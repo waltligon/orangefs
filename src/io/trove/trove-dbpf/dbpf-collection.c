@@ -16,6 +16,7 @@
 #include "trove.h"
 #include "trove-internal.h"
 #include "dbpf.h"
+#include "gossip.h"
 
 /* dbpf-collection.c
  *
@@ -70,7 +71,7 @@ void dbpf_collection_clear_registered(void)
 	return;
     }
     if ((ret = free_ptr->coll_attr_db->close(free_ptr->coll_attr_db, 0)) != 0) {
-	fprintf(stderr, "dbpf_finalize: %s\n",
+	gossip_lerr("dbpf_finalize: %s\n",
 		db_strerror(ret));
     }
 
@@ -78,7 +79,7 @@ void dbpf_collection_clear_registered(void)
 	return;
     }
     if ((ret = free_ptr->ds_db->close(free_ptr->ds_db, 0)) != 0) {
-	fprintf(stderr, "dbpf_finalize: %s\n",
+	gossip_lerr("dbpf_finalize: %s\n",
 		db_strerror(ret));
     }	
 	free(free_ptr->name);

@@ -19,6 +19,7 @@
 #include "dbpf.h"
 #include "dbpf-op-queue.h"
 #include "dbpf-keyval.h"
+#include "gossip.h"
 
 /* Internal function prototypes */
 static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p);
@@ -590,7 +591,7 @@ return_ok:
     return 1;
     
 return_error:
-    fprintf(stderr, "dbpf_keyval_iterate_op_svc: %s\n", db_strerror(ret));
+    gossip_lerr("dbpf_keyval_iterate_op_svc: %s\n", db_strerror(ret));
     *op_p->u.k_iterate.count_p = i;
     if (got_db) dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
     return error;

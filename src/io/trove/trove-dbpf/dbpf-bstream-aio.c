@@ -12,12 +12,13 @@
 #include <errno.h>
 #include <assert.h>
 
-#include <trove.h>
-#include <trove-internal.h>
-#include <dbpf.h>
-#include <dbpf-bstream.h>
-#include <dbpf-op-queue.h>
-#include <id-generator.h>
+#include "trove.h"
+#include "trove-internal.h"
+#include "dbpf.h"
+#include "dbpf-bstream.h"
+#include "dbpf-op-queue.h"
+#include "id-generator.h"
+#include "gossip.h"
 
 /* Note: need to link in librt */
 

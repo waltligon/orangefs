@@ -85,7 +85,7 @@ struct handle_ledger * trove_handle_ledger_init(TROVE_coll_id coll_id,
 	 * maybe in the final cut...*/
 	ret = extentlist_addextent(&(ledger->free_list), MIN_HANDLE, MAX_HANDLE);
 	if (ret != 0) {
-	    fprintf(stderr, "error adding extent\n");
+	    gossip_lerr("error adding extent\n");
 	    return NULL;
 	}
     } else {
@@ -93,7 +93,7 @@ struct handle_ledger * trove_handle_ledger_init(TROVE_coll_id coll_id,
 	 * already created ... say by a mkfs */
 	ret = handle_store_load(coll_id, admin_name, ledger);
 	if (ret < 0) {
-	    fprintf(stderr, "backing store initialization failed\n");
+	    gossip_lerr("backing store initialization failed\n");
 	    return NULL;
 	}		
     }
@@ -305,7 +305,7 @@ static int handle_store_extentlist_create(TROVE_coll_id coll_id,
     while ( ret == 0) trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
     free(extent_array.extent_array);
     if (ret < 0) {
-	fprintf(stderr, "dspace create failed\n");
+	gossip_lerr("dspace create failed\n");
 	return -1;
     }
 
@@ -317,7 +317,7 @@ static int handle_store_extentlist_create(TROVE_coll_id coll_id,
 				NULL, NULL, &state);
     }
     if (ret < 0 ) {
-	fprintf(stderr, "handle_store_create: write to bstream failed\n");
+	gossip_lerr("handle_store_create: write to bstream failed\n");
 	return -1;
     }
     return 0;
@@ -355,7 +355,7 @@ static int handle_store_load(TROVE_coll_id coll_id,
     /* ONE DAY THIS CODE WILL READ THE FREE LISTS FROM BSTREAMS, BUT NOT TODAY. */
     ret = trove_collection_lookup(admin_name, &admin_id, NULL, &op_id);
     if (ret < 0) {
-	fprintf(stderr, "collection lookup failed");
+	gossip_lerr("collection lookup failed");
 	return -1;
     }
 
@@ -364,46 +364,46 @@ static int handle_store_load(TROVE_coll_id coll_id,
     if (handle_store_extentlist_exists(admin_id, free_list_handle)) {
 	ret = handle_store_extentlist_read(admin_id, free_list_handle, &(ledger->free_list));
 	if (ret < 0 ) {
-	    fprintf(stderr, "loading from backing store failed\n");
+	    gossip_lerr("loading from backing store failed\n");
 	    return -1;
 	}
     } else {
 	ret = handle_store_extentlist_create(admin_id, free_list_handle, &(ledger->free_list));
 	if (ret < 0 ) {
-	    fprintf(stderr, "creation of backing store failed\n");
+	    gossip_lerr("creation of backing store failed\n");
 	    return -1;
 	}
 	ret = extentlist_addextent(&(ledger->free_list), MIN_HANDLE, MAX_HANDLE);
 	if (ret < 0 ) {
-	    fprintf(stderr, "adding extent failed\n");
+	    gossip_lerr("adding extent failed\n");
 	    return -1;
 	}
     }
     if (handle_store_extentlist_exists(admin_id, recently_freed_list_handle)) {
 	ret = handle_store_extentlist_read(admin_id, recently_freed_list_handle, &(ledger->recently_freed_list));
 	if ( ret < 0 ) {
-	    fprintf(stderr, "loading from backing store failed\n");
+	    gossip_lerr("loading from backing store failed\n");
 	    return -1;
 	}
     } else {
 	ret = handle_store_extentlist_create(admin_id, recently_freed_list_handle, 
 					     &(ledger->recently_freed_list));
 	if (ret < 0) {
-	    fprintf(stderr, "creation of backing store failed\n");
+	    gossip_lerr("creation of backing store failed\n");
 	    return -1;
 	}
     }
     if(handle_store_extentlist_exists(admin_id, overflow_list_handle )) {
 	ret = handle_store_extentlist_read(admin_id, overflow_list_handle, &(ledger->overflow_list));
 	if (ret < 0 ) {
-	    fprintf(stderr, "loading from backing store failed\n");
+	    gossip_lerr("loading from backing store failed\n");
 	    return -1;
 	}
     }  else {
 	ret = handle_store_extentlist_create(admin_id, overflow_list_handle, 
 					     &(ledger->overflow_list));
 	if (ret < 0) {
-	    fprintf(stderr, "creation of backing store failed\n");
+	    gossip_lerr("creation of backing store failed\n");
 	    return -1;
 	}
     }

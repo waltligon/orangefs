@@ -8,6 +8,7 @@
 #include <assert.h>
 
 #include "dbpf-op.h"
+#include "gossip.h"
 
 dbpf_queued_op_t *dbpf_queued_op_alloc(void)
 {

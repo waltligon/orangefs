@@ -218,7 +218,7 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
 
     ret = db_create(&(keyval_db_cache[i].db_p), NULL, 0);
     if (ret != 0) {
-	    fprintf(stderr, "dbpf_keyval_dbcache_get: %s\n", db_strerror(ret));
+	    gossip_lerr("dbpf_keyval_dbcache_get: %s\n", db_strerror(ret));
 	    assert(0);
     }
 

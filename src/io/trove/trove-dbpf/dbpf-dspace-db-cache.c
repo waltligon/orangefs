@@ -19,6 +19,7 @@
 #include "trove-internal.h"
 #include "dbpf.h"
 #include "dbpf-dspace.h"
+#include "gossip.h"
 
 
 enum {
@@ -142,7 +143,7 @@ int dbpf_dspace_dbcache_try_get(TROVE_coll_id coll_id,
 
     ret = db_create(&(dspace_db_cache[i].db_p), NULL, 0);
     if (ret != 0) {
-	    fprintf(stderr, "dbpf_dspace_dbcache_get: %s\n", db_strerror(ret));
+	    gossip_lerr("dbpf_dspace_dbcache_get: %s\n", db_strerror(ret));
 	    assert(0);
     }
 

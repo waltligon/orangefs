@@ -31,6 +31,7 @@
 #include "trove-internal.h"
 #include "dbpf.h"
 #include "dbpf-bstream.h"
+#include "gossip.h"
 
 enum {
     FDCACHE_ENTRIES = 16

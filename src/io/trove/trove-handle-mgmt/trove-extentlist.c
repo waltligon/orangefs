@@ -7,10 +7,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-
 #include <assert.h>
 
-#include <trove-extentlist.h>
+#include "trove-extentlist.h"
+#include "gossip.h"
 
 enum extentlist_coalesce_status {
 	COALESCE_ERROR=-1,
@@ -103,7 +103,7 @@ int extentlist_addextent(struct TROVE_handle_extentlist *elist,
     if (extentlist_coalesce_extent(&elist->index,e)  == COALESCE_NONE) {
 	/* if the index is empty, avlinsert will allocate space */
 	if ( avlinsert(&elist->index, e) == 0 ) {
-	    fprintf(stderr, "error inserting key\n");
+	    gossip_lerr("error inserting key\n");
 	    return -1;
 	}
 	elist->num_extents++;
@@ -201,7 +201,7 @@ static int extentlist_coalesce_extent(struct avlnode **n,
     if ( (lesser = avlaltaccess(*n, (e->first - 1))) != NULL) {
 	e->first = (*lesser)->first;
 	if ( avlremove(n, (*lesser)->first) == 0 ) {
-	    fprintf(stderr, "error removing key %Ld\n", (*lesser)->first);
+	    gossip_lerr("error removing key %Ld\n", (*lesser)->first);
 	    return COALESCE_ERROR;
 	}
 	merge_lesser = 1;
@@ -209,7 +209,7 @@ static int extentlist_coalesce_extent(struct avlnode **n,
     if ( (greater = avlaccess(*n, (e->last + 1)) )!= NULL ) {
 	e->last = (*greater)->last;
 	if (avlremove(n, (*greater)->first) == 0 ) {
-	    fprintf(stderr, "error removing key %Ld\n", (*greater)->first);
+	    gossip_lerr("error removing key %Ld\n", (*greater)->first);
 	    return COALESCE_ERROR;
 	}
 	merge_greater = 1;
@@ -217,7 +217,7 @@ static int extentlist_coalesce_extent(struct avlnode **n,
 
     if (merge_lesser || merge_greater ) {
 	if (avlinsert(n, e) == 0 ) {
-	    fprintf(stderr, "error inserting key %Ld\n", e->first);
+	    gossip_lerr("error inserting key %Ld\n", e->first);
 	    return COALESCE_ERROR;
 	} else
 	    return COALESCE_SUCCESS;
@@ -260,7 +260,7 @@ int64_t extentlist_get_and_dec_extent(struct TROVE_handle_extentlist *elist)
     /* could either be called w/o calling the setup functions, or we gave
      * out the last handle in the list */
     if (e == NULL ) {
-	fprintf(stderr, "no handles avaliable\n");
+	gossip_lerr("no handles avaliable\n");
 	return -1;
     }
     ext = *e;
@@ -271,7 +271,7 @@ int64_t extentlist_get_and_dec_extent(struct TROVE_handle_extentlist *elist)
     if (ext->first  == ext->last)	{
 	/* just gave out the last handle in the range */
 	if (avlremove(&(elist->index), ext->first) == 0) {
-	    fprintf(stderr, "avlremove: index does not have that item\n");
+	    gossip_lerr("avlremove: index does not have that item\n");
 	    return -1;
 	}
 	elist->num_extents--;

@@ -5,6 +5,7 @@
  */
 
 #include "dbpf-op-queue.h"
+#include "gossip.h"
 
 /* the queue that stores pending serviceable operations */
 QLIST_HEAD(dbpf_op_queue);

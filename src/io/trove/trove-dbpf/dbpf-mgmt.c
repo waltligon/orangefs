@@ -29,6 +29,7 @@
 #include "dbpf-thread.h"
 #include "trove-ledger.h"
 #include "trove-handle-mgmt.h"
+#include "gossip.h"
 
 int dbpf_method_id = -1;
 char dbpf_method_name[] = "dbpf";
@@ -103,13 +104,13 @@ static int dbpf_collection_seteattr(TROVE_coll_id coll_id,
     db_data.size = val_p->buffer_sz;
     ret = coll_p->coll_attr_db->put(coll_p->coll_attr_db, NULL, &db_key, &db_data, 0);
     if (ret != 0) {
-	fprintf(stderr, "dbpf_collection_seteattr: %s\n", db_strerror(ret));
+	gossip_lerr("dbpf_collection_seteattr: %s\n", db_strerror(ret));
 	return -1;
     }
 
     ret = coll_p->coll_attr_db->sync(coll_p->coll_attr_db, 0);
     if (ret != 0) {
-	fprintf(stderr, "dbpf_collection_seteattr: %s\n", db_strerror(ret));
+	gossip_lerr("dbpf_collection_seteattr: %s\n", db_strerror(ret));
 	return -1;
     }
 
@@ -151,7 +152,7 @@ static int dbpf_collection_geteattr(TROVE_coll_id coll_id,
 
     ret = coll_p->coll_attr_db->get(coll_p->coll_attr_db, NULL, &db_key, &db_data, 0);
     if (ret != 0) {
-	fprintf(stderr, "dbpf_collection_geteattr: %s\n", db_strerror(ret));
+	gossip_lerr("dbpf_collection_geteattr: %s\n", db_strerror(ret));
 	return -1;
     }
 
@@ -217,7 +218,7 @@ static int dbpf_finalize(void)
 	return -1;
     }
     if ((ret = my_storage_p->sto_attr_db->close(my_storage_p->sto_attr_db, 0)) != 0) {
-	fprintf(stderr, "dbpf_finalize: %s\n",
+	gossip_lerr("dbpf_finalize: %s\n",
 		db_strerror(ret));
 	return -1;
     }
@@ -226,7 +227,7 @@ static int dbpf_finalize(void)
 	return -1;
     }
     if ((ret = my_storage_p->coll_db->close(my_storage_p->coll_db, 0)) != 0) {
-	fprintf(stderr, "dbpf_finalize: %s\n",
+	gossip_lerr("dbpf_finalize: %s\n",
 		db_strerror(ret));
 	return -1;
     }
@@ -638,7 +639,7 @@ return_ok:
     return 1;
     
 return_error:
-    fprintf(stderr, "dbpf_collection_iterate_op_svc: %s\n", db_strerror(ret));
+    gossip_lerr("dbpf_collection_iterate_op_svc: %s\n", db_strerror(ret));
     *inout_count_p = i;
     return -1;
 }
@@ -879,7 +880,7 @@ static int dbpf_db_create(char *dbname)
     data.size = strlen(datastring)+1;
 
     if ((ret = db_create(&db_p, NULL, 0)) != 0) {
-	fprintf(stderr, "dbpf_storage_create: %s\n",
+	gossip_lerr("dbpf_storage_create: %s\n",
 		db_strerror(ret));
 	return -1;
     }
@@ -914,7 +915,7 @@ static int dbpf_db_create(char *dbname)
 #endif
 
     if ((ret = db_p->close(db_p, 0)) != 0) {
-	fprintf(stderr, "dbpf_storage_create: %s\n",
+	gossip_lerr("dbpf_storage_create: %s\n",
 		db_strerror(ret));
 	return -1;
     }
