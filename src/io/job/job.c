@@ -2197,10 +2197,20 @@ int job_testsome(
 	/* check before we do anything else to see if the job that we
 	 * want is in the completion queue
 	 */
-	ret = completion_query_some(tmp_id_array,  
-		inout_count_p, &out_index_array[total_completed],
-		&returned_user_ptr_array[total_completed], 
-		&out_status_array_p[total_completed]);
+	if(returned_user_ptr_array)
+	{
+		ret = completion_query_some(tmp_id_array,  
+			inout_count_p, &out_index_array[total_completed],
+			&returned_user_ptr_array[total_completed], 
+			&out_status_array_p[total_completed]);
+	}
+	else
+	{
+		ret = completion_query_some(tmp_id_array,  
+			inout_count_p, &out_index_array[total_completed],
+			NULL, &out_status_array_p[total_completed]);
+	}
+
 	/* return here on error or completion */
 	if(ret < 0)
 	{
@@ -2275,10 +2285,20 @@ int job_testsome(
 		else
 		{
 			/* check queue now to see of the op we want is done */
-			ret = completion_query_some(tmp_id_array,  
-				inout_count_p, &out_index_array[total_completed],
-				&returned_user_ptr_array[total_completed], 
-				&out_status_array_p[total_completed]);
+			if(returned_user_ptr_array)
+			{
+				ret = completion_query_some(tmp_id_array,  
+					inout_count_p, &out_index_array[total_completed],
+					&returned_user_ptr_array[total_completed], 
+					&out_status_array_p[total_completed]);
+			}
+			else
+			{
+				ret = completion_query_some(tmp_id_array,  
+					inout_count_p, &out_index_array[total_completed],
+					NULL, &out_status_array_p[total_completed]);
+			}
+
 			/* return here on error or completion */
 			if(ret < 0)
 			{
@@ -2311,10 +2331,19 @@ int job_testsome(
 		if(num_completed > 0)
 		{
 			/* check queue now to see of the op we want is done */
-			ret = completion_query_some(tmp_id_array,  
-				inout_count_p, &out_index_array[total_completed],
-				&returned_user_ptr_array[total_completed], 
-				&out_status_array_p[total_completed]);
+			if(returned_user_ptr_array)
+			{
+				ret = completion_query_some(tmp_id_array,  
+					inout_count_p, &out_index_array[total_completed],
+					&returned_user_ptr_array[total_completed], 
+					&out_status_array_p[total_completed]);
+			}
+			else
+			{
+				ret = completion_query_some(tmp_id_array,  
+					inout_count_p, &out_index_array[total_completed],
+					NULL, &out_status_array_p[total_completed]);
+			}
 			/* return here on error or completion */
 			if(ret < 0)
 			{
@@ -3347,8 +3376,15 @@ static int completion_query_some(
 		for(i=0; i<(*inout_count_p); i++)
 		{
 			tmp_desc = id_gen_fast_lookup(id_array[out_index_array[i]]);
-			fill_status(tmp_desc, &(returned_user_ptr_array[i]),
-				&(out_status_array_p[i]));
+			if(returned_user_ptr_array)
+			{
+				fill_status(tmp_desc, &(returned_user_ptr_array[i]),
+					&(out_status_array_p[i]));
+			}
+			else
+			{
+				fill_status(tmp_desc, NULL, &(out_status_array_p[i]));
+			}	
 			job_desc_q_remove(tmp_desc);
 			if(tmp_desc->type == JOB_REQ_SCHED &&
 				tmp_desc->u.req_sched.post_flag == 1)
@@ -3388,8 +3424,16 @@ static int completion_query_world(
 		while(*inout_count_p < incount && (query =
 			job_desc_q_shownext(completion_queue)))
 		{
-			fill_status(query, &(returned_user_ptr_array[*inout_count_p]), 
-				&(out_status_array_p[*inout_count_p]));
+			if(returned_user_ptr_array)
+			{
+				fill_status(query, &(returned_user_ptr_array[*inout_count_p]), 
+					&(out_status_array_p[*inout_count_p]));
+			}
+			else
+			{
+				fill_status(query, NULL,
+					&(out_status_array_p[*inout_count_p]));
+			}	
 			out_id_array_p[*inout_count_p] = query->job_id;
 			job_desc_q_remove(query);
 			(*inout_count_p)++;
