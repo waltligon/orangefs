@@ -174,21 +174,23 @@ static int pvfs2_get_block(
     return pvfs2_get_blocks(ip, lblock, 1, bh_result, create);
 }
 
-/* static int pvfs2_writepage( */
-/*     struct page *page, */
-/*     struct writeback_control *wbc) */
-/* { */
-/*     pvfs2_print("pvfs2: pvfs2_writepage called\n"); */
+static int pvfs2_writepage(
+    struct page *page,
+    struct writeback_control *wbc)
+{
+    pvfs2_print("pvfs2: pvfs2_writepage called\n");
 /*     return block_write_full_page(page, pvfs2_get_block, wbc); */
-/* } */
+    return 0;
+}
 
-/* static int pvfs2_writepages( */
-/*     struct address_space *mapping, */
-/*     struct writeback_control *wbc) */
-/* { */
-/*     pvfs2_print("pvfs2: pvfs2_writepages called\n"); */
+static int pvfs2_writepages(
+    struct address_space *mapping,
+    struct writeback_control *wbc)
+{
+    pvfs2_print("pvfs2: pvfs2_writepages called\n");
 /*     return mpage_writepages(mapping, wbc, pvfs2_get_block); */
-/* } */
+    return 0;
+}
 
 /* static int pvfs2_sync_page(struct page *page) */
 /* { */
@@ -290,8 +292,8 @@ struct address_space_operations pvfs2_address_operations =
 {
     .readpage = pvfs2_readpage,
     .readpages = pvfs2_readpages,
-/*     .writepage = pvfs2_writepage, */
-/*     .writepages = pvfs2_writepages, */
+    .writepage = pvfs2_writepage,
+    .writepages = pvfs2_writepages,
 /*     .prepare_write = pvfs2_prepare_write, */
 /*     .commit_write = generic_commit_write, */
     .set_page_dirty = pvfs2_set_page_dirty,
