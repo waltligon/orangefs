@@ -1,7 +1,6 @@
 DIR := server
 
 TESTSRC += \
-	$(DIR)/getconfig.c \
 	$(DIR)/showconfig.c
 
 test/server/showconfig: test/server/showconfig.o lib/libpvfs2-server.a
