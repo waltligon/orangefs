@@ -375,7 +375,7 @@ static int truncate_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
 
 	/* no callback. the status will be in the generic response structure */
 	msg_p->fs_id = sm_p->u.truncate.object_ref.fs_id;
-	msg_p->handle = sm_p->u.truncate.object_ref.handle;
+	msg_p->handle = sm_p->u.truncate.datafile_handles[i];
 	msg_p->comp_fn = NULL;
     }
 
