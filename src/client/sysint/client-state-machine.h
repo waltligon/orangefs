@@ -141,7 +141,6 @@ typedef struct
     flow_descriptor flow_desc;
     PVFS_msg_tag_t session_tag;
 
-    int write_transfer_timeout;
     PINT_client_sm_recv_state write_ack;
 
     /*

@@ -238,7 +238,7 @@ void job_close_context(job_context_id context_id)
  *
  * returns 0 on success, -PVFS_errno on failure
  */
-int job_reset_timout(job_id_t id, int timeout_sec)
+int job_reset_timeout(job_id_t id, int timeout_sec)
 {
     struct job_desc* query = NULL;
     int ret = -1;

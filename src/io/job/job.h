@@ -60,7 +60,7 @@ int job_open_context(job_context_id* context_id);
 
 void job_close_context(job_context_id context_id);
 
-int job_reset_timout(job_id_t id, int timeout_sec);
+int job_reset_timeout(job_id_t id, int timeout_sec);
 
 /******************************************************************
  * job posting functions 

@@ -57,8 +57,6 @@ static inline int process_context_recv_and_post_flow(
 static inline int check_context_status(
     PINT_client_io_ctx *cur_ctx, int io_type,
     PVFS_size *total_size);
-static inline int compute_scaling_write_transfer_timeout(
-    PVFS_size data_size, int datafile_count);
 static int io_find_target_datafiles(
     PVFS_Request mem_req, PVFS_Request file_req,
     PVFS_offset file_req_offset, PINT_dist *dist_p,
@@ -859,8 +857,25 @@ static int io_datafile_complete_operations(PINT_client_sm *sm_p,
 
         cur_ctx->flow_status = *js_p;
 
+        if (cur_ctx->write_ack_in_progress)
+        {
+            int ret = 0;
+
+            assert(sm_p->u.io.write_ack_completion_count);
+            ret = job_reset_timeout(cur_ctx->write_ack.recv_id,
+                                    PVFS2_CLIENT_JOB_TIMEOUT);
+
+            /*
+              allow -PVFS_EINVAL errors in case the recv has already
+              completed (before we've processed it)
+            */
+            assert((ret == 0) || (ret == -PVFS_EINVAL));
+        }
+
         gossip_debug(GOSSIP_IO_DEBUG, "  matched completed flow for "
-                     "context %p\n", cur_ctx);
+                     "context %p%s\n", cur_ctx,
+                     ((cur_ctx->write_ack_in_progress ?
+                       " and\n\treset write_recv timeout" : "")));
 
         cur_ctx->flow_in_progress = 0;
         sm_p->u.io.flow_completion_count--;
@@ -1257,14 +1272,6 @@ static inline int build_context_flow(
         cur_ctx->flow_desc.src.u.mem.buffer = sm_p->u.io.buffer;
         cur_ctx->flow_desc.dest.endpoint_id = BMI_ENDPOINT;
         cur_ctx->flow_desc.dest.u.bmi.address = cur_ctx->msg->svr_addr;
-
-        cur_ctx->write_transfer_timeout =
-            compute_scaling_write_transfer_timeout(
-                cur_ctx->flow_desc.file_data.fsize,
-                cur_ctx->flow_desc.file_data.server_ct);
-
-        gossip_debug(GOSSIP_IO_DEBUG, " using write_transfer_timeout "
-                     "of %d seconds\n", cur_ctx->write_transfer_timeout);
     }
     return 0;
 }
@@ -1358,12 +1365,17 @@ static inline int process_context_recv_and_post_flow(
         */
         status_user_tag = ((4 * cur_ctx->index) + IO_SM_PHASE_FINAL_ACK);
 
+        /*
+          pre-post this recv with an infinite timeout and adjust it
+          after the flow completes since we don't know how long a flow
+          can take at this point
+        */ 
         ret = job_bmi_recv(
             cur_ctx->msg->svr_addr, cur_ctx->write_ack.encoded_resp_p,
             cur_ctx->write_ack.max_resp_sz, cur_ctx->session_tag,
             BMI_PRE_ALLOC, sm_p, status_user_tag,
             &cur_ctx->write_ack.recv_status, &cur_ctx->write_ack.recv_id,
-            pint_client_sm_context, cur_ctx->write_transfer_timeout);
+            pint_client_sm_context, JOB_TIMEOUT_INF);
 
         if (ret < 0)
         {
@@ -1505,16 +1517,6 @@ static inline int check_context_status(
         }
     }
     return ret;
-}
-
-static inline int compute_scaling_write_transfer_timeout(
-    PVFS_size data_size, int datafile_count)
-{
-    static int one_hundred_megs = (1024 * 1024 * 100);
-    int scale = ((data_size / one_hundred_megs) * datafile_count);
-
-    return (scale ? (scale * PVFS2_CLIENT_JOB_TIMEOUT) :
-            PVFS2_CLIENT_JOB_TIMEOUT);
 }
 
 /*
