@@ -128,7 +128,7 @@ $(TESTS): %: %.o $(LIBRARIES)
 
 cscope:
 	find $(srcdir) -iname "*.[ch]" > $(srcdir)/cscope.files
-	cscope -beq -i $(srcdir)/cscope.files
+	( cd $(srcdir); cscope -beq -i $(srcdir)/cscope.files )
 
 docs: $(DOCSPS) $(DOCSPDF)
 
