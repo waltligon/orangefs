@@ -23,6 +23,7 @@
 #define BUFFER_SIZE (256*1024)
 #define MAX_REGIONS 8
 
+/* fp_queue_item describes an individual buffer being used within the flow */
 struct fp_queue_item
 {
     void* buffer;
@@ -35,6 +36,9 @@ struct fp_queue_item
     struct PINT_thread_mgr_trove_callback trove_callback;
 };
 
+/* fp_private_data is information specific to this flow protocol, stored
+ * in flow descriptor but hidden from caller
+ */
 struct fp_private_data
 {
     flow_descriptor* parent;
@@ -113,6 +117,12 @@ struct flowproto_ops fp_multiqueue_ops = {
     fp_multiqueue_service
 };
 
+/* fp_multiqueue_initialize()
+ *
+ * starts up the flow protocol
+ *
+ * returns 0 on succes, -PVFS_error on failure
+ */
 int fp_multiqueue_initialize(int flowproto_id)
 {
     int ret = -1;
@@ -143,6 +153,12 @@ assert(0);
     return(0);
 }
 
+/* fp_multiqueue_finalize()
+ *
+ * shuts down the flow protocol
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
 int fp_multiqueue_finalize(void)
 {
     PINT_thread_mgr_bmi_stop();
@@ -150,6 +166,12 @@ int fp_multiqueue_finalize(void)
     return (0);
 }
 
+/* fp_multiqueue_getinfo()
+ *
+ * retrieves runtime parameters from flow protocol
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
 int fp_multiqueue_getinfo(flow_descriptor * flow_d,
 			       int option,
 			       void *parameter)
@@ -170,6 +192,12 @@ int fp_multiqueue_getinfo(flow_descriptor * flow_d,
     }
 }
 
+/* fp_multiqueue_setinfo()
+ *
+ * sets runtime parameters in flow protocol
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
 int fp_multiqueue_setinfo(flow_descriptor * flow_d,
 			       int option,
 			       void *parameter)
@@ -177,6 +205,12 @@ int fp_multiqueue_setinfo(flow_descriptor * flow_d,
     return (-PVFS_ENOSYS);
 }
 
+/* fp_multiqueue_post()
+ *
+ * posts a flow descriptor to begin work
+ *
+ * returns 0 on success, 1 on immediate completion, -PVFS_error on failure
+ */
 int fp_multiqueue_post(flow_descriptor * flow_d)
 {
     struct fp_private_data* flow_data = NULL;
@@ -265,6 +299,12 @@ int fp_multiqueue_post(flow_descriptor * flow_d)
     return (0);
 }
 
+/* fp_multiqueue_find_serviceable()
+ *
+ * looks for flows that have completed or are in need of service
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
 int fp_multiqueue_find_serviceable(flow_descriptor ** flow_d_array,
 				  int *count,
 				  int max_idle_time_ms)
@@ -319,6 +359,13 @@ int fp_multiqueue_find_serviceable(flow_descriptor ** flow_d_array,
     return (0);
 }
 
+/* fp_multiqueue_service()
+ *
+ * services a flow descriptor, should never be called for this particular
+ * protocol because it services itself autonomously
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
 int fp_multiqueue_service(flow_descriptor * flow_d)
 {
     /* should never get here; this protocol skips the scheduler for now */
@@ -326,6 +373,12 @@ int fp_multiqueue_service(flow_descriptor * flow_d)
     return (-PVFS_ENOSYS);
 }
 
+/* bmi_recv_callback_fn()
+ *
+ * function to be called upon completion of a BMI recv operation
+ * 
+ * no return value
+ */
 static void bmi_recv_callback_fn(void *user_ptr,
 		         PVFS_size actual_size,
 		         PVFS_error error_code)
@@ -464,6 +517,12 @@ static void trove_read_callback_fn(void *user_ptr,
 }
 #endif
 
+/* bmi_send_callback_fn()
+ *
+ * function to be called upon completion of a BMI send operation
+ *
+ * no return value
+ */
 static void bmi_send_callback_fn(void *user_ptr,
 		         PVFS_size actual_size,
 		         PVFS_error error_code)
@@ -476,6 +535,12 @@ static void bmi_send_callback_fn(void *user_ptr,
     return;
 };
 
+/* trove_write_callback_fn()
+ *
+ * function to be called upon completion of a trove write operation
+ *
+ * no return value
+ */
 static void trove_write_callback_fn(void *user_ptr,
 		           PVFS_error error_code)
 {
@@ -570,6 +635,12 @@ static void trove_write_callback_fn(void *user_ptr,
     return;
 };
 
+/* cleanup_buffers()
+ *
+ * releases any resources consumed during flow processing
+ *
+ * no return value
+ */
 static void cleanup_buffers(struct fp_private_data* flow_data)
 {
     int i;
