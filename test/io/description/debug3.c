@@ -31,6 +31,12 @@ int main(int argc, char **argv)
 	int ret = -1;
 	int pack_size = 0;
 
+	/* DESCRIPTION: 
+	 * in this case, we are doing a single write, of size 4390228,
+	 * at offset 20M.  There are two servers.  We are looking at
+	 * the output of the request processing code on the client side
+	 */
+
 	/* PVFS_Process_request arguments */
 	int retval;
 	PVFS_count32 segmax;
