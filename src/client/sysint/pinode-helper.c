@@ -139,9 +139,9 @@ pinode_alloc_failure:
 int phelper_refresh_pinode(int flags,PVFS_bitfield mask,pinode *pinode_ptr,\
 		pinode_reference pref, PVFS_credentials credentials)
 {
-	struct PVFS_server_req_s *req_job;
-	struct PVFS_server_resp_s *ack_job;
-	PVFS_servreq_getattr req_gattr;
+	struct PVFS_server_req_s *req_p;
+	struct PVFS_server_resp_s *ack_p;
+	/*PVFS_servreq_getattr req_gattr;*/
 	int ret = 0,tflags = 0;
 	bmi_addr_t serv_addr;
 	char *server = NULL;

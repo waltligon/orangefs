@@ -150,11 +150,11 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 
 	ack_p = (struct PVFS_server_resp_s *) decoded.buffer;
 
-	/*if (ack_p->status < 0 )
+	if (ack_p->status < 0 )
         {
             goto send_req_failure;
             ret = ack_p->status;
-        }*/
+        }
 
 	resp->attr = ack_p->u.getattr.attr;
 	/* TODO: uncomment when extended attributes are defined */
@@ -164,6 +164,12 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
         free(req_p);
 
 	/* do size calculations here? */
+
+	if ((req->attrmask & ATTR_SIZE) == ATTR_SIZE)
+	{
+		/*only do this if you want the size*/
+		num_data_servers = entry_pinode->attr.u.meta.nr_datafiles;
+	}
 
 #if 0
 	ret = phelper_get_pinode(entry,&entry_pinode,attr_mask,
