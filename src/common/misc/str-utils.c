@@ -210,7 +210,11 @@ int PINT_parse_handle_ranges(
        `\0' but **endptr is `\0' on return, the entire string  is
        valid.  */ 
     out_extent->first = out_extent->last =
+#ifdef HAVE_STRTOULL
+        (PVFS_handle)strtoull(p, &endchar, 0);
+#else
         (PVFS_handle)strtoul(p, &endchar, 0);
+#endif
     if ( p == endchar )  /* all done */
 	return 0; 
     /* strtoul eats leading space, but not trailing space.  take care of ws
@@ -221,7 +225,11 @@ int PINT_parse_handle_ranges(
 
     switch (*endchar) {
 	case '-': /* we got the first half of the range. grab 2nd half */
-	    out_extent->last = (int)strtoul(p, &endchar, 0);
+#ifdef HAVE_STRTOULL
+	    out_extent->last = (PVFS_handle)strtoull(p, &endchar, 0);
+#else
+	    out_extent->last = (PVFS_handle)strtoul(p, &endchar, 0);
+#endif
 	    /* again, skip trailing space ...*/
 	    while (isspace(*endchar)) endchar++;
 	    /* ... and the delimiter */ 
