@@ -63,15 +63,16 @@ int PINT_Process_request(PINT_Request_state *req,
 	if (PINT_EQ_CKSIZE(mode)) /* be must be exact here */
 	{
 		/* request for a size check - do not alter request state */
-		gossip_debug(REQUEST_DEBUG,"\tsize request - copying state, hold on to your hat! dp %d\n",req->cur->rqbase->depth);
-		temp_space = (void *)malloc(sizeof(PVFS_offset)+sizeof(PINT_Request_state)+
+		gossip_debug(REQUEST_DEBUG,
+				"\tsize request - copying state, hold on to your hat! dp %d\n",
+				req->cur->rqbase->depth);
+		temp_space = (void *)malloc(sizeof(PINT_Request_state)+
 				(sizeof(PINT_reqstack)*req->cur->rqbase->depth));
-		memcpy((temp_space + sizeof(PVFS_offset)),req,sizeof(PINT_Request_state));
-		req = (PINT_Request_state *)(temp_space + sizeof(PVFS_offset));
-		memcpy((temp_space + sizeof(PVFS_offset) + sizeof(PINT_Request_state)),
+		memcpy(temp_space,req,sizeof(PINT_Request_state));
+		req = (PINT_Request_state *)temp_space;
+		memcpy(temp_space + sizeof(PINT_Request_state),
 				req->cur,(sizeof(PINT_reqstack)*req->cur->rqbase->depth));
-		req->cur = (PINT_reqstack *)(temp_space + sizeof(PVFS_offset) +
-				sizeof(PINT_Request_state));
+		req->cur = (PINT_reqstack *)(temp_space + sizeof(PINT_Request_state));
 	}
 	gossip_debug(REQUEST_DEBUG,"\tstart_offset == %lld\n", req->start_offset);
 	/* check to see if we are picking up where we left off */
