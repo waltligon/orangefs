@@ -136,6 +136,7 @@ typedef struct
     /* a reference to the msgpair we're using for communication */
     PINT_sm_msgpair_state *msg;
 
+    int flow_timeout;
     job_id_t flow_job_id;
     job_status_s flow_status;
     flow_descriptor flow_desc;
