@@ -1157,6 +1157,8 @@ static int dbpf_dspace_test(
         return ret;
     }
 
+    gen_mutex_lock(context_mutex);
+
     /* check the state of the current op to see if it's completed */
     gen_mutex_lock(&cur_op->mutex);
     state = cur_op->op.state;
@@ -1180,10 +1182,8 @@ static int dbpf_dspace_test(
             wait_time.tv_sec++;
         }
 
-        gen_mutex_lock(context_mutex);
         ret = pthread_cond_timedwait(&dbpf_op_completed_cond,
                                      context_mutex, &wait_time);
-        gen_mutex_unlock(context_mutex);
 
         if (ret == ETIMEDOUT)
         {
@@ -1209,7 +1209,6 @@ static int dbpf_dspace_test(
         assert(!dbpf_op_queue_empty(dbpf_completion_queue_array[context_id]));
 
         /* pull the op out of the context specific completion queue */
-        gen_mutex_lock(context_mutex);
         dbpf_op_queue_remove(cur_op);
         gen_mutex_unlock(context_mutex);
 
@@ -1227,6 +1226,7 @@ static int dbpf_dspace_test(
     }
 
   op_not_completed:
+    gen_mutex_unlock(context_mutex);
     return 0;
 
 #else
@@ -1321,6 +1321,7 @@ int dbpf_dspace_testcontext(
       we will only sleep if there is nothing to do; otherwise 
       we return whatever we find ASAP
     */
+    gen_mutex_lock(context_mutex);
     if (dbpf_op_queue_empty(dbpf_completion_queue_array[context_id]))
     {
         struct timeval base;
@@ -1338,10 +1339,8 @@ int dbpf_dspace_testcontext(
             wait_time.tv_sec++;
         }
 
-        gen_mutex_lock(context_mutex);
         ret = pthread_cond_timedwait(&dbpf_op_completed_cond,
                                      context_mutex, &wait_time);
-        gen_mutex_unlock(context_mutex);
 
         if (ret == ETIMEDOUT)
         {
@@ -1349,6 +1348,7 @@ int dbpf_dspace_testcontext(
              * no point in checking the completion queue, we should just
              * return
              */
+            gen_mutex_unlock(context_mutex);
             *inout_count_p = 0;
             return(0);
         }
@@ -1362,9 +1362,7 @@ int dbpf_dspace_testcontext(
         assert(cur_op);
 
         /* pull the op out of the context specific completion queue */
-        gen_mutex_lock(context_mutex);
         dbpf_op_queue_remove(cur_op);
-        gen_mutex_unlock(context_mutex);
 
         state_array[out_count] = cur_op->state;
 
@@ -1380,6 +1378,7 @@ int dbpf_dspace_testcontext(
 
         out_count++;
     }
+    gen_mutex_unlock(context_mutex);
 
     *inout_count_p = out_count;
     ret = 0;
@@ -1447,6 +1446,7 @@ static int dbpf_dspace_testsome(
     context_mutex = dbpf_completion_queue_array_mutex[context_id];
     assert(context_mutex);
 
+    gen_mutex_lock(context_mutex);
   scan_for_completed_ops:
 #endif
 
@@ -1457,6 +1457,7 @@ static int dbpf_dspace_testsome(
         cur_op = id_gen_fast_lookup(ds_id_array[i]);
         if (cur_op == NULL)
         {
+            gen_mutex_unlock(context_mutex);
             gossip_err("Invalid operation to testsome against\n");
             return -1;
         }
@@ -1472,9 +1473,7 @@ static int dbpf_dspace_testsome(
                        dbpf_completion_queue_array[context_id]));
 
             /* pull the op out of the context specific completion queue */
-            gen_mutex_lock(context_mutex);
             dbpf_op_queue_remove(cur_op);
-            gen_mutex_unlock(context_mutex);
 
             state_array[out_count] = cur_op->state;
 
@@ -1531,10 +1530,8 @@ static int dbpf_dspace_testsome(
             wait_time.tv_sec++;
         }
 
-        gen_mutex_lock(context_mutex);
         ret = pthread_cond_timedwait(&dbpf_op_completed_cond,
                                      context_mutex, &wait_time);
-        gen_mutex_unlock(context_mutex);
 
         if (ret != ETIMEDOUT)
         {
@@ -1549,6 +1546,8 @@ static int dbpf_dspace_testsome(
             goto scan_for_completed_ops;
         }
     }
+
+    gen_mutex_unlock(context_mutex);
 #endif
 
     *inout_count_p = out_count;
