@@ -55,7 +55,7 @@
 int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 {
     /* Initialization */   
-    struct PVFS_server_req_s *req_p = NULL;	 /* server request */
+    struct PVFS_server_req_s req_p;	 /* server request */
     struct PVFS_server_resp_s *ack_p = NULL; /* server response */
     int ret = -1, i = 0;
     int max_msg_sz, name_sz;
@@ -64,9 +64,9 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
     pinode *entry_pinode = NULL, *pinode_ptr = NULL;
     char *server = NULL, *segment = NULL, *path = NULL;
     bmi_addr_t serv_addr;
-    int start_seg = 0, vflags = 0, num_seg = 0;
+    int total_segments = 0, num_segments_remaining = 0;
     int start_path = 0, end_path = 0, path_len = 0;
-    PVFS_handle parent_handle, final_handle = 0;
+    PVFS_handle final_handle = 0;
     PVFS_bitfield attr_mask;
     pinode_reference entry, parent;
 
@@ -78,19 +78,187 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
      * up "/"; if so, then get the root handle from the bucket table interface
      * and return
      */
-    resp->pinode_refn.fs_id = req->fs_id;
+    parent.fs_id = req->fs_id;
+
+    ret = PINT_bucket_get_root_handle(req->fs_id,&parent.handle);
+    if (ret < 0)
+    {
+	return(ret);
+    }
 
     if (!strcmp(req->name, "/"))
     {
-	ret = PINT_bucket_get_root_handle(req->fs_id,&parent_handle);
-	if (ret < 0)
-	{
-	    return(ret);
-	}
-	resp->pinode_refn.handle = parent_handle;
+	resp->pinode_refn.handle = parent.handle;
+	resp->pinode_refn.fs_id = req->fs_id;
 	return(0);
     }
 
+    /* Get  the total number of segments */
+    get_no_of_segments(req->name, &num_segments_remaining);
+    total_segments = num_segments_remaining;
+
+    /* make sure we're asking for something reasonable */
+    if(num_segments_remaining < 1)
+    {
+	return(-EINVAL);
+    }
+
+    /* do dcache lookups here to shorten the path as much as possible */
+
+    name_sz = strlen(req->name) + 1;
+    path = (char *)malloc(name_sz);
+    if (path == NULL)
+    {
+        ret = -ENOMEM;
+        goto return_error;
+    }
+    memcpy(path, req->name, name_sz);
+
+    /* traverse the path as much as we can via the dcache */
+
+    /* send server messages here */
+    while(num_segments_remaining > 0)
+    {
+
+	max_msg_sz = sizeof(struct PVFS_server_resp_s) + num_segments_remaining * (sizeof(PVFS_handle) + sizeof(PVFS_object_attr));
+	gossip_ldebug(CLIENT_DEBUG,"max msg size = %d \n",max_msg_sz);
+	name_sz = strlen(path) + 1;
+	req_p.op     = PVFS_SERV_LOOKUP_PATH;
+	req_p.rsize = sizeof(struct PVFS_server_req_s) + name_sz;
+	req_p.credentials = req->credentials;
+
+	/* update the pointer to the copy we already have */
+	req_p.u.lookup_path.path = path;
+	req_p.u.lookup_path.fs_id = parent.fs_id;
+	req_p.u.lookup_path.starting_handle = parent.handle;
+	req_p.u.lookup_path.attrmask = ATTR_BASIC;
+
+        /* Get Metaserver in BMI URL format using the bucket table 
+         * interface */
+	ret = PINT_bucket_map_to_server(&serv_addr, parent.handle,
+						 parent.fs_id);
+	if (ret < 0)
+	{
+	    goto return_error;
+	}
+
+	ret = PINT_server_send_req(serv_addr, &req_p, max_msg_sz, &decoded);
+	if (ret < 0)
+	{
+	    goto return_error;
+	}
+	ack_p = (struct PVFS_server_resp_s *) decoded.buffer;
+
+	if (ack_p->u.lookup_path.count < 1)
+	{
+	    gossip_ldebug(CLIENT_DEBUG,"server returned 0 entries\n");
+	    goto return_error;
+	}
+
+	num_segments_remaining -= ack_p->u.lookup_path.count;
+
+	for(i = 0; i < ack_p->u.lookup_path.count; i++)
+	{
+
+	    entry.handle = ack_p->u.lookup_path.handle_array[i];
+	    entry.fs_id = req->fs_id;
+
+	    //segment = path_element(i);
+	    ret = get_path_element(path, &segment, i);
+	    if (ret < 0)
+	    {
+		goto return_error;
+	    }
+
+	    /* Add entry to dcache */
+	    ret = PINT_dcache_insert(segment, entry, parent);
+	    if (ret < 0)
+	    {
+		goto return_error;
+	    }
+	    /* Add to pinode cache */
+	    ret = PINT_pcache_pinode_alloc(&pinode_ptr); 	
+	    if (ret < 0)
+	    {
+		ret = -ENOMEM;
+		goto return_error;
+	    }
+	    /* Fill the pinode */
+	    pinode_ptr->pinode_ref.handle = entry.handle;
+	    pinode_ptr->pinode_ref.fs_id = entry.fs_id;
+	    pinode_ptr->mask = req_p.u.lookup_path.attrmask;
+
+	    if ((i+1 == ack_p->u.lookup_path.count) && 
+		((ack_p->rsize % sizeof(struct PVFS_server_resp_s)) == 0))
+	    {
+		/* the attributes on the last item may not be valid,  so if
+		 * we're on the last path segment, and we didn't get an attr
+		 * structure for set everything to zero.
+		 */
+		memset(&pinode_ptr->attr, 0, sizeof(PVFS_object_attr));
+	    }
+	    else
+	    {
+		pinode_ptr->attr = ack_p->u.lookup_path.attr_array[i];
+	    }
+
+	    /* Check permissions for path */
+	    ret = check_perms(pinode_ptr->attr,req->credentials.perms,
+				  req->credentials.uid, req->credentials.gid);
+	    if (ret < 0)
+	    {
+		goto return_error;
+	    }
+
+	    /* Fill in the timestamps */
+	    ret = phelper_fill_timestamps(pinode_ptr);
+	    if (ret < 0)
+	    {
+		goto return_error;
+	    }
+					
+	    /* Set the size timestamp - size was not fetched */
+	    pinode_ptr->size_flag = SIZE_INVALID;
+
+	    /* Add to the pinode list */
+	    ret = PINT_pcache_insert(pinode_ptr);
+	    if (ret < 0)
+	    {
+		goto return_error;
+	    }
+	}
+	/* If it is the final object handle,save it!! */
+	if (num_segments_remaining == 0)
+	{
+	    final_handle = pinode_ptr->pinode_ref.handle;
+	}
+
+	/*get rid of the old path*/
+	if (path != NULL)
+	    free(path);
+
+	/* get the next chunk of the path to send */
+	ret = get_next_path(req->name,&path,total_segments - num_segments_remaining);
+	if (ret < 0)
+	{
+	    goto return_error;
+	}
+
+	/* Update the parent handle with the handle of last segment
+	 * that has been looked up
+	 */
+	parent.handle = entry.handle;
+    }
+
+    resp->pinode_refn.handle = entry.handle;
+    resp->pinode_refn.fs_id = entry.fs_id;
+
+    return(0);
+    
+return_error:
+    return(ret);
+
+#if 0
 
     /* Get  the total number of segments */
     get_no_of_segments(req->name,&num_seg);
@@ -402,6 +570,7 @@ printf("path_alloc_failure\n");
 	free(segment);
 
     return(ret);
+#endif
 }
 
 /*

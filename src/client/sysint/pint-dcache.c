@@ -25,7 +25,7 @@ struct dcache_t {
 };
 
 /* Cache Management structure */
-struct dcache {
+struct dcache_s {
 	struct dcache_t element[PINT_DCACHE_MAX_ENTRIES];
 	int count;
 	int16_t top;
@@ -33,7 +33,7 @@ struct dcache {
 	int16_t bottom;
 	gen_mutex_t *mt_lock;
 };
-typedef struct dcache dcache;
+typedef struct dcache_s dcache;
 
 
 static void dcache_remove_dentry(int16_t item);
@@ -178,8 +178,8 @@ int PINT_dcache_remove(
 {
 	int16_t i = 0;
 
-	if (!name)
-		return(-ENOMEM);
+	if (name == NULL)
+		return(-EINVAL);
 
 	/* Grab the mutex */
 	gen_mutex_lock(cache->mt_lock);
@@ -207,8 +207,10 @@ int PINT_dcache_remove(
 		gossip_ldebug(DCACHE_DEBUG, "dcache found no entry to remove.\n");
 	}
 
+#if 0
 	/* Relase the mutex */
 	gen_mutex_unlock(cache->mt_lock);
+#endif
 
 	return(0);
 }
@@ -235,13 +237,15 @@ int PINT_dcache_initialize(void)
 	int16_t i = 0;	
 
 	cache = (dcache*)malloc(sizeof(dcache));
-	if(!cache)
+	if(cache == NULL)
 	{
-		return(-errno);
+		return(-ENOMEM);
 	}
 
 	/* Init the mutex lock */
+#if 0
 	cache->mt_lock = gen_mutex_build();
+#endif
 	cache->top = -1;
 	cache->bottom = -1;
 	cache->free = 0;
@@ -265,9 +269,10 @@ int PINT_dcache_initialize(void)
  */
 int PINT_dcache_finalize(void)
 {
-
 	/* Destroy the mutex */
+#if 0
 	gen_mutex_destroy(cache->mt_lock);
+#endif
 
 	if (cache != NULL);
 		free(cache);
@@ -331,7 +336,8 @@ static int dcache_add_dentry(char *name,
 	cache->element[free].prev = -1;
 	cache->element[free].next = cache->top;
 	/* Make previous element point to new entry */
-	cache->element[cache->top].prev = free;
+//	cache->element[cache->top].prev = free;
+	cache->element[free].prev = free;
 	/* Readjust the top */
 	cache->top = free;
 

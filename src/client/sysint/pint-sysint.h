@@ -132,12 +132,16 @@ void job_waitblock(job_id_t *id_array,
 		   int *failure);
 int server_getconfig(pvfs_mntlist mntent_list);
 void get_no_of_segments(char *path,int *num);
-int get_next_path(char *fname,int num,int *start,int *end);
+int get_next_path(char *path, char **newpath, int skip);
+#if 0
 int get_next_segment(char *inout,char **output,int *start);
+#endif
 int check_perms(PVFS_object_attr attr,PVFS_permissions mode,int uid,int gid);
 
 int PINT_do_lookup (PVFS_string name,pinode_reference parent,PVFS_bitfield mask,
                 PVFS_credentials cred,pinode_reference *entry);
+
+int get_path_element(char *path, char** segment, int element);
 
 /*
  * Local variables:
