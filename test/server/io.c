@@ -203,6 +203,9 @@ int main(int argc, char **argv)	{
 		printf("ERROR: server returned status: %d\n",
 			(int)dec_ack->status);
 	}
+	
+	/* release the decoded buffer */
+	PINT_decode_release(&bar, PINT_ENCODE_RESP, 0);
 
 	/* shutdown the local interface */
 	ret = BMI_finalize();
