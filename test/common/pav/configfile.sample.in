@@ -4,8 +4,8 @@
 #	. trailing whitespace can confuse some parts of PAV
 # 
 
-SRCDIR_TOP=@SRC_TOP_LEVEL@
-BUILDDIR=@BUILD_TOP_LEVEL@
+SRCDIR_TOP=@SRC_ABSOLUTE_TOP@
+BUILDDIR=@BUILD_ABSOLUTE_TOP@
 # primative bakctick expansion is allowed: 
 # NODEFILE=`sort $PBS_NODEFILE | uniq > machines ; echo machines`
 NODEFILE=machines.pav
