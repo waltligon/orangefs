@@ -497,7 +497,7 @@ int PINT_req_sched_test(
 		gossip_debug(REQ_SCHED_DEBUG, 
 			"REQ SCHED SCHEDULING, handle: %ld, queue_element: %p\n", 
 			(long)tmp_element->handle, tmp_element);
-		return(0);
+		return(1);
 	}
 	else
 	{
@@ -560,8 +560,10 @@ int PINT_req_sched_testsome(
 			return(-EINVAL);
 		}
 	}
-
-	return(0);
+	if(*inout_count_p > 0)
+		return(1);
+	else
+		return(0);
 }
 
 int PINT_req_sched_testworld(
@@ -594,7 +596,10 @@ int PINT_req_sched_testworld(
 			"REQ SCHED SCHEDULING, handle: %ld, queue_element: %p\n", 
 			(long)tmp_element->handle, tmp_element);
 	}
-	return(0);
+	if(*inout_count_p > 0)
+		return(1);
+	else
+		return(0);
 }
 
 /* hash_handle()
