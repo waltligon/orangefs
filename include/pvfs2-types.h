@@ -11,7 +11,8 @@
 
 #ifdef __KERNEL__
 #ifndef __WORDSIZE
-#define __WORDSIZE (SIZEOF_LONG * 8)
+#include <asm/types.h>
+#define __WORDSIZE BITS_PER_LONG
 #endif
 #include <linux/types.h>
 #else
@@ -382,10 +383,10 @@ enum PVFS_io_type {
  * specifier and a parameter are mismatched, that machine will issue
  * a warning, while 64-bit machines will silenly perform the cast.
  */
-#if __WORDSIZE == 32
+#if (__WORDSIZE == 32)
 #  define Lu(x) (x)
 #  define Ld(x) (x)
-#elif __WORDSIZE == 64
+#elif (__WORDSIZE == 64)
 #  define Lu(x) (unsigned long long)(x)
 #  define Ld(x) (long long)(x)
 #else

@@ -13,9 +13,6 @@
 /* Define if you have the GNU extended strnlen function */
 #undef HAVE_STRNLEN
 
-/* The number of bytes in a long.  */
-#undef SIZEOF_LONG
-
 /* The number of bytes in a void *.  */
 #undef SIZEOF_VOID_P
 
