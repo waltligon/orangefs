@@ -80,11 +80,7 @@ int main(int argc, char **argv)
 	return -1;
     }
 
-    /* TODO: verify that this is in fact a directory! */
-    
-    /* Q: how do I know what handle to use for the new file? */
-    file_handle = 0;
-
+    file_handle = requested_file_handle;
     cur_extent.first = cur_extent.last = requested_file_handle;
     extent_array.extent_count = 1;
     extent_array.extent_array = &cur_extent;
@@ -93,7 +89,7 @@ int main(int argc, char **argv)
 			      &file_handle,
 			      TROVE_TEST_FILE,
 			      NULL,
-			      0 /* flags */,
+			      TROVE_FORCE_REQUESTED_HANDLE,
 			      NULL,
                               trove_context,
 			      &op_id);

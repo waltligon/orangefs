@@ -623,7 +623,7 @@ int PVFS_util_remove_internal_mntent(
 
 /* PVFS_util_resolve()
  *
- * given a local path of a file that resides on a pvfs2 volume, 
+ * given a local path of a file that resides on a pvfs2 volume,
  * determine what the fsid and fs relative path is
  *
  * returns 0 on succees, -PVFS_error on failure

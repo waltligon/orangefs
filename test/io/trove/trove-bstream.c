@@ -76,7 +76,7 @@ int main(int argc, char ** argv )
                               &file_handle,
 			      TROVE_TEST_BSTREAM,
 			      NULL,
-			      TROVE_SYNC /* flags */,
+			      TROVE_FORCE_REQUESTED_HANDLE | TROVE_SYNC,
 			      NULL,
                               trove_context,
 			      &op_id);

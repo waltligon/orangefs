@@ -86,7 +86,7 @@ int main(int argc, char ** argv)
 			      &file_handle,
 			      TROVE_TEST_DIR,
 			      NULL,
-			      0 /* flags */,
+			      TROVE_FORCE_REQUESTED_HANDLE,
 			      NULL,
                               trove_context,
 			      &op_id);
