@@ -892,7 +892,8 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
                  (int) s_attr.type);
 #endif
 
-    trove_ds_stored_to_attr(s_attr, (*op_p->u.d_setattr.attr_p), b_size, k_size);
+    trove_ds_stored_to_attr(
+        s_attr, (*op_p->u.d_getattr.attr_p), b_size, k_size);
 
     /* sync if requested; permissable under API */
     if (op_p->flags & TROVE_SYNC) {
