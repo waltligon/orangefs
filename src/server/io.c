@@ -13,11 +13,10 @@
 #include <job-consist.h>
 #include <assert.h>
 
-#define SKIP_FLOW_STATE 2
-
 static int io_init(state_action_struct *s_op, job_status_s *ret);
 static int io_get_size(state_action_struct *s_op, job_status_s *ret);
 static int io_send_ack(state_action_struct *s_op, job_status_s *ret);
+static int io_start_flow(state_action_struct *s_op, job_status_s *ret);
 static int io_release(state_action_struct *s_op, job_status_s *ret);
 static int io_cleanup(state_action_struct *s_op, job_status_s *ret);
 void io_init_state_machine(void);
@@ -39,9 +38,14 @@ PINT_state_machine_s io_req_s =
  * access control?
  */
 
+/* TODO: figure out how to jump from sending an ack to the release
+ * function, without doing a flow in between.  We need this to be able
+ * to skip the flow when we send a negative acknowledgement.
+ */
+
 %%
 
-machine io(init, get_size, send_ack, cleanup, release)
+machine io(init, get_size, send_ack, start_flow, cleanup, release)
 {
 	state init
 	{
@@ -58,6 +62,13 @@ machine io(init, get_size, send_ack, cleanup, release)
 	state send_ack 
 	{
 		run io_send_ack;
+		success => start_flow;
+		default => release;
+	}
+
+	state start_flow
+	{
+		run io_start_flow;
 		default => release;
 	}
 
@@ -225,9 +236,76 @@ static int io_send_ack(state_action_struct *s_op, job_status_s *ret)
 			ret,
 			&tmp_id);
 	}
-
+ 
 	return(err);
 }
+
+/*
+ * Function: io_start_flow()
+ *
+ * Params:   server_op *s_op, 
+ *           job_status_s *ret
+ *
+ * Pre:      Memory is allocated, and we are ready to do what we are 
+ *           going to do.
+ *
+ * Post:     Some type of work has been done!
+ *            
+ * Returns:  int
+ *
+ * Synopsis: This function should make a call that will perform an 
+ *           operation be it to Trove, BMI, server_config, etc.  
+ *           But, the operation is non-blocking.
+ *           
+ */
+static int io_start_flow(state_action_struct *s_op, job_status_s *ret)
+{
+	int err = -1;
+	job_id_t tmp_id;
+	
+	gossip_ldebug(SERVER_DEBUG, "IO: io_start_flow() executed.\n");
+
+#if 0
+	/* this is where we report the file size to the client before
+	 * starting the I/O transfer, or else report an error if we
+	 * failed to get the size, or failed for permission reasons
+	 */
+	s_op->resp->status = ret->error_code;
+	s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
+	s_op->resp->u.io.bstream_size = ret->ds_attr.b_size;
+
+	err = PINT_encode(
+		s_op->resp, 
+		PINT_ENCODE_RESP, 
+		&(s_op->encoded),
+		s_op->addr,
+		s_op->enc_type);
+
+	if(err < 0)
+	{
+		/* TODO: what do I do here? */
+		gossip_lerr("IO: AIEEEeee! PINT_encode() failure.\n");
+		gossip_lerr("IO: returning -1 from state function.\n");
+	}
+	else
+	{
+		err = job_bmi_send_list(
+			s_op->addr,
+			s_op->encoded.buffer_list,
+			s_op->encoded.size_list,
+			s_op->encoded.list_count,
+			s_op->encoded.total_size,
+			s_op->tag,
+			s_op->encoded.buffer_flag,
+			0,
+			s_op,
+			ret,
+			&tmp_id);
+	}
+#endif
+	return(0);
+}
+
 
 /*
  * Function: io_release()
