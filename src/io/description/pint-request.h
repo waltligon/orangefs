@@ -10,11 +10,28 @@
 #include <pvfs2-types.h>
 #include <pvfs-distribution.h>
 
-/* modes for PINT_Process_request */
-#define PINT_SERVER 1
-#define PINT_CLIENT 2
-#define PINT_CKSIZE 3
-#define PINT_CKSIZE_MODIFY_OFFSET  4
+/* modes for PINT_Process_request  and PINT_Distribute */
+#define PINT_SERVER                000001
+#define PINT_CLIENT                000002
+#define PINT_CKSIZE                000004
+#define PINT_MODIFY_OFFSET         000010
+#define PINT_CKSIZE_MODIFY_OFFSET  000014
+#define PINT_LOGICAL_SKIP          000020
+#define PINT_CKSIZE_LOGICAL_SKIP   000024
+#define PINT_SEEKING               000040
+
+#define PINT_IS_SERVER(x)          ((x) & PINT_SERVER)
+#define PINT_EQ_SERVER(x)          ((x) == PINT_SERVER)
+#define PINT_IS_CLIENT(x)          ((x) & PINT_CLIENT)
+#define PINT_EQ_CLIENT(x)          ((x) == PINT_CLIENT)
+#define PINT_IS_CKSIZE(x)          ((x) & PINT_CKSIZE)
+#define PINT_EQ_CKSIZE(x)          ((x) == PINT_CKSIZE)
+#define PINT_IS_LOGICAL_SKIP(x)    ((x) & PINT_LOGICAL_SKIP)
+#define PINT_EQ_LOGICAL_SKIP(x)    ((x) == PINT_LOGICAL_SKIP)
+#define PINT_IS_SEEKING(x)         ((x) & PINT_SEEKING)
+#define PINT_EQ_SEEKING(x)         ((x) == PINT_SEEKING)
+#define PINT_SET_SEEKING(x)        ((x) |= PINT_SEEKING)
+#define PINT_CLR_SEEKING(x)        ((x) &= ~(PINT_SEEKING))
 
 /* PVFS Request Processing Stuff */
 
@@ -30,6 +47,7 @@ typedef struct PINT_Request {
 	int32_t depth;    	    /* number of levels of nesting */
 	int32_t num_nested_req;/* number of requests nested under this one */
 	int32_t committed;     /* indicates if request has been commited */
+	int32_t refcount;      /* number of references to this request struct */
 	struct PINT_Request *ereq;  /* element type */
 	struct PINT_Request *sreq;  /* sequence type */
 } PINT_Request;

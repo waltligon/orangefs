@@ -4,8 +4,12 @@
 // Author: Walt Ligon
 // Date: Summer 2000
 
-// $Header: /root/MIGRATE/CVS2SVN/cvs/pvfs2-1/src/io/description/pvfs-request.c,v 1.4 2003-06-02 19:55:41 pcarns Exp $
+// $Header: /root/MIGRATE/CVS2SVN/cvs/pvfs2-1/src/io/description/pvfs-request.c,v 1.5 2003-07-01 20:19:03 walt Exp $
 // $Log: not supported by cvs2svn $
+// Revision 1.4  2003/06/02 19:55:41  pcarns
+// got rid of PVFS_count32 type; replaced with int32_t or uint32_t or int
+// where appropriate
+//
 // Revision 1.3  2003/03/26 15:25:58  walt
 // added a couple of comments
 //
@@ -138,6 +142,7 @@ static int PINT_subreq(PVFS_offset offset, int32_t bsize,
 	(*newreq)->depth = oldreq->depth + 1;
 	(*newreq)->num_nested_req = oldreq->num_nested_req + 1;
 	(*newreq)->committed = 0;
+	(*newreq)->refcount = 0;
 	(*newreq)->ereq = oldreq;
 	return PVFS_SUCCESS;
 }
@@ -149,6 +154,7 @@ int PVFS_Request_hvector(int32_t count, int32_t blocklength,
 	if (oldreq == NULL)
 		return PVFS_ERR_REQ;
 	PVFS_Request_extent(oldreq, &oldext);
+	(*oldreq)->refcount++;
 	*newreq = (PINT_Request *)malloc(sizeof(struct PINT_Request));
 	(*newreq)->sreq = NULL;
 	PINT_subreq(0, blocklength, stride, count, oldreq, oldext, newreq);
@@ -157,6 +163,7 @@ int PVFS_Request_hvector(int32_t count, int32_t blocklength,
 	{
 		(*newreq)->lb = (count - 1) * stride;
 	}
+	(*newreq)->refcount = 1;
 	return PVFS_SUCCESS;
 }
 
@@ -169,6 +176,7 @@ int PVFS_Request_indexed(int32_t count, int32_t *blocklengths,
 	if (oldreq == NULL)
 		return PVFS_ERR_REQ;
 	PVFS_Request_extent(oldreq, &oldext);
+	(*oldreq)->refcount++;
 	while (count--)
 	{
 		dt = *newreq;
@@ -201,6 +209,7 @@ int PVFS_Request_indexed(int32_t count, int32_t *blocklengths,
 			}
 		}
 	}
+	(*newreq)->refcount = 1;
 	return PVFS_SUCCESS;
 }
 
@@ -213,6 +222,7 @@ int PVFS_Request_hindexed(int32_t count, int32_t *blocklengths,
 	if (oldreq == NULL)
 		return PVFS_ERR_REQ;
 	PVFS_Request_extent(oldreq, &oldext);
+	(*oldreq)->refcount++;
 	while (count--)
 	{
 		dt = *newreq;
@@ -245,6 +255,7 @@ int PVFS_Request_hindexed(int32_t count, int32_t *blocklengths,
 			}
 		}
 	}
+	(*newreq)->refcount = 1;
 	return PVFS_SUCCESS;
 }
 
@@ -266,6 +277,7 @@ int PVFS_Request_struct(int32_t count, int32_t *blocklengths,
 		(*newreq)->sreq = dt;
 		PINT_subreq(displacements[count], blocklengths[count],
 				0, 1, oldreqs[count], oldext, newreq);
+		oldreqs[count]->refcount++;
 		/* calculate statistics like ub, lb, depth, etc. */
 		if ((*newreq)->sreq)
 		{
@@ -291,6 +303,7 @@ int PVFS_Request_struct(int32_t count, int32_t *blocklengths,
 			}
 		}
 	}
+	(*newreq)->refcount = 1;
 	return PVFS_SUCCESS;
 }
 
@@ -332,6 +345,7 @@ int PVFS_Request_ub(PVFS_Request request, PVFS_size *displacement)
 	return PVFS_SUCCESS;
 }
 
+#if 0
 /* This function will take the request that points to all the 
  * contained types, separate out each of the types and then lay them out in a
  * contiguous region of memory. A pointer to this contiguous region will
@@ -402,7 +416,7 @@ int PVFS_Pack_size(int incount, PVFS_Request request, PVFS_Comm comm, int *size)
 	return PVFS_SUCCESS;
 }
 */
-
+#endif
 
 void PVFS_Dump_request(PVFS_Request req)
 {
