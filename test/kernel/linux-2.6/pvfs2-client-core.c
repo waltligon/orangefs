@@ -860,7 +860,7 @@ static int pvfs2_flush_mmap_racache(
         pvfs2_mmap_ra_cache_flush(in_upcall->req.io.refn);
 
         /* we need to send a blank success response */
-        out_downcall->type = PVFS2_VFS_MMAP_RA_FLUSH;
+        out_downcall->type = PVFS2_VFS_OP_MMAP_RA_FLUSH;
         out_downcall->status = 0;
         ret = 0;
     }
@@ -1060,7 +1060,7 @@ int main(int argc, char **argv)
 		service_truncate_request(&upcall, &downcall);
 		break;
 #ifdef USE_MMAP_RA_CACHE
-            case PVFS2_VFS_MMAP_RA_FLUSH:
+            case PVFS2_VFS_OP_MMAP_RA_FLUSH:
                 pvfs2_flush_mmap_racache(&upcall, &downcall);
                 break;
 #endif

@@ -929,7 +929,7 @@ int pvfs2_flush_mmap_racache(struct inode *inode)
     {
         return -ENOMEM;
     }
-    new_op->upcall.type = PVFS2_VFS_MMAP_RA_FLUSH;
+    new_op->upcall.type = PVFS2_VFS_OP_MMAP_RA_FLUSH;
     new_op->upcall.req.ra_cache_flush.refn = pvfs2_inode->refn;
 
     service_operation(new_op, "pvfs2_flush_mmap_racache",
