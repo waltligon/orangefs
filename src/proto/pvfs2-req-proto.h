@@ -277,7 +277,7 @@ struct PVFS_servreq_readdir_s
 {
     PVFS_handle handle;		/* Handle of directory to read entries from */
     PVFS_fs_id fs_id;		/* Filesystem identifier of directory's FS */
-    PVFS_token token;		/* Opaque type to show current position in dir */
+    PVFS_ds_position token;	/* Opaque type to show current position in dir */
     uint32_t pvfs_dirent_count;	/* count of no of dirents client 
 					   wants to read */
 };
@@ -285,7 +285,7 @@ typedef struct PVFS_servreq_readdir_s PVFS_servreq_readdir;
 
 struct PVFS_servresp_readdir_s
 {
-    PVFS_token token;
+    PVFS_ds_position token;
     uint32_t pvfs_dirent_count;
     PVFS_dirent *pvfs_dirent_array;
 };

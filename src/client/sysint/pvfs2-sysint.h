@@ -349,7 +349,7 @@ typedef struct PVFS_sysresp_config_s PVFS_sysresp_config;
 /* readdir */
 struct PVFS_sysreq_readdir_s {
 	pinode_reference pinode_refn;
-	PVFS_token token;
+	PVFS_ds_position token;
 	int pvfs_dirent_incount;
 	PVFS_credentials credentials;
 	
@@ -357,7 +357,7 @@ struct PVFS_sysreq_readdir_s {
 typedef struct PVFS_sysreq_readdir_s PVFS_sysreq_readdir;
 
 struct PVFS_sysresp_readdir_s {
-	PVFS_token token;  
+	PVFS_ds_position token;  
 	int pvfs_dirent_outcount;
 	PVFS_dirent *dirent_array;
 };

@@ -337,7 +337,7 @@ static int readdir_iterate_on_entries(PINT_server_op *s_op,
 		 "  iterating over keyvals (coll_id = 0x%x, handle = 0x%08Lx, token = 0x%Lx, count = %d)\n",
 		 s_op->req->u.readdir.fs_id,
 		 s_op->u.readdir.dirent_handle,
-		 s_op->req->u.readdir.token,
+		 (long long)s_op->req->u.readdir.token,
 		 s_op->req->u.readdir.pvfs_dirent_count);
 
     job_post_ret = job_trove_keyval_iterate(s_op->req->u.readdir.fs_id,
