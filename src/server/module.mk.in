@@ -1,0 +1,23 @@
+DIR := src/server
+
+SERVERGENSRC := \
+	$(DIR)/lookup.src.c \
+	$(DIR)/create.src.c \
+	$(DIR)/crdirent.src.c \
+	$(DIR)/set-attr.src.c \
+	$(DIR)/mkdir.src.c \
+	$(DIR)/get-attr.src.c \
+	$(DIR)/get-config.src.c 
+
+SERVERSRC += \
+	$(DIR)/pack.c \
+	$(DIR)/job-consist.c \
+	$(DIR)/server-config.c \
+	$(DIR)/pvfs2-server.c \
+	$(DIR)/state-machine.c \
+	$(SERVERGENSRC)
+
+$(SRCFILES) += $(SERVERGENSRC)
+
+$(SERVERGENSRC): %.src.c: %.c src/common/statecomp/statecomp
+	src/common/statecomp/statecomp -o $@ < $<

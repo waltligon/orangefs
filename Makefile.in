@@ -66,10 +66,9 @@ LIBSRC :=
 SERVERSRC :=
 MISCSRC := 
 DOCSRC :=
-SERVER := src/server/server-daemon
+SERVER := src/server/pvfs2-server
 
-#all: $(LIBRARIES) tests $(SERVER)
-all: $(LIBRARIES) tests
+all: $(LIBRARIES) tests $(SERVER)
 
 include $(patsubst %, %/module.mk, $(MODULES))
 
