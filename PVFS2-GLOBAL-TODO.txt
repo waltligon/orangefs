@@ -93,6 +93,8 @@ I/O description:
 correctness/performance testing
 ====================================================================
 - more pts tests
+- profiling code paths
+- eliminate memory leaks
 
 system management utilities
 ====================================================================
