@@ -363,7 +363,10 @@ static int pvfs2_file_mmap(struct file *file, struct vm_area_struct *vma)
     inode->i_mapping->backing_dev_info = &pvfs2_backing_dev_info;
 
     /* and clear any associated pages in the page cache (if any) */
-    truncate_inode_pages(inode->i_mapping, 0);
+    if (inode->i_data.nrpages)
+    {
+        truncate_inode_pages(inode->i_mapping, 0);
+    }
 
     /* have the vfs enforce readonly mmap support for us */
     return generic_file_readonly_mmap(file, vma);
@@ -391,11 +394,11 @@ int pvfs2_file_release(
       data for the next caller of mmap (or 'get_block' accesses)
     */
     if (file->f_dentry->d_inode &&
-        file->f_dentry->d_inode->i_mapping)
+        file->f_dentry->d_inode->i_mapping &&
+        file->f_dentry->d_inode->i_data.nrpages)
     {
         clear_inode_mmap_ra_cache(file->f_dentry->d_inode);
         truncate_inode_pages(file->f_dentry->d_inode->i_mapping, 0);
-        i_size_write(file->f_dentry->d_inode, 0);
     }
     return 0;
 }
