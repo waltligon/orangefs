@@ -88,6 +88,10 @@ performance tuning:
 request encoding:
 ====================================================================
 - finish "real" wire encoding scheme
+- come up with a mechanism for handling requests that go beyond
+  the BMI defined limit for unexpected messages (mainly an issue
+  on read/write with complex datatypes, but also potentially a 
+  problem on setattr)
 
 error codes:
 ====================================================================
