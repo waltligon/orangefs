@@ -52,6 +52,10 @@ the file size does not work.  However, contiguous IO, both individual and
 collective, and removal of files works,   Collective nontcontiguous IO has
 passes a few tests, but may or may not work for a given application.  
 
+\subsection{pvfstab file}
+We currently do not handle bogus entries well.  For now, try not to put file
+systems known not to work in the pvfs2tab file.
+
 \section{Experimental features}
 \section{Open issues}
 \section{Good examples}
