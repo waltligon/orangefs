@@ -289,7 +289,8 @@ static int pvfs2_file_mmap(struct file *file, struct vm_area_struct *vma)
     /* and clear any associated pages in the page cache (if any) */
     truncate_inode_pages(inode->i_mapping, 0);
 
-    return generic_file_mmap(file, vma);
+    /* have the vfs enforece readonly mmap support for us */
+    return generic_file_readonly_mmap(file, vma);
 }
 
 /*

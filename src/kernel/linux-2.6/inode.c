@@ -174,21 +174,21 @@ static int pvfs2_get_block(
     return pvfs2_get_blocks(ip, lblock, 1, bh_result, create);
 }
 
-static int pvfs2_writepage(
-    struct page *page,
-    struct writeback_control *wbc)
-{
-    pvfs2_print("pvfs2: pvfs2_writepage called\n");
-    return block_write_full_page(page, pvfs2_get_block, wbc);
-}
+/* static int pvfs2_writepage( */
+/*     struct page *page, */
+/*     struct writeback_control *wbc) */
+/* { */
+/*     pvfs2_print("pvfs2: pvfs2_writepage called\n"); */
+/*     return block_write_full_page(page, pvfs2_get_block, wbc); */
+/* } */
 
-static int pvfs2_writepages(
-    struct address_space *mapping,
-    struct writeback_control *wbc)
-{
-    pvfs2_print("pvfs2: pvfs2_writepages called\n");
-    return mpage_writepages(mapping, wbc, pvfs2_get_block);
-}
+/* static int pvfs2_writepages( */
+/*     struct address_space *mapping, */
+/*     struct writeback_control *wbc) */
+/* { */
+/*     pvfs2_print("pvfs2: pvfs2_writepages called\n"); */
+/*     return mpage_writepages(mapping, wbc, pvfs2_get_block); */
+/* } */
 
 /* static int pvfs2_sync_page(struct page *page) */
 /* { */
@@ -218,15 +218,15 @@ static int pvfs2_readpages(
     return mpage_readpages(mapping, pages, nr_pages, pvfs2_get_block);
 }
 
-static int pvfs2_prepare_write(
-    struct file *file,
-    struct page *page,
-    unsigned from,
-    unsigned to)
-{
-    pvfs2_print("pvfs2: pvfs2_prepare_write called\n");
-    return block_prepare_write(page, from, to, pvfs2_get_block);
-}
+/* static int pvfs2_prepare_write( */
+/*     struct file *file, */
+/*     struct page *page, */
+/*     unsigned from, */
+/*     unsigned to) */
+/* { */
+/*     pvfs2_print("pvfs2: pvfs2_prepare_write called\n"); */
+/*     return block_prepare_write(page, from, to, pvfs2_get_block); */
+/* } */
 
 static int pvfs2_set_page_dirty(struct page *page)
 {
@@ -290,10 +290,10 @@ struct address_space_operations pvfs2_address_operations =
 {
     .readpage = pvfs2_readpage,
     .readpages = pvfs2_readpages,
-    .writepage = pvfs2_writepage,
-    .writepages = pvfs2_writepages,
-    .prepare_write = pvfs2_prepare_write,
-    .commit_write = generic_commit_write,
+/*     .writepage = pvfs2_writepage, */
+/*     .writepages = pvfs2_writepages, */
+/*     .prepare_write = pvfs2_prepare_write, */
+/*     .commit_write = generic_commit_write, */
     .set_page_dirty = pvfs2_set_page_dirty,
     .bmap = pvfs2_bmap,
     .invalidatepage = pvfs2_invalidatepage,
