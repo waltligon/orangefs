@@ -87,7 +87,6 @@ int main(int argc, char **argv)
 	/* create the new dspace */
 	ret = trove_dspace_create(coll_id,
 				  &file_handle,
-				  0xffffffff,
 				  TROVE_TEST_FILE,
 				  NULL,
 				  0 /* flags */,

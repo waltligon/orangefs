@@ -252,7 +252,6 @@ static int handle_store_extentlist_create(TROVE_coll_id coll_id,
 	
     ret = trove_dspace_create(coll_id, 
 			      &bstream_handle,
-			      0xffffffff,
 			      TROVE_PLAIN_FILE, /* not sure exactly what to
 						   call this, but
 						   TROVE_TEST_BSTREAM is

@@ -178,7 +178,6 @@ struct TROVE_dspace_ops
     int (*dspace_create)(
 			 TROVE_coll_id coll_id,
 			 TROVE_handle *handle,
-			 TROVE_handle bitmask,
 			 TROVE_ds_type type,
 			 TROVE_keyval_s *hint, /* TODO: figure out what this is! */
 			 TROVE_ds_flags flags,

@@ -159,13 +159,11 @@ int main(int argc, char **argv)
 	coll_id = job_stat.coll_id;
 
     /* create a dataspace to hold the root directory */
-    /* Q: what should the bitmask be? */
     /* Q: where are we going to define the dspace types? -- trove-test.h for now. */
     root_handle = 7;
 
 	ret = job_trove_dspace_create(coll_id,
 		root_handle, 
-		0xffffffff,
 		TROVE_TEST_DIR,
 		NULL,
 		NULL,

@@ -121,7 +121,6 @@ struct dbpf_collection_db_entry {
 
 struct dbpf_dspace_create_op {
     TROVE_handle *out_handle_p;
-    TROVE_handle bitmask;
     TROVE_ds_type type;
     /* hint? */
 };

@@ -1625,7 +1625,6 @@ int job_trove_keyval_iterate_keys(PVFS_coll_id coll_id,
  */
 int job_trove_dspace_create(PVFS_coll_id coll_id,
 			    PVFS_handle handle,
-			    PVFS_handle bitmask,
 			    PVFS_ds_type type,
 			    void *hint,
 			    void *user_ptr,
@@ -1656,7 +1655,6 @@ int job_trove_dspace_create(PVFS_coll_id coll_id,
 
     ret = trove_dspace_create(coll_id,
 			      &(jd->u.trove.handle),
-			      bitmask,
 			      type,
 			      hint, TROVE_SYNC /* flags -- sync for now */ ,
 			      jd, &(jd->u.trove.id));

@@ -38,7 +38,6 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p);
  */
 static int dbpf_dspace_create(TROVE_coll_id coll_id,
 			      TROVE_handle *handle_p,
-			      TROVE_handle bitmask,
 			      TROVE_ds_type type,
 			      TROVE_keyval_s *hint, /* TODO: What is this? */
 			      TROVE_ds_flags flags,
@@ -65,7 +64,6 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
 
     /* no op-specific members here */
     q_op_p->op.u.d_create.out_handle_p = handle_p;
-    q_op_p->op.u.d_create.bitmask      = bitmask;
     q_op_p->op.u.d_create.type         = type;
 
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);

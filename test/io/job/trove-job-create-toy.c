@@ -26,7 +26,7 @@ int main(int argc, char **argv)
 {
     int ret, i;
     TROVE_coll_id coll_id;
-    TROVE_handle file_handle, handle_mask;
+    TROVE_handle file_handle;
     char *method_name;
 	 job_id_t foo_id;
 	 job_status_s job_stat;
@@ -104,12 +104,10 @@ int main(int argc, char **argv)
 	{
 		/* lets assume bucket 1, 8 bit handle mask */
 		 file_handle = 0x01000000;
-		 handle_mask = 0xff000000;
 
 		 /* create the new dspace */
 		ret = job_trove_dspace_create(coll_id,
 			file_handle, 
-			handle_mask,
 			TROVE_TEST_FILE,
 			NULL,
 			NULL,

@@ -83,7 +83,6 @@ int main(int argc, char **argv)
 
 
     /* create a dataspace to hold the root directory */
-    /* Q: what should the bitmask be? */
     /* Q: where are we going to define the dspace types? -- trove-test.h for now. */
 #if 0
     printf("creating root directory\n");
@@ -91,7 +90,6 @@ int main(int argc, char **argv)
     root_handle = 7;
     ret = trove_dspace_create(coll_id,
 			      &root_handle,
-			      0xffffffff,
 			      TROVE_TEST_DIR,
 			      NULL,
 			      TROVE_SYNC,

@@ -171,7 +171,6 @@ int main(int argc, char **argv)
 	file_handle = requested_file_handle;
 	ret = trove_dspace_create(coll_id,
 				  &file_handle,
-				  0xffffffff,
 				  TROVE_TEST_BSTREAM,
 				  NULL,
 				  TROVE_SYNC,
