@@ -61,8 +61,6 @@ int main(int argc, char **argv)
     PVFS_Request io_req;
     int buffer_size;
 
-    gossip_enable_stderr();
-
     /* look at command line arguments */
     user_opts = parse_args(argc, argv);
     if(!user_opts)
@@ -115,7 +113,7 @@ int main(int argc, char **argv)
     }
 
     memset(&resp_init, 0, sizeof(resp_init));
-    ret = PVFS_sys_initialize(mnt,&resp_init);
+    ret = PVFS_sys_initialize(mnt, 0, &resp_init);
     if(ret < 0)
     {
 	PVFS_perror("PVFS_sys_initialize", ret);
@@ -244,8 +242,6 @@ main_out:
 
     PVFS_sys_finalize();
 
-    gossip_disable();
-
     if(src_fd > 0)
 	close(src_fd);
     if(buffer)
@@ -288,7 +284,7 @@ static struct options* parse_args(int argc, char* argv[])
     while((one_opt = getopt(argc, argv, flags)) != EOF){
 	switch(one_opt){
 	    case('s'):
-		gossip_lerr("Error: strip size option not supported.\n");
+		fprintf(stderr, "Error: strip size option not supported.\n");
 		free(tmp_opts);
 		return(NULL);
 		ret = sscanf(optarg, "%d", &tmp_opts->strip_size);
@@ -298,7 +294,7 @@ static struct options* parse_args(int argc, char* argv[])
 		}
 		break;
 	    case('n'):
-		gossip_lerr("Error: num datafiles option not supported.\n");
+		fprintf(stderr, "Error: num datafiles option not supported.\n");
 		free(tmp_opts);
 		return(NULL);
 		ret = sscanf(optarg, "%d", &tmp_opts->num_datafiles);

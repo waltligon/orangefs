@@ -43,9 +43,6 @@ int main(int argc,char **argv)
 	int buffer_size;
 	void* off_buffer;
 
-	gossip_enable_stderr();
-	gossip_set_debug_mask(1,CLIENT_DEBUG);
-
 	if (argc != 2)
 	{
 		fprintf(stderr, "Usage: %s <file name>\n", argv[0]);
@@ -91,7 +88,7 @@ int main(int argc,char **argv)
 		return(-1);
 	}
 	/* init the system interface */
-	ret = PVFS_sys_initialize(mnt, &resp_init);
+	ret = PVFS_sys_initialize(mnt, CLIENT_DEBUG, &resp_init);
 	if(ret < 0)
 	{
 		fprintf(stderr, "Error: PVFS_sys_initialize() failure. = %d\n", ret);
@@ -247,8 +244,6 @@ int main(int argc,char **argv)
 		fprintf(stderr, "Error: PVFS_sys_finalize() failed with errcode = %d\n", ret);
 		return (-1);
 	}
-
-	gossip_disable();
 
 	free(filename);
 	free(io_buffer);

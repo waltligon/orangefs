@@ -37,12 +37,10 @@ static int test_system_init(int nullCase)
     ret = parse_pvfstab(NULL, &pvfs_helper.mnt);
     if (ret > -1)
     {
-	gossip_disable();
-
 	/* init the system interface */
 	if (nullCase == 2)
 	{
-	    ret = PVFS_sys_initialize(pvfs_helper.mnt, NULL);
+	    ret = PVFS_sys_initialize(pvfs_helper.mnt, CLIENT_DEBUG, NULL);
 	}
 	if (ret > -1)
 	{

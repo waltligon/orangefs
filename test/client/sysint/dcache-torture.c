@@ -25,6 +25,7 @@ int main(int argc, char **argv)
 
     PVFS_pinode_reference root_ref = {100,0};
 
+    gossip_enable_stderr();
     gossip_set_debug_mask(1, DCACHE_DEBUG);
 
     /* initialize the cache */

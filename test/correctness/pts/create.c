@@ -171,7 +171,7 @@ int test_create(MPI_Comm * comm,
     }
 
     /*Init the system interface */
-    ret = PVFS_sys_initialize(mnt, &resp_init);
+    ret = PVFS_sys_initialize(mnt, CLIENT_DEBUG, &resp_init);
     if (ret < 0)
     {
 	printf("PVFS_sys_initialize() failure. = %d\n", ret);

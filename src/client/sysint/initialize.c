@@ -41,7 +41,8 @@ extern gen_mutex_t *g_session_tag_mt_lock;
  * returns 0 on success, -errno on failure
  */
 
-int PVFS_sys_initialize(pvfs_mntlist mntent_list, PVFS_sysresp_init *resp)
+int PVFS_sys_initialize(pvfs_mntlist mntent_list, int debug_mask,
+    PVFS_sysresp_init *resp)
 {
     int ret = -1, i = 0;
     int num_file_systems = 0;
@@ -61,6 +62,13 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, PVFS_sysresp_init *resp)
 	BUCKET_INIT_FAIL,
 	GET_CONFIG_INIT_FAIL
     } init_fail = NONE_INIT_FAIL; /* used for cleanup in the event of failures */
+
+    /* setup gossip */
+    gossip_enable_stderr();
+    if(debug_mask)
+    {
+	gossip_set_debug_mask(1,debug_mask);
+    }
 
     /* make sure we were given sane arguments */
     if ((mntent_list.ptab_p == NULL) || (resp == NULL))
@@ -225,6 +233,8 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, PVFS_sysresp_init *resp)
 	    /* nothing to do for either of these */
 	    break;
     }
+    gossip_disable();
+
     return(ret);
 }
 

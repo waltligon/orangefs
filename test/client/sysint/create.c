@@ -22,9 +22,6 @@ int main(int argc, char **argv)
     PVFS_sys_attr attr;
     PVFS_credentials credentials;
 
-    gossip_enable_stderr();
-    gossip_set_debug_mask(1,CLIENT_DEBUG);
-
     if (argc != 2)
     {
         fprintf(stderr,"Usage: %s filename\n",argv[0]);
@@ -39,7 +36,7 @@ int main(int argc, char **argv)
     }
 
     memset(&resp_init, 0, sizeof(resp_init));
-    if (PVFS_sys_initialize(mnt,&resp_init))
+    if (PVFS_sys_initialize(mnt, CLIENT_DEBUG, &resp_init))
     {
         printf("Failed to initialize system interface\n");
         return ret;
@@ -92,8 +89,6 @@ int main(int argc, char **argv)
         printf("finalizing sysint failed with errcode = %d\n", ret);
         return (-1);
     }
-
-    gossip_disable();
 
     return(0);
 }

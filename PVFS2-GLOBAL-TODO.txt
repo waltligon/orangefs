@@ -132,6 +132,9 @@ code cleanup:
 - consistent formatting
 - consistent function naming
 - consistent header file inclusion
+- use TROVE_HANDLE_NULL in more places instead of "0"
+- come up with more named values like TROVE_HANDLE_NULL to use in 
+  other parts of the code
 
 fault tolerance:
 =====================================================================

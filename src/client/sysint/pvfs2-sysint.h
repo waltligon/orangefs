@@ -270,6 +270,7 @@ enum PVFS_sys_io_type
  */
 int PVFS_sys_initialize(
     pvfs_mntlist mntent_list,
+    int debug_mask,
     PVFS_sysresp_init *resp);
 
 int PVFS_sys_finalize(void);

@@ -163,9 +163,6 @@ int main(int argc, char **argv)
     pvfs_mntlist mnt = {0,NULL};
     PVFS_sysresp_init init_response;
 
-/*     gossip_enable_stderr(); */
-/*     gossip_set_debug_mask(1, CLIENT_DEBUG); */
-
     if (argc > 2)
     {
         fprintf(stderr,"Usage: ls starting_dir\n");
@@ -180,7 +177,7 @@ int main(int argc, char **argv)
     }
 
     memset(&init_response,0,sizeof(PVFS_sysresp_init));
-    if (PVFS_sys_initialize(mnt, &init_response))
+    if (PVFS_sys_initialize(mnt, CLIENT_DEBUG, &init_response))
     {
         fprintf(stderr,"Cannot initialize system interface\n");
         return 1;
@@ -196,8 +193,6 @@ int main(int argc, char **argv)
         fprintf(stderr,"Failed to finalize system interface\n");
         return 1;
     }
-
-/*     gossip_disable(); */
 
     return 0;
 }

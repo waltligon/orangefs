@@ -8,7 +8,6 @@
 
 #include "pvfs2-sysint.h"
 #include "pint-sysint.h"
-#include "gossip.h"
 #include "dotconf.h"
 #include "trove.h"
 #include "server-config.h"
@@ -57,9 +56,6 @@ int main(int argc, char **argv)
     char server_name[MAX_BMI_ADDR_LEN] = {0};
     int test_handles_verified[NUM_TEST_HANDLES] = {0};
     PVFS_handle_extent_array meta_handle_extent_array;
-
-    gossip_enable_stderr();
-    gossip_set_debug_mask(0, 0);
 
     if (parse_pvfstab(NULL,&mnt))
     {
@@ -276,6 +272,5 @@ int main(int argc, char **argv)
 
     job_finalize();
     BMI_finalize();
-    gossip_disable();
     return(0);
 }

@@ -9,7 +9,6 @@
 #include <stdio.h>
 
 #include "client.h"
-#include "gossip.h"
 
 void gen_rand_str(int len, char** gen_str);
 extern int parse_pvfstab(char *fn,pvfs_mntlist *mnt);
@@ -22,9 +21,6 @@ int main(int argc,char **argv)
 	pvfs_mntlist mnt = {0,NULL};
 	PVFS_fs_id fs_id;
 	PVFS_credentials credentials;
-
-	gossip_enable_stderr();
-	gossip_set_debug_mask(1,CLIENT_DEBUG);
 
 	if (argc != 2)
 	{
@@ -42,7 +38,7 @@ int main(int argc,char **argv)
 		return(-1);
 	}
 	/*Init the system interface*/
-	ret = PVFS_sys_initialize(mnt, &resp_init);
+	ret = PVFS_sys_initialize(mnt, CLIENT_DEBUG, &resp_init);
 	if(ret < 0)
 	{
 		printf("PVFS_sys_initialize() failure. = %d\n", ret);
@@ -68,8 +64,6 @@ int main(int argc,char **argv)
 		printf("finalizing sysint failed with errcode = %d\n", ret);
 		return (-1);
 	}
-
-	gossip_disable();
 
 	return(0);
 }

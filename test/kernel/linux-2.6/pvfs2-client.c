@@ -504,19 +504,16 @@ int main(int argc, char **argv)
     pvfs_mntlist mnt = {0,NULL};
     PVFS_sysresp_init init_response;
 
-    gossip_enable_stderr();
-    gossip_set_debug_mask(1, CLIENT_DEBUG);
-
     if (parse_pvfstab(NULL,&mnt))
     {
-        gossip_err("Error parsing pvfstab!\n");
+        fprintf(stderr, "Error parsing pvfstab!\n");
         return 1;
     }
 
     memset(&init_response,0,sizeof(PVFS_sysresp_init));
-    if (PVFS_sys_initialize(mnt, &init_response))
+    if (PVFS_sys_initialize(mnt, CLIENT_DEBUG, &init_response))
     {
-        gossip_err("Cannot initialize system interface\n");
+        fprintf(stderr, "Cannot initialize system interface\n");
         return 1;
     }
 

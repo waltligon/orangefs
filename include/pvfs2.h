@@ -22,11 +22,6 @@
  */
 /******************************************************************************/
 
-/* needed because gossip is being enabled/disabled outside of system interface
- * at the moment, need to hide
- */
-#include "gossip.h"
-
 /* needed to get parse_pvfstab() outside of system interface, should be
  * replaced with a more generic mechanism for getting mount point
  * info that can deal with fstab and env variables

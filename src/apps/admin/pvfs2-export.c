@@ -57,8 +57,6 @@ int main(int argc, char **argv)
     PVFS_Request io_req;
     int buffer_size;
 
-    gossip_enable_stderr();
-
     /* look at command line arguments */
     user_opts = parse_args(argc, argv);
     if(!user_opts)
@@ -112,7 +110,7 @@ int main(int argc, char **argv)
     }
 
     memset(&resp_init, 0, sizeof(resp_init));
-    ret = PVFS_sys_initialize(mnt,&resp_init);
+    ret = PVFS_sys_initialize(mnt, 0, &resp_init);
     if(ret < 0)
     {
 	PVFS_perror("PVFS_sys_initialize", ret);
@@ -245,8 +243,6 @@ int main(int argc, char **argv)
 main_out:
 
     PVFS_sys_finalize();
-
-    gossip_disable();
 
     if(dest_fd > 0)
 	close(dest_fd);

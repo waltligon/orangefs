@@ -54,6 +54,8 @@ int PVFS_sys_finalize()
 
     PINT_encode_finalize();
 
+    gossip_disable();
+
     return(0);
 }
 

@@ -14,9 +14,6 @@ int main(int argc, char* argv[])
 	char segment[PVFS_SEGMENT_MAX] = {0};
 	int num_segments = 0,i, ret=0;
 
-	gossip_enable_stderr();
-	gossip_set_debug_mask(1,CLIENT_DEBUG);
-
 	printf("path = %s\n",path);
 
         num_segments = PINT_string_count_segments(path);
@@ -31,8 +28,6 @@ int main(int argc, char* argv[])
 		}
 		printf("segment = %s\n",segment);
 	}
-
-	gossip_disable();
 
 	return 0;
 }

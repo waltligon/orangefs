@@ -9,7 +9,6 @@
 #include <time.h>
 
 #include "client.h"
-#include "gossip.h"
 
 extern int parse_pvfstab(char *fn,pvfs_mntlist *mnt);
 
@@ -27,9 +26,6 @@ int main(int argc,char **argv)
 	char *filename = NULL;
 	int ret = -1;
 	pvfs_mntlist mnt = {0,NULL};
-
-	gossip_enable_stderr();
-	gossip_set_debug_mask(1,CLIENT_DEBUG);
 
 	if (argc == 2)
 	{
@@ -53,7 +49,7 @@ int main(int argc,char **argv)
 		return(-1);
 	}
 	/*Init the system interface*/
-	ret = PVFS_sys_initialize(mnt, &resp_init);
+	ret = PVFS_sys_initialize(mnt, CLIENT_DEBUG, &resp_init);
 	if(ret < 0)
 	{
 		printf("PVFS_sys_initialize() failure. = %d\n", ret);
@@ -129,8 +125,6 @@ int main(int argc,char **argv)
 	free(resp_gattr);
 
 	free(filename);
-
-	gossip_disable();
 
 	return(0);
 }

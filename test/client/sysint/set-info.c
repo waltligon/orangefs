@@ -10,7 +10,6 @@
 #include <time.h>
 
 #include "client.h"
-#include "gossip.h"
 
 extern int parse_pvfstab(char *fn,pvfs_mntlist *mnt);
 
@@ -26,30 +25,27 @@ int main(int argc, char **argv)
     PVFS_sysresp_getattr resp_getattr;
     PVFS_pinode_reference pinode_refn;
 
-    gossip_enable_stderr();
-    gossip_set_debug_mask(1,CLIENT_DEBUG);
-
     if (argc == 2)
     {
         filename = argv[1];
     }
     else
     {
-        gossip_err("usage: %s /file_to_set_info_on\n", argv[0]);
+        fprintf(stderr, "usage: %s /file_to_set_info_on\n", argv[0]);
         return ret;
     }
 
     ret = parse_pvfstab(NULL,&mnt);
     if (ret < 0)
     {
-        gossip_err("Failed to parse pvfstab!\n");
+        fprintf(stderr, "Failed to parse pvfstab!\n");
         return ret;
     }
 
-    ret = PVFS_sys_initialize(mnt, &resp_init);
+    ret = PVFS_sys_initialize(mnt, CLIENT_DEBUG, &resp_init);
     if(ret < 0)
     {
-        gossip_err("PVFS_sys_initialize() failure. = %d\n", ret);
+        fprintf(stderr, "PVFS_sys_initialize() failure. = %d\n", ret);
         return ret;
     }
 
@@ -59,19 +55,19 @@ int main(int argc, char **argv)
 
     fs_id = resp_init.fsid_list[0];
 
-    gossip_ldebug(CLIENT_DEBUG,"about to lookup %s\n", filename);
+    printf("about to lookup %s\n", filename);
 
     ret = PVFS_sys_lookup(fs_id, filename, credentials, &resp_look);
     if (ret < 0)
     {
-        gossip_err("Lookup failed with errcode = %d\n", ret);
+        fprintf(stderr, "Lookup failed with errcode = %d\n", ret);
         return ret;
     }
 
     pinode_refn.handle = resp_look.pinode_refn.handle;
     pinode_refn.fs_id = fs_id;
 
-    gossip_ldebug(CLIENT_DEBUG,"about to getattr on %s\n", filename);
+    printf("about to getattr on %s\n", filename);
 
     ret = PVFS_sys_getattr(pinode_refn, PVFS_ATTR_SYS_ALL_SETABLE,
                            credentials, &resp_getattr);
@@ -105,17 +101,17 @@ int main(int argc, char **argv)
     credentials.uid = resp_getattr.attr.owner;
     credentials.gid = resp_getattr.attr.group;
 
-    gossip_ldebug(CLIENT_DEBUG,"about to setattr on %s\n", filename);
+    printf("about to setattr on %s\n", filename);
 
     ret = PVFS_sys_setattr(pinode_refn, resp_getattr.attr, credentials);
     if (ret < 0)
     {
-        gossip_err("setattr failed with errcode = %d\n", ret);
+        fprintf(stderr, "setattr failed with errcode = %d\n", ret);
         return ret;
     }
     else
     {
-        gossip_ldebug(CLIENT_DEBUG,"setattr returned success\n");
+        printf("setattr returned success\n");
 
         printf("Set the following attributes\n");
         printf("Handle      : %Ld\n", pinode_refn.handle);
@@ -132,11 +128,10 @@ int main(int argc, char **argv)
     ret = PVFS_sys_finalize();
     if (ret < 0)
     {
-        gossip_err("finalizing sysint failed with errcode = %d\n", ret);
+        fprintf(stderr, "finalizing sysint failed with errcode = %d\n", ret);
         return ret;
     }
 
-    gossip_disable();
     return 0;
 }
 
