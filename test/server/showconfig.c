@@ -11,11 +11,12 @@ void print_filesystem_configuration(struct filesystem_configuration_s *fs)
 {
     struct llist *cur = NULL;
     char *cur_str = (char *)0;
-    struct host_bucket_mapping_s *cur_b_mapping = NULL;
+    struct host_handle_mapping_s *cur_h_mapping = NULL;
 
     if (fs)
     {
         fprintf(stderr,"File system name: %s\n",fs->file_system_name);
+        fprintf(stderr,"FS Collection ID: %d\n",fs->coll_id);
 
         fprintf(stderr,"\t*** Meta Servers for %s:\n",fs->file_system_name);
         cur = fs->meta_server_list;
@@ -43,17 +44,17 @@ void print_filesystem_configuration(struct filesystem_configuration_s *fs)
             cur = llist_next(cur);
         }
 
-        fprintf(stderr,"\t*** Bucket Mappings for %s:\n",fs->file_system_name);
-        cur = fs->bucket_ranges;
+        fprintf(stderr,"\t*** Handle Mappings for %s:\n",fs->file_system_name);
+        cur = fs->handle_ranges;
         while(cur)
         {
-            cur_b_mapping = llist_head(cur);
-            if (!cur_b_mapping)
+            cur_h_mapping = llist_head(cur);
+            if (!cur_h_mapping)
             {
                 break;
             }
-            fprintf(stderr,"\t  %s has bucket range %s\n",
-                    cur_b_mapping->host_alias,cur_b_mapping->bucket_range);
+            fprintf(stderr,"\t  %s has handle range %s\n",
+                    cur_h_mapping->host_alias,cur_h_mapping->handle_range);
             cur = llist_next(cur);
         }
     }
@@ -84,6 +85,7 @@ int main(int argc, char **argv)
     /* dump all gathered config values */
     fprintf(stderr,"server id: %s\n",serverconfig.host_id);
     fprintf(stderr,"storage space: %s\n",serverconfig.storage_path);
+    fprintf(stderr,"root handle: %d\n",serverconfig.root_handle);
 
     fprintf(stderr,"fs config file name: %s\n",
             serverconfig.fs_config_filename);

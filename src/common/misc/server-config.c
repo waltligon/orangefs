@@ -25,21 +25,23 @@ static DOTCONF_CB(enter_aliases_context);
 static DOTCONF_CB(exit_aliases_context);
 static DOTCONF_CB(enter_filesystem_context);
 static DOTCONF_CB(exit_filesystem_context);
-static DOTCONF_CB(enter_bucket_context);
-static DOTCONF_CB(exit_bucket_context);
+static DOTCONF_CB(enter_handleranges_context);
+static DOTCONF_CB(exit_handleranges_context);
 static DOTCONF_CB(get_metaserver_list);
 static DOTCONF_CB(get_dataserver_list);
 static DOTCONF_CB(get_unexp_req);
+static DOTCONF_CB(get_root_handle);
 static DOTCONF_CB(get_filesystem_name);
+static DOTCONF_CB(get_filesystem_collid);
 static DOTCONF_CB(get_alias_list);
-static DOTCONF_CB(get_bucket_list);
+static DOTCONF_CB(get_range_list);
 
 /* misc helper functions */
 static int cache_config_files(int argc, char **argv);
 static int is_valid_alias(char *str);
-static int is_valid_bucket_range_description(char *b_range);
+static int is_valid_handle_range_description(char *h_range);
 static int is_valid_filesystem_configuration(struct filesystem_configuration_s *fs);
-static void free_host_bucket_mapping(void *ptr);
+static void free_host_handle_mapping(void *ptr);
 static void free_host_alias(void *ptr);
 static void free_filesystem(void *ptr);
 
@@ -56,13 +58,15 @@ static const configoption_t options[] =
     {"Alias",ARG_LIST, get_alias_list,NULL,CTX_ALL},
     {"<FileSystem>",ARG_NONE, enter_filesystem_context,NULL,CTX_ALL},
     {"</FileSystem>",ARG_NONE, exit_filesystem_context,NULL,CTX_ALL},
-    {"<Buckets>",ARG_NONE, enter_bucket_context,NULL,CTX_ALL},
-    {"</Buckets>",ARG_NONE, exit_bucket_context,NULL,CTX_ALL},
-    {"Bucket",ARG_LIST, get_bucket_list,NULL,CTX_ALL},
+    {"<HandleRanges>",ARG_NONE, enter_handleranges_context,NULL,CTX_ALL},
+    {"</HandleRanges>",ARG_NONE, exit_handleranges_context,NULL,CTX_ALL},
+    {"Range",ARG_LIST, get_range_list,NULL,CTX_ALL},
     {"MetaServerList",ARG_LIST, get_metaserver_list,NULL,CTX_ALL},
     {"DataServerList",ARG_LIST, get_dataserver_list,NULL,CTX_ALL},
     {"UnexpectedRequests",ARG_INT, get_unexp_req,NULL,CTX_ALL},
+    {"RootHandle",ARG_INT, get_root_handle,NULL,CTX_ALL},
     {"FS_Name",ARG_STR, get_filesystem_name,NULL,CTX_ALL},
+    {"CollectionID",ARG_INT, get_filesystem_collid,NULL,CTX_ALL},
     LAST_OPTION
 };
 
@@ -299,24 +303,24 @@ DOTCONF_CB(exit_filesystem_context)
     return NULL;
 }
 
-DOTCONF_CB(enter_bucket_context)
+DOTCONF_CB(enter_handleranges_context)
 {
     if (config_s->configuration_context != FILESYSTEM_CONFIG)
     {
-        gossip_lerr("Error in context.  Cannot have Buckets tag here\n");
+        gossip_lerr("Error in context.  Cannot have HandleRanges tag here\n");
         return NULL;
     }
-    config_s->configuration_context = BUCKETS_CONFIG;
+    config_s->configuration_context = HANDLERANGES_CONFIG;
     return NULL;
 }
 
-DOTCONF_CB(exit_bucket_context)
+DOTCONF_CB(exit_handleranges_context)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
 
-    if (config_s->configuration_context != BUCKETS_CONFIG)
+    if (config_s->configuration_context != HANDLERANGES_CONFIG)
     {
-        gossip_lerr("Error in context.  Cannot have /Buckets tag here\n");
+        gossip_lerr("Error in context.  Cannot have /HandleRanges tag here\n");
         return NULL;
     }
 
@@ -324,9 +328,9 @@ DOTCONF_CB(exit_bucket_context)
         llist_head(config_s->file_systems);
     assert(fs_conf);
 
-    if (!fs_conf->bucket_ranges)
+    if (!fs_conf->handle_ranges)
     {
-        gossip_lerr("Error! No valid bucket ranges added to %s\n",
+        gossip_lerr("Error! No valid handle ranges added to %s\n",
                     fs_conf->file_system_name);
     }
     config_s->configuration_context = FILESYSTEM_CONFIG;
@@ -416,6 +420,17 @@ DOTCONF_CB(get_unexp_req)
     return NULL;
 }
 
+DOTCONF_CB(get_root_handle)
+{
+    if (config_s->configuration_context != DEFAULTS_CONFIG)
+    {
+        gossip_lerr("RootHandle Tag can only be in a Defaults block");
+        return NULL;
+    }
+    config_s->root_handle = cmd->data.value;
+    return NULL;
+}
+
 DOTCONF_CB(get_filesystem_name)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
@@ -433,6 +448,26 @@ DOTCONF_CB(get_filesystem_name)
                     fs_conf->file_system_name,cmd->data.str);
     }
     fs_conf->file_system_name = strdup(cmd->data.str);
+    return NULL;
+}
+
+DOTCONF_CB(get_filesystem_collid)
+{
+    struct filesystem_configuration_s *fs_conf = NULL;
+
+    if (config_s->configuration_context != FILESYSTEM_CONFIG)
+    {
+        gossip_lerr("CollectionID Tags can only be within Filesystem tags");
+        return NULL;
+    }
+    fs_conf = (struct filesystem_configuration_s *)
+        llist_head(config_s->file_systems);
+    if (fs_conf->coll_id)
+    {
+        gossip_lerr("WARNING: Overwriting %d with %d\n",
+                    (int)fs_conf->coll_id,(int)cmd->data.value);
+    }
+    fs_conf->coll_id = (TROVE_coll_id)cmd->data.value;
     return NULL;
 }
 
@@ -461,25 +496,25 @@ DOTCONF_CB(get_alias_list)
     return NULL;
 }
 	
-DOTCONF_CB(get_bucket_list)
+DOTCONF_CB(get_range_list)
 {
     int i = 0;
     struct filesystem_configuration_s *fs_conf = NULL;
-    struct host_bucket_mapping_s *bucket_mapping = NULL;
+    struct host_handle_mapping_s *handle_mapping = NULL;
 
-    if (config_s->configuration_context != BUCKETS_CONFIG)
+    if (config_s->configuration_context != HANDLERANGES_CONFIG)
     {
-        gossip_lerr("Error in context.  Cannot have Bucket "
-                    "outside of Buckets context\n");
+        gossip_lerr("Error in context.  Cannot have Range keyword "
+                    "outside of HandleRanges context\n");
         return NULL;
     }
 
     fs_conf = (struct filesystem_configuration_s *)
         llist_head(config_s->file_systems);
 
-    if (!fs_conf->bucket_ranges)
+    if (!fs_conf->handle_ranges)
     {
-        fs_conf->bucket_ranges = llist_new();
+        fs_conf->handle_ranges = llist_new();
     }
 
     for(i = 0; i < cmd->arg_count; i += 2)
@@ -489,22 +524,22 @@ DOTCONF_CB(get_bucket_list)
             i++;
             assert(cmd->data.list[i]);
 
-            if (is_valid_bucket_range_description(cmd->data.list[i]))
+            if (is_valid_handle_range_description(cmd->data.list[i]))
             {
-                bucket_mapping = (host_bucket_mapping_s *)malloc(
-                    sizeof(host_bucket_mapping_s));
-                assert(bucket_mapping);
-                memset(bucket_mapping,0,sizeof(host_bucket_mapping_s));
+                handle_mapping = (host_handle_mapping_s *)malloc(
+                    sizeof(host_handle_mapping_s));
+                assert(handle_mapping);
+                memset(handle_mapping,0,sizeof(host_handle_mapping_s));
 
-                bucket_mapping->host_alias = strdup(cmd->data.list[i-1]);
-                bucket_mapping->bucket_range = strdup(cmd->data.list[i]);
+                handle_mapping->host_alias = strdup(cmd->data.list[i-1]);
+                handle_mapping->handle_range = strdup(cmd->data.list[i]);
 
-                llist_add_to_tail(fs_conf->bucket_ranges,
-                                  (void *)bucket_mapping);
+                llist_add_to_tail(fs_conf->handle_ranges,
+                                  (void *)handle_mapping);
             }
             else
             {
-                gossip_lerr("Error in bucket range description.\n"
+                gossip_lerr("Error in handle range description.\n"
                             "%s is invalid input data!\n",cmd->data.list[i]);
             }
         }
@@ -600,19 +635,19 @@ static int is_valid_alias(char *str)
     return ret;
 }
 
-static int is_valid_bucket_range_description(char *b_range)
+static int is_valid_handle_range_description(char *h_range)
 {
     int ret = 0;
     int len = 0;
     char *ptr = (char *)0;
     char *end = (char *)0;
 
-    if (b_range)
+    if (h_range)
     {
-        len = strlen(b_range);
-        end = (b_range + len);
+        len = strlen(h_range);
+        end = (h_range + len);
 
-        for(ptr = b_range; ptr < end; ptr++)
+        for(ptr = h_range; ptr < end; ptr++)
         {
             if (!isdigit((int)*ptr) && (*ptr != ',') &&
                 (*ptr != ' ') && (*ptr != '-'))
@@ -630,19 +665,20 @@ static int is_valid_bucket_range_description(char *b_range)
 
 static int is_valid_filesystem_configuration(struct filesystem_configuration_s *fs)
 {
-    return ((fs && fs->file_system_name && fs->meta_server_list &&
-             fs->data_server_list && fs->bucket_ranges) ? 1 : 0);
+    return ((fs && fs->coll_id && fs->file_system_name &&
+             fs->meta_server_list && fs->data_server_list &&
+             fs->handle_ranges) ? 1 : 0);
 }
 
-static void free_host_bucket_mapping(void *ptr)
+static void free_host_handle_mapping(void *ptr)
 {
-    struct host_bucket_mapping_s *b_mapping =
-        (struct host_bucket_mapping_s *)ptr;
-    if (b_mapping)
+    struct host_handle_mapping_s *h_mapping =
+        (struct host_handle_mapping_s *)ptr;
+    if (h_mapping)
     {
-        free(b_mapping->host_alias);
-        free(b_mapping->bucket_range);
-        free(b_mapping);
+        free(h_mapping->host_alias);
+        free(h_mapping->handle_range);
+        free(h_mapping);
     }
 }
 
@@ -671,8 +707,8 @@ static void free_filesystem(void *ptr)
         /* free all data server strings */
         llist_free(fs->data_server_list,free);
 
-        /* free all bucket ranges */
-        llist_free(fs->bucket_ranges,free_host_bucket_mapping);
+        /* free all handle ranges */
+        llist_free(fs->handle_ranges,free_host_handle_mapping);
 
         free(fs);
     }
@@ -768,9 +804,9 @@ char *PINT_server_config_get_host_alias_ptr(struct server_configuration_s *confi
  * Params:   struct server_configuration_s*,
  *           struct filesystem_configuration_s *fs
  *
- * Returns:  char * (bucket range) on success; NULL on failure
+ * Returns:  char * (handle range) on success; NULL on failure
  *
- * Synopsis: return the bucket range (string) on the specified
+ * Synopsis: return the handle range (string) on the specified
  *           filesystem that matches the host specific configuration
  *           
  */
@@ -780,27 +816,27 @@ char *PINT_server_config_get_handle_range_str(struct server_configuration_s *con
     char *ret = (char *)0;
     char *my_alias = (char *)0;
     struct llist *cur = NULL;
-    struct host_bucket_mapping_s *cur_b_mapping = NULL;
+    struct host_handle_mapping_s *cur_h_mapping = NULL;
 
     if (config_s && config_s->host_id && fs)
     {
         my_alias = PINT_server_config_get_host_alias_ptr(config_s,config_s->host_id);
         if (my_alias)
         {
-            cur = fs->bucket_ranges;
+            cur = fs->handle_ranges;
             while(cur)
             {
-                cur_b_mapping = llist_head(cur);
-                if (!cur_b_mapping)
+                cur_h_mapping = llist_head(cur);
+                if (!cur_h_mapping)
                 {
                     break;
                 }
-                assert(cur_b_mapping->host_alias);
-                assert(cur_b_mapping->bucket_range);
+                assert(cur_h_mapping->host_alias);
+                assert(cur_h_mapping->handle_range);
 
-                if (strcmp(cur_b_mapping->host_alias,my_alias) == 0)
+                if (strcmp(cur_h_mapping->host_alias,my_alias) == 0)
                 {
-                    ret = cur_b_mapping->bucket_range;
+                    ret = cur_h_mapping->handle_range;
                     break;
                 }
                 cur = llist_next(cur);

@@ -10,7 +10,7 @@ enum
     FILESYSTEM_CONFIG = 2,
     DEFAULTS_CONFIG = 3,
     ALIASES_CONFIG = 4,
-    BUCKETS_CONFIG = 5
+    HANDLERANGES_CONFIG = 5
 };
 
 enum
@@ -25,11 +25,11 @@ typedef struct host_alias_s
     char *bmi_address;
 } host_alias_s;
 
-typedef struct host_bucket_mapping_s
+typedef struct host_handle_mapping_s
 {
     char *host_alias;
-    char *bucket_range;
-} host_bucket_mapping_s;
+    char *handle_range;
+} host_handle_mapping_s;
 
 typedef struct filesystem_configuration_s
 {
@@ -37,7 +37,7 @@ typedef struct filesystem_configuration_s
     char *file_system_name;
     struct llist *meta_server_list; /* ptrs are type char*                  */
     struct llist *data_server_list; /* ptrs are type char*                  */
-    struct llist *bucket_ranges;    /* ptrs are type host_bucket_mapping_s* */
+    struct llist *handle_ranges;    /* ptrs are type host_handle_mapping_s* */
 } filesystem_configuration_s;
 
 typedef struct server_configuration_s
@@ -51,6 +51,7 @@ typedef struct server_configuration_s
     ssize_t server_config_buflen;   /* the server.conf file length      */
     char *server_config_buf;        /* the server.conf file contents    */
     int  initial_unexpected_requests;
+    int  root_handle;               /* FIXME: should be 64 bit?         */
     int  configuration_context;
     struct llist *host_aliases;     /* ptrs are type host_alias_s               */
     struct llist *file_systems;     /* ptrs are type filesystem_configuration_s */
