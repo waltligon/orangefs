@@ -285,8 +285,10 @@ sub print_welcome
 	}
 }
 
-sub get_nettype
+sub get_protocol
 {
+	my $type;
+
 	if (!$opt_quiet) {
 		# get network type
 		print "\n";
@@ -402,26 +404,18 @@ sub get_metanames
 	return @meta_aliases;
 }
 
-# bmi_tcp_mung(): makes bmi strings of the form tcp://host:port
-sub bmi_tcp_mung
+# bmi_prot_mung(): makes bmi strings of the form protocol//host:port
+sub bmi_prot_mung
 {
-	my($port, @bmi_array);
+	my($protocol, $port, @bmi_array);
+	$protocol = pop @_;
 	$port = pop @_;
 	for ($i=0; $i <= $#_; $i++) {
-		$bmi_array[$i] = "tcp://$_[$i]:$port";
+		$bmi_array[$i] = "$protocol://$_[$i]:$port";
 	}
 	return @bmi_array;
 }
-# bmi_gm_mung(): makes bmi strings of the form gm://host:port
-sub bmi_gm_mung
-{
-	my($port, @bmi_array);
-	$port = pop @_;
-	for ($i=0; $i <= $#_; $i++) {
-		$bmi_array[$i] = "gm://$_[$i]:$port";
-	}
-	return @bmi_array;
-}
+
 # ---------------------
 # entry point of script
 # ---------------------
@@ -465,54 +459,51 @@ else
 $num_unexp_reqs = 10;
 
 print_welcome();
-$type = get_nettype();
-	
 
-if ( $type =~ /tcp/) 
+$type = get_protocol();
+if ( $type eq "tcp") 
 {
 	$port = tcp_get_port();
 	@io_aliases = get_ionames();
 	@meta_aliases = get_metanames();
 
-	my %nonunion_aliases = ();
-	foreach(@io_aliases,@meta_aliases){
-	    $nonunion_aliases{$_}=1;
-	}
-	@union_aliases = keys %nonunion_aliases;
-	@union_aliases = sort @union_aliases;
-
-	# tack on BMI style notation
-	@io_bmi = bmi_tcp_mung(@io_aliases, $port);
-	@meta_bmi = bmi_tcp_mung(@meta_aliases, $port);
-	@union_bmi = bmi_tcp_mung(@union_aliases, $port);
-
 	$bmi_module = "bmi_tcp";
 
-} elsif ($type =~ /gm/) 
+} elsif ($type eq "gm") 
 {
 	$port = gm_get_port();
 	@io_aliases = get_ionames();
 	@meta_aliases = get_metanames();
 
-	my %nonunion_aliases = ();
-	foreach(@io_aliases,@meta_aliases){
-	    $nonunion_aliases{$_}=1;
-	}
-	@union_aliases = keys %nonunion_aliases;
-	@union_aliases = sort @union_aliases;
-
-	# tack on BMI style notation
-	@io_bmi = bmi_gm_mung(@io_aliases, $port);
-	@meta_bmi = bmi_gm_mung(@meta_aliases, $port);
-	@union_bmi = bmi_gm_mung(@union_aliases, $port);
-
 	$bmi_module = "bmi_gm";
+
+} elsif ($type eq "ib") {
+
+	$port = tcp_get_port();  # we use TCP routines to listen for connections
+	@io_aliases = get_ionames();
+	@meta_aliases = get_metanames();
+
+	$bmi_module = "bmi_ib";
 
 } else {
     print "Sorry.  At this time, only the tcp and gm protocols are available\n";
     print "for use with this configuration utility.\n";
     exit 1;
 }
+
+# union is the union of io and meta nodes
+my %nonunion_aliases = ();
+foreach(@io_aliases,@meta_aliases){
+    $nonunion_aliases{$_}=1;
+}
+@union_aliases = keys %nonunion_aliases;
+@union_aliases = sort @union_aliases;
+
+# tack on BMI style notation
+@io_bmi = bmi_prot_mung(@io_aliases, $port, $type);
+@meta_bmi = bmi_prot_mung(@meta_aliases, $port, $type);
+@union_bmi = bmi_prot_mung(@union_aliases, $port, $type);
+
 
 if (!$opt_quiet) {
 	print "Configured a total of ", ($#union_bmi + 1), " servers:\n";
