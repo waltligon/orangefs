@@ -1030,8 +1030,8 @@ char *PINT_server_config_get_merged_handle_range_str(
     struct server_configuration_s *config_s,
     struct filesystem_configuration_s *fs)
 {
-    char *mrange = get_handle_range_str(config_s,fs,0);
-    char *drange = get_handle_range_str(config_s,fs,1);
+    char *mrange = get_handle_range_str(config_s,fs,1);
+    char *drange = get_handle_range_str(config_s,fs,0);
     char *merged_range = NULL;
 
     if (mrange && drange)
