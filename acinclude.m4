@@ -128,10 +128,7 @@ int main (int argc, char *argv[])
   else
      AC_MSG_RESULT(no)
      if test "$SDL_CONFIG" = "no" ; then
-       echo "*** The sdl-config script installed by SDL could not be found"
-       echo "*** If SDL was installed in PREFIX, make sure PREFIX/bin is in"
-       echo "*** your path, or set the SDL_CONFIG environment variable to the"
-       echo "*** full path to sdl-config."
+	:
      else
        if test -f conf.sdltest ; then
         :
