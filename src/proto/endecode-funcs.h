@@ -82,7 +82,7 @@
 #define decode_enum decode_int32_t
 
 /* memory alloc and free, just for decoding */
-#define decode_malloc(n) malloc(n)
+#define decode_malloc(n) ((n) ? malloc(n) : 0)
 #define decode_free(n) free(n)
 
 /*
