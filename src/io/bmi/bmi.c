@@ -500,7 +500,7 @@ int BMI_post_recv(bmi_op_id_t * id,
 		  void *buffer,
 		  bmi_size_t expected_size,
 		  bmi_size_t * actual_size,
-		  int buffer_flag,
+		  enum bmi_buffer_type buffer_type,
 		  bmi_msg_tag_t tag,
 		  void *user_ptr,
 		  bmi_context_id context_id)
@@ -525,7 +525,8 @@ int BMI_post_recv(bmi_op_id_t * id,
 
     ret = tmp_ref->interface->BMI_meth_post_recv(id, tmp_ref->method_addr,
 						 buffer, expected_size,
-						 actual_size, buffer_flag, tag,
+						 actual_size,
+						 buffer_type, tag,
 						 user_ptr, context_id);
     gen_mutex_unlock(&interface_mutex);
     return (ret);
@@ -542,7 +543,7 @@ int BMI_post_send(bmi_op_id_t * id,
 		  bmi_addr_t dest,
 		  void *buffer,
 		  bmi_size_t size,
-		  int buffer_flag,
+		  enum bmi_buffer_type buffer_type,
 		  bmi_msg_tag_t tag,
 		  void *user_ptr,
 		  bmi_context_id context_id)
@@ -566,7 +567,8 @@ int BMI_post_send(bmi_op_id_t * id,
     }
 
     ret = tmp_ref->interface->BMI_meth_post_send(id, tmp_ref->method_addr,
-						 buffer, size, buffer_flag, tag,
+						 buffer, size,
+						 buffer_type, tag,
 						 user_ptr, context_id);
     gen_mutex_unlock(&interface_mutex);
     return (ret);
@@ -583,7 +585,7 @@ int BMI_post_sendunexpected(bmi_op_id_t * id,
 			    bmi_addr_t dest,
 			    void *buffer,
 			    bmi_size_t size,
-			    int buffer_flag,
+			    enum bmi_buffer_type buffer_type,
 			    bmi_msg_tag_t tag,
 			    void *user_ptr,
 			    bmi_context_id context_id)
@@ -609,7 +611,7 @@ int BMI_post_sendunexpected(bmi_op_id_t * id,
     ret = tmp_ref->interface->BMI_meth_post_sendunexpected(id,
 							   tmp_ref->method_addr,
 							   buffer, size,
-							   buffer_flag, tag,
+							   buffer_type, tag,
 							   user_ptr,
 							   context_id);
     gen_mutex_unlock(&interface_mutex);
@@ -1294,7 +1296,7 @@ int BMI_post_send_list(bmi_op_id_t * id,
 		       int list_count,
 		       /* "total_size" is the sum of the size list */
 		       bmi_size_t total_size,
-		       int buffer_flag,
+		       enum bmi_buffer_type buffer_type,
 		       bmi_msg_tag_t tag,
 		       void *user_ptr,
 		       bmi_context_id context_id)
@@ -1335,7 +1337,7 @@ int BMI_post_send_list(bmi_op_id_t * id,
 							  buffer_list,
 							  size_list, list_count,
 							  total_size,
-							  buffer_flag, tag,
+							  buffer_type, tag,
 							  user_ptr,
 							  context_id);
 	gen_mutex_unlock(&interface_mutex);
@@ -1367,7 +1369,7 @@ int BMI_post_recv_list(bmi_op_id_t * id,
 		       bmi_size_t total_expected_size,
 		       /* "total_actual_size" is the aggregate amt that was received */
 		       bmi_size_t * total_actual_size,
-		       int buffer_flag,
+		       enum bmi_buffer_type buffer_type,
 		       bmi_msg_tag_t tag,
 		       void *user_ptr,
 		       bmi_context_id context_id)
@@ -1410,7 +1412,7 @@ int BMI_post_recv_list(bmi_op_id_t * id,
 							  size_list, list_count,
 							  total_expected_size,
 							  total_actual_size,
-							  buffer_flag, tag,
+							  buffer_type, tag,
 							  user_ptr,
 							  context_id);
 	gen_mutex_unlock(&interface_mutex);
@@ -1440,7 +1442,7 @@ int BMI_post_sendunexpected_list(bmi_op_id_t * id,
 				 int list_count,
 				 /* "total_size" is the sum of the size list */
 				 bmi_size_t total_size,
-				 int buffer_flag,
+				 enum bmi_buffer_type buffer_type,
 				 bmi_msg_tag_t tag,
 				 void *user_ptr,
 				 bmi_context_id context_id)
@@ -1483,7 +1485,7 @@ int BMI_post_sendunexpected_list(bmi_op_id_t * id,
 								    size_list,
 								    list_count,
 								    total_size,
-								    buffer_flag,
+								    buffer_type,
 								    tag,
 								    user_ptr,
 								    context_id);

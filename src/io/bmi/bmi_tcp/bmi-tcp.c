@@ -40,7 +40,7 @@ int BMI_tcp_post_send(bmi_op_id_t * id,
 		      method_addr_p dest,
 		      void *buffer,
 		      bmi_size_t size,
-		      int buffer_flag,
+		      enum bmi_buffer_type buffer_type,
 		      bmi_msg_tag_t tag,
 		      void *user_ptr,
 		      bmi_context_id context_id);
@@ -48,7 +48,7 @@ int BMI_tcp_post_sendunexpected(bmi_op_id_t * id,
 				method_addr_p dest,
 				void *buffer,
 				bmi_size_t size,
-				int buffer_flag,
+				enum bmi_buffer_type buffer_type,
 				bmi_msg_tag_t tag,
 				void *user_ptr,
 				bmi_context_id context_id);
@@ -57,7 +57,7 @@ int BMI_tcp_post_recv(bmi_op_id_t * id,
 		      void *buffer,
 		      bmi_size_t expected_size,
 		      bmi_size_t * actual_size,
-		      int buffer_flag,
+		      enum bmi_buffer_type buffer_type,
 		      bmi_msg_tag_t tag,
 		      void *user_ptr,
 		      bmi_context_id context_id);
@@ -96,7 +96,7 @@ int BMI_tcp_post_send_list(bmi_op_id_t * id,
 			   bmi_size_t * size_list,
 			   int list_count,
 			   bmi_size_t total_size,
-			   int buffer_flag,
+			   enum bmi_buffer_type buffer_type,
 			   bmi_msg_tag_t tag,
 			   void *user_ptr,
 			   bmi_context_id context_id);
@@ -107,7 +107,7 @@ int BMI_tcp_post_recv_list(bmi_op_id_t * id,
 			   int list_count,
 			   bmi_size_t total_expected_size,
 			   bmi_size_t * total_actual_size,
-			   int buffer_flag,
+			   enum bmi_buffer_type buffer_type,
 			   bmi_msg_tag_t tag,
 			   void *user_ptr,
 			   bmi_context_id context_id);
@@ -117,7 +117,7 @@ int BMI_tcp_post_sendunexpected_list(bmi_op_id_t * id,
 				     bmi_size_t * size_list,
 				     int list_count,
 				     bmi_size_t total_size,
-				     int buffer_flag,
+				     enum bmi_buffer_type buffer_type,
 				     bmi_msg_tag_t tag,
 				     void *user_ptr,
 				     bmi_context_id context_id);
@@ -196,7 +196,7 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 				     void **buffer_list,
 				     bmi_size_t * size_list,
 				     int list_count,
-				     int buffer_flag,
+				     enum bmi_buffer_type buffer_type,
 				     struct tcp_msg_header my_header,
 				     void *user_ptr,
 				     int list_stub_flag,
@@ -208,7 +208,7 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
 				 int list_count,
 				 bmi_size_t expected_size,
 				 bmi_size_t * actual_size,
-				 int buffer_flag,
+				 enum bmi_buffer_type buffer_type,
 				 bmi_msg_tag_t tag,
 				 void *user_ptr,
 				 int list_stub_flag,
@@ -626,7 +626,7 @@ int BMI_tcp_post_send(bmi_op_id_t * id,
 		      method_addr_p dest,
 		      void *buffer,
 		      bmi_size_t size,
-		      int buffer_flag,
+		      enum bmi_buffer_type buffer_type,
 		      bmi_msg_tag_t tag,
 		      void *user_ptr,
 		      bmi_context_id context_id)
@@ -655,7 +655,7 @@ int BMI_tcp_post_send(bmi_op_id_t * id,
     my_header.magic_nr = BMI_MAGIC_NR;
 
     return (BMI_tcp_post_send_generic(id, dest, &buffer,
-				      &size, 1, buffer_flag, my_header,
+				      &size, 1, buffer_type, my_header,
 				      user_ptr, 1, context_id));
 }
 
@@ -671,7 +671,7 @@ int BMI_tcp_post_sendunexpected(bmi_op_id_t * id,
 				method_addr_p dest,
 				void *buffer,
 				bmi_size_t size,
-				int buffer_flag,
+				enum bmi_buffer_type buffer_type,
 				bmi_msg_tag_t tag,
 				void *user_ptr,
 				bmi_context_id context_id)
@@ -692,7 +692,7 @@ int BMI_tcp_post_sendunexpected(bmi_op_id_t * id,
     my_header.magic_nr = BMI_MAGIC_NR;
 
     return (BMI_tcp_post_send_generic(id, dest, &buffer,
-				      &size, 1, buffer_flag, my_header,
+				      &size, 1, buffer_type, my_header,
 				      user_ptr, 1, context_id));
 }
 
@@ -710,7 +710,7 @@ int BMI_tcp_post_recv(bmi_op_id_t * id,
 		      void *buffer,
 		      bmi_size_t expected_size,
 		      bmi_size_t * actual_size,
-		      int buffer_flag,
+		      enum bmi_buffer_type buffer_type,
 		      bmi_msg_tag_t tag,
 		      void *user_ptr,
 		      bmi_context_id context_id)
@@ -734,7 +734,8 @@ int BMI_tcp_post_recv(bmi_op_id_t * id,
     }
 
     ret = tcp_post_recv_generic(id, src, &buffer, &expected_size,
-				1, expected_size, actual_size, buffer_flag, tag,
+				1, expected_size, actual_size,
+				buffer_type, tag,
 				user_ptr, 1, context_id);
 
     return (ret);
@@ -950,7 +951,7 @@ int BMI_tcp_post_send_list(bmi_op_id_t * id,
 			   bmi_size_t * size_list,
 			   int list_count,
 			   bmi_size_t total_size,
-			   int buffer_flag,
+			   enum bmi_buffer_type buffer_type,
 			   bmi_msg_tag_t tag,
 			   void *user_ptr,
 			   bmi_context_id context_id)
@@ -979,7 +980,7 @@ int BMI_tcp_post_send_list(bmi_op_id_t * id,
     my_header.magic_nr = BMI_MAGIC_NR;
 
     return (BMI_tcp_post_send_generic(id, dest, buffer_list,
-				      size_list, list_count, buffer_flag,
+				      size_list, list_count, buffer_type,
 				      my_header, user_ptr, 0, context_id));
 }
 
@@ -998,7 +999,7 @@ int BMI_tcp_post_recv_list(bmi_op_id_t * id,
 			   int list_count,
 			   bmi_size_t total_expected_size,
 			   bmi_size_t * total_actual_size,
-			   int buffer_flag,
+			   enum bmi_buffer_type buffer_type,
 			   bmi_msg_tag_t tag,
 			   void *user_ptr,
 			   bmi_context_id context_id)
@@ -1012,7 +1013,7 @@ int BMI_tcp_post_recv_list(bmi_op_id_t * id,
 
     ret = tcp_post_recv_generic(id, src, buffer_list, size_list,
 				list_count, total_expected_size,
-				total_actual_size, buffer_flag, tag, user_ptr,
+				total_actual_size, buffer_type, tag, user_ptr,
 				0, context_id);
 
     return (ret);
@@ -1033,7 +1034,7 @@ int BMI_tcp_post_sendunexpected_list(bmi_op_id_t * id,
 				     bmi_size_t * size_list,
 				     int list_count,
 				     bmi_size_t total_size,
-				     int buffer_flag,
+				     enum bmi_buffer_type buffer_type,
 				     bmi_msg_tag_t tag,
 				     void *user_ptr,
 				     bmi_context_id context_id)
@@ -1054,7 +1055,7 @@ int BMI_tcp_post_sendunexpected_list(bmi_op_id_t * id,
     my_header.magic_nr = BMI_MAGIC_NR;
 
     return (BMI_tcp_post_send_generic(id, dest, buffer_list,
-				      size_list, list_count, buffer_flag,
+				      size_list, list_count, buffer_type,
 				      my_header, user_ptr, 0, context_id));
 }
 
@@ -1528,7 +1529,7 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
 				 int list_count,
 				 bmi_size_t expected_size,
 				 bmi_size_t * actual_size,
-				 int buffer_flag,
+				 enum bmi_buffer_type buffer_type,
 				 bmi_msg_tag_t tag,
 				 void *user_ptr,
 				 int list_stub_flag,
@@ -2532,7 +2533,7 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 				     void **buffer_list,
 				     bmi_size_t * size_list,
 				     int list_count,
-				     int buffer_flag,
+				     enum bmi_buffer_type buffer_type,
 				     struct tcp_msg_header my_header,
 				     void *user_ptr,
 				     int list_stub_flag,
@@ -2559,7 +2560,7 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
      * The difference is in the recv processing for TCP.
      */
 
-    /* NOTE: we also don't care what the buffer_flag says, TCP could care
+    /* NOTE: we also don't care what the buffer_type says, TCP could care
      * less what buffers it is using.
      */
 

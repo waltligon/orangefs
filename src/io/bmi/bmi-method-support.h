@@ -71,7 +71,7 @@ struct bmi_method_ops
 			       method_addr_p,
 			       void *,
 			       bmi_size_t,
-			       int,
+			       enum bmi_buffer_type,
 			       bmi_msg_tag_t,
 			       void *,
 			       bmi_context_id);
@@ -79,7 +79,7 @@ struct bmi_method_ops
 					 method_addr_p,
 					 void *,
 					 bmi_size_t,
-					 int,
+					 enum bmi_buffer_type,
 					 bmi_msg_tag_t,
 					 void *,
 					 bmi_context_id);
@@ -88,7 +88,7 @@ struct bmi_method_ops
 			       void *,
 			       bmi_size_t,
 			       bmi_size_t *,
-			       int,
+			       enum bmi_buffer_type,
 			       bmi_msg_tag_t,
 			       void *,
 			       bmi_context_id);
@@ -127,7 +127,7 @@ struct bmi_method_ops
 				    bmi_size_t *,
 				    int,
 				    bmi_size_t,
-				    int,
+				    enum bmi_buffer_type,
 				    bmi_msg_tag_t,
 				    void *,
 				    bmi_context_id);
@@ -138,7 +138,7 @@ struct bmi_method_ops
 				    int,
 				    bmi_size_t,
 				    bmi_size_t *,
-				    int,
+				    enum bmi_buffer_type,
 				    bmi_msg_tag_t,
 				    void *,
 				    bmi_context_id);
@@ -148,7 +148,7 @@ struct bmi_method_ops
 					      bmi_size_t *,
 					      int,
 					      bmi_size_t,
-					      int,
+					      enum bmi_buffer_type,
 					      bmi_msg_tag_t,
 					      void *,
 					      bmi_context_id);

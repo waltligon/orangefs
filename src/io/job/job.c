@@ -284,7 +284,7 @@ int job_bmi_send(bmi_addr_t addr,
 		 void *buffer,
 		 bmi_size_t size,
 		 bmi_msg_tag_t tag,
-		 int buffer_flag,
+		 enum bmi_buffer_type buffer_type,
 		 int send_unexpected,
 		 void *user_ptr,
 		 job_status_s * out_status_p,
@@ -315,12 +315,12 @@ int job_bmi_send(bmi_addr_t addr,
     if (!send_unexpected)
     {
 	ret = BMI_post_send(&(jd->u.bmi.id), addr, buffer, size,
-			    buffer_flag, tag, jd, global_bmi_context);
+			    buffer_type, tag, jd, global_bmi_context);
     }
     else
     {
 	ret = BMI_post_sendunexpected(&(jd->u.bmi.id), addr,
-				      buffer, size, buffer_flag, tag,
+				      buffer, size, buffer_type, tag,
 				      jd, global_bmi_context);
     }
 
@@ -369,7 +369,7 @@ int job_bmi_send_list(bmi_addr_t addr,
 		      int list_count,
 		      bmi_size_t total_size,
 		      bmi_msg_tag_t tag,
-		      int buffer_flag,
+		      enum bmi_buffer_type buffer_type,
 		      int send_unexpected,
 		      void *user_ptr,
 		      job_status_s * out_status_p,
@@ -400,14 +400,14 @@ int job_bmi_send_list(bmi_addr_t addr,
     if (!send_unexpected)
     {
 	ret = BMI_post_send_list(&(jd->u.bmi.id), addr, buffer_list, size_list,
-				 list_count, total_size, buffer_flag,
+				 list_count, total_size, buffer_type,
 				 tag, jd, global_bmi_context);
     }
     else
     {
 	ret = BMI_post_sendunexpected_list(&(jd->u.bmi.id), addr,
 					   buffer_list, size_list, list_count,
-					   total_size, buffer_flag, tag,
+					   total_size, buffer_type, tag,
 					   jd, global_bmi_context);
     }
 
@@ -453,7 +453,7 @@ int job_bmi_recv(bmi_addr_t addr,
 		 void *buffer,
 		 bmi_size_t size,
 		 bmi_msg_tag_t tag,
-		 int buffer_flag,
+		 enum bmi_buffer_type buffer_type,
 		 void *user_ptr,
 		 job_status_s * out_status_p,
 		 job_id_t * id,
@@ -480,7 +480,7 @@ int job_bmi_recv(bmi_addr_t addr,
     jd->context_id = context_id;
 
     ret = BMI_post_recv(&(jd->u.bmi.id), addr, buffer, size,
-			&(jd->u.bmi.actual_size), buffer_flag, tag, jd,
+			&(jd->u.bmi.actual_size), buffer_type, tag, jd,
 			global_bmi_context);
 
     if (ret < 0)
@@ -529,7 +529,7 @@ int job_bmi_recv_list(bmi_addr_t addr,
 		      int list_count,
 		      bmi_size_t total_expected_size,
 		      bmi_msg_tag_t tag,
-		      int buffer_flag,
+		      enum bmi_buffer_type buffer_type,
 		      void *user_ptr,
 		      job_status_s * out_status_p,
 		      job_id_t * id,
@@ -557,7 +557,7 @@ int job_bmi_recv_list(bmi_addr_t addr,
 
     ret = BMI_post_recv_list(&(jd->u.bmi.id), addr, buffer_list,
 			     size_list, list_count, total_expected_size,
-			     &(jd->u.bmi.actual_size), buffer_flag, tag,
+			     &(jd->u.bmi.actual_size), buffer_type, tag,
 			     jd, global_bmi_context);
 
     if (ret < 0)

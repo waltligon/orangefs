@@ -44,7 +44,7 @@ int BMI_gm_post_send(bmi_op_id_t * id,
 		     method_addr_p dest,
 		     void *buffer,
 		     bmi_size_t size,
-		     int buffer_flag,
+		     enum bmi_buffer_type buffer_type,
 		     bmi_msg_tag_t tag,
 		     void *user_ptr,
 		     bmi_context_id context_id);
@@ -54,7 +54,7 @@ int BMI_gm_post_send_list(bmi_op_id_t * id,
     bmi_size_t * size_list,
     int list_count,
     bmi_size_t total_size,
-    int buffer_flag,
+    enum bmi_buffer_type buffer_type,
     bmi_msg_tag_t tag,
     void *user_ptr,
     bmi_context_id context_id);
@@ -64,7 +64,7 @@ int BMI_gm_post_sendunexpected_list(bmi_op_id_t * id,
     bmi_size_t * size_list,
     int list_count,
     bmi_size_t total_size,
-    int buffer_flag,
+    enum bmi_buffer_type buffer_type,
     bmi_msg_tag_t tag,
     void *user_ptr,
     bmi_context_id context_id);
@@ -72,7 +72,7 @@ int BMI_gm_post_sendunexpected(bmi_op_id_t * id,
 			       method_addr_p dest,
 			       void *buffer,
 			       bmi_size_t size,
-			       int buffer_flag,
+			       enum bmi_buffer_type buffer_type,
 			       bmi_msg_tag_t tag,
 			       void *user_ptr,
 			       bmi_context_id context_id);
@@ -81,7 +81,7 @@ int BMI_gm_post_recv(bmi_op_id_t * id,
 		     void *buffer,
 		     bmi_size_t expected_size,
 		     bmi_size_t * actual_size,
-		     int buffer_flag,
+		     enum bmi_buffer_type buffer_type,
 		     bmi_msg_tag_t tag,
 		     void *user_ptr,
 		     bmi_context_id context_id);
@@ -92,7 +92,7 @@ int BMI_gm_post_recv_list(bmi_op_id_t * id,
     int list_count,
     bmi_size_t total_expected_size,
     bmi_size_t * total_actual_size,
-    int buffer_flag,
+    enum bmi_buffer_type buffer_type,
     bmi_msg_tag_t tag,
     void *user_ptr,
     bmi_context_id context_id);
@@ -827,7 +827,7 @@ int BMI_gm_post_send(bmi_op_id_t * id,
 		     method_addr_p dest,
 		     void *buffer,
 		     bmi_size_t size,
-		     int buffer_flag,
+		     enum bmi_buffer_type buffer_type,
 		     bmi_msg_tag_t tag,
 		     void *user_ptr,
 		     bmi_context_id context_id)
@@ -848,7 +848,7 @@ int BMI_gm_post_send(bmi_op_id_t * id,
 	return (-EMSGSIZE);
     }
 
-    if (!(buffer_flag & BMI_PRE_ALLOC))
+    if (buffer_type != BMI_PRE_ALLOC)
     {
 	if (size <= GM_IMMED_LENGTH)
 	{
@@ -913,7 +913,7 @@ int BMI_gm_post_send_list(bmi_op_id_t * id,
     bmi_size_t * size_list,
     int list_count,
     bmi_size_t total_size,
-    int buffer_flag,
+    enum bmi_buffer_type buffer_type,
     bmi_msg_tag_t tag,
     void *user_ptr,
     bmi_context_id context_id)
@@ -934,7 +934,7 @@ int BMI_gm_post_send_list(bmi_op_id_t * id,
     if(list_count == 1)
     {
 	return(BMI_gm_post_send(id, dest, buffer_list[0], size_list[0], 
-	    buffer_flag, tag, user_ptr, context_id));
+	    buffer_type, tag, user_ptr, context_id));
     }
 
     /* TODO: think about this some.  For now this is going to be
@@ -1009,7 +1009,7 @@ int BMI_gm_post_sendunexpected_list(bmi_op_id_t * id,
     bmi_size_t * size_list,
     int list_count,
     bmi_size_t total_size,
-    int buffer_flag,
+    enum bmi_buffer_type buffer_type,
     bmi_msg_tag_t tag,
     void *user_ptr,
     bmi_context_id context_id)
@@ -1031,7 +1031,7 @@ int BMI_gm_post_sendunexpected_list(bmi_op_id_t * id,
     if(list_count == 1)
     {
 	return(BMI_gm_post_sendunexpected(id, dest, buffer_list[0], 
-	    size_list[0], buffer_flag, tag, user_ptr, context_id));
+	    size_list[0], buffer_type, tag, user_ptr, context_id));
     }
 
     /* TODO: think about this some.  For now this is going to be
@@ -1093,7 +1093,7 @@ int BMI_gm_post_sendunexpected(bmi_op_id_t * id,
 			       method_addr_p dest,
 			       void *buffer,
 			       bmi_size_t size,
-			       int buffer_flag,
+			       enum bmi_buffer_type buffer_type,
 			       bmi_msg_tag_t tag,
 			       void *user_ptr,
 			       bmi_context_id context_id)
@@ -1113,7 +1113,7 @@ int BMI_gm_post_sendunexpected(bmi_op_id_t * id,
 	return (-EMSGSIZE);
     }
 
-    if (!(buffer_flag & BMI_PRE_ALLOC))
+    if (buffer_type != BMI_PRE_ALLOC)
     {
 	/* pad enough room for a ctrl structure */
 	buffer_size = sizeof(struct ctrl_msg) + size;
@@ -1161,7 +1161,7 @@ int BMI_gm_post_recv(bmi_op_id_t * id,
 		     void *buffer,
 		     bmi_size_t expected_size,
 		     bmi_size_t * actual_size,
-		     int buffer_flag,
+		     enum bmi_buffer_type buffer_type,
 		     bmi_msg_tag_t tag,
 		     void *user_ptr,
 		     bmi_context_id context_id)
@@ -1192,7 +1192,7 @@ int BMI_gm_post_recv(bmi_op_id_t * id,
     }
 
     /* set flag to indicate if we need to pinn this buffer internally */ 
-    if(expected_size > GM_IMMED_LENGTH && buffer_flag != BMI_PRE_ALLOC)
+    if(expected_size > GM_IMMED_LENGTH && buffer_type != BMI_PRE_ALLOC)
 	buffer_status = GM_BUF_METH_REG;
 
     /* push work first; use this as an opportunity to make sure that the
@@ -1328,7 +1328,7 @@ int BMI_gm_post_recv_list(bmi_op_id_t * id,
     int list_count,
     bmi_size_t total_expected_size,
     bmi_size_t * total_actual_size,
-    int buffer_flag,
+    enum bmi_buffer_type buffer_type,
     bmi_msg_tag_t tag,
     void *user_ptr,
     bmi_context_id context_id)
@@ -1353,7 +1353,7 @@ int BMI_gm_post_recv_list(bmi_op_id_t * id,
     if(list_count == 1)
     {
 	return(BMI_gm_post_recv(id, src, buffer_list[0], size_list[0],
-	    total_actual_size, buffer_flag, tag, user_ptr, context_id));
+	    total_actual_size, buffer_type, tag, user_ptr, context_id));
     }
 
     /* what happens here ?

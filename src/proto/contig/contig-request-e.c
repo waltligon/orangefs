@@ -40,7 +40,7 @@ int do_encode_req(
 	return -EINVAL;
     }
     target_msg->list_count = 1;
-    target_msg->buffer_flag = 0;
+    target_msg->buffer_type = BMI_EXT_ALLOC;
 
     switch( request->op )
     {

@@ -17,11 +17,11 @@
 
 static int bmi_server_postall(struct bench_options* opts, struct
 	mem_buffers* bmi_buf_array, int num_clients, bmi_addr_t* addr_array, 
-	int buffer_flag, double* wtime, int world_rank, bmi_context_id
+	enum bmi_buffer_type buffer_type, double* wtime, int world_rank, bmi_context_id
 	context);
 static int bmi_client_postall(struct bench_options* opts, struct
 	mem_buffers* bmi_buf_array, int num_servers, bmi_addr_t* addr_array, 
-	int buffer_flag, double* wtime, int world_rank, bmi_context_id
+	enum bmi_buffer_type buffer_type, double* wtime, int world_rank, bmi_context_id
 	context);
 static int mpi_client_postall(struct bench_options* opts, struct 
 	mem_buffers* mpi_buf_array, int num_servers, int* addr_array, 
@@ -40,7 +40,7 @@ int main( int argc, char *argv[])
 	int num_clients;
 	struct bench_options opts;
 	int i = 0;
-	int buffer_flag = BMI_EXT_ALLOC;
+	enum bmi_buffer_type buffer_type = BMI_EXT_ALLOC;
 	struct mem_buffers* mpi_buf_array = NULL;
 	struct mem_buffers* bmi_buf_array = NULL;
 	int im_a_server = 0;
@@ -94,7 +94,7 @@ int main( int argc, char *argv[])
 		{
 			if(opts.flags & BMI_ALLOCATE_MEMORY)
 			{
-				buffer_flag = BMI_PRE_ALLOC;
+				buffer_type = BMI_PRE_ALLOC;
 				ret = BMI_alloc_buffers(&(bmi_buf_array[i]), num_messages,
 					opts.message_len, bmi_peer_array[i], BMI_RECV);
 			}
@@ -132,7 +132,7 @@ int main( int argc, char *argv[])
 		{
 			if(opts.flags & BMI_ALLOCATE_MEMORY)
 			{
-				buffer_flag = BMI_PRE_ALLOC;
+				buffer_type = BMI_PRE_ALLOC;
 				ret = BMI_alloc_buffers(&(bmi_buf_array[i]), num_messages,
 					opts.message_len, bmi_peer_array[i], BMI_SEND);
 			}
@@ -168,12 +168,12 @@ int main( int argc, char *argv[])
 	if(im_a_server)
 	{
 		ret = bmi_server_postall(&opts, bmi_buf_array, num_clients, 
-			bmi_peer_array, buffer_flag, &bmi_time, world_rank, context);
+			bmi_peer_array, buffer_type, &bmi_time, world_rank, context);
 	}
 	else
 	{
 		ret = bmi_client_postall(&opts, bmi_buf_array, opts.num_servers, 
-			bmi_peer_array, buffer_flag, &bmi_time, world_rank, context);
+			bmi_peer_array, buffer_type, &bmi_time, world_rank, context);
 	}
 	if(ret < 0)
 	{
@@ -379,7 +379,7 @@ MPI_COMM_WORLD);
 
 static int bmi_server_postall(struct bench_options* opts, struct
 	mem_buffers* bmi_buf_array, int num_clients, bmi_addr_t* addr_array, 
-	int buffer_flag, double* wtime, int world_rank, bmi_context_id
+	enum bmi_buffer_type buffer_type, double* wtime, int world_rank, bmi_context_id
 	context)
 {
 	double time1, time2;
@@ -447,7 +447,7 @@ static int bmi_server_postall(struct bench_options* opts, struct
 			}
 			
 			ret = BMI_post_recv(&(ids[j][i]), addr_array[j], recv_buffer,
-				bmi_buf_array[0].size, &actual_size, buffer_flag, 0, NULL,
+				bmi_buf_array[0].size, &actual_size, buffer_type, 0, NULL,
 				context);
 			if(ret < 0)
 			{
@@ -556,7 +556,7 @@ static int bmi_server_postall(struct bench_options* opts, struct
 
 static int bmi_client_postall(struct bench_options* opts, struct
 	mem_buffers* bmi_buf_array, int num_servers, bmi_addr_t* addr_array, 
-	int buffer_flag, double* wtime, int world_rank, bmi_context_id
+	enum bmi_buffer_type buffer_type, double* wtime, int world_rank, bmi_context_id
 	context)
 {
 	double time1, time2;
@@ -623,7 +623,7 @@ static int bmi_client_postall(struct bench_options* opts, struct
 			}
 			
 			ret = BMI_post_send(&(ids[j][i]), addr_array[j], send_buffer,
-				bmi_buf_array[0].size, buffer_flag, 0, NULL, context);
+				bmi_buf_array[0].size, buffer_type, 0, NULL, context);
 			if(ret < 0)
 			{
 				fprintf(stderr, "Client: BMI send error.\n");

@@ -163,7 +163,7 @@ static int getconfig_job_bmi_send(PINT_server_op *s_op, job_status_s *ret)
 	    s_op->encoded.list_count,
 	    s_op->encoded.total_size,
 	    s_op->tag,
-	    s_op->encoded.buffer_flag,
+	    s_op->encoded.buffer_type,
 	    0,
 	    s_op,
 	    ret,

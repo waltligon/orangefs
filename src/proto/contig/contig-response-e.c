@@ -52,7 +52,7 @@ int do_encode_resp(
 	    target_msg->size_list   = malloc(sizeof(PVFS_size));
 	    target_msg->buffer_list = malloc(sizeof(void *));
 	    target_msg->list_count  = 1;
-	    target_msg->buffer_flag = BMI_PRE_ALLOC;
+	    target_msg->buffer_type = BMI_PRE_ALLOC;
 	    target_msg->size_list[0] = target_msg->total_size 
 		= sizeof(struct PVFS_server_resp_s) + header_size;
 	    target_msg->buffer_list[0] 
@@ -85,7 +85,7 @@ int do_encode_resp(
 	    target_msg->size_list   = malloc(sizeof(PVFS_size));
 	    target_msg->buffer_list = malloc(sizeof(void *));
 	    target_msg->list_count  = 1;
-	    target_msg->buffer_flag = BMI_PRE_ALLOC;
+	    target_msg->buffer_type = BMI_PRE_ALLOC;
 
 	    /* we may need to pack trailing data for metafiles */
 	    if(response->u.getattr.attr.objtype ==
@@ -157,7 +157,7 @@ int do_encode_resp(
 		target_msg->size_list   = malloc(3*sizeof(PVFS_size));
 		target_msg->buffer_list = malloc(3*sizeof(void *));
 		target_msg->list_count  = 3;
-		target_msg->buffer_flag = BMI_EXT_ALLOC;
+		target_msg->buffer_type = BMI_EXT_ALLOC;
 
 		target_msg->size_list[0] = sizeof(struct PVFS_server_resp_s);
 		target_msg->size_list[1] = response->u.getconfig.fs_config_buflen;
@@ -175,7 +175,7 @@ int do_encode_resp(
 		target_msg->size_list   = malloc(sizeof(PVFS_size));
 		target_msg->buffer_list = malloc(sizeof(void *));
 		target_msg->list_count  = 1;
-		target_msg->buffer_flag = BMI_EXT_ALLOC;
+		target_msg->buffer_type = BMI_EXT_ALLOC;
 		target_msg->buffer_list[0] = response;
 		target_msg->size_list[0] = sizeof(struct PVFS_server_resp_s);
 		target_msg->total_size = target_msg->size_list[0];
@@ -211,7 +211,7 @@ int do_encode_resp(
 	    target_msg->size_list   = malloc(3*sizeof(PVFS_size));
 	    target_msg->buffer_list = malloc(3*sizeof(void *));
 	    target_msg->list_count  = 3;
-	    target_msg->buffer_flag = BMI_EXT_ALLOC;
+	    target_msg->buffer_type = BMI_EXT_ALLOC;
 
 	    if(response->status != 0)
 		target_msg->list_count = 1;
@@ -253,7 +253,7 @@ int do_encode_resp(
 	    target_msg->size_list   = malloc(2*sizeof(PVFS_size));
 	    target_msg->buffer_list = malloc(2*sizeof(void *));
 	    target_msg->list_count  = 2;
-	    target_msg->buffer_flag = BMI_EXT_ALLOC;
+	    target_msg->buffer_type = BMI_EXT_ALLOC;
 
 	    /* If there was an error, we need to not send any dirents */
 	    if(response->status != 0)

@@ -23,7 +23,7 @@ struct PINT_encoded_msg
     /* Need to be set up ahead of time */
     /***********************************/
     bmi_addr_t dest;        /* host this is going to */
-    int buffer_flag; /* buffer flag for BMI's use */
+    int buffer_type; /* buffer flag for BMI's use */
 
 	/* These values are filled in by the API */
     void** buffer_list;     /* list of buffers */

@@ -1221,18 +1221,18 @@ static void service_mem_to_bmi(flow_descriptor * flow_d)
 {
     struct bmi_trove_flow_data *flow_data = PRIVATE_FLOW(flow_d);
     int ret = -1;
-    int buffer_flag = 0;
+    enum bmi_buffer_type buffer_type;
 
     /* make sure BMI knows if we are using an intermediate buffer or not,
      * because those have been created with bmi_memalloc()
      */
     if (flow_data->bmi_buffer_list[0] == flow_data->intermediate_buffer)
     {
-	buffer_flag = BMI_PRE_ALLOC;
+	buffer_type = BMI_PRE_ALLOC;
     }
     else
     {
-	buffer_flag = BMI_EXT_ALLOC;
+	buffer_type = BMI_EXT_ALLOC;
     }
 
     /* post list send */
@@ -1243,7 +1243,7 @@ static void service_mem_to_bmi(flow_descriptor * flow_d)
 			     flow_data->bmi_buffer_list,
 			     flow_data->bmi_size_list,
 			     flow_data->bmi_list_count,
-			     flow_data->bmi_total_size, buffer_flag,
+			     flow_data->bmi_total_size, buffer_type,
 			     flow_d->tag, flow_d, global_bmi_context);
     if (ret == 1)
     {

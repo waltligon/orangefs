@@ -185,7 +185,7 @@ int main(int argc, char **argv)	{
 		encoded1.size_list,
 		encoded1.list_count,
 		encoded1.total_size, 
-		encoded1.buffer_flag, 
+		encoded1.buffer_type, 
 		0, 
 		NULL,
 		context);
@@ -338,7 +338,7 @@ int main(int argc, char **argv)	{
 		encoded2.size_list,
 		encoded2.list_count,
 		encoded2.total_size,
-		encoded2.buffer_flag,
+		encoded2.buffer_type,
 		0,
 		NULL,
 		context);
@@ -510,7 +510,7 @@ int main(int argc, char **argv)	{
 		encoded3.size_list,
 		encoded3.list_count,
 		encoded3.total_size, 
-		encoded3.buffer_flag, 
+		encoded3.buffer_type, 
 		0, 
 		NULL,
 		context);

@@ -39,10 +39,10 @@ enum bmi_op_type
 };
 
 /* BMI memory buffer flags */
-enum
+enum bmi_buffer_type
 {
-    BMI_PRE_ALLOC = 4,
-    BMI_EXT_ALLOC = 8
+    BMI_PRE_ALLOC = 1,
+    BMI_EXT_ALLOC = 2
 };
 
 /* BMI get_info and set_info options */

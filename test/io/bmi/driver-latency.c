@@ -17,10 +17,10 @@
 
 static int bmi_server(struct bench_options* opts, struct mem_buffers*
 	bmi_recv_bufs, struct mem_buffers* bmi_send_bufs, bmi_addr_t addr,
-	int buffer_flag, double* wtime, bmi_context_id context);
+	enum bmi_buffer_type buffer_type, double* wtime, bmi_context_id context);
 static int bmi_client(struct bench_options* opts, struct mem_buffers*
 	bmi_recv_bufs, struct mem_buffers* bmi_send_bufs, bmi_addr_t addr,
-	int buffer_flag, double* wtime, bmi_context_id context);
+	enum bmi_buffer_type buffer_type, double* wtime, bmi_context_id context);
 static int mpi_server(struct bench_options* opts, struct mem_buffers*
 	mpi_recv_bufs, struct mem_buffers* mpi_send_bufs, int addr, double* wtime);
 static int mpi_client(struct bench_options* opts, struct mem_buffers*
@@ -39,7 +39,7 @@ int main( int argc, char *argv[])
 	struct mem_buffers mpi_recv_bufs;
 	struct mem_buffers bmi_send_bufs;
 	struct mem_buffers bmi_recv_bufs;
-	int buffer_flag = BMI_EXT_ALLOC;
+	enum bmi_buffer_type buffer_type = BMI_EXT_ALLOC;
 	double mpi_time, bmi_time;
 	bmi_context_id context;
 
@@ -71,7 +71,7 @@ int main( int argc, char *argv[])
 	/* setup BMI buffers (differs depending on command line args) */
 	if(opts.flags & BMI_ALLOCATE_MEMORY)
 	{
-		buffer_flag = BMI_PRE_ALLOC;
+		buffer_type = BMI_PRE_ALLOC;
 		ret = BMI_alloc_buffers(&bmi_send_bufs, 1000, opts.message_len,
 			bmi_peer_array[0], BMI_SEND);
 		ret += BMI_alloc_buffers(&bmi_recv_bufs, 1000, opts.message_len,
@@ -84,7 +84,7 @@ int main( int argc, char *argv[])
 	}
 	else
 	{
-		buffer_flag = BMI_EXT_ALLOC;
+		buffer_type = BMI_EXT_ALLOC;
 		ret = alloc_buffers(&bmi_send_bufs, 1000, opts.message_len);
 		ret += alloc_buffers(&bmi_recv_bufs, 1000, opts.message_len);
 		if(ret < 0)
@@ -110,12 +110,12 @@ int main( int argc, char *argv[])
 	if(world_rank == 0)
 	{
 		ret = bmi_server(&opts, &bmi_recv_bufs, &bmi_send_bufs,
-			bmi_peer_array[0], buffer_flag, &bmi_time, context);
+			bmi_peer_array[0], buffer_type, &bmi_time, context);
 	}
 	else
 	{
 		ret = bmi_client(&opts, &bmi_recv_bufs, &bmi_send_bufs,
-			bmi_peer_array[0], buffer_flag, &bmi_time, context);
+			bmi_peer_array[0], buffer_type, &bmi_time, context);
 	}
 	if(ret < 0)
 	{
@@ -212,7 +212,7 @@ int main( int argc, char *argv[])
 
 static int bmi_server(struct bench_options* opts, struct mem_buffers*
 	bmi_recv_bufs, struct mem_buffers* bmi_send_bufs, bmi_addr_t addr,
-	int buffer_flag, double* wtime, bmi_context_id context)
+	enum bmi_buffer_type buffer_type, double* wtime, bmi_context_id context)
 {
 	int i=0;
 	bmi_size_t actual_size;
@@ -244,7 +244,7 @@ static int bmi_server(struct bench_options* opts, struct mem_buffers*
 		/* receive a message */
 		error_code = 0;
 		ret = BMI_post_recv(&bmi_id, addr, recv_buffer, 
-			bmi_recv_bufs->size, &actual_size, buffer_flag, 0, NULL,
+			bmi_recv_bufs->size, &actual_size, buffer_type, 0, NULL,
 			context);
 		if(ret == 0)
 		{
@@ -263,7 +263,7 @@ static int bmi_server(struct bench_options* opts, struct mem_buffers*
 		/* send a message */
 		error_code = 0;
 		ret = BMI_post_send(&bmi_id, addr, send_buffer,
-			bmi_send_bufs->size, buffer_flag, 0, NULL, context);
+			bmi_send_bufs->size, buffer_type, 0, NULL, context);
 		if(ret == 0)
 		{
 			do
@@ -288,7 +288,7 @@ static int bmi_server(struct bench_options* opts, struct mem_buffers*
 
 static int bmi_client(struct bench_options* opts, struct mem_buffers*
 	bmi_recv_bufs, struct mem_buffers* bmi_send_bufs, bmi_addr_t addr,
-	int buffer_flag, double* wtime, bmi_context_id context)
+	enum bmi_buffer_type buffer_type, double* wtime, bmi_context_id context)
 {
 	int i=0;
 	bmi_size_t actual_size;
@@ -319,7 +319,7 @@ static int bmi_client(struct bench_options* opts, struct mem_buffers*
 		/* send a message */
 		error_code = 0;
 		ret = BMI_post_send(&bmi_id, addr, send_buffer,
-			bmi_send_bufs->size, buffer_flag, 0, NULL, context);
+			bmi_send_bufs->size, buffer_type, 0, NULL, context);
 		if(ret == 0)
 		{
 			do
@@ -337,7 +337,7 @@ static int bmi_client(struct bench_options* opts, struct mem_buffers*
 		/* receive a message */
 		error_code = 0;
 		ret = BMI_post_recv(&bmi_id, addr, recv_buffer, 
-			bmi_recv_bufs->size, &actual_size, buffer_flag, 0, NULL,
+			bmi_recv_bufs->size, &actual_size, buffer_type, 0, NULL,
 			context);
 		if(ret == 0)
 		{

@@ -16,7 +16,7 @@ ENCODE_REL_HEAD(do_encode_rel)
 {
 	int i;
 	
-	if(msg->buffer_flag == BMI_PRE_ALLOC)
+	if(msg->buffer_type == BMI_PRE_ALLOC)
 	{
 
 		for (i=0;i<msg->list_count;i++)
