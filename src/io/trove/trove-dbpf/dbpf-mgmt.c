@@ -41,8 +41,7 @@ static DB *dbpf_db_open(char *dbname);
 
 /* dbpf_collection_getinfo()
  */
-static int dbpf_collection_getinfo(
-				   TROVE_coll_id coll_id,
+static int dbpf_collection_getinfo(TROVE_coll_id coll_id,
 				   TROVE_handle handle,
 				   int option,
 				   void *parameter)
@@ -52,8 +51,7 @@ static int dbpf_collection_getinfo(
 
 /* dbpf_collection_setinfo()
  */
-static int dbpf_collection_setinfo(
-				   TROVE_coll_id coll_id,
+static int dbpf_collection_setinfo(TROVE_coll_id coll_id,
 				   TROVE_handle handle,
 				   int option,
 				   void *parameter)
@@ -63,8 +61,7 @@ static int dbpf_collection_setinfo(
 
 /* dbpf_collection_seteattr()
  */
-static int dbpf_collection_seteattr(
-				    TROVE_coll_id coll_id,
+static int dbpf_collection_seteattr(TROVE_coll_id coll_id,
 				    TROVE_keyval_s *key_p,
 				    TROVE_keyval_s *val_p,
 				    TROVE_ds_flags flags,
@@ -108,8 +105,7 @@ static int dbpf_collection_seteattr(
 
 /* dbpf_collection_geteattr()
  */
-static int dbpf_collection_geteattr(
-				    TROVE_coll_id coll_id,
+static int dbpf_collection_geteattr(TROVE_coll_id coll_id,
 				    TROVE_keyval_s *key_p,
 				    TROVE_keyval_s *val_p,
 				    TROVE_ds_flags flags,
@@ -151,8 +147,7 @@ static int dbpf_collection_geteattr(
  *
  * TODO: what's the method_id good for?
  */
-static int dbpf_initialize(
-			   char *stoname,
+static int dbpf_initialize(char *stoname,
 			   TROVE_ds_flags flags,
 			   char **method_name_p,
 			   int method_id)
@@ -230,8 +225,7 @@ static int dbpf_finalize(void)
  * - creating storage attribute database, propagating with create time
  * - creating collections database, filling in create time
  */
-static int dbpf_storage_create(
-			       char *stoname,
+static int dbpf_storage_create(char *stoname,
 			       void *user_ptr,
 			       TROVE_op_id *out_op_id_p)
 {
@@ -247,8 +241,7 @@ static int dbpf_storage_create(
 
 /* dbpf_storage_remove()
  */
-static int dbpf_storage_remove(
-			       char *stoname,
+static int dbpf_storage_remove(char *stoname,
 			       void *user_ptr,
 			       TROVE_op_id *out_op_id_p)
 {
@@ -271,9 +264,7 @@ static int dbpf_storage_remove(
  * 4) Create dataspace attributes database.
  * 5) Create keyval and bstream directories.
  */
-static int dbpf_collection_create(
-				  /* char *stoname, */
-				  char *collname,
+static int dbpf_collection_create(char *collname,
 				  TROVE_coll_id new_coll_id,
 				  void *user_ptr,
 				  TROVE_op_id *out_op_id_p)
@@ -287,11 +278,8 @@ static int dbpf_collection_create(
     char path_name[PATH_MAX];
     struct stat dirstat;
 
-#if 0
-    sto_p = dbpf_storage_lookup(stoname);
-#else
     sto_p = my_storage_p;
-#endif
+
     if (sto_p == NULL) return -1;
     
     printf("storage region found.\n");
@@ -421,9 +409,7 @@ static int dbpf_collection_create(
 
 /* dbpf_collection_remove()
  */
-static int dbpf_collection_remove(
-				  /* char *stoname, */
-				  char *collname,
+static int dbpf_collection_remove(char *collname,
 				  void *user_ptr,
 				  TROVE_op_id *out_op_id_p)
 {
@@ -476,9 +462,7 @@ static int dbpf_collection_remove(
 
 /* dbpf_collection_lookup()
  */
-static int dbpf_collection_lookup(
-				  /* char *stoname, */
-				  char *collname,
+static int dbpf_collection_lookup(char *collname,
 				  TROVE_coll_id *coll_id_p,
 				  void *user_ptr,
 				  TROVE_op_id *out_op_id_p)
@@ -637,8 +621,7 @@ static struct dbpf_storage *dbpf_storage_lookup(char *stoname)
  * Internal function for creating first instances of the databases for a
  * db plus files storage region.
  */
-static int dbpf_db_create(
-			  char *dbname)
+static int dbpf_db_create(char *dbname)
 {
     int ret;
     DB *db_p;
@@ -710,8 +693,7 @@ static int dbpf_db_create(
  * Internal function for opening the databases that are used to store
  * basic information on a storage region.
  */
-static DB *dbpf_db_open(
-			char *dbname)
+static DB *dbpf_db_open(char *dbname)
 {
     int ret;
     DB *db_p;
