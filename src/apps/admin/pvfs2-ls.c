@@ -27,6 +27,12 @@
  */
 #define MAX_NUM_DIRENTS    32
 
+/*
+  arbitrarily restrict the number of paths
+  that this ls version can take as arguments
+*/
+#define MAX_NUM_PATHS       8
+
 /* optional parameters, filled in by parse_args() */
 struct options
 {
@@ -35,7 +41,8 @@ struct options
     int list_numeric_uid_gid;
     int list_no_owner;
     int list_no_group;
-    char *start;
+    char *start[MAX_NUM_PATHS];
+    int num_starts;
 };
 
 static struct options* parse_args(int argc, char* argv[]);
@@ -52,8 +59,8 @@ static void print_entry_attr(
 
 int main(int argc, char **argv)
 {
-    int ret = -1, i = 0;
-    char pvfs_path[PVFS_NAME_MAX] = {0};
+    int ret = -1, i = 0, j = 0;
+    char pvfs_path[MAX_NUM_PATHS][PVFS_NAME_MAX];
     pvfs_mntlist mnt = {0,NULL};
     PVFS_sysresp_init resp_init;
     struct options* user_opts = NULL;
@@ -80,20 +87,33 @@ int main(int argc, char **argv)
      */
     for(i = 0; i < mnt.nr_entry; i++)
     {
-        ret = PVFS_util_remove_dir_prefix(
-            user_opts->start, mnt.ptab_p[i].local_mnt_dir,
-            pvfs_path, PVFS_NAME_MAX);
-	if (ret == 0)
-	{
-	    mnt_index = i;
-	    break;
-	}
+        for(j = 0; j < user_opts->num_starts; j++)
+        {
+            memset(pvfs_path[j],0,PVFS_NAME_MAX);
+            ret = PVFS_util_remove_dir_prefix(
+                user_opts->start[j], mnt.ptab_p[i].local_mnt_dir,
+                pvfs_path[j], PVFS_NAME_MAX);
+            if (ret == 0)
+            {
+                if ((mnt_index != -1) && (i != mnt_index))
+                {
+                    ret = -1;
+                    PVFS_perror("Cannot use pvfs2-ls across "
+                                "mount points at this time!\n",ret);
+                    goto main_out;
+                }
+                else
+                {
+                    mnt_index = i;
+                }
+            }
+        }
     }
 
     if (mnt_index == -1)
     {
 	fprintf(stderr, "Error: could not find filesystem for %s in "
-                "pvfstab %s\n", user_opts->start, DEFAULT_TAB);
+                "pvfstab %s\n", user_opts->start[j], DEFAULT_TAB);
 	return(-1);
 
     }
@@ -106,12 +126,23 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    ret = do_list(&resp_init, pvfs_path, user_opts);
-    if (ret < 0)
+    for(i = 0; i < user_opts->num_starts; i++)
     {
-	PVFS_perror("do_list", ret);
-	ret = -1;
-	goto main_out;
+        if (user_opts->num_starts > 1)
+        {
+            printf("%s:\n", pvfs_path[i]);
+        }
+        ret = do_list(&resp_init, pvfs_path[i], user_opts);
+        if (ret < 0)
+        {
+            PVFS_perror("do_list", ret);
+            ret = -1;
+            goto main_out;
+        }
+        if (user_opts->num_starts > 1)
+        {
+            printf("\n");
+        }
     }
 
 main_out:
@@ -313,7 +344,7 @@ int do_list(
     if (PVFS_sys_lookup(fs_id, name, credentials, &lk_response))
     {
         fprintf(stderr,"Failed to lookup %s on fs_id %d!\n",
-                opts->start,init_response->fsid_list[0]);
+                name, init_response->fsid_list[0]);
         return -1;
     }
 
@@ -373,12 +404,12 @@ int do_list(
  */
 static struct options* parse_args(int argc, char* argv[])
 {
+    int i = 0;
     /* getopt stuff */
     extern char* optarg;
     extern int optind, opterr, optopt;
     char flags[] = "alngo:";
     char one_opt = ' ';
-
     struct options* tmp_opts = NULL;
 
     /* create storage for the command line options */
@@ -420,7 +451,18 @@ static struct options* parse_args(int argc, char* argv[])
 	}
     }
 
-    tmp_opts->start = ((argc > 1) ? argv[argc-1] : "/");
+    for(i = optind; i < argc; i++)
+    {
+        if (tmp_opts->num_starts < MAX_NUM_PATHS)
+        {
+            tmp_opts->start[i-optind] = argv[i];
+            tmp_opts->num_starts++;
+        }
+        else
+        {
+            fprintf(stderr,"Ignoring path %s\n",argv[i]);
+        }
+    }
     return tmp_opts;
 }
 
