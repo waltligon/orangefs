@@ -144,6 +144,177 @@ int PINT_server_send_req(bmi_addr_t addr,
     return ret;
 }
 
+/* server_send_req_array()
+ *
+ * TODO: prepost receives 
+ * TODO: add more gossip output
+ *
+ * Sends an array of requests and waits for an acknowledgement for each.
+ * Fills in PINT_decoded_msg array pointed to by decoded_array.  The
+ * caller must call PINT_decode_release() for each array element later
+ * on.
+ *
+ */
+int PINT_server_send_req_array(bmi_addr_t* addr_array,
+			 struct PVFS_server_req_s* req_array,
+			 bmi_size_t max_resp_size,
+			 void** resp_encoded_array,
+			 struct PINT_decoded_msg* resp_decoded_array,
+			 int* error_code_array,
+			 int array_size)
+{
+    int i, j;
+    int ret = -1;
+    struct PINT_encoded_msg* req_encoded_array = NULL;
+    PVFS_msg_tag_t op_tag = get_next_session_tag();
+    job_id_t* id_array = NULL;
+    job_status_s* status_array = NULL;
+    int* index_array = NULL;
+    int total_completed = 0;
+    int count;
+
+    enum
+    {
+	NONE_FAIL,
+	MEM_FAIL
+    } failure_state = NONE_FAIL;
+
+    /* clear some of the arrays for safety */
+    memset(error_code_array, 0, (array_size*sizeof(int)));
+    memset(resp_encoded_array, 0, (array_size*sizeof(void*)));
+
+    /* allocate some bookkeeping fields */
+    req_encoded_array = (struct PINT_encoded_msg*)malloc(array_size *
+	sizeof(struct PINT_encoded_msg));
+    status_array = (job_status_s*)malloc(array_size *
+	sizeof(job_status_s));
+    index_array = (int*)malloc(array_size * sizeof(int));
+    id_array = (job_id_t*)malloc(array_size * sizeof(job_id_t));
+
+    if(!req_encoded_array || !status_array || !id_array)
+    {
+	ret = -ENOMEM;
+	failure_state = MEM_FAIL;
+	goto out;
+    }
+
+    /* encode all of the requests */
+    for(i=0; i<array_size; i++)
+    {
+	ret = PINT_encode(&(req_array[i]), PINT_ENCODE_REQ,
+	    &(req_encoded_array[i]), addr_array[i], REQ_ENC_FORMAT);
+	if(ret < 0)
+	{
+	    /* go back and release earlier encodings */
+	    for(j=(i-1); j>-1; j++)
+	    {
+		PINT_encode_release(&(req_encoded_array[i]),
+		    PINT_ENCODE_REQ, REQ_ENC_FORMAT);
+	    }
+	    failure_state = MEM_FAIL;
+	    goto out;
+	}
+    }
+
+    /* post a bunch of sends */
+    /* keep up with job ids, and the number of immediate completions */
+    total_completed = 0;
+    for(i=0; i<array_size; i++)
+    {
+	ret = job_bmi_send_list(
+	    req_encoded_array[i].dest, 
+	    req_encoded_array[i].buffer_list,
+	    req_encoded_array[i].size_list,
+	    req_encoded_array[i].list_count,
+	    req_encoded_array[i].total_size,
+	    op_tag,
+	    req_encoded_array[i].buffer_flag,
+	    0,
+	    NULL,
+	    &(status_array[i]),
+	    &(id_array[i]));
+	if(ret < 0)
+	{
+	    /* set the error code array entry; as a side effect, this
+	     * will keep us from looking for a response to this
+	     * particular request later 
+	     */
+	    total_completed++;
+	    error_code_array[i] = ret;
+	    id_array[i] = 0;
+	}
+	else if (ret == 1)
+	{
+	    /* immediate completion */
+	    /* increment our completed count, make sure this id_array
+	     * entry is cleared
+	     */
+	    total_completed++;
+	    error_code_array[i] = status_array[i].error_code;
+	    id_array[i] = 0;
+	}
+    }
+
+    /* see if anything needs to be tested for completion */
+    if(total_completed < array_size)
+    {
+	count = array_size;
+	/* TODO: do a timeout here later */
+	ret = job_testsome(id_array, &count, index_array, NULL,
+	    status_array, -1);
+	if(ret < 0)
+	{
+	    /* TODO: there is no real way cleanup from this right now */
+	    gossip_lerr("Error: PINT_server_send_req_array() critical failure.\n");
+	    exit(-1);
+	}
+	    
+	/* all sends are complete now, fill in error codes */
+	total_completed = array_size;
+	for(i=0; i<count; i++)
+	{
+	    error_code_array[index_array[i]] =
+		status_array[i].error_code;
+	}
+    }
+
+    /* allocate room for responses */
+    for(i=0; i<array_size; i++)
+    {
+	if(!(error_code_array[i]))
+	{
+	    resp_encoded_array[i] = BMI_memalloc(addr_array[i], max_resp_size,
+		BMI_RECV_BUFFER);
+	    if(!resp_encoded_array[i])
+	    {
+		error_code_array[i] = -ENOMEM;
+	    }
+	}
+    }
+
+    /* TODO: add cleanup of resp_encoded_array at bottom */
+    /* TODO: this function isn't completed yet */
+    ret = -ENOSYS;
+
+out:
+
+    switch(failure_state)
+    {
+	case NONE_FAIL:
+	case MEM_FAIL:
+	    if(req_encoded_array)
+		free(req_encoded_array);
+	    if(status_array)
+		free(status_array);
+	    if(id_array)
+		free(id_array);
+	    if(index_array)
+		free(index_array);
+	    break;
+    }
+    return(ret);
+}
+
 /*
  * Local variables:
  *  c-indent-level: 4
