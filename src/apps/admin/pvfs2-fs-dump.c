@@ -32,6 +32,7 @@ struct options
     int mnt_point_set;
     int dot_format;
     int key;
+    char *fontname;
 };
 
 static struct options* parse_args(int argc, char* argv[]);
@@ -57,7 +58,7 @@ void verify_datafiles(PVFS_fs_id cur_fs,
 		      PVFS_pinode_reference mf_ref,
 		      int df_count,
 		      PVFS_credentials creds,
-		      int dot_fmt);
+		      struct options *opts_p);
 
 void analyze_remaining_handles(PVFS_fs_id cur_fs,
 			       PVFS_id_gen_t *addr_array,
@@ -65,18 +66,20 @@ void analyze_remaining_handles(PVFS_fs_id cur_fs,
 			       int dot_fmt);
 
 /* print functions */
-static void print_header(int dot_fmt, int key);
-static void print_trailer(int dot_fmt);
+static void print_header(int dot_fmt, int key, char *fontname);
+static void print_trailer(int dot_fmt, char *fontname);
 static void print_root_entry(PVFS_handle handle,
 			     int server_idx,
-			     int dot_fmt);
+			     int dot_fmt,
+			     char *fontname);
 static void print_entry(char *name,
 			PVFS_handle handle,
 			PVFS_handle parent_handle,
 			PVFS_ds_type objtype,
 			int server_idx,
 			int error,
-			int dot_fmt);
+			int dot_fmt,
+			char *fontname);
 
 
 /* handlelist functions and globals */
@@ -216,7 +219,7 @@ int main(int argc, char **argv)
      */
     build_handlelist(cur_fs, addr_array, server_count, creds);
 
-    print_header(user_opts->dot_format, user_opts->key);
+    print_header(user_opts->dot_format, user_opts->key, user_opts->fontname);
 
     traverse_directory_tree(cur_fs,
 			    addr_array,
@@ -229,7 +232,7 @@ int main(int argc, char **argv)
 			      creds,
 			      user_opts->dot_format);
 
-    print_trailer(user_opts->dot_format);
+    print_trailer(user_opts->dot_format, user_opts->fontname);
 
     handlelist_finalize();
 
@@ -430,7 +433,7 @@ int traverse_directory_tree(PVFS_fs_id cur_fs,
 	assert(0);
     }
 
-    print_root_entry(pref.handle, server_idx, opts_p->dot_format);
+    print_root_entry(pref.handle, server_idx, opts_p->dot_format, opts_p->fontname);
 
     descend(cur_fs, pref, creds, opts_p);
 
@@ -492,7 +495,8 @@ int descend(PVFS_fs_id cur_fs,
 		    getattr_resp.attr.objtype,
 		    server_idx,
 		    0,
-		    opts_p->dot_format);
+		    opts_p->dot_format,
+		    opts_p->fontname);
 
 	switch (getattr_resp.attr.objtype) {
 	    case PVFS_TYPE_METAFILE:
@@ -500,7 +504,7 @@ int descend(PVFS_fs_id cur_fs,
 				 entry_ref,
 				 getattr_resp.attr.dfile_count,
 				 creds,
-				 opts_p->dot_format);
+				 opts_p);
 		break;
 	    case PVFS_TYPE_DIRECTORY:
 		descend(cur_fs, entry_ref, creds, opts_p);
@@ -524,7 +528,7 @@ void verify_datafiles(PVFS_fs_id cur_fs,
 		      PVFS_pinode_reference mf_ref,
 		      int df_count,
 		      PVFS_credentials creds,
-		      int dot_fmt)
+		      struct options *opts_p)
 {
     int ret, i, server_idx;
     PVFS_handle *df_handles;
@@ -567,7 +571,8 @@ void verify_datafiles(PVFS_fs_id cur_fs,
 		    PVFS_TYPE_DATAFILE,
 		    server_idx,
 		    0,
-		    dot_fmt);
+		    opts_p->dot_format,
+		    opts_p->fontname);
 
 	handlelist_remove_handle(df_handles[i], server_idx);
     }
@@ -748,27 +753,38 @@ static void handlelist_finalize(void)
 
 /**********************************************/
 
-static void print_header(int dot_fmt, int key)
+static void print_header(int dot_fmt,
+			 int key,
+			 char *fontname)
 {
     if (dot_fmt) {
-	printf("digraph %d {\n",
-	       getpid());
+	if (fontname != NULL) {
+	    printf("digraph %d {\n\tnode [fontname = \"%s\"];\n",
+		   getpid(),
+		   fontname);
+	}
+	else {
+	    printf("digraph %d {\n",
+		   getpid());
+	}
 	if (key) {
 	    printf("\tsubgraph cluster1 {\n\t\t\"Datafile\" [shape=ellipse, style=filled, fillcolor=violet];\n\t\t\"Metafile\" [shape=record, style=filled, fillcolor=aquamarine];\n\t\t\"Directory\" [shape=record, style=filled, fillcolor=grey];\n\t\t\"Missing Datafile\" [shape=ellipse, style=dashed, color=red];\n\t\t\"Datafile\" -> \"Metafile\" [style=invis];\n\t\t\"Metafile\" -> \"Directory\" [style=invis];\n\t\t\"Directory\" -> \"Missing Datafile\" [style=invis];\n\t\tstyle=dotted;\n\t\tlabel = \"Key\";\t}\n");
 	}
     }
 }
 
-static void print_trailer(int dot_fmt)
+static void print_trailer(int dot_fmt,
+			  char *fontname)
 {
     if (dot_fmt) {
-	printf("}\n");
+	printf("\t}\n");
     }
 }
 
 static void print_root_entry(PVFS_handle handle,
 			     int server_idx,
-			     int dot_fmt)
+			     int dot_fmt,
+			     char *fontname)
 {
     if (dot_fmt)
     {
@@ -803,7 +819,8 @@ static void print_entry(char *name,
 			PVFS_ds_type objtype,
 			int server_idx,
 			int error,
-			int dot_fmt)
+			int dot_fmt,
+			char *fontname)
 {
     if (dot_fmt)
     {
@@ -865,7 +882,7 @@ static struct options* parse_args(int argc, char* argv[])
     /* getopt stuff */
     extern char* optarg;
     extern int optind, opterr, optopt;
-    char flags[] = "dvkm:";
+    char flags[] = "dvkm:f:";
     int one_opt = 0;
     int len = 0;
 
@@ -873,7 +890,7 @@ static struct options* parse_args(int argc, char* argv[])
     int ret = -1;
 
     /* create storage for the command line options */
-    tmp_opts = (struct options*)malloc(sizeof(struct options));
+    tmp_opts = (struct options*) malloc(sizeof(struct options));
     if(!tmp_opts){
 	return(NULL);
     }
@@ -913,6 +930,16 @@ static struct options* parse_args(int argc, char* argv[])
 	    case 'k':
 		tmp_opts->key = 1;
 		break;
+	    case 'f':
+		if ((len = strlen(optarg)) > 0) {
+		    tmp_opts->fontname = (char *) malloc(len + 1);
+		    strncpy(tmp_opts->fontname, optarg, len);
+		}
+		else {
+		    usage(argc, argv);
+		    exit(EXIT_FAILURE);
+		}
+		break;
 	    case '?':
 		usage(argc, argv);
 		exit(EXIT_FAILURE);
@@ -936,7 +963,8 @@ static void usage(int argc, char** argv)
 	argv[0]);
     fprintf(stderr, "Display information about contents of file system.\n");
     fprintf(stderr, "  -d              output in format suitable for dot\n");
-    fprintf(stderr, "  -k              when used with -d, prints key\n");
+    fprintf(stderr, "    -k            when used with -d, prints key\n");
+    fprintf(stderr, "    -f <font>     when used with -d, specifies a font name (e.g. Helvetica)\n");
     fprintf(stderr, "  -v              print version and exit\n");
     fprintf(stderr, "Example: %s -m /mnt/pvfs2\n",
 	argv[0]);
