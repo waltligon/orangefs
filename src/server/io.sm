@@ -196,10 +196,12 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s* js_p)
     /* on writes, we allow the bstream to be extended at EOF */
     if (s_op->req->u.io.io_type == PVFS_IO_WRITE)
     {
+	gossip_debug(GOSSIP_IO_DEBUG, "io_start_flow() issuing flow to write data.\n");
         s_op->u.io.flow_d->file_data.extend_flag = 1;
     }
     else
     {
+	gossip_debug(GOSSIP_IO_DEBUG, "io_start_flow() issuing flow to read data.\n");
         s_op->u.io.flow_d->file_data.extend_flag = 0;
     }
 
@@ -210,6 +212,15 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s* js_p)
     s_op->u.io.flow_d->tag = s_op->tag;
     s_op->u.io.flow_d->user_ptr = NULL;
     s_op->u.io.flow_d->type = s_op->req->u.io.flow_type;
+
+    gossip_debug(GOSSIP_IO_DEBUG, "flow parameters: fsize: %Ld, "
+    "server_nr: %d, server_ct: %d, \n\tfile_req_offset: %Ld, aggregate_size: "
+    "%Ld, handle: %Lu\n", Ld(s_op->u.io.flow_d->file_data.fsize),
+    (int)s_op->u.io.flow_d->file_data.server_nr,
+    (int)s_op->u.io.flow_d->file_data.server_ct,
+    Ld(s_op->u.io.flow_d->file_req_offset),
+    Ld(s_op->u.io.flow_d->aggregate_size),
+    Lu(s_op->req->u.io.handle));
 
     /* set endpoints depending on type of io requested */
     if (s_op->req->u.io.io_type == PVFS_IO_WRITE)
