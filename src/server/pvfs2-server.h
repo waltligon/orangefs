@@ -83,7 +83,6 @@ struct PINT_server_readdir_op {
 };
 
 struct PINT_server_rmdirent_op {
-    PVFS_object_attr parent_attr;             /* holds attributes of directory from which entry will be removed */
     PVFS_handle dirdata_handle, entry_handle; /* holds handle of dirdata object, removed entry */
 };
 

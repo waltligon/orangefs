@@ -12,7 +12,6 @@
 #include "pvfs2-attr.h"
 #include "gossip.h"
 
-static int rmdirent_read_parent_metadata(PINT_server_op *s_op, job_status_s* js_p);
 static int rmdirent_verify_parent_metadata_and_read_directory_entry_handle(PINT_server_op *s_op, job_status_s* js_p);
 static int rmdirent_cleanup(PINT_server_op *s_op, job_status_s* js_p);
 static int rmdirent_remove_directory_entry(PINT_server_op *s_op, job_status_s* js_p);
@@ -27,7 +26,6 @@ extern job_context_id PINT_server_job_context;
 %%
 
 machine pvfs2_rmdirent_sm(prelude,
-			  read_parent_metadata,
 			  verify_parent_metadata_and_read_directory_entry_handle,
 			  read_directory_entry,
 			  read_directory_entry_failure,
@@ -40,15 +38,8 @@ machine pvfs2_rmdirent_sm(prelude,
 	state prelude
 	{
 	    jump pvfs2_prelude_sm;
-	    success => read_parent_metadata;
-	    default => final_response;
-	}
-
-	state read_parent_metadata
-	{
-	    run rmdirent_read_parent_metadata;
 	    success => verify_parent_metadata_and_read_directory_entry_handle;
-	    default => setup_resp;
+	    default => final_response;
 	}
 
 	state verify_parent_metadata_and_read_directory_entry_handle
@@ -104,51 +95,6 @@ machine pvfs2_rmdirent_sm(prelude,
 
 %%
 
-/*
- * Function: rmdirent_read_parent_metadata
- *
- * Synopsis: We need to get the attribute structure if it is available.
- *           If it is not, we just send an error to the client.  
- *           TODO: Semantics here!
- */
-static int rmdirent_read_parent_metadata(PINT_server_op *s_op,
-					 job_status_s* js_p)
-{
-    int ret;
-    job_id_t j_id;
-
-    gossip_debug(SERVER_DEBUG, "rmdirent state: read_parent_metadata\n");
-
-    /* fill in key and value structures prior to keyval read */
-    s_op->key.buffer = Trove_Common_Keys[METADATA_KEY].key;
-    s_op->key.buffer_sz = Trove_Common_Keys[METADATA_KEY].size;
-
-    /* we'll store the parent attributes in the rmdirent scratch space in the s_op */
-    s_op->val.buffer = &s_op->u.rmdirent.parent_attr;
-    s_op->val.buffer_sz = sizeof(PVFS_object_attr);
-
-    gossip_debug(SERVER_DEBUG,
-		 "  reading metadata (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = 0x%08x (%d))\n",
-		 s_op->req->u.rmdirent.fs_id,
-		 s_op->req->u.rmdirent.parent_handle,
-		 (char *) s_op->key.buffer,
-		 s_op->key.buffer_sz,
-		 (unsigned) s_op->val.buffer,
-		 s_op->val.buffer_sz);
-
-    ret = job_trove_keyval_read(s_op->req->u.rmdirent.fs_id,
-					 s_op->req->u.rmdirent.parent_handle,
-					 &s_op->key,
-					 &s_op->val,
-					 0,
-					 NULL,
-					 s_op,
-					 js_p,
-					 &j_id,
-					 PINT_server_job_context);
-    return ret;
-
-}
 
 /*
  * Function: rmdirent_verify_parent_metadata_and_read_directory_entry_handle
@@ -168,8 +114,6 @@ static int rmdirent_verify_parent_metadata_and_read_directory_entry_handle(PINT_
     job_id_t i;
 
     gossip_debug(SERVER_DEBUG, "rmdirent state: verify_parent_metadata_and_read_directory_entry_handle\n");
-
-    /* TODO: PERFORM PERMISSION CHECKING */
 
     /* set up key and value structures to read directory entry */
     s_op->key.buffer    = Trove_Common_Keys[DIR_ENT_KEY].key;
