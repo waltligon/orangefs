@@ -16,6 +16,7 @@
 #include "trove.h"
 #include "trove-internal.h"
 #include "trove-ledger.h"
+#include "trove-handle-mgmt.h"
 #include "dbpf.h"
 #include "dbpf-dspace.h"
 #include "dbpf-bstream.h"
@@ -93,10 +94,7 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
 	    break;
     }
 
-    /* TODO: REDO BUCKETS!!!! */
-    new_handle = trove_handle_alloc(op_p->coll_p->free_handles,
-				    op_p->handle,
-				    op_p->u.d_create.bitmask);
+    new_handle = trove_handle_alloc(op_p->coll_p->coll_id);
     
 #if 0
     printf("new handle = %Lu (%Lx).\n", new_handle, new_handle);
@@ -265,12 +263,12 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
     }
 
     /* return handle to free list */
-    trove_handle_free(op_p->coll_p->free_handles, op_p->handle);
+    trove_handle_free(op_p->coll_p->coll_id,op_p->handle);
     dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);
     return 1;
 
 return_error:
-    trove_handle_free(op_p->coll_p->free_handles, op_p->handle);
+    trove_handle_free(op_p->coll_p->coll_id,op_p->handle);
     if (got_db) dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);
     return -1;
 }

@@ -141,16 +141,13 @@ void trove_handle_ledger_free(struct handle_ledger *hl) {
 }
 
 
-TROVE_handle trove_handle_alloc(struct handle_ledger *hl,
-				TROVE_handle requested_handle,
-				TROVE_handle bitmask)
+TROVE_handle trove_ledger_handle_alloc(struct handle_ledger *hl)
 {
-    /* for bootstrapping, return the requested handle if we haven't gotten going */
-    if (hl == NULL) return requested_handle;
-    else return (extentlist_get_and_dec_extent(&(hl->free_list)));
+    return (hl ? extentlist_get_and_dec_extent(&(hl->free_list)) :
+            (TROVE_handle)0);
 }
 
-int trove_handle_free(struct handle_ledger *hl, TROVE_handle handle) 
+int trove_ledger_handle_free(struct handle_ledger *hl, TROVE_handle handle)
 {
     /* won't actually return to the free list until timeout stuff is in
      * place */

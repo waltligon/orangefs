@@ -264,6 +264,42 @@ int trove_set_handle_ranges(TROVE_coll_id coll_id,
     return ret;
 }
 
+TROVE_handle trove_handle_alloc(TROVE_coll_id coll_id)
+{
+    handle_ledger_t *ledger = NULL;
+    struct qlist_head *hash_link = NULL;
+    TROVE_handle handle = (TROVE_handle)0;
+
+    hash_link = qhash_search(s_fsid_to_ledger_table,&coll_id);
+    if (hash_link)
+    {
+        ledger = qlist_entry(hash_link, handle_ledger_t, hash_link);
+        if (ledger)
+        {
+            handle = trove_ledger_handle_alloc(ledger->ledger);
+        }
+    }
+    return handle;
+}
+
+int trove_handle_free(TROVE_coll_id coll_id, TROVE_handle handle)
+{
+    int ret = -1;
+    handle_ledger_t *ledger = NULL;
+    struct qlist_head *hash_link = NULL;
+
+    hash_link = qhash_search(s_fsid_to_ledger_table,&coll_id);
+    if (hash_link)
+    {
+        ledger = qlist_entry(hash_link, handle_ledger_t, hash_link);
+        if (ledger)
+        {
+            ret = trove_ledger_handle_free(ledger->ledger, handle);
+        }
+    }
+    return ret;
+}
+
 int trove_handle_mgmt_finalize()
 {
     /* FIXME: clean up all ledger objects and wrappers */
