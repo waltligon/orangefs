@@ -226,6 +226,34 @@ wait_for_op:                                                  \
      }                                                        \
  }
 
+/*
+  tries to service the operation and will retry on timeout
+  failure up to num times (num MUST be a numeric lvalue).
+
+  this is a special case of this generic method for namei.c's
+  lookup.  we need to know on failure if we should add a
+  negative dentry or not on error_exit.
+*/
+#define service_lookup_op_with_timeout_retry(op, method, num, e)\
+wait_for_op:                                                    \
+ add_op_to_request_list(op);                                    \
+ if ((ret = wait_for_matching_downcall(op)) != 0)               \
+ {                                                              \
+     if ((ret == 1) && (--num))                                 \
+     {                                                          \
+         pvfs2_print("pvfs2: %s -- timeout; requeing op\n",     \
+                     method);                                   \
+         goto wait_for_op;                                      \
+     }                                                          \
+     else                                                       \
+     {                                                          \
+         pvfs2_error("pvfs2: %s -- wait failed (%x).\n",        \
+                     method,ret);                               \
+         e = 1;                                                 \
+         goto error_exit;                                       \
+     }                                                          \
+ }
+
 /****************************
  * defined in pvfs2-cache.c
  ****************************/

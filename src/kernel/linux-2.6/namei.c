@@ -49,7 +49,7 @@ struct dentry *pvfs2_lookup(
     struct dentry *dentry,
     struct nameidata *nd)
 {
-    int ret = -1, retries = PVFS2_OP_RETRY_COUNT;
+    int ret = -1, retries = PVFS2_OP_RETRY_COUNT, error_exit = 0;
     struct inode *inode = NULL;
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *parent = NULL, *found_pvfs2_inode = NULL;
@@ -132,8 +132,8 @@ struct dentry *pvfs2_lookup(
     strncpy(new_op->upcall.req.lookup.d_name,
 	    dentry->d_name.name, PVFS2_NAME_LEN);
 
-    service_operation_with_timeout_retry(
-        new_op, "pvfs2_lookup", retries);
+    service_lookup_op_with_timeout_retry(
+        new_op, "pvfs2_lookup", retries, error_exit);
 
     /* check what kind of goodies we got */
     pvfs2_print("Lookup Got PVFS2 handle %Lu on fsid %d\n",
@@ -177,8 +177,10 @@ struct dentry *pvfs2_lookup(
       if no inode was found, add a negative dentry to dcache
       anyway; if we don't, we don't hold expected lookup semantics
       and we most noticeably break during directory renames.
+
+      if the operation failed or exited, do not add the dentry.
     */
-    if (!inode)
+    if (!inode && !error_exit)
     {
         d_add(dentry, inode);
     }
