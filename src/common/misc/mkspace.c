@@ -36,12 +36,14 @@ int pvfs2_mkspace(
     struct PVFS_object_attr attr; /* from proto/pvfs2-attr.h */
     static char root_handle_string[PATH_MAX] = "root_handle";
 
-
-    printf("Storage space: %s\n",storage_space);
-    printf("Collection   : %s\n",collection);
-    printf("Collection ID: %d\n",coll_id);
-    printf("Root Handle  : %d\n",root_handle);
-    printf("Handle Ranges: %s\n",handle_ranges);
+    if (verbose)
+    {
+        fprintf(stderr,"Storage space: %s\n",storage_space);
+        fprintf(stderr,"Collection   : %s\n",collection);
+        fprintf(stderr,"Collection ID: %d\n",coll_id);
+        fprintf(stderr,"Root Handle  : %d\n",root_handle);
+        fprintf(stderr,"Handle Ranges: %s\n",handle_ranges);
+    }
 
     new_root_handle = (PVFS_handle)root_handle;
 

@@ -59,7 +59,7 @@ static int parse_args(int argc, char **argv)
 {
     int c;
 
-    while ((c = getopt(argc, argv, "s:c:i:r:R:v:h")) != EOF) {
+    while ((c = getopt(argc, argv, "s:c:i:r:R:vh")) != EOF) {
 	switch (c) {
 	    case 's':
 		strncpy(storage_space, optarg, PATH_MAX);
