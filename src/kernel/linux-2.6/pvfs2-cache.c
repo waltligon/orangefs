@@ -41,9 +41,6 @@ static void op_cache_ctor(
         pvfs2_op_initialize(op);
 
         op->tag = 0;
-
-        /* preemptively fill in the upcall credentials */
-        pvfs2_gen_credentials(&op->upcall.credentials);
     }
 }
 
@@ -80,9 +77,12 @@ pvfs2_kernel_op_t *op_alloc(void)
     new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
     if (new_op)
     {
+        /* initialize the op specific tag and upcall credentials */
         spin_lock(&next_tag_value_lock);
         new_op->tag = next_tag_value++;
         spin_unlock(&next_tag_value_lock);
+
+        pvfs2_gen_credentials(&new_op->upcall.credentials);
     }
     else
     {

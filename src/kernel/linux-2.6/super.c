@@ -176,7 +176,6 @@ static void pvfs2_destroy_inode(struct inode *inode)
     pvfs2_print("pvfs2_destroy_inode: destroying inode %d\n",
                 (int)inode->i_ino);
 
-    
     pvfs2_inode_finalize(pvfs2_inode);
     kmem_cache_free(pvfs2_inode_cache, pvfs2_inode);
 }

@@ -34,25 +34,28 @@ extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
 %%
 
-nested machine pvfs2_prelude_sm(req_sched, getattr_if_needed, perm_check)
+nested machine pvfs2_prelude_sm(
+    req_sched,
+    getattr_if_needed,
+    perm_check)
 {
     state req_sched
     {
-	run prelude_req_sched;
-	success => getattr_if_needed;
-	default => return;
+        run prelude_req_sched;
+        success => getattr_if_needed;
+        default => return;
     }
 
     state getattr_if_needed
     {
-	run prelude_getattr_if_needed;
-	default => perm_check;
+        run prelude_getattr_if_needed;
+        default => perm_check;
     }
 
     state perm_check
     {
-	run prelude_perm_check;
-	default => return;
+        run prelude_perm_check;
+        default => return;
     }
 }
 
@@ -62,55 +65,50 @@ nested machine pvfs2_prelude_sm(req_sched, getattr_if_needed, perm_check)
  *
  * posts a request scheduler job
  */
-static int prelude_req_sched(PINT_server_op *s_op, job_status_s *js_p)
+static int prelude_req_sched(
+    PINT_server_op *s_op, job_status_s *js_p)
 {
-    int ret = -1;
+    int ret = -PVFS_EINVAL;
 
     gossip_debug(GOSSIP_SERVER_DEBUG, 
                  "(%p) %s (prelude sm) state: req_sched\n", s_op,
                  PINT_map_server_op_to_string(s_op->req->op));
 
-    /* this is the first state for every normal pvfs2 server state machine,
-     * so we get to do some housekeeping here.  In particular, bump up the
-     * reference count on the bmi address that we are using 
+    /* this is the first state for every normal pvfs2 server state
+     * machine, so we get to do some housekeeping here.  In
+     * particular, bump up the reference count on the bmi address that
+     * we are using
      */
     BMI_set_info(s_op->addr, BMI_INC_ADDR_REF, NULL);
 
-    /* this is a bit of a hack; if we are changing server mode we
-     * must preserve the old mode value before calling req scheduler
+    /* this is a bit of a hack; if we are changing server mode we must
+     * preserve the old mode value before calling req scheduler
      */
     if ((s_op->op == PVFS_SERV_MGMT_SETPARAM) &&
-	(s_op->req->u.mgmt_setparam.param == PVFS_SERV_PARAM_MODE))
+        (s_op->req->u.mgmt_setparam.param == PVFS_SERV_PARAM_MODE))
     {
         s_op->resp.u.mgmt_setparam.old_value = PINT_req_sched_get_mode();
     }
     
-    ret = job_req_sched_post(
-        s_op->req,
-        0,
-        s_op,
-	0,
-	js_p,
-	&(s_op->scheduled_id),
-	server_job_context);
-
-    return(ret);
+    ret = job_req_sched_post(s_op->req, 0, s_op, 0, js_p,
+                             &(s_op->scheduled_id), server_job_context);
+    return ret;
 }
 
 /* prelude_getattr_if_needed()
  *
- * reads basic attributes of target object, if there is a particular target
- * object for the operation
+ * reads basic attributes of target object, if there is a particular
+ * target object for the operation
  */
-static int prelude_getattr_if_needed(PINT_server_op *s_op, job_status_s *js_p)
+static int prelude_getattr_if_needed(
+    PINT_server_op *s_op, job_status_s *js_p)
 {
-    int ret = -1;
+    int ret = -PVFS_EINVAL, readonly_flag = 0;
     PVFS_handle target_handle = PVFS_HANDLE_NULL;
     PVFS_fs_id target_fs_id = PVFS_FS_ID_NULL;
     job_id_t tmp_id;
-    int readonly_flag;
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, 
+    gossip_debug(GOSSIP_SERVER_DEBUG,
                  "(%p) %s (prelude sm) state: getattr_if_needed\n", s_op,
                  PINT_map_server_op_to_string(s_op->req->op));
 
@@ -119,26 +117,29 @@ static int prelude_getattr_if_needed(PINT_server_op *s_op, job_status_s *js_p)
      */
     ret = PINT_req_sched_target_handle(
         s_op->req, 0, &target_handle, &target_fs_id, &readonly_flag);
+
     if (ret < 0)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "PINT_req_sched_target_handle "
                      "returned %d ret, skipping getattr on handle %Lu\n",
                      ret, Lu(target_handle));
-	js_p->error_code = ret;
-	return(1);
+
+        js_p->error_code = ret;
+        return 1;
     }
 
     /* if the handle is 0, that indicates that the request does not
-     * operate on a specific handle, so there is nothing we can do here
+     * operate on a specific handle, so there is nothing we can do
+     * here
      */
     if (target_handle == PVFS_HANDLE_NULL)
     {
-	js_p->error_code = 0;
-	return(1);
+        js_p->error_code = 0;
+        return(1);
     }
 
-    /* all other operations fall to this point and read basic attribute
-     * information 
+    /* all other operations fall to this point and read basic
+     * attribute information
      */
     memset(&(s_op->ds_attr), 0, sizeof(PVFS_ds_attributes));
 
@@ -149,7 +150,7 @@ static int prelude_getattr_if_needed(PINT_server_op *s_op, job_status_s *js_p)
         target_fs_id, target_handle, s_op, &(s_op->ds_attr),
         0, js_p, &tmp_id, server_job_context);
 
-    return(ret);
+    return ret;
 }
 
 /* prelude_perm_check()
@@ -158,7 +159,8 @@ static int prelude_getattr_if_needed(PINT_server_op *s_op, job_status_s *js_p)
  * permission checking, it will be replaced by a couple of states that
  * actually perform this task later
  */
-static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p)
+static int prelude_perm_check(
+    PINT_server_op *s_op, job_status_s *js_p)
 {
     PVFS_object_attr *obj_attr = NULL;
     PVFS_ds_attributes *ds_attr = NULL;
@@ -166,13 +168,12 @@ static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p)
     gossip_debug(GOSSIP_SERVER_DEBUG, 
                  "(%p) %s (prelude sm) state: perm_check\n", s_op,
                  PINT_map_server_op_to_string(s_op->req->op));
-
     /*
       first we translate the dspace attributes into a more convenient
       server use-able format.  i.e. a PVFS_object_attr
     */
-    ds_attr = &(s_op->ds_attr);
-    obj_attr = &(s_op->attr);
+    ds_attr = &s_op->ds_attr;
+    obj_attr = &s_op->attr;
     PVFS_ds_attr_to_object_attr(ds_attr, obj_attr);
     s_op->attr.mask = PVFS_ATTR_COMMON_ALL;
 
@@ -182,63 +183,70 @@ static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p)
      * set attributes on a file that did not have attributes
      * previously.
      */
-    if(PINT_server_req_table[s_op->req->op].attrib_flags ==
-	PINT_SERVER_ATTRIBS_NOT_REQUIRED)
+    if (PINT_server_req_table[s_op->req->op].attrib_flags ==
+        PINT_SERVER_ATTRIBS_NOT_REQUIRED)
     {
-	js_p->error_code = 0;
+        js_p->error_code = 0;
     }
 
     /* anything else we treat as a real error */
     if (js_p->error_code)
     {
-	js_p->error_code = -PVFS_ERROR_CODE(-js_p->error_code);
-	return(1);
+        js_p->error_code = -PVFS_ERROR_CODE(-js_p->error_code);
+        return(1);
     }
 
     gossip_debug(
         GOSSIP_PERMISSIONS_DEBUG, "PVFS operation \"%s\" got "
         "attr mask %d\n\t(attr_uid_valid? %s, attr_owner = "
-        "%d, credentials_uid = %d)\n",
+        "%d, credentials_uid = %d)\n\t(attr_gid_valid? %s, attr_group = "
+        "%d, credentials.gid = %d)\n",
         PINT_map_server_op_to_string(s_op->req->op), s_op->attr.mask,
-        ((s_op->attr.mask & PVFS_ATTR_COMMON_UID) ? "yes" :
-         "no"), s_op->attr.owner, s_op->req->credentials.uid);
-	
+        ((s_op->attr.mask & PVFS_ATTR_COMMON_UID) ? "yes" : "no"),
+        s_op->attr.owner, s_op->req->credentials.uid,
+        ((s_op->attr.mask & PVFS_ATTR_COMMON_GID) ? "yes" : "no"),
+        s_op->attr.group, s_op->req->credentials.gid);
+    
     switch(PINT_server_req_table[s_op->req->op].perm)
     {
-	case PINT_SERVER_CHECK_WRITE:
-	    /* TODO: figure out something cleaner looking than using 
-	     * PVFS_U_WRITE here to indicate we need write access; its 
-	     * misleading
-	     */
-	    js_p->error_code = check_mode(
+        case PINT_SERVER_CHECK_WRITE:
+            /* TODO: figure out something cleaner looking than using
+             * PVFS_U_WRITE here to indicate we need write access; its
+             * misleading
+             */
+            js_p->error_code = check_mode(
                 &(s_op->attr), s_op->req->credentials.uid,
                 s_op->req->credentials.gid, PVFS_U_WRITE);
-	    break;
-	case PINT_SERVER_CHECK_READ:
-	    /* TODO: figure out something cleaner looking than using 
-	     * PVFS_U_READ here to indicate we need read access; its 
-	     * misleading
-	     */
-	    js_p->error_code = check_mode(
+            break;
+        case PINT_SERVER_CHECK_READ:
+            /* TODO: figure out something cleaner looking than using 
+             * PVFS_U_READ here to indicate we need read access; its 
+             * misleading
+             */
+            js_p->error_code = check_mode(
                 &(s_op->attr), s_op->req->credentials.uid,
                 s_op->req->credentials.gid, PVFS_U_READ);
-	    break;
-	case PINT_SERVER_CHECK_ATTR:
-	    /* a datafile will have a 0 mask value here */
+            break;
+        case PINT_SERVER_CHECK_ATTR:
+            /* a datafile will have a 0 mask value here */
             if (s_op->attr.mask == 0)
             {
                 js_p->error_code = 0;
             }
-	    else
-	    {
+            else
+            {
                 /*
-                  NOTE: on other file systems, getattr/setattr doesn't seem to
-                  require read permissions by the user, group OR
-                  other, so long as the user matches (or is root)
+                  NOTE: on other file systems, getattr/setattr doesn't
+                  seem to require read permissions by the user, group
+                  OR other, so long as the user or group matches (or
+                  is root)
                 */
                 if (((s_op->attr.mask & PVFS_ATTR_COMMON_UID) &&
                      ((s_op->attr.owner == 0) ||
                       (s_op->attr.owner == s_op->req->credentials.uid))) ||
+                    (((s_op->attr.mask & PVFS_ATTR_COMMON_GID) &&
+                      ((s_op->attr.group == 0) ||
+                       (s_op->attr.group == s_op->req->credentials.gid)))) ||
                     (s_op->req->credentials.uid == 0))
                 {
                     js_p->error_code = 0;
@@ -247,14 +255,14 @@ static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p)
                 {
                     js_p->error_code = -PVFS_EPERM;
                 }
-	    }
+            }
             break;
-	case PINT_SERVER_CHECK_NONE:
-	    js_p->error_code = 0;
-	    break;
-	case PINT_SERVER_CHECK_INVALID:
-	    js_p->error_code = -PVFS_EINVAL;
-	    break;
+        case PINT_SERVER_CHECK_NONE:
+            js_p->error_code = 0;
+            break;
+        case PINT_SERVER_CHECK_INVALID:
+            js_p->error_code = -PVFS_EINVAL;
+            break;
     }
 
     gossip_debug(
@@ -278,7 +286,8 @@ static int check_mode(
     PVFS_permissions mode)
 {
     uint32_t perm_mask = (PVFS_ATTR_COMMON_UID |
-                          PVFS_ATTR_COMMON_GID | PVFS_ATTR_COMMON_PERM);
+                          PVFS_ATTR_COMMON_GID |
+                          PVFS_ATTR_COMMON_PERM);
 
     /* if we don't have masks for the permission information that we
      * need, then the system is broken
@@ -302,7 +311,7 @@ static int check_mode(
     if (attr->owner == 0)
     {
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "yes\n");
-	return 0;
+        return 0;
     }
     gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "no\n");
 
@@ -312,7 +321,7 @@ static int check_mode(
     if ((attr->owner == uid) && (((attr->perms >> 6) & mode) == mode))
     {
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "yes\n");
-	return 0;
+        return 0;
     }
     gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "no\n");
 
@@ -322,7 +331,7 @@ static int check_mode(
     if ((attr->group == gid) && (((attr->perms >> 3) & mode) == mode))
     {
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "yes\n");
-	return 0;
+        return 0;
     }
     gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "no\n");
 
@@ -331,14 +340,13 @@ static int check_mode(
     if ((attr->perms & mode) == mode)
     {
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "yes\n");
-	return 0;
+        return 0;
     }
     gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "no\n");
 
     /* access denied */
-    return(-PVFS_EPERM);
+    return -PVFS_EPERM;
 }
-
 
 /*
  * Local variables:
@@ -349,4 +357,3 @@ static int check_mode(
  *
  * vim: ft=c ts=8 sts=4 sw=4 expandtab
  */
-

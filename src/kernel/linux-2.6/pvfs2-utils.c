@@ -31,8 +31,8 @@ int pvfs2_gen_credentials(
     if (credentials)
     {
         memset(credentials, 0, sizeof(PVFS_credentials));
-        credentials->uid = current->uid;
-        credentials->gid = current->gid;
+        credentials->uid = current->fsuid;
+        credentials->gid = current->fsgid;
 
         ret = 0;
     }
