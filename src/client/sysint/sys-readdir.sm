@@ -102,7 +102,7 @@ machine pvfs2_client_readdir_sm(init,
 %%
 
 int PVFS_sys_readdir(
-    PVFS_pinode_reference pinode_refn,
+    PVFS_object_ref ref,
     PVFS_ds_position token, 
     int pvfs_dirent_incount,
     PVFS_credentials credentials,
@@ -134,15 +134,15 @@ int PVFS_sys_readdir(
     sm_p->u.readdir.dirent_limit = pvfs_dirent_incount;
     sm_p->u.readdir.readdir_resp = resp;
     /*
-      set the parent ref to the passed in dir pinode_refn
+      set the parent ref to the passed in dir ref
       only for using the sm_common method for getattr
     */
-    sm_p->parent_ref = pinode_refn;
-    sm_p->u.readdir.object_ref = pinode_refn;
+    sm_p->parent_ref = ref;
+    sm_p->u.readdir.object_ref = ref;
 
     gossip_debug(GOSSIP_READDIR_DEBUG, "Doing readdir on parent handle "
-                 "%Lu on fs %d\n", Lu(pinode_refn.handle),
-                 pinode_refn.fs_id);
+                 "%Lu on fs %d\n", Lu(ref.handle),
+                 ref.fs_id);
 
     ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_READDIR);
     if (ret)

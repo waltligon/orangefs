@@ -213,7 +213,7 @@ machine pvfs2_client_create_sm(init,
 
 int PVFS_sys_create(
     char *object_name,
-    PVFS_pinode_reference parent_refn,
+    PVFS_object_ref parent_ref,
     PVFS_sys_attr attr,
     PVFS_credentials credentials,
     PVFS_sysresp_create *resp)
@@ -252,7 +252,7 @@ int PVFS_sys_create(
 
     sm_p->cred_p = &credentials;
     sm_p->u.create.object_name = object_name;
-    sm_p->parent_ref = parent_refn;
+    sm_p->parent_ref = parent_ref;
     sm_p->u.create.create_resp = resp;
     sm_p->u.create.sys_attr = &attr;
     sm_p->u.create.stored_error_code = 0;
@@ -275,8 +275,8 @@ int PVFS_sys_create(
 
     gossip_debug(
         GOSSIP_CLIENT_DEBUG, "Creating file named %s under parent handle "
-        "%Lu on fs %d\n", object_name, Lu(parent_refn.handle),
-        parent_refn.fs_id);
+        "%Lu on fs %d\n", object_name, Lu(parent_ref.handle),
+        parent_ref.fs_id);
 
     ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_CREATE);
     if (ret)
@@ -826,7 +826,7 @@ static int create_delete_handles_setup_msgpair_array(
 static int create_cleanup(PINT_client_sm *sm_p,
                           job_status_s *js_p)
 {
-    PVFS_pinode_reference metafile_ref;
+    PVFS_object_ref metafile_ref;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: cleanup\n");
 
@@ -840,7 +840,7 @@ static int create_cleanup(PINT_client_sm *sm_p,
         metafile_ref.fs_id = sm_p->parent_ref.fs_id;
 
         /* fill in outgoing response fields */
-        sm_p->u.create.create_resp->pinode_refn = metafile_ref;
+        sm_p->u.create.create_resp->ref = metafile_ref;
     }
 
     if (sm_p->u.create.io_handle_extent_array)

@@ -19,17 +19,17 @@ int main(int argc, char **argv)
     int ret = -1;
     int found_flag;
 
-    PVFS_pinode_reference test_ref;
+    PVFS_object_ref test_ref;
 
-    PVFS_pinode_reference root_ref = {100,0};
+    PVFS_object_ref root_ref = {100,0};
 
-    PVFS_pinode_reference first_ref = {1,0};
+    PVFS_object_ref first_ref = {1,0};
     char first_name[] = "first";
 	
-    PVFS_pinode_reference second_ref = {2,0};
+    PVFS_object_ref second_ref = {2,0};
     char second_name[] = "second";
 	
-    PVFS_pinode_reference third_ref = {3,0};
+    PVFS_object_ref third_ref = {3,0};
     char third_name[] = "third";
 
     /* set debugging stuff */

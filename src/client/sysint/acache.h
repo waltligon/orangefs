@@ -85,7 +85,7 @@ typedef struct
     gen_mutex_t *mutex;
     struct timeval time_stamp;
     struct PVFS_object_attr attr;
-    PVFS_pinode_reference refn;
+    PVFS_object_ref refn;
 
     struct qlist_head link;
 
@@ -97,12 +97,12 @@ int PINT_acache_get_timeout(void);
 void PINT_acache_set_timeout(int max_timeout_ms);
 int PINT_acache_get_size(void);
 
-PINT_pinode *PINT_acache_lookup(PVFS_pinode_reference refn);
+PINT_pinode *PINT_acache_lookup(PVFS_object_ref refn);
 int PINT_acache_pinode_status(PINT_pinode *pinode);
 void PINT_acache_set_valid(PINT_pinode *pinode);
-void PINT_acache_invalidate(PVFS_pinode_reference refn);
+void PINT_acache_invalidate(PVFS_object_ref refn);
 PINT_pinode *PINT_acache_pinode_alloc(void);
-void PINT_acache_release_refn(PVFS_pinode_reference refn);
+void PINT_acache_release_refn(PVFS_object_ref refn);
 void PINT_acache_release(PINT_pinode *pinode);
 
 

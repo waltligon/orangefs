@@ -18,17 +18,17 @@ typedef struct
 
 typedef struct
 {
-    PVFS_pinode_reference refn;
+    PVFS_object_ref refn;
 } pvfs2_lookup_response_t;
 
 typedef struct
 {
-    PVFS_pinode_reference refn;
+    PVFS_object_ref refn;
 } pvfs2_create_response_t;
 
 typedef struct
 {
-    PVFS_pinode_reference refn;
+    PVFS_object_ref refn;
 } pvfs2_symlink_response_t;
 
 typedef struct
@@ -49,13 +49,13 @@ typedef struct
 
 typedef struct
 {
-    PVFS_pinode_reference refn;
+    PVFS_object_ref refn;
 } pvfs2_mkdir_response_t;
 
 typedef struct
 {
     int dirent_count;
-    PVFS_pinode_reference refn[MAX_DIRENT_COUNT];
+    PVFS_object_ref refn[MAX_DIRENT_COUNT];
     char d_name[MAX_DIRENT_COUNT][PVFS2_NAME_LEN];
     int d_name_len[MAX_DIRENT_COUNT];
     PVFS_ds_position token;

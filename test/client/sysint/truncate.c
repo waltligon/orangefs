@@ -20,7 +20,7 @@ int main(int argc,char **argv)
     PVFS_fs_id fs_id;
     char* name;
     PVFS_credentials credentials;
-    PVFS_pinode_reference pinode_refn;
+    PVFS_object_ref pinode_refn;
     PVFS_size size;
 
     if (argc != 3)
@@ -81,8 +81,8 @@ int main(int argc,char **argv)
 
     size = trunc_size;
 
-    pinode_refn.handle = resp_lk.pinode_refn.handle;
-    pinode_refn.fs_id = resp_lk.pinode_refn.fs_id;
+    pinode_refn.handle = resp_lk.ref.handle;
+    pinode_refn.fs_id = resp_lk.ref.fs_id;
 
     ret = PVFS_sys_truncate(pinode_refn, size, credentials);
     if (ret < 0)

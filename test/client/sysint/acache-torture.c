@@ -21,7 +21,7 @@ int main(int argc, char **argv)
     int ret = -1, i = 0;
     int entries_to_add = 0;
     PINT_pinode *pinode1 = NULL, *pinode2 = NULL;
-    PVFS_pinode_reference tmp;
+    PVFS_object_ref tmp;
 
     if (argc == 2)
     {

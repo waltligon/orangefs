@@ -62,7 +62,7 @@ static int test_getattr(int testcase)
 {
     int fs_id, ret;
     PVFS_credentials credentials;
-    PVFS_pinode_reference pinode_refn;
+    PVFS_object_ref pinode_refn;
     uint32_t attrmask;
     PVFS_sysresp_lookup resp_lookup;
     PVFS_sysresp_getattr resp_getattr;
@@ -89,7 +89,7 @@ static int test_getattr(int testcase)
 	return ret;
     }
 
-    pinode_refn = resp_lookup.pinode_refn;
+    pinode_refn = resp_lookup.ref;
     attrmask = PVFS_ATTR_SYS_ALL_NOSIZE;
 
     switch (testcase)
@@ -126,7 +126,7 @@ static int test_setattr(void)
  */
 static int test_mkdir(int testcase)
 {
-    PVFS_pinode_reference parent_refn;
+    PVFS_object_ref parent_refn;
     PVFS_sys_attr attr;
     PVFS_sysresp_mkdir resp_mkdir;
 
@@ -155,7 +155,7 @@ static int test_mkdir(int testcase)
 	return -1;
     }
 
-    parent_refn = resp_lookup.pinode_refn;
+    parent_refn = resp_lookup.ref;
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
     attr.owner = credentials.uid;
     attr.group = credentials.gid;
@@ -189,7 +189,7 @@ static int test_readdir(int testcase)
 
     int ret;
 
-    PVFS_pinode_reference pinode_refn;
+    PVFS_object_ref pinode_refn;
     PVFS_ds_position token;
     int pvfs_dirent_incount;
     PVFS_credentials credentials;
@@ -219,7 +219,7 @@ static int test_readdir(int testcase)
 	return -1;
     }
 
-    pinode_refn = resp_lookup.pinode_refn;
+    pinode_refn = resp_lookup.ref;
     token = PVFS_READDIR_START;
     pvfs_dirent_incount = 1;
 
@@ -286,15 +286,15 @@ static int test_create(int testcase)
     switch (testcase)
     {
     case 0:
-	resp_look.pinode_refn.handle = -1;
+	resp_look.ref.handle = -1;
 	ret =
-	    PVFS_sys_create(filename, resp_look.pinode_refn, attr, credentials,
+	    PVFS_sys_create(filename, resp_look.ref, attr, credentials,
 			    &resp_create);
 	break;
     case 1:
-	resp_look.pinode_refn.fs_id = -1;
+	resp_look.ref.fs_id = -1;
 	ret =
-	    PVFS_sys_create(filename, resp_look.pinode_refn, attr, credentials,
+	    PVFS_sys_create(filename, resp_look.ref, attr, credentials,
 			    &resp_create);
 	break;
     default:
@@ -340,12 +340,12 @@ static int test_remove(int testcase)
     switch (testcase)
     {
     case 0:
-	resp_look.pinode_refn.handle = -1;
-	ret = PVFS_sys_remove(filename, resp_look.pinode_refn, credentials);
+	resp_look.ref.handle = -1;
+	ret = PVFS_sys_remove(filename, resp_look.ref, credentials);
 	break;
     case 1:
-	resp_look.pinode_refn.fs_id = -1;
-	ret = PVFS_sys_remove(filename, resp_look.pinode_refn, credentials);
+	resp_look.ref.fs_id = -1;
+	ret = PVFS_sys_remove(filename, resp_look.ref, credentials);
 	break;
     default:
 	fprintf(stderr, "Error: invalid case number \n");
@@ -426,15 +426,15 @@ static int test_read(int testcase)
     switch (testcase)
     {
     case 0:
-	resp_lk.pinode_refn.handle = -1;
+	resp_lk.ref.handle = -1;
 	ret =
-	    PVFS_sys_read(resp_lk.pinode_refn, req_io, 0, io_buffer, req_mem,
+	    PVFS_sys_read(resp_lk.ref, req_io, 0, io_buffer, req_mem,
 			  credentials, &resp_io);
 	break;
     case 1:
-	resp_lk.pinode_refn.fs_id = -1;
+	resp_lk.ref.fs_id = -1;
 	ret =
-	    PVFS_sys_read(resp_lk.pinode_refn, req_io, 0, io_buffer, req_mem,
+	    PVFS_sys_read(resp_lk.ref, req_io, 0, io_buffer, req_mem,
 			  credentials, &resp_io);
 	break;
     }
@@ -485,15 +485,15 @@ static int test_write(int testcase)
     switch (testcase)
     {
     case 0:
-	resp_lk.pinode_refn.handle = -1;
+	resp_lk.ref.handle = -1;
 	ret =
-	    PVFS_sys_write(resp_lk.pinode_refn, req_io, 0, io_buffer, req_mem,
+	    PVFS_sys_write(resp_lk.ref, req_io, 0, io_buffer, req_mem,
 			   credentials, &resp_io);
 	break;
     case 1:
-	resp_lk.pinode_refn.fs_id = -1;
+	resp_lk.ref.fs_id = -1;
 	ret =
-	    PVFS_sys_write(resp_lk.pinode_refn, req_io, 0, io_buffer, req_mem,
+	    PVFS_sys_write(resp_lk.ref, req_io, 0, io_buffer, req_mem,
 			   credentials, &resp_io);
 	break;
     }
@@ -536,7 +536,7 @@ static int init_file(void)
 	return (-1);
     }
 
-    return PVFS_sys_create(filename, resp_look.pinode_refn, attr, credentials,
+    return PVFS_sys_create(filename, resp_look.ref, attr, credentials,
 			   &resp_create);
 
 }

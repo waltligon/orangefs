@@ -57,7 +57,7 @@ static int test_getattr(void)
 {
     int fs_id, ret;
     PVFS_credentials credentials;
-    PVFS_pinode_reference pinode_refn;
+    PVFS_object_ref pinode_refn;
     uint32_t attrmask;
     PVFS_sysresp_lookup resp_lookup;
     PVFS_sysresp_getattr resp_getattr;
@@ -79,7 +79,7 @@ static int test_getattr(void)
 	return ret;
     }
 
-    pinode_refn = resp_lookup.pinode_refn;
+    pinode_refn = resp_lookup.ref;
     attrmask = PVFS_ATTR_SYS_ALL_NOSIZE;
 
     ret = PVFS_sys_getattr(pinode_refn, attrmask, credentials, &resp_getattr);
@@ -102,7 +102,7 @@ static int test_setattr(void)
  */
 static int test_mkdir(void)
 {
-    PVFS_pinode_reference parent_refn;
+    PVFS_object_ref parent_refn;
     PVFS_sys_attr attr;
     PVFS_sysresp_mkdir resp_mkdir;
 
@@ -126,7 +126,7 @@ static int test_mkdir(void)
 	return -1;
     }
 
-    parent_refn = resp_lookup.pinode_refn;
+    parent_refn = resp_lookup.ref;
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
     attr.owner = credentials.uid;
     attr.group = credentials.gid;
@@ -148,7 +148,7 @@ static int test_readdir(void)
 
     int ret;
 
-    PVFS_pinode_reference pinode_refn;
+    PVFS_object_ref pinode_refn;
     PVFS_ds_position token;
     int pvfs_dirent_incount;
     PVFS_credentials credentials;
@@ -173,7 +173,7 @@ static int test_readdir(void)
 	return -1;
     }
 
-    pinode_refn = resp_lookup.pinode_refn;
+    pinode_refn = resp_lookup.ref;
     token = PVFS_READDIR_START;
     pvfs_dirent_incount = 1;
 
@@ -218,7 +218,7 @@ static int test_create(void)
     }
 
     ret =
-	PVFS_sys_create(filename, resp_look.pinode_refn, attr, credentials,
+	PVFS_sys_create(filename, resp_look.ref, attr, credentials,
 			&resp_create);
     return ret;
 }
@@ -251,7 +251,7 @@ static int test_remove(void)
 	printf("Lookup failed with errcode = %d\n", ret);
 	return (-1);
     }
-    ret = PVFS_sys_remove(filename, resp_look.pinode_refn, credentials);
+    ret = PVFS_sys_remove(filename, resp_look.ref, credentials);
     return ret;
 }
 
@@ -319,7 +319,7 @@ static int test_read(void)
     }
 
     ret =
-	PVFS_sys_read(resp_lk.pinode_refn, req_io, 0, io_buffer, NULL, credentials,
+	PVFS_sys_read(resp_lk.ref, req_io, 0, io_buffer, NULL, credentials,
 		      &resp_io);
     return ret;
 }
@@ -359,7 +359,7 @@ static int test_write(void)
     }
 
     ret =
-	PVFS_sys_write(resp_lk.pinode_refn, req_io, 0, io_buffer, NULL, credentials,
+	PVFS_sys_write(resp_lk.ref, req_io, 0, io_buffer, NULL, credentials,
 		       &resp_io);
     return ret;
 }

@@ -33,7 +33,7 @@ void print_at_depth(char *name, int depth)
 */
 int is_directory(PVFS_handle handle, PVFS_fs_id fs_id)
 {
-    PVFS_pinode_reference pinode_refn;
+    PVFS_object_ref pinode_refn;
     uint32_t attrmask;
     PVFS_credentials credentials;
     PVFS_sysresp_getattr getattr_response;
@@ -67,7 +67,7 @@ int directory_walk(PVFS_fs_id cur_fs,
     char full_path[PVFS_NAME_MAX] = {0};
     char* name;
     PVFS_credentials credentials;
-    PVFS_pinode_reference pinode_refn;
+    PVFS_object_ref pinode_refn;
     PVFS_ds_position token;
     int pvfs_dirent_incount;
 
@@ -102,7 +102,7 @@ int directory_walk(PVFS_fs_id cur_fs,
 
     print_at_depth(name,depth);
 
-    pinode_refn.handle = lk_response.pinode_refn.handle;
+    pinode_refn.handle = lk_response.ref.handle;
     pinode_refn.fs_id = cur_fs;
     token = 0;
     pvfs_dirent_incount = MAX_NUM_DIRENTS;

@@ -48,10 +48,10 @@ int main(int argc,char **argv)
         printf("=== getparent data:\n");
         printf("resp_getparent.basename: %s\n",
                resp_getparent.basename);
-        printf("resp_getparent.parent_refn.fs_id: %d\n",
-               resp_getparent.parent_refn.fs_id);
-        printf("resp_getparent.parent_refn.handle: %Ld\n",
-               Ld(resp_getparent.parent_refn.handle));
+        printf("resp_getparent.parent_ref.fs_id: %d\n",
+               resp_getparent.parent_ref.fs_id);
+        printf("resp_getparent.parent_ref.handle: %Ld\n",
+               Ld(resp_getparent.parent_ref.handle));
     }
     else
     {

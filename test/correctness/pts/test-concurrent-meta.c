@@ -60,7 +60,7 @@ static int getattr(char *name, int fs_id)
 {
     int ret;
     PVFS_credentials credentials;
-    PVFS_pinode_reference pinode_refn;
+    PVFS_object_ref pinode_refn;
     PVFS_sysresp_getattr resp_getattr;
     uint32_t attrmask;
     PVFS_sysresp_lookup resp_lookup;
@@ -76,7 +76,7 @@ static int getattr(char *name, int fs_id)
         return ret;
     }
 
-    pinode_refn = resp_lookup.pinode_refn;
+    pinode_refn = resp_lookup.ref;
     attrmask = PVFS_ATTR_SYS_ALL_NOSIZE;
 
     ret = PVFS_sys_getattr(pinode_refn, attrmask, credentials, &resp_getattr);
@@ -109,7 +109,7 @@ static int remove_file_dir(char *name, int fs_id)
         printf("Lookup failed with errcode = %d\n", ret);
         return (-1);
     }
-    ret = PVFS_sys_remove(name, resp_look.pinode_refn, credentials);
+    ret = PVFS_sys_remove(name, resp_look.ref, credentials);
 
     return ret;
 }
@@ -126,7 +126,7 @@ static int list_dir(char *test_dir, int fs_id)
 {
     int ret;
 
-    PVFS_pinode_reference pinode_refn;
+    PVFS_object_ref pinode_refn;
     PVFS_ds_position token;
     PVFS_sysresp_readdir resp_readdir;
     int pvfs_dirent_incount;
@@ -145,7 +145,7 @@ static int list_dir(char *test_dir, int fs_id)
         return -1;
     }
 
-    pinode_refn = resp_lookup.pinode_refn;
+    pinode_refn = resp_lookup.ref;
     token = PVFS_READDIR_START;
     pvfs_dirent_incount = 1;
 
@@ -190,7 +190,7 @@ static int create_file(char *filename, char *directory, int fs_id)
         return (-1);
     }
 
-    ret = PVFS_sys_create(filename, resp_look.pinode_refn,
+    ret = PVFS_sys_create(filename, resp_look.ref,
                           attr, credentials, &resp_create);
    return ret;
 }
@@ -205,7 +205,7 @@ static int create_file(char *filename, char *directory, int fs_id)
  */
 static int create_dir2(char *name, int fs_id)
 {
-    PVFS_pinode_reference parent_refn;
+    PVFS_object_ref parent_refn;
     PVFS_sys_attr attr;
     PVFS_sysresp_mkdir resp_mkdir;
 
@@ -222,7 +222,7 @@ static int create_dir2(char *name, int fs_id)
         return -1;
     }
 
-    parent_refn = resp_lookup.pinode_refn;
+    parent_refn = resp_lookup.ref;
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
     attr.owner = credentials.uid;
     attr.group = credentials.gid;

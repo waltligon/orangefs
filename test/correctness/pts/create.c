@@ -45,7 +45,7 @@ static int create_file(PVFS_fs_id fs_id,
     attr.atime = attr.mtime = attr.ctime = 0xdeadbeef;
 
     memset(&resp_create,0,sizeof(resp_create));
-    ret = PVFS_sys_create(filename, resp_look.pinode_refn,
+    ret = PVFS_sys_create(filename, resp_look.ref,
                           attr, credentials, &resp_create);
     if (ret < 0)
     {
@@ -53,7 +53,7 @@ static int create_file(PVFS_fs_id fs_id,
 	return (-1);
     }
 
-    ret = PVFS_sys_getattr(resp_create.pinode_refn, attr.mask,
+    ret = PVFS_sys_getattr(resp_create.ref, attr.mask,
                            credentials, &resp_getattr);
     if (ret < 0)
     {

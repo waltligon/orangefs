@@ -20,7 +20,7 @@
  * rank:    rank in the mpi process group 
  */
 
-static int remove_dirs(PVFS_pinode_reference parent_refn,
+static int remove_dirs(PVFS_object_ref parent_refn,
                        int ndirs,
                        int rank)
 {
@@ -39,7 +39,7 @@ static int remove_dirs(PVFS_pinode_reference parent_refn,
     return 0;
 }
 
-static int read_dirs(PVFS_pinode_reference refn,
+static int read_dirs(PVFS_object_ref refn,
                      int ndirs,
                      int rank)
 {
@@ -98,13 +98,13 @@ static int read_dirs(PVFS_pinode_reference refn,
     return 0;
 }
 
-static int create_dirs(PVFS_pinode_reference refn,
+static int create_dirs(PVFS_object_ref refn,
                        int ndirs,
                        int rank)
 {
     int i;
     char name[PVFS_SEGMENT_MAX];
-    PVFS_pinode_reference out_refn;
+    PVFS_object_ref out_refn;
 
     for (i = 0; i < ndirs; i++)
     {
@@ -137,7 +137,7 @@ int test_dir_operations(MPI_Comm * comm,
     int nerrs = 0;
     char name[PVFS_SEGMENT_MAX];
     PVFS_fs_id fs_id = 0;
-    PVFS_pinode_reference root_refn, out_refn;
+    PVFS_object_ref root_refn, out_refn;
     generic_params *myparams = (generic_params *) rawparams;
 
     if (rank == 0)

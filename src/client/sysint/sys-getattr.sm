@@ -133,7 +133,7 @@ machine pvfs2_client_getattr_sm(object_getattr_setup_msgpair,
 
 %%
 
-int PVFS_sys_getattr(PVFS_pinode_reference pinode_ref,
+int PVFS_sys_getattr(PVFS_object_ref ref,
 		     uint32_t              attrmask, 
 		     PVFS_credentials      credentials,
 		     PVFS_sysresp_getattr *resp_p)
@@ -165,7 +165,7 @@ int PVFS_sys_getattr(PVFS_pinode_reference pinode_ref,
 
     sm_p->error_code = 0;
     sm_p->cred_p = &credentials;
-    sm_p->u.getattr.object_ref     = pinode_ref;
+    sm_p->u.getattr.object_ref     = ref;
     sm_p->u.getattr.attrmask       = attrmask;
     sm_p->u.getattr.getattr_resp_p = resp_p;
 

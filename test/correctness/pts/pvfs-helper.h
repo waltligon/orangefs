@@ -31,17 +31,17 @@ extern pvfs_helper_t pvfs_helper;
   these are some helper functions that are implemented in pvfs-helper.c
   they return 0 on success; non-zero otherwise unless specified
 */
-int create_dir(PVFS_pinode_reference parent_refn, char *name,
-               PVFS_pinode_reference *out_refn);
+int create_dir(PVFS_object_ref parent_refn, char *name,
+               PVFS_object_ref *out_refn);
 
-int remove_file(PVFS_pinode_reference parent_refn, char *name);
+int remove_file(PVFS_object_ref parent_refn, char *name);
 
-int remove_dir(PVFS_pinode_reference parent_refn, char *name);
+int remove_dir(PVFS_object_ref parent_refn, char *name);
 
-int lookup_name(PVFS_pinode_reference pinode_refn, char *name,
-                PVFS_pinode_reference *out_refn);
+int lookup_name(PVFS_object_ref pinode_refn, char *name,
+                PVFS_object_ref *out_refn);
 
-int get_root(PVFS_fs_id fs_id, PVFS_pinode_reference *pinode_refn);
+int get_root(PVFS_fs_id fs_id, PVFS_object_ref *pinode_refn);
 
 int initialize_sysint(void);
 int finalize_sysint(void);

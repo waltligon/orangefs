@@ -133,7 +133,7 @@ typedef struct
 /* per inode private pvfs2 info */
 typedef struct
 {
-    PVFS_pinode_reference refn;
+    PVFS_object_ref refn;
     PVFS_ds_position readdir_token_adjustment;
     char *link_target;
     struct inode vfs_inode;

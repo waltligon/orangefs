@@ -33,9 +33,9 @@ int main(
     char *name;
     PVFS_credentials credentials;
     char *entry_name;
-    PVFS_pinode_reference parent_refn;
+    PVFS_object_ref parent_refn;
     PVFS_sys_attr attr;
-    PVFS_pinode_reference pinode_refn;
+    PVFS_object_ref pinode_refn;
     PVFS_Request file_req;
     PVFS_Request mem_req;
     void *buffer;
@@ -131,7 +131,7 @@ int main(
 	attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
 	attr.dfile_count = 4;
 	attr.mask |= PVFS_ATTR_SYS_DFILE_COUNT;
-	parent_refn.handle = resp_lk.pinode_refn.handle;
+	parent_refn.handle = resp_lk.ref.handle;
 	parent_refn.fs_id = fs_id;
 	entry_name = &(filename[1]);	/* leave off slash */
 
@@ -144,14 +144,14 @@ int main(
 	}
 
 	pinode_refn.fs_id = fs_id;
-	pinode_refn.handle = resp_cr.pinode_refn.handle;
+	pinode_refn.handle = resp_cr.ref.handle;
     }
     else
     {
 	printf("IO-TEST: lookup succeeded; performing I/O on existing file.\n");
 
 	pinode_refn.fs_id = fs_id;
-	pinode_refn.handle = resp_lk.pinode_refn.handle;
+	pinode_refn.handle = resp_lk.ref.handle;
     }
 
 	/**************************************************************

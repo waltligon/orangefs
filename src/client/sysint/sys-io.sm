@@ -144,7 +144,7 @@ machine pvfs2_client_io_sm(io_getattr_setup_msgpair,
 
 %%
 
-int PVFS_sys_io(PVFS_pinode_reference pinode_ref,
+int PVFS_sys_io(PVFS_object_ref ref,
                 PVFS_Request          file_req,
                 PVFS_offset           file_req_offset,
                 void                 *buffer,
@@ -171,7 +171,7 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_ref,
     }
 
     server_config = PINT_get_server_config_struct();
-    cur_fs = PINT_config_find_fs_id(server_config, pinode_ref.fs_id);
+    cur_fs = PINT_config_find_fs_id(server_config, ref.fs_id);
     PINT_put_server_config_struct(server_config);
 
     if (!cur_fs)
@@ -198,7 +198,7 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_ref,
     memset(sm_p, 0, sizeof(*sm_p));
 
     sm_p->cred_p = &credentials;
-    sm_p->object_ref = pinode_ref;
+    sm_p->object_ref = ref;
     sm_p->u.io.io_type = io_type;
     sm_p->u.io.file_req = file_req;
     sm_p->u.io.file_req_offset = file_req_offset;

@@ -18,10 +18,10 @@ int main(int argc, char **argv)
 {
     int ret = -1;
     int found_flag, i;
-    PVFS_pinode_reference test_ref;
+    PVFS_object_ref test_ref;
     char new_filename[ENTRIES_TO_ADD][PVFS_NAME_MAX];
 
-    PVFS_pinode_reference root_ref = {100,0};
+    PVFS_object_ref root_ref = {100,0};
 
     gossip_enable_stderr();
     gossip_set_debug_mask(1, GOSSIP_NCACHE_DEBUG);

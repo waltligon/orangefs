@@ -70,7 +70,7 @@ int main(int argc, char **argv)
         PVFS_fs_id cur_fs;
         PVFS_sysresp_lookup resp_lookup;
         PVFS_credentials credentials;
-        PVFS_pinode_reference parent_ref;
+        PVFS_object_ref parent_ref;
 
         /* Translate path into pvfs2 relative path */
         rc = split_pathname(working_file, &directory, &filename);
@@ -109,7 +109,7 @@ int main(int argc, char **argv)
         }
         
         /* Remove file */
-        parent_ref = resp_lookup.pinode_refn;
+        parent_ref = resp_lookup.ref;
         rc = PVFS_sys_remove(filename, parent_ref, credentials);
 
         if ( 0 != rc )

@@ -23,7 +23,7 @@ int main(int argc,char **argv)
     PVFS_fs_id fs_id;
     char* name;
     PVFS_credentials credentials;
-    PVFS_pinode_reference pinode_refn;
+    PVFS_object_ref pinode_refn;
     PVFS_ds_position token;
     int pvfs_dirent_incount;
 
@@ -62,11 +62,11 @@ int main(int argc,char **argv)
         return(-1);
     }
 
-    printf("LOOKUP_RESPONSE===>\n\tresp_look.pinode_refn.handle = %Ld\n"
-           "\tresp_look.pinode_refn.fs_id = %d\n",
-           Ld(resp_look.pinode_refn.handle), resp_look.pinode_refn.fs_id);
+    printf("LOOKUP_RESPONSE===>\n\tresp_look.ref.handle = %Ld\n"
+           "\tresp_look.ref.fs_id = %d\n",
+           Ld(resp_look.ref.handle), resp_look.ref.fs_id);
 
-    pinode_refn.handle = resp_look.pinode_refn.handle;
+    pinode_refn.handle = resp_look.ref.handle;
     pinode_refn.fs_id = fs_id;
     pvfs_dirent_incount = max_dirents_returned;
 

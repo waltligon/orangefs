@@ -60,7 +60,7 @@ machine pvfs2_client_mgmt_get_dfile_array_sm(getattr_setup_msgpair,
 %%
 
 int PVFS_mgmt_get_dfile_array(
-    PVFS_pinode_reference pinode_refn,
+    PVFS_object_ref ref,
     PVFS_credentials credentials,
     PVFS_handle * dfile_array,
     int dfile_count)
@@ -84,7 +84,7 @@ int PVFS_mgmt_get_dfile_array(
     memset(sm_p, 0, sizeof(*sm_p));
 
     sm_p->cred_p = &credentials;
-    sm_p->object_ref = pinode_refn;
+    sm_p->object_ref = ref;
     sm_p->u.get_dfile_array.dfile_array = dfile_array;
     sm_p->u.get_dfile_array.dfile_count = dfile_count;
 

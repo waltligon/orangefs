@@ -218,13 +218,13 @@ endecode_fields_8(
     uint64_t, handles_available_count,
     uint64_t, handles_total_count)
 
-/* pinode reference (uniquely refers to a single pinode) */
-struct PVFS_pinode_reference_s
+/* object reference (uniquely refers to a single file, directory, or symlink) */
+struct PVFS_object_ref_s
 {
     PVFS_handle handle;
     PVFS_fs_id fs_id;
 };
-typedef struct PVFS_pinode_reference_s PVFS_pinode_reference;
+typedef struct PVFS_object_ref_s PVFS_object_ref;
 
 /* credentials (stubbed for future authentication methods) */
 struct PVFS_credentials_s

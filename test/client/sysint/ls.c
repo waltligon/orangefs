@@ -76,7 +76,7 @@ void print_entry(
     PVFS_handle handle,
     PVFS_fs_id fs_id)
 {
-    PVFS_pinode_reference pinode_refn;
+    PVFS_object_ref pinode_refn;
     PVFS_credentials credentials;
     PVFS_sysresp_getattr getattr_response;
 
@@ -111,7 +111,7 @@ int do_list(
     PVFS_sysresp_readdir rd_response;
     PVFS_sysresp_getattr getattr_response;
     PVFS_credentials credentials;
-    PVFS_pinode_reference pinode_refn;
+    PVFS_object_ref pinode_refn;
     PVFS_ds_position token;
 
     memset(&lk_response,0,sizeof(PVFS_sysresp_lookup));
@@ -129,7 +129,7 @@ int do_list(
         return 1;
     }
 
-    pinode_refn.handle = lk_response.pinode_refn.handle;
+    pinode_refn.handle = lk_response.ref.handle;
     pinode_refn.fs_id = fs_id;
     pvfs_dirent_incount = MAX_NUM_DIRENTS;
     credentials.uid = 0;

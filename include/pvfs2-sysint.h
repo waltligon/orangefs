@@ -52,7 +52,7 @@ struct PVFS_sys_mntent
 /* lookup (request and response) */
 struct PVFS_sysresp_lookup_s
 {
-    PVFS_pinode_reference pinode_refn;
+    PVFS_object_ref ref;
 };
 typedef struct PVFS_sysresp_lookup_s PVFS_sysresp_lookup;
 
@@ -69,14 +69,14 @@ typedef struct PVFS_sysresp_getattr_s PVFS_sysresp_getattr;
 /* mkdir */
 struct PVFS_sysresp_mkdir_s
 {
-    PVFS_pinode_reference pinode_refn;
+    PVFS_object_ref ref;
 };
 typedef struct PVFS_sysresp_mkdir_s PVFS_sysresp_mkdir;
 
 /* create */
 struct PVFS_sysresp_create_s
 {
-    PVFS_pinode_reference pinode_refn;
+    PVFS_object_ref ref;
 };
 typedef struct PVFS_sysresp_create_s PVFS_sysresp_create;
 
@@ -89,7 +89,7 @@ typedef struct PVFS_sysresp_create_s PVFS_sysresp_create;
 /* symlink */
 struct PVFS_sysresp_symlink_s
 {
-    PVFS_pinode_reference pinode_refn;
+    PVFS_object_ref ref;
 };
 typedef struct PVFS_sysresp_symlink_s PVFS_sysresp_symlink;
 
@@ -129,7 +129,7 @@ typedef struct PVFS_sysresp_statfs_s PVFS_sysresp_statfs;
 
 struct PVFS_sysresp_getparent_s
 {
-    PVFS_pinode_reference parent_refn;
+    PVFS_object_ref parent_ref;
     char basename[PVFS_NAME_MAX];
 };
 typedef struct PVFS_sysresp_getparent_s PVFS_sysresp_getparent;
@@ -165,7 +165,7 @@ int PVFS_sys_finalize(
 int PVFS_sys_ref_lookup(
     PVFS_fs_id fs_id,
     char *relative_pathname,
-    PVFS_pinode_reference parent,
+    PVFS_object_ref parent_ref,
     PVFS_credentials credentials,
     PVFS_sysresp_lookup * resp,
     int follow_link);
@@ -178,25 +178,25 @@ int PVFS_sys_lookup(
     int follow_link);
 
 int PVFS_sys_getattr(
-    PVFS_pinode_reference pinode_refn,
+    PVFS_object_ref ref,
     uint32_t attrmask,
     PVFS_credentials credentials,
     PVFS_sysresp_getattr * resp);
 
 int PVFS_sys_setattr(
-    PVFS_pinode_reference pinode_refn,
+    PVFS_object_ref ref,
     PVFS_sys_attr attr,
     PVFS_credentials credentials);
 
 int PVFS_sys_mkdir(
     char *entry_name,
-    PVFS_pinode_reference parent_refn,
+    PVFS_object_ref parent_ref,
     PVFS_sys_attr attr,
     PVFS_credentials credentials,
     PVFS_sysresp_mkdir * resp);
 
 int PVFS_sys_readdir(
-    PVFS_pinode_reference pinode_refn,
+    PVFS_object_ref ref,
     PVFS_ds_position token,
     int pvfs_dirent_incount,
     PVFS_credentials credentials,
@@ -204,38 +204,38 @@ int PVFS_sys_readdir(
 
 int PVFS_sys_create(
     char *entry_name,
-    PVFS_pinode_reference parent_refn,
+    PVFS_object_ref ref,
     PVFS_sys_attr attr,
     PVFS_credentials credentials,
     PVFS_sysresp_create * resp);
 
 int PVFS_sys_remove(
     char *entry_name,
-    PVFS_pinode_reference parent_refn,
+    PVFS_object_ref ref,
     PVFS_credentials credentials);
 
 int PVFS_sys_rename(
     char *old_entry,
-    PVFS_pinode_reference old_parent_refn,
+    PVFS_object_ref old_parent_ref,
     char *new_entry,
-    PVFS_pinode_reference new_parent_refn,
+    PVFS_object_ref new_parent_ref,
     PVFS_credentials credentials);
 
 int PVFS_sys_symlink(
     char *entry_name,
-    PVFS_pinode_reference parent_refn,
+    PVFS_object_ref parent_ref,
     char *target,
     PVFS_sys_attr attr,
     PVFS_credentials credentials,
     PVFS_sysresp_symlink * resp);
 
 int PVFS_sys_readlink(
-    PVFS_pinode_reference pinode_refn,
+    PVFS_object_ref ref,
     PVFS_credentials credentials,
     PVFS_sysresp_readlink * resp);
 
 int PVFS_sys_io(
-    PVFS_pinode_reference pinode_refn,
+    PVFS_object_ref ref,
     PVFS_Request file_req,
     PVFS_offset file_req_offset,
     void *buffer,
@@ -251,7 +251,7 @@ PVFS_sys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_READ)
 PVFS_sys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_WRITE)
 
 int PVFS_sys_truncate(
-    PVFS_pinode_reference pinode_refn,
+    PVFS_object_ref ref,
     PVFS_size size,
     PVFS_credentials credentials);
 
@@ -262,7 +262,7 @@ int PVFS_sys_getparent(
     PVFS_sysresp_getparent * resp);
 
 int PVFS_sys_flush(
-    PVFS_pinode_reference pinode_refn,
+    PVFS_object_ref ref,
     PVFS_credentials credentials);
 
 int PVFS_sys_statfs(

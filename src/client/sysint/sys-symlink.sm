@@ -165,7 +165,7 @@ machine pvfs2_client_symlink_sm(init,
 
 int PVFS_sys_symlink(
     char *entry_name,
-    PVFS_pinode_reference parent_refn,
+    PVFS_object_ref parent_ref,
     char *target,
     PVFS_sys_attr attr,
     PVFS_credentials credentials,
@@ -205,14 +205,14 @@ int PVFS_sys_symlink(
     sm_p->cred_p = &credentials;
     sm_p->u.sym.link_name = entry_name;
     sm_p->u.sym.link_target = target;
-    sm_p->parent_ref = parent_refn;
+    sm_p->parent_ref = parent_ref;
     sm_p->u.sym.sym_resp = resp;
     sm_p->u.sym.sys_attr = &attr;
 
     gossip_debug(
         GOSSIP_CLIENT_DEBUG, "Symlinking %s under parent handle %Lu "
-        "on fs %d to %s\n", entry_name, Lu(parent_refn.handle),
-        parent_refn.fs_id, target);
+        "on fs %d to %s\n", entry_name, Lu(parent_ref.handle),
+        parent_ref.fs_id, target);
 
     ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_SYMLINK);
     if (ret)
@@ -478,7 +478,7 @@ static int symlink_setattr_failure(PINT_client_sm *sm_p,
 static int symlink_cleanup(PINT_client_sm *sm_p,
                           job_status_s *js_p)
 {
-    PVFS_pinode_reference symlink_ref;
+    PVFS_object_ref symlink_ref;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "symlink state: cleanup\n");
 
@@ -488,7 +488,7 @@ static int symlink_cleanup(PINT_client_sm *sm_p,
     symlink_ref.fs_id = sm_p->parent_ref.fs_id;
 
     /* fill in outgoing response fields */
-    sm_p->u.sym.sym_resp->pinode_refn = symlink_ref;
+    sm_p->u.sym.sym_resp->ref = symlink_ref;
 
     if (sm_p->msgarray)
     {

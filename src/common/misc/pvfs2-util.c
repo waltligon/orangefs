@@ -794,7 +794,7 @@ int PVFS_util_lookup_parent(
         *handle = 0;
         return (ret);
     }
-    *handle = resp_look.pinode_refn.handle;
+    *handle = resp_look.ref.handle;
     return (0);
 }
 

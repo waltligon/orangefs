@@ -27,7 +27,7 @@
  * DEPRECATED: SEE sys-remove.sm FOR CURRENT IMPLEMENTATION.
  */
 int PVFS_sys_remove_old(char* entry_name,
-			PVFS_pinode_reference parent_refn, 
+			PVFS_object_ref parent_refn, 
 			PVFS_credentials credentials)
 {
     struct PVFS_server_req req_p;		    /* server request */
@@ -36,7 +36,7 @@ int PVFS_sys_remove_old(char* entry_name,
     PINT_pinode *pinode_ptr = NULL, *item_ptr = NULL;
     PVFS_BMI_addr_t serv_addr;	/* PVFS address type structure */
     int name_sz = 0;
-    PVFS_pinode_reference entry;
+    PVFS_object_ref entry;
     int items_found = 0, i = 0;
     struct PINT_decoded_msg decoded;
     bmi_size_t max_msg_sz;

@@ -106,7 +106,7 @@ static int test_getattr(int nullCase)
 {
     int fs_id, ret;
     PVFS_credentials credentials;
-    PVFS_pinode_reference pinode_refn;
+    PVFS_object_ref pinode_refn;
     uint32_t attrmask;
     PVFS_sysresp_lookup resp_lookup;
     char *name;
@@ -132,7 +132,7 @@ static int test_getattr(int nullCase)
 	return ret;
     }
 
-    pinode_refn = resp_lookup.pinode_refn;
+    pinode_refn = resp_lookup.ref;
     attrmask = PVFS_ATTR_SYS_ALL_NOSIZE;
 
     switch (nullCase)
@@ -160,7 +160,7 @@ static int test_setattr(void)
  */
 static int test_mkdir(int nullCase)
 {
-    PVFS_pinode_reference parent_refn;
+    PVFS_object_ref parent_refn;
     PVFS_sys_attr attr;
     PVFS_sysresp_mkdir resp_mkdir;
 
@@ -189,7 +189,7 @@ static int test_mkdir(int nullCase)
 	return -1;
     }
 
-    parent_refn = resp_lookup.pinode_refn;
+    parent_refn = resp_lookup.ref;
     attr.owner = credentials.uid;
     attr.group = credentials.gid;
     attr.perms = 1877;
@@ -220,7 +220,7 @@ static int test_readdir(int nullCase)
 
     int ret;
 
-    PVFS_pinode_reference pinode_refn;
+    PVFS_object_ref pinode_refn;
     PVFS_ds_position token;
     int pvfs_dirent_incount;
     PVFS_credentials credentials;
@@ -249,7 +249,7 @@ static int test_readdir(int nullCase)
 	return -1;
     }
 
-    pinode_refn = resp_lookup.pinode_refn;
+    pinode_refn = resp_lookup.ref;
     token = PVFS_READDIR_START;
     pvfs_dirent_incount = 1;
 
@@ -307,12 +307,12 @@ static int test_create(int nullCase)
     {
     case 0:
 	ret =
-	    PVFS_sys_create(NULL, resp_look.pinode_refn, attr, credentials,
+	    PVFS_sys_create(NULL, resp_look.ref, attr, credentials,
 			    &resp_create);
 	break;
     case 1:
 	ret =
-	    PVFS_sys_create(filename, resp_look.pinode_refn, attr, credentials,
+	    PVFS_sys_create(filename, resp_look.ref, attr, credentials,
 			    NULL);
 	break;
     default:
@@ -358,7 +358,7 @@ static int test_remove(int nullCase)
     switch (nullCase)
     {
     case 0:
-	ret = PVFS_sys_remove(NULL, resp_look.pinode_refn, credentials);
+	ret = PVFS_sys_remove(NULL, resp_look.ref, credentials);
 	break;
     default:
 	fprintf(stderr, "Error: invalid case number \n");
@@ -438,17 +438,17 @@ static int test_read(int nullCase)
     {
     case 0:
 	ret =
-	    PVFS_sys_read(resp_lk.pinode_refn, NULL, 0, io_buffer, NULL,
+	    PVFS_sys_read(resp_lk.ref, NULL, 0, io_buffer, NULL,
 			  credentials, &resp_io);
 	break;
     case 1:
 	ret =
-	    PVFS_sys_read(resp_lk.pinode_refn, req_io, 0, NULL, NULL, credentials,
+	    PVFS_sys_read(resp_lk.ref, req_io, 0, NULL, NULL, credentials,
 			  &resp_io);
 	break;
     case 2:
 	ret =
-	    PVFS_sys_read(resp_lk.pinode_refn, req_io, 0, io_buffer, NULL,
+	    PVFS_sys_read(resp_lk.ref, req_io, 0, io_buffer, NULL,
 			  credentials, NULL);
 	break;
     }
@@ -498,17 +498,17 @@ static int test_write(int nullCase)
     {
     case 0:
 	ret =
-	    PVFS_sys_write(resp_lk.pinode_refn, NULL, 0, io_buffer, NULL,
+	    PVFS_sys_write(resp_lk.ref, NULL, 0, io_buffer, NULL,
 			   credentials, &resp_io);
 	break;
     case 1:
 	ret =
-	    PVFS_sys_write(resp_lk.pinode_refn, req_io, 0, NULL, NULL, credentials,
+	    PVFS_sys_write(resp_lk.ref, req_io, 0, NULL, NULL, credentials,
 			   &resp_io);
 	break;
     case 2:
 	ret =
-	    PVFS_sys_write(resp_lk.pinode_refn, req_io, 0, io_buffer, NULL,
+	    PVFS_sys_write(resp_lk.ref, req_io, 0, io_buffer, NULL,
 			   credentials, NULL);
 	break;
     }
@@ -549,7 +549,7 @@ static int init_file(void)
 	return (-1);
     }
 
-    return PVFS_sys_create(filename, resp_look.pinode_refn, attr, credentials,
+    return PVFS_sys_create(filename, resp_look.ref, attr, credentials,
 			   &resp_create);
 
 }

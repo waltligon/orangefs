@@ -21,7 +21,7 @@ int main(int argc, char **argv)
     PVFS_fs_id cur_fs;
     PVFS_sysresp_create resp_create;
     char* entry_name;
-    PVFS_pinode_reference parent_refn;
+    PVFS_object_ref parent_refn;
     PVFS_sys_attr attr;
     PVFS_credentials credentials;
 
@@ -89,7 +89,7 @@ int main(int argc, char **argv)
 	
     // print the handle 
     printf("--create--\n"); 
-    printf("Handle: %Ld\n",Ld(resp_create.pinode_refn.handle));
+    printf("Handle: %Ld\n",Ld(resp_create.ref.handle));
 
     ret = PVFS_sys_finalize();
     if (ret < 0)

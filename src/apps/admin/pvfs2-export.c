@@ -48,7 +48,7 @@ int main(int argc, char **argv)
     PVFS_fs_id lk_fs_id;
     char* lk_name;
     PVFS_credentials credentials;
-    PVFS_pinode_reference pinode_refn;
+    PVFS_object_ref ref;
     PVFS_Request file_req;
     PVFS_Request mem_req;
     int buffer_size;
@@ -142,7 +142,7 @@ int main(int argc, char **argv)
 	goto main_out;
     }
 
-    pinode_refn = resp_lookup.pinode_refn;
+    ref = resp_lookup.ref;
     buffer_size = user_opts->buf_size;
 
     file_req = PVFS_BYTE;
@@ -156,7 +156,7 @@ int main(int argc, char **argv)
     }
 
     time1 = Wtime();
-    while((ret = PVFS_sys_read(pinode_refn, file_req, total_written,
+    while((ret = PVFS_sys_read(ref, file_req, total_written,
                 buffer, mem_req, credentials, &resp_io)) == 0 &&
 	resp_io.total_completed > 0)
     {

@@ -34,11 +34,11 @@ static int build_nested_path(int levels, char *format, int rank, int test_symlin
     PVFS_sysresp_mkdir mkdir_resp;
     PVFS_sysresp_symlink symlink_resp;
     char PATH_LOOKUP_BASE_DIR[64] = {0};
-    PVFS_pinode_reference root_refn, parent_refn, base_refn;
-    PVFS_pinode_reference *newdir_refns = NULL;
-    PVFS_pinode_reference *lookup_refns = NULL;
-    PVFS_pinode_reference *rsymlink_refns = NULL;
-    PVFS_pinode_reference *asymlink_refns = NULL;
+    PVFS_object_ref root_refn, parent_refn, base_refn;
+    PVFS_object_ref *newdir_refns = NULL;
+    PVFS_object_ref *lookup_refns = NULL;
+    PVFS_object_ref *rsymlink_refns = NULL;
+    PVFS_object_ref *asymlink_refns = NULL;
     char **absolute_paths = NULL;
 
     if (levels && format)
@@ -59,7 +59,7 @@ static int build_nested_path(int levels, char *format, int rank, int test_symlin
             return ret;
         }
 
-        root_refn = lookup_resp.pinode_refn;
+        root_refn = lookup_resp.ref;
         fprintf(stderr,"Got Root Handle %Lu on fs %d\n",
                 Lu(root_refn.handle), root_refn.fs_id);
 
@@ -81,12 +81,12 @@ static int build_nested_path(int levels, char *format, int rank, int test_symlin
                     "base directory %s\n", PATH_LOOKUP_BASE_DIR);
             goto cleanup;
         }
-        base_refn = mkdir_resp.pinode_refn;
+        base_refn = mkdir_resp.ref;
 
-        newdir_refns = (PVFS_pinode_reference *)malloc(
-            (levels * sizeof(PVFS_pinode_reference)));
-        lookup_refns = (PVFS_pinode_reference *)malloc(
-            (levels * sizeof(PVFS_pinode_reference)));
+        newdir_refns = (PVFS_object_ref *)malloc(
+            (levels * sizeof(PVFS_object_ref)));
+        lookup_refns = (PVFS_object_ref *)malloc(
+            (levels * sizeof(PVFS_object_ref)));
         absolute_paths = (char **)malloc(
             (levels * PVFS_NAME_MAX * sizeof(char)));
         if (!newdir_refns || !lookup_refns | !absolute_paths)
@@ -97,7 +97,7 @@ static int build_nested_path(int levels, char *format, int rank, int test_symlin
 
         for(i = 0; i < levels; i++)
         {
-            parent_refn = mkdir_resp.pinode_refn;
+            parent_refn = mkdir_resp.ref;
 
             GENERATE_FILENAME(cur_filename, 64, format, i, rank, 0);
             fprintf(stderr,"  Creating directory %s under %Lu, %d\n",
@@ -114,7 +114,7 @@ static int build_nested_path(int levels, char *format, int rank, int test_symlin
             }
 
             /* grab refn of newly created directory */
-            newdir_refns[i] = mkdir_resp.pinode_refn;
+            newdir_refns[i] = mkdir_resp.ref;
         }
 
         /* generate the absolute path names */
@@ -161,7 +161,7 @@ static int build_nested_path(int levels, char *format, int rank, int test_symlin
             }
 
             /* grab refn of looked up directory */
-            lookup_refns[i] = lookup_resp.pinode_refn;
+            lookup_refns[i] = lookup_resp.ref;
 
             /* then do an absolute path lookup */
             fprintf(stderr,"Looking up path %d [ABSOLUTE] \t\t... ", i);
@@ -187,16 +187,16 @@ static int build_nested_path(int levels, char *format, int rank, int test_symlin
               lookup yielded the same result
             */
             if ((lookup_refns[i].fs_id !=
-                 lookup_resp.pinode_refn.fs_id) ||
+                 lookup_resp.ref.fs_id) ||
                 (lookup_refns[i].handle !=
-                 lookup_resp.pinode_refn.handle))
+                 lookup_resp.ref.handle))
             {
                 fprintf(stderr," PVFS_sys_ref_lookup and "
                         "PVFS_sys_lookup returned different results "
                         "when they should be the same!\n");
                 goto cleanup;
             }
-            parent_refn = lookup_resp.pinode_refn;
+            parent_refn = lookup_resp.ref;
         }
         ret = 0;
     }
@@ -210,10 +210,10 @@ static int build_nested_path(int levels, char *format, int rank, int test_symlin
       generate both relative and absolute symlinks for
       most of the nested directories created
     */
-    rsymlink_refns = (PVFS_pinode_reference *)malloc(
-        (levels * sizeof(PVFS_pinode_reference)));
-    asymlink_refns = (PVFS_pinode_reference *)malloc(
-        (levels * sizeof(PVFS_pinode_reference)));
+    rsymlink_refns = (PVFS_object_ref *)malloc(
+        (levels * sizeof(PVFS_object_ref)));
+    asymlink_refns = (PVFS_object_ref *)malloc(
+        (levels * sizeof(PVFS_object_ref)));
     for(i = 0; i < levels; i++)
     {
         parent_refn = ((i == 0) ? base_refn : lookup_refns[i - 1]);
@@ -232,7 +232,7 @@ static int build_nested_path(int levels, char *format, int rank, int test_symlin
         }
 
         /* stash the newly created relative symlink references created */
-        rsymlink_refns[i] = symlink_resp.pinode_refn;
+        rsymlink_refns[i] = symlink_resp.ref;
 
         fprintf(stderr, "Generating absolute symlink %s "
                 "in %Lu,%d to point at %s\n", ABSOLUTE_SYMLINK_NAME,
@@ -248,7 +248,7 @@ static int build_nested_path(int levels, char *format, int rank, int test_symlin
         }
 
         /* stash the newly created absolute symlink references created */
-        asymlink_refns[i] = symlink_resp.pinode_refn;
+        asymlink_refns[i] = symlink_resp.ref;
     }
 
     for(i = 0; i < levels; i++)
@@ -277,14 +277,14 @@ static int build_nested_path(int levels, char *format, int rank, int test_symlin
                 goto symlink_cleanup;
             }
 
-            if ((lookup_resp.pinode_refn.handle !=
+            if ((lookup_resp.ref.handle !=
                  rsymlink_refns[i].handle) ||
-                (lookup_resp.pinode_refn.fs_id !=
+                (lookup_resp.ref.fs_id !=
                  rsymlink_refns[i].fs_id))
             {
                 fprintf(stderr,"\nSymlink %s resolved to %Lu "
                         "but should have resolved to %Lu\n", tmp_buf,
-                        Lu(lookup_resp.pinode_refn.handle),
+                        Lu(lookup_resp.ref.handle),
                         Lu(rsymlink_refns[i].handle));
                 goto symlink_cleanup;
             }
@@ -304,14 +304,14 @@ static int build_nested_path(int levels, char *format, int rank, int test_symlin
                 goto symlink_cleanup;
             }
 
-            if ((lookup_resp.pinode_refn.handle !=
+            if ((lookup_resp.ref.handle !=
                  lookup_refns[i].handle) ||
-                (lookup_resp.pinode_refn.fs_id !=
+                (lookup_resp.ref.fs_id !=
                  lookup_refns[i].fs_id))
             {
                 fprintf(stderr,"\nSymlink %s resolved to %Lu "
                         "but should have resolved to %Lu\n", tmp_buf,
-                        Lu(lookup_resp.pinode_refn.handle),
+                        Lu(lookup_resp.ref.handle),
                         Lu(lookup_refns[i].handle));
                 goto symlink_cleanup;
             }
@@ -338,14 +338,14 @@ static int build_nested_path(int levels, char *format, int rank, int test_symlin
                 goto symlink_cleanup;
             }
 
-            if ((lookup_resp.pinode_refn.handle !=
+            if ((lookup_resp.ref.handle !=
                  asymlink_refns[i].handle) ||
-                (lookup_resp.pinode_refn.fs_id !=
+                (lookup_resp.ref.fs_id !=
                  asymlink_refns[i].fs_id))
             {
                 fprintf(stderr,"\nSymlink %s resolved to %Lu "
                         "but should have resolved to %Lu\n", tmp_buf,
-                        Lu(lookup_resp.pinode_refn.handle),
+                        Lu(lookup_resp.ref.handle),
                         Lu(asymlink_refns[i].handle));
                 goto symlink_cleanup;
             }
@@ -365,14 +365,14 @@ static int build_nested_path(int levels, char *format, int rank, int test_symlin
                 goto symlink_cleanup;
             }
 
-            if ((lookup_resp.pinode_refn.handle !=
+            if ((lookup_resp.ref.handle !=
                  lookup_refns[i].handle) ||
-                (lookup_resp.pinode_refn.fs_id !=
+                (lookup_resp.ref.fs_id !=
                  lookup_refns[i].fs_id))
             {
                 fprintf(stderr,"\nSymlink %s resolved to %Lu "
                         "but should have resolved to %Lu\n", tmp_buf,
-                        Lu(lookup_resp.pinode_refn.handle),
+                        Lu(lookup_resp.ref.handle),
                         Lu(lookup_refns[i].handle));
                 goto symlink_cleanup;
             }

@@ -40,10 +40,10 @@ static PVFS_handle simple_lookup_name(char *name,
        return(-1);
     }
 
-    return (PVFS_handle) resp_lookup.pinode_refn.handle;
+    return (PVFS_handle) resp_lookup.ref.handle;
 }
 
-static int do_create_lookup(PVFS_pinode_reference parent_refn,
+static int do_create_lookup(PVFS_object_ref parent_refn,
                      PVFS_fs_id fs_id,
                      int depth,
                      int ndirs,
@@ -53,7 +53,7 @@ static int do_create_lookup(PVFS_pinode_reference parent_refn,
     char name[PVFS_NAME_MAX];
     char path[PVFS_NAME_MAX]; /*same as name except it has a slash prepending the path*/
     PVFS_handle dir_handle, lookup_handle;
-    PVFS_pinode_reference out_refn;
+    PVFS_object_ref out_refn;
     double before, after, running_total = 0, max=0.0, min = 10000.0, total = 0, current;
 
     /* base case: we've gone far enough */
@@ -118,7 +118,7 @@ int test_lookup_bench(MPI_Comm * comm __unused,
 {
     int ret = -1;
     PVFS_fs_id fs_id;
-    PVFS_pinode_reference root_refn;
+    PVFS_object_ref root_refn;
     generic_params *myparams = (generic_params *) rawparams;
     int nerrs = 0;
 

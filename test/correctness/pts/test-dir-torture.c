@@ -29,8 +29,8 @@ static int recursive_create_dir(PVFS_handle handle,
 {
     int i;
     char name[PVFS_SEGMENT_MAX];
-    PVFS_pinode_reference refn;
-    PVFS_pinode_reference out_refn;
+    PVFS_object_ref refn;
+    PVFS_object_ref out_refn;
 
     /* base case: we've gone far enough */
     if (depth == 0)
@@ -80,7 +80,7 @@ int test_dir_torture(MPI_Comm * comm __unused,
 		     void *rawparams)
 {
     PVFS_fs_id fs_id;
-    PVFS_pinode_reference root_refn;
+    PVFS_object_ref root_refn;
     generic_params *myparams = (generic_params *) rawparams;
     int nerrs = 0;
 

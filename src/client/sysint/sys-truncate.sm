@@ -86,7 +86,7 @@ machine pvfs2_client_truncate_sm(truncate_getattr_setup_msgpair,
 
 %%
 
-int PVFS_sys_truncate(PVFS_pinode_reference pinode_ref,
+int PVFS_sys_truncate(PVFS_object_ref ref,
                       PVFS_size size,
                       PVFS_credentials credentials)
 {
@@ -97,8 +97,8 @@ int PVFS_sys_truncate(PVFS_pinode_reference pinode_ref,
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PVFS_sys_truncate entered with %Ld\n", Ld(size));
 
-    if ((pinode_ref.fs_id == PVFS_FS_ID_NULL) ||
-        (pinode_ref.handle == PVFS_HANDLE_NULL))
+    if ((ref.fs_id == PVFS_FS_ID_NULL) ||
+        (ref.handle == PVFS_HANDLE_NULL))
     {
 	gossip_lerr("Invalid pinode reference\n");
 	return ret;
@@ -112,7 +112,7 @@ int PVFS_sys_truncate(PVFS_pinode_reference pinode_ref,
     memset(sm_p, 0, sizeof(*sm_p));
 
     sm_p->cred_p = &credentials;
-    sm_p->object_ref = pinode_ref;
+    sm_p->object_ref = ref;
     sm_p->u.truncate.size = size;
 
     ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_TRUNCATE);

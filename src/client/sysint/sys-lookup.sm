@@ -79,7 +79,7 @@ static int initialize_context(
     PINT_client_lookup_sm_ctx *ctx_array,
     int current_ctx_index,
     char *pathname,
-    PVFS_pinode_reference ctx_starting_refn);
+    PVFS_object_ref ctx_starting_refn);
 
 static void finalize_context(
     PINT_client_lookup_sm_ctx *ctx);
@@ -200,7 +200,7 @@ static int initialize_context(
     PINT_client_lookup_sm_ctx *ctx_array,
     int current_ctx_index,
     char *pathname,
-    PVFS_pinode_reference ctx_starting_refn)
+    PVFS_object_ref ctx_starting_refn)
 {
     int ret = -PVFS_EINVAL, pathlen = 0, num_segments = 0;
     void *state = NULL;
@@ -464,7 +464,7 @@ static void finalize_context(
 int PVFS_sys_ref_lookup(
     PVFS_fs_id fs_id,
     char* relative_pathname,
-    PVFS_pinode_reference parent,
+    PVFS_object_ref parent,
     PVFS_credentials credentials,
     PVFS_sysresp_lookup *resp,
     int follow_link)
@@ -545,7 +545,7 @@ int PVFS_sys_lookup(
     int follow_link)
 {
     int ret = -PVFS_EINVAL;
-    PVFS_pinode_reference parent;
+    PVFS_object_ref parent;
 
     if (name && resp)
     {
@@ -561,8 +561,8 @@ int PVFS_sys_lookup(
         /* special case root handle lookup, since we already know it */
         if (strcmp(name, "/") == 0)
         {
-            resp->pinode_refn.handle = parent.handle;
-            resp->pinode_refn.fs_id = fs_id;
+            resp->ref.handle = parent.handle;
+            resp->ref.fs_id = fs_id;
             ret = 0;
         }
         else
@@ -881,7 +881,7 @@ static int lookup_segment_handle_absolute_link(PINT_client_sm *sm_p,
     int ret = -PVFS_EINVAL;
     PINT_client_lookup_sm_segment *cur_seg = NULL;
     char *absolute_symlink_target = NULL;
-    PVFS_pinode_reference root_refn;
+    PVFS_object_ref root_refn;
 
     /*
       NOTE: if we have an absolute link, we need to essentially
@@ -932,7 +932,7 @@ static int lookup_segment_handle_absolute_link(PINT_client_sm *sm_p,
 static int lookup_context_check_completion(PINT_client_sm *sm_p,
                                            job_status_s *js_p)
 {
-    PVFS_pinode_reference last_resolved_refn;
+    PVFS_object_ref last_resolved_refn;
     PINT_client_lookup_sm_ctx *cur_ctx = NULL;
     PINT_client_lookup_sm_segment *cur_seg = NULL;
 
@@ -970,7 +970,7 @@ static int lookup_context_check_completion(PINT_client_sm *sm_p,
         if (sm_p->u.lookup.current_context == 0)
         {
             /* we are done, done at this point */
-            sm_p->u.lookup.lookup_resp->pinode_refn =
+            sm_p->u.lookup.lookup_resp->ref =
                 cur_ctx->ctx_resolved_refn;
             js_p->error_code = 0;
             return 1;
@@ -1053,7 +1053,7 @@ static int lookup_segment_lookup_comp_fn(
     PINT_client_lookup_sm_segment *cur_seg = NULL;
     int current_seg_index = sm_p->u.lookup.contexts[
         sm_p->u.lookup.current_context].current_segment;
-    PVFS_pinode_reference last_resolved_refn;
+    PVFS_object_ref last_resolved_refn;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup_segment_lookup_comp_fn\n");
 

@@ -180,7 +180,7 @@ int PVFS_mgmt_iterate_handles_list(
     int server_count);
 
 int PVFS_mgmt_get_dfile_array(
-    PVFS_pinode_reference pinode_refn,
+    PVFS_object_ref ref,
     PVFS_credentials credentials,
     PVFS_handle *dfile_array,
     int dfile_count);

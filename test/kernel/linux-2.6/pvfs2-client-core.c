@@ -52,7 +52,7 @@ static int service_lookup_request(
 {
     int ret = 1;
     PVFS_sysresp_lookup response;
-    PVFS_pinode_reference parent_refn;
+    PVFS_object_ref parent_refn;
 
     if (in_upcall && out_downcall)
     {
@@ -93,7 +93,7 @@ static int service_lookup_request(
         {
             out_downcall->type = PVFS2_VFS_OP_LOOKUP;
             out_downcall->status = 0;
-            out_downcall->resp.lookup.refn = response.pinode_refn;
+            out_downcall->resp.lookup.refn = response.ref;
             ret = 0;
         }
     }
@@ -106,7 +106,7 @@ static int service_create_request(
 {
     int ret = 1;
     PVFS_sysresp_create response;
-    PVFS_pinode_reference parent_refn;
+    PVFS_object_ref parent_refn;
     PVFS_sys_attr *attrs = NULL;
 
     if (in_upcall && out_downcall)
@@ -159,7 +159,7 @@ static int service_create_request(
                 else
                 {
                     /* copy out the looked up pinode reference */
-                    response.pinode_refn = lk_response.pinode_refn;
+                    response.ref = lk_response.ref;
                     goto create_lookup_success;
                 }
             }
@@ -181,7 +181,7 @@ static int service_create_request(
           create_lookup_success:
             out_downcall->type = PVFS2_VFS_OP_CREATE;
             out_downcall->status = 0;
-            out_downcall->resp.create.refn = response.pinode_refn;
+            out_downcall->resp.create.refn = response.ref;
             ret = 0;
         }
     }
@@ -194,7 +194,7 @@ static int service_symlink_request(
 {
     int ret = 1;
     PVFS_sysresp_symlink response;
-    PVFS_pinode_reference parent_refn;
+    PVFS_object_ref parent_refn;
     PVFS_sys_attr *attrs = NULL;
 
     if (in_upcall && out_downcall)
@@ -235,7 +235,7 @@ static int service_symlink_request(
         {
             out_downcall->type = PVFS2_VFS_OP_SYMLINK;
             out_downcall->status = 0;
-            out_downcall->resp.sym.refn = response.pinode_refn;
+            out_downcall->resp.sym.refn = response.ref;
             ret = 0;
         }
     }
@@ -531,7 +531,7 @@ static int service_remove_request(
     pvfs2_downcall_t *out_downcall)
 {
     int ret = 1;
-    PVFS_pinode_reference parent_refn;
+    PVFS_object_ref parent_refn;
 
     if (in_upcall && out_downcall)
     {
@@ -576,7 +576,7 @@ static int service_mkdir_request(
 {
     int ret = 1;
     PVFS_sysresp_mkdir response;
-    PVFS_pinode_reference parent_refn;
+    PVFS_object_ref parent_refn;
     PVFS_sys_attr *attrs = NULL;
 
     if (in_upcall && out_downcall)
@@ -615,7 +615,7 @@ static int service_mkdir_request(
         {
             out_downcall->type = PVFS2_VFS_OP_MKDIR;
             out_downcall->status = 0;
-            out_downcall->resp.mkdir.refn = response.pinode_refn;
+            out_downcall->resp.mkdir.refn = response.ref;
             ret = 0;
         }
     }
@@ -628,7 +628,7 @@ static int service_readdir_request(
 {
     int ret = 1;
     PVFS_sysresp_readdir response;
-    PVFS_pinode_reference refn;
+    PVFS_object_ref refn;
 
     if (in_upcall && out_downcall)
     {
@@ -700,7 +700,7 @@ static int service_rename_request(
     pvfs2_downcall_t *out_downcall)
 {
     int ret = 1;
-    PVFS_pinode_reference old_parent_refn, new_parent_refn;
+    PVFS_object_ref old_parent_refn, new_parent_refn;
 
     if (in_upcall && out_downcall)
     {

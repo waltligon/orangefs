@@ -42,9 +42,9 @@ int main(
     char *name = "/";
     PVFS_credentials credentials;
     char *entry_name;
-    PVFS_pinode_reference parent_refn;
+    PVFS_object_ref parent_refn;
     PVFS_sys_attr attr;
-    PVFS_pinode_reference pinode_refn;
+    PVFS_object_ref pinode_refn;
     PVFS_ds_position token;
     int pvfs_dirent_incount;
 
@@ -81,7 +81,7 @@ int main(
     }
     // print the handle 
     printf("--lookup--\n");
-    printf("ROOT Handle:%ld\n", (long int) resp_look.pinode_refn.handle);
+    printf("ROOT Handle:%ld\n", (long int) resp_look.ref.handle);
 
     /* test create */
     resp_create = (PVFS_sysresp_create *) malloc(sizeof(PVFS_sysresp_create));
@@ -107,7 +107,7 @@ int main(
     attr.perms = 1877;
     attr.atime = attr.mtime = attr.ctime = time(NULL);
 
-    parent_refn.handle = resp_look.pinode_refn.handle;
+    parent_refn.handle = resp_look.ref.handle;
     parent_refn.fs_id = fs_id;
 
 
@@ -131,7 +131,7 @@ int main(
 
     // print the handle 
     printf("--create--\n");
-    printf("Handle:%ld\n", (long int) resp_create->pinode_refn.handle);
+    printf("Handle:%ld\n", (long int) resp_create->ref.handle);
 
 #if 0
     printf("GETATTR HERE===>\n");
@@ -211,11 +211,11 @@ int main(
     }
     // print the handle 
     printf("--lookup--\n");
-    printf("Handle:%ld\n", (long int) resp_lk->pinode_refn.handle);
-    printf("FSID:%ld\n", (long int) resp_lk->pinode_refn.fs_id);
+    printf("Handle:%ld\n", (long int) resp_lk->ref.handle);
+    printf("FSID:%ld\n", (long int) resp_lk->ref.fs_id);
 
-    lk_handle = resp_lk->pinode_refn.handle;
-    lk_fsid = resp_lk->pinode_refn.fs_id;
+    lk_handle = resp_lk->ref.handle;
+    lk_fsid = resp_lk->ref.fs_id;
 
     free(name);
     free(resp_lk);
@@ -472,7 +472,7 @@ int main(
 
     // Fill in the dir info 
 
-    pinode_refn.handle = resp_look.pinode_refn.handle;
+    pinode_refn.handle = resp_look.ref.handle;
     pinode_refn.fs_id = fs_id;
     token = PVFS_READDIR_START;
     pvfs_dirent_incount = 6;

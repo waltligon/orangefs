@@ -51,12 +51,12 @@ int traverse_directory_tree(PVFS_fs_id cur_fs,
 			    PVFS_credentials creds,
 			    struct options *opts_p);
 int descend(PVFS_fs_id cur_fs,
-	    PVFS_pinode_reference pref,
+	    PVFS_object_ref pref,
 	    PVFS_credentials creds,
 	    struct options *opts_p);
 
 void verify_datafiles(PVFS_fs_id cur_fs,
-		      PVFS_pinode_reference mf_ref,
+		      PVFS_object_ref mf_ref,
 		      int df_count,
 		      PVFS_credentials creds,
 		      struct options *opts_p);
@@ -387,12 +387,12 @@ int traverse_directory_tree(PVFS_fs_id cur_fs,
     int server_idx;
     PVFS_sysresp_lookup lookup_resp;
     PVFS_sysresp_getattr getattr_resp;
-    PVFS_pinode_reference pref;
+    PVFS_object_ref pref;
 
     PVFS_sys_lookup(cur_fs, "/", creds,
                     &lookup_resp, PVFS2_LOOKUP_LINK_NO_FOLLOW);
     /* lookup_resp.pinode_refn.handle gets root handle */
-    pref = lookup_resp.pinode_refn;
+    pref = lookup_resp.ref;
 
     PVFS_sys_getattr(pref,
 		     PVFS_ATTR_SYS_ALL,
@@ -419,7 +419,7 @@ int traverse_directory_tree(PVFS_fs_id cur_fs,
 }
 
 int descend(PVFS_fs_id cur_fs,
-	    PVFS_pinode_reference pref,
+	    PVFS_object_ref pref,
 	    PVFS_credentials creds,
 	    struct options *opts_p)
 {
@@ -427,7 +427,7 @@ int descend(PVFS_fs_id cur_fs,
     PVFS_ds_position token = PVFS_READDIR_START;
     PVFS_sysresp_readdir readdir_resp;
     PVFS_sysresp_getattr getattr_resp;
-    PVFS_pinode_reference entry_ref;
+    PVFS_object_ref entry_ref;
 
     count = 64;
 
@@ -501,7 +501,7 @@ int descend(PVFS_fs_id cur_fs,
  * verifies that they exist, and removes them from the handlelist.
  */
 void verify_datafiles(PVFS_fs_id cur_fs,
-		      PVFS_pinode_reference mf_ref,
+		      PVFS_object_ref mf_ref,
 		      int df_count,
 		      PVFS_credentials creds,
 		      struct options *opts_p)

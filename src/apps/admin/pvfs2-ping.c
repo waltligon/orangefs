@@ -167,7 +167,7 @@ int main(int argc, char **argv)
 	fprintf(stderr, "Failure: could not lookup root handle.\n");
 	return(-1);
     }
-    printf("\n   Root handle: %Lu\n", Lu(resp_lookup.pinode_refn.handle));
+    printf("\n   Root handle: %Lu\n", Lu(resp_lookup.ref.handle));
 
     /* check that only one server controls root handle */
     /* TODO: we need a way to get information out about which server
@@ -175,7 +175,7 @@ int main(int argc, char **argv)
      */
     ret = PVFS_mgmt_setparam_all(
         cur_fs, creds, PVFS_SERV_PARAM_ROOT_CHECK,
-	(int64_t)resp_lookup.pinode_refn.handle, NULL);
+	(int64_t)resp_lookup.ref.handle, NULL);
 
     /* check for understood error values */
     if(ret == -PVFS_ENOENT)

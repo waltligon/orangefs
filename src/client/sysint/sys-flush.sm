@@ -86,7 +86,7 @@ machine pvfs2_client_flush_sm(flush_getattr_setup_msgpair,
 
 %%
 
-int PVFS_sys_flush(PVFS_pinode_reference refn,
+int PVFS_sys_flush(PVFS_object_ref ref,
                    PVFS_credentials credentials)
 {
     int ret = -PVFS_EINVAL;
@@ -95,8 +95,8 @@ int PVFS_sys_flush(PVFS_pinode_reference refn,
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_flush entered\n");
 
-    if ((refn.fs_id == PVFS_FS_ID_NULL) ||
-        (refn.handle == PVFS_HANDLE_NULL))
+    if ((ref.fs_id == PVFS_FS_ID_NULL) ||
+        (ref.handle == PVFS_HANDLE_NULL))
     {
         gossip_err("Invalid handle/fs_id specified\n");
         return ret;
@@ -110,7 +110,7 @@ int PVFS_sys_flush(PVFS_pinode_reference refn,
     memset(sm_p, 0, sizeof(*sm_p));
 
     sm_p->cred_p = &credentials;
-    sm_p->object_ref = refn;
+    sm_p->object_ref = ref;
 
     ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_FLUSH);
     if (ret)

@@ -70,8 +70,8 @@ int main(int argc,char **argv)
         return(-1);
     }
 
-    printf("Handle     : %Lu\n", Lu(resp_lk.pinode_refn.handle));
-    printf("FS ID      : %d\n", resp_lk.pinode_refn.fs_id);
+    printf("Handle     : %Lu\n", Lu(resp_lk.ref.handle));
+    printf("FS ID      : %d\n", resp_lk.ref.fs_id);
 
     ret = PVFS_sys_finalize();
     if (ret < 0)

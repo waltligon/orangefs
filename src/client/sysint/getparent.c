@@ -53,7 +53,7 @@ int PVFS_sys_getparent(
     }
 
     strncpy(resp->basename, file_buf, PVFS_SEGMENT_MAX);
-    resp->parent_refn = resp_look.pinode_refn;
+    resp->parent_ref = resp_look.ref;
 
     return 0;
 }

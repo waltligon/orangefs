@@ -179,9 +179,9 @@ machine pvfs2_client_rename_sm(init,
  */
 int PVFS_sys_rename(
     char *old_entry,
-    PVFS_pinode_reference old_parent_refn,
+    PVFS_object_ref old_parent_ref,
     char *new_entry,
-    PVFS_pinode_reference new_parent_refn,
+    PVFS_object_ref new_parent_ref,
     PVFS_credentials credentials)
 {
     int ret = -PVFS_EINVAL;
@@ -196,8 +196,8 @@ int PVFS_sys_rename(
     }
 
     /* don't even try to rename a file to itself */
-    if ((old_parent_refn.handle == new_parent_refn.handle) &&
-        (old_parent_refn.fs_id == new_parent_refn.fs_id) &&
+    if ((old_parent_ref.handle == new_parent_ref.handle) &&
+        (old_parent_ref.fs_id == new_parent_ref.fs_id) &&
         (strcmp(old_entry, new_entry) == 0))
     {
         return ret;
@@ -230,15 +230,15 @@ int PVFS_sys_rename(
     sm_p->cred_p = &credentials;
     sm_p->u.rename.entries[0] = old_entry;
     sm_p->u.rename.entries[1] = new_entry;
-    sm_p->u.rename.parent_refns[0] = old_parent_refn;
-    sm_p->u.rename.parent_refns[1] = new_parent_refn;
+    sm_p->u.rename.parent_refns[0] = old_parent_ref;
+    sm_p->u.rename.parent_refns[1] = new_parent_ref;
     sm_p->u.rename.rmdirent_index = 0;
 
     gossip_debug(
         GOSSIP_CLIENT_DEBUG, "Renaming file named %s (under %Lu on "
         "fs %d) to %s (under %Lu on fs %d)\n", old_entry,
-        Lu(old_parent_refn.handle), old_parent_refn.fs_id, new_entry,
-        Lu(new_parent_refn.handle), new_parent_refn.fs_id);
+        Lu(old_parent_ref.handle), old_parent_ref.fs_id, new_entry,
+        Lu(new_parent_ref.handle), new_parent_ref.fs_id);
 
     ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_RENAME);
     if (ret)

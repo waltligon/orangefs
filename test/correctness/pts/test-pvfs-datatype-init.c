@@ -70,7 +70,7 @@ int test_pvfs_datatype_init(
             ret = PVFS_sys_lookup(pvfs_helper.fs_id,
                                   "/", credentials, &resp_lk,
                                   PVFS2_LOOKUP_LINK_NO_FOLLOW);
-            if ((ret < 0) || (!resp_lk.pinode_refn.handle))
+            if ((ret < 0) || (!resp_lk.ref.handle))
             {
                 debug_printf("Error: PVFS_sys_lookup() failed to find "
                              "root handle.\n");
@@ -85,21 +85,21 @@ int test_pvfs_datatype_init(
 	    attr.atime = attr.mtime = attr.ctime = 
 		time(NULL);
 
-            ret = PVFS_sys_create(&(filename[1]),resp_lk.pinode_refn,
+            ret = PVFS_sys_create(&(filename[1]),resp_lk.ref,
                                   attr, credentials, &resp_cr);
-            if ((ret < 0) || (!resp_cr.pinode_refn.handle))
+            if ((ret < 0) || (!resp_cr.ref.handle))
             {
                 debug_printf("Error: PVFS_sys_create() failure.\n");
                 break;
             }
             debug_printf("Created file %s\n",&(filename[1]));
-            debug_printf("Got handle %Ld.\n", Ld(resp_cr.pinode_refn.handle));
+            debug_printf("Got handle %Ld.\n", Ld(resp_cr.ref.handle));
             num_test_files_ok++;
         }
         else
         {
             debug_printf("lookup succeeded; skipping existing file.\n");
-            debug_printf("Got handle %Ld.\n", Ld(resp_lk.pinode_refn.handle));
+            debug_printf("Got handle %Ld.\n", Ld(resp_lk.ref.handle));
             num_test_files_ok++;
         }
     }

@@ -399,7 +399,7 @@ void print_entry(
     struct options *opts)
 {
     int ret = -1;
-    PVFS_pinode_reference pinode_refn;
+    PVFS_object_ref ref;
     PVFS_credentials credentials;
     PVFS_sysresp_getattr getattr_response;
 
@@ -416,13 +416,13 @@ void print_entry(
         return;
     }
 
-    pinode_refn.handle = handle;
-    pinode_refn.fs_id = fs_id;
+    ref.handle = handle;
+    ref.fs_id = fs_id;
 
     memset(&getattr_response,0, sizeof(PVFS_sysresp_getattr));
     PVFS_util_gen_credentials(&credentials);
 
-    ret = PVFS_sys_getattr(pinode_refn, PVFS_ATTR_SYS_ALL,
+    ret = PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL,
                            credentials, &getattr_response);
     if (ret)
     {
@@ -447,7 +447,7 @@ int do_list(
     PVFS_sysresp_readdir rd_response;
     PVFS_sysresp_getattr getattr_response;
     PVFS_credentials credentials;
-    PVFS_pinode_reference pinode_refn;
+    PVFS_object_ref ref;
     PVFS_ds_position token;
 
     name = start;
@@ -463,12 +463,12 @@ int do_list(
         return -1;
     }
 
-    pinode_refn.handle = lk_response.pinode_refn.handle;
-    pinode_refn.fs_id = fs_id;
+    ref.handle = lk_response.ref.handle;
+    ref.fs_id = fs_id;
     pvfs_dirent_incount = MAX_NUM_DIRENTS;
 
     memset(&getattr_response,0,sizeof(PVFS_sysresp_getattr));
-    if (PVFS_sys_getattr(pinode_refn, PVFS_ATTR_SYS_ALL,
+    if (PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL,
                          credentials, &getattr_response) == 0)
     {
         if ((getattr_response.attr.objtype == PVFS_TYPE_METAFILE) ||
@@ -486,23 +486,23 @@ int do_list(
 
             if (getattr_response.attr.objtype == PVFS_TYPE_DIRECTORY)
             {
-                if (PVFS_sys_getparent(pinode_refn.fs_id, name,
+                if (PVFS_sys_getparent(ref.fs_id, name,
                                        credentials, &getparent_resp) == 0)
                 {
                     print_dot_and_dot_dot_info_if_required(
-                        getparent_resp.parent_refn);
+                        getparent_resp.parent_ref);
                 }
             }
 
             if (opts->list_long)
             {
-                print_entry_attr(pinode_refn.handle, segment,
+                print_entry_attr(ref.handle, segment,
                                  &getattr_response.attr, opts);
             }
             else
             {
-                print_entry(segment, pinode_refn.handle,
-                            pinode_refn.fs_id, opts);
+                print_entry(segment, ref.handle,
+                            ref.fs_id, opts);
             }
             return 0;
         }
@@ -512,7 +512,7 @@ int do_list(
     do
     {
         memset(&rd_response,0,sizeof(PVFS_sysresp_readdir));
-        if (PVFS_sys_readdir(pinode_refn,
+        if (PVFS_sys_readdir(ref,
                              (!token ? PVFS_READDIR_START : token),
                              pvfs_dirent_incount, credentials, &rd_response))
         {
@@ -526,7 +526,7 @@ int do_list(
               the list_all option prints files starting with .;
               the almost_all option skips the '.', '..' printing
             */
-            print_dot_and_dot_dot_info_if_required(pinode_refn);
+            print_dot_and_dot_dot_info_if_required(ref);
             printed_dot_info = 1;
         }
 

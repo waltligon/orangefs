@@ -50,7 +50,7 @@ static int s_acache_timeout_ms = (PINT_ACACHE_TIMEOUT * 1000);
 static int s_acache_allocated_entries = 0;
 
 /* static internal helper methods */
-static int pinode_hash_refn(void *pinode_refn_p, int table_size);
+static int pinode_hash_refn(void *refn_p, int table_size);
 static int pinode_hash_refn_compare(void *key, struct qlist_head *link);
 static PINT_pinode *pinode_alloc(void);
 static void pinode_free(PINT_pinode *pinode);
@@ -149,7 +149,7 @@ void PINT_acache_finalize()
   lock held.  That means no one else can use it before
   the lock is released (in release, or set_valid);
 */
-PINT_pinode *PINT_acache_lookup(PVFS_pinode_reference refn)
+PINT_pinode *PINT_acache_lookup(PVFS_object_ref refn)
 {
     PINT_pinode *pinode = NULL;
     struct qhash_head *link = NULL;
@@ -239,7 +239,7 @@ void PINT_acache_set_valid(PINT_pinode *pinode)
 }
 
 /* tries to release the pinode, based on the specified refn */
-void PINT_acache_invalidate(PVFS_pinode_reference refn)
+void PINT_acache_invalidate(PVFS_object_ref refn)
 {
     PINT_pinode *pinode = NULL;
 
@@ -263,7 +263,7 @@ void PINT_acache_invalidate(PVFS_pinode_reference refn)
     acache_debug("PINT_acache_invalidate exiting\n");
 }
 
-void PINT_acache_release_refn(PVFS_pinode_reference refn)
+void PINT_acache_release_refn(PVFS_object_ref refn)
 {
     PINT_pinode *pinode = PINT_acache_lookup(refn);
     if (pinode)
@@ -471,10 +471,10 @@ void PINT_acache_object_attr_deep_free(PVFS_object_attr *attr)
     }
 }
 
-static int pinode_hash_refn(void *pinode_refn_p, int table_size)
+static int pinode_hash_refn(void *refn_p, int table_size)
 {
     unsigned long tmp = 0;
-    PVFS_pinode_reference *refn = (PVFS_pinode_reference *)pinode_refn_p;
+    PVFS_object_ref *refn = (PVFS_object_ref *)refn_p;
 
     tmp += (unsigned long)(refn->handle + refn->fs_id);
     tmp = tmp%table_size;
@@ -485,7 +485,7 @@ static int pinode_hash_refn(void *pinode_refn_p, int table_size)
 static int pinode_hash_refn_compare(void *key, struct qlist_head *link)
 {
     PINT_pinode *pinode = NULL;
-    PVFS_pinode_reference *refn = (PVFS_pinode_reference *)key;
+    PVFS_object_ref *refn = (PVFS_object_ref *)key;
 
     pinode = qlist_entry(link, PINT_pinode, link);
     assert(pinode);

@@ -21,9 +21,9 @@ int main(int argc,char **argv)
     char *new_filename = (char *)0;
     PVFS_fs_id cur_fs;
     char* old_entry;
-    PVFS_pinode_reference old_parent_refn;
+    PVFS_object_ref old_parent_refn;
     char* new_entry;
-    PVFS_pinode_reference new_parent_refn;
+    PVFS_object_ref new_parent_refn;
     PVFS_credentials credentials;
 
     if (argc != 3)

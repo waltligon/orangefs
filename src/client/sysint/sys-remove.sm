@@ -252,7 +252,7 @@ machine pvfs2_client_remove_sm(init,
   - remove the actual object specified
 */
 int PVFS_sys_remove(char *object_name,
-		    PVFS_pinode_reference parent_ref, 
+		    PVFS_object_ref parent_ref, 
 		    PVFS_credentials credentials)
 {
     int ret = -PVFS_EINVAL;

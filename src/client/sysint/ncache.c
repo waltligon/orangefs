@@ -11,9 +11,9 @@
 
 struct ncache_entry_s
 {
-    PVFS_pinode_reference parent; /* the pinode of the parent directory */
+    PVFS_object_ref parent; /* the pinode of the parent directory */
     char name[PVFS_SEGMENT_MAX];  /* PVFS object name */
-    PVFS_pinode_reference entry;  /* the pinode of entry in parent */
+    PVFS_object_ref entry;  /* the pinode of entry in parent */
     struct timeval tstamp_valid;  /* timestamp indicating validity period */
 };
 typedef struct ncache_entry_s ncache_entry;
@@ -53,8 +53,8 @@ static int ncache_update_dentry_timestamp(ncache_entry* entry);
 static int ncache_get_lru(void);
 static int ncache_add_dentry(
     char *name,
-    PVFS_pinode_reference parent,
-    PVFS_pinode_reference entry);
+    PVFS_object_ref parent,
+    PVFS_object_ref entry);
 
 /* static globals required for ncache operation */
 static ncache *cache = NULL;
@@ -70,7 +70,7 @@ static int s_pint_ncache_timeout_ms = (PINT_NCACHE_TIMEOUT * 1000);
 static inline int compare(
     struct ncache_t element,
     char *name,
-    PVFS_pinode_reference refn)
+    PVFS_object_ref refn)
 {
     int ret = 0;
 
@@ -118,8 +118,8 @@ static inline int check_dentry_expiry(struct timeval time_stamp)
  */
 int PINT_ncache_lookup(
     char *name,
-    PVFS_pinode_reference parent,
-    PVFS_pinode_reference *entry)
+    PVFS_object_ref parent,
+    PVFS_object_ref *entry)
 {
 #if ENABLE_NCACHE
     int i = 0;
@@ -229,8 +229,8 @@ static void ncache_rotate_dentry(int item)
  */
 int PINT_ncache_insert(
 	char *name,
-	PVFS_pinode_reference entry,
-	PVFS_pinode_reference parent)
+	PVFS_object_ref entry,
+	PVFS_object_ref parent)
 {
 #if ENABLE_NCACHE
 	int i = 0, index = 0, ret = 0;
@@ -291,7 +291,7 @@ int PINT_ncache_insert(
  */
 int PINT_ncache_remove(
 	char *name,
-	PVFS_pinode_reference parent,
+	PVFS_object_ref parent,
 	int *item_found)
 {
 #if ENABLE_NCACHE
@@ -410,8 +410,8 @@ void PINT_ncache_set_timeout(int max_timeout_ms)
  */
 static int ncache_add_dentry(
     char *name,
-    PVFS_pinode_reference parent,
-    PVFS_pinode_reference entry)
+    PVFS_object_ref parent,
+    PVFS_object_ref entry)
 {
 	int new = 0, ret = 0;
 	int size = strlen(name) + 1; /* size includes null terminator*/

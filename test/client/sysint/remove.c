@@ -19,7 +19,7 @@ int main(int argc,char **argv)
     char *filename = (char *)0;
     PVFS_fs_id cur_fs;
     char* entry_name;
-    PVFS_pinode_reference parent_refn;
+    PVFS_object_ref parent_refn;
     PVFS_credentials credentials;
 
     if (argc != 2)

@@ -13,7 +13,7 @@ typedef struct
 {
     struct qlist_head hash_link;
 
-    PVFS_pinode_reference refn;
+    PVFS_object_ref refn;
     void *data;
     PVFS_size data_sz;
     int data_invalid;
@@ -33,7 +33,7 @@ typedef struct
 
 int pvfs2_mmap_ra_cache_initialize(void);
 
-int pvfs2_mmap_ra_cache_register(PVFS_pinode_reference refn,
+int pvfs2_mmap_ra_cache_register(PVFS_object_ref refn,
                                  void *data, int data_len);
 
 /*
@@ -42,10 +42,10 @@ int pvfs2_mmap_ra_cache_register(PVFS_pinode_reference refn,
   returns -2 if the data matching the refn should be flushed
 */
 int pvfs2_mmap_ra_cache_get_block(
-    PVFS_pinode_reference refn, PVFS_size offset,
+    PVFS_object_ref refn, PVFS_size offset,
     PVFS_size len, void *dest);
 
-int pvfs2_mmap_ra_cache_flush(PVFS_pinode_reference refn);
+int pvfs2_mmap_ra_cache_flush(PVFS_object_ref refn);
 
 int pvfs2_mmap_ra_cache_finalize(void);
 

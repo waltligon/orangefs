@@ -73,9 +73,9 @@ int PINT_check_perms(
     int gid);
 int PINT_do_lookup (
     char* name,
-    PVFS_pinode_reference parent,
+    PVFS_object_ref parent,
     PVFS_credentials cred,
-    PVFS_pinode_reference *entry);
+    PVFS_object_ref *entry);
 int PINT_server_get_config(
     struct server_configuration_s *config,
     struct PVFS_sys_mntent* mntent);

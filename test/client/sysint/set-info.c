@@ -21,7 +21,7 @@ int main(int argc, char **argv)
     PVFS_credentials credentials;
     PVFS_sysresp_lookup resp_look;
     PVFS_sysresp_getattr resp_getattr;
-    PVFS_pinode_reference pinode_refn;
+    PVFS_object_ref pinode_refn;
     time_t r_atime, r_mtime, r_ctime;
 
     if (argc == 2)
@@ -59,7 +59,7 @@ int main(int argc, char **argv)
         return ret;
     }
 
-    pinode_refn.handle = resp_look.pinode_refn.handle;
+    pinode_refn.handle = resp_look.ref.handle;
     pinode_refn.fs_id = fs_id;
 
     printf("about to getattr on %s\n", filename);

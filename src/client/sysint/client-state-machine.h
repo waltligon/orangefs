@@ -88,8 +88,8 @@ typedef struct PINT_client_sm_recv_state_s {
 /* PINT_client_remove_sm */
 struct PINT_client_remove_sm {
     char                         *object_name;    /* input parameter */
-    PVFS_pinode_reference         parent_ref;     /* input parameter */
-    PVFS_pinode_reference         object_ref;     /* looked up */
+    PVFS_object_ref         parent_ref;     /* input parameter */
+    PVFS_object_ref         object_ref;     /* looked up */
     int                           datafile_count; /* from attribs */
     PVFS_handle                  *datafile_handles;
     PINT_client_sm_msgpair_state *msgpair;        /* for datafile remove */
@@ -120,7 +120,7 @@ struct PINT_client_mkdir_sm {
 
 /* PINT_client_symlink_sm */
 struct PINT_client_symlink_sm {
-    PVFS_pinode_reference        parent_ref;      /* input parameter */
+    PVFS_object_ref        parent_ref;      /* input parameter */
     char                         *link_name;      /* input parameter */
     char                         *link_target;    /* input parameter */
     PVFS_sysresp_symlink         *sym_resp;       /* in/out parameter*/
@@ -130,7 +130,7 @@ struct PINT_client_symlink_sm {
 
 /* PINT_client_getattr_sm */
 struct PINT_client_getattr_sm {
-    PVFS_pinode_reference object_ref;     /* input parameter */
+    PVFS_object_ref object_ref;     /* input parameter */
     uint32_t              attrmask;       /* input parameter */
     int                   datafile_count; /* from object attribs */
     PVFS_handle          *datafile_handles;
@@ -142,7 +142,7 @@ struct PINT_client_getattr_sm {
 
 /* PINT_client_setattr_sm */
 struct PINT_client_setattr_sm {
-    PVFS_pinode_reference refn;           /* input parameter */
+    PVFS_object_ref refn;           /* input parameter */
     PVFS_sys_attr         *sys_attr;      /* input parameter */
 };
 
@@ -190,7 +190,7 @@ struct PINT_client_flush_sm {
 
 /* PINT_client_readdir_sm */
 struct PINT_client_readdir_sm {
-    PVFS_pinode_reference         object_ref;     /* looked up */
+    PVFS_object_ref         object_ref;     /* looked up */
     PVFS_ds_position              pos_token;      /* input parameter */
     int                           dirent_limit;   /* input parameter */
     PVFS_sysresp_readdir          *readdir_resp;  /* in/out parameter*/
@@ -201,8 +201,8 @@ typedef struct
     char                         *seg_name;
     char                         *seg_remaining;
     PVFS_object_attr             seg_attr;
-    PVFS_pinode_reference        seg_starting_refn;
-    PVFS_pinode_reference        seg_resolved_refn;
+    PVFS_object_ref        seg_starting_refn;
+    PVFS_object_ref        seg_resolved_refn;
 } PINT_client_lookup_sm_segment;
 
 typedef struct
@@ -210,15 +210,15 @@ typedef struct
     int                           total_segments;
     int                           current_segment;
     PINT_client_lookup_sm_segment segments[MAX_LOOKUP_SEGMENTS];
-    PVFS_pinode_reference         ctx_starting_refn;
-    PVFS_pinode_reference         ctx_resolved_refn;
+    PVFS_object_ref         ctx_starting_refn;
+    PVFS_object_ref         ctx_resolved_refn;
 } PINT_client_lookup_sm_ctx;
 
 /* PINT_client_lookup_sm */
 struct PINT_client_lookup_sm
 {
     char                         *orig_pathname;/* input parameter */
-    PVFS_pinode_reference        starting_refn; /* input parameter */
+    PVFS_object_ref        starting_refn; /* input parameter */
     PVFS_sysresp_lookup          *lookup_resp;  /* in/out parameter*/
     int                          follow_link;   /* input parameter */
     int                          current_context;
@@ -229,9 +229,9 @@ struct PINT_client_lookup_sm
 struct PINT_client_rename_sm {
     char                  *entries[2];     /* old/new entry names;
                                               input parameter */
-    PVFS_pinode_reference parent_refns[2]; /* old/new parent pinode refns;
+    PVFS_object_ref parent_refns[2]; /* old/new parent pinode refns;
                                               input parameter */
-    PVFS_pinode_reference refns[2];        /* old/new pinode ref */
+    PVFS_object_ref refns[2];        /* old/new pinode ref */
     int                   rmdirent_index;
 };
 
@@ -333,8 +333,8 @@ typedef struct PINT_client_sm {
       the sm_common state machine routines, or otherwise as
       scratch pinode references during sm processing
     */
-    PVFS_pinode_reference object_ref;
-    PVFS_pinode_reference parent_ref;
+    PVFS_object_ref object_ref;
+    PVFS_object_ref parent_ref;
 
     PVFS_credentials *cred_p;
     union
@@ -390,7 +390,7 @@ enum {
 };
 
 /* prototypes of helper functions */
-int PINT_serv_prepare_msgpair(PVFS_pinode_reference object_ref,
+int PINT_serv_prepare_msgpair(PVFS_object_ref object_ref,
 			      struct PVFS_server_req *req_p,
 			      struct PINT_encoded_msg *encoded_req_out_p,
 			      void **encoded_resp_out_pp,

@@ -15,7 +15,7 @@ typedef struct
     int buf_index;
     size_t count;
     loff_t offset;
-    PVFS_pinode_reference refn;
+    PVFS_object_ref refn;
     enum PVFS_io_type io_type;
     loff_t readahead_size;
 } pvfs2_io_request_t;
@@ -23,13 +23,13 @@ typedef struct
 typedef struct
 {
     int sym_follow;
-    PVFS_pinode_reference parent_refn;
+    PVFS_object_ref parent_refn;
     char d_name[PVFS2_NAME_LEN];
 } pvfs2_lookup_request_t;
 
 typedef struct
 {
-    PVFS_pinode_reference parent_refn;
+    PVFS_object_ref parent_refn;
     PVFS_sys_attr attributes;
     char d_name[PVFS2_NAME_LEN];
 } pvfs2_create_request_t;
@@ -37,46 +37,46 @@ typedef struct
 typedef struct
 {
     char entry_name[PVFS2_NAME_LEN];
-    PVFS_pinode_reference parent_refn;
+    PVFS_object_ref parent_refn;
     char target[PVFS2_NAME_LEN];
     PVFS_sys_attr attributes;
 } pvfs2_symlink_request_t;
 
 typedef struct
 {
-    PVFS_pinode_reference refn;
+    PVFS_object_ref refn;
 } pvfs2_getattr_request_t;
 
 typedef struct
 {
-    PVFS_pinode_reference refn;
+    PVFS_object_ref refn;
     PVFS_sys_attr attributes;
 } pvfs2_setattr_request_t;
 
 typedef struct
 {
-    PVFS_pinode_reference parent_refn;
+    PVFS_object_ref parent_refn;
     char d_name[PVFS2_NAME_LEN];
 } pvfs2_remove_request_t;
 
 typedef struct
 {
-    PVFS_pinode_reference parent_refn;
+    PVFS_object_ref parent_refn;
     PVFS_sys_attr attributes;
     char d_name[PVFS2_NAME_LEN];
 } pvfs2_mkdir_request_t;
 
 typedef struct
 {
-    PVFS_pinode_reference refn;
+    PVFS_object_ref refn;
     PVFS_ds_position token;
     int max_dirent_count;
 } pvfs2_readdir_request_t;
 
 typedef struct
 {
-    PVFS_pinode_reference old_parent_refn;
-    PVFS_pinode_reference new_parent_refn;
+    PVFS_object_ref old_parent_refn;
+    PVFS_object_ref new_parent_refn;
     char d_old_name[PVFS2_NAME_LEN];
     char d_new_name[PVFS2_NAME_LEN];
 } pvfs2_rename_request_t;
@@ -88,13 +88,13 @@ typedef struct
 
 typedef struct
 {
-    PVFS_pinode_reference refn;
+    PVFS_object_ref refn;
     PVFS_size size;
 } pvfs2_truncate_request_t;
 
 typedef struct
 {
-    PVFS_pinode_reference refn;
+    PVFS_object_ref refn;
 } pvfs2_mmap_ra_cache_flush_t;
 
 typedef struct

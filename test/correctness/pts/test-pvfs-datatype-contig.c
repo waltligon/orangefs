@@ -75,7 +75,7 @@ int test_pvfs_datatype_contig(
             break;
         }
 
-        ret = PVFS_sys_write(resp_lk.pinode_refn, req_io, 0, io_buffer,
+        ret = PVFS_sys_write(resp_lk.ref, req_io, 0, io_buffer,
                              req_mem, credentials, &resp_io);
         if(ret < 0)
         {
@@ -88,7 +88,7 @@ int test_pvfs_datatype_contig(
 
         /* now try to read the data back */
         memset(io_buffer,0,TEST_PVFS_DATA_SIZE);
-        ret = PVFS_sys_read(resp_lk.pinode_refn, req_io, 0, io_buffer,
+        ret = PVFS_sys_read(resp_lk.ref, req_io, 0, io_buffer,
                             req_mem, credentials, &resp_io);
         if(ret < 0)
         {

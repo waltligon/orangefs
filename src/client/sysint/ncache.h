@@ -23,19 +23,19 @@
 /* Function Prototypes */
 int PINT_ncache_lookup(
 	char *name, 
-	PVFS_pinode_reference parent,
-	PVFS_pinode_reference *entry);
+	PVFS_object_ref parent,
+	PVFS_object_ref *entry);
 
 int PINT_ncache_insert(
 	char *name, 
-	PVFS_pinode_reference entry,
-	PVFS_pinode_reference parent);
+	PVFS_object_ref entry,
+	PVFS_object_ref parent);
 
 int PINT_ncache_flush(void);
 
 int PINT_ncache_remove(
 	char *name, 
-	PVFS_pinode_reference parent,
+	PVFS_object_ref parent,
 	int *item_found);
 
 int PINT_ncache_initialize(void);

@@ -22,7 +22,7 @@ int main(int argc,char **argv)
     PVFS_fs_id cur_fs;
     PVFS_sysresp_mkdir resp_mkdir;
     char* entry_name;
-    PVFS_pinode_reference parent_refn;
+    PVFS_object_ref parent_refn;
     PVFS_sys_attr attr;
     PVFS_credentials credentials;
 
@@ -86,7 +86,7 @@ int main(int argc,char **argv)
     }
     // print the handle 
     printf("--mkdir--\n"); 
-    printf("Handle:%Lu\n",Lu(resp_mkdir.pinode_refn.handle));
+    printf("Handle:%Lu\n",Lu(resp_mkdir.ref.handle));
     printf("FSID:%d\n",parent_refn.fs_id);
 
     //close it down

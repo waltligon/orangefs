@@ -67,7 +67,7 @@ int pvfs2_mmap_ra_cache_initialize(void)
     return ret;
 }
 
-int pvfs2_mmap_ra_cache_register(PVFS_pinode_reference refn,
+int pvfs2_mmap_ra_cache_register(PVFS_object_ref refn,
                                  void *data, int data_len)
 {
     int ret = -1;
@@ -113,7 +113,7 @@ int pvfs2_mmap_ra_cache_register(PVFS_pinode_reference refn,
 }
 
 int pvfs2_mmap_ra_cache_get_block(
-    PVFS_pinode_reference refn, PVFS_size offset,
+    PVFS_object_ref refn, PVFS_size offset,
     PVFS_size len, void *dest)
 {
     int ret = -1;
@@ -175,7 +175,7 @@ int pvfs2_mmap_ra_cache_get_block(
     return ret;
 }
 
-int pvfs2_mmap_ra_cache_flush(PVFS_pinode_reference refn)
+int pvfs2_mmap_ra_cache_flush(PVFS_object_ref refn)
 {
     int ret = -1;
     struct qlist_head *hash_link = NULL;
@@ -259,8 +259,8 @@ int pvfs2_mmap_ra_cache_finalize(void)
 static int hash_key(void *key, int table_size)
 {
     unsigned long tmp = 0;
-    PVFS_pinode_reference *refn =
-        (PVFS_pinode_reference *)key;
+    PVFS_object_ref *refn =
+        (PVFS_object_ref *)key;
 
     tmp += ((refn->handle << 2) | (refn->fs_id));
     tmp = (tmp % table_size);
@@ -278,8 +278,8 @@ static int hash_key(void *key, int table_size)
 static int hash_key_compare(void *key, struct qlist_head *link)
 {
     mmap_ra_cache_elem_t *cache_elem = NULL;
-    PVFS_pinode_reference *refn =
-        (PVFS_pinode_reference *)key;
+    PVFS_object_ref *refn =
+        (PVFS_object_ref *)key;
 
     cache_elem = qlist_entry(link, mmap_ra_cache_elem_t, hash_link);
     assert(cache_elem);

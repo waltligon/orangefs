@@ -46,7 +46,7 @@ int finalize_sysint(void)
  * returns:  0 on success; 
  *      -1 if a problem
  */
-int get_root(PVFS_fs_id fs_id, PVFS_pinode_reference *pinode_refn)
+int get_root(PVFS_fs_id fs_id, PVFS_object_ref *pinode_refn)
 {
     int ret = -1;
     PVFS_credentials credentials;
@@ -66,14 +66,14 @@ int get_root(PVFS_fs_id fs_id, PVFS_pinode_reference *pinode_refn)
         {
             printf("Lookup failed with errcode = %d\n", ret);
         }
-        memcpy(pinode_refn, &resp_look.pinode_refn,
-               sizeof(PVFS_pinode_reference));
+        memcpy(pinode_refn, &resp_look.ref,
+               sizeof(PVFS_object_ref));
     }
     return ret;
 }
 
-int create_dir(PVFS_pinode_reference parent_refn, char *name,
-               PVFS_pinode_reference *out_refn)
+int create_dir(PVFS_object_ref parent_refn, char *name,
+               PVFS_object_ref *out_refn)
 {
     int ret = -1;
     PVFS_sys_attr attr;
@@ -100,9 +100,9 @@ int create_dir(PVFS_pinode_reference parent_refn, char *name,
     }
     if (out_refn)
     {
-        memset(out_refn, 0, sizeof(PVFS_pinode_reference));
-        memcpy(out_refn, &resp_mkdir.pinode_refn,
-               sizeof(PVFS_pinode_reference));
+        memset(out_refn, 0, sizeof(PVFS_object_ref));
+        memcpy(out_refn, &resp_mkdir.ref,
+               sizeof(PVFS_object_ref));
     }
     return 0;
 }
@@ -113,7 +113,7 @@ int create_dir(PVFS_pinode_reference parent_refn, char *name,
  * returns 0 on success.
  *          -1 if some error happened.
  */
-int remove_file(PVFS_pinode_reference parent_refn, char *name)
+int remove_file(PVFS_object_ref parent_refn, char *name)
 {
     int ret = -1;
     PVFS_credentials credentials;
@@ -135,7 +135,7 @@ int remove_file(PVFS_pinode_reference parent_refn, char *name)
  * returns 0 on success.
  *          -1 if some error happened.
  */
-int remove_dir(PVFS_pinode_reference parent_refn, char *name)
+int remove_dir(PVFS_object_ref parent_refn, char *name)
 {
     return remove_file(parent_refn, name);
 }
@@ -146,8 +146,8 @@ int remove_dir(PVFS_pinode_reference parent_refn, char *name)
  * returns a handle to the new directory
  *          -1 if some error happened
  */
-int lookup_name(PVFS_pinode_reference pinode_refn, char *name,
-                PVFS_pinode_reference *out_refn)
+int lookup_name(PVFS_object_ref pinode_refn, char *name,
+                PVFS_object_ref *out_refn)
 {
     int ret = -1;
     PVFS_credentials credentials;
@@ -167,8 +167,8 @@ int lookup_name(PVFS_pinode_reference pinode_refn, char *name,
     }
     if (out_refn)
     {
-        memcpy(out_refn, &resp_lookup.pinode_refn,
-               sizeof(PVFS_pinode_reference));
+        memcpy(out_refn, &resp_lookup.ref,
+               sizeof(PVFS_object_ref));
     }
     return 0;
 }

@@ -51,10 +51,10 @@ int main(int argc, char **argv)
     int64_t total_written = 0;
     double time1, time2;
     char* entry_name;
-    PVFS_pinode_reference parent_refn;
+    PVFS_object_ref parent_ref;
     PVFS_sys_attr attr;
     PVFS_credentials credentials;
-    PVFS_pinode_reference pinode_refn;
+    PVFS_object_ref ref;
     PVFS_Request file_req;
     PVFS_Request mem_req;
     int buffer_size;
@@ -126,8 +126,8 @@ int main(int argc, char **argv)
             ret = -1;
             goto main_out;
         }
-        parent_refn.handle = resp_lookup.pinode_refn.handle;
-        parent_refn.fs_id = resp_lookup.pinode_refn.fs_id;
+        parent_ref.handle = resp_lookup.ref.handle;
+        parent_ref.fs_id = resp_lookup.ref.fs_id;
 
         while(!PINT_string_next_segment(
                   user_opts->srcfile, &segp, &segstate))
@@ -153,7 +153,7 @@ int main(int argc, char **argv)
         }
 
         ret = PVFS_util_lookup_parent(pvfs_path, cur_fs, credentials, 
-                                      &parent_refn.handle);
+                                      &parent_ref.handle);
         if(ret < 0)
         {
             PVFS_perror("PVFS_util_lookup_parent", ret);
@@ -176,13 +176,13 @@ int main(int argc, char **argv)
                 strncat(pvfs_path, prev_segp, PVFS_NAME_MAX);
                 entry_name = prev_segp;
             }
-            parent_refn.fs_id = cur_fs;
+            parent_ref.fs_id = cur_fs;
         }
     }
 
     memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
-    ret = PVFS_sys_ref_lookup(parent_refn.fs_id, entry_name,
-                              parent_refn, credentials, &resp_lookup,
+    ret = PVFS_sys_ref_lookup(parent_ref.fs_id, entry_name,
+                              parent_ref, credentials, &resp_lookup,
                               PVFS2_LOOKUP_LINK_NO_FOLLOW);
     if (ret == 0)
     {
@@ -192,7 +192,7 @@ int main(int argc, char **argv)
     }
 
     memset(&resp_create, 0, sizeof(PVFS_sysresp_create));
-    ret = PVFS_sys_create(entry_name, parent_refn, attr,
+    ret = PVFS_sys_create(entry_name, parent_ref, attr,
                           credentials, &resp_create);
     if (ret < 0)
     {
@@ -210,7 +210,7 @@ int main(int argc, char **argv)
 	goto main_out;
     }
 
-    pinode_refn = resp_create.pinode_refn;
+    ref = resp_create.ref;
 
     time1 = Wtime();
     while((current_size = read(src_fd, buffer, user_opts->buf_size)) > 0)
@@ -228,7 +228,7 @@ int main(int argc, char **argv)
 	}
 
 	/* write out the data */
-	ret = PVFS_sys_write(pinode_refn, file_req,
+	ret = PVFS_sys_write(ref, file_req,
                              total_written, buffer, mem_req, 
                              credentials, &resp_io);
 	if(ret < 0)
