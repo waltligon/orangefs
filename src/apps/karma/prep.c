@@ -102,12 +102,14 @@ void gui_data_prepare(struct PVFS_mgmt_server_stat *svr_stat,
 
     /* process uptime information */
     done = 0;
-    for (i=0; i < 6 && !done; i++) {
+    for (i=0; i < 6; i++) {
 	for (j=0; j < svr_stat_ct && !done; j++) {
 	    if (((float) svr_stat[j].uptime_seconds) / time_table[i] > 1.0) {
 		done = 1;
+		break;
 	    }
 	}
+	if (done) break;
     }
 
     snprintf(graph_data[GUI_STATUS_UPTIME].title,
