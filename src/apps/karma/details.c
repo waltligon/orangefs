@@ -16,7 +16,7 @@ enum {
     GUI_DETAILS_TYPE
 };
 
-char *column_name[] = { "Server Name",
+char *column_name[] = { "Server Address (BMI)",
 			"Total RAM",
 			"Available RAM",
 			"Uptime",
@@ -24,7 +24,7 @@ char *column_name[] = { "Server Name",
 			"Available Handles",
 			"Total Space",
 			"Available Space",
-			"Type" };
+			"Type of Service" };
 
 static int gui_details_initialized = 0;
 static GtkListStore *gui_details_list;
@@ -192,7 +192,7 @@ void gui_details_update(struct PVFS_mgmt_server_stat *server_stat,
 
 	gtk_list_store_set(gui_details_list,
 			   &iter,
-			   GUI_DETAILS_NAME, "xxx",
+			   GUI_DETAILS_NAME, server_stat[i].bmi_address,
 			   GUI_DETAILS_RAM_TOT,
 			   (float) server_stat[i].ram_total_bytes / rt_div,
 			   GUI_DETAILS_RAM_AVAIL,
