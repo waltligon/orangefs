@@ -65,6 +65,7 @@ machine pvfs2_rmdirent_sm(prelude,
 	state remove_directory_entry
 	{
 	    run rmdirent_remove_directory_entry;
+	    success => setup_resp;
 	    default => remove_directory_entry_failure;
 	}
 
