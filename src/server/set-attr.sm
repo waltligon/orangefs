@@ -15,7 +15,6 @@ enum {
 };
 
 static int setattr_cleanup(PINT_server_op *s_op, job_status_s* js_p);
-static int setattr_getobj_attribs(PINT_server_op *s_op, job_status_s* js_p);
 static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s* js_p);
 static int setattr_write_metafile_datafile_handles_if_required(
     PINT_server_op *s_op, job_status_s* js_p);
@@ -30,7 +29,6 @@ extern job_context_id PINT_server_job_context;
 
 machine pvfs2_set_attr_sm(prelude,
 			  cleanup,
-			  getobj_attrib,
 			  verify_attribs,
 			  write_metafile_datafile_handles_if_required,
 			  write_metafile_distribution_if_required,
@@ -40,14 +38,8 @@ machine pvfs2_set_attr_sm(prelude,
 	state prelude
 	{
 		jump pvfs2_prelude_sm;
-		success => getobj_attrib;
+		success => verify_attribs;
 		default => final_response;
-	}
-
-	state getobj_attrib
-	{
-		run setattr_getobj_attribs;
-		default => verify_attribs;
 	}
 
 	state verify_attribs
@@ -95,71 +87,6 @@ machine pvfs2_set_attr_sm(prelude,
 
 
 /*
- * Function: setattr_getobj_attrib
- *
- * Params:   server_op *b, 
- *           job_status_s* js_p
- *
- * Returns:  int
- *
- * Synopsis: 
- */
-
-static int setattr_getobj_attribs(PINT_server_op *s_op, job_status_s* js_p)
-{
-
-    int ret=0;
-    job_id_t j_id;
-    PVFS_object_attr *a_p = &s_op->req->u.setattr.attr;
-
-    gossip_debug(SERVER_DEBUG,
-		 "  attributes from request = (owner = %d, group = %d, perms = %o, type = %d)\n",
-		 a_p->owner,
-		 a_p->group,
-		 a_p->perms,
-		 a_p->objtype);
-
-    gossip_debug(SERVER_DEBUG,
-		 "  setting attributes for fs_id = 0x%x, handle = 0x%08Lx\n",
-		 s_op->req->u.setattr.fs_id,
-		 s_op->req->u.setattr.handle);
-    
-    gossip_debug(SERVER_DEBUG, "setattr state: getobj_attribs\n");
-
-    s_op->key.buffer    = Trove_Common_Keys[METADATA_KEY].key;
-    s_op->key.buffer_sz = Trove_Common_Keys[METADATA_KEY].size;
-
-    /*
-      use scratch attr object space when retrieving the
-      attr to avoid dynamic allocation
-    */
-    s_op->val.buffer = (void *)&s_op->u.setattr.attr;
-    s_op->val.buffer_sz = sizeof(PVFS_object_attr);
-
-    gossip_debug(SERVER_DEBUG,
-		 "  reading attributes (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = 0x%08x (%d))\n",
-		 s_op->req->u.setattr.fs_id,
-		 s_op->req->u.setattr.handle,
-		 (char *) s_op->key.buffer,
-		 s_op->key.buffer_sz,
-		 (unsigned) s_op->val.buffer,
-		 s_op->val.buffer_sz);
-
-    ret = job_trove_keyval_read(s_op->req->u.setattr.fs_id,
-					 s_op->req->u.setattr.handle,
-					 &(s_op->key),
-					 &(s_op->val),
-					 0,
-					 NULL,
-					 s_op,
-					 js_p,
-					 &j_id,
-					 PINT_server_job_context);
-    return(ret);
-}
-
-
-/*
  * Function: setattr_verify_attribs
  *
  * Notes:
@@ -172,51 +99,40 @@ static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
 
     gossip_debug(SERVER_DEBUG, "setattr state: verify_attribs\n");
 
-    a_p = (PVFS_object_attr *)&s_op->u.setattr.attr;
+    a_p = (PVFS_object_attr *)&s_op->attr;
     req_a_p = (PVFS_object_attr *)&s_op->req->u.setattr.attr;
 
-    if (js_p->error_code != 0)
-    {
-	gossip_debug(SERVER_DEBUG, "  previous keyval read had an "
-                     "error (new metafile?); data is useless\n");
-    }
-    else
-    {
-	gossip_debug(SERVER_DEBUG, "  attrs read from dspace = "
-                     "(owner = %d, group = %d, perms = %o, type = %d)\n",
-		     a_p->owner,
-		     a_p->group,
-		     a_p->perms,
-		     a_p->objtype);
-    }
+    gossip_debug(SERVER_DEBUG, "  attrs read from dspace = "
+		 "(owner = %d, group = %d, perms = %o, type = %d)\n",
+		 a_p->owner,
+		 a_p->group,
+		 a_p->perms,
+		 a_p->objtype);
 
-    if (js_p->error_code == 0)
+    gossip_debug(SERVER_DEBUG, "  attrs read from request = "
+		 "(owner = %d, group = %d, perms = %o, type = %d)\n",
+		 req_a_p->owner,
+		 req_a_p->group,
+		 req_a_p->perms,
+		 req_a_p->objtype);
+
+    /*
+      here we're enforcing that no one can change the type of the
+      handle/object already stored once it's been set to
+      a non-zero value.  (zero is not a valid object type meaning
+      that it hasn't been assigned yet)
+    */
+    if (a_p->objtype &&
+	(a_p->objtype != s_op->req->u.setattr.attr.objtype))
     {
-	gossip_debug(SERVER_DEBUG, "  attrs read from request = "
-                     "(owner = %d, group = %d, perms = %o, type = %d)\n",
-		     req_a_p->owner,
-		     req_a_p->group,
-		     req_a_p->perms,
-		     req_a_p->objtype);
+	gossip_debug(SERVER_DEBUG, "  handle 0x%08Lx is of type %d "
+		     "and cannot be changed to type %d\n",
+		     s_op->req->u.setattr.handle,
+		     a_p->objtype, s_op->req->u.setattr.attr.objtype);
 
-        /*
-          here we're enforcing that no one can change the type of the
-          handle/object already stored once it's been set to
-          a non-zero value.  (zero is not a valid object type meaning
-          that it hasn't been assigned yet)
-        */
-        if (a_p->objtype &&
-            (a_p->objtype != s_op->req->u.setattr.attr.objtype))
-        {
-            gossip_debug(SERVER_DEBUG, "  handle 0x%08Lx is of type %d "
-                         "and cannot be changed to type %d\n",
-                         s_op->req->u.setattr.handle,
-                         a_p->objtype, s_op->req->u.setattr.attr.objtype);
-
-            /* set an error to bail out of set-attr processing */
-            js_p->error_code = -1;
-            return 1;
-        }
+	/* set an error to bail out of set-attr processing */
+	js_p->error_code = -1;
+	return 1;
     }
 
     /* TODO: LOOK AT ATTRIBUTE MASK, SET UP s_op->req->u.setattr.attr for writing
@@ -224,8 +140,7 @@ static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
      */
 
     /* TODO: HANDLE TYPES OTHER THAN METAFILES TOO, SOME DAY... */
-    if ((js_p->error_code != 0) &&
-        ((req_a_p->objtype == PVFS_TYPE_METAFILE) ||
+    if (((req_a_p->objtype == PVFS_TYPE_METAFILE) ||
          (a_p->objtype == PVFS_TYPE_METAFILE)))
     {
 	gossip_debug(SERVER_DEBUG,
