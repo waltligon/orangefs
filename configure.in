@@ -56,6 +56,15 @@ if test x$host_os = xlinux-gnu; then
 		    MISC_TROVE_FLAGS="-D__PVFS2_TROVE_AIO_THREADED__"
                 fi
 	    fi
+        else
+            vers=`strings /lib/libc.so.* | grep GLIBC | tail -n 2 | grep -v PRIVATE | cut -b 7-`
+            majorminor=`echo $vers | cut -b 1-3`
+            sub=`echo $vers | cut -b 5`
+            if test x$majorminor = x2.3; then
+                if test $sub -gt 1; then
+                    MISC_TROVE_FLAGS="-D__PVFS2_TROVE_AIO_THREADED__"
+                fi
+            fi
 	fi
     fi
 fi
