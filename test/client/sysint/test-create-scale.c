@@ -39,7 +39,7 @@ int main(int argc, char **argv)
     int i,j;
     double start_time;
     double end_time;
-    double* measurements;
+    double** measurements;
 
     if (argc != 4)
     {
@@ -60,9 +60,15 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    measurements = (double*)malloc(max_dfiles*sizeof(double));
+    measurements = (double**)malloc(max_dfiles*sizeof(double*));
     assert(measurements);
-    memset(measurements, 0, max_dfiles*sizeof(double));
+    memset(measurements, 0, max_dfiles*sizeof(double*));
+    for(i=0; i<max_dfiles; i++)
+    {
+	measurements[i] = (double*)malloc(iters*sizeof(double));
+	assert(measurements[i]);
+	memset(measurements[i], 0, iters*sizeof(double));
+    }
 
     ret = PVFS_util_init_defaults();
     if (ret < 0)
@@ -127,21 +133,21 @@ int main(int argc, char **argv)
 
     for(i=0; i<max_dfiles; i++)
     {
-	start_time = Wtime();
 	for(j=0; j<iters; j++)
 	{
 	    sprintf(entry_name, "%s%d", str_buf, j);
 	    attr.dfile_count = i+1;
+	    start_time = Wtime();
 	    ret = PVFS_sys_create(entry_name, parent_refn, attr,
 				  credentials, NULL, &resp_create);
+	    end_time = Wtime();
 	    if (ret < 0)
 	    {
 		PVFS_perror("PVFS_sys_create", ret);
 		return(-1);
 	    }
+	    measurements[i][j] = end_time-start_time;
 	}
-	end_time = Wtime();
-	measurements[i] = end_time-start_time;
 
 	for(j=0; j<iters; j++)
 	{
@@ -156,10 +162,26 @@ int main(int argc, char **argv)
     }
 
     /* print out some results */
-    printf("<num dfiles> <ave. time each> <iterations>\n");
+    printf("<num dfiles> <iterations> <ave> <max> <min> <ave-min-max>\n");
     for(i=0; i<max_dfiles; i++)
     {
-	printf("%d\t%f\t%d\n", (i+1), (measurements[i]/iters), iters);
+	float min = 0;
+	float max = 0;
+	float sum = 0;
+	for(j=0; j<iters; j++)
+	{
+	    if(min == 0 || min > measurements[i][j])
+		min = measurements[i][j];
+	    if(max == 0 || max < measurements[i][j])
+		max = measurements[i][j];
+
+	    sum += measurements[i][j];
+	}
+	printf("%d\t%d\t%f\t%f\t%f\t%f\n", (i+1), iters,
+	    (sum/(float)iters),
+	    max,
+	    min,
+	    ((sum-min-max)/(float)(iters-2)));
     }
 
     ret = PVFS_sys_finalize();
