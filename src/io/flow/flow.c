@@ -173,6 +173,16 @@ int PINT_flow_initialize(
 		}
 	}
 
+	/* get rid of method string list */
+	if(requested_flowprotos){
+		for(i=0; i<active_flowproto_count; i++){
+			if(requested_flowprotos[i]){
+				free(requested_flowprotos[i]);
+			}
+		}
+		free(requested_flowprotos);
+	}
+
 	gen_mutex_unlock(&interface_mutex);
 	return(0);
 
