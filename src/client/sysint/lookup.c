@@ -71,7 +71,7 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
     pinode_reference entry, parent;
 
     /*print args to make sure we're sane*/
-    printf("req->\n\tname: %s\n\tfs_id: %d\n\tcredentials:\n\t\tuid: %d\n\t\tgid: %d\n\t\tperms: %d\n",req->name,req->fs_id, req->credentials.uid, req->credentials.gid, req->credentials.perms);
+    gossip_ldebug(CLIENT_DEBUG,"req->\n\tname: %s\n\tfs_id: %d\n\tcredentials:\n\t\tuid: %d\n\t\tgid: %d\n\t\tperms: %d\n",req->name,req->fs_id, req->credentials.uid, req->credentials.gid, req->credentials.perms);
 
     /* NOTE: special case is that we're doing a lookup on the root handle (which
      * we got during the getconfig) so we want to check to see if we're looking
@@ -90,6 +90,7 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 	resp->pinode_refn.handle = parent_handle;
 	return(0);
     }
+
 
     /* Get  the total number of segments */
     get_no_of_segments(req->name,&num_seg);
@@ -138,7 +139,7 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 	/* Is any segment still to be looked up? */
     while(segment && ((end_path + 1) < strlen(req->name)))
     {
-        printf("looking up segment = %s\n", segment);
+        gossip_ldebug(CLIENT_DEBUG,"looking up segment = %s\n", segment);
 	/* Search in the dcache */
 	ret = PINT_dcache_lookup(segment,parent,&entry);
 	if(ret < 0)
@@ -149,7 +150,7 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 	/* Was entry in cache? */
 	if (entry.handle == PINT_DCACHE_HANDLE_INVALID)
 	{
-	    printf("not in dcache\n");
+	    gossip_ldebug(CLIENT_DEBUG,"not in dcache\n");
 	    /* Entry not in dcache */
 
 	    /* send server request here */
@@ -170,7 +171,7 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 	     */
 
 	    max_msg_sz = sizeof(struct PVFS_server_resp_s) + num_seg * (sizeof(PVFS_handle) + sizeof(PVFS_object_attr));
-	    printf("max msg size = %d \n",max_msg_sz);
+	    gossip_ldebug(CLIENT_DEBUG,"max msg size = %d \n",max_msg_sz);
 	    name_sz = strlen(path) + 1;
 	    req_p->op     = PVFS_SERV_LOOKUP_PATH;
 	    req_p->rsize = sizeof(struct PVFS_server_req_s) + name_sz;
@@ -291,6 +292,7 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 	    }/* For */
 
 	    /* Get the remaining part of the path to be looked up */
+	    gossip_ldebug(CLIENT_DEBUG,"GET_NEXT_PATH: %s %d %d %d",path, ack_p->u.lookup_path.count,start_path, end_path);
 	    ret = get_next_path(path,ack_p->u.lookup_path.count,&start_path,
 				&end_path);
 	    if (ret < 0)
@@ -307,7 +309,7 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 	}
 	else
 	{
-	    printf("dcache hit\n");
+	    gossip_ldebug(CLIENT_DEBUG,"dcache hit\n");
 	    /* A Dcache hit! */
 	    /* Get pinode from pinode cache */
 	    /* If no pinode exists no error, will fetch 

@@ -269,7 +269,8 @@ int PINT_dcache_finalize(void)
 	/* Destroy the mutex */
 	gen_mutex_destroy(cache->mt_lock);
 
-	free(cache);
+	if (cache != NULL);
+		free(cache);
 
 	return(0);
 }

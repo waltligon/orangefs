@@ -159,31 +159,31 @@ void debug_print_type(void* thing, int type)
 		switch( req->op )
 		{
 			case PVFS_SERV_CREATE:
-				printf("create request");
+				gossip_ldebug(CLIENT_DEBUG,"create request");
 				break;
 			case PVFS_SERV_CREATEDIRENT:
-				printf("create dirent request");
+				gossip_ldebug(CLIENT_DEBUG,"create dirent request");
 				break;
 			case PVFS_SERV_REMOVE:
-				printf("remove request");
+				gossip_ldebug(CLIENT_DEBUG,"remove request");
 				break;
 			case PVFS_SERV_LOOKUP_PATH:
-				printf("lookup path request");
+				gossip_ldebug(CLIENT_DEBUG,"lookup path request");
 				break;
 			case PVFS_SERV_SETATTR:
-				printf("setattr request");
+				gossip_ldebug(CLIENT_DEBUG,"setattr request");
 				break;
 			case PVFS_SERV_GETCONFIG:
-				printf("getconfig request");
+				gossip_ldebug(CLIENT_DEBUG,"getconfig request");
 				break;
 			case PVFS_SERV_GETATTR:
-				printf("getattr request");
+				gossip_ldebug(CLIENT_DEBUG,"getattr request");
 				break;
 			case PVFS_SERV_READDIR:
-				printf("readdir request");
+				gossip_ldebug(CLIENT_DEBUG,"readdir request");
 				break;
 			default:
-				printf("unknown request = %d", req->op);
+				gossip_ldebug(CLIENT_DEBUG,"unknown request = %d", req->op);
 				break;
 		}
 	}
@@ -193,31 +193,31 @@ void debug_print_type(void* thing, int type)
 		switch( resp->op )
 		{
 			case PVFS_SERV_READDIR:
-				printf("readdir response");
+				gossip_ldebug(CLIENT_DEBUG,"readdir response");
 				break;
 			case PVFS_SERV_CREATE:
-				printf("create response");
+				gossip_ldebug(CLIENT_DEBUG,"create response");
 				break;
 			case PVFS_SERV_CREATEDIRENT:
-				printf("create dirent response");
+				gossip_ldebug(CLIENT_DEBUG,"create dirent response");
 				break;
 			case PVFS_SERV_REMOVE:
-				printf("remove response");
+				gossip_ldebug(CLIENT_DEBUG,"remove response");
 				break;
 			case PVFS_SERV_LOOKUP_PATH:
-				printf("lookup path response");
+				gossip_ldebug(CLIENT_DEBUG,"lookup path response");
 				break;
 			case PVFS_SERV_SETATTR:
-				printf("setattr request");
+				gossip_ldebug(CLIENT_DEBUG,"setattr request");
 				break;
 			case PVFS_SERV_GETCONFIG:
-				printf("getconfig reply");
+				gossip_ldebug(CLIENT_DEBUG,"getconfig reply");
 				break;
 			case PVFS_SERV_GETATTR:
-				printf("getattr reply");
+				gossip_ldebug(CLIENT_DEBUG,"getattr reply");
 				break;
 			default:
-				printf("unknown reply = %d", resp->op);
+				gossip_ldebug(CLIENT_DEBUG,"unknown reply = %d", resp->op);
 				break;
 		}
 	}

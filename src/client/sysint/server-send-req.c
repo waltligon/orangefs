@@ -84,15 +84,14 @@ int PINT_server_send_req(bmi_addr_t addr,
     }
 
     debug_print_type(req_p, 0);
-    printf(" sent\n");
 
     /* post a blocking receive job */
     ret = job_bmi_recv_blocking(addr, encoded_resp, max_resp_size, op_tag, BMI_PRE_ALLOC, &r_status);
-    printf("message recieved: r_status.actual_size = %lld\n",r_status.actual_size);
-    printf("r_status.error_code = %d\nreturn value = %d\n",r_status.error_code, ret);
+    gossip_ldebug(CLIENT_DEBUG,"message recieved: r_status.actual_size = %lld\n",r_status.actual_size);
+    gossip_ldebug(CLIENT_DEBUG,"r_status.error_code = %d\nreturn value = %d\n",r_status.error_code, ret);
 
-    printf("status(insided encoded struct) = %d\n",((struct PVFS_server_resp_s *)encoded_resp)->status);
-    printf("rsize(insided encoded struct) = %lld\n",((struct PVFS_server_resp_s *)encoded_resp)->rsize);
+    gossip_ldebug(CLIENT_DEBUG,"status(insided encoded struct) = %d\n",((struct PVFS_server_resp_s *)encoded_resp)->status);
+    gossip_ldebug(CLIENT_DEBUG,"rsize(insided encoded struct) = %lld\n",((struct PVFS_server_resp_s *)encoded_resp)->rsize);
     if (((struct PVFS_server_resp_s *)encoded_resp)->rsize == 0)
 	((struct PVFS_server_resp_s *)encoded_resp)->rsize = sizeof(struct PVFS_server_resp_s);
     if (ret < 0)
@@ -110,14 +109,13 @@ int PINT_server_send_req(bmi_addr_t addr,
 #if 0
 	else
 	{
-	    printf("%d > 0\n", ret);
-	    printf("%d != 1, r_status.error_code == %d\n", ret, r_status.error_code );
-	    printf("r_status.actual_size == %d\n", r_status.actual_size );
-	    printf("max_resp_size == %d\n", max_resp_size );
+	    gossip_ldebug(CLIENT_DEBUG,"%d != 1, r_status.error_code == %d\n", ret, r_status.error_code );
+	    gossip_ldebug(CLIENT_DEBUG,"r_status.actual_size == %d\n", r_status.actual_size );
+	    gossip_ldebug(CLIENT_DEBUG,"max_resp_size == %d\n", max_resp_size );
 	}
 #endif
     }
-    printf("job_bmi call was successfull\n");
+    gossip_ldebug(CLIENT_DEBUG,"job_bmi call was successfull\n");
 
     /* decode msg from wire format here; function allocates space for decoded response.
      * PINT_decode_release() must be used to free this later.
@@ -136,7 +134,6 @@ int PINT_server_send_req(bmi_addr_t addr,
     }
 
     debug_print_type(decoded_p->buffer, 1);
-    printf(" recv'ed\n");
 
     /* free encoded_resp buffer */
     ret = BMI_memfree(addr, encoded_resp, max_resp_size, BMI_RECV_BUFFER);

@@ -244,16 +244,10 @@ static int server_get_config(pvfs_mntlist mntent_list)
 	req_p->rsize                   = sizeof(struct PVFS_server_req_s) + name_sz;
 	req_p->credentials             = creds;
 
-/*TODO: rework the pvfstab parsing, cause its all hacked and sucks now*/
-	req_p->u.getconfig.fs_name     = malloc(8);
-	strcpy(req_p->u.getconfig.fs_name,"fs-foo");
-	req_p->u.getconfig.fs_name[7] = '\0';
-#if 0
 	req_p->u.getconfig.fs_name     = mntent_p->service_name; /* just point to the mount info */
-#endif
 	req_p->u.getconfig.max_strsize = MAX_STRING_SIZE;
 
-	printf("asked for fs name = %s\n", req_p->u.getconfig.fs_name);
+	gossip_ldebug(CLIENT_DEBUG,"asked for fs name = %s\n", req_p->u.getconfig.fs_name);
 
 	/* DO THE GETCONFIG */
 	/* do_getconfig() fills returns an allocated and populated PVFS_server_resp_s
