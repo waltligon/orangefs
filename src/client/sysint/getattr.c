@@ -18,7 +18,15 @@
 #include "pint-bucket.h"
 #include "PINT-reqproto-encode.h"
 
-/* PVFS_sys_getattr()
+int PVFS_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask, 
+		    PVFS_credentials credentials, PVFS_sysresp_getattr *resp)
+{
+    return(PINT_sys_getattr(pinode_refn, attrmask, credentials, resp));
+}
+
+
+/* TODO: this function is a hack- will be removed later */
+/* PINT_sys_getattr()
  *
  * obtain the attributes of a PVFS file
  *
@@ -28,7 +36,7 @@
  * 
  * returns 0 on success, -errno on failure
  */
-int PVFS_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask, 
+int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask, 
 		    PVFS_credentials credentials, PVFS_sysresp_getattr *resp)
 {
     struct PVFS_server_req req_p;	 	/* server request */

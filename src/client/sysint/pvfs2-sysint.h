@@ -243,6 +243,10 @@ enum PVFS_sys_io_type
 	PVFS_SYS_IO_WRITE
 };
 
+/* TODO: this function is a hack- will be removed later */
+int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask, 
+    PVFS_credentials credentials, PVFS_sysresp_getattr *resp);
+
 /* PVFS System Request Prototypes
  *
  * That's fine, except that we KNOW that this interface is just a

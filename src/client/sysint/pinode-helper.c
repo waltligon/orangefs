@@ -106,7 +106,7 @@ static int phelper_refresh_pinode(uint32_t mask, pinode **pinode_ptr,
 	int ret = 0;
 	PVFS_sysresp_getattr resp;
 
-	ret = PVFS_sys_getattr(pref, mask, credentials, &resp);
+	ret = PINT_sys_getattr(pref, mask, credentials, &resp);
 	if (ret < 0)
 	{
 		return(ret);
