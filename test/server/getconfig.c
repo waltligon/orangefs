@@ -12,7 +12,6 @@
 #include <bmi.h>
 #include <gossip.h>
 #include <pvfs2-req-proto.h>
-#include <pack.h>
 #include <print-struct.h>
 #include <PINT-reqproto-encode.h>
 
@@ -175,9 +174,12 @@ int main(int argc, char **argv)	{
 		
 	/* look at the ack */
 	ret = PINT_decode(my_ack,PINT_ENCODE_RESP,&bar,server_addr,actual_size,NULL);
+	printf("Act size: %d\n",(int)actual_size);
+	display_pvfs_structure(bar.buffer,1);
 	BMI_memfree(server_addr, my_ack, sizeof(struct PVFS_server_resp_s)+8192, 
 		BMI_RECV_BUFFER);
 	my_ack = bar.buffer;
+	printf("Foo: %s\n",my_ack->u.getconfig.io_server_mapping);
 	if(my_ack->op != PVFS_SERV_GETCONFIG)
 	{
 		printf("ERROR: received ack of wrong type (%d)\n", (int)my_ack->op);
@@ -187,7 +189,6 @@ int main(int argc, char **argv)	{
 		printf("ERROR: server returned status: %d\n",
 			(int)my_ack->status);
 	}
-	display_pvfs_structure(my_ack,2);
 
 	/* free up memory buffers */
 	BMI_memfree(server_addr, my_req, sizeof(struct PVFS_server_req_s), 

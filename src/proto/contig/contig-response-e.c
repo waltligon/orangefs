@@ -43,6 +43,7 @@ int do_encode_resp(
 	case PVFS_SERV_CREATE:
 	case PVFS_SERV_MKDIR:
 	case PVFS_SERV_RMDIRENT:
+	case PVFS_SERV_NOOP:
 	    /* 
 	     *	There is an int64_t here...
 	     *	but handled correctly so far!
