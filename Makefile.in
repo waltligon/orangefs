@@ -17,8 +17,11 @@ CC = @CC@
 CFLAGS = @CFLAGS@
 LDFLAGS = @LDFLAGS@
 LD = gcc
-CFLAGS += -D__STATIC_METHOD_BMI_TCP__ -Wconversion -Wall\
- -Wstrict-prototypes -pipe -I $(srcdir)/include
+CFLAGS +=\
+ -D__STATIC_METHOD_BMI_TCP__\
+ -D__STATIC_FLOWPROTO_DEFAULT__\
+ -D__STATIC_FLOWPROTO_BMI_TROVE__\
+ -Wconversion -Wall -Wstrict-prototypes -pipe -I $(srcdir)/include
 LDFLAGS += -L lib
 LIBS += -lpvfs2
 # here we differentiate cflags between some components
