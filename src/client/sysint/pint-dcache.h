@@ -23,19 +23,19 @@
 /* Function Prototypes */
 int PINT_dcache_lookup(
 	char *name, 
-	pinode_reference parent,
-	pinode_reference *entry);
+	PVFS_pinode_reference parent,
+	PVFS_pinode_reference *entry);
 
 int PINT_dcache_insert(
 	char *name, 
-	pinode_reference entry,
-	pinode_reference parent);
+	PVFS_pinode_reference entry,
+	PVFS_pinode_reference parent);
 
 int PINT_dcache_flush(void);
 
 int PINT_dcache_remove(
 	char *name, 
-	pinode_reference parent,
+	PVFS_pinode_reference parent,
 	int *item_found);
 
 int PINT_dcache_initialize(void);

@@ -16,7 +16,7 @@ int main(int argc,char **argv)
     pvfs_mntlist mnt = {0,NULL};
     PVFS_sysresp_init resp_init;
     char* entry_name;
-    pinode_reference parent_refn;
+    PVFS_pinode_reference parent_refn;
     PVFS_credentials credentials;
 
     gossip_enable_stderr();

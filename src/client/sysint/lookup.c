@@ -85,7 +85,7 @@ int PVFS_sys_lookup(PVFS_fs_id fs_id, char* name, PVFS_credentials credentials, 
     char *segment = NULL, *path = NULL;
     bmi_addr_t serv_addr;
     int total_segments = 0, num_segments_remaining = 0;
-    pinode_reference entry, parent;
+    PVFS_pinode_reference entry, parent;
 
     enum {
 	NONE_FAILURE = 0,

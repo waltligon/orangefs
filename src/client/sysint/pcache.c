@@ -254,7 +254,7 @@ int PINT_pcache_insert_rls(pinode *pnode )
  *
  * returns PCACHE_LOOKUP_FAILURE on failure and PCACHE_LOOKUP_SUCCESS on success 
  */
-int PINT_pcache_lookup(pinode_reference refn,pinode **pinode_ptr)
+int PINT_pcache_lookup(PVFS_pinode_reference refn,pinode **pinode_ptr)
 {
     int ret = PCACHE_LOOKUP_FAILURE;
 #if PINT_ENABLE_PCACHE
@@ -315,7 +315,7 @@ int PINT_pcache_lookup_rls(pinode *pinode_ptr)
  * last process is done using it.
  *
  */
-int PINT_pcache_remove(pinode_reference refn,pinode **item)
+int PINT_pcache_remove(PVFS_pinode_reference refn,pinode **item)
 {
 #if PINT_ENABLE_PCACHE
     int i = 0;

@@ -69,7 +69,7 @@ typedef struct
     int64_t handle;		/* unique identifier per PVFS2 file */
     PVFS_fs_id fs_id;		/* Filesystem ID */
 }
-pinode_reference;
+PVFS_pinode_reference;
 
 /* credentials (used for permission checking of operations) */
 struct PVFS_credentials_s

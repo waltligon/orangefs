@@ -42,7 +42,7 @@ static int io_req_ack_flow_array(bmi_addr_t* addr_array,
     int array_size,
     PVFS_msg_tag_t* op_tag_array,
     PVFS_object_attr* attr_p,
-    pinode_reference pinode_refn, /* FGS replaced PVFS_sys_io request */
+    PVFS_pinode_reference pinode_refn, /* FGS replaced PVFS_sys_io request */
     PVFS_Request io_req,
     void* buffer, 
     int buffer_size, 
@@ -66,7 +66,7 @@ static void io_release_req_ack_flow_array(bmi_addr_t* addr_array,
  *
  * returns 0 on success, -errno on failure
  */
-int PVFS_sys_io(pinode_reference pinode_refn, PVFS_Request io_req, 
+int PVFS_sys_io(PVFS_pinode_reference pinode_refn, PVFS_Request io_req, 
                 void* buffer, int buffer_size, PVFS_credentials credentials,
 		PVFS_sysresp_io *resp, enum PVFS_sys_io_type type)
 {
@@ -440,7 +440,7 @@ static int io_req_ack_flow_array(bmi_addr_t* addr_array,
     int array_size,
     PVFS_msg_tag_t* op_tag_array,
     PVFS_object_attr* attr_p,
-    pinode_reference pinode_refn, /* FGS replaced PVFS_sys_io request */
+    PVFS_pinode_reference pinode_refn, /* FGS replaced PVFS_sys_io request */
     PVFS_Request io_req,
     void* buffer, 
     int buffer_size, 

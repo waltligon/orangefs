@@ -43,8 +43,8 @@ extern pcache pvfs_pcache;
  *
  * returns 0 on success, -errno on failure
  */
-int PVFS_sys_rename(char* old_entry, pinode_reference old_parent_refn, 
-                        char* new_entry, pinode_reference new_parent_refn, 
+int PVFS_sys_rename(char* old_entry, PVFS_pinode_reference old_parent_refn, 
+                        char* new_entry, PVFS_pinode_reference new_parent_refn, 
                         PVFS_credentials credentials)
 {
     struct PVFS_server_req_s req_p;		/* server request */
@@ -54,7 +54,7 @@ int PVFS_sys_rename(char* old_entry, pinode_reference old_parent_refn,
     bmi_addr_t serv_addr;	/* PVFS address type structure */
     int name_sz = 0;
     uint32_t attr_mask;
-    pinode_reference old_entry_refn;
+    PVFS_pinode_reference old_entry_refn;
     struct PINT_decoded_msg decoded;
     bmi_size_t max_msg_sz;
     void* encoded_resp;

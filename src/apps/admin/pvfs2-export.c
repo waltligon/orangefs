@@ -54,7 +54,7 @@ int main(int argc, char **argv)
     PVFS_fs_id lk_fs_id;
     char* lk_name;
     PVFS_credentials credentials;
-    pinode_reference pinode_refn;
+    PVFS_pinode_reference pinode_refn;
     PVFS_Request io_req;
     int buffer_size;
 

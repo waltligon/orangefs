@@ -28,7 +28,7 @@ extern struct server_configuration_s g_server_config;
  *
  * returns 0 on success, -errno on failure
  */
-int PVFS_sys_mkdir(char* entry_name, pinode_reference parent_refn, 
+int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn, 
                         uint32_t attrmask, PVFS_object_attr attr, 
                         PVFS_credentials credentials, PVFS_sysresp_mkdir *resp)
 {
@@ -38,7 +38,7 @@ int PVFS_sys_mkdir(char* entry_name, pinode_reference parent_refn,
     pinode *pinode_ptr = NULL, *parent_ptr = NULL;
     bmi_addr_t serv_addr1, serv_addr2;	/* PVFS address type structure */
     int name_sz = 0;
-    pinode_reference entry;
+    PVFS_pinode_reference entry;
     int attr_mask;
     struct PINT_decoded_msg decoded;
     void* encoded_resp;

@@ -11,9 +11,9 @@
 
 /* Dcache Entry */
 struct dcache_entry_s {
-	pinode_reference parent;   /* the pinode of the parent directory */
+	PVFS_pinode_reference parent;   /* the pinode of the parent directory */
 	char name[PVFS_NAME_MAX];  /* PVFS object name */
-	pinode_reference entry;    /* the pinode of entry in parent */
+	PVFS_pinode_reference entry;    /* the pinode of entry in parent */
 	struct timeval tstamp_valid;  /* timestamp indicating validity period */
 };
 typedef struct dcache_entry_s dcache_entry;
@@ -51,9 +51,9 @@ static void dcache_rotate_dentry(int item);
 static int dcache_update_dentry_timestamp(dcache_entry* entry); 
 static int check_dentry_expiry(struct timeval t2);
 static int dcache_add_dentry(char *name,
-	pinode_reference parent,pinode_reference entry);
+	PVFS_pinode_reference parent, PVFS_pinode_reference entry);
 static int dcache_get_lru(void);
-static int compare(struct dcache_t element,char *name,pinode_reference refn);
+static int compare(struct dcache_t element,char *name, PVFS_pinode_reference refn);
 
 /* The PVFS Dcache */
 static dcache* cache = NULL;
@@ -66,8 +66,8 @@ static dcache* cache = NULL;
  */
 int PINT_dcache_lookup(
     char *name,
-    pinode_reference parent,
-    pinode_reference *entry)
+    PVFS_pinode_reference parent,
+    PVFS_pinode_reference *entry)
 {
 #if ENABLE_DCACHE
     int i = 0;
@@ -172,8 +172,8 @@ static void dcache_rotate_dentry(int item)
  */
 int PINT_dcache_insert(
 	char *name,
-	pinode_reference entry,
-	pinode_reference parent)
+	PVFS_pinode_reference entry,
+	PVFS_pinode_reference parent)
 {
 #if ENABLE_DCACHE
 	int i = 0, index = 0, ret = 0;
@@ -233,7 +233,7 @@ int PINT_dcache_insert(
  */
 int PINT_dcache_remove(
 	char *name,
-	pinode_reference parent,
+	PVFS_pinode_reference parent,
 	int *item_found)
 {
 #if ENABLE_DCACHE
@@ -352,7 +352,7 @@ int PINT_dcache_finalize(void)
  *
  * returns 0 on success, -errno on failure
  */
-static int compare(struct dcache_t element,char *name,pinode_reference refn)
+static int compare(struct dcache_t element,char *name,PVFS_pinode_reference refn)
 {
     /* Does the cache entry match the search key? */
     if (!strncmp(name,element.dentry.name,strlen(name)) &&
@@ -370,8 +370,8 @@ static int compare(struct dcache_t element,char *name,pinode_reference refn)
  *
  * returns 0 on success, -errno on failure
  */
-static int dcache_add_dentry(char *name, pinode_reference parent,
-		pinode_reference entry)
+static int dcache_add_dentry(char *name, PVFS_pinode_reference parent,
+		PVFS_pinode_reference entry)
 {
 	int new = 0, ret = 0;
 	int size = strlen(name) + 1; /* size includes null terminator*/

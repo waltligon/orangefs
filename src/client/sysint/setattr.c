@@ -28,7 +28,7 @@
  *
  * returns 0 on success, -errno on failure
  */
-int PVFS_sys_setattr(pinode_reference pinode_refn, PVFS_object_attr attr,
+int PVFS_sys_setattr(PVFS_pinode_reference pinode_refn, PVFS_object_attr attr,
                 uint32_t attrmask, PVFS_credentials credentials, 
                 PVFS_attr_extended extended)
 {
@@ -39,7 +39,7 @@ int PVFS_sys_setattr(pinode_reference pinode_refn, PVFS_object_attr attr,
 	bmi_addr_t serv_addr;		/* PVFS address type structure */
 	char *server = NULL;
 	uint32_t mask = attrmask;
-	pinode_reference entry;
+	PVFS_pinode_reference entry;
 	PVFS_size handlesize = 0;
 	bmi_size_t max_msg_sz = PINT_get_encoded_generic_ack_sz(0, PVFS_SERV_SETATTR);
 	struct PINT_decoded_msg decoded;

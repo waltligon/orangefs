@@ -54,11 +54,11 @@ int main(int argc, char **argv)
     int32_t blocklength = 0;
     PVFS_size displacement = 0;
     char* entry_name;
-    pinode_reference parent_refn;
+    PVFS_pinode_reference parent_refn;
     uint32_t attrmask;
     PVFS_object_attr attr;
     PVFS_credentials credentials;
-    pinode_reference pinode_refn;
+    PVFS_pinode_reference pinode_refn;
     PVFS_Request io_req;
     int buffer_size;
 

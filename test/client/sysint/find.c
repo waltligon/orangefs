@@ -24,7 +24,7 @@ void print_at_depth(char *name, int depth)
 */
 int is_directory(PVFS_handle handle, PVFS_fs_id fs_id)
 {
-    pinode_reference pinode_refn;
+    PVFS_pinode_reference pinode_refn;
     uint32_t attrmask;
     PVFS_credentials credentials;
     PVFS_sysresp_getattr getattr_response;
@@ -58,7 +58,7 @@ int directory_walk(PVFS_sysresp_init *init_response,
     PVFS_fs_id fs_id;
     char* name;
     PVFS_credentials credentials;
-    pinode_reference pinode_refn;
+    PVFS_pinode_reference pinode_refn;
     PVFS_ds_position token;
     int pvfs_dirent_incount;
 

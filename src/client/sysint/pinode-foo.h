@@ -29,7 +29,7 @@
 /* Pinode structure */
 typedef struct
 {
-	pinode_reference pinode_ref; /* pinode reference - entity to uniquely
+	PVFS_pinode_reference pinode_ref; /* pinode reference - entity to uniquely
 											  identify a pinode */ 
 	gen_mutex_t *pinode_mutex;	  /* mutex lock */
 	char *object_name;           /* name of the PVFS object */
@@ -55,8 +55,8 @@ void pcache_storage_finalize(pinode_storage_p pstore);
 int pcache_storage_add_new(pinode_storage_p pstore,pinode_p pinode_ptr);
 int pcache_merge_pinodes(pinode *p1, pinode *p2);
 int pcache_storage_get(pinode_storage_p pstore,pinode **pnode,\
-	pinode_reference pinode_refn);
-int pcache_rem(pinode_storage_p pstore,pinode_reference pinode_refn);
+	PVFS_pinode_reference pinode_refn);
+int pcache_rem(pinode_storage_p pstore,PVFS_pinode_reference pinode_refn);
 int pcache_lock(pinode_p pinode_ptr);
 int pcache_unlock(pinode_p pinode_ptr);
 pinode_p pcache_alloc(void);

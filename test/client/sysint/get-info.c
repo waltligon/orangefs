@@ -26,7 +26,7 @@ int main(int argc,char **argv)
 	PVFS_sysresp_init resp_init;
 	PVFS_sysresp_lookup resp_look;
 	PVFS_sysresp_getattr *resp_gattr = NULL;
-	pinode_reference pinode_refn;
+	PVFS_pinode_reference pinode_refn;
         uint32_t attrmask;
 	PVFS_fs_id fs_id;
 	char* name;

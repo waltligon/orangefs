@@ -31,7 +31,7 @@ static void copy_attributes(PVFS_object_attr *new,PVFS_object_attr old,
  *
  * returns 0 on success, -errno on failure
  */
-int PVFS_sys_create(char* entry_name, pinode_reference parent_refn,
+int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
                 uint32_t attrmask, PVFS_object_attr attr,
                 PVFS_credentials credentials, PVFS_sysresp_create *resp)
 {
@@ -42,7 +42,7 @@ int PVFS_sys_create(char* entry_name, pinode_reference parent_refn,
 	pinode *parent_ptr = NULL, *pinode_ptr = NULL;
 	bmi_addr_t serv_addr1,serv_addr2,*bmi_addr_list = NULL;
 	PVFS_handle *df_handle_array = NULL, new_bkt = 0;
-	pinode_reference entry;
+	PVFS_pinode_reference entry;
 	struct PINT_decoded_msg decoded;
 	void* encoded_resp;
 	PVFS_msg_tag_t op_tag;

@@ -19,7 +19,7 @@ int main(int argc,char **argv)
     PVFS_fs_id fs_id;
     char* name;
     PVFS_credentials credentials;
-    pinode_reference pinode_refn;
+    PVFS_pinode_reference pinode_refn;
     PVFS_size size;
 
     gossip_enable_stderr();

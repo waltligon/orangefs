@@ -25,7 +25,7 @@
  *	truncate to the specified physical size
  * returns 0 on success, -errno on failure
  */
-int PVFS_sys_truncate(pinode_reference pinode_refn, PVFS_size size, 
+int PVFS_sys_truncate(PVFS_pinode_reference pinode_refn, PVFS_size size, 
                         PVFS_credentials credentials)
 {
     struct PVFS_server_req_s req_p;			/* server request */

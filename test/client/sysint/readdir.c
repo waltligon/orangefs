@@ -31,7 +31,7 @@ int main(int argc,char **argv)
 	PVFS_fs_id fs_id;
 	char* name;
 	PVFS_credentials credentials;
-	pinode_reference pinode_refn;
+	PVFS_pinode_reference pinode_refn;
 	PVFS_ds_position token;
 	int pvfs_dirent_incount;
 

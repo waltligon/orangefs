@@ -19,11 +19,11 @@ int main(int argc, char **argv)
 	int ret = -1;
 	int found_flag, i;
 
-	pinode_reference test_ref;
+	PVFS_pinode_reference test_ref;
 
 	char* new_filename[ENTRIES_TO_ADD];
 
-	pinode_reference root_ref = {100,0};
+	PVFS_pinode_reference root_ref = {100,0};
 
 	gossip_set_debug_mask(1, DCACHE_DEBUG);
 

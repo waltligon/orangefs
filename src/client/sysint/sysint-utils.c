@@ -38,8 +38,8 @@ static int server_parse_config(
  * returns 0 on success (with pinode_ref filled in), -ERRNO on failure
  */
 
-int PINT_do_lookup (char* name,pinode_reference parent,
-		uint32_t mask,PVFS_credentials cred,pinode_reference *entry)
+int PINT_do_lookup (char* name,PVFS_pinode_reference parent,
+		uint32_t mask,PVFS_credentials cred,PVFS_pinode_reference *entry)
 {
 	struct PVFS_server_req_s req_p;             /* server request */
         struct PVFS_server_resp_s *ack_p = NULL;    /* server response */

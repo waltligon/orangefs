@@ -18,7 +18,7 @@ int main(int argc,char **argv)
     PVFS_sysresp_init resp_init;
     PVFS_sysresp_mkdir resp_mkdir;
     char* entry_name;
-    pinode_reference parent_refn;
+    PVFS_pinode_reference parent_refn;
     uint32_t attrmask;
     PVFS_object_attr attr;
     PVFS_credentials credentials;

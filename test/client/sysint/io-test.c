@@ -28,10 +28,10 @@ int main(int argc,char **argv)
 	char* name;
 	PVFS_credentials credentials;
 	char* entry_name;
-	pinode_reference parent_refn;
+	PVFS_pinode_reference parent_refn;
 	uint32_t attrmask;
 	PVFS_object_attr attr;
-	pinode_reference pinode_refn;
+	PVFS_pinode_reference pinode_refn;
 	PVFS_Request io_req;
 	void* buffer;
 	int buffer_size;

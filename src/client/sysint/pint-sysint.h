@@ -50,7 +50,7 @@ enum
 /* Pinode structure */
 typedef struct
 {
-    pinode_reference pinode_ref; /* pinode reference - entity to
+    PVFS_pinode_reference pinode_ref; /* pinode reference - entity to
 
                                     uniquely identify a pinode */
     gen_mutex_t *pinode_mutex;        /* mutex lock */
@@ -143,8 +143,8 @@ int get_next_segment(char *inout,char **output,int *start);
 #endif
 int check_perms(PVFS_object_attr attr,PVFS_permissions mode,int uid,int gid);
 
-int PINT_do_lookup (char* name,pinode_reference parent,uint32_t mask,
-                PVFS_credentials cred,pinode_reference *entry);
+int PINT_do_lookup (char* name,PVFS_pinode_reference parent,uint32_t mask,
+                PVFS_credentials cred,PVFS_pinode_reference *entry);
 
 int get_path_element(char *path, char** segment, int element);
 

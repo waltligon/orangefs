@@ -20,9 +20,9 @@ int main(int argc,char **argv)
     pvfs_mntlist mnt = {0,NULL};
     PVFS_sysresp_init resp_init;
     char* old_entry;
-    pinode_reference old_parent_refn;
+    PVFS_pinode_reference old_parent_refn;
     char* new_entry;
-    pinode_reference new_parent_refn;
+    PVFS_pinode_reference new_parent_refn;
     PVFS_credentials credentials;
 
     gossip_enable_stderr();

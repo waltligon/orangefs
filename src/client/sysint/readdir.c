@@ -24,7 +24,7 @@
  *
  * returns 0 on success, -errno on failure
  */
-int PVFS_sys_readdir(pinode_reference pinode_refn, PVFS_ds_position token, 
+int PVFS_sys_readdir(PVFS_pinode_reference pinode_refn, PVFS_ds_position token, 
                         int pvfs_dirent_incount, PVFS_credentials credentials,
 			PVFS_sysresp_readdir *resp)
 {

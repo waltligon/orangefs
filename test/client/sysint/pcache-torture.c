@@ -18,7 +18,7 @@ int main(int argc, char **argv)
 	int i;
 	int entries_to_add;
 	pinode *pinode1, *pinode2, *pinode3;
-	pinode_reference test_ref;
+	PVFS_pinode_reference test_ref;
 
 	if (argc == 2)
 	{

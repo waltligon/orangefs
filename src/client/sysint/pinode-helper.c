@@ -23,7 +23,7 @@ static int phelper_fill_attr(pinode *ptr,PVFS_object_attr attr,\
  *
  * returns 0 on success, -errno on failure
  */
-int phelper_get_pinode(pinode_reference pref, pinode **pinode_ptr,
+int phelper_get_pinode(PVFS_pinode_reference pref, pinode **pinode_ptr,
 		uint32_t attrmask, PVFS_credentials credentials)
 {
 
@@ -104,7 +104,7 @@ int phelper_release_pinode(pinode *pinode_ptr)
  * returns 0 on success, -errno on failure
  */
 int phelper_refresh_pinode(uint32_t mask,pinode **pinode_ptr,
-		pinode_reference pref, PVFS_credentials credentials)
+		PVFS_pinode_reference pref, PVFS_credentials credentials)
 {
 	int ret = 0;
 	PVFS_sysresp_getattr resp;

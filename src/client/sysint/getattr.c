@@ -26,7 +26,7 @@
  * 
  * returns 0 on success, -errno on failure
  */
-int PVFS_sys_getattr(pinode_reference pinode_refn, uint32_t attrmask, 
+int PVFS_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask, 
 		    PVFS_credentials credentials, PVFS_sysresp_getattr *resp)
 {
     struct PVFS_server_req_s req_p;	 	/* server request */
@@ -37,7 +37,7 @@ int PVFS_sys_getattr(pinode_reference pinode_refn, uint32_t attrmask,
     struct timeval cur_time;
     PVFS_size *size_array = 0;
     pinode *entry_pinode = NULL;
-    pinode_reference entry;
+    PVFS_pinode_reference entry;
     struct PINT_decoded_msg decoded;
     uint32_t attr_mask;
     int max_msg_sz = 0;

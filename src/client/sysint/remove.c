@@ -26,7 +26,7 @@
  *
  * returns 0 on success, -errno on failure
  */
-int PVFS_sys_remove(char* entry_name, pinode_reference parent_refn, 
+int PVFS_sys_remove(char* entry_name, PVFS_pinode_reference parent_refn, 
                         PVFS_credentials credentials)
 {
 	struct PVFS_server_req_s req_p;		    /* server request */
@@ -35,7 +35,7 @@ int PVFS_sys_remove(char* entry_name, pinode_reference parent_refn,
 	pinode *pinode_ptr = NULL, *item_ptr = NULL;
 	bmi_addr_t serv_addr;	/* PVFS address type structure */
 	int name_sz = 0, attr_mask = 0;
-	pinode_reference entry;
+	PVFS_pinode_reference entry;
 	int items_found = 0, i = 0;
 	struct PINT_decoded_msg decoded;
 	bmi_size_t max_msg_sz;
