@@ -22,7 +22,6 @@ extern int parse_pvfstab(char *fn,pvfs_mntlist *mnt);
 int main(int argc,char **argv)
 {
 	PVFS_sysresp_init resp_init;
-	PVFS_sysreq_lookup req_look;
 	PVFS_sysresp_lookup resp_look;
 	PVFS_sysreq_readdir *req_readdir = NULL;
 	PVFS_sysresp_readdir *resp_readdir = NULL;
@@ -30,6 +29,9 @@ int main(int argc,char **argv)
 	pvfs_mntlist mnt = {0,NULL};
 	int max_dirents_returned = 25;
 	char* starting_point = NULL;
+	PVFS_fs_id fs_id;
+	char* name;
+	PVFS_credentials credentials;
 
 	gossip_enable_stderr();
 	gossip_set_debug_mask(1,CLIENT_DEBUG);
@@ -67,12 +69,12 @@ int main(int argc,char **argv)
 	}
 
 	/* lookup the directory handle */
-	req_look.credentials.uid = 100;
-	req_look.credentials.gid = 100;
-	req_look.credentials.perms = 1877;
-	req_look.name = starting_point;
-	req_look.fs_id = resp_init.fsid_list[0];
-	ret = PVFS_sys_lookup(&req_look,&resp_look);
+	credentials.uid = 100;
+	credentials.gid = 100;
+	credentials.perms = 1877;
+	name = starting_point;
+	fs_id = resp_init.fsid_list[0];
+	ret = PVFS_sys_lookup(fs_id, name, credentials, &resp_look);
 	if (ret < 0)
 	{
 		printf("Lookup failed with errcode = %d\n", ret);
@@ -99,7 +101,7 @@ int main(int argc,char **argv)
 	printf("LOOKUP_RESPONSE===>\n\tresp_look.pinode_refn.handle = %Ld\n\tresp_look.pinode_refn.fs_id = %d\n",resp_look.pinode_refn.handle, resp_look.pinode_refn.fs_id);
 
 	req_readdir->pinode_refn.handle = resp_look.pinode_refn.handle;
-	req_readdir->pinode_refn.fs_id = req_look.fs_id;
+	req_readdir->pinode_refn.fs_id = fs_id;
 	req_readdir->token = PVFS2_READDIR_START;
 	req_readdir->pvfs_dirent_incount = max_dirents_returned;
 

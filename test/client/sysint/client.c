@@ -23,9 +23,7 @@ extern int parse_pvfstab(char *fn,pvfs_mntlist *mnt);
 int main(int argc,char **argv)
 {
 	PVFS_sysresp_init resp_init;
-	PVFS_sysreq_lookup req_look;
 	PVFS_sysresp_lookup resp_look;
-	PVFS_sysreq_lookup *req_lk = NULL;
 	PVFS_sysresp_lookup *resp_lk = NULL;
 	PVFS_sysreq_readdir *req_readdir = NULL;
 	PVFS_sysresp_readdir *resp_readdir = NULL;
@@ -45,6 +43,9 @@ int main(int argc,char **argv)
 	//char dirname[256] = "/parl/fshorte/sysint/home";
 	int ret = -1,i = 0;
 	pvfs_mntlist mnt = {0,NULL};
+	PVFS_fs_id fs_id;
+	char* name;
+	PVFS_credentials credentials;
 
 	PVFS_handle lk_handle;
 	PVFS_handle lk_fsid;
@@ -81,13 +82,13 @@ int main(int argc,char **argv)
 	printf("SYSTEM INTERFACE INITIALIZED\n");
 
 	/* lookup the root handle */
-	req_look.credentials.perms = 1877;
-	req_look.name = malloc(2);/*null terminator included*/
-	req_look.name[0] = '/';
-	req_look.name[1] = '\0';
-	req_look.fs_id = resp_init.fsid_list[0];
-	printf("looking up the root handle for fsid = %d\n", req_look.fs_id);
-	ret = PVFS_sys_lookup(&req_look,&resp_look);
+	credentials.perms = 1877;
+	name = malloc(2);/*null terminator included*/
+	name[0] = '/';
+	name[1] = '\0';
+	fs_id = resp_init.fsid_list[0];
+	printf("looking up the root handle for fsid = %d\n", fs_id);
+	ret = PVFS_sys_lookup(fs_id, name, credentials, &resp_look);
 	if (ret < 0)
 	{
 		printf("Lookup failed with errcode = %d\n", ret);
@@ -96,6 +97,7 @@ int main(int argc,char **argv)
 	// print the handle 
 	printf("--lookup--\n"); 
 	printf("ROOT Handle:%ld\n", (long int)resp_look.pinode_refn.handle);
+	free(name);
 	
 
 	/* test create */
@@ -132,7 +134,7 @@ int main(int argc,char **argv)
 	req_create->attr.u.meta.nr_datafiles = 4;
 
 	req_create->parent_refn.handle = resp_look.pinode_refn.handle;
-	req_create->parent_refn.fs_id = req_look.fs_id;
+	req_create->parent_refn.fs_id = fs_id;
 
 	
 #if 0
@@ -213,12 +215,6 @@ int main(int argc,char **argv)
 
 
 	/* test the lookup function */
-	req_lk = (PVFS_sysreq_lookup *)malloc(sizeof(PVFS_sysreq_lookup));
-	if (!req_lk)
-	{
-		printf("Error in malloc\n");
-		return(-1);
-	}
 	resp_lk = (PVFS_sysresp_lookup *)malloc(sizeof(PVFS_sysresp_lookup));
 	if (!resp_lk)
 	{
@@ -226,21 +222,16 @@ int main(int argc,char **argv)
 		return(-1);
 	}
 	
-	req_lk->name = (char *)malloc(strlen(filename) + 2);
-	if (!req_lk->name)
+	name = (char *)malloc(strlen(filename) + 2);
+	if (name)
 	{
 		printf("Error in malloc\n");
 		return(-1);
 	}
-	req_lk->name[0] = '/';
-	memcpy(req_lk->name + 1,filename,strlen(filename) + 1 );
-	req_lk->fs_id = resp_init.fsid_list[0];
+	name[0] = '/';
+	memcpy(name + 1,filename,strlen(filename) + 1 );
 
-	req_lk->credentials.uid = 100;
-	req_lk->credentials.gid = 100;
-	req_lk->credentials.perms = 1877;
-
-	ret = PVFS_sys_lookup(req_lk,resp_lk);
+	ret = PVFS_sys_lookup(fs_id, name, credentials, resp_lk);
 	if (ret < 0)
 	{
 		printf("Lookup failed with errcode = %d\n", ret);
@@ -254,8 +245,7 @@ int main(int argc,char **argv)
 	lk_handle = resp_lk->pinode_refn.handle;
 	lk_fsid = resp_lk->pinode_refn.fs_id;
 
-	free(req_lk->name);
-	free(req_lk);
+	free(name);
 	free(resp_lk);
 
 
@@ -517,7 +507,7 @@ int main(int argc,char **argv)
 	// Fill in the dir info 
 
 	req_readdir->pinode_refn.handle = resp_look.pinode_refn.handle;
-	req_readdir->pinode_refn.fs_id = req_look.fs_id;
+	req_readdir->pinode_refn.fs_id = fs_id;
 	req_readdir->token = PVFS2_READDIR_START;
 	req_readdir->pvfs_dirent_incount = 6;
 /*

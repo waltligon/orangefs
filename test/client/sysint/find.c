@@ -50,15 +50,16 @@ int directory_walk(PVFS_sysresp_init *init_response,
     int is_dir = 0;
     char *cur_file = (char *)0;
     PVFS_handle cur_handle;
-    PVFS_sysreq_lookup lk_request;
     PVFS_sysresp_lookup lk_response;
     PVFS_sysreq_readdir rd_request;
     PVFS_sysresp_readdir rd_response;
     char full_path[MAX_PVFS_PATH_LEN] = {0};
+    PVFS_fs_id fs_id;
+    char* name;
+    PVFS_credentials credentials;
 
     printf("DIRECTORY WALK CALLED WITH base %s | %s\n",base_dir,start_dir);
 
-    memset(&lk_request,0,sizeof(PVFS_sysreq_lookup));
     memset(&lk_response,0,sizeof(PVFS_sysresp_lookup));
 
     if (base_dir)
@@ -74,20 +75,20 @@ int directory_walk(PVFS_sysresp_init *init_response,
     {
         strcpy(full_path,start_dir);
     }
-    lk_request.name = full_path;
-    lk_request.fs_id = init_response->fsid_list[0];
-    lk_request.credentials.uid = 100;
-    lk_request.credentials.gid = 100;
-    lk_request.credentials.perms = 1877;
+    name = full_path;
+    fs_id = init_response->fsid_list[0];
+    credentials.uid = 100;
+    credentials.gid = 100;
+    credentials.perms = 1877;
 
-    if (PVFS_sys_lookup(&lk_request,&lk_response))
+    if (PVFS_sys_lookup(fs_id, name, credentials, &lk_response))
     {
         fprintf(stderr,"Failed to lookup %s on fs_id %d!\n",
                 start_dir,init_response->fsid_list[0]);
         return 1;
     }
 
-    print_at_depth(lk_request.name,depth);
+    print_at_depth(name,depth);
 
     memset(&rd_request,0,sizeof(PVFS_sysreq_readdir));
     memset(&rd_response,0,sizeof(PVFS_sysresp_readdir));

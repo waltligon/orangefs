@@ -12,10 +12,9 @@
 PVFS_handle lookup_parent_handle(char *filename, PVFS_fs_id fs_id)
 {
     char buf[MAX_PVFS_PATH_LEN] = {0};
-    PVFS_sysreq_lookup req_look;
+    PVFS_credentials credentials;
     PVFS_sysresp_lookup resp_look;
 
-    memset(&req_look,0,sizeof(PVFS_sysreq_lookup));
     memset(&resp_look,0,sizeof(PVFS_sysresp_lookup));
 
     if (PINT_get_base_dir(filename,buf,MAX_PVFS_PATH_LEN))
@@ -29,16 +28,14 @@ PVFS_handle lookup_parent_handle(char *filename, PVFS_fs_id fs_id)
     }
 
     /* retrieve the parent handle */
-    req_look.name = buf;
-    req_look.fs_id = fs_id;
-    req_look.credentials.uid = 100;
-    req_look.credentials.gid = 100;
-    req_look.credentials.perms = 1877;
+    credentials.uid = 100;
+    credentials.gid = 100;
+    credentials.perms = 1877;
 
     gossip_debug(CLIENT_DEBUG, "looking up the parent handle of %s for fsid = %d\n",
-           buf,req_look.fs_id);
+           buf,fs_id);
 
-    if (PVFS_sys_lookup(&req_look,&resp_look))
+    if (PVFS_sys_lookup(fs_id, buf, credentials ,&resp_look))
     {
         gossip_err("Lookup failed on %s\n",buf);
         return (PVFS_handle)0;

@@ -22,10 +22,12 @@ extern int parse_pvfstab(char *fn,pvfs_mntlist *mnt);
 int main(int argc,char **argv)
 {
 	PVFS_sysresp_init resp_init;
-	PVFS_sysreq_lookup req_look;
 	PVFS_sysresp_lookup resp_look;
 	PVFS_sysreq_getattr *req_gattr = NULL;
 	PVFS_sysresp_getattr *resp_gattr = NULL;
+	PVFS_fs_id fs_id;
+	char* name;
+	PVFS_credentials credentials;
 
 	char *filename = NULL;
 	int ret = -1,i = 0;
@@ -65,12 +67,12 @@ int main(int argc,char **argv)
 	printf("SYSTEM INTERFACE INITIALIZED\n");
 
 	/* lookup the file we're getattr'ing */
-	req_look.credentials.uid = 100;
-	req_look.credentials.gid = 100;
-	req_look.credentials.perms = 1877;
-	req_look.name = filename;
-	req_look.fs_id = resp_init.fsid_list[0];
-	ret = PVFS_sys_lookup(&req_look,&resp_look);
+	credentials.uid = 100;
+	credentials.gid = 100;
+	credentials.perms = 1877;
+	name = filename;
+	fs_id = resp_init.fsid_list[0];
+	ret = PVFS_sys_lookup(fs_id, name, credentials, &resp_look);
 	if (ret < 0)
 	{
 		printf("Lookup failed with errcode = %d\n", ret);
@@ -94,7 +96,7 @@ int main(int argc,char **argv)
 	// Fill in the handle 
 	req_gattr->pinode_refn.handle = resp_look.pinode_refn.handle;
 	req_gattr->pinode_refn.fs_id = resp_init.fsid_list[0];
-	req_gattr->attrmask = ATTR_META;
+	req_gattr->attrmask = ATTR_META | ATTR_SIZE;
 
 	// Use it 
 	ret = PVFS_sys_getattr(req_gattr,resp_gattr);

@@ -13,7 +13,6 @@ extern int parse_pvfstab(char *fn,pvfs_mntlist *mnt);
 int main(int argc,char **argv)
 {
 	PVFS_sysresp_init resp_init;
-	PVFS_sysreq_lookup req_lk;
 	PVFS_sysresp_lookup resp_lk;
 	PVFS_sysreq_create req_cr;
 	PVFS_sysresp_create resp_cr;
@@ -27,6 +26,9 @@ int main(int argc,char **argv)
 	int* io_buffer = NULL;
 	int i;
 	int errors;
+	PVFS_fs_id fs_id;
+	char* name;
+	PVFS_credentials credentials;
 
 	gossip_enable_stderr();
 	gossip_set_debug_mask(1,CLIENT_DEBUG);
@@ -87,13 +89,13 @@ int main(int argc,char **argv)
 	 * try to look up the target file 
 	 */
 	
-	req_lk.name = filename;
-	req_lk.fs_id = resp_init.fsid_list[0];
-	req_lk.credentials.uid = 100;
-	req_lk.credentials.gid = 100;
-	req_lk.credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
+	name = filename;
+	fs_id = resp_init.fsid_list[0];
+	credentials.uid = 100;
+	credentials.gid = 100;
+	credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
 
-	ret = PVFS_sys_lookup(&req_lk, &resp_lk);
+	ret = PVFS_sys_lookup(fs_id, name, credentials, &resp_lk);
 	/* TODO: really we probably want to look for a specific error code,
 	 * like maybe ENOENT?
 	 */
@@ -102,13 +104,13 @@ int main(int argc,char **argv)
 		printf("IO-TEST: lookup failed; creating new file.\n");
 
 		/* get root handle */
-		req_lk.name = "/";
-		req_lk.fs_id = resp_init.fsid_list[0];
-		req_lk.credentials.uid = 100;
-		req_lk.credentials.gid = 100;
-		req_lk.credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
+		name = "/";
+		fs_id = resp_init.fsid_list[0];
+		credentials.uid = 100;
+		credentials.gid = 100;
+		credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
 
-		ret = PVFS_sys_lookup(&req_lk, &resp_lk);
+		ret = PVFS_sys_lookup(fs_id, name, credentials, &resp_lk);
 		if(ret < 0)
 		{
 			fprintf(stderr, "Error: PVFS_sys_lookup() failed to find root handle.\n");
@@ -125,7 +127,7 @@ int main(int argc,char **argv)
 		req_cr.attr.u.meta.nr_datafiles = 1;
 		req_cr.attr.u.meta.dist = NULL;
 		req_cr.parent_refn.handle = resp_lk.pinode_refn.handle;
-		req_cr.parent_refn.fs_id = req_lk.fs_id;
+		req_cr.parent_refn.fs_id = fs_id;
 		req_cr.entry_name = &(filename[1]); /* leave off slash */
 		req_cr.credentials.uid = 100;
 		req_cr.credentials.gid = 100;
@@ -138,14 +140,14 @@ int main(int argc,char **argv)
 			return(-1);
 		}
 
-		req_io.pinode_refn.fs_id = req_lk.fs_id;
+		req_io.pinode_refn.fs_id = fs_id;
 		req_io.pinode_refn.handle = resp_cr.pinode_refn.handle;
 	}
 	else
 	{
 		printf("IO-TEST: lookup succeeded; performing I/O on existing file.\n");
 
-		req_io.pinode_refn.fs_id = req_lk.fs_id;
+		req_io.pinode_refn.fs_id = fs_id;
 		req_io.pinode_refn.handle = resp_lk.pinode_refn.handle;
 	}
 

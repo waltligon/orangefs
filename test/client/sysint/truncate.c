@@ -14,11 +14,12 @@ int main(int argc,char **argv)
     pvfs_mntlist mnt = {0,NULL};
     PVFS_sysresp_init resp_init;
     PVFS_sysreq_truncate req_truncate;
-    PVFS_sysreq_lookup req_look;
-    PVFS_sysreq_lookup req_lk;
     PVFS_sysresp_lookup resp_look;
     PVFS_sysresp_lookup resp_lk;
     PVFS_size trunc_size;
+    PVFS_fs_id fs_id;
+    char* name;
+    PVFS_credentials credentials;
 
     gossip_enable_stderr();
     gossip_set_debug_mask(1,CLIENT_DEBUG);
@@ -46,30 +47,30 @@ int main(int argc,char **argv)
     }
 
     /* lookup the root handle */
-    req_look.credentials.perms = 1877;
-    req_look.name = malloc(2);/*null terminator included*/
-    req_look.name[0] = '/';
-    req_look.name[1] = '\0';
-    req_look.fs_id = resp_init.fsid_list[0];
-    printf("looking up the root handle for fsid = %d\n", req_look.fs_id);
-    ret = PVFS_sys_lookup(&req_look,&resp_look);
+    credentials.perms = 1877;
+    name = malloc(2);/*null terminator included*/
+    name[0] = '/';
+    name[1] = '\0';
+    fs_id = resp_init.fsid_list[0];
+    printf("looking up the root handle for fsid = %d\n", fs_id);
+    ret = PVFS_sys_lookup(fs_id, name, credentials, &resp_look);
     if (ret < 0)
     {
 	printf("Lookup failed with errcode = %d\n", ret);
 	return(-1);
     }
 
+    free(name);
+
     /* test the lookup function */
-    memset(&req_lk,0,sizeof(PVFS_sysreq_lookup));
     memset(&resp_lk,0,sizeof(PVFS_sysresp_lookup));
 
-    req_lk.name = filename;
-    req_lk.fs_id = resp_init.fsid_list[0];
-    req_lk.credentials.uid = 100;
-    req_lk.credentials.gid = 100;
-    req_lk.credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
+    name = filename;
+    credentials.uid = 100;
+    credentials.gid = 100;
+    credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
 
-    ret = PVFS_sys_lookup(&req_lk,&resp_lk);
+    ret = PVFS_sys_lookup(fs_id, name, credentials, &resp_lk);
     if (ret < 0)
     {
 	printf("Lookup failed with errcode = %d\n", ret);
