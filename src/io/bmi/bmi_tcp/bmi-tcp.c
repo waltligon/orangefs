@@ -452,7 +452,7 @@ void* BMI_tcp_memalloc(bmi_size_t size, bmi_flag_t send_recv)
 	 * preferences about how the memory should be configured.
 	 */
 
-	return(calloc(1,(size_t)size));
+	return(malloc((size_t)size));
 }
 
 
