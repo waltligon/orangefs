@@ -13,6 +13,7 @@
 #include "job.h"
 #include "gossip.h"
 #include "str-utils.h"
+#include "pint-util.h"
 #include "pvfs2-util.h"
 #include "pint-servreq.h"
 #include "pint-cached-config.h"

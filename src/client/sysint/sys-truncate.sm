@@ -14,6 +14,7 @@
 #include "job.h"
 #include "gossip.h"
 #include "str-utils.h"
+#include "pint-util.h"
 #include "pint-servreq.h"
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
