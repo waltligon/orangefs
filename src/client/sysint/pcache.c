@@ -368,12 +368,11 @@ int PINT_pcache_object_attr_deep_copy(
 	{
             dest->u.meta.dist_size = src->u.meta.dist_size;
 
-            gossip_lerr("WARNING: packing distribution to memcpy it.\n");
             if (dest->u.meta.dist)
             {
                 /* FIXME: memory leak */
-                gossip_lerr("WARNING: need to free old dist, "
-                            "but I don't know how.\n");
+                pcache_debug("WARNING: need to free old dist, "
+                             "but I don't know how.\n");
             }
             dest->u.meta.dist = malloc(src->u.meta.dist_size);
             if(dest->u.meta.dist == NULL)
@@ -415,13 +414,19 @@ void PINT_pcache_object_attr_deep_free(PVFS_object_attr *attr)
     {
         if (attr->mask & PVFS_ATTR_META_DFILES)
         {
-            free(attr->u.meta.dfile_array);
+            if (attr->u.meta.dfile_array)
+            {
+                free(attr->u.meta.dfile_array);
+            }
         }
         if (attr->mask & PVFS_ATTR_META_DIST)
         {
-            /* FIXME: memory leak */
-            gossip_lerr("WARNING: need to free old dist, "
-                        "but I don't know how.\n");
+            if (attr->u.meta.dist)
+            {
+                /* FIXME: memory leak */
+                pcache_debug("WARNING: need to free old dist, "
+                             "but I don't know how.\n");
+            }
         }
     }
 }
