@@ -104,6 +104,19 @@ int PINT_serv_msgpairarray_resolve_addrs(
     int count, 
     PINT_sm_msgpair_state* msgarray);
 
+#define PRINT_ENCODING_ERROR(type_str, type)                        \
+do {                                                                \
+    gossip_err("***********************************************"    \
+               "********************\n");                           \
+    gossip_err("Encoding type (%d) is not %s. Trying all "          \
+               "supported encoders.\n\n", type, type_str);          \
+    gossip_err("Please check that your pvfs2tab file has a "        \
+               "%s encoding entry,\n  or use the default "          \
+               "by using \"encoding=default\"\n", type_str);        \
+    gossip_err("***********************************************"    \
+               "********************\n");                           \
+} while(0)
+
 #endif /* __MSGPAIRARRAY_H */
 
 /*

@@ -61,19 +61,6 @@ static int msgpairarray_completion_fn(
 static int count_incomplete_msgs(
     PINT_sm_msgpair_state *msgarray, int array_count);
 
-#define PRINT_ENCODING_ERROR(type)                                  \
-do {                                                                \
-    gossip_err("***********************************************"    \
-               "********************\n");                           \
-    gossip_err("Encoding type (%d) is not %s. Trying all "          \
-               "supported encoders.\n\n", msg_p->enc_type, type);   \
-    gossip_err("Please check that your pvfs2tab file has a "        \
-               "%s encoding entry,\n  or use the default "          \
-               "by using \"encoding=default\"\n", type);            \
-    gossip_err("***********************************************"    \
-               "********************\n");                           \
-} while(0)
-
 %%
 
 nested machine pvfs2_msgpairarray_sm(init,
@@ -222,13 +209,13 @@ static int msgpairarray_post(PARENT_SM *sm_p,
 
             if (!ENCODING_IS_VALID(msg_p->enc_type))
             {
-                PRINT_ENCODING_ERROR("supported");
+                PRINT_ENCODING_ERROR("supported", msg_p->enc_type);
                 must_loop_encodings = 1;
                 msg_p->enc_type = (ENCODING_INVALID_MIN + 1);
             }
             else if (!ENCODING_IS_SUPPORTED(msg_p->enc_type))
             {
-                PRINT_ENCODING_ERROR("supported");
+                PRINT_ENCODING_ERROR("supported", msg_p->enc_type);
                 must_loop_encodings = 1;
                 msg_p->enc_type = ENCODING_SUPPORTED_MIN;
             }

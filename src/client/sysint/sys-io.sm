@@ -533,6 +533,7 @@ static int io_datafile_post_msgpairs(PINT_client_sm *sm_p,
 {
     int ret = -PVFS_EINVAL, i = 0;
     unsigned long status_user_tag = 0;
+    int must_loop_encodings = 0;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "io_datafile_post_msgpairs "
                  "state: post (%d message(s))\n", sm_p->msgarray_count);
@@ -559,13 +560,41 @@ static int io_datafile_post_msgpairs(PINT_client_sm *sm_p,
         assert(cur_ctx && msg);
         assert(cur_ctx->msg == msg);
 
+        if (!ENCODING_IS_VALID(sm_p->u.io.encoding))
+        {
+            PRINT_ENCODING_ERROR("supported", sm_p->u.io.encoding);
+            must_loop_encodings = 1;
+            sm_p->u.io.encoding = (ENCODING_INVALID_MIN + 1);
+        }
+        else if (!ENCODING_IS_SUPPORTED(sm_p->u.io.encoding))
+        {
+            PRINT_ENCODING_ERROR("supported", sm_p->u.io.encoding);
+            must_loop_encodings = 1;
+            sm_p->u.io.encoding = ENCODING_SUPPORTED_MIN;
+        }
+
+      try_next_encoding:
+        assert(ENCODING_IS_VALID(sm_p->u.io.encoding));
+
         ret = PINT_encode(&msg->req, PINT_ENCODE_REQ, &msg->encoded_req,
                           msg->svr_addr, sm_p->u.io.encoding);
         if (ret)
         {
+            if (must_loop_encodings)
+            {
+                gossip_debug(GOSSIP_CLIENT_DEBUG, "Looping through "
+                             "encodings [%d/%d]\n", sm_p->u.io.encoding,
+                             ENCODING_INVALID_MAX);
+
+                sm_p->u.io.encoding++;
+                if (ENCODING_IS_VALID(sm_p->u.io.encoding))
+                {
+                    goto try_next_encoding;
+                }
+            }
             /*
-              FIXME: make this a clean error transition by
-              adjusting the completion count and/or (not) exiting
+              FIXME: make this a clean error transition by adjusting
+              the completion count and/or (not) exiting
             */
             PVFS_perror_gossip("PINT_encode failed", ret);
             js_p->error_code = ret;
