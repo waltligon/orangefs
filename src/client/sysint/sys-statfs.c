@@ -20,43 +20,39 @@ int PVFS_sys_statfs(
     PVFS_sysresp_statfs* resp)
 {
     int num_servers = 0;
-    int ret = -1;
+    int ret = -PVFS_EINVAL, i = 0;
     struct PVFS_mgmt_server_stat* stat_array = NULL;
-    int i;
     int num_io_servers = 0;
     PVFS_size min_bytes_available = 0;
     PVFS_size min_bytes_total = 0;
 
-    /* first, determine how many servers are in the file system */
-    ret = PVFS_mgmt_count_servers(fs_id, credentials, 
-	(PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER), &num_servers);
-    if(ret < 0)
+    ret = PVFS_mgmt_count_servers(
+        fs_id, credentials, (PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER),
+        &num_servers);
+    if (ret < 0)
     {
-	return(ret);
+	return ret;
     }
 
-    /* allocate room for statfs info from all servers */
-    stat_array = (struct PVFS_mgmt_server_stat*)malloc(num_servers*sizeof(struct 
-	PVFS_mgmt_server_stat));
-    if(!stat_array)
+    stat_array = (struct PVFS_mgmt_server_stat*)malloc(
+        num_servers*sizeof(struct PVFS_mgmt_server_stat));
+    if (!stat_array)
     {
 	return(-PVFS_ENOMEM);
     }
 
-    /* gather all statfs information */
     ret = PVFS_mgmt_statfs_all(
 	fs_id,
 	credentials,
 	stat_array,
 	&num_servers);
-    if(ret < 0)
+    if (ret < 0)
     {
 	free(stat_array);
 	return(ret);
     }
 
     /* aggregate statistics down into one statfs structure */
-
     resp->statfs_buf.fs_id = fs_id;
     resp->statfs_buf.bytes_available = 0;
     resp->statfs_buf.bytes_total = 0;

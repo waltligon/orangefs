@@ -33,10 +33,13 @@ const char* PVFS_mgmt_map_addr(PVFS_fs_id fs_id,
 			       PVFS_BMI_addr_t addr,
 			       int *server_type)
 {
-    return(PINT_bucket_map_addr(PINT_get_server_config_struct(),
-				fs_id,
-				addr,
-				server_type));
+    char *ret = NULL;
+    struct server_configuration_s *server_config = NULL;
+
+    server_config = PINT_get_server_config_struct();
+    ret = PINT_bucket_map_addr(server_config, fs_id, addr, server_type);
+    PINT_put_server_config_struct(server_config);
+    return ret;
 }
 
 /* PVFS_mgmt_statfs_all()
@@ -51,44 +54,51 @@ int PVFS_mgmt_statfs_all(PVFS_fs_id fs_id,
 			 struct PVFS_mgmt_server_stat* stat_array,
 			 int* inout_count_p)
 {
+    int ret = -PVFS_EINVAL;
     PVFS_BMI_addr_t *addr_array = NULL;
     int real_count = 0;
-    int ret = -1;
+    struct server_configuration_s *server_config = NULL;
 
-    ret = PINT_bucket_count_servers(PINT_get_server_config_struct(),
-				    fs_id, 
-				    PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
-				    &real_count);
+    server_config = PINT_get_server_config_struct();
+    ret = PINT_bucket_count_servers(
+        server_config, fs_id,  PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
+        &real_count);
+    PINT_put_server_config_struct(server_config);
+
     if (ret < 0)
+    {
 	return ret;
+    }
 
     if (real_count > *inout_count_p)
+    {
 	return -PVFS_EOVERFLOW;
+    }
 
     *inout_count_p = real_count;
 
-    addr_array = (PVFS_BMI_addr_t *)malloc(real_count*sizeof(PVFS_BMI_addr_t));
+    addr_array = (PVFS_BMI_addr_t *)malloc(
+        real_count*sizeof(PVFS_BMI_addr_t));
     if (addr_array == NULL)
+    {
 	return -PVFS_ENOMEM;
+    }
 
+    server_config = PINT_get_server_config_struct();
     /* generate default list of servers */
-    ret = PINT_bucket_get_server_array(PINT_get_server_config_struct(),
-				       fs_id,
-				       PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
-				       addr_array, 
-				       &real_count);
+    ret = PINT_bucket_get_server_array(
+        server_config, fs_id, PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
+        addr_array, &real_count);
+    PINT_put_server_config_struct(server_config);
+
     if (ret < 0)
     {
 	free(addr_array);
 	return ret;
     }
     
-    ret = PVFS_mgmt_statfs_list(fs_id,
-				credentials,
-				stat_array,
-				addr_array,
-				NULL, /* error array */
-				real_count);
+    ret = PVFS_mgmt_statfs_list(
+        fs_id, credentials, stat_array, addr_array, NULL, real_count);
 
     free(addr_array);
 
@@ -112,12 +122,15 @@ int PVFS_mgmt_setparam_all(
 {
     PVFS_BMI_addr_t *addr_array = NULL;
     int count = 0;
-    int ret = -1;
+    int ret = -PVFS_EINVAL;
+    struct server_configuration_s *server_config = NULL;
 
-    ret = PINT_bucket_count_servers(PINT_get_server_config_struct(),
-				    fs_id, 
-				    PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
-				    &count);
+    server_config = PINT_get_server_config_struct();
+    ret = PINT_bucket_count_servers(
+        server_config, fs_id,
+        PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER, &count);
+    PINT_put_server_config_struct(server_config);
+
     if (ret < 0)
     {
 	return ret;
@@ -129,26 +142,22 @@ int PVFS_mgmt_setparam_all(
 	return -PVFS_ENOMEM;
     }
 
+    server_config = PINT_get_server_config_struct();
     /* generate default list of servers */
-    ret = PINT_bucket_get_server_array(PINT_get_server_config_struct(),
-				       fs_id,
-				       PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
-				       addr_array,
-				       &count);
+    ret = PINT_bucket_get_server_array(
+        server_config, fs_id, PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
+        addr_array, &count);
+    PINT_put_server_config_struct(server_config);
+
     if (ret < 0)
     {
 	free(addr_array);
 	return ret;
     }
 
-    /* issue setparam call */
-    ret = PVFS_mgmt_setparam_list(fs_id,
-				  credentials,
-				  param,
-				  value,
-				  addr_array,
-				  old_value_array,
-				  count);
+    ret = PVFS_mgmt_setparam_list(
+        fs_id, credentials, param, value, addr_array,
+        old_value_array, count);
 
     free(addr_array);
 
@@ -167,11 +176,14 @@ int PVFS_mgmt_get_server_array(PVFS_fs_id fs_id,
 			       PVFS_BMI_addr_t *addr_array,
 			       int* inout_count_p)
 {
-    return(PINT_bucket_get_server_array(PINT_get_server_config_struct(),
-					fs_id, 
-					server_type,
-					addr_array,
-					inout_count_p));
+    int ret = -PVFS_EINVAL;
+    struct server_configuration_s *server_config = NULL;
+
+    server_config = PINT_get_server_config_struct();
+    ret = PINT_bucket_get_server_array(
+        server_config, fs_id, server_type, addr_array, inout_count_p);
+    PINT_put_server_config_struct(server_config);
+    return ret;
 }
 
 /* PVFS_mgmt_count_servers()
@@ -186,10 +198,14 @@ int PVFS_mgmt_count_servers(PVFS_fs_id fs_id,
 			    int server_type,
 			    int* count)
 {
-    return(PINT_bucket_count_servers(PINT_get_server_config_struct(),
-				     fs_id,
-				     server_type,
-				     count));
+    int ret = -PVFS_EINVAL;
+    struct server_configuration_s *server_config = NULL;
+
+    server_config = PINT_get_server_config_struct();
+    ret = PINT_bucket_count_servers(
+        server_config, fs_id, server_type, count);
+    PINT_put_server_config_struct(server_config);
+    return ret;
 }
 
 /* PVFS_mgmt_toggle_admin_mode()
