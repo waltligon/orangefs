@@ -13,13 +13,12 @@
 #include <assert.h>
 #include <db.h>
 #include <string.h>
-
-#include <trove.h>
-#include <trove-internal.h>
-#include <dbpf.h>
-#include <dbpf-keyval.h>
-
 #include <limits.h>
+
+#include "trove.h"
+#include "trove-internal.h"
+#include "dbpf.h"
+#include "dbpf-keyval.h"
 
 enum {
     DBCACHE_ENTRIES = 16
@@ -100,7 +99,9 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
 
     if (i < DBCACHE_ENTRIES) {
 	/* found cached DB */
+#if 0
 	printf("dbcache: found cached db at index %d\n", i);
+#endif
 	keyval_db_cache[i].ref_ct++;
 	*db_pp = keyval_db_cache[i].db_p;
 	gen_mutex_unlock(&keyval_db_cache[i].mutex);
@@ -112,7 +113,9 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
 	if (!(ret = gen_mutex_trylock(&keyval_db_cache[i].mutex)) &&
 	    keyval_db_cache[i].ref_ct == -1)
 	{
+#if 0
 	    printf("dbcache: found empty entry at %d\n", i);
+#endif
 	    break;
 	}
 	else if (ret == 0) gen_mutex_unlock(&keyval_db_cache[i].mutex);
@@ -124,7 +127,9 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
 	    if (!(ret = gen_mutex_trylock(&keyval_db_cache[i].mutex)) &&
 		keyval_db_cache[i].ref_ct == 0)
 	    {
+#if 0
 		printf("dbcache: no empty entries; found unused entry at %d\n", i);
+#endif
 		
 		ret = keyval_db_cache[i].db_p->close(keyval_db_cache[i].db_p, 0);
 		if (ret != 0) {
@@ -142,7 +147,9 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
     /* have lock on an entry */
 
     snprintf(filename, PATH_MAX, "/%s/%08x/%s/%08Lx.keyval", TROVE_DIR, coll_id, KEYVAL_DIRNAME, handle);
+#if 0
     printf("file name = %s\n", filename);
+#endif
 
     ret = db_create(&(keyval_db_cache[i].db_p), NULL, 0);
     if (ret != 0) {
@@ -230,5 +237,5 @@ void dbpf_keyval_dbcache_put(TROVE_coll_id coll_id,
  *  c-basic-offset: 4
  * End:
  *
- * vim: ts=8 sw=4 noexpandtab
+ * vim: ts=8 sts=4 sw=4 noexpandtab
  */

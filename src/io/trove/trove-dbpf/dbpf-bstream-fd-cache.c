@@ -22,19 +22,12 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <assert.h>
-
-#include <trove.h>
-#include <trove-internal.h>
-#include <dbpf.h>
-#include <dbpf-bstream.h>
-
 #include <limits.h>
 
-#define DBPF_OPEN open
-#define DBPF_WRITE write
-#define DBPF_LSEEK lseek
-#define DBPF_READ read
-#define DBPF_CLOSE close
+#include "trove.h"
+#include "trove-internal.h"
+#include "dbpf.h"
+#include "dbpf-bstream.h"
 
 enum {
     FDCACHE_ENTRIES = 16
@@ -116,7 +109,9 @@ int dbpf_bstream_fdcache_try_get(TROVE_coll_id coll_id,
 
     if (i < FDCACHE_ENTRIES) {
 	/* found cached FD, and have the lock */
+#if 0
 	printf("fdcache: found cached fd at index %d\n", i);
+#endif
 	bstream_fd_cache[i].ref_ct++;
 	*fd_p = bstream_fd_cache[i].fd;
 	gen_mutex_unlock(&bstream_fd_cache[i].mutex);
@@ -128,7 +123,9 @@ int dbpf_bstream_fdcache_try_get(TROVE_coll_id coll_id,
 	if (!(ret = gen_mutex_trylock(&bstream_fd_cache[i].mutex)) && 
 	    !bstream_fd_cache[i].valid) 
 	{
+#if 0
 	    printf("fdcache: found empty entry at %d\n", i);
+#endif
 	    break;
 	}
 	else if (ret == 0) gen_mutex_unlock(&bstream_fd_cache[i].mutex);
@@ -139,7 +136,9 @@ int dbpf_bstream_fdcache_try_get(TROVE_coll_id coll_id,
 	    if (!(ret = gen_mutex_trylock(&bstream_fd_cache[i].mutex)) &&
 		bstream_fd_cache[i].ref_ct == 0)
 	    {
+#if 0
 		printf("fdcache: no empty entries; found unused entry at %d\n", i);
+#endif
 		DBPF_CLOSE(bstream_fd_cache[i].fd);
 		bstream_fd_cache[i].valid = 0;
 		bstream_fd_cache[i].fd    = -1;
@@ -155,7 +154,9 @@ int dbpf_bstream_fdcache_try_get(TROVE_coll_id coll_id,
     /* TODO: create the name of the bstream file more correctly */
     snprintf(filename, PATH_MAX, "/%s/%08x/%s/%08Lx.bstream", 
 		    TROVE_DIR, coll_id, BSTREAM_DIRNAME, handle);
+#if 0
     printf("file name = %s\n", filename);
+#endif
     
     /* note: we don't really need the coll_id for this operation,
      * but it doesn't really hurt anything...
@@ -163,7 +164,9 @@ int dbpf_bstream_fdcache_try_get(TROVE_coll_id coll_id,
     
     fd = DBPF_OPEN(filename, O_RDWR, 0);
     if (fd < 0 && errno == ENOENT && create_flag) {
+#if 0
 	printf("creating new dataspace\n");
+#endif
 	if ((fd = DBPF_OPEN(filename, O_RDWR|O_CREAT|O_EXCL, 0644)) < 0)
 	{
 	    printf("error trying to create!\n");
@@ -232,5 +235,5 @@ void dbpf_bstream_fdcache_put(TROVE_coll_id coll_id,
  *  c-basic-offset: 4
  * End:
  *
- * vim: ts=8 sw=4 noexpandtab
+ * vim: ts=8 sts=4 sw=4 noexpandtab
  */

@@ -13,6 +13,7 @@
 #include "trove-ledger.h"
 #include "trove.h"
 
+/* TODO: GET RID OF THIS INCLUDE!!! */
 #include "trove-test.h"
 
 /* struct handle_ledger
@@ -329,7 +330,9 @@ static int handle_store_load(TROVE_coll_id coll_id,
 
     /* add everything onto the free list for now */
     extentlist_addextent(&(ledger->free_list), MIN_HANDLE, MAX_HANDLE);
+#if 0
     extentlist_show(&(ledger->free_list));
+#endif
 
     /* now take off everything that has been used...time consuming, but accurate. */
     array_count = 256;
@@ -355,12 +358,18 @@ static int handle_store_load(TROVE_coll_id coll_id,
 
 	if (array_count == 0) break;
 
+#if 0
 	printf("handle_store_load: found %d handles used.\n", array_count);
+#endif
 
 	for (i=0; i < array_count; i++) {
+#if 0
 	    printf("  handle_store_load: removing %Ld from free list.\n", handle_array[i]);
+#endif
 	    extentlist_handle_remove(&ledger->free_list, handle_array[i]);
+#if 0
 	    extentlist_show(&(ledger->free_list));
+#endif
 	}
     }
 
@@ -433,5 +442,5 @@ static int handle_store_load(TROVE_coll_id coll_id,
  *  c-basic-offset: 4
  * End:
  *
- * vim: ts=8 sw=4 noexpandtab
+ * vim: ts=8 sts=4 sw=4 noexpandtab
  */

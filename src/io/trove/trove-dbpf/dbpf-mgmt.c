@@ -101,7 +101,9 @@ static int dbpf_collection_seteattr(
 	return -1;
     }
 
+#if 0
     printf("seteattr done.\n");
+#endif
     return 1;
 }
 
@@ -226,8 +228,11 @@ static int dbpf_storage_remove(
 {
     unlink(STO_ATTRIB_DBNAME);
     unlink(COLLECTIONS_DBNAME);
-    
+
+    /* TODO: REMOVE ALL THE OTHER FILES!!! */
+#if 0
     printf("databases for storage space removed.\n");
+#endif
     return 1;
 }
 
@@ -281,11 +286,15 @@ static int dbpf_collection_create(
     /* ensure that the collection record isn't already there */
     ret = sto_p->coll_db->get(sto_p->coll_db, NULL, &key, &data, 0);
     if (ret != DB_NOTFOUND) {
+#if 0
 	printf("coll %s already exists with coll_id %d, len = %d.\n",
 	       collname, db_data.coll_id, data.size);
+#endif
 	return -1;
     }
+#if 0
     printf("collection %s didn't already exist.\n", collname);
+#endif
     
     key.data = collname;
     key.size = strlen(collname)+1;
@@ -304,8 +313,10 @@ static int dbpf_collection_create(
     if ((ret = sto_p->coll_db->sync(sto_p->coll_db, 0)) != 0) {
 	return -1;
     }
-    
+
+#if 0    
     printf("collection db updated, coll_id = %d.\n", new_coll_id);
+#endif
 
     /* Create both the base directory, if necessary, then the new collection
      * directory.
@@ -326,7 +337,9 @@ static int dbpf_collection_create(
     
     snprintf(path_name, PATH_MAX, "/%s/%08x", TROVE_DIR, new_coll_id);
 
+#if 0
     printf("dirname = %s\n", path_name);
+#endif
     ret = mkdir(path_name, 0755);
     if (ret != 0) {
 	perror("base collection directory create");
@@ -373,8 +386,10 @@ static int dbpf_collection_create(
 	perror("bstream directory create");
 	return -1;
     }
-    
+
+#if 0
     printf("subdirectories for storing bstreams and keyvals created.\n");
+#endif
     return 1;
 }
 
@@ -426,7 +441,9 @@ static int dbpf_collection_remove(
     snprintf(path_name, PATH_MAX, "/%s/%08x/%s", TROVE_DIR, db_data.coll_id, KEYVAL_DIRNAME);
     rmdir(path_name);
 
+#if 0
     printf("databases and directories for collection removed.\n");
+#endif
 
     return 1;
 }
@@ -456,9 +473,11 @@ static int dbpf_collection_lookup(
     
     /* only one fs for now */
     sto_p = my_storage_p;
-    
+
+#if 0    
     printf("collection %s is part of storage space %s.\n", collname,
 	   sto_p->name);
+#endif
     
     memset(&key, 0, sizeof(key));
     memset(&data, 0, sizeof(data));
@@ -471,7 +490,9 @@ static int dbpf_collection_lookup(
     ret = sto_p->coll_db->get(sto_p->coll_db, NULL, &key, &data, 0);
     if (ret == DB_NOTFOUND) {
 	/* not an error per se */
+#if 0
 	printf("lookup didn't find collection\n");
+#endif
 	return -1;
     }
     else if (ret != 0) {
@@ -480,10 +501,12 @@ static int dbpf_collection_lookup(
 	printf("lookup got error\n");
 	return -1;
     }
-    
+
+#if 0
     printf("found collection %s in database.\n", collname);
     
     printf("coll_id = %d.\n", db_data.coll_id);
+#endif
     
     coll_p = (struct dbpf_collection *)malloc(sizeof(struct dbpf_collection));
     if (coll_p == NULL) {
@@ -620,6 +643,7 @@ static int dbpf_db_create(
     }
     
 #if 0
+    /* store the time string -- removed because it is dirtying up the space */
     if ((ret = db_p->put(db_p, NULL, &key, &data, 0)) == 0)
 	printf("db: %s: key stored.\n", (char *)key.data);
     else {

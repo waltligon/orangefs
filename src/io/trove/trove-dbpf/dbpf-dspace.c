@@ -13,12 +13,12 @@
 #include <malloc.h>
 #include <assert.h>
 
-#include <trove.h>
-#include <trove-internal.h>
-#include <dbpf.h>
-#include <dbpf-dspace.h>
-#include <dbpf-op-queue.h>
-#include <trove-ledger.h>
+#include "trove.h"
+#include "trove-internal.h"
+#include "trove-ledger.h"
+#include "dbpf.h"
+#include "dbpf-dspace.h"
+#include "dbpf-op-queue.h"
 
 /* TODO: move both of these into header file? */
 extern struct dbpf_collection *my_coll_p;
@@ -365,7 +365,9 @@ return_ok:
     if (ret == DB_NOTFOUND) {
 	/* if we ran off the end of the database, return TROVE_ITERATE_END */
 	*op_p->u.d_iterate_handles.position_p = TROVE_ITERATE_END;
+#if 0
 	printf("returning done!\n");
+#endif
     }
     else {
 	/* get the record number to return.
@@ -473,10 +475,12 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
     /* initialize op-specific members */
     q_op_p->op.u.d_setattr.attr_p = ds_attr_p;
 
+#if 0
     printf("storing attributes (1), uid = %d, mode = %d, type = %d\n",
 	   (int) ds_attr_p->uid,
 	   (int) ds_attr_p->mode,
 	   (int) ds_attr_p->type);
+#endif
 
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
 
@@ -510,8 +514,10 @@ static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p)
     data.size = sizeof(s_attr);
 
     trove_ds_attr_to_stored((*op_p->u.d_setattr.attr_p), s_attr);
-    
+
+#if 0   
     printf("storing attributes (2), uid = %d, mode = %d, type = %d\n", (int) s_attr.uid, (int) s_attr.mode, (int) s_attr.type);
+#endif
 
     ret = db_p->put(db_p, NULL, &key, &data, 0);
     if (ret != 0) {
@@ -564,7 +570,9 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
 	goto return_error;
     }
 
+#if 0
     printf("reading attributes (1), uid = %d, mode = %d, type = %d\n", (int) s_attr.uid, (int) s_attr.mode, (int) s_attr.type);
+#endif
 
     trove_ds_stored_to_attr(s_attr, (*op_p->u.d_setattr.attr_p), b_size, k_size);
 
@@ -640,12 +648,16 @@ static int dbpf_dspace_test(TROVE_coll_id coll_id,
 	    *returned_user_ptr_p = q_op_p->op.user_ptr;
 	}
 	dbpf_queued_op_put_and_dequeue(q_op_p);
+#if 0
 	printf("dbpf_dspace_test returning success.\n");
+#endif
 	return 1;
     }
     else {
 	dbpf_queued_op_put(q_op_p, 0);
+#if 0
 	printf("dbpf_dspace_test returning no progress.\n");
+#endif
 	return 0;
     }
 }
@@ -710,5 +722,5 @@ struct TROVE_dspace_ops dbpf_dspace_ops =
  *  c-basic-offset: 4
  * End:
  *
- * vim: ts=8 sw=4 sts=4 noexpandtab
+ * vim: ts=8 sts=4 sw=4 noexpandtab
  */

@@ -58,7 +58,9 @@ int main(int argc, char **argv)
     }
 
     strcpy(path_name, path_to_dir);
+#if 0
     printf("path is %s\n", path_name);
+#endif
 
     /* find the directory handle */
     ret = path_lookup(coll_id, path_name, &handle);
@@ -109,7 +111,8 @@ int main(int argc, char **argv)
 	    count = 1;
 	    while (ga_ret == 0) ga_ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
 
-	    printf("%s (handle = %Ld, uid = %d, gid = %d, perm = %o, type = %d)\n",
+	    printf("%s/%s (handle = %Ld, uid = %d, gid = %d, perm = %o, type = %d)\n",
+		   path_name,
 		   (char *) key[i].buffer,
 		   *(TROVE_handle *) val[i].buffer,
 		   (int) ds_attr.uid,
@@ -181,5 +184,5 @@ int parse_args(int argc, char **argv)
  *  c-basic-offset: 4
  * End:
  *
- * vim: ts=8 sw=4 noexpandtab
+ * vim: ts=8 sts=4 sw=4 noexpandtab
  */

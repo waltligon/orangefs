@@ -7,10 +7,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <time.h>
 
 #include <trove.h>
 #include <trove-test.h>
-
 
 char storage_space[SSPACE_SIZE] = "/tmp/storage-space-foo";
 char file_system[FS_SIZE] = "fs-foo";
@@ -30,6 +30,7 @@ int main(int argc, char ** argv)
     TROVE_coll_id coll_id;
     TROVE_ds_state state;
     TROVE_handle parent_handle, file_handle;
+    TROVE_ds_attributes_s s_attr;
     TROVE_keyval_s key, val;
 
     ret = parse_args(argc, argv);
@@ -83,7 +84,19 @@ int main(int argc, char ** argv)
 	return -1;
     }
 
-    /* add new file name/handle pair to parent directory */
+    /* set attributes of file */
+    s_attr.fs_id  = coll_id; /* for now */
+    s_attr.handle = file_handle;
+    s_attr.type   = TROVE_TEST_DIR; /* shouldn't need to fill this one in. */
+    s_attr.uid    = getuid();
+    s_attr.gid    = getgid();
+    s_attr.mode   = 0755;
+    s_attr.ctime  = time(NULL);
+    count = 1;
+
+    ret = trove_dspace_setattr(coll_id, file_handle, &s_attr, NULL, &op_id);
+    while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+    if (ret < 0) return -1;    /* add new file name/handle pair to parent directory */
     key.buffer = dir_name;
     key.buffer_sz = strlen(dir_name) + 1;
     val.buffer = &file_handle;

@@ -212,5 +212,5 @@ int map_coll_id_to_method(int coll_id)
  *  c-basic-offset: 4
  * End:
  *
- * vim: ts=4
+ * vim: ts=8 sts=4 sw=4 noexpandtab
  */

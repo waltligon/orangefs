@@ -8,7 +8,9 @@
 #include <string.h>
 #include <stdio.h>
 #include <trove.h>
-#include <trove-test.h>
+#include <getopt.h>
+
+#include "trove-test.h"
 
 char storage_space[SSPACE_SIZE] = "/tmp/storage-space-foo";
 char file_system[FS_SIZE] = "fs-foo";
@@ -108,7 +110,9 @@ int main(int argc, char **argv)
     /* create a dataspace to hold the root directory */
     /* Q: what should the bitmask be? */
     /* Q: where are we going to define the dspace types? -- trove-test.h for now. */
+#if 0
     printf("creating root directory\n");
+#endif
     root_handle = 7;
     ret = trove_dspace_create(coll_id,
 			      &root_handle,
@@ -138,7 +142,11 @@ int main(int argc, char **argv)
     }
 
     /* add attribute to collection for last used handle ??? */
-    
+
+    printf("fs created (root handle = %d, coll id = %d, root string = %s)\n",
+	   (int) root_handle,
+	   (int) coll_id,
+	   root_handle_string);
     return 0;
 }
 
@@ -167,4 +175,6 @@ int parse_args(int argc, char **argv)
  *  c-indent-level: 4
  *  c-basic-offset: 4
  * End:
+ *
+ *vim: ts=8 sts=4 sw=4 noexpandtab
  */

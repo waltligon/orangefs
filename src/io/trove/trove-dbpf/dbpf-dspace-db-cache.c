@@ -15,13 +15,13 @@
 #include <assert.h>
 #include <db.h>
 #include <string.h>
-
-#include <trove.h>
-#include <trove-internal.h>
-#include <dbpf.h>
-#include <dbpf-dspace.h>
-
 #include <limits.h>
+
+#include "trove.h"
+#include "trove-internal.h"
+#include "dbpf.h"
+#include "dbpf-dspace.h"
+
 
 enum {
     DBCACHE_ENTRIES = 2
@@ -94,7 +94,9 @@ int dbpf_dspace_dbcache_try_get(TROVE_coll_id coll_id,
 
     if (i < DBCACHE_ENTRIES) {
 	/* found cached DB */
+#if 0
 	printf("dspace dbcache: found cached db at index %d\n", i);
+#endif
 	dspace_db_cache[i].ref_ct++;
 	*db_pp = dspace_db_cache[i].db_p;
 	gen_mutex_unlock(&dspace_db_cache[i].mutex);
@@ -106,7 +108,9 @@ int dbpf_dspace_dbcache_try_get(TROVE_coll_id coll_id,
 	if (!(ret = gen_mutex_trylock(&dspace_db_cache[i].mutex)) &&
 	    dspace_db_cache[i].ref_ct == -1)
 	{
+#if 0
 	    printf("dspace dbcache: found empty entry at %d\n", i);
+#endif
 	    break;
 	}
 	else if (ret == 0) gen_mutex_unlock(&dspace_db_cache[i].mutex);
@@ -118,7 +122,9 @@ int dbpf_dspace_dbcache_try_get(TROVE_coll_id coll_id,
 	    if (!(ret = gen_mutex_trylock(&dspace_db_cache[i].mutex)) &&
 		dspace_db_cache[i].ref_ct == 0)
 	    {
+#if 0
 		printf("dspace dbcache: no empty entries; found unused entry at %d\n", i);
+#endif
 		
 		ret = dspace_db_cache[i].db_p->close(dspace_db_cache[i].db_p, 0);
 		if (ret != 0) {
@@ -134,7 +140,9 @@ int dbpf_dspace_dbcache_try_get(TROVE_coll_id coll_id,
     }
 
     snprintf(filename, PATH_MAX, "/%s/%08x/%s", TROVE_DIR, coll_id, DS_ATTRIB_DBNAME);
+#if 0
     printf("file name = %s\n", filename);
+#endif
 
     ret = db_create(&(dspace_db_cache[i].db_p), NULL, 0);
     if (ret != 0) {
@@ -214,5 +222,5 @@ void dbpf_dspace_dbcache_put(TROVE_coll_id coll_id)
  *  c-basic-offset: 4
  * End:
  *
- * vim: ts=8 sw=4 noexpandtab
+ * vim: ts=8 sts=4 sw=4 noexpandtab
  */

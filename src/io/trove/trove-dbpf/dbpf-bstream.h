@@ -13,9 +13,8 @@ extern "C" {
 
 #include <aio.h>
 
-#include <trove.h>
-#include <dbpf.h>
-
+#include "trove.h"
+#include "dbpf.h"
 
 /* bstream-aio functions */
 
@@ -52,6 +51,12 @@ int dbpf_bstream_fdcache_try_get(TROVE_coll_id coll_id,
 void dbpf_bstream_fdcache_put(TROVE_coll_id coll_id,
 			      TROVE_handle handle);
 
+#define DBPF_OPEN open
+#define DBPF_WRITE write
+#define DBPF_LSEEK lseek
+#define DBPF_READ read
+#define DBPF_CLOSE close
+
 #if defined(__cplusplus)
 }
 #endif
@@ -62,7 +67,7 @@ void dbpf_bstream_fdcache_put(TROVE_coll_id coll_id,
  *  c-basic-offset: 4
  * End:
  *
- * vim: ts=8 sw=4 noexpandtab
+ * vim: ts=8 sts=4 sw=4 noexpandtab
  */
 
 #endif
