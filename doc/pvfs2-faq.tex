@@ -46,6 +46,17 @@ very large numbers of clients and servers.  The architecture is very modular,
 allowing for easy inclusion of new hardware support and new algorithms.  This
 makes PVFS2 a perfect research testbed as well.
 
+\subsection{What does the ``V'' in PVFS stand for?}
+
+The ``V'' in PVFS stands for virtual.  This is a holdover from the original
+(PVFS1) project that built a parallel file system on top of local file
+systems, which we still do now.  It isn't meant to imply virtualization of
+storage, although that is sort of what the file system does.
+
+\subsection{Is PVFS an attempt to parallelize the UNIX VFS?}
+
+No; we're not even sure what that means.
+
 \subsection{What architectures does PVFS2 support?}
 \label{sec:supported-architectures}
 
