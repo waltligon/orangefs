@@ -9,14 +9,11 @@
 #define TEST_FILE_PREFIX                "/tpvfs"
 #define TEST_PVFS_DATA_SIZE             1024*1024
 
-#ifdef __GNUC__
 #define debug_printf(format, f...)                              \
   do {                                                          \
      fprintf(stderr, "file %s, line %d\n", __FILE__, __LINE__); \
      fprintf(stderr, format, ##f);                              \
    } while (0);
-
-#endif /* __GNUC__ */
 
 typedef struct
 {
