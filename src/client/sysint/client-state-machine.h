@@ -100,18 +100,44 @@ struct PINT_client_getattr_sm {
     PVFS_sysresp_getattr *getattr_resp_p; /* destination for output */
 };
 
-/* PINT_client_io_sm */
+/* PINT_client_io_sm
+ *
+ * Data specific to I/O operations on the client side.
+ */
 struct PINT_client_io_sm {
-    PVFS_pinode_reference object_ref;       /* input parameter */
-    enum PVFS_sys_io_type io_type;          /* input parameter */
-    PVFS_Request          io_req;           /* input parameter */
-    PVFS_offset           io_req_offset;    /* input parameter */
-    void                 *buffer;           /* input parameter */
-    PVFS_size             buffer_size;      /* input parameter */
-    int                   datafile_count;   /* from object attribs */
-    PVFS_handle          *datafile_handles; /* from object attribs */
-    PVFS_Dist            *dist_p;           /* from object attribs */
-    uint32_t              dist_size;        /* from object attribs */
+    /* input parameters */
+    PVFS_pinode_reference object_ref;
+    enum PVFS_sys_io_type io_type;
+    PVFS_Request          io_req;
+    PVFS_offset           io_req_offset;
+    void                 *buffer;
+    PVFS_size             buffer_size;
+
+    /* cached from object attributes */
+    int                   datafile_count;
+    PVFS_handle          *datafile_handles;
+    PVFS_Dist            *dist_p;
+    uint32_t              dist_size;
+
+    /* data regarding flows */
+    int                     flow_comp_ct;
+    flow_descriptor       **flow_p_array;
+    PINT_Request_file_data *file_data_array;
+    job_id_t               *flow_id_array;
+    job_status_s           *flow_status_array;
+
+    /* session tags, used in all messages */
+    PVFS_msg_tag_t         *session_tag_array;
+
+    /* data regarding final acknowledgements (writes only) */
+    int                        ack_comp_ct;
+    PINT_client_sm_recv_state *ackarray;
+#if 0
+    job_id_t             *ack_id_array;
+    job_status_s         *ack_status_array;
+#endif
+
+    /* output parameter */
     PVFS_sysresp_io      *io_resp_p;
 };
 

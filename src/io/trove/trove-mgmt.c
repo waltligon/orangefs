@@ -245,7 +245,7 @@ int trove_open_context(TROVE_context_id *context_id)
       route this request to dbpf; same problem suffered
       in trove_initialize, where we have to assume dbpf.
     */
-    if (context_method_table[method_id])
+    if (trove_init_status != 0)
     {
         ret = context_method_table[method_id]->open_context(
             context_id);
@@ -268,7 +268,7 @@ int trove_close_context(TROVE_context_id context_id)
       route this request to dbpf; same problem suffered
       in trove_initialize, where we have to assume dbpf.
     */
-    if (context_method_table[method_id])
+    if (trove_init_status != 0)
     {
         ret = context_method_table[method_id]->close_context(
             context_id);
