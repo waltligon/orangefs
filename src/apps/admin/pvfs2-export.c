@@ -22,8 +22,6 @@
 /* optional parameters, filled in by parse_args() */
 struct options
 {
-    int strip_size;
-    int num_datafiles;
     int buf_size;
     char* srcfile;
     char* destfile;
@@ -41,14 +39,14 @@ int main(int argc, char **argv)
     PVFS_fs_id cur_fs;
     pvfs_mntlist mnt = {0,NULL};
     PVFS_sysresp_init resp_init;
-    PVFS_sysreq_create req_create;
-    PVFS_sysresp_create resp_create;
+    PVFS_sysreq_lookup req_lookup;
+    PVFS_sysresp_lookup resp_lookup;
     PVFS_sysreq_io req_io;
     PVFS_sysresp_io resp_io;
     struct options* user_opts = NULL;
     int i = 0;
     int mnt_index = -1;
-    int src_fd = -1;
+    int dest_fd = -1;
     int current_size = 0;
     void* buffer = NULL;
     int64_t total_written = 0;
@@ -66,15 +64,16 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    /* make sure we can access the source file before we go to any
+    /* make sure we can access the dest file before we go to any
      * trouble to contact pvfs servers
      */
-    src_fd = open(user_opts->srcfile, O_RDONLY);
-    if(src_fd < 0)
+    dest_fd = open(user_opts->destfile, O_CREAT|O_WRONLY|O_TRUNC,
+	0777);
+    if(dest_fd < 0)
     {
 	perror("open()");
-	fprintf(stderr, "Error: could not access src file: %s\n",
-	    user_opts->srcfile);
+	fprintf(stderr, "Error: could not access dest file: %s\n",
+	    user_opts->destfile);
 	return(-1);
     }
 
@@ -82,7 +81,7 @@ int main(int argc, char **argv)
     if(parse_pvfstab(DEFAULT_TAB, &mnt))
     {
         fprintf(stderr, "Error: failed to parse pvfstab %s.\n", DEFAULT_TAB);
-	close(src_fd);
+	close(dest_fd);
         return(-1);
     }
 
@@ -91,7 +90,7 @@ int main(int argc, char **argv)
      */
     for(i=0; i<mnt.nr_entry; i++)
     {
-	ret = PINT_remove_dir_prefix(user_opts->destfile,
+	ret = PINT_remove_dir_prefix(user_opts->srcfile,
 	    mnt.ptab_p[i].local_mnt_dir, pvfs_path, PVFS_NAME_MAX);
 	if(ret == 0)
 	{
@@ -103,8 +102,8 @@ int main(int argc, char **argv)
     if(mnt_index == -1)
     {
 	fprintf(stderr, "Error: could not find filesystem for %s in pvfstab %s\n", 
-	    user_opts->destfile, DEFAULT_TAB);
-	close(src_fd);
+	    user_opts->srcfile, DEFAULT_TAB);
+	close(dest_fd);
 	return(-1);
 
     }
@@ -114,7 +113,7 @@ int main(int argc, char **argv)
     if(ret < 0)
     {
 	PVFS_perror("PVFS_sys_initialize", ret);
-	close(src_fd);
+	close(dest_fd);
 	return(-1);
     }
 
@@ -131,50 +130,37 @@ int main(int argc, char **argv)
 	goto main_out;
     }
 
-    memset(&req_create, 0, sizeof(PVFS_sysreq_create));
-    memset(&resp_create, 0, sizeof(PVFS_sysresp_create));
+    memset(&req_lookup, 0, sizeof(PVFS_sysreq_lookup));
+    memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
 
     cur_fs = resp_init.fsid_list[mnt_index];
 
     printf("Warning: overriding ownership and permissions to match prototype file system.\n");
 
-    req_create.entry_name = str_buf;
-    req_create.attrmask = (ATTR_UID | ATTR_GID | ATTR_PERM);
-    req_create.attr.owner = 100;
-    req_create.attr.group = 100;
-    req_create.attr.perms = 1877;
-    req_create.credentials.uid = 100;
-    req_create.credentials.gid = 100;
-    req_create.credentials.perms = 1877;
-    req_create.attr.u.meta.nr_datafiles = user_opts->num_datafiles;
-    req_create.parent_refn.handle =
-        lookup_parent_handle(pvfs_path,cur_fs);
-    req_create.parent_refn.fs_id = cur_fs;
+    req_lookup.credentials.uid = 100;
+    req_lookup.credentials.gid = 100;
+    req_lookup.credentials.perms = 1877;
+    req_lookup.fs_id = cur_fs;
 
-    /* Fill in the dist -- NULL means the system interface used the 
-     * "default_dist" as the default
+    /* TODO: this is awkward- the remove_base_dir() function
+     * doesn't leave an opening slash on the path (because it was
+     * first written to help with sys_create() calls).  However,
+     * in the sys_lookup() case, we need the opening slash.
      */
-    if(user_opts->strip_size == -1)
+    req_lookup.name = (char*)malloc(strlen(str_buf) + 2);
+    if(!req_lookup.name)
     {
-	req_create.attr.u.meta.dist = NULL;
+	perror("malloc()");
+	ret = -1;
+	goto main_out;
     }
-    else
-    {
-	req_create.attr.u.meta.dist = PVFS_Dist_create("simple_stripe");
-	if(!req_create.attr.u.meta.dist)
-	{
-	    fprintf(stderr, "Error: PVFS_Dist_create() failure.\n");
-	    ret = -1;
-	    goto main_out;
-	}
-	req_create.attr.u.meta.dist->params->strip_size =
-	    user_opts->strip_size;
-    }
+    req_lookup.name[0] = '/';
+    strcpy(&(req_lookup.name[1]), str_buf);
 
-    ret = PVFS_sys_create(&req_create,&resp_create);
-    if (ret < 0)
+    ret = PVFS_sys_lookup(&req_lookup, &resp_lookup);
+    if(ret < 0)
     {
-	PVFS_perror("PVFS_sys_create", ret);
+	PVFS_perror("PVFS_sys_lookup", ret);
 	ret = -1;
 	goto main_out;
     }
@@ -188,16 +174,41 @@ int main(int argc, char **argv)
 	goto main_out;
     }
 
-    req_io.pinode_refn = resp_create.pinode_refn;
-    req_io.credentials = req_create.credentials;
+    req_io.pinode_refn = resp_lookup.pinode_refn;
+    req_io.credentials = req_lookup.credentials;
     req_io.buffer = buffer;
+    req_io.buffer_size = user_opts->buf_size;
+    blocklength = user_opts->buf_size;
+    displacement = 0;
+    ret = PVFS_Request_indexed(1, &blocklength, &displacement,
+	PVFS_BYTE, &req_io.io_req);
+    if(ret < 0)
+    {
+	fprintf(stderr, "Error: PVFS_Request_indexed failure.\n");
+	ret = -1;
+	goto main_out;
+    }
 
     time1 = Wtime();
-    while((current_size = read(src_fd, buffer, user_opts->buf_size)) > 0)
+    while((ret = PVFS_sys_read(&req_io, &resp_io)) == 0 &&
+	resp_io.total_completed > 0)
     {
+	current_size = resp_io.total_completed;
+
+	/* write out the data */
+	ret = write(dest_fd, buffer, current_size);
+	if(ret < 0)
+	{
+	    perror("write()");
+	    ret = -1;
+	    goto main_out;
+	}
+
+	total_written += current_size;
+
+	/* TODO: need to free the old request description */
+	
 	/* setup I/O description */
-	req_io.buffer_size = current_size;
-	blocklength = current_size;
 	displacement = total_written;
 	ret = PVFS_Request_indexed(1, &blocklength,
 	    &displacement, PVFS_BYTE, &req_io.io_req);
@@ -207,36 +218,12 @@ int main(int argc, char **argv)
 	    ret = -1;
 	    goto main_out;
 	}
-
-	/* write out the data */
-	ret = PVFS_sys_write(&req_io, &resp_io);
-	if(ret < 0)
-	{
-	    PVFS_perror("PVFS_sys_write", ret);
-	    ret = -1;
-	    goto main_out;
-	}
-
-	/* sanity check */
-	if(current_size != resp_io.total_completed)
-	{
-	    fprintf(stderr, "Error: short write!\n");
-	    fprintf(stderr, "Tried to write %d bytes at offset %d.\n", 
-		(int)current_size, (int)total_written);
-	    fprintf(stderr, "Only got %d bytes.\n", (int)resp_io.total_completed);
-	    ret = -1;
-	    goto main_out;
-	}
-
-	total_written += current_size;
-
-	/* TODO: need to free the request description */
     };
     time2 = Wtime();
 
-    if(current_size < 0)
+    if(ret < 0)
     {
-	perror("read()");
+	PVFS_perror("PVFS_sys_read()", ret);
 	ret = -1;
 	goto main_out;
     }
@@ -244,8 +231,8 @@ int main(int argc, char **argv)
     /* print some statistics */
     printf("PVFS2 Import Statistics:\n");
     printf("********************************************************\n");
-    printf("Destination path (local): %s\n", user_opts->destfile);
-    printf("Destination path (PVFS2 file system): %s\n", pvfs_path);
+    printf("Source path (local): %s\n", user_opts->srcfile);
+    printf("Source path (PVFS2 file system): %s\n", pvfs_path);
     printf("File system name: %s\n", mnt.ptab_p[mnt_index].service_name);
     printf("Initial config server: %s\n", mnt.ptab_p[mnt_index].meta_addr);
     printf("********************************************************\n");
@@ -263,8 +250,8 @@ main_out:
 
     gossip_disable();
 
-    if(src_fd > 0)
-	close(src_fd);
+    if(dest_fd > 0)
+	close(dest_fd);
     if(buffer)
 	free(buffer);
 
@@ -283,7 +270,7 @@ static struct options* parse_args(int argc, char* argv[])
     /* getopt stuff */
     extern char* optarg;
     extern int optind, opterr, optopt;
-    char flags[] = "s:n:b:";
+    char flags[] = "b:";
     char one_opt = ' ';
 
     struct options* tmp_opts = NULL;
@@ -297,27 +284,11 @@ static struct options* parse_args(int argc, char* argv[])
     memset(tmp_opts, 0, sizeof(struct options));
 
     /* fill in defaults (except for hostid) */
-    tmp_opts->strip_size = -1;
-    tmp_opts->num_datafiles = -1;
     tmp_opts->buf_size = 10*1024*1024;
 
     /* look at command line arguments */
     while((one_opt = getopt(argc, argv, flags)) != EOF){
 	switch(one_opt){
-	    case('s'):
-		ret = sscanf(optarg, "%d", &tmp_opts->strip_size);
-		if(ret < 1){
-		    free(tmp_opts);
-		    return(NULL);
-		}
-		break;
-	    case('n'):
-		ret = sscanf(optarg, "%d", &tmp_opts->num_datafiles);
-		if(ret < 1){
-		    free(tmp_opts);
-		    return(NULL);
-		}
-		break;
 	    case('b'):
 		ret = sscanf(optarg, "%d", &tmp_opts->buf_size);
 		if(ret < 1){
@@ -348,9 +319,8 @@ static struct options* parse_args(int argc, char* argv[])
 static void usage(int argc, char** argv)
 {
     fprintf(stderr, 
-	"Usage: %s [-s strip_size] [-n num_datafiles] [-b buffer_size]\n",
-	argv[0]);
-    fprintf(stderr, "   unix_source_file pvfs2_dest_file\n");
+	"Usage: %s [-b buffer_size] pvfs2_src_file unix_dest_file\n", 
+	argv[0]); 
     fprintf(stderr, "\n      Note: this utility reads /etc/pvfs2tab for file system configuration.\n");
     return;
 }
