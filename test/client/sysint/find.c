@@ -55,7 +55,7 @@ int is_directory(PVFS_handle handle, PVFS_fs_id fs_id)
     return ((getattr_response.attr.objtype == PVFS_TYPE_DIRECTORY) ? 1 : 0);
 }
 
-int directory_walk(PVFS_sysresp_init *init_response,
+int directory_walk(PVFS_fs_id cur_fs,
                    char *start_dir, char *base_dir, int depth)
 {
     int i = 0;
@@ -65,7 +65,6 @@ int directory_walk(PVFS_sysresp_init *init_response,
     PVFS_sysresp_lookup lk_response;
     PVFS_sysresp_readdir rd_response;
     char full_path[PVFS_NAME_MAX] = {0};
-    PVFS_fs_id fs_id;
     char* name;
     PVFS_credentials credentials;
     PVFS_pinode_reference pinode_refn;
@@ -91,22 +90,21 @@ int directory_walk(PVFS_sysresp_init *init_response,
         strcpy(full_path,start_dir);
     }
     name = full_path;
-    fs_id = init_response->fsid_list[0];
     credentials.uid = getuid();
     credentials.gid = getgid();
 
-    if (PVFS_sys_lookup(fs_id, name, credentials,
+    if (PVFS_sys_lookup(cur_fs, name, credentials,
                         &lk_response, PVFS2_LOOKUP_LINK_FOLLOW))
     {
         fprintf(stderr,"Failed to lookup %s on fs_id %d!\n",
-                name,init_response->fsid_list[0]);
+                name,cur_fs);
         return 1;
     }
 
     print_at_depth(name,depth);
 
     pinode_refn.handle = lk_response.pinode_refn.handle;
-    pinode_refn.fs_id = init_response->fsid_list[0];
+    pinode_refn.fs_id = cur_fs;
     token = 0;
     pvfs_dirent_incount = MAX_NUM_DIRENTS;
     credentials.uid = getuid();
@@ -141,7 +139,7 @@ int directory_walk(PVFS_sysresp_init *init_response,
                          Lu(cur_handle));
 
             is_dir = is_directory(cur_handle,
-                                  init_response->fsid_list[0]);
+                                  cur_fs);
             switch(is_dir)
             {
                 case -1:
@@ -161,7 +159,7 @@ int directory_walk(PVFS_sysresp_init *init_response,
                 break;
                 case 1:
                     /* if we have a dir, recurse */
-                    if (directory_walk(init_response,cur_file,
+                    if (directory_walk(cur_fs, cur_file,
                                        full_path,depth+1))
                     {
                         fprintf(stderr,"Failed directory walk at "
@@ -184,9 +182,9 @@ int directory_walk(PVFS_sysresp_init *init_response,
 
 int main(int argc, char **argv)
 {
-    const PVFS_util_tab* tab;
-    PVFS_sysresp_init init_response;
     int go_twice = 0;
+    PVFS_fs_id cur_fs;
+    int ret = -1;
 
     if (argc != 2)
     {
@@ -209,21 +207,20 @@ int main(int argc, char **argv)
 
   start_find:
 
-    tab = PVFS_util_parse_pvfstab(NULL);
-    if(!tab)
+    ret = PVFS_util_init_defaults();
+    if (ret < 0)
     {
-        fprintf(stderr,"Error parsing pvfstab!\n");
-        return 1;
+	PVFS_perror("PVFS_util_init_defaults", ret);
+	return (-1);
+    }
+    ret = PVFS_util_get_default_fsid(&cur_fs);
+    if (ret < 0)
+    {
+	PVFS_perror("PVFS_util_get_default_fsid", ret);
+	return (-1);
     }
 
-    memset(&init_response,0,sizeof(PVFS_sysresp_init));
-    if (PVFS_sys_initialize(*tab, GOSSIP_NO_DEBUG, &init_response))
-    {
-        fprintf(stderr,"Cannot initialize system interface\n");
-        return 1;
-    }
-
-    if (directory_walk(&init_response,argv[1],NULL,0))
+    if (directory_walk(cur_fs, argv[1],NULL,0))
     {
         fprintf(stderr,"Failed to do directory walk\n");
         return 1;
@@ -231,7 +228,7 @@ int main(int argc, char **argv)
 
     if (go_twice)
     {
-        if (directory_walk(&init_response,argv[1],NULL,0))
+        if (directory_walk(cur_fs, argv[1],NULL,0))
         {
             fprintf(stderr,"Failed to do directory walk (2nd iteration)\n");
             return 1;

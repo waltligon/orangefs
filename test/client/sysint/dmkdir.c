@@ -22,8 +22,6 @@ int main(int argc,char **argv)
     char str_buf2[256] = {0};
     char str_buf3[256] = {0};
     PVFS_fs_id cur_fs;
-    const PVFS_util_tab* tab;
-    PVFS_sysresp_init resp_init;
     PVFS_sysresp_mkdir resp_mkdir;
     char* entry_name;
     PVFS_pinode_reference parent_refn;
@@ -37,18 +35,17 @@ int main(int argc,char **argv)
     }
     dirname = argv[1];
 
-    tab = PVFS_util_parse_pvfstab(NULL);
-    if (!tab)
+    ret = PVFS_util_init_defaults();
+    if (ret < 0)
     {
-        printf("Failed to parse pvfstab\n");
-        return ret;
+	PVFS_perror("PVFS_util_init_defaults", ret);
+	return (-1);
     }
-
-    memset(&resp_init, 0, sizeof(resp_init));
-    if (PVFS_sys_initialize(*tab, GOSSIP_NO_DEBUG, &resp_init))
+    ret = PVFS_util_get_default_fsid(&cur_fs);
+    if (ret < 0)
     {
-        printf("Failed to initialize system interface\n");
-        return ret;
+	PVFS_perror("PVFS_util_get_default_fsid", ret);
+	return (-1);
     }
 
     if (PVFS_util_remove_base_dir(dirname,str_buf,256))
@@ -68,8 +65,6 @@ int main(int argc,char **argv)
            str_buf, str_buf2, str_buf3);
 
     memset(&resp_mkdir, 0, sizeof(PVFS_sysresp_mkdir));
-
-    cur_fs = resp_init.fsid_list[0];
 
     entry_name = str_buf;
     ret = PVFS_util_lookup_parent(dirname, cur_fs, credentials, 

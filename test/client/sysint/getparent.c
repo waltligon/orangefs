@@ -15,10 +15,8 @@
 
 int main(int argc,char **argv)
 {
-    PVFS_sysresp_init resp_init;
     PVFS_sysresp_getparent resp_getparent;
     int ret = -1;
-    const PVFS_util_tab* tab;
     PVFS_fs_id fs_id;
     PVFS_credentials credentials;
 
@@ -30,24 +28,21 @@ int main(int argc,char **argv)
 
     printf("lookup up path %s\n", argv[1]);
 
-    tab = PVFS_util_parse_pvfstab(NULL);
-    if(!tab)
+    ret = PVFS_util_init_defaults();
+    if (ret < 0)
     {
-        printf("Parsing error\n");
-        return(-1);
+	PVFS_perror("PVFS_util_init_defaults", ret);
+	return (-1);
     }
-
-    ret = PVFS_sys_initialize(*tab, GOSSIP_CLIENT_DEBUG, &resp_init);
-    if(ret < 0)
+    ret = PVFS_util_get_default_fsid(&fs_id);
+    if (ret < 0)
     {
-        printf("PVFS_sys_initialize() failure. = %d\n", ret);
-        return(ret);
+	PVFS_perror("PVFS_util_get_default_fsid", ret);
+	return (-1);
     }
 
     credentials.uid = getuid();
     credentials.gid = getgid();
-
-    fs_id = resp_init.fsid_list[0];
 
     ret = PVFS_sys_getparent(fs_id, argv[1], credentials, &resp_getparent);
     if (ret == 0)

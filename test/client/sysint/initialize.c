@@ -13,27 +13,15 @@
 
 int main(int argc,char **argv)
 {
-	PVFS_sysresp_init resp_init;
 	int ret = -1;
-	const PVFS_util_tab* tab;
 
-	/* Parse PVFStab */
-	tab = PVFS_util_parse_pvfstab(NULL);
-	if (!tab)
+	ret = PVFS_util_init_defaults();
+	if (ret < 0)
 	{
-		printf("Parsing error\n");
-		return(-1);
+		PVFS_perror("PVFS_util_init_defaults", ret);
+		return (-1);
 	}
 
-	/*Init the system interface*/
-	ret = PVFS_sys_initialize(*tab, GOSSIP_CLIENT_DEBUG, &resp_init);
-	if(ret < 0)
-	{
-		printf("PVFS_sys_initialize() failure. = %d\n", ret);
-		return(ret);
-	}
-
-	/*close it down*/
 	ret = PVFS_sys_finalize();
 	if (ret < 0)
 	{
