@@ -18,12 +18,22 @@
 #include <stdint.h>
 #endif /* __KERNEL__ */
 
+#include "src/proto/endecode-funcs.h"
+
 /* basic types used throughout code */
 typedef uint8_t PVFS_boolean;
 typedef int32_t PVFS_error;
 typedef int64_t PVFS_offset;
 typedef int64_t PVFS_size;
 typedef int64_t PVFS_id_gen_t;
+#define encode_PVFS_error encode_int32_t
+#define decode_PVFS_error decode_int32_t
+#define encode_PVFS_offset encode_int64_t
+#define decode_PVFS_offset decode_int64_t
+#define encode_PVFS_size encode_int64_t
+#define decode_PVFS_size decode_int64_t
+#define encode_PVFS_id_gen_t encode_int64_t
+#define decode_PVFS_id_gen_t decode_int64_t
 
 /* basic types used by communication subsystems */
 typedef int32_t PVFS_msg_tag_t;
@@ -41,12 +51,26 @@ typedef uint64_t PVFS_handle;
 typedef int32_t PVFS_fs_id;
 typedef int32_t PVFS_ds_position;
 typedef int32_t PVFS_ds_flags;
+#define encode_PVFS_handle encode_uint64_t
+#define decode_PVFS_handle decode_uint64_t
+#define encode_PVFS_fs_id encode_int32_t
+#define decode_PVFS_fs_id decode_int32_t
+#define decode_PVFS_ds_position decode_int32_t
+#define encode_PVFS_ds_position encode_int32_t
 
 /* basic types used within metadata */
 typedef uint32_t PVFS_uid;
 typedef uint32_t PVFS_gid;
 typedef int64_t PVFS_time;
 typedef uint32_t PVFS_permissions;
+#define encode_PVFS_uid encode_uint32_t
+#define decode_PVFS_uid decode_uint32_t
+#define encode_PVFS_gid encode_uint32_t
+#define decode_PVFS_gid decode_uint32_t
+#define encode_PVFS_time encode_int64_t
+#define decode_PVFS_time decode_int64_t
+#define encode_PVFS_permissions encode_uint32_t
+#define decode_PVFS_permissions decode_uint32_t
 
 /* some limits */
 /* TODO: is there a better place for this stuff?  maybe merge with
@@ -62,6 +86,9 @@ struct PVFS_handle_extent_s
     PVFS_handle last;
 };
 typedef struct PVFS_handle_extent_s PVFS_handle_extent;
+endecode_fields_2(PVFS_handle_extent,
+  PVFS_handle, first,
+  PVFS_handle, last);
 
 /* an array of contiguous ranges of handles */
 struct PVFS_handle_extent_array_s
@@ -70,6 +97,9 @@ struct PVFS_handle_extent_array_s
     PVFS_handle_extent *extent_array;
 };
 typedef struct PVFS_handle_extent_array_s PVFS_handle_extent_array;
+endecode_fields_0a(PVFS_handle_extent_array,
+  uint32_t, extent_count,
+  PVFS_handle_extent, extent_array);
 
 /* predefined special values for types */
 #define PVFS_HANDLE_NULL ((PVFS_handle)0) /* invalid object handle */
@@ -99,6 +129,8 @@ enum PVFS_ds_type_e
     PVFS_TYPE_DIRDATA =	    (1 << 4)
 };
 typedef enum PVFS_ds_type_e PVFS_ds_type;
+#define decode_PVFS_ds_type decode_enum
+#define encode_PVFS_ds_type encode_enum
 
 /* internal attribute masks, common to all obj types */
 #define PVFS_ATTR_COMMON_UID	(1 << 0)
@@ -153,6 +185,12 @@ struct PVFS_statfs_s
     uint64_t handles_total_count;
 };
 typedef struct PVFS_statfs_s PVFS_statfs;
+endecode_fields_5(PVFS_statfs,
+  PVFS_fs_id, fs_id,
+  PVFS_size, bytes_available,
+  PVFS_size, bytes_total,
+  uint64_t, handles_available_count,
+  uint64_t, handles_total_count);
 
 /* pinode reference (uniquely refers to a single pinode) */
 struct PVFS_pinode_reference_s
@@ -169,6 +207,7 @@ struct PVFS_credentials_s
     PVFS_gid gid;
 };
 typedef struct PVFS_credentials_s PVFS_credentials;
+endecode_fields_2(PVFS_credentials, PVFS_uid, uid, PVFS_gid, gid);
 
 /* directory entry */
 #define PVFS_NAME_MAX    256	/* max length of PVFS filename */
@@ -179,6 +218,7 @@ struct PVFS_dirent_s
     PVFS_handle handle;
 };
 typedef struct PVFS_dirent_s PVFS_dirent;
+endecode_fields_2(PVFS_dirent, here_string, d_name, PVFS_handle, handle);
 
 /* these are predefined server parameters that can be manipulated
  * through the mgmt interface

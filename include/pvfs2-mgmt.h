@@ -33,6 +33,12 @@ struct PVFS_mgmt_perf_stat
     int64_t write;	    /* bytes written */
     int64_t read;	    /* bytes read */
 };
+endecode_fields_5_struct(PVFS_mgmt_perf_stat,
+  int32_t, valid_flag,
+  uint32_t, id,
+  uint64_t, start_time_ms,
+  int64_t, write,
+  int64_t, read);
 
 /* low level information about individual server level objects */
 struct PVFS_mgmt_dspace_info
@@ -44,6 +50,13 @@ struct PVFS_mgmt_dspace_info
     PVFS_size k_size;		/* number of keyvals (if applicable) */
     PVFS_handle dirdata_handle; /* directory data handle (if applicable) */
 };
+endecode_fields_6_struct(PVFS_mgmt_dspace_info,
+  PVFS_error, error_code,
+  PVFS_handle, handle,
+  PVFS_ds_type, type,
+  PVFS_size, b_size,
+  PVFS_size, k_size,
+  PVFS_handle, dirdata_handle);
 
 /* individual datapoint from event monitoring */
 struct PVFS_mgmt_event
@@ -52,10 +65,18 @@ struct PVFS_mgmt_event
     int32_t operation;
     int64_t value;
     PVFS_id_gen_t id;
-    int8_t flags;
+    int32_t flags;
     int32_t tv_sec;
     int32_t tv_usec;
 };
+endecode_fields_7_struct(PVFS_mgmt_event,
+    int32_t, api,
+    int32_t, operation,
+    int64_t, value,
+    PVFS_id_gen_t, id,
+    int32_t, flags,
+    int32_t, tv_sec,
+    int32_t, tv_usec);
 
 /* values which may be or'd together in the flags field above */
 enum
