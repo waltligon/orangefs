@@ -100,7 +100,6 @@ int PVFS_sys_fs_add(struct PVFS_sys_mntent *mntent)
     if (ret < 0)
     {
         PVFS_perror_gossip("PINT_server_config_mgr_add_config failed", ret);
-        PVFS_util_remove_internal_mntent(mntent);
         goto error_exit;
     }
 

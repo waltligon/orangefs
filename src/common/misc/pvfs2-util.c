@@ -30,9 +30,10 @@
 #include <mntent.h>
 #endif
 
-#define PVFS2_MAX_TABFILES       8
+#define PVFS2_MAX_INVALID_MNTENTS                     256
+#define PVFS2_MAX_TABFILES                              8
 #define PVFS2_DYNAMIC_TAB_INDEX  (PVFS2_MAX_TABFILES - 1)
-#define PVFS2_DYNAMIC_TAB_NAME   "<DynamicTab>"
+#define PVFS2_DYNAMIC_TAB_NAME              "<DynamicTab>"
 
 static PVFS_util_tab s_stat_tab_array[PVFS2_MAX_TABFILES];
 static int s_stat_tab_count = 0;
@@ -699,9 +700,8 @@ int PVFS_util_resolve(
  */
 int PVFS_util_init_defaults(void)
 {
-    int ret = -1;
-    int i;
-    int found_one = 0;
+    int ret = -1, i = 0, j = 0, found_one = 0;
+    int failed_indices[PVFS2_MAX_INVALID_MNTENTS] = {0};
 
     /* use standard system tab files */
     const PVFS_util_tab* tab = PVFS_util_parse_pvfstab(NULL);
@@ -721,7 +721,7 @@ int PVFS_util_init_defaults(void)
     }
 
     /* add in any file systems we found in the fstab */
-    for(i=0; i<tab->mntent_count; i++)
+    for(i = 0; i < tab->mntent_count; i++)
     {
         ret = PVFS_sys_fs_add(&tab->mntent_array[i]);
         if (ret == 0)
@@ -730,11 +730,30 @@ int PVFS_util_init_defaults(void)
         }
         else
         {
-            gossip_err(
-                "WARNING: failed to initialize file system for mount "
-                "point %s in tab file %s\n", tab->mntent_array[i].mnt_dir,
-                tab->tabfile_name);
+            failed_indices[j++] = i;
+            gossip_err("WARNING: failed to initialize file system for "
+                       "mount point %s in tab file %s\n",
+                       tab->mntent_array[i].mnt_dir, tab->tabfile_name);
+
+            if (j > (PVFS2_MAX_INVALID_MNTENTS - 1))
+            {
+                gossip_err("*** Failed to initialize %d file systems "
+                           "from tab file %s.\n ** If this is a valid "
+                           "tabfile, please remove invalid entries.\n",
+                           PVFS2_MAX_INVALID_MNTENTS,
+                           tab->tabfile_name);
+                gossip_err("Continuing execution without remaining "
+                           "mount entries\n");
+                
+                break;
+            }
         }
+    }
+
+    /* remove any mount entries that couldn't be added here */
+    for(; j > -1; j--)
+    {
+        PVFS_util_remove_internal_mntent(&tab->mntent_array[j]);
     }
 
     if (found_one)
