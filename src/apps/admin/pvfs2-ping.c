@@ -54,6 +54,7 @@ int main(int argc, char **argv)
     PVFS_sysresp_init resp_init;
     int i;
     PVFS_credentials creds;
+    PVFS_sysresp_lookup resp_lookup;
 
     /* look at command line arguments */
     user_opts = parse_args(argc, argv);
@@ -159,6 +160,46 @@ int main(int argc, char **argv)
 	return(-1);
     }
     printf("\n   Ok; all servers understand fs_id %ld\n", (long)cur_fs);
+
+    printf("\n(5) Verifying that root handle is owned by one server...\n");    
+
+    ret = PVFS_sys_lookup(cur_fs, "/", creds, &resp_lookup);
+    if(ret != 0)
+    {
+	PVFS_perror("PVFS_sys_lookup", ret);
+	fprintf(stderr, "Failure: could not lookup root handle.\n");
+	return(-1);
+    }
+    printf("\n   Root handle: 0x%08Lx\n", resp_lookup.pinode_refn.handle);
+
+    /* check that only one server controls root handle */
+    /* TODO: we need a way to get information out about which server failed
+     * in error cases here 
+     */
+    ret = PVFS_mgmt_setparam_all(cur_fs, creds, PVFS_SERV_PARAM_ROOT_CHECK,
+	(int64_t)resp_lookup.pinode_refn.handle);
+
+    /* check for understood error values */
+    if(ret == -PVFS_ENOENT)
+    {
+	fprintf(stderr, "Failure: no servers claimed ownership of root handle.\n");
+	return(-1);
+    }
+    if(ret == -PVFS_EALREADY)
+    {
+	fprintf(stderr, "Failure: more than one server appears to own root handle.\n");
+	return(-1);
+    }
+    if(ret < 0)
+    {
+	PVFS_perror("PVFS_mgmt_setparam_all", ret);
+	fprintf(stderr, "Failure: failed to check root handle.\n");
+	return(-1);
+    }
+
+    /* if we hit this point, then everything is ok */
+    printf("   Ok; root handle is owned by exactly one server.\n");
+    printf("\n");
 
     PVFS_sys_finalize();
 

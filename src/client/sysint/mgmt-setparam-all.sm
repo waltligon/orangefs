@@ -31,6 +31,9 @@ static int mgmt_setparam_all_setup_msgpair(PINT_client_sm *sm_p,
 static int mgmt_setparam_all_cleanup(PINT_client_sm *sm_p,
 			  job_status_s *js_p);
 
+static int root_check_comp_fn(void* v_p, struct PVFS_server_resp * resp_p,
+    int i);
+
 %%
 
 machine pvfs2_client_mgmt_setparam_all_sm(
@@ -203,7 +206,10 @@ static int mgmt_setparam_all_setup_msgpair(PINT_client_sm *sm_p,
 
 	msg_p->fs_id = sm_p->u.setparam_all.fs_id;
 	msg_p->handle = PVFS_HANDLE_NULL;
-	msg_p->comp_fn = NULL;
+	if(sm_p->u.setparam_all.param == PVFS_SERV_PARAM_ROOT_CHECK)
+	    msg_p->comp_fn = root_check_comp_fn;
+	else
+	    msg_p->comp_fn = NULL;
 	msg_p->svr_addr = addr_array[i];
     }
 
@@ -224,6 +230,60 @@ static int mgmt_setparam_all_cleanup(PINT_client_sm *sm_p,
     sm_p->op_complete = 1;
 
     return(0);
+}
+
+
+/* root_check_comp_fn()
+ *
+ * completion function for PVFS_SERV_PARAM_ROOT_CHECK parameter; it 
+ * handles this special case operation in which we want just one server to
+ * return success and all others to return -PVFS_ENOENT.
+ *
+ * returns 0 if exactly one server claims ownership of root handle,
+ * -PVFS_error on failure
+ */
+static int root_check_comp_fn(void* v_p, struct PVFS_server_resp * resp_p,
+    int i)
+{
+    int j = 0;
+    PINT_client_sm* sm_p = (PINT_client_sm*)v_p;
+    int success_flag = 0;
+
+    if(i < (sm_p->msgarray_count -1))
+    {
+	/* just return invalid, we only compute the correct error
+	 * code after the final response has been successfully received
+	 */
+	return(-PVFS_EINVAL);
+    }
+
+    /* if we hit this point, it must be the last response.  Look at all of
+     * the responses, and return success if one response has a zero status 
+     * and all other responses have -PVFS_ENOENT.
+     */
+    for(j=0; j<i; j++)
+    {
+	if(sm_p->msgarray[j].op_status == 0)
+	{
+	    if(success_flag)
+	    {
+		/* whoops- too many servers say that they have the root handle */
+		return(-PVFS_EALREADY);
+	    }
+	    success_flag = 1;
+	}
+	else if(sm_p->msgarray[j].op_status != -PVFS_ENOENT)
+	{
+	    /* one of the servers returned an odd error code */
+	    return(sm_p->msgarray[j].op_status);
+	}
+    }
+
+    /* check to make sure someone claimed root handle */
+    if(!success_flag)
+	return(-PVFS_ENOENT);
+    else
+	return(0);
 }
 
 /*

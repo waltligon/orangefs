@@ -131,7 +131,8 @@ enum PVFS_server_param
 {
     PVFS_SERV_PARAM_INVALID = 0,
     PVFS_SERV_PARAM_GOSSIP_MASK = 1,  /* gossip debuggin on or off */
-    PVFS_SERV_PARAM_FSID_CHECK = 2    /* verify that a specific fsid is ok */
+    PVFS_SERV_PARAM_FSID_CHECK = 2,   /* verify that a specific fsid is ok */
+    PVFS_SERV_PARAM_ROOT_CHECK = 3    /* verify existance of root handle */
 };
 
 /* PVFS2 errors
