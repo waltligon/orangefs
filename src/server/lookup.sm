@@ -25,11 +25,10 @@ enum
 static int lookup_init(PINT_server_op *s_op, job_status_s* js_p);
 static int lookup_cleanup(PINT_server_op *s_op, job_status_s* js_p);
 static int lookup_verify_object_metadata(PINT_server_op *s_op, job_status_s* js_p);
-static int lookup_send_response(PINT_server_op *s_op, job_status_s* js_p);
 static int lookup_read_directory_entry(PINT_server_op *s_op, job_status_s* js_p);
 static int lookup_read_directory_entry_handle(PINT_server_op *s_op, job_status_s* js_p);
 static int lookup_read_object_metadata(PINT_server_op *s_op, job_status_s* js_p);
-static int lookup_release_job(PINT_server_op *s_op, job_status_s* js_p);
+static int lookup_setup_resp(PINT_server_op *s_op, job_status_s* js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 extern job_context_id PINT_server_job_context;
@@ -44,8 +43,8 @@ machine pvfs2_lookup_sm(prelude,
 		        read_directory_entry_handle,
 		        read_directory_entry,
 		        verify_object_metadata,
-		        send_response,
-			release,
+			setup_resp,
+			final_response,
 			cleanup)
 {
     state prelude
@@ -57,7 +56,7 @@ machine pvfs2_lookup_sm(prelude,
     state init
 	{
 	    run lookup_init;
-	    STATE_ENOTDIR => send_response;
+	    STATE_ENOTDIR => setup_resp;
 	    default       => read_object_metadata;
 	}
 
@@ -65,41 +64,39 @@ machine pvfs2_lookup_sm(prelude,
 	{
 	    run lookup_read_object_metadata;
 	    success => verify_object_metadata;
-	    default => send_response;
+	    default => setup_resp;
 	}
 
     state verify_object_metadata
 	{
 	    run lookup_verify_object_metadata;
 	    success          => read_directory_entry_handle;
-	    STATE_ENOTDIR    => send_response;
-	    STATE_NOMORESEGS => send_response;
-	    default          => send_response;
+	    default          => setup_resp;
 	}
 
     state read_directory_entry_handle
 	{
 	    run lookup_read_directory_entry_handle;
 	    success => read_directory_entry;
-	    default => send_response;
+	    default => setup_resp;
 	}
 
     state read_directory_entry
 	{
 	    run lookup_read_directory_entry;
 	    success => read_object_metadata;
-	    default => send_response;
+	    default => setup_resp;
 	}
 
-    state send_response
+    state setup_resp 
 	{
-	    run lookup_send_response;
-	    default => release;
+	    run lookup_setup_resp;
+	    default => final_response;
 	}
 
-    state release
+    state final_response 
 	{
-	    run lookup_release_job;
+	    jump pvfs2_final_response_sm;
 	    default => cleanup;
 	}
 
@@ -395,24 +392,13 @@ static int lookup_read_directory_entry(PINT_server_op *s_op,
 }
 
 
-/*
- * Function: lookup_send_response
+/* lookup_setup_resp()
  *
- * Synopsis: Encode and send response
- *
- * This function fills in the remaining sections of the response structure
- * prior to encoding the response.  It then calls PINT_encode() to
- * encode the response.
- *
- * Posts send to BMI.
+ * fills in fields of the response in preperation for sending
  */
-static int lookup_send_response(PINT_server_op *s_op,
-				job_status_s* js_p)
+static int lookup_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
 {
-    int encode_ret, ret;
-    job_id_t j_id;
-
-    gossip_debug(SERVER_DEBUG, "lookup state: lookup_send_response\n");
+    gossip_debug(SERVER_DEBUG, "lookup state: lookup_setup_resp\n");
 
     if (js_p->error_code != 0 && js_p->error_code != STATE_NOMORESEGS && js_p->error_code != STATE_ENOTDIR)
     {
@@ -427,69 +413,27 @@ static int lookup_send_response(PINT_server_op *s_op,
 	/* TODO: think about this some more; I think the logic upstream is 
 	 * broken.  For now we should just call this a complete failure. -Phil
 	 */
-	s_op->resp.status = js_p->error_code;
 	s_op->resp.u.lookup_path.handle_count = 0;
 	s_op->resp.u.lookup_path.attr_count = 0;
-    }
-    else
-    {
-	/* fill in response -- status field is the only generic one we should have to set */
-	s_op->resp.status              = 0; /* ??? */
-	s_op->resp.u.lookup_path.handle_count = s_op->u.lookup.seg_nr; /* # actually completed */
-	/* TODO: this won't always be correct if we have multiple meta servers... */
-	s_op->resp.u.lookup_path.attr_count = s_op->u.lookup.seg_nr; /* # actually completed */
 
+	/* NOTE: _intentionally_ leave the error_code at its current value
+	 * so that following states can use it to set resp.status.
+	 */
+	return(1);
     }
+
+    /* TODO: this won't always be correct if we have multiple meta servers... */
+    /* # actually completed */
+    s_op->resp.u.lookup_path.handle_count = s_op->u.lookup.seg_nr; 
+    /* # actually completed */
+    s_op->resp.u.lookup_path.attr_count = s_op->u.lookup.seg_nr; 
+
     gossip_debug(SERVER_DEBUG,
 		 "  sending response with %d segment(s)\n",
 		 s_op->u.lookup.seg_nr);
 
-    encode_ret = PINT_encode(&s_op->resp,
-			     PINT_ENCODE_RESP,
-			     &(s_op->encoded),
-			     s_op->addr,
-			     s_op->decoded.enc_type);
-    assert(encode_ret == 0);
-
-    /* Post message */
-    ret = job_bmi_send_list(s_op->addr,
-				     s_op->encoded.buffer_list,
-				     s_op->encoded.size_list,
-				     s_op->encoded.list_count,
-				     s_op->encoded.total_size,
-				     s_op->tag,
-				     s_op->encoded.buffer_type,
-				     0,
-				     s_op, 
-				     js_p, 
-				     &j_id,
-				     PINT_server_job_context);
-    return ret;
-}
-
-
-/*
- * Function: lookup_release_job
- *
- * Synopsis: Free the job from the scheduler to allow next job to proceed.
- *
- * Posts release request to job scheduler.
- */
-static int lookup_release_job(PINT_server_op *s_op,
-			      job_status_s* js_p)
-{
-
-    int ret=0;
-    job_id_t j_id;
-
-    gossip_debug(SERVER_DEBUG,"lookup state: lookup_release_job\n");
-
-    ret = job_req_sched_release(s_op->scheduled_id,
-					 s_op,
-					 js_p,
-					 &j_id,
-					 PINT_server_job_context);
-    return ret;
+    js_p->error_code = 0;
+    return(1);
 }
 
 
@@ -516,9 +460,6 @@ static int lookup_cleanup(PINT_server_op *s_op,
 {
     gossip_debug(SERVER_DEBUG, "lookup state: lookup_cleanup\n");
     
-    /* free encoded response */
-    PINT_encode_release(&(s_op->encoded), PINT_ENCODE_RESP);
-
     /* free dynamically allocated parts of non-encoded response */
     free(s_op->resp.u.lookup_path.handle_array);
 
