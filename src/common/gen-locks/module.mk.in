@@ -1,0 +1,2 @@
+DIR := src/common/gen-locks
+LIBSRC += $(DIR)/gen-locks.c

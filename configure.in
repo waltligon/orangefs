@@ -30,9 +30,11 @@ src/common/quicklist/module.mk
 src/common/dotconf/module.mk
 src/common/id-generator/module.mk
 src/common/gossip/module.mk
+src/common/gen-locks/module.mk
 test/io/trove/module.mk
 test/common/quicklist/module.mk
 test/common/id-generator/module.mk
 test/common/gossip/module.mk
+test/common/gen-locks/module.mk
 )
 
