@@ -16,8 +16,11 @@ extern spinlock_t pvfs2_request_list_lock;
 extern struct qhash_table *htable_ops_in_progress;
 extern struct qhash_table *htable_ops_invalidated;
 
-/* FIXME: For testing, this is small; make bigger */
+#ifdef PVFS2_KERNEL_DEBUG
 #define MAX_SERVICE_WAIT_IN_SECONDS       60
+#else
+#define MAX_SERVICE_WAIT_IN_SECONDS      300
+#endif
 
 /*
   sleeps on waitqueue waiting for matching downcall

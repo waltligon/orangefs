@@ -8,6 +8,7 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/fs.h>
+#include <linux/namei.h>
 #include <linux/pagemap.h>
 #include "pvfs2-kernel.h"
 
@@ -43,6 +44,28 @@ static struct dentry *pvfs2_lookup(
     pvfs2_kernel_op_t *new_op = (pvfs2_kernel_op_t *) 0;
     pvfs2_inode_t *parent = PVFS2_I(dir);
     pvfs2_inode_t *found_pvfs2_inode = NULL;
+
+    /*
+      we can skip doing anything knowing that the intent is to
+      create.  normally this results in an expensive failed
+      lookup; we're avoiding that here.
+    */
+    if (nd && (nd->flags & LOOKUP_CREATE) &&
+        !(nd->flags & LOOKUP_CONTINUE))
+    {
+        pvfs2_print("pvfs2: pvfs2_lookup -- skipping operation "
+                    "based on create intent\n");
+        return NULL;
+    }
+
+    /* same thing for an exclusive open */
+    if (nd && (nd->flags & LOOKUP_OPEN) &&
+        (nd->intent.open.flags & O_EXCL))
+    {
+        pvfs2_print("pvfs2: pvfs2_lookup -- skipping operation "
+                    "based on excl open intent\n");
+        return NULL;
+    }
 
     if (dentry->d_name.len > PVFS2_NAME_LEN)
     {

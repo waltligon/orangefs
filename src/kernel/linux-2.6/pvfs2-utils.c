@@ -8,6 +8,7 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/fs.h>
+#include <linux/dcache.h>
 #include "pvfs2-kernel.h"
 #include "pint-dev-shared.h"
 #include "pvfs2-dev-proto.h"
@@ -53,7 +54,8 @@ static inline int copy_attributes_to_inode(
 
     if (inode && attrs)
     {
-        if (attrs->mask & PVFS_ATTR_SYS_SIZE)
+        if ((attrs->objtype == PVFS_TYPE_METAFILE) &&
+            (attrs->mask & PVFS_ATTR_SYS_SIZE))
             inode->i_size = (off_t)attrs->size;
         else
             inode->i_size = 0;
@@ -648,8 +650,9 @@ int pvfs2_remove_entry(
 
     if (inode && parent)
     {
-	pvfs2_print("pvfs2: pvfs2_remove_entry: Parent is %Ld | "
-                    "fs_id %d\n", parent->refn.handle,
+	pvfs2_print("pvfs2: pvfs2_remove_entry on inode %d: "
+                    "Parent is %Ld | fs_id %d\n",
+                    (int)inode->i_ino, parent->refn.handle,
                     parent->refn.fs_id);
 	new_op = kmem_cache_alloc(op_cache, SLAB_KERNEL);
 	if (!new_op)

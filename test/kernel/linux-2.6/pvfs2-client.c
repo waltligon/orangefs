@@ -158,7 +158,7 @@ static int service_io_request(
 	blocklength = in_upcall->req.io.count;
 
 	ret = PVFS_Request_indexed(1, &blocklength, &displacement,
-	    PVFS_BYTE, &io_req);
+                                   PVFS_BYTE, &io_req);
 	assert(ret == 0);
 
 	ret = PVFS_sys_io(
