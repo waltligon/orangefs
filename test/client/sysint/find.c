@@ -9,17 +9,12 @@
 #include <string.h>
 #include "helper.h"
 
-void print_at_depth(char *name, PVFS_handle handle, int depth)
+void print_at_depth(char *name, int depth)
 {
-/*     int i = 0; */
-
-    if (name && handle)
+    /* we ignore depth for now */
+    if (name)
     {
-/*         for(i = 0; i < depth; i++) */
-/*         { */
-/*             printf("\t"); */
-/*         } */
-        printf("****  .%s\n",name);
+        printf("****  %s\n",name);
     }
 }
 
@@ -54,6 +49,7 @@ int directory_walk(PVFS_sysresp_init *init_response,
     int i = 0;
     int is_dir = 0;
     char *cur_file = (char *)0;
+    PVFS_handle cur_handle;
     PVFS_sysreq_lookup lk_request;
     PVFS_sysresp_lookup lk_response;
     PVFS_sysreq_readdir rd_request;
@@ -91,8 +87,7 @@ int directory_walk(PVFS_sysresp_init *init_response,
         return 1;
     }
 
-    print_at_depth(lk_request.name,
-                   lk_response.pinode_refn.handle,depth);
+    print_at_depth(lk_request.name,depth);
 
     memset(&rd_request,0,sizeof(PVFS_sysreq_readdir));
     memset(&rd_response,0,sizeof(PVFS_sysresp_readdir));
@@ -121,11 +116,11 @@ int directory_walk(PVFS_sysresp_init *init_response,
     for(i = 0; i < rd_response.pvfs_dirent_outcount; i++)
     {
         cur_file = rd_response.dirent_array[i].d_name;
+        cur_handle = rd_response.dirent_array[i].handle;
 
-        fprintf(stderr,"Got handle 0x%08Lx\n",
-                rd_response.dirent_array[i].handle);
+        fprintf(stderr,"Got handle 0x%08Lx\n",cur_handle);
 
-        is_dir = is_directory(rd_response.dirent_array[i].handle,
+        is_dir = is_directory(cur_handle,
                               init_response->fsid_list[0]);
         switch(is_dir)
         {
@@ -138,22 +133,15 @@ int directory_walk(PVFS_sysresp_init *init_response,
                 /* if we have a normal file, print it */
                 {
                     char buf[MAX_PVFS_PATH_LEN] = {0};
-                    if (depth != 0)
-                    {
-                        snprintf(buf,MAX_PVFS_PATH_LEN,"%s/%s",full_path,
-                                 cur_file);
-                    }
-                    else
-                    {
-                        snprintf(buf,MAX_PVFS_PATH_LEN,"/%s",cur_file);
-                    }
-                    print_at_depth(buf,
-                                   rd_response.dirent_array[i].handle,depth);
+                    snprintf(buf,MAX_PVFS_PATH_LEN,"%s/%s",
+                             ((full_path && (strcmp(full_path,"/"))) ?
+                              full_path : ""),cur_file);
+                    print_at_depth(buf,depth);
                 }
                 break;
             case 1:
                 /* if we have a dir, recurse */
-                if(directory_walk(init_response,cur_file,full_path,depth+1))
+                if (directory_walk(init_response,cur_file,full_path,depth+1))
                 {
                     fprintf(stderr,"Failed directory walk at depth %d\n",
                             depth+1);
@@ -173,7 +161,8 @@ int main(int argc, char **argv)
 
     if (argc != 2)
     {
-        fprintf(stderr,"usage: %s start_dir\n", argv[0]);
+        fprintf(stderr,"usage: %s <starting dir>\n",argv[0]);
+        fprintf(stderr,"This is not a full featured version of FIND(1L)\n",argv[0]);
         return 1;
     }
 
