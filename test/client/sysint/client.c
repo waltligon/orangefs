@@ -15,12 +15,12 @@ int main(int argc,char **argv)
 	PVFS_sysreq_rmdir *req_rmdir = NULL;
 	PVFS_sysreq_readdir *req_readdir = NULL;
 	PVFS_sysresp_readdir *resp_readdir = NULL;
-/*
+#if 0
 	PVFS_sysreq_create *req_create = NULL;
 	PVFS_sysresp_create *resp_create = NULL;
 	PVFS_sysreq_statfs *req_statfs = NULL;
 	PVFS_sysresp_statfs *resp_statfs = NULL;
-	*/
+#endif
 	char filename[80] = "/parl/fshorte/sysint/file1";
 	char dirname[256] = "/parl/fshorte/sysint/home";
 	int ret = -1,i = 0;
@@ -43,7 +43,6 @@ int main(int argc,char **argv)
 	}
 	printf("SYSTEM INTERFACE INITIALIZED\n");
 	
-#if 0
 	/* test the lookup function */
 	/*Alloc memory and fill the structures*/
 	
@@ -73,7 +72,7 @@ int main(int argc,char **argv)
 	ret = PVFS_sys_lookup(req_lk,resp_lk);
 	if (ret < 0)
 	{
-		printf("Lookup failed\n");
+		printf("Lookup failed with errcode = %d\n", ret);
 		return(-1);
 	}
 	// print the handle 
@@ -81,19 +80,7 @@ int main(int argc,char **argv)
 	printf("Handle:%ld\n", (long int)resp_lk->pinode_refn.handle);
 	printf("FSID:%ld\n", (long int)resp_lk->pinode_refn.fs_id);
 
-	//close it down
-	//ret = PVFS_sys_finalize();
-
-	//Init the system interface
-	// Setattr test 
-	/*ret = PVFS_sys_init();
-	if(ret < 0)
-	{
-		printf("PVFS_sys_init() failure.\n");
-		return(ret);
-	}*/
-#endif
-
+#if 0
 	// test the setattr function 
 	//	Alloc memory and fill the structures
 	printf("SETATTR HERE===>\n");
@@ -151,7 +138,7 @@ int main(int argc,char **argv)
 	
 	// Fill in the handle 
 	req_gattr->pinode_refn.handle = req_sattr->pinode_refn.handle;
-	req_gattr->pinode_refn.fs_id = 1;
+	req_gattr->pinode_refn.fs_id = 9;
 	req_gattr->attrmask = ATTR_BASIC;
 
 	// Use it 
@@ -170,7 +157,6 @@ int main(int argc,char **argv)
 	printf("gid:%d\n",resp_gattr->attr.group);
 	printf("permissions:%d\n",resp_gattr->attr.perms);
 	
-#if 0
 	// close it down
 	ret = PVFS_sys_finalize();
 
