@@ -331,10 +331,10 @@ int config_bt_map_bucket_to_server(char **server_name, PVFS_handle bucket,\
 			{
 				bucket_start = server_config.fs_info[i].bucket_array[j].bucket_st;
 				bucket_end = server_config.fs_info[i].bucket_array[j].bucket_end;
-				meta_serv = server_config.fs_info[i].meta_serv_array[j];
+				/*meta_serv = server_config.fs_info[i].meta_serv_array[j];*/
 				if ((bkt >= bucket_start) && (bkt <= bucket_end))
 				{
-					name_sz = strlen(meta_serv) + 1;
+					/*name_sz = strlen(meta_serv) + 1;*/
 					*server_name = malloc(name_sz);
 					memcpy(*server_name, meta_serv, name_sz);
 					/* Release the mutex */

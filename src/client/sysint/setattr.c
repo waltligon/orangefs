@@ -32,8 +32,8 @@ int PVFS_sys_setattr(PVFS_sysreq_setattr *req)
 {
 	struct PVFS_server_req_s req_p;			/* server request */
 	struct PVFS_server_resp_s *ack_p = NULL;	/* server response */
-	int ret = -1, flags = 0;
-	pinode *pinode_ptr = NULL, *item_ptr = NULL;
+	int ret = -1;
+	pinode *pinode_ptr = NULL;
 	bmi_addr_t serv_addr;		/* PVFS address type structure */
 	char *server = NULL;
 	PVFS_bitfield mask = req->attrmask;

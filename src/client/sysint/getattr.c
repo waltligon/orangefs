@@ -30,17 +30,16 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 {
 	struct PVFS_server_req_s req_p;	 	/* server request */
 	struct PVFS_server_resp_s *ack_p = NULL; /* server response */
-   	int ret = -1,i = 0;
+   	int ret = -1;
    	bmi_addr_t serv_addr;	            /* PVFS address type structure */ 
 	char *server = NULL;
-	int vflags = 0;
 	struct timeval cur_time;
-	PVFS_size *size_array = 0, logical_size = 0;
+	PVFS_size *size_array = 0;
 	pinode *entry_pinode = NULL;
 	PVFS_bitfield attr_mask = req->attrmask;
 	pinode_reference entry;
 	struct PINT_decoded_msg decoded;
-	int max_msg_sz = 0, num_data_servers = 0;
+	int max_msg_sz = 0;
 	int pinode_exists_in_cache = 0;
 
 	enum {

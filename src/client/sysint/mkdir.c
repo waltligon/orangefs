@@ -76,7 +76,7 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
 	if (entry.handle != PINT_DCACHE_HANDLE_INVALID)
 	{
 		/* Search in pinode cache */
-		ret = PINT_pcache_lookup(entry,pinode_ptr);
+		ret = PINT_pcache_lookup(entry,&pinode_ptr);
 		if (ret < 0)
 		{
 			goto pinode_get_failure;
@@ -111,7 +111,7 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
 	/* Get the parent pinode */
 	cflags = HANDLE_VALIDATE;
 	/* Search in pinode cache */
-	ret = pcache_lookup(req->parent_refn,pinode_ptr);
+	ret = PINT_pcache_lookup(req->parent_refn,&pinode_ptr);
 	if (ret < 0)
 	{
 		goto pinode_get_failure;

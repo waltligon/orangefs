@@ -6,17 +6,16 @@
 
 /* Remove Directory Function Implementation */
 
-#include <pinode-helper.h>
-#include <pvfs2-sysint.h>
-#include <pint-sysint.h>
-#include <pint-dcache.h>
-#include <pint-servreq.h>
-#include <config-manage.h>
+#include "pinode-helper.h"
+#include "pvfs2-sysint.h"
+#include "pint-sysint.h"
+#include "pint-dcache.h"
+#include "pint-servreq.h"
+#include "config-manage.h"
+#include "pcache.h"
 
 static int do_crdirent(char *name,pinode_reference parent,\
 	PVFS_handle entry_handle,PVFS_credentials credentials,bmi_addr_t addr);
-
-extern pcache pvfs_pcache;
 
 /* PVFS_sys_rmdir()
  *
@@ -40,7 +39,7 @@ int PVFS_sys_rmdir(PVFS_sysreq_rmdir *req)
 	PVFS_servreq_rmdirent req_rmdirent;
 	
 	/* Allocate the pinode */
-	ret = pcache_pinode_alloc(&pinode_ptr);
+	ret = PINT_pcache_pinode_alloc(&pinode_ptr);
 	if (!pinode_ptr)
 	{
 		ret = -ENOMEM;
@@ -50,7 +49,7 @@ int PVFS_sys_rmdir(PVFS_sysreq_rmdir *req)
 	/* Get the parent pinode */
 	cflags = HANDLE_VALIDATE;
 	/* Search in pinode cache */
-	ret = pcache_lookup(&pvfs_pcache,req->parent_refn,pinode_ptr);
+	ret = PINT_pcache_lookup(req->parent_refn,&pinode_ptr);
 	if (ret < 0)
 	{
 		goto pinode_get_failure;
@@ -135,13 +134,13 @@ int PVFS_sys_rmdir(PVFS_sysreq_rmdir *req)
 	}
 	
 	/* Remove from pinode cache */
-	ret = pcache_remove(&pvfs_pcache,entry,&item_ptr);
+	ret = PINT_pcache_remove(entry,&item_ptr);
 	if (ret < 0)
 	{
 		goto remove_failure;
 	}
 	/* Free the pinode removed from cache */
-	pcache_pinode_dealloc(item_ptr);
+	PINT_pcache_pinode_dealloc(item_ptr);
 	
 	/* Create and fill in a dentry and add it to the dcache */
 	ret = PINT_dcache_remove(req->entry_name,req->parent_refn,\
@@ -187,7 +186,7 @@ pinode_get_failure:
 	
 	/* Free the pinode */
 	if (pinode_ptr)
-		pcache_pinode_dealloc(pinode_ptr);
+		PINT_pcache_pinode_dealloc(pinode_ptr);
 
 pinode_alloc_failure:
 
@@ -233,3 +232,12 @@ static int do_crdirent(char *name,pinode_reference parent,\
 
 	return(0);
 }
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 noexpandtab
+ */

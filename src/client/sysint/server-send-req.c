@@ -88,11 +88,11 @@ int PINT_server_send_req(bmi_addr_t addr,
 
     /* post a blocking receive job */
     ret = job_bmi_recv_blocking(addr, encoded_resp, max_resp_size, op_tag, BMI_PRE_ALLOC, &r_status);
-    printf("message recieved: r_status.actual_size = %d\n",r_status.actual_size);
+    printf("message recieved: r_status.actual_size = %lld\n",r_status.actual_size);
     printf("r_status.error_code = %d\nreturn value = %d\n",r_status.error_code, ret);
 
     printf("status(insided encoded struct) = %d\n",((struct PVFS_server_resp_s *)encoded_resp)->status);
-    printf("rsize(insided encoded struct) = %d\n",((struct PVFS_server_resp_s *)encoded_resp)->rsize);
+    printf("rsize(insided encoded struct) = %lld\n",((struct PVFS_server_resp_s *)encoded_resp)->rsize);
     if (((struct PVFS_server_resp_s *)encoded_resp)->rsize == 0)
 	((struct PVFS_server_resp_s *)encoded_resp)->rsize = sizeof(struct PVFS_server_resp_s);
     if (ret < 0)
