@@ -285,13 +285,11 @@ int trove_collection_seteattr(
 
 int trove_collection_getinfo(
 			     TROVE_coll_id coll_id,
-			     TROVE_handle handle,
 			     int option,
 			     void *parameter);
 
 int trove_collection_setinfo(
 			     TROVE_coll_id coll_id,
-			     TROVE_handle handle,
 			     int option,
 			     void *parameter);
 /* END AUTOGEN PROTOTYPES */
