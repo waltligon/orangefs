@@ -18,12 +18,11 @@
 #include "flowproto-support.h"
 #include "pvfs-distribution.h"
 #include "pvfs2-request.h"
-#include "trove.h"
+#include "thread-mgr.h"
 
 int TEST_SIZE = 1024 * 1024 * 20;	/* 1M */
 static int block_on_flow(
-    flow_descriptor * flow_d,
-    FLOW_context_id flow_context);
+    flow_descriptor * flow_d);
 static double Wtime(
     void);
 
@@ -45,8 +44,6 @@ int main(
     double time1, time2;
     PINT_Request *req;
     bmi_context_id context;
-    FLOW_context_id flow_context;
-    char *method_name;
 
 	/*************************************************************/
     /* initialization stuff */
@@ -63,14 +60,6 @@ int main(
 	return (-1);
     }
 
-    /* start up trove */
-    ret = trove_initialize(storage_space, 0, &method_name, 0);
-    if (ret < 0)
-    {
-	fprintf(stderr, "trove_initialize() failure.\n");
-	return (-1);
-    }
-
     ret = BMI_open_context(&context);
     if (ret < 0)
     {
@@ -79,20 +68,12 @@ int main(
     }
 
     /* initialize the flow interface */
-    ret = PINT_flow_initialize("flowproto_bmi_trove", 0);
+    ret = PINT_flow_initialize("flowproto_multiqueue", 0);
     if (ret < 0)
     {
 	fprintf(stderr, "flow init failure.\n");
 	return (-1);
     }
-
-    ret = PINT_flow_open_context(&flow_context);
-    if (ret < 0)
-    {
-	fprintf(stderr, "PINT_flow_open_context() failure.\n");
-	return (-1);
-    }
-
 
     /* send some random crap to the other side to start up communication */
     ret = BMI_addr_lookup(&server_addr, "tcp://localhost:3335");
@@ -203,7 +184,7 @@ int main(
 	 */
 
     time1 = Wtime();
-    ret = block_on_flow(flow_d, flow_context);
+    ret = block_on_flow(flow_d);
     if (ret < 0)
     {
 	return (-1);
@@ -213,13 +194,14 @@ int main(
 	/*******************************************************/
     /* final cleanup and output */
 
+#if 0
     printf("Client bw (send): %f MB/sec\n",
 	   ((TEST_SIZE) / ((time2 - time1) * 1000000.0)));
+#endif
 
     PINT_flow_free(flow_d);
 
     /* shut down flow interface */
-    PINT_flow_close_context(flow_context);
     ret = PINT_flow_finalize();
     if (ret < 0)
     {
@@ -231,24 +213,26 @@ int main(
     BMI_close_context(context);
     BMI_finalize();
 
-    trove_finalize();
-
     free(mybuffer);
 
     gossip_disable();
     return (0);
 }
 
+static int done_flag = 0;
+static void callback_fn(flow_descriptor* flow_d)
+{
+    done_flag = 1;
+    return;
+}
 
 static int block_on_flow(
-    flow_descriptor * flow_d,
-    FLOW_context_id flow_context)
+    flow_descriptor * flow_d)
 {
     int ret = -1;
-    int count = 0;
-    int index = 5;
 
-    ret = PINT_flow_post(flow_d, flow_context);
+    flow_d->callback = callback_fn;
+    ret = PINT_flow_post(flow_d);
     if (ret == 1)
     {
 	return (0);
@@ -259,23 +243,14 @@ static int block_on_flow(
 	return (ret);
     }
 
-    do
+    while(!done_flag)
     {
-	ret = PINT_flow_testsome(1, &flow_d, &count, &index, 10, flow_context);
-    } while (ret == 0 && count == 0);
-    if (ret < 0)
-    {
-	fprintf(stderr, "flow_test failure.\n");
-	return (ret);
+	PINT_thread_mgr_bmi_push(10);
     }
+
     if (flow_d->state != FLOW_COMPLETE)
     {
 	fprintf(stderr, "flow finished in error state: %d\n", flow_d->state);
-	return (-1);
-    }
-    if (index != 0)
-    {
-	fprintf(stderr, "bad index.\n");
 	return (-1);
     }
     return (0);

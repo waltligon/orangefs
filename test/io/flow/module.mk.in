@@ -1,21 +1,28 @@
 DIR := test/io/flow
 
-TEST_IO_FLOW_DIR_SRC := 
+TEST_IO_FLOW_DIR_SRC := \
+	$(DIR)/test-harness-server-trove.c \
+	$(DIR)/test-harness-client.c
 #	$(DIR)/test-harness-server.c
-#	$(DIR)/test-harness-client.c
 #	$(DIR)/test-harness-client-from-trove.c
-#	$(DIR)/test-harness-server-trove.c
 #	$(DIR)/wire-harness-server.c\
 #	$(DIR)/wire-harness-client.c
 
 TESTSRC += $(TEST_IO_FLOW_DIR_SRC)
 
-LOCALTESTS := $(patsubst %.c,%, $(TEST_IO_FLOW_DIR_SRC))
-$(LOCALTESTS): %: %.o
+test/io/flow/test-harness-server-trove: test/io/flow/test-harness-server-trove.o
 ifdef QUIET_COMPILE
 	@echo "  LD		$@"
 	@$(LD) $< $(LDFLAGS) $(SERVERLIBS) -o $@
 else
 	$(LD) $< $(LDFLAGS) $(SERVERLIBS) -o $@
+endif
+
+test/io/flow/test-harness-client: test/io/flow/test-harness-client.o
+ifdef QUIET_COMPILE
+	@echo "  LD		$@"
+	@$(LD) $< $(LDFLAGS) $(LIBS) -o $@
+else
+	$(LD) $< $(LDFLAGS) $(LIBS) -o $@
 endif
 

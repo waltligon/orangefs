@@ -12,6 +12,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/time.h>
+#include <unistd.h>
+#include <time.h>
 
 #include "gossip.h"
 #include "flow.h"
@@ -24,8 +26,7 @@
 #define ROOT_HANDLE_STRING "root_handle"
 
 static int block_on_flow(
-    flow_descriptor * flow_d,
-    FLOW_context_id flow_context);
+    flow_descriptor * flow_d);
 static double Wtime(
     void);
 int path_lookup(
@@ -75,7 +76,6 @@ int main(
     char *method_name, *file_name;
     TROVE_keyval_s key, val;
     bmi_context_id context;
-    FLOW_context_id flow_context;
     TROVE_context_id trove_context;
     PVFS_handle_extent cur_extent;
     PVFS_handle_extent_array extent_array;
@@ -110,17 +110,10 @@ int main(
     }
 
     /* initialize the flow interface */
-    ret = PINT_flow_initialize("flowproto_bmi_trove", 0);
+    ret = PINT_flow_initialize("flowproto_multiqueue", 0);
     if (ret < 0)
     {
 	fprintf(stderr, "flow init failure.\n");
-	return (-1);
-    }
-
-    ret = PINT_flow_open_context(&flow_context);
-    if (ret < 0)
-    {
-	fprintf(stderr, "PINT_flow_open_context() failure.\n");
 	return (-1);
     }
 
@@ -273,55 +266,24 @@ int main(
 	 */
 
     time1 = Wtime();
-    ret = block_on_flow(flow_d, flow_context);
+    ret = block_on_flow(flow_d);
     if (ret < 0)
     {
 	return (-1);
     }
     time2 = Wtime();
 
+#if 0
     printf("Server bw (recv): %f MB/sec\n",
 	   ((TEST_SIZE) / ((time2 - time1) * 1000000.0)));
-
-#if 0
-    PINT_flow_reset(flow_d);
-
-    flow_d->request = &req1;
-    flow_d->tag = 0;
-    flow_d->user_ptr = NULL;
-
-    /* fill in flow details */
-    flow_d->src.endpoint_id = TROVE_ENDPOINT;
-    flow_d->src.u.trove.handle = file_handle;
-    flow_d->src.u.trove.coll_id = coll_id;
-    flow_d->dest.endpoint_id = MEM_ENDPOINT;
-    flow_d->dest.u.mem.size = TEST_SIZE;
-    flow_d->dest.u.mem.buffer = mybuffer;
-
-    ret = block_on_flow(flow_d);
-    if (ret < 0)
-    {
-	return (-1);
-    }
 #endif
 
-#if 0
-    /* verify memory */
-    for (i = 0; i < (TEST_SIZE / (sizeof(int))); i++)
-    {
-	if (((int *) mybuffer)[i] != i)
-	{
-	    fprintf(stderr, "Failed Verification!!! (step 1)\n");
-	}
-    }
-#endif
 	/*******************************************************/
     /* final cleanup and output */
 
     PINT_flow_free(flow_d);
 
     /* shut down flow interface */
-    PINT_flow_close_context(flow_context);
     ret = PINT_flow_finalize();
     if (ret < 0)
     {
@@ -340,14 +302,21 @@ int main(
     return (0);
 }
 
+static int done_flag = 0;
+static void callback_fn(flow_descriptor* flow_d)
+{
+    done_flag = 1;
+    return;
+}
+
 static int block_on_flow(
-    flow_descriptor * flow_d,
-    FLOW_context_id flow_context)
+    flow_descriptor * flow_d)
 {
     int ret = -1;
-    int count = 0;
+    struct timespec req = {0, 1000};
 
-    ret = PINT_flow_post(flow_d, flow_context);
+    flow_d->callback = callback_fn;
+    ret = PINT_flow_post(flow_d);
     if (ret == 1)
     {
 	return (0);
@@ -358,15 +327,11 @@ static int block_on_flow(
 	return (ret);
     }
 
-    do
+    while(!done_flag)
     {
-	ret = PINT_flow_test(flow_d, &count, 10, flow_context);
-    } while (ret == 0 && count == 0);
-    if (ret < 0)
-    {
-	fprintf(stderr, "flow_test failure.\n");
-	return (ret);
+	nanosleep(&req, NULL);
     }
+
     if (flow_d->state != FLOW_COMPLETE)
     {
 	fprintf(stderr, "flow finished in error state: %d\n", flow_d->state);
