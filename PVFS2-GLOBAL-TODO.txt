@@ -33,11 +33,7 @@ server operations:
 
 general server functionality:
 ====================================================================
-- make sure server prints error message to stderr instead of to log file
-  if it fails during startup (such as if storage space doesn't exist)
 - attributes (permissions, etc.) on datafiles
-- defining "on disk" format for metadata
-  - short term goal of using dspace attribs for storing pvfs2 object attribs
 - finishing file system semantics documentation
 - don't forget to define semantics for access times
 - access control, general security model
@@ -71,11 +67,6 @@ kernel/vfs interface
 ====================================================================
 - 2.4.x pvfs-kernel implementation
   - quick modification of existing pvfs-kernel and/or full rewrite
-- 2.6.x pvfs2-kernel implementation
-  - add ability to mount multiple file systems
-  - get fsid/root handle information at mount time
-  - use /etc/fstab mount interface for volume info
-  - nfs exporting
 
 performance tuning:
 ====================================================================
@@ -171,7 +162,6 @@ code cleanup:
 - consistent formatting
 - consistent function naming
 - consistent header file inclusion
-- use TROVE_HANDLE_NULL in more places instead of "0"
 - come up with more named values like TROVE_HANDLE_NULL to use in 
   other parts of the code
 - try to clean up flow / I/O path some, in particular so we don't have

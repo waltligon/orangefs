@@ -14,6 +14,12 @@ pvfs2-0.0.9pre1
   program update
 - add kernel support for being an nfs exportable file system
 - add kernel support for being able to mount more than one pvfs2 volume
+- misc code cleanups and removals all over
+- test/client/sysint program bugfixes and cleanups
+- pvfstab parsing bugfix
+- pvfs2-ping and pvfs2-statfs support for multiple file systems
+- improved server error reporting if failure occurs before backgrounding
+- fix hang on server shutdown via signal
 
 	
 pvfs2-0.0.8
