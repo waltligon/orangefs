@@ -48,10 +48,12 @@ static int service_lookup_request(
         memset(&response,0,sizeof(PVFS_sysresp_lookup));
         memset(out_downcall,0,sizeof(pvfs2_downcall_t));
 
-        printf("Got a lookup request for %s (fsid %d | parent %Ld)\n",
-               in_upcall->req.lookup.d_name,
-               in_upcall->req.lookup.parent_refn.fs_id,
-               in_upcall->req.lookup.parent_refn.handle);
+        gossip_debug(
+            CLIENT_DEBUG,
+            "Got a lookup request for %s (fsid %d | parent %Ld)\n",
+            in_upcall->req.lookup.d_name,
+            in_upcall->req.lookup.parent_refn.fs_id,
+            in_upcall->req.lookup.parent_refn.handle);
 
         parent_refn = in_upcall->req.lookup.parent_refn;
 
@@ -61,10 +63,10 @@ static int service_lookup_request(
                                   &response);
         if (ret < 0)
         {
-            fprintf(stderr,"Failed to lookup %s (fsid %d | "
-                    "parent is %Ld)!\n",in_upcall->req.lookup.d_name,
-                    parent_refn.fs_id,parent_refn.handle);
-            fprintf(stderr,"Lookup returned error code %d\n",ret);
+            gossip_err("Failed to lookup %s (fsid %d | parent is %Ld)!\n",
+                       in_upcall->req.lookup.d_name,
+                       parent_refn.fs_id,parent_refn.handle);
+            gossip_err("Lookup returned error code %d\n", ret);
 
             /* we need to send a blank response */
             out_downcall->type = PVFS2_VFS_OP_LOOKUP;
@@ -104,18 +106,20 @@ static int service_create_request(
 
         parent_refn = in_upcall->req.create.parent_refn;
 
-        printf("Got a create request for %s (fsid %d | parent %Ld)\n",
-               in_upcall->req.create.d_name,parent_refn.fs_id,
-               parent_refn.handle);
+        gossip_debug(
+            CLIENT_DEBUG,
+            "Got a create request for %s (fsid %d | parent %Ld)\n",
+            in_upcall->req.create.d_name,parent_refn.fs_id,
+            parent_refn.handle);
 
         ret = PVFS_sys_create(in_upcall->req.create.d_name, parent_refn,
                               *attrs, in_upcall->credentials, &response);
         if (ret < 0)
         {
-            fprintf(stderr,"Failed to create %s under %Ld on fsid %d!\n",
-                    in_upcall->req.create.d_name,
-                    parent_refn.handle,parent_refn.fs_id);
-            fprintf(stderr,"Create returned error code %d\n",ret);
+            gossip_err("Failed to create %s under %Ld on fsid %d!\n",
+                       in_upcall->req.create.d_name,
+                       parent_refn.handle,parent_refn.fs_id);
+            gossip_err("Create returned error code %d\n",ret);
 
             /* we need to send a blank response */
             out_downcall->type = PVFS2_VFS_OP_CREATE;
@@ -192,18 +196,20 @@ static int service_getattr_request(
         memset(&response,0,sizeof(PVFS_sysresp_getattr));
         memset(out_downcall,0,sizeof(pvfs2_downcall_t));
 
-        printf("got a getattr request for fsid %d | handle %Ld\n",
-               in_upcall->req.getattr.refn.fs_id,
-               in_upcall->req.getattr.refn.handle);
+        gossip_debug(
+            CLIENT_DEBUG,
+            "got a getattr request for fsid %d | handle %Ld\n",
+            in_upcall->req.getattr.refn.fs_id,
+            in_upcall->req.getattr.refn.handle);
 
         ret = PVFS_sys_getattr(in_upcall->req.getattr.refn, attrmask,
                                in_upcall->credentials, &response);
         if (ret < 0)
         {
-            fprintf(stderr,"failed to getattr handle %Ld on fsid %d!\n",
-                    in_upcall->req.getattr.refn.handle,
-                    in_upcall->req.getattr.refn.fs_id);
-            fprintf(stderr,"getattr returned error code %d\n",ret);
+            gossip_err("failed to getattr handle %Ld on fsid %d!\n",
+                       in_upcall->req.getattr.refn.handle,
+                       in_upcall->req.getattr.refn.fs_id);
+            gossip_err("getattr returned error code %d\n",ret);
 
             /* we need to send a blank response */
             out_downcall->type = PVFS2_VFS_OP_GETATTR;
@@ -231,19 +237,21 @@ static int service_setattr_request(
     {
         memset(out_downcall,0,sizeof(pvfs2_downcall_t));
 
-        printf("got a setattr request for fsid %d | handle %Ld\n",
-               in_upcall->req.setattr.refn.fs_id,
-               in_upcall->req.setattr.refn.handle);
+        gossip_debug(
+            CLIENT_DEBUG,
+            "got a setattr request for fsid %d | handle %Ld\n",
+            in_upcall->req.setattr.refn.fs_id,
+            in_upcall->req.setattr.refn.handle);
 
         ret = PVFS_sys_setattr(in_upcall->req.setattr.refn,
                                in_upcall->req.setattr.attributes,
                                in_upcall->credentials);
         if (ret < 0)
         {
-            fprintf(stderr,"failed to setattr handle %Ld on fsid %d!\n",
-                    in_upcall->req.setattr.refn.handle,
-                    in_upcall->req.setattr.refn.fs_id);
-            fprintf(stderr,"setattr returned error code %d\n",ret);
+            gossip_err("failed to setattr handle %Ld on fsid %d!\n",
+                       in_upcall->req.setattr.refn.handle,
+                       in_upcall->req.setattr.refn.fs_id);
+            gossip_err("setattr returned error code %d\n",ret);
 
             /* we need to send a blank response */
             out_downcall->type = PVFS2_VFS_OP_SETATTR;
@@ -273,18 +281,20 @@ static int service_remove_request(
 
         parent_refn = in_upcall->req.remove.parent_refn;
 
-        printf("Got a remove request for %s under fsid %d and "
-               "handle %Ld\n", in_upcall->req.remove.d_name,
-               parent_refn.fs_id, parent_refn.handle);
+        gossip_debug(
+            CLIENT_DEBUG,
+            "Got a remove request for %s under fsid %d and "
+            "handle %Ld\n", in_upcall->req.remove.d_name,
+            parent_refn.fs_id, parent_refn.handle);
 
         ret = PVFS_sys_remove(in_upcall->req.remove.d_name,
                               parent_refn, in_upcall->credentials);
         if (ret < 0)
         {
-            fprintf(stderr,"Failed to remove %s under handle %Ld "
-                    "on fsid %d!\n", in_upcall->req.remove.d_name,
-                    parent_refn.handle, parent_refn.fs_id);
-            fprintf(stderr,"Remove returned error code %d\n",ret);
+            gossip_err("Failed to remove %s under handle %Ld "
+                       "on fsid %d!\n", in_upcall->req.remove.d_name,
+                       parent_refn.handle, parent_refn.fs_id);
+            gossip_err("Remove returned error code %d\n",ret);
 
             /* we need to send a blank error response */
             out_downcall->type = PVFS2_VFS_OP_REMOVE;
@@ -322,18 +332,20 @@ static int service_mkdir_request(
 
         parent_refn = in_upcall->req.mkdir.parent_refn;
 
-        printf("Got a mkdir request for %s (fsid %d | parent %Ld)\n",
-               in_upcall->req.mkdir.d_name,parent_refn.fs_id,
-               parent_refn.handle);
+        gossip_debug(
+            CLIENT_DEBUG,
+            "Got a mkdir request for %s (fsid %d | parent %Ld)\n",
+            in_upcall->req.mkdir.d_name,parent_refn.fs_id,
+            parent_refn.handle);
 
         ret = PVFS_sys_mkdir(in_upcall->req.mkdir.d_name, parent_refn,
                              *attrs, in_upcall->credentials, &response);
         if (ret < 0)
         {
-            fprintf(stderr,"Failed to mkdir %s under %Ld on fsid %d!\n",
-                    in_upcall->req.mkdir.d_name,
-                    parent_refn.handle,parent_refn.fs_id);
-            fprintf(stderr,"Mkdir returned error code %d\n",ret);
+            gossip_err("Failed to mkdir %s under %Ld on fsid %d!\n",
+                       in_upcall->req.mkdir.d_name,
+                       parent_refn.handle,parent_refn.fs_id);
+            gossip_err("Mkdir returned error code %d\n",ret);
 
             /* we need to send a blank response */
             out_downcall->type = PVFS2_VFS_OP_MKDIR;
@@ -368,17 +380,19 @@ static int service_readdir_request(
 
         refn = in_upcall->req.readdir.refn;
 
-        printf("Got a readdir request for fsid %d | parent %Ld\n",
-               refn.fs_id, refn.handle);
+        gossip_debug(
+            CLIENT_DEBUG,
+            "Got a readdir request for fsid %d | parent %Ld\n",
+            refn.fs_id, refn.handle);
 
         ret = PVFS_sys_readdir(refn, in_upcall->req.readdir.token,
                                in_upcall->req.readdir.max_dirent_count,
                                in_upcall->credentials, &response);
         if (ret < 0)
         {
-            fprintf(stderr,"Failed to readdir under %Ld on fsid %d!\n",
-                    refn.handle, refn.fs_id);
-            fprintf(stderr,"Readdir returned error code %d\n",ret);
+            gossip_err("Failed to readdir under %Ld on fsid %d!\n",
+                       refn.handle, refn.fs_id);
+            gossip_err("Readdir returned error code %d\n",ret);
 
             /* we need to send a blank response */
             out_downcall->type = PVFS2_VFS_OP_READDIR;
@@ -397,8 +411,6 @@ static int service_readdir_request(
             {
                 out_downcall->resp.readdir.refn[i].handle =
                     response.dirent_array[i].handle;
-
-                /* DIRENT SHOULD HAVE AN FSID, NO?? */
                 out_downcall->resp.readdir.refn[i].fs_id = refn.fs_id;
 
                 len = strlen(response.dirent_array[i].d_name);
@@ -406,9 +418,6 @@ static int service_readdir_request(
                 strncpy(&out_downcall->resp.readdir.d_name[i][0],
                         response.dirent_array[i].d_name,len);
 
-                printf("COPIED OVER DIRENT %s (%s)\n",
-                       response.dirent_array[i].d_name,
-                       &out_downcall->resp.readdir.d_name[i][0]);
                 out_downcall->resp.readdir.dirent_count++;
             }
 
@@ -419,9 +428,9 @@ static int service_readdir_request(
             }
             else
             {
-                fprintf(stderr,"DIRENT COUNTS DON'T MATCH (%d != %d)\n",
-                        out_downcall->resp.readdir.dirent_count,
-                        response.pvfs_dirent_outcount);
+                gossip_err("DIRENT COUNTS DON'T MATCH (%d != %d)\n",
+                           out_downcall->resp.readdir.dirent_count,
+                           response.pvfs_dirent_outcount);
             }
         }
     }
@@ -454,17 +463,12 @@ int write_device_response(
         }
         else if (ret == 0)
         {
-            printf("no immed completion.\n");
 	    ret = job_test(*job_id, &outcount, NULL, jstat, -1, context);
             if (ret < 0)
             {
                 PVFS_perror("job_test()", ret);
                 goto exit_point;
             }
-        }
-        else
-        {
-            printf("immed completion.\n");
         }
 
         if (jstat->error_code != 0)
@@ -505,14 +509,14 @@ int main(int argc, char **argv)
 
     if (parse_pvfstab(NULL,&mnt))
     {
-        fprintf(stderr,"Error parsing pvfstab!\n");
+        gossip_err("Error parsing pvfstab!\n");
         return 1;
     }
 
     memset(&init_response,0,sizeof(PVFS_sysresp_init));
     if (PVFS_sys_initialize(mnt, &init_response))
     {
-        fprintf(stderr,"Cannot initialize system interface\n");
+        gossip_err("Cannot initialize system interface\n");
         return 1;
     }
 
@@ -524,8 +528,8 @@ int main(int argc, char **argv)
     }
 
     /* setup a mapped region for I/O transfers */
-    ret = PINT_dev_get_mapped_region(&mapped_region,
-	MAPPED_REGION_SIZE);
+    ret = PINT_dev_get_mapped_region(
+        &mapped_region, MAPPED_REGION_SIZE);
     if(ret < 0)
     {
 	PVFS_perror("PINT_dev_get_mapped_region", ret);
@@ -565,20 +569,19 @@ int main(int argc, char **argv)
 	    return(-1);
 	}
 
-	printf("Got message: size: %d, tag: %d, payload: %s\n", 
-	       info.size, (int)info.tag, (char*)info.buffer);
+        gossip_debug(CLIENT_DEBUG,
+                     "Got message: size: %d, tag: %d, payload: %p\n",
+                     info.size, (int)info.tag, info.buffer);
 
 	tag = (unsigned long)info.tag;
 	if (info.size >= sizeof(pvfs2_upcall_t))
 	{
-	    printf("Copying upcall from device\n");
 	    memcpy(&upcall,info.buffer,sizeof(pvfs2_upcall_t));
-
-	    printf("upcall Type is %d\n",upcall.type);
 	}
 	else
 	{
-	    printf("What does this mean?\n");
+	    gossip_err("Error! Short read from device -- "
+                       "What does this mean?\n");
 	    return(-1);
 	}
 
@@ -613,7 +616,8 @@ int main(int argc, char **argv)
 		break;
 	    case PVFS2_VFS_OP_INVALID:
 	    default:
-		printf("Got an unrecognized vfs operation.\n");
+		gossip_err("Got an unrecognized vfs operation of "
+                           "type %x.\n", upcall.type);
 	}
 
 	PINT_dev_release_unexpected(&info);
@@ -628,7 +632,7 @@ int main(int argc, char **argv)
 				  total_size,(PVFS_id_gen_t)tag,
 				  &job_id,&jstat,context) < 0)
 	{
-	    fprintf(stderr,"write_device_response failed on tag %lu\n",tag);
+	    gossip_err("write_device_response failed on tag %lu\n",tag);
 	}
     }
 
@@ -636,7 +640,7 @@ int main(int argc, char **argv)
 
     if (PVFS_sys_finalize())
     {
-        fprintf(stderr,"Failed to finalize PVFS\n");
+        gossip_err("Failed to finalize PVFS\n");
         return 1;
     }
     gossip_disable();
