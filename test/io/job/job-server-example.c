@@ -127,7 +127,7 @@ int main(int argc, char **argv)
 
 	/* allocate a buffer for the ack */
 	ack = BMI_memalloc(req_info.addr, sizeof(struct ack_foo),
-		BMI_SEND_BUFFER);
+		BMI_SEND);
 	if(!ack)
 	{
 		fprintf(stderr, "BMI_memalloc failure.\n");
@@ -161,7 +161,7 @@ int main(int argc, char **argv)
 		return(-1);
 	}
 
-	BMI_memfree(req_info.addr, ack, sizeof(struct ack_foo), BMI_RECV_BUFFER);
+	BMI_memfree(req_info.addr, ack, sizeof(struct ack_foo), BMI_RECV);
 	free(req_info.buffer);
 
 	/* shut down the interfaces */

@@ -98,9 +98,9 @@ int main(int argc, char **argv)	{
 
 	/* allocate a buffer for the initial request and ack */
 	my_req = (struct server_request*)BMI_memalloc(server_addr, 
-		sizeof(struct server_request), BMI_SEND_BUFFER);
+		sizeof(struct server_request), BMI_SEND);
 	my_ack = (struct server_ack*)BMI_memalloc(server_addr, 
-		sizeof(struct server_ack), BMI_RECV_BUFFER);
+		sizeof(struct server_ack), BMI_RECV);
 	if(!my_req || !my_ack){
 		fprintf(stderr, "BMI_memalloc failed.\n");
 		return(-1);
@@ -201,9 +201,9 @@ int main(int argc, char **argv)	{
 	}
 
 	/* create 3 buffers to send */
-	send_buffer1 = BMI_memalloc(server_addr, MSG1_SIZE, BMI_SEND_BUFFER);
-	send_buffer2 = BMI_memalloc(server_addr, MSG2_SIZE, BMI_SEND_BUFFER);
-	send_buffer3 = BMI_memalloc(server_addr, MSG3_SIZE, BMI_SEND_BUFFER);
+	send_buffer1 = BMI_memalloc(server_addr, MSG1_SIZE, BMI_SEND);
+	send_buffer2 = BMI_memalloc(server_addr, MSG2_SIZE, BMI_SEND);
+	send_buffer3 = BMI_memalloc(server_addr, MSG3_SIZE, BMI_SEND);
 	if(!send_buffer1 || !send_buffer2 || !send_buffer3){
 		fprintf(stderr, "BMI_memalloc.\n");
 		return(-1);
@@ -267,13 +267,13 @@ int main(int argc, char **argv)	{
 	}
 
 	/* free up the message buffers */
-	BMI_memfree(server_addr, send_buffer1, MSG1_SIZE, BMI_SEND_BUFFER);
-	BMI_memfree(server_addr, send_buffer2, MSG2_SIZE, BMI_SEND_BUFFER);
-	BMI_memfree(server_addr, send_buffer3, MSG3_SIZE, BMI_SEND_BUFFER);
+	BMI_memfree(server_addr, send_buffer1, MSG1_SIZE, BMI_SEND);
+	BMI_memfree(server_addr, send_buffer2, MSG2_SIZE, BMI_SEND);
+	BMI_memfree(server_addr, send_buffer3, MSG3_SIZE, BMI_SEND);
 	BMI_memfree(server_addr, my_req, sizeof(struct server_request), 
-		BMI_SEND_BUFFER);
+		BMI_SEND);
 	BMI_memfree(server_addr, my_ack, sizeof(struct server_ack), 
-		BMI_RECV_BUFFER);
+		BMI_RECV);
 
 	/* shutdown the local interface */
 	BMI_close_context(context);

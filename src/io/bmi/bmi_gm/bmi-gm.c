@@ -36,10 +36,10 @@ int BMI_gm_set_info(int option,
 int BMI_gm_get_info(int option,
 		    void *inout_parameter);
 void *BMI_gm_memalloc(bmi_size_t size,
-		      bmi_flag_t send_recv);
+		      enum bmi_op_type send_recv);
 int BMI_gm_memfree(void *buffer,
 		   bmi_size_t size,
-		   bmi_flag_t send_recv);
+		   enum bmi_op_type send_recv);
 int BMI_gm_post_send(bmi_op_id_t * id,
 		     method_addr_p dest,
 		     void *buffer,
@@ -695,7 +695,7 @@ method_addr_p BMI_gm_method_addr_lookup(const char *id_string)
  * returns 0 on success, -errno on failure
  */
 void *BMI_gm_memalloc(bmi_size_t size,
-		      bmi_flag_t send_recv)
+		      enum bmi_op_type send_recv)
 {
     /* NOTE: In the send case, we allocate a little bit of extra memory
      * at the END of the buffer to use for message trailers.  We stick it
@@ -705,7 +705,7 @@ void *BMI_gm_memalloc(bmi_size_t size,
      */
     void *new_buffer = NULL;
 
-    if (send_recv == BMI_RECV_BUFFER)
+    if (send_recv == BMI_RECV)
     {
 	if (size <= GM_IMMED_LENGTH)
 	{
@@ -717,7 +717,7 @@ void *BMI_gm_memalloc(bmi_size_t size,
 							     long) size);
 	}
     }
-    else if (send_recv == BMI_SEND_BUFFER)
+    else if (send_recv == BMI_SEND)
     {
 	if (size <= GM_IMMED_LENGTH)
 	{
@@ -749,9 +749,9 @@ void *BMI_gm_memalloc(bmi_size_t size,
  */
 int BMI_gm_memfree(void *buffer,
 		   bmi_size_t size,
-		   bmi_flag_t send_recv)
+		   enum bmi_op_type send_recv)
 {
-    if (send_recv == BMI_RECV_BUFFER)
+    if (send_recv == BMI_RECV)
     {
 	if (size <= GM_IMMED_LENGTH)
 	{
@@ -762,7 +762,7 @@ int BMI_gm_memfree(void *buffer,
 	    gm_dma_free(local_port, buffer);
 	}
     }
-    else if (send_recv == BMI_SEND_BUFFER)
+    else if (send_recv == BMI_SEND)
     {
 	gm_dma_free(local_port, buffer);
     }
@@ -1291,7 +1291,7 @@ int BMI_gm_post_recv(bmi_op_id_t * id,
 	}
 	*id = new_method_op->op_id;
 	new_method_op->user_ptr = user_ptr;
-	new_method_op->send_recv = BMI_OP_RECV;
+	new_method_op->send_recv = BMI_RECV;
 	new_method_op->addr = src;
 	new_method_op->buffer = buffer;
 	new_method_op->expected_size = expected_size;
@@ -1494,7 +1494,7 @@ int BMI_gm_post_recv_list(bmi_op_id_t * id,
 	}
 	*id = new_method_op->op_id;
 	new_method_op->user_ptr = user_ptr;
-	new_method_op->send_recv = BMI_OP_RECV;
+	new_method_op->send_recv = BMI_RECV;
 	new_method_op->addr = src;
 	new_method_op->buffer = NULL;
 	new_method_op->expected_size = total_expected_size;
@@ -1853,7 +1853,7 @@ static int gm_post_send_build_op_list(bmi_op_id_t * id,
     }
     *id = new_method_op->op_id;
     new_method_op->user_ptr = user_ptr;
-    new_method_op->send_recv = BMI_OP_SEND;
+    new_method_op->send_recv = BMI_SEND;
     new_method_op->addr = dest;
     new_method_op->buffer = NULL;
     new_method_op->actual_size = total_size;
@@ -1904,7 +1904,7 @@ static int gm_post_send_build_op(bmi_op_id_t * id,
     }
     *id = new_method_op->op_id;
     new_method_op->user_ptr = user_ptr;
-    new_method_op->send_recv = BMI_OP_SEND;
+    new_method_op->send_recv = BMI_SEND;
     new_method_op->addr = dest;
     new_method_op->buffer = buffer;
     new_method_op->actual_size = size;
@@ -2580,7 +2580,7 @@ static int immed_unexp_recv_handler(bmi_size_t size,
     {
 	return (-ENOMEM);
     }
-    new_method_op->send_recv = BMI_OP_RECV;
+    new_method_op->send_recv = BMI_RECV;
     new_method_op->addr = map;
     new_method_op->actual_size = size;
     new_method_op->expected_size = 0;
@@ -2616,7 +2616,7 @@ static int immed_recv_handler(bmi_size_t actual_size,
     {
 	return (-ENOMEM);
     }
-    new_method_op->send_recv = BMI_OP_RECV;
+    new_method_op->send_recv = BMI_RECV;
     new_method_op->addr = map;
     new_method_op->actual_size = actual_size;
     /* TODO: is this the right thing to do here? */
@@ -3566,7 +3566,7 @@ static int ctrl_req_handler_rend(bmi_op_id_t ctrl_op_id,
 	{
 	    return (-ENOMEM);
 	}
-	active_method_op->send_recv = BMI_OP_RECV;
+	active_method_op->send_recv = BMI_RECV;
 	active_method_op->addr = map;
 	active_method_op->actual_size = ctrl_actual_size;
 	/* TODO: is this the right thing to do here? */

@@ -106,7 +106,7 @@ int PINT_send_req(bmi_addr_t addr,
     }
 
     /* allocate space for response */
-    *encoded_resp = BMI_memalloc(addr, max_resp_size, BMI_RECV_BUFFER);
+    *encoded_resp = BMI_memalloc(addr, max_resp_size, BMI_RECV);
     if (encoded_resp == NULL)
     {
 	ret = -ENOMEM;
@@ -181,7 +181,7 @@ send_req_out:
      * PINT_release_req()
      */
     if(*encoded_resp && (ret != 0))
-	BMI_memfree(addr, *encoded_resp, max_resp_size, BMI_RECV_BUFFER);
+	BMI_memfree(addr, *encoded_resp, max_resp_size, BMI_RECV);
 
     return(ret);
 }
@@ -212,7 +212,7 @@ void PINT_release_req(bmi_addr_t addr,
 	REQ_ENC_FORMAT);
 
     BMI_memfree(addr, *encoded_resp, max_resp_size,
-	BMI_RECV_BUFFER);
+	BMI_RECV);
 
     return;
 }
@@ -365,7 +365,7 @@ int PINT_send_req_array(bmi_addr_t* addr_array,
 	if(!(error_code_array[i]))
 	{
 	    resp_encoded_array[i] = BMI_memalloc(addr_array[i], max_resp_size,
-		BMI_RECV_BUFFER);
+		BMI_RECV);
 	    if(!resp_encoded_array[i])
 	    {
 		error_code_array[i] = -ENOMEM;
@@ -499,7 +499,7 @@ void PINT_release_req_array(bmi_addr_t* addr_array,
 	if(resp_encoded_array[i])
 	{
 	    BMI_memfree(addr_array[i], resp_encoded_array[i],
-		max_resp_size, BMI_RECV_BUFFER);
+		max_resp_size, BMI_RECV);
 	}
     }
 
@@ -558,7 +558,7 @@ int PINT_recv_ack_array(bmi_addr_t* addr_array,
 	if(!(error_code_array[i]))
 	{
 	    resp_encoded_array[i] = BMI_memalloc(addr_array[i], max_resp_size,
-		BMI_RECV_BUFFER);
+		BMI_RECV);
 	    if(!resp_encoded_array[i])
 	    {
 		error_code_array[i] = -ENOMEM;
@@ -686,7 +686,7 @@ void PINT_release_ack_array(bmi_addr_t* addr_array,
 	if(resp_encoded_array[i])
 	{
 	    BMI_memfree(addr_array[i], resp_encoded_array[i],
-		max_resp_size, BMI_RECV_BUFFER);
+		max_resp_size, BMI_RECV);
 	}
     }
 

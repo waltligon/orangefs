@@ -90,9 +90,9 @@ int main(int argc, char **argv)	{
 
 	/* allocate a buffer for the initial request and ack */
 	my_req = (struct server_request*)BMI_memalloc(server_addr, 
-		sizeof(struct server_request), BMI_SEND_BUFFER);
+		sizeof(struct server_request), BMI_SEND);
 	my_ack = (struct server_ack*)BMI_memalloc(server_addr, 
-		sizeof(struct server_ack), BMI_RECV_BUFFER);
+		sizeof(struct server_ack), BMI_RECV);
 	if(!my_req || !my_ack){
 		fprintf(stderr, "BMI_memalloc failed.\n");
 		return(-1);
@@ -194,7 +194,7 @@ int main(int argc, char **argv)	{
 
 	/* create a buffer to send */
 	send_buffer = BMI_memalloc(server_addr,
-		user_opts->message_size, BMI_SEND_BUFFER);
+		user_opts->message_size, BMI_SEND);
 	if(!send_buffer){
 		fprintf(stderr, "BMI_memalloc.\n");
 		return(-1);
@@ -240,11 +240,11 @@ int main(int argc, char **argv)	{
 
 	/* free up the message buffers */
 	BMI_memfree(server_addr, send_buffer, user_opts->message_size, 
-		BMI_SEND_BUFFER);
+		BMI_SEND);
 	BMI_memfree(server_addr, my_req, sizeof(struct server_request), 
-		BMI_SEND_BUFFER);
+		BMI_SEND);
 	BMI_memfree(server_addr, my_ack, sizeof(struct server_ack), 
-		BMI_RECV_BUFFER);
+		BMI_RECV);
 
 	/* shutdown the local interface */
 	BMI_close_context(context);

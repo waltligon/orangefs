@@ -324,7 +324,7 @@ static int create_cleanup(PINT_server_op *s_op, job_status_s *ret)
 	    s_op->addr,
 	    s_op->req,
 	    s_op->unexp_bmi_buff->size,
-	    BMI_RECV_BUFFER
+	    BMI_RECV
 	    );
     */
 

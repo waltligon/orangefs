@@ -73,9 +73,9 @@ int main( int argc, char *argv[])
 	{
 		buffer_flag = BMI_PRE_ALLOC;
 		ret = BMI_alloc_buffers(&bmi_send_bufs, 1000, opts.message_len,
-			bmi_peer_array[0], BMI_SEND_BUFFER);
+			bmi_peer_array[0], BMI_SEND);
 		ret += BMI_alloc_buffers(&bmi_recv_bufs, 1000, opts.message_len,
-			bmi_peer_array[0], BMI_RECV_BUFFER);
+			bmi_peer_array[0], BMI_RECV);
 		if(ret < 0)
 		{
 			fprintf(stderr, "BMI_alloc_buffers() failure.\n");
@@ -193,9 +193,9 @@ int main( int argc, char *argv[])
 	if(opts.flags & BMI_ALLOCATE_MEMORY)
 	{
 		BMI_free_buffers(&bmi_send_bufs, bmi_peer_array[0],
-			BMI_SEND_BUFFER);
+			BMI_SEND);
 		BMI_free_buffers(&bmi_recv_bufs, bmi_peer_array[0],
-			BMI_RECV_BUFFER);
+			BMI_RECV);
 	}
 	else
 	{

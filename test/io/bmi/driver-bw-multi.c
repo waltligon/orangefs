@@ -96,7 +96,7 @@ int main( int argc, char *argv[])
 			{
 				buffer_flag = BMI_PRE_ALLOC;
 				ret = BMI_alloc_buffers(&(bmi_buf_array[i]), num_messages,
-					opts.message_len, bmi_peer_array[i], BMI_RECV_BUFFER);
+					opts.message_len, bmi_peer_array[i], BMI_RECV);
 			}
 			else
 			{
@@ -134,7 +134,7 @@ int main( int argc, char *argv[])
 			{
 				buffer_flag = BMI_PRE_ALLOC;
 				ret = BMI_alloc_buffers(&(bmi_buf_array[i]), num_messages,
-					opts.message_len, bmi_peer_array[i], BMI_SEND_BUFFER);
+					opts.message_len, bmi_peer_array[i], BMI_SEND);
 			}
 			else
 			{
@@ -238,7 +238,7 @@ int main( int argc, char *argv[])
 			if(opts.flags & BMI_ALLOCATE_MEMORY)
 			{
 				BMI_free_buffers(&(bmi_buf_array[i]), bmi_peer_array[i],
-					BMI_RECV_BUFFER);
+					BMI_RECV);
 			}
 			else
 			{
@@ -254,7 +254,7 @@ int main( int argc, char *argv[])
 			if(opts.flags & BMI_ALLOCATE_MEMORY)
 			{
 				BMI_free_buffers(&(bmi_buf_array[i]), bmi_peer_array[i],
-					BMI_SEND_BUFFER);
+					BMI_SEND);
 			}
 			else
 			{

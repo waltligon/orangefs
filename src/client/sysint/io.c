@@ -576,7 +576,7 @@ static int io_req_ack_flow_array(bmi_addr_t* addr_array,
 	if(!(error_code_array[i]))
 	{
 	    resp_encoded_array[i] = BMI_memalloc(addr_array[i], max_resp_size,
-		BMI_RECV_BUFFER);
+		BMI_RECV);
 	    if(!resp_encoded_array[i])
 	    {
 		error_code_array[i] = -ENOMEM;
@@ -822,7 +822,7 @@ static void io_release_req_ack_flow_array(bmi_addr_t* addr_array,
 	if(resp_encoded_array[i])
 	{
 	    BMI_memfree(addr_array[i], resp_encoded_array[i],
-		max_resp_size, BMI_RECV_BUFFER);
+		max_resp_size, BMI_RECV);
 	}
 	if(flow_array[i])
 	{

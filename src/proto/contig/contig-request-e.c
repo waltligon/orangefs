@@ -47,7 +47,7 @@ int do_encode_req(
 	case PVFS_SERV_GETCONFIG:
             size = sizeof(struct PVFS_server_req_s) + header_size;
 	    enc_msg = BMI_memalloc(target_msg->dest, (bmi_size_t)size,
-		BMI_SEND_BUFFER);
+		BMI_SEND);
 
 	    /* here the right thing to do is to return the error code. */
 	    if (enc_msg == NULL)
@@ -74,7 +74,7 @@ int do_encode_req(
 	    size = sizeof( struct PVFS_server_req_s ) +
 		header_size + name_sz;
 	    enc_msg = BMI_memalloc(target_msg->dest, (bmi_size_t)size, 
-		BMI_SEND_BUFFER );
+		BMI_SEND );
 
 	    if (enc_msg == NULL)
 	    {
@@ -105,7 +105,7 @@ int do_encode_req(
 	    size = sizeof( struct PVFS_server_req_s ) +
 		header_size + name_sz;
 	    enc_msg = BMI_memalloc( target_msg->dest, (bmi_size_t)size, 
-		BMI_SEND_BUFFER );
+		BMI_SEND );
 
 	    if (enc_msg == NULL)
 	    {
@@ -136,7 +136,7 @@ int do_encode_req(
 	    size = sizeof( struct PVFS_server_req_s ) + header_size 
 		+ name_sz;
 	    enc_msg = BMI_memalloc( target_msg->dest, (bmi_size_t)size, 
-		BMI_SEND_BUFFER );
+		BMI_SEND );
 
 	    if (enc_msg == NULL)
 	    {
@@ -174,7 +174,7 @@ int do_encode_req(
 	     * distributions cause they're going to change */
 
 	    enc_msg = BMI_memalloc( target_msg->dest, (bmi_size_t)size, 
-		BMI_SEND_BUFFER );
+		BMI_SEND );
 	    if (!enc_msg)
 	    {
 		return (-ENOMEM);
@@ -229,7 +229,7 @@ int do_encode_req(
 	    /* TODO: come back and alloc the right spaces for 
 	     * distributions and eattribs cause they're going to change */
 
-	    enc_msg = BMI_memalloc( target_msg->dest, size + header_size, BMI_SEND_BUFFER );
+	    enc_msg = BMI_memalloc( target_msg->dest, size + header_size, BMI_SEND );
 	    if (enc_msg == NULL)
 	    {
 		return (-ENOMEM);
@@ -275,7 +275,7 @@ int do_encode_req(
 		header_size;
 
 	    /* create buffer for encoded message */
-	    enc_msg = BMI_memalloc( target_msg->dest, (bmi_size_t)(size + header_size), BMI_SEND_BUFFER ) ;
+	    enc_msg = BMI_memalloc( target_msg->dest, (bmi_size_t)(size + header_size), BMI_SEND ) ;
 	    if (enc_msg == NULL)
 	    {
 		return (-ENOMEM);
@@ -304,14 +304,14 @@ int do_encode_req(
 	    if(ret < 0)
 	    {
 		BMI_memfree(target_msg->dest, enc_msg, (size +
-		    header_size), BMI_SEND_BUFFER);
+		    header_size), BMI_SEND);
 		return(ret);
 	    }
 	    ret = PINT_Request_encode(encode_io_req);
 	    if(ret < 0)
 	    {
 		BMI_memfree(target_msg->dest, enc_msg, (size +
-		    header_size), BMI_SEND_BUFFER);
+		    header_size), BMI_SEND);
 		return(ret);
 	    }
 	    /* pack the distribution */
@@ -330,7 +330,7 @@ int do_encode_req(
 	case PVFS_SERV_ALLOCATE:
 	    size = sizeof( struct PVFS_server_req_s ) + header_size;
 	    enc_msg = BMI_memalloc( target_msg->dest, (bmi_size_t)size, 
-		BMI_SEND_BUFFER ) ;
+		BMI_SEND ) ;
 	    if (enc_msg == NULL)
 	    {
 		return (-ENOMEM);

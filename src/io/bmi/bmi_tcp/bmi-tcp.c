@@ -32,10 +32,10 @@ int BMI_tcp_set_info(int option,
 int BMI_tcp_get_info(int option,
 		     void *inout_parameter);
 void *BMI_tcp_memalloc(bmi_size_t size,
-		       bmi_flag_t send_recv);
+		       enum bmi_op_type send_recv);
 int BMI_tcp_memfree(void *buffer,
 		    bmi_size_t size,
-		    bmi_flag_t send_recv);
+		    enum bmi_op_type send_recv);
 int BMI_tcp_post_send(bmi_op_id_t * id,
 		      method_addr_p dest,
 		      void *buffer,
@@ -162,7 +162,7 @@ static int tcp_server_init(void);
 static void dealloc_tcp_method_addr(method_addr_p map);
 static int tcp_sock_init(method_addr_p my_method_addr);
 static int enqueue_operation(op_list_p target_list,
-			     bmi_flag_t send_recv,
+			     enum bmi_op_type send_recv,
 			     method_addr_p map,
 			     void **buffer_list,
 			     bmi_size_t * size_list,
@@ -518,7 +518,7 @@ method_addr_p BMI_tcp_method_addr_lookup(const char *id_string)
  * returns 0 on success, -errno on failure
  */
 void *BMI_tcp_memalloc(bmi_size_t size,
-		       bmi_flag_t send_recv)
+		       enum bmi_op_type send_recv)
 {
     /* we really don't care what flags the caller uses, TCP/IP has no
      * preferences about how the memory should be configured.
@@ -536,7 +536,7 @@ void *BMI_tcp_memalloc(bmi_size_t size,
  */
 int BMI_tcp_memfree(void *buffer,
 		    bmi_size_t size,
-		    bmi_flag_t send_recv)
+		    enum bmi_op_type send_recv)
 {
     /* NOTE: I am not going to bother to check to see if it is really our
      * buffer.  This function trusts the caller.
@@ -1413,7 +1413,7 @@ static int tcp_sock_init(method_addr_p my_method_addr)
  * returns 0 on success, -errno on failure
  */
 static int enqueue_operation(op_list_p target_list,
-			     bmi_flag_t send_recv,
+			     enum bmi_op_type send_recv,
 			     method_addr_p map,
 			     void **buffer_list,
 			     bmi_size_t * size_list,
@@ -1738,7 +1738,7 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
     }
     bogus_header.tag = tag;
     ret = enqueue_operation(op_list_array[IND_RECV],
-			    BMI_OP_RECV, src, buffer_list, size_list,
+			    BMI_RECV, src, buffer_list, size_list,
 			    list_count, 0, 0, 0, id, BMI_TCP_INPROGRESS,
 			    bogus_header, user_ptr, list_stub_flag, 0,
 			    expected_size, context_id);
@@ -1786,7 +1786,7 @@ static int tcp_cleanse_addr(method_addr_p map)
 		op_list_remove(query_op);
 		query_op->error_code = -EPROTO;
 		if (query_op->mode == TCP_MODE_UNEXP && query_op->send_recv
-		    == BMI_OP_RECV)
+		    == BMI_RECV)
 		{
 		    op_list_add(op_list_array[IND_COMPLETE_RECV_UNEXP],
 				query_op);
@@ -2090,7 +2090,7 @@ static int tcp_do_work_recv(method_addr_p map)
 	}
 
 	/* set the fields */
-	active_method_op->send_recv = BMI_OP_RECV;
+	active_method_op->send_recv = BMI_RECV;
 	active_method_op->addr = map;
 	active_method_op->actual_size = new_header.size;
 	active_method_op->expected_size = 0;
@@ -2168,7 +2168,7 @@ static int tcp_do_work_recv(method_addr_p map)
     }
 
     /* set the fields */
-    active_method_op->send_recv = BMI_OP_RECV;
+    active_method_op->send_recv = BMI_RECV;
     active_method_op->addr = map;
     active_method_op->actual_size = new_header.size;
     active_method_op->expected_size = 0;
@@ -2572,7 +2572,7 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
     if (query_op)
     {
 	/* queue up operation */
-	ret = enqueue_operation(op_list_array[IND_SEND], BMI_OP_SEND,
+	ret = enqueue_operation(op_list_array[IND_SEND], BMI_SEND,
 				dest, buffer_list, size_list, list_count, 0, 0,
 				1, id, BMI_TCP_INPROGRESS, my_header, user_ptr,
 				list_stub_flag, my_header.size, 0,
@@ -2600,7 +2600,7 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
     if (tcp_addr_data->not_connected)
     {
 	/* if the connection is not completed, queue up for later work */
-	ret = enqueue_operation(op_list_array[IND_SEND], BMI_OP_SEND,
+	ret = enqueue_operation(op_list_array[IND_SEND], BMI_SEND,
 				dest, buffer_list, size_list, list_count, 0, 0,
 				1, id, BMI_TCP_INPROGRESS, my_header, user_ptr,
 				list_stub_flag, my_header.size, 0,
@@ -2621,7 +2621,7 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
     if (ret < msg_header_size)
     {
 	/* header send not completed */
-	ret = enqueue_operation(op_list_array[IND_SEND], BMI_OP_SEND,
+	ret = enqueue_operation(op_list_array[IND_SEND], BMI_SEND,
 				dest, buffer_list, size_list, list_count, 0,
 				ret, 1, id, BMI_TCP_INPROGRESS, my_header,
 				user_ptr, list_stub_flag,
@@ -2657,7 +2657,7 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
     }
 
     /* queue up the remainder */
-    ret = enqueue_operation(op_list_array[IND_SEND], BMI_OP_SEND,
+    ret = enqueue_operation(op_list_array[IND_SEND], BMI_SEND,
 			    dest, buffer_list, size_list, list_count,
 			    amt_complete, sizeof(struct tcp_msg_header), 1, id,
 			    BMI_TCP_INPROGRESS, my_header, user_ptr,

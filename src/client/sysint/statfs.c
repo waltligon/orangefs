@@ -279,8 +279,8 @@ int PVFS_sys_statfs(PVFS_sysreq_statfs *req, PVFS_sysresp_statfs *resp)
 	/* Deallocate */
 	for(i = 0;i < mtable.number + iotable.number; i++)
 	{
-		sysjob_free(server_addr[i],req_array[i],req_size,BMI_SEND_BUFFER,NULL);
-		sysjob_free(server_addr[i],ack_array[i],ack_size,BMI_RECV_BUFFER,NULL);
+		sysjob_free(server_addr[i],req_array[i],req_size,BMI_SEND,NULL);
+		sysjob_free(server_addr[i],ack_array[i],ack_size,BMI_RECV,NULL);
 	}
 	free(ack_array);
 	free(req_array);
@@ -302,12 +302,12 @@ int PVFS_sys_statfs(PVFS_sysreq_statfs *req, PVFS_sysresp_statfs *resp)
 recv_failure:
 	for(i = 0;i < (mtable.number + iotable.number); i++)
 	{
-		sysjob_free(server_addr[i],ack_array[i],ack_size,BMI_RECV_BUFFER,NULL);
+		sysjob_free(server_addr[i],ack_array[i],ack_size,BMI_RECV,NULL);
 	}
 send_failure:
 	for(i = 0;i < mtable.number + iotable.number; i++)
 	{
-		sysjob_free(server_addr[i],req_array[i],req_size,BMI_SEND_BUFFER,NULL);
+		sysjob_free(server_addr[i],req_array[i],req_size,BMI_SEND,NULL);
 	}
 job_fill_failure:
 	if (ack_array)
@@ -351,7 +351,7 @@ static int mstatreq_alloc(void *pjob,void *preq,bmi_addr_t server,
 	/* Fill up the request structure */
 	size = sizeof(struct PVFS_server_req_s); 
 	/* Alloc memory for request structure */
-	(*serv_req) = BMI_memalloc(server,size,BMI_SEND_BUFFER);
+	(*serv_req) = BMI_memalloc(server,size,BMI_SEND);
 	if (!(*serv_req))
 	{
 		return(-ENOMEM);
@@ -384,7 +384,7 @@ static int iostatreq_alloc(void *pjob,void *preq,bmi_addr_t server,
 	/* Fill up the response structure */
 	size = sizeof(struct PVFS_server_req_s); 
 	/* Alloc memory for request structure */
-	(*serv_req) = BMI_memalloc(server,size,BMI_SEND_BUFFER);
+	(*serv_req) = BMI_memalloc(server,size,BMI_SEND);
 	if (!(*serv_req))
 	{
 		return(-ENOMEM);
@@ -416,7 +416,7 @@ static int mstatack_alloc(void *pjob,void *preq,bmi_addr_t server,
 	/* Fill up the response structure */
 	size = sizeof(struct PVFS_server_resp_s); 
 	/* Alloc memory for request structure */
-	(*serv_resp) = BMI_memalloc(server,size,BMI_RECV_BUFFER);
+	(*serv_resp) = BMI_memalloc(server,size,BMI_RECV);
 	if (!(*serv_resp))
 	{
 		return(-ENOMEM);
@@ -450,7 +450,7 @@ static int iostatack_alloc(void *pjob,void *preq,bmi_addr_t server,
 	/* Fill up the response structure */
 	size = sizeof(struct PVFS_server_resp_s); 
 	/* Alloc memory for response structure */
-	(*serv_resp) = BMI_memalloc(server,size,BMI_RECV_BUFFER);
+	(*serv_resp) = BMI_memalloc(server,size,BMI_RECV);
 	if (!(*serv_resp))
 	{
 		return(-ENOMEM);

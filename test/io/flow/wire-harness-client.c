@@ -133,7 +133,7 @@ int main(int argc, char **argv)
 		PINT_DIST_PACK_SIZE(io_dist);
 
 	req = (struct wire_harness_req*)BMI_memalloc(server_addr,
-		total_req_size, BMI_SEND_BUFFER);
+		total_req_size, BMI_SEND);
 	if(!req)
 	{
 		fprintf(stderr, "BMI_memalloc() failure.\n");
@@ -172,7 +172,7 @@ int main(int argc, char **argv)
 
 	/* create a buffer for the response */
 	ack = BMI_memalloc(server_addr, sizeof(struct wire_harness_ack),
-		BMI_RECV_BUFFER);
+		BMI_RECV);
 	if(!ack)
 	{
 		fprintf(stderr, "Error: BMI malloc failure.\n");
@@ -200,8 +200,8 @@ int main(int argc, char **argv)
 	free(memory_buffer);
 
 	BMI_memfree(server_addr, ack, sizeof(struct wire_harness_ack), 
-		BMI_RECV_BUFFER);
-	BMI_memfree(server_addr, req, total_req_size, BMI_SEND_BUFFER);
+		BMI_RECV);
+	BMI_memfree(server_addr, req, total_req_size, BMI_SEND);
 
 	/* shut down flow interface */
 	PINT_flow_close_context(flow_context);

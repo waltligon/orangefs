@@ -690,7 +690,7 @@ static void buffer_teardown_bmi_to_mem(flow_descriptor * flow_d)
     {
 	BMI_memfree(flow_d->src.u.bmi.address,
 		    flow_data->intermediate_buffer, flow_data->max_buffer_size,
-		    BMI_RECV_BUFFER);
+		    BMI_RECV);
     }
 
     return;
@@ -711,7 +711,7 @@ static void buffer_teardown_mem_to_bmi(flow_descriptor * flow_d)
     {
 	BMI_memfree(flow_d->dest.u.bmi.address,
 		    flow_data->intermediate_buffer, flow_data->max_buffer_size,
-		    BMI_SEND_BUFFER);
+		    BMI_SEND);
     }
 
     return;
@@ -788,7 +788,7 @@ static int buffer_setup_bmi_to_mem(flow_descriptor * flow_d)
 	{
 	    flow_data->intermediate_buffer =
 		BMI_memalloc(flow_d->src.u.bmi.address,
-			     flow_data->max_buffer_size, BMI_RECV_BUFFER);
+			     flow_data->max_buffer_size, BMI_RECV);
 	    if (!flow_data->intermediate_buffer)
 	    {
 		return (-ENOMEM);
@@ -872,7 +872,7 @@ static int buffer_setup_mem_to_bmi(flow_descriptor * flow_d)
 	{
 	    flow_data->intermediate_buffer =
 		BMI_memalloc(flow_d->dest.u.bmi.address,
-			     flow_data->max_buffer_size, BMI_SEND_BUFFER);
+			     flow_data->max_buffer_size, BMI_SEND);
 	    if (!flow_data->intermediate_buffer)
 	    {
 		return (-ENOMEM);
@@ -961,7 +961,7 @@ static int buffer_setup_bmi_to_trove(flow_descriptor * flow_d)
     /* create two buffers and set them to initial states */
     flow_data->fill_buffer =
 	BMI_memalloc(flow_d->src.u.bmi.address,
-		     flow_data->max_buffer_size, BMI_RECV_BUFFER);
+		     flow_data->max_buffer_size, BMI_RECV);
     if (!flow_data->fill_buffer)
     {
 	return (-ENOMEM);
@@ -970,12 +970,12 @@ static int buffer_setup_bmi_to_trove(flow_descriptor * flow_d)
 
     flow_data->drain_buffer =
 	BMI_memalloc(flow_d->src.u.bmi.address,
-		     flow_data->max_buffer_size, BMI_RECV_BUFFER);
+		     flow_data->max_buffer_size, BMI_RECV);
     if (!flow_data->drain_buffer)
     {
 	BMI_memfree(flow_d->src.u.bmi.address,
 		    flow_data->fill_buffer, flow_data->max_buffer_size,
-		    BMI_RECV_BUFFER);
+		    BMI_RECV);
 	return (-ENOMEM);
     }
     flow_data->drain_buffer_state = BUF_READY_TO_SWAP;
@@ -990,10 +990,10 @@ static int buffer_setup_bmi_to_trove(flow_descriptor * flow_d)
     {
 	BMI_memfree(flow_d->src.u.bmi.address,
 		    flow_data->fill_buffer, flow_data->max_buffer_size,
-		    BMI_RECV_BUFFER);
+		    BMI_RECV);
 	BMI_memfree(flow_d->src.u.bmi.address,
 		    flow_data->drain_buffer, flow_data->max_buffer_size,
-		    BMI_RECV_BUFFER);
+		    BMI_RECV);
 	return (-ENOMEM);
     }
     return (0);
@@ -1019,7 +1019,7 @@ static int buffer_setup_trove_to_bmi(flow_descriptor * flow_d)
     /* create two buffers and set them to initial states */
     flow_data->fill_buffer =
 	BMI_memalloc(flow_d->dest.u.bmi.address,
-		     flow_data->max_buffer_size, BMI_SEND_BUFFER);
+		     flow_data->max_buffer_size, BMI_SEND);
     if (!flow_data->fill_buffer)
     {
 	return (-ENOMEM);
@@ -1028,12 +1028,12 @@ static int buffer_setup_trove_to_bmi(flow_descriptor * flow_d)
 
     flow_data->drain_buffer =
 	BMI_memalloc(flow_d->dest.u.bmi.address,
-		     flow_data->max_buffer_size, BMI_SEND_BUFFER);
+		     flow_data->max_buffer_size, BMI_SEND);
     if (!flow_data->drain_buffer)
     {
 	BMI_memfree(flow_d->dest.u.bmi.address,
 		    flow_data->fill_buffer, flow_data->max_buffer_size,
-		    BMI_SEND_BUFFER);
+		    BMI_SEND);
 	return (-ENOMEM);
     }
     flow_data->drain_buffer_state = BUF_READY_TO_SWAP;
@@ -2151,9 +2151,9 @@ static void buffer_teardown_trove_to_bmi(flow_descriptor * flow_d)
 
     /* just free the intermediate buffers */
     BMI_memfree(flow_d->dest.u.bmi.address, flow_data->fill_buffer,
-		flow_data->max_buffer_size, BMI_SEND_BUFFER);
+		flow_data->max_buffer_size, BMI_SEND);
     BMI_memfree(flow_d->dest.u.bmi.address, flow_data->drain_buffer,
-		flow_data->max_buffer_size, BMI_SEND_BUFFER);
+		flow_data->max_buffer_size, BMI_SEND);
 
     return;
 }
@@ -2171,9 +2171,9 @@ static void buffer_teardown_bmi_to_trove(flow_descriptor * flow_d)
 
     /* just free the intermediate buffers */
     BMI_memfree(flow_d->src.u.bmi.address, flow_data->fill_buffer,
-		flow_data->max_buffer_size, BMI_RECV_BUFFER);
+		flow_data->max_buffer_size, BMI_RECV);
     BMI_memfree(flow_d->src.u.bmi.address, flow_data->drain_buffer,
-		flow_data->max_buffer_size, BMI_RECV_BUFFER);
+		flow_data->max_buffer_size, BMI_RECV);
     PINT_Free_request_state(flow_data->dup_req_state);
     return;
 }

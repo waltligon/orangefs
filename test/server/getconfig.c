@@ -91,9 +91,9 @@ int main(int argc, char **argv)	{
 	}
 
 	server_req = (struct PVFS_server_req_s*)BMI_memalloc(server_addr, 
-		sizeof(struct PVFS_server_req_s), BMI_SEND_BUFFER);
+		sizeof(struct PVFS_server_req_s), BMI_SEND);
 	server_resp = (struct PVFS_server_resp_s*)BMI_memalloc(server_addr, 
-		sizeof(struct PVFS_server_resp_s)+8192, BMI_RECV_BUFFER);
+		sizeof(struct PVFS_server_resp_s)+8192, BMI_RECV);
 	if(!server_req || !server_resp){
 		fprintf(stderr, "BMI_memalloc failed.\n");
 		return(-1);
@@ -186,7 +186,7 @@ int main(int argc, char **argv)	{
 	printf("\n---decoded_msg (server_resp) ---\n");
 	display_pvfs_structure(decoded_msg.buffer,0);
 	BMI_memfree(server_addr, server_resp, sizeof(struct PVFS_server_resp_s)+8192, 
-		BMI_RECV_BUFFER);
+		BMI_RECV);
 	server_resp = decoded_msg.buffer;
 	if(server_resp->op != PVFS_SERV_GETCONFIG)
 	{
@@ -200,9 +200,9 @@ int main(int argc, char **argv)	{
 
 	/* free up memory buffers */
 	BMI_memfree(server_addr, server_req, sizeof(struct PVFS_server_req_s), 
-		BMI_SEND_BUFFER);
+		BMI_SEND);
 	BMI_memfree(server_addr, server_resp, sizeof(struct PVFS_server_resp_s)+8192, 
-		BMI_RECV_BUFFER);
+		BMI_RECV);
 
 	/* shutdown the local interface */
 	BMI_close_context(context);

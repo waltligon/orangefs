@@ -26,7 +26,7 @@ ENCODE_REL_HEAD(do_encode_rel)
 				BMI_memfree(msg->dest,
 						msg->buffer_list[i],
 						msg->size_list[i],
-						BMI_SEND_BUFFER);
+						BMI_SEND);
 			}
 		}
 	}

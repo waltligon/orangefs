@@ -598,7 +598,7 @@ int main(int argc, char **argv)
 	RET_CHECK("Error in Encoding Create Req\n")
 
 #ifdef USE_BMI_MSGS
-        bmi_resp = BMI_memalloc(me,encoded.size_list[0],BMI_RECV_BUFFER);
+        bmi_resp = BMI_memalloc(me,encoded.size_list[0],BMI_RECV);
         ret = send_msg(client_ops[1],
                                                 me,
                                                 encoded.buffer_list[0],
@@ -647,7 +647,7 @@ int main(int argc, char **argv)
         BMI_memfree(me,
                                         bmi_resp,
                                         encoded.size_list[0],
-                                        BMI_RECV_BUFFER
+                                        BMI_RECV
                                         );
 	BMI_close_context(context);
 	BMI_finalize();

@@ -23,12 +23,6 @@
  * method interfaces and data structures 
  */
 
-enum
-{
-    BMI_OP_SEND = 1,
-    BMI_OP_RECV
-};
-
 /* this is the generic address structure which contains adressing
  * information for every protocol we support.  The method routines
  * can look into the union to find necessary information for a given
@@ -69,10 +63,10 @@ struct bmi_method_ops
     int (*BMI_meth_get_info) (int,
 			      void *);
     void *(*BMI_meth_memalloc) (bmi_size_t,
-				bmi_flag_t);
+				enum bmi_op_type);
     int (*BMI_meth_memfree) (void *,
 			     bmi_size_t,
-			     bmi_flag_t);
+			     enum bmi_op_type);
     int (*BMI_meth_post_send) (bmi_op_id_t *,
 			       method_addr_p,
 			       void *,
@@ -167,7 +161,7 @@ struct bmi_method_ops
 struct method_op
 {
     bmi_op_id_t op_id;		/* operation identifier */
-    bmi_flag_t send_recv;	/* type of operation */
+    enum bmi_op_type send_recv;	/* type of operation */
     void *user_ptr;		/* user_ptr associated with this op */
     bmi_msg_tag_t msg_tag;	/* message tag */
     bmi_error_code_t error_code;	/* final status of operation */

@@ -993,7 +993,7 @@ int BMI_testcontext(int incount,
  */
 void *BMI_memalloc(bmi_addr_t addr,
 		   bmi_size_t size,
-		   bmi_flag_t send_recv)
+		   enum bmi_op_type send_recv)
 {
     void *new_buffer = NULL;
     ref_st_p tmp_ref = NULL;
@@ -1024,7 +1024,7 @@ void *BMI_memalloc(bmi_addr_t addr,
 int BMI_memfree(bmi_addr_t addr,
 		void *buffer,
 		bmi_size_t size,
-		bmi_flag_t send_recv)
+		enum bmi_op_type send_recv)
 {
     ref_st_p tmp_ref = NULL;
     int ret = -1;

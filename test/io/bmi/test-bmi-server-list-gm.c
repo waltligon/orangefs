@@ -114,7 +114,7 @@ int main(int argc, char **argv)	{
 
 	/* create an ack */
 	my_ack = (struct server_ack*)BMI_memalloc(client_addr,
-		sizeof(struct server_ack), BMI_SEND_BUFFER);
+		sizeof(struct server_ack), BMI_SEND);
 	if(!my_ack){
 		fprintf(stderr, "BMI_memalloc failed.\n");
 		return(-1);
@@ -151,9 +151,9 @@ int main(int argc, char **argv)	{
 
 	/* create 2 buffers to recv into */
 	recv_buffer1 = BMI_memalloc(client_addr, (my_req->size/2), 
-		BMI_RECV_BUFFER);
+		BMI_RECV);
 	recv_buffer2 = BMI_memalloc(client_addr,
-		(my_req->size-(my_req->size/2)), BMI_RECV_BUFFER);
+		(my_req->size-(my_req->size/2)), BMI_RECV);
 	if(!recv_buffer1 || !recv_buffer2){
 		fprintf(stderr, "BMI_memalloc failed.\n");
 		return(-1);
@@ -214,11 +214,11 @@ int main(int argc, char **argv)	{
 
 	/* free up the message buffers */
 	BMI_memfree(client_addr, recv_buffer1, (my_req->size/2), 
-		BMI_RECV_BUFFER);
+		BMI_RECV);
 	BMI_memfree(client_addr, recv_buffer2, (my_req->size -
-		(my_req->size/2)), BMI_RECV_BUFFER);
+		(my_req->size/2)), BMI_RECV);
 	BMI_memfree(client_addr, my_ack, sizeof(struct server_ack), 
-		BMI_SEND_BUFFER);
+		BMI_SEND);
 	free(my_req);
 
 	/* shutdown the local interface */

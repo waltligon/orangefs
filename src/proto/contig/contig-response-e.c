@@ -58,7 +58,7 @@ int do_encode_resp(
 	    target_msg->buffer_list[0] 
 		= BMI_memalloc(target_msg->dest, 
 			sizeof(struct PVFS_server_resp_s) + header_size,
-			BMI_SEND_BUFFER);
+			BMI_SEND);
 	    memcpy(
 		    target_msg->buffer_list[0], 
 		    response, 
@@ -102,7 +102,7 @@ int do_encode_resp(
 		target_msg->buffer_list[0] = 
 		    BMI_memalloc(target_msg->dest, 
 		    target_msg->total_size,
-		    BMI_SEND_BUFFER);
+		    BMI_SEND);
 		pack_dest = (char*)target_msg->buffer_list[0];
 		/* copy in the datafiles */
 		if(response->u.getattr.attr.u.meta.nr_datafiles > 0)
@@ -132,7 +132,7 @@ int do_encode_resp(
 		target_msg->buffer_list[0]
 		    = BMI_memalloc(target_msg->dest, 
 			    sizeof(struct PVFS_server_resp_s) + header_size,
-			    BMI_SEND_BUFFER);
+			    BMI_SEND);
 	    }
 
 	    /* in either case, pack the basic ack in */
@@ -231,7 +231,7 @@ int do_encode_resp(
 	    target_msg->total_size = target_msg->size_list[0] = response->rsize;
 	    respbuf = target_msg->buffer_list[0] = BMI_memalloc(target_msg->dest,
 		    target_msg->total_size + header_size,
-		    BMI_SEND_BUFFER);
+		    BMI_SEND);
 
 	    memcpy(respbuf, response, sizeof(struct PVFS_server_resp_s));
 	    respbuf += sizeof(struct PVFS_server_resp_s);
@@ -270,7 +270,7 @@ int do_encode_resp(
 #if 0
 	    target_msg->buffer_list[0] = BMI_memalloc(target_msg->dest,
 		    target_msg->total_size + header_size,
-		    BMI_SEND_BUFFER);
+		    BMI_SEND);
 
 	    memcpy(respbuf, response, sizeof(struct PVFS_server_resp_s));
 	    respbuf += sizeof(struct PVFS_server_resp_s);

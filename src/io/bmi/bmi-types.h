@@ -33,11 +33,15 @@ enum
     BMI_INIT_SERVER = 1
 };
 
+enum bmi_op_type
+{
+    BMI_SEND = 1,
+    BMI_RECV = 2
+};
+
 /* BMI memory buffer flags */
 enum
 {
-    BMI_SEND_BUFFER = 1,
-    BMI_RECV_BUFFER = 2,
     BMI_PRE_ALLOC = 4,
     BMI_EXT_ALLOC = 8
 };

@@ -92,9 +92,9 @@ int main(int argc, char **argv)	{
 
 	/* allocate a buffer for the initial request and ack */
 	my_req = (struct PVFS_server_req_s*)BMI_memalloc(server_addr, 
-		sizeof(struct PVFS_server_req_s), BMI_SEND_BUFFER);
+		sizeof(struct PVFS_server_req_s), BMI_SEND);
 	my_ack = (struct PVFS_server_resp_s*)BMI_memalloc(server_addr, 
-		sizeof(struct PVFS_server_resp_s)+(5*sizeof(PVFS_dirent))+4, BMI_RECV_BUFFER);
+		sizeof(struct PVFS_server_resp_s)+(5*sizeof(PVFS_dirent))+4, BMI_RECV);
 	if(!my_req || !my_ack){
 		fprintf(stderr, "BMI_memalloc failed.\n");
 		return(-1);
@@ -183,7 +183,7 @@ int main(int argc, char **argv)	{
 	}
 	ret = PINT_decode(my_ack,PINT_ENCODE_RESP,&bar,server_addr,actual_size,NULL);
 	BMI_memfree(server_addr, my_ack, sizeof(struct PVFS_server_resp_s)+8192, 
-		BMI_RECV_BUFFER);
+		BMI_RECV);
 	my_ack = bar.buffer;
 		
 	/* look at the ack */
@@ -202,9 +202,9 @@ int main(int argc, char **argv)	{
 
 	/* free up memory buffers */
 	BMI_memfree(server_addr, my_req, sizeof(struct PVFS_server_req_s), 
-		BMI_SEND_BUFFER);
+		BMI_SEND);
 	BMI_memfree(server_addr, my_ack, sizeof(struct PVFS_server_resp_s), 
-		BMI_RECV_BUFFER);
+		BMI_RECV);
 
 	/* shutdown the local interface */
 	BMI_close_context(context);

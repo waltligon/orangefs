@@ -81,9 +81,9 @@ int main(int argc, char **argv)
 
 	/* allocate some buffers for the req and ack */
 	req = BMI_memalloc(server_addr, sizeof(struct request_foo),
-		BMI_SEND_BUFFER);
+		BMI_SEND);
 	ack = BMI_memalloc(server_addr, sizeof(struct ack_foo),
-		BMI_RECV_BUFFER);
+		BMI_RECV);
 	if(!ack || ! req)
 	{
 		fprintf(stderr, "BMI_memalloc failure.\n");
@@ -151,9 +151,9 @@ int main(int argc, char **argv)
 
 	/* free memory buffers */
 	BMI_memfree(server_addr, req, sizeof(struct request_foo), 
-		BMI_SEND_BUFFER);
+		BMI_SEND);
 	BMI_memfree(server_addr, ack, sizeof(struct ack_foo), 
-		BMI_RECV_BUFFER);
+		BMI_RECV);
 
 	/* shut down the interfaces */
 	job_close_context(context);
