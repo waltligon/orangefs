@@ -270,7 +270,7 @@ struct TROVE_mgmt_ops
 			     TROVE_coll_id new_coll_id,
 			     void *user_ptr,
 			     TROVE_op_id *out_op_id_p);
-    
+
     int (*collection_remove)(
 			     /* char *stoname, */
 			     char *collname,
@@ -296,13 +296,11 @@ struct TROVE_mgmt_ops
     /* Note: setinfo and getinfo always return immediately */
     int (*collection_setinfo)(
 			      TROVE_coll_id coll_id,
-			      TROVE_handle handle,
 			      int option,
 			      void *parameter);
     
     int (*collection_getinfo)(
 			      TROVE_coll_id coll_id,
-			      TROVE_handle handle,
 			      int option,
 			      void *parameter);
     
