@@ -7,4 +7,5 @@ TESTSRC += \
 	$(DIR)/debug2.c\
 	$(DIR)/debug3.c\
 	$(DIR)/debug4.c\
-	$(DIR)/debug5.c
+	$(DIR)/debug5.c\
+	$(DIR)/debug6.c
