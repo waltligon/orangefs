@@ -143,6 +143,7 @@ LDFLAGS += -L lib
 LIBS += -lpvfs2 @LIBS@ 
 MMAP_RA_CACHE = @MMAP_RA_CACHE@
 REDHAT_RELEASE = @REDHAT_RELEASE@
+NPTL_WORKAROUND = @NPTL_WORKAROUND@
 # for Solaris:
 # LIBS += -lsocket -lnsl
 
@@ -307,8 +308,9 @@ SMCGEN :=
 # Top level (default) targets
 
 ifdef BUILD_SERVER
-# SERVER_STUB is a wrapper script that export the LD_ASSUME_KERNEL
-# variable for REDHAT releases
+# SERVER_STUB is a wrapper script that export the LD_ASSUME_KERNEL variable for
+#    systems with buggy NPTL/Pthread implementations, such as early RedHat
+#    EL 3 distributions
 SERVER_STUB := src/server/pvfs2-server-stub
 # SERVER is the pvfs2 server
 SERVER := src/server/pvfs2-server
@@ -766,7 +768,7 @@ endif
 
 ifdef BUILD_SERVER
 	install -m 755 $(ADMINTOOLS_SERVER) $(prefix)/bin
-    ifeq ($(REDHAT_RELEASE),)
+    ifeq ($(NPTL_WORKAROUND),)
 	install -m 755 $(SERVER) $(prefix)/sbin
     else
 	install -m 755 $(srcdir)/$(SERVER_STUB) $(prefix)/sbin/pvfs2-server

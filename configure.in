@@ -162,12 +162,31 @@ dnl what was the configure option set to?
 use_redhat24=0
 
 AC_ARG_ENABLE([redhat24],
-[  --enable-redhat24 Enable workaround for building against redhat 2.4 kernel], 
+[  --enable-redhat24       Enable workaround for RedHat 2.4 kernel], 
     set_redhat24=1
     if test "$enableval" = no ; then 
     	use_redhat24=0
     else
         use_redhat24=1 
+    fi
+)
+
+dnl some systems (ie, RedHat EL 3 prior to Update 2) have buggy NPTL/Pthread
+dnl implementations.  We accomodate this with a server stub script hack that
+dnl attempts to disable NPTL and fall back to old fashioned Linux Threads.
+
+dnl was the configure option passed in?
+set_nptl_workaround=0
+dnl what was the configure option set to?
+use_nptl_workaround=0
+
+AC_ARG_ENABLE([nptl-workaround],
+[  --enable-nptl-workaround Enable workaround for buggy NPTL/Pthread libraries], 
+    set_nptl_workaround=1
+    if test "$enableval" = no ; then 
+    	use_nptl_workaround=0
+    else
+        use_nptl_workaround=1 
     fi
 )
 
@@ -198,15 +217,24 @@ if test -f /etc/redhat-release; then
        test "x`echo $REDHAT_REL | cut -b 1-43`" = "x$RHTAG5" ||
        test "x`echo $REDHAT_REL | cut -b 1-30`" = "x$RHTAG6" ; then
        AC_MSG_RESULT(yes)
-       if test "$set_redhat24" = 0 ; then
+       
+       if test "$set_redhat24" = 0 || test "$set_nptl_workaround" = 0 ; then
            AC_MSG_ERROR([
-    you appear to be configuring pvfs2 on a redhat distribution which
-    ships with a heavily modified 2.4 kernel.  We need more
-    information before we can proceed.  If you are configuring the
-    pvfs2 module for a redhat kernel, re-run configure with the
-    --enable-redhat24 option.  If you are configuring the pvfs2 module
-    for a kernel.org (unmondified) kernel, then re-run
-    configure with the --disable-redhat24 option.])
+    You appear to be configuring PVFS2 on a RedHat distribution that
+    likely ships with a heavily modified kernel and c library.  You must
+    specify two configure arguments to provide necessary information before
+    proceeding.  First pick one of these two options:
+    =============================
+    --enable-redhat24         (if you are using a redhat provided 2.4 kernel)
+    --disable-redhat24        (if you are using a stock kernel.org kernel)
+    =============================
+    Also pick one of the next two options.  You should probably enable the
+    workaround if you are using RedHat EL 3 prior to update 2.  Otherwise it
+    is probably safer (and higher performance) to disable it:
+    =============================
+    --enable-nptl-workaround  (to work around buggy glibc pthread library)
+    --disable-nptl-workaround (if you trust your glibc pthread library)
+    ============================= ])
        fi
     else
        AC_MSG_RESULT(no)
@@ -220,8 +248,12 @@ dnl "enable-redhat24", then use it no matter what /etc/redhat-release might say
 if test "$use_redhat24" = 1 ; then
    REDHAT_RELEASE="-DREDHAT_RELEASE_9"
 fi
-
 AC_SUBST(REDHAT_RELEASE)
+
+if test "$use_nptl_workaround" = 1 ; then
+   NPTL_WORKAROUND="1"
+fi
+AC_SUBST(NPTL_WORKAROUND)
 
 use_aio_thcb=1
 AC_ARG_ENABLE([aio-threaded-callbacks],
@@ -862,6 +894,12 @@ if test "x$REDHAT_RELEASE" = "x"; then
    AC_MSG_RESULT([PVFS2 will use workaround for redhat 2.4 kernels  :  no])
 else
    AC_MSG_RESULT([PVFS2 will use workaround for redhat 2.4 kernels  : yes])
+fi
+
+if test "x$NPTL_WORKAROUND" = "x"; then
+   AC_MSG_RESULT([PVFS2 will use workaround for buggy NPTL          :  no])
+else
+   AC_MSG_RESULT([PVFS2 will use workaround for buggy NPTL          : yes])
 fi
 
 if test "x$BUILD_SERVER" = "x1"; then
