@@ -256,7 +256,7 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
 		     filename,
 		     NULL,
 		     DB_UNKNOWN,
-		     0,
+		     TROVE_DB_OPEN_FLAGS,
 		     0);
     if (ret == ENOENT && create_flag != 0)
     {
@@ -267,7 +267,7 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
 			 filename,
 			 NULL,
 			 DB_BTREE,
-			 DB_CREATE|DB_EXCL,
+			 TROVE_DB_CREATE_FLAGS,
 			 0644);
 
         /* this can easily happen if the server is out of disk space */

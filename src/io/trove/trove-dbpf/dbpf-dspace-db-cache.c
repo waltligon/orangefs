@@ -145,29 +145,34 @@ int dbpf_dspace_dbcache_try_get(TROVE_coll_id coll_id,
 	    db_p->err(db_p, ret, "%s: set_flags", filename);
 	    assert(0);
     }
-    ret = dspace_db_cache[i].db_p->open(dspace_db_cache[i].db_p,
+    ret = dspace_db_cache[i].db_p->open(
+        dspace_db_cache[i].db_p,
 #ifdef HAVE_TXNID_PARAMETER_TO_DB_OPEN
-                                        NULL,
+        NULL,
 #endif
-					filename,
-					NULL,
-					DB_UNKNOWN,
-					0,
-					0);
-    if (ret == ENOENT && create_flag != 0) {
+        filename,
+        NULL,
+        DB_UNKNOWN,
+        TROVE_DB_OPEN_FLAGS,
+        0);
+
+    if (ret == ENOENT && create_flag != 0)
+    {
 	/* if no such DB and create_flag is set, try to create the DB */
-	ret = dspace_db_cache[i].db_p->open(dspace_db_cache[i].db_p,
+	ret = dspace_db_cache[i].db_p->open(
+            dspace_db_cache[i].db_p,
 #ifdef HAVE_TXNID_PARAMETER_TO_DB_OPEN
-                                            NULL,
+            NULL,
 #endif
-					    filename,
-					    NULL,
-					    DB_BTREE,
-					    DB_CREATE|DB_EXCL,
-					    0644);
-	if (ret != 0) assert(0);
+            filename,
+            NULL,
+            DB_BTREE,
+            TROVE_DB_CREATE_FLAGS,
+            0644);
+        assert(ret == 0);
     }
-    else if (ret != 0) {
+    else if (ret != 0)
+    {
 	    perror("dpbf_dspace_dbcache_get");
 	    assert(0);
     }

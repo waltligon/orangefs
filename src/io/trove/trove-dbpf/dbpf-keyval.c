@@ -417,8 +417,6 @@ static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p)
     return error;
 }
 
-/* dbpf_keyval_validate()
- */
 static int dbpf_keyval_validate(TROVE_coll_id coll_id,
 				TROVE_handle handle,
 				TROVE_ds_flags flags,
@@ -430,8 +428,6 @@ static int dbpf_keyval_validate(TROVE_coll_id coll_id,
     return -TROVE_ENOSYS;
 }
 
-/* dbpf_keyval_iterate()
- */
 static int dbpf_keyval_iterate(TROVE_coll_id coll_id,
 			       TROVE_handle handle,
 			       TROVE_ds_position *position_p,

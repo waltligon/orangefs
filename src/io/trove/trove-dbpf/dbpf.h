@@ -21,6 +21,10 @@ extern "C" {
 #define LAST_HANDLE_STRING                                  "last_handle"
 #define ROOT_HANDLE_STRING                                  "root_handle"
 
+/* #define TROVE_DB_OPEN_FLAGS                                0 */
+#define TROVE_DB_OPEN_FLAGS      (DB_DIRTY_READ | DB_THREAD)
+#define TROVE_DB_CREATE_FLAGS          (DB_CREATE | DB_EXCL)
+
 /*
   for more efficient host filesystem accesses, we have
   a simple *_MAX_NUM_BUCKETS define that can be thought of more

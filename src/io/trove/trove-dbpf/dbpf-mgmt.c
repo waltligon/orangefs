@@ -1203,7 +1203,7 @@ static int dbpf_db_create(char *dbname)
                           dbname,
                           NULL,
                           DB_BTREE,
-			  DB_CREATE|DB_EXCL,
+			  TROVE_DB_CREATE_FLAGS,
                           0644)) != 0)
     {
 	db_p->err(db_p, ret, "%s\n", dbname);
@@ -1248,7 +1248,8 @@ static DB *dbpf_db_open(char *dbname,
     int ret;
     DB *db_p;
 
-    if ((ret = db_create(&db_p, NULL, 0)) != 0) {
+    if ((ret = db_create(&db_p, NULL, 0)) != 0)
+    {
 	*error_p = dbpf_db_error_to_trove_error(ret);
 	return NULL;
     }
@@ -1257,10 +1258,11 @@ static DB *dbpf_db_open(char *dbname,
     db_p->set_errpfx(db_p, "xxx");
 
     /* DB_RECNUM makes it easier to iterate through every key in chunks */
-    if ((ret = db_p->set_flags(db_p, DB_RECNUM)) != 0) {
-	    db_p->err(db_p, ret, "%s: set_flags", dbname);
-	    *error_p = dbpf_db_error_to_trove_error(ret);
-	    return NULL;
+    if ((ret = db_p->set_flags(db_p, DB_RECNUM)) != 0)
+    {
+        db_p->err(db_p, ret, "%s: set_flags", dbname);
+        *error_p = dbpf_db_error_to_trove_error(ret);
+        return NULL;
     }
     if ((ret = db_p->open(db_p,
 #ifdef HAVE_TXNID_PARAMETER_TO_DB_OPEN
@@ -1269,13 +1271,12 @@ static DB *dbpf_db_open(char *dbname,
                           dbname,
                           NULL,
                           DB_BTREE,
-                          0,
+                          TROVE_DB_OPEN_FLAGS,
                           0)) != 0)
     {
 	*error_p = dbpf_db_error_to_trove_error(ret);
 	return NULL;
     }
-
     return db_p;
 }
 
