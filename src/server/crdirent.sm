@@ -24,7 +24,7 @@ static int crdirent_create_dirdata_dspace(PINT_server_op *s_op, job_status_s *re
 static int crdirent_write_dirdata_handle(PINT_server_op *s_op, job_status_s *ret);
 static int crdirent_send_bmi(PINT_server_op *s_op, job_status_s *ret);
 static int crdirent_cleanup(PINT_server_op *s_op, job_status_s *ret);
-static int crdirent_release_posted_job(PINT_server_op *s_op, job_status_s *ret);
+static int crdirent_release(PINT_server_op *s_op, job_status_s *ret);
 void crdirent_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
@@ -127,7 +127,7 @@ machine crdirent(init,
 
 	state release
 	{
-		run crdirent_release_posted_job;
+		run crdirent_release;
 		default => cleanup;
 	}
 
@@ -660,7 +660,7 @@ static int crdirent_send_bmi(PINT_server_op *s_op,
 }
 
 /*
- * Function: crdirent_release_posted_job
+ * Function: crdirent_release
  *
  * Params:   server_op *b, 
  *           job_status_s *ret
@@ -674,14 +674,14 @@ static int crdirent_send_bmi(PINT_server_op *s_op,
  * Synopsis: Free the job from the scheduler to allow next job to proceed.
  */
 
-static int crdirent_release_posted_job(PINT_server_op *s_op,
+static int crdirent_release(PINT_server_op *s_op,
 				       job_status_s *ret)
 {
 
     int job_post_ret=0;
     job_id_t i;
 
-    gossip_debug(SERVER_DEBUG, "crdirent state: release_posted_job\n");
+    gossip_debug(SERVER_DEBUG, "crdirent state: release\n");
 
     if (s_op->scheduled_id == 0) {
 	gossip_debug(SERVER_DEBUG, "  skipping; didn't schedule this request\n");

@@ -23,7 +23,7 @@ static int readdir_cleanup(PINT_server_op *s_op, job_status_s *ret);
 static int readdir_read_dirdata_handle(PINT_server_op *s_op, job_status_s *ret);
 static int readdir_iterate_on_entries(PINT_server_op *s_op, job_status_s *ret);
 static int readdir_send_bmi(PINT_server_op *s_op, job_status_s *ret);
-static int readdir_unpost_req(PINT_server_op *s_op, job_status_s *ret);
+static int readdir_release(PINT_server_op *s_op, job_status_s *ret);
 static int readdir_verify_directory_metadata(PINT_server_op *s_op, job_status_s *ret);
 static int readdir_read_directory_metadata(PINT_server_op *s_op, job_status_s *ret);
 void readdir_init_state_machine(void);
@@ -48,7 +48,7 @@ machine readdir_(init,
 		read_directory_metadata,
 		verify_directory_metadata,
 		send,
-		unpost,
+		release,
 		cleanup)
 {
 	state init
@@ -87,12 +87,12 @@ machine readdir_(init,
 	state send
 	{
 		run readdir_send_bmi;
-		default => unpost;
+		default => release;
 	}
 
-	state unpost
+	state release
 	{
-		run readdir_unpost_req;
+		run readdir_release;
 		default => cleanup;
 	}
 
@@ -424,7 +424,7 @@ static int readdir_send_bmi(PINT_server_op *s_op, job_status_s *ret)
 
 
 /*
- * Function: readdir_unpost_req
+ * Function: readdir_release
  *
  * Params:   server_op *b, 
  *           job_status_s *ret
@@ -437,13 +437,13 @@ static int readdir_send_bmi(PINT_server_op *s_op, job_status_s *ret)
  *
  * Synopsis: Free the job from the scheduler to allow next job to proceed.
  */
-static int readdir_unpost_req(PINT_server_op *s_op, job_status_s *ret)
+static int readdir_release(PINT_server_op *s_op, job_status_s *ret)
 {
 
     int job_post_ret=0;
     job_id_t i;
 
-    gossip_debug(SERVER_DEBUG, "readdir state: unpost_req\n");
+    gossip_debug(SERVER_DEBUG, "readdir state: release\n");
 
     job_post_ret = job_req_sched_release(s_op->scheduled_id,
 					 s_op,
