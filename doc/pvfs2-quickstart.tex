@@ -55,9 +55,8 @@ This document only applies to the most recent snapshot of PVFS2.
 
 \section{Downloading and compiling PVFS2}
 
-At this time, tarballs (and CVS access) are provided to trusted
-parties.  If you're reading this, you should have a method of
-obtaining the PVFS2 source code.  Once the source code is downloaded,
+Follow the information at http://www.pvfs.org/pvfs2/download.html .
+Once the source code is downloaded,
 compiling the PVFS2 source code is a matter of running './configure',
 followed by 'make' from the top level source directory.  More detailed
 instruction for building and installing are provided below.
@@ -76,8 +75,8 @@ The following software packages are currently required by PVFS2:
 The following software packages are currently recommended for use with PVFS2:
 \begin{itemize}
 \item GNU Libc (glibc) 2.3.2 [ or later ]
-\item Linux kernel version 2.6.0, or later (NOTE: not necessary for
-  running PVFS2 servers, only the client kernel module)
+\item Linux kernel version 2.6.0 (or later) or 2.4.19 (or later) (NOTE: not
+necessary for running PVFS2 servers, only the client kernel module).  
 \item A GNU/Linux environment (heterogenous configuration are
 supported)
 \end{itemize}
@@ -86,7 +85,8 @@ ROMIO supports PVFS2.  It is not provided with pvfs2, but can be found
 as part of the following MPI implementations:
 
 \begin{itemize}
-\item MPICH2-0.96p2 or newer
+\item MPICH2-0.96p2 or newer, though we suggest using the most recent MPICH2
+release
 \end{itemize}
 
 \subsection{Untarring the packages}
@@ -145,6 +145,7 @@ in which a single machine acts as both the client and server for all
 PVFS2 operations.  It assumes that you have completed the above sections
 on building and installation already.  The hostname of the example machine
 is ``testhost'' and will be referenced as such in the following examples.
+
 IMPORTANT: if you intend to use the provided rc scripts to handle startup
 and shutdown of the PVFS2 server, then you must specify a valid hostname 
 as reported by the \texttt{hostname} command line tool in the configuration.
