@@ -363,7 +363,7 @@ sub get_ionames
 	}
 	if (@opt_ioservers) {
 		foreach $server (@opt_ioservers) {
-			$ioline = $ioline . $server;
+			$ioline = $ioline . ' ' .  $server;
 		}
 	} else {
 		$ioline = prompt_word("Enter hostnames [Default is localhost]: ","localhost");
@@ -382,7 +382,7 @@ sub get_metanames
 	}
 	if (@opt_metaservers) {
 		foreach $server (@opt_metaservers) {
-			$metaline = $metaline . $server;
+			$metaline = $metaline . ' ' . $server;
 		}
 	} else {
 		$metaline = prompt_word("Enter hostnames [Default is localhost]: ","localhost");
