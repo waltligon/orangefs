@@ -30,7 +30,7 @@ struct options
     int debug_mask_set;
 };
 
-static struct options* parse_args(int argc, char* argv[]);
+static struct options* parse_args(int argc, char* argv[], const pvfs_mntlist *mnt);
 static void usage(int argc, char** argv);
 
 int main(int argc, char **argv)
@@ -45,20 +45,20 @@ int main(int argc, char **argv)
     int i;
     PVFS_credentials creds;
 
-    /* look at command line arguments */
-    user_opts = parse_args(argc, argv);
-    if(!user_opts)
-    {
-	fprintf(stderr, "Error: failed to parse command line arguments.\n");
-	usage(argc, argv);
-	return(-1);
-    }
-
     /* look at pvfstab */
     if(PVFS_util_parse_pvfstab(&mnt))
     {
         fprintf(stderr, "Error: failed to parse pvfstab.\n");
         return(-1);
+    }
+
+    /* look at command line arguments */
+    user_opts = parse_args(argc, argv, &mnt);
+    if(!user_opts)
+    {
+	fprintf(stderr, "Error: failed to parse command line arguments.\n");
+	usage(argc, argv);
+	return(-1);
     }
 
     /* see if the destination resides on any of the file systems
@@ -111,7 +111,7 @@ int main(int argc, char **argv)
  *
  * returns pointer to options structure on success, NULL on failure
  */
-static struct options* parse_args(int argc, char* argv[])
+static struct options* parse_args(int argc, char* argv[], const pvfs_mntlist *mnt)
 {
     /* getopt stuff */
     extern char* optarg;
@@ -176,12 +176,18 @@ static struct options* parse_args(int argc, char* argv[])
     tmp_opts->debug_mask = PVFS_debug_eventlog_to_mask(argv[argc-1]);
     tmp_opts->debug_mask_set = 1;
 
-    if(!tmp_opts->mnt_point_set || !tmp_opts->debug_mask_set)
-    {
-	if(tmp_opts->mnt_point)
-	    free(tmp_opts->mnt_point);
-	free(tmp_opts);
-	return(NULL);
+    /* typical case of just a single tab entry requires no -m argument */
+    if (!tmp_opts->mnt_point_set) {
+	if (mnt->ptab_count == 1) {
+	    /* see dirty hack above */
+	    char *x = malloc(strlen(mnt->ptab_array[0].mnt_dir) + 2);
+	    if (!x)
+		return 0;
+	    strcpy(x, mnt->ptab_array[0].mnt_dir);
+	    strcat(x, "/");
+	    tmp_opts->mnt_point = x;
+	} else
+	    return 0;
     }
 
     return(tmp_opts);
