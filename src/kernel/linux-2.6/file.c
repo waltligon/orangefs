@@ -141,8 +141,21 @@ ssize_t pvfs2_inode_read(
             /* this macro is defined in pvfs2-kernel.h */
             handle_io_error();
 
-	    pvfs2_error("pvfs2_inode_read: returning error %d "
-                        "(error_exit=%d)\n", ret, error_exit);
+            /*
+              don't write an error to syslog on signaled operation
+              termination unless we've got debugging turned on, as
+              this can happen regularly (i.e. ctrl-c)
+            */
+            if ((error_exit == 1) && (ret == -EINTR))
+            {
+                pvfs2_print("pvfs2_inode_read: returning error %d "
+                            "(error_exit=%d)\n", ret, error_exit);
+            }
+            else
+            {
+                pvfs2_error("pvfs2_inode_read: returning error %d "
+                            "(error_exit=%d)\n", ret, error_exit);
+            }
 	    return ret;
 	}
 
@@ -294,8 +307,21 @@ static ssize_t pvfs2_file_write(
             /* this macro is defined in pvfs2-kernel.h */
             handle_io_error();
 
-	    pvfs2_error("pvfs2_file_write: returning error %d "
-                        "(error_exit=%d)\n", ret, error_exit);
+            /*
+              don't write an error to syslog on signaled operation
+              termination unless we've got debugging turned on, as
+              this can happen regularly (i.e. ctrl-c)
+            */
+            if ((error_exit == 1) && (ret == -EINTR))
+            {
+                pvfs2_print("pvfs2_file_write: returning error %d "
+                            "(error_exit=%d)\n", ret, error_exit);
+            }
+            else
+            {
+                pvfs2_error("pvfs2_file_write: returning error %d "
+                            "(error_exit=%d)\n", ret, error_exit);
+            }
 	    return ret;
 	}
 

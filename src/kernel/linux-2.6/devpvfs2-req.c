@@ -28,7 +28,6 @@ extern struct file_system_type pvfs2_fs_type;
 extern struct list_head pvfs2_superblocks;
 extern spinlock_t pvfs2_superblocks_lock;
 
-
 static int open_access_count = 0;
 
 /* a pointer to the task that opens the dev-req device file */
@@ -296,10 +295,10 @@ static ssize_t pvfs2_devreq_writev(
                 remove_wait_queue(&op->io_completion_waitq, &wait_entry);
 
                 /*
-                  NOTE: for I/O operations we handle releasing the
-                  op object except in the case of timeout.  the reason
-                  we can't free the op in timeout cases is that the
-                  op service logic in the vfs retries operations using
+                  NOTE: for I/O operations we handle releasing the op
+                  object except in the case of timeout.  the reason we
+                  can't free the op in timeout cases is that the op
+                  service logic in the vfs retries operations using
                   the same op ptr, thus it can't be freed.
                 */
                 if (!timed_out)
@@ -310,8 +309,8 @@ static ssize_t pvfs2_devreq_writev(
             else
             {
                 /*
-                  for every other operation (i.e. non-I/O), we need
-                  to wake up the callers for downcall completion
+                  for every other operation (i.e. non-I/O), we need to
+                  wake up the callers for downcall completion
                   notification
                 */
                 wake_up_interruptible(&op->waitq);
@@ -329,10 +328,9 @@ static ssize_t pvfs2_devreq_writev(
 }
 
 /*
-  NOTE: gets called when the last reference to this device
-  is dropped.  Using the open_access_count variable, we
-  enforce a reference count on this file so that it can be
-  opened by only one process at a time.
+  NOTE: gets called when the last reference to this device is dropped.
+  Using the open_access_count variable, we enforce a reference count
+  on this file so that it can be opened by only one process at a time.
 */
 static int pvfs2_devreq_release(
     struct inode *inode,
@@ -406,7 +404,7 @@ static int pvfs2_devreq_ioctl(
                                         pvfs2_sb->data);
                     if (ret)
                     {
-                        pvfs2_error("Failed to mount SB %p\n", pvfs2_sb);
+                        pvfs2_print("Failed to remount SB %p\n", pvfs2_sb);
                         break;
                     }
                 }

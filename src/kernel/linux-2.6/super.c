@@ -254,7 +254,11 @@ static int pvfs2_statfs(
   re-initializing the user space client with the initial mount
   information specified when the super block was first initialized.
   this is very different than the first initialization/creation of a
-  superblock
+  superblock.  we use the special service_priority_operation to make
+  sure that the mount gets ahead of any other pending operation that
+  is waiting for servicing.  this means that the pvfs2-client won't
+  fail to start several times for all other pending operations before
+  the client regains all of the mount information from us.
 */
 int pvfs2_remount(
     struct super_block *sb,
@@ -289,10 +293,10 @@ int pvfs2_remount(
         pvfs2_print("Attempting PVFS2 Remount via host %s\n",
                     new_op->upcall.req.fs_mount.pvfs2_config_server);
 
-        service_operation(new_op, "pvfs2_fs_mount", 0);
+        service_priority_operation(new_op, "pvfs2_remount", 0);
         ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
 
-        pvfs2_print("pvfs2_remount: got return value of %d\n", ret);
+        pvfs2_print("pvfs2_remount: mount got return value of %d\n", ret);
         if (ret)
         {
             sb = ERR_PTR(ret);
@@ -423,10 +427,10 @@ struct super_block *pvfs2_get_sb(
         pvfs2_print("Attempting PVFS2 Mount via host %s\n",
                     new_op->upcall.req.fs_mount.pvfs2_config_server);
 
-        service_operation(new_op, "pvfs2_fs_mount", 0);
+        service_operation(new_op, "pvfs2_get_sb", 0);
         ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
 
-        pvfs2_print("pvfs2_fs_mount: got return value of %d\n", ret);
+        pvfs2_print("pvfs2_get_sb: mount got return value of %d\n", ret);
         if (ret)
         {
             sb = ERR_PTR(ret);

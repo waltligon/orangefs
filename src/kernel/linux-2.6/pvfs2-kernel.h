@@ -320,6 +320,19 @@ do {                                                         \
     wake_up_interruptible(&pvfs2_request_list_waitq);        \
 } while(0)
 
+#define add_priority_op_to_request_list(op)                  \
+do {                                                         \
+    spin_lock(&op->lock);                                    \
+    op->op_state = PVFS2_VFS_STATE_WAITING;                  \
+                                                             \
+    spin_lock(&pvfs2_request_list_lock);                     \
+    list_add(&op->list, &pvfs2_request_list);                \
+    spin_unlock(&pvfs2_request_list_lock);                   \
+                                                             \
+    spin_unlock(&op->lock);                                  \
+    wake_up_interruptible(&pvfs2_request_list_waitq);        \
+} while(0)
+
 #define remove_op_from_request_list(op)                      \
 do {                                                         \
     struct list_head *tmp = NULL;                            \
@@ -347,6 +360,24 @@ do {                                                         \
     sigset_t orig_sigset;                                    \
     if (!intr) mask_blocked_signals(&orig_sigset);           \
     add_op_to_request_list(op);                              \
+    ret = wait_for_matching_downcall(new_op);                \
+    if (!intr) unmask_blocked_signals(&orig_sigset);         \
+    if (ret != PVFS2_WAIT_SUCCESS)                           \
+    {                                                        \
+        if (ret == PVFS2_WAIT_TIMEOUT_REACHED)               \
+        {                                                    \
+            pvfs2_error("pvfs2: %s -- wait timed out (%x).  "\
+                        "aborting attempt.\n", method,ret);  \
+        }                                                    \
+        goto error_exit;                                     \
+    }                                                        \
+} while(0)
+
+#define service_priority_operation(op, method, intr)         \
+do {                                                         \
+    sigset_t orig_sigset;                                    \
+    if (!intr) mask_blocked_signals(&orig_sigset);           \
+    add_priority_op_to_request_list(op);                     \
     ret = wait_for_matching_downcall(new_op);                \
     if (!intr) unmask_blocked_signals(&orig_sigset);         \
     if (ret != PVFS2_WAIT_SUCCESS)                           \
