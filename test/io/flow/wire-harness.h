@@ -33,6 +33,7 @@ struct wire_harness_req
 /* ack structure */
 struct wire_harness_ack
 {
+    PVFS_handle handle; /* returned handle for writes to new files??? */
 	int32_t error_code;     /* 0 or -error */
 	PVFS_size dspace_size;  /* so both sides can handle EOF */
 };
