@@ -103,7 +103,7 @@ int job_bmi_recv_list(
 
 /* unexpected network receive */
 int job_bmi_unexp(
-	struct unexpected_info* bmi_unexp_d,
+	struct BMI_unexpected_info* bmi_unexp_d,
 	void* user_ptr,
 	job_status_s* out_status_p,
 	job_id_t* id);

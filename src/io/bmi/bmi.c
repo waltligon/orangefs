@@ -605,7 +605,7 @@ int BMI_testsome(int incount, bmi_op_id_t* id_array, int* outcount, int*
  * returns 0 on success, -errno on failure
  */
 int BMI_testunexpected(int incount, int* outcount, struct
-	unexpected_info* info_array, int max_idle_time_ms)
+	BMI_unexpected_info* info_array, int max_idle_time_ms)
 {
 	int i = 0;
 	int ret = -1;

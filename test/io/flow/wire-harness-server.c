@@ -28,7 +28,7 @@ int main(int argc, char **argv)
 {
 	int ret = -1;
 	int outcount = 0, count;
-	struct unexpected_info request_info;
+	struct BMI_unexpected_info request_info;
 	struct wire_harness_req* req;
 	struct wire_harness_ack ack;
 	PINT_Request* io_req;

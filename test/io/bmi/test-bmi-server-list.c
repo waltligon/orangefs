@@ -48,7 +48,7 @@ int main(int argc, char **argv)	{
 	bmi_op_id_t server_ops[2];
 	bmi_error_code_t error_code;
 	int outcount = 0;
-	struct unexpected_info request_info;
+	struct BMI_unexpected_info request_info;
 	bmi_size_t actual_size;
 	bmi_size_t size_list[2];
 	void* buffer_list[2];

@@ -76,7 +76,7 @@ enum
 static bmi_op_id_t stat_bmi_id_array[job_work_metric];
 static bmi_error_code_t stat_bmi_error_code_array[job_work_metric];
 static bmi_size_t stat_bmi_actual_size_array[job_work_metric];
-static struct unexpected_info stat_bmi_unexp_array[job_work_metric];
+static struct BMI_unexpected_info stat_bmi_unexp_array[job_work_metric];
 static void* stat_bmi_user_ptr_array[job_work_metric];
 static int stat_bmi_index_array[job_work_metric];
 
@@ -495,7 +495,7 @@ int job_bmi_recv_list(
  * failure
  */
 int job_bmi_unexp(
-	struct unexpected_info* bmi_unexp_d,
+	struct BMI_unexpected_info* bmi_unexp_d,
 	void* user_ptr,
 	job_status_s* out_status_p,
 	job_id_t* id)

@@ -27,7 +27,7 @@ int main(int argc, char **argv)
 {
 	int ret = -1;
 	int outcount = 0;
-	struct unexpected_info request_info;
+	struct BMI_unexpected_info request_info;
 	void* mybuffer;
 	flow_descriptor* flow_d = NULL;
 	double time1, time2;

@@ -197,7 +197,7 @@ int bench_initialize_bmi_addresses_server(int num_servers, int num_clients,
 {
 	int i=0;
 	int ret = -1;
-	struct unexpected_info this_info;
+	struct BMI_unexpected_info this_info;
 	int outcount = 0;
 
 	/* send the name of the process to the clients */

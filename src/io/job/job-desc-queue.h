@@ -41,7 +41,7 @@ struct trove_desc
 /* describes unexpected BMI operations */
 struct bmi_unexp_desc
 {
-	struct unexpected_info* info;
+	struct BMI_unexpected_info* info;
 };
 
 /* describes flows */

@@ -35,7 +35,7 @@ int main(int argc, char **argv)
 	int ret = -1;
 	struct ack_foo* ack = NULL;
 	job_status_s status1;
-	struct unexpected_info req_info;
+	struct BMI_unexpected_info req_info;
 	job_id_t job_id;
 	int outcount;
 #if 0

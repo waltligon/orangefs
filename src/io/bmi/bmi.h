@@ -13,8 +13,12 @@
 
 #include <bmi-types.h>
 
+/* TODO: REMOVE THIS LATER, ONCE SERVER CODE USES THE CORRECT NAME
+ */
+#define unexpected_info BMI_unexpected_info
+
 /* used to describe unexpected message arrivals */
-struct unexpected_info
+struct BMI_unexpected_info
 {
 	bmi_error_code_t error_code;
 	bmi_addr_t addr;
@@ -80,7 +84,7 @@ int BMI_testsome(
 int BMI_testunexpected(
 	int incount, 
 	int* outcount, 
-	struct unexpected_info* info_array,
+	struct BMI_unexpected_info* info_array,
 	int max_idel_time_ms);
 
 void* BMI_memalloc(

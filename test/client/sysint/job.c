@@ -90,7 +90,7 @@ struct PINT_job
 	union                   /* descriptors for each type of operation */
 	{
 		struct bmi_descriptor bmi_d;
-		struct unexpected_info bmi_unexp_d;
+		struct BMI_unexpected_info bmi_unexp_d;
 		struct flow_descriptor flow_d;
 		struct storage_descriptor sto_d;
 	}u;
