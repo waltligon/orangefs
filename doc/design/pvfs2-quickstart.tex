@@ -41,38 +41,47 @@
 \label{sec:howto}
 
 The quick start guide is intended to be a reference on how to quickly
-install and configure a PVFS2 file system.  It is broken down into 
-three parts.  The first
-describes how to download and compile the PVFS2 software.  The next
-section walks through the steps of configuring PVFS2 to store and
-access files on a single host, which may be useful for simple testing
-and evaluation.  The final section of this document describes how to
-install and configure PVFS2 in a true cluster environment with multiple
-servers and/or clients.
+install and configure a PVFS2 file system.  It is broken down into
+three parts.  The first describes how to download and compile the
+PVFS2 software.  The next section walks through the steps of
+configuring PVFS2 to store and access files on a single host, which
+may be useful for simple testing and evaluation.  The final section of
+this document describes how to install and configure PVFS2 in a true
+cluster environment with multiple servers and/or clients.
 
 \subsection{Versions}
 
-This document only applies to alpha snapshots of PVFS2 as of August 2003.
+This document only applies to alpha snapshots of PVFS2 as of August
+2003.
 
-\section{Downloading and compiling PVFS}
+\section{Downloading and compiling PVFS2}
+
+At this time, tarballs (and CVS access) are provided to trusted
+parties.  If you're reading this, you should have a method of
+obtaining the PVFS2 source code.  Once the source code is downloaded,
+compiling the PVFS2 source code is a matter of running './configure',
+followed by 'make' from the top level source directory.  More detailed
+instruction for building and installing are provided below.
 
 \subsection{Dependencies}
 
 The following software packages are currently required by PVFS2:
 \begin{itemize}
 \item Berkely DB (version 3 or 4)
+\item aio support (provided by glibc and librt)
 \item pthreads
 \item gcc 2.9.x or newer
 \end{itemize}
 
-The following system assumptions are also made:
+The following software packages are currently encouraged for use with PVFS2:
 \begin{itemize}
-\item homogeneous Linux environment
+\item GNU Libc (glibc) 2.3.2 [ or later ]
+\item Linux kernel version 2.6.0-test3 [ or later ]
 \end{itemize}
 
-The optional Linux kernel driver has the following requirements:
+The following system assumptions are also made:
 \begin{itemize}
-\item Linux kernel version 2.6 (test release) or newer
+\item A Homogeneous GNU/Linux environment
 \end{itemize}
 
 ROMIO supports PVFS2.  It is not provided with pvfs2, but can be found as part
@@ -84,7 +93,9 @@ of the following MPI implementations:
 
 \subsection{Untarring the packages}
 
-All source code is contained in one tarball: pvfs2-XXX.tgz.  The following example assumes that you will be building in the /usr/src directory, although that is not required:
+All source code is contained in one tarball: pvfs2-XXX.tgz.  The
+following example assumes that you will be building in the /usr/src
+directory, although that is not required:
 
 \begin{verbatim}
 [root@testhost /root]# cp pvfs2-XXX.tgz /usr/src
@@ -101,7 +112,7 @@ drwxr-xr-x  12 root    root        512 Aug 14 10:11 pvfs2-XXX/
 
 \subsection{Building and installing the packages}
 
-The default steps for building and installing PVFS2 are simply:
+The default steps for building and installing PVFS2 are as follows:
 
 \begin{verbatim}
 [root@testhost /usr/src]# cd pvfs2
@@ -114,7 +125,7 @@ Here are some optional configure arguments which may be of interest:
 \begin{itemize}
 \item --with-prefix=$<$path$>$: installs all files in the specified directory
 \item --with-kernel=$<$path to kernel source$>$: this enables compilation of
-the PVFS2 Linux kernel driver
+the PVFS2 Linux kernel driver [ Requires Linux Kernel 2.6.0-test3 or later ]
 \item --with-mpi=$<$path to mpi installation$>$: this enables compilation of MPI
 based test programs
 \item --with-efence: automatically links in Electric Fence for debugging assistance
@@ -331,7 +342,7 @@ bash-2.05b# ./pvfs2-ping /mnt/pvfs2
 
 =============================================================
 
-The PVFS filesystem at /mnt/pvfs2 appears to be correctly configured.
+The PVFS2 filesystem at /mnt/pvfs2 appears to be correctly configured.
 
 bash-2.05b# ./pvfs2-ls /mnt/pvfs2/
 
@@ -378,13 +389,13 @@ bash-2.05b# diff /tmp/testfile-out /usr/lib/libc.a
 \section{Installing PVFS2 on a cluster}
 \label{sec:cluster}
 It is important to have in mind the roles that machines (a.k.a. nodes) will
-play in the PVFS system. There are three potential roles that a machine might
+play in the PVFS2 system. There are three potential roles that a machine might
 play: metadata server,  I/O server, or client. 
 
 A metadata server is a node that keeps up with metadata (such as permissions
 and time stamps) for the file system. An I/O server is a node that actually
-stores a portion of the PVFS file data. A client is a node that can read and
-write PVFS files. Your applications will typically be run on PVFS clients so
+stores a portion of the PVFS2 file data. A client is a node that can read and
+write PVFS2 files. Your applications will typically be run on PVFS2 clients so
 that they can access the file system.
 
 A machine can fill one, two, or all of these roles simultaneously. Unlike
@@ -523,6 +534,201 @@ Setting up a client for multiple servers is the same as setting up a client for 
 \subsection {Testing your Installation}
 
 Testing a multiple-server pvfs2 installation is the same as testing a single-server pvfs2 installation.  Refer to section \ref{subsec:testing}
+
+\section{Configuring the PVFS2 Linux VFS Interface}
+\label{sec:vfs-configure}
+
+Assuming you've mastered the download and installation steps of
+managing the PVFS2 source code, configuring the PVFS2 Linux VFS
+Interface is relatively straight forward.  We assume at this point
+that you are familiar with running the server and that a PVFS2 storage
+space has already been created on the node that you would like to
+configure for use with the VFS.  We also assume that you are able to
+run a Linux 2.6.0-test3 kernel or later.
+
+The basic steps are as follows:
+\begin{itemize}
+\item Make sure you are running Linux Kernel version 2.6.0-test3 or
+  later
+\item Compile the PVFS2 Kernel Module against your running kernel
+\end{itemize}
+
+Check to make sure that you are running a Linux 2.6.0-test3 Kernel or
+later.  You can do this in the following manner:
+
+\begin{verbatim}
+gil:~# cat /proc/version 
+Linux version 2.6.0-test3 (root@gil) (gcc version 3.3.1 20030722
+(Debian prerelease)) #1 Thu Aug 14 14:32:57 CDT 2003
+\end{verbatim}
+
+By issuing that command, we are able to inspect the output to ensure
+that we're running an appropriate kernel version.  If your kernel is
+older than this version, please download the latest kernel available
+at:
+
+\begin{verbatim}
+http://www.kernel.org/pub/linux/kernel/v2.6/
+
+(or your favorite mirror site)
+\end{verbatim}
+
+Once you're convinced the Linux kernel version is appropriate, it's
+time to compile the PVFS2 kernel module.  This kernel module is built
+independently from the other parts of PVFS2.  The first step in
+building this module is generating the Makefile.  To generate the
+Makefile, you need to make sure that you run './configure' with the
+'--with-kernel=path' argument.  An example is provided here for your
+convenience:
+
+\begin{verbatim}
+gil:/usr/src/pvfs2# ./configure --with-kernel=/usr/src/linux-2.6.0-test3
+\end{verbatim}
+
+This example assumes that you've already downloaded, compiled, and are
+now running the kernel located in the /usr/src/linux-2.6.0-test3
+directory.  After this command is issued, build the PVFS2 source tree
+if it has not yet been built.
+
+Building the kernel module should now be a trivial task.  From the top
+level PVFS2 source directory, you need to first change directory to
+the where the code is located, and then run make.  You should see
+output similar to the following if your environment is properly
+configured:
+
+\begin{verbatim}
+gil:/usr/src/pvfs2# cd src/kernel/linux-2.6/
+gil:/usr/src/pvfs2/src/kernel/linux-2.6# make
+touch /usr/src/pvfs2/src/kernel/linux-2.6/pvfs2.mod.c
+make -C /usr/src/linux SUBDIRS=/usr/src/pvfs2/src/kernel/linux-2.6
+modules
+make[1]: Entering directory `/usr/src/linux-2.6.0-test3'
+make[2]: `arch/i386/kernel/asm-offsets.s' is up to date.
+*** Warning: Overriding SUBDIRS on the command line can cause
+***          inconsistencies
+  CC [M]  /usr/src/pvfs2/src/kernel/linux-2.6/pvfs2.mod.o
+  CC [M]  /usr/src/pvfs2/src/kernel/linux-2.6/pvfs2-utils.o
+  CC [M]  /usr/src/pvfs2/src/kernel/linux-2.6/waitqueue.o
+  CC [M]  /usr/src/pvfs2/src/kernel/linux-2.6/devpvfs2-req.o
+  CC [M]  /usr/src/pvfs2/src/kernel/linux-2.6/pvfs2-cache.o
+  CC [M]  /usr/src/pvfs2/src/kernel/linux-2.6/dcache.o
+  CC [M]  /usr/src/pvfs2/src/kernel/linux-2.6/file.o
+  CC [M]  /usr/src/pvfs2/src/kernel/linux-2.6/inode.o
+  CC [M]  /usr/src/pvfs2/src/kernel/linux-2.6/dir.o
+  CC [M]  /usr/src/pvfs2/src/kernel/linux-2.6/namei.o
+  CC [M]  /usr/src/pvfs2/src/kernel/linux-2.6/super.o
+  CC [M]  /usr/src/pvfs2/src/kernel/linux-2.6/pvfs2-mod.o
+  CC [M]  /usr/src/pvfs2/src/kernel/linux-2.6/pvfs2-bufmap.o
+  LD [M]  /usr/src/pvfs2/src/kernel/linux-2.6/pvfs2.o
+  Building modules, stage 2.
+  MODPOST
+  CC      /usr/src/pvfs2/src/kernel/linux-2.6/pvfs2.mod.o
+  LD [M]  /usr/src/pvfs2/src/kernel/linux-2.6/pvfs2.ko
+make[1]: Leaving directory `/usr/src/linux-2.6.0-test3'
+\end{verbatim}
+
+At this point, we have a valid PVFS2 Kernel module.  The module itself
+is contained in the output file 'pvfs2.ko' located in the directory
+where the previous 'make' command was issued.  You may copy this
+module to another location if it better suits your environment.
+
+
+\section{Testing the PVFS2 Linux VFS Interface}
+\label{sec:vfs-test}
+
+Now that you've built a valid PVFS2 kernel module, there are several
+steps to perform to properly use the file system.
+
+The basic steps are as follows:
+\begin{itemize}
+\item Create a mount point on the local filesystem
+\item Load the Kernel Module into the running kernel
+\item Mount your existing PVFS2 volume on the local filesystem
+\item Start the PVFS2 Server application
+\item Start the PVFS2 Client application
+\item Issue VFS commands
+\end{itemize}
+
+First, choose where you'd like to mount your existing PVFS2 volume.
+Create this directory on the local file system if it does not already
+exist.  For the sake of example, our chosen mount point is /tmp/mnt.
+
+\begin{verbatim}
+gil:~# mkdir /tmp/mnt
+\end{verbatim}
+
+Now load the kernel module into your running kernel.  You can do this
+by using the 'insmod' program.  You can then verify that the module
+was loaded properly using 'lsmod' as follows:
+
+\begin{verbatim}
+gil:~# insmod /usr/src/pvfs2/src/kernel/linux-2.6/pvfs2.ko
+gil:~# lsmod
+Module                  Size  Used by
+pvfs2                  52320  0 
+\end{verbatim}
+
+Note that the module size observed does NOT need to match that as
+shown above.  Also, you can use 'rmmod' to remove the PVFS2 module
+after it's been loaded.
+
+Now that the module is loaded, we can mount our PVFS2 file system (and
+verify that it's properly mounted) as follows:
+
+\begin{verbatim}
+gil:~# mount -t pvfs2 pvfs2 /tmp/mnt
+gil:~# mount
+/dev/hda3 on / type ext3 (rw,errors=remount-ro)
+proc on /proc type proc (rw)
+devpts on /dev/pts type devpts (rw,gid=5,mode=620)
+/dev/hda1 on /boot type ext2 (rw)
+pvfs2 on /tmp/mnt type pvfs2 (rw)
+\end{verbatim}
+
+NOTE:  You can use 'umount' to unmount the PVFS2 volume.
+
+At this point, we need to start the PVFS2 server and the PVFS2 client
+applications before any VFS operations will operate properly on the
+mounted PVFS2 volume.  See previous sections on how to properly start
+the PVFS2 server if you're unsure.  Starting the PVFS2 client is
+covered below.
+
+The PVFS2 client application consists of two programs.
+pvfs2-client-core and pvfs2-client.  Do not run pvfs2-client-core by
+itself.  pvfs2-client is the PVFS2 client application.  This
+application cannot be started unless the PVFS2 server is already
+running.  Here is an example of how to start the PVFS2 client:
+
+\begin{verbatim}
+gil:/usr/src/pvfs2# cd test/kernel/linux-2.6/
+gil:/usr/src/pvfs2/test/kernel/linux-2.6# ./pvfs2-client -f
+pvfs2-client starting
+Spawning new child process
+About to exec ./pvfs2-client-core
+Waiting on child with pid 17731
+\end{verbatim}
+
+The -f argument is not required.  For reference, this keeps the PVFS2
+client application running in the foreground.
+
+Now that the PVFS2 server and PVFS2 client applications are running,
+normal VFS operation can be issued on the command line.  An example is
+provided below:
+
+\begin{verbatim}
+gil:/usr/src/pvfs2/src/kernel/linux-2.6# mkdir /tmp/mnt/newdir
+gil:/usr/src/pvfs2/src/kernel/linux-2.6# ls -al /tmp/mnt/newdir
+total 1
+drwxr-xr-x    2 root     root            0 Aug 15 13:29 .
+drwxr-xr-x    3 root     root            0 Aug 15 13:21 ..
+gil:/usr/src/pvfs2/src/kernel/linux-2.6# cp pvfs2.ko
+/tmp/mnt/newdir/foo
+gil:/usr/src/pvfs2/src/kernel/linux-2.6# ls -al /tmp/mnt/newdir
+total 2
+drwxr-xr-x    2 root     root            0 Aug 15 13:29 .
+drwxr-xr-x    3 root     root            0 Aug 15 13:21 ..
+-rw-r--r--    1 root     root       330526 Aug 15 13:30 foo
+\end{verbatim}
 
 
 \end{document}

@@ -38,27 +38,51 @@
 \setlength{\parindent}{0.0cm}
 
 \section{Introduction}
-\section{Known limitations}
+
+This document describes the state of the PVFS2 project.  At this time,
+it's far from complete, so some important details are listed below.
+
+% \section{Known limitations}
+
 \subsection{Topology}
 
-Heterogeneous clusters will not work yet.  Multiple data servers work, but not
-multiple metadata servers.
+Currently, only Homogenous clusters are supported.  Further, multiple
+data servers are supported, but not multiple metadata servers.  Thus,
+the encouraged topology at this time is a single metadata server with
+a small number of data servers.  The node acting as a metadata server
+can also act as a data server, but isn't necessarily encouraged if the
+resources are available.  Alternatively, for simple testing, a single
+machine configured as both metadata and a data server will suffice.
+Information on configuring your cluster are provided in the quickstart
+document provided by the PVFS2 development team.
 
 \subsection{ROMIO}
 
-The ROMIO interface is not complete.  Both ROMIO and PVFS are missing a few
+The ROMIO interface is not complete.  Both ROMIO and PVFS2 are missing a few
 features.  Noncontiguous IO does not work.   Resize does not work.   Retrieving
 the file size does not work.  However, contiguous IO, both individual and
 collective, and removal of files works,   Collective noncontiguous IO has
-passes a few tests, but may or may not work for a given application.  
+passes a few tests, but may or may not work for a given application.
 
 \subsection{pvfstab file}
+
 We currently do not handle bogus entries well.  For now, try not to put file
 systems known not to work in the pvfs2tab file.
 
-\section{Experimental features}
-\section{Open issues}
-\section{Good examples}
+\subsection{The Linux 2.6.x VFS Interface}
+
+At this time, it's possible to mount a PVFS2 volume through the Linux
+VFS interface using 2.6.0-test3 kernels or later.  Common operations
+(such as 'ls', 'rm', 'mkdir', 'touch', 'chmod', 'chown', etc) work
+similarly to other local filesystems.  However, several operations
+(such as 'df') will not work as expected.  Also, while it's possible
+to develop and write source code on a mounted PVFS2 volume, it is not
+possible to execute any programs on it at this time.
+
+% \section{Experimental features}
+% \section{Open issues}
+% \section{Good examples}
+
 
 \end{document}
 
