@@ -18,7 +18,7 @@
 /* defined in devpvfs2-req.c */
 void kill_device_owner(void);
 
-/*defined in file.c */
+/* defined in file.c */
 extern ssize_t pvfs2_inode_read(
     struct inode *inode,
     char *buf,
@@ -150,7 +150,14 @@ static int pvfs2_get_blocks(
     }
 
     /* only zero remaining unread portions of the page data */
-    memset(page_data + bytes_read, 0, blocksize - bytes_read);
+    if (bytes_read > 0)
+    {
+        memset(page_data + bytes_read, 0, blocksize - bytes_read);
+    }
+    else
+    {
+        memset(page_data, 0, blocksize);
+    }
 
     flush_dcache_page(page);
     kunmap(page);
