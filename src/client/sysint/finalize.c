@@ -14,6 +14,7 @@
 extern pcache pvfs_pcache;
 extern dcache pvfs_dcache;
 extern fsconfig_array server_config;
+extern g_session_tag_mt_lock;
 
 /* PVFS_finalize
  *
@@ -33,6 +34,11 @@ int PVFS_sys_finalize()
 	/* Shut down the configuration management interface */
 	ret = config_bt_finalize();
 	
+	/* get rid of the mutex for the BMI session tag identifier */
+	gen_mutex_lock( g_session_tag_mt_lock );
+	gen_mutex_unlock( g_session_tag_mt_lock );
+	gen_mutex_destroy( g_session_tag_mt_lock );
+
 	/* Close down all flows,endpoints */
 	/* leaving this out for now until flows are implemented */
 #if 0

@@ -8,6 +8,8 @@
 
 #include <pint-servreq.h>
 
+extern PVFS_msg_tag_t get_next_session_tag();
+
 static int createreq_alloc(void *pjob,void *preq,bmi_addr_t server,\
 		PVFS_credentials credentials,int *sz);
 static int createack_alloc(void *pjob,void *presp,bmi_addr_t server,int *sz);
@@ -27,6 +29,8 @@ int pint_serv_create(struct PVFS_server_req_s **req_job,\
 	int req_size = 0, ack_size = 0;
 	job_status_s status1;
 	PVFS_servreq_create *arg = (PVFS_servreq_create *)req;
+	PVFS_msg_tag_t bmi_connection_id = get_next_session_tag();
+	
 	
 	/* Fill in parent pinode reference */
 	/*parent_reference.handle = req->parent_handle;
@@ -46,7 +50,7 @@ int pint_serv_create(struct PVFS_server_req_s **req_job,\
 
 	/* Post a blocking send job */
 	ret = job_bmi_send_blocking(server_addr,(*req_job),req_size,
-			0,BMI_PRE_ALLOC,1,&status1);
+			bmi_connection_id,BMI_PRE_ALLOC,1,&status1);
 	if (ret < 0)
 	{
 		goto send_failure;
@@ -71,7 +75,7 @@ int pint_serv_create(struct PVFS_server_req_s **req_job,\
 
 	/* Post a blocking receive job */
 	ret = job_bmi_recv_blocking(server_addr,(*ack_job),ack_size,
-			0, BMI_PRE_ALLOC,&status1);
+			bmi_connection_id, BMI_PRE_ALLOC,&status1);
 	if (ret < 0)
 	{
 		goto recv_failure;

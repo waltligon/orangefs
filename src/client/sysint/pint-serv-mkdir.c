@@ -8,6 +8,8 @@
 
 #include <pint-servreq.h>
 
+extern PVFS_msg_tag_t get_next_session_tag();
+
 static int mkdirreq_alloc(void *pjob,void *preq,bmi_addr_t server,\
 		PVFS_credentials credentials,int *sz);
 static int mkdirack_alloc(void *pjob,void *presp,bmi_addr_t server,int *sz);
@@ -26,6 +28,7 @@ int pint_serv_mkdir(struct PVFS_server_req_s **req_job,\
    bmi_addr_t server_addr = *serv_arg;	 /*PVFS address type structure*/ 
 	job_status_s status1;
 	PVFS_servreq_mkdir *arg = (PVFS_servreq_mkdir *)req;
+	PVFS_msg_tag_t bmi_connection_id = get_next_session_tag();
 
 	/* Create and fill jobs for request and response */
 
@@ -41,7 +44,7 @@ int pint_serv_mkdir(struct PVFS_server_req_s **req_job,\
 
 	/* Post a blocking send job */
 	ret = job_bmi_send_blocking(server_addr,(*req_job),req_size,
-			0,BMI_PRE_ALLOC,1,&status1);
+			bmi_connection_id,BMI_PRE_ALLOC,1,&status1);
 	if (ret < 0)
 	{
 		goto send_failure;
@@ -66,7 +69,7 @@ int pint_serv_mkdir(struct PVFS_server_req_s **req_job,\
 
 	/* Post a blocking receive job */
 	ret = job_bmi_recv_blocking(server_addr,(*ack_job),ack_size,
-			0,BMI_PRE_ALLOC,&status1);
+			bmi_connection_id,BMI_PRE_ALLOC,&status1);
 	if (ret < 0)
 	{
 		goto recv_failure;

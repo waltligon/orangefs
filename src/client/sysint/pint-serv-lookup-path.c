@@ -10,6 +10,8 @@
 
 static int max_seg = 0;
 
+extern PVFS_msg_tag_t get_next_session_tag();
+
 static int lookuppath_req_alloc(void *pjob,void *preq,bmi_addr_t server,
 		PVFS_credentials credentials, int *sz);
 static int lookuppath_ack_alloc(void *pjob,void *presp,bmi_addr_t server,
@@ -29,6 +31,7 @@ int pint_serv_lookup_path(struct PVFS_server_req_s **req_job,\
    bmi_addr_t server_addr = *serv_arg;   /* PVFS address type structure */ 
 	job_status_s status1;
 	PVFS_servreq_lookup_path *arg = (PVFS_servreq_lookup_path *)req; 
+	PVFS_msg_tag_t bmi_connection_id = get_next_session_tag();
 	
 	/* Get the total no. of segments */
 	get_no_of_segments(arg->path,&num_seg);
@@ -51,7 +54,7 @@ int pint_serv_lookup_path(struct PVFS_server_req_s **req_job,\
 	
 	/* Post a blocking send job */
 	ret = job_bmi_send_blocking(server_addr,(*req_job),req_size,
-			0,BMI_PRE_ALLOC,1,&status1);
+			bmi_connection_id,BMI_PRE_ALLOC,1,&status1);
 	if (ret < 0)
 	{
 		goto send_failure;
@@ -75,7 +78,7 @@ int pint_serv_lookup_path(struct PVFS_server_req_s **req_job,\
 	}
 
 	/* Post a blocking recv job */
-	ret = job_bmi_recv_blocking(server_addr,(*ack_job),ack_size,0,
+	ret = job_bmi_recv_blocking(server_addr,(*ack_job),ack_size, bmi_connection_id,
 		BMI_PRE_ALLOC,&status1);
 	if (ret < 0)
 	{

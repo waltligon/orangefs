@@ -23,6 +23,8 @@ extern pcache pvfs_pcache;
 extern struct dcache pvfs_dcache;
 extern fsconfig_array server_config;
 
+extern g_session_tag_mt_lock;
+
 /* PVFS_sys_initialize()
  *
  * Initializes the PVFS system interface and any necessary internal data
@@ -42,6 +44,9 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list)
 		printf("BMI initialize failure\n");
 		goto BMI_init_failure;
 	}
+
+	/* initialize bmi session identifier */
+	g_session_tag_mt_lock = gen_mutex_build( );
 
 	/* Initialize flow */
 	/* Leaving out for now until flows are implemented */

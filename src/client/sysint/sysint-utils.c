@@ -7,6 +7,33 @@
 #include <pvfs2-sysint.h>
 #include <pint-sysint.h>
 
+int g_session_tag;
+gen_mutex_t *g_session_tag_mt_lock;
+
+int get_next_session_tag()
+{
+        int ret = 0;
+        /* grab a lock for this variable */
+        gen_mutex_lock(g_session_tag_mt_lock);
+
+        ret = g_session_tag;
+
+        /* increment the tag, don't use zero */
+        if (g_session_tag + 1 == 0)
+        {
+                g_session_tag = 1;
+        }
+        else
+        {
+                g_session_tag++;
+        }
+
+        /* release the lock */
+        gen_mutex_unlock(g_session_tag_mt_lock);
+        return ret;
+}
+
+
 /* get_no_of_segments
  *
  * calculates the number of segments in the path
