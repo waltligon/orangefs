@@ -38,6 +38,7 @@ $startdir = cwd();
 $indir    = dirname($inputpath);
 $infile   = basename($inputpath);
 $outdir   = dirname($outputpath);
+@auxfiles = ();
 # $outfile  = basename($outputpath);
 
 chdir "$indir";
@@ -47,8 +48,28 @@ chdir "$outdir";
 $outdir   = cwd();
 
 if ($outdir ne $indir) {
+    my @info = ();
+
     symlink $indir."/".$infile, $infile;
     symlink $indir."/figs", "figs";
+
+    # ok, here's a bit of a mess: some LaTeX files include other files. try to
+    # handle it:
+
+    open FILE, $infile;
+    while (<FILE>) {
+    	if (/\\input/) {
+		# external .tex files are referenced by
+		# \input{foo.tex}
+		# so pull out the 'foo.tex' part and make a symlink
+		s/\\input\{(.*)\}/$1/;
+		chomp;
+		symlink $indir."/".$_,  $_;
+		push @auxfiles, $_;
+	}
+    }
+    close FILE;
+
 
     system "latex $infile";
     system "latex $infile"; # once more to get figures correct
@@ -57,6 +78,10 @@ if ($outdir ne $indir) {
     # Note: leaving the "figs" link there; helps in ps/pdf build.
     # unlink $infile, "figs";
     unlink $infile;
+    # clean up all the extra flies linked because of \input{} calls
+    foreach $link (@auxfiles) {
+    	unlink $link;
+    }
 }
 else {
     system "latex $infile";
