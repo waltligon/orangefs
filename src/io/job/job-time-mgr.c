@@ -178,9 +178,9 @@ int job_time_mgr_add(struct job_desc* jd, int timeout_sec)
  *
  * remove a job from the set that is being monitored for timeout
  *
- * returns 0 on success, -PVFS_error on failure
+ * no return value
  */
-int job_time_mgr_rem(struct job_desc* jd)
+void job_time_mgr_rem(struct job_desc* jd)
 {
     struct time_bucket* tmp_bucket = NULL;
 
@@ -190,7 +190,7 @@ int job_time_mgr_rem(struct job_desc* jd)
     {
 	/* nothing to do, it is already removed */
         gen_mutex_unlock(&bucket_mutex);
-	return(0);
+	return;
     }
 
     qlist_del(&jd->job_time_link);
@@ -207,7 +207,7 @@ int job_time_mgr_rem(struct job_desc* jd)
 
     gen_mutex_unlock(&bucket_mutex);
 
-    return(0);
+    return;
 }
 
 /* job_time_mgr_expire()

@@ -14,7 +14,7 @@
 int job_time_mgr_init(void);
 int job_time_mgr_finalize(void);
 int job_time_mgr_add(struct job_desc* jd, int timeout_sec);
-int job_time_mgr_rem(struct job_desc* jd);
+void job_time_mgr_rem(struct job_desc* jd);
 int job_time_mgr_expire(void);
 
 #endif /* __JOB_TIME_MGR_H */
