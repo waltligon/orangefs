@@ -4,11 +4,12 @@
  * See COPYING in top-level directory.
  */
 
-/* used for storing for storing BMI and Trove operation id's 
+/* used for storing for storing Trove operation id's 
  *
  */
 
 #include <errno.h>
+#include <assert.h>
 
 #include "op-id-queue.h"
 #include "quicklist.h"
@@ -19,7 +20,6 @@ struct op_id_entry
     struct qlist_head queue_link;
     union
     {
-	bmi_op_id_t bmi_op;
 	PVFS_ds_id trove_op;
     }
     u;
@@ -65,9 +65,6 @@ int op_id_queue_add(op_id_queue_p queue,
     new_entry->type = type;
     switch (type)
     {
-    case BMI_OP_ID:
-	new_entry->u.bmi_op = *((bmi_op_id_t *) id_pointer);
-	break;
     case TROVE_OP_ID:
 	new_entry->u.trove_op = *((PVFS_ds_id *) id_pointer);
 	break;
@@ -103,23 +100,12 @@ void op_id_queue_del(op_id_queue_p queue,
 				queue_link);
 	if (tmp_entry->type == type)
 	{
-	    if (type == BMI_OP_ID)
+	    if (type == TROVE_OP_ID && 
+		tmp_entry->u.trove_op == *((PVFS_ds_id *) id_pointer))
 	    {
-		if (tmp_entry->u.bmi_op == *((bmi_op_id_t *) id_pointer))
-		{
-		    qlist_del(tmp_link);
-		    free(tmp_entry);
-		    return;
-		}
-	    }
-	    else
-	    {
-		if (tmp_entry->u.bmi_op == *((bmi_op_id_t *) id_pointer))
-		{
-		    qlist_del(tmp_link);
-		    free(tmp_entry);
-		    return;
-		}
+		qlist_del(tmp_link);
+		free(tmp_entry);
+		return;
 	    }
 	}
     }
@@ -164,31 +150,14 @@ int op_id_queue_query(op_id_queue_p queue,
 		      int *count,
 		      int type)
 {
-    bmi_op_id_t *bmi_array = array;
     PVFS_ds_id *trove_array = array;
     op_id_queue_p tmp_link = NULL;
     struct op_id_entry *tmp_entry = NULL;
     int current_index = 0;
 
+    assert(type == TROVE_OP_ID);
 
-    if (type == BMI_OP_ID)
-    {
-	qlist_for_each(tmp_link, queue)
-	{
-	    tmp_entry = qlist_entry(tmp_link, struct op_id_entry,
-				    queue_link);
-	    if (tmp_entry->type == type)
-	    {
-		bmi_array[current_index] = tmp_entry->u.bmi_op;
-		current_index++;
-		if (current_index == *count)
-		{
-		    return (0);
-		}
-	    }
-	}
-    }
-    else if (type == TROVE_OP_ID)
+    if (type == TROVE_OP_ID)
     {
 	qlist_for_each(tmp_link, queue)
 	{

@@ -103,12 +103,15 @@ static PVFS_fs_id HACK_global_fsid = -1;
 /* bmi context */
 static bmi_context_id global_bmi_context = -1;
 
-/* array of bmi ops in flight; filled in when needed to call testsome()
- * or waitsome() at the BMI level. */
-static bmi_op_id_t *bmi_op_array = NULL;
-static int bmi_op_array_len = 0;
-/* continuously updated list of bmi ops in flight */
-static op_id_queue_p bmi_inflight_queue;
+/* array of bmi ops in flight; filled in when needed to call
+ * testcontext() 
+ */
+#define BMI_TEST_SIZE 8
+static bmi_op_id_t bmi_op_array[BMI_TEST_SIZE];
+static int bmi_error_code_array[BMI_TEST_SIZE];
+static void* bmi_usrptr_array[BMI_TEST_SIZE];
+static bmi_size_t bmi_actualsize_array[BMI_TEST_SIZE];
+int bmi_pending_count = 0;
 
 /* array of trove ops in flight; filled in when needed to call testsome()
  * or waitsome() at the trove level. */
@@ -286,17 +289,10 @@ int flowproto_bmi_trove_initialize(int flowproto_id)
     }
 
     /* setup our queues to track low level operations */
-    bmi_inflight_queue = op_id_queue_new();
-    if (!bmi_inflight_queue)
-    {
-	BMI_close_context(global_bmi_context);
-	return (-ENOMEM);
-    }
     trove_inflight_queue = op_id_queue_new();
     if (!trove_inflight_queue)
     {
 	BMI_close_context(global_bmi_context);
-	op_id_queue_cleanup(bmi_inflight_queue);
 	return (-ENOMEM);
     }
 
@@ -313,19 +309,12 @@ int flowproto_bmi_trove_initialize(int flowproto_id)
  */
 int flowproto_bmi_trove_finalize(void)
 {
-    /* get rid of the pending BMI and trove operation arrays */
-    if (bmi_op_array)
-    {
-	free(bmi_op_array);
-    }
-    bmi_op_array_len = 0;
     if (trove_op_array)
     {
 	free(trove_op_array);
     }
     trove_op_array_len = 0;
 
-    op_id_queue_cleanup(bmi_inflight_queue);
     op_id_queue_cleanup(trove_inflight_queue);
 
     BMI_close_context(global_bmi_context);
@@ -435,15 +424,9 @@ int flowproto_bmi_trove_checkworld(flow_descriptor ** flow_d_array,
 				   int *count,
 				   int max_idle_time_ms)
 {
-    bmi_op_id_t *bmi_op_array = NULL;
-    bmi_error_code_t *bmi_error_code_array = NULL;
     PVFS_ds_state *trove_error_code_array = NULL;
-    bmi_size_t *bmi_actualsize_array = NULL;
-    void **bmi_usrptr_array = NULL;
     void **trove_usrptr_array = NULL;
-    int *bmi_index_array = NULL;
     int *trove_index_array = NULL;
-    int bmi_count = *count;
     int trove_count = *count;
     int bmi_outcount = 0;
     int ret = -1;
@@ -471,24 +454,12 @@ int flowproto_bmi_trove_checkworld(flow_descriptor ** flow_d_array,
      */
 
     /* build arrays to use for checking for completion of low level ops */
-    bmi_op_array = alloca(sizeof(bmi_op_id_t) * (bmi_count));
-    if (!bmi_op_array)
-    {
-	return (-ENOMEM);
-    }
     trove_op_array = alloca(sizeof(PVFS_ds_id) * (trove_count));
     if (!trove_op_array)
     {
 	return (-ENOMEM);
     }
 
-    /* fill in arrays with ops that are in flight */
-    ret = op_id_queue_query(bmi_inflight_queue, bmi_op_array, &bmi_count,
-			    BMI_OP_ID);
-    if (ret < 0)
-    {
-	return (ret);
-    }
     ret = op_id_queue_query(trove_inflight_queue, trove_op_array, &trove_count,
 			    TROVE_OP_ID);
     if (ret < 0)
@@ -497,29 +468,18 @@ int flowproto_bmi_trove_checkworld(flow_descriptor ** flow_d_array,
     }
 
     /* divide up the idle time if we need to */
-    if (max_idle_time_ms && bmi_count && trove_count)
+    if (max_idle_time_ms && bmi_pending_count && trove_count)
     {
 	split_idle_time_ms = max_idle_time_ms / 2;
 	if (!split_idle_time_ms)
 	    split_idle_time_ms = 1;
     }
 
-    if (bmi_count > 0)
+    if (bmi_pending_count > 0)
     {
-	/* build arrays to use for determining state of completed ops */
-	bmi_error_code_array = alloca(sizeof(bmi_error_code_t) * bmi_count);
-	bmi_actualsize_array = alloca(sizeof(bmi_size_t) * bmi_count);
-	bmi_usrptr_array = alloca(sizeof(void *) * bmi_count);
-	bmi_index_array = alloca(sizeof(int) * bmi_count);
-	if (!bmi_error_code_array || !bmi_actualsize_array || !bmi_usrptr_array
-	    || !bmi_index_array)
-	{
-	    return (-ENOMEM);
-	}
-
 	/* test for completion */
-	ret = BMI_testsome(bmi_count, bmi_op_array, &bmi_outcount,
-			   bmi_index_array, bmi_error_code_array,
+	ret = BMI_testcontext(BMI_TEST_SIZE, bmi_op_array, &bmi_outcount,
+			   bmi_error_code_array,
 			   bmi_actualsize_array, bmi_usrptr_array,
 			   split_idle_time_ms, global_bmi_context);
 	if (ret < 0)
@@ -527,14 +487,14 @@ int flowproto_bmi_trove_checkworld(flow_descriptor ** flow_d_array,
 	    return (ret);
 	}
 
+	bmi_pending_count -= bmi_outcount;
+
 	/* handle each completed bmi operation */
 	for (i = 0; i < bmi_outcount; i++)
 	{
 	    active_flowd = bmi_completion(bmi_error_code_array[i],
 					  bmi_actualsize_array[i],
 					  bmi_usrptr_array[i]);
-	    op_id_queue_del(bmi_inflight_queue,
-			    &bmi_op_array[bmi_index_array[i]], BMI_OP_ID);
 
 	    /* put flows into done_checking_queue if needed */
 	    if (active_flowd->state & FLOW_FINISH_MASK ||
@@ -1286,16 +1246,8 @@ static void service_mem_to_bmi(flow_descriptor * flow_d)
     else if (ret == 0)
     {
 	/* successful post, need to test later */
+	bmi_pending_count++;
 	flow_d->state = FLOW_TRANSMITTING;
-	/* keep up with the BMI id */
-	if ((ret = op_id_queue_add(bmi_inflight_queue,
-				   &flow_data->bmi_id, BMI_OP_ID)) < 0)
-	{
-	    /* lost track of the id */
-	    gossip_lerr("Error: lost track of BMI id.\n");
-	    flow_d->state = FLOW_ERROR;
-	    flow_d->error_code = ret;
-	}
     }
     else
     {
@@ -1364,16 +1316,8 @@ static void service_bmi_to_mem(flow_descriptor * flow_d)
     else if (ret == 0)
     {
 	/* successful post, need to test later */
+	bmi_pending_count++;
 	flow_d->state = FLOW_TRANSMITTING;
-	/* keep up with the BMI id */
-	if ((ret = op_id_queue_add(bmi_inflight_queue,
-				   &flow_data->bmi_id, BMI_OP_ID)) < 0)
-	{
-	    /* lost track of the id */
-	    gossip_lerr("Error: lost track of BMI id.\n");
-	    flow_d->state = FLOW_ERROR;
-	    flow_d->error_code = ret;
-	}
     }
     else
     {
@@ -1500,17 +1444,9 @@ static void service_bmi_to_trove(flow_descriptor * flow_d)
 	    else if (ret == 0)
 	    {
 		/* successful post, need to test later */
+		bmi_pending_count++;
 		flow_d->state = FLOW_TRANSMITTING;
 		flow_data->fill_buffer_state = BUF_FILLING;
-		/* keep up with the BMI id */
-		if ((ret = op_id_queue_add(bmi_inflight_queue,
-					   &flow_data->bmi_id, BMI_OP_ID)) < 0)
-		{
-		    /* lost track of the id */
-		    gossip_lerr("Error: lost track of BMI op id.\n");
-		    flow_d->state = FLOW_ERROR;
-		    flow_d->error_code = ret;
-		}
 	    }
 	    else
 	    {
@@ -1672,17 +1608,9 @@ static void service_trove_to_bmi(flow_descriptor * flow_d)
 	else if (ret == 0)
 	{
 	    /* successful post, need to test later */
+	    bmi_pending_count++;
 	    flow_d->state = FLOW_TRANSMITTING;
 	    flow_data->drain_buffer_state = BUF_DRAINING;
-	    /* keep up with the BMI id */
-	    if ((ret = op_id_queue_add(bmi_inflight_queue,
-				       &flow_data->bmi_id, BMI_OP_ID)) < 0)
-	    {
-		/* lost track of the id */
-		gossip_lerr("Error: lost track of BMI op id.\n");
-		flow_d->state = FLOW_ERROR;
-		flow_d->error_code = ret;
-	    }
 	}
 	else
 	{

@@ -4,7 +4,7 @@
  * See COPYING in top-level directory.
  */
 
-/* used for storing for storing BMI and Trove operation id's 
+/* used for storing for storing Trove operation id's  
  *
  */
 
@@ -12,13 +12,11 @@
 #define __OP_ID_QUEUE_H
 
 #include "quicklist.h"
-#include "bmi.h"
 #include "trove-types.h"
 
 enum
 {
-    BMI_OP_ID = 1,
-    TROVE_OP_ID = 2
+    TROVE_OP_ID = 1
 };
 
 typedef struct qlist_head *op_id_queue_p;
