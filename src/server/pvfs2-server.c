@@ -41,6 +41,7 @@ static struct PINT_state_machine_s *PINT_server_op_table[PVFS_MAX_SERVER_OP+1] =
 {NULL};
 
 static int server_create_storage_space = 0;
+static int server_background = 1;
 
 /* For the switch statement to know what interfaces to shutdown */
 static PINT_server_status_code server_level_init;
@@ -267,7 +268,7 @@ static int server_initialize(PINT_server_status_code *server_level_init,
     int ret = 0, i = 0;
 
     /* Handle backgrounding, setting up working directory, and so on. */
-    ret = server_setup_process_environment(0);	
+    ret = server_setup_process_environment(server_background);	
     if (ret < 0)
     {
 	gossip_err("Error: Could not start server; aborting.\n");
@@ -329,28 +330,35 @@ static int server_setup_process_environment(int background)
 	int ret;
 	char fn[] = "/tmp/pvfs2-server.log"; /* placeholder */
 
-	assert(0);
-
 	/* become a daemon, redirect log to file */
-
 	ret = fork();
 	if (ret < 0) {
 	    exit(1); /* couldn't fork?!? */
 	}
+
+	if (ret > 0) exit(0); /* parent goes away */
 
 	ret = setsid();
 	if (ret < 0) {
 	    exit(2);
 	}
 
+	/* NOTE: THIS IS NECESSARY UNTIL ALL LOGGING IN SERVER IS THROUGH
+	 * GOSSIP; OTHERWISE PRINTFS CAN END UP DUMPING DATA IN A SOCKET!
+	 */
+	freopen("/dev/null", "r", stdin);
+	freopen("/dev/null", "w", stdout);
+	freopen("/dev/null", "w", stderr);
+
 	/* TODO: LOOK OVER STEVEN'S TEXT ON DAEMONIZING, DO WHATEVER
 	 * ELSE HE SUGGESTS FOR RANDOM PLATFORMS.
 	 */
 
-	if (ret > 0) exit(0); /* parent goes away */
-	
 	ret = gossip_enable_file(fn, "a");
-	if (ret < 0) exit(3); /* couldn't open log! */
+	if (ret < 0) {
+	    gossip_lerr("error opening log file\n");
+	    exit(3); /* couldn't open log! */
+	}
     }
     else {
 	/* stay in the foreground, direct log to stderr */
@@ -395,7 +403,9 @@ static int server_initialize_subsystems(PINT_server_status_code *server_level_in
 	goto interface_init_failed;
     }
 
-    printf("Passing %s to BMI as listen address.\n",server_config.host_id);
+    gossip_debug(SERVER_DEBUG,
+		 "Passing %s to BMI as listen address.\n",
+		 server_config.host_id);
 
     /* initialize BMI */
     ret = BMI_initialize("bmi_tcp", server_config.host_id, BMI_INIT_SERVER);
@@ -638,10 +648,13 @@ static int server_parse_cmd_line_args(int argc, char **argv)
 {
     int opt;
 
-    while ((opt = getopt(argc, argv,"fh")) != EOF) {
+    while ((opt = getopt(argc, argv,"fhd")) != EOF) {
 	switch (opt) {
 	    case 'f':
 		server_create_storage_space = 1;
+		break;
+	    case 'd':
+		server_background = 0;
 		break;
 	    case '?':
 	    case 'h':
