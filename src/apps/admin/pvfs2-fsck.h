@@ -22,8 +22,12 @@ int traverse_directory_tree(PVFS_fs_id cur_fs,
 			    struct handlelist *hl,
 			    PVFS_BMI_addr_t *addr_array,
 			    int server_count,
-			    PVFS_credentials *creds,
-			    struct options *opts_p);
+			    PVFS_credentials *creds);
+
+int match_dirdata(struct handlelist *hl,
+		  struct handlelist *alt_hl,
+		  PVFS_object_ref dir_ref,
+		  PVFS_credentials *creds);
 
 int descend(PVFS_fs_id cur_fs,
 	    struct handlelist *hl,
@@ -52,6 +56,19 @@ void cull_leftovers(PVFS_fs_id cur_fs,
 		    struct handlelist *hl,
 		    PVFS_id_gen_t *addr_array,
 		    PVFS_credentials *creds);
+
+/* fs modification functions */
+int create_lost_and_found(PVFS_fs_id cur_fs,
+			  PVFS_credentials *creds);
+
+int remove_object(PVFS_object_ref obj_ref,
+		  PVFS_ds_type obj_type,
+		  PVFS_credentials *creds);
+
+int remove_directory_entry(PVFS_object_ref dir_ref,
+			   PVFS_object_ref entry_ref,
+			   char *name,
+			   PVFS_credentials *creds);
 
 /* handlelist structure, functions */
 struct handlelist {
