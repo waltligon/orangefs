@@ -86,9 +86,9 @@ static void get_handle_extent_from_ranges(
                 /*
                   allow any handle range in this list that can allow
                   at least the single handle allocation to pass.  a
-                  range of 1 is ok, so long as it's not the root
-                  handle that was previously allocated (i.e. in the
-                  specified excluded list
+                  range of 1 is ok, so long as it's not a handle that
+                  was previously allocated (i.e. in the specified
+                  excluded list)
                 */
                 if (((tmp_extent->last - tmp_extent->first) > 0) ||
                     ((tmp_extent->last > 0) &&
