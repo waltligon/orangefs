@@ -506,6 +506,10 @@ int BMI_post_recv(bmi_op_id_t * id,
     ref_st_p tmp_ref = NULL;
     int ret = -1;
 
+    gossip_debug(BMI_DEBUG_OFFSETS,
+	"BMI_post_recv: addr: %ld, offset: 0x%lx, size: %ld\n", (long)src,
+	(long)buffer, (long)expected_size);
+
     gen_mutex_lock(&interface_mutex);
 
     *id = 0;
@@ -544,6 +548,10 @@ int BMI_post_send(bmi_op_id_t * id,
     ref_st_p tmp_ref = NULL;
     int ret = -1;
 
+    gossip_debug(BMI_DEBUG_OFFSETS,
+	"BMI_post_send: addr: %ld, offset: 0x%lx, size: %ld\n", (long)dest,
+	(long)buffer, (long)size);
+
     gen_mutex_lock(&interface_mutex);
 
     *id = 0;
@@ -580,6 +588,10 @@ int BMI_post_sendunexpected(bmi_op_id_t * id,
 {
     ref_st_p tmp_ref = NULL;
     int ret = -1;
+
+    gossip_debug(BMI_DEBUG_OFFSETS,
+	"BMI_post_sendunexpected: addr: %ld, offset: 0x%lx, size: %ld\n", 
+	(long)dest, (long)buffer, (long)size);
 
     gen_mutex_lock(&interface_mutex);
 
@@ -1302,6 +1314,21 @@ int BMI_post_send_list(bmi_op_id_t * id,
     ref_st_p tmp_ref = NULL;
     int ret = -1;
 
+#ifndef GOSSIP_DISABLE_DEBUG
+    int i;
+
+    gossip_debug(BMI_DEBUG_OFFSETS,
+	"BMI_post_send_list: addr: %ld, count: %d, total_size: %ld\n", 
+	(long)dest, list_count, (long)total_size);
+
+    for(i=0; i<list_count; i++)
+    {
+	gossip_debug(BMI_DEBUG_OFFSETS,
+	    "   element %d: offset: 0x%lx, size: %ld\n",
+	    i, (long)buffer_list[i], (long)size_list[i]);
+    }
+#endif
+
     gen_mutex_lock(&interface_mutex);
 
     *id = 0;
@@ -1360,6 +1387,22 @@ int BMI_post_recv_list(bmi_op_id_t * id,
     ref_st_p tmp_ref = NULL;
     int ret = -1;
 
+#ifndef GOSSIP_DISABLE_DEBUG
+    int i;
+
+    gossip_debug(BMI_DEBUG_OFFSETS,
+	"BMI_post_recv_list: addr: %ld, count: %d, total_size: %ld\n", 
+	(long)src, list_count, (long)total_expected_size);
+
+    for(i=0; i<list_count; i++)
+    {
+	gossip_debug(BMI_DEBUG_OFFSETS,
+	    "   element %d: offset: 0x%lx, size: %ld\n",
+	    i, (long)buffer_list[i], (long)size_list[i]);
+    }
+#endif
+
+
     gen_mutex_lock(&interface_mutex);
 
     *id = 0;
@@ -1416,6 +1459,21 @@ int BMI_post_sendunexpected_list(bmi_op_id_t * id,
 {
     ref_st_p tmp_ref = NULL;
     int ret = -1;
+
+#ifndef GOSSIP_DISABLE_DEBUG
+    int i;
+
+    gossip_debug(BMI_DEBUG_OFFSETS,
+	"BMI_post_sendunexpected_list: addr: %ld, count: %d, total_size: %ld\n", 
+	(long)dest, list_count, (long)total_size);
+
+    for(i=0; i<list_count; i++)
+    {
+	gossip_debug(BMI_DEBUG_OFFSETS,
+	    "   element %d: offset: 0x%lx, size: %ld\n",
+	    i, (long)buffer_list[i], (long)size_list[i]);
+    }
+#endif
 
     gen_mutex_lock(&interface_mutex);
 
