@@ -35,23 +35,24 @@ and
 .I local_config_file
 options warrant a little explanation.  
 .B pvfs2-genconfig
-will create one config file with settings aplicable to every server in the
-system.  It will also create one smaller config file with settings aplicable to
-the individual servers in the system.  Getting the many server-specific config
-files out to the server nodes is left as an excercise for the reader.
+will create one config file with settings applicable to every server in the
+system.  It will also create one smaller config file with settings applicable
+to the individual servers in the system.  Getting the many server-specific
+config files out to the server nodes is left as an exercise for the reader.
 
 .SH OPTIONS
 .IP --protocol
 The communication method the servers will use.  As of this writing, the only
 supported options are "gm" (for myrinet networks) and "tcp".  
 .IP --port
-The port the server will bind to.  This port should be appropriate for the protocol: GM ports must be in the range 0-7, for example.
+The port the server will bind to.  This port should be appropriate for the
+protocol: GM ports must be in the range 0-7, for example.
 .IP --ioservers
 A comma-delimited list of servers used for datafiles.  This option can be given
 more than one time.  Each instance will append to the list of servers.
 .IP --metaservers
 A comma-delimited list of servers used for metadata.  This option can be given
-mre than one time.  Each instance will append to the list of servers.  Note
+more than one time.  Each instance will append to the list of servers.  Note
 that as of pvfs-0.0.3, more than one metadata server is not supported.
 .IP --logfile
 Directory in which the server will create its logfile.
