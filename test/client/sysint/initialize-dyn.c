@@ -26,6 +26,8 @@ int main(int argc, char **argv)
 {
     int ret = -1;
     int i = 0;
+    char buf[PVFS_NAME_MAX] = {0};
+    PVFS_fs_id fs_id = PVFS_FS_ID_NULL;
     struct PVFS_sys_mntent mntent[MAX_NUM_MNT] =
     {
         { "tcp://localhost:3334", "pvfs2-volume1", 0, 0, 9,
@@ -45,6 +47,25 @@ int main(int argc, char **argv)
 
     printf("*** All defaults initialized\n");
 
+    /* make sure we can resolve all mnt points */
+    for(i = 0; i < MAX_NUM_MNT; i++)
+    {
+        ret = PVFS_util_resolve(mntent[i].mnt_dir, &fs_id,
+                                buf, PVFS_NAME_MAX);
+        if (ret)
+        {
+            printf("Failed to resolve mount point %s\n",
+                   mntent[i].mnt_dir);
+            PVFS_perror("Error", ret);
+            break;
+        }
+        else
+        {
+            printf(" - Resolved mnt point %s to fs_id %d\n",
+                   mntent[i].mnt_dir, (int)fs_id);
+        }
+    }
+
     /* remove the mount points */
     for(i = 0; i < MAX_NUM_MNT; i++)
     {
@@ -59,6 +80,24 @@ int main(int argc, char **argv)
         }
     }
 
+    /* make sure we *can't* resolve all mnt points */
+    for(i = 0; i < MAX_NUM_MNT; i++)
+    {
+        ret = PVFS_util_resolve(mntent[i].mnt_dir, &fs_id,
+                                buf, PVFS_NAME_MAX);
+        if (ret == 0)
+        {
+            printf("Resolve an unresolvable mount point %s\n",
+                   mntent[i].mnt_dir);
+            break;
+        }
+        else
+        {
+            printf(" - Properly failed to resolve mnt point %s\n",
+                   mntent[i].mnt_dir);
+        }
+    }
+
     /* re-add the mount points */
     for(i = 0; i < MAX_NUM_MNT; i++)
     {
@@ -73,10 +112,32 @@ int main(int argc, char **argv)
         }
     }
 
-    /* re-remove the mount points */
+    /*
+      make sure we can re-resolve all mnt points now that they've been
+      moved to the dynamic area of the book keeping
+    */
     for(i = 0; i < MAX_NUM_MNT; i++)
     {
-        printf("Removing mount entry %d: %s\n",
+        ret = PVFS_util_resolve(mntent[i].mnt_dir, &fs_id,
+                                buf, PVFS_NAME_MAX);
+        if (ret)
+        {
+            printf("Failed to resolve mount point %s\n",
+                   mntent[i].mnt_dir);
+            PVFS_perror("Error", ret);
+            break;
+        }
+        else
+        {
+            printf(" - Resolved dyn mnt point %s to fs_id %d\n",
+                   mntent[i].mnt_dir, (int)fs_id);
+        }
+    }
+
+    /* remove the dynamic mount points */
+    for(i = 0; i < MAX_NUM_MNT; i++)
+    {
+        printf("Removing dynamic mount entry %d: %s\n",
                i, mntent[i].mnt_dir);
         ret = PVFS_sys_fs_remove(&mntent[i]);
         if (ret)
@@ -87,6 +148,24 @@ int main(int argc, char **argv)
         }
     }
 
+    /* make sure we *can't* resolve all mnt points */
+    for(i = 0; i < MAX_NUM_MNT; i++)
+    {
+        ret = PVFS_util_resolve(mntent[i].mnt_dir, &fs_id,
+                                buf, PVFS_NAME_MAX);
+        if (ret == 0)
+        {
+            printf("Resolve an unresolvable mount point %s\n",
+                   mntent[i].mnt_dir);
+            break;
+        }
+        else
+        {
+            printf(" - Properly failed to resolve mnt point %s\n",
+                   mntent[i].mnt_dir);
+        }
+    }
+
     /* re-add the mount points */
     for(i = 0; i < MAX_NUM_MNT; i++)
     {
@@ -98,6 +177,25 @@ int main(int argc, char **argv)
             printf("Failed to add mount entry %d\n",i);
             PVFS_perror("Error", ret);
             break;
+        }
+    }
+
+    /* re-resolve one more time -- to be sure ;-) */
+    for(i = 0; i < MAX_NUM_MNT; i++)
+    {
+        ret = PVFS_util_resolve(mntent[i].mnt_dir, &fs_id,
+                                buf, PVFS_NAME_MAX);
+        if (ret)
+        {
+            printf("Failed to resolve mount point %s\n",
+                   mntent[i].mnt_dir);
+            PVFS_perror("Error", ret);
+            break;
+        }
+        else
+        {
+            printf(" - Resolved dyn mnt point %s to fs_id %d\n",
+                   mntent[i].mnt_dir, (int)fs_id);
         }
     }
 
