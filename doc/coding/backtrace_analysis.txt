@@ -35,16 +35,25 @@ fault signal to a running server:
     [bt] ./pvfs2-server(read+0x65) [0x804fd81]
 
 The memory addresses can be translated into more specific code file and line
-numbers after the fact using gdb.  The following steps described how to do
-this:
+numbers after the fact using the "addr2line" utility.  For example:
+
+addr2line -e pvfs2-server 0x8060d73
+src/io/job/job.c:3310
+
+This tells us that the server received the segfault signal while executing
+line 3310 of job.c, which is a pthread_cond_timedwait() call.  You can do the
+same for any address in the dump that corresponds to PVFS2 code.
+
+Thats it!
+
+-----
+
+An alternative approach is to use gdb:
 
 1) load the offending executable into gdb (do not run it)
 2) set listsize 1
 3) list * <memory address>
 4) repeat step 3) for any other addresses you wish to inspect
-
-The following example shows how to do this with the first PVFS2 specific
-address found in the above backtrace:
 
 src/server> gdb pvfs2-server
 GNU gdb 5.3
@@ -55,9 +64,3 @@ GNU gdb 5.3
 3310            ret = pthread_cond_timedwait(&completion_cond, 
 (gdb)
 
-This tells us that the server received the segfault signal while executing
-line 3310 of job.c, which is a pthread_cond_timedwait() call.
-
-Thats it!
-
--Phil
