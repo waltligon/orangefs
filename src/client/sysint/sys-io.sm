@@ -1333,7 +1333,7 @@ static int io_analyze_size_results(
     if (zero_fill_size > -1)
     {
         gossip_debug(GOSSIP_IO_DEBUG, "computed zero fill size of %Ld "
-                     "at offset %Ld\n", Ld(zero_fill_size),
+                     "at memory offset %Ld\n", Ld(zero_fill_size),
                      Ld(sm_p->u.io.total_size));
 
         memset((char *)(sm_p->u.io.buffer + sm_p->u.io.total_size),
@@ -1945,19 +1945,21 @@ static inline int check_for_zero_fill_on_read(
                 zero_fill_size = sm_p->u.io.size -
                     cur_ctx->flow_desc.file_req_offset;
             }
-            assert(zero_fill_size > -1);
 
-            gossip_debug(GOSSIP_IO_DEBUG, " SHORT read -- "
-                         "zero filling %Ld bytes at offset %Ld\n",
-                         Ld(zero_fill_size), Ld(zero_fill_offset));
+            if (zero_fill_size > -1)
+            {
+                gossip_debug(GOSSIP_IO_DEBUG, " SHORT read -- "
+                             "zero filling %Ld bytes at offset %Ld\n",
+                             Ld(zero_fill_size), Ld(zero_fill_offset));
 
-            memset((char *)(cur_ctx->flow_desc.dest.u.mem.buffer +
-                            zero_fill_offset), 0, zero_fill_size);
+                memset((char *)(cur_ctx->flow_desc.dest.u.mem.buffer +
+                                zero_fill_offset), 0, zero_fill_size);
 
-            sm_p->u.io.total_size += zero_fill_size;
+                sm_p->u.io.total_size += zero_fill_size;
 
-            /* exit loop -- we're done zero-filling */
-            break;
+                /* exit loop -- we're done zero-filling */
+                break;
+            }
         }
         else
         {
