@@ -592,7 +592,6 @@ int PINT_server_cp_bmi_unexp(PINT_server_op * serv_op,
 
     serv_op->op = BMI_UNEXP;
 
-
     mem_calc_ptr = (char *) serv_op;
     serv_op->encoded.buffer_list = (void *)mem_calc_ptr+sizeof(PINT_server_op);
 
@@ -600,6 +599,8 @@ int PINT_server_cp_bmi_unexp(PINT_server_op * serv_op,
 	    malloc(sizeof(struct BMI_unexpected_info));
     if (!serv_op->unexp_bmi_buff)
     {
+	free(serv_op);
+	serv_op = (PINT_server_op *)0;
 	return (-2);
     }
 
@@ -618,9 +619,11 @@ int PINT_server_cp_bmi_unexp(PINT_server_op * serv_op,
 	    temp_stat, &jid, JOB_NO_IMMED_COMPLETE);
     if (ret < 0)
     {
+	free(serv_op->unexp_bmi_buff);
+	free(serv_op);
+	serv_op = (PINT_server_op *)0;
 	return (-4);
     }
-
     return (0);
 }
 
