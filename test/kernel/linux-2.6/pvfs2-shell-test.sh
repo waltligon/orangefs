@@ -7,6 +7,13 @@
 # programs work correctly on top of pvfs2.
 #
 
+
+#####################################
+# test constants here
+#####################################
+
+TEST_PERMISSIONS="0777 0767 0666 0644 0600 0500 0400 0000"
+
 #####################################
 # misc functions here
 #####################################
@@ -62,12 +69,47 @@ generate_hello_world_code()
 
     rm -f $OUTFILE
 
+    DATE=`date`
+    echo "$DATE: Generating Hello World source code"
+
     echo "#include <stdio.h>" >> $OUTFILE
     echo "int main(int argc, char **argv) {" >> $OUTFILE
     echo "printf(\"Hello, World!\n\");" >> $OUTFILE
     echo "return 0; }" >> $OUTFILE
+
+    DATE=`date`
+    echo "$DATE: Hello World source code written"
 }
 
+stat_file()
+{
+    WORDS=$1
+    FILE=$2
+
+    DATE=`date`
+    echo "$DATE: $WORDS"
+
+    echo "***********************************"
+    stat $FILE
+    echo "***********************************"
+
+    DATE=`date`
+    echo "$DATE: Finished"
+}
+
+check_file_permissions()
+{
+    FILE=$1
+    PERM=$2
+
+    echo "  - Verifying that file permission is now $PERM"
+    OUTPUT=`stat $FILE | head -n 4 | tail -n 1 | awk '{print \$2}' | grep $PERM`
+    if test "x$OUTPUT" = "x"; then
+        echo "Permission check Failed; Test Aborting"
+        exit 1
+    fi
+    return 0
+}
 
 #####################################
 # simple directory test functions
@@ -242,6 +284,51 @@ directory_test3()
 }
 
 #####################################
+# simple permission test functions
+#####################################
+
+# create a dir
+# create a file in that dir
+# change permissions of that file to each of TEST_PERMISSIONS[] and verify
+# rm -rf the dir
+permission_test1()
+{
+    echo ""
+    echo "******************************************"
+    echo "* RUNNING PERMISSION TEST 1"
+    echo "******************************************"
+
+    setup_testdir $PVFS2_TESTDIR
+
+    TESTFILE=$PVFS2_TESTDIR/perm-testfile
+
+    echo "Creating test file $TESTFILE"
+    touch $TESTFILE
+
+    if ! test -f $TESTFILE; then
+        echo "Failed to create test file $TESTFILE"
+        return 1
+    fi
+
+    DATE=`date`
+    echo "$DATE: Modifying permissions of test file"
+    for f in $TEST_PERMISSIONS; do
+        echo "Changing permission of test file to $f"
+        chmod $f $TESTFILE
+        check_file_permissions $TESTFILE $f
+    done
+    DATE=`date`
+    echo "$DATE: Finished"
+
+    echo "Removing testfile"
+    rm -f $TESTFILE
+
+    remove_testdir $PVFS2_TESTDIR
+
+    return 0
+}
+
+#####################################
 # simple i/o test functions
 #####################################
 
@@ -341,19 +428,38 @@ compile_test1()
     setup_testdir $PVFS2_TESTDIR
 
     HELLO_WORLD_SOURCE="$PVFS2_TESTDIR/__hello_world.c"
+    HELLO_WORLD_BINARY="$PVFS2_TESTDIR/__hello_world"
 
     echo "Removing temporary files (if they exist)"
     rm -rf $HELLO_WORLD_SOURCE $HELLO_WORLD_BINARY
 
     generate_hello_world_code $HELLO_WORLD_SOURCE
 
+    stat_file "Doing stat on generated source code" $HELLO_WORLD_SOURCE
 
-    # testing only
-    echo "DUMPING GENERATED FILE"
-    echo ""
-    cat $HELLO_WORLD_SOURCE
+    DATE=`date`
+    echo "$DATE: Compiling source code"
 
-    echo "FIXME: THIS TEST ISN'T FINISHED YET"
+    OUTPUT=`gcc $HELLO_WORLD_SOURCE -o $HELLO_WORLD_BINARY`
+    if ! test "x$OUTPUT" = "x"; then
+        echo "Clean Compilation Failed"
+        echo $OUTPUT
+        return 1
+    fi
+
+    if ! test -x "$HELLO_WORLD_BINARY"; then
+        echo "Binary file not created!"
+        echo $OUTPUT
+        return 1
+    fi
+
+    DATE=`date`
+    echo "$DATE: Compilation finished"
+
+    stat_file "Doing stat on generated binary" $HELLO_WORLD_BINARY
+
+    CMD="$HELLO_WORLD_BINARY"
+    timestamp "Executing Hello World Program" $CMD
 
     remove_testdir $PVFS2_TESTDIR
 
@@ -401,3 +507,4 @@ io_test2
 
 compile_test1
 
+permission_test1
