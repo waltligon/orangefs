@@ -502,7 +502,7 @@ clean: docsclean
 		src/server/pvfs2-server-server.o $(MPIIOTESTS)
 
 # builds a tarball of the source tree suitable for distribution
-dist: $(SERVERGENSRC) $(SMCGEN) cleaner
+dist: $(SERVERGENSRC) $(SMCGEN) $(TROVE_AUTOGEN_FILES) cleaner
 	@sh $(srcdir)/maint/make-dist.sh $(srcdir) @PVFS2_VERSION@
 
 # some stuff that is cleaned in both distclean and dist targets
