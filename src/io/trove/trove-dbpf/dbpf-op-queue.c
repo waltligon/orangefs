@@ -174,6 +174,8 @@ void dbpf_queued_op_put(dbpf_queued_op_t *q_op_p, int completed)
  */
 TROVE_op_id dbpf_queued_op_queue(dbpf_queued_op_t *q_op_p)
 {
+    PVFS_id_gen_t op_id = (PVFS_id_gen_t)0;
+
     gen_mutex_lock(&dbpf_op_queue_mutex);
 
     dbpf_op_queue_add(&dbpf_op_queue, q_op_p);
@@ -185,6 +187,8 @@ TROVE_op_id dbpf_queued_op_queue(dbpf_queued_op_t *q_op_p)
 
     gen_mutex_unlock(&dbpf_op_queue_mutex);
 
+    op_id = q_op_p->op.id;
+
 #ifdef __PVFS2_TROVE_THREADED__
     /*
       wake up our operation thread if it's sleeping to let
@@ -192,7 +196,7 @@ TROVE_op_id dbpf_queued_op_queue(dbpf_queued_op_t *q_op_p)
     */
     pthread_cond_signal(&dbpf_op_incoming_cond);
 #endif
-    return q_op_p->op.id;
+    return op_id;
 }
 
 /* dbpf_queued_op_dequeue()
