@@ -306,6 +306,14 @@ struct PINT_client_truncate_sm {
     PVFS_size			size; /* new logical size of object*/
 };
 
+struct PINT_server_get_config_sm {
+    struct PVFS_sys_mntent* mntent;
+    char *fs_config_buf;
+    uint32_t fs_config_buf_size;
+    char *server_config_buf;
+    uint32_t server_config_buf_size;
+};
+
 typedef struct PINT_client_sm {
     /* STATE MACHINE VALUES */
     int stackptr; /* stack of contexts for nested state machines */
@@ -369,6 +377,7 @@ typedef struct PINT_client_sm {
 	struct PINT_client_mgmt_event_mon_list_sm event_mon_list;
 	struct PINT_client_mgmt_iterate_handles_list_sm iterate_handles_list;
 	struct PINT_client_mgmt_get_dfile_array_sm get_dfile_array;
+	struct PINT_server_get_config_sm get_config;
     } u;
 } PINT_client_sm;
 
@@ -399,6 +408,7 @@ enum {
     PVFS_MGMT_ITERATE_HANDLES_LIST = 74,
     PVFS_MGMT_GET_DFILE_ARRAY = 75,
     PVFS_MGMT_EVENT_MON_LIST = 76,
+    PVFS_SERVER_GET_CONFIG = 77,
     PVFS_CLIENT_JOB_TIMER = 200
 };
 
@@ -460,6 +470,7 @@ extern struct PINT_state_machine_s pvfs2_client_mgmt_get_dfile_array_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_noop_sm;
 extern struct PINT_state_machine_s pvfs2_client_truncate_sm;
 extern struct PINT_state_machine_s pvfs2_client_job_timer_sm;
+extern struct PINT_state_machine_s pvfs2_server_get_config_sm;
 
 /* nested state machines (helpers) */
 extern struct PINT_state_machine_s pvfs2_client_msgpairarray_sm;

@@ -109,6 +109,10 @@ int PINT_client_state_machine_post(PINT_client_sm *sm_p,
 	    sm_p->current_state 
 		= pvfs2_client_mgmt_get_dfile_array_sm.state_machine +1;
 	    break;
+	case PVFS_SERVER_GET_CONFIG:
+	    sm_p->current_state 
+		= pvfs2_server_get_config_sm.state_machine +1;
+	    break;
 	case PVFS_CLIENT_JOB_TIMER:
 	    sm_p->current_state 
 		= pvfs2_client_job_timer_sm.state_machine +1;

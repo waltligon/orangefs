@@ -513,6 +513,14 @@ endecode_fields_1a_struct(PVFS_servresp_readdir,
 /* getconfig ***************************************************/
 /* - retrieves initial configuration information from server */
 
+#define PINT_SERVREQ_GETCONFIG_FILL(__req,	    \
+				    __creds)	    \
+do {						    \
+    memset(&(__req), 0, sizeof(__req));		    \
+    (__req).op = PVFS_SERV_GETCONFIG;		    \
+    (__req).credentials = (__creds);		    \
+} while (0);
+
 /* NOTE: no request structure; all necessary request info is
  * represented in generic server request structure
  */

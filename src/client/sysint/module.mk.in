@@ -39,7 +39,8 @@ SMSRC := \
 	mgmt-event-mon-list.sm \
 	mgmt-iterate-handles-list.sm \
 	mgmt-get-dfile-array.sm \
-	client-job-timer.sm
+	client-job-timer.sm \
+	server-get-config.sm
 
 SMCGEN := $(patsubst %.sm,$(DIR)/%.c,$(SMSRC))
 
