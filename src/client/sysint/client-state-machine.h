@@ -86,10 +86,10 @@ typedef struct PINT_client_sm_recv_state_s {
 struct PINT_client_remove_sm {
     char                         *object_name;    /* input parameter */
     PVFS_pinode_reference         parent_ref;     /* input parameter */
-    PVFS_pinode_reference         object_ref;     /* created */
+    PVFS_pinode_reference         object_ref;     /* looked up */
     int                           datafile_count; /* from attribs */
     PVFS_handle                  *datafile_handles;
-    PINT_client_sm_msgpair_state *msgpair;        /* for datafile creation */
+    PINT_client_sm_msgpair_state *msgpair;        /* for datafile remove */
 };
 
 /* PINT_client_create_sm */
