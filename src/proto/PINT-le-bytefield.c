@@ -1,5 +1,6 @@
 /*
  * (C) 2001 Clemson University and The University of Chicago
+ * (C) 2003 Pete Wyckoff, Ohio Supercomputer Center <pw@osc.edu>
  *
  * See COPYING in top-level directory.
  */
@@ -9,208 +10,728 @@
 #include <string.h>
 #include <assert.h>
 
+#define __PINT_REQPROTO_ENCODE_FUNCS_C  /* trigger actual definitions */
+#include "endecode-funcs.h"
 #include "bmi.h"
 #include "bmi-byteswap.h"
-#include "pvfs2-req-proto.h"
 #include "gossip.h"
+#include "pvfs2-types.h"
+#include "pvfs2-req-proto.h"
 #include "PINT-reqproto-encode.h"
 #include "PINT-reqproto-module.h"
+#include "src/io/description/pint-request.h"  /* for PINT_Request */
+#include "src/io/description/pint-distribution.h"  /* for PINT_Dist_lookup */
 
-#define PINT_ENC 1
-#define PINT_DEC 2
-#define PINT_CALC_SIZE 3
+/* defined later */
+PINT_encoding_table_values le_bytefield_table;
+static int check_req_size(struct PVFS_server_req *req);
+static int check_resp_size(struct PVFS_server_resp *resp);
 
-/**************************************************************
- * macros for transforming basic types
+static int initializing_sizes = 0;
+
+/* an array of structs for storing precalculated maximum encoding sizes
+ * for each type of server operation 
  */
+static struct {
+    int req;
+    int resp;
+} max_size_array[PVFS_MAX_SERVER_OP+1];
 
-/* unsigned 32 bit int */
-#define PINT_XENC_UINT32(msg_p,x_p)				    \
-do{								    \
-    if(PINT_XENC_MODE == PINT_ENC){				    \
-	*((uint32_t*)((msg_p)->ptr_current)) = htobmi32(*(x_p));    \
-    }								    \
-    else if(PINT_XENC_MODE == PINT_DEC){			    \
-	*(x_p) = bmitoh32(*((uint32_t*)((msg_p)->ptr_current)));    \
-    }								    \
-    (msg_p)->ptr_current += sizeof(uint32_t);			    \
-}while(0)
-
-/* enum types */
-#define PINT_XENC_ENUM PINT_XENC_UINT32
-
-/* signed 32 bit int */
-#define PINT_XENC_INT32(msg_p,x_p)				    \
-do{								    \
-    if(PINT_XENC_MODE == PINT_ENC){				    \
-	*((int32_t*)((msg_p)->ptr_current)) = htobmi32(*(x_p));     \
-    }								    \
-    else if(PINT_XENC_MODE == PINT_DEC){			    \
-	*(x_p) = bmitoh32(*((int32_t*)((msg_p)->ptr_current)));     \
-    }								    \
-    (msg_p)->ptr_current += sizeof(int32_t);			    \
-}while(0)
-
-/* unsigned 64 bit int */
-#define PINT_XENC_UINT64(msg_p,x_p)				    \
-do{								    \
-    if(PINT_XENC_MODE == PINT_ENC){				    \
-	*((uint64_t*)((msg_p)->ptr_current)) = htobmi64(*(x_p));    \
-    }								    \
-    else if(PINT_XENC_MODE == PINT_DEC){			    \
-	*(x_p) = bmitoh64(*((uint64_t*)((msg_p)->ptr_current)));    \
-    }								    \
-    (msg_p)->ptr_current += sizeof(uint64_t);			    \
-}while(0)
-
-/* signed 64 bit int */
-#define PINT_XENC_INT64(msg_p,x_p)				    \
-do{								    \
-    if(PINT_XENC_MODE == PINT_ENC){				    \
-	*((int64_t*)((msg_p)->ptr_current)) = htobmi64(*(x_p));     \
-    }								    \
-    else if(PINT_XENC_MODE == PINT_DEC){			    \
-	*(x_p) = bmitoh64(*((int64_t*)((msg_p)->ptr_current)));     \
-    }								    \
-    (msg_p)->ptr_current += sizeof(int64_t);			    \
-}while(0)
-
-/* strings */
-#define PINT_XENC_STRING(msg_p,x_p,size)			    \
-do{								    \
-    if(PINT_XENC_MODE == PINT_ENC){				    \
-	memcpy((msg_p)->ptr_current, x_p, size);		    \
-    }								    \
-    else if(PINT_XENC_MODE == PINT_DEC){			    \
-	x_p = (msg_p)->ptr_current;				    \
-    }								    \
-    (msg_p)->ptr_current += size;				    \
-}while(0)
-
-/* PVFS2 specific types */
-#define PINT_XENC_PVFS_ERROR	    PINT_XENC_INT32
-#define PINT_XENC_PVFS_OFFSET	    PINT_XENC_INT64
-#define PINT_XENC_PVFS_SIZE	    PINT_XENC_INT64
-#define PINT_XENC_PVFS_MSG_TAG	    PINT_XENC_INT32
-#define PINT_XENC_PVFS_CONTEXT_ID   PINT_XENC_INT32
-#define PINT_XENC_PVFS_HANDLE	    PINT_XENC_UINT64
-#define PINT_XENC_PVFS_FS_ID	    PINT_XENC_INT32
-#define PINT_XENC_PVFS_DS_POSITION  PINT_XENC_INT32
-#define PINT_XENC_PVFS_UID	    PINT_XENC_UINT32
-#define PINT_XENC_PVFS_GID	    PINT_XENC_UINT32
-#define PINT_XENC_PVFS_TIME	    PINT_XENC_INT64
-#define PINT_XENC_PVFS_PERMISSIONS  PINT_XENC_UINT32
-#define PINT_XENC_PVFS_DS_TYPE	    PINT_XENC_ENUM
-
-/* TODO: fill these in */
-#define PINT_XENC_PVFS_DIST	    do{}while(0)	    
-#define PINT_XENC_PVFS_DFILES	    do{}while(0)
-
-#define PINT_XENC_PVFS_OBJ_ATTR(msg_p,attr_p)			    \
-do{								    \
-    PINT_XENC_PVFS_UID(msg_p,&((attr_p)->owner));		    \
-    PINT_XENC_PVFS_GID(msg_p,&((attr_p)->group));		    \
-    PINT_XENC_PVFS_PERMISSIONS(msg_p,&((attr_p)->perms));	    \
-    PINT_XENC_PVFS_TIME(msg_p,&((attr_p)->atime));		    \
-    PINT_XENC_PVFS_TIME(msg_p,&((attr_p)->mtime));		    \
-    PINT_XENC_PVFS_TIME(msg_p,&((attr_p)->ctime));		    \
-    PINT_XENC_UINT32(msg_p,&((attr_p)->mask));			    \
-    PINT_XENC_PVFS_DS_TYPE(msg_p,&((attr_p)->objtype));		    \
-    if(attr_p->mask & PVFS_ATTR_META_DIST){			    \
-    }								    \
-    if(attr_p->mask & PVFS_ATTR_META_DFILES){			    \
-    }								    \
-    if(attr_p->mask & PVFS_ATTR_DATA_SIZE){			    \
-	PINT_XENC_PVFS_SIZE(msg_p,&((attr_p)->u.data.size));	    \
-    }								    \
-    if(attr_p->mask & PVFS_ATTR_SYMLNK_TARGET){			    \
-	PINT_XENC_UINT32(msg_p,&((attr_p)->u.sym.target_path_len)); \
-	PINT_XENC_STRING(msg_p,(attr_p)->u.sym.target_path,	    \
-	    (attr_p)->u.sym.target_path_len);			    \
-    }								    \
-}while(0)
-
-/************************************************************
- * macros for transforming specific structures
+/* lebf_initialize()
+ *
+ * initializes the encoder module, calculates max sizes of each request type 
+ * in advance
+ *
+ * no return value
  */
+static void lebf_initialize(void)
+{
+    struct PVFS_server_req req;
+    struct PVFS_server_resp resp;
+    int i;
+    int reqsize, respsize;
+    int noreq;
+    PVFS_Dist tmp_dist;
+    PINT_Request tmp_req;
+    char *tmp_name = strdup("foo");
+    const int init_big_size = 1024 * 1024;
 
-/* operates on the generic part of a request structure */
-#define PINT_XENC_REQ_GEN(msg_p,req)			    \
-do{							    \
-    PINT_XENC_ENUM(msg_p,&((req)->op));			    \
-    PINT_XENC_PVFS_UID(msg_p,&((req)->credentials.uid));    \
-    PINT_XENC_PVFS_GID(msg_p,&((req)->credentials.gid));    \
-}while(0)
+    /*
+     * Some messages have extra structures, and even indeterminate sizes
+     * which are hand-calculated here.  Also some fields must be initialized
+     * for encoding to work properly.
+     */
+    memset(&tmp_dist, 0, sizeof(tmp_dist));
+    tmp_dist.dist_name = strdup("default_dist");
+    if (PINT_Dist_lookup(&tmp_dist)) {
+	gossip_err("%s: dist %s does not exist?!?\n",
+	  __func__, tmp_dist.dist_name);
+	exit(1);
+    }
+    memset(&tmp_req, 0, sizeof(tmp_req));
 
-/* operates on the generic part of a response structure */
-#define PINT_XENC_RESP_GEN(msg_p,resp)			    \
-do{							    \
-    PINT_XENC_ENUM(msg_p,&((resp)->op));		    \
-    PINT_XENC_PVFS_ERROR(msg_p,&((resp)->status));	    \
-}while(0)
+    initializing_sizes = 1;
+    for (i=0; i<=PVFS_MAX_SERVER_OP; i++) {
+	req.op = resp.op = i;
+	reqsize = 0;
+	respsize = 0;
+	noreq = 0;
+	switch (i) {
+	    case PVFS_SERV_INVALID:
+	    case PVFS_SERV_PERF_UPDATE:
+		/* never used, skip initialization */
+		continue;
+	    case PVFS_SERV_GETCONFIG:
+		resp.u.getconfig.fs_config_buf = tmp_name;
+		resp.u.getconfig.server_config_buf = tmp_name;
+		respsize = extra_size_PVFS_servresp_getconfig;
+		break;
+	    case PVFS_SERV_LOOKUP_PATH:
+		req.u.lookup_path.path = "";
+		resp.u.lookup_path.handle_count = 0;
+		resp.u.lookup_path.attr_count = 0;
+		reqsize = extra_size_PVFS_servreq_lookup_path;
+		respsize = extra_size_PVFS_servresp_lookup_path;
+		break;
+	    case PVFS_SERV_CREATE:
+		/* can request a range of handles */
+		req.u.create.handle_extent_array.extent_count = 0;
+		reqsize = extra_size_PVFS_servreq_create;
+		break;
+	    case PVFS_SERV_REMOVE:
+		/* nothing special, let normal encoding work */
+		break;
+	    case PVFS_SERV_IO:
+		req.u.io.io_dist = &tmp_dist;
+		req.u.io.file_req = &tmp_req;
+		reqsize = extra_size_PVFS_servreq_io;
+		break;
+	    case PVFS_SERV_GETATTR:
+		resp.u.getattr.attr.mask = 0;
+		respsize = extra_size_PVFS_servresp_getattr;
+		break;
+	    case PVFS_SERV_SETATTR:
+		req.u.setattr.attr.mask = 0;
+		reqsize = extra_size_PVFS_servreq_setattr;
+		break;
+	    case PVFS_SERV_CRDIRENT:
+		req.u.crdirent.name = tmp_name;
+		reqsize = extra_size_PVFS_servreq_crdirent;
+		break;
+	    case PVFS_SERV_RMDIRENT:
+		req.u.rmdirent.entry = tmp_name;
+		reqsize = extra_size_PVFS_servreq_rmdirent;
+		break;
+	    case PVFS_SERV_TRUNCATE:
+		/* nothing special */
+		break;
+	    case PVFS_SERV_MKDIR:
+		req.u.mkdir.handle_extent_array.extent_count = 0;
+		req.u.mkdir.attr.mask = 0;
+		reqsize = extra_size_PVFS_servreq_mkdir;
+		break;
+	    case PVFS_SERV_READDIR:
+		resp.u.readdir.dirent_count = 0;
+		respsize = extra_size_PVFS_servresp_readdir;
+		break;
+	    case PVFS_SERV_FLUSH:
+		/* nothing special */
+		break;
+	    case PVFS_SERV_MGMT_SETPARAM:
+		/* nothing special */
+		break;
+	    case PVFS_SERV_MGMT_NOOP:
+		/* nothing special */
+		break;
+	    case PVFS_SERV_STATFS:
+		/* nothing special */
+		break;
+	    case PVFS_SERV_WRITE_COMPLETION:
+		/* only a response, but nothing special there */
+		noreq = 1;
+		break;
+	    case PVFS_SERV_MGMT_PERF_MON:
+		resp.u.mgmt_perf_mon.perf_array_count = 0;
+		respsize = extra_size_PVFS_servresp_mgmt_perf_mon;
+		break;
+	    case PVFS_SERV_MGMT_ITERATE_HANDLES:
+		resp.u.mgmt_iterate_handles.handle_count = 0;
+		respsize = extra_size_PVFS_servresp_mgmt_iterate_handles;
+		break;
+	    case PVFS_SERV_MGMT_DSPACE_INFO_LIST:
+		req.u.mgmt_dspace_info_list.handle_count = 0;
+		resp.u.mgmt_dspace_info_list.dspace_info_count = 0;
+		reqsize = extra_size_PVFS_servreq_mgmt_dspace_info_list;
+		respsize = extra_size_PVFS_servresp_mgmt_dspace_info_list;
+		break;
+	    case PVFS_SERV_MGMT_EVENT_MON:
+		resp.u.mgmt_event_mon.event_count = 0;
+		respsize = extra_size_PVFS_servresp_mgmt_event_mon;
+		break;
+	}
+	/* since these take the max size when mallocing in the encode,
+	 * give them a huge number, then later fix it. */
+	max_size_array[i].req = max_size_array[i].resp = init_big_size;
 
-/* operates on a getconfig request */
-#define PINT_XENC_REQ_GETCONFIG(msg_p,req) do{}while(0)
+	if (noreq)
+	    reqsize = 0;
+	else
+	    reqsize += check_req_size(&req);
 
-/* operates on a getconfig response */
-#define PINT_XENC_RESP_GETCONFIG(msg_p,resp)		    \
-do{							    \
-    PINT_XENC_UINT32(msg_p,&((resp)->u.getconfig.fs_config_buf_size));	\
-    PINT_XENC_UINT32(msg_p,&((resp)->u.getconfig.server_config_buf_size)); \
-    PINT_XENC_STRING(msg_p, (resp)->u.getconfig.fs_config_buf, \
-	(resp)->u.getconfig.fs_config_buf_size);		    \
-    PINT_XENC_STRING(msg_p, (resp)->u.getconfig.server_config_buf, \
-	(resp)->u.getconfig.server_config_buf_size);	    \
-}while(0)
+	respsize += check_resp_size(&resp);
 
-/* operates on a getattr request */
-#define PINT_XENC_REQ_GETATTR(msg_p,req)		    \
-do{							    \
-    PINT_XENC_PVFS_HANDLE(msg_p,&((req)->u.getattr.handle)); \
-    PINT_XENC_PVFS_FS_ID(msg_p,&((req)->u.getattr.fs_id)); \
-    PINT_XENC_UINT32(msg_p,&((req)->u.getattr.attrmask));  \
-}while(0);
+	if (reqsize > init_big_size)
+	    gossip_err("%s: op %d reqsize %d exceeded prealloced %d\n",
+	      __func__, i, reqsize, init_big_size);
+	if (respsize > init_big_size)
+	    gossip_err("%s: op %d respsize %d exceeded prealloced %d\n",
+	      __func__, i, respsize, init_big_size);
+	max_size_array[i].req = reqsize;
+	max_size_array[i].resp = respsize;
+    }
 
-/* operates on a getattr reponse */
-#define PINT_XENC_RESP_GETATTR(msg_p,resp)		    \
-do{							    \
-    PINT_XENC_PVFS_OBJ_ATTR(msg_p,&((resp)->u.getattr.attr)); \
-}while(0);
+    /* clean up stuff just used for initialization */
+    free(tmp_dist.dist_name);
+    free(tmp_name);
+    initializing_sizes = 0;
+}
 
+/* lebf_encode_calc_max_size()
+ *
+ * reports the maximum allowed encoded size for the given request type
+ *
+ * returns size on success, -errno on failure
+ */
+static int lebf_encode_calc_max_size(
+    enum PINT_encode_msg_type input_type,
+    enum PVFS_server_op op_type)
+{
+    if(input_type == PINT_ENCODE_REQ)
+	return(max_size_array[op_type].req);
+    else if(input_type == PINT_ENCODE_RESP)
+	return(max_size_array[op_type].resp);
+
+    return(-EINVAL);
+}
+
+/*
+ * Used by both encode functions, request and response, to set
+ * up the one buffer which will hold the encoded message.
+ */
+static int
+encode_common(struct PINT_encoded_msg *target_msg, int maxsize)
+{
+    int ret = 0;
+    void *buf;
+
+    /* this encoder always uses just one buffer */
+    target_msg->buffer_list = &target_msg->buffer_stub;
+    target_msg->size_list = &target_msg->size_stub;
+    target_msg->list_count = 1;
+    target_msg->buffer_type = BMI_PRE_ALLOC;
+    /* allocate the max size buffer to avoid the work of calculating it */
+    if (initializing_sizes)
+	buf = malloc(maxsize);
+    else
+	buf = BMI_memalloc(target_msg->dest, maxsize, BMI_SEND);
+    if (!buf) {
+	ret = -ENOMEM;
+	goto out;
+    }
+
+    target_msg->buffer_list[0] = buf;
+    target_msg->ptr_current = buf;
+
+    /* generic header */
+    memcpy(target_msg->ptr_current, le_bytefield_table.generic_header,
+	PINT_ENC_GENERIC_HEADER_SIZE);
+    target_msg->ptr_current += PINT_ENC_GENERIC_HEADER_SIZE;
+
+ out:
+    return ret;
+}
+
+/* lebf_encode_req()
+ *
+ * encodes a request structure
+ *
+ * returns 0 on success, -errno on failure
+ */
 static int lebf_encode_req(
-    struct PVFS_server_req *request,
-    struct PINT_encoded_msg *target_msg);
+    struct PVFS_server_req *req,
+    struct PINT_encoded_msg *target_msg)
+{
+    int ret = 0;
+    char **p;
+
+    ret = encode_common(target_msg, max_size_array[req->op].req);
+    if (ret)
+	goto out;
+
+    /* every request has these fields */
+    p = &target_msg->ptr_current;
+    encode_PVFS_server_req(p, req);
+
+#define CASE(tag,var) \
+    case tag: encode_PVFS_servreq_##var(p,&req->u.var); break
+
+    switch (req->op) {
+
+	/* call standard function defined in headers */
+	CASE(PVFS_SERV_LOOKUP_PATH, lookup_path);
+	CASE(PVFS_SERV_CREATE, create);
+	CASE(PVFS_SERV_REMOVE, remove);
+	CASE(PVFS_SERV_IO, io);
+	CASE(PVFS_SERV_GETATTR, getattr);
+	CASE(PVFS_SERV_SETATTR, setattr);
+	CASE(PVFS_SERV_CRDIRENT, crdirent);
+	CASE(PVFS_SERV_RMDIRENT, rmdirent);
+	CASE(PVFS_SERV_TRUNCATE, truncate);
+	CASE(PVFS_SERV_MKDIR, mkdir);
+	CASE(PVFS_SERV_READDIR, readdir);
+	CASE(PVFS_SERV_FLUSH, flush);
+	CASE(PVFS_SERV_STATFS, statfs);
+	CASE(PVFS_SERV_MGMT_SETPARAM, mgmt_setparam);
+	CASE(PVFS_SERV_MGMT_PERF_MON, mgmt_perf_mon);
+	CASE(PVFS_SERV_MGMT_ITERATE_HANDLES, mgmt_iterate_handles);
+	CASE(PVFS_SERV_MGMT_DSPACE_INFO_LIST, mgmt_dspace_info_list);
+	CASE(PVFS_SERV_MGMT_EVENT_MON, mgmt_event_mon);
+
+	case PVFS_SERV_GETCONFIG:
+        case PVFS_SERV_MGMT_NOOP:
+	    /* nothing else */
+	    break;
+
+	case PVFS_SERV_INVALID:
+        case PVFS_SERV_WRITE_COMPLETION:
+        case PVFS_SERV_PERF_UPDATE:
+	    gossip_err("%s: invalid operation %d\n", __func__, req->op);
+	    ret = -ENOSYS;
+	    break;
+    }
+
+#undef CASE
+
+    /* although much more may have been allocated */
+    target_msg->total_size = target_msg->ptr_current
+      - (char *) target_msg->buffer_list[0];
+    target_msg->size_list[0] = target_msg->total_size;
+
+    if (target_msg->total_size > max_size_array[req->op].req) {
+	ret = -ENOMEM;
+	gossip_err("%s: op %d needed %Ld bytes but alloced only %d\n",
+	  __func__, req->op, target_msg->total_size,
+	  max_size_array[req->op].req);
+    }
+
+  out:
+    return ret;
+}
+
+
+/* lebf_encode_resp()
+ *
+ * encodes a response structure
+ *
+ * returns 0 on success, -errno on failure
+ */
 static int lebf_encode_resp(
-    struct PVFS_server_resp *response,
-    struct PINT_encoded_msg *target_msg);
-static int lebf_decode_resp(
-    void *input_buffer,
-    int input_size,
-    struct PINT_decoded_msg *target_msg,
-    bmi_addr_t target_addr);
+    struct PVFS_server_resp *resp,
+    struct PINT_encoded_msg *target_msg)
+{
+    int ret;
+    char **p;
+
+    ret = encode_common(target_msg, max_size_array[resp->op].resp);
+    if (ret)
+	goto out;
+
+    /* every response has these fields */
+    p = &target_msg->ptr_current;
+    encode_PVFS_server_resp(p, resp);
+
+#define CASE(tag,var) \
+    case tag: encode_PVFS_servresp_##var(p,&resp->u.var); break
+
+    /* extra encoding rules for particular responses */
+    switch (resp->op) {
+
+	/* call standard function defined in headers */
+	CASE(PVFS_SERV_GETCONFIG, getconfig);
+	CASE(PVFS_SERV_LOOKUP_PATH, lookup_path);
+	CASE(PVFS_SERV_CREATE, create);
+	CASE(PVFS_SERV_IO, io);
+	CASE(PVFS_SERV_GETATTR, getattr);
+	CASE(PVFS_SERV_RMDIRENT, rmdirent);
+	CASE(PVFS_SERV_MKDIR, mkdir);
+	CASE(PVFS_SERV_READDIR, readdir);
+	CASE(PVFS_SERV_STATFS, statfs);
+	CASE(PVFS_SERV_MGMT_SETPARAM, mgmt_setparam);
+	CASE(PVFS_SERV_MGMT_PERF_MON, mgmt_perf_mon);
+	CASE(PVFS_SERV_MGMT_ITERATE_HANDLES, mgmt_iterate_handles);
+	CASE(PVFS_SERV_MGMT_DSPACE_INFO_LIST, mgmt_dspace_info_list);
+	CASE(PVFS_SERV_MGMT_EVENT_MON, mgmt_event_mon);
+        CASE(PVFS_SERV_WRITE_COMPLETION, write_completion);
+
+        case PVFS_SERV_REMOVE:
+        case PVFS_SERV_SETATTR:
+        case PVFS_SERV_CRDIRENT:
+        case PVFS_SERV_TRUNCATE:
+        case PVFS_SERV_FLUSH:
+        case PVFS_SERV_MGMT_NOOP:
+	    /* nothing else */
+	    break;
+
+	case PVFS_SERV_INVALID:
+        case PVFS_SERV_PERF_UPDATE:
+	    gossip_err("%s: invalid operation %d\n", __func__, resp->op);
+	    ret = -ENOSYS;
+	    break;
+    }
+
+#undef CASE
+
+    /* although much more may have been allocated */
+    target_msg->total_size = target_msg->ptr_current
+      - (char *) target_msg->buffer_list[0];
+    target_msg->size_list[0] = target_msg->total_size;
+
+    if (target_msg->total_size > max_size_array[resp->op].resp) {
+	ret = -ENOMEM;
+	gossip_err("%s: op %d needed %Ld bytes but alloced only %d\n",
+	  __func__, resp->op, target_msg->total_size,
+	  max_size_array[resp->op].resp);
+    }
+
+  out:
+    return ret;
+}
+
+/* lebf_decode_req()
+ *
+ * decodes a request message
+ *
+ * input_buffer is a pointer past the generic header; it starts with
+ * PVFS_server_req->op.
+ *
+ * returns 0 on success, -errno on failure
+ */
 static int lebf_decode_req(
     void *input_buffer,
     int input_size,
     struct PINT_decoded_msg *target_msg,
-    bmi_addr_t target_addr);
-static void lebf_decode_rel(
-    struct PINT_decoded_msg *msg,
-    enum PINT_encode_msg_type input_type);
+    bmi_addr_t target_addr)
+{
+    int ret = 0;
+    char *ptr = input_buffer;
+    char **p = &ptr;
+    struct PVFS_server_req *req = &target_msg->stub_dec.req;
+
+    target_msg->buffer = req;
+
+    /* decode generic part of request (enough to get op number) */
+    decode_PVFS_server_req(p, req);
+
+#define CASE(tag,var) \
+    case tag: decode_PVFS_servreq_##var(p ,&req->u.var); break
+
+    switch (req->op) {
+
+	/* call standard function defined in headers */
+	CASE(PVFS_SERV_LOOKUP_PATH, lookup_path);
+	CASE(PVFS_SERV_CREATE, create);
+	CASE(PVFS_SERV_REMOVE, remove);
+	CASE(PVFS_SERV_IO, io);
+	CASE(PVFS_SERV_GETATTR, getattr);
+	CASE(PVFS_SERV_SETATTR, setattr);
+	CASE(PVFS_SERV_CRDIRENT, crdirent);
+	CASE(PVFS_SERV_RMDIRENT, rmdirent);
+	CASE(PVFS_SERV_TRUNCATE, truncate);
+	CASE(PVFS_SERV_MKDIR, mkdir);
+	CASE(PVFS_SERV_READDIR, readdir);
+	CASE(PVFS_SERV_FLUSH, flush);
+	CASE(PVFS_SERV_STATFS, statfs);
+	CASE(PVFS_SERV_MGMT_SETPARAM, mgmt_setparam);
+	CASE(PVFS_SERV_MGMT_PERF_MON, mgmt_perf_mon);
+	CASE(PVFS_SERV_MGMT_ITERATE_HANDLES, mgmt_iterate_handles);
+	CASE(PVFS_SERV_MGMT_DSPACE_INFO_LIST, mgmt_dspace_info_list);
+	CASE(PVFS_SERV_MGMT_EVENT_MON, mgmt_event_mon);
+
+	case PVFS_SERV_GETCONFIG:
+        case PVFS_SERV_MGMT_NOOP:
+	    /* nothing else */
+	    break;
+
+	case PVFS_SERV_INVALID:
+        case PVFS_SERV_WRITE_COMPLETION:
+        case PVFS_SERV_PERF_UPDATE:
+	    gossip_lerr("%s: invalid operation %d.\n", __func__, req->op);
+	    ret = -EPROTO;
+	    goto out;
+    }
+
+#undef CASE
+
+    if (ptr != (char *)input_buffer + input_size) {
+	gossip_lerr("%s: improper input buffer size", __func__);
+	ret = -EPROTO;
+    }
+
+  out:
+    return(ret);
+}
+
+/* lebf_decode_resp()
+ *
+ * decodes a response structure
+ *
+ * returns 0 on success, -errno on failure
+ */
+static int lebf_decode_resp(
+    void *input_buffer,
+    int input_size,
+    struct PINT_decoded_msg *target_msg,
+    bmi_addr_t target_addr)
+{
+    int ret = 0;
+    char *ptr = input_buffer;
+    char **p = &ptr;
+    struct PVFS_server_resp *resp = &target_msg->stub_dec.resp;
+
+    target_msg->buffer = resp;
+
+    /* decode generic part of response (including op number) */
+    decode_PVFS_server_resp(p, resp);
+
+#define CASE(tag,var) \
+    case tag: decode_PVFS_servresp_##var(p,&resp->u.var); break
+
+    switch (resp->op) {
+
+	/* call standard function defined in headers */
+	CASE(PVFS_SERV_GETCONFIG, getconfig);
+	CASE(PVFS_SERV_LOOKUP_PATH, lookup_path);
+	CASE(PVFS_SERV_CREATE, create);
+	CASE(PVFS_SERV_IO, io);
+	CASE(PVFS_SERV_GETATTR, getattr);
+	CASE(PVFS_SERV_RMDIRENT, rmdirent);
+	CASE(PVFS_SERV_MKDIR, mkdir);
+	CASE(PVFS_SERV_READDIR, readdir);
+	CASE(PVFS_SERV_STATFS, statfs);
+	CASE(PVFS_SERV_MGMT_SETPARAM, mgmt_setparam);
+	CASE(PVFS_SERV_MGMT_PERF_MON, mgmt_perf_mon);
+	CASE(PVFS_SERV_MGMT_ITERATE_HANDLES, mgmt_iterate_handles);
+	CASE(PVFS_SERV_MGMT_DSPACE_INFO_LIST, mgmt_dspace_info_list);
+	CASE(PVFS_SERV_MGMT_EVENT_MON, mgmt_event_mon);
+        CASE(PVFS_SERV_WRITE_COMPLETION, write_completion);
+
+        case PVFS_SERV_REMOVE:
+        case PVFS_SERV_SETATTR:
+        case PVFS_SERV_CRDIRENT:
+        case PVFS_SERV_TRUNCATE:
+        case PVFS_SERV_FLUSH:
+        case PVFS_SERV_MGMT_NOOP:
+	    /* nothing else */
+	    break;
+
+	case PVFS_SERV_INVALID:
+        case PVFS_SERV_PERF_UPDATE:
+	    gossip_lerr("%s: invalid operation %d.\n", __func__, resp->op);
+	    ret = -EPROTO;
+	    goto out;
+    }
+
+#undef CASE
+
+    if (ptr != (char *)input_buffer + input_size) {
+	gossip_lerr("%s: improper input buffer size", __func__);
+	ret = -EPROTO;
+    }
+
+  out:
+    return(ret);
+}
+
+/* lebf_encode_rel()
+ *
+ * releases resources consumed while encoding
+ *
+ * no return value 
+ */
 static void lebf_encode_rel(
     struct PINT_encoded_msg *msg,
-    enum PINT_encode_msg_type input_type);
-static int lebf_encode_calc_max_size(
-    enum PINT_encode_msg_type input_type,
-    enum PVFS_server_op op_type);
-static void lebf_initialize(
-    void);
-static int lebf_encode_alloc_resp(
-    struct PVFS_server_resp *response,
-    struct PINT_encoded_msg *target_msg);
-static int lebf_encode_alloc_req(
-    struct PVFS_server_req* request,
-    struct PINT_encoded_msg* target_msg);
-    
+    enum PINT_encode_msg_type input_type)
+{
+    /* just a single buffer to free */
+    if (initializing_sizes)
+	free(msg->buffer_list[0]);
+    else
+	BMI_memfree(msg->dest, msg->buffer_list[0], msg->total_size, BMI_SEND);
+
+    return;
+}
+
+/* lebf_decode_rel()
+ *
+ * releases resources consumed while decoding
+ *
+ * no return value
+ */
+static void lebf_decode_rel(struct PINT_decoded_msg *msg,
+  enum PINT_encode_msg_type input_type)
+{
+    int i;
+
+    if (input_type == PINT_DECODE_REQ) {
+	struct PVFS_server_req *req = &msg->stub_dec.req;
+	switch (req->op) {
+
+	    case PVFS_SERV_CREATE:
+		decode_free(req->u.create.handle_extent_array.extent_array);
+		break;
+
+	    case PVFS_SERV_IO:
+		decode_free(req->u.io.io_dist);
+		decode_free(req->u.io.file_req);
+		break;
+
+	    case PVFS_SERV_MKDIR:
+		decode_free(req->u.mkdir.handle_extent_array.extent_array);
+		if (req->u.mkdir.attr.mask & PVFS_ATTR_META_DIST)
+		    decode_free(req->u.mkdir.attr.u.meta.dist);
+		if (req->u.mkdir.attr.mask & PVFS_ATTR_META_DFILES)
+		    decode_free(req->u.mkdir.attr.u.meta.dfile_array);
+		break;
+
+	    case PVFS_SERV_MGMT_DSPACE_INFO_LIST:
+		decode_free(req->u.mgmt_dspace_info_list.handle_array);
+		break;
+
+	    case PVFS_SERV_SETATTR:
+		if (req->u.setattr.attr.mask & PVFS_ATTR_META_DIST)
+		    decode_free(req->u.setattr.attr.u.meta.dist);
+		if (req->u.setattr.attr.mask & PVFS_ATTR_META_DFILES)
+		    decode_free(req->u.setattr.attr.u.meta.dfile_array);
+		break;
+
+	    case PVFS_SERV_GETCONFIG:
+	    case PVFS_SERV_LOOKUP_PATH:
+	    case PVFS_SERV_REMOVE:
+	    case PVFS_SERV_GETATTR:
+	    case PVFS_SERV_CRDIRENT:
+	    case PVFS_SERV_RMDIRENT:
+	    case PVFS_SERV_TRUNCATE:
+	    case PVFS_SERV_READDIR:
+	    case PVFS_SERV_FLUSH:
+	    case PVFS_SERV_MGMT_SETPARAM:
+	    case PVFS_SERV_MGMT_NOOP:
+	    case PVFS_SERV_STATFS:
+	    case PVFS_SERV_MGMT_ITERATE_HANDLES:
+	    case PVFS_SERV_MGMT_PERF_MON:
+	    case PVFS_SERV_MGMT_EVENT_MON:
+		/* nothing to free */
+		break;
+
+	    case PVFS_SERV_INVALID:
+	    case PVFS_SERV_WRITE_COMPLETION:
+	    case PVFS_SERV_PERF_UPDATE:
+		gossip_lerr("%s: invalid request operation %d.\n",
+		  __func__, req->op);
+		break;
+	}
+    } else if (input_type == PINT_DECODE_RESP) {
+	struct PVFS_server_resp *resp = &msg->stub_dec.resp;
+	switch (resp->op) {
+
+	    case PVFS_SERV_LOOKUP_PATH: {
+		struct PVFS_servresp_lookup_path *lookup = &resp->u.lookup_path;
+		decode_free(lookup->handle_array);
+		for (i=0; i<lookup->attr_count; i++) {
+		    if (lookup->attr_array[i].mask & PVFS_ATTR_META_DIST)
+			decode_free(lookup->attr_array[i].u.meta.dist);
+		    if (lookup->attr_array[i].mask & PVFS_ATTR_META_DFILES)
+			decode_free(lookup->attr_array[i].u.meta.dfile_array);
+		}
+		decode_free(lookup->attr_array);
+		break;
+	    }
+
+	    case PVFS_SERV_READDIR:
+		decode_free(resp->u.readdir.dirent_array);
+		break;
+
+	    case PVFS_SERV_MGMT_PERF_MON:
+		decode_free(resp->u.mgmt_perf_mon.perf_array);
+		break;
+
+	    case PVFS_SERV_MGMT_ITERATE_HANDLES:
+		decode_free(resp->u.mgmt_iterate_handles.handle_array);
+		break;
+
+	    case PVFS_SERV_MGMT_DSPACE_INFO_LIST:
+		decode_free(resp->u.mgmt_dspace_info_list.dspace_info_array);
+		break;
+
+	    case PVFS_SERV_GETATTR:
+		if (resp->u.getattr.attr.mask & PVFS_ATTR_META_DIST)
+		    decode_free(resp->u.getattr.attr.u.meta.dist);
+		if (resp->u.getattr.attr.mask & PVFS_ATTR_META_DFILES)
+		    decode_free(resp->u.getattr.attr.u.meta.dfile_array);
+		break;
+
+	    case PVFS_SERV_MGMT_EVENT_MON:
+		decode_free(resp->u.mgmt_event_mon.event_array);
+		break;
+
+	    case PVFS_SERV_GETCONFIG:
+	    case PVFS_SERV_CREATE:
+	    case PVFS_SERV_REMOVE:
+	    case PVFS_SERV_IO:
+	    case PVFS_SERV_SETATTR:
+	    case PVFS_SERV_CRDIRENT:
+	    case PVFS_SERV_RMDIRENT:
+	    case PVFS_SERV_TRUNCATE:
+	    case PVFS_SERV_MKDIR:
+	    case PVFS_SERV_FLUSH:
+	    case PVFS_SERV_MGMT_SETPARAM:
+	    case PVFS_SERV_MGMT_NOOP:
+	    case PVFS_SERV_STATFS:
+	    case PVFS_SERV_WRITE_COMPLETION:
+		/* nothing to free */
+		break;
+
+	    case PVFS_SERV_INVALID:
+	    case PVFS_SERV_PERF_UPDATE:
+		gossip_lerr("%s: invalid response operation %d.\n",
+		  __func__, resp->op);
+		break;
+	}
+    }
+}
+
+static int
+check_req_size(struct PVFS_server_req *req)
+{
+    struct PINT_encoded_msg msg;
+    int size;
+
+    lebf_encode_req(req, &msg);
+    size = msg.total_size;
+    lebf_encode_rel(&msg, 0);
+    return size;
+}
+
+static int
+check_resp_size(struct PVFS_server_resp *resp)
+{
+    struct PINT_encoded_msg msg;
+    int size;
+
+    lebf_encode_resp(resp, &msg);
+    size = msg.total_size;
+    lebf_encode_rel(&msg, 0);
+    return size;
+}
 
 static PINT_encoding_functions lebf_functions = {
     lebf_encode_req,
@@ -227,399 +748,6 @@ PINT_encoding_table_values le_bytefield_table = {
     "little endian bytefield",
     lebf_initialize
 };
-
-/* an array of structs for storing precalculated maximum encoding sizes
- * for each type of server operation 
- */
-struct max_size
-{
-    int max_req;
-    int max_resp;
-};
-static struct max_size max_size_array[PVFS_MAX_SERVER_OP+1];
-
-/* lebf_initialize()
- *
- * initializes the encoder module, calculates max sizes of each request type 
- * in advance
- *
- * no return value
- */
-static void lebf_initialize(void)
-{
-    struct PVFS_server_req tmp_req;
-    struct PVFS_server_resp tmp_resp;
-    struct PINT_encoded_msg tmp_msg;
-    int PINT_XENC_MODE = PINT_CALC_SIZE;
-
-    le_bytefield_table.op = &lebf_functions;
-    memset(max_size_array, 0, ((PVFS_MAX_SERVER_OP+1)*sizeof(struct max_size)));
-
-    /* calculate maximum encoded message size for each type of operation */
-
-    /* getconfig request */
-    tmp_msg.ptr_current = 0;
-    memset(&tmp_req, 0, sizeof(tmp_req));
-    PINT_XENC_REQ_GEN(&tmp_msg, &tmp_req);
-    PINT_XENC_REQ_GETCONFIG(&tmp_msg, &tmp_req);
-    max_size_array[PVFS_SERV_GETCONFIG].max_req = (int)(tmp_msg.ptr_current);
-
-
-    /* getconfig response */
-    tmp_msg.ptr_current = 0;
-    memset(&tmp_resp, 0, sizeof(tmp_resp));
-    PINT_XENC_RESP_GEN(&tmp_msg, &tmp_resp);
-    PINT_XENC_RESP_GETCONFIG(&tmp_msg, &tmp_resp);
-    max_size_array[PVFS_SERV_GETCONFIG].max_resp = (int)(tmp_msg.ptr_current)
-	+ (PVFS_REQ_LIMIT_CONFIG_FILE_BYTES * 2);
-
-    return;
-}
-
-/* lebf_encode_calc_max_size()
- *
- * reports the maximum allowed encoded size for the given request type
- *
- * returns size on success, -errno on failure
- */
-static int lebf_encode_calc_max_size(
-    enum PINT_encode_msg_type input_type,
-    enum PVFS_server_op op_type)
-{
-    if(input_type == PINT_ENCODE_REQ)
-	return(max_size_array[op_type].max_req);
-    else if(input_type == PINT_ENCODE_RESP)
-	return(max_size_array[op_type].max_resp);
-
-    return(-EINVAL);
-}
-
-/* lebf_encode_req()
- *
- * encodes a request structure
- *
- * returns 0 on success, -errno on failure
- */
-static int lebf_encode_req(
-    struct PVFS_server_req *request,
-    struct PINT_encoded_msg *target_msg)
-{
-    int ret = -1;
-    int PINT_XENC_MODE = PINT_ENC;
-
-    /* this encoder always uses just one buffer */
-    target_msg->buffer_list = &target_msg->buffer_stub;
-    target_msg->size_list = &target_msg->size_stub;
-    target_msg->list_count = 1;
-    target_msg->buffer_type = BMI_PRE_ALLOC;
-
-    /* compute size and allocate a buffer */
-    ret = lebf_encode_alloc_req(request, target_msg);
-    if(ret < 0)
-    {
-	return(ret);
-    }
-
-    /* tack on generic header */
-    memcpy(target_msg->ptr_current, le_bytefield_table.generic_header,
-	PINT_ENC_GENERIC_HEADER_SIZE);
-    target_msg->ptr_current += PINT_ENC_GENERIC_HEADER_SIZE;
-
-    switch(request->op)
-    {
-	case PVFS_SERV_GETCONFIG:
-	    PINT_XENC_REQ_GEN(target_msg, request);
-	    PINT_XENC_REQ_GETCONFIG(target_msg, request);
-	    ret = 0;
-	    break;
-	default:
-	    gossip_lerr("Error: unsupported operation.\n");
-	    ret = -ENOSYS;
-	    break;
-    }
-
-
-    /* check sanity */
-    if(ret == 0)
-    {
-	assert(target_msg->total_size == (int)(target_msg->ptr_current -
-	    (char*)(target_msg->buffer_list[0])));
-    }
-    return(ret);
-}
-
-
-/* lebf_encode_resp()
- *
- * encodes a response structure
- *
- * returns 0 on success, -errno on failure
- */
-static int lebf_encode_resp(
-    struct PVFS_server_resp *response,
-    struct PINT_encoded_msg *target_msg)
-{
-    int ret = -1;
-    int PINT_XENC_MODE = PINT_ENC;
-
-    /* this encoder always uses just one buffer */
-    target_msg->buffer_list = &target_msg->buffer_stub;
-    target_msg->size_list = &target_msg->size_stub;
-    target_msg->list_count = 1;
-    target_msg->buffer_type = BMI_PRE_ALLOC;
-
-    /* compute size and allocate a buffer */
-    ret = lebf_encode_alloc_resp(response, target_msg);
-    if(ret < 0)
-    {
-	return(ret);
-    }
-
-    /* tack on generic header */
-    memcpy(target_msg->ptr_current, le_bytefield_table.generic_header,
-	PINT_ENC_GENERIC_HEADER_SIZE);
-    target_msg->ptr_current += PINT_ENC_GENERIC_HEADER_SIZE;
-
-    switch(response->op)
-    {
-	case PVFS_SERV_GETCONFIG:
-	    PINT_XENC_RESP_GEN(target_msg, response);
-	    PINT_XENC_RESP_GETCONFIG(target_msg, response);
-	    ret = 0;
-	    break;
-	default:
-	    gossip_lerr("Error: unsupported operation.\n");
-	    ret = -ENOSYS;
-	    break;
-    }
-
-    /* check sanity */
-    if(ret == 0)
-    {
-	assert(target_msg->total_size == (int)(target_msg->ptr_current -
-	    (char*)(target_msg->buffer_list[0])));
-    }
-    return(ret);
-}
-
-
-/* lebf_decode_resp()
- *
- * decodes a response structure
- *
- * returns 0 on success, -errno on failure
- */
-static int lebf_decode_resp(
-    void *input_buffer,
-    int input_size,
-    struct PINT_decoded_msg *target_msg,
-    bmi_addr_t target_addr)
-{
-    int ret = -1;
-    int PINT_XENC_MODE = PINT_DEC;
-
-    target_msg->buffer = &(target_msg->stub_dec.resp);
-    target_msg->ptr_current = input_buffer;
-
-    /* decode generic part of response (enough to get op number) */
-    PINT_XENC_RESP_GEN(target_msg, &(target_msg->stub_dec.resp));
-
-    switch(target_msg->stub_dec.resp.op)
-    {
-	case PVFS_SERV_GETCONFIG:
-	    PINT_XENC_RESP_GETCONFIG(target_msg, &(target_msg->stub_dec.resp));
-	    ret = 0;
-	    break;
-	default:
-	    gossip_lerr("Error: unkown server operation: %d\n",
-		(int)target_msg->stub_dec.req.op);
-	    ret = -EPROTO;
-	    break;
-    }
-
-    return(ret);
-}
-
-
-/* lebf_decode_req()
- *
- * decodes a request message
- *
- * returns 0 on success, -errno on failure
- */
-static int lebf_decode_req(
-    void *input_buffer,
-    int input_size,
-    struct PINT_decoded_msg *target_msg,
-    bmi_addr_t target_addr)
-{
-    int ret = -1;
-    int PINT_XENC_MODE = PINT_DEC;
-
-    target_msg->buffer = &(target_msg->stub_dec.req);
-    target_msg->ptr_current = input_buffer;
-
-    /* decode generic part of request (enough to get op number) */
-    PINT_XENC_REQ_GEN(target_msg, &(target_msg->stub_dec.req));
-
-    switch(target_msg->stub_dec.req.op)
-    {
-	case PVFS_SERV_GETCONFIG:
-	    PINT_XENC_REQ_GETCONFIG(target_msg, &(target_msg->stub_dec.req));
-	    ret = 0;
-	    break;
-	default:
-	    gossip_lerr("Error: unkown server operation: %d\n",
-		(int)target_msg->stub_dec.req.op);
-	    ret = -EPROTO;
-	    break;
-    }
-
-    return(ret);
-}
-
-
-/* lebf_decode_rel()
- *
- * releases resources consumed while decoding
- *
- * no return value
- */
-static void lebf_decode_rel(
-    struct PINT_decoded_msg *msg,
-    enum PINT_encode_msg_type input_type)
-{
-    if(input_type == PINT_ENCODE_REQ)
-    {
-	switch(msg->stub_dec.req.op)
-	{
-	    case PVFS_SERV_GETCONFIG:
-		break;
-	    default:
-		gossip_lerr("Error: unsupported operation.\n");
-		break;
-	}
-    }
-    else if(input_type == PINT_ENCODE_RESP)
-    {
-	switch(msg->stub_dec.resp.op)
-	{
-	    case PVFS_SERV_GETCONFIG:
-		break;
-	    default:
-		gossip_lerr("Error: unsupported operation.\n");
-		break;
-	}
-    }
-
-    return;
-}
-
-
-/* lebf_encode_rel()
- *
- * releases resources consumed while encoding
- *
- * no return value 
- */
-static void lebf_encode_rel(
-    struct PINT_encoded_msg *msg,
-    enum PINT_encode_msg_type input_type)
-{
-    /* just a single buffer to free */
-    BMI_memfree(msg->dest, msg->buffer_list[0], msg->total_size, BMI_SEND);
-
-    return;
-}
-
-/* lebf_encode_alloc_resp()
- *
- * internal function, calculates size needed for encoded version 
- * of a response and allocates the buffer
- *
- * returns 0 on success, -errno on failure
- */
-static int lebf_encode_alloc_resp(
-    struct PVFS_server_resp* response,
-    struct PINT_encoded_msg* target_msg)
-{
-    int PINT_XENC_MODE = PINT_CALC_SIZE;
-
-    target_msg->ptr_current = NULL;
-    target_msg->total_size = 0;
-
-    PINT_XENC_RESP_GEN(target_msg, response);
-
-    switch(response->op)
-    {
-	case PVFS_SERV_GETCONFIG:
-	    PINT_XENC_RESP_GETCONFIG(target_msg, response);
-	    target_msg->total_size = (int)(target_msg->ptr_current) + 
-		PINT_ENC_GENERIC_HEADER_SIZE;
-	    break;
-	default:
-	    gossip_lerr("Error: unsupported operation.\n");
-	    return(-ENOSYS);
-	    break;
-    }
-
-    target_msg->size_list[0] = target_msg->total_size;
-    target_msg->buffer_list[0] = 
-	BMI_memalloc(target_msg->dest, target_msg->total_size,
-	BMI_SEND);
-    if(!target_msg->buffer_list[0])
-    {
-	return(-ENOMEM);
-    }
-
-    target_msg->ptr_current = target_msg->buffer_list[0];
-    return(0);
-}
-
-/* lebf_encode_alloc_req()
- *
- * internal function, calculates size needed for encoded version 
- * of a request and allocates the buffer
- *
- * returns 0 on success, -errno on failure
- */
-static int lebf_encode_alloc_req(
-    struct PVFS_server_req* request,
-    struct PINT_encoded_msg* target_msg)
-{
-    int PINT_XENC_MODE = PINT_CALC_SIZE;
-
-    target_msg->ptr_current = NULL;
-    target_msg->total_size = 0;
-
-    PINT_XENC_REQ_GEN(target_msg, request);
-
-    switch(request->op)
-    {
-	case PVFS_SERV_GETCONFIG:
-	    PINT_XENC_REQ_GETCONFIG(target_msg, request);
-	    target_msg->total_size = (int)(target_msg->ptr_current) + 
-		PINT_ENC_GENERIC_HEADER_SIZE;
-	    break;
-	default:
-	    gossip_lerr("Error: unsupported operation.\n");
-	    return(-ENOSYS);
-	    break;
-    }
-
-    target_msg->size_list[0] = target_msg->total_size;
-    target_msg->buffer_list[0] = 
-	BMI_memalloc(target_msg->dest, target_msg->total_size,
-	BMI_SEND);
-    if(!target_msg->buffer_list[0])
-    {
-	return(-ENOMEM);
-    }
-
-    target_msg->ptr_current = target_msg->buffer_list[0];
-    return(0);
-}
-
 
 /*
  * Local variables:
