@@ -26,6 +26,14 @@ int main(int argc,char **argv)
 	int ret = -1,i = 0;
 	PVFS_fs_id fsid = 9;
 	pvfs_mntlist mnt = {0,NULL};
+	int64_t cmd_handle=1048572; /*handle that already exists on the server*/
+	PVFS_handle some_datafile = 42069; /*handle to a datafile */
+
+	if (argc > 1)
+	{
+		sscanf(argv[1], "%d", &cmd_handle);
+		printf("using handle %d\n", cmd_handle);
+	}
 
 	/* Parse PVFStab */
 	ret = parse_pvfstab(NULL,&mnt);
@@ -93,12 +101,18 @@ int main(int argc,char **argv)
 	}
 	
 	// fill in the handle 
-	req_sattr->pinode_refn.handle = 1048574;//resp_lk->pinode_refn.handle;
+	req_sattr->pinode_refn.handle = cmd_handle;//resp_lk->pinode_refn.handle;
 	req_sattr->pinode_refn.fs_id = 9;
-	req_sattr->attrmask = ATTR_BASIC;
+	req_sattr->attrmask = ATTR_META;
 	req_sattr->attr.owner = 12345;
 	req_sattr->attr.group = 56789;
 	req_sattr->attr.perms = 255;
+	req_sattr->attr.atime = 1111111;
+	req_sattr->attr.mtime = 2222222;
+	req_sattr->attr.ctime = 3333333;
+	req_sattr->attr.objtype = ATTR_META;
+	req_sattr->attr.u.meta.dfh = &some_datafile;
+	req_sattr->attr.u.meta.nr_datafiles = 1;
 
 	//use it
 	ret = PVFS_sys_setattr(req_sattr);
@@ -115,6 +129,10 @@ int main(int argc,char **argv)
 	printf("uid:%d\n",req_sattr->attr.owner);
 	printf("gid:%d\n",req_sattr->attr.group);
 	printf("permissions:%d\n",req_sattr->attr.perms);
+	printf("atime:%d\n",req_sattr->attr.atime);
+	printf("mtime:%d\n",req_sattr->attr.mtime);
+	printf("ctime:%d\n",req_sattr->attr.ctime);
+	printf("nr_datafiles:%d\n",req_sattr->attr.u.meta.nr_datafiles);
 		
 
 	// Test the getattr function 
@@ -137,7 +155,7 @@ int main(int argc,char **argv)
 	// Fill in the handle 
 	req_gattr->pinode_refn.handle = req_sattr->pinode_refn.handle;
 	req_gattr->pinode_refn.fs_id = 9;
-	req_gattr->attrmask = ATTR_BASIC;
+	req_gattr->attrmask = ATTR_META;
 
 	// Use it 
 	ret = PVFS_sys_getattr(req_gattr,resp_gattr);
@@ -154,6 +172,10 @@ int main(int argc,char **argv)
 	printf("uid:%d\n",resp_gattr->attr.owner);
 	printf("gid:%d\n",resp_gattr->attr.group);
 	printf("permissions:%d\n",resp_gattr->attr.perms);
+	printf("atime:%d\n",resp_gattr->attr.atime);
+	printf("mtime:%d\n",resp_gattr->attr.mtime);
+	printf("ctime:%d\n",resp_gattr->attr.ctime);
+	printf("nr_datafiles:%d\n",resp_gattr->attr.u.meta.nr_datafiles);
 	
 #if 0
 	// close it down
