@@ -370,14 +370,6 @@ static int server_initialize(
 {
     int ret = 0, i = 0;
 
-    /* Handle backgrounding, setting up working directory, and so on. */
-    ret = server_setup_process_environment(server_background);
-    if (ret < 0)
-    {
-	gossip_err("Error: Could not start server; aborting.\n");
-        return ret;
-    }
-
     /* Initialize the bmi, flow, trove and job interfaces */
     ret = server_initialize_subsystems(server_status_flag);
     if (ret < 0)
@@ -411,6 +403,14 @@ static int server_initialize(
 
     gossip_debug(SERVER_DEBUG,
                  "Initialization completed successfully.\n");
+
+    /* Handle backgrounding, setting up working directory, and so on. */
+    ret = server_setup_process_environment(server_background);
+    if (ret < 0)
+    {
+	gossip_err("Error: Could not start server; aborting.\n");
+        return ret;
+    }
 
     return ret;
 }
@@ -450,9 +450,6 @@ static int server_setup_process_environment(int background)
 	    exit(2);
 	}
         assert(new_pid == getpid());
-
-	/* set this here so our "feed signals to controlling pid" logic works
-	 * correctly */
 	server_controlling_pid = new_pid;
 
         freopen("/dev/null", "r", stdin);
@@ -466,11 +463,11 @@ static int server_setup_process_environment(int background)
                         server_config.logfile);
 	    exit(3);
 	}
-    } else 
-	/* moved from main so we could do the right thing depending on if we
-	 * are daemonized or not */
+    }
+    else 
+    {
 	server_controlling_pid = getpid();
-
+    }
     return 0;
 }
 
@@ -821,44 +818,94 @@ static int server_shutdown(
     PINT_server_status_flag status,
     int ret, int siglevel)
 {
-    if(siglevel == SIGSEGV)
+    if (siglevel == SIGSEGV)
     {
 	gossip_err("SIGSEGV: skipping cleanup; exit now!\n");
 	exit(-1);
     }
 
+    gossip_debug(SERVER_DEBUG,
+                 "*** normal server shutdown in progress ***\n");
+
     if (status & SERVER_STATE_MACHINE_INIT)
+    {
+        gossip_debug(
+            SERVER_DEBUG, "* halting state machine processor ... ");
 	PINT_state_machine_halt();
+        gossip_debug(SERVER_DEBUG, "done.\n");
+    }
 
     if (status & SERVER_PERF_COUNTER_INIT)
+    {
+        gossip_debug(
+            SERVER_DEBUG, "* halting performance interface   ... ");
 	PINT_perf_finalize();
+        gossip_debug(SERVER_DEBUG, "done.\n");
+    }
 
     if (status & SERVER_REQ_SCHED_INIT)
+    {
+        gossip_debug(
+            SERVER_DEBUG, "* halting request scheduler       ... ");
 	PINT_req_sched_finalize();
+        gossip_debug(SERVER_DEBUG, "done.\n");
+    }
 	
     if (status & SERVER_JOB_CTX_INIT)
+    {
 	job_close_context(server_job_context);
+    }
 
     if (status & SERVER_JOB_INIT)
+    {
+        gossip_debug(
+            SERVER_DEBUG, "* halting job interface           ... ");
 	job_finalize();
+        gossip_debug(SERVER_DEBUG, "done.\n");
+    }
 
     if (status & SERVER_TROVE_INIT)
+    {
+        gossip_debug(
+            SERVER_DEBUG, "* halting storage interface       ... ");
 	trove_finalize();
+        gossip_debug(SERVER_DEBUG, "done.\n");
+    }
 
     if (status & SERVER_FLOW_INIT)
+    {
+        gossip_debug(
+            SERVER_DEBUG, "* halting flow interface          ... ");
 	PINT_flow_finalize();
+        gossip_debug(SERVER_DEBUG, "done.\n");
+    }
 
     if (status & SERVER_BMI_INIT)
+    {
+        gossip_debug(
+            SERVER_DEBUG, "* halting bmi interface           ... ");
 	BMI_finalize();
+        gossip_debug(SERVER_DEBUG, "done.\n");
+    }
 
     if (status & SERVER_ENCODER_INIT)
+    {
+        gossip_debug(
+            SERVER_DEBUG, "* halting encoder interface       ... ");
 	PINT_encode_finalize();
+        gossip_debug(SERVER_DEBUG, "done.\n");
+    }
 
     if (status & SERVER_GOSSIP_INIT)
+    {
+        gossip_debug(SERVER_DEBUG, "* halting logging interface\n");
 	gossip_disable();
+    }
 
     if (status & SERVER_CONFIG_INIT)
+    {
         PINT_config_release(&server_config);
+    }
 
     if (status & SERVER_JOB_OBJS_ALLOCATED)
     {
@@ -877,20 +924,21 @@ static void server_sig_handler(int sig)
         return;
     }
 
-    if(sig != SIGSEGV)
+    if (sig != SIGSEGV)
     {
-	gossip_err("PVFS2 server: got signal: %d, server_status_flag: "
+	gossip_err("\nPVFS2 server: got signal: %d, server_status_flag: "
                    "%d\n", sig, (int)server_status_flag);
     }
 
     /* short circuit non critical signals here */
-    if(sig == SIGPIPE || sig == SIGUSR1 || sig == SIGUSR2)
+    if (sig == SIGPIPE || sig == SIGUSR1 || sig == SIGUSR2)
     {
 	/* reset handler and continue processing */
 	gossip_err("PVFS2 server: continuing.\n");
 	return;
     }
-    if(sig == SIGHUP)
+
+    if (sig == SIGHUP)
     {
 	/* TODO: fix this, need to clean up server initialization
 	 * and shut down before we can handle this cleanly
@@ -899,8 +947,8 @@ static void server_sig_handler(int sig)
                    "shutting down instead.\n");
     }
 
-    /* set the signal_recvd_flag on critical errors to cause the server to 
-     * exit gracefully on the next work cycle
+    /* set the signal_recvd_flag on critical errors to cause the
+     * server to exit gracefully on the next work cycle
      */
     signal_recvd_flag = sig;
     return;
