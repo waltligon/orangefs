@@ -132,8 +132,6 @@ static int pvfs2_statfs(
 {
     int ret = -1, retries = 5;
     pvfs2_kernel_op_t *new_op = NULL;
-    long max_long = (long)(1 << (BITS_PER_LONG - 1));
-    max_long -= 1;
 
     pvfs2_print("pvfs2_: pvfs2_statfs called on sb %p "
                 "(fs_id is %d)\n", sb, (int)(PVFS2_SB(sb)->coll_id));
@@ -169,6 +167,10 @@ static int pvfs2_statfs(
             new_op->downcall.resp.statfs.blocks_avail;
         buf->f_bavail = (sector_t)
             new_op->downcall.resp.statfs.blocks_avail;
+        buf->f_files = (sector_t)
+            new_op->downcall.resp.statfs.files_total;
+        buf->f_ffree = (sector_t)
+            new_op->downcall.resp.statfs.files_avail;
 
         pvfs2_print("sizeof(kstatfs)=%d\n",sizeof(struct kstatfs));
         pvfs2_print("sizeof(buf)=%d\n",sizeof(*buf));
@@ -178,20 +180,17 @@ static int pvfs2_statfs(
             (sizeof(buf->f_blocks) == 4))
         {
             /*
-              we need to truncate the value to be the max long value
-              because the kernel will return an overflow if it's
-              larger otherwise.  see vfs_statfs_native in open.c for
-              the actual overflow checks made.
+              in this case, we need to truncate the values here to be
+              no bigger than the max 4 byte long value because the
+              kernel will return an overflow if it's larger otherwise.
+              see vfs_statfs_native in open.c for the actual overflow
+              checks made.
             */
-            buf->f_files = (sector_t)max_long;
-            buf->f_ffree = (sector_t)max_long;
-        }
-        else
-        {
-            buf->f_files = (sector_t)
-                new_op->downcall.resp.statfs.files_total;
-            buf->f_ffree = (sector_t)
-                new_op->downcall.resp.statfs.files_avail;
+            buf->f_blocks &= 0x00000000ffffffffULL;
+            buf->f_bfree &= 0x00000000ffffffffULL;
+            buf->f_bavail &= 0x00000000ffffffffULL;
+            buf->f_files &= 0x00000000ffffffffULL;
+            buf->f_ffree &= 0x00000000ffffffffULL;
         }
 
         pvfs2_print("pvfs2_statfs got %lu files total | "
