@@ -268,7 +268,7 @@ enum
     GM_IMMED_SIZE = 14,
     GM_CTRL_LENGTH = sizeof(struct ctrl_msg),
     GM_MODE_IMMED_LIMIT = 0,
-    GM_MODE_REND_LIMIT = 262144,	/* 256K */
+    GM_MODE_REND_LIMIT = 524288,	/* 512K */
     GM_MODE_UNEXP_LIMIT = 16384	/* 16K */
 };
 static gm_size_t GM_IMMED_LENGTH;
@@ -1699,7 +1699,30 @@ int BMI_gm_testcontext(int incount,
     int ret = -1;
     method_op_p query_op = NULL;
 
+    *outcount = 0;
+
     gen_mutex_lock(&interface_mutex);
+
+    /* check queue before doing anything */
+    while((*outcount < incount) && (query_op = 
+	op_list_shownext(completion_array[context_id])))
+    {
+	assert(query_op->context_id == context_id);
+	op_list_remove(query_op);
+	error_code_array[*outcount] = query_op->error_code;
+	actual_size_array[*outcount] = query_op->actual_size;
+	out_id_array[*outcount] = query_op->op_id;
+	if(user_ptr_array != NULL)
+	    user_ptr_array[*outcount] = query_op->user_ptr;
+	dealloc_gm_method_op(query_op);
+	(*outcount)++;
+    }
+    if(*outcount)
+    {
+        gen_mutex_unlock(&interface_mutex);
+        return(0);
+    }
+
     /* do some ``real work'' here */
     ret = gm_do_work(max_idle_time_ms*1000);
     if (ret < 0)
@@ -1708,8 +1731,7 @@ int BMI_gm_testcontext(int incount,
 	return (ret);
     }
 
-    *outcount = 0;
-
+    /* check queue again */
     while((*outcount < incount) && (query_op = 
 	op_list_shownext(completion_array[context_id])))
     {
