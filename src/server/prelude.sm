@@ -172,12 +172,6 @@ static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p)
 	js_p->error_code = -js_p->error_code;
 	return(1);
     }
-
-    /* lets clean up the mask to insure that later states don't accidentally
-     * use fields that they shouldn't (really the attr structure should 
-     * already be stored on disk like this)
-     */
-     s_op->attr.mask &= PVFS_ATTR_COMMON_ALL;
 	
     /* decide what kind of permission checking to do based on the 
      * request type:
