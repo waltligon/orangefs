@@ -7,7 +7,6 @@
 #ifndef __MMAP_RA_CACHE_H
 #define __MMAP_RA_CACHE_H
 
-#include "client.h"
 #include "quickhash.h"
 
 typedef struct
