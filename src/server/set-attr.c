@@ -114,9 +114,6 @@ static int setattr_init(state_action_struct *s_op, job_status_s *ret)
     s_op->key.buffer = Trove_Common_Keys[METADATA_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[METADATA_KEY].size;
 
-    gossip_debug(SERVER_DEBUG,"%s:%d\n",Trove_Common_Keys[METADATA_KEY].key,Trove_Common_Keys[METADATA_KEY].size);
-    /*gossip_debug(SERVER_DEBUG,"%s:%d\n",s_op->key.buffer,s_op->key.buffer_sz);*/
-
     s_op->val.buffer = (void *) malloc((s_op->val.buffer_sz = sizeof(PVFS_object_attr)));
 
     /* post a scheduler job */
@@ -198,8 +195,9 @@ TODO: Can I do that?  dw
 static int setattr_setobj_attribs(state_action_struct *s_op, job_status_s *ret)
 {
 
-    PVFS_object_attr *old_attr;
+    /*PVFS_object_attr *old_attr;*/
     int job_post_ret=0;
+    PVFS_vtag_s bs;
     job_id_t i;
 
 #if 0
@@ -254,16 +252,16 @@ static int setattr_setobj_attribs(state_action_struct *s_op, job_status_s *ret)
 
 
     gossip_debug(SERVER_DEBUG,"Writing trove values\n");
-    job_post_ret = job_trove_keyval_write(s_op->req->u.setattr.fs_id,
+    job_post_ret = job_trove_keyval_write(
+	    s_op->req->u.setattr.fs_id,
 	    s_op->req->u.setattr.handle,
 	    &(s_op->key),
 	    &(s_op->val),
 	    0,
-	    ret->vtag, /* This needs to change for vtags */
-	    s_op,      /* Or is that right? dw */
+	    bs, 
+	    s_op,
 	    ret,
 	    &i);
-    gossip_debug(SERVER_DEBUG,"Writing trove values\n");
 
     return(job_post_ret);
 
@@ -291,7 +289,10 @@ static int setattr_send_bmi(state_action_struct *s_op, job_status_s *ret)
 
     s_op->resp->u.generic.handle = s_op->req->u.setattr.handle;
     s_op->resp->status = ret->error_code;
+    gossip_ldebug(SERVER_DEBUG,"Returning Status %d\n",ret->error_code);
     s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
+    
+    s_op->encoded.dest = s_op->addr;
 
     job_post_ret = PINT_encode(s_op->resp,
 	    PINT_ENCODE_RESP,
@@ -386,15 +387,29 @@ static int setattr_release_posted_job(state_action_struct *s_op, job_status_s *r
 static int setattr_cleanup(state_action_struct *s_op, job_status_s *ret)
 {
 
+    PINT_encode_release(&(s_op->encoded),PINT_ENCODE_RESP,0);
+    PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ,0);
+
+    /*
+    if(s_op->val.buffer)
+    {
+	free(s_op->val.buffer);
+    }
+    */
+
     if(s_op->resp)
     {
 	free(s_op->resp);
     }
 
-    if(s_op->req)
-    {
-	free(s_op->req);
-    }
+    /*
+    BMI_memfree(
+	    s_op->addr,
+	    s_op->req,
+	    s_op->unexp_bmi_buff->size,
+	    BMI_RECV_BUFFER
+	    );
+    */
 
     free(s_op->unexp_bmi_buff);
 

@@ -345,13 +345,25 @@ static int readdir_unpost_req(state_action_struct *s_op, job_status_s *ret)
 static int readdir_cleanup(state_action_struct *s_op, job_status_s *ret)
 {
 
+    PINT_encode_release(&(s_op->encoded),PINT_ENCODE_RESP,0);
+
+    PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ,0);
+
     if(s_op->key_a)
 	free(s_op->key_a);
 
     if(s_op->resp)
 	free(s_op->resp);
 
-    free(s_op->req);
+    /*
+    BMI_memfree(
+	    s_op->addr,
+	    s_op->req,
+	    s_op->unexp_bmi_buff->size,
+	    BMI_RECV_BUFFER
+	    );
+    */
+
 
     free(s_op->unexp_bmi_buff);
 

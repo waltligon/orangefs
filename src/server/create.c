@@ -130,7 +130,6 @@ static int create_init(state_action_struct *s_op, job_status_s *ret)
 	    s_op,
 	    ret,
 	    &(s_op->scheduled_id));
-    job_post_ret = 1;
 
     return(job_post_ret);
 
@@ -301,15 +300,23 @@ static int create_release_posted_job(state_action_struct *s_op, job_status_s *re
 static int create_cleanup(state_action_struct *s_op, job_status_s *ret)
 {
 
+    PINT_encode_release(&(s_op->encoded),PINT_ENCODE_RESP,0);
+
+    PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ,0);
+
     if(s_op->resp)
     {
 	free(s_op->resp);
     }
 
-    if(s_op->req)
-    {
-	free(s_op->req);
-    }
+    /*
+    BMI_memfree(
+	    s_op->addr,
+	    s_op->req,
+	    s_op->unexp_bmi_buff->size,
+	    BMI_RECV_BUFFER
+	    );
+    */
 
     free(s_op->unexp_bmi_buff);
 

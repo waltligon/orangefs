@@ -68,6 +68,7 @@ extern PINT_state_machine_s mkdir_req_s;
 extern PINT_state_machine_s readdir_req_s;
 extern PINT_state_machine_s lookup_req_s;
 extern PINT_state_machine_s io_req_s;
+extern PINT_state_machine_s remove_req_s;
 
 /* DALE - fill in the rest of these please - WBL */
 PINT_state_machine_s *PINT_server_op_table[SERVER_OP_TABLE_SIZE] =

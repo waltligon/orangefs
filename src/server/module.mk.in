@@ -10,6 +10,7 @@ SERVERGENSRC := \
 	$(DIR)/get-attr.src.c \
 	$(DIR)/readdir.src.c \
 	$(DIR)/get-config.src.c \
+	$(DIR)/remove.src.c \
 	$(DIR)/io.src.c
 
 # "normal" c files
