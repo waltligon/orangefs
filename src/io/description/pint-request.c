@@ -143,7 +143,8 @@ int PINT_Process_request(PINT_Request_state *req,
 				req->cur[req->lvl].rq == req->cur[req->lvl].rqbase)
 		{
 			gossip_debug(REQUEST_DEBUG,"\tbasic type or contiguous data\n");
-			contig_offset = req->cur[req->lvl].chunk_offset + req->bytes;
+			contig_offset = req->cur[req->lvl].rq->offset +
+					req->cur[req->lvl].chunk_offset + req->bytes;
 			contig_size = (req->cur[req->lvl].maxel *
 					req->cur[req->lvl].rq->aggregate_size) - req->bytes;
 			lvl_flag = 1;
