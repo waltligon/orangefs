@@ -485,15 +485,6 @@ static int hash_fsid_compare(void *key, struct qlist_head *link)
     return(0);
 }
 
-static void free_extent_list(void *ptr)
-{
-    struct llist *extent_list = (struct llist *)ptr;
-    if (extent_list)
-    {
-        PINT_release_extent_list(extent_list);
-    }
-}
-
 static void free_host_extent_table(void *ptr)
 {
     struct bmi_host_extent_table_s *cur_host_extent_table =
@@ -509,7 +500,6 @@ static void free_host_extent_table(void *ptr)
       it is properly freed by PINT_server_config_release
     */
     cur_host_extent_table->bmi_address = (char *)0;
-    llist_free(cur_host_extent_table->extent_list,
-               free_extent_list);
+    PINT_release_extent_list(cur_host_extent_table->extent_list);
     free(cur_host_extent_table);
 }
