@@ -1,7 +1,5 @@
 DIR := src/io/flow/flowproto-bmi-trove
 LIBSRC += \
-	$(DIR)/flowproto-bmi-trove.c \
-	$(DIR)/trove-id-queue.c 
+	$(DIR)/flowproto-bmi-trove.c 
 SERVERSRC += \
-	$(DIR)/flowproto-bmi-trove.c \
-	$(DIR)/trove-id-queue.c 
+	$(DIR)/flowproto-bmi-trove.c
