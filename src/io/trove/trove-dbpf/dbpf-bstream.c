@@ -543,7 +543,7 @@ static int dbpf_bstream_resize_op_svc(struct dbpf_op *op_p)
 
     /* grab the FD (also increments a reference count) */
     /* TODO: CONSIDER PUTTING COLL_ID IN THE OP INSTEAD OF THE PTR */
-    ret = dbpf_bstream_fdcache_try_get(op_p->coll_p->coll_id, op_p->handle, 0, &fd);
+    ret = dbpf_bstream_fdcache_try_get(op_p->coll_p->coll_id, op_p->handle, 1, &fd);
     switch (ret) {
 	/* TODO: fix the bstream error codes to be like the keyval error codes*/
 	case -TROVE_ENOENT:
