@@ -40,7 +40,8 @@ request scheduler:
 
 system interface functionality:
 ====================================================================
-- env variable to control gossip
+- test/client/sysint/remove will destroy directories that are not empty;
+  propably a rmdir bug, but luckily does not affect vfs
 - not started:
   - eattrib (set/get)?
 
