@@ -4,7 +4,12 @@ TEST_PTS_SRC := $(DIR)/pts.c
 
 TEST_PTS_MISC := \
 	$(DIR)/create.c \
-	$(DIR)/generic_parser.c
+	$(DIR)/generic_parser.c \
+	$(DIR)/pvfs_helper.c \
+	$(DIR)/test_pvfs_datatype_init.c \
+	$(DIR)/test_pvfs_datatype_contig.c \
+	$(DIR)/test_pvfs_datatype_vector.c \
+	$(DIR)/test_pvfs_datatype_hvector.c
 
 MPIMISCSRC += $(TEST_PTS_MISC)
 

@@ -7,9 +7,17 @@
 
 /* include all test specific header files */
 #include <test_create.h>
+#include <test_pvfs_datatype_init.h>
+#include <test_pvfs_datatype_contig.h>
+#include <test_pvfs_datatype_vector.h>
+#include <test_pvfs_datatype_hvector.h>
 
 enum test_types { 
-	TEST_CREATE
+    TEST_CREATE,
+        TEST_PVFSDATATYPE_INIT,
+        TEST_PVFSDATATYPE_CONTIG,
+        TEST_PVFSDATATYPE_VECTOR,
+        TEST_PVFSDATATYPE_HVECTOR
 };
 
 void setup_ptstests(config *myconfig) {
@@ -23,6 +31,17 @@ void setup_ptstests(config *myconfig) {
    */
    myconfig->testpool[TEST_CREATE].test_func = (void *)create_file;
    myconfig->testpool[TEST_CREATE].test_name = str_malloc("create_file");
+   myconfig->testpool[TEST_PVFSDATATYPE_INIT].test_func = (void *)test_pvfs_datatype_init;
+   myconfig->testpool[TEST_PVFSDATATYPE_INIT].test_name = str_malloc("test_pvfs_datatype_init");
+
+   myconfig->testpool[TEST_PVFSDATATYPE_CONTIG].test_func = (void *)test_pvfs_datatype_contig;
+   myconfig->testpool[TEST_PVFSDATATYPE_CONTIG].test_name = str_malloc("test_pvfs_datatype_contig");
+
+   myconfig->testpool[TEST_PVFSDATATYPE_VECTOR].test_func = (void *)test_pvfs_datatype_vector;
+   myconfig->testpool[TEST_PVFSDATATYPE_VECTOR].test_name = str_malloc("test_pvfs_datatype_vector");
+
+   myconfig->testpool[TEST_PVFSDATATYPE_HVECTOR].test_func = (void *)test_pvfs_datatype_hvector;
+   myconfig->testpool[TEST_PVFSDATATYPE_HVECTOR].test_name = str_malloc("test_pvfs_datatype_hvector");
 }
 
 #endif
