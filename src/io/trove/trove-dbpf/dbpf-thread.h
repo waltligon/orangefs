@@ -39,9 +39,9 @@ dbpf_op_queue_add(dbpf_completion_queue_array[cid],cur_op);        \
 gen_mutex_lock(&cur_op->mutex);                                    \
 cur_op->op.state = OP_COMPLETED;                                   \
 gen_mutex_unlock(&cur_op->mutex);                                  \
-gen_mutex_unlock(context_mutex);                                   \
-/* wake up one waiting thread in this context, if any */           \
+/* wake up one waiting thread, if any */                           \
 pthread_cond_signal(&dbpf_op_cond);                                \
+gen_mutex_unlock(context_mutex);                                   \
 } while(0)
 
 
