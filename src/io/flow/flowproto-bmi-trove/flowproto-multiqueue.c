@@ -1520,7 +1520,7 @@ static int cancel_pending_bmi(struct qlist_head* list)
 		&q_item->bmi_callback);
 	    if(ret < 0)
 	    {
-		gossip_err("WARNING: BMI cancel failed, proceeding anyway.\n");
+		gossip_err("WARNING: BMI thread mgr cancel failed, proceeding anyway.\n");
 	    }
 	}
     }

@@ -61,11 +61,9 @@ static pthread_cond_t trove_test_cond = PTHREAD_COND_INITIALIZER;
 static gen_mutex_t bmi_test_mutex = GEN_MUTEX_INITIALIZER;
 static int bmi_test_flag = 0;
 static int bmi_test_count = 0;
-static int bmi_test_index = 0;
 static gen_mutex_t trove_test_mutex = GEN_MUTEX_INITIALIZER;
 static int trove_test_flag = 0;
 static int trove_test_count = 0;
-static int trove_test_index = 0;
 
 static int bmi_thread_running = 0;
 static int trove_thread_running = 0;
@@ -92,7 +90,6 @@ static void *trove_thread_function(void *ptr)
 	gen_mutex_unlock(&trove_test_mutex);
 	
 	trove_test_count = THREAD_MGR_TEST_COUNT;
-	trove_test_index = 0;
 #ifdef __PVFS2_TROVE_SUPPORT__
 	ret = trove_dspace_testcontext(HACK_fs_id,
 	    stat_trove_id_array,
@@ -130,25 +127,8 @@ static void *trove_thread_function(void *ptr)
 	    /* sanity check */
 	    assert(tmp_callback != NULL);
 	    assert(tmp_callback->fn != NULL);
-	    
-	    /* yuck, another critical region; we can't execute callbacks
-	     * while a cancel() is in progress, but we also can't hold a
-	     * lock while executing the callback.  
-	     */
-	    gen_mutex_lock(&trove_test_mutex);
-	    trove_test_flag = 1;
-	    gen_mutex_unlock(&trove_test_mutex);
-	
-	    trove_test_index++;
+	   
 	    tmp_callback->fn(tmp_callback->data, stat_trove_error_code_array[i]);
-
-	    gen_mutex_lock(&trove_test_mutex);
-	    trove_test_flag = 0;
-#ifdef __PVFS2_JOB_THREADED__
-	    pthread_cond_signal(&trove_test_cond);
-#endif
-	    gen_mutex_unlock(&trove_test_mutex);
-
 	}
     }
     return (NULL);
@@ -228,7 +208,6 @@ static void *bmi_thread_function(void *ptr)
 	
 	incount = THREAD_MGR_TEST_COUNT;
 	bmi_test_count = 0;
-	bmi_test_index = 0;
 
 	ret = BMI_testcontext(incount, stat_bmi_id_array, &bmi_test_count,
 	    stat_bmi_error_code_array, stat_bmi_actual_size_array,
@@ -257,25 +236,9 @@ static void *bmi_thread_function(void *ptr)
 	    /* sanity check */
 	    assert(tmp_callback != NULL);
 	    assert(tmp_callback->fn != NULL);
-
-	    /* yuck, another critical region; we can't execute callbacks
-	     * while a cancel() is in progress, but we also can't hold a
-	     * lock while executing the callback.  
-	     */
-	    gen_mutex_lock(&bmi_test_mutex);
-	    bmi_test_flag = 1;
-	    gen_mutex_unlock(&bmi_test_mutex);
 	
-	    bmi_test_index++;
 	    tmp_callback->fn(tmp_callback->data, stat_bmi_actual_size_array[i],
 		stat_bmi_error_code_array[i]);
-
-	    gen_mutex_lock(&bmi_test_mutex);
-	    bmi_test_flag = 0;
-#ifdef __PVFS2_JOB_THREADED__
-	    pthread_cond_signal(&bmi_test_cond);
-#endif
-	    gen_mutex_unlock(&bmi_test_mutex);
 	}
     }
 
@@ -523,7 +486,7 @@ int PINT_thread_mgr_bmi_cancel(PVFS_id_gen_t id, void* user_ptr)
     /* iterate down list of pending completions, to see if the caller is
      * trying to cancel one of them
      */
-    for(i=bmi_test_index; i<bmi_test_count; i++)
+    for(i=0; i<bmi_test_count; i++)
     {
 	if(stat_bmi_id_array[i] == id && stat_bmi_user_ptr_array ==
 	    user_ptr)
@@ -536,6 +499,8 @@ int PINT_thread_mgr_bmi_cancel(PVFS_id_gen_t id, void* user_ptr)
 
     /* tell BMI to cancel the operation */
     ret = BMI_cancel(id, global_bmi_context);
+    if(ret < 0)
+	gossip_err("WARNING: BMI cancel failed, proceeding anyway.\n");
     gen_mutex_unlock(&bmi_test_mutex);
     return(ret);
 }
@@ -643,7 +608,7 @@ int PINT_thread_mgr_trove_cancel(PVFS_id_gen_t id, PVFS_fs_id fs_id,
     /* iterate down list of pending completions, to see if the caller is
      * trying to cancel one of them
      */
-    for(i=trove_test_index; i<trove_test_count; i++)
+    for(i=0; i<trove_test_count; i++)
     {
 	if(stat_trove_id_array[i] == id && stat_trove_user_ptr_array ==
 	    user_ptr)
