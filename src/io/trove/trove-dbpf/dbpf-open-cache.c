@@ -527,8 +527,19 @@ static int open_db(DB** db_pp,
 	"dbpf_open_cache open_db: opening db %Lu (%Lx).\n",
 	Lu(handle), Lu(handle));
 
-    DBPF_GET_KEYVAL_DBNAME(filename, PATH_MAX,
-	my_storage_p->name, coll_id, Lu(handle));
+    /* special case; ds attrib database */
+    if(handle == TROVE_HANDLE_NULL)
+    {
+	DBPF_GET_DS_ATTRIB_DBNAME(filename, PATH_MAX,
+	    my_storage_p->name, coll_id);
+    }
+    /* normal case; keyval db */
+    else
+    {
+	DBPF_GET_KEYVAL_DBNAME(filename, PATH_MAX,
+	    my_storage_p->name, coll_id, Lu(handle));
+    }
+
     ret = db_create(db_pp, NULL, 0);
     if(ret != 0)
     {

@@ -43,6 +43,13 @@ int dbpf_open_cache_remove(
     TROVE_coll_id coll_id,
     TROVE_handle handle);
 
+#define dbpf_open_cache_attr_get( \
+ __coll_id, __create_flag, __out_ref) \
+ dbpf_open_cache_get(__coll_id, TROVE_HANDLE_NULL, \
+    __create_flag, DBPF_OPEN_DB, __out_ref)
+
+#define dbpf_open_cache_attr_put dbpf_open_cache_put
+
 #endif /* __DBPF_OPEN_CACHE_H__ */
 
 /*
