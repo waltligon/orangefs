@@ -80,7 +80,11 @@ static int test_lookup(int nullCase){
 	name = (char *)malloc(sizeof(char)*100);
 	name = strcpy(name,"name");
 
-	initialize_sysint();
+	if(initialize_sysint()<0)
+	{
+		debug_printf("UNABLE TO INIT THE SYSTEM INTERFACE\n");
+		return -1;
+	}
 	fs_id = pvfs_helper.resp_init.fsid_list[0];
 
    credentials.uid = 100;
@@ -134,7 +138,11 @@ static int test_getattr(int nullCase){
 	name = (char *)malloc(sizeof(char)*100);
 	name = strcpy(name,"name");
 
-	initialize_sysint();
+	if (initialize_sysint() < 0)
+	{
+		debug_printf("ERROR UNABLE TO INIT SYSTEM INTERFACE\n");
+		return -1;
+	}
 	fs_id = pvfs_helper.resp_init.fsid_list[0];
 
    credentials.uid = 100;
@@ -212,7 +220,11 @@ static int test_mkdir(int nullCase){
 	name = (char *)malloc(sizeof(char)*100);
 	name = strcpy(name,"name");
 
-	initialize_sysint();
+	if(initialize_sysint() < 0)
+	{
+		debug_printf("UNABLE TO INIT THE SYSTEM INTERFACE\n");
+		return -1;
+	}
 	fs_id = pvfs_helper.resp_init.fsid_list[0];
 
    credentials.uid = 100;
@@ -306,7 +318,11 @@ static int test_readdir(int nullCase){
 	name = (char *)malloc(sizeof(char)*100);
 	name = strcpy(name,"name");
 
-	initialize_sysint();
+	if(initialize_sysint() < 0)
+	{
+		debug_printf("UNABLE TO INIT THE SYSTEM INTERFACE\n");
+		return -1;
+	}
 	fs_id = pvfs_helper.resp_init.fsid_list[0];
 
    credentials.uid = 100;
@@ -386,7 +402,11 @@ static int test_create(int nullCase){
    credentials.gid = 100;
    credentials.perms = 1877;
 
-	initialize_sysint();
+	if(initialize_sysint())
+	{
+		debug_printf("UNABLE TO INIT THE SYSTEM INTERFACE\n");
+		return -1;
+	}
 	fs_id = pvfs_helper.resp_init.fsid_list[0];
 
    ret = PVFS_sys_lookup(fs_id, "/", credentials, &resp_look);
@@ -462,7 +482,11 @@ static int test_remove(int nullCase){
    credentials.gid = 100;
    credentials.perms = 1877;
 
-	initialize_sysint();
+	if(initialize_sysint() < 0)
+	{
+		debug_printf("UNABLE TO INIT SYSTEM INTERFACE\n");
+		return -1;
+	}
 	fs_id = pvfs_helper.resp_init.fsid_list[0];
 
    ret = PVFS_sys_lookup(fs_id, filename, credentials, &resp_look);
@@ -552,7 +576,11 @@ static int test_read(int nullCase){
    credentials.perms = (PVFS_U_WRITE | PVFS_U_READ);
    memset(&resp_lk,0,sizeof(PVFS_sysresp_lookup));
 
-	initialize_sysint();
+	if(initialize_sysint()<0)
+	{
+		debug_printf("UNABLE TO INIT THE SYSTEM INTERFACE\n");
+		return -1;
+	}
 	fs_id = pvfs_helper.resp_init.fsid_list[0];
 
    ret = PVFS_sys_lookup(fs_id,filename, credentials, &resp_lk);
@@ -623,7 +651,11 @@ static int test_write(int nullCase){
    credentials.perms = (PVFS_U_WRITE | PVFS_U_READ);
    memset(&resp_lk,0,sizeof(PVFS_sysresp_lookup));
 
-	initialize_sysint();
+	if ( initialize_sysint() < 0)
+	{
+		debug_printf("UNABLE TO INIT THE SYSTEM INTERFACE\n");
+		return -1;
+	}
 	fs_id = pvfs_helper.resp_init.fsid_list[0];
 
    ret = PVFS_sys_lookup(fs_id,filename, credentials, &resp_lk);
@@ -687,7 +719,11 @@ static int init_file(void){
    credentials.gid = 100;
    credentials.perms = 1877;
 
-	initialize_sysint();
+	if(initialize_sysint()<0)
+	{
+		debug_printf("UNABLE TO INIT THE SYSTEM INTERFACE\n");
+		return -1;
+	}
 	fs_id = pvfs_helper.resp_init.fsid_list[0];
 
 	//get root

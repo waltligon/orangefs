@@ -18,7 +18,7 @@
 #include <pvfs-restart-server.h>
 #include <pvfs-stop-server.h>
 #include <null_params.h>
-#include <test-invlaid-files.h>
+#include <test-invalid-files.h>
 
 enum test_types { 
    TEST_CREATE,
@@ -31,7 +31,8 @@ enum test_types {
 	TEST_LOOKUP_BENCH,
    TEST_NULL_PARAMS,
 	PVFS_RESTART_SERVER,
-	PVFS_STOP_SERVER
+	PVFS_STOP_SERVER,
+	TEST_INVALID_FILES
 };
 
 void setup_ptstests(config *myconfig) {
