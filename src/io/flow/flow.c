@@ -54,10 +54,6 @@ static int teardown_flow_queues(void);
 
 static int flow_quick_test(flow_descriptor * flow_d,
 			   int *outcount);
-static int flow_quick_testsome(int incount,
-			       flow_descriptor ** flow_array,
-			       int *outcount,
-			       int *index_array);
 
 /* tunable parameters */
 enum
@@ -498,47 +494,6 @@ static int flow_quick_test(flow_descriptor * flow_d,
 }
 
 
-/* flow_quick_testsome()
- *
- * Instantaneouse check for completion of any of a specified set of
- * flows
- *
- * returns 0 on success, -errno on failure
- */
-static int flow_quick_testsome(int incount,
-			       flow_descriptor ** flow_array,
-			       int *outcount,
-			       int *index_array)
-{
-    int ret = -1;
-    int i = 0;
-
-    gen_mutex_lock(&interface_mutex);
-
-    /* see if any of these are in the completion queue */
-    ret = flow_queue_search_multi(completion_queue, incount, flow_array,
-				  outcount, index_array);
-    if (ret < 0)
-    {
-	return (ret);
-	gen_mutex_unlock(&interface_mutex);
-    }
-
-    /* remove anything that completed from the queue */
-    if (*outcount > 0)
-    {
-	for (i = 0; i < (*outcount); i++)
-	{
-	    flow_queue_remove(flow_array[index_array[i]]);
-	    flow_release(flow_array[index_array[i]]);
-	}
-    }
-
-    gen_mutex_unlock(&interface_mutex);
-    return (0);
-}
-
-
 /* PINT_flow_test()
  *
  * Check for completion of a particular flow; is allowed to do work or
@@ -606,39 +561,63 @@ int PINT_flow_testsome(int incount,
 {
     int ret = -1;
     int num_completed;
-
-    /* see if any of these are already completed */
-    ret = flow_quick_testsome(incount, flow_array, outcount, index_array);
-    if (ret < 0)
-    {
-	return (ret);
-    }
-    if ((*outcount) > 0)
-    {
-	return (1);
-    }
+    int i;
 
     gen_mutex_lock(&interface_mutex);
+
+    *outcount = 0;
+
+    for(i=0; i<incount; i++)
+    {
+	if(flow_array[i] && (flow_array[i]->state & FLOW_FINISH_MASK))
+	{
+	    index_array[*outcount] = i;
+	    (*outcount)++;
+	    flow_queue_remove(flow_array[i]);
+	    flow_release(flow_array[i]);
+	}
+    }
+
+    /* go ahead and return if we found anything the caller wanted */
+    if((*outcount) > 0)
+    {
+	gen_mutex_unlock(&interface_mutex);
+	return(1);
+    }
+
     /* push on work for one round */
     ret = do_one_work_cycle(&num_completed, max_idle_time_ms);
-    gen_mutex_unlock(&interface_mutex);
 
     if (ret < 0)
     {
+	gen_mutex_unlock(&interface_mutex);
 	return (ret);
     }
     if (num_completed == 0)
     {
 	/* don't bother checking completion queue again */
+	gen_mutex_unlock(&interface_mutex);
 	return (0);
     }
 
-    /* check again to see if any of the flows completed */
-    ret = flow_quick_testsome(incount, flow_array, outcount, index_array);
-    if (ret == 0 && *outcount > 0)
-	return (1);
+    *outcount = 0;
+
+    for(i=0; i<incount; i++)
+    {
+	if(flow_array[i] && (flow_array[i]->state & FLOW_FINISH_MASK))
+	{
+	    index_array[*outcount] = i;
+	    (*outcount)++;
+	    flow_queue_remove(flow_array[i]);
+	    flow_release(flow_array[i]);
+	}
+    }
+
+    gen_mutex_unlock(&interface_mutex);
+    if((*outcount) > 0)
+	return(1);
     else
-	return (ret);
+	return(0);
 }
 
 

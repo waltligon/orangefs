@@ -134,63 +134,6 @@ flow_descriptor *flow_queue_search(flow_queue_p fqp,
     return (NULL);
 }
 
-/* flow_queue_search_multi()
- *
- * searches a queue for any of an array of flows (does not lock queue)
- *
- * returns 0 on success, -errno on failure
- */
-int flow_queue_search_multi(flow_queue_p fqp,
-			    int incount,
-			    flow_descriptor ** flow_array,
-			    int *outcount,
-			    int *index_array)
-{
-    int num_real_descriptors = 0;
-    struct qlist_head *tmp_link = NULL;
-    flow_descriptor *tmp_flow = NULL;
-    int i = 0;
-
-    *outcount = 0;
-
-    /* do a quick check to see if any of the flow descriptors are null */
-    for (i = 0; i < incount; i++)
-    {
-	if (flow_array[i] != NULL)
-	{
-	    num_real_descriptors++;
-	}
-    }
-    if (num_real_descriptors == 0)
-    {
-	return (-EINVAL);
-    }
-
-    /* iterate all the way through the queue */
-    qlist_for_each(tmp_link, fqp)
-    {
-	tmp_flow = qlist_entry(tmp_link, struct flow_descriptor,
-			       sched_queue_link);
-	/* for each queue entry, loop through the flow array */
-	for (i = 0; i < incount; i++)
-	{
-	    if (flow_array[i] == tmp_flow)
-	    {
-		index_array[*outcount] = i;
-		(*outcount)++;
-		break;
-	    }
-	}
-	/* quit early if we have already found everything */
-	if (*outcount == num_real_descriptors)
-	{
-	    return (0);
-	}
-    }
-
-    return (0);
-}
-
 /*
  * Local variables:
  *  c-indent-level: 4
