@@ -71,6 +71,10 @@ path specifying where to run the pvfs2-server from, only where to get the pvfs2-
 to use.  Same is true for PINGPROG.
 PINGPROG="</path/to/pvfs2-ping/binary>"
 
+GENCONFIG="</path/to/pvfs2-genconfig>" pvfs2-genconfig generates the config 
+  file for the pvfs2 servers.  It will run locally and then the generated files
+  will later be copied to the pvfs2 nodes.  
+
 COPYBINS=<1 = default, copy binaries out to temp area on each node,
           0 = do not copy, and run them from the specified path above>
 
