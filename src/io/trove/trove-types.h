@@ -26,6 +26,7 @@ typedef PVFS_ds_flags              TROVE_ds_flags;
 typedef PVFS_ds_keyval             TROVE_keyval_s;
 typedef PVFS_ds_position           TROVE_ds_position;
 typedef PVFS_ds_attributes         TROVE_ds_attributes_s;
+typedef PVFS_ds_attributes         TROVE_ds_attributes;
 typedef PVFS_ds_storedattr         TROVE_ds_storedattr_s;
 typedef PVFS_error                 TROVE_ds_state;
 typedef PVFS_context_id            TROVE_context_id;

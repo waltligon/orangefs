@@ -25,6 +25,7 @@
 #include "dbpf-bstream.h"
 #include "dbpf-keyval.h"
 #include "dbpf-op-queue.h"
+#include "dbpf-attr-cache.h"
 
 #ifdef __PVFS2_TROVE_THREADED__
 #include <pthread.h>
@@ -113,9 +114,9 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
     DB *db_p;
     TROVE_extent cur_extent;
 
-    /* NOTE: THIS WOULD BE EASIER IF THE COLL_ID WERE IN THE OP */
     ret = dbpf_dspace_dbcache_try_get(op_p->coll_p->coll_id, 0, &db_p);
-    switch (ret) {
+    switch (ret)
+    {
 	case DBPF_DSPACE_DBCACHE_ERROR:
 	    goto return_error;
 	case DBPF_DSPACE_DBCACHE_BUSY:
@@ -183,6 +184,7 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
         return -TROVE_EINVAL;
     }
 
+    memset(&s_attr, 0, sizeof(TROVE_ds_storedattr_s));
     s_attr.type = op_p->u.d_create.type;
 
     memset(&key, 0, sizeof(key));
@@ -192,7 +194,7 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
     /* ensure that DB doesn't allocate any memory for the data */
     memset(&data, 0, sizeof(data));
     data.data = &s_attr;
-    data.size = data.ulen = sizeof(s_attr);
+    data.size = data.ulen = sizeof(TROVE_ds_storedattr_s);
     data.flags |= DB_DBT_USERMEM;
 
     /* check to see if handle is already used */
@@ -254,6 +256,9 @@ static int dbpf_dspace_remove(TROVE_coll_id coll_id,
     dbpf_queued_op_t *q_op_p;
     struct dbpf_collection *coll_p;
 
+    /* if this attr is in the dbpf attr cache, remove it */
+    dbpf_attr_cache_remove(handle);
+
     coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL) return -TROVE_EINVAL;
 
@@ -285,9 +290,9 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
     DBT key;
     DB *db_p;
 
-    /* NOTE: THIS WOULD BE EASIER IF THE COLL_ID WERE IN THE OP */
     ret = dbpf_dspace_dbcache_try_get(op_p->coll_p->coll_id, 0, &db_p);
-    switch (ret) {
+    switch (ret)
+    {
 	case DBPF_DSPACE_DBCACHE_ERROR:
 	    error = -1;
 	    goto return_error;
@@ -414,15 +419,16 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     TROVE_ds_storedattr_s s_attr;
     TROVE_handle dummy_handle;
 
-    if (*op_p->u.d_iterate_handles.position_p == TROVE_ITERATE_END) {
+    if (*op_p->u.d_iterate_handles.position_p == TROVE_ITERATE_END)
+    {
 	/* already hit end of keyval space; return 1 */
 	*op_p->u.d_iterate_handles.count_p = 0;
 	return 1;
     }
 
-    /* NOTE: THIS WOULD BE EASIER IF THE COLL_ID WERE IN THE OP */
     ret = dbpf_dspace_dbcache_try_get(op_p->coll_p->coll_id, 0, &db_p);
-    switch (ret) {
+    switch (ret)
+    {
 	case DBPF_DSPACE_DBCACHE_ERROR:
 	    goto return_error;
 	case DBPF_DSPACE_DBCACHE_BUSY:
@@ -669,6 +675,18 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
 {
     dbpf_queued_op_t *q_op_p;
     struct dbpf_collection *coll_p;
+    TROVE_ds_attributes *attr = NULL;
+
+    attr = dbpf_attr_cache_lookup(handle);
+    if (attr)
+    {
+        /* fast path cache hit; skips queueing */
+        memcpy(ds_attr_p, attr, sizeof(TROVE_ds_attributes));
+        gossip_debug(TROVE_DEBUG, "fast path attr cache hit on %Lu"
+                     "(dfile_count=%d | dist_size=%d)\n", Lu(handle),
+                     ds_attr_p->dfile_count, ds_attr_p->dist_size);
+        return 1;
+    }
 
     coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL) return -TROVE_EINVAL;
@@ -707,6 +725,9 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
     dbpf_queued_op_t *q_op_p;
     struct dbpf_collection *coll_p;
 
+    /* if this attr is in the dbpf attr cache, remove it */
+    dbpf_attr_cache_remove(handle);
+
     coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL) return -TROVE_EINVAL;
 
@@ -726,11 +747,15 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
     /* initialize op-specific members */
     q_op_p->op.u.d_setattr.attr_p = ds_attr_p;
 
-    gossip_debug(TROVE_DEBUG, "storing attributes (1), "
-                 "uid = %d, mode = %d, type = %d\n",
+    gossip_debug(TROVE_DEBUG, "storing attributes (1) on key %Lu, "
+                 "uid = %d, mode = %d, type = %d, dfile_count = %d, "
+                 "dist_size = %d\n",
+                 Lu(handle),
                  (int) ds_attr_p->uid,
                  (int) ds_attr_p->mode,
-                 (int) ds_attr_p->type);
+                 (int) ds_attr_p->type,
+                 (int) ds_attr_p->dfile_count,
+                 (int) ds_attr_p->dist_size);
 
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
 
@@ -744,9 +769,9 @@ static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p)
     DBT key, data;
     TROVE_ds_storedattr_s s_attr;
 
-    /* NOTE: THIS WOULD BE EASIER IF THE COLL_ID WERE IN THE OP */
     ret = dbpf_dspace_dbcache_try_get(op_p->coll_p->coll_id, 0, &db_p);
-    switch (ret) {
+    switch (ret)
+    {
 	case DBPF_DSPACE_DBCACHE_ERROR:
 	    goto return_error;
 	case DBPF_DSPACE_DBCACHE_BUSY:
@@ -766,22 +791,29 @@ static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p)
 
     trove_ds_attr_to_stored((*op_p->u.d_setattr.attr_p), s_attr);
 
-    gossip_debug(TROVE_DEBUG, "storing attributes (2), "
-                 "uid = %d, mode = %d, type = %d\n",
+    gossip_debug(TROVE_DEBUG, "storing attributes (2) on key %Lu, "
+                 "uid = %d, mode = %d, type = %d, dfile_count = %d, "
+                 "dist_size = %d\n",
+                 Lu(op_p->handle),
                  (int) s_attr.uid,
                  (int) s_attr.mode,
-                 (int) s_attr.type);
+                 (int) s_attr.type,
+                 (int) s_attr.dfile_count,
+                 (int) s_attr.dist_size);
 
     ret = db_p->put(db_p, NULL, &key, &data, 0);
-    if (ret != 0) {
+    if (ret != 0)
+    {
 	db_p->err(db_p, ret, "DB->put");
 	goto return_error;
     }
 
     /* sync if requested */
-    if (op_p->flags & TROVE_SYNC) {
-	if ((ret = db_p->sync(db_p, 0)) != 0) {
-	    goto return_error;
+    if (op_p->flags & TROVE_SYNC)
+    {
+        if ((ret = db_p->sync(db_p, 0)) != 0)
+        {
+            goto return_error;
 	}
     }
 
@@ -789,7 +821,10 @@ static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p)
     return 1; /* done */
     
 return_error:
-    if (got_db) dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);
+    if (got_db)
+    {
+        dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);
+    }
     return -1;
 }
 
@@ -799,114 +834,159 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
     DB *db_p, *kdb_p;
     DBT key, data;
     TROVE_ds_storedattr_s s_attr;
+    TROVE_ds_attributes *attr = NULL;
     TROVE_size b_size = 0, k_size = 0;
-    struct stat b_stat; /* for grabbing bstream size */
-    DB_BTREE_STAT *k_stat_p; /* for grabbing keyval size; assumes DB_RECNUM!!! */
+    /* for grabbing bstream size */
+    struct stat b_stat;
+    /* for grabbing keyval size; assumes DB_RECNUM!!! */
+    DB_BTREE_STAT *k_stat_p;
 
-    /* NOTE: THIS WOULD BE EASIER IF THE COLL_ID WERE IN THE OP */
-    ret = dbpf_dspace_dbcache_try_get(op_p->coll_p->coll_id, 0, &db_p);
-    switch (ret) {
-	case DBPF_DSPACE_DBCACHE_ERROR:
-	    goto return_error;
-	case DBPF_DSPACE_DBCACHE_BUSY:
-	    return 0; /* try again later */
-	case DBPF_DSPACE_DBCACHE_SUCCESS:
-	    got_db = 1;
-	    /* drop through */
-	    break;
-    }
+    attr = dbpf_attr_cache_lookup(op_p->handle);
+    if (!attr)
+    {
+        ret = dbpf_dspace_dbcache_try_get(op_p->coll_p->coll_id, 0, &db_p);
+        switch (ret)
+        {
+            case DBPF_DSPACE_DBCACHE_ERROR:
+                goto return_error;
+            case DBPF_DSPACE_DBCACHE_BUSY:
+                return 0; /* try again later */
+            case DBPF_DSPACE_DBCACHE_SUCCESS:
+                got_db = 1;
+                /* drop through */
+                break;
+        }
 
-    /* get an fd for the bstream so we can check size */
-    ret = dbpf_bstream_fdcache_try_get(op_p->coll_p->coll_id, op_p->handle, 0, &fd);
-    switch (ret) {
-	case DBPF_BSTREAM_FDCACHE_ERROR:
-	    /* TODO: HOW DO WE TELL A REAL ERROR FROM A "HAVEN'T CREATED YET" ERROR? */
-	    /* b_size is already set to zero */
+        /* get an fd for the bstream so we can check size */
+        ret = dbpf_bstream_fdcache_try_get(
+            op_p->coll_p->coll_id, op_p->handle, 0, &fd);
+
+        switch (ret)
+        {
+            case DBPF_BSTREAM_FDCACHE_ERROR:
+                /*
+                  TODO:
+                  how do we tell a real error from
+                  'haven't yet created yet' error
+                */
+                /* b_size is already set to zero */
 	    break;
 	case DBPF_BSTREAM_FDCACHE_BUSY:
-	    dbpf_dspace_dbcache_put(op_p->coll_p->coll_id); /* release the dspace dbcache entry */
-	    return 0; /* try again later */
+            /* release the dspace dbcache entry; try again later */
+            dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);
+	    return 0;
 	case DBPF_BSTREAM_FDCACHE_SUCCESS:
 	    ret = DBPF_FSTAT(fd, &b_stat);
-	    dbpf_bstream_fdcache_put(op_p->coll_p->coll_id, op_p->handle); /* release the fd right away */
-	    if (ret < 0) goto return_error;
+	    dbpf_bstream_fdcache_put(op_p->coll_p->coll_id,
+                                     op_p->handle);
+	    if (ret < 0)
+            {
+                goto return_error;
+            }
 	    b_size = (TROVE_size) b_stat.st_size;
 	    /* drop through */
 	    break;
-    }
+        }
 
-    ret = dbpf_keyval_dbcache_try_get(op_p->coll_p->coll_id,
-				      op_p->handle,
-				      0,
-				      &kdb_p);
-    if (ret == -TROVE_EBUSY) {
-	/* release the dspace dbcache entry */
-	dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);
-	return 0; /* try again later */
-    }
-    else if (ret == 0) {
-	    ret = kdb_p->stat(kdb_p,
+        ret = dbpf_keyval_dbcache_try_get(
+            op_p->coll_p->coll_id,
+            op_p->handle,
+            0,
+            &kdb_p);
+
+        if (ret == -TROVE_EBUSY)
+        {
+            /* release the dspace dbcache entry */
+            dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);
+            return 0; /* try again later */
+        }
+        else if (ret == 0)
+        {
+            ret = kdb_p->stat(kdb_p,
                               &k_stat_p,
 #ifdef HAVE_UNKNOWN_PARAMETER_TO_DB_STAT
                               NULL,
 #endif
                               0);
 
-	    dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle); /* release the db right away */
-	    if (ret == 0) {
-		k_size = (TROVE_size) k_stat_p->bt_ndata;
-		free(k_stat_p);
-	    }
-	    else goto return_error;
-	    /* drop through */
-    }
-    else {
-	/* TODO: HOW DO WE TELL A REAL ERROR FROM A "HAVEN'T
-	 * CREATED YET" ERROR?
-	 */
+            dbpf_keyval_dbcache_put(
+                op_p->coll_p->coll_id, op_p->handle);
+            if (ret == 0)
+            {
+                k_size = (TROVE_size) k_stat_p->bt_ndata;
+                free(k_stat_p);
+            }
+            else
+            {
+                goto return_error;
+            }
+            /* drop through */
+        }
+        else
+        {
+            /* TODO: HOW DO WE TELL A REAL ERROR FROM A "HAVEN'T
+             * CREATED YET" ERROR?
+             */
+            /* b_size is already set to zero */
+            /* drop through */
+        }
 
-	/* b_size is already set to zero */
-	/* drop through */
-    }
+        memset(&key, 0, sizeof(key));
+        key.data = &op_p->handle;
+        key.size = sizeof(TROVE_handle);
 
-    memset(&key, 0, sizeof(key));
-    key.data = &op_p->handle;
-    key.size = sizeof(TROVE_handle);
-    
-    memset(&data, 0, sizeof(data));
-    data.data = &s_attr;
-    data.size = data.ulen = sizeof(s_attr);
-    data.flags |= DB_DBT_USERMEM;
+        memset(&data, 0, sizeof(data));
+        memset(&s_attr, 0, sizeof(TROVE_ds_storedattr_s));
+        data.data = &s_attr;
+        data.size = data.ulen = sizeof(TROVE_ds_storedattr_s);
+        data.flags |= DB_DBT_USERMEM;
 
-    ret = db_p->get(db_p, NULL, &key, &data, 0);
-    if (ret != 0) {
-	db_p->err(db_p, ret, "DB->get");
-	goto return_error;
-    }
+        ret = db_p->get(db_p, NULL, &key, &data, 0);
+        if (ret != 0)
+        {
+            db_p->err(db_p, ret, "DB->get");
+            goto return_error;
+        }
 
-#if 0
-    gossip_debug(TROVE_DEBUG, "reading attributes (1), "
-                 "uid = %d, mode = %d, type = %d\n",
-                 (int) s_attr.uid,
-                 (int) s_attr.mode,
-                 (int) s_attr.type);
+#if 1
+        gossip_debug(TROVE_DEBUG, "reading attributes (1) on key %Lu, "
+                     "uid = %d, mode = %d, type = %d, dfile_count "
+                     "= %d, dist_size = %d\n",
+                     Lu(op_p->handle),
+                     (int) s_attr.uid,
+                     (int) s_attr.mode,
+                     (int) s_attr.type,
+                     (int) s_attr.dfile_count,
+                     (int) s_attr.dist_size);
 #endif
 
-    trove_ds_stored_to_attr(
-        s_attr, (*op_p->u.d_getattr.attr_p), b_size, k_size);
+        attr = op_p->u.d_getattr.attr_p;
+        trove_ds_stored_to_attr(s_attr, *attr, b_size, k_size);
 
-    /* sync if requested; permissable under API */
-    if (op_p->flags & TROVE_SYNC) {
-	if ((ret = db_p->sync(db_p, 0)) != 0) {
-	    goto return_error;
-	}
+        /* add retrieved ds_attr to dbpf_attr cache here */
+        dbpf_attr_cache_insert(op_p->handle, attr);
     }
 
-    dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);
+    /* sync if requested; permissable under API */
+    if (op_p->flags & TROVE_SYNC)
+    {
+        if ((ret = db_p->sync(db_p, 0)) != 0)
+        {
+            goto return_error;
+        }
+    }
+
+    if (got_db)
+    {
+        dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);
+    }
     return 1; /* done */
     
 return_error:
-    if (got_db) dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);
+    if (got_db)
+    {
+        dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);
+    }
     return -1;
 }
 

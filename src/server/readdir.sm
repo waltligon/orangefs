@@ -146,7 +146,8 @@ static int readdir_read_dirdata_handle(PINT_server_op *s_op,
     s_op->val.buffer_sz = sizeof(PVFS_handle);
 
     gossip_debug(SERVER_DEBUG,
-		 "  reading metadata (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = %p (%d))\n",
+		 "  reading metadata (coll_id = 0x%x, handle = %Lu, "
+                 "key = %s (%d), val_buf = %p (%d))\n",
 		 s_op->req->u.readdir.fs_id,
 		 Lu(s_op->req->u.readdir.handle),
 		 (char *) s_op->key.buffer,
@@ -234,7 +235,8 @@ static int readdir_iterate_on_entries(PINT_server_op *s_op,
     }
 
     gossip_debug(SERVER_DEBUG,
-		 "  iterating over keyvals (coll_id = 0x%x, handle = 0x%08Lx, token = 0x%x, count = %d)\n",
+		 "  iterating over keyvals (coll_id = 0x%x, handle = "
+                 "%Lu, token = 0x%x, count = %d)\n",
 		 s_op->req->u.readdir.fs_id,
 		 Lu(s_op->u.readdir.dirent_handle),
 		 s_op->req->u.readdir.token,

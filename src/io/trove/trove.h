@@ -11,6 +11,7 @@
 
 #include "pvfs2-config.h"
 #include "pvfs2-debug.h"
+#include "pvfs2-req-proto.h"
 
 #include "trove-types.h"
 #include "trove-proto.h"
