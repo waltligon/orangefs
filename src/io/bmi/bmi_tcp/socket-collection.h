@@ -40,6 +40,6 @@ void socket_collection_remove_write_bit(socket_collection_p scp,
 void socket_collection_finalize(socket_collection_p scp);
 int socket_collection_testglobal(socket_collection_p scp, int incount, 
 	int* outcount, method_addr_p* maps, bmi_flag_t* status, int
-	wait_metric);
+	poll_timeout);
 
 #endif /* __SOCKET_COLLECTION_H */

@@ -198,7 +198,7 @@ void socket_collection_finalize(socket_collection_p scp){
  */
 int socket_collection_testglobal(socket_collection_p scp, 
 	int incount, int* outcount, method_addr_p* maps, bmi_flag_t* status,
-	int wait_metric){
+	int poll_timeout){
 
 	int num_to_poll = 0;
 	int max_to_poll = SC_POLL_SIZE;
@@ -272,7 +272,7 @@ int socket_collection_testglobal(socket_collection_p scp,
 	/* we should be all set now to perform the poll operation */
 	do
 	{
-		ret = poll(big_poll_fds, num_to_poll, wait_metric);
+		ret = poll(big_poll_fds, num_to_poll, poll_timeout);
 	} while(ret < 0 && errno == EINTR);
 		
 	/* look for poll error */

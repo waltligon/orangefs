@@ -41,12 +41,12 @@ int BMI_tcp_post_recv(bmi_op_id_t* id, method_addr_p src, void* buffer,
 	buffer_flag, bmi_msg_tag_t tag, void* user_ptr);
 int BMI_tcp_test(bmi_op_id_t id, int* outcount, bmi_error_code_t*
 	error_code, bmi_size_t* actual_size, void** user_ptr,
-	int timeout_ms);
+	int max_idle_time_ms);
 int BMI_tcp_testsome(int incount, bmi_op_id_t* id_array, int* outcount,
 	int* index_array, bmi_error_code_t* error_code_array, bmi_size_t*
-	actual_size_array, void** user_ptr_array, int timeout_ms);
+	actual_size_array, void** user_ptr_array, int max_idle_time_ms);
 int BMI_tcp_testunexpected(int incount, int* outcount, struct
-	method_unexpected_info* info, int timeout_ms);
+	method_unexpected_info* info, int max_idle_time_ms);
 method_addr_p BMI_tcp_method_addr_lookup(const char* id_string);
 int BMI_tcp_post_send_list(bmi_op_id_t* id, method_addr_p dest,
 	void** buffer_list, bmi_size_t* size_list, int list_count,
@@ -104,7 +104,7 @@ static int test_done_some(int incount, bmi_op_id_t* id_array,
 static int test_done(bmi_op_id_t id, int* outcount,
 	bmi_error_code_t* error_code, bmi_size_t* actual_size, void**
 	user_ptr);
-static int tcp_do_work(int wait_metric);
+static int tcp_do_work(int max_idle_time);
 static int tcp_do_work_error(method_addr_p map);
 static int tcp_do_work_recv(method_addr_p map);
 static int tcp_do_work_send(method_addr_p map);
@@ -180,11 +180,7 @@ enum
 	 * translates into the number of sockets that we will perform
 	 * nonblocking operations on during one function call.
 	 */
-	TCP_WORK_METRIC = 128,
-	/* amount of time we will wait around within the wait functions if no
-	 * work is immediately available (in milliseconds)
-	 */
-	TCP_WAIT_METRIC = 10
+	TCP_WORK_METRIC = 128
 };
 
 /* TCP message modes */
@@ -697,12 +693,12 @@ int BMI_tcp_post_recv(bmi_op_id_t* id, method_addr_p src, void* buffer,
  */
 int BMI_tcp_test(bmi_op_id_t id, int* outcount, bmi_error_code_t* 
 	error_code, bmi_size_t* actual_size, void** user_ptr, 
-	int wait_time)
+	int max_idle_time)
 {
 	int ret = -1;
 
 	/* do some ``real work'' here */
-	ret = tcp_do_work(wait_time);
+	ret = tcp_do_work(max_idle_time);
 	if(ret < 0)
 	{
 		return(ret);
@@ -721,12 +717,13 @@ int BMI_tcp_test(bmi_op_id_t id, int* outcount, bmi_error_code_t*
  */
 int BMI_tcp_testsome(int incount, bmi_op_id_t* id_array, 
 	int* outcount, int* index_array, bmi_error_code_t* error_code_array,
-	bmi_size_t* actual_size_array, void** user_ptr_array, int wait_time)
+	bmi_size_t* actual_size_array, void** user_ptr_array, int
+	max_idle_time)
 {
 	int ret = -1;
 
 	/* do some ``real work'' here */
-	ret = tcp_do_work(wait_time);
+	ret = tcp_do_work(max_idle_time);
 	if(ret < 0)
 	{
 		return(ret);
@@ -746,12 +743,12 @@ int BMI_tcp_testsome(int incount, bmi_op_id_t* id_array,
  * returns 0 on success, -errno on failure
  */
 int BMI_tcp_testunexpected(int incount, int* outcount, struct
-	method_unexpected_info* info, int wait_time)
+	method_unexpected_info* info, int max_idle_time)
 {
 	int ret = -1;
 
 	/* do some ``real work'' here */
-	ret = tcp_do_work(wait_time);
+	ret = tcp_do_work(max_idle_time);
 	if(ret < 0)
 	{
 		return(ret);
@@ -1668,7 +1665,7 @@ static int test_done_some(int incount, bmi_op_id_t* id_array, int* outcount,
  *
  * returns 0 on success, -errno on failure.
  */
-static int tcp_do_work(int wait_metric)
+static int tcp_do_work(int max_idle_time)
 {
 	int ret = -1;
 	method_addr_p addr_array[TCP_WORK_METRIC];
@@ -1679,7 +1676,7 @@ static int tcp_do_work(int wait_metric)
 	/* now we need to poll and see what to work on */
 	ret = socket_collection_testglobal(tcp_socket_collection_p,
 		TCP_WORK_METRIC, &socket_count, addr_array, status_array,
-		wait_metric);
+		max_idle_time);
 	if(ret < 0)
 	{
 		return(ret);
