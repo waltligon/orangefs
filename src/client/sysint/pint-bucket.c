@@ -379,10 +379,26 @@ int PINT_bucket_get_root_handle(
 	PVFS_handle *fh_root)
 {
     int ret = -EINVAL;
-    if (fh_root && g_server_config.root_handle)
+    struct llist *cur = NULL;
+    struct filesystem_configuration_s *cur_fs = NULL;
+
+    if (fh_root)
     {
-        *fh_root = (PVFS_handle)g_server_config.root_handle;
-        ret = 0;
+        cur = g_server_config.file_systems;
+        while(cur)
+        {
+            cur_fs = llist_head(cur);
+            if (!cur_fs)
+            {
+                break;
+            }
+            if (fsid = (PVFS_fs_id)cur_fs->coll_id)
+            {
+                *fh_root = (PVFS_handle)cur_fs->root_handle;
+                ret = 0;
+                break;
+            }
+        }
     }
     return ret;
 }

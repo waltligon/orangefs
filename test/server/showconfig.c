@@ -17,6 +17,7 @@ void print_filesystem_configuration(struct filesystem_configuration_s *fs)
     {
         fprintf(stderr,"File system name: %s\n",fs->file_system_name);
         fprintf(stderr,"FS Collection ID: %d\n",fs->coll_id);
+        fprintf(stderr,"FS Root Handle  : %d\n",fs->root_handle);
 
         fprintf(stderr,"\t*** Meta Servers for %s:\n",fs->file_system_name);
         cur = fs->meta_server_list;
@@ -85,7 +86,6 @@ int main(int argc, char **argv)
     /* dump all gathered config values */
     fprintf(stderr,"server id: %s\n",serverconfig.host_id);
     fprintf(stderr,"storage space: %s\n",serverconfig.storage_path);
-    fprintf(stderr,"root handle: %d\n",serverconfig.root_handle);
 
     fprintf(stderr,"fs config file name: %s\n",
             serverconfig.fs_config_filename);

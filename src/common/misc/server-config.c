@@ -422,12 +422,17 @@ DOTCONF_CB(get_unexp_req)
 
 DOTCONF_CB(get_root_handle)
 {
-    if (config_s->configuration_context != DEFAULTS_CONFIG)
+    struct filesystem_configuration_s *fs_conf = NULL;
+
+    if (config_s->configuration_context != FILESYSTEM_CONFIG)
     {
-        gossip_lerr("RootHandle Tag can only be in a Defaults block");
+        gossip_lerr("RootHandle Tag can only be in a Filesystem block");
         return NULL;
     }
-    config_s->root_handle = cmd->data.value;
+    fs_conf = (struct filesystem_configuration_s *)
+        llist_head(config_s->file_systems);
+    assert(fs_conf);
+    fs_conf->root_handle = cmd->data.value;
     return NULL;
 }
 
