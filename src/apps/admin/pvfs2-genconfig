@@ -373,6 +373,7 @@ sub get_storage
 # get host port
 sub tcp_get_port
 {
+	my $port;
 	if (!$opt_quiet) { 
 		print "Choose a TCP/IP port for the servers to listen on.  Note that this\n";
 		print "script assumes that all servers will use the same port number.\n";
@@ -389,6 +390,7 @@ sub tcp_get_port
 }
 sub gm_get_port
 {
+	my $port;
 	if (!$opt_quiet) { 
 		print "Choose a GM port (in the range of 0 to 7) for the servers to listen on. \n";
 		print "This script assumes that all servers will use the same port number.\n";
@@ -409,6 +411,7 @@ sub gm_get_port
 }
 sub ib_get_port
 {
+	my $port;
 	if (!$opt_quiet) { 
 		print "Choose a TCP/IP port for the servers to listen on for IB communications.  Note that this\n";
 		print "script assumes that all servers will use the same port number.\n";
@@ -538,11 +541,11 @@ print_welcome();
 $type = get_protocol();
 foreach (split(',', $type)) {
     if ($_ eq "tcp") {
-	$port{$_} = tcp_get_port();
+	$port{'tcp'} = tcp_get_port();
     } elsif ($_ eq "gm") {
-	$port{$_} = gm_get_port();
+	$port{'gm'} = gm_get_port();
     } elsif ($_ eq "ib") {
-	$port{$_} = ib_get_port();
+	$port{'ib'} = ib_get_port();
     } else {
 	print "Sorry.  At this time, only the tcp,gm, and ib protocols are available\n";
 	print "for use with this configuration utility.\n";
