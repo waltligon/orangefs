@@ -23,13 +23,21 @@
 #define BUFFER_SIZE (256*1024)
 #define MAX_REGIONS 16
 
+struct result_chain_entry
+{
+    void* buffer_offset;
+    PINT_Request_result result;
+    PVFS_size size_list[MAX_REGIONS];
+    PVFS_offset offset_list[MAX_REGIONS];
+    struct result_chain_entry* next;
+};
+
 /* fp_queue_item describes an individual buffer being used within the flow */
 struct fp_queue_item
 {
     void* buffer;
-    PVFS_size size_list[MAX_REGIONS];
-    PVFS_offset offset_list[MAX_REGIONS];
-    PINT_Request_result result;
+    struct result_chain_entry result_chain;
+    int result_chain_count;
     struct qlist_head list_link;
     flow_descriptor* parent;
     struct PINT_thread_mgr_bmi_callback bmi_callback;
@@ -239,10 +247,6 @@ int fp_multiqueue_post(flow_descriptor * flow_d)
     for(i=0; i<BUFFERS_PER_FLOW; i++)
     {
 	flow_data->prealloc_array[i].parent = flow_d;
-	flow_data->prealloc_array[i].result.size_array = 
-	    flow_data->prealloc_array[i].size_list;
-	flow_data->prealloc_array[i].result.offset_array = 
-	    flow_data->prealloc_array[i].offset_list;
 	flow_data->prealloc_array[i].bmi_callback.data = 
 	    &(flow_data->prealloc_array[i]);
 	flow_data->prealloc_array[i].trove_callback.data = 
@@ -388,6 +392,10 @@ static void bmi_recv_callback_fn(void *user_ptr,
     struct fp_private_data* flow_data = PRIVATE_FLOW(q_item->parent);
     PVFS_id_gen_t tmp_id;
     PVFS_size tmp_actual_size;
+    struct result_chain_entry* result_tmp;
+    struct result_chain_entry* old_result_tmp;
+    PVFS_size bytes_processed = 0;
+    void* tmp_buffer;
 
     /* TODO: error handling */
     if(error_code != 0)
@@ -395,9 +403,6 @@ static void bmi_recv_callback_fn(void *user_ptr,
 	PVFS_perror_gossip("bmi_recv_callback_fn error_code", error_code);
 	assert(0);
     }
-
-    /* TODO: define semantics for short recv's here */
-    assert(actual_size == q_item->result.bytes);
 
     /* remove from current queue */
     gen_mutex_lock(&flow_data->src_mutex);
@@ -411,28 +416,33 @@ static void bmi_recv_callback_fn(void *user_ptr,
 
     flow_data->bytes_from_src += actual_size;
 
-    ret = trove_bstream_write_list(q_item->parent->dest.u.trove.coll_id,
-	q_item->parent->dest.u.trove.handle,
-	(char**)&q_item->buffer,
-	&q_item->result.bytes,
-	1,
-	q_item->result.offset_array,
-	q_item->result.size_array,
-	q_item->result.segs,
-	&q_item->result.bytes,
-	0,
-	NULL,
-	&q_item->trove_callback,
-	global_trove_context,
-	&tmp_id);
-    /* TODO: error handling */
-    assert(ret >= 0);
+    result_tmp = &q_item->result_chain;
+    do{
+	ret = trove_bstream_write_list(q_item->parent->dest.u.trove.coll_id,
+	    q_item->parent->dest.u.trove.handle,
+	    (char**)result_tmp->buffer_offset,
+	    &result_tmp->result.bytes,
+	    1,
+	    result_tmp->result.offset_array,
+	    result_tmp->result.size_array,
+	    result_tmp->result.segs,
+	    &result_tmp->result.bytes,
+	    0,
+	    NULL,
+	    &q_item->trove_callback,
+	    global_trove_context,
+	    &tmp_id);
+	result_tmp = result_tmp->next;
 
-    if(ret == 1)
-    {
-	/* immediate completion; trigger callback ourselves */
-	trove_write_callback_fn(q_item, 0);
-    }
+	/* TODO: error handling */
+	assert(ret >= 0);
+
+	if(ret == 1)
+	{
+	    /* immediate completion; trigger callback ourselves */
+	    trove_write_callback_fn(q_item, 0);
+	}
+    }while(result_tmp);
 
     /* do we need to repost another recv? */
     /* be careful about lock order */
@@ -461,28 +471,49 @@ static void bmi_recv_callback_fn(void *user_ptr,
 	    q_item->bmi_callback.fn = bmi_recv_callback_fn;
 	    q_item->trove_callback.fn = trove_write_callback_fn;
 	}
-
-	/* process request */
-	q_item->result.bytemax = BUFFER_SIZE;
-	q_item->result.bytes = 0;
-	q_item->result.segmax = MAX_REGIONS;
-	q_item->result.segs = 0;
-	ret = PINT_Process_request(q_item->parent->file_req_state,
-	    q_item->parent->mem_req_state,
-	    &q_item->parent->file_data,
-	    &q_item->result,
-	    PINT_SERVER);
-	/* TODO: error handling */ 
-	assert(ret >= 0);
 	
-	 /* TODO: implement handling of > MAX_REGIONS discontig parts */
-	assert(q_item->result.bytes == BUFFER_SIZE || 
-	    PINT_REQUEST_DONE(q_item->parent->file_req_state));
+	result_tmp = &q_item->result_chain;
+	old_result_tmp = result_tmp;
+	tmp_buffer = q_item->buffer;
+	do{
+	    q_item->result_chain_count++;
+	    if(!result_tmp)
+	    {
+		result_tmp = (struct result_chain_entry*)malloc(
+		    sizeof(struct result_chain_entry));
+		assert(result_tmp);
+		old_result_tmp->next = result_tmp;
+	    }
+	    /* process request */
+	    result_tmp->result.offset_array = 
+		result_tmp->offset_list;
+	    result_tmp->result.size_array = 
+		result_tmp->size_list;
+	    result_tmp->result.bytemax = BUFFER_SIZE;
+	    result_tmp->result.bytes = 0;
+	    result_tmp->result.segmax = MAX_REGIONS;
+	    result_tmp->result.segs = 0;
+	    result_tmp->buffer_offset = tmp_buffer;
+	    ret = PINT_Process_request(q_item->parent->file_req_state,
+		q_item->parent->mem_req_state,
+		&q_item->parent->file_data,
+		&result_tmp->result,
+		PINT_SERVER);
+	    /* TODO: error handling */ 
+	    assert(ret >= 0);
+	    
+	    old_result_tmp = result_tmp;
+	    result_tmp = result_tmp->next;
+	    tmp_buffer = (void*)((char*)tmp_buffer + old_result_tmp->result.bytes);
+	    bytes_processed += old_result_tmp->result.bytes;
+	}while(bytes_processed < BUFFER_SIZE && 
+	    !PINT_REQUEST_DONE(q_item->parent->file_req_state));
 
+	/* TODO: what if we recv less than expected? */
 	ret = BMI_post_recv(&tmp_id,
 	    q_item->parent->src.u.bmi.address,
 	    q_item->buffer,
-	    q_item->result.bytes,
+	    BUFFER_SIZE,
 	    &tmp_actual_size,
 	    BMI_PRE_ALLOC,
 	    q_item->parent->tag,
@@ -553,11 +584,30 @@ static void trove_write_callback_fn(void *user_ptr,
     struct fp_queue_item* q_item = user_ptr;
     int ret;
     struct fp_private_data* flow_data = PRIVATE_FLOW(q_item->parent);
+    struct result_chain_entry* result_tmp;
+    struct result_chain_entry* old_result_tmp;
+    void* tmp_buffer;
+    PVFS_size bytes_processed = 0;
 
     /* TODO: error handling */
     assert(error_code == 0);
 
-    q_item->parent->total_transfered += q_item->result.bytes;
+    /* don't do anything until the last write completes */
+    if(q_item->result_chain_count > 1)
+    {
+	q_item->result_chain_count--;
+	return;
+    }
+
+    result_tmp = &q_item->result_chain;
+    do{
+	q_item->parent->total_transfered += result_tmp->result.bytes;
+	old_result_tmp = result_tmp;
+	result_tmp = result_tmp->next;
+	if(old_result_tmp != &q_item->result_chain)
+	    free(old_result_tmp);
+    }while(result_tmp);
+    q_item->result_chain_count = 0;
 
     /* if this was the last operation, then mark the flow as done */
     if(flow_data->parent->total_transfered == flow_data->parent->aggregate_size)
@@ -607,28 +657,49 @@ static void trove_write_callback_fn(void *user_ptr,
 	/* ready to post new recv! */
 	qlist_add_tail(&q_item->list_link, &flow_data->src_list);
 	gen_mutex_unlock(&(flow_data->src_mutex));
-
-	/* process request */
-	q_item->result.bytemax = BUFFER_SIZE;
-	q_item->result.bytes = 0;
-	q_item->result.segmax = MAX_REGIONS;
-	q_item->result.segs = 0;
-	ret = PINT_Process_request(q_item->parent->file_req_state,
-	    q_item->parent->mem_req_state,
-	    &q_item->parent->file_data,
-	    &q_item->result,
-	    PINT_SERVER);
-	/* TODO: error handling */ 
-	assert(ret >= 0);
 	
-	 /* TODO: implement handling of > MAX_REGIONS discontig parts */
-	assert(q_item->result.bytes == BUFFER_SIZE || 
-	    PINT_REQUEST_DONE(q_item->parent->file_req_state));
+	result_tmp = &q_item->result_chain;
+	old_result_tmp = result_tmp;
+	tmp_buffer = q_item->buffer;
+	do{
+	    q_item->result_chain_count++;
+	    if(!result_tmp)
+	    {
+		result_tmp = (struct result_chain_entry*)malloc(
+		    sizeof(struct result_chain_entry));
+		assert(result_tmp);
+		old_result_tmp->next = result_tmp;
+	    }
+	    /* process request */
+	    result_tmp->result.offset_array = 
+		result_tmp->offset_list;
+	    result_tmp->result.size_array = 
+		result_tmp->size_list;
+	    result_tmp->result.bytemax = BUFFER_SIZE;
+	    result_tmp->result.bytes = 0;
+	    result_tmp->result.segmax = MAX_REGIONS;
+	    result_tmp->result.segs = 0;
+	    result_tmp->buffer_offset = tmp_buffer;
+	    ret = PINT_Process_request(q_item->parent->file_req_state,
+		q_item->parent->mem_req_state,
+		&q_item->parent->file_data,
+		&result_tmp->result,
+		PINT_SERVER);
+	    /* TODO: error handling */ 
+	    assert(ret >= 0);
+	    
+	    old_result_tmp = result_tmp;
+	    result_tmp = result_tmp->next;
+	    tmp_buffer = (void*)((char*)tmp_buffer + old_result_tmp->result.bytes);
+	    bytes_processed += old_result_tmp->result.bytes;
+	}while(bytes_processed < BUFFER_SIZE && 
+	    !PINT_REQUEST_DONE(q_item->parent->file_req_state));
 
+	/* TODO: what if we recv less than expected? */
 	ret = BMI_post_recv(&tmp_id,
 	    q_item->parent->src.u.bmi.address,
 	    q_item->buffer,
-	    q_item->result.bytes,
+	    BUFFER_SIZE,
 	    &tmp_actual_size,
 	    BMI_PRE_ALLOC,
 	    q_item->parent->tag,
