@@ -121,7 +121,8 @@ int PVFS_sys_truncate(PVFS_pinode_reference pinode_ref,
     PINT_client_sm *sm_p;
     PVFS_error error;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_truncate_new entered\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_truncate entered with %Ld\n",
+	    Ld(size) );
 
     /* do parameter checking here, then assume things are ok below.
      * assert()s are still ok of course :).
@@ -358,11 +359,13 @@ static int truncate_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
 	msg_p = &sm_p->msgarray[i];
 
 	gossip_debug(GOSSIP_CLIENT_DEBUG,
-		"  datafile_truncate: resizing %Ld\n",
-		Lu(sm_p->u.truncate.datafile_handles[i]));
+		"  datafile_truncate: client requests %Ld: resizing %Ld",
+		Ld(sm_p->u.truncate.size), Lu(sm_p->u.truncate.datafile_handles[i]));
 	new_dfile_size = 
 	    dist->methods->logical_to_physical_offset(dist->params, i, 
 		    sm_p->u.truncate.datafile_count, sm_p->u.truncate.size);
+	gossip_debug(GOSSIP_CLIENT_DEBUG,
+		" to %Ld bytes\n", Ld(new_dfile_size));
 
         PINT_SERVREQ_TRUNCATE_FILL(
             msg_p->req,
