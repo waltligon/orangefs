@@ -141,7 +141,7 @@ typedef struct PVFS_sysresp_init_s PVFS_sysresp_init;
 /* lookup (request and response) */
 
 struct PVFS_sysresp_lookup_s {
-	pinode_reference pinode_refn;
+    pinode_reference pinode_refn; /* NOTE: fs_id IN HERE IS UNNECESSARY */
 };
 typedef struct PVFS_sysresp_lookup_s PVFS_sysresp_lookup;
 
@@ -409,5 +409,14 @@ int PVFS_sys_statfs(PVFS_sysreq_statfs *req, PVFS_sysresp_statfs *resp);
 int PVFS_sys_config(PVFS_handle handle, PVFS_sysresp_config *resp);
 int PVFS_sys_hint(int undefined,  PVFS_sysresp_hint *resp);
 int PVFS_sys_extension(int undefined, PVFS_sysresp_extension *resp);
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 noexpandtab
+ */
 
 #endif
