@@ -31,7 +31,7 @@
 #ifndef __ID_GENERATOR_H
 #define __ID_GENERATOR_H 
 
-#include <stdint.h>
+#include <inttypes.h>
 
 typedef int64_t id_gen_t;
 

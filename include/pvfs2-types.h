@@ -7,7 +7,7 @@
 #ifndef __PVFS2_TYPES_H
 #define __PVFS2_TYPES_H
 
-#include <stdint.h>
+#include <inttypes.h>
 
 /* basic types used throughout code */
 typedef uint8_t PVFS_boolean;

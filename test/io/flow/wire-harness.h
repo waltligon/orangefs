@@ -7,7 +7,7 @@
 #ifndef __WIRE_HARNESS_H
 #define __WIRE_HARNESS_H
 
-#include <stdint.h>
+#include <inttypes.h>
 
 #include <pvfs2-types.h>
 #include <pvfs2-req-proto.h>

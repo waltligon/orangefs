@@ -12,7 +12,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
-#include <stdint.h>
+#include <inttypes.h>
 #include <sys/ioctl.h>
 #include <sys/poll.h>
 #include <sys/uio.h>

@@ -33,7 +33,7 @@
 
 #include <errno.h>
 #include <stdlib.h>
-#include <stdint.h>
+#include <inttypes.h>
 #include <id-generator.h>
 
 /* id_gen_fast_register()
