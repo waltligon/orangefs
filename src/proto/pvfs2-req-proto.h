@@ -214,11 +214,9 @@ struct PVFS_servresp_readdir
 /* getconfig ***************************************************/
 /* - retrieves initial configuration information from server */
 
-struct PVFS_servreq_getconfig
-{
-    /* maximum allowed size of configuration information to retrieve */
-    uint32_t config_buf_size;
-};
+/* NOTE: no request structure; all necessary request info is
+ * represented in generic server request structure
+ */
 
 struct PVFS_servresp_getconfig
 {
@@ -302,7 +300,6 @@ struct PVFS_server_req
 	struct PVFS_servreq_readdir readdir;
 	struct PVFS_servreq_lookup_path lookup_path;
 	struct PVFS_servreq_createdirent crdirent;
-	struct PVFS_servreq_getconfig getconfig;
 	struct PVFS_servreq_rmdirent rmdirent;
 	struct PVFS_servreq_truncate truncate;
     }

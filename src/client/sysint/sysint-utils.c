@@ -385,7 +385,6 @@ int PINT_server_get_config(struct server_configuration_s *config,
         memset(&serv_req,0,sizeof(struct PVFS_server_req));
 	serv_req.op = PVFS_SERV_GETCONFIG;
 	serv_req.credentials = creds;
-	serv_req.u.getconfig.config_buf_size = PVFS_REQ_LIMIT_CONFIG_FILE_BYTES;
 
 	gossip_ldebug(CLIENT_DEBUG,"asked for fs name = %s\n",
                       mntent_p->service_name);

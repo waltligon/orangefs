@@ -164,8 +164,6 @@ void print_request(struct PVFS_server_req *my_req, int direction)
 			arrow(direction);
                         printf("credentials.perms = %d\n", (int)my_req->credentials.perms);
 			arrow(direction);
-                        printf("PVFS_servreq_getconfig.config_buf_size = %d\n", (int)my_req->u.getconfig.config_buf_size );
-			arrow(direction);
 			arrow(direction);
                         printf("======================================\n");
                         break;
@@ -377,7 +375,6 @@ int main(int argc, char **argv)
 	request->credentials.uid = 420;
 	request->credentials.gid = 420;
 	request->credentials.perms = 420;
-	request->u.getconfig.config_buf_size = 666;
 	break;
 
 	// simple ops

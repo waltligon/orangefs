@@ -304,6 +304,9 @@ static int readdir_iterate_on_entries(PINT_server_op *s_op,
 
     gossip_debug(SERVER_DEBUG, "readdir state: iterate_on_entries\n");
 
+    /* TODO: handle this error properly */
+    assert(s_op->req->u.readdir.dirent_count <= PVFS_REQ_LIMIT_DIRENT_COUNT);
+
     /* calculate total memory needed:
      * - 2 * dirent_count keyval structures to pass to iterate function
      * - dirent_count dirent structures to hold the results

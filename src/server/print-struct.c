@@ -118,7 +118,6 @@ void display_pvfs_structure(void *s,int r)
 				break;
 			case PVFS_SERV_GETCONFIG:
 				printf("Get Config\n");
-				printf("Max Size: %d\n",p->u.getconfig.config_buf_size);
 				break;
 			case PVFS_SERV_READDIR:
 				printf("Read Dir\n");
