@@ -940,7 +940,7 @@ endif
 ifeq ($(REDHAT_RELEASE),)
 	install -m 755 $(SERVER) $(prefix)/sbin
 else
-	install -m 755 $(SERVER_STUB) $(prefix)/sbin/pvfs2-server
+	install -m 755 $(srcdir)/$(SERVER_STUB) $(prefix)/sbin/pvfs2-server
 	install -m 755 $(SERVER) $(prefix)/sbin/pvfs2-server.bin
 endif
 	install -m 755 $(KERNAPPS) $(prefix)/sbin
