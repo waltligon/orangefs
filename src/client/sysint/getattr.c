@@ -125,12 +125,10 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 	req_p.u.getattr.fs_id = entry.fs_id;
 	req_p.u.getattr.attrmask = req->attrmask;
 
-	/* TODO: this is correct for the time being since we're 
-	 * not getting handles or distributions back from the server
-	 * yet, but it *will* produce message ordering violations in bmi
-	 */
-
-	max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
+	/* TODO: use some sane value for this, I dunno what to put --Phil */
+	gossip_lerr("KLUDGE: guessing at max size of getattr response.\n");
+	max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op)
+	    + 1000;
 
 	/* Make a server getattr request */
 	ret = PINT_send_req(serv_addr, &req_p, max_msg_sz, &decoded, &encoded_resp, op_tag);
