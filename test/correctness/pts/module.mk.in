@@ -24,7 +24,8 @@ TEST_PTS_MISC := \
 	$(DIR)/test-concurrent-meta.c \
 	$(DIR)/test-request-indexed.c \
 	$(DIR)/test-request-contiguous.c \
-	$(DIR)/test-encode-basic.c
+	$(DIR)/test-encode-basic.c \
+	$(DIR)/test-noncontig-pattern.c
 
 MPIMISCSRC += $(TEST_PTS_MISC)
 

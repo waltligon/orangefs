@@ -26,6 +26,7 @@
 #include <test-request-indexed.h>
 #include <test-request-contiguous.h>
 #include <test-encode-basic.h>
+#include <test-noncontig-pattern.h>
 
 enum test_types { 
    TEST_CREATE,
@@ -46,7 +47,8 @@ enum test_types {
 	TEST_CONCURRENT_META,
 	TEST_REQUEST_INDEXED,
 	TEST_REQUEST_CONTIGUOUS,
-	TEST_ENCODE_BASIC
+	TEST_ENCODE_BASIC,
+	TEST_NONCONTIG_PATTERN
 };
 
 void setup_ptstests(config *myconfig) {
@@ -106,6 +108,8 @@ void setup_ptstests(config *myconfig) {
    myconfig->testpool[TEST_REQUEST_CONTIGUOUS].test_name = str_malloc("test_request_contiguous");
    myconfig->testpool[TEST_ENCODE_BASIC].test_func = (void *)test_encode_basic;
    myconfig->testpool[TEST_ENCODE_BASIC].test_name = str_malloc("test_encode_basic");
+   myconfig->testpool[TEST_NONCONTIG_PATTERN].test_func = (void *)test_noncontig_pattern;
+   myconfig->testpool[TEST_NONCONTIG_PATTERN].test_name = str_malloc("test_noncontig_pattern");
 }
 
 #endif
