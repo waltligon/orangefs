@@ -36,6 +36,8 @@ static int print_keyval_pair(TROVE_keyval_s *key,
 			     TROVE_ds_type type,
 			     int sz);
 static void print_object_attributes(struct PVFS_object_attr *a_p);
+static void print_datafile_handles(PVFS_handle *h_p,
+				   int sz);
 
 int main(int argc, char **argv)
 {
@@ -328,18 +330,28 @@ static void print_object_attributes(struct PVFS_object_attr *a_p)
 	    type_to_string(a_p->objtype));
 }
 
+static void print_datafile_handles(PVFS_handle *h_p,
+				   int count)
+{
+    int i;
+
+    for (i = 0; i < count && i < 10; i++) fprintf(stdout, "0x%08Lx ", h_p[i]);
+
+    if (i == 10) fprintf(stdout, "...\n");
+    else fprintf(stdout, "\n");
+}
+
 static int print_keyval_pair(TROVE_keyval_s *key_p,
 			     TROVE_keyval_s *val_p,
 			     TROVE_ds_type type,
 			     int sz)
 {
     int key_printable = 0, val_printable = 0;
-    struct PVFS_object_attr attr; /* from proto/pvfs2-attr.h */
 
     if (isprint(((char *)key_p->buffer)[0]) && strnlen(key_p->buffer, sz) < 64) key_printable = 1;
     if (isprint(((char *)val_p->buffer)[0]) && strnlen(val_p->buffer, sz) < 64) val_printable = 1;
 
-    if (!strncmp(key_p->buffer, "metadata", 8) && val_p->read_sz == sizeof(struct PVFS_object_attr)) {
+    if (!strncmp(key_p->buffer, "metadata", 9) && val_p->read_sz == sizeof(struct PVFS_object_attr)) {
 	fprintf(stdout,
 		"\t\t'%s' (%d): '%s' (%d) -- interpreted as PVFS_object_attr = ",
 		(char *) key_p->buffer,
@@ -347,6 +359,15 @@ static int print_keyval_pair(TROVE_keyval_s *key_p,
 		(char *) val_p->buffer,
 		val_p->read_sz);
 	print_object_attributes((struct PVFS_object_attr *) val_p->buffer);
+    }
+    else if (!strncmp(key_p->buffer, "datafile_handles", 17) && val_p->read_sz % sizeof(PVFS_handle) == 0) {
+	fprintf(stdout,
+		"\t\t'%s' (%d): '%s' (%d) -- interpreted as handles = ",
+		(char *) key_p->buffer,
+		key_p->read_sz,
+		(char *) val_p->buffer,
+		val_p->read_sz);
+	print_datafile_handles((PVFS_handle *) val_p->buffer, val_p->read_sz / sizeof(PVFS_handle));
     }
     else if (type == PVFS_TYPE_DIRECTORY && !strncmp(key_p->buffer, "dir_ent", 8)) {
 	fprintf(stdout,
