@@ -9,6 +9,7 @@ LIBSRC += \
 	$(DIR)/dbpf-dspace.c \
 	$(DIR)/dbpf-dspace-db-cache.c \
         $(DIR)/dbpf-context.c \
+	$(DIR)/dbpf-op.c \
 	$(DIR)/dbpf-op-queue.c \
 	$(DIR)/dbpf-error.c \
 	$(DIR)/dbpf-mgmt.c
@@ -22,6 +23,7 @@ SERVERSRC += \
 	$(DIR)/dbpf-dspace.c \
 	$(DIR)/dbpf-dspace-db-cache.c \
         $(DIR)/dbpf-context.c \
+	$(DIR)/dbpf-op.c \
 	$(DIR)/dbpf-op-queue.c \
 	$(DIR)/dbpf-error.c \
 	$(DIR)/dbpf-mgmt.c

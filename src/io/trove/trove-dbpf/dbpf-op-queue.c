@@ -5,96 +5,12 @@
  */
 
 #include "dbpf-op-queue.h"
-#include "malloc.h"
 
 /* the queue that stores pending serviceable operations */
 static QLIST_HEAD(dbpf_op_queue);
 
 /* lock to be obtained before manipulating dbpf_op_queue */
 gen_mutex_t dbpf_op_queue_mutex = GEN_MUTEX_INITIALIZER;
-
-/* Note: the majority of the operations on the queue are static inlines
- * and are defined in dbpf-op-queue.h for speed.
- */
-dbpf_queued_op_t *dbpf_queued_op_alloc(void)
-{
-    return (dbpf_queued_op_t *)malloc(sizeof(dbpf_queued_op_t));
-}
-
-/* dbpf_queued_op_init()
- *
-v * Initializes a dbpf_queued_op_t structure.  Afterwards the op union and
- * the next_p must still be handled.
- *
- */
-void dbpf_queued_op_init(
-    dbpf_queued_op_t *q_op_p,
-    enum dbpf_op_type type,
-    TROVE_handle handle,
-    struct dbpf_collection *coll_p,
-    int (*svc_fn)(struct dbpf_op *op),
-    void *user_ptr,
-    TROVE_ds_flags flags,
-    TROVE_context_id context_id)
-{
-    assert(q_op_p);
-    memset(q_op_p, 0, sizeof(dbpf_queued_op_t));
-
-    INIT_QLIST_HEAD(&q_op_p->link);
-    gen_mutex_init(&q_op_p->mutex);
-    q_op_p->op.type       = type;
-    q_op_p->op.state      = OP_NOT_QUEUED;
-    q_op_p->op.handle     = handle;
-    q_op_p->op.id         = 0; /* filled in when queued */
-    q_op_p->op.coll_p     = coll_p;
-    q_op_p->op.svc_fn     = svc_fn;
-    q_op_p->op.user_ptr   = user_ptr;
-    q_op_p->op.flags      = flags;
-    q_op_p->op.context_id = context_id;
-}
-
-void dbpf_queued_op_free(dbpf_queued_op_t *q_op_p)
-{
-    if (q_op_p->op.type == DSPACE_CREATE)
-    {
-        free(q_op_p->op.u.d_create.extent_array.extent_array);
-    }
-    free(q_op_p);
-}
-
-void dbpf_queue_list()
-{
-/*     dbpf_queued_op_t *q_op = NULL, *start_op = NULL; */
-
-    gen_mutex_lock(&dbpf_op_queue_mutex);
-
-/*     q_op = dbpf_op_queue_head; */
-
-/*     if (q_op == NULL) { */
-/* 	printf("<queue empty>\n"); */
-/* 	gen_mutex_unlock(&dbpf_op_queue_mutex); */
-/* 	return; */
-/*     } */
-    
-/*     start_op = q_op; */
-/*     printf("op: id=%Lx, type=%d, state=%d, handle=%Lx\n", */
-/* 	   q_op->op.id, */
-/* 	   q_op->op.type, */
-/* 	   q_op->op.state, */
-/* 	   q_op->op.handle); */
- 
-/*     q_op = q_op->next_p; */
-/*     while (q_op != start_op) { */
-/* 	printf("op: id=%Lx, type=%d, state=%d, handle=%Lx\n", */
-/* 	       q_op->op.id, */
-/* 	       q_op->op.type, */
-/* 	       q_op->op.state, */
-/* 	       q_op->op.handle); */
-/* 	q_op = q_op->next_p; */
-/*     } */
-
-    gen_mutex_unlock(&dbpf_op_queue_mutex);
-}
 
 /* dbpf_queued_op_put_and_dequeue()
  *
@@ -281,16 +197,6 @@ void dbpf_queued_op_dequeue(dbpf_queued_op_t *q_op_p)
 
     gen_mutex_unlock(&dbpf_op_queue_mutex);
     gen_mutex_unlock(&q_op_p->mutex);
-}
-
-/* dbpf_queued_op_touch()
- *
- * Notes in statistics that we have been working on this operation
- * again.
- */
-void dbpf_queued_op_touch(dbpf_queued_op_t *q_op_p)
-{
-    q_op_p->stats.svc_ct++;
 }
 
 /*
