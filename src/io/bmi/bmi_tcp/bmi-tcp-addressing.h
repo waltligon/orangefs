@@ -45,7 +45,8 @@ struct tcp_addr
  */
 
 void tcp_forget_addr(method_addr_p map,
-		     int dealloc_flag);
+		     int dealloc_flag,
+		     int error_code);
 method_addr_p alloc_tcp_method_addr(void);
 
 #endif /* __BMI_TCP_ADDRESSING_H */

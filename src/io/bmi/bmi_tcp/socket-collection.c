@@ -329,10 +329,8 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
 		else
 		    tmp_host = ((struct
 			tcp_addr*)(big_poll_addr[i]->method_data))->hostname;
-	    	gossip_err("Error: bmi_tcp: socket closed or failed to"
-		    " connect.\n");
-		gossip_err("       host: %s, socket %d, poll error: 0x%x.\n",
-		    tmp_host, big_poll_fds[i].fd, big_poll_fds[i].revents);
+	    	gossip_err("Error: bmi_tcp: socket closed to host:"
+		    " %s, socket %d.\n", tmp_host, big_poll_fds[i].fd);
 		status[num_handled] += SC_ERROR_BIT;
 	    }
 	    if (big_poll_fds[i].revents & POLLIN)

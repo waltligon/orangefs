@@ -214,7 +214,7 @@ static int enqueue_operation(op_list_p target_list,
 			     bmi_size_t actual_size,
 			     bmi_size_t expected_size,
 			     bmi_context_id context_id);
-static int tcp_cleanse_addr(method_addr_p map);
+static int tcp_cleanse_addr(method_addr_p map, int error_code);
 static int tcp_shutdown_addr(method_addr_p map);
 static int tcp_do_work(int max_idle_time);
 static int tcp_do_work_error(method_addr_p map);
@@ -613,7 +613,7 @@ int BMI_tcp_set_info(int option,
 	{
 	    tmp_addr = (method_addr_p) inout_parameter;
 	    /* take it out of the socket collection */
-	    tcp_forget_addr(tmp_addr, 1);
+	    tcp_forget_addr(tmp_addr, 1, 0);
 	    ret = 0;
 	}
 	break;
@@ -1194,14 +1194,15 @@ void BMI_tcp_close_context(bmi_context_id context_id)
  * no return value
  */
 void tcp_forget_addr(method_addr_p map,
-		     int dealloc_flag)
+		     int dealloc_flag,
+		     int error_code)
 {
     tcp_shutdown_addr(map);
     if (tcp_socket_collection_p)
     {
 	BMI_socket_collection_remove(tcp_socket_collection_p, map);
     }
-    tcp_cleanse_addr(map);
+    tcp_cleanse_addr(map, error_code);
     if (dealloc_flag)
     {
 	dealloc_tcp_method_addr(map);
@@ -1777,7 +1778,7 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
 	    if (ret < 0)
 	    {
 		gossip_lerr("Error: payload_progress: %s\n", strerror(-ret));
-		tcp_forget_addr(query_op->addr, 0);
+		tcp_forget_addr(query_op->addr, 0, ret);
 		return (0);
 	    }
 
@@ -1847,7 +1848,7 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
  *
  * returns 0 on success, -errno on failure
  */
-static int tcp_cleanse_addr(method_addr_p map)
+static int tcp_cleanse_addr(method_addr_p map, int error_code)
 {
     int i = 0;
     struct op_list_search_key key;
@@ -1865,7 +1866,7 @@ static int tcp_cleanse_addr(method_addr_p map)
 	    while ((query_op = op_list_search(op_list_array[i], &key)))
 	    {
 		op_list_remove(query_op);
-		query_op->error_code = -EPROTO;
+		query_op->error_code = error_code;
 		if (query_op->mode == TCP_MODE_UNEXP && query_op->send_recv
 		    == BMI_RECV)
 		{
@@ -2074,6 +2075,7 @@ static int tcp_do_work_recv(method_addr_p map)
     struct tcp_msg_header new_header;
     struct tcp_addr *tcp_addr_data = map->method_data;
     struct tcp_op *tcp_op_data = NULL;
+    int tmp_errno;
 
     /* figure out if this is a new connection */
     if (tcp_addr_data->server_port)
@@ -2108,7 +2110,7 @@ static int tcp_do_work_recv(method_addr_p map)
     ret = BMI_sockio_nbpeek(tcp_addr_data->socket, new_header.enc_hdr, TCP_ENC_HDR_SIZE);
     if (ret < 0)
     {
-	tcp_forget_addr(map, 0);
+	tcp_forget_addr(map, 0, -errno);
 	return (0);
     }
     if (ret < TCP_ENC_HDR_SIZE)
@@ -2124,8 +2126,9 @@ static int tcp_do_work_recv(method_addr_p map)
     ret = BMI_sockio_brecv(tcp_addr_data->socket, new_header.enc_hdr, TCP_ENC_HDR_SIZE);
     if (ret < TCP_ENC_HDR_SIZE)
     {
-	gossip_lerr("Error: BMI_sockio_brecv: %s\n", strerror(errno));
-	tcp_forget_addr(map, 0);
+	tmp_errno = errno;
+	gossip_lerr("Error: BMI_sockio_brecv: %s\n", strerror(tmp_errno));
+	tcp_forget_addr(map, 0, -tmp_errno);
 	return (0);
     }
 
@@ -2146,7 +2149,7 @@ static int tcp_do_work_recv(method_addr_p map)
     if(new_header.magic_nr != BMI_MAGIC_NR)
     {
 	gossip_err("Error: bad magic in BMI TCP message.\n");
-	tcp_forget_addr(map, 0);
+	tcp_forget_addr(map, 0, -EBADMSG);
 	return(0);
     }
 
@@ -2160,7 +2163,7 @@ static int tcp_do_work_recv(method_addr_p map)
 	active_method_op = alloc_tcp_method_op();
 	if (!active_method_op)
 	{
-	    tcp_forget_addr(map, 0);
+	    tcp_forget_addr(map, 0, -ENOMEM);
 	    return (-ENOMEM);
 	}
 	/* create data buffer */
@@ -2168,7 +2171,7 @@ static int tcp_do_work_recv(method_addr_p map)
 	if (!new_buffer)
 	{
 	    dealloc_tcp_method_op(active_method_op);
-	    tcp_forget_addr(map, 0);
+	    tcp_forget_addr(map, 0, -ENOMEM);
 	    return (-ENOMEM);
 	}
 
@@ -2230,7 +2233,7 @@ static int tcp_do_work_recv(method_addr_p map)
     active_method_op = alloc_tcp_method_op();
     if (!active_method_op)
     {
-	tcp_forget_addr(map, 0);
+	tcp_forget_addr(map, 0, -ENOMEM);
 	return (-ENOMEM);
     }
 
@@ -2241,7 +2244,7 @@ static int tcp_do_work_recv(method_addr_p map)
 	if (!new_buffer)
 	{
 	    dealloc_tcp_method_op(active_method_op);
-	    tcp_forget_addr(map, 0);
+	    tcp_forget_addr(map, 0, -ENOMEM);
 	    return (-ENOMEM);
 	}
     }
@@ -2296,6 +2299,7 @@ static int work_on_send_op(method_op_p my_method_op,
     void *working_buf = NULL;
     struct tcp_addr *tcp_addr_data = my_method_op->addr->method_data;
     struct tcp_op *tcp_op_data = my_method_op->method_data;
+    int tmp_errno;
 
     *blocked_flag = 1;
 
@@ -2305,7 +2309,7 @@ static int work_on_send_op(method_op_p my_method_op,
 	ret = tcp_sock_init(my_method_op->addr);
 	if (ret < 0)
 	{
-	    tcp_forget_addr(my_method_op->addr, 0);
+	    tcp_forget_addr(my_method_op->addr, 0, ret);
 	    return (0);
 	}
 	if (tcp_addr_data->not_connected)
@@ -2324,8 +2328,9 @@ static int work_on_send_op(method_op_p my_method_op,
 		     (TCP_ENC_HDR_SIZE - my_method_op->env_amt_complete));
 	if (ret < 0)
 	{
-	    gossip_lerr("Error: BMI_sockio_nbsend: %s\n", strerror(errno));
-	    tcp_forget_addr(my_method_op->addr, 0);
+	    tmp_errno = errno;
+	    gossip_lerr("Error: BMI_sockio_nbsend: %s\n", strerror(tmp_errno));
+	    tcp_forget_addr(my_method_op->addr, 0, -tmp_errno);
 	    return (0);
 	}
 	my_method_op->env_amt_complete += ret;
@@ -2353,7 +2358,7 @@ static int work_on_send_op(method_op_p my_method_op,
 	if (ret < 0)
 	{
 	    gossip_lerr("Error: payload_progress: %s\n", strerror(-ret));
-	    tcp_forget_addr(my_method_op->addr, 0);
+	    tcp_forget_addr(my_method_op->addr, 0, ret);
 	    return (0);
 	}
     }
@@ -2418,7 +2423,7 @@ static int work_on_recv_op(method_op_p my_method_op)
 	if (ret < 0)
 	{
 	    gossip_lerr("Error: payload_progress: %s\n", strerror(-ret));
-	    tcp_forget_addr(my_method_op->addr, 0);
+	    tcp_forget_addr(my_method_op->addr, 0, ret);
 	    return (0);
 	}
     }
@@ -2470,19 +2475,28 @@ static int work_on_recv_op(method_op_p my_method_op)
 static int tcp_do_work_error(method_addr_p map)
 {
     struct tcp_addr *tcp_addr_data = NULL;
+    int buf;
+    int ret;
+    int tmp_errno;
 
     tcp_addr_data = map->method_data;
+
+    /* perform a read on the socket so that we can get a real errno */
+    ret = read(tcp_addr_data->socket, &buf, sizeof(int));
+    tmp_errno = errno;
+
+    gossip_err("Error: bmi_tcp: %s\n", strerror(tmp_errno));
 
     if (tcp_addr_data->server_port)
     {
 	/* Ignore this and hope it goes away... we don't want to loose
 	 * our local socket */
 	dealloc_tcp_method_addr(map);
-	gossip_lerr("Warning: error polling on server socket.\n");
+	gossip_lerr("Warning: error polling on server socket, continuing.\n");
 	return (0);
     }
 
-    tcp_forget_addr(map, 0);
+    tcp_forget_addr(map, 0, -tmp_errno);
 
     return (0);
 }
@@ -2699,7 +2713,7 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
     {
 	tmp_errno = errno;
 	gossip_lerr("Error: BMI_sockio_nbsend: %s\n", strerror(tmp_errno));
-	tcp_forget_addr(dest, 0);
+	tcp_forget_addr(dest, 0, -tmp_errno);
 	return (-tmp_errno);
     }
     if (ret < TCP_ENC_HDR_SIZE)
@@ -2729,7 +2743,7 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 	if (ret < 0)
 	{
 	    gossip_lerr("Error: payload_progress: %s\n", strerror(-ret));
-	    tcp_forget_addr(dest, 0);
+	    tcp_forget_addr(dest, 0, ret);
 	    return (ret);
 	}
     }
