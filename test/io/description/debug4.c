@@ -50,9 +50,9 @@ int main(int argc, char **argv)
 	rs2 = PINT_New_request_state(r2);
 
 	/* set up file data for first request */
-	rf1.iod_num = 2;
+	rf1.iod_num = 0;
 	rf1.iod_count = 3;
-	rf1.fsize = 20*1024*1024;
+	rf1.fsize = 8454144;
 	rf1.dist = PVFS_Dist_create("simple_stripe");
 	rf1.extend_flag = 0;
 	PINT_Dist_lookup(rf1.dist);
@@ -60,16 +60,16 @@ int main(int argc, char **argv)
 	/* file data for second request is the same, except the file
 	 * will have grown by 10M 
 	 */
-	rf2.iod_num = 2;
+	rf2.iod_num = 0;
 	rf2.iod_count = 3;
-	rf2.fsize = 20*1024*1024;
+	rf2.fsize = 8454144;
 	rf2.dist = PVFS_Dist_create("simple_stripe");
 	rf2.extend_flag = 0;
 	PINT_Dist_lookup(rf2.dist);
 
    /* Turn on debugging */
-	/* gossip_enable_stderr(); */
-	/* gossip_set_debug_mask(1,REQUEST_DEBUG); */
+	/* gossip_enable_stderr();  */
+	/* gossip_set_debug_mask(1,REQUEST_DEBUG);  */
 
 	offset_array = (int64_t *)malloc(SEGMAX * sizeof(int64_t));
 	size_array = (int64_t *)malloc(SEGMAX * sizeof(int64_t));
@@ -89,7 +89,7 @@ int main(int argc, char **argv)
 
 		if(retval >= 0)
 		{
-			printf("results of PINT_Process_request():\n");
+			printf("results of PINT_Process_request(PINT_SERVER):\n");
 			printf("total size: %d\n", (int)bytemax);
 			for(i=0; i<segmax; i++)
 			{
@@ -125,7 +125,7 @@ int main(int argc, char **argv)
 
 		if(retval >= 0)
 		{
-			printf("results of PINT_Process_request():\n");
+			printf("results of PINT_Process_request(PINT_CLIENT):\n");
 			printf("total size: %d\n", (int)bytemax);
 			for(i=0; i<segmax; i++)
 			{
