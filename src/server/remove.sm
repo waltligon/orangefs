@@ -264,6 +264,7 @@ static int remove_remove_dirdata_dspace(PINT_server_op *s_op,
 {
     int ret;
     job_id_t j_id;
+    struct server_configuration_s *user_opts = get_server_config_struct();
 
     PINT_STATE_DEBUG("remove_dirdata_dspace");
 
@@ -274,6 +275,8 @@ static int remove_remove_dirdata_dspace(PINT_server_op *s_op,
     ret = job_trove_dspace_remove(
         s_op->req->u.remove.fs_id,
         s_op->u.remove.dirdata_handle,
+        PINT_config_get_trove_sync_mode(
+            user_opts, s_op->req->u.remove.fs_id),
         s_op,
         0,
         js_p,
@@ -294,12 +297,15 @@ static int remove_remove_dspace(PINT_server_op *s_op,
 {
     int ret;
     job_id_t j_id;
+    struct server_configuration_s *user_opts = get_server_config_struct();
 
     PINT_STATE_DEBUG("remove_dspace");
 
     ret = job_trove_dspace_remove(
         s_op->req->u.remove.fs_id,
         s_op->req->u.remove.handle,
+        PINT_config_get_trove_sync_mode(
+            user_opts, s_op->req->u.remove.fs_id),
         s_op,
         0,
         js_p,

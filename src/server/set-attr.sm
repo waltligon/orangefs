@@ -7,6 +7,7 @@
 #include <string.h>
 #include <assert.h>
 
+#include "server-config.h"
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
 
@@ -249,6 +250,7 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s* js_p)
     PVFS_object_attr *a_p = NULL;
     PVFS_object_attr *dspace_a_p = NULL;
     PVFS_ds_attributes *ds_attr = NULL;
+    struct server_configuration_s *user_opts = get_server_config_struct();
 
     PINT_STATE_DEBUG("setobj_attribs");
 
@@ -322,8 +324,11 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s* js_p)
 
     ret = job_trove_dspace_setattr(
         s_op->req->u.setattr.fs_id, s_op->req->u.setattr.handle,
-        ds_attr, s_op, 0 /* status tag */, js_p, &j_id,
+        ds_attr, PINT_config_get_trove_sync_mode(
+            user_opts, s_op->req->u.setattr.fs_id),
+        s_op, 0 /* status tag */, js_p, &j_id,
         server_job_context);
+
     return ret;
 }
 

@@ -33,8 +33,6 @@ int main(int argc, char **argv)
     TROVE_extent cur_extent;
     TROVE_handle_extent_array extent_array;
 
-
-
     ret = parse_args(argc, argv);
     if (ret < 0) {
 	fprintf(stderr, "argument parsing failed.\n");
@@ -113,6 +111,7 @@ int main(int argc, char **argv)
 			&extent_array,                        
 			TROVE_TEST_FILE,
 			NULL,
+			TROVE_SYNC,
 			NULL,
 			0,
 			&job_stat,

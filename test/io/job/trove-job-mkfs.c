@@ -171,6 +171,7 @@ int main(int argc, char **argv)
 		&extent_array,
 		TROVE_TEST_DIR,
 		NULL,
+		TROVE_SYNC,
 		NULL,
 		0,
 		&job_stat,

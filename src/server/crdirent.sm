@@ -261,6 +261,7 @@ static int crdirent_create_dirdata_dspace(PINT_server_op *s_op,
     job_id_t i;
     PVFS_handle_extent extent;
     PVFS_handle_extent_array extent_array;
+    struct server_configuration_s *user_opts = get_server_config_struct();
 
     PINT_STATE_DEBUG("create_dirdata_dspace");
 
@@ -273,15 +274,19 @@ static int crdirent_create_dirdata_dspace(PINT_server_op *s_op,
     extent_array.extent_count = 1;
     extent_array.extent_array = &extent;
 
-    ret = job_trove_dspace_create(s_op->req->u.crdirent.fs_id,
-                                  &extent_array,
-                                  PVFS_TYPE_DIRDATA,
-                                  NULL,
-                                  s_op,
-                                  0,
-                                  js_p,
-                                  &i,
-                                  server_job_context);
+    ret = job_trove_dspace_create(
+        s_op->req->u.crdirent.fs_id,
+        &extent_array,
+        PVFS_TYPE_DIRDATA,
+        NULL,
+        PINT_config_get_trove_sync_mode(
+            user_opts, s_op->req->u.crdirent.fs_id),
+        s_op,
+        0,
+        js_p,
+        &i,
+        server_job_context);
+
     return ret;
 }
 

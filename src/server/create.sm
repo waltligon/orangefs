@@ -16,7 +16,6 @@ static int create_cleanup(PINT_server_op *s_op, job_status_s* js_p);
 static int create_create(PINT_server_op *s_op, job_status_s* js_p);
 static int create_setup_resp(PINT_server_op *s_op, job_status_s* js_p);
 
-
 %%
 
 machine pvfs2_create_sm(prelude, create2, setup_resp, final_response, cleanup)
@@ -75,6 +74,7 @@ static int create_create(PINT_server_op *s_op, job_status_s* js_p)
 
     int ret = -1;
     job_id_t i;
+    struct server_configuration_s *user_opts = get_server_config_struct();
 
     PINT_STATE_DEBUG("create");
 
@@ -83,6 +83,8 @@ static int create_create(PINT_server_op *s_op, job_status_s* js_p)
         &s_op->req->u.create.handle_extent_array,
         s_op->req->u.create.object_type,
         NULL,
+        PINT_config_get_trove_sync_mode(
+            user_opts, s_op->req->u.create.fs_id),
         s_op,
         0,
         js_p,

@@ -688,6 +688,11 @@ static int server_initialize_subsystems(
                 GOSSIP_SERVER_DEBUG, "File system %s using handles: %s\n",
                 cur_fs->file_system_name, cur_merged_handle_range);
 
+	    gossip_debug(GOSSIP_SERVER_DEBUG, "Sync mode for %s is %s\n",
+                         cur_fs->file_system_name,
+                         ((cur_fs->trove_sync_mode == TROVE_SYNC) ?
+                          "sync" : "nosync"));
+
             trove_close_context(cur_fs->coll_id, trove_context);
             free(cur_merged_handle_range);
         }
