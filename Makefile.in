@@ -4,7 +4,7 @@ SHELL = @SHELL@
 INSTALL = @INSTALL@
 
 .SUFFIXES:
-.PHONY: all clean tests distclean
+.PHONY: all clean tests distclean tmp_server_objs
 
 # main source subdirectories
 #
@@ -32,10 +32,10 @@ CFLAGS += $(patsubst %, -I $(srcdir)/%, $(MODULES))
 SRCFILES := src/io/trove/trove-autogen.c
 LIBRARIES := lib/libpvfs2.a
 TESTSRC :=
-LIBSRC  :=
+LIBSRC :=
+SERVERSRC :=
 
-all: $(LIBRARIES) tests
-# all: $(LIBRARIES) tests
+all: $(LIBRARIES) tests tmp_server_objs
 
 include $(patsubst %, %/module.mk, $(MODULES))
 
@@ -46,12 +46,22 @@ TESTOBJS := $(patsubst %.c,%.o, $(filter %.c,$(TESTSRC)))
 TESTS := $(patsubst %.c,%, $(filter %.c, $(TESTSRC)))
 TESTDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(TESTSRC)))
 
+SERVEROBJS := $(patsubst %.c,%-server.o, $(filter %.c,$(SERVERSRC)))
+SERVERDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(SERVERSRC)))
+
 # we don't really care if the dependencies are sorted; 
-# this is just a trick to remove dependencies if a source file
-# appears in multiple sets
-DEPENDS := $(sort $(LIBDEPENDS) $(TESTDEPENDS))
+# this is just a trick to remove duplicate entries
+DEPENDS := $(sort $(LIBDEPENDS) $(TESTDEPENDS) $(SERVERDEPENDS))
 
 tests: $(TESTS)
+
+# TODO: this rule is temporary to force the building of objects to
+# be used in the server until we have a server target; remove this
+# later
+tmp_server_objs: $(SERVEROBJS)
+
+debug:
+	echo $(SERVEROBJS)
 
 lib/libpvfs2.a: $(LIBOBJS)
 	$(INSTALL) -d lib
@@ -61,13 +71,20 @@ lib/libpvfs2.a: $(LIBOBJS)
 %: %.o $(LIBRARIES)
 	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
 
+#
+# NOTE: NOT SURE IF IT IS IMPORTANT FOR THIS RULE TO BE
+# FIRST OR NOT...SHOULD LEARN THE MATCHING RULES BETTER.
+#
+%-server.o: %.c
+	$(CC) $(CFLAGS) $< -c -o $@
+
 %.o: %.c
 	$(CC) $(CFLAGS) $< -c -o $@
 
 $(TESTS): %: %.o $(LIBRARIES)
 
 clean:
-	rm -f $(LIBOBJS) $(TESTOBJS) $(TESTS) $(LIBRARIES) \
+	rm -f $(LIBOBJS) $(TESTOBJS) $(SERVEROBJS) $(TESTS) $(LIBRARIES) \
 		$(DEPENDS) src/io/trove/trove-autogen.c
 
 distclean: clean
