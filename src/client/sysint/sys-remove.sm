@@ -220,6 +220,58 @@ int PVFS_sys_remove2(char *object_name,
     return 0;
 }
 
+/* PINT_serv_prepare_reqresp()
+ *
+ * TODO: cache some values locally and assign at the end.
+ */
+static int PINT_serv_prepare_reqresp(PVFS_pinode_reference object_ref,
+				     struct PVFS_server_req *req_p,
+				     struct PINT_encoded_msg *encoded_req_out_p,
+				     void **encoded_resp_out_pp,
+				     bmi_addr_t *svr_addr_p,
+				     int *max_msg_sz_out_p,
+				     PVFS_msg_tag_t *session_tag_out_p)
+{
+    int ret;
+
+    /* must determine destination server before we can encode;
+     * this fills in sm_p->svr_addr.
+     */
+    ret = PINT_bucket_map_to_server(svr_addr_p,
+				    object_ref.handle,
+				    object_ref.fs_id);
+    if (ret < 0) {
+	assert(0);
+    }
+
+    /* encode request */
+    ret = PINT_encode(req_p,
+		      PINT_ENCODE_REQ,
+		      encoded_req_out_p,
+		      *svr_addr_p,
+		      PINT_CLIENT_ENC_TYPE);
+    if (ret < 0) {
+	assert(0);
+    }
+
+    /* calculate maximum response message size and allocate space */
+    *max_msg_sz_out_p = PINT_encode_calc_max_size(PINT_ENCODE_RESP,
+						  req_p->op,
+						  PINT_CLIENT_ENC_TYPE);
+
+    *encoded_resp_out_pp = BMI_memalloc(*svr_addr_p,
+					*max_msg_sz_out_p,
+					BMI_RECV);
+    if (*encoded_resp_out_pp == NULL) {
+	assert(0);
+    }
+
+    /* get session tag to associate with send and receive */
+    *session_tag_out_p = get_next_session_tag();
+
+    return 0;
+}
+
 /****************************************************************/
 
 /* remove_init()
@@ -288,6 +340,7 @@ static int remove_post_lookup_sendrecv(PINT_client_sm *sm_p,
      * (8) call job fn. to post send
      */
 
+    /* do parameter checking */
     if ((strlen(sm_p->u.remove.object_name) + 1 >
 	 PVFS_REQ_LIMIT_PATH_NAME_BYTES) ||
 	(PINT_string_count_segments(sm_p->u.remove.object_name) >
@@ -298,48 +351,31 @@ static int remove_post_lookup_sendrecv(PINT_client_sm *sm_p,
 	return -PVFS_ENAMETOOLONG;
     }
 
-    memset(&sm_p->req, 0, sizeof(sm_p->req));
-    sm_p->req.op          = PVFS_SERV_LOOKUP_PATH;
-    sm_p->req.credentials = *sm_p->cred_p;
-    sm_p->req.u.lookup_path.path            = sm_p->u.remove.object_name;
-    sm_p->req.u.lookup_path.fs_id           = sm_p->u.remove.parent_ref.fs_id;
-    sm_p->req.u.lookup_path.starting_handle = sm_p->u.remove.parent_ref.handle;
-    sm_p->req.u.lookup_path.attrmask        = PVFS_ATTR_COMMON_ALL;
+    /* fill in lookup request (macro in pvfs2-req-proto.h) */
+    PINT_SERV_LOOKUP_PATH_FILL(sm_p->req,
+			       *sm_p->cred_p,
+			       sm_p->u.remove.object_name,
+			       sm_p->u.remove.parent_ref.fs_id,
+			       sm_p->u.remove.parent_ref.handle,
+			       PVFS_ATTR_COMMON_ALL);
 
-    /* must determine destination server before we can encode;
-     * this fills in sm_p->svr_addr.
+    /* This function:
+     * - maps object to server
+     * - encodes the request
+     * - calculates the max. response size
+     * - allocates memory for that response
+     * - gets a session tag
      */
-    ret = PINT_bucket_map_to_server(&sm_p->svr_addr,
-				    sm_p->u.remove.parent_ref.handle,
-				    sm_p->u.remove.parent_ref.fs_id);
-    if (ret < 0) {
+    ret = PINT_serv_prepare_reqresp(sm_p->u.remove.parent_ref,
+				    &sm_p->req,
+				    &sm_p->encoded_req,
+				    &sm_p->encoded_resp_p,
+				    &sm_p->svr_addr,
+				    &sm_p->max_msg_sz,
+				    &session_tag);
+    if (ret != 0) {
 	assert(0);
     }
-
-    /* encode request */
-    ret = PINT_encode(&sm_p->req,
-		      PINT_ENCODE_REQ,
-		      &sm_p->encoded_req,
-		      sm_p->svr_addr,
-		      PINT_CLIENT_ENC_TYPE);
-    if (ret < 0) {
-	assert(0);
-    }
-
-    /* calculate maximum response message size and allocate space */
-    sm_p->max_msg_sz = PINT_encode_calc_max_size(PINT_ENCODE_RESP,
-					       sm_p->req.op,
-					       PINT_CLIENT_ENC_TYPE);
-
-    sm_p->encoded_resp_p = BMI_memalloc(sm_p->svr_addr,
-				      sm_p->max_msg_sz,
-				      BMI_RECV);
-    if (sm_p->encoded_resp_p == NULL) {
-	assert(0);
-    }
-
-    /* get session tag to associate with send and receive */
-    session_tag = get_next_session_tag();
 
     /* post receive of response */
     ret = job_bmi_recv(sm_p->svr_addr,

@@ -151,6 +151,22 @@ struct PVFS_servreq_lookup_path
     uint32_t attrmask;
 };
 
+#define PINT_SERV_LOOKUP_PATH_FILL(__req,		\
+				   __creds,		\
+				   __path,		\
+				   __fsid,		\
+				   __handle,		\
+				   __amask)		\
+do {							\
+    memset(&(__req), 0, sizeof(__req));			\
+    (__req).op = PVFS_SERV_LOOKUP_PATH;			\
+    (__req).credentials = (__creds);			\
+    (__req).u.lookup_path.path = (__path);		\
+    (__req).u.lookup_path.fs_id = (__fsid);		\
+    (__req).u.lookup_path.starting_handle = (__handle);	\
+    (__req).u.lookup_path.attrmask = (__amask);		\
+} while (0)
+
 struct PVFS_servresp_lookup_path
 {
     /* array of handles for each successfully resolved path segment */

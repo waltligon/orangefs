@@ -63,6 +63,8 @@ typedef struct PINT_client_sm_s {
     } u;
 } PINT_client_sm;
 
+
+
 /* INCLUDE STATE-MACHINE.H DOWN HERE */
 #define PINT_OP_STATE       PINT_client_sm
 #if 0
