@@ -1,0 +1,128 @@
+# todo: latex this
+
+#
+# 18 July 2003
+#
+# rob latham and team pvfs2
+#
+
+Adding a new server operation is currently rather involved.  I'm going to try
+to lay out what i did to add a flush operation to pvfs2
+
+CLIENT-SIDE
+
+ Add a prototype for your function to pvfs2-sysint.h.  If your function
+ just needs to know if it suceeded or failed, you are done.  If not, you
+ must also define a server response structure.
+
+ We are moving to using state machines for both client and server
+ operations, so if you are adding a new operation, make it a state
+ machine.  Define your operation-specific state machine structure in
+ client-state-machine.h and add it to the PINT_client_sm structure. Add
+ your operation to the switch statement in
+ PINT_client_state_machine_post()
+
+ there is an unnamed enum in client-state-machine.h with some other
+ operations (PVFS_SYS_REMOVE, PVFS_SYS_IO, etc).  Add your operation to
+ that enum.
+
+ also in client-state-machine.h, declare your state machine 'extern'
+ with the other operation state machine declarations.
+
+ add the .c file for your operation to src/client/sysint/module.mk.in
+
+ A client-side state machine can take advantage of several nested state
+ machines.  The client state machines tend to have a certain pattern to
+ them:  check_parameters, then for each time they talk to the server
+ there is a 'setup/xfer/failure' triplet of states to send a msgpair (or
+ a bunch of msgpairs in one msgpairarray). lastly, 'cleanup'.  As with
+ the server, the best documentation is other state machines.
+
+SERVER-SIDE
+
+  It's probably a good idea to start implementing your new operation
+  at the trove layer, then adding support for it at the job interface.
+  Once the job interface is in place, then you can implement the state
+  machine.  Doing things this way means you can always compile the tree
+  to catch errors. 
+
+Trove:
+
+  If you need to extend trove functionality to implement your new
+  operation, start by adding a prototype to trove-proto.h.  This will
+  autogenerate the code that links the trove api to the underlying
+  storage implementation (currently dbpf).
+
+  Define a new member of the TROVE_bstream_ops, TROVE_keyval_ops, and/or
+  TROVE_dspace_ops structure.  Add the dbpf implementation: check out
+  trove-dbpf/dbpf-bstream.c and trove-dbpf/dbpf-keyval.  At the bottom
+  of those files is a structure of function pointers.  Add your new
+  function.
+
+  If your new function is nonblocking, add it to the dbpf_op_type enum.
+
+Job:
+  
+  You can follow the example of the other job functions to get error
+  handling/reporting, mutex locking, and calling down to trove correct.
+  Add a prototype for your function to job.h
+
+State Machine:
+
+  Write a state machine to deal with the server-side of your operation.
+  The 'prelude' and 'final_response' states take care of some common
+  tasks.  look at the other server state machines to see how things
+  should go: that's the best documetnation so far.
+
+  
+Everything Else:
+
+  define a PINT_server_xxx_op with the information specific to your new
+  operation, and add it to the union in PINT_server_op.
+
+  Add a new enum to PVFS_server_op, remembering to increate the
+  PVFS_MAX_SERVER_OP define.  Define a server request structure
+  (PVFS_servreq_xxx) and optionally (but encouraged) a
+  PINT_SERVREQ_xxx_FILL macro.  If your operation needs information back
+  from the server (beyond 'success' or 'fail'), define a
+  PVFS_servresp_xxx structure for the server response.  Add these new
+  structures to the union in the declaration of the PVFS_server_req and
+  PVFS_server_resp (if necessary).
+
+
+  For many operations, -TROVE_ENOENT is ok (e.g. flushing a keyval when
+  the keyval space has not been created on disk, or setting attributes
+  on a file that didn't have atributes previously).  If your operation
+  is like that, modifly prelude_perm_check and add it to the list of
+  operations for which TROVE_ENOENT is ok.   If you haven't figured out
+  what it means to 'check permissions' for your operation, add it
+  towards the bottom of the function with the other oddball operations.
+
+  Help out the debugging helper functions by adding a text
+  representation of your operation to PINT_map_server_op_to_string()
+
+  The server will not know how to handle the new operation until you've
+  addded it along with the other operations in
+  PINT_state_table_initialize().
+
+  If your operation needs data from the request structure (and most of
+  them do), modify PINT_req_sched_target_handle to make the apropriate
+  copies.
+
+
+PROTOCOL
+  
+  the encode and decode system needs to know how to handle your new
+  operation.  If it is a self-contained structure -- that is, it has no
+  pointers -- then it can be added with the other self-contained
+  structures in do_decode_req(), do_encode_req(), do_decode_resp(), and
+  do_encode_resp().  Otherwise, you'll have to perform more steps like
+  those done in PVFS_SERV_IO and PVFS_SERV_MKDIR and others.
+
+TESTING
+  
+  no new operation should go in without a testcase exercising that
+  operation.  add it to the other tests in tests/client/sysint and add
+  it to the list of targets to build in module.mk.in
+
+
