@@ -35,6 +35,7 @@ static int print_keyval_pair(TROVE_keyval_s *key,
 			     TROVE_keyval_s *val,
 			     TROVE_ds_type type,
 			     int sz);
+static void print_object_attributes(struct PVFS_object_attr *a_p);
 
 int main(int argc, char **argv)
 {
@@ -150,111 +151,6 @@ int main(int argc, char **argv)
 
     ret = print_dspaces(coll_id, root_handle, no_root_handle);
 
-#if 0
-    /* create a dataspace to hold the root directory */
-    /* Q: what should the bitmask be? */
-    /* Q: where are we going to define the dspace types? -- trove-test.h for now. */
-    root_handle = new_root_handle;
-    ret = trove_dspace_create(coll_id,
-			      &root_handle,
-			      0xffffffff,
-			      2, /* TYPE; FIX!!! */
-			      NULL,
-			      TROVE_SYNC,
-			      NULL,
-			      &op_id);
-    while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
-    if (ret != 1 && state != 0) {
-	fprintf(stderr, "dspace create (for root dir) failed.\n");
-	return -1;
-    }
-
-    if (verbose) fprintf(stderr,
-			 "%s: info: created root directory with handle 0x%x.\n",
-			 argv[0],
-			 (int) root_handle);
-
-
-    memset(&attr, 0, sizeof(attr));
-    attr.owner    = 100;
-    attr.group    = 100;
-    attr.perms    = 0777;
-    attr.objtype  = 1;
-
-    key.buffer    = metastring;
-    key.buffer_sz = strlen(metastring) + 1;
-    val.buffer    = &attr;
-    val.buffer_sz = sizeof(attr);
-
-    ret = trove_keyval_write(coll_id,
-			     root_handle,
-			     &key,
-			     &val,
-			     TROVE_SYNC,
-			     0 /* vtag */,
-			     NULL /* user ptr */,
-			     &op_id);
-    while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
-    if (ret < 0) {
-	fprintf(stderr,
-		"%s: error: keyval write for root handle attributes failed; aborting!\n",
-		argv[0]);
-	return -1;
-    }
-
-    ent_handle = root_handle - 1; /* just put something in here */
-    ret = trove_dspace_create(coll_id,
-			      &ent_handle,
-			      0xffffffff,
-			      2, /* TYPE; FIX!!! */
-			      NULL,
-			      TROVE_SYNC,
-			      NULL,
-			      &op_id);
-    while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
-    if (ret != 1 && state != 0) {
-	fprintf(stderr, "dspace create (for dirent storage) failed.\n");
-	return -1;
-    }
-
-    if (verbose) fprintf(stderr,
-			 "%s: info: created dspace for dirents with handle 0x%x.\n",
-			 argv[0],
-			 (int) ent_handle);
-
-    key.buffer    = entstring;
-    key.buffer_sz = strlen(entstring) + 1;
-    val.buffer    = &ent_handle;
-    val.buffer_sz = sizeof(PVFS_handle);
-
-    ret = trove_keyval_write(coll_id,
-			     root_handle,
-			     &key,
-			     &val,
-			     TROVE_SYNC,
-			     0 /* vtag */,
-			     NULL /* user ptr */,
-			     &op_id);
-    while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
-    if (ret < 0) {
-	fprintf(stderr,
-		"%s: error: keyval write for handle used to store dirents failed; aborting!\n",
-		argv[0]);
-	return -1;
-    }
-
-    if (verbose) fprintf(stderr,
-			 "%s: info: wrote attributes for root directory.\n",
-			 argv[0]);
-
-    if (verbose) fprintf(stderr,
-			 "%s: info: collection created (root handle = %d, coll id = %d, root string = %s).\n",
-			 argv[0],
-			 (int) root_handle,
-			 (int) coll_id,
-			 root_handle_string);
-#endif
-
     trove_finalize();
 
     return 0;
@@ -283,10 +179,11 @@ static int parse_args(int argc, char **argv)
 	    default:
 		fprintf(stderr, "%s: error: unrecognized option '%c'.\n", argv[0], c);
 		fprintf(stderr,
-			"usage: %s [-s storage_space] [-c collection_name] [-v]\n",
+			"usage: %s [-s storage_space] [-c collection_name] [-v] [-k]\n",
 			argv[0]);
 		fprintf(stderr, "\tdefault storage space is '/tmp/pvfs2-test-space'.\n");
 		fprintf(stderr, "\t'-v' turns on verbose output.\n");
+		fprintf(stderr, "\t'-k' prints data in keyval spaces.\n");
 		return -1;
 	}
     }
@@ -420,6 +317,16 @@ static int print_dspace_keyvals(TROVE_coll_id coll_id,
     return 0;
 }
 
+static void print_object_attributes(struct PVFS_object_attr *a_p)
+{
+    fprintf(stdout,
+	    "(owner = %d, group = %d, perms = %o, objtype = %s)\n",
+	    a_p->owner,
+	    a_p->group,
+	    a_p->perms,
+	    type_to_string(a_p->objtype));
+}
+
 static int print_keyval_pair(TROVE_keyval_s *key_p,
 			     TROVE_keyval_s *val_p,
 			     TROVE_ds_type type,
@@ -431,7 +338,16 @@ static int print_keyval_pair(TROVE_keyval_s *key_p,
     if (isprint(((char *)key_p->buffer)[0]) && strnlen(key_p->buffer, sz) < 64) key_printable = 1;
     if (isprint(((char *)val_p->buffer)[0]) && strnlen(val_p->buffer, sz) < 64) val_printable = 1;
 
-    if (type == PVFS_TYPE_DIRECTORY && !strncmp(key_p->buffer, "dir_ent", 8)) {
+    if (!strncmp(key_p->buffer, "metadata", 8) && val_p->read_sz == sizeof(struct PVFS_object_attr)) {
+	fprintf(stdout,
+		"\t\t'%s' (%d): '%s' (%d) -- interpreted as PVFS_object_attr = ",
+		(char *) key_p->buffer,
+		key_p->read_sz,
+		(char *) val_p->buffer,
+		val_p->read_sz);
+	print_object_attributes((struct PVFS_object_attr *) val_p->buffer);
+    }
+    else if (type == PVFS_TYPE_DIRECTORY && !strncmp(key_p->buffer, "dir_ent", 8)) {
 	fprintf(stdout,
 		"\t\t'%s' (%d): '%s' (%d) -- interpreted as a handle = 0x%08Lx\n",
 		(char *) key_p->buffer,
@@ -440,7 +356,7 @@ static int print_keyval_pair(TROVE_keyval_s *key_p,
 		val_p->read_sz,
 		*(TROVE_handle *) val_p->buffer);
     }
-    if (type == PVFS_TYPE_DIRDATA && val_p->read_sz == 8) {
+    else if (type == PVFS_TYPE_DIRDATA && val_p->read_sz == 8) {
 	fprintf(stdout,
 		"\t\t'%s' (%d): '%s' (%d) -- interpreted as a handle = 0x%08Lx\n",
 		(char *) key_p->buffer,

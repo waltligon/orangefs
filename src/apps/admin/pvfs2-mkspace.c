@@ -158,7 +158,7 @@ int main(int argc, char **argv)
     attr.owner    = 100;
     attr.group    = 100;
     attr.perms    = 0777;
-    attr.objtype  = 1;
+    attr.objtype  = PVFS_TYPE_DIRECTORY;
 
     key.buffer    = metastring;
     key.buffer_sz = strlen(metastring) + 1;
