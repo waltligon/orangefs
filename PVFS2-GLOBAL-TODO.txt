@@ -105,6 +105,8 @@ I/O path:
 - bmi shmem implementation
 - many items in BMI and flow TODO files
 - push device thread into thread_mgr api, don't spawn unless needed
+- come up with a scheme to handle cases in dbpf-bstream-fd-cache in which
+  the number of fd's in use exceeds FDCACHE_ENTRIES
 
 I/O description:
 ====================================================================

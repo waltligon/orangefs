@@ -34,7 +34,7 @@
 #include "gossip.h"
 
 enum {
-    FDCACHE_ENTRIES = 16
+    FDCACHE_ENTRIES = 256
 };
 
 #undef FDCACHE_DONT_CACHE
