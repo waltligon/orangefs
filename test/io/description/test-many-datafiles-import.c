@@ -52,7 +52,7 @@ int main(int argc, char **argv)
 	    rf1.server_nr = j;
 	    rf1.server_ct = 67;
 	    rf1.fsize = 41943040;
-	    rf1.dist = PVFS_Dist_create("simple_stripe");
+	    rf1.dist = PVFS_dist_create("simple_stripe");
 	    rf1.extend_flag = 1;
 	    PINT_Dist_lookup(rf1.dist);
 

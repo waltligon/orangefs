@@ -67,7 +67,7 @@ int main(
     rf1.server_nr = 0;
     rf1.server_ct = 4;
     rf1.fsize = 0;
-    rf1.dist = PVFS_Dist_create("simple_stripe");
+    rf1.dist = PVFS_dist_create("simple_stripe");
     rf1.extend_flag = 1;
     PINT_Dist_lookup(rf1.dist);
 
@@ -109,7 +109,7 @@ int main(
     if (!PINT_REQUEST_DONE(file_state))
     {
 	fprintf(stderr,
-		"ERROR: request processing not done when it should be; calling again!\n");
+		"NEXT call to PINT_REQUEST_DONE should return 0.\n");
 
 	seg1.bytemax = BYTEMAX;
 	seg1.segmax = SEGMAX;

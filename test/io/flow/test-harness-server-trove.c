@@ -241,7 +241,7 @@ int main(
     flow_d->file_data.server_nr = 0;
     flow_d->file_data.server_ct = 1;
     flow_d->file_data.extend_flag = 1;
-    flow_d->file_data.dist = PVFS_Dist_create("default_dist");
+    flow_d->file_data.dist = PVFS_dist_create("basic_dist");
     if (!flow_d->file_data.dist)
     {
 	fprintf(stderr, "Error: failed to create dist.\n");

@@ -72,7 +72,7 @@ int main(int argc, char **argv)
 	rf1.server_nr = 0;
 	rf1.server_ct = 1;
 	rf1.fsize = 508;
-	rf1.dist = PVFS_Dist_create("simple_stripe");
+	rf1.dist = PVFS_dist_create("simple_stripe");
 	rf1.extend_flag = 1;
 	PINT_Dist_lookup(rf1.dist);
 
@@ -155,7 +155,7 @@ int main(int argc, char **argv)
 	rf1.server_nr = 0;
 	rf1.server_ct = 1;
 	rf1.fsize = 508;
-	rf1.dist = PVFS_Dist_create("simple_stripe");
+	rf1.dist = PVFS_dist_create("simple_stripe");
 	rf1.extend_flag = 1;
 	PINT_Dist_lookup(rf1.dist);
 

@@ -15,16 +15,16 @@
 #include "simple-stripe.h"
 #include "pint-distribution.h"
 
-void PINT_Dist_dump(PVFS_Dist *dist);
+void PINT_Dist_dump(PINT_dist *dist);
 
 int main(int argc, char **argv)
 {
-    struct PVFS_Dist *d;
+    PINT_dist *d;
     int ret = -1;
     PVFS_offset tmp_off = 0;
 
     /* grab a distribution */
-    d = PVFS_Dist_create("simple_stripe");
+    d = PVFS_dist_create("simple_stripe");
     assert(d);
 
     ret = PINT_Dist_lookup(d);
@@ -63,7 +63,7 @@ int main(int argc, char **argv)
 
 
     /* free dist */
-    PVFS_Dist_free(d);
+    PVFS_dist_free(d);
 
     return (0);
 }

@@ -92,28 +92,28 @@ int main(int argc, char **argv)
 	rf1.server_nr = 0;
 	rf1.server_ct = 4;
 	rf1.fsize = 0;
-	rf1.dist = PVFS_Dist_create("simple_stripe");
+	rf1.dist = PVFS_dist_create("simple_stripe");
 	rf1.extend_flag = 1;
 	PINT_Dist_lookup(rf1.dist);
 
 	rf2.server_nr = 1;
 	rf2.server_ct = 4;
 	rf2.fsize = 0;
-	rf2.dist = PVFS_Dist_create("simple_stripe");
+	rf2.dist = PVFS_dist_create("simple_stripe");
 	rf2.extend_flag = 1;
 	PINT_Dist_lookup(rf2.dist);
 
 	rf3.server_nr = 2;
 	rf3.server_ct = 4;
 	rf3.fsize = 0;
-	rf3.dist = PVFS_Dist_create("simple_stripe");
+	rf3.dist = PVFS_dist_create("simple_stripe");
 	rf3.extend_flag = 1;
 	PINT_Dist_lookup(rf3.dist);
 
 	rf4.server_nr = 3;
 	rf4.server_ct = 4;
 	rf4.fsize = 0;
-	rf4.dist = PVFS_Dist_create("simple_stripe");
+	rf4.dist = PVFS_dist_create("simple_stripe");
 	rf4.extend_flag = 1;
 	PINT_Dist_lookup(rf4.dist);
 
