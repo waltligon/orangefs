@@ -14,7 +14,7 @@
 typedef struct qlist_head* queue_list_p;
 
 queue_list_p queue_list_new(void);
-void queue_list_cleanup(void);
+void queue_list_cleanup(queue_list_p list);
 void queue_list_add(queue_list_p list, op_id_queue_p queue,
 	PVFS_fs_id fsid);
 op_id_queue_p queue_list_query(queue_list_p list, PVFS_fs_id fsid);
