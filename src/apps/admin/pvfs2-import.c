@@ -113,8 +113,8 @@ int main(int argc, char **argv)
     if(ret < 0)
     {
 	PVFS_perror("PVFS_sys_initialize", ret);
-	ret = -1;
-	goto main_out;
+	close(src_fd);
+	return(-1);
     }
 
     /* get the absolute path on the pvfs2 file system */
