@@ -518,16 +518,38 @@ PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
    }
 	gossip_debug(REQUEST_DEBUG,"\t\tfinished\n");
 	gossip_debug(REQUEST_DEBUG,
-			"\t\t\tof %lld sz %lld sg %d sm %d by %lld bm %lld eof %d",
-			offset, size, *segs, segmax, *bytes, bytemax, *eof_flag);
+			"\t\t\tof %lld sz %lld sg %d sm %d by %lld bm %lld\n",
+			offset, size, *segs, segmax, *bytes, bytemax);
+	/* find physical offset for this loff */
+	gossip_debug(REQUEST_DEBUG,"\t\t\tnext loff: %lld ", loff);
+   poff = (*rfdata->dist->methods->logical_to_physical_offset)
+			(rfdata->dist->params, rfdata->iod_num, rfdata->iod_count, loff);
+	gossip_debug(REQUEST_DEBUG,"next poff: %lld\n", poff);
+	if (poff >= rfdata->fsize)
+	{
+		/* end of file - thus end of request */
+		*eof_flag = 1;
+		gossip_debug(REQUEST_DEBUG,"\t\t\t[return value] %lld (EOF)\n",
+				orig_size);
+		return orig_size;
+	}
 	if (loff >= orig_offset + orig_size)
 	{
-		gossip_debug(REQUEST_DEBUG," (rv) %lld\n", orig_size);
+		gossip_debug(REQUEST_DEBUG,"\t\t\t(return value) %lld", orig_size);
+		if (*eof_flag)
+			gossip_debug(REQUEST_DEBUG," (EOF)\n");
+		else
+			gossip_debug(REQUEST_DEBUG,"\n");
 		return orig_size;
 	}
 	else
 	{
-		gossip_debug(REQUEST_DEBUG," rv %lld\n", offset - orig_offset);
+		gossip_debug(REQUEST_DEBUG,"\t\t\treturn value %lld",
+				offset - orig_offset);
+		if (*eof_flag)
+			gossip_debug(REQUEST_DEBUG," (EOF)\n");
+		else
+			gossip_debug(REQUEST_DEBUG,"\n");
 		return (offset - orig_offset);
 	}
 }
