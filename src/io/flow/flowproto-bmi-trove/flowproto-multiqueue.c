@@ -84,10 +84,8 @@ static void bmi_send_callback_fn(void *user_ptr,
 		         PVFS_error error_code);
 static void cleanup_buffers(struct fp_private_data* flow_data);
 
-#if 0
 static void trove_read_callback_fn(void *user_ptr,
 		           PVFS_error error_code);
-#endif
 static void trove_write_callback_fn(void *user_ptr,
 		           PVFS_error error_code);
 
@@ -539,7 +537,12 @@ static void bmi_recv_callback_fn(void *user_ptr,
     return;
 }
 
-#if 0
+/* trove_read_callback_fn()
+ *
+ * function to be called upon completion of a trove read operation
+ *
+ * no return value
+ */
 static void trove_read_callback_fn(void *user_ptr,
 		           PVFS_error error_code)
 {
@@ -550,7 +553,6 @@ static void trove_read_callback_fn(void *user_ptr,
     assert(0);
     return;
 }
-#endif
 
 /* bmi_send_callback_fn()
  *
@@ -562,11 +564,125 @@ static void bmi_send_callback_fn(void *user_ptr,
 		         PVFS_size actual_size,
 		         PVFS_error error_code)
 {
+    struct fp_queue_item* q_item = user_ptr;
+    struct fp_private_data* flow_data = PRIVATE_FLOW(q_item->parent);
+    int ret;
+    struct result_chain_entry* result_tmp;
+    struct result_chain_entry* old_result_tmp;
+    void* tmp_buffer;
+    PVFS_size bytes_processed = 0;
+    PVFS_id_gen_t tmp_id;
+
     /* TODO: error handling */
     assert(error_code == 0);
 
-    /* TODO: fill this in */
-    assert(0);
+    /* if this was the last operation, then mark the flow as done */
+    if(flow_data->parent->total_transfered == flow_data->parent->aggregate_size)
+    {
+	q_item->parent->state = FLOW_COMPLETE;
+	gen_mutex_lock(&completion_mutex);
+	qlist_add_tail(&(flow_data->list_link), 
+	    &completion_queue);
+	pthread_cond_signal(&completion_cond);
+	gen_mutex_unlock(&completion_mutex);
+	return;
+    }
+
+    if(q_item->buffer)
+    {
+	/* if this q_item has been used before, remove it from its 
+	 * current queue */
+	gen_mutex_lock(&flow_data->dest_mutex);
+	qlist_del(&q_item->list_link);
+	gen_mutex_unlock(&flow_data->dest_mutex);
+    }
+    else
+    {
+	/* if the q_item has not been used, allocate a buffer */
+	q_item->buffer = BMI_memalloc(q_item->parent->dest.u.bmi.address,
+	    BUFFER_SIZE, BMI_SEND);
+	/* TODO: error handling */
+	assert(q_item->buffer);
+	q_item->bmi_callback.fn = bmi_send_callback_fn;
+	q_item->trove_callback.fn = trove_read_callback_fn;
+    }
+    
+    /* add to src queue */
+    gen_mutex_lock(&flow_data->src_mutex);
+    qlist_add_tail(&q_item->list_link, &flow_data->src_list);
+    gen_mutex_unlock(&flow_data->src_mutex);
+
+    result_tmp = &q_item->result_chain;
+    old_result_tmp = result_tmp;
+    tmp_buffer = q_item->buffer;
+    do{
+	q_item->result_chain_count++;
+	if(!result_tmp)
+	{
+	    result_tmp = (struct result_chain_entry*)malloc(
+		sizeof(struct result_chain_entry));
+	    assert(result_tmp);
+	    old_result_tmp->next = result_tmp;
+	}
+	/* process request */
+	result_tmp->result.offset_array = 
+	    result_tmp->offset_list;
+	result_tmp->result.size_array = 
+	    result_tmp->size_list;
+	result_tmp->result.bytemax = BUFFER_SIZE;
+	result_tmp->result.bytes = 0;
+	result_tmp->result.segmax = MAX_REGIONS;
+	result_tmp->result.segs = 0;
+	result_tmp->buffer_offset = tmp_buffer;
+	ret = PINT_Process_request(q_item->parent->file_req_state,
+	    q_item->parent->mem_req_state,
+	    &q_item->parent->file_data,
+	    &result_tmp->result,
+	    PINT_SERVER);
+	/* TODO: error handling */ 
+	assert(ret >= 0);
+	
+	old_result_tmp = result_tmp;
+	result_tmp = result_tmp->next;
+	tmp_buffer = (void*)((char*)tmp_buffer + old_result_tmp->result.bytes);
+	bytes_processed += old_result_tmp->result.bytes;
+    }while(bytes_processed < BUFFER_SIZE && 
+	!PINT_REQUEST_DONE(q_item->parent->file_req_state));
+
+    /* nothing to do */
+    if(bytes_processed == 0)
+    {
+	return;
+    }
+
+    result_tmp = &q_item->result_chain;
+    do{
+	ret = trove_bstream_read_list(q_item->parent->src.u.trove.coll_id,
+	    q_item->parent->src.u.trove.handle,
+	    (char**)&result_tmp->buffer_offset,
+	    &result_tmp->result.bytes,
+	    1,
+	    result_tmp->result.offset_array,
+	    result_tmp->result.size_array,
+	    result_tmp->result.segs,
+	    &result_tmp->result.bytes,
+	    0,
+	    NULL,
+	    &q_item->trove_callback,
+	    global_trove_context,
+	    &tmp_id);
+	result_tmp = result_tmp->next;
+
+	/* TODO: error handling */
+	assert(ret >= 0);
+
+	if(ret == 1)
+	{
+	    /* immediate completion; trigger callback ourselves */
+	    trove_read_callback_fn(q_item, 0);
+	}
+    }while(result_tmp);
+
     return;
 };
 
