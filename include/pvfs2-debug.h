@@ -51,6 +51,7 @@
 #define GOSSIP_CANCEL_DEBUG            ((uint64_t)1 << 29)
 #define GOSSIP_MSGPAIR_DEBUG           ((uint64_t)1 << 30)
 #define GOSSIP_CLIENTCORE_DEBUG        ((uint64_t)1 << 31)
+#define GOSSIP_CLIENTCORE_TIMING_DEBUG ((uint64_t)1 << 32)
 
 #define GOSSIP_BMI_DEBUG_ALL (uint64_t)                               \
 (GOSSIP_BMI_DEBUG_TCP + GOSSIP_BMI_DEBUG_CONTROL +                    \

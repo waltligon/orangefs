@@ -687,6 +687,16 @@ static int lookup_segment_verify_attr_present(PINT_client_sm *sm_p,
     assert(cur_seg);
 
     /*
+      attempt to insert the resolved segment/object refn into the
+      ncache if it wasn't a cache hit
+    */
+    if (!sm_p->ncache_hit)
+    {
+        PINT_ncache_insert(cur_seg->seg_name, cur_seg->seg_resolved_refn,
+                           cur_seg->seg_starting_refn);
+    }
+
+    /*
       NOTE: there are two cases here where we need to fetch the attrs.
 
       1) either the attrs are not present at all (i.e. objtype is

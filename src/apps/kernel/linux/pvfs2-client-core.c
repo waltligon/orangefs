@@ -71,7 +71,7 @@
   uncomment for timing of individual operation information to be
   emitted to the pvfs2-client logging output
 */
-/* #define CLIENT_CORE_OP_TIMING */
+#define CLIENT_CORE_OP_TIMING
 
 #ifdef CLIENT_CORE_OP_TIMING
 #include "pint-util.h"
@@ -394,10 +394,11 @@ static inline void log_operation_timing(vfs_request_t *vfs_request)
                    vfs_request->end,
                    &wtime, &utime, &stime);
 
-    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "%s complete (vfs_request "
-                 "%p)\n\twtime = %f, utime=%f, stime=%f (seconds)\n",
-                 get_vfs_op_name_str(vfs_request->in_upcall.type),
-                 vfs_request, wtime, utime, stime);
+    gossip_debug(
+        GOSSIP_CLIENTCORE_TIMING_DEBUG, "%s complete (vfs_request "
+        "%p)\n\twtime = %f, utime=%f, stime=%f (seconds)\n",
+        get_vfs_op_name_str(vfs_request->in_upcall.type),
+        vfs_request, wtime, utime, stime);
 #else
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG, "%s complete (vfs_request %p)\n",

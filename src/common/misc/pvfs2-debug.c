@@ -59,6 +59,7 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "cancel", GOSSIP_CANCEL_DEBUG },
     { "msgpair", GOSSIP_MSGPAIR_DEBUG },
     { "clientcore", GOSSIP_CLIENTCORE_DEBUG },
+    { "clientcore_timing", GOSSIP_CLIENTCORE_TIMING_DEBUG },
     { "verbose",  (__DEBUG_ALL & ~GOSSIP_REQ_SCHED_DEBUG)},
     { "none", GOSSIP_NO_DEBUG },
     { "all",  __DEBUG_ALL }

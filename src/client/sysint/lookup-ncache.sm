@@ -6,15 +6,17 @@
 
 /* pvfs2_client_getattr_pcache_sm
  *
- * The purpose of this state machine is to resolve a segment (one component
- * of a path) and a parent handle down to an object handle.  This object handle
- * might already be present in a local cache (the ncache) or could be obtained
- * from a remote server.
+ * The purpose of this state machine is to resolve a segment (one
+ * component of a path) and a parent handle down to an object handle.
+ * This object handle might already be present in a local cache (the
+ * ncache) or could be obtained from a remote server.
  *
  * This state machine uses the msgpair structure in the PINT_client_sm
- * structure in order to perform the message passing.  It assumes that this
- * has been previously set up by the state machine above this one.  In particular
- * the following fields of the msgpair structure must be filled in:
+ * structure in order to perform the message passing.  It assumes that
+ * this has been previously set up by the state machine above this
+ * one.  In particular the following fields of the msgpair structure
+ * must be filled in:
+ *
  * - req (unencoded lookup request)
  * - fs_id
  * - handle
@@ -23,15 +25,15 @@
  *   them in the appropriate place for the state machine jumping to this one
  *   (e.g. copies object handle out in the remove case)
  *
- * This state machine in turns jumps to the pvfs2_msgpairarray_sm 
- * to perform messaging, if necessary.
+ * This state machine in turns jumps to the pvfs2_msgpairarray_sm to
+ * perform messaging, if necessary.
  *
- * NOTE: the comp_fn can cause a non-zero error_code to be passed back up from
- *       the msgpair state machine and through this state machine back to the
- *       one that jumped to here.  so be aware!
+ * NOTE: the comp_fn can cause a non-zero error_code to be passed back
+ * up from the msgpair state machine and through this state machine
+ * back to the one that jumped to here.  so be aware!
  *
- * TODO: sometimes we will get new attributes back with the lookup response.
- *       we should add these into the pcache as appropriate.
+ * TODO: sometimes we will get new attributes back with the lookup
+ * response.  we should add these into the pcache as appropriate.
  */
 
 #include <string.h>
@@ -64,7 +66,6 @@ nested machine pvfs2_client_lookup_ncache_sm(lookup,
     state lookup
     {
         run lookup_ncache_lookup;
-        success => return;
         LOOKUP_NCACHE_MISS => xfer_msgpair;
         default => return;
     }
@@ -84,16 +85,16 @@ static int lookup_ncache_lookup(PINT_client_sm *sm_p,
     int ret = -PVFS_EINVAL;
     PVFS_object_ref parent_ref, object_ref;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup_ncache state: lookup\n");
+    gossip_debug(GOSSIP_NCACHE_DEBUG, "lookup_ncache state: lookup\n");
 
-    assert(js_p->error_code == 0); /* sanity check */
+    assert(js_p->error_code == 0);
 
-    parent_ref.fs_id  = sm_p->msgpair.fs_id;
+    parent_ref.fs_id = sm_p->msgpair.fs_id;
     parent_ref.handle = sm_p->msgpair.handle;
 
-    ret = PINT_ncache_lookup(sm_p->msgpair.req.u.lookup_path.path,
-			     parent_ref,
-			     &object_ref);
+    ret = PINT_ncache_lookup(
+        sm_p->msgpair.req.u.lookup_path.path, parent_ref, &object_ref);
+
     if (ret == 0)
     {
 	struct PVFS_server_resp fake_resp;
@@ -115,8 +116,10 @@ static int lookup_ncache_lookup(PINT_client_sm *sm_p,
 	ret = sm_p->msgpair.comp_fn(sm_p, &fake_resp, 0);
 	return 1;
     }
+
     gossip_debug(GOSSIP_NCACHE_DEBUG, "*** ncache clean miss on %s.\n",
                  sm_p->msgpair.req.u.lookup_path.path);
+
     js_p->error_code = LOOKUP_NCACHE_MISS;
     return 1;
 }
