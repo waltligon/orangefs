@@ -3,6 +3,11 @@ PVFS2 Release ChangeLog
 -----------------------
 
 
+pvfs2-0.7.0pre1
+===============
+- 
+
+
 pvfs2-0.6.4
 ===========
 - added a pvfs2-config tool to help when compiling against pvfs2
