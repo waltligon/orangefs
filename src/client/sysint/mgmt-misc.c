@@ -102,7 +102,7 @@ int PVFS_mgmt_statfs_all(PVFS_fs_id fs_id,
     }
     
     ret = PVFS_mgmt_statfs_list(
-        fs_id, credentials, stat_array, addr_array, NULL, real_count);
+        fs_id, credentials, stat_array, addr_array, real_count, NULL);
 
     free(addr_array);
 
