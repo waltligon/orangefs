@@ -183,12 +183,13 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
         }
         else
         {
-            TROVE_context_id HACK_trove_context = -1;
-            ret = trove_open_context(&HACK_trove_context);
-            assert(ret == 0);
+/*             TROVE_context_id HACK_trove_context = 0; */
+/*             ret = trove_open_context(&HACK_trove_context); */
+/*             assert(ret == 0); */
+            gossip_err("FIXME: Faking trove_context 0\n");
             /* add configured merged handle range for this host/fs */
             ret = trove_collection_setinfo(
-                cur_fs->coll_id,HACK_trove_context,
+                cur_fs->coll_id,0,
                 TROVE_COLLECTION_HANDLE_RANGES,
                 (void *)cur_merged_handle_range);
             if (ret < 0)
@@ -199,7 +200,7 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
                 goto interface_init_failed;
             }
             free(cur_merged_handle_range);
-            trove_close_context(HACK_trove_context);
+/*             trove_close_context(HACK_trove_context); */
         }
 
         cur = llist_next(cur);
