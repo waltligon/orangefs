@@ -5,7 +5,11 @@ PVFS2 Release ChangeLog
 
 pvfs2-0.6.5pre1
 ===============
-- 
+- broke several server state machines into multiple nested machines 
+- some PAV cleanups, including support for a larger number of meta servers
+  than io servers
+- update k_size (number of keyvals) in dspace attr cache when the number of
+  keyvals on disk changes
 
 
 pvfs2-0.6.4
