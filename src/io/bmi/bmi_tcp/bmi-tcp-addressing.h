@@ -31,7 +31,6 @@ struct tcp_addr
     /* stores error code for addresses that are broken for some reason */
     int addr_error;		
     char *hostname;
-    char *ipaddr;
     int port;
     int socket;
     /* flag that indicates this address represents a
@@ -46,6 +45,8 @@ struct tcp_addr
     int sc_index;
     /* count of the number of sequential zero read operations */
     int zero_read_limit;
+    /* flag used to determine if we can reconnect this address after failure */
+    int dont_reconnect;
 };
 
 /*****************************************************************

@@ -1507,23 +1507,29 @@ static int tcp_sock_init(method_addr_p my_method_addr)
     int tmp_errno = 0;
 
     /* check for obvious problems */
-    if (!my_method_addr)
+    assert(my_method_addr);
+    assert(my_method_addr->method_type == tcp_method_params.method_id);
+    assert(tcp_addr_data->server_port == 0);
+
+    /* fail immediately if the address is in failure mode and we have no way
+     * to reconnect
+     */
+    if(tcp_addr_data->addr_error && tcp_addr_data->dont_reconnect)
     {
-	return (bmi_tcp_errno_to_pvfs(-EINVAL));
+	gossip_debug(GOSSIP_BMI_DEBUG_TCP, 
+	"Warning: BMI communication attempted on an address in failure mode.\n");
+	return(tcp_addr_data->addr_error);
     }
-    if (my_method_addr->method_type != tcp_method_params.method_id)
-    {
-	return (bmi_tcp_errno_to_pvfs(-EINVAL));
-    }
-    if (tcp_addr_data->server_port)
-    {
-	return (bmi_tcp_errno_to_pvfs(-EINVAL));
-    }
+
     if(tcp_addr_data->addr_error)
     {
-	/* this address is bad, don't try to do anything with it */
-	gossip_err("Warning: BMI communication attempted on an address in failure mode.\n");
-	return(tcp_addr_data->addr_error);
+	/* TODO: make this a debug rather than error message once we have
+	 * tested this out enough
+	 */
+	gossip_err("Warning: BMI attempting reconnect.\n");
+	tcp_addr_data->addr_error = 0;
+	assert(tcp_addr_data->socket < 0);
+	tcp_addr_data->not_connected = 1;
     }
 
     /* is there already a socket? */
@@ -1582,7 +1588,6 @@ static int tcp_sock_init(method_addr_p my_method_addr)
 	return (bmi_tcp_errno_to_pvfs(-tmp_errno));
     }
 
-    /* BMI_sockio_connect_sock will work with both ipaddr and hostname :) */
     if (tcp_addr_data->hostname)
     {
 	gossip_ldebug(GOSSIP_BMI_DEBUG_TCP,
@@ -1592,15 +1597,6 @@ static int tcp_sock_init(method_addr_p my_method_addr)
 	ret =
 	    BMI_sockio_connect_sock(tcp_addr_data->socket, tcp_addr_data->hostname,
 			 tcp_addr_data->port);
-    }
-    else if (tcp_addr_data->ipaddr)
-    {
-	gossip_ldebug(GOSSIP_BMI_DEBUG_TCP,
-                      "Connect: socket=%d, ip=%s, port=%d\n",
-		      tcp_addr_data->socket, tcp_addr_data->ipaddr,
-		      tcp_addr_data->port);
-	ret = BMI_sockio_connect_sock(tcp_addr_data->socket,
-			   tcp_addr_data->ipaddr, tcp_addr_data->port);
     }
     else
     {
@@ -1726,6 +1722,23 @@ static int enqueue_operation(op_list_p target_list,
     }
 
     tcp_addr_data = map->method_data;
+
+    if(tcp_addr_data->addr_error)
+    {
+	/* just fail here, whether on client or server side.  This case only
+	 * occurs in race condition where tcp_cleanse_addr() function misses
+	 * operations that are not yet queued
+	 */
+        gossip_debug(GOSSIP_BMI_DEBUG_TCP, 
+		   "Warning: BMI communication attempted on an "
+                   "address in failure mode.\n");
+        new_method_op->error_code = tcp_addr_data->addr_error;
+        op_list_add(op_list_array[new_method_op->context_id],
+                    new_method_op);
+        return(tcp_addr_data->addr_error);
+    }
+
+#if 0
     if(tcp_addr_data->addr_error)
     {
         /* this address is bad, don't try to do anything with it */
@@ -1737,6 +1750,7 @@ static int enqueue_operation(op_list_p target_list,
                     new_method_op);
         return(tcp_addr_data->addr_error);
     }
+#endif
 
     /* add the socket to poll on */
     BMI_socket_collection_add(tcp_socket_collection_p, map);
@@ -1784,10 +1798,14 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
     int i;
 
     tcp_addr_data = src->method_data;
-    if(tcp_addr_data->addr_error)
+
+    /* short out immediately if the address is bad and we have no way to
+     * reconnect
+     */
+    if(tcp_addr_data->addr_error && tcp_addr_data->dont_reconnect)
     {
-	/* this address is bad, don't try to do anything with it */
-	gossip_err("Warning: BMI communication attempted on an address in failure mode.\n");
+	gossip_debug(GOSSIP_BMI_DEBUG_TCP, 
+	"Warning: BMI communication attempted on an address in failure mode.\n");
 	return(tcp_addr_data->addr_error);
     }
 
@@ -2246,6 +2264,10 @@ static int handle_new_connection(method_addr_p map)
 		  accepted_socket);
     tcp_addr_data = new_addr->method_data;
     tcp_addr_data->socket = accepted_socket;
+    /* set a flag to make sure that we never try to reconnect this address
+     * in the future
+     */
+    tcp_addr_data->dont_reconnect = 1;
     /* register this address with the method control layer */
     ret = bmi_method_addr_reg_callback(new_addr);
     if (ret < 0)
