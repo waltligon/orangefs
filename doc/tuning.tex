@@ -1,0 +1,20 @@
+\section{Tuning PVFS2}
+\label{sec:tuning}
+
+The default settings -- those provided by \texttt{pvfs2-genconfig} --
+will give correct behavior and decent performance.   You can use more
+aggressive settings that will yield better performance, but you should
+understand the consequences of altering the defaults.
+
+\subsection{Sync Mode}
+
+The easiest way to see an improvement in performance is to set the
+\texttt{TroveSyncMeta} and \texttt{TroveSyncData} attributes to ``no''
+in the \texttt{<StorageHints>} section.  If those attributes are set to
+``no'' then Trove will read and write data from a cache and not the
+underlying file.  Performance will increase greatly, but if the server
+dies at some point, you could lose data.  At this point in PVFS2
+development, server crashes are rare outside of hardware failures.
+PVFS2 developers should probably leave these settings to ``yes''.  If
+PVFS2 hosts the only copy of your data, leave these settings to ``yes''.
+Otherwise, give ``no'' a shot.
