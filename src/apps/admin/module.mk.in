@@ -8,7 +8,8 @@ ADMINSRC := \
         $(DIR)/pvfs2-ls.c \
         $(DIR)/pvfs2-ping.c \
         $(DIR)/pvfs2-statfs.c \
-	$(DIR)/pvfs2-perf-mon-example.c
+	$(DIR)/pvfs2-perf-mon-example.c \
+	$(DIR)/pvfs2-fs-dump.c
 
 ADMINSRC_SERVER := \
 	$(DIR)/pvfs2-mkspace.c \

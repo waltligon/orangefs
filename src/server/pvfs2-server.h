@@ -285,6 +285,7 @@ extern struct PINT_state_machine_s pvfs2_noop_sm;
 extern struct PINT_state_machine_s pvfs2_statfs_sm;
 extern struct PINT_state_machine_s pvfs2_perf_update_sm;
 extern struct PINT_state_machine_s pvfs2_perf_mon_sm;
+extern struct PINT_state_machine_s pvfs2_iterate_handles_sm;
 
 /* nested state machines */
 extern struct PINT_state_machine_s pvfs2_prelude_sm;

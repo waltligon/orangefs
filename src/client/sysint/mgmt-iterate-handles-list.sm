@@ -159,10 +159,12 @@ static int mgmt_iterate_handles_list_setup_msgpair(
 	msg_p = &sm_p->msgarray[j];
 
 	/* skip servers that have already reached end */
+	/* TODO: use a better #define or something for ITERATE_END */
 	if(sm_p->u.iterate_handles_list.position_array[i]
 	    == TROVE_ITERATE_END)
 	{
 	    sm_p->msgarray_count--;
+	    sm_p->u.iterate_handles_list.handle_count_array[i] = 0;
 	}
 	else
 	{
