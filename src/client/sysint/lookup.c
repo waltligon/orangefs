@@ -123,11 +123,11 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
     }
 
     /* Get  the total number of segments */
-    get_no_of_segments(req->name, &num_segments_remaining);
+    get_no_of_segments(req->name, &num_segments_remaining); /* TODO: USE STRING LIB CALLS */
     total_segments = num_segments_remaining;
 
     /* make sure we're asking for something reasonable */
-    if(num_segments_remaining < 1)
+    if (num_segments_remaining < 1)
     {
 	failure = GET_PARENT_FAILURE;
 	ret = (-EINVAL);
@@ -157,7 +157,10 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 	req_p.rsize = sizeof(struct PVFS_server_req_s) + name_sz;
 	req_p.credentials = req->credentials;
 	max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op) + num_segments_remaining * (sizeof(PVFS_handle) + sizeof(PVFS_object_attr));
-	gossip_ldebug(CLIENT_DEBUG,"max msg size = %d \n",max_msg_sz);
+	gossip_debug(CLIENT_DEBUG,
+		      "  expecting ack of %d bytes (%d segment(s))\n",
+		      max_msg_sz,
+		      num_segments_remaining);
 
 	/* update the pointer to the copy we already have */
 	req_p.u.lookup_path.path = path;

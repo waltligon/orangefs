@@ -19,7 +19,8 @@
 
 enum 
 {
-    ENO_METADATA = 200
+    STATE_ENOTDIR = 22,
+    STATE_NOMORESEGS = 23
 };
 
 extern int PINT_string_count_segments(char *pathname);
@@ -29,12 +30,12 @@ extern int PINT_string_next_segment(char *pathname,
 
 static int lookup_init(PINT_server_op *s_op, job_status_s *ret);
 static int lookup_cleanup(PINT_server_op *s_op, job_status_s *ret);
-static int lookup_verify_directory_metadata(PINT_server_op *s_op, job_status_s *ret);
+static int lookup_verify_object_metadata(PINT_server_op *s_op, job_status_s *ret);
 static int lookup_send_response(PINT_server_op *s_op, job_status_s *ret);
 static int lookup_read_directory_entry(PINT_server_op *s_op, job_status_s *ret);
-static int lookup_read_directory_metadata(PINT_server_op *s_op, job_status_s *ret);
+static int lookup_read_directory_entry_handle(PINT_server_op *s_op, job_status_s *ret);
+static int lookup_read_object_metadata(PINT_server_op *s_op, job_status_s *ret);
 static int lookup_release_job(PINT_server_op *s_op, job_status_s *ret);
-static int lookup_setup_next_segment(PINT_server_op *s_op, job_status_s *ret);
 void lookup_init_state_machine(void);
 /* TODO: Release Scheduled Job */
 
@@ -49,40 +50,48 @@ PINT_state_machine_s lookup_req_s =
 
 %%
 
-machine lookup(init, read_directory_metadata, read_directory_entry, verify_directory_metadata, send_response, release, cleanup, setup_next_segment)
+machine lookup(init,
+	       read_object_metadata,
+	       read_directory_entry_handle,
+	       read_directory_entry,
+	       verify_object_metadata,
+	       send_response,
+	       release,
+	       cleanup)
 {
     state init
 	{
 	    run lookup_init;
-	    default => read_directory_metadata;
+	    default => read_object_metadata;
 	}
 
-    state read_directory_metadata
+    state read_object_metadata
 	{
-	    run lookup_read_directory_metadata;
-	    success => verify_directory_metadata;
+	    run lookup_read_object_metadata;
+	    success => verify_object_metadata;
 	    default => send_response;
 	}
 
-    state verify_directory_metadata
+    state verify_object_metadata
 	{
-	    run lookup_verify_directory_metadata;
-	    success      => read_directory_entry;
-	    ENO_METADATA => send_response;
-	    default      => send_response;
+	    run lookup_verify_object_metadata;
+	    success          => read_directory_entry_handle;
+	    STATE_ENOTDIR    => send_response;
+	    STATE_NOMORESEGS => send_response;
+	    default          => send_response;
+	}
+
+    state read_directory_entry_handle
+	{
+	    run lookup_read_directory_entry_handle;
+	    success => read_directory_entry;
+	    default => send_response;
 	}
 
     state read_directory_entry
 	{
 	    run lookup_read_directory_entry;
-	    success => setup_next_segment;
-	    default => send_response;
-	}
-
-    state setup_next_segment
-	{
-	    run lookup_setup_next_segment;
-            success => read_directory_metadata;
+	    success => read_object_metadata;
 	    default => send_response;
 	}
 
@@ -117,7 +126,6 @@ machine lookup(init, read_directory_metadata, read_directory_entry, verify_direc
  * Synopsis: Set up the state machine for set_attrib. 
  *           
  */
-
 void lookup_init_state_machine(void)
 {
     lookup_req_s.state_machine = lookup;
@@ -140,7 +148,7 @@ void lookup_init_state_machine(void)
  */
 static int lookup_init(PINT_server_op *s_op, job_status_s *ret)
 {
-    int seg_ret, job_post_ret;
+    int job_post_ret;
     char *ptr;
 
     gossip_debug(SERVER_DEBUG, "lookup state: lookup_init\n");
@@ -151,15 +159,7 @@ static int lookup_init(PINT_server_op *s_op, job_status_s *ret)
     s_op->u.lookup.segp = NULL;
 
     s_op->u.lookup.seg_ct = PINT_string_count_segments(s_op->u.lookup.path);
-    if (s_op->u.lookup.seg_ct == -1)
-    {
-        s_op->u.lookup.seg_ct = 0;
-    }
-    s_op->u.lookup.seg_nr = 0;
-
-    seg_ret = PINT_string_next_segment(s_op->u.lookup.path,
-				       &s_op->u.lookup.segp,
-				       &s_op->u.lookup.segstate);
+    assert(s_op->u.lookup.seg_ct >= 0);
 
     s_op->u.lookup.base_handle = s_op->req->u.lookup_path.starting_handle;
     s_op->u.lookup.fs_id       = s_op->req->u.lookup_path.fs_id;
@@ -184,7 +184,7 @@ static int lookup_init(PINT_server_op *s_op, job_status_s *ret)
 }
 
 /*
- * Function: lookup_read_directory_metadata
+ * Function: lookup_read_object_metadata
  *
  * Params:   server_op *s_op, 
  *           job_status_s *ret
@@ -200,22 +200,19 @@ static int lookup_init(PINT_server_op *s_op, job_status_s *ret)
  *           keyval pairs.
  *           
  */
-static int lookup_read_directory_metadata(PINT_server_op *s_op, job_status_s *ret)
+static int lookup_read_object_metadata(PINT_server_op *s_op, job_status_s *ret)
 {
     int job_post_ret;
     job_id_t j_id;
     PVFS_handle handle;
 
-    gossip_debug(SERVER_DEBUG, "lookup state: lookup_read_directory_metadata\n");
+    gossip_debug(SERVER_DEBUG, "lookup state: lookup_read_object_metadata\n");
+
+    assert(s_op->u.lookup.seg_nr <= s_op->u.lookup.seg_ct);
 
     /* use the base handle if we haven't looked up a segment yet */
     if (s_op->u.lookup.seg_nr == 0) handle = s_op->u.lookup.base_handle;
     else                            handle = s_op->u.lookup.h_a[s_op->u.lookup.seg_nr-1];
-
-    gossip_debug(SERVER_DEBUG,
-		 "  looking up segment %s using directory handle = 0x%08Lx\n",
-		 s_op->u.lookup.segp,
-		 handle);
 
     /* initialize keyvals prior to read list call
      *
@@ -225,33 +222,38 @@ static int lookup_read_directory_metadata(PINT_server_op *s_op, job_status_s *re
      * If this is the base handle, we read attributes into base_attr rather
      * than into the object attribute array (oa_a).
      */
-    s_op->u.lookup.k_a[0].buffer    = Trove_Common_Keys[DIR_ENT_KEY].key;
-    s_op->u.lookup.k_a[0].buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
-    s_op->u.lookup.v_a[0].buffer    = &s_op->u.lookup.dirent_handle;
-    s_op->u.lookup.v_a[0].buffer_sz = sizeof(PVFS_handle);
 
-    s_op->u.lookup.k_a[1].buffer    = Trove_Common_Keys[METADATA_KEY].key;
-    s_op->u.lookup.k_a[1].buffer_sz = Trove_Common_Keys[METADATA_KEY].size;
-    if (s_op->u.lookup.seg_nr == 0) s_op->u.lookup.v_a[1].buffer = &s_op->u.lookup.base_attr;
-    else                            s_op->u.lookup.v_a[1].buffer = &s_op->u.lookup.oa_a[s_op->u.lookup.seg_nr-1];
+    s_op->u.lookup.k_a[0].buffer    = Trove_Common_Keys[METADATA_KEY].key;
+    s_op->u.lookup.k_a[0].buffer_sz = Trove_Common_Keys[METADATA_KEY].size;
 
-    s_op->u.lookup.v_a[1].buffer_sz = sizeof(PVFS_object_attr);
+    if (s_op->u.lookup.seg_nr == 0) s_op->u.lookup.v_a[0].buffer = &s_op->u.lookup.base_attr;
+    else                            s_op->u.lookup.v_a[0].buffer = &s_op->u.lookup.oa_a[s_op->u.lookup.seg_nr-1];
 
-    job_post_ret = job_trove_keyval_read_list(s_op->u.lookup.fs_id,
-					      handle,
-					      s_op->u.lookup.k_a,
-					      s_op->u.lookup.v_a,
-					      2,
-					      0 /* flags */,
-					      NULL,
-					      s_op,
-					      ret,
-					      &j_id);
+    s_op->u.lookup.v_a[0].buffer_sz = sizeof(PVFS_object_attr);
+
+    gossip_debug(SERVER_DEBUG,
+		 "  reading metadata (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf =  0x%08x (%d))\n",
+		 s_op->u.lookup.fs_id,
+		 handle,
+		 (char *) s_op->u.lookup.k_a->buffer,
+		 s_op->u.lookup.k_a->buffer_sz,
+		 (unsigned) s_op->u.lookup.v_a->buffer,
+		 s_op->u.lookup.v_a->buffer_sz);
+
+    job_post_ret = job_trove_keyval_read(s_op->u.lookup.fs_id,
+					 handle,
+					 s_op->u.lookup.k_a,
+					 s_op->u.lookup.v_a,
+					 0,
+					 NULL,
+					 s_op,
+					 ret,
+					 &j_id);
     return job_post_ret;
 }
 
 /*
- * Function: lookup_verify_directory_metadata
+ * Function: lookup_verify_object_metadata
  *
  * Params:   server_op *s_op, 
  *           job_status_s *ret
@@ -272,28 +274,93 @@ static int lookup_read_directory_metadata(PINT_server_op *s_op, job_status_s *re
  *           If we failed, we go on to send our response (partial??? verify!).
  *           
  */
-static int lookup_verify_directory_metadata(PINT_server_op *s_op, job_status_s *ret)
+static int lookup_verify_object_metadata(PINT_server_op *s_op, job_status_s *ret)
 {
+    int seg_ret;
     PVFS_object_attr *a_p;
 
-    gossip_debug(SERVER_DEBUG, "lookup state: lookup_verify_directory_metadata\n");
+    gossip_debug(SERVER_DEBUG, "lookup state: lookup_verify_object_metadata\n");
 
     if (s_op->u.lookup.seg_nr == 0) a_p = &s_op->u.lookup.base_attr;
     else                            a_p = &s_op->u.lookup.oa_a[s_op->u.lookup.seg_nr - 1];
 
-    assert(a_p->objtype == PVFS_TYPE_DIRECTORY);
+    assert(a_p->objtype == PVFS_TYPE_DIRECTORY || a_p->objtype == PVFS_TYPE_METAFILE);
 
     gossip_debug(SERVER_DEBUG,
-		 "  dirent handle = 0x%08Lx, attrs = (owner = %d, group = %d, perms = %o, type = %d)\n",
-		 s_op->u.lookup.dirent_handle,
+		 "  attrs = (owner = %d, group = %d, perms = %o, type = %d)\n",
 		 a_p->owner,
 		 a_p->group,
 		 a_p->perms,
 		 a_p->objtype);
 
+    /* if we hit a metafile, we are done */
+    if (a_p->objtype == PVFS_TYPE_METAFILE) {
+	gossip_debug(SERVER_DEBUG, "  object is a metafile; halting lookup and sending response\n");
+	ret->error_code = STATE_ENOTDIR;
+	return 1;
+    }
+
+    /* if we looked up all the segments, we are done */
+    if (s_op->u.lookup.seg_nr == s_op->u.lookup.seg_ct) {
+	gossip_debug(SERVER_DEBUG,
+		     "  no more segments in path; sending response\n");
+	ret->error_code = STATE_NOMORESEGS;
+	return 1;
+    }
+
+    /* find the segment that we should look up in the directory */
+    seg_ret = PINT_string_next_segment(s_op->u.lookup.path,
+				       &s_op->u.lookup.segp,
+				       &s_op->u.lookup.segstate);
+    assert(seg_ret == 0);
+
+    gossip_debug(SERVER_DEBUG,
+		 "  object is a datafile; will be looking for handle for segment %s in a bit\n",
+		 s_op->u.lookup.segp);
+
     return 1;
 }
 
+/*
+ * Function: lookup_read_directory_entry_handle
+ */
+static int lookup_read_directory_entry_handle(PINT_server_op *s_op, job_status_s *ret)
+{
+    TROVE_handle handle;
+    int job_post_ret;
+    job_id_t j_id;
+
+    gossip_debug(SERVER_DEBUG, "lookup state: lookup_read_directory_entry_handle\n");
+
+    /* initialize keyval prior to read call
+     *
+     * We will read the handle of the object holding dirents here.
+     */
+
+    /* use the base handle if we haven't looked up a segment yet */
+    if (s_op->u.lookup.seg_nr == 0) handle = s_op->u.lookup.base_handle;
+    else                            handle = s_op->u.lookup.h_a[s_op->u.lookup.seg_nr-1];
+
+    gossip_debug(SERVER_DEBUG,
+		 "  reading dirent handle value from handle 0x%08Lx\n",
+		 handle);
+
+    s_op->u.lookup.k_a[0].buffer    = Trove_Common_Keys[DIR_ENT_KEY].key;
+    s_op->u.lookup.k_a[0].buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
+    s_op->u.lookup.v_a[0].buffer    = &s_op->u.lookup.dirent_handle;
+    s_op->u.lookup.v_a[0].buffer_sz = sizeof(PVFS_handle);
+
+    job_post_ret = job_trove_keyval_read(s_op->u.lookup.fs_id,
+					 handle,
+					 s_op->u.lookup.k_a,
+					 s_op->u.lookup.v_a,
+					 0,
+					 NULL,
+					 s_op,
+					 ret,
+					 &j_id);
+    return job_post_ret;
+}
 
 /*
  * Function: lookup_read_directory_entry
@@ -328,6 +395,8 @@ static int lookup_read_directory_entry(PINT_server_op *s_op, job_status_s *ret)
     s_op->u.lookup.v_a[0].buffer    = &s_op->u.lookup.h_a[s_op->u.lookup.seg_nr];
     s_op->u.lookup.v_a[0].buffer_sz = sizeof(PVFS_handle);
 
+    s_op->u.lookup.seg_nr++;
+
     job_post_ret = job_trove_keyval_read(s_op->u.lookup.fs_id,
 					 s_op->u.lookup.dirent_handle,
 					 s_op->u.lookup.k_a,
@@ -340,46 +409,6 @@ static int lookup_read_directory_entry(PINT_server_op *s_op, job_status_s *ret)
     return job_post_ret;
 }
 
-/*
- * Function: lookup_setup_next_segment
- *
- * Params:   server_op *s_op, 
- *           job_status_s *ret
- *
- * Returns:  int
- *
- * Synopsis:
- *           
- */
-static int lookup_setup_next_segment(PINT_server_op *s_op, job_status_s *ret)
-{
-    int seg_ret;
-
-    gossip_debug(SERVER_DEBUG, "lookup state: lookup_setup_next_segment\n");
-
-    s_op->u.lookup.seg_nr++;
-
-    assert(s_op->u.lookup.seg_nr <= s_op->u.lookup.seg_ct);
-
-    if (s_op->u.lookup.seg_nr == s_op->u.lookup.seg_ct) {
-	gossip_debug(SERVER_DEBUG,
-		     "  hit end of segments\n");
-	ret->error_code = 99; /* TODO: MAKE THIS A REAL VALUE; THIS SEEMS POOR. */
-	return 1;
-    }
-    else {
-	gossip_debug(SERVER_DEBUG,
-		     "  now on segment %d of %d\n",
-		     s_op->u.lookup.seg_nr,
-		     s_op->u.lookup.seg_ct);
-    }
-	
-    seg_ret = PINT_string_next_segment(s_op->u.lookup.path,
-				       &s_op->u.lookup.segp,
-				       &s_op->u.lookup.segstate);
-    if (seg_ret != 0) assert(0);
-    return 1;
-}
 
 /*
  * Function: lookup_release_job

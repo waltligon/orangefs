@@ -142,7 +142,7 @@ int main(int argc, char **argv)
     }
     else {
 	fprintf(stdout,
-		"Storage space %s, collection %s (coll_id = 0x%x, root_handle = 0x%Lx):\n",
+		"Storage space %s, collection %s (coll_id = 0x%x, root_handle = 0x%08Lx):\n",
 		storage_space,
 		collection,
 		coll_id,
