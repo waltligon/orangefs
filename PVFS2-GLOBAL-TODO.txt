@@ -62,6 +62,10 @@ system interface functionality:
 - add nonblocking api for some functions
 - clean up API (in particular fstab parsing / initialize path, and removal of
   depricated terminology)
+- make input pointer argumentss to system interface be declared const
+- make sure that system interface functions return an error, rather than
+  asserting, if the caller tries to operate on a bogus handle (one case occurs
+  in assertions following PINT_bucket_map_to_server())
 
 kernel/vfs interface
 ====================================================================
@@ -139,6 +143,8 @@ system management utilities
 
 documentation:
 ====================================================================
+- come up with an automated way to document the wire packet format
+  - also document headers that bmi tacks on, at least for bmi_tcp
 - update the coding guidelines
 - document config file options
 - a way to export to html
