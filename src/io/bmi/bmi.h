@@ -4,11 +4,6 @@
  * See COPYING in top-level directory.
  */
 
-
-/** \file
- * Declarations for the Buffered Message Interface (BMI).
- */
-
 /** \defgroup bmiint BMI network interface
  *
  *  The BMI interface provides functionality used for communication
@@ -18,12 +13,16 @@
  * @{
  */
 
+/** \file
+ * Declarations for the Buffered Message Interface (BMI).
+ */
+
 #ifndef __BMI_H
 #define __BMI_H
 
 #include "bmi-types.h"
 
-/* used to describe unexpected message arrivals */
+/** used to describe unexpected message arrivals. */
 struct BMI_unexpected_info
 {
     bmi_error_code_t error_code;

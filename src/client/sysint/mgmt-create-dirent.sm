@@ -5,6 +5,8 @@
  */
 
 /** \file
+ *  \ingroup mgmtint
+ *
  *  PVFS2 management interface routines for creating directory entries
  *  that point to specific existing objects.  These are used primarily
  *  for file system repair purposes.

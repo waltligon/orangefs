@@ -5,6 +5,8 @@
  */
 
 /** \file
+ *  \ingroup mgmtint
+ *
  *  PVFS2 management interface routines for obtaining the handle of
  *  the object that holds directory data (the dirdata object).
  *

@@ -5,6 +5,8 @@
  */
 
 /** \file
+ *  \ingroup bmiint
+ *
  *  Top-level BMI network interface routines.
  */
 

@@ -5,6 +5,8 @@
  */
 
 /** \file
+ *  \ingroup mgmtint
+ *
  *  PVFS2 management interface routines for obtaining datafile handles
  *  for a given file.
  *

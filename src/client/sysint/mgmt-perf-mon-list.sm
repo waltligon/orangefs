@@ -4,6 +4,13 @@
  * See COPYING in top-level directory.
  */
 
+/** \file
+ *  \ingroup mgmtint
+ *
+ *  PVFS2 management interface routines for obtaining server performance
+ *  statistics.  This is used primarily for monitoring purposes.
+ */
+
 #include <string.h>
 #include <assert.h>
 
@@ -58,6 +65,8 @@ machine pvfs2_client_mgmt_perf_mon_list_sm(
 
 %%
 
+/** Initiate retrieval of performance statistics from a list of servers.
+ */
 PVFS_error PVFS_imgmt_perf_mon_list(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
@@ -114,6 +123,8 @@ PVFS_error PVFS_imgmt_perf_mon_list(
         sm_p, PVFS_MGMT_PERF_MON_LIST, op_id, user_ptr);
 }
 
+/** Obtain performance statistics from a list of servers.
+ */
 PVFS_error PVFS_mgmt_perf_mon_list(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,

@@ -5,8 +5,11 @@
  *
  */
 
-/* this file includes definitions for trivial mgmt routines that do not 
- * warrant their own .c file
+/** \file
+ *  \ingroup mgmtint
+ *
+ *  Various PVFS2 management interface routines.  Many are built on top of
+ *  other management interface routines.
  */
 
 #include <assert.h>
@@ -21,12 +24,10 @@
 
 extern int g_admin_mode;
 
-/* PVFS_mgmt_map_addr()
+/** Maps a given opaque server address back to a string address.  Also
+ *  fills in server type.
  *
- * maps a given opaque server address back to a string address, also
- * fills in server type
- *
- * returns pointer to string on success, NULL on failure
+ *  \return Pointer to string on success, NULL on failure.
  */
 const char *PVFS_mgmt_map_addr(
     PVFS_fs_id fs_id,
@@ -43,12 +44,10 @@ const char *PVFS_mgmt_map_addr(
     return ret;
 }
 
-/* PVFS_mgmt_statfs_all()
+/** Obtains file system statistics from all servers in a given
+ *  file system.
  *
- * helper function on top of PVFS_mgmt_statfs_list(); automatically
- * generates list of all servers and operates on that list
- *
- * returns 0 on success, -PVFS_error on failure
+ *  \return 0 on success, -PVFS_error on failure.
  */
 PVFS_error PVFS_mgmt_statfs_all(
     PVFS_fs_id fs_id,
@@ -113,12 +112,10 @@ PVFS_error PVFS_mgmt_statfs_all(
     return ret;
 }
 
-/* PVFS_mgmt_setparam_all()
+/** Set a single run-time parameter on all servers in a given
+ *  file system.
  *
- * helper function on top of PVFS_mgmt_setparam_list(); automatically
- * generates list of all servers and operates on that list
- *
- * returns 0 on success, -PVFS_error on failure
+ *  \return 0 on success, -PVFS_error on failure.
  */
 PVFS_error PVFS_mgmt_setparam_all(
     PVFS_fs_id fs_id,
@@ -177,6 +174,8 @@ PVFS_error PVFS_mgmt_setparam_all(
     return ret;
 }
 
+/** Sets a single run-time parameter on a specific server.
+ */
 PVFS_error PVFS_mgmt_setparam_single(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
@@ -198,11 +197,10 @@ PVFS_error PVFS_mgmt_setparam_single(
     return ret;
 }
 
-/* PVFS_mgmt_get_server_array()
+/** Obtains a list of all servers of a given type in a specific
+ *  file system.
  *
- * fills in an array of opaque server addresses of the specified type
- *
- * returns 0 on success, -PVFS_error on failure
+ *  \return 0 on success, -PVFS_error on failure.
  */
 PVFS_error PVFS_mgmt_get_server_array(
     PVFS_fs_id fs_id,
@@ -223,12 +221,12 @@ PVFS_error PVFS_mgmt_get_server_array(
     return ret;
 }
 
-/* PVFS_mgmt_count_servers()
+/** Counts the number of servers of a given type present in a file
+ *  system.
  *
- * counts the number of physical servers present in a given PVFS2 file 
- * system
+ *  \param count pointer to address where output count is stored
  *
- * returns 0 on success, -PVFS_error on failure
+ *  \return 0 on success, -PVFS_error on failure.
  */
 PVFS_error PVFS_mgmt_count_servers(
     PVFS_fs_id fs_id,
@@ -248,13 +246,11 @@ PVFS_error PVFS_mgmt_count_servers(
     return ret;
 }
 
-/* PVFS_mgmt_toggle_admin_mode()
+/** Turns on/off admin mode of system/mgmt interface.  This changes
+ *  a local variable that determines the "mode" of subsequent server
+ *  requests.
  *
- * turns on/off admin mode of system/mgmt interface; allows requests
- * that modify the file system to take effect on servers that are in 
- * admin mode.
- *
- * returns 0 on success, -PVFS_error on failure
+ *  \return 0 on success, -PVFS_error on failure.
  */
 PVFS_error PVFS_mgmt_toggle_admin_mode(
     PVFS_credentials *credentials,

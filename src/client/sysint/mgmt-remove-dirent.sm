@@ -4,6 +4,15 @@
  * See COPYING in top-level directory.
  */
 
+/** \file
+ *  \ingroup mgmtint
+ *
+ *  PVFS2 management interface routines for removing specific directory
+ *  entries.  These are used primarily for file system repair purposes,
+ *  although they can also be used to create specific inconsistency cases
+ *  for testing of failure tolerance.
+ */
+
 #include <string.h>
 #include <assert.h>
 
@@ -65,6 +74,8 @@ machine pvfs2_client_mgmt_remove_dirent_sm(
 
 %%
 
+/** Initiate removal of a specific directory entry.
+ */
 PVFS_error PVFS_imgmt_remove_dirent(
     PVFS_object_ref parent_ref,
     char *entry,
@@ -106,6 +117,8 @@ PVFS_error PVFS_imgmt_remove_dirent(
         sm_p, PVFS_MGMT_REMOVE_DIRENT, op_id, user_ptr);
 }
 
+/** Remove a specific directory entry.
+ */
 PVFS_error PVFS_mgmt_remove_dirent(
     PVFS_object_ref parent_ref,
     char *entry,

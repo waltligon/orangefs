@@ -4,10 +4,6 @@
  * See COPYING in top-level directory.
  */
 
-/** \file
- *  Declarations for the PVFS2 management interface.
- */
-
 /** \defgroup mgmtint PVFS2 management interface
  *
  *  The PVFS2 management interface provides functionality used to check
@@ -15,6 +11,10 @@
  *  and nonblocking calls are provided for most operations.
  *
  * @{
+ */
+
+/** \file
+ *  Declarations for the PVFS2 management interface.
  */
 
 #ifndef __PVFS2_MGMT_H

@@ -5,11 +5,11 @@
  */
 
 /** \file
- *  PVFS2 management routines for iterating through handles of objects
- *  stored on servers.
+ *  \ingroup mgmtint
  *
- *  These routines are used primarily for file system check and repair
- *  purposes.
+ *  PVFS2 management routines for iterating through handles of objects
+ *  stored on servers. These routines are used primarily for file system
+ *  check and repair purposes.
  */
 
 #include <string.h>

@@ -4,10 +4,6 @@
  * See COPYING in top-level directory.
  */
 
-/** \file
- *  Declarations and prototypes for Trove storage interface.
- */
-
 /** \defgroup troveint Trove storage interface
  *
  *  The Trove storage interface provides functionality used for
@@ -16,6 +12,10 @@
  *  builds on it.
  *
  * @{
+ */
+
+/** \file
+ *  Declarations and prototypes for Trove storage interface.
  */
 
 #ifndef __TROVE_H

@@ -4,6 +4,14 @@
  * See COPYING in top-level directory.
  */
 
+/** \file
+ *  \ingroup mgmtint
+ *
+ *  PVFS2 management interface routines for sending "no operation"
+ *  (no-op) requests.  This is primarily used for verifying connectivity
+ *  to servers.
+ */
+
 #include <string.h>
 #include <assert.h>
 
@@ -54,6 +62,8 @@ machine pvfs2_client_mgmt_noop_sm(
 
 %%
 
+/** Initiate sending of no-op request to a specific server.
+ */
 PVFS_error PVFS_imgmt_noop(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
@@ -85,6 +95,8 @@ PVFS_error PVFS_imgmt_noop(
         sm_p, PVFS_MGMT_NOOP, op_id, user_ptr);
 }
 
+/** Send a no-op request to a specific server and receive response.
+ */
 PVFS_error PVFS_mgmt_noop(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,

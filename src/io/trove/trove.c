@@ -4,6 +4,19 @@
  * See COPYING in top-level directory.
  */
 
+/** \file
+ *  \ingroup troveint
+ *
+ *  Trove interface routines.
+ *
+ *  This file holds the top-level routines for Trove.  These routines 
+ *  are responsible for mapping Trove calls to specific underlying
+ *  implementations.
+ *
+ *  Currently there is just one implementation, DBPF (database plus
+ *  files), but there could be more.
+ */
+
 #include "trove.h"
 #include "trove-internal.h"
 
@@ -12,6 +25,9 @@ extern struct TROVE_dspace_ops  *dspace_method_table[];
 extern struct TROVE_bstream_ops *bstream_method_table[];
 extern struct TROVE_mgmt_ops    *mgmt_method_table[];
 
+/** Initiate reading from a contiguous region in a bstream into a
+ *  contiguous region in memory.
+ */
 int trove_bstream_read_at(
     TROVE_coll_id coll_id,
     TROVE_handle handle,
@@ -43,6 +59,9 @@ int trove_bstream_read_at(
            out_op_id_p);
 }
 
+/** Initiate writing from a contiguous region in memory into a
+ *  contiguous region in a bstream.
+ */
 int trove_bstream_write_at(
     TROVE_coll_id coll_id,
     TROVE_handle handle,
@@ -74,6 +93,10 @@ int trove_bstream_write_at(
            out_op_id_p);
 }
 
+/** Initiate resizing of a bstream.  This may be used to grow or
+ *  shrink a bstream.  It does not guarantee that space is actually
+ *  allocated; rather it changes the logical size of the bstream.
+ */
 int trove_bstream_resize(
     TROVE_coll_id coll_id,
     TROVE_handle handle,
@@ -126,6 +149,10 @@ int trove_bstream_validate(
            out_op_id_p);
 }
 
+/** Initiate reading from a list of regions in a bstream into
+ *  a list of regions in memory.  Sizes of individual regions
+ *  in lists need not match, but total sizes must be equal.
+ */
 int trove_bstream_read_list(
     TROVE_coll_id coll_id,
     TROVE_handle handle,
@@ -165,6 +192,10 @@ int trove_bstream_read_list(
            out_op_id_p);
 }
 
+/** Initiate writing from a list of regions in memory into a
+ *  list of regions in a bstream.  Sizes of individual regions
+ *  in lists need not match, but total sizes must be equal.
+ */
 int trove_bstream_write_list(
     TROVE_coll_id coll_id,
     TROVE_handle handle,
@@ -204,6 +235,9 @@ int trove_bstream_write_list(
            out_op_id_p);
 }
 
+/** Initiate movement of all data to storage devices for a specific
+ *  bstream.
+ */
 int trove_bstream_flush(
     TROVE_coll_id coll_id,
     TROVE_handle handle,
@@ -227,6 +261,8 @@ int trove_bstream_flush(
            out_op_id_p);
 }
 
+/** Initiate read of a single keyword/value pair.
+ */
 int trove_keyval_read(
     TROVE_coll_id coll_id,
     TROVE_handle handle,
@@ -256,6 +292,8 @@ int trove_keyval_read(
            out_op_id_p);
 }
 
+/** Initiate write of a single keyword/value pair.
+ */
 int trove_keyval_write(
     TROVE_coll_id coll_id,
     TROVE_handle handle,
@@ -285,6 +323,8 @@ int trove_keyval_write(
            out_op_id_p);
 }
 
+/** Initiate removal of a keyword/value pair from a given data space.
+ */
 int trove_keyval_remove(
     TROVE_coll_id coll_id,
     TROVE_handle handle,
@@ -401,6 +441,9 @@ int trove_keyval_iterate_keys(
            out_op_id_p);
 }
 
+/** Initiate read of multiple keyword/value pairs from the same
+ *  data space as a single operation.
+ */
 int trove_keyval_read_list(
     TROVE_coll_id coll_id,
     TROVE_handle handle,
@@ -432,6 +475,9 @@ int trove_keyval_read_list(
            out_op_id_p);
 }
 
+/** Initiate storing of multiple keyword/value pairs to the same
+ *  data space as a single operation.
+ */
 int trove_keyval_write_list(
     TROVE_coll_id coll_id,
     TROVE_handle handle,
@@ -463,6 +509,9 @@ int trove_keyval_write_list(
            out_op_id_p);
 }
 
+/** Initiate movement of all keyword/value pairs to storage for a given
+ *  data space.
+ */
 int trove_keyval_flush(
     TROVE_coll_id coll_id,
     TROVE_handle handle,
@@ -486,6 +535,8 @@ int trove_keyval_flush(
            out_op_id_p);
 }
 
+/** Initiate creation of a new data space.
+ */
 int trove_dspace_create(
     TROVE_coll_id coll_id,
     TROVE_handle_extent_array* handle_extent_array,
@@ -515,6 +566,8 @@ int trove_dspace_create(
            out_op_id_p);
 }
 
+/** Initiate removal of a data space.
+ */
 int trove_dspace_remove(
     TROVE_coll_id coll_id,
     TROVE_handle handle,
@@ -592,6 +645,8 @@ int trove_dspace_verify(
            out_op_id_p);
 }
 
+/** Initiate retrieval of attributes for a given data space.
+ */
 int trove_dspace_getattr(
     TROVE_coll_id coll_id,
     TROVE_handle handle,
@@ -659,6 +714,8 @@ int trove_dspace_cancel(
            context_id);
 }
 
+/** Test for completion of a single trove operation.
+ */
 int trove_dspace_test(
     TROVE_coll_id coll_id,
     TROVE_op_id id,
@@ -686,6 +743,8 @@ int trove_dspace_test(
            max_idle_time_ms);
 }
 
+/** Test for completion of one or more trove operations.
+ */
 int trove_dspace_testsome(
     TROVE_coll_id coll_id,
     TROVE_context_id context_id,
@@ -715,6 +774,8 @@ int trove_dspace_testsome(
            max_idle_time_ms);
 }
 
+/** Test for completion of any trove operation within a given context.
+ */
 int trove_dspace_testcontext(
     TROVE_coll_id coll_id,
     TROVE_op_id* ds_id_array,

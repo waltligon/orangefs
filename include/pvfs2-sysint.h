@@ -4,10 +4,6 @@
  * See COPYING in top-level directory.
  */
 
-/** \file
- *  Declarations for the PVFS2 system interface.
- */
-
 /** \defgroup sysint PVFS2 system interface
  *
  *  The PVFS2 system interface provides functionality used for everyday
@@ -15,6 +11,10 @@
  *  implementation build on this interface.
  *
  * @{
+ */
+
+/** \file
+ *  Declarations for the PVFS2 system interface.
  */
 
 #ifndef __PVFS_SYSINT_H

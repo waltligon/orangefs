@@ -4,6 +4,16 @@
  * See COPYING in top-level directory.
  */
 
+/** \file
+ *  \ingroup mgmtint
+ *
+ *  PVFS2 management interface routines for setting run-time parameters
+ *  on a list of servers.  These are currently used primarily for file
+ *  system repair purposes, specifically to put the servers in a special
+ *  administrative mode to avoid file system changes while repairs are
+ *  underway.
+ */
+
 #include <string.h>
 #include <assert.h>
 
@@ -59,6 +69,8 @@ machine pvfs2_client_mgmt_setparam_list_sm(
 
 %%
 
+/** Initiate setting of a run-time server parameter on a list of servers.
+ */
 PVFS_error PVFS_imgmt_setparam_list(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
@@ -123,6 +135,8 @@ PVFS_error PVFS_imgmt_setparam_list(
         sm_p, PVFS_MGMT_SETPARAM_LIST, op_id, user_ptr);
 }
 
+/** Set a run-time parameter on a list of servers.
+ */
 PVFS_error PVFS_mgmt_setparam_list(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
