@@ -772,8 +772,6 @@ static int io_datafile_complete_operations(PINT_client_sm *sm_p,
                    sm_p->u.io.write_ack_completion_count);
     }
 
-    js_p->error_code = 0;
-
     assert(sm_p->msgarray_count == sm_p->u.io.datafile_count);
     assert(sm_p->u.io.msgpair_completion_count > -1);
     assert(sm_p->u.io.flow_completion_count > -1);
@@ -886,6 +884,8 @@ static int io_datafile_complete_operations(PINT_client_sm *sm_p,
         sm_p->u.io.write_ack_completion_count--;
         assert(sm_p->u.io.write_ack_completion_count > -1);
     }
+
+    js_p->error_code = 0;
 
     if ((sm_p->u.io.msgpair_completion_count == 0) &&
         (sm_p->u.io.flow_completion_count == 0) &&
@@ -1265,6 +1265,13 @@ static inline int process_context_recv_and_post_flow(
 
     cur_ctx = &sm_p->u.io.contexts[index];
     assert(cur_ctx && cur_ctx->msg);
+
+    if (js_p->error_code)
+    {
+        PVFS_perror_gossip("pre-process_context_recv failed",
+                           js_p->error_code);
+        return js_p->error_code;
+    }
 
     ret = process_context_recv(cur_ctx, &decoded_resp, &resp);
     if (ret)
