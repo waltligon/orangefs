@@ -209,7 +209,8 @@ int main(int argc, char **argv)
 static inline void format_size_string(char *src_str,
                                       int num_spaces_total,
                                       char **out_str_p,
-                                      int right_justified)
+                                      int right_justified,
+				      int hard_limit)
 {
     int len = 0;
     int spaces_size_allowed = 0;
@@ -218,13 +219,23 @@ static inline void format_size_string(char *src_str,
     assert(src_str);
     len = strlen(src_str);
 
-    spaces_size_allowed = (num_spaces_total ? num_spaces_total : len);
-    buf = (char *)malloc(spaces_size_allowed);
+    if(hard_limit)
+    {
+	spaces_size_allowed = (num_spaces_total ? num_spaces_total : len);
+    }
+    else
+    {
+	spaces_size_allowed = len;
+	if(len < num_spaces_total)
+	    spaces_size_allowed = num_spaces_total;
+    }
+	
+    buf = (char *)malloc(spaces_size_allowed+1);
     assert(buf);
 
-    memset(buf,0,spaces_size_allowed);
+    memset(buf,0,spaces_size_allowed+1);
 
-    if ((len > 0) && (len < spaces_size_allowed))
+    if ((len > 0) && (len <= spaces_size_allowed))
     {
         memset(buf,' ',(spaces_size_allowed - 1));
 
@@ -244,6 +255,11 @@ static inline void format_size_string(char *src_str,
             *start++ = *src_start++;
         }
         *out_str_p = strdup(buf);
+    }
+    else if(len > 0)
+    {
+	/* string won't fit; set explicitly to null */
+	*out_str_p = NULL;
     }
     else if (len == 0)
     {
@@ -309,7 +325,7 @@ void print_entry_attr(
     {
         snprintf(scratch_size,16, "%Ld", Ld(size));
     }
-    format_size_string(scratch_size,11,&formatted_size,1);
+    format_size_string(scratch_size,11,&formatted_size,1,1);
 
     if (!opts->list_no_owner)
     {
@@ -334,8 +350,12 @@ void print_entry_attr(
         }
     }
 
-    format_size_string(owner,8,&formatted_owner,0);
-    format_size_string(group,8,&formatted_group,0);
+    /* for owner and group allow the fields to grow larger than 8 if
+     * necessary (set hard_limit to 0), but pad anything smaller to take up
+     * 8 spaces.
+     */
+    format_size_string(owner,8,&formatted_owner,0,0);
+    format_size_string(group,8,&formatted_group,0,0);
 
     if (attr->objtype == PVFS_TYPE_DIRECTORY)
     {
