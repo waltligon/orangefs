@@ -185,6 +185,8 @@ int main(int argc, char **argv)
 	printf("Client bw (send): %f MB/sec\n",
 		((TEST_SIZE)/((time2-time1)*1000000.0)));
 
+	PINT_flow_free(flow_d);
+
 	/* shut down flow interface */
 	ret = PINT_flow_finalize();
 	if(ret < 0)
