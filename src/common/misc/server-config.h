@@ -59,6 +59,7 @@ typedef struct filesystem_configuration_s
     PINT_llist *meta_handle_ranges; /* ptrs are type host_handle_mapping_s* */
     PINT_llist *data_handle_ranges; /* ptrs are type host_handle_mapping_s* */
     enum PVFS_flowproto_type flowproto; /* default flowprotocol */
+    enum PVFS_encoding_type encoding;   /* encoding used for messages */
 
     /* the following fields will be used to cache arrays of
      * unique physical server addresses, of particular use to the 

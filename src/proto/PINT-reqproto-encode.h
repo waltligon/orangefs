@@ -11,22 +11,14 @@
 #ifndef __PINT_REQUEST_ENCODE_H
 #define __PINT_REQUEST_ENCODE_H
 
-#include "pvfs2-req-proto.h"
+#include "src/proto/pvfs2-req-proto.h"
 #include "bmi.h"
-
-/* supported encoding types */
-enum PINT_encoding_type
-{
-    PINT_ENC_DIRECT = 0,
-    PINT_ENC_LE_BFIELD = 1,
-    PINT_ENC_XDR = 2
-};
 
 /* structure to describe messages that have been encoded */
 struct PINT_encoded_msg
 {
     bmi_addr_t dest;			    /* host this is going to */
-    enum PINT_encoding_type enc_type;	    /* type of encoding that was used */
+    enum PVFS_encoding_type enc_type;	    /* type of encoding that was used */
     enum bmi_buffer_type buffer_type;	    /* buffer flag for BMI's use */
     void** buffer_list;			    /* list of buffers */
     PVFS_size* size_list;		    /* size of buffers */
@@ -43,11 +35,10 @@ struct PINT_encoded_msg
 struct PINT_decoded_msg
 {
     void* buffer;			    /* decoded buffer */
-    enum PINT_encoding_type enc_type;	    /* type of encoding that was used */
+    enum PVFS_encoding_type enc_type;	    /* type of encoding that was used */
 
     /* fields below this comment are meant for internal use */
-    char* ptr_current;			    /* current encoding pointer */
-    union				    /* used for storing decoded info */
+    union	    /* used for storing decoded info rather than malloc */
     {
 	struct PVFS_server_req req;
 	struct PVFS_server_resp resp;
@@ -78,7 +69,7 @@ int PINT_encode(
 		enum PINT_encode_msg_type input_type,
 		struct PINT_encoded_msg* target_msg,
 		bmi_addr_t target_addr,
-		enum PINT_encoding_type enc_type
+		enum PVFS_encoding_type enc_type
 		);
 
 int PINT_decode(
@@ -102,7 +93,8 @@ void PINT_decode_release(
 int PINT_encode_calc_max_size(
     enum PINT_encode_msg_type input_type,
     enum PVFS_server_op op_type,
-    enum PINT_encoding_type enc_type);
+    enum PVFS_encoding_type enc_type);
+
 
 #endif /* __PINT_REQUEST_ENCODE_H */
 

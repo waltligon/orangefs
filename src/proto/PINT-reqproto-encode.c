@@ -21,7 +21,7 @@ extern PINT_encoding_table_values contig_buffer_table;
 extern PINT_encoding_table_values le_bytefield_table;
 int g_admin_mode = 0;
 
-PINT_encoding_table_values *PINT_encoding_table[ENCODING_TABLE_SIZE] = {NULL};
+static PINT_encoding_table_values *PINT_encoding_table[ENCODING_TABLE_SIZE] = {NULL};
 
 /* PINT_encode_initialize()
  *
@@ -32,22 +32,22 @@ PINT_encoding_table_values *PINT_encoding_table[ENCODING_TABLE_SIZE] = {NULL};
 int PINT_encode_initialize(void)
 {
     /* setup direct struct encoding */
-    PINT_encoding_table[PINT_ENC_DIRECT] = &contig_buffer_table;
+    PINT_encoding_table[ENCODING_DIRECT] = &contig_buffer_table;
     contig_buffer_table.init_fun();
     /* header prepended to all messages of this type */
     *((int32_t*)&(contig_buffer_table.generic_header[0])) = 
 	htobmi32(PVFS_RELEASE_NR);
     *((int32_t*)&(contig_buffer_table.generic_header[4])) = 
-	htobmi32(PINT_ENC_DIRECT);
+	htobmi32(ENCODING_DIRECT);
 
     /* setup little endian bytefield encoding */
-    PINT_encoding_table[PINT_ENC_LE_BFIELD] = &le_bytefield_table;
+    PINT_encoding_table[ENCODING_LE_BFIELD] = &le_bytefield_table;
     le_bytefield_table.init_fun();
     /* header prepended to all messages of this type */
     *((int32_t*)&(le_bytefield_table.generic_header[0])) = 
 	htobmi32(PVFS_RELEASE_NR);
     *((int32_t*)&(le_bytefield_table.generic_header[4])) = 
-	htobmi32(PINT_ENC_LE_BFIELD);
+	htobmi32(ENCODING_LE_BFIELD);
 
     return(0);
 }
@@ -76,7 +76,7 @@ int PINT_encode(
 		enum PINT_encode_msg_type input_type,
 		struct PINT_encoded_msg* target_msg,
 		bmi_addr_t target_addr,
-		enum PINT_encoding_type enc_type
+		enum PVFS_encoding_type enc_type
 		)
 {
     int ret = -1;
@@ -85,8 +85,8 @@ int PINT_encode(
 
     switch(enc_type)
     {
-	case PINT_ENC_DIRECT:
-	case PINT_ENC_LE_BFIELD:
+	case ENCODING_DIRECT:
+	case ENCODING_LE_BFIELD:
 	    if (input_type == PINT_ENCODE_REQ)
 	    {
 		/* overwrite flags on the way through */
@@ -225,14 +225,14 @@ void PINT_decode_release(
 int PINT_encode_calc_max_size(
     enum PINT_encode_msg_type input_type,
     enum PVFS_server_op op_type,
-    enum PINT_encoding_type enc_type)
+    enum PVFS_encoding_type enc_type)
 {    
     int ret = -1;
 
     switch(enc_type)
     {
-	case PINT_ENC_LE_BFIELD:
-	case PINT_ENC_DIRECT:
+	case ENCODING_LE_BFIELD:
+	case ENCODING_DIRECT:
 	    ret = PINT_encoding_table[enc_type]->op->encode_calc_max_size
 		(input_type, op_type);
 	    break;

@@ -45,6 +45,7 @@ struct pvfs_mntent
     char *mnt_dir;		/* local mount path */
     char *mnt_opts;		/* full option list */
     enum PVFS_flowproto_type flowproto;	/* flow protocol */
+    enum PVFS_encoding_type encoding;   /* wire data encoding */
 };
 
 struct pvfs_mntlist_s

@@ -46,6 +46,15 @@ enum PVFS_flowproto_type
 };
 #define FLOWPROTO_DEFAULT FLOWPROTO_BMI_TROVE
 
+/* supported wire encoding types */
+enum PVFS_encoding_type
+{
+    ENCODING_DIRECT = 0,
+    ENCODING_LE_BFIELD = 1,
+    ENCODING_XDR = 2
+};
+#define ENCODING_DEFAULT ENCODING_DIRECT
+
 /* basic types used by storage subsystem */
 typedef uint64_t PVFS_handle;
 typedef int32_t PVFS_fs_id;

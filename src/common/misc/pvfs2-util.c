@@ -29,6 +29,7 @@
 
 static int parse_flowproto_string(const char* input, enum PVFS_flowproto_type* 
     flowproto);
+static int parse_encoding_string(const char *cp, enum PVFS_encoding_type *et);
 
 /* PVFS_util_parse_pvfstab()
  *
@@ -52,6 +53,7 @@ int PVFS_util_parse_pvfstab(pvfs_mntlist* pvfstab_p)
     int slashcount = 0;
     char* slash = NULL;
     char* last_slash = NULL;
+    const char *cp;
     int ret = -1;
 
     /* safety */
@@ -178,6 +180,20 @@ int PVFS_util_parse_pvfstab(pvfs_mntlist* pvfstab_p)
 	    {
 		pvfstab_p->ptab_array[i].flowproto = FLOWPROTO_DEFAULT;
 	    }
+
+	    /* pick an encoding to use with the server */
+	    pvfstab_p->ptab_array[i].encoding = ENCODING_DEFAULT;
+	    cp = hasmntopt(tmp_ent, "encoding");
+	    if (cp) {
+		ret = parse_encoding_string(cp,
+		  &pvfstab_p->ptab_array[i].encoding);
+		if (ret < 0) {
+		    /* TODO: clean up mallocs */
+		    endmntent(mnt_fp);
+		    return ret;
+		}
+	    }
+
 	    i++;
 	}
     }
@@ -465,6 +481,55 @@ static int parse_flowproto_string(const char* input, enum PVFS_flowproto_type*
     }
 
     return(0);
+}
+
+/*
+ * Pull out the wire encoding specified as a mount option in the tab
+ * file.
+ *
+ * Input string is not modified; result goes into et.
+ *
+ * Returns 0 if all okay.
+ */
+static int parse_encoding_string(const char *cp, enum PVFS_encoding_type *et)
+{
+    const char *cq;
+    int i;
+    struct {
+	const char *name;
+	enum PVFS_encoding_type val;
+    } enc_str[] = {
+	{ "direct", ENCODING_DIRECT },
+	{ "le_bfield", ENCODING_LE_BFIELD },
+	{ "xdr", ENCODING_XDR },
+    };
+
+    gossip_debug(CLIENT_DEBUG, "%s: input is %s\n", __func__, cp);
+    cp += strlen("encoding");
+    for (; isspace(*cp); cp++) ;  /* optional spaces */
+    if (*cp != '=') {
+	gossip_err("Error: %s: malformed encoding option in tab file.\n",
+	  __func__);
+	return -PVFS_EINVAL;
+    }
+    for (++cp; isspace(*cp); cp++) ;  /* optional spaces */
+    for (cq=cp; *cq && *cq != ','; cq++) ;  /* find option end */
+
+    *et = -1;
+    for (i=0; i<sizeof(enc_str)/sizeof(enc_str[0]); i++) {
+	int n = strlen(enc_str[i].name);
+	if (cq-cp > n)
+	    n = cq-cp;
+	if (!strncmp(enc_str[i].name, cp, n)) {
+	    *et = enc_str[i].val;
+	    break;
+	}
+    }
+    if (*et == -1) {
+	gossip_err("Error: %s: unknown encoding type in tab file.\n", __func__);
+	return -PVFS_EINVAL;
+    }
+    return 0;
 }
 
 /*
