@@ -202,7 +202,7 @@ enum
 };
 
 /* hash table for completed operations */
-struct qhash_table* completion_hash;
+struct qhash_table* completion_hash = NULL;
 
 /*************************************************************************
  * Visible Interface 
@@ -241,9 +241,6 @@ int BMI_tcp_initialize(method_addr_p listen_addr, bmi_flag_t
 	tcp_method_params.mode_rend_limit = TCP_MODE_REND_LIMIT;
 	tcp_method_params.mode_unexp_limit = TCP_MODE_UNEXP_LIMIT;
 	tcp_method_params.method_flags = init_flags;
-
-	/* zero our completion hash table */
-	completion_hash = (struct qhash_table*)0;
 
 	if(init_flags & BMI_INIT_SERVER)
 	{
