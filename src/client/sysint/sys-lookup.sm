@@ -26,7 +26,8 @@ extern job_context_id pint_client_sm_context;
 
 enum
 {
-    LOOKUP_CONTINUE = 2
+    LOOKUP_CONTINUE = 2,
+    LOOKUP_SYMLINK = 3
 };
 
 /* state function prototypes */
@@ -38,6 +39,10 @@ static int lookup_msg_setup_msgpair(PINT_client_sm *sm_p,
                                     job_status_s *js_p);
 static int lookup_msg_failure(PINT_client_sm *sm_p,
                               job_status_s *js_p);
+static int lookup_symlink_getattr_setup_msgpair(PINT_client_sm *sm_p,
+                                                job_status_s *js_p);
+static int lookup_symlink_getattr_failure(PINT_client_sm *sm_p,
+                                          job_status_s *js_p);
 static int lookup_cleanup(PINT_client_sm *sm_p,
                           job_status_s *js_p);
 
@@ -45,6 +50,10 @@ static int lookup_cleanup(PINT_client_sm *sm_p,
 static int lookup_msg_comp_fn(void *v_p,
                               struct PVFS_server_resp *resp_p,
                               int index);
+static int lookup_symlink_getattr_comp_fn(
+    void *v_p,
+    struct PVFS_server_resp *resp_p,
+    int index);
 
 %%
 
@@ -53,6 +62,9 @@ machine pvfs2_client_lookup_sm(init,
                                lookup_msg_setup_msgpair,
 			       lookup_msg_xfer_msgpair,
 			       lookup_msg_failure,
+                               lookup_symlink_getattr_setup_msgpair,
+                               lookup_symlink_getattr_xfer_msgpair,
+                               lookup_symlink_getattr_failure,
 			       cleanup)
 {
     state init {
@@ -80,7 +92,25 @@ machine pvfs2_client_lookup_sm(init,
 	run lookup_check_completion;
         success => cleanup;
         LOOKUP_CONTINUE => lookup_msg_setup_msgpair;
+        LOOKUP_SYMLINK => lookup_symlink_getattr_setup_msgpair;
 	default => lookup_msg_failure;
+    }
+
+    state lookup_symlink_getattr_setup_msgpair {
+        run lookup_symlink_getattr_setup_msgpair;
+        success => lookup_symlink_getattr_xfer_msgpair;
+        default => lookup_symlink_getattr_failure;
+    }
+
+    state lookup_symlink_getattr_xfer_msgpair {
+	jump pvfs2_client_getattr_pcache_sm;
+        success => lookup_msg_setup_msgpair;
+        default => lookup_symlink_getattr_failure;
+    }
+
+    state lookup_symlink_getattr_failure {
+        run lookup_symlink_getattr_failure;
+        default => cleanup;
     }
 
     state cleanup {
@@ -147,6 +177,8 @@ int PVFS_sys_ref_lookup(
             PVFS_SEGMENT_MAX);
     sm_p->u.lookup.remaining_starting_refn.fs_id = fs_id;
     sm_p->u.lookup.remaining_starting_refn.handle = parent.handle;
+    sm_p->u.lookup.resolve_symlink = 0;
+    sm_p->u.lookup.num_symlinks_followed = 0;
 
     gossip_debug(CLIENT_DEBUG, "Looking up %s under parent handle "
                  "%Lu on fs %d\n", relative_pathname, parent.handle,
@@ -241,22 +273,32 @@ static int lookup_check_completion(PINT_client_sm *sm_p,
                  "lookup state: lookup_check_completion\n");
 
     /*
-      if there are no more segments, we've finished properly
-
-      otherwise, at this point; if not, we hit one of two cases:
-      1) error, bad lookup,
-      2) need to query another meta server
-
-      determine if we need to contact another meta server
-      for the remaining path segment lookups, or if we've
-      actually got a bad lookup request.
-
-      we can tell the difference based on the last error
-      value set in lookup_msg_comp_fn
+      at this point; if not, we hit one of several cases:
+      1) the lookup_msg_comp_fn saw a symlink and we need to
+         continue resolution
+      2) no more segments; successful lookup
+      3) need to query another meta server to continue resolution
+      4) error, bad lookup (entry cannot be resolved)
     */
-    if (sm_p->u.lookup.num_segments == 0)
+    if (sm_p->u.lookup.resolve_symlink)
     {
-        /* direct state machine to cleanup */
+        /* continue with symlink resolution */
+        js_p->error_code = LOOKUP_SYMLINK;
+        sm_p->u.lookup.resolve_symlink = 0;
+        if (sm_p->u.lookup.num_symlinks_followed++ >
+            PVFS_REQ_LIMIT_MAX_SYMLINK_RESOLUTION_COUNT)
+        {
+            gossip_err("Cannot resolve more than %d symlinks; "
+                       "aborting resolution and assuming infinite loop\n",
+                       PVFS_REQ_LIMIT_MAX_SYMLINK_RESOLUTION_COUNT);
+            sm_p->u.lookup.last_error = -PVFS_EMLINK;
+            goto lookup_failure;
+        }
+        goto lookup_continue;
+    }
+    else if (sm_p->u.lookup.num_segments == 0)
+    {
+        /* success case: direct state machine to cleanup */
         js_p->error_code = 0;
     }
     else if (sm_p->u.lookup.last_error == 0)
@@ -267,12 +309,11 @@ static int lookup_check_completion(PINT_client_sm *sm_p,
     }
     else
     {
+      lookup_failure:
         /* error case: direct state machine to failure */
         js_p->error_code = (sm_p->u.lookup.last_error ?
                             sm_p->u.lookup.last_error :
                             -PVFS_ENOENT);
-        PVFS_perror("Restoring last error code of",
-                    js_p->error_code);
     }
   
   lookup_continue:
@@ -329,7 +370,6 @@ static int lookup_msg_comp_fn(void *v_p,
                               struct PVFS_server_resp *resp_p,
                               int index)
 {
-    int i = 0;
     PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
     char buf[PVFS_SEGMENT_MAX] = {0};
     
@@ -343,10 +383,6 @@ static int lookup_msg_comp_fn(void *v_p,
       the error value in case we need it later, while resetting
       the error code to allow us to continue processing.
     */
-    if (resp_p->status != 0)
-    {
-        PVFS_perror("Got error from server: ", resp_p->status);
-    }
     sm_p->u.lookup.last_error = resp_p->status;
     resp_p->status = 0;
 
@@ -354,9 +390,8 @@ static int lookup_msg_comp_fn(void *v_p,
                  resp_p->u.lookup_path.handle_count,
                  resp_p->u.lookup_path.attr_count);
 
-    /* need to check for SYMLINK HERE */
-    /* INSERT ALL ATTRS IN ARRAY INTO PCACHE HERE */
-    /* handle_array, attr_array */
+    /* FIXME: INSERT ALL ATTRS IN ARRAY INTO PCACHE HERE */
+    /* TODO : INSERT ALL ATTRS IN ARRAY INTO PCACHE HERE */
 
     /* adjust local lookup processing state */
     sm_p->u.lookup.num_segments -= resp_p->u.lookup_path.handle_count;
@@ -364,7 +399,47 @@ static int lookup_msg_comp_fn(void *v_p,
 
     if (sm_p->u.lookup.num_segments == 0)
     {
-        /* restore the real error code */
+        /* check for the special case of symlink resolution */
+        if (resp_p->u.lookup_path.attr_count &&
+            (resp_p->u.lookup_path.attr_array[
+                resp_p->u.lookup_path.attr_count - 1].objtype ==
+             PVFS_TYPE_SYMLINK))
+        {
+            /*
+              FIXME: we're not guaranteed this is always true...right?
+              the tricky thing would be if the link pointed to a file on
+              a different filesystem (i.e. different root dir/handle).
+              this isn't supported at the moment since fs ids are not
+              returned from the server along with the resolved handles.
+
+              think about for later though, it could be cool.
+            */
+            sm_p->u.lookup.remaining_starting_refn =
+                sm_p->u.lookup.starting_refn;
+
+            /*
+              store the symlink handle so we know which handle
+              to do the symlink_getattr on
+            */
+            assert(resp_p->u.lookup_path.handle_count > 0);
+            sm_p->u.lookup.symlink_refn.handle =
+                resp_p->u.lookup_path.handle_array[
+                    resp_p->u.lookup_path.handle_count - 1];
+
+            /* FIXME: assuming fs_id same as starting point */
+            sm_p->u.lookup.symlink_refn.fs_id =
+                sm_p->u.lookup.starting_refn.fs_id;
+
+            /*
+              given the pinode_refn of the current symlink, our
+              check_completion routine will take care of the rest
+              as long as we set this flag
+            */
+            sm_p->u.lookup.resolve_symlink = 1;
+            return 1;
+        }
+
+        /* restore the real error/success code */
         resp_p->status = sm_p->u.lookup.last_error;
 
         /* copy out the final looked up handle value to sys response */
@@ -373,7 +448,7 @@ static int lookup_msg_comp_fn(void *v_p,
                 resp_p->u.lookup_path.handle_count - 1];
         /*
           FIXME: for now requires that the final resolved name must be
-          on the same fs as the starting name to be resolved
+          on the same fs as the starting name to be resolved.
         */
         sm_p->u.lookup.lookup_resp->pinode_refn.fs_id =
             sm_p->u.lookup.starting_refn.fs_id;
@@ -384,8 +459,8 @@ static int lookup_msg_comp_fn(void *v_p,
         int next_path_segment =
             ((resp_p->u.lookup_path.attr_count == 0) ? 0 :
              resp_p->u.lookup_path.handle_count);
-#if 1
-        /* FIXME: remove since this is debugging only */
+#if 0
+        /* debugging only */
         for(i = 0; i < resp_p->u.lookup_path.handle_count; i++)
         {
             gossip_debug(CLIENT_DEBUG, "[%d] Got partial lookup "
@@ -431,6 +506,110 @@ static int lookup_msg_failure(PINT_client_sm *sm_p,
     return 1;
 }
 
+static int lookup_symlink_getattr_setup_msgpair(PINT_client_sm *sm_p,
+                                                job_status_s *js_p)
+{
+    int ret = -1;
+    PINT_client_sm_msgpair_state *msg_p = NULL;
+
+    gossip_debug(CLIENT_DEBUG, "lookup state: "
+                 "lookup_symlink_getattr_setup_msgpair\n");
+
+    /* clear error field in job */
+    js_p->error_code = 0;
+
+    gossip_debug(CLIENT_DEBUG," lookup: posting symlink getattr "
+                 "req on handle %Lu\n",
+                 sm_p->u.lookup.remaining_starting_refn.handle);
+
+    msg_p = &sm_p->msgpair;
+    memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
+
+    /* fill in getattr request */
+    PINT_SERVREQ_GETATTR_FILL(
+        msg_p->req,
+        *sm_p->cred_p,
+        sm_p->u.lookup.symlink_refn.fs_id,
+        sm_p->u.lookup.symlink_refn.handle,
+        (PVFS_ATTR_COMMON_ALL | PVFS_ATTR_SYMLNK_ALL));
+
+    /* fill in msgpair structure components */
+    msg_p->fs_id   = sm_p->u.lookup.symlink_refn.fs_id;
+    msg_p->handle  = sm_p->u.lookup.symlink_refn.handle;
+    msg_p->comp_fn = lookup_symlink_getattr_comp_fn;
+
+    ret = PINT_bucket_map_to_server(&msg_p->svr_addr,
+                                    msg_p->handle,
+                                    msg_p->fs_id);
+    if (ret != 0)
+    {
+	gossip_err("Error: failure mapping to server.\n");
+	assert(ret < 0); /* return value range check */
+	assert(0); /* TODO: real error handling */
+    }
+    return 1;
+}
+
+static int lookup_symlink_getattr_comp_fn(
+    void *v_p,
+    struct PVFS_server_resp *resp_p,
+    int index)
+{
+    PVFS_object_attr *attr = NULL;
+    PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
+
+    gossip_debug(CLIENT_DEBUG,
+                 "lookup state: lookup_symlink_getattr_comp_fn\n");
+
+    assert(resp_p->op == PVFS_SERV_GETATTR);
+
+    /* if we get an error, just return immediately, don't try to
+     * actually fill anything in.
+     */
+    if (resp_p->status != 0)
+    {
+	return resp_p->status;
+    }
+
+    attr = (sm_p->pcache_hit ?
+            &sm_p->pinode->attr :
+            &resp_p->u.getattr.attr);
+    assert(attr);
+
+    /* more sanity checks */
+    assert(attr->objtype == PVFS_TYPE_SYMLINK);
+    assert(attr->mask & PVFS_ATTR_SYMLNK_TARGET);
+    assert(attr->u.sym.target_path_len > 0);
+    assert(attr->u.sym.target_path);
+
+    /*
+      re-load state to continue processing as normal
+      now that we have a new pathname to resolve;
+
+      note: the remaining_starting_refn was already
+      set by the previous lookup_msg_comp_fn call.
+    */
+    memset(sm_p->u.lookup.remaining_pathname, 0,
+           PVFS_SEGMENT_MAX);
+    strncpy(sm_p->u.lookup.remaining_pathname,
+            attr->u.sym.target_path, PVFS_SEGMENT_MAX);
+    sm_p->u.lookup.num_segments =
+        PINT_string_count_segments(sm_p->u.lookup.remaining_pathname);
+
+    gossip_debug(CLIENT_DEBUG, "Remaining Lookup Path is %s\n",
+                 sm_p->u.lookup.remaining_pathname);
+
+    return 0;
+}
+
+
+static int lookup_symlink_getattr_failure(PINT_client_sm *sm_p,
+                                          job_status_s *js_p)
+{
+    gossip_debug(CLIENT_DEBUG,
+                 "lookup state: lookup_symlink_getattr_failure\n");
+    return 1;
+}
 
 static int lookup_cleanup(PINT_client_sm *sm_p,
                           job_status_s *js_p)

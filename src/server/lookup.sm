@@ -278,6 +278,9 @@ static int lookup_verify_object_metadata(PINT_server_op *s_op,
             s_op->u.lookup.seg_nr - 1];
     }
 
+    /* update our successful attr read count */
+    s_op->u.lookup.attr_ct++;
+
     assert(((a_p->objtype == PVFS_TYPE_DIRECTORY) ||
             (a_p->objtype == PVFS_TYPE_METAFILE)  ||
             (a_p->objtype == PVFS_TYPE_SYMLINK)));
@@ -295,7 +298,10 @@ static int lookup_verify_object_metadata(PINT_server_op *s_op,
 	return 1;
     }
 
-    /* if we hit a symlink, we're done */
+    /*
+      if we hit a symlink, we're done; client will pick up
+      the pieces and continue to resolve the symlink if required
+    */
     if (a_p->objtype == PVFS_TYPE_SYMLINK)
     {
 	gossip_debug(SERVER_DEBUG, "  object is a symlink; halting "
@@ -322,9 +328,6 @@ static int lookup_verify_object_metadata(PINT_server_op *s_op,
     gossip_debug(SERVER_DEBUG, "  object is a datafile; will be "
                  "looking for handle for segment %s in a bit\n",
 		 s_op->u.lookup.segp);
-
-    /* update our successful attr read count */
-    s_op->u.lookup.attr_ct++;
 
     return 1;
 }
@@ -461,24 +464,12 @@ static int lookup_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
 {
     PINT_STATE_DEBUG("setup_resp");
 
-    if ((js_p->error_code != 0) &&
-        (js_p->error_code != STATE_NOMORESEGS) &&
-        (js_p->error_code != STATE_ENOTDIR))
-    {
-	/* as mentioned in lookup_read_directory_entry, on error seg_nr
-	 * is one too large.
-	 */
-	s_op->u.lookup.seg_nr--;
-	gossip_debug(SERVER_DEBUG, "  error occurred in lookup "
-                     "process; decrementing number of segments.\n");
-    }
-
     /*
       NOTE:
       we may have handle_count N with attr_count N-1 in the
       case that another meta-server needs to continue with
-      the path lookup.  otherwise, we're returning N handles
-      with N attrs.
+      the path (attr) lookup.  otherwise, we're returning N
+      handles with N attrs.
 
       # actually completed are one less than the respective counts
     */

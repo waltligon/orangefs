@@ -203,6 +203,9 @@ struct PINT_client_lookup_sm {
     char                         *remaining_pathname;
     PVFS_pinode_reference        remaining_starting_refn;
     PVFS_error                   last_error;
+    int                          resolve_symlink;
+    PVFS_pinode_reference        symlink_refn;
+    int                          num_symlinks_followed;
 };
 
 struct PINT_client_mgmt_setparam_list_sm 

@@ -96,6 +96,8 @@ enum PVFS_server_op
 #define PVFS_REQ_LIMIT_MGMT_DSPACE_INFO_LIST_COUNT 1024
 /* max number of path elements in a lookup_attr response */
 #define PVFS_REQ_LIMIT_MAX_PATH_ELEMENTS  40
+/* max number of symlinks to resolve before erroring out */
+#define PVFS_REQ_LIMIT_MAX_SYMLINK_RESOLUTION_COUNT 8
 
 /* create *********************************************************/
 /* - used to create new metafile and datafile objects */
