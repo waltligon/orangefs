@@ -8,6 +8,9 @@ int main(int argc,char* argv[])
 	pinode *pinode1, *pinode2, *pinode3, *test_pinode = NULL;
 	int ret;
 
+	gossip_enable_stderr();
+	gossip_set_debug_mask(1,CLIENT_DEBUG);
+
 	ret = PINT_pcache_initialize( );
 	if (ret < 0)
 	{
@@ -139,6 +142,8 @@ int main(int argc,char* argv[])
 		return(-1);
 	}
 	printf("pcache finalized\n");
+
+	gossip_disable();
 
 	return(0);
 }

@@ -197,5 +197,7 @@ int main(int argc, char **argv)
 
 	BMI_finalize();
 
+	gossip_disable();
+
 	return(0);
 }

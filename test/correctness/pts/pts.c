@@ -23,6 +23,9 @@ int main(int argc, char **argv) {
   
   int numprocs, myid, rc, status;
 
+  gossip_enable_stderr();
+  gossip_set_debug_mask(1,CLIENT_DEBUG);
+
   MPI_Init(&argc,&argv);
   MPI_Comm_size(MPI_COMM_WORLD, &numprocs);
   MPI_Comm_rank(MPI_COMM_WORLD, &myid);
@@ -78,6 +81,9 @@ int main(int argc, char **argv) {
   fprintf(stderr, "%d: DONE RUNNING TESTS!\n", myid);
   //   MPI_Barrier(MPI_COMM_WORLD);
   MPI_Finalize();
+
+  gossip_disable();
+
   exit(0);
 }
 

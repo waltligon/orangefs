@@ -31,6 +31,9 @@ int main(int argc,char **argv)
 	int ret = -1,i = 0;
 	pvfs_mntlist mnt = {0,NULL};
 
+	gossip_enable_stderr();
+	gossip_set_debug_mask(1,CLIENT_DEBUG);
+
 	if (argc == 2)
 	{
 		filename = malloc(strlen(argv[1]) + 1);
@@ -147,5 +150,8 @@ int main(int argc,char **argv)
 	free(resp_gattr);
 
 	free(filename);
+
+	gossip_disable();
+
 	return(0);
 }

@@ -159,6 +159,9 @@ int main(int argc, char **argv)
     pvfs_mntlist mnt = {0,NULL};
     PVFS_sysresp_init init_response;
 
+    gossip_enable_stderr();
+	 gossip_set_debug_mask(1, CLIENT_DEBUG);
+
     if (argc != 2)
     {
         fprintf(stderr,"usage: %s <starting dir>\n",argv[0]);
@@ -190,5 +193,8 @@ int main(int argc, char **argv)
         fprintf(stderr,"Failed to finalize PVFS\n");
         return 1;
     }
+
+    gossip_disable();
+
     return 0;
 }

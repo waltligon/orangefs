@@ -11,6 +11,9 @@ int main(int argc, char* argv[])
 	char *segment = NULL;
 	int num_segments = 10,i, ret=0;
 
+	gossip_enable_stderr();
+	gossip_set_debug_mask(1,CLIENT_DEBUG);
+
 	path = malloc(41);
 
 	strcpy(path,"/home/fshorte/porn/mp3s/crap/foobar.txt");
@@ -41,5 +44,8 @@ int main(int argc, char* argv[])
 		free(segment);
 	}
 	free(path);
+
+	gossip_disable();
+
 	return 0;
 }

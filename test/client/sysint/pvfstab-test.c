@@ -15,6 +15,9 @@ int main(int argc, char* argv[])
     pvfs_mntlist mnt;
     int ret;
 
+    gossip_enable_stderr();
+    gossip_set_debug_mask(1,CLIENT_DEBUG);
+
     ret = parse_pvfstab(argv[1],&mnt);
     if (ret < 0)
     {
@@ -23,6 +26,9 @@ int main(int argc, char* argv[])
     }
 
     print_mount_list(&mnt);
+
+    gossip_disable();
+
     return(0);
 }
 

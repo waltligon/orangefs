@@ -31,6 +31,9 @@ int main(int argc,char **argv)
 	int max_dirents_returned = 25;
 	char* starting_point = NULL;
 
+	gossip_enable_stderr();
+	gossip_set_debug_mask(1,CLIENT_DEBUG);
+
 	switch(argc)
 	{
 		case 3:
@@ -136,6 +139,8 @@ int main(int argc,char **argv)
 	free(resp_readdir);		/* allocated by us */
 
 	free(starting_point);
+
+	gossip_disable();
 
 	return(0);
 }

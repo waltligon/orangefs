@@ -223,5 +223,7 @@ int main(int argc, char **argv)
 		return(-1);
 	}
 
+	gossip_disable();
+
 	return(0);
 }

@@ -28,6 +28,9 @@ int main(int argc,char **argv)
 	int i;
 	int errors;
 
+	gossip_enable_stderr();
+	gossip_set_debug_mask(1,CLIENT_DEBUG);
+
 	if (argc != 2)
 	{
 		fprintf(stderr, "Usage: %s <file name>\n", argv[0]);
@@ -223,6 +226,8 @@ int main(int argc,char **argv)
 		fprintf(stderr, "Error: PVFS_sys_finalize() failed with errcode = %d\n", ret);
 		return (-1);
 	}
+
+	gossip_disable();
 
 	free(filename);
 	free(io_buffer);
