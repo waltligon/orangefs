@@ -299,15 +299,17 @@ static int handle_store_load(TROVE_coll_id coll_id,
 			     char *admin_name,
 			     struct handle_ledger *ledger) 
 {
-    int i, ret;
+#if 0
     char *method_name;
     TROVE_coll_id admin_id;
-    TROVE_op_id op_id;
     TROVE_handle free_list_handle = FREE_EXTENTLIST_HANDLE;
     TROVE_handle overflow_list_handle = OVERFLOW_EXTENTLIST_HANDLE;
     TROVE_handle recently_freed_list_handle = RECENTLY_FREED_EXTENTLIST_HANDLE;
+#endif
 
-    int count, array_count, state;
+    TROVE_op_id op_id;
+
+    int i, ret, count, array_count, state;
     TROVE_handle *handle_array;
     TROVE_ds_position pos = TROVE_ITERATE_START; /* ??? */
 
@@ -333,7 +335,6 @@ static int handle_store_load(TROVE_coll_id coll_id,
     handle_array = malloc(256 * sizeof(TROVE_handle));
     if (!handle_array) assert(0);
 
-    /* HACK -- NEED TO REPEAT CALL */
     for (;;) {
 	array_count = 256;
 	ret = trove_dspace_iterate_handles(coll_id,
@@ -365,6 +366,7 @@ static int handle_store_load(TROVE_coll_id coll_id,
     free(handle_array);
 
 #if 0
+    /* ONE DAY THIS CODE WILL READ THE FREE LISTS FROM BSTREAMS, BUT NOT TODAY. */
     ret = trove_collection_lookup(admin_name, &admin_id, NULL, &op_id);
     if (ret < 0) {
 	fprintf(stderr, "collection lookup failed");
