@@ -51,7 +51,7 @@ int main(int argc, char **argv)	{
 	bmi_error_code_t error_code;
 	bmi_size_t actual_size;
 	struct PINT_encoded_msg foo;
-	struct PINT_decoded_msg bar;
+	//struct PINT_decoded_msg bar;
 
 	/* grab any command line options */
 	user_opts = parse_args(argc, argv);

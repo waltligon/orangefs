@@ -65,10 +65,10 @@ extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
 /* Prototypes */
 static int initialize_interfaces(PINT_server_status_code *server_level_init);
-static int initialize_signal_handlers();
+static int initialize_signal_handlers(void);
 static int initialize_server_state(PINT_server_status_code *server_level_init,
-                                   PINT_server_op *s_op, job_status_s
-				   *job_status_structs[]);
+                                   PINT_server_op *s_op, 
+				   job_status_s *job_status_structs[]);
 static int server_init(void);
 static int server_shutdown(PINT_server_status_code level,
 			   int ret,
@@ -149,7 +149,7 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
 
 
 /* Registers signal handlers. returns < 0 on error. */
-static int initialize_signal_handlers()
+static int initialize_signal_handlers(void)
 {
     int ret = 1;
 
@@ -179,10 +179,10 @@ static int initialize_signal_handlers()
 /* #else */
     signal(SIGSEGV, (void *) sig_handler);
     signal(SIGPIPE, (void *) sig_handler);
-#endif
-    ret = 0;
 
   sh_init_failed:
+#endif
+    ret = 0;
     return ret;
 }
 
@@ -332,6 +332,11 @@ int main(int argc,
 	goto server_shutdown;
     }
 
+    /* TODO: Why is this generating a warning??? Fix Me!
+     *       src/server/pvfs2-server.c: In function `main':
+     *       src/server/pvfs2-server.c:340: warning: passing arg 3 of `initialize_server_state' 
+     *       from incompatible pointer type
+     */
     ret = initialize_server_state(&server_level_init,s_op,&job_status_structs);
     if (ret < 0)
     {

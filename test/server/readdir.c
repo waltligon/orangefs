@@ -99,7 +99,7 @@ int main(int argc, char **argv)	{
 	my_req->u.readdir.token = 1;
 	my_req->u.readdir.pvfs_dirent_count = 5;
 	
-	printf("Sending READDIR for Handle %Ld\n",user_opts->bucket);
+	printf("Sending READDIR for Handle %d\n",user_opts->bucket);
 	display_pvfs_structure(my_req,1);
 
 
