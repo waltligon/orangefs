@@ -34,8 +34,6 @@
 #include "trove-handle-mgmt.h"
 #include "gossip.h"
 
-DB_ENV * trove_db_env = NULL;
-
 int dbpf_method_id = -1;
 char dbpf_method_name[] = "dbpf";
 
@@ -258,7 +256,6 @@ static int dbpf_initialize(char *stoname,
 {
     int error;
     struct dbpf_storage *sto_p = NULL;
-    int ret;
 
     gossip_err("STONAME: %s\n", stoname);
     if (!method_name_p)
@@ -267,30 +264,12 @@ static int dbpf_initialize(char *stoname,
         return -1;
     }
 
-    ret = db_env_create(&trove_db_env, 0);
-    if(ret != 0)
-    {
-	return -1;
-    }
-
-    ret = trove_db_env->open(trove_db_env, 
-	stoname,
-	(DB_INIT_MPOOL|DB_THREAD),
-	TROVE_DB_MODE);
-    if(ret != 0)
-    {
-	gossip_err("dbpf_initialize failure: could not open env.\n");
-	return -1;
-    }
-
     sto_p = dbpf_storage_lookup(stoname, &error);
     if (sto_p == NULL)
     {
         gossip_debug(
             GOSSIP_TROVE_DEBUG, "dbpf_initialize failure: storage "
             "lookup failed\n");
-	trove_db_env->close(trove_db_env, 0);
-	trove_db_env = NULL;
         return -1;
     }
     
@@ -301,7 +280,6 @@ static int dbpf_initialize(char *stoname,
     if (*method_name_p == NULL)
     {
         gossip_err("dbpf_initialize failure: cannot allocate memory\n");
-	trove_db_env = NULL;
         return -1;
     }
 
@@ -354,14 +332,6 @@ static int dbpf_finalize(void)
 	return -1;
     }
 
-    ret = trove_db_env->close(trove_db_env, 0);
-    trove_db_env = NULL;
-    if (ret)
-    {
-	gossip_err("dbpf_finalize: %s\n", db_strerror(ret));
-	return(-1);
-    }
-
     free(my_storage_p->name);
     free(my_storage_p);
     my_storage_p = NULL;
@@ -389,21 +359,6 @@ static int dbpf_storage_create(char *stoname,
         return -1;
     }
 
-    ret = db_env_create(&trove_db_env, 0);
-    if(ret != 0)
-    {
-	return -1;
-    }
-
-    ret = trove_db_env->open(trove_db_env, 
-	stoname,
-	(DB_INIT_MPOOL|DB_THREAD|DB_CREATE),
-	TROVE_DB_MODE);
-    if(ret != 0)
-    {
-	return -1;
-    }
-
     DBPF_GET_STO_ATTRIB_DBNAME(path_name, PATH_MAX, stoname);
     ret = dbpf_db_create(path_name);
     if (ret != 0)
@@ -418,13 +373,6 @@ static int dbpf_storage_create(char *stoname,
         return -1;
     }
 
-    ret = trove_db_env->close(trove_db_env, 0);
-    trove_db_env = NULL;
-    if(ret != 0)
-    {
-	return -1;
-    }
-
     return 1;
 }
 
@@ -433,30 +381,6 @@ static int dbpf_storage_remove(char *stoname,
 			       TROVE_op_id *out_op_id_p)
 {
     char path_name[PATH_MAX];
-    int ret = -1;
-
-    if(trove_db_env)
-    {
-	ret = trove_db_env->close(trove_db_env, 0);
-	trove_db_env = NULL;
-	if(ret != 0)
-	{
-	    gossip_err("Warning: db env close failure, continuing...\n");
-	}
-    }
-
-    ret = db_env_create(&trove_db_env, 0);
-    if(ret != 0)
-    {
-	goto storage_remove_failure;
-    }
-
-    ret = trove_db_env->remove(trove_db_env, stoname, 0);
-    trove_db_env = NULL;
-    if(ret != 0)
-    {
-	goto storage_remove_failure;
-    }
 
     DBPF_GET_STO_ATTRIB_DBNAME(path_name, PATH_MAX, stoname);
     gossip_debug(GOSSIP_TROVE_DEBUG, "Removing %s\n", path_name);
@@ -1254,7 +1178,7 @@ static int dbpf_db_create(char *dbname)
     data.data = datastring;
     data.size = strlen(datastring)+1;
 
-    if ((ret = db_create(&db_p, trove_db_env, 0)) != 0) {
+    if ((ret = db_create(&db_p, NULL, 0)) != 0) {
 	gossip_lerr("dbpf_storage_create: %s\n",
 		db_strerror(ret));
 	return -1;
@@ -1317,7 +1241,7 @@ static DB *dbpf_db_open(char *dbname,
     int ret;
     DB *db_p;
 
-    if ((ret = db_create(&db_p, trove_db_env, 0)) != 0)
+    if ((ret = db_create(&db_p, NULL, 0)) != 0)
     {
 	*error_p = dbpf_db_error_to_trove_error(ret);
 	return NULL;

@@ -21,8 +21,6 @@
 #include "dbpf-dspace.h"
 #include "gossip.h"
 
-extern DB_ENV* trove_db_env;
-
 enum
 {
     DBCACHE_ENTRIES = 2
@@ -131,7 +129,7 @@ int dbpf_dspace_dbcache_try_get(TROVE_coll_id coll_id,
     DBPF_GET_DS_ATTRIB_DBNAME(filename, PATH_MAX,
                               my_storage_p->name, coll_id);
 
-    ret = db_create(&(dspace_db_cache[i].db_p), trove_db_env, 0);
+    ret = db_create(&(dspace_db_cache[i].db_p), NULL, 0);
     if (ret != 0) {
 	    gossip_lerr("dbpf_dspace_dbcache_get: %s\n", db_strerror(ret));
 	    assert(0);

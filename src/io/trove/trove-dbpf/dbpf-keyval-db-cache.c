@@ -21,8 +21,6 @@
 #include "dbpf.h"
 #include "dbpf-keyval.h"
 
-extern DB_ENV* trove_db_env;
-
 enum
 {
     DBCACHE_ENTRIES = 16
@@ -124,7 +122,7 @@ int dbpf_keyval_dbcache_try_remove(TROVE_coll_id coll_id,
     __DBPF_GET_KEYVAL_DBNAME(db_name, PATH_MAX, my_storage_p->name,
                              coll_id, Lu(handle));
 
-    ret = db_create(&db_p, trove_db_env, 0);
+    ret = db_create(&db_p, NULL, 0);
     assert(ret == 0);
 
     ret = db_p->remove(db_p, filename, db_name, 0);
@@ -244,7 +242,7 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
     __DBPF_GET_KEYVAL_DBNAME(db_name, PATH_MAX,
                              my_storage_p->name, coll_id, Lu(handle));
 
-    ret = db_create(&(keyval_db_cache[i].db_p), trove_db_env, 0);
+    ret = db_create(&(keyval_db_cache[i].db_p), NULL, 0);
     if (ret != 0)
     {
         gossip_lerr("dbpf_keyval_dbcache_get: %s\n", db_strerror(ret));
