@@ -1,5 +1,0 @@
-
-pvfs-tcp://localhost:3000/pvfs /mnt/pvfs pvfs 0 0 
-pvfs-gm://athena:4000/pvfs /mnt/foo pvfs 0 0
-
-pvfs-tcp://crack:3000/pvfs /mnt/pvfs pvfs 0 0
