@@ -119,7 +119,7 @@ ifdef BUILD_GM
 	CFLAGS += -D__STATIC_METHOD_BMI_GM__
 	# TODO: later on we will want the ability to modify this at configure
 	# time
-	CFLAGS += -DENABLE_GM_REGISTER
+	CFLAGS += -DENABLE_GM_BUFPOOL
 	LDFLAGS += -L @GM_HOME@/lib
 	LIBS += -lgm
 	SERVERLIBS += -lgm
