@@ -77,15 +77,15 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
+    /* initialize only one file system, regardless of how many are present
+     * in the pvfs2tab file 
+     */
+    mnt.ptab_p = &mnt.ptab_p[mnt_index];
+    mnt.nr_entry = 1;
+    mnt_index = 0;
+
     creds.uid = getuid();
     creds.gid = getgid();
-
-    ret = PVFS_mgmt_noop(creds, mnt.ptab_p[mnt_index].meta_addr);
-    if(ret < 0)
-    {
-	PVFS_perror("PVFS_mgmt_noop", ret);
-	return(-1);
-    }
 
     memset(&resp_init, 0, sizeof(resp_init));
     ret = PVFS_sys_initialize(mnt, 0, &resp_init);
