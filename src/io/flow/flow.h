@@ -74,9 +74,7 @@ enum flow_state
     FLOW_COMPLETE = 8,
     FLOW_ERROR = 16,
     FLOW_SRC_ERROR = 32,
-    FLOW_DEST_ERROR = 64,
-    FLOW_COMPLETE_SHORT = 128,
-    FLOW_UNPOSTED = 256
+    FLOW_DEST_ERROR = 64
 };
 
 /* supported getinfo types */
@@ -142,7 +140,7 @@ typedef struct flow_descriptor flow_descriptor;
 
 
 #define FLOW_FINISH_MASK  (FLOW_COMPLETE | FLOW_ERROR | FLOW_SRC_ERROR |\
- FLOW_DEST_ERROR | FLOW_COMPLETE_SHORT | FLOW_UNPOSTED)
+ FLOW_DEST_ERROR)
 
 /********************************************************************
  * flow interface functions
