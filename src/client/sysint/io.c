@@ -382,8 +382,160 @@ static int HACK_create(PVFS_handle* handle, PVFS_fs_id fsid)
 
 static int HACK_remove(PVFS_handle handle, PVFS_fs_id fsid)
 {
+    int ret = -1;
+    bmi_addr_t server_addr;
+    bmi_op_id_t client_ops[2];
+    int outcount = 0;
+    bmi_error_code_t error_code;
+    bmi_size_t actual_size;
+    struct PVFS_server_req_s my_req;
+    void* remove_ack;
+    int remove_ack_size;
+    struct PVFS_server_resp_s* remove_dec_ack;
+    struct PINT_encoded_msg encoded3;
+    struct PINT_decoded_msg decoded3;
 
-    return(-ENOSYS);
+    remove_ack_size = PINT_get_encoded_generic_ack_sz(0,
+	PVFS_SERV_REMOVE);
+
+    remove_ack = malloc(remove_ack_size);
+    if(!remove_ack)
+	return(-errno);
+
+    ret = PINT_bucket_map_to_server(
+	&server_addr,
+	4095,
+	fsid);
+    if(ret < 0)
+    {
+	fprintf(stderr, "PINT_bucket_map_to_server() failure.\n");
+	return(-1);
+    }
+
+    my_req.op = PVFS_SERV_REMOVE;
+    my_req.rsize = sizeof(struct PVFS_server_req_s);
+    my_req.credentials.uid = 100;
+    my_req.credentials.gid = 100;
+    my_req.credentials.perms = U_WRITE | U_READ;  
+
+    /* remove specific fields */
+    my_req.u.remove.fs_id = fsid;
+    my_req.u.remove.handle = handle;
+
+    ret = PINT_encode(&my_req,PINT_ENCODE_REQ,&encoded3,server_addr,0);
+    if(ret < 0)
+    {
+	fprintf(stderr, "Error: PINT_encode failure.\n");
+	return(-1);
+    }
+
+    /* send the request on its way */
+    ret = BMI_post_sendunexpected_list(
+	&(client_ops[1]), 
+	encoded3.dest,
+	encoded3.buffer_list, 
+	encoded3.size_list,
+	encoded3.list_count,
+	encoded3.total_size, 
+	encoded3.buffer_flag, 
+	0, 
+	NULL);
+    if(ret < 0)
+    {
+	errno = -ret;
+	perror("BMI_post_send");
+	return(-1);
+    }
+    if(ret == 0)
+    {
+	/* turning this into a blocking call for testing :) */
+	/* check for completion of request */
+	do
+	{
+	    ret = BMI_test(client_ops[1], &outcount, &error_code, &actual_size,
+		NULL, 10);
+	} while(ret == 0 && outcount == 0);
+
+	if(ret < 0 || error_code != 0)
+	{
+	    fprintf(stderr, "Error: request send failed.\n");
+	    if(ret<0)
+	    {
+		errno = -ret;
+		perror("BMI_test");
+	    }
+	    return(-1);
+	}
+    }
+
+    /* release the encoded message */
+    PINT_encode_release(&encoded3, PINT_ENCODE_REQ, 0);
+
+    /* post a recv for the server acknowledgement */
+    ret = BMI_post_recv(&(client_ops[0]), server_addr, remove_ack, 
+	remove_ack_size, &actual_size, BMI_EXT_ALLOC, 0, 
+	NULL);
+    if(ret < 0)
+    {
+	errno = -ret;
+	perror("BMI_post_recv");
+	return(-1);
+    }
+    if(ret == 0)
+    {
+	/* turning this into a blocking call for testing :) */
+	/* check for completion of ack recv */
+	do
+	{
+	    ret = BMI_test(client_ops[0], &outcount, &error_code,
+		&actual_size, NULL, 10);
+	} while(ret == 0 && outcount == 0);
+
+	if(ret < 0 || error_code != 0)
+	{
+	    fprintf(stderr, "Error: ack recv.\n");
+	    fprintf(stderr, "   ret: %d, error code: %d\n",ret,error_code);
+	    return(-1);
+	}
+    }
+    else
+    {
+	if(actual_size != remove_ack_size)
+	{
+	    printf("Error: short recv.\n");
+	    return(-1);
+	}
+    }
+
+    /* look at the ack */
+    ret = PINT_decode(
+	remove_ack,
+	PINT_ENCODE_RESP,
+	&decoded3,
+	server_addr,
+	actual_size,
+	NULL);
+    if(ret < 0)
+    {
+	fprintf(stderr, "Error: PINT_decode() failure.\n");
+	return(-1);
+    }
+
+    remove_dec_ack = decoded3.buffer;
+    if(remove_dec_ack->op != PVFS_SERV_REMOVE)
+    {
+	fprintf(stderr, "ERROR: received ack of wrong type (%d)\n", 
+	    (int)remove_dec_ack->op);
+	return(-1);
+    }
+    if(remove_dec_ack->status != 0)
+    {
+	fprintf(stderr, "ERROR: server returned status: %d\n",
+	    (int)remove_dec_ack->status);
+	return(-1);
+    }
+
+    return(0);
 }
 
 /*
