@@ -19,6 +19,7 @@
 extern YYSTYPE yylval;
 
 extern FILE *out_file;
+extern char *in_file_name;
 void produce_listing(int line, char *listing);
 
 /* int      atoi();
@@ -50,7 +51,7 @@ w           [ \t\n]*
 "\%"		{fprintf(out_file,"%s", yytext);}
 "\%\%"		{BEGIN(CODE);}
 
-<CODE>"\%\%"	{BEGIN(0);}
+<CODE>"\%\%"	{fprintf(out_file,"# %d \"%s\"\n", line, in_file_name); BEGIN(0);}
 
 <CODE>"machine"    {LIST; RETURNVAL(MACHINE);}
 <CODE>"nested" 	   {LIST; RETURNVAL(NESTED);}

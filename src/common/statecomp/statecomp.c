@@ -38,6 +38,7 @@ int list_file_flag = 0;
 int out_file_flag = 0;
 FILE *out_file;
 int line = 1;
+char *in_file_name = 0;
 
 int main(int argc, char **argv)
 {
@@ -109,6 +110,7 @@ static void parse_args(int argc, char **argv)
 	perror("opening input file");
 	exit(-1);
     }
+    in_file_name = strdup(file_name);
     if (argc == optind + 1) {
 	/* construct output file name from input file name */
 	file_name = malloc(file_name_size);
@@ -155,6 +157,7 @@ static void finalize(void)
     {
 	fclose(list_file);
     }
+    free(in_file_name);
 }
 
 void yyerror(char *s)
