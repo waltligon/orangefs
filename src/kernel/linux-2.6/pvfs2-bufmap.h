@@ -14,7 +14,7 @@ struct pvfs_bufmap_desc
     struct page** page_array;	/* array of mapped pages */
     void** kaddr_array;		/* kernel addresses matching above */
     int array_count;		/* size of above arrays */
-    struct list_head list_entry;
+    struct list_head list_link;
 };
 
 int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc);

@@ -23,6 +23,7 @@ static int bufmap_page_count = 0;
 static LIST_HEAD(desc_list);
 static spinlock_t desc_list_lock = SPIN_LOCK_UNLOCKED;
 static struct pvfs_bufmap_desc desc_array[PVFS2_BUFMAP_DESC_COUNT];
+static DECLARE_WAIT_QUEUE_HEAD(bufmap_waitq);
 
 /* pvfs_bufmap_initialize()
  *
@@ -133,7 +134,7 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc)
 	desc_array[i].array_count = pages_per_desc;
 	desc_array[i].uaddr = user_desc->ptr +
 	    (i*pages_per_desc*PAGE_SIZE);
-	list_add_tail(&(desc_array[i].list_entry), &desc_list);
+	list_add_tail(&(desc_array[i].list_link), &desc_list);
 	offset += pages_per_desc;
     }
 
@@ -179,8 +180,42 @@ void pvfs_bufmap_finalize(void)
  */
 int pvfs_bufmap_get(struct pvfs_bufmap_desc** desc)
 {
-    pvfs2_error("pvfs2: error: function not implemented.\n");
-    return(-ENOSYS);
+    int ret = -1;
+    DECLARE_WAITQUEUE(my_wait, current);
+
+    add_wait_queue(&bufmap_waitq, &my_wait);
+
+    while(1)
+    {
+	set_current_state(TASK_INTERRUPTIBLE);
+
+	/* check for available desc */
+	spin_lock(&desc_list_lock);
+	if(!list_empty(&desc_list))
+	{
+	    /* we have a buf desc ready; pull it out and return immediately */
+	    *desc = list_entry(desc_list.next, struct pvfs_bufmap_desc,
+		list_link);
+	    list_del(&((*desc)->list_link));
+	    spin_unlock(&desc_list_lock);
+	    ret = 0;
+	    break;
+	}
+	spin_unlock(&desc_list_lock);
+
+	/* TODO: figure out which signals to look for */
+	if(signal_pending(current))
+	{
+	    pvfs2_print("pvfs2: bufmap_get() interrupted.\n");
+	    ret = -EINTR;
+	    break;
+	}
+    }
+
+    set_current_state(TASK_RUNNING);
+    remove_wait_queue(&bufmap_waitq, &my_wait);
+
+    return(ret);
 }
 
 /* pvfs_bufmap_put()
@@ -191,7 +226,14 @@ int pvfs_bufmap_get(struct pvfs_bufmap_desc** desc)
  */
 void pvfs_bufmap_put(struct pvfs_bufmap_desc* desc)
 {
-    pvfs2_error("pvfs2: error: function not implemented.\n");
+    /* put the desc back on the queue */
+    spin_lock(&desc_list_lock);
+    list_add_tail(&(desc->list_link), &desc_list);
+    spin_unlock(&desc_list_lock);
+
+    /* wake up anyone who may be sleeping on the queue */
+    wake_up_interruptible(&bufmap_waitq);
+
     return;
 }
 
