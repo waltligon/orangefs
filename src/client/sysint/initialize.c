@@ -27,7 +27,7 @@
 static int server_send_req(bmi_addr_t addr,
 			   struct PVFS_server_req_s *req_p,
 			   PVFS_credentials creds,
-			   struct PVFS_server_resp_s **ack_pp);
+			   struct PINT_decoded_msg *decoded_p);
 
 /* pinode cache */
 extern pcache pvfs_pcache; 
@@ -183,10 +183,13 @@ static int server_get_config(pvfs_mntlist mntent_list)
 {
     struct PVFS_server_req_s *req_p = NULL;		/* server request */
     struct PVFS_server_resp_s *ack_p = NULL;	/* server response */
-    int ret = -1, i = 0, j = 0;
+    int ret = -1, i, j;
     bmi_addr_t serv_addr;				 /*PVFS address type structure*/ 
-    int start = 0, k = 0, name_sz = 0, metalen= 0, iolen = 0;
+    int len, name_sz, metalen, iolen;
     PVFS_credentials creds;
+    char *parse_p;
+    struct PINT_decoded_msg decoded;
+
 
     enum {
 	NONE_FAIL = 0,
@@ -225,20 +228,16 @@ static int server_get_config(pvfs_mntlist mntent_list)
 	req_p->u.getconfig.fs_name     = mntent_p->serv_mnt_dir; /* just point to the mount info */
 	req_p->u.getconfig.max_strsize = MAX_STRING_SIZE;
 
-
 	/* DO THE GETCONFIG */
 	/* do_getconfig() fills returns an allocated and populated PVFS_server_resp_s
 	 * pointed to by ack_p.
 	 */
-	ret = server_send_req(serv_addr, req_p, creds, &ack_p);
-#if 0
-	ret = pint_serv_getconfig(&req_p, &ack_p, &req_getconfig, cred, &serv_addr);
-	if (ret < 0)
-	{
-	    ret = -EINVAL;
-	    goto getconfig_failure;
+	ret = server_send_req(serv_addr, req_p, creds, &decoded);
+	if (ret < 0) {
+	    goto return_error;
 	}
-#endif
+
+	ack_p = (struct PVFS_server_resp_s *) decoded.buffer;
 
 	/* Use data from response to update global tables */
 	fsinfo_p = &server_config.fs_info[i];
@@ -260,7 +259,8 @@ static int server_get_config(pvfs_mntlist mntent_list)
 	metalen = strlen(ack_p->u.getconfig.meta_server_mapping);
 	iolen   = strlen(ack_p->u.getconfig.io_server_mapping);
 
-	printf("meta: %s\nio: %s\n",
+	printf("server %d config reply:\n\tmeta = %s\n\tio = %s\n",
+	       i,
 	       ack_p->u.getconfig.meta_server_mapping,
 	       ack_p->u.getconfig.io_server_mapping);
 
@@ -270,101 +270,125 @@ static int server_get_config(pvfs_mntlist mntent_list)
 	if (fsinfo_p->meta_serv_array == NULL)
 	{
 	    ret = -ENOMEM;
-	    goto getconfig_failure;
+	    goto return_error;
 	}
 	fsinfo_p->bucket_array = (bucket_info *) malloc(fsinfo_p->meta_serv_count * sizeof(bucket_info));
 	if (fsinfo_p->bucket_array == NULL)
 	{
 	    ret = -ENOMEM;
-	    goto metabucketalloc_failure;
+	    goto return_error;
 	}
 	/* Copy the metaservers from ack to config info */
-	for(j = 0; j < fsinfo_p->meta_serv_count; j++) 
+	parse_p = ack_p->u.getconfig.meta_server_mapping;
+	printf("meta server count = %d\n", fsinfo_p->meta_serv_count);
+	for (j=0; j < fsinfo_p->meta_serv_count; j++)
 	{
-	    k = start;
-	    while (ack_p->u.getconfig.meta_server_mapping[k] != '-' && k < metalen) k++;
-	    start = k;
-	    fsinfo_p->meta_serv_array[j] = (PVFS_string) malloc(k - start + 1);
-	    if (fsinfo_p->meta_serv_array[j] == NULL)
-	    {
-		ret = -ENOMEM;
-		goto metaserver_alloc_failure;
+	    len = 0;
+
+	    /* find next ";" terminator (or end of string) */
+	    while (parse_p[len] != ';' && parse_p[len] != '\0') len++;
+
+	    /* skip "pvfs-" */
+	    assert(len > 5);
+	    if (!strncmp(parse_p, "pvfs-", 5)) {
+		parse_p += 5;
+		len -= 5;
 	    }
-	    memcpy(fsinfo_p->meta_serv_array[j], &(ack_p->u.getconfig.meta_server_mapping[start]),k-start);
-	    fsinfo_p->meta_serv_array[j][k-start] = '\0';
+	    else {
+		goto return_error;
+	    }
 
-	    /*** NO BUCKET TABLE INFO ON THE WIRE AT THIS TIME ***/
+	    /* allocate space for entry */
+	    fsinfo_p->meta_serv_array[j] = (PVFS_string) malloc(len + 1);
+	    if (fsinfo_p->meta_serv_array[j] == NULL) {
+		goto return_error;
+	    }
+
+	    /* copy entry */
+	    memcpy(fsinfo_p->meta_serv_array[j], parse_p, len);
+	    fsinfo_p->meta_serv_array[j][len] = '\0';
+	    printf("\tmeta server[%d] = %s\n", j, fsinfo_p->meta_serv_array[j]);
+
+	    if (parse_p[len] == '\0') break;
+	    else parse_p += len + 1;
 	}
-	start = k = 0;
 
-	/* How to get the size of ioserver list in ack? */
+	/* repeat for i/o servers */
 	fsinfo_p->io_serv_array = (PVFS_string *) malloc(fsinfo_p->io_serv_count * sizeof(PVFS_string));
 	if (fsinfo_p->io_serv_array == NULL)
 	{
 	    ret = -ENOMEM;
-	    goto metaserver_alloc_failure;
+	    goto return_error;
 	}
 	fsinfo_p->io_bucket_array = (bucket_info *) malloc(fsinfo_p->io_serv_count * sizeof(bucket_info));
 	if (fsinfo_p->io_bucket_array == NULL)
 	{
 	    ret = -ENOMEM;
-	    goto iobucketalloc_failure;
+	    goto return_error;
 	}
-	/* Copy the ioservers from ack to config info */
-	for(j = 0; j < fsinfo_p->io_serv_count; j++) 
+	parse_p = ack_p->u.getconfig.io_server_mapping;
+	printf("io server count = %d\n", fsinfo_p->io_serv_count);
+	for (j=0; j < fsinfo_p->io_serv_count; j++)
 	{
-	    k = start;
-	    /* CHANGE THE SPACE BELOW TO A DASH SO IT WOULD SKIP pvfs- */
-	    while (ack_p->u.getconfig.io_server_mapping[k] != '-' && k < iolen) k++;
-	    /* ASSIGN start = k TO SKIP pvfs- */
-	    start = k;
-	    fsinfo_p->io_serv_array[j] = (PVFS_string)malloc(k - start + 1);
-	    if (fsinfo_p->io_serv_array[j] == NULL)
-	    {
-		ret = -ENOMEM;
-		goto ioserver_alloc_failure;
+	    len = 0;
+
+	    /* find next ";" terminator (or end of string) */
+	    while (parse_p[len] != ';' && parse_p[len] != '\0') len++;
+
+	    /* skip "pvfs-" */
+	    assert(len > 5);
+	    if (!strncmp(parse_p, "pvfs-", 5)) {
+		parse_p += 5;
+		len -= 5;
 	    }
-	    memcpy(fsinfo_p->io_serv_array[j], &(ack_p->u.getconfig.io_server_mapping[start]),k-start);
-	    fsinfo_p->io_serv_array[j][k-start] = '\0';
+	    else {
+		goto return_error;
+	    }
 
-	    /*** NO BUCKET STUFF IS ON THE WIRE AT THIS TIME ***/
+	    /* allocate space for entry */
+	    fsinfo_p->io_serv_array[j] = (PVFS_string) malloc(len + 1);
+	    if (fsinfo_p->io_serv_array[j] == NULL) {
+		goto return_error;
+	    }
 
+	    /* copy entry */
+	    memcpy(fsinfo_p->io_serv_array[j], parse_p, len);
+	    fsinfo_p->io_serv_array[j][len] = '\0';
+	    printf("\tio server[%d] = %s\n", j, fsinfo_p->io_serv_array[j]);
 
+	    if (parse_p[len] == '\0') break;
+	    else parse_p += len + 1;
 	}
-	start = k = 0;
 
-#if 0
-	sysjob_free(serv_addr,req_p,req_size,BMI_SEND_BUFFER,NULL);
-	sysjob_free(serv_addr,ack_p,ack_size,BMI_RECV_BUFFER,NULL);
-#endif
+	/* free decoded response */
+	PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
     }
+
     return(0); 
 
 
     /* TODO: FIX UP ERROR HANDLING; NEEDS TO BE REVIEWED TOTALLY */
- ioserver_alloc_failure:
- iobucketalloc_failure:
- metaserver_alloc_failure:
- metabucketalloc_failure:
- getconfig_failure:
- namealloc_failure:
  return_error:
-    return(ret);
+    return -1;
 }	  
 
 /* server_send_req()
  *
  * TODO: PREPOST RECV
+ *
+ * Fills in PINT_decoded_msg pointed to by decoded_p; decoded_p->buffer will 
+ * hold the decoded acknowledgement.  The caller must call PINT_decode_release()
+ * on decoded_p in order to free the memory allocated during the decoding
+ * process.
  */
 static int server_send_req(bmi_addr_t addr,
 			   struct PVFS_server_req_s *req_p,
 			   PVFS_credentials creds,
-			   struct PVFS_server_resp_s **ack_pp)
+			   struct PINT_decoded_msg *decoded_p)
 {
     int ret;
     bmi_size_t max_msg_sz;
     struct PINT_encoded_msg encoded;
-    struct PINT_decoded_msg decoded;
     char *encoded_resp;
     job_status_s s_status, r_status;
     PVFS_msg_tag_t op_tag = get_next_session_tag();
@@ -422,7 +446,7 @@ static int server_send_req(bmi_addr_t addr,
      */
     ret = PINT_decode(encoded_resp,
 		      PINT_DECODE_RESP,
-		      &decoded,
+		      decoded_p,
 		      addr,
 		      r_status.actual_size,
 		      NULL);
@@ -436,7 +460,6 @@ static int server_send_req(bmi_addr_t addr,
     ret = BMI_memfree(addr, encoded_resp, max_msg_sz, BMI_RECV_BUFFER);
     assert(ret == 0);
 
-    *ack_pp = (struct PVFS_server_resp_s *) decoded.buffer;
     return 0;
  return_error:
     return -1;
