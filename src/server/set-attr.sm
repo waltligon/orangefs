@@ -338,6 +338,7 @@ static int setattr_write_metafile_datafile_handles_if_required(
 {
     int ret = 0, dfile_count = 0;
     job_id_t j_id;
+    struct server_configuration_s *user_opts = get_server_config_struct();
 
     PINT_STATE_DEBUG("write_metafile_datafile_handles_if_needed");
 
@@ -386,17 +387,19 @@ static int setattr_write_metafile_datafile_handles_if_required(
         s_op->val.buffer,
         s_op->val.buffer_sz);
 
-    ret = job_trove_keyval_write(s_op->req->u.setattr.fs_id,
-                                 s_op->req->u.setattr.handle,
-                                 &(s_op->key),
-                                 &(s_op->val),
-                                 TROVE_SYNC /* flags */,
-                                 NULL,
-                                 s_op,
-				 0,
-                                 js_p,
-                                 &j_id,
-                                 server_job_context);
+    ret = job_trove_keyval_write(
+        s_op->req->u.setattr.fs_id,
+        s_op->req->u.setattr.handle,
+        &(s_op->key),
+        &(s_op->val),
+        PINT_config_get_trove_sync_mode(
+            user_opts, s_op->req->u.setattr.fs_id),
+        NULL,
+        s_op,
+        0,
+        js_p,
+        &j_id,
+        server_job_context);
 
     return ret;
 }
@@ -406,6 +409,7 @@ static int setattr_write_metafile_distribution_if_required(
 {
     int ret = 0;
     job_id_t j_id;
+    struct server_configuration_s *user_opts = get_server_config_struct();
 
     PINT_STATE_DEBUG("write_metafile_distribution_if_required");
 
@@ -445,17 +449,20 @@ static int setattr_write_metafile_distribution_if_required(
         s_op->val.buffer,
         s_op->val.buffer_sz);
 
-    ret = job_trove_keyval_write(s_op->req->u.setattr.fs_id,
-                                 s_op->req->u.setattr.handle,
-                                 &(s_op->key),
-                                 &(s_op->val),
-                                 TROVE_SYNC /* flags */,
-                                 NULL,
-                                 s_op,
-                                 0,
-                                 js_p,
-                                 &j_id,
-                                 server_job_context);
+    ret = job_trove_keyval_write(
+        s_op->req->u.setattr.fs_id,
+        s_op->req->u.setattr.handle,
+        &(s_op->key),
+        &(s_op->val),
+        PINT_config_get_trove_sync_mode(
+            user_opts, s_op->req->u.setattr.fs_id),
+        NULL,
+        s_op,
+        0,
+        js_p,
+        &j_id,
+        server_job_context);
+
     return(ret);
 }
 
@@ -464,6 +471,7 @@ static int setattr_write_symlink_target_if_required(
 {
     int ret = 0;
     job_id_t j_id;
+    struct server_configuration_s *user_opts = get_server_config_struct();
 
     PINT_STATE_DEBUG("write_symlink_target_if_required");
 
@@ -500,17 +508,20 @@ static int setattr_write_symlink_target_if_required(
 		 s_op->val.buffer,
 		 s_op->val.buffer_sz);
 
-    ret = job_trove_keyval_write(s_op->req->u.setattr.fs_id,
-                                 s_op->req->u.setattr.handle,
-                                 &(s_op->key),
-                                 &(s_op->val),
-                                 TROVE_SYNC /* flags */,
-                                 NULL,
-                                 s_op,
-				 0,
-                                 js_p,
-                                 &j_id,
-                                 server_job_context);
+    ret = job_trove_keyval_write(
+        s_op->req->u.setattr.fs_id,
+        s_op->req->u.setattr.handle,
+        &(s_op->key),
+        &(s_op->val),
+        PINT_config_get_trove_sync_mode(
+            user_opts, s_op->req->u.setattr.fs_id),
+        NULL,
+        s_op,
+        0,
+        js_p,
+        &j_id,
+        server_job_context);
+
     return ret;
 }
 

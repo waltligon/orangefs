@@ -250,8 +250,8 @@ static int rmdirent_remove_directory_entry(
         s_op->req->u.rmdirent.fs_id,
         s_op->u.rmdirent.dirdata_handle,
         &s_op->key,
-        (PINT_config_get_trove_sync_mode(
-            user_opts, s_op->req->u.rmdirent.fs_id) | TROVE_SYNC),
+        PINT_config_get_trove_sync_mode(
+            user_opts, s_op->req->u.rmdirent.fs_id),
         NULL,
         s_op,
         0,
