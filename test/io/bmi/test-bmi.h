@@ -11,7 +11,7 @@
 
 /* default hostid of server when none is given */
 #define DEFAULT_HOSTID  "tcp://localhost:3334"
-#define DEFAULT_HOSTID_GM  "gm://alt0"
+#define DEFAULT_HOSTID_GM  "gm://playtoy"
 #define DEFAULT_SERVERID  "tcp://NULL:3334"
 #define DEFAULT_SERVERID_GM  "gm://NULL"
 
