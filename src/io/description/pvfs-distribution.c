@@ -29,8 +29,7 @@ PVFS_Dist *PVFS_Dist_create(char *name)
 	if (PINT_Dist_lookup(&old_dist) == 0)
 	{
 		/* distribution was found */
-		new_dist = (PVFS_Dist *)malloc(sizeof(PVFS_Dist) +
-				old_dist.param_size + old_dist.name_size);
+		new_dist = (PVFS_Dist *)malloc(PINT_DIST_PACK_SIZE(&old_dist));
 		if (new_dist)
 		{
 			*new_dist = old_dist;
@@ -51,4 +50,55 @@ PVFS_Dist *PVFS_Dist_create(char *name)
 		/* distribution was not found */
 		return NULL;
 	}
+}
+
+int PVFS_Dist_free(PVFS_Dist *dist)
+{
+	if (dist)
+	{
+		/* assumes this is a dist created from above */
+		free(dist);
+		return 0;
+	}
+	return -1;
+}
+
+PVFS_Dist *PVFS_Dist_copy(PVFS_Dist *dist)
+{
+	int dist_size;
+	PVFS_Dist *new_dist;
+
+	if (!dist)
+	{
+		return NULL;
+	}
+	dist_size = PINT_DIST_PACK_SIZE(dist);
+	new_dist = (PVFS_Dist *)malloc(dist_size);
+	if (new_dist)
+	{
+		memcpy(new_dist, dist, dist_size);
+		return (new_dist);
+	}
+	/* memory allocation failed */
+	return NULL;
+}
+
+int PVFS_Dist_getparams(void *buf, PVFS_Dist *dist)
+{
+	if (!dist || !buf)
+	{
+		return -1;
+	}
+	memcpy (buf, dist->params, dist->param_size);
+	return 0;
+}
+
+int PVFS_Dist_setparams(PVFS_Dist *dist, void *buf)
+{
+	if (!dist || !buf)
+	{
+		return -1;
+	}
+	memcpy (dist->params, buf, dist->param_size);
+	return 0;
 }

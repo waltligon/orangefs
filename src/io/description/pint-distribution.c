@@ -99,8 +99,7 @@ void PINT_Dist_encode(void *buffer, struct PVFS_Dist *dist)
 		return;
 	if (buffer)
 	{
-		memcpy(buffer, dist,
-				sizeof(struct PVFS_Dist) + dist->name_size + dist->param_size);
+		memcpy(buffer, dist, PINT_DIST_PACK_SIZE(dist));
 		dist = buffer;
 		/* adjust pointers in new buffer */
 		dist->dist_name = ((char *)dist + ((char *)old_dist->dist_name -
@@ -127,8 +126,7 @@ void PINT_Dist_decode(struct PVFS_Dist *dist, void *buffer)
 	if (buffer)
 	{
 		PVFS_Dist *d2 = (PVFS_Dist *)buffer;
-		memcpy(dist, buffer, 
-				sizeof(struct PVFS_Dist) + d2->name_size + d2->param_size);
+		memcpy(dist, buffer, PINT_DIST_PACK_SIZE(d2));
 	}
 	/* convert pointers in dist to ints */
 	dist->dist_name = (char *)(dist) + (int)(dist->dist_name);
