@@ -249,12 +249,12 @@ int job_time_mgr_expire(void)
 	    jd = qlist_entry(iterator2, struct job_desc, job_time_link);
 	    qlist_del(&jd->job_time_link);
 
-	    gossip_debug(GOSSIP_JOB_DEBUG, "job_timer: expiring job!\n");
+	    gossip_debug(GOSSIP_CANCEL_DEBUG, "job_timer: expiring job!\n");
 
 	    switch(jd->type)
 	    {
 	    case JOB_BMI:
-		gossip_debug(GOSSIP_JOB_DEBUG, "Job timer: cancelling bmi.\n");
+		gossip_debug(GOSSIP_CANCEL_DEBUG, "job_timer: cancelling bmi.\n");
 		ret = job_bmi_cancel(jd->job_id, jd->context_id);
 		break;
 	    case JOB_FLOW:
@@ -271,14 +271,14 @@ int job_time_mgr_expire(void)
 		else
 		{
 		    /* otherwise kill the flow */
-		    gossip_debug(GOSSIP_JOB_DEBUG,
-                                 "Job timer: cancelling flow.\n");
+		    gossip_debug(GOSSIP_CANCEL_DEBUG,
+                                 "job_timer: cancelling flow.\n");
 		    ret = job_flow_cancel(jd->job_id, jd->context_id);
 		}
 		break;
 	    case JOB_TROVE:
-		gossip_debug(GOSSIP_JOB_DEBUG,
-                             "Job timer: cancelling trove.\n");
+		gossip_debug(GOSSIP_CANCEL_DEBUG,
+                             "job_timer: cancelling trove.\n");
 		ret = job_trove_dspace_cancel(
                     jd->u.trove.fsid, jd->job_id, jd->context_id);
 	    default:

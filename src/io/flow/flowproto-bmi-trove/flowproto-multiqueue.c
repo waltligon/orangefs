@@ -377,8 +377,16 @@ int fp_multiqueue_cancel(flow_descriptor * flow_d)
     /* if the flow is already marked as complete, then there is nothing to do */
     if(flow_d->state != FLOW_COMPLETE)
     {
+	gossip_debug(GOSSIP_CANCEL_DEBUG,
+	    "PINT_flow_cancel() called on active flow, %Ld bytes transferred.\n",
+	    Ld(flow_d->total_transfered));
 	assert(flow_d->state == FLOW_TRANSMITTING);
 	handle_io_error(-PVFS_ECANCEL, NULL, flow_data);
+    }
+    else
+    {
+	gossip_debug(GOSSIP_CANCEL_DEBUG,
+	    "PINT_flow_cancel() called on already completed flow; doing nothing.\n");
     }
     gen_mutex_unlock(flow_data->parent->flow_mutex);
 
