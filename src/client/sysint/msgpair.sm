@@ -190,7 +190,7 @@ static int msgpair_post(PINT_client_sm *sm_p,
     }
     else if (ret == 1) {
 	/* send completed immediately; decrement the completion counter */
-	gossip_debug(CLIENT_DEBUG, "remove: rmdirent send completed immediately.\n");
+	gossip_debug(CLIENT_DEBUG, "  msgpair: send completed immediately.\n");
 
 	/* 0 is the valid "completed job id" value, according to Phil */
 	msg_p->send_id = 0;
@@ -223,6 +223,8 @@ static int msgpair_complete(PINT_client_sm *sm_p,
 
     msg_p = &sm_p->msgpair;
 
+    /* we know status of operation is 0, or we wouldn't be in this state. */
+
     /* decrement until both operations have completed */
     if (--msg_p->comp_ct > 0) return 0;
 
@@ -246,12 +248,14 @@ static int msgpair_complete(PINT_client_sm *sm_p,
 				msg_p->actual_resp_sz,
 				&resp_p);
     if (ret != 0) {
+	gossip_err("error: msgpair_complete: decode error\n");
 	assert(ret < 0); /* return value range check */
 	assert(0); /* placeholder */
     }
 
     /* check status of response */
     if (resp_p->status != 0) {
+	gossip_err("error: msgpair_complete: status error\n");
 	assert(0); /* placeholder */
     }
 

@@ -109,8 +109,10 @@ state_decl_list   : state_decl
 
 state_decl	  : .EXTERN. identifier
 		     {$$ = symlook($2);
-		      if ($$ != NULL)
+		      if ($$ != NULL) {
 			 fprintf(stderr,"identifier already declared %s\n", $2);
+			 exit(1);
+		      } 
 		      else {
 			 $$ = symenter($2);
 			 $$->type = TYPE_STATE;
@@ -137,7 +139,9 @@ state_def	  : STATE identifier LBRACE
 		     {$$ = symlook($2);
 		      if ($$->type != TYPE_STATE){
 			 fprintf(stderr,"bad state identifier %s\n", $2);
-			 fprintf(stderr,"declared as another type\n");}
+			 fprintf(stderr,"declared as another type\n");
+			 exit(1);
+		      }
 		      else{
 			 gen_state_start($2);}}
 		    .state_body. RBRACE
@@ -171,7 +175,9 @@ transition	  : return_code
 target		  : identifier
 		     {$$ = symlook($1);
 		      if ($$ == NULL){
-			 fprintf(stderr,"jump to undeclared state %s\n", $1);}
+			 fprintf(stderr,"jump to undeclared state %s\n", $1);
+			 exit(1);
+		      }
 		      else{
 			 gen_next_state(SM_NEXT, $$->name);}}
 		  | STATE_RETURN
