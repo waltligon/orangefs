@@ -93,10 +93,16 @@ static inline int copy_attributes_to_inode(
             i_size_write(inode, inode_size);
 
             /*
-              truncate this inode's page cache entries every
-              time we get a different size value.
+              NOTE:
+              we may want to truncate this inode's page
+              cache entries every time we get a different
+              size value (or always?).
 
-              clear all pages?
+              why clear all pages?
+              the motivation for clearing all is that the
+              file may have changed quite a bit from the time
+              of the last getattr, so here's one place
+              to make sure it's as up to date as possible.
             */
 /*             vmtruncate(inode, inode_size); */
         }
@@ -432,7 +438,7 @@ int pvfs2_inode_setattr(
 	new_op = kmem_cache_alloc(op_cache, SLAB_KERNEL);
 	if (!new_op)
 	{
-	    return -1;
+	    return ret;
 	}
 
 	new_op->upcall.type = PVFS2_VFS_OP_SETATTR;
@@ -445,6 +451,9 @@ int pvfs2_inode_setattr(
 
         pvfs2_print("Setattr Got PVFS2 status value of %d\n",
                     new_op->downcall.status);
+
+        /* on success, truncate unnecessary page cache entries */
+/*         vmtruncate(inode, inode->i_size); */
 
       error_exit:
         ret = new_op->downcall.status;

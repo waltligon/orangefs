@@ -19,7 +19,8 @@ int pvfs2_d_revalidate(
     int ret = 0;
     struct inode *inode = (dentry ? dentry->d_inode : NULL);
 
-    pvfs2_print("pvfs2: pvfs2_d_revalidate called\n");
+    pvfs2_print("pvfs2: pvfs2_d_revalidate called (name is %s)\n",
+                (dentry ? dentry->d_name.name : "unknown"));
 
     if (nd && (nd->flags == LOOKUP_FOLLOW) &&
         (!nd->flags & LOOKUP_CREATE))

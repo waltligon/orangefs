@@ -10,6 +10,7 @@
 #include <linux/fs.h>
 #include <linux/namei.h>
 #include <linux/pagemap.h>
+#include <linux/smp_lock.h>
 #include "pvfs2-kernel.h"
 
 extern kmem_cache_t *op_cache;
@@ -120,6 +121,8 @@ struct dentry *pvfs2_lookup(
                 new_op->downcall.resp.lookup.refn.handle,
                 new_op->downcall.resp.lookup.refn.fs_id);
 
+    ret = new_op->downcall.status;
+
     /* lookup inode matching name (or add if not there) */
     if (new_op->downcall.status > -1)
     {
@@ -134,7 +137,6 @@ struct dentry *pvfs2_lookup(
 
 	    /* update dentry/inode pair into dcache */
 	    dentry->d_op = &pvfs2_dentry_operations;
-	    d_splice_alias(inode, dentry);
 	}
 	else
 	{
@@ -146,7 +148,12 @@ struct dentry *pvfs2_lookup(
     /* when request is serviced properly, free req op struct */
     op_release(new_op);
 
-    return NULL;
+    /*
+      if no inode was found, add a negative dentry to dcache
+      anyway; if we don't, we don't hold expected lookup semantics
+      and we most noticeably break during directory renames
+    */
+    return d_splice_alias(inode, dentry);
 }
 
 static int pvfs2_link(
@@ -307,17 +314,34 @@ static int pvfs2_rename(
     service_operation_with_timeout_retry(
         new_op, "pvfs2_rename", retries);
 
-    /* nothing's returned; just return the exit status */
+    /*
+      nothing's returned; just return the exit status
+
+      NOTE: make sure the properly translated error code
+      is passed down from above to distinguish between
+      different types of rename errors (target dir/file
+      exists, other error, etc).
+    */
     ret = new_op->downcall.status;
+
+    pvfs2_print("pvfs2: pvfs2_rename got downcall status %d\n", ret);
 
     if (new_dentry->d_inode)
     {
-        new_dentry->d_inode->i_nlink--;
-        dput(new_dentry);
-        if (are_directories)
+        if (are_directories && simple_empty(new_dentry))
         {
-            old_dir->i_nlink--;
+            pvfs2_print("pvfs2: pvfs2_rename target dir not empty\n");
+            ret = -ENOTEMPTY;
+            goto error_exit;
         }
+
+        /*
+          FIXME:
+          at some point we need to get our set
+          attribute rules straight
+        */
+        new_dentry->d_inode->i_ctime = CURRENT_TIME;
+        mark_inode_dirty(new_dentry->d_inode);
     }
     else if (are_directories)
     {
@@ -325,12 +349,9 @@ static int pvfs2_rename(
         old_dir->i_nlink--;
     }
 
-    pvfs2_print("pvfs2: pvfs2_rename got downcall status %d\n", ret);
-
   error_exit:
     op_release(new_op);
 
-    pvfs2_print("pvfs2: pvfs2_rename is returning %d\n", ret);
     return ret;
 }
 
