@@ -164,7 +164,7 @@ static int flush_check_error(PINT_server_op *s_op, job_status_s *js_p)
     if (js_p->error_code == -TROVE_ENOENT)
     {
         gossip_err("failed to flush handle %Lu\n",
-                   s_op->req->u.flush.handle);
+                   Lu(s_op->req->u.flush.handle));
     }
     return 1;
 }
