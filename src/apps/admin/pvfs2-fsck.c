@@ -452,6 +452,7 @@ int match_dirdata(struct handlelist *hl,
 				       creds);
     if (ret != 0)
     {
+        PVFS_perror("match_dirdata", ret);
 	return -1;
     }
 
