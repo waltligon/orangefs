@@ -142,6 +142,19 @@ sub emit_filesystem
     print $target "</Filesystem>\n";
 }
 
+sub emit_server_conf
+{
+    my($target, $node, $storage);
+    $target = $_[0];
+    $node = $_[1];
+    $storage = $_[2];
+
+    print "GOT NODE $node : STORAGE $storage\n";
+
+    print $target "StorageSpace $storage\n";
+    print $target "HostID \"$node\"\n";
+}
+
 sub confirm
 {
     my($prompt, $char, $valid_char);
@@ -163,25 +176,25 @@ sub confirm
 # entry point of script
 # ---------------------
 
-if (length(@ARGV) != 1)
-{
-    print "Usage: pvfs2-genconfig <output file>\n";
-    print "If <output file> is '-', output is directed to stdout\n";
-    exit;
-}
-
-if ($ARGV[0] eq "-")
+if ((@ARGV == 1) && ($ARGV[0] eq "-"))
 {
     $output_target = STDOUT;
 }
-else
+elsif (@ARGV != 2)
 {
-    $output_target = FILEOUT;
-    unless (open($output_target, ">", $ARGV[0]))
-    {
-        print STDERR "Can't open specified file $ARGV[0]: $!\n";
-        return;
-    }
+    print "Usage: pvfs2-genconfig <fs.conf> <server.conf template>\n";
+    print "The server.conf template is used for generating server\n";
+    print "  specific configuration files.  One file will be generated\n";
+    print "  for each server configured with this program.\n";
+    print "NOTE: If <fs.conf> is '-', output is directed to stdout\n";
+    exit;
+}
+
+$output_target = FILEOUT;
+unless (open($output_target, ">", $ARGV[0]))
+{
+    print STDERR "Can't open specified file $ARGV[0]: $!\n";
+    return;
 }
 
 @server_addrs = undef;
@@ -276,4 +289,32 @@ emit_defaults($output_target, $num_unexp_reqs);
 emit_aliases($output_target, $num_nodes);
 emit_filesystem($output_target, "fs-foo", 9, 1048576, $num_nodes);
 
-print "Configuration written!\n";
+# close fs.conf
+close($output_target);
+
+print "\nAbout to generate $num_nodes server specific setting files\n\n";
+for($i = 0; $i < $num_nodes; $i++)
+{
+    my($storage, $filename);
+
+    # and open server.conf files
+    $output_target = FILEOUT + $i + 10;
+
+    $filename = "$ARGV[1]0";
+    unless (open($output_target, ">", $filename))
+    {
+        print STDERR "Can't open specified file $ARGV[1]: $!\n";
+        return;
+    }
+
+    print "Please specify a storage location for host $server_addrs[$i]\n";
+    $storage = prompt_word("(e.g. /storage/node1): ");
+
+    emit_server_conf($output_target, $server_addrs[$i], $storage);
+
+    close($output_target);
+
+    print "Wrote server specific configuration file $filename!\n";
+}
+
+print "Configuration files written!\n";
