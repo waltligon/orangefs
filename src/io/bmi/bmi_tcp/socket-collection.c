@@ -284,23 +284,24 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
 	tcp_data = tmp_map->method_data;
 	if (tcp_data->socket < 0)
 	{
-	    gossip_lerr("Error: found bad socket in socket collection.\n");
-	    gossip_lerr("Error: not handle properly....\n");
-	    /* TODO: handle this better */
-	    gen_mutex_unlock(external_mutex);
-	    gen_mutex_unlock(&big_poll_mutex);
-	    gen_mutex_lock(external_mutex);
-	    return (-EINVAL);
+	    /* TODO: not sure how we hit this case, but it is definitely
+	     * happening.  For now just ignore and keep going, fix better
+	     * later
+	     */
+	    qlist_add_tail(&(tcp_data->sc_link), scp);
 	}
-	big_poll_fds[num_to_poll].fd = tcp_data->socket;
-	if (tcp_data->write_ref_count > 0)
+	else
 	{
-	    big_poll_fds[num_to_poll].events += POLLOUT;
+	    big_poll_fds[num_to_poll].fd = tcp_data->socket;
+	    if (tcp_data->write_ref_count > 0)
+	    {
+		big_poll_fds[num_to_poll].events += POLLOUT;
+	    }
+	    big_poll_fds[num_to_poll].events += POLLIN;
+	    big_poll_addr[num_to_poll] = tmp_map;
+	    num_to_poll++;
+	    qlist_add_tail(&(tcp_data->sc_link), scp);
 	}
-	big_poll_fds[num_to_poll].events += POLLIN;
-	big_poll_addr[num_to_poll] = tmp_map;
-	num_to_poll++;
-	qlist_add_tail(&(tcp_data->sc_link), scp);
     }
 
     /* we should be all set now to perform the poll operation */
