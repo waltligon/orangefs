@@ -48,6 +48,7 @@ int main(int argc, char **argv)
     int run_index = 0;
     char tmp_buf[512];
     double tmp_time = 0.0f;
+    double tmp_time2 = 0.0f;
     double first_time = 0.0f;
     double last_end_time = 0.0f;
     double total_empty = 0.0f;
@@ -70,6 +71,8 @@ int main(int argc, char **argv)
 	return(-1);
     }
     memset(data_array, 0, array_size*sizeof(struct data_point));
+
+    printf("# (measurement #) (server) (api_op) (size/value) (start) (end) (length)\n");
 
     /* pull in all of the data */
     while(fgets(tmp_buf, 512, infile))
@@ -145,7 +148,8 @@ int main(int argc, char **argv)
 		tmp_time = (double)data_array[cur_index].sec + 
 		    (double)data_array[cur_index].usec / 1000000;
 		tmp_time = tmp_time - first_time;
-		printf("%f\t%f\t", tmp_time, tmp_time);
+		/* tmp_time is start time, counted since first event */
+		printf("%f\t", tmp_time);
 
 		if(last_end_time != 0 && last_end_time < tmp_time)
 		{
@@ -163,13 +167,15 @@ int main(int argc, char **argv)
 		}
 
 		/* again; end time */
-		tmp_time = (double)data_array[run_index].sec + 
+		tmp_time2 = (double)data_array[run_index].sec + 
 		    (double)data_array[run_index].usec / 1000000;
-		tmp_time = tmp_time - first_time;
-		printf("%f\n", tmp_time);
+		tmp_time2 = tmp_time2 - first_time;
+		/* tmp_time2 is end time, counted since first event */
+		printf("%f\t%f\n", tmp_time2, (tmp_time2-tmp_time));
 
-		if(tmp_time > last_end_time)
-		    last_end_time = tmp_time;
+		if(tmp_time2 > last_end_time)
+		    last_end_time = tmp_time2;
+
 
 		break;
 	    }
