@@ -1,9 +1,13 @@
+# primative bakctick expansion is allowed: 
+# NODEFILE=`sort $PBS_NODEFILE | uniq > machines ; echo machines`
 NODEFILE=machines.pav
+
+# this is the default number of IO servers, but it can be overridden with -n
 IONCOUNT=2
-# only support one metaserver for now
+
 METACOUNT=1
-PROTOCOL=tcp
 UNIQUEMETA=1
+
 
 #
 # EVERYTHING SHOULD BE IN THIS DIRECTORY ON REMOTE NODES
@@ -14,8 +18,16 @@ WORKINGDIR="/sandbox/robl/pvfs"
 # SERVER CONFIGURATION
 #
 
-# this has to be a port apropriate for the protocol
+# be careful: the port has to be a port apropriate for the protocol
+PROTOCOL=tcp
 PVFSPORT=3335
+#  --  could be --
+# PROTOCOL=gm
+# PVFSPORT=6
+#  --  or even --
+# PROTOCOL=ib
+# PVFSPORT=12345
+
 STORAGE=$WORKINGDIR/storage
 SERVERLOG=$WORKINGDIR/log
 
@@ -35,3 +47,5 @@ PVFS=/homes/robl/pvfs2
 SERVER=$PVFS/sbin/pvfs2-server
 PINGPROG=$PVFS/bin/pvfs2-ping
 GENCONFIG=$PVFS/bin/pvfs2-genconfig
+# this value only has to be set in heterogenous environments 
+#ENCODING="{direct|le_bfield|xdr}" 
