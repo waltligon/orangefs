@@ -19,7 +19,8 @@ CSRC := \
 	$(DIR)/getparent.c \
 	$(DIR)/client-state-machine.c \
 	$(DIR)/shared-state-methods.c \
-	$(DIR)/mgmt-count-servers.c
+	$(DIR)/mgmt-count-servers.c \
+	$(DIR)/sys-statfs.c
 
 SMSRC := \
 	getattr-pcache.sm \
