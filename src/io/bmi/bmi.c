@@ -646,10 +646,7 @@ int BMI_test(bmi_op_id_t id,
     *outcount = 0;
 
     target_op = id_gen_fast_lookup(id);
-    if (target_op->op_id != id)
-    {
-	return (-EINVAL);
-    }
+    assert(target_op->op_id == id);
 
     ret = active_method_table[target_op->addr->method_type]->BMI_meth_test(id,
 									   outcount,
@@ -761,6 +758,7 @@ int BMI_testsome(int incount,
 	    if(id_array[j])
 	    {
 		query_op = (struct method_op*)id_gen_fast_lookup(id_array[j]);
+		assert(query_op->op_id == id_array[j]);
 		if(query_op->addr->method_type == i)
 		{
 		    tmp_id_array[j] = id_array[j];
@@ -1529,9 +1527,6 @@ int BMI_cancel(bmi_op_id_t id,
     int ret = -1;
 
     target_op = id_gen_fast_lookup(id);
-    /* TODO: figure out how we are hitting this, probably flow protocol
-     * error? 
-     */
     assert(target_op->op_id == id);
 
     if(active_method_table[target_op->addr->method_type]->BMI_meth_cancel)
