@@ -169,7 +169,8 @@ static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p)
 	 s_op->req->op == PVFS_SERV_IO ||
          s_op->req->op == PVFS_SERV_GETATTR ||
 	 s_op->req->op == PVFS_SERV_REMOVE ||
-	 s_op->req->op == PVFS_SERV_FLUSH ))
+	 s_op->req->op == PVFS_SERV_FLUSH ||
+	 s_op->req->op == PVFS_SERV_TRUNCATE ))
     {
 	js_p->error_code = 0;
     }

@@ -163,7 +163,7 @@ do {						\
     (__req).op = PVFS_SERV_FLUSH;		\
     (__req).credentials = (__creds);		\
     (__req).u.flush.fs_id = (__fsid);		\
-    (__req).u.remove.handle = (__handle);	\
+    (__req).u.flush.handle = (__handle);	\
 } while (0)
 
 /* NOTE: no response structure; all necessary response info is returned in
@@ -402,7 +402,23 @@ struct PVFS_servreq_truncate
     PVFS_handle handle;		    /* handle of obj to resize */
     PVFS_fs_id fs_id;		    /* file system */
     PVFS_size size;		    /* new size */
+    int flags;			    /* future use */
+
 };
+#define PINT_SERVREQ_TRUNCATE_FILL(__req,		\
+				__creds,	\
+				__fsid,		\
+				__size,         \
+				__handle)	\
+do {						\
+    memset(&(__req), 0, sizeof(__req));		\
+    (__req).op = PVFS_SERV_TRUNCATE;		\
+    (__req).credentials = (__creds);		\
+    (__req).u.truncate.fs_id = (__fsid);	\
+    (__req).u.truncate.size = (__size);         \
+    (__req).u.truncate.handle = (__handle);	\
+} while (0)
+
 
 /* NOTE: no response structure; all necessary response info is 
  * returned in generic server response structure

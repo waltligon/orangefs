@@ -106,6 +106,11 @@ struct PINT_server_flush_op {
     int flags;		    /* any special flags for flush */
 };
 
+struct PINT_server_truncate_op {
+    PVFS_handle handle;	    /* handle of datafile we resize */
+    PVFS_offset size;	    /* new size of datafile */
+};
+
 
     
 /* This structure is passed into the void *ptr 
@@ -158,6 +163,7 @@ typedef struct PINT_server_op
 	struct PINT_server_rmdirent_op  rmdirent;
 	struct PINT_server_io_op	io;
 	struct PINT_server_flush_op	flush;
+	struct PINT_server_truncate_op  truncate;
     } u; /* TODO: RENAME TO 'scratch' */
 } PINT_server_op;
 
@@ -263,6 +269,7 @@ extern struct PINT_state_machine_s pvfs2_io_sm;
 extern struct PINT_state_machine_s pvfs2_remove_sm;
 extern struct PINT_state_machine_s pvfs2_rmdirent_sm;
 extern struct PINT_state_machine_s pvfs2_flush_sm;
+extern struct PINT_state_machine_s pvfs2_truncate_sm;
 extern struct PINT_state_machine_s pvfs2_setparam_sm;
 extern struct PINT_state_machine_s pvfs2_noop_sm;
 extern struct PINT_state_machine_s pvfs2_statfs_sm;

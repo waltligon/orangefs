@@ -100,6 +100,7 @@ static int server_state_machine_start(
 int main(int argc, char **argv)
 {
     int ret = -1, debug_mask = 0;
+    int i;
 
 #ifdef WITH_MTRACE
     mtrace();
@@ -209,7 +210,8 @@ int main(int argc, char **argv)
     }
 
     /* Initialization complete; process server requests indefinitely. */
-    for (;;)
+    for (i=0;i<3000;i++)
+    /* for ( ;; )  */
     {
 	int i, comp_ct = PVFS_SERVER_MAX_JOBS;
 
@@ -853,6 +855,7 @@ static void server_state_table_initialize(void)
     PINT_server_op_table[PVFS_SERV_READDIR]       = &pvfs2_readdir_sm;
     PINT_server_op_table[PVFS_SERV_GETCONFIG]     = &pvfs2_get_config_sm;
     PINT_server_op_table[PVFS_SERV_FLUSH]	  = &pvfs2_flush_sm;
+    PINT_server_op_table[PVFS_SERV_TRUNCATE]	  = &pvfs2_truncate_sm;
     PINT_server_op_table[PVFS_SERV_MGMT_SETPARAM] = &pvfs2_setparam_sm;
     PINT_server_op_table[PVFS_SERV_MGMT_NOOP]     = &pvfs2_noop_sm;
     /*

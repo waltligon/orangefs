@@ -192,9 +192,10 @@ struct PINT_client_mgmt_noop_sm
 
 struct PINT_client_truncate_sm {
     PVFS_pinode_reference	object_ref;	/* input parameter */
-    PVFS_size			size;		/* in(out?) parameter */
+    PVFS_size			size;		/* new logical size of object*/
     int				datafile_count;	/* from attribs */
     PVFS_handle			*datafile_handles;
+    PVFS_Dist			*distribution;	/* datafile distribution meth*/
     PINT_client_sm_msgpair_state *msgpair;	/* used in truncate op */
 };
 
