@@ -29,9 +29,6 @@
 #include "trove.h"
 #include "server-config.h"
 
-/* TODO: this should be read from config information, probably per fs */
-#define PINT_CLIENT_ENC_TYPE ENCODING_DIRECT
-
 /* converts common fields between sys attr and obj attr structures */
 #define PINT_CONVERT_ATTR(dest, src, attrmask)	\
 do{						\

@@ -17,6 +17,7 @@
 #include "pcache.h"
 #include "PINT-reqproto-encode.h"
 #include "pvfs-distribution.h"
+#include "client-state-machine.h"
 
 #if 0
 static int get_bmi_address(bmi_addr_t *io_addr_array, int32_count num_io,\
@@ -55,9 +56,9 @@ int PVFS_sys_rename(
     uint32_t attr_mask;
     PVFS_pinode_reference old_entry_refn, target_entry_refn;
     struct PINT_decoded_msg decoded;
-    bmi_size_t max_msg_sz;
     void* encoded_resp;
     PVFS_msg_tag_t op_tag;
+    struct filesystem_configuration_s *cur_fs;
 
     if((strlen(new_entry) + 1) > PVFS_REQ_LIMIT_SEGMENT_BYTES) 
     {
@@ -135,6 +136,11 @@ int PVFS_sys_rename(
 	goto return_error;
     }
 
+    /* lookup the file system to figure out which encoding to use */
+    cur_fs = PINT_config_find_fs_id(PINT_get_server_config_struct(),
+      new_parent_refn.fs_id);
+    assert(cur_fs);
+
     req_p.op = PVFS_SERV_CRDIRENT;
     req_p.credentials = credentials;
 
@@ -144,14 +150,11 @@ int PVFS_sys_rename(
     req_p.u.crdirent.fs_id = new_parent_refn.fs_id;
 
     /* create requests get a generic response */
-    max_msg_sz = PINT_encode_calc_max_size(PINT_ENCODE_RESP, req_p.op, 
-	PINT_CLIENT_ENC_TYPE);
-
     op_tag = get_next_session_tag();
 
     /* Make server request */
-    ret = PINT_send_req(serv_addr, &req_p, max_msg_sz, &decoded, &encoded_resp,
-			op_tag);
+    ret = PINT_send_req(serv_addr, &req_p, cur_fs->encoding, &decoded,
+      &encoded_resp, op_tag);
     if (ret < 0)
     {
 	goto return_error;
@@ -167,8 +170,8 @@ int PVFS_sys_rename(
 	goto return_error;
     }
 
-    PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded, &encoded_resp, 
-			    op_tag);
+    PINT_release_req(serv_addr, &req_p, cur_fs->encoding, &decoded,
+      &encoded_resp, op_tag);
 
     /* now we have 2 dirents pointing to one meta file, we need to rmdirent the 
      * old one
@@ -182,6 +185,10 @@ int PVFS_sys_rename(
 	goto return_error;
     }
 
+    cur_fs = PINT_config_find_fs_id(PINT_get_server_config_struct(),
+      old_parent_refn.fs_id);
+    assert(cur_fs);
+
     /* the following arguments are the same from the last server msg:
      * req_p.credentials
      */
@@ -194,7 +201,7 @@ int PVFS_sys_rename(
     op_tag = get_next_session_tag();
 
     /* dead man walking */
-    ret = PINT_send_req(serv_addr, &req_p, max_msg_sz,
+    ret = PINT_send_req(serv_addr, &req_p, cur_fs->encoding,
 	&decoded, &encoded_resp, op_tag);
     if (ret < 0)
     {
@@ -221,7 +228,7 @@ int PVFS_sys_rename(
     */
 /*     assert(ack_p->u.rmdirent.entry_handle == old_parent_refn.handle); */
 
-    PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
+    PINT_release_req(serv_addr, &req_p, cur_fs->encoding, &decoded,
 			&encoded_resp, op_tag);
 
     return (0);

@@ -31,7 +31,7 @@ extern job_context_id PVFS_sys_job_context;
  */
 int PINT_send_req(bmi_addr_t addr,
 		  struct PVFS_server_req *req_p,
-		  bmi_size_t max_resp_size,
+		  enum PVFS_encoding_type encoding,
 		  struct PINT_decoded_msg *decoded_resp,
 		  void** encoded_resp,
 		  PVFS_msg_tag_t op_tag)
@@ -41,6 +41,8 @@ int PINT_send_req(bmi_addr_t addr,
     job_status_s tmp_status;
     job_id_t tmp_id;
     int count = 0;
+    bmi_size_t max_resp_size = PINT_encode_calc_max_size(PINT_ENCODE_RESP,
+      req_p->op, encoding);
 
     *encoded_resp = NULL;
 
@@ -50,7 +52,7 @@ int PINT_send_req(bmi_addr_t addr,
 	PINT_ENCODE_REQ, 
 	&encoded_req, 
 	addr, 
-	PINT_CLIENT_ENC_TYPE);
+	encoding);
     if(ret < 0)
     {
 	return(ret);
@@ -195,7 +197,7 @@ send_req_out:
  */
 void PINT_release_req(bmi_addr_t addr,
     struct PVFS_server_req *req_p,
-    bmi_size_t max_resp_size,
+    enum PVFS_encoding_type encoding,
     struct PINT_decoded_msg *decoded_resp,
     void** encoded_resp,
     PVFS_msg_tag_t op_tag)
@@ -203,6 +205,8 @@ void PINT_release_req(bmi_addr_t addr,
     /* the only resources we need to get rid of are the decoded
      * response and the encoded response.
      */
+    bmi_size_t max_resp_size = PINT_encode_calc_max_size(PINT_ENCODE_RESP,
+      req_p->op, encoding);
 
     PINT_decode_release(
 	decoded_resp,
@@ -214,6 +218,7 @@ void PINT_release_req(bmi_addr_t addr,
     return;
 }
 
+#if 0  /* unused */
 /* PINT_send_req_array()
  *
  * TODO: prepost receives 
@@ -508,6 +513,7 @@ void PINT_release_req_array(bmi_addr_t* addr_array,
 
     return;
 }
+#endif  /* unused */
 
 /* PINT_recv_ack_array()
  *

@@ -18,6 +18,7 @@
 #include "trove.h"
 #include "server-config.h"
 #include "str-utils.h"
+#include "client-state-machine.h"
 
 static int g_session_tag;
 gen_mutex_t *g_session_tag_mt_lock = NULL;
@@ -53,7 +54,8 @@ int PINT_do_lookup(char* name,
     PINT_pinode *pinode_ptr = NULL;
     void* encoded_resp;
     PVFS_msg_tag_t op_tag;
-    bmi_size_t max_msg_sz = 0;
+    struct filesystem_configuration_s *cur_fs;
+    enum PVFS_encoding_type encoding = 0;
 
     /*Q: should I combine these into one since there's not much
      * cleanup going on for each case?
@@ -87,11 +89,6 @@ int PINT_do_lookup(char* name,
     req_p.u.lookup_path.starting_handle = parent.handle;
     req_p.u.lookup_path.attrmask = PVFS_ATTR_COMMON_ALL;
 
-    /*expecting exactly one segment to come back (maybe attribs)*/
-    max_msg_sz = PINT_encode_calc_max_size(PINT_ENCODE_RESP, 
-					   req_p.op,
-					   PINT_CLIENT_ENC_TYPE);
-
     ret = PINT_bucket_map_to_server(&serv_addr,
 				    parent.handle,
 				    parent.fs_id);
@@ -100,6 +97,10 @@ int PINT_do_lookup(char* name,
 	failure = MAP_SERVER_FAILURE;
 	goto return_error;
     }
+    cur_fs = PINT_config_find_fs_id(PINT_get_server_config_struct(),
+      parent.fs_id);
+    assert(cur_fs);
+    encoding = cur_fs->encoding;
 
     /* Make a lookup_path server request to get the handle and
      * attributes
@@ -109,7 +110,7 @@ int PINT_do_lookup(char* name,
 
     ret = PINT_send_req(serv_addr,
 			&req_p,
-			max_msg_sz,
+			encoding,
 			&decoded,
 			&encoded_resp,
 			op_tag);
@@ -165,7 +166,7 @@ int PINT_do_lookup(char* name,
     PINT_pcache_set_valid(pinode_ptr);
     PINT_pcache_release(pinode_ptr);
 
-    PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
+    PINT_release_req(serv_addr, &req_p, encoding, &decoded,
 		     &encoded_resp, op_tag);
     return (0);
 
@@ -176,7 +177,7 @@ int PINT_do_lookup(char* name,
         case ADD_PCACHE_FAILURE:
         case INVAL_LOOKUP_FAILURE:
         case SEND_REQ_FAILURE:
-	    PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
+	    PINT_release_req(serv_addr, &req_p, encoding, &decoded,
 			     &encoded_resp, op_tag);
         case MAP_SERVER_FAILURE:
         case NONE_FAILURE:
@@ -348,17 +349,12 @@ int PINT_server_get_config(struct server_configuration_s *config,
     PVFS_credentials creds;
     struct PINT_decoded_msg decoded;
     void* encoded_resp;
-    PVFS_size max_msg_sz;
     struct pvfs_mntent *mntent_p = NULL;
     PVFS_msg_tag_t op_tag = get_next_session_tag();
     int found_one_good=0;	/* do we have at least one valid filesystem? */
     struct filesystem_configuration_s* cur_fs = NULL;
 
     /* TODO: Fill up the credentials information */
-
-    max_msg_sz = PINT_encode_calc_max_size(PINT_ENCODE_RESP, 
-					   PVFS_SERV_GETCONFIG,
-					   PINT_CLIENT_ENC_TYPE);
 
     /*
       for each entry in the pvfstab, attempt to query the server for
@@ -386,7 +382,7 @@ int PINT_server_get_config(struct server_configuration_s *config,
                       mntent_p->pvfs_fs_name);
 
 	/* send the request and receive an acknowledgment */
-	ret = PINT_send_req(serv_addr, &serv_req, max_msg_sz,
+	ret = PINT_send_req(serv_addr, &serv_req, mntent_p->encoding,
                             &decoded, &encoded_resp, op_tag);
 	if (ret < 0)
         {
@@ -406,13 +402,13 @@ int PINT_server_get_config(struct server_configuration_s *config,
                           "%s\n",mntent_p->pvfs_config_server);
 
             /* let go of any resources consumed by PINT_send_req() */
-            PINT_release_req(serv_addr, &serv_req, max_msg_sz, &decoded,
+            PINT_release_req(serv_addr, &serv_req, mntent_p->encoding, &decoded,
                              &encoded_resp, op_tag);
             continue;
         }
 
 	/* let go of any resources consumed by PINT_send_req() */
-	PINT_release_req(serv_addr, &serv_req, max_msg_sz, &decoded,
+	PINT_release_req(serv_addr, &serv_req, mntent_p->encoding, &decoded,
                          &encoded_resp, op_tag);
         break;
     }
@@ -444,6 +440,7 @@ int PINT_server_get_config(struct server_configuration_s *config,
 	{
 	    found_one_good = 1;
 	    cur_fs->flowproto = mntent_p->flowproto;
+	    cur_fs->encoding = mntent_p->encoding;
 	}
     }
 

@@ -123,14 +123,19 @@ int msgpairarray_post(PINT_client_sm *sm_p,
     for (i=0; i < sm_p->msgarray_count; i++) {
 	PVFS_msg_tag_t session_tag;
 	PINT_client_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
+	struct filesystem_configuration_s *cur_fs;
 
 	/* encode request. fills in encoded_req.
 	 */
+	cur_fs = PINT_config_find_fs_id(PINT_get_server_config_struct(),
+	  msg_p->fs_id);
+	assert(cur_fs);
+
 	ret = PINT_encode(&msg_p->req,
 			  PINT_ENCODE_REQ,
 			  &msg_p->encoded_req,
 			  msg_p->svr_addr,
-			  PINT_CLIENT_ENC_TYPE);
+			  cur_fs->encoding);
 	if (ret != 0) {
 	    gossip_lerr("pint_encode failed\n");
 	    assert(ret < 0); /* return value range check */
@@ -142,7 +147,7 @@ int msgpairarray_post(PINT_client_sm *sm_p,
 	 */
 	msg_p->max_resp_sz = PINT_encode_calc_max_size(PINT_ENCODE_RESP,
 						       msg_p->req.op,
-						       PINT_CLIENT_ENC_TYPE);
+						       cur_fs->encoding);
 	msg_p->encoded_resp_p = BMI_memalloc(msg_p->svr_addr,
 					     msg_p->max_resp_sz,
 					     BMI_RECV);

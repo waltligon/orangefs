@@ -17,6 +17,7 @@
 #include "pint-servreq.h"
 #include "pint-bucket.h"
 #include "PINT-reqproto-encode.h"
+#include "client-state-machine.h"
 
 /* PVFS_sys_getattr()
  *
@@ -99,7 +100,6 @@ int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
     PINT_pinode *entry_pinode = NULL;
     PVFS_pinode_reference entry;
     struct PINT_decoded_msg decoded;
-    int max_msg_sz = 0;
     void* encoded_resp;
     PVFS_msg_tag_t op_tag = get_next_session_tag();
     PVFS_handle *data_files = NULL;
@@ -107,6 +107,8 @@ int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
     PVFS_size total_filesize;
     int num_data_servers;
     int i, can_compute_size = 0;
+    struct filesystem_configuration_s *cur_fs;
+    enum PVFS_encoding_type encoding = 0;
 
 	enum {
 	    NONE_FAILURE = 0,
@@ -133,6 +135,10 @@ int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 		failure = MAP_SERVER_FAILURE;
 		goto return_error;
         }
+	cur_fs = PINT_config_find_fs_id(PINT_get_server_config_struct(),
+	  entry.fs_id);
+	assert(cur_fs);
+	encoding = cur_fs->encoding;
 
 	req_p.op = PVFS_SERV_GETATTR;
         req_p.credentials = credentials;
@@ -148,10 +154,7 @@ int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
             req_p.u.getattr.attrmask |= PVFS_ATTR_META_ALL;
         }
 
-	max_msg_sz = PINT_encode_calc_max_size(
-            PINT_ENCODE_RESP, req_p.op, PINT_CLIENT_ENC_TYPE);
-
-	ret = PINT_send_req(serv_addr, &req_p, max_msg_sz,
+	ret = PINT_send_req(serv_addr, &req_p, encoding,
                             &decoded, &encoded_resp, op_tag);
 	if (ret < 0)
 	{
@@ -219,7 +222,7 @@ int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
             can_compute_size = 1;
         }
 
-	PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
+	PINT_release_req(serv_addr, &req_p, encoding, &decoded,
                          &encoded_resp, op_tag);
 
 	if (can_compute_size)
@@ -269,10 +272,7 @@ int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 
 		req_p.u.getattr.handle = data_files[i];
 
-		max_msg_sz = PINT_encode_calc_max_size(
-                    PINT_ENCODE_RESP, req_p.op, PINT_CLIENT_ENC_TYPE);
-
-		ret = PINT_send_req(serv_addr, &req_p, max_msg_sz,
+		ret = PINT_send_req(serv_addr, &req_p, encoding,
                                     &decoded, &encoded_resp, op_tag);
 		if (ret < 0)
 		{
@@ -326,7 +326,7 @@ return_error:
 		case SEND_REQ_FAILURE:
 		case MAP_SERVER_FAILURE:
 		    if (ack_p)
-			PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
+			PINT_release_req(serv_addr, &req_p, encoding, &decoded,
 				&encoded_resp, op_tag);
 
 		    if (server)
