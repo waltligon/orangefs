@@ -67,11 +67,23 @@ int dbpf_attr_cache_initialize(
     char **cacheable_keywords,
     int num_cacheable_keywords);
 
-/* returns the looked up ds_attr on success; NULL on failure */
-TROVE_ds_attributes *dbpf_attr_cache_lookup(TROVE_handle key);
-
 /* returns the cached element object on success; NULL on failure */
 dbpf_attr_cache_elem_t *dbpf_attr_cache_elem_lookup(TROVE_handle key);
+
+int dbpf_attr_cache_elem_set_data_based_on_key(
+    TROVE_handle key, char *key_str, void *data, int data_sz);
+
+/* do an atomic update of the attributes in the cache for this key */
+int dbpf_attr_cache_ds_attr_pair_update_cached_data(
+    dbpf_attr_cache_elem_t *cached_elem,
+    TROVE_ds_attributes *src_ds_attr);
+/*
+  do an atomic copy of the cached attributes into the provided
+  target_ds_attr object
+*/
+int dbpf_attr_cache_ds_attr_pair_fetch_cached_data(
+    dbpf_attr_cache_elem_t *cached_elem,
+    TROVE_ds_attributes *target_ds_attr);
 
 int dbpf_attr_cache_insert(TROVE_handle key, TROVE_ds_attributes *attr);
 int dbpf_attr_cache_remove(TROVE_handle key);

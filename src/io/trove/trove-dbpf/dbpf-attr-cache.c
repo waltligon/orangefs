@@ -324,6 +324,47 @@ int dbpf_attr_cache_elem_set_data_based_on_key(
     return ret;
 }
 
+int dbpf_attr_cache_ds_attr_pair_update_cached_data(
+    dbpf_attr_cache_elem_t *cached_elem,
+    TROVE_ds_attributes *src_ds_attr)
+{
+    int ret = -1;
+
+    if (DBPF_ATTR_CACHE_INITIALIZED() && (cached_elem && src_ds_attr))
+    {
+        gen_mutex_lock(s_dbpf_attr_mutex);
+        if (cached_elem && src_ds_attr)
+        {
+            memcpy(&cached_elem->attr, src_ds_attr,
+                   sizeof(TROVE_ds_attributes));
+            ret = 0;
+        }
+        gen_mutex_unlock(s_dbpf_attr_mutex);
+    }
+    return ret;
+}
+
+int dbpf_attr_cache_ds_attr_pair_fetch_cached_data(
+    dbpf_attr_cache_elem_t *cached_elem,
+    TROVE_ds_attributes *target_ds_attr)
+{
+    int ret = -1;
+
+    if (DBPF_ATTR_CACHE_INITIALIZED() && (cached_elem && target_ds_attr))
+    {
+        gen_mutex_lock(s_dbpf_attr_mutex);
+        if (cached_elem && target_ds_attr)
+        {
+            memcpy(target_ds_attr, &cached_elem->attr,
+                   sizeof(TROVE_ds_attributes));
+            ret = 0;
+        }
+        gen_mutex_unlock(s_dbpf_attr_mutex);
+    }
+    return ret;
+}
+
+
 int dbpf_attr_cache_keyval_pair_update_cached_data(
     dbpf_attr_cache_elem_t *cached_elem,
     dbpf_keyval_pair_cache_elem_t *keyval_pair,

@@ -24,11 +24,13 @@
 /* NOTE: THIS IS ALMOST CERTAINLY BROKEN FOR MULTITHREADED APPS!!!
  */
 
-enum {
-    DBCACHE_ENTRIES = 16
+enum
+{
+    DBCACHE_ENTRIES = 1024
 };
 
-struct keyval_dbcache_entry {
+struct keyval_dbcache_entry
+{
     int ref_ct; /* -1 == not a valid cache entry */
     gen_mutex_t mutex;
     TROVE_coll_id coll_id;

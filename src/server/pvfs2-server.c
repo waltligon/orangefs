@@ -580,7 +580,64 @@ static int server_initialize_subsystems(
                 return ret;
             }
 
-            /* add configured merged handle range for this host/fs */
+            /*
+              set storage hints if any.  if any of these fail, we
+              can't error out since they're just hints.  thus, we
+              complain in logging and continue.
+            */
+            ret = trove_collection_setinfo(
+                cur_fs->coll_id, trove_context, 
+                TROVE_COLLECTION_HANDLE_TIMEOUT,
+                (void *)&cur_fs->handle_purgatory);
+            if (ret < 0)
+            {
+                gossip_lerr("Error setting handle timeout\n");
+            }
+
+            if (cur_fs->attr_cache_keywords &&
+                cur_fs->attr_cache_size &&
+                cur_fs->attr_cache_max_num_elems)
+            {
+                ret = trove_collection_setinfo(
+                    cur_fs->coll_id, trove_context, 
+                    TROVE_COLLECTION_ATTR_CACHE_KEYWORDS,
+                    (void *)cur_fs->attr_cache_keywords);
+                if (ret < 0)
+                {
+                    gossip_lerr("Error setting attr cache keywords\n");
+                }
+                ret = trove_collection_setinfo(
+                    cur_fs->coll_id, trove_context, 
+                    TROVE_COLLECTION_ATTR_CACHE_SIZE,
+                    (void *)&cur_fs->attr_cache_size);
+                if (ret < 0)
+                {
+                    gossip_lerr("Error setting attr cache size\n");
+                }
+                ret = trove_collection_setinfo(
+                    cur_fs->coll_id, trove_context, 
+                    TROVE_COLLECTION_ATTR_CACHE_MAX_NUM_ELEMS,
+                    (void *)&cur_fs->attr_cache_max_num_elems);
+                if (ret < 0)
+                {
+                    gossip_lerr("Error setting attr cache max num elems\n");
+                }
+                ret = trove_collection_setinfo(
+                    cur_fs->coll_id, trove_context, 
+                    TROVE_COLLECTION_ATTR_CACHE_INITIALIZE,
+                    (void *)0);
+                if (ret < 0)
+                {
+                    gossip_lerr("Error initializing the attr cache\n");
+                }
+            }
+
+            /*
+              add configured merged handle range for this host/fs.
+              NOTE: if the attr cache was properly configured above,
+              this next setinfo may have the opportunity to cache
+              a number of attributes on startup during an iterate.
+            */
             ret = trove_collection_setinfo(
                 cur_fs->coll_id, trove_context,
                 TROVE_COLLECTION_HANDLE_RANGES,
@@ -594,63 +651,12 @@ static int server_initialize_subsystems(
                 return ret;
             }
 
-	    gossip_debug(SERVER_DEBUG, "File system %s using handles: %s\n",
-			 cur_fs->file_system_name, cur_merged_handle_range);
+	    gossip_debug(
+                SERVER_DEBUG, "File system %s using handles: %s\n",
+                cur_fs->file_system_name, cur_merged_handle_range);
 
             trove_close_context(cur_fs->coll_id, trove_context);
             free(cur_merged_handle_range);
-        }
-
-        /*
-          set storage hints if any.  if any of these fail, we
-          can't error out since they're just hints.  thus, we
-          complain in logging and continue.
-        */
-	ret = trove_collection_setinfo(
-            cur_fs->coll_id, trove_context, 
-            TROVE_COLLECTION_HANDLE_TIMEOUT,
-            (void *)&cur_fs->handle_purgatory);
-	if (ret < 0)
-	{
-	    gossip_lerr("Error setting handle timeout\n");
-	}
-
-        if (cur_fs->attr_cache_keywords &&
-            cur_fs->attr_cache_size &&
-            cur_fs->attr_cache_max_num_elems)
-        {
-            ret = trove_collection_setinfo(
-                cur_fs->coll_id, trove_context, 
-                TROVE_COLLECTION_ATTR_CACHE_KEYWORDS,
-                (void *)cur_fs->attr_cache_keywords);
-            if (ret < 0)
-            {
-                gossip_lerr("Error setting attr cache keywords\n");
-            }
-            ret = trove_collection_setinfo(
-                cur_fs->coll_id, trove_context, 
-                TROVE_COLLECTION_ATTR_CACHE_SIZE,
-                (void *)&cur_fs->attr_cache_size);
-            if (ret < 0)
-            {
-                gossip_lerr("Error setting attr cache size\n");
-            }
-            ret = trove_collection_setinfo(
-                cur_fs->coll_id, trove_context, 
-                TROVE_COLLECTION_ATTR_CACHE_MAX_NUM_ELEMS,
-                (void *)&cur_fs->attr_cache_max_num_elems);
-            if (ret < 0)
-            {
-                gossip_lerr("Error setting attr cache max num elems\n");
-            }
-            ret = trove_collection_setinfo(
-                cur_fs->coll_id, trove_context, 
-                TROVE_COLLECTION_ATTR_CACHE_INITIALIZE,
-                (void *)0);
-            if (ret < 0)
-            {
-                gossip_lerr("Error initializing the attr cache\n");
-            }
         }
 
         cur = PINT_llist_next(cur);
