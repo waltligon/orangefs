@@ -28,6 +28,8 @@
 #define FLOW_CLEANUP(__flow_data)				\
 do{								\
     struct flow_descriptor* __flow_d = (__flow_data)->parent;	\
+    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, "flowproto completing %p\n", \
+	__flow_d);						\
     cleanup_buffers(__flow_data);				\
     __flow_d = (__flow_data)->parent;				\
     free(__flow_data);						\
