@@ -1,7 +1,5 @@
 DIR := src/io/flow/flowproto-bmi-trove
 LIBSRC += \
 	$(DIR)/flowproto-multiqueue.c 
-#	$(DIR)/flowproto-bmi-trove.c 
 SERVERSRC += \
 	$(DIR)/flowproto-multiqueue.c
-#	$(DIR)/flowproto-bmi-trove.c 
