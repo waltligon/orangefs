@@ -2,11 +2,14 @@
 PVFS2 Release ChangeLog
 -----------------------
 
+
 pvfs2-0.0.5pre1
 ===============
-- compile cleanly on 64-bit machines
+- clean compilation on 64-bit machines
 - vfs stability improvements during I/O, including across client restarts
 - statfs reporting improvements (closer to correct)
+- sysint remove method fix to properly clean up datafiles
+- vfs symlink resolution/following support
 
 
 pvfs2-0.0.4
