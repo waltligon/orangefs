@@ -333,6 +333,7 @@ void extentlist_count(struct TROVE_handle_extentlist *elist, uint64_t* count)
      * fact that the request scheduler will prevent multiple 
      * concurrent callers 
      */
+    gossip_err("FOO: extentlist_count.\n");
     g_counter = 0;
     avldepthfirst(elist->index, extent_count, 0 , 0);
     *count = g_counter;
@@ -351,6 +352,7 @@ static void extent_count(struct avlnode *n,
 			int depth)
 {
     struct TROVE_handle_extent *e = (struct TROVE_handle_extent *)(n->d);
+    gossip_err("lb: %Lu ub: %Lu\n", e->first, e->last);
     g_counter += (e->last - e->first + 1);
 }
 
@@ -406,7 +408,9 @@ int extentlist_handle_remove(struct TROVE_handle_extentlist *elist,
     ret = avltree_extent_search(elist->index, handle, &key_handle, &last_handle);
     if (ret == -1) return -1;
 
-    avlremove(&(elist->index), key_handle);
+    ret = avlremove(&(elist->index), key_handle);
+    assert(ret != 0);
+
     if (key_handle == last_handle) return 0; /* done, length 1 extent now gone */
     else {
 	if ((old_e = (struct TROVE_handle_extent *)malloc(sizeof(struct TROVE_handle_extent)) ) == NULL ) {
