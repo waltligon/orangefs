@@ -226,6 +226,7 @@ int dbpf_attr_cache_finalize(void)
         {
             s_cacheable_keyword_array[i] = NULL;
         }
+        s_cacheable_keyword_array_size = 0;
     }
     return ret;
 }

@@ -243,12 +243,6 @@ int trove_open_context(
         ret = context_method_table[method_id]->open_context(
             coll_id, context_id);
     }
-    else
-    {
-        gossip_debug(TROVE_DEBUG, "KLUDGE:  faking trove open context\n");
-        gossip_debug(TROVE_DEBUG, "* trove_open_context called "
-                     "before trove_initialize()\n");
-    }
     return ret;
 }
 
@@ -263,12 +257,6 @@ int trove_close_context(
     {
         ret = context_method_table[method_id]->close_context(
             coll_id, context_id);
-    }
-    else
-    {
-        gossip_debug(TROVE_DEBUG, "KLUDGE:  faking trove close context\n");
-        gossip_debug(TROVE_DEBUG, "* trove_close_context called "
-                     "before trove_initialize()\n");
     }
     return ret;
 }
