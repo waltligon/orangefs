@@ -9,14 +9,23 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <assert.h>
 
+#include "pvfs2-config.h"
 #include "pvfs2-sysint.h"
 #include "pvfs2-util.h"
 #include "str-utils.h"
 #include "pvfs2-debug.h"
 #include "gossip.h"
-#include "mntent.h"
-#include "assert.h"
+
+/* TODO: add replacement functions for systems without getmntent() */
+#ifndef HAVE_GETMNTENT
+    #error HAVE_GETMNTENT undefined! needed for parse_pvfstab
+#endif
+
+#ifdef HAVE_MNTENT_H
+#include <mntent.h>
+#endif
 
 /* PVFS_util_parse_pvfstab()
  *

@@ -250,8 +250,12 @@ dnl for regular functions, add them to the CHECK_FUNCS
 AC_CHECK_FUNCS(strtoull)
 AC_CHECK_FUNCS(strstr)
 
+dnl check for getmntent(), special test
+AC_FUNC_GETMNTENT
+
 dnl if we use headers that might not be on every platform, add them here
 AC_CHECK_HEADERS(malloc.h)
+AC_CHECK_HEADERS(mntent.h)
 
 dnl create any missing subdirectories that wouldn't be created
 dnl by AC_OUTPUT below (which won't create intermediate dirs).
