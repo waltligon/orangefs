@@ -45,7 +45,7 @@
 #define PVFS2_MMAP_RACACHE_MAX_SIZE ((loff_t)(8 * (1024 * 1024)))
 
 /* tells the pvfs2-client-core to flush any cached readahead data */
-#define PVFS2_MMAP_RACACHE_FLUSH ((uint32_t)0xFFFFFFFF)
+#define PVFS2_MMAP_RACACHE_FLUSH ((loff_t)-1)
 
 /* describes memory regions to map in the PVFS_DEV_MAP ioctl */
 struct PVFS_dev_map_desc

@@ -99,8 +99,10 @@ int pvfs2_mmap_ra_cache_register(PVFS_pinode_reference refn,
         gen_mutex_unlock(s_mmap_ra_cache_mutex);
 
         gossip_debug(MMAP_RCACHE_DEBUG, "Inserted mmap ra cache "
-                     "element %Lu, %d\n", Lu(cache_elem->refn.handle),
-                     cache_elem->refn.fs_id);
+                     "element %Lu, %d of size %Lu\n",
+                     Lu(cache_elem->refn.handle),
+                     cache_elem->refn.fs_id,
+                     Lu(cache_elem->data_sz));
 
         ret = 0;
     }
@@ -178,9 +180,11 @@ int pvfs2_mmap_ra_cache_flush(PVFS_pinode_reference refn)
             assert(cache_elem);
             assert(cache_elem->data);
 
-            gossip_debug(MMAP_RCACHE_DEBUG, "Flushing mmap ra cache "
-                         "element %Lu, %d\n", Lu(cache_elem->refn.handle),
-                         cache_elem->refn.fs_id);
+            gossip_debug(MMAP_RCACHE_DEBUG, "Flushed mmap ra cache "
+                         "element %Lu, %d of size %Lu\n",
+                         Lu(cache_elem->refn.handle),
+                         cache_elem->refn.fs_id,
+                         Lu(cache_elem->data_sz));
 
             free(cache_elem->data);
             free(cache_elem);

@@ -354,10 +354,9 @@ static int service_io_request(
     {
 #ifdef USE_MMAP_RA_CACHE
         if ((in_upcall->req.io.offset == (loff_t)0) &&
-            (uint32_t)in_upcall->req.io.readahead_size ==
-            PVFS2_MMAP_RACACHE_FLUSH)
+            (in_upcall->req.io.readahead_size ==
+             PVFS2_MMAP_RACACHE_FLUSH))
         {
-            gossip_debug(MMAP_RCACHE_DEBUG," Flushing MMAP_RCACHE\n");
             pvfs2_mmap_ra_cache_flush(in_upcall->req.io.refn);
         }
         else if ((in_upcall->req.io.readahead_size > 0) &&

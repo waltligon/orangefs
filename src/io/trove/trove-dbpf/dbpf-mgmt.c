@@ -51,7 +51,7 @@ void dbpf_error_report(const char *errpfx, char *msg)
     if (errpfx && msg)
     {
         snprintf(buf, 512, "%s: %s\n", errpfx, msg);
-        gossip_lerr(buf);
+        gossip_err(buf);
     }
 #endif
 }
