@@ -86,7 +86,9 @@ typedef struct PINT_dist_s {
 	gossip_err("%s: encode_PINT_dist: methods is null\n", __func__); \
 	exit(1); \
     } \
+    align8(pptr); \
     (px->methods->encode_lebf) (pptr, px->params); \
+    align8(pptr); \
 } while (0)
 #define decode_PINT_dist(pptr,x) do { PINT_dist tmp_dist; PINT_dist *px; \
     decode_string(pptr, &tmp_dist.dist_name); \
@@ -104,7 +106,9 @@ typedef struct PINT_dist_s {
     px->dist_name = (char *) px + roundup8(sizeof(*px)); \
     memcpy(px->dist_name, tmp_dist.dist_name, tmp_dist.name_size); \
     px->params = (void *)(px->dist_name + roundup8(px->name_size)); \
+    align8(pptr); \
     (px->methods->decode_lebf) (pptr, px->params); \
+    align8(pptr); \
 } while (0)
 #endif
 
