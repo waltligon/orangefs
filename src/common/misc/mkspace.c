@@ -327,14 +327,19 @@ int pvfs2_rmspace(
     int ret = -1;
     char *method_name = NULL;
     TROVE_op_id op_id;
+    static int trove_is_initialized = 0;
 
     /* try to initialize; fails if storage space isn't there? */
-    ret = trove_initialize(storage_space, 0, &method_name, 0);
-    if (ret == -1)
+    if (!trove_is_initialized)
     {
-        gossip_err("error: storage space %s does not "
-                   "exist; aborting!\n", storage_space);
-        return -1;
+        ret = trove_initialize(storage_space, 0, &method_name, 0);
+        if (ret == -1)
+        {
+            gossip_err("error: storage space %s does not "
+                       "exist; aborting!\n", storage_space);
+            return -1;
+        }
+        trove_is_initialized = 1;
     }
 
     if (verbose)
@@ -361,16 +366,17 @@ int pvfs2_rmspace(
                 storage_space,
                 ((ret != -1) ? "successfully" : "with errors"));
         }
-    }
 
-    /*
-      we should be doing a trove finalize here, but for now
-      we can't because it will fail horribly during the sync/close
-      calls to files that we've just removed.
+        /*
+          we should be doing a trove finalize here, but for now
+          we can't because it will fail horribly during the sync/close
+          calls to files that we've just removed.
      
-      an extra flag to finalize, or a static var in the dbpf-mgmt
-      methods could resolve this.
-    */
-/*     trove_finalize(); */
+          an extra flag to finalize, or a static var in the dbpf-mgmt
+          methods could resolve this.
+        */
+/*         trove_finalize(); */
+        trove_is_initialized = 0;
+    }
     return ret;
 }

@@ -280,7 +280,7 @@ static int dbpf_initialize(char *stoname,
         gossip_err("dbpf_initialize failure: cannot allocate memory\n");
         return -1;
     }
-    
+
     dbpf_dspace_dbcache_initialize();
     dbpf_bstream_fdcache_initialize();
     dbpf_keyval_dbcache_initialize();
@@ -459,13 +459,13 @@ static int dbpf_collection_create(char *collname,
 	return -1;
     }
 
+    memset(&db_data, 0, sizeof(db_data));
+    db_data.coll_id = new_coll_id;
+    
     key.data = collname;
     key.size = strlen(collname)+1;
     data.data = &db_data;
     data.size = sizeof(db_data);
-    
-    memset(&db_data, 0, sizeof(db_data));
-    db_data.coll_id = new_coll_id;
     
     ret = sto_p->coll_db->put(sto_p->coll_db, NULL, &key, &data, 0);
     if (ret)
@@ -485,7 +485,7 @@ static int dbpf_collection_create(char *collname,
     ret = stat(path_name, &dirstat);
     if (ret < 0 && errno != ENOENT)
     {
-        gossip_err("stat failed on storage directory %s", path_name);
+        gossip_err("stat failed on storage directory %s\n", path_name);
 	return -1;
     }
     else if (ret < 0)
@@ -493,7 +493,7 @@ static int dbpf_collection_create(char *collname,
 	ret = mkdir(path_name, 0755);
 	if (ret != 0)
         {
-            gossip_err("mkdir failed on storage directory %s", path_name);
+            gossip_err("mkdir failed on storage directory %s\n", path_name);
 	    return -1;
 	}
     }
@@ -502,24 +502,28 @@ static int dbpf_collection_create(char *collname,
     ret = mkdir(path_name, 0755);
     if (ret != 0)
     {
-        gossip_err("mkdir failed on collection directory %s", path_name);
-	return -1;
+        gossip_err("mkdir failed on collection directory %s\n", path_name);
+        return -1;
     }
 
     DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX,
                                 sto_p->name, new_coll_id);
-    ret = dbpf_db_create(path_name);
-    if (ret != 0)
-    {
-        gossip_err("dbpf_db_create failed on attrib db %s", path_name);
-        return -1;
-    }
-    
     db_p = dbpf_db_open(path_name, &error);
     if (db_p == NULL)
     {
-        gossip_err("dbpf_db_open failed on attrib db %s", path_name);
-	return -error;
+        ret = dbpf_db_create(path_name);
+        if (ret != 0)
+        {
+            gossip_err("dbpf_db_create failed on attrib db %s\n", path_name);
+            return -1;
+        }
+
+        db_p = dbpf_db_open(path_name, &error);
+        if (db_p == NULL)
+        {
+            gossip_err("dbpf_db_open failed on attrib db %s\n", path_name);
+            return -error;
+        }
     }
 
     /*
@@ -563,19 +567,23 @@ static int dbpf_collection_create(char *collname,
     db_p->sync(db_p, 0);
 
     DBPF_GET_DS_ATTRIB_DBNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
-    ret = dbpf_db_create(path_name);
-    if (ret != 0)
+    db_p = dbpf_db_open(path_name, &error);
+    if (db_p == NULL)
     {
-        gossip_err("dbpf_db_create failed on %s", path_name);
-        return -1;
+        ret = dbpf_db_create(path_name);
+        if (ret != 0)
+        {
+            gossip_err("dbpf_db_create failed on %s\n", path_name);
+            return -1;
+        }
     }
     
     DBPF_GET_KEYVAL_DIRNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
     ret = mkdir(path_name, 0755);
     if (ret != 0)
     {
-        gossip_err("mkdir failed on keyval directory %s", path_name);
-	return -1;
+        gossip_err("mkdir failed on keyval directory %s\n", path_name);
+        return -1;
     }
 
     for(i = 0; i < DBPF_KEYVAL_MAX_NUM_BUCKETS; i++)
@@ -583,7 +591,7 @@ static int dbpf_collection_create(char *collname,
         snprintf(dir, PATH_MAX, "%s/%.8d", path_name, i);
         if ((mkdir(dir, 0755) == -1) && (errno != EEXIST))
         {
-            gossip_err("mkdir failed on keyval bucket directory %s", dir);
+            gossip_err("mkdir failed on keyval bucket directory %s\n", dir);
             return -1;
         }
     }
@@ -592,8 +600,8 @@ static int dbpf_collection_create(char *collname,
     ret = mkdir(path_name, 0755);
     if (ret != 0)
     {
-        gossip_err("mkdir failed on bstream directory %s", path_name);
-	return -1;
+        gossip_err("mkdir failed on bstream directory %s\n", path_name);
+        return -1;
     }
 
     for(i = 0; i < DBPF_BSTREAM_MAX_NUM_BUCKETS; i++)
@@ -601,7 +609,7 @@ static int dbpf_collection_create(char *collname,
         snprintf(dir, PATH_MAX, "%s/%.8d", path_name, i);
         if ((mkdir(dir, 0755) == -1) && (errno != EEXIST))
         {
-            gossip_err("mkdir failed on bstream bucket directory %s",
+            gossip_err("mkdir failed on bstream bucket directory %s\n",
                        dir);
             return -1;
         }
@@ -645,7 +653,6 @@ static int dbpf_collection_remove(char *collname,
     if (unlink(path_name) != 0)
     {
         perror("failure removing dataspace attrib db");
-        goto collection_remove_failure;
     }
 
     DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX,
@@ -711,6 +718,7 @@ static int dbpf_collection_remove(char *collname,
                 }
                 snprintf(tmp_path, PATH_MAX, "%s/%s", dir,
                          current_dirent->d_name);
+
 #if 0
                 gossip_debug(TROVE_DEBUG, "Removing keyval entry %s\n",
                              tmp_path);
@@ -1205,7 +1213,7 @@ static int dbpf_db_create(char *dbname)
 			  DB_CREATE|DB_EXCL,
                           0644)) != 0)
     {
-	db_p->err(db_p, ret, "%s", dbname);
+	db_p->err(db_p, ret, "%s\n", dbname);
 	return -1;
     }
     

@@ -2026,6 +2026,9 @@ int PINT_config_pvfs2_rmspace(
                 break;
             }
 
+            cur = PINT_llist_next(cur);
+            remove_collection_only = (PINT_llist_head(cur) ? 1 : 0);
+
             gossip_debug(SERVER_DEBUG,"\n*****************************\n");
             gossip_debug(SERVER_DEBUG,"Removing existing PVFS2 %s\n",
                     (remove_collection_only ? "collection" :
@@ -2036,8 +2039,6 @@ int PINT_config_pvfs2_rmspace(
                                 remove_collection_only,
                                 1);
             gossip_debug(SERVER_DEBUG,"\n*****************************\n");
-
-            cur = PINT_llist_next(cur);
         }
     }
     return ret;
