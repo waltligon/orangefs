@@ -29,7 +29,6 @@ struct fp_queue_item
     PVFS_offset offset_list[MAX_REGIONS];
     PINT_Request_result result;
     struct qlist_head list_link;
-    int last_flag;
     flow_descriptor* parent;
     struct PINT_thread_mgr_bmi_callback bmi_callback;
     struct PINT_thread_mgr_trove_callback trove_callback;
@@ -41,9 +40,6 @@ struct fp_private_data
     struct fp_queue_item prealloc_array[BUFFERS_PER_FLOW];
     struct qlist_head list_link;
 
-    gen_mutex_t next_seq_mutex;
-    int next_seq_num;
-
     gen_mutex_t src_mutex;
     struct qlist_head src_list;
     int src_done;
@@ -54,6 +50,9 @@ struct fp_private_data
 
     gen_mutex_t empty_mutex;
     struct qlist_head empty_list;
+
+    int ending_flag;
+    int dest_count;
 };
 #define PRIVATE_FLOW(target_flow)\
     ((struct fp_private_data*)(target_flow->flow_protocol_data))
@@ -346,9 +345,11 @@ static void bmi_recv_callback_fn(void *user_ptr,
      /* TODO: implement handling of > MAX_REGIONS discontig parts */
     assert(q_item->result.bytes == actual_size);
 
+    flow_data->dest_count++;
+
     /* does this finish the flow? */
     if(PINT_REQUEST_DONE(q_item->parent->file_req_state))
-	q_item->last_flag = 1;
+	flow_data->ending_flag = 1;
 
     ret = trove_bstream_write_list(q_item->parent->dest.u.trove.coll_id,
 	q_item->parent->dest.u.trove.handle,
@@ -378,7 +379,7 @@ static void bmi_recv_callback_fn(void *user_ptr,
     gen_mutex_lock(&flow_data->src_mutex);
     gen_mutex_lock(&flow_data->empty_mutex);
 
-    if(!q_item->last_flag && qlist_empty(&flow_data->src_list) 
+    if(!flow_data->ending_flag && qlist_empty(&flow_data->src_list) 
 	&& !qlist_empty(&flow_data->empty_list))
     {
 	q_item = qlist_entry(flow_data->empty_list.next,
@@ -469,7 +470,7 @@ static void trove_write_callback_fn(void *user_ptr,
     q_item->parent->total_transfered += q_item->result.bytes;
 
     /* if this was the last operation, then mark the flow as done */
-    if(q_item->last_flag)
+    if(flow_data->ending_flag && flow_data->dest_count == 1)
     {
 	q_item->parent->state = FLOW_COMPLETE;
 	gen_mutex_lock(&completion_mutex);
@@ -482,6 +483,7 @@ static void trove_write_callback_fn(void *user_ptr,
 
     if(q_item->buffer)
     {
+	flow_data->dest_count--;
 	/* if this q_item has been used before, remove it from its 
 	 * current queue */
 	gen_mutex_lock(&flow_data->dest_mutex);
