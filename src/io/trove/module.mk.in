@@ -1,9 +1,11 @@
 DIR := src/io/trove
 LIBSRC += \
 	$(DIR)/trove-mgmt.c \
+	$(DIR)/trove-error.c \
 	$(DIR)/trove-autogen.c
 SERVERSRC += \
 	$(DIR)/trove-mgmt.c \
+	$(DIR)/trove-error.c \
 	$(DIR)/trove-autogen.c
 
 $(DIR)/trove-autogen.c: $(DIR)/trove-proto.h maint/trove-autogen.pl

@@ -11,6 +11,8 @@
 
 int map_coll_id_to_method(int coll_id);
 
+PVFS_error trove_errno_to_trove_error(int errno_value);
+
 
 /* These structures contains the function pointers that should be provided
  * by valid trove "method" implementations
