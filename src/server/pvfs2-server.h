@@ -225,6 +225,12 @@ struct PINT_server_mkdir_op
     PVFS_handle dirent_handle;
 };
 
+struct PINT_server_getattr_op
+{
+    PVFS_handle handle;
+    PVFS_fs_id fs_id;
+    uint32_t attrmask;
+};
     
 /* This structure is passed into the void *ptr 
  * within the job interface.  Used to tell us where
@@ -282,6 +288,7 @@ typedef struct PINT_server_op
     union
     {
 	/* request-specific scratch spaces for use during processing */
+        struct PINT_server_getattr_op getattr;
 	struct PINT_server_getconfig_op getconfig;
 	struct PINT_server_lookup_op lookup;
 	struct PINT_server_crdirent_op crdirent;
