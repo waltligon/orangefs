@@ -29,19 +29,36 @@ static job_context_id pint_client_sm_context;
 /* values greater than zero are usable here */
 enum {
     REMOVE_DCACHE_HIT = 1,
-    REMOVE_PCACHE_HIT = 2
+    REMOVE_PCACHE_HIT = 2,
+    REMOVE_MUST_REMOVE_DATAFILES = 3
 };
 
-static int remove_init(PINT_client_sm *sm_p, job_status_s *js_p);
-static int remove_post_lookup_sendrecv(PINT_client_sm *sm_p, job_status_s *js_p);
-static int remove_lookup_failure(PINT_client_sm *sm_p, job_status_s *js_p);
-static int remove_recv_lookup_resp(PINT_client_sm *sm_p, job_status_s *js_p);
+static int remove_init(PINT_client_sm *sm_p,
+		       job_status_s *js_p);
 
-static int remove_post_getattr_sendrecv(PINT_client_sm *sm_p, job_status_s *js_p);
-static int remove_getattr_failure(PINT_client_sm *sm_p, job_status_s *js_p);
-static int remove_recv_getattr_resp(PINT_client_sm *sm_p, job_status_s *js_p);
+static int remove_post_lookup_sendrecv(PINT_client_sm *sm_p,
+				       job_status_s *js_p);
+static int remove_lookup_failure(PINT_client_sm *sm_p,
+				 job_status_s *js_p);
+static int remove_recv_lookup_resp(PINT_client_sm *sm_p,
+				   job_status_s *js_p);
 
-static int remove_cleanup(PINT_client_sm *sm_p, job_status_s *js_p);
+static int remove_post_getattr_sendrecv(PINT_client_sm *sm_p,
+					job_status_s *js_p);
+static int remove_getattr_failure(PINT_client_sm *sm_p,
+				  job_status_s *js_p);
+static int remove_recv_getattr_resp(PINT_client_sm *sm_p,
+				    job_status_s *js_p);
+
+static int remove_post_datafile_remove_sendrecv(PINT_client_sm *sm_p,
+						job_status_s *js_p);
+static int remove_datafile_remove_failure(PINT_client_sm *sm_p,
+					  job_status_s *js_p);
+static int remove_recv_datafile_remove_resp(PINT_client_sm *sm_p,
+					    job_status_s *js_p);
+
+static int remove_cleanup(PINT_client_sm *sm_p,
+			  job_status_s *js_p);
 
 /* all stuff used in test function */
 enum {
@@ -60,7 +77,10 @@ machine pvfs2_client_remove_sm(init,
 			       recv_lookup_resp,
 			       post_getattr_sendrecv,
 			       getattr_failure,
-			       recv_getattr_resp)
+			       recv_getattr_resp,
+			       post_datafile_remove_sendrecv,
+			       datafile_remove_failure,
+			       recv_datafile_remove_resp)
 {
     state init
 	{
@@ -106,6 +126,26 @@ machine pvfs2_client_remove_sm(init,
     state recv_getattr_resp
 	{
 	    run remove_recv_getattr_resp;
+	    REMOVE_MUST_REMOVE_DATAFILES => post_datafile_remove_sendrecv;
+	    default => cleanup;
+	}
+
+    state post_datafile_remove_sendrecv
+	{
+	    run remove_post_datafile_remove_sendrecv;
+	    success => recv_datafile_remove_resp;
+	    default => datafile_remove_failure;
+	}
+
+    state datafile_remove_failure
+	{
+	    run remove_datafile_remove_failure;
+	    default => cleanup;
+	}
+
+    state recv_datafile_remove_resp
+	{
+	    run remove_recv_datafile_remove_resp;
 	    default => cleanup;
 	}
 
@@ -736,12 +776,53 @@ static int remove_recv_getattr_resp(PINT_client_sm *sm_p,
 	assert(0);
     }
 
-    /* pull out the data that we wanted */
-
-    /* TODO: POPULATE THE PCACHE? */
-
     gossip_debug(CLIENT_DEBUG, "getattr completed (handle = 0x%08Lx)\n",
 		 sm_p->u.remove.object_ref.handle);
+
+    /* pull out the data that we wanted */
+    switch (resp_p->u.getattr.attr.objtype) {
+	case PVFS_TYPE_METAFILE:
+	    /* need to save datafile handles and remove them;
+	     * redirect us to those states.
+	     */
+	    js_p->error_code = REMOVE_MUST_REMOVE_DATAFILES;
+	    assert(resp_p->u.getattr.attr.mask & PVFS_ATTR_META_DFILES);
+	    assert(resp_p->u.getattr.attr.u.meta.dfile_count > 0);
+
+	    gossip_debug(CLIENT_DEBUG,
+			 "remove sm: %d datafiles to remove too.\n",
+			 resp_p->u.getattr.attr.u.meta.dfile_count);
+
+	    /* save the datafile handles prior to freeing up the
+	     * buffers we used for messages.  we could keep them around
+	     * i suppose, but we're not going to do that for now.  later
+	     * it is likely that this stuff will be stuck in the pcache
+	     * anyway, so we'll be able to just reference it from there.
+	     */
+	    sm_p->u.remove.datafile_handles = (PVFS_handle *) malloc(resp_p->u.getattr.attr.u.meta.dfile_count * sizeof(PVFS_handle));
+	    if (sm_p->u.remove.datafile_handles == NULL) {
+		assert(0);
+	    }
+	    sm_p->u.remove.datafile_count = resp_p->u.getattr.attr.u.meta.dfile_count;
+	    memcpy(sm_p->u.remove.datafile_handles,
+		   resp_p->u.getattr.attr.u.meta.dfile_array,
+		   resp_p->u.getattr.attr.u.meta.dfile_count * sizeof(PVFS_handle));
+
+	    break;
+	case PVFS_TYPE_DIRECTORY:
+	    break;
+	case PVFS_TYPE_SYMLINK:
+	    /* fall through */
+	case PVFS_TYPE_DATAFILE:
+	    /* fall through */
+	case PVFS_TYPE_DIRDATA:
+	    /* fall through */
+	default:
+	    gossip_err("error: remove sm: unhandled object type\n");
+	    assert(0);
+    }
+
+    /* TODO: POPULATE THE PCACHE? */
 
     ret = PINT_serv_free_reqresp_resources(&sm_p->encoded_req,
 					   sm_p->encoded_resp_p,
@@ -763,17 +844,12 @@ static int remove_recv_getattr_resp(PINT_client_sm *sm_p,
     return 1;
 }
 
-/* remove_post_rmdirent_sendrecv()
- */
+
+
+
 static int remove_post_rmdirent_sendrecv(PINT_client_sm *sm_p,
 					 job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG, "remove state: post_rmdirent_sendrecv\n");
-
-    /* post rmdirent send and receive */
-
-    /* NOTE: same issue with posting as in lookup case. */
-
     /* NOTE:  we remove the dirent first because this gets the
      * object out of the system fastest.
      */
@@ -789,28 +865,162 @@ static int remove_recv_rmdirent_resp(PINT_client_sm *sm_p,
     return 1;
 }
 
+/* remove_post_datafile_remove_sendrecv()
+ */
 static int remove_post_datafile_remove_sendrecv(PINT_client_sm *sm_p,
 						job_status_s *js_p)
 {
-    /* post all datafile remove requests and responses simultaneously.
+    int ret, i;
+
+   /* post all datafile remove requests and responses simultaneously.
      *
      * NOTE: it's easier to clean up from a metafile with no datafiles
      * than the other way around!  so we remove datafiles first.
      */
 
-    return 1;
+    gossip_debug(CLIENT_DEBUG, "remove state: post_getattr_sendrecv\n");
+
+    /* do parameter checking */
+
+    sm_p->u.remove.dfremove_array = (PINT_client_sm_msgpair_state *)
+	malloc(sm_p->u.remove.datafile_count * sizeof(PINT_client_sm_msgpair_state));
+    if (sm_p->u.remove.dfremove_array == NULL) {
+	assert(0);
+    }
+
+    /* mark that we have two jobs per datafile */
+    sm_p->comp_ct = 2 * sm_p->u.remove.datafile_count;
+
+    /* for each datafile, post a send/recv pair for the remove */
+    for (i=0; i < sm_p->u.remove.datafile_count; i++) {
+	PVFS_msg_tag_t session_tag;
+	job_status_s send_status;
+	job_status_s recv_status;
+	job_id_t send_id, recv_id;
+
+	PINT_SERVREQ_REMOVE_FILL(sm_p->u.remove.dfremove_array[i].req,
+				 *sm_p->cred_p,
+				  sm_p->u.remove.object_ref.fs_id,
+				 sm_p->u.remove.datafile_handles[i]);
+    
+	ret = PINT_serv_prepare_reqresp(sm_p->u.remove.parent_ref,
+					&sm_p->u.remove.dfremove_array[i].req,
+					&sm_p->u.remove.dfremove_array[i].encoded_req,
+					&sm_p->u.remove.dfremove_array[i].encoded_resp_p,
+					&sm_p->u.remove.dfremove_array[i].svr_addr,
+					&sm_p->u.remove.dfremove_array[i].max_msg_sz,
+					&session_tag);
+	if (ret != 0) {
+	    assert(0);
+	}
+
+	/* post receive of response */
+	ret = job_bmi_recv(sm_p->u.remove.dfremove_array[i].svr_addr,
+			   sm_p->u.remove.dfremove_array[i].encoded_resp_p,
+			   sm_p->u.remove.dfremove_array[i].max_msg_sz,
+			   session_tag,
+			   BMI_PRE_ALLOC,
+			   sm_p,
+			   &recv_status,
+			   &recv_id,
+			   pint_client_sm_context);
+	if (ret < 0) {
+	    assert(0);
+	}
+	else if (ret == 1) {
+	    assert(0);
+	}
+	assert(ret == 0); /* just to see that we don't get odd values */
+
+	/* post send of request */
+	ret = job_bmi_send_list(sm_p->u.remove.dfremove_array[i].encoded_req.dest,
+				sm_p->u.remove.dfremove_array[i].encoded_req.buffer_list,
+				sm_p->u.remove.dfremove_array[i].encoded_req.size_list,
+				sm_p->u.remove.dfremove_array[i].encoded_req.list_count,
+				sm_p->u.remove.dfremove_array[i].encoded_req.total_size,
+				session_tag,
+				sm_p->u.remove.dfremove_array[i].encoded_req.buffer_type,
+				1,
+				sm_p,
+				&send_status,
+				&send_id,
+				pint_client_sm_context);
+	if (ret < 0) {
+	    assert(0);
+	}
+	else if (ret == 1) {
+	    /* send completed immediately; decrement the completion counter */
+	    gossip_debug(CLIENT_DEBUG, "remove: datafile remove send completed immediately.\n");
+	    /* TODO: CHECK THE STATUS!!! */
+	    assert(send_status.error_code == 0);
+	    sm_p->comp_ct--;
+	}
+
+	/* TODO: keep up with job ids, so we can match later. */
+    }
+
+    gossip_debug(CLIENT_DEBUG, "remove sm: post_datafile_remove_sendrecv: count = %d\n",
+		 sm_p->comp_ct);
+
+    return 0;
 }
 
 static int remove_recv_datafile_remove_resp(PINT_client_sm *sm_p,
 					    job_status_s *js_p)
 {
-    /* receive responses from servers.
-     *
-     * tally up any failures so that we can report them in the FT
-     * case.
-     *
-     * return 0 if we're not done; we'll get called again.
+    int ret, i;
+    struct PINT_decoded_msg decoded_resp; /* data about decoded resp */
+    struct PVFS_server_resp *resp_p; /* response structure (decoded) */
+
+    gossip_debug(CLIENT_DEBUG, "remove state: recv_datafile_remove_resp\n");
+
+    /* keep decrementing comp_ct until we're done */
+    /* TODO: MARK THE ONES THAT WE RECEIVED ALREADY, SO WE COULD CLEAN
+     * UP NICELY.
      */
+
+    gossip_debug(CLIENT_DEBUG, "remove sm: recv_datafile_remove_resp: count = %d\n",
+		 sm_p->comp_ct);
+
+    if (--sm_p->comp_ct > 0) return 0;
+    assert(sm_p->comp_ct == 0);
+
+    /* we have received all the responses successfully */
+
+    /* HACK!!!!!!  WE'RE ASSUMING THAT THE ACTUAL SIZE OF ALL THE
+     * MESSAGES ARE THE SAME!  WE NEED TO MATCH TAGS AND DO THE RIGHT
+     * THING HERE...
+     */
+
+    /* for each remove message, decode, check status, and free resources */
+    for (i=0; i < sm_p->u.remove.datafile_count; i++) {
+	/* decode; resp_p will point to response */
+	ret = PINT_serv_decode_resp(sm_p->u.remove.dfremove_array[i].encoded_resp_p,
+				    &decoded_resp,
+				    &sm_p->u.remove.dfremove_array[i].svr_addr,
+				    js_p->actual_size,
+				    &resp_p);
+	if (ret < 0) {
+	    assert(0);
+	}
+
+	/* check status of response */
+	if (resp_p->status != 0) {
+	    gossip_err("error: remove sm: status = %d on datafile remove msg\n",
+		       resp_p->status);
+	    assert(0);
+	}
+
+	/* free resources */
+	ret = PINT_serv_free_reqresp_resources(&sm_p->u.remove.dfremove_array[i].encoded_req,
+					       sm_p->u.remove.dfremove_array[i].encoded_resp_p,
+					       &decoded_resp,
+					       &sm_p->u.remove.dfremove_array[i].svr_addr,
+					       sm_p->u.remove.dfremove_array[i].max_msg_sz);
+	if (ret != 0) {
+	    assert(0);
+	}
+    }
 
     return 1;
 }
@@ -897,6 +1107,14 @@ static int remove_getattr_failure(PINT_client_sm *sm_p,
     /* Q: CAN WE HANDLE ALL THE SEND/RECV PAIRS FAILURE CASES WITH ONE
      * STATE?
      */
+
+    return 1;
+}
+
+static int remove_datafile_remove_failure(PINT_client_sm *sm_p,
+					  job_status_s *js_p)
+{
+    gossip_debug(CLIENT_DEBUG, "remove state: datafile_remove_failure\n");
 
     return 1;
 }

@@ -106,6 +106,18 @@ struct PVFS_servreq_remove
     PVFS_fs_id fs_id;		    /* file system */
 };
 
+#define PINT_SERVREQ_REMOVE_FILL(__req,		\
+				 __creds,	\
+				 __fsid,	\
+				 __handle)	\
+do {						\
+    memset(&(__req), 0, sizeof(__req));		\
+    (__req).op = PVFS_SERV_REMOVE;		\
+    (__req).credentials = (__creds);		\
+    (__req).u.remove.fs_id = (__fsid);		\
+    (__req).u.remove.handle = (__handle);	\
+} while (0)
+
 /* NOTE: no response structure; all necessary response info is 
  * returned in generic server response structure
  */

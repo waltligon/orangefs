@@ -19,14 +19,39 @@
 
 #define PINT_STATE_STACK_SIZE 3
 
-struct PINT_client_remove_sm {
-    char                 *object_name; /* input parameter */
-    PVFS_pinode_reference parent_ref;  /* input parameter */
-    PVFS_pinode_reference object_ref;  /* discovered during processing */
-};
-
 /* HACK!!! */
 typedef union PINT_state_array_values PINT_state_array_values;
+
+/* NOTE:
+ * This structure holds everything that we need for the state of a
+ * message pair.  We need arrays of these in some cases, so it's
+ * convenient to group it like this.
+ *
+ * Q: SHOULD WE USE ONE OF THESE IN THE COMMON PART OF THE STRUCTURE
+ * RATHER THAN THE INDIVIDUAL ONES?
+ */
+typedef struct PINT_client_sm_msgpair_state_s {
+    /* req and encoded_req are needed to send a request */
+    struct PVFS_server_req req;
+    struct PINT_encoded_msg encoded_req;
+
+    /* max_msg_sz, svr_addr, and encoded_resp_p needed to recv a response */
+    int max_msg_sz;
+    bmi_addr_t svr_addr;
+    void *encoded_resp_p;
+} PINT_client_sm_msgpair_state;
+
+
+struct PINT_client_remove_sm {
+    char                         *object_name; /* input parameter */
+    PVFS_pinode_reference         parent_ref;  /* input parameter */
+    PVFS_pinode_reference         object_ref;  /* looked up */
+    int                           datafile_count; /* from attribs */
+    PVFS_handle                  *datafile_handles;
+    PINT_client_sm_msgpair_state *dfremove_array;
+};
+
+
 
 typedef struct PINT_client_sm_s {
     /* STATE MACHINE VALUES */
