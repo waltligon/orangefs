@@ -129,17 +129,15 @@ static int getconfig_init(state_action_struct *s_op, job_status_s *ret)
     s_op->resp->u.getconfig.meta_server_mapping = file_system->meta_server_list;
     s_op->resp->u.getconfig.io_server_mapping = file_system->io_server_list;
     s_op->resp->u.getconfig.fs_id = file_system->coll_id;
-    s_op->strsize = strlen(file_system->meta_server_list)+1;
-    s_op->strsize += strlen(file_system->io_server_list)+1;
+    s_op->u.getconfig.strsize = strlen(file_system->meta_server_list)+1;
+    s_op->u.getconfig.strsize += strlen(file_system->io_server_list)+1;
 
     /* Set up the key/val pair for trove to get root handle */
     s_op->key.buffer = Trove_Common_Keys[ROOT_HANDLE_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[ROOT_HANDLE_KEY].size;
     s_op->val.buffer = malloc((s_op->val.buffer_sz = sizeof(TROVE_handle)));
 
-
     return(job_post_ret);
-
 }
 
 /*
@@ -206,7 +204,7 @@ static int getconfig_job_bmi_send(state_action_struct *s_op, job_status_s *ret)
     s_op->resp->status = ret->error_code;
     if(!ret->error_code)
     {
-	s_op->resp->rsize = sizeof(struct PVFS_server_resp_s) + s_op->strsize;
+	s_op->resp->rsize = sizeof(struct PVFS_server_resp_s) + s_op->u.getconfig.strsize;
 	s_op->resp->u.getconfig.root_handle = *((TROVE_handle *)s_op->val.buffer);
     }
     else

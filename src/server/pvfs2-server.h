@@ -64,6 +64,10 @@ struct PINT_server_remove_op {
     PVFS_object_attr object_attr; /* used to hold attributes of object to be removed */
 };
 
+struct PINT_server_getconfig_op {
+    int strsize; /* used to hold string lengths during getconfig processing */
+};
+
 /* This structure is passed into the void *ptr 
  * within the job interface.  Used to tell us where
  * to go next in our state machine.
@@ -74,7 +78,6 @@ struct PINT_server_remove_op {
 typedef struct PINT_server_op
 {
     int op; /* op == req->op after initialize_unexpected */
-    int strsize;
     int enc_type;
     job_id_t scheduled_id; /* holds id from request scheduler so we can release it later */
 
@@ -96,11 +99,12 @@ typedef struct PINT_server_op
     flow_descriptor* flow_d;
     union {
 	/* request-specific scratch spaces for use during processing */
-	struct PINT_server_lookup_op   lookup;
-	struct PINT_server_crdirent_op crdirent;
-	struct PINT_server_readdir_op  readdir;
-	struct PINT_server_remove_op   remove;
-	struct PINT_server_rmdirent_op rmdirent;
+	struct PINT_server_getconfig_op getconfig;
+	struct PINT_server_lookup_op    lookup;
+	struct PINT_server_crdirent_op  crdirent;
+	struct PINT_server_readdir_op   readdir;
+	struct PINT_server_remove_op    remove;
+	struct PINT_server_rmdirent_op  rmdirent;
     } u;
 } PINT_server_op;
 
