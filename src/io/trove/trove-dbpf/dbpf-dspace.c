@@ -1043,13 +1043,15 @@ static int dbpf_dspace_cancel(
     TROVE_context_id context_id)
 {
     int ret = -TROVE_ENOSYS;
-
-    gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_dspace_cancel called\n");
-
 #ifdef __PVFS2_TROVE_THREADED__
     int state = 0;
     gen_mutex_t *context_mutex = NULL;
     dbpf_queued_op_t *cur_op = NULL;
+#endif
+
+    gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_dspace_cancel called\n");
+
+#ifdef __PVFS2_TROVE_THREADED__
 
     assert(dbpf_completion_queue_array[context_id]);
     context_mutex = dbpf_completion_queue_array_mutex[context_id];
