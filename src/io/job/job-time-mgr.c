@@ -249,8 +249,6 @@ int job_time_mgr_expire(void)
 	    jd = qlist_entry(iterator2, struct job_desc, job_time_link);
 	    qlist_del(&jd->job_time_link);
 
-	    gossip_debug(GOSSIP_CANCEL_DEBUG, "job_timer: expiring job!\n");
-
 	    switch(jd->type)
 	    {
 	    case JOB_BMI:
