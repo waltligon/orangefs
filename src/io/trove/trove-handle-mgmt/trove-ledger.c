@@ -309,7 +309,7 @@ static int handle_store_load(TROVE_coll_id coll_id,
 
     int count, array_count, state;
     TROVE_handle *handle_array;
-    TROVE_ds_position pos = SI_START_POSITION; /* ??? */
+    TROVE_ds_position pos = TROVE_ITERATE_START; /* ??? */
 
 #if 0
     /* SHOULD ALREADY HAVE BEEN DONE */
@@ -334,29 +334,35 @@ static int handle_store_load(TROVE_coll_id coll_id,
     if (!handle_array) assert(0);
 
     /* HACK -- NEED TO REPEAT CALL */
-    ret = trove_dspace_iterate_handles(coll_id,
-				       &pos,
-				       handle_array,
-				       &array_count,
-				       0, /* flags */
-				       0, /* vtag */
-				       0, /* user_ptr */
-				       &op_id);
-    if (ret < 0) assert(0);
-
-    while (ret != 1) {
-	ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+    for (;;) {
+	array_count = 3;
+	ret = trove_dspace_iterate_handles(coll_id,
+					   &pos,
+					   handle_array,
+					   &array_count,
+					   0, /* flags */
+					   0, /* vtag */
+					   0, /* user_ptr */
+					   &op_id);
 	if (ret < 0) assert(0);
+
+	while (ret != 1) {
+	    ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+	    if (ret < 0) assert(0);
+	}
+
+	if (array_count == 0) break;
+
+	printf("handle_store_load: found %d handles used.\n", array_count);
+
+	for (i=0; i < array_count; i++) {
+	    printf("  handle_store_load: removing %Ld from free list.\n", handle_array[i]);
+	    extentlist_handle_remove(&ledger->free_list, handle_array[i]);
+	    extentlist_show(&(ledger->free_list));
+	}
     }
 
-    printf("handle_store_load: found %d handles used.\n", array_count);
-
-    for (i=0; i < array_count; i++) {
-	printf("  handle_store_load: removing %Ld from free list.\n", handle_array[i]);
-	extentlist_handle_remove(&ledger->free_list, handle_array[i]);
-	extentlist_show(&(ledger->free_list));
-
-    }
+    free(handle_array);
 
 #if 0
     ret = trove_collection_lookup(admin_name, &admin_id, NULL, &op_id);

@@ -11,7 +11,8 @@
 #include <trove-proto.h>
 
 enum { 
-	SI_START_POSITION=1 
+	TROVE_ITERATE_START= 1,
+	TROVE_ITERATE_END  = 2
 };
 
 enum { TROVE_PLAIN_FILE,

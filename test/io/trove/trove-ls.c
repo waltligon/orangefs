@@ -30,7 +30,7 @@ int main(int argc, char **argv)
     TROVE_handle handle;
     TROVE_ds_state state;
     TROVE_keyval_s key[KEYVAL_ARRAY_LEN], val[KEYVAL_ARRAY_LEN];
-    TROVE_ds_position pos = SI_START_POSITION;
+    TROVE_ds_position pos = TROVE_ITERATE_START;
     char *method_name, *dir_name;
     char path_name[PATH_SIZE];
 

@@ -11,6 +11,7 @@
 #include <db.h>
 #include <time.h>
 #include <malloc.h>
+#include <assert.h>
 
 #include <trove.h>
 #include <trove-internal.h>
@@ -198,11 +199,15 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     DBT key, data;
     db_recno_t recno;
     struct dbpf_dspace_attr attr;
+    TROVE_handle dummy_handle;
 
     db_p = op_p->coll_p->ds_db;
     if (db_p == NULL) goto return_error;
-
-    /* grab out key/value pairs */
+ 
+    if (*op_p->u.d_iterate_handles.position_p == TROVE_ITERATE_END) {
+	*op_p->u.d_iterate_handles.count_p = 0;
+	return 1;
+    }
 
     /* get a cursor */
     ret = db_p->cursor(db_p, NULL, &dbc_p, 0);
@@ -218,45 +223,26 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
      * not sure this is the best thing to be doing, but ok for now... -- rob
      */
 
-    if (*op_p->u.d_iterate_handles.position_p == SI_START_POSITION) {
-	/* an uninitialized cursor will start reading at the beginning
-	 * of the database (first record) when used with DB_NEXT, so
-	 * we don't need to position with DB_FIRST.
-	 */
-	printf("si_start_pos detected\n");
-
-#if 0
-	memset(&key, 0, sizeof(key));
-	key.data = &op_p->u.d_iterate_handles.handle_array[0];
-	key.size = key.ulen = sizeof(TROVE_handle);
-	key.flags |= DB_DBT_USERMEM;
-
-	memset(&data, 0, sizeof(data));
-	data.data = &attr;
-	data.size = data.ulen = sizeof(attr);
-	data.flags |= DB_DBT_USERMEM;
-
-	ret = dbc_p->c_get(dbc_p, &key, &data, DB_FIRST);
-	if (ret == DB_NOTFOUND) goto return_ok;
-	else if (ret != 0) {
-	    printf("c_get failed on iteration %d\n", i);
-	    goto return_error;
-	}
-	i++;
-#endif
-    }
-    else {
+    /* an uninitialized cursor will start reading at the beginning
+     * of the database (first record) when used with DB_NEXT, so
+     * we don't need to position with DB_FIRST.
+     */
+    if (*op_p->u.d_iterate_handles.position_p != TROVE_ITERATE_START) {
 	/* we need to position the cursor before we can read new entries.
 	 * we will go ahead and read the first entry as well, so that we
 	 * can use the same loop below to read the remainder in this or
 	 * the above case.
 	 */
 
+	printf("setting position\n");
+
 	/* set position */
-	recno = *op_p->u.d_iterate_handles.position_p;
+	assert(sizeof(recno) < sizeof(dummy_handle));
+
+	dummy_handle = *op_p->u.d_iterate_handles.position_p;
 	memset(&key, 0, sizeof(key));
-	key.data  = &recno;
-	key.size  = key.ulen = sizeof(recno);
+	key.data  = &dummy_handle;
+	key.size  = key.ulen = sizeof(dummy_handle);
 	key.flags |= DB_DBT_USERMEM;
 
 	memset(&data, 0, sizeof(data));
@@ -268,20 +254,7 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
 	if (ret == DB_NOTFOUND) goto return_ok;
 	if (ret != 0) goto return_error;
 
-	/* read current to get current key */
-	memset(&key, 0, sizeof(key));
-	key.data  = &op_p->u.d_iterate_handles.handle_array[0];
-	key.size  = key.ulen = sizeof(TROVE_handle);
-	key.flags |= DB_DBT_USERMEM;
-
-	memset(&data, 0, sizeof(data));
-	data.data = &attr;
-	data.size = data.ulen = sizeof(attr);
-	data.flags |= DB_DBT_USERMEM;
-
-	ret = dbc_p->c_get(dbc_p, &key, &data, DB_CURRENT);
-	if (ret == DB_NOTFOUND) goto return_ok;
-	if (ret != 0) goto return_error;
+	printf("handle at recno = %Ld\n", dummy_handle);
     }
 
     /* read more handles until we run out of handles or space in buffer */
@@ -304,29 +277,35 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
 	}
     }
 
-    /* get the record number to return.
-     *
-     * note: key field is ignored by c_get in this case
-     */
-    memset(&data, 0, sizeof(data));
-    data.data = &recno;
-    data.size = data.ulen = sizeof(recno);
-    data.flags |= DB_DBT_USERMEM;
-
-    ret = dbc_p->c_get(dbc_p, NULL, &data, DB_GET_RECNO);
-
-    *(op_p->u.d_iterate_handles.position_p) = recno;
-
-    /* 'position' is the record we will read next time through */
-    /* XXX: right now, 'posistion' gets set to garbage when we hit the end.
-     * well, not exactly 'garbage', but it gets incremented here even in the
-     * end-of-database case ( come in, ask for one, read zero (hit end):
-     * position still gets incremented ).  It might be helpful (or at least
-     * consistent) if posistion always pointed to the 'next' place to access,
-     * even if that's one place past the end of the database ... or maybe i'm
-     * putting too much weight on 'posistion's value at the end */
-
 return_ok:
+    if (ret == DB_NOTFOUND) {
+	/* if we ran off the end of the database, return TROVE_ITERATE_END */
+	*op_p->u.d_iterate_handles.position_p = TROVE_ITERATE_END;
+	printf("returning done!\n");
+    }
+    else {
+	/* get the record number to return.
+	 *
+	 * note: key field is ignored by c_get in this case
+	 */
+	memset(&key, 0, sizeof(key));
+	key.data  = &dummy_handle;
+	key.size  = key.ulen = sizeof(dummy_handle);
+	key.flags |= DB_DBT_USERMEM;
+
+	memset(&data, 0, sizeof(data));
+	data.data = &recno;
+	data.size = data.ulen = sizeof(recno);
+	data.flags |= DB_DBT_USERMEM;
+
+	ret = dbc_p->c_get(dbc_p, &key, &data, DB_GET_RECNO);
+	if (ret == DB_NOTFOUND) printf("iterate -- notfound\n");
+	else if (ret != 0) printf("iterate -- some other failure @ recno\n");
+
+	*op_p->u.d_iterate_handles.position_p = recno;
+    }
+    /* 'position' is the record we will read next time through */
+
     *op_p->u.d_iterate_handles.count_p = i;
     op_p->state = OP_COMPLETED;
 
