@@ -38,6 +38,7 @@
 \setlength{\parindent}{0.0cm}
 
 \section{How to use this document}
+\label{sec:howto}
 
 The quick start guide is intended to be a reference on how to quickly
 install and configure a PVFS2 file system.  It is broken down into 
@@ -74,7 +75,9 @@ The optional Linux kernel driver has the following requirements:
 \item Linux kernel version 2.6 (test release) or newer
 \end{itemize}
 
-The optional ROMIO interface has the following requirements:
+ROMIO supports PVFS2.  It is not provided with pvfs2, but can be found as part
+of the following MPI implementations:
+
 \begin{itemize}
 \item MPICH2-0.94 or newer
 \end{itemize}
@@ -121,6 +124,7 @@ Also note that the pvfs2 kernel source supports out of tree builds if you
 prefer to use that technique.
 
 \section{Configuring PVFS2 for a single host}
+\label{sec:single}
 
 This section documents the steps required to configure PVFS2 on a system
 in which a single machine acts as both the client and server for all
@@ -135,7 +139,7 @@ the purpose of these directories please see the PVFS2 users guide.
 
 Since this is a single host configuration, we only have to configure one
 server daemon.  In the original PVFS, the metadata and I/O servers were 
-seperated into two seperate programs (mgr and iod).  PVFS2, however, has 
+separated into two separate programs (mgr and iod).  PVFS2, however, has 
 only a single daemon called pvfs2-server which serves both roles.
 
 The most important part of server configuration is simply generating the 
@@ -254,7 +258,7 @@ first is the native PVFS2 interface which is made available
 through {\tt libpvfs2}.  This also happens to be the same interface used by
 ROMIO if you configure your system to use MPI-IO.  The second method
 relies on a kernel module to provide standard Linux file system
-compatability.  This interface allows the user to use existing
+compatibility.  This interface allows the user to use existing
 binaries and system utilities on PVFS2 without recompiling.  We will
 cover how to configure both access methods here.
 
@@ -368,18 +372,127 @@ bash-2.05b# diff /tmp/testfile-out /usr/lib/libc.a
 
 
 \section{Installing PVFS2 on a cluster}
+\label{sec:cluster}
+It is important to have in mind the roles that machines (a.k.a. nodes) will
+play in the PVFS system. There are three potential roles that a machine might
+play:
 
-\emph{TODO: write something here}
+    * metadata server
+    * I/O server
+    * client
+
+A metadata server is a node that keeps up with metadata (such as permissions
+and time stamps) for the file system. An I/O server is a node that actually
+stores a portion of the PVFS file data. A client is a node that can read and
+write PVFS files. Your applications will typically be run on PVFS clients so
+that they can access the file system.
+
+A machine can fill one, two, or all of these roles simultaneously. Unlike
+PVFS-1, each role requires just the pvfs2-server binary, one cluster-wide
+config file, and one node-specific config file.
+
+We currently support just one metadata server (this limit will be raised in the
+future).  There can be many I/O servers and clients. In this section we will
+discuss the components and configuration files needed to fulfill each role.
+
+We will configure our example system so that the node ``cluster1'' provides
+metadata information, eight nodes (named ``cluster1'' through ``cluster8''),
+and all nodes can as clients.
+
+\subsection{Server configuration}
+
+Installing PVFS2 on a cluster is quite similar to installing it on a single
+machine, so familiarize yourself with Section \ref{sec:single}.  We are going
+to generate one master config file and 8 smaller node-specific config files. 
+
+\begin{verbatim}
+root@cluster1:~# /usr/local/pvfs2/bin/pvfs2-genconfig  \
+	/etc/pvfs2-fs.conf /etc/pvfs2-server.conf
+**********************************************************************
+        Welcome to the PVFS2 Configuration Generator:
+
+This interactive script will generate configuration files suitable
+for use with a new PVFS2 file system.  Please see the PVFS2 quickstart
+guide for details.
+
+**********************************************************************
+
+You must first select the network protocol that your file system will use.
+The only currently supported options are "tcp" and "gm".
+
+* Enter protocol type [Default is tcp]: tcp
+
+Choose a TCP/IP port for the servers to listen on.  Note that this
+script assumes that all servers will use the same port number.
+
+* Enter port number [Default is 3334]: 
+
+Next you must list the hostnames of the machines that will act as
+I/O servers.  Acceptable syntax is "node1, node2, ..." or "node{#-#,#,#}".
+
+* Enter hostnames [Default is localhost]: cluster{1-8}
+
+Now list the hostnames of the machines that will act as Metadata
+servers.  This list may or may not overlap with the I/O server list.
+
+* Enter hostnames [Default is localhost]: cluster1
+
+Configured a total of 8 servers:
+8 of them are I/O servers.
+1 of them are Metadata servers.
+
+* Would you like to verify server list (y/n) [Default is n]? y
+
+****** I/O servers:
+tcp://cluster1:3334
+tcp://cluster2:3334
+tcp://cluster3:3334
+tcp://cluster4:3334
+tcp://cluster5:3334
+tcp://cluster6:3334
+tcp://cluster7:3334
+tcp://cluster8:3334
+
+****** Metadata servers:
+tcp://cluster1:3334
+
+* Does this look ok (y/n) [Default is y]? y
+
+Choose a file for each server to write log messages to.
+
+* Enter log file location [Default is /tmp/pvfs2-server.log]: 
+
+Choose a directory for each server to store data in.
+
+* Enter directory name: [Default is /tmp/pvfs2-storage-space]: 
+
+Writing fs config file... Done.
+Writing 8 server config file(s)... Done.
+
+Configuration complete!
+\end{verbatim}
+
 
 \end{document}
 
+We have now made all the config files for an 8-node storage cluster:
+\begin{verbatim}
+root@cluster1:~# ls /etc/pvfs2/foo/
+pvfs2-fs.conf               pvfs2-server.conf-cluster5
+pvfs2-server.conf-cluster1  pvfs2-server.conf-cluster6
+pvfs2-server.conf-cluster2  pvfs2-server.conf-cluster7
+pvfs2-server.conf-cluster3  pvfs2-server.conf-cluster8
+pvfs2-server.conf-cluster4
+\end{verbatim}
 
+Now get those 8 node-specific files (pvfs2-server.conf-clusterN) out to the
+nodes.  This is probably the most onerous part of pvfs2 setup, and it's
+something we will try to address in future releases, but for now, push them out by hand, renaming them to pvfs2-server.conf.  Here's one idea:
 
+\begin{verbatim}
+root@cluster1:~# for i in `seq 1 8`; do
+> scp /etc/pvfs2-server.conf-cluster${i] cluster${i}:/etc/pvfs2-server.conf
+> done
+\end{verbatim}
 
-
-
-
-
-
-
-
+\subsection{starting the server}
