@@ -166,6 +166,9 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
 	    assert(0);
     }
     ret = db_p->open(db_p,
+#ifdef HAVE_TXNID_PARAMETER_TO_DB_OPEN
+                     NULL,
+#endif
 		     filename,
 		     NULL,
 		     DB_UNKNOWN,
@@ -174,6 +177,9 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
     if (ret == ENOENT && create_flag != 0) {
 	/* if no such DB and create_flag is set, try to create the DB */
 	ret = db_p->open(db_p,
+#ifdef HAVE_TXNID_PARAMETER_TO_DB_OPEN
+                         NULL,
+#endif
 			 filename,
 			 NULL,
 			 DB_BTREE,

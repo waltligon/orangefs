@@ -635,8 +635,15 @@ static int dbpf_db_create(
 	    db_p->err(db_p, ret, "%s: set_flags", dbname);
 	    return -1;
     }
-    if ((ret = db_p->open(db_p, dbname, NULL, DB_BTREE,
-			  DB_CREATE|DB_EXCL, 0644)) != 0)
+    if ((ret = db_p->open(db_p,
+#ifdef HAVE_TXNID_PARAMETER_TO_DB_OPEN
+                          NULL,
+#endif
+                          dbname,
+                          NULL,
+                          DB_BTREE,
+			  DB_CREATE|DB_EXCL,
+                          0644)) != 0)
     {
 	db_p->err(db_p, ret, "%s", dbname);
 	return -1;
@@ -684,7 +691,15 @@ static DB *dbpf_db_open(
 	    db_p->err(db_p, ret, "%s: set_flags", dbname);
 	    return NULL;
     }
-    if ((ret = db_p->open(db_p, dbname, NULL, DB_BTREE, 0, 0)) != 0)
+    if ((ret = db_p->open(db_p,
+#ifdef HAVE_TXNID_PARAMETER_TO_DB_OPEN
+                          NULL,
+#endif
+                          dbname,
+                          NULL,
+                          DB_BTREE,
+                          0,
+                          0)) != 0)
     {
 	printf("open failed on database %s.\n", dbname);
 	return NULL;

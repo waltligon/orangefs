@@ -593,7 +593,12 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
 	    dbpf_dspace_dbcache_put(op_p->coll_p->coll_id); /* release the dspace dbcache entry */
 	    return 0; /* try again later */
 	case DBPF_BSTREAM_FDCACHE_SUCCESS:
-	    ret = kdb_p->stat(kdb_p, &k_stat_p, 0);
+	    ret = kdb_p->stat(kdb_p,
+                              &k_stat_p,
+#ifdef HAVE_UNKNOWN_PARAMETER_TO_DB_STAT
+                              NULL,
+#endif
+                              0);
 	    dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle); /* release the fd right away */
 	    if (ret == 0) {
 		k_size = (TROVE_size) k_stat_p->bt_nkeys;
