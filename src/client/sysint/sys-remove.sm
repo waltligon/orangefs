@@ -330,10 +330,13 @@ static int remove_init(PINT_client_sm *sm_p,
 static int remove_getattr_setup_msgpair(PINT_client_sm *sm_p,
 					job_status_s *js_p)
 {
-    int ret = -1;
+    int ret = -PVFS_EINVAL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "remove state: getattr_setup_msgpair\n");
+
+
+    js_p->error_code = 0;
 
     assert(sm_p->u.remove.object_ref.fs_id != 0);
     assert(sm_p->u.remove.object_ref.handle != 0);
@@ -357,13 +360,11 @@ static int remove_getattr_setup_msgpair(PINT_client_sm *sm_p,
     ret = PINT_bucket_map_to_server(&sm_p->msgpair.svr_addr,
                                     sm_p->msgpair.handle,
                                     sm_p->msgpair.fs_id);
-    if(ret != 0)
+    if (ret)
     {
-	gossip_err("Error: failure mapping to server.\n");
+        gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
-        return 1;
     }
-    js_p->error_code = 0;
     return 1;
 }
 
@@ -446,13 +447,15 @@ static int remove_getattr_comp_fn(void *v_p,
 static int remove_rmdirent_setup_msgpair(PINT_client_sm *sm_p,
 					 job_status_s *js_p)
 {
-    int ret = -1;
+    int ret = -PVFS_EINVAL;
 
     /* NOTE: we remove the dirent first because this gets the object
      * out of the system fastest.
      */
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "remove state: rmdirent_setup_msgpair\n");
+
+    js_p->error_code = 0;
 
     PINT_SERVREQ_RMDIRENT_FILL(sm_p->msgpair.req,
 			       *sm_p->cred_p,
@@ -473,9 +476,9 @@ static int remove_rmdirent_setup_msgpair(PINT_client_sm *sm_p,
     ret = PINT_bucket_map_to_server(&sm_p->msgpair.svr_addr,
                                     sm_p->msgpair.handle,
                                     sm_p->msgpair.fs_id);
-    if (ret != 0)
+    if (ret)
     {
-	gossip_err("Error: failure mapping to server.\n");
+        gossip_err("Failed to map meta server address\n");
 	js_p->error_code = ret;
     }
     return 1;
@@ -509,12 +512,12 @@ static int remove_check_dir_contents_comp_fn(
 static int remove_crdirent_setup_msgpair(PINT_client_sm *sm_p,
 					 job_status_s *js_p)
 {
-    int ret = -1;
-
-    js_p->error_code = 0;
+    int ret = -PVFS_EINVAL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "remove state: crdirent_setup_msgpair\n");
+
+    js_p->error_code = 0;
 
     PINT_SERVREQ_CRDIRENT_FILL(
         sm_p->msgpair.req,
@@ -539,10 +542,10 @@ static int remove_crdirent_setup_msgpair(PINT_client_sm *sm_p,
     ret = PINT_bucket_map_to_server(&sm_p->msgpair.svr_addr,
                                     sm_p->msgpair.handle,
                                     sm_p->msgpair.fs_id);
-    if (ret != 0)
+    if (ret)
     {
-	gossip_err("Error: failure mapping to server.\n");
-	assert(0);
+        gossip_err("Failed to map meta server address\n");
+        js_p->error_code = ret;
     }
     return 1;
 }
@@ -596,13 +599,13 @@ static int remove_crdirent_comp_fn(void *v_p,
 static int remove_check_dir_contents_setup_msgpair(PINT_client_sm *sm_p,
                                                    job_status_s *js_p)
 {
-    int ret = -1;
+    int ret = -PVFS_EINVAL;
     PINT_client_sm_msgpair_state *msg_p = NULL;
-
-    js_p->error_code = 0;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: "
                  "remove_check_dir_contents_setup_msgpair\n");
+
+    js_p->error_code = 0;
 
     msg_p = &sm_p->msgpair;
     memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
@@ -627,9 +630,9 @@ static int remove_check_dir_contents_setup_msgpair(PINT_client_sm *sm_p,
     ret = PINT_bucket_map_to_server(&msg_p->svr_addr,
                                     msg_p->handle,
                                     msg_p->fs_id);
-    if (ret != 0)
+    if (ret)
     {
-	gossip_err("Error: failure mapping to server.\n");
+        gossip_err("Failed to map meta server address\n");
 	js_p->error_code = ret;
     }
     return 1;
@@ -638,8 +641,8 @@ static int remove_check_dir_contents_setup_msgpair(PINT_client_sm *sm_p,
 static int remove_datafile_remove_setup_msgpair(PINT_client_sm *sm_p,
 						job_status_s *js_p)
 {
-    int i;
-    int ret = -1;
+    int i = 0;
+    int ret = -PVFS_EINVAL;
 
    /* post all datafile remove requests and responses simultaneously.
     *
@@ -696,10 +699,12 @@ static int remove_datafile_remove_setup_msgpair(PINT_client_sm *sm_p,
 static int remove_object_remove_setup_msgpair(PINT_client_sm *sm_p,
 					      job_status_s *js_p)
 {
-    int ret = -1;
+    int ret = -PVFS_EINVAL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "remove state: object_remove_setup_msgpair\n");
+
+    js_p->error_code = 0;
 
     PINT_SERVREQ_REMOVE_FILL(
         sm_p->msgpair.req,
@@ -715,11 +720,10 @@ static int remove_object_remove_setup_msgpair(PINT_client_sm *sm_p,
     ret = PINT_bucket_map_to_server(&sm_p->msgpair.svr_addr,
                                     sm_p->msgpair.handle,
                                     sm_p->msgpair.fs_id);
-    if (ret != 0)
+    if (ret)
     {
-	gossip_err("Error: failure mapping to server.\n");
+        gossip_err("Failed to map meta server address\n");
 	js_p->error_code = ret;
-	return 1;
     }
     return 1;    
 }

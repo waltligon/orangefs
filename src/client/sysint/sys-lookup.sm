@@ -495,7 +495,7 @@ int PVFS_sys_lookup(
     PVFS_sysresp_lookup *resp,
     int follow_link)
 {
-    int ret = -EINVAL;
+    int ret = -PVFS_EINVAL;
     PVFS_pinode_reference parent;
 
     if (name && resp)
@@ -546,6 +546,7 @@ static int lookup_init(PINT_client_sm *sm_p,
 static int lookup_segment_lookup_setup_msgpair(PINT_client_sm *sm_p,
                                             job_status_s *js_p)
 {
+    int ret = -PVFS_EINVAL;
     PINT_client_sm_msgpair_state *msg_p = NULL;
     PINT_client_lookup_sm_segment *cur_seg = NULL;
 
@@ -595,20 +596,21 @@ static int lookup_segment_lookup_setup_msgpair(PINT_client_sm *sm_p,
         cur_seg->seg_starting_refn.handle,
         PVFS_ATTR_COMMON_ALL);
 
-    gossip_debug(GOSSIP_LOOKUP_DEBUG, "Looking up segment %s under handle %Lu\n",
-                 cur_seg->seg_name, Lu(cur_seg->seg_starting_refn.handle));
+    gossip_debug(
+        GOSSIP_LOOKUP_DEBUG, "Looking up segment %s under handle %Lu\n",
+        cur_seg->seg_name, Lu(cur_seg->seg_starting_refn.handle));
 
-    /* fill in msgpair structure components */
     msg_p->fs_id = cur_seg->seg_starting_refn.fs_id;
     msg_p->handle = cur_seg->seg_starting_refn.handle;
     msg_p->comp_fn = lookup_segment_lookup_comp_fn;
 
-    if (PINT_bucket_map_to_server(&msg_p->svr_addr,
-                                  msg_p->handle,
-                                  msg_p->fs_id) < 0)
+    ret = PINT_bucket_map_to_server(&msg_p->svr_addr,
+                                    msg_p->handle,
+                                    msg_p->fs_id);
+    if (ret)
     {
-        gossip_err("Failed to get meta server information\n");
-        js_p->error_code = -PVFS_EINVAL;
+        gossip_err("Failed to map meta server address\n");
+        js_p->error_code = ret;
     }
     return 1;
 }
@@ -695,19 +697,20 @@ static int lookup_segment_getattr_setup_msgpair(PINT_client_sm *sm_p,
         cur_seg->seg_resolved_refn.handle,
         (PVFS_ATTR_COMMON_ALL | PVFS_ATTR_SYMLNK_ALL));
 
-    gossip_debug(GOSSIP_LOOKUP_DEBUG, "Doing GETATTR on resolved handle %Lu\n",
-                 Lu(cur_seg->seg_resolved_refn.handle));
+    gossip_debug(
+        GOSSIP_LOOKUP_DEBUG, "Doing GETATTR on resolved handle %Lu\n",
+        Lu(cur_seg->seg_resolved_refn.handle));
 
-    msg_p->fs_id   = cur_seg->seg_resolved_refn.fs_id;
-    msg_p->handle  = cur_seg->seg_resolved_refn.handle;
+    msg_p->fs_id = cur_seg->seg_resolved_refn.fs_id;
+    msg_p->handle = cur_seg->seg_resolved_refn.handle;
     msg_p->comp_fn = lookup_segment_getattr_comp_fn;
 
     if (PINT_bucket_map_to_server(&msg_p->svr_addr,
                                   msg_p->handle,
                                   msg_p->fs_id) < 0)
     {
-	gossip_err("Error: failure mapping to server.\n");
-        js_p->error_code = -PVFS_EINVAL;
+        gossip_err("Failed to map meta server address\n");
+        js_p->error_code = ret;
     }
     return 1;
 }
@@ -783,11 +786,9 @@ static int lookup_segment_check_attr_type(PINT_client_sm *sm_p,
 static int lookup_segment_handle_relative_link(PINT_client_sm *sm_p,
                                                job_status_s *js_p)
 {
-    int ret = -1;
+    int ret = -PVFS_EINVAL;
     PINT_client_lookup_sm_segment *cur_seg = NULL;
     char *relative_symlink_target = NULL;
-
-    js_p->error_code = 0;
 
     /*
       NOTE: if we have a relative link, we need to essentially
@@ -799,6 +800,8 @@ static int lookup_segment_handle_relative_link(PINT_client_sm *sm_p,
     */
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "lookup state: lookup_segment_handle_relative_link\n");
+
+    js_p->error_code = 0;
 
     /* grab the current segment that has a relative link to be resolved */
     cur_seg = GET_CURRENT_SEGMENT();
@@ -825,7 +828,7 @@ static int lookup_segment_handle_relative_link(PINT_client_sm *sm_p,
                              sm_p->u.lookup.current_context,
                              relative_symlink_target,
                              cur_seg->seg_starting_refn);
-    if (ret != 0)
+    if (ret)
     {
         js_p->error_code = ret;
     }
@@ -835,12 +838,10 @@ static int lookup_segment_handle_relative_link(PINT_client_sm *sm_p,
 static int lookup_segment_handle_absolute_link(PINT_client_sm *sm_p,
                                                job_status_s *js_p)
 {
-    int ret = -1;
+    int ret = -PVFS_EINVAL;
     PINT_client_lookup_sm_segment *cur_seg = NULL;
     char *absolute_symlink_target = NULL;
     PVFS_pinode_reference root_refn;
-
-    js_p->error_code = 0;
 
     /*
       NOTE: if we have an absolute link, we need to essentially
@@ -850,6 +851,8 @@ static int lookup_segment_handle_absolute_link(PINT_client_sm *sm_p,
     */
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "lookup state: lookup_segment_handle_absolute_link\n");
+
+    js_p->error_code = 0;
 
     /* grab the current segment that has an absolute link to be resolved */
     cur_seg = GET_CURRENT_SEGMENT();
@@ -879,7 +882,7 @@ static int lookup_segment_handle_absolute_link(PINT_client_sm *sm_p,
                              sm_p->u.lookup.current_context,
                              absolute_symlink_target,
                              root_refn);
-    if (ret != 0)
+    if (ret)
     {
         js_p->error_code = ret;
     }

@@ -215,13 +215,13 @@ static int getattr_check_parameters(PINT_client_sm *sm_p,
 static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
 						job_status_s *js_p)
 {
-    int ret = -1;
+    int ret = -PVFS_EINVAL;
     uint32_t attrmask;
-
-    js_p->error_code = 0;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) getattr state: "
                  "getattr_setup_msgpair\n", sm_p);
+
+    js_p->error_code = 0;
 
     /*
       adjust parameters as necessary; what's happening here
@@ -252,7 +252,10 @@ static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
         attrmask |= PVFS_ATTR_SYMLNK_TARGET;
     }
 
-    /* fill in getattr request */
+    gossip_debug(GOSSIP_GETATTR_DEBUG,
+                 "attrmask being passed to server: ");
+    PINT_attrmask_print(GOSSIP_GETATTR_DEBUG, attrmask);
+
     PINT_SERVREQ_GETATTR_FILL(sm_p->msgpair.req,
 			      *sm_p->cred_p,
 			      sm_p->u.getattr.object_ref.fs_id,
@@ -267,17 +270,11 @@ static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
     ret = PINT_bucket_map_to_server(&sm_p->msgpair.svr_addr,
                                     sm_p->msgpair.handle,
                                     sm_p->msgpair.fs_id);
-    if(ret != 0)
+    if (ret)
     {
-	gossip_err("Error: failure mapping to server.\n");
+        gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
-        return 1;
     }
-
-    gossip_debug(GOSSIP_GETATTR_DEBUG,
-                 "attrmask being passed to server: ");
-    PINT_attrmask_print(GOSSIP_GETATTR_DEBUG, attrmask);
-
     return 1;
 }
 
@@ -510,13 +507,12 @@ static int getattr_object_getattr_failure(PINT_client_sm *sm_p,
 static int getattr_datafile_getattr_setup_msgpairarray(PINT_client_sm *sm_p,
 						       job_status_s *js_p)
 {
-    int i;
-    int ret = -1;
+    int i = 0;
+    int ret = -PVFS_EINVAL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) getattr state: "
                  "getattr_datafile_getattr_setup_msgpairarray\n", sm_p);
 
-    /* clear error field in job */
     js_p->error_code = 0;
     
     sm_p->msgarray = (PINT_client_sm_msgpair_state *)
@@ -555,13 +551,11 @@ static int getattr_datafile_getattr_setup_msgpairarray(PINT_client_sm *sm_p,
     /* fill in address of each server to contact */
     ret = PINT_serv_msgpairarray_resolve_addrs(
         sm_p->msgarray_count, sm_p->msgarray);
-    if(ret < 0)
+    if (ret < 0)
     {
-	gossip_lerr("Error: failed to resolve server addresses.\n");
+	gossip_lerr("Error: failed to resolve meta server addresses.\n");
 	js_p->error_code = ret;
-	return 1;
     }
-
     return 1;
 }
 
