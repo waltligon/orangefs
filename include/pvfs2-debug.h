@@ -39,29 +39,6 @@ enum
 	+BMI_DEBUG_GM + BMI_DEBUG_OFFSETS
 };
 
-typedef struct 
-{
-    char *keyword;
-    int mask_val;
-} keyword_mask_t;
-
-/* map all config keywords to pvfs2 debug masks here */
-static keyword_mask_t s_keyword_mask_map[] =
-{
-    { "storage", TROVE_DEBUG },
-    { "trove", TROVE_DEBUG },
-    { "network", BMI_DEBUG_ALL },
-    { "server", SERVER_DEBUG },
-    { "client", CLIENT_DEBUG },
-    { "job", JOB_DEBUG },
-    { "request", REQUEST_DEBUG },
-    { "reqsched", REQ_SCHED_DEBUG },
-    { "flowproto", FLOW_PROTO_DEBUG },
-    { "flow", FLOW_DEBUG },
-    { "pcache", PCACHE_DEBUG },
-    { "distribution", DIST_DEBUG }
-};
-
 /*
   based on human readable keywords, translate them into
   a mask value appropriate for the debugging level desired.
@@ -75,19 +52,42 @@ static inline int PVFS_debug_eventlog_to_mask(
     char *ptr = NULL;
     int mask = 0, i = 0, num_entries = 0;
 
-    num_entries = (sizeof(s_keyword_mask_map) / sizeof(keyword_mask_t));
+    typedef struct 
+    {
+        char *keyword;
+        int mask_val;
+    } keyword_mask_t;
+
+    /* map all config keywords to pvfs2 debug masks here */
+    keyword_mask_t keyword_mask_map[] =
+    {
+        { "storage", TROVE_DEBUG },
+        { "trove", TROVE_DEBUG },
+        { "network", BMI_DEBUG_ALL },
+        { "server", SERVER_DEBUG },
+        { "client", CLIENT_DEBUG },
+        { "job", JOB_DEBUG },
+        { "request", REQUEST_DEBUG },
+        { "reqsched", REQ_SCHED_DEBUG },
+        { "flowproto", FLOW_PROTO_DEBUG },
+        { "flow", FLOW_DEBUG },
+        { "pcache", PCACHE_DEBUG },
+        { "distribution", DIST_DEBUG }
+    };
+
+    num_entries = (sizeof(keyword_mask_map) / sizeof(keyword_mask_t));
 
     if (event_logging)
     {
         for(i = 0; i < num_entries; i++)
         {
-            ptr = strstr(event_logging, s_keyword_mask_map[i].keyword);
+            ptr = strstr(event_logging, keyword_mask_map[i].keyword);
             if (ptr)
             {
-                ptr += (int)strlen(s_keyword_mask_map[i].keyword);
+                ptr += (int)strlen(keyword_mask_map[i].keyword);
                 if ((*ptr == '\0') || (*ptr == ' ') || (*ptr == ','))
                 {
-                    mask |= s_keyword_mask_map[i].mask_val;
+                    mask |= keyword_mask_map[i].mask_val;
                 }
             }
         }
