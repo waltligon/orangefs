@@ -146,8 +146,8 @@ static PINT_state_array_values *PINT_state_machine_locate(PINT_OP_STATE *s_op)
     }
     if (PINT_OP_STATE_TABLE[s_op->op] != NULL)
     {
-	/* this (rather nonintuitively) returns a pointer to the function
-	 * to call for the first state in the appropriate state machine.
+	/* this returns a pointer to a "PINT_state_array_values"
+	 * structure, whose state_action member is the function to call.
 	 */
 	return PINT_OP_STATE_TABLE[s_op->op]->state_machine + 1;
     }

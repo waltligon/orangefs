@@ -22,26 +22,26 @@
 #include "pcache.h"
 #include "PINT-reqproto-encode.h"
 
-extern job_context_id pint_client_sm_context;
+static job_context_id pint_client_sm_context;
 
 /* values greater than zero are usable here */
 enum {
     REMOVE_DCACHE_HIT = 1
 };
 
-static int remove_init(PINT_client_sm *sm, job_status_s *js);
-static int remove_post_lookup_sendrecv(PINT_client_sm *sm, job_status_s *js);
-static int remove_lookup_failure(PINT_client_sm *sm, job_status_s *js);
-static int remove_recv_lookup_resp(PINT_client_sm *sm, job_status_s *js);
-static int remove_cleanup(PINT_client_sm *sm, job_status_s *js);
+static int remove_init(PINT_client_sm *sm_p, job_status_s *js_p);
+static int remove_post_lookup_sendrecv(PINT_client_sm *sm_p, job_status_s *js_p);
+static int remove_lookup_failure(PINT_client_sm *sm_p, job_status_s *js_p);
+static int remove_recv_lookup_resp(PINT_client_sm *sm_p, job_status_s *js_p);
+static int remove_cleanup(PINT_client_sm *sm_p, job_status_s *js_p);
 
 %%
 
-machine pvfs2_remove_sm(init,
-			cleanup,
-			post_lookup_sendrecv,
-			lookup_failure,
-			recv_lookup_resp)
+machine pvfs2_client_remove_sm(init,
+			       cleanup,
+			       post_lookup_sendrecv,
+			       lookup_failure,
+			       recv_lookup_resp)
 {
     state init
 	{
@@ -82,7 +82,7 @@ int PVFS_sys_remove2(char *object_name,
 		     PVFS_pinode_reference parent_ref, 
 		     PVFS_credentials credentials)
 {
-    PINT_client_sm *sm;
+    PINT_client_sm *sm_p;
 
     /* do parameter checking here, then assume things are ok below.
      * assert()s are still ok of course :).
@@ -91,26 +91,66 @@ int PVFS_sys_remove2(char *object_name,
 
     /* build PINT_client_sm structure */
     /* TODO: KEEP A CACHE OF THESE AROUND SO WE'RE NOT ALWAYS MALLOC'ING? */
-    sm = (PINT_client_sm *) malloc(sizeof(*sm));
-    if (sm == NULL) return -PVFS_ENOMEM;
+    sm_p = (PINT_client_sm *) malloc(sizeof(*sm_p));
+    if (sm_p == NULL) return -PVFS_ENOMEM;
 
-    memset(sm, 0, sizeof(*sm));
+    memset(sm_p, 0, sizeof(*sm_p));
 
-    sm->cred_p = &credentials;
-    sm->u.remove.object_name = object_name;
-    sm->u.remove.parent_ref  = parent_ref;
+    sm_p->cred_p = &credentials;
+    sm_p->u.remove.object_name = object_name;
+    sm_p->u.remove.parent_ref  = parent_ref;
 
     /* do something to kick off processing */
 
     /* while !done call progress function */
 
     /* clean up after ourselves */
-    free(sm);
+    free(sm_p);
     return 0;
 }
 
-static int remove_init(PINT_client_sm *sm,
-		       job_status_s *js)
+static int PINT_client_state_machine_post(PINT_client_sm *sm_p,
+					  job_status_s *js_p)
+{
+    int ret;
+
+    static int got_context = 0;
+
+    /* TODO: MOVE THIS INTO THE INITIALIZE OR SOMETHING. */
+    if (got_context == 0) {
+	/* get a context for our state machine operations */
+	job_open_context(&pint_client_sm_context);
+	got_context = 1;
+    }
+
+    /* figure out what function needs to be called first */
+    sm_p->current_state = pvfs2_client_remove_sm.state_machine + 1;
+
+    /* call function, continue calling as long as we get immediate
+     * success.
+     */
+    ret = sm_p->current_state->state_action(sm_p, js_p);
+    while (ret == 1) {
+	/* PINT_state_machine_next() calls next function and
+	 * returns the result.
+	 */
+	ret = PINT_state_machine_next(sm_p, js_p);
+    }
+
+    /* note: job_status_s pointed to by js_p is ok to use after
+     * we return regardless of whether or not we finished.
+     */
+    return ret;
+}
+
+static int PINT_client_state_machine_test()
+{
+}
+
+/* remove_init()
+ */
+static int remove_init(PINT_client_sm *sm_p,
+		       job_status_s *js_p)
 {
     gossip_debug(CLIENT_DEBUG, "remove state: init\n");
 
@@ -121,8 +161,8 @@ static int remove_init(PINT_client_sm *sm,
 
 /* remove_post_lookup_sendrecv()
  */
-static int remove_post_lookup_sendrecv(PINT_client_sm *sm,
-				       job_status_s *js)
+static int remove_post_lookup_sendrecv(PINT_client_sm *sm_p,
+				       job_status_s *js_p)
 {
     int ret;
 
@@ -135,16 +175,16 @@ static int remove_post_lookup_sendrecv(PINT_client_sm *sm,
     /* check and see if we have the pinode for the object in
      * our pinode cache already.
      */
-    ret = PINT_dcache_lookup(sm->u.remove.object_name,
-			     sm->u.remove.parent_ref,
-			     &sm->u.remove.object_ref);
+    ret = PINT_dcache_lookup(sm_p->u.remove.object_name,
+			     sm_p->u.remove.parent_ref,
+			     &sm_p->u.remove.object_ref);
     if (ret < 0 && ret != -PVFS_ENOENT) {
 	/* fatal error */
 	return -1;
     }
     else if (ret == 0) {
 	/* match in dcache; no need for lookup */
-	js->error_code = REMOVE_DCACHE_HIT;
+	js_p->error_code = REMOVE_DCACHE_HIT;
 	return 1;
     }
 
@@ -160,7 +200,7 @@ static int remove_post_lookup_sendrecv(PINT_client_sm *sm,
      * use the sm->comp_ct for this purpose.  We set to 2 (# of jobs)
      * and then decrement as they complete in the next state.
      */
-    sm->comp_ct = 2;
+    sm_p->comp_ct = 2;
 
     /* Steps:
      * (1) fill in request
@@ -173,9 +213,9 @@ static int remove_post_lookup_sendrecv(PINT_client_sm *sm,
      * (8) call job fn. to post send
      */
 
-    if ((strlen(sm->u.remove.object_name) + 1 >
+    if ((strlen(sm_p->u.remove.object_name) + 1 >
 	 PVFS_REQ_LIMIT_PATH_NAME_BYTES) ||
-	(PINT_string_count_segments(sm->u.remove.object_name) >
+	(PINT_string_count_segments(sm_p->u.remove.object_name) >
 	 PVFS_REQ_LIMIT_PATH_SEGMENT_COUNT))
     {
 	/* TODO: CLEAN UP... */
@@ -183,43 +223,43 @@ static int remove_post_lookup_sendrecv(PINT_client_sm *sm,
 	return -PVFS_ENAMETOOLONG;
     }
 
-    memset(&sm->req, 0, sizeof(sm->req));
-    sm->req.op          = PVFS_SERV_LOOKUP_PATH;
-    sm->req.credentials = *sm->cred_p;
-    sm->req.u.lookup_path.path            = sm->u.remove.object_name;
-    sm->req.u.lookup_path.fs_id           = sm->u.remove.parent_ref.fs_id;
-    sm->req.u.lookup_path.starting_handle = sm->u.remove.parent_ref.handle;
-    sm->req.u.lookup_path.attrmask        = PVFS_ATTR_COMMON_ALL;
+    memset(&sm_p->req, 0, sizeof(sm_p->req));
+    sm_p->req.op          = PVFS_SERV_LOOKUP_PATH;
+    sm_p->req.credentials = *sm_p->cred_p;
+    sm_p->req.u.lookup_path.path            = sm_p->u.remove.object_name;
+    sm_p->req.u.lookup_path.fs_id           = sm_p->u.remove.parent_ref.fs_id;
+    sm_p->req.u.lookup_path.starting_handle = sm_p->u.remove.parent_ref.handle;
+    sm_p->req.u.lookup_path.attrmask        = PVFS_ATTR_COMMON_ALL;
 
     /* must determine destination server before we can encode;
-     * this fills in sm->svr_addr.
+     * this fills in sm_p->svr_addr.
      */
-    ret = PINT_bucket_map_to_server(&sm->svr_addr,
-				    sm->u.remove.parent_ref.handle,
-				    sm->u.remove.parent_ref.fs_id);
+    ret = PINT_bucket_map_to_server(&sm_p->svr_addr,
+				    sm_p->u.remove.parent_ref.handle,
+				    sm_p->u.remove.parent_ref.fs_id);
     if (ret < 0) {
 	assert(0);
     }
 
     /* encode request */
-    ret = PINT_encode(&sm->req,
+    ret = PINT_encode(&sm_p->req,
 		      PINT_ENCODE_REQ,
-		      &sm->encoded_req,
-		      sm->svr_addr,
+		      &sm_p->encoded_req,
+		      sm_p->svr_addr,
 		      PINT_CLIENT_ENC_TYPE);
     if (ret < 0) {
 	assert(0);
     }
 
     /* calculate maximum response message size and allocate space */
-    sm->max_msg_sz = PINT_encode_calc_max_size(PINT_ENCODE_RESP,
-					       sm->req.op,
+    sm_p->max_msg_sz = PINT_encode_calc_max_size(PINT_ENCODE_RESP,
+					       sm_p->req.op,
 					       PINT_CLIENT_ENC_TYPE);
 
-    sm->encoded_resp_p = BMI_memalloc(sm->svr_addr,
-				      sm->max_msg_sz,
+    sm_p->encoded_resp_p = BMI_memalloc(sm_p->svr_addr,
+				      sm_p->max_msg_sz,
 				      BMI_RECV);
-    if (sm->encoded_resp_p == NULL) {
+    if (sm_p->encoded_resp_p == NULL) {
 	assert(0);
     }
 
@@ -227,12 +267,12 @@ static int remove_post_lookup_sendrecv(PINT_client_sm *sm,
     session_tag = get_next_session_tag();
 
     /* post receive of response */
-    ret = job_bmi_recv(sm->svr_addr,
-		       sm->encoded_resp_p,
-		       sm->max_msg_sz,
+    ret = job_bmi_recv(sm_p->svr_addr,
+		       sm_p->encoded_resp_p,
+		       sm_p->max_msg_sz,
 		       session_tag,
 		       BMI_PRE_ALLOC,
-		       sm, /* user pointer -- used to get to next state */
+		       sm_p, /* user pointer -- used to get to next state */
 		       &recv_status, /* only for immediate completion */
 		       &recv_id, /* could theoretically be used to unpost */
 		       pint_client_sm_context);
@@ -245,15 +285,15 @@ static int remove_post_lookup_sendrecv(PINT_client_sm *sm,
     assert(ret == 0); /* just to see that we don't get odd values */
 
     /* post send of request */
-    ret = job_bmi_send_list(sm->encoded_req.dest,
-			    sm->encoded_req.buffer_list,
-			    sm->encoded_req.size_list,
-			    sm->encoded_req.list_count,
-			    sm->encoded_req.total_size,
+    ret = job_bmi_send_list(sm_p->encoded_req.dest,
+			    sm_p->encoded_req.buffer_list,
+			    sm_p->encoded_req.size_list,
+			    sm_p->encoded_req.list_count,
+			    sm_p->encoded_req.total_size,
 			    session_tag,
-			    sm->encoded_req.buffer_type,
+			    sm_p->encoded_req.buffer_type,
 			    1,
-			    sm, /* user pointer -- used to get to next state */
+			    sm_p, /* user pointer -- used to get to next state */
 			    &send_status, /* only for immediate completion */
 			    &send_id, /* could in theory be used to unpost */
 			    pint_client_sm_context);
@@ -264,7 +304,7 @@ static int remove_post_lookup_sendrecv(PINT_client_sm *sm,
 	/* send completed immediately; decrement the completion counter */
 	
 	/* TODO: CHECK THE STATUS!!! */
-	sm->comp_ct--;
+	sm_p->comp_ct--;
     }
 
     /* TODO: keep up with job ids, so we can match later. */
@@ -274,8 +314,8 @@ static int remove_post_lookup_sendrecv(PINT_client_sm *sm,
 
 /* remove_recv_lookup_resp()
  */
-static int remove_recv_lookup_resp(PINT_client_sm *sm,
-				   job_status_s *js)
+static int remove_recv_lookup_resp(PINT_client_sm *sm_p,
+				   job_status_s *js_p)
 {
     int ret;
     struct PINT_decoded_msg decoded_resp; /* data about decoded resp */
@@ -292,19 +332,19 @@ static int remove_recv_lookup_resp(PINT_client_sm *sm,
      * otherwise we return 0; we will get called again when the next
      * bmi job completes.
      */
-    if (--sm->comp_ct > 0) return 0;
-    assert(sm->comp_ct == 0);
+    if (--sm_p->comp_ct > 0) return 0;
+    assert(sm_p->comp_ct == 0);
 
     /* in the success case we can assume that the last thing we received
      * was the response.
      */
 
     /* decode response */
-    ret = PINT_decode(sm->encoded_resp_p,
+    ret = PINT_decode(sm_p->encoded_resp_p,
 		      PINT_DECODE_RESP,
 		      &decoded_resp, /* holds data on decoded resp */
-		      sm->svr_addr,
-		      js->actual_size);
+		      sm_p->svr_addr,
+		      js_p->actual_size);
     if (ret < 0) {
 	assert(0);
     }
@@ -320,25 +360,25 @@ static int remove_recv_lookup_resp(PINT_client_sm *sm,
     assert(resp_p->u.lookup_path.handle_count == 1);
 
     /* pull out the data that we wanted */
-    sm->u.remove.object_ref.handle = resp_p->u.lookup_path.handle_array[0];
-    sm->u.remove.object_ref.fs_id  = sm->u.remove.parent_ref.fs_id;
+    sm_p->u.remove.object_ref.handle = resp_p->u.lookup_path.handle_array[0];
+    sm_p->u.remove.object_ref.fs_id  = sm_p->u.remove.parent_ref.fs_id;
 
     gossip_debug(CLIENT_DEBUG, "lookup completed (handle = 0x%08Lx)\n",
 		 0);
 
     /* free resources */
     /* TODO: CHECK RETURN VALUES IN HERE */
-    PINT_encode_release(&sm->encoded_req,
+    PINT_encode_release(&sm_p->encoded_req,
 			PINT_ENCODE_REQ);
 
-    /* sm->req doesn't go anywhere; we'll use it again. */
+    /* sm_p->req doesn't go anywhere; we'll use it again. */
 
     PINT_decode_release(&decoded_resp,
 			PINT_DECODE_RESP);
 
-    BMI_memfree(sm->svr_addr,
-		sm->encoded_resp_p,
-		sm->max_msg_sz,
+    BMI_memfree(sm_p->svr_addr,
+		sm_p->encoded_resp_p,
+		sm_p->max_msg_sz,
 		BMI_RECV);
 
 
@@ -353,8 +393,8 @@ static int remove_recv_lookup_resp(PINT_client_sm *sm,
     return 1;
 }
 
-static int remove_post_rmdirent_sendrecv(PINT_client_sm *sm,
-					 job_status_s *js)
+static int remove_post_rmdirent_sendrecv(PINT_client_sm *sm_p,
+					 job_status_s *js_p)
 {
     /* post rmdirent send and receive */
 
@@ -367,16 +407,16 @@ static int remove_post_rmdirent_sendrecv(PINT_client_sm *sm,
     return 1;
 }
 
-static int remove_recv_rmdirent_resp(PINT_client_sm *sm,
-				     job_status_s *js)
+static int remove_recv_rmdirent_resp(PINT_client_sm *sm_p,
+				     job_status_s *js_p)
 {
     /* receive rmdirent response from the server */
 
     return 1;
 }
 
-static int remove_post_datafile_remove_sendrecv(PINT_client_sm *sm,
-						job_status_s *js)
+static int remove_post_datafile_remove_sendrecv(PINT_client_sm *sm_p,
+						job_status_s *js_p)
 {
     /* post all datafile remove requests and responses simultaneously.
      *
@@ -387,8 +427,8 @@ static int remove_post_datafile_remove_sendrecv(PINT_client_sm *sm,
     return 1;
 }
 
-static int remove_recv_datafile_remove_resp(PINT_client_sm *sm,
-					    job_status_s *js)
+static int remove_recv_datafile_remove_resp(PINT_client_sm *sm_p,
+					    job_status_s *js_p)
 {
     /* receive responses from servers.
      *
@@ -401,8 +441,8 @@ static int remove_recv_datafile_remove_resp(PINT_client_sm *sm,
     return 1;
 }
 
-static int remove_post_remove_sendrecv(PINT_client_sm *sm,
-				       job_status_s *js)
+static int remove_post_remove_sendrecv(PINT_client_sm *sm_p,
+				       job_status_s *js_p)
 {
     /* post remove request and response; this would catch
      * metafiles or directories as appropriate.
@@ -411,8 +451,8 @@ static int remove_post_remove_sendrecv(PINT_client_sm *sm,
     return 1;
 }
 
-static int remove_recv_remove_resp(PINT_client_sm *sm,
-				   job_status_s *js)
+static int remove_recv_remove_resp(PINT_client_sm *sm_p,
+				   job_status_s *js_p)
 {
     /* receive response from server.
      */
@@ -422,20 +462,20 @@ static int remove_recv_remove_resp(PINT_client_sm *sm,
 
 /* remove_cleanup()
  */
-static int remove_cleanup(PINT_client_sm *sm,
-			  job_status_s *js)
+static int remove_cleanup(PINT_client_sm *sm_p,
+			  job_status_s *js_p)
 {
     gossip_debug(CLIENT_DEBUG, "remove state: cleanup\n");
 
-    sm->op_complete = 1;
+    sm_p->op_complete = 1;
 
     return 0;
 }
 
 /* remove_lookup_failure()
  */
-static int remove_lookup_failure(PINT_client_sm *sm,
-				 job_status_s *js)
+static int remove_lookup_failure(PINT_client_sm *sm_p,
+				 job_status_s *js_p)
 {
     gossip_debug(CLIENT_DEBUG, "remove state: lookup_failure\n");
 
