@@ -18,7 +18,7 @@
 #endif
 
 
-#define MAX_MSGS 12
+#define MAX_MSGS 11
 
 #define RET_CHECK(__name) if(ret != 0) {printf(__name);printf("ret=%d\n",ret);exit(-1);}
 
@@ -95,28 +95,6 @@ void print_request(struct PVFS_server_req_s *my_req, int direction)
 			arrow(direction);
                         printf("======================================\n");
                         break;
-
-                case PVFS_SERV_STATFS:
-			arrow(direction);
-                        printf("PVFS_SERV_STATFS structure:\n");
-			arrow(direction);
-                        printf("op = %d \n", (int)my_req->op);
-			arrow(direction);
-                        printf("rsize = %d\n", (int)my_req->rsize);
-			arrow(direction);
-                        printf("credentials.uid = %d\n", (int)my_req->credentials.uid);
-			arrow(direction);
-                        printf("credentials.gid = %d\n",(int) my_req->credentials.gid);
-			arrow(direction);
-                        printf("credentials.perms = %d\n", (int)my_req->credentials.perms);
-			arrow(direction);
-                        printf("PVFS_servreq_statfs->server_type = %d\n",(int) my_req->u.statfs.server_type );
-			arrow(direction);
-                        printf("PVFS_servreq_statfs->fs_id = %d\n",(int) my_req->u.statfs.fs_id );
-			arrow(direction);
-                        printf("======================================\n");
-                        break;
-
                 case PVFS_SERV_REMOVE:
 			arrow(direction);
                         printf("PVFS_SERV_REMOVE structure:\n");
@@ -477,16 +455,6 @@ int main(int argc, char **argv)
 	break;
 
 	case 5:
-        request->op = PVFS_SERV_STATFS;
-	request->rsize = 666;
-	request->credentials.uid = 420;
-	request->credentials.gid = 420;
-	request->credentials.perms = 420;
-        request->u.statfs.server_type = 11111;
-        request->u.statfs.fs_id  = 22222;
-	break;
-
-	case 6:
         request->op = PVFS_SERV_REMOVE;
 	request->rsize = 666;
 	request->credentials.uid = 420;
@@ -496,7 +464,7 @@ int main(int argc, char **argv)
         request->u.remove.fs_id  = 22222;
 	break;
 
-	case 7:
+	case 6:
         request->op = PVFS_SERV_TRUNCATE;
 	request->rsize = 666;
 	request->credentials.uid = 420;
@@ -507,7 +475,7 @@ int main(int argc, char **argv)
         request->u.truncate.size = 33333;
 	break;
 
-	case 8:
+	case 7:
         request->op = PVFS_SERV_ALLOCATE;
 	request->rsize = 666;
 	request->credentials.uid = 420;
@@ -515,7 +483,7 @@ int main(int argc, char **argv)
 	request->credentials.perms = 420;
 	break;
 
-	case 9:
+	case 8:
 	request->op = PVFS_SERV_LOOKUP_PATH;
 	request->rsize = 666;
 	request->credentials.uid = 420;
@@ -527,7 +495,7 @@ int main(int argc, char **argv)
         request->u.lookup_path.attrmask = 33333;
 	break;
 
-	case 10:
+	case 9:
         request->op = PVFS_SERV_CREATEDIRENT;
 	request->rsize = 666;
 	request->credentials.uid = 420;
@@ -539,7 +507,7 @@ int main(int argc, char **argv)
         request->u.crdirent.fs_id = 333333;
 	break;
 
-	case 11:
+	case 10:
         request->op = PVFS_SERV_RMDIRENT;
 	request->rsize = 666;
 	request->credentials.uid = 420;

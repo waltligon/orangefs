@@ -122,16 +122,11 @@ int do_decode_req(
 	case PVFS_SERV_CREATE:
 	case PVFS_SERV_READDIR:
 	case PVFS_SERV_GETATTR:
-	case PVFS_SERV_STATFS:
 	case PVFS_SERV_REMOVE:
 	case PVFS_SERV_TRUNCATE:
 	case PVFS_SERV_ALLOCATE:
 	case PVFS_SERV_GETCONFIG:
 	    return(0);
-
-	case PVFS_SERV_IOSTATFS: /*haven't been implemented yet*/
-	case PVFS_SERV_GETDIST:
-	case PVFS_SERV_REVLOOKUP:
 	default:
 	    printf("Unpacking Req Op: %d Not Supported\n", ((struct PVFS_server_req_s *)char_ptr)->op);
 	    return -1;

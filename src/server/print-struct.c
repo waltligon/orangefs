@@ -77,7 +77,6 @@ void display_pvfs_structure(void *s,int r)
 				printf("FSid: %d\n",p->u.remove.fs_id);
 				break;
 			case PVFS_SERV_IO:
-			case PVFS_SERV_BATCH:
 				printf("NOT SURE\n");
 				break;
 			case PVFS_SERV_GETATTR:
@@ -188,7 +187,6 @@ void display_pvfs_structure(void *s,int r)
 
 			case PVFS_SERV_REMOVE:
 			case PVFS_SERV_IO:
-			case PVFS_SERV_BATCH:
 			case PVFS_SERV_SETATTR:
 			case PVFS_SERV_CREATEDIRENT:
 				printf("Shouldn't have a response\n");

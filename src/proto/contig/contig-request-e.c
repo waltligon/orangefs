@@ -324,7 +324,6 @@ int do_encode_req(
 	case PVFS_SERV_CREATE:
 	case PVFS_SERV_READDIR:
 	case PVFS_SERV_GETATTR:
-	case PVFS_SERV_STATFS:
 	case PVFS_SERV_REMOVE:
 	case PVFS_SERV_TRUNCATE:
 	case PVFS_SERV_ALLOCATE:
@@ -343,14 +342,6 @@ int do_encode_req(
 	    /* set accurate rsize */
 	    ((struct PVFS_server_req_s*)enc_msg)->rsize = size - header_size;
 	    return (0);
-
-	/*haven't been implemented yet*/
-	case PVFS_SERV_IOSTATFS:
-	case PVFS_SERV_GETDIST:
-	case PVFS_SERV_REVLOOKUP:
-	    printf("op: %d not implemented\n", request->op);
-	    target_msg = NULL;
-	    return -1;
 	default:
 	    printf("op: %d not defined\n", request->op);
 	    target_msg = NULL;

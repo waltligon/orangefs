@@ -70,7 +70,6 @@ DECODE_RESP_HEAD(do_decode_resp)
 			}
 			return 0;
 		case PVFS_SERV_CREATE:
-		case PVFS_SERV_NOOP:
 		case PVFS_SERV_SETATTR:
 		case PVFS_SERV_REMOVE:
 		case PVFS_SERV_CREATEDIRENT:

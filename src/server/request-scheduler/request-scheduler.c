@@ -674,9 +674,6 @@ static int handle_from_request(struct PVFS_server_req_s*
 		case PVFS_SERV_INVALID: 
 			return(-EINVAL);
 			break;
-		case PVFS_SERV_NOOP: 
-			return(0);
-			break;
 		case PVFS_SERV_CREATE:
 			return(0);
 			break;
@@ -688,9 +685,6 @@ static int handle_from_request(struct PVFS_server_req_s*
 			*handle = req->u.io.handle;
 			return(0);
 			break;
-		case PVFS_SERV_BATCH:
-			return(-EINVAL);
-			break;
 		case PVFS_SERV_GETATTR:
 			*handle = req->u.getattr.handle;
 			return(0);
@@ -699,19 +693,9 @@ static int handle_from_request(struct PVFS_server_req_s*
 			*handle = req->u.setattr.handle;
 			return(0);
 			break;
-		case PVFS_SERV_GETEATTR:
-			*handle = req->u.geteattr.handle;
-			return(0);
-			break;
-		case PVFS_SERV_SETEATTR:
-			return(-EINVAL);
-			break;
 		case PVFS_SERV_LOOKUP_PATH:
 			*handle = req->u.lookup_path.starting_handle;
 			return(0);
-			break;
-		case PVFS_SERV_GETDIST:
-			return(-EINVAL);
 			break;
 		case PVFS_SERV_CREATEDIRENT:
 			*handle = req->u.crdirent.parent_handle;
@@ -720,9 +704,6 @@ static int handle_from_request(struct PVFS_server_req_s*
 		case PVFS_SERV_RMDIRENT:
 			*handle = req->u.rmdirent.parent_handle;
 			return(0);
-			break;
-		case PVFS_SERV_REVLOOKUP:
-			return(-EINVAL);
 			break;
 		case PVFS_SERV_ALLOCATE:
 			return(-EINVAL);
@@ -738,17 +719,8 @@ static int handle_from_request(struct PVFS_server_req_s*
 			*handle = req->u.readdir.handle;
 			return(0);
 			break;
-		case PVFS_SERV_STATFS:
-			return(0);
-			break;
-		case PVFS_SERV_IOSTATFS:
-			return(-EINVAL);
-			break;
 		case PVFS_SERV_GETCONFIG:
 			return(0);
-			break;
-		case PVFS_SERV_EXTENSION:
-			return(-EINVAL);
 			break;
 		default:
 			return(-EINVAL);
