@@ -213,7 +213,7 @@ int main(int argc, char **argv)
     }
 
     /* print some statistics */
-    printf("PVFS2 Import Statistics:\n");
+    printf("PVFS2 Export Statistics:\n");
     printf("********************************************************\n");
     printf("Source path (local): %s\n", user_opts->srcfile);
     printf("Source path (PVFS2 file system): %s\n", pvfs_path);
