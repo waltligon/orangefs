@@ -2128,9 +2128,13 @@ static void ctrl_put_callback(struct gm_port *port,
     if (status != GM_SUCCESS)
     {
 	gossip_lerr("Error: GM send failure, detected in callback.\n");
-	gossip_lerr("Error value: %d\n", (int) status);
+	gossip_err("Error value: %d\n", (int) status);
 	op_list_remove(my_op);
-	my_op->error_code = -EPROTO;
+	/* TODO: need generic solution to map GM codes to pvfs2 codes */
+	if(status == GM_SEND_TARGET_NODE_UNREACHABLE)
+	    my_op->error_code = -PVFS_EHOSTUNREACH;
+	else
+	    my_op->error_code = -PVFS_EPROTO;
 	op_list_add(completion_array[my_op->context_id], my_op);
 	gm_op_data->complete = 1;
 	return;
@@ -2189,9 +2193,13 @@ static void immed_send_callback(struct gm_port *port,
     if (status != GM_SUCCESS)
     {
 	gossip_lerr("Error: GM send failure, detected in callback.\n");
-	gossip_lerr("Error value: %d\n", (int) status);
+	gossip_err("Error value: %d\n", (int) status);
 	op_list_remove(my_op);
-	my_op->error_code = -EPROTO;
+	/* TODO: need generic solution to map GM codes to pvfs2 codes */
+	if(status == GM_SEND_TARGET_NODE_UNREACHABLE)
+	    my_op->error_code = -PVFS_EHOSTUNREACH;
+	else
+	    my_op->error_code = -PVFS_EPROTO;
 	op_list_add(completion_array[my_op->context_id], my_op);
 	gm_op_data->complete = 1;
 	return;
@@ -2255,9 +2263,13 @@ static void ctrl_req_callback(struct gm_port *port,
     if (status != GM_SUCCESS)
     {
 	gossip_lerr("Error: GM send failure, detected in callback.\n");
-	gossip_lerr("Error value: %d\n", (int) status);
+	gossip_err("Error value: %d\n", (int) status);
 	op_list_remove(my_op);
-	my_op->error_code = -EPROTO;
+	/* TODO: need generic solution to map GM codes to pvfs2 codes */
+	if(status == GM_SEND_TARGET_NODE_UNREACHABLE)
+	    my_op->error_code = -PVFS_EHOSTUNREACH;
+	else
+	    my_op->error_code = -PVFS_EPROTO;
 	op_list_add(completion_array[my_op->context_id], my_op);
 	gm_op_data->complete = 1;
 	return;
@@ -3371,7 +3383,7 @@ static void ctrl_ack_callback(struct gm_port *port,
     if (status != GM_SUCCESS)
     {
 	gossip_lerr("Error: GM send failure, detected in callback.\n");
-	gossip_lerr("Error value: %d\n", (int) status);
+	gossip_err("Error value: %d\n", (int) status);
 	op_list_remove(my_op);
 	my_op->error_code = -ETIMEDOUT;
 	op_list_add(completion_array[my_op->context_id], my_op);
@@ -3444,7 +3456,11 @@ static void data_send_callback(struct gm_port *port,
 	gossip_lerr("Error: GM send failure, detected in callback.\n");
 	gossip_lerr("Error: GM return value: %d.\n", (int) status);
 	op_list_remove(my_op);
-	my_op->error_code = -EPROTO;
+	/* TODO: need generic solution to map GM codes to pvfs2 codes */
+	if(status == GM_SEND_TARGET_NODE_UNREACHABLE)
+	    my_op->error_code = -PVFS_EHOSTUNREACH;
+	else
+	    my_op->error_code = -PVFS_EPROTO;
 	op_list_add(completion_array[my_op->context_id], my_op);
 	gm_op_data->complete = 1;
 	return;
