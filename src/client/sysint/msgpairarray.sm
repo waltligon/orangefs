@@ -359,9 +359,13 @@ static int msgpairarray_complete(PINT_client_sm *sm_p,
 	if(msg_p->op_status == 0)
 	    msg_p->op_status = msg_p->recv_status.error_code;
 
-	/* TODO: if we had a good way to tell if a send were still pending,
-	 * then we could cancel here
-	 */
+	if(msg_p->recv_status.error_code && msg_p->send_id != 0)
+	{
+	    /* we got a receive error, but send is still pending.  Cancel
+	     * the send
+	     */
+	    PINT_client_bmi_cancel(msg_p->send_id);
+	}
     }
     else
     {
@@ -375,9 +379,13 @@ static int msgpairarray_complete(PINT_client_sm *sm_p,
 	if(msg_p->op_status == 0)
 	    msg_p->op_status = msg_p->send_status.error_code;
 
-	/* TODO: if we had a good way to tell if a recv were still pending,
-	 * then we could cancel here
-	 */
+	if(msg_p->send_status.error_code && msg_p->recv_id != 0)
+	{
+	    /* we got a send error, but recv is still pending.  Cancel
+	     * the recv 
+	     */
+	    PINT_client_bmi_cancel(msg_p->recv_id);
+	}
     }
 
     /* decrement comp_ct until all operations have completed */
