@@ -384,6 +384,8 @@ static void bmi_recv_callback_fn(void *user_ptr,
     PVFS_size bytes_processed = 0;
     void* tmp_buffer;
 
+    q_item->posted_id = 0;
+
     gen_mutex_lock(&flow_data->flow_mutex);
 
     if(error_code != 0 || flow_data->parent->error_code != 0)
@@ -395,12 +397,10 @@ static void bmi_recv_callback_fn(void *user_ptr,
     /* remove from current queue */
     qlist_del(&q_item->list_link);
     /* add to dest queue */
-    q_item->posted_id = 0;
     qlist_add_tail(&q_item->list_link, &flow_data->dest_list);
     result_tmp = &q_item->result_chain;
     do{
 	assert(result_tmp->result.bytes);
-	q_item->posted_id = 0;
 	ret = trove_bstream_write_list(q_item->parent->dest.u.trove.coll_id,
 	    q_item->parent->dest.u.trove.handle,
 	    (char**)&result_tmp->buffer_offset,
@@ -441,7 +441,6 @@ static void bmi_recv_callback_fn(void *user_ptr,
 	q_item = qlist_entry(flow_data->empty_list.next,
 	    struct fp_queue_item, list_link);
 	qlist_del(&q_item->list_link);
-	q_item->posted_id = 0;
 	qlist_add_tail(&q_item->list_link, &flow_data->src_list);
 
 	if(!q_item->buffer)
@@ -497,7 +496,6 @@ static void bmi_recv_callback_fn(void *user_ptr,
 	{	
 	    gen_mutex_unlock(&flow_data->flow_mutex);
 	    qlist_del(&q_item->list_link);
-	    q_item->posted_id = 0;
 	    qlist_add_tail(&q_item->list_link, &flow_data->empty_list);
 	    return;
 	}
@@ -570,7 +568,6 @@ static void trove_read_callback_fn(void *user_ptr,
 
     /* remove from current queue */
     qlist_del(&q_item->list_link);
-    q_item->posted_id = 0;
     /* add to dest queue */
     qlist_add_tail(&q_item->list_link, &flow_data->dest_list);
 
@@ -657,6 +654,8 @@ static int bmi_send_callback_fn(void *user_ptr,
     void* tmp_buffer;
     PVFS_size bytes_processed = 0;
 
+    q_item->posted_id = 0;
+
     gen_mutex_lock(&flow_data->flow_mutex);
 
     if(error_code != 0 || flow_data->parent->error_code != 0)
@@ -718,7 +717,6 @@ static int bmi_send_callback_fn(void *user_ptr,
     }
     
     /* add to src queue */
-    q_item->posted_id = 0;
     qlist_add_tail(&q_item->list_link, &flow_data->src_list);
 
     result_tmp = &q_item->result_chain;
@@ -786,7 +784,6 @@ static int bmi_send_callback_fn(void *user_ptr,
     do{
 	assert(q_item->buffer_used);
 	assert(result_tmp->result.bytes);
-	q_item->posted_id = 0;
 	ret = trove_bstream_read_list(q_item->parent->src.u.trove.coll_id,
 	    q_item->parent->src.u.trove.handle,
 	    (char**)&result_tmp->buffer_offset,
@@ -921,7 +918,6 @@ static void trove_write_callback_fn(void *user_ptr,
     if(qlist_empty(&flow_data->src_list))
     {
 	/* ready to post new recv! */
-	q_item->posted_id = 0;
 	qlist_add_tail(&q_item->list_link, &flow_data->src_list);
 	
 	result_tmp = &q_item->result_chain;
@@ -997,7 +993,6 @@ static void trove_write_callback_fn(void *user_ptr,
     }
     else
     {
-	q_item->posted_id = 0;
 	qlist_add_tail(&q_item->list_link, 
 	    &(flow_data->empty_list));
     }
@@ -1105,6 +1100,8 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
     PVFS_size bytes_processed = 0;
     char *src_ptr, *dest_ptr;
     enum bmi_buffer_type buffer_type = BMI_EXT_ALLOC;
+
+    q_item->posted_id = 0;
 
     gen_mutex_lock(&flow_data->flow_mutex);
     
@@ -1275,6 +1272,8 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
     PVFS_size bytes_processed = 0;
     char *src_ptr, *dest_ptr;
     PVFS_size region_size;
+
+    q_item->posted_id = 0;
 
     gen_mutex_lock(&flow_data->flow_mutex);
       
