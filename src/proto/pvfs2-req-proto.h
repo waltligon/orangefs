@@ -84,7 +84,7 @@ enum PVFS_server_op
 #define PVFS_REQ_LIMIT_DFILE_COUNT_IS_VALID(dfile_count) \
 ((dfile_count > 0) && (dfile_count < PVFS_REQ_LIMIT_DFILE_COUNT))
 /* max count of directory entries per readdir request */
-#define PVFS_REQ_LIMIT_DIRENT_COUNT       1024
+#define PVFS_REQ_LIMIT_DIRENT_COUNT        512
 /* max number of perf metrics returned by mgmt perf mon op */
 #define PVFS_REQ_LIMIT_MGMT_PERF_MON_COUNT 16
 /* max number of events returned by mgmt event mon op */

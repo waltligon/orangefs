@@ -177,14 +177,20 @@ static int msgpair_post(PINT_client_sm *sm_p,
     }
     else if (ret == 1)
     {
+        /*
+          it shouldn't be possible for the receive to complete before
+          we send the request, so assert that the recv wasn't
+          successful
+        */
+        assert(msg_p->recv_status.error_code != 0);
+
+        /*
+          otherwise, we had an error posting the recv and need to
+          report it
+        */
         gossip_err("msgpair recv status error code is: %d\n",
                    msg_p->recv_status.error_code);
 
-	/*
-          it shouldn't be possible for the receive to complete before
-          we send the request, but we need to report errors in posting
-          the recv if any occur
-        */
         js_p->error_code = msg_p->recv_status.error_code;
         return 1;
     }
