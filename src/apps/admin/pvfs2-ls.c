@@ -67,7 +67,9 @@ static void print_entry(
 
 static int do_list(
     PVFS_sysresp_init *init_response,
-    char *start, struct options *opts);
+    char *start,
+    int fs_id_index,
+    struct options *opts);
 
 static void print_entry_attr(
     PVFS_handle handle,
@@ -107,6 +109,7 @@ int main(int argc, char **argv)
 {
     int ret = -1, i = 0, j = 0;
     char pvfs_path[MAX_NUM_PATHS][PVFS_NAME_MAX];
+    PVFS_fs_id fs_id_index_array[MAX_NUM_PATHS] = {0};
     pvfs_mntlist mnt = {0,NULL};
     PVFS_sysresp_init resp_init;
     struct options* user_opts = NULL;
@@ -167,17 +170,8 @@ int main(int argc, char **argv)
             }
             if (ret == 0)
             {
-                if ((mnt_index != -1) && (i != mnt_index))
-                {
-                    fprintf(stderr, "Cannot use %s across "
-                            "mount points at this time!\n",
-                            process_name);
-                    return(-1);
-                }
-                else
-                {
-                    mnt_index = i;
-                }
+                mnt_index = i;
+                fs_id_index_array[j] = mnt_index;
             }
         }
     }
@@ -223,7 +217,8 @@ int main(int argc, char **argv)
             printf("%s:\n", pvfs_path[i]);
         }
 
-        do_list(&resp_init, pvfs_path[i], user_opts);
+        do_list(&resp_init, pvfs_path[i],
+                fs_id_index_array[i], user_opts);
 
         if (user_opts->num_starts > 1)
         {
@@ -444,9 +439,9 @@ void print_entry(
     memset(&getattr_response,0, sizeof(PVFS_sysresp_getattr));
     memset(&credentials,0, sizeof(PVFS_credentials));
 
-    credentials.uid = 0;
-    credentials.gid = 0;
-    
+    credentials.uid = getuid();
+    credentials.gid = getgid();
+
     pinode_refn.handle = handle;
     pinode_refn.fs_id = fs_id;
 
@@ -463,6 +458,7 @@ void print_entry(
 int do_list(
     PVFS_sysresp_init *init_response,
     char *start,
+    int fs_id_index,
     struct options *opts)
 {
     int i = 0, printed_dot_info = 0;
@@ -472,15 +468,15 @@ int do_list(
     PVFS_sysresp_lookup lk_response;
     PVFS_sysresp_readdir rd_response;
     PVFS_sysresp_getattr getattr_response;
-    PVFS_fs_id fs_id;
     PVFS_credentials credentials;
     PVFS_pinode_reference pinode_refn;
     PVFS_ds_position token;
+    PVFS_fs_id fs_id;
 
     name = start;
-    fs_id = init_response->fsid_list[0];
-    credentials.uid = 0;
-    credentials.gid = 0;
+    fs_id = init_response->fsid_list[fs_id_index];
+    credentials.uid = getuid();
+    credentials.gid = getgid();
 
     memset(&lk_response,0,sizeof(PVFS_sysresp_lookup));
     if (PVFS_sys_lookup(fs_id, name, credentials,
@@ -492,10 +488,10 @@ int do_list(
     }
 
     pinode_refn.handle = lk_response.pinode_refn.handle;
-    pinode_refn.fs_id = init_response->fsid_list[0];
+    pinode_refn.fs_id = fs_id;
     pvfs_dirent_incount = MAX_NUM_DIRENTS;
-    credentials.uid = 0;
-    credentials.gid = 0;
+    credentials.uid = getuid();
+    credentials.gid = getgid();
 
     memset(&getattr_response,0,sizeof(PVFS_sysresp_getattr));
 
@@ -563,8 +559,7 @@ int do_list(
             cur_file = rd_response.dirent_array[i].d_name;
             cur_handle = rd_response.dirent_array[i].handle;
 
-            print_entry(cur_file, cur_handle,
-                        init_response->fsid_list[0], opts);
+            print_entry(cur_file, cur_handle, fs_id, opts);
         }
         token += rd_response.pvfs_dirent_outcount;
 
