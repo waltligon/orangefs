@@ -7,9 +7,10 @@
 rootdir=/tmp/pvfs2-build-test
 srcdir=$rootdir/pvfs2
 builddir=$rootdir/BUILD-pvfs2
+installdir=$rootdir/INSTALL-pvfs2
 
 # run the script that downloads, builds, and installs pvfs2
-./pvfs2-build.sh
+./pvfs2-build.sh -t
 if [ $? -ne 0 ] ; then
 	echo "Failed to build PVFS2."
 	exit 1

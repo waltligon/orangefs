@@ -55,6 +55,7 @@ tarball=`basename $tarballurl`
 tarballdir=`echo $tarball | sed -e "s/.tar.gz//" | sed -e "s/.tgz//"`
 old_wd=`pwd`
 build_kernel="false"
+build_tests="false"
 kerneldir=""
 
 usage()
@@ -62,15 +63,17 @@ usage()
     echo "USAGE: pvfs2-build.sh <-k kernel source> <-r dir>"
     echo "  -k: path to kernel source (enables module build)"
     echo "  -r: path to directory to build and install in"
+    echo "  -t: build test programs"
     return
 }
 
 # get command line arguments
-while getopts k:r: opt
+while getopts k:r:t opt
 do
     case "$opt" in
 	k) build_kernel="true"; kerneldir="$OPTARG";;
 	r) rootdir="$OPTARG";;
+	t) build_tests="true";;
 	\?) usage; exit 1;; 
     esac
 done   
@@ -163,6 +166,40 @@ fi
 # not sure where to put this; just go with sbin for now?
 if [ $build_kernel == "true" ] ; then
 	cp $builddir/src/kernel/linux-2.6/pvfs2.ko $installdir/sbin/
+fi
+
+# build tests if needed 
+if [ $build_tests == "true" ] ; then
+	cd $builddir/test
+	$srcdir/test/configure $configureopts 2>&1 > $rootdir/configure.log
+	if [ $? != 0 ] ; then
+		echo "Configure of test programs failed; see $rootdir/configure.log.  Aborting."
+		exit 1
+	fi
+
+	# make
+	make 2>&1 > $rootdir/make.log
+
+	if [ $? != 0 ] ; then
+		echo "Make failed; see $rootdir/make.log.  Aborting."
+		exit 1
+	fi
+
+	# look through make output
+	PEMM=`which pvfs2-extract-make-msgs.pl 2>/dev/null`
+	if [ x$PEMM == "x" ] ; then
+		if [ ! -x $old_wd/pvfs2-extract-make-msgs.pl ] ; then
+			echo "Failed to find pvfs2-extract-make-msgs.pl.  Aborting."
+			exit 1
+		else
+			PEMM=$old_wd/pvfs2-extract-make-msgs.pl 
+		fi
+	fi
+	$PEMM $rootdir/make.log 2>&1 > $rootdir/make-extracted.log
+	if [ $? != 0 ] ; then
+		echo "Spurious output during test make; see $rootdir/make-extracted.log.  Aborting."
+		exit 1
+	fi
 fi
 
 exit 0
