@@ -28,14 +28,13 @@ int main(int argc,char **argv)
 	PVFS_sysresp_readdir *resp_readdir = NULL;
 	int ret = -1,i = 0;
 	pvfs_mntlist mnt = {0,NULL};
+	int max_dirents_returned = 20;
 
-/*
 	if (argc > 1)
 	{
-		sscanf(argv[1], "%d", (int*)&cmd_handle);
-		printf("using handle %d\n",(int) cmd_handle);
+		sscanf(argv[1], "%d", &max_dirents_returned);
+		printf(" no more than %d dirents should be returned\n",max_dirents_returned);
 	}
-*/
 
 	/* Parse PVFStab */
 	ret = parse_pvfstab(NULL,&mnt);
@@ -51,7 +50,6 @@ int main(int argc,char **argv)
 		printf("PVFS_sys_initialize() failure. = %d\n", ret);
 		return(ret);
 	}
-	printf("SYSTEM INTERFACE INITIALIZED\n");
 
 	/* lookup the root handle */
 	req_look.credentials.perms = 1877;
@@ -59,47 +57,40 @@ int main(int argc,char **argv)
 	req_look.name[0] = '/';
 	req_look.name[1] = '\0';
 	req_look.fs_id = resp_init.fsid_list[0];
-	printf("looking up the root handle for fsid = %d\n", req_look.fs_id);
 	ret = PVFS_sys_lookup(&req_look,&resp_look);
 	if (ret < 0)
 	{
 		printf("Lookup failed with errcode = %d\n", ret);
 		return(-1);
 	}
-	// print the handle 
-	printf("--lookup--\n"); 
-	printf("ROOT Handle:%ld\n", (long int)resp_look.pinode_refn.handle);
+	/* print the handle */
+	/*printf("ROOT Handle:%ld\n", (long int)resp_look.pinode_refn.handle);*/
 	
 
 	req_readdir = (PVFS_sysreq_readdir *)malloc(sizeof(PVFS_sysreq_readdir));
-	if (!req_readdir)
+	if (req_readdir == NULL)
 	{
 		printf("Error in malloc\n");
 		return(-1);
 	}
 	resp_readdir = (PVFS_sysresp_readdir *)malloc(sizeof(PVFS_sysresp_readdir));
-	if (!resp_readdir)
+	if (resp_readdir == NULL)
 	{
 		printf("Error in malloc\n");
 		return(-1);
 	}
 
-	// Fill in the dir info 
-
 	req_readdir->pinode_refn.handle = resp_look.pinode_refn.handle;
 	req_readdir->pinode_refn.fs_id = req_look.fs_id;
 	req_readdir->token = 1;
-	req_readdir->pvfs_dirent_incount = 6;
-	resp_readdir->dirent_array = (PVFS_dirent *)malloc(sizeof(PVFS_dirent) *
-			req_readdir->pvfs_dirent_incount);
-	resp_readdir->pvfs_dirent_outcount = 6;
+	req_readdir->pvfs_dirent_incount = max_dirents_returned;
 
 	req_readdir->credentials.uid = 100;
 	req_readdir->credentials.gid = 100;
 	req_readdir->credentials.perms = 1877;
 
 
-	// call readdir 
+	/* call readdir */
 	ret = PVFS_sys_readdir(req_readdir,resp_readdir);
 	if (ret < 0)
 	{
@@ -107,21 +98,25 @@ int main(int argc,char **argv)
 		return(-1);
 	}
 	
-	// print the handle 
-	printf("--readdir--\n"); 
+	printf("===>READDIR\n"); 
 	printf("Token:%ld\n",(long int)resp_readdir->token);
+	printf("Returned %d dirents\n",resp_readdir->pvfs_dirent_outcount);
 	for(i = 0;i < resp_readdir->pvfs_dirent_outcount;i++)
 	{
 		printf("name:%s\n",resp_readdir->dirent_array[i].d_name);
 	}
 
-	//close it down
+	/*close it down*/
 	ret = PVFS_sys_finalize();
 	if (ret < 0)
 	{
 		printf("finalizing sysint failed with errcode = %d\n", ret);
 		return (-1);
 	}
+
+	free(resp_readdir->dirent_array); /*allocated by the system interface*/
+	free(req_readdir);		/* allocated by us */
+	free(resp_readdir);		/* allocated by us */
 
 	return(0);
 }

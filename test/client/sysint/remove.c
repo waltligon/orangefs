@@ -24,8 +24,8 @@ int main(int argc,char **argv)
 	PVFS_sysresp_init resp_init;
 	PVFS_sysreq_lookup req_look;
 	PVFS_sysresp_lookup resp_look;
-	PVFS_sysreq_rmdir *req_rmdir = NULL;
-	char *dirname = NULL;
+	PVFS_sysreq_remove *req_remove;
+	char *filename = NULL;
 	int ret = -1, name_sz = 0;
 	pvfs_mntlist mnt = {0,NULL};
 
@@ -33,15 +33,15 @@ int main(int argc,char **argv)
 	if (argc > 1)
 	{
 		name_sz = strlen(argv[1]) + 1; /*include null terminator*/
-		dirname = malloc(name_sz);
-		memcpy(dirname, argv[1], name_sz);
+		filename = malloc(name_sz);
+		memcpy(filename, argv[1], name_sz);
 	}
 	else
 	{
-		printf("usage: %s dir_to_remove\n", argv[0]);
+		printf("usage: %s file_to_remove\n", argv[0]);
 	}
 
-	printf("creating a file named %s\n", dirname);
+	printf("creating a file named %s\n", filename);
 
 	/* Parse PVFStab */
 	ret = parse_pvfstab(NULL,&mnt);
@@ -78,31 +78,31 @@ int main(int argc,char **argv)
 	
 
 	// test the rmdir function 
-	printf("--rmdir--\n"); 
-	req_rmdir = (PVFS_sysreq_rmdir *)malloc(sizeof(PVFS_sysreq_rmdir));
-	if (!req_rmdir)
+	printf("--remove--\n"); 
+	req_remove = (PVFS_sysreq_remove *)malloc(sizeof(PVFS_sysreq_remove));
+	if (req_remove == NULL)
 	{
 		printf("Error in malloc\n");
 		return(-1);
 	}
 
-	req_rmdir->entry_name = dirname;
-	req_rmdir->parent_refn.handle = resp_look.pinode_refn.handle;
-	req_rmdir->parent_refn.fs_id = resp_look.pinode_refn.fs_id;
-	req_rmdir->credentials.uid = 100;
-	req_rmdir->credentials.gid = 100;
-	req_rmdir->credentials.perms = 1877;
+	req_remove->entry_name = filename;
+	req_remove->parent_refn.handle = resp_look.pinode_refn.handle;
+	req_remove->parent_refn.fs_id = resp_look.pinode_refn.fs_id;
+	req_remove->credentials.uid = 100;
+	req_remove->credentials.gid = 100;
+	req_remove->credentials.perms = 1877;
 
 	// call rmdir 
-	ret = PVFS_sys_rmdir(req_rmdir);
+	ret = PVFS_sys_remove(req_remove);
 	if (ret < 0)
 	{
-		printf("rmdir failed with errcode = %d\n",ret);
+		printf("remove failed with errcode = %d\n",ret);
 		return(-1);
 	}
 
 	printf("===================================");
-	printf("Directory named %s has been removed.", dirname);
+	printf("file named %s has been removed.", filename);
 
 	//close it down
 	ret = PVFS_sys_finalize();
@@ -112,7 +112,6 @@ int main(int argc,char **argv)
 		return (-1);
 	}
 
-	free(dirname);
+	free(filename);
 	return(0);
 }
-
