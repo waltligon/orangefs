@@ -71,7 +71,7 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
     struct PINT_decoded_msg* resp_decoded_array = NULL;
     int* error_code_array = NULL;
     flow_descriptor** flow_array = NULL;
-    int i;
+    int i,j;
     int target_handle_count = 0;
     PVFS_handle* target_handle_array = NULL;
     int total_errors = 0;
@@ -226,7 +226,16 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	req_array[i].credentials = req->credentials;
 	req_array[i].u.io.handle = target_handle_array[i];
 	req_array[i].u.io.fs_id = req->pinode_refn.fs_id;
-	req_array[i].u.io.iod_num = i;
+	/* TODO: this is silly */
+	for(j=0; j<pinode_ptr->attr.u.meta.nr_datafiles; j++)
+	{
+	    if(target_handle_array[i] == pinode_ptr->attr.u.meta.dfh[j])
+	    {
+		fprintf(stderr, "FOO: talking to iod: %d\n", j);
+		req_array[i].u.io.iod_num = j;
+		break;
+	    }
+	}
 	req_array[i].u.io.iod_count =
 	    pinode_ptr->attr.u.meta.nr_datafiles;
 	req_array[i].u.io.io_req = req->io_req;
@@ -651,7 +660,7 @@ static int io_req_ack_flow_array(bmi_addr_t* addr_array,
 		    tmp_resp->u.io.bstream_size;
 		flow_array[i]->file_data->dist =
 		    attr_p->u.meta.dist;
-		flow_array[i]->file_data->iod_num = i;
+		flow_array[i]->file_data->iod_num = req_array[i].u.io.iod_num;
 		flow_array[i]->file_data->iod_count =
 		    attr_p->u.meta.nr_datafiles;
 		flow_array[i]->request = req->io_req;
