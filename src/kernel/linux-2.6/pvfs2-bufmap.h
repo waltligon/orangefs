@@ -23,6 +23,12 @@ void pvfs_bufmap_put(struct pvfs_bufmap_desc* desc);
 
 int pvfs_bufmap_size_query(void);
 
+int pvfs_bufmap_copy_from_user(struct pvfs_bufmap_desc* to, void* from,
+    int size);
+
+int pvfs_bufmap_copy_to_user(void* to, struct pvfs_bufmap_desc* from,
+    int size);
+
 #endif /* __PVFS2_BUFMAP_H */
 
 /*

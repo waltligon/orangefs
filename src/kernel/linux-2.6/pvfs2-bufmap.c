@@ -89,6 +89,33 @@ int pvfs_bufmap_size_query(void)
     return(-ENOSYS);
 }
 
+/* pvfs_bufmap_copy_to_user()
+ *
+ * copies data out of a mapped buffer to a user space address
+ *
+ * returns 0 on success, -errno on failure
+ */
+int pvfs_bufmap_copy_to_user(void* to, struct pvfs_bufmap_desc* from,
+    int size)
+{
+    pvfs2_error("Error: function not implemented.\n");
+    return(-ENOSYS);
+}
+
+/* pvfs2_bufmap_copy_from_user()
+ *
+ * copies data from a user space address to a mapped buffer
+ *
+ * returns 0 on success, -errno on failure
+ */
+int pvfs_bufmap_copy_from_user(struct pvfs_bufmap_desc* to, void* from,
+    int size)
+{
+    pvfs2_error("Error: function not implemented.\n");
+    return(-ENOSYS);
+}
+
+
 /*
  * Local variables:
  *  c-indent-level: 4
