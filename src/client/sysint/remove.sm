@@ -16,6 +16,7 @@
 #include "pint-servreq.h"
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
+#include "pint-util.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -174,12 +175,8 @@ static int remove_getattr_setup_msgpair(PINT_client_sm *sm_p,
 
     js_p->error_code = 0;
 
-    /* clear fields that are private to us */
-    sm_p->datafile_handles = NULL;
-    sm_p->datafile_count = 0;
-
-    assert(sm_p->object_ref.fs_id != 0);
-    assert(sm_p->object_ref.handle != 0);
+    assert(sm_p->object_ref.fs_id != PVFS_FS_ID_NULL);
+    assert(sm_p->object_ref.handle != PVFS_HANDLE_NULL);
 
     gossip_debug(GOSSIP_REMOVE_DEBUG, "- doing GETATTR on %Lu,%d\n",
                  Lu(sm_p->object_ref.handle),
@@ -192,15 +189,15 @@ static int remove_getattr_setup_msgpair(PINT_client_sm *sm_p,
         sm_p->object_ref.handle,
         PVFS_ATTR_COMMON_ALL|PVFS_ATTR_META_DFILES);
 
-    /* fill in msgpair structure components */
     sm_p->msgpair.fs_id = sm_p->object_ref.fs_id;
     sm_p->msgpair.handle = sm_p->object_ref.handle;
     sm_p->msgpair.retry_flag = PVFS_MSGPAIR_RETRY;
     sm_p->msgpair.comp_fn = remove_getattr_comp_fn;
 
-    ret = PINT_cached_config_map_to_server(&sm_p->msgpair.svr_addr,
-                                    sm_p->msgpair.handle,
-                                    sm_p->msgpair.fs_id);
+    ret = PINT_cached_config_map_to_server(
+        &sm_p->msgpair.svr_addr, sm_p->msgpair.handle,
+        sm_p->msgpair.fs_id);
+
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");
@@ -212,9 +209,9 @@ static int remove_getattr_setup_msgpair(PINT_client_sm *sm_p,
         free(sm_p->msgarray);
         sm_p->msgarray = NULL;
     }
+
     sm_p->msgarray = &(sm_p->msgpair);
     sm_p->msgarray_count = 1;
-    
     return 1;
 }
 
@@ -230,10 +227,12 @@ static int remove_getattr_setup_msgpair(PINT_client_sm *sm_p,
  * Returns 0 for directory, REMOVE_MUST_REMOVE_DATAFILES for a
  * metafile.
  */
-static int remove_getattr_comp_fn(void *v_p,
-				  struct PVFS_server_resp *resp_p,
-				  int index)
+static int remove_getattr_comp_fn(
+    void *v_p,
+    struct PVFS_server_resp *resp_p,
+    int index)
 {
+    PVFS_object_attr *attr = NULL;
     PINT_client_sm *sm_p = (PINT_client_sm *)v_p;
     
     assert(resp_p->op == PVFS_SERV_GETATTR);
@@ -243,36 +242,31 @@ static int remove_getattr_comp_fn(void *v_p,
         return resp_p->status;
     }
 
-    switch (resp_p->u.getattr.attr.objtype)
+    attr = (sm_p->acache_hit ?
+            &sm_p->pinode->attr :
+            &resp_p->u.getattr.attr);
+    assert(attr);
+
+    gossip_debug(GOSSIP_REMOVE_DEBUG, "Getattr remove response "
+                 "is %d, objtype is %d\n", resp_p->status,
+                 attr->objtype);
+
+    switch(attr->objtype)
     {
 	case PVFS_TYPE_METAFILE:
-	    /* need to save datafile handles and remove them;
-	     * redirect us to those states.
-	     */
-	    assert(resp_p->u.getattr.attr.mask & PVFS_ATTR_META_DFILES);
-	    assert(resp_p->u.getattr.attr.u.meta.dfile_count > 0);
+	    assert(attr->mask & PVFS_ATTR_META_DFILES);
+	    assert(attr->u.meta.dfile_count > 0);
+
+            if (!sm_p->acache_hit)
+            {
+                PINT_copy_object_attr(&sm_p->acache_attr,
+                                      &resp_p->u.getattr.attr);
+            }
 	    
 	    gossip_debug(
                 GOSSIP_CLIENT_DEBUG,
-                "remove_getattr_comp_fn: %d datafiles to remove too.\n",
-                resp_p->u.getattr.attr.u.meta.dfile_count);
-
-            /* save the datafile handles prior to freeing up the
-             * buffers we used for messages.  we could keep them around
-             * i suppose, but we're not going to do that for now.  later
-             * it is likely that this stuff will be stuck in the acache
-             * anyway, so we'll be able to just reference it from there.
-             */
-            sm_p->datafile_handles = (PVFS_handle *)malloc(
-                resp_p->u.getattr.attr.u.meta.dfile_count *
-                sizeof(PVFS_handle));
-            assert(sm_p->datafile_handles);
-            sm_p->datafile_count =
-                resp_p->u.getattr.attr.u.meta.dfile_count;
-            memcpy(sm_p->datafile_handles,
-	 	   resp_p->u.getattr.attr.u.meta.dfile_array,
-                   resp_p->u.getattr.attr.u.meta.dfile_count *
-                   sizeof(PVFS_handle));
+                "remove_getattr_comp_fn: must remove %d datafiles\n",
+                attr->u.meta.dfile_count);
 
 	    return REMOVE_MUST_REMOVE_DATAFILES;
 	case PVFS_TYPE_DIRECTORY:
@@ -283,9 +277,10 @@ static int remove_getattr_comp_fn(void *v_p,
 	case PVFS_TYPE_DIRDATA:
 	default:
 	    gossip_err("error: remove_getattr_comp_fn: unhandled "
-                       "object type\n");
+                       "object type (%x)\n",
+                       attr->objtype);
     }
-    return -PVFS_EINVAL; /* should not get here */
+    return -PVFS_EINVAL;
 }
 
 static int remove_check_dir_contents_comp_fn(
@@ -366,6 +361,7 @@ static int remove_datafile_remove_setup_msgpair(PINT_client_sm *sm_p,
 {
     int i = 0;
     int ret = -PVFS_EINVAL;
+    PVFS_object_attr *attr = NULL;
 
    /* post all datafile remove requests and responses simultaneously.
     *
@@ -377,33 +373,38 @@ static int remove_datafile_remove_setup_msgpair(PINT_client_sm *sm_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "remove state: datafile_remove_setup_msgpair\n");
 
+    attr = (sm_p->acache_hit ?
+            &sm_p->pinode->attr :
+            &sm_p->acache_attr);
+
+    assert(attr);
+
     sm_p->msgarray = (PINT_sm_msgpair_state *)malloc(
-        sm_p->datafile_count * sizeof(PINT_sm_msgpair_state));
+        attr->u.meta.dfile_count * sizeof(PINT_sm_msgpair_state));
     if (!sm_p->msgarray)
     {
 	js_p->error_code = -PVFS_ENOMEM;
         return 1;
     }
-    sm_p->msgarray_count = sm_p->datafile_count;
+    sm_p->msgarray_count = attr->u.meta.dfile_count;
     
     /* for each datafile, post a send/recv pair for the remove */
-    for (i = 0; i < sm_p->datafile_count; i++)
+    for (i = 0; i < attr->u.meta.dfile_count; i++)
     {
 	PINT_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
 
 	gossip_debug(GOSSIP_CLIENT_DEBUG,
 		     "  datafile_remove: removing handle %Lu\n",
-		     Lu(sm_p->datafile_handles[i]));
+		     Lu(attr->u.meta.dfile_array[i]));
 
 	PINT_SERVREQ_REMOVE_FILL(
             msg_p->req,
             *sm_p->cred_p,
             sm_p->object_ref.fs_id,
-            sm_p->datafile_handles[i]);
+            attr->u.meta.dfile_array[i]);
 
-	/* fill in msgpair structure components */
-	msg_p->fs_id   = sm_p->object_ref.fs_id;
-	msg_p->handle  = sm_p->datafile_handles[i];
+	msg_p->fs_id = sm_p->object_ref.fs_id;
+	msg_p->handle = attr->u.meta.dfile_array[i];
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
 	msg_p->comp_fn = NULL;
     }
@@ -411,6 +412,7 @@ static int remove_datafile_remove_setup_msgpair(PINT_client_sm *sm_p,
     /* fill in address of each server to contact */
     ret =  PINT_serv_msgpairarray_resolve_addrs(
         sm_p->msgarray_count, sm_p->msgarray);
+
     if (ret < 0)
     {
 	gossip_lerr("Error: failed to resolve server addresses.\n");
@@ -435,15 +437,15 @@ static int remove_object_remove_setup_msgpair(PINT_client_sm *sm_p,
         sm_p->object_ref.fs_id,
         sm_p->object_ref.handle);
 
-    /* fill in msgpair structure components */
     sm_p->msgpair.fs_id   = sm_p->object_ref.fs_id;
     sm_p->msgpair.handle  = sm_p->object_ref.handle;
     sm_p->msgpair.retry_flag = PVFS_MSGPAIR_RETRY;
     sm_p->msgpair.comp_fn = NULL;
 
-    ret = PINT_cached_config_map_to_server(&sm_p->msgpair.svr_addr,
-                                    sm_p->msgpair.handle,
-                                    sm_p->msgpair.fs_id);
+    ret = PINT_cached_config_map_to_server(
+        &sm_p->msgpair.svr_addr, sm_p->msgpair.handle,
+        sm_p->msgpair.fs_id);
+
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");
@@ -487,23 +489,21 @@ static int remove_helper_cleanup(PINT_client_sm *sm_p,
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: helper cleanup\n");
 
-    /* if we acache entry, release it */
     if (sm_p->acache_hit)
     {
 	PINT_acache_release(sm_p->pinode);
+        sm_p->acache_hit = 0;
+        sm_p->pinode = NULL;
+    }
+    else
+    {
+        PINT_free_object_attr(&sm_p->acache_attr);
     }
 
     if (sm_p->msgarray && (sm_p->msgarray != &sm_p->msgpair))
     {
         free(sm_p->msgarray);
         sm_p->msgarray = NULL;
-    }
-
-    if (sm_p->datafile_handles)
-    {
-        free(sm_p->datafile_handles);
-        sm_p->datafile_handles = NULL;
-        sm_p->datafile_count = 0;
     }
     return 1;
 }

@@ -256,7 +256,7 @@ int PVFS_isys_create(
 	return ret;
     }
 
-    sm_p = (PINT_client_sm *) malloc(sizeof(*sm_p));
+    sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));
     if (sm_p == NULL)
     {
         return -PVFS_ENOMEM;
@@ -272,21 +272,33 @@ int PVFS_isys_create(
     sm_p->u.create.stored_error_code = 0;
     sm_p->u.create.retry_count = 0;
 
-    /* Lookup the distribution */
-    if (NULL != dist)
+    if (dist)
     {
-        assert(dist->name);
+        if (!dist->name)
+        {
+            free(sm_p);
+            return -PVFS_EINVAL;
+        }
+
         sm_p->u.create.dist = PINT_dist_create(dist->name);
-        assert(sm_p->u.create.dist);
+        if (!sm_p->u.create.dist)
+        {
+            free(sm_p);
+            return -PVFS_ENOMEM;
+        }
         sm_p->u.create.dist->params = dist->params;
     }
     else
     {
         sm_p->u.create.dist = PINT_dist_create("simple_stripe");
-        assert(sm_p->u.create.dist);
+        if (!sm_p->u.create.dist)
+        {
+            free(sm_p);
+            return -PVFS_ENOMEM;
+        }
     }
     
-    /* Determine the number of datafile objects to use */
+    /* determine the number of datafile objects to use */
     if (attr.mask & PVFS_ATTR_SYS_DFILE_COUNT)
     {
         num_dfiles_req = attr.dfile_count;
@@ -295,10 +307,11 @@ int PVFS_isys_create(
     {
         num_dfiles_req = 0;
     }
-    ret = PINT_cached_config_get_num_dfiles(sm_p->parent_ref.fs_id,
-                                     sm_p->u.create.dist,
-                                     num_dfiles_req,
-                                     &sm_p->u.create.num_data_files);
+
+    ret = PINT_cached_config_get_num_dfiles(
+        sm_p->parent_ref.fs_id, sm_p->u.create.dist,
+        num_dfiles_req, &sm_p->u.create.num_data_files);
+
     if (ret < 0)
     {
         gossip_err("Failed to get number of data servers\n");
@@ -307,8 +320,8 @@ int PVFS_isys_create(
     }
 
     gossip_debug(
-        GOSSIP_CLIENT_DEBUG, "Creating file named %s under parent handle "
-        "%Lu on fs %d\n", object_name, Lu(parent_ref.handle),
+        GOSSIP_CLIENT_DEBUG, "Creating file named %s under parent "
+        "handle %Lu on fs %d\n", object_name, Lu(parent_ref.handle),
         parent_ref.fs_id);
 
     return PINT_client_state_machine_post(
@@ -926,10 +939,10 @@ static int create_cleanup(PINT_client_sm *sm_p,
     else if ((PVFS_ERROR_CLASS(-sm_p->error_code) == PVFS_ERROR_BMI) &&
              (sm_p->u.create.retry_count < PVFS2_CLIENT_RETRY_LIMIT))
     {
-        if ((sm_p->acache_hit != 0) || (sm_p->pinode != NULL))
+        if (sm_p->acache_hit || (sm_p->pinode != NULL))
         {
-            sm_p->acache_hit = 0;
             PINT_acache_release(sm_p->pinode);
+            sm_p->acache_hit = 0;
             sm_p->pinode = NULL;
         }
 

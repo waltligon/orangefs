@@ -49,7 +49,7 @@
 #define STATFS_DEFAULT_BLOCKSIZE PVFS2_BUFMAP_DEFAULT_DESC_SIZE
 
 /* client side attribute cache timeout; 0 is effectively disabled */
-#define ACACHE_TIMEOUT_MS 0
+#define ACACHE_TIMEOUT_MS 10000
 
 /*
   default timeout value to wait for completion of in progress

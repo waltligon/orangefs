@@ -634,8 +634,8 @@ static int symlink_cleanup(PINT_client_sm *sm_p,
     {
         if ((sm_p->acache_hit != 0) || (sm_p->pinode != NULL))
         {
-            sm_p->acache_hit = 0;
             PINT_acache_release(sm_p->pinode);
+            sm_p->acache_hit = 0;
             sm_p->pinode = NULL;
         }
 

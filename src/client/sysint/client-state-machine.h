@@ -102,7 +102,6 @@ struct PINT_client_mkdir_sm
 
 struct PINT_client_symlink_sm
 {
-    PVFS_object_ref parent_ref;     /* input parameter */
     char *link_name;                /* input parameter */
     char *link_target;              /* input parameter */
     PVFS_sysresp_symlink *sym_resp; /* in/out parameter*/
@@ -115,7 +114,6 @@ struct PINT_client_symlink_sm
 
 struct PINT_client_getattr_sm
 {
-    PVFS_object_ref object_ref;           /* input parameter */
     uint32_t attrmask;                    /* input parameter */
 
     PVFS_size *size_array;                /* from datafile attribs */
@@ -124,7 +122,6 @@ struct PINT_client_getattr_sm
 
 struct PINT_client_setattr_sm
 {
-    PVFS_object_ref refn;   /* input parameter */
     PVFS_sys_attr sys_attr; /* input parameter */
 };
 
@@ -205,7 +202,6 @@ struct PINT_client_flush_sm
 
 struct PINT_client_readdir_sm
 {
-    PVFS_object_ref object_ref;         /* looked up */
     PVFS_ds_position pos_token;         /* input parameter */
     int dirent_limit;                   /* input parameter */
     PVFS_sysresp_readdir *readdir_resp; /* in/out parameter*/
@@ -386,10 +382,6 @@ typedef struct PINT_client_sm
     */
     PVFS_object_ref object_ref;
     PVFS_object_ref parent_ref;
-
-    /* used internally in the remove helper state machine */
-    int datafile_count;
-    PVFS_handle *datafile_handles;
 
     /* used internally by client-state-machine.c */
     PVFS_sys_op_id sys_op_id;

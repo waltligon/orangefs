@@ -83,7 +83,8 @@ static inline int copy_attributes_to_inode(
 #if (PVFS2_LINUX_KERNEL_2_4_MINOR_VER > 21)
             inode->i_bytes = inode_size;
 #endif
-#else /* always ok for 2.6.x */
+#else
+            /* this is always ok for 2.6.x */
             inode->i_bytes = inode_size;
 #endif
             inode->i_blocks = (unsigned long)(rounded_up_size / 512);
@@ -108,7 +109,8 @@ static inline int copy_attributes_to_inode(
 #if (PVFS2_LINUX_KERNEL_2_4_MINOR_VER > 21)
             inode->i_bytes = PAGE_CACHE_SIZE;
 #endif
-#else /* always ok for 2.6.x */
+#else
+            /* always ok for 2.6.x */
             inode->i_bytes = PAGE_CACHE_SIZE;
 #endif
             inode->i_blocks = (unsigned long)(PAGE_CACHE_SIZE / 512);

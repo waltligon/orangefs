@@ -98,25 +98,28 @@ static int getattr_acache_lookup(PINT_client_sm *sm_p,
     uint32_t trimmed_mask = 0;
     struct PVFS_server_resp fake_resp;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "getattr_acache state: lookup\n");
-
-    /* check input parameters */
     assert(sm_p->pinode == NULL);
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "getattr_acache state: lookup "
+                 "on %Lu,%d\n", Lu(sm_p->object_ref.handle),
+                 sm_p->object_ref.fs_id);
 
     js_p->error_code = 0;
 
     /* point msgarray to the statically allocated msgpair */
     if (sm_p->msgarray != &(sm_p->msgpair))
+    {
 	    free(sm_p->msgarray);
+    }
     sm_p->msgarray = &(sm_p->msgpair);
     sm_p->msgarray_count = 1;
 
-    sm_p->pinode = PINT_acache_lookup(sm_p->u.getattr.object_ref);
+    sm_p->pinode = PINT_acache_lookup(sm_p->object_ref);
     if (sm_p->pinode)
     {
         /*
-          make sure pinode is not expired, and that it
-          has all attribute info fields requested;
+          make sure pinode is not expired, and that it has all
+          attribute info fields requested;
 
           NOTE that the req attrmask has been tampered with by
           sys-getattr.sm.
@@ -126,8 +129,8 @@ static int getattr_acache_lookup(PINT_client_sm *sm_p,
             /*
               the trimmed mask is used for making sure that we're only
               checking attr bits that make sense for the object type
-              since the caller may have requested all attributes in the
-              case where it doesn't know what type of object we're
+              since the caller may have requested all attributes in
+              the case where it doesn't know what type of object we're
               doing the getattr against.
             */
             trimmed_mask = sm_p->msgpair.req.u.getattr.attrmask;
@@ -193,9 +196,14 @@ static int getattr_acache_lookup(PINT_client_sm *sm_p,
             return 1;
         }
       cache_miss:
+        /*
+          to avoid having an entry in the cache that doesn't exactly
+          match what the caller asked for, in this case invalidate the
+          entry; note invalidate implies an internal acache release
+        */
         gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: invalid acache miss\n");
         sm_p->acache_hit = 0;
-        PINT_acache_release(sm_p->pinode);
+        PINT_acache_invalidate(sm_p->object_ref);
     }
     gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: clean acache miss\n");
     

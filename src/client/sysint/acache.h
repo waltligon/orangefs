@@ -62,9 +62,9 @@
 */
 
 #define PINT_ACACHE_TIMEOUT_MS                                  5000
-#define PINT_ACACHE_NUM_ENTRIES                                 1024
+#define PINT_ACACHE_NUM_ENTRIES                                10240
 #define PINT_ACACHE_NUM_FLUSH_ENTRIES  (PINT_ACACHE_NUM_ENTRIES / 4)
-#define PINT_ACACHE_HTABLE_SIZE                                  511
+#define PINT_ACACHE_HTABLE_SIZE                                 4093
 
 enum
 {

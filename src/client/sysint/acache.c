@@ -334,11 +334,11 @@ static void acache_internal_release(PINT_pinode *pinode)
 {
     acache_debug("acache_internal_release entered\n");
     assert(s_acache_initialized);
-    if (pinode)
+    if (pinode && pinode->mutex)
     {
         /*
-          if we don't have the lock, acquire it; but one way or another,
-          it better be locked below
+          if we don't have the lock, acquire it; but one way or
+          another, it better be locked below
         */
         gen_mutex_trylock(pinode->mutex);
 

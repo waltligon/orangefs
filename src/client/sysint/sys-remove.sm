@@ -265,15 +265,15 @@ static int remove_rmdirent_setup_msgpair(PINT_client_sm *sm_p,
                  Lu(sm_p->parent_ref.handle),
                  sm_p->parent_ref.fs_id);
 
-    /* fill in msgpair structure components */
     sm_p->msgpair.fs_id   = sm_p->parent_ref.fs_id;
     sm_p->msgpair.handle  = sm_p->parent_ref.handle;
     sm_p->msgpair.retry_flag = PVFS_MSGPAIR_NO_RETRY;
     sm_p->msgpair.comp_fn = remove_rmdirent_comp_fn;
 
-    ret = PINT_cached_config_map_to_server(&sm_p->msgpair.svr_addr,
-                                    sm_p->msgpair.handle,
-                                    sm_p->msgpair.fs_id);
+    ret = PINT_cached_config_map_to_server(
+        &sm_p->msgpair.svr_addr, sm_p->msgpair.handle,
+        sm_p->msgpair.fs_id);
+
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");
@@ -285,9 +285,9 @@ static int remove_rmdirent_setup_msgpair(PINT_client_sm *sm_p,
         free(sm_p->msgarray);
         sm_p->msgarray = NULL;
     }
+
     sm_p->msgarray = &(sm_p->msgpair);
     sm_p->msgarray_count = 1;
-
     return 1;
 }
 
@@ -318,15 +318,15 @@ static int remove_crdirent_setup_msgpair(PINT_client_sm *sm_p,
                  Lu(sm_p->parent_ref.handle),
                  sm_p->parent_ref.fs_id);
 
-    /* fill in msgpair structure components */
-    sm_p->msgpair.fs_id   = sm_p->parent_ref.fs_id;
-    sm_p->msgpair.handle  = sm_p->object_ref.handle;
+    sm_p->msgpair.fs_id = sm_p->parent_ref.fs_id;
+    sm_p->msgpair.handle = sm_p->object_ref.handle;
     sm_p->msgpair.retry_flag = PVFS_MSGPAIR_NO_RETRY;
     sm_p->msgpair.comp_fn = remove_crdirent_comp_fn;
 
-    ret = PINT_cached_config_map_to_server(&sm_p->msgpair.svr_addr,
-                                    sm_p->msgpair.handle,
-                                    sm_p->msgpair.fs_id);
+    ret = PINT_cached_config_map_to_server(
+        &sm_p->msgpair.svr_addr, sm_p->msgpair.handle,
+        sm_p->msgpair.fs_id);
+
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");
@@ -338,15 +338,16 @@ static int remove_crdirent_setup_msgpair(PINT_client_sm *sm_p,
         free(sm_p->msgarray);
         sm_p->msgarray = NULL;
     }
+
     sm_p->msgarray = &(sm_p->msgpair);
     sm_p->msgarray_count = 1;
-
     return 1;
 }
 
-static int remove_rmdirent_comp_fn(void *v_p,
-				   struct PVFS_server_resp *resp_p,
-				   int index)
+static int remove_rmdirent_comp_fn(
+    void *v_p,
+    struct PVFS_server_resp *resp_p,
+    int index)
 {
     PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
 
@@ -354,8 +355,8 @@ static int remove_rmdirent_comp_fn(void *v_p,
 
     if (resp_p->status == 0)
     {
-        assert(resp_p->u.rmdirent.entry_handle != 0);
-        assert(sm_p->parent_ref.fs_id != 0);
+        assert(resp_p->u.rmdirent.entry_handle != PVFS_HANDLE_NULL);
+        assert(sm_p->parent_ref.fs_id != PVFS_FS_ID_NULL);
 
         /* pull handle out of response, also copy in fs_id from before */
         sm_p->object_ref.handle = resp_p->u.rmdirent.entry_handle;
@@ -369,9 +370,10 @@ static int remove_rmdirent_comp_fn(void *v_p,
     return resp_p->status;
 }
 
-static int remove_crdirent_comp_fn(void *v_p,
-				   struct PVFS_server_resp *resp_p,
-				   int index)
+static int remove_crdirent_comp_fn(
+    void *v_p,
+    struct PVFS_server_resp *resp_p,
+    int index)
 {
     assert(resp_p->op == PVFS_SERV_CRDIRENT);
 
@@ -392,10 +394,11 @@ static int remove_cleanup(PINT_client_sm *sm_p,
                         sm_p->u.remove.stored_error_code :
                         js_p->error_code);
 
-    /* if we acache entry, release it */
     if (sm_p->acache_hit)
     {
-	PINT_acache_release(sm_p->pinode);
+        PINT_acache_release(sm_p->pinode);
+        sm_p->acache_hit = 0;
+        sm_p->pinode = NULL;
     }
 
     if (sm_p->msgarray && (sm_p->msgarray != &sm_p->msgpair))
@@ -436,18 +439,18 @@ static int remove_crdirent_retry_or_fail(PINT_client_sm *sm_p,
     {
 	sm_p->u.remove.retry_count++;
 	js_p->error_code = CRDIRENT_RETRY;
-	return(1);
+	return 1;
     }
 
     if ((js_p->error_code == -PVFS_EEXIST) &&
         (sm_p->u.remove.retry_count > 0))
     {
-	/* assume everything worked out ok and we got the right directory
-	 * entry back.  there was just a transient network problem along the
-	 * way
+	/* assume everything worked out ok and we got the right
+	 * directory entry back.  there was just a transient network
+	 * problem along the way
 	 */
 	js_p->error_code = 0;
-	return(1);
+	return 1;
     }
 
     sm_p->u.remove.stored_error_code = js_p->error_code;
@@ -456,7 +459,6 @@ static int remove_crdirent_retry_or_fail(PINT_client_sm *sm_p,
     gossip_err("WARNING: PVFS_sys_remove() encountered an error which "
                "may lead to inconsistent state.\n");
     gossip_err("WARNING: PVFS2 fsck (if available) may be needed.\n");
-
     return 1;
 }
 
@@ -468,15 +470,16 @@ static int remove_rmdirent_retry_or_fail(PINT_client_sm *sm_p,
                  "remove state: rmdirent_retry_or_fail\n");
 
     /* try again (up to a point) if we get a comm. failure. */
-    if((PVFS_ERROR_CLASS(-js_p->error_code) == PVFS_ERROR_BMI) &&
+    if ((PVFS_ERROR_CLASS(-js_p->error_code) == PVFS_ERROR_BMI) &&
 	(sm_p->u.remove.retry_count < PVFS2_CLIENT_RETRY_LIMIT))
     {
 	sm_p->u.remove.retry_count++;
 	js_p->error_code = RMDIRENT_RETRY;
-	return(1);
+	return 1;
     }
 
-    if(js_p->error_code == -PVFS_ENOENT && sm_p->u.remove.retry_count > 0)
+    if ((js_p->error_code == -PVFS_ENOENT) &&
+        (sm_p->u.remove.retry_count > 0))
     {
 	/* this is a tricky error case.  Server reports ENOENT, but
 	 * this is not the first time we attempted the rmdirent.  It
@@ -486,15 +489,14 @@ static int remove_rmdirent_retry_or_fail(PINT_client_sm *sm_p,
 	 * strand objects, or remove non-empty directories, for
 	 * example.
 	 */
-	 gossip_err("WARNING: PVFS_sys_remove() encountered an error which "
-	    "may lead to inconsistent state.\n");
+	 gossip_err("WARNING: PVFS_sys_remove() encountered an error "
+                    "which may lead to inconsistent state.\n");
 	 gossip_err("WARNING: PVFS2 fsck (if available) may be needed.\n");
 	 js_p->error_code = 0;
-	 return(1);
+	 return 1;
     }
 
     /* any other errors we just preserve and pass along to the next state */
-
     return 1;
 }
 

@@ -1057,8 +1057,8 @@ static int io_analyze_results(PINT_client_sm *sm_p,
     {
         if (sm_p->acache_hit || sm_p->pinode)
         {
-            sm_p->acache_hit = 0;
             PINT_acache_release(sm_p->pinode);
+            sm_p->acache_hit = 0;
             sm_p->pinode = NULL;
         }
 
@@ -1093,14 +1093,15 @@ static int io_cleanup(PINT_client_sm *sm_p,
 
     if (sm_p->acache_hit)
     {
-        gossip_debug(GOSSIP_CLIENT_DEBUG,
-                     "Invalidating cached attribute size\n");
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "sys-io.sm Invalidating "
+                     "cached attribute size\n");
 
-        sm_p->acache_hit = 0;
         sm_p->pinode->attr.mask &=
             ~(PVFS_ATTR_DATA_SIZE | PVFS_ATTR_DATA_ALL);
         PINT_acache_set_valid(sm_p->pinode);
+
         PINT_acache_release(sm_p->pinode);
+        sm_p->acache_hit = 0;
         sm_p->pinode = NULL;
     }
     else

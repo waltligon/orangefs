@@ -167,6 +167,8 @@ static int mgmt_get_dfile_array_cleanup(
     if (sm_p->acache_hit)
     {
 	PINT_acache_release(sm_p->pinode);
+        sm_p->acache_hit = 0;
+        sm_p->pinode = NULL;
     }
 
     sm_p->op_complete = 1;

@@ -137,7 +137,7 @@ int PVFS_isys_readdir(
       sm_common method for getattr
     */
     sm_p->parent_ref = ref;
-    sm_p->u.readdir.object_ref = ref;
+    sm_p->object_ref = ref;
 
     gossip_debug(GOSSIP_READDIR_DEBUG, "Doing readdir on parent handle "
                  "%Lu on fs %d\n", Lu(ref.handle),
@@ -205,10 +205,10 @@ static int readdir_msg_setup_msgpair(PINT_client_sm *sm_p,
 
     js_p->error_code = 0;
 
-    /* determine the metadata server to contact */
     ret = PINT_cached_config_map_to_server(
-        &server_addr, sm_p->u.readdir.object_ref.handle,
-        sm_p->u.readdir.object_ref.fs_id);
+        &server_addr, sm_p->object_ref.handle,
+        sm_p->object_ref.fs_id);
+
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");
@@ -223,30 +223,28 @@ static int readdir_msg_setup_msgpair(PINT_client_sm *sm_p,
 
     gossip_debug(
         GOSSIP_READDIR_DEBUG, "%Lu|%d | token is %d | limit is %d\n",
-        Lu(sm_p->u.readdir.object_ref.handle),
-        sm_p->u.readdir.object_ref.fs_id,
+        Lu(sm_p->object_ref.handle),
+        sm_p->object_ref.fs_id,
         sm_p->u.readdir.pos_token,
         sm_p->u.readdir.dirent_limit);
 
-    PINT_SERVREQ_READDIR_FILL(msg_p->req,
-                              *sm_p->cred_p,
-                              sm_p->u.readdir.object_ref.fs_id,
-                              sm_p->u.readdir.object_ref.handle,
-                              sm_p->u.readdir.pos_token,
-                              sm_p->u.readdir.dirent_limit);
+    PINT_SERVREQ_READDIR_FILL(
+        msg_p->req,
+        *sm_p->cred_p,
+        sm_p->object_ref.fs_id,
+        sm_p->object_ref.handle,
+        sm_p->u.readdir.pos_token,
+        sm_p->u.readdir.dirent_limit);
 
     /* fill in msgpair structure components */
-    msg_p->fs_id = sm_p->u.readdir.object_ref.fs_id;
-    msg_p->handle = sm_p->u.readdir.object_ref.handle;
+    msg_p->fs_id = sm_p->object_ref.fs_id;
+    msg_p->handle = sm_p->object_ref.handle;
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = readdir_msg_comp_fn;
     msg_p->svr_addr = server_addr;
 
-
-    /* let 'msgpairarray' handle the 'msgpair' case */
     sm_p->msgarray = msg_p;
     sm_p->msgarray_count = 1;
-
     return 1;
 }
 
