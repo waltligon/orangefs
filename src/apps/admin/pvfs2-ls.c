@@ -17,8 +17,13 @@
 #include <pwd.h>
 #include <grp.h>
 #include <assert.h>
+#include <getopt.h>
 
 #include "pvfs2.h"
+
+#ifndef VERSION
+#define VERSION "0.0.1"
+#endif
 
 #define DEFAULT_TAB "/etc/pvfs2tab"
 
@@ -36,11 +41,16 @@
 /* optional parameters, filled in by parse_args() */
 struct options
 {
-    int list_all;
+    int list_human_readable;
     int list_long;
     int list_numeric_uid_gid;
-    int list_no_owner;
+    int list_directory;
     int list_no_group;
+    int list_almost_all;
+    int list_all;
+    int list_no_owner;
+    int list_inode;
+    int list_size;
     char *start[MAX_NUM_PATHS];
     int num_starts;
 };
@@ -48,15 +58,24 @@ struct options
 static char *process_name = NULL;
 
 static struct options* parse_args(int argc, char* argv[]);
+
 static void usage(int argc, char** argv);
+
 static void print_entry(
-    char *entry_name, PVFS_handle handle,
-    PVFS_fs_id fs_id, struct options *opts);
+    char *entry_name,
+    PVFS_handle handle,
+    PVFS_fs_id fs_id,
+    struct options *opts);
+
 static int do_list(
     PVFS_sysresp_init *init_response,
     char *start, struct options *opts);
+
 static void print_entry_attr(
-    char *entry_name, PVFS_sys_attr *attr, struct options *opts);
+    PVFS_handle handle,
+    char *entry_name,
+    PVFS_sys_attr *attr,
+    struct options *opts);
 
 
 int main(int argc, char **argv)
@@ -179,33 +198,42 @@ main_out:
     return(ret);
 }
 
-static inline void format_size_string(unsigned long size,
+/*
+  build a string of a specified length that's either
+  left or right justified based on the src string;
+  caller must free ptr passed out as *out_str_p
+*/
+static inline void format_size_string(char *src_str,
                                       int num_spaces_total,
-                                      char **out_str_p)
+                                      char **out_str_p,
+                                      int right_justified)
 {
     int len = 0;
     int spaces_size_allowed = num_spaces_total;
+    char *buf = NULL, *start = NULL, *src_start = NULL;
 
-    char *tmp_size = NULL, *buf = NULL;
-    char *start = NULL, *src_start = NULL;
-
-    tmp_size = (char *)malloc(spaces_size_allowed);
-    assert(tmp_size);
+    assert(src_str);
     buf = (char *)malloc(spaces_size_allowed);
     assert(buf);
 
-    memset(tmp_size,0,spaces_size_allowed);
     memset(buf,0,spaces_size_allowed);
 
-    snprintf(tmp_size,spaces_size_allowed,"%lu",size);
-    len = strlen(tmp_size);
+    len = strlen(src_str);
 
     if ((len > 0) && (len < spaces_size_allowed))
     {
         memset(buf,' ',(spaces_size_allowed - 1));
 
-        src_start = tmp_size;
-        start = &buf[(spaces_size_allowed-(len+1))];
+        src_start = src_str;
+
+        if (right_justified)
+        {
+            start = &buf[(spaces_size_allowed-(len+1))];
+        }
+        else
+        {
+            start = buf;
+        }
 
         while(src_start && (*src_start))
         {
@@ -213,23 +241,26 @@ static inline void format_size_string(unsigned long size,
         }
         *out_str_p = strdup(buf);
     }
-    free(tmp_size);
     free(buf);
 }
 
 void print_entry_attr(
+    PVFS_handle handle,
     char *entry_name,
     PVFS_sys_attr *attr,
     struct options *opts)
 {
     char buf[128] = {0}, *formatted_size = NULL;
+    char *formatted_owner = NULL, *formatted_group = NULL;
     struct group *grp = NULL;
     struct passwd *pwd = NULL;
     char *empty_str = "";
     char *owner = empty_str, *group = empty_str;
+    char *inode = empty_str;
     struct tm *time = gmtime((time_t *)&attr->atime);
-    unsigned long size = 0;
+    PVFS_size size = 0;
     char scratch_owner[16] = {0}, scratch_group[16] = {0};
+    char scratch_size[16] = {0}, scratch_inode[16] = {0};
 
     if (!opts->list_all && (entry_name[0] == '.'))
     {
@@ -239,10 +270,20 @@ void print_entry_attr(
     snprintf(scratch_owner,16,"%d",(int)attr->owner);
     snprintf(scratch_group,16,"%d",(int)attr->group);
 
+    if (opts->list_inode)
+    {
+        snprintf(scratch_inode,16,"%Ld ",handle);
+        inode = scratch_inode;
+    }
+
     size = (((attr->objtype == PVFS_TYPE_METAFILE) &&
              (attr->mask & PVFS_ATTR_SYS_SIZE)) ?
             (unsigned long)attr->size : 0);
-    format_size_string(size,11,&formatted_size);
+
+    /* format size string -- FIXME: handle human readable cases */
+    snprintf(scratch_size,16, "%Ld", size);
+
+    format_size_string(scratch_size,11,&formatted_size,1);
 
     if (!opts->list_numeric_uid_gid)
     {
@@ -250,16 +291,19 @@ void print_entry_attr(
         {
             pwd = getpwuid((uid_t)attr->owner);
             owner = (pwd ? pwd->pw_name : scratch_owner);
+            format_size_string(owner,8,&formatted_owner,0);
         }
 
         if (!opts->list_no_group)
         {
             grp = getgrgid((gid_t)attr->group);
             group = (grp ? grp->gr_name : scratch_group);
+            format_size_string(group,8,&formatted_group,0);
         }
 
-        snprintf(buf,128,"%c%c%c%c%c%c%c%c%c%c    1 %s     %s\t%s "
+        snprintf(buf,128,"%s%c%c%c%c%c%c%c%c%c%c    1 %s %s %s "
                  "%.4d-%.2d-%.2d %.2d:%.2d %s\n",
+                 inode,
                  ((attr->objtype == PVFS_TYPE_DIRECTORY) ? 'd' : '-'),
                  ((attr->perms & PVFS_U_READ) ? 'r' : '-'),
                  ((attr->perms & PVFS_U_WRITE) ? 'w' : '-'),
@@ -270,8 +314,8 @@ void print_entry_attr(
                  ((attr->perms & PVFS_O_READ) ? 'r' : '-'),
                  ((attr->perms & PVFS_O_WRITE) ? 'w' : '-'),
                  ((attr->perms & PVFS_O_EXECUTE) ? 'x' : '-'),
-                 owner,
-                 group,
+                 formatted_owner,
+                 formatted_group,
                  formatted_size,
                  (time->tm_year + 1900),
                  (time->tm_mon + 1),
@@ -282,32 +326,41 @@ void print_entry_attr(
     }
     else
     {
-    snprintf(buf,128,"%c%c%c%c%c%c%c%c%c%c    1 %d   %d\t%s "
-             "%.4d-%.2d-%.2d %.2d:%.2d %s\n",
-             ((attr->objtype == PVFS_TYPE_DIRECTORY) ? 'd' : '-'),
-             ((attr->perms & PVFS_U_READ) ? 'r' : '-'),
-             ((attr->perms & PVFS_U_WRITE) ? 'w' : '-'),
-             ((attr->perms & PVFS_U_EXECUTE) ? 'x' : '-'),
-             ((attr->perms & PVFS_G_READ) ? 'r' : '-'),
-             ((attr->perms & PVFS_G_WRITE) ? 'w' : '-'),
-             ((attr->perms & PVFS_G_EXECUTE) ? 'x' : '-'),
-             ((attr->perms & PVFS_O_READ) ? 'r' : '-'),
-             ((attr->perms & PVFS_O_WRITE) ? 'w' : '-'),
-             ((attr->perms & PVFS_O_EXECUTE) ? 'x' : '-'),
-             attr->owner,
-             attr->group,
-             formatted_size,
-             (time->tm_year + 1900),
-             (time->tm_mon + 1),
-             time->tm_mday,
-             (time->tm_hour + 1),
-             (time->tm_min + 1),
-             entry_name);
+        snprintf(buf,128,"%s%c%c%c%c%c%c%c%c%c%c    1 %d   %d\t%s "
+                 "%.4d-%.2d-%.2d %.2d:%.2d %s\n",
+                 inode,
+                 ((attr->objtype == PVFS_TYPE_DIRECTORY) ? 'd' : '-'),
+                 ((attr->perms & PVFS_U_READ) ? 'r' : '-'),
+                 ((attr->perms & PVFS_U_WRITE) ? 'w' : '-'),
+                 ((attr->perms & PVFS_U_EXECUTE) ? 'x' : '-'),
+                 ((attr->perms & PVFS_G_READ) ? 'r' : '-'),
+                 ((attr->perms & PVFS_G_WRITE) ? 'w' : '-'),
+                 ((attr->perms & PVFS_G_EXECUTE) ? 'x' : '-'),
+                 ((attr->perms & PVFS_O_READ) ? 'r' : '-'),
+                 ((attr->perms & PVFS_O_WRITE) ? 'w' : '-'),
+                 ((attr->perms & PVFS_O_EXECUTE) ? 'x' : '-'),
+                 attr->owner,
+                 attr->group,
+                 formatted_size,
+                 (time->tm_year + 1900),
+                 (time->tm_mon + 1),
+                 time->tm_mday,
+                 (time->tm_hour + 1),
+                 (time->tm_min + 1),
+                 entry_name);
     }
 
     if (formatted_size)
     {
         free(formatted_size);
+    }
+    if (formatted_owner)
+    {
+        free(formatted_owner);
+    }
+    if (formatted_group)
+    {
+        free(formatted_group);
     }
     printf("%s",buf);
 }
@@ -322,10 +375,16 @@ void print_entry(
     PVFS_credentials credentials;
     PVFS_sysresp_getattr getattr_response;
 
-    /* if we're not doing a long listing, we can skip all of this */
     if (!opts->list_long)
     {
-        printf("%s\n", entry_name);
+        if (opts->list_inode)
+        {
+            printf("%Ld %s\n", handle, entry_name);
+        }
+        else
+        {
+            printf("%s\n", entry_name);
+        }
         return;
     }
 
@@ -345,7 +404,7 @@ void print_entry(
                 "(fs_id is %d)\n",handle,fs_id);
         return;
     }
-    print_entry_attr(entry_name, &getattr_response.attr, opts);
+    print_entry_attr(handle, entry_name, &getattr_response.attr, opts);
 }
 
 int do_list(
@@ -353,7 +412,7 @@ int do_list(
     char *start,
     struct options *opts)
 {
-    int i = 0;
+    int i = 0, printed_dot_info = 0;
     int pvfs_dirent_incount;
     char *name = NULL, *cur_file = NULL;
     PVFS_handle cur_handle;
@@ -390,11 +449,14 @@ int do_list(
     if (PVFS_sys_getattr(pinode_refn, PVFS_ATTR_SYS_ALL,
                          credentials, &getattr_response) == 0)
     {
-        if (getattr_response.attr.objtype == PVFS_TYPE_METAFILE)
+        if ((getattr_response.attr.objtype == PVFS_TYPE_METAFILE) ||
+            ((getattr_response.attr.objtype == PVFS_TYPE_DIRECTORY) &&
+             (opts->list_directory)))
         {
             char segment[128] = {0};
             PVFS_util_remove_base_dir(name, segment, 128);
-            print_entry_attr(segment, &getattr_response.attr, opts);
+            print_entry_attr(pinode_refn.handle, segment,
+                             &getattr_response.attr, opts);
             return 0;
         }
     }
@@ -409,6 +471,42 @@ int do_list(
         {
             fprintf(stderr,"readdir failed\n");
             return -1;
+        }
+
+        if (!printed_dot_info)
+        {
+            /*
+              the list_all option prints files starting with .;
+              the almost_all option skips the '.', '..' printing
+            */
+            if (opts->list_all && !opts->list_almost_all)
+            {
+                /*
+                  we have to fake access to the .. handle
+                  since our sysint lookup doesn't return that
+                  kind of intermediate information.  we can get
+                  this value, by manually resolving it with lookups
+                  on base dirs, but I'm not sure it's worth it
+                */
+                if (opts->list_inode)
+                {
+                    printf("%Ld .\n",pinode_refn.handle);
+                    printf("%Ld .. (faked)\n",pinode_refn.handle);
+                }
+                else if (opts->list_long)
+                {
+                    print_entry(".", pinode_refn.handle,
+                                pinode_refn.fs_id, opts);
+                    print_entry(".. (faked)", pinode_refn.handle,
+                                pinode_refn.fs_id, opts);
+                }
+                else
+                {
+                    printf(".\n");
+                    printf("..\n");
+                }
+            }
+            printed_dot_info = 1;
         }
 
         for(i = 0; i < rd_response.pvfs_dirent_outcount; i++)
@@ -437,13 +535,23 @@ int do_list(
  */
 static struct options* parse_args(int argc, char* argv[])
 {
-    int i = 0;
-    /* getopt stuff */
-    extern char* optarg;
-    extern int optind, opterr, optopt;
-    char flags[] = "alngo:";
-    char one_opt = ' ';
+    int i = 0, ret = 0, option_index = 0;
+    char *cur_option = NULL;
     struct options* tmp_opts = NULL;
+    static struct option long_opts[] =
+    {
+        {"help",0,0,0},
+        {"human_readable",0,0,0},
+        {"version",0,0,0},
+        {"numeric-uid-gid",0,0,0},
+        {"directory",0,0,0},
+        {"no-group",0,0,0},
+        {"almost-all",0,0,0},
+        {"all",0,0,0},
+        {"inode",0,0,0},
+        {"size",0,0,0},
+        {0,0,0,0}
+    };
 
     /* create storage for the command line options */
     tmp_opts = (struct options*)malloc(sizeof(struct options));
@@ -451,34 +559,107 @@ static struct options* parse_args(int argc, char* argv[])
     {
 	return(NULL);
     }
-
-    /* fill in defaults */
     memset(tmp_opts, 0, sizeof(struct options));
 
     /* look at command line arguments */
-    while((one_opt = getopt(argc, argv, flags)) != EOF)
+    while((ret = getopt_long(argc, argv, "hvndGoAaisgl",
+                             long_opts, &option_index)) != -1)
     {
-	switch(one_opt)
+	switch(ret)
         {
-	    case('a'):
-                tmp_opts->list_all = 1;
-		break;
-	    case('l'):
+            case 0:
+                cur_option = (char *)long_opts[option_index].name;
+
+                if (strcmp("help", cur_option) == 0)
+                {
+                    usage(argc, argv);
+                    exit(0);
+                }
+                else if (strcmp("human-readable", cur_option) == 0)
+                {
+                    goto list_human_readable;
+                }
+                else if (strcmp("version", cur_option) == 0)
+                {
+                    printf("%s\n", VERSION);
+                    exit(0);
+                }
+                else if (strcmp("numeric-uid-gid", cur_option) == 0)
+                {
+                    goto list_numeric_uid_gid;
+                }
+                else if (strcmp("directory", cur_option) == 0)
+                {
+                    goto list_directory;
+                }
+                else if (strcmp("no-group", cur_option) == 0)
+                {
+                    goto list_no_group;
+                }
+                else if (strcmp("almost-all", cur_option) == 0)
+                {
+                    goto list_almost_all;
+                }
+                else if (strcmp("all", cur_option) == 0)
+                {
+                    goto list_all;
+                }
+                else if (strcmp("inode", cur_option) == 0)
+                {
+                    goto list_inode;
+                }
+                else if (strcmp("size", cur_option) == 0)
+                {
+                    goto list_size;
+                }
+                else
+                {
+                    usage(argc, argv);
+                    exit(EXIT_FAILURE);
+                }
+                break;
+            case 'h':
+          list_human_readable:
+                tmp_opts->list_human_readable = 1;
+                break;
+	    case 'l':
                 tmp_opts->list_long = 1;
 		break;
-	    case('n'):
+	    case 'n':
+          list_numeric_uid_gid:
                 tmp_opts->list_long = 1;
                 tmp_opts->list_numeric_uid_gid = 1;
 		break;
-	    case('o'):
+            case 'd':
+          list_directory:
+                tmp_opts->list_directory = 1;
+                break;
+	    case 'o':
+          list_no_group:
                 tmp_opts->list_long = 1;
                 tmp_opts->list_no_group = 1;
 		break;
-	    case('g'):
+            case 'A':
+          list_almost_all:
+                tmp_opts->list_almost_all = 1;
+                break;
+	    case 'a':
+          list_all:
+                tmp_opts->list_all = 1;
+		break;
+	    case 'g':
                 tmp_opts->list_long = 1;
                 tmp_opts->list_no_owner = 1;
 		break;
-	    case('?'):
+            case 'i':
+          list_inode:
+                tmp_opts->list_inode = 1;
+                break;
+            case 's':
+          list_size:
+                tmp_opts->list_size = 1;
+                break;
+	    case '?':
 		usage(argc, argv);
 		exit(EXIT_FAILURE);
 	}
@@ -503,7 +684,32 @@ static void usage(int argc, char** argv)
 {
     fprintf(stderr,  "Usage: %s [OPTION]... [FILE]...\n", argv[0]); 
     fprintf(stderr, "List information about the FILEs (the current "
-            "directory by default)\n ");
+            "directory by default)\n\n");
+    fprintf(stderr,"  -a, --all                  "
+            "do not hide entries starting with .\n");
+    fprintf(stderr,"  -A, --almost-all           do not list "
+            "implied . and ..\n");
+    fprintf(stderr,"  -d, --directory            list directory "
+            "entries instead of contents\n");
+    fprintf(stderr,"  -g                         like -l, but do "
+            "not list owner\n");
+    fprintf(stderr,"  -G, --no-group             inhibit display "
+            "of group information\n");
+    fprintf(stderr,"  -h, --human-readable  print sizes in human "
+            "readable format (e.g., 1K 234M 2G)\n");
+    fprintf(stderr,"  -i, --inode                print index number "
+            "of each file\n");
+    fprintf(stderr,"  -l                         use a long listing "
+            "format\n");
+    fprintf(stderr,"  -n, --numeric-uid-gid      like -l, but list "
+            "numeric UIDs and GIDs\n");
+    fprintf(stderr,"  -o                         like -l, but do not "
+            "list group information\n");
+    fprintf(stderr,"  -s, --size                 print size of each "
+            "file, in blocks\n");
+    fprintf(stderr,"      --help     display this help and exit\n");
+    fprintf(stderr,"      --version  output version information "
+            "and exit\n");
     fprintf(stderr, "\n      Note: this utility reads /etc/pvfs2tab "
             "for file system configuration.\n");
     return;
