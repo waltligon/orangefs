@@ -177,6 +177,7 @@ static int setattr_getobj_attribs(PINT_server_op *s_op, job_status_s *ret)
       attr to avoid dynamic allocation
     */
     s_op->val.buffer = (void *)&s_op->u.setattr.attr;
+    s_op->val.buffer_sz = sizeof(PVFS_object_attr);
 
     gossip_debug(SERVER_DEBUG,
 		 "  reading attributes (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = 0x%08x (%d))\n",
@@ -210,23 +211,55 @@ static int setattr_getobj_attribs(PINT_server_op *s_op, job_status_s *ret)
  */
 static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s *ret)
 {
-    PVFS_object_attr *a_p;
+    PVFS_object_attr *a_p, *req_a_p;
 
     gossip_debug(SERVER_DEBUG, "setattr state: verify_attribs\n");
 
     a_p = (PVFS_object_attr *)&s_op->u.setattr.attr;
+    req_a_p = (PVFS_object_attr *)&s_op->req->u.setattr.attr;
 
-    if (ret->error_code != 0) {
-	gossip_debug(SERVER_DEBUG,
-		     "  previous keyval read had an error (new metafile?); data is useless\n");
+    if (ret->error_code != 0)
+    {
+	gossip_debug(SERVER_DEBUG, "  previous keyval read had an "
+                     "error (new metafile?); data is useless\n");
     }
-    else {
-	gossip_debug(SERVER_DEBUG,
-		     "  attrs read from dspace = (owner = %d, group = %d, perms = %o, type = %d)\n",
+    else
+    {
+	gossip_debug(SERVER_DEBUG, "  attrs read from dspace = "
+                     "(owner = %d, group = %d, perms = %o, type = %d)\n",
 		     a_p->owner,
 		     a_p->group,
 		     a_p->perms,
 		     a_p->objtype);
+    }
+
+    if (ret->error_code == 0)
+    {
+	gossip_debug(SERVER_DEBUG, "  attrs read from request = "
+                     "(owner = %d, group = %d, perms = %o, type = %d)\n",
+		     req_a_p->owner,
+		     req_a_p->group,
+		     req_a_p->perms,
+		     req_a_p->objtype);
+
+        /*
+          here we're enforcing that no one can change the type of the
+          handle/object already stored once it's been set to
+          a non-zero value.  (zero is not a valid object type meaning
+          that it hasn't been assigned yet)
+        */
+        if (a_p->objtype &&
+            (a_p->objtype != s_op->req->u.setattr.attr.objtype))
+        {
+            gossip_debug(SERVER_DEBUG, "  handle 0x%08Lx is of type %d "
+                         "and cannot be changed to type %d\n",
+                         s_op->req->u.setattr.handle,
+                         a_p->objtype, s_op->req->u.setattr.attr.objtype);
+
+            /* set an error to bail out of set-attr processing */
+            ret->error_code = 1;
+            return 1;
+        }
     }
 
     /* TODO: LOOK AT ATTRIBUTE MASK, SET UP s_op->req->u.setattr.attr for writing
@@ -234,20 +267,22 @@ static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s *ret)
      */
 
     /* TODO: HANDLE TYPES OTHER THAN METAFILES TOO, SOME DAY... */
-    if ((ret->error_code != 0 && s_op->req->u.setattr.attr.objtype == PVFS_TYPE_METAFILE) || a_p->objtype == PVFS_TYPE_METAFILE)
+    if ((ret->error_code != 0) &&
+        ((req_a_p->objtype == PVFS_TYPE_METAFILE) ||
+         (a_p->objtype == PVFS_TYPE_METAFILE)))
     {
 	gossip_debug(SERVER_DEBUG,
 		     "  handle 0x%08Lx refers to a metafile\n",
 		     s_op->req->u.setattr.handle);
 	ret->error_code = STATE_METAFILE;
     }
-    else {
+    else
+    {
 	gossip_debug(SERVER_DEBUG,
-		     "  handle 0x%08Lx refers to something other than a metafile\n",
-		     s_op->req->u.setattr.handle);
+		     "  handle 0x%08Lx refers to something other than "
+                     "a metafile\n", s_op->req->u.setattr.handle);
 	ret->error_code = 0;
     }
-    
     return 1;
 }
 
@@ -273,8 +308,6 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s *ret)
     gossip_debug(SERVER_DEBUG, "setattr state: setobj_attribs\n");
 
     a_p = &s_op->req->u.setattr.attr;
-
-    /* FIXME: MAKE SURE TYPES MATCH HERE */
 
     gossip_debug(SERVER_DEBUG,
 		 "  attrs to write = (owner = %d, group = %d, perms = %o, type = %d, atime = %lld, mtime = %lld, ctime = %lld)\n",
