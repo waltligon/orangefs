@@ -14,9 +14,6 @@
 #include <linux/buffer_head.h>
 #include "pvfs2-kernel.h"
 
-/* defined in linux/fs/block_dev.c */
-extern struct super_block *blockdev_superblock;
-
 extern struct file_system_type pvfs2_fs_type;
 extern struct dentry_operations pvfs2_dentry_operations;
 extern struct inode *pvfs2_get_custom_inode(
