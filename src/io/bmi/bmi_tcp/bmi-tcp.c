@@ -198,7 +198,6 @@ static int enqueue_operation(op_list_p target_list,
 			     int list_count,
 			     bmi_size_t amt_complete,
 			     bmi_size_t env_amt_complete,
-			     int add_write_bit_flag,
 			     bmi_op_id_t * id,
 			     int tcp_op_state,
 			     struct tcp_msg_header header,
@@ -1454,7 +1453,6 @@ static int enqueue_operation(op_list_p target_list,
 			     int list_count,
 			     bmi_size_t amt_complete,
 			     bmi_size_t env_amt_complete,
-			     int add_write_bit_flag,
 			     bmi_op_id_t * id,
 			     int tcp_op_state,
 			     struct tcp_msg_header header,
@@ -1533,8 +1531,7 @@ static int enqueue_operation(op_list_p target_list,
 
     /* add the socket to poll on */
     socket_collection_add(tcp_socket_collection_p, map);
-
-    if (add_write_bit_flag)
+    if(send_recv == BMI_SEND)
     {
 	socket_collection_add_write_bit(tcp_socket_collection_p, map);
 	bit_added = 1;
@@ -1773,7 +1770,7 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
     bogus_header.tag = tag;
     ret = enqueue_operation(op_list_array[IND_RECV],
 			    BMI_RECV, src, buffer_list, size_list,
-			    list_count, 0, 0, 0, id, BMI_TCP_INPROGRESS,
+			    list_count, 0, 0, id, BMI_TCP_INPROGRESS,
 			    bogus_header, user_ptr, list_stub_flag, 0,
 			    expected_size, context_id);
     /* just for safety; this field isn't valid to the caller anymore */
@@ -2602,7 +2599,7 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 	/* queue up operation */
 	ret = enqueue_operation(op_list_array[IND_SEND], BMI_SEND,
 				dest, buffer_list, size_list, list_count, 0, 0,
-				1, id, BMI_TCP_INPROGRESS, my_header, user_ptr,
+				id, BMI_TCP_INPROGRESS, my_header, user_ptr,
 				list_stub_flag, my_header.size, 0,
 				context_id);
 	if (ret >= 0)
@@ -2630,7 +2627,7 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 	/* if the connection is not completed, queue up for later work */
 	ret = enqueue_operation(op_list_array[IND_SEND], BMI_SEND,
 				dest, buffer_list, size_list, list_count, 0, 0,
-				1, id, BMI_TCP_INPROGRESS, my_header, user_ptr,
+				id, BMI_TCP_INPROGRESS, my_header, user_ptr,
 				list_stub_flag, my_header.size, 0,
 				context_id);
 	return (ret);
@@ -2651,7 +2648,7 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 	/* header send not completed */
 	ret = enqueue_operation(op_list_array[IND_SEND], BMI_SEND,
 				dest, buffer_list, size_list, list_count, 0,
-				ret, 1, id, BMI_TCP_INPROGRESS, my_header,
+				ret, id, BMI_TCP_INPROGRESS, my_header,
 				user_ptr, list_stub_flag,
 				my_header.size, 0, context_id);
 	return (ret);
@@ -2687,7 +2684,7 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
     /* queue up the remainder */
     ret = enqueue_operation(op_list_array[IND_SEND], BMI_SEND,
 			    dest, buffer_list, size_list, list_count,
-			    amt_complete, TCP_ENC_HDR_SIZE, 1, id,
+			    amt_complete, TCP_ENC_HDR_SIZE, id,
 			    BMI_TCP_INPROGRESS, my_header, user_ptr,
 			    list_stub_flag, my_header.size, 0,
 			    context_id);
