@@ -226,7 +226,10 @@ int PINT_req_sched_post(
 	if(ret == 1)
 		tmp_element->state = REQ_SCHEDULED;
 	else
+	{
+		/* TODO: handle concurrent I/O */
 		tmp_element->state = REQ_QUEUED;
+	}
 
 	/* add this element to the list */
 	tmp_element->list_head = tmp_list;
@@ -270,7 +273,6 @@ int PINT_req_sched_unpost(
 	/* make sure it isn't already scheduled */
 	if(tmp_element->state == REQ_SCHEDULED)
 	{
-		/* TODO: should this really be an error? */
 		return(-EALREADY);
 	}
 
@@ -302,6 +304,7 @@ int PINT_req_sched_unpost(
 		 */
 		if(next_ready_flag)
 		{
+			/* TODO: handle concurrent I/O */
 			next_element =
 				qlist_entry((tmp_element->list_head->req_list.next),
 				struct req_sched_element, list_link);
@@ -313,7 +316,6 @@ int PINT_req_sched_unpost(
 	/* destroy the unposted element */
 	free(tmp_element);
 
-	/* TODO: is this the right semantics? */
 	return(0);
 }
 
@@ -365,6 +367,7 @@ int PINT_req_sched_release(
 		/* find the next request, change its state, and add it to
 		 * the queue of requests that are ready to be scheduled
 		 */
+		/* TODO: handle concurrent I/O */
 		next_element = qlist_entry((tmp_list->req_list.next),
 			struct req_sched_element, list_link);
 		next_element->state = REQ_READY_TO_SCHEDULE;
@@ -428,7 +431,6 @@ int PINT_req_sched_test(
 		gossip_debug(REQ_SCHED_DEBUG, 
 			"REQ SCHED SCHEDULING, handle: %ld, queue_element: %p\n", 
 			(long)tmp_element->handle, tmp_element);
-		/* TODO: make sure this is the semantics we want */
 		return(0);
 	}
 	else
