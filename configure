@@ -1107,6 +1107,45 @@ else
 fi
 rm -f conftest*
 
+echo $ac_n "checking for txnid parameter to DB open function""... $ac_c" 1>&6
+echo "configure:1112: checking for txnid parameter to DB open function" >&5
+cat > conftest.$ac_ext <<EOF
+#line 1114 "configure"
+#include "confdefs.h"
+
+#include <db.h>
+
+int main() {
+
+int ret;
+DB *db;
+DB_TXN *txnid;
+char *file;
+char *database;
+DBTYPE type;
+u_int32_t flags;
+int mode;
+
+ret = db->open(db, txnid, file, database, type, flags, mode);
+
+; return 0; }
+EOF
+if { (eval echo configure:1134: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
+  rm -rf conftest*
+  echo "$ac_t""yes" 1>&6
+cat >> confdefs.h <<\EOF
+#define HAVE_TXNID_PARAMETER_TO_DB_OPEN 1
+EOF
+
+else
+  echo "configure: failed program was:" >&5
+  cat conftest.$ac_ext >&5
+  rm -rf conftest*
+  echo "$ac_t""no" 1>&6
+fi
+rm -f conftest*
+
+
 trap '' 1 2 15
 cat > confcache <<\EOF
 # This file is a shell script that caches the results of configure
