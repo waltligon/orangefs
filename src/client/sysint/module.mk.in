@@ -21,5 +21,6 @@ LIBSRC += \
 	$(DIR)/getparent.c \
 	$(DIR)/sys-remove.c \
 	$(DIR)/msgpair.c \
-	$(DIR)/msgpairarray.c
+	$(DIR)/msgpairarray.c \
+	$(DIR)/getattr-pcache.c
 

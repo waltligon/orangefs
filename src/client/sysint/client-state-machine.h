@@ -69,8 +69,6 @@ struct PINT_client_remove_sm {
     PINT_client_sm_msgpair_state *msgpair; /* used in datafile remove */
 };
 
-
-
 typedef struct PINT_client_sm {
     /* STATE MACHINE VALUES */
     int stackptr; /* stack of contexts for nested state machines */
@@ -161,6 +159,7 @@ int PINT_serv_free_msgpair_resources(struct PINT_encoded_msg *encoded_req_p,
 extern struct PINT_state_machine_s pvfs2_client_remove_sm;
 extern struct PINT_state_machine_s pvfs2_client_msgpair_sm;
 extern struct PINT_state_machine_s pvfs2_client_msgpairarray_sm;
+extern struct PINT_state_machine_s pvfs2_client_getattr_pcache_sm;
 
 
 /*

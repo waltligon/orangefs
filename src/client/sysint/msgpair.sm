@@ -11,7 +11,7 @@
  *
  * The following elements of the PINT_client_sm_msgpair_state
  * must be valid prior to entering this state machine:
- * - req (unencoded request)
+ * - req (unencoded request of some type)
  * - fs_id
  * - handle
  * - comp_fn
@@ -51,7 +51,7 @@ nested machine pvfs2_client_msgpair_sm(post,
     state complete {
 	run msgpair_complete;
 	success => return;
-	default => error;
+	default => return;
     }
     
     state error {
@@ -199,6 +199,9 @@ static int msgpair_post(PINT_client_sm *sm_p,
 
 /* msgpair_complete()
  *
+ * NOTE: the comp_fn can set the error_code of this to be non-zero.
+ * we need to be sure to happily propagate this back up the path!
+ *
  */     
 static int msgpair_complete(PINT_client_sm *sm_p,
 			    job_status_s *js_p)
@@ -257,7 +260,9 @@ static int msgpair_complete(PINT_client_sm *sm_p,
      */
     if (msg_p->comp_fn != NULL) ret = msg_p->comp_fn(sm_p, resp_p);
     if (ret != 0) {
-	assert(0);
+	/* return error code in job status */
+	/* TODO: SAVE THE ERROR CODE SOMEWHERE ELSE ALSO? */
+	js_p->error_code = ret;
     }
 
     /* free all the resources that we used to send and receive. */
