@@ -21,18 +21,13 @@ $retry = 0;
 
 my $prog_root = $config{"PROGROOT"};
 my $working_dir = $config{"WORKINGDIR"};
+my $ionodecount = $config{"IONCOUNT"};
 
-if ($prog_name =~ /pav_start/) {
-
-    @commands = ("$prog_root/pav_create -c $config_file -r $prog_root", "$prog_root/pav_check -ping -one-all -sd $working_dir -r $prog_root", "$prog_root/pav_dist -sd $working_dir -r $prog_root", "$prog_root/pav_init -sd $working_dir -r $prog_root");
+@commands = ("$prog_root/pav_create -c $config_file -n $ionodecount",
+	"$prog_root/pav_check -ping -one-all -sd $working_dir", 
+	"$prog_root/pav_dist -sd $working_dir", 
+	"$prog_root/pav_init -sd $working_dir");
     
-} elsif ($prog_name =~ /pav_stop/) {
-    @commands = ("$prog_root/pav_uninit -sd $working_dir -r $prog_root", "$prog_root/pav_clean -sd $working_dir -r $prog_root");
-} else {
-    print STDERR "ERROR: unknown command function: $prog_name\n";
-    exit(1);
-}
-
 mainloop:
 my $done = 0;
 while(!$done) {
@@ -81,6 +76,7 @@ Usage: $prog_name [option]
 -c -config        configuration file for PAV to use
 -r -root          path to program root (default ./)
 -m -machinefile   file with list of available nodes
+-n -ionodecount   number of nodes to use for IO
 -h -help          display this message
 EOF
 }
@@ -90,6 +86,7 @@ sub init {
 	       'c|config:s',
 	       'r|root:s',
 	       'm|machinefile:s',
+	       'n|ionodecount:i',
 	       'h|help'
 	       );
 
@@ -141,6 +138,7 @@ sub init {
 
     $config{'PROGROOT'} = $args{'r'} || $config{'PROGROOT'};
     $config{'NODEFILE'} = $args{'m'} || $config{'NODEFILE'};
+    $config{'IONCOUNT'} = $args{'n'} || $config{'IONCOUNT'};
     
     return(0);
 }

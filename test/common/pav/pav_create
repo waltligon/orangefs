@@ -1,6 +1,7 @@
 #!/usr/bin/perl -w
 
-use      Getopt::Long;
+use     Getopt::Long;
+use 	File::Basename;
 
 #globals
 my $config_file;
@@ -190,6 +191,7 @@ Usage: $prog_name [option]
 -c -config        configuration file for PAV to use
 -r -root          path to program root (default ./)
 -m -machinefile   file with list of available nodes
+-n -ionodecount   number of nodes to use for IO
 -h -help          display this message
 EOF
 }
@@ -201,8 +203,12 @@ sub init {
 	       'sd|sessiondir:s',
 	       'r|root:s',
 	       'm|machinefile:s',
+	       'n|ionodecount:i',
 	       'h|help'
 	       );
+
+    $prog_name = $0;
+    $pid = $$;
 
     if ($args{'h'}) {
 	usage();
@@ -229,7 +235,7 @@ sub init {
     my ($gid) = split(/\s*/, $();
     ($config{'GROUPNAME'}) = getgrgid($gid);
 
-    $config{'PROGROOT'} = $args{'r'} || $config{'PROGROOT'};
+    $config{'PROGROOT'} = $args{'r'} || real_dir($0) || $config{'PROGROOT'};
     my $prog_root = $config{'PROGROOT'};
     require "$prog_root/pav_lib.pl";
 
@@ -267,6 +273,9 @@ sub init {
 	    return(1);
 	}
 
+	# override with command line options
+	$config{'IONCOUNT'} = $args{'n'} || $config{'IONCOUNT'};
+
 	$rc = split_machines(\%config);
 	if ($rc) {
 	    return($rc);
@@ -282,9 +291,6 @@ sub init {
     $config{'PROGROOT'} = $args{'r'} || $config{'PROGROOT'};
     $config{'NODEFILE'} = $args{'m'} || $config{'NODEFILE'};
     
-    $prog_name = $0;
-    $pid = $$;
-
     return(0);
 }
 
@@ -366,3 +372,22 @@ sub split_machines {
     return(0);
 }
 
+sub real_dir {
+   my ($file, $reldir, $suffix) = fileparse(shift);
+   my ($realdir, $envpwd);
+
+   if ($reldir =~ /^\//) {
+      $realdir = $reldir;
+   } else {
+      if (!$ENV{PWD}) {
+         chomp($envpwd = `pwd`);
+      } else {
+         $envpwd = $ENV{PWD};
+      }
+      $realdir = $envpwd . "/$reldir";
+   }
+   $realdir .= '/';
+   $realdir =~ s#/./#/#g;
+   $realdir =~ s#//#/#g;
+   return($realdir);
+}

@@ -18,16 +18,8 @@ if (init()) {
 my $prog_root = $config{"PROGROOT"};
 my $working_dir = $config{"WORKINGDIR"};
 
-if ($prog_name =~ /pav_start/) {
-
-    @commands = ("$prog_root/pav_create -c $config_file -r $prog_root", "$prog_root/pav_check -ping -one-all -sd $working_dir -r $prog_root", "$prog_root/pav_dist -sd $working_dir -r $prog_root", "$prog_root/pav_init -sd $working_dir -r $prog_root");
-    
-} elsif ($prog_name =~ /pav_stop/) {
-    @commands = ("$prog_root/pav_uninit -sd $working_dir -r $prog_root", "$prog_root/pav_clean -sd $working_dir -r $prog_root");
-} else {
-    print STDERR "ERROR: unknown command function: $prog_name\n";
-    exit(1);
-}
+@commands = ("$prog_root/pav_uninit -sd $working_dir -r $prog_root", 
+		"$prog_root/pav_clean -sd $working_dir -r $prog_root");
 
 mainloop:
 my $done = 0;
@@ -85,6 +77,9 @@ sub init {
 	       'h|help:s'
 	       );
 
+    $prog_name = $0;
+    $pid = $$;
+ 
     if ($args{'h'}) {
 	usage();
 	return(1);
@@ -129,9 +124,6 @@ sub init {
     $config{'PROGROOT'} = $args{'r'} || $config{'PROGROOT'};
     $config{'NODEFILE'} = $args{'m'} || $config{'NODEFILE'};
     
-    $prog_name = $0;
-    $pid = $$;
- 
     return(0);
 }
 
