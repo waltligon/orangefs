@@ -14,7 +14,7 @@ struct foo_struct
 
 QLIST_HEAD(list_head);
 
-void init_list()
+void init_list(void)
 {
 	INIT_QLIST_HEAD(&list_head);
 }
@@ -28,7 +28,7 @@ int add_item(int data)
 	return 0;
 }
 
-void dump_list() 
+void dump_list(void) 
 {
 	struct qlist_head *p;
 
