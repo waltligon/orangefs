@@ -8,7 +8,6 @@
 #include <linux/pagemap.h>
 #include "pvfs2-kernel.h"
 
-extern struct inode_operations pvfs2_file_inode_operations;
 extern struct file_operations pvfs2_file_operations;
 extern struct inode_operations pvfs2_dir_inode_operations;
 extern struct file_operations pvfs2_dir_operations;
@@ -98,6 +97,28 @@ static struct backing_dev_info pvfs2_backing_dev_info =
 {
     .ra_pages = 0,       /* no readahead */
     .memory_backed = 1   /* does not contribute to dirty memory */ 
+};
+
+
+static int pvfs2_setattr(struct dentry *dentry, struct iattr *iattr)
+{
+    struct inode *inode = dentry->d_inode;
+
+    pvfs2_print("pvfs2: pvfs2_setattr called on %s\n",
+                dentry->d_name.name);
+
+    return pvfs2_inode_setattr(inode, iattr);
+}
+
+struct inode_operations pvfs2_file_inode_operations =
+{
+/*     .truncate = pvfs2_truncate, */
+/*     .setxattr = pvfs2_setxattr, */
+/*     .getxattr = pvfs2_getxattr, */
+/*     .listxattr = pvfs2_listxattr, */
+/*     .removexattr = pvfs2_removexattr, */
+/*     .permission = pvfs2_permission */
+    .setattr = pvfs2_setattr
 };
 
 struct inode *pvfs2_get_custom_inode(struct super_block *sb,

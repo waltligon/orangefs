@@ -166,6 +166,22 @@ int pvfs2_inode_getattr(struct inode *inode)
     return ret;
 }
 
+/*
+  issues a pvfs2 setattr request to make sure the
+  new attribute values take effect if successful.
+
+  returns 0 on success; -1 otherwise
+*/
+int pvfs2_inode_setattr(struct inode *inode, struct iattr *iattr)
+{
+    int ret = -1;
+
+    pvfs2_error("FIXME: SKIPPING SETATTR: DOING NOTHING!\n");
+
+    return ret;
+}
+
+
 static inline struct inode *pvfs2_create_file(
     struct inode *dir,
     struct dentry *dentry,

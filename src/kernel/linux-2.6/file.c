@@ -62,7 +62,7 @@ static ssize_t pvfs2_file_write(struct file *file, const char *buf,
 {
     pvfs2_print("pvfs2: pvfs2_file_write called on %s\n",
                 file->f_dentry->d_name.name);
-    return 0;
+    return count;
 }
 
 int pvfs2_ioctl(struct inode *inode, struct file * file,
@@ -93,17 +93,6 @@ int pvfs2_fsync(struct file *file, struct dentry *dentry, int datasync)
     pvfs2_print("pvfs2: pvfs2_fsync called\n");
     return 0;
 }
-
-struct inode_operations pvfs2_file_inode_operations =
-{
-/*     .truncate = pvfs2_truncate, */
-/*     .setxattr = pvfs2_setxattr, */
-/*     .getxattr = pvfs2_getxattr, */
-/*     .listxattr = pvfs2_listxattr, */
-/*     .removexattr = pvfs2_removexattr, */
-/*     .setattr = pvfs2_setattr, */
-/*     .permission = pvfs2_permission, */
-};
 
 struct file_operations pvfs2_file_operations =
 {
