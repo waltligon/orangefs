@@ -19,7 +19,7 @@ int main(int argc,char **argv)
     PVFS_fs_id cur_fs;
     pvfs_mntlist mnt = {0,NULL};
     PVFS_sysresp_init resp_init;
-    PVFS_sysreq_remove req_remove;
+    PVFS_sysreq_rename req_rename;
 
     gossip_enable_stderr();
     gossip_set_debug_mask(1,CLIENT_DEBUG);
