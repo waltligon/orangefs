@@ -18,16 +18,6 @@
 #include "pvfs2.h"
 #include "pvfs2-mgmt.h"
 
-/* we are going to break some API boundaries here to get to the information
- * that we need
- */
-#include "server-config.h"
-#include "quicklist.h"
-#include "quickhash.h"
-#include "pint-sysint-utils.h"
-extern struct server_configuration_s g_server_config;
-extern struct qhash_table *PINT_fsid_config_cache_table;
-
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
 #endif
@@ -41,10 +31,8 @@ struct options
 static struct options* parse_args(int argc, char* argv[]);
 static void usage(int argc, char** argv);
 static void print_mntent(struct pvfs_mntent* entry);
-static int print_config(struct server_configuration_s* conf,
-    PVFS_fs_id fsid);
-static int noop_all_servers(struct server_configuration_s* conf,
-    PVFS_fs_id fsid);
+static int print_config(PVFS_fs_id fsid);
+static int noop_all_servers(PVFS_fs_id fsid);
 
 int main(int argc, char **argv)
 {
@@ -125,7 +113,7 @@ int main(int argc, char **argv)
     cur_fs = resp_init.fsid_list[mnt_index];
 
     /* dump some key parts of the config file */
-    ret = print_config(&g_server_config, cur_fs);
+    ret = print_config(cur_fs);
     if(ret < 0)
     {
 	PVFS_perror("print_config", ret);
@@ -136,7 +124,7 @@ int main(int argc, char **argv)
     printf("\n(3) Verifying that all servers are responding...\n");
 
     /* send noop to everyone */
-    ret = noop_all_servers(&g_server_config, cur_fs);
+    ret = noop_all_servers(cur_fs);
     if(ret < 0)
     {
 	PVFS_perror("noop_all_servers", ret);
@@ -220,47 +208,31 @@ int main(int argc, char **argv)
  *
  * returns -PVFS_error on failure, 0 on success
  */
-static int noop_all_servers(struct server_configuration_s* conf,
-    PVFS_fs_id fsid)
+static int noop_all_servers(PVFS_fs_id fsid)
 {
-    struct qlist_head* hash_link = NULL;
-    char* server_bmi_str = NULL;
-    struct config_fs_cache_s *cur_config_cache = NULL;
-    PINT_llist* tmp_server = NULL;
-    struct host_handle_mapping_s *cur_mapping = NULL;
+    char* server_list;
+    char* server_index;
     PVFS_credentials creds;
     int ret = -1;
-
+    char cur_server[PVFS_MAX_SERVER_ADDR_LEN];
+ 
     creds.uid = getuid();
     creds.gid = getgid();
 
-    hash_link = qhash_search(PINT_fsid_config_cache_table, &(fsid));
-    if(!hash_link)
-    {
-	fprintf(stderr, "Failure: could not find fsid %ld in configuration.\n",
-	    (long)fsid);
-	return(-PVFS_EINVAL);
-    }
-
-    cur_config_cache =
-	qlist_entry(hash_link, struct config_fs_cache_s,
-		    hash_link);
-    tmp_server = cur_config_cache->fs->meta_handle_ranges;
-    if(!tmp_server)
-    {
-	fprintf(stderr, "Failure: could not find meta servers in configuration.\n");
-	return(-PVFS_EINVAL);
-    }
-
     printf("\n   meta servers (duplicates are normal):\n");
-    while((cur_mapping = PINT_llist_head(tmp_server)))
+    server_list = PVFS_mgmt_build_virt_server_list(
+	fsid, creds, PVFS_MGMT_META_SERVER);	
+    if(!server_list)
     {
-	tmp_server = PINT_llist_next(tmp_server);
-
-	server_bmi_str = PINT_config_get_host_addr_ptr(
-	    conf,cur_mapping->alias_mapping->host_alias);
-	printf("   %s ", server_bmi_str);
-	ret = PVFS_mgmt_noop(creds, server_bmi_str);
+	fprintf(stderr, "Failure: could not find list of meta servers.\n");
+	return(-PVFS_EINVAL);
+    }
+    server_index = server_list;
+   
+    while(server_index && sscanf(server_index, "%s ", cur_server) == 1)
+    {
+	printf("   %s ", cur_server);
+	ret = PVFS_mgmt_noop(creds, cur_server);
 	if(ret == 0)
 	{
 	    printf("Ok\n");
@@ -270,24 +242,27 @@ static int noop_all_servers(struct server_configuration_s* conf,
 	    printf("Failure!\n");
 	    return(ret);
 	}
-    }
 
-    tmp_server = cur_config_cache->fs->data_handle_ranges;
-    if(!tmp_server)
-    {
-	fprintf(stderr, "Failure: could not find data servers in configuration.\n");
-	return(-PVFS_EINVAL);
+	server_index = index(server_index, ' ');
+	if(server_index)
+	    server_index++;
     }
+    free(server_list);
 
     printf("\n   data servers (duplicates are normal):\n");
-    while((cur_mapping = PINT_llist_head(tmp_server)))
+    server_list = PVFS_mgmt_build_virt_server_list(
+	fsid, creds, PVFS_MGMT_IO_SERVER);	
+    if(!server_list)
     {
-	tmp_server = PINT_llist_next(tmp_server);
-
-	server_bmi_str = PINT_config_get_host_addr_ptr(
-	    conf,cur_mapping->alias_mapping->host_alias);
-	printf("   %s ", server_bmi_str);
-	ret = PVFS_mgmt_noop(creds, server_bmi_str);
+	fprintf(stderr, "Failure: could not find list of data servers.\n");
+	return(-PVFS_EINVAL);
+    }
+    server_index = server_list;
+   
+    while(server_index && sscanf(server_index, "%s ", cur_server) == 1)
+    {
+	printf("   %s ", cur_server);
+	ret = PVFS_mgmt_noop(creds, cur_server);
 	if(ret == 0)
 	{
 	    printf("Ok\n");
@@ -297,7 +272,12 @@ static int noop_all_servers(struct server_configuration_s* conf,
 	    printf("Failure!\n");
 	    return(ret);
 	}
+
+	server_index = index(server_index, ' ');
+	if(server_index)
+	    server_index++;
     }
+    free(server_list);
 
     return(0);
 }
@@ -309,59 +289,55 @@ static int noop_all_servers(struct server_configuration_s* conf,
  *
  * returns -PVFS_error on failure, 0 on success
  */
-static int print_config(struct server_configuration_s* conf,
-    PVFS_fs_id fsid)
+static int print_config(PVFS_fs_id fsid)
 {
-    struct qlist_head* hash_link = NULL;
-    char* server_bmi_str = NULL;
-    struct config_fs_cache_s *cur_config_cache = NULL;
-    PINT_llist* tmp_server = NULL;
-    struct host_handle_mapping_s *cur_mapping = NULL;
-
-    hash_link = qhash_search(PINT_fsid_config_cache_table, &(fsid));
-    if(!hash_link)
-    {
-	fprintf(stderr, "Failure: could not find fsid %ld in configuration.\n",
-	    (long)fsid);
-	return(-PVFS_EINVAL);
-    }
-
-    cur_config_cache =
-	qlist_entry(hash_link, struct config_fs_cache_s,
-		    hash_link);
-    tmp_server = cur_config_cache->fs->meta_handle_ranges;
-    if(!tmp_server)
-    {
-	fprintf(stderr, "Failure: could not find meta servers in configuration.\n");
-	return(-PVFS_EINVAL);
-    }
+    char* server_list;
+    char* server_index;
+    char cur_server[PVFS_MAX_SERVER_ADDR_LEN];
+    PVFS_credentials creds;
+ 
+    creds.uid = getuid();
+    creds.gid = getgid();
 
     printf("\n   meta servers (duplicates are normal):\n");
-    while((cur_mapping = PINT_llist_head(tmp_server)))
+    server_list = PVFS_mgmt_build_virt_server_list(
+	fsid, creds, PVFS_MGMT_META_SERVER);	
+    if(!server_list)
     {
-	tmp_server = PINT_llist_next(tmp_server);
-
-	server_bmi_str = PINT_config_get_host_addr_ptr(
-	    conf,cur_mapping->alias_mapping->host_alias);
-	printf("   %s\n", server_bmi_str);
-    }
-
-    tmp_server = cur_config_cache->fs->data_handle_ranges;
-    if(!tmp_server)
-    {
-	fprintf(stderr, "Failure: could not find data servers in configuration.\n");
+	fprintf(stderr, "Failure: could not find list of meta servers.\n");
 	return(-PVFS_EINVAL);
     }
+    server_index = server_list;
+   
+    while(server_index && sscanf(server_index, "%s ", cur_server) == 1)
+    {
+	printf("   %s\n", cur_server);
+
+	server_index = index(server_index, ' ');
+	if(server_index)
+	    server_index++;
+    }
+    free(server_list);
 
     printf("\n   data servers (duplicates are normal):\n");
-    while((cur_mapping = PINT_llist_head(tmp_server)))
+    server_list = PVFS_mgmt_build_virt_server_list(
+	fsid, creds, PVFS_MGMT_IO_SERVER);	
+    if(!server_list)
     {
-	tmp_server = PINT_llist_next(tmp_server);
-
-	server_bmi_str = PINT_config_get_host_addr_ptr(
-	    conf,cur_mapping->alias_mapping->host_alias);
-	printf("   %s\n", server_bmi_str);
+	fprintf(stderr, "Failure: could not find list of data servers.\n");
+	return(-PVFS_EINVAL);
     }
+    server_index = server_list;
+   
+    while(server_index && sscanf(server_index, "%s ", cur_server) == 1)
+    {
+	printf("   %s\n", cur_server);
+
+	server_index = index(server_index, ' ');
+	if(server_index)
+	    server_index++;
+    }
+    free(server_list);
 
     return(0);
 }
