@@ -9,11 +9,14 @@
 
 #include "trove-init.c"
 
+extern void   cache_dump_active_list(void);
+extern void   cache_dump_inactive_list(void);
+
 TROVE_coll_id coll_id;
 TROVE_handle file_handle;
 TROVE_context_id trove_context;
 
-int main()
+int main(int argc, char *argv[])
 {
     PVFS_offset offarr[100];
     PVFS_size sizearr[100];
@@ -97,7 +100,7 @@ while ( comp < loop ) {
     /* bring it to the active list */
 for ( i=0; i< loop; i++ ) {
     offarr[0] = i*65536;
-    ret = cache_read_post(&desc, &request[i], &reply[i], NULL);
+    ret = cache_read_post((cache_read_desc_t*)&desc, &request[i], &reply[i], NULL);
     if (ret<0){
         fprintf(stderr, "cache_read_post error\n");
     }else{
@@ -137,7 +140,7 @@ for ( i=0; i< loop; i++ ) {
 /* refill inactive needed. */
 for ( i=0; i< loop; i++ ) {
     offarr[0] = (i+loop)*65536;
-    ret = cache_read_post(&desc, &request[i], &reply[i], NULL);
+    ret = cache_read_post((cache_read_desc_t*)&desc, &request[i], &reply[i], NULL);
     if (ret<0){
         fprintf(stderr, "cache_read_post error\n");
     }else{

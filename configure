@@ -2111,6 +2111,7 @@ src/io/bmi/bmi_tcp/module.mk
 src/io/bmi/bmi_gm/module.mk
 src/io/description/module.mk
 src/io/flow/module.mk
+src/io/buffer/module.mk
 src/io/flow/flowproto-bmi-trove/module.mk
 src/io/flow/flowproto-template/module.mk
 src/io/flow/flowproto-dump-offsets/module.mk
@@ -2131,6 +2132,7 @@ test/common/gen-locks/module.mk
 test/io/bmi/module.mk
 test/io/description/module.mk
 test/io/flow/module.mk
+test/io/buffer/module.mk
 test/io/job/module.mk
 test/io/dev/module.mk
 test/client/sysint/module.mk
@@ -2271,6 +2273,7 @@ src/io/flow/module.mk
 src/io/flow/flowproto-bmi-trove/module.mk
 src/io/flow/flowproto-template/module.mk
 src/io/flow/flowproto-dump-offsets/module.mk
+src/io/buffer/module.mk
 src/io/job/module.mk
 src/io/dev/module.mk
 src/proto/module.mk
@@ -2288,6 +2291,7 @@ test/common/gen-locks/module.mk
 test/io/bmi/module.mk
 test/io/description/module.mk
 test/io/flow/module.mk
+test/io/buffer/module.mk
 test/io/job/module.mk
 test/io/dev/module.mk
 test/client/sysint/module.mk

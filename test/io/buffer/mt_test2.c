@@ -11,6 +11,9 @@
 
 #include "trove-init.c"
 
+extern void   cache_dump_active_list(void);
+extern void   cache_dump_inactive_list(void);
+
 TROVE_coll_id coll_id;
 TROVE_handle file_handle;
 TROVE_context_id trove_context;

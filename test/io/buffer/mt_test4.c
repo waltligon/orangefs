@@ -21,17 +21,16 @@ void do_io(int *myid);
 int   loop = 16;
 int   req_cnt = 5;
 
-int main()
+int main(int argc, char * argv[])
 {
 
     NCAC_info_t info;
 
     int ret1, ret2, ret3;
-    int ret;
     int extcnt;
     int threadcnt;
 
-    pthread_t thread1, thread2, thread3;
+    pthread_t thread1, thread2;
 
 
 
@@ -65,24 +64,12 @@ int main()
                  (void *) &ret2) != 0)
         perror("pthread_create"), exit(1);
 
-#if 0
-    if (pthread_create(&thread3,
-                 NULL,
-                 (void *) do_io,
-                 (void *) &ret3) != 0)
-        perror("pthread_create"), exit(1);
-#endif
 
     if (pthread_join(thread1, NULL) != 0)
         perror("pthread_join"),exit(1);
 
     if (pthread_join(thread2, NULL) != 0)
         perror("pthread_join"),exit(1);
-
-#if 0
-    if (pthread_join(thread3, NULL) != 0)
-        perror("pthread_join"),exit(1);
-#endif
 
 
     //cache_dump_active_list();
