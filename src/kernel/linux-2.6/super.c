@@ -560,8 +560,6 @@ struct super_block* pvfs2_get_sb(
                 new_op->upcall.req.fs_mount.pvfs2_config_server);
 
     service_operation(new_op, "pvfs2_get_sb", 1);
-    goto_error_exit_if_wait_failed(ret, 0, 0);
-
     ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
 
     pvfs2_print("pvfs2_remount: mount got return value of %d\n", ret);
@@ -737,8 +735,8 @@ struct super_block *pvfs2_get_sb(
                     new_op->upcall.req.fs_mount.pvfs2_config_server);
 
         service_operation(new_op, "pvfs2_get_sb", 0);
-
         ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
+
         pvfs2_print("pvfs2_get_sb: mount got return value of %d\n", ret);
         if (ret)
         {
@@ -793,7 +791,7 @@ struct super_block *pvfs2_get_sb(
 
   error_exit:
     translate_error_if_wait_failed(ret, 0, 0);
-    if (ret && !sb)
+    if (ret && IS_ERR(sb))
     {
         sb = ERR_PTR(ret);
     }
