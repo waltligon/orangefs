@@ -14,7 +14,20 @@
 #include "quicklist.h"
 #include "trove-types.h"
 
-typedef struct qlist_head **trove_id_queue_p;
+struct trove_id_entry
+{
+    PVFS_ds_id trove_id;
+    struct qlist_head queue_link;
+};
+
+struct coll_index
+{
+    PVFS_coll_id coll_id;
+    struct qlist_head trove_id_queue; 
+};
+
+
+typedef struct coll_index* trove_id_queue_p;
 
 trove_id_queue_p trove_id_queue_new(void);
 int trove_id_queue_add(trove_id_queue_p queue,
@@ -25,11 +38,10 @@ void trove_id_queue_del(trove_id_queue_p queue,
 		     PVFS_coll_id coll_id);
 void trove_id_queue_cleanup(trove_id_queue_p queue);
 int trove_id_queue_query(trove_id_queue_p queue,
-		      void *array,
+		      PVFS_ds_id *array,
 		      int *count,
-		      PVFS_coll_id* coll_id,
-		      int index);
-int trove_id_queue_index_count(trove_id_queue_p queue);
+		      int *query_offset,
+		      PVFS_coll_id* coll_id);
 
 #endif /* __TROVE_ID_QUEUE_H */
 
