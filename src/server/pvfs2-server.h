@@ -148,8 +148,9 @@ typedef struct PINT_server_op
      * partially filled in by prelude nested state machine (for 
      * permission checking); may be used/modified by later states as well
      *
-     * the ds_attr is used by the prelude sm only; don't use it -- the
-     * object_attr is prepared for other sm's, so use it instead.
+     * the ds_attr is used by the prelude sm only (and for pulling the
+     * size out in the get-attr server sm); don't use it otherwise --
+     * the object_attr is prepared for other sm's, so use it instead.
      */
     PVFS_ds_attributes ds_attr;
     PVFS_object_attr attr;

@@ -20,19 +20,15 @@
  * - post the request to the request scheduler
  * - check permissions
  */
-
-/* TODO: document pre and post conditions (what server_op fields do we
- * require, and which ones do we modify?) 
- * TODO: don't forget in particular to document what we do with the 
- * s_op->attr structure, so other state machines know how to use it
- */
-
-static int prelude_req_sched(PINT_server_op *s_op, job_status_s *js_p);
-static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p);
-static int prelude_getattr_if_needed(PINT_server_op *s_op, job_status_s *js_p);
-
-static int check_mode(PVFS_object_attr* attr, PVFS_uid uid, PVFS_gid gid,
-    PVFS_permissions mode);
+static int prelude_req_sched(
+    PINT_server_op *s_op, job_status_s *js_p);
+static int prelude_perm_check(
+    PINT_server_op *s_op, job_status_s *js_p);
+static int prelude_getattr_if_needed(
+    PINT_server_op *s_op, job_status_s *js_p);
+static int check_mode(
+    PVFS_object_attr* attr, PVFS_uid uid,
+    PVFS_gid gid, PVFS_permissions mode);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
@@ -60,7 +56,6 @@ nested machine pvfs2_prelude_sm(req_sched, getattr_if_needed, perm_check)
     }
 }
 
-
 %%
 
 /* prelude_req_sched()
@@ -78,15 +73,16 @@ static int prelude_req_sched(PINT_server_op *s_op, job_status_s *js_p)
     /* this is a bit of a hack; if we are changing server mode we
      * must preserve the old mode value before calling req scheduler
      */
-    if(s_op->op == PVFS_SERV_MGMT_SETPARAM &&
-	s_op->req->u.mgmt_setparam.param == PVFS_SERV_PARAM_MODE)
+    if ((s_op->op == PVFS_SERV_MGMT_SETPARAM) &&
+	(s_op->req->u.mgmt_setparam.param == PVFS_SERV_PARAM_MODE))
     {
-	s_op->resp.u.mgmt_setparam.old_value = PINT_req_sched_get_mode();
+        s_op->resp.u.mgmt_setparam.old_value = PINT_req_sched_get_mode();
     }
     
-    ret = job_req_sched_post(s_op->req,
-	0,
-	s_op,
+    ret = job_req_sched_post(
+        s_op->req,
+        0,
+        s_op,
 	0,
 	js_p,
 	&(s_op->scheduled_id),
@@ -136,6 +132,7 @@ static int prelude_getattr_if_needed(PINT_server_op *s_op, job_status_s *js_p)
      * information 
      */
     memset(&(s_op->ds_attr), 0, sizeof(PVFS_ds_attributes));
+
     ret = job_trove_dspace_getattr(
         target_fs_id, target_handle, s_op, &(s_op->ds_attr),
         0, js_p, &tmp_id, server_job_context);
@@ -145,9 +142,9 @@ static int prelude_getattr_if_needed(PINT_server_op *s_op, job_status_s *js_p)
 
 /* prelude_perm_check()
  *
- * this really just marks the spot where we would want to do permission checking,
- * it will be replaced by a couple of states that actually perform this task
- * later
+ * this really just marks the spot where we would want to do
+ * permission checking, it will be replaced by a couple of states that
+ * actually perform this task later
  */
 static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p)
 {
@@ -167,15 +164,13 @@ static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p)
     PVFS_ds_attr_to_object_attr(ds_attr, obj_attr);
     s_op->attr.mask = PVFS_ATTR_COMMON_ALL;
 
-    /* the next thing we need to do is interpret the error code from reading
-     * the attributes.  Normally it is an error if that step failed, but we 
-     * have to look for the special case in which we set attributes on a file
-     * that did not have attributes previously.
+    /* the next thing we need to do is interpret the error code from
+     * reading the attributes.  Normally it is an error if that step
+     * failed, but we have to look for the special case in which we
+     * set attributes on a file that did not have attributes
+     * previously.
      */
-    /* also, we aren't storing any attributes with datafiles yet */
-    /* also, we do both a keyval and a bstream flush on a handle, one of which
-     * will fail -- or both, if the bstream hasn't been created yet */
-    if((js_p->error_code == -TROVE_ENOENT) && 
+    if ((js_p->error_code == -TROVE_ENOENT) && 
 	(s_op->req->op == PVFS_SERV_SETATTR ||
 	 s_op->req->op == PVFS_SERV_IO ||
          s_op->req->op == PVFS_SERV_GETATTR ||
@@ -187,22 +182,12 @@ static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p)
     }
 
     /* anything else we treat as a real error */
-    if(js_p->error_code)
+    if (js_p->error_code)
     {
-	/* convert to a PVFS error code; we don't have any special semantics
-	 * for error codes at this particular spot, so just remove trove mask
-	 */
-	/* NOTE: the negative signs are necessary because the bit masking
-	 * loses the sign, unfortunately
-	 */
 	js_p->error_code = -PVFS_ERROR_CODE(-js_p->error_code);
-	assert(js_p->error_code < 0);
 	return(1);
     }
 	
-    /* decide what kind of permission checking to do based on the 
-     * request type:
-     */
     switch(s_op->req->op)
     {
 	/* things that need read permissions */
@@ -213,8 +198,7 @@ static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p)
                 js_p->error_code = 0;
                 break;
             }
-            else
-                /* drop through to check mode */
+            /* drop through to check mode */
 	case PVFS_SERV_READDIR:
 	    /* TODO: figure out something cleaner looking than using 
 	     * PVFS_U_READ here to indicate we need read access; its 
@@ -278,7 +262,6 @@ static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p)
 	case PVFS_SERV_INVALID: 
 	case PVFS_SERV_WRITE_COMPLETION:
 	case PVFS_SERV_PERF_UPDATE:
-	    assert(0);
 	    js_p->error_code = -PVFS_EINVAL;
 	    break;
     }
