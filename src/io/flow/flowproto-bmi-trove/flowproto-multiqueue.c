@@ -800,6 +800,10 @@ static void trove_read_callback_fn(void *user_ptr,
 	    flow_data->next_seq_to_send++;
 	    if(q_item->last)
 		flow_data->dest_last_posted = 1;
+	    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
+		"(post send time) ini posts: %d, pending: %d, last: %d\n",
+		flow_data->initial_posts, flow_data->dest_pending,
+		flow_data->dest_last_posted);
 	}
 	else
 	{
@@ -884,6 +888,10 @@ static int bmi_send_callback_fn(void *user_ptr,
 #endif
 
     /* if this was the last operation, then mark the flow as done */
+    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
+	"(send callback time) ini posts: %d, pending: %d, last: %d\n",
+	flow_data->initial_posts, flow_data->dest_pending,
+	flow_data->dest_last_posted);
     if(flow_data->initial_posts == 0 &&
 	flow_data->dest_pending == 0 && 
 	flow_data->dest_last_posted)
