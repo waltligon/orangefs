@@ -848,7 +848,7 @@ install:: install_doc
 ifneq (,$(LINUX_KERNEL_SRC))
 
 KERNEL_VERS := $(shell grep UTS_RELEASE $(LINUX_KERNEL_SRC)/include/linux/version.h | cut -d\" -f2)
-KMOD_DIR := /lib/modules/$(KERNEL_VERS)/kernel/fs
+KMOD_DIR ?= /lib/modules/$(KERNEL_VERS)/kernel/fs
 
 .PHONY: kmod_install
 kmod_install:
