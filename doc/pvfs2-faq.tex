@@ -204,10 +204,47 @@ archived and that everyone has a chance to respond.
 
 This section covers issues related to the performance of PVFS2.
 
-\subsection{I ran Bonnie and the performance is terrible. Why? Is there
-            anything I can do?}
+\subsection{I ran Bonnie and/or IOzone and the performance is terrible.
+Why? Is there anything I can do?}
+\label{sec:badperf}
+
+We designed PVFS2 to work well for scientific applications in a cluster
+environment.  In such an environment, a file system must either spend time
+ensuring all client-side caches are in sync or not use a cache at all.  The
+\texttt{bonnie} and \texttt{bonnie++} benchmarks read and write very small
+blocks -- on the order of 1K.  These many small requests must travel from the
+client to the server and back again.  Without client-side caching, there
+is no sane way to speed this up.
+
+To improve benchmark performance, specify a bigger block size.   PVFS2
+has several more agressive optimizations that can be turned on, but
+those optimizations require that applications accessing PVFS2 can cope
+with out-of-sync caches.  
+
+In the future, PVFS2 is looking to provide optional semantics for use
+through the VFS that will allow some client-side caching to speed these
+kinds of serial benchmarks up.  By offering a way to explicitly sync
+data at any given time or by providing 'close-to-open' semantics, these
+kinds of caching improvements become an option for some applications.
+
+Bear in mind that benchmarks such as IOzone and Bonnie were meant to
+stress local file systems.   They do not accurately reflect the types of
+workloads for which we designed PVFS2.  Furthermore, because of their
+serial nature, PVFS2 will be unable to deliver its full performance.
+Try running a parallel file system benchmark like IOR
+(\url{http://www.llnl.gov/asci/purple/benchmarks/limited/ior/}).
+
 
 \subsection{Why is program XXX so slow?}
+See question \ref{sec:badperf}.  If the program uses small block sizes to
+access a PVFS2 file, performance will suffer.  
+
+The \texttt{TroveSyncMode}
+config file option can improve performance in some situations, but if the
+server dies, you will lose data.   PVFS2 has an Attribute Cache, which can
+speed up applications which read a lot of attributes (\texttt{ls}, for
+example).  Playing around with the \texttt{AttrCache*} config file settings
+might yield some performance improvements, or it might not. 
 
 %
 % REDUNDANCY
@@ -258,9 +295,8 @@ This section covers issues related to accessing PVFS2 file systems.
 \subsection{How do I get MPI-IO for PVFS2?}
 
 The ROMIO MPI-IO implementation, as provided with MPICH2 and others, supports
-PVFS2.
-
-\emph{Add pointer to notes on installing?}
+PVFS2.  You can find more information in the ROMIO section of the
+pvfs2-quickstart: \url{http://www.pvfs.org/pvfs2/pvfs2-quickstart.html\#sec:romio}
 
 \subsection{Can I directly manipulate PVFS2 files on the PVFS2 servers
             without going through some client interface?}
