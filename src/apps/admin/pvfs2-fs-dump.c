@@ -31,6 +31,7 @@ struct options
     char* mnt_point;
     int mnt_point_set;
     int dot_format;
+    int key;
 };
 
 static struct options* parse_args(int argc, char* argv[]);
@@ -64,7 +65,7 @@ void analyze_remaining_handles(PVFS_fs_id cur_fs,
 			       int dot_fmt);
 
 /* print functions */
-static void print_header(int dot_fmt);
+static void print_header(int dot_fmt, int key);
 static void print_trailer(int dot_fmt);
 static void print_root_entry(PVFS_handle handle,
 			     int server_idx,
@@ -74,6 +75,7 @@ static void print_entry(char *name,
 			PVFS_handle parent_handle,
 			PVFS_ds_type objtype,
 			int server_idx,
+			int error,
 			int dot_fmt);
 
 
@@ -214,7 +216,7 @@ int main(int argc, char **argv)
      */
     build_handlelist(cur_fs, addr_array, server_count, creds);
 
-    print_header(user_opts->dot_format);
+    print_header(user_opts->dot_format, user_opts->key);
 
     traverse_directory_tree(cur_fs,
 			    addr_array,
@@ -489,6 +491,7 @@ int descend(PVFS_fs_id cur_fs,
 		    pref.handle, /* parent handle */
 		    getattr_resp.attr.objtype,
 		    server_idx,
+		    0,
 		    opts_p->dot_format);
 
 	switch (getattr_resp.attr.objtype) {
@@ -563,6 +566,7 @@ void verify_datafiles(PVFS_fs_id cur_fs,
 		    mf_ref.handle,
 		    PVFS_TYPE_DATAFILE,
 		    server_idx,
+		    0,
 		    dot_fmt);
 
 	handlelist_remove_handle(df_handles[i], server_idx);
@@ -744,11 +748,14 @@ static void handlelist_finalize(void)
 
 /**********************************************/
 
-static void print_header(int dot_fmt)
+static void print_header(int dot_fmt, int key)
 {
     if (dot_fmt) {
 	printf("digraph %d {\n",
 	       getpid());
+	if (key) {
+	    printf("\tsubgraph cluster1 {\n\t\t\"Datafile\" [shape=ellipse, style=filled, fillcolor=violet];\n\t\t\"Metafile\" [shape=record, style=filled, fillcolor=aquamarine];\n\t\t\"Directory\" [shape=record, style=filled, fillcolor=grey];\n\t\t\"Missing Datafile\" [shape=ellipse, style=dashed, color=red];\n\t\t\"Datafile\" -> \"Metafile\" [style=invis];\n\t\t\"Metafile\" -> \"Directory\" [style=invis];\n\t\t\"Directory\" -> \"Missing Datafile\" [style=invis];\n\t\tstyle=dotted;\n\t\tlabel = \"Key\";\t}\n");
+	}
     }
 }
 
@@ -765,7 +772,7 @@ static void print_root_entry(PVFS_handle handle,
 {
     if (dot_fmt)
     {
-	printf("\tH0x%08Lx [shape=record, label = \"{/ | 0x%08Lx (%d)}\"];\n",
+	printf("\tH0x%08Lx [shape = record, fillcolor = grey, style = filled, label = \"{/ | 0x%08Lx (%d)}\"];\n",
 	       handle,
 	       handle,
 	       server_idx);
@@ -779,30 +786,42 @@ static void print_root_entry(PVFS_handle handle,
     }
 }
 
+/* print_entry()
+ *
+ * Parameters:
+ * name          - name of object, ignored for datafiles
+ * handle        - handle of object
+ * parent_handle - handle of parent, for drawing connections
+ * objtype       - type of object (e.g. PVFS_TYPE_DIRECTORY)
+ * server_idx    - index into list of servers for location of this handle
+ * error         - boolean indicating if there is an error with this entry
+ * dot_fmt       - boolean indicating if output should be in dot format
+ */
 static void print_entry(char *name,
 			PVFS_handle handle,
 			PVFS_handle parent_handle,
 			PVFS_ds_type objtype,
 			int server_idx,
+			int error,
 			int dot_fmt)
 {
     if (dot_fmt)
     {
 	/* always show connector */
-	printf("\tH0x%08Lx -> H0x%08Lx;\n",
+	printf("\tH0x%08Lx -> H0x%08Lx [style = bold];\n",
 	       parent_handle,
 	       handle);
 	switch (objtype) {
 	    case PVFS_TYPE_DIRECTORY:
-		printf("\tH0x%08Lx [shape=record, label = \"{%s/ | 0x%08Lx (%d)}\"];\n",
+		printf("\tH0x%08Lx [shape = record, fillcolor = grey, style = filled, label = \"{%s/ | 0x%08Lx (%d)}\"];\n",
 		       handle, name, handle, server_idx);
 		break;
 	    case PVFS_TYPE_METAFILE:
-		printf("\tH0x%08Lx [shape=record, label = \"{%s | 0x%08Lx (%d)}\"];\n",
+		printf("\tH0x%08Lx [shape = record, fillcolor = aquamarine, style = filled, label = \"{%s | 0x%08Lx (%d)}\"];\n",
 		       handle, name, handle, server_idx);
 		break;
 	    case PVFS_TYPE_DATAFILE:
-		printf("\tH0x%08Lx [shape=ellipse, label =\"0x%08Lx (%d)\"];\n",
+		printf("\tH0x%08Lx [shape = ellipse, fillcolor = violet, style = filled, label =\"0x%08Lx (%d)\"];\n",
 		       handle, handle, server_idx);
 		break;
 	    case PVFS_TYPE_DIRDATA:
@@ -846,7 +865,7 @@ static struct options* parse_args(int argc, char* argv[])
     /* getopt stuff */
     extern char* optarg;
     extern int optind, opterr, optopt;
-    char flags[] = "dvm:";
+    char flags[] = "dvkm:";
     int one_opt = 0;
     int len = 0;
 
@@ -891,6 +910,9 @@ static struct options* parse_args(int argc, char* argv[])
 	    case 'd':
 		tmp_opts->dot_format = 1;
 		break;
+	    case 'k':
+		tmp_opts->key = 1;
+		break;
 	    case '?':
 		usage(argc, argv);
 		exit(EXIT_FAILURE);
@@ -914,6 +936,7 @@ static void usage(int argc, char** argv)
 	argv[0]);
     fprintf(stderr, "Display information about contents of file system.\n");
     fprintf(stderr, "  -d              output in format suitable for dot\n");
+    fprintf(stderr, "  -k              when used with -d, prints key\n");
     fprintf(stderr, "  -v              print version and exit\n");
     fprintf(stderr, "Example: %s -m /mnt/pvfs2\n",
 	argv[0]);
