@@ -78,7 +78,7 @@ static struct errno_mapping trove_error_map[] =
 
 PVFS_error trove_errno_to_trove_error(int errno_value)
 {
-    int i;
+    int i = 0;
 
     /* don't try to map invalid values */
     if (errno_value <= 0) return errno_value;
