@@ -50,12 +50,6 @@ static int pvfs2_get_blocks(
     void *page_data = NULL;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
 
-    /* check assumption before continuing */
-    if (max_blocks != 1) {
-	pvfs2_error("pvfs2_get_blocks called with invalid max_blocks (%lu)\n",
-		    max_blocks);
-    }
-
     /*
       We're faking our inode block size to be PAGE_CACHE_SIZE
       to play nicely with the page cache.
@@ -65,6 +59,12 @@ static int pvfs2_get_blocks(
     */
     const uint32_t blocksize = PAGE_CACHE_SIZE;  /* inode->i_blksize */
     const uint32_t blockbits = PAGE_CACHE_SHIFT; /* inode->i_blkbits */
+
+    /* check assumption before continuing */
+    if (max_blocks != 1) {
+	pvfs2_error("pvfs2_get_blocks called with invalid max_blocks (%lu)\n",
+		    max_blocks);
+    }
 
     pvfs2_print("pvfs2_get_blocks called for lblock %lu\n",
                 (unsigned long)lblock);
