@@ -35,8 +35,7 @@
 %
 \section{Basics}
 
-This section covers some basic questions about what PVFS2 is and where it can
-be used.
+This section covers some basic questions for people who are unfamiliar with PVFS2.
 
 \subsection{What is PVFS2?}
 
@@ -60,26 +59,69 @@ not depend on the design of the traditional *NIX Virtual Filesystem
 Switch (VFS) layer, although we provide a compatibility layer that
 allows access to the file system through it.
 
+\subsection{What are the components of PVFS2 that I should know about?}
+
+The PVFS2 Guide (\url{http://www.pvfs.org/pvfs2/pvfs2-guide.html}) has more
+information on all of these components, plus a discussion of the system as a
+whole, the code tree, and more.
+
+%
+% SUPPORTED ARCHITECTURES
+%
+\section{Supported Architectures and Hardware}
+
+This section covers questions related to particular system architectures,
+operating systems, and other hardware.
+
+\subsection{Does PVFS2 require any particular hardware?}
+
+Other than hardware supported by the Linux OS, no.  PVFS2 uses
+existing network infrastructure for communication and can currently
+operate over TCP, Myrinet, and InfiniBand.  Disk local to servers is
+used for PVFS2 storage, so no storage area network (SAN) is required
+either (although it can be helpful when setting up fault tolerant solutions;
+see Section~\ref{sec:fault-tolerance}.
+
 \subsection{What architectures does PVFS2 support?}
 \label{sec:supported-architectures}
 
 The majority of PVFS2 is POSIX-compliant C code that runs in user
-space.  As such, much of PVFS2 can run on most available systems.
+space.  As such, much of PVFS2 can run on most available systems.  See
+Question~\ref{sec:supported-hw} for more information on particular
+hardware.
 
 The (optional) part of PVFS2 that hooks to the operating system on
 clients must be written specifically for the particular operating
-system and the requirements are described below.
+system.  Question~\ref{sec:kernel-version} covers this issue.
 
-\subsection{Does running PVFS2 require a particular kernel version?}
+\subsection{Does PVFS2 work across heterogeneous architectures?}
+
+Yes!  The ``language'' that PVFS2 uses to talk between clients and
+servers is encoded in a architecture-independent format (little-endian
+with fixed byte length parameters).  This allows different PVFS2
+components to interact seamlessly regardless of architecture.
+
+\subsection{Does running PVFS2 require a particular kernel or kernel
+            version?}
+\label{sec:kernel-version}
 
 You can run the userspace PVFS2 servers and administration tools on
 every major GNU/Linux distribution out of the box, and we intend to
-keep it that way.  However, the kernel module that allows client
-access to the PVFS2 system does depend on particular kernel versions
-because it builds against the running one (in the same manner as every
-other Linux module).  The kernel dependent PVFS2 client support has
-been written for Linux kernel versions 2.4.19 (and greater) and 2.6.0
-(and greater).
+keep it that way.
+%
+However, the kernel module that allows client access to the PVFS2 system
+does depend on particular kernel versions because it builds against
+the running one (in the same manner as every other Linux module).
+The kernel dependent PVFS2 client support has been written for Linux
+kernel versions 2.4.19 (and greater) and 2.6.0 (and greater).  At this
+time only Linux clients have this level of support.
+
+\subsection{What specific hardware architectures are supported by the
+            PVFS2 kernel module?}
+\label{sec:supported-hw}
+
+To our knowledge, PVFS2 has been verified to be working on x86/IA-32,
+IA-64, AMD64, PowerPC (ppc), and Alpha based GNU/Linux distributions.
 
 \subsection{Does the PVFS2 client require a patched Linux kernel?}
 
@@ -91,29 +133,10 @@ the officially released kernels.  The best place to find out more
 information about support for a kernel tied to a particular
 distribution is on the PVFS2-developers mailing list.
 
-\subsection{Can I build the PVFS2 kernel code directly into the kernel, rather than as a module?}
+\subsection{Can I build the PVFS2 kernel code directly into the kernel,
+            rather than as a module?}
 
 No, this is currently not supported nor recommended.
-
-\subsection{Does PVFS2 work across heterogeneous architectures?}
-
-Yes.  The ``language'' that PVFS2 uses to talk between clients and
-servers is encoded in a architecture-independent format (little-endian
-with fixed byte length parameters).  This allows different PVFS2
-components to interact seamlessly regardless of architecture.
-
-\subsection{Does PVFS2 require any particular hardware?}
-
-Other than hardware supported by the Linux OS, no.  PVFS2 uses
-existing network infrastructure for communication and can currently
-operate over TCP, Myrinet, and InfiniBand.  Disk local to servers is
-used for PVFS2 storage, so no storage area network (SAN) is required
-either.
-
-\subsection{What specific hardware architectures are supported by the PVFS2 kernel module?}
-
-To our knowledge, PVFS2 has been verified to be working on x86/IA-32,
-IA-64, AMD64, PowerPC (ppc), and Alpha based GNU/Linux distributions.
 
 \subsection{Is there a MacOS X/Cygwin/Windows client for PVFS2?}
 
@@ -121,12 +144,6 @@ At this time we have no plans for porting the code to operating
 systems other than Linux.  However, we do encourage porting efforts of
 PVFS2 to other operating systems, and will likely aid in the
 development.
-
-\subsection{What are the components of PVFS2 that I should know about?}
-
-The PVFS2 Guide (\url{http://www.pvfs.org/pvfs2/pvfs2-guide.html}) has more
-information on all of these components, plus a discussion of the system as a
-whole, the code tree, and more.
 
 %
 % INSTALLATION
@@ -171,14 +188,16 @@ might be useful for setting up complicated configurations of local storage
 prior to starting up PVFS2 servers.
 
 A second solution would be to use more than one server on the same node, each
-using a different file system to store its data.
+using a different file system to store its data.  This might lead to resource
+contention issues, so we suggest trying other options first.
 
 \subsection{How can I run multiple PVFS2 servers on the same node?}
 
-Running more than one PVFS2 server on the same node is as simple as setting up
-servers on different nodes.  Each will need its own entry in the list of
-Aliases and its own server-specific configuration file, as described in the
-Quick Start (\url{http://www.pvfs.org/pvfs2/pvfs2-quickstart.html}).
+If you do decide to run more than one PVFS2 server on the same node,
+setting things up is as simple as setting up servers on different
+nodes.  Each will need its own entry in the list of Aliases and its
+own server-specific configuration file, as described in the Quick Start
+(\url{http://www.pvfs.org/pvfs2/pvfs2-quickstart.html}).
 
 \subsection{Can I use multiple metadata servers in PVFS2?}
 
@@ -186,11 +205,13 @@ Absolutely!  Any PVFS2 server can store either metadata, data, or both.
 Simply allocate unique MetaHandleRanges for each server that you would like to
 store metadata; the clients will handle the rest.
 
-\subsection{Does using multiple metadata servers reduce the chance of file system corruption during hardware failures?}
+\subsection{Does using multiple metadata servers reduce the chance of
+            file system corruption during hardware failures?}
 
-Unfortnately, no.  While using multiple metadata servers distributes
+Unfortunately, no.  While using multiple metadata servers distributes
 metadata, it does not replicate or store redundant information across
-these servers.
+these servers.  For information on better handling failures, see
+Section~\ref{sec:fault-tolerance}.
 
 \subsection{Can PVFS2 servers listen on two network interfaces simultaneously (i.e. multihome)?}
 
@@ -202,7 +223,7 @@ implement this feature in the future.
 \subsection{How can I automount PVFS2 volumes?}
 
 The Linux automounter needs some help dealing with PVFS2's resource strings.  A
-typical mount command would look like this:
+typical mount command (on Linux 2.6) would look like this:
 
 \begin{verbatim}
 	mount -t pvfs2 tcp://server0:3334/pvfs2-fs /mnt/pvfs2
@@ -211,7 +232,7 @@ typical mount command would look like this:
 The entry in the automount config file should look like this:
 
 \begin{verbatim}
-	pvfs -fstype=pvfs2           :tcp://cave0\:3334/pvfs2-fs
+	pvfs -fstype=pvfs2           :tcp://server0\:3334/pvfs2-fs
 \end{verbatim}
 
 Note the backslash-escape of the colon before the port number.  Without that
@@ -358,12 +379,13 @@ Why? Is there anything I can do?}
 \label{sec:badperf}
 
 We designed PVFS2 to work well for scientific applications in a cluster
-environment.  In such an environment, a file system must either spend time
-ensuring all client-side caches are in sync or not use a cache at all.  The
-\texttt{bonnie} and \texttt{bonnie++} benchmarks read and write very small
-blocks -- on the order of 1K.  These many small requests must travel from the
-client to the server and back again.  Without client-side caching, there
-is no sane way to speed this up.
+environment.  In such an environment, a file system must either spend
+time ensuring all client-side caches are in sync, or not use a cache
+at all (which is how PVFS2 currently operates).  The \texttt{bonnie}
+and \texttt{bonnie++} benchmarks read and write very small blocks --
+on the order of 1K.  These many small requests must travel from the
+client to the server and back again.  Without client-side caching,
+there is no sane way to speed this up.
 
 To improve benchmark performance, specify a bigger block size.   PVFS2
 has several more aggressive optimizations that can be turned on, but
@@ -380,12 +402,12 @@ Bear in mind that benchmarks such as IOzone and Bonnie were meant to
 stress local file systems.   They do not accurately reflect the types of
 workloads for which we designed PVFS2.  Furthermore, because of their
 serial nature, PVFS2 will be unable to deliver its full performance.
-Try running a parallel file system benchmark like IOR
+Instead try running a parallel file system benchmark like IOR
 (\url{http://www.llnl.gov/asci/purple/benchmarks/limited/ior/}).
 
 
 \subsection{Why is program XXX so slow?}
-See question \ref{sec:badperf}.  If the program uses small block sizes to
+See Question~\ref{sec:badperf}.  If the program uses small block sizes to
 access a PVFS2 file, performance will suffer.  
 
 Setting both (or either of) the \texttt{TroveSyncMeta} and
@@ -406,7 +428,7 @@ a command line argument to pvfs2-client.
 \subsection{NFS outperforms PVFS2 for application XXX. Why?}
 
 In an environment where there is one client accessing a file on one
-server, NFS will outperform PVFS2 in most benchmarks.  NFS has
+server, NFS will outperform PVFS2 in many benchmarks.  NFS has
 completely different consistency semantics, which work very well when
 just one process accesses a file.  There is some ongoing work that
 will optionally offer similar consistency semantics for PVFS2, at
@@ -436,10 +458,10 @@ particularly one with small accesses.
 
 \subsection{Can the underlying local file system affect PVFS2 performance?}
 
-The interaction between the PVFS2 servers and the local file system
-hosting the storage space has not been fully explored.  No doubt a
-great deal of time could be spent on different file systems and their
-parameters.
+Yes!  However, the interaction between the PVFS2 servers and the local
+file system hosting the storage space has not been fully explored.
+No doubt a great deal of time could be spent on different file systems
+and their parameters.
 
 People have looked at sync performance for a variety of file systems.
 Some file systems will flush all dirty buffers when \texttt{fsync} is
@@ -453,10 +475,14 @@ These tests demonstrate wide variance in file system behavior.
 Interested users are encouraged to experiment and discuss their
 findings on the PVFS2 lists.
 
+If you're looking for a quick suggestion for a local file system type to use, we
+suggest ext3 with ``journal data writeback'' option as a reasonable choice.
+
 %
 % REDUNDANCY
 %
 \section{Fault Tolerance}
+\label{sec:fault-tolerance}
 
 This section covers issues related to fault tolerance in the context of PVFS2.
 
@@ -487,17 +513,21 @@ server may be used with PVFS2.  \emph{Need a reference of some sort.}
 
 \subsection{Can PVFS2 tolerate server failures?}
 
-We currently have a recipie decscribing the hardware and software needed to set
-up PVFS2 in a high availability cluster.  Our method is outlined in the
-`pvfs2-ha.\{ps,pdf\}' file.  Software redundancy offers a cheaper solution to
-redundancy, but at a non-trivial cost to performance.  We are studying how to
-implement software reduncancy with lower overhead, but we have more designing
-yet to do.
+Yes.  We currently have a recipe describing the hardware and software
+needed to set up PVFS2 in a high availability cluster.  Our method is
+outlined in the `pvfs2-ha.\{ps,pdf\}' file in the doc subdirectory of the
+PVFS2 distribution.  This configuration relies on shared storage and
+commodity ``heartbeat'' software to provide means for failover.
+
+Software redundancy offers a less expensive solution to redundancy,
+but usually at a non-trivial cost to performance.  We are studying how
+to implement software reduncancy with lower overhead, but at this time
+we provide no software-only server failover solution.
 
 %
 % INTERFACES
 %
-\section{Interfaces}
+\section{File System Interfaces}
 
 This section covers issues related to accessing PVFS2 file systems.
 
@@ -569,7 +599,7 @@ order):
 Note that adding a new server will \emph{not} cause existing datafiles to be
 placed on the new server, although new ones will be (by default).  Migration
 tools are necessary to move existing datafiles (see
-Section~\ref{sec:migration}) both in the case of a new server, or if you
+Question~\ref{sec:migration}) both in the case of a new server, or if you
 wanted to migrate data off a server before removing it.
 
 \subsection{Are there tools for migrating data between servers?}
@@ -632,6 +662,17 @@ No.  Currently PVFS2 does not intelligently place new files based on free
 space.  It's a good idea, and possible, but we have not done this yet.  See
 Section~\ref{sec:contributing} for notes on how you could help get this
 feature in place.
+
+\subsection{Does PVFS2 have locks?}
+
+No.  Locking subsystems add a great deal of shared state to a parallel file 
+system implementation, and one of the primary design goals was to eliminate
+shared state in PVFS2.  This results in a simpler, more fault tolerant
+overall system than would have been possible had we integrated locking into
+the file system.
+
+It's possible that an add-on locking subsystem will be developed at some point;
+however, there is no plan to build such a system at this time.
 
 %
 % HELPING OUT
