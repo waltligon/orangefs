@@ -115,10 +115,6 @@ int main(int argc, char **argv)	{
 		return(-1);
 	}
 
-#if 0
-	display_pvfs_structure(my_req,1);
-#endif
-
 	/* send the initial request on its way */
 	ret = BMI_post_sendunexpected(&(client_ops[1]), server_addr,
 		foo.buffer_list[0], foo.total_size, BMI_PRE_ALLOC, 0, NULL);
@@ -149,6 +145,9 @@ int main(int argc, char **argv)	{
 			return(-1);
 		}
 	}
+
+	/* release the encoded message */
+	PINT_encode_release(&foo, PINT_ENCODE_REQ, 0);
 
 	/* post a recv for the server acknowledgement */
 	ret = BMI_post_recv(&(client_ops[0]), server_addr, my_ack, 
@@ -204,9 +203,6 @@ int main(int argc, char **argv)	{
 		printf("ERROR: server returned status: %d\n",
 			(int)dec_ack->status);
 	}
-
-	BMI_memfree(server_addr, foo.buffer_list[0], foo.total_size,
-		BMI_SEND_BUFFER);
 
 	/* shutdown the local interface */
 	ret = BMI_finalize();
