@@ -3042,6 +3042,8 @@ static int do_one_work_cycle_flow(int *num_completed)
 	gen_mutex_unlock(&completion_mutex);
     }
 
+    flow_pending_count -= outcount;
+
     *num_completed = outcount;
     return (0);
 }
