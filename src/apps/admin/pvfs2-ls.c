@@ -274,7 +274,8 @@ void print_entry_attr(
     char *empty_str = "";
     char *owner = empty_str, *group = empty_str;
     char *inode = empty_str;
-    struct tm *time = gmtime((time_t *)&attr->atime);
+    time_t atime = (time_t)attr->atime;
+    struct tm *time = gmtime(&atime);
     PVFS_size size = 0;
     char scratch_owner[16] = {0}, scratch_group[16] = {0};
     char scratch_size[16] = {0}, scratch_inode[16] = {0};

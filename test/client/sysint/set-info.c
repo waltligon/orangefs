@@ -4,10 +4,11 @@
  * See COPYING in top-level directory.
  */
 
-#include <sys/time.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <unistd.h>
+#include <sys/types.h>
 
 #include "client.h"
 #include "pvfs2-util.h"
@@ -23,6 +24,7 @@ int main(int argc, char **argv)
     PVFS_sysresp_lookup resp_look;
     PVFS_sysresp_getattr resp_getattr;
     PVFS_pinode_reference pinode_refn;
+    time_t r_atime, r_mtime, r_ctime;
 
     if (argc == 2)
     {
@@ -48,9 +50,8 @@ int main(int argc, char **argv)
         return ret;
     }
 
-    /* fake credentials here */
-    credentials.uid = 100;
-    credentials.gid = 100;
+    credentials.uid = getuid();
+    credentials.gid = getgid();
 
     fs_id = resp_init.fsid_list[0];
 
@@ -77,6 +78,10 @@ int main(int argc, char **argv)
         return ret;
     }
 
+    r_atime = (time_t)resp_getattr.attr.atime;
+    r_mtime = (time_t)resp_getattr.attr.mtime;
+    r_ctime = (time_t)resp_getattr.attr.ctime;
+
     printf("Retrieved the following attributes\n");
     printf("Handle      : %Lu\n", Lu(pinode_refn.handle));
     printf("FSID        : %d\n", (int)pinode_refn.fs_id);
@@ -84,9 +89,9 @@ int main(int argc, char **argv)
     printf("uid         : %d\n", resp_getattr.attr.owner);
     printf("gid         : %d\n", resp_getattr.attr.group);
     printf("permissions : %d\n", resp_getattr.attr.perms);
-    printf("atime       : %s", ctime((time_t *)&resp_getattr.attr.atime));
-    printf("mtime       : %s", ctime((time_t *)&resp_getattr.attr.mtime));
-    printf("ctime       : %s", ctime((time_t *)&resp_getattr.attr.ctime));
+    printf("atime       : %s", ctime(&r_atime));
+    printf("mtime       : %s", ctime(&r_mtime));
+    printf("ctime       : %s", ctime(&r_ctime));
 
     /* take the retrieved attributes and update the access time */
     resp_getattr.attr.atime = time(NULL);
@@ -113,6 +118,10 @@ int main(int argc, char **argv)
     {
         printf("setattr returned success\n");
 
+        r_atime = (time_t)resp_getattr.attr.atime;
+        r_mtime = (time_t)resp_getattr.attr.mtime;
+        r_ctime = (time_t)resp_getattr.attr.ctime;
+
         printf("Set the following attributes\n");
         printf("Handle      : %Lu\n", Lu(pinode_refn.handle));
         printf("FSID        : %d\n", (int)pinode_refn.fs_id);
@@ -120,9 +129,9 @@ int main(int argc, char **argv)
         printf("uid         : %d\n", resp_getattr.attr.owner);
         printf("gid         : %d\n", resp_getattr.attr.group);
         printf("permissions : %d\n", resp_getattr.attr.perms);
-        printf("atime       : %s", ctime((time_t *)&resp_getattr.attr.atime));
-        printf("mtime       : %s", ctime((time_t *)&resp_getattr.attr.mtime));
-        printf("ctime       : %s", ctime((time_t *)&resp_getattr.attr.ctime));
+        printf("atime       : %s", ctime(&r_atime));
+        printf("mtime       : %s", ctime(&r_mtime));
+        printf("ctime       : %s", ctime(&r_ctime));
     }
 
     ret = PVFS_sys_finalize();
