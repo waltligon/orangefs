@@ -41,15 +41,23 @@ dnl this should really check for 2.3.2 or later -- probably in
 dnl more portable format as well.
 MISC_TROVE_FLAGS=""
 if test x$host_os = xlinux-gnu; then
-   AC_MSG_CHECKING(glibc version for working aio callbacks)
-   GLIBC_VERSION=`/lib/libc.so.6  | head -n 1 | sed s/,//g | awk '{print $7}'`
-   if test x$GLIBC_VERSION = x2.3.2; then
-      MISC_TROVE_FLAGS="-D__PVFS2_TROVE_AIO_THREADED__"
-      AC_SUBST(MISC_TROVE_FLAGS)
-      AC_MSG_RESULT(yes)
-   else AC_MSG_RESULT(no)
-   fi
+    AC_MSG_CHECKING(glibc version for working aio callbacks)
+    libc=`echo /lib/libc.so.* | sed 1q`
+    if test x$libc != x ; then
+	if test -x $libc ; then
+	    vers=`$libc | sed 's/.*version \(.*\),.*/\1/; q'`
+	    if test x$vers = x2.3.2; then
+		MISC_TROVE_FLAGS="-D__PVFS2_TROVE_AIO_THREADED__"
+	    fi
+	fi
+    fi
 fi
+if test x$MISC_TROVE_FLAGS = x ; then
+    AC_MSG_RESULT(no)
+else
+    AC_MSG_RESULT(yes)
+fi
+AC_SUBST(MISC_TROVE_FLAGS)
 
 dnl Check byte ordering
 AC_C_BIGENDIAN
@@ -61,15 +69,13 @@ dnl decide how large the PVFS_aint type should be, based on above
 AC_MSG_CHECKING(typedef to use for PVFS_aint type)
 if test x$ac_cv_sizeof_void_p = x4; then
     PVFS_AINT=int32_t
-    AC_SUBST(PVFS_AINT)
-    AC_MSG_RESULT(int32_t)
 elif test x$ac_cv_sizeof_void_p = x8; then
     PVFS_AINT=int64_t
-    AC_SUBST(PVFS_AINT)
-    AC_MSG_RESULT(int64_t)
 else
     AC_MSG_ERROR(pointer size check failure?)
 fi
+AC_SUBST(PVFS_AINT)
+AC_MSG_RESULT($PVFS_AINT)
 
 dnl Options for debugging
 dnl This particular one enables tracing of memory allocation and
@@ -283,6 +289,12 @@ for d in src/apps src/io src/common src/client src/kernel test/common \
 	install -d $d;
 done
 
+dnl Avoid recompiling the universe if this file has not actually changed.
+types=include/pvfs2-types.h
+if test -e $types ; then
+    mv $types $types.prev
+fi
+
 dnl output final version of top level makefile and subdirectory
 dnl    makefile includes
 AC_OUTPUT(Makefile
@@ -343,4 +355,9 @@ maint/mpi-depend.sh
 include/pvfs2-types.h
 )
 
-
+if test -e $types.prev ; then
+    if cmp -s $types $types.prev ; then
+	mv $types.prev $types
+	echo $as_me: $types is unchanged
+    fi
+fi
