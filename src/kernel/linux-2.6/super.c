@@ -156,17 +156,9 @@ static int pvfs2_statfs(
                     new_op->downcall.resp.statfs.blocks_avail,
                     new_op->downcall.resp.statfs.blocks_total);
 
-        /*
-          re-assign superblock blocksize based on statfs blocksize:
-
-          NOTE: it seems okay that the superblock blocksize doesn't
-          match what we're using as the inode blocksize.  keep an
-          eye out to be sure.
-        */
-        sb->s_blocksize = new_op->downcall.resp.statfs.block_size;
-
         buf->f_type = sb->s_magic;
         buf->f_bsize = sb->s_blocksize;
+        buf->f_frsize = 1024;
         buf->f_namelen = PVFS2_NAME_LEN;
 
         buf->f_blocks = (sector_t)
@@ -305,7 +297,7 @@ int pvfs2_fill_sb(
     void *data,
     int silent)
 {
-    int ret = -EINVAL, shift_val = 0;
+    int ret = -EINVAL;
     struct inode *root = NULL;
     struct dentry *root_dentry = NULL;
 
@@ -330,14 +322,8 @@ int pvfs2_fill_sb(
     sb->s_type = &pvfs2_fs_type;
 
     sb->s_blocksize = PVFS2_BUFMAP_DEFAULT_DESC_SIZE;
-    shift_val = ((sizeof(sb->s_blocksize_bits) * 8) - 1);
-    sb->s_blocksize_bits = (1 << shift_val);
-    sb->s_blocksize_bits =
-        ((sb->s_blocksize > sb->s_blocksize_bits) ?
-         sb->s_blocksize_bits : PVFS2_BUFMAP_DEFAULT_DESC_SIZE);
-
-    shift_val = ((sizeof(sb->s_maxbytes) * 8) - 1);
-    sb->s_maxbytes = (1 << shift_val);
+    sb->s_blocksize_bits = PVFS2_BUFMAP_DEFAULT_DESC_SHIFT;
+    sb->s_maxbytes = MAX_LFS_FILESIZE;
 
     if (!silent)
     {

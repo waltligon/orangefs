@@ -36,8 +36,12 @@
 
 #define MAX_NUM_UNEXPECTED 10
 
-/* the block size to report in statfs */
-#define STATFS_DEFAULT_BLOCKSIZE  1024
+/*
+  the block size to report in statfs as the blocksize (i.e. the
+  optimal i/o transfer size); regardless of this value, the fragment
+  size (underlying fs block size) in the kernel is fixed at 1024
+*/
+#define STATFS_DEFAULT_BLOCKSIZE PVFS2_BUFMAP_DESC_SIZE
 
 /* small default attribute cache timeout; effectively disabled */
 #define ACACHE_TIMEOUT_MS 1
