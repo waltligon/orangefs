@@ -1,14 +1,7 @@
 DIR := test/server
 
 TESTSRC += \
-	$(DIR)/crdirent.c \
-	$(DIR)/create.c \
-	$(DIR)/getattr.c \
 	$(DIR)/getconfig.c \
-	$(DIR)/mkdir.c \
-	$(DIR)/readdir.c \
-	$(DIR)/setattr.c \
-	$(DIR)/io.c \
 	$(DIR)/showconfig.c
 
 test/server/showconfig: test/server/showconfig.o lib/libpvfs2-server.a
