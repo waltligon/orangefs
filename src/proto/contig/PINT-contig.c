@@ -36,9 +36,11 @@ void do_decode_rel(
 void do_encode_rel(
     struct PINT_encoded_msg *msg,
     enum PINT_encode_msg_type input_type);
-
 int do_encode_gen_ack_sz(
     int);
+int do_encode_calc_max_size(
+    enum PINT_encode_msg_type input_type,
+    enum PVFS_server_op op_type);
 void init_contig(
     void);
 
@@ -49,7 +51,8 @@ PINT_encoding_functions_s contig_buffer_functions = {
     do_decode_resp,
     do_encode_rel,
     do_decode_rel,
-    do_encode_gen_ack_sz
+    do_encode_gen_ack_sz,
+    do_encode_calc_max_size
 };
 
 PINT_encoding_table_values_s contig_buffer_table = {
@@ -69,6 +72,42 @@ void init_contig(
 {
     contig_buffer_table.op = &contig_buffer_functions;
 }
+
+int do_encode_calc_max_size(
+    enum PINT_encode_msg_type input_type,
+    enum PVFS_server_op op_type)
+{
+    int size = sizeof(struct PVFS_server_resp) + ENCODED_HEADER_SIZE;
+
+    if(input_type != PINT_ENCODE_RESP)
+    {
+	gossip_lerr("Not supported yet.\n");
+	return(-ENOSYS);
+    }
+
+    switch(op_type)
+    {
+	case PVFS_SERV_GETATTR:
+	    size += PVFS_REQ_LIMIT_DIST_BYTES;
+	    size += (PVFS_REQ_LIMIT_DFILE_COUNT*sizeof(PVFS_handle));
+	    break;
+	case PVFS_SERV_GETCONFIG:
+	    size += (PVFS_REQ_LIMIT_CONFIG_FILE_BYTES*2);
+	    break;
+	case PVFS_SERV_LOOKUP_PATH:
+	    size += (PVFS_REQ_LIMIT_PATH_SEGMENT_COUNT*sizeof(PVFS_object_attr));
+	    size += (PVFS_REQ_LIMIT_PATH_SEGMENT_COUNT*sizeof(PVFS_handle));
+	    break;
+	case PVFS_SERV_READDIR:
+	    size += (PVFS_REQ_LIMIT_DIRENT_COUNT*sizeof(PVFS_dirent));
+	    break;
+	default:
+	    break;
+    }
+
+    return(size);
+}
+
 
 /*
  * Local variables:

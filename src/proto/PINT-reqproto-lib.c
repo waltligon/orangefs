@@ -198,8 +198,22 @@ int PINT_encode_calc_max_size(
     enum PINT_encode_msg_type input_type,
     enum PVFS_server_op op_type,
     enum PINT_encoding_type enc_type)
-{
-    return(-ENOSYS);
+{    
+    int ret = -1;
+
+    switch(enc_type)
+    {
+	case PINT_ENC_DIRECT:
+	    ret = PINT_encoding_table[enc_type]->op->encode_calc_max_size
+		(input_type, op_type);
+	    break;
+	default:
+	    gossip_lerr("Error: encoding type not supported.\n");
+	    ret = -EINVAL;
+	    break;
+    }
+
+    return(ret);
 }
 
 /*
