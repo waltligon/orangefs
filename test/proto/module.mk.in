@@ -1,0 +1,16 @@
+DIR := test/proto
+TEST_PROTO_DIR := test/proto
+
+TEST_PROTO_DIR_SRC := \
+	$(DIR)/test-bmi-server.c \
+	$(DIR)/test-harness.c \
+	$(DIR)/test-request.c
+
+MISCSRC += $(DIR)/bmi-send-recv.c
+
+TESTSRC += $(TEST_PROTO_DIR_SRC)
+
+LOCALTESTS := $(patsubst %.c,%, $(TEST_PROTO_DIR_SRC))
+$(LOCALTESTS): %: %.o $(TEST_PROTO_DIR)/bmi-send-recv.o
+	$(LD) $< $(TEST_PROTO_DIR)/bmi-send-recv.o $(LDFLAGS) $(LIBS) -o $@
+

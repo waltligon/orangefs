@@ -1,15 +1,15 @@
 DIR := test/io/flow
 
-LOCALTESTSRC := \
+TEST_IO_FLOW_DIR_SRC := \
 	$(DIR)/test-harness-server.c\
 	$(DIR)/test-harness-client.c\
 	$(DIR)/test-harness-client-from-trove.c\
 	$(DIR)/test-harness-server-trove.c
 
-TESTSRC += $(LOCALTESTSRC)
+TESTSRC += $(TEST_IO_FLOW_DIR_SRC)
 
 LOCALLIBS := -ldb -lrt -lpthread
-LOCALTESTS := $(patsubst %.c,%, $(LOCALTESTSRC))
+LOCALTESTS := $(patsubst %.c,%, $(TEST_IO_FLOW_DIR_SRC))
 $(LOCALTESTS): %: %.o
 	$(LD) $< $(LDFLAGS) $(LIBS) $(LOCALLIBS) -o $@
 
