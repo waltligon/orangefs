@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: setup.c,v 1.5 2003-10-23 14:59:56 pw Exp $
+ * $Id: setup.c,v 1.6 2004-01-30 16:26:57 pw Exp $
  */
 #include <fcntl.h>
 #include <unistd.h>
@@ -341,7 +341,7 @@ init_connection_modify_qp(VAPI_qp_hndl_t qp, VAPI_qp_num_t remote_qp_num,
     attr.qp_state = VAPI_RTS;
     attr.sq_psn = 0;
     attr.ous_dst_rd_atom = 0;
-    attr.timeout = 32;  /* 4.096us * 2^32 == 4.9 hours */
+    attr.timeout = 26;  /* 4.096us * 2^26 = 5 min */
     attr.retry_count = 20;
     attr.rnr_retry = 20;
     ret = VAPI_modify_qp(nic_handle, qp, &attr, &mask, &cap);

@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.4 2003-12-09 19:24:39 pcarns Exp $
+ * $Id: ib.c,v 1.5 2004-01-30 16:26:57 pw Exp $
  */
 #include <stdio.h>  /* just for NULL for id-generator.h */
 #include <src/common/id-generator/id-generator.h>
@@ -765,6 +765,7 @@ generic_post_send(bmi_op_id_t *id, struct method_addr *remote_map,
     struct method_op *mop;
     ib_method_addr_t *ibmap = remote_map->method_data;
     int i;
+    int ret = 0;
 
     gen_mutex_lock(&interface_mutex);
 
@@ -806,8 +807,8 @@ generic_post_send(bmi_op_id_t *id, struct method_addr *remote_map,
     /* unexpected messages must fit inside an eager message */
     if (is_unexpected && sq->buflist.tot_len > EAGER_BUF_PAYLOAD) {
 	free(sq);
-	gen_mutex_unlock(&interface_mutex);
-	return -EINVAL;
+	ret = -EINVAL;
+	goto out;
     }
 
     sq->bmi_tag = tag;
@@ -827,8 +828,9 @@ generic_post_send(bmi_op_id_t *id, struct method_addr *remote_map,
 
     /* and start sending it if possible */
     encourage_send(sq, 0);
+  out:
     gen_mutex_unlock(&interface_mutex);
-    return 0;
+    return ret;
 }
 
 static int
