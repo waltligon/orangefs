@@ -28,7 +28,8 @@
 #include "quicklist.h"
 #include "dbpf-open-cache.h"
 
-#define OPEN_CACHE_SIZE 64
+/* TODO: re-enable this later! */
+#define OPEN_CACHE_SIZE 0
 
 struct open_cache_entry
 {
@@ -71,6 +72,10 @@ void dbpf_open_cache_initialize(void)
     /* run through preallocated cache elements to initialize
      * and put them on the free list
      */
+    if(OPEN_CACHE_SIZE == 0)
+    {
+	gossip_err("Warning: dbpf_open_cache disabled.\n");
+    }
     for(i=0; i<OPEN_CACHE_SIZE; i++)
     {
 	prealloc[i].fd = -1;
