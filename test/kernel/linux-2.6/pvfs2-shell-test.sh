@@ -50,8 +50,13 @@ timestamp()
         $CMD
     fi
 
+    if test $? -ne 0 ; then
+        return 1
+    fi
+
     DATE=`date`
     echo "$DATE: Finished"
+    return 0
 }
 
 error_exit()
@@ -153,10 +158,12 @@ stat_file()
 
     echo "***********************************"
     stat $FILE
+    RET=$?
     echo "***********************************"
 
     DATE=`date`
     echo "$DATE: Finished"
+    return $RET
 }
 
 check_entry_permissions()
@@ -169,7 +176,7 @@ check_entry_permissions()
 
     if test "x$OUTPUT" = "x"; then
         echo "Permission check: FAILED.  Test Aborting."
-        exit 1
+        return 1
     else
         echo "Permission check: OK $OUTPUT"
     fi
@@ -197,11 +204,13 @@ directory_test1()
     for f in `seq 1 100`; do
         CUR_FILE=$PVFS2_TESTDIR/testfile0$f
 
-        RET=`touch $CUR_FILE`
+        touch $CUR_FILE
 
-        if ! test "x$RET" = "x"; then
-            echo "FAILURE IN DIRECTORY TEST "
-            echo "Failed to create file $CUR_FILE"
+        if test $? -ne 0 ; then
+            echo ""
+            echo "******************************************"
+            echo "* FAILED DIRECTORY TEST 1"
+            echo "******************************************"
             return 1
         fi
     done
@@ -237,11 +246,13 @@ directory_test2()
     for f in `seq 1 100`; do
         CUR_FILE=$PVFS2_TESTDIR/testfile1$f
 
-        RET=`touch $CUR_FILE`
+        touch $CUR_FILE
 
-        if ! test "x$RET" = "x"; then
-            echo "FAILURE IN DIRECTORY TEST 2"
-            echo "Failed to create file $CUR_FILE"
+        if test $? -ne 0 ; then
+            echo ""
+            echo "******************************************"
+            echo "* FAILED DIRECTORY TEST 2 [stage 1]"
+            echo "******************************************"
             return 1
         fi
     done
@@ -253,11 +264,13 @@ directory_test2()
     for f in `seq 1 100`; do
         CUR_DIR=$PVFS2_TESTDIR/testdir1$f
 
-        RET=`mkdir $CUR_DIR`
+        mkdir $CUR_DIR
 
-        if ! test "x$RET" = "x"; then
-            echo "FAILURE IN DIRECTORY TEST 2"
-            echo "Failed to create directory $CUR_DIR"
+        if test $? -ne 0 ; then
+            echo ""
+            echo "******************************************"
+            echo "* FAILED DIRECTORY TEST 2 [stage 2]"
+            echo "******************************************"
             return 1
         fi
     done
@@ -300,11 +313,13 @@ directory_test3()
     for f in `seq 1 100`; do
         CUR_FILE=$PVFS2_TESTDIR/testfile1$f
 
-        RET=`touch $CUR_FILE`
+        touch $CUR_FILE
 
-        if ! test "x$RET" = "x"; then
-            echo "FAILURE IN DIRECTORY TEST 3"
-            echo "Failed to create file $CUR_FILE"
+        if test $? -ne 0 ; then
+            echo ""
+            echo "******************************************"
+            echo "* FAILED DIRECTORY TEST 3 [stage 1]"
+            echo "******************************************"
             return 1
         fi
     done
@@ -316,11 +331,13 @@ directory_test3()
     for f in `seq 1 100`; do
         CUR_DIR=$PVFS2_TESTDIR/testdir1$f
 
-        RET=`mkdir $CUR_DIR`
+        mkdir $CUR_DIR
 
-        if ! test "x$RET" = "x"; then
-            echo "FAILURE IN DIRECTORY TEST 3"
-            echo "Failed to create directory $CUR_DIR"
+        if test $? -ne 0 ; then
+            echo ""
+            echo "******************************************"
+            echo "* FAILED DIRECTORY TEST 3 [stage 2]"
+            echo "******************************************"
             return 1
         fi
     done
@@ -334,11 +351,13 @@ directory_test3()
         CUR_DIR=$PVFS2_TESTDIR/testdir1$f
         CUR_LINK=$CUR_DIR/testsymlink1$f
 
-        RET=`ln -s $CUR_FILE $CUR_LINK`
+        ln -s $CUR_FILE $CUR_LINK
 
-        if ! test "x$RET" = "x"; then
-            echo "FAILURE IN DIRECTORY TEST 3"
-            echo "Failed to create symlink $CUR_LINK"
+        if test $? -ne 0 ; then
+            echo ""
+            echo "******************************************"
+            echo "* FAILED DIRECTORY TEST 3 [stage 3]"
+            echo "******************************************"
             return 1
         fi
     done
@@ -383,7 +402,10 @@ permission_test1()
     touch $TESTFILE
 
     if ! test -f $TESTFILE; then
-        echo "Failed to create test file $TESTFILE"
+        echo ""
+        echo "******************************************"
+        echo "* FAILED PERMISSION TEST 1 [stage 1]"
+        echo "******************************************"
         return 1
     fi
 
@@ -393,6 +415,13 @@ permission_test1()
         echo "Changing permission of test file to $f"
         chmod $f $TESTFILE
         check_entry_permissions $TESTFILE $f
+        if test $? -ne 0 ; then
+            echo ""
+            echo "******************************************"
+            echo "* FAILED PERMISSION TEST 1 [stage 2]"
+            echo "******************************************"
+            return 1;
+        fi
     done
     DATE=`date`
     echo "$DATE: Finished"
@@ -431,7 +460,10 @@ permission_test2()
     mkdir $TESTDIR
 
     if ! test -d $TESTDIR; then
-        echo "Failed to create test dir $TESTDIR"
+        echo ""
+        echo "******************************************"
+        echo "* FAILED PERMISSION TEST 2 [stage 1]"
+        echo "******************************************"
         return 1
     fi
 
@@ -441,6 +473,13 @@ permission_test2()
         echo "Changing permission of test dir to $f"
         chmod $f $TESTDIR
         check_entry_permissions $TESTDIR $f
+        if test $? -ne 0 ; then
+            echo ""
+            echo "******************************************"
+            echo "* FAILED PERMISSION TEST 2 [stage 2]"
+            echo "******************************************"
+            return 1;
+        fi
     done
     DATE=`date`
     echo "$DATE: Finished"
@@ -456,7 +495,6 @@ permission_test2()
     echo "******************************************"
     return 0
 }
-
 
 #####################################
 # simple i/o test functions
@@ -488,12 +526,33 @@ io_test1()
 
     CMD="dd if=/dev/zero of=$OUTFILE1 bs=4194304 count=8"
     timestamp "Generating zeroed 32MB file in 8 4MB blocks" "$CMD"
+    if test $? -ne 0 ; then
+        echo ""
+        echo "******************************************"
+        echo "* FAILED I/O TEST 1 [stage 1]"
+        echo "******************************************"
+        return 1
+    fi
 
     CMD="cp $OUTFILE1 $OUTFILE2"
     timestamp "Copying data file" "$CMD"
+    if test $? -ne 0 ; then
+        echo ""
+        echo "******************************************"
+        echo "* FAILED I/O TEST 1 [stage 2]"
+        echo "******************************************"
+        return 1
+    fi
 
     CMD="rm -rf $OUTFILE1 $OUTFILE2"
     timestamp "Removing temporary datafiles" "$CMD"
+    if test $? -ne 0 ; then
+        echo ""
+        echo "******************************************"
+        echo "* FAILED I/O TEST 1 [stage 3]"
+        echo "******************************************"
+        return 1
+    fi
 
     remove_testdir $PVFS2_TESTDIR
 
@@ -530,12 +589,33 @@ io_test2()
 
     CMD="dd if=/dev/urandom of=$OUTFILE1 bs=4194304 count=8"
     timestamp "Generating random 32MB file in 8 4MB blocks" "$CMD"
+    if test $? -ne 0 ; then
+        echo ""
+        echo "******************************************"
+        echo "* FAILED I/O TEST 2 [stage 1]"
+        echo "******************************************"
+        return 1
+    fi
 
     CMD="cp $OUTFILE1 $OUTFILE2"
     timestamp "Copying data file" "$CMD"
+    if test $? -ne 0 ; then
+        echo ""
+        echo "******************************************"
+        echo "* FAILED I/O TEST 2 [stage 2]"
+        echo "******************************************"
+        return 1
+    fi
 
     CMD="rm -rf $OUTFILE1 $OUTFILE2"
     timestamp "Removing temporary datafiles" "$CMD"
+    if test $? -ne 0 ; then
+        echo ""
+        echo "******************************************"
+        echo "* FAILED I/O TEST 2 [stage 3]"
+        echo "******************************************"
+        return 1
+    fi
 
     remove_testdir $PVFS2_TESTDIR
 
@@ -570,11 +650,22 @@ execute_test1()
 
     LS=`which ls`
     if ! test -x $LS; then
-        echo "Failed to find ls program: Execute test FAILED."
+        echo ""
+        echo "******************************************"
+        echo "* FAILED EXECUTE TEST 1 [stage 1]"
+        echo "******************************************"
+        return 1
     fi
 
     # make sure ls will be running from the pvfs2 volume
     cp $LS $PVFS2_TESTDIR/ls
+    if test $? -ne 0 ; then
+        echo ""
+        echo "******************************************"
+        echo "* FAILED EXECUTE TEST 1 [stage 2]"
+        echo "******************************************"
+        return 1
+    fi
 
     # populate the working dir to run the LS command on
     touch $PVFS2_TESTDIR/a $PVFS2_TESTDIR/b $PVFS2_TESTDIR/c
@@ -584,6 +675,13 @@ execute_test1()
 
     CMD="eval $PVFS2_LS & $PVFS2_LS & $PVFS2_LS & $PVFS2_LS & $PVFS2_LS"
     timestamp "Running 'ls' multiple times at once" "$CMD" /dev/null
+    if test $? -ne 0 ; then
+        echo ""
+        echo "******************************************"
+        echo "* FAILED EXECUTE TEST 1 [stage 3]"
+        echo "******************************************"
+        return 1
+    fi
 
     # attempt to be sure the commands have returned before we
     # continue.  if we don't sleep here, it looks like a serious error
@@ -639,6 +737,10 @@ compile_test1()
     if ! test "x$OUTPUT" = "x"; then
         echo "Clean Compilation Failed"
         echo $OUTPUT
+        echo ""
+        echo "******************************************"
+        echo "* FAILED COMPILE TEST 1 [stage 1]"
+        echo "******************************************"
         return 1
     fi
 
@@ -652,9 +754,23 @@ compile_test1()
     echo "$DATE: Compilation finished"
 
     stat_file "Doing stat on generated binary" $HELLO_WORLD_BINARY
+    if test $? -ne 0 ; then
+        echo ""
+        echo "******************************************"
+        echo "* FAILED COMPILE TEST 1 [stage 2]"
+        echo "******************************************"
+        return 1
+    fi
 
     CMD="$HELLO_WORLD_BINARY"
     timestamp "Executing Hello World Program" $CMD
+    if test $? -ne 0 ; then
+        echo ""
+        echo "******************************************"
+        echo "* FAILED COMPILE TEST 1 [stage 3]"
+        echo "******************************************"
+        return 1
+    fi
 
     remove_testdir $PVFS2_TESTDIR
 
@@ -690,6 +806,13 @@ compile_test2()
     generate_mmap_read_code $MMAP_READ_SOURCE
 
     stat_file "Doing stat on generated source code" $MMAP_READ_SOURCE
+    if test $? -ne 0 ; then
+        echo ""
+        echo "******************************************"
+        echo "* FAILED COMPILE TEST 2 [stage 1]"
+        echo "******************************************"
+        return 1
+    fi
 
     DATE=`date`
     echo "$DATE: Compiling source code"
@@ -698,12 +821,20 @@ compile_test2()
     if ! test "x$OUTPUT" = "x"; then
         echo "Clean Compilation Failed"
         echo $OUTPUT
+        echo ""
+        echo "******************************************"
+        echo "* FAILED COMPILE TEST 2 [stage 2]"
+        echo "******************************************"
         return 1
     fi
 
     if ! test -x "$MMAP_READ_BINARY"; then
         echo "Binary file not created!"
         echo $OUTPUT
+        echo ""
+        echo "******************************************"
+        echo "* FAILED COMPILE TEST 2 [stage 3]"
+        echo "******************************************"
         return 1
     fi
 
@@ -711,6 +842,13 @@ compile_test2()
     echo "$DATE: Compilation finished"
 
     stat_file "Doing stat on generated binary" $MMAP_READ_BINARY
+    if test $? -ne 0 ; then
+        echo ""
+        echo "******************************************"
+        echo "* FAILED COMPILE TEST 2 [stage 4]"
+        echo "******************************************"
+        return 1
+    fi
 
     if ! test -c /dev/urandom; then
         echo "Skipping test because /dev/urandom does not "
@@ -720,9 +858,23 @@ compile_test2()
 
     CMD="dd if=/dev/urandom of=$MMAP_READ_BINARY_DATA bs=4194304 count=1"
     timestamp "Generating random 4MB file in 1 4MB block" "$CMD"
+    if test $? -ne 0 ; then
+        echo ""
+        echo "******************************************"
+        echo "* FAILED COMPILE TEST 2 [stage 5]"
+        echo "******************************************"
+        return 1
+    fi
 
     CMD="$MMAP_READ_BINARY $MMAP_READ_BINARY_DATA"
     timestamp "Executing MMAP Read Program on random data file" "$CMD" /dev/null
+    if test $? -ne 0 ; then
+        echo ""
+        echo "******************************************"
+        echo "* FAILED COMPILE TEST 2 [stage 6]"
+        echo "******************************************"
+        return 1
+    fi
 
     remove_testdir $PVFS2_TESTDIR
 
