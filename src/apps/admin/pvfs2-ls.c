@@ -203,7 +203,7 @@ int main(int argc, char **argv)
     }
 
     memset(&resp_init, 0, sizeof(resp_init));
-    ret = PVFS_sys_initialize(mnt, 0, &resp_init);
+    ret = PVFS_sys_initialize(mnt, GOSSIP_NO_DEBUG, &resp_init);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_sys_initialize", ret);
