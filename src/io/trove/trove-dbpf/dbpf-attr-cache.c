@@ -23,6 +23,7 @@ static char *s_cacheable_keywords = NULL;
 static char *s_cacheable_keyword_array[
     DBPF_ATTR_CACHE_MAX_NUM_KEYVALS] = {0};
 static int s_cacheable_keyword_array_size = 0;
+static int s_current_num_cache_elems = 0;
 
 #define DBPF_ATTR_CACHE_INITIALIZED() \
 (s_key_to_attr_table && s_dbpf_attr_mutex)
@@ -145,12 +146,15 @@ int dbpf_attr_cache_initialize(
             }
         }
 
+        s_current_num_cache_elems = 0;
         s_max_num_cache_elems = cache_max_num_elems;
         s_key_to_attr_table = qhash_init(
             hash_key_compare, hash_key, table_size);
 
         s_dbpf_attr_mutex = gen_mutex_build();
         assert(s_dbpf_attr_mutex);
+
+        srand((unsigned int)time(NULL));
 
         ret = (s_key_to_attr_table ? 0 : -1);
         gossip_debug(DBPF_ATTRCACHE_DEBUG,
@@ -174,16 +178,19 @@ int dbpf_attr_cache_finalize(void)
         {
             do
             {
-                hash_link =
-                    qhash_search_and_remove(s_key_to_attr_table,&(i));
+                hash_link = qhash_search_and_remove_at_index(
+                    s_key_to_attr_table,i);
                 if (hash_link)
                 {
                     cache_elem = qhash_entry(
                         hash_link, dbpf_attr_cache_elem_t, hash_link);
                     free(cache_elem);
+                    s_current_num_cache_elems--;
                 }
             } while(hash_link);
         }
+
+        assert(s_current_num_cache_elems == 0);
         ret = ((i == s_key_to_attr_table->table_size) ? 0 : -1);
         qhash_finalize(s_key_to_attr_table);
         s_key_to_attr_table = NULL;
@@ -222,7 +229,8 @@ dbpf_attr_cache_elem_t *dbpf_attr_cache_elem_lookup(TROVE_handle key)
             assert(cache_elem);
             gossip_debug(
                 DBPF_ATTRCACHE_DEBUG, "dbpf_cache_elem_lookup: cache "
-                "elem matching %Lu returned\n", Lu(key));
+                "elem matching %Lu returned (num_elems=%d)\n",
+                Lu(key), s_current_num_cache_elems);
         }
         gen_mutex_unlock(s_dbpf_attr_mutex);
     }
@@ -401,11 +409,55 @@ int dbpf_attr_cache_insert(
     dbpf_attr_cache_elem_t *cache_elem = NULL;
     struct qlist_head *hash_link = NULL;
 
-    /* should enforce cache size boundary here (s_max_num_cache_elems) */
-
     if (DBPF_ATTR_CACHE_INITIALIZED())
     {
         gen_mutex_lock(s_dbpf_attr_mutex);
+        if ((s_current_num_cache_elems + 1) > s_max_num_cache_elems)
+        {
+            TROVE_handle sacrificial_lamb_key = TROVE_HANDLE_NULL;
+            /*
+              we have the lock, so we can safely remove
+              any element in this cache at this point;
+              since our hashtable isn't sorted, and a hit/age
+              count would be too costly in a linear search
+              here, just remove the first element at an arbitrary
+              hashed index that we can find in the hash table
+            */
+            i = (rand() % s_key_to_attr_table->table_size);
+          hashtable_linear_scan:
+            for(; i < s_key_to_attr_table->table_size; i++)
+            {
+                hash_link =
+                    qhash_search_at_index(s_key_to_attr_table,i);
+                if (hash_link)
+                {
+                    cache_elem = qhash_entry(
+                        hash_link, dbpf_attr_cache_elem_t, hash_link);
+                    sacrificial_lamb_key = cache_elem->key;
+                    break;
+                }
+            }
+
+            /*
+              handle a special case where the random index
+              yields a completely empty linked list; start again
+              at 0, as *something* must be in the hash table
+            */
+            if ((i == s_key_to_attr_table->table_size) &&
+                (sacrificial_lamb_key == TROVE_HANDLE_NULL))
+            {
+                i = 0;
+                goto hashtable_linear_scan;
+            }
+            assert(sacrificial_lamb_key != TROVE_HANDLE_NULL);
+            gen_mutex_unlock(s_dbpf_attr_mutex);
+            gossip_debug(DBPF_ATTRCACHE_DEBUG, "*** Cache is full -- "
+                         "removing key %Lu to insert key %Lu\n",
+                         Lu(sacrificial_lamb_key), Lu(key));
+            dbpf_attr_cache_remove(sacrificial_lamb_key);
+            gen_mutex_lock(s_dbpf_attr_mutex);
+        }
+
         hash_link = qhash_search(s_key_to_attr_table,&(key));
         if (!hash_link)
         {
@@ -442,6 +494,7 @@ int dbpf_attr_cache_insert(
             {
                 qhash_add(
                     s_key_to_attr_table,&(key),&(cache_elem->hash_link));
+                s_current_num_cache_elems++;
                 gossip_debug(
                     DBPF_ATTRCACHE_DEBUG,
                     "dbpf_attr_cache_insert: inserting %Lu "
@@ -488,6 +541,7 @@ int dbpf_attr_cache_remove(TROVE_handle key)
                     }
                 }
             }
+            s_current_num_cache_elems--;
             free(cache_elem);
             ret = 0;
         }
@@ -496,7 +550,7 @@ int dbpf_attr_cache_remove(TROVE_handle key)
     return ret;
 }
 
-/* hash_fsid()
+/* hash_key()
  *
  * hash function for fsids added to table
  *
@@ -513,7 +567,7 @@ static int hash_key(void *key, int table_size)
     return ((int)tmp);
 }
 
-/* hash_fsid_compare()
+/* hash_key_compare()
  *
  * performs a comparison of a hash table entry to a given key
  * (used for searching)

@@ -213,7 +213,7 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
 	gossip_debug(TROVE_DEBUG, "handle already exists...\n");
 	return -TROVE_EEXIST;
     }
-    if (ret != DB_NOTFOUND)
+    else if (ret != DB_NOTFOUND)
     {
 	gossip_err("error in dspace create (db_p->get failed).\n");
         trove_handle_free(op_p->coll_p->coll_id, new_handle);
@@ -456,7 +456,7 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
 	    got_db = 1;
 	    break;
     }
- 
+
     /* get a cursor */
     ret = db_p->cursor(db_p, NULL, &dbc_p, 0);
     if (ret != 0) goto return_error;
@@ -497,9 +497,15 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
 	data.size = data.ulen = sizeof(s_attr);
 	data.flags |= DB_DBT_USERMEM;
 
-	ret = dbc_p->c_get(dbc_p, &key, &data, DB_SET_RECNO);
-	if (ret == DB_NOTFOUND) goto return_ok;
-	if (ret != 0) goto return_error;
+        ret = dbc_p->c_get(dbc_p, &key, &data, DB_SET_RECNO);
+        if (ret == DB_NOTFOUND)
+        {
+            goto return_ok;
+        }
+	else if (ret != 0)
+        {
+            goto return_error;
+        }
     }
 
     /* read handles until we run out of handles or space in buffer */
@@ -528,11 +534,13 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
     }
 
 return_ok:
-    if (ret == DB_NOTFOUND) {
+    if (ret == DB_NOTFOUND)
+    {
 	/* if we ran off the end of the database, return TROVE_ITERATE_END */
 	*op_p->u.d_iterate_handles.position_p = TROVE_ITERATE_END;
     }
-    else {
+    else
+    {
 	/* get the record number to return.
 	 *
 	 * note: key field is ignored by c_get in this case
@@ -653,15 +661,19 @@ static int dbpf_dspace_verify_op_svc(struct dbpf_op *op_p)
 
     /* check to see if dspace handle is used (ie. object exists) */
     ret = db_p->get(db_p, NULL, &key, &data, 0);
-    if (ret == 0) {
+    if (ret == 0)
+    {
 	/* object does exist */
     }
-    else if (ret == DB_NOTFOUND) {
+    else if (ret == DB_NOTFOUND)
+    {
 	/* no error in access, but object does not exist */
 	error = -TROVE_ENOENT;
 	goto return_error;
     }
-    else {	/* error in accessing database */
+    else
+    {
+        /* error in accessing database */
 	error = -1;
 	goto return_error;
     }
@@ -670,10 +682,12 @@ static int dbpf_dspace_verify_op_svc(struct dbpf_op *op_p)
     *op_p->u.d_verify.type_p = s_attr.type;
 
     /* sync if requested (unusual but supported in semantics) */
-    if (op_p->flags & TROVE_SYNC) {
-	if ((ret = db_p->sync(db_p, 0)) != 0) {
-	    error = -1;
-	    goto return_error;
+    if (op_p->flags & TROVE_SYNC)
+    {
+	if ((ret = db_p->sync(db_p, 0)) != 0)
+        {
+            error = -1;
+            goto return_error;
 	}
     }
 

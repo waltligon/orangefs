@@ -218,8 +218,8 @@ sub emit_filesystem
     print $target "\t<StorageHints>\n";
     print $target "\t\tHandlePurgatory $handle_purgatory\n";
     print $target "\t\tAttrCacheKeywords datafile_handles,metafile_dist\n";
-    print $target "\t\tAttrCacheSize 511\n";
-    print $target "\t\tAttrCacheMaxNumElems 1024\n";
+    print $target "\t\tAttrCacheSize 1031\n";
+    print $target "\t\tAttrCacheMaxNumElems 8192\n";
     print $target "\t</StorageHints>\n";
 
     print $target "</Filesystem>\n";
