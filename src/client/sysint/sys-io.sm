@@ -951,21 +951,26 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 
 	    break;
 	}
-	else if (sm_p->u.io.io_type == PVFS_IO_WRITE &&
-		 sm_p->u.io.ackarray[i].recv_id == js_p->id) {
-	    matched_ack = 1;
-	    sm_p->u.io.ackarray[i].recv_id     = 0;
-	    sm_p->u.io.ackarray[i].recv_status = *js_p;
-	    assert(sm_p->u.io.ackarray[i].recv_status.actual_size 
-		<= sm_p->u.io.ackarray[i].max_resp_sz);
-	    sm_p->u.io.ack_comp_ct--;
-	    gossip_debug(CLIENT_DEBUG,
-			 "  matched completed ack for %d\n",
-			 i);
+    }
+    if(!matched_flow && sm_p->u.io.io_type == PVFS_IO_WRITE)
+    {
+	for(i=0; i<sm_p->msgarray_count; i++)
+	{
+	    if (sm_p->u.io.ackarray[i].recv_id == js_p->id) {
+		matched_ack = 1;
+		sm_p->u.io.ackarray[i].recv_id     = 0;
+		sm_p->u.io.ackarray[i].recv_status = *js_p;
+		assert(sm_p->u.io.ackarray[i].recv_status.actual_size 
+		    <= sm_p->u.io.ackarray[i].max_resp_sz);
+		sm_p->u.io.ack_comp_ct--;
+		gossip_debug(CLIENT_DEBUG,
+			     "  matched completed ack for %d\n",
+			     i);
 
-	    assert(sm_p->u.io.ack_comp_ct >= 0);
+		assert(sm_p->u.io.ack_comp_ct >= 0);
 
-	    break;
+		break;
+	    }
 	}
     }
     
