@@ -643,10 +643,6 @@ static int server_shutdown(PINT_server_status_code level,
 
 }
 
-/* TODO: Fix signal handler */
-/* Problem is how to handle user_opts and server_init_level */
-/* Update!!! 31/01/2002  I made both static... Try that out for now */
-
 /* Signal Handling */
 
 static void *sig_handler(int sig)
