@@ -11,6 +11,10 @@ installdir=$rootdir/INSTALL-pvfs2
 
 # run the script that downloads, builds, and installs pvfs2
 ./pvfs2-build.sh
+if [ $? -ne 0 ] ; then
+	echo "Failed to build PVFS2."
+	exit 1
+fi
 
 cd $builddir
 
@@ -45,3 +49,5 @@ $builddir/src/apps/admin/pvfs2-import $builddir/src/apps/admin/pvfs2-import $MOU
 
 # and clean up
 $srcdir/$PAV_DIR/pav_stop -c $builddir/${PAV_DIR}/configfile.sample > $rootdir/pav-shutdown.log 2>&1 &&  echo "Script completed successfully." 
+
+exit 0
