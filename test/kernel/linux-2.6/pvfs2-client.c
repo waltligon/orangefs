@@ -175,11 +175,9 @@ static int service_read_request(
 	    PVFS_BYTE, &io_req);
 	assert(ret == 0);
 
-	/* TODO: need to get pinode reference from somewhere */
-#if 0
-	ret = PVFS_sys_io(NEED_REF, io_req, 0, in_upcall->req.read.buf,
-	    in_upcall->req.read.count, credentials, &response,
-	    PVFS_SYS_IO_READ);
+	ret = PVFS_sys_io(in_upcall->req.read.refn, io_req, 0, 
+	    in_upcall->req.read.buf, in_upcall->req.read.count, credentials, 
+	    &response, PVFS_SYS_IO_READ);
 	if(ret < 0)
 	{
 	    /* we need to send a blank response */
@@ -194,14 +192,6 @@ static int service_read_request(
 	    out_downcall->resp.read.amt_read = response.total_completed;
 	    ret = 0;
 	}
-#else
-	/* we need to send a blank response */
-	out_downcall->type = PVFS2_VFS_OP_FILE_READ;
-	/* TODO: is this right? set error both in ret and in status? */
-	/* maybe we don't even need a return value in these functions? */
-	out_downcall->status = -ENOSYS;
-	ret = -ENOSYS;
-#endif
     }
     return(ret);
 }
