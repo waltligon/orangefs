@@ -12,6 +12,7 @@
 #include "pvfs2-kernel.h"
 #include "pint-dev-shared.h"
 #include "pvfs2-dev-proto.h"
+#include "pvfs2-bufmap.h"
 
 /* this file implements the /dev/pvfs2-req device node */
 extern kmem_cache_t *dev_req_cache;
@@ -240,6 +241,8 @@ static int pvfs2_devreq_release(
 	pvfs2_error("pvfs2: the impossible has happened.  again.\n");
     }
 
+    pvfs_bufmap_finalize();
+
     spin_unlock(&inode->i_lock);
     return 0;
 }
@@ -255,6 +258,7 @@ static int pvfs2_devreq_ioctl(
 	sizeof(int32_t) + sizeof(int64_t) + sizeof(pvfs2_upcall_t);
     static int32_t max_down_size =
 	sizeof(int32_t) + sizeof(int64_t) + sizeof(pvfs2_downcall_t);
+    struct PVFS_dev_map_desc user_desc;
 
     switch (command)
     {
@@ -267,6 +271,10 @@ static int pvfs2_devreq_ioctl(
     case PVFS_DEV_GET_MAX_DOWNSIZE:
 	copy_to_user((void *) arg, &max_down_size, sizeof(int32_t));
 	return 0;
+    case PVFS_DEV_MAP:
+	copy_from_user(&user_desc, (void *) arg, sizeof(struct
+	    PVFS_dev_map_desc));
+	return(pvfs_bufmap_initialize(&user_desc));
     default:
 	return -ENOSYS;
     }
