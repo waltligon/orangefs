@@ -18,6 +18,7 @@
 #include "bench-mem.h"
 
 #define TESTCOUNT 10
+#define MSG_SIZE (256*1024)
 
 struct svr_xfer_state
 {
@@ -31,6 +32,13 @@ struct svr_xfer_state
 
     struct request* req;
     struct response* resp;
+
+    void** buffer_array;
+    int buffer_array_size;
+
+    int list_factor;
+    void** buffer_list;
+    bmi_size_t* size_list;
 };
 
 struct request
@@ -48,9 +56,9 @@ int num_done = 0;
 int svr_handle_next(struct svr_xfer_state* state, bmi_context_id context);
 int client_handle_next(struct svr_xfer_state* state, bmi_context_id context);
 int prepare_states(struct svr_xfer_state* state_array, PVFS_BMI_addr_t*
-    addr_array, int count, int svr_flag);
+    addr_array, struct bench_options* opts, int count, int svr_flag);
 int teardown_states(struct svr_xfer_state* state_array, PVFS_BMI_addr_t*
-    addr_array, int count, int svr_flag);
+    addr_array, struct bench_options* opts, int count, int svr_flag);
 
 int main(
     int argc,
@@ -89,6 +97,7 @@ int main(
     int indexer = 0;
     int state_size;
     int i;
+    double time1, time2;
 
     /* start up benchmark environment */
     ret = bench_init(&opts, argc, argv, &num_clients, &world_rank, &comm,
@@ -105,7 +114,9 @@ int main(
 	im_a_server = 1;
     }
 
-    num_messages = opts.total_len / opts.message_len;
+    num_messages = opts.total_len / MSG_SIZE;
+    if(opts.total_len%MSG_SIZE)
+        num_messages++;
 
     if(im_a_server)
         state_size = num_clients;
@@ -118,16 +129,24 @@ int main(
     assert(state_array);
     memset(state_array, 0, state_size*sizeof(struct svr_xfer_state));
 
+    if(im_a_server)
+        prepare_states(state_array, bmi_peer_array, &opts, state_size, 1);
+    else
+        prepare_states(state_array, bmi_peer_array, &opts, state_size, 0);
+
     MPI_Barrier(MPI_COMM_WORLD);
 
+    time1 = MPI_Wtime();
+    
     if(im_a_server)
     {
         while(num_done < num_clients)
         {
+            outcount = 0;
             ret = BMI_testunexpected(TESTCOUNT, &outcount, info_array, 0);
             assert(ret >= 0);
             indexer = 0;
-            while(ret == 1 && indexer < outcount)
+            while(indexer < outcount)
             {
                 assert(info_array[indexer].error_code == 0);
                 state_array[num_requested].addr = info_array[indexer].addr;
@@ -140,11 +159,12 @@ int main(
                 num_requested++;
             }
 
+            outcount = 0;
             ret = BMI_testcontext(TESTCOUNT, id_array, &outcount,
                 error_array, size_array, user_ptr_array, 0, context);
-            assert(ret == 0);
+            assert(ret >= 0);
             indexer = 0;
-            while(ret == 1 && indexer < outcount)
+            while(indexer < outcount)
             {
                 assert(error_array[indexer] == 0);
                 tmp_state = user_ptr_array[indexer];
@@ -163,11 +183,12 @@ int main(
 
         while(num_done < opts.num_servers)
         {
+            outcount = 0;
             ret = BMI_testcontext(TESTCOUNT, id_array, &outcount,
                 error_array, size_array, user_ptr_array, 0, context);
-            assert(ret == 0);
+            assert(ret >= 0);
             indexer = 0;
-            while(ret == 1 && indexer < outcount)
+            while(indexer < outcount)
             {
                 assert(error_array[indexer] == 0);
                 tmp_state = user_ptr_array[indexer];
@@ -176,6 +197,21 @@ int main(
             }
         }
     }
+    time2 = MPI_Wtime();
+    bmi_time = (time2-time1);
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    /* TODO: release bmi memory */
+    if(im_a_server)
+        teardown_states(state_array, bmi_peer_array, &opts, state_size, 1);
+    else
+        teardown_states(state_array, bmi_peer_array, &opts, state_size, 0);
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    /* run mpi version */
+    mpi_time = 0;
 
     MPI_Barrier(MPI_COMM_WORLD);
 
@@ -201,7 +237,7 @@ int main(
 	bench_args_dump(&opts);
 
 	total_data_xfer = opts.num_servers * num_clients * num_messages *
-	    opts.message_len;
+	    MSG_SIZE;
 	if (opts.num_servers > 1)
 	{
 	    var_bmi_time = sumsq_bmi_time -
@@ -223,18 +259,18 @@ int main(
 
 	printf
 	    ("%d %d %f %f %f %f %f (msg_len,servers,min,max,ave,stddev,agg_MB/s) bmi server\n",
-	     opts.message_len, opts.num_servers, min_bmi_time, max_bmi_time,
+	     MSG_SIZE, opts.num_servers, min_bmi_time, max_bmi_time,
 	     ave_bmi_time, stddev_bmi_time, agg_bmi_bw / (1024 * 1024));
 	printf
 	    ("%d %d %f %f %f %f %f (msg_len,servers,min,max,ave,stddev,agg_MB/s) mpi server\n",
-	     opts.message_len, opts.num_servers, min_mpi_time, max_mpi_time,
+	     MSG_SIZE, opts.num_servers, min_mpi_time, max_mpi_time,
 	     ave_mpi_time, stddev_mpi_time, agg_mpi_bw / (1024 * 1024));
     }
 
     if (world_rank == opts.num_servers)
     {
 	total_data_xfer = opts.num_servers * num_clients * num_messages *
-	    opts.message_len;
+	    MSG_SIZE;
 
 	if (num_clients > 1)
 	{
@@ -257,11 +293,11 @@ int main(
 
 	printf
 	    ("%d %d %f %f %f %f %f (msg_len,clients,min,max,ave,stddev,agg_MB/s) bmi client\n",
-	     opts.message_len, num_clients, min_bmi_time, max_bmi_time,
+	     MSG_SIZE, num_clients, min_bmi_time, max_bmi_time,
 	     ave_bmi_time, stddev_bmi_time, agg_bmi_bw / (1024 * 1024));
 	printf
 	    ("%d %d %f %f %f %f %f (msg_len,clients,min,max,ave,stddev,agg_MB/s) mpi client\n",
-	     opts.message_len, num_clients, min_mpi_time, max_mpi_time,
+	     MSG_SIZE, num_clients, min_mpi_time, max_mpi_time,
 	     ave_mpi_time, stddev_mpi_time, agg_mpi_bw / (1024 * 1024));
     }
 
@@ -277,6 +313,7 @@ int client_handle_next(struct svr_xfer_state* state, bmi_context_id context)
     int ret = 0;
     bmi_op_id_t tmp_id;
     bmi_size_t actual_size;
+    int i;
 
     switch(state->step)
     {
@@ -285,6 +322,10 @@ int client_handle_next(struct svr_xfer_state* state, bmi_context_id context)
             ret = BMI_post_recv(&tmp_id, state->addr, state->resp,
                 sizeof(struct response), &actual_size, BMI_PRE_ALLOC,
                 state->tag, state, context);
+            if(ret < 0)
+            {
+                PVFS_perror("BMI_post_recv", ret);
+            }
             assert(ret == 0);
 
             /* send request */
@@ -305,16 +346,32 @@ int client_handle_next(struct svr_xfer_state* state, bmi_context_id context)
             return(0);
             break;
 
-        case 2: 
-            /* recv completed */
-            state->step++;
-            /* TODO: temporary, mark done */
-            num_done++;
-            return(0);
-            break;
-
         default:
-            assert(0);
+
+            /* recv completed (resp or bulk) */
+            state->step++;
+            if(state->step == (state->buffer_array_size + 3))
+            {
+                num_done++;
+                return(0);
+            }
+
+            for(i=0; i<state->list_factor; i++)
+            {
+                state->buffer_list[i] = state->buffer_array[state->step-3] +
+                    ((MSG_SIZE/state->list_factor)*i);
+            }
+            ret = BMI_post_recv_list(&tmp_id, state->addr,
+                state->buffer_list, state->size_list, state->list_factor,
+                MSG_SIZE, &actual_size, BMI_PRE_ALLOC,
+                state->tag, state, context);
+            assert(ret >= 0);
+            if(ret == 1)
+                return(client_handle_next(state, context));
+            else
+                return(0);
+
+        break;
     }
 
     return(0);
@@ -324,6 +381,7 @@ int svr_handle_next(struct svr_xfer_state* state, bmi_context_id context)
 {
     int ret = 0;
     bmi_op_id_t tmp_id;
+    int i;
 
     switch(state->step)
     {
@@ -337,7 +395,7 @@ int svr_handle_next(struct svr_xfer_state* state, bmi_context_id context)
             assert(ret >= 0);
             state->step++;
             if(ret == 1)
-                return(client_handle_next(state, context));
+                return(svr_handle_next(state, context));
             else
                 return(0);
             break;
@@ -345,13 +403,30 @@ int svr_handle_next(struct svr_xfer_state* state, bmi_context_id context)
         case 1:
             /* response send completed */
             state->step++;
-            /* TODO: temporary, mark done */
-            num_done++;
+
+            /* post data sends */
+            for(i=0; i<state->buffer_array_size; i++)
+            {
+                ret = BMI_post_send(&tmp_id, state->addr,
+                    state->buffer_array[i], MSG_SIZE, BMI_PRE_ALLOC,
+                    state->tag, state, context);
+                assert(ret >= 0);
+                if(ret == 1)
+                    state->step++;
+            }
+
+            if(state->step == (state->buffer_array_size + 2))
+                num_done++;
             return(0);
             break;
 
         default:
-            assert(0);
+            state->step++;
+            if(state->step == (state->buffer_array_size + 2))
+            {
+                num_done++;
+            }
+            return(0);
             break;
     }
     
@@ -359,12 +434,13 @@ int svr_handle_next(struct svr_xfer_state* state, bmi_context_id context)
 };
 
 int prepare_states(struct svr_xfer_state* state_array, PVFS_BMI_addr_t*
-    addr_array, int count, int svr_flag)
+    addr_array, struct bench_options* opts, int count, int svr_flag)
 {
-    int i;
+    int i,j;
 
     if(svr_flag == 0)
     {
+        /* CLIENT */
         for(i=0; i<count; i++)
         {
             state_array[i].addr = addr_array[i];
@@ -377,16 +453,62 @@ int prepare_states(struct svr_xfer_state* state_array, PVFS_BMI_addr_t*
             state_array[i].resp = BMI_memalloc(addr_array[i],
                 sizeof(struct response), BMI_RECV);
             assert(state_array[i].resp);
+
+            /* allocate array of buffers for bulk transfer */
+            state_array[i].buffer_array_size = opts->total_len/MSG_SIZE;
+            if(opts->total_len%MSG_SIZE)
+                state_array[i].buffer_array_size++;
+            state_array[i].buffer_array =
+                (void**)malloc(state_array[i].buffer_array_size*sizeof(void*));
+            assert(state_array[i].buffer_array);
+            for(j=0; j<state_array[i].buffer_array_size; j++)
+            {
+                state_array[i].buffer_array[j] =
+                   malloc(MSG_SIZE);
+                assert(state_array[i].buffer_array[j]);
+            }
+
+            /* setup scratch area for list transfers */
+            state_array[i].list_factor = opts->list_io_factor;
+            state_array[i].buffer_list =
+                (void**)malloc(opts->list_io_factor*sizeof(void*));
+            state_array[i].size_list =
+                (bmi_size_t*)malloc(opts->list_io_factor*sizeof(bmi_size_t));
+            assert(state_array[i].buffer_list);
+            assert(state_array[i].size_list);
+            /* preset size list */
+            for(j=0; j<opts->list_io_factor; j++)
+            {
+                state_array[i].size_list[j] = MSG_SIZE/opts->list_io_factor;
+            }
+            state_array[i].size_list[opts->list_io_factor-1] +=
+                (MSG_SIZE%opts->list_io_factor);
+
         }
     }
     else
     {
+        /* SERVER */
         for(i=0; i<count; i++)
         {
             /* allocate response */
             state_array[i].resp = BMI_memalloc(addr_array[i],
                 sizeof(struct response), BMI_SEND);
             assert(state_array[i].resp);
+
+            /* allocate array of buffers for bulk transfer */
+            state_array[i].buffer_array_size = opts->total_len/MSG_SIZE;
+            if(opts->total_len%MSG_SIZE)
+                state_array[i].buffer_array_size++;
+            state_array[i].buffer_array =
+                (void**)malloc(state_array[i].buffer_array_size*sizeof(void*));
+            assert(state_array[i].buffer_array);
+            for(j=0; j<state_array[i].buffer_array_size; j++)
+            {
+                state_array[i].buffer_array[j] =
+                    BMI_memalloc(addr_array[i], MSG_SIZE, BMI_SEND);
+                assert(state_array[i].buffer_array[j]);
+            }
         }
     }
 
@@ -394,7 +516,7 @@ int prepare_states(struct svr_xfer_state* state_array, PVFS_BMI_addr_t*
 }
 
 int teardown_states(struct svr_xfer_state* state_array, PVFS_BMI_addr_t*
-    addr_array, int count, int svr_flag)
+    addr_array, struct bench_options* opts, int count, int svr_flag)
 {
     int i;
 
@@ -410,6 +532,8 @@ int teardown_states(struct svr_xfer_state* state_array, PVFS_BMI_addr_t*
             BMI_memfree(addr_array[i], state_array[i].resp, 
                 sizeof(struct request), BMI_RECV);
             assert(state_array[i].resp);
+
+            /* TODO: free message buffers */
         }
     }
     else
@@ -421,6 +545,8 @@ int teardown_states(struct svr_xfer_state* state_array, PVFS_BMI_addr_t*
                 sizeof(struct request), BMI_SEND);
             assert(state_array[i].resp);
         }
+
+        /* TODO: free message buffers */
     }
 
     return(0);
