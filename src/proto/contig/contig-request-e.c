@@ -341,7 +341,7 @@ int do_encode_req(
         }
 
 	/* TODO: come back and alloc the right spaces for 
-	 * distributions and eattribs cause they're going to change */
+	 * distributions and attribs cause they're going to change */
 
 	enc_msg = BMI_memalloc(target_msg->dest, size, BMI_SEND);
 	if (enc_msg == NULL)
