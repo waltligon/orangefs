@@ -3,7 +3,7 @@ Index: Makefile.in
 RCS file: /home/MPI/cvsMaster/romio/Makefile.in,v
 retrieving revision 1.34
 retrieving revision 1.35
-diff -u -w -p -b -u -p -r1.34 -r1.35
+diff -u -w -p -r1.34 -r1.35
 --- Makefile.in	1 Dec 2003 21:52:57 -0000	1.34
 +++ Makefile.in	27 Jan 2004 23:27:35 -0000	1.35
 @@ -164,3 +164,10 @@ htmldoc:
@@ -21,9 +21,10 @@ Index: aclocal.m4
 ===================================================================
 RCS file: /home/MPI/cvsMaster/romio/aclocal.m4,v
 retrieving revision 1.30
-diff -u -w -p -b -u -p -r1.30 aclocal.m4
+retrieving revision 1.31
+diff -u -w -p -r1.30 -r1.31
 --- aclocal.m4	6 Oct 2003 16:04:45 -0000	1.30
-+++ aclocal.m4	13 Jan 2004 22:42:33 -0000
++++ aclocal.m4	8 Jan 2004 22:41:16 -0000	1.31
 @@ -324,7 +324,7 @@ EOF
    $CC $USER_CFLAGS -I$MPI_INCLUDE_DIR -o conftest mpitest.c $MPI_LIB > /dev/null 2>&1
    if test -x conftest ; then
@@ -33,80 +34,12 @@ diff -u -w -p -b -u -p -r1.30 aclocal.m4
        HAVE_MPI_INFO="#define HAVE_MPI_INFO"
        MPI_FINFO1="!"
        MPI_FINFO2="!"
-@@ -810,3 +810,67 @@ EOF
-   rm -f conftest mpitest.c
- ])dnl
- 
-+
-+define(PAC_NEWSTYLE_FEATURE_TESTS, [
-+	AC_MSG_CHECKING([impl. support for MPI_INFO])
-+	AC_TRY_COMPILE([
-+		#include <mpi.h>
-+		], [
-+		#ifndef MPIIMPL_HAVE_MPI_INFO
-+		#error mpi implementation does not have MPI_INFO
-+		#endif
-+		], 
-+		dnl use implementation's stuff: no need to modify variables
-+		AC_MSG_RESULT(yes), 
-+		AC_MSG_RESULT([no. using our own])
-+		EXTRA_SRC_DIRS="$EXTRA_SRC_DIRS mpi2-other/info"
-+		if test $NOF77 = 0 ; then
-+			EXTRA_SRC_DIRS="$EXTRA_SRC_DIRS mpi2-other/info/fortran"
-+		fi
-+		) 
-+	AC_MSG_CHECKING([impl. support for DARRAY/SUBARRAY])
-+	AC_TRY_COMPILE([
-+		#include <mpi.h>
-+		], [
-+		#ifndef MPIIMPL_HAVE_TYPE_CREATE_DARRAY
-+		#error mpi implementation does not have TYPE_CREATE_DARRAy
-+		#endif
-+		],
-+		dnl use implementation's stuff: don't modify variables
-+		AC_MSG_RESULT(yes),
-+		AC_MSG_RESULT([no. using our own])
-+		EXTRA_SRC_DIRS="$EXTRA_SRC_DIRS mpi2-other/array"
-+		if test "$NOF77" = 0 ; then 
-+			EXTRA_SRC_DIRS="$EXTRA_SRC_DIRS mpi2-other/array/fortran"
-+		fi
-+		)
-+])
-+define(PAC_OLDSTYLE_FEATURE_TESTS, [
-+dnl  check if darray and subarray constructors are defined in the MPI 
-+dnl implementation 
-+	if test $WITHIN_KNOWN_MPI_IMPL = no -o $FROM_MPICH2 != no ; then
-+	   PAC_MPI_DARRAY_SUBARRAY
-+	else
-+	   AC_DEFINE(HAVE_MPI_DARRAY_SUBARRAY,1,[Define if Darray is available])
-+	   HAVE_MPI_DARRAY_SUBARRAY="#define HAVE_MPI_DARRAY_SUBARRAY"
-+	   MPI_FARRAY1="!"
-+	   MPI_FARRAY2="!"
-+	   MPI_FARRAY3="!"
-+	   MPI_FARRAY4="!"
-+	   MPI_FARRAY5="!"
-+	   MPI_FARRAY6="!"
-+	   MPI_FARRAY7="!"
-+	fi   
-+dnl check if MPI_Info functions are defined in the MPI implementation
-+	if test $WITHIN_KNOWN_MPI_IMPL = no ; then
-+	   PAC_MPI_INFO
-+	else
-+	   AC_DEFINE(HAVE_MPI_INFO,1,[Define if MPI Info is available])
-+	   HAVE_MPI_INFO="#define HAVE_MPI_INFO"
-+	   MPI_FINFO1="!"
-+	   MPI_FINFO2="!"
-+	   MPI_FINFO3="!"
-+	   MPI_FINFO4="!"
-+	fi   
-+])
-+
 Index: configure.in
 ===================================================================
 RCS file: /home/MPI/cvsMaster/romio/configure.in,v
 retrieving revision 1.98
 retrieving revision 1.109
-diff -u -w -p -b -u -p -r1.98 -r1.109
+diff -u -w -p -r1.98 -r1.109
 --- configure.in	10 Dec 2003 22:44:11 -0000	1.98
 +++ configure.in	2 Mar 2004 18:37:37 -0000	1.109
 @@ -81,6 +81,12 @@ MPIO_EXTRA_OBJECTS="get_errh.o set_errh.
@@ -1805,7 +1738,7 @@ Index: adio/ad_hfs/.cvsignore
 RCS file: /home/MPI/cvsMaster/romio/adio/ad_hfs/.cvsignore,v
 retrieving revision 1.2
 retrieving revision 1.3
-diff -u -w -p -b -u -p -r1.2 -r1.3
+diff -u -w -p -r1.2 -r1.3
 --- adio/ad_hfs/.cvsignore	1 Aug 2003 13:30:17 -0000	1.2
 +++ adio/ad_hfs/.cvsignore	19 Jan 2004 14:49:35 -0000	1.3
 @@ -1,2 +1,4 @@
@@ -1818,7 +1751,7 @@ Index: adio/ad_nfs/.cvsignore
 RCS file: /home/MPI/cvsMaster/romio/adio/ad_nfs/.cvsignore,v
 retrieving revision 1.2
 retrieving revision 1.3
-diff -u -w -p -b -u -p -r1.2 -r1.3
+diff -u -w -p -r1.2 -r1.3
 --- adio/ad_nfs/.cvsignore	1 Aug 2003 13:30:17 -0000	1.2
 +++ adio/ad_nfs/.cvsignore	19 Jan 2004 14:49:35 -0000	1.3
 @@ -1,2 +1,4 @@
@@ -1831,7 +1764,7 @@ Index: adio/ad_ntfs/.cvsignore
 RCS file: /home/MPI/cvsMaster/romio/adio/ad_ntfs/.cvsignore,v
 retrieving revision 1.2
 retrieving revision 1.3
-diff -u -w -p -b -u -p -r1.2 -r1.3
+diff -u -w -p -r1.2 -r1.3
 --- adio/ad_ntfs/.cvsignore	1 Aug 2003 13:30:17 -0000	1.2
 +++ adio/ad_ntfs/.cvsignore	19 Jan 2004 14:49:35 -0000	1.3
 @@ -1,2 +1,4 @@
@@ -1844,7 +1777,7 @@ Index: adio/ad_pfs/.cvsignore
 RCS file: /home/MPI/cvsMaster/romio/adio/ad_pfs/.cvsignore,v
 retrieving revision 1.2
 retrieving revision 1.3
-diff -u -w -p -b -u -p -r1.2 -r1.3
+diff -u -w -p -r1.2 -r1.3
 --- adio/ad_pfs/.cvsignore	1 Aug 2003 13:30:17 -0000	1.2
 +++ adio/ad_pfs/.cvsignore	19 Jan 2004 14:49:35 -0000	1.3
 @@ -1,2 +1,4 @@
@@ -1857,7 +1790,7 @@ Index: adio/ad_piofs/.cvsignore
 RCS file: /home/MPI/cvsMaster/romio/adio/ad_piofs/.cvsignore,v
 retrieving revision 1.2
 retrieving revision 1.3
-diff -u -w -p -b -u -p -r1.2 -r1.3
+diff -u -w -p -r1.2 -r1.3
 --- adio/ad_piofs/.cvsignore	1 Aug 2003 13:30:18 -0000	1.2
 +++ adio/ad_piofs/.cvsignore	19 Jan 2004 14:49:36 -0000	1.3
 @@ -1,2 +1,4 @@
@@ -1870,7 +1803,7 @@ Index: adio/ad_pvfs/.cvsignore
 RCS file: /home/MPI/cvsMaster/romio/adio/ad_pvfs/.cvsignore,v
 retrieving revision 1.2
 retrieving revision 1.3
-diff -u -w -p -b -u -p -r1.2 -r1.3
+diff -u -w -p -r1.2 -r1.3
 --- adio/ad_pvfs/.cvsignore	1 Aug 2003 13:30:18 -0000	1.2
 +++ adio/ad_pvfs/.cvsignore	19 Jan 2004 14:49:36 -0000	1.3
 @@ -1,2 +1,4 @@
@@ -1883,7 +1816,7 @@ Index: adio/ad_pvfs2/.cvsignore
 RCS file: /home/MPI/cvsMaster/romio/adio/ad_pvfs2/.cvsignore,v
 retrieving revision 1.2
 retrieving revision 1.3
-diff -u -w -p -b -u -p -r1.2 -r1.3
+diff -u -w -p -r1.2 -r1.3
 --- adio/ad_pvfs2/.cvsignore	1 Aug 2003 13:30:18 -0000	1.2
 +++ adio/ad_pvfs2/.cvsignore	19 Jan 2004 14:49:36 -0000	1.3
 @@ -1,2 +1,5 @@
@@ -1896,14 +1829,15 @@ Index: adio/ad_pvfs2/ad_pvfs2_common.c
 ===================================================================
 RCS file: /home/MPI/cvsMaster/romio/adio/ad_pvfs2/ad_pvfs2_common.c,v
 retrieving revision 1.7
-diff -u -w -p -b -u -p -r1.7 ad_pvfs2_common.c
+retrieving revision 1.9
+diff -u -w -p -r1.7 -r1.9
 --- adio/ad_pvfs2/ad_pvfs2_common.c	5 Sep 2003 20:43:58 -0000	1.7
-+++ adio/ad_pvfs2/ad_pvfs2_common.c	18 Mar 2004 19:44:34 -0000
++++ adio/ad_pvfs2/ad_pvfs2_common.c	25 Mar 2004 22:17:45 -0000	1.9
 @@ -1,6 +1,6 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
 - *   $Id: ad_pvfs2_common.c,v 1.7 2003/09/05 20:43:58 robl Exp $
-+ *   $Id: ad_pvfs2_common.c,v 1.8 2004/03/16 22:55:32 robl Exp $
++ *   $Id: ad_pvfs2_common.c,v 1.9 2004/03/25 22:17:45 robl Exp $
   *
   *   Copyright (C) 2003 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -1973,19 +1907,26 @@ Index: adio/ad_pvfs2/ad_pvfs2_common.h
 ===================================================================
 RCS file: /home/MPI/cvsMaster/romio/adio/ad_pvfs2/ad_pvfs2_common.h,v
 retrieving revision 1.8
-retrieving revision 1.9
-diff -u -w -p -b -u -p -r1.8 -r1.9
+retrieving revision 1.10
+diff -u -w -p -r1.8 -r1.10
 --- adio/ad_pvfs2/ad_pvfs2_common.h	18 Sep 2003 23:13:18 -0000	1.8
-+++ adio/ad_pvfs2/ad_pvfs2_common.h	16 Mar 2004 22:55:32 -0000	1.9
++++ adio/ad_pvfs2/ad_pvfs2_common.h	25 Mar 2004 22:22:34 -0000	1.10
 @@ -1,6 +1,6 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*-
   * vim: ts=8 sts=4 sw=4 noexpandtab
 - *   $Id: ad_pvfs2_common.h,v 1.8 2003/09/18 23:13:18 robl Exp $    
-+ *   $Id: ad_pvfs2_common.h,v 1.9 2004/03/16 22:55:32 robl Exp $    
++ *   $Id: ad_pvfs2_common.h,v 1.10 2004/03/25 22:22:34 robl Exp $    
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
-@@ -24,8 +24,6 @@ struct ADIOI_PVFS2_fs_s {
+@@ -18,14 +18,12 @@
+ 
+ 
+ struct ADIOI_PVFS2_fs_s {
+-    PVFS_pinode_reference pinode_refn;
++    PVFS_object_ref object_ref;
+     PVFS_credentials credentials;
+ } ADIOI_PVFS2_fs_s;
  
  typedef struct ADIOI_PVFS2_fs_s ADIOI_PVFS2_fs;
  
@@ -1998,15 +1939,15 @@ Index: adio/ad_pvfs2/ad_pvfs2_delete.c
 ===================================================================
 RCS file: /home/MPI/cvsMaster/romio/adio/ad_pvfs2/ad_pvfs2_delete.c,v
 retrieving revision 1.5
-retrieving revision 1.6
-diff -u -w -p -b -u -p -r1.5 -r1.6
+retrieving revision 1.7
+diff -u -w -p -r1.5 -r1.7
 --- adio/ad_pvfs2/ad_pvfs2_delete.c	5 Sep 2003 20:43:58 -0000	1.5
-+++ adio/ad_pvfs2/ad_pvfs2_delete.c	16 Mar 2004 22:55:32 -0000	1.6
++++ adio/ad_pvfs2/ad_pvfs2_delete.c	25 Mar 2004 22:22:35 -0000	1.7
 @@ -1,6 +1,6 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
 - *   $Id: ad_pvfs2_delete.c,v 1.5 2003/09/05 20:43:58 robl Exp $    
-+ *   $Id: ad_pvfs2_delete.c,v 1.6 2004/03/16 22:55:32 robl Exp $    
++ *   $Id: ad_pvfs2_delete.c,v 1.7 2004/03/25 22:22:35 robl Exp $    
   *
   *   Copyright (C) 2003 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -2020,7 +1961,7 @@ diff -u -w -p -b -u -p -r1.5 -r1.6
      char pvfs_path[PVFS_NAME_MAX] = {0};
  
      ADIOI_PVFS2_Init(error_code);
-@@ -30,25 +31,14 @@ void ADIOI_PVFS2_Delete(char *filename, 
+@@ -30,28 +31,17 @@ void ADIOI_PVFS2_Delete(char *filename, 
      ADIOI_PVFS2_makecredentials(&credentials);
  
      /* given the filename, figure out which pvfs filesystem it is on */
@@ -2049,20 +1990,49 @@ diff -u -w -p -b -u -p -r1.5 -r1.6
 +    ret = PVFS_sys_getparent(cur_fs, pvfs_path, credentials, &resp_getparent);
  
      ret = PVFS_sys_remove(resp_getparent.basename, 
- 	    resp_getparent.parent_refn, credentials);
+-	    resp_getparent.parent_refn, credentials);
++	    resp_getparent.parent_ref, credentials);
+     if (ret < 0) {
+ 	/* XXX: better error handling */
+ 	ADIOI_PVFS2_pvfs_error_convert(ret, error_code);
+Index: adio/ad_pvfs2/ad_pvfs2_fcntl.c
+===================================================================
+RCS file: /home/MPI/cvsMaster/romio/adio/ad_pvfs2/ad_pvfs2_fcntl.c,v
+retrieving revision 1.3
+retrieving revision 1.4
+diff -u -w -p -r1.3 -r1.4
+--- adio/ad_pvfs2/ad_pvfs2_fcntl.c	5 Aug 2003 22:59:20 -0000	1.3
++++ adio/ad_pvfs2/ad_pvfs2_fcntl.c	25 Mar 2004 22:22:35 -0000	1.4
+@@ -1,6 +1,6 @@
+ /* -*- Mode: C; c-basic-offset:4 ; -*- */
+ /* 
+- *   $Id: ad_pvfs2_fcntl.c,v 1.3 2003/08/05 22:59:20 robl Exp $    
++ *   $Id: ad_pvfs2_fcntl.c,v 1.4 2004/03/25 22:22:35 robl Exp $    
+  *
+  *   Copyright (C) 1997 University of Chicago. 
+  *   See COPYRIGHT notice in top-level directory.
+@@ -21,7 +21,7 @@ void ADIOI_PVFS2_Fcntl(ADIO_File fd, int
+     switch(flag) {
+ 
+     case ADIO_FCNTL_GET_FSIZE:
+-	ret = PVFS_sys_getattr(pvfs_fs->pinode_refn, PVFS_ATTR_SYS_SIZE, 
++	ret = PVFS_sys_getattr(pvfs_fs->object_ref, PVFS_ATTR_SYS_SIZE, 
+ 		pvfs_fs->credentials, &resp_getattr);
+ 	if (ret < 0 ) {
+ 	    ADIOI_PVFS2_pvfs_error_convert(ret, error_code);
 Index: adio/ad_pvfs2/ad_pvfs2_flush.c
 ===================================================================
 RCS file: /home/MPI/cvsMaster/romio/adio/ad_pvfs2/ad_pvfs2_flush.c,v
 retrieving revision 1.3
-retrieving revision 1.7
-diff -u -w -p -b -u -p -r1.3 -r1.7
+retrieving revision 1.8
+diff -u -w -p -r1.3 -r1.8
 --- adio/ad_pvfs2/ad_pvfs2_flush.c	30 Oct 2003 18:53:40 -0000	1.3
-+++ adio/ad_pvfs2/ad_pvfs2_flush.c	16 Mar 2004 22:59:23 -0000	1.7
++++ adio/ad_pvfs2/ad_pvfs2_flush.c	25 Mar 2004 22:22:35 -0000	1.8
 @@ -1,6 +1,6 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
 - *   $Id: ad_pvfs2_flush.c,v 1.3 2003/10/30 18:53:40 robl Exp $    
-+ *   $Id: ad_pvfs2_flush.c,v 1.7 2004/03/16 22:59:23 robl Exp $    
++ *   $Id: ad_pvfs2_flush.c,v 1.8 2004/03/25 22:22:35 robl Exp $    
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -2095,6 +2065,7 @@ diff -u -w -p -b -u -p -r1.3 -r1.7
 -    MPI_Gather(&dummy1, 1, MPI_INT, &dummy2, 1, MPI_INT, 0, fd->comm);
  
 -    if (rank == 0) {
+-	ret = PVFS_sys_flush(pvfs_fs->pinode_refn, pvfs_fs->credentials);
 +    /* unlike ADIOI_PVFS2_Resize, MPI_File_sync() does not perform any
 +     * syncronization */
 +    MPI_Reduce(&dummy_in, &dummy, 1, MPI_INT, MPI_SUM, 
@@ -2102,7 +2073,7 @@ diff -u -w -p -b -u -p -r1.3 -r1.7
 +
 +    /* io_worker computed in ADIO_Open */
 +    if (rank == fd->hints->ranklist[0]) {
- 	ret = PVFS_sys_flush(pvfs_fs->pinode_refn, pvfs_fs->credentials);
++	ret = PVFS_sys_flush(pvfs_fs->object_ref, pvfs_fs->credentials);
  	MPI_Bcast(&ret, 1, MPI_INT, 0, fd->comm);
 -    }
 +    } else {
@@ -2115,19 +2086,61 @@ Index: adio/ad_pvfs2/ad_pvfs2_open.c
 ===================================================================
 RCS file: /home/MPI/cvsMaster/romio/adio/ad_pvfs2/ad_pvfs2_open.c,v
 retrieving revision 1.11
-retrieving revision 1.12
-diff -u -w -p -b -u -p -r1.11 -r1.12
+retrieving revision 1.13
+diff -u -w -p -r1.11 -r1.13
 --- adio/ad_pvfs2/ad_pvfs2_open.c	2 Nov 2003 15:55:18 -0000	1.11
-+++ adio/ad_pvfs2/ad_pvfs2_open.c	16 Mar 2004 22:55:32 -0000	1.12
++++ adio/ad_pvfs2/ad_pvfs2_open.c	25 Mar 2004 22:22:35 -0000	1.13
 @@ -1,6 +1,6 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*-
   * vim: ts=8 sts=4 sw=4 noexpandtab
 - *   $Id: ad_pvfs2_open.c,v 1.11 2003/11/02 15:55:18 rross Exp $
-+ *   $Id: ad_pvfs2_open.c,v 1.12 2004/03/16 22:55:32 robl Exp $
++ *   $Id: ad_pvfs2_open.c,v 1.13 2004/03/25 22:22:35 robl Exp $
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
-@@ -95,7 +95,8 @@ static void fake_an_open(PVFS_fs_id fs_i
+@@ -11,7 +11,7 @@
+ 
+ struct open_status_s {
+     int error;
+-    PVFS_pinode_reference pinode_refn;
++    PVFS_object_ref object_ref;
+ };
+ typedef struct open_status_s open_status;
+     
+@@ -55,8 +55,8 @@ static void fake_an_open(PVFS_fs_id fs_i
+ 		return;
+ 	    } 
+ 	    ret = PVFS_sys_create(resp_getparent.basename, 
+-		    resp_getparent.parent_refn, attribs, 
+-		    pvfs2_fs->credentials, &resp_create); 
++		    resp_getparent.parent_ref, attribs, 
++		    pvfs2_fs->credentials, NULL, &resp_create); 
+ 
+ 	    if (ret < 0) { /* XXX: should only do this for EEXISTS */
+ 		ret = PVFS_sys_lookup(fs_id, pvfs_name,
+@@ -67,10 +67,10 @@ static void fake_an_open(PVFS_fs_id fs_i
+ 		    return;
+ 		}
+ 		o_status->error = ret;
+-		o_status->pinode_refn = resp_lookup.pinode_refn;
++		o_status->object_ref = resp_lookup.ref;
+ 		return;
+ 	    }
+-	    o_status->pinode_refn = resp_create.pinode_refn;
++	    o_status->object_ref = resp_create.ref;
+ 	} else {
+ 	    fprintf(stderr, "cannot create file without MPI_MODE_CREATE\n");
+ 	    o_status->error = ret;
+@@ -81,7 +81,7 @@ static void fake_an_open(PVFS_fs_id fs_i
+ 	o_status->error = -1; /* XXX: what should it be? */
+ 	return;
+     } else {
+-	o_status->pinode_refn = resp_lookup.pinode_refn;
++	o_status->object_ref = resp_lookup.ref;
+     }
+     o_status->error = ret;
+     return;
+@@ -95,19 +95,20 @@ static void fake_an_open(PVFS_fs_id fs_i
   */
  void ADIOI_PVFS2_Open(ADIO_File fd, int *error_code)
  {
@@ -2137,6 +2150,30 @@ diff -u -w -p -b -u -p -r1.11 -r1.12
      char pvfs_path[PVFS_NAME_MAX] = {0};
  
      ADIOI_PVFS2_fs *pvfs2_fs;
+ 
+     /* since one process is doing the open, that means one process is also
+-     * doing the error checking.  define a struct for both the pinode and the
+-     * error code to broadcast to all the processors */
++     * doing the error checking.  define a struct for both the object reference
++     * and the error code to broadcast to all the processors */
+ 
+     open_status o_status;
+     MPI_Datatype open_status_type;
+     MPI_Datatype types[2] = {MPI_INT, MPI_BYTE};
+-    int lens[2] = {1, sizeof(PVFS_pinode_reference)};
++    int lens[2] = {1, sizeof(PVFS_object_ref)};
+     MPI_Aint offsets[2];
+     
+     pvfs2_fs = (ADIOI_PVFS2_fs *)ADIOI_Malloc(sizeof(ADIOI_PVFS2_fs));
+@@ -120,7 +121,7 @@ void ADIOI_PVFS2_Open(ADIO_File fd, int 
+     MPI_Comm_rank(fd->comm, &rank);
+ 
+     MPI_Address(&o_status.error, &offsets[0]);
+-    MPI_Address(&o_status.pinode_refn, &offsets[1]);
++    MPI_Address(&o_status.object_ref, &offsets[1]);
+ 
+     MPI_Type_struct(2, lens, offsets, types, &open_status_type);
+     MPI_Type_commit(&open_status_type);
 @@ -128,7 +129,7 @@ void ADIOI_PVFS2_Open(ADIO_File fd, int 
      ADIOI_PVFS2_Init(error_code);
      if (*error_code != MPI_SUCCESS)
@@ -2176,19 +2213,71 @@ diff -u -w -p -b -u -p -r1.11 -r1.12
  
      /* NOTE: if MPI_MODE_EXCL was set, ADIO_Open will call
       * ADIOI_PVFS2_Open from just one processor.  This really confuses MPI when
+@@ -175,7 +170,7 @@ void ADIOI_PVFS2_Open(ADIO_File fd, int 
+ 	return;
+     } 
+ 
+-    /* broadcast status and (if successful) valid pinode refn */
++    /* broadcast status and (if successful) valid object reference */
+     MPI_Bcast(MPI_BOTTOM, 1, open_status_type, 0, fd->comm);
+ 
+     if (o_status.error != 0 ) { 
+@@ -184,7 +179,7 @@ void ADIOI_PVFS2_Open(ADIO_File fd, int 
+ 	return;
+     }
+ 
+-    pvfs2_fs->pinode_refn = o_status.pinode_refn;
++    pvfs2_fs->object_ref = o_status.object_ref;
+     fd->fs_ptr = pvfs2_fs;
+ 
+     MPI_Type_free(&open_status_type);
+Index: adio/ad_pvfs2/ad_pvfs2_read.c
+===================================================================
+RCS file: /home/MPI/cvsMaster/romio/adio/ad_pvfs2/ad_pvfs2_read.c,v
+retrieving revision 1.7
+retrieving revision 1.8
+diff -u -w -p -r1.7 -r1.8
+--- adio/ad_pvfs2/ad_pvfs2_read.c	7 Aug 2003 23:34:31 -0000	1.7
++++ adio/ad_pvfs2/ad_pvfs2_read.c	25 Mar 2004 22:22:35 -0000	1.8
+@@ -1,6 +1,6 @@
+ /* -*- Mode: C; c-basic-offset:4 ; -*- */
+ /* 
+- *   $Id: ad_pvfs2_read.c,v 1.7 2003/08/07 23:34:31 robl Exp $
++ *   $Id: ad_pvfs2_read.c,v 1.8 2004/03/25 22:22:35 robl Exp $
+  *
+  *   Copyright (C) 1997 University of Chicago. 
+  *   See COPYRIGHT notice in top-level directory.
+@@ -39,7 +39,7 @@ void ADIOI_PVFS2_ReadContig(ADIO_File fd
+     }
+ 
+     if (file_ptr_type == ADIO_EXPLICIT_OFFSET) {
+-	ret = PVFS_sys_read(pvfs_fs->pinode_refn, file_req, offset, buf, 
++	ret = PVFS_sys_read(pvfs_fs->object_ref, file_req, offset, buf, 
+ 		mem_req, pvfs_fs->credentials, &resp_io);
+ 	if (ret < 0 ) {
+ 	    fprintf(stderr, "pvfs_sys_read returns with %d\n", ret);
+@@ -47,7 +47,7 @@ void ADIOI_PVFS2_ReadContig(ADIO_File fd
+ 	}
+ 	fd->fp_sys_posn = offset + (int)resp_io.total_completed;
+     } else { 
+-	ret = PVFS_sys_read(pvfs_fs->pinode_refn, file_req, fd->fp_ind, buf, 
++	ret = PVFS_sys_read(pvfs_fs->object_ref, file_req, fd->fp_ind, buf, 
+ 		mem_req, pvfs_fs->credentials, &resp_io);
+ 	if (ret < 0) {
+ 	    fprintf(stderr, "pvfs_sys_read returns with %d\n", ret);
 Index: adio/ad_pvfs2/ad_pvfs2_resize.c
 ===================================================================
 RCS file: /home/MPI/cvsMaster/romio/adio/ad_pvfs2/ad_pvfs2_resize.c,v
 retrieving revision 1.4
-retrieving revision 1.8
-diff -u -w -p -b -u -p -r1.4 -r1.8
+retrieving revision 1.9
+diff -u -w -p -r1.4 -r1.9
 --- adio/ad_pvfs2/ad_pvfs2_resize.c	4 Sep 2003 23:20:09 -0000	1.4
-+++ adio/ad_pvfs2/ad_pvfs2_resize.c	17 Mar 2004 16:50:52 -0000	1.8
++++ adio/ad_pvfs2/ad_pvfs2_resize.c	25 Mar 2004 22:22:35 -0000	1.9
 @@ -1,6 +1,6 @@
  /* -*- Mode: C; c-basic-offset:4 ; -*- */
  /* 
 - *   $Id: ad_pvfs2_resize.c,v 1.4 2003/09/04 23:20:09 robl Exp $
-+ *   $Id: ad_pvfs2_resize.c,v 1.8 2004/03/17 16:50:52 robl Exp $
++ *   $Id: ad_pvfs2_resize.c,v 1.9 2004/03/25 22:22:35 robl Exp $
   *
   *   Copyright (C) 1997 University of Chicago. 
   *   See COPYRIGHT notice in top-level directory.
@@ -2222,7 +2311,7 @@ diff -u -w -p -b -u -p -r1.4 -r1.8
 +     * MPI_Barrier in MPI_File_set_size() */
 +
 +    if (rank == fd->hints->ranklist[0]) {
-+	ret = PVFS_sys_truncate(pvfs_fs->pinode_refn, 
++	ret = PVFS_sys_truncate(pvfs_fs->object_ref, 
 +		size, pvfs_fs->credentials);
 +	MPI_Bcast(&ret, 1, MPI_INT, 0, fd->comm);
      } else {
@@ -2234,12 +2323,82 @@ diff -u -w -p -b -u -p -r1.4 -r1.8
  }
  
  /*
+Index: adio/ad_pvfs2/ad_pvfs2_write.c
+===================================================================
+RCS file: /home/MPI/cvsMaster/romio/adio/ad_pvfs2/ad_pvfs2_write.c,v
+retrieving revision 1.11
+retrieving revision 1.12
+diff -u -w -p -r1.11 -r1.12
+--- adio/ad_pvfs2/ad_pvfs2_write.c	5 Sep 2003 20:47:47 -0000	1.11
++++ adio/ad_pvfs2/ad_pvfs2_write.c	25 Mar 2004 22:22:36 -0000	1.12
+@@ -1,6 +1,6 @@
+ /* -*- Mode: C; c-basic-offset:4 ; -*- 
+  *   vim: ts=8 sts=4 sw=4 noexpandtab
+- *   $Id: ad_pvfs2_write.c,v 1.11 2003/09/05 20:47:47 robl Exp $
++ *   $Id: ad_pvfs2_write.c,v 1.12 2004/03/25 22:22:36 robl Exp $
+  *
+  *   Copyright (C) 1997 University of Chicago. 
+  *   See COPYRIGHT notice in top-level directory.
+@@ -38,7 +38,7 @@ void ADIOI_PVFS2_WriteContig(ADIO_File f
+     }
+ 
+     if (file_ptr_type == ADIO_EXPLICIT_OFFSET) {
+-	ret = PVFS_sys_write(pvfs_fs->pinode_refn, file_req, offset,  buf, 
++	ret = PVFS_sys_write(pvfs_fs->object_ref, file_req, offset,  buf, 
+ 		mem_req, pvfs_fs->credentials, &resp_io);
+ 	if (ret < 0 ) {
+ 	    fprintf(stderr, "pvfs_sys_write returns with %d\n", ret);
+@@ -46,7 +46,7 @@ void ADIOI_PVFS2_WriteContig(ADIO_File f
+ 	}
+ 	fd->fp_sys_posn = offset + (int) resp_io.total_completed;
+     } else {
+-	ret = PVFS_sys_write(pvfs_fs->pinode_refn, file_req, fd->fp_ind, buf, 
++	ret = PVFS_sys_write(pvfs_fs->object_ref, file_req, fd->fp_ind, buf, 
+ 		mem_req, pvfs_fs->credentials, &resp_io);
+ 	if (ret < 0) {
+ 	    fprintf(stderr, "pvfs_sys_write returns with %d\n", ret);
+@@ -205,7 +205,7 @@ void ADIOI_PVFS2_WriteStrided(ADIO_File 
+ 		    err_flag = PVFS_Request_contiguous(file_lengths, 
+ 			    PVFS_BYTE, &file_req);
+ 		    if (err_flag < 0) break;
+-		    err_flag = PVFS_sys_write(pvfs_fs->pinode_refn, file_req, 
++		    err_flag = PVFS_sys_write(pvfs_fs->object_ref, file_req, 
+ 			    file_offsets, PVFS_BOTTOM, mem_req, 
+ 			    pvfs_fs->credentials, &resp_io);
+ 		  
+@@ -385,7 +385,7 @@ void ADIOI_PVFS2_WriteStrided(ADIO_File 
+ 	    /* PVFS_Request_hindexed already expresses the offsets into the
+ 	     * file, so we should not pass in an offset if we are using
+ 	     * hindexed for the file type */
+-	    err_flag = PVFS_sys_write(pvfs_fs->pinode_refn, file_req, 0, 
++	    err_flag = PVFS_sys_write(pvfs_fs->object_ref, file_req, 0, 
+ 		    mem_offsets, mem_req, pvfs_fs->credentials, &resp_io);
+ 	    if (err_flag < 0)
+ 		goto error_state;
+@@ -427,7 +427,7 @@ void ADIOI_PVFS2_WriteStrided(ADIO_File 
+ 	    if (err_flag < 0)
+ 		goto error_state;
+ 	    /* as above, use 0 for 'offset' when using hindexed file type*/
+-	    err_flag = PVFS_sys_write(pvfs_fs->pinode_refn, file_req, 0, 
++	    err_flag = PVFS_sys_write(pvfs_fs->object_ref, file_req, 0, 
+ 		    mem_offsets, mem_req, pvfs_fs->credentials, &resp_io);
+ 	    if (err_flag < 0)
+ 		goto error_state;
+@@ -781,7 +781,7 @@ void ADIOI_PVFS2_WriteStrided(ADIO_File 
+ 	    if (err_flag < 0)
+ 		goto error_state;
+ 	    /* offset will be expressed in memory and file datatypes */
+-	    err_flag = PVFS_sys_write(pvfs_fs->pinode_refn, file_req, 0, 
++	    err_flag = PVFS_sys_write(pvfs_fs->object_ref, file_req, 0, 
+ 		    PVFS_BOTTOM, mem_req, pvfs_fs->credentials, &resp_io);
+ 	    size_wrote += new_buffer_write;
+ 	    start_k = k;
 Index: adio/ad_sfs/.cvsignore
 ===================================================================
 RCS file: /home/MPI/cvsMaster/romio/adio/ad_sfs/.cvsignore,v
 retrieving revision 1.2
 retrieving revision 1.3
-diff -u -w -p -b -u -p -r1.2 -r1.3
+diff -u -w -p -r1.2 -r1.3
 --- adio/ad_sfs/.cvsignore	1 Aug 2003 13:30:18 -0000	1.2
 +++ adio/ad_sfs/.cvsignore	19 Jan 2004 14:49:36 -0000	1.3
 @@ -1,2 +1,4 @@
@@ -2252,7 +2411,7 @@ Index: adio/ad_testfs/.cvsignore
 RCS file: /home/MPI/cvsMaster/romio/adio/ad_testfs/.cvsignore,v
 retrieving revision 1.2
 retrieving revision 1.3
-diff -u -w -p -b -u -p -r1.2 -r1.3
+diff -u -w -p -r1.2 -r1.3
 --- adio/ad_testfs/.cvsignore	1 Aug 2003 13:30:19 -0000	1.2
 +++ adio/ad_testfs/.cvsignore	19 Jan 2004 14:49:36 -0000	1.3
 @@ -1,2 +1,4 @@
@@ -2265,7 +2424,7 @@ Index: adio/ad_ufs/.cvsignore
 RCS file: /home/MPI/cvsMaster/romio/adio/ad_ufs/.cvsignore,v
 retrieving revision 1.2
 retrieving revision 1.3
-diff -u -w -p -b -u -p -r1.2 -r1.3
+diff -u -w -p -r1.2 -r1.3
 --- adio/ad_ufs/.cvsignore	1 Aug 2003 13:30:19 -0000	1.2
 +++ adio/ad_ufs/.cvsignore	19 Jan 2004 14:49:37 -0000	1.3
 @@ -1,2 +1,4 @@
@@ -2278,7 +2437,7 @@ Index: adio/ad_xfs/.cvsignore
 RCS file: /home/MPI/cvsMaster/romio/adio/ad_xfs/.cvsignore,v
 retrieving revision 1.3
 retrieving revision 1.4
-diff -u -w -p -b -u -p -r1.3 -r1.4
+diff -u -w -p -r1.3 -r1.4
 --- adio/ad_xfs/.cvsignore	1 Aug 2003 13:30:19 -0000	1.3
 +++ adio/ad_xfs/.cvsignore	19 Jan 2004 14:49:37 -0000	1.4
 @@ -1,4 +1,5 @@
@@ -2293,7 +2452,7 @@ Index: adio/common/.cvsignore
 RCS file: /home/MPI/cvsMaster/romio/adio/common/.cvsignore,v
 retrieving revision 1.3
 retrieving revision 1.4
-diff -u -w -p -b -u -p -r1.3 -r1.4
+diff -u -w -p -r1.3 -r1.4
 --- adio/common/.cvsignore	1 Aug 2003 13:30:19 -0000	1.3
 +++ adio/common/.cvsignore	19 Jan 2004 14:49:37 -0000	1.4
 @@ -1,5 +1,6 @@
@@ -2309,7 +2468,7 @@ Index: adio/common/Makefile.in
 RCS file: /home/MPI/cvsMaster/romio/adio/common/Makefile.in,v
 retrieving revision 1.12
 retrieving revision 1.15
-diff -u -w -p -b -u -p -r1.12 -r1.15
+diff -u -w -p -r1.12 -r1.15
 --- adio/common/Makefile.in	7 Oct 2003 22:12:29 -0000	1.12
 +++ adio/common/Makefile.in	6 Feb 2004 15:57:24 -0000	1.15
 @@ -19,7 +19,8 @@ AD_OBJECTS = ad_close.o ad_init.o ad_end
@@ -2337,7 +2496,7 @@ Index: adio/common/ad_open.c
 RCS file: /home/MPI/cvsMaster/romio/adio/common/ad_open.c,v
 retrieving revision 1.23
 retrieving revision 1.25
-diff -u -w -p -b -u -p -r1.23 -r1.25
+diff -u -w -p -r1.23 -r1.25
 --- adio/common/ad_open.c	5 Sep 2003 22:35:49 -0000	1.23
 +++ adio/common/ad_open.c	16 Mar 2004 22:53:53 -0000	1.25
 @@ -1,6 +1,6 @@
@@ -2374,7 +2533,7 @@ Index: adio/common/ad_write_str.c
 RCS file: /home/MPI/cvsMaster/romio/adio/common/ad_write_str.c,v
 retrieving revision 1.11
 retrieving revision 1.12
-diff -u -w -p -b -u -p -r1.11 -r1.12
+diff -u -w -p -r1.11 -r1.12
 --- adio/common/ad_write_str.c	26 Jul 2003 23:16:57 -0000	1.11
 +++ adio/common/ad_write_str.c	16 Dec 2003 21:51:22 -0000	1.12
 @@ -1,6 +1,6 @@
@@ -2794,7 +2953,7 @@ Index: adio/common/flatten.c
 RCS file: /home/MPI/cvsMaster/romio/adio/common/flatten.c,v
 retrieving revision 1.12
 retrieving revision 1.14
-diff -u -w -p -b -u -p -r1.12 -r1.14
+diff -u -w -p -r1.12 -r1.14
 --- adio/common/flatten.c	4 Sep 2003 21:35:29 -0000	1.12
 +++ adio/common/flatten.c	19 Feb 2004 16:24:02 -0000	1.14
 @@ -1,6 +1,6 @@
@@ -3341,7 +3500,7 @@ Index: adio/include/adio.h
 RCS file: /home/MPI/cvsMaster/romio/adio/include/adio.h,v
 retrieving revision 1.30
 retrieving revision 1.33
-diff -u -w -p -b -u -p -r1.30 -r1.33
+diff -u -w -p -r1.30 -r1.33
 --- adio/include/adio.h	8 Sep 2003 13:35:43 -0000	1.30
 +++ adio/include/adio.h	16 Mar 2004 22:53:55 -0000	1.33
 @@ -1,6 +1,6 @@
@@ -3366,7 +3525,7 @@ Index: adio/include/adioi.h
 RCS file: /home/MPI/cvsMaster/romio/adio/include/adioi.h,v
 retrieving revision 1.21
 retrieving revision 1.22
-diff -u -w -p -b -u -p -r1.21 -r1.22
+diff -u -w -p -r1.21 -r1.22
 --- adio/include/adioi.h	4 Dec 2003 22:20:06 -0000	1.21
 +++ adio/include/adioi.h	17 Dec 2003 16:49:52 -0000	1.22
 @@ -1,6 +1,6 @@
@@ -3393,7 +3552,7 @@ Index: adio/include/mpipr.h
 RCS file: /home/MPI/cvsMaster/romio/adio/include/mpipr.h,v
 retrieving revision 1.8
 retrieving revision 1.9
-diff -u -w -p -b -u -p -r1.8 -r1.9
+diff -u -w -p -r1.8 -r1.9
 --- adio/include/mpipr.h	8 Sep 2003 13:36:43 -0000	1.8
 +++ adio/include/mpipr.h	8 Jan 2004 22:41:54 -0000	1.9
 @@ -1,5 +1,5 @@
@@ -3424,7 +3583,7 @@ Index: include/mpio.h.in
 RCS file: /home/MPI/cvsMaster/romio/include/mpio.h.in,v
 retrieving revision 1.20
 retrieving revision 1.24
-diff -u -w -p -b -u -p -r1.20 -r1.24
+diff -u -w -p -r1.20 -r1.24
 --- include/mpio.h.in	7 Nov 2003 00:14:54 -0000	1.20
 +++ include/mpio.h.in	29 Feb 2004 18:31:14 -0000	1.24
 @@ -1,6 +1,6 @@
@@ -3499,7 +3658,7 @@ Index: mpi-io/.cvsignore
 RCS file: /home/MPI/cvsMaster/romio/mpi-io/.cvsignore,v
 retrieving revision 1.2
 retrieving revision 1.3
-diff -u -w -p -b -u -p -r1.2 -r1.3
+diff -u -w -p -r1.2 -r1.3
 --- mpi-io/.cvsignore	1 Aug 2003 13:30:20 -0000	1.2
 +++ mpi-io/.cvsignore	19 Jan 2004 14:49:37 -0000	1.3
 @@ -1,2 +1,5 @@
@@ -3513,7 +3672,7 @@ Index: mpi-io/Makefile.in
 RCS file: /home/MPI/cvsMaster/romio/mpi-io/Makefile.in,v
 retrieving revision 1.19
 retrieving revision 1.21
-diff -u -w -p -b -u -p -r1.19 -r1.21
+diff -u -w -p -r1.19 -r1.21
 --- mpi-io/Makefile.in	1 Dec 2003 21:52:58 -0000	1.19
 +++ mpi-io/Makefile.in	27 Jan 2004 23:27:39 -0000	1.21
 @@ -34,10 +34,7 @@ mpi_sources = close.c read.c open.c writ
@@ -3595,7 +3754,7 @@ Index: mpi-io/delete.c
 RCS file: /home/MPI/cvsMaster/romio/mpi-io/delete.c,v
 retrieving revision 1.18
 retrieving revision 1.19
-diff -u -w -p -b -u -p -r1.18 -r1.19
+diff -u -w -p -r1.18 -r1.19
 --- mpi-io/delete.c	15 Sep 2003 13:33:30 -0000	1.18
 +++ mpi-io/delete.c	12 Feb 2004 06:08:22 -0000	1.19
 @@ -1,6 +1,6 @@
@@ -3649,7 +3808,7 @@ Index: mpi-io/get_posn_sh.c
 RCS file: /home/MPI/cvsMaster/romio/mpi-io/get_posn_sh.c,v
 retrieving revision 1.17
 retrieving revision 1.18
-diff -u -w -p -b -u -p -r1.17 -r1.18
+diff -u -w -p -r1.17 -r1.18
 --- mpi-io/get_posn_sh.c	1 Jul 2003 19:12:39 -0000	1.17
 +++ mpi-io/get_posn_sh.c	12 Feb 2004 06:08:24 -0000	1.18
 @@ -1,6 +1,6 @@
@@ -3694,7 +3853,7 @@ Index: mpi-io/get_view.c
 RCS file: /home/MPI/cvsMaster/romio/mpi-io/get_view.c,v
 retrieving revision 1.15
 retrieving revision 1.16
-diff -u -w -p -b -u -p -r1.15 -r1.16
+diff -u -w -p -r1.15 -r1.16
 --- mpi-io/get_view.c	18 Apr 2003 20:15:08 -0000	1.15
 +++ mpi-io/get_view.c	12 Feb 2004 06:08:26 -0000	1.16
 @@ -1,6 +1,6 @@
@@ -3729,7 +3888,7 @@ Index: mpi-io/ioreq_f2c.c
 RCS file: /home/MPI/cvsMaster/romio/mpi-io/ioreq_f2c.c,v
 retrieving revision 1.10
 retrieving revision 1.11
-diff -u -w -p -b -u -p -r1.10 -r1.11
+diff -u -w -p -r1.10 -r1.11
 --- mpi-io/ioreq_f2c.c	24 Feb 2003 23:52:08 -0000	1.10
 +++ mpi-io/ioreq_f2c.c	12 Feb 2004 06:08:27 -0000	1.11
 @@ -1,6 +1,6 @@
@@ -3759,7 +3918,7 @@ Index: mpi-io/iread_sh.c
 RCS file: /home/MPI/cvsMaster/romio/mpi-io/iread_sh.c,v
 retrieving revision 1.20
 retrieving revision 1.21
-diff -u -w -p -b -u -p -r1.20 -r1.21
+diff -u -w -p -r1.20 -r1.21
 --- mpi-io/iread_sh.c	1 Jul 2003 19:12:40 -0000	1.20
 +++ mpi-io/iread_sh.c	12 Feb 2004 06:08:29 -0000	1.21
 @@ -1,6 +1,6 @@
@@ -3901,13 +4060,13 @@ Index: mpi-io/mpich2_fileutil.c
 RCS file: /home/MPI/cvsMaster/romio/mpi-io/mpich2_fileutil.c,v
 retrieving revision 1.12
 retrieving revision 1.13
-diff -u -w -p -b -u -p -r1.12 -r1.13
+diff -u -w -p -r1.12 -r1.13
 Index: mpi-io/open.c
 ===================================================================
 RCS file: /home/MPI/cvsMaster/romio/mpi-io/open.c,v
 retrieving revision 1.32
 retrieving revision 1.33
-diff -u -w -p -b -u -p -r1.32 -r1.33
+diff -u -w -p -r1.32 -r1.33
 --- mpi-io/open.c	22 Sep 2003 21:23:23 -0000	1.32
 +++ mpi-io/open.c	12 Feb 2004 06:08:34 -0000	1.33
 @@ -1,6 +1,6 @@
@@ -4025,7 +4184,7 @@ Index: mpi-io/read_alle.c
 RCS file: /home/MPI/cvsMaster/romio/mpi-io/read_alle.c,v
 retrieving revision 1.15
 retrieving revision 1.16
-diff -u -w -p -b -u -p -r1.15 -r1.16
+diff -u -w -p -r1.15 -r1.16
 --- mpi-io/read_alle.c	8 Sep 2003 13:35:04 -0000	1.15
 +++ mpi-io/read_alle.c	12 Feb 2004 06:08:42 -0000	1.16
 @@ -1,6 +1,6 @@
@@ -4071,7 +4230,7 @@ Index: mpi-io/read_at.c
 RCS file: /home/MPI/cvsMaster/romio/mpi-io/read_at.c,v
 retrieving revision 1.20
 retrieving revision 1.21
-diff -u -w -p -b -u -p -r1.20 -r1.21
+diff -u -w -p -r1.20 -r1.21
 --- mpi-io/read_at.c	8 Sep 2003 13:33:43 -0000	1.20
 +++ mpi-io/read_at.c	12 Feb 2004 06:08:44 -0000	1.21
 @@ -1,6 +1,6 @@
@@ -4205,7 +4364,7 @@ Index: mpi-io/read_ordb.c
 RCS file: /home/MPI/cvsMaster/romio/mpi-io/read_ordb.c,v
 retrieving revision 1.20
 retrieving revision 1.21
-diff -u -w -p -b -u -p -r1.20 -r1.21
+diff -u -w -p -r1.20 -r1.21
 --- mpi-io/read_ordb.c	25 Sep 2003 13:25:11 -0000	1.20
 +++ mpi-io/read_ordb.c	12 Feb 2004 06:08:49 -0000	1.21
 @@ -1,6 +1,6 @@
@@ -4316,7 +4475,7 @@ Index: mpi-io/read_orde.c
 RCS file: /home/MPI/cvsMaster/romio/mpi-io/read_orde.c,v
 retrieving revision 1.15
 retrieving revision 1.16
-diff -u -w -p -b -u -p -r1.15 -r1.16
+diff -u -w -p -r1.15 -r1.16
 --- mpi-io/read_orde.c	8 Sep 2003 13:35:04 -0000	1.15
 +++ mpi-io/read_orde.c	12 Feb 2004 06:08:51 -0000	1.16
 @@ -1,6 +1,6 @@
@@ -4351,7 +4510,7 @@ Index: mpi-io/read_sh.c
 RCS file: /home/MPI/cvsMaster/romio/mpi-io/read_sh.c,v
 retrieving revision 1.19
 retrieving revision 1.20
-diff -u -w -p -b -u -p -r1.19 -r1.20
+diff -u -w -p -r1.19 -r1.20
 --- mpi-io/read_sh.c	15 Sep 2003 13:33:31 -0000	1.19
 +++ mpi-io/read_sh.c	12 Feb 2004 06:08:53 -0000	1.20
 @@ -1,6 +1,6 @@
@@ -4478,7 +4637,7 @@ Index: mpi-io/seek_sh.c
 RCS file: /home/MPI/cvsMaster/romio/mpi-io/seek_sh.c,v
 retrieving revision 1.18
 retrieving revision 1.19
-diff -u -w -p -b -u -p -r1.18 -r1.19
+diff -u -w -p -r1.18 -r1.19
 --- mpi-io/seek_sh.c	15 Sep 2003 13:33:31 -0000	1.18
 +++ mpi-io/seek_sh.c	12 Feb 2004 06:09:02 -0000	1.19
 @@ -1,6 +1,6 @@
@@ -4645,7 +4804,7 @@ Index: mpi-io/set_errh.c
 RCS file: /home/MPI/cvsMaster/romio/mpi-io/set_errh.c,v
 retrieving revision 1.11
 retrieving revision 1.12
-diff -u -w -p -b -u -p -r1.11 -r1.12
+diff -u -w -p -r1.11 -r1.12
 --- mpi-io/set_errh.c	18 Apr 2003 20:15:12 -0000	1.11
 +++ mpi-io/set_errh.c	16 Dec 2003 17:32:34 -0000	1.12
 @@ -1,6 +1,6 @@
@@ -4670,7 +4829,7 @@ Index: mpi-io/wr_atallb.c
 RCS file: /home/MPI/cvsMaster/romio/mpi-io/wr_atallb.c,v
 retrieving revision 1.16
 retrieving revision 1.17
-diff -u -w -p -b -u -p -r1.16 -r1.17
+diff -u -w -p -r1.16 -r1.17
 --- mpi-io/wr_atallb.c	5 Sep 2003 22:33:57 -0000	1.16
 +++ mpi-io/wr_atallb.c	12 Feb 2004 06:09:09 -0000	1.17
 @@ -1,6 +1,6 @@
@@ -4772,7 +4931,7 @@ Index: mpi-io/wr_atalle.c
 RCS file: /home/MPI/cvsMaster/romio/mpi-io/wr_atalle.c,v
 retrieving revision 1.16
 retrieving revision 1.17
-diff -u -w -p -b -u -p -r1.16 -r1.17
+diff -u -w -p -r1.16 -r1.17
 --- mpi-io/wr_atalle.c	8 Sep 2003 13:35:05 -0000	1.16
 +++ mpi-io/wr_atalle.c	12 Feb 2004 06:09:10 -0000	1.17
 @@ -1,6 +1,6 @@
@@ -4818,7 +4977,7 @@ Index: mpi-io/write_allb.c
 RCS file: /home/MPI/cvsMaster/romio/mpi-io/write_allb.c,v
 retrieving revision 1.15
 retrieving revision 1.16
-diff -u -w -p -b -u -p -r1.15 -r1.16
+diff -u -w -p -r1.15 -r1.16
 --- mpi-io/write_allb.c	5 Sep 2003 22:34:31 -0000	1.15
 +++ mpi-io/write_allb.c	12 Feb 2004 06:09:12 -0000	1.16
 @@ -1,6 +1,6 @@
@@ -4910,7 +5069,7 @@ Index: mpi-io/write_alle.c
 RCS file: /home/MPI/cvsMaster/romio/mpi-io/write_alle.c,v
 retrieving revision 1.15
 retrieving revision 1.18
-diff -u -w -p -b -u -p -r1.15 -r1.18
+diff -u -w -p -r1.15 -r1.18
 --- mpi-io/write_alle.c	5 Sep 2003 22:34:32 -0000	1.15
 +++ mpi-io/write_alle.c	17 Mar 2004 20:31:27 -0000	1.18
 @@ -1,6 +1,6 @@
@@ -4958,7 +5117,7 @@ Index: mpi-io/write_at.c
 RCS file: /home/MPI/cvsMaster/romio/mpi-io/write_at.c,v
 retrieving revision 1.20
 retrieving revision 1.21
-diff -u -w -p -b -u -p -r1.20 -r1.21
+diff -u -w -p -r1.20 -r1.21
 --- mpi-io/write_at.c	8 Sep 2003 21:29:22 -0000	1.20
 +++ mpi-io/write_at.c	12 Feb 2004 06:09:15 -0000	1.21
 @@ -1,6 +1,6 @@
@@ -5092,7 +5251,7 @@ Index: mpi-io/write_ordb.c
 RCS file: /home/MPI/cvsMaster/romio/mpi-io/write_ordb.c,v
 retrieving revision 1.20
 retrieving revision 1.21
-diff -u -w -p -b -u -p -r1.20 -r1.21
+diff -u -w -p -r1.20 -r1.21
 --- mpi-io/write_ordb.c	25 Sep 2003 13:25:11 -0000	1.20
 +++ mpi-io/write_ordb.c	12 Feb 2004 06:09:17 -0000	1.21
 @@ -1,6 +1,6 @@
@@ -5203,7 +5362,7 @@ Index: mpi-io/write_orde.c
 RCS file: /home/MPI/cvsMaster/romio/mpi-io/write_orde.c,v
 retrieving revision 1.15
 retrieving revision 1.16
-diff -u -w -p -b -u -p -r1.15 -r1.16
+diff -u -w -p -r1.15 -r1.16
 --- mpi-io/write_orde.c	8 Sep 2003 13:35:05 -0000	1.15
 +++ mpi-io/write_orde.c	12 Feb 2004 06:09:19 -0000	1.16
 @@ -1,6 +1,6 @@
@@ -5249,7 +5408,7 @@ Index: mpi-io/write_sh.c
 RCS file: /home/MPI/cvsMaster/romio/mpi-io/write_sh.c,v
 retrieving revision 1.19
 retrieving revision 1.21
-diff -u -w -p -b -u -p -r1.19 -r1.21
+diff -u -w -p -r1.19 -r1.21
 --- mpi-io/write_sh.c	15 Sep 2003 13:33:36 -0000	1.19
 +++ mpi-io/write_sh.c	20 Feb 2004 19:47:59 -0000	1.21
 @@ -1,6 +1,6 @@
@@ -5359,7 +5518,7 @@ Index: test/async.c
 RCS file: /home/MPI/cvsMaster/romio/test/async.c,v
 retrieving revision 1.6
 retrieving revision 1.7
-diff -u -w -p -b -u -p -r1.6 -r1.7
+diff -u -w -p -r1.6 -r1.7
 --- test/async.c	23 Feb 2003 16:17:22 -0000	1.6
 +++ test/async.c	27 Jan 2004 23:23:37 -0000	1.7
 @@ -66,7 +66,11 @@ int main(int argc, char **argv)
@@ -5392,7 +5551,7 @@ Index: test/i_noncontig.c
 RCS file: /home/MPI/cvsMaster/romio/test/i_noncontig.c,v
 retrieving revision 1.6
 retrieving revision 1.7
-diff -u -w -p -b -u -p -r1.6 -r1.7
+diff -u -w -p -r1.6 -r1.7
 --- test/i_noncontig.c	23 Feb 2003 16:31:15 -0000	1.6
 +++ test/i_noncontig.c	29 Jan 2004 16:30:22 -0000	1.7
 @@ -91,14 +91,22 @@ int main(int argc, char **argv)
@@ -5464,103 +5623,12 @@ diff -u -w -p -b -u -p -r1.6 -r1.7
  
      for (i=0; i<SIZE; i++) {
  	if (!mynod) {
-Index: test/noncontig.c
-===================================================================
-RCS file: /home/MPI/cvsMaster/romio/test/noncontig.c,v
-retrieving revision 1.7
-diff -u -w -p -b -u -p -r1.7 noncontig.c
---- test/noncontig.c	23 Feb 2003 16:31:15 -0000	1.7
-+++ test/noncontig.c	16 Mar 2004 22:59:48 -0000
-@@ -85,6 +85,11 @@ int main(int argc, char **argv)
-        better to use the default values in practice. */
-     MPI_Info_set(info, "ind_rd_buffer_size", "1209");
-     MPI_Info_set(info, "ind_wr_buffer_size", "1107");
-+    /*
-+    MPI_Info_set(info, "romio_ds_read", "enable");
-+    MPI_Info_set(info, "romio_ds_write", "enable");
-+    */
-+
- 
-     if (!mynod) {
- #if VERBOSE
-Index: test/noncontig_coll.c
-===================================================================
-RCS file: /home/MPI/cvsMaster/romio/test/noncontig_coll.c,v
-retrieving revision 1.6
-diff -u -w -p -b -u -p -r1.6 noncontig_coll.c
---- test/noncontig_coll.c	23 Feb 2003 16:38:30 -0000	1.6
-+++ test/noncontig_coll.c	16 Dec 2003 20:30:10 -0000
-@@ -23,6 +23,7 @@ int main(int argc, char **argv)
-     MPI_Status status;
-     char *filename;
-     MPI_Datatype typevec, newtype, t[3];
-+    MPI_Info info;
- 
-     MPI_Init(&argc,&argv);
-     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
-@@ -74,18 +75,20 @@ int main(int argc, char **argv)
-     MPI_Type_commit(&newtype);
-     MPI_Type_free(&typevec);
- 
-+    info = MPI_INFO_NULL;
-+
-     if (!mynod) {
- #if VERBOSE
- 	fprintf(stderr, "\ntesting noncontiguous in memory, noncontiguous in file using collective I/O\n");
- #endif
--	MPI_File_delete(filename, MPI_INFO_NULL);
-+	MPI_File_delete(filename, info);
-     }
-     MPI_Barrier(MPI_COMM_WORLD);
- 
-     MPI_File_open(MPI_COMM_WORLD, filename, MPI_MODE_CREATE | MPI_MODE_RDWR,
--                  MPI_INFO_NULL, &fh);
-+                  info, &fh);
- 
--    MPI_File_set_view(fh, 0, MPI_INT, newtype, "native", MPI_INFO_NULL);
-+    MPI_File_set_view(fh, 0, MPI_INT, newtype, "native", info);
- 
-     for (i=0; i<SIZE; i++) buf[i] = i + mynod*SIZE;
-     MPI_File_write_all(fh, buf, 1, newtype, &status);
-@@ -131,12 +134,12 @@ int main(int argc, char **argv)
- #if VERBOSE
- 	fprintf(stderr, "\ntesting noncontiguous in memory, contiguous in file using collective I/O\n");
- #endif
--	MPI_File_delete(filename, MPI_INFO_NULL);
-+	MPI_File_delete(filename, info);
-     }
-     MPI_Barrier(MPI_COMM_WORLD);
- 
-     MPI_File_open(MPI_COMM_WORLD, filename, MPI_MODE_CREATE | MPI_MODE_RDWR,
--                  MPI_INFO_NULL, &fh);
-+                  info, &fh);
- 
-     for (i=0; i<SIZE; i++) buf[i] = i + mynod*SIZE;
-     MPI_File_write_at_all(fh, mynod*(SIZE/2)*sizeof(int), buf, 1, newtype, &status);
-@@ -182,14 +185,14 @@ int main(int argc, char **argv)
- #if VERBOSE
- 	fprintf(stderr, "\ntesting contiguous in memory, noncontiguous in file using collective I/O\n");
- #endif
--	MPI_File_delete(filename, MPI_INFO_NULL);
-+	MPI_File_delete(filename, info);
-     }
-     MPI_Barrier(MPI_COMM_WORLD);
- 
-     MPI_File_open(MPI_COMM_WORLD, filename, MPI_MODE_CREATE | MPI_MODE_RDWR,
--                  MPI_INFO_NULL, &fh);
-+                  info, &fh);
- 
--    MPI_File_set_view(fh, 0, MPI_INT, newtype, "native", MPI_INFO_NULL);
-+    MPI_File_set_view(fh, 0, MPI_INT, newtype, "native", info);
- 
-     for (i=0; i<SIZE; i++) buf[i] = i + mynod*SIZE;
-     MPI_File_write_all(fh, buf, SIZE, MPI_INT, &status);
 Index: test/runtests.in
 ===================================================================
 RCS file: /home/MPI/cvsMaster/romio/test/runtests.in,v
 retrieving revision 1.10
 retrieving revision 1.11
-diff -u -w -p -b -u -p -r1.10 -r1.11
+diff -u -w -p -r1.10 -r1.11
 --- test/runtests.in	19 Dec 2002 22:31:35 -0000	1.10
 +++ test/runtests.in	8 Jan 2004 22:39:12 -0000	1.11
 @@ -1,6 +1,6 @@
