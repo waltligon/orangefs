@@ -644,7 +644,7 @@ static int io_datafile_post_msgpairs(PINT_client_sm *sm_p,
 
 	    /* TODO: CHECK THE STATUS!!! */
 	    if (msg_p->send_status.error_code != 0) {
-		PVFS_perror("sys-io.sm: msg_p->send_status.error_code", msg_p->send_status.error_code);
+		PVFS_perror_gossip("sys-io.sm: msg_p->send_status.error_code", msg_p->send_status.error_code);
 		assert(0);
 	    }
 

@@ -143,6 +143,8 @@ enum PVFS_server_param
 
 void PVFS_perror(char *text,
 		 int retcode);
+void PVFS_perror_gossip(char* text,
+			int retcode);
 
 /* special bit used to differentiate PVFS error codes from system
  * errno values

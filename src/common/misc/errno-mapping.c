@@ -9,6 +9,7 @@
 #include <string.h>
 
 #include "pvfs2-types.h"
+#include "gossip.h"
 
 /* PVFS_perror()
  *
@@ -39,6 +40,32 @@ void PVFS_perror(char* text, int retcode)
 
     return;
 }
+
+/* PVFS_perror_gossip()
+ *
+ * same as PVFS_perror, except that the output is routed through 
+ * gossip rather than stderr
+ *
+ * no return value
+ */
+void PVFS_perror_gossip(char* text, int retcode)
+{
+    if(IS_PVFS_ERROR(-retcode))
+    {
+	gossip_err("%s: %s\n", text, strerror(PVFS_ERROR_TO_ERRNO(-retcode)));
+	/* TODO: probably we should do something to print
+	 * out the class too?
+	 */
+    }       
+    else
+    {
+	gossip_err("Warning: non PVFS2 error code:\n");
+	gossip_err("%s: %s\n", text, strerror(-retcode));
+    }
+
+    return;
+}
+
 
 /* NOTE: PVFS error values are defined in include/pvfs2-types.h
  */
