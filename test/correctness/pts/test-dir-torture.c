@@ -13,38 +13,7 @@
 #include "pvfs-helper.h"
 #include "pvfs2-util.h"
 
-
-/* 
- * helper function to initialize pvfs
- * doesn't take any parameters (relies heavily on some expected default information)
- *
- * returns: fs_id of a pvfs file system 
- * 	or -1 if error
- */
-PVFS_fs_id system_init(void)
-{
-    PVFS_sysresp_init resp_init;
-    int ret = -1;
-    pvfs_mntlist mnt = { 0, NULL };	/* use pvfstab in cwd */
-
-    memset(&resp_init, 0, sizeof(resp_init));
-
-    ret = PVFS_util_parse_pvfstab(NULL, &mnt);
-    if (ret < 0)
-    {
-	printf("Parsing error\n");
-	return -1;
-    }
-
-    ret = PVFS_sys_initialize(mnt, CLIENT_DEBUG, &resp_init);
-    if (ret < 0)
-    {
-	printf("PVFS_sys_initialize() failure. = %d\n", ret);
-	return (ret);
-    }
-
-    return resp_init.fsid_list[0];
-}
+extern pvfs_helper_t pvfs_helper;
 
 /*
  * handle:  handle of parent directory
@@ -73,17 +42,24 @@ int recursive_create_dir(PVFS_handle handle,
 
     for (i = 0; i < ndirs; i++)
     {
-	snprintf(name, PVFS_SEGMENT_MAX, "depth=%d-rank=%d-iter=%d", depth, rank, i);
-	create_dir(refn, name, &out_refn);
-	if (out_refn.handle < 0)
-	{
-	    return -1;
-	}
-	else
-	{
-	    recursive_create_dir(out_refn.handle, out_refn.fs_id,
-                                 depth - 1, ndirs, rank);
-	}
+	snprintf(name, PVFS_SEGMENT_MAX, "depth=%d-rank=%d-iter=%d",
+                 depth, rank, i);
+
+	if (create_dir(refn, name, &out_refn) < 0)
+        {
+            fprintf(stderr, "Failed to create dir %s\n",name);
+            return -1;
+        }
+
+        recursive_create_dir(out_refn.handle, out_refn.fs_id,
+                             depth - 1, ndirs, rank);
+
+        if (remove_dir(refn, name) < 0)
+        {
+            fprintf(stderr, "Faild to remove dir %s.  This is a "
+                    "real error.\n",name);
+            return -1;
+        }
     }
     return 0;
 }
@@ -104,19 +80,18 @@ int test_dir_torture(MPI_Comm * comm,
 		     char *buf,
 		     void *rawparams)
 {
-    int ret = -1;
     PVFS_fs_id fs_id;
     PVFS_pinode_reference root_refn;
     generic_params *myparams = (generic_params *) rawparams;
     int nerrs = 0;
 
-    fs_id = system_init();
-    if (fs_id < 0)
+    if (!pvfs_helper.initialized && initialize_sysint())
     {
-	printf("System initialization error\n");
-	return (fs_id);
+        debug_printf("test_dir_torture cannot be initialized!\n");
+        return -1;
     }
 
+    fs_id = pvfs_helper.resp_init.fsid_list[0];
     get_root(fs_id, &root_refn);
 
     /*
@@ -125,13 +100,6 @@ int test_dir_torture(MPI_Comm * comm,
     */
     nerrs = recursive_create_dir(root_refn.handle, root_refn.fs_id,
                                  myparams->mode, myparams->mode, rank);
-
-    ret = PVFS_sys_finalize();
-    if (ret < 0)
-    {
-	printf("finalizing sysint failed with errcode = %d\n", ret);
-	return (-1);
-    }
 
     return -nerrs;
 }

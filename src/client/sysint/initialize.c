@@ -140,6 +140,9 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, int debug_mask,
 	goto return_error;	
     }
 
+    /* FIXME: get this value from config file? */
+    PINT_pcache_set_timeout(30000);
+
     /* Initialize the directory cache */
     ret = PINT_dcache_initialize();
     if (ret < 0)
@@ -148,6 +151,9 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, int debug_mask,
 	gossip_ldebug(CLIENT_DEBUG,"Error initializing directory cache\n");
 	goto return_error;	
     }	
+
+    /* FIXME: get this value from config file? */
+    PINT_dcache_set_timeout(30000);
 
     /* Get configuration parameters from server */
     ret = PINT_server_get_config(&g_server_config,mntent_list);

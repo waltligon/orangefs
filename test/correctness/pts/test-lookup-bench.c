@@ -13,6 +13,9 @@
 #include "pvfs-helper.h"
 #include "pvfs2-util.h"
 
+
+extern pvfs_helper_t pvfs_helper;
+
 /*
  * simple helper to lookup a handle given a filename
  *
@@ -119,32 +122,19 @@ int test_lookup_bench(MPI_Comm * comm,
     PVFS_pinode_reference root_refn;
     generic_params *myparams = (generic_params *) rawparams;
     int nerrs = 0;
-    PVFS_sysresp_init resp_init;
-    pvfs_mntlist mnt = { 0, NULL };     /* use pvfstab in cwd */
-    
 
     /* right now, the system interface isn't threadsafe, so we just want to run with one process. */
 
     if (rank == 0)
     {
 
-	memset(&resp_init, 0, sizeof(resp_init));
+        if (!pvfs_helper.initialized && initialize_sysint())
+        {
+            debug_printf("test_lookup_bench cannot be initialized!\n");
+            return -1;
+        }
 
-	ret = PVFS_util_parse_pvfstab(NULL, &mnt);
-	if (ret < 0)
-	{
-	    printf("Parsing error\n");
-	    return -1;
-	}
-
-	ret = PVFS_sys_initialize(mnt, CLIENT_DEBUG, &resp_init);
-	if (ret < 0)
-	{
-	    printf("PVFS_sys_initialize() failure. = %d\n", ret);
-	    return (ret);
-	}
-
-	fs_id = resp_init.fsid_list[0];
+	fs_id = pvfs_helper.resp_init.fsid_list[0];
 	if (fs_id < 0)
 	{
 	    printf("System initialization error\n");

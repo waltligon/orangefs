@@ -337,7 +337,7 @@ int PINT_dcache_flush(void)
 int PINT_dcache_initialize(void)
 {
 #if ENABLE_DCACHE
-    int ret = -1, i = 0;
+    int ret = 0, i = 0;
 
     if (cache == NULL)
     {

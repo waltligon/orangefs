@@ -143,7 +143,7 @@ int test_dir_operations(MPI_Comm * comm,
 
     if (rank == 0)
     {
-	if (initialize_sysint() || (!pvfs_helper.initialized))
+	if (!pvfs_helper.initialized && initialize_sysint())
 	{
 	    printf("System initialization error\n");
 	    return (-1);
