@@ -54,7 +54,7 @@ enum {
 
 /* state function prototypes */
 static int getattr_check_parameters(PINT_client_sm *sm_p,
-			  job_status_s *js_p);
+                                    job_status_s *js_p);
 static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
 						job_status_s *js_p);
 static int getattr_object_getattr_failure(PINT_client_sm *sm_p,
@@ -155,8 +155,6 @@ int PVFS_sys_getattr(PVFS_pinode_reference pinode_ref,
 	return -PVFS_EINVAL;
     }
 
-    /* build PINT_client_sm structure */
-    /* TODO: KEEP A CACHE OF THESE AROUND SO WE'RE NOT ALWAYS MALLOC'ING? */
     sm_p = (PINT_client_sm *) malloc(sizeof(*sm_p));
     if (sm_p == NULL) return -PVFS_ENOMEM;
 
@@ -425,9 +423,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
 		 */
 		sm_p->u.getattr.datafile_handles = (PVFS_handle *)
                     malloc(attr->u.meta.dfile_count * sizeof(PVFS_handle));
-		if (sm_p->u.getattr.datafile_handles == NULL) {
-		    assert(0);
-		}
+                assert(sm_p->u.getattr.datafile_handles);
 		sm_p->u.getattr.datafile_count = attr->u.meta.dfile_count;
 		memcpy(sm_p->u.getattr.datafile_handles,
 		   attr->u.meta.dfile_array,
@@ -475,18 +471,16 @@ static int getattr_object_getattr_comp_fn(void *v_p,
 static int getattr_object_getattr_failure(PINT_client_sm *sm_p,
 					  job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG,
-		 "(%p) getattr state: getattr_object_getattr_failure\n",
-		 sm_p);
+    gossip_debug(
+        CLIENT_DEBUG,
+        "(%p) getattr state: getattr_object_getattr_failure\n", sm_p);
 
-    /* ENOENT is a legal failure; for now others will die */
-    if (js_p->error_code != -PVFS_ENOENT && js_p->error_code != -PVFS_EINVAL)
+    if ((js_p->error_code != -PVFS_ENOENT) &&
+        (js_p->error_code != -PVFS_EINVAL))
     {
-        gossip_err("getattr: Failed with error code %d\n",
+        gossip_err("getattr: Failed with unexpected error code %d\n",
                    js_p->error_code);
-        assert(0);
     }
-
     return 1;
 }
 
@@ -503,13 +497,6 @@ static int getattr_datafile_getattr_setup_msgpairarray(PINT_client_sm *sm_p,
     /* clear error field in job */
     js_p->error_code = 0;
     
-    /* allocate memory for datafile message pairs, resulting sizes
-     *
-     * all this will need to be freed later.
-     *
-     * TODO: CAN WE MAKE THE GETATTR COMP_FN FILL THIS STUFF IN AND AVOID
-     *       SOME EXTRA MALLOCS? -- RobR
-     */
     sm_p->msgarray = (PINT_client_sm_msgpair_state *)
 	malloc(sm_p->u.getattr.datafile_count *
                sizeof(PINT_client_sm_msgpair_state));

@@ -187,6 +187,14 @@ int PVFS_sys_rename(
         return ret;
     }
 
+    /* don't even try to rename a file to itself */
+    if ((old_parent_refn.handle == new_parent_refn.handle) &&
+        (old_parent_refn.fs_id == new_parent_refn.fs_id) &&
+        (strcmp(old_entry, new_entry) == 0))
+    {
+        return ret;
+    }
+
     if ((strlen(new_entry) + 1) > PVFS_REQ_LIMIT_SEGMENT_BYTES)
     {
         return -PVFS_ENAMETOOLONG;
@@ -278,7 +286,13 @@ static int rename_lookups_comp_fn(
      */
     if (resp_p->status != 0)
     {
-        if (index == 1)
+        if (index == 0)
+        {
+            gossip_debug(
+                CLIENT_DEBUG, "*** Failed to Lookup up old handle (%d)\n",
+                resp_p->status);
+        }
+        else
         {
             /*
               if the index is 1, this failure just means that

@@ -144,8 +144,6 @@ int PVFS_sys_flush(PVFS_pinode_reference pinode_ref,
 	return -PVFS_EINVAL;
     }
 
-    /* build PINT_client_sm structure */
-    /* TODO: KEEP A CACHE OF THESE AROUND SO WE'RE NOT ALWAYS MALLOC'ING? */
     sm_p = (PINT_client_sm *) malloc(sizeof(*sm_p));
     if (sm_p == NULL) return -PVFS_ENOMEM;
 

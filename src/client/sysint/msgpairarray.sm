@@ -316,6 +316,19 @@ static int msgpairarray_completion_fn(PINT_client_sm *sm_p,
 	     *
 	     */
 	    js_p->error_code = msg_p->comp_fn(sm_p, resp_p, i);
+
+            /*
+              break out if a completion function fails;
+              caller will have to do manual cleanup in the
+              next state (presumably a failure or cleanup state)
+              -- Neill
+            */
+            if (js_p->error_code)
+            {
+                gossip_debug(CLIENT_DEBUG, "Completion function %d "
+                             "failed; aborting\n", i);
+                break;
+            }
 	}
 	else if (resp_p->status != 0) {
 	    /* no comp_fn specified and status non-zero */
