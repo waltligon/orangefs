@@ -221,7 +221,8 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 	if (ret < 0)
         {
 	    PVFS_perror("Post of receive failed", ret);
-
+	    /* decrement count, we won't bother to post send */
+	    sm_p->msgarray[0].comp_ct--;
             js_p->error_code = ret;
             return 1;
 	}
@@ -268,6 +269,13 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
                 msg_p->retry_count++;
                 goto post_msg_receive;
             }
+	    else
+	    {
+		/* decrement count, we won't bother to post send */
+		sm_p->msgarray[0].comp_ct--;
+		js_p->error_code = status.error_code;
+		return(1);
+	    }
         }
 
 	/* post send of request; job_id stored in send_id */
