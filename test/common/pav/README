@@ -90,6 +90,9 @@ TROVESYNC=<1 = default. sync data after metadata operations,
            0 = do not perform implicit sync. improved performance at the risk 
 	   		of data loss>
 
+COMPUTENODES_LAST=<1 = default.  Choose compute nodes from end of host list,
+                   0 = Choose compute nodes from beginning of host list>
+
 3.) execute pav_start -c <configfile>.  You will see the pav system
 setting up a PVFS volume for you.
 

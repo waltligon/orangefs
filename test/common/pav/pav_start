@@ -119,6 +119,7 @@ sub init {
 	       'PINGPROG' => "pvfs2-ping",
 	       'GENCONFIG' => "pvfs2-genconfig",
 	       'TROVESYNC' => 1,
+	       'COMPUTENODES_LAST' => 1,
 	       'PROGROOT' => "./"
 	       );
  

@@ -77,3 +77,7 @@ COPYBINS=1
 # Set this to 0 to turn off trove metadata syncing.  This is EXPERIMENTAL and
 # could cause DATA LOSS, but will give improved performance.
 TROVESYNC=1
+
+# set this to 0 if you would rather have compute nodes come before server
+# nodes in the list of hosts pav uses
+COMPUTENODES_LAST=1
