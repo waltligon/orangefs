@@ -9,7 +9,6 @@
 #include "pinode-helper.h"
 #include "pvfs2-sysint.h"
 #include "pint-servreq.h"
-#include "config-manage.h"
 
 #if 0
 static int check_pinode_match(pinode *pnode,pinode *pinode_ptr);

@@ -1,6 +1,5 @@
 DIR := src/client/sysint
 LIBSRC += \
-	$(DIR)/config-manage.c \
 	$(DIR)/create.c \
 	$(DIR)/finalize.c \
 	$(DIR)/getattr.c \

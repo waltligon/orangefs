@@ -13,7 +13,6 @@
 #include "pcache.h"
 #include "pint-bucket.h"
 #include "pint-dcache.h"
-#include "config-manage.h"
 #include "pvfs2-sysint.h"
 #include "pint-sysint.h"
 #include "gen-locks.h"

@@ -10,7 +10,6 @@
 #include "pint-sysint.h"
 #include "pcache.h"
 #include "pint-dcache.h"
-#include "config-manage.h"
 #include "gen-locks.h"
 
 extern fsconfig_array server_config;
@@ -24,15 +23,13 @@ extern gen_mutex_t *g_session_tag_mt_lock;
  */
 int PVFS_sys_finalize()
 {
-    int ret = 0;
-	
     /* Free the dcache */
     PINT_dcache_finalize();
     /* free all pinode structures */
     PINT_pcache_finalize();
 	
-    /* Shut down the configuration management interface */
-    ret = config_bt_finalize();
+    /* shut down bucket interface */
+    PINT_bucket_finalize();
 	
     /* get rid of the mutex for the BMI session tag identifier */
     gen_mutex_lock(g_session_tag_mt_lock);
