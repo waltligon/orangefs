@@ -153,7 +153,7 @@ In this simple configuration, we can accept the default options for every
 field.  We will use the hostname ``testhost'' rather than ``localhost'' however.
 
 \begin{verbatim}
-bash-2.05b# perl /usr/bin/pvfs2-genconfig /etc/pvfs2-fs.conf /etc/pvfs2-server.conf
+bash-2.05b# /usr/bin/pvfs2-genconfig /etc/pvfs2-fs.conf /etc/pvfs2-server.conf
 **********************************************************************
         Welcome to the PVFS2 Configuration Generator:
 
@@ -228,14 +228,14 @@ argument that tells it to create a new storage space if it does not already
 exist.
 
 \begin{verbatim}
-bash-2.05b# /usr/bin/pvfs2-server /etc/pvfs2-fs.conf /etc/pvfs2-server.conf -f
+bash-2.05b# /usr/sbin/pvfs2-server /etc/pvfs2-fs.conf /etc/pvfs2-server.conf -f
 \end{verbatim}
 
 Once the above step is done, you can start the server in normal mode 
 as follows:
 
 \begin{verbatim}
-bash-2.05b# /usr/bin/pvfs2-server /etc/pvfs2-fs.conf /etc/pvfs2-server.conf
+bash-2.05b# /usr/sbin/pvfs2-server /etc/pvfs2-fs.conf /etc/pvfs2-server.conf
 \end{verbatim}
 
 All log messages will be directed to /tmp/pvfs2-server.log, unless you specified
@@ -244,7 +244,7 @@ pvfs2-server in the foreground and direct all messages to stderr, then
 you may run the server as follows:
 
 \begin{verbatim}
-bash-2.05b# /usr/bin/pvfs2-server /etc/pvfs2-fs.conf /etc/pvfs2-server.conf -d
+bash-2.05b# /usr/sbin/pvfs2-server /etc/pvfs2-fs.conf /etc/pvfs2-server.conf -d
 \end{verbatim}
 
 \subsection{Client configuration}
