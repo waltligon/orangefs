@@ -25,7 +25,7 @@ if [ ! -d /tmp/mnt ]; then
 fi
 
 echo "Starting pvfs2-client"
-./pvfs2-client -p ./pvfs2-client-core
+../../../src/apps/kernel/linux-2.6/pvfs2-client -p ../../../src/apps/kernel/linux-2.6/pvfs2-client-core
 
 if [ "`mount | grep -c pvfs2`" = "0" ]; then
    echo "Mounting pvfs2 on /tmp/mnt"
