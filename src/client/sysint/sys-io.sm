@@ -1197,6 +1197,10 @@ static int io_find_target_datafiles(PVFS_Request io_req,
 	return -PVFS_ENOMEM;
     }
 
+    tmp_file_data.dist = dist_p;
+    tmp_file_data.iod_count = input_handle_count;
+    tmp_file_data.extend_flag = 1;
+
     for (i=0; i < input_handle_count; i++)
     {
 	/* NOTE: we don't have to give an accurate file size here,
@@ -1204,10 +1208,9 @@ static int io_find_target_datafiles(PVFS_Request io_req,
 	 * processor to continue past eof if needed
 	 */
 	tmp_file_data.fsize = 0;  
-	tmp_file_data.dist = dist_p;
 	tmp_file_data.iod_num = i;
-	tmp_file_data.iod_count = input_handle_count;
-	tmp_file_data.extend_flag = 1;
+
+	PINT_REQUEST_STATE_RESET(req_state);
 
 	/* if a file datatype offset was specified, go ahead and skip ahead 
 	 * before calculating
@@ -1218,7 +1221,6 @@ static int io_find_target_datafiles(PVFS_Request io_req,
 	memset(&tmp_result, 0, sizeof(PINT_Request_result));
 	tmp_result.bytemax = 1;
 	tmp_result.segmax = 1;
-	tmp_file_data.fsize = 0;  
 
 	/* PINT_Process_request() returns number of bytes processed */
 	ret = PINT_Process_request(req_state,
