@@ -44,6 +44,7 @@ int PVFS_sys_fs_add(struct PVFS_sys_mntent *mntent)
     server_config = PINT_get_server_config_struct();
 
     PINT_config_release(server_config);
+    memset(server_config, 0, sizeof(struct server_configuration_s));
 
     /* get configuration parameters from server */
     ret = PINT_server_get_config(server_config, mntent);
