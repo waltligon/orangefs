@@ -302,13 +302,13 @@ static inline int copy_attributes_from_inode(
 
         if (iattr && (iattr->ia_valid & ATTR_MODE))
         {
-            pvfs2_print("[1] CONVERTING ATTR MODE %d\n", iattr->ia_mode);
+            pvfs2_print("[1] converting attr mode %d\n", iattr->ia_mode);
             convert_attribute_mode_to_pvfs_sys_attr(
                 iattr->ia_mode, attrs);
         }
         else
         {
-            pvfs2_print("[2] CONVERTING ATTR MODE %d\n", inode->i_mode);
+            pvfs2_print("[2] converting attr mode %d\n", inode->i_mode);
             convert_attribute_mode_to_pvfs_sys_attr(
                 inode->i_mode, attrs);
         }

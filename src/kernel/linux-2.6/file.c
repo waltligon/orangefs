@@ -30,7 +30,7 @@ int pvfs2_file_open(
 {
     int ret = -EINVAL;
 
-    pvfs2_print("pvfs2: pvfs2_file_open called on %s (inode is %d)\n",
+    pvfs2_print("pvfs2_file_open: called on %s (inode is %d)\n",
                 file->f_dentry->d_name.name, (int)inode->i_ino);
 
     inode->i_mapping->host = inode;
@@ -209,7 +209,7 @@ ssize_t pvfs2_file_read(
     size_t count,
     loff_t *offset)
 {
-    pvfs2_print("pvfs2: pvfs2_file_read called on %s\n",
+    pvfs2_print("pvfs2_file_read: called on %s\n",
                 (file && file->f_dentry && file->f_dentry->d_name.name ?
                  (char *)file->f_dentry->d_name.name : "UNKNOWN"));
 
@@ -233,7 +233,7 @@ static ssize_t pvfs2_file_write(
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
     size_t amt_complete = 0;
 
-    pvfs2_print("pvfs2: pvfs2_file_write called on %s\n",
+    pvfs2_print("pvfs2_file_write: called on %s\n",
                 (file && file->f_dentry && file->f_dentry->d_name.name ?
                  (char *)file->f_dentry->d_name.name : "UNKNOWN"));
 
@@ -249,7 +249,7 @@ static ssize_t pvfs2_file_write(
         new_op->upcall.req.io.io_type = PVFS_IO_WRITE;
         new_op->upcall.req.io.refn = pvfs2_inode->refn;
 
-        pvfs2_print("pvfs2: writing %d bytes.\n", count);
+        pvfs2_print("pvfs2_file_write: writing %d bytes.\n", count);
 
         ret = pvfs_bufmap_get(&buffer_index);
         if (ret < 0)
@@ -356,7 +356,7 @@ int pvfs2_ioctl(
 {
     int ret = -ENOTTY;
 
-    pvfs2_print("pvfs2: pvfs2_ioctl called with cmd %d\n", cmd);
+    pvfs2_print("pvfs2_ioctl: called with cmd %d\n", cmd);
     return ret;
 }
 
@@ -364,7 +364,7 @@ static int pvfs2_file_mmap(struct file *file, struct vm_area_struct *vma)
 {
     struct inode *inode = file->f_dentry->d_inode;
 
-    pvfs2_print("pvfs2: pvfs2_mmap called on %s\n",
+    pvfs2_print("pvfs2_file_mmap: called on %s\n",
                 (file ? (char *)file->f_dentry->d_name.name :
                  (char *)"Unknown"));
     /*
@@ -393,7 +393,7 @@ int pvfs2_file_release(
     struct inode *inode,
     struct file *file)
 {
-    pvfs2_print("pvfs2: pvfs2_file_release called on %s\n",
+    pvfs2_print("pvfs2_file_release: called on %s\n",
                 file->f_dentry->d_name.name);
 
     update_atime(inode);
@@ -422,7 +422,7 @@ int pvfs2_fsync(
     struct dentry *dentry,
     int datasync)
 {
-    pvfs2_print("pvfs2: pvfs2_fsync called\n");
+    pvfs2_print("pvfs2_fsync: called\n");
     return 0;
 }
 
