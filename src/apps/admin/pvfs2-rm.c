@@ -60,6 +60,7 @@ int main(int argc, char **argv)
     for (i = 0; i < user_opts->num_files; ++i)
     {
         int rc;
+        int num_segs;
         char* working_file = user_opts->filenames[i];
         char directory[PVFS_NAME_MAX];
         char filename[PVFS_SEGMENT_MAX];
@@ -71,11 +72,11 @@ int main(int argc, char **argv)
         PVFS_object_ref parent_ref;
 
         /* Translate path into pvfs2 relative path */
-        rc = PVFS_util_split_pathname(working_file,
-                                      directory,
-                                      PVFS_NAME_MAX,
-                                      filename,
-                                      PVFS_SEGMENT_MAX);
+        rc = PINT_get_base_dir(working_file, directory, PVFS_NAME_MAX);
+        num_segs = PINT_string_count_segments(working_file);
+        rc = PINT_get_path_element(working_file, num_segs - 1,
+                                   filename, PVFS_SEGMENT_MAX);
+
         if (0 != rc)
         {
             fprintf(stderr, "Unknown path format: %s\n", working_file);
