@@ -30,7 +30,7 @@ int do_decode_req(
     int tmp_count;
     int ret = -1;
 
-    size = input_size - ENCODED_HEADER_SIZE;
+    size = input_size;
 
     if (size <= 0)
     {

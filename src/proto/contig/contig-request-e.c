@@ -18,10 +18,11 @@
 #include "pint-distribution.h"
 #include "pint-request.h"
 
+extern PINT_encoding_table_values_s contig_buffer_table;
+
 int do_encode_req(
     struct PVFS_server_req *request,
-    struct PINT_encoded_msg *target_msg,
-    int header_size)
+    struct PINT_encoded_msg *target_msg)
 {
     void *enc_msg;
     bmi_size_t size = 0, name_sz = 0;
@@ -44,7 +45,7 @@ int do_encode_req(
     switch (request->op)
     {
     case PVFS_SERV_GETCONFIG:
-	size = sizeof(struct PVFS_server_req) + header_size;
+	size = sizeof(struct PVFS_server_req) + PINT_ENC_GENERIC_HEADER_SIZE;
 	enc_msg = BMI_memalloc(target_msg->dest, (bmi_size_t) size, BMI_SEND);
 
 	/* here the right thing to do is to return the error code. */
@@ -57,6 +58,9 @@ int do_encode_req(
 	target_msg->size_list[0] = size;
 	target_msg->total_size = size;
 
+	memcpy(enc_msg, contig_buffer_table.generic_header,
+	    PINT_ENC_GENERIC_HEADER_SIZE);
+	enc_msg = (void*)((char*)enc_msg + PINT_ENC_GENERIC_HEADER_SIZE);
 	memcpy(enc_msg, request, sizeof(struct PVFS_server_req));
 	return 0;
 
@@ -66,7 +70,8 @@ int do_encode_req(
 	assert(request->u.lookup_path.path != NULL);
 
 	name_sz = strlen(request->u.lookup_path.path) + 1;	/* include NULL terminator in size */
-	size = sizeof(struct PVFS_server_req) + header_size + name_sz;
+	size = sizeof(struct PVFS_server_req) + PINT_ENC_GENERIC_HEADER_SIZE
+	    + name_sz;
 	enc_msg = BMI_memalloc(target_msg->dest, (bmi_size_t) size, BMI_SEND);
 
 	if (enc_msg == NULL)
@@ -78,6 +83,9 @@ int do_encode_req(
 	target_msg->size_list[0] = size;
 	target_msg->total_size = size;
 
+	memcpy(enc_msg, contig_buffer_table.generic_header,
+	    PINT_ENC_GENERIC_HEADER_SIZE);
+	enc_msg = (void*)((char*)enc_msg + PINT_ENC_GENERIC_HEADER_SIZE);
 	memcpy(enc_msg, request, sizeof(struct PVFS_server_req));
 
 	/* copy a null terminated string to another */
@@ -94,7 +102,8 @@ int do_encode_req(
 	assert(request->u.crdirent.name != NULL);
 
 	name_sz = strlen(request->u.crdirent.name) + 1;	/* include NULL terminator in size */
-	size = sizeof(struct PVFS_server_req) + header_size + name_sz;
+	size = sizeof(struct PVFS_server_req) + PINT_ENC_GENERIC_HEADER_SIZE 
+	    + name_sz;
 	enc_msg = BMI_memalloc(target_msg->dest, (bmi_size_t) size, BMI_SEND);
 
 	if (enc_msg == NULL)
@@ -106,6 +115,9 @@ int do_encode_req(
 	target_msg->size_list[0] = size;
 	target_msg->total_size = size;
 
+	memcpy(enc_msg, contig_buffer_table.generic_header,
+	    PINT_ENC_GENERIC_HEADER_SIZE);
+	enc_msg = (void*)((char*)enc_msg + PINT_ENC_GENERIC_HEADER_SIZE);
 	memcpy(enc_msg, request, sizeof(struct PVFS_server_req));
 
 	/* copy a null terminated string to another */
@@ -122,7 +134,8 @@ int do_encode_req(
 	assert(request->u.rmdirent.entry != NULL);
 
 	name_sz = strlen(request->u.rmdirent.entry) + 1;	/* include NULL terminator in size */
-	size = sizeof(struct PVFS_server_req) + header_size + name_sz;
+	size = sizeof(struct PVFS_server_req) + PINT_ENC_GENERIC_HEADER_SIZE
+	    + name_sz;
 	enc_msg = BMI_memalloc(target_msg->dest, (bmi_size_t) size, BMI_SEND);
 
 	if (enc_msg == NULL)
@@ -134,6 +147,9 @@ int do_encode_req(
 	target_msg->size_list[0] = size;
 	target_msg->total_size = size;
 
+	memcpy(enc_msg, contig_buffer_table.generic_header,
+	    PINT_ENC_GENERIC_HEADER_SIZE);
+	enc_msg = (void*)((char*)enc_msg + PINT_ENC_GENERIC_HEADER_SIZE);
 	memcpy(enc_msg, request, sizeof(struct PVFS_server_req));
 
 	/* copy a null terminated string to another */
@@ -149,7 +165,7 @@ int do_encode_req(
     case PVFS_SERV_MKDIR:
 	size =
 	    sizeof(struct PVFS_server_req) + sizeof(struct PVFS_object_attr) +
-	    header_size;
+	    PINT_ENC_GENERIC_HEADER_SIZE;
 
 	/* if we're mkdir'ing a meta file, we need to alloc space for the attributes */
 	if (request->u.mkdir.attr.objtype == PVFS_TYPE_METAFILE)
@@ -171,6 +187,9 @@ int do_encode_req(
 	target_msg->size_list[0] = size;
 	target_msg->total_size = size;
 
+	memcpy(enc_msg, contig_buffer_table.generic_header,
+	    PINT_ENC_GENERIC_HEADER_SIZE);
+	enc_msg = (void*)((char*)enc_msg + PINT_ENC_GENERIC_HEADER_SIZE);
 	memcpy(enc_msg, request, sizeof(struct PVFS_server_req));
 
 	/* throw handles at the end for metadata files */
@@ -193,7 +212,7 @@ int do_encode_req(
     case PVFS_SERV_SETATTR:
 	size =
 	    sizeof(struct PVFS_server_req) + sizeof(struct PVFS_object_attr) +
-	    header_size;
+	    PINT_ENC_GENERIC_HEADER_SIZE;
 
 	if (request->u.setattr.attr.objtype == PVFS_TYPE_METAFILE)
 	{
@@ -219,7 +238,7 @@ int do_encode_req(
 	/* TODO: come back and alloc the right spaces for 
 	 * distributions and eattribs cause they're going to change */
 
-	enc_msg = BMI_memalloc(target_msg->dest, size + header_size, BMI_SEND);
+	enc_msg = BMI_memalloc(target_msg->dest, size, BMI_SEND);
 	if (enc_msg == NULL)
 	{
 	    return (-ENOMEM);
@@ -229,6 +248,9 @@ int do_encode_req(
 	target_msg->size_list[0] = size;
 	target_msg->total_size = size;
 
+	memcpy(enc_msg, contig_buffer_table.generic_header,
+	    PINT_ENC_GENERIC_HEADER_SIZE);
+	enc_msg = (void*)((char*)enc_msg + PINT_ENC_GENERIC_HEADER_SIZE);
 	memcpy(enc_msg, request, sizeof(struct PVFS_server_req));
 	enc_msg += sizeof(struct PVFS_server_req);
 
@@ -258,12 +280,12 @@ int do_encode_req(
 	 */
 	size = sizeof(struct PVFS_server_req) + 2 * sizeof(int) +
 	    PINT_REQUEST_PACK_SIZE(request->u.io.io_req) +
-	    PINT_DIST_PACK_SIZE(request->u.io.io_dist) + header_size;
+	    PINT_DIST_PACK_SIZE(request->u.io.io_dist) + 
+	    PINT_ENC_GENERIC_HEADER_SIZE;
 
 	/* create buffer for encoded message */
 	enc_msg =
-	    BMI_memalloc(target_msg->dest, (bmi_size_t) (size + header_size),
-			 BMI_SEND);
+	    BMI_memalloc(target_msg->dest, (bmi_size_t)size, BMI_SEND);
 	if (enc_msg == NULL)
 	{
 	    return (-ENOMEM);
@@ -271,6 +293,9 @@ int do_encode_req(
 	target_msg->buffer_list[0] = enc_msg;
 	target_msg->size_list[0] = size;
 	target_msg->total_size = size;
+	memcpy(enc_msg, contig_buffer_table.generic_header,
+	    PINT_ENC_GENERIC_HEADER_SIZE);
+	enc_msg = (void*)((char*)enc_msg + PINT_ENC_GENERIC_HEADER_SIZE);
 	/* copy the basic request structure in */
 	memcpy(enc_msg, request, sizeof(struct PVFS_server_req));
 	/* store the size of the io description */
@@ -292,15 +317,13 @@ int do_encode_req(
 				  &commit_index);
 	if (ret < 0)
 	{
-	    BMI_memfree(target_msg->dest, enc_msg, (size +
-						    header_size), BMI_SEND);
+	    BMI_memfree(target_msg->dest, enc_msg, size, BMI_SEND);
 	    return (ret);
 	}
 	ret = PINT_Request_encode(encode_io_req);
 	if (ret < 0)
 	{
-	    BMI_memfree(target_msg->dest, enc_msg, (size +
-						    header_size), BMI_SEND);
+	    BMI_memfree(target_msg->dest, enc_msg, size, BMI_SEND);
 	    return (ret);
 	}
 	/* pack the distribution */
@@ -312,7 +335,7 @@ int do_encode_req(
     case PVFS_SERV_GETATTR:
     case PVFS_SERV_REMOVE:
     case PVFS_SERV_TRUNCATE:
-	size = sizeof(struct PVFS_server_req) + header_size;
+	size = sizeof(struct PVFS_server_req) + PINT_ENC_GENERIC_HEADER_SIZE;
 	enc_msg = BMI_memalloc(target_msg->dest, (bmi_size_t) size, BMI_SEND);
 	if (enc_msg == NULL)
 	{
@@ -321,6 +344,9 @@ int do_encode_req(
 	target_msg->buffer_list[0] = enc_msg;
 	target_msg->size_list[0] = size;
 	target_msg->total_size = size;
+	memcpy(enc_msg, contig_buffer_table.generic_header,
+	    PINT_ENC_GENERIC_HEADER_SIZE);
+	enc_msg = (void*)((char*)enc_msg + PINT_ENC_GENERIC_HEADER_SIZE);
 	memcpy(enc_msg, request, sizeof(struct PVFS_server_req));
 	return (0);
     default:

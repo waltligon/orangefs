@@ -6,6 +6,7 @@
 
 #include <stdlib.h>
 #include <errno.h>
+#include <string.h>
 
 #include "bmi.h"
 #include "gossip.h"
@@ -77,14 +78,12 @@ int PINT_encode(
 	    if (input_type == PINT_ENCODE_REQ)
 	    {
 		ret =  PINT_encoding_table[enc_type]->op->encode_req(input_buffer,
-								 target_msg,
-								 ENCODED_HEADER_SIZE);
+								 target_msg);
 	    }
 	    else if(input_type == PINT_ENCODE_RESP)
 	    {
 		ret =  PINT_encoding_table[enc_type]->op->encode_resp(input_buffer,
-								  target_msg,
-								  ENCODED_HEADER_SIZE);
+								  target_msg);
 	    }
 	    break;
 	default:
@@ -123,37 +122,39 @@ int PINT_decode(
 		PVFS_size size
 		)
 {
-    int ret = -1;
-    /* TODO: pull this from the input buffer... */
-    enum PINT_encoding_type type = PINT_ENC_DIRECT;
+    int i=0;
+    char* buffer_index = (char*)input_buffer + PINT_ENC_GENERIC_HEADER_SIZE;
+    int size_index = (int)size - PINT_ENC_GENERIC_HEADER_SIZE;
+    char* enc_type_ptr = (char*)input_buffer + 4;
 
-    target_msg->enc_type = type;
-    
-    switch(type)
+    /* compare the header of the incoming buffer against the precalculated
+     * header associated with each module
+     */
+    for(i=0; i<ENCODING_TABLE_SIZE; i++)
     {
-	case PINT_ENC_DIRECT:
-	    if (input_type == PINT_DECODE_REQ)
-	    {
-		ret = PINT_encoding_table[type]->op->decode_req(input_buffer,
-								 (int)size,
-								 target_msg,
-								 target_addr);
-	    }
+	if(PINT_encoding_table[i] && !(memcmp(input_buffer, 
+	    PINT_encoding_table[i]->generic_header, 
+	    PINT_ENC_GENERIC_HEADER_SIZE)))
+	{
+	    target_msg->enc_type = bmitoh32(*((int32_t*)enc_type_ptr));
+	    if(input_type == PINT_DECODE_REQ)
+		return(PINT_encoding_table[i]->op->decode_req(buffer_index,
+		    size_index,
+		    target_msg,
+		    target_addr));
 	    else if(input_type == PINT_DECODE_RESP)
-	    {
-		ret = PINT_encoding_table[type]->op->decode_resp(input_buffer,
-								  (int)size,
-								  target_msg,
-								  target_addr);
-	    }
-	    break;
-	default:
-	    gossip_lerr("Error: encoding type not supported.\n");
-	    ret = -EINVAL;
-	    break;
+		return(PINT_encoding_table[i]->op->decode_resp(buffer_index,
+		    size_index,
+		    target_msg,
+		    target_addr));
+	    else
+		return(-EINVAL);
+	}
     }
 
-    return(ret);
+    gossip_err("Error: poorly formated protocol message received.\n");
+    return(-EPROTO);
+
 }
 	
 /* PINT_encode_release()

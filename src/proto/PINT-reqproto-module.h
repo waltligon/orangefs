@@ -9,19 +9,15 @@
 #ifndef PINT_ENCODING_MODULE_H
 #define PINT_ENCODING_MODULE_H
 
-#define ENCODED_HEADER_SIZE sizeof(int)
-
 /*defines the interface to the encoding modules */
 typedef struct PINT_encoding_functions
 {
     int (*encode_req) (
 	struct PVFS_server_req * request,
-	struct PINT_encoded_msg * target_msg,
-	int header_size);
+	struct PINT_encoded_msg * target_msg);
     int (*encode_resp) (
 	struct PVFS_server_resp * response,
-	struct PINT_encoded_msg * target_msg,
-	int header_size);
+	struct PINT_encoded_msg * target_msg);
     int (*decode_req) (
 	void *input_buffer,
 	int input_size,

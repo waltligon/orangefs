@@ -14,12 +14,10 @@
 
 int do_encode_req(
     struct PVFS_server_req *request,
-    struct PINT_encoded_msg *target_msg,
-    int header_size);
+    struct PINT_encoded_msg *target_msg);
 int do_encode_resp(
     struct PVFS_server_resp *response,
-    struct PINT_encoded_msg *target_msg,
-    int header_size);
+    struct PINT_encoded_msg *target_msg);
 int do_decode_resp(
     void *input_buffer,
     int input_size,
@@ -68,7 +66,7 @@ int do_encode_calc_max_size(
     enum PINT_encode_msg_type input_type,
     enum PVFS_server_op op_type)
 {
-    int size = sizeof(struct PVFS_server_resp) + ENCODED_HEADER_SIZE;
+    int size = sizeof(struct PVFS_server_resp) + PINT_ENC_GENERIC_HEADER_SIZE;
 
     if(input_type != PINT_ENCODE_RESP)
     {

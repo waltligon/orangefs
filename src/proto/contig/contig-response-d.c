@@ -26,7 +26,7 @@ int do_decode_resp(
 
     struct PVFS_server_resp *response = input_buffer;
     struct PVFS_server_resp *decoded_response = NULL;
-    int payload_size = input_size - ENCODED_HEADER_SIZE;
+    int payload_size = input_size;
 
     assert(input_size > 0);
 
