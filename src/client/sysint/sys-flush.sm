@@ -18,19 +18,6 @@
 #include "pint-bucket.h"
 #include "PINT-reqproto-encode.h"
 
-/* pvfs2_client_flush-sm
- *
- * implementes the flush system interface function
- *
- * the input parameters are held in sm_p->u.flush
- *
- * we getattr on the passed-in handle.  if we are acting on a metafile
- * object, we will flush that metafile object and its associated
- * datafiles, making use of the sm_p->msgpairarray
- *
- *
- */
-
 extern job_context_id pint_client_sm_context;
 
 static int flush_datafile_flush_failure(
@@ -112,7 +99,8 @@ int PVFS_sys_flush(PVFS_pinode_reference refn,
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_flush entered\n");
 
-    if ((refn.fs_id == 0) || (refn.handle == 0))
+    if ((refn.fs_id == PVFS_FS_ID_NULL) ||
+        (refn.handle == PVFS_HANDLE_NULL))
     {
 	gossip_err("Invalid handle/fs_id specified\n");
 	return ret;
@@ -221,7 +209,7 @@ static int flush_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
         sm_p->msgarray_count, sm_p->msgarray);
     if (ret)
     {
-        gossip_err("Failed to map meta server address\n");
+	gossip_err("Error: failed to resolve server addresses.\n");
         js_p->error_code = ret;
     }
     return 1;

@@ -9,6 +9,7 @@
 
 #include "client-state-machine.h"
 #include "state-machine-fns.h"
+#include "shared-state-methods.h"
 #include "pvfs2-debug.h"
 #include "job.h"
 #include "gossip.h"
@@ -17,97 +18,69 @@
 #include "pint-bucket.h"
 #include "PINT-reqproto-encode.h"
 
-/* pvfs2_client_truncate_sm
- *
- * implementes the truncate system interface function
- *
- * input parameters held in sm_p->u.truncate
- *
- * somewhat similar to flush:  getattr on the passed-in handle to get datafile
- * servers and distribution information.  compute the new sizes on the servers
- * and send truncate requests to all involved parties
- */
-
 extern job_context_id pint_client_sm_context;
 
-/* static function prototypes */
-
-static int truncate_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
-						job_status_s *js_p);
-
-static int truncate_object_getattr_comp_fn(void *v_p,
-					struct PVFS_server_resp *resp_p,
-					int index);
-
-static int truncate_object_getattr_failure(PINT_client_sm *sm_p,
-					job_status_s *js_p);
-
-static int truncate_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
-						job_status_s *js_p);
-
-static int truncate_check_parameters(PINT_client_sm *sm_p,
-				    job_status_s *js_p);
-
-static int truncate_datafile_resize_failure(PINT_client_sm *sm_p,
-					    job_status_s *js_p);
-
-static int truncate_cleanup(PINT_client_sm *sm_p,
-			    job_status_s *js_p);
+static int truncate_datafile_setup_msgpairarray(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int truncate_datafile_failure(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int truncate_cleanup(
+    PINT_client_sm *sm_p, job_status_s *js_p);
 
 %% 
 
-machine pvfs2_client_truncate_sm(check_parameters, 
-				object_getattr_setup_msgpair,
-				object_getattr_xfer_msgpair,
-				object_getattr_failure,
-				datafile_setup_msgpairarray,
-				datafile_xfer_msgpairarray,
-				datafile_truncate_failure,
-				cleanup)
+machine pvfs2_client_truncate_sm(truncate_getattr_setup_msgpair,
+                                 truncate_getattr_xfer_msgpair,
+                                 truncate_getattr_failure,
+                                 truncate_datafile_setup_msgpairarray,
+                                 truncate_datafile_xfer_msgpairarray,
+                                 truncate_datafile_failure,
+                                 cleanup)
 {
-    state check_parameters {
-	run truncate_check_parameters;
-	success => object_getattr_setup_msgpair;
-	default => cleanup;
+    state truncate_getattr_setup_msgpair
+    {
+        run PINT_sm_common_object_getattr_setup_msgpair;
+        success => truncate_getattr_xfer_msgpair;
+        default => truncate_getattr_failure;
     }
 
-    state object_getattr_setup_msgpair {
-	run truncate_object_getattr_setup_msgpair;
-	success => object_getattr_xfer_msgpair;
-	default => cleanup;
+    state truncate_getattr_xfer_msgpair
+    {
+        jump pvfs2_client_getattr_acache_sm;
+        success => truncate_datafile_setup_msgpairarray;
+        default => truncate_getattr_failure;
     }
 
-    state object_getattr_xfer_msgpair {
-	jump pvfs2_client_getattr_acache_sm;
-	success => datafile_setup_msgpairarray;
-	default => object_getattr_failure;
+    state truncate_getattr_failure
+    {
+        run PINT_sm_common_object_getattr_failure;
+        default => cleanup;
     }
 
-    state object_getattr_failure {
-	run truncate_object_getattr_failure;
-	default => cleanup;
+    state truncate_datafile_setup_msgpairarray
+    {
+        run truncate_datafile_setup_msgpairarray;
+        success => truncate_datafile_xfer_msgpairarray;
+        default => cleanup;
     }
 
-    state datafile_setup_msgpairarray {
-	run truncate_datafile_setup_msgpairarray;
-	success => datafile_xfer_msgpairarray;
-	default => cleanup;
+    state truncate_datafile_xfer_msgpairarray
+    {
+        jump pvfs2_client_msgpairarray_sm;
+        success => cleanup;
+        default => truncate_datafile_failure;
     }
 
-    state datafile_xfer_msgpairarray {
-	jump pvfs2_client_msgpairarray_sm;
-	success => cleanup;
-	default => datafile_truncate_failure;
+    state truncate_datafile_failure
+    {
+        run truncate_datafile_failure;
+        default => cleanup;
     }
 
-    state datafile_truncate_failure {
-	run truncate_datafile_resize_failure;
-	default => cleanup;
-    }
-
-    state cleanup {
-	run truncate_cleanup;
-	default => terminate;
+    state cleanup
+    {
+        run truncate_cleanup;
+        default => terminate;
     }
 }
 
@@ -117,34 +90,36 @@ int PVFS_sys_truncate(PVFS_pinode_reference pinode_ref,
                       PVFS_size size,
                       PVFS_credentials credentials)
 {
-    int ret; 
-    PINT_client_sm *sm_p;
+    int ret = PVFS_EINVAL;
+    PINT_client_sm *sm_p = NULL;
     PVFS_error error;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_truncate entered with %Ld\n",
-	    Ld(size) );
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "PVFS_sys_truncate entered with %Ld\n", Ld(size));
 
-    /* do parameter checking here, then assume things are ok below.
-     * assert()s are still ok of course :).
-     */
-    if (pinode_ref.fs_id == 0 || pinode_ref.handle == 0) {
+    if ((pinode_ref.fs_id == PVFS_FS_ID_NULL) ||
+        (pinode_ref.handle == PVFS_HANDLE_NULL))
+    {
 	gossip_lerr("Invalid pinode reference\n");
-	return -PVFS_EINVAL;
+	return ret;
     }
-    
-    sm_p = (PINT_client_sm *) malloc(sizeof(*sm_p));
-    if (sm_p == NULL) return -PVFS_ENOMEM;
 
+    sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));
+    if (sm_p == NULL)
+    {
+        return -PVFS_ENOMEM;
+    }
     memset(sm_p, 0, sizeof(*sm_p));
 
     sm_p->cred_p = &credentials;
-    sm_p->u.truncate.object_ref     = pinode_ref;
-    sm_p->u.truncate.size	    = size;
+    sm_p->object_ref = pinode_ref;
+    sm_p->u.truncate.size = size;
 
     ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_TRUNCATE);
     assert(ret == 0);
 
-    while (!sm_p->op_complete && ret == 0) {
+    while (!sm_p->op_complete && (ret == 0))
+    {
 	ret = PINT_client_state_machine_test();
     }
     assert(ret == 0);
@@ -154,308 +129,134 @@ int PVFS_sys_truncate(PVFS_pinode_reference pinode_ref,
     free(sm_p);
     return error;
 }
-			    
-/* TODO: actually check parameters */
-static int truncate_check_parameters(PINT_client_sm *sm_p,
-				    job_status_s *js_p)
-{
-    return 1;
-}
 
-/* truncate_object_getattr_setup_msgpair()
- *
- * fills in sm_p->msgpair to perform a getattr using the getattr_acache state
- * machine
- */
-static int truncate_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
-						job_status_s *js_p)
-{
-    int ret = -1;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-	    "(%p) truncate state: getattr_setup_msgpair\n",
-	    sm_p);
-
-    /* fill in getattr request.  we need is what handles are
-     * associated with the object and the distribution */
-    PINT_SERVREQ_GETATTR_FILL(sm_p->msgpair.req,
-			      *sm_p->cred_p,
-			      sm_p->u.truncate.object_ref.fs_id,
-			      sm_p->u.truncate.object_ref.handle,
-			      PVFS_ATTR_META_ALL);
-    
-    /* fill in msgpair structure components */
-    sm_p->msgpair.fs_id   = sm_p->u.getattr.object_ref.fs_id;
-    sm_p->msgpair.handle  = sm_p->u.getattr.object_ref.handle;
-    sm_p->msgpair.comp_fn = truncate_object_getattr_comp_fn;
-    ret = PINT_bucket_map_to_server(&sm_p->msgpair.svr_addr,
-	sm_p->msgpair.handle, sm_p->msgpair.fs_id);
-    if(ret != 0)
-    {
-	gossip_err("Error: failure mapping to server.\n");
-	assert(ret < 0); /* return value range check */
-	assert(0); /* TODO: real error handling */
-    }
-
-    /* drop through and jump to getattr_acache state machine */
-    return 1;
-}
-
-/*
- * truncate_object_getattr_comp_fn
- * copy data from the getattr response into our PINT_client_sm structure
- *
- * the client should only be working with metafiles, so anything else is an
- * error... hey, prove me wrong and i'll change it 
- *
- * truncate on other object types is an error (EINVAL)
- */
-static int truncate_object_getattr_comp_fn(
-    void *v_p,
-    struct PVFS_server_resp *resp_p,
-    int index)
-{
-    /* this is a little kludge to get around some struct definition
-     * issues in the headers.  maybe fix later?
-     */
-    PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
-
-    PVFS_object_attr *r_attr_p = NULL;
-
-    assert(resp_p->op == PVFS_SERV_GETATTR); /* sanity check */
-
-    /* if we get an error, just return immediately, don't try to
-     * actually fill anything in.
-     */
-    if (resp_p->status != 0)
-    {
-	return resp_p->status;
-    }
-
-    if (!sm_p->acache_hit)
-    {
-        r_attr_p = &resp_p->u.getattr.attr;
-        PINT_acache_object_attr_deep_copy(
-            &sm_p->acache_attr, &resp_p->u.getattr.attr);
-    }
-    else
-    {
-        r_attr_p = &sm_p->pinode->attr;
-    }
-    assert(r_attr_p);
-
-    /* copy in the attributes we care about from the response */
-    switch (resp_p->u.getattr.attr.objtype)
-    {
-	case PVFS_TYPE_METAFILE:
-        {
-	    /* sanity checks */
-	    assert(r_attr_p->mask & (PVFS_ATTR_META_ALL));
-	    assert(r_attr_p->u.meta.dfile_count > 0);
-	    assert(r_attr_p->u.meta.dist_size > 0);
-
-	    gossip_debug(GOSSIP_CLIENT_DEBUG,
-			 "truncate_object_getattr_comp_fn: %d datafiles.\n",
-			 r_attr_p->u.meta.dfile_count); 
-
-            if (!sm_p->acache_hit)
-            {
-                /* save the datafile handles prior to freeing up the
-                 * buffers we used for messages.  we could keep them around
-                 * i suppose, but we're not going to do that for now.  later
-                 * it is likely that this stuff will be stuck in the acache
-                 * anyway, so we'll be able to just reference it from there.
-                 */
-                sm_p->u.truncate.datafile_handles = (PVFS_handle *) 
-                    malloc((r_attr_p->u.meta.dfile_count) *
-                           sizeof(PVFS_handle));
-                assert(sm_p->u.truncate.datafile_handles);
-                memcpy(sm_p->u.truncate.datafile_handles,
-                       r_attr_p->u.meta.dfile_array,
-                       r_attr_p->u.meta.dfile_count * sizeof(PVFS_handle));
-
-		sm_p->u.truncate.distribution
-		      = PVFS_Dist_copy(r_attr_p->u.meta.dist);
-                if (!sm_p->u.truncate.distribution)
-                {
-                    sm_p->error_code = -PVFS_ENOMEM;
-                    return 1;
-                }
-		sm_p->u.truncate.dist_size = r_attr_p->u.meta.dist_size;
-            }
-            else
-            {
-                /* on acache hit use cached dfile handle array */
-                sm_p->u.truncate.datafile_handles =
-                    r_attr_p->u.meta.dfile_array;
-                sm_p->u.truncate.distribution = r_attr_p->u.meta.dist;
-		sm_p->u.truncate.dist_size = r_attr_p->u.meta.dist_size;
-            }
-            sm_p->u.truncate.datafile_count = r_attr_p->u.meta.dfile_count;
-            assert(sm_p->u.truncate.distribution);
-	    return 0;
-        }
-	/*
-          return -PVFS_EINVAL since you can't truncate
-          the following types of objects
-        */
-	case PVFS_TYPE_DIRECTORY:
-	case PVFS_TYPE_SYMLINK:
-	case PVFS_TYPE_DATAFILE:
-	case PVFS_TYPE_DIRDATA:
-	default:
-            break;
-    }
-    sm_p->error_code = -PVFS_EINVAL;
-    return 1;
-}
-
-
-/* not really sure what to do here...  */
-static int truncate_object_getattr_failure(PINT_client_sm *sm_p,
-                                           job_status_s *js_p)
-{
-    gossip_debug(
-        GOSSIP_CLIENT_DEBUG,
-        "(%p) truncate state: object_getattr_failure\n", sm_p);
-    return 1;
-}
-
-/* truncate_datafile_setup_msgpairarray:
- *	set up a bunch of msgpairs to send truncate requests in one shot */
 static int truncate_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
 						job_status_s *js_p)
 {
-    int i;
-    PINT_client_sm_msgpair_state *msg_p;
-    int ret = -1;
-    PVFS_offset new_dfile_size;
-    PVFS_Dist *dist = NULL;
+    int ret = -PVFS_EINVAL, i = 0;
+    PVFS_object_attr *attr = NULL;
+    PINT_client_sm_msgpair_state *msg_p = NULL;
+    PVFS_size new_dfile_size = 0;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-	    "(%p) truncate state: datafile_setup_msgpairarray\n",
-	     sm_p);
+	    "(%p) truncate state: datafile_setup_msgpairarray\n", sm_p);
 
-    /* clear error field in job */
     js_p->error_code = 0;
 
-    /* allocate memory for datafile message pairs and the metafile */
-    sm_p->msgarray = (PINT_client_sm_msgpair_state *)
-	malloc((sm_p->u.truncate.datafile_count)* 
-		sizeof(PINT_client_sm_msgpair_state));
-    if (sm_p->msgarray == NULL) {
-	assert(0);
+    attr = (sm_p->acache_hit ?
+            &sm_p->pinode->attr :
+            &sm_p->acache_attr);
+
+    assert(attr);
+    assert(attr->objtype == PVFS_TYPE_METAFILE);
+    assert(attr->mask & PVFS_ATTR_META_DFILES);
+    assert(attr->mask & PVFS_ATTR_META_DIST);
+    assert(attr->u.meta.dfile_count > 0);
+    assert(attr->u.meta.dist_size > 0);
+
+    sm_p->msgarray_count = attr->u.meta.dfile_count;
+
+    sm_p->msgarray = (PINT_client_sm_msgpair_state *)malloc(
+        sm_p->msgarray_count * sizeof(PINT_client_sm_msgpair_state));
+    if (!sm_p->msgarray)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return 1;
     }
 
-    sm_p->msgarray_count = sm_p->u.truncate.datafile_count;
-
-    dist = sm_p->u.truncate.distribution;
-    ret = PINT_Dist_lookup(dist);
-    assert (ret == 0);
-
-    /* post our send/recv pairs for the datafile truncate requests */
-    for (i=0; i< sm_p->u.truncate.datafile_count; i++)
+    for (i = 0; i < attr->u.meta.dfile_count; i++)
     {
 	msg_p = &sm_p->msgarray[i];
 
-	gossip_debug(GOSSIP_CLIENT_DEBUG,
-		"  datafile_truncate: client requests %Ld: resizing %Ld",
-		Ld(sm_p->u.truncate.size), Lu(sm_p->u.truncate.datafile_handles[i]));
+	gossip_debug(
+            GOSSIP_CLIENT_DEBUG,
+            "  datafile_truncate: client requests %Ld: resizing %Ld",
+            Ld(sm_p->u.truncate.size),
+            Lu(attr->u.meta.dfile_array[i]));
+
 	new_dfile_size = 
-	    dist->methods->logical_to_physical_offset(dist->params, i, 
-		    sm_p->u.truncate.datafile_count, sm_p->u.truncate.size);
+            attr->u.meta.dist->methods->logical_to_physical_offset(
+                attr->u.meta.dist->params, i, attr->u.meta.dfile_count,
+                sm_p->u.truncate.size);
+
 	gossip_debug(GOSSIP_CLIENT_DEBUG,
 		" to %Ld bytes\n", Ld(new_dfile_size));
 
         PINT_SERVREQ_TRUNCATE_FILL(
             msg_p->req,
             *sm_p->cred_p,
-            sm_p->u.truncate.object_ref.fs_id,
+            sm_p->object_ref.fs_id,
             new_dfile_size,
-            sm_p->u.truncate.datafile_handles[i]);
+            attr->u.meta.dfile_array[i]);
 
-	/* no callback. the status will be in the generic response structure */
-	msg_p->fs_id = sm_p->u.truncate.object_ref.fs_id;
-	msg_p->handle = sm_p->u.truncate.datafile_handles[i];
+	/*
+          no callback. the status will be in the generic response
+          structure
+        */
+	msg_p->fs_id = sm_p->object_ref.fs_id;
+	msg_p->handle = attr->u.meta.dfile_array[i];
 	msg_p->comp_fn = NULL;
     }
 
     /* fill in address of each server to contact */
     ret = PINT_serv_msgpairarray_resolve_addrs(
         sm_p->msgarray_count, sm_p->msgarray);
-    if (ret < 0)
+    if (ret)
     {
-	gossip_lerr("Error: failed to resolve server addresses.\n");
-	js_p->error_code = ret;
-	return (1);
+	gossip_err("Error: failed to resolve server addresses.\n");
+        js_p->error_code = ret;
     }
-
-    /* immediate return: next state jumps to the msgpairarray machine */
     return 1;
 }
 
-static int truncate_datafile_resize_failure(PINT_client_sm *sm_p,
-					    job_status_s *js_p)
+static int truncate_datafile_failure(PINT_client_sm *sm_p,
+                                     job_status_s *js_p)
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-	    "(%p) truncate state: datafile_resize_failure\n",
-	    sm_p);
+	    "(%p) truncate state: datafile_failure\n", sm_p);
     return 1;
 }
 
-
-/* truncate_cleanup: deallocate memory */
 static int truncate_cleanup(PINT_client_sm *sm_p,
 			    job_status_s *js_p)
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) truncate state: "
                  "truncate_cleanup\n", sm_p);
-    if (js_p->error_code == 0) {
-	if(sm_p->msgarray != NULL) {
-	    free(sm_p->msgarray);
-	}
 
-        /* add entry to acache if not already present */
-        if (!sm_p->acache_hit)
+    if (sm_p->msgarray)
+    {
+        free(sm_p->msgarray);
+    }
+
+    /* add entry to acache if not already present */
+    if (!sm_p->acache_hit)
+    {
+        int release_required = 1;
+        PINT_pinode *pinode =
+            PINT_acache_lookup(sm_p->object_ref);
+        if (!pinode)
         {
-            int release_required = 1;
-            PINT_pinode *pinode =
-                PINT_acache_lookup(sm_p->u.truncate.object_ref);
-            if (!pinode)
-            {
-                pinode = PINT_acache_pinode_alloc();
-                assert(pinode);
-                release_required = 0;
-            }
-            pinode->size = sm_p->u.truncate.size;
-            pinode->refn = sm_p->u.truncate.object_ref;
-
-            PINT_acache_object_attr_deep_copy(
-                &pinode->attr, &sm_p->acache_attr);
-            PINT_acache_object_attr_deep_free(
-                &sm_p->acache_attr);
-
-            PINT_acache_set_valid(pinode);
-
-            if (release_required)
-            {
-                PINT_acache_release(pinode);
-            }
-            sm_p->acache_hit = 0;
-
-            /* finally, free previously allocated memory if any */
-            if (sm_p->u.truncate.datafile_handles != NULL)
-            {
-                free(sm_p->u.truncate.datafile_handles);
-            }
-            if (sm_p->u.truncate.distribution)
-            {
-                PVFS_Dist_free(sm_p->u.truncate.distribution);
-            }
+            pinode = PINT_acache_pinode_alloc();
+            assert(pinode);
+            release_required = 0;
         }
+        pinode->size = sm_p->u.truncate.size;
+        pinode->refn = sm_p->object_ref;
+
+        PINT_acache_object_attr_deep_copy(
+            &pinode->attr, &sm_p->acache_attr);
+        PINT_acache_object_attr_deep_free(
+            &sm_p->acache_attr);
+
+        PINT_acache_set_valid(pinode);
+
+        if (release_required)
+        {
+            PINT_acache_release(pinode);
+        }
+        sm_p->acache_hit = 0;
     }
     sm_p->op_complete = 1;
-
     return 0;
 }
 

@@ -292,13 +292,7 @@ struct PINT_client_mgmt_get_dfile_array_sm
 };
 
 struct PINT_client_truncate_sm {
-    PVFS_pinode_reference	object_ref;	/* input parameter */
-    PVFS_size			size;		/* new logical size of object*/
-    int				datafile_count;	/* from attribs */
-    PVFS_handle			*datafile_handles;
-    PVFS_Dist			*distribution;  /* datafile distribution meth*/
-    PVFS_size			dist_size;
-    PINT_client_sm_msgpair_state *msgpair;	/* used in truncate op */
+    PVFS_size			size; /* new logical size of object*/
 };
 
 typedef struct PINT_client_sm {
