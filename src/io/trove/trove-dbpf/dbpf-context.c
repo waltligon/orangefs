@@ -38,7 +38,7 @@ int dbpf_open_context(
     {
 	/* we don't have any more available! */
 	gen_mutex_unlock(&dbpf_context_mutex);
-	return(-EBUSY);
+	return -EBUSY;
     }
 
     /* create a new completion queue for the context */
@@ -47,13 +47,14 @@ int dbpf_open_context(
     if(!dbpf_completion_queue_array[context_index])
     {
 	gen_mutex_unlock(&dbpf_context_mutex);
-	return(-ENOMEM);
+	return -ENOMEM;
     }
     dbpf_completion_queue_array_mutex[context_index] = gen_mutex_build();
+    assert(dbpf_completion_queue_array_mutex[context_index]);
 
     *context_id = context_index;
     gen_mutex_unlock(&dbpf_context_mutex);
-    return(0);
+    return 0;
 }
 
 int dbpf_close_context(
@@ -68,10 +69,6 @@ int dbpf_close_context(
 	return 1;
     }
 
-    /*
-      FIXME: can't free these, as gen_mutex_destroy thinks it can
-      so I have to resort to using pthread_mutex_destroy instead
-    */
     gen_mutex_destroy(dbpf_completion_queue_array_mutex[context_id]);
     dbpf_op_queue_cleanup(dbpf_completion_queue_array[context_id]);
 
