@@ -15,13 +15,15 @@
 #include "pvfs2-attr.h"
 #include "trove.h"
 #include "mkspace.h"
+#include "pvfs2-debug.h"
+#include "gossip.h"
 
 
 int pvfs2_mkspace(
     char *storage_space,
     char *collection,
     TROVE_coll_id coll_id,
-    int root_handle,
+    TROVE_handle root_handle,
     char *handle_ranges,
     int create_collection_only,
     int verbose)
@@ -42,11 +44,11 @@ int pvfs2_mkspace(
 
     if (verbose)
     {
-        fprintf(stderr,"Storage space: %s\n",storage_space);
-        fprintf(stderr,"Collection   : %s\n",collection);
-        fprintf(stderr,"Collection ID: %d\n",coll_id);
-        fprintf(stderr,"Root Handle  : %d\n",root_handle);
-        fprintf(stderr,"Handle Ranges: %s\n",handle_ranges);
+        gossip_debug(SERVER_DEBUG,"Storage space: %s\n",storage_space);
+        gossip_debug(SERVER_DEBUG,"Collection   : %s\n",collection);
+        gossip_debug(SERVER_DEBUG,"Collection ID: %d\n",coll_id);
+        gossip_debug(SERVER_DEBUG,"Root Handle  : %Ld\n",root_handle);
+        gossip_debug(SERVER_DEBUG,"Handle Ranges: %s\n",handle_ranges);
     }
 
     new_root_handle = (PVFS_handle)root_handle;
@@ -61,8 +63,8 @@ int pvfs2_mkspace(
         ret = trove_initialize(storage_space, 0, &method_name, 0);
         if (ret > -1)
         {
-            fprintf(stderr,"error: storage space %s already "
-                    "exists; aborting!\n",storage_space);
+            gossip_err("error: storage space %s already "
+                       "exists; aborting!\n",storage_space);
             return -1;
         }
 
@@ -75,7 +77,7 @@ int pvfs2_mkspace(
         ret = trove_storage_create(storage_space, NULL, &op_id);
         if (ret != 1)
         {
-            fprintf(stderr,"error: storage create failed; aborting!\n");
+            gossip_err("error: storage create failed; aborting!\n");
             return -1;
         }
     }
@@ -84,13 +86,13 @@ int pvfs2_mkspace(
     ret = trove_initialize(storage_space, 0, &method_name, 0);
     if (ret < 0)
     {
-	fprintf(stderr,"error: trove initialize failed; aborting!\n");
+	gossip_err("error: trove initialize failed; aborting!\n");
 	return -1;
     }
 
     if (verbose)
     {
-        fprintf(stderr,"info: created storage space '%s'.\n",
+        gossip_debug(SERVER_DEBUG,"info: created storage space '%s'.\n",
                 storage_space);
     }
 
@@ -98,7 +100,7 @@ int pvfs2_mkspace(
     ret = trove_collection_lookup(collection, &coll_id, NULL, &op_id);
     if (ret != -1)
     {
-	fprintf(stderr, "error: collection lookup succeeded before it "
+	gossip_debug(SERVER_DEBUG, "error: collection lookup succeeded before it "
                 "should; aborting!\n");
 	trove_finalize();
 	return -1;
@@ -108,7 +110,7 @@ int pvfs2_mkspace(
     ret = trove_collection_create(collection, coll_id, NULL, &op_id);
     if (ret != 1)
     {
-	fprintf(stderr,"error: collection create failed for "
+	gossip_debug(SERVER_DEBUG,"error: collection create failed for "
                 "collection '%s'.\n",collection);
 	return -1;
     }
@@ -122,20 +124,20 @@ int pvfs2_mkspace(
     ret = trove_collection_lookup(collection, &coll_id, NULL, &op_id);
     if (ret != 1)
     {
-	fprintf(stderr,"error: collection lookup failed for "
+	gossip_debug(SERVER_DEBUG,"error: collection lookup failed for "
                 "collection '%s' after create.\n",collection);
 	return -1;
     }
 
     if (verbose)
     {
-        fprintf(stderr,"info: created collection '%s'.\n",collection);
+        gossip_debug(SERVER_DEBUG,"info: created collection '%s'.\n",collection);
     }
 
     ret = trove_open_context(coll_id, &trove_context);
     if (ret < 0)
     {
-        fprintf(stderr,"trove_open_context() failure.\n");
+        gossip_debug(SERVER_DEBUG,"trove_open_context() failure.\n");
         return -1;
     }
 
@@ -147,7 +149,7 @@ int pvfs2_mkspace(
                                    handle_ranges);
     if (ret < 0)
     {
-	fprintf(stderr, "Error adding handle ranges\n");
+	gossip_debug(SERVER_DEBUG, "Error adding handle ranges\n");
 	return -1;
     }
 
@@ -184,14 +186,15 @@ int pvfs2_mkspace(
         }
         if (ret != 1 && state != 0)
         {
-            fprintf(stderr, "dspace create (for root dir) failed.\n");
+            gossip_debug(SERVER_DEBUG,
+                         "dspace create (for root dir) failed.\n");
             return -1;
         }
 
         if (verbose)
         {
-            fprintf(stderr,"info: created root directory with handle "
-                    "0x%x.\n",(int)new_root_handle);
+            gossip_debug(SERVER_DEBUG,"info: created root directory "
+                         "with handle %Ld.\n", new_root_handle);
         }
 
         /*
@@ -212,8 +215,8 @@ int pvfs2_mkspace(
         }
         if (ret < 0)
         {
-            fprintf(stderr,"error: collection seteattr (for root "
-                    "handle) failed; aborting!\n");
+            gossip_err("error: collection seteattr (for root handle) "
+                       "failed; aborting!\n");
             return -1;
         }
 
@@ -249,8 +252,8 @@ int pvfs2_mkspace(
         }
         if (ret < 0)
         {
-            fprintf(stderr,"error: keyval write for root handle "
-                    "attributes failed; aborting!\n");
+            gossip_err("error: keyval write for root handle attributes "
+                       "failed; aborting!\n");
             return -1;
         }
 
@@ -279,14 +282,14 @@ int pvfs2_mkspace(
         }
         if (ret != 1 && state != 0)
         {
-            fprintf(stderr, "dspace create (for dirent storage) failed.\n");
+            gossip_err("dspace create (for dirent storage) failed.\n");
             return -1;
         }
 
         if (verbose)
         {
-            fprintf(stderr,"info: created dspace for dirents with handle "
-                    "0x%x.\n",(int) ent_handle);
+            gossip_debug(SERVER_DEBUG,"info: created dspace for dirents "
+                         "with handle %Ld.\n", ent_handle);
         }
 
         key.buffer    = entstring;
@@ -311,14 +314,15 @@ int pvfs2_mkspace(
         }
         if (ret < 0)
         {
-            fprintf(stderr,"error: keyval write for handle used to "
-                    "store dirents failed; aborting!\n");
+            gossip_err("error: keyval write for handle used to store "
+                       "dirents failed; aborting!\n");
             return -1;
         }
 
         if (verbose)
         {
-            fprintf(stderr,"info: wrote attributes for root directory.\n");
+            gossip_debug(SERVER_DEBUG,
+                         "info: wrote attributes for root directory.\n");
         }
     }
 
@@ -330,10 +334,10 @@ int pvfs2_mkspace(
 
     if (verbose)
     {
-        fprintf(stderr,
-                "info: collection created (root handle = %d, coll "
-                "id = %d, root string = %s).\n",root_handle,
-                (int)coll_id,root_handle_string);
+        gossip_debug(SERVER_DEBUG,
+                     "info: collection created (root handle = %Ld, coll "
+                     "id = %d, root string = %s).\n",root_handle,
+                     (int)coll_id, root_handle_string);
     }
     return 0;
 }

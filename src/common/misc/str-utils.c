@@ -234,7 +234,6 @@ int PINT_parse_handle_ranges(
 	    *status = ( p - range );
 	    break;
 	default:
-	    printf("illegal characher %c\n", *endchar);
 	    return -1;
     }
     return 1;

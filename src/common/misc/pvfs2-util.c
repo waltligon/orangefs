@@ -12,6 +12,7 @@
 #include "pvfs2-sysint.h"
 #include "pvfs2-util.h"
 #include "str-utils.h"
+#include "pvfs2-debug.h"
 #include "gossip.h"
 
 #define PARSER_MAX_LINE_LENGTH 255
@@ -108,7 +109,7 @@ int PVFS_util_parse_pvfstab(
 	    }
 	    if (end - start < 0)
 	    {
-		printf("end = %d\nstart = %d\n", end, start);
+		gossip_debug(CLIENT_DEBUG,"end = %d\nstart = %d\n", end, start);
 		ret = -EINVAL;
 		goto metaaddr_failure;
 	    }
@@ -134,7 +135,7 @@ int PVFS_util_parse_pvfstab(
 
 	    if (end - start < 0)
 	    {
-		printf("end = %d\nstart = %d\n", end, start);
+		gossip_debug(CLIENT_DEBUG,"end = %d\nstart = %d\n", end, start);
 		ret = -EINVAL;
 		goto servmnt_failure;
 	    }
@@ -159,7 +160,7 @@ int PVFS_util_parse_pvfstab(
 
 	    if (end - start < 0)
 	    {
-		printf("end = %d\nstart = %d\n", end, start);
+		gossip_debug(CLIENT_DEBUG,"end = %d\nstart = %d\n", end, start);
 		ret = -EINVAL;
 		goto localmnt_failure;
 	    }
@@ -184,7 +185,7 @@ int PVFS_util_parse_pvfstab(
 
 	    if (end - start < 0)
 	    {
-		printf("end = %d\nstart = %d\n", end, start);
+		gossip_debug(CLIENT_DEBUG,"end = %d\nstart = %d\n", end, start);
 		ret = -EINVAL;
 		goto fstype_failure;
 	    }
@@ -208,7 +209,7 @@ int PVFS_util_parse_pvfstab(
 
 	    if (end - start < 0)
 	    {
-		printf("end = %d\nstart = %d\n", end, start);
+		gossip_debug(CLIENT_DEBUG,"end = %d\nstart = %d\n", end, start);
 		ret = -EINVAL;
 		goto opt1_failure;
 	    }
@@ -232,7 +233,7 @@ int PVFS_util_parse_pvfstab(
 
 	    if (end - start < 0)
 	    {
-		printf("end = %d\nstart = %d\n", end, start);
+		gossip_debug(CLIENT_DEBUG,"end = %d\nstart = %d\n", end, start);
 		ret = -EINVAL;
 		goto opt2_failure;
 	    }

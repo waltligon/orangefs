@@ -1637,7 +1637,7 @@ int PINT_config_pvfs2_mkspace(
               creating the storage space
             */
             root_handle = (is_root_handle_in_my_range(config,cur_fs) ?
-                           cur_fs->root_handle : 0);
+                           cur_fs->root_handle : PVFS_HANDLE_NULL);
 
             /*
               for the first fs/collection we encounter, create
