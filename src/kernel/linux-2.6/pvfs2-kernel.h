@@ -169,8 +169,8 @@ sizeof(int64_t) + sizeof(pvfs2_downcall_t))
 #define pvfs2_kunmap(page) kunmap(page)
 #else
 #define PVFS2_BUFMAP_GFP_FLAGS (GFP_KERNEL)
-#define pvfs2_kmap(page) page
-#define pvfs2_kunmap(page) page
+#define pvfs2_kmap(page) page_address(page)
+#define pvfs2_kunmap(page) page_address(page)
 #endif /* CONFIG_HIGHMEM */
 
 /************************************
