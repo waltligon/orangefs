@@ -744,7 +744,7 @@ running.  Here is an example of how to start the PVFS2 client:
 
 \begin{verbatim}
 gil:/usr/src/pvfs2# cd test/kernel/linux-2.6/
-gil:/usr/src/pvfs2/test/kernel/linux-2.6# ./pvfs2-client -f
+gil:/usr/src/pvfs2/test/kernel/linux-2.6# ./pvfs2-client -f -p ./pvfs2-client-core
 pvfs2-client starting
 Spawning new child process
 About to exec ./pvfs2-client-core
@@ -753,6 +753,9 @@ Waiting on child with pid 17731
 
 The -f argument is not required.  For reference, this keeps the PVFS2
 client application running in the foreground.
+
+The -p argument is required unless the pvfs2-client-core is installed
+and can be found in your PATH.
 
 Now that the PVFS2 server and PVFS2 client applications are running,
 normal VFS operation can be issued on the command line.  An example is
