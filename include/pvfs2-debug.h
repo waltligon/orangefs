@@ -73,7 +73,8 @@ static inline int PVFS_debug_eventlog_to_mask(
         { "flowproto", FLOW_PROTO_DEBUG },
         { "flow", FLOW_DEBUG },
         { "pcache", PCACHE_DEBUG },
-        { "distribution", DIST_DEBUG }
+        { "distribution", DIST_DEBUG },
+        { "none", 0 }
     };
 
     num_entries = (sizeof(keyword_mask_map) / sizeof(keyword_mask_t));

@@ -113,7 +113,7 @@ static struct options* parse_args(int argc, char* argv[])
     /* getopt stuff */
     extern char* optarg;
     extern int optind, opterr, optopt;
-    char flags[] = "m:d:";
+    char flags[] = "m:";
     char one_opt = ' ';
     int len = 0;
 
@@ -133,16 +133,6 @@ static struct options* parse_args(int argc, char* argv[])
     /* look at command line arguments */
     while((one_opt = getopt(argc, argv, flags)) != EOF){
 	switch(one_opt){
-	    case('d'):
-		ret = sscanf(optarg, "%x", &tmp_opts->debug_mask);
-		if(ret < 1){
-		    if(tmp_opts->mnt_point) 
-			free(tmp_opts->mnt_point);
-		    free(tmp_opts);
-		    return(NULL);
-		}
-		tmp_opts->debug_mask_set = 1;
-		break;
 	    case('m'):
 		len = strlen(optarg)+1;
 		tmp_opts->mnt_point = (char*)malloc(len+1);
@@ -170,6 +160,15 @@ static struct options* parse_args(int argc, char* argv[])
 	}
     }
 
+    if(optind != (argc - 1))
+    {
+	usage(argc, argv);
+	exit(EXIT_FAILURE);
+    }
+
+    tmp_opts->debug_mask = PVFS_debug_eventlog_to_mask(argv[argc-1]);
+    tmp_opts->debug_mask_set = 1;
+
     if(!tmp_opts->mnt_point_set || !tmp_opts->debug_mask_set)
     {
 	if(tmp_opts->mnt_point)
@@ -184,10 +183,16 @@ static struct options* parse_args(int argc, char* argv[])
 
 static void usage(int argc, char** argv)
 {
+    /* TODO: need a way to print the valid masks... */
+
+    fprintf(stderr, "\n");
     fprintf(stderr, 
-	"Usage: %s [-m fs_mount_point] [-d hex gossip_debug_mask]\n",
+	"Usage: %s [-m fs_mount_point] <mask list>\n",
 	argv[0]);
-    fprintf(stderr, "\n      Note: this utility reads /etc/pvfs2tab for file system configuration.\n");
+    fprintf(stderr, "Example: %s -m /mnt/pvfs2 \"network,server\"\n",
+	argv[0]);
+    fprintf(stderr, "See pvfs2-debug.h for more masks.\n");
+    fprintf(stderr, "Note: this utility reads /etc/pvfs2tab for file system configuration.\n");
     return;
 }
 
