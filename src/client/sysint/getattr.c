@@ -306,9 +306,6 @@ int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 		max_msg_sz = PINT_encode_calc_max_size(
                     PINT_ENCODE_RESP, req_p.op, PINT_CLIENT_ENC_TYPE);
 
-                gossip_lerr("SENDING REQUEST FOR DATAFILE %Ld\n",
-                            req_p.u.getattr.handle);
-
 		ret = PINT_send_req(serv_addr, &req_p, max_msg_sz,
                                     &decoded, &encoded_resp, op_tag);
 		if (ret < 0)
@@ -384,7 +381,6 @@ int PINT_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask,
 	/* Free memory allocated for name */
 	if (size_array)
 	    free(size_array);
-
 
 	return(0);
 

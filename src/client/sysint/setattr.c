@@ -101,7 +101,19 @@ int PVFS_sys_setattr(PVFS_pinode_reference pinode_refn, PVFS_sys_attr attr,
 	 * all of the attributes that are valid to set here
 	 */
 	PINT_CONVERT_ATTR(&req_p.u.setattr.attr, &attr,
-                          PVFS_ATTR_SYS_ALL_SETABLE);
+                          PVFS_ATTR_COMMON_ALL);
+
+        if (attr.objtype == PVFS_TYPE_METAFILE)
+        {
+            req_p.u.setattr.attr.u.meta.dfile_count =
+                pinode_ptr->attr.u.meta.dfile_count;
+            req_p.u.setattr.attr.u.meta.dfile_array =
+                pinode_ptr->attr.u.meta.dfile_array;
+            req_p.u.setattr.attr.u.meta.dist =
+                pinode_ptr->attr.u.meta.dist;
+            req_p.u.setattr.attr.u.meta.dist_size =
+                pinode_ptr->attr.u.meta.dist_size;
+        }
 
 	/* Make a server setattr request */	
 	ret = PINT_send_req(serv_addr, &req_p, max_msg_sz,
