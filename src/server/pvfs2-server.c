@@ -36,6 +36,12 @@
 #define PVFS2_VERSION "Unknown"
 #endif
 
+/* this controls how many jobs we will test for per job_testcontext() call */
+/* NOTE: this is currently independent of the config file parameter that
+ * governs how many unexpected BMI jobs are kept posted at any given time
+ */
+#define PVFS_SERVER_TEST_COUNT 64
+
 /* Lookup table for determining what state machine to use when a
  * new request is received.
  */
@@ -161,45 +167,34 @@ int main(int argc, char **argv)
 	exit(ret);
     }
 
-    if (server_config.initial_unexpected_requests > PVFS_SERVER_MAX_JOBS)
+
+    server_job_id_array = (job_id_t *)
+	malloc(PVFS_SERVER_TEST_COUNT * sizeof(job_id_t));
+    server_completed_job_p_array = (void **)
+	malloc(PVFS_SERVER_TEST_COUNT * sizeof(void *));
+    server_job_status_array = (job_status_s *)
+	malloc(PVFS_SERVER_TEST_COUNT * sizeof(job_status_s));
+
+    if (!server_job_id_array ||
+	!server_completed_job_p_array ||
+	!server_job_status_array)
     {
-	gossip_err("Error: initial_unexpected request value is too "
-                   "large; aborting.\n");
+	if (server_job_id_array)
+	{
+	    free(server_job_id_array);
+	}
+	if (server_completed_job_p_array)
+	{
+	    free(server_completed_job_p_array);
+	}
+	if (server_job_status_array)
+	{
+	    free(server_job_status_array);
+	}
+	gossip_err("Error: failed to allocate arrays for tracking completed jobs.\n");
 	goto server_shutdown;
     }
-    else
-    {
-        int num_jobs = server_config.initial_unexpected_requests;
-
-        server_job_id_array = (job_id_t *)
-            malloc(num_jobs * sizeof(job_id_t));
-        server_completed_job_p_array = (void **)
-            malloc(num_jobs * sizeof(void *));
-        server_job_status_array = (job_status_s *)
-            malloc(num_jobs * sizeof(job_status_s));
-
-        if (!server_job_id_array ||
-            !server_completed_job_p_array ||
-            !server_job_status_array)
-        {
-            if (server_job_id_array)
-            {
-                free(server_job_id_array);
-            }
-            if (server_completed_job_p_array)
-            {
-                free(server_completed_job_p_array);
-            }
-            if (server_job_status_array)
-            {
-                free(server_job_status_array);
-            }
-            gossip_err("Error: initial_unexpected request allocation "
-                       "failure; aborting.\n");
-            goto server_shutdown;
-        }
-        server_status_flag |= SERVER_JOB_OBJS_ALLOCATED;
-    }
+    server_status_flag |= SERVER_JOB_OBJS_ALLOCATED;
 
     /* Initialize the server (many many steps) */
     ret = server_initialize(&server_status_flag, server_job_status_array);
@@ -220,7 +215,7 @@ int main(int argc, char **argv)
     /* Initialization complete; process server requests indefinitely. */
     for ( ;; )  
     {
-	int i, comp_ct = PVFS_SERVER_MAX_JOBS;
+	int i, comp_ct = PVFS_SERVER_TEST_COUNT;
 
 	if (signal_recvd_flag != 0)
 	{

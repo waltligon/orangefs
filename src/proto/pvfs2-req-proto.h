@@ -58,9 +58,6 @@ enum PVFS_server_op
 };
 #define PVFS_MAX_SERVER_OP 20
 
-/* max number of jobs the server is able to manage at a time */
-#define PVFS_SERVER_MAX_JOBS  512
-
 /******************************************************************/
 /* these values define limits on the maximum size of variable length
  * parameters used within the request protocol
