@@ -119,7 +119,7 @@ static const configoption_t *get_argname_fallback(
     return NULL;
 }
 
-char *dotconf_substitute_env(
+char *PINT_dotconf_substitute_env(
     configfile_t * configfile,
     char *str)
 {
@@ -166,7 +166,7 @@ char *dotconf_substitute_env(
 
 	    if (*cp1 != '}')
 	    {
-		dotconf_warning(configfile, DCLOG_WARNING, ERR_PARSE_ERROR,
+		PINT_dotconf_warning(configfile, DCLOG_WARNING, ERR_PARSE_ERROR,
 				"Unbalanced '{'");
 	    }
 	    else
@@ -194,7 +194,7 @@ char *dotconf_substitute_env(
     return strdup(tmp_value);
 }
 
-int dotconf_warning(
+int PINT_dotconf_warning(
     configfile_t * configfile,
     int type,
     unsigned long errnum,
@@ -223,7 +223,7 @@ int dotconf_warning(
     return retval;
 }
 
-void dotconf_register_options(
+void PINT_dotconf_register_options(
     configfile_t * configfile,
     const configoption_t * options)
 {
@@ -250,7 +250,7 @@ void dotconf_register_options(
 
 }
 
-void dotconf_callback(
+void PINT_dotconf_callback(
     configfile_t * configfile,
     callback_types type,
     dotconf_callback_t callback)
@@ -268,7 +268,7 @@ void dotconf_callback(
     }
 }
 
-int dotconf_continue_line(
+int PINT_dotconf_continue_line(
     char *buffer,
     size_t length)
 {
@@ -291,7 +291,7 @@ int dotconf_continue_line(
     return (*cp1 != '\\');
 }
 
-int dotconf_get_next_line(
+int PINT_dotconf_get_next_line(
     char *buffer,
     size_t bufsize,
     configfile_t * configfile)
@@ -313,7 +313,7 @@ int dotconf_get_next_line(
 
     configfile->line++;
     length = strlen(cp1);
-    while (dotconf_continue_line(cp1, length))
+    while (PINT_dotconf_continue_line(cp1, length))
     {
 	cp2 = fgets(buf2, CFG_BUFSIZE, configfile->stream);
 	if (!cp2)
@@ -332,7 +332,7 @@ int dotconf_get_next_line(
     return 0;
 }
 
-char *dotconf_get_here_document(
+char *PINT_dotconf_get_here_document(
     configfile_t * configfile,
     const char *delimit)
 {
@@ -349,7 +349,7 @@ char *dotconf_get_here_document(
     {
 	if (stat(configfile->filename, &finfo))
 	{
-	    dotconf_warning(configfile, DCLOG_EMERG, ERR_NOACCESS,
+	    PINT_dotconf_warning(configfile, DCLOG_EMERG, ERR_NOACCESS,
 			    "[emerg] could not stat currently read file (%s)\n",
 			    configfile->filename);
 	    return NULL;
@@ -366,7 +366,7 @@ char *dotconf_get_here_document(
 
     here_string = 1;
     limit_len = snprintf(here_limit, 9, "%s", delimit);
-    while (!dotconf_get_next_line(buffer, CFG_BUFSIZE, configfile))
+    while (!PINT_dotconf_get_next_line(buffer, CFG_BUFSIZE, configfile))
     {
 	if (!strncmp(here_limit, buffer, limit_len - 1))
 	{
@@ -378,7 +378,7 @@ char *dotconf_get_here_document(
 		     buffer);
     }
     if (here_string)
-	dotconf_warning(configfile, DCLOG_WARNING, ERR_PARSE_ERROR,
+	PINT_dotconf_warning(configfile, DCLOG_WARNING, ERR_PARSE_ERROR,
 			"Unterminated here-document!");
 
     here_doc[offset - 1] = '\0';	/* strip newline */
@@ -386,7 +386,7 @@ char *dotconf_get_here_document(
     return (char *) realloc(here_doc, offset);
 }
 
-const char *dotconf_invoke_command(
+const char *PINT_dotconf_invoke_command(
     configfile_t * configfile,
     command_t * cmd)
 {
@@ -396,7 +396,7 @@ const char *dotconf_invoke_command(
     return error;
 }
 
-char *dotconf_read_arg(
+char *PINT_dotconf_read_arg(
     configfile_t * configfile,
     char **line)
 {
@@ -487,14 +487,14 @@ char *dotconf_read_arg(
      */
     if ((configfile->flags & DONT_SUBSTITUTE) == DONT_SUBSTITUTE)
 	return buf[0] ? strdup(buf) : NULL;
-    return buf[0] ? dotconf_substitute_env(configfile, strdup(buf)) : NULL;
+    return buf[0] ? PINT_dotconf_substitute_env(configfile, strdup(buf)) : NULL;
 }
 
-/* dotconf_find_command remains here for backwards compatability. it's
+/* PINT_dotconf_find_command remains here for backwards compatability. it's
  * internally unused since dot.conf 1.0.9 because it cannot handle the
  * DUPLICATE_OPTION_NAMES flag
  */
-configoption_t *dotconf_find_command(
+configoption_t *PINT_dotconf_find_command(
     configfile_t * configfile,
     const char *command)
 {
@@ -526,7 +526,7 @@ configoption_t *dotconf_find_command(
     return option;
 }
 
-void dotconf_set_command(
+void PINT_dotconf_set_command(
     configfile_t * configfile,
     const configoption_t * option,
     char *args,
@@ -559,7 +559,7 @@ void dotconf_set_command(
 
 	if (!strncmp("<<", cp, 2))
 	{
-	    cmd->data.str = dotconf_get_here_document(configfile, cp + 2);
+	    cmd->data.str = PINT_dotconf_get_here_document(configfile, cp + 2);
 	    cmd->arg_count = 1;
 	}
     }
@@ -573,7 +573,7 @@ void dotconf_set_command(
 	cmd->arg_count = 0;
 	while (cmd->arg_count < (CFG_VALUES - 1)
 	       && (cmd->data.list[cmd->arg_count] =
-		   dotconf_read_arg(configfile, &args)))
+		   PINT_dotconf_read_arg(configfile, &args)))
 	{
 	    cmd->arg_count++;
 	}
@@ -607,7 +607,7 @@ void dotconf_set_command(
 		/* the value is true if the argument is Yes, On or 1 */
 		if (cmd->arg_count < 1)
 		{
-		    dotconf_warning(configfile, DCLOG_WARNING,
+		    PINT_dotconf_warning(configfile, DCLOG_WARNING,
 				    ERR_WRONG_ARG_COUNT,
 				    "Missing argument to option '%s'", name);
 		    return;
@@ -618,7 +618,7 @@ void dotconf_set_command(
 	    case ARG_INT:
 		if (cmd->arg_count < 1)
 		{
-		    dotconf_warning(configfile, DCLOG_WARNING,
+		    PINT_dotconf_warning(configfile, DCLOG_WARNING,
 				    ERR_WRONG_ARG_COUNT,
 				    "Missing argument to option '%s'", name);
 		    return;
@@ -629,7 +629,7 @@ void dotconf_set_command(
 	    case ARG_STR:
 		if (cmd->arg_count < 1)
 		{
-		    dotconf_warning(configfile, DCLOG_WARNING,
+		    PINT_dotconf_warning(configfile, DCLOG_WARNING,
 				    ERR_WRONG_ARG_COUNT,
 				    "Missing argument to option '%s'", name);
 		    return;
@@ -648,7 +648,7 @@ void dotconf_set_command(
     }
 }
 
-void dotconf_free_command(
+void PINT_dotconf_free_command(
     command_t * command)
 {
     int i;
@@ -661,7 +661,7 @@ void dotconf_free_command(
     free(command->data.list);
 }
 
-const char *dotconf_handle_command(
+const char *PINT_dotconf_handle_command(
     configfile_t * configfile,
     char *buffer)
 {
@@ -728,20 +728,20 @@ const char *dotconf_handle_command(
 	{
 	    if (error)
 		return error;
-	    dotconf_warning(configfile, DCLOG_INFO, ERR_UNKNOWN_OPTION,
+	    PINT_dotconf_warning(configfile, DCLOG_INFO, ERR_UNKNOWN_OPTION,
 			    "Unknown Config-Option: '%s'", name);
 	    return NULL;
 	}
 
 	/* set up the command structure (contextchecker wants this) */
-	dotconf_set_command(configfile, option, cp1, &command);
+	PINT_dotconf_set_command(configfile, option, cp1, &command);
 
 	if (configfile->contextchecker)
 	    context_error =
 		configfile->contextchecker(&command, command.option->context);
 
 	if (!context_error)
-	    error = dotconf_invoke_command(configfile, &command);
+	    error = PINT_dotconf_invoke_command(configfile, &command);
 	else
 	{
 	    if (!error)
@@ -752,7 +752,7 @@ const char *dotconf_handle_command(
 	    }
 	}
 
-	dotconf_free_command(&command);
+	PINT_dotconf_free_command(&command);
 
 	if (!context_error || !(configfile->flags & DUPLICATE_OPTION_NAMES))
 	{
@@ -764,39 +764,39 @@ const char *dotconf_handle_command(
     return error;
 }
 
-const char *dotconf_command_loop_until_error(
+const char *PINT_dotconf_command_loop_until_error(
     configfile_t * configfile)
 {
     char buffer[CFG_BUFSIZE];
 
-    while (!(dotconf_get_next_line(buffer, CFG_BUFSIZE, configfile)))
+    while (!(PINT_dotconf_get_next_line(buffer, CFG_BUFSIZE, configfile)))
     {
-	const char *error = dotconf_handle_command(configfile, buffer);
+	const char *error = PINT_dotconf_handle_command(configfile, buffer);
 	if (error)
 	    return error;
     }
     return NULL;
 }
 
-int dotconf_command_loop(
+int PINT_dotconf_command_loop(
     configfile_t * configfile)
 {
     /* ------ returns: 0 for failure -- !0 for success ------------------------------------------ */
     char buffer[CFG_BUFSIZE];
 
-    while (!(dotconf_get_next_line(buffer, CFG_BUFSIZE, configfile)))
+    while (!(PINT_dotconf_get_next_line(buffer, CFG_BUFSIZE, configfile)))
     {
-	const char *error = dotconf_handle_command(configfile, buffer);
+	const char *error = PINT_dotconf_handle_command(configfile, buffer);
 	if (error != NULL)
 	{
-	    if (dotconf_warning(configfile, DCLOG_ERR, 0, error))
+	    if (PINT_dotconf_warning(configfile, DCLOG_ERR, 0, error))
 		return 0;
 	}
     }
     return 1;
 }
 
-configfile_t *dotconf_create(
+configfile_t *PINT_dotconf_create(
     char *fname,
     const configoption_t * options,
     context_t * context,
@@ -831,8 +831,8 @@ configfile_t *dotconf_create(
 
     new->context = context;
 
-    dotconf_register_options(new, dotconf_options);
-    dotconf_register_options(new, options);
+    PINT_dotconf_register_options(new, dotconf_options);
+    PINT_dotconf_register_options(new, options);
 
     if (new->flags & CASE_INSENSITIVE)
 	new->cmp_func = strncasecmp;
@@ -842,7 +842,7 @@ configfile_t *dotconf_create(
     return new;
 }
 
-void dotconf_cleanup(
+void PINT_dotconf_cleanup(
     configfile_t * configfile)
 {
     if (configfile->stream)
@@ -861,7 +861,7 @@ void dotconf_cleanup(
 }
 
 /* ------ internal utility function that verifies if a character is in the WILDCARDS list -- */
-int dotconf_is_wild_card(
+int PINT_dotconf_is_wild_card(
     char value)
 {
     int retval = 0;
@@ -881,7 +881,7 @@ int dotconf_is_wild_card(
 }
 
 /* ------ internal utility function that calls the appropriate routine for the wildcard passed in -- */
-int dotconf_handle_wild_card(
+int PINT_dotconf_handle_wild_card(
     command_t * cmd,
     char wild_card,
     char *path,
@@ -894,13 +894,13 @@ int dotconf_handle_wild_card(
     {
     case '*':
 
-	retval = dotconf_handle_star(cmd, path, pre, ext);
+	retval = PINT_dotconf_handle_star(cmd, path, pre, ext);
 
 	break;
 
     case '?':
 
-	retval = dotconf_handle_question_mark(cmd, path, pre, ext);
+	retval = PINT_dotconf_handle_question_mark(cmd, path, pre, ext);
 
 	break;
 
@@ -913,7 +913,7 @@ int dotconf_handle_wild_card(
 
 
 /* ------ internal utility function that frees allocated memory from dotcont_find_wild_card -- */
-void dotconf_wild_card_cleanup(
+void PINT_dotconf_wild_card_cleanup(
     char *path,
     char *pre)
 {
@@ -931,8 +931,8 @@ void dotconf_wild_card_cleanup(
 }
 
 /* ------ internal utility function to check for wild cards in file path -- */
-/* ------ path and pre must be freed by the developer ( dotconf_wild_card_cleanup) -- */
-int dotconf_find_wild_card(
+/* ------ path and pre must be freed by the developer ( PINT_dotconf_wild_card_cleanup) -- */
+int PINT_dotconf_find_wild_card(
     char *filename,
     char *wildcard,
     char **path,
@@ -1004,7 +1004,7 @@ int dotconf_find_wild_card(
 }
 
 /* ------ internal utility function that compares two stings from back to front -- */
-int dotconf_strcmp_from_back(
+int PINT_dotconf_strcmp_from_back(
     const char *s1,
     const char *s2)
 {
@@ -1026,7 +1026,7 @@ int dotconf_strcmp_from_back(
 }
 
 /* ------ internal utility function that determins if a string matches the '?' criteria -- */
-int dotconf_question_mark_match(
+int PINT_dotconf_question_mark_match(
     char *dir_name,
     char *pre,
     char *ext)
@@ -1059,7 +1059,7 @@ int dotconf_question_mark_match(
 }
 
 /* ------ internal utility function that determins if a string matches the '*' criteria -- */
-int dotconf_star_match(
+int PINT_dotconf_star_match(
     char *dir_name,
     char *pre,
     char *ext)
@@ -1080,7 +1080,7 @@ int dotconf_star_match(
     {
 
 	if ((dir_name_len >= (ext_len + pre_len)) &&
-	    (dotconf_strcmp_from_back(dir_name, ext) == 0) &&
+	    (PINT_dotconf_strcmp_from_back(dir_name, ext) == 0) &&
 	    (strncmp(dir_name, pre, pre_len) == 0) &&
 	    (strcmp(dir_name, ".") != 0) && (strcmp(dir_name, "..") != 0))
 	{
@@ -1094,7 +1094,7 @@ int dotconf_star_match(
 
 /* ------ internal utility function that determins matches for filenames with   -- */
 /* ------ a '?' in name and calls the Internal Include function on that filename -- */
-int dotconf_handle_question_mark(
+int PINT_dotconf_handle_question_mark(
     command_t * cmd,
     char *path,
     char *pre,
@@ -1127,7 +1127,7 @@ int dotconf_handle_question_mark(
     {
 	while ((dirptr = readdir(dh)) != NULL)
 	{
-	    match_state = dotconf_question_mark_match(dirptr->d_name, pre, ext);
+	    match_state = PINT_dotconf_question_mark_match(dirptr->d_name, pre, ext);
 
 	    if (match_state >= 0)
 	    {
@@ -1181,23 +1181,23 @@ int dotconf_handle_question_mark(
 
 		    }
 
-		    if (dotconf_find_wild_card
+		    if (PINT_dotconf_find_wild_card
 			(new_path, &wc, &wc_path, &wc_pre, &wc_ext) >= 0)
 		    {
-			if (dotconf_handle_wild_card
+			if (PINT_dotconf_handle_wild_card
 			    (cmd, wc, wc_path, wc_pre, wc_ext) < 0)
 			{
-			    dotconf_warning(cmd->configfile, DCLOG_WARNING,
+			    PINT_dotconf_warning(cmd->configfile, DCLOG_WARNING,
 					    ERR_INCLUDE_ERROR,
 					    "Error occured while processing wildcard %c\n"
 					    "Filename is '%s'\n", wc, new_path);
 
 			    free(new_path);
-			    dotconf_wild_card_cleanup(wc_path, wc_pre);
+			    PINT_dotconf_wild_card_cleanup(wc_path, wc_pre);
 			    return -1;
 			}
 
-			dotconf_wild_card_cleanup(wc_path, wc_pre);
+			PINT_dotconf_wild_card_cleanup(wc_path, wc_pre);
 			continue;
 		    }
 
@@ -1207,7 +1207,7 @@ int dotconf_handle_question_mark(
 
 		if (access(new_path, R_OK))
 		{
-		    dotconf_warning(cmd->configfile, DCLOG_WARNING,
+		    PINT_dotconf_warning(cmd->configfile, DCLOG_WARNING,
 				    ERR_INCLUDE_ERROR,
 				    "Cannot open %s for inclusion.\n"
 				    "IncludePath is '%s'\n", new_path,
@@ -1216,19 +1216,19 @@ int dotconf_handle_question_mark(
 		}
 
 		included =
-		    dotconf_create(new_path, cmd->configfile->config_options[1],
+		    PINT_dotconf_create(new_path, cmd->configfile->config_options[1],
 				   cmd->configfile->context,
 				   cmd->configfile->flags);
 		if (included)
 		{
 		    for (i = 2; cmd->configfile->config_options[i]; i++)
-			dotconf_register_options(included,
+			PINT_dotconf_register_options(included,
 						 cmd->configfile->
 						 config_options[i]);
 		    included->errorhandler = cmd->configfile->errorhandler;
 		    included->contextchecker = cmd->configfile->contextchecker;
-		    dotconf_command_loop(included);
-		    dotconf_cleanup(included);
+		    PINT_dotconf_command_loop(included);
+		    PINT_dotconf_cleanup(included);
 		}
 
 	    }
@@ -1245,7 +1245,7 @@ int dotconf_handle_question_mark(
 
 /* ------ internal utility function that determins matches for filenames with   --- */
 /* ------ a '*' in name and calls the Internal Include function on that filename -- */
-int dotconf_handle_star(
+int PINT_dotconf_handle_star(
     command_t * cmd,
     char *path,
     char *pre,
@@ -1281,14 +1281,14 @@ int dotconf_handle_star(
     memset(already_matched, 0, CFG_MAX_FILENAME);
     s_ext = ext;
 
-    while (dotconf_is_wild_card(*s_ext))	/* remove trailing wild-cards proceeded by * */
+    while (PINT_dotconf_is_wild_card(*s_ext))	/* remove trailing wild-cards proceeded by * */
     {
 	s_ext++;
     }
 
     t_ext = s_ext;
 
-    while (t_ext != NULL && !(dotconf_is_wild_card(*t_ext)) && *t_ext != '\0')
+    while (t_ext != NULL && !(PINT_dotconf_is_wild_card(*t_ext)) && *t_ext != '\0')
     {
 	t_ext++;	/* find non-wild-card string */
 	t_ext_count++;
@@ -1304,7 +1304,7 @@ int dotconf_handle_star(
 	    sub_count = 0;
 	    t_ext_count = 0;
 
-	    match_state = dotconf_star_match(dirptr->d_name, pre, s_ext);
+	    match_state = PINT_dotconf_star_match(dirptr->d_name, pre, s_ext);
 
 	    if (match_state >= 0)
 	    {
@@ -1374,23 +1374,23 @@ int dotconf_handle_star(
 
 		    }
 
-		    if (dotconf_find_wild_card
+		    if (PINT_dotconf_find_wild_card
 			(new_path, &wc, &wc_path, &wc_pre, &wc_ext) >= 0)
 		    {
-			if (dotconf_handle_wild_card
+			if (PINT_dotconf_handle_wild_card
 			    (cmd, wc, wc_path, wc_pre, wc_ext) < 0)
 			{
-			    dotconf_warning(cmd->configfile, DCLOG_WARNING,
+			    PINT_dotconf_warning(cmd->configfile, DCLOG_WARNING,
 					    ERR_INCLUDE_ERROR,
 					    "Error occured while processing wildcard %c\n"
 					    "Filename is '%s'\n", wc, new_path);
 
 			    free(new_path);
-			    dotconf_wild_card_cleanup(wc_path, wc_pre);
+			    PINT_dotconf_wild_card_cleanup(wc_path, wc_pre);
 			    return -1;
 			}
 
-			dotconf_wild_card_cleanup(wc_path, wc_pre);
+			PINT_dotconf_wild_card_cleanup(wc_path, wc_pre);
 			continue;
 		    }
 
@@ -1400,7 +1400,7 @@ int dotconf_handle_star(
 
 		if (access(new_path, R_OK))
 		{
-		    dotconf_warning(cmd->configfile, DCLOG_WARNING,
+		    PINT_dotconf_warning(cmd->configfile, DCLOG_WARNING,
 				    ERR_INCLUDE_ERROR,
 				    "Cannot open %s for inclusion.\n"
 				    "IncludePath is '%s'\n", new_path,
@@ -1409,15 +1409,15 @@ int dotconf_handle_star(
 		}
 
 		included =
-		    dotconf_create(new_path, cmd->configfile->config_options[1],
+		    PINT_dotconf_create(new_path, cmd->configfile->config_options[1],
 				   cmd->configfile->context,
 				   cmd->configfile->flags);
 		if (included)
 		{
 		    included->errorhandler = cmd->configfile->errorhandler;
 		    included->contextchecker = cmd->configfile->contextchecker;
-		    dotconf_command_loop(included);
-		    dotconf_cleanup(included);
+		    PINT_dotconf_command_loop(included);
+		    PINT_dotconf_cleanup(included);
 		}
 
 	    }
@@ -1454,7 +1454,7 @@ DOTCONF_CB(dotconf_cb_include)
 	inclen = strlen(cmd->configfile->includepath);
 	if ((len = (strlen(cmd->data.str) + inclen + 1)) == CFG_MAX_FILENAME)
 	{
-	    dotconf_warning(cmd->configfile, DCLOG_WARNING, ERR_INCLUDE_ERROR,
+	    PINT_dotconf_warning(cmd->configfile, DCLOG_WARNING, ERR_INCLUDE_ERROR,
 			    "Absolute filename too long (>%d)",
 			    CFG_MAX_FILENAME);
 	    return NULL;
@@ -1476,24 +1476,24 @@ DOTCONF_CB(dotconf_cb_include)
 	filename = strdup(cmd->data.str);
 
     /* Added wild card support here */
-    if (dotconf_find_wild_card(filename, &wild_card, &path, &pre, &ext) >= 0)
+    if (PINT_dotconf_find_wild_card(filename, &wild_card, &path, &pre, &ext) >= 0)
     {
-	if (dotconf_handle_wild_card(cmd, wild_card, path, pre, ext) < 0)
+	if (PINT_dotconf_handle_wild_card(cmd, wild_card, path, pre, ext) < 0)
 	{
-	    dotconf_warning(cmd->configfile, DCLOG_WARNING, ERR_INCLUDE_ERROR,
+	    PINT_dotconf_warning(cmd->configfile, DCLOG_WARNING, ERR_INCLUDE_ERROR,
 			    "Error occured while attempting to process %s for inclusion.\n"
 			    "IncludePath is '%s'\n", filename,
 			    cmd->configfile->includepath);
 	}
 
-	dotconf_wild_card_cleanup(path, pre);
+	PINT_dotconf_wild_card_cleanup(path, pre);
 	free(filename);
 	return NULL;
     }
 
     if (access(filename, R_OK))
     {
-	dotconf_warning(cmd->configfile, DCLOG_WARNING, ERR_INCLUDE_ERROR,
+	PINT_dotconf_warning(cmd->configfile, DCLOG_WARNING, ERR_INCLUDE_ERROR,
 			"Cannot open %s for inclusion.\n"
 			"IncludePath is '%s'\n", filename,
 			cmd->configfile->includepath);
@@ -1501,7 +1501,7 @@ DOTCONF_CB(dotconf_cb_include)
 	return NULL;
     }
 
-    included = dotconf_create(filename, cmd->configfile->config_options[1],
+    included = PINT_dotconf_create(filename, cmd->configfile->config_options[1],
 			      cmd->configfile->context, cmd->configfile->flags);
     if (included)
     {
@@ -1510,8 +1510,8 @@ DOTCONF_CB(dotconf_cb_include)
 	included->errorhandler =
 	    (dotconf_errorhandler_t) cmd->configfile->errorhandler;
 
-	dotconf_command_loop(included);
-	dotconf_cleanup(included);
+	PINT_dotconf_command_loop(included);
+	PINT_dotconf_cleanup(included);
     }
 
     free(filename);

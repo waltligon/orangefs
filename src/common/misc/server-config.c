@@ -155,7 +155,7 @@ int PINT_parse_config(
 
     /* first read in the fs.conf defaults config file */
     config_s->configuration_context = GLOBAL_CONFIG;
-    configfile = dotconf_create(config_s->fs_config_filename,
+    configfile = PINT_dotconf_create(config_s->fs_config_filename,
                                 options, NULL, CASE_INSENSITIVE);
     if (!configfile)
     {
@@ -164,17 +164,17 @@ int PINT_parse_config(
         return 1;
     }
 
-    if (dotconf_command_loop(configfile) == 0)
+    if (PINT_dotconf_command_loop(configfile) == 0)
     {
         gossip_err("Error reading config file %s\n",
                    config_s->fs_config_filename);
         return 1;
     }
-    dotconf_cleanup(configfile);
+    PINT_dotconf_cleanup(configfile);
 
     /* then read in the server.conf (host specific) config file */
     config_s->configuration_context = GLOBAL_CONFIG;
-    configfile = dotconf_create(config_s->server_config_filename,
+    configfile = PINT_dotconf_create(config_s->server_config_filename,
                                 options, NULL, CASE_INSENSITIVE);
     if (!configfile)
     {
@@ -183,13 +183,13 @@ int PINT_parse_config(
         return 1;
     }
 
-    if (dotconf_command_loop(configfile) == 0)
+    if (PINT_dotconf_command_loop(configfile) == 0)
     {
         gossip_err("Error reading config file %s\n",
                    config_s->server_config_filename);
         return 1;
     }
-    dotconf_cleanup(configfile);
+    PINT_dotconf_cleanup(configfile);
 
     if (!config_s->host_id)
     {
