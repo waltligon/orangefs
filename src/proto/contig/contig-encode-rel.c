@@ -14,8 +14,22 @@
 
 ENCODE_REL_HEAD(do_encode_rel)
 {
-	free(msg->buffer_list[0]);
+	int i;
+	
+	if(msg->buffer_flag == BMI_PRE_ALLOC)
+	{
+
+		for (i=0;i<msg->list_count;i++)
+		{
+			if(msg->buffer_list[i])
+			{
+				BMI_memfree(msg->dest,
+						msg->buffer_list[i],
+						msg->size_list[i],
+						BMI_SEND_BUFFER);
+			}
+		}
+	}
 	free(msg->buffer_list);
 	free(msg->size_list);
-	//free(msg);
 }

@@ -91,11 +91,19 @@ int do_encode_resp(
 	    target_msg->size_list   = malloc(sizeof(PVFS_size));
 	    target_msg->buffer_list = malloc(sizeof(void *));
 	    target_msg->list_count  = 1;
-	    target_msg->buffer_flag = BMI_EXT_ALLOC;
+	    target_msg->buffer_flag = BMI_PRE_ALLOC;
 
 	    target_msg->size_list[0] = 
-		target_msg->total_size = sizeof(struct PVFS_server_resp_s);
-	    target_msg->buffer_list[0] = response;
+		target_msg->total_size = sizeof(struct PVFS_server_resp_s)+header_size;
+	    target_msg->buffer_list[0]
+		= BMI_memalloc(target_msg->dest, 
+			sizeof(struct PVFS_server_resp_s) + header_size,
+			BMI_SEND_BUFFER);
+	    memcpy(
+		    target_msg->buffer_list[0], 
+		    response, 
+		    sizeof(struct PVFS_server_resp_s)
+		  );
 	    return(0);
 
 	case PVFS_SERV_GETCONFIG:

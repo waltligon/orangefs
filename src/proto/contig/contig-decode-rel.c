@@ -16,5 +16,4 @@ DECODE_REL_HEAD(do_decode_rel)
 {
 	if(msg->buffer)
 		free(msg->buffer);
-	//free(msg);
 }
