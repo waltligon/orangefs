@@ -77,6 +77,8 @@ struct dbpf_queued_op {
 
 extern struct dbpf_queued_op *dbpf_op_queue_head;
 
+void dbpf_queued_op_put_and_dequeue(struct dbpf_queued_op *q_op_p);
+
 /* dbpf_queued_op_init()
  *
  * Initializes a dbpf_queued_op structure.  Afterwards the op union and
@@ -217,60 +219,6 @@ static inline TROVE_op_id dbpf_queued_op_queue(struct dbpf_queued_op *q_op_p)
     q_op_p->op.id = id;
     return q_op_p->op.id;
 }
-
-/* dbpf_queued_op_put_and_dequeue()
- *
- * Assumption: we already have gotten responsibility for the op by
- * calling dbpf_queued_op_try_get() and succeeding.  This means that
- * the op will be in the OP_IN_SERVICE state.
- *
- * Remove the structure from the queue:
- * 1) lock the queue
- * 2) update all the pointers in queue
- * 3) unlock the queue
- * 4) update pointers in op, mark as dequeued
- *
- * Note: this leaves open the possibility that someone might somehow
- * get a pointer to this operation and try to look at the state while
- * it is transitioning from OP_IN_SERVICE to OP_DEQUEUED.  However,
- * in order to do that they would need to get that pointer before we
- * lock the queue and use it afterwards, which is erroneous.  So we're
- * not going to try to protect against that.
- */
-static inline void dbpf_queued_op_put_and_dequeue(struct dbpf_queued_op *q_op_p);
-
-static inline void dbpf_queued_op_put_and_dequeue(struct dbpf_queued_op *q_op_p)
-{
-    int state;
-
-    gen_mutex_lock(&dbpf_op_queue_mutex);
-
-    state = q_op_p->op.state;
-
-    assert(state == OP_IN_SERVICE || state == OP_COMPLETED);
-
-    if ( (q_op_p->next_p == NULL) ||  (q_op_p->next_p == q_op_p)) {
-	/* only one on list. ->next_p might have gotten set to NULL the
-	 * last time through */
-	dbpf_op_queue_head = NULL;
-    }
-    else {
-	q_op_p->next_p->prev_p = q_op_p->prev_p;
-	q_op_p->prev_p->next_p = q_op_p->next_p;
-
-	if (dbpf_op_queue_head == q_op_p) {
-	    /* this is the head */
-	    dbpf_op_queue_head = q_op_p->next_p;
-	}
-    }
-
-    gen_mutex_unlock(&dbpf_op_queue_mutex);
-
-    q_op_p->next_p   = NULL;
-    q_op_p->prev_p   = NULL;
-    q_op_p->op.state = OP_DEQUEUED;
-}
-
 
 /* dbpf_queued_op_dequeue()
  *

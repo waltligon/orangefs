@@ -130,6 +130,7 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
     printf("created new dspace with above handle.\n");
     
     *op_p->u.d_create.out_handle_p = new_handle;
+    dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);
     return 1;
 
 return_error:
@@ -639,10 +640,14 @@ static int dbpf_dspace_test(TROVE_coll_id coll_id,
 	    *returned_user_ptr_p = q_op_p->op.user_ptr;
 	}
 	dbpf_queued_op_put_and_dequeue(q_op_p);
+	printf("dbpf_dspace_test returning success.\n");
 	return 1;
     }
-	
-    return 0;
+    else {
+	dbpf_queued_op_put(q_op_p, 0);
+	printf("dbpf_dspace_test returning no progress.\n");
+	return 0;
+    }
 }
 
 /* dbpf_dspace_testsome()

@@ -78,12 +78,14 @@ int main(int argc, char **argv)
 	return -1;
     }
 
+#if 0
     /* create the collection for the admin data */
     ret = trove_collection_create(admin_info, ADMIN_COLL_ID, NULL, &op_id);
     if (ret < 0 ) {
 	    fprintf(stderr, "collection create (admin) failed.\n");
 	    return -1;
     }
+#endif
     
     /* lookup collection.  this is redundant because we just gave it a coll. id to use,
      * but it's a good test i guess...
@@ -95,11 +97,13 @@ int main(int argc, char **argv)
 	return -1;
     }
 
+#if 0
     ret = trove_collection_lookup(admin_info, &coll_id_admin, NULL, &op_id);
     if (ret < 0 ) {
 	    fprintf(stderr, "collection lookup (admin) failed.\n");
 	    return -1;
     }
+#endif
 
     /* create a dataspace to hold the root directory */
     /* Q: what should the bitmask be? */
