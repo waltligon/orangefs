@@ -613,6 +613,9 @@ int BMI_testsome(int incount,
 		 void **user_ptr_array,
 		 int max_idle_time_ms)
 {
+    gossip_lerr("Please implement me correctly.\n");
+    return(-ENOSYS);
+#if 0
     /* this is not going to be pretty :( */
 
     bmi_op_id_t sub_id_array[active_method_count][incount];
@@ -714,6 +717,7 @@ int BMI_testsome(int incount,
 	return (1);
     }
     return (0);
+#endif
 }
 #endif /* __BMI_SINGLE_METHOD__ */
 
