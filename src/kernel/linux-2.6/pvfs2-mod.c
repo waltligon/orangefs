@@ -13,9 +13,7 @@
 #include <linux/vermagic.h>
 #include "pvfs2-kernel.h"
 
-
 extern struct file_operations pvfs2_devreq_file_operations;
-extern struct file_operations pvfs2_devflow_file_operations;
 
 extern struct super_block *pvfs2_get_sb(
     struct file_system_type *fst,
@@ -59,9 +57,8 @@ static int hash_compare(
  * global variables declared here
  *************************************/
 
-/* the major numbers assigned to the /dev/pvfs2-xxx device nodes */
-static int req_major = 0;
-static int flow_major = 0;
+/* the assigned device major number */
+static int pvfs2_dev_major = 0;
 
 /* the pvfs2 memory caches (see pvfs2-cache.c) */
 kmem_cache_t *op_cache = NULL;
@@ -98,30 +95,18 @@ static int __init pvfs2_init(
     pvfs2_print("pvfs2: pvfs2_init called\n");
 
     /* register pvfs2-req device  */
-    req_major = register_chrdev(0, PVFS2_REQDEVICE_NAME,
-				&pvfs2_devreq_file_operations);
-    if (req_major < 0)
+    pvfs2_dev_major = register_chrdev(0, PVFS2_REQDEVICE_NAME,
+                                      &pvfs2_devreq_file_operations);
+    if (pvfs2_dev_major < 0)
     {
 	pvfs2_print("Failed to register /dev/%s (error %d)\n",
-		    PVFS2_REQDEVICE_NAME, req_major);
-	return req_major;
+		    PVFS2_REQDEVICE_NAME, pvfs2_dev_major);
+	return pvfs2_dev_major;
     }
     pvfs2_print("*** /dev/%s character device registered ***\n",
 		PVFS2_REQDEVICE_NAME);
-    pvfs2_print("'mknod /dev/%s c %d 0'.\n", PVFS2_REQDEVICE_NAME, req_major);
-
-    /* register pvfs2-flow device  */
-    flow_major = register_chrdev(0, PVFS2_FLOWDEVICE_NAME,
-				 &pvfs2_devflow_file_operations);
-    if (flow_major < 0)
-    {
-	pvfs2_print("Failed to register /dev/%s (error %d)\n",
-		    PVFS2_FLOWDEVICE_NAME, flow_major);
-	return flow_major;
-    }
-    pvfs2_print("*** /dev/%s character device registered ***\n",
-		PVFS2_FLOWDEVICE_NAME);
-    pvfs2_print("'mknod /dev/%s c %d 0'.\n", PVFS2_FLOWDEVICE_NAME, flow_major);
+    pvfs2_print("'mknod /dev/%s c %d 0'.\n", PVFS2_REQDEVICE_NAME,
+                pvfs2_dev_major);
 
     /* initialize global book keeping data structures */
     op_cache_initialize();
@@ -150,20 +135,12 @@ static void __exit pvfs2_exit(
     pvfs2_print("pvfs2: pvfs2_exit called\n");
 
     /* first unregister the pvfs2-req chrdev */
-    if (unregister_chrdev(req_major, PVFS2_REQDEVICE_NAME) < 0)
+    if (unregister_chrdev(pvfs2_dev_major, PVFS2_REQDEVICE_NAME) < 0)
     {
 	pvfs2_print("Failed to unregister pvfs2 device /dev/%s\n",
 		    PVFS2_REQDEVICE_NAME);
     }
     pvfs2_print("Unregistered pvfs2 device /dev/%s\n", PVFS2_REQDEVICE_NAME);
-
-    /* then unregister the pvfs2-flow chrdev */
-    if (unregister_chrdev(flow_major, PVFS2_FLOWDEVICE_NAME) < 0)
-    {
-	pvfs2_print("Failed to unregister pvfs2 device /dev/%s\n",
-		    PVFS2_FLOWDEVICE_NAME);
-    }
-    pvfs2_print("Unregistered pvfs2 device /dev/%s\n", PVFS2_FLOWDEVICE_NAME);
 
     /* then unregister the filesystem */
     unregister_filesystem(&pvfs2_fs_type);

@@ -197,6 +197,10 @@ int wait_for_matching_downcall(
 int pvfs2_inode_getattr(
     struct inode *inode);
 
+int pvfs2_inode_setattr(
+    struct inode *inode,
+    struct iattr *iattr);
+
 struct inode *pvfs2_create_entry(
     struct inode *dir,
     struct dentry *dentry,
