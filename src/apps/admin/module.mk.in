@@ -10,10 +10,10 @@ ADMINLIBS := -ldb -lrt -lpthread
 
 ADMINTOOLS := $(patsubst %.c, %, $(ADMINSRC))
 
-$(ADMINTOOLS): %: %.o test/client/sysint/helper.o
+$(ADMINTOOLS): %: %.o
 ifdef QUIET_COMPILE
 	@echo "  LD		$@"
-	@$(LD) $< test/client/sysint/helper.o $(LDFLAGS) $(LIBS) $(ADMINLIBS) -o $@
+	@$(LD) $< $(LDFLAGS) $(LIBS) $(ADMINLIBS) -o $@
 else
-	$(LD) $< test/client/sysint/helper.o $(LDFLAGS) $(LIBS) $(ADMINLIBS) -o $@
+	$(LD) $< $(LDFLAGS) $(LIBS) $(ADMINLIBS) -o $@
 endif
