@@ -49,7 +49,6 @@ static inline void organize_post_op_statistics(
         case KEYVAL_REMOVE_KEY:
         case KEYVAL_WRITE_LIST:
         case KEYVAL_FLUSH:
-        case DSPACE_CREATE:
         case DSPACE_REMOVE:
         case DSPACE_SETATTR:
             UPDATE_PERF_METADATA_WRITE();
@@ -71,6 +70,10 @@ static inline void organize_post_op_statistics(
             DBPF_EVENT_END(PVFS_EVENT_TROVE_WRITE_LIST, op_id); 
             break;
         default:
+            break;
+        case DSPACE_CREATE:
+            UPDATE_PERF_METADATA_WRITE();
+            DBPF_EVENT_END(PVFS_EVENT_TROVE_DSPACE_CREATE, op_id); 
             break;
     }
 }
@@ -141,6 +144,7 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
     q_op_p->op.u.d_create.type         = type;
 
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
+    DBPF_EVENT_START(PVFS_EVENT_TROVE_DSPACE_CREATE, *out_op_id_p);
 
     return 0;
 }
