@@ -13,13 +13,14 @@ int main(int argc,char **argv)
     char *filename = (char *)0;
     pvfs_mntlist mnt = {0,NULL};
     PVFS_sysresp_init resp_init;
-    PVFS_sysreq_truncate req_truncate;
     PVFS_sysresp_lookup resp_look;
     PVFS_sysresp_lookup resp_lk;
     PVFS_size trunc_size;
     PVFS_fs_id fs_id;
     char* name;
     PVFS_credentials credentials;
+    pinode_reference pinode_refn;
+    PVFS_size size;
 
     gossip_enable_stderr();
     gossip_set_debug_mask(1,CLIENT_DEBUG);
@@ -77,15 +78,15 @@ int main(int argc,char **argv)
 	return(-1);
     }
 
-    req_truncate.size = trunc_size;
+    size = trunc_size;
 
-    req_truncate.pinode_refn.handle = resp_lk.pinode_refn.handle;
-    req_truncate.pinode_refn.fs_id = resp_lk.pinode_refn.fs_id;
-    req_truncate.credentials.uid = 100;
-    req_truncate.credentials.gid = 100;
-    req_truncate.credentials.perms = 1877;
+    pinode_refn.handle = resp_lk.pinode_refn.handle;
+    pinode_refn.fs_id = resp_lk.pinode_refn.fs_id;
+    credentials.uid = 100;
+    credentials.gid = 100;
+    credentials.perms = 1877;
 
-    ret = PVFS_sys_truncate(&req_truncate);
+    ret = PVFS_sys_truncate(pinode_refn, size, credentials);
     if (ret < 0)
     {
         printf("truncate failed with errcode = %d\n",ret);

@@ -304,13 +304,6 @@ struct PVFS_sysresp_hint_s {
 typedef struct PVFS_sysresp_hint_s PVFS_sysresp_hint;
 
 /* truncate */
-struct PVFS_sysreq_truncate_s {
-	pinode_reference pinode_refn;
-	PVFS_size size;
-	PVFS_credentials credentials;
-};
-typedef struct PVFS_sysreq_truncate_s PVFS_sysreq_truncate;
-
 /* no data returned in truncate response */
 
 
@@ -379,6 +372,13 @@ enum PVFS_sys_io_type
 	PVFS_SYS_IO_WRITE
 };
 
+struct PVFS_sysreq_truncate_s {
+	pinode_reference pinode_refn;
+	PVFS_size size;
+	PVFS_credentials credentials;
+};
+typedef struct PVFS_sysreq_truncate_s PVFS_sysreq_truncate;
+
 /* PVFS System Request Prototypes
  *
  * That's fine, except that we KNOW that this interface is just a
@@ -414,7 +414,8 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 #define PVFS_sys_read(x,y) PVFS_sys_io(x,y,PVFS_SYS_IO_READ)
 #define PVFS_sys_write(x,y) PVFS_sys_io(x,y,PVFS_SYS_IO_WRITE)
 int PVFS_sys_allocate(pinode_reference pinode_refn, PVFS_size size);
-int PVFS_sys_truncate(PVFS_sysreq_truncate *req);
+int PVFS_sys_truncate(pinode_reference pinode_refn, PVFS_size size, 
+			PVFS_credentials credentials);
 int PVFS_sys_duplicate(PVFS_fs_id fs_id, pinode_reference old_reference, 
 		char* new_entry, pinode_reference new_parent_reference, 
 		PVFS_sysresp_duplicate *resp);

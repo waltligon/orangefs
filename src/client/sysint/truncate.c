@@ -25,7 +25,8 @@
  *	truncate to the specified physical size
  * returns 0 on success, -errno on failure
  */
-int PVFS_sys_truncate(PVFS_sysreq_truncate *req)
+int PVFS_sys_truncate(pinode_reference pinode_refn, PVFS_size size, 
+                        PVFS_credentials credentials)
 {
     struct PVFS_server_req_s req_p;			/* server request */
     struct PVFS_server_resp_s *ack_p = NULL;	/* server response */
@@ -51,8 +52,8 @@ int PVFS_sys_truncate(PVFS_sysreq_truncate *req)
 
     /* Get the directory pinode -- don't retrieve the size */
     attr_mask = ATTR_BASIC;
-    ret = phelper_get_pinode(req->pinode_refn,&pinode_ptr, attr_mask, 
-				req->credentials);
+    ret = phelper_get_pinode(pinode_refn,&pinode_ptr, attr_mask, 
+				credentials);
     if (ret < 0)
     {
 	failure = NONE_FAILURE;
@@ -61,8 +62,8 @@ int PVFS_sys_truncate(PVFS_sysreq_truncate *req)
 
     /* make sure we're allowed to remove that request */
 
-    ret = check_perms(pinode_ptr->attr, req->credentials.perms,
-                                req->credentials.uid, req->credentials.gid);
+    ret = check_perms(pinode_ptr->attr, credentials.perms,
+                                credentials.uid, credentials.gid);
     if (ret < 0)
     {
 	ret = (-EPERM);
@@ -78,15 +79,15 @@ int PVFS_sys_truncate(PVFS_sysreq_truncate *req)
 
     dist = pinode_ptr->attr.u.meta.dist;
     req_p.op = PVFS_SERV_TRUNCATE;
-    req_p.credentials = req->credentials;
+    req_p.credentials = credentials;
     req_p.rsize = sizeof(struct PVFS_server_req_s);
-    req_p.u.truncate.fs_id = req->pinode_refn.fs_id;
+    req_p.u.truncate.fs_id = pinode_refn.fs_id;
 
     /* we're sending the total logical filesize to the server and it will figure
      * out how much of the phyiscal file it needs to get rid of.
      */
 
-    req_p.u.truncate.size = req->size;
+    req_p.u.truncate.size = size;
 
     /* TODO: come back and unserialize this eventually */
 
@@ -95,7 +96,7 @@ int PVFS_sys_truncate(PVFS_sysreq_truncate *req)
 	req_p.u.truncate.handle = pinode_ptr->attr.u.meta.dfh[i];
 
 	ret = PINT_bucket_map_to_server(&serv_addr, req_p.u.truncate.handle,
-		    req->pinode_refn.fs_id);
+		    pinode_refn.fs_id);
 	if (ret < 0)
 	{
 	    failure = MAP_TO_SERVER_FAILURE;
