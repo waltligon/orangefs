@@ -30,10 +30,6 @@ struct PVFS_sys_attr_s
     int dfile_count;
     PVFS_ds_type objtype;
     uint32_t mask;
-
-    /* TODO: we may want to later add some sort of enumerated value
-     * that can be used to determine distribution type? 
-     */
 };
 typedef struct PVFS_sys_attr_s PVFS_sys_attr;
 
@@ -61,13 +57,6 @@ struct PVFS_util_tab_s
 };
 typedef struct PVFS_util_tab_s PVFS_util_tab;
 
-struct pvfs_mntlist_s
-{
-    int ptab_count;		/* number of tab file entries */
-    struct PVFS_sys_mntent *ptab_array;	/* array of entries */
-};
-typedef struct pvfs_mntlist_s pvfs_mntlist;
-
 /* response from init */
 struct PVFS_sysresp_init_s
 {
@@ -77,7 +66,6 @@ struct PVFS_sysresp_init_s
 typedef struct PVFS_sysresp_init_s PVFS_sysresp_init;
 
 /* lookup (request and response) */
-
 struct PVFS_sysresp_lookup_s
 {
     PVFS_pinode_reference pinode_refn;
@@ -162,17 +150,8 @@ struct PVFS_sysresp_getparent_s
 };
 typedef struct PVFS_sysresp_getparent_s PVFS_sysresp_getparent;
 
-/*declarations*/
+/* system interface functions */
 
-/* PVFS System Request Prototypes
- *
- * That's fine, except that we KNOW that this interface is just a
- * virtual one; this interface will be converting the input parameters
- * into requests for servers.  So we can avoid some parsing and checking
- * at this level by using a number of calls instead.  We'd probably have
- * a function per system operation anyway, so what we're really doing is
- * avoiding an extra function call.
- */
 int PVFS_sys_initialize(
     PVFS_util_tab tab,
     int debug_mask,
