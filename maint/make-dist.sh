@@ -60,30 +60,31 @@ cp -f --no-dereference -R $SRCDIR/* $TARGETDIR
 
 cd $TARGETDIR
 
-# clean out cvs directories and other cruft
+# clean out cvs directories and other cruft (if any)
 for f in `find . | grep CVS`; do rm -rf $f; done
 for f in `find . | grep \#`;  do rm -rf $f; done
 for f in `find . | grep \~`;  do rm -rf $f; done
 for f in `find . -name *.o`;  do rm -rf $f; done
 for f in `find . -name core`; do rm -rf $f; done
+for f in `find . -name core\.[1-9]*`; do rm -rf $f; done
 for f in `find . -name module.mk`; do rm -rf $f; done
 for f in `find . -name "*.log"`; do rm -rf $f; done
 for f in `find . -name "*.toc"`; do rm -rf $f; done
 for f in `find . -name "*.aux"`; do rm -rf $f; done
-rm Makefile pvfs2-config.h
+rm Makefile pvfs2-config.h PVFS2-GLOBAL-TODO.txt
 
 # dump some special options into the top level module.mk.in
 echo "DIST_RELEASE = 1" >> module.mk.in
 
 # make sure the cleaned up directory exists
 cd /tmp
-if ! test -d "./$TARGETBASE"; then
+if ! test -d "$TARGETBASE"; then
     echo "Newly created target directory doesn't exist; aborting"
     exit 1
 fi
 
 # tar up the cleaned up directory
-tar c "./$TARGETBASE" > $TARFILE_NAME 2> /dev/null
+tar c "$TARGETBASE" > $TARFILE_NAME 2> /dev/null
 
 if ! test -f $TARFILE_NAME; then
     echo "Newly created tarfile does not exist!"
