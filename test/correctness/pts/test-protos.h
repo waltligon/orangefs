@@ -25,6 +25,7 @@
 #include <test-concurrent-meta.h>
 #include <test-request-indexed.h>
 #include <test-request-contiguous.h>
+#include <test-encode-basic.h>
 
 enum test_types { 
    TEST_CREATE,
@@ -44,7 +45,8 @@ enum test_types {
 	TEST_MISC,
 	TEST_CONCURRENT_META,
 	TEST_REQUEST_INDEXED,
-	TEST_REQUEST_CONTIGUOUS
+	TEST_REQUEST_CONTIGUOUS,
+	TEST_ENCODE_BASIC
 };
 
 void setup_ptstests(config *myconfig) {
@@ -102,6 +104,8 @@ void setup_ptstests(config *myconfig) {
    myconfig->testpool[TEST_REQUEST_INDEXED].test_name = str_malloc("test_request_indexed");
    myconfig->testpool[TEST_REQUEST_CONTIGUOUS].test_func = (void *)test_request_contiguous;
    myconfig->testpool[TEST_REQUEST_CONTIGUOUS].test_name = str_malloc("test_request_contiguous");
+   myconfig->testpool[TEST_ENCODE_BASIC].test_func = (void *)test_encode_basic;
+   myconfig->testpool[TEST_ENCODE_BASIC].test_name = str_malloc("test_encode_basic");
 }
 
 #endif
