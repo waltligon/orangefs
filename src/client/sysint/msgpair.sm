@@ -326,12 +326,11 @@ static int msgpair_completion_fn(PINT_client_sm *sm_p,
     return 1;
 }
 
-/* msgpair_error()
- */
 static int msgpair_error(PINT_client_sm *sm_p,
 			 job_status_s *js_p)
 {
-    assert(0); /* placeholder */
+    gossip_lerr("msgpair error: communication broken\n");
+    exit(1);
     return 1;
 }
 
