@@ -86,6 +86,7 @@ int PINT_pcache_finalize(void)
  */
 int PINT_pcache_insert(pinode *pnode )
 {
+#if 0
 	int16_t i = 0,entry = 0;
 	int ret = 0;
 	unsigned char entry_found = 0;
@@ -137,6 +138,8 @@ int PINT_pcache_insert(pinode *pnode )
 	/* Release the mutex */
 	gen_mutex_unlock(pvfs_pcache.mt_lock);
 #endif
+
+#endif
 	
 	return(0);
 }
@@ -159,6 +162,7 @@ int PINT_pcache_lookup(pinode_reference refn,pinode **pinode_ptr)
 
 	/* No match found */
         ret = PCACHE_LOOKUP_FAILURE;
+#if 0
 	
 	/* Search the cache */
 	for(i = pvfs_pcache.top; i != -1; i = pvfs_pcache.element[i].next)
@@ -174,6 +178,7 @@ int PINT_pcache_lookup(pinode_reference refn,pinode **pinode_ptr)
 			}
 		}
 	}
+#endif
 
 #if 0
 	/* TODO: does a mutex need to go here?*/
@@ -192,6 +197,7 @@ int PINT_pcache_lookup(pinode_reference refn,pinode **pinode_ptr)
  */
 int PINT_pcache_remove(pinode_reference refn,pinode **item)
 {
+#if 0
 	int16_t i = 0,prev = 0,next = 0;
 	
 #if 0
@@ -247,6 +253,7 @@ int PINT_pcache_remove(pinode_reference refn,pinode **item)
 	/* TODO: does a mutex need to go here?*/
 	/* Release the mutex */
 	gen_mutex_unlock(pvfs_pcache.mt_lock);
+#endif
 #endif
 
 	return(0);

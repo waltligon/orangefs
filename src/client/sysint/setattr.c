@@ -41,6 +41,8 @@ int PVFS_sys_setattr(PVFS_sysreq_setattr *req)
 	PVFS_size handlesize = 0;
 	bmi_size_t max_msg_sz = sizeof(struct PVFS_server_resp_s);
 	struct PINT_decoded_msg decoded;
+	void* encoded_resp;
+	PVFS_msg_tag_t op_tag = get_next_session_tag();
 
 	enum {
 	    NONE_FAILURE = 0,
@@ -101,7 +103,8 @@ int PVFS_sys_setattr(PVFS_sysreq_setattr *req)
 	req_p.u.setattr.attr = req->attr;
 
 	/* Make a server setattr request */	
-	ret = PINT_server_send_req(serv_addr, &req_p, max_msg_sz, &decoded);
+	ret = PINT_send_req(serv_addr, &req_p, max_msg_sz,
+            &decoded, &encoded_resp, op_tag);
 	if (ret < 0)
 	{
 	    failure = MAP_TO_SERVER_FAILURE;
@@ -118,10 +121,11 @@ int PVFS_sys_setattr(PVFS_sysreq_setattr *req)
 	    goto return_error;
 	}
 
-	PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
+	PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
+            &encoded_resp, op_tag);
 
 	/* Modify pinode to reflect changed attributes */
-	ret =	modify_pinode(pinode_ptr,req->attr,req->attrmask);
+	ret = modify_pinode(pinode_ptr,req->attr,req->attrmask);
 	if (ret < 0)
 	{
 		failure = PINODE_REMOVE_FAILURE;
@@ -136,7 +140,8 @@ return_error:
 	{
 	    case PINODE_REMOVE_FAILURE:
 		if (ack_p != NULL)
-		    PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
+		    PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
+	                &encoded_resp, op_tag);
 
 	    case MAP_TO_SERVER_FAILURE:
 		if (server != NULL)

@@ -28,19 +28,21 @@
  */
 int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 {
-	struct PVFS_server_req_s req_p;	 	/* server request */
-	struct PVFS_server_resp_s *ack_p = NULL; /* server response */
-   	int ret = -1;
-   	bmi_addr_t serv_addr;	            /* PVFS address type structure */ 
-	char *server = NULL;
-	struct timeval cur_time;
-	PVFS_size *size_array = 0;
-	pinode *entry_pinode = NULL;
-	PVFS_bitfield attr_mask = req->attrmask;
-	pinode_reference entry;
-	struct PINT_decoded_msg decoded;
-	int max_msg_sz = 0;
-	int pinode_exists_in_cache = 0;
+    struct PVFS_server_req_s req_p;	 	/* server request */
+    struct PVFS_server_resp_s *ack_p = NULL; /* server response */
+    int ret = -1;
+    bmi_addr_t serv_addr;	            /* PVFS address type structure */ 
+    char *server = NULL;
+    struct timeval cur_time;
+    PVFS_size *size_array = 0;
+    pinode *entry_pinode = NULL;
+    PVFS_bitfield attr_mask = req->attrmask;
+    pinode_reference entry;
+    struct PINT_decoded_msg decoded;
+    int max_msg_sz = 0;
+    int pinode_exists_in_cache = 0;
+    void* encoded_resp;
+    PVFS_msg_tag_t op_tag = get_next_session_tag();
 
 	enum {
 	    NONE_FAILURE = 0,
@@ -127,7 +129,8 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 	max_msg_sz = sizeof(struct PVFS_server_resp_s);
 
 	/* Make a server getattr request */
-	ret = PINT_server_send_req(serv_addr, &req_p, max_msg_sz, &decoded);
+	//ret = PINT_server_send_req(serv_addr, &req_p, max_msg_sz, &decoded);
+	ret = PINT_send_req(serv_addr, &req_p, max_msg_sz, &decoded, &encoded_resp, op_tag);
 	if (ret < 0)
 	{
 		failure = SEND_REQ_FAILURE;
@@ -171,7 +174,8 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 	/* TODO: copy extended attributes just like normal attr */
 	/* resp->eattr = ack_p.u.getattr.eattr; */
 
-	PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
+	PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
+	    &encoded_resp, op_tag);
 
 	/* do size calculations here? */
 
@@ -246,7 +250,8 @@ return_error:
 		case SEND_REQ_FAILURE:
 		case MAP_SERVER_FAILURE:
 			if (ack_p)
-				PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
+			    PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
+				&encoded_resp, op_tag);
 
 			if (server)
 				free(server);

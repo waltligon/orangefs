@@ -40,6 +40,8 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	PVFS_handle *df_handle_array = NULL,new_bkt = 0,handle_mask = 0;
 	pinode_reference entry;
 	struct PINT_decoded_msg decoded;
+	void* encoded_resp;
+	PVFS_msg_tag_t op_tag;
 	bmi_size_t max_msg_sz;
 
 	enum {
@@ -150,8 +152,10 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 
 	max_msg_sz = sizeof(struct PVFS_server_resp_s);
 
+	op_tag = get_next_session_tag();
 	/* send the server request */
-	ret = PINT_server_send_req(serv_addr1, &req_p, max_msg_sz, &decoded);
+	ret = PINT_send_req(serv_addr1, &req_p, max_msg_sz,
+            &decoded, &encoded_resp, op_tag);
 	if (ret < 0)
 	{
 	    failure = LOOKUP_SERVER_FAILURE;
@@ -177,7 +181,8 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	resp->pinode_refn.handle = entry.handle;
 	resp->pinode_refn.fs_id = req->parent_refn.fs_id;
 
-	PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
+	PINT_release_req(serv_addr1, &req_p, max_msg_sz, &decoded,
+            &encoded_resp, op_tag);
 
 	/* Create directory entry server request to parent */
 	/* Query BTI to get initial meta server */
@@ -209,8 +214,11 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 
 	/* max response size is the same as the previous request */
 
+	op_tag = get_next_session_tag();
+
 	/* Make server request */
-	ret = PINT_server_send_req(serv_addr2, &req_p, max_msg_sz, &decoded);
+	ret = PINT_send_req(serv_addr2, &req_p, max_msg_sz,
+            &decoded, &encoded_resp, op_tag);
 	if (ret < 0)
 	{
 	    failure = CREATE_MSG_FAILURE;
@@ -228,6 +236,9 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
             failure = CRDIRENT_MSG_FAILURE;
             goto return_error;
         }
+
+	PINT_release_req(serv_addr2, &req_p, max_msg_sz, &decoded,
+            &encoded_resp, op_tag);
 
 	/* we need one BMI address for each data file */
 	bmi_addr_list = (bmi_addr_t *)malloc(sizeof(bmi_addr_t)*io_serv_count);
@@ -294,9 +305,11 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 		/* Fill in the parameters */
 		req_p.u.create.bucket = df_handle_array[i];
 
+		op_tag = get_next_session_tag();
+
 		/* Server request */
-		ret = PINT_server_send_req(bmi_addr_list[i],&req_p,max_msg_sz,
-					    &decoded);
+		ret = PINT_send_req(bmi_addr_list[i], &req_p, max_msg_sz,
+	            &decoded, &encoded_resp, op_tag);
 		if (ret < 0)
 		{
 		    /* if we fail then we assume no data file has been created
@@ -319,7 +332,8 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 		/* store the new handle here */
 		df_handle_array[i] = ack_p->u.create.handle;
 
-		PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
+		PINT_release_req(bmi_addr_list[i], &req_p, max_msg_sz, &decoded,
+		    &encoded_resp, op_tag);
 	}
 
 	/* store all the handles to the files we've created in the metafile
@@ -349,8 +363,11 @@ gossip_ldebug(CLIENT_DEBUG,"\t\tnr_datafiles: %d\n",req_p.u.setattr.attr.u.meta.
 
 	max_msg_sz = sizeof(struct PVFS_server_resp_s);
 
+	op_tag = get_next_session_tag();
+
 	/* send the setattr request to the meta server */
-	ret = PINT_server_send_req(serv_addr1, &req_p, max_msg_sz, &decoded);
+	ret = PINT_send_req(serv_addr1, &req_p, max_msg_sz,
+            &decoded, &encoded_resp, op_tag);
 	if (ret < 0)
 	{
 	    failure = SETATTR_FAILURE;
@@ -368,6 +385,8 @@ gossip_ldebug(CLIENT_DEBUG,"\t\tnr_datafiles: %d\n",req_p.u.setattr.attr.u.meta.
 	}
 
 	PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
+	PINT_release_req(serv_addr1, &req_p, max_msg_sz, &decoded,
+	    &encoded_resp, op_tag);
 
 	/* don't need to hold on to the io server addresses anymore */
 	free(bmi_addr_list);
@@ -439,11 +458,11 @@ return_error:
 		{
 		    /*best effort rollback*/
 		    req_p.u.remove.handle = df_handle_array[i];
-		    ret = PINT_server_send_req(bmi_addr_list[i], &req_p, 
-						max_msg_sz, &decoded);
-
-		    PINT_decode_release(&decoded, PINT_DECODE_RESP,
-					REQ_ENC_FORMAT);
+		    op_tag = get_next_session_tag();
+		    ret = PINT_send_req(bmi_addr_list[i], &req_p, max_msg_sz,
+			&decoded, &encoded_resp, op_tag);
+		    PINT_release_req(bmi_addr_list[i], &req_p, max_msg_sz, &decoded,
+			&encoded_resp, op_tag);
 		}
 
 	    case PREIO3_CREATE_FAILURE:
@@ -464,10 +483,12 @@ return_error:
 		req_p.u.rmdirent.fs_id = req->parent_refn.fs_id;
 		req_p.u.rmdirent.entry = req->entry_name;
 		max_msg_sz = sizeof(struct PVFS_server_resp_s);
-		ret = PINT_server_send_req(serv_addr2, &req_p, max_msg_sz, 
-					    &decoded);
+		op_tag = get_next_session_tag();
+                ret = PINT_send_req(serv_addr2, &req_p, max_msg_sz,
+                    &decoded, &encoded_resp, op_tag);
+                PINT_release_req(serv_addr2, &req_p, max_msg_sz, &decoded,
+                    &encoded_resp, op_tag);
 
-		PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
 	    case CRDIRENT_MSG_FAILURE:
 		gossip_ldebug(CLIENT_DEBUG,"CRDIRENT_MSG_FAILURE\n");
 		/* rollback create req*/
@@ -477,15 +498,19 @@ return_error:
 		req_p.u.remove.handle = entry.handle;
 		req_p.u.remove.fs_id = entry.fs_id;
 		max_msg_sz = sizeof(struct PVFS_server_resp_s);
-		ret = PINT_server_send_req(serv_addr1, &req_p, max_msg_sz, 
-					    &decoded);
+		op_tag = get_next_session_tag();
+                ret = PINT_send_req(serv_addr1, &req_p, max_msg_sz,
+                    &decoded, &encoded_resp, op_tag);
+                PINT_release_req(serv_addr1, &req_p, max_msg_sz, &decoded,
+                    &encoded_resp, op_tag);
 
-		PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
 	    case CREATE_MSG_FAILURE:
 		gossip_ldebug(CLIENT_DEBUG,"CREATE_MSG_FAILURE\n");
+
+		/*op_tag should still be valid since we just failed*/
 		if (decoded.buffer != NULL)
-		    PINT_decode_release(&decoded, PINT_DECODE_RESP, 
-					    REQ_ENC_FORMAT);
+		    PINT_release_req(serv_addr1, &req_p, max_msg_sz, &decoded,
+			&encoded_resp, op_tag);
 
 	    case LOOKUP_SERVER_FAILURE:
 		gossip_ldebug(CLIENT_DEBUG,"LOOKUP_SERVER_FAILURE\n");

@@ -204,8 +204,9 @@ static int server_get_config(pvfs_mntlist mntent_list)
     PVFS_credentials creds;
     char *parse_p;
     struct PINT_decoded_msg decoded;
-    bmi_size_t max_msg_sz;
-
+    void* encoded_resp;
+    PVFS_msg_tag_t op_tag = get_next_session_tag();
+    PVFS_size max_msg_sz;
 
     enum {
 	NONE_FAIL = 0,
@@ -221,7 +222,9 @@ static int server_get_config(pvfs_mntlist mntent_list)
     /* TODO: Fill up the credentials information */
 
     /* TODO: IS THIS A REASONABLE MAXIMUM MESSAGE SIZE?  I HAVE NO IDEA */
-    max_msg_sz = sizeof(struct PVFS_server_resp_s) + 2 * MAX_STRING_SIZE;
+    max_msg_sz = 
+	PINT_get_encoded_generic_ack_sz(0, PVFS_SERV_GETCONFIG) 
+	+ (2 * MAX_STRING_SIZE);
 
     /* Process all entries in pvfstab */
     for (i = 0; i < mntent_list.nr_entry; i++) 
@@ -254,7 +257,10 @@ static int server_get_config(pvfs_mntlist mntent_list)
 	/* do_getconfig() fills returns an allocated and populated PVFS_server_resp_s
 	 * pointed to by ack_p.
 	 */
-	ret = PINT_server_send_req(serv_addr, req_p, max_msg_sz, &decoded);
+
+	/* send the request and receive an acknowledgment */
+	ret = PINT_send_req(serv_addr, req_p, max_msg_sz,
+	    &decoded, &encoded_resp, op_tag);
 	if (ret < 0) {
 	    goto return_error;
 	}
@@ -386,8 +392,9 @@ static int server_get_config(pvfs_mntlist mntent_list)
 	    else parse_p += len + 1;
 	}
 
-	/* free decoded response */
-	PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
+	/* let go of any resources consumed by PINT_send_req() */
+	PINT_release_req(serv_addr, req_p, max_msg_sz, &decoded,
+	    &encoded_resp, op_tag);
     }
 
     return(0); 

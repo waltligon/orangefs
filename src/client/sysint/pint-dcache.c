@@ -59,6 +59,7 @@ int PINT_dcache_lookup(
 	pinode_reference parent,
 	pinode_reference *entry)
 {
+#if 0
 	int16_t i = 0;
 	int ret = 0;
 
@@ -67,9 +68,12 @@ int PINT_dcache_lookup(
 
 	/* Grab a mutex */
 	gen_mutex_lock(cache->mt_lock);
+#endif
 
 	/* No match found */
 	entry->handle = PINT_DCACHE_HANDLE_INVALID;	
+
+#if 0
 	
 	/* Search the cache */
 	for(i = cache->top; i != -1;)
@@ -102,6 +106,7 @@ int PINT_dcache_lookup(
 
 	/* Release the mutex */
 	gen_mutex_unlock(cache->mt_lock);
+#endif
 
 	return(0);
 }
@@ -117,6 +122,7 @@ int PINT_dcache_insert(
 	pinode_reference entry,
 	pinode_reference parent)
 {
+#if 0
 	int16_t i = 0,index = 0, ret = 0;
 	unsigned char entry_found = 0;
 	
@@ -162,6 +168,7 @@ int PINT_dcache_insert(
 
 	/* Release the mutex */
 	gen_mutex_unlock(cache->mt_lock);
+#endif
 	
 	return(0);
 }
@@ -177,7 +184,9 @@ int PINT_dcache_remove(
 	pinode_reference parent,
 	int *item_found)
 {
+#if 0
 	int16_t i = 0;
+
 
 	if (name == NULL)
 		return(-EINVAL);
@@ -211,6 +220,8 @@ int PINT_dcache_remove(
 #if 0
 	/* Relase the mutex */
 	gen_mutex_unlock(cache->mt_lock);
+#endif
+
 #endif
 
 	return(0);
