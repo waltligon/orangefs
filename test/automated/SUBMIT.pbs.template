@@ -8,6 +8,8 @@ cd $PBS_O_WORKDIR
 # Set the path to match the path of the submitter
 PATH=$PBS_O_PATH
 
+# TODO: need to update path to get proper mpich2 build
+
 ############################
 #Change these variables if you want
 #to name your config files something
