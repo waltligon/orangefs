@@ -393,6 +393,7 @@ int BMI_gm_initialize(method_addr_p listen_addr,
     unsigned int min_message_size = 0;
     int i = 0;
     int tmp_errno = 0;
+    struct gm_addr *gm_addr_data = NULL;
 
     gossip_ldebug(BMI_DEBUG_GM, "Initializing GM module.\n");
 
@@ -427,12 +428,6 @@ int BMI_gm_initialize(method_addr_p listen_addr,
 	}
     }
 
-    if (init_flags & BMI_INIT_SERVER)
-    {
-	/* hang on to our local listening address if needed */
-	gm_method_params.listen_addr = listen_addr;
-    }
-
     /* start up gm */
     gm_ret = gm_init();
     if (gm_ret != GM_SUCCESS)
@@ -441,13 +436,41 @@ int BMI_gm_initialize(method_addr_p listen_addr,
 	return (-EPROTO);
     }
 
-    /* open our local port for communication */
-    gm_ret = gm_open(&local_port, BMI_GM_UNIT_NUM, BMI_GM_PORT_NUM,
-		     BMI_GM_PORT_NAME, GM_API_VERSION_1_3);
-    if (gm_ret != GM_SUCCESS)
+    if(init_flags & BMI_INIT_SERVER)
     {
-	ret = -EPROTO;
-	goto gm_initialize_failure;
+	/* hang on to our local listening address if needed */
+	gm_method_params.listen_addr = listen_addr;
+
+	/* open our local port for communication */
+	gm_addr_data = listen_addr->method_data;
+	gm_ret = gm_open(&local_port, BMI_GM_UNIT_NUM, 
+	    gm_addr_data->port_id, BMI_GM_PORT_NAME, GM_API_VERSION_1_3);
+	if (gm_ret != GM_SUCCESS)
+	{
+	    ret = -EPROTO;
+	    goto gm_initialize_failure;
+	}
+    }
+    else
+    {
+	/* we must cycle through and find an open port */
+	for(i=0; i<BMI_GM_MAX_PORTS; i++)
+	{
+	    if(!bmi_gm_reserved_ports[i])
+	    {
+		gm_ret = gm_open(&local_port, BMI_GM_UNIT_NUM, 
+		    (unsigned int)i, BMI_GM_PORT_NAME, GM_API_VERSION_1_3);
+		if(gm_ret == GM_SUCCESS)
+		    break;
+	    }
+	}
+	if(i >= BMI_GM_MAX_PORTS)
+	{
+	    gossip_lerr("Error: failed to find available GM port.\n");
+	    ret = -EPROTO;
+	    goto gm_initialize_failure;
+	}
+	gossip_ldebug(BMI_DEBUG_GM, "Using port number %i.\n", i);
     }
 
     rec_tokens = gm_num_receive_tokens(local_port);
@@ -3090,7 +3113,7 @@ static void send_data_buffer(method_op_p mop)
     gm_directed_send_with_callback(local_port, mop->buffer,
 				   gm_op_data->remote_ptr,
 				   mop->actual_size, GM_LOW_PRIORITY,
-				   gm_addr_data->node_id, BMI_GM_PORT_NUM,
+				   gm_addr_data->node_id, gm_addr_data->port_id,
 				   data_send_callback, mop);
 
     op_list_add(op_list_array[IND_SENDING], mop);

@@ -21,14 +21,13 @@
  * Information specific to gm
  */
 
-enum
-{
-    /* unit and port number we will be using on every machine */
-    /* TODO: this should be configurable */
-    BMI_GM_UNIT_NUM = 0,
-    /* TODO: get rid of this eventually */
-    BMI_GM_PORT_NUM = 5,
-};
+/* mask of ports that are off limits to user applications (see GM FAQ) */
+#define BMI_GM_MAX_PORTS 8
+static unsigned int bmi_gm_reserved_ports[BMI_GM_MAX_PORTS] = 
+    {1,1,0,1,0,0,0,0};
+
+/* TODO: this should be configurable */
+#define BMI_GM_UNIT_NUM  0
 
 struct gm_addr
 {
