@@ -258,17 +258,21 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
 		     DB_UNKNOWN,
 		     TROVE_DB_OPEN_FLAGS,
 		     0);
-    if (ret == ENOENT && create_flag != 0)
+
+    if ((ret == ENOENT) && (create_flag != 0))
     {
+        gossip_debug(GOSSIP_TROVE_DEBUG, "About to create new DB "
+                     "file %s ... ", filename);
 	ret = db_p->open(db_p,
 #ifdef HAVE_TXNID_PARAMETER_TO_DB_OPEN
                          NULL,
 #endif
 			 filename,
 			 NULL,
-			 DB_BTREE,
+			 TROVE_DB_TYPE,
 			 TROVE_DB_CREATE_FLAGS,
-			 0644);
+			 TROVE_DB_MODE);
+        gossip_debug(GOSSIP_TROVE_DEBUG, "done\n");
 
         /* this can easily happen if the server is out of disk space */
         if (ret)

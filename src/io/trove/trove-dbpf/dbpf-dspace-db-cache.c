@@ -166,9 +166,9 @@ int dbpf_dspace_dbcache_try_get(TROVE_coll_id coll_id,
 #endif
             filename,
             NULL,
-            DB_BTREE,
+            TROVE_DB_TYPE,
             TROVE_DB_CREATE_FLAGS,
-            0644);
+            TROVE_DB_MODE);
         assert(ret == 0);
     }
     else if (ret != 0)

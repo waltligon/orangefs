@@ -261,7 +261,8 @@ int dbpf_bstream_fdcache_try_get(TROVE_coll_id coll_id,
 #if 0
 	gossip_debug(GOSSIP_TROVE_DEBUG, "creating new dataspace\n");
 #endif
-	if ((fd = DBPF_OPEN(filename, O_RDWR|O_CREAT|O_EXCL, 0644)) < 0)
+	if ((fd = DBPF_OPEN(filename, O_RDWR|O_CREAT|O_EXCL,
+                            TROVE_DB_MODE)) < 0)
 	{
 	    gossip_debug(GOSSIP_TROVE_DEBUG, "error trying to create!\n");
 	    goto return_error;

@@ -1209,9 +1209,9 @@ static int dbpf_db_create(char *dbname)
 #endif
                           dbname,
                           NULL,
-                          DB_BTREE,
+                          TROVE_DB_TYPE,
 			  TROVE_DB_CREATE_FLAGS,
-                          0644)) != 0)
+                          TROVE_DB_MODE)) != 0)
     {
 	db_p->err(db_p, ret, "%s\n", dbname);
 	return -1;
@@ -1277,7 +1277,7 @@ static DB *dbpf_db_open(char *dbname,
 #endif
                           dbname,
                           NULL,
-                          DB_BTREE,
+                          TROVE_DB_TYPE,
                           TROVE_DB_OPEN_FLAGS,
                           0)) != 0)
     {
