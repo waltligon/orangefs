@@ -129,6 +129,7 @@ static void init_req_table(void);
 static void bt_sighandler(int sig, siginfo_t *info, void *secret);
 #endif
 static int create_pidfile(char *pidfile);
+static void write_pidfile(int fd);
 static void remove_pidfile(void);
 
 /* table of incoming request types and associated parameters */
@@ -251,21 +252,6 @@ int main(int argc, char **argv)
     {
         gossip_err("Error: Could not initialize server; aborting.\n");
         goto server_shutdown;
-    }
-
-    /* manage a pid file if requested (for init scripts), after fork */
-    if (s_server_options.pidfile)
-    {
-        ret = create_pidfile(s_server_options.pidfile);
-        if (ret)
-        {
-            gossip_err("Failed to create pid file %s: %s\n",
-                       s_server_options.pidfile, strerror(ret));
-        }
-        else
-        {
-            atexit(remove_pidfile);
-        }
     }
 
 #ifndef __PVFS2_DISABLE_PERF_COUNTERS__
@@ -407,29 +393,24 @@ int main(int argc, char **argv)
     return -1;
 }
 
+/*
+ * Manipulate the pid file.  Don't bother returning an error in
+ * the write stage, since there's nothing that can be done about it.
+ */
 static int create_pidfile(char *pidfile)
 {
-    int ret = -EINVAL, fd = 0, len = 0;
+    return open(pidfile, (O_CREAT | O_WRONLY | O_TRUNC), 0644);
+}
+
+static void write_pidfile(int fd)
+{
     pid_t pid = getpid();
     char pid_str[16] = {0};
+    int len;
 
-    if (pidfile)
-    {
-        fd = open(pidfile, (O_CREAT | O_WRONLY | O_TRUNC), 0600);
-        if (fd == -1)
-        {
-            ret = errno;
-        }
-        else
-        {
-            snprintf(pid_str, 16, "%d\n", pid);
-            len = strlen(pid_str);
-            ret = write(fd, pid_str, len);
-            close(fd);
-            ret = ((ret == len) ? 0 : errno);
-        }
-    }
-    return ret;
+    snprintf(pid_str, 16, "%d\n", pid);
+    len = strlen(pid_str);
+    write(fd, pid_str, len);
 }
 
 static void remove_pidfile(void)
@@ -515,6 +496,22 @@ static int server_initialize(
 static int server_setup_process_environment(int background)
 {
     pid_t new_pid = 0;
+    int pid_fd = -1;
+
+    /*
+     * Manage a pid file if requested (for init scripts).  Create
+     * the file in the parent before the chdir, but let the child
+     * write his pid and delete it when exiting.
+     */
+    if (s_server_options.pidfile)
+    {
+        pid_fd = create_pidfile(s_server_options.pidfile);
+        if (pid_fd < 0)
+        {
+            gossip_err("Failed to create pid file %s: %s\n",
+                       s_server_options.pidfile, strerror(errno));
+        }
+    }
 
     if (chdir("/"))
     {
@@ -546,6 +543,12 @@ static int server_setup_process_environment(int background)
             gossip_lerr("error in setsid() system call.  aborting.\n");
             exit(2);
         }
+    }
+    if (pid_fd >= 0)
+    {
+        write_pidfile(pid_fd);
+        close(pid_fd);
+        atexit(remove_pidfile);
     }
     server_controlling_pid = getpid();
     return 0;
