@@ -268,7 +268,7 @@ static ssize_t pvfs2_devreq_writev(
     int64_t _tag = 0;
     unsigned long tag = 0;
 
-    buffer = kmem_cache_alloc(dev_req_cache, SLAB_KERNEL);
+    buffer = kmem_cache_alloc(dev_req_cache, PVFS2_CACHE_ALLOC_FLAGS);
     if (!buffer)
     {
 	return (-ENOMEM);

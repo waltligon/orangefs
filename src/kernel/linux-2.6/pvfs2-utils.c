@@ -170,7 +170,7 @@ static inline int copy_attributes_to_inode(
                     pvfs2_inode->link_target = NULL;
                 }
                 pvfs2_inode->link_target = kmalloc(
-                    (strlen(symname) + 1), GFP_KERNEL);
+                    (strlen(symname) + 1), PVFS2_GFP_FLAGS);
                 if (pvfs2_inode->link_target)
                 {
                     strcpy(pvfs2_inode->link_target, symname);
@@ -365,7 +365,7 @@ int pvfs2_inode_getattr(
 	   post a getattr request here;
 	   make dentry valid if getattr passes
         */
-	new_op = kmem_cache_alloc(op_cache, SLAB_KERNEL);
+	new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
 	if (!new_op)
 	{
 	    pvfs2_error("pvfs2: pvfs2_inode_getattr -- "
@@ -421,7 +421,7 @@ int pvfs2_inode_setattr(
     {
         pvfs2_inode = PVFS2_I(inode);
 
-	new_op = kmem_cache_alloc(op_cache, SLAB_KERNEL);
+	new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
 	if (!new_op)
 	{
 	    return ret;
@@ -470,7 +470,7 @@ static inline struct inode *pvfs2_create_file(
 
     if (inode)
     {
-	new_op = kmem_cache_alloc(op_cache, SLAB_KERNEL);
+	new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
 	if (!new_op)
 	{
 	    return NULL;
@@ -561,7 +561,7 @@ static inline struct inode *pvfs2_create_dir(
 
     if (inode)
     {
-	new_op = kmem_cache_alloc(op_cache, SLAB_KERNEL);
+	new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
 	if (!new_op)
 	{
 	    pvfs2_error("pvfs2: pvfs2_create_dir -- "
@@ -655,7 +655,7 @@ static inline struct inode *pvfs2_create_symlink(
 
     if (inode)
     {
-	new_op = kmem_cache_alloc(op_cache, SLAB_KERNEL);
+	new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
 	if (!new_op)
 	{
 	    return NULL;
@@ -781,7 +781,7 @@ int pvfs2_remove_entry(
                     "Parent is %Lu | fs_id %d\n",
                     (int)inode->i_ino, parent->refn.handle,
                     parent->refn.fs_id);
-	new_op = kmem_cache_alloc(op_cache, SLAB_KERNEL);
+	new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
 	if (!new_op)
 	{
 	    return -ENOMEM;
@@ -831,7 +831,7 @@ int pvfs2_truncate_inode(
                 (int)inode->i_ino, pvfs2_inode->refn.handle,
                 pvfs2_inode->refn.fs_id, (unsigned long)size);
 
-    new_op = kmem_cache_alloc(op_cache, SLAB_KERNEL);
+    new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
     if (!new_op)
     {
         return -ENOMEM;
@@ -868,7 +868,7 @@ int pvfs2_empty_dir(struct dentry *dentry)
     pvfs2_print("pvfs2: pvfs2_empty_dir called on %s (inode %d)\n",
                 dentry->d_name.name, (int)inode->i_ino);
 
-    new_op = kmem_cache_alloc(op_cache, SLAB_KERNEL);
+    new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
     if (!new_op)
     {
         pvfs2_error("pvfs2: pvfs2_empty_dir -- "

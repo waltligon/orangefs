@@ -90,7 +90,7 @@ static int pvfs2_readdir(
 	/* drop through */
     default:
 	/* handle the normal cases here */
-	new_op = kmem_cache_alloc(op_cache, SLAB_KERNEL);
+	new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
 	if (!new_op)
 	{
 	    pvfs2_error("pvfs2: pvfs2_readdir -- "

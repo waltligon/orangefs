@@ -82,7 +82,9 @@ struct dentry *pvfs2_lookup(
 	return ERR_PTR(-ENAMETOOLONG);
     }
 
-    new_op = kmem_cache_alloc(op_cache, SLAB_KERNEL);
+    pvfs2_print("About to kmem_cache_alloc...");
+    new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
+    pvfs2_print("done\n");
     if (!new_op)
     {
 	pvfs2_error("pvfs2: pvfs2_lookup -- kmem_cache_alloc failed!\n");
@@ -303,7 +305,7 @@ static int pvfs2_rename(
         return -EMLINK;
     }
 
-    new_op = kmem_cache_alloc(op_cache, SLAB_KERNEL);
+    new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
     if (!new_op)
     {
 	pvfs2_error("pvfs2: pvfs2_rename -- kmem_cache_alloc failed!\n");

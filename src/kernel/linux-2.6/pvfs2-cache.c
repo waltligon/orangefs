@@ -4,7 +4,6 @@
  * See COPYING in top-level directory.
  */
 
-#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/module.h>
@@ -15,6 +14,7 @@
 
 /* a cache for pvfs2 upcall/downcall operations */
 extern kmem_cache_t *op_cache;
+
 static atomic_t next_tag_value;
 
 /* a cache for device (/dev/pvfs2-req) communication */
@@ -29,7 +29,7 @@ extern int pvfs2_gen_credentials(
 
 static void op_cache_ctor(
     void *kernel_op,
-    kmem_cache_t * cachep,
+    kmem_cache_t *cachep,
     unsigned long flags)
 {
     pvfs2_kernel_op_t *op = (pvfs2_kernel_op_t *) kernel_op;
@@ -50,29 +50,21 @@ static void op_cache_ctor(
         op->downcall.status = -1;
 
 	op->op_state = PVFS2_VFS_STATE_UNKNOWN;
-	op->tag = (unsigned long) atomic_read(&next_tag_value);
-	atomic_inc(&next_tag_value);
+
+        op->tag = (unsigned long)atomic_read(&next_tag_value);
+        atomic_inc(&next_tag_value);
 
         /* preemptively fill in the upcall credentials */
         pvfs2_gen_credentials(&op->upcall.credentials);
     }
 }
 
-void op_cache_initialize(
-    )
+void op_cache_initialize(void)
 {
-    /*
-       NOTE: the SLAB_POISION and SLAB_RED_ZONE flags
-       are for debugging only and should be removed
-     */
     op_cache = kmem_cache_create("pvfs2_op_cache",
 				 sizeof(pvfs2_kernel_op_t),
 				 0,
-#ifdef CONFIG_DEBUG_SLAB
-				 SLAB_POISON | SLAB_RED_ZONE,
-#else
-				 0,
-#endif
+                                 PVFS2_CACHE_CREATE_FLAGS,
 				 op_cache_ctor, NULL);
     if (!op_cache)
     {
@@ -83,17 +75,19 @@ void op_cache_initialize(
     atomic_set(&next_tag_value, 100);
 }
 
-void op_cache_finalize(
-    )
+void op_cache_finalize(void)
 {
     if (kmem_cache_destroy(op_cache) != 0)
     {
+#ifdef PVFS2_KERNEL_DEBUG
 	panic("Failed to destroy pvfs2_op_cache");
+#else
+        pvfs2_error("Failed to destroy pvfs2_op_cache");
+#endif
     }
 }
 
-void op_release(
-    void *op)
+void op_release(void *op)
 {
 /*     pvfs2_kernel_op_t *pvfs2_op = (pvfs2_kernel_op_t *) op; */
 
@@ -115,21 +109,12 @@ static void dev_req_cache_ctor(
     }
 }
 
-void dev_req_cache_initialize(
-    )
+void dev_req_cache_initialize(void)
 {
-    /*
-       NOTE: the SLAB_POISION and SLAB_RED_ZONE flags
-       are for debugging only and should be removed
-     */
     dev_req_cache = kmem_cache_create("pvfs2_dev_req_cache",
 				      MAX_DEV_REQ_DOWNSIZE,
 				      0,
-#ifdef CONFIG_DEBUG_SLAB
-				      SLAB_POISON | SLAB_RED_ZONE,
-#else
-				      0,
-#endif
+                                      PVFS2_CACHE_CREATE_FLAGS,
 				      dev_req_cache_ctor, NULL);
     if (!dev_req_cache)
     {
@@ -137,12 +122,15 @@ void dev_req_cache_initialize(
     }
 }
 
-void dev_req_cache_finalize(
-    )
+void dev_req_cache_finalize(void)
 {
     if (kmem_cache_destroy(dev_req_cache) != 0)
     {
+#ifdef PVFS2_KERNEL_DEBUG
 	panic("Failed to destroy pvfs2_dev_req_cache");
+#else
+	pvfs2_error("Failed to destroy pvfs2_dev_req_cache");
+#endif
     }
 }
 
@@ -188,21 +176,12 @@ static void pvfs2_inode_cache_dtor(
     }
 }
 
-void pvfs2_inode_cache_initialize(
-    void)
+void pvfs2_inode_cache_initialize(void)
 {
-    /*
-       NOTE: the SLAB_POISION and SLAB_RED_ZONE flags
-       are for debugging only and should be removed
-     */
     pvfs2_inode_cache = kmem_cache_create("pvfs2_inode_cache",
 					  sizeof(pvfs2_inode_t),
 					  0,
-#ifdef CONFIG_DEBUG_SLAB
-					  SLAB_POISON | SLAB_RED_ZONE,
-#else
-					  0,
-#endif
+                                          PVFS2_CACHE_CREATE_FLAGS,
 					  pvfs2_inode_cache_ctor,
                                           pvfs2_inode_cache_dtor);
     if (!pvfs2_inode_cache)
@@ -211,12 +190,15 @@ void pvfs2_inode_cache_initialize(
     }
 }
 
-void pvfs2_inode_cache_finalize(
-    )
+void pvfs2_inode_cache_finalize(void)
 {
     if (kmem_cache_destroy(pvfs2_inode_cache) != 0)
     {
+#ifdef PVFS2_KERNEL_DEBUG
 	panic("Failed to destroy pvfs2_inode_cache");
+#else
+	pvfs2_error("Failed to destroy pvfs2_inode_cache");
+#endif
     }
 }
 

@@ -73,7 +73,7 @@ ssize_t pvfs2_inode_read(
 
     while(total_count < count)
     {
-        new_op = kmem_cache_alloc(op_cache, SLAB_KERNEL);
+        new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
         if (!new_op)
         {
             pvfs2_error("pvfs2: ERROR -- pvfs2_inode_read "
@@ -212,7 +212,7 @@ static ssize_t pvfs2_file_write(
 
     while(total_count < count)
     {
-        new_op = kmem_cache_alloc(op_cache, SLAB_KERNEL);
+        new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
         if (!new_op)
         {
             pvfs2_error("pvfs2: ERROR -- pvfs2_file_write "

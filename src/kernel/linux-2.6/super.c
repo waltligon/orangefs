@@ -44,7 +44,8 @@ static struct inode *pvfs2_alloc_inode(
        the inodes ourselves (rather than letting the system inode
        allocator initialize them for us); see inode.c/inode_init_once()
      */
-    pvfs2_inode = kmem_cache_alloc(pvfs2_inode_cache, SLAB_KERNEL);
+    pvfs2_inode = kmem_cache_alloc(pvfs2_inode_cache,
+                                   PVFS2_CACHE_ALLOC_FLAGS);
     if (pvfs2_inode)
     {
 	new_inode = &pvfs2_inode->vfs_inode;
@@ -121,7 +122,7 @@ static int pvfs2_statfs(
     pvfs2_print("pvfs2_: pvfs2_statfs called on sb %p "
                 "(fs_id is %d)\n", sb, (int)(PVFS2_SB(sb)->fs_id));
 
-    new_op = kmem_cache_alloc(op_cache, SLAB_KERNEL);
+    new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
     if (!new_op)
     {
 	pvfs2_error("pvfs2: pvfs2_statfs -- kmem_cache_alloc failed!\n");
@@ -239,7 +240,7 @@ int pvfs2_fill_sb(
     }
 
     /* alloc and init our private pvfs2 sb info */
-    sb->s_fs_info = kmalloc(sizeof(pvfs2_sb_info), GFP_KERNEL);
+    sb->s_fs_info = kmalloc(sizeof(pvfs2_sb_info), PVFS2_GFP_FLAGS);
     if (!PVFS2_SB(sb))
     {
 	iput(root);

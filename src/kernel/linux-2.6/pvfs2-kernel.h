@@ -7,6 +7,7 @@
 #ifndef __PVFS2KERNEL_H
 #define __PVFS2KERNEL_H
 
+#include <linux/config.h>
 #include <linux/fs.h>
 
 #include "pint-dev-shared.h"
@@ -65,6 +66,29 @@ sizeof(int64_t) + sizeof(pvfs2_downcall_t))
 #define PVFS2_VFS_STATE_WAITING        0x00FF0001
 #define PVFS2_VFS_STATE_INPROGR        0x00FF0002
 #define PVFS2_VFS_STATE_SERVICED       0x00FF0003
+
+
+/************************************
+ * pvfs2 kernel memory related flags
+ ************************************/
+
+#if ((defined PVFS2_KERNEL_DEBUG) && (defined CONFIG_DEBUG_SLAB))
+/* #define PVFS2_CACHE_CREATE_FLAGS \ */
+/*         (SLAB_POISON | SLAB_RED_ZONE | SLAB_RECLAIM_ACCOUNT) */
+#define PVFS2_CACHE_CREATE_FLAGS (SLAB_POISON | SLAB_RED_ZONE)
+#else
+/* #define PVFS2_CACHE_CREATE_FLAGS (SLAB_RECLAIM_ACCOUNT) */
+#define PVFS2_CACHE_CREATE_FLAGS 0
+#endif /* ((defined PVFS2_KERNEL_DEBUG) && (defined CONFIG_DEBUG_SLAB)) */
+
+#define PVFS2_CACHE_ALLOC_FLAGS (SLAB_KERNEL)
+#define PVFS2_GFP_FLAGS (GFP_KERNEL)
+
+#ifdef CONFIG_HIGHMEM
+#define PVFS2_BUFMAP_GFP_FLAGS (GFP_ATOMIC)
+#else
+#define PVFS2_BUFMAP_GFP_FLAGS (GFP_KERNEL)
+#endif /* CONFIG_HIGHMEM */
 
 
 /************************************
@@ -229,7 +253,9 @@ int wait_for_matching_downcall(
 /****************************
  * defined in inode.c
  ****************************/
-int pvfs2_setattr(struct dentry *dentry, struct iattr *iattr);
+int pvfs2_setattr(
+    struct dentry *dentry,
+    struct iattr *iattr);
 
 /****************************
  * defined in namei.c
@@ -239,7 +265,8 @@ struct dentry *pvfs2_lookup(
     struct dentry *dentry,
     struct nameidata *nd);
 
-int pvfs2_empty_dir(struct dentry *dentry);
+int pvfs2_empty_dir(
+    struct dentry *dentry);
 
 /****************************
  * defined in pvfs2-utils.c

@@ -16,46 +16,25 @@
 extern struct file_operations pvfs2_devreq_file_operations;
 
 extern struct super_block *pvfs2_get_sb(
-    struct file_system_type *fst,
-    int flags,
-    const char *devname,
-    void *data);
+    struct file_system_type *fst, int flags,
+    const char *devname, void *data);
 
-extern void pvfs2_kill_sb(
-    struct super_block *sb);
+extern void pvfs2_kill_sb(struct super_block *sb);
 
-static int hash_func(
-    void *key,
-    int table_size)
-{
-    unsigned long tmp = 0;
-    unsigned long *real_tag = (unsigned long *) key;
-    tmp += (*(real_tag));
-    tmp = tmp % table_size;
-    return ((int) tmp);
-}
-
-static int hash_compare(
-    void *key,
-    struct qhash_head *link)
-{
-    pvfs2_kernel_op_t *op = NULL;
-    unsigned long *real_tag = (unsigned long *) key;
-
-    op = qhash_entry(link, pvfs2_kernel_op_t, list);
-
-    /* use unlikely here since most hash compares will fail */
-    if (unlikely(op->tag == *real_tag))
-    {
-	return (1);
-    }
-    return (0);
-}
+static int hash_func(void *key, int table_size);
+static int hash_compare(void *key, struct qhash_head *link);
 
 
 /*************************************
  * global variables declared here
  *************************************/
+struct file_system_type pvfs2_fs_type =
+{
+    .name = "pvfs2",
+    .get_sb = pvfs2_get_sb,
+    .kill_sb = pvfs2_kill_sb,
+    .owner = THIS_MODULE
+};
 
 /* the assigned character device major number */
 static int pvfs2_dev_major = 0;
@@ -83,12 +62,6 @@ spinlock_t pvfs2_request_list_lock = SPIN_LOCK_UNLOCKED;
 wait_queue_head_t pvfs2_request_list_waitq;
 #endif
 
-struct file_system_type pvfs2_fs_type = {
-    .name = "pvfs2",
-    .get_sb = pvfs2_get_sb,
-    .kill_sb = pvfs2_kill_sb,
-    .owner = THIS_MODULE
-};
 
 static int __init pvfs2_init(void)
 {
@@ -139,7 +112,8 @@ static void __exit pvfs2_exit(void)
 	pvfs2_print("Failed to unregister pvfs2 device /dev/%s\n",
 		    PVFS2_REQDEVICE_NAME);
     }
-    pvfs2_print("Unregistered pvfs2 device /dev/%s\n", PVFS2_REQDEVICE_NAME);
+    pvfs2_print("Unregistered pvfs2 device /dev/%s\n",
+                PVFS2_REQDEVICE_NAME);
 
     /* then unregister the filesystem */
     unregister_filesystem(&pvfs2_fs_type);
@@ -150,7 +124,8 @@ static void __exit pvfs2_exit(void)
     spin_lock(&pvfs2_request_list_lock);
     while (!list_empty(&pvfs2_request_list))
     {
-	cur_op = list_entry(pvfs2_request_list.next, pvfs2_kernel_op_t, list);
+	cur_op = list_entry(pvfs2_request_list.next,
+                            pvfs2_kernel_op_t, list);
 	list_del(&cur_op->list);
 	pvfs2_print("Freeing unhandled upcall request type %d\n",
 		    cur_op->upcall.type);
@@ -167,7 +142,8 @@ static void __exit pvfs2_exit(void)
     {
 	do
 	{
-	    hash_link = qhash_search_and_remove(htable_ops_in_progress, &(i));
+	    hash_link =
+                qhash_search_and_remove(htable_ops_in_progress, &(i));
 	    if (hash_link)
 	    {
 		cur_op = qhash_entry(hash_link, pvfs2_kernel_op_t, list);
@@ -180,6 +156,30 @@ static void __exit pvfs2_exit(void)
     op_cache_finalize();
     dev_req_cache_finalize();
     pvfs2_inode_cache_finalize();
+}
+
+static int hash_func(void *key, int table_size)
+{
+    unsigned long tmp = 0;
+    unsigned long *real_tag = (unsigned long *) key;
+    tmp += (*(real_tag));
+    tmp = tmp % table_size;
+    return ((int) tmp);
+}
+
+static int hash_compare(void *key, struct qhash_head *link)
+{
+    pvfs2_kernel_op_t *op = NULL;
+    unsigned long *real_tag = (unsigned long *) key;
+
+    op = qhash_entry(link, pvfs2_kernel_op_t, list);
+
+    /* use unlikely here since most hash compares will fail */
+    if (unlikely(op->tag == *real_tag))
+    {
+	return (1);
+    }
+    return (0);
 }
 
 module_init(pvfs2_init);
