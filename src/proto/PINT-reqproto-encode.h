@@ -42,9 +42,6 @@ enum PINT_encode_msg_type
     PINT_DECODE_RESP = 13
 };
 
-#define ENCODING_TABLE_SIZE 5
-
-
 /*******************************************************
  * public function prototypes
  */

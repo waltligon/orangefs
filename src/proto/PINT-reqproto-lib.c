@@ -13,6 +13,7 @@
 #include "PINT-reqproto-encode.h"
 #include "PINT-reqproto-module.h"
 
+#define ENCODING_TABLE_SIZE 5
 
 extern PINT_encoding_table_values_s contig_buffer_table;
 
