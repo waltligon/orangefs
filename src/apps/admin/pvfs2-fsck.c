@@ -80,6 +80,11 @@ struct handlelist *third_pass(PVFS_fs_id cur_fs,
 			      PVFS_id_gen_t *addr_array,
 			      PVFS_credentials *creds);
 
+void fourth_pass(PVFS_fs_id cur_fs,
+		 struct handlelist *hl,
+		 PVFS_id_gen_t *addr_array,
+		 PVFS_credentials *creds);
+
 /* print functions */
 static void print_root_entry(PVFS_handle handle,
 			     int server_idx,
@@ -125,7 +130,7 @@ int main(int argc, char **argv)
     PVFS_credentials creds;
     int server_count;
     PVFS_BMI_addr_t *addr_array;
-    struct handlelist *hl_all, *hl_second;
+    struct handlelist *hl_all, *hl_second, *hl_third;
 
     /* look at command line arguments */
     user_opts = parse_args(argc, argv);
@@ -239,7 +244,13 @@ int main(int argc, char **argv)
     handlelist_finalize(&hl_all);
 
     /* drop orphaned dir trees and files into lost and found */
-    third_pass(cur_fs, hl_second, addr_array, &creds);
+    hl_third = third_pass(cur_fs, hl_second, addr_array, &creds);
+
+    handlelist_finalize(&hl_second);
+
+    fourth_pass(cur_fs, hl_third, addr_array, &creds);
+
+    handlelist_finalize(&hl_third);
 
     /* get us out of admin mode */
     PVFS_mgmt_setparam_list(cur_fs,
@@ -642,7 +653,9 @@ int verify_datafiles(PVFS_fs_id cur_fs,
 	    in_main_list = 1;
 	}
 	else if (alt_hl &&
-		 (handlelist_find_handle(alt_hl, df_handles[i], &server_idx) == 0))
+		 (handlelist_find_handle(alt_hl,
+					 df_handles[i],
+					 &server_idx) == 0))
 	{
 	    in_alt_list = 1;
 	}
@@ -875,6 +888,65 @@ struct handlelist *third_pass(PVFS_fs_id cur_fs,
     printf("# finished third pass.\n");
 
     return alt_hl;
+}
+
+/* fourth pass - remove remaining datafiles (I think),
+ * remove dirdata objects that weren't matched to something else.
+ */
+void fourth_pass(PVFS_fs_id cur_fs,
+		 struct handlelist *hl_all,
+		 PVFS_BMI_addr_t *addr_array,
+		 PVFS_credentials *creds)
+{
+    int ret;
+    int server_idx;
+    PVFS_handle handle;
+
+    /* recall that return_handle removes from list */
+    while (handlelist_return_handle(hl_all,
+				    &handle,
+				    &server_idx) == 0)
+    {
+	PVFS_object_ref handle_ref;
+	PVFS_sysresp_getattr getattr_resp;
+
+	handle_ref.handle = handle;
+	handle_ref.fs_id  = cur_fs;
+
+	ret = PVFS_sys_getattr(handle_ref,
+			       PVFS_ATTR_SYS_ALL,
+			       creds,
+			       &getattr_resp);
+	if (ret) {
+	    printf("warning: problem calling getattr on %Lu\n",
+		   Lu(handle));
+	    getattr_resp.attr.objtype = PVFS_TYPE_DATAFILE;
+	}
+
+	/* metafile and directory handles should have been removed
+	 * in the previous pass.
+	 */
+	assert(getattr_resp.attr.objtype != PVFS_TYPE_METAFILE);
+	assert(getattr_resp.attr.objtype != PVFS_TYPE_DIRECTORY);
+
+	switch (getattr_resp.attr.objtype)
+	{
+	    case PVFS_TYPE_DATAFILE:
+		printf("* killing orphaned datafile %Lu.\n", Lu(handle));
+		break;
+	    case PVFS_TYPE_DIRDATA:
+		printf("* killing orphaned dirdata %Lu.\n", Lu(handle));
+		break;
+	    default:
+		/* delete on handle -- unknown type */
+		printf("* killing %Lu (unknown type).\n",
+		       Lu(handle));
+		break;
+	}
+
+    }
+
+    printf("# finished fourth pass.\n");
 }
 
 /********************************************/
