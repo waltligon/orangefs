@@ -210,7 +210,7 @@ int main(int argc, char **argv)
   start_find:
 
     tab = PVFS_util_parse_pvfstab(NULL);
-    if(!tab);
+    if(!tab)
     {
         fprintf(stderr,"Error parsing pvfstab!\n");
         return 1;
