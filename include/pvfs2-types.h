@@ -40,6 +40,10 @@ typedef uint32_t PVFS_gid;
 typedef int64_t PVFS_time;
 typedef uint32_t PVFS_permissions;
 
+/* predefined special values for types */
+#define PVFS_HANDLE_NULL ((PVFS_handle)0) /* invalid object handle */
+#define PVFS_OP_NULL ((id_gen_t)0)        /* invalid op id for I/O subsystems */
+
 /* permission bits */
 #define PVFS_O_EXECUTE	(1 << 0)
 #define PVFS_O_WRITE	(1 << 1)
