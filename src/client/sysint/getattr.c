@@ -24,8 +24,10 @@
  *
  * returns 0 on success, -errno on failure
  */
-int PVFS_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask, 
-		    PVFS_credentials credentials, PVFS_sysresp_getattr *resp)
+int PVFS_sys_getattr_old(PVFS_pinode_reference pinode_refn,
+			 uint32_t attrmask, 
+			 PVFS_credentials credentials,
+			 PVFS_sysresp_getattr *resp)
 {
     int ret = -1;
     PVFS_object_attr tmp_attr;
