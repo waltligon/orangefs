@@ -38,6 +38,16 @@ static struct qhash_table *s_fsid_config_cache_table = NULL;
 static int hash_fsid(void *fsid, int table_size);
 static int hash_fsid_compare(void *key, struct qlist_head *link);
 
+/*
+  FIXME:
+  there's a header file problem that needs to be resolved...
+  for now, I'm forward declaring functions to fix warnings.
+  this is a sin.
+*/
+int PINT_bucket_get_server_name(char* server_name, int max_server_name_len,
+                                PVFS_handle bucket, PVFS_fs_id fsid);
+int PINT_handle_load_mapping(void *fs);
+
 
 /* PINT_bucket_initialize()
  *
@@ -48,8 +58,6 @@ static int hash_fsid_compare(void *key, struct qlist_head *link);
 int PINT_bucket_initialize(void)
 {
     int ret = -EINVAL;
-    struct llist *cur = NULL;
-    struct filesystem_configuration_s *cur_fs = NULL;
 
     if (!g_server_config.file_systems)
     {
@@ -67,21 +75,7 @@ int PINT_bucket_initialize(void)
       we can do this here...reserving the load_mapping
       call for dynamic addition.  is this a problem?
     */
-    cur = g_server_config.file_systems;
-    while(cur)
-    {
-        cur_fs = llist_head(cur);
-        if (!cur_fs)
-        {
-            break;
-        }
-        ret = PINT_handle_load_mapping(cur_fs);
-        if (ret)
-        {
-            return ret;
-        }
-        cur = llist_next(cur);
-    }
+    llist_doall(g_server_config.file_systems, PINT_handle_load_mapping);
     return(0);
 }
 
@@ -108,7 +102,7 @@ int PINT_bucket_finalize(void)
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_handle_load_mapping(struct filesystem_configuration_s *fs)
+int PINT_handle_load_mapping(void *fs)
 {
     int ret = -EINVAL;
     struct llist *cur = NULL;
@@ -122,11 +116,11 @@ int PINT_handle_load_mapping(struct filesystem_configuration_s *fs)
             sizeof(struct config_fs_cache_s));
         assert(cur_config_fs_cache);
 
-        cur_config_fs_cache->fs = fs;
+        cur_config_fs_cache->fs = (struct filesystem_configuration_s *)fs;
         cur_config_fs_cache->bmi_host_extent_tables = llist_new();
         assert(cur_config_fs_cache->bmi_host_extent_tables);
 
-        cur = fs->handle_ranges;
+        cur = cur_config_fs_cache->fs->handle_ranges;
         while(cur)
         {
             cur_mapping = llist_head(cur);
@@ -175,7 +169,8 @@ int PINT_handle_load_mapping(struct filesystem_configuration_s *fs)
         */
         if (ret == 0)
         {
-            qhash_add(s_fsid_config_cache_table,&(fs->coll_id),
+            qhash_add(s_fsid_config_cache_table,
+                      &(cur_config_fs_cache->fs->coll_id),
                       &(cur_config_fs_cache->hash_link));
         }
     }

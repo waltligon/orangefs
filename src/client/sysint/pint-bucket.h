@@ -19,8 +19,18 @@ int PINT_bucket_initialize(void);
 
 int PINT_bucket_finalize(void);
 
-int PINT_handle_load_mapping(
-    struct filesystem_configuration_s *fs);
+/*
+  NOTE: the incoming pointer MUST be a valid
+  struct filesystem_configuration_s * object.
+
+  e.g.
+  int PINT_handle_load_mapping(struct filesystem_configuration_s *fs);
+
+  it's declared void to be used in llist_doall, as well as
+  relaxing the requirement that this file should know what
+  that datatype is.
+*/
+int PINT_handle_load_mapping(void *fs);
 
 int PINT_bucket_get_next_meta(
 	PVFS_fs_id fsid,

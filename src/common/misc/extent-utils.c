@@ -14,6 +14,7 @@
 #include "pvfs2-types.h"
 #include "str-utils.h"
 #include "extent-utils.h"
+#include "llist.h"
 
 /* PINT_create_extent_list()
  *
@@ -62,8 +63,7 @@ struct llist *PINT_create_extent_list(char *extent_str)
  * range of the specified extent.  Returns 0 otherwise.
  *
  */
-static inline int PINT_handle_in_extent(struct extent *ext,
-                                        PVFS_handle handle)
+int PINT_handle_in_extent(struct extent *ext, PVFS_handle handle)
 {
     return (((int64_t)handle > ext->first-1) &&
             ((int64_t)handle < ext->last+1));
