@@ -50,11 +50,11 @@ void yyerror(char *);
 
 %type <i> state_machine .state_body. state_body
 
-%type <c> identifier, return_code
+%type <c> identifier return_code
 
-%type <s> state_decl_list, .state_decl_list., state_decl,
-			 state_def, state_def_list, .state_def_list.,
-			 transition, transition_list
+%type <s> state_decl_list .state_decl_list. state_decl,
+			 state_def state_def_list .state_def_list.,
+			 transition transition_list
 
 %start state_machine
 
