@@ -197,17 +197,16 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, PVFS_sysresp_init *resp)
  */
 static int server_get_config(pvfs_mntlist mntent_list)
 {
-    struct PVFS_server_req_s *req_p = NULL;		/* server request */
-    struct PVFS_server_resp_s *ack_p = NULL;	/* server response */
-    int ret = -1, i, j;
-    bmi_addr_t serv_addr;				 /*PVFS address type structure*/ 
-    int len, name_sz, metalen, iolen;
+    int ret = -1;
+    struct PVFS_server_req_s *req_p = NULL;
+    struct PVFS_server_resp_s *ack_p = NULL;
+    bmi_addr_t serv_addr;
+    int i = 0, name_sz = 0;
     PVFS_credentials creds;
-    char *parse_p;
     struct PINT_decoded_msg decoded;
     void* encoded_resp;
-    PVFS_msg_tag_t op_tag = get_next_session_tag();
     PVFS_size max_msg_sz;
+    PVFS_msg_tag_t op_tag = get_next_session_tag();
 
     enum {
 	NONE_FAIL = 0,
@@ -274,10 +273,12 @@ static int server_get_config(pvfs_mntlist mntent_list)
         {
             gossip_ldebug(CLIENT_DEBUG,"Failed to getconfig from host "
                           "%s\n",mntent_p->meta_addr);
+
+            /* let go of any resources consumed by PINT_send_req() */
+            PINT_release_req(serv_addr, req_p, max_msg_sz, &decoded,
+                             &encoded_resp, op_tag);
             continue;
         }
-
-
 
 /* 	fsinfo_p->meta_serv_count = ack_p->u.getconfig.meta_server_count; */
 /* 	fsinfo_p->io_serv_count   = ack_p->u.getconfig.io_server_count; */
