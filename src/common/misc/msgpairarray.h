@@ -22,9 +22,6 @@ extern struct PINT_state_machine_s pvfs2_msgpairarray_sm;
 #define PVFS_MSGPAIR_RETRY          0xFE
 #define PVFS_MSGPAIR_NO_RETRY       0xFF
 
-/* this is the max number of times to attempt a msgpair retry */
-#define PVFS_MSGPAIR_RETRY_LIMIT     10
-
 /*
  * This structure holds everything that we need for the state of a
  * message pair.  We need arrays of these in some cases, so it's
