@@ -1231,6 +1231,7 @@ int job_trove_bstream_flush(PVFS_fs_id coll_id,
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
      */
+    jd = alloc_job_desc(JOB_TROVE);
     if (!jd)
     {
 	return (-errno);
