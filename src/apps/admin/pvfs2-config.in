@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# taken from SDL's sdl-config.in
+# taken from SDL-1.2.7 sdl-config.in, licensed under the LGPL v.2
 
 prefix=@prefix@
 exec_prefix=@exec_prefix@
