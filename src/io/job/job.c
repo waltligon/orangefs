@@ -694,6 +694,7 @@ int job_req_sched_release(
 	{
 		/* immediate completion */
 		out_status_p->error_code = 0;
+		dealloc_job_desc(jd);
 		return(1);
 	}
 	
