@@ -920,7 +920,7 @@ int main(int argc, char **argv)
     pvfs2_upcall_t upcall;
     pvfs2_downcall_t downcall;
 
-    PVFS_util_tab mnt = {0,NULL};
+    const PVFS_util_tab* tab;
     PVFS_sysresp_init init_response;
 
     /* set rlimit to prevent core files */
@@ -931,14 +931,15 @@ int main(int argc, char **argv)
 	fprintf(stderr, "continuing...\n");
     }
 
-    if (PVFS_util_parse_pvfstab(NULL, &mnt))
+    tab = PVFS_util_parse_pvfstab(NULL);
+    if(!tab)
     {
         fprintf(stderr, "Error parsing pvfstab!\n");
         return 1;
     }
 
     memset(&init_response,0,sizeof(PVFS_sysresp_init));
-    if (PVFS_sys_initialize(mnt, 0, &init_response))
+    if (PVFS_sys_initialize(*tab, 0, &init_response))
     {
         fprintf(stderr, "Cannot initialize system interface\n");
         return 1;

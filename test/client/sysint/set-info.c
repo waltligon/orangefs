@@ -18,7 +18,7 @@ int main(int argc, char **argv)
     int ret = -1;
     char *filename = NULL;
     PVFS_fs_id fs_id;
-    PVFS_util_tab mnt = {0,NULL};
+    const PVFS_util_tab* tab;
     PVFS_credentials credentials;
     PVFS_sysresp_init resp_init;
     PVFS_sysresp_lookup resp_look;
@@ -36,14 +36,14 @@ int main(int argc, char **argv)
         return ret;
     }
 
-    ret = PVFS_util_parse_pvfstab(NULL, &mnt);
-    if (ret < 0)
+    tab = PVFS_util_parse_pvfstab(NULL);
+    if (!tab)
     {
         fprintf(stderr, "Failed to parse pvfstab!\n");
         return ret;
     }
 
-    ret = PVFS_sys_initialize(mnt, GOSSIP_NO_DEBUG, &resp_init);
+    ret = PVFS_sys_initialize(*tab, GOSSIP_NO_DEBUG, &resp_init);
     if(ret < 0)
     {
         fprintf(stderr, "PVFS_sys_initialize() failure. = %d\n", ret);

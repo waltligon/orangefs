@@ -15,18 +15,18 @@ int main(int argc,char **argv)
 {
 	PVFS_sysresp_init resp_init;
 	int ret = -1;
-	PVFS_util_tab mnt = {0,NULL};
+	const PVFS_util_tab* tab;
 
 	/* Parse PVFStab */
-	ret = PVFS_util_parse_pvfstab(NULL, &mnt);
-	if (ret < 0)
+	tab = PVFS_util_parse_pvfstab(NULL);
+	if (!tab)
 	{
 		printf("Parsing error\n");
 		return(-1);
 	}
 
 	/*Init the system interface*/
-	ret = PVFS_sys_initialize(mnt, GOSSIP_CLIENT_DEBUG, &resp_init);
+	ret = PVFS_sys_initialize(*tab, GOSSIP_CLIENT_DEBUG, &resp_init);
 	if(ret < 0)
 	{
 		printf("PVFS_sys_initialize() failure. = %d\n", ret);
@@ -40,8 +40,6 @@ int main(int argc,char **argv)
 		printf("finalizing sysint failed with errcode = %d\n", ret);
 		return (-1);
 	}
-
-	PVFS_util_free_pvfstab(&mnt);
 
 	return(0);
 }

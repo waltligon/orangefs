@@ -25,7 +25,7 @@ int main(int argc,char **argv)
     PVFS_credentials credentials;
     char *filename = NULL;
     int ret = -1;
-    PVFS_util_tab mnt = {0,NULL};
+    const PVFS_util_tab* tab;
     time_t r_atime, r_mtime, r_ctime;
 
     if (argc == 2)
@@ -39,14 +39,14 @@ int main(int argc,char **argv)
         return (-1);
     }
 
-    ret = PVFS_util_parse_pvfstab(NULL, &mnt);
-    if (ret < 0)
+    tab = PVFS_util_parse_pvfstab(NULL);
+    if(!tab)
     {
         printf("Parsing error\n");
         return(-1);
     }
 
-    ret = PVFS_sys_initialize(mnt, GOSSIP_NO_DEBUG, &resp_init);
+    ret = PVFS_sys_initialize(*tab, GOSSIP_NO_DEBUG, &resp_init);
     if(ret < 0)
     {
         printf("PVFS_sys_initialize() failure. = %d\n", ret);

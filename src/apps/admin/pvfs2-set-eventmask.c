@@ -39,7 +39,7 @@ int main(int argc, char **argv)
 {
     int ret = -1;
     PVFS_fs_id cur_fs;
-    PVFS_util_tab mnt = {0,NULL};
+    const PVFS_util_tab* tab;
     struct options* user_opts = NULL;
     int mnt_index = -1;
     char pvfs_path[PVFS_NAME_MAX] = {0};
@@ -57,7 +57,8 @@ int main(int argc, char **argv)
     }
 
     /* look at pvfstab */
-    if(PVFS_util_parse_pvfstab(NULL, &mnt))
+    tab = PVFS_util_parse_pvfstab(NULL);
+    if(!tab)
     {
         fprintf(stderr, "Error: failed to parse pvfstab.\n");
         return(-1);
@@ -66,10 +67,10 @@ int main(int argc, char **argv)
     /* see if the destination resides on any of the file systems
      * listed in the pvfstab; find the pvfs fs relative path
      */
-    for(i=0; i<mnt.mntent_count; i++)
+    for(i=0; i<tab->mntent_count; i++)
     {
 	ret = PVFS_util_remove_dir_prefix(user_opts->mnt_point,
-	    mnt.mntent_array[i].mnt_dir, pvfs_path, PVFS_NAME_MAX);
+	    tab->mntent_array[i].mnt_dir, pvfs_path, PVFS_NAME_MAX);
 	if(ret == 0)
 	{
 	    mnt_index = i;
@@ -85,7 +86,7 @@ int main(int argc, char **argv)
     }
 
     memset(&resp_init, 0, sizeof(resp_init));
-    ret = PVFS_sys_initialize(mnt, GOSSIP_NO_DEBUG, &resp_init);
+    ret = PVFS_sys_initialize(*tab, GOSSIP_NO_DEBUG, &resp_init);
     if(ret < 0)
     {
 	PVFS_perror("PVFS_sys_initialize", ret);
@@ -128,7 +129,6 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    PVFS_util_free_pvfstab(&mnt);
     PVFS_sys_finalize();
 
     return(ret);

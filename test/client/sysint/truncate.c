@@ -14,7 +14,7 @@ int main(int argc,char **argv)
 {
     int ret = -1;
     char *filename = (char *)0;
-    PVFS_util_tab mnt = {0,NULL};
+    const PVFS_util_tab *tab;
     PVFS_sysresp_init resp_init;
     PVFS_sysresp_lookup resp_look;
     PVFS_sysresp_lookup resp_lk;
@@ -39,14 +39,15 @@ int main(int argc,char **argv)
     trunc_size = ull;
     }
 
-    if (PVFS_util_parse_pvfstab(NULL, &mnt))
+    tab = PVFS_util_parse_pvfstab(NULL);
+    if(!tab)
     {
         printf("Failed to parse pvfstab\n");
         return ret;
     }
 
     memset(&resp_init, 0, sizeof(resp_init));
-    if (PVFS_sys_initialize(mnt, GOSSIP_CLIENT_DEBUG, &resp_init))
+    if (PVFS_sys_initialize(*tab, GOSSIP_CLIENT_DEBUG, &resp_init))
     {
         printf("Failed to initialize system interface\n");
         return ret;

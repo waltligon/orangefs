@@ -23,7 +23,7 @@ int main(int argc,char **argv)
 	char *filename;
 	int name_sz;
 	int ret = -1;
-	PVFS_util_tab mnt = {0,NULL};
+	const PVFS_util_tab* tab;
 	int io_size = 1024 * 1024;
 	int* io_buffer = NULL;
 	int i;
@@ -78,14 +78,14 @@ int main(int argc,char **argv)
 	memcpy(&(filename[1]), argv[1], (name_sz-1));
 
 	/* parse pvfstab */
-	ret = PVFS_util_parse_pvfstab(NULL, &mnt);
-	if (ret < 0)
+	tab = PVFS_util_parse_pvfstab(NULL);
+	if (!tab)
 	{
 		fprintf(stderr, "Error: parse_pvfstab() failure.\n");
 		return(-1);
 	}
 	/* init the system interface */
-	ret = PVFS_sys_initialize(mnt, GOSSIP_CLIENT_DEBUG, &resp_init);
+	ret = PVFS_sys_initialize(*tab, GOSSIP_CLIENT_DEBUG, &resp_init);
 	if(ret < 0)
 	{
 		fprintf(stderr, "Error: PVFS_sys_initialize() failure. = %d\n", ret);

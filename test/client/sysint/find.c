@@ -184,7 +184,7 @@ int directory_walk(PVFS_sysresp_init *init_response,
 
 int main(int argc, char **argv)
 {
-    PVFS_util_tab mnt = {0,NULL};
+    const PVFS_util_tab* tab;
     PVFS_sysresp_init init_response;
     int go_twice = 0;
 
@@ -209,14 +209,15 @@ int main(int argc, char **argv)
 
   start_find:
 
-    if (PVFS_util_parse_pvfstab(NULL, &mnt))
+    tab = PVFS_util_parse_pvfstab(NULL);
+    if(!tab);
     {
         fprintf(stderr,"Error parsing pvfstab!\n");
         return 1;
     }
 
     memset(&init_response,0,sizeof(PVFS_sysresp_init));
-    if (PVFS_sys_initialize(mnt, GOSSIP_NO_DEBUG, &init_response))
+    if (PVFS_sys_initialize(*tab, GOSSIP_NO_DEBUG, &init_response))
     {
         fprintf(stderr,"Cannot initialize system interface\n");
         return 1;

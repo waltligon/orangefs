@@ -40,7 +40,7 @@ extern job_context_id PVFS_sys_job_context;
 int main(int argc, char **argv)	
 {
     int i = 0, j = 0, k = 0, n = 0, m = 0, num_file_systems = 0;
-    PVFS_util_tab mnt = {0,NULL};
+    const PVFS_util_tab* tab;
     struct server_configuration_s server_config;
     PINT_llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs = NULL;
@@ -53,7 +53,8 @@ int main(int argc, char **argv)
     PVFS_handle_extent_array data_handle_extent_array[
         NUM_DATA_SERVERS_TO_QUERY];
 
-    if (PVFS_util_parse_pvfstab(NULL, &mnt))
+    tab = PVFS_util_parse_pvfstab(NULL);
+    if(!tab)
     {
         fprintf(stderr, "PVFS_util_parse_pvfstab failure.\n");
         return(-1);
@@ -90,7 +91,7 @@ int main(int argc, char **argv)
     }
 
     memset(&server_config,0,sizeof(struct server_configuration_s));
-    if (PINT_server_get_config(&server_config, mnt))
+    if (PINT_server_get_config(&server_config, *tab))
     {
         fprintf(stderr, "PINT_server_get_config failure.\n");
         return(-1);

@@ -159,14 +159,14 @@ int test_create(MPI_Comm * comm,
 		void *params)
 {
     int ret = -1;
-    PVFS_util_tab tab = { 0, NULL };
+    const PVFS_util_tab* tab;
     generic_params *myparams = (generic_params *) params;
     char name[PVFS_NAME_MAX];
     int i, nerrs = 0;
 
     /* Parse PVFStab */
-    ret = PVFS_util_parse_pvfstab(NULL, &tab);
-    if (ret < 0)
+    tab = PVFS_util_parse_pvfstab(NULL);
+    if (!tab)
     {
 	printf("Parsing error\n");
 	return (-1);

@@ -22,7 +22,7 @@ int main(int argc,char **argv)
     char str_buf2[256] = {0};
     char str_buf3[256] = {0};
     PVFS_fs_id cur_fs;
-    PVFS_util_tab mnt = {0,NULL};
+    const PVFS_util_tab* tab;
     PVFS_sysresp_init resp_init;
     PVFS_sysresp_mkdir resp_mkdir;
     char* entry_name;
@@ -37,14 +37,15 @@ int main(int argc,char **argv)
     }
     dirname = argv[1];
 
-    if (PVFS_util_parse_pvfstab(NULL, &mnt))
+    tab = PVFS_util_parse_pvfstab(NULL);
+    if (!tab)
     {
         printf("Failed to parse pvfstab\n");
         return ret;
     }
 
     memset(&resp_init, 0, sizeof(resp_init));
-    if (PVFS_sys_initialize(mnt, GOSSIP_NO_DEBUG, &resp_init))
+    if (PVFS_sys_initialize(*tab, GOSSIP_NO_DEBUG, &resp_init))
     {
         printf("Failed to initialize system interface\n");
         return ret;

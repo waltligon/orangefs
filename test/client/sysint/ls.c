@@ -181,7 +181,7 @@ int do_list(
 
 int main(int argc, char **argv)
 {
-    PVFS_util_tab mnt = {0,NULL};
+    const PVFS_util_tab* tab;
     PVFS_sysresp_init init_response;
 
     if (argc > 2)
@@ -191,14 +191,15 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    if (PVFS_util_parse_pvfstab(NULL, &mnt))
+    tab = PVFS_util_parse_pvfstab(NULL);
+    if(!tab)
     {
         fprintf(stderr,"Error parsing pvfstab!\n");
         return 1;
     }
 
     memset(&init_response,0,sizeof(PVFS_sysresp_init));
-    if (PVFS_sys_initialize(mnt, 0, &init_response))
+    if (PVFS_sys_initialize(*tab, 0, &init_response))
     {
         fprintf(stderr,"Cannot initialize system interface\n");
         return 1;

@@ -12,11 +12,7 @@
 #define __PVFS2_UTIL_H
 
 /* client side config file / option management */
-int PVFS_util_parse_pvfstab(
-    const char* tabfile, 
-    PVFS_util_tab * tab);
-void PVFS_util_free_pvfstab(
-    PVFS_util_tab * tab);
+const PVFS_util_tab* PVFS_util_parse_pvfstab(const char* tabfile);
 
 /* path management */
 int PVFS_util_lookup_parent(

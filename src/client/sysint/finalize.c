@@ -54,6 +54,8 @@ int PVFS_sys_finalize()
 
     PINT_encode_finalize();
 
+    PINT_release_pvfstab();
+
     gossip_disable();
 
     return(0);

@@ -19,7 +19,7 @@ int main(int argc,char **argv)
     PVFS_sysresp_lookup resp_look;
     PVFS_sysresp_readdir resp_readdir;
     int ret = -1, i = 0;
-    PVFS_util_tab mnt = {0,NULL};
+    const PVFS_util_tab* tab;
     int max_dirents_returned = 25;
     char starting_point[256] = "/";
     PVFS_fs_id fs_id;
@@ -40,14 +40,14 @@ int main(int argc,char **argv)
     printf("no more than %d dirents should be returned per "
            "iteration\n", max_dirents_returned);
 
-    ret = PVFS_util_parse_pvfstab(NULL, &mnt);
-    if (ret < 0)
+    tab = PVFS_util_parse_pvfstab(NULL);
+    if (!tab)
     {
         printf("Parsing error\n");
         return(-1);
     }
 
-    ret = PVFS_sys_initialize(mnt, GOSSIP_NO_DEBUG, &resp_init);
+    ret = PVFS_sys_initialize(*tab, GOSSIP_NO_DEBUG, &resp_init);
     if(ret < 0)
     {
         printf("PVFS_sys_initialize() failure. = %d\n", ret);

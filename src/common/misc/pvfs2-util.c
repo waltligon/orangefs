@@ -20,18 +20,25 @@
 
 /* TODO: add replacement functions for systems without getmntent() */
 #ifndef HAVE_GETMNTENT
-    #error HAVE_GETMNTENT undefined! needed for parse_pvfstab
+#error HAVE_GETMNTENT undefined! needed for parse_pvfstab
 #endif
 
 #ifdef HAVE_MNTENT_H
 #include <mntent.h>
 #endif
 
+#define PVFS2_MAX_TABFILES 8
+
+static PVFS_util_tab stat_tab_array[PVFS2_MAX_TABFILES];
+static int stat_tab_count = 0;
+
 static int parse_flowproto_string(
-    const char *input, enum PVFS_flowproto_type *flowproto);
+    const char *input,
+    enum PVFS_flowproto_type *flowproto);
 
 static int parse_encoding_string(
-    const char *cp, enum PVFS_encoding_type *et);
+    const char *cp,
+    enum PVFS_encoding_type *et);
 
 /* PVFS_util_parse_pvfstab()
  *
@@ -45,26 +52,27 @@ static int parse_encoding_string(
  * example entry:
  * tcp://localhost:3334/pvfs2-fs /mnt/pvfs2 pvfs2 defaults 0 0
  *
- * returns 0 on success, -PVFS_error on failure
+ * returns constant pointer to internal tab structure on success, NULL on
+ * failure
  */
-int PVFS_util_parse_pvfstab(const char* tabfile, PVFS_util_tab* pvfstab_p)
+const PVFS_util_tab *PVFS_util_parse_pvfstab(
+    const char *tabfile)
 {
-    FILE* mnt_fp = NULL;
+    FILE *mnt_fp = NULL;
     int file_count = 4;
-    const char* file_list[4] = {NULL, "/etc/fstab", "/etc/pvfs2tab", "pvfs2tab"};
-    const char* targetfile = NULL;
-    struct mntent* tmp_ent;
-    int i;
+    const char *file_list[4] =
+	{ NULL, "/etc/fstab", "/etc/pvfs2tab", "pvfs2tab" };
+    const char *targetfile = NULL;
+    struct mntent *tmp_ent;
+    int i, j;
     int slashcount = 0;
-    char* slash = NULL;
-    char* last_slash = NULL;
+    char *slash = NULL;
+    char *last_slash = NULL;
     const char *cp;
     int ret = -1;
+    int tmp_mntent_count = 0;
 
-    /* safety */
-    pvfstab_p->mntent_count = 0;
-
-    if(tabfile != NULL)
+    if (tabfile != NULL)
     {
 	/* caller wants us to look in a specific location for the tabfile */
 	file_list[0] = tabfile;
@@ -79,20 +87,36 @@ int PVFS_util_parse_pvfstab(const char* tabfile, PVFS_util_tab* pvfstab_p)
 	file_count = 4;
     }
 
+    /* start by checking list of files we have already parsed */
+    for (i = 0; i < stat_tab_count; i++)
+    {
+	for (j = 0; j < file_count; j++)
+	{
+	    if (file_list[j] && !strcmp(file_list[j],
+					stat_tab_array[i].tabfile_name))
+	    {
+		/* already done */
+		return (&stat_tab_array[i]);
+	    }
+	}
+    }
+
+    assert(stat_tab_count < PVFS2_MAX_TABFILES);
+
     /* scan our prioritized list of tab files in order, stop when we find
      * one that has at least one pvfs2 entry
      */
-    for(i=0; (i<file_count && !targetfile); i++)
+    for (i = 0; (i < file_count && !targetfile); i++)
     {
 	mnt_fp = setmntent(file_list[i], "r");
-	if(mnt_fp)
+	if (mnt_fp)
 	{
-	    while((tmp_ent = getmntent(mnt_fp)))
+	    while ((tmp_ent = getmntent(mnt_fp)))
 	    {
-		if(strcmp(tmp_ent->mnt_type, "pvfs2") == 0)
+		if (strcmp(tmp_ent->mnt_type, "pvfs2") == 0)
 		{
 		    targetfile = file_list[i];
-		    pvfstab_p->mntent_count++;
+		    tmp_mntent_count++;
 		}
 	    }
 	    endmntent(mnt_fp);
@@ -103,27 +127,28 @@ int PVFS_util_parse_pvfstab(const char* tabfile, PVFS_util_tab* pvfstab_p)
     {
 	gossip_err("Error: could not find any pvfs2 tabfile entries.\n");
 	gossip_err("Error: tried the following tabfiles:\n");
-	for(i=0; i<file_count; i++)
+	for (i = 0; i < file_count; i++)
 	{
 	    gossip_err("       %s\n", file_list[i]);
 	}
-	return(-PVFS_ENOENT);
+	return (NULL);
     }
     gossip_debug(GOSSIP_CLIENT_DEBUG, "Using pvfs2 tab file: %s\n", targetfile);
 
     /* allocate array of entries */
-    pvfstab_p->mntent_array = (struct PVFS_sys_mntent*)
-        malloc(pvfstab_p->mntent_count * sizeof(struct PVFS_sys_mntent));
-    if (!pvfstab_p->mntent_array)
+    stat_tab_array[stat_tab_count].mntent_array = (struct PVFS_sys_mntent *)
+	malloc(tmp_mntent_count * sizeof(struct PVFS_sys_mntent));
+    if (!stat_tab_array[stat_tab_count].mntent_array)
     {
-	return(-PVFS_ENOMEM);
+	return (NULL);
     }
-    memset(pvfstab_p->mntent_array, 0, 
-	pvfstab_p->mntent_count*sizeof(struct PVFS_sys_mntent));
-    for(i=0; i<pvfstab_p->mntent_count; i++)
+    memset(stat_tab_array[stat_tab_count].mntent_array, 0,
+	   tmp_mntent_count * sizeof(struct PVFS_sys_mntent));
+    for (i = 0; i < tmp_mntent_count; i++)
     {
-	pvfstab_p->mntent_array[i].fs_id = PVFS_FS_ID_NULL;
+	stat_tab_array[stat_tab_count].mntent_array[i].fs_id = PVFS_FS_ID_NULL;
     }
+    stat_tab_array[stat_tab_count].mntent_count = tmp_mntent_count;
 
     /* reopen our chosen fstab file */
     mnt_fp = setmntent(targetfile, "r");
@@ -131,13 +156,13 @@ int PVFS_util_parse_pvfstab(const char* tabfile, PVFS_util_tab* pvfstab_p)
 
     /* scan through looking for every pvfs2 entry */
     i = 0;
-    while((tmp_ent = getmntent(mnt_fp)))
+    while ((tmp_ent = getmntent(mnt_fp)))
     {
 	if (strcmp(tmp_ent->mnt_type, "pvfs2") == 0)
 	{
 	    slash = tmp_ent->mnt_fsname;
 	    slashcount = 0;
-	    while((slash = index(slash, '/')))
+	    while ((slash = index(slash, '/')))
 	    {
 		slash++;
 		slashcount++;
@@ -149,26 +174,26 @@ int PVFS_util_parse_pvfstab(const char* tabfile, PVFS_util_tab* pvfstab_p)
 	    if (slashcount != 3)
 	    {
 		gossip_lerr("Error: invalid tab file entry: %s\n",
-		    tmp_ent->mnt_fsname);
+			    tmp_ent->mnt_fsname);
 		endmntent(mnt_fp);
-		return(-PVFS_EINVAL);
+		return (NULL);
 	    }
-	
+
 	    /* allocate room for our copies of the strings */
-	    pvfstab_p->mntent_array[i].pvfs_config_server = 
-		(char*)malloc(strlen(tmp_ent->mnt_fsname) + 1);
-	    pvfstab_p->mntent_array[i].mnt_dir = 
-		(char*)malloc(strlen(tmp_ent->mnt_dir) + 1);
-	    pvfstab_p->mntent_array[i].mnt_opts = 
-		(char*)malloc(strlen(tmp_ent->mnt_opts) + 1);
+	    stat_tab_array[stat_tab_count].mntent_array[i].pvfs_config_server =
+		(char *) malloc(strlen(tmp_ent->mnt_fsname) + 1);
+	    stat_tab_array[stat_tab_count].mntent_array[i].mnt_dir =
+		(char *) malloc(strlen(tmp_ent->mnt_dir) + 1);
+	    stat_tab_array[stat_tab_count].mntent_array[i].mnt_opts =
+		(char *) malloc(strlen(tmp_ent->mnt_opts) + 1);
 
 	    /* bail if any mallocs failed */
-	    if (!pvfstab_p->mntent_array[i].pvfs_config_server
-                || !pvfstab_p->mntent_array[i].mnt_dir
-                || !pvfstab_p->mntent_array[i].mnt_opts)
+	    if (!stat_tab_array[stat_tab_count].mntent_array[i].
+		pvfs_config_server
+		|| !stat_tab_array[stat_tab_count].mntent_array[i].mnt_dir
+		|| !stat_tab_array[stat_tab_count].mntent_array[i].mnt_opts)
 	    {
-                ret = -PVFS_EINVAL;
-                goto error_exit;
+		goto error_exit;
 	    }
 
 	    /* make our own copy of parameters of interest */
@@ -177,108 +202,92 @@ int PVFS_util_parse_pvfstab(const char* tabfile, PVFS_util_tab* pvfstab_p)
 	     * string and split it in half on "/" delimiter
 	     */
 	    *last_slash = '\0';
-	    strcpy(pvfstab_p->mntent_array[i].pvfs_config_server,
-                   tmp_ent->mnt_fsname);
+	    strcpy(stat_tab_array[stat_tab_count].mntent_array[i].
+		   pvfs_config_server, tmp_ent->mnt_fsname);
 	    last_slash++;
-	    pvfstab_p->mntent_array[i].pvfs_fs_name = strdup(last_slash);
-            if (!pvfstab_p->mntent_array[i].pvfs_fs_name)
-            {
-                ret = -PVFS_ENOMEM;
-                goto error_exit;
-            }
+	    stat_tab_array[stat_tab_count].mntent_array[i].pvfs_fs_name =
+		strdup(last_slash);
+	    if (!stat_tab_array[stat_tab_count].mntent_array[i].pvfs_fs_name)
+	    {
+		goto error_exit;
+	    }
 
 	    /* mnt_dir and mnt_opts are verbatim copies */
-	    strcpy(pvfstab_p->mntent_array[i].mnt_dir,
-                   tmp_ent->mnt_dir);
-	    strcpy(pvfstab_p->mntent_array[i].mnt_opts,
-                   tmp_ent->mnt_opts);
+	    strcpy(stat_tab_array[stat_tab_count].mntent_array[i].mnt_dir,
+		   tmp_ent->mnt_dir);
+	    strcpy(stat_tab_array[stat_tab_count].mntent_array[i].mnt_opts,
+		   tmp_ent->mnt_opts);
 
 	    /* find out if a particular flow protocol was specified */
 	    if ((hasmntopt(tmp_ent, "flowproto")))
 	    {
-		ret = parse_flowproto_string(
-                    tmp_ent->mnt_opts,
-                    &(pvfstab_p->mntent_array[i].flowproto));
+		ret = parse_flowproto_string(tmp_ent->mnt_opts,
+					     &(stat_tab_array[stat_tab_count].
+					       mntent_array[i].flowproto));
 		if (ret < 0)
 		{
-                    goto error_exit;
+		    goto error_exit;
 		}
 	    }
 	    else
 	    {
-		pvfstab_p->mntent_array[i].flowproto = FLOWPROTO_DEFAULT;
+		stat_tab_array[stat_tab_count].mntent_array[i].flowproto =
+		    FLOWPROTO_DEFAULT;
 	    }
 
 	    /* pick an encoding to use with the server */
-	    pvfstab_p->mntent_array[i].encoding = ENCODING_DEFAULT;
+	    stat_tab_array[stat_tab_count].mntent_array[i].encoding =
+		ENCODING_DEFAULT;
 	    cp = hasmntopt(tmp_ent, "encoding");
 	    if (cp)
-            {
-		ret = parse_encoding_string(
-                    cp, &pvfstab_p->mntent_array[i].encoding);
+	    {
+		ret =
+		    parse_encoding_string(cp,
+					  &stat_tab_array[stat_tab_count].
+					  mntent_array[i].encoding);
 		if (ret < 0)
-                {
-                    goto error_exit;
+		{
+		    goto error_exit;
 		}
 	    }
 	    i++;
 	}
     }
-    return(0);
+    stat_tab_count++;
+    return (&stat_tab_array[stat_tab_count - 1]);
 
   error_exit:
-    for(; i > -1; i--)
+    for (; i > -1; i--)
     {
-        if (pvfstab_p->mntent_array[i].pvfs_config_server)
-        {
-            free(pvfstab_p->mntent_array[i].pvfs_config_server);
-            pvfstab_p->mntent_array[i].pvfs_config_server = NULL;
-        }
+	if (stat_tab_array[stat_tab_count].mntent_array[i].pvfs_config_server)
+	{
+	    free(stat_tab_array[stat_tab_count].mntent_array[i].
+		 pvfs_config_server);
+	    stat_tab_array[stat_tab_count].mntent_array[i].pvfs_config_server =
+		NULL;
+	}
 
-        if (pvfstab_p->mntent_array[i].mnt_dir)
-        {
-            free(pvfstab_p->mntent_array[i].mnt_dir);
-            pvfstab_p->mntent_array[i].mnt_dir = NULL;
-        }
+	if (stat_tab_array[stat_tab_count].mntent_array[i].mnt_dir)
+	{
+	    free(stat_tab_array[stat_tab_count].mntent_array[i].mnt_dir);
+	    stat_tab_array[stat_tab_count].mntent_array[i].mnt_dir = NULL;
+	}
 
-        if (pvfstab_p->mntent_array[i].mnt_opts)
-        {
-            free(pvfstab_p->mntent_array[i].mnt_opts);
-            pvfstab_p->mntent_array[i].mnt_opts = NULL;
-        }
+	if (stat_tab_array[stat_tab_count].mntent_array[i].mnt_opts)
+	{
+	    free(stat_tab_array[stat_tab_count].mntent_array[i].mnt_opts);
+	    stat_tab_array[stat_tab_count].mntent_array[i].mnt_opts = NULL;
+	}
 
-        if (pvfstab_p->mntent_array[i].pvfs_fs_name)
-        {
-            free(pvfstab_p->mntent_array[i].pvfs_fs_name);
-            pvfstab_p->mntent_array[i].pvfs_fs_name = NULL;
-        }
+	if (stat_tab_array[stat_tab_count].mntent_array[i].pvfs_fs_name)
+	{
+	    free(stat_tab_array[stat_tab_count].mntent_array[i].pvfs_fs_name);
+	    stat_tab_array[stat_tab_count].mntent_array[i].pvfs_fs_name = NULL;
+	}
     }
     endmntent(mnt_fp);
-    return ret;
+    return (NULL);
 }
-
-/* PVFS_util_free_pvfstab()
- *
- * frees the mount entries data structure
- *
- * does not return anything
- */
-void PVFS_util_free_pvfstab(
-    PVFS_util_tab * tab)
-{
-    int i = 0;
-
-    for(i=0; i<tab->mntent_count; i++)
-    {
-	free(tab->mntent_array[i].pvfs_config_server);
-	free(tab->mntent_array[i].mnt_dir);
-	free(tab->mntent_array[i].mnt_opts);
-	free(tab->mntent_array[i].pvfs_fs_name);
-    }
-
-    free(tab->mntent_array);
-}
-
 
 /* PVFS_util_lookup_parent()
  *
@@ -312,7 +321,7 @@ int PVFS_util_lookup_parent(
     }
 
     ret = PVFS_sys_lookup(fs_id, buf, credentials,
-                          &resp_look, PVFS2_LOOKUP_LINK_FOLLOW);
+			  &resp_look, PVFS2_LOOKUP_LINK_FOLLOW);
     if (ret < 0)
     {
 	gossip_err("Lookup failed on %s\n", buf);
@@ -440,7 +449,8 @@ int PVFS_util_remove_dir_prefix(
 	return ret;
     }
 
-    while (pathname[1] == '/') pathname++;
+    while (pathname[1] == '/')
+	pathname++;
 
     prefix_len = strlen(prefix);
     pathname_len = strlen(pathname);
@@ -490,8 +500,8 @@ int PVFS_util_remove_dir_prefix(
 	return (-ENAMETOOLONG);
 
     /* try to handle the case of no trailing slash */
-    if (pathname[cut_index] == '\0') 
-	out_path[0]='/';
+    if (pathname[cut_index] == '\0')
+	out_path[0] = '/';
     else
 	/* copy out appropriate part of pathname */
 	strcpy(out_path, &(pathname[cut_index]));
@@ -517,11 +527,10 @@ int PVFS_util_remove_dir_prefix(
 */
 #define NUM_SIZES                  3
 
-PVFS_size PINT_s_size_table[NUM_SIZES] =
-    { /*YOTTABYTE, ZETTABYTE, EXABYTE, PETABYTE,
-        TERABYTE,*/ GIGABYTE, MEGABYTE, KILOBYTE };
+PVFS_size PINT_s_size_table[NUM_SIZES] = {	/*YOTTABYTE, ZETTABYTE, EXABYTE, PETABYTE,
+						   TERABYTE, */ GIGABYTE, MEGABYTE, KILOBYTE };
 char *PINT_s_str_size_table[NUM_SIZES] =
-    { /*"Y", "Z", "E", "P","T",*/ "G", "M", "K" };
+    { /*"Y", "Z", "E", "P","T", */ "G", "M", "K" };
 
 
 void PVFS_util_make_size_human_readable(
@@ -534,24 +543,24 @@ void PVFS_util_make_size_human_readable(
 
     if (out_str)
     {
-        for(i = 0; i < NUM_SIZES; i++)
-        {
-            tmp = size;
-            if ((PVFS_size)(tmp / PINT_s_size_table[i]) > 0)
-            {
-                tmp = (PVFS_size)(tmp / PINT_s_size_table[i]);
-                break;
-            }
-        }
-        if (i == NUM_SIZES)
-        {
-            snprintf(out_str,16, "%Ld", Ld(size));
-        }
-        else
-        {
-            snprintf(out_str,max_out_len,"%Ld%s",
-                     Ld(tmp),PINT_s_str_size_table[i]);
-        }
+	for (i = 0; i < NUM_SIZES; i++)
+	{
+	    tmp = size;
+	    if ((PVFS_size) (tmp / PINT_s_size_table[i]) > 0)
+	    {
+		tmp = (PVFS_size) (tmp / PINT_s_size_table[i]);
+		break;
+	    }
+	}
+	if (i == NUM_SIZES)
+	{
+	    snprintf(out_str, 16, "%Ld", Ld(size));
+	}
+	else
+	{
+	    snprintf(out_str, max_out_len, "%Ld%s",
+		     Ld(tmp), PINT_s_str_size_table[i]);
+	}
     }
 }
 
@@ -563,12 +572,13 @@ void PVFS_util_make_size_human_readable(
  * returns 0 on success, -PVFS_error on failure
  */
 static int parse_flowproto_string(
-    const char *input, enum PVFS_flowproto_type *flowproto)
+    const char *input,
+    enum PVFS_flowproto_type *flowproto)
 {
     int ret = 0;
-    char* start = NULL;
+    char *start = NULL;
     char flow[256];
-    char* comma = NULL;
+    char *comma = NULL;
 
     start = strstr(input, "flowproto");
     /* we must find a match if this function is being called... */
@@ -576,34 +586,34 @@ static int parse_flowproto_string(
 
     /* scan out the option */
     ret = sscanf(start, "flowproto = %255s ,", flow);
-    if(ret != 1)
+    if (ret != 1)
     {
 	gossip_err("Error: malformed flowproto option in tab file.\n");
-	return(-PVFS_EINVAL);
+	return (-PVFS_EINVAL);
     }
 
     /* chop it off at any trailing comma */
     comma = index(flow, ',');
-    if(comma)
+    if (comma)
     {
 	comma[0] = '\0';
     }
 
-    if(!strcmp(flow, "bmi_trove"))
+    if (!strcmp(flow, "bmi_trove"))
 	*flowproto = FLOWPROTO_BMI_TROVE;
-    else if(!strcmp(flow, "dump_offsets"))
+    else if (!strcmp(flow, "dump_offsets"))
 	*flowproto = FLOWPROTO_DUMP_OFFSETS;
-    else if(!strcmp(flow, "bmi_cache"))
+    else if (!strcmp(flow, "bmi_cache"))
 	*flowproto = FLOWPROTO_BMI_CACHE;
-    else if(!strcmp(flow, "multiqueue"))
+    else if (!strcmp(flow, "multiqueue"))
 	*flowproto = FLOWPROTO_MULTIQUEUE;
     else
     {
 	gossip_err("Error: unrecognized flowproto option: %s\n", flow);
-	return(-PVFS_EINVAL);
+	return (-PVFS_EINVAL);
     }
 
-    return(0);
+    return (0);
 }
 
 /*
@@ -614,45 +624,78 @@ static int parse_flowproto_string(
  *
  * Returns 0 if all okay.
  */
-static int parse_encoding_string(const char *cp, enum PVFS_encoding_type *et)
+static int parse_encoding_string(
+    const char *cp,
+    enum PVFS_encoding_type *et)
 {
     const char *cq;
     int i;
-    struct {
+    struct
+    {
 	const char *name;
 	enum PVFS_encoding_type val;
-    } enc_str[] = {
-	{ "direct", ENCODING_DIRECT },
-	{ "le_bfield", ENCODING_LE_BFIELD },
-	{ "xdr", ENCODING_XDR },
-    };
+    } enc_str[] =
+    {
+	{
+	"direct", ENCODING_DIRECT},
+	{
+	"le_bfield", ENCODING_LE_BFIELD},
+	{
+    "xdr", ENCODING_XDR},};
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: input is %s\n", __func__, cp);
     cp += strlen("encoding");
-    for (; isspace(*cp); cp++) ;  /* optional spaces */
-    if (*cp != '=') {
+    for (; isspace(*cp); cp++);	/* optional spaces */
+    if (*cp != '=')
+    {
 	gossip_err("Error: %s: malformed encoding option in tab file.\n",
-	  __func__);
+		   __func__);
 	return -PVFS_EINVAL;
     }
-    for (++cp; isspace(*cp); cp++) ;  /* optional spaces */
-    for (cq=cp; *cq && *cq != ','; cq++) ;  /* find option end */
+    for (++cp; isspace(*cp); cp++);	/* optional spaces */
+    for (cq = cp; *cq && *cq != ','; cq++);	/* find option end */
 
     *et = -1;
-    for (i=0; i<sizeof(enc_str)/sizeof(enc_str[0]); i++) {
+    for (i = 0; i < sizeof(enc_str) / sizeof(enc_str[0]); i++)
+    {
 	int n = strlen(enc_str[i].name);
-	if (cq-cp > n)
-	    n = cq-cp;
-	if (!strncmp(enc_str[i].name, cp, n)) {
+	if (cq - cp > n)
+	    n = cq - cp;
+	if (!strncmp(enc_str[i].name, cp, n))
+	{
 	    *et = enc_str[i].val;
 	    break;
 	}
     }
-    if (*et == -1) {
+    if (*et == -1)
+    {
 	gossip_err("Error: %s: unknown encoding type in tab file.\n", __func__);
 	return -PVFS_EINVAL;
     }
     return 0;
+}
+
+/* PINT_release_pvfstab()
+ *
+ * frees up any resources associated with previously parsed tabfiles
+ *
+ * no return value
+ */
+void PINT_release_pvfstab(void)
+{
+    int i, j;
+
+    for(i=0; i<stat_tab_count; i++)
+    {
+	for (j = 0; j < stat_tab_array[i].mntent_count; j++)
+	{
+	    free(stat_tab_array[i].mntent_array[j].pvfs_config_server);
+	    free(stat_tab_array[i].mntent_array[j].mnt_dir);
+	    free(stat_tab_array[i].mntent_array[j].mnt_opts);
+	    free(stat_tab_array[i].mntent_array[j].pvfs_fs_name);
+	}
+	free(stat_tab_array[i].mntent_array);
+    }
 }
 
 /*

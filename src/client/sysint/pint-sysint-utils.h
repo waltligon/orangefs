@@ -78,6 +78,7 @@ int PINT_do_lookup (
 int PINT_server_get_config(
     struct server_configuration_s *config,
     PVFS_util_tab tab);
+void PINT_release_pvfstab(void);
 
 struct server_configuration_s *PINT_get_server_config_struct(void);
 

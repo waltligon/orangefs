@@ -110,7 +110,7 @@ int main(int argc, char **argv)
     int ret = -1, i = 0, j = 0;
     char pvfs_path[MAX_NUM_PATHS][PVFS_NAME_MAX];
     PVFS_fs_id fs_id_index_array[MAX_NUM_PATHS] = {0};
-    PVFS_util_tab mnt = {0,NULL};
+    const PVFS_util_tab* tab;
     PVFS_sysresp_init resp_init;
     struct options* user_opts = NULL;
     int mnt_index = -1;
@@ -126,7 +126,8 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    if (PVFS_util_parse_pvfstab(NULL, &mnt))
+    tab = PVFS_util_parse_pvfstab(NULL);
+    if (!tab)
     {
         fprintf(stderr, "Error: failed to parse pvfstab.\n");
         return(-1);
@@ -140,12 +141,12 @@ int main(int argc, char **argv)
     /* see if the destination resides on any of the file systems
      * listed in the pvfstab; find the pvfs fs relative path
      */
-    for(i = 0; i < mnt.mntent_count; i++)
+    for(i = 0; i < tab->mntent_count; i++)
     {
         if (user_opts->num_starts == 0)
         {
             snprintf(current_dir,PVFS_NAME_MAX,"%s/",
-                     mnt.mntent_array[i].mnt_dir);
+                     tab->mntent_array[i].mnt_dir);
             user_opts->start[0] = current_dir;
             user_opts->num_starts = 1;
         }
@@ -157,7 +158,7 @@ int main(int argc, char **argv)
               a mnt.mntent entry, use '/' as the pvfs_path
             */
             if (strcmp(user_opts->start[j],
-                       mnt.mntent_array[i].mnt_dir) == 0)
+                       tab->mntent_array[i].mnt_dir) == 0)
             {
                 strcpy(pvfs_path[j], "/");
                 ret = 0;
@@ -165,7 +166,7 @@ int main(int argc, char **argv)
             else
             {
                 ret = PVFS_util_remove_dir_prefix(
-                    user_opts->start[j], mnt.mntent_array[i].mnt_dir,
+                    user_opts->start[j], tab->mntent_array[i].mnt_dir,
                     pvfs_path[j], PVFS_NAME_MAX);
             }
             if (ret == 0)
@@ -203,7 +204,7 @@ int main(int argc, char **argv)
     }
 
     memset(&resp_init, 0, sizeof(resp_init));
-    ret = PVFS_sys_initialize(mnt, GOSSIP_NO_DEBUG, &resp_init);
+    ret = PVFS_sys_initialize(*tab, GOSSIP_NO_DEBUG, &resp_init);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_sys_initialize", ret);
@@ -226,7 +227,6 @@ int main(int argc, char **argv)
         }
     }
 
-    PVFS_util_free_pvfstab(&mnt);
     PVFS_sys_finalize();
 
     return(ret);
