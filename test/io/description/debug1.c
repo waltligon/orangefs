@@ -10,7 +10,6 @@
 #include <gossip.h>
 #include <pvfs2-debug.h>
 
-#include "pvfs-distribution.h"
 #include "pint-distribution.h"
 #include "pvfs2-request.h"
 #include "pint-request.h"
@@ -52,9 +51,9 @@ int main(int argc, char **argv)
 	rf1.server_nr = 0;
 	rf1.server_ct = 1;
 	rf1.fsize = 0;
-	rf1.dist = PVFS_dist_create("simple_stripe");
+	rf1.dist = PINT_dist_create("simple_stripe");
 	rf1.extend_flag = 1;
-	PINT_Dist_lookup(rf1.dist);
+	PINT_dist_lookup(rf1.dist);
 
 	/* file data for second request is the same, except the file
 	 * will have grown by 10M 
@@ -62,9 +61,9 @@ int main(int argc, char **argv)
 	rf2.server_nr = 0;
 	rf2.server_ct = 1;
 	rf2.fsize = 10*1024*1024;
-	rf2.dist = PVFS_dist_create("simple_stripe");
+	rf2.dist = PINT_dist_create("simple_stripe");
 	rf2.extend_flag = 1;
-	PINT_Dist_lookup(rf2.dist);
+	PINT_dist_lookup(rf2.dist);
 
 	/* set up result structures */
 

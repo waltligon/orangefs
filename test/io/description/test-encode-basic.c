@@ -12,11 +12,9 @@
 #include <gossip.h>
 #include <pvfs2-debug.h>
 
-#include <pvfs-distribution.h>
+#include <pint-distribution.h>
 #include <pvfs2-request.h>
 #include <pint-request.h>
-
-#include <simple-stripe.h>
 
 #define SEGMAX 16
 #define BYTEMAX (1024*1024)

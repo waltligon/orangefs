@@ -12,10 +12,9 @@
 #include "pvfs2-types.h"
 #include "gossip.h"
 #include "pvfs2-debug.h"
-#include "pvfs-distribution.h"
+#include "pint-distribution.h"
 #include "pvfs2-request.h"
 #include "pint-request.h"
-#include "simple-stripe.h"
 
 #define SEGMAX 16
 #define BYTEMAX (256*1024)
@@ -67,9 +66,9 @@ int main(
     rf1.server_nr = 0;
     rf1.server_ct = 4;
     rf1.fsize = 0;
-    rf1.dist = PVFS_dist_create("simple_stripe");
+    rf1.dist = PINT_dist_create("simple_stripe");
     rf1.extend_flag = 1;
-    PINT_Dist_lookup(rf1.dist);
+    PINT_dist_lookup(rf1.dist);
 
     /* set up result struct */
     seg1.offset_array = (int64_t *) malloc(SEGMAX * sizeof(int64_t));

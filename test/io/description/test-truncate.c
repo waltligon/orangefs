@@ -11,8 +11,6 @@
 #include "pvfs2-types.h"
 #include "gossip.h"
 #include "pvfs2-debug.h"
-#include "pvfs-distribution.h"
-#include "simple-stripe.h"
 #include "pint-distribution.h"
 
 void PINT_Dist_dump(PINT_dist *dist);
@@ -24,13 +22,13 @@ int main(int argc, char **argv)
     PVFS_offset tmp_off = 0;
 
     /* grab a distribution */
-    d = PVFS_dist_create("simple_stripe");
+    d = PINT_dist_create("simple_stripe");
     assert(d);
 
-    ret = PINT_Dist_lookup(d);
+    ret = PINT_dist_lookup(d);
     assert(ret == 0);
 
-    PINT_Dist_dump(d);
+    PINT_dist_dump(d);
 
     /* easy case */
     tmp_off = d->methods->logical_to_physical_offset(d->params, 0, 4, 100);
@@ -63,7 +61,7 @@ int main(int argc, char **argv)
 
 
     /* free dist */
-    PVFS_dist_free(d);
+    PINT_dist_free(d);
 
     return (0);
 }

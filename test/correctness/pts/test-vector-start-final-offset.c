@@ -17,8 +17,7 @@
 #include<assert.h>
 
 #include <pint-request.h>
-#include <pvfs-distribution.h>
-#include <simple-stripe.h>
+#include <pint-distribution.h>
 #include <pvfs2-debug.h>
 #include "client.h"
 #include "mpi.h"
@@ -58,9 +57,9 @@ static int test_vec_start_final(void){
     rf1.server_nr = 0;
     rf1.server_ct = 8;
     rf1.fsize = 10000000;
-    rf1.dist = PVFS_dist_create("simple_stripe");
+    rf1.dist = PINT_dist_create("simple_stripe");
     rf1.extend_flag = 1;
-    PINT_Dist_lookup(rf1.dist);
+    PINT_dist_lookup(rf1.dist);
                                                                                 
     /* set up result struct */
     seg1.offset_array = (int64_t *)malloc(SEGMAX * sizeof(int64_t));

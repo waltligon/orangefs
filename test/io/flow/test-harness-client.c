@@ -16,7 +16,7 @@
 #include "gossip.h"
 #include "flow.h"
 #include "flowproto-support.h"
-#include "pvfs-distribution.h"
+#include "pint-distribution.h"
 #include "pvfs2-request.h"
 #include "thread-mgr.h"
 
@@ -155,13 +155,13 @@ int main(
     flow_d->file_data.server_nr = 0;
     flow_d->file_data.server_ct = 1;
     flow_d->file_data.extend_flag = 0;
-    flow_d->file_data.dist = PVFS_dist_create("basic_dist");
+    flow_d->file_data.dist = PINT_dist_create("basic_dist");
     if (!flow_d->file_data.dist)
     {
 	fprintf(stderr, "Error: failed to create dist.\n");
 	return (-1);
     }
-    ret = PINT_Dist_lookup(flow_d->file_data.dist);
+    ret = PINT_dist_lookup(flow_d->file_data.dist);
     if (ret != 0)
     {
 	fprintf(stderr, "Error: failed to lookup dist.\n");

@@ -17,8 +17,7 @@
 #include<assert.h>
 
 #include <pint-request.h>
-#include <pvfs-distribution.h>
-#include <simple-stripe.h>
+#include <pint-distribution.h>
 #include "client.h"
 #include "mpi.h"
 #include "pts.h"
