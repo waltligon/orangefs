@@ -13,7 +13,6 @@ LIBSRC += \
 	$(DIR)/pint-serv-crdirent.c \
 	$(DIR)/pint-serv-create.c \
 	$(DIR)/pint-serv-getattr.c \
-	$(DIR)/pint-serv-getconfig.c \
 	$(DIR)/pint-serv-lookup-path.c \
 	$(DIR)/pint-serv-mkdir.c \
 	$(DIR)/pint-serv-readdir.c \
