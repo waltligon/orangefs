@@ -40,9 +40,9 @@ static int server_get_config(pvfs_mntlist mntent_list);
  * returns 0 on success, -errno on failure
  */
 
-int PVFS_sys_initialize(pvfs_mntlist mntent_list)
+int PVFS_sys_initialize(pvfs_mntlist mntent_list, PVFS_sysresp_init *resp)
 {
-    int ret = -1;
+    int ret = -1, i;
     gen_mutex_t mt_config;
 
     enum {
@@ -142,7 +142,23 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list)
 	/* Release the mutex */
 	gen_mutex_unlock(&mt_config);
 	goto return_error;
-    }	
+    }
+
+    /* we need to return the fs_id's to the calling function */
+    resp->nr_fsid = server_config.nr_fs;
+    resp->fsid_list = malloc(server_config.nr_fs * sizeof(PVFS_handle));
+    if (resp->fsid_list == NULL)
+    {
+	init_fail = GET_CONFIG_INIT_FAIL;
+	ret = -ENOMEM;
+	goto return_error;
+    }
+
+    for(i = 0; i < server_config.nr_fs; i++)
+    {
+	resp->fsid_list[i] = server_config.fs_info[i].fsid;
+    }
+
 
     /* Release the mutex */
     gen_mutex_unlock(&mt_config);
@@ -226,8 +242,15 @@ static int server_get_config(pvfs_mntlist mntent_list)
 	req_p->op                      = PVFS_SERV_GETCONFIG;	
 	req_p->rsize                   = sizeof(struct PVFS_server_req_s) + name_sz;
 	req_p->credentials             = creds;
+	req_p->u.getconfig.fs_name     = malloc(7);
+	strcpy(req_p->u.getconfig.fs_name,"fs-foo");
+	req_p->u.getconfig.fs_name[7] = '\0';
+#if 0
 	req_p->u.getconfig.fs_name     = mntent_p->serv_mnt_dir; /* just point to the mount info */
+#endif
 	req_p->u.getconfig.max_strsize = MAX_STRING_SIZE;
+
+	printf("asked for fs name = %s\n", req_p->u.getconfig.fs_name);
 
 	/* DO THE GETCONFIG */
 	/* do_getconfig() fills returns an allocated and populated PVFS_server_resp_s
@@ -266,7 +289,7 @@ static int server_get_config(pvfs_mntlist mntent_list)
 	       ack_p->u.getconfig.meta_server_mapping,
 	       ack_p->u.getconfig.io_server_mapping);
 
-	gossip_ldebug(CLIENT_DEBUG,"maskbits = %d \nfh_root = %d\n",fsinfo_p->maskbits, fsinfo_p->fh_root, fsinfo_p->fsid);
+	gossip_ldebug(CLIENT_DEBUG,"maskbits = %lld \nfh_root = %ld\nfsid = %lld\n",fsinfo_p->maskbits, fsinfo_p->fh_root, fsinfo_p->fsid);
 
 	/* How to get the size of metaserver list in ack? */
 	/* NOTE: PVFS_string == char *, SO I HAVE DOUBTS ABOUT THIS LINE!!! -- ROB */
@@ -284,6 +307,7 @@ static int server_get_config(pvfs_mntlist mntent_list)
 	}
 	/* Copy the metaservers from ack to config info */
 	parse_p = ack_p->u.getconfig.meta_server_mapping;
+	gossip_ldebug(CLIENT_DEBUG," = %lld\n", fsinfo_p->fh_root);
 	gossip_ldebug(CLIENT_DEBUG,"meta server count = %d\n", fsinfo_p->meta_serv_count);
 	for (j=0; j < fsinfo_p->meta_serv_count; j++)
 	{

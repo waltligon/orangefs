@@ -11,14 +11,19 @@
 #include <string.h>
 
 #include "pvfs2-types.h"
+#include "pvfs2-attr.h"
+#include "pint-sysint.h"
 #include "bmi.h"
 #include "gossip.h"
 
+/* Configuration Management Data Structure */
+fsconfig_array server_config;
+
 static char HACK_server_name[] = "tcp://localhost:3334";
 static PVFS_handle HACK_handle_mask = 0;
-static PVFS_fs_id HACK_fsid = 0;
+static PVFS_fs_id HACK_fsid = 9;
 static PVFS_handle HACK_bucket = 0;
-static PVFS_handle HACK_root_fs_handle = 0;
+static PVFS_handle HACK_root_fs_handle = 1048576;
 
 /* TODO: NOTE: THIS IS NOT A FULL IMPLEMENTATION.  It is simply a stub that
  * can operate on a single server file system for testing purposes.
@@ -104,12 +109,14 @@ int PINT_bucket_get_next_meta(
 {
 	int ret = -1;
 	
+#if 0
 	/* make sure that they asked for something sane */
 	if(fsid != HACK_fsid)
 	{
 		gossip_lerr("PINT_bucket_get_next_meta() called for invalid fsid.\n");
 		return(-EINVAL);
 	}
+#endif
 
 	ret = BMI_addr_lookup(meta_addr, HACK_server_name);
 	if(ret < 0)
@@ -142,12 +149,14 @@ int PINT_bucket_get_next_io(
 	int i = 0;
 	int ret = -1;
 	
+#if 0
 	/* make sure that they asked for something sane */
 	if(fsid != HACK_fsid)
 	{
 		gossip_lerr("PINT_bucket_get_next_io() called for invalid fsid.\n");
 		return(-EINVAL);
 	}
+#endif
 
 	/* NOTE: for now, we assume that if the caller asks for more servers
 	 * than we have available, we should just duplicate servers in the
@@ -194,12 +203,14 @@ int PINT_bucket_map_to_server(
 {	
 	int ret = -1;
 
+#if 0
 	/* make sure that they asked for something sane */
 	if(fsid != HACK_fsid || bucket != HACK_bucket)
 	{
 		gossip_lerr("PINT_bucket_map_to_server() called for invalid fsid.\n");
 		return(-EINVAL);
 	}
+#endif
 
 	ret = BMI_addr_lookup(server_addr, HACK_server_name);
 	if(ret < 0)
@@ -224,10 +235,12 @@ int PINT_bucket_map_from_server(
 	PVFS_handle* bucket_array,
 	PVFS_handle* handle_mask)
 {
+#if 0
 	if(strcmp(server_name, HACK_server_name) != 0)
 	{
 		return(-EINVAL);
 	}
+#endif
 
 	if(*inout_count < 1)
 	{
@@ -253,10 +266,12 @@ int PINT_bucket_get_num_meta(
 	int* num_meta)
 {
 	
+#if 0
 	if(fsid != HACK_fsid)
 	{
 		return(-EINVAL);
 	}
+#endif
 
 	*num_meta = 1;
 
@@ -274,10 +289,12 @@ int PINT_bucket_get_num_io(
 	int* num_io)
 {
 	
+#if 0
 	if(fsid != HACK_fsid)
 	{
 		return(-EINVAL);
 	}
+#endif
 
 	*num_io = 1;
 
@@ -298,10 +315,12 @@ int PINT_bucket_get_server_name(
 	PVFS_fs_id fsid)
 {
 	
+#if 0
 	if(!server_name || bucket != HACK_bucket || fsid != HACK_fsid)
 	{
 		return(-EINVAL);
 	}
+#endif
 
 	if((strlen(HACK_server_name) + 1) > max_server_name_len)
 	{
@@ -324,8 +343,16 @@ int PINT_bucket_get_root_handle(
 	PVFS_fs_id fsid,
 	PVFS_handle *fh_root)
 {
-	*fh_root = HACK_root_fs_handle;
-	return(0);
+	int i;
+	for(i = 0; i < server_config.nr_fs; i++)
+	{
+		if (server_config.fs_info[i].fsid == fsid)
+		{
+			*fh_root = server_config.fs_info[i].fh_root;
+			return(0);
+		}
+	}
+	return(-EINVAL);
 }
 
 #endif

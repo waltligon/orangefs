@@ -100,6 +100,13 @@ struct pvfs_mntlist_s {
 };
 typedef struct pvfs_mntlist_s pvfs_mntlist;
 
+/* response from init */
+struct PVFS_sysresp_init_s {
+	PVFS_count32 nr_fsid; /*Number of fs_id's that we're returning*/
+	PVFS_fs_id *fsid_list; 
+};
+typedef struct PVFS_sysresp_init_s PVFS_sysresp_init;
+
 /* lookup (request and response) */
 struct PVFS_sysreq_lookup_s {
 	PVFS_string name;
@@ -457,7 +464,7 @@ struct PVFS_system_resp_s {
  * a function per system operation anyway, so what we're really doing is
  * avoiding an extra function call.
  */
-int PVFS_sys_initialize(pvfs_mntlist mntent_list);
+int PVFS_sys_initialize(pvfs_mntlist mntent_list, PVFS_sysresp_init *resp);
 int PVFS_sys_finalize(void);
 int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp);
 int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp);
