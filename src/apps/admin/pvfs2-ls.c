@@ -374,7 +374,14 @@ void print_entry_attr(
     {
         assert(attr->link_target);
 
-        printf("%s -> %s\n", buf, attr->link_target);
+        if (opts->list_long)
+        {
+            printf("%s -> %s\n", buf, attr->link_target);
+        }
+        else
+        {
+            printf("%s\n",buf);
+        }
         free(attr->link_target);
     }
     else
@@ -469,6 +476,7 @@ int do_list(
                          credentials, &getattr_response) == 0)
     {
         if ((getattr_response.attr.objtype == PVFS_TYPE_METAFILE) ||
+            (getattr_response.attr.objtype == PVFS_TYPE_SYMLINK) ||
             ((getattr_response.attr.objtype == PVFS_TYPE_DIRECTORY) &&
              (opts->list_directory)))
         {
@@ -478,8 +486,17 @@ int do_list(
             {
                 snprintf(segment,128,"/");
             }
-            print_entry_attr(pinode_refn.handle, segment,
-                             &getattr_response.attr, opts);
+
+            if (opts->list_long)
+            {
+                print_entry_attr(pinode_refn.handle, segment,
+                                 &getattr_response.attr, opts);
+            }
+            else
+            {
+                print_entry(segment, pinode_refn.handle,
+                            pinode_refn.fs_id, opts);
+            }
             return 0;
         }
     }
