@@ -63,7 +63,7 @@ int main(int argc,char **argv)
 		return(ret);
 	}
 
-	/* lookup the root handle */
+	/* lookup the directory handle */
 	req_look.credentials.uid = 100;
 	req_look.credentials.gid = 100;
 	req_look.credentials.perms = 1877;
