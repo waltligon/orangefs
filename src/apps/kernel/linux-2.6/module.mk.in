@@ -1,6 +1,6 @@
 DIR := src/apps/kernel/linux-2.6
 
-TESTSRC += \
+ADMINSRC += \
 	$(DIR)/pvfs2-client-core.c \
 	$(DIR)/pvfs2-threaded-client-core.c \
 	$(DIR)/pvfs2-client.c
