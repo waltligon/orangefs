@@ -704,7 +704,7 @@ int PVFS_util_init_defaults(void)
 
     /* use standard system tab files */
     const PVFS_util_tab* tab = PVFS_util_parse_pvfstab(NULL);
-    if(!tab)
+    if (!tab)
     {
         gossip_err(
             "Error: failed to find any pvfs2 file systems in the "
@@ -714,7 +714,7 @@ int PVFS_util_init_defaults(void)
 
     /* initialize pvfs system interface */
     ret = PVFS_sys_initialize(GOSSIP_NO_DEBUG);
-    if(ret < 0)
+    if (ret < 0)
     {
         return(ret);
     }
@@ -723,7 +723,7 @@ int PVFS_util_init_defaults(void)
     for(i=0; i<tab->mntent_count; i++)
     {
         ret = PVFS_sys_fs_add(&tab->mntent_array[i]);
-        if(ret == 0)
+        if (ret == 0)
         {
             found_one = 1;
         }
@@ -736,7 +736,7 @@ int PVFS_util_init_defaults(void)
         }
     }
 
-    if(found_one)
+    if (found_one)
     {
         return(0);
     }

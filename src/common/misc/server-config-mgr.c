@@ -327,11 +327,11 @@ struct server_configuration_s *PINT_server_config_mgr_get_config(
             config = qlist_entry(hash_link, server_config_t, hash_link);
             assert(config);
             assert(config->server_config);
-
+#if 0
             gossip_debug(
                 GOSSIP_CLIENT_DEBUG, "server_config_mgr: LOCKING config "
                 "object %p with fs_id %d\n", config, fs_id);
-
+#endif
             gen_mutex_lock(config->server_config_mutex);
             ret = config->server_config;
         }
@@ -348,7 +348,7 @@ void PINT_server_config_mgr_put_config(
     server_config_t *config = NULL;
     struct qlist_head *hash_link = NULL;
 
-    if (SC_MGR_INITIALIZED())
+    if (SC_MGR_INITIALIZED() && config_s)
     {
         gen_mutex_lock(s_server_config_mgr_mutex);
         SC_MGR_ASSERT_OK();
@@ -366,11 +366,11 @@ void PINT_server_config_mgr_put_config(
             config = qlist_entry(hash_link, server_config_t, hash_link);
             assert(config);
             assert(config->server_config);
-
+#if 0
             gossip_debug(
                 GOSSIP_CLIENT_DEBUG, "server_config_mgr: "
                 "UNLOCKING config object %p\n", config);
-
+#endif
             gen_mutex_unlock(config->server_config_mutex);
         }
         gen_mutex_unlock(s_server_config_mgr_mutex);

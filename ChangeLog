@@ -3,16 +3,42 @@ PVFS2 Release ChangeLog
 -----------------------
 
 
-pvfs2-0.1.3pre1
-===============
+pvfs2-0.1.3
+===========
 - added event logging to request encoder, server state machines, and most
   job calls
 - some changes to the event logging mask system
 - some new test programs for event logging
-- fix flow protocol handling of zero byte request processing results
+- fixed flow protocol handling of zero byte request processing results
 - moved pvfs2-client* to src/apps/kernel/linux-2.6
-- add an independent configure and make setup for test subdirectory
+- added an independent configure and make setup for test subdirectory
 - removed all dependencies on test subdirectory from src subdirectory
+- properly report if the pvfs2-client fails to execute the core program
+- reworked the error code handling in the kernel module to better match the
+  userspace pvfs2 error codes
+- handle kernel mount attempts that fail without crashing
+- added support for the pvfs2-client-core to request that the kernel module
+  pass all of the mount information it knows about back to the client so
+  that a client restart can seamlessly pick up from where it left off
+- added a client/kernel umount operation that removes dynamic mount entries
+- properly report symlink types in the pvfs2-ls tool
+- fixed karma from hanging on start due to a previous api change
+- reworked the client side system interface to be able to handle dealing
+  with multiple server configuration files at once
+- kernel now supports multiple mount points from different servers
+- kernel mount option parsing improvements and error handling
+- fixed broken configure options: --enable-karma and --disable-karma
+- better error handling and synchronization in the kernel module
+- fixed a kernel crash if pvfs2-client-core was restarted while another
+  process was attempting to do I/O
+- added a mechanism for ensuring that remount operations are serviced first
+  by the pvfs2-client-core on restart, rather than failing all pending
+  operations until the mount tables are built
+- reworked the dbpf-attr-cache to use both fs_id and handle as the lookup
+  key to allow it to work properly when multiple file systems are mounted
+- fixed a kernel crash bug that tried to overwrite pages at invalid
+  offsets on read error
+
 
 pvfs2-0.1.2
 ===========
