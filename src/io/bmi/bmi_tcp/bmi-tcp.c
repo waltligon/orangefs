@@ -202,7 +202,6 @@ static int enqueue_operation(op_list_p target_list,
 			     int tcp_op_state,
 			     struct tcp_msg_header header,
 			     void *user_ptr,
-			     int list_stub_flag,
 			     bmi_size_t actual_size,
 			     bmi_size_t expected_size,
 			     bmi_context_id context_id);
@@ -227,7 +226,6 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 				     enum bmi_buffer_type buffer_type,
 				     struct tcp_msg_header my_header,
 				     void *user_ptr,
-				     int list_stub_flag,
 				     bmi_context_id context_id);
 static int tcp_post_recv_generic(bmi_op_id_t * id,
 				 method_addr_p src,
@@ -239,7 +237,6 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
 				 enum bmi_buffer_type buffer_type,
 				 bmi_msg_tag_t tag,
 				 void *user_ptr,
-				 int list_stub_flag,
 				 bmi_context_id context_id);
 static int send_payload_progress(int s, void** buffer_list, bmi_size_t* 
     size_list, int list_count, bmi_size_t total_size, int* list_index, 
@@ -688,7 +685,7 @@ int BMI_tcp_post_send(bmi_op_id_t * id,
 
     return (BMI_tcp_post_send_generic(id, dest, &buffer,
 				      &size, 1, buffer_type, my_header,
-				      user_ptr, 1, context_id));
+				      user_ptr, context_id));
 }
 
 
@@ -725,7 +722,7 @@ int BMI_tcp_post_sendunexpected(bmi_op_id_t * id,
 
     return (BMI_tcp_post_send_generic(id, dest, &buffer,
 				      &size, 1, buffer_type, my_header,
-				      user_ptr, 1, context_id));
+				      user_ptr, context_id));
 }
 
 
@@ -768,7 +765,7 @@ int BMI_tcp_post_recv(bmi_op_id_t * id,
     ret = tcp_post_recv_generic(id, src, &buffer, &expected_size,
 				1, expected_size, actual_size,
 				buffer_type, tag,
-				user_ptr, 1, context_id);
+				user_ptr, context_id);
 
     return (ret);
 }
@@ -1013,7 +1010,7 @@ int BMI_tcp_post_send_list(bmi_op_id_t * id,
 
     return (BMI_tcp_post_send_generic(id, dest, buffer_list,
 				      size_list, list_count, buffer_type,
-				      my_header, user_ptr, 0, context_id));
+				      my_header, user_ptr, context_id));
 }
 
 /* BMI_tcp_post_recv_list()
@@ -1046,7 +1043,7 @@ int BMI_tcp_post_recv_list(bmi_op_id_t * id,
     ret = tcp_post_recv_generic(id, src, buffer_list, size_list,
 				list_count, total_expected_size,
 				total_actual_size, buffer_type, tag, user_ptr,
-				0, context_id);
+				context_id);
 
     return (ret);
 }
@@ -1088,7 +1085,7 @@ int BMI_tcp_post_sendunexpected_list(bmi_op_id_t * id,
 
     return (BMI_tcp_post_send_generic(id, dest, buffer_list,
 				      size_list, list_count, buffer_type,
-				      my_header, user_ptr, 0, context_id));
+				      my_header, user_ptr, context_id));
 }
 
 
@@ -1457,7 +1454,6 @@ static int enqueue_operation(op_list_p target_list,
 			     int tcp_op_state,
 			     struct tcp_msg_header header,
 			     void *user_ptr,
-			     int list_stub_flag,
 			     bmi_size_t actual_size,
 			     bmi_size_t expected_size,
 			     bmi_context_id context_id)
@@ -1516,7 +1512,12 @@ static int enqueue_operation(op_list_p target_list,
     tcp_op_data->tcp_op_state = tcp_op_state;
     tcp_op_data->env = header;
 
-    if (list_stub_flag)
+    /* if there is only one item in the list, then keep the list stored
+     * in the op structure.  This allows us to use the same code for send
+     * and recv as we use for send_list and recv_list, without having to 
+     * malloc lists for those special cases
+     */
+    if (list_count == 1)
     {
 	new_method_op->buffer_list = &tcp_op_data->buffer_list_stub;
 	new_method_op->size_list = &tcp_op_data->size_list_stub;
@@ -1562,7 +1563,6 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
 				 enum bmi_buffer_type buffer_type,
 				 bmi_msg_tag_t tag,
 				 void *user_ptr,
-				 int list_stub_flag,
 				 bmi_context_id context_id)
 {
     method_op_p query_op = NULL;
@@ -1687,7 +1687,12 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
 
 	query_op->list_count = list_count;
 	query_op->user_ptr = user_ptr;
-	if (list_stub_flag)
+	/* if there is only one item in the list, then keep the list stored
+	 * in the op structure.  This allows us to use the same code for send
+	 * and recv as we use for send_list and recv_list, without having to 
+	 * malloc lists for those special cases
+	 */
+	if (list_count == 1)
 	{
 	    query_op->buffer_list = &tcp_op_data->buffer_list_stub;
 	    query_op->size_list = &tcp_op_data->size_list_stub;
@@ -1771,7 +1776,7 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
     ret = enqueue_operation(op_list_array[IND_RECV],
 			    BMI_RECV, src, buffer_list, size_list,
 			    list_count, 0, 0, id, BMI_TCP_INPROGRESS,
-			    bogus_header, user_ptr, list_stub_flag, 0,
+			    bogus_header, user_ptr, 0,
 			    expected_size, context_id);
     /* just for safety; this field isn't valid to the caller anymore */
     (*actual_size) = 0;
@@ -2558,7 +2563,6 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 				     enum bmi_buffer_type buffer_type,
 				     struct tcp_msg_header my_header,
 				     void *user_ptr,
-				     int list_stub_flag,
 				     bmi_context_id context_id)
 {
     struct tcp_addr *tcp_addr_data = dest->method_data;
@@ -2600,7 +2604,7 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 	ret = enqueue_operation(op_list_array[IND_SEND], BMI_SEND,
 				dest, buffer_list, size_list, list_count, 0, 0,
 				id, BMI_TCP_INPROGRESS, my_header, user_ptr,
-				list_stub_flag, my_header.size, 0,
+				my_header.size, 0,
 				context_id);
 	if (ret >= 0)
 	{
@@ -2628,7 +2632,7 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 	ret = enqueue_operation(op_list_array[IND_SEND], BMI_SEND,
 				dest, buffer_list, size_list, list_count, 0, 0,
 				id, BMI_TCP_INPROGRESS, my_header, user_ptr,
-				list_stub_flag, my_header.size, 0,
+				my_header.size, 0,
 				context_id);
 	return (ret);
     }
@@ -2649,8 +2653,7 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 	ret = enqueue_operation(op_list_array[IND_SEND], BMI_SEND,
 				dest, buffer_list, size_list, list_count, 0,
 				ret, id, BMI_TCP_INPROGRESS, my_header,
-				user_ptr, list_stub_flag,
-				my_header.size, 0, context_id);
+				user_ptr, my_header.size, 0, context_id);
 	return (ret);
     }
 
@@ -2686,8 +2689,7 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 			    dest, buffer_list, size_list, list_count,
 			    amt_complete, TCP_ENC_HDR_SIZE, id,
 			    BMI_TCP_INPROGRESS, my_header, user_ptr,
-			    list_stub_flag, my_header.size, 0,
-			    context_id);
+			    my_header.size, 0, context_id);
 
     return (ret);
 }
