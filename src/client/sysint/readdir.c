@@ -35,7 +35,7 @@ int PVFS_sys_readdir(PVFS_sysreq_readdir *req, PVFS_sysresp_readdir *resp)
 	vflags = 0;
 	attr_mask = ATTR_BASIC;
 	ret = phelper_get_pinode(req->pinode_refn,&pinode_ptr,
-			attr_mask, vflags, req->credentials);
+			attr_mask, req->credentials);
 	if (ret < 0)
 	{
 		goto pinode_get_failure;

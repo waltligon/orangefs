@@ -41,6 +41,7 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 	pinode_reference entry;
 	struct PINT_decoded_msg decoded;
 	int max_msg_sz = 0, num_data_servers = 0;
+	int pinode_exists_in_cache = 0;
 
 	enum {
 	    NONE_FAILURE = 0,
@@ -73,6 +74,12 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 			/* if we want the size, and its valid, then return now */
 			if (entry_pinode->size_flag == SIZE_VALID)
 				return (0);
+
+			/* if the pinode already exists in the cache, we need
+			 * to remember this so we can update fields instead
+			 * of adding it again.
+			 */
+			pinode_exists_in_cache = 1;
 			/* if the size isn't valid, continue with the getattr*/
 		}
 		else
@@ -137,15 +144,24 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 
 	if ((req->attrmask & ATTR_SIZE) == ATTR_SIZE)
 	{
+	    /* getting size isn't implemented yet, figure this out,
+	     * and uncomment.
+	     */
+	    return (-EINVAL);
+#if 0
 		/*only do this if you want the size*/
 
-		/* things to do to get the size:
+		/* TODO: things to do to get the size:
 		 * 1). get each handle
 		 * 2). for each handle find out how much data is written on each (dist code)
 		 * 3). uhm, I think that's it?
 		 */
 
 		num_data_servers = entry_pinode->attr.u.meta.nr_datafiles;
+		/**/
+
+		entry_pinode->size_flag = SIZE_VALID
+#endif
 	}
 
 	ret = gettimeofday(&cur_time,NULL);
@@ -157,17 +173,20 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 	/* Set the size timestamp */
 	phelper_fill_timestamps(entry_pinode);
 
-	/* Add to cache  */
-	ret = PINT_pcache_insert(entry_pinode);
-	if (ret < 0)
+	if (pinode_exists_in_cache == 0)
 	{
+	    /* Add to cache  */
+	    ret = PINT_pcache_insert(entry_pinode);
+	    if (ret < 0)
+	    {
 		failure = SEND_REQ_FAILURE;
 		goto return_error;
+	    }
 	}
 
 	/* Free memory allocated for name */
 	if (size_array)
-		free(size_array);
+	    free(size_array);
 
 	/* Free the jobs */	
 	PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);

@@ -21,9 +21,9 @@ static int phelper_fill_attr(pinode *ptr,PVFS_object_attr attr,\
  * returns 0 on success, -errno on failure
  */
 int phelper_get_pinode(pinode_reference pref, pinode **pinode_ptr,
-		PVFS_bitfield attrmask,int valid_flags,
-		PVFS_credentials credentials)
+		PVFS_bitfield attrmask, PVFS_credentials credentials)
 {
+
 	int ret = 0;
 	
 	/* Does pinode exist? */

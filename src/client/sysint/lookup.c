@@ -283,7 +283,7 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 	    attr_mask = ATTR_BASIC;
 	    /* Get the pinode from the cache */
 	    ret = phelper_get_pinode(entry,&entry_pinode,
-				     attr_mask,vflags,req->credentials);
+				     attr_mask,req->credentials);
 	    if (ret < 0)
 	    {
 		goto lookup_path_failure;

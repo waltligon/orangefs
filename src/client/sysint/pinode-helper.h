@@ -15,8 +15,7 @@ struct timeval attr_to;
 struct timeval size_to;
 
 int phelper_get_pinode(pinode_reference pref,pinode **pinode_ptr,
-		PVFS_bitfield attrmask, int valid_flags,
-		PVFS_credentials credentials);
+		PVFS_bitfield attrmask, PVFS_credentials credentials);
 int phelper_refresh_pinode(PVFS_bitfield mask, pinode *pinode_ptr,
 		pinode_reference pref,PVFS_credentials credentials);
 int phelper_validate_pinode(pinode *pnode,int flags,PVFS_bitfield mask,
