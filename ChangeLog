@@ -12,6 +12,8 @@ pvfs2-0.7.0pre1
 - ib: fix leaking connection structs (thanks to D. Beilloin)
 - ib: use faster 1k mtu
 - ib: cleanup warning texts
+- configure: add option to disable AIO threaded callbacks
+- configure: fix GM and IB to enable only when explicitly requested
 
 
 pvfs2-0.6.5
