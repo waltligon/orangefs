@@ -1,5 +1,8 @@
 # Top level makefile for pvfs2
 
+# going to call it BUILD_SERVER
+#
+
 ###############################################################
 # LIST OF TARGETS WHICH MAY BE USED WHEN RUNNING MAKE:
 #
@@ -351,21 +354,22 @@ LIBTHREADEDOBJS := $(patsubst %.c,%-threaded.o, $(filter %.c,$(LIBSRC)))
 LIBTHREADEDPICOBJS := $(patsubst %.c,%-threaded.po, $(filter %.c,$(LIBSRC)))
 # LIBTHREADEDDEPENDS is a list of dependency files for the multithreaded client lib
 LIBTHREADEDDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(LIBSRC)))
-
 # ADMINOBJS is a list of admin program objects
 ADMINOBJS := $(patsubst %.c,%.o, $(filter %.c,$(ADMINSRC)))
-ADMINOBJS_SERVER := $(patsubst %.c,%.o, $(filter %.c,$(ADMINSRC_SERVER)))
 # ADMINTOOLS is a list of admin program executables
 ADMINTOOLS := $(patsubst %.c,%, $(filter %.c, $(ADMINSRC)))
-ADMINTOOLS_SERVER := $(patsubst %.c,%, $(filter %.c, $(ADMINSRC_SERVER)))
 # ADMINDEPENDS is a list of dependency files for admin programs
 ADMINDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(ADMINSRC)))
-ADMINDEPENDS_SERVER := $(patsubst %.c,%.d, $(filter %.c,$(ADMINSRC_SERVER)))
 
-# SERVEROBJS is a list of objects to put into the server
-SERVEROBJS := $(patsubst %.c,%-server.o, $(filter %.c,$(SERVERSRC)))
-# SERVERDEPENDS is a list of dependency files for the server
-SERVERDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(SERVERSRC)))
+ifdef BUILD_SERVER
+    ADMINOBJS_SERVER := $(patsubst %.c,%.o, $(filter %.c,$(ADMINSRC_SERVER)))
+    ADMINTOOLS_SERVER := $(patsubst %.c,%, $(filter %.c, $(ADMINSRC_SERVER)))
+    ADMINDEPENDS_SERVER := $(patsubst %.c,%.d, $(filter %.c,$(ADMINSRC_SERVER)))
+    # SERVEROBJS is a list of objects to put into the server
+    SERVEROBJS := $(patsubst %.c,%-server.o, $(filter %.c,$(SERVERSRC)))
+    # SERVERDEPENDS is a list of dependency files for the server
+    SERVERDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(SERVERSRC)))
+endif
 
 # MISCOBJS is a list of misc. objects not in the above categories
 MISCOBJS := $(patsubst %.c,%.o, $(filter %.c,$(MISCSRC)))
