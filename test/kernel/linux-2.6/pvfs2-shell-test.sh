@@ -566,7 +566,7 @@ execute_test1()
 
     setup_testdir $PVFS2_TESTDIR
 
-    PVFS2_LS="$PVFS2_TESTDIR/ls"
+    PVFS2_LS="$PVFS2_TESTDIR/ls -al $PVFS2_TESTDIR"
 
     LS=`which ls`
     if ! test -x $LS; then
@@ -574,10 +574,26 @@ execute_test1()
     fi
 
     # make sure ls will be running from the pvfs2 volume
-    cp $LS $PVFS2_LS
+    cp $LS $PVFS2_TESTDIR/ls
+
+    # populate the working dir to run the LS command on
+    touch $PVFS2_TESTDIR/a $PVFS2_TESTDIR/b $PVFS2_TESTDIR/c
+    touch $PVFS2_TESTDIR/1 $PVFS2_TESTDIR/2 $PVFS2_TESTDIR/3
+    touch $PVFS2_TESTDIR/d $PVFS2_TESTDIR/e $PVFS2_TESTDIR/f
+    touch $PVFS2_TESTDIR/4 $PVFS2_TESTDIR/5 $PVFS2_TESTDIR/6
 
     CMD="eval $PVFS2_LS & $PVFS2_LS & $PVFS2_LS & $PVFS2_LS & $PVFS2_LS"
-    timestamp "Running 'ls' multiple times at once" "$CMD"
+    timestamp "Running 'ls' multiple times at once" "$CMD" /dev/null
+
+    # attempt to be sure the commands have returned before we
+    # continue.  if we don't sleep here, it looks like a serious error
+    # occured because we are listing a directory that we've removed
+    # (below) before the command completes.  the error looks
+    # particularly nasty because the binary the kernel is trying to
+    # re-fetch has also disappeared in that case
+
+    echo "Waiting for 'ls' commands to complete"
+    sleep 30
 
     remove_testdir $PVFS2_TESTDIR
 
@@ -747,34 +763,44 @@ fi
 #####################################
 
 if ! test -z "$ENABLE_DIRECTORY_TESTS"; then
+
     directory_test1
 
     directory_test2
 
     directory_test3
+
 fi
 
 
 if ! test -z "$ENABLE_IO_TESTS"; then
+
     io_test1
 
     io_test2
+
 fi
 
 if ! test -z "$ENABLE_EXECUTE_TESTS"; then
+
     execute_test1
+
 fi
 
 if ! test -z "$ENABLE_COMPILE_TESTS"; then
+
     compile_test1
 
     compile_test2
+
 fi
 
 if ! test -z "$ENABLE_PERMISSION_TESTS"; then
+
     permission_test1
 
     permission_test2
+
 fi
 
 
