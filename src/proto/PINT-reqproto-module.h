@@ -43,11 +43,17 @@ typedef struct PINT_encoding_functions
 	enum PVFS_server_op op_type);
 } PINT_encoding_functions_s;
 
+/* size of generic header placed at the beginning of all encoded buffers;
+ * indicates encoding type and protocol version
+ */
+#define PINT_ENC_GENERIC_HEADER_SIZE 8
+
 typedef struct PINT_encoding_table_values
 {
     PINT_encoding_functions_s *op;
     char *name;
     void (*init_fun) (void);
+    char generic_header[PINT_ENC_GENERIC_HEADER_SIZE];
 } PINT_encoding_table_values_s;
 
 #endif /* PINT_ENCODING_MODULE_H */

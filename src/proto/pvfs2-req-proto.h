@@ -12,6 +12,12 @@
 #include "pvfs-distribution.h"
 #include "pvfs-request.h"
 
+/* release number:
+ * This is a base-10, 5 digit number, with one digit for the most
+ * significant version number and two for the last two (e.g. 1.5.6 => 10506)
+ */
+#define PVFS_RELEASE_NR 19901
+
 /* enumeration of supported server operations */
 enum PVFS_server_op
 {
