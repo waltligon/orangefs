@@ -260,6 +260,7 @@ int fp_multiqueue_post(flow_descriptor * flow_d)
 	}
     }
 
+    flow_d->state = FLOW_TRANSMITTING;
     return (0);
 }
 
