@@ -422,11 +422,14 @@ permission_test2()
 
     TESTDIR=$PVFS2_TESTDIR/perm-testdir
 
-    echo "Creating test dir $TESTDIR"
-    touch $TESTDIR
+    echo "Removing test dir $TESTDIR (if exists)"
+    rm -rf $TESTDIR
 
-    if ! test -f $TESTDIR; then
-        echo "Failed to create test file $TESTDIR"
+    echo "Creating test dir $TESTDIR"
+    mkdir $TESTDIR
+
+    if ! test -d $TESTDIR; then
+        echo "Failed to create test dir $TESTDIR"
         return 1
     fi
 
@@ -441,7 +444,7 @@ permission_test2()
     echo "$DATE: Finished"
 
     echo "Removing testdir"
-    rm -f $TESTDIR
+    rm -rf $TESTDIR
 
     remove_testdir $PVFS2_TESTDIR
 
