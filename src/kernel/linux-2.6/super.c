@@ -562,7 +562,7 @@ struct super_block* pvfs2_get_sb(
     PVFS2_SB(sb)->fs_id = new_op->downcall.resp.fs_mount.fs_id;
     PVFS2_SB(sb)->id = new_op->downcall.resp.fs_mount.id;
 
-    sb->s_magic = PVFS2_MAGIC;
+    sb->s_magic = PVFS2_SUPER_MAGIC;
     sb->s_op = &pvfs2_s_ops;
     sb->s_type = &pvfs2_fs_type;
 
@@ -659,7 +659,7 @@ int pvfs2_fill_sb(
         }
     }
 
-    sb->s_magic = PVFS2_MAGIC;
+    sb->s_magic = PVFS2_SUPER_MAGIC;
     sb->s_op = &pvfs2_s_ops;
     sb->s_type = &pvfs2_fs_type;
 

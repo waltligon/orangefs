@@ -593,6 +593,12 @@ enum PVFS_io_type
 #  error Unknown wordsize, perhaps your system headers are not POSIX
 #endif
 
+/*
+ * Filesystem "magic" number unique to PVFS2 kernel interface.  Used by
+ * ROMIO to auto-detect access method given a mounted path.
+ */
+#define PVFS2_SUPER_MAGIC 0x20030528
+
 #endif /* __PVFS2_TYPES_H */
 
 /*

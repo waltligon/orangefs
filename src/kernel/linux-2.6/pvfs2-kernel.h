@@ -112,7 +112,6 @@ do {                                                           \
 
 #define PVFS2_REQDEVICE_NAME          "pvfs2-req"
 
-#define PVFS2_MAGIC                    0x20030528
 #define PVFS2_DEVREQ_MAGIC             0x20030529
 #define PVFS2_LINK_MAX                 0x000000FF
 #define PVFS2_OP_RETRY_COUNT           0x00000005
