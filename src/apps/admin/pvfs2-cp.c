@@ -144,7 +144,7 @@ int main (int argc, char ** argv)
 
     PVFS_util_gen_credentials(&credentials);
 
-    ret = generic_open(&src, &credentials, 0, NULL, OPEN_SRC );
+    ret = generic_open(&src, &credentials, 0, NULL, OPEN_SRC);
     if (ret < 0)
     {
 	fprintf(stderr, "Could not open %s\n", user_opts->srcfile);
@@ -448,7 +448,7 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials,
 	    }
 
 	    obj->ufs.fd = open(obj->ufs.path,
-                               O_WRONLY|O_CREAT|O_LARGEFILE, 0666);
+                               O_WRONLY|O_CREAT|O_LARGEFILE|O_TRUNC,0666);
 	}
 	if (obj->ufs.fd < 0)
 	{
