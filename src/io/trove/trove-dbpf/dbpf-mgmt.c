@@ -665,6 +665,20 @@ static int dbpf_collection_remove(char *collname,
         return -dbpf_db_error_to_trove_error(ret);
     }
 
+    ret = sto_p->coll_db->del(sto_p->coll_db, NULL, &key, 0);
+    if (ret != 0)
+    {
+        sto_p->coll_db->err(sto_p->coll_db, ret, "DB->del");
+        return -dbpf_db_error_to_trove_error(ret);
+    }
+
+    ret = sto_p->coll_db->sync(sto_p->coll_db, 0);
+    if (ret != 0)
+    {
+        sto_p->coll_db->err(sto_p->coll_db, ret, "DB->sync");
+        return -dbpf_db_error_to_trove_error(ret);
+    }
+
     DBPF_GET_DS_ATTRIB_DBNAME(path_name, PATH_MAX,
                               sto_p->name, db_data.coll_id);
     if (unlink(path_name) != 0)
@@ -974,7 +988,7 @@ static int dbpf_collection_lookup(char *collname,
     data.data = &db_data;
     data.ulen = sizeof(db_data);
     data.flags = DB_DBT_USERMEM;
-    
+
     ret = sto_p->coll_db->get(sto_p->coll_db, NULL, &key, &data, 0);
     if (ret == DB_NOTFOUND)
     {

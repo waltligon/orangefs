@@ -12,6 +12,7 @@
 #include <errno.h>
 #include <assert.h>
 #include <limits.h>
+#include <string.h>
 
 #include "trove.h"
 #include "trove-internal.h"
