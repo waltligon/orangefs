@@ -5,7 +5,7 @@
 #
 # See COPYING in top-level directory.
 #
-# $Id: module.mk.in,v 1.1 2003-08-26 19:07:14 pw Exp $
+# $Id: module.mk.in,v 1.2 2003-09-09 22:44:39 pw Exp $
 #
 
 # only do any of this if configure decided to use IB
@@ -25,10 +25,20 @@ SERVERSRC += $(subdir)/bmi_ib.c
 PRIVATEDEPENDS += $(bmi_ib_dep)
 
 $(subdir)/bmi_ib-server.o: $(subdir)/bmi_ib.o
+ifdef QUIET_COMPILE
+	@echo "  LN -S		$@"
+	@test -e $@ || ln -s $(notdir $<) $@
+else
 	test -e $@ || ln -s $(notdir $<) $@
+endif
 
 $(subdir)/bmi_ib.o: $(bmi_ib_obj)
+ifdef QUIET_COMPILE
+	@echo "  LD 		$@"
+	@ld -r -o $@ $^
+else
 	ld -r -o $@ $^
+endif
 
 # make sure this gets pulled into libpvfs
 LIBSRC += $(subdir)/../bmi_tcp/sockio.c
@@ -42,8 +52,6 @@ bmi_ib_cflags := $(patsubst $(bmi_ib_bad_mod_inc),,$(CFLAGS))
 # Now add back include directories required by included files which include
 # other files without explicit paths.
 bmi_ib_cflags += -Isrc/common/quicklist
-bmi_ib_cflags += -Isrc/common/id-generator
-bmi_ib_cflags += -Isrc/io/bmi
 # And finally the IB_HOME defined from configure and some flags.
 bmi_ib_cflags += -I@IB_HOME@/include
 bmi_ib_cflags += -fno-common
