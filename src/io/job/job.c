@@ -2807,6 +2807,8 @@ static int do_one_work_cycle_bmi(int *num_completed,
 	return (ret);
     }
 
+    bmi_pending_count -= outcount;
+
     for (i = 0; i < outcount; i++)
     {
 	tmp_desc = (struct job_desc *) stat_bmi_user_ptr_array[i];
