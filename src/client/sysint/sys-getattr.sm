@@ -168,7 +168,8 @@ int PVFS_sys_getattr(PVFS_pinode_reference pinode_ref,
     ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_GETATTR);
     assert(ret == 0);
 
-    while (!sm_p->op_complete && ret == 0) {
+    while (!sm_p->op_complete && ret == 0)
+    {
 	ret = PINT_client_state_machine_test();
     }
     assert(ret == 0);
@@ -185,6 +186,10 @@ int PVFS_sys_getattr(PVFS_pinode_reference pinode_ref,
 static int getattr_check_parameters(PINT_client_sm *sm_p,
 				    job_status_s *js_p)
 {
+    gossip_debug(CLIENT_DEBUG,
+                 "getattr state: getattr_check_parameters\n");
+
+    assert(js_p->error_code == 0);
     return 1;
 }
 
@@ -198,6 +203,8 @@ static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
 {
     int ret = -1;
     uint32_t attrmask;
+
+    js_p->error_code = 0;
 
     gossip_debug(CLIENT_DEBUG, "(%p) getattr state: "
                  "getattr_setup_msgpair\n", sm_p);
