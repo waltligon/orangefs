@@ -52,9 +52,6 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
     int* error_code_array = NULL;
     flow_descriptor** flow_array = NULL;
     int i;
-#if 0
-    PVFS_msg_tag_t op_tag = get_next_session_tag();
-#endif
     int target_handle_count = 0;
     PVFS_handle* target_handle_array = NULL;
     int total_errors = 0;
@@ -139,26 +136,12 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	}
 
 	/* did we find that any data belongs to this handle? */
-	/* TODO: change this to support multiple handles */
-#if 0
 	if(bytemax)
 	{
 	    target_handle_array[target_handle_count] =
 		pinode_ptr->attr.u.meta.dfh[i]; 
 	    target_handle_count++;
 	}
-#else
-	if(bytemax && i == 0)
-	{
-	    target_handle_array[target_handle_count] =
-		pinode_ptr->attr.u.meta.dfh[i]; 
-	    target_handle_count++;
-	}
-	else
-	{
-	    gossip_lerr("KLUDGE: only allowing I/O to first data handle.\n");
-	}
-#endif
     }
     PINT_Free_request_state(req_state);
     req_state = NULL;
@@ -223,13 +206,8 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	req_array[i].u.io.handle = target_handle_array[i];
 	req_array[i].u.io.fs_id = req->pinode_refn.fs_id;
 	req_array[i].u.io.iod_num = i;
-	/* TODO: change this to support multiple handles */
-#if 0
 	req_array[i].u.io.iod_count =
 	    pinode_ptr->attr.u.meta.nr_datafiles;
-#else
-	req_array[i].u.io.iod_count = 1;
-#endif
 	req_array[i].u.io.io_req = req->io_req;
 	req_array[i].u.io.io_dist = pinode_ptr->attr.u.meta.dist;
 	if(type == PVFS_SYS_IO_READ)
@@ -283,13 +261,8 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	    flow_array[i]->file_data->dist =
 		pinode_ptr->attr.u.meta.dist;
 	    flow_array[i]->file_data->iod_num = i;
-	    /* TODO: change this to support multiple handles */
-#if 0
 	    flow_array[i]->file_data->iod_count =
 		pinode_ptr->attr.u.meta.nr_datafiles;
-#else
-	    flow_array[i]->file_data->iod_count = 1;
-#endif
 	    flow_array[i]->request = req->io_req;
 	    flow_array[i]->flags = 0;
 	    flow_array[i]->tag = op_tag_array[i];

@@ -124,7 +124,8 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 
 	if (req->attr.u.meta.dist == NULL)
 	{
-	    req->attr.u.meta.dist = PVFS_Dist_create("default_dist");
+	    req->attr.u.meta.dist =
+		PVFS_Dist_create("simple_stripe");
 	    //PINT_Dist_dump(req->attr.u.meta.dist);
 	}
 
