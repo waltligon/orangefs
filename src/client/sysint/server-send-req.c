@@ -297,6 +297,8 @@ int PINT_send_req_array(bmi_addr_t* addr_array,
 		NULL,
 		&(status_array[i]),
 		&(id_array[i]));
+	    gossip_err("SEND_REQ_ARRAY(): send %d returned %d.\n",
+		i, ret);
 	    if(ret < 0)
 	    {
 		/* immediate error */
@@ -319,6 +321,8 @@ int PINT_send_req_array(bmi_addr_t* addr_array,
     /* see if anything needs to be tested for completion */
     if(need_to_test)
     {
+	gossip_err("SEND_REQ_ARRAY(): testing for %d jobs.\n",
+	    need_to_test);
 	count = array_size;
 	ret = job_testsome(id_array, &count, index_array, NULL,
 	    status_array, -1);
@@ -382,6 +386,8 @@ int PINT_send_req_array(bmi_addr_t* addr_array,
 		NULL, 
 		&(status_array[i]), 
 		&(id_array[i]));
+	    gossip_err("SEND_REQ_ARRAY(): recv %d returned %d.\n",
+		i, ret);
 	    if(ret < 0)
 	    {
 		/* immediate error */
@@ -404,6 +410,8 @@ int PINT_send_req_array(bmi_addr_t* addr_array,
     /* see if anything needs to be tested for completion */
     if(need_to_test)
     {
+	gossip_err("SEND_REQ_ARRAY(): testing for %d jobs.\n",
+	    need_to_test);
 	count = array_size;
 	ret = job_testsome(id_array, &count, index_array, NULL,
 	    status_array, -1);
