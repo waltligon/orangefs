@@ -140,7 +140,7 @@ int PINT_pcache_insert(pinode *pnode )
  *
  * returns PCACHE_LOOKUP_FAILURE on failure and PCACHE_LOOKUP_SUCCESS on success 
  */
-int PINT_pcache_lookup(pinode_reference refn,pinode *pinode_ptr)
+int PINT_pcache_lookup(pinode_reference refn,pinode **pinode_ptr)
 {
 	int i = 0, ret;
 
@@ -162,7 +162,7 @@ int PINT_pcache_lookup(pinode_reference refn,pinode *pinode_ptr)
 			/* we don't want old pinodes */
 			if (check_expiry(pvfs_pcache.element[i].pnode) == PINODE_VALID)
 			{
-				pinode_ptr = pvfs_pcache.element[i].pnode;
+				(*pinode_ptr) = pvfs_pcache.element[i].pnode;
 				ret = PCACHE_LOOKUP_SUCCESS;
 			}
 		}
