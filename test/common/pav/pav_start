@@ -118,6 +118,7 @@ sub init {
 	       'PROG' => "pvfs2-server",
 	       'PINGPROG' => "pvfs2-ping",
 	       'GENCONFIG' => "pvfs2-genconfig",
+	       'TROVESYNC' => 1,
 	       'PROGROOT' => "./"
 	       );
  
