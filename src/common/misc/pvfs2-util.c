@@ -347,6 +347,39 @@ int PVFS_util_resolve(
     return(-PVFS_ENOENT);
 }
 
+/* PVFS_util_init_defaults()
+ *
+ * performs the standard set of initialization steps for the system
+ * interface, mostly just a wrapper function
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
+int PVFS_util_init_defaults(void)
+{
+    const PVFS_util_tab* tab;
+    PVFS_sysresp_init resp_init;
+    int ret = -1;
+
+    /* use standard system tab files */
+    tab = PVFS_util_parse_pvfstab(NULL);
+    if(!tab)
+    {
+	gossip_err("Error: failed to find any pvfs2 file systems in the "
+	    "standard system tab files.\n");
+	return(-PVFS_ENOENT);
+    }
+
+    /* initialize pvfs system interface */
+    memset(&resp_init, 0, sizeof(resp_init));
+    ret = PVFS_sys_initialize(*tab, GOSSIP_NO_DEBUG, &resp_init);
+    if(ret < 0)
+    {
+	return(ret);
+    }
+
+    return(0);
+}
+
 /* PVFS_util_lookup_parent()
  *
  * given a pathname and an fsid, looks up the handle of the parent
