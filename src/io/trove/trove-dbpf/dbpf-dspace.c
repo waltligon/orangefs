@@ -930,20 +930,17 @@ static int dbpf_dspace_test(TROVE_coll_id coll_id,
                             int max_idle_time_ms)
 {
     int ret = -1;
+    dbpf_queued_op_t *cur_op = NULL;
 #ifdef __PVFS2_TROVE_THREADED__
     int state = 0;
     gen_mutex_t *context_mutex = NULL;
-
-    assert(dbpf_completion_queue_array[context_id]);
-
-    context_mutex = dbpf_completion_queue_array_mutex[context_id];
-    assert(context_mutex);
 #endif
-    dbpf_queued_op_t *cur_op = NULL;
 
     *out_count_p = 0;
-
 #ifdef __PVFS2_TROVE_THREADED__
+    assert(dbpf_completion_queue_array[context_id]);
+    context_mutex = dbpf_completion_queue_array_mutex[context_id];
+    assert(context_mutex);
     cur_op = id_gen_fast_lookup(id);
     if (cur_op == NULL)
     {
