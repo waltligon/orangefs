@@ -1731,7 +1731,7 @@ fi
 
 
 CPPFLAGS_OLD="$CPPFLAGS"
-CPPFLAGS="$CPPFLAGS -I ${GM_HOME}/include"
+CPPFLAGS="$CPPFLAGS -I ${GM_HOME}/include -I ${GM_HOME}/include/gm"
 ac_safe=`echo "gm.h" | sed 'y%./+-%__p_%'`
 echo $ac_n "checking for gm.h""... $ac_c" 1>&6
 echo "configure:1738: checking for gm.h" >&5

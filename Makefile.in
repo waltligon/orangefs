@@ -138,7 +138,7 @@ LIBS += -lpthread
 # enable GM if configure detected it
 
 ifdef BUILD_GM
-	CFLAGS += -I @GM_HOME@/include
+	CFLAGS += -I @GM_HOME@/include -I @GM_HOME@/include/gm
 	CFLAGS += -D__STATIC_METHOD_BMI_GM__
 	# TODO: later on we will want the ability to modify this at configure
 	# time

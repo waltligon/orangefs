@@ -211,7 +211,7 @@ AC_SUBST(GM_HOME)
 
 dnl look for GM headers
 CPPFLAGS_OLD="$CPPFLAGS"
-CPPFLAGS="$CPPFLAGS -I ${GM_HOME}/include"
+CPPFLAGS="$CPPFLAGS -I ${GM_HOME}/include -I ${GM_HOME}/include/gm"
 AC_CHECK_HEADER(gm.h,
 	AC_DEFINE(HAVE_GM, 1, Define if GM is present)
 	BUILD_GM="1"
