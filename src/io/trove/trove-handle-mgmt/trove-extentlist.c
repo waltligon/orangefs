@@ -352,7 +352,7 @@ int extentlist_hit_cutoff(struct TROVE_handle_extentlist *elist,
  * 					than this one?
  */
 int extentlist_endured_purgatory(struct TROVE_handle_extentlist *querent, struct TROVE_handle_extentlist *reference) {
-    return ( (reference->timestamp.tv_sec - querent->timestamp.tv_sec) > EXTENTLIST_PURGATORY );
+    return ( (querent->timestamp.tv_sec - reference->timestamp.tv_sec) > EXTENTLIST_PURGATORY );
 }
 
 

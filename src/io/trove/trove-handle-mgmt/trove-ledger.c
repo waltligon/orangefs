@@ -195,6 +195,7 @@ static int handle_recycle(struct handle_ledger *hl)
     extentlist_free(&(hl->recently_freed_list));
     hl->recently_freed_list = hl->overflow_list;
     memset(&(hl->overflow_list), 0, sizeof(struct TROVE_handle_extentlist));
+    gettimeofday(&(hl->overflow_list.timestamp), NULL);
 
     return 0;
 }
