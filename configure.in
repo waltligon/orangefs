@@ -92,7 +92,7 @@ AC_DEFINE(WITH_MTRACE, 1, Define if mtrace memory leak detection was enabled)
 
 dnl This particular one enables berkeley db to emit detected errors
 AC_ARG_WITH(berkdb-debug,
-[  --with-berkdb-debug     Use berkeley db error reporting if detected).],
+[  --with-berkdb-debug     Use berkeley db error reporting (if detected).],
 AC_DEFINE(BERKDB_ERROR_REPORTING, 1, Define if berkeley db error reporting was enabled)
 )
 

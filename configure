@@ -14,7 +14,7 @@ ac_default_prefix=/usr/local
 ac_help="$ac_help
   --with-mtrace           Use mtrace for detecting memory leaks (must setenv MALLOC_TRACE to output file name)."
 ac_help="$ac_help
-  --with-berkdb-debug     Use berkeley db error reporting if detected)."
+  --with-berkdb-debug     Use berkeley db error reporting (if detected)."
 ac_help="$ac_help
   --with-pablo=path       Use Pablo trace library installed in "path""
 ac_help="$ac_help
@@ -582,8 +582,8 @@ ac_configure=$ac_aux_dir/configure # This should be Cygnus configure.
 
 PVFS2_MAJOR=0
 PVFS2_MINOR=1
-PVFS2_SUB=0
-PVFS2_PRE=""
+PVFS2_SUB=1
+PVFS2_PRE="pre1"
 
 am__api_version="1.4"
 # Find a good install program.  We prefer a C program (faster),
