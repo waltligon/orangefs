@@ -173,6 +173,9 @@ when it is safe to kill sockets.
 GM module:
 -----------------------
 
+clean up use of qlist (in particular, make use of
+qlist_for_each_safe() when appropriate)
+
 Implement BMI_CHECK_MAXSIZE get_info() option.
 
 Make sure that GM can handle 0 byte messages; the flow code may trigger
