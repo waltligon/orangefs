@@ -962,14 +962,13 @@ int job_req_sched_post(struct PVFS_server_req *in_request,
 
     ret = PINT_req_sched_post(in_request, jd, &(jd->u.req_sched.id));
 
-    /* NOTE: I am letting the return value propigate here, rather
-     * than just setting the status.  Failure here is bad...
-     */
     if (ret < 0)
     {
 	/* error posting */
 	dealloc_job_desc(jd);
-	return (ret);
+	out_status_p->error_code = ret;
+	out_status_p->status_user_tag = status_user_tag;
+	return (1);
     }
 
     if (ret == 1)
