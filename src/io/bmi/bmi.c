@@ -935,9 +935,7 @@ int BMI_addr_lookup(bmi_addr_t* new_addr, const char* id_string){
 	new_ref->interface = active_method_table[i];
 
 	/* keep up with the reference and we are done */
-	if((ret = ref_list_add(cur_ref_list, new_ref)) != 0){
-		goto bmi_addr_lookup_failure;
-	}
+	ref_list_add(cur_ref_list, new_ref);
 
 	*new_addr = new_ref->bmi_addr;
 	gen_mutex_unlock(&interface_mutex);
@@ -1132,7 +1130,6 @@ int BMI_post_sendunexpected_list(
 int bmi_method_addr_reg_callback(method_addr_p map)
 {
 	ref_st_p new_ref = NULL;
-	int ret = -1;
 
 	/* NOTE: we are trusting the method to make sure that we really don't
 	 * know about the address yet.  No verification done here.
@@ -1153,10 +1150,7 @@ int bmi_method_addr_reg_callback(method_addr_p map)
 	new_ref->interface = active_method_table[map->method_type];
 	
 	/* add the reference structure to the list */
-	ret = ref_list_add(cur_ref_list, new_ref);
-	if(ret < 0){
-		return(ret);
-	}
+	ref_list_add(cur_ref_list, new_ref);
 	
 	return(0);
 }

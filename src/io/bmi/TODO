@@ -59,8 +59,6 @@ each module is called once with 1/n idle time)
 come up with some decent defaults for BMI timeouts and give them
 symbolic names to use throughout the pvfs2 code
 
-replace the use of llist in the reference list with quicklist
-
 we can probably redo op_list_search as a simpler function - I'm not sure
 we need so much flexibility any more, so maybe we can skip passing
 a whole key into search.

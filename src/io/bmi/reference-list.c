@@ -9,7 +9,6 @@
  * reference_list.c - functions to handle the creation and modification of 
  * reference structures for the BMI layer
  *
- * This is built on top of the llist.[ch] files
  */
 
 #include <stdlib.h>
@@ -19,15 +18,6 @@
 #include <reference-list.h>
 #include <gossip.h>
 #include <id-generator.h>
-
-/***************************************************************
- * Function prototypes
- */
-
-static int ref_list_cmp_addr(void *key, void *refp);
-static int ref_list_cmp_method_addr(void *key, void *refp);
-static int ref_list_cmp_str(void *key, void *refp);
-static void ref_st_free(void* rsp);
 
 
 /***************************************************************
@@ -43,7 +33,15 @@ static void ref_st_free(void* rsp);
  */
 ref_list_p ref_list_new(void)
 {
-	return(llist_new());
+	
+	ref_list_p tmp_list = NULL;
+
+	tmp_list = (ref_list_p)malloc(sizeof(struct qlist_head));
+	if(tmp_list)
+	{
+		INIT_QLIST_HEAD(tmp_list);
+	}
+	return(tmp_list);
 }
 
 /*
@@ -51,11 +49,11 @@ ref_list_p ref_list_new(void)
  *
  * adds a reference to the list.  
  *
- * returns 0 on success, -1 on failure
+ * no return value
  */
-int ref_list_add(ref_list_p rlp, ref_st_p rsp)
+void ref_list_add(ref_list_p rlp, ref_st_p rsp)
 {
-	return (llist_add(rlp, (void *) rsp));
+	qlist_add(&(rsp->list_link), rlp);
 }
 
 /*
@@ -68,7 +66,16 @@ int ref_list_add(ref_list_p rlp, ref_st_p rsp)
  */
 ref_st_p ref_list_search_addr(ref_list_p rlp, bmi_addr_t my_addr)
 {
-	return((ref_st_p) llist_search(rlp, (void *) (&my_addr), ref_list_cmp_addr));
+	ref_list_p tmp_link = NULL;
+	ref_st_p tmp_entry = NULL;
+
+	qlist_for_each(tmp_link, rlp)
+	{
+		tmp_entry = qlist_entry(tmp_link, struct ref_st, list_link);
+		if(tmp_entry->bmi_addr == my_addr)
+			return(tmp_entry);
+	}
+	return(NULL);
 }
 
 
@@ -81,8 +88,16 @@ ref_st_p ref_list_search_addr(ref_list_p rlp, bmi_addr_t my_addr)
  * returns a pointer to the structure on success, NULL on failure.
  */
 ref_st_p ref_list_search_method_addr(ref_list_p rlp, method_addr_p map){
-	
-	return((ref_st_p) llist_search(rlp, (void*) (map), ref_list_cmp_method_addr));
+	ref_list_p tmp_link = NULL;
+	ref_st_p tmp_entry = NULL;
+
+	qlist_for_each(tmp_link, rlp)
+	{
+		tmp_entry = qlist_entry(tmp_link, struct ref_st, list_link);
+		if(tmp_entry->method_addr == map)
+			return(tmp_entry);
+	}
+	return(NULL);
 }
 
 /*
@@ -95,7 +110,16 @@ ref_st_p ref_list_search_method_addr(ref_list_p rlp, method_addr_p map){
  */
 ref_st_p ref_list_search_str(ref_list_p rlp, const char* idstring)
 {
-	return((ref_st_p) llist_search(rlp, (void *) (idstring), ref_list_cmp_str));
+	ref_list_p tmp_link = NULL;
+	ref_st_p tmp_entry = NULL;
+
+	qlist_for_each(tmp_link, rlp)
+	{
+		tmp_entry = qlist_entry(tmp_link, struct ref_st, list_link);
+		if(!strcmp(tmp_entry->id_string, idstring))
+			return(tmp_entry);
+	}
+	return(NULL);
 }
 
 /*
@@ -107,7 +131,20 @@ ref_st_p ref_list_search_str(ref_list_p rlp, const char* idstring)
  */
 ref_st_p ref_list_rem(ref_list_p rlp, bmi_addr_t my_addr)
 {
-	return((ref_st_p) llist_rem(rlp, (void *) (&my_addr), ref_list_cmp_addr));
+	ref_list_p tmp_link = NULL;
+	ref_list_p scratch = NULL;
+	ref_st_p tmp_entry = NULL;
+
+	qlist_for_each_safe(tmp_link, scratch, rlp)
+	{
+		tmp_entry = qlist_entry(tmp_link, struct ref_st, list_link);
+		if(tmp_entry->bmi_addr == my_addr)
+		{
+			qlist_del(&tmp_entry->list_link);
+			return(tmp_entry);
+		}
+	}
+	return(NULL);
 }
 
 
@@ -121,7 +158,18 @@ ref_st_p ref_list_rem(ref_list_p rlp, bmi_addr_t my_addr)
  */
 void ref_list_cleanup(ref_list_p rlp)
 {
-	llist_free(rlp, ref_st_free);
+	ref_list_p tmp_link = NULL;
+	ref_list_p scratch = NULL;
+	ref_st_p tmp_entry = NULL;
+
+	qlist_for_each_safe(tmp_link, scratch, rlp)
+	{
+		tmp_entry = qlist_entry(tmp_link, struct ref_st, list_link);
+		free(tmp_entry);
+	}
+
+	free(rlp);
+	return;
 }
 
 /*
@@ -180,68 +228,3 @@ void dealloc_ref_st(ref_st_p deadref){
 	free(deadref);
 }                                   
 
-/****************************************************************
- * Internal utility functions
- */
-
-/*
- * ref_list_cmp_addr()
- *
- * compares a given reference structure against a bmi_addr_t  to see
- * if it is a match.
- * 
- * returns a 0 if there it is a match, 1 otherwise.
- */
-static int ref_list_cmp_addr(void *key, void *refp)
-{
-	if(((ref_st_p)refp)->bmi_addr == (*(bmi_addr_t *)key)){
-		return(0);
-	}
-	return(1);
-
-}
-
-/*
- * ref_list_cmp_method_addr()
- *
- * compares a given reference structure against a method_addr_p pointer to
- * see if there is a match.
- *
- * returns a 0 if there is a match, 1 otherwise.
- */
-static int ref_list_cmp_method_addr(void *key, void *refp){
-
-	if(((ref_st_p)refp)->method_addr == (method_addr_p)key){
-		return(0);
-	}
-	return(1);
-}
-
-/*
- * ref_list_cmp_str()
- *
- * compares a given reference structure against an id string to see
- * if it is a match.
- * 
- * returns a 0 if there it is a match, 1 otherwise.
- */
-static int ref_list_cmp_str(void *key, void *refp)
-{
-	if(!strcmp(((ref_st_p)refp)->id_string, (char*)key)){
-		return(0);
-	}
-	return(1);
-
-}
-
-/*
- * ref_st_free()
- *
- * used by ref_list_cleanup to free up the memory associated with a list
- * item.
- *
- * no return value
- */
-static void ref_st_free(void* rsp){
-	dealloc_ref_st((ref_st_p)rsp);
-}

@@ -14,9 +14,11 @@
 #ifndef __REFERENCE_LIST_H
 #define __REFERENCE_LIST_H
 
-#include <bmi-types.h>
-#include <bmi-method-support.h>
-#include <llist.h>
+#include "bmi-types.h"
+#include "bmi-method-support.h"
+#include "quicklist.h"
+
+typedef struct qlist_head* ref_list_p;
 
 /**********************************************************************/
 /* this is the basic reference structure for the glue layer above the
@@ -30,9 +32,11 @@ struct ref_st{
 
 	/* pointer to the appropriate method interface */
 	struct bmi_method_ops* interface;
+
+	/* linked list entry */
+	struct qlist_head list_link;
 };
 
-typedef llist_p ref_list_p;
 typedef struct ref_st ref_st, *ref_st_p;
 
 /********************************************************************
@@ -40,7 +44,7 @@ typedef struct ref_st ref_st, *ref_st_p;
  */
 
 ref_list_p ref_list_new(void);
-int ref_list_add(ref_list_p rlp, ref_st_p rsp);
+void ref_list_add(ref_list_p rlp, ref_st_p rsp);
 ref_st_p ref_list_search_addr(ref_list_p rlp, bmi_addr_t my_addr);
 ref_st_p ref_list_rem(ref_list_p rlp, bmi_addr_t my_addr);
 ref_st_p ref_list_search_method_addr(ref_list_p rlp, method_addr_p map);
