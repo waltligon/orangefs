@@ -1053,6 +1053,7 @@ int BMI_set_info(PVFS_BMI_addr_t addr,
     {
 	tmp_ref->ref_count--;
 	assert(tmp_ref->ref_count >= 0);
+
 	gen_mutex_unlock(&ref_mutex);
 	return(0);
     }

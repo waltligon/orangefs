@@ -4,10 +4,6 @@
  * See COPYING in top-level directory.
  */
 
-/* This file contains the primary application interface to the BMI
- * system.
- */
-
 #ifndef __BMI_METHOD_CALLBACK_H
 #define __BMI_METHOD_CALLBACK_H
 
