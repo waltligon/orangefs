@@ -13,11 +13,10 @@ extern "C" {
 
 #include <db.h>
 
-#include <trove.h>
-#include <dbpf.h>
+#include "trove.h"
+#include "dbpf.h"
 
 void dbpf_dspace_dbcache_initialize(void);
-
 void dbpf_dspace_dbcache_finalize(void);
 
 enum {

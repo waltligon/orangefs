@@ -4,8 +4,11 @@
  * See COPYING in top-level directory.
  */
 
-#include <trove.h>
-#include <trove-internal.h>
+#include <assert.h>
+
+#include "trove.h"
+#include "trove-internal.h"
+#include "gen-locks.h"
 
 /* Currently we only have one method for these tables to refer to */
 struct TROVE_mgmt_ops    *mgmt_method_table[1];
@@ -25,6 +28,24 @@ extern struct TROVE_fs_ops      dbpf_fs_ops;
  * generated.
  */
 
+/* trove_init_mutex, trove_init_status
+ *
+ * These two are used to ensure that trove is only initialized once.
+ *
+ * A program is erroneous if it performs trove operations before calling
+ * trove_initialize(), and we don't try to help in that case.  We do,
+ * however, make sure that we don't destroy anything if initialize is called
+ * more than once.
+ */
+static gen_mutex_t trove_init_mutex = GEN_MUTEX_INITIALIZER;
+static int trove_init_status = 0;
+
+/* trove_initialize()
+ *
+ * Returns -1 on failure (already initialized), 1 on success.  This is in
+ * keeping with the "1 is immediate succcess" semantic for return values used
+ * throughout trove.
+ */
 int trove_initialize(char *stoname,
 		     TROVE_ds_flags flags,
 		     char **method_name_p,
@@ -33,10 +54,16 @@ int trove_initialize(char *stoname,
     int ret;
     char *ret_method_name_p;
 
+    ret = gen_mutex_lock(&trove_init_mutex);
+    assert (!ret);
+    if (trove_init_status) {
+	gen_mutex_unlock(&trove_init_mutex);
+	return -1;
+    }
+
     /* for each underlying method, call its initialize function */
 
     /* currently all we have is dbpf */
-
 
     /* add mapping into method table */
     mgmt_method_table[0]    = &dbpf_mgmt_ops;
@@ -52,21 +79,38 @@ int trove_initialize(char *stoname,
 				   flags, 
 				   &ret_method_name_p,
 				   0); /* first and only method */
-    if (ret < 0) return ret;
 
     /* TODO: do something with returned name? */
 
-    return 1;
+    if (ret >= 0) {
+	ret = 1;
+	trove_init_status = 1;
+    }
+    gen_mutex_unlock(&trove_init_mutex);
+    return ret;
 }
 
+/* trove_finalize()
+ */
 int trove_finalize(void)
 {
     int ret;
 
-    ret = mgmt_method_table[0]->finalize();
-    if (ret < 0) return ret;
+    ret = gen_mutex_lock(&trove_init_mutex);
+    assert (!ret);
+    if (!trove_init_status) {
+	gen_mutex_unlock(&trove_init_mutex);
+	return -1;
+    }
+    else {
+	trove_init_status = 0;
+    }
 
-    return 1;
+    ret = mgmt_method_table[0]->finalize();
+
+    gen_mutex_unlock(&trove_init_mutex);
+    if (ret < 0) return ret;
+    else return 1;
 }
 
 int trove_storage_create(char *stoname,

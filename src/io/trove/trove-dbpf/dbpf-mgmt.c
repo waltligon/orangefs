@@ -17,15 +17,15 @@
 #include <time.h>
 #include <malloc.h>
 #include <errno.h>
-
-#include <trove.h>
-#include <trove-internal.h>
-#include <dbpf.h>
-#include <dbpf-bstream.h>
-#include <dbpf-keyval.h>
-#include <trove-ledger.h>
-
 #include <limits.h>
+
+#include "trove.h"
+#include "trove-internal.h"
+#include "dbpf.h"
+#include "dbpf-bstream.h"
+#include "dbpf-keyval.h"
+#include "dbpf-dspace.h"
+#include "trove-ledger.h"
 
 int dbpf_method_id = -1;
 char dbpf_method_name[] = "dbpf";
@@ -48,7 +48,7 @@ static int dbpf_collection_getinfo(
 				   int option,
 				   void *parameter)
 {
-    return 0;
+    return -1;
 }
 
 /* dbpf_collection_setinfo()
@@ -59,7 +59,7 @@ static int dbpf_collection_setinfo(
 				   int option,
 				   void *parameter)
 {
-    return 0;
+    return -1;
 }
 
 /* dbpf_collection_seteattr()
@@ -178,7 +178,6 @@ static int dbpf_initialize(
     dbpf_keyval_dbcache_initialize();
     
     return 1;
-    
 }
 
 /* dbpf_finalize()
@@ -697,5 +696,5 @@ struct TROVE_mgmt_ops dbpf_mgmt_ops =
  *  c-basic-offset: 4
  * End:
  *
- * vim: ts=8 sw=4 noexpandtab
+ * vim: ts=8 sts=4 sw=4 noexpandtab
  */
