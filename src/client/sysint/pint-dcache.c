@@ -241,7 +241,7 @@ int PINT_dcache_insert(
 
         gossip_ldebug(DCACHE_DEBUG, "DCACHE: Inserting segment %s "
                       "(%Lu|%d) under parent (%Lu|%d)\n", name,
-                      entry.handle, entry.fs_id, parent.handle,
+                      Lu(entry.handle), entry.fs_id, Lu(parent.handle),
                       parent.fs_id);
 
 	for (i = cache->top; i != BAD_LINK; i = cache->element[i].next)
