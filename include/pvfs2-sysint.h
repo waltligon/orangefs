@@ -19,9 +19,6 @@
 /* non-blocking sysint operation handle */
 typedef PVFS_id_gen_t PVFS_sys_op_id;
 
-/* non-blocking mgmt operation handle */
-typedef PVFS_id_gen_t PVFS_mgmt_op_id;
-
 /* attributes */
 struct PVFS_sys_attr_s
 {

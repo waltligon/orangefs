@@ -11,6 +11,9 @@
 
 #include "pvfs2-types.h"
 
+/* non-blocking mgmt operation handle */
+typedef PVFS_id_gen_t PVFS_mgmt_op_id;
+
 /* low level statfs style information for each server */
 /* see PVFS_mgmt_statfs_all() */
 struct PVFS_mgmt_server_stat
@@ -194,7 +197,7 @@ int PVFS_mgmt_get_dfile_array(
 int PVFS_imgmt_remove_object(
     PVFS_object_ref object_ref, 
     PVFS_credentials *credentials,
-    PVFS_sys_op_id *op_id,
+    PVFS_mgmt_op_id *op_id,
     void *user_ptr);
 
 int PVFS_mgmt_remove_object(
@@ -205,7 +208,7 @@ int PVFS_imgmt_remove_dirent(
     PVFS_object_ref parent_ref,
     char *entry,
     PVFS_credentials *credentials,
-    PVFS_sys_op_id *op_id,
+    PVFS_mgmt_op_id *op_id,
     void *user_ptr);
 
 int PVFS_mgmt_remove_dirent(
