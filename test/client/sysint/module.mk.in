@@ -28,13 +28,12 @@ TEST_SYSINT_DIR_SRC += \
 
 TESTSRC += $(TEST_SYSINT_DIR_SRC)
 
-LOCALLIBS := -ldb -lrt -lpthread
 LOCALTESTS := $(patsubst %.c,%, $(TEST_SYSINT_DIR_SRC))
 $(LOCALTESTS): %: %.o
 ifdef QUIET_COMPILE
 	@echo "  LD		$@"
-	@$(LD) $< $(LDFLAGS) $(LIBS) $(LOCALLIBS) -o $@
+	@$(LD) $< $(LDFLAGS) $(LIBS) -o $@
 else
-	$(LD) $< $(LDFLAGS) $(LIBS) $(LOCALLIBS) -o $@
+	$(LD) $< $(LDFLAGS) $(LIBS) -o $@
 endif
 
