@@ -70,6 +70,11 @@ struct handle_ledger * trove_handle_ledger_init(TROVE_coll_id coll_id,
     if (extentlist_init(&(ledger->recently_freed_list))) return NULL;
     if (extentlist_init(&(ledger->overflow_list))) return NULL;
 	
+    /* we work with extents through trove_setinfo now.  We still don't have a
+     * good way to save and restore state, but we can limp along with our 'good
+     * enough' way for a bit.  The commented-out code below might be one way to
+     * load and restore state */
+#if 0
     if (admin_name == NULL ) {
 	/* load with defaults */
 	/* XXX: should it be an error to run without a backing store?
@@ -88,6 +93,7 @@ struct handle_ledger * trove_handle_ledger_init(TROVE_coll_id coll_id,
 	    return NULL;
 	}		
     }
+#endif
     return ledger;
 }
 
@@ -299,72 +305,18 @@ static int handle_store_load(TROVE_coll_id coll_id,
 			     char *admin_name,
 			     struct handle_ledger *ledger) 
 {
-#if 0
-    char *method_name;
-    TROVE_coll_id admin_id;
-    TROVE_handle free_list_handle = FREE_EXTENTLIST_HANDLE;
-    TROVE_handle overflow_list_handle = OVERFLOW_EXTENTLIST_HANDLE;
-    TROVE_handle recently_freed_list_handle = RECENTLY_FREED_EXTENTLIST_HANDLE;
-#endif
-
     TROVE_op_id op_id;
 
     int i, ret, count, array_count, state;
-    TROVE_handle *handle_array;
-    TROVE_ds_position pos = TROVE_ITERATE_START; /* ??? */
 
     /* initialize lists to empty */
     extentlist_init(&ledger->free_list);
     extentlist_init(&ledger->recently_freed_list);
     extentlist_init(&ledger->overflow_list);
 
-    /* add everything onto the free list for now */
-    extentlist_addextent(&(ledger->free_list), MIN_HANDLE, MAX_HANDLE);
-#if 0
-    extentlist_show(&(ledger->free_list));
-#endif
-
-    /* now take off everything that has been used...time consuming, but accurate. */
-    array_count = 256;
-    handle_array = malloc(256 * sizeof(TROVE_handle));
-    if (!handle_array) assert(0);
-
-    for (;;) {
-	array_count = 256;
-	ret = trove_dspace_iterate_handles(coll_id,
-					   &pos,
-					   handle_array,
-					   &array_count,
-					   0, /* flags */
-					   0, /* vtag */
-					   0, /* user_ptr */
-					   &op_id);
-	if (ret < 0) assert(0);
-
-	while (ret != 1) {
-	    ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
-	    if (ret < 0) assert(0);
-	}
-
-	if (array_count == 0) break;
-
-#if 0
-	printf("handle_store_load: found %d handles used.\n", array_count);
-#endif
-
-	for (i=0; i < array_count; i++) {
-#if 0
-	    printf("  handle_store_load: removing %Ld from free list.\n", handle_array[i]);
-#endif
-	    extentlist_handle_remove(&ledger->free_list, handle_array[i]);
-#if 0
-	    extentlist_show(&(ledger->free_list));
-#endif
-	}
-    }
-
-    free(handle_array);
-
+    /* we used to add everything onto the free list, then take it off.  we now
+     * do this somewhere else (trove_map_handle_ranges */
+    
 #if 0
     /* ONE DAY THIS CODE WILL READ THE FREE LISTS FROM BSTREAMS, BUT NOT TODAY. */
     ret = trove_collection_lookup(admin_name, &admin_id, NULL, &op_id);
@@ -424,6 +376,36 @@ static int handle_store_load(TROVE_coll_id coll_id,
 #endif
 
     return 0;
+}
+
+/* trove_handle_ledger_addextent:  add a new legal extent from which the ledger
+ *   can dole out handles.  
+ *
+ *	hl	struct handle_ledger to which we add stuff
+ *	extent	the new legal extent
+ *
+ * return:
+ *    0 if ok
+ *    nonzero if not
+ */
+inline int trove_handle_ledger_addextent(struct handle_ledger *hl, 
+	TROVE_extent * extent)
+{
+   return extentlist_addextent(&(ledger->free_list), 
+	   extent->first, extent->last);
+}
+
+/* trove_handle_remove: 
+ *	take a specific handle out of the valid handle space 
+ *
+ * returns
+ *  0 if ok
+ *  nonzero  on error
+ */
+
+inline int trove_handle_remove(struct handle_ledger *hl, TROVE_handle handle)
+{
+    return extentlist_handle_remove(hl->free_list, handle);
 }
 
 /*

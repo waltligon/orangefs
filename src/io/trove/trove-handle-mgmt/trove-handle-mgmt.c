@@ -91,6 +91,9 @@ static int trove_check_handle_ranges(TROVE_coll_id coll_id,
                                handles[i]);
                         break;
                     }
+		    /* remove handle from trove-handle-mgmt */
+		    trove_handle_remove(ledger, handle[i]);
+
 #if 0
                     else
                     {
@@ -127,12 +130,9 @@ static int trove_map_handle_ranges(TROVE_coll_id coll_id,
             }
             assert(cur_extent);
 
-            /* FIXME: add to handle mgmt book keeping */
-            printf("* Trove got handle range %Ld-%Ld\n",cur_extent->first,
-                   cur_extent->last);
-            printf("KLUDGE: We're not adding this to handle mgmt "
-                   "book keeping yet\n");
-            ret = 0;
+	    ret = trove_handle_ledger_addextent(ledger, cur_extent);
+	    if (ret != 0)
+		break;
 
             cur = llist_next(cur);
         }
