@@ -28,37 +28,35 @@ job_context_id PVFS_sys_job_context = -1;
 
 extern gen_mutex_t *g_session_tag_mt_lock;
 
+typedef enum
+{
+    CLIENT_ENCODER_INIT = 0,
+    CLIENT_BMI_INIT     = (1 << 0),
+    CLIENT_FLOW_INIT    = (1 << 1),
+    CLIENT_JOB_INIT     = (1 << 2),
+    CLIENT_JOB_CTX_INIT = (1 << 3),
+    CLIENT_ACACHE_INIT  = (1 << 4),
+    CLIENT_NCACHE_INIT  = (1 << 5)
+} PINT_client_status_flag;
+
 /* PVFS_sys_initialize()
  *
- * Initializes the PVFS system interface and any necessary internal data
- * structures.  Must be called before any other system interface function.
+ * Initializes the PVFS system interface and any necessary internal
+ * data structures.  Must be called before any other system interface
+ * function.
  *
- * the default_debug_mask is used if not overridden by the PVFS2_DEBUGMASK
- * environment variable at run-time.  allowable string formats of the
- * env variable are the same as the EventLogging line in the server
- * configuration file.
+ * the default_debug_mask is used if not overridden by the
+ * PVFS2_DEBUGMASK environment variable at run-time.  allowable string
+ * formats of the env variable are the same as the EventLogging line
+ * in the server configuration file.
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int PVFS_sys_initialize(
-    int default_debug_mask)
+int PVFS_sys_initialize(int default_debug_mask)
 {
-    int ret = -1;
-    char *debug_mask_str = NULL;
-    int debug_mask = 0;
-    char *debug_file = 0;
-
-    enum {
-	NONE_INIT_FAIL = 0,
-	ENCODER_INIT_FAIL,
-	BMI_INIT_FAIL,
-	FLOW_INIT_FAIL,
-	JOB_INIT_FAIL,
-	JOB_CONTEXT_FAIL,
-	ACACHE_INIT_FAIL,
-	NCACHE_INIT_FAIL,
-	BUCKET_INIT_FAIL
-    } init_fail = NONE_INIT_FAIL;
+    int ret = -PVFS_EINVAL, debug_mask = 0;
+    char *debug_mask_str = NULL, *debug_file = NULL;
+    PINT_client_status_flag client_status_flag;
 
     gossip_enable_stderr();
 
@@ -70,110 +68,124 @@ int PVFS_sys_initialize(
 
     debug_file = getenv("PVFS2_DEBUGFILE");
     if (debug_file)
-	gossip_enable_file(debug_file, "w");
-
-    /* initialize protocol encoder */
-    ret = PINT_encode_initialize();
-    if(ret < 0)
     {
-	init_fail = ENCODER_INIT_FAIL;
-	goto return_error;
+        gossip_enable_file(debug_file, "w");
     }
+
+    /* initlialize the protocol encoder */
+    ret = PINT_encode_initialize();
+    if (ret < 0)
+    {
+        gossip_lerr("Protocol encoder initialize failure\n");
+        goto error_exit;
+    }
+    client_status_flag |= CLIENT_ENCODER_INIT;
     
-    /* Initialize BMI */
+    /* initialize bmi and the bmi session identifier */
     ret = BMI_initialize(NULL,NULL,0);
     if (ret < 0)
     {
-	init_fail = BMI_INIT_FAIL;
-	gossip_ldebug(GOSSIP_CLIENT_DEBUG,"BMI initialize failure\n");
-	goto return_error;
+        gossip_lerr("BMI initialize failure\n");
+        goto error_exit;
     }
-
-    /* initialize bmi session identifier, TODO: DOCUMENT THIS */
     g_session_tag_mt_lock = gen_mutex_build();
+    client_status_flag |= CLIENT_BMI_INIT;
 
-    /* Initialize flow */
+    /* initialize the flow interface */
     ret = PINT_flow_initialize(NULL, 0);
     if (ret < 0)
     {
-	init_fail = FLOW_INIT_FAIL;
-	gossip_ldebug(GOSSIP_CLIENT_DEBUG,"Flow initialize failure.\n");
-	goto return_error;
+        gossip_lerr("Flow initialize failure.\n");
+        goto error_exit;
     }
+    client_status_flag |= CLIENT_FLOW_INIT;
 
-    /* Initialize the job interface */
+    /* initialize the job interface and the job context */
     ret = job_initialize(0);
     if (ret < 0)
     {
-	init_fail = JOB_INIT_FAIL;
-	gossip_ldebug(GOSSIP_CLIENT_DEBUG,"Error initializing job interface: %s\n",strerror(-ret));
-	goto return_error;
+        gossip_lerr("Error initializing job interface: %s\n",
+                    strerror(-ret));
+        goto error_exit;
     }
+    client_status_flag |= CLIENT_JOB_INIT;
 
     ret = job_open_context(&PVFS_sys_job_context);
-    if(ret < 0)
+    if (ret < 0)
     {
-	init_fail = JOB_CONTEXT_FAIL;
-	gossip_ldebug(GOSSIP_CLIENT_DEBUG, "job_open_context() failure.\n");
-	goto return_error;
+        gossip_lerr("job_open_context() failure.\n");
+        goto error_exit;
     }
-	
-    /* Initialize the pinode cache */
+    client_status_flag |= CLIENT_JOB_CTX_INIT;
+        
+    /* initialize the attribute cache and set the default timeout */
     ret = PINT_acache_initialize();
     if (ret < 0)
     {
-	init_fail = ACACHE_INIT_FAIL;
-	gossip_ldebug(GOSSIP_CLIENT_DEBUG,"Error initializing pinode cache\n");
-	goto return_error;	
+        gossip_lerr("Error initializing attribute cache\n");
+        goto error_exit;        
     }
     PINT_acache_set_timeout(PINT_ACACHE_TIMEOUT * 1000);
+    client_status_flag |= CLIENT_ACACHE_INIT;
 
-    /* Initialize the directory cache */
+    /* initialize the name lookup cache and set the default timeout */
     ret = PINT_ncache_initialize();
     if (ret < 0)
     {
-	init_fail = NCACHE_INIT_FAIL;
-	gossip_ldebug(GOSSIP_CLIENT_DEBUG,"Error initializing directory cache\n");
-	goto return_error;	
-    }	
+        gossip_lerr("Error initializing name lookup cache\n");
+        goto error_exit;        
+    }        
     PINT_ncache_set_timeout(PINT_NCACHE_TIMEOUT * 1000);
+    client_status_flag |= CLIENT_NCACHE_INIT;
 
-    /* Initialize the configuration management interface */
+    /* initialize the handle mapping interface */
     ret = PINT_bucket_initialize();
     if (ret < 0)
     {
-	init_fail = BUCKET_INIT_FAIL;
-	gossip_ldebug(GOSSIP_CLIENT_DEBUG,"Error initializing config management\n");
-	goto return_error;	
+        gossip_lerr("Error initializing handle mapping interface\n");
+        goto error_exit;
     }
 
-    return(0);
+    return 0;
 
- return_error:
-    switch(init_fail) {
-	case BUCKET_INIT_FAIL:
-	    PINT_ncache_finalize();
-	case NCACHE_INIT_FAIL:
-	    PINT_acache_finalize();
-	case ACACHE_INIT_FAIL:
-	case JOB_CONTEXT_FAIL:
-	    job_finalize();
-	case JOB_INIT_FAIL:
-	    PINT_flow_finalize();
-	case FLOW_INIT_FAIL:
-	    BMI_finalize();
-	case BMI_INIT_FAIL:
-	    PINT_encode_finalize();
-	case ENCODER_INIT_FAIL:
-	case NONE_INIT_FAIL:
-	    /* nothing to do for either of these */
-	    break;
+  error_exit:
+
+    if (client_status_flag & CLIENT_NCACHE_INIT)
+    {
+        PINT_ncache_finalize();
     }
-    gossip_disable();
 
-    return(ret);
+    if (client_status_flag & CLIENT_ACACHE_INIT)
+    {
+        PINT_acache_finalize();
+    }
+
+    if (client_status_flag & CLIENT_JOB_CTX_INIT)
+    {
+        job_close_context(PVFS_sys_job_context);
+    }
+
+    if (client_status_flag & CLIENT_JOB_INIT)
+    {
+        job_finalize();
+    }
+
+    if (client_status_flag & CLIENT_FLOW_INIT)
+    {
+        PINT_flow_finalize();
+    }
+
+    if (client_status_flag & CLIENT_BMI_INIT)
+    {
+        BMI_finalize();
+    }
+
+    if (client_status_flag & CLIENT_ENCODER_INIT)
+    {
+        PINT_encode_finalize();
+    }
+    return ret;
 }
-
 
 /*
  * Local variables:
