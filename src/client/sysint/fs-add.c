@@ -49,10 +49,12 @@ int PVFS_sys_fs_add(struct PVFS_sys_mntent *mntent)
         return -PVFS_EEXIST;
     }
 
-    /* first make sure BMI knows how to handle this method, else fail quietly */
+    /* make sure BMI knows how to handle this method, else fail quietly */
     ret = BMI_addr_lookup(&test_addr, mntent->pvfs_config_server);
     if (ret == bmi_errno_to_pvfs(-ENOPROTOOPT))
+    {
 	goto error_exit;
+    }
 
     new_server_config = (struct server_configuration_s *)malloc(
         sizeof(struct server_configuration_s));

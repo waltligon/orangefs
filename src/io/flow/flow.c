@@ -299,6 +299,7 @@ flow_descriptor *PINT_flow_alloc(void)
  */
 void PINT_flow_reset(flow_descriptor * flow_d)
 {
+    assert(flow_d);
 
     memset(flow_d, 0, sizeof(struct flow_descriptor));
 
@@ -306,10 +307,11 @@ void PINT_flow_reset(flow_descriptor * flow_d)
     flow_d->aggregate_size = -1;
     flow_d->state = FLOW_INITIAL;
     flow_d->type = FLOWPROTO_DEFAULT;
-    flow_d->flow_mutex = gen_mutex_build();
+    if (flow_d->flow_mutex == NULL)
+    {
+        flow_d->flow_mutex = gen_mutex_build();
+    }
     assert(flow_d->flow_mutex);
-
-    return;
 }
 
 /* PINT_flow_free()
@@ -320,7 +322,11 @@ void PINT_flow_reset(flow_descriptor * flow_d)
  */
 void PINT_flow_free(flow_descriptor *flow_d)
 {
+    assert(flow_d);
+    assert(flow_d->flow_mutex);
+
     gen_mutex_destroy(flow_d->flow_mutex);
+    flow_d->flow_mutex = NULL;
 
     free(flow_d);
     return;

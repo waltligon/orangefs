@@ -13,7 +13,7 @@ dnl PVFS2 versioning information
 PVFS2_MAJOR=0
 PVFS2_MINOR=6
 PVFS2_SUB=0
-PVFS2_PRE="pre1"
+PVFS2_PRE="pre2"
 
 AM_INIT_AUTOMAKE(pvfs2, $PVFS2_MAJOR.$PVFS2_MINOR.$PVFS2_SUB$PVFS2_PRE)
 
@@ -35,10 +35,8 @@ dnl if test x$host_os != xlinux-gnu; then AC_MSG_ERROR($host_os not supported.)
 dnl else AC_MSG_RESULT(yes)
 dnl fi
 
-dnl NOTE: for now, if we're running on linux-gnu and we find
-dnl glibc version 2.3.2, we assume the aio callbacks work.
-dnl this should really check for 2.3.2 or later -- probably in
-dnl more portable format as well.
+dnl if we're running on linux-gnu and we find glibc version 2.3.2 or
+dnl later, we assume the aio threaded callbacks work
 MISC_TROVE_FLAGS=""
 if test x$host_os = xlinux-gnu; then
     AC_MSG_CHECKING(glibc version for working aio callbacks)
@@ -226,6 +224,22 @@ AC_ARG_ENABLE(verbose-build,
 QUIET_COMPILE=1)
 
 AC_SUBST(QUIET_COMPILE)
+
+dnl a mechanism to turn off threads in the client library
+AC_MSG_CHECKING([for client library thread safety support])
+AC_ARG_ENABLE(disable-thread-safety,
+[  --disable-thread-safety Disables thread safety in the client library],
+[if test x$enableval = xno; then
+    LIBCFLAGS="$LIBCFLAGS -D__GEN_NULL_LOCKING__"
+    THREAD_LIB=""
+    AC_MSG_RESULT(no)
+fi],
+[   LIBCFLAGS="$LIBCFLAGS -D__GEN_POSIX_LOCKING__"
+    THREAD_LIB="-lpthread"
+    AC_MSG_RESULT(yes) ])
+
+AC_SUBST(LIBCFLAGS)
+AC_SUBST(THREAD_LIB)
 
 dnl a mechanism to turn off perf counters
 AC_ARG_ENABLE(perf-counters,
@@ -575,10 +589,46 @@ examples/pvfs2-server.rc
 # dump LIBS variable into a file to be used by test/configure
 AC_OUTPUT_COMMANDS([echo ${LIBS}> .libs])
 
-# print a summary of the configuration after all the junky output
+
+# print a summary of the configuration information
+AC_MSG_RESULT()
+AC_MSG_RESULT([***** Displaying PVFS2 Configuration Information *****])
+AC_MSG_RESULT([------------------------------------------------------])
+
 if test x$BUILD_KARMA = x1 ; then
-	echo PVFS2 "configured to build karma gui."
+   AC_MSG_RESULT([PVFS2 configured to build karma gui              : yes])
+else
+   AC_MSG_RESULT([PVFS2 configured to build karma gui              :  no])
 fi
+
 if test x$ENABLE_COVERAGE = x1 ; then
-	echo PVFS2 "configured to perform coverage analysis."
+   AC_MSG_RESULT([PVFS2 configured to perform coverage analysis    : yes])
+else
+   AC_MSG_RESULT([PVFS2 configured to perform coverage analysis    :  no])
 fi
+
+if test "x$LINUX_KERNEL_SRC" = "x" ; then
+   AC_MSG_RESULT([PVFS2 configured for the 2.6.x kernel module     :  no])
+else
+   AC_MSG_RESULT([PVFS2 configured for the 2.6.x kernel module     : yes])
+fi
+
+if test "x$LINUX24_KERNEL_SRC" = "x" ; then
+   AC_MSG_RESULT([PVFS2 configured for the 2.4.x kernel module     :  no])
+else
+   AC_MSG_RESULT([PVFS2 configured for the 2.4.x kernel module     : yes])
+fi
+
+if test "x$MMAP_RA_CACHE" = "x" ; then
+   AC_MSG_RESULT([PVFS2 configured for using the mmap-ra-cache     :  no])
+else
+   AC_MSG_RESULT([PVFS2 configured for using the mmap-ra-cache     : yes])
+fi
+
+if test "x$THREAD_LIB" = "x" ; then
+   AC_MSG_RESULT([PVFS2 configured for a thread-safe client library:  no])
+else
+   AC_MSG_RESULT([PVFS2 configured for a thread-safe client library: yes])
+fi
+
+AC_MSG_RESULT()

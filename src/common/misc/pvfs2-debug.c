@@ -55,6 +55,7 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "readdir", GOSSIP_READDIR_DEBUG },
     { "open_cache", GOSSIP_DBPF_OPEN_CACHE_DEBUG }, 
     { "io", GOSSIP_IO_DEBUG },
+    { "open_cache", GOSSIP_DBPF_OPEN_CACHE_DEBUG }, 
     { "permissions", GOSSIP_PERMISSIONS_DEBUG }, 
     { "verbose",  (__DEBUG_ALL & ~GOSSIP_REQ_SCHED_DEBUG)},
     { "none", GOSSIP_NO_DEBUG },

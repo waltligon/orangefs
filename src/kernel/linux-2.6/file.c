@@ -7,10 +7,6 @@
 #include "pvfs2-kernel.h"
 #include "pvfs2-bufmap.h"
 
-/* defined in devpvfs2-req.c */
-void kill_device_owner(void);
-
-extern kmem_cache_t *op_cache;
 extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
 extern wait_queue_head_t pvfs2_request_list_waitq;
@@ -94,10 +90,9 @@ ssize_t pvfs2_inode_read(
 
     while(total_count < count)
     {
-        new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
+        new_op = op_alloc();
         if (!new_op)
         {
-            pvfs2_error("pvfs2_inode_read: kmem_cache_alloc failed!\n");
             return -ENOMEM;
         }
 
@@ -189,7 +184,6 @@ ssize_t pvfs2_inode_read(
           after this.
         */
         wake_up_device_for_return(new_op);
-
         pvfs_bufmap_put(buffer_index);
 
         /* if we got a short read, fall out and return what we
@@ -244,11 +238,9 @@ static ssize_t pvfs2_file_write(
 
     while(total_count < count)
     {
-        new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
+        new_op = op_alloc();
         if (!new_op)
         {
-            pvfs2_error("pvfs2: ERROR -- pvfs2_file_write "
-                        "kmem_cache_alloc failed!\n");
             return -ENOMEM;
         }
 
@@ -282,6 +274,7 @@ static ssize_t pvfs2_file_write(
             pvfs2_error("Failed to copy user buffer.  Please make sure "
                         "that the pvfs2-client is running.\n");
             op_release(new_op);
+            pvfs_bufmap_put(buffer_index);
             *offset = original_offset;
             return -EIO;
         }
@@ -334,7 +327,6 @@ static ssize_t pvfs2_file_write(
           after this.
         */
         wake_up_device_for_return(new_op);
-
         pvfs_bufmap_put(buffer_index);
 
         /* if we got a short write, fall out and return what we got so

@@ -29,6 +29,8 @@
 
 job_context_id PVFS_sys_job_context = -1;
 
+PINT_client_sm *g_sm_p = NULL;
+
 extern gen_mutex_t *g_session_tag_mt_lock;
 
 typedef enum
@@ -72,6 +74,9 @@ int PVFS_sys_initialize(int default_debug_mask)
     {
 	return(-PVFS_ENOMEM);
     }
+
+    /* keep track of this pointer for freeing on finalize */
+    g_sm_p = sm_p;
     memset(sm_p, 0, sizeof(*sm_p));
 
     gossip_enable_stderr();
@@ -167,7 +172,7 @@ int PVFS_sys_initialize(int default_debug_mask)
         gossip_lerr("Error initializing attribute cache\n");
         goto error_exit;        
     }
-    PINT_acache_set_timeout(PINT_ACACHE_TIMEOUT * 1000);
+    PINT_acache_set_timeout(PINT_ACACHE_TIMEOUT_MS);
     client_status_flag |= CLIENT_ACACHE_INIT;
 
     /* initialize the name lookup cache and set the default timeout */
@@ -177,7 +182,7 @@ int PVFS_sys_initialize(int default_debug_mask)
         gossip_lerr("Error initializing name lookup cache\n");
         goto error_exit;        
     }        
-    PINT_ncache_set_timeout(PINT_NCACHE_TIMEOUT * 1000);
+    PINT_ncache_set_timeout(PINT_NCACHE_TIMEOUT_MS);
     client_status_flag |= CLIENT_NCACHE_INIT;
 
     /* initialize the server configuration manager */

@@ -181,15 +181,15 @@ static int getattr_acache_lookup(PINT_client_sm *sm_p,
             fake_resp.status = 0;
 
             /*
-              skip the deep fill (i.e. copy) of attributes
-              on cache hit.  by setting the acache_hit flag,
-              caller state machine won't try to read those
-              attributes out of this faked response in their
-              getattr completion functions
+              skip the deep fill (i.e. copy) of attributes on cache
+              hit.  by setting the acache_hit flag, caller state
+              machine won't try to read those attributes out of this
+              faked response in their getattr completion functions.
+              also, the caller MUST call PINT_acache_release or
+              PINT_acache_release_refn on acache hit.
             */
             sm_p->acache_hit = 1;
             sm_p->msgpair.comp_fn(sm_p, &fake_resp, 0);
-            PINT_acache_release(sm_p->pinode);
             return 1;
         }
       cache_miss:

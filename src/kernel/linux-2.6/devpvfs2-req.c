@@ -26,21 +26,6 @@ extern spinlock_t pvfs2_superblocks_lock;
 
 static int open_access_count = 0;
 
-/* a pointer to the task that opens the dev-req device file */
-static struct task_struct *device_owner = NULL;
-
-
-/* a function that forces termination of the device owner */
-void kill_device_owner(void)
-{
-    down(&devreq_semaphore);
-    if (device_owner)
-    {
-        force_sig(SIGKILL, device_owner);
-    }
-    up(&devreq_semaphore);
-}
-
 static int pvfs2_devreq_open(
     struct inode *inode,
     struct file *file)
@@ -64,7 +49,6 @@ static int pvfs2_devreq_open(
             if (ret == 0)
             {
                 open_access_count++;
-                device_owner = current;
             }
             else
             {
@@ -181,8 +165,17 @@ static ssize_t pvfs2_devreq_read(
         else
         {
             pvfs2_error("Read buffer is too small to copy pvfs2 op\n");
-            len = -1;
+            len = -EIO;
         }
+    }
+    else if (file->f_flags & O_NONBLOCK)
+
+    {
+        /*
+          if in non-blocking mode, return EAGAIN since no requests are
+          ready yet
+        */
+        len = -EAGAIN;
     }
     return len;
 }
@@ -361,7 +354,6 @@ static int pvfs2_devreq_release(
     pvfs_bufmap_finalize();
 
     open_access_count--;
-    device_owner = NULL;
 
 #ifdef PVFS2_LINUX_KERNEL_2_4
 /*     MOD_DEC_USE_COUNT; */
@@ -454,6 +446,23 @@ static int pvfs2_devreq_ioctl(
     return -ENOSYS;
 }
 
+static unsigned int pvfs2_devreq_poll(
+    struct file *file,
+    struct poll_table_struct *poll_table)
+{
+    int poll_revent_mask = 0;
+
+    poll_wait(file, &pvfs2_request_list_waitq, poll_table);
+
+    spin_lock(&pvfs2_request_list_lock);
+    if (!list_empty(&pvfs2_request_list))
+    {
+        poll_revent_mask |= POLL_IN;
+    }
+    spin_unlock(&pvfs2_request_list_lock);
+
+    return poll_revent_mask;
+}
 
 struct file_operations pvfs2_devreq_file_operations =
 {
@@ -463,13 +472,15 @@ struct file_operations pvfs2_devreq_file_operations =
     writev : pvfs2_devreq_writev,
     open : pvfs2_devreq_open,
     release : pvfs2_devreq_release,
-    ioctl : pvfs2_devreq_ioctl
+    ioctl : pvfs2_devreq_ioctl,
+    poll : pvfs2_devreq_poll
 #else
     .read = pvfs2_devreq_read,
     .writev = pvfs2_devreq_writev,
     .open = pvfs2_devreq_open,
     .release = pvfs2_devreq_release,
-    .ioctl = pvfs2_devreq_ioctl
+    .ioctl = pvfs2_devreq_ioctl,
+    .poll = pvfs2_devreq_poll
 #endif
 };
 

@@ -92,6 +92,11 @@ typedef struct
 {
 } pvfs2_fs_umount_response_t;
 
+/* the cancel response is a blank downcall */
+typedef struct
+{
+} pvfs2_cancel_response_t;
+
 typedef struct
 {
     int type;
@@ -113,6 +118,7 @@ typedef struct
 /* 	pvfs2_truncate_response_t truncate; */
         pvfs2_fs_mount_response_t fs_mount;
 /* 	pvfs2_fs_umount_response_t fs_umount; */
+/* 	pvfs2_cancel_response_t cancel; */
     } resp;
 } pvfs2_downcall_t;
 

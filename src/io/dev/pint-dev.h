@@ -33,6 +33,8 @@ void PINT_dev_finalize(void);
 int PINT_dev_get_mapped_region(struct PVFS_dev_map_desc *desc,
 			       int size);
 
+void PINT_dev_put_mapped_region(struct PVFS_dev_map_desc *desc);
+
 void *PINT_dev_get_mapped_buffer(struct PVFS_dev_map_desc *desc,
 				 int buffer_index);
 

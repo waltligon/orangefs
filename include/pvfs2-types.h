@@ -272,6 +272,7 @@ enum PVFS_server_mode
  * that indicates where the error came from.  These are |'d together.
  */
 
+int PVFS_strerror_r(int errnum, char *buf, int n);
 void PVFS_perror(char *text, int retcode);
 void PVFS_perror_gossip(char* text, int retcode);
 int32_t PVFS_get_errno_mapping(int32_t error);
@@ -438,7 +439,7 @@ int32_t PINT_errno_mapping[PVFS_ERRNO_MAX + 1] = {    \
 };                                                    \
 char *PINT_non_errno_strerror_mapping[] = {           \
     "Success", /* 0 */                                \
-    "Operation canceled (possibly due to timeout)",   \
+    "Operation cancelled (possibly due to timeout)",  \
     "Device initialization failed"                    \
 };                                                    \
 int32_t PINT_non_errno_mapping[] = {                  \

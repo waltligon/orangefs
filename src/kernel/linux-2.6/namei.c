@@ -6,7 +6,6 @@
 
 #include "pvfs2-kernel.h"
 
-extern kmem_cache_t *op_cache;
 extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
 extern wait_queue_head_t pvfs2_request_list_waitq;
@@ -90,10 +89,9 @@ struct dentry *pvfs2_lookup(
 	return ERR_PTR(-ENAMETOOLONG);
     }
 
-    new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
+    new_op = op_alloc();
     if (!new_op)
     {
-	pvfs2_error("pvfs2: pvfs2_lookup -- kmem_cache_alloc failed!\n");
 	return NULL;
     }
     new_op->upcall.type = PVFS2_VFS_OP_LOOKUP;
@@ -348,10 +346,9 @@ static int pvfs2_rename(
         return -EMLINK;
     }
 
-    new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
+    new_op = op_alloc();
     if (!new_op)
     {
-	pvfs2_error("pvfs2: pvfs2_rename -- kmem_cache_alloc failed!\n");
 	return ret;
     }
     new_op->upcall.type = PVFS2_VFS_OP_RENAME;

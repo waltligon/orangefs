@@ -13,7 +13,7 @@
 
 static int bufmap_init = 0;
 
-static struct page** bufmap_page_array = NULL;
+static struct page **bufmap_page_array = NULL;
 
 /* array to track usage of buffer descriptors */
 int buffer_index_array[PVFS2_BUFMAP_DESC_COUNT] = {0};
@@ -258,8 +258,6 @@ void pvfs_bufmap_put(int buffer_index)
 
     /* wake up anyone who may be sleeping on the queue */
     wake_up_interruptible(&bufmap_waitq);
-
-    return;
 }
 
 /* pvfs_bufmap_copy_to_user()

@@ -48,6 +48,7 @@ typedef unsigned long sector_t;
 #include <linux/wait.h>
 #include <linux/dcache.h>
 #include <linux/pagemap.h>
+#include <linux/poll.h>
 
 /* taken from include/linux/fs.h from 2.4.19 or later kernels */
 #ifndef MAX_LFS_FILESIZE
@@ -88,9 +89,9 @@ do {                                                           \
 #endif
 
 #ifdef PVFS2_KERNEL_DEBUG
-#define MAX_SERVICE_WAIT_IN_SECONDS       10
-#else
 #define MAX_SERVICE_WAIT_IN_SECONDS       30
+#else
+#define MAX_SERVICE_WAIT_IN_SECONDS       60
 #endif
 
 #define PVFS2_REQDEVICE_NAME          "pvfs2-req"
@@ -181,7 +182,7 @@ sizeof(int64_t) + sizeof(pvfs2_downcall_t))
 typedef struct
 {
     int op_state;
-    unsigned long tag;
+    int64_t tag;
 
     pvfs2_upcall_t upcall;
     pvfs2_downcall_t downcall;
@@ -279,6 +280,8 @@ void op_cache_initialize(
     void);
 void op_cache_finalize(
     void);
+pvfs2_kernel_op_t *op_alloc(
+    void);
 void op_release(
     void *op);
 void dev_req_cache_initialize(
@@ -294,6 +297,8 @@ void pvfs2_inode_cache_finalize(
  * defined in waitqueue.c
  ****************************/
 int wait_for_matching_downcall(
+    pvfs2_kernel_op_t * op);
+int wait_for_cancellation_downcall(
     pvfs2_kernel_op_t * op);
 
 /****************************
@@ -410,6 +415,9 @@ int pvfs2_flush_mmap_racache(
 int pvfs2_unmount_sb(
     struct super_block *sb);
 
+int pvfs2_cancel_op_in_progress(
+    unsigned long tag);
+
 /************************************
  * misc convenience macros
  ************************************/
@@ -425,7 +433,6 @@ do {                                                         \
     spin_unlock(&pvfs2_request_list_lock);                   \
                                                              \
     spin_unlock(&op->lock);                                  \
-                                                             \
     wake_up_interruptible(&pvfs2_request_list_waitq);        \
 } while(0)
 
@@ -471,7 +478,7 @@ do {                                                         \
     down_interruptible(&request_semaphore);                  \
     add_op_to_request_list(op);                              \
     up(&request_semaphore);                                  \
-    ret = wait_for_matching_downcall(new_op);                \
+    ret = wait_for_matching_downcall(op);                    \
     if (!intr) unmask_blocked_signals(&orig_sigset);         \
     if (ret != PVFS2_WAIT_SUCCESS)                           \
     {                                                        \
@@ -484,12 +491,29 @@ do {                                                         \
     }                                                        \
 } while(0)
 
+#define service_cancellation_operation(op)                   \
+do {                                                         \
+    down_interruptible(&request_semaphore);                  \
+    add_op_to_request_list(op);                              \
+    up(&request_semaphore);                                  \
+    ret = wait_for_cancellation_downcall(op);                \
+    if (ret != PVFS2_WAIT_SUCCESS)                           \
+    {                                                        \
+        if (ret == PVFS2_WAIT_TIMEOUT_REACHED)               \
+        {                                                    \
+            pvfs2_error("pvfs2_op_cancel: wait timed out  "  \
+                        "(%x). aborting attempt.\n", ret);   \
+        }                                                    \
+        goto error_exit;                                     \
+    }                                                        \
+} while(0)
+
 #define service_priority_operation(op, method, intr)         \
 do {                                                         \
     sigset_t orig_sigset;                                    \
     if (!intr) mask_blocked_signals(&orig_sigset);           \
     add_priority_op_to_request_list(op);                     \
-    ret = wait_for_matching_downcall(new_op);                \
+    ret = wait_for_matching_downcall(op);                    \
     if (!intr) unmask_blocked_signals(&orig_sigset);         \
     if (ret != PVFS2_WAIT_SUCCESS)                           \
     {                                                        \
@@ -584,13 +608,13 @@ do {                                                                \
   depending on where the error occured.
 
   if the error happens in the waitqueue code because we either timed
-  out or a signal was raised while waiting, we need to kill the
-  device_owner and free the op manually.  this is done to avoid having
-  the device start writing application data to our shared bufmap pages
-  without us expecting it.
+  out or a signal was raised while waiting, we need to cancel the
+  userspace i/o operation and free the op manually.  this is done to
+  avoid having the device start writing application data to our shared
+  bufmap pages without us expecting it.
 
   if a pvfs2 sysint level error occured and i/o has been completed,
-  there is no need to kill the device_owner, as the user has finished
+  there is no need to cancel the operation, as the user has finished
   using the bufmap page and so there is no danger in this case.  in
   this case, we wake up the device normally so that it may free the
   op, as normal.
@@ -604,9 +628,9 @@ do {                                                                \
 do {                                                      \
     if (error_exit)                                       \
     {                                                     \
-        ret = -EINTR;                                     \
-        kill_device_owner();                              \
+        ret = pvfs2_cancel_op_in_progress(new_op->tag);   \
         op_release(new_op);                               \
+        pvfs_bufmap_put(buffer_index);                    \
     }                                                     \
     else                                                  \
     {                                                     \
@@ -614,6 +638,7 @@ do {                                                      \
                  new_op->downcall.status);                \
         *offset = original_offset;                        \
         wake_up_device_for_return(new_op);                \
+        pvfs_bufmap_put(buffer_index);                    \
     }                                                     \
     *offset = original_offset;                            \
 } while(0)

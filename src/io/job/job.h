@@ -140,6 +140,7 @@ int job_dev_unexp(struct PINT_dev_unexp_info* dev_unexp_d,
 		  job_aint status_user_tag,
 		  job_status_s * out_status_p,
 		  job_id_t* id,
+		  enum job_flags flags,
 		  job_context_id context_id);
 
 /* device write */

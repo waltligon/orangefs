@@ -41,6 +41,9 @@ static int msgpairarray_complete(
 static int msgpairarray_completion_fn(
     PINT_client_sm *sm_p, job_status_s *js_p);
 
+static int count_incomplete_msgs(
+    PINT_client_sm_msgpair_state *msgarray, int array_count);
+
 %%
 
 nested machine pvfs2_client_msgpairarray_sm(init,
@@ -92,8 +95,8 @@ static int msgpairarray_init(PINT_client_sm *sm_p,
     PINT_client_sm_msgpair_state *msg_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "msgpairarray state: init (%d message(s))\n",
-                 sm_p->msgarray_count);
+                 "(%p) msgpairarray state: init (%d msgpair(s))\n",
+                 sm_p, sm_p->msgarray_count);
 
     assert(sm_p->msgarray_count > 0);
 
@@ -104,15 +107,19 @@ static int msgpairarray_init(PINT_client_sm *sm_p,
       comp_ct in the first msgarray entry to keep up with the count
       for the entire array.
     */
-    sm_p->msgarray[0].comp_ct = 2 * sm_p->msgarray_count;
+    sm_p->msgarray[0].comp_ct = (2 * sm_p->msgarray_count);
 
     for(i = 0; i < sm_p->msgarray_count; i++)
     {
         msg_p = &sm_p->msgarray[i];
         assert(msg_p);
 
+        assert((msg_p->retry_flag == PVFS_MSGPAIR_RETRY) ||
+               (msg_p->retry_flag == PVFS_MSGPAIR_NO_RETRY));
+
         msg_p->encoded_resp_p = NULL;
         msg_p->retry_count = 0;
+        msg_p->complete = 0;
     }
     return 1;
 }
@@ -143,22 +150,31 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
     PVFS_msg_tag_t session_tag;
     PINT_client_sm_msgpair_state *msg_p = NULL;
     struct filesystem_configuration_s *cur_fs = NULL;
+    int num_incomplete_msgpairs = (sm_p->msgarray[0].comp_ct / 2);
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "msgpairarray state: post (%d message(s))\n",
-		 sm_p->msgarray_count);
-
-    assert(sm_p->msgarray_count > 0);
+    gossip_debug(
+        GOSSIP_CLIENT_DEBUG, "(%p) msgpairarray state: post "
+        "(%d total message(s) with %d incomplete)\n", sm_p,
+        (sm_p->msgarray_count * 2), (num_incomplete_msgpairs * 2));
 
     js_p->error_code = 0;
 
-    for (i = 0; i < sm_p->msgarray_count; i++)
+    assert(sm_p->msgarray_count > 0);
+    assert(num_incomplete_msgpairs && sm_p->msgarray[0].comp_ct);
+
+    for (i = 0; i < num_incomplete_msgpairs; i++)
     {
         msg_p = &sm_p->msgarray[i];
         assert(msg_p);
 
-        assert((msg_p->retry_flag == PVFS_MSGPAIR_RETRY) ||
-               (msg_p->retry_flag == PVFS_MSGPAIR_NO_RETRY));
+        /*
+          here we skip over the msgs that have already completed in
+          the case of being in the retry code path when it's ok
+        */
+        if (msg_p->complete)
+        {
+            continue;
+        }
 
         msg_p->op_status = 0;
 
@@ -189,7 +205,7 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
                 return 1;
             }
 
-            /* calculate maximum response message size and allocate space */
+            /* calculate max response msg size and allocate space */
             msg_p->max_resp_sz = PINT_encode_calc_max_size(
                 PINT_ENCODE_RESP, msg_p->req.op, enc_type);
 
@@ -204,6 +220,10 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
         }
 
 	session_tag = get_next_session_tag();
+
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "(%p) msgpair %d (%p): posting recv\n",
+                     sm_p, (i + 1), msg_p);
 
 	/* post receive of response; job_id stored in recv_id */
 	ret = job_bmi_recv(msg_p->svr_addr,
@@ -228,7 +248,7 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 			   &msg_p->recv_status, 0, pint_client_sm_context);
 	}
 
-	if (ret < 0 || ret == 1)
+	if ((ret < 0) || (ret == 1))
         {
 	    /* it is impossible for this recv to complete at this point
 	     * without errors; we haven't sent the request yet!
@@ -260,6 +280,10 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 	 */
 	assert(ret == 0);
 
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "(%p) msgpair %d (%p): posting send\n",
+                     sm_p, (i + 1), msg_p);
+
 	/* post send of request; job_id stored in send_id */
 	ret = job_bmi_send_list(msg_p->encoded_req.dest,
 				msg_p->encoded_req.buffer_list,
@@ -275,13 +299,19 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 				&msg_p->send_id,
 				pint_client_sm_context,
 				PVFS2_CLIENT_JOB_TIMEOUT);
-	if (ret < 0 || (ret == 1 && msg_p->send_status.error_code != 0))
+
+ 	if ((ret < 0) ||
+            ((ret == 1) && (msg_p->send_status.error_code != 0)))
 	{
-	    if(ret < 0)
+	    if (ret < 0)
+            {
 		PVFS_perror_gossip("Post of send failed", ret);
+            }
 	    else
+            {
 		PVFS_perror_gossip("Send immediately failed",
 		    msg_p->recv_status.error_code);
+            }
 
 	    gossip_err("Send error: cancelling recv.\n");
 
@@ -294,7 +324,7 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 	    msg_p->send_id = 0;
 	    sm_p->msgarray[0].comp_ct--;
 	}
-	else if(ret == 1)
+	else if (ret == 1)
 	{
 	    /* immediate completion */
 	    msg_p->send_id = 0;
@@ -305,13 +335,10 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 	     */
 	    sm_p->msgarray[0].comp_ct--;
 	}
-	else
-	{
-	    /* successful post, no immediate completion */
-	}
+        /* else: successful post, no immediate completion */
     }
 
-    if(sm_p->msgarray[0].comp_ct == 0)
+    if (sm_p->msgarray[0].comp_ct == 0)
     {
 	/* everything is completed already (could happen in some failure
 	 * cases); jump straight to final completion function.
@@ -319,14 +346,11 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 	 js_p->error_code = MSGPAIRS_COMPLETE;
 	 return 1;
     }
-    else
-    {
-	/* we are still waiting on operations to complete, next state
-	 * transition will handle them
-	 */
-	return 0;
 
-    }
+    /* we are still waiting on operations to complete, next state
+     * transition will handle them
+     */
+    return 0;
 }
 
 static int msgpairarray_post_retry(PINT_client_sm *sm_p,
@@ -335,7 +359,7 @@ static int msgpairarray_post_retry(PINT_client_sm *sm_p,
     job_id_t tmp_id;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "msgpairarray state: post_retry\n");
+                 "(%p) msgpairarray state: post_retry\n", sm_p);
 
     return job_req_sched_post_timer(
         PVFS2_CLIENT_RETRY_DELAY, sm_p, 0, js_p, &tmp_id,
@@ -345,7 +369,8 @@ static int msgpairarray_post_retry(PINT_client_sm *sm_p,
 static int msgpairarray_complete(PINT_client_sm *sm_p,
                                  job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "msgpairarray state: complete\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "(%p) msgpairarray state: complete\n", sm_p);
 
     /* match operation with something in the msgpair array */
     /* the first N tags are receives, the second N are sends */
@@ -410,13 +435,13 @@ static int msgpairarray_completion_fn(PINT_client_sm *sm_p,
 				      job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL, i = 0;
-    struct PINT_decoded_msg decoded_resp; /* data about decoded resp */
+    struct PINT_decoded_msg decoded_resp;
     struct PVFS_server_resp *resp_p; /* response structure (decoded) */
 
     js_p->error_code = 0;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "msgpairarray state: "
-                 "completion_fn\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) msgpairarray state: "
+                 "completion_fn\n", sm_p);
 
     for (i = 0; i < sm_p->msgarray_count; i++)
     {
@@ -432,12 +457,23 @@ static int msgpairarray_completion_fn(PINT_client_sm *sm_p,
             {
                 msg_p->retry_count++;
 
-                gossip_debug(GOSSIP_CLIENT_DEBUG, "*** msgarray send "
-                             "failed -- retrying msgpair "
-                             "(count = %d)\n", msg_p->retry_count);
+                gossip_debug(GOSSIP_CLIENT_DEBUG, "*** msgpairarray send "
+                             "failed -- retrying msgpair (count = %d)\n",
+                             msg_p->retry_count);
 
-                /* FIXME: only redo the failed ones, not all */
-                sm_p->msgarray[0].comp_ct = 2 * sm_p->msgarray_count;
+                /*
+                  NOTE: we only retry msgpairs that haven't yet been
+                  completed
+                */
+                sm_p->msgarray[0].comp_ct = 2 * count_incomplete_msgs(
+                    sm_p->msgarray, sm_p->msgarray_count);
+
+                assert(sm_p->msgarray[0].comp_ct > 0);
+
+                gossip_debug(GOSSIP_CLIENT_DEBUG, "*** msgpairarray is "
+                             "retrying %d of %d total messages\n",
+                             sm_p->msgarray[0].comp_ct,
+                             (2 * sm_p->msgarray_count));
 
                 js_p->error_code = MSGPAIRS_RETRY;
                 return 1;
@@ -469,7 +505,7 @@ static int msgpairarray_completion_fn(PINT_client_sm *sm_p,
 	 * meaningful, so we save it.
 	 */
 	msg_p->op_status = resp_p->status;
-	
+
 	/* NOTE: we call the function associated with each message,
 	 *       not just the one from the first array element.  so
 	 *       there could in theory be different functions for each
@@ -512,19 +548,46 @@ static int msgpairarray_completion_fn(PINT_client_sm *sm_p,
 	}
 	
 	/* free all the resources that we used to send and receive. */
-	ret = PINT_serv_free_msgpair_resources(&msg_p->encoded_req,
-					       msg_p->encoded_resp_p,
-					       &decoded_resp,
-					       &msg_p->svr_addr,
-					       msg_p->max_resp_sz);
-	if (ret != 0)
+	ret = PINT_serv_free_msgpair_resources(
+            &msg_p->encoded_req, msg_p->encoded_resp_p, &decoded_resp,
+            &msg_p->svr_addr, msg_p->max_resp_sz);
+	if (ret)
         {
             PVFS_perror_gossip("Failed to free msgpair resources", ret);
             js_p->error_code = ret;
             return 1;
 	}
+
+        msg_p->encoded_resp_p = NULL;
+        msg_p->max_resp_sz = 0;
+
+        /*
+          mark that this msgpair has been completed and should not be
+          retried in the case of possible future retries
+        */
+        msg_p->complete = 1;
+
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "(%p) msgpair %d (%p): marked complete\n",
+                     sm_p, (i + 1), msg_p);
     }
     return 1;
+}
+
+static int count_incomplete_msgs(
+    PINT_client_sm_msgpair_state *msgarray, int array_count)
+{
+    int count = 0, i = 0;
+    PINT_client_sm_msgpair_state *msg = NULL;
+
+    for(i = 0; i < array_count; i++)
+    {
+        msg = &msgarray[i];
+        assert(msg);
+
+        count += (msg->complete ? 0 : 1);
+    }
+    return count;
 }
     
 /*

@@ -3,9 +3,77 @@ PVFS2 Release ChangeLog
 -----------------------
 
 
-pvfs2-0.6.0pre1
+pvfs2-0.6.0pre2
 ===============
-- kill pvfs2-import and pvfs2-export in favor of pvfs2-cp 
+- remove pvfs2-import and pvfs2-export in favor of pvfs2-cp
+- added compile time option for disabling thread-safety in the client
+  library (enabled by default; --disable-thread-safety to disable)
+- improved configure summary information emitted at configure time
+- added missing non-blocking sysint declarations to sysint header
+- made sysint test and testsome() calls more useable
+- merged dev unexp polling/handling with system interface
+- added PINT_sys_dev_unexp call that allows posting unexpected device
+  messages so that they can be returned from the sysint testsome
+  method in addition to completed sysint operations
+- added a id_gen_fast_unregister macro that is a no op, to make the
+  api more consistent with the id_gen_safe_* calls
+- modified device driver to work properly in non-blocking mode from
+  userspace by implementing the character device poll method and
+  modified the pint-dev device interface to make sure it can handle
+  the pvfs2 device in a non-blocking manner; added a no immediate
+  completion option to the device interface; made test more efficient
+  by not polling if no idle time is specified; check for poll errors; use
+  proper buffer sizes for reads across the device
+- added a method to free the mapped memory region on pvfs2-client-core
+  shutdown (valgrind complained)
+- modified all job uses of the id-generator to use the safe, rather
+  than fast, methods (useful for several reasons including safe
+  cancellation of already completed operations)
+- modified the job_dev_unexp method to have (and honor) the no
+  immediate completion flag if passed (used in the pvfs2-client-core)
+- re-wrote pvfs2-client-core to use sysint non-blocking operations
+- improved human readable size reporting
+- allow human readable size reporting to optionally use si units
+- added --si option to pvfs2-ls (similar to ls's --si option)
+- added -H option to pvfs2-statfs (similar to du's -H option)
+- added a method able to cancel I/O operations in progress
+- removed kernel ability to kill device file on cancelled I/O
+- added the ability of sys-io.sm to handle run-time cancellation while
+  still transitioning properly
+- added support in the pvfs2-client for ignoring an upcall retry for an
+  op already in progress (as opposed to servicing it multiple times)
+- added kernel method that allows the cancellation upcall/downcall cycle
+  to progress, ignoring the fact that a signal is pending (since the
+  only time a cancellation is issued is when there's a signal pending)
+- fixed kernel oops on setattr (signal) interruption by returning a
+  valid error code in this case
+- full acache cleanup, bugfixes, and thread-safety support
+- allow the sysint post() method to complete an op if finished
+  (i.e. all states are immed. completion) by adding it to the
+  completion list (which test/testsome can retrieve)
+- remove 'cached' attribute fields from getattr_sm object
+- remove mostly duplicated code from shared-state-methods.c
+- added support (testing only) for building a threaded client library
+- gracefully terminate thread-mgr testing threads on errors
+  [ this is only really useful for graceful shutdown of the threaded
+    client library ]
+- added a set_info option to bmi that tells it to be more aggressive
+  when cancelling operations (bmi_tcp will now close sockets)
+- fixed kernel bugs that didn't release the bufmap indices in use on
+  some error paths (eventually caused all of them to be permanently
+  used which caused hangs on I/O)
+- extend msgpairarray code to only retry msgpairs that haven't
+  completed already
+- increase kernel module single operation timeout to be 60 seconds
+  instead of 30 seconds (note: as a side-effect this also extends the
+  amount of time you'll have to wait on interrupted operations via
+  signal for now)
+- added PVFS_strerror_r; an equivalent to strerror_r (the
+  thread-safe strerror call) that handles PVFS_error codes
+- added a simple file_write test program (tests are not in releases)
+- always delay for 1 second before spawning the pvfs2-client-core from
+  within the pvfs2-client to avoid filling dmesg with harmful looking
+  errors while restarting (and re-opening the device file)
 
 
 pvfs2-0.5.1
@@ -517,4 +585,3 @@ pvfs2-0.0.2
 pvfs2-0.0.1
 ==========
 - limited initial public release
-

@@ -7,7 +7,6 @@
 #include "pvfs2-kernel.h"
 #include "pvfs2-sysint.h"
 
-extern kmem_cache_t *op_cache;
 extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
 extern wait_queue_head_t pvfs2_request_list_waitq;
@@ -83,11 +82,9 @@ static int pvfs2_readdir(
 	/* drop through */
     default:
 	/* handle the normal cases here */
-	new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
+	new_op = op_alloc();
 	if (!new_op)
 	{
-	    pvfs2_error("pvfs2: pvfs2_readdir -- "
-			"kmem_cache_alloc failed!\n");
 	    return -ENOMEM;
 	}
 	new_op->upcall.type = PVFS2_VFS_OP_READDIR;

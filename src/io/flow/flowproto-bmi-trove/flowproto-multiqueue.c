@@ -231,6 +231,11 @@ static inline void bmi_to_mem_callback_wrapper(void *user_ptr,
 {
     struct fp_private_data* flow_data = 
 	PRIVATE_FLOW(((struct fp_queue_item*)user_ptr)->parent);
+
+    assert(flow_data);
+    assert(flow_data->parent);
+    assert(flow_data->parent->flow_mutex);
+
     gen_mutex_lock(flow_data->parent->flow_mutex);
     bmi_to_mem_callback_fn(user_ptr, actual_size, error_code);
     if(flow_data->parent->state == FLOW_COMPLETE)

@@ -1159,7 +1159,7 @@ static int lookup_segment_getattr_comp_fn(
         gossip_debug(GOSSIP_CLIENT_DEBUG, " getattr failed with code %d\n",
                      resp_p->status);
         return resp_p->status;
-    }            
+    }
 
     cur_seg = GET_CURRENT_SEGMENT();
     assert(cur_seg);
@@ -1171,7 +1171,6 @@ static int lookup_segment_getattr_comp_fn(
     PINT_acache_object_attr_deep_copy(
         &(cur_seg->seg_attr),
         &(resp_p->u.getattr.attr));
-
     return 0;
 }
 

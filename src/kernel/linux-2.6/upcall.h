@@ -110,6 +110,11 @@ typedef struct
 
 typedef struct
 {
+    unsigned long op_tag;
+} pvfs2_op_cancel_t;
+
+typedef struct
+{
     int type;
     PVFS_credentials credentials;
 
@@ -130,6 +135,7 @@ typedef struct
         pvfs2_mmap_ra_cache_flush_request_t ra_cache_flush;
         pvfs2_fs_mount_request_t fs_mount;
         pvfs2_fs_umount_request_t fs_umount;
+        pvfs2_op_cancel_t cancel;
     } req;
 } pvfs2_upcall_t;
 

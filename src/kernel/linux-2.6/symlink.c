@@ -7,7 +7,6 @@
 #include "pvfs2-kernel.h"
 #include "pvfs2-bufmap.h"
 
-extern kmem_cache_t *op_cache;
 extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
 extern struct dentry_operations pvfs2_dentry_operations;

@@ -215,7 +215,7 @@ int PVFS_isys_symlink(
         return -PVFS_ENAMETOOLONG;
     }
 
-    sm_p = (PINT_client_sm *) malloc(sizeof(*sm_p));
+    sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));
     if (sm_p == NULL)
     {
         return -PVFS_ENOMEM;

@@ -3,31 +3,6 @@
  *
  * See COPYING in top-level directory.
  */
-
-/* pvfs2_client_getattr_sm
- *
- * This state machine implements the getattr system interface function.
- *
- * The input parameters are held in sm_p->u.getattr.
- *
- * The sm_p->msgpair structure is used to get the attributes of the
- * object itself.  We convert the original attribute mask (in
- * sm_p->u.getattr.attrmask) to ask for datafile and distribution info
- * if the user asked for file size (PVFS_ATTR_SYS_SIZE).  This allows us
- * to obtain this information (if the object turns out to be a metafile)
- * so that we can later look up the datafile sizes and calculate the overall
- * file size.
- *
- * The datafile handles and distribution information are stored in
- * sm_p->u.getattr also, if the object turns out to be a metafile and the 
- * caller asked for the size.  These need to be freed once we are done with
- * them.
- *
- * The sm_p->msgpairarray is used to get datafile sizes, if it turns out that
- * we need them.  This space will also need to be freed, if we grab these
- * sizes.
- */
-
 #include <string.h>
 #include <assert.h>
 
@@ -42,6 +17,21 @@
 #include "pint-servreq.h"
 #include "pint-bucket.h"
 #include "PINT-reqproto-encode.h"
+
+/* pvfs2_client_getattr_sm
+ *
+ * The sm_p->msgpair structure is used to get the attributes of the
+ * object itself.  We convert the original attribute mask (in
+ * sm_p->u.getattr.attrmask) to ask for datafile and distribution info
+ * if the user asked for file size (PVFS_ATTR_SYS_SIZE).  This allows
+ * us to obtain this information (if the object turns out to be a
+ * metafile) so that we can later look up the datafile sizes and
+ * calculate the overall file size.
+ *
+ * The sm_p->msgpairarray is used to get datafile sizes, if it turns
+ * out that we need them.  This space will also need to be freed, if
+ * we grab these sizes.
+ */
 
 extern job_context_id pint_client_sm_context;
 
@@ -71,59 +61,60 @@ static int getattr_datafile_getattr_comp_fn(
 
 %%
 
-machine pvfs2_client_getattr_sm(object_getattr_setup_msgpair,
-				object_getattr_xfer_msgpair,
-				object_getattr_failure,
-				datafile_getattr_setup_msgpairarray,
-				datafile_getattr_xfer_msgpairarray,
-				datafile_getattr_failure,
-				cleanup)
+machine pvfs2_client_getattr_sm(
+    object_getattr_setup_msgpair,
+    object_getattr_xfer_msgpair,
+    object_getattr_failure,
+    datafile_getattr_setup_msgpairarray,
+    datafile_getattr_xfer_msgpairarray,
+    datafile_getattr_failure,
+    cleanup)
 {
     state object_getattr_setup_msgpair
     {
-	run getattr_object_getattr_setup_msgpair;
-	success => object_getattr_xfer_msgpair;
-	default => cleanup;
+        run getattr_object_getattr_setup_msgpair;
+        success => object_getattr_xfer_msgpair;
+        default => cleanup;
     }
 
     state object_getattr_xfer_msgpair
     {
-	jump pvfs2_client_getattr_acache_sm;
-	success => cleanup;
-	GETATTR_NEED_DATAFILE_SIZES => datafile_getattr_setup_msgpairarray;
-	default => object_getattr_failure;
+        jump pvfs2_client_getattr_acache_sm;
+        success => cleanup;
+        GETATTR_NEED_DATAFILE_SIZES => datafile_getattr_setup_msgpairarray;
+        default => object_getattr_failure;
     }
 
     state object_getattr_failure
     {
-	run getattr_object_getattr_failure;
-	default => cleanup;
+        run getattr_object_getattr_failure;
+        default => cleanup;
     }
 
     state datafile_getattr_setup_msgpairarray
     {
-	run getattr_datafile_getattr_setup_msgpairarray;
-	success => datafile_getattr_xfer_msgpairarray;
-	default => cleanup;
+        run getattr_datafile_getattr_setup_msgpairarray;
+        success => datafile_getattr_xfer_msgpairarray;
+        default => cleanup;
     }
 
     state datafile_getattr_xfer_msgpairarray
     {
-	jump pvfs2_client_msgpairarray_sm;
-	success => cleanup;
-	default => datafile_getattr_failure;
+        jump pvfs2_client_msgpairarray_sm;
+        success => cleanup;
+        default => datafile_getattr_failure;
     }
 
     state datafile_getattr_failure
     {
-	run getattr_datafile_getattr_failure;
-	default => cleanup;
+        run getattr_datafile_getattr_failure;
+        default => cleanup;
     }
 
     state cleanup
     {
-	run getattr_cleanup;
-	default => terminate;
+        run getattr_cleanup;
+        default => terminate;
     }
 }
 
@@ -207,13 +198,8 @@ int PVFS_sys_getattr(
 
 /*******************************************************************/
 
-/* getattr_object_getattr_setup_msgpair()
- *
- * Fills in sm_p->msgpair to perform a getattr using the getattr_acache
- * state machine.
- */
 static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
-						job_status_s *js_p)
+                                                job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL;
     uint32_t attrmask;
@@ -231,19 +217,19 @@ static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
     attrmask = sm_p->u.getattr.attrmask;
     if (attrmask & PVFS_ATTR_SYS_SIZE)
     {
-	/* need datafile handles and distribution in order to get 
-	 * datafile handles and know what function to call to get
-	 * the file size.
-	 */
-	attrmask &= ~PVFS_ATTR_SYS_SIZE;
+        /* need datafile handles and distribution in order to get 
+         * datafile handles and know what function to call to get
+         * the file size.
+         */
+        attrmask &= ~PVFS_ATTR_SYS_SIZE;
 
-	attrmask |= (PVFS_ATTR_META_DFILES | PVFS_ATTR_META_DIST);
+        attrmask |= (PVFS_ATTR_META_DFILES | PVFS_ATTR_META_DIST);
         attrmask |= PVFS_ATTR_DATA_SIZE;
     }
 
     if (attrmask & PVFS_ATTR_SYS_DFILE_COUNT)
     {
-	attrmask |= PVFS_ATTR_META_DFILES;
+        attrmask |= PVFS_ATTR_META_DFILES;
     }
 
     if (attrmask & PVFS_ATTR_SYS_LNK_TARGET)
@@ -256,13 +242,13 @@ static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
                  "attrmask being passed to server: ");
     PINT_attrmask_print(GOSSIP_GETATTR_DEBUG, attrmask);
 
-    PINT_SERVREQ_GETATTR_FILL(sm_p->msgpair.req,
-			      *sm_p->cred_p,
-			      sm_p->u.getattr.object_ref.fs_id,
-			      sm_p->u.getattr.object_ref.handle,
-			      attrmask);
+    PINT_SERVREQ_GETATTR_FILL(
+        sm_p->msgpair.req,
+        *sm_p->cred_p,
+        sm_p->u.getattr.object_ref.fs_id,
+        sm_p->u.getattr.object_ref.handle,
+        attrmask);
 
-    /* fill in msgpair structure components */
     sm_p->msgpair.fs_id   = sm_p->u.getattr.object_ref.fs_id;
     sm_p->msgpair.handle  = sm_p->u.getattr.object_ref.handle;
     sm_p->msgpair.retry_flag = PVFS_MSGPAIR_RETRY;
@@ -279,46 +265,31 @@ static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
     return 1;
 }
 
-/* getattr_object_getattr_comp_fn()
- *
- * Called to copy data from getattr response into the
- * getattr-specific portion of the PINT_client_sm structure,
- * so we can use the data after returning to this state
- * machine.
- *
- * Return value is returned in job status, so it affects the
- * resulting state coming back from the nested state machine.
- *
- * Returns 0 for directory, GETATTR_NEED_DATAFILE_SIZES for a
- * metafile (when appropriate).  Returns 0 for symlink.
- * Other types die right now.
- */
-static int getattr_object_getattr_comp_fn(void *v_p,
-					  struct PVFS_server_resp *resp_p,
-					  int index)
+/*
+  copies data from getattr response into the user supplied sys_attr
+  structure.  returns 0 for directories and symlinks, and
+  GETATTR_NEED_DATAFILE_SIZES for a metafile (when appropriate)
+*/
+static int getattr_object_getattr_comp_fn(
+    void *v_p,
+    struct PVFS_server_resp *resp_p,
+    int index)
 {
     int need_datafiles = 0;
     PVFS_object_attr *attr = NULL;
-
-    /* this is a little kludge to get around some struct definition
-     * issues in the headers.  maybe fix later?
-     */
     PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
 
-    assert(resp_p->op == PVFS_SERV_GETATTR); /* sanity check */
+    assert(resp_p->op == PVFS_SERV_GETATTR);
 
-    /* if we get an error, just return immediately, don't try to
-     * actually fill anything in.
-     */
     if (resp_p->status != 0)
     {
-	return resp_p->status;
+        return resp_p->status;
     }
 
     /*
-      if we got a metafile that didn't get a cache hit *and* we
-      need the size, that should be only time we're going to have
-      to do a full data file fetch.  (that's expensive)
+      if we got a metafile that didn't get a cache hit *and* we need
+      the size, that should be only time we're going to have to do a
+      full data file fetch.  (that's expensive)
     */
     if ((resp_p->u.getattr.attr.objtype == PVFS_TYPE_METAFILE) &&
         (!sm_p->acache_hit) &&
@@ -328,9 +299,9 @@ static int getattr_object_getattr_comp_fn(void *v_p,
     }
 
     /*
-      if we didn't get a cache hit, we're making a
-      copy of the attributes here so that we can add
-      a acache entry later in cleanup.
+      if we didn't get a cache hit, we're making a copy of the
+      attributes here so that we can add a acache entry later in
+      cleanup.
     */
     if (!sm_p->acache_hit)
     {
@@ -338,10 +309,6 @@ static int getattr_object_getattr_comp_fn(void *v_p,
             &sm_p->acache_attr, &resp_p->u.getattr.attr);
     }
 
-    /*
-      if we got a cache hit, use those attributes,
-      otherwise use the real server replied attrs
-    */
     attr = (sm_p->acache_hit ?
             &sm_p->pinode->attr :
             &resp_p->u.getattr.attr);
@@ -372,16 +339,11 @@ static int getattr_object_getattr_comp_fn(void *v_p,
     if ((attr->objtype == PVFS_TYPE_METAFILE) &&
         (sm_p->u.getattr.attrmask & PVFS_ATTR_SYS_DFILE_COUNT))
     {
-	sm_p->u.getattr.getattr_resp_p->attr.dfile_count = 
-	    attr->u.meta.dfile_count;
+        sm_p->u.getattr.getattr_resp_p->attr.dfile_count = 
+            attr->u.meta.dfile_count;
     }
 
-    /* transform the attributes from the response
-     *
-     * Note: the structure in sm_p is a PVFS_sys_attr, while the data
-     * returned is in a PVFS_object_attr.  So some translation is
-     * necessary.
-     */
+    /* copy outgoing sys_attr fields from returned object_attr */
     sm_p->u.getattr.getattr_resp_p->attr.owner = attr->owner;
     sm_p->u.getattr.getattr_resp_p->attr.group = attr->group;
     sm_p->u.getattr.getattr_resp_p->attr.perms = attr->perms;
@@ -400,55 +362,24 @@ static int getattr_object_getattr_comp_fn(void *v_p,
 
     switch (attr->objtype)
     {
-	case PVFS_TYPE_METAFILE:
-	    if (sm_p->msgpair.req.u.getattr.attrmask & PVFS_ATTR_META_DIST)
+        case PVFS_TYPE_METAFILE:
+            if (sm_p->msgpair.req.u.getattr.attrmask &
+                PVFS_ATTR_META_DIST)
             {
-		/* sanity checks */
-		assert(attr->mask & PVFS_ATTR_META_DIST);
-		assert(attr->u.meta.dist_size > 0);
-		
-		gossip_debug(GOSSIP_GETATTR_DEBUG,
+                assert(attr->mask & PVFS_ATTR_META_DIST);
+                assert(attr->u.meta.dist && (attr->u.meta.dist_size > 0));
+            }
+
+            if (sm_p->msgpair.req.u.getattr.attrmask &
+                PVFS_ATTR_META_DFILES)
+            {
+                assert(attr->mask & PVFS_ATTR_META_DFILES);
+                assert(attr->u.meta.dfile_array &&
+                       (attr->u.meta.dfile_count > 0));
+
+                gossip_debug(GOSSIP_GETATTR_DEBUG,
                              "getattr_object_getattr_comp_fn: "
-                             "copying %d bytes of dist.\n",
-                             attr->u.meta.dist_size);
-
-		/* here we make a copy of the distribution information. */
-		sm_p->u.getattr.dist_p = PINT_dist_copy(attr->u.meta.dist);
-		if (sm_p->u.getattr.dist_p == NULL) {
-		    assert(0);
-		    return -PVFS_ENOMEM;
-		}
-		sm_p->u.getattr.dist_size = attr->u.meta.dist_size;
-
-		/* nothing special about our return value here */
-	    }
-	    if (sm_p->msgpair.req.u.getattr.attrmask & PVFS_ATTR_META_DFILES)
-            {
-		/* need to save datafile handles to calculate file size;
-		 * redirect us to those states.
-		 */
-		
-		/* sanity checks */
-		assert(attr->mask & PVFS_ATTR_META_DFILES);
-		assert(attr->u.meta.dfile_count > 0);
-		
-		gossip_debug(GOSSIP_GETATTR_DEBUG,
-			     "getattr_object_getattr_comp_fn: %d datafiles.\n",
-			     attr->u.meta.dfile_count);
-		
-		/* save the datafile handles prior to freeing up the
-		 * buffers we used for messages.  we could keep them around
-		 * i suppose, but we're not going to do that for now.  later
-		 * it is likely that this stuff will be stuck in the acache
-		 * anyway, so we'll be able to just reference it from there.
-		 */
-		sm_p->u.getattr.datafile_handles = (PVFS_handle *)
-                    malloc(attr->u.meta.dfile_count * sizeof(PVFS_handle));
-                assert(sm_p->u.getattr.datafile_handles);
-		sm_p->u.getattr.datafile_count = attr->u.meta.dfile_count;
-		memcpy(sm_p->u.getattr.datafile_handles,
-		   attr->u.meta.dfile_array,
-		   attr->u.meta.dfile_count * sizeof(PVFS_handle));
+                             "%d datafiles.\n", attr->u.meta.dfile_count);
 
                 if (need_datafiles == 0)
                 {
@@ -458,39 +389,34 @@ static int getattr_object_getattr_comp_fn(void *v_p,
                     */
                     return 0;
                 }
-		else if (sm_p->u.getattr.attrmask & PVFS_ATTR_SYS_SIZE)
+                else if (sm_p->u.getattr.attrmask & PVFS_ATTR_SYS_SIZE)
                 {
-		    /* if caller asked for the size, AND we couldn't
+                    /* if caller asked for the size, AND we couldn't
                      * retrieve them from the acache, then we need to
-                     * go get the datafile sizes
-		     */
-		    return GETATTR_NEED_DATAFILE_SIZES;
-		}
-	    }
-	    else return 0;
-	    break;
-	case PVFS_TYPE_DIRECTORY:
-	    return 0;
-	    break;
-	case PVFS_TYPE_SYMLINK:
+                     * retrieve the datafile sizes
+                     */
+                    return GETATTR_NEED_DATAFILE_SIZES;
+                }
+            }
             return 0;
-            break;
-	case PVFS_TYPE_DATAFILE:
-	    /* fall through */
-	case PVFS_TYPE_DIRDATA:
-	    /* fall through */
-	default:
-	    gossip_err("error: getattr_object_getattr_comp_fn: "
+        case PVFS_TYPE_DIRECTORY:
+            return 0;
+        case PVFS_TYPE_SYMLINK:
+            return 0;
+        case PVFS_TYPE_DATAFILE:
+            /* fall through */
+        case PVFS_TYPE_DIRDATA:
+            /* fall through */
+        default:
+            gossip_err("error: getattr_object_getattr_comp_fn: "
                        "handle refers to invalid object type\n");
-	    return -PVFS_EINVAL;
     }
-
-    return -PVFS_EINVAL; /* should not get here */
+    return -PVFS_EINVAL;
 }
 
 
 static int getattr_object_getattr_failure(PINT_client_sm *sm_p,
-					  job_status_s *js_p)
+                                          job_status_s *js_p)
 {
     gossip_debug(
         GOSSIP_CLIENT_DEBUG,
@@ -499,109 +425,114 @@ static int getattr_object_getattr_failure(PINT_client_sm *sm_p,
     if ((js_p->error_code != -PVFS_ENOENT) &&
         (js_p->error_code != -PVFS_EINVAL))
     {
-        gossip_err("getattr: Failed with unexpected error code %d\n",
-                   js_p->error_code);
+        PVFS_perror_gossip("getattr_object_getattr_failure ",
+                           js_p->error_code);
     }
     return 1;
 }
 
-static int getattr_datafile_getattr_setup_msgpairarray(PINT_client_sm *sm_p,
-						       job_status_s *js_p)
+static int getattr_datafile_getattr_setup_msgpairarray(
+    PINT_client_sm *sm_p, job_status_s *js_p)
 {
-    int i = 0;
-    int ret = -PVFS_EINVAL;
+    int ret = -PVFS_EINVAL, i = 0;
+    PVFS_object_attr *attr = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) getattr state: "
                  "getattr_datafile_getattr_setup_msgpairarray\n", sm_p);
 
     js_p->error_code = 0;
-    
-    sm_p->msgarray = (PINT_client_sm_msgpair_state *)
-	malloc(sm_p->u.getattr.datafile_count *
-               sizeof(PINT_client_sm_msgpair_state));
-    assert(sm_p->msgarray);
 
-    sm_p->u.getattr.size_array = (PVFS_size *)
-	malloc(sm_p->u.getattr.datafile_count * sizeof(PVFS_size));
-    assert(sm_p->u.getattr.size_array);
+    attr = (sm_p->acache_hit ?
+            &sm_p->pinode->attr :
+            &sm_p->acache_attr);
+    assert(attr);
 
-    sm_p->msgarray_count = sm_p->u.getattr.datafile_count;
+    sm_p->msgarray = (PINT_client_sm_msgpair_state *)malloc(
+        attr->u.meta.dfile_count * sizeof(PINT_client_sm_msgpair_state));
+    if (!sm_p->msgarray)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return 1;
+    }
+
+    sm_p->u.getattr.size_array = (PVFS_size *)malloc(
+        attr->u.meta.dfile_count * sizeof(PVFS_size));
+    if (!sm_p->u.getattr.size_array)
+    {
+        free(sm_p->msgarray);
+        sm_p->msgarray = NULL;
+
+        js_p->error_code = -PVFS_ENOMEM;
+        return 1;
+    }
+
+    sm_p->msgarray_count = attr->u.meta.dfile_count;
 
     /* for each datafile, post a send/recv pair to obtain the size */
     for (i=0; i < sm_p->msgarray_count; i++)
     {
-	PINT_client_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
+        PINT_client_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
+        assert(msg_p);
 
-	gossip_debug(GOSSIP_GETATTR_DEBUG,
-		     "  datafile_getattr: getting size for handle %Lu\n", 
-		     Lu(sm_p->u.getattr.datafile_handles[i]));
+        gossip_debug(GOSSIP_GETATTR_DEBUG,
+                     "  datafile_getattr: getting size for handle %Lu\n", 
+                     Lu(attr->u.meta.dfile_array[i]));
 
-	/* fill in getattr request; all we care about is the size */
-	PINT_SERVREQ_GETATTR_FILL(msg_p->req,
-				  *sm_p->cred_p,
-				  sm_p->u.getattr.object_ref.fs_id,
-				  sm_p->u.getattr.datafile_handles[i],
-				  PVFS_ATTR_DATA_SIZE);
-	
-	/* fill in msgpair structure components */
-	msg_p->fs_id = sm_p->u.getattr.object_ref.fs_id;
-	msg_p->handle = sm_p->u.getattr.datafile_handles[i];
+        PINT_SERVREQ_GETATTR_FILL(
+            msg_p->req,
+            *sm_p->cred_p,
+            sm_p->u.getattr.object_ref.fs_id,
+            attr->u.meta.dfile_array[i],
+            PVFS_ATTR_DATA_SIZE);
+
+        msg_p->fs_id = sm_p->u.getattr.object_ref.fs_id;
+        msg_p->handle = attr->u.meta.dfile_array[i];
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
-	msg_p->comp_fn = getattr_datafile_getattr_comp_fn;
+        msg_p->comp_fn = getattr_datafile_getattr_comp_fn;
     }
 
-    /* fill in address of each server to contact */
     ret = PINT_serv_msgpairarray_resolve_addrs(
         sm_p->msgarray_count, sm_p->msgarray);
     if (ret < 0)
     {
-	gossip_lerr("Error: failed to resolve meta server addresses.\n");
-	js_p->error_code = ret;
+        gossip_lerr("Error: failed to resolve meta server addresses.\n");
+        js_p->error_code = ret;
     }
     return 1;
 }
 
 static int getattr_datafile_getattr_comp_fn(
-    void *v_p,
-    struct PVFS_server_resp *resp_p,
-    int index)
+    void *v_p, struct PVFS_server_resp *resp_p, int index)
 {
-    PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
+    PINT_client_sm *sm_p = (PINT_client_sm *)v_p;
 
     if (resp_p->status != 0)
     {
-	return resp_p->status;
+        return resp_p->status;
     }
 
-    /* sanity checks:
-     * - this is a getattr response
-     * - the attributes indicate that this was indeed a datafile
-     * - the datafile has a positive size
-     */
     assert(resp_p->op == PVFS_SERV_GETATTR);
-    assert(resp_p->u.getattr.attr.objtype == PVFS_TYPE_DATAFILE);
-    assert(resp_p->u.getattr.attr.u.data.size >= 0);
 
     gossip_debug(GOSSIP_GETATTR_DEBUG,
-		 "datafile_getattr: size of datafile %d is %Ld\n",
-		 index, Ld(resp_p->u.getattr.attr.u.data.size));
+                 "datafile_getattr: size of datafile %d is %Ld\n",
+                 index, Ld(resp_p->u.getattr.attr.u.data.size));
 
-    sm_p->u.getattr.size_array[index] = resp_p->u.getattr.attr.u.data.size;
+    sm_p->u.getattr.size_array[index] =
+        resp_p->u.getattr.attr.u.data.size;
 
     return 0;
 }
 
 static int getattr_datafile_getattr_failure(PINT_client_sm *sm_p,
-					    job_status_s *js_p)
+                                            job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-		 "(%p) getattr state: getattr_datafile_getattr_failure\n",
-		 sm_p);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) getattr state: "
+                 "getattr_datafile_getattr_failure\n", sm_p);
     return 1;
 }
 
 static int getattr_cleanup(PINT_client_sm *sm_p,
-			   job_status_s *js_p)
+                           job_status_s *js_p)
 {
     int ret = 0;
     uint32_t amask;
@@ -614,32 +545,36 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
 
     if (js_p->error_code == 0)
     {
-	/* calculate size of file if necessary */
-	assert(s_attr_p->size == 0);
+        /* calculate size of file if necessary */
+        assert(s_attr_p->size == 0);
 
-	amask = s_attr_p->mask; /* from object getattr */
+        amask = s_attr_p->mask; /* from object getattr */
 
         if (amask & PVFS_ATTR_META_DIST)
         {
             /*
-              recompute size if it's not a acache hit, or if it is
-              a acache hit on an entry that no longer has a valid size
+              recompute size if it's not a acache hit, or if it is a
+              acache hit on an entry that no longer has a valid size
             */
             if (!sm_p->acache_hit ||
                 (sm_p->acache_hit &&
                  !(sm_p->pinode->attr.mask & PVFS_ATTR_DATA_SIZE)))
             {
-                ret = PINT_dist_lookup(sm_p->u.getattr.dist_p);
-                if (ret < 0)
-                {
-                    assert(0);
-                }
+                PINT_dist *dist = NULL;
+                PVFS_object_attr *attr = (sm_p->acache_hit ?
+                                          &sm_p->pinode->attr :
+                                          &sm_p->acache_attr);
+                assert(attr && attr->u.meta.dist);
 
-                s_attr_p->size =
-                    (sm_p->u.getattr.dist_p->methods->logical_file_size)
-                    (sm_p->u.getattr.dist_p->params,
-                     sm_p->u.getattr.datafile_count,
-                     sm_p->u.getattr.size_array);
+                dist = attr->u.meta.dist;
+                assert(dist->methods);
+
+                ret = PINT_dist_lookup(dist);
+                assert(ret == 0);
+
+                s_attr_p->size = (dist->methods->logical_file_size)(
+                    dist->params, attr->u.meta.dfile_count,
+                    sm_p->u.getattr.size_array);
             }
             else
             {
@@ -647,58 +582,33 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
             }
         }
 
-	/* redo the mask */
-	s_attr_p->mask = PVFS_util_object_to_sys_attr_mask(s_attr_p->mask);
+        /* convert outgoing attribute mask based on what we got */
+        s_attr_p->mask = PVFS_util_object_to_sys_attr_mask(
+            s_attr_p->mask);
 
-	/* we know we grabbed the size if they asked for it */
-	if (sm_p->u.getattr.attrmask & PVFS_ATTR_SYS_SIZE)
+        /* and add the size if they asked for it */
+        if (sm_p->u.getattr.attrmask & PVFS_ATTR_SYS_SIZE)
         {
-	    s_attr_p->mask |= PVFS_ATTR_SYS_SIZE;
-	}
+            s_attr_p->mask |= PVFS_ATTR_SYS_SIZE;
+        }
 
-        /* if this is a symlink, we know we have the target */
+        /* if this is a symlink, add the link target */
         if (sm_p->u.getattr.attrmask & PVFS_ATTR_SYS_LNK_TARGET)
         {
             s_attr_p->mask |= PVFS_ATTR_SYS_LNK_TARGET;
         }
 
-	/* free all the memory we allocated, which could include:
-	 * - size array
-	 * - msgpair array
-	 * - datafile handle array (if not from acache)
-	 * - distribution description (if not from acache)
-	 */
-	if (sm_p->u.getattr.size_array != NULL)
+        if (sm_p->u.getattr.size_array)
         {
-	    free(sm_p->u.getattr.size_array);
-	}
-
-	if (sm_p->msgarray != NULL && (sm_p->msgarray != &(sm_p->msgpair)))
-        {
-	    free(sm_p->msgarray);
-	}
-        sm_p->msgarray = NULL;
-        sm_p->msgarray_count = 0;
-
-        /*
-          only free dist and dfile memory if we didn't get a
-          cache hit;  if we got a acache hit, we're referencing
-          memory inside the acache entries, so no allocations we
-          made
-        */
-        if (!sm_p->acache_hit)
-        {
-            if ((amask & PVFS_ATTR_META_DFILES) &&
-                (sm_p->u.getattr.datafile_handles != NULL))
-            {
-                free(sm_p->u.getattr.datafile_handles);
-            }
-            if ((amask & PVFS_ATTR_META_DIST) &&
-                (sm_p->u.getattr.dist_p != NULL))
-            {
-                PINT_dist_free(sm_p->u.getattr.dist_p);
-            }
+            free(sm_p->u.getattr.size_array);
+            sm_p->u.getattr.size_array = NULL;
         }
+
+        if (sm_p->msgarray && (sm_p->msgarray != &(sm_p->msgpair)))
+        {
+            free(sm_p->msgarray);
+        }
+        sm_p->msgarray = NULL;
 
         /* add entry to acache if not already present */
         if (!sm_p->acache_hit)
@@ -712,6 +622,10 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
                 assert(pinode);
                 release_required = 0;
             }
+
+            gossip_debug(GOSSIP_CLIENT_DEBUG, "trying to add object "
+                         "reference to acache (%s present)\n",
+                         (release_required ? "already" : "not"));
             pinode->refn = sm_p->u.getattr.object_ref;
 
             if (sm_p->acache_attr.objtype == PVFS_TYPE_SYMLINK)
@@ -726,7 +640,6 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
                   not apply at all to symlinks, so special case
                   symlinks above
                 */
-
                 pinode->size = s_attr_p->size;
                 /*
                   update the attr mask in the src object so that
@@ -753,19 +666,16 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
             {
                 PINT_acache_release(pinode);
             }
-            sm_p->acache_hit = 0;
         }
     }
     else
     {
         /* in case of failure, blank out response */ 
-	memset(sm_p->u.getattr.getattr_resp_p,
+        memset(sm_p->u.getattr.getattr_resp_p,
                0, sizeof(PVFS_sysresp_getattr));
     }
 
-    /* mark operation as complete */
     sm_p->op_complete = 1;
-
     return 0;
 }
 

@@ -11,7 +11,13 @@
 #ifndef __PVFS2_UTIL_H
 #define __PVFS2_UTIL_H
 
+#include "pvfs2.h"
 #include "pvfs2-types.h"
+
+/* Define min macro with pvfs2 prefix */
+#ifndef PVFS_util_min
+#define PVFS_util_min(x1,x2) ((x1) > (x2))? (x2):(x1)
+#endif
 
 /* results of parsing a pvfs2 tabfile, may contain more than one entry */
 struct PVFS_util_tab_s
@@ -60,13 +66,12 @@ int PVFS_util_remove_internal_mntent(
 void PVFS_sys_free_mntent(
     struct PVFS_sys_mntent *mntent);
 
-/* help out lazy humans */
 void PVFS_util_make_size_human_readable(
     PVFS_size size,
     char *out_str,
-    int max_out_len);
+    int max_out_len,
+    int use_si_units);
 
-/* generic attribute conversion */
 static inline int PVFS_util_object_to_sys_attr_mask(
     int obj_mask)
 {

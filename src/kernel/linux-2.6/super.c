@@ -11,7 +11,6 @@ extern struct dentry_operations pvfs2_dentry_operations;
 
 extern kmem_cache_t *pvfs2_inode_cache;
 
-extern kmem_cache_t *op_cache;
 extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
 extern wait_queue_head_t pvfs2_request_list_waitq;
@@ -302,8 +301,8 @@ static void pvfs2_write_inode(
 }
 
 /*
-  NOTE: information filled in here is typically
-  reflected in the output of 'df'
+  NOTE: information filled in here is typically reflected in the
+  output of the system command 'df'
 */
 #ifdef PVFS2_LINUX_KERNEL_2_4
 static int pvfs2_statfs(
@@ -315,16 +314,15 @@ static int pvfs2_statfs(
     struct kstatfs *buf)
 #endif
 {
-    int ret = -1, retries = 5;
+    int ret = -ENOMEM, retries = 5;
     pvfs2_kernel_op_t *new_op = NULL;
 
     pvfs2_print("pvfs2_statfs: called on sb %p (fs_id is %d)\n",
                 sb, (int)(PVFS2_SB(sb)->fs_id));
 
-    new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
+    new_op = op_alloc();
     if (!new_op)
     {
-        pvfs2_error("pvfs2_statfs: kmem_cache_alloc failed!\n");
         return ret;
     }
     new_op->upcall.type = PVFS2_VFS_OP_STATFS;
@@ -441,7 +439,7 @@ int pvfs2_remount(
             }
         }
 
-        new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
+        new_op = op_alloc();
         if (!new_op)
         {
             return -ENOMEM;
@@ -547,7 +545,7 @@ struct super_block* pvfs2_get_sb(
         dev_name = PVFS2_SB(sb)->devname;
     }
 
-    new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
+    new_op = op_alloc();
     if (!new_op)
     {
         goto error_exit;
@@ -719,7 +717,7 @@ struct super_block *pvfs2_get_sb(
 
     if (devname)
     {
-        new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
+        new_op = op_alloc();
         if (!new_op)
         {
             return ERR_PTR(-ENOMEM);

@@ -406,13 +406,11 @@ static int create_datafiles_comp_fn(void *v_p,
     }
 
     /* allocate memory for the data handles if we haven't already */
-    if (index == 0)
+    if (sm_p->u.create.datafile_handles == NULL)
     {
-        if (sm_p->u.create.datafile_handles == NULL)
-        {
-            sm_p->u.create.datafile_handles = (PVFS_handle *)malloc(
-                sm_p->u.create.num_data_files * sizeof(PVFS_handle));
-        }
+        sm_p->u.create.datafile_handles = (PVFS_handle *)malloc(
+            sm_p->u.create.num_data_files * sizeof(PVFS_handle));
+
         if (sm_p->u.create.datafile_handles == NULL)
         {
             gossip_err("create: Failed to allocate data handle array\n");
@@ -421,8 +419,6 @@ static int create_datafiles_comp_fn(void *v_p,
         memset(sm_p->u.create.datafile_handles, 0,
                sm_p->u.create.num_data_files * sizeof(PVFS_handle));
     }
-
-    assert(sm_p->u.create.datafile_handles);
 
     /* otherwise, just stash the newly created data file handle */
     sm_p->u.create.datafile_handles[index] = resp_p->u.create.handle;

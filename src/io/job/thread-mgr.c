@@ -6,6 +6,7 @@
 
 #include <pthread.h>
 #include <stdlib.h>
+#include <string.h>
 #include <assert.h>
 
 #include "pvfs2-types.h"
@@ -111,24 +112,33 @@ static void *trove_thread_function(void *ptr)
 #endif
 	gen_mutex_unlock(&trove_test_mutex);
 
-	if(ret < 0)
+	if (ret < 0)
 	{
-	    /* critical error */
-	    /* TODO: how to handle this */
-	    assert(0);
-	    gossip_lerr("Error: critical Trove failure.\n");
+	    PVFS_perror_gossip("critical Trove failure.\n", ret);
+#ifdef __PVFS2_JOB_THREADED__
+            gossip_err("trove_thread_function thread terminating\n");
+            break;
+#endif
+            return NULL;
 	}
 
 	for(i=0; i<trove_test_count; i++)
 	{
-	    /* execute a callback function for each completed BMI operation */
-	    tmp_callback = 
-		(struct PINT_thread_mgr_trove_callback*)stat_trove_user_ptr_array[i];
-	    /* sanity check */
-	    assert(tmp_callback != NULL);
-	    assert(tmp_callback->fn != NULL);
-	   
-	    tmp_callback->fn(tmp_callback->data, stat_trove_error_code_array[i]);
+	    /* execute a callback for each completed BMI operation */
+	    tmp_callback =  (struct PINT_thread_mgr_trove_callback*)
+                stat_trove_user_ptr_array[i];
+
+            if (!tmp_callback || !tmp_callback->fn)
+            {
+                gossip_err("critical Trove failure (null callback)\n");
+#ifdef __PVFS2_JOB_THREADED__
+                gossip_err("trove_thread_function thread terminating\n");
+                break;
+#endif
+                return NULL;
+            }
+	    tmp_callback->fn(tmp_callback->data,
+                             stat_trove_error_code_array[i]);
 	}
     }
     return (NULL);
@@ -160,7 +170,8 @@ static void *bmi_thread_function(void *ptr)
 		incount = THREAD_MGR_TEST_COUNT;
 	    gen_mutex_unlock(&bmi_mutex);
 
-	    ret = BMI_testunexpected(incount, &outcount, stat_bmi_unexp_array, 0);
+	    ret = BMI_testunexpected(
+                incount, &outcount, stat_bmi_unexp_array, 0);
 	    if(ret < 0)
 	    {
 		/* critical failure */
@@ -169,7 +180,7 @@ static void *bmi_thread_function(void *ptr)
 		gossip_lerr("Error: critical BMI failure.\n");
 	    }
 
-	    /* execute callback function for each completed unexpected message */
+	    /* execute callback for each completed unexpected message */
 	    gen_mutex_lock(&bmi_mutex);
 	    for(i=0; i<outcount; i++)
 	    {
@@ -209,6 +220,9 @@ static void *bmi_thread_function(void *ptr)
 	incount = THREAD_MGR_TEST_COUNT;
 	bmi_test_count = 0;
 
+        memset(stat_bmi_user_ptr_array, 0,
+               (THREAD_MGR_TEST_COUNT * sizeof(void *)));
+
 	ret = BMI_testcontext(incount, stat_bmi_id_array, &bmi_test_count,
 	    stat_bmi_error_code_array, stat_bmi_actual_size_array,
 	    stat_bmi_user_ptr_array, test_timeout, global_bmi_context);
@@ -222,23 +236,33 @@ static void *bmi_thread_function(void *ptr)
 
 	if(ret < 0)
 	{
-	    /* critical error */
-	    /* TODO: how to handle this */
-	    assert(0);
-	    gossip_lerr("Error: critical BMI failure.\n");
+	    PVFS_perror_gossip("critical BMI failure.\n", ret);
+#ifdef __PVFS2_JOB_THREADED__
+            gossip_err("bmi_thread_function thread terminating\n");
+            break;
+#endif
+            return NULL;
 	}
 
 	for(i=0; i<bmi_test_count; i++)
 	{
-	    /* execute a callback function for each completed BMI operation */
-	    tmp_callback = 
-		(struct PINT_thread_mgr_bmi_callback*)stat_bmi_user_ptr_array[i];
-	    /* sanity check */
-	    assert(tmp_callback != NULL);
-	    assert(tmp_callback->fn != NULL);
-	
-	    tmp_callback->fn(tmp_callback->data, stat_bmi_actual_size_array[i],
-		stat_bmi_error_code_array[i]);
+	    /* execute a callback for each completed BMI operation */
+	    tmp_callback = (struct PINT_thread_mgr_bmi_callback*)
+                stat_bmi_user_ptr_array[i];
+
+            if (!tmp_callback || !tmp_callback->fn)
+            {
+                gossip_err("critical BMI failure (null callback)\n");
+#ifdef __PVFS2_JOB_THREADED__
+                gossip_err("bmi_thread_function thread terminating\n");
+                break;
+#endif
+                return NULL;
+            }
+
+	    tmp_callback->fn(tmp_callback->data,
+                             stat_bmi_actual_size_array[i],
+                             stat_bmi_error_code_array[i]);
 	}
     }
 
@@ -266,17 +290,20 @@ static void *dev_thread_function(void *ptr)
 	    incount = THREAD_MGR_TEST_COUNT;
 	gen_mutex_unlock(&dev_mutex);
 
-	ret = PINT_dev_test_unexpected(incount, &outcount,
-	    stat_dev_unexp_array, timeout);
-	if(ret < 0)
+	ret = PINT_dev_test_unexpected(
+            incount, &outcount, stat_dev_unexp_array, timeout);
+
+	if (ret < 0)
 	{
-	    /* critical failure */
-	    /* TODO: how to handle this? */
-	    gossip_lerr("Error: critical device failure.\n");
-	    assert(0);
+            PVFS_perror_gossip("critical device failure", ret);
+#ifdef __PVFS2_JOB_THREADED__
+            gossip_err("dev_thread_function thread terminating\n");
+            break;
+#endif
+            return NULL;
 	}
 
-	/* execute callback function for each completed unexpected message */
+	/* execute callback for each completed unexpected message */
 	gen_mutex_lock(&dev_mutex);
 	for(i=0; i<outcount; i++)
 	{

@@ -121,6 +121,55 @@ int wait_for_matching_downcall(pvfs2_kernel_op_t * op)
 }
 
 /*
+  similar to the wait above, however used in the special case of I/O
+  cancellations.  we need a special wait function because if this is
+  called we already know that a signal is pending in current and need
+  to service the cancellation upcall anyway.  the only way to exit
+  this is to either timeout or have the cancellation be serviced
+  properly.
+*/
+int wait_for_cancellation_downcall(pvfs2_kernel_op_t * op)
+{
+    int ret = PVFS2_WAIT_ERROR;
+    DECLARE_WAITQUEUE(wait_entry, current);
+
+    spin_lock(&op->lock);
+    add_wait_queue(&op->waitq, &wait_entry);
+    spin_unlock(&op->lock);
+
+    while (1)
+    {
+	set_current_state(TASK_INTERRUPTIBLE);
+
+	spin_lock(&op->lock);
+	if (op->op_state == PVFS2_VFS_STATE_SERVICED)
+	{
+	    spin_unlock(&op->lock);
+	    ret = PVFS2_WAIT_SUCCESS;
+	    break;
+	}
+	spin_unlock(&op->lock);
+
+        if (!schedule_timeout
+            (MSECS_TO_JIFFIES(1000 * MAX_SERVICE_WAIT_IN_SECONDS)))
+        {
+            pvfs2_print("*** operation timed out\n");
+            clean_up_interrupted_operation(op);
+            ret = PVFS2_WAIT_TIMEOUT_REACHED;
+            break;
+        }
+    }
+
+    set_current_state(TASK_RUNNING);
+
+    spin_lock(&op->lock);
+    remove_wait_queue(&op->waitq, &wait_entry);
+    spin_unlock(&op->lock);
+
+    return ret;
+}
+
+/*
  * Local variables:
  *  c-indent-level: 4
  *  c-basic-offset: 4

@@ -48,6 +48,7 @@ struct options
     int list_all;
     int list_no_owner;
     int list_inode;
+    int list_use_si_units;
     char *start[MAX_NUM_PATHS];
     int num_starts;
 };
@@ -321,7 +322,8 @@ void print_entry_attr(
 
     if (opts->list_human_readable)
     {
-        PVFS_util_make_size_human_readable(size,scratch_size,16);
+        PVFS_util_make_size_human_readable(
+            size,scratch_size,16,opts->list_use_si_units);
     }
     else
     {
@@ -576,6 +578,11 @@ int do_list(
 
     } while(rd_response.pvfs_dirent_outcount != 0);
 
+    if (rd_response.pvfs_dirent_outcount)
+    {
+        free(rd_response.dirent_array);
+        rd_response.dirent_array = NULL;
+    }
     return 0;
 }
 
@@ -594,6 +601,7 @@ static struct options* parse_args(int argc, char* argv[])
     {
         {"help",0,0,0},
         {"human-readable",0,0,0},
+        {"si",0,0,0},
         {"version",0,0,0},
         {"numeric-uid-gid",0,0,0},
         {"directory",0,0,0},
@@ -628,6 +636,11 @@ static struct options* parse_args(int argc, char* argv[])
                 else if (strcmp("human-readable", cur_option) == 0)
                 {
                     goto list_human_readable;
+                }
+                else if (strcmp("si", cur_option) == 0)
+                {
+                    tmp_opts->list_use_si_units = 1;
+                    break;
                 }
                 else if (strcmp("version", cur_option) == 0)
                 {
@@ -737,8 +750,10 @@ static void usage(int argc, char** argv)
             "not list owner\n");
     fprintf(stderr,"  -G, --no-group             inhibit display "
             "of group information\n");
-    fprintf(stderr,"  -h, --human-readable  print sizes in human "
-            "readable format (e.g., 1K 234M 2G)\n");
+    fprintf(stderr,"  -h, --human-readable       print sizes in human "
+            "readable format\n\t\t\t\t(e.g. 1K 234M 2G)\n");
+    fprintf(stderr,"      --si                   likewise, but use powers "
+            "of 1000, not 1024\n");
     fprintf(stderr,"  -i, --inode                print index number "
             "of each file\n");
     fprintf(stderr,"  -l                         use a long listing "
@@ -747,9 +762,10 @@ static void usage(int argc, char** argv)
             "numeric UIDs and GIDs\n");
     fprintf(stderr,"  -o                         like -l, but do not "
             "list group information\n");
-    fprintf(stderr,"      --help     display this help and exit\n");
-    fprintf(stderr,"      --version  output version information "
+    fprintf(stderr,"      --help                 display this help "
             "and exit\n");
+    fprintf(stderr,"      --version              output version "
+            "information and exit\n");
     return;
 }
 

@@ -70,6 +70,7 @@ static struct bmi_method_ops **known_method_table = 0;
  * because we listen on them for the duration.
  */
 static int active_method_count = 0;
+static gen_mutex_t active_method_count_mutex = GEN_MUTEX_INITIALIZER;
 static struct bmi_method_ops **active_method_table = NULL;
 
 static int activate_method(const char *name, const char *listen_addr,
@@ -121,6 +122,7 @@ int BMI_initialize(const char *method_list,
     memcpy(known_method_table, static_methods,
 	known_method_count * sizeof(*known_method_table));
 
+    gen_mutex_lock(&active_method_count_mutex);
     if (!method_list) {
 	/* nothing active until lookup */
 	active_method_count = 0;
@@ -131,6 +133,7 @@ int BMI_initialize(const char *method_list,
 	{
 	    gossip_lerr("Error: bad method list.\n");
 	    ret = bmi_errno_to_pvfs(-EINVAL);
+	    gen_mutex_unlock(&active_method_count_mutex);
 	    goto bmi_initialize_failure;
 	}
 
@@ -143,12 +146,14 @@ int BMI_initialize(const char *method_list,
 	    ret = activate_method(requested_methods[i], listen_addr, flags);
 	    if (ret < 0) {
 		ret = bmi_errno_to_pvfs(ret);
+		gen_mutex_unlock(&active_method_count_mutex);
 		goto bmi_initialize_failure;
 	    }
 	    free(requested_methods[i]);
 	}
 	free(requested_methods);
     }
+    gen_mutex_unlock(&active_method_count_mutex);
 
     return (0);
 
@@ -160,6 +165,7 @@ int BMI_initialize(const char *method_list,
 	ref_list_cleanup(cur_ref_list);
     }
 
+    gen_mutex_lock(&active_method_count_mutex);
     /* look for loaded methods and shut down */
     if (active_method_table)
     {
@@ -191,6 +197,7 @@ int BMI_initialize(const char *method_list,
 	free(requested_methods);
     }
     active_method_count = 0;
+    gen_mutex_unlock(&active_method_count_mutex);
 
     return (ret);
 }
@@ -364,6 +371,7 @@ int BMI_finalize(void)
 {
     int i = -1;
 
+    gen_mutex_lock(&active_method_count_mutex);
     /* attempt to shut down active methods */
     for (i = 0; i < active_method_count; i++)
     {
@@ -371,6 +379,7 @@ int BMI_finalize(void)
     }
     active_method_count = 0;
     free(active_method_table);
+    gen_mutex_unlock(&active_method_count_mutex);
 
     free(known_method_table);
     known_method_count = 0;
@@ -414,6 +423,7 @@ int BMI_open_context(bmi_context_id* context_id)
 	return(bmi_errno_to_pvfs(-EBUSY));
     }
 
+    gen_mutex_lock(&active_method_count_mutex);
     /* tell all of the modules about the new context */
     for (i = 0; i < active_method_count; i++)
     {
@@ -433,6 +443,7 @@ int BMI_open_context(bmi_context_id* context_id)
 	    goto out;
 	}
     }
+    gen_mutex_unlock(&active_method_count_mutex);
 
     context_array[context_index] = 1;
     *context_id = context_index;
@@ -463,11 +474,13 @@ void BMI_close_context(bmi_context_id context_id)
     }
 
     /* tell all of the modules to get rid of this context */
+    gen_mutex_lock(&active_method_count_mutex);
     for (i = 0; i < active_method_count; i++)
     {
 	active_method_table[i]->BMI_meth_close_context(context_id);
     }
     context_array[context_id] = 0;
+    gen_mutex_unlock(&active_method_count_mutex);
 
     gen_mutex_unlock(&context_mutex);
     return;
@@ -659,13 +672,18 @@ int BMI_testsome(int incount,
     struct method_op *query_op;
     int need_to_test;
     int tmp_outcount;
+    int tmp_active_method_count;
+
+    gen_mutex_lock(&active_method_count_mutex);
+    tmp_active_method_count = active_method_count;
+    gen_mutex_unlock(&active_method_count_mutex);
 
     if (max_idle_time_ms < 0)
 	return (bmi_errno_to_pvfs(-EINVAL));
 
     *outcount = 0;
 
-    if (active_method_count == 1) {
+    if (tmp_active_method_count == 1) {
 	/* shortcircuit for perhaps common case of only one method */
 	ret = active_method_table[0]->BMI_meth_testsome(
 	    incount, id_array, outcount, index_array,
@@ -682,7 +700,7 @@ int BMI_testsome(int incount,
     /* TODO: do something more clever here */
     if (max_idle_time_ms)
     {
-	idle_per_method = max_idle_time_ms / active_method_count;
+	idle_per_method = max_idle_time_ms / tmp_active_method_count;
 	if (!idle_per_method)
 	    idle_per_method = 1;
     }
@@ -692,7 +710,7 @@ int BMI_testsome(int incount,
 	return(bmi_errno_to_pvfs(-ENOMEM));
 
     /* iterate over each active method */
-    for(i=0; i<active_method_count; i++)
+    for(i=0; i<tmp_active_method_count; i++)
     {
 	/* setup the tmp id array with only operations that match
 	 * that method
@@ -763,6 +781,11 @@ int BMI_testunexpected(int incount,
     struct method_unexpected_info sub_info[incount];
     ref_st_p tmp_ref = NULL;
     int idle_per_method = 0;
+    int tmp_active_method_count = 0;
+
+    gen_mutex_lock(&active_method_count_mutex);
+    tmp_active_method_count = active_method_count;
+    gen_mutex_unlock(&active_method_count_mutex);
 
     if (max_idle_time_ms < 0)
 	return (bmi_errno_to_pvfs(-EINVAL));
@@ -772,12 +795,12 @@ int BMI_testunexpected(int incount,
     /* TODO: do something more clever here */
     if (max_idle_time_ms)
     {
-	idle_per_method = max_idle_time_ms / active_method_count;
+	idle_per_method = max_idle_time_ms / tmp_active_method_count;
 	if (!idle_per_method)
 	    idle_per_method = 1;
     }
 
-    while (position < incount && i < active_method_count)
+    while (position < incount && i < tmp_active_method_count)
     {
 	ret = active_method_table[i]->BMI_meth_testunexpected(
             (incount - position), &tmp_outcount,
@@ -842,21 +865,39 @@ int BMI_testcontext(int incount,
     int position = 0;
     int tmp_outcount = 0;
     int idle_per_method = 0;
+    int tmp_active_method_count = 0;
+    struct timespec ts;
+
+    gen_mutex_lock(&active_method_count_mutex);
+    tmp_active_method_count = active_method_count;
+    gen_mutex_unlock(&active_method_count_mutex);
 
     if (max_idle_time_ms < 0)
 	return (bmi_errno_to_pvfs(-EINVAL));
 
     *outcount = 0;
 
+    if(tmp_active_method_count < 1)
+    {
+	/* nothing active yet, just snooze and return */
+	if(max_idle_time_ms > 0)
+	{
+	    ts.tv_sec = 0;
+	    ts.tv_nsec = 2000;
+	    nanosleep(&ts, NULL);
+	}
+	return(0);
+    }
+
     /* TODO: do something more clever here */
     if (max_idle_time_ms)
     {
-	idle_per_method = max_idle_time_ms / active_method_count;
+	idle_per_method = max_idle_time_ms / tmp_active_method_count;
 	if (!idle_per_method)
 	    idle_per_method = 1;
     }
 
-    while (position < incount && i < active_method_count)
+    while (position < incount && i < tmp_active_method_count)
     {
 	if(user_ptr_array)
 	{
@@ -1018,6 +1059,7 @@ int BMI_set_info(PVFS_BMI_addr_t addr,
 	{
 	    return (bmi_errno_to_pvfs(-EINVAL));
 	}
+	gen_mutex_lock(&active_method_count_mutex);
 	for (i = 0; i < active_method_count; i++)
 	{
 	    ret = active_method_table[i]->BMI_meth_set_info(
@@ -1027,9 +1069,11 @@ int BMI_set_info(PVFS_BMI_addr_t addr,
 	    {
 		gossip_lerr(
                     "Error: failure on set_info to method: %d\n", i);
+		gen_mutex_unlock(&active_method_count_mutex);
 		return (ret);
 	    }
 	}
+	gen_mutex_unlock(&active_method_count_mutex);
 	return (0);
     }
 
@@ -1108,16 +1152,20 @@ int BMI_get_info(PVFS_BMI_addr_t addr,
     {
 	/* check to see if the interface is initialized */
     case BMI_CHECK_INIT:
+	gen_mutex_lock(&active_method_count_mutex);
 	if (active_method_count > 0)
 	{
+	    gen_mutex_unlock(&active_method_count_mutex);
 	    return (0);
 	}
 	else
 	{
+	    gen_mutex_unlock(&active_method_count_mutex);
 	    return (bmi_errno_to_pvfs(-ENETDOWN));
 	}
 	break;
     case BMI_CHECK_MAXSIZE:
+	gen_mutex_lock(&active_method_count_mutex);
 	for (i = 0; i < active_method_count; i++)
 	{
 	    ret = active_method_table[i]->BMI_meth_get_info(
@@ -1137,6 +1185,7 @@ int BMI_get_info(PVFS_BMI_addr_t addr,
 	    }
 	    *((int *) inout_parameter) = maxsize;
 	}
+	gen_mutex_unlock(&active_method_count_mutex);
 	break;
     case BMI_GET_METH_ADDR:
 	gen_mutex_lock(&ref_mutex);
@@ -1199,6 +1248,7 @@ int BMI_addr_lookup(PVFS_BMI_addr_t * new_addr,
      * listed in order of preference
      */
     i = 0;
+    gen_mutex_lock(&active_method_count_mutex);
     while ((i < active_method_count) &&
            !(meth_addr = active_method_table[i]->
              BMI_meth_method_addr_lookup(id_string)))
@@ -1231,6 +1281,7 @@ int BMI_addr_lookup(PVFS_BMI_addr_t * new_addr,
 	    }
 	}
     }
+    gen_mutex_unlock(&active_method_count_mutex);
 
     /* make sure one was successful */
     if (!meth_addr)
@@ -1566,6 +1617,7 @@ int bmi_method_addr_reg_callback(method_addr_p map)
 /*
  * Attempt to insert this name into the list of active methods,
  * and bring it up.
+ * NOTE: assumes caller has protected active_method_count with a mutex lock
  */
 static int
 activate_method(const char *name, const char *listen_addr, int flags)
@@ -1579,7 +1631,9 @@ activate_method(const char *name, const char *listen_addr, int flags)
     for (i=0; i<active_method_count; i++)
 	if (!strcmp(active_method_table[i]->method_name, name)) break;
     if (i < active_method_count)
+    {
 	return 0;
+    }
 
     /* is the method known? */
     for (i=0; i<known_method_count; i++)
