@@ -65,6 +65,11 @@ int PINT_bucket_get_physical(
 #define PINT_bucket_get_physical_all(x1,x2,x3,x4,x5) \
     PINT_bucket_get_physical(x1,x2,x3,x4,x5,PINT_BUCKET_ALL);
 
+char* PINT_bucket_build_virt_server_list(
+    struct server_configuration_s *config,
+    PVFS_fs_id fsid,
+    int server_type);
+
 int PINT_bucket_map_to_server(
     bmi_addr_t *server_addr,
     PVFS_handle handle,

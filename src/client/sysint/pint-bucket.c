@@ -575,6 +575,98 @@ int PINT_bucket_get_root_handle(
     return ret;
 }
 
+/* PINT_bucket_build_virt_server_list()
+ *
+ * allocates a string containing a space delimited list of pvfs2 server
+ * addresses for the given fsid.  server_type controls whether listing is
+ * of meta servers or I/O servers.  Caller must free allocated string.
+ *
+ * returns pointer to string on success, NULL on failure
+ */
+char* PINT_bucket_build_virt_server_list(
+    struct server_configuration_s *config,
+    PVFS_fs_id fsid,
+    int server_type)
+{
+    struct qlist_head *hash_link = NULL;
+    struct config_fs_cache_s *cur_config_cache = NULL;
+    PINT_llist* tmp_server = NULL;
+    char* ret_str = NULL;
+    int ret_str_len = 0;
+    char* server_bmi_str;
+    int count = 0;
+    struct host_handle_mapping_s *cur_mapping = NULL;
+
+    hash_link = qhash_search(PINT_fsid_config_cache_table,&(fsid));
+    if(!hash_link)
+    {
+	return(NULL);
+    }
+    cur_config_cache = qlist_entry(hash_link, struct config_fs_cache_s,
+	hash_link);
+    assert(cur_config_cache);
+    assert(cur_config_cache->fs);
+
+    if(server_type == PINT_BUCKET_META)
+    {
+	tmp_server = cur_config_cache->fs->meta_handle_ranges;
+    }
+    else if(server_type == PINT_BUCKET_IO)
+    {
+	tmp_server = cur_config_cache->fs->data_handle_ranges;
+    }
+    else
+    {
+	return(NULL);
+    }
+    assert(tmp_server);
+
+    /* first, run through the list to figure out how long our string
+     * must be
+     */
+    while((cur_mapping = PINT_llist_head(tmp_server)))
+    {
+	tmp_server = PINT_llist_next(tmp_server);
+	server_bmi_str = PINT_config_get_host_addr_ptr(
+	    config,cur_mapping->alias_mapping->host_alias);
+	count++;
+	ret_str_len += strlen(server_bmi_str) + 1;
+    }
+    ret_str_len++;
+
+    if(ret_str_len <= 1)
+	return(NULL);
+
+    ret_str = (char*)malloc(ret_str_len*sizeof(char));	
+    if(!ret_str)
+	return(NULL);
+    memset(ret_str, 0, ret_str_len*sizeof(char));
+
+    if(server_type == PINT_BUCKET_META)
+    {
+	tmp_server = cur_config_cache->fs->meta_handle_ranges;
+    }
+    else if(server_type == PINT_BUCKET_IO)
+    {
+	tmp_server = cur_config_cache->fs->data_handle_ranges;
+    }
+
+    /* now cycle through again, this time filling in string */
+    while((cur_mapping = PINT_llist_head(tmp_server)))
+    {
+	tmp_server = PINT_llist_next(tmp_server);
+	server_bmi_str = PINT_config_get_host_addr_ptr(
+	    config,cur_mapping->alias_mapping->host_alias);
+	count--;
+	strcat(ret_str, server_bmi_str);
+	if(count)
+	    strcat(ret_str, " ");
+    }
+ 
+    return(ret_str);
+}
+
+
 /* hash_fsid()
  *
  * hash function for fsids added to table

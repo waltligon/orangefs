@@ -29,20 +29,17 @@ enum
     PVFS_MGMT_META_SERVER = 2
 };
 
-int PVFS_mgmt_setparam_all(
-    PVFS_fs_id fs_id,
-    PVFS_credentials credentials,
-    enum PVFS_server_param param,
-    int64_t value);
-
-int PVFS_mgmt_noop(
-    PVFS_credentials credentials,
-    char* host);
 
 int PVFS_mgmt_count_servers(
     PVFS_fs_id fs_id,
     PVFS_credentials credentials,
     int* count);
+
+int PVFS_mgmt_setparam_all(
+    PVFS_fs_id fs_id,
+    PVFS_credentials credentials,
+    enum PVFS_server_param param,
+    int64_t value);
 
 int PVFS_mgmt_statfs_all(
     PVFS_fs_id fs_id,
@@ -51,6 +48,15 @@ int PVFS_mgmt_statfs_all(
     int* outcount,
     int* overflow_flag,
     struct PVFS_mgmt_server_stat* stat_array);
+
+char* PVFS_mgmt_build_virt_server_list(
+    PVFS_fs_id fs_id,
+    PVFS_credentials credentials,
+    int server_type);
+
+int PVFS_mgmt_noop(
+    PVFS_credentials credentials,
+    char* host);
 
 #endif /* __PVFS2_MGMT_H */
 
