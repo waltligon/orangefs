@@ -719,7 +719,7 @@ static int remove_datafile_remove_setup_msgpair(PINT_client_sm *sm_p,
 	/* fill in msgpair structure components */
 	msg_p->fs_id   = sm_p->u.remove.object_ref.fs_id;
 	msg_p->handle  = sm_p->u.remove.datafile_handles[i];
-        msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
+        msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
 	msg_p->comp_fn = NULL;
     }
 
@@ -754,7 +754,7 @@ static int remove_object_remove_setup_msgpair(PINT_client_sm *sm_p,
     /* fill in msgpair structure components */
     sm_p->msgpair.fs_id   = sm_p->u.remove.object_ref.fs_id;
     sm_p->msgpair.handle  = sm_p->u.remove.object_ref.handle;
-    sm_p->msgpair.retry_flag = PVFS_MSGPAIR_NO_RETRY;
+    sm_p->msgpair.retry_flag = PVFS_MSGPAIR_RETRY;
     sm_p->msgpair.comp_fn = NULL;
 
     ret = PINT_bucket_map_to_server(&sm_p->msgpair.svr_addr,
@@ -833,7 +833,7 @@ static int remove_check_dir_contents_failure(PINT_client_sm *sm_p,
                  "remove state: remove_check_dir_contents_failure\n");
 
     gossip_err("WARNING: PVFS_sys_remove() encountered an error which "
-    "may lead to inconsistent state.\n");
+	"may lead to inconsistent state.\n");
     gossip_err("WARNING: PVFS2 fsck (if available) may be needed.\n");
     js_p->error_code = 0;
     return(1);
@@ -844,6 +844,12 @@ static int remove_datafile_remove_failure(PINT_client_sm *sm_p,
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "remove state: datafile_remove_failure\n");
+	 
+    gossip_err("WARNING: PVFS_sys_remove() encountered an error which "
+	"may lead to inconsistent state.\n");
+    gossip_err("WARNING: PVFS2 fsck (if available) may be needed.\n");
+    js_p->error_code = 0;
+
     return 1;
 }
 
@@ -937,7 +943,13 @@ static int remove_object_remove_failure(PINT_client_sm *sm_p,
 					job_status_s *js_p)
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "remove state: object_remove_failure\n");
+                 "remove state: object_remove_failure\n");	 
+
+    gossip_err("WARNING: PVFS_sys_remove() encountered an error which "
+	"may lead to inconsistent state.\n");
+    gossip_err("WARNING: PVFS2 fsck (if available) may be needed.\n");
+    js_p->error_code = 0;
+
     return 1;
 }
 
