@@ -41,9 +41,8 @@ struct dentry *pvfs2_lookup(
 {
     int ret = -1, retries = PVFS2_OP_RETRY_COUNT;
     struct inode *inode = NULL;
-    pvfs2_kernel_op_t *new_op = (pvfs2_kernel_op_t *) 0;
-    pvfs2_inode_t *parent = NULL;
-    pvfs2_inode_t *found_pvfs2_inode = NULL;
+    pvfs2_kernel_op_t *new_op = NULL;
+    pvfs2_inode_t *parent = NULL, *found_pvfs2_inode = NULL;
     struct super_block *sb = NULL;
 
     /*
@@ -163,7 +162,7 @@ static int pvfs2_link(
     {
 	return -EMLINK;
     }
-    return 0;
+    return -ENOSYS;
 }
 
 /* return 0 on success; non-zero otherwise */
@@ -239,9 +238,100 @@ static int pvfs2_rename(
     struct inode *new_dir,
     struct dentry *new_dentry)
 {
+    int ret = -1, retries = 5, are_directories = 0;
+    pvfs2_inode_t *pvfs2_old_parent_inode = PVFS2_I(old_dir);
+    pvfs2_inode_t *pvfs2_new_parent_inode = PVFS2_I(new_dir);
+    pvfs2_kernel_op_t *new_op = NULL;
+    struct super_block *sb = NULL;
+
     pvfs2_print("pvfs2: pvfs2_rename called (%s to %s)\n",
                 old_dentry->d_name.name, new_dentry->d_name.name);
-    return 0;
+
+    are_directories = S_ISDIR(old_dentry->d_inode->i_mode);
+    if (are_directories && (new_dir->i_nlink >= PVFS2_LINK_MAX))
+    {
+        pvfs2_error("pvfs2: pvfs2_rename -- directory %s "
+                    "surpassed PVFS2_LINK_MAX\n",
+                    new_dentry->d_name.name);
+        return -EMLINK;
+    }
+
+    new_op = kmem_cache_alloc(op_cache, SLAB_KERNEL);
+    if (!new_op)
+    {
+	pvfs2_error("pvfs2: pvfs2_rename -- kmem_cache_alloc failed!\n");
+	return ret;
+    }
+    new_op->upcall.type = PVFS2_VFS_OP_RENAME;
+
+    /*
+      if no handle/fs_id is available in the parent,
+      use the root handle/fs_id as specified by the
+      inode's corresponding superblock
+    */
+    if (pvfs2_old_parent_inode->refn.handle &&
+        pvfs2_old_parent_inode->refn.fs_id)
+    {
+        new_op->upcall.req.rename.old_parent_refn =
+            pvfs2_old_parent_inode->refn;
+    }
+    else
+    {
+        sb = old_dir->i_sb;
+        new_op->upcall.req.rename.old_parent_refn.handle =
+	    PVFS2_SB(sb)->handle;
+        new_op->upcall.req.rename.old_parent_refn.fs_id =
+	    PVFS2_SB(sb)->fs_id;
+    }
+
+    /* do the same for the new parent */
+    if (pvfs2_new_parent_inode->refn.handle &&
+        pvfs2_new_parent_inode->refn.fs_id)
+    {
+        new_op->upcall.req.rename.new_parent_refn =
+            pvfs2_new_parent_inode->refn;
+    }
+    else
+    {
+        sb = new_dir->i_sb;
+        new_op->upcall.req.rename.new_parent_refn.handle =
+	    PVFS2_SB(sb)->handle;
+        new_op->upcall.req.rename.new_parent_refn.fs_id =
+	    PVFS2_SB(sb)->fs_id;
+    }
+    strncpy(new_op->upcall.req.rename.d_old_name,
+	    old_dentry->d_name.name, PVFS2_NAME_LEN);
+    strncpy(new_op->upcall.req.rename.d_new_name,
+	    new_dentry->d_name.name, PVFS2_NAME_LEN);
+
+    service_operation_with_timeout_retry(
+        new_op, "pvfs2_rename", retries);
+
+    /* nothing's returned; just return the exit status */
+    ret = new_op->downcall.status;
+
+    if (new_dentry->d_inode)
+    {
+        new_dentry->d_inode->i_nlink--;
+        dput(new_dentry);
+        if (are_directories)
+        {
+            old_dir->i_nlink--;
+        }
+    }
+    else if (are_directories)
+    {
+        new_dir->i_nlink++;
+        old_dir->i_nlink--;
+    }
+
+    pvfs2_print("pvfs2: pvfs2_rename got downcall status %d\n", ret);
+
+  error_exit:
+    op_release(new_op);
+
+    pvfs2_print("pvfs2: pvfs2_rename is returning %d\n", ret);
+    return ret;
 }
 
 struct inode_operations pvfs2_dir_inode_operations = {

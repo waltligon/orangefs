@@ -82,6 +82,7 @@ struct file_system_type pvfs2_fs_type = {
     .name = "pvfs2",
     .get_sb = pvfs2_get_sb,
     .kill_sb = pvfs2_kill_sb,
+    .fs_flags = FS_ODD_RENAME,
     .owner = THIS_MODULE
 };
 

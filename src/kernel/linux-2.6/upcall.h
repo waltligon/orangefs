@@ -73,6 +73,14 @@ typedef struct
 
 typedef struct
 {
+    PVFS_pinode_reference old_parent_refn;
+    PVFS_pinode_reference new_parent_refn;
+    char d_old_name[PVFS2_NAME_LEN];
+    char d_new_name[PVFS2_NAME_LEN];
+} pvfs2_rename_request_t;
+
+typedef struct
+{
     int type;
     PVFS_credentials credentials;
 
@@ -87,6 +95,7 @@ typedef struct
 	pvfs2_remove_request_t remove;
 	pvfs2_mkdir_request_t mkdir;
 	pvfs2_readdir_request_t readdir;
+	pvfs2_rename_request_t rename;
     } req;
 } pvfs2_upcall_t;
 

@@ -527,6 +527,58 @@ static int service_readdir_request(
     return ret;
 }
 
+static int service_rename_request(
+    PVFS_sysresp_init *init_response,
+    pvfs2_upcall_t *in_upcall,
+    pvfs2_downcall_t *out_downcall)
+{
+    int ret = 1;
+    PVFS_pinode_reference old_parent_refn, new_parent_refn;
+
+    if (init_response && in_upcall && out_downcall)
+    {
+        memset(out_downcall,0,sizeof(pvfs2_downcall_t));
+
+        old_parent_refn = in_upcall->req.rename.old_parent_refn;
+        new_parent_refn = in_upcall->req.rename.new_parent_refn;
+
+        fprintf(
+            stderr,
+            "Got a rename request for %s under fsid %d and "
+            "handle %Lu to be %s under fsid %d and handle %Lu\n",
+            in_upcall->req.rename.d_old_name,
+            old_parent_refn.fs_id, old_parent_refn.handle,
+            in_upcall->req.rename.d_new_name,
+            new_parent_refn.fs_id, new_parent_refn.handle);
+
+        ret = PVFS_sys_rename(in_upcall->req.rename.d_old_name,
+                              in_upcall->req.rename.old_parent_refn,
+                              in_upcall->req.rename.d_new_name,
+                              in_upcall->req.rename.new_parent_refn,
+                              in_upcall->credentials);
+        if (ret < 0)
+        {
+            gossip_err("Failed to rename %s to %s\n",
+                       in_upcall->req.rename.d_old_name,
+                       in_upcall->req.rename.d_new_name);
+            gossip_err("Rename returned error code %d\n", ret);
+
+            /* we need to send a blank error response */
+            out_downcall->type = PVFS2_VFS_OP_RENAME;
+            out_downcall->status = -1;
+        }
+        else
+        {
+            /* we need to send a blank success response */
+            out_downcall->type = PVFS2_VFS_OP_RENAME;
+            out_downcall->status = 0;
+            ret = 0;
+        }
+    }
+    return ret;
+}
+
+
 int write_device_response(
     void *buffer_list,
     int *size_list,
@@ -708,6 +760,9 @@ int main(int argc, char **argv)
 		break;
 	    case PVFS2_VFS_OP_FILE_IO:
 		service_io_request(&init_response, &upcall, &downcall);
+		break;
+	    case PVFS2_VFS_OP_RENAME:
+		service_rename_request(&init_response, &upcall, &downcall);
 		break;
 	    case PVFS2_VFS_OP_INVALID:
 	    default:

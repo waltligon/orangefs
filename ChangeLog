@@ -2,6 +2,10 @@
 PVFS2 Release ChangeLog
 -----------------------
 
+pvfs2-0.0.3pre1
+===========
+- vfs mmap and execution support (read-only)
+- vfs rename support
 
 pvfs2-0.0.2
 ===========

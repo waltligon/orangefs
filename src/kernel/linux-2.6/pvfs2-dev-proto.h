@@ -21,6 +21,7 @@
 #define PVFS2_VFS_OP_READDIR           0xFF000007
 #define PVFS2_VFS_OP_SETATTR           0xFF000008
 #define PVFS2_VFS_OP_SYMLINK           0xFF000009
+#define PVFS2_VFS_OP_RENAME            0xFF00000A
 
 /* misc constants */
 #define PVFS2_NAME_LEN                 0x000000FF
