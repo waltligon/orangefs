@@ -1597,7 +1597,7 @@ int BMI_gm_test(bmi_op_id_t id,
 		bmi_context_id context_id)
 {
     int ret = -1;
-    method_op_p query_op = (method_op_p)id_gen_fast_lookup(id);
+    method_op_p query_op = (method_op_p)id_gen_safe_lookup(id);
     struct gm_op *gm_op_data = query_op->method_data;
 
     gen_mutex_lock(&interface_mutex);
@@ -1662,7 +1662,7 @@ int BMI_gm_testsome(int incount,
     {
 	if(id_array[i])
 	{
-	    query_op = (method_op_p)id_gen_fast_lookup(id_array[i]);
+	    query_op = (method_op_p)id_gen_safe_lookup(id_array[i]);
 	    gm_op_data = query_op->method_data;
 	    if(gm_op_data->complete)
 	    {
@@ -2984,7 +2984,7 @@ static void put_recv_handler(bmi_op_id_t ctrl_op_id)
     int i;
 
     /* find the matching operation */
-    query_op = id_gen_fast_lookup(ctrl_op_id);
+    query_op = id_gen_safe_lookup(ctrl_op_id);
     op_list_remove(query_op);
     gm_op_data = query_op->method_data;
 
@@ -3079,7 +3079,7 @@ static void ctrl_ack_handler(bmi_op_id_t ctrl_op_id,
      */
 
     /* find the matching operation */
-    query_op = id_gen_fast_lookup(ctrl_op_id);
+    query_op = id_gen_safe_lookup(ctrl_op_id);
     op_list_remove(query_op);
     gm_op_data = query_op->method_data;
     gm_op_data->remote_ptr = remote_ptr;

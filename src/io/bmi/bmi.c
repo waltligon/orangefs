@@ -617,7 +617,7 @@ int BMI_test(bmi_op_id_t id,
 
     *outcount = 0;
 
-    target_op = id_gen_fast_lookup(id);
+    target_op = id_gen_safe_lookup(id);
     assert(target_op->op_id == id);
 
     ret = active_method_table[
@@ -703,7 +703,7 @@ int BMI_testsome(int incount,
 	    if(id_array[j])
 	    {
 		query_op = (struct method_op*)
-                    id_gen_fast_lookup(id_array[j]);
+                    id_gen_safe_lookup(id_array[j]);
 		assert(query_op->op_id == id_array[j]);
 		if(query_op->addr->method_type == i)
 		{
@@ -1465,7 +1465,7 @@ int BMI_cancel(bmi_op_id_t id,
     gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
                  "bmi canceling: %Lu\n", Lu(id));
 
-    target_op = id_gen_fast_lookup(id);
+    target_op = id_gen_safe_lookup(id);
     assert(target_op->op_id == id);
 
     if(active_method_table[target_op->addr->method_type]->BMI_meth_cancel)

@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.8 2004-04-15 18:33:04 pw Exp $
+ * $Id: ib.c,v 1.9 2004-04-26 17:58:35 neill Exp $
  */
 #include <stdio.h>  /* just for NULL for id-generator.h */
 #include <src/common/id-generator/id-generator.h>
@@ -832,7 +832,7 @@ generic_post_send(bmi_op_id_t *id, struct method_addr *remote_map,
 
     /* generate identifier used by caller to test for message later */
     mop = Malloc(sizeof(*mop));
-    id_gen_fast_register(&mop->op_id, mop);
+    id_gen_safe_register(&mop->op_id, mop);
     mop->addr = remote_map;  /* set of function pointers, essentially */
     mop->method_data = sq;
     mop->user_ptr = user_ptr;
@@ -967,7 +967,7 @@ generic_post_recv(bmi_op_id_t *id, struct method_addr *remote_map,
 
     /* generate identifier used by caller to test for message later */
     mop = Malloc(sizeof(*mop));
-    id_gen_fast_register(&mop->op_id, mop);
+    id_gen_safe_register(&mop->op_id, mop);
     mop->addr = remote_map;  /* set of function pointers, essentially */
     mop->method_data = rq;
     mop->user_ptr = user_ptr;
@@ -1139,7 +1139,7 @@ BMI_ib_test(bmi_op_id_t id, int *outcount, bmi_error_code_t *err,
     gen_mutex_lock(&interface_mutex);
     check_cq();
 
-    mop = id_gen_fast_lookup(id);
+    mop = id_gen_safe_lookup(id);
     sq = mop->method_data;
     n = 0;
     if (sq->type == TYPE_SEND) {

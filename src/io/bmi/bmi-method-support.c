@@ -41,7 +41,7 @@ method_op_p alloc_method_op(bmi_size_t payload_size)
     }
     memset(my_method_op, 0, (ssize + payload_size));
 
-    if (id_gen_fast_register(&(my_method_op->op_id), my_method_op) < 0)
+    if (id_gen_safe_register(&(my_method_op->op_id), my_method_op) < 0)
     {
 	free(my_method_op);
 	return (NULL);
