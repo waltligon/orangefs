@@ -34,6 +34,12 @@ static gen_mutex_t interface_mutex = GEN_MUTEX_INITIALIZER;
 static unsigned int bmi_gm_reserved_ports[BMI_GM_MAX_PORTS] = 
     {1,1,0,1,0,0,0,0};
 
+/* how long to wait on cancelled rendezvous receive operations to finish 
+ * before reusing the buffer for something else
+ */
+/* 15 minutes */
+#define PINT_CANCELLED_REND_RECLAIM_TIMEOUT (60*15)
+
 /* function prototypes */
 int BMI_gm_initialize(method_addr_p listen_addr,
 		      int method_id,
@@ -387,6 +393,8 @@ static void prepare_for_recv(method_op_p mop);
 static void setup_send_data_buffer(method_op_p mop);
 static void setup_send_data_buffer_list(method_op_p mop);
 static void prepare_for_recv_list(method_op_p mop);
+static void reclaim_cancelled_io_buffers(void);
+static int io_buffers_exhausted(void);
 
 /*************************************************************************
  * Visible Interface 
@@ -1296,7 +1304,7 @@ int BMI_gm_post_recv(bmi_op_id_t * id,
 	    if (gm_alloc_send_token(local_port, GM_HIGH_PRIORITY))
 	    {
 #ifdef ENABLE_GM_BUFPOOL
-		if (!bmi_gm_bufferpool_empty(io_pool))
+		if (!io_buffers_exhausted())
 		{
 #endif /* ENABLE_GM_BUFPOOL */
 		    prepare_for_recv(query_op);
@@ -1490,7 +1498,7 @@ int BMI_gm_post_recv_list(bmi_op_id_t * id,
 	    if (gm_alloc_send_token(local_port, GM_HIGH_PRIORITY))
 	    {
 #ifdef ENABLE_GM_BUFPOOL
-		if (!bmi_gm_bufferpool_empty(io_pool))
+		if (!io_buffers_exhausted())
 		{
 #endif /* ENABLE_GM_BUFPOOL */
 		    
@@ -2675,7 +2683,7 @@ static void delayed_token_sweep(void)
 	if (gm_alloc_send_token(local_port, GM_LOW_PRIORITY))
 	{
 #ifdef ENABLE_GM_BUFPOOL
-	    if (!bmi_gm_bufferpool_empty(io_pool))
+	    if (!io_buffers_exhausted())
 	    {
 #endif /* ENABLE_GM_BUFPOOL */
 		query_op =
@@ -2705,7 +2713,7 @@ static void delayed_token_sweep(void)
 	if (gm_alloc_send_token(local_port, GM_HIGH_PRIORITY))
 	{
 #ifdef ENABLE_GM_BUFPOOL
-	    if (!bmi_gm_bufferpool_empty(io_pool))
+	    if (!io_buffers_exhausted())
 	    {
 #endif /* ENABLE_GM_BUFPOOL */
 		query_op =
@@ -3307,7 +3315,7 @@ static void ctrl_ack_handler(bmi_op_id_t ctrl_op_id,
     }
 
 #ifdef ENABLE_GM_BUFPOOL
-    if (bmi_gm_bufferpool_empty(io_pool))
+    if (io_buffers_exhausted())
     {
 	gm_free_send_token(local_port, GM_LOW_PRIORITY);
 	op_list_add(op_list_array[IND_NEED_SEND_TOK_LOW], query_op);
@@ -3851,7 +3859,7 @@ static int ctrl_req_handler_rend(bmi_op_id_t ctrl_op_id,
 	{
 	    /* got it! */
 #ifdef ENABLE_GM_BUFPOOL
-	    if (bmi_gm_bufferpool_empty(io_pool))
+	    if (io_buffers_exhausted())
 	    {
 		gm_free_send_token(local_port, GM_HIGH_PRIORITY);
 		op_list_add(op_list_array[IND_NEED_SEND_TOK_HI_CTRLACK],
@@ -4141,6 +4149,69 @@ int BMI_gm_cancel(bmi_op_id_t id, bmi_context_id context_id)
 
     return(0);
 }
+
+static void reclaim_cancelled_io_buffers(void)
+{
+    struct timeval tv;
+    method_op_p query_op = NULL;
+    struct gm_op *gm_op_data = NULL;
+
+    gettimeofday(&tv, NULL);
+
+    if(cancelled_rend_count)
+    {
+        while((query_op = op_list_shownext(op_list_array[IND_CANCELLED_REND])))
+        {
+	    gm_op_data = query_op->method_data;
+            if((tv.tv_sec - gm_op_data->cancelled_tv_sec) <
+                PINT_CANCELLED_REND_RECLAIM_TIMEOUT)
+            {
+                /* these are too recent; move on */
+                break;
+            }
+
+            /* we want to put this one back into service */
+            /* let put recv handler do the work as if we had gotten msg
+             * from sender
+             */
+            put_recv_handler(query_op->op_id);
+            cancelled_rend_count--;
+        }
+
+        /* if after doing this we still have too many exhausted buffers, then
+         * just give up - we did the best we could...
+         */
+        if((io_pool->num_buffers - cancelled_rend_count) < 4)
+        {
+            gossip_lerr(
+                "Error: BMI_GM: exhausted memory buffers due to cancellation.\n");
+            assert(0);
+        }
+    }
+
+    return;
+}
+
+static int io_buffers_exhausted(void)
+{
+    if(!bmi_gm_bufferpool_empty(io_pool))
+    {
+        return(0);
+    }
+
+    /* try to get some cancelled buffers back */
+    reclaim_cancelled_io_buffers();
+
+    if(!bmi_gm_bufferpool_empty(io_pool))
+    {
+        return(0);
+    }
+    else
+    {
+        return(1);
+    }
+}
+
 /*
  * Local variables:
  *  c-indent-level: 4

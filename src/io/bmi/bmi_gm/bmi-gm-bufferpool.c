@@ -45,6 +45,7 @@ struct bufferpool *bmi_gm_bufferpool_init(struct gm_port *current_port,
     }
     INIT_QLIST_HEAD(&tmp_bp->cache_head);
     tmp_bp->local_port = current_port;
+    tmp_bp->num_buffers = num_buffers;
 
     for (i = 0; i < num_buffers; i++)
     {

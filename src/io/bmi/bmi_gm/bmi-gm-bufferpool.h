@@ -18,6 +18,7 @@ struct bufferpool
 {
     struct qlist_head cache_head;
     struct gm_port *local_port;
+    int num_buffers;
 };
 
 struct bufferpool *bmi_gm_bufferpool_init(struct gm_port *current_port,
