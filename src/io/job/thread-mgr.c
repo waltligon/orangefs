@@ -135,7 +135,7 @@ static void *trove_thread_function(void *ptr)
                 gossip_err("trove_thread_function thread terminating\n");
                 break;
 #endif
-                return NULL;
+                continue;
             }
 	    tmp_callback->fn(tmp_callback->data,
                              stat_trove_error_code_array[i]);
@@ -258,7 +258,7 @@ static void *bmi_thread_function(void *ptr)
                 gossip_err("bmi_thread_function thread terminating\n");
                 break;
 #endif
-                return NULL;
+                continue;
             }
 
 	    tmp_callback->fn(tmp_callback->data,
