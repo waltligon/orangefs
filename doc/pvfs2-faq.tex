@@ -213,6 +213,29 @@ metadata, it does not replicate or store redundant information across
 these servers.  For information on better handling failures, see
 Section~\ref{sec:fault-tolerance}.
 
+\subsection{How many servers should I run?}
+\label{sec:howmany-servers}
+
+Really, the answer is ``it depends'', but here are some factors you
+should take into account.  
+
+Running multiple metadata servers might help if you expect to have have
+a lot of small files.  The metadata servers are not involved in data
+access (file contents) but do have a role in file creation and lookup.
+Multiple clients accessing different files will likely access different
+metadata servers, so you could see a load balancing effect.
+
+A good rule of thumb is you should run as many data servers as possible.
+One common configuration is to have some nodes with very
+high-performance disks acting as servers to the larger cluster.  As you
+use more servers in this configuraiton, the theoretical peak performance
+of PVFS2 increases.  The clients, however, have to make very large
+requests in order to stripe the I/O across all the servers.  If your
+clients will never write large files, use a smaller number of servers.
+If your clients are writing out gigantic checkpoint files or reading in
+huge datasets, then use more servers.
+
+
 \subsection{Can PVFS2 servers listen on two network interfaces simultaneously (i.e. multihome)?}
 
 PVFS2 servers currently listen on one interface at a time.  Multihome
