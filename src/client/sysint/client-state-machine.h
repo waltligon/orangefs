@@ -300,7 +300,7 @@ struct server_configuration_s *PINT_get_server_config_struct(void);
 /* system interface function state machines */
 extern struct PINT_state_machine_s pvfs2_client_remove_sm;
 extern struct PINT_state_machine_s pvfs2_client_create_sm;
-extern struct PINT_state_machine_s pvfs2_client_mkdir_sm;
+/* extern struct PINT_state_machine_s pvfs2_client_mkdir_sm; */
 extern struct PINT_state_machine_s pvfs2_client_symlink_sm;
 extern struct PINT_state_machine_s pvfs2_client_getattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_io_sm;

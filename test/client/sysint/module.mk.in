@@ -14,6 +14,7 @@ TESTSRC += \
 	$(DIR)/ls.c \
 	$(DIR)/path-test.c\
 	$(DIR)/create.c\
+	$(DIR)/symlink.c\
 	$(DIR)/flush-1.c\
 	$(DIR)/flush-2.c\
 	$(DIR)/truncate.c\

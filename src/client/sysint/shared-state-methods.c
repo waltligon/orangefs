@@ -71,11 +71,27 @@ int sm_common_parent_getattr_failure(PINT_client_sm *sm_p,
 }
 
 int sm_common_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
-                                          job_status_s *js_p);
+                                          job_status_s *js_p)
+{
+    gossip_debug(CLIENT_DEBUG,
+                 "state: sm_common_dspace_create_setup_msgpair\n");
+
+    return 1;
+}
+
 int sm_common_dspace_create_failure(PINT_client_sm *sm_p,
-                                    job_status_s *js_p);
+                                    job_status_s *js_p)
+{
+    return 1;
+}
+
 int sm_common_crdirent_setup_msgpair(PINT_client_sm *sm_p,
-                                     job_status_s *js_p);
+                                     job_status_s *js_p)
+{
+    gossip_debug(CLIENT_DEBUG, "state: sm_common_crdirent_setup_msgpair\n");
+    return 1;
+}
+
 int sm_common_crdirent_failure(PINT_client_sm *sm_p,
                                job_status_s *js_p);
 int sm_common_setattr_setup_msgpair(PINT_client_sm *sm_p,

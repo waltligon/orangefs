@@ -70,6 +70,12 @@ int PINT_client_state_machine_post(PINT_client_sm *sm_p,
 	case PVFS_SYS_CREATE:
 	    sm_p->current_state = pvfs2_client_create_sm.state_machine + 1;
 	    break;
+/* 	case PVFS_SYS_MKDIR: */
+/* 	    sm_p->current_state = pvfs2_client_mkdir_sm.state_machine + 1; */
+/* 	    break; */
+	case PVFS_SYS_SYMLINK:
+	    sm_p->current_state = pvfs2_client_symlink_sm.state_machine + 1;
+	    break;
 	case PVFS_SYS_GETATTR:
 	    sm_p->current_state = pvfs2_client_getattr_sm.state_machine + 1;
 	    break;
