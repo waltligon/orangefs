@@ -286,13 +286,7 @@ static int rename_lookups_comp_fn(
      */
     if (resp_p->status != 0)
     {
-        if (index == 0)
-        {
-            gossip_debug(
-                CLIENT_DEBUG, "*** Failed to Lookup up old handle (%d)\n",
-                resp_p->status);
-        }
-        else
+        if (index == 1)
         {
             /*
               if the index is 1, this failure just means that
