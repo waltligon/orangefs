@@ -189,16 +189,21 @@ sub emit_filesystem
     # num nodes for calculation purposes below
     $step = sprintf("%lu",($total_num_handles_available / $num_ranges));
 
-    # pre-compute the single meta handle range
-    $start = 2^1;
-    $end = $step;
-
     print $target "\n<Filesystem>\n";
     print $target "\tName $name\n";
     print $target "\tCollectionID $fs_id\n";
     print $target "\tRootHandle $root_handle\n";
     print $target "\t<MetaHandleRanges>\n";
-    print $target "\t\tRange $meta_aliases[0] $start-$end\n";
+
+    $start = $end = 2^1;
+
+    foreach(@meta_aliases)
+    {
+        $start = $end + 1;
+	$end += $step;
+	print $target "\t\tRange $_ $start-$end\n";
+    }
+
     print $target "\t</MetaHandleRanges>\n";
     print $target "\t<DataHandleRanges>\n";
 
@@ -513,12 +518,6 @@ if (!$opt_quiet) {
 	print "Configured a total of ", ($#union_bmi + 1), " servers:\n";
 	print "", ($#io_bmi + 1), " of them are I/O servers.\n";
 	print "", ($#meta_bmi + 1), " of them are Metadata servers.\n";
-}
-
-if($#meta_aliases != 0)
-{
-    print "\nERROR: we only support the use of one Metadata server at this time.\n";
-    exit 1;
 }
 
 if (!$opt_quiet) {
