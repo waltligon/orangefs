@@ -78,13 +78,11 @@ int PVFS_sys_truncate(PVFS_sysreq_truncate *req)
     req_p.rsize = sizeof(struct PVFS_server_req_s);
     req_p.u.truncate.fs_id = req->pinode_refn.fs_id;
 
-    /* make sure we have this distribution setup to work */
-    ret = PINT_Dist_lookup(dist);
-    if (ret < 0)
-    {
-	failure = NONE_FAILURE;
-	goto return_error;
-    }
+    /* we're sending the total logical filesize to the server and it will figure
+     * out how much of the phyiscal file it needs to get rid of.
+     */
+
+    req_p.u.truncate.size = req->size;
 
     /* TODO: come back and unserialize this eventually */
 
@@ -92,15 +90,8 @@ int PVFS_sys_truncate(PVFS_sysreq_truncate *req)
     {
 	req_p.u.truncate.handle = pinode_ptr->attr.u.meta.dfh[i];
 
-	/* call the distribution code here to see how much data each 
-	 * server needs to hold*/
-
-	req_p.u.truncate.size = (dist->methods->logical_to_physical_offset)(
-		    dist->params, pinode_ptr->attr.u.meta.nr_datafiles, i,
-		    req->size);
-
-	ret = PINT_bucket_map_to_server(&serv_addr,
-		    pinode_ptr->attr.u.meta.dfh[i], req->pinode_refn.fs_id);
+	ret = PINT_bucket_map_to_server(&serv_addr, req_p.u.truncate.handle,
+		    req->pinode_refn.fs_id);
 	if (ret < 0)
 	{
 	    failure = NONE_FAILURE;
