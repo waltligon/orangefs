@@ -135,9 +135,6 @@ int main(int argc, char **argv)
 
     server_status_flag |= SERVER_GOSSIP_INIT;
 
-    gossip_debug(SERVER_DEBUG, "PVFS2 Server version %s starting.\n",
-		 PVFS2_VERSION);
-
     /* Determine initial server configuration, looking at both command line
      * arguments and the configuration file.
      */
@@ -145,6 +142,9 @@ int main(int argc, char **argv)
     {
 	goto server_shutdown;
     }
+
+    gossip_debug(SERVER_DEBUG, "PVFS2 Server version %s starting.\n",
+		 PVFS2_VERSION);
 
     fs_conf = ((argc >= optind) ? argv[optind] : NULL);
     server_conf = ((argc >= (optind + 1)) ? argv[optind + 1] : NULL);
@@ -900,34 +900,87 @@ static void server_sig_handler(int sig)
     return;
 }
 
-/* server_parse_cmd_line_args()
- */
+static void usage(int argc, char **argv)
+{
+    gossip_err("Usage: %s: [OPTIONS] <global_config_file> "
+               "<server_config_file>\n\n", argv[0]);
+    gossip_err("  -d, --foreground\t"
+               "will keep server in the foreground\n");
+    gossip_err("  -f, --mkfs\t\twill cause server to "
+               "create file system storage and exit\n");
+    gossip_err("  -h, --help\t\twill show this message\n");
+    gossip_err("  -r, --rmfs\t\twill cause server to "
+               "remove file system storage and exit\n");
+    gossip_err("  -v, --version\t\toutput version information "
+               "and exit\n");
+}
+
 static int server_parse_cmd_line_args(int argc, char **argv)
 {
-    int opt;
+    int ret = 0, option_index = 0;
+    char *cur_option = NULL;
+    static struct option long_opts[] =
+    {
+        {"foreground",0,0,0},
+        {"mkfs",0,0,0},
+        {"help",0,0,0},
+        {"rmfs",0,0,0},
+        {"version",0,0,0},
+        {0,0,0,0}
+   };
 
-    while ((opt = getopt(argc, argv,"rfhd")) != EOF) {
-	switch (opt) {
+    while ((ret = getopt_long(argc, argv,"dfhrv",
+                              long_opts, &option_index)) != -1)
+    {
+	switch (ret)
+        {
+            case 0:
+                cur_option = (char *)long_opts[option_index].name;
+                assert(cur_option);
+
+                if (strcmp("foreground", cur_option) == 0)
+                {
+                    goto do_foreground;
+                }
+                else if (strcmp("mkfs", cur_option) == 0)
+                {
+                    goto do_mkfs;
+                }
+                else if (strcmp("help", cur_option) == 0)
+                {
+                    goto do_help;
+                }
+                else if (strcmp("rmfs", cur_option) == 0)
+                {
+                    goto do_rmfs;
+                }
+                else if (strcmp("version", cur_option) == 0)
+                {
+                    goto do_version;
+                }
+                break;
+            case 'v':
+          do_version:
+                printf("%s\n", PVFS2_VERSION);
+                return 1;
             case 'r':
+          do_rmfs:
                 server_remove_storage_space = 1;
 	    case 'f':
+          do_mkfs:
 		server_create_storage_space = 1;
 		break;
 	    case 'd':
+          do_foreground:
 		server_background = 0;
 		break;
 	    case '?':
 	    case 'h':
+          do_help:
 	    default:
           parse_cmd_line_args_failure:
-		gossip_err("pvfs2-server: [-hdf] <global_config_file> <server_config_file>\n\n"
-			   "\t-h will show this message\n"
-			   "\t-d will keep the server in the foreground\n"
-			   "\t-r will cause server to remove file system storage and exit\n"
-			   "\t-f will cause server to create file system storage and exit\n"
-			   );
+                usage(argc, argv);
 		return 1;
-		break;
 	}
     }
 
