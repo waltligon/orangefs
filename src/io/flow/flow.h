@@ -125,12 +125,6 @@ struct flow_descriptor
     PINT_Request_state *file_req_state;
     PINT_Request_state *mem_req_state;
     PINT_Request_result result;
-#if 0
-    PINT_Request_state *request_state;	/* req processor state */
-    PVFS_offset current_req_offset;	/* offset of request processing */
-    PVFS_offset *offset_array;	/* array of offsets being processed */
-    PVFS_size *size_array;	/* array of sizes being processed */
-#endif
 };
 typedef struct flow_descriptor flow_descriptor;
 

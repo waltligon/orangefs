@@ -4023,13 +4023,7 @@ static int do_one_work_cycle_trove(int *num_completed)
 	    gen_mutex_unlock(&trove_mutex);
 	    /* set appropriate fields and store in completed queue */
 	    tmp_desc->u.trove.state = stat_trove_ds_state_array[i];
-	    /* TODO: I don't really know how to handle vtags here */
-	    /* I think these are filled in from pointers passed in
-	     * earlier?  Why have it in the test functions?
-	     */
-    #if 0
-	    tmp_desc->u.trove.vtag = stat_trove_vtag_array[i];
-    #endif
+
 	    gen_mutex_lock(&completion_mutex);
 	    /* set completed flag while holding queue lock */
 	    tmp_desc->completed_flag = 1;
