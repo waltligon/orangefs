@@ -39,29 +39,332 @@
 
 \section{How to use this document}
 
+The quick start guide is intended to be a reference on how to quickly
+install and configure a PVFS2 file system.  It is broken down into 
+three parts.  The first
+describes how to download and compile the PVFS2 software.  The next
+section walks through the steps of configuring PVFS2 to store and
+access files on a single host, which may be useful for simple testing
+and evaluation.  The final section of this document describes how to
+install and configure PVFS2 in a true cluster environment with multiple
+servers and/or clients.
+
 \subsection{Versions}
+
+This document only applies to alpha snapshots of PVFS2 as of August 2003.
 
 \section{Downloading and compiling PVFS}
 
 \subsection{Dependencies}
 
-\subsection{Obtaining the source}
+The following software packages are currently required by PVFS2:
+\begin{itemize}
+\item Berkely DB (version 3 or 4)
+\item pthreads
+\item gcc 2.9.x or newer
+\end{itemize}
+
+The following system assumptions are also made:
+\begin{itemize}
+\item homogeneous Linux environment
+\end{itemize}
+
+The optional Linux kernel driver has the following requirements:
+\begin{itemize}
+\item Linux kernel version 2.6 (test release) or newer
+\end{itemize}
 
 \subsection{Untarring the packages}
 
-\subsection{Building the packages}
+All source code is contained in one tarball: pvfs2-XXX.tgz.  The following example assumes that you will be building in the /usr/src directory, although that is not required:
 
-\section{Installing PVFS on a single host}
+\begin{verbatim}
+[root@testhost /root]# cp pvfs2-XXX.tgz /usr/src
+[root@testhost /root]# cd /usr/src
+[root@testhost /usr/src]# tar -xzf pvfs2-XXX.tgz
+[root@testhost /usr/src]# ln -s pvfs2-XXX pvfs2
+[root@testhost /usr/src]# ls -lF
+total 476
+lrwxrwxrwx   1 root    root         15 Aug 14 17:42 pvfs2 -> pvfs2-XXX/
+drwxr-xr-x  12 root    root        512 Aug 14 10:11 pvfs2-XXX/
+-rw-r--r--   1 root    root     371535 Aug 14 17:41 pvfs2-XXX.tgz
+
+\end{verbatim}
+
+\subsection{Building and installing the packages}
+
+The default steps for building and installing PVFS2 are simply:
+
+\begin{verbatim}
+[root@testhost /usr/src]# cd pvfs2
+[root@testhost /usr/src/pvfs2-XXX]# ./configure
+[root@testhost /usr/src/pvfs2-XXX]# make
+[root@testhost /usr/src/pvfs2-XXX]# make install
+\end{verbatim}
+
+Here are some optional configure arguments which may be of interest:
+\begin{itemize}
+\item --with-prefix=$<$path$>$: installs all files in the specified directory
+\item --with-kernel=$<$path to kernel source$>$: this enables compilation of
+the PVFS2 Linux kernel driver
+\item --with-mpi=$<$path to mpi installation$>$: this enables compilation of MPI
+based test programs
+\item --with-efence: automatically links in Electric Fence for debugging assistance
+\end{itemize}
+
+Also note that the pvfs2 kernel source supports out of tree builds if you 
+prefer to use that technique.
+
+\section{Configuring PVFS2 for a single host}
+
+This section documents the steps required to configure PVFS2 on a system
+in which a single machine acts as both the client and server for all
+PVFS2 operations.  It assumes that you have completed the above sections
+on building and installation already.  The hostname of the example machine
+is ``testhost'' and will be referenced as such in the following examples.
+We will store all PVFS2 data in /tmp/pvfs2-storage-space.  /mnt/pvfs2 will
+serve as the mount point for the file system.  For more details about
+the purpose of these directories please see the PVFS2 users guide.
 
 \subsection{Server configuration}
 
+Since this is a single host configuration, we only have to configure one
+server daemon.  In the original PVFS, the metadata and I/O servers were 
+seperated into two seperate programs (mgr and iod).  PVFS2, however, has 
+only a single daemon called pvfs2-server which serves both roles.
+
+The most important part of server configuration is simply generating the 
+configuration files.  These can be created using the pvfs2-genconfig 
+script.  This is an interactive script which will ask several questions
+to determine your desired configuration.  Please pay particular attention
+to the listing of the metadata servers and I/O servers.  
+In this example we will use ``testhost'' for both.  
+
+The pvfs2-genconfig tool will generate two configuration files.  One is a file system configuration file that will be identical for all servers (if we had more than
+one).  The second is a server specific configuration file that will be different for
+each server.  We will place both of these files in the /etc directory, so you must run this script as root.  
+
+In this simple configuration, we can accept the default options for every
+field.  We will use the hostname ``testhost'' rather than ``localhost'' however.
+
+\begin{verbatim}
+bash-2.05b# perl /usr/bin/pvfs2-genconfig /etc/pvfs2-fs.conf /etc/pvfs2-server.conf
+**********************************************************************
+        Welcome to the PVFS2 Configuration Generator:
+
+This interactive script will generate configuration files suitable
+for use with a new PVFS2 file system.  Please see the PVFS2 quickstart
+guide for details.
+
+**********************************************************************
+
+You must first select the network protocol that your file system will use.
+The only currently supported options are "tcp" and "gm".
+
+* Enter protocol type [Default is tcp]: 
+
+Choose a TCP/IP port for the servers to listen on.  Note that this
+script assumes that all servers will use the same port number.
+
+* Enter port number [Default is 3334]: 
+
+Next you must list the hostnames of the machines that will act as
+I/O servers.  Acceptable syntax is "node1, node2, ..." or "node{#-#,#,#}".
+
+* Enter hostnames [Default is localhost]: testhost
+
+Now list the hostnames of the machines that will act as Metadata
+servers.  This list may or may not overlap with the I/O server list.
+
+* Enter hostnames [Default is localhost]: testhost
+
+Configured a total of 1 servers:
+1 of them are I/O servers.
+1 of them are Metadata servers.
+
+* Would you like to verify server list (y/n) [Default is n]? 
+
+Choose a file for each server to write log messages to.
+
+* Enter log file location [Default is /tmp/pvfs2-server.log]: 
+
+Choose a directory for each server to store data in.
+
+* Enter directory name: [Default is /tmp/pvfs2-storage-space]: 
+
+Writing fs config file... Done.
+Writing 1 server config file(s)... Done.
+
+Configuration complete!
+\end{verbatim}
+
+Now we will create a symbolic link to the correct server configuration file 
+(note that you will need to adjust the following command to match the 
+hostname of your system):
+
+\begin{verbatim}
+bash-2.05b# ls -alh /etc/pvfs2*.conf*
+-rw-r--r--  1 root   root      384 Aug 14 17:16 /etc/pvfs2-fs.conf
+-rw-r--r--  1 root   root       67 Aug 14 17:16 /etc/pvfs2-server.conf-testhost
+
+bash-2.05b# ln -s /etc/pvfs2-server.conf-testhost /etc/pvfs2-server.conf
+
+bash-2.05b# ls -alh /etc/pvfs2*.conf*
+-rw-r--r--  1 root   root      384 Aug 14 17:16 /etc/pvfs2-fs.conf
+lrwxr-xr-x  1 root   root       31 Aug 14 17:20 /etc/pvfs2-server.conf -> /etc/pvfs2-server.conf-testhost
+-rw-r--r--  1 root   root       67 Aug 14 17:16 /etc/pvfs2-server.conf-testhost
+
+\end{verbatim}
+
 \subsection{Starting the server}
+
+Before you run pvfs2-server for the first time, you must run it with a special 
+argument that tells it to create a new storage space if it does not already 
+exist.
+
+\begin{verbatim}
+bash-2.05b# /usr/bin/pvfs2-server /etc/pvfs2-fs.conf /etc/pvfs2-server.conf -f
+\end{verbatim}
+
+Once the above step is done, you can start the server in normal mode 
+as follows:
+
+\begin{verbatim}
+bash-2.05b# /usr/bin/pvfs2-server /etc/pvfs2-fs.conf /etc/pvfs2-server.conf
+\end{verbatim}
+
+All log messages will be directed to /tmp/pvfs2-server.log, unless you specified
+a different location while running pvfs2-genconfig.  If you would prefer to run 
+pvfs2-server in the foreground and direct all messages to stderr, then 
+you may run the server as follows:
+
+\begin{verbatim}
+bash-2.05b# /usr/bin/pvfs2-server /etc/pvfs2-fs.conf /etc/pvfs2-server.conf -d
+\end{verbatim}
 
 \subsection{Client configuration}
 
+There are two primary methods for accessing a PVFS2 file system.  The
+first is the native PVFS2 interface which is made available
+through {\tt libpvfs2}.  This also happens to be the same interface used by
+ROMIO if you configure your system to use MPI-IO.  The second method
+relies on a kernel module to provide standard Linux file system
+compatability.  This interface allows the user to use existing
+binaries and system utilities on PVFS2 without recompiling.  We will
+cover how to configure both access methods here.
+
+We must create a mount point for the file system as well as
+an {\tt /etc/pvfs2tab} entry that will be used by
+the PVFS2 libraries to locate the file system.  The {\tt pvfs2tab} file is
+analogous to the {\tt /etc/fstab} file that most linux systems use to keep up
+with file system mount points.
+
+\begin{verbatim}
+[root@testhost /root]# mkdir /mnt/pvfs2
+[root@testhost /root]# touch /etc/pvfs2tab
+[root@testhost /root]# chmod a+r /etc/pvfs2tab
+\end{verbatim}
+
+Now edit this file so that it contains the following, except that you should
+substitute your host name in place of ``testhost'':
+
+\begin{verbatim}
+pvfs-tcp://testhost:3334/pvfs2-fs /mnt/pvfs2 pvfs 0 0 
+\end{verbatim}
+
+
+\emph{TODO: something about kernel driver}
+
 \subsection{Testing your installation}
 
-\section{Installing PVFS on a cluster}
+PVFS2 currently includes the following tools for manipulating the file system
+using the native PVFS2 library: pvfs2-ping, pvfs2-import, pvfs2-ls, and pvfs2-export.  These tools check the health of the file system, import local files, 
+list the contents of directories, and export files, respectively.  Their usage 
+can best be summarized with the following examples:
+
+\begin{verbatim}
+bash-2.05b# ./pvfs2-ping /mnt/pvfs2
+
+(1) Searching for /mnt/pvfs2 in /etc/pvfs2tab...
+
+   Initial server: tcp://testhost:3334
+   Storage name: pvfs2-fs
+   Local mount point: /mnt/pvfs2
+
+(2) Initializing system interface and retrieving configuration from server...
+
+   meta servers (duplicates are normal):
+   tcp://testhost:3334
+
+   data servers (duplicates are normal):
+   tcp://testhost:3334
+
+(3) Verifying that all servers are responding...
+
+   meta servers (duplicates are normal):
+   tcp://testhost:3334 Ok
+
+   data servers (duplicates are normal):
+   tcp://testhost:3334 Ok
+
+(4) Verifying that fsid 9 is acceptable to all servers...
+
+   Ok; all servers understand fs_id 9
+
+(5) Verifying that root handle is owned by one server...
+
+   Root handle: 0x00100000
+   Ok; root handle is owned by exactly one server.
+
+=============================================================
+
+The PVFS filesystem at /mnt/pvfs2 appears to be correctly configured.
+
+bash-2.05b# ./pvfs2-ls /mnt/pvfs2/
+
+bash-2.05b# ./pvfs2-import /usr/lib/libc.a /mnt/pvfs2/testfile
+PVFS2 Import Statistics:
+********************************************************
+Destination path (local): /mnt/pvfs2/testfile
+Destination path (PVFS2 file system): /testfile
+File system name: pvfs2-fs
+Initial config server: tcp://localhost:3334
+********************************************************
+Bytes written: 2555802
+Elapsed time: 0.416727 seconds
+Bandwidth: 5.848920 MB/second
+********************************************************
+
+bash-2.05b# ./pvfs2-ls /mnt/pvfs2/
+testfile
+
+bash-2.05b# ./pvfs2-ls -alh /mnt/pvfs2/
+drwxrwxrwx    1 pcarns  users            0 2003-08-14 22:45 .
+drwxrwxrwx    1 pcarns  users            0 2003-08-14 22:45 .. (faked)
+-rw-------    1 root    root            2M 2003-08-14 22:47 testfile
+
+bash-2.05b# ./pvfs2-export /mnt/pvfs2/testfile /tmp/testfile-out
+PVFS2 Import Statistics:
+********************************************************
+Source path (local): /mnt/pvfs2/testfile
+Source path (PVFS2 file system): /testfile
+File system name: pvfs2-fs
+Initial config server: tcp://localhost:3334
+********************************************************
+Bytes written: 2555802
+Elapsed time: 0.443431 seconds
+Bandwidth: 5.496690 MB/second
+********************************************************
+
+bash-2.05b# diff /tmp/testfile-out /usr/lib/libc.a
+\end{verbatim}
+
+\emph{TODO: something about kernel driver}
+
+
+\section{Installing PVFS2 on a cluster}
+
+\emph{TODO: write something here}
 
 \end{document}
 
