@@ -136,14 +136,10 @@ int main(int argc,char **argv)
 	req_create->parent_refn.fs_id = req_look.fs_id;
 
 	
-#if 0
-	// Fill in the dist 
-	//req_create->dist = malloc(sizeof(PVFS_dist));
-	req_create->dist.type = PVFS_DIST_STRIPED;
-	req_create->dist.u.striped.base = 0;
-	req_create->dist.u.striped.pcount = 3;
-	req_create->dist.u.striped.ssize = 512;
-#endif
+	/* Fill in the dist -- NULL means the system interface used the 
+	 * "default_dist" as the default
+	 */
+	req_create->attr.u.meta.dist = NULL;
 
 	// call create 
 	ret = PVFS_sys_create(req_create,resp_create);

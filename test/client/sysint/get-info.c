@@ -123,7 +123,7 @@ int main(int argc,char **argv)
 
 		case ATTR_DATA:
 		printf("DATAFILE?? we shouldn't see these\n");
-		printf("size written on server = %d", resp_gattr->attr.u.data.size);
+		printf("size written on server = %ld", resp_gattr->attr.u.data.size);
 		printf("handle: = %d", (int)resp_gattr->attr.u.data.dfh);
 		break;
 
