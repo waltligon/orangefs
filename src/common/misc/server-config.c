@@ -123,9 +123,18 @@ int PINT_server_config(struct server_configuration_s *config_obj,
     }
 
     if (dotconf_command_loop(configfile) == 0)
-        gossip_err("Error reading config file\n");
-
+    {
+        gossip_err("Error reading config file %s\n",
+                   config_s->fs_config_filename);
+        return 1;
+    }
     dotconf_cleanup(configfile);
+
+    if (!config_s->storage_path)
+    {
+        gossip_err("Configuration file error. No storage path specified.\n");
+        return 1;
+    }
 
     /* then read in the server.conf (host specific) config file */
     config_s->configuration_context = GLOBAL_CONFIG;
@@ -139,9 +148,19 @@ int PINT_server_config(struct server_configuration_s *config_obj,
     }
 
     if (dotconf_command_loop(configfile) == 0)
-        gossip_err("Error reading config file\n");
-
+    {
+        gossip_err("Error reading config file %s\n",
+                   config_s->server_config_filename);
+        return 1;
+    }
     dotconf_cleanup(configfile);
+
+    if (!config_s->host_id)
+    {
+        gossip_err("Configuration file error. No host ID specified.\n");
+        return 1;
+    }
+
     return 0;
 }
 
@@ -154,7 +173,8 @@ DOTCONF_CB(get_pvfs_server_id)
     }
     if (config_s->host_id)
     {
-        gossip_lerr("WARNING: HostID value being overwritten.");
+        gossip_lerr("WARNING: HostID value being overwritten (from "
+                    "%s to %s).\n",config_s->host_id,cmd->data.str);
         free(config_s->host_id);
     }
     config_s->host_id = strdup(cmd->data.str);
