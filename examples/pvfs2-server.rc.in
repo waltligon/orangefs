@@ -16,6 +16,9 @@ PVFS2SERVER=@prefix@/sbin/pvfs2-server
 #   but you just need to specify what directory they are in
 PVFS2_CONF_PATH=/etc
 
+# the server will record its PID in this file
+PVFS2_PIDFILE=/var/run/pvfs2.pid
+
 # verify presence of server binary
 if ! [ -x ${PVFS2SERVER} ]; then
 	echo "Error: could not find executable ${PVFS2SERVER}"
@@ -58,7 +61,7 @@ fi
 case "$1" in
   start)
 	echo -n "Starting PVFS2 server: "
-	daemon ${PVFS2SERVER} --pidfile /var/run/pvfs2.pid ${PVFS2_FS_CONF} ${PVFS2_SERVER_CONF}
+	daemon ${PVFS2SERVER} --pidfile ${PVFS2_PIDFILE} ${PVFS2_FS_CONF} ${PVFS2_SERVER_CONF}
 	echo
 	touch /var/lock/subsys/pvfs2-server
 	;;
