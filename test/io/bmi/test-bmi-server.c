@@ -187,6 +187,9 @@ int main(int argc, char **argv)	{
 		BMI_SEND);
 	free(my_req);
 
+	/* try out rev lookup */
+	printf("rev_lookup() output: %s\n", BMI_addr_rev_lookup(client_addr));
+
 	/* shutdown the local interface */
 	BMI_close_context(context);
 	ret = BMI_finalize();

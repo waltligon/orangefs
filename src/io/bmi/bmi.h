@@ -116,6 +116,8 @@ const char *BMI_method_from_scheme(const char *uri);
 int BMI_addr_lookup(bmi_addr_t * new_addr,
 		    const char *id_string);
 
+const char* BMI_addr_rev_lookup(bmi_addr_t addr);
+
 int BMI_post_send_list(bmi_op_id_t * id,
 		       bmi_addr_t dest,
 		       const void *const *buffer_list,

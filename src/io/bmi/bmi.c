@@ -1000,6 +1000,35 @@ int BMI_testcontext(int incount,
 }
 
 
+/* BMI_addr_rev_lookup()
+ *
+ * performs a reverse lookup, returning the string (URL style) address
+ * for a given opaque address.
+ * NOTE: caller must not free or modify returned string
+ *
+ * returns pointer to string on success, NULL on failure
+ */
+const char* BMI_addr_rev_lookup(bmi_addr_t addr)
+{
+    ref_st_p tmp_ref = NULL;
+    char* tmp_str = NULL;
+
+    gen_mutex_lock(&interface_mutex);
+
+    /* find a reference that matches this address */
+    tmp_ref = ref_list_search_addr(cur_ref_list, addr);
+    if (!tmp_ref)
+    {
+	gen_mutex_unlock(&interface_mutex);
+	return (NULL);
+    }
+    
+    tmp_str = tmp_ref->id_string;
+    gen_mutex_unlock(&interface_mutex);
+
+    return(tmp_str);
+}
+
 /* BMI_memalloc()
  * 
  * Allocates memory that can be used in native mode by the BMI layer.

@@ -246,6 +246,9 @@ int main(int argc, char **argv)	{
 	BMI_memfree(server_addr, my_ack, sizeof(struct server_ack), 
 		BMI_RECV);
 
+	/* try out rev lookup */
+	printf("rev_lookup() output: %s\n", BMI_addr_rev_lookup(server_addr));
+
 	/* shutdown the local interface */
 	BMI_close_context(context);
 	ret = BMI_finalize();
