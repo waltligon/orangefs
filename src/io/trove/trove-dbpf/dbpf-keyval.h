@@ -20,9 +20,16 @@ void dbpf_keyval_dbcache_initialize(void);
 
 void dbpf_keyval_dbcache_finalize(void);
 
-DB *dbpf_keyval_dbcache_get(TROVE_coll_id coll_id,
-			    TROVE_handle handle,
-			    int create_flag);
+enum {
+    DBPF_KEYVAL_DBCACHE_ERROR = -1,
+    DBPF_KEYVAL_DBCACHE_BUSY = 0,
+    DBPF_KEYVAL_DBCACHE_SUCCESS = 1
+};
+
+int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
+				TROVE_handle handle,
+				int create_flag,
+				DB **db_pp);
 
 void dbpf_keyval_dbcache_put(TROVE_coll_id coll_id,
 			     TROVE_handle handle);				

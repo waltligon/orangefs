@@ -6,6 +6,15 @@
 
 /* NOTE: Prototypes etc. in dbpf-bstream.h */
 
+/* Notes on locking:
+ *
+ * Right now we implement locks on fdcache entries by a mutex for each entry.
+ * There is no overall "lock" on the entire cache.  This has at least one
+ * important implication: THE INITIALIZE AND FINALIZE FUNCTIONS MUST BE CALLED
+ * BY A SINGLE THREAD ONLY AND CALLED BEFORE/AFTER ALL OTHER THREADS ARE
+ * STARTED/FINISHED.
+ */
+
 #include <unistd.h>
 #include <stdio.h>
 #include <sys/types.h>
@@ -42,29 +51,22 @@ struct bstream_fdcache_entry {
     int fd;
 };
 
-static gen_mutex_t dbpf_bstream_fd_cache_mutex = GEN_MUTEX_INITIALIZER;
-
 static struct bstream_fdcache_entry bstream_fd_cache[FDCACHE_ENTRIES];
 
 void dbpf_bstream_fdcache_initialize(void)
 {
     int i;
-    gen_mutex_lock(&dbpf_bstream_fd_cache_mutex);
 
     for (i=0; i < FDCACHE_ENTRIES; i++) {
 	bstream_fd_cache[i].valid = 0;
 	gen_mutex_init(&bstream_fd_cache[i].mutex);
 	bstream_fd_cache[i].fd = -1;
     }
-
-    gen_mutex_unlock(&dbpf_bstream_fd_cache_mutex);
 }
 
 void dbpf_bstream_fdcache_finalize(void)
 {
     int i;
-
-    gen_mutex_lock(&dbpf_bstream_fd_cache_mutex);
 
     for (i=0; i < FDCACHE_ENTRIES; i++) {
 	if (bstream_fd_cache[i].ref_ct > 0) {
@@ -76,8 +78,6 @@ void dbpf_bstream_fdcache_finalize(void)
 	/* warning or no, close the FD */
 	if (bstream_fd_cache[i].valid) DBPF_CLOSE(bstream_fd_cache[i].fd);
     }
-
-    gen_mutex_unlock(&dbpf_bstream_fd_cache_mutex);
 }
 
 /* dbpf_bstream_fdcache_get()

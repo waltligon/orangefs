@@ -90,7 +90,15 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
     /* TODO: move into initial function so we know that the DB is around before
      * we enqueue
      */
-    db_p = dbpf_keyval_dbcache_get(op_p->coll_p->coll_id, op_p->handle, 0);
+    ret = dbpf_keyval_dbcache_try_get(op_p->coll_p->coll_id, op_p->handle, 0, &db_p);
+    switch (ret) {
+	case DBPF_KEYVAL_DBCACHE_ERROR:
+	    goto return_error;
+	case DBPF_KEYVAL_DBCACHE_BUSY:
+	    return 0;
+	case DBPF_KEYVAL_DBCACHE_SUCCESS:
+	    /* drop through */
+    }
 
     /* get keyval */
     memset(&key, 0, sizeof(key));
@@ -179,7 +187,15 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
     /* TODO: move into initial function so that we know the DB is around
      * before we enqueue.
      */
-    db_p = dbpf_keyval_dbcache_get(op_p->coll_p->coll_id, op_p->handle, 1);
+    ret = dbpf_keyval_dbcache_try_get(op_p->coll_p->coll_id, op_p->handle, 1, &db_p);
+    switch (ret) {
+	case DBPF_KEYVAL_DBCACHE_ERROR:
+	    goto return_error;
+	case DBPF_KEYVAL_DBCACHE_BUSY:
+	    return 0;
+	case DBPF_KEYVAL_DBCACHE_SUCCESS:
+	    /* drop through */
+    }
 
     /* we have a keyval space now, maybe a brand new one. */
     memset(&key, 0, sizeof(key));
@@ -217,20 +233,20 @@ static int dbpf_keyval_remove(
 			      void *user_ptr,
 			      TROVE_op_id *out_op_id_p)
 {
-	struct dbpf_queued_op *q_op_p;
-	struct dbpf_collection *coll_p;
+    struct dbpf_queued_op *q_op_p;
+    struct dbpf_collection *coll_p;
 
-	/* TODO: find the collection */
-	coll_p = my_coll_p;
+    /* TODO: find the collection */
+    coll_p = my_coll_p;
 
-	/* Q: what happens if someone queues a read/write request on 
-	 * a deleted keyval? */
+    /* Q: what happens if someone queues a read/write request on 
+     * a deleted keyval? */
 
-	q_op_p = dbpf_queued_op_alloc();
-	if (q_op_p == NULL) return -1;
+    q_op_p = dbpf_queued_op_alloc();
+    if (q_op_p == NULL) return -1;
 
-	/* initialaze common members */
-	dbpf_queued_op_init(
+    /* initialaze common members */
+    dbpf_queued_op_init(
 			q_op_p,
 			KEYVAL_REMOVE_KEY,
 			handle,
@@ -238,41 +254,48 @@ static int dbpf_keyval_remove(
 			dbpf_keyval_remove_op_svc,
 			user_ptr);
 
-	/* initialize op-specific members */
-	q_op_p->op.u.k_remove.key = *key_p;
+    /* initialize op-specific members */
+    q_op_p->op.u.k_remove.key = *key_p;
 
-	*out_op_id_p = dbpf_queued_op_queue(q_op_p);
+    *out_op_id_p = dbpf_queued_op_queue(q_op_p);
 	
-	return 0;
+    return 0;
 }
 
 static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p)
 {
-	int ret;
-	DB *db_p;
-	DBT key;
+    int ret;
+    DB *db_p;
+    DBT key;
 
-	/* absolutely no need to create the db if we are removing entries */
-	db_p = dbpf_keyval_dbcache_get(op_p->coll_p->coll_id, op_p->handle, 0);
-
-	memset (&key, 0, sizeof(key));
-	key.data = op_p->u.k_remove.key.buffer;
-	key.size = op_p->u.k_remove.key.buffer_sz;
-	if ( (ret = db_p->del(db_p, NULL, &key, 0)) == 0) {
-		printf("db: key removed. \n");
-	} else {
-		db_p->err(db_p, ret, "DB->del");
-		goto return_error;
-	}
-	if ((ret=db_p->sync(db_p, 0) )!= 0) {
-		db_p->err(db_p, ret, "dbpf_keyval_remove_op_svc\n");
-		return -1;
-	}
-	dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
-	return 1;
-
-return_error:
+    /* absolutely no need to create the db if we are removing entries */
+    ret = dbpf_keyval_dbcache_try_get(op_p->coll_p->coll_id, op_p->handle, 0, &db_p);
+    switch (ret) {
+	case DBPF_KEYVAL_DBCACHE_ERROR:
+	    goto return_error;
+	case DBPF_KEYVAL_DBCACHE_BUSY:
+	    return 0;
+	case DBPF_KEYVAL_DBCACHE_SUCCESS:
+	    /* drop through */
+    }
+    memset (&key, 0, sizeof(key));
+    key.data = op_p->u.k_remove.key.buffer;
+    key.size = op_p->u.k_remove.key.buffer_sz;
+    if ( (ret = db_p->del(db_p, NULL, &key, 0)) == 0) {
+	printf("db: key removed. \n");
+    } else {
+	db_p->err(db_p, ret, "DB->del");
+	goto return_error;
+    }
+    if ((ret=db_p->sync(db_p, 0) )!= 0) {
+	db_p->err(db_p, ret, "dbpf_keyval_remove_op_svc\n");
 	return -1;
+    }
+    dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
+    return 1;
+
+ return_error:
+    return -1;
 }
 
 /* dbpf_keyval_validate()
@@ -339,8 +362,15 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
     DBC *dbc_p;
     DBT key, data;
 
-    db_p = dbpf_keyval_dbcache_get(op_p->coll_p->coll_id, op_p->handle, 1);
-    if (db_p == NULL) goto return_error;
+    ret = dbpf_keyval_dbcache_try_get(op_p->coll_p->coll_id, op_p->handle, 1, &db_p);
+    switch (ret) {
+	case DBPF_KEYVAL_DBCACHE_ERROR:
+	    goto return_error;
+	case DBPF_KEYVAL_DBCACHE_BUSY:
+	    return 0;
+	case DBPF_KEYVAL_DBCACHE_SUCCESS:
+	    /* drop through */
+    }
 
     /* grab out key/value pairs */
 

@@ -17,6 +17,7 @@
 #include <trove.h>
 #include <trove-internal.h>
 #include <dbpf.h>
+#include <dbpf-keyval.h>
 
 #include <limits.h>
 
@@ -28,6 +29,7 @@ enum {
 
 struct keyval_dbcache_entry {
     int ref_ct; /* -1 == not a valid cache entry */
+    gen_mutex_t mutex;
     TROVE_coll_id coll_id;
     TROVE_handle handle;
     DB *db_p;
@@ -40,7 +42,9 @@ static struct keyval_dbcache_entry keyval_db_cache[DBCACHE_ENTRIES];
 void dbpf_keyval_dbcache_initialize(void)
 {
     int i;
+
     for (i=0; i < DBCACHE_ENTRIES; i++) {
+	gen_mutex_init(&keyval_db_cache[i].mutex);
 	keyval_db_cache[i].ref_ct = -1;
 	keyval_db_cache[i].db_p   = NULL;
     }
@@ -68,41 +72,58 @@ void dbpf_keyval_dbcache_finalize(void)
 
 /* dbpf_keyval_dbcache_get()
  *
+ * Right now we don't place any kind of upper limit on the number of
+ * references to the same db, so this will never return BUSY.  That might
+ * change at some later time.
+ *
+ * Returns one of DBPF_KEYVAL_DBCACHE_ERROR, DBPF_KEYVAL_DBCACHE_BUSY,
+ * DBPF_KEYVAL_DBCACHE_SUCCESS.
+ *
  * create_flag - 0 = don't create if doesn't exist; non-zero = create.
  */
-DB *dbpf_keyval_dbcache_get(TROVE_coll_id coll_id,
-			    TROVE_handle handle,
-			    int create_flag)
+int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
+				TROVE_handle handle,
+				int create_flag,
+				DB **db_pp)
 {
     int i, ret;
     char filename[PATH_MAX];
     DB *db_p;
 
     for (i=0; i < DBCACHE_ENTRIES; i++) {
-	if (keyval_db_cache[i].ref_ct  >= 0 &&
+	if (!(ret = gen_mutex_trylock(&keyval_db_cache[i].mutex)) &&
+	    keyval_db_cache[i].ref_ct  >= 0 &&
 	    keyval_db_cache[i].coll_id == coll_id &&
 	    keyval_db_cache[i].handle  == handle) break;
+	else if (ret == 0) gen_mutex_unlock(&keyval_db_cache[i].mutex);
     }
 
     if (i < DBCACHE_ENTRIES) {
 	/* found cached DB */
 	printf("dbcache: found cached db at index %d\n", i);
 	keyval_db_cache[i].ref_ct++;
-	return keyval_db_cache[i].db_p;
+	*db_pp = keyval_db_cache[i].db_p;
+	gen_mutex_unlock(&keyval_db_cache[i].mutex);
+	return DBPF_KEYVAL_DBCACHE_SUCCESS;
     }
 
     /* no cached db; open it */
     for (i=0; i < DBCACHE_ENTRIES; i++) {
-	if (keyval_db_cache[i].ref_ct == -1) {
+	if (!(ret = gen_mutex_trylock(&keyval_db_cache[i].mutex)) &&
+	    keyval_db_cache[i].ref_ct == -1)
+	{
 	    printf("dbcache: found empty entry at %d\n", i);
 	    break;
 	}
+	else if (ret == 0) gen_mutex_unlock(&keyval_db_cache[i].mutex);
     }
 
     if (i == DBCACHE_ENTRIES) {
 	/* no invalid entries; search for one that isn't in use */
 	for (i=0; i < DBCACHE_ENTRIES; i++) {
-	    if (keyval_db_cache[i].ref_ct == 0) {
+	    if (!(ret = gen_mutex_trylock(&keyval_db_cache[i].mutex)) &&
+		keyval_db_cache[i].ref_ct == 0)
+	    {
 		printf("dbcache: no empty entries; found unused entry at %d\n", i);
 		
 		ret = keyval_db_cache[i].db_p->close(keyval_db_cache[i].db_p, 0);
@@ -113,9 +134,12 @@ DB *dbpf_keyval_dbcache_get(TROVE_coll_id coll_id,
 		keyval_db_cache[i].db_p   = NULL;
 		break;
 	    }
+	    else if (ret == 0) gen_mutex_unlock(&keyval_db_cache[i].mutex);
 	}
 	if (i == DBCACHE_ENTRIES) assert(0);
     }
+
+    /* have lock on an entry */
 
     snprintf(filename, PATH_MAX, "/%s/%08x/%s/%08Lx.keyval", TROVE_DIR, coll_id, KEYVAL_DIRNAME, handle);
     printf("file name = %s\n", filename);
@@ -158,7 +182,9 @@ DB *dbpf_keyval_dbcache_get(TROVE_coll_id coll_id,
     keyval_db_cache[i].ref_ct  = 1;
     keyval_db_cache[i].coll_id = coll_id;
     keyval_db_cache[i].handle  = handle;
-    return keyval_db_cache[i].db_p;
+    *db_pp = keyval_db_cache[i].db_p;
+    gen_mutex_unlock(&keyval_db_cache[i].mutex);
+    return DBPF_KEYVAL_DBCACHE_SUCCESS;
 }
 
 /* dbpf_keyval_dbcache_put()
@@ -169,9 +195,11 @@ void dbpf_keyval_dbcache_put(TROVE_coll_id coll_id,
     int i;
 
     for (i=0; i < DBCACHE_ENTRIES; i++) {
+	gen_mutex_lock(&keyval_db_cache[i].mutex);
 	if (keyval_db_cache[i].ref_ct  >= 0 &&
 	    keyval_db_cache[i].coll_id == coll_id &&
 	    keyval_db_cache[i].handle  == handle) break;
+	else gen_mutex_unlock(&keyval_db_cache[i].mutex);
     }
     if (i == DBCACHE_ENTRIES) {
 	printf("warning: no matching entry for dbcache_put op\n");
@@ -191,6 +219,7 @@ void dbpf_keyval_dbcache_put(TROVE_coll_id coll_id,
 	keyval_db_cache[i].db_p   = NULL;
     }
 #endif
+    gen_mutex_unlock(&keyval_db_cache[i].mutex);
 }
 
 
