@@ -61,7 +61,7 @@ int main(int argc, char **argv)
         }
         else
         {
-            printf(" - Resolved mnt point %s to fs_id %d\n",
+            printf(" - Resolved PARSED mnt point %s to fs_id %d\n",
                    mntent[i].mnt_dir, (int)fs_id);
         }
     }
@@ -87,7 +87,7 @@ int main(int argc, char **argv)
                                 buf, PVFS_NAME_MAX);
         if (ret == 0)
         {
-            printf("Resolve an unresolvable mount point %s\n",
+            printf("Resolved an unresolvable mount point %s\n",
                    mntent[i].mnt_dir);
             break;
         }
@@ -129,7 +129,7 @@ int main(int argc, char **argv)
         }
         else
         {
-            printf(" - Resolved dyn mnt point %s to fs_id %d\n",
+            printf(" - Resolved DYNAMIC mnt point %s to fs_id %d\n",
                    mntent[i].mnt_dir, (int)fs_id);
         }
     }
@@ -155,7 +155,7 @@ int main(int argc, char **argv)
                                 buf, PVFS_NAME_MAX);
         if (ret == 0)
         {
-            printf("Resolve an unresolvable mount point %s\n",
+            printf("Resolved an unresolvable mount point %s\n",
                    mntent[i].mnt_dir);
             break;
         }
@@ -194,7 +194,7 @@ int main(int argc, char **argv)
         }
         else
         {
-            printf(" - Resolved dyn mnt point %s to fs_id %d\n",
+            printf(" - Resolved DYNAMIC mnt point %s to fs_id %d\n",
                    mntent[i].mnt_dir, (int)fs_id);
         }
     }
