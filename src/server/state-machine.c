@@ -4,20 +4,6 @@
  * See COPYING in top-level directory.
  */
 
-/*
- * June 2002
- * 
- * State machine going through changes...
- * Initialization functions to go through server_queue
- * with a check_dep() call
- * this will be for all operations  dw
- *
- * Jan 2002
- *
- * This is a basic state machine.
- * This is meant to be a basic framework.
- */ 
-
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
@@ -30,20 +16,19 @@
 #include <linux/types.h>
 #include <linux/dirent.h>
 #include <signal.h>
-
-#include <bmi.h>
-#include <gossip.h>
-#include <job.h>
-#include <pvfs2-debug.h>
-#include <pvfs2-storage.h>
 #include <assert.h>
-#include <PINT-reqproto-encode.h>
 
-#include <state-machine.h>
-#include <pvfs2-server.h>
+#include "bmi.h"
+#include "gossip.h"
+#include "job.h"
+#include "pvfs2-debug.h"
+#include "pvfs2-storage.h"
+#include "PINT-reqproto-encode.h"
 
-/* This array is used for common key-val pairs for trove =) */
+#include "state-machine.h"
+#include "pvfs2-server.h"
 
+/* keep one copy of strings commonly used in trove keyval lookups */
 PINT_server_trove_keys_s Trove_Common_Keys[] = {
     {"root_handle", 12},
     {"metadata", 9},
@@ -82,34 +67,34 @@ extern PINT_state_machine_s rmdirent_req_s;
 /* DALE - fill in the rest of these please - WBL */
 PINT_state_machine_s *PINT_server_op_table[SERVER_OP_TABLE_SIZE] =
 {
-	NULL,              /* invalid          */
-	NULL,              /* noop             */
-	&create_req_s,     /* create           */
-	&remove_req_s,     /* remove           */
-	&io_req_s,         /* io               */
-	NULL,					 /* empty - 5        */
-	NULL,              /* batch            */ 
-	&getattr_req_s,    /* get attrib       */
-	&setattr_req_s,    /* set attrib       */
-	NULL,              /* geteattr         */
-	NULL,					 /* seteattr - 10    */
-	&lookup_req_s,     /* lookup           */
-	NULL,              /* getdist ????     */
-	&crdirent_req_s,   /* createdir ent    */
-	&rmdirent_req_s,   /* rmdirent         */
-	NULL,					 /* revlookup? - 15  */
-	NULL,              /* allocate         */
-	NULL,              /* truncate         */
-	&mkdir_req_s,      /* mkdir            */
-	NULL,              /* rmdir            */
-	&readdir_req_s, 	 /* readdir - 20     */
-	NULL,              /* statfs           */
-	NULL,              /* iostatfs         */
-	&getconfig_req_s,  /* get config       */
-	/*                                     */
-	/* NULL's continue for a while...      */
-	/*                                     */
-	NULL               /* extension !99!   */
+    NULL,              /* invalid          */
+    NULL,              /* noop             */
+    &create_req_s,     /* create           */
+    &remove_req_s,     /* remove           */
+    &io_req_s,         /* io               */
+    NULL,					 /* empty - 5        */
+    NULL,              /* batch            */ 
+    &getattr_req_s,    /* get attrib       */
+    &setattr_req_s,    /* set attrib       */
+    NULL,              /* geteattr         */
+    NULL,					 /* seteattr - 10    */
+    &lookup_req_s,     /* lookup           */
+    NULL,              /* getdist ????     */
+    &crdirent_req_s,   /* createdir ent    */
+    &rmdirent_req_s,   /* rmdirent         */
+    NULL,					 /* revlookup? - 15  */
+    NULL,              /* allocate         */
+    NULL,              /* truncate         */
+    &mkdir_req_s,      /* mkdir            */
+    NULL,              /* rmdir            */
+    &readdir_req_s, 	 /* readdir - 20     */
+    NULL,              /* statfs           */
+    NULL,              /* iostatfs         */
+    &getconfig_req_s,  /* get config       */
+    /*                                     */
+    /* NULL's continue for a while...      */
+    /*                                     */
+    NULL               /* extension !99!   */
 };
 
 
@@ -124,47 +109,51 @@ PINT_state_machine_s *PINT_server_op_table[SERVER_OP_TABLE_SIZE] =
  * 
  * Synopsis: Intialize request structure, first location, and call
  *           respective init function.
- * 			 
+ *
+ * Initialization:
+ * - sets s_op->op, addr, tag
+ * - allocates space for s_op->resp and memset()s it to zero
+ * - points s_op->req to s_op->decoded.buffer
  */
-
-int PINT_state_machine_initialize_unexpected(state_action_struct *s_op, job_status_s *ret)
+int PINT_state_machine_initialize_unexpected(PINT_server_op *s_op,
+					     job_status_s *ret)
 {
+    PINT_decode(s_op->unexp_bmi_buff.buffer,
+		PINT_ENCODE_REQ,
+		&s_op->decoded,
+		s_op->unexp_bmi_buff.addr,
+		s_op->unexp_bmi_buff.size,
+		&(s_op->enc_type));
 
-	PINT_decode(s_op->unexp_bmi_buff.buffer,
-					PINT_ENCODE_REQ,
-					&s_op->decoded,
-					s_op->unexp_bmi_buff.addr,
-					s_op->unexp_bmi_buff.size,
-					&(s_op->enc_type));
-	s_op->req  = (struct PVFS_server_req_s *) s_op->decoded.buffer;
-	assert(s_op->req != NULL);
+    s_op->req  = (struct PVFS_server_req_s *) s_op->decoded.buffer;
+    assert(s_op->req != NULL);
 
-	s_op->addr = s_op->unexp_bmi_buff.addr;
-	s_op->tag  = s_op->unexp_bmi_buff.tag;
-	s_op->op   = s_op->req->op;
-	s_op->current_state = PINT_state_machine_locate(s_op);
+    s_op->addr = s_op->unexp_bmi_buff.addr;
+    s_op->tag  = s_op->unexp_bmi_buff.tag;
+    s_op->op   = s_op->req->op;
+    s_op->current_state = PINT_state_machine_locate(s_op);
 
-	if(!s_op->current_state)
-	{
-		gossip_err("System not init for function\n");
-		return(-1);
-	}
-	/* TODO:  This would be a good place for caching!!! */
-	s_op->resp = (struct PVFS_server_resp_s *)
-			malloc(sizeof(struct PVFS_server_resp_s));
+    if(!s_op->current_state)
+    {
+	gossip_err("System not init for function\n");
+	return(-1);
+    }
 
-	if (!s_op->resp)
-	{
-		gossip_err("Out of Memory");
-		ret->error_code = 1;
-		return(-ENOMEM);
-	}
-	memset(s_op->resp, 0, sizeof(struct PVFS_server_resp_s));
+    /* allocate and zero memory for (unencoded) response */
+    s_op->resp = (struct PVFS_server_resp_s *)
+	malloc(sizeof(struct PVFS_server_resp_s));
 
-	s_op->resp->op = s_op->req->op;
+    if (!s_op->resp)
+    {
+	gossip_err("Out of Memory");
+	ret->error_code = 1;
+	return(-ENOMEM);
+    }
+    memset(s_op->resp, 0, sizeof(struct PVFS_server_resp_s));
 
-	return(((s_op->current_state->state_action))(s_op,ret));
+    s_op->resp->op = s_op->req->op;
 
+    return ((s_op->current_state->state_action))(s_op,ret);
 }
 
 
@@ -178,15 +167,15 @@ int PINT_state_machine_initialize_unexpected(state_action_struct *s_op, job_stat
 int PINT_state_machine_init(void)
 {
 
-	int i;
-	for (i = 0 ; i < SERVER_OP_TABLE_SIZE; i++)
+    int i;
+    for (i = 0 ; i < SERVER_OP_TABLE_SIZE; i++)
+    {
+	if(PINT_server_op_table[i])
 	{
-		if(PINT_server_op_table[i])
-		{
-			(PINT_server_op_table[i]->init_fun)();
-		}
+	    (PINT_server_op_table[i]->init_fun)();
 	}
-	return(0);
+    }
+    return(0);
 	
 }
 
@@ -199,7 +188,7 @@ int PINT_state_machine_init(void)
 
 int PINT_state_machine_halt(void)
 {
-	return(-1);
+    return(-1);
 }
 
 
@@ -212,57 +201,57 @@ int PINT_state_machine_halt(void)
 				  back to pvfs2-server.c's while loop.
  */
 
-int PINT_state_machine_next(state_action_struct *s,job_status_s *r)
+int PINT_state_machine_next(PINT_server_op *s,job_status_s *r)
 {
 
-   int code_val = r->error_code; /* temp to hold the return code */
-	int retval; /* temp to hold return value of state action */
-	PINT_state_array_values *loc; /* temp pointer into state memory */
+    int code_val = r->error_code; /* temp to hold the return code */
+    int retval; /* temp to hold return value of state action */
+    PINT_state_array_values *loc; /* temp pointer into state memory */
 
-	/* skip over the current state action to get to the return code list */
-	loc = s->current_state + 1;
+    /* skip over the current state action to get to the return code list */
+    loc = s->current_state + 1;
 
-	/* for each entry in the state machine table there is a return
-	 * code followed by a next state pointer to the new state.
-	 * This loops through each entry, checking for a match on the
-	 * return address, and then sets the new current_state and calls
-	 * the new state action function */
-	while (loc->return_value != code_val && loc->return_value != DEFAULT_ERROR) 
-	{
-		/* each entry is two items long */
-		loc += 2;
-	}
+    /* for each entry in the state machine table there is a return
+     * code followed by a next state pointer to the new state.
+     * This loops through each entry, checking for a match on the
+     * return address, and then sets the new current_state and calls
+     * the new state action function */
+    while (loc->return_value != code_val && loc->return_value != DEFAULT_ERROR) 
+    {
+	/* each entry is two items long */
+	loc += 2;
+    }
 
-	/* skip over the return code to get to the next state */
-	loc += 1;
+    /* skip over the return code to get to the next state */
+    loc += 1;
 
-	/* Update the server_op struct to reflect the new location
-	 * see if the selected return value is a STATE_RETURN */
-	if (loc->flag == SM_STATE_RETURN)
-	{
-		s->current_state = PINT_pop_state(s);
-	}
-	else
-	{
-		s->current_state = loc->next_state;
-	}
+    /* Update the server_op struct to reflect the new location
+     * see if the selected return value is a STATE_RETURN */
+    if (loc->flag == SM_STATE_RETURN)
+    {
+	s->current_state = PINT_pop_state(s);
+    }
+    else
+    {
+	s->current_state = loc->next_state;
+    }
 
-	/* To do nested states, we check to see if the next state is
-	 * a nested state machine, and if so we push the return state
-	 * onto a stack */
-	if (s->current_state->flag == SM_NESTED_STATE)
-	{
-		PINT_push_state(s, NULL);
-	}
+    /* To do nested states, we check to see if the next state is
+     * a nested state machine, and if so we push the return state
+     * onto a stack */
+    if (s->current_state->flag == SM_NESTED_STATE)
+    {
+	PINT_push_state(s, NULL);
+    }
 
-	/* skip over the flag so we can execute the next state action */
-	s->current_state += 1;
+    /* skip over the flag so we can execute the next state action */
+    s->current_state += 1;
 
-	/* Call the new state function then */
-	retval = (s->current_state->state_action)(s,r);
+    /* Call the new state function then */
+    retval = (s->current_state->state_action)(s,r);
 
-	/* return to the while loop in pvfs2-server.c */
-	return retval;
+    /* return to the while loop in pvfs2-server.c */
+    return retval;
 
 }
 
@@ -276,28 +265,36 @@ int PINT_state_machine_next(state_action_struct *s,job_status_s *r)
 				 We should also add in some "text" backup if necessary
  */
 
-PINT_state_array_values *PINT_state_machine_locate(state_action_struct *s_op)
+PINT_state_array_values *PINT_state_machine_locate(PINT_server_op *s_op)
 {
 
-	/* do we need to check for s_op->op out of range?  - WBL */
-	if(PINT_server_op_table[s_op->op] != NULL)
-	{
-		/* Return the first return value possible from the init function... =) */
+    /* do we need to check for s_op->op out of range?  - WBL */
+    if(PINT_server_op_table[s_op->op] != NULL)
+    {
+	/* Return the first return value possible from the init function... =) */
 
-		/* WBL - adjusted for nested state machines
-		 * return PINT_server_op_table[s_op->op]->state_machine */
-		return PINT_server_op_table[s_op->op]->state_machine + 1;
-	}
-	gossip_err("State machine not found for operation %d\n",s_op->op);
-	return(NULL);
+	/* WBL - adjusted for nested state machines
+	 * return PINT_server_op_table[s_op->op]->state_machine */
+	return PINT_server_op_table[s_op->op]->state_machine + 1;
+    }
+    gossip_err("State machine not found for operation %d\n",s_op->op);
+    return(NULL);
 }
 
-PINT_state_array_values *PINT_pop_state(state_action_struct *s)
+PINT_state_array_values *PINT_pop_state(PINT_server_op *s)
 {
-	return NULL;
+    return NULL;
 }
 
-void PINT_push_state(state_action_struct *s, PINT_state_array_values *p)
+void PINT_push_state(PINT_server_op *s, PINT_state_array_values *p)
 {
 }
 
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 noexpandtab
+ */

@@ -35,22 +35,22 @@
 #include <linux/dirent.h>
 #include <signal.h>
 #include <rpc/rpc.h>
-
-#include <bmi.h>
-#include <gossip.h>
-#include <job.h>
-#include <trove.h>
-#include <pvfs2-debug.h>
-#include <pvfs2-storage.h>
-#include <PINT-reqproto-encode.h>
-#include <request-scheduler.h>
-
-#include <state-machine.h>
-#include <server-config.h>
-#include <pvfs2-server.h>
-
-#include <quicklist.h>
 #include <assert.h>
+
+#include "bmi.h"
+#include "gossip.h"
+#include "job.h"
+#include "trove.h"
+#include "pvfs2-debug.h"
+#include "pvfs2-storage.h"
+#include "PINT-reqproto-encode.h"
+#include "request-scheduler.h"
+
+#include "state-machine.h"
+#include "server-config.h"
+#include "pvfs2-server.h"
+
+#include "quicklist.h"
 
 /* Internal Globals */
 

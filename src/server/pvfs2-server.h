@@ -70,7 +70,7 @@ struct PINT_server_remove_op {
  */
 typedef struct PINT_server_op
 {
-    int op;
+    int op; /* op == req->op after initialize_unexpected */
     int strsize;
     int enc_type;
     job_id_t scheduled_id; /* holds id from request scheduler so we can release it later */
@@ -79,11 +79,14 @@ typedef struct PINT_server_op
     PVFS_ds_keyval_s *key_a;
     PVFS_ds_keyval_s *val_a;
 
-    bmi_addr_t addr;
-    bmi_msg_tag_t tag;
-    PINT_state_array_values *current_state;
-    struct PVFS_server_req_s *req;
-    struct PVFS_server_resp_s *resp;
+    bmi_addr_t addr; /* set in initialize_unexpected */
+    bmi_msg_tag_t tag; /* set in initialize_unexpected */
+    PINT_state_array_values *current_state; /* initialized in initialize_unexpected */
+    struct PVFS_server_req_s *req; /* req == decoded.buffer after initialize_unexpected */
+    struct PVFS_server_resp_s *resp; /* resp space allocated, memset(0) in initialize_unexpected
+				      *
+                                      * note: resp->op == req->op after initialize_unexpected also!
+				      */
     struct BMI_unexpected_info unexp_bmi_buff;
     struct PINT_encoded_msg encoded;
     struct PINT_decoded_msg decoded;
