@@ -320,11 +320,8 @@ int main(int argc,
 	goto server_shutdown;
     }
 
-    /* perform initial steps to run as a server 
-     * This function is located at the bottom of this file
-     * TODO: Should it be here? dw
-     */
-    ret = server_init();	/* server_daemon.c:286 */
+    /* perform initial steps to run as a server  */
+    ret = server_init();	
     if (ret < 0)
     {
 	gossip_err("Error: Could not start server; aborting.\n");
