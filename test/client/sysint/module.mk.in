@@ -1,5 +1,7 @@
 DIR := test/client/sysint
+TEST_JOBINT_DIR := src/io/job
 TEST_SYSINT_DIR := test/client/sysint
+TEST_REALSYSINT_DIR := src/client/unix-io
 
 TEST_SYSINT_DIR_SRC += \
 	$(DIR)/client.c
@@ -12,7 +14,7 @@ TESTSRC += $(TEST_SYSINT_DIR_SRC)
 
 LOCALLIBS := -ldb -lrt -lpthread
 LOCALTESTS := $(patsubst %.c,%, $(TEST_SYSINT_DIR_SRC))
-$(LOCALTESTS): %: %.o $(TEST_SYSINT_DIR)/job.o $(TEST_SYSINT_DIR)/parse-pvfstab.o
-	$(LD) $< $(TEST_SYSINT_DIR)/job.o $(TEST_SYSINT_DIR)/parse-pvfstab.o\
+$(LOCALTESTS): %: %.o $(TEST_JOBINT_DIR)/job.o $(TEST_REALSYSINT_DIR)/parse-pvfstab.o
+	$(LD) $< $(TEST_JOBINT_DIR)/job.o $(TEST_REALSYSINT_DIR)/parse-pvfstab.o\
 	$(LDFLAGS) $(LIBS) $(LOCALLIBS) -o $@
 

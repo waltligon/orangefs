@@ -39,7 +39,7 @@ int main(int argc,char **argv)
 	ret = PVFS_sys_initialize(mnt);
 	if(ret < 0)
 	{
-		printf("PVFS_sys_initialize() failure.\n");
+		printf("PVFS_sys_initialize() failure. = %d\n", ret);
 		return(ret);
 	}
 	

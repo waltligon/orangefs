@@ -1,5 +1,1 @@
-
-pvfs-tcp://www.yahoo.com:3000/pvfs /mnt/pvfs pvfs 0 0 
-pvfs-gm://www.parl.clemson.edu:4000/pvfs /mnt/foo pvfs 0 0
-
-pvfs-tcp://crack:3000/pvfs /mnt/pvfs pvfs 0 0
+pvfs-tcp://speed.parl.clemson.edu:3000/pvfs /mnt/pvfs pvfs 0 0 
