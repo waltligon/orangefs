@@ -60,6 +60,8 @@ int PVFS_sys_statfs(
     resp->statfs_buf.fs_id = fs_id;
     resp->statfs_buf.bytes_available = 0;
     resp->statfs_buf.bytes_total = 0;
+    resp->statfs_buf.handles_available_count = 0;
+    resp->statfs_buf.handles_total_count = 0;
     for(i=0; i<num_servers; i++)
     {
 	if(stat_array[i].server_type & PVFS_MGMT_IO_SERVER)
@@ -76,6 +78,10 @@ int PVFS_sys_statfs(
 		min_bytes_total = stat_array[i].bytes_total;
 	    }
 	}
+	resp->statfs_buf.handles_available_count 
+	    += stat_array[i].handles_available_count;
+	resp->statfs_buf.handles_total_count 
+	    += stat_array[i].handles_total_count;
     }
     resp->statfs_buf.bytes_available = min_bytes_available*num_io_servers;
     resp->statfs_buf.bytes_total = min_bytes_total*num_io_servers;

@@ -18,6 +18,8 @@ struct PVFS_mgmt_server_stat
     PVFS_fs_id fs_id;
     PVFS_size bytes_available;
     PVFS_size bytes_total;
+    uint64_t handles_available_count;
+    uint64_t handles_total_count;
     const char* bmi_address;
     int server_type;
 };
