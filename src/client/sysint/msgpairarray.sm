@@ -165,15 +165,24 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 
         if (msg_p->encoded_resp_p == NULL)
         {
-            server_config = PINT_get_server_config_struct(msg_p->fs_id);
-            cur_fs = PINT_config_find_fs_id(server_config, msg_p->fs_id);
-            PINT_put_server_config_struct(server_config);
-            assert(cur_fs);
+            enum PVFS_encoding_type enc_type = ENCODING_DEFAULT;
 
+            if (msg_p->fs_id != PVFS_FS_ID_NULL)
+            {
+                server_config = PINT_get_server_config_struct(
+                    msg_p->fs_id);
+                assert(server_config);
+
+                cur_fs = PINT_config_find_fs_id(server_config,
+                                                msg_p->fs_id);
+                PINT_put_server_config_struct(server_config);
+                assert(cur_fs);
+                enc_type = cur_fs->encoding;
+            }
 
             ret = PINT_encode(&msg_p->req, PINT_ENCODE_REQ,
                               &msg_p->encoded_req, msg_p->svr_addr,
-                              cur_fs->encoding);
+                              enc_type);
             if (ret != 0)
             {
                 gossip_lerr("msgpairarray_post: PINT_encode failed\n");
@@ -296,7 +305,7 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 
 	    if (msg_p->send_status.error_code != 0)
             {
-		gossip_err("msgarray send post failed; canceling recv\n");
+		gossip_err("msgarray send failed; canceling recv\n");
                 ret = job_bmi_cancel(
                     msg_p->recv_id, pint_client_sm_context);
                 if (ret)
@@ -342,7 +351,7 @@ static int msgpairarray_post_retry(PINT_client_sm *sm_p,
 
     /* delay here to stall before posting again */
     ret = job_req_sched_post_timer(
-        5000,
+        1000,
         sm_p,
         0,
         js_p,
