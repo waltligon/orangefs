@@ -12,7 +12,7 @@
 #define ATTR_MTIME 32
 #define ATTR_TYPE 2048
 
-
+#define MAX_NUM_DIRENTS    512
 #define MAX_PVFS_PATH_LEN  512
 
 extern int parse_pvfstab(char *fn,pvfs_mntlist *mnt);

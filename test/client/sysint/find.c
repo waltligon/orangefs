@@ -7,20 +7,7 @@
 #include <stdio.h>
 #include <client.h>
 #include <string.h>
-#include <sys/time.h>
-
-/* these should be in a common place... */
-#define ATTR_UID            1
-#define ATTR_GID            2
-#define ATTR_PERM           4
-#define ATTR_ATIME          8
-#define ATTR_CTIME         16
-#define ATTR_MTIME         32
-#define ATTR_TYPE        2048
-#define MAX_NUM_DIRENTS   512
-#define MAX_TEST_PATH_LEN 512
-
-extern int parse_pvfstab(char *fn,pvfs_mntlist *mnt);
+#include "helper.h"
 
 void print_at_depth(char *name, PVFS_handle handle, int depth)
 {
@@ -71,7 +58,7 @@ int directory_walk(PVFS_sysresp_init *init_response,
     PVFS_sysresp_lookup lk_response;
     PVFS_sysreq_readdir rd_request;
     PVFS_sysresp_readdir rd_response;
-    char full_path[MAX_TEST_PATH_LEN] = {0};
+    char full_path[MAX_PVFS_PATH_LEN] = {0};
 
     printf("DIRECTORY WALK CALLED WITH base %s | %s\n",base_dir,start_dir);
 
@@ -80,12 +67,12 @@ int directory_walk(PVFS_sysresp_init *init_response,
 
     if (base_dir)
     {
-        strncpy(full_path,base_dir,MAX_TEST_PATH_LEN);
+        strncpy(full_path,base_dir,MAX_PVFS_PATH_LEN);
         if (strlen(base_dir) > 1)
         {
             strcat(full_path,"/");
         }
-        strncat(full_path,start_dir,MAX_TEST_PATH_LEN);
+        strncat(full_path,start_dir,MAX_PVFS_PATH_LEN);
         lk_request.name = full_path;
     }
     else
