@@ -141,6 +141,9 @@ int main(int argc,char **argv)
 	req_create->dist.u.striped.ssize = 512;
 #endif
 
+	/* use default dist */
+	req_create->attr.u.meta.dist = NULL;
+
 	// call create 
 	ret = PVFS_sys_create(req_create,resp_create);
 	if (ret < 0)
