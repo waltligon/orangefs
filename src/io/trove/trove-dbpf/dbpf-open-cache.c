@@ -53,18 +53,27 @@ static QLIST_HEAD(free_list);
 static gen_mutex_t cache_mutex = GEN_MUTEX_INITIALIZER;
 static struct open_cache_entry prealloc[OPEN_CACHE_SIZE];
 
-static int open_fd(int* fd, 
+static int open_fd(
+    int *fd, 
     TROVE_coll_id coll_id,
     TROVE_handle handle,
     int create_flag);
-static int open_db(DB** db, 
+static int open_db(
+    DB **db, 
     TROVE_coll_id coll_id,
     TROVE_handle handle,
     int create_flag);
+static int internal_db_open(
+    DB **db,
+    char *name,
+    char *subdb,
+    DBTYPE type,
+    uint32_t flags,
+    uint32_t mode);
 
 void dbpf_open_cache_initialize(void)
 {
-    int i;
+    int i = 0;
 
     gen_mutex_lock(&cache_mutex);
 
@@ -485,115 +494,105 @@ int dbpf_open_cache_remove(
     return(tmp_error);
 }
 
-static int open_fd(int* fd, 
+static int open_fd(
+    int *fd, 
     TROVE_coll_id coll_id,
     TROVE_handle handle,
     int create_flag)
 {
-    char filename[PATH_MAX];
+    char filename[PATH_MAX] = {0};
 
     DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX,
 			      my_storage_p->name, coll_id, Lu(handle));
+
     *fd = DBPF_OPEN(filename, O_RDWR, 0);
-    if((*fd) < 0 && errno == ENOENT && create_flag)
+    if ((*fd < 0) && (errno == ENOENT) && create_flag)
     {
-	*fd = DBPF_OPEN(filename,
-	    O_RDWR|O_CREAT|O_EXCL,
-	    TROVE_DB_MODE);
+	*fd = DBPF_OPEN(filename, O_RDWR|O_CREAT|O_EXCL, TROVE_DB_MODE);
     }
-    
-    if(*fd < 0)
-    {
-	return -trove_errno_to_trove_error(errno);
-    }
-    return(0);
+    return ((*fd < 0) ? -trove_errno_to_trove_error(errno) : 0);
 }
 
-static int open_db(DB** db_pp, 
+static int open_db(
+    DB **db_pp, 
     TROVE_coll_id coll_id,
     TROVE_handle handle,
     int create_flag)
 {
-    char filename[PATH_MAX];
-    int ret = -1;
+    int ret = -TROVE_EINVAL;
+    char filename[PATH_MAX] = {0};
 
     gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
 	"dbpf_open_cache open_db: opening db %Lu (%Lx).\n",
 	Lu(handle), Lu(handle));
 
     /* special case; ds attrib database */
-    if(handle == TROVE_HANDLE_NULL)
+    if (handle == TROVE_HANDLE_NULL)
     {
 	DBPF_GET_DS_ATTRIB_DBNAME(filename, PATH_MAX,
-	    my_storage_p->name, coll_id);
+                                  my_storage_p->name, coll_id);
     }
-    /* normal case; keyval db */
     else
     {
-	DBPF_GET_KEYVAL_DBNAME(filename, PATH_MAX,
-	    my_storage_p->name, coll_id, Lu(handle));
+        /* normal case; keyval db */
+        DBPF_GET_KEYVAL_DBNAME(filename, PATH_MAX,
+                               my_storage_p->name, coll_id, Lu(handle));
     }
 
     ret = db_create(db_pp, NULL, 0);
-    if(ret != 0)
+    if (ret != 0)
     {
-	ret = -dbpf_db_error_to_trove_error(ret);
-	return(ret);
+	return -dbpf_db_error_to_trove_error(ret);
     }
 
     (*db_pp)->set_errpfx((*db_pp), "pvfs2");
     (*db_pp)->set_errcall((*db_pp), dbpf_error_report);
+
     /* DB_RECNUM makes it easier to iterate through every key in chunks */
     if ((ret = (*db_pp)->set_flags((*db_pp), DB_RECNUM)))
     {
-	(*db_pp)->err((*db_pp), ret, "%s: set_flags", 
-	    filename);
+	(*db_pp)->err((*db_pp), ret, "%s: set_flags", filename);
 	assert(0);
     }
-    ret = (*db_pp)->open(*db_pp,
-#ifdef HAVE_TXNID_PARAMETER_TO_DB_OPEN
-		     NULL,
-#endif
-		     filename,
-		     NULL,
-		     DB_UNKNOWN,
-		     TROVE_DB_OPEN_FLAGS,
-		     0);
+
+    ret = internal_db_open(db_pp, filename, NULL,
+                           DB_UNKNOWN, TROVE_DB_OPEN_FLAGS, 0);
 
     if ((ret == ENOENT) && (create_flag != 0))
     {
 	gossip_debug(GOSSIP_TROVE_DEBUG, "About to create new DB "
 		     "file %s ... ", filename);
-	ret = (*db_pp)->open(*db_pp,
-#ifdef HAVE_TXNID_PARAMETER_TO_DB_OPEN
-			 NULL,
-#endif
-			 filename,
-			 NULL,
-			 TROVE_DB_TYPE,
-			 TROVE_DB_CREATE_FLAGS,
-			 TROVE_DB_MODE);
+
+        ret = internal_db_open(db_pp, filename, NULL, TROVE_DB_TYPE,
+                               TROVE_DB_CREATE_FLAGS, TROVE_DB_MODE);
 
 	gossip_debug(GOSSIP_TROVE_DEBUG, "done\n");
 
 	/* this can easily happen if the server is out of disk space */
 	if (ret)
 	{
-	    ret = -dbpf_db_error_to_trove_error(ret);
 	    (*db_pp)->close(*db_pp, 0);
 	    *db_pp = NULL;
-	    return(ret);
+	    return -dbpf_db_error_to_trove_error(ret);
 	}
     }
     else if (ret != 0)
     {
-	ret = -dbpf_db_error_to_trove_error(ret);
 	(*db_pp)->close((*db_pp), 0);
 	*db_pp = NULL;
-	return(ret);
+	return -dbpf_db_error_to_trove_error(ret);
     }
+    return 0;
+}
 
-    return(0);
+static int internal_db_open(DB **db, char *name, char *subdb,
+                            DBTYPE type, uint32_t flags, uint32_t mode)
+{
+    return (*db)->open(*db,
+#ifdef HAVE_TXNID_PARAMETER_TO_DB_OPEN
+                       NULL,
+#endif
+                       name, subdb, type, flags, mode);
 }
 
 /*

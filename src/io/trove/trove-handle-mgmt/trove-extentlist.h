@@ -52,21 +52,50 @@ struct TROVE_handle_extentlist {
     struct avlnode *index;	         /* in-memory index for fast lookups */
 };
 
-/* extentlist_xxx - functions for manipulating extent lists */
-int extentlist_init(struct TROVE_handle_extentlist * elist );
-void extentlist_free(struct TROVE_handle_extentlist *e);
-int extentlist_merge(struct TROVE_handle_extentlist *dest, struct TROVE_handle_extentlist *src);
-TROVE_handle extentlist_get_and_dec_extent(struct TROVE_handle_extentlist *elist);
-TROVE_handle extentlist_get_from_extent(struct TROVE_handle_extentlist *elist, 
-	TROVE_extent *extent);
-int extentlist_handle_remove(struct TROVE_handle_extentlist *elist, TROVE_handle handle);
-void extentlist_show(struct TROVE_handle_extentlist *elist);
-void extentlist_count(struct TROVE_handle_extentlist *elist, uint64_t* count);
-void extentlist_stats(struct TROVE_handle_extentlist *elist); 
-int extentlist_hit_cutoff(struct TROVE_handle_extentlist *elist, TROVE_handle cutoff);
-int extentlist_endured_purgatory(struct TROVE_handle_extentlist *querent, struct TROVE_handle_extentlist *reference);
-int extentlist_set_purgatory(struct timeval * timeout);
-int extentlist_addextent(struct TROVE_handle_extentlist *elist, TROVE_handle first, TROVE_handle last);
+/* functions for manipulating extent lists */
+int extentlist_init(
+    struct TROVE_handle_extentlist * elist);
+void extentlist_free(
+    struct TROVE_handle_extentlist *e);
+int extentlist_merge(
+    struct TROVE_handle_extentlist *dest,
+    struct TROVE_handle_extentlist *src);
+TROVE_handle extentlist_get_and_dec_extent(
+    struct TROVE_handle_extentlist *elist);
+TROVE_handle extentlist_get_from_extent(
+    struct TROVE_handle_extentlist *elist, 
+    TROVE_extent *extent);
+int extentlist_peek_handles(
+    struct TROVE_handle_extentlist *elist,
+    TROVE_handle *out_handle_array,
+    int max_num_handles,
+    int *returned_handle_count);
+int extentlist_peek_handles_from_extent(
+    struct TROVE_handle_extentlist *elist, 
+    TROVE_extent *extent,
+    TROVE_handle *out_handle_array,
+    int max_num_handles,
+    int *returned_handle_count);
+int extentlist_handle_remove(
+    struct TROVE_handle_extentlist *elist,
+    TROVE_handle handle);
+void extentlist_show(
+    struct TROVE_handle_extentlist *elist);
+void extentlist_count(
+    struct TROVE_handle_extentlist *elist,
+    uint64_t* count);
+void extentlist_stats(
+    struct TROVE_handle_extentlist *elist); 
+int extentlist_hit_cutoff(
+    struct TROVE_handle_extentlist *elist,
+    TROVE_handle cutoff);
+int extentlist_endured_purgatory(
+    struct TROVE_handle_extentlist *querent,
+    struct TROVE_handle_extentlist *reference);
+int extentlist_set_purgatory(struct timeval *timeout);
+int extentlist_addextent(
+    struct TROVE_handle_extentlist *elist,
+    TROVE_handle first, TROVE_handle last);
 
 /*
  * Local variables:

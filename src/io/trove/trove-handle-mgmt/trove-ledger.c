@@ -16,8 +16,8 @@
 
 /* struct handle_ledger
  *
- * Structure used internally for maintaining state.  Opaque pointers passed
- * back to the caller.
+ * Structure used internally for maintaining state.  Opaque pointers
+ * passed back to the caller.
  */
 struct handle_ledger {
     struct TROVE_handle_extentlist free_list;
@@ -34,34 +34,26 @@ struct handle_ledger {
 /* Functions used only internally:
  */
 
-#if 0
-/* handle_store_xxx - functions to handle moving handle free lists to/from storage */
-static int handle_store_save(void);/* unimplemented */
-static int handle_store_load(TROVE_coll_id coll_id, char *admin_name, struct handle_ledger *ledger); 
-
-/* handle_store_extentlist_xxx - functions to move extentlists to/from bstreams, used by handle_store_xxx */
-static int handle_store_extentlist_create(TROVE_coll_id coll_id, TROVE_handle bstream_handle, struct TROVE_handle_extentlist *el);
-
-static int handle_store_extentlist_exists(TROVE_coll_id coll_id, TROVE_handle bstream_handle);
-static int handle_store_extentlist_read(TROVE_coll_id coll_id, TROVE_handle handle, struct TROVE_handle_extentlist *el);
-#endif
-
-/* handle_recycle - takes care of moving handles among the various free lists */
+/*
+  handle_recycle - takes care of moving handles among the various free
+  lists
+*/
 static int handle_recycle(struct handle_ledger *hl);
 
 /* handle_ledger_init()
  *
- * initializes the structure that tracks the extent lists. for lack of a better
- * term we call it a 'handle_ledger'.   If the backing store file exists, reads
- * it into memory.   
+ * initializes the structure that tracks the extent lists. for lack of
+ * a better term we call it a 'handle_ledger'.  If the backing store
+ * file exists, reads it into memory.
  *
- * coll_name    name of collection for which this handle ledger applies
- * admin_name	name of collection from which we read and dump extentlist bstreams
+ * coll_name: name of collection for which this handle ledger applies
+ * admin_name: name of collection from which we read and dump
+ * extentlist bstreams
  *
  * returns: pointer to an initialized  handle_ledger struct
  */
-struct handle_ledger * trove_handle_ledger_init(TROVE_coll_id coll_id,
-						char *admin_name)
+struct handle_ledger * trove_handle_ledger_init(
+    TROVE_coll_id coll_id, char *admin_name)
 {
     struct handle_ledger *ledger;
 
@@ -75,10 +67,10 @@ struct handle_ledger * trove_handle_ledger_init(TROVE_coll_id coll_id,
     if (extentlist_init(&(ledger->recently_freed_list))) return NULL;
     if (extentlist_init(&(ledger->overflow_list))) return NULL;
 	
-    /* we work with extents through trove_setinfo now.  We still don't have a
-     * good way to save and restore state, but we can limp along with our 'good
-     * enough' way for a bit.  The commented-out code below might be one way to
-     * load and restore state */
+    /* we work with extents through trove_setinfo now.  We still don't
+     * have a good way to save and restore state, but we can limp
+     * along with our 'good enough' way for a bit.  The commented-out
+     * code below might be one way to load and restore state */
 #if 0
     if (admin_name == NULL ) {
 	/* load with defaults */
@@ -112,36 +104,11 @@ int trove_handle_ledger_dump(struct handle_ledger *hl)
     return -1;
 }
 
-#if 0
-/* handle_store_save
- * XXX: unimplemented
- */
-
-static int handle_store_save() 
-{
-    return -1;
-}
-
-/*
- * handle_store_extentlist_read:
- * given a dspace, 
- * 	read the extents from the bstream. 
- * 	add them to the extentlist.  
- *
- */
-
-static int handle_store_extentlist_read(TROVE_coll_id coll_id,
-					TROVE_handle handle,
-					struct TROVE_handle_extentlist *elist)
-{
-    return -1;
-}
-#endif
-
 /* 
  * return all allocated memory back to the system
  */
-void trove_handle_ledger_free(struct handle_ledger *hl) {
+void trove_handle_ledger_free(struct handle_ledger *hl)
+{
     extentlist_free(&(hl->free_list));
     extentlist_free(&(hl->recently_freed_list));
     extentlist_free((&hl->overflow_list));
@@ -151,39 +118,69 @@ void trove_handle_ledger_free(struct handle_ledger *hl) {
 
 TROVE_handle trove_ledger_handle_alloc(struct handle_ledger *hl)
 {
-    return (hl ? extentlist_get_and_dec_extent(&(hl->free_list)) :
-            (TROVE_handle)0);
+    return (hl ? extentlist_get_and_dec_extent(
+                &(hl->free_list)) : TROVE_HANDLE_NULL);
 }
 
-/* if possible, allocate a handle within the given starting point and ending
- * point (provided by the TROVE_extent)
+/* if possible, allocate a handle within the given starting point and
+ * ending point (provided by the TROVE_extent)
  *
  * if no handle avaliable in the extent, return 0
  */
-TROVE_handle trove_ledger_handle_alloc_from_range(struct handle_ledger *hl, 
-	TROVE_extent *extent)
+TROVE_handle trove_ledger_handle_alloc_from_range(
+    struct handle_ledger *hl, TROVE_extent *extent)
 {
-    if (hl == NULL) return (TROVE_handle)0;
+    return (hl ? extentlist_get_from_extent(
+                &(hl->free_list), extent) : TROVE_HANDLE_NULL);
+}
 
-    return( extentlist_get_from_extent(&(hl->free_list), extent) );
+int trove_ledger_peek_handles(
+    struct handle_ledger *hl,
+    TROVE_handle *out_handle_array,
+    int max_num_handles,
+    int *returned_handle_count)
+{
+    return (hl ? extentlist_peek_handles(
+                &(hl->free_list), out_handle_array, max_num_handles,
+                returned_handle_count) : TROVE_HANDLE_NULL);
+}
+
+int trove_ledger_peek_handles_from_extent(
+    struct handle_ledger *hl,
+    TROVE_extent *extent,
+    TROVE_handle *out_handle_array,
+    int max_num_handles,
+    int *returned_handle_count)
+{
+    return (hl ? extentlist_peek_handles_from_extent(
+                &(hl->free_list), extent, out_handle_array,
+                max_num_handles, returned_handle_count) :
+            TROVE_HANDLE_NULL);
 }
 
 int trove_ledger_handle_free(struct handle_ledger *hl, TROVE_handle handle)
 {
-    /* won't actually return to the free list until timeout stuff is in
-     * place */
-    if ( extentlist_hit_cutoff(&(hl->recently_freed_list), hl->cutoff))
+    /* won't actually return to the free list until timeout stuff is
+     * in place */
+    if (extentlist_hit_cutoff(&(hl->recently_freed_list), hl->cutoff))
+    {
 	extentlist_addextent(&(hl->overflow_list), handle, handle);
-    else 
+    }
+    else
+    {
 	extentlist_addextent(&(hl->recently_freed_list), handle, handle);
+    }
 
-    /* don't even bother checking the timeouts until the free_list starts
-     * running out */
-    if (hl->free_list.num_handles > hl->cutoff) {
+    /* don't even bother checking the timeouts until the free_list
+     * starts running out */
+    if (hl->free_list.num_handles > hl->cutoff)
+    {
 	return 0;
     }
-    if (extentlist_endured_purgatory(&(hl->recently_freed_list), 
-		&(hl->overflow_list)) ) {
+
+    if (extentlist_endured_purgatory(
+            &(hl->recently_freed_list), &(hl->overflow_list)) )
+    {
 	handle_recycle(hl);
     }
     return 0;
@@ -192,16 +189,18 @@ int trove_ledger_handle_free(struct handle_ledger *hl, TROVE_handle handle)
 /* trove_ledger_set_timeout: 
  *	set the handle purgatory on the underlying extentlists 
  */
-int trove_ledger_set_timeout(struct handle_ledger *hl, 
-	struct timeval * timeout)
+int trove_ledger_set_timeout(
+    struct handle_ledger *hl, 
+    struct timeval *timeout)
 {
     return (extentlist_set_purgatory(timeout));
 }
 /* 
- * handle_recycle:  recently_freed items become free items.  overflow items
- * become recently_freed items 
+ * handle_recycle: recently_freed items become free items.  overflow
+ * items become recently_freed items
  *
- * call this function when the purgatory time for freed handles expires
+ * call this function when the purgatory time for freed handles
+ * expires
  */
 static int handle_recycle(struct handle_ledger *hl)
 {
@@ -214,17 +213,17 @@ static int handle_recycle(struct handle_ledger *hl)
     return 0;
 }
 
-
 /* trove_handle_ledger_get_statistics()
  *
  * returns statistics on a given ledger, for now just free handle count
  *
  * no return value
  */
-void trove_handle_ledger_get_statistics(struct handle_ledger *hl,
-    uint64_t* free_count)
+void trove_handle_ledger_get_statistics(
+    struct handle_ledger *hl,
+    uint64_t *free_count)
 {
-    uint64_t tmp_count;
+    uint64_t tmp_count = 0;
     *free_count = 0;
 
     extentlist_count(&(hl->free_list), &tmp_count);
@@ -233,8 +232,6 @@ void trove_handle_ledger_get_statistics(struct handle_ledger *hl,
     *free_count += tmp_count;
     extentlist_count(&(hl->overflow_list), &tmp_count);
     *free_count += tmp_count;
-
-    return;
 }
 
 
@@ -254,7 +251,6 @@ void trove_handle_ledger_show(struct handle_ledger *hl)
     gossip_debug(GOSSIP_TROVE_DEBUG, "====== overflow list\n");
     extentlist_stats(&(hl->overflow_list));
 }
-
 
 #if 0
 /*

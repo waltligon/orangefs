@@ -359,16 +359,6 @@ TROVE_handle trove_handle_alloc(TROVE_coll_id coll_id)
     return handle;
 }
 
-/* trove_handle_alloc_from_range
- *  coll_id	collection id
- *  extent_array    array of, well, PVFS_handle_extents. 
- *
- *  returns:
- *  a handle from within one of the extents provided by extent_array
- *  no gaurantee from which extent we will allocate a handle
- *
- *  0 if error or if there were no handles avaliable from the given ranges
- */
 TROVE_handle trove_handle_alloc_from_range(
     TROVE_coll_id coll_id,
     TROVE_handle_extent_array *extent_array)
@@ -396,6 +386,78 @@ TROVE_handle trove_handle_alloc_from_range(
         }
     }
     return handle;
+}
+
+int trove_handle_peek(
+    TROVE_coll_id coll_id,
+    TROVE_handle *out_handle_array,
+    int max_num_handles,
+    int *returned_handle_count)
+{
+    int ret = -TROVE_EINVAL;
+    handle_ledger_t *ledger = NULL;
+    struct qlist_head *hash_link = NULL;
+
+    if (!out_handle_array || !returned_handle_count)
+    {
+        return ret;
+    }
+
+    hash_link = qhash_search(s_fsid_to_ledger_table,&(coll_id));
+    if (hash_link)
+    {
+        ledger = qlist_entry(hash_link, handle_ledger_t, hash_link);
+        if (ledger && (ledger->have_valid_ranges == 1))
+        {
+            ret = trove_ledger_peek_handles(
+                ledger->ledger, out_handle_array,
+                max_num_handles, returned_handle_count);
+        }
+    }
+    return ret;
+}
+
+int trove_handle_peek_from_range(
+    TROVE_coll_id coll_id,
+    TROVE_handle_extent_array *extent_array,
+    TROVE_handle *out_handle_array,
+    int max_num_handles,
+    int *returned_handle_count)
+{
+    int ret = -TROVE_EINVAL, i = 0;
+    handle_ledger_t *ledger = NULL;
+    struct qlist_head *hash_link = NULL;
+
+    if (!extent_array || !out_handle_array || !returned_handle_count)
+    {
+        return ret;
+    }
+
+    hash_link = qhash_search(s_fsid_to_ledger_table,&(coll_id));
+    if (hash_link)
+    {
+        ledger = qlist_entry(hash_link, handle_ledger_t, hash_link);
+        if (ledger && (ledger->have_valid_ranges == 1))
+        {
+            for(i = 0; i < extent_array->extent_count; i++)
+            {
+                ret = trove_ledger_peek_handles_from_extent(
+                    ledger->ledger, &(extent_array->extent_array[i]),
+                    out_handle_array, max_num_handles,
+                    returned_handle_count);
+                /*
+                  if we get any handles back, just return, even if
+                  it's not the full amount requested
+                */
+                if (ret == 0)
+                {
+                    assert(*returned_handle_count > 0);
+                    break;
+                }
+            }
+        }
+    }
+    return ret;
 }
 
 int trove_handle_set_used(TROVE_coll_id coll_id, TROVE_handle handle)
