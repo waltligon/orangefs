@@ -36,9 +36,10 @@ static int mgmt_setparam_all_failure(PINT_client_sm *sm_p,
 
 %%
 
-machine pvfs2_client_mgmt_setparam_all_sm(cleanup,
+machine pvfs2_client_mgmt_setparam_all_sm(
     setup_msgpair,
     xfer_msgpair,
+    cleanup,
     failure)
 {
 
