@@ -66,13 +66,13 @@ static pthread_cond_t dev_cond = PTHREAD_COND_INITIALIZER;
  */
 
 /* code that the threads will run when initialized */
-static void *bmi_thread_function(void *foo);
+static void *bmi_thread_function(void *ptr);
 static pthread_t bmi_thread_id;
-static void *flow_thread_function(void *foo);
+static void *flow_thread_function(void *ptr);
 static pthread_t flow_thread_id;
-static void *trove_thread_function(void *foo);
+static void *trove_thread_function(void *ptr);
 static pthread_t trove_thread_id;
-static void *dev_thread_function(void* foo);
+static void *dev_thread_function(void* ptr);
 static pthread_t dev_thread_id;
 #endif /* __PVFS2_JOB_THREADED__ */
 
@@ -3645,7 +3645,7 @@ static void fill_status(struct job_desc *jd,
  *
  * function executed by the thread in charge of BMI
  */
-static void *bmi_thread_function(void *foo)
+static void *bmi_thread_function(void *ptr)
 {
     int bmi_pending_flag, bmi_unexp_pending_flag;
     int num_bmi_completed, num_bmi_unexp_completed;
@@ -3737,7 +3737,7 @@ static void *bmi_thread_function(void *foo)
  *
  * function executed by the thread in charge of flows
  */
-static void *flow_thread_function(void *foo)
+static void *flow_thread_function(void *ptr)
 {
     int flow_pending_flag;
     int num_completed;
@@ -3794,7 +3794,7 @@ static void *flow_thread_function(void *foo)
  *
  * function executed by the thread in charge of trove
  */
-static void *trove_thread_function(void *foo)
+static void *trove_thread_function(void *ptr)
 {
     int trove_pending_flag;
     int num_completed;
@@ -3851,7 +3851,7 @@ static void *trove_thread_function(void *foo)
  *
  * function executed by the thread in charge of the device interface
  */
-static void *dev_thread_function(void *foo)
+static void *dev_thread_function(void *ptr)
 {
     int dev_unexp_pending_flag;
     int num_completed;

@@ -1092,11 +1092,61 @@ static int dbpf_dspace_testsome(
     TROVE_ds_state *state_array,
     int max_idle_time_ms)
 {
-    int i, out_count = 0, ret, tmp_count;
+    int i = 0, out_count = 0, ret = 0;
+#ifdef __PVFS2_TROVE_THREADED__
+    int state = 0, wait = 0;
+    dbpf_queued_op_t *cur_op = NULL;
+    gen_mutex_t *context_mutex = NULL;
+    void **returned_user_ptr_p = NULL;
 
-    for (i=0; i < *inout_count_p; i++)
+    assert(dbpf_completion_queue_array[context_id]);
+
+    context_mutex = dbpf_completion_queue_array_mutex[context_id];
+    assert(context_mutex);
+
+  scan_for_completed_ops:
+#endif
+
+    assert(inout_count_p);
+    for (i = 0; i < *inout_count_p; i++)
     {
-	ret = dbpf_dspace_test(
+#ifdef __PVFS2_TROVE_THREADED__
+        cur_op = id_gen_fast_lookup(ds_id_array[i]);
+        if (cur_op == NULL)
+        {
+            gossip_err("Invalid operation to testsome against\n");
+            return -1;
+        }
+
+        /* check the state of the current op to see if it's completed */
+        gen_mutex_lock(&cur_op->mutex);
+        state = cur_op->op.state;
+        gen_mutex_unlock(&cur_op->mutex);
+
+        if (state == OP_COMPLETED)
+        {
+            assert(!dbpf_op_queue_empty(
+                       dbpf_completion_queue_array[context_id]));
+
+            /* pull the op out of the context specific completion queue */
+            gen_mutex_lock(context_mutex);
+            dbpf_op_queue_remove(cur_op);
+            gen_mutex_unlock(context_mutex);
+
+            state_array[out_count] = cur_op->state;
+
+            returned_user_ptr_p = &returned_user_ptr_array[out_count];
+            if (returned_user_ptr_p != NULL)
+            {
+                *returned_user_ptr_p = cur_op->op.user_ptr;
+            }
+            dbpf_queued_op_free(cur_op);
+        }
+        ret = ((state == OP_COMPLETED) ? 1 : 0);
+#else
+        int tmp_count = 0;
+
+        ret = dbpf_dspace_test(
             coll_id,
             ds_id_array[i],
             context_id,
@@ -1106,7 +1156,7 @@ static int dbpf_dspace_testsome(
              &returned_user_ptr_array[out_count] : NULL),
             &state_array[out_count],
             max_idle_time_ms);
-
+#endif
 	if (ret != 0)
         {
 	    /* operation is done and we are telling the caller;
@@ -1117,8 +1167,36 @@ static int dbpf_dspace_testsome(
 	}
     }
 
+#ifdef __PVFS2_TROVE_THREADED__
+    /* if no op completed, wait for up to max_idle_time_ms */
+    if ((wait == 0) && (out_count == 0) && (max_idle_time_ms > 0))
+    {
+        struct timespec wait_time;
+        wait_time.tv_sec = (max_idle_time_ms / 1000);
+        wait_time.tv_nsec = ((max_idle_time_ms % 1000) * 1000000);
+
+        gen_mutex_lock(context_mutex);
+        ret = pthread_cond_timedwait(
+            &dbpf_op_cond, context_mutex, &wait_time);
+        gen_mutex_unlock(context_mutex);
+
+        if (ret != ETIMEDOUT)
+        {
+            /*
+              since we were signaled awake (rather than timed out
+              while sleeping), we're going to rescan ops here for
+              completion.  if nothing completes the second time
+              around, we're giving up and won't be back here.
+            */
+            wait = 1;
+
+            goto scan_for_completed_ops;
+        }
+    }
+#endif
+
     *inout_count_p = out_count;
-    return (out_count > 0) ? 1 : 0;
+    return ((out_count > 0) ? 1 : 0);
 }
 
 struct TROVE_dspace_ops dbpf_dspace_ops =

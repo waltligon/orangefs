@@ -63,7 +63,8 @@ void *dbpf_thread_function(void *ptr)
     {
 
         dbpf_do_one_work_cycle(&out_count);
-        usleep(500 - (out_count * 100)); /* FOR NOW; will be removed */
+        usleep((DBPF_OPS_PER_WORK_CYCLE * 10) -
+               (out_count * 10));
 
     } while(dbpf_thread_running);
 
