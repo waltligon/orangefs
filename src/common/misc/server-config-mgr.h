@@ -22,12 +22,24 @@ int PINT_server_config_mgr_add_config(
 int PINT_server_config_mgr_remove_config(
     PVFS_fs_id fs_id);
 
-struct server_configuration_s *PINT_server_config_mgr_get_config(
+struct server_configuration_s *__PINT_server_config_mgr_get_config(
     PVFS_fs_id fs_id);
 
-void PINT_server_config_mgr_put_config(
+void __PINT_server_config_mgr_put_config(
     struct server_configuration_s *config_s);
 
+/* client and server retrieve fs configuration from different sources */
+#if defined(__PVFS2_CLIENT__)
+#define PINT_server_config_mgr_get_config __PINT_server_config_mgr_get_config
+#define PINT_server_config_mgr_put_config __PINT_server_config_mgr_put_config
+#elif defined(__PVFS2_SERVER__)
+static inline void __PINT_server_config_mgr_put_config_null(
+    struct server_configuration_s *config_s){return;}
+#define PINT_server_config_mgr_get_config(__fsid) get_server_config_struct()
+#define PINT_server_config_mgr_put_config \
+ __PINT_server_config_mgr_put_config_null
+#else
+#endif
 
 #endif  /* __SERVER_CONFIG_MGR_H */
 /*

@@ -314,7 +314,7 @@ int PINT_server_config_mgr_remove_config(
     return ret;
 }
 
-struct server_configuration_s *PINT_server_config_mgr_get_config(
+struct server_configuration_s *__PINT_server_config_mgr_get_config(
     PVFS_fs_id fs_id)
 {
     struct server_configuration_s *ret = NULL;
@@ -345,7 +345,7 @@ struct server_configuration_s *PINT_server_config_mgr_get_config(
     return ret;
 }
 
-void PINT_server_config_mgr_put_config(
+void __PINT_server_config_mgr_put_config(
     struct server_configuration_s *config_s)
 {
     PINT_llist *cur = NULL;
