@@ -65,6 +65,7 @@ int main(int argc, char **argv)
     PVFS_sysresp_init resp_init;
     struct options* user_opts = NULL;
     int mnt_index = -1;
+    char current_dir[PVFS_NAME_MAX] = {0};
 
     /* look at command line arguments */
     user_opts = parse_args(argc, argv);
@@ -87,6 +88,14 @@ int main(int argc, char **argv)
      */
     for(i = 0; i < mnt.nr_entry; i++)
     {
+        if (user_opts->num_starts == 0)
+        {
+            snprintf(current_dir,PVFS_NAME_MAX,"%s/",
+                     mnt.ptab_p[i].local_mnt_dir);
+            user_opts->start[0] = current_dir;
+            user_opts->num_starts = 1;
+        }
+
         for(j = 0; j < user_opts->num_starts; j++)
         {
             memset(pvfs_path[j],0,PVFS_NAME_MAX);
@@ -202,6 +211,7 @@ void print_entry_attr(
     char *owner = empty_str, *group = empty_str;
     struct tm *time = gmtime((time_t *)&attr->atime);
     unsigned long size = 0;
+    char scratch_owner[16] = {0}, scratch_group[16] = {0};
 
     if (!opts->list_all && (entry_name[0] == '.'))
     {
@@ -214,6 +224,9 @@ void print_entry_attr(
         return;
     }
 
+    snprintf(scratch_owner,16,"%d",(int)attr->owner);
+    snprintf(scratch_group,16,"%d",(int)attr->group);
+
     size = (((attr->objtype == PVFS_TYPE_METAFILE) &&
              (attr->mask & PVFS_ATTR_SYS_SIZE)) ?
             (unsigned long)attr->size : 0);
@@ -224,13 +237,13 @@ void print_entry_attr(
         if (!opts->list_no_owner)
         {
             pwd = getpwuid((uid_t)attr->owner);
-            owner = pwd->pw_name;
+            owner = (pwd ? pwd->pw_name : scratch_owner);
         }
 
         if (!opts->list_no_group)
         {
             grp = getgrgid((gid_t)attr->group);
-            group = grp->gr_name;
+            group = (grp ? grp->gr_name : scratch_group);
         }
 
         snprintf(buf,128,"%c%c%c%c%c%c%c%c%c%c    1 %s     %s\t%s "
