@@ -45,7 +45,7 @@ while test $# -gt 0; do
 
       ;;
     --libs|--static-libs)
-	libflags="-L@libdir@ -lpvfs2" 
+	libflags="-L@libdir@ -lpvfs2 -lpthread " 
 	if [ x"@BUILD_GM@" = x"1" ]; then
 		libflags="$libflags -L@GM_HOME@/lib -lgm"
 	fi
