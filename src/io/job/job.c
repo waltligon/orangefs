@@ -24,6 +24,15 @@
 #include "request-scheduler.h"
 #include "pint-dev.h"
 #include "id-generator.h"
+#include "pint-event.h"
+
+#define JOB_EVENT_START(__op, __size, __id) \
+ PINT_event_timestamp(PINT_EVENT_API_JOB, __op, __size, __id, \
+ PINT_EVENT_FLAG_START)
+
+#define JOB_EVENT_END(__op, __size, __id) \
+ PINT_event_timestamp(PINT_EVENT_API_JOB, __op, __size, __id, \
+ PINT_EVENT_FLAG_END)
 
 /* contexts for use within the job interface */
 static bmi_context_id global_bmi_context = -1;
@@ -1166,6 +1175,8 @@ int job_flow(flow_descriptor * flow_d,
 	out_status_p->status_user_tag = status_user_tag;
 	out_status_p->actual_size = flow_d->total_transfered;
 	dealloc_job_desc(jd);
+        JOB_EVENT_START(PINT_EVENT_FLOW, 0, 0);
+        JOB_EVENT_END(PINT_EVENT_FLOW, flow_d->total_transfered, 0);
 	return (1);
     }
 
@@ -1177,6 +1188,8 @@ int job_flow(flow_descriptor * flow_d,
     pthread_cond_signal(&flow_cond);
 #endif /* __PVFS2_JOB_THREADED__ */
     gen_mutex_unlock(&flow_mutex);
+
+    JOB_EVENT_START(PINT_EVENT_FLOW, 0, *id);
 
     return (0);
 }
@@ -4238,6 +4251,7 @@ static void fill_status(struct job_desc *jd,
     case JOB_FLOW:
 	status->error_code = jd->u.flow.flow_d->error_code;
 	status->actual_size = jd->u.flow.flow_d->total_transfered;
+        JOB_EVENT_END(PINT_EVENT_FLOW, status->actual_size, jd->job_id);
 	break;
     case JOB_REQ_SCHED:
 	status->error_code = jd->u.req_sched.error_code;

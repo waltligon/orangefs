@@ -29,9 +29,9 @@ enum PINT_event_flag
 /* TODO: is there a better way to do this?  any point in registering these
  * at runtime rather than listing them all in a header here?
  */
-enum PINT_event_job_op
+enum PINT_event_flow_op
 {
-    PINT_EVENT_JOB_FLOW = 1
+    PINT_EVENT_FLOW = 1
 };
 enum PINT_event_bmi_op
 {
@@ -73,7 +73,7 @@ void __PINT_event_timestamp(
 	    (PINT_event_op_mask & __operation)){\
 	    __PINT_event_timestamp(__api, __operation, __value, __id, \
 	    __flags); }\
-    while(0)
+    }while(0)
 #endif
 
 #endif /* __PINT_EVENT_H */
