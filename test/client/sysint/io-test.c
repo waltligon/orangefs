@@ -11,48 +11,37 @@
 #include <sys/types.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <assert.h>
 #include "pvfs2-util.h"
 #include "pvfs2-mgmt.h"
 
 #define DEFAULT_IO_SIZE 8*1024*1024
 
-int main(
-    int argc,
-    char **argv)
+int main(int argc, char **argv)
 {
     PVFS_sysresp_lookup resp_lk;
     PVFS_sysresp_create resp_cr;
     PVFS_sysresp_io resp_io;
-    char *filename;
-    int name_sz;
-    int ret = -1;
-    int io_size = DEFAULT_IO_SIZE;
+    char *filename = NULL;
+    int ret = -1, io_size = DEFAULT_IO_SIZE;
     int *io_buffer = NULL;
-    int i;
-    int errors;
+    int i, errors, buffer_size;
     PVFS_fs_id fs_id;
-    char *name;
+    char name[512] = {0};
+    char *entry_name = NULL;
     PVFS_credentials credentials;
-    char *entry_name;
     PVFS_object_ref parent_refn;
     PVFS_sys_attr attr;
     PVFS_object_ref pinode_refn;
     PVFS_Request file_req;
     PVFS_Request mem_req;
-    void *buffer;
-    int buffer_size;
+    void *buffer = NULL;
     PVFS_sysresp_getattr resp_getattr;
     PVFS_handle *dfile_array = NULL;
 
     if (argc != 2)
     {
 	fprintf(stderr, "Usage: %s <file name>\n", argv[0]);
-	return (-1);
-    }
-
-    if (index(argv[1], '/'))
-    {
-	fprintf(stderr, "Error: please use simple file names, no path.\n");
 	return (-1);
     }
 
@@ -69,19 +58,6 @@ int main(
 	io_buffer[i] = i;
     }
 
-    /* build the full path name (work out of the root dir for this test) */
-
-    name_sz = strlen(argv[1]) + 2;	/* include null terminator and slash */
-    filename = malloc(name_sz);
-    if (!filename)
-    {
-	perror("malloc");
-	return (-1);
-    }
-    filename[0] = '/';
-
-    memcpy(&(filename[1]), argv[1], (name_sz - 1));
-
     ret = PVFS_util_init_defaults();
     if (ret < 0)
     {
@@ -95,48 +71,49 @@ int main(
 	return (-1);
     }
 
-	/*************************************************************
-	 * try to look up the target file 
-	 */
-
-    name = filename;
+    if (argv[1][0] == '/')
+    {
+        snprintf(name, 512, "%s", argv[1]);
+    }
+    else
+    {
+        snprintf(name, 512, "/%s", argv[1]);
+    }
 
     PVFS_util_gen_credentials(&credentials);
     ret = PVFS_sys_lookup(fs_id, name, credentials,
 			  &resp_lk, PVFS2_LOOKUP_LINK_FOLLOW);
-    /* TODO: really we probably want to look for a specific error code,
-     * like maybe ENOENT?
-     */
-    if (ret < 0)
+    if (ret == -PVFS_ENOENT)
     {
+        PVFS_sysresp_getparent gp_resp;
+
 	printf("IO-TEST: lookup failed; creating new file.\n");
 
-	/* get root handle */
-	name = "/";
-	ret = PVFS_sys_lookup(fs_id, name, credentials,
-			      &resp_lk, PVFS2_LOOKUP_LINK_NO_FOLLOW);
+        memset(&gp_resp, 0, sizeof(PVFS_sysresp_getparent));
+	ret = PVFS_sys_getparent(fs_id, name, credentials, &gp_resp);
 	if (ret < 0)
 	{
-	    fprintf(stderr,
-		    "Error: PVFS_sys_lookup() failed to find root handle.\n");
-	    return (-1);
+            PVFS_perror("PVFS_sys_getparent failed", ret);
+	    return ret;
 	}
 
-	/* create new file */
 	attr.owner = credentials.uid;
 	attr.group = credentials.gid;
 	attr.perms = PVFS_U_WRITE | PVFS_U_READ;
 	attr.atime = attr.ctime = attr.mtime = time(NULL);
 	attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-	parent_refn.handle = resp_lk.ref.handle;
-	parent_refn.fs_id = fs_id;
-	entry_name = &(filename[1]);	/* leave off slash */
+	parent_refn = gp_resp.parent_ref;
+
+        entry_name = rindex(name, (int)'/');
+        assert(entry_name);
+        entry_name++;
+        assert(entry_name);
 
 	ret = PVFS_sys_create(entry_name, parent_refn, attr,
 			      credentials, NULL, &resp_cr);
 	if (ret < 0)
 	{
-	    fprintf(stderr, "Error: PVFS_sys_create() failure.\n");
+	    PVFS_perror("PVFS_sys_create() failure", ret);
 	    return (-1);
 	}
 
@@ -145,7 +122,8 @@ int main(
     }
     else
     {
-	printf("IO-TEST: lookup succeeded; performing I/O on existing file.\n");
+	printf("IO-TEST: lookup succeeded; performing I/O on "
+               "existing file.\n");
 
 	pinode_refn.fs_id = fs_id;
 	pinode_refn.handle = resp_lk.ref.handle;
@@ -161,13 +139,17 @@ int main(
     buffer = io_buffer;
     buffer_size = io_size * sizeof(int);
 
-    /* file datatype is tiled, so we can get away with a trivial type here */
+    /*
+      file datatype is tiled, so we can get away with a trivial type
+      here
+    */
     file_req = PVFS_BYTE;
 
-    ret = PVFS_Request_contiguous(io_size * sizeof(int), PVFS_BYTE, &(mem_req));
+    ret = PVFS_Request_contiguous(io_size * sizeof(int),
+                                  PVFS_BYTE, &(mem_req));
     if (ret < 0)
     {
-	fprintf(stderr, "Error: PVFS_Request_contiguous() failure.\n");
+        PVFS_perror("PVFS_request_contiguous failure", ret);
 	return (-1);
     }
 
@@ -175,7 +157,7 @@ int main(
 			 credentials, &resp_io);
     if (ret < 0)
     {
-	fprintf(stderr, "Error: PVFS_sys_write() failure.\n");
+        PVFS_perror("PVFS_sys_write failure", ret);
 	return (-1);
     }
 
@@ -193,7 +175,7 @@ int main(
 			credentials, &resp_io);
     if (ret < 0)
     {
-	fprintf(stderr, "Error: PVFS_sys_read() failure.\n");
+        PVFS_perror("PVFS_sys_read failure", ret);
 	return (-1);
     }
     printf("IO-TEST: read %d bytes.\n", (int) resp_io.total_completed);

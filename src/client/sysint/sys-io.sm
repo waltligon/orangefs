@@ -331,14 +331,25 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
     attr = (sm_p->acache_hit ?
             &sm_p->pinode->attr :
             &sm_p->acache_attr);
-
     assert(attr);
-    assert(attr->objtype == PVFS_TYPE_METAFILE);
-    assert(attr->mask & PVFS_ATTR_META_DFILES);
-    assert(attr->mask & PVFS_ATTR_META_DIST);
-    assert(attr->u.meta.dist_size > 0);
-    assert(attr->u.meta.dfile_array);
-    assert(attr->u.meta.dfile_count > 0);
+
+    switch(attr->objtype)
+    {
+        case PVFS_TYPE_METAFILE:
+            assert(attr->objtype == PVFS_TYPE_METAFILE);
+            assert(attr->mask & PVFS_ATTR_META_DFILES);
+            assert(attr->mask & PVFS_ATTR_META_DIST);
+            assert(attr->u.meta.dist_size > 0);
+            assert(attr->u.meta.dfile_array);
+            assert(attr->u.meta.dfile_count > 0);
+            break;
+        case PVFS_TYPE_DIRECTORY:
+            js_p->error_code = -PVFS_EISDIR;
+            return 1;
+        default:
+            js_p->error_code = -PVFS_EIO;
+            return 1;
+    }
 
     /*
       assign internal io ptrs for convenience here (without copying)

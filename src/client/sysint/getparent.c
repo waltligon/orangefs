@@ -33,7 +33,6 @@ int PVFS_sys_getparent(
         {
             gossip_err("Invalid dirname (no leading '/')\n");
         }
-        gossip_err("cannot get parent directory of %s\n",entry_name);
         return ret;
     }
 
