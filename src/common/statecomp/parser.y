@@ -53,6 +53,7 @@ void yyerror(char *);
 %token <i> RUN
 %token <i> JUMP
 %token <i> STATE_RETURN
+%token <i> STATE_TERMINATE
 %token <i> SUCCESS
 %token <c> DEFAULT
 %token <i> LBRACE
@@ -71,7 +72,7 @@ void yyerror(char *);
 
 %type <s> state_decl_list .state_decl_list. state_decl
 	  state_def state_def_list .state_def_list.
-	  transition transition_list state_machine target
+	  transition transition_list state_machine target 
 
 %start state_machine
 
@@ -178,6 +179,9 @@ target		  : identifier
 		  | STATE_RETURN
 		     {$$ = NULL;
 		      gen_next_state(SM_RETURN, NULL);}
+		  | STATE_TERMINATE
+		     {$$ = NULL;
+		      gen_next_state(SM_TERMINATE, NULL);}
 		  ;
 
 return_code	  : SUCCESS {$$ = "0";}

@@ -91,7 +91,7 @@ machine pvfs2_set_attr_sm(prelude,
 	state cleanup
 	{
 		run setattr_cleanup;
-		default => prelude;
+		default => terminate;
 	}
 }
 

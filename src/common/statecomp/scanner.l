@@ -72,6 +72,7 @@ w           [ \t\n]*
 <CODE>"jump"	   {LIST; RETURNVAL(JUMP);}
 <CODE>"success"	   {LIST; RETURNVAL(SUCCESS);}
 <CODE>"default"	   {LIST; RETURNVAL(DEFAULT);}
+<CODE>"terminate"  {LIST; RETURNVAL(STATE_TERMINATE);}
 <CODE>"\{"	   {LIST; RETURNVAL(LBRACE);}
 <CODE>"\}"	   {LIST; RETURNVAL(RBRACE);}
 <CODE>"\("	   {LIST; RETURNVAL(LPAREN);}

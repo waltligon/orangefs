@@ -64,7 +64,7 @@ machine pvfs2_mkdir_sm(prelude,
 	state cleanup
 	{
 		run mkdir_cleanup;
-		default => prelude;
+		default => terminate;
 	}
 }
 

@@ -19,6 +19,7 @@
 #define SM_EXTERN 3
 #define SM_NESTED 5
 #define SM_JUMP   6
+#define SM_TERMINATE 7
 
 /*
  * Local variables:

@@ -89,7 +89,7 @@ machine pvfs2_client_setattr_sm(init,
 
     state cleanup {
         run setattr_cleanup;
-        default => init;
+        default => terminate;
     }
 }
 

@@ -107,7 +107,7 @@ machine pvfs2_lookup_sm(prelude,
     state cleanup
     {
         run lookup_cleanup;
-        default => prelude;
+        default => terminate;
     }
 }
 

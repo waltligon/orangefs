@@ -61,7 +61,7 @@ machine pvfs2_client_mgmt_get_dfile_array_sm(getattr_setup_msgpair,
     state cleanup
     {
 	run mgmt_get_dfile_array_cleanup;
-	default => getattr_setup_msgpair;
+	default => terminate;
     }
 }
 

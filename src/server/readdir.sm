@@ -77,7 +77,7 @@ machine pvfs2_readdir_sm(prelude,
     state cleanup
     {
 	run readdir_cleanup;
-	default => prelude;
+	default => terminate;
     }
 }
 

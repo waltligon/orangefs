@@ -89,7 +89,7 @@ machine pvfs2_client_readdir_sm(init,
 
     state cleanup {
         run readdir_cleanup;
-        default => init;
+        default => terminate;
     }
 }
 

@@ -103,7 +103,7 @@ machine pvfs2_crdirent_sm(prelude,
 	state cleanup
 	{
 		run crdirent_cleanup;
-		default => prelude;
+		default => terminate;
 	}
 }
 

@@ -109,7 +109,7 @@ machine pvfs2_client_truncate_sm(check_parameters,
 
     state cleanup {
 	run truncate_cleanup;
-	default => check_parameters;
+	default => terminate;
     }
 }
 

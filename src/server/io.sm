@@ -76,7 +76,7 @@ machine pvfs2_io_sm(prelude, send_positive_ack, send_negative_ack,
 	state cleanup
 	{
 		run io_cleanup;
-		default => prelude;
+		default => terminate;
 	}
 }
 

@@ -154,7 +154,7 @@ machine pvfs2_client_rename_sm(init,
 
     state cleanup {
         run rename_cleanup;
-        default => init;
+        default => terminate;
     }
 }
 

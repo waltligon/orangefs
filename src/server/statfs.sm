@@ -42,7 +42,7 @@ machine pvfs2_statfs_sm(prelude, do_statfs, final_response, cleanup)
 	state cleanup
 	{
 		run statfs_cleanup;
-		default => prelude;
+		default => terminate;
 	}
 }
 

@@ -116,7 +116,7 @@ machine pvfs2_client_mkdir_sm(init,
 
     state cleanup {
         run mkdir_cleanup;
-        default => init;
+        default => terminate;
     }
 }
 

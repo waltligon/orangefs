@@ -33,7 +33,7 @@ machine pvfs2_noop_sm(prelude, final_response, cleanup)
 	state cleanup
 	{
 		run noop_cleanup;
-		default => prelude;
+		default => terminate;
 	}
 }
 

@@ -52,7 +52,7 @@ machine pvfs2_client_mgmt_setparam_list_sm(
 
     state cleanup {
 	run mgmt_setparam_list_cleanup;
-	default => setup_msgpair;
+	default => terminate;
     }
 }
 

@@ -190,7 +190,7 @@ machine pvfs2_client_lookup_sm(
     state lookup_cleanup
     {
         run lookup_cleanup;
-        default => lookup_init;
+        default => terminate;
     }
 }
 

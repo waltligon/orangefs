@@ -49,7 +49,7 @@ machine pvfs2_create_sm(prelude, create2, setup_resp, final_response, cleanup)
     state cleanup
     {
         run create_cleanup;
-        default => prelude;
+        default => terminate;
     }
 }
 

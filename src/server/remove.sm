@@ -129,7 +129,7 @@ machine pvfs2_remove_sm(prelude,
 	state cleanup
 	{
             run remove_cleanup;
-            default => prelude;
+            default => terminate;
 	}
 }
 

@@ -78,6 +78,7 @@ static inline int PINT_state_machine_next(struct PINT_OP_STATE *s,
 					  job_status_s *r)
 {
 
+
     int code_val = r->error_code;       /* temp to hold the return code */
     int retval;            /* temp to hold return value of state action */
     union PINT_state_array_values *loc; /* temp pointer into state memory */
@@ -105,6 +106,15 @@ static inline int PINT_state_machine_next(struct PINT_OP_STATE *s,
 	 */
 	loc += 1;
 
+	/* its not legal to actually reach a termination point; preceding
+	 * function should have completed state machine.
+	 */
+	if(loc->flag == SM_TERMINATE)
+	{
+	    gossip_err("Error: state machine using an invalid termination path.\n");
+	    return(-PVFS_EINVAL);
+	}
+
 	/* Update the server_op struct to reflect the new location
 	 * see if the selected return value is a STATE_RETURN */
 	if (loc->flag == SM_RETURN)
@@ -115,6 +125,7 @@ static inline int PINT_state_machine_next(struct PINT_OP_STATE *s,
     } while (loc->flag == SM_RETURN);
 
     s->current_state = loc->next_state;
+
 
     /* To do nested states, we check to see if the next state is
      * a nested state machine, and if so we push the return state
@@ -172,6 +183,7 @@ static union PINT_state_array_values *PINT_state_machine_locate(struct PINT_OP_S
 	    current_tmp += 1;
 	    current_tmp = ((struct PINT_state_machine_s *)current_tmp->nested_machine)->state_machine;
 	}
+
 	/* this returns a pointer to a "PINT_state_array_values"
 	 * structure, whose state_action member is the function to call.
 	 */

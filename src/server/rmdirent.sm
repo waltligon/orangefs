@@ -89,7 +89,7 @@ machine pvfs2_rmdirent_sm(prelude,
 	state cleanup
 	{
 	    run rmdirent_cleanup;
-	    default => prelude;
+	    default => terminate;
 	}
 }
 

@@ -28,6 +28,8 @@ void gen_init(void);
 void yywrap(void);
 void yyerror(char *s);
 
+int terminate_path_flag = 0;
+
 /*
  * Global Variables
  */
@@ -152,6 +154,10 @@ static void parse_args(int argc, char **argv)
 
 static void finalize(void)
 {
+    if(!terminate_path_flag)
+    {
+	fprintf(stderr, "warning: state machine contains no explicit exit path (terminate or return transition).\n");
+    }
     fclose(out_file);
     if (list_flag)
     {

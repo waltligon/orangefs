@@ -42,7 +42,7 @@ machine pvfs2_perf_mon_sm(prelude, do_work, final_response, cleanup)
 	state cleanup
 	{
 		run perf_mon_cleanup;
-		default => prelude;
+		default => terminate;
 	}
 }
 

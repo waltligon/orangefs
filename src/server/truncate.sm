@@ -60,7 +60,7 @@ machine pvfs2_truncate_sm(prelude,
     state cleanup
     {
 	run truncate_cleanup;
-	default => prelude;
+	default => terminate;
     }
 }
 

@@ -99,7 +99,7 @@ machine pvfs2_client_io_sm(object_getattr_setup_msgpair,
 
     state analyze_results {
 	run io_analyze_results;
-	default => analyze_results;
+	default => terminate;
     }
 }
 

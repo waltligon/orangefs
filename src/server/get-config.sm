@@ -43,7 +43,7 @@ machine pvfs2_get_config_sm(prelude, init, final_response, cleanup)
 	state cleanup
 	{
 		run getconfig_cleanup;
-		default => prelude;
+		default => terminate;
 	}
 }
 

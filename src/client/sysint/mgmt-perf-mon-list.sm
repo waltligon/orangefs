@@ -49,7 +49,7 @@ machine pvfs2_client_mgmt_perf_mon_list_sm(
 
     state cleanup {
 	run mgmt_perf_mon_list_cleanup;
-	default => setup_msgpair;
+	default => terminate;
     }
 }
 

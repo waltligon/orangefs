@@ -48,7 +48,7 @@ machine pvfs2_client_mgmt_noop_sm(
 
     state cleanup {
 	run mgmt_noop_cleanup;
-	default => setup_msgpair;
+	default => terminate;
     }
 }
 

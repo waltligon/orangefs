@@ -170,7 +170,7 @@ machine pvfs2_client_create_sm(init,
 
     state cleanup {
         run create_cleanup;
-        default => init;
+        default => terminate;
     }
 }
 

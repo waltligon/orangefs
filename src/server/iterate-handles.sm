@@ -47,7 +47,7 @@ machine pvfs2_iterate_handles_sm(prelude, do_work, fill_resp, final_response, cl
 	state cleanup
 	{
 		run iterate_handles_cleanup;
-		default => prelude;
+		default => terminate;
 	}
 }
 

@@ -72,7 +72,7 @@ machine pvfs2_flush_sm(prelude, kflush, kflush_check_error, bflush,
     state cleanup
     {
 	run flush_cleanup;
-	default => prelude;
+	default => terminate;
     }
 }
 

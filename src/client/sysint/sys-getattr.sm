@@ -124,7 +124,7 @@ machine pvfs2_client_getattr_sm(check_parameters,
 
     state cleanup {
 	run getattr_cleanup;
-	default => check_parameters;
+	default => terminate;
     }
 }
 

@@ -48,7 +48,7 @@ machine pvfs2_client_mgmt_iterate_handles_list_sm(
     state cleanup
     {
 	run mgmt_iterate_handles_list_cleanup;
-	default => setup_msgpair;
+	default => terminate;
     }
 }
 

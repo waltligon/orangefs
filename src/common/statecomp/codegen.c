@@ -10,6 +10,7 @@
 #include "state-machine-values.h"
 
 extern FILE *out_file;
+extern int terminate_path_flag;
 
 void gen_init(void)
 {
@@ -88,6 +89,13 @@ void gen_next_state(int flag, char *new_state)
 		    new_state);
 	    break;
 	case SM_RETURN:
+	    terminate_path_flag = 1;
+	    fprintf(out_file,
+		    ",\n(union PINT_state_array_values) %d",
+		    flag);
+	    break;
+	case SM_TERMINATE:
+	    terminate_path_flag = 1;
 	    fprintf(out_file,
 		    ",\n(union PINT_state_array_values) %d",
 		    flag);

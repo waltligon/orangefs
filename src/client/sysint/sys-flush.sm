@@ -113,7 +113,7 @@ machine pvfs2_client_flush_sm(check_parameters,
     
     state cleanup {
 	run flush_cleanup;
-	default => check_parameters;
+	default => terminate;
     }
 }
 

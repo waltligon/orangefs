@@ -44,7 +44,7 @@ machine pvfs2_setparam_sm(prelude, work, final_response, cleanup)
 	state cleanup
 	{
 		run setparam_cleanup;
-		default => prelude;
+		default => terminate;
 	}
 }
 

@@ -219,7 +219,7 @@ machine pvfs2_client_remove_sm(init,
 
     state cleanup {
 	run remove_cleanup;
-	default => init;
+	default => terminate;
     }
 }
 

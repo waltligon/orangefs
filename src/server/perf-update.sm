@@ -32,7 +32,7 @@ machine pvfs2_perf_update_sm(do_work, error)
 	state error 
 	{
 		run perf_update_error;
-		default => do_work;
+		default => terminate;
 	}
 }
 
