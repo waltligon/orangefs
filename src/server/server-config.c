@@ -817,7 +817,7 @@ static int cache_config_files(int argc, char **argv)
     if (stat(fs_config_filename,&statbuf) == 0)
     {
         config_s->fs_config_filename = strdup(fs_config_filename);
-        config_s->fs_config_buflen = statbuf.st_size;
+        config_s->fs_config_buflen = statbuf.st_size + 1;
     }
     else
     {
@@ -827,7 +827,7 @@ static int cache_config_files(int argc, char **argv)
         if (stat(buf,&statbuf) == 0)
         {
             config_s->fs_config_filename = strdup(buf);
-            config_s->fs_config_buflen = statbuf.st_size;
+            config_s->fs_config_buflen = statbuf.st_size + 1;
         }
     }
 
@@ -842,7 +842,7 @@ static int cache_config_files(int argc, char **argv)
     if (stat(server_config_filename,&statbuf) == 0)
     {
         config_s->server_config_filename = strdup(server_config_filename);
-        config_s->server_config_buflen = statbuf.st_size;
+        config_s->server_config_buflen = statbuf.st_size + 1;
     }
     else
     {
@@ -852,7 +852,7 @@ static int cache_config_files(int argc, char **argv)
         if (stat(buf,&statbuf) == 0)
         {
             config_s->server_config_filename = strdup(buf);
-            config_s->server_config_buflen = statbuf.st_size;
+            config_s->server_config_buflen = statbuf.st_size + 1;
         }
     }
 
@@ -878,8 +878,9 @@ static int cache_config_files(int argc, char **argv)
         return 1;
     }
 
+    memset(config_s->fs_config_buf,0,config_s->fs_config_buflen);
     nread = read(fd,config_s->fs_config_buf,config_s->fs_config_buflen);
-    if (nread != config_s->fs_config_buflen)
+    if (nread != (config_s->fs_config_buflen - 1))
     {
         gossip_err("Failed to read fs config file %s (nread is %d)\n",
                    fs_config_filename,nread);
@@ -904,9 +905,10 @@ static int cache_config_files(int argc, char **argv)
         return 1;
     }
 
+    memset(config_s->server_config_buf,0,config_s->server_config_buflen);
     nread = read(fd,config_s->server_config_buf,
                  config_s->server_config_buflen);
-    if (nread != config_s->server_config_buflen)
+    if (nread != (config_s->server_config_buflen - 1))
     {
         gossip_err("Failed to read server config file %s (nread is %d)\n",
                    server_config_filename,nread);
