@@ -261,7 +261,7 @@ static int root_check_comp_fn(void* v_p, struct PVFS_server_resp * resp_p,
      * the responses, and return success if one response has a zero status 
      * and all other responses have -PVFS_ENOENT.
      */
-    for(j=0; j<i; j++)
+    for(j=0; j<=i; j++)
     {
 	if(sm_p->msgarray[j].op_status == 0)
 	{
