@@ -116,6 +116,9 @@ enum
 #define BMI_ENOMEDIUM       (PVFS_ENOMEDIUM | PVFS_ERROR_BMI)
 #define BMI_EMEDIUMTYPE     (PVFS_EMEDIUMTYPE | PVFS_ERROR_BMI)
 
+/* default bmi error translation function */
+int bmi_errno_to_pvfs(int error);
+
 #endif /* __BMI_TYPES_H */
 
 /*

@@ -71,11 +71,6 @@ static struct bmi_method_ops *bmi_static_methods[] = {
  * use, listen_addr is a comma separated list of addresses to listen on
  * for each method (if needed), and flags are initialization flags.
  *
- * NOTE: if method_list is NULL, then all compiled in modules will be
- * initialized
- * TODO: eventually update this so that modules can be initialized on the
- * fly as needed
- *
  * returns 0 on success, -errno on failure
  */
 int BMI_initialize(const char *method_list,
@@ -88,31 +83,18 @@ int BMI_initialize(const char *method_list,
     method_addr_p new_addr = NULL;
     struct bmi_method_ops **tmp_method_ops = NULL;
 
-    if ((flags & BMI_INIT_SERVER) && ((!listen_addr) || (!method_list)))
+    if (((flags & BMI_INIT_SERVER) && (!listen_addr)) || !method_list)
     {
-	return (-EINVAL);
+	return (bmi_errno_to_pvfs(-EINVAL));
     }
 
-    if(method_list)
+    /* separate out the method list */
+    active_method_count = split_string_list(&requested_methods, method_list);
+    if (active_method_count < 1)
     {
-	/* separate out the method list */
-	active_method_count = split_string_list(&requested_methods, method_list);
-	if (active_method_count < 1)
-	{
-	    gossip_lerr("Error: bad method list.\n");
-	    ret = -EINVAL;
-	    goto bmi_initialize_failure;
-	}
-    }
-    else
-    {
-	active_method_count = 0;
-	tmp_method_ops = bmi_static_methods;
-	while ((*tmp_method_ops) != NULL)
-	{
-	    tmp_method_ops++;
-	    active_method_count++;
-	}
+	gossip_lerr("Error: bad method list.\n");
+	ret = bmi_errno_to_pvfs(-EINVAL);
+	goto bmi_initialize_failure;
     }
 
     /* create a table to keep up with the active methods */
@@ -121,52 +103,40 @@ int BMI_initialize(const char *method_list,
 					  sizeof(struct bmi_method_ops *));
     if (!active_method_table)
     {
-	ret = -ENOMEM;
+	ret = bmi_errno_to_pvfs(-ENOMEM);
 	goto bmi_initialize_failure;
     }
     memset(active_method_table, 0, active_method_count * sizeof(struct
 								bmi_method_ops
 								*));
-    
+
     /* find the interface for each requested method and load it into the
      * active table
      */
-    if(method_list)
-    {
-	for (i = 0; i < active_method_count; i++)
-	{
-	    tmp_method_ops = bmi_static_methods;
-	    while ((*tmp_method_ops) != NULL &&
-		   strcmp((*tmp_method_ops)->method_name,
-			  requested_methods[i]) != 0)
-	    {
-		tmp_method_ops++;
-	    }
-	    if ((*tmp_method_ops) == NULL)
-	    {
-		gossip_lerr("Error: no method available for %s.\n",
-			    requested_methods[i]);
-		ret = -ENOPROTOOPT;
-		goto bmi_initialize_failure;
-	    }
-	    active_method_table[i] = (*tmp_method_ops);
-	}
-    }
-    else
+    for (i = 0; i < active_method_count; i++)
     {
 	tmp_method_ops = bmi_static_methods;
-	for(i=0; i<active_method_count; i++)
+	while ((*tmp_method_ops) != NULL &&
+	       strcmp((*tmp_method_ops)->method_name,
+		      requested_methods[i]) != 0)
 	{
-	    active_method_table[i] = (*tmp_method_ops);
 	    tmp_method_ops++;
 	}
+	if ((*tmp_method_ops) == NULL)
+	{
+	    gossip_lerr("Error: no method available for %s.\n",
+			requested_methods[i]);
+	    ret = bmi_errno_to_pvfs(-ENOPROTOOPT);
+	    goto bmi_initialize_failure;
+	}
+	active_method_table[i] = (*tmp_method_ops);
     }
 
     /* make a new reference list */
     cur_ref_list = ref_list_new();
     if (!cur_ref_list)
     {
-	ret = -ENOMEM;
+	ret = bmi_errno_to_pvfs(-ENOMEM);
 	goto bmi_initialize_failure;
     }
 
@@ -290,7 +260,7 @@ int BMI_initialize(const char *module_string,
 
     if (((flags & BMI_INIT_SERVER) && (!listen_addr)) || !module_string)
     {
-	return (-EINVAL);
+	return (bmi_errno_to_pvfs(-EINVAL));
     }
 
     /* separate out the module list */
@@ -298,7 +268,7 @@ int BMI_initialize(const char *module_string,
     if (active_method_count < 1)
     {
 	gossip_lerr("Error: bad module list.\n");
-	ret = -EINVAL;
+	ret = bmi_errno_to_pvfs(-EINVAL);
 	goto bmi_initialize_failure;
     }
 
@@ -308,7 +278,7 @@ int BMI_initialize(const char *module_string,
 					  sizeof(struct bmi_method_ops *));
     if (!active_method_table)
     {
-	ret = -ENOMEM;
+	ret = bmi_errno_to_pvfs(-ENOMEM);
 	goto bmi_initialize_failure;
     }
 
@@ -319,7 +289,7 @@ int BMI_initialize(const char *module_string,
 	if (!meth_mod)
 	{
 	    gossip_lerr("Error: could not open module: %s\n", dlerror());
-	    ret = -EINVAL;
+	    ret = bmi_errno_to_pvfs(-EINVAL);
 	    goto bmi_initialize_failure;
 	}
 	dlerror();
@@ -330,7 +300,7 @@ int BMI_initialize(const char *module_string,
 	if (mod_error)
 	{
 	    gossip_lerr("Error: module load: %s\n", mod_error);
-	    ret = -EINVAL;
+	    ret = bmi_errno_to_pvfs(-EINVAL);
 	    goto bmi_initialize_failure;
 	}
     }
@@ -339,7 +309,7 @@ int BMI_initialize(const char *module_string,
     cur_ref_list = ref_list_new();
     if (!cur_ref_list)
     {
-	ret = -ENOMEM;
+	ret = bmi_errno_to_pvfs(-ENOMEM);
 	goto bmi_initialize_failure;
     }
 
@@ -468,7 +438,7 @@ int BMI_open_context(bmi_context_id* context_id)
     {
 	/* we don't have any more available! */
 	gen_mutex_unlock(&context_mutex);
-	return(-EBUSY);
+	return(bmi_errno_to_pvfs(-EBUSY));
     }
 
     /* tell all of the modules about the new context */
@@ -556,7 +526,7 @@ int BMI_post_recv(bmi_op_id_t * id,
     if (!tmp_ref)
     {
 	gen_mutex_unlock(&ref_mutex);
-	return (-EPROTO);
+	return (bmi_errno_to_pvfs(-EPROTO));
     }
     gen_mutex_unlock(&ref_mutex);
 
@@ -598,7 +568,7 @@ int BMI_post_send(bmi_op_id_t * id,
     if (!tmp_ref)
     {
 	gen_mutex_unlock(&ref_mutex);
-	return (-EPROTO);
+	return (bmi_errno_to_pvfs(-EPROTO));
     }
     gen_mutex_unlock(&ref_mutex);
 
@@ -639,7 +609,7 @@ int BMI_post_sendunexpected(bmi_op_id_t * id,
     if (!tmp_ref)
     {
 	gen_mutex_unlock(&ref_mutex);
-	return (-EPROTO);
+	return (bmi_errno_to_pvfs(-EPROTO));
     }
     gen_mutex_unlock(&ref_mutex);
 
@@ -671,7 +641,7 @@ int BMI_test(bmi_op_id_t id,
     int ret = -1;
 
     if (max_idle_time_ms < 0)
-	return (-EINVAL);
+	return (bmi_errno_to_pvfs(-EINVAL));
 
     *outcount = 0;
 
@@ -715,7 +685,7 @@ int BMI_testsome(int incount,
     int ret = -1;
 
     if (max_idle_time_ms < 0)
-	return (-EINVAL);
+	return (bmi_errno_to_pvfs(-EINVAL));
 
     *outcount = 0;
 
@@ -760,7 +730,7 @@ int BMI_testsome(int incount,
     int tmp_outcount;
 
     if (max_idle_time_ms < 0)
-	return (-EINVAL);
+	return (bmi_errno_to_pvfs(-EINVAL));
 
     *outcount = 0;
 
@@ -774,7 +744,7 @@ int BMI_testsome(int incount,
 
     tmp_id_array = (bmi_op_id_t*)malloc(incount*sizeof(bmi_op_id_t));
     if(!tmp_id_array)
-	return(-ENOMEM);
+	return(bmi_errno_to_pvfs(-ENOMEM));
 
     /* iterate over each active method */
     for(i=0; i<active_method_count; i++)
@@ -861,7 +831,7 @@ int BMI_testunexpected(int incount,
     int idle_per_method = 0;
 
     if (max_idle_time_ms < 0)
-	return (-EINVAL);
+	return (bmi_errno_to_pvfs(-EINVAL));
 
     *outcount = 0;
 
@@ -903,7 +873,7 @@ int BMI_testunexpected(int incount,
 	    /* yeah, right */
 	    gossip_lerr("Error: critical BMI_testunexpected failure.\n");
 	    gen_mutex_unlock(&ref_mutex);
-	    return (-EPROTO);
+	    return (bmi_errno_to_pvfs(-EPROTO));
 	}
 	gen_mutex_unlock(&ref_mutex);
 	info_array[i].addr = tmp_ref->bmi_addr;
@@ -939,7 +909,7 @@ int BMI_testcontext(int incount,
     int idle_per_method = 0;
 
     if (max_idle_time_ms < 0)
-	return (-EINVAL);
+	return (bmi_errno_to_pvfs(-EINVAL));
 
     *outcount = 0;
 
@@ -1082,7 +1052,7 @@ int BMI_memfree(PVFS_BMI_addr_t addr,
     if (!tmp_ref)
     {
 	gen_mutex_unlock(&ref_mutex);
-	return (-EINVAL);
+	return (bmi_errno_to_pvfs(-EINVAL));
     }
     gen_mutex_unlock(&ref_mutex);
 
@@ -1113,7 +1083,7 @@ int BMI_set_info(PVFS_BMI_addr_t addr,
     {
 	if (!active_method_table)
 	{
-	    return (-EINVAL);
+	    return (bmi_errno_to_pvfs(-EINVAL));
 	}
 	for (i = 0; i < active_method_count; i++)
 	{
@@ -1136,7 +1106,7 @@ int BMI_set_info(PVFS_BMI_addr_t addr,
     if (!tmp_ref)
     {
 	gen_mutex_unlock(&ref_mutex);
-	return (-EINVAL);
+	return (bmi_errno_to_pvfs(-EINVAL));
     }
     gen_mutex_unlock(&ref_mutex);
 
@@ -1171,7 +1141,7 @@ int BMI_get_info(PVFS_BMI_addr_t addr,
 	}
 	else
 	{
-	    return (-ENETDOWN);
+	    return (bmi_errno_to_pvfs(-ENETDOWN));
 	}
 	break;
     case BMI_CHECK_MAXSIZE:
@@ -1201,13 +1171,13 @@ int BMI_get_info(PVFS_BMI_addr_t addr,
 	if(!tmp_ref)
 	{
 	    gen_mutex_unlock(&ref_mutex);
-	    return (-EINVAL);
+	    return (bmi_errno_to_pvfs(-EINVAL));
 	}
 	gen_mutex_unlock(&ref_mutex);
 	*((void**) inout_parameter) = tmp_ref->method_addr;
 	break;
     default:
-	return (-ENOSYS);
+	return (bmi_errno_to_pvfs(-ENOSYS));
 	break;
     }
     return (0);
@@ -1253,7 +1223,7 @@ int BMI_addr_lookup(PVFS_BMI_addr_t * new_addr,
 
     if((strlen(id_string)+1) > BMI_MAX_ADDR_LEN)
     {
-	return(-ENAMETOOLONG);
+	return(bmi_errno_to_pvfs(-ENAMETOOLONG));
     }
 
     /* set the addr to zero in case we fail */
@@ -1289,14 +1259,14 @@ int BMI_addr_lookup(PVFS_BMI_addr_t * new_addr,
     {
 	gossip_err("Error: could not resolve id_string!\n");
 	gossip_lerr("Error: no BMI methods could resolve: %s\n", id_string);
-	return (-ENOPROTOOPT);
+	return (bmi_errno_to_pvfs(-ENOPROTOOPT));
     }
 
     /* create a new reference for the addr */
     new_ref = alloc_ref_st();
     if (!new_ref)
     {
-	ret = -ENOMEM;
+	ret = bmi_errno_to_pvfs(-ENOMEM);
 	goto bmi_addr_lookup_failure;
     }
 
@@ -1380,7 +1350,7 @@ int BMI_post_send_list(bmi_op_id_t * id,
     if (!tmp_ref)
     {
 	gen_mutex_unlock(&ref_mutex);
-	return (-EPROTO);
+	return (bmi_errno_to_pvfs(-EPROTO));
     }
     gen_mutex_unlock(&ref_mutex);
 
@@ -1400,7 +1370,7 @@ int BMI_post_send_list(bmi_op_id_t * id,
     gossip_lerr("Error: method doesn't implement send_list.\n");
     gossip_lerr("Error: send_list emulation not yet available.\n");
 
-    return (-ENOSYS);
+    return (bmi_errno_to_pvfs(-ENOSYS));
 }
 
 
@@ -1451,7 +1421,7 @@ int BMI_post_recv_list(bmi_op_id_t * id,
     if (!tmp_ref)
     {
 	gen_mutex_unlock(&ref_mutex);
-	return (-EPROTO);
+	return (bmi_errno_to_pvfs(-EPROTO));
     }
     gen_mutex_unlock(&ref_mutex);
 
@@ -1472,7 +1442,7 @@ int BMI_post_recv_list(bmi_op_id_t * id,
     gossip_lerr("Error: method doesn't implement recv_list.\n");
     gossip_lerr("Error: recv_list emulation not yet available.\n");
 
-    return (-ENOSYS);
+    return (bmi_errno_to_pvfs(-ENOSYS));
 }
 
 
@@ -1521,7 +1491,7 @@ int BMI_post_sendunexpected_list(bmi_op_id_t * id,
     if (!tmp_ref)
     {
 	gen_mutex_unlock(&ref_mutex);
-	return (-EPROTO);
+	return (bmi_errno_to_pvfs(-EPROTO));
     }
     gen_mutex_unlock(&ref_mutex);
 
@@ -1544,7 +1514,7 @@ int BMI_post_sendunexpected_list(bmi_op_id_t * id,
     gossip_lerr("Error: method doesn't implement sendunexpected_list.\n");
     gossip_lerr("Error: send_list emulation not yet available.\n");
 
-    return (-ENOSYS);
+    return (bmi_errno_to_pvfs(-ENOSYS));
 }
 
 
@@ -1576,7 +1546,7 @@ int BMI_cancel(bmi_op_id_t id,
     else
     {
 	gossip_err("Error: BMI_cancel() unimplemented for this module.\n");
-	ret = -ENOSYS;
+	ret = bmi_errno_to_pvfs(-ENOSYS);
     }
 
     return (ret);
@@ -1605,7 +1575,7 @@ int bmi_method_addr_reg_callback(method_addr_p map)
     new_ref = alloc_ref_st();
     if (!new_ref)
     {
-	return (-ENOMEM);
+	return (bmi_errno_to_pvfs(-ENOMEM));
     }
 
     /* fill in the details */
@@ -1703,6 +1673,76 @@ static int split_string_list(char ***tokens,
     }
     return (0);
 }
+
+int bmi_errno_to_pvfs(int error)
+{
+    int bmi_errno = error;
+
+#define __CASE(err) case -err: bmi_errno = BMI_##err; break
+
+    switch(error)
+    {
+        __CASE(EPERM);
+        __CASE(ENOENT);
+        __CASE(EINTR);
+        __CASE(EIO);
+        __CASE(ENXIO);
+        __CASE(EBADF);
+        __CASE(EAGAIN);
+        __CASE(ENOMEM);
+        __CASE(EFAULT);
+        __CASE(EBUSY);
+        __CASE(EEXIST);
+        __CASE(ENODEV);
+        __CASE(ENOTDIR);
+        __CASE(EISDIR);
+        __CASE(EINVAL);
+        __CASE(EMFILE);
+        __CASE(EFBIG);
+        __CASE(ENOSPC);
+        __CASE(EROFS);
+        __CASE(EMLINK);
+        __CASE(EPIPE);
+        __CASE(EDEADLK);
+        __CASE(ENAMETOOLONG);
+        __CASE(ENOLCK);
+        __CASE(ENOSYS);
+        __CASE(ENOTEMPTY);
+        __CASE(ELOOP);
+        __CASE(ENOMSG);
+        __CASE(EUNATCH);
+        __CASE(EBADR);
+        __CASE(ENODATA);
+        __CASE(ETIME);
+        __CASE(ENONET);
+        __CASE(EREMOTE);
+        __CASE(ECOMM);
+        __CASE(EPROTO);
+        __CASE(EBADMSG);
+        __CASE(EOVERFLOW);
+        __CASE(ERESTART);
+        __CASE(EMSGSIZE);
+        __CASE(EPROTOTYPE);
+        __CASE(ENOPROTOOPT);
+        __CASE(EPROTONOSUPPORT);
+        __CASE(EOPNOTSUPP);
+        __CASE(EADDRINUSE);
+        __CASE(EADDRNOTAVAIL);
+        __CASE(ENETDOWN);
+        __CASE(ENETUNREACH);
+        __CASE(ENETRESET);
+        __CASE(ENOBUFS);
+        __CASE(ETIMEDOUT);
+        __CASE(ECONNREFUSED);
+        __CASE(EHOSTDOWN);
+        __CASE(EHOSTUNREACH);
+        __CASE(EALREADY);
+    }
+    return bmi_errno;
+
+#undef __CASE
+}
+
 
 /*
  * Local variables:

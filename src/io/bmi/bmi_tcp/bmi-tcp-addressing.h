@@ -52,6 +52,8 @@ struct tcp_addr
  * function prototypes
  */
 
+#define bmi_tcp_errno_to_pvfs bmi_errno_to_pvfs
+
 void tcp_forget_addr(method_addr_p map,
 		     int dealloc_flag,
 		     int error_code);

@@ -104,7 +104,6 @@ do { \
 #define CLR_NONBLOCK(x_fd) fcntl((x_fd), F_SETFL, fcntl((x_fd), F_GETFL, 0) & \
    (~O_NONBLOCK))
 
-
 #endif
 
 /*

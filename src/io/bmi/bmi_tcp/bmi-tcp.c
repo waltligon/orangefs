@@ -355,7 +355,7 @@ int BMI_tcp_initialize(method_addr_p listen_addr,
 {
 
     int ret = -1;
-    int tmp_errno = -ENOSYS;
+    int tmp_errno = bmi_tcp_errno_to_pvfs(-ENOSYS);
     struct tcp_addr *tcp_addr_data = NULL;
     int i = 0;
 
@@ -365,7 +365,7 @@ int BMI_tcp_initialize(method_addr_p listen_addr,
     if ((init_flags & BMI_INIT_SERVER) && !listen_addr)
     {
 	gossip_lerr("Error: bad parameters given to TCP/IP module.\n");
-	return (-EINVAL);
+	return (bmi_tcp_errno_to_pvfs(-EINVAL));
     }
 
     gen_mutex_lock(&interface_mutex);
@@ -387,7 +387,7 @@ int BMI_tcp_initialize(method_addr_p listen_addr,
 	ret = tcp_server_init();
 	if (ret < 0)
 	{
-	    tmp_errno = ret;
+	    tmp_errno = bmi_tcp_errno_to_pvfs(ret);
 	    gossip_err("Error: tcp_server_init() failure.\n");
 	    goto initialize_failure;
 	}
@@ -399,7 +399,7 @@ int BMI_tcp_initialize(method_addr_p listen_addr,
 	op_list_array[i] = op_list_new();
 	if (!op_list_array[i])
 	{
-	    tmp_errno = -ENOMEM;
+	    tmp_errno = bmi_tcp_errno_to_pvfs(-ENOMEM);
 	    goto initialize_failure;
 	}
     }
@@ -417,7 +417,7 @@ int BMI_tcp_initialize(method_addr_p listen_addr,
 
     if (!tcp_socket_collection_p)
     {
-	tmp_errno = -ENOMEM;
+	tmp_errno = bmi_tcp_errno_to_pvfs(-ENOMEM);
 	goto initialize_failure;
     }
 
@@ -625,7 +625,7 @@ int BMI_tcp_set_info(int option,
     case BMI_DROP_ADDR:
 	if (inout_parameter == NULL)
 	{
-	    ret = -EINVAL;
+	    ret = bmi_tcp_errno_to_pvfs(-EINVAL);
 	}
 	else
 	{
@@ -674,7 +674,7 @@ int BMI_tcp_get_info(int option,
     }
 
     gen_mutex_unlock(&interface_mutex);
-    return (-ENOSYS);
+    return (bmi_tcp_errno_to_pvfs(-ENOSYS));
 }
 
 
@@ -703,7 +703,7 @@ int BMI_tcp_post_send(bmi_op_id_t * id,
     /* fill in the TCP-specific message header */
     if (size > TCP_MODE_REND_LIMIT)
     {
-	return (-EMSGSIZE);
+	return (bmi_tcp_errno_to_pvfs(-EMSGSIZE));
     }
 
     if (size <= TCP_MODE_EAGER_LIMIT)
@@ -757,7 +757,7 @@ int BMI_tcp_post_sendunexpected(bmi_op_id_t * id,
 
     if (size > TCP_MODE_EAGER_LIMIT)
     {
-	return (-EMSGSIZE);
+	return (bmi_tcp_errno_to_pvfs(-EMSGSIZE));
     }
 
     my_header.mode = TCP_MODE_UNEXP;
@@ -813,7 +813,7 @@ int BMI_tcp_post_recv(bmi_op_id_t * id,
 
     if (expected_size > TCP_MODE_REND_LIMIT)
     {
-	return (-EINVAL);
+	return (bmi_tcp_errno_to_pvfs(-EINVAL));
     }
     gen_mutex_lock(&interface_mutex);
 
@@ -1084,7 +1084,7 @@ int BMI_tcp_post_send_list(bmi_op_id_t * id,
     if (total_size > TCP_MODE_REND_LIMIT)
     {
 	gossip_lerr("Error: BMI message too large!\n");
-	return (-EMSGSIZE);
+	return (bmi_tcp_errno_to_pvfs(-EMSGSIZE));
     }
 
     if (total_size <= TCP_MODE_EAGER_LIMIT)
@@ -1137,7 +1137,7 @@ int BMI_tcp_post_recv_list(bmi_op_id_t * id,
 
     if (total_expected_size > TCP_MODE_REND_LIMIT)
     {
-	return (-EINVAL);
+	return (bmi_tcp_errno_to_pvfs(-EINVAL));
     }
 
     gen_mutex_lock(&interface_mutex);
@@ -1184,7 +1184,7 @@ int BMI_tcp_post_sendunexpected_list(bmi_op_id_t * id,
 
     if (total_size > TCP_MODE_EAGER_LIMIT)
     {
-	return (-EMSGSIZE);
+	return (bmi_tcp_errno_to_pvfs(-EMSGSIZE));
     }
 
     my_header.mode = TCP_MODE_UNEXP;
@@ -1223,7 +1223,7 @@ int BMI_tcp_open_context(bmi_context_id context_id)
     if (!completion_array[context_id])
     {
 	gen_mutex_unlock(&interface_mutex);
-	return(-ENOMEM);
+	return(bmi_tcp_errno_to_pvfs(-ENOMEM));
     }
 
     gen_mutex_unlock(&interface_mutex);
@@ -1281,7 +1281,7 @@ int BMI_tcp_cancel(bmi_op_id_t id, bmi_context_id context_id)
 	/* NOTE: this may place other operations beside this one into
 	 * EINTR error state 
 	 */
-	tcp_forget_addr(query_op->addr, 0, -EINTR);
+	tcp_forget_addr(query_op->addr, 0, bmi_tcp_errno_to_pvfs(-EINTR));
 	gen_mutex_unlock(&interface_mutex);
 	return(0);
     }
@@ -1291,7 +1291,7 @@ int BMI_tcp_cancel(bmi_op_id_t id, bmi_context_id context_id)
      */
 
     /* mark op as canceled, move to completion queue */
-    query_op->error_code = -EINTR;
+    query_op->error_code = bmi_tcp_errno_to_pvfs(-EINTR);
     if(query_op->send_recv == BMI_SEND)
     {
 	BMI_socket_collection_remove_write_bit(tcp_socket_collection_p,
@@ -1420,7 +1420,7 @@ static int tcp_server_init(void)
 
     int oldfl = 0;		/* old socket flags */
     struct tcp_addr *tcp_addr_data = NULL;
-    int tmp_errno = EINVAL;
+    int tmp_errno = bmi_tcp_errno_to_pvfs(-EINVAL);
 
     /* create a socket */
     tcp_addr_data = tcp_method_params.listen_addr->method_data;
@@ -1428,7 +1428,7 @@ static int tcp_server_init(void)
     {
 	tmp_errno = errno;
 	gossip_lerr("Error: BMI_sockio_new_sock: %s\n", strerror(tmp_errno));
-	return (-tmp_errno);
+	return (bmi_tcp_errno_to_pvfs(-tmp_errno));
     }
 
     /* set it to non-blocking operation */
@@ -1446,7 +1446,7 @@ static int tcp_server_init(void)
     {
 	tmp_errno = errno;
 	gossip_err("Error: BMI_sockio_bind_sock: %s\n", strerror(tmp_errno));
-	return (-tmp_errno);
+	return (bmi_tcp_errno_to_pvfs(-tmp_errno));
     }
 
     /* go ahead and listen to the socket */
@@ -1454,7 +1454,7 @@ static int tcp_server_init(void)
     {
 	tmp_errno = errno;
 	gossip_err("Error: listen: %s\n", strerror(tmp_errno));
-	return (-tmp_errno);
+	return (bmi_tcp_errno_to_pvfs(-tmp_errno));
     }
 
     return (0);
@@ -1509,15 +1509,15 @@ static int tcp_sock_init(method_addr_p my_method_addr)
     /* check for obvious problems */
     if (!my_method_addr)
     {
-	return (-EINVAL);
+	return (bmi_tcp_errno_to_pvfs(-EINVAL));
     }
     if (my_method_addr->method_type != tcp_method_params.method_id)
     {
-	return (-EINVAL);
+	return (bmi_tcp_errno_to_pvfs(-EINVAL));
     }
     if (tcp_addr_data->server_port)
     {
-	return (-EINVAL);
+	return (bmi_tcp_errno_to_pvfs(-EINVAL));
     }
     if(tcp_addr_data->addr_error)
     {
@@ -1541,7 +1541,7 @@ static int tcp_sock_init(method_addr_p my_method_addr)
 	    {
 		tmp_errno = errno;
 		gossip_lerr("Error: poll: %s\n", strerror(tmp_errno));
-		return (-tmp_errno);
+		return (bmi_tcp_errno_to_pvfs(-tmp_errno));
 	    }
 	    if (poll_conn.revents & POLLOUT)
 	    {
@@ -1556,14 +1556,14 @@ static int tcp_sock_init(method_addr_p my_method_addr)
     /* at this point there is no socket.  try to build it */
     if (tcp_addr_data->port < 1)
     {
-	return (-EINVAL);
+	return (bmi_tcp_errno_to_pvfs(-EINVAL));
     }
 
     /* make a socket */
     if ((tcp_addr_data->socket = BMI_sockio_new_sock()) < 0)
     {
 	tmp_errno = errno;
-	return (-tmp_errno);
+	return (bmi_tcp_errno_to_pvfs(-tmp_errno));
     }
 
     /* set it to non-blocking operation */
@@ -1579,7 +1579,7 @@ static int tcp_sock_init(method_addr_p my_method_addr)
 	tmp_errno = errno;
 	gossip_lerr("Error: failed to set TCP_NODELAY option.\n");
 	close(tcp_addr_data->socket);
-	return (-tmp_errno);
+	return (bmi_tcp_errno_to_pvfs(-tmp_errno));
     }
 
     /* BMI_sockio_connect_sock will work with both ipaddr and hostname :) */
@@ -1604,7 +1604,7 @@ static int tcp_sock_init(method_addr_p my_method_addr)
     }
     else
     {
-	return (-EINVAL);
+	return (bmi_tcp_errno_to_pvfs(-EINVAL));
     }
 
     if (ret < 0)
@@ -1617,7 +1617,7 @@ static int tcp_sock_init(method_addr_p my_method_addr)
 	else
 	{
 	    gossip_lerr("Error: BMI_sockio_connect_sock: %s\n", strerror(errno));
-	    return (-errno);
+	    return (bmi_tcp_errno_to_pvfs(-errno));
 	}
     }
 
@@ -1654,13 +1654,14 @@ static int enqueue_operation(op_list_p target_list,
     method_op_p new_method_op = NULL;
     int bit_added = 0;
     struct tcp_op *tcp_op_data = NULL;
+    struct tcp_addr* tcp_addr_data = NULL;
     int i;
 
     /* allocate the operation structure */
     new_method_op = alloc_tcp_method_op();
     if (!new_method_op)
     {
-	return (-ENOMEM);
+	return (bmi_tcp_errno_to_pvfs(-ENOMEM));
     }
 
     *id = new_method_op->op_id;
@@ -1724,12 +1725,25 @@ static int enqueue_operation(op_list_p target_list,
 	new_method_op->buffer_list = buffer_list;
     }
 
+    tcp_addr_data = map->method_data;
+    if(tcp_addr_data->addr_error)
+    {
+        /* this address is bad, don't try to do anything with it */
+        gossip_err("Warning: BMI communication attempted on an "
+                   "address in failure mode.\n");
+
+        new_method_op->error_code = tcp_addr_data->addr_error;
+        op_list_add(op_list_array[new_method_op->context_id],
+                    new_method_op);
+        return(tcp_addr_data->addr_error);
+    }
+
     /* add the socket to poll on */
     BMI_socket_collection_add(tcp_socket_collection_p, map);
     if(send_recv == BMI_SEND)
     {
-	BMI_socket_collection_add_write_bit(tcp_socket_collection_p, map);
-	bit_added = 1;
+        BMI_socket_collection_add_write_bit(tcp_socket_collection_p, map);
+        bit_added = 1;
     }
 
     /* keep up with the operation */
@@ -1795,7 +1809,7 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
 	{
 	    gossip_lerr("Error: message ordering violation;\n");
 	    gossip_lerr("Error: message too large for next buffer.\n");
-	    return (-EPROTO);
+	    return (bmi_tcp_errno_to_pvfs(-EPROTO));
 	}
 
 	/* whoohoo- it is already done! */
@@ -1839,7 +1853,7 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
 	{
 	    gossip_lerr("Error: message ordering violation;\n");
 	    gossip_lerr("Error: message too large for next buffer.\n");
-	    return (-EPROTO);
+	    return (bmi_tcp_errno_to_pvfs(-EPROTO));
 	}
 
 	/* copy what we have so far into the correct buffers */
@@ -2225,7 +2239,7 @@ static int handle_new_connection(method_addr_p map)
     new_addr = alloc_tcp_method_addr();
     if (!new_addr)
     {
-	return (-ENOMEM);
+	return (bmi_tcp_errno_to_pvfs(-ENOMEM));
     }
     gossip_ldebug(GOSSIP_BMI_DEBUG_TCP,
                   "Assigning socket %d to new method addr.\n",
@@ -2316,7 +2330,7 @@ static int tcp_do_work_recv(method_addr_p map, int* stall_flag)
                 {
                     gossip_debug(GOSSIP_BMI_DEBUG_TCP,
                                  "...dropping connection.\n");
-                    tcp_forget_addr(map, 0, -EPIPE);
+                    tcp_forget_addr(map, 0, bmi_tcp_errno_to_pvfs(-EPIPE));
                 }
 	    }
             else
@@ -2336,7 +2350,7 @@ static int tcp_do_work_recv(method_addr_p map, int* stall_flag)
                             new_header.enc_hdr, TCP_ENC_HDR_SIZE);
     if (ret < 0)
     {
-	tcp_forget_addr(map, 0, -errno);
+	tcp_forget_addr(map, 0, bmi_tcp_errno_to_pvfs(-errno));
 	return (0);
     }
 
@@ -2351,7 +2365,7 @@ static int tcp_do_work_recv(method_addr_p map, int* stall_flag)
         {
             gossip_debug(GOSSIP_BMI_DEBUG_TCP,
                          "...dropping connection.\n");
-            tcp_forget_addr(map, 0, -EPIPE);
+            tcp_forget_addr(map, 0, bmi_tcp_errno_to_pvfs(-EPIPE));
         }
 	return(ret);
     }
@@ -2377,7 +2391,7 @@ static int tcp_do_work_recv(method_addr_p map, int* stall_flag)
     {
 	tmp_errno = errno;
 	gossip_err("Error: BMI_sockio_brecv: %s\n", strerror(tmp_errno));
-	tcp_forget_addr(map, 0, -tmp_errno);
+	tcp_forget_addr(map, 0, bmi_tcp_errno_to_pvfs(-tmp_errno));
 	return (0);
     }
 
@@ -2398,7 +2412,7 @@ static int tcp_do_work_recv(method_addr_p map, int* stall_flag)
     if(new_header.magic_nr != BMI_MAGIC_NR)
     {
 	gossip_err("Error: bad magic in BMI TCP message.\n");
-	tcp_forget_addr(map, 0, -EBADMSG);
+	tcp_forget_addr(map, 0, bmi_tcp_errno_to_pvfs(-EBADMSG));
 	return(0);
     }
 
@@ -2412,16 +2426,16 @@ static int tcp_do_work_recv(method_addr_p map, int* stall_flag)
 	active_method_op = alloc_tcp_method_op();
 	if (!active_method_op)
 	{
-	    tcp_forget_addr(map, 0, -ENOMEM);
-	    return (-ENOMEM);
+	    tcp_forget_addr(map, 0, bmi_tcp_errno_to_pvfs(-ENOMEM));
+	    return (bmi_tcp_errno_to_pvfs(-ENOMEM));
 	}
 	/* create data buffer */
 	new_buffer = malloc(new_header.size);
 	if (!new_buffer)
 	{
 	    dealloc_tcp_method_op(active_method_op);
-	    tcp_forget_addr(map, 0, -ENOMEM);
-	    return (-ENOMEM);
+	    tcp_forget_addr(map, 0, bmi_tcp_errno_to_pvfs(-ENOMEM));
+	    return (bmi_tcp_errno_to_pvfs(-ENOMEM));
 	}
 
 	/* set the fields */
@@ -2466,7 +2480,7 @@ static int tcp_do_work_recv(method_addr_p map, int* stall_flag)
 			(long) new_header.size,
 			(long) active_method_op->expected_size);
 	    /* TODO: return error here or do something else? */
-	    return (-EPROTO);
+	    return (bmi_tcp_errno_to_pvfs(-EPROTO));
 	}
 
 	/* we found a match.  go work on it and return */
@@ -2482,8 +2496,8 @@ static int tcp_do_work_recv(method_addr_p map, int* stall_flag)
     active_method_op = alloc_tcp_method_op();
     if (!active_method_op)
     {
-	tcp_forget_addr(map, 0, -ENOMEM);
-	return (-ENOMEM);
+	tcp_forget_addr(map, 0, bmi_tcp_errno_to_pvfs(-ENOMEM));
+	return (bmi_tcp_errno_to_pvfs(-ENOMEM));
     }
 
     if (new_header.mode == TCP_MODE_EAGER)
@@ -2493,8 +2507,8 @@ static int tcp_do_work_recv(method_addr_p map, int* stall_flag)
 	if (!new_buffer)
 	{
 	    dealloc_tcp_method_op(active_method_op);
-	    tcp_forget_addr(map, 0, -ENOMEM);
-	    return (-ENOMEM);
+	    tcp_forget_addr(map, 0, bmi_tcp_errno_to_pvfs(-ENOMEM));
+	    return (bmi_tcp_errno_to_pvfs(-ENOMEM));
 	}
     }
     else
@@ -2727,7 +2741,7 @@ static int tcp_do_work_error(method_addr_p map)
     if(tmp_errno == 0)
 	tmp_errno = EPROTO;
 
-    tcp_forget_addr(map, 0, -tmp_errno);
+    tcp_forget_addr(map, 0, bmi_tcp_errno_to_pvfs(-tmp_errno));
 
     return (0);
 }
@@ -2777,7 +2791,7 @@ static int tcp_accept_init(int *socket)
 	else
 	{
 	    gossip_lerr("Error: accept: %s\n", strerror(errno));
-	    return (-errno);
+	    return (bmi_tcp_errno_to_pvfs(-errno));
 	}
     }
 
@@ -2787,7 +2801,7 @@ static int tcp_accept_init(int *socket)
 	tmp_errno = errno;
 	gossip_lerr("Error: failed to set TCP_NODELAY option.\n");
 	close(*socket);
-	return (-tmp_errno);
+	return (bmi_tcp_errno_to_pvfs(-tmp_errno));
     }
     return (0);
 }
@@ -3076,7 +3090,7 @@ static int payload_progress(int s, void *const *buffer_list, const bmi_size_t*
     if(ret == 0)
 	return(0);
     if(ret <= 0)
-	return(-errno);
+	return(bmi_tcp_errno_to_pvfs(-errno));
 
     completed = ret;
     if(header_flag && (completed >= 0))
