@@ -600,6 +600,11 @@ return_ok:
 
     DBPF_DB_SYNC_IF_NECESSARY(op_p, db_p);
  
+    if(dbc_p)
+    {
+	dbc_p->c_close(dbc_p);
+    }
+
     dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);
     return 1;
 
@@ -607,6 +612,11 @@ return_error:
     *op_p->u.d_iterate_handles.count_p = i; 
     gossip_err("dbpf_dspace_iterate_handles_op_svc: %s\n",
                db_strerror(ret));
+ 
+    if(dbc_p)
+    {
+	dbc_p->c_close(dbc_p);
+    }
 
     if (got_db)
     {

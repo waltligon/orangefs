@@ -660,9 +660,6 @@ return_ok:
 
     DBPF_DB_SYNC_IF_NECESSARY(op_p, db_p);
 
-    /* give up the db reference */
-    dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
-
     /* free the cursor */
     ret = dbc_p->c_close(dbc_p);
     if (ret != 0)
@@ -670,11 +667,19 @@ return_ok:
 	error = -dbpf_db_error_to_trove_error(ret);
 	goto return_error;
     }
+
+    /* give up the db reference */
+    dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
     return 1;
     
 return_error:
     gossip_lerr("dbpf_keyval_iterate_op_svc: %s\n", db_strerror(ret));
     *op_p->u.k_iterate.count_p = i;
+
+    if(dbc_p)
+    {
+	dbc_p->c_close(dbc_p);
+    }
 
     if (got_db)
     {
