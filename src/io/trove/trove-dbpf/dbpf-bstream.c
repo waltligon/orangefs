@@ -884,7 +884,7 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
 #ifndef __PVFS2_TROVE_AIO_THREADED__
 static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
 {
-    int ret, i, aiocb_inuse_count, op_in_progress_count = 0;
+    int ret, i, aiocb_inuse_count, op_in_progress_count = 0, error_code = 0;
     struct aiocb *aiocb_p, *aiocb_ptr_array[AIOCB_ARRAY_SZ];
 
     if (op_p->u.b_rw_list.list_proc_state == LIST_PROC_INITIALIZED)
