@@ -19,7 +19,7 @@ void print_entry_attr(
     char buf[128] = {0};
     PVFS_size computed_size = 0;
 
-    struct tm *time = gmtime((time_t *)&attr->ctime);
+    struct tm *time = gmtime((time_t *)&attr->atime);
     assert(time);
 
     if ((attr->objtype == PVFS_TYPE_METAFILE) &&
