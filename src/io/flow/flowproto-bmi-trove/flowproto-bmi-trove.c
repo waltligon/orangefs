@@ -1808,6 +1808,8 @@ static void bmi_completion_trove_to_bmi(bmi_error_code_t error_code,
 	flow_data->total_drained += flow_data->drain_buffer_used;
 	flow_d->total_transfered = flow_data->total_drained;
 	flow_data->drain_buffer_state = BUF_READY_TO_SWAP;
+	gossip_ldebug(FLOW_PROTO_DEBUG, "Total completed (trove to bmi): %ld\n",
+		(long)flow_d->total_transfered);
 
 	/* did this complete the flow? */
 	if(flow_data->fill_buffer_state == BUF_DONE)
@@ -2274,6 +2276,9 @@ static void trove_completion_bmi_to_trove(PVFS_ds_state error_code,
 
 	flow_data->total_drained += flow_data->drain_buffer_stepsize;
 	flow_data->drain_buffer_offset += flow_data->drain_buffer_stepsize;
+	flow_d->total_transfered += flow_data->drain_buffer_stepsize;
+	gossip_ldebug(FLOW_PROTO_DEBUG, "Total completed (bmi to trove): %ld\n",
+		(long)flow_d->total_transfered);
 
 	/* if this was the last part of a multi stage write, then 
 	 * finish it as if it were a normal completion 
