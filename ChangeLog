@@ -5,7 +5,8 @@ PVFS2 Release ChangeLog
 
 pvfs2-0.1.1
 ===========
-- 
+- can now specify Trove sync behavior when setting up PVFS2 volumes w/ pav
+- add a new mpi-io test to exercise ROMIO's scalable operations
 
 
 pvfs2-0.1.0
