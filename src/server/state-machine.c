@@ -132,34 +132,6 @@ int PINT_state_machine_initialize_unexpected(state_action_struct *s_op, job_stat
 	s_op->op   = s_op->req->op;
 	s_op->current_state = PINT_state_machine_locate(s_op);
 
-	/* Walt said this code does not need to be here anymore */
-#if 0
-
-	/* What is happening here!!! 
-		Right now, we are pointing to the pointer of the first state.... 
-		We need to follow that pointer down one. By dereferencing this pointer, we are where we 
-	   should be! TODO: WHY IS THIS NOW NECESSARY????  dw
-		
-		-- More explanation:  Ok, so in gdb, without this line of code below, there is a pointer
-		   that is to ST_init which itself is that generated array.  So it looks like what has 
-			happened is there is another layer of pointers... but I will find out once I fix this 
-			request scheduler problem
-	*/
-		
-
-	/********************************************************************************/
-	/******************************   WARNING  **************************************/
-	/******************* Ugly code to handle an issue below *************************/
-	/********************************************************************************/
-
-	s_op->current_state = (PINT_state_array_values *) *((PINT_state_array_values **)s_op->current_state);
-
-	/********************************************************************************/
-	/****************************** /WARNING ****************************************/
-	/********************************************************************************/
-#endif
-
-
 	if(!s_op->current_state)
 	{
 		gossip_err("System not init for function\n");
