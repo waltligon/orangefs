@@ -75,11 +75,11 @@ fi]
 ,)
 
 dnl a mechanism to turn on mmap-readahead caching (for kernel interface)
-MMAP_RA_CACHE="-DUSE_MMAP_RA_CACHE"
+MMAP_RA_CACHE=""
 AC_ARG_ENABLE(mmap-racache,
-[  --disable-mmap-racache  Disables mmap-readahead in kernel interface],
-[if test "x$enableval" = "xno" ; then
-    MMAP_RA_CACHE=""
+[  --enable-mmap-racache   Enables mmap-readahead in kernel interface],
+[if test "x$enableval" = "xyes" ; then
+MMAP_RA_CACHE="-DUSE_MMAP_RA_CACHE"
 fi]
 ,)
 AC_SUBST(MMAP_RA_CACHE)

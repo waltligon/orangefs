@@ -18,7 +18,7 @@ ac_help="$ac_help
 ac_help="$ac_help
   --disable-disk-io       Disables pvfs2-server disk I/O (for testing)"
 ac_help="$ac_help
-  --disable-mmap-racache  Disables mmap-readahead in kernel interface"
+  --enable-mmap-racache   Enables mmap-readahead in kernel interface"
 ac_help="$ac_help
   --disable-karma         Disables optional gui.  (Enabled by default)"
 ac_help="$ac_help
@@ -1399,12 +1399,12 @@ fi
 fi
 
 
-MMAP_RA_CACHE="-DUSE_MMAP_RA_CACHE"
+MMAP_RA_CACHE=""
 # Check whether --enable-mmap-racache or --disable-mmap-racache was given.
 if test "${enable_mmap_racache+set}" = set; then
   enableval="$enable_mmap_racache"
-  if test "x$enableval" = "xno" ; then
-    MMAP_RA_CACHE=""
+  if test "x$enableval" = "xyes" ; then
+MMAP_RA_CACHE="-DUSE_MMAP_RA_CACHE"
 fi
 
 fi
