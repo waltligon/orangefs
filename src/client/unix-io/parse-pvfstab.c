@@ -6,6 +6,8 @@
 
 #include <pint-userlib.h>
 
+#define PARSER_MAX_LINE_LENGTH 255
+
 /* Function Prototypes */
 static int mntlist_new(int num_mnts,pvfs_mntlist *mntlist_ptr);
 
@@ -15,25 +17,39 @@ static int mntlist_new(int num_mnts,pvfs_mntlist *mntlist_ptr);
  *
  * returns 0 on success, -1 on error
  */
-int parse_pvfstab(char *fn,pvfs_mntlist *pvfstab_p)
+int parse_pvfstab(char *filename,pvfs_mntlist *pvfstab_p)
 {
 	FILE *tab;
-	char line[80];
-	char *root_mnt = NULL,*tok = NULL;
-	char delims[] = "- \n"; /* Delimiters for strtok */
+	char line[PARSER_MAX_LINE_LENGTH];
 	int index = 0, ret = 0,lines = 0;
-	size_t len1=0, len2=0;
+	size_t linelen=0;
+	int i = 0, start = 0, end = 0, num_slashes_seen = 0;
 
-	/* Open the pvfstab file */
-	tab = fopen("pvfstab","rb");
-	if (!tab) 
+	if (filename == NULL)
 	{
+	    /* if we didn't get a filename, just look in the current dir for
+	     * a file named "pvfstab"
+	     */
+
+	    tab = fopen("pvfstab","rb");
+	    if (tab == NULL) 
+	    {
 		return(-1);
+	    }
+	}
+	else
+	{
+	    tab = fopen(filename,"rb");
+	    if (tab == NULL) 
+	    {
+		return(errno);
+	    }
 	}
 
 	/* Count the number of lines */
-	while (fgets(line,80,tab) != NULL)
+	while (fgets(line,PARSER_MAX_LINE_LENGTH,tab) != NULL)
 	{
+		/* ignore any blank lines */
 		if (strlen(line) > 1)
 			lines++;
 	}
@@ -43,142 +59,165 @@ int parse_pvfstab(char *fn,pvfs_mntlist *pvfstab_p)
 		return(-1);
 	}
 
-	/* Grab the mutex */
-
-	/* Rewind the file */
-	rewind(tab);
+	fseek(tab, 0, SEEK_SET);
 
 	/* Fill in the mount structure */
 	/* Get a line from the pvstab file */
-	while (fgets(line,80,tab) != NULL)
+	while (fgets(line,PARSER_MAX_LINE_LENGTH,tab) != NULL)
 	{
-		//printf("read a line \n");
 		/* Is the line blank? */
-		if (strlen(line) > 1)
+		linelen = strlen(line);
+		if (linelen > 1)
 		{
-			//printf("line = \"%s\"\n",line);
-			/* Skip the first token */
-			tok = strtok(line,delims);
-			//printf("skipping = %s\n", tok);
 
-			/* Extract the bmi address */
-			tok = strtok(NULL,delims);
-			//printf("bmi_address = %s\n", tok);
-#define META_ADDR pvfstab_p->ptab_p[index].meta_addr 
-			root_mnt = strrchr(tok,'/');
-			//printf("root = %s\n", root_mnt);
-			//printf("tok = %s\n", tok);
-			len1 = strlen(tok);
-			len2 = strlen(root_mnt);
-			if ((len1 < 0) || (len2 < 0))
+		    /* 'pvfs-tcp://user:port/' */
+		    //sscanf("pvfs-%s://%s:%d/%s")
+		    for(i = 0; i < linelen; i++)
+		    {
+			if (line[i] == '-')
 			{
-				ret = -EINVAL;
-				goto metaaddr_failure;
+			    start = i+1;
+			    break;
 			}
-			META_ADDR = (PVFS_string)malloc(len1-len2 + 1);
-			if (!META_ADDR)
-			{
-				ret = -ENOMEM;
-				goto metaaddr_failure;
-			}
-			strncpy(META_ADDR,tok,len1-len2);
-			META_ADDR[len1 - len2] = '\0';
-			//printf("meta_attr = %s\n",META_ADDR);
-#undef META_ADDR 
+		    }
 
-#define SERV_MNT pvfstab_p->ptab_p[index].service_name 
-			/* Extract the Root Mount Point */
-			len1 = strlen(root_mnt);
-			if (len1 < 0)
+		    num_slashes_seen = 0;
+		    for(i = start; i < linelen; i++)
+		    {
+			if (line[i] == '/')
 			{
-				ret = -EINVAL;
-				goto servmnt_failure;
+			    num_slashes_seen++;
+			    if (num_slashes_seen > 2)
+			    {
+				end = i;
+				break;
+			    }
 			}
-			SERV_MNT = (PVFS_string)malloc(len1 + 1);
-			if (!SERV_MNT)
-			{
-				ret = -ENOMEM;
-				goto servmnt_failure;
-			}
-			strncpy(SERV_MNT,root_mnt,len1);
-			SERV_MNT[len1] = '\0';
-#undef SERV_MNT 
+		    }
+		    if (end - start < 0)
+		    {
+			printf("end = %d\nstart = %d\n",end,start);
+			goto metaaddr_failure;
+		    }
+		    pvfstab_p->ptab_p[index].meta_addr = malloc(end - start + 1);
+		    if(pvfstab_p->ptab_p[index].meta_addr == NULL)
+		    {
+			goto metaaddr_failure;
+		    }
+		    memcpy(pvfstab_p->ptab_p[index].meta_addr, &line[start], end-start);
+		    pvfstab_p->ptab_p[index].meta_addr[end - start] = '\0';
 
-#define LOCAL_MNT pvfstab_p->ptab_p[index].local_mnt_dir 
-			/* Extract the Local Mount Point */
-			tok = strtok(NULL,delims);
-			len1 = strlen(tok);
-			if (len1 < 0)
+		    start = end + 1; /*skip the '/' character*/
+		    for(i = start; i < linelen; i++)
+		    {
+			if ((line[i] == ' ') || (line[i] == '\t'))
 			{
-				ret = -EINVAL;
-				goto localmnt_failure;
+			    end = i;
+			    break;
 			}
-			LOCAL_MNT = (PVFS_string)malloc(len1 + 1);
-			if (!LOCAL_MNT)
-			{
-				ret = -ENOMEM;
-				goto localmnt_failure;
-			}
-			strncpy(LOCAL_MNT,tok,len1);
-			LOCAL_MNT[len1] = '\0';
-#undef LOCAL_MNT 
+		    }
 
-#define FTYPE pvfstab_p->ptab_p[index].fs_type 
-			/* Extract the File System Type */
-			tok = strtok(NULL,delims);
-			len1 = strlen(tok);
-			if (len1 < 0)
+		    if (end - start < 0)
+		    {
+			printf("end = %d\nstart = %d\n",end,start);
+			goto servmnt_failure;
+		    }
+		    pvfstab_p->ptab_p[index].service_name = malloc(end - start + 1);
+		    if(pvfstab_p->ptab_p[index].service_name == NULL)
+		    {
+			goto servmnt_failure;
+		    }
+		    memcpy(pvfstab_p->ptab_p[index].service_name, &line[start], end-start);
+		    pvfstab_p->ptab_p[index].service_name[end - start] = '\0';
+		    start = end + 1;
+		    for(i = start; i < linelen; i++)
+		    {
+			if ((line[i] == ' ') || (line[i] == '\t'))
 			{
-				ret = -EINVAL;
-				goto fstype_failure;
+			    end = i;
+			    break;
 			}
-			FTYPE = (PVFS_string)malloc(len1 + 1);
-			if (!FTYPE)
+		    }
+
+		    if (end - start < 0)
+		    {
+			printf("end = %d\nstart = %d\n",end,start);
+			goto localmnt_failure;
+		    }
+		    pvfstab_p->ptab_p[index].local_mnt_dir = malloc(end - start + 1);
+		    if(pvfstab_p->ptab_p[index].local_mnt_dir == NULL)
+		    {
+			goto localmnt_failure;
+		    }
+		    memcpy(pvfstab_p->ptab_p[index].local_mnt_dir, &line[start], end-start);
+		    pvfstab_p->ptab_p[index].local_mnt_dir[end - start] = '\0';
+		    start = end + 1;
+		    for(i = start; i < linelen; i++)
+		    {
+			if ((line[i] == ' ') || (line[i] == '\t'))
 			{
-				ret = -ENOMEM;
-				goto fstype_failure;
+			    end = i;
+			    break;
 			}
-			strncpy(FTYPE,tok,len1);
-			FTYPE[len1] = '\0';
-#undef FTYPE 
-			
-#define OPT1 pvfstab_p->ptab_p[index].opt1 
-			/* Extract the option 1 */
-			tok = strtok(NULL,delims);
-			len1 = strlen(tok);
-			if (len1 < 0)
+		    }
+
+		    if (end - start < 0)
+		    {
+			printf("end = %d\nstart = %d\n",end,start);
+			goto fstype_failure;
+		    }
+		    pvfstab_p->ptab_p[index].fs_type = malloc(end - start + 1);
+		    if(pvfstab_p->ptab_p[index].fs_type == NULL)
+		    {
+			goto fstype_failure;
+		    }
+		    memcpy(pvfstab_p->ptab_p[index].fs_type, &line[start], end-start);
+		    pvfstab_p->ptab_p[index].fs_type[end - start] = '\0';
+		    start = end + 1;
+		    for(i = start; i < linelen; i++)
+		    {
+			if ((line[i] == ' ') || (line[i] == '\t'))
 			{
-				ret = -EINVAL;
-				goto opt1_failure;
+			    end = i;
+			    break;
 			}
-			OPT1 = (PVFS_string)malloc(len1 + 1);
-			if (!OPT1)
+		    }
+
+		    if (end - start < 0)
+		    {
+			printf("end = %d\nstart = %d\n",end,start);
+			goto opt1_failure;
+		    }
+		    pvfstab_p->ptab_p[index].opt1 = malloc(end - start + 1);
+		    if(pvfstab_p->ptab_p[index].opt1 == NULL)
+		    {
+			goto opt1_failure;
+		    }
+		    memcpy(pvfstab_p->ptab_p[index].opt1, &line[start], end-start);
+		    pvfstab_p->ptab_p[index].opt1[end - start] = '\0';
+		    start = end + 1;
+		    for(i = start; i < linelen; i++)
+		    {
+			if ((line[i] == ' ') || (line[i] == '\t'))
 			{
-				ret = -ENOMEM;
-				goto opt1_failure;
+			    end = i;
+			    break;
 			}
-			strncpy(OPT1,tok,len1);
-			OPT1[len1] = '\0';
-#undef OPT1 
-	
-#define OPT2 pvfstab_p->ptab_p[index].opt2 
-			/* Extract the option 2 */
-			tok = strtok(NULL,delims);
-			len1 = strlen(tok);
-			if (len1 < 0)
-			{
-				ret = -EINVAL;
-				goto opt2_failure;
-			}
-			OPT2 = (PVFS_string)malloc(len1 + 1);
-			if (!OPT2)
-			{
-				ret = -ENOMEM;
-				goto opt2_failure;
-			}
-			strncpy(OPT2,tok,len1);
-			OPT2[len1] = '\0';
-#undef OPT2 
+		    }
+
+		    if (end - start < 0)
+		    {
+			printf("end = %d\nstart = %d\n",end,start);
+			goto opt2_failure;
+		    }
+		    pvfstab_p->ptab_p[index].opt2 = malloc(end - start + 1);
+		    if(pvfstab_p->ptab_p[index].opt2 == NULL)
+		    {
+			goto opt2_failure;
+		    }
+		    memcpy(pvfstab_p->ptab_p[index].opt2, &line[start], end-start);
+		    pvfstab_p->ptab_p[index].opt2[end - start] = '\0';
+
 		/* Increment the counter */
 		index++;
 
@@ -189,6 +228,10 @@ int parse_pvfstab(char *fn,pvfs_mntlist *pvfstab_p)
 	fclose(tab);
 
 	return(0);
+
+/* TODO: if we hit these error cases, we're going to need to free() whatever
+ * we were able to malloc before we encountered whatever error happened.
+ */
 
 metaaddr_failure:
 servmnt_failure:

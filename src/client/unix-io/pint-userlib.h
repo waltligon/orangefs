@@ -66,7 +66,7 @@ struct pvfs_fd_manage {
 typedef struct pvfs_fd_manage pfd_manage;
 
 /* Function Prototypes */
-int parse_pvfstab(char *fn,pvfs_mntlist *pvfstab_p);
+int parse_pvfstab(char *filename,pvfs_mntlist *pvfstab_p);
 int search_pvfstab(char *fname,pvfs_mntlist mnt,pvfs_mntent *mntent);
 void free_pvfstab_entry(pvfs_mntlist *e_p);
 int pvfs_getfsid(const char *fname, int *result, char **abs_fname, 
