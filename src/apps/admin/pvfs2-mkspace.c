@@ -39,6 +39,7 @@ int main(int argc, char **argv)
                          new_coll_id,
                          new_root_handle,
                          ranges,
+                         0,
                          verbose);
 }
 

@@ -13,6 +13,7 @@ int pvfs2_mkspace(
     TROVE_coll_id coll_id,
     int root_handle,
     char *handle_ranges,
+    int create_collection_only,
     int verbose);
 
 #endif /* __MKSPACE_H */

@@ -749,7 +749,6 @@ static int is_root_handle_in_my_range(
     return ret;
 }
 
-
 static int is_valid_filesystem_configuration(
     struct filesystem_configuration_s *fs)
 {
@@ -1216,6 +1215,7 @@ int PINT_server_config_pvfs2_mkspace(struct server_configuration_s *config)
 {
     int ret = 1;
     int root_handle = 0;
+    int create_collection_only = 0;
     struct llist *cur = NULL;
     char *cur_handle_range = (char *)0;
     filesystem_configuration_s *cur_fs = NULL;
@@ -1249,6 +1249,10 @@ int PINT_server_config_pvfs2_mkspace(struct server_configuration_s *config)
                 root_handle = cur_fs->root_handle;
             }
 
+            /*
+              for the first fs we encounter, create the storage space
+              if it doesn't exist.
+            */
             fprintf(stderr,"\n*****************************\n");
             fprintf(stderr,"Creating new storage space\n");
             ret = pvfs2_mkspace(config->storage_path,
@@ -1256,8 +1260,19 @@ int PINT_server_config_pvfs2_mkspace(struct server_configuration_s *config)
                                 cur_fs->coll_id,
                                 root_handle,
                                 cur_handle_range,
+                                create_collection_only,
                                 1);
             fprintf(stderr,"\n*****************************\n");
+
+            /*
+              now that the storage space is created, set the
+              create_collection_only variable so that subsequent
+              calls to pvfs2_mkspace will not fail when it finds
+              that the storage space already exists; this causes
+              pvfs2_mkspace to only add the collection to the
+              already existing storage space
+            */
+            create_collection_only = 1;
 
             cur = llist_next(cur);
         }

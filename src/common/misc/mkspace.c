@@ -23,6 +23,7 @@ int pvfs2_mkspace(
     TROVE_coll_id coll_id,
     int root_handle,
     char *handle_ranges,
+    int create_collection_only,
     int verbose)
 {
     int ret, count;
@@ -47,26 +48,33 @@ int pvfs2_mkspace(
 
     new_root_handle = (PVFS_handle)root_handle;
 
-    /* try to initialize; fails if storage space isn't there? */
-    ret = trove_initialize(storage_space, 0, &method_name, 0);
-    if (ret > -1)
-    {
-	fprintf(stderr,"error: storage space %s already "
-                "exists; aborting!\n",storage_space);
-	return -1;
-    }
-
     /*
-      create the storage space
-
-      Q: what good is the op_id here if we have to match
-      on coll_id in test fn?
+      if we're only creating a collection inside an existing
+      storage space, we need to assume that it exists already
     */
-    ret = trove_storage_create(storage_space, NULL, &op_id);
-    if (ret != 1)
+    if (!create_collection_only)
     {
-	fprintf(stderr,"error: storage create failed; aborting!\n");
-	return -1;
+        /* try to initialize; fails if storage space isn't there? */
+        ret = trove_initialize(storage_space, 0, &method_name, 0);
+        if (ret > -1)
+        {
+            fprintf(stderr,"error: storage space %s already "
+                    "exists; aborting!\n",storage_space);
+            return -1;
+        }
+
+        /*
+          create the storage space
+          
+          Q: what good is the op_id here if we have to match
+          on coll_id in test fn?
+        */
+        ret = trove_storage_create(storage_space, NULL, &op_id);
+        if (ret != 1)
+        {
+            fprintf(stderr,"error: storage create failed; aborting!\n");
+            return -1;
+        }
     }
 
     /* second try at initialize, in case it failed first try. */
