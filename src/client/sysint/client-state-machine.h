@@ -49,8 +49,9 @@
  */
 #define PVFS2_CLIENT_JOB_TIMEOUT 30
 
-/* the maximum number of times to retry restartable client operations */
-#define PVFS2_CLIENT_RETRY_LIMIT  5
+/* the maximum number of times to retry restartable client operations,
+ * or INT_MAX to try forever (well, 187 years if retry_delay = 2 sec). */
+#define PVFS2_CLIENT_RETRY_LIMIT  (5)
 
 /* the number of milliseconds to delay before retries */
 #define PVFS2_CLIENT_RETRY_DELAY  2000
