@@ -37,6 +37,7 @@ struct fp_queue_item
 {
     int seq;
     void* buffer;
+    PVFS_size buffer_used;
     struct result_chain_entry result_chain;
     int result_chain_count;
     struct qlist_head list_link;
@@ -317,49 +318,48 @@ int fp_multiqueue_find_serviceable(flow_descriptor ** flow_d_array,
 {
     int incount = *count;
     struct fp_private_data* tmp_data;
-	 int ret;
-	 struct timeval base;
-	 struct timespec pthread_timeout;
+    int ret;
+    struct timeval base;
+    struct timespec pthread_timeout;
 
     *count = 0;
 
     gen_mutex_lock(&completion_mutex);
-	/* see if anything has completed */
-	if(qlist_empty(&completion_queue))
-	{	
+    /* see if anything has completed */
+    if(qlist_empty(&completion_queue))
+    {	
 	/* figure out how long to wait */
 	gettimeofday(&base, NULL);
 	pthread_timeout.tv_sec = base.tv_sec + max_idle_time_ms / 1000;
 	pthread_timeout.tv_nsec = base.tv_usec * 1000 + 
-	    ((max_idle_time_ms % 1000) * 1000000);
+	((max_idle_time_ms % 1000) * 1000000);
 	if (pthread_timeout.tv_nsec > 1000000000)
 	{
 	    pthread_timeout.tv_nsec = pthread_timeout.tv_nsec - 1000000000;
 	    pthread_timeout.tv_sec++;
 	}
 
-	ret = pthread_cond_timedwait(&completion_cond, &completion_mutex, &pthread_timeout);
+	ret = pthread_cond_timedwait(&completion_cond, 
+	    &completion_mutex, &pthread_timeout);
 
 	if(ret == ETIMEDOUT)
 	{
-	gen_mutex_unlock(&completion_mutex);
-	return(0);
+	    gen_mutex_unlock(&completion_mutex);
+	    return(0);
 	}
-	}
+    }
 
-	/* run down queue, pulling out anything we can find */
-        while(*count < incount && !qlist_empty(&completion_queue))
-	{
-	    tmp_data = qlist_entry(completion_queue.next,
-		struct fp_private_data,
-		list_link);
-	    qlist_del(&tmp_data->list_link);
-	    flow_d_array[*count] = tmp_data->parent;
-	    cleanup_buffers(tmp_data);
-	    free(tmp_data);
-	    (*count)++;
-	}
-
+    /* run down queue, pulling out anything we can find */
+    while(*count < incount && !qlist_empty(&completion_queue))
+    {
+	tmp_data = qlist_entry(completion_queue.next,
+	    struct fp_private_data, list_link);
+	qlist_del(&tmp_data->list_link);
+	flow_d_array[*count] = tmp_data->parent;
+	cleanup_buffers(tmp_data);
+	free(tmp_data);
+	(*count)++;
+    }
     gen_mutex_unlock(&completion_mutex);
 
     return (0);
@@ -554,7 +554,6 @@ static void trove_read_callback_fn(void *user_ptr,
     struct fp_queue_item* q_item = user_ptr;
     int ret;
     struct fp_private_data* flow_data = PRIVATE_FLOW(q_item->parent);
-    PVFS_size bytes_to_send = 0;
     struct result_chain_entry* result_tmp;
     struct result_chain_entry* old_result_tmp;
     PVFS_id_gen_t tmp_id;
@@ -582,7 +581,6 @@ static void trove_read_callback_fn(void *user_ptr,
 
     result_tmp = &q_item->result_chain;
     do{
-	bytes_to_send += result_tmp->result.bytes;
 	old_result_tmp = result_tmp;
 	result_tmp = result_tmp->next;
 	if(old_result_tmp != &q_item->result_chain)
@@ -610,10 +608,13 @@ static void trove_read_callback_fn(void *user_ptr,
 
 	if(q_item->seq == flow_data->next_seq_to_send)
 	{
+	    gossip_err("FOO: flow %p sending seq %d, bytes: %Ld\n",
+		q_item->parent, flow_data->next_seq_to_send,
+		(long long)q_item->buffer_used);
 	    ret = BMI_post_send(&tmp_id,
 		q_item->parent->dest.u.bmi.address,
 		q_item->buffer,
-		bytes_to_send,
+		q_item->buffer_used,
 		BMI_PRE_ALLOC,
 		q_item->parent->tag,
 		&q_item->bmi_callback,
@@ -635,7 +636,7 @@ static void trove_read_callback_fn(void *user_ptr,
 	{
 	    gen_mutex_unlock(&flow_data->dest_mutex);
 	    /* immediate completion; trigger callback ourselves */
-	    bmi_send_callback_fn(q_item, bytes_to_send, 0);
+	    bmi_send_callback_fn(q_item, q_item->buffer_used, 0);
 	    gen_mutex_lock(&flow_data->dest_mutex);
 	}
     }
@@ -715,6 +716,7 @@ static void bmi_send_callback_fn(void *user_ptr,
     result_tmp = &q_item->result_chain;
     old_result_tmp = result_tmp;
     tmp_buffer = q_item->buffer;
+    q_item->buffer_used = 0;
     do{
 	q_item->result_chain_count++;
 	if(!result_tmp)
@@ -750,6 +752,7 @@ static void bmi_send_callback_fn(void *user_ptr,
 	result_tmp = result_tmp->next;
 	tmp_buffer = (void*)((char*)tmp_buffer + old_result_tmp->result.bytes);
 	bytes_processed += old_result_tmp->result.bytes;
+	q_item->buffer_used += old_result_tmp->result.bytes;
     }while(bytes_processed < BUFFER_SIZE && 
 	!PINT_REQUEST_DONE(q_item->parent->file_req_state));
 
