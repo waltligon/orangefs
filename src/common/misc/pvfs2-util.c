@@ -930,7 +930,7 @@ int PVFS_util_remove_base_dir(
     {
         if ((strcmp(pathname, "/") == 0) || (pathname[0] != '/'))
         {
-            return -ENOTDIR;
+            return -PVFS_ENOTDIR;
         }
 
         start = pathname;
@@ -999,7 +999,7 @@ int PVFS_util_remove_dir_prefix(
 
     if (!pathname || !prefix || !out_path || !out_max_len)
     {
-        return (-EINVAL);
+        return (-PVFS_EINVAL);
     }
 
     /* make sure we are given absolute paths */
@@ -1032,7 +1032,7 @@ int PVFS_util_remove_dir_prefix(
 
         /* make sure prefix would fit in pathname */
         if (prefix_len > (pathname_len + 1))
-            return (-ENOENT);
+            return (-PVFS_ENOENT);
 
         /* see if we can find prefix at beginning of path */
         if (strncmp(prefix, pathname, prefix_len) == 0)
@@ -1040,7 +1040,7 @@ int PVFS_util_remove_dir_prefix(
             /* apparent match; see if next element is a slash */
             if ((pathname[prefix_len] != '/') &&
                 (pathname[prefix_len] != '\0'))
-                return (-ENOENT);
+                return (-PVFS_ENOENT);
 
             /* this was indeed a match */
             /* in the case of no trailing slash cut_index will point to the end
@@ -1049,7 +1049,7 @@ int PVFS_util_remove_dir_prefix(
         }
         else
         {
-            return (-ENOENT);
+            return (-PVFS_ENOENT);
         }
     }
 
@@ -1057,7 +1057,7 @@ int PVFS_util_remove_dir_prefix(
 
     /* is the buffer large enough? */
     if ((1 + strlen(&(pathname[cut_index]))) > out_max_len)
-        return (-ENAMETOOLONG);
+        return (-PVFS_ENAMETOOLONG);
 
     /* try to handle the case of no trailing slash */
     if (pathname[cut_index] == '\0')
@@ -1134,7 +1134,7 @@ int PVFS_util_split_pathname( const char *path,
     else
     {
         fprintf(stderr, "Error: Not an absolute path: %s\n", path);
-        return -ENOTDIR;
+        return -PVFS_ENOTDIR;
     }
     return 0;
 }
