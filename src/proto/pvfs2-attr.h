@@ -7,24 +7,9 @@
 #ifndef __PVFS2_ATTR_H
 #define __PVFS2_ATTR_H
 
-/* This file contains declarations of the PVFS objects
- *
- * I think we want to keep extended attributes in a separate structure
- * from PVFS_object_attr.  The reasoning for this is simple; they're
- * extra stuff, and for many operations we won't want to require that
- * the extended stuff get passed back and forth.
- *
- * Likewise for file distribution information; it would be silly to pass
- * that information back on every stat call.  We simply don't need it
- * unless we specifically ask for it.
- */
-
 #include "pvfs2-types.h"
 #include "pvfs2-storage.h"
-#include "pint-distribution.h"
-
-/* PVFS filesystem objects */
-
+#include "pvfs-distribution.h"
 
 /*attributes*/
 /* MetaFile
