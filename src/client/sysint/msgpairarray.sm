@@ -26,8 +26,8 @@ extern job_context_id pint_client_sm_context;
 
 enum
 {
-    MSGPAIRS_COMPLETE = 1,
-    MSGPAIRS_RETRY = 2
+    MSGPAIRS_COMPLETE = 190,
+    MSGPAIRS_RETRY = 191
 };
 
 static int msgpairarray_init(
@@ -160,6 +160,8 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
         assert((msg_p->retry_flag == PVFS_MSGPAIR_RETRY) ||
                (msg_p->retry_flag == PVFS_MSGPAIR_NO_RETRY));
 
+        msg_p->op_status = 0;
+
         if (msg_p->encoded_resp_p == NULL)
         {
             enum PVFS_encoding_type enc_type = ENCODING_DEFAULT;
@@ -260,7 +262,8 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
                 (PVFS_ERROR_CLASS(-status.error_code) == PVFS_ERROR_BMI) &&
                 (msg_p->retry_count < PVFS_MSGPAIR_RETRY_LIMIT))
             {
-                PVFS_perror("*** Reposting receive", status.error_code);
+                gossip_debug(GOSSIP_CLIENT_DEBUG, "*** Reposting "
+                             "receive (error %d)", status.error_code);
 
                 msg_p->retry_count++;
                 goto post_msg_receive;
@@ -435,8 +438,9 @@ static int msgpairarray_completion_fn(PINT_client_sm *sm_p,
             {
                 msg_p->retry_count++;
 
-                gossip_err("*** msgarray send failed -- retrying msgpair "
-                           "(count = %d)\n", msg_p->retry_count);
+                gossip_debug(GOSSIP_CLIENT_DEBUG, "*** msgarray send "
+                             "failed -- retrying msgpair "
+                             "(count = %d)\n", msg_p->retry_count);
 
                 /* FIXME: only redo the failed ones, not all */
                 sm_p->msgarray[0].comp_ct = 2 * sm_p->msgarray_count;
@@ -445,8 +449,9 @@ static int msgpairarray_completion_fn(PINT_client_sm *sm_p,
                 return 1;
             }
 
-	    PVFS_perror("msg pair did not complete; skipping comp_fn\n",
+	    PVFS_perror("*** msgpair did not complete successfully",
                         msg_p->op_status);
+
 	    js_p->error_code = msg_p->op_status;
 	    continue;
 	}
