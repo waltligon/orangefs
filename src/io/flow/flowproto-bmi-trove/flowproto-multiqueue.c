@@ -556,6 +556,8 @@ static void trove_read_callback_fn(void *user_ptr,
     int done = 0;
     struct qlist_head* tmp_link;
 
+    result_tmp->posted_id = 0;
+
     q_item = result_tmp->q_item;
 
     gen_mutex_lock(&flow_data->flow_mutex);
@@ -860,6 +862,7 @@ static void trove_write_callback_fn(void *user_ptr,
     void* tmp_buffer;
     PVFS_size bytes_processed = 0;
 
+    result_tmp->posted_id = 0;
 
     gen_mutex_lock(&flow_data->flow_mutex);
 
@@ -1564,27 +1567,33 @@ static int cancel_pending_trove(struct qlist_head* list)
     struct qlist_head* tmp_link;
     struct fp_queue_item* q_item = NULL;
     int count = 0;
+    struct result_chain_entry* result_tmp;
+    struct result_chain_entry* old_result_tmp;
+    int ret;
 
     /* run down the chain of pending operations */
     qlist_for_each(tmp_link, list)
     {
 	q_item = qlist_entry(tmp_link, struct fp_queue_item,
 	    list_link);
-#if 0
-	/* skip anything that is in the queue but not actually posted */
-	if(q_item->posted_id)
-	{
-	    count++;
-	    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-		"flowprotocol cleanup: unposting BMI operation.\n");
-	    ret = PINT_thread_mgr_bmi_cancel(q_item->posted_id,
-		&q_item->bmi_callback);
-	    if(ret < 0)
+
+	result_tmp = &q_item->result_chain;
+	do{
+	    old_result_tmp = result_tmp;
+	    result_tmp = result_tmp->next;
+
+	    if(old_result_tmp->posted_id)
 	    {
-		gossip_err("WARNING: BMI thread mgr cancel failed, proceeding anyway.\n");
+		count++;
+		ret = PINT_thread_mgr_trove_cancel(old_result_tmp->posted_id,
+		    q_item->parent->src.u.trove.coll_id,
+		    &old_result_tmp->trove_callback);
+		if(ret < 0)
+		{
+		    gossip_err("WARNING: Trove thread mgr cancel failed, proceeding anyway.\n");
+		}
 	    }
-	}
-#endif
+	}while(result_tmp);
     }
 
     return (count);
