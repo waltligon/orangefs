@@ -60,9 +60,6 @@ tests: $(TESTS)
 # later
 tmp_server_objs: $(SERVEROBJS)
 
-debug:
-	echo $(SERVEROBJS)
-
 lib/libpvfs2.a: $(LIBOBJS)
 	$(INSTALL) -d lib
 	ar rcs $@ $(LIBOBJS)
