@@ -24,6 +24,13 @@ enum
     DATA_HANDLERANGES_CONFIG = 6
 };
 
+typedef struct phys_server_desc
+{
+    PVFS_id_gen_t addr;
+    char* addr_string;
+    int server_type;
+} phys_server_desc_s;
+
 typedef struct host_alias_s
 {
     char *host_alias;
@@ -52,6 +59,17 @@ typedef struct filesystem_configuration_s
     PINT_llist *meta_handle_ranges; /* ptrs are type host_handle_mapping_s* */
     PINT_llist *data_handle_ranges; /* ptrs are type host_handle_mapping_s* */
     enum PVFS_flowproto_type flowproto; /* default flowprotocol */
+
+    /* the following fields will be used to cache arrays of
+     * unique physical server addresses, of particular use to the 
+     * mgmt interface
+     */
+    phys_server_desc_s* io_server_array;
+    int io_server_count;
+    phys_server_desc_s* meta_server_array;
+    int meta_server_count;
+    phys_server_desc_s* server_array;
+    int server_count;
 } filesystem_configuration_s;
 
 typedef struct server_configuration_s

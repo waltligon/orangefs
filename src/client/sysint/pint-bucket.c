@@ -284,6 +284,215 @@ int PINT_bucket_get_next_io(
 }
 
 
+/* PINT_bucket_get_server_array()
+ *
+ * fills in an array of addresses corresponding to each server of the
+ * type specified by "server_type" (meta,io,or both).  If inout_count_p is
+ * not large enough to accomodate array, then an error is returned.
+ *
+ * returns 0 on success, -errno on failure
+ */
+int PINT_bucket_get_server_array(
+    struct server_configuration_s* config,
+    PVFS_fs_id fsid,
+    int server_type,
+    PVFS_id_gen_t* addr_array,
+    int* inout_count_p)
+{
+    int ret = -EINVAL;
+    char *server_bmi_str = (char *)0;
+    struct host_handle_mapping_s *cur_mapping = NULL;
+    struct qlist_head *hash_link = NULL;
+    struct config_fs_cache_s *cur_config_cache = NULL;
+    PINT_llist* tmp_server = NULL;
+    bmi_addr_t tmp_bmi_addr;
+    int dup_flag = 0;
+    int i;
+    int current = 0;
+    int array_index,array_index2 = 0;
+
+    if (!(config && *inout_count_p && addr_array && server_type))
+    {
+	return(-EINVAL);
+    }
+
+    /* find the correct fs in our config information */
+    hash_link = qhash_search(PINT_fsid_config_cache_table,&(fsid));
+    if (!hash_link)
+    {
+	return(-EINVAL);
+    }
+    cur_config_cache =
+	qlist_entry(hash_link, struct config_fs_cache_s,
+		    hash_link);
+    assert(cur_config_cache);
+    assert(cur_config_cache->fs);
+
+    /* first check to see if we have the array information cached */
+    if(cur_config_cache->fs->server_count < 1)
+    {
+	/* we need to fill in this stuff in our config cache */
+	cur_config_cache->fs->server_count = 0;
+	cur_config_cache->fs->meta_server_count = 0;
+	cur_config_cache->fs->io_server_count = 0;
+	
+	/* iterate through lists to come up with an upper bound for the 
+	 * size of the arrays that we need 
+	 */
+	while((cur_mapping = 
+	    PINT_llist_head(cur_config_cache->fs->meta_handle_ranges)))
+	{
+	    cur_config_cache->fs->meta_server_count++;
+	    cur_config_cache->fs->server_count++;
+	}
+	while((cur_mapping = 
+	    PINT_llist_head(cur_config_cache->fs->data_handle_ranges)))
+	{
+	    cur_config_cache->fs->io_server_count++;
+	    cur_config_cache->fs->server_count++;
+	}
+	cur_config_cache->fs->meta_server_array = 
+	    (phys_server_desc_s*)malloc(
+	    cur_config_cache->fs->meta_server_count*sizeof(phys_server_desc_s));
+	cur_config_cache->fs->io_server_array = 
+	    (phys_server_desc_s*)malloc(
+	    cur_config_cache->fs->io_server_count*sizeof(phys_server_desc_s));
+	cur_config_cache->fs->server_array = 
+	    (phys_server_desc_s*)malloc(
+	    cur_config_cache->fs->server_count*sizeof(phys_server_desc_s));
+	if(!cur_config_cache->fs->meta_server_array 
+	    || !cur_config_cache->fs->io_server_array
+	    || !cur_config_cache->fs->server_array)
+	{
+	    /* TODO: clean up nicer */
+	    return(-ENOMEM);
+	}
+	memset(cur_config_cache->fs->server_array, 0, 
+	    cur_config_cache->fs->server_count*sizeof(phys_server_desc_s));
+
+	/* reset counts until we find out how many physical servers are
+	 * actually present 
+	 */
+	cur_config_cache->fs->server_count = 0;
+	cur_config_cache->fs->meta_server_count = 0;
+	cur_config_cache->fs->io_server_count = 0;
+
+	for(i=0; i<2; i++)
+	{
+	    if(i==0)
+	    {
+		tmp_server = cur_config_cache->fs->meta_handle_ranges;
+		current = PINT_BUCKET_META;
+	    }
+	    else
+	    {
+		tmp_server = cur_config_cache->fs->data_handle_ranges;
+		current = PINT_BUCKET_IO;
+	    }
+	    while((cur_mapping = PINT_llist_head(tmp_server)))
+	    {
+		tmp_server = PINT_llist_next(tmp_server);
+		server_bmi_str = PINT_config_get_host_addr_ptr(
+		    config,cur_mapping->alias_mapping->host_alias);
+
+		ret = BMI_addr_lookup(&tmp_bmi_addr,server_bmi_str);
+		if (ret < 0)
+		{
+		    return(ret);
+		}
+
+		/* see if we have already listed this BMI address */
+		dup_flag = 0;
+		for(i=0; i<array_index; i++)
+		{
+		    if(cur_config_cache->fs->server_array[i].addr
+			== tmp_bmi_addr)
+		    {
+			dup_flag = 1;
+			break;
+		    }
+		}
+		
+		if(!dup_flag)
+		{
+		    cur_config_cache->fs->server_array[array_index].addr 
+			= tmp_bmi_addr;
+		    cur_config_cache->fs->server_array[array_index].addr_string 
+			= server_bmi_str;
+		    cur_config_cache->fs->server_array[array_index].server_type 
+			+= current;
+		    array_index++;
+		    cur_config_cache->fs->server_count = array_index;
+		}
+	    }
+	}
+
+	/* now build meta and I/O arrays based on generic server list */
+	array_index = 0;
+	array_index2 = 0;
+	for(i=0; i<cur_config_cache->fs->server_count; i++)
+	{
+	    if(cur_config_cache->fs->server_array[i].server_type &
+		PINT_BUCKET_META)
+	    {
+		cur_config_cache->fs->meta_server_array[array_index] = 
+		    cur_config_cache->fs->server_array[i];
+		array_index++;
+	    }
+	    if(cur_config_cache->fs->server_array[i].server_type &
+		PINT_BUCKET_IO)
+	    {
+		cur_config_cache->fs->io_server_array[array_index2] = 
+		    cur_config_cache->fs->server_array[i];
+		array_index2++;
+	    }
+	}
+	cur_config_cache->fs->meta_server_count = array_index;
+	cur_config_cache->fs->io_server_count = array_index2;
+    }
+
+    /* at this point, we should have the data that we need cached up,
+     * just copy out
+     */
+    if(server_type == PINT_BUCKET_META)
+    {
+	if(*inout_count_p < cur_config_cache->fs->meta_server_count)
+	    return(-EMSGSIZE);
+	for(i=0; i<cur_config_cache->fs->meta_server_count; i++)
+	{
+	    addr_array[i] = cur_config_cache->fs->meta_server_array[i].addr;
+	}
+	*inout_count_p = cur_config_cache->fs->meta_server_count;
+	return(0);
+    }
+    else if (server_type == PINT_BUCKET_IO)
+    {
+	if(*inout_count_p < cur_config_cache->fs->io_server_count)
+	    return(-EMSGSIZE);
+	for(i=0; i<cur_config_cache->fs->io_server_count; i++)
+	{
+	    addr_array[i] = cur_config_cache->fs->io_server_array[i].addr;
+	}
+	*inout_count_p = cur_config_cache->fs->io_server_count;
+	return(0);
+
+    }
+    else if (server_type == (PINT_BUCKET_META & PINT_BUCKET_IO))
+    {
+	if(*inout_count_p < cur_config_cache->fs->server_count)
+	    return(-EMSGSIZE);
+	for(i=0; i<cur_config_cache->fs->server_count; i++)
+	{
+	    addr_array[i] = cur_config_cache->fs->server_array[i].addr;
+	}
+	*inout_count_p = cur_config_cache->fs->server_count;
+	return(0);
+    }
+
+    return(-EINVAL);
+}
+
+
 /* PINT_bucket_get_physical()
  *
  * returns the BMI addresses of all of the specified types of servers 

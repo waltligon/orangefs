@@ -39,6 +39,12 @@ int PINT_bucket_get_next_io(
     bmi_addr_t *io_addr_array,
     PVFS_handle_extent_array *io_handle_extent_array);
 
+#define PINT_BUCKET_IO 1
+#define PINT_BUCKET_META 2
+#define PINT_BUCKET_ALL (PINT_BUCKET_META|PINT_BUCKET_IO)
+
+/* TODO get rid of this stuff later */
+/******************************************************/
 struct PINT_bucket_server_info
 {
     bmi_addr_t addr;
@@ -54,10 +60,6 @@ int PINT_bucket_get_physical(
     struct PINT_bucket_server_info* info_array,
     int server_type);
 
-#define PINT_BUCKET_META 1
-#define PINT_BUCKET_IO 2
-#define PINT_BUCKET_ALL (PINT_BUCKET_META|PINT_BUCKET_IO)
-
 #define PINT_bucket_get_physical_meta(x1,x2,x3,x4,x5) \
     PINT_bucket_get_physical(x1,x2,x3,x4,x5,PINT_BUCKET_META);
 #define PINT_bucket_get_physical_io(x1,x2,x3,x4,x5) \
@@ -69,6 +71,14 @@ char* PINT_bucket_build_virt_server_list(
     struct server_configuration_s *config,
     PVFS_fs_id fsid,
     int server_type);
+/******************************************************/
+
+int PINT_bucket_get_server_array(
+    struct server_configuration_s* config,
+    PVFS_fs_id fsid,
+    int server_type,
+    PVFS_id_gen_t* addr_array,
+    int* inout_count_p);
 
 int PINT_bucket_map_to_server(
     bmi_addr_t *server_addr,
