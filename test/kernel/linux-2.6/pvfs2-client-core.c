@@ -240,7 +240,7 @@ static int service_symlink_request(
 }
 
 static int service_io_request(
-    void *mapped_address,
+    struct PVFS_dev_map_desc *desc,
     PVFS_sysresp_init *init_response,
     pvfs2_upcall_t *in_upcall,
     pvfs2_downcall_t *out_downcall)
@@ -251,7 +251,7 @@ static int service_io_request(
     PVFS_Request mem_req;
     void *buf = NULL;
 
-    if (mapped_address && init_response && in_upcall && out_downcall)
+    if (desc && init_response && in_upcall && out_downcall)
     {
         memset(&response,0,sizeof(PVFS_sysresp_io));
         memset(out_downcall,0,sizeof(pvfs2_downcall_t));
@@ -266,8 +266,8 @@ static int service_io_request(
                (in_upcall->req.io.buf_index < PVFS2_BUFMAP_DESC_COUNT));
 
         /* get a shared kernel/userspace buffer for the I/O transfer */
-        buf = (mapped_address + (in_upcall->req.io.buf_index *
-                                 PVFS2_BUFMAP_DEFAULT_DESC_SIZE));
+        buf = PINT_dev_get_mapped_buffer(
+            desc, in_upcall->req.io.buf_index);
         assert(buf);
 
 	ret = PVFS_sys_io(
@@ -777,7 +777,7 @@ int main(int argc, char **argv)
     job_id_t job_id;
     job_status_s jstat;
     struct PINT_dev_unexp_info info;
-    void *mapped_region = NULL;
+    struct PVFS_dev_map_desc desc;
 
     unsigned long tag = 0;
     pvfs2_upcall_t upcall;
@@ -812,9 +812,9 @@ int main(int argc, char **argv)
     }
 
     /* setup a mapped region for I/O transfers */
-    ret = PINT_dev_get_mapped_region(
-        &mapped_region, PVFS2_BUFMAP_TOTAL_SIZE);
-    if(ret < 0)
+    memset(&desc, 0 , sizeof(struct PVFS_dev_map_desc));
+    ret = PINT_dev_get_mapped_region(&desc, PVFS2_BUFMAP_TOTAL_SIZE);
+    if (ret < 0)
     {
 	PVFS_perror("PINT_dev_get_mapped_region", ret);
 	return(-1);
@@ -899,7 +899,7 @@ int main(int argc, char **argv)
 		service_readdir_request(&init_response,&upcall,&downcall);
 		break;
 	    case PVFS2_VFS_OP_FILE_IO:
-		service_io_request(&mapped_region, &init_response,
+		service_io_request(&desc, &init_response,
                                    &upcall, &downcall);
 		break;
 	    case PVFS2_VFS_OP_RENAME:

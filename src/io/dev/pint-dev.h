@@ -8,6 +8,7 @@
 #define __PINT_DEV_H
 
 #include "pvfs2-types.h"
+#include "pint-dev-shared.h"
 
 /* describes unexpected messages coming out of the device */
 struct PINT_dev_unexp_info
@@ -30,9 +31,13 @@ int PINT_dev_initialize(
 
 void PINT_dev_finalize(void);
 
-int PINT_dev_get_mapped_region(void** ptr, int size);
+int PINT_dev_get_mapped_region(
+    struct PVFS_dev_map_desc *desc,
+    int size);
 
-void *PINT_dev_get_mapped_buffer(int buffer_index);
+void *PINT_dev_get_mapped_buffer(
+    struct PVFS_dev_map_desc *desc,
+    int buffer_index);
 
 int PINT_dev_test_unexpected(
 	int incount,

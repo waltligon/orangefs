@@ -22,7 +22,6 @@
 #include "pvfs2-types.h"
 #include "gossip.h"
 #include "pint-dev.h"
-#include "pint-dev-shared.h"
 
 static int setup_dev_entry(const char* dev_name);
 static int parse_devices(const char* targetfile, const char* devname, 
@@ -121,10 +120,9 @@ void PINT_dev_finalize(void)
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int PINT_dev_get_mapped_region(void** ptr, int size)
+int PINT_dev_get_mapped_region(struct PVFS_dev_map_desc *desc, int size)
 {
     int ret = -1;
-    struct PVFS_dev_map_desc desc;
     int page_count = 0;
     long page_size = sysconf(_SC_PAGE_SIZE);
 
@@ -132,30 +130,47 @@ int PINT_dev_get_mapped_region(void** ptr, int size)
      * of the system page size
      */
     page_count = size/page_size;
-    if((size%page_size) != 0)
+    if ((size%page_size) != 0)
     {
 	page_count++;
     }
 
-    desc.ptr = PINT_mem_aligned_alloc((page_count*page_size),
-	page_size);
-    if(!desc.ptr)
+    desc->ptr = PINT_mem_aligned_alloc(
+        (page_count*page_size), page_size);
+    if (!desc->ptr)
     {
 	return(-(PVFS_ENOMEM|PVFS_ERROR_DEV));
     }
-    desc.size = page_count*page_size;
+    desc->size = (page_count * page_size);
     
     /* ioctl to ask driver to map pages */
-    ret = ioctl(pdev_fd, PVFS_DEV_MAP, &desc);
-    if(ret < 0)
+    ret = ioctl(pdev_fd, PVFS_DEV_MAP, desc);
+    if (ret < 0)
     {
+        free(desc->ptr);
 	return(-(PVFS_ENOMEM|PVFS_ERROR_DEV));
     }
-
-    *ptr = desc.ptr;
-
     return(0);
 }
+
+/* PINT_dev_get_mapped_buffer()
+ *
+ * returns a memory buffer of size PVFS2_BUFMAP_DEFAULT_DESC_SIZE
+ * matching the specified buffer_index given a PVFS_dev_map_desc
+ *
+ * returns a valid desc addr on success, NULL on failure
+ */
+void *PINT_dev_get_mapped_buffer(
+    struct PVFS_dev_map_desc *desc,
+    int buffer_index)
+{
+    return ((desc && desc->ptr &&
+             ((buffer_index > -1) &&
+              (buffer_index < PVFS2_BUFMAP_DESC_COUNT))) ?
+            (desc->ptr + (buffer_index * PVFS2_BUFMAP_DEFAULT_DESC_SIZE)) :
+            NULL);
+}
+
 
 /* PINT_dev_test_unexpected()
  *
