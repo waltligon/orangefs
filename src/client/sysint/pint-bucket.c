@@ -35,7 +35,6 @@ static char HACK_server_name[] = "tcp://localhost:3334";
 static PVFS_handle HACK_handle_mask = 0;
 static PVFS_fs_id HACK_fsid = 9;
 static PVFS_handle HACK_bucket = 0;
-static PVFS_handle HACK_root_fs_handle = 1048576;
 
 /* TODO: NOTE: THIS IS NOT A FULL IMPLEMENTATION.  It is simply a stub that
  * can operate on a single server file system for testing purposes.

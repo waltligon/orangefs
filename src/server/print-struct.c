@@ -173,9 +173,9 @@ void display_pvfs_structure(void *s,int r)
 				break;
 			case PVFS_SERV_GETCONFIG:
 				printf("Get Config Resp\n");
-				printf("FS Config buffer length: %Ld\n",p->u.getconfig.fs_config_buflen);
+				printf("FS Config buffer length: %d\n",p->u.getconfig.fs_config_buflen);
 				printf("FS Config buffer:\n%s\n",p->u.getconfig.fs_config_buf);
-				printf("SERVER Config buffer length: %Ld\n",p->u.getconfig.server_config_buflen);
+				printf("SERVER Config buffer length: %d\n",p->u.getconfig.server_config_buflen);
 				printf("SERVER Config buffer:\n%s\n",p->u.getconfig.server_config_buf);
 				break;
 			case PVFS_SERV_READDIR:

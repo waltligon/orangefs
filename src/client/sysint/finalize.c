@@ -12,6 +12,9 @@
 #include "pint-dcache.h"
 #include "gen-locks.h"
 #include "pint-bucket.h"
+#include "dotconf.h"
+#include "trove.h"
+#include "server-config.h"
 
 extern fsconfig_array server_config;
 extern struct server_configuration_s g_server_config;

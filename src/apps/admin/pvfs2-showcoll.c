@@ -370,8 +370,8 @@ static int print_keyval_pair(TROVE_keyval_s *key_p,
 {
     int key_printable = 0, val_printable = 0;
 
-    if (isprint(((char *)key_p->buffer)[0]) && strnlen(key_p->buffer, sz) < 64) key_printable = 1;
-    if (isprint(((char *)val_p->buffer)[0]) && strnlen(val_p->buffer, sz) < 64) val_printable = 1;
+    if (isprint(((char *)key_p->buffer)[0]) && (strnlen(key_p->buffer, sz) < 64)) key_printable = 1;
+    if (isprint(((char *)val_p->buffer)[0]) && (strnlen(val_p->buffer, sz) < 64)) val_printable = 1;
 
     if (!strncmp(key_p->buffer, "metadata", 9) && val_p->read_sz == sizeof(struct PVFS_object_attr)) {
 	fprintf(stdout,

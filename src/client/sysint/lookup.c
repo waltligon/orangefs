@@ -17,6 +17,7 @@
 #include "pint-servreq.h"
 #include "pint-bucket.h"
 #include "PINT-reqproto-encode.h"
+#include "str_utils.h"
 
 #define REQ_ENC_FORMAT 0
 /* TODO: figure out the maximum number of handles a given metafile can have*/
