@@ -16,6 +16,7 @@ pvfs2-1.1.0pre1
   to many source files
 - pvfs2-cp: can pass strip size as a parameter (thanks David Beilloin
   <dbeilloi@mc.com>)
+- gossip: avoid double-timestamp in debug and error messages
 
 
 pvfs2-1.0.1
