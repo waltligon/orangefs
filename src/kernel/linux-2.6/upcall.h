@@ -12,7 +12,7 @@
 
 typedef struct
 {
-    char *buf;
+    int buf_index;
     size_t count;
     loff_t offset;
     PVFS_pinode_reference refn;

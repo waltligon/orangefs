@@ -240,6 +240,7 @@ static int service_symlink_request(
 }
 
 static int service_io_request(
+    void *mapped_address,
     PVFS_sysresp_init *init_response,
     pvfs2_upcall_t *in_upcall,
     pvfs2_downcall_t *out_downcall)
@@ -248,22 +249,31 @@ static int service_io_request(
     PVFS_sysresp_io response;
     PVFS_Request file_req;
     PVFS_Request mem_req;
+    void *buf = NULL;
 
-    if(init_response && in_upcall && out_downcall)
+    if (mapped_address && init_response && in_upcall && out_downcall)
     {
         memset(&response,0,sizeof(PVFS_sysresp_io));
         memset(out_downcall,0,sizeof(pvfs2_downcall_t));
 
 	file_req = PVFS_BYTE;
 	
-	ret = PVFS_Request_contiguous(in_upcall->req.io.count, PVFS_BYTE,
-	    &mem_req);
+	ret = PVFS_Request_contiguous(
+            in_upcall->req.io.count, PVFS_BYTE, &mem_req);
 	assert(ret == 0);
+
+        assert((in_upcall->req.io.buf_index > -1) &&
+               (in_upcall->req.io.buf_index < PVFS2_BUFMAP_DESC_COUNT));
+
+        /* get a shared kernel/userspace buffer for the I/O transfer */
+        buf = (mapped_address + (in_upcall->req.io.buf_index *
+                                 PVFS2_BUFMAP_DEFAULT_DESC_SIZE));
+        assert(buf);
 
 	ret = PVFS_sys_io(
             in_upcall->req.io.refn, file_req, in_upcall->req.io.offset, 
-	    in_upcall->req.io.buf, mem_req,
-            in_upcall->credentials, &response, in_upcall->req.io.io_type);
+	    buf, mem_req, in_upcall->credentials, &response,
+            in_upcall->req.io.io_type);
 	if(ret < 0)
 	{
 	    /* report an error */
@@ -761,13 +771,13 @@ int main(int argc, char **argv)
     void* buffer_list[MAX_LIST_SIZE];
     int size_list[MAX_LIST_SIZE];
     int list_size = 0, total_size = 0;
-    void* mapped_region = NULL;
 
     job_context_id context;
 
     job_id_t job_id;
     job_status_s jstat;
     struct PINT_dev_unexp_info info;
+    void *mapped_region = NULL;
 
     unsigned long tag = 0;
     pvfs2_upcall_t upcall;
@@ -889,7 +899,8 @@ int main(int argc, char **argv)
 		service_readdir_request(&init_response,&upcall,&downcall);
 		break;
 	    case PVFS2_VFS_OP_FILE_IO:
-		service_io_request(&init_response, &upcall, &downcall);
+		service_io_request(&mapped_region, &init_response,
+                                   &upcall, &downcall);
 		break;
 	    case PVFS2_VFS_OP_RENAME:
 		service_rename_request(&init_response, &upcall, &downcall);
