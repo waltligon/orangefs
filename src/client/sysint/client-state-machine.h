@@ -105,14 +105,9 @@ typedef struct PINT_client_sm_recv_state_s {
 
 /* PINT_client_remove_sm */
 struct PINT_client_remove_sm {
-    char                         *object_name;    /* input parameter */
-    PVFS_object_ref         parent_ref;     /* input parameter */
-    PVFS_object_ref         object_ref;     /* looked up */
-    int                           datafile_count; /* from attribs */
-    PVFS_handle                  *datafile_handles;
-    PINT_client_sm_msgpair_state *msgpair;        /* for datafile remove */
-    int                           stored_error_code;
-    int				  retry_count;
+    char                         *object_name;   /* input parameter */
+    int                          stored_error_code;
+    int				 retry_count;
 };
 
 /* PINT_client_create_sm */
@@ -366,12 +361,16 @@ typedef struct PINT_client_sm {
     PINT_client_sm_msgpair_state *msgarray;
 
     /*
-      internal pinode references; used in conjunction with
-      the sm_common state machine routines, or otherwise as
-      scratch pinode references during sm processing
+      internal pvfs_object references; used in conjunction with the
+      sm_common state machine routines, or otherwise as scratch pinode
+      references during sm processing
     */
     PVFS_object_ref object_ref;
     PVFS_object_ref parent_ref;
+
+    /* used internally in the remove helper state machine */
+    int datafile_count;
+    PVFS_handle *datafile_handles;
 
     PVFS_credentials *cred_p;
     union
@@ -496,6 +495,7 @@ extern struct PINT_state_machine_s pvfs2_server_get_config_sm;
 extern struct PINT_state_machine_s pvfs2_client_msgpairarray_sm;
 extern struct PINT_state_machine_s pvfs2_client_getattr_acache_sm;
 extern struct PINT_state_machine_s pvfs2_client_lookup_ncache_sm;
+extern struct PINT_state_machine_s pvfs2_client_remove_helper_sm;
 
 /*
  * Local variables:
