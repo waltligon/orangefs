@@ -1,14 +1,5 @@
 DIR := src/common/statecomp
 
-# NOTE: WE SHOULDN'T NEED THIS RULE!
-$(DIR)/scanner.o: $(DIR)/scanner.c
-ifdef QUIET_COMPILE
-	@echo "  CC		$@"
-	@$(CC) $(CFLAGS) -I src/common/statecomp -c $< -o $@
-else
-	$(CC) $(CFLAGS) -I src/common/statecomp -c $< -o $@
-endif
-
 $(DIR)/statecomp: $(DIR)/statecomp.o $(DIR)/parser.o $(DIR)/scanner.o $(DIR)/statecomp-symbol.o $(DIR)/emalloc.o $(DIR)/codegen.o $(DIR)/stringtbl.o
 ifdef QUIET_COMPILE
 	@echo "  LD		$@"
@@ -32,4 +23,7 @@ ifdef QUIET_COMPILE
 else
 	$(FLEX) -o$@ $<
 endif
-	
+
+# This directory generates C files in the _build_, not the source location,
+# so needs an extra include to find the real source dir.
+MODCFLAGS_$(DIR) := -I$(srcdir)/$(DIR)

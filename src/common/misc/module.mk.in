@@ -16,3 +16,7 @@ SERVERSRC += $(DIR)/server-config.c \
              $(DIR)/pvfs2-debug.c \
 	     $(DIR)/pint-perf-counter.c \
 	     $(DIR)/pint-event.c
+
+# for client.h used by mmap-ra-cache.c
+MODCFLAGS_$(DIR)/mmap-ra-cache.c = -I$(srcdir)/test/client/sysint
+

@@ -29,3 +29,6 @@ ifdef QUIET_COMPILE
 else
 	$(LD) $< $(LDFLAGS) $(SERVERLIBS) -o $@
 endif
+
+# get listio declarations
+MODCFLAGS_$(DIR)/test-listio-aio-convert.c = -I$(srcdir)/src/io/trove/trove-dbpf

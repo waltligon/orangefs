@@ -94,6 +94,28 @@ build_static = @build_static@
 #    includes).
 MODULES := $(shell find . -name "*.mk" | sed -e 's/^.\///;s/module.mk//')
 
+# List of directories to search for headers.
+INCLUDES := \
+    src/client/sysint \
+    src/common/misc \
+    src/common/quickhash \
+    src/common/quicklist \
+    src/common/dotconf \
+    src/common/id-generator \
+    src/common/gossip \
+    src/common/gen-locks \
+    src/common/llist \
+    src/io/trove \
+    src/io/bmi \
+    src/io/description \
+    src/io/flow \
+    src/io/buffer \
+    src/io/job \
+    src/io/dev \
+    src/proto \
+    src/server \
+    src/server/request-scheduler
+
 #################################################################
 # Setup global flags
 
@@ -133,8 +155,8 @@ CFLAGS += -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE
 CFLAGS += -I .
   # setup general warning levels and gcc options
 CFLAGS += -I $(srcdir)/include -I include -I $(srcdir)
-  # add all module directories into include path
-CFLAGS += $(patsubst %, -I $(srcdir)/%, $(MODULES))
+  # add selected include directories
+CFLAGS += $(patsubst %,-I$(srcdir)/%,$(INCLUDES))
   # add package version information
 CFLAGS += -DPVFS2_VERSION="\"@PVFS2_VERSION@\""
   # special Intel cc options
@@ -479,6 +501,20 @@ kernel:
 # target for building MPI-IO test programs 
 mpiiotests: $(MPIIOTESTS)
 
+# Just like dir, but strip the slash off the end, to be pretty.
+dirname = $(patsubst %/,%,$(dir $(1)))
+
+# Generate the canonical in-tree location of a file, given a possibly
+# out-of-tree reference.
+canonname = $(patsubst $(srcdir)/%,%,$(call dirname,$(1)))
+
+# Grab any CFLAGS defined by the make stub for a particular file, and
+# for the directory in which the source resides.
+# Always add the directory in question for "local" includes.
+modcflags = $(MODCFLAGS_$(call canonname,$(1))) \
+            $(MODCFLAGS_$(patsubst $(srcdir)/%,%,$(1))) \
+	    -I$(call dirname,$(1))
+
 # note: this will look better if you use two tabs instead of spaces between
 # SHORT_NAME and the object
 
@@ -572,9 +608,9 @@ $(MPITESTOBJS): %.o: %.c
 ifdef BUILD_MPI
 ifdef QUIET_COMPILE
 	@echo "  MPICC		$@"
-	@$(MPICC) $(LIBCFLAGS) $(MPICFLAGS) $< -c -o $@
+	@$(MPICC) $(LIBCFLAGS) $(MPICFLAGS) $(call modcflags,$<) $< -c -o $@
 else
-	$(MPICC) $(LIBCFLAGS) $(MPICFLAGS) $< -c -o $@
+	$(MPICC) $(LIBCFLAGS) $(MPICFLAGS) $(call modcflags,$<) $< -c -o $@
 endif
 else
 	@echo Error: You must specify --with-mpi=dir at configure time 
@@ -587,9 +623,9 @@ $(MPIIOTESTOBJS): %.o: %.c
 ifdef BUILD_MPI
 ifdef QUIET_COMPILE
 	@echo "  MPICC		$@"
-	@$(MPICC) $(LIBCFLAGS) $(MPICFLAGS) $< -c -o $@
+	@$(MPICC) $(LIBCFLAGS) $(MPICFLAGS) $(call modcflags,$<) $< -c -o $@
 else
-	$(MPICC) $(LIBCFLAGS) $(MPICFLAGS) $< -c -o $@
+	$(MPICC) $(LIBCFLAGS) $(MPICFLAGS) $(call modcflags,$<) $< -c -o $@
 endif
 else
 	@echo Error: You must specify --with-mpi=dir at configure time 
@@ -602,9 +638,9 @@ $(MPIMISCOBJS): %.o: %.c
 ifdef BUILD_MPI
 ifdef QUIET_COMPILE
 	@echo "  MPICC		$@"
-	@$(MPICC) $(LIBCFLAGS) $(MPICFLAGS) $< -c -o $@
+	@$(MPICC) $(LIBCFLAGS) $(MPICFLAGS) $(call modcflags,$<) $< -c -o $@
 else
-	$(MPICC) $(LIBCFLAGS) $(MPICFLAGS) $< -c -o $@
+	$(MPICC) $(LIBCFLAGS) $(MPICFLAGS) $(call modcflags,$<) $< -c -o $@
 endif
 else
 	@echo Error: You must specify --with-mpi=dir at configure time 
@@ -617,9 +653,9 @@ $(VISMISCOBJS): %.o: %.c
 ifdef BUILD_VIS
 ifdef QUIET_COMPILE
 	@echo "  CC		$@"
-	@$(CC) $(VISCFLAGS) $< -c -o $@
+	@$(CC) $(VISCFLAGS) $(call modcflags,$<) $< -c -o $@
 else
-	$(CC) $(VISCFLAGS) $< -c -o $@
+	$(CC) $(VISCFLAGS) $(call modcflags,$<) $< -c -o $@
 endif
 else
 	@echo Error: libraries needed by vis tools not detected.
@@ -668,27 +704,27 @@ endif
 %-server.o: %.c
 ifdef QUIET_COMPILE
 	@echo "  CC		$@"
-	@$(CC) $(SERVERCFLAGS) $(CFLAGS) $< -c -o $@
+	@$(CC) $(SERVERCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
 else
-	$(CC) $(SERVERCFLAGS) $(CFLAGS) $< -c -o $@
+	$(CC) $(SERVERCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
 endif
 
 # default rule for building objects 
 %.o: %.c
 ifdef QUIET_COMPILE
 	@echo "  CC		$@"
-	@$(CC) $(LIBCFLAGS) $(CFLAGS) $< -c -o $@
+	@$(CC) $(LIBCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
 else
-	$(CC) $(LIBCFLAGS) $(CFLAGS) $< -c -o $@
+	$(CC) $(LIBCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
 endif
 
 # rule for building shared objects 
 %.po: %.c
 ifdef QUIET_COMPILE
 	@echo "  CCPIC		$@"
-	@$(CC) $(LIBCFLAGS) $(CFLAGS) $(PICFLAGS) $< -c -o $@
+	@$(CC) $(LIBCFLAGS) $(CFLAGS) $(PICFLAGS) $(call modcflags,$<) $< -c -o $@
 else
-	$(CC) $(LIBCFLAGS) $(CFLAGS) $(PICFLAGS) $< -c -o $@
+	$(CC) $(LIBCFLAGS) $(CFLAGS) $(PICFLAGS) $(call modcflags,$<) $< -c -o $@
 endif
 
 # handy rule to generate cpp-output file, for debugging
@@ -696,17 +732,17 @@ endif
 %-server.i: %.c FORCE
 ifdef QUIET_COMPILE
 	@echo "  CPP		$@"
-	@$(CC) $(SERVERCFLAGS) $(CFLAGS) $< -E -o $@
+	@$(CC) $(SERVERCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -E -o $@
 else
-	$(CC) $(SERVERCFLAGS) $(CFLAGS) $< -E -o $@
+	$(CC) $(SERVERCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -E -o $@
 endif
 
 %.i: %.c FORCE
 ifdef QUIET_COMPILE
 	@echo "  CPP		$@"
-	@$(CC) $(LIBCFLAGS) $(CFLAGS) $< -E -o $@
+	@$(CC) $(LIBCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -E -o $@
 else
-	$(CC) $(LIBCFLAGS) $(CFLAGS) $< -E -o $@
+	$(CC) $(LIBCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -E -o $@
 endif
 
 # all test programs depend on the pvfs2 library
@@ -818,7 +854,7 @@ ifdef QUIET_COMPILE
 else
 	@echo generating mpitest dependency file $@.
 endif
-	@sh ./maint/mpi-depend.sh `dirname $*` $(MPICFLAGS) $< > $@
+	@sh ./maint/mpi-depend.sh `dirname $*` $(MPICFLAGS) $(call modcflags,$<) $< > $@
 
 # rule for generating dependency files for vis code
 $(VISDEPENDS) $(VISMISCDEPENDS): %.d: %.c
@@ -827,7 +863,7 @@ ifdef QUIET_COMPILE
 else
 	@echo generating vis dependency file $@.
 endif
-	@$(srcdir)/maint/depend.sh `dirname $*` $(VISCFLAGS) $< > $@
+	@$(srcdir)/maint/depend.sh `dirname $*` $(VISCFLAGS) $(call modcflags,$<) $< > $@
 
 # rule for generating dependency files for karma
 $(KARMADEPENDS): %.d: %.c
@@ -836,16 +872,16 @@ ifdef QUIET_COMPILE
 else
 	@echo generating karma dependency file $@.
 endif
-	@$(srcdir)/maint/depend.sh `dirname $*` $(KARMACFLAGS) $< > $@
+	@$(srcdir)/maint/depend.sh `dirname $*` $(KARMACFLAGS) $(call modcflags,$<) $< > $@
 
 # default rule for generating dependency files
 %.d: %.c
 ifdef QUIET_COMPILE
 	@echo "  DEP		$@"
+	@$(srcdir)/maint/depend.sh $(call dirname,$*) $(CFLAGS) $(call modcflags,$<) $< > $@
 else
-	@echo generating dependency file $@.
+	$(srcdir)/maint/depend.sh $(call dirname,$*) $(CFLAGS) $(call modcflags,$<) $< > $@
 endif
-	@$(srcdir)/maint/depend.sh `dirname $*` $(CFLAGS) $< > $@
 
 # default rules for building documents in .tex format:
 # TODO: these documentation rules are a big hack!
@@ -905,14 +941,13 @@ else
  --quiet examples/fs.conf examples/server.conf
 endif
 
-
 install_doc:
 	install -d $(mandir)/man1
 	install -d $(mandir)/man5
 	install -m 644 $(srcdir)/doc/man/*.1 $(mandir)/man1
 	install -m 644 $(srcdir)/doc/man/*.5 $(mandir)/man5
 
-install: install_doc
+install:: install_doc
 	install -d $(prefix)/include
 	install -m 644 $(srcdir)/include/pvfs2.h $(prefix)/include
 	install -m 644 $(srcdir)/include/pvfs2-request.h $(prefix)/include
@@ -936,6 +971,14 @@ install: install_doc
 
 	install -m 755 test/kernel/linux-2.6/pvfs2-client $(prefix)/sbin
 	install -m 755 test/kernel/linux-2.6/pvfs2-client-core $(prefix)/sbin
+
+ifneq (,$(LINUX_KERNEL_SRC))
+install:: install_kmod
+endif
+
+.PHONY: install_kmod
+install_kmod:
+	install -m 755 src/kernel/linux-2.6/pvfs2.ko $(prefix)/sbin
 
 install_tests:
 	install -d $(prefix)/bin

@@ -32,3 +32,7 @@ SERVERSRC += \
 # server code that will be linked manually, not included in library
 MISCSRC += \
 	$(DIR)/pvfs2-server.c
+
+# to stat the fs, need to know about handle statistics
+MODCFLAGS_$(DIR)/statfs.c = -I$(srcdir)/src/io/trove/trove-handle-mgmt
+

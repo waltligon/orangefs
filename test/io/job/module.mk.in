@@ -18,6 +18,9 @@ MISCSRC += $(DIR)/job-help.c
 
 TESTSRC += $(TEST_IO_JOB_DIR_SRC)
 
+# trove-job-*.c need trove-test.h from here
+MODCFLAGS_$(DIR) = -I$(srcdir)/test/io/trove
+
 LOCALTESTS := $(patsubst %.c,%, $(TEST_IO_JOB_DIR_SRC))
 $(LOCALTESTS): %: %.o $(TEST_IO_JOB_DIR)/job-help.o
 ifdef QUIET_COMPILE

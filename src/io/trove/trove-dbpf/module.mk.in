@@ -15,3 +15,6 @@ SERVERSRC += \
 	$(DIR)/dbpf-thread.c \
 	$(DIR)/dbpf-error.c \
 	$(DIR)/dbpf-mgmt.c
+
+# grab trove-ledger.h from handle-mgmt.
+MODCFLAGS_$(DIR) = -I$(srcdir)/src/io/trove/trove-handle-mgmt

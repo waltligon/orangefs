@@ -16,6 +16,11 @@ pvfs2-0.1.2pre1
     - build the module with everything else, if configured
     - clean up properly
     - work out-of-tree
+- Build system:
+    - list explicit include directories
+    - add cflags provided by module makefile stubs
+    - install kernel module if configured
+    - simplify dependency generator script, add .po
 
 
 pvfs2-0.1.1
