@@ -52,7 +52,7 @@
 /* Internal Globals */
 
 /* For the switch statement to know what interfaces to shutdown */
-static int server_level_init;
+static PINT_server_status_code server_level_init;
 
 /* All parameters read in from the configuration file */
 static struct server_configuration_s *user_opts;
@@ -66,7 +66,7 @@ extern PINT_server_trove_keys_s Trove_Common_Keys[];
 /* Prototypes */
 
 static int server_init(void);
-static int server_shutdown(int level,
+static int server_shutdown(PINT_server_status_code level,
 			   int ret,
 			   int sig);
 static void *sig_handler(int sig);
@@ -115,7 +115,7 @@ int main(int argc,
     /* Begin Main */
 
     /* Passed to server shutdown function */
-    server_level_init = 0;
+    server_level_init = STATUS_UNKNOWN;
 
     /* When we get a signal, we are thread based, so we need to make
        sure that one, the parent has the signal, and two, none of the 
@@ -403,7 +403,7 @@ static int server_init(void)
 
 /* For fatal errors, and SIG */
 
-static int server_shutdown(int level,
+static int server_shutdown(PINT_server_status_code level,
 			   int ret,
 			   int siglevel)
 {
@@ -461,6 +461,7 @@ static int server_shutdown(int level,
 	//free(user_opts->host_id);
 	//free(user_opts->tcp_path_bmi_library);
 	//free(user_opts);
+    case STATUS_UNKNOWN:
     default:
 	if (siglevel == 0)
 	{
@@ -481,7 +482,7 @@ static int server_shutdown(int level,
 
 static void *sig_handler(int sig)
 {
-    gossip_debug(SERVER_DEBUG, "Got Signal %d... Level...%d\n", sig, server_level_init);
+    gossip_debug(SERVER_DEBUG, "Got Signal %d... Level...%d\n", sig, (int)server_level_init);
     signal_recvd_flag = sig;
 #if 0
     if (sig == SIGSEGV)

@@ -16,9 +16,10 @@ enum
 	MAX_JOBS = 10 /* also defined in a config file, but nice to have */
 };
 
-enum
+typedef enum
 {
-    DEALLOC_INIT_MEMORY = 1,       /* de-alloc any memory we have        */
+    STATUS_UNKNOWN = 0,            /* default value                      */
+    DEALLOC_INIT_MEMORY,           /* de-alloc any memory we have        */
     SHUTDOWN_GOSSIP_INTERFACE,     /* turn off gossip interface          */
     SHUTDOWN_BMI_INTERFACE,        /* turn off bmi interface             */
     SHUTDOWN_FLOW_INTERFACE,       /* turn off flow interface            */
@@ -29,7 +30,7 @@ enum
     UNEXPECTED_BMI_FAILURE,        /* BMI unexpected failure             */
     UNEXPECTED_POSTINIT_FAILURE,   /* running fine; failed in while loop */
     UNEXPECTED_LOOP_END,           /* outside of while loop in main()    */
-};
+} PINT_server_status_code;
 
 /* This structure is passed into the void *ptr 
  * within the job interface.  Used to tell us where
