@@ -28,6 +28,8 @@ pvfs2-0.0.9pre1
   within the system
 - added new gtk gui program (karma) for interactive monitoring of pvfs2
   servers (statistics and performance)
+- sync and truncate bug fixes
+- mpi-io-test reports variance among processes
 
 	
 pvfs2-0.0.8
