@@ -259,8 +259,9 @@ static inline void format_size_string(char *src_str,
     }
     else if(len > 0)
     {
-	/* string won't fit; set explicitly to null */
-	*out_str_p = NULL;
+	/* string won't fit; don't worry about nicely alinging and 
+	 * shove it in there */
+	*out_str_p = strdup(src_str);
     }
     else if (len == 0)
     {
