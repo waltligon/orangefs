@@ -4,24 +4,6 @@
  * See COPYING in top-level directory.
  */
 
-/*
- *
- * July 2002
- * 
- * The server is now configured to answer requests
- * Operations are set forth from state_machine
- * and check_dependancies.
- * There should be little modification to this code
- * from now on!
- * 
- * May 2002
- * 
- * Modularized Code.  
- * Removed Status Queue. (see job_check_consistency)
- * Added Signal Handlers
- * 
- */
-
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
@@ -78,9 +60,7 @@ static int server_shutdown(PINT_server_status_code level,
 			   int ret,
 			   int sig);
 static void *sig_handler(int sig);
-int PINT_server_cp_bmi_unexp(PINT_server_op * s_op,
-			     job_status_s * ret);
-void PINT_server_get_bmi_unexp_err(int ret);
+static int initialize_new_server_op(job_status_s * ret);
 
 /*
   Initializes the bmi, flow, trove, and job interfaces.
@@ -236,10 +216,9 @@ static int initialize_server_state(PINT_server_status_code *server_level_init,
     for (i = 0; i < user_opts->initial_unexpected_requests; i++)
     {
         /* ARE THESE SUPPOSED TO BE UNINITIALIZED??? -N.M. */
-	ret = PINT_server_cp_bmi_unexp(s_op, &job_status_structs[0]);
+	ret = initialize_new_server_op(&job_status_structs[0]);
 	if (ret < 0)
 	{
-	    PINT_server_get_bmi_unexp_err(ret);
 	    *server_level_init = CHECK_DEPS_QUEUE;
 	    goto state_init_failed;
 	}
@@ -420,7 +399,7 @@ int main(int argc,
 	    if (postBMIFlag) /* unexpected message */
 	    {
 		postBMIFlag = 0;
-		ret = PINT_server_cp_bmi_unexp(s_op, &job_status_structs[i]);
+		ret = initialize_new_server_op(&job_status_structs[i]);
 		if (ret < 0)
 		{
 		    /* TODO: do something here, the return value was
@@ -604,24 +583,21 @@ struct server_configuration_s *get_server_config_struct(void)
  *
  * Allocates space for server operation, zeros it, and calls job_bmi_unexp()
  */
-int PINT_server_cp_bmi_unexp(PINT_server_op * serv_op,
-			     job_status_s * temp_stat)
+static int initialize_new_server_op(job_status_s *temp_stat)
 {
-    job_id_t jid;
     int ret;
-    char *mem_calc_ptr;
+    job_id_t j_id;
+    PINT_server_op *s_op;
 
     /* allocate space for server operation structure, and memset() it to zero */
-    serv_op = (PINT_server_op *) malloc(sizeof(PINT_server_op) + ENCODED_HEADER_SIZE);
-    if (!serv_op)
+    s_op = (PINT_server_op *) malloc(sizeof(PINT_server_op) + ENCODED_HEADER_SIZE);
+    if (s_op == NULL)
     {
 	return (-1);
     }
-    memset(serv_op, 0, sizeof(PINT_server_op));
+    memset(s_op, 0, sizeof(PINT_server_op));
 
-    serv_op->op = BMI_UNEXP;
-
-    mem_calc_ptr = (char *) serv_op;
+    s_op->op = BMI_UNEXP;
 
     /* TODO:
      * Consider optimizations later, so that we don't have to
@@ -633,37 +609,20 @@ int PINT_server_cp_bmi_unexp(PINT_server_op * serv_op,
      * At the moment, the server cannot handle immediate completion
      * in this part of the code.
      * -Phil
+     *
+     * note: unexp_bmi_buff is really a struct that describes an unexpected
+     * message (it is an output parameter).
      */
-    ret = job_bmi_unexp(&(serv_op->unexp_bmi_buff), serv_op,
-			temp_stat, &jid, JOB_NO_IMMED_COMPLETE);
-    if (ret < 0)
-    {
-	free(serv_op);
-	serv_op = (PINT_server_op *)0;
-	return (-4);
+    ret = job_bmi_unexp(&(s_op->unexp_bmi_buff),
+			s_op, /* user ptr */
+			temp_stat,
+			&j_id,
+			JOB_NO_IMMED_COMPLETE);
+    if (ret < 0) {
+	free(s_op);
+	return -1; /* TODO: ????????? */
     }
-    return (0);
-}
-
-void PINT_server_get_bmi_unexp_err(int ret)
-{
-    switch (ret)
-    {
-    case -1:
-	gossip_err("Error Initializing Initial Server Struct\n");
-	break;
-    case -2:
-	/* We are out of memory... call shutdown and error */
-	gossip_err("Error Initializing Unexpected BMI Struct\n");
-	break;
-    case -3:
-	gossip_err("Error Initializing Job Struct\n");
-	break;
-    case -4:
-	gossip_err("Error Posting Job\n");
-	break;
-    }
-
+    return 0;
 }
 
 /*
@@ -674,5 +633,3 @@ void PINT_server_get_bmi_unexp_err(int ret)
  *
  * vim: ts=8 sts=4 sw=4 noexpandtab
  */
-
-/* End pvfs_server.c */
