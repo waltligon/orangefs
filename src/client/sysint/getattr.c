@@ -19,62 +19,7 @@
 #include "PINT-reqproto-encode.h"
 #include "client-state-machine.h"
 
-/* PVFS_sys_getattr()
- *
- * retrieves attributes for a file system object
- *
- * returns 0 on success, -errno on failure
- */
-int PVFS_sys_getattr_old(PVFS_pinode_reference pinode_refn,
-			 uint32_t attrmask, 
-			 PVFS_credentials credentials,
-			 PVFS_sysresp_getattr *resp)
-{
-    int ret = -1;
-    PVFS_object_attr tmp_attr;
-
-    memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
-
-    /* make sure that the caller asked for valid fields */
-    if((attrmask & ~PVFS_ATTR_SYS_ALL) != 0)
-    {
-	gossip_lerr("Error: PVFS_sys_getattr(): attempted to "
-                    "get invalid attributes.\n");
-	return(-EINVAL);
-    }
-
-    ret = PINT_sys_getattr(pinode_refn, attrmask, credentials, &tmp_attr);
-    if(ret < 0)
-    {
-	return(ret);
-    }
-
-    PINT_CONVERT_ATTR(&(resp->attr), &tmp_attr, PVFS_ATTR_COMMON_ALL);
-
-    if (attrmask & PVFS_ATTR_SYS_SIZE)
-    {
-        resp->attr.size = tmp_attr.u.data.size;
-        resp->attr.mask |= PVFS_ATTR_SYS_SIZE;
-        resp->attr.mask |= PVFS_ATTR_DATA_ALL;
-    }
-    else
-    {
-        resp->attr.size = 0;
-        resp->attr.mask &= ~PVFS_ATTR_SYS_SIZE;
-        resp->attr.mask &= ~PVFS_ATTR_DATA_ALL;
-    }
-
-    /*
-      FIXME/NOTE: if this is ever used anymore, you may have
-      to add appropriate symlink conversion as well.
-
-      i.e. if (attrmask & PVFS_ATTR_SYS_LNKTARGET)
-      resp->link_target = strdup(tmp_attr.u.sym.target_path);
-      of something ...
-    */
-
-    return(0);
-}
+/* NOTE: PVFS_sys_getattr() is in sys-getattr.sm now */
 
 
 /* TODO: this function is a hack- will be removed later */
