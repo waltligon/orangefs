@@ -22,25 +22,20 @@
 
 extern job_context_id server_job_context;
 
-#define PINT_STATE_STACK_SIZE 8  /* size of stack for nested state machines */
-
-/* Some config values for the prototype pvfs2 server */
-enum
-{
-    PVFS2_DEBUG_SERVER = 32,
-    BMI_UNEXP = 999, /* Give the Server the idea of what BMI_Unexpected Ops are */
-    PVFS_SERVER_MAX_JOBS = 10 /* also defined in a config file, but nice to have */
-};
-
+/* size of stack for nested state machines */
+#define PINT_STATE_STACK_SIZE                  8
+#define PVFS2_SERVER_DEFAULT_TIMEOUT_MS      100
+#define BMI_UNEXPECTED_OP                    999
 
 /* used to keep a random, but handy, list of keys around */
 typedef struct PINT_server_trove_keys
 {
-	char *key;
-	int size;
+    char *key;
+    int size;
 } PINT_server_trove_keys_s;
 
-enum {
+enum
+{
     ROOT_HANDLE_KEY      = 0,
     METADATA_KEY         = 1,
     DIR_ENT_KEY          = 2,
@@ -64,6 +59,7 @@ typedef enum
     SERVER_STATE_MACHINE_INIT  = (1 << 9),
     SERVER_BMI_UNEXP_POST_INIT = (1 << 10),
     SERVER_SIGNAL_HANDLER_INIT = (1 << 11),
+    SERVER_JOB_OBJS_ALLOCATED  = (1 << 12),
 } PINT_server_status_flag;
 
 /* struct PINT_server_lookup_op
