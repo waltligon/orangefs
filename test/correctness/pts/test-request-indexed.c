@@ -75,7 +75,7 @@ static int test_request(void){
     rf1.server_nr = 0;
     rf1.server_ct = 1;
     rf1.fsize = 0;
-    rf1.dist = PVFS_Dist_create("simple_stripe");
+    rf1.dist = PVFS_dist_create("simple_stripe");
     rf1.extend_flag = 1;
     PINT_Dist_lookup(rf1.dist);
                                                                                 
@@ -85,7 +85,7 @@ static int test_request(void){
     rf2.server_nr = 0;
     rf2.server_ct = 1;
     rf2.fsize = 10*1024*1024;
-    rf2.dist = PVFS_Dist_create("simple_stripe");
+    rf2.dist = PVFS_dist_create("simple_stripe");
     rf2.extend_flag = 1;
     PINT_Dist_lookup(rf2.dist);
                                                                                  
