@@ -75,8 +75,8 @@ int main(int argc,char **argv)
         return(-1);
     }
 
-    printf("===================================");
-    printf("file named %s has been removed.", filename);
+    printf("===================================\n");
+    printf("file named %s has been removed.\n", filename);
 
     //close it down
     ret = PVFS_sys_finalize();
