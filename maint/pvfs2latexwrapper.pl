@@ -51,6 +51,8 @@ if ($outdir ne $indir) {
     symlink $indir."/figs", "figs";
 
     system "latex $infile";
+    system "latex $infile"; # once more to get figures correct
+    system "latex $infile"; # and sometimes it takes a *third* pass
 
     # Note: leaving the "figs" link there; helps in ps/pdf build.
     # unlink $infile, "figs";
@@ -58,4 +60,6 @@ if ($outdir ne $indir) {
 }
 else {
     system "latex $infile";
+    system "latex $infile"; # once more to get figures correct
+    system "latex $infile"; # and sometimes it takes a *third* pass
 }
