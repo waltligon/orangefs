@@ -28,6 +28,8 @@ DONE . pvfs2-set-debugmask for runtime gossip settings, (Phil)
     - make sure root handle exists in exactly one place
 
 . a real 'make install'
+  - how do we want to handle building and installing vfs stuff?
+    other than that, it seems like this item is done already...
 
 DONE . server log to a file and run in background
 
