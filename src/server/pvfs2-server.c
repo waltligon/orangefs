@@ -1111,7 +1111,7 @@ static int server_state_machine_start(
     int retval = -1;
 
     retval = PINT_decode(s_op->unexp_bmi_buff.buffer,
-		PINT_ENCODE_REQ,
+		PINT_DECODE_REQ,
 		&s_op->decoded,
 		s_op->unexp_bmi_buff.addr,
 		s_op->unexp_bmi_buff.size);
