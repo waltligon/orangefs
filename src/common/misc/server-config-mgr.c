@@ -159,6 +159,12 @@ int PINT_server_config_mgr_reload_cached_config_interface(void)
             return ret;
         }
 
+        /*
+          reset the min_handle_recycle_timeout_in_sec since it's going
+          to be re-determined at this point
+        */
+        s_min_handle_recycle_timeout_in_sec = -1;
+
         for (i = 0; i < s_fsid_to_config_table->table_size; i++)
         {
             hash_link = qhash_search_at_index(
@@ -407,7 +413,6 @@ void __PINT_server_config_mgr_put_config(
 
 int PINT_server_config_mgr_get_abs_min_handle_recycle_time(void)
 {
-    assert(s_min_handle_recycle_timeout_in_sec != -1);
     return s_min_handle_recycle_timeout_in_sec;
 }
 

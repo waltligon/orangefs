@@ -130,10 +130,11 @@ int PVFS_sys_fs_add(struct PVFS_sys_mntent *mntent)
     return ret;
 }
 
-/* PVFS_sys_fs_add()
+/* PVFS_sys_fs_remove()
  *
  * tells the system interface to dynamically "unmount" a mounted file
- * system
+ * system by removing the configuration info and reloading the cached
+ * configuration interface
  *
  * returns 0 on success, -PVFS_error on failure
  */
@@ -153,6 +154,12 @@ int PVFS_sys_fs_remove(struct PVFS_sys_mntent *mntent)
                 PVFS_perror_gossip("PINT_server_config_mgr_remove_config "
                             "failed", ret);
             }
+
+            /*
+              reload all handle mappings as well as the interface with
+              the new configuration information
+            */
+            PINT_server_config_mgr_reload_cached_config_interface();
         }
         gen_mutex_unlock(&mt_config);
     }

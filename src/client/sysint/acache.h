@@ -102,6 +102,7 @@ typedef struct
 
 int PINT_acache_initialize(void);
 void PINT_acache_finalize(void);
+int PINT_acache_reinitialize(void);
 int PINT_acache_get_timeout(void);
 void PINT_acache_set_timeout(int max_timeout_ms);
 int PINT_acache_get_size(void);

@@ -13,6 +13,7 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <signal.h>
+#include <getopt.h>
 
 #include "pvfs2.h"
 #include "gossip.h"
@@ -24,6 +25,7 @@
 #include "pvfs2-util.h"
 #include "pint-cached-config.h"
 #include "pvfs2-sysint.h"
+#include "server-config-mgr.h"
 #include "client-state-machine.h"
 
 #ifdef USE_MMAP_RA_CACHE
@@ -48,9 +50,6 @@
 */
 #define STATFS_DEFAULT_BLOCKSIZE PVFS2_BUFMAP_DEFAULT_DESC_SIZE
 
-/* client side attribute cache timeout; 0 is effectively disabled */
-#define ACACHE_TIMEOUT_MS 0
-
 /*
   default timeout value to wait for completion of in progress
   operations
@@ -64,6 +63,12 @@
   getting core dumps.  this is NOT a supported run mode
 */
 /* #define STANDALONE_RUN_MODE */
+
+typedef struct
+{
+    /* client side attribute cache timeout; 0 is effectively disabled */
+    int acache_timeout;
+} options_t;
 
 /*
   this client core *requires* pthreads now, regardless of if the pvfs2
@@ -117,6 +122,8 @@ typedef struct
 
 } vfs_request_t;
 
+static options_t s_opts;
+
 static job_context_id s_client_dev_context;
 static int s_client_is_processing = 1;
 static struct PVFS_dev_map_desc s_io_desc;
@@ -129,6 +136,10 @@ vfs_request_t *s_vfs_request_array[MAX_NUM_OPS] = {NULL};
 static int hash_key(void *key, int table_size);
 static int hash_key_compare(void *key, struct qlist_head *link);
 static struct qhash_table *s_ops_in_progress_table = NULL;
+
+static void parse_args(int argc, char **argv, options_t *opts);
+static void print_help(char *progname);
+static void reset_acache_timeout(void);
 
 static PVFS_object_ref perform_lookup_on_create_error(
     PVFS_object_ref parent,
@@ -745,6 +756,7 @@ static int service_fs_mount_request(vfs_request_t *vfs_request)
                              "mode enabled\n");
             }
         }
+        reset_acache_timeout();
 
         /*
           before sending success response we need to resolve the root
@@ -813,6 +825,8 @@ static int service_fs_umount_request(vfs_request_t *vfs_request)
     else
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG, "FS umount ok\n");
+
+        reset_acache_timeout();
 
         vfs_request->out_downcall.type = PVFS2_VFS_OP_FS_MOUNT;
         vfs_request->out_downcall.status = 0;
@@ -1840,6 +1854,9 @@ int main(int argc, char **argv)
     signal(SIGINT, client_core_sig_handler);
 #endif
 
+    memset(&s_opts, 0, sizeof(options_t));
+    parse_args(argc, argv, &s_opts);
+
     /*
       initialize pvfs system interface
 
@@ -1850,7 +1867,9 @@ int main(int argc, char **argv)
       protocol://server/fs_name
 
       At kernel mount time, we dynamically resolve and add the file
-      system mount information to the pvfs2 system interface
+      system mount information to the pvfs2 system interface (and also
+      (re)configure the acache at that time since it's based on the
+      dynamic server configurations)
     */
     ret = PVFS_sys_initialize(GOSSIP_NO_DEBUG);
     if (ret < 0)
@@ -1862,7 +1881,7 @@ int main(int argc, char **argv)
     pvfs2_mmap_ra_cache_initialize();
 #endif
 
-    PINT_acache_set_timeout(ACACHE_TIMEOUT_MS);
+    PINT_acache_set_timeout(s_opts.acache_timeout);
 
     ret = initialize_ops_in_progress_table();
     if (ret)
@@ -1949,6 +1968,110 @@ int main(int argc, char **argv)
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "%s terminating\n", argv[0]);
     return 0;
+}
+
+static void print_help(char *progname)
+{
+    assert(progname);
+
+    printf("Usage: %s [OPTION]...[PATH]\n\n",progname);
+    printf("-h, --help                    display this help and exit\n");
+    printf("-a MS, --acache-timeout=MS    acache timeout in ms "
+           "(default is 0 ms)\n");
+ }
+
+static void parse_args(int argc, char **argv, options_t *opts)
+{
+    int ret = 0, option_index = 0;
+    char *cur_option = NULL;
+    static struct option long_opts[] =
+    {
+        {"help",0,0,0},
+        {"acache-timeout",1,0,0},
+        {0,0,0,0}
+    };
+
+    assert(opts);
+
+    while((ret = getopt_long(argc, argv, "ha:",
+                             long_opts, &option_index)) != -1)
+    {
+        switch(ret)
+        {
+            case 0:
+                cur_option = (char *)long_opts[option_index].name;
+ 
+                if (strcmp("help", cur_option) == 0)
+                {
+                    goto do_help;
+                }
+                else if (strcmp("acache-timeout", cur_option) == 0)
+                {
+                    goto do_acache;
+                }
+                break;
+            case 'h':
+          do_help:
+                print_help(argv[0]);
+                exit(0);
+            case 'a':
+          do_acache:
+                opts->acache_timeout = atoi(optarg);
+                if (opts->acache_timeout < 0)
+                {
+                    gossip_err("Invalid acache timeout value of %d ms,"
+                               "disabling the acache.\n",
+                               opts->acache_timeout);
+                    opts->acache_timeout = 0;
+                }
+                break;
+            default:
+                fprintf(stderr, "Unrecognized option.  "
+                        "Try --help for information.\n");
+                exit(1);
+        }
+    }
+}
+
+static void reset_acache_timeout(void)
+{
+    int min_stored_timeout = 0, max_acache_timeout_ms = 0;
+
+    min_stored_timeout =
+        PINT_server_config_mgr_get_abs_min_handle_recycle_time();
+
+    /*
+      if all file systems have been unmounted, this value will be -1,
+      so don't do anything in that case
+    */
+    if (min_stored_timeout != -1)
+    {
+        /*
+          determine the new maximum acache timeout value based on server
+          handle recycle times and what the user specified on the command
+          line.  if they differ then reset the entire acache to be sure
+          there are no entries in the cache that could exceed the new
+          timeout.
+        */
+        max_acache_timeout_ms = PVFS_util_min(
+            (min_stored_timeout * 1000), s_opts.acache_timeout);
+
+        if (max_acache_timeout_ms != s_opts.acache_timeout)
+        {
+            gossip_debug(
+                GOSSIP_CLIENT_DEBUG, "Resetting acache timeout to %d "
+                "milliseconds\n (based on new dynamic configuration "
+                "handle recycle time value)\n", max_acache_timeout_ms);
+
+            PINT_acache_set_timeout(max_acache_timeout_ms);
+            PINT_acache_reinitialize();
+        }
+    }
+    else
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "All file systems unmounted. Not "
+                     "resetting the acache.\n");
+    }
 }
 
 /*

@@ -29,6 +29,7 @@ typedef struct
 {
     int verbose;
     int foreground;
+    char *acache_timeout;
     char *path;
 } options_t;
 
@@ -218,7 +219,7 @@ static int monitor_pvfs2_client(options_t *opts)
                 close(fd);
             }
 
-            ret = execvp(opts->path, NULL);
+            ret = execlp(opts->path, "-a", opts->acache_timeout, NULL);
             fprintf(stderr, "Could not exec %s, errno is %d\n",
                     opts->path, errno);
             exit(1);
@@ -232,11 +233,14 @@ static void print_help(char *progname)
     assert(progname);
 
     printf("Usage: %s [OPTION]...[PATH]\n\n",progname);
-    printf("-h, --help            display this help and exit\n");
-    printf("-v, --version         display version and exit\n");
-    printf("-V, --verbose         run in verbose output mode\n");
-    printf("-f, --foreground      run in foreground mode\n");
-    printf("-p PATH, --path PATH  execute pvfs2-client at PATH\n");
+    printf("-h, --help                    display this help and exit\n");
+    printf("-v, --version                 display version and exit\n");
+    printf("-V, --verbose                 run in verbose output mode\n");
+    printf("-f, --foreground              run in foreground mode\n");
+    printf("-a MS, --acache-timeout=MS    acache timeout in ms "
+           "(default is 0 ms)\n");
+    printf("-p PATH, --path PATH          execute pvfs2-client at "
+           "PATH\n");
 }
 
 static void parse_args(int argc, char **argv, options_t *opts)
@@ -250,13 +254,14 @@ static void parse_args(int argc, char **argv, options_t *opts)
         {"version",0,0,0},
         {"verbose",0,0,0},
         {"foreground",0,0,0},
+        {"acache-timeout",1,0,0},
         {"path",1,0,0},
         {0,0,0,0}
     };
 
     assert(opts);
 
-    while((ret = getopt_long(argc, argv, "hvVfp:",
+    while((ret = getopt_long(argc, argv, "hvVfa:p:",
                              long_opts, &option_index)) != -1)
     {
         switch(ret)
@@ -279,6 +284,10 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 else if (strcmp("foreground", cur_option) == 0)
                 {
                     goto do_foreground;
+                }
+                else if (strcmp("acache-timeout", cur_option) == 0)
+                {
+                    goto do_acache;
                 }
                 else if (strcmp("path", cur_option) == 0)
                 {
@@ -303,6 +312,10 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 /* for now, foreground implies verbose */
                 goto do_verbose;
                 break;
+            case 'a':
+          do_acache:
+                opts->acache_timeout = optarg;
+                break;
             case 'p':
           do_path:
                 opts->path = optarg;
@@ -319,11 +332,17 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 exit(1);
         }
     }
+
     if (!opts->path)
     {
         /* Since they didn't specify a specific path, we're going
-         * to let execvp() sort things out later */
+         * to let execlp() sort things out later */
       opts->path = PVFS2_CLIENT_CORE_NAME;
+    }
+
+    if (!opts->acache_timeout)
+    {
+        opts->acache_timeout = "0";
     }
 }
 

@@ -148,6 +148,12 @@ void PINT_acache_finalize()
     acache_debug("PINT_acache_finalize exiting\n");
 }
 
+int PINT_acache_reinitialize(void)
+{
+    PINT_acache_finalize();
+    return PINT_acache_initialize();
+}
+
 /*
   internal use only -- does a lookup without involving the pinode
   locks or reference counts; always done with the interface lock and
