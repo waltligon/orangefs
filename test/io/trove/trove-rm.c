@@ -24,15 +24,15 @@ int path_lookup(TROVE_coll_id coll_id, char *path, TROVE_handle *out_handle_p);
 int main(int argc, char **argv)
 {
     int ret, count, i;
+    char *method_name, *file_name;
+    char path_name[PATH_SIZE];
+
     TROVE_op_id op_id;
     TROVE_coll_id coll_id;
     TROVE_handle file_handle, parent_handle;
     TROVE_ds_state state;
     TROVE_keyval_s key, val;
-    char *method_name, *file_name;
-    TROVE_handle handle_buf;
-    char path_name[PATH_SIZE];
-
+    TROVE_ds_attributes_s s_attr;
 
     ret = parse_args(argc, argv);
     if (ret < 0) {
@@ -71,25 +71,32 @@ int main(int argc, char **argv)
 	return -1;
     }
 
-    /* TODO: verify that this is in fact a directory! */
     /* TODO: make a is_dir function... maybe make a full blown stat(2)? */
     
-    /* Q: how do I know what handle to use for the to-be-deleted file? */
-    /* A: look it up: */
+    /* look up the handle for the file */
     memset(&key, 0, sizeof(key));
     memset(&val, 0, sizeof(val));
     key.buffer = file_name;
     key.buffer_sz = strlen(file_name)+1;
-    val.buffer = &handle_buf;
+    val.buffer = &file_handle;
     val.buffer_sz = sizeof(TROVE_handle);
 
+    /* it would be smart to verify that this is a directory first... */
     ret = trove_keyval_read(coll_id, parent_handle, &key, &val, 0, NULL, NULL, &op_id);
     while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
     if ( ret < 0 || state == -1) {
 	    fprintf(stderr, "read failed for key %s\n", file_name);
 	    return -1;
     }
-    file_handle = *(TROVE_handle*)val.buffer;
+
+    ret = trove_dspace_getattr(coll_id, file_handle, &s_attr, NULL, &op_id);
+    while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+    if (ret < 0) return -1;
+
+    if (s_attr.type != TROVE_TEST_FILE) {
+	fprintf(stderr, "%s is not a file.\n", file_name);
+	return -1;
+    }
 
     /* 'handles are everything':  now that we've gotten a handle from the
      * file_name, we can wipe the keyval (via name) and the dspace (via

@@ -8,6 +8,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <time.h>
+#include <getopt.h>
 
 #include <trove.h>
 #include <trove-test.h>
@@ -57,8 +58,10 @@ int main(int argc, char ** argv)
 	else break;
     }
     dir_name = path_to_dir + strlen(path_name);
+#if 0
     printf("path is %s\n", path_name);
     printf("dir is %s\n", dir_name);
+#endif
 
     /* find parent directory handle */
     ret = path_lookup(coll_id, path_name, &parent_handle);
@@ -167,5 +170,5 @@ int parse_args(int argc, char **argv)
  *  c-basic-offset: 4
  * End:
  *
- * vim: ts=8 sw=4 noexpandtab
+ * vim: ts=8 sts=4 sw=4 noexpandtab
  */

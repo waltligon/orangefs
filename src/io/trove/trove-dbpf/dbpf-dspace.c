@@ -92,7 +92,9 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
 				    op_p->handle,
 				    op_p->u.d_create.bitmask);
     
+#if 0
     printf("new handle = %Lu (%Lx).\n", new_handle, new_handle);
+#endif
 
     s_attr.type = op_p->u.d_create.type;
 
@@ -127,7 +129,9 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
 	goto return_error;
     }
     
+#if 0
     printf("created new dspace with above handle.\n");
+#endif
     
     *op_p->u.d_create.out_handle_p = new_handle;
     dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);

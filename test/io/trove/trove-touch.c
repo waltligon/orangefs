@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <getopt.h>
 
 #include <trove.h>
 #include <trove-test.h>
@@ -17,8 +18,6 @@ char storage_space[SSPACE_SIZE] = "/tmp/storage-space-foo";
 char file_system[FS_SIZE] = "fs-foo";
 char path_to_file[PATH_SIZE] = "/bar";
 TROVE_handle requested_file_handle = 4095;
-
-extern char *optarg;
 
 int parse_args(int argc, char **argv);
 int path_lookup(TROVE_coll_id coll_id, char *path, TROVE_handle *out_handle_p);
@@ -62,8 +61,10 @@ int main(int argc, char **argv)
 	else break;
     }
     file_name = path_to_file + strlen(path_name);
+#if 0
     printf("path is %s\n", path_name);
     printf("file is %s\n", file_name);
+#endif
 
     /* find the parent directory handle */
     ret = path_lookup(coll_id, path_name, &parent_handle);

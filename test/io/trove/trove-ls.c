@@ -8,15 +8,15 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <getopt.h>
+
 #include <trove.h>
-#include <trove-test.h>
+#include "trove-test.h"
 
 char storage_space[SSPACE_SIZE] = "/tmp/storage-space-foo";
 char file_system[FS_SIZE] = "fs-foo";
 char path_to_dir[PATH_SIZE] = "/";
 TROVE_handle requested_file_handle = 4095;
-
-extern char *optarg;
 
 int parse_args(int argc, char **argv);
 int path_lookup(TROVE_coll_id coll_id, char *path, TROVE_handle *out_handle_p);
@@ -34,6 +34,7 @@ int main(int argc, char **argv)
     TROVE_ds_position pos = TROVE_ITERATE_START;
     char *method_name;
     char path_name[PATH_SIZE];
+    TROVE_ds_attributes_s s_attr;
 
     TROVE_handle ls_handle[KEYVAL_ARRAY_LEN];
     char ls_name[KEYVAL_ARRAY_LEN][PATH_SIZE];
@@ -69,6 +70,14 @@ int main(int argc, char **argv)
     }
 
     /* TODO: verify that this is in fact a directory! */
+    ret = trove_dspace_getattr(coll_id, handle, &s_attr, NULL, &op_id);
+    while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+    if (ret < 0) return -1;
+
+    if (s_attr.type != TROVE_TEST_DIR) {
+	fprintf(stderr, "%s is not a directory.\n", path_name);
+	return -1;
+    }
 
     /* iterate through keyvals in directory */
 
