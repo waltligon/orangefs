@@ -37,6 +37,8 @@ pvfs2-0.0.8pre2
 - improvements to several test programs (in test/client/sysint)
 - removed several files and function that are no longer needed
 - on disk storage format is now versioned
+- bound acache size, while it's only holding invalid entries and growing
+  too large
 
 
 pvfs2-0.0.7

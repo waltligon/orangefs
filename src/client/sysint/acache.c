@@ -25,7 +25,7 @@
   cleanup mechanism for trying to bound the number of
   pinode entries in the acache at any given time
 */
-/* #define PINT_ACACHE_AUTO_CLEANUP */
+#define PINT_ACACHE_AUTO_CLEANUP
 
 
 #ifdef VERBOSE_ACACHE_DEBUG
@@ -227,6 +227,8 @@ void PINT_acache_set_valid(PINT_pinode *pinode)
 
             pinode->flag = PINODE_INTERNAL_FLAG_HASHED;
             acache_debug("*** added pinode to htable\n");
+/*             fprintf(stderr,"There are %d allocated entries\n", */
+/*                     s_acache_allocated_entries); */
         }
 
         pinode->status = PINODE_STATUS_VALID;
@@ -659,7 +661,9 @@ static void reclaim_pinode_entries()
 
                 if (pinode_status(pinode) != PINODE_STATUS_VALID)
                 {
+                    gen_mutex_unlock(s_acache_htable_mutex);
                     pinode_invalidate(pinode);
+                    gen_mutex_lock(s_acache_htable_mutex);
                     if (num_reclaimed++ == PINT_ACACHE_NUM_FLUSH_ENTRIES)
                     {
                         goto reclaim_exit;
