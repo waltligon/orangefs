@@ -92,7 +92,6 @@ struct PVFS_servreq_setattr
     PVFS_handle handle;		    /* handle of target object */
     PVFS_fs_id fs_id;		    /* file system */
     PVFS_object_attr attr;	    /* new attributes */
-    uint32_t attrmask;		    /* mask of attribs to set */
 };
 
 /* NOTE: no response structure; all necessary response info is 
