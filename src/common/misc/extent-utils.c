@@ -30,7 +30,7 @@
  */
 struct llist *PINT_create_extent_list(char *extent_str)
 {
-    struct extent *cur_extent = NULL;
+    PVFS_handle_extent *cur_extent = NULL;
     struct llist *extent_list = NULL;
     int first = 0, last = 0, status = 0;
 
@@ -41,7 +41,7 @@ struct llist *PINT_create_extent_list(char *extent_str)
 
         while(PINT_parse_handle_ranges(extent_str,&first,&last,&status))
         {
-            cur_extent = malloc(sizeof(struct extent));
+            cur_extent = malloc(sizeof(PVFS_handle_extent));
             assert(cur_extent);
 
             cur_extent->first = (int64_t)first;
@@ -56,14 +56,14 @@ struct llist *PINT_create_extent_list(char *extent_str)
 /* PINT_handle_in_extent()
  *
  * Parameters:
- * struct extent   - extent structure
+ * PVFS_handle_extent   - extent structure
  * PVFS_handle     - a handle
  *
  * Returns 1 if the specified handle is within the
  * range of the specified extent.  Returns 0 otherwise.
  *
  */
-int PINT_handle_in_extent(struct extent *ext, PVFS_handle handle)
+int PINT_handle_in_extent(PVFS_handle_extent *ext, PVFS_handle handle)
 {
     return (((int64_t)handle > ext->first-1) &&
             ((int64_t)handle < ext->last+1));
@@ -85,7 +85,7 @@ int PINT_handle_in_extent_list(struct llist *extent_list,
 {
     int ret = 0;
     struct llist *cur = NULL;
-    struct extent *cur_extent = NULL;
+    PVFS_handle_extent *cur_extent = NULL;
 
     if (extent_list)
     {

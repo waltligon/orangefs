@@ -7,10 +7,13 @@
 #ifndef __EXTENT_UTILS_H
 #define __EXTENT_UTILS_H
 
+#include <pvfs2-types.h>
+#include <pvfs2-storage.h>
+
 struct llist *PINT_create_extent_list(
     char *extent_str);
 int PINT_handle_in_extent(
-    struct extent *ext,
+    PVFS_handle_extent *ext,
     PVFS_handle handle);
 int PINT_handle_in_extent_list(
     struct llist *extent_list,

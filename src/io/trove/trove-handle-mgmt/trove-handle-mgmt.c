@@ -130,7 +130,7 @@ static int trove_map_handle_ranges(TROVE_coll_id coll_id,
 {
     int ret = -1;
     struct llist *cur = NULL;
-    struct extent *cur_extent = NULL;
+    PVFS_handle_extent *cur_extent = NULL;
 
     if (extent_list && ledger)
     {

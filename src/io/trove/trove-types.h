@@ -26,7 +26,7 @@ typedef PVFS_ds_attributes_s TROVE_ds_attributes_s;
 typedef PVFS_ds_storedattr_s TROVE_ds_storedattr_s;
 typedef PVFS_ds_state        TROVE_ds_state;
 
-typedef PVFS_extent	    TROVE_extent;
+typedef PVFS_handle_extent   TROVE_extent;
 #define trove_ds_attr_to_stored PVFS_ds_attr_to_stored
 #define trove_ds_stored_to_attr PVFS_ds_stored_to_attr
 

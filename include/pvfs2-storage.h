@@ -16,6 +16,15 @@
  * Types and structures specific to the storage interface
  */
 
+/* contiguous range of handles */
+struct PVFS_handle_extent_s
+{
+    PVFS_handle first;
+    PVFS_handle last;
+};
+typedef struct PVFS_handle_extent_s PVFS_handle_extent;
+
+
 /* unique identifier for each collection that is managed by the storage
  * interface within a specific storage space
  */

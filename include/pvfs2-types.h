@@ -115,13 +115,6 @@ struct PVFS_dirent_s
 };
 typedef struct PVFS_dirent_s PVFS_dirent;
 
-struct extent
-{
-    int64_t first;
-    int64_t last;
-};
-typedef struct extent PVFS_extent;
-
 
 /* PVFS2 errors
  *
