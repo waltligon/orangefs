@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
+#include <unistd.h>
 
 #include "gossip.h"
 #include "quicklist.h"
@@ -19,7 +20,7 @@
 #include "trove.h"
 #include "thread-mgr.h"
     
-#define BUFFERS_PER_FLOW 12
+#define BUFFERS_PER_FLOW 8
 #define BUFFER_SIZE (256*1024)
 #define MAX_REGIONS 16
 
@@ -35,6 +36,7 @@ struct result_chain_entry
 /* fp_queue_item describes an individual buffer being used within the flow */
 struct fp_queue_item
 {
+    int last;
     int seq;
     void* buffer;
     PVFS_size buffer_used;
@@ -57,17 +59,13 @@ struct fp_private_data
     PVFS_size total_bytes_processed;
     int next_seq;
     int next_seq_to_send;
+    int dest_pending;
+    int dest_last_posted;
+    int initial_posts;
     gen_mutex_t flow_mutex;
 
-    gen_mutex_t src_mutex;
     struct qlist_head src_list;
-    int src_done;
-
-    gen_mutex_t dest_mutex;
     struct qlist_head dest_list;
-    int dest_done;
-
-    gen_mutex_t empty_mutex;
     struct qlist_head empty_list;
 };
 #define PRIVATE_FLOW(target_flow)\
@@ -244,9 +242,6 @@ int fp_multiqueue_post(flow_descriptor * flow_d)
     INIT_QLIST_HEAD(&flow_data->dest_list);
     INIT_QLIST_HEAD(&flow_data->empty_list);
     gen_mutex_init(&flow_data->flow_mutex);
-    gen_mutex_init(&flow_data->src_mutex);
-    gen_mutex_init(&flow_data->dest_mutex);
-    gen_mutex_init(&flow_data->empty_mutex);
     for(i=0; i<BUFFERS_PER_FLOW; i++)
     {
 	flow_data->prealloc_array[i].parent = flow_d;
@@ -281,6 +276,8 @@ int fp_multiqueue_post(flow_descriptor * flow_d)
 	}
     }
 
+    flow_d->state = FLOW_TRANSMITTING;
+    flow_data->initial_posts = initial_posts;
     for(i=0; i<initial_posts; i++)
     {
 	/* all progress is driven through callbacks; so we may as well use
@@ -294,15 +291,8 @@ int fp_multiqueue_post(flow_descriptor * flow_d)
 	{
 	    bmi_send_callback_fn(&(flow_data->prealloc_array[i]), 0, 0);
 	}
-	if(flow_d->state & FLOW_FINISH_MASK)
-	{
-	    /* immediate completion */
-	    free(flow_data);
-	    return(1);
-	}
     }
 
-    flow_d->state = FLOW_TRANSMITTING;
     return (0);
 }
 
@@ -406,15 +396,12 @@ static void bmi_recv_callback_fn(void *user_ptr,
 	assert(0);
     }
 
-    /* remove from current queue */
-    gen_mutex_lock(&flow_data->src_mutex);
-    qlist_del(&q_item->list_link);
-    gen_mutex_unlock(&flow_data->src_mutex);
+    gen_mutex_lock(&flow_data->flow_mutex);
 
+    /* remove from current queue */
+    qlist_del(&q_item->list_link);
     /* add to dest queue */
-    gen_mutex_lock(&flow_data->dest_mutex);
     qlist_add_tail(&q_item->list_link, &flow_data->dest_list);
-    gen_mutex_unlock(&flow_data->dest_mutex);
 
     result_tmp = &q_item->result_chain;
     do{
@@ -439,15 +426,14 @@ static void bmi_recv_callback_fn(void *user_ptr,
 
 	if(ret == 1)
 	{
+	    gen_mutex_unlock(&flow_data->flow_mutex);
 	    /* immediate completion; trigger callback ourselves */
 	    trove_write_callback_fn(q_item, 0);
+	    gen_mutex_lock(&flow_data->flow_mutex);
 	}
     }while(result_tmp);
 
     /* do we need to repost another recv? */
-    /* be careful about lock order */
-    gen_mutex_lock(&flow_data->src_mutex);
-    gen_mutex_lock(&flow_data->empty_mutex);
 
     if((!PINT_REQUEST_DONE(q_item->parent->file_req_state)) 
 	&& qlist_empty(&flow_data->src_list) 
@@ -457,9 +443,6 @@ static void bmi_recv_callback_fn(void *user_ptr,
 	    struct fp_queue_item, list_link);
 	qlist_del(&q_item->list_link);
 	qlist_add_tail(&q_item->list_link, &flow_data->src_list);
-
-	gen_mutex_unlock(&flow_data->empty_mutex);
-	gen_mutex_unlock(&flow_data->src_mutex);
 
 	if(!q_item->buffer)
 	{
@@ -509,6 +492,12 @@ static void bmi_recv_callback_fn(void *user_ptr,
 	}while(bytes_processed < BUFFER_SIZE && 
 	    !PINT_REQUEST_DONE(q_item->parent->file_req_state));
 
+	if(bytes_processed == 0)
+	{	
+	    gen_mutex_unlock(&flow_data->flow_mutex);
+	    return;
+	}
+
 	flow_data->total_bytes_processed += bytes_processed;
 
 	/* TODO: what if we recv less than expected? */
@@ -528,16 +517,13 @@ static void bmi_recv_callback_fn(void *user_ptr,
 	if(ret == 1)
 	{
 	    /* immediate completion; trigger callback ourselves */
+	    gen_mutex_unlock(&flow_data->flow_mutex);
 	    bmi_recv_callback_fn(q_item, tmp_actual_size, 0);
+	    gen_mutex_lock(&flow_data->flow_mutex);
 	}
     }
-    else
-    {
-	gen_mutex_unlock(&flow_data->empty_mutex);
-	gen_mutex_unlock(&flow_data->src_mutex);
-    }
-
 	
+    gen_mutex_unlock(&flow_data->flow_mutex);
     return;
 }
 
@@ -567,17 +553,19 @@ static void trove_read_callback_fn(void *user_ptr,
 	assert(0);
     }
 
+    gen_mutex_lock(&flow_data->flow_mutex);
     /* don't do anything until the last read completes */
     if(q_item->result_chain_count > 1)
     {
 	q_item->result_chain_count--;
+	gen_mutex_unlock(&flow_data->flow_mutex);
 	return;
     }
 
     /* remove from current queue */
-    gen_mutex_lock(&flow_data->src_mutex);
     qlist_del(&q_item->list_link);
-    gen_mutex_unlock(&flow_data->src_mutex);
+    /* add to dest queue */
+    qlist_add_tail(&q_item->list_link, &flow_data->dest_list);
 
     result_tmp = &q_item->result_chain;
     do{
@@ -588,15 +576,8 @@ static void trove_read_callback_fn(void *user_ptr,
     }while(result_tmp);
     q_item->result_chain_count = 0;
 
-    /* add to dest queue */
-    gen_mutex_lock(&flow_data->dest_mutex);
-    qlist_add_tail(&q_item->list_link, &flow_data->dest_list);
-    gen_mutex_unlock(&flow_data->dest_mutex);
-
     /* while we hold dest lock, look for next seq no. to send */
     do{
-	gen_mutex_lock(&flow_data->flow_mutex);
-	gen_mutex_lock(&flow_data->dest_mutex);
 	qlist_for_each(tmp_link, &flow_data->dest_list)
 	{
 	    q_item = qlist_entry(tmp_link, struct fp_queue_item,
@@ -604,13 +585,11 @@ static void trove_read_callback_fn(void *user_ptr,
 	    if(q_item->seq == flow_data->next_seq_to_send)
 		break;
 	}
-	gen_mutex_unlock(&flow_data->dest_mutex);
 
 	if(q_item->seq == flow_data->next_seq_to_send)
 	{
-	    gossip_err("FOO: flow %p sending seq %d, bytes: %Ld\n",
-		q_item->parent, flow_data->next_seq_to_send,
-		(long long)q_item->buffer_used);
+	    flow_data->dest_pending++;
+	    assert(q_item->buffer_used);
 	    ret = BMI_post_send(&tmp_id,
 		q_item->parent->dest.u.bmi.address,
 		q_item->buffer,
@@ -619,29 +598,30 @@ static void trove_read_callback_fn(void *user_ptr,
 		q_item->parent->tag,
 		&q_item->bmi_callback,
 		global_bmi_context);
-	    gen_mutex_unlock(&flow_data->flow_mutex);
 	    flow_data->next_seq_to_send++;
+	    if(q_item->last)
+		flow_data->dest_last_posted = 1;
 	}
 	else
 	{
 	    ret = 0;
 	    done = 1;
 	}
-	gen_mutex_unlock(&flow_data->flow_mutex);
 	
 	/* TODO: error handling */
 	assert(ret >= 0);
 
 	if(ret == 1)
 	{
-	    gen_mutex_unlock(&flow_data->dest_mutex);
+	    gen_mutex_unlock(&flow_data->flow_mutex);
 	    /* immediate completion; trigger callback ourselves */
 	    bmi_send_callback_fn(q_item, q_item->buffer_used, 0);
-	    gen_mutex_lock(&flow_data->dest_mutex);
+	    gen_mutex_lock(&flow_data->flow_mutex);
 	}
     }
     while(!done);
 
+    gen_mutex_unlock(&flow_data->flow_mutex);
     return;
 }
 
@@ -667,12 +647,23 @@ static void bmi_send_callback_fn(void *user_ptr,
     /* TODO: error handling */
     assert(error_code == 0);
 
+    gen_mutex_lock(&flow_data->flow_mutex);
+
     flow_data->parent->total_transfered += actual_size;
 
+    if(q_item->buffer)
+    {
+	flow_data->dest_pending--;
+    }
+    else
+    {
+	flow_data->initial_posts--;
+    }
+
     /* if this was the last operation, then mark the flow as done */
-    if(flow_data->parent->total_transfered ==
-	flow_data->total_bytes_processed &&
-	PINT_REQUEST_DONE(flow_data->parent->file_req_state))
+    if(flow_data->initial_posts == 0 &&
+	flow_data->dest_pending == 0 && 
+	flow_data->dest_last_posted)
     {
 	q_item->parent->state = FLOW_COMPLETE;
 	gen_mutex_lock(&completion_mutex);
@@ -680,12 +671,7 @@ static void bmi_send_callback_fn(void *user_ptr,
 	    &completion_queue);
 	pthread_cond_signal(&completion_cond);
 	gen_mutex_unlock(&completion_mutex);
-	return;
-    }
-
-    /* if there are no more reads to post, just return */
-    if(PINT_REQUEST_DONE(flow_data->parent->file_req_state))
-    {
+	gen_mutex_unlock(&flow_data->flow_mutex);
 	return;
     }
 
@@ -693,9 +679,7 @@ static void bmi_send_callback_fn(void *user_ptr,
     {
 	/* if this q_item has been used before, remove it from its 
 	 * current queue */
-	gen_mutex_lock(&flow_data->dest_mutex);
 	qlist_del(&q_item->list_link);
-	gen_mutex_unlock(&flow_data->dest_mutex);
     }
     else
     {
@@ -709,9 +693,7 @@ static void bmi_send_callback_fn(void *user_ptr,
     }
     
     /* add to src queue */
-    gen_mutex_lock(&flow_data->src_mutex);
     qlist_add_tail(&q_item->list_link, &flow_data->src_list);
-    gen_mutex_unlock(&flow_data->src_mutex);
 
     result_tmp = &q_item->result_chain;
     old_result_tmp = result_tmp;
@@ -736,7 +718,6 @@ static void bmi_send_callback_fn(void *user_ptr,
 	result_tmp->result.segmax = MAX_REGIONS;
 	result_tmp->result.segs = 0;
 	result_tmp->buffer_offset = tmp_buffer;
-	gen_mutex_lock(&flow_data->flow_mutex);
 	q_item->seq = flow_data->next_seq;
 	flow_data->next_seq++;
 	ret = PINT_Process_request(q_item->parent->file_req_state,
@@ -744,7 +725,6 @@ static void bmi_send_callback_fn(void *user_ptr,
 	    &q_item->parent->file_data,
 	    &result_tmp->result,
 	    PINT_SERVER);
-	gen_mutex_unlock(&flow_data->flow_mutex);
 	/* TODO: error handling */ 
 	assert(ret >= 0);
 	
@@ -757,15 +737,28 @@ static void bmi_send_callback_fn(void *user_ptr,
 	!PINT_REQUEST_DONE(q_item->parent->file_req_state));
 
     flow_data->total_bytes_processed += bytes_processed;
-
-    /* nothing to do */
-    if(bytes_processed == 0)
+    if(PINT_REQUEST_DONE(q_item->parent->file_req_state))
     {
+	q_item->last = 1;
+	/* special case, we never have a "last" operation when there
+	 * is no work to do, trigger manually
+	 */
+	if(flow_data->total_bytes_processed == 0)
+	    flow_data->dest_last_posted = 1;
+    }
+
+    if(bytes_processed == 0)
+    {	
+	gen_mutex_unlock(&flow_data->flow_mutex);
 	return;
     }
 
+    assert(q_item->buffer_used);
+
     result_tmp = &q_item->result_chain;
     do{
+	assert(q_item->buffer_used);
+	assert(result_tmp->result.bytes);
 	ret = trove_bstream_read_list(q_item->parent->src.u.trove.coll_id,
 	    q_item->parent->src.u.trove.handle,
 	    (char**)&result_tmp->buffer_offset,
@@ -788,10 +781,13 @@ static void bmi_send_callback_fn(void *user_ptr,
 	if(ret == 1)
 	{
 	    /* immediate completion; trigger callback ourselves */
+	    gen_mutex_unlock(&flow_data->flow_mutex);
 	    trove_read_callback_fn(q_item, 0);
+	    gen_mutex_lock(&flow_data->flow_mutex);
 	}
     }while(result_tmp);
 
+    gen_mutex_unlock(&flow_data->flow_mutex);
     return;
 };
 
@@ -817,10 +813,13 @@ static void trove_write_callback_fn(void *user_ptr,
     /* TODO: error handling */
     assert(error_code == 0);
 
+    gen_mutex_lock(&flow_data->flow_mutex);
+
     /* don't do anything until the last write completes */
     if(q_item->result_chain_count > 1)
     {
 	q_item->result_chain_count--;
+	gen_mutex_unlock(&flow_data->flow_mutex);
 	return;
     }
 
@@ -845,12 +844,14 @@ static void trove_write_callback_fn(void *user_ptr,
 	    &completion_queue);
 	pthread_cond_signal(&completion_cond);
 	gen_mutex_unlock(&completion_mutex);
+	gen_mutex_unlock(&flow_data->flow_mutex);
 	return;
     }
 
     /* if there are no more receives to post, just return */
     if(PINT_REQUEST_DONE(flow_data->parent->file_req_state))
     {
+	gen_mutex_unlock(&flow_data->flow_mutex);
 	return;
     }
 
@@ -858,9 +859,7 @@ static void trove_write_callback_fn(void *user_ptr,
     {
 	/* if this q_item has been used before, remove it from its 
 	 * current queue */
-	gen_mutex_lock(&flow_data->dest_mutex);
 	qlist_del(&q_item->list_link);
-	gen_mutex_unlock(&flow_data->dest_mutex);
     }
     else
     {
@@ -873,17 +872,13 @@ static void trove_write_callback_fn(void *user_ptr,
 	q_item->trove_callback.fn = trove_write_callback_fn;
     }
 
-    /* acquire two locks (careful about order to prevent deadlock!)
-     * if src list is empty, then post new recv; otherwise just queue
+    /* if src list is empty, then post new recv; otherwise just queue
      * in empty list
      */
-    gen_mutex_lock(&(flow_data->src_mutex));
-
     if(qlist_empty(&flow_data->src_list))
     {
 	/* ready to post new recv! */
 	qlist_add_tail(&q_item->list_link, &flow_data->src_list);
-	gen_mutex_unlock(&(flow_data->src_mutex));
 	
 	result_tmp = &q_item->result_chain;
 	old_result_tmp = result_tmp;
@@ -925,8 +920,8 @@ static void trove_write_callback_fn(void *user_ptr,
 	flow_data->total_bytes_processed += bytes_processed;
 
 	if(bytes_processed == 0)
-	{
-	    /* nothing to do */
+	{	
+	    gen_mutex_unlock(&flow_data->flow_mutex);
 	    return;
 	}
 
@@ -946,19 +941,19 @@ static void trove_write_callback_fn(void *user_ptr,
 
 	if(ret == 1)
 	{
+	    gen_mutex_unlock(&flow_data->flow_mutex);
 	    /* immediate completion; trigger callback ourselves */
 	    bmi_recv_callback_fn(q_item, tmp_actual_size, 0);
+	    gen_mutex_lock(&flow_data->flow_mutex);
 	}
     }
     else
     {
-	gen_mutex_lock(&(flow_data->empty_mutex));
 	qlist_add_tail(&q_item->list_link, 
 	    &(flow_data->empty_list));
-	gen_mutex_unlock(&(flow_data->empty_mutex));
-	gen_mutex_unlock(&(flow_data->src_mutex));
     }
 
+    gen_mutex_unlock(&flow_data->flow_mutex);
     return;
 };
 

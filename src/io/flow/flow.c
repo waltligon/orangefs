@@ -479,7 +479,11 @@ int PINT_flow_post(flow_descriptor * flow_d, FLOW_context_id context_id)
      */
     if (flow_d->state & FLOW_FINISH_MASK)
     {
-	flow_queue_add(completion_queue_array[flow_d->context_id], flow_d);
+	/* TODO: this is a temporary hack, don't autocomplete multiqueue flows */
+	if(flow_d->type == FLOWPROTO_MULTIQUEUE)
+	    flow_queue_add(transmitting_queue, flow_d);
+	else
+	    flow_queue_add(completion_queue_array[flow_d->context_id], flow_d);
     }
     else if (flow_d->state == FLOW_TRANSMITTING)
     {
