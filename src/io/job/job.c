@@ -709,8 +709,57 @@ int job_dev_unexp(struct PINT_dev_unexp_info* dev_unexp_d,
     job_id_t* id,
     job_context_id context_id)
 {
-    gossip_lerr("Error: unimplemented.\n");
-    return(-ENOSYS);
+    /* post a dev recv for an unexpected message.  We will do a quick
+     * test to see if an unexpected message is available.  If so, we
+     * return the necessary info; if not we queue up to test again later
+     */
+
+    int ret = -1;
+    struct job_desc *jd = NULL;
+    int outcount = 0;
+
+    /* create the job desc first, even though we may not use it.  This
+     * gives us somewhere to store the user ptr etc.
+     */
+    jd = alloc_job_desc(JOB_DEV_UNEXP);
+    if (!jd)
+    {
+	return (-errno);
+    }
+    jd->job_user_ptr = user_ptr;
+    jd->u.dev_unexp.info = dev_unexp_d;
+    jd->context_id = context_id;
+
+    ret = PINT_dev_test_unexpected(1, &outcount, jd->u.dev_unexp.info, 0);
+
+    if (ret < 0)
+    {
+	/* error testing */
+	dealloc_job_desc(jd);
+	return (ret);
+    }
+
+    if (outcount == 1)
+    {
+	/* there was an unexpected job available */
+	out_status_p->error_code = 0;
+	dealloc_job_desc(jd);
+	return (ret);
+    }
+
+    /* if we fall through to this point, then there were not any
+     * uenxpected receive's available; queue up to test later 
+     */
+    gen_mutex_lock(&dev_mutex);
+    *id = jd->job_id;
+    job_desc_q_add(dev_unexp_queue, jd);
+    dev_unexp_pending_count++;
+#ifdef __PVFS2_JOB_THREADED__
+    pthread_cond_signal(&dev_cond);
+#endif /* __PVFS2_JOB_THREADED__ */
+    gen_mutex_unlock(&dev_mutex);
+
+    return (0);
 }
 
 /* job_dev_write()
@@ -728,9 +777,27 @@ int job_dev_write(void* buffer,
     job_id_t * id,
     job_context_id context_id)
 {
-    gossip_lerr("Error: unimplemented.\n");
-    return(-ENOSYS);
+    /* NOTE: This function will _always_ immediately complete for now.  
+     * It is really just in the job interface for completeness, in case we 
+     * decide later to make the function asynchronous
+     */
+
+    int ret = -1;
+
+    ret = PINT_dev_write(buffer, size, buffer_type, tag);
+    if(ret < 0)
+    {
+	/* error posting */
+	out_status_p->error_code = ret;
+	return(1);
+    }
+
+    /* immediate completion */
+    out_status_p->error_code = 0;
+    out_status_p->actual_size = size;
+    return(1);
 }
+
 
 /* job_dev_write_list()
  *
@@ -749,8 +816,26 @@ int job_dev_write_list(void** buffer_list,
     job_id_t* id,
     job_context_id context_id)
 {
-    gossip_lerr("Error: unimplemented.\n");
-    return(-ENOSYS);
+    /* NOTE: This function will _always_ immediately complete for now.  
+     * It is really just in the job interface for completeness, in case we 
+     * decide later to make the function asynchronous
+     */
+
+    int ret = -1;
+
+    ret = PINT_dev_write_list(buffer_list, size_list, list_count,
+	total_size, buffer_type, tag);
+    if(ret < 0)
+    {
+	/* error posting */
+	out_status_p->error_code = ret;
+	return(1);
+    }
+
+    /* immediate completion */
+    out_status_p->error_code = 0;
+    out_status_p->actual_size = total_size;
+    return(1);
 }
 
 
