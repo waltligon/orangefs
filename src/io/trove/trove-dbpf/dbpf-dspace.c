@@ -381,6 +381,11 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
     /* initialize op-specific members */
     q_op_p->op.u.d_setattr.attr_p = ds_attr_p;
 
+    printf("storing attributes (1), uid = %d, mode = %d, type = %d\n",
+	   (int) ds_attr_p->uid,
+	   (int) ds_attr_p->mode,
+	   (int) ds_attr_p->type);
+
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
 
     return 0;
@@ -405,14 +410,18 @@ static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p)
     data.size = sizeof(s_attr);
 
     trove_ds_attr_to_stored((*op_p->u.d_setattr.attr_p), s_attr);
+    
+    printf("storing attributes (2), uid = %d, mode = %d, type = %d\n", (int) s_attr.uid, (int) s_attr.mode, (int) s_attr.type);
 
-    if ((ret = db_p->put(db_p, NULL, &key, &data, 0)) == 0)
-	printf("db: %s: key stored.\n", (char *)key.data);
-    else {
+    ret = db_p->put(db_p, NULL, &key, &data, 0);
+    if (ret != 0) {
 	db_p->err(db_p, ret, "DB->put");
 	goto return_error;
     }
-
+    /* always sync to ensure that data made it to the disk */
+    if ((ret = db_p->sync(db_p, 0)) != 0) {
+	return -1;
+    }
     return 1; /* done */
     
 return_error:
@@ -439,12 +448,13 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
     data.size = data.ulen = sizeof(s_attr);
     data.flags |= DB_DBT_USERMEM;
 
-    if ((ret = db_p->get(db_p, NULL, &key, &data, 0)) == 0)
-	printf("db: %s: key stored.\n", (char *)key.data);
-    else {
-	db_p->err(db_p, ret, "DB->put");
+    ret = db_p->get(db_p, NULL, &key, &data, 0);
+    if (ret != 0) {
+	db_p->err(db_p, ret, "DB->get");
 	goto return_error;
     }
+
+    printf("reading attributes (1), uid = %d, mode = %d, type = %d\n", (int) s_attr.uid, (int) s_attr.mode, (int) s_attr.type);
 
     trove_ds_stored_to_attr(s_attr, (*op_p->u.d_setattr.attr_p), b_size, k_size);
 
@@ -584,5 +594,5 @@ struct TROVE_dspace_ops dbpf_dspace_ops =
  *  c-basic-offset: 4
  * End:
  *
- * vim: ts=8 sw=4 noexpandtab
+ * vim: ts=8 sw=4 sts=4 noexpandtab
  */

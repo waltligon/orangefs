@@ -8,6 +8,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #include <trove.h>
 #include <trove-test.h>
 
@@ -29,6 +30,7 @@ int main(int argc, char **argv)
     TROVE_handle file_handle, parent_handle;
     TROVE_ds_state state;
     TROVE_keyval_s key, val;
+    TROVE_ds_attributes_s s_attr;
     char *method_name, *file_name;
     char path_name[PATH_SIZE];
 
@@ -90,6 +92,17 @@ int main(int argc, char **argv)
     }
 
     /* TODO: set attributes of file? */
+    s_attr.fs_id  = coll_id; /* for now */
+    s_attr.handle = file_handle;
+    s_attr.type   = TROVE_TEST_FILE; /* shouldn't need to fill this one in. */
+    s_attr.uid    = getuid();
+    s_attr.gid    = getgid();
+    s_attr.mode   = 0755;
+    s_attr.ctime  = time(NULL);
+    ret = trove_dspace_setattr(coll_id, file_handle, &s_attr, NULL, &op_id);
+    if (ret == -1) return -1;
+    count = 1;
+    while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
 
     /* add new file name/handle pair to parent directory */
     key.buffer = file_name;

@@ -63,9 +63,9 @@ typedef struct PVFS_vtag PVFS_vtag_s;
  */
 struct PVFS_ds_attributes
 {
-    PVFS_fs_id fs_id;
-    PVFS_handle handle;
-    PVFS_type type;
+    PVFS_fs_id fs_id; /* REQUIRED */
+    PVFS_handle handle; /* REQUIRED */
+    PVFS_type type; /* REQUIRED */
     PVFS_uid uid;
     PVFS_gid gid;
     PVFS_permissions mode;

@@ -25,7 +25,7 @@ int path_lookup(TROVE_coll_id coll_id, char *path, TROVE_handle *out_handle_p);
 
 int main(int argc, char **argv)
 {
-    int ret, num_processed, count, i,j;
+    int ret, it_ret, ga_ret, num_processed, count, i,j;
     TROVE_op_id op_id;
     TROVE_coll_id coll_id;
     TROVE_handle handle;
@@ -84,25 +84,38 @@ int main(int argc, char **argv)
 
     for (;;) {
 	num_processed = KEYVAL_ARRAY_LEN;
-	ret = trove_keyval_iterate(coll_id,
-				   handle,
-				   &pos,
-				   key,
-				   val,
-				   &num_processed,
-				   0,
-				   NULL,
-				   NULL, 
-				   &op_id);
-	if (ret == -1) return -1;
+	it_ret = trove_keyval_iterate(coll_id,
+				      handle,
+				      &pos,
+				      key,
+				      val,
+				      &num_processed,
+				      0,
+				      NULL,
+				      NULL, 
+				      &op_id);
+	if (it_ret == -1) return -1;
 
-	while (ret == 0) ret=trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
-	if (ret < 0) return -1; 
+	while (it_ret == 0) it_ret=trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+	if (it_ret < 0) return -1;
 	
 	if (num_processed == 0) return 0;
 	
 	for(i = 0; i < num_processed; i++ ) {
-	    printf("%s (%Ld)\n", (char *) key[i].buffer, *(TROVE_handle *) val[i].buffer);
+	    TROVE_ds_attributes_s ds_attr;
+
+	    ga_ret = trove_dspace_getattr(coll_id, ls_handle[i], &ds_attr, NULL, &op_id);
+	    if (ga_ret == -1) return -1;
+	    count = 1;
+	    while (ga_ret == 0) ga_ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+
+	    printf("%s (handle = %Ld, uid = %d, gid = %d, perm = %o, type = %d)\n",
+		   (char *) key[i].buffer,
+		   *(TROVE_handle *) val[i].buffer,
+		   (int) ds_attr.uid,
+		   (int) ds_attr.gid,
+		   ds_attr.mode,
+		   ds_attr.type);
 	}
     }
     
