@@ -218,7 +218,11 @@ static int hash_fsid_compare(void *key, struct qlist_head *link)
 
 int trove_handle_mgmt_initialize()
 {
-    int ret = -1;
+    /*
+      due to weird trove_initialize usages; this will always succeed
+      unless a the hash table initialization really fails.
+    */
+    int ret = 0;
 
     if (s_fsid_to_ledger_table == NULL)
     {
