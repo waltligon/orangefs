@@ -47,6 +47,7 @@ int main(int argc, char **argv)
     PVFS_credentials creds;
     int io_server_count;
     struct PVFS_mgmt_perf_stat** perf_matrix;
+    uint64_t end_time_ms;
     uint32_t* next_id_array;
     PVFS_id_gen_t* addr_array;
 
@@ -156,8 +157,8 @@ int main(int argc, char **argv)
 
     while(1)
     {
-	ret = PVFS_mgmt_perf_mon_list(creds, perf_matrix, addr_array,
-	    next_id_array, io_server_count, HISTORY);
+	ret = PVFS_mgmt_perf_mon_list(creds, perf_matrix, &end_time_ms,
+	    addr_array, next_id_array, io_server_count, HISTORY);
 	if(ret < 0)
 	{
 	    PVFS_perror("PVFS_mgmt_perf_mon_list", ret);

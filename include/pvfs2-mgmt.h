@@ -93,6 +93,7 @@ int PVFS_mgmt_statfs_all(
 int PVFS_mgmt_perf_mon_list(
     PVFS_credentials credentials,
     struct PVFS_mgmt_perf_stat** perf_matrix,
+    uint64_t* end_time_ms,
     PVFS_id_gen_t* addr_array,
     uint32_t* next_id_array,
     int server_count,
