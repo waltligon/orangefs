@@ -33,7 +33,7 @@ typedef struct PINT_server_op
 	PVFS_ds_keyval_s *val_a;
 	bmi_addr_t addr;
 	bmi_msg_tag_t tag;
-	PINT_state_array_values current_state;
+	PINT_state_array_values *current_state;
 	struct PVFS_server_req_s *req;
 	struct PVFS_server_resp_s *resp;
 	struct unexpected_info *unexp_bmi_buff;

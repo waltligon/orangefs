@@ -38,7 +38,7 @@ typedef union PINT_state_array_values PINT_state_array_values;
 enum {
 	JMP_NOT_READY = 99,
 	DEFAULT_ERROR = -1,
-	SERVER_REQ_ARRAY_SIZE = 99
+	SERVER_OP_TABLE_SIZE = 99
 };
 
 /* Values for use in KeyVal Array */

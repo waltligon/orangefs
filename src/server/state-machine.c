@@ -68,32 +68,33 @@ extern PINT_state_machine_s mkdir_req_s;
 extern PINT_state_machine_s readdir_req_s;
 extern PINT_state_machine_s lookup_req_s;
 
-PINT_state_machine_s *PINT_state_array[SERVER_REQ_ARRAY_SIZE] =
+/* DALE - fill in the rest of these please - WBL */
+PINT_state_machine_s *PINT_server_op_table[SERVER_OP_TABLE_SIZE] =
 {
 	NULL,               /* 0 */
 	NULL,
-	&create_req_s,
+	&create_req_s,     /* create */
 	NULL,
 	NULL,
 	NULL,					  /* 5 */
 	NULL,
-	&getattr_req_s,
-	&setattr_req_s,
+	&getattr_req_s,    /* get attrib */
+	&setattr_req_s,    /* set attrib */
 	NULL,
-	NULL,					 /* 10 */
-	&lookup_req_s,
+	NULL,					  /* 10 */
+	&lookup_req_s,     /* lookup */
 	NULL,
-	&crdirent_req_s,
+	&crdirent_req_s,   /* create dir entry */
 	NULL,
-	NULL,					 /* 15 */
-	NULL,
-	NULL,
-	&mkdir_req_s,
-	NULL,
-	&readdir_req_s, 	 /* 20 */
+	NULL,					  /* 15 */
 	NULL,
 	NULL,
-	&getconfig_req_s,
+	&mkdir_req_s,      /* mkdir */
+	NULL,
+	&readdir_req_s, 	 /* readdir - 20 */
+	NULL,
+	NULL,
+	&getconfig_req_s,  /* get config */
 	NULL
 };
 
@@ -127,8 +128,8 @@ int PINT_state_machine_initialize_unexpected(state_action_struct *s_op, job_stat
 	s_op->addr = s_op->unexp_bmi_buff->addr;
 	s_op->tag  = s_op->unexp_bmi_buff->tag;
 	s_op->op   = s_op->req->op;
-	s_op->current_state.next_state = PINT_state_machine_locate(s_op);
-	if(!s_op->current_state.next_state)
+	s_op->current_state = PINT_state_machine_locate(s_op);
+	if(!s_op->current_state)
 	{
 		gossip_err("System not init for function\n");
 		return(-1);
@@ -143,11 +144,11 @@ int PINT_state_machine_initialize_unexpected(state_action_struct *s_op, job_stat
 		ret->error_code = 1;
 		return(-ENOMEM);
 	}
-	memset(s_op->resp,0,sizeof(struct PVFS_server_resp_s));
+	memset(s_op->resp, 0, sizeof(struct PVFS_server_resp_s));
 
 	s_op->resp->op = s_op->req->op;
 
-	return(((s_op->current_state.next_state)->state_action)(s_op,ret));
+	return((s_op->current_state->state_action)(s_op,ret));
 
 }
 
@@ -162,10 +163,10 @@ int PINT_state_machine_initialize_unexpected(state_action_struct *s_op, job_stat
 int PINT_state_machine_init(void)
 {
 
-	int i=0;
-	while (i++ < SERVER_REQ_ARRAY_SIZE)
-		if(PINT_state_array[i-1])
-			(PINT_state_array[i-1]->init_fun)();
+	int i;
+	for (in = 0 ; i < SERVER_OP_TABLE_SIZE; i++)
+		if(PINT_server_op_table[i])
+			(PINT_server_op_table[i]->init_fun)();
 	return(0);
 	
 }
@@ -194,34 +195,32 @@ int PINT_state_machine_next(state_action_struct *s,job_status_s *r)
 {
 
    int code_val = r->error_code; 
-	PINT_state_array_values *loc = s->current_state.next_state+1;
+	/* move current state to the first return code */
+	PINT_state_array_values *loc;
 
-	/* loc is set to the proper return value
-	 * update s struct for change
-	 * loc + 1 contains a pointer in the array to the next function.  
-	 * Following this pointer, then incrementing by one gives us
-	 * the return value for the next state.  
-	 * The next time this function is called for this server op
-	 * we are ready to start our comparisons.  
-	 */
+	/* for each entry in the state machine table there is a return
+	 * code followed by a next state pointer to the new state.
+	 * This loops through each entry, checking for a match on the
+	 * return address, and then sets the new current_state and calls
+	 * the new state action function */
 
+	loc = s->current_state + 1;
 	while (loc->return_value != code_val && loc->return_value != DEFAULT_ERROR) 
+	{
+		/* each entry is two items long */
 		loc += 2;
+	}
 
 	/* Update the server_op struct to reflect the new location */
-
 	/* NOTE: This remains a pointer pointing to the first return
-	 *	      value possibility of the function.
-	 */
+	 *	      value possibility of the function.  */
 
-	s->current_state.next_state = (loc + 1)->next_state;
+	s->current_state = (loc + 1)->next_state;
 
-	/* Call the next function.
-	 * NOTE: the function will return back to the original while loop
-	 *       in server_daemon.c
-	 */
+	/* Call the next function.  NOTE: the function will return
+	 * back to the original while loop in server_daemon.c */
 
-	return(((s->current_state.next_state)->state_action)(s,r));
+	return((s->current_state->state_action)(s,r));
 
 }
 
@@ -239,11 +238,12 @@ PINT_state_array_values *PINT_state_machine_locate(state_action_struct *s_op)
 {
 
 	gossip_debug(SERVER_DEBUG,"Locating State machine for %d\n",s_op->op);
-	if(PINT_state_array[s_op->op] != NULL)
+	/* do we need to check for s_op->op out of range?  - WBL */
+	if(PINT_server_op_table[s_op->op] != NULL)
 	{
 		/* Return the first return value possible from the init function... =) */
 		gossip_debug(SERVER_DEBUG,"Found State Machine %d\n",s_op->op);
-		return(((PINT_state_array_values *)PINT_state_array[s_op->op]->state_machine)[0].next_state);
+		return PINT_server_op_table[s_op->op]->state_machine;
 	}
 	gossip_err("State machine not found for operation %d\n",s_op->op);
 	return(NULL);
