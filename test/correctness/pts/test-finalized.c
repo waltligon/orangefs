@@ -379,7 +379,7 @@ static int test_read(void)
     }
 
     ret =
-	PVFS_sys_read(resp_lk.pinode_refn, req_io, io_buffer, 100, credentials,
+	PVFS_sys_read(resp_lk.pinode_refn, req_io, 0, io_buffer, 100, credentials,
 		      &resp_io);
     return ret;
 }
@@ -426,7 +426,7 @@ static int test_write(void)
     }
 
     ret =
-	PVFS_sys_write(resp_lk.pinode_refn, req_io, io_buffer, 100, credentials,
+	PVFS_sys_write(resp_lk.pinode_refn, req_io, 0, io_buffer, 100, credentials,
 		       &resp_io);
     return ret;
 }

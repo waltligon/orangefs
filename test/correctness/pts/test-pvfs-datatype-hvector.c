@@ -58,7 +58,7 @@ int test_pvfs_datatype_hvector(MPI_Comm *mycomm, int myid, char *buf, void *para
             break;
         }
 
-        ret = PVFS_sys_write(resp_lk.pinode_refn, req_io, io_buffer,
+        ret = PVFS_sys_write(resp_lk.pinode_refn, req_io, 0, io_buffer,
                              TEST_PVFS_DATA_SIZE, credentials, &resp_io);
         if(ret < 0)
         {
@@ -71,7 +71,7 @@ int test_pvfs_datatype_hvector(MPI_Comm *mycomm, int myid, char *buf, void *para
 
         /* now try to read the data back */
         memset(io_buffer,0,TEST_PVFS_DATA_SIZE);
-        ret = PVFS_sys_read(resp_lk.pinode_refn, req_io, io_buffer,
+        ret = PVFS_sys_read(resp_lk.pinode_refn, req_io, 0, io_buffer,
                             TEST_PVFS_DATA_SIZE, credentials, &resp_io);
         if(ret < 0)
         {

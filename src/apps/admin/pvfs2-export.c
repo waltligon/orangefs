@@ -191,7 +191,7 @@ int main(int argc, char **argv)
     }
 
     time1 = Wtime();
-    while((ret = PVFS_sys_read(pinode_refn, io_req,
+    while((ret = PVFS_sys_read(pinode_refn, io_req, 0,
                 buffer, buffer_size, credentials, &resp_io)) == 0 &&
 	resp_io.total_completed > 0)
     {

@@ -321,6 +321,7 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s *ret)
 		s_op->u.io.flow_d->file_data->extend_flag = 0;
 
 	s_op->u.io.flow_d->request = s_op->req->u.io.io_req;
+	s_op->u.io.flow_d->request_offset = s_op->req->u.io.io_req_offset;
 	s_op->u.io.flow_d->flags = 0;
 	s_op->u.io.flow_d->tag = s_op->tag;
 	s_op->u.io.flow_d->user_ptr = NULL;

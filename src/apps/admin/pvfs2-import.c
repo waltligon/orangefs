@@ -215,7 +215,7 @@ int main(int argc, char **argv)
 	}
 
 	/* write out the data */
-	ret = PVFS_sys_write(pinode_refn, io_req, buffer, buffer_size, 
+	ret = PVFS_sys_write(pinode_refn, io_req, 0, buffer, buffer_size, 
 			    credentials, &resp_io);
 	if(ret < 0)
 	{

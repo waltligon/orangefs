@@ -267,8 +267,10 @@ struct PVFS_servreq_io
     uint32_t iod_count;
     /* distribution */
     PVFS_Dist *io_dist;
-    /* I/O request description */
+    /* I/O request description (file datatype) */
     PVFS_Request io_req;
+    /* I/O request offset (into file datatype) */
+    PVFS_offset io_req_offset;
 };
 
 struct PVFS_servresp_io

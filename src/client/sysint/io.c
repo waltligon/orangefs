@@ -45,6 +45,7 @@ static int io_req_ack_flow_array(bmi_addr_t* addr_array,
     PVFS_object_attr* attr_p,
     PVFS_pinode_reference pinode_refn, /* FGS replaced PVFS_sys_io request */
     PVFS_Request io_req,
+    PVFS_offset io_req_offset,
     void* buffer, 
     PVFS_size buffer_size, 
     PVFS_credentials credentials, /* end changed by frank */
@@ -60,7 +61,7 @@ static void io_release_req_ack_flow_array(bmi_addr_t* addr_array,
     int* error_code_array,
     int array_size);
 
-static int io_find_target_dfiles(PVFS_Request io_req, PVFS_offset io_offset, 
+static int io_find_target_dfiles(PVFS_Request io_req, PVFS_offset io_req_offset, 
     pinode* pinode_ptr, PVFS_handle* target_handle_array, 
     int* target_handle_count);
 
@@ -72,8 +73,9 @@ static int io_find_target_dfiles(PVFS_Request io_req, PVFS_offset io_offset,
  * returns 0 on success, -errno on failure
  */
 int PVFS_sys_io(PVFS_pinode_reference pinode_refn, PVFS_Request io_req, 
-                void* buffer, PVFS_size buffer_size, PVFS_credentials 
-		credentials, PVFS_sysresp_io *resp, enum PVFS_sys_io_type type)
+		PVFS_offset io_req_offset, void* buffer, PVFS_size buffer_size, 
+		PVFS_credentials credentials, PVFS_sysresp_io *resp, 
+		enum PVFS_sys_io_type type)
 {
     pinode* pinode_ptr = NULL;
     uint32_t attr_mask = 0;
@@ -142,8 +144,8 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_refn, PVFS_Request io_req,
      * contact everyone, just the servers that hold the parts of
      * the file that we are interested in.
      */
-    ret = io_find_target_dfiles(io_req, 0, pinode_ptr, target_handle_array,
-	&target_handle_count);
+    ret = io_find_target_dfiles(io_req, io_req_offset, pinode_ptr, 
+	target_handle_array, &target_handle_count);
     if(ret < 0)
     {
 	phelper_release_pinode(pinode_ptr);
@@ -228,6 +230,7 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_refn, PVFS_Request io_req,
 	req_array[i].u.io.iod_count =
 	    pinode_ptr->attr.u.meta.dfile_count;
 	req_array[i].u.io.io_req = io_req;
+	req_array[i].u.io.io_req_offset = io_req_offset;
 	req_array[i].u.io.io_dist = pinode_ptr->attr.u.meta.dist;
 	if(type == PVFS_SYS_IO_READ)
 	    req_array[i].u.io.io_type = PVFS_IO_READ;
@@ -249,6 +252,7 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_refn, PVFS_Request io_req,
 	&pinode_ptr->attr,
 	pinode_refn, /* FGS replaced PVFS_sys_io request */
 	io_req,
+	io_req_offset,
 	buffer, 
 	buffer_size, 
 	credentials, /* end changed by frank */
@@ -395,7 +399,7 @@ sys_io_out:
  *
  * TODO: make this step more efficient 
  */
-static int io_find_target_dfiles(PVFS_Request io_req, PVFS_offset io_offset, 
+static int io_find_target_dfiles(PVFS_Request io_req, PVFS_offset io_req_offset, 
     pinode* pinode_ptr, PVFS_handle* target_handle_array, 
     int* target_handle_count)
 {
@@ -435,7 +439,7 @@ static int io_find_target_dfiles(PVFS_Request io_req, PVFS_offset io_offset,
 	if(offset)
 	{
 	    segmax = INT_MAX;
-	    bytemax = io_offset;
+	    bytemax = io_req_offset;
 	    eof_flag = 0;
 	    ret = PINT_Process_request(req_state, &tmp_file_data,
 		&segmax, NULL, NULL, &offset, &bytemax,
@@ -502,6 +506,7 @@ static int io_req_ack_flow_array(bmi_addr_t* addr_array,
     PVFS_object_attr* attr_p,
     PVFS_pinode_reference pinode_refn, /* FGS replaced PVFS_sys_io request */
     PVFS_Request io_req,
+    PVFS_offset io_req_offset,
     void* buffer, 
     PVFS_size buffer_size, 
     PVFS_credentials credentials, /* end changed by frank */
@@ -756,6 +761,7 @@ static int io_req_ack_flow_array(bmi_addr_t* addr_array,
 		flow_array[i]->file_data->iod_count =
 		    attr_p->u.meta.dfile_count;
 		flow_array[i]->request = io_req;
+		flow_array[i]->request_offset = io_req_offset;
 		flow_array[i]->flags = 0;
 		flow_array[i]->tag = op_tag_array[i];
 		flow_array[i]->user_ptr = NULL;

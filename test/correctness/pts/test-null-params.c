@@ -451,17 +451,17 @@ static int test_read(int nullCase)
     {
     case 0:
 	ret =
-	    PVFS_sys_read(resp_lk.pinode_refn, NULL, io_buffer, 100,
+	    PVFS_sys_read(resp_lk.pinode_refn, NULL, 0, io_buffer, 100,
 			  credentials, &resp_io);
 	break;
     case 1:
 	ret =
-	    PVFS_sys_read(resp_lk.pinode_refn, req_io, NULL, 100, credentials,
+	    PVFS_sys_read(resp_lk.pinode_refn, req_io, 0, NULL, 100, credentials,
 			  &resp_io);
 	break;
     case 2:
 	ret =
-	    PVFS_sys_read(resp_lk.pinode_refn, req_io, io_buffer, 100,
+	    PVFS_sys_read(resp_lk.pinode_refn, req_io, 0, io_buffer, 100,
 			  credentials, NULL);
 	break;
     }
@@ -512,17 +512,17 @@ static int test_write(int nullCase)
     {
     case 0:
 	ret =
-	    PVFS_sys_write(resp_lk.pinode_refn, NULL, io_buffer, 100,
+	    PVFS_sys_write(resp_lk.pinode_refn, NULL, 0, io_buffer, 100,
 			   credentials, &resp_io);
 	break;
     case 1:
 	ret =
-	    PVFS_sys_write(resp_lk.pinode_refn, req_io, NULL, 100, credentials,
+	    PVFS_sys_write(resp_lk.pinode_refn, req_io, 0, NULL, 100, credentials,
 			   &resp_io);
 	break;
     case 2:
 	ret =
-	    PVFS_sys_write(resp_lk.pinode_refn, req_io, io_buffer, 100,
+	    PVFS_sys_write(resp_lk.pinode_refn, req_io, 0, io_buffer, 100,
 			   credentials, NULL);
 	break;
     }
