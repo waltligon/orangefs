@@ -9,6 +9,7 @@
 
 #include <errno.h>
 #include <string.h>
+#include <assert.h>
 
 #include "pvfs2-types.h"
 #include "pvfs2-attr.h"
@@ -18,6 +19,7 @@
 #include "dotconf.h"
 #include "trove.h"
 #include "server-config.h"
+#include "llist.h"
 
 /*
 FIXME:
@@ -53,7 +55,32 @@ static PVFS_handle HACK_bucket = 0;
  */
 int PINT_bucket_initialize(void)
 {
-	return(0);
+    int ret = -EINVAL;
+    struct llist *cur = NULL;
+    struct filesystem_configuration_s *cur_fs = NULL;
+    char *cur_h_range = (char *)0;
+
+    cur = g_server_config.file_systems;
+    while(cur)
+    {
+        cur_fs = llist_head(cur);
+        if (!cur_fs)
+        {
+            break;
+        }
+        cur_h_range = PINT_server_config_get_handle_range_str(
+            &g_server_config,cur_fs);
+        assert(cur_h_range);
+
+        /* FIXME: this is all hacked atm */
+        /* if (do_something_cool(cur_fs,cur_h_range)) break; */
+        ret = 0;
+        gossip_lerr("Mapping handle range %s to file system %s\n",
+                    cur_h_range,cur_fs->file_system_name);
+
+        cur = llist_next(cur);
+    }
+    return ret;
 }
 
 /* PINT_bucket_finalize()
@@ -119,6 +146,7 @@ int PINT_bucket_get_next_meta(
 	PVFS_handle* handle_mask)
 {
 	int ret = -1;
+
 #if 0
 	/* make sure that they asked for something sane */
 	if (!PINT_server_config_is_valid_collection_id(
@@ -210,24 +238,21 @@ int PINT_bucket_map_to_server(
 	bmi_addr_t* server_addr,
 	PVFS_handle bucket,
 	PVFS_fs_id fsid)
-{	
-	int ret = -1;
+{
+    char *bmi_server_addr = (char *)0;
 
-#if 0
-	/* make sure that they asked for something sane */
-	if (!PINT_server_config_is_valid_collection_id(
-                &g_server_config,(TROVE_coll_id)fsid))
-	{
-		gossip_lerr("PINT_bucket_map_to_server() called with invalid fsid.\n");
-		return(-EINVAL);
-	}
-#endif
-	ret = BMI_addr_lookup(server_addr, HACK_server_name);
-	if(ret < 0)
-	{
-		return(ret);
-	}
-	return(0);
+    /* make sure the specified fs_id is sane */
+    if (!PINT_server_config_is_valid_collection_id(
+            &g_server_config,(TROVE_coll_id)fsid))
+    {
+        gossip_lerr("PINT_bucket_map_to_server() called with invalid fs_id.\n");
+        return(-EINVAL);
+    }
+
+    /* FIXME: hack for compatibility */
+    bmi_server_addr = HACK_server_name;
+
+    return BMI_addr_lookup(server_addr, bmi_server_addr);
 }
 
 

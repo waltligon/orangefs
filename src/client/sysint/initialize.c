@@ -135,19 +135,6 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, PVFS_sysresp_init *resp)
     }
     memset(server_config.fs_info, 0, mntent_list.nr_entry * sizeof(fsconfig));
 
-    /* Grab the mutex - serialize all writes to server_config */
-    gen_mutex_lock(&mt_config);	
-	
-    /* Initialize the configuration management interface */
-    ret = PINT_bucket_initialize();
-    if (ret < 0)
-    {
-	init_fail = BUCKET_INIT_FAIL;
-	gossip_ldebug(CLIENT_DEBUG,"Error in initializing configuration management interface\n");
-	/* Release the mutex */
-	gen_mutex_unlock(&mt_config);
-	goto return_error;
-    }
 
     /* Get configuration parameters from server */
     ret = server_get_config(mntent_list);
@@ -159,9 +146,22 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, PVFS_sysresp_init *resp)
 	gen_mutex_unlock(&mt_config);
 	goto return_error;
     }
-
     num_file_systems = llist_count(g_server_config.file_systems);
     assert(num_file_systems);
+
+    /* Grab the mutex - serialize all writes to server_config */
+    gen_mutex_lock(&mt_config);	
+
+    /* Initialize the configuration management interface */
+    ret = PINT_bucket_initialize();
+    if (ret < 0)
+    {
+	init_fail = BUCKET_INIT_FAIL;
+	gossip_ldebug(CLIENT_DEBUG,"Error in initializing configuration management interface\n");
+	/* Release the mutex */
+	gen_mutex_unlock(&mt_config);
+	goto return_error;
+    }
 
     /* we need to return the fs_id's to the calling function */
     resp->nr_fsid = num_file_systems;
