@@ -1,5 +1,5 @@
 DIR := src/proto
 LIBSRC += \
-	$(DIR)/PINT-reqproto-lib.c 
+	$(DIR)/PINT-reqproto-encode.c 
 SERVERSRC += \
-	$(DIR)/PINT-reqproto-lib.c 
+	$(DIR)/PINT-reqproto-encode.c 
