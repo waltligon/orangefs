@@ -6,4 +6,5 @@ TESTSRC += \
 	$(DIR)/getattr.c \
 	$(DIR)/getconfig.c \
 	$(DIR)/mkdir.c \
+	$(DIR)/readdir.c \
 	$(DIR)/setattr.c
