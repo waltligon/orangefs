@@ -116,26 +116,35 @@ int PINT_req_sched_finalize(
 {
 	int i;
 	struct req_sched_list* tmp_list;
+	struct qlist_head* scratch;
+	struct qlist_head* iterator;
+	struct qlist_head* scratch2;
+	struct qlist_head* iterator2;
 	struct req_sched_element* tmp_element;
 
 	/* iterate through the hash table */
 	for(i=0; i<req_sched_table->table_size; i++)
 	{
 		/* remove any queues from the table */
-		while(!qlist_empty(&(req_sched_table->array[i])))
+		qlist_for_each_safe(iterator, scratch,
+			&(req_sched_table->array[i]))
 		{
-			tmp_list = qlist_entry((req_sched_table->array[i].next),
-				struct req_sched_list, hash_link);
-			qlist_del(&(tmp_list->hash_link));
+			tmp_list = qlist_entry(iterator, struct req_sched_list, 
+				hash_link);
 			/* remove any elements from each queue */
-			while(!qlist_empty(&(tmp_list->req_list)))
+			qlist_for_each_safe(iterator2, scratch2, &(tmp_list->req_list))
 			{
-				tmp_element = qlist_entry((tmp_list->req_list.next),
+				tmp_element = qlist_entry(iterator2, 
 					struct req_sched_element, list_link);
-				qlist_del(&(tmp_element->list_link));
 				free(tmp_element);
+				/* note: no need to delete from list; we are
+				 * destroying it as we go 
+				 */
 			}
 			free(tmp_list);
+			/* note: no need to delete from list; we are destroying
+			 * it as we go
+			 */
 		}
 	}
 
@@ -330,7 +339,8 @@ int PINT_req_sched_unpost(
 			/* skip looking at the next request if it is already
 			 * ready to go 
 			 */
-			if(next_element->state != REQ_READY_TO_SCHEDULE)
+			if(next_element->state != REQ_READY_TO_SCHEDULE &&
+				next_element->state != REQ_SCHEDULED)
 			{
 				next_element->state = REQ_READY_TO_SCHEDULE;
 				qlist_add_tail(&(next_element->ready_link), &ready_queue);
@@ -415,7 +425,8 @@ int PINT_req_sched_release(
 		/* skip it if the top queue item is already ready for
 		 * scheduling 
 		 */
-		if(next_element->state != REQ_READY_TO_SCHEDULE)
+		if(next_element->state != REQ_READY_TO_SCHEDULE &&
+			next_element->state != REQ_SCHEDULED)
 		{
 			next_element->state = REQ_READY_TO_SCHEDULE;
 			qlist_add_tail(&(next_element->ready_link), &ready_queue);
