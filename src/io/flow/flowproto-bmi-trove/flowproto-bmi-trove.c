@@ -1980,6 +1980,12 @@ static void bmi_completion_bmi_to_mem(bmi_error_code_t error_code,
 	/* if we got a short message, then we have to rewind the
 	 * request processing stream
 	 */
+	/* TODO: fix this; we should probably treat it as a managable error.
+	 * For now it is just an assertion; we don't want to have to rewind 
+	 * the stream as is done in the #if 0'd code
+	 */
+	assert(actual_size == flow_data->bmi_total_size);
+#if 0
 	if (actual_size < flow_data->bmi_total_size)
 	{
 	    if (flow_d->current_req_offset != -1)
@@ -1987,6 +1993,7 @@ static void bmi_completion_bmi_to_mem(bmi_error_code_t error_code,
 		flow_d->current_req_offset = (flow_d->total_transfered);
 	    }
 	}
+#endif
     }
 
     /* did this complete the flow? */
