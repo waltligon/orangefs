@@ -155,10 +155,14 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_ref,
 
     error = sm_p->error_code;
 
-    /* flush pcache entry, if any */
+    /* invalidate pinode entry's size on write, if pinode exists */
     if (sm_p->pcache_hit && (io_type == PVFS_IO_WRITE))
     {
-        PINT_pcache_invalidate(pinode_ref);
+        /* invalidate the size attribute in the pinode */
+        sm_p->pinode->attr.mask &= ~PVFS_ATTR_DATA_SIZE;
+
+        PINT_pcache_set_valid(sm_p->pinode);
+        PINT_pcache_release(sm_p->pinode);
         sm_p->pcache_hit = 0;
     }
     free(sm_p);
@@ -264,6 +268,28 @@ static int io_object_getattr_comp_fn(void *v_p,
 
     if (!sm_p->pcache_hit)
     {
+        int release_required = 1;
+        PINT_pinode *pinode =
+            PINT_pcache_lookup(sm_p->u.io.object_ref);
+        if (!pinode)
+        {
+            pinode = PINT_pcache_pinode_alloc();
+            assert(pinode);
+            release_required = 0;
+        }
+        pinode->refn = sm_p->u.io.object_ref;
+        pinode->size = r_attr_p->u.data.size;
+
+        PINT_pcache_object_attr_deep_copy(
+            &pinode->attr, r_attr_p);
+
+        PINT_pcache_set_valid(pinode);
+
+        if (release_required)
+        {
+            PINT_pcache_release(pinode);
+        }
+
         /*
           FIXME: Replace with PVFS_Dist_copy, which
           causes problems when used here

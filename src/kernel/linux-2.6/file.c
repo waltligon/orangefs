@@ -173,7 +173,8 @@ static ssize_t pvfs2_file_write(
 
     while(total_count < count)
     {
-	pvfs2_print("pvfs2: write iteration.\n");
+	pvfs2_print("pvfs2: write iteration %d (size of %d).\n",
+                    total_count, count);
 
 	/* get a buffer for the transfer */
 	/* note that we get a new buffer each time for fairness, though

@@ -147,6 +147,7 @@ static int getattr_pcache_lookup(PINT_client_sm *sm_p,
             }
 
           cache_hit:
+            gossip_debug(PCACHE_DEBUG, "pcache: pcache hit\n"); 
             /* build a fake response for completion */
             fake_resp.op = PVFS_SERV_GETATTR;
             fake_resp.status = 0;
@@ -164,8 +165,13 @@ static int getattr_pcache_lookup(PINT_client_sm *sm_p,
             return 1;
         }
       cache_miss:
+        gossip_debug(
+            PCACHE_DEBUG, "pcache: invalid pcache miss (%d != %d)\n",
+            sm_p->u.getattr.attrmask, sm_p->pinode->attr.mask);
         PINT_pcache_release(sm_p->pinode);
     }
+    gossip_debug(PCACHE_DEBUG,"pcache: clean pcache miss(%d)\n",
+                 sm_p->u.getattr.attrmask); 
 
     js_p->error_code = GETATTR_PCACHE_MISS;
     return 1;
