@@ -12,6 +12,7 @@
 # admintools builds admin tools
 # statecomp  builds only the statecomp component
 # cscope     generates information for cscope utility
+# tags       generates tags file for use by editors
 # codecheck  checks source code for nonconformance to our std.
 # mpitests   builds test programs that use mpi
 # 
@@ -69,7 +70,7 @@ QUIET_COMPILE = @QUIET_COMPILE@
 #    of a file that has the same name as the target.  Listing them
 #    here keeps make from accidentally doing too much work (see GNU
 #    make manual).
-.PHONY: all clean tests distclean docs docsclean cscope codecheck statecomp admintools
+.PHONY: all clean tests distclean docs docsclean cscope tags codecheck statecomp admintools
 
 ################################################################
 # Find project subdirectories
@@ -420,6 +421,11 @@ cscope:
 		-name pvfs2-types.h.in > $(srcdir)/cscope.files
 	( cd $(srcdir); cscope -be -i $(srcdir)/cscope.files )
 
+# build editor tags file over just the modules of interest
+tags:
+	find $(MODULES) include . -maxdepth 1 -name '*.[ch]' -print |\
+	  ctags --excmd=pattern -B -I __hidden,DOTCONF_CB -L-
+
 # rule for running code check
 codecheck:
 	find $(srcdir) -iname "*.[ch]" | xargs -n 1 $(srcdir)/maint/pvfs2codecheck.pl
@@ -446,21 +452,14 @@ distclean: clean
 	rm -f Makefile config.log config.status config.cache pvfs2-config.h
 	rm -f src/io/trove/autogen.c
 	rm -f $(SERVERGENSRC)
+	rm -f tags
 
 # this is where we include all of our automatic dependencies.
 # NOTE: we wrap this in ifneq's in order to prevent the
 #    dependencies from being generated for special targets that don't 
 #    require them
-ifneq ($(MAKECMDGOALS),statecomp)
-ifneq ($(MAKECMDGOALS),clean)
-ifneq ($(MAKECMDGOALS),distclean)
-ifneq ($(MAKECMDGOALS),docs)
-ifneq ($(MAKECMDGOALS),cscope)
+ifeq (,$(filter statecomp clean distclean docs cscope tags,$(MAKECMDGOALS)))
 -include $(DEPENDS)
-endif
-endif
-endif
-endif
 endif
 
 # rule for generating dependency files for MPI code
