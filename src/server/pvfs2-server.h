@@ -264,6 +264,7 @@ extern struct PINT_state_machine_s pvfs2_remove_sm;
 extern struct PINT_state_machine_s pvfs2_rmdirent_sm;
 extern struct PINT_state_machine_s pvfs2_flush_sm;
 extern struct PINT_state_machine_s pvfs2_setparam_sm;
+extern struct PINT_state_machine_s pvfs2_noop_sm;
 
 /* nested state machines */
 extern struct PINT_state_machine_s pvfs2_prelude_sm;

@@ -15,6 +15,7 @@ SERVERGENSRC := \
 	$(DIR)/rmdirent.c \
 	$(DIR)/io.c \
 	$(DIR)/flush.c \
+	$(DIR)/noop.c \
 	$(DIR)/prelude.c \
 	$(DIR)/final-response.c
 
