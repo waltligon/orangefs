@@ -22,6 +22,7 @@ int parse_pvfstab(char *fn,pvfs_mntlist *pvfstab_p)
 	char *root_mnt = NULL,*tok = NULL;
 	char delims[] = "- \n"; /* Delimiters for strtok */
 	int index = 0, ret = 0,lines = 0;
+	size_t len1=0, len2=0;
 
 	/* Open the pvfstab file */
 	tab = fopen("pvfstab","rb");
@@ -51,88 +52,132 @@ int parse_pvfstab(char *fn,pvfs_mntlist *pvfstab_p)
 	/* Get a line from the pvstab file */
 	while (fgets(line,80,tab) != NULL)
 	{
+		//printf("read a line \n");
 		/* Is the line blank? */
 		if (strlen(line) > 1)
 		{
+			//printf("line = \"%s\"\n",line);
 			/* Skip the first token */
 			tok = strtok(line,delims);
+			//printf("skipping = %s\n", tok);
 
 			/* Extract the bmi address */
 			tok = strtok(NULL,delims);
+			//printf("bmi_address = %s\n", tok);
 #define META_ADDR pvfstab_p->ptab_p[index].meta_addr 
 			root_mnt = strrchr(tok,'/');
-			META_ADDR = (PVFS_string)malloc(strlen(tok)-strlen(root_mnt) + 1);
+			//printf("root = %s\n", root_mnt);
+			//printf("tok = %s\n", tok);
+			len1 = strlen(tok);
+			len2 = strlen(root_mnt);
+			if ((len1 < 0) || (len2 < 0))
+			{
+				ret = -EINVAL;
+				goto metaaddr_failure;
+			}
+			META_ADDR = (PVFS_string)malloc(len1-len2 + 1);
 			if (!META_ADDR)
 			{
 				ret = -ENOMEM;
 				goto metaaddr_failure;
 			}
-			strncpy(META_ADDR,tok,strlen(tok)-strlen(root_mnt));
-			META_ADDR[strlen(tok) - strlen(root_mnt)] = '\0';
+			strncpy(META_ADDR,tok,len1-len2);
+			META_ADDR[len1 - len2] = '\0';
+			//printf("meta_attr = %s\n",META_ADDR);
 #undef META_ADDR 
 
 #define SERV_MNT pvfstab_p->ptab_p[index].serv_mnt_dir 
 			/* Extract the Root Mount Point */
-			SERV_MNT = (PVFS_string)malloc(strlen(root_mnt) + 1);
+			len1 = strlen(root_mnt);
+			if (len1 < 0)
+			{
+				ret = -EINVAL;
+				goto servmnt_failure;
+			}
+			SERV_MNT = (PVFS_string)malloc(len1 + 1);
 			if (!SERV_MNT)
 			{
 				ret = -ENOMEM;
 				goto servmnt_failure;
 			}
-			strncpy(SERV_MNT,root_mnt,strlen(root_mnt));
-			SERV_MNT[(strlen(root_mnt))] = '\0';
+			strncpy(SERV_MNT,root_mnt,len1);
+			SERV_MNT[len1] = '\0';
 #undef SERV_MNT 
 
 #define LOCAL_MNT pvfstab_p->ptab_p[index].local_mnt_dir 
 			/* Extract the Local Mount Point */
 			tok = strtok(NULL,delims);
-			LOCAL_MNT = (PVFS_string)malloc(strlen(tok) + 1);
+			len1 = strlen(tok);
+			if (len1 < 0)
+			{
+				ret = -EINVAL;
+				goto localmnt_failure;
+			}
+			LOCAL_MNT = (PVFS_string)malloc(len1 + 1);
 			if (!LOCAL_MNT)
 			{
 				ret = -ENOMEM;
 				goto localmnt_failure;
 			}
-			strncpy(LOCAL_MNT,tok,strlen(tok));
-			LOCAL_MNT[(strlen(tok))] = '\0';
+			strncpy(LOCAL_MNT,tok,len1);
+			LOCAL_MNT[len1] = '\0';
 #undef LOCAL_MNT 
 
 #define FTYPE pvfstab_p->ptab_p[index].fs_type 
 			/* Extract the File System Type */
 			tok = strtok(NULL,delims);
-			FTYPE = (PVFS_string)malloc(strlen(tok) + 1);
+			len1 = strlen(tok);
+			if (len1 < 0)
+			{
+				ret = -EINVAL;
+				goto fstype_failure;
+			}
+			FTYPE = (PVFS_string)malloc(len1 + 1);
 			if (!FTYPE)
 			{
 				ret = -ENOMEM;
 				goto fstype_failure;
 			}
-			strncpy(FTYPE,tok,strlen(tok));
-			FTYPE[(strlen(tok))] = '\0';
+			strncpy(FTYPE,tok,len1);
+			FTYPE[len1] = '\0';
 #undef FTYPE 
 			
 #define OPT1 pvfstab_p->ptab_p[index].opt1 
 			/* Extract the option 1 */
 			tok = strtok(NULL,delims);
-			OPT1 = (PVFS_string)malloc(strlen(tok) + 1);
+			len1 = strlen(tok);
+			if (len1 < 0)
+			{
+				ret = -EINVAL;
+				goto opt1_failure;
+			}
+			OPT1 = (PVFS_string)malloc(len1 + 1);
 			if (!OPT1)
 			{
 				ret = -ENOMEM;
 				goto opt1_failure;
 			}
-			strncpy(OPT1,tok,strlen(tok));
-			OPT1[(strlen(tok))] = '\0';
+			strncpy(OPT1,tok,len1);
+			OPT1[len1] = '\0';
 #undef OPT1 
 	
 #define OPT2 pvfstab_p->ptab_p[index].opt2 
 			/* Extract the option 2 */
 			tok = strtok(NULL,delims);
-			OPT2 = (PVFS_string)malloc(strlen(tok) + 1);
+			len1 = strlen(tok);
+			if (len1 < 0)
+			{
+				ret = -EINVAL;
+				goto opt2_failure;
+			}
+			OPT2 = (PVFS_string)malloc(len1 + 1);
 			if (!OPT2)
 			{
 				ret = -ENOMEM;
 				goto opt2_failure;
 			}
-			strncpy(OPT2,tok,strlen(tok));
-			OPT2[(strlen(tok))] = '\0';
+			strncpy(OPT2,tok,len1);
+			OPT2[len1] = '\0';
 #undef OPT2 
 		/* Increment the counter */
 		index++;
