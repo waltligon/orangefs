@@ -366,6 +366,10 @@ int main(int argc,
 		}
 #endif
 		ret = PINT_state_machine_initialize_unexpected(s_op, &job_status_structs[i]);
+                do
+                {
+                    ret = PINT_state_machine_next(s_op, &job_status_structs[i]);
+                } while (ret == 1);
 		postBMIFlag = 1;
 	    }
 	    else
