@@ -5,13 +5,22 @@
  */
 
 /* Lookup Function Implementation */
+#include <malloc.h>
+#include <assert.h>
+#include <string.h>
 
-#include <pinode-helper.h>
-#include <pvfs2-sysint.h>
-#include <pint-sysint.h>
-#include <pint-dcache.h>
-#include <pint-servreq.h>
-#include <config-manage.h>
+#include "pcache.h"
+#include "pinode-helper.h"
+#include "pvfs2-sysint.h"
+#include "pint-sysint.h"
+#include "pint-dcache.h"
+#include "pint-servreq.h"
+#include "config-manage.h"
+#include "PINT-reqproto-encode.h"
+
+#define REQ_ENC_FORMAT 0
+/* TODO: figure out the maximum number of handles a given metafile can have*/
+#define MAX_HANDLES_PER_METAFILE 10
 
 /* PVFS_sys_lookup()
  *
@@ -47,9 +56,10 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 {
     /* Initialization */   
     struct PVFS_server_req_s *req_p = NULL;	 /* server request */
-    struct PVFS_server_req_s *req_job = NULL;	 /* server request */
-    struct PVFS_server_resp_s *ack_job = NULL; /* server response */
+    struct PVFS_server_resp_s *ack_p = NULL; /* server response */
     int ret = -1, i = 0, tflags = 0;
+    int max_msg_sz, name_sz;
+    struct PINT_decoded_msg decoded;
 
     pinode *entry_pinode = NULL, *pinode_ptr = NULL;
     char *server = NULL, *segment = NULL, *path = NULL;
@@ -59,8 +69,13 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
     PVFS_handle parent_handle, final_handle = 0;
     PVFS_bitfield attr_mask;
     pinode_reference entry, parent;
-    PVFS_servreq_lookup_path req_args;
 
+
+    req_p = (struct PVFS_server_req_s *) malloc(sizeof(struct PVFS_server_req_s));
+    if (req_p == NULL)
+    {
+        assert(0);
+    }
 
     /* Get the total number of segments */
     get_no_of_segments(req->name,&num_seg);
@@ -90,6 +105,7 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 	goto path_alloc_failure;
     }
     memcpy(path, req->name, path_len);
+    printf("looking up path = %s\n", path);
 
     /* Fill the parent pinode, parent handle is root handle */
     parent.handle = parent_handle;
@@ -98,6 +114,7 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 	/* Is any segment still to be looked up? */
     while(segment && ((end_path + 1) < strlen(req->name)))
     {
+        printf("looking up segment = %s\n", segment);
 	/* Search in the dcache */
 	ret = PINT_dcache_lookup(segment,parent,&entry);
 	if(ret < 0)
@@ -108,55 +125,78 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 	/* Was entry in cache? */
 	if (entry.handle == PINT_DCACHE_HANDLE_INVALID)
 	{
+	    printf("not in dcache\n");
 	    /* Entry not in dcache */
 
 	    /* send server request here */
+	    /* TODO: IS THIS A REASONABLE MAXIMUM MESSAGE SIZE?  I HAVE NO IDEA */
+	    /* 
+	     * Q: what is the largest response for a lookup?
+	     * Q: what's the largest number of handles any meta file have?
+	     * (?? number of buckets in the system)
+	     *
+	     * total number of segments in the path * sizeof(PVFS_handle) + 
+	     * total number of segments in the path * sizeof(PVFS_object_attr) +
+	     * total number data files for each segment
+	     *
+	     * user/program/file1.dat
+	     * 3 segments, user and program are metafiles, file1 is a data file
+	     * largest response = 2 * (max # of handles for a metafile) + 
+	     *
+	     */
+
+	    max_msg_sz = sizeof(struct PVFS_server_resp_s) + num_seg * sizeof(PVFS_handle)*MAX_HANDLES_PER_METAFILE;
+	    name_sz = strlen(path) + 1;
+	    req_p->op     = PVFS_SERV_LOOKUP_PATH;
+	    req_p->rsize = sizeof(struct PVFS_server_req_s) + name_sz;
+	    req_p->credentials = req->credentials;
 
 	    /* Need to pass the arguments */
-	    req_args.path = (char *)malloc(strlen(path) + 1);
-	    if (!req_args.path)
+	    req_p->u.lookup_path.path = (char *)malloc(name_sz);
+	    if (!req_p->u.lookup_path.path)
 	    {
 		ret = -ENOMEM;
 		goto dcache_lookup_failure;
 	    }
-	    req_args.starting_handle = parent_handle;
-	    strncpy(req_args.path,path,strlen(path));
-	    req_args.path[strlen(path)] = '\0';
-	    req_args.fs_id = req->fs_id;
-	    req_args.attrmask = ATTR_BASIC;
+	    memcpy(req_p->u.lookup_path.path, path, name_sz);
+	    req_p->u.lookup_path.fs_id = req->fs_id;
+	    req_p->u.lookup_path.starting_handle = parent_handle;
+	    req_p->u.lookup_path.attrmask = ATTR_BASIC;
 
-			/* Get Metaserver in BMI URL format using the bucket table 
-			 * interface */
-	    ret = config_bt_map_bucket_to_server(&server,parent.handle,\
+		/* Get Metaserver in BMI URL format using the bucket table 
+		 * interface */
+	    ret = config_bt_map_bucket_to_server(&server, parent.handle,
 						 parent.fs_id);
 	    if (ret < 0)
 	    {
 		goto map_to_server_failure;
 	    }
+	    printf("mapping server address from bti to bmi address\n");
 	    ret = BMI_addr_lookup(&serv_addr,server);
 	    if (ret < 0)
 	    {
 		goto map_to_server_failure;
 	    }
 	    /* Free the server */
-	    if (server)
-		free(server);
+	    free(server);
+	    server = NULL;
 
-			/* Make a lookup_path server request to get the handle and
-			 * attributes of segment
-			 */
-	    ret = pint_serv_lookup_path(&req_job,&ack_job,&req_args,\
-					req->credentials,&serv_addr);
+	/* Make a lookup_path server request to get the handle and
+	 * attributes of segment
+	 */
+
+	    ret = PINT_server_send_req(serv_addr, req_p, max_msg_sz, &decoded);
 	    if (ret < 0)
 	    {
 		goto lookup_path_failure;
 	    }
-			
+	    ack_p = (struct PVFS_server_resp_s *) decoded.buffer;
+
 	    /* Repeat for number of handles returned */
-	    for(i = 0; i < ack_job->u.lookup_path.count; i++)
+	    for(i = 0; i < ack_p->u.lookup_path.count; i++)
 	    {
 				/* Fill up pinode reference for entry */
-		entry.handle = ack_job->u.lookup_path.handle_array[i];
+		entry.handle = ack_p->u.lookup_path.handle_array[i];
 		entry.fs_id = req->fs_id;
 
 				/* Add entry to dcache */
@@ -172,13 +212,13 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 		    ret = -ENOMEM;
 		    goto lookup_path_failure ;
 		}
-				/* Fill the pinode */
+		/* Fill the pinode */
 		pinode_ptr->pinode_ref.handle = entry.handle;
 		pinode_ptr->pinode_ref.fs_id = entry.fs_id;
-		pinode_ptr->attr = ack_job->u.lookup_path.attr_array[i];
-		pinode_ptr->mask = req_args.attrmask;
+		pinode_ptr->attr = ack_p->u.lookup_path.attr_array[i];
+		pinode_ptr->mask = req_p->u.lookup_path.attrmask;
 
-				/* Check permissions for path */
+		/* Check permissions for path */
 		ret = check_perms(pinode_ptr->attr,req->credentials.perms,\
 				  req->credentials.uid, req->credentials.gid);
 		if (ret < 0)
@@ -193,20 +233,20 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 		    goto check_perms_failure;
 		}
 					
-				/* Set the size timestamp - size was not fetched */
+		/* Set the size timestamp - size was not fetched */
 		pinode_ptr->tstamp_size.tv_sec = 0;
 		pinode_ptr->tstamp_size.tv_usec = 0;
 
-				/* Add to the pinode list */
+		/* Add to the pinode list */
 		ret = PINT_pcache_insert(pinode_ptr);
 		if (ret < 0)
 		{
 		    goto check_perms_failure;
 		}
 				
-				/* If it is the final object handle,save it!! */
+		/* If it is the final object handle,save it!! */
 		num_seg--;
-		if (!num_seg)
+		if (num_seg == 0)
 		{
 		    final_handle = pinode_ptr->pinode_ref.handle;
 		}
@@ -216,16 +256,16 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 		{
 		    goto check_perms_failure;
 		}
-		
-				/* Update the parent handle with the handle of last segment
-				 * that has been looked up
-				 */
+
+		/* Update the parent handle with the handle of last segment
+		 * that has been looked up
+		 */
 		parent.handle = entry.handle;
 				
 	    }/* For */
 
 	    /* Get the remaining part of the path to be looked up */
-	    ret = get_next_path(path,ack_job->u.lookup_path.count,&start_path,
+	    ret = get_next_path(path,ack_p->u.lookup_path.count,&start_path,
 				&end_path);
 	    if (ret < 0)
 	    {
@@ -234,6 +274,7 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 	}
 	else
 	{
+	    printf("dcache hit\n");
 	    /* A Dcache hit! */
 	    /* Get pinode from pinode cache */
 	    /* If no pinode exists no error, will fetch 
@@ -284,8 +325,10 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 	parent.handle = entry.handle;
 
 	/* Free request,ack jobs */
-	sysjob_free(serv_addr,ack_job,ack_job->rsize,BMI_RECV_BUFFER,NULL);
-	sysjob_free(serv_addr,req_job,req_job->rsize,BMI_SEND_BUFFER,NULL);
+	PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
+
+	free(req_p->u.lookup_path.path);
+	free(req_p);
 
     }/* end of while */
 
@@ -295,33 +338,40 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 
     return(0);
  
- check_perms_failure:
+check_perms_failure:
+printf("check_perms_failure\n");
     /* Free pinode allocated */
     PINT_pcache_pinode_dealloc(pinode_ptr);
 
- lookup_path_failure:
+lookup_path_failure:
+printf("lookup_path_failure\n");
     /* Free the recently allocated pinode */
-    if (entry_pinode)
+    if (entry_pinode != NULL)
 	free(entry_pinode);
-    if (ack_job)
-	sysjob_free(serv_addr,ack_job,ack_job->rsize,BMI_RECV_BUFFER,NULL);
-    if (req_job)
-	sysjob_free(serv_addr,req_job,req_job->rsize,BMI_SEND_BUFFER,NULL);
+    if (ack_p != NULL)
+	PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
 
- map_to_server_failure:
-    if (server)
+map_to_server_failure:
+printf("map_to_server_failure\n");
+    if(server != NULL)
 	free(server);
     /* Free memory allocated for name */
-    if (req_args.path)
-	free(req_args.path);
+    if (req_p->u.lookup_path.path != NULL)
+	free(req_p->u.lookup_path.path);
 
- dcache_lookup_failure:
+dcache_lookup_failure:
+printf("dcache_lookup_failure\n");
     /* Free the path string */
-    if (path)
+    if (path != NULL)
 	free(path);
+    if (req_p != NULL)
+    {
+	free(req_p);
+    }
 
- path_alloc_failure:
-    if (segment)
+path_alloc_failure:
+printf("path_alloc_failure\n");
+    if (segment != NULL)
 	free(segment);
 
     return(ret);

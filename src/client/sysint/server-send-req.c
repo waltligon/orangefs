@@ -67,23 +67,39 @@ int PINT_server_send_req(bmi_addr_t addr,
     {
 	goto return_error;
     }
-    else if (ret == 1 && s_status.error_code != 0)
+    else if (ret == 0 && s_status.error_code != 0)
     {
 	ret = -EINVAL;
 	goto return_error;
     }
 
+    debug_print_type(req_p, 0);
+    printf(" sent\n");
+
     /* post a blocking receive job */
     ret = job_bmi_recv_blocking(addr, encoded_resp, max_resp_size, op_tag, BMI_PRE_ALLOC, &r_status);
+    printf("message recieved: \nr_status.actual_size = %d\n",r_status.actual_size);
+    printf("r_status.error_code = %d\nreturn value = %d\n",r_status.error_code, ret);
     if (ret < 0)
     {
 	goto return_error;
     }
-    else if (ret == 1 && (r_status.error_code != 0 || r_status.actual_size > max_resp_size))
+    else 
     {
-	ret = -EINVAL;
-	goto return_error;
+	if (((ret == 0) && (r_status.error_code != 0)) || (r_status.actual_size > max_resp_size))
+	{
+	    ret = -EINVAL;
+	    goto return_error;
+	}
+	else
+	{
+	    printf("%d > 0\n", ret);
+	    printf("%d != 1, r_status.error_code == %d\n", ret, r_status.error_code );
+	    printf("r_status.actual_size == %d\n", r_status.actual_size );
+	    printf("max_resp_size == %d\n", max_resp_size );
+	}
     }
+    printf("job_bmi call was successfull\n");
 
     /* decode msg from wire format here; function allocates space for decoded response.
      * PINT_decode_release() must be used to free this later.
@@ -99,6 +115,9 @@ int PINT_server_send_req(bmi_addr_t addr,
 	ret = (-EINVAL);
 	goto return_error;
     }
+
+    debug_print_type(decoded_p->buffer, 1);
+    printf(" recv'ed\n");
 
     /* free encoded_resp buffer */
     ret = BMI_memfree(addr, encoded_resp, max_resp_size, BMI_RECV_BUFFER);

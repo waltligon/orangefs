@@ -243,6 +243,7 @@ static int server_get_config(pvfs_mntlist mntent_list)
 	fsinfo_p->io_serv_count   = ack_p->u.getconfig.io_server_count;
 	fsinfo_p->maskbits        = ack_p->u.getconfig.maskbits;
 
+
 	/* Copy the client mount point */
 	name_sz = strlen(mntent_p->local_mnt_dir) + 1;
 	fsinfo_p->local_mnt_dir = (PVFS_string) malloc(name_sz);
@@ -258,6 +259,8 @@ static int server_get_config(pvfs_mntlist mntent_list)
 	       i,
 	       ack_p->u.getconfig.meta_server_mapping,
 	       ack_p->u.getconfig.io_server_mapping);
+
+	printf("maskbits = %d \nfh_root = %d\n",fsinfo_p->maskbits, fsinfo_p->fh_root, fsinfo_p->fsid);
 
 	/* How to get the size of metaserver list in ack? */
 	/* NOTE: PVFS_string == char *, SO I HAVE DOUBTS ABOUT THIS LINE!!! -- ROB */

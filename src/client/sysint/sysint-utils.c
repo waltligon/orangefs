@@ -10,6 +10,9 @@
 int g_session_tag;
 gen_mutex_t *g_session_tag_mt_lock;
 
+/*
+ * type: if 0 for requests, 1 for reponses.
+ */
 void debug_print_type(void* thing, int type)
 {
 	if (type ==0)
@@ -17,6 +20,9 @@ void debug_print_type(void* thing, int type)
 		struct PVFS_server_req_s * req = thing;
 		switch( req->op )
 		{
+			case PVFS_SERV_LOOKUP_PATH:
+				printf("lookup path request");
+				break;
 			case PVFS_SERV_SETATTR:
 				printf("setattr request");
 				break;
@@ -36,6 +42,9 @@ void debug_print_type(void* thing, int type)
 		struct PVFS_server_resp_s * resp = thing;
 		switch( resp->op )
 		{
+			case PVFS_SERV_LOOKUP_PATH:
+				printf("lookup path response");
+				break;
 			case PVFS_SERV_SETATTR:
 				printf("setattr request");
 				break;

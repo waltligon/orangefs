@@ -5,14 +5,20 @@
  */
 
 /* Get attribute Function Implementation */
+#include <malloc.h>
+#include <assert.h>
+#include <string.h>
 
-#include <pinode-helper.h>
-#include <pvfs2-sysint.h>
-#include <pint-sysint.h>
-#include <pvfs2-req-proto.h>
-#include <pvfs-distribution.h>
-#include <pint-servreq.h>
-#include <config-manage.h>
+#include "pinode-helper.h"
+#include "pvfs2-sysint.h"
+#include "pint-sysint.h"
+#include "pvfs2-req-proto.h"
+#include "pvfs-distribution.h"
+#include "pint-servreq.h"
+#include "config-manage.h"
+#include "PINT-reqproto-encode.h"
+
+#define REQ_ENC_FORMAT 0
 
 /* PVFS_sys_getattr()
  *
@@ -23,8 +29,8 @@
 int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 {
    /* Initialization */   
-	struct PVFS_server_req_s *req_job = NULL;	 /* server request */
-	struct PVFS_server_resp_s *ack_job = NULL; /* server response */
+	struct PVFS_server_req_s *req_p = NULL;	 /* server request */
+	struct PVFS_server_resp_s *ack_p = NULL; /* server response */
    int ret = -1,i = 0;
    bmi_addr_t serv_addr;	            /* PVFS address type structure */ 
 	char *server = NULL;
@@ -35,6 +41,8 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 	pinode *entry_pinode = NULL;
 	PVFS_bitfield attr_mask = req->attrmask;
 	pinode_reference entry;
+	struct PINT_decoded_msg decoded;
+	int max_msg_sz = 0;
 	PVFS_servreq_getattr req_args;
 
 	/* Let's check if size is to be fetched here, If so
@@ -49,7 +57,7 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 	entry.fs_id = req->pinode_refn.fs_id;
 
 	/* Check for presence of pinode */ 
-	//cflags = HANDLE_TSTAMP + ATTR_TSTAMP;
+	/*cflags = HANDLE_TSTAMP + ATTR_TSTAMP;*/
 	cflags = HANDLE_VALIDATE + ATTR_VALIDATE;
 	if (cflags & ATTR_SIZE)
 		cflags += SIZE_VALIDATE;
@@ -101,36 +109,41 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 			req_args.attrmask = req->attrmask | ATTR_DATA | ATTR_SIZE;
 
 			/* Make a server getattr request */
-			ret = pint_serv_getattr(&req_job,&ack_job,&req_args,req->credentials,\
-				&serv_addr);
+			ret = PINT_server_send_req(serv_addr, req_p, max_msg_sz, &decoded);
 			if (ret < 0)
 			{
 				goto map_server_failure;
 			}
 
+			ack_p = (struct PVFS_server_resp_s *) decoded.buffer;
+
 			/* store the file size reported by the I/O server */
-			size_array[i] = ack_job->u.getattr.attr.u.data.size;
+			size_array[i] = ack_p->u.getattr.attr.u.data.size;
 
 			/* Free the jobs */
-			sysjob_free(serv_addr,ack_job,ack_job->rsize,BMI_RECV_BUFFER,NULL);
-			sysjob_free(serv_addr,req_job,req_job->rsize,BMI_SEND_BUFFER,NULL);
+			PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
+			free(req_p);
 		}
 
 		/* Now, calculate the logical size using the relevant distribution
 	 	* function
 	 	*/
 		/* TODO: Figure this thing out!!! */
-		/* dist_p = &(entry_pinode->attr.u.meta.dist);
-	 	*/
+#if 0
+		dist_p = &(entry_pinode->attr.u.meta.dist);
+#endif
+
 		/* TODO: Check with Walt if this is the prototype of the logical
 	 	* size calculation function. It may differ slightly. 
 	 	*/
-		/* ret = dist_p->logical_size(dparm,size_array,count,&logical_size);
-	 	*/
+#if 0
+		ret = dist_p->logical_size(dparm,size_array,count,&logical_size);
+
 		if (ret < 0)
 		{
 			goto map_server_failure;
 		}
+#endif
 
 		/* Need to update the pinode with size and cache it */
 		/* TODO: Need to figure out an optimum way of doing it */
@@ -162,18 +175,18 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 		free(size_array);
 
 	/* Free the jobs */	
-	if (ack_job)
-		sysjob_free(serv_addr,ack_job,ack_job->rsize,BMI_RECV_BUFFER,NULL);
-	if (req_job)
-		sysjob_free(serv_addr,req_job,req_job->rsize,BMI_SEND_BUFFER,NULL);
+	if (ack_p)
+		PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
+	if (req_p)
+		free(req_p);
 
 	return(0);
 	
 map_server_failure:
-	if (ack_job)
-		sysjob_free(serv_addr,ack_job,ack_job->rsize,BMI_RECV_BUFFER,NULL);
-	if (req_job)
-		sysjob_free(serv_addr,req_job,req_job->rsize,BMI_SEND_BUFFER,NULL);
+	if (ack_p)
+		PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
+	if (req_p)
+		free(req_p);
 
 	if (server)
 		free(server);

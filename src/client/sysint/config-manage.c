@@ -315,18 +315,26 @@ int config_bt_map_bucket_to_server(char **server_name, PVFS_handle bucket,\
 	{
 		if (fsid == server_config.fs_info[i].fsid) 
 		{
-			bkt = bucket >> (64 - server_config.fs_info[i].maskbits);
+			/* HACK: come back and figure out the right way to map a bucket to a
+			 * server
+			 */
+			if (server_config.fs_info[i].maskbits == 0)
+			{
+				bkt = 0;
+			} else {
+				bkt = bucket >> ( 63 - (server_config.fs_info[i].maskbits));
+			}
+
 			for(j = 0; j < server_config.fs_info[i].meta_serv_count; j++)
 			{
 #define bucket_start server_config.fs_info[i].bucket_array[j].bucket_st
 #define bucket_end server_config.fs_info[i].bucket_array[j].bucket_end
 #define meta_serv server_config.fs_info[i].meta_serv_array[j]
-				if (bkt >= bucket_start && bkt <= bucket_end) 
+				if ((bkt >= bucket_start) && (bkt <= bucket_end))
 				{
-					name_sz = strlen(meta_serv);
-					*server_name = (PVFS_string)malloc(name_sz + 1);
-					strncpy(*server_name,meta_serv,name_sz);
-					(*server_name)[name_sz] = '\0';
+					name_sz = strlen(meta_serv) + 1;
+					*server_name = malloc(name_sz);
+					memcpy(*server_name, meta_serv, name_sz);
 					/* Release the mutex */
 					gen_mutex_unlock(server_config.mt_lock);
 					return(0);
@@ -339,6 +347,7 @@ int config_bt_map_bucket_to_server(char **server_name, PVFS_handle bucket,\
 	}
 	/* Release the mutex */
 	gen_mutex_unlock(server_config.mt_lock);
+	printf("unable to map server to bucket/server combo\n");
 	return(-EINVAL);
 }
 
