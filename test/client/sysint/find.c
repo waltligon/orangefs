@@ -11,15 +11,15 @@
 
 void print_at_depth(char *name, PVFS_handle handle, int depth)
 {
-    int i = 0;
+/*     int i = 0; */
 
     if (name && handle)
     {
-        for(i = 0; i < depth; i++)
-        {
-            printf("\t");
-        }
-        printf("****  %s\n",name);
+/*         for(i = 0; i < depth; i++) */
+/*         { */
+/*             printf("\t"); */
+/*         } */
+        printf("****  .%s\n",name);
     }
 }
 
@@ -122,8 +122,6 @@ int directory_walk(PVFS_sysresp_init *init_response,
     {
         cur_file = rd_response.dirent_array[i].d_name;
 
-        print_at_depth(cur_file,rd_response.dirent_array[i].handle,depth);
-
         fprintf(stderr,"Got handle 0x%08Lx\n",
                 rd_response.dirent_array[i].handle);
 
@@ -137,7 +135,21 @@ int directory_walk(PVFS_sysresp_init *init_response,
                        cur_file);
                 break;
             case 0:
-                /* if we have a normal file, do nothing */
+                /* if we have a normal file, print it */
+                {
+                    char buf[MAX_PVFS_PATH_LEN] = {0};
+                    if (depth != 0)
+                    {
+                        snprintf(buf,MAX_PVFS_PATH_LEN,"%s/%s",full_path,
+                                 cur_file);
+                    }
+                    else
+                    {
+                        snprintf(buf,MAX_PVFS_PATH_LEN,"/%s",cur_file);
+                    }
+                    print_at_depth(buf,
+                                   rd_response.dirent_array[i].handle,depth);
+                }
                 break;
             case 1:
                 /* if we have a dir, recurse */
