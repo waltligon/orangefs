@@ -339,11 +339,16 @@ static int gui_comm_stats_collect(void)
 
 	for (i=0; i < internal_details->count_used; i++)
 	{
+	    int dummy;
 	    char msgbuf[64];
 
 	    snprintf(msgbuf,
 		     64,
-		     "Server not responding (need to map to addr!).\n");
+		     "Server %s not responding.",
+		     PVFS_mgmt_map_addr(cur_fsid,
+					creds,
+					internal_details->error[i].addr,
+					&dummy));
 	    gui_message_new(msgbuf);
 	}
 
@@ -380,11 +385,16 @@ static int gui_comm_perf_collect(void)
 
 	for (i=0; i < internal_details->count_used; i++)
 	{
+	    int dummy;
 	    char msgbuf[64];
 
 	    snprintf(msgbuf,
 		     64,
-		     "Server not responding (need to map to addr!).\n");
+		     "Server %s not responding.",
+		     PVFS_mgmt_map_addr(cur_fsid,
+					creds,
+					internal_details->error[i].addr,
+					&dummy));
 	    gui_message_new(msgbuf);
 	}
 
