@@ -414,7 +414,7 @@ static int lookup_read_directory_entry(PINT_server_op *s_op,
     gossip_debug(GOSSIP_SERVER_DEBUG, "  reading from dirent handle = "
                  "%Lu, segment = %s (len=%d)\n",
                  Lu(s_op->u.lookup.dirent_handle),
-		 s_op->u.lookup.segp, strlen(s_op->u.lookup.segp));
+		 s_op->u.lookup.segp, (int) strlen(s_op->u.lookup.segp));
 
     /* initialize keyval prior to read call
      *
