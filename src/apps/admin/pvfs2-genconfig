@@ -80,7 +80,7 @@ sub prompt_word
     return $val;
 }
 
-sub tcp_parse_hostlist
+sub parse_hostlist
 {
     my($inputline, $port, $i, $foo, @parse, $arrayline);
     my($prefix, $count, @temparray, @inodes, $numinodes);
@@ -338,8 +338,24 @@ sub tcp_get_port
 	}
 	return  $port;
 }
+sub gm_get_port
+{
+	if (!$opt_quiet) { 
+		print "Choose a GM port (in the range of 0 to 7) for the servers to listen on. \n";
+		print "This script assumes that all servers will use the same port number.\n";
+	}
+	if ($opt_port) {
+		$port = $opt_port;
+	} else {
+		$port = prompt_num("Enter port number [Default is 6]: ","6");
+	}
+	# every myrinet card i've seen has 8 ports.  If myricom makes a card
+	# with more than that, we'll have to adapt
+	($port < 8) or die "GM ports must be in the range 0 to 7";
 
-sub tcp_get_ionames
+	return  $port;
+}
+sub get_ionames
 {
 	if (!$opt_quiet) {
 		print "Next you must list the hostnames of the machines that will act as\n";
@@ -353,12 +369,12 @@ sub tcp_get_ionames
 		$ioline = prompt_word("Enter hostnames [Default is localhost]: ","localhost");
 	}
 
-	@io_aliases = tcp_parse_hostlist($ioline, $port);
+	@io_aliases = parse_hostlist($ioline, $port);
 	@io_aliases = sort @io_aliases;
 	return @io_aliases;
 }
 
-sub tcp_get_metanames
+sub get_metanames
 {
 	if (!$opt_quiet) {
 		print "Now list the hostnames of the machines that will act as Metadata\n";
@@ -371,7 +387,7 @@ sub tcp_get_metanames
 	} else {
 		$metaline = prompt_word("Enter hostnames [Default is localhost]: ","localhost");
 	}
-	@meta_aliases = tcp_parse_hostlist($metaline, $port);
+	@meta_aliases = parse_hostlist($metaline, $port);
 	@meta_aliases = sort @meta_aliases;
 
 	return @meta_aliases;
@@ -387,7 +403,16 @@ sub bmi_tcp_mung
 	}
 	return @bmi_array;
 }
-
+# bmi_gm_mung(): makes bmi strings of the form gm://host:port
+sub bmi_gm_mung
+{
+	my($port, @bmi_array);
+	$port = pop @_;
+	for ($i=0; $i <= $#_; $i++) {
+		$bmi_array[$i] = "gm://$_[$i]:$port";
+	}
+	return @bmi_array;
+}
 # ---------------------
 # entry point of script
 # ---------------------
@@ -434,33 +459,51 @@ print_welcome();
 $type = get_nettype();
 	
 
-if (!($type =~ /tcp/))
+if ( $type =~ /tcp/) 
 {
-    print "Sorry.  At this time, only the tcp protocol is configured\n";
+	$port = tcp_get_port();
+	@io_aliases = get_ionames();
+	@meta_aliases = get_metanames();
+
+	my %nonunion_aliases = ();
+	foreach(@io_aliases,@meta_aliases){
+	    $nonunion_aliases{$_}=1;
+	}
+	@union_aliases = keys %nonunion_aliases;
+	@union_aliases = sort @union_aliases;
+
+	# tack on BMI style notation
+	@io_bmi = bmi_tcp_mung(@io_aliases, $port);
+	@meta_bmi = bmi_tcp_mung(@meta_aliases, $port);
+	@union_bmi = bmi_tcp_mung(@union_aliases, $port);
+
+	$bmi_module = "bmi_tcp";
+
+} elsif ($type =~ /gm/) 
+{
+	$port = gm_get_port();
+	@io_aliases = get_ionames();
+	@meta_aliases = get_metanames();
+
+	my %nonunion_aliases = ();
+	foreach(@io_aliases,@meta_aliases){
+	    $nonunion_aliases{$_}=1;
+	}
+	@union_aliases = keys %nonunion_aliases;
+	@union_aliases = sort @union_aliases;
+
+	# tack on BMI style notation
+	@io_bmi = bmi_gm_mung(@io_aliases, $port);
+	@meta_bmi = bmi_gm_mung(@meta_aliases, $port);
+	@union_bmi = bmi_gm_mung(@union_aliases, $port);
+
+	$bmi_module = "bmi_gm";
+
+} else {
+    print "Sorry.  At this time, only the tcp and gm protocols are available\n";
     print "for use with this configuration utility.\n";
     exit 1;
 }
-
-$port = tcp_get_port();
-@io_aliases = tcp_get_ionames();
-@meta_aliases = tcp_get_metanames();
-
-my %nonunion_aliases = ();
-foreach(@io_aliases,@meta_aliases){
-    $nonunion_aliases{$_}=1;
-}
-@union_aliases = keys %nonunion_aliases;
-@union_aliases = sort @union_aliases;
-
-# tack on BMI style notation
-@io_bmi = bmi_tcp_mung(@io_aliases, $port);
-@meta_bmi = bmi_tcp_mung(@meta_aliases, $port);
-@union_bmi = bmi_tcp_mung(@union_aliases, $port);
-
-$bmi_module = "bmi_tcp";
-
-###################################
-# end of tcp specific section
 
 if (!$opt_quiet) {
 	print "Configured a total of ", ($#union_bmi + 1), " servers:\n";
