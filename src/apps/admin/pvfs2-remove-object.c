@@ -17,6 +17,7 @@
 #include <getopt.h>
 
 #include "pvfs2.h"
+#include "pvfs2-mgmt.h"
 #include "str-utils.h"
 
 #ifndef PVFS2_VERSION

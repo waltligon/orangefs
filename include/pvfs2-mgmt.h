@@ -139,6 +139,15 @@ int PVFS_mgmt_setparam_all(
     int64_t* old_value_array,
     PVFS_error_details *details);
 
+int PVFS_mgmt_setparam_single(
+    PVFS_fs_id fs_id,
+    PVFS_credentials *credentials,
+    enum PVFS_server_param param,
+    int64_t value,
+    char *server_addr_str,
+    int64_t *old_value,
+    PVFS_error_details *details);
+
 int PVFS_mgmt_statfs_list(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,

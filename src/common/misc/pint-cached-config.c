@@ -127,7 +127,8 @@ int PINT_cached_config_finalize(void)
     return 0;
 }
 
-int PINT_cached_config_reinitialize(struct server_configuration_s *config)
+int PINT_cached_config_reinitialize(
+    struct server_configuration_s *config)
 {
     int ret = -PVFS_EINVAL;
     PINT_llist *cur = NULL;
@@ -291,7 +292,7 @@ int PINT_cached_config_get_next_meta(
             ext_array->extent_array =
                 cur_mapping->handle_extent_array.extent_array;
 
-	    if(meta_addr != NULL)
+	    if (meta_addr != NULL)
 	    {
 		ret = BMI_addr_lookup(meta_addr,meta_server_bmi_str);
 	    }
@@ -356,9 +357,10 @@ int PINT_cached_config_get_next_io(
                 data_server_bmi_str = PINT_config_get_host_addr_ptr(
                     config,cur_mapping->alias_mapping->host_alias);
 
-		if(io_addr_array != NULL)
+		if (io_addr_array != NULL)
 		{
-		    ret = BMI_addr_lookup(io_addr_array,data_server_bmi_str);
+		    ret = BMI_addr_lookup(
+                        io_addr_array,data_server_bmi_str);
 		    if (ret)
 		    {
 			break;
@@ -380,7 +382,6 @@ int PINT_cached_config_get_next_io(
     }
     return ret;
 }
-
 
 /* PINT_cached_config_map_addr()
  *
@@ -438,10 +439,11 @@ const char *PINT_cached_config_map_addr(
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_cached_config_count_servers(struct server_configuration_s *config,
-                              PVFS_fs_id fsid, 
-                              int server_type,
-                              int *count)
+int PINT_cached_config_count_servers(
+    struct server_configuration_s *config,
+    PVFS_fs_id fsid, 
+    int server_type,
+    int *count)
 {
     int ret = -PVFS_EINVAL;
     struct qlist_head *hash_link = NULL;
@@ -505,7 +507,8 @@ int PINT_cached_config_get_server_array(
     struct qlist_head *hash_link = NULL;
     struct config_fs_cache_s *cur_config_cache = NULL;
 
-    if (!config || !*inout_count_p || !addr_array || !server_type)
+    if (!config || !inout_count_p || !*inout_count_p ||
+        !addr_array || !server_type)
     {
         return ret;
     }
@@ -602,33 +605,28 @@ int PINT_cached_config_map_to_server(
     return (!ret ? BMI_addr_lookup(server_addr, bmi_server_addr) : ret);
 }
 
-/** PINT_bucker_get_num_dfiles()
+/* PINT_bucker_get_num_dfiles()
  *
- * Return the number of dfiles to use for files with this combination of
- * fs id, distribution, and attributes.  If the distribution and attributes
- * do not specify a number of dfiles, the number of io servers will be used.
+ * Return the number of dfiles to use for files with this combination
+ * of fs id, distribution, and attributes.  If the distribution and
+ * attributes do not specify a number of dfiles, the number of io
+ * servers will be used.
  */
-int PINT_cached_config_get_num_dfiles(PVFS_fs_id fsid,
-                               PINT_dist* dist,
-                               int num_dfiles_requested,
-                               int* num_dfiles)
+int PINT_cached_config_get_num_dfiles(
+    PVFS_fs_id fsid,
+    PINT_dist *dist,
+    int num_dfiles_requested,
+    int *num_dfiles)
 {
-    int num_servers_requested;
-    int ret;
+    int ret = -PVFS_EINVAL, num_servers_requested = 0;
 
-    /* Get the number of available servers */
-    ret = PINT_cached_config_get_num_io(fsid, &num_servers_requested);
-
-    if (0 == ret)
+    if (PINT_cached_config_get_num_io(fsid, &num_servers_requested) == 0)
     {
         /* Let the distribution determine the number of dfiles to use */
-        *num_dfiles = dist->methods->get_num_dfiles(dist->params,
-                                                    num_servers_requested,
-                                                    num_dfiles_requested);
-    }
-    else
-    {
-        ret = -PVFS_EINVAL;
+        *num_dfiles = dist->methods->get_num_dfiles(
+            dist->params, num_servers_requested, num_dfiles_requested);
+
+        ret = 0;
     }
     return ret;
 }
@@ -640,7 +638,9 @@ int PINT_cached_config_get_num_dfiles(PVFS_fs_id fsid,
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_cached_config_get_num_meta(PVFS_fs_id fsid, int *num_meta)
+int PINT_cached_config_get_num_meta(
+    PVFS_fs_id fsid,
+    int *num_meta)
 {
     int ret = -PVFS_EINVAL;
     struct qlist_head *hash_link = NULL;
@@ -706,9 +706,9 @@ int PINT_cached_config_get_num_io(PVFS_fs_id fsid, int *num_io)
  * returns 0 on success, -PVFS_error on failure
  */
 int PINT_cached_config_get_server_handle_count(
-    const char* server_addr_str,
+    const char *server_addr_str,
     PVFS_fs_id fs_id,
-    uint64_t* handle_count)
+    uint64_t *handle_count)
 {
     int ret = -PVFS_EINVAL;
     PINT_llist *cur = NULL;
@@ -851,7 +851,6 @@ int PINT_cached_config_get_root_handle(
     return ret;
 }
 
-
 /* cache_server_array()
  *
  * verifies that the arrays of physical server addresses have been
@@ -859,15 +858,16 @@ int PINT_cached_config_get_root_handle(
  *
  * returns 0 on success, -errno on failure
  */
-static int cache_server_array(struct server_configuration_s* config,
-                              PVFS_fs_id fsid)
+static int cache_server_array(
+    struct server_configuration_s *config,
+    PVFS_fs_id fsid)
 {
     int ret = -PVFS_EINVAL, i = 0, j = 0;
     char *server_bmi_str = NULL;
     struct host_handle_mapping_s *cur_mapping = NULL;
     struct qlist_head *hash_link = NULL;
     struct config_fs_cache_s *cur_config_cache = NULL;
-    PINT_llist* tmp_server = NULL;
+    PINT_llist *tmp_server = NULL;
     PVFS_BMI_addr_t tmp_bmi_addr;
     int dup_flag = 0;
     int current = 0;
