@@ -70,7 +70,8 @@ static int trove_check_handle_ranges(TROVE_coll_id coll_id,
             while(ret == 0)
             {
                 ret = trove_dspace_test(coll_id,op_id,context_id,
-                                        &op_count,NULL,NULL,&state);
+                                        &op_count,NULL,NULL,&state,
+                                        TROVE_DEFAULT_TEST_TIMEOUT);
             }
 
             if (ret != 1)

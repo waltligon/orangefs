@@ -11,8 +11,11 @@
 
 static gen_mutex_t dbpf_context_mutex = GEN_MUTEX_INITIALIZER;
 dbpf_op_queue_p dbpf_completion_queue_array[TROVE_MAX_CONTEXTS] = {NULL};
+gen_mutex_t dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
 
-int dbpf_open_context(TROVE_context_id *context_id)
+int dbpf_open_context(
+    TROVE_coll_id coll_id,
+    TROVE_context_id *context_id)
 {
     int context_index = 0;
 
@@ -45,23 +48,27 @@ int dbpf_open_context(TROVE_context_id *context_id)
 	gen_mutex_unlock(&dbpf_context_mutex);
 	return(-ENOMEM);
     }
+    gen_mutex_init(&dbpf_completion_queue_array_mutex[context_index]);
 
     *context_id = context_index;
     gen_mutex_unlock(&dbpf_context_mutex);
     return(0);
 }
 
-int dbpf_close_context(TROVE_context_id context_id)
+int dbpf_close_context(
+    TROVE_coll_id coll_id,
+    TROVE_context_id context_id)
 {
     gen_mutex_lock(&dbpf_context_mutex);
 
-    if(!dbpf_completion_queue_array[context_id])
+    if (!dbpf_completion_queue_array[context_id])
     {
 	gen_mutex_unlock(&dbpf_context_mutex);
 	return 1;
     }
 
     dbpf_op_queue_cleanup(dbpf_completion_queue_array[context_id]);
+    gen_mutex_destroy(&dbpf_completion_queue_array_mutex[context_id]);
 
     dbpf_completion_queue_array[context_id] = NULL;
 

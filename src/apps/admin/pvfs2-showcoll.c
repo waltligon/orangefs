@@ -74,13 +74,6 @@ int main(int argc, char **argv)
 	return -1;
     }
 
-    ret = trove_open_context(&trove_context);
-    if (ret < 0)
-    {
-        fprintf(stderr, "trove_open_context failed\n");
-        return -1;
-    }
-
     if (verbose) fprintf(stderr,
 			 "%s: info: initialized with storage space '%s'.\n",
 			 argv[0],
@@ -93,11 +86,11 @@ int main(int argc, char **argv)
 	    fprintf(stderr,
 		    "%s: error: collection iterate failed; aborting!\n",
 		    argv[0]);
-            trove_close_context(trove_context);
+            trove_close_context(coll_id, trove_context);
 	    trove_finalize();
 	    return -1;
 	}
-        trove_close_context(trove_context);
+        trove_close_context(coll_id, trove_context);
 	trove_finalize();
 	return 0;
     }
@@ -127,6 +120,13 @@ int main(int argc, char **argv)
 			 collection);
 
 
+    ret = trove_open_context(coll_id, &trove_context);
+    if (ret < 0)
+    {
+        fprintf(stderr, "trove_open_context failed\n");
+        return -1;
+    }
+
     /* find root handle */
     key.buffer = root_handle_string;
     key.buffer_sz = strlen(root_handle_string) + 1;
@@ -142,7 +142,8 @@ int main(int argc, char **argv)
 
     while (ret == 0) {
 	ret = trove_dspace_test(
-            coll_id, op_id, trove_context, &count, NULL, NULL, &state);
+            coll_id, op_id, trove_context, &count, NULL, NULL, &state,
+            TROVE_DEFAULT_TEST_TIMEOUT);
     }
     if (ret != 1) {
 	if (verbose) fprintf(stderr,
@@ -182,7 +183,7 @@ int main(int argc, char **argv)
                             trove_context, no_root_handle);
     }
 
-    trove_close_context(trove_context);
+    trove_close_context(coll_id, trove_context);
     trove_finalize();
 
     return 0;
@@ -257,7 +258,8 @@ static int print_dspaces(TROVE_coll_id coll_id,
                                            trove_context,
 					   &op_id);
 	while (ret == 0) ret = trove_dspace_test(
-            coll_id, op_id, trove_context, &opcount, NULL, NULL, &state);
+            coll_id, op_id, trove_context, &opcount, NULL, NULL, &state,
+            TROVE_DEFAULT_TEST_TIMEOUT);
 	if (ret != 1) return -1;
 
 	if (count > 0) {
@@ -289,7 +291,8 @@ static int print_dspace(TROVE_coll_id coll_id,
 			       &op_id);
     while (ret == 0) {
 	ret = trove_dspace_test(
-            coll_id, op_id, trove_context, &opcount, NULL, NULL, &state);
+            coll_id, op_id, trove_context, &opcount, NULL, NULL, &state,
+            TROVE_DEFAULT_TEST_TIMEOUT);
     }
     if (ret != 1) return -1;
 		
@@ -368,7 +371,8 @@ static int print_dspace_keyvals(TROVE_coll_id coll_id,
 				   &op_id);
 
 	while (ret == 0) ret = trove_dspace_test(
-            coll_id, op_id, trove_context, &opcount, NULL, NULL, &state);
+            coll_id, op_id, trove_context, &opcount, NULL, NULL, &state,
+            TROVE_DEFAULT_TEST_TIMEOUT);
 	if (ret != 1) return -1;
 
 	if (count > 0) print_keyval_pair(&key, &val, type, 65536);

@@ -162,7 +162,7 @@ int job_initialize(int flags)
 	return(ret);
     }
     /* ditto for trove */
-    ret = trove_open_context(&global_trove_context);
+    ret = trove_open_context(/*FIXME: HACK*/9,&global_trove_context);
     if (ret < 0)
     {
 	BMI_close_context(global_bmi_context);
@@ -175,7 +175,7 @@ int job_initialize(int flags)
     {
 	PINT_flow_close_context(global_flow_context);
 	BMI_close_context(global_bmi_context);
-        trove_close_context(global_trove_context);
+        trove_close_context(/*FIXME: HACK*/9,global_trove_context);
 	return (ret);
     }
 
@@ -186,7 +186,7 @@ int job_initialize(int flags)
     {
 	PINT_flow_close_context(global_flow_context);
 	BMI_close_context(global_bmi_context);
-        trove_close_context(global_trove_context);
+        trove_close_context(/*FIXME: HACK*/9,global_trove_context);
 	teardown_queues();
 	return (-ret);
     }
@@ -196,7 +196,7 @@ int job_initialize(int flags)
 	pthread_cancel(bmi_thread_id);
 	PINT_flow_close_context(global_flow_context);
 	BMI_close_context(global_bmi_context);
-        trove_close_context(global_trove_context);
+        trove_close_context(/*FIXME: HACK*/9,global_trove_context);
 	teardown_queues();
 	return (-ret);
     }
@@ -207,7 +207,7 @@ int job_initialize(int flags)
 	pthread_cancel(flow_thread_id);
 	PINT_flow_close_context(global_flow_context);
 	BMI_close_context(global_bmi_context);
-        trove_close_context(global_trove_context);
+        trove_close_context(/*FIXME: HACK*/9,global_trove_context);
 	teardown_queues();
 	return (-ret);
     }
@@ -219,7 +219,7 @@ int job_initialize(int flags)
 	pthread_cancel(trove_thread_id);
 	PINT_flow_close_context(global_flow_context);
 	BMI_close_context(global_bmi_context);
-        trove_close_context(global_trove_context);
+        trove_close_context(/*FIXME: HACK*/9,global_trove_context);
 	teardown_queues();
 	return (-ret);
     }
@@ -247,7 +247,7 @@ int job_finalize(void)
 
     BMI_close_context(global_bmi_context);
     PINT_flow_close_context(global_flow_context);
-    trove_close_context(global_trove_context);
+    trove_close_context(/*FIXME: HACK*/9,global_trove_context);
 
     teardown_queues();
 
@@ -3535,7 +3535,7 @@ static int do_one_work_cycle_trove(int *num_completed)
 				    &count, stat_trove_index_array,
 				    stat_trove_vtag_array,
 				    stat_trove_user_ptr_array,
-				    stat_trove_ds_state_array);
+				    stat_trove_ds_state_array, 0);
 
 	if (ret < 0)
 	{

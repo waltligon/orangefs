@@ -14,11 +14,15 @@ extern "C" {
 #include "trove.h"
 #include "dbpf.h"
 
+#define DBPF_OPS_PER_WORK_CYCLE 5
+
 int dbpf_thread_intialize(void);
 
 int dbpf_thread_finalize(void);
 
 void *dbpf_thread_function(void *ptr);
+
+int dbpf_do_one_work_cycle(int *out_count);
 
 #if defined(__cplusplus)
 }

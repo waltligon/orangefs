@@ -95,13 +95,6 @@ int main(int argc, char **argv)
 	    return -1;
 	}
 
-	ret = trove_open_context(&trove_context);
-	if(ret < 0)
-	{
-		fprintf(stderr, "trove_open_context() failure.\n");
-		return(-1);
-	}
-
 	while(1)
 	{
 		/* wait for a request via BMI */
@@ -173,10 +166,23 @@ int main(int argc, char **argv)
 		    fprintf(stderr, "collection lookup failed.\n");
 		    return -1;
 		}
+
+                if (trove_context < 0)
+                {
+                    ret = trove_open_context(coll_id, &trove_context);
+                    if(ret < 0)
+                    {
+                        fprintf(stderr, "trove_open_context() failure.\n");
+                        return(-1);
+                    }
+                }
+
 		file_handle = req->handle;
 
 		ret = trove_dspace_getattr(coll_id, file_handle, &s_attr, 0 /* flags */, NULL, trove_context, &op_id);
-		while (ret == 0) ret = trove_dspace_test(coll_id, op_id, trove_context, &count, NULL, NULL, &state);
+		while (ret == 0) ret = trove_dspace_test(
+                    coll_id, op_id, trove_context, &count,
+                    NULL, NULL, &state, TROVE_DEFAULT_TEST_TIMEOUT);
 		if (ret < 0 && req->op == WIRE_HARNESS_READ) {
 		    ack.error_code = ENOENT;
 		}
@@ -289,7 +295,7 @@ int main(int argc, char **argv)
 	BMI_close_context(context);
 	BMI_finalize();
 
-        trove_close_context(trove_context);
+        trove_close_context(coll_id, trove_context);
         trove_finalize();
 
 	gossip_disable();

@@ -7,7 +7,7 @@
 #include "dbpf-op-queue.h"
 
 /* the queue that stores pending serviceable operations */
-static QLIST_HEAD(dbpf_op_queue);
+QLIST_HEAD(dbpf_op_queue);
 
 /* lock to be obtained before manipulating dbpf_op_queue */
 gen_mutex_t dbpf_op_queue_mutex = GEN_MUTEX_INITIALIZER;
@@ -60,11 +60,14 @@ void dbpf_op_queue_cleanup(dbpf_op_queue_p op_queue)
     assert(op_queue);
     do
     {
+        gen_mutex_lock(&dbpf_op_queue_mutex);
         cur_op = dbpf_op_queue_shownext(op_queue);
         if (cur_op)
         {
             dbpf_op_queue_remove(cur_op);
         }
+        gen_mutex_unlock(&dbpf_op_queue_mutex);
+
     } while (cur_op);
 
     free(op_queue);

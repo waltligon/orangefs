@@ -40,6 +40,10 @@ typedef struct
     gen_mutex_t mutex;
     struct dbpf_op op;
     struct dbpf_queued_op_stats stats;
+
+    /* the operation return code after being services */
+    TROVE_ds_state state;
+
     struct qlist_head link;
 } dbpf_queued_op_t;
 

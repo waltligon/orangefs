@@ -132,7 +132,7 @@ int pvfs2_mkspace(
         fprintf(stderr,"info: created collection '%s'.\n",collection);
     }
 
-    ret = trove_open_context(&trove_context);
+    ret = trove_open_context(coll_id, &trove_context);
     if (ret < 0)
     {
         fprintf(stderr,"trove_open_context() failure.\n");
@@ -179,7 +179,8 @@ int pvfs2_mkspace(
         while (ret == 0)
         {
             ret = trove_dspace_test(coll_id, op_id, trove_context,
-                                    &count, NULL, NULL, &state);
+                                    &count, NULL, NULL, &state,
+                                    TROVE_DEFAULT_TEST_TIMEOUT);
         }
         if (ret != 1 && state != 0)
         {
@@ -206,7 +207,8 @@ int pvfs2_mkspace(
         while (ret == 0)
         {
             ret = trove_dspace_test(coll_id, op_id, trove_context,
-                                    &count, NULL, NULL, &state);
+                                    &count, NULL, NULL, &state,
+                                    TROVE_DEFAULT_TEST_TIMEOUT);
         }
         if (ret < 0)
         {
@@ -216,8 +218,8 @@ int pvfs2_mkspace(
         }
 
         memset(&attr, 0, sizeof(attr));
-        attr.owner    = 100;
-        attr.group    = 100;
+        attr.owner    = getuid();
+        attr.group    = getgid();
         attr.perms    = 0777;
 	attr.atime    = time(NULL);
 	attr.ctime    = time(NULL);
@@ -242,7 +244,8 @@ int pvfs2_mkspace(
         while (ret == 0)
         {
             ret = trove_dspace_test(coll_id, op_id, trove_context,
-                                    &count, NULL, NULL, &state);
+                                    &count, NULL, NULL, &state,
+                                    TROVE_DEFAULT_TEST_TIMEOUT);
         }
         if (ret < 0)
         {
@@ -271,7 +274,8 @@ int pvfs2_mkspace(
         while (ret == 0)
         {
             ret = trove_dspace_test(coll_id, op_id, trove_context,
-                                    &count, NULL, NULL, &state);
+                                    &count, NULL, NULL, &state,
+                                    TROVE_DEFAULT_TEST_TIMEOUT);
         }
         if (ret != 1 && state != 0)
         {
@@ -302,7 +306,8 @@ int pvfs2_mkspace(
         while (ret == 0)
         {
             ret = trove_dspace_test(coll_id, op_id, trove_context,
-                                    &count, NULL, NULL, &state);
+                                    &count, NULL, NULL, &state,
+                                    TROVE_DEFAULT_TEST_TIMEOUT);
         }
         if (ret < 0)
         {
@@ -317,7 +322,7 @@ int pvfs2_mkspace(
         }
     }
 
-    trove_close_context(trove_context);
+    trove_close_context(coll_id, trove_context);
     trove_finalize();
 
     if (verbose)

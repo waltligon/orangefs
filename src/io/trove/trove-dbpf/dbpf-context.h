@@ -13,8 +13,13 @@ extern "C" {
 
 #include "trove-types.h"
 
-int dbpf_open_context(TROVE_context_id *context_id);
-int dbpf_close_context(TROVE_context_id context_id);
+int dbpf_open_context(
+    TROVE_coll_id coll_id,
+    TROVE_context_id *context_id);
+
+int dbpf_close_context(
+    TROVE_coll_id coll_id,
+    TROVE_context_id context_id);
 
 #if defined(__cplusplus)
 }

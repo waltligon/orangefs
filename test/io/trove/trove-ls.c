@@ -51,18 +51,18 @@ int main(int argc, char **argv)
 	return -1;
     }
 
-    ret = trove_open_context(&trove_context);
-    if (ret < 0)
-    {
-        fprintf(stderr, "trove_open_context failed\n");
-        return -1;
-    }
-
     /* try to look up collection used to store file system */
     ret = trove_collection_lookup(file_system, &coll_id, NULL, &op_id);
     if (ret < 0) {
 	fprintf(stderr, "collection lookup failed.\n");
 	return -1;
+    }
+
+    ret = trove_open_context(coll_id, &trove_context);
+    if (ret < 0)
+    {
+        fprintf(stderr, "trove_open_context failed\n");
+        return -1;
     }
 
     strcpy(path_name, path_to_dir);
@@ -85,7 +85,8 @@ int main(int argc, char **argv)
                                trove_context,
 			       &op_id);
     while (ret == 0) ret = trove_dspace_test(
-        coll_id, op_id, trove_context, &count, NULL, NULL, &state);
+        coll_id, op_id, trove_context, &count, NULL, NULL, &state,
+        TROVE_DEFAULT_TEST_TIMEOUT);
     if (ret < 0) return -1;
 
     if (s_attr.type != TROVE_TEST_DIR) {
@@ -123,7 +124,8 @@ int main(int argc, char **argv)
 	if (it_ret == -1) return -1;
 
 	while (it_ret == 0) it_ret = trove_dspace_test(
-            coll_id, op_id, trove_context, &count, NULL, NULL, &state);
+            coll_id, op_id, trove_context, &count, NULL, NULL, &state,
+            TROVE_DEFAULT_TEST_TIMEOUT);
 	if (it_ret < 0) return -1;
 	
 	if (num_processed == 0) return 0;
@@ -141,7 +143,8 @@ int main(int argc, char **argv)
 	    if (ga_ret == -1) return -1;
 	    count = 1;
 	    while (ga_ret == 0) ga_ret = trove_dspace_test(
-                coll_id, op_id, trove_context, &count, NULL, NULL, &state);
+                coll_id, op_id, trove_context, &count, NULL, NULL, &state,
+                TROVE_DEFAULT_TEST_TIMEOUT);
 
 	    printf("%s/%s (handle = %Ld, uid = %d, gid = %d, perm = %o, type = %d, b_size = %d, k_size = %d)\n",
 		   path_name,
@@ -158,7 +161,7 @@ int main(int argc, char **argv)
 	}
     }
 
-    trove_close_context(trove_context);
+    trove_close_context(coll_id, trove_context);
     trove_finalize();
     
     return 0;

@@ -270,7 +270,8 @@ struct TROVE_dspace_ops
 		       int *out_count_p,
 		       TROVE_vtag_s *vtag,
 		       void **returned_user_ptr_p,
-		       TROVE_ds_state *out_state_p);
+		       TROVE_ds_state *out_state_p,
+		       int max_idle_time_ms);
     
     int (*dspace_testsome)(
 			   TROVE_coll_id coll_id,
@@ -280,7 +281,8 @@ struct TROVE_dspace_ops
 			   int *out_index_array,
 			   TROVE_vtag_s *vtag_array,
 			   void **returned_user_ptr_array,
-			   TROVE_ds_state *out_state_array);
+			   TROVE_ds_state *out_state_array,
+			   int max_idle_time_ms);
 
     /* TODO: replace 'testsome' with this.  this is the future */
     int (*dspace_testcontext)(
@@ -376,8 +378,13 @@ struct TROVE_mgmt_ops
 
 struct TROVE_context_ops
 {
-    int (*open_context)(TROVE_context_id *context_id);
-    int (*close_context)(TROVE_context_id context_id);
+    int (*open_context)(
+                        TROVE_coll_id coll_id,
+                        TROVE_context_id *context_id);
+
+    int (*close_context)(
+                         TROVE_coll_id coll_id,
+                         TROVE_context_id context_id);
 };
 
 /*

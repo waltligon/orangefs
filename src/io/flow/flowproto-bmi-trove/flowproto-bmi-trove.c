@@ -290,7 +290,7 @@ int flowproto_bmi_trove_initialize(int flowproto_id)
     }
 
     /* get a TROVE context */
-    ret = trove_open_context(&global_trove_context);
+    ret = trove_open_context(/*FIXME: HACK*/9,&global_trove_context);
     if (ret < 0)
     {
         return(ret);
@@ -301,7 +301,7 @@ int flowproto_bmi_trove_initialize(int flowproto_id)
     if (!trove_inflight_queue)
     {
 	BMI_close_context(global_bmi_context);
-        trove_close_context(global_trove_context);
+        trove_close_context(/*FIXME: HACK*/9,global_trove_context);
 	return (-ENOMEM);
     }
 
@@ -327,7 +327,7 @@ int flowproto_bmi_trove_finalize(void)
     trove_id_queue_cleanup(trove_inflight_queue);
 
     BMI_close_context(global_bmi_context);
-    trove_close_context(global_trove_context);
+    trove_close_context(/*FIXME: HACK*/9,global_trove_context);
 
     gossip_ldebug(FLOW_PROTO_DEBUG, "flowproto_bmi_trove shut down.\n");
     return (0);
@@ -551,7 +551,8 @@ int flowproto_bmi_trove_checkworld(flow_descriptor ** flow_d_array,
 					trove_op_array, &trove_count,
 					trove_index_array, NULL,
 					trove_usrptr_array, 
-					trove_error_code_array);
+					trove_error_code_array,
+                                        TROVE_DEFAULT_TEST_TIMEOUT);
 	    if (ret < 0)
 	    {
 		/* TODO: cleanup properly */

@@ -21,9 +21,13 @@ int trove_initialize(
 
 int trove_finalize(void);
 
-int trove_open_context(TROVE_context_id *context_id);
+int trove_open_context(
+    TROVE_coll_id coll_id,
+    TROVE_context_id *context_id);
 
-int trove_close_context(TROVE_context_id context_id);
+int trove_close_context(
+    TROVE_coll_id coll_id,
+    TROVE_context_id context_id);
 
 int trove_storage_create(
     char *stoname,
@@ -301,7 +305,8 @@ int trove_dspace_test(TROVE_coll_id coll_id,
 		      int *out_count_p,
 		      TROVE_vtag_s *vtag,
 		      void **returned_user_ptr_p,
-		      TROVE_ds_state *state_p);
+		      TROVE_ds_state *state_p,
+		      int max_idle_time_ms);
 
 int trove_dspace_testsome(
 			  TROVE_coll_id coll_id,
@@ -311,7 +316,8 @@ int trove_dspace_testsome(
 			  int *out_index_array,
 			  TROVE_vtag_s *vtag_array,
 			  void **returned_user_ptr_array,
-			  TROVE_ds_state *state_array);
+			  TROVE_ds_state *state_array,
+			  int max_idle_time_ms);
 
 int trove_dspace_testcontext(
 			     TROVE_coll_id coll_id,

@@ -42,7 +42,8 @@ static inline int path_lookup(
     ret = trove_collection_geteattr(
         coll_id, &key, &val, 0, NULL, context_id, &op_id);
     while (ret == 0) ret = trove_dspace_test(
-        coll_id, op_id, context_id, &count, NULL, NULL, &state);
+        coll_id, op_id, context_id, &count, NULL, NULL, &state,
+        TROVE_DEFAULT_TEST_TIMEOUT);
     if (ret < 0) {
 	fprintf(stderr, "collection geteattr (for root handle) failed.\n");
 	return -1;
@@ -73,7 +74,8 @@ static inline int path_lookup(
             coll_id, parent_handle, &key, &val, 0,
             NULL, NULL, context_id, &op_id);
 	while (ret == 0) ret = trove_dspace_test(
-            coll_id, op_id, context_id, &count, NULL, NULL, &state);
+            coll_id, op_id, context_id, &count, NULL, NULL, &state,
+            TROVE_DEFAULT_TEST_TIMEOUT);
 	if (ret < 0) {
 	    fprintf(stderr, "keyval read failed.\n");
 	    return -1;
@@ -87,7 +89,8 @@ static inline int path_lookup(
 	ret = trove_dspace_getattr(
             coll_id, handle, &s_attr, 0, NULL, context_id, &op_id);
 	while (ret == 0) ret = trove_dspace_test(
-            coll_id, op_id, context_id, &count, NULL, NULL, &state);
+            coll_id, op_id, context_id, &count, NULL, NULL, &state,
+            TROVE_DEFAULT_TEST_TIMEOUT);
 	if (ret < 0) return -1;
 	if (state != 0) return -1;
 	

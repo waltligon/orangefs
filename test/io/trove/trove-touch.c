@@ -48,18 +48,18 @@ int main(int argc, char **argv)
 	return -1;
     }
 
-    ret = trove_open_context(&trove_context);
-    if (ret < 0)
-    {
-        fprintf(stderr, "trove_open_context failed\n");
-        return -1;
-    }
-
     /* try to look up collection used to store file system */
     ret = trove_collection_lookup(file_system, &coll_id, NULL, &op_id);
     if (ret < 0) {
 	fprintf(stderr, "collection lookup failed.\n");
 	return -1;
+    }
+
+    ret = trove_open_context(coll_id, &trove_context);
+    if (ret < 0)
+    {
+        fprintf(stderr, "trove_open_context failed\n");
+        return -1;
     }
 
     /* find the parent directory name */
@@ -98,7 +98,8 @@ int main(int argc, char **argv)
                               trove_context,
 			      &op_id);
     while (ret == 0) ret = trove_dspace_test(
-        coll_id, op_id, trove_context, &count, NULL, NULL, &state);
+        coll_id, op_id, trove_context, &count, NULL, NULL, &state,
+        TROVE_DEFAULT_TEST_TIMEOUT);
     if (ret < 0) {
 	fprintf(stderr, "dspace create failed.\n");
 	return -1;
@@ -122,7 +123,8 @@ int main(int argc, char **argv)
                                trove_context,
 			       &op_id);
     while (ret == 0) ret = trove_dspace_test(
-        coll_id, op_id, trove_context, &count, NULL, NULL, &state);
+        coll_id, op_id, trove_context, &count, NULL, NULL, &state,
+        TROVE_DEFAULT_TEST_TIMEOUT);
     if (ret < 0) return -1;
 
     /* add new file name/handle pair to parent directory */
@@ -134,12 +136,13 @@ int main(int argc, char **argv)
     ret = trove_keyval_write(coll_id, parent_handle, &key, &val,
                              0, NULL, NULL, trove_context, &op_id);
     while (ret == 0) ret = trove_dspace_test(
-        coll_id, op_id, trove_context, &count, NULL, NULL, &state);
+        coll_id, op_id, trove_context, &count, NULL, NULL, &state,
+        TROVE_DEFAULT_TEST_TIMEOUT);
     if (ret < 0) {
 	fprintf(stderr, "keyval write failed.\n");
 	return -1;
     }
-    trove_close_context(trove_context);
+    trove_close_context(coll_id, trove_context);
     trove_finalize();
 
     printf("created file %s (handle = %d)\n", file_name, (int) file_handle);
