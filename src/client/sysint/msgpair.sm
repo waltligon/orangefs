@@ -96,6 +96,11 @@ static int msgpair_post(PINT_client_sm *sm_p,
 
     gossip_debug(CLIENT_DEBUG, "msgpair state: post\n");
 
+    /* we don't know what this is set to prior to this function,
+     * so we reset it here.
+     */
+    js_p->error_code = 0;
+
     msg_p = &sm_p->msgpair;
 
     /* NOTE: THIS IS REPLICATED IN PINT_SERV_PREPARE_MSGPAIR();

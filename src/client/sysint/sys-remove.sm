@@ -32,11 +32,6 @@ enum {
 static int remove_init(PINT_client_sm *sm_p,
 		       job_status_s *js_p);
 
-static int remove_lookup_setup_msgpair(PINT_client_sm *sm_p,
-				       job_status_s *js_p);
-static int remove_lookup_failure(PINT_client_sm *sm_p,
-				 job_status_s *js_p);
-
 static int remove_getattr_setup_msgpair(PINT_client_sm *sm_p,
 					job_status_s *js_p);
 static int remove_getattr_failure(PINT_client_sm *sm_p,
@@ -63,16 +58,13 @@ static int remove_cleanup(PINT_client_sm *sm_p,
 /* completion function prototypes */
 static int remove_getattr_comp_fn(void *v_p,
 				  struct PVFS_server_resp *resp_p);
-static int remove_lookup_comp_fn(void *v_p,
-				 struct PVFS_server_resp *resp_p);
+static int remove_rmdirent_comp_fn(void *v_p,
+				   struct PVFS_server_resp *resp_p);
 
 %%
 
 machine pvfs2_client_remove_sm(init,
 			       cleanup,
-			       lookup_setup_msgpair,
-			       lookup_xfer_msgpair,
-			       lookup_failure,
 			       getattr_setup_msgpair,
 			       getattr_xfer_msgpair,
 			       getattr_failure,
@@ -88,22 +80,7 @@ machine pvfs2_client_remove_sm(init,
 {
     state init {
 	run remove_init;
-	default => lookup_setup_msgpair;
-    }
-
-    state lookup_setup_msgpair {
-	run remove_lookup_setup_msgpair;
-	success => lookup_xfer_msgpair;
-	default => lookup_failure;
-    }
-    state lookup_xfer_msgpair {
-	jump pvfs2_client_lookup_dcache_sm;
-	success => rmdirent_setup_msgpair;
-	default => lookup_failure;
-    }
-    state lookup_failure {
-	run remove_lookup_failure;
-	default => cleanup;
+	default => rmdirent_setup_msgpair;
     }
 
     state getattr_setup_msgpair {
@@ -175,15 +152,13 @@ machine pvfs2_client_remove_sm(init,
 
 %%
 
-
-
 int PVFS_sys_remove2(char *object_name,
 		     PVFS_pinode_reference parent_ref, 
 		     PVFS_credentials credentials)
 {
     int ret;
     PINT_client_sm *sm_p;
-
+    PVFS_error error;
 
     gossip_debug(CLIENT_DEBUG, "PVFS_sys_remove entered\n");
 
@@ -221,9 +196,12 @@ int PVFS_sys_remove2(char *object_name,
 
     gossip_debug(CLIENT_DEBUG, "PVFS_sys_remove completed\n");
 
+    /* save our return value */
+    error = sm_p->error_code;
+
     /* clean up after ourselves */
     free(sm_p);
-    return 0;
+    return error;
 }
 
 
@@ -236,59 +214,12 @@ static int remove_init(PINT_client_sm *sm_p,
 {
     gossip_debug(CLIENT_DEBUG, "remove state: init\n");
 
+    assert(js_p->error_code == 0); /* sanity check */
+
     /* do the request scheduler thing, if necessary */
 
     return 1;
 }
-
-/* remove_lookup_setup_msgpair()
- */
-static int remove_lookup_setup_msgpair(PINT_client_sm *sm_p,
-				       job_status_s *js_p)
-{
-    /* do parameter checking */
-    if ((strlen(sm_p->u.remove.object_name) + 1 >
-	 PVFS_REQ_LIMIT_PATH_NAME_BYTES) ||
-	(PINT_string_count_segments(sm_p->u.remove.object_name) >
-	 PVFS_REQ_LIMIT_PATH_SEGMENT_COUNT))
-    {
-	/* TODO: CLEAN UP... */
-	assert(0);
-	return -PVFS_ENAMETOOLONG;
-    }
-
-    /* fill in lookup request (macro in pvfs2-req-proto.h) */
-    PINT_SERVREQ_LOOKUP_PATH_FILL(sm_p->msgpair.req,
-				  *sm_p->cred_p,
-				  sm_p->u.remove.object_name,
-				  sm_p->u.remove.parent_ref.fs_id,
-				  sm_p->u.remove.parent_ref.handle,
-				  PVFS_ATTR_COMMON_ALL);
-
-    /* fill in msgpair structure components */
-    sm_p->msgpair.fs_id   = sm_p->u.remove.parent_ref.fs_id;
-    sm_p->msgpair.handle  = sm_p->u.remove.parent_ref.handle;
-    sm_p->msgpair.comp_fn = remove_lookup_comp_fn;
-
-    return 1;
-}
-
-/* remove_lookup_comp_fn()
- */
-static int remove_lookup_comp_fn(void *v_p,
-				 struct PVFS_server_resp *resp_p)
-{
-    PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
-
-    assert(resp_p->u.lookup_path.handle_count >= 1); /* sanity check */
-
-    /* pull handle out of response, also copy in fs_id from before */
-    sm_p->u.remove.object_ref.handle = resp_p->u.lookup_path.handle_array[0];
-    sm_p->u.remove.object_ref.fs_id  = sm_p->u.remove.parent_ref.fs_id;
-
-    return 0;
-}
-
 
 /* remove_getattr_post_msgpair()
  *
@@ -296,7 +227,7 @@ static int remove_lookup_comp_fn(void *v_p,
 static int remove_getattr_setup_msgpair(PINT_client_sm *sm_p,
 					job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG, "remove state: post_getattr_post_msgpair\n");
+    gossip_debug(CLIENT_DEBUG, "remove state: getattr_setup_msgpair\n");
 
     /* fill in getattr request */
     PINT_SERVREQ_GETATTR_FILL(sm_p->msgpair.req,
@@ -334,6 +265,8 @@ static int remove_getattr_comp_fn(void *v_p,
      */
     PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
     
+    assert(resp_p->op == PVFS_SERV_GETATTR); /* sanity check */
+
     switch (resp_p->u.getattr.attr.objtype)
     {
 	case PVFS_TYPE_METAFILE:
@@ -392,7 +325,7 @@ static int remove_rmdirent_setup_msgpair(PINT_client_sm *sm_p,
      * object out of the system fastest.
      */
 
-    gossip_debug(CLIENT_DEBUG, "remove state: post_rmdirent_setup_msgpair\n");
+    gossip_debug(CLIENT_DEBUG, "remove state: rmdirent_setup_msgpair\n");
 
     /* fill in rmdirent request */
     PINT_SERVREQ_RMDIRENT_FILL(sm_p->msgpair.req,
@@ -404,10 +337,31 @@ static int remove_rmdirent_setup_msgpair(PINT_client_sm *sm_p,
     /* fill in msgpair structure components */
     sm_p->msgpair.fs_id   = sm_p->u.remove.parent_ref.fs_id;
     sm_p->msgpair.handle  = sm_p->u.remove.parent_ref.handle;
-    sm_p->msgpair.comp_fn = NULL;
+    sm_p->msgpair.comp_fn = remove_rmdirent_comp_fn;
 
     return 1;
 }
+
+/* remove_rmdirent_comp_fn()
+ */
+static int remove_rmdirent_comp_fn(void *v_p,
+				 struct PVFS_server_resp *resp_p)
+{
+    PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
+
+    assert(resp_p->op == PVFS_SERV_RMDIRENT); /* sanity check */
+
+    /* pull handle out of response, also copy in fs_id from before */
+    sm_p->u.remove.object_ref.handle = resp_p->u.rmdirent.entry_handle;
+    sm_p->u.remove.object_ref.fs_id  = sm_p->u.remove.parent_ref.fs_id;
+
+    gossip_debug(CLIENT_DEBUG,
+		 "  remove_rmdirent_comp_fn: metafile handle = 0x%08Lx\n",
+		 sm_p->u.remove.object_ref.handle);
+
+    return 0;
+}
+
 
 /* remove_datafile_remove_setup_msgpair()
  */
@@ -415,13 +369,17 @@ static int remove_datafile_remove_setup_msgpair(PINT_client_sm *sm_p,
 						job_status_s *js_p)
 {
     int i;
+
    /* post all datafile remove requests and responses simultaneously.
      *
      * NOTE: it's easier to clean up from a metafile with no datafiles
      * than the other way around!  so we remove datafiles first.
      */
 
-    gossip_debug(CLIENT_DEBUG, "remove state: post_getattr_post_msgpair\n");
+    /* clear error field in job */
+    js_p->error_code = 0;
+
+    gossip_debug(CLIENT_DEBUG, "remove state: datafile_remove_setup_msgpair\n");
 
     /* do parameter checking */
 
@@ -456,7 +414,7 @@ static int remove_datafile_remove_setup_msgpair(PINT_client_sm *sm_p,
 static int remove_object_remove_setup_msgpair(PINT_client_sm *sm_p,
 					      job_status_s *js_p)
 {
-    gossip_debug(CLIENT_DEBUG, "remove state: post_object_remove_setup_msgpair\n");
+    gossip_debug(CLIENT_DEBUG, "remove state: object_remove_setup_msgpair\n");
 
     /* fill in remove request */
     PINT_SERVREQ_REMOVE_FILL(sm_p->msgpair.req,
@@ -483,7 +441,7 @@ static int remove_cleanup(PINT_client_sm *sm_p,
     /* store enough information in the sm structure that the caller
      * can tell what happened.
      */
-    sm_p->status = *js_p;
+    sm_p->error_code = js_p->error_code;
 
     /* if we have a locked pcache entry, release it */
     if (sm_p->pcache_lock) {
@@ -500,25 +458,6 @@ static int remove_cleanup(PINT_client_sm *sm_p,
     sm_p->op_complete = 1;
 
     return 0;
-}
-
-/* remove_lookup_failure()
- */
-static int remove_lookup_failure(PINT_client_sm *sm_p,
-				 job_status_s *js_p)
-{
-    gossip_debug(CLIENT_DEBUG, "remove state: lookup_failure\n");
-
-    /* TODO: unpost operations that are still in progress, once we can. */
-
-    /* ISSUE: can't tell which thing completed (with an error).
-     *
-     * SOLUTION: add job_id to the job_status structure, keep up with
-     * them in the PINT_client_sm structure so we can tell the
-     * difference.
-     */
-
-    return 1;
 }
 
 /* remove_getattr_failure()

@@ -77,6 +77,11 @@ static int getattr_pcache_lookup(PINT_client_sm *sm_p,
 {
     gossip_debug(CLIENT_DEBUG, "getattr_pcache state: lookup\n");
 
+    /* we don't know what this is set to prior to this function,
+     * so we reset it here.
+     */
+    js_p->error_code = 0;
+
     /* TODO: check pcache to see if we have an entry.  if so, set
      * up a fake, decoded response structure with the results so that
      * we can then call the comp_fn to copy data out of the response

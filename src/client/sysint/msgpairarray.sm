@@ -90,21 +90,22 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 
     gossip_debug(CLIENT_DEBUG, "msgpairarray state: post\n");
 
+    /* we don't know what this is set to prior to this function,
+     * so we reset it here.
+     */
+    js_p->error_code = 0;
+
     /* set number of operations that must complete.
      *
      * NOTE: we're using the comp_ct in the first msgarray
      * entry to keep up with the count for the entire array.
      */
-    sm_p->msgarray[0].comp_ct += 2 * sm_p->msgarray_count;
+    sm_p->msgarray[0].comp_ct = 2 * sm_p->msgarray_count;
 
     /* run through array of msgpairarray to kick off */
     for (i=0; i < sm_p->msgarray_count; i++) {
 	PVFS_msg_tag_t session_tag;
 	PINT_client_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
-
-	/* NOTE: THIS IS REPLICATED IN PINT_SERV_PREPARE_MSGPAIR();
-	 * WE SHOULD GET RID OF ONE OF THEM OR SOMETHING...
-	 */
 
 	/* determine server address from fs_id/handle pair.
 	 * this is needed prior to encoding.

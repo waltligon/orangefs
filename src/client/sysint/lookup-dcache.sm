@@ -84,6 +84,8 @@ static int lookup_dcache_lookup(PINT_client_sm *sm_p,
 
     gossip_debug(CLIENT_DEBUG, "lookup_dcache state: lookup\n");
 
+    assert(js_p->error_code == 0); /* sanity check */
+
     /* for now we don't want to deal with anything with more than one
      * segment.
      */

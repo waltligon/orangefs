@@ -83,9 +83,9 @@ typedef struct PINT_client_sm {
     int op_complete; /* used to indicate that the operation as a 
 		      * whole is finished.
 		      */
-    job_status_s status; /* used to hold final job status so client
-			  * can determine what finally happened
-			  */
+    PVFS_error error_code; /* used to hold final job status so client
+			    * can determine what finally happened
+			    */
     int comp_ct; /* used to keep up with completion of multiple
 		  * jobs for some some states; typically set and
 		  * then decremented to zero as jobs complete */
