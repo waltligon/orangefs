@@ -2979,9 +2979,9 @@ static int payload_progress(int s, void *const *buffer_list, const bmi_size_t*
 	    size_list[*list_index] - *current_index_complete;
 	for(i = (*list_index + 1); i < list_count; i++)
 	{
-	    stat_io_vector[vector_index].iov_base = buffer_list[i];
 	    vector_index++;
 	    count++;
+	    stat_io_vector[vector_index].iov_base = buffer_list[i];
 	    if(i == final_index)
 	    {
 		stat_io_vector[vector_index].iov_len = final_size;
@@ -2995,6 +2995,7 @@ static int payload_progress(int s, void *const *buffer_list, const bmi_size_t*
     }
 
     assert(count > 0);
+
     if(send_recv == BMI_RECV)
     {
 	ret = BMI_sockio_nbvector(s, stat_io_vector, count, 1);
