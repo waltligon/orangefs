@@ -30,69 +30,69 @@ My TODO list for this SM:
 #include <assert.h>
 #include <gossip.h>
 
-static int remove_init(state_action_struct *s_op, job_status_s *ret);
-static int remove_getattr(state_action_struct *s_op, job_status_s *ret);
-static int remove_check_perms(state_action_struct *s_op, job_status_s *ret);
-static int remove_cleanup(state_action_struct *s_op, job_status_s *ret);
-static int remove_remove(state_action_struct *s_op, job_status_s *ret);
-static int remove_release_posted_job(state_action_struct *s_op, job_status_s *ret);
-static int remove_send_bmi(state_action_struct *s_op, job_status_s *ret);
-void remove_init_state_machine(void);
+static int rmdirent_init(state_action_struct *s_op, job_status_s *ret);
+static int rmdirent_getattr(state_action_struct *s_op, job_status_s *ret);
+static int rmdirent_check_perms(state_action_struct *s_op, job_status_s *ret);
+static int rmdirent_cleanup(state_action_struct *s_op, job_status_s *ret);
+static int rmdirent_rmdirent(state_action_struct *s_op, job_status_s *ret);
+static int rmdirent_release_job(state_action_struct *s_op, job_status_s *ret);
+static int rmdirent_send_bmi(state_action_struct *s_op, job_status_s *ret);
+void rmdirent_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
-PINT_state_machine_s remove_req_s = 
+PINT_state_machine_s rmdirent_req_s = 
 {
 	NULL,
-	"remove",
-	remove_init_state_machine
+	"rmdirent",
+	rmdirent_init_state_machine
 };
 
 %%
 
-machine remove(init, getattr, check_perms, remove2, send, release, cleanup)
+machine rmdirent(init, getattr, check_perms, rmdirent_entry, send, release, cleanup)
 {
 	state init
 	{
-		run remove_init;
+		run rmdirent_init;
 		default => getattr;
 	}
 
 	state getattr
 	{
-		run remove_getattr;
+		run rmdirent_getattr;
 		success => check_perms;
-		default => remove2;
+		default => send;
 	}
 
 	state check_perms
 	{
-		run remove_check_perms;
-		success => remove2;
+		run rmdirent_check_perms;
+		success => rmdirent_entry;
 		default => send;
 	}
 
-	state remove2
+	state rmdirent_entry
 	{
-		run remove_remove;
+		run rmdirent_rmdirent;
 		default => send;
 	}
 
 	state send
 	{
-		run remove_send_bmi;
+		run rmdirent_send_bmi;
 		default => release;
 	}
 
 	state release
 	{
-		run remove_release_posted_job;
+		run rmdirent_release_job;
 		default => cleanup;
 	}
 
 	state cleanup
 	{
-		run remove_cleanup;
+		run rmdirent_cleanup;
 		default => init;
 	}
 }
@@ -100,7 +100,7 @@ machine remove(init, getattr, check_perms, remove2, send, release, cleanup)
 %%
 
 /*
- * Function: remove_init_state_machine
+ * Function: rmdirent_init_state_machine
  *
  * Params:   void
  *
@@ -110,19 +110,19 @@ machine remove(init, getattr, check_perms, remove2, send, release, cleanup)
  *
  * Returns:  void
  *
- * Synopsis: Set up the state machine for remove. 
+ * Synopsis: Set up the state machine for rmdirent. 
  *           
  */
 
-void remove_init_state_machine(void)
+void rmdirent_init_state_machine(void)
 {
 
-    remove_req_s.state_machine = remove;
+    rmdirent_req_s.state_machine = rmdirent;
 
 }
 
 /*
- * Function: remove_init
+ * Function: rmdirent_init
  *
  * Params:   server_op *s_op, 
  *           job_status_s *ret
@@ -139,7 +139,7 @@ void remove_init_state_machine(void)
  */
 
 
-static int remove_init(state_action_struct *s_op, job_status_s *ret)
+static int rmdirent_init(state_action_struct *s_op, job_status_s *ret)
 {
 
     int job_post_ret;
@@ -160,34 +160,36 @@ static int remove_init(state_action_struct *s_op, job_status_s *ret)
 }
 
 /*
- * Function: remove_getattr
+ * Function: rmdirent_getattr
  *
  * Params:   server_op *s_op, 
  *           job_status_s *ret
  *
  * Pre:      Valid handle
  *
- * Post:     Attributes Structure Obtained if available
- *             --This could be a datafile which has no attribs
+ * Post:     Attributes Structure Obtained if available. If not... 
+ *           send an error right now.
  *
  * Returns:  int
  *
  * Synopsis: We need to get the attribute structure if it is available.
- *           If it is not, we just remove it.  TODO: Semantics here!
+ *           If it is not, we just send an error to the client.  
+ *           TODO: Semantics here!
  *           
  *           
  */
 
 
-static int remove_getattr(state_action_struct *s_op, job_status_s *ret)
+static int rmdirent_getattr(state_action_struct *s_op, job_status_s *ret)
 {
 
     int job_post_ret;
     job_id_t i;
     PVFS_vtag_s bs;
 
-    job_post_ret = job_trove_keyval_read(s_op->req->u.remove.fs_id,
-	    s_op->req->u.remove.handle,
+    job_post_ret = job_trove_keyval_read(
+	    s_op->req->u.rmdirent.fs_id,
+	    s_op->req->u.rmdirent.parent_handle,
 	    &(s_op->key),
 	    &(s_op->val),
 	    0,
@@ -201,7 +203,7 @@ static int remove_getattr(state_action_struct *s_op, job_status_s *ret)
 }
 
 /*
- * Function: remove_check_perms
+ * Function: rmdirent_check_perms
  *
  * Params:   server_op *s_op, 
  *           job_status_s *ret
@@ -218,19 +220,45 @@ static int remove_getattr(state_action_struct *s_op, job_status_s *ret)
  *           
  */
 
-static int remove_check_perms(state_action_struct *s_op, job_status_s *ret)
+static int rmdirent_check_perms(state_action_struct *s_op, job_status_s *ret)
 {
     int job_post_ret;
-    /*job_id_t i;*/
+    job_id_t i;
+    PVFS_vtag_s bs;
 
     job_post_ret = 1;  /* Just pretend it is good right now */
     /*IF THEY don't have permission, set ret->error_code to -ENOPERM!*/
+
+    /* From here, the user has permission.  We need to get the second k/v
+       space so we can remove the key */
+    s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
+    s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
+
+    /* 
+       Recall that we previously allocated a buffer for object attribs that 
+       we used above!
+     */
+    assert(s_op->val.buffer_sz >= sizeof(PVFS_handle));
+
+    s_op->val.buffer_sz = sizeof(PVFS_handle);
+
+    job_post_ret = job_trove_keyval_read(
+	    s_op->req->u.rmdirent.fs_id,
+	    s_op->req->u.rmdirent.parent_handle,
+	    &(s_op->key),
+	    &(s_op->val),
+	    0,
+	    bs,
+	    s_op,
+	    ret,
+	    &i);
+
 
     return(job_post_ret);
 }
 
 /*
- * Function: remove_remove
+ * Function: rmdirent_rmdirent
  *
  * Params:   server_op *s_op, 
  *           job_status_s *ret
@@ -246,15 +274,25 @@ static int remove_check_perms(state_action_struct *s_op, job_status_s *ret)
  */
 
 
-static int remove_remove(state_action_struct *s_op, job_status_s *ret)
+static int rmdirent_rmdirent(state_action_struct *s_op, job_status_s *ret)
 {
 
     int job_post_ret;
     job_id_t i;
+    PVFS_handle h;
+    PVFS_vtag_s bs;
 
-    job_post_ret = job_trove_dspace_remove(
-	    s_op->req->u.remove.fs_id,
-	    s_op->req->u.remove.handle,
+    h = *((PVFS_handle *)s_op->val.buffer);
+
+    s_op->key.buffer = s_op->req->u.rmdirent.entry;
+    s_op->key.buffer_sz = strlen((char *)s_op->key.buffer)+1;
+
+    job_post_ret = job_trove_keyval_remove(
+	    s_op->req->u.rmdirent.fs_id,
+	    h,
+	    &(s_op->key),
+	    0,
+	    bs,
 	    s_op,
 	    ret,
 	    &i);
@@ -265,7 +303,7 @@ static int remove_remove(state_action_struct *s_op, job_status_s *ret)
 
 
 /*
- * Function: remove_bmi_send
+ * Function: rmdirent_bmi_send
  *
  * Params:   server_op *s_op, 
  *           job_status_s *ret
@@ -276,13 +314,14 @@ static int remove_remove(state_action_struct *s_op, job_status_s *ret)
  *
  * Returns:  int
  *
- * Synopsis: Send a message to the client.  If the dataspace was successfully
- *           removed, send the new handle back.
+ * Synopsis: Send a message to the client.  
+ *           If the entry was successfully
+ *           removed, send the handle back.
  *           
  */
 
 
-static int remove_send_bmi(state_action_struct *s_op, job_status_s *ret)
+static int rmdirent_send_bmi(state_action_struct *s_op, job_status_s *ret)
 {
 
     int job_post_ret=0;
@@ -294,8 +333,9 @@ static int remove_send_bmi(state_action_struct *s_op, job_status_s *ret)
     /* Set the handle IF it was removed */
     if(ret->error_code == 0) 
     {
-	gossip_err("Handle Removed: %lld\n",s_op->req->u.remove.handle);
-	s_op->resp->u.generic.handle = ret->handle;
+	gossip_err("Dirent Removed from : %lld\n",
+		s_op->req->u.rmdirent.parent_handle);
+	s_op->resp->u.generic.handle = s_op->req->u.rmdirent.parent_handle;
 
     }
 
@@ -344,7 +384,7 @@ static int remove_send_bmi(state_action_struct *s_op, job_status_s *ret)
 }
 
 /*
- * Function: remove_release_posted_job
+ * Function: rmdirent_release_job
  *
  * Params:   server_op *b, 
  *           job_status_s *ret
@@ -358,7 +398,7 @@ static int remove_send_bmi(state_action_struct *s_op, job_status_s *ret)
  * Synopsis: Free the job from the scheduler to allow next job to proceed.
  */
 
-static int remove_release_posted_job(state_action_struct *s_op, job_status_s *ret)
+static int rmdirent_release_job(state_action_struct *s_op, job_status_s *ret)
 {
 
     int job_post_ret=0;
@@ -373,7 +413,7 @@ static int remove_release_posted_job(state_action_struct *s_op, job_status_s *re
 
 
 /*
- * Function: remove_cleanup
+ * Function: rmdirent_cleanup
  *
  * Params:   server_op *b, 
  *           job_status_s *ret
@@ -389,7 +429,7 @@ static int remove_release_posted_job(state_action_struct *s_op, job_status_s *re
  */
 
 
-static int remove_cleanup(state_action_struct *s_op, job_status_s *ret)
+static int rmdirent_cleanup(state_action_struct *s_op, job_status_s *ret)
 {
 
     PINT_encode_release(&(s_op->encoded),PINT_ENCODE_RESP,0);
@@ -408,12 +448,12 @@ static int remove_cleanup(state_action_struct *s_op, job_status_s *ret)
     /*
     BMI_memfree(
 	    s_op->addr,
-	    s_op->req,
-	    s_op->unexp_bmi_buff->size,
+	    s_op->unexp_bmi_buff.buffer,
+	    s_op->unexp_bmi_buff.size,
 	    BMI_RECV_BUFFER
 	    );
-
     */
+
     free(s_op);
 
     return(0);

@@ -11,6 +11,7 @@ SERVERGENSRC := \
 	$(DIR)/readdir.src.c \
 	$(DIR)/get-config.src.c \
 	$(DIR)/remove.src.c \
+	$(DIR)/rmdirent.src.c \
 	$(DIR)/io.src.c
 
 # "normal" c files

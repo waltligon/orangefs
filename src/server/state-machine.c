@@ -71,35 +71,39 @@ extern PINT_state_machine_s readdir_req_s;
 extern PINT_state_machine_s lookup_req_s;
 extern PINT_state_machine_s io_req_s;
 extern PINT_state_machine_s remove_req_s;
+extern PINT_state_machine_s rmdirent_req_s;
 
 /* DALE - fill in the rest of these please - WBL */
 PINT_state_machine_s *PINT_server_op_table[SERVER_OP_TABLE_SIZE] =
 {
-	NULL,               /* 0 */
-	NULL,
-	&create_req_s,     /* create */
-	&remove_req_s,     /* remove */
-	&io_req_s,         /* io */
-	NULL,					  /* 5 */
-	NULL,
-	&getattr_req_s,    /* get attrib */
-	&setattr_req_s,    /* set attrib */
-	NULL,
-	NULL,					  /* 10 */
-	&lookup_req_s,     /* lookup */
-	NULL,
-	&crdirent_req_s,   /* create dir entry */
-	NULL,
-	NULL,					  /* 15 */
-	NULL,
-	NULL,
-	&mkdir_req_s,      /* mkdir */
-	NULL,
-	&readdir_req_s, 	 /* readdir - 20 */
-	NULL,
-	NULL,
-	&getconfig_req_s,  /* get config */
-	NULL
+	NULL,              /* invalid          */
+	NULL,              /* noop             */
+	&create_req_s,     /* create           */
+	&remove_req_s,     /* remove           */
+	&io_req_s,         /* io               */
+	NULL,					 /* empty - 5        */
+	NULL,              /* batch            */ 
+	&getattr_req_s,    /* get attrib       */
+	&setattr_req_s,    /* set attrib       */
+	NULL,              /* geteattr         */
+	NULL,					 /* seteattr - 10    */
+	&lookup_req_s,     /* lookup           */
+	NULL,              /* getdist ????     */
+	&crdirent_req_s,   /* createdir ent    */
+	&rmdirent_req_s,   /* rmdirent         */
+	NULL,					 /* revlookup? - 15  */
+	NULL,              /* allocate         */
+	NULL,              /* truncate         */
+	&mkdir_req_s,      /* mkdir            */
+	NULL,              /* rmdir            */
+	&readdir_req_s, 	 /* readdir - 20     */
+	NULL,              /* statfs           */
+	NULL,              /* iostatfs         */
+	&getconfig_req_s,  /* get config       */
+	/*                                     */
+	/* NULL's continue for a while...      */
+	/*                                     */
+	NULL               /* extension !99!   */
 };
 
 
