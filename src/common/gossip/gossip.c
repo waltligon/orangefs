@@ -11,6 +11,8 @@
 #include <errno.h>
 #include <syslog.h>
 #include <stdlib.h>
+#include <time.h>
+#include <sys/time.h>
 #include "pvfs2-config.h"
 #ifdef HAVE_EXECINFO_H
 #include <execinfo.h>
@@ -33,7 +35,7 @@ enum
 
 enum
 {
-    GOSSIP_BUF_SIZE = 128
+    GOSSIP_BUF_SIZE = 1024
 };
 
 /* determines which logging facility to use */
@@ -407,6 +409,7 @@ static int gossip_debug_syslog(
     return 0;
 }
 
+#define GOSSIP_DEBUG_TIMESTAMP 0
 
 /* gossip_debug_file()
  * 
@@ -421,8 +424,23 @@ static int gossip_debug_file(
 {
     char buffer[GOSSIP_BUF_SIZE];
     int ret = -EINVAL;
+    char *bptr = buffer;
+    int bsize = GOSSIP_BUF_SIZE;
 
-    ret = vsnprintf(buffer, GOSSIP_BUF_SIZE, format, ap);
+#if GOSSIP_DEBUG_TIMESTAMP
+    {
+    struct timeval tv;
+    time_t tp;
+
+    gettimeofday(&tv, 0);
+    tp = tv.tv_sec;
+    strftime(buffer, 2048, "[%H:%M:%S", localtime(&tp));
+    sprintf(buffer+9, ".%06ld] ", tv.tv_usec);
+    bptr += 18;
+    bsize -= 18;
+    }
+#endif
+    ret = vsnprintf(bptr, bsize, format, ap);
     if (ret < 0)
     {
         return -errno;
