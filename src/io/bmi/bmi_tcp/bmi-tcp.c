@@ -2027,6 +2027,12 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
 			    expected_size, context_id);
     /* just for safety; this field isn't valid to the caller anymore */
     (*actual_size) = 0;
+    /* TODO: figure out why this causes deadlocks; observable in 2
+     * scenarios:
+     * - pvfs2-client-core with threaded library and nptl
+     * - pvfs2-server threaded with nptl sending messages to itself
+     */
+#if 0
     if (ret >= 0)
     {
 	/* go ahead and try to do some work while we are in this
@@ -2035,6 +2041,7 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
 	 */
 	ret = tcp_do_work(0);
     }
+#endif
     return (ret);
 }
 
