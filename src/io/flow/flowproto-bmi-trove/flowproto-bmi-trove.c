@@ -1284,6 +1284,14 @@ static int buffer_setup_trove_to_bmi(flow_descriptor * flow_d)
 	&& flow_data->fill_buffer_stepsize == 0)
     {
 	/* there is no work to do; zero length flow */
+	BMI_memfree(flow_d->dest.u.bmi.address,
+	    flow_data->fill_buffer,
+	    flow_data->max_buffer_size,
+	    BMI_SEND);
+	BMI_memfree(flow_d->dest.u.bmi.address,
+	    flow_data->drain_buffer,
+	    flow_data->max_buffer_size,
+	    BMI_SEND);
 	return (1);
     }
 
