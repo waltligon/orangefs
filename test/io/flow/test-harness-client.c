@@ -17,7 +17,7 @@
 #include <flow.h>
 #include <flowproto-support.h>
 #include <pvfs-distribution.h>
-#include <pvfs-request.h>
+#include <pvfs2-request.h>
 
 int TEST_SIZE=1024*1024*20; /* 1M */
 static int block_on_flow(flow_descriptor* flow_d, FLOW_context_id

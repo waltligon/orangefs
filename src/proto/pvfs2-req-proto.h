@@ -10,7 +10,7 @@
 #include "pvfs2-types.h"
 #include "pvfs2-attr.h"
 #include "pvfs-distribution.h"
-#include "pvfs-request.h"
+#include "pvfs2-request.h"
 
 /* release number:
  * This is a base-10, 5 digit number, with one digit for the most

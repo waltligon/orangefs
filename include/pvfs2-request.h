@@ -5,8 +5,8 @@
  * See COPYING in top-level directory.
  */
 
-#ifndef __PVFS_REQUEST_H
-#define __PVFS_REQUEST_H
+#ifndef __PVFS2_REQUEST_H
+#define __PVFS2_REQUEST_H
 
 #include <pvfs2-types.h>
 
@@ -59,4 +59,4 @@ extern PVFS_Request PVFS_LONG_DOUBLE;
 extern PVFS_Request PVFS_BYTE;
 extern PVFS_Request PVFS_PACKED;
 
-#endif /* __PVFS_REQUEST_H */
+#endif /* __PVFS2_REQUEST_H */

@@ -12,7 +12,7 @@
 #include "flow.h"
 #include "flowproto-support.h"
 #include "quicklist.h"
-#include "pvfs-request.h"
+#include "pvfs2-request.h"
 
 /**********************************************************
  * interface prototypes 

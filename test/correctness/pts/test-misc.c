@@ -20,7 +20,7 @@
 #include "pts.h"
 #include "pvfs-helper.h"
 #include "null_params.h"
-#include "pvfs-request.h"
+#include "pvfs2-request.h"
 
 extern pvfs_helper_t pvfs_helper;
 

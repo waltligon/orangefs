@@ -17,7 +17,7 @@
 #include <flow.h>
 #include <flowproto-support.h>
 #include <pvfs-distribution.h>
-#include <pvfs-request.h>
+#include <pvfs2-request.h>
 
 #include <wire-harness.h>
 

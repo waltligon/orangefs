@@ -12,7 +12,7 @@
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
 #include "pvfs-distribution.h"
-#include "pvfs-request.h"
+#include "pvfs2-request.h"
 #include "pint-distribution.h"
 #include "pint-request.h"
 

@@ -9,7 +9,7 @@
 #include "pvfs2-req-proto.h"
 #include "print-struct.h"
 #include "PINT-reqproto-encode.h"
-#include "pvfs-request.h"
+#include "pvfs2-request.h"
 #include "pint-request.h"
 #include "pvfs-distribution.h"
 #include "pint-distribution.h"

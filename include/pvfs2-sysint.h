@@ -14,7 +14,7 @@
 #endif
 
 #include "pvfs2-types.h"
-#include "pvfs-request.h"
+#include "pvfs2-request.h"
 
 /* TODO: note that this should be a derived value eventually.  For
  * now it is hard coded to match the definition of

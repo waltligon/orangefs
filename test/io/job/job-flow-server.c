@@ -15,7 +15,7 @@
 #include <gossip.h>
 #include <flow.h>
 #include <pvfs-distribution.h>
-#include <pvfs-request.h>
+#include <pvfs2-request.h>
 #include <job.h>
 
 

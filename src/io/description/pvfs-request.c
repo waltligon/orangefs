@@ -4,8 +4,12 @@
 // Author: Walt Ligon
 // Date: Summer 2000
 
-// $Header: /root/MIGRATE/CVS2SVN/cvs/pvfs2-1/src/io/description/pvfs-request.c,v 1.8 2003-07-02 20:00:44 walt Exp $
+// $Header: /root/MIGRATE/CVS2SVN/cvs/pvfs2-1/src/io/description/pvfs-request.c,v 1.9 2003-07-17 23:22:44 pcarns Exp $
 // $Log: not supported by cvs2svn $
+// Revision 1.8  2003/07/02 20:00:44  walt
+//
+// hopefully updates reported before are now correct!
+//
 // Revision 1.7  2003/07/02 18:29:16  walt
 // added refcount to requests, developed code for freeing requests
 //
@@ -51,7 +55,7 @@
 #include <unistd.h>
 #include <pvfs2-types.h>
 #include <pint-request.h>
-#include <pvfs-request.h>
+#include <pvfs2-request.h>
 #include <gossip.h>
 
 #define PVFS_SUCCESS 0

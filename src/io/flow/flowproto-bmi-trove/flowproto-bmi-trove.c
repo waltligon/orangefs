@@ -20,7 +20,7 @@
 #include "quicklist.h"
 #include "trove-id-queue.h"
 #include "trove-proto.h"
-#include "pvfs-request.h"
+#include "pvfs2-request.h"
 
 /**********************************************************
  * interface prototypes 

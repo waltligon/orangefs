@@ -1,6 +1,6 @@
 #include <malloc.h>
 #include <string.h>
-#include <pvfs-request.h>
+#include <pvfs2-request.h>
 #include <pint-request.h>
 
 int main(int argc, char **argv)

@@ -12,7 +12,7 @@
 #include <pvfs2-debug.h>
 
 #include <pvfs-distribution.h>
-#include <pvfs-request.h>
+#include <pvfs2-request.h>
 #include <pint-request.h>
 
 #include <simple-stripe.h>

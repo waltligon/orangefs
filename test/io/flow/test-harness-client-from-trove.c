@@ -18,7 +18,7 @@
 #include "flowproto-support.h"
 #include "trove.h"
 #include "pvfs-distribution.h"
-#include "pvfs-request.h"
+#include "pvfs2-request.h"
 
 #define ROOT_HANDLE_STRING "root_handle"
 #define TROVE_TEST_BSTREAM 3
