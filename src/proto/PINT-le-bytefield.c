@@ -56,7 +56,7 @@ do{								    \
 	memcpy((msg_p)->ptr_current, x_p, size);		    \
     }								    \
     else if(PINT_XENC_MODE == PINT_DEC){			    \
-	memcpy(x_p, (msg_p)->ptr_current, size);		    \
+	x_p = (msg_p)->ptr_current;				    \
     }								    \
     (msg_p)->ptr_current += size;				    \
 }while(0)
@@ -85,13 +85,10 @@ do{							    \
 #define PINT_XENC_REQ_GETCONFIG(msg_p,req) do{}while(0)
 
 /* operates on a getconfig response */
-#define PINT_XENC_RESP_GETCONFIG_A(msg_p,resp)		    \
+#define PINT_XENC_RESP_GETCONFIG(msg_p,resp)		    \
 do{							    \
     PINT_XENC_UINT32(msg_p,&((resp)->u.getconfig.fs_config_buf_size));	\
     PINT_XENC_UINT32(msg_p,&((resp)->u.getconfig.server_config_buf_size)); \
-}while(0)
-#define PINT_XENC_RESP_GETCONFIG_B(msg_p,resp)		    \
-do{							    \
     PINT_XENC_STRING(msg_p, (resp)->u.getconfig.fs_config_buf, \
 	(resp)->u.getconfig.fs_config_buf_size);		    \
     PINT_XENC_STRING(msg_p, (resp)->u.getconfig.server_config_buf, \
@@ -181,8 +178,7 @@ static void lebf_initialize(void)
     tmp_resp.u.getconfig.fs_config_buf_size = PVFS_REQ_LIMIT_CONFIG_FILE_BYTES;
     tmp_resp.u.getconfig.server_config_buf_size = PVFS_REQ_LIMIT_CONFIG_FILE_BYTES;
     PINT_XENC_RESP_GEN(&tmp_msg, &tmp_resp);
-    PINT_XENC_RESP_GETCONFIG_A(&tmp_msg, &tmp_resp);
-    PINT_XENC_RESP_GETCONFIG_B(&tmp_msg, &tmp_resp);
+    PINT_XENC_RESP_GETCONFIG(&tmp_msg, &tmp_resp);
     max_size_array[PVFS_SERV_GETCONFIG].max_resp = (int)(tmp_msg.ptr_current);
 
     return;
@@ -293,8 +289,7 @@ static int lebf_encode_resp(
 	    /* adjust size estimage based on what we are sending */
 	    target_msg->ptr_current = NULL;
 	    PINT_XENC_RESP_GEN(target_msg, response);
-	    PINT_XENC_RESP_GETCONFIG_A(target_msg, response);
-	    PINT_XENC_RESP_GETCONFIG_B(target_msg, response);
+	    PINT_XENC_RESP_GETCONFIG(target_msg, response);
 	    target_msg->size_list[0] = target_msg->total_size = 
 		(int)(target_msg->ptr_current) + PINT_ENC_GENERIC_HEADER_SIZE;
 
@@ -309,8 +304,7 @@ static int lebf_encode_resp(
 		PINT_ENC_GENERIC_HEADER_SIZE);
 	    target_msg->ptr_current += PINT_ENC_GENERIC_HEADER_SIZE;
 	    PINT_XENC_RESP_GEN(target_msg, response);
-	    PINT_XENC_RESP_GETCONFIG_A(target_msg, response);
-	    PINT_XENC_RESP_GETCONFIG_B(target_msg, response);
+	    PINT_XENC_RESP_GETCONFIG(target_msg, response);
 	    ret = 0;
 	default:
 	    gossip_lerr("Error: unsupported operation.\n");
@@ -318,6 +312,12 @@ static int lebf_encode_resp(
 	    break;
     }
 
+    /* check sanity */
+    if(ret == 0)
+    {
+	assert(target_msg->total_size == (int)(target_msg->ptr_current -
+	    (char*)(target_msg->buffer_list[0])));
+    }
     return(ret);
 }
 
@@ -346,19 +346,7 @@ static int lebf_decode_resp(
     switch(target_msg->stub_dec.resp.op)
     {
 	case PVFS_SERV_GETCONFIG:
-	    PINT_XENC_RESP_GETCONFIG_A(target_msg, &(target_msg->stub_dec.resp));
-	    target_msg->stub_dec.resp.u.getconfig.fs_config_buf =
-		(char*)malloc(target_msg->stub_dec.resp.u.getconfig.fs_config_buf_size);
-	    if(!target_msg->stub_dec.resp.u.getconfig.fs_config_buf)
-		return(-ENOMEM);
-	    target_msg->stub_dec.resp.u.getconfig.server_config_buf =
-		(char*)malloc(target_msg->stub_dec.resp.u.getconfig.server_config_buf_size);
-	    if(!target_msg->stub_dec.resp.u.getconfig.server_config_buf)
-	    {
-		free(target_msg->stub_dec.resp.u.getconfig.fs_config_buf);
-		return(-ENOMEM);
-	    }
-	    PINT_XENC_RESP_GETCONFIG_B(target_msg, &(target_msg->stub_dec.resp));
+	    PINT_XENC_RESP_GETCONFIG(target_msg, &(target_msg->stub_dec.resp));
 	    ret = 0;
 	    break;
 	default:
@@ -436,8 +424,6 @@ static void lebf_decode_rel(
 	switch(msg->stub_dec.resp.op)
 	{
 	    case PVFS_SERV_GETCONFIG:
-		free(msg->stub_dec.resp.u.getconfig.fs_config_buf);
-		free(msg->stub_dec.resp.u.getconfig.server_config_buf);
 		break;
 	    default:
 		gossip_lerr("Error: unsupported operation.\n");
