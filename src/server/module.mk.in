@@ -12,7 +12,8 @@ SERVERGENSRC := \
 	$(DIR)/get-config.c \
 	$(DIR)/remove.c \
 	$(DIR)/rmdirent.c \
-	$(DIR)/io.c
+	$(DIR)/io.c \
+	$(DIR)/prelude.c
 
 # "normal" c files
 SERVERSRC += \

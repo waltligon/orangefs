@@ -1,0 +1,83 @@
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+
+#include <string.h>
+#include <assert.h>
+
+#include "server-config.h"
+#include "pvfs2-server.h"
+#include "pvfs2-attr.h"
+
+/* prelude state machine:
+ * This is a nested state machine that performs initial setup 
+ * steps that are common to many server operations.
+ * - post the request to the request scheduler
+ * - check permissions
+ */
+
+/* TODO: document pre and post conditions (what server_op fields do we
+ * require, and which ones do we modify?
+ */
+
+static int prelude_req_sched(PINT_server_op *s_op, job_status_s *js_p);
+static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p);
+
+extern PINT_server_trove_keys_s Trove_Common_Keys[];
+extern job_context_id PINT_server_job_context;
+
+%%
+
+nested machine pvfs2_prelude_sm(req_sched, perm_check)
+{
+    state req_sched
+    {
+	run prelude_req_sched;
+	default => perm_check;
+    }
+
+    state perm_check
+    {
+	run prelude_perm_check;
+	default => return;
+    }
+}
+
+
+%%
+
+/* prelude_req_sched()
+ *
+ * posts a request scheduler job
+ */
+static int prelude_req_sched(PINT_server_op *s_op, job_status_s *js_p)
+{
+
+    return(1);
+}
+
+/* prelude_perm_check()
+ *
+ * this really just marks the spot where we would want to do permission checking,
+ * it will be replaced by a couple of states that actually perform this task
+ * later
+ */
+static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p)
+{
+
+    return(1);
+}
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 noexpandtab
+ */
+
