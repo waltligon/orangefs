@@ -96,6 +96,9 @@ static void trove_write_callback_fn(void *user_ptr,
 static void mem_to_bmi_callback_fn(void *user_ptr,
 		         PVFS_size actual_size,
 		         PVFS_error error_code);
+static void bmi_to_mem_callback_fn(void *user_ptr,
+		         PVFS_size actual_size,
+		         PVFS_error error_code);
 static void cleanup_buffers(struct fp_private_data* flow_data);
 
 
@@ -284,8 +287,9 @@ int fp_multiqueue_post(flow_descriptor * flow_d)
     if(flow_d->src.endpoint_id == BMI_ENDPOINT &&
 	flow_d->dest.endpoint_id == MEM_ENDPOINT)
     {
-	/* TODO: fill this in */
-	assert(0);
+	flow_data->prealloc_array[0].buffer = flow_d->dest.u.mem.buffer;
+	flow_data->prealloc_array[0].bmi_callback.fn = bmi_to_mem_callback_fn;
+	bmi_to_mem_callback_fn(&(flow_data->prealloc_array[0]), 0, 0);
     }
     else if(flow_d->src.endpoint_id == MEM_ENDPOINT &&
 	flow_d->dest.endpoint_id == BMI_ENDPOINT)
@@ -705,6 +709,7 @@ static void bmi_send_callback_fn(void *user_ptr,
 	flow_data->dest_last_posted)
     {
 	q_item->parent->state = FLOW_COMPLETE;
+	gen_mutex_unlock(&flow_data->flow_mutex);
 	gen_mutex_lock(&completion_mutex);
 	qlist_add_tail(&(flow_data->list_link), 
 	    &completion_queue);
@@ -712,7 +717,6 @@ static void bmi_send_callback_fn(void *user_ptr,
 	pthread_cond_signal(&completion_cond);
 #endif
 	gen_mutex_unlock(&completion_mutex);
-	gen_mutex_unlock(&flow_data->flow_mutex);
 	return;
     }
 
@@ -881,6 +885,7 @@ static void trove_write_callback_fn(void *user_ptr,
 	PINT_REQUEST_DONE(flow_data->parent->file_req_state))
     {
 	q_item->parent->state = FLOW_COMPLETE;
+	gen_mutex_unlock(&flow_data->flow_mutex);
 	gen_mutex_lock(&completion_mutex);
 	qlist_add_tail(&(flow_data->list_link), 
 	    &completion_queue);
@@ -888,7 +893,6 @@ static void trove_write_callback_fn(void *user_ptr,
 	pthread_cond_signal(&completion_cond);
 #endif
 	gen_mutex_unlock(&completion_mutex);
-	gen_mutex_unlock(&flow_data->flow_mutex);
 	return;
     }
 
@@ -1065,10 +1069,13 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
 
     gen_mutex_lock(&flow_data->flow_mutex);
     
+    flow_data->parent->total_transfered += actual_size;
+
     /* are we done? */
     if(PINT_REQUEST_DONE(q_item->parent->file_req_state))
     {
 	q_item->parent->state = FLOW_COMPLETE;
+	gen_mutex_unlock(&flow_data->flow_mutex);
 	gen_mutex_lock(&completion_mutex);
 	qlist_add_tail(&(flow_data->list_link), 
 	    &completion_queue);
@@ -1076,7 +1083,6 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
 	pthread_cond_signal(&completion_cond);
 #endif
 	gen_mutex_unlock(&completion_mutex);
-	gen_mutex_unlock(&flow_data->flow_mutex);
 	return;
     }
 
@@ -1134,6 +1140,110 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
     {
 	mem_to_bmi_callback_fn(q_item, 
 	    q_item->result_chain.result.bytes, 0);
+    }
+
+    return;
+}
+
+
+/* bmi_to_mem_callback()
+ *
+ * function to be called upon completion of bmi operations in bmi to memory
+ * transfers
+ * 
+ * no return value
+ */
+static void bmi_to_mem_callback_fn(void *user_ptr,
+		         PVFS_size actual_size,
+		         PVFS_error error_code)
+{
+    struct fp_queue_item* q_item = user_ptr;
+    int ret;
+    struct fp_private_data* flow_data = PRIVATE_FLOW(q_item->parent);
+    int i;
+    PVFS_id_gen_t tmp_id;
+    PVFS_size tmp_actual_size;
+
+    /* TODO: error handling */
+    if(error_code != 0)
+    {
+	PVFS_perror_gossip("bmi_recv_callback_fn error_code", error_code);
+	assert(0);
+    }
+
+    gen_mutex_lock(&flow_data->flow_mutex);
+    
+    flow_data->parent->total_transfered += actual_size;
+
+    /* are we done? */
+    if(PINT_REQUEST_DONE(q_item->parent->file_req_state))
+    {
+	q_item->parent->state = FLOW_COMPLETE;
+	gen_mutex_unlock(&flow_data->flow_mutex);
+	gen_mutex_lock(&completion_mutex);
+	qlist_add_tail(&(flow_data->list_link), 
+	    &completion_queue);
+#ifdef __PVFS2_JOB_THREADED__
+	pthread_cond_signal(&completion_cond);
+#endif
+	gen_mutex_unlock(&completion_mutex);
+	return;
+    }
+
+    /* process request */
+    q_item->result_chain.result.offset_array = 
+	q_item->result_chain.offset_list;
+    q_item->result_chain.result.size_array = 
+	q_item->result_chain.size_list;
+    q_item->result_chain.result.bytemax = BUFFER_SIZE;
+    q_item->result_chain.result.bytes = 0;
+    q_item->result_chain.result.segmax = MAX_REGIONS;
+    q_item->result_chain.result.segs = 0;
+    q_item->result_chain.buffer_offset = NULL;
+    ret = PINT_Process_request(q_item->parent->file_req_state,
+	q_item->parent->mem_req_state,
+	&q_item->parent->file_data,
+	&q_item->result_chain.result,
+	PINT_SERVER);
+
+    /* TODO: error handling */ 
+    assert(ret >= 0);
+    /* TODO: handle highly discontiguous cases */
+    assert(q_item->result_chain.result.segs <= MAX_REGIONS);
+
+    if(q_item->result_chain.result.bytes == 0)
+    {	
+	gen_mutex_unlock(&flow_data->flow_mutex);
+	return;
+    }
+
+    /* convert offsets to memory addresses */
+    for(i=0; i<q_item->result_chain.result.segs; i++)
+    {
+	flow_data->tmp_buffer_list[i] = 
+	    (void*)(q_item->result_chain.result.offset_array[i] +
+	    q_item->buffer);
+    }
+
+    ret = BMI_post_recv_list(&tmp_id,
+	q_item->parent->src.u.bmi.address,
+	flow_data->tmp_buffer_list,
+	q_item->result_chain.result.size_array,
+	q_item->result_chain.result.segs,
+	q_item->result_chain.result.bytes,
+	&tmp_actual_size,
+	BMI_EXT_ALLOC,
+	q_item->parent->tag,
+	&q_item->bmi_callback,
+	global_bmi_context);
+    /* TODO: error handling */
+    assert(ret >= 0);
+
+    gen_mutex_unlock(&flow_data->flow_mutex);
+
+    if(ret == 1)
+    {
+	bmi_to_mem_callback_fn(q_item, tmp_actual_size, 0);
     }
 
     return;
