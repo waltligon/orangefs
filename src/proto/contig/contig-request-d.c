@@ -154,8 +154,11 @@ int do_decode_req(
 	return(-ENOSYS);
     }
 
-    assert(0);
-    return(-ENOSYS);
+    /* if we hit this point, it must be a request type that we
+     * don't understand
+     */
+    free(dec_msg);
+    return(-EPROTO);
 }
 
 /*

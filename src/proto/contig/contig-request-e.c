@@ -427,6 +427,8 @@ int do_encode_req(
 	    (int)request->op);
 	return(-ENOSYS);
     }
+
+    gossip_lerr("Error: system attempted to encode an unkown request structure.\n");
     assert(0);
     return(-ENOSYS);
 }

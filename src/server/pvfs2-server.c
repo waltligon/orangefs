@@ -214,25 +214,16 @@ int main(int argc, char **argv)
 	     * While the job continues to complete immediately, we continue to
 	     * service it.
 	     */
-	       
             while (ret == 1)
             {
                 ret = PINT_state_machine_next(s_op, &server_job_status_array[i]);
             }
 
-	    /* The job has either hit an error case, or has hit a point where it
-	     * could no longer continue.
-	     */
-
 	    if (ret < 0)
 	    {
-		/* Job did in fact have an error */
-
-		gossip_lerr("Error on job %d, Return Code: %d\n", i, ret);
-		ret = 1;
-		goto server_shutdown;
-		/* if ret < 0 oh no... job mechanism died */
-		/* TODO: fix this */
+		gossip_lerr("Error: unhandled state machine processing error.\n");
+		/* TODO: handle this properly */
+		assert(0);
 	    }
 
 	    if (unexpected_msg)
