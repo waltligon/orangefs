@@ -17,6 +17,7 @@
 #include <flow.h>
 #include <flowproto-support.h>
 #include <pvfs-distribution.h>
+#include <pvfs-request.h>
 
 int TEST_SIZE=1024*1024*20; /* 20M */
 static int block_on_flow(flow_descriptor* flow_d);
@@ -34,7 +35,7 @@ int main(int argc, char **argv)
 	int i= 0;
 	bmi_size_t actual_size;
 	double time1, time2;
-	PINT_Request req1;
+	PINT_Request* req;
 	PINT_Request_file_data file_data;
 
 	/*************************************************************/
@@ -101,18 +102,14 @@ int main(int argc, char **argv)
 
 	/* request description */
 	/* just want one contiguous region */
-	req1.offset = 0;
-	req1.num_ereqs = 1;
-	req1.stride = 0;
-	req1.num_blocks = 1;
-	req1.ub = TEST_SIZE;
-	req1.lb = 0;
-	req1.aggregate_size = TEST_SIZE;
-	req1.depth = 1;
-	req1.num_contig_chunks = 1;
-	req1.ereq = NULL;
-	req1.sreq = NULL;
+	ret = PVFS_Request_contiguous(TEST_SIZE, PVFS_BYTE, &req);
+	if(ret < 0)
+	{
+		fprintf(stderr, "PVFS_Request_contiguous() failure.\n");
+		return(-1);
+	}
 
+	
 	/* file data */
 	file_data.fsize = TEST_SIZE; 
 	file_data.iod_num = 0;
@@ -157,7 +154,7 @@ int main(int argc, char **argv)
 		return(-1);
 	}
 
-	flow_d->request = &req1;
+	flow_d->request = req;
 	flow_d->file_data =  &file_data;
 	flow_d->flags = 0;
 	flow_d->tag = 0;
