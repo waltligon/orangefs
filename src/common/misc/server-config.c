@@ -16,6 +16,7 @@
 #include "pvfs2-storage.h"
 #include "job.h"
 #include "gossip.h"
+#include "extent-utils.h"
 
 static DOTCONF_CB(get_pvfs_server_id);
 static DOTCONF_CB(get_storage_space);
@@ -40,7 +41,10 @@ static DOTCONF_CB(get_range_list);
 static int cache_config_files(int argc, char **argv);
 static int is_valid_alias(char *str);
 static int is_valid_handle_range_description(char *h_range);
-static int is_valid_filesystem_configuration(struct filesystem_configuration_s *fs);
+static int is_populated_filesystem_configuration(
+    struct filesystem_configuration_s *fs);
+static int is_valid_filesystem_configuration(
+    struct filesystem_configuration_s *fs);
 static void free_host_handle_mapping(void *ptr);
 static void free_host_alias(void *ptr);
 static void free_filesystem(void *ptr);
@@ -291,11 +295,15 @@ DOTCONF_CB(exit_filesystem_context)
         llist_head(config_s->file_systems);
     assert(fs_conf);
 
-    /* make sure last fs config object is valid */
-    if (!is_valid_filesystem_configuration(fs_conf))
+    /*
+      make sure last fs config object is valid
+      (i.e. has all required values filled in)
+    */
+    if (!is_populated_filesystem_configuration(fs_conf))
     {
-        gossip_lerr("Error in context.  Cannot have /Filesystem tag "
-                    "before all filesystem attributes are declared\n");
+        gossip_lerr("Error: Filesystem configuration is invalid!\n");
+        gossip_lerr("Possible Error in context.  Cannot have /Filesystem "
+                    "tag before all filesystem attributes are declared\n");
         return NULL;
     }
 
@@ -668,11 +676,63 @@ static int is_valid_handle_range_description(char *h_range)
     return ret;
 }
 
-static int is_valid_filesystem_configuration(struct filesystem_configuration_s *fs)
+static int is_populated_filesystem_configuration(
+    struct filesystem_configuration_s *fs)
 {
     return ((fs && fs->coll_id && fs->file_system_name &&
              fs->meta_server_list && fs->data_server_list &&
-             fs->handle_ranges) ? 1 : 0);
+             fs->handle_ranges && fs->root_handle) ? 1 : 0);
+}
+
+static int is_valid_filesystem_configuration(
+    struct filesystem_configuration_s *fs)
+{
+    int ret = 0;
+    struct llist *cur = NULL;
+    struct llist *extent_list = NULL;
+    host_handle_mapping_s *cur_h_mapping = NULL;
+
+    if (is_populated_filesystem_configuration(fs))
+    {
+        /*
+          first, make sure the root handle is within one of the
+          specified handle ranges for this fs
+        */
+        cur = fs->handle_ranges;
+        while(cur)
+        {
+            cur_h_mapping = llist_head(cur);
+            if (!cur_h_mapping)
+            {
+                break;
+            }
+            assert(cur_h_mapping->host_alias);
+            assert(cur_h_mapping->handle_range);
+
+            extent_list = PINT_create_extent_list(cur_h_mapping->handle_range);
+            if (!extent_list)
+            {
+                gossip_err("Failed to create extent list.\n");
+                break;
+            }
+
+            ret = PINT_handle_in_extent_list(extent_list,fs->root_handle);
+            PINT_release_extent_list(extent_list);
+            if (ret == 1)
+            {
+                break;
+            }
+            cur = llist_next(cur);
+        }
+
+        if (ret == 0)
+        {
+            gossip_err("Specified RootHandle is NOT within the "
+                       "valid handle range specified for this "
+                       "filesystem.\n");
+        }
+    }
+    return ret;
 }
 
 static void free_host_handle_mapping(void *ptr)
@@ -815,8 +875,9 @@ char *PINT_server_config_get_host_alias_ptr(struct server_configuration_s *confi
  *           filesystem that matches the host specific configuration
  *           
  */
-char *PINT_server_config_get_handle_range_str(struct server_configuration_s *config_s,
-                                              struct filesystem_configuration_s *fs)
+char *PINT_server_config_get_handle_range_str(
+    struct server_configuration_s *config_s,
+    struct filesystem_configuration_s *fs)
 {
     char *ret = (char *)0;
     char *my_alias = (char *)0;
@@ -825,7 +886,8 @@ char *PINT_server_config_get_handle_range_str(struct server_configuration_s *con
 
     if (config_s && config_s->host_id && fs)
     {
-        my_alias = PINT_server_config_get_host_alias_ptr(config_s,config_s->host_id);
+        my_alias = PINT_server_config_get_host_alias_ptr(
+            config_s,config_s->host_id);
         if (my_alias)
         {
             cur = fs->handle_ranges;
@@ -980,6 +1042,40 @@ static int cache_config_files(int argc, char **argv)
     close(fd);
     return 0;
 }
+
+/*
+  returns 1 if the specified configuration object is valid
+  (i.e. contains values that make sense); 0 otherwise
+*/
+int PINT_server_config_is_valid_configuration(
+    struct server_configuration_s *config_s)
+{
+    int ret = 0, fs_count = 0;
+    struct llist *cur = NULL;
+    struct filesystem_configuration_s *cur_fs = NULL;
+    
+    if (config_s)
+    {
+        cur = config_s->file_systems;
+        while(cur)
+        {
+            cur_fs = llist_head(cur);
+            if (!cur_fs)
+            {
+                break;
+            }
+
+            ret += is_valid_filesystem_configuration(cur_fs);
+            fs_count++;
+
+            cur = llist_next(cur);
+        }
+
+        ret = ((ret == fs_count) ? 1 : 0);
+    }
+    return ret;
+}
+
 
 /*
   returns 1 if the specified coll_id is valid based on

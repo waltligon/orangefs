@@ -128,7 +128,16 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
 	}
         cur_handle_range =
             PINT_server_config_get_handle_range_str(&user_opts,cur_fs);
-        assert(cur_handle_range);
+        if (!cur_handle_range)
+        {
+	    gossip_lerr("Error: Invalid handle range for host %s "
+                        "(alias %s) specified in file system %s\n",
+                        user_opts.host_id,
+                        PINT_server_config_get_host_alias_ptr(
+                            &user_opts,user_opts.host_id),
+                        cur_fs->file_system_name);
+	    goto interface_init_failed;
+        }
 
         ret = trove_collection_setinfo(
             cur_fs->coll_id,TROVE_COLLECTION_HANDLE_RANGES,
@@ -336,6 +345,13 @@ int main(int argc,
     if (PINT_server_config(&user_opts, argc, argv))
     {
 	gossip_err("Error: Could not read configuration; aborting.\n");
+	goto server_shutdown;
+    }
+
+    /* make sure the configuration file is valid */
+    if (!PINT_server_config_is_valid_configuration(&user_opts))
+    {
+	gossip_err("Error: Invalid configuration; aborting.\n");
 	goto server_shutdown;
     }
 

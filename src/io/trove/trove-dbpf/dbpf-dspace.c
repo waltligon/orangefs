@@ -56,7 +56,7 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
     /* initialize all the common members */
     dbpf_queued_op_init(q_op_p,
 			DSPACE_CREATE,
-			(handle_p ? *handle_p : NULL),
+			(handle_p ? *handle_p : (TROVE_handle)0),
 			coll_p,
 			dbpf_dspace_create_op_svc,
 			user_ptr,

@@ -57,24 +57,34 @@ typedef struct server_configuration_s
     struct llist *file_systems;     /* ptrs are type filesystem_configuration_s */
 } server_configuration_s;
 
-int PINT_server_config(struct server_configuration_s *config_s,
-                       int argc,char **argv);
+int PINT_server_config(
+    struct server_configuration_s *config_s,
+    int argc,char **argv);
 
-void PINT_server_config_release(struct server_configuration_s *config_s);
+void PINT_server_config_release(
+    struct server_configuration_s *config_s);
 
-char *PINT_server_config_get_host_addr_ptr(struct server_configuration_s *config_s,
-                                           char *alias);
+char *PINT_server_config_get_host_addr_ptr(
+    struct server_configuration_s *config_s,
+    char *alias);
 
-char *PINT_server_config_get_host_alias_ptr(struct server_configuration_s *config_s,
-                                            char *bmi_address);
+char *PINT_server_config_get_host_alias_ptr(
+    struct server_configuration_s *config_s,
+    char *bmi_address);
 
-char *PINT_server_config_get_handle_range_str(struct server_configuration_s *config_s,
-                                              struct filesystem_configuration_s *fs);
+char *PINT_server_config_get_handle_range_str(
+    struct server_configuration_s *config_s,
+    struct filesystem_configuration_s *fs);
+
+int PINT_server_config_is_valid_configuration(
+    struct server_configuration_s *config_s);
 
 int PINT_server_config_is_valid_collection_id(
-    struct server_configuration_s *config_s, TROVE_coll_id coll_id);
+    struct server_configuration_s *config_s,
+    TROVE_coll_id coll_id);
 
 int PINT_server_config_has_fs_config_info(
-    struct server_configuration_s *config_s, char *fs_name);
+    struct server_configuration_s *config_s,
+    char *fs_name);
 
 #endif  /* __SERVER_CONFIG_H */
