@@ -83,7 +83,7 @@ void dbpf_keyval_dbcache_finalize(void)
 int dbpf_keyval_dbcache_try_remove(TROVE_coll_id coll_id,
 				   TROVE_handle handle)
 {
-    int i = 0, ret = -TROVE_EINVAL;
+    int i = 0, ret = -TROVE_EINVAL, keyval_cached = 0;
     char filename[PATH_MAX] = {0}, db_name[PATH_MAX] = {0};
     DB *db_p = NULL;
 
@@ -116,10 +116,7 @@ int dbpf_keyval_dbcache_try_remove(TROVE_coll_id coll_id,
         {
 	    gossip_debug(GOSSIP_TROVE_DEBUG, "db: close error\n");
 	}
-
-        keyval_db_cache[i].ref_ct = -1;
-        keyval_db_cache[i].db_p = NULL;
-        gen_mutex_unlock(&keyval_db_cache[i].mutex);
+        keyval_cached = 1;
     }
 
     DBPF_GET_KEYVAL_DBNAME(filename, PATH_MAX,
@@ -147,6 +144,13 @@ int dbpf_keyval_dbcache_try_remove(TROVE_coll_id coll_id,
             gossip_err("warning: unreliable error value %d\n", ret);
             ret = -TROVE_EPERM;
             break;
+    }
+
+    if (keyval_cached)
+    {
+        keyval_db_cache[i].ref_ct = -1;
+        keyval_db_cache[i].db_p = NULL;
+        gen_mutex_unlock(&keyval_db_cache[i].mutex);
     }
     return ret;
 }
