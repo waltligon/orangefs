@@ -267,7 +267,7 @@ int job_finalize(void)
 #else /* __PVFS2_JOB_THREADED__ */
     BMI_close_context(global_bmi_context);
 #ifdef __PVFS2_TROVE_SUPPORT__
-    trove_close_context(/* FIXME: HACK*/9,&global_trove_context);
+    trove_close_context(/* FIXME: HACK*/9,global_trove_context);
 #endif
 #endif /* __PVFS2_JOB_THREADED__ */
 
