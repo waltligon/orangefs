@@ -142,9 +142,10 @@ int PINT_Process_request(PINT_Request_state *req,
 	}
 #endif
 	/* automatically set final_offset of req based on mem size */
-	if (PINT_IS_CLIENT(mode) && mem)
+	if (PINT_IS_CLIENT(mode) && mem && req->final_offset == 0)
 	{
-		req->final_offset = req->target_offset + mem->cur[0].rq->aggregate_size;
+		req->final_offset = req->target_offset +
+				mem->cur[0].rqbase->aggregate_size;
 		gossip_debug(REQUEST_DEBUG,"\tsetting final offset %lld\n",
 				req->final_offset);
 	}
@@ -152,9 +153,9 @@ int PINT_Process_request(PINT_Request_state *req,
 	if (!PINT_IS_MEMREQ(mode))
 	{
 		int count;
-		if (req->cur[0].rq)
+		if (req->cur[0].rqbase)
 		{
-			count = req->final_offset / req->cur[0].rq->aggregate_size;
+			count = req->final_offset / req->cur[0].rqbase->aggregate_size;
 		}
 		else
 		{
