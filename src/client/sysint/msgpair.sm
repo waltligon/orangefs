@@ -345,6 +345,7 @@ static int msgpair_error(PINT_client_sm *sm_p,
 			 job_status_s *js_p)
 {
     gossip_lerr("msgpair error: communication broken\n");
+    PVFS_perror_gossip("js_p->error_code", js_p->error_code);
     exit(1);
     return 1;
 }
