@@ -12,6 +12,7 @@
 #include "dotconf.h"
 #include "trove.h"
 #include "server-config.h"
+#include "PINT-reqproto-encode.h"
 #include "pint-bucket.h"
 
 #define MAX_NUM_FS                   67
@@ -69,6 +70,12 @@ int main(int argc, char **argv)
     if (BMI_initialize("bmi_tcp",NULL,0))
     {
         fprintf(stderr, "BMI_initialize failure.\n");
+        return(-1);
+    }
+
+    if (PINT_encode_initialize())
+    {
+        fprintf(stderr, "PINT_encoded_initialize failure.\n");
         return(-1);
     }
 
