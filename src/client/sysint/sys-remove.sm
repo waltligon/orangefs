@@ -211,6 +211,13 @@ PVFS_error PVFS_isys_remove(
         GOSSIP_CLIENT_DEBUG, "Trying to remove entry %s under %Lu,%d\n",
         object_name, Lu(parent_ref.handle), parent_ref.fs_id);
 
+    /*
+      override the default job timeout on the internal msgarray for a
+      delete since this will force a big sync before the delete that
+      can easily take longer than most other operations
+    */
+    sm_p->msgarray_params.job_timeout = (5 * PVFS2_CLIENT_JOB_TIMEOUT);
+
     return PINT_client_state_machine_post(
         sm_p, PVFS_SYS_REMOVE, op_id, user_ptr);
 }
