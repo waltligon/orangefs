@@ -23,7 +23,3 @@ SERVERSRC += \
 # added to the library so that test programs will work
 LIBSRC += \
 	$(DIR)/print-struct.c
-
-# rule for automatically generated source files
-$(SERVERGENSRC): %.c: %.sm src/common/statecomp/statecomp
-	src/common/statecomp/statecomp $< $@

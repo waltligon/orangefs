@@ -397,3 +397,6 @@ $(MPIMISCDEPENDS): %.d: %.c
 %.pdf: %.dvi
 	( cd $(@D); dvipdf $(<F) $(@F) )
 
+# rule for automatically generated source files
+%.c: %.sm src/common/statecomp/statecomp
+	src/common/statecomp/statecomp $< $@
