@@ -984,7 +984,7 @@ static int io_datafile_complete_operations(PINT_client_sm *sm_p,
         gossip_debug(GOSSIP_IO_DEBUG, "  matched completed flow for "
                      "context %p%s\n", cur_ctx,
                      ((cur_ctx->write_ack_in_progress ?
-                       " and\n\treset write_recv timeout" : "")));
+                       " and reset write_recv timeout" : "")));
 
         cur_ctx->flow_in_progress = 0;
         sm_p->u.io.flow_completion_count--;
@@ -1587,8 +1587,8 @@ static inline int build_context_flow(
     cur_ctx->flow_desc.type = sm_p->u.io.flowproto_type;
     cur_ctx->flow_desc.user_ptr = NULL;
 
-    gossip_debug(GOSSIP_IO_DEBUG, "   bstream_size = %Ld, datafile "
-                 "nr=%d, ct=%d\n\t\t\tfile_req_off = %Ld\n",
+    gossip_debug(GOSSIP_IO_DEBUG, "  bstream_size = %Ld, datafile "
+                 "nr=%d, ct=%d, file_req_off = %Ld\n",
                  Ld(cur_ctx->flow_desc.file_data.fsize),
                  cur_ctx->flow_desc.file_data.server_nr,
                  cur_ctx->flow_desc.file_data.server_ct,
