@@ -100,7 +100,6 @@ static int server_state_machine_start(
 int main(int argc, char **argv)
 {
     int ret = -1, debug_mask = 0;
-    int i;
 
 #ifdef WITH_MTRACE
     mtrace();
@@ -210,8 +209,7 @@ int main(int argc, char **argv)
     }
 
     /* Initialization complete; process server requests indefinitely. */
-    for (i=0;i<3000;i++)
-    /* for ( ;; )  */
+    for ( ;; )  
     {
 	int i, comp_ct = PVFS_SERVER_MAX_JOBS;
 
