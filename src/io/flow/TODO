@@ -1,6 +1,10 @@
 general stuff:
 --------------------------
 
+- do a better implementation of testsome(), so that it is more
+  clever about dividing time between multiple modules and
+  splitting up the max_idle_time_ms argument
+
 - get Walt to implement another request processing function (or another
   mode of the current function) that discards segments and lets me seek
   ahead in the stream as far as I want (maintaining state, unlike the
@@ -30,9 +34,6 @@ general stuff:
 
 - implement unpost()
 
-- why do we need flowproto_check() or flowproto_checksome()? the top
-  level flow code is not calling them.
-
 - look into idea of hash table in place of completion queue (see
   bmi_tcp implementation in BMI)
 
@@ -49,6 +50,10 @@ general stuff:
 
 flowproto bmi_trove stuff:
 --------------------------
+
+- do a better implementation of checkworld, so that it is more
+  clever about multiplexing between bmi/trove and dividing up the
+  max_idle_time.
 
 - use trove testsome() once it is implemented
 

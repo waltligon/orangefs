@@ -40,7 +40,8 @@ static struct flowproto_ops** active_flowproto_table = NULL;
 /* mappings of flow endpoints to the correct protocol */
 static flow_ref_p flow_mapping = NULL;
 
-static int do_one_work_cycle(int* num_completed);
+static int do_one_work_cycle(int* num_completed, int
+	max_idle_time_ms);
 static void flow_release(flow_descriptor* flow_d);
 static int map_endpoints_to_flowproto(int src_endpoint_id, int
 	dest_endpoint_id);
@@ -581,7 +582,7 @@ static int flow_quick_testworld(
 int PINT_flow_test(
 	flow_descriptor* flow_d, 
 	int* outcount, 
-	int timeout_ms)
+	int max_idle_time_ms)
 {
 	int ret = -1;
 	int num_completed;
@@ -600,12 +601,9 @@ int PINT_flow_test(
 		return(0);
 	}
 
-	if(timeout_ms == 0)
-		return(0);
-
 	gen_mutex_lock(&interface_mutex);
 		/* push on work for one round */
-		ret = do_one_work_cycle(&num_completed);
+		ret = do_one_work_cycle(&num_completed, max_idle_time_ms);
 	gen_mutex_unlock(&interface_mutex);
 
 	if(ret < 0)
@@ -636,7 +634,7 @@ int PINT_flow_testsome(
 	flow_descriptor** flow_array, 
 	int* outcount, 
 	int* index_array, 
-	int timeout_ms)
+	int max_idle_time_ms)
 {
 	int ret = -1;
 	int num_completed;
@@ -652,12 +650,9 @@ int PINT_flow_testsome(
 		return(0);
 	}
 
-	if(timeout_ms == 0)
-		return(0);
-
 	gen_mutex_lock(&interface_mutex);
 		/* push on work for one round */
-		ret = do_one_work_cycle(&num_completed);
+		ret = do_one_work_cycle(&num_completed, max_idle_time_ms);
 	gen_mutex_unlock(&interface_mutex);
 
 	if(ret <0)
@@ -688,7 +683,7 @@ int PINT_flow_testworld(
 	int incount, 
 	flow_descriptor** flow_array, 
 	int* outcount,
-	int timeout_ms)
+	int max_idle_time_ms)
 {
 	flow_descriptor* flow_d = NULL;
 	int num_completed = 0;
@@ -698,13 +693,10 @@ int PINT_flow_testworld(
 
 	*outcount = 0;
 
-	if(timeout_ms == 0 && flow_queue_empty(completion_queue))
-		return(0);
-
 	/* do some work if the completion queue is empty */
 	if(flow_queue_empty(completion_queue))
 	{
-		ret = do_one_work_cycle(&num_completed);
+		ret = do_one_work_cycle(&num_completed, max_idle_time_ms);
 		if(ret < 0)
 		{
 			return(ret);
@@ -770,7 +762,7 @@ int PINT_flow_getinfo(
  * scheduling, etc.)
  *
  */
-static int do_one_work_cycle(int* num_completed)
+static int do_one_work_cycle(int* num_completed, int max_idle_time_ms)
 {
 	flow_descriptor* flow_array[CHECKGLOBAL_COUNT];
 	int tmp_count = 0;
@@ -780,6 +772,15 @@ static int do_one_work_cycle(int* num_completed)
 	flow_descriptor* tmp_flow = NULL;
 	
 	*num_completed = 0;
+
+	/* divide up the idle time if necessary */
+	/* TODO: do something more clever here later */
+	if(max_idle_time_ms)
+	{
+		max_idle_time_ms = max_idle_time_ms/active_flowproto_count;
+		if(!max_idle_time_ms)
+			max_idle_time_ms = 1;
+	}
 
 	/* what should happen here? */
 	/* 1) service flows that are currently transmitting, and move any to
@@ -795,7 +796,7 @@ static int do_one_work_cycle(int* num_completed)
 	{
 		tmp_count = CHECKGLOBAL_COUNT;
 		ret = active_flowproto_table[i]->flowproto_checkworld(flow_array,
-			&tmp_count);
+			&tmp_count, max_idle_time_ms);
 		if(ret < 0)
 		{
 			/* no good way to clean this up */

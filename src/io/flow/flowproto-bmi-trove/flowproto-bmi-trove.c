@@ -49,18 +49,10 @@ int flowproto_bmi_trove_memfree(
 int flowproto_bmi_trove_announce_flow(
 	flow_descriptor* flow_d);
 
-int flowproto_bmi_trove_check(
-	flow_descriptor* flow_d, 
-	int* count);
-
-int flowproto_bmi_trove_checksome(
-	flow_descriptor** flow_d_array, 
-	int* count, 
-	int* index_array);
-
 int flowproto_bmi_trove_checkworld(
 	flow_descriptor** flow_d_array, 	
-	int* count);
+	int* count,
+	int max_idle_time_ms);
 	
 int flowproto_bmi_trove_service(
 	flow_descriptor* flow_d);
@@ -77,8 +69,6 @@ struct flowproto_ops flowproto_bmi_trove_ops =
 	flowproto_bmi_trove_memalloc,
 	flowproto_bmi_trove_memfree,
 	flowproto_bmi_trove_announce_flow,
-	flowproto_bmi_trove_check,
-	flowproto_bmi_trove_checksome,
 	flowproto_bmi_trove_checkworld,
 	flowproto_bmi_trove_service
 };
@@ -425,36 +415,6 @@ int flowproto_bmi_trove_announce_flow(
 	return(0);
 }
 
-/* flowproto_bmi_trove_check()
- *
- * checks to see if a particular flow needs to be serviced
- *
- * returns 0 on success, -errno on failure
- */
-int flowproto_bmi_trove_check(
-	flow_descriptor* flow_d, 
-	int* count)
-{
-	/* NOTE: don't implement for now; may not be needed */
-	return(-ENOSYS);
-}
-
-/* flowproto_bmi_trove_checksome()
- *
- * checks to see if any of a particular array of flows need to be
- * serviced
- *
- * returns 0 on success, -errno on failure
- */
-int flowproto_bmi_trove_checksome(
-	flow_descriptor** flow_d_array, 
-	int* count, 
-	int* index_array)
-{
-	/* NOTE: don't implement for now; may not be needed */
-	return(-ENOSYS);
-}
-
 /* flowproto_bmi_trove_checkworld()
  *
  * checks to see if any previously posted flows need to be serviced
@@ -463,7 +423,8 @@ int flowproto_bmi_trove_checksome(
  */
 int flowproto_bmi_trove_checkworld(
 	flow_descriptor** flow_d_array, 
-	int* count)
+	int* count,
+	int max_idle_time_ms)
 {
 	bmi_op_id_t* bmi_op_array = NULL;
 	bmi_error_code_t* bmi_error_code_array = NULL;
@@ -482,6 +443,12 @@ int flowproto_bmi_trove_checkworld(
 	struct bmi_trove_flow_data* flow_data = NULL;
 	int incount = *count;
 	PVFS_ds_id* trove_op_array = NULL;
+	int split_idle_time_ms = max_idle_time_ms;
+
+	/* TODO: do something more clever with the max_idle_time_ms
+	 * argument.  For now we just split it evenly among the
+	 * interfaces that we are talking to
+	 */
 
 	/* what to do here: 
 	 * 1) test for completion of any in flight bmi operations
@@ -495,18 +462,37 @@ int flowproto_bmi_trove_checkworld(
 	 */
 
 	/* build arrays to use for checking for completion of low level ops */
-	bmi_op_array = alloca(sizeof(bmi_op_id_t) * (*count));
+	bmi_op_array = alloca(sizeof(bmi_op_id_t) * (bmi_count));
 	if(!bmi_op_array)
 	{
 		return(-ENOMEM);
 	}
+	trove_op_array = alloca(sizeof(PVFS_ds_id) * (trove_count));
+	if(!trove_op_array)
+	{
+		return(-ENOMEM);
+	}
 
-	/* fill in array with bmi ops that are in flight */
+	/* fill in arrays with ops that are in flight */
 	ret = op_id_queue_query(bmi_inflight_queue, bmi_op_array, &bmi_count, 
 		BMI_OP_ID);
 	if(ret < 0)
 	{
 		return(ret);
+	}
+	ret = op_id_queue_query(trove_inflight_queue, trove_op_array, &trove_count, 
+		TROVE_OP_ID);
+	if(ret < 0)
+	{
+		return(ret);
+	}
+
+	/* divide up the idle time if we need to */
+	if(max_idle_time_ms && bmi_count && trove_count)
+	{
+		split_idle_time_ms = max_idle_time_ms/2;
+		if(!split_idle_time_ms)
+			split_idle_time_ms = 1;
 	}
 
 	if(bmi_count > 0)
@@ -525,7 +511,7 @@ int flowproto_bmi_trove_checkworld(
 		/* test for completion */
 		ret = BMI_testsome(bmi_count, bmi_op_array, &bmi_outcount,
 			bmi_index_array, bmi_error_code_array, bmi_actualsize_array,
-			bmi_usrptr_array, 0);
+			bmi_usrptr_array, split_idle_time_ms);
 		if(ret < 0)
 		{
 			return(ret);
@@ -550,21 +536,6 @@ int flowproto_bmi_trove_checkworld(
 	}
 
 	/* manage in flight trove operations */
-	/* build arrays to use for checking for completion of low level ops */
-	trove_op_array = alloca(sizeof(PVFS_ds_id) * (trove_count));
-	if(!trove_op_array)
-	{
-		return(-ENOMEM);
-	}
-
-	/* fill in array with trove ops that are in flight */
-	ret = op_id_queue_query(trove_inflight_queue, trove_op_array, &trove_count, 
-		TROVE_OP_ID);
-	if(ret < 0)
-	{
-		return(ret);
-	}
-
 	if(trove_count > 0)
 	{
 		trove_error_code_array =

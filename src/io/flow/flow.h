@@ -183,19 +183,19 @@ int PINT_flow_memfree(
 int PINT_flow_test(
 	flow_descriptor* flow_d, 
 	int* outcount,
-	int timeout_ms);
+	int max_idle_time_ms);
 
 int PINT_flow_testsome(int incount, 
 	flow_descriptor** flow_array, 
 	int* outcount, 
 	int* index_array,
-	int timeout_ms);
+	int max_idle_time_ms);
 
 int PINT_flow_testworld(
 	int incount, 
 	flow_descriptor** flow_array, 
 	int* outcount,
-	int timeout_ms);
+	int max_idle_time_ms);
 
 int PINT_flow_setinfo(flow_descriptor* flow_d, 
 	int option, 

@@ -50,9 +50,10 @@ is also using gcc/ld specific linking flags.
 General (non critical)
 -----------------------
 
-document the semantics of the timeout argument to the test
-function.  Note that I don't think -1 timeout should be allowed...
-or at least if we do allow it, then document what it does
+do a better implementation of the testsome and testunexpected
+functions, so that they are more clever about multiplexing between
+multiple modules and splitting up the max_idle_time (right now
+each module is called once with 1/n idle time)
 
 come up with some decent defaults for BMI timeouts and give them
 symbolic names to use throughout the pvfs2 code

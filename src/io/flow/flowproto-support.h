@@ -39,16 +39,10 @@ struct flowproto_ops
 		PVFS_bitfield send_recv_flag);
 	int (*flowproto_announce_flow)(
 		flow_descriptor* flow_d);
-	int (*flowproto_check)(
-		flow_descriptor* flow_d, 
-		int* count);
-	int (*flowproto_checksome)(
-		flow_descriptor** flow_d_array, 
-		int* count, 
-		int* index_array);
 	int (*flowproto_checkworld)(
 		flow_descriptor** flow_d_array, 
-		int* count);
+		int* count,
+		int max_idle_time_ms);
 	int (*flowproto_service)(
 		flow_descriptor* flow_d);
 };
