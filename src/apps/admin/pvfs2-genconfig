@@ -17,6 +17,7 @@ my @opt_metaservers = ();
 my $opt_logfile = '';
 my $opt_storage = '';
 my $opt_quiet = '';
+my $opt_logging = '';
 
 sub get_user_input
 {
@@ -152,7 +153,7 @@ sub emit_defaults
     print $target "<Defaults>\n";
     print $target "\tUnexpectedRequests $num_unexp\n";
     print $target "\tLogFile $logfile\n";
-    print $target "\tEventLogging none\n";
+    print $target "\tEventLogging $logging\n";
     print $target "\tBMIModules $bmi_module\n";
     print $target "\tFlowModules flowproto_multiqueue\n";
     print $target "\tPerfUpdateInterval 1000\n";
@@ -263,6 +264,7 @@ sub usage
     print "     --ioservers   <STRING>         hostnames of data servers\n";
     print "     --metaservers <STRING>         hostnames of meta servers\n";
     print "     --logfile     <STRING>         logfile location\n";
+    print "     --logging     <STRING>         debugging mask for log messages.\n";
     print "     --storage     <STRING>         storage space location\n";
     print "     --quiet                        run silently\n\n";
 
@@ -310,6 +312,17 @@ sub get_protocol
 	}
 	return $type;
 }
+
+sub get_logging
+{
+	if ($opt_logging) {
+		$logging = $opt_logging;
+	} else {
+		$logging = "none";
+	}
+	return $logging;
+}
+
 
 sub get_logfile
 {
@@ -437,6 +450,7 @@ GetOptions('protocol=s'    => \$opt_protocol,
 	   'ioservers=s'   => \@opt_ioservers,
 	   'metaservers=s' => \@opt_metaservers,
 	   'logfile=s'     => \$opt_logfile,
+	   'logging=s'     => \$opt_logging,
 	   'storage=s'     => \$opt_storage,
 	   'help'          => \$show_help,
 	   'quiet!'        => \$opt_quiet,
@@ -547,6 +561,7 @@ if (!$opt_quiet) {
 
 $logfile = get_logfile();
 $storage = get_storage();
+$logging = get_logging();
 
 # could prompt for handle purgatory time, but it is probably best if we pick a
 # reasonable value w/o prompting
