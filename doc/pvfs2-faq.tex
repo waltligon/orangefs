@@ -393,6 +393,29 @@ see if your distribution has an updated glibc package.  RHEL3, for
 example, will exhibit this behavior with glibc-2.3.2-95.6, but not
 with the updated glibc-2.3.2-95.20 package.
 
+\subsection{I get ``error while loading sharel libraries'' when starting PVFS2 programs}
+
+PVFS2 needs several libraries.  If those libraries aren't in the default
+locations, you might need to add flags when running PVFS2's configure script.
+At configure time you can, for example, pass \texttt{--with-db=/path/to/db
+--with-gm=/path/to/gm} to compile with Berkeley DB and Myiricom GM libraries.
+The configure options let the compiler know where to find the libraries at
+compile time.  
+
+Those compile-time options, however, aren't enough to find the libraries at
+run-time.  There are two ways to teach the system where to find libraries:  
+
+\begin{itemize}
+\item add /usr/local/BerkeleyDB.4.3/lib to the /etc/ld.so.conf config file
+  and re-run 'ldconfig' OR
+\item add /usr/local/BerkeleyDB.4.3/lib to the \texttt{LD\_LIBRARY\_PATH}
+    environment variable.
+\end{itemize}
+
+I would suggest the ld.so.conf approach, since that will work for all users on
+your system.
+
+
 \subsection{I'm running Redhat and the pvfs2-server can't be killed! What's wrong?}
 
 On some Redhat systems, for compatibility reasons, the pvfs2-server
