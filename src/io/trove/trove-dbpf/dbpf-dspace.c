@@ -98,14 +98,34 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
     {
         new_handle = *op_p->u.d_create.out_handle_p;
 
-        /*
-          we should probably handle this error nicely;
-          right now, it will fail later (gracefully) if this
-          fails since the handle will already exist, but
-          since we know it here, handle it here ?
-        */
-        trove_handle_set_used(op_p->coll_p->coll_id,
-                              (TROVE_handle)new_handle);
+        /* check if we MUST use the exact handle value specified */
+        if (op_p->flags & TROVE_FORCE_REQUESTED_HANDLE)
+        {
+            /*
+              we should probably handle this error nicely;
+              right now, it will fail later (gracefully) if this
+              fails since the handle will already exist, but
+              since we know it here, handle it here ?
+            */
+            trove_handle_set_used(op_p->coll_p->coll_id,
+                                  (TROVE_handle)new_handle);
+        }
+        else
+        {
+            /*
+              given a starting point, find the next available
+              handle in the specified range
+              
+              FIXME: This is faked for now...we can't do the
+              real thing until our handle mgmt can understand
+              the concept of multiple handle ranges.
+            */
+            do
+            {
+                ret = trove_handle_set_used(op_p->coll_p->coll_id,
+                                            (TROVE_handle)new_handle);
+            } while((ret != 0) && (++new_handle));
+        }
     }
     else
     {
