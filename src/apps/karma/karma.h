@@ -2,6 +2,8 @@
 
 #include "pvfs2.h"
 #include "pvfs2-mgmt.h"
+#include "pint-sysint-utils.h"
+#include "server-config.h"
 
 /* setting window title (from karma.c) */
 void gui_set_title(char *title);
