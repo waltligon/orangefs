@@ -41,86 +41,86 @@
 
 // Server Info 
 /*struct serv_info
-{
-	char *name;
-	int id;
-};
+  {
+  char *name;
+  int id;
+  };
 
-// Metadata servers 
-struct metaserv_table 
-{
-	struct serv_info *table_p;
-	int number;
-};
+  // Metadata servers 
+  struct metaserv_table 
+  {
+  struct serv_info *table_p;
+  int number;
+  };
 
-// I/O servers 
-struct ioserv_table 
-{
-	struct serv_info *table_p;
-	int number;
-};
+  // I/O servers 
+  struct ioserv_table 
+  {
+  struct serv_info *table_p;
+  int number;
+  };
 */
 
 /* Bucket related info */
 typedef struct {
-	PVFS_handle bucket_st;
-	PVFS_handle bucket_end;
+    PVFS_handle bucket_st;
+    PVFS_handle bucket_end;
 } bucket_info;
 
 /* Server Config Parameters(per filesystem) */
 struct fsconfig_s {
-	PVFS_handle fh_root;  /* root file system */
-	PVFS_handle maskbits; /* number of handle mask bits */
-	PVFS_string *meta_serv_array; /* array of metaservers */
-	bucket_info *bucket_array; /* bucket info per metaserver */
-	PVFS_count32 meta_serv_count;/* number of metaservers */ 
-	bucket_info *io_bucket_array; /* bucket info per ioserver */ 
-	PVFS_string *io_serv_array; /* array of ioservers */
-	PVFS_count32 io_serv_count;/* number of ioservers */ 
-	PVFS_string local_mnt_dir; /* Client side mount point */
-	PVFS_fs_id fsid;
+    PVFS_handle fh_root;  /* root file system */
+    PVFS_handle maskbits; /* number of handle mask bits */
+    PVFS_string *meta_serv_array; /* array of metaservers */
+    bucket_info *bucket_array; /* bucket info per metaserver */
+    PVFS_count32 meta_serv_count;/* number of metaservers */ 
+    bucket_info *io_bucket_array; /* bucket info per ioserver */ 
+    PVFS_string *io_serv_array; /* array of ioservers */
+    PVFS_count32 io_serv_count;/* number of ioservers */ 
+    PVFS_string local_mnt_dir; /* Client side mount point */
+    PVFS_fs_id fsid;
 };
 typedef struct fsconfig_s fsconfig;
 
 /* Server Config Parameters aggregated over all filesystems */
 struct fsconfig_array_s {
-	PVFS_count32 nr_fs; /* Number of filesystems */
-	fsconfig *fs_info;  /* Config info for each filesystem */
-	gen_mutex_t *mt_lock;/* Mutex */
+    PVFS_count32 nr_fs; /* Number of filesystems */
+    fsconfig *fs_info;  /* Config info for each filesystem */
+    gen_mutex_t *mt_lock;/* Mutex */
 };
 typedef struct fsconfig_array_s fsconfig_array;
 
 /* send_info */
 typedef struct 
 {
-	bmi_addr_t addr;
-	void *buffer;
-	bmi_size_t size;
-	bmi_size_t expected_size;
-	bmi_msg_tag_t tag;
-	bmi_flag_t flag;
-	bmi_flag_t unexpected;
-	void *user_ptr;
-	job_status_s *status_p;
-	job_id_t *id;
-	int *failure;
-	PVFS_error errval;
+    bmi_addr_t addr;
+    void *buffer;
+    bmi_size_t size;
+    bmi_size_t expected_size;
+    bmi_msg_tag_t tag;
+    bmi_flag_t flag;
+    bmi_flag_t unexpected;
+    void *user_ptr;
+    job_status_s *status_p;
+    job_id_t *id;
+    int *failure;
+    PVFS_error errval;
 } post_info;
 
 /* Error_stats */
 struct error_stats
 {
-	int failure;
-	int id;
-	int num_pending;
+    int failure;
+    int id;
+    int num_pending;
 };
 
 /* PVFS Object - File name + Collection ID */
 /*typedef struct
-{
-	char *fname;         // File Name 
-	PVFS_fs_id fs_id;    // Filesystem id 
-}pobj, *pobj_p;
+  {
+  char *fname;         // File Name 
+  PVFS_fs_id fs_id;    // Filesystem id 
+  }pobj, *pobj_p;
 */
 
 /* PVFStab parameters */
@@ -150,14 +150,23 @@ int sysjob_free(bmi_addr_t server,void *tmp_job,bmi_size_t size,const int op,
 void job_postack(post_info *rinfo);
 void job_postreq(post_info *sinfo);
 void job_waitblock(job_id_t *id_array,
-		      int pending,
-		      void **user_ptr_array,
-		      job_status_s *status_array,
-		      int *failure);
+		   int pending,
+		   void **user_ptr_array,
+		   job_status_s *status_array,
+		   int *failure);
 int server_getconfig(pvfs_mntlist mntent_list);
 void get_no_of_segments(char *path,int *num);
 int get_next_path(char *fname,int num,int *start,int *end);
 int get_next_segment(char *inout,char **output,int *start);
 int check_perms(PVFS_object_attr attr,PVFS_permissions mode,int uid,int gid);
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 noexpandtab
+ */
 
 #endif

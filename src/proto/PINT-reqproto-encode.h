@@ -11,43 +11,44 @@
 #ifndef __PINT_REQUEST_ENCODE_H
 #define __PINT_REQUEST_ENCODE_H
 
+#include "bmi.h"
 
 /* structure to describe messages that have been encoded */
 struct PINT_encoded_msg
 {
-	/* publicly accessable encoding information */
-	/***********************************/
-	/* Need to be set up ahead of time */
-	/***********************************/
-	bmi_addr_t dest;        /* host this is going to */
-	bmi_flag_t buffer_flag; /* buffer flag for BMI's use */
+    /* publicly accessable encoding information */
+    /***********************************/
+    /* Need to be set up ahead of time */
+    /***********************************/
+    bmi_addr_t dest;        /* host this is going to */
+    bmi_flag_t buffer_flag; /* buffer flag for BMI's use */
 
 	/* These values are filled in by the API */
-	void** buffer_list;     /* list of buffers */
-	PVFS_size* size_list;   /* size of buffers */
-	int list_count;         /* number of buffers */
-	PVFS_size total_size;   /* aggregate size of encoding */
+    void** buffer_list;     /* list of buffers */
+    PVFS_size* size_list;   /* size of buffers */
+    int list_count;         /* number of buffers */
+    PVFS_size total_size;   /* aggregate size of encoding */
 
 	/* private encoding information goes here */
-	int type;
+    int type;
 };
 
 /* structure to describe messages that have been decoded */
 struct PINT_decoded_msg
 {
-	/* publicly accessable decoding information */
-	void* buffer;
+    /* publicly accessable decoding information */
+    void* buffer;
 
-	/* private decoding information goes here */
+    /* private decoding information goes here */
 };
 
 /* types of messages we will encode or decode */
 enum PINT_encode_msg_type
 {
-	PINT_ENCODE_REQ = 7,
-	PINT_DECODE_REQ = 7,
-	PINT_ENCODE_RESP = 13,
-	PINT_DECODE_RESP = 13
+    PINT_ENCODE_REQ = 7,
+    PINT_DECODE_REQ = 7,
+    PINT_ENCODE_RESP = 13,
+    PINT_DECODE_RESP = 13
 };
 
 #define ENCODING_TABLE_SIZE 5
@@ -65,12 +66,12 @@ enum PINT_encode_msg_type
  * returns 0 on success, -ERRNO on failure
  */
 int PINT_encode(
-	void* input_buffer,
-	enum PINT_encode_msg_type input_type,
-	struct PINT_encoded_msg* target_msg,
-	bmi_addr_t target_addr,
-	int type
-	);
+		void* input_buffer,
+		enum PINT_encode_msg_type input_type,
+		struct PINT_encoded_msg* target_msg,
+		bmi_addr_t target_addr,
+		int type
+		);
 
 /* PINT_decode()
  *
@@ -80,13 +81,13 @@ int PINT_encode(
  * returns 0 on success, -ERRNO on failure
  */
 int PINT_decode(
-	void* input_buffer,
-	enum PINT_encode_msg_type input_type,
-	struct PINT_decoded_msg* target_msg,
-	bmi_addr_t target_addr,
-	PVFS_size size,
-	int *type
-	);
+		void* input_buffer,
+		enum PINT_encode_msg_type input_type,
+		struct PINT_decoded_msg* target_msg,
+		bmi_addr_t target_addr,
+		PVFS_size size,
+		int *type
+		);
 	
 /* PINT_encode_release()
  *
@@ -96,10 +97,10 @@ int PINT_decode(
  * no return value
  */
 void PINT_encode_release(
-	struct PINT_encoded_msg* msg,
-	enum PINT_encode_msg_type input_type,
-	int type
-	);
+			 struct PINT_encoded_msg* msg,
+			 enum PINT_encode_msg_type input_type,
+			 int type
+			 );
 
 /* PINT_decode_release()
  *
@@ -109,10 +110,19 @@ void PINT_encode_release(
  * no return value
  */
 void PINT_decode_release(
-	struct PINT_decoded_msg* msg,
-	enum PINT_encode_msg_type input_type,
-	int type
-	);
+			 struct PINT_decoded_msg* msg,
+			 enum PINT_encode_msg_type input_type,
+			 int type
+			 );
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 noexpandtab
+ */
 
 #endif /* __PINT_REQUEST_ENCODE_H */
 

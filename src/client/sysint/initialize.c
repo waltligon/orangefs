@@ -24,11 +24,6 @@
 
 #define REQ_ENC_FORMAT 0
 
-static int server_send_req(bmi_addr_t addr,
-			   struct PVFS_server_req_s *req_p,
-			   PVFS_credentials creds,
-			   struct PINT_decoded_msg *decoded_p);
-
 /* pinode cache */
 extern pcache pvfs_pcache; 
 
@@ -208,6 +203,8 @@ static int server_get_config(pvfs_mntlist mntent_list)
     {
 	pvfs_mntent *mntent_p = &mntent_list.ptab_p[i]; /* for convenience */
 	struct fsconfig_s *fsinfo_p;
+	/* TODO: IS THIS A REASONABLE MAXIMUM MESSAGE SIZE?  I HAVE NO IDEA */
+	bmi_size_t max_msg_sz = sizeof(struct PVFS_server_resp_s) + 2 * MAX_STRING_SIZE;
 
    	/* Obtain the metaserver to send the request */
 	ret = BMI_addr_lookup(&serv_addr, mntent_p->meta_addr);   
@@ -231,7 +228,7 @@ static int server_get_config(pvfs_mntlist mntent_list)
 	/* do_getconfig() fills returns an allocated and populated PVFS_server_resp_s
 	 * pointed to by ack_p.
 	 */
-	ret = server_send_req(serv_addr, req_p, creds, &decoded);
+	ret = PINT_server_send_req(serv_addr, req_p, max_msg_sz, &decoded);
 	if (ret < 0) {
 	    goto return_error;
 	}
@@ -370,100 +367,6 @@ static int server_get_config(pvfs_mntlist mntent_list)
  return_error:
     return -1;
 }	  
-
-/* server_send_req()
- *
- * TODO: PREPOST RECV
- *
- * Fills in PINT_decoded_msg pointed to by decoded_p; decoded_p->buffer will 
- * hold the decoded acknowledgement.  The caller must call PINT_decode_release()
- * on decoded_p in order to free the memory allocated during the decoding
- * process.
- */
-static int server_send_req(bmi_addr_t addr,
-			   struct PVFS_server_req_s *req_p,
-			   PVFS_credentials creds,
-			   struct PINT_decoded_msg *decoded_p)
-{
-    int ret;
-    bmi_size_t max_msg_sz;
-    struct PINT_encoded_msg encoded;
-    char *encoded_resp;
-    job_status_s s_status, r_status;
-    PVFS_msg_tag_t op_tag = get_next_session_tag();
-
-    /* convert into something we can send across the wire.
-     *
-     * PINT_encode returns an encoded buffer in encoded. We have to free it
-     * later.
-     */
-    ret = PINT_encode(req_p, PINT_ENCODE_REQ, &encoded, addr, REQ_ENC_FORMAT);
-
-    /* TODO: IS THIS A REASONABLE MAXIMUM MESSAGE SIZE?  I HAVE NO IDEA */
-    max_msg_sz = sizeof(struct PVFS_server_resp_s) + 2 * req_p->u.getconfig.max_strsize;
-
-    /* allocate space for response, prepost receive */
-    encoded_resp = BMI_memalloc(addr, max_msg_sz, BMI_RECV_BUFFER);
-    if (encoded_resp == NULL)
-    {
-	ret = -ENOMEM;
-	goto return_error;
-    }
-
-    /* post a blocking send job (this is a helper function) */
-    ret = job_bmi_send_blocking(addr,
-				encoded.buffer_list[0],
-				encoded.size_list[0],
-				op_tag,
-				BMI_PRE_ALLOC,
-				1, /* # of items in lists */
-				&s_status);
-    if (ret < 0)
-    {
-	goto return_error;
-    }
-    else if (ret == 1 && s_status.error_code != 0)
-    {
-	ret = -EINVAL;
-	goto return_error;
-    }
-
-    /* post a blocking receive job */
-    ret = job_bmi_recv_blocking(addr, encoded_resp, max_msg_sz, op_tag, BMI_PRE_ALLOC, &r_status);
-    if (ret < 0)
-    {
-	goto return_error;
-    }
-    else if (ret == 1 && (r_status.error_code != 0 || r_status.actual_size > max_msg_sz))
-    {
-	ret = -EINVAL;
-	goto return_error;
-    }
-
-    /* decode msg from wire format here; function allocates space for decoded response.
-     * PINT_decode_release() must be used to free this later.
-     */
-    ret = PINT_decode(encoded_resp,
-		      PINT_DECODE_RESP,
-		      decoded_p,
-		      addr,
-		      r_status.actual_size,
-		      NULL);
-    if (ret < 0)
-    {
-	ret = (-EINVAL);
-	goto return_error;
-    }
-
-    /* free encoded_resp buffer */
-    ret = BMI_memfree(addr, encoded_resp, max_msg_sz, BMI_RECV_BUFFER);
-    assert(ret == 0);
-
-    return 0;
- return_error:
-    return -1;
-}
-		
 
 /*
  * Local variables:
