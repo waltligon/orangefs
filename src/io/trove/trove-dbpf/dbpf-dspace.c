@@ -1418,8 +1418,8 @@ int dbpf_dspace_testcontext(
 
     }
 
-    while(!dbpf_op_queue_empty(dbpf_completion_queue_array[context_id])
-	&& out_count < limit)
+    while(!dbpf_op_queue_empty(dbpf_completion_queue_array[context_id]) &&
+          (out_count < limit))
     {
         cur_op = dbpf_op_queue_shownext(
             dbpf_completion_queue_array[context_id]);

@@ -419,6 +419,7 @@ void print_entry(
     PVFS_fs_id fs_id,
     struct options *opts)
 {
+    int ret = -1;
     PVFS_pinode_reference pinode_refn;
     PVFS_credentials credentials;
     PVFS_sysresp_getattr getattr_response;
@@ -445,11 +446,13 @@ void print_entry(
     pinode_refn.handle = handle;
     pinode_refn.fs_id = fs_id;
 
-    if (PVFS_sys_getattr(pinode_refn, PVFS_ATTR_SYS_ALL,
-                         credentials, &getattr_response))
+    ret = PVFS_sys_getattr(pinode_refn, PVFS_ATTR_SYS_ALL,
+                           credentials, &getattr_response);
+    if (ret)
     {
-        fprintf(stderr,"Failed to get attributes on handle 0x%08Lx "
-                "(fs_id is %d)\n",Lu(handle),fs_id);
+        fprintf(stderr,"Failed to get attributes on handle %Lu,%d\n",
+                Lu(handle),fs_id);
+        PVFS_perror("Getattr failure", ret);
         return;
     }
     print_entry_attr(handle, entry_name, &getattr_response.attr, opts);

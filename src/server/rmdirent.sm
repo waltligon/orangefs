@@ -241,16 +241,18 @@ static int rmdirent_remove_directory_entry(
         s_op->req->u.rmdirent.entry,
         Lu(s_op->u.rmdirent.dirdata_handle));
 
-    ret = job_trove_keyval_remove(s_op->req->u.rmdirent.fs_id,
-                                  s_op->u.rmdirent.dirdata_handle,
-                                  &s_op->key,
-                                  TROVE_SYNC,
-                                  NULL,
-                                  s_op,
-                                  0,
-                                  js_p,
-                                  &j_id,
-                                  server_job_context);
+    ret = job_trove_keyval_remove(
+        s_op->req->u.rmdirent.fs_id,
+        s_op->u.rmdirent.dirdata_handle,
+        &s_op->key,
+        TROVE_SYNC,
+        NULL,
+        s_op,
+        0,
+        js_p,
+        &j_id,
+        server_job_context);
+
     return ret;
 }
 
