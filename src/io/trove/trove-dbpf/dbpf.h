@@ -172,8 +172,6 @@ struct dbpf_keyval_iterate_op {
     /* vtag? */
 };
 
-/* Defined in bstream.c */
-
 /* used for both read and write at */
 struct dbpf_bstream_rw_at_op {
     TROVE_offset offset;
@@ -206,6 +204,7 @@ enum {
     LIST_PROC_ALLCONVERTED, /* all list elements converted */
     LIST_PROC_ALLPOSTED     /* all list elements also posted */
 };
+
 /* struct dbpf_bstream_rw_list_op
  *
  * Used for both read and write list

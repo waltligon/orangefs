@@ -199,6 +199,30 @@ int trove_collection_lookup(
     return 1;
 }
 
+int trove_collection_iterate(TROVE_ds_position *inout_position_p,
+			     TROVE_keyval_s *name_array,
+			     TROVE_coll_id *coll_id_array,
+			     int *inout_count_p,
+			     TROVE_ds_flags flags,
+			     TROVE_vtag_s *vtag,
+			     void *user_ptr,
+			     TROVE_op_id *out_op_id_p)
+{
+    int ret;
+
+    ret = mgmt_method_table[0]->collection_iterate(inout_position_p,
+						   name_array,
+						   coll_id_array,
+						   inout_count_p,
+						   flags,
+						   vtag,
+						   user_ptr,
+						   out_op_id_p);
+
+    if (ret < 0) return ret;
+    return 1;
+}
+
 /* map_coll_id_to_method()
  *
  * NOTE: this is a hack for now.

@@ -22,6 +22,7 @@
 #include "trove.h"
 #include "trove-internal.h"
 #include "dbpf.h"
+#include "dbpf-op-queue.h"
 #include "dbpf-bstream.h"
 #include "dbpf-keyval.h"
 #include "dbpf-dspace.h"
@@ -471,10 +472,162 @@ static int dbpf_collection_remove(char *collname,
     return 1;
 }
 
+/* dbpf_collection_iterate()
+ */
+static int dbpf_collection_iterate(TROVE_ds_position *inout_position_p,
+				   TROVE_keyval_s *name_array,
+				   TROVE_coll_id *coll_id_array,
+				   int *inout_count_p,
+				   TROVE_ds_flags flags,
+				   TROVE_vtag_s *vtag,
+				   void *user_ptr,
+				   TROVE_op_id *out_op_id_p)
+{
+    int ret, i=0;
+    db_recno_t recno;
+    DB *db_p;
+    DBC *dbc_p;
+    DBT key, data;
+    struct dbpf_collection_db_entry db_entry;
+
+    /* if they passed in that they are at the end, return 0.
+     *
+     * this seems silly maybe, but it makes while (count) loops
+     * work right.
+     */
+    if (*inout_position_p == TROVE_ITERATE_END) {
+	*inout_count_p = 0;
+	return 1;
+    }
+
+    /* collection db is stored with storage space info */
+    db_p = my_storage_p->coll_db;
+
+    /* get a cursor */
+    ret = db_p->cursor(db_p, NULL, &dbc_p, 0);
+    if (ret != 0) goto return_error;
+
+
+    /* see keyval iterate for discussion of this implementation; it was
+     * basically copied from there. -- RobR
+     */
+
+    if (*inout_position_p != TROVE_ITERATE_START) {
+	/* need to position cursor before reading.  note that this will
+	 * actually position the cursor over the last thing that was read
+	 * on the last call, so we don't need to return what we get back.
+	 */
+
+	/* here we make sure that the key is big enough to hold the
+	 * position that we need to pass in.
+	 */
+	memset(&key, 0, sizeof(key));
+	if (sizeof(recno) < name_array[0].buffer_sz) {
+	    key.data = name_array[0].buffer;
+	    key.size = key.ulen = name_array[0].buffer_sz;
+	}
+	else {
+	    key.data = &recno;
+	    key.size = key.ulen = sizeof(recno);
+	}
+	*(TROVE_ds_position *) key.data = *inout_position_p;
+	key.flags |= DB_DBT_USERMEM;
+
+	memset(&data, 0, sizeof(data));
+	data.data = &db_entry;
+	data.size = data.ulen = sizeof(db_entry);
+	data.flags |= DB_DBT_USERMEM;
+
+	/* position the cursor and grab the first key/value pair */
+	ret = dbc_p->c_get(dbc_p, &key, &data, DB_SET_RECNO);
+	if (ret == DB_NOTFOUND) goto return_ok;
+	else if (ret != 0) goto return_error;
+    }
+
+    for (i=0; i < *inout_count_p; i++)
+    {
+	memset(&key, 0, sizeof(key));
+	key.data = name_array[i].buffer;
+	key.size = key.ulen = name_array[i].buffer_sz;
+	key.flags |= DB_DBT_USERMEM;
+
+	memset(&data, 0, sizeof(data));
+	data.data = &db_entry;
+	data.size = data.ulen = sizeof(db_entry);
+	data.flags |= DB_DBT_USERMEM;
+	
+	ret = dbc_p->c_get(dbc_p, &key, &data, DB_NEXT);
+	if (ret == DB_NOTFOUND) {
+	    goto return_ok;
+	}
+	else if (ret != 0) goto return_error;
+
+	/* store coll_id for return */
+	coll_id_array[i] = db_entry.coll_id;
+    }
+    
+return_ok:
+    if (ret == DB_NOTFOUND) {
+	*inout_position_p = TROVE_ITERATE_END;
+    }
+    else {
+	char buf[64];
+	/* get the record number to return.
+	 *
+	 * note: key field is ignored by c_get in this case.  sort of.
+	 * i'm not actually sure what they mean by "ignored", because
+	 * it sure seems to matter what you put in there...
+	 *
+	 * TODO: FIGURE OUT WHAT IS GOING ON W/KEY AND TRY TO AVOID USING
+	 * ANY MEMORY.
+	 */
+	memset(&key, 0, sizeof(key));
+	key.data  = buf;
+	key.size  = key.ulen = 64;
+	key.dlen  = 64;
+	key.doff  = 0;
+	key.flags |= DB_DBT_USERMEM | DB_DBT_PARTIAL;
+
+	memset(&data, 0, sizeof(data));
+	data.data = &recno;
+	data.size = data.ulen = sizeof(recno);
+	data.flags |= DB_DBT_USERMEM;
+
+	ret = dbc_p->c_get(dbc_p, &key, &data, DB_GET_RECNO);
+	if (ret == DB_NOTFOUND) printf("warning: keyval iterate -- notfound\n");
+	else if (ret != 0) printf("warning: keyval iterate -- some other failure @ recno\n");
+
+	assert(recno != TROVE_ITERATE_START && recno != TROVE_ITERATE_END);
+	*inout_position_p = recno;
+    }
+    /* 'position' points us to the record we just read, or is set to END */
+
+    *inout_count_p = i;
+
+    /* sync if requested by user
+     */
+    if (flags & TROVE_SYNC) {
+	if ((ret = db_p->sync(db_p, 0)) != 0) {
+	    goto return_error;
+	}
+    }
+
+    /* free the cursor */
+    ret = dbc_p->c_close(dbc_p);
+    if (ret != 0) goto return_error;
+    return 1;
+    
+return_error:
+    fprintf(stderr, "dbpf_collection_iterate_op_svc: %s\n", db_strerror(ret));
+    *inout_count_p = i;
+    return -1;
+}
+
+
 /* dbpf_collection_lookup()
  */
 static int dbpf_collection_lookup(char *collname,
-				  TROVE_coll_id *coll_id_p,
+				  TROVE_coll_id *out_coll_id_p,
 				  void *user_ptr,
 				  TROVE_op_id *out_op_id_p)
 {
@@ -486,21 +639,8 @@ static int dbpf_collection_lookup(char *collname,
     DBT key, data;
     char path_name[PATH_MAX];
     
-#if 0
-    /* look in cached values to see if it is in memory already */
-    if (my_coll_p != NULL) {
-	    *coll_id_p = my_coll_p->coll_id;
-	    return 1;
-    }
-#endif
-    
     /* only one fs for now */
     sto_p = my_storage_p;
-
-#if 0    
-    printf("collection %s is part of storage space %s.\n", collname,
-	   sto_p->name);
-#endif
     
     memset(&key, 0, sizeof(key));
     memset(&data, 0, sizeof(data));
@@ -534,7 +674,7 @@ static int dbpf_collection_lookup(char *collname,
     /* look to see if we have already registered this collection; if so, return */
     coll_p = dbpf_collection_find_registered(db_data.coll_id);
     if (coll_p != NULL) {
-	*coll_id_p = coll_p->coll_id;
+	*out_coll_id_p = coll_p->coll_id;
 	return 1;
     }
 
@@ -571,7 +711,7 @@ static int dbpf_collection_lookup(char *collname,
     coll_p->free_handles = trove_handle_ledger_init(coll_p->coll_id, "admin-foo");
 
     /* fill in output parameter */
-    *coll_id_p = coll_p->coll_id;
+    *out_coll_id_p = coll_p->coll_id;
     return 1;
 }
 
@@ -806,6 +946,7 @@ struct TROVE_mgmt_ops dbpf_mgmt_ops =
     dbpf_collection_create,
     dbpf_collection_remove,
     dbpf_collection_lookup,
+    dbpf_collection_iterate,
     dbpf_collection_setinfo,
     dbpf_collection_getinfo,
     dbpf_collection_seteattr,

@@ -523,6 +523,7 @@ return_ok:
 	if (ret == DB_NOTFOUND) printf("warning: keyval iterate -- notfound\n");
 	else if (ret != 0) printf("warning: keyval iterate -- some other failure @ recno\n");
 
+	assert(recno != TROVE_ITERATE_START && recno != TROVE_ITERATE_END);
 	*op_p->u.k_iterate.position_p = recno;
     }
     /* 'position' points us to the record we just read, or is set to END */

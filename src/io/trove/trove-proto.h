@@ -28,27 +28,31 @@ int trove_storage_remove(char *stoname,
 			 void *user_ptr,
 			 TROVE_op_id *out_op_id_p);
 
-int trove_collection_create(
-			    /* char *stoname, */
+int trove_collection_create(/* char *stoname, */
 			    char *collname,
 			    TROVE_coll_id new_coll_id,
 			    void *user_ptr,
 			    TROVE_op_id *out_op_id_p);
 
-int trove_collection_remove(
-		/* char *stoname, */
-		char *collname,
-		void *user_ptr,
-		TROVE_op_id *out_op_id_p);
-
-int trove_collection_lookup(
-			    /* char *stoname, */
+int trove_collection_remove(/* char *stoname, */
 			    char *collname,
-			    TROVE_coll_id *coll_id_p,
 			    void *user_ptr,
 			    TROVE_op_id *out_op_id_p);
 
+int trove_collection_lookup(/* char *stoname, */
+			    char *collname,
+			    TROVE_coll_id *out_coll_id_p,
+			    void *user_ptr,
+			    TROVE_op_id *out_op_id_p);
 
+int trove_collection_iterate(TROVE_ds_position *inout_position_p,
+			     TROVE_keyval_s *name_array,
+			     TROVE_coll_id *coll_id_array,
+			     int *inout_count_p,
+			     TROVE_ds_flags flags,
+			     TROVE_vtag_s *vtag,
+			     void *user_ptr,
+			     TROVE_op_id *out_op_id_p);
 
 /* NOTE: DON'T PUT COMMENTS IN THIS SECTION!  THESE ARE USED TO AUTOMATICALLY GENERATE CODE
  */

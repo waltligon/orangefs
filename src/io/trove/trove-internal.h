@@ -283,7 +283,16 @@ struct TROVE_mgmt_ops
 			     TROVE_coll_id *coll_id_p,
 			     void *user_ptr,
 			     TROVE_op_id *out_op_id_p);
-    
+
+    int (*collection_iterate)(TROVE_ds_position *inout_position_p,
+			      TROVE_keyval_s *name_array,
+			      TROVE_coll_id *coll_id_array,
+			      int *inout_count_p,
+			      TROVE_ds_flags flags,
+			      TROVE_vtag_s *vtag,
+			      void *user_ptr,
+			      TROVE_op_id *out_op_id_p);
+
     /* Note: setinfo and getinfo always return immediately */
     int (*collection_setinfo)(
 			      TROVE_coll_id coll_id,
