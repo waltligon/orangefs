@@ -18,30 +18,19 @@
 /* structure to describe messages that have been encoded */
 struct PINT_encoded_msg
 {
-    /* publicly accessable encoding information */
-    /***********************************/
-    /* Need to be set up ahead of time */
-    /***********************************/
     bmi_addr_t dest;        /* host this is going to */
-    int buffer_type; /* buffer flag for BMI's use */
-
-	/* These values are filled in by the API */
+    int buffer_type;	    /* buffer flag for BMI's use */
     void** buffer_list;     /* list of buffers */
     PVFS_size* size_list;   /* size of buffers */
     int list_count;         /* number of buffers */
     PVFS_size total_size;   /* aggregate size of encoding */
-
-	/* private encoding information goes here */
     int type;
 };
 
 /* structure to describe messages that have been decoded */
 struct PINT_decoded_msg
 {
-    /* publicly accessable decoding information */
     void* buffer;
-
-    /* private decoding information goes here */
 };
 
 /* types of messages we will encode or decode */
