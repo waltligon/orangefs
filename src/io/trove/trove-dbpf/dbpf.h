@@ -13,6 +13,7 @@ extern "C" {
 
 #include <db.h>
 #include <trove.h>
+#include <gen-locks.h>
 
 #define TROVE_DIR "/tmp/trove/"
 #define STO_ATTRIB_DBNAME "/tmp/storage_attributes.db"

@@ -171,7 +171,7 @@ int dbpf_dspace_iterate_handles(
 
     /* initialize all the common members */
     dbpf_queued_op_init(q_op_p,
-			KEYVAL_ITERATE,
+			DSPACE_ITERATE_HANDLES,
 			0, /* handle -- ignored in this case */
 			new_id,
 			coll_p,
