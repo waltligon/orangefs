@@ -27,6 +27,23 @@ extern struct inode *pvfs2_get_custom_inode(
     int mode,
     dev_t dev);
 
+
+int pvfs2_gen_credentials(
+    PVFS_credentials *credentials)
+{
+    int ret = -1;
+
+    if (credentials)
+    {
+        memset(credentials, 0, sizeof(PVFS_credentials));
+        credentials->uid = current->uid;
+        credentials->gid = current->gid;
+
+        ret = 0;
+    }
+    return ret;
+}
+
 static inline int copy_attributes_to_inode(
     struct inode *inode,
     PVFS_sys_attr * attrs)

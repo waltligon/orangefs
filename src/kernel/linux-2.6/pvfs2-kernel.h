@@ -200,6 +200,9 @@ int wait_for_matching_downcall(
 /****************************
  * defined in pvfs2-utils.c
  ****************************/
+int pvfs2_gen_credentials(
+    PVFS_credentials *credentials);
+
 int pvfs2_inode_getattr(
     struct inode *inode);
 

@@ -22,6 +22,10 @@ extern kmem_cache_t *dev_req_cache;
 /* a cache for pvfs2-inode objects (i.e. pvfs2 inode private data) */
 extern kmem_cache_t *pvfs2_inode_cache;
 
+extern int pvfs2_gen_credentials(
+    PVFS_credentials *credentials);
+
+
 static void op_cache_ctor(
     void *kernel_op,
     kmem_cache_t * cachep,
@@ -43,6 +47,9 @@ static void op_cache_ctor(
 	op->op_state = PVFS2_VFS_STATE_UNKNOWN;
 	op->tag = (unsigned long) atomic_read(&next_tag_value);
 	atomic_inc(&next_tag_value);
+
+        /* preemptively fill in the upcall credentials */
+        pvfs2_gen_credentials(&op->upcall.credentials);
     }
 }
 

@@ -66,6 +66,7 @@ typedef struct
 typedef struct
 {
     int type;
+    PVFS_credentials credentials;
 
     union
     {

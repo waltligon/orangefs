@@ -48,7 +48,7 @@ static struct dentry *pvfs2_lookup(
     new_op = kmem_cache_alloc(op_cache, SLAB_KERNEL);
     if (!new_op)
     {
-	printk("pvfs2: pvfs2_lookup -- kmem_cache_alloc failed!\n");
+	pvfs2_error("pvfs2: pvfs2_lookup -- kmem_cache_alloc failed!\n");
 	return NULL;
     }
     new_op->upcall.type = PVFS2_VFS_OP_LOOKUP;
@@ -63,11 +63,6 @@ static struct dentry *pvfs2_lookup(
 	new_op->upcall.req.lookup.parent_refn.fs_id =
 	    PVFS2_SB(dir->i_sb)->fs_id;
     }
-
-    printk("LOOKING UP %s under parent handle %Ld (fs_id %d)\n",
-	   dentry->d_name.name,
-	   new_op->upcall.req.lookup.parent_refn.handle,
-	   new_op->upcall.req.lookup.parent_refn.fs_id);
     strncpy(new_op->upcall.req.lookup.d_name,
 	    dentry->d_name.name, PVFS2_NAME_LEN);
 
