@@ -112,10 +112,6 @@ Fix it :)
 
 Redo tcp_do_work_recv().  It is huge.
 
-Duh.  The tcp_msg_header, of all things, should have a magic
-number.  We need to check this before routing recv operations, notably
-in tcp_do_work_recv() function.
-
 The data reception portions of tcp_post_recv_eager and
 tcp_post_recv_rend could be shared (maybe a separate function also used
 within poll?).
