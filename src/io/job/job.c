@@ -3301,7 +3301,7 @@ int job_testsome(job_id_t * id_array,
                 free(tmp_id_array);
                 return (ret);
             }
-            if (ret > 1)
+            if (ret > 0)
             {
                 *inout_count_p = real_id_count;
                 free(tmp_id_array);
