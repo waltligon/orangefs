@@ -2379,6 +2379,15 @@ int job_waitworld(
 #endif /* __PVFS2_JOB_THREADED__ */
 
 	*inout_count_p = 0;
+	
+	/* use this as a chance to do a cheap test on the request
+	 * scheduler
+	 */
+	if((ret = do_one_test_cycle_req_sched()) < 0)
+	{
+		return(ret);
+	}
+
 
 	gen_mutex_lock(&completion_mutex);
 		if(completion_error)
