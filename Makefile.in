@@ -57,6 +57,7 @@ INSTALL = @INSTALL@
 BISON = bison
 FLEX = flex
 BUILD_GM = @BUILD_GM@
+BUILD_IB = @BUILD_IB@
 BUILD_MPI = @BUILD_MPI@
 MPICC = @MPICC@
 QUIET_COMPILE = @QUIET_COMPILE@
@@ -140,6 +141,16 @@ ifdef BUILD_GM
 	SERVERLIBS += -lgm
 endif
 
+#####################################
+# enable IB if configure requested it
+
+ifdef BUILD_IB
+    CFLAGS += -D__STATIC_METHOD_BMI_IB__
+    IBLIBS := -L@IB_HOME@/lib -Wl,-rpath -Wl,@IB_HOME@/lib \
+	     -lvapi -lmtl_common -lmosal -lmpga -lpthread
+    LIBS += $(IBLIBS)
+    SERVERLIBS += $(IBLIBS)
+endif
 
 #################################################################
 # Starter variables 

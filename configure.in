@@ -202,6 +202,18 @@ CPPFLAGS="$CPPFLAGS_OLD"
 
 AC_SUBST(BUILD_GM)
 
+dnl configure options for IB install path
+AC_ARG_WITH(ib,[  --with-ib=<dir>         Location of the IB installation (default=/usr/mellanox)],
+    IB_HOME="$withval",IB_HOME="/usr/mellanox")
+CPPFLAGS_OLD="$CPPFLAGS"
+CPPFLAGS="$CPPFLAGS -I ${IB_HOME}/include"
+AC_CHECK_HEADER(vapi.h,
+	AC_DEFINE(HAVE_IB, 1, Define if IB is present)
+	BUILD_IB=1)
+CPPFLAGS="$CPPFLAGS_OLD"
+AC_SUBST(IB_HOME)
+AC_SUBST(BUILD_IB)
+
 AC_ARG_WITH(mpi, 
 [  --with-mpi=<dir>        Location of the MPI installation],
     if test x$withval = xyes; then
@@ -267,6 +279,7 @@ src/common/statecomp/module.mk
 src/io/bmi/module.mk
 src/io/bmi/bmi_tcp/module.mk
 src/io/bmi/bmi_gm/module.mk
+src/io/bmi/bmi_ib/module.mk
 src/io/description/module.mk
 src/io/flow/module.mk
 src/io/flow/flowproto-bmi-trove/module.mk
