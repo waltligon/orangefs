@@ -420,7 +420,7 @@ static void bmi_recv_callback_fn(void *user_ptr,
     do{
 	ret = trove_bstream_write_list(q_item->parent->dest.u.trove.coll_id,
 	    q_item->parent->dest.u.trove.handle,
-	    (char**)result_tmp->buffer_offset,
+	    (char**)&result_tmp->buffer_offset,
 	    &result_tmp->result.bytes,
 	    1,
 	    result_tmp->result.offset_array,
