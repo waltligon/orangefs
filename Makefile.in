@@ -202,7 +202,7 @@ GCC_CFLAGS := -Wall -Wstrict-prototypes -pipe
 
 SERVERCFLAGS = -D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__ \
 -D__PVFS2_TROVE_THREADED__ @MISC_TROVE_FLAGS@ \
--D__PVFS2_TROVE_SUPPORT__
+-D__PVFS2_TROVE_SUPPORT__ -D__PVFS2_SERVER__
 
 # server side flow protocol connecting BMI with NCAC cache
 SERVERCFLAGS += -D__STATIC_FLOWPROTO_BMI_CACHE__
@@ -212,7 +212,7 @@ SERVERLIBS = -lrt -lpthread -lpvfs2-server @LIBS@
 # though it's not recommended unless *required*.
 #
 # run ./configure --help for information on how to do this cleanly.
-LIBCFLAGS=@LIBCFLAGS@
+LIBCFLAGS=@LIBCFLAGS@ -D__PVFS2_CLIENT__
 LIBTHREADEDCFLAGS=-D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__
 LIBS += @THREAD_LIB@
 

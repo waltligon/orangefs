@@ -13,9 +13,27 @@
 #include <string.h>
 #include <assert.h>
 
-#include "msgpairarray.h"
+/* conditionally include different headers to get the type of the state
+ * machine struct that contains the msgpair state structs we need to access;
+ * this is done to allow the reuse of this nested machine on both client and
+ * server side where completely different primary state machine structures
+ * are used
+ */
+#if defined(__PVFS2_CLIENT__)
 #include "client-state-machine.h"
+#define PARENT_SM PINT_client_sm
+#elif defined(__PVFS2_SERVER__)
+#include "pvfs2-server.h"
+#define PARENT_SM PINT_server_op 
+#else
+/* this condition is only included for dependency building step; will not
+ * actually compile cleanly
+ */
+#include "client-state-machine.h"
+#include "pvfs2-server.h"
+#endif
 #include "state-machine-fns.h"
+#include "msgpairarray.h"
 #include "pvfs2-debug.h"
 #include "pint-cached-config.h"
 #include "job.h"
@@ -32,15 +50,15 @@ enum
 };
 
 static int msgpairarray_init(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    PARENT_SM *sm_p, job_status_s *js_p);
 static int msgpairarray_post(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    PARENT_SM *sm_p, job_status_s *js_p);
 static int msgpairarray_post_retry(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    PARENT_SM *sm_p, job_status_s *js_p);
 static int msgpairarray_complete(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    PARENT_SM *sm_p, job_status_s *js_p);
 static int msgpairarray_completion_fn(
-    PINT_client_sm *sm_p, job_status_s *js_p);
+    PARENT_SM *sm_p, job_status_s *js_p);
 
 static int count_incomplete_msgs(
     PINT_sm_msgpair_state *msgarray, int array_count);
@@ -89,7 +107,7 @@ nested machine pvfs2_client_msgpairarray_sm(init,
 
 %%
 
-static int msgpairarray_init(PINT_client_sm *sm_p,
+static int msgpairarray_init(PARENT_SM *sm_p,
                              job_status_s *js_p)
 {
     int i = 0;
@@ -143,7 +161,7 @@ static int msgpairarray_init(PINT_client_sm *sm_p,
  * (7) stores job ids for later matching
  *
  */
-static int msgpairarray_post(PINT_client_sm *sm_p,
+static int msgpairarray_post(PARENT_SM *sm_p,
 			     job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL, i = 0, tmp = 0;
@@ -354,7 +372,7 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
     return 0;
 }
 
-static int msgpairarray_post_retry(PINT_client_sm *sm_p,
+static int msgpairarray_post_retry(PARENT_SM *sm_p,
                                    job_status_s *js_p)
 {
     job_id_t tmp_id;
@@ -367,7 +385,7 @@ static int msgpairarray_post_retry(PINT_client_sm *sm_p,
         pint_client_sm_context);
 }
 
-static int msgpairarray_complete(PINT_client_sm *sm_p,
+static int msgpairarray_complete(PARENT_SM *sm_p,
                                  job_status_s *js_p)
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG,
@@ -432,7 +450,7 @@ static int msgpairarray_complete(PINT_client_sm *sm_p,
     return 1;
 }
 
-static int msgpairarray_completion_fn(PINT_client_sm *sm_p,
+static int msgpairarray_completion_fn(PARENT_SM *sm_p,
 				      job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL, i = 0;
