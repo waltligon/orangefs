@@ -40,6 +40,23 @@ pvfs2-0.7.0pre1
 - modified PINT_sys_testsome to return immediately without calling
   testcontext if any ops are completed and ready to be returned right
   away
+- made statfs return load information from servers
+- gm: fixed performance bug, make sure test calls check completion queue
+  before sleeping
+- gm: implement cancel functionality and verified for common cases
+- fixed dbpf SYNC macro bugs that caused hangs on systems without aio callback
+  support
+- updated pvfs2-config tool to use LIBS variable from configure
+- removed -ldb from client side link stage
+- added --serverlibs option to pvfs2-config to determine what libraries
+  have been linked against pvfs2-server
+- updated makefile system for tests directory to use pvfs2-config and
+  depricate use of .libs file
+- added make install target for test harness programs
+- introduced mutex locking in trove-handle-mgmt to avoid race conditions
+  that appear when statfs is called while trove operations are in progress
+- added utility functions for measuring elapsed wall, system, and user time
+  between specified points in code
 
 
 pvfs2-0.6.5
