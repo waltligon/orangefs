@@ -15,6 +15,8 @@
 #include "gossip.h"
 #include "PINT-reqproto-encode.h"
 #include "PINT-reqproto-module.h"
+#include "pint-distribution.h"
+#include "pint-request.h"
 
 int do_encode_req(
 		  struct PVFS_server_req_s *request,
@@ -24,6 +26,10 @@ int do_encode_req(
 {
     void* enc_msg;
     bmi_size_t size = 0, name_sz = 0;
+    PINT_Request* encode_io_req = NULL;
+    PVFS_Dist* encode_io_dist = NULL;
+    int commit_index = 0;
+    int ret = -1;
 
     /* all the messages that we build in this function are one contig. block */
     /* TODO: USE ONE MALLOC() INSTEAD OF TWO */
@@ -235,11 +241,14 @@ int do_encode_req(
 	    }
 	    return (0);
 	case PVFS_SERV_IO: 
-	    /* TODO: this one is a work in progress.
-	     * for now it works like the self contained operations
-	     * listed below, but it will get more complex later
+
+	    /* make it large enough for the req structure, the dist, the
+	     * io description, and two integers (used to indicate the
+	     * size of the dist and description)
 	     */
-	    size = sizeof( struct PVFS_server_req_s );
+	    size = sizeof(struct PVFS_server_req_s) + 2*sizeof(int) +
+		PINT_REQUEST_PACK_SIZE(request->u.io.io_req) +
+		PINT_DIST_PACK_SIZE(request->u.io.io_dist);
 	    enc_msg = BMI_memalloc( target_msg->dest, (bmi_size_t)(size + header_size), BMI_SEND_BUFFER ) ;
 	    if (enc_msg == NULL)
 	    {
@@ -248,7 +257,39 @@ int do_encode_req(
 	    target_msg->buffer_list[0] = enc_msg;
 	    target_msg->size_list[0] = size;
 	    target_msg->total_size = size;
+	    /* copy the basic request structure in */
 	    memcpy( enc_msg, request, sizeof( struct PVFS_server_req_s ) );
+	    /* store the size of the io description */
+	    *(int*)((char*)(enc_msg) + sizeof(struct PVFS_server_req_s))
+		= PINT_REQUEST_PACK_SIZE(request->u.io.io_req);
+	    /* store the size of the distribution */
+	    *(int*)((char*)(enc_msg) + sizeof(struct PVFS_server_req_s)
+		+ sizeof(int))
+		= PINT_DIST_PACK_SIZE(request->u.io.io_dist);
+	    /* find pointers to where the req and dist will be packed */
+	    encode_io_req = (PINT_Request*)((char*)(enc_msg) + 
+		sizeof(struct PVFS_server_req_s) + 2*sizeof(int));
+	    encode_io_dist = (PVFS_Dist*)((char*)(encode_io_req) + 
+		PINT_REQUEST_PACK_SIZE(request->u.io.io_req));
+	    /* pack the I/O description */
+	    commit_index = 0;
+	    ret = PINT_Request_commit(encode_io_req, request->u.io.io_req, 
+		&commit_index);
+	    if(ret < 0)
+	    {
+		BMI_memfree(target_msg->dest, enc_msg, (size +
+		    header_size), BMI_SEND_BUFFER);
+		return(ret);
+	    }
+	    ret = PINT_Request_encode(encode_io_req);
+	    if(ret < 0)
+	    {
+		BMI_memfree(target_msg->dest, enc_msg, (size +
+		    header_size), BMI_SEND_BUFFER);
+		return(ret);
+	    }
+	    /* pack the distribution */
+	    PINT_Dist_encode(encode_io_dist, request->u.io.io_dist);
 
 	    return (0);
 	case PVFS_SERV_RMDIR: /*these structures are all self contained (no pointers that need to be packed) */

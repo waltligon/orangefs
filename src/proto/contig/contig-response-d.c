@@ -57,7 +57,6 @@ DECODE_RESP_HEAD(do_decode_resp)
 		case PVFS_SERV_RMDIRENT:
 		case PVFS_SERV_GETATTR:
 		case PVFS_SERV_IO:
-			/* TODO: SERV_IO may require some more work later */
 			return 0;
 		default:
 			return -1;

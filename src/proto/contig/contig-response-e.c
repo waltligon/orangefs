@@ -43,6 +43,7 @@ int do_encode_resp(
 	case PVFS_SERV_CREATE:
 	case PVFS_SERV_MKDIR:
 	case PVFS_SERV_RMDIRENT:
+	case PVFS_SERV_IO:
 
 	    /* 
 	     *	There is no response struct for
@@ -64,20 +65,6 @@ int do_encode_resp(
 						      sizeof(struct PVFS_server_resp_s) + header_size,
 						      BMI_SEND_BUFFER);
 	    memcpy(target_msg->buffer_list[0], response, sizeof(struct PVFS_server_resp_s));
-	    return(0);
-
-	case PVFS_SERV_IO:
-	    /* TODO: finish filling this in.  For now it acts just like
-	     * the "normal" responses above, but I expect to add more
-	     * later
-	     */
-	    target_msg->size_list[0] = 
-		target_msg->total_size = sizeof(struct PVFS_server_resp_s);
-	    target_msg->buffer_list[0] = BMI_memalloc(target_msg->dest, 
-		sizeof(struct PVFS_server_resp_s) + header_size,
-		BMI_SEND_BUFFER);
-	    memcpy(target_msg->buffer_list[0], response, 
-		sizeof(struct PVFS_server_resp_s));
 	    return(0);
 
 	case PVFS_SERV_GETATTR:
