@@ -32,6 +32,7 @@ static int draw(void);
 static struct options* parse_args(int argc, char* argv[]);
 static void usage(int argc, char** argv);
 static struct options* user_opts = NULL;
+static int check_for_exit(void);
 
 #define S_LOCK() do{ \
 if (SDL_MUSTLOCK(screen) ) { \
@@ -176,14 +177,6 @@ static int draw(void)
     double max_bw = 13.0;
     int stat_depth = pint_vis_shared.io_depth - 1;
 
-    /* TODO: need a way to tell the main thread to stop if we have 
-     * an error
-     */
-
-    /* TODO: ditto for the other direction; it would be nice to be able
-     * to exit cleanly from this thread
-     */
-
     ret = SDL_Init(SDL_INIT_VIDEO);
     if(ret < 0)
     {
@@ -196,6 +189,7 @@ static int draw(void)
     if(!screen)
     {
 	fprintf(stderr, "SDL_SetVideoMode: %s\n", SDL_GetError());
+	SDL_Quit();
 	return(-1);
     }
 
@@ -209,6 +203,7 @@ static int draw(void)
     if(!read_bws)
     {
 	perror("malloc");
+	SDL_Quit();
 	return(-1);
     }
     write_bws = &read_bws[pint_vis_shared.io_count];
@@ -238,11 +233,22 @@ static int draw(void)
 
     while(1)
     {
+	if(check_for_exit())
+	{
+	    return(0);
+	    SDL_Quit();
+	}
+
 	pthread_mutex_lock(&pint_vis_mutex);
 	pthread_cond_wait(&pint_vis_cond, &pint_vis_mutex);
-	pthread_mutex_unlock(&pint_vis_mutex);
-	
-	pthread_mutex_lock(&pint_vis_mutex);
+
+	if(check_for_exit() || pint_vis_error)
+	{
+	    pthread_mutex_unlock(&pint_vis_mutex);
+	    SDL_Quit();
+	    return(0);
+	}
+
 	for(i=0; i<pint_vis_shared.io_count; i++)
 	{
 	    S_LOCK();
@@ -283,6 +289,7 @@ static int draw(void)
 	SDL_Flip(screen);
     }
 
+    SDL_Quit();
     return(0);
 }
 
@@ -296,6 +303,31 @@ static void usage(int argc, char** argv)
     return;
 }
 
+static int check_for_exit(void)
+{
+    SDL_Event event;
+
+    while(SDL_PollEvent(&event))
+    {
+	if(event.type == SDL_QUIT)
+	{
+	    return(1);
+	}
+	else if(event.type == SDL_KEYDOWN)
+	{
+	    switch(event.key.keysym.sym)
+	    {
+		case SDLK_q:
+		case SDLK_ESCAPE:
+		    return(1);
+		    break;
+		default:
+		    break;
+	    }
+	}
+    }
+    return(0);
+}
 
 /*
  * Local variables:
