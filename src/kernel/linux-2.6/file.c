@@ -40,11 +40,11 @@ int pvfs2_file_open(
     struct file *file)
 {
     pvfs2_print("pvfs2: pvfs2_file_open called on %s (inode is %d)\n",
-		file->f_dentry->d_name.name, (int)inode->i_ino);
+                file->f_dentry->d_name.name, (int)inode->i_ino);
 
     if (S_ISDIR(inode->i_mode))
     {
-	return dcache_dir_open(inode, file);
+        return dcache_dir_open(inode, file);
     }
 
     /*
@@ -104,37 +104,31 @@ ssize_t pvfs2_inode_read(
         new_op->upcall.req.io.io_type = PVFS_IO_READ;
         new_op->upcall.req.io.refn = pvfs2_inode->refn;
 
-	/* note that we get a new buffer each time for fairness,
-	 * though it may speed things up in the common case more if we
-	 * kept one buffer the whole time; need to measure performance
-	 * difference
-	 */
-	ret = pvfs_bufmap_get(&buffer_index);
-	if (ret < 0)
-	{
-	    pvfs2_error("pvfs2: error: pvfs_bufmap_get() failure.\n");
-	    ret = new_op->downcall.status;
+        ret = pvfs_bufmap_get(&buffer_index);
+        if (ret < 0)
+        {
+            pvfs2_error("pvfs2_inode_read: pvfs_bufmap_get() failure.\n");
             kill_device_owner();
             op_release(new_op);
-	    *offset = original_offset;
-	    return(ret);
-	}
+            *offset = original_offset;
+            return ret;
+        }
 
-	/* how much to transfer in this loop iteration */
-	each_count = (((count - total_count) > pvfs_bufmap_size_query()) ?
+        /* how much to transfer in this loop iteration */
+        each_count = (((count - total_count) > pvfs_bufmap_size_query()) ?
                       pvfs_bufmap_size_query() : (count - total_count));
 
-	new_op->upcall.req.io.buf_index = buffer_index;
-	new_op->upcall.req.io.count = each_count;
-	new_op->upcall.req.io.offset = *offset;
+        new_op->upcall.req.io.buf_index = buffer_index;
+        new_op->upcall.req.io.count = each_count;
+        new_op->upcall.req.io.offset = *offset;
 
         service_error_exit_op_with_timeout_retry(
             new_op, "pvfs2_inode_read", retries, error_exit,
             get_interruptible_flag(inode));
 
-	if (new_op->downcall.status != 0)
-	{
-	    pvfs2_error("pvfs2_inode_read: error: io downcall status.\n");
+        if (new_op->downcall.status != 0)
+        {
+            pvfs2_error("pvfs2_inode_read: error: io downcall status.\n");
 
           error_exit:
             /* this macro is defined in pvfs2-kernel.h */
@@ -155,12 +149,12 @@ ssize_t pvfs2_inode_read(
                 pvfs2_error("pvfs2_inode_read: returning error %d "
                             "(error_exit=%d)\n", ret, error_exit);
             }
-	    return ret;
-	}
+            return ret;
+        }
 
-	/* copy data out to destination */
-	if (new_op->downcall.resp.io.amt_complete)
-	{
+        /* copy data out to destination */
+        if (new_op->downcall.resp.io.amt_complete)
+        {
             if (copy_to_user)
             {
                 ret = pvfs_bufmap_copy_to_user(
@@ -169,7 +163,7 @@ ssize_t pvfs2_inode_read(
             }
             else
             {
-		ret = pvfs_bufmap_copy_to_kernel(
+                ret = pvfs_bufmap_copy_to_kernel(
                     current_buf, buffer_index,
                     new_op->downcall.resp.io.amt_complete);
             }
@@ -180,11 +174,11 @@ ssize_t pvfs2_inode_read(
                             "sure that the pvfs2-client is running.\n");
                 goto error_exit;
             }
-	}
+        }
 
-	current_buf += new_op->downcall.resp.io.amt_complete;
-	*offset += new_op->downcall.resp.io.amt_complete;
-	total_count += new_op->downcall.resp.io.amt_complete;
+        current_buf += new_op->downcall.resp.io.amt_complete;
+        *offset += new_op->downcall.resp.io.amt_complete;
+        total_count += new_op->downcall.resp.io.amt_complete;
         amt_complete = new_op->downcall.resp.io.amt_complete;
 
         /*
@@ -195,15 +189,15 @@ ssize_t pvfs2_inode_read(
         */
         wake_up_device_for_return(new_op);
 
-	pvfs_bufmap_put(buffer_index);
+        pvfs_bufmap_put(buffer_index);
 
-	/* if we got a short read, fall out and return what we
-	 * got so far
-	 */
-	if (amt_complete < each_count)
-	{
-	    break;
-	}
+        /* if we got a short read, fall out and return what we
+         * got so far
+         */
+        if (amt_complete < each_count)
+        {
+            break;
+        }
     }
 
     /*
@@ -241,7 +235,7 @@ static ssize_t pvfs2_file_write(
     size_t amt_complete = 0;
 
     pvfs2_print("pvfs2: pvfs2_file_write called on %s\n",
-		(file && file->f_dentry && file->f_dentry->d_name.name ?
+                (file && file->f_dentry && file->f_dentry->d_name.name ?
                  (char *)file->f_dentry->d_name.name : "UNKNOWN"));
 
     while(total_count < count)
@@ -258,48 +252,46 @@ static ssize_t pvfs2_file_write(
         new_op->upcall.req.io.io_type = PVFS_IO_WRITE;
         new_op->upcall.req.io.refn = pvfs2_inode->refn;
 
-	pvfs2_print("pvfs2: writing %d bytes.\n", count);
+        pvfs2_print("pvfs2: writing %d bytes.\n", count);
 
-	/* note that we get a new buffer each time for fairness,
-	 * though it may speed things up in the common case more if we
-	 * kept one buffer the whole time; need to measure performance
-	 * difference
-	 */
-	ret = pvfs_bufmap_get(&buffer_index);
-	if(ret < 0)
-	{
-	    pvfs2_error("pvfs2: error: pvfs_bufmap_get() failure.\n");
-            goto error_exit;
-	}
+        ret = pvfs_bufmap_get(&buffer_index);
+        if (ret < 0)
+        {
+            pvfs2_error("pvfs2_file_write: pvfs_bufmap_get() failure.\n");
+            kill_device_owner();
+            op_release(new_op);
+            *offset = original_offset;
+            return ret;
+        }
 
-	/* how much to transfer in this loop iteration */
-	each_count = (((count - total_count) > pvfs_bufmap_size_query()) ?
+        /* how much to transfer in this loop iteration */
+        each_count = (((count - total_count) > pvfs_bufmap_size_query()) ?
                       pvfs_bufmap_size_query() : (count - total_count));
 
-	new_op->upcall.req.io.buf_index = buffer_index;
-	new_op->upcall.req.io.count = each_count;
-	new_op->upcall.req.io.offset = *offset;
+        new_op->upcall.req.io.buf_index = buffer_index;
+        new_op->upcall.req.io.count = each_count;
+        new_op->upcall.req.io.offset = *offset;
 
-	/* copy data from application */
-	if (pvfs_bufmap_copy_from_user(
+        /* copy data from application */
+        if (pvfs_bufmap_copy_from_user(
                 buffer_index, current_buf, each_count))
         {
             pvfs2_error("Failed to copy user buffer.  Please make sure "
                         "that the pvfs2-client is running.\n");
-	    ret = new_op->downcall.status;
+            ret = new_op->downcall.status;
             kill_device_owner();
             op_release(new_op);
-	    *offset = original_offset;
-	    return(ret);
+            *offset = original_offset;
+            return(ret);
         }
 
         service_error_exit_op_with_timeout_retry(
             new_op, "pvfs2_file_write", retries, error_exit,
             get_interruptible_flag(inode));
 
-	if (new_op->downcall.status != 0)
-	{
-	    pvfs2_error("pvfs2_file_write: error: io downcall status.\n");
+        if (new_op->downcall.status != 0)
+        {
+            pvfs2_error("pvfs2_file_write: io downcall status error\n");
 
           error_exit:
             /* this macro is defined in pvfs2-kernel.h */
@@ -320,12 +312,12 @@ static ssize_t pvfs2_file_write(
                 pvfs2_error("pvfs2_file_write: returning error %d "
                             "(error_exit=%d)\n", ret, error_exit);
             }
-	    return ret;
-	}
+            return ret;
+        }
 
-	current_buf += new_op->downcall.resp.io.amt_complete;
-	*offset += new_op->downcall.resp.io.amt_complete;
-	total_count += new_op->downcall.resp.io.amt_complete;
+        current_buf += new_op->downcall.resp.io.amt_complete;
+        *offset += new_op->downcall.resp.io.amt_complete;
+        total_count += new_op->downcall.resp.io.amt_complete;
         amt_complete = new_op->downcall.resp.io.amt_complete;
 
         /* adjust inode size if applicable */
@@ -342,16 +334,16 @@ static ssize_t pvfs2_file_write(
         */
         wake_up_device_for_return(new_op);
 
-	pvfs_bufmap_put(buffer_index);
+        pvfs_bufmap_put(buffer_index);
 
-	/* if we got a short write, fall out and return what we got so
-	 * far TODO: define semantics here- kind of depends on pvfs2
-	 * semantics that don't really exist yet
-	 */
-	if (amt_complete < each_count)
-	{
-	    break;
-	}
+        /* if we got a short write, fall out and return what we got so
+         * far TODO: define semantics here- kind of depends on pvfs2
+         * semantics that don't really exist yet
+         */
+        if (amt_complete < each_count)
+        {
+            break;
+        }
     }
 
     if (total_count)
@@ -413,7 +405,7 @@ int pvfs2_file_release(
     update_atime(inode);
     if (S_ISDIR(inode->i_mode))
     {
-	return dcache_dir_close(inode, file);
+        return dcache_dir_close(inode, file);
     }
 
     /*
