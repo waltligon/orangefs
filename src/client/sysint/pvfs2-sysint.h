@@ -171,15 +171,6 @@ struct PVFS_sysresp_mkdir_s {
 typedef struct PVFS_sysresp_mkdir_s PVFS_sysresp_mkdir;
 
 /* create */
-struct PVFS_sysreq_create_s {
-	char* entry_name; /* single path segment */
-	pinode_reference parent_refn;
-	PVFS_object_attr attr;
-	uint32_t attrmask;
-	PVFS_credentials credentials;
-};
-typedef struct PVFS_sysreq_create_s PVFS_sysreq_create;
-
 struct PVFS_sysresp_create_s {
 	pinode_reference pinode_refn;
 };
@@ -337,7 +328,6 @@ struct PVFS_system_req_s {
 	int32_t verno;	  /* Version number */
 	union {
 		PVFS_sysreq_mkdir mkdir;
-		PVFS_sysreq_create create;
 		PVFS_sysreq_remove remove;
 		PVFS_sysreq_rename rename;
 		PVFS_sysreq_io io;
@@ -409,7 +399,9 @@ int PVFS_sys_setattr(pinode_reference pinode_refn, PVFS_object_attr attr,
 		PVFS_attr_extended extended);
 int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp);
 int PVFS_sys_readdir(PVFS_sysreq_readdir *req, PVFS_sysresp_readdir *resp);
-int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp);
+int PVFS_sys_create(char* entry_name, pinode_reference parent_refn, 
+		uint32_t attrmask, PVFS_object_attr attr, 
+		PVFS_credentials credentials, PVFS_sysresp_create *resp);
 int PVFS_sys_remove(PVFS_sysreq_remove *req);
 int PVFS_sys_rename(PVFS_sysreq_rename *req);
 int PVFS_sys_symlink(PVFS_fs_id fs_id, char* name, char* target, 

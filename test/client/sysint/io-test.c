@@ -14,7 +14,6 @@ int main(int argc,char **argv)
 {
 	PVFS_sysresp_init resp_init;
 	PVFS_sysresp_lookup resp_lk;
-	PVFS_sysreq_create req_cr;
 	PVFS_sysresp_create resp_cr;
 	PVFS_sysreq_io req_io;
 	PVFS_sysresp_io resp_io;
@@ -29,6 +28,10 @@ int main(int argc,char **argv)
 	PVFS_fs_id fs_id;
 	char* name;
 	PVFS_credentials credentials;
+	char* entry_name;
+	pinode_reference parent_refn;
+	uint32_t attrmask;
+	PVFS_object_attr attr;
 
 	gossip_enable_stderr();
 	gossip_set_debug_mask(1,CLIENT_DEBUG);
@@ -121,19 +124,20 @@ int main(int argc,char **argv)
 
 		/* TODO: I'm not setting the attribute mask... not real sure
 		 * what's supposed to happen there */
-		req_cr.attr.owner = 100;
-		req_cr.attr.group = 100;
-		req_cr.attr.perms = PVFS_U_WRITE|PVFS_U_READ;
-		req_cr.attr.u.meta.nr_datafiles = 1;
-		req_cr.attr.u.meta.dist = NULL;
-		req_cr.parent_refn.handle = resp_lk.pinode_refn.handle;
-		req_cr.parent_refn.fs_id = fs_id;
-		req_cr.entry_name = &(filename[1]); /* leave off slash */
-		req_cr.credentials.uid = 100;
-		req_cr.credentials.gid = 100;
-		req_cr.credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
+		attr.owner = 100;
+		attr.group = 100;
+		attr.perms = PVFS_U_WRITE|PVFS_U_READ;
+		attr.u.meta.nr_datafiles = 1;
+		attr.u.meta.dist = NULL;
+		parent_refn.handle = resp_lk.pinode_refn.handle;
+		parent_refn.fs_id = fs_id;
+		entry_name = &(filename[1]); /* leave off slash */
+		credentials.uid = 100;
+		credentials.gid = 100;
+		credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
 
-		ret = PVFS_sys_create(&req_cr, &resp_cr);
+		ret = PVFS_sys_create(entry_name, parent_refn, attrmask, attr, 
+					credentials, &resp_cr);
 		if(ret < 0)
 		{
 			fprintf(stderr, "Error: PVFS_sys_create() failure.\n");

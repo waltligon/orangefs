@@ -37,7 +37,6 @@ int main(int argc,char **argv)
 	PVFS_sysreq_statfs *req_statfs = NULL;
 	PVFS_sysresp_statfs *resp_statfs = NULL;
 #endif
-	PVFS_sysreq_create *req_create = NULL;
 	PVFS_sysresp_create *resp_create = NULL;
 	char *filename;
 	//char dirname[256] = "/parl/fshorte/sysint/home";
@@ -46,6 +45,10 @@ int main(int argc,char **argv)
 	PVFS_fs_id fs_id;
 	char* name;
 	PVFS_credentials credentials;
+	char* entry_name;
+	pinode_reference parent_refn;
+	uint32_t attrmask;
+	PVFS_object_attr attr;
 
 	PVFS_handle lk_handle;
 	PVFS_handle lk_fsid;
@@ -101,12 +104,6 @@ int main(int argc,char **argv)
 	
 
 	/* test create */
-	req_create = (PVFS_sysreq_create *)malloc(sizeof(PVFS_sysreq_create));
-	if (!req_create)
-	{
-		printf("Error in malloc\n");
-		return(-1);
-	}
 	resp_create = (PVFS_sysresp_create *)malloc(sizeof(PVFS_sysresp_create));
 	if (!resp_create)
 	{
@@ -115,26 +112,26 @@ int main(int argc,char **argv)
 	}
 
 	// Fill in the create info 
-	req_create->entry_name = (char *)malloc(strlen(filename) + 1);
-	if (!req_create->entry_name)
+	entry_name = (char *)malloc(strlen(filename) + 1);
+	if (!entry_name)
 	{
 		printf("Error in malloc\n");
 		return(-1);
 	}
-	memcpy(req_create->entry_name,filename,strlen(filename) + 1);
-	req_create->attrmask = (ATTR_UID | ATTR_GID | ATTR_PERM);
-	req_create->attr.owner = 100;
-	req_create->attr.group = 100;
-	req_create->attr.perms = 1877;
+	memcpy(entry_name,filename,strlen(filename) + 1);
+	attrmask = (ATTR_UID | ATTR_GID | ATTR_PERM);
+	attr.owner = 100;
+	attr.group = 100;
+	attr.perms = 1877;
 
-	req_create->credentials.uid = 100;
-	req_create->credentials.gid = 100;
-	req_create->credentials.perms = 1877;
+	credentials.uid = 100;
+	credentials.gid = 100;
+	credentials.perms = 1877;
 
-	req_create->attr.u.meta.nr_datafiles = 4;
+	attr.u.meta.nr_datafiles = 4;
 
-	req_create->parent_refn.handle = resp_look.pinode_refn.handle;
-	req_create->parent_refn.fs_id = fs_id;
+	parent_refn.handle = resp_look.pinode_refn.handle;
+	parent_refn.fs_id = fs_id;
 
 	
 #if 0
@@ -147,10 +144,11 @@ int main(int argc,char **argv)
 #endif
 
 	/* use default dist */
-	req_create->attr.u.meta.dist = NULL;
+	attr.u.meta.dist = NULL;
 
 	// call create 
-	ret = PVFS_sys_create(req_create,resp_create);
+	ret = PVFS_sys_create(entry_name, parent_refn, attrmask, attr,
+				credentials, resp_create);
 	if (ret < 0)
 	{
 		printf("create failed with errcode = %d\n", ret);
@@ -208,8 +206,7 @@ int main(int argc,char **argv)
 #endif
 	
 
-	free(req_create->entry_name);
-	free(req_create);
+	free(entry_name);
 	free(resp_create);
 
 

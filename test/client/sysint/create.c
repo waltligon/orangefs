@@ -15,8 +15,12 @@ int main(int argc, char **argv)
     PVFS_fs_id cur_fs;
     pvfs_mntlist mnt = {0,NULL};
     PVFS_sysresp_init resp_init;
-    PVFS_sysreq_create req_create;
     PVFS_sysresp_create resp_create;
+    char* entry_name;
+    pinode_reference parent_refn;
+    uint32_t attrmask;
+    PVFS_object_attr attr;
+    PVFS_credentials credentials;
 
     gossip_enable_stderr();
     gossip_set_debug_mask(1,CLIENT_DEBUG);
@@ -53,30 +57,30 @@ int main(int argc, char **argv)
     }
     printf("File to be created is %s\n",str_buf);
 
-    memset(&req_create, 0, sizeof(PVFS_sysreq_create));
     memset(&resp_create, 0, sizeof(PVFS_sysresp_create));
 
     cur_fs = resp_init.fsid_list[0];
 
-    req_create.entry_name = str_buf;
-    req_create.attrmask = (ATTR_UID | ATTR_GID | ATTR_PERM);
-    req_create.attr.owner = 100;
-    req_create.attr.group = 100;
-    req_create.attr.perms = 1877;
-    req_create.credentials.uid = 100;
-    req_create.credentials.gid = 100;
-    req_create.credentials.perms = 1877;
-    req_create.attr.u.meta.nr_datafiles = 4;
-    req_create.parent_refn.handle =
+    entry_name = str_buf;
+    attrmask = (ATTR_UID | ATTR_GID | ATTR_PERM);
+    attr.owner = 100;
+    attr.group = 100;
+    attr.perms = 1877;
+    credentials.uid = 100;
+    credentials.gid = 100;
+    credentials.perms = 1877;
+    attr.u.meta.nr_datafiles = 4;
+    parent_refn.handle =
         lookup_parent_handle(filename,cur_fs);
-    req_create.parent_refn.fs_id = cur_fs;
+    parent_refn.fs_id = cur_fs;
 
     /* Fill in the dist -- NULL means the system interface used the 
      * "default_dist" as the default
      */
-    req_create.attr.u.meta.dist = NULL;
+    attr.u.meta.dist = NULL;
 
-    ret = PVFS_sys_create(&req_create,&resp_create);
+    ret = PVFS_sys_create(entry_name, parent_refn, attrmask, attr,
+                credentials, &resp_create);
     if (ret < 0)
     {
         printf("create failed with errcode = %d\n", ret);

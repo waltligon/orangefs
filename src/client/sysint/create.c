@@ -31,7 +31,9 @@ static void copy_attributes(PVFS_object_attr *new,PVFS_object_attr old,
  *
  * returns 0 on success, -errno on failure
  */
-int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
+int PVFS_sys_create(char* entry_name, pinode_reference parent_refn,
+                uint32_t attrmask, PVFS_object_attr attr,
+                PVFS_credentials credentials, PVFS_sysresp_create *resp)
 {
 	struct PVFS_server_req_s req_p;			/* server request */
 	struct PVFS_server_resp_s *ack_p = NULL;	/* server response */
@@ -64,14 +66,14 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	    PCACHE_INSERT2_FAILURE,
 	} failure = NONE_FAILURE;
 
-	gossip_ldebug(CLIENT_DEBUG,"creating file named %s\n", req->entry_name);
-	gossip_ldebug(CLIENT_DEBUG,"parent handle = %lld\n", req->parent_refn.handle);
-	gossip_ldebug(CLIENT_DEBUG,"parent fsid = %d\n", req->parent_refn.fs_id);
+	gossip_ldebug(CLIENT_DEBUG,"creating file named %s\n", entry_name);
+	gossip_ldebug(CLIENT_DEBUG,"parent handle = %lld\n", parent_refn.handle);
+	gossip_ldebug(CLIENT_DEBUG,"parent fsid = %d\n", parent_refn.fs_id);
 
         /* get the pinode of the parent so we can check permissions */
         attr_mask = ATTR_BASIC | ATTR_META;
-        ret = phelper_get_pinode(req->parent_refn, &parent_ptr, attr_mask, 
-				    req->credentials);
+        ret = phelper_get_pinode(parent_refn, &parent_ptr, attr_mask, 
+				    credentials);
         if(ret < 0)
         {
 	    /* parent pinode doesn't exist ?!? */
@@ -81,8 +83,8 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	}
 
 	/* check permissions in parent directory */
-	ret = check_perms(parent_ptr->attr,req->credentials.perms,
-			    req->credentials.uid, req->credentials.gid);
+	ret = check_perms(parent_ptr->attr,credentials.perms,
+			    credentials.uid, credentials.gid);
 	if (ret < 0)
 	{
 	    phelper_release_pinode(parent_ptr);
@@ -96,7 +98,7 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
         phelper_release_pinode(parent_ptr);
 
 	/* Lookup handle(if it exists) in dcache */
-	ret = PINT_dcache_lookup(req->entry_name,req->parent_refn,&entry);
+	ret = PINT_dcache_lookup(entry_name,parent_refn,&entry);
 	if (ret < 0 )
 	{
 	    /* there was an error, bail*/
@@ -114,13 +116,13 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	}
 
 	/* how many data files do we need to create? */
-	io_serv_count = req->attr.u.meta.nr_datafiles;
+	io_serv_count = attr.u.meta.nr_datafiles;
 
 	/* if the user passed in -1, we're going to assume that's the default
 	 * and create one datafile per server */
 	if (io_serv_count == -1)
 	{
-	    PINT_bucket_get_num_io( req->parent_refn.fs_id, &io_serv_count);
+	    PINT_bucket_get_num_io( parent_refn.fs_id, &io_serv_count);
 	}
 
 	gossip_ldebug(CLIENT_DEBUG,"number of data files to create = %d\n",io_serv_count);
@@ -129,16 +131,16 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	 * need to get the default distribution for them
 	 */
 
-	if (req->attr.u.meta.dist == NULL)
+	if (attr.u.meta.dist == NULL)
 	{
-	    req->attr.u.meta.dist =
+	    attr.u.meta.dist =
 		PVFS_Dist_create("simple_stripe");
-	    //PINT_Dist_dump(req->attr.u.meta.dist);
+	    //PINT_Dist_dump(attr.u.meta.dist);
 	}
 
 	/* Determine the initial metaserver for new file */
 	ret = PINT_bucket_get_next_meta(&g_server_config,
-                                        req->parent_refn.fs_id,
+                                        parent_refn.fs_id,
                                         &serv_addr1);
 	if (ret < 0)
 	{
@@ -149,9 +151,9 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	/* send the create request for the meta file */
 	req_p.op = PVFS_SERV_CREATE;
 	req_p.rsize = sizeof(struct PVFS_server_req_s);
-	req_p.credentials = req->credentials;
+	req_p.credentials = credentials;
 	req_p.u.create.requested_handle = new_bkt;
-	req_p.u.create.fs_id = req->parent_refn.fs_id;
+	req_p.u.create.fs_id = parent_refn.fs_id;
 
 	/* Q: is this sane?  pretty sure we're creating meta files here, but do 
 	 * we want to re-use this for other object types? symlinks, dirs, etc?*/
@@ -180,22 +182,22 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 
 	/* save the handle for the meta file so we can refer to it later */
 	entry.handle = ack_p->u.create.handle;
-	entry.fs_id = req->parent_refn.fs_id;
+	entry.fs_id = parent_refn.fs_id;
 
 	/* these fields are the only thing we need to set for the response to
 	 * the calling function
 	 */
 
 	resp->pinode_refn.handle = entry.handle;
-	resp->pinode_refn.fs_id = req->parent_refn.fs_id;
+	resp->pinode_refn.fs_id = parent_refn.fs_id;
 
 	PINT_release_req(serv_addr1, &req_p, max_msg_sz, &decoded,
             &encoded_resp, op_tag);
 
 	/* Create directory entry server request to parent */
 	/* Query BTI to get initial meta server */
-	ret = PINT_bucket_map_to_server(&serv_addr2,req->parent_refn.handle,
-                                        req->parent_refn.fs_id);
+	ret = PINT_bucket_map_to_server(&serv_addr2,parent_refn.handle,
+                                        parent_refn.fs_id);
 	if (ret < 0)
 	{
 	    failure = CREATE_MSG_FAILURE;
@@ -204,21 +206,21 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 
 	/* send crdirent to associate a name with the meta file we just made */
 
-	name_sz = strlen(req->entry_name) + 1; /*include null terminator*/
+	name_sz = strlen(entry_name) + 1; /*include null terminator*/
 	req_p.op = PVFS_SERV_CREATEDIRENT;
 	req_p.rsize = sizeof(struct PVFS_server_req_s) + name_sz;
 
-	/* credentials come from req->credentials and are set in the previous
+	/* credentials come from credentials and are set in the previous
 	 * create request.  so we don't have to set those again.
 	 */
 
 	/* just update the pointer, it'll get malloc'ed when its sent on the 
 	 * wire.
 	 */
-	req_p.u.crdirent.name = req->entry_name;
+	req_p.u.crdirent.name = entry_name;
 	req_p.u.crdirent.new_handle = entry.handle;
-	req_p.u.crdirent.parent_handle = req->parent_refn.handle;
-	req_p.u.crdirent.fs_id = req->parent_refn.fs_id;
+	req_p.u.crdirent.parent_handle = parent_refn.handle;
+	req_p.u.crdirent.fs_id = parent_refn.fs_id;
 
 	/* max response size is the same as the previous request */
 
@@ -277,7 +279,7 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
         memset(df_handle_array,0,io_serv_count*sizeof(PVFS_handle));
 	
 	ret = PINT_bucket_get_next_io(&g_server_config,
-                                      req->parent_refn.fs_id,
+                                      parent_refn.fs_id,
                                       io_serv_count,
                                       bmi_addr_list);
 	if (ret < 0)
@@ -298,8 +300,8 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 
 	req_p.op = PVFS_SERV_CREATE;
 	req_p.rsize = sizeof(struct PVFS_server_req_s);
-	req_p.credentials = req->credentials;
-	req_p.u.create.fs_id = req->parent_refn.fs_id;
+	req_p.credentials = credentials;
+	req_p.u.create.fs_id = parent_refn.fs_id;
 	/* we're making data files on each server */
 	req_p.u.create.object_type = PVFS_TYPE_DATAFILE;
 
@@ -353,8 +355,8 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	req_p.rsize = sizeof(struct PVFS_server_req_s) 
 			+ io_serv_count*sizeof(PVFS_handle);
 	req_p.u.setattr.handle = entry.handle;
-	req_p.u.setattr.fs_id = req->parent_refn.fs_id;
-	req_p.u.setattr.attrmask = req->attrmask;
+	req_p.u.setattr.fs_id = parent_refn.fs_id;
+	req_p.u.setattr.attrmask = attrmask;
 
 	/* TODO: figure out how we're storing the distribution for the file
 	 * does this go in the attributes, or the eattr?
@@ -363,7 +365,7 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	/* even though this says copy, we're just updating the pointer for the
 	 * array of data files
 	 */
-	copy_attributes(&req_p.u.setattr.attr, req->attr, io_serv_count,
+	copy_attributes(&req_p.u.setattr.attr, attr, io_serv_count,
 			df_handle_array); 
 	gossip_ldebug(CLIENT_DEBUG,"\towner: %d\n\tgroup: %d\n\tperms: %d\n\tatime: %lld\n\tmtime: %lld\n\tctime: %lld\n\tobjtype: %d\n",
 		req_p.u.setattr.attr.owner, 
@@ -408,7 +410,7 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	free(bmi_addr_list);
 
 	/* add entry to dcache */
-	ret = PINT_dcache_insert(req->entry_name, entry, req->parent_refn);
+	ret = PINT_dcache_insert(entry_name, entry, parent_refn);
 	if (ret < 0)
 	{
 	    failure = DCACHE_INSERT_FAILURE;
@@ -424,8 +426,8 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	}
 	/* Fill up the pinode */
 	pinode_ptr->pinode_ref.handle = entry.handle;
-	pinode_ptr->pinode_ref.fs_id = req->parent_refn.fs_id;
-	pinode_ptr->mask = req->attrmask;
+	pinode_ptr->pinode_ref.fs_id = parent_refn.fs_id;
+	pinode_ptr->mask = attrmask;
 	/* Allocate the handle array */
 	pinode_ptr->attr = req_p.u.setattr.attr;
 	/* Fill in the timestamps */
@@ -468,8 +470,8 @@ return_error:
 		last_handle_created = i;
 		req_p.op = PVFS_SERV_REMOVE;
 		req_p.rsize = sizeof(struct PVFS_server_req_s);
-		req_p.credentials = req->credentials;
-		req_p.u.remove.fs_id = req->parent_refn.fs_id;
+		req_p.credentials = credentials;
+		req_p.u.remove.fs_id = parent_refn.fs_id;
 		max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
 
 		for(i = 0;i < last_handle_created; i++)
@@ -497,12 +499,12 @@ return_error:
 		/* rollback crdirent */
 		req_p.op = PVFS_SERV_RMDIRENT;
 		req_p.rsize = sizeof(struct PVFS_server_req_s) 
-			+ strlen(req->entry_name)+1; /*include null terminator*/
+			+ strlen(entry_name)+1; /*include null terminator*/
 
-		req_p.credentials = req->credentials;
-		req_p.u.rmdirent.parent_handle = req->parent_refn.handle;
-		req_p.u.rmdirent.fs_id = req->parent_refn.fs_id;
-		req_p.u.rmdirent.entry = req->entry_name;
+		req_p.credentials = credentials;
+		req_p.u.rmdirent.parent_handle = parent_refn.handle;
+		req_p.u.rmdirent.fs_id = parent_refn.fs_id;
+		req_p.u.rmdirent.entry = entry_name;
 		max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
 		op_tag = get_next_session_tag();
 		old_ret = ret;
@@ -518,7 +520,7 @@ return_error:
 		/* rollback create req*/
 		req_p.op = PVFS_SERV_REMOVE;
 		req_p.rsize = sizeof(struct PVFS_server_req_s);
-		req_p.credentials = req->credentials;
+		req_p.credentials = credentials;
 		req_p.u.remove.handle = entry.handle;
 		req_p.u.remove.fs_id = entry.fs_id;
 		max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);

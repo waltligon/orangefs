@@ -41,7 +41,6 @@ int main(int argc, char **argv)
     PVFS_fs_id cur_fs;
     pvfs_mntlist mnt = {0,NULL};
     PVFS_sysresp_init resp_init;
-    PVFS_sysreq_create req_create;
     PVFS_sysresp_create resp_create;
     PVFS_sysreq_io req_io;
     PVFS_sysresp_io resp_io;
@@ -55,6 +54,11 @@ int main(int argc, char **argv)
     double time1, time2;
     int32_t blocklength = 0;
     PVFS_size displacement = 0;
+    char* entry_name;
+    pinode_reference parent_refn;
+    uint32_t attrmask;
+    PVFS_object_attr attr;
+    PVFS_credentials credentials;
 
     gossip_enable_stderr();
 
@@ -131,47 +135,47 @@ int main(int argc, char **argv)
 	goto main_out;
     }
 
-    memset(&req_create, 0, sizeof(PVFS_sysreq_create));
     memset(&resp_create, 0, sizeof(PVFS_sysresp_create));
 
     cur_fs = resp_init.fsid_list[mnt_index];
 
     printf("Warning: overriding ownership and permissions to match prototype file system.\n");
 
-    req_create.entry_name = str_buf;
-    req_create.attrmask = (ATTR_UID | ATTR_GID | ATTR_PERM);
-    req_create.attr.owner = 100;
-    req_create.attr.group = 100;
-    req_create.attr.perms = 1877;
-    req_create.credentials.uid = 100;
-    req_create.credentials.gid = 100;
-    req_create.credentials.perms = 1877;
-    req_create.attr.u.meta.nr_datafiles = user_opts->num_datafiles;
-    req_create.parent_refn.handle =
+    entry_name = str_buf;
+    attrmask = (ATTR_UID | ATTR_GID | ATTR_PERM);
+    attr.owner = 100;
+    attr.group = 100;
+    attr.perms = 1877;
+    credentials.uid = 100;
+    credentials.gid = 100;
+    credentials.perms = 1877;
+    attr.u.meta.nr_datafiles = user_opts->num_datafiles;
+    parent_refn.handle =
         lookup_parent_handle(pvfs_path,cur_fs);
-    req_create.parent_refn.fs_id = cur_fs;
+    parent_refn.fs_id = cur_fs;
 
     /* Fill in the dist -- NULL means the system interface used the 
      * "default_dist" as the default
      */
     if(user_opts->strip_size == -1)
     {
-	req_create.attr.u.meta.dist = NULL;
+	attr.u.meta.dist = NULL;
     }
     else
     {
-	req_create.attr.u.meta.dist = PVFS_Dist_create("simple_stripe");
-	if(!req_create.attr.u.meta.dist)
+	attr.u.meta.dist = PVFS_Dist_create("simple_stripe");
+	if(!attr.u.meta.dist)
 	{
 	    fprintf(stderr, "Error: PVFS_Dist_create() failure.\n");
 	    ret = -1;
 	    goto main_out;
 	}
-	req_create.attr.u.meta.dist->params->strip_size =
+	attr.u.meta.dist->params->strip_size =
 	    user_opts->strip_size;
     }
 
-    ret = PVFS_sys_create(&req_create,&resp_create);
+    ret = PVFS_sys_create(entry_name, parent_refn, attrmask, attr, credentials,
+			    &resp_create);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_sys_create", ret);
@@ -189,7 +193,7 @@ int main(int argc, char **argv)
     }
 
     req_io.pinode_refn = resp_create.pinode_refn;
-    req_io.credentials = req_create.credentials;
+    req_io.credentials = credentials;
     req_io.buffer = buffer;
 
     time1 = Wtime();
