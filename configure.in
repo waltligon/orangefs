@@ -170,6 +170,7 @@ test/io/bmi/module.mk
 test/io/description/module.mk
 test/io/flow/module.mk
 test/io/job/module.mk
+test/io/dev/module.mk
 test/client/sysint/module.mk
 test/proto/module.mk
 test/server/module.mk
