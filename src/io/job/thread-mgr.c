@@ -56,14 +56,10 @@ static void *trove_thread_function(void *ptr)
     struct PINT_thread_mgr_trove_callback *tmp_callback;
     int timeout = thread_mgr_test_timeout;
 
-    /* TODO: fix the locking */
-
 #ifdef __PVFS2_JOB_THREADED__
     while (1)
 #endif
     {
-	gen_mutex_lock(&trove_mutex);
-
 	count = THREAD_MGR_TEST_COUNT;
 #ifdef __PVFS2_TROVE_SUPPORT__
 	ret = trove_dspace_testcontext(HACK_fs_id,
@@ -97,8 +93,6 @@ static void *trove_thread_function(void *ptr)
 	    assert(tmp_callback->fn != NULL);
 	    tmp_callback->fn(tmp_callback->data, stat_trove_error_code_array[i]);
 	}
-
-	gen_mutex_unlock(&trove_mutex);
     }
     return (NULL);
 }
@@ -132,6 +126,7 @@ static void *bmi_thread_function(void *ptr)
 	    incount = bmi_unexp_count;
 	    if(incount > THREAD_MGR_TEST_COUNT)
 		incount = THREAD_MGR_TEST_COUNT;
+	    gen_mutex_unlock(&bmi_mutex);
 
 	    ret = BMI_testunexpected(incount, &outcount, stat_bmi_unexp_array, 0);
 	    if(ret < 0)
@@ -143,11 +138,13 @@ static void *bmi_thread_function(void *ptr)
 	    }
 
 	    /* execute callback function for each completed unexpected message */
+	    gen_mutex_lock(&bmi_mutex);
 	    for(i=0; i<outcount; i++)
 	    {
 		bmi_unexp_fn(&stat_bmi_unexp_array[i]);
 		bmi_unexp_count--;
 	    }
+	    gen_mutex_unlock(&bmi_mutex);
 
 	    /* set a flag if we are getting as many incoming BMI unexpected
 	     * operations as we can handle to indicate that we should cycle
@@ -155,6 +152,10 @@ static void *bmi_thread_function(void *ptr)
 	     */
 	    if(outcount == THREAD_MGR_TEST_COUNT)
 		quick_flag = 1;
+	}
+	else
+	{
+	    gen_mutex_unlock(&bmi_mutex);
 	}
 
 	/* decide how long we are willing to wait on the main test call */
@@ -191,8 +192,6 @@ static void *bmi_thread_function(void *ptr)
 	    tmp_callback->fn(tmp_callback->data, stat_bmi_actual_size_array[i],
 		stat_bmi_error_code_array[i]);
 	}
-
-	gen_mutex_unlock(&bmi_mutex);
     }
 
     return (NULL);
