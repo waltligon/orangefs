@@ -98,6 +98,7 @@ typedef struct
 
 #ifdef USE_MMAP_RA_CACHE
     void *io_tmp_buf;
+    int readahead_posted;
 #endif
     PVFS_Request file_req;
     PVFS_Request mem_req;
@@ -887,11 +888,12 @@ static int service_statfs_request(vfs_request_t *vfs_request)
 #ifdef USE_MMAP_RA_CACHE
 static int post_io_readahead_request(vfs_request_t *vfs_request)
 {
-    int ret = -PVFS_EINVAL, val = 0;
-    void *buf = NULL;
+    int ret = -PVFS_EINVAL;
 
-    gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
-                 "post_io_readahead_request called\n");
+    gossip_debug(
+        GOSSIP_MMAP_RCACHE_DEBUG,
+        "post_io_readahead_request called (%lu bytes)\n",
+        (unsigned long)vfs_request->in_upcall.req.io.readahead_size);
 
     assert((vfs_request->in_upcall.req.io.buf_index > -1) &&
            (vfs_request->in_upcall.req.io.buf_index <
@@ -902,38 +904,6 @@ static int post_io_readahead_request(vfs_request_t *vfs_request)
     if (!vfs_request->io_tmp_buf)
     {
         return -PVFS_ENOMEM;
-    }
-
-    if ((vfs_request->in_upcall.req.io.io_type == PVFS_IO_READ) &&
-        vfs_request->in_upcall.req.io.readahead_size)
-    {
-        /* check readahead cache first */
-        val = pvfs2_mmap_ra_cache_get_block(
-            vfs_request->in_upcall.req.io.refn,
-            vfs_request->in_upcall.req.io.offset,
-            vfs_request->in_upcall.req.io.count,
-            vfs_request->io_tmp_buf);
-
-        if (val == 0)
-        {
-            goto mmap_ra_cache_hit;
-        }
-        else if (val == -2)
-        {
-            /* check if we should flush stale cache data */
-            pvfs2_mmap_ra_cache_flush(
-                vfs_request->in_upcall.req.io.refn);
-
-            free(vfs_request->io_tmp_buf);
-            vfs_request->io_tmp_buf = NULL;
-            return ret;
-        }
-    }
-    else
-    {
-        free(vfs_request->io_tmp_buf);
-        vfs_request->io_tmp_buf = NULL;
-        return ret;
     }
 
     /* make the full-blown readahead sized request */
@@ -957,57 +927,73 @@ static int post_io_readahead_request(vfs_request_t *vfs_request)
     {
         PVFS_perror_gossip("Posting file I/O failed", ret);
     }
-    return 0;
 
-    /* on cache hits, we return immediately with the cached data */
-  mmap_ra_cache_hit:
-
-    vfs_request->out_downcall.type = PVFS2_VFS_OP_FILE_IO;
-    vfs_request->out_downcall.status = 0;
-    vfs_request->out_downcall.resp.io.amt_complete =
-        vfs_request->in_upcall.req.io.count;
-
-    /* get a shared kernel/userspace buffer for the I/O transfer */
-    buf = PINT_dev_get_mapped_buffer(
-        &s_io_desc, vfs_request->in_upcall.req.io.buf_index);
-    assert(buf);
-
-    /* copy cached data into the shared user/kernel space */
-    memcpy(buf, vfs_request->io_tmp_buf,
-           vfs_request->in_upcall.req.io.count);
-    free(vfs_request->io_tmp_buf);
-    vfs_request->io_tmp_buf = NULL;
-
-    write_inlined_device_response(vfs_request);
+    vfs_request->readahead_posted = 1;
     return 0;
 }
 #endif /* USE_MMAP_RA_CACHE */
 
 static int post_io_request(vfs_request_t *vfs_request)
 {
-    int ret = -PVFS_EINVAL;
+    int ret = -PVFS_EINVAL, val = 0;
 
 #ifdef USE_MMAP_RA_CACHE
+    void *buf = NULL;
+
     if ((vfs_request->in_upcall.req.io.readahead_size ==
          PVFS2_MMAP_RACACHE_FLUSH))
     {
         pvfs2_mmap_ra_cache_flush(
             vfs_request->in_upcall.req.io.refn);
     }
-    else if ((vfs_request->in_upcall.req.io.offset == (loff_t)0) &&
-             (vfs_request->in_upcall.req.io.readahead_size > 0) &&
-             (vfs_request->in_upcall.req.io.readahead_size <
-              PVFS2_MMAP_RACACHE_MAX_SIZE))
+    else if (vfs_request->in_upcall.req.io.io_type == PVFS_IO_READ)
     {
-        ret = post_io_readahead_request(vfs_request);
-
-        /*
-          if the readahead request succeeds, return.  otherwise
-          fallback to normal posting/servicing
-        */
-        if (ret == 0)
+        /* check readahead cache for the read data being requested */
+        if (vfs_request->in_upcall.req.io.count > 0)
         {
-            return ret;
+            vfs_request->io_tmp_buf = (char *)malloc(
+                vfs_request->in_upcall.req.io.count);
+
+            if (vfs_request->io_tmp_buf)
+            {
+
+                gossip_debug(
+                    GOSSIP_MMAP_RCACHE_DEBUG,
+                    "checking for %d bytes at offset %lu in cache\n",
+                    vfs_request->in_upcall.req.io.count, (unsigned long)
+                    vfs_request->in_upcall.req.io.offset);
+
+                val = pvfs2_mmap_ra_cache_get_block(
+                    vfs_request->in_upcall.req.io.refn,
+                    vfs_request->in_upcall.req.io.offset,
+                    vfs_request->in_upcall.req.io.count,
+                    vfs_request->io_tmp_buf);
+
+                if (val == 0)
+                {
+                    gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
+                                 "mmapracache cache hit!\n");
+                    goto mmap_ra_cache_hit;
+                }
+                free(vfs_request->io_tmp_buf);
+                vfs_request->io_tmp_buf = NULL;
+            }
+        }
+
+        if (vfs_request->in_upcall.req.io.readahead_size > 0)
+        {
+            /* otherwise, check if we can post a readahead request here */
+            ret = post_io_readahead_request(vfs_request);
+            /*
+              if the readahead request succeeds, return.  otherwise
+              fallback to normal posting/servicing
+            */
+            if (ret == 0)
+            {
+                gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
+                             "readahead io posting succeeded!\n");
+                return ret;
+            }
         }
     }
 #endif /* USE_MMAP_RA_CACHE */
@@ -1042,6 +1028,31 @@ static int post_io_request(vfs_request_t *vfs_request)
         PVFS_perror_gossip("Posting file I/O failed", ret);
     }
     return ret;
+
+#ifdef USE_MMAP_RA_CACHE
+    /* on cache hits, we return immediately with the cached data */
+  mmap_ra_cache_hit:
+
+    vfs_request->out_downcall.type = PVFS2_VFS_OP_FILE_IO;
+    vfs_request->out_downcall.status = 0;
+    vfs_request->out_downcall.resp.io.amt_complete =
+        vfs_request->in_upcall.req.io.count;
+
+    /* get a shared kernel/userspace buffer for the I/O transfer */
+    buf = PINT_dev_get_mapped_buffer(
+        &s_io_desc, vfs_request->in_upcall.req.io.buf_index);
+    assert(buf);
+
+    /* copy cached data into the shared user/kernel space */
+    memcpy(buf, vfs_request->io_tmp_buf,
+           vfs_request->in_upcall.req.io.count);
+
+    free(vfs_request->io_tmp_buf);
+    vfs_request->io_tmp_buf = NULL;
+
+    write_inlined_device_response(vfs_request);
+    return 0;
+#endif /* USE_MMAP_RA_CACHE */
 }
 
 #ifdef USE_MMAP_RA_CACHE
@@ -1397,10 +1408,12 @@ static inline void package_downcall_members(
             if (*error_code == 0)
             {
 #ifdef USE_MMAP_RA_CACHE
-                if ((vfs_request->in_upcall.req.io.io_type ==
-                     PVFS_IO_READ) && vfs_request->io_tmp_buf)
+                if (vfs_request->readahead_posted)
                 {
                     void *buf = NULL;
+
+                    assert(vfs_request->io_tmp_buf);
+                    assert(vfs_request->in_upcall.req.io.readahead_size > 0);
                     /*
                       now that we've read the data, insert it into the
                       mmap_ra_cache here
@@ -1419,8 +1432,10 @@ static inline void package_downcall_members(
                     assert(buf);
 
                     /* copy cached data into the shared user/kernel space */
-                    memcpy(buf, vfs_request->io_tmp_buf,
+                    memcpy(buf, (vfs_request->io_tmp_buf +
+                                 vfs_request->in_upcall.req.io.offset),
                            vfs_request->in_upcall.req.io.count);
+
                     free(vfs_request->io_tmp_buf);
                     vfs_request->io_tmp_buf = NULL;
 
@@ -1448,6 +1463,17 @@ static inline void package_downcall_members(
                     (size_t)vfs_request->response.io.total_completed;
 #endif
             }
+#ifdef USE_MMAP_RA_CACHE
+            /* free resources if allocated, even on failed reads */
+            if (vfs_request->readahead_posted && vfs_request->io_tmp_buf)
+            {
+                free(vfs_request->io_tmp_buf);
+                vfs_request->io_tmp_buf = NULL;
+
+                PVFS_Request_free(&vfs_request->mem_req);
+                PVFS_Request_free(&vfs_request->file_req);
+            }
+#endif
             break;
         default:
             gossip_err("Completed upcall of unknown type %x!\n",

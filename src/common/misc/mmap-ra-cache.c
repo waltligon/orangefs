@@ -90,7 +90,6 @@ int pvfs2_mmap_ra_cache_register(PVFS_object_ref refn,
         }
         memcpy(cache_elem->data, data, data_len);
         cache_elem->data_sz = data_len;
-        cache_elem->data_invalid = 0;
 
         gen_mutex_lock(s_mmap_ra_cache_mutex);
         qhash_add(s_key_to_data_table,
@@ -129,8 +128,7 @@ int pvfs2_mmap_ra_cache_get_block(
                 hash_link, mmap_ra_cache_elem_t, hash_link);
             assert(cache_elem);
 
-            if ((cache_elem->data_sz > (offset + len)) &&
-                !cache_elem->data_invalid)
+            if (cache_elem->data_sz > (offset + len))
             {
                 gossip_debug(
                     GOSSIP_MMAP_RCACHE_DEBUG, "mmap_ra_cache_get_block "
@@ -140,16 +138,7 @@ int pvfs2_mmap_ra_cache_get_block(
                 ptr = (void *)((char *)(cache_elem->data + offset));
                 memcpy(dest, ptr, len);
 
-                cache_elem->data_invalid = 1;
                 ret = 0;
-            }
-            else if (cache_elem->data_invalid == 1)
-            {
-                gossip_debug(
-                    GOSSIP_MMAP_RCACHE_DEBUG, "mmap_ra_cache_get_block "
-                    "found block but data is invalid "
-                    "(already read once)\n");
-                ret = -2;
             }
             else
             {
@@ -157,8 +146,8 @@ int pvfs2_mmap_ra_cache_get_block(
                     GOSSIP_MMAP_RCACHE_DEBUG, "mmap_ra_cache_get_block "
                     "found block but offset/len are invalid\n");
                 gossip_debug(
-                    GOSSIP_MMAP_RCACHE_DEBUG, " data_sz is %Lu, offset is %Lu "
-                    "len is %Lu\n", Lu(cache_elem->data_sz),
+                    GOSSIP_MMAP_RCACHE_DEBUG, " data_sz is %Lu, "
+                    "offset is %Lu len is %Lu\n", Lu(cache_elem->data_sz),
                     Lu(offset), Lu(len));
             }
         }

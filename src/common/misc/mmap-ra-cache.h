@@ -16,7 +16,7 @@ typedef struct
     PVFS_object_ref refn;
     void *data;
     PVFS_size data_sz;
-    int data_invalid;
+
 } mmap_ra_cache_elem_t;
 
 
