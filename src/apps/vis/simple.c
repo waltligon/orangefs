@@ -61,7 +61,7 @@ int main(int argc, char **argv)
 	pthread_mutex_unlock(&pint_vis_mutex);
     }
 
-    pvfs_vis_stop();
+    pvfs2_vis_stop();
 
     return(0);
 }

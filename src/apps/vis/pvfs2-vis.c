@@ -44,7 +44,7 @@ static pthread_t poll_thread_id = -1;
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int pvfs_vis_stop(void)
+int pvfs2_vis_stop(void)
 {
     if(poll_thread_id > 0)
     {
