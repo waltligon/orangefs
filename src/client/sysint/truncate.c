@@ -60,8 +60,8 @@ int PVFS_sys_truncate(PVFS_pinode_reference pinode_refn, PVFS_size size,
 
     /* make sure we're allowed to remove that request */
 
-    ret = check_perms(pinode_ptr->attr, credentials.perms,
-                                credentials.uid, credentials.gid);
+    ret = check_perms(pinode_ptr->attr, pinode_ptr->attr.perms,
+                      credentials.uid, credentials.gid);
     if (ret < 0)
     {
 	ret = (-EPERM);

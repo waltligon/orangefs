@@ -60,7 +60,6 @@ int main(int argc,char **argv)
 	/* lookup the directory handle */
 	credentials.uid = 100;
 	credentials.gid = 100;
-	credentials.perms = 511;
 	name = starting_point;
 	fs_id = resp_init.fsid_list[0];
 	ret = PVFS_sys_lookup(fs_id, name, credentials, &resp_look);
@@ -78,7 +77,6 @@ int main(int argc,char **argv)
 
 	credentials.uid = 100;
 	credentials.gid = 100;
-	credentials.perms = 511;
 
 	token = 0;
         do

@@ -85,7 +85,6 @@ int main(int argc,char **argv)
     new_parent_refn.fs_id = cur_fs;
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = 1877;
 
     ret = PVFS_sys_rename(old_entry, old_parent_refn, new_entry, 
 			new_parent_refn, credentials);

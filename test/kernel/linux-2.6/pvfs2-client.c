@@ -51,7 +51,6 @@ static int service_lookup_request(
 
         credentials.uid = 100;
         credentials.gid = 100;
-        credentials.perms = 511;
 
         printf("Got a lookup request for %s (fsid %d | parent %Ld)\n",
                in_upcall->req.lookup.d_name,
@@ -110,7 +109,6 @@ static int service_create_request(
 
         credentials.uid = attrs->owner;
         credentials.gid = attrs->group;
-        credentials.perms = attrs->perms;
 
         parent_refn = in_upcall->req.create.parent_refn;
 
@@ -151,7 +149,6 @@ static int service_io_request(
 {
     int ret = 1;
     PVFS_sysresp_io response;
-    PVFS_credentials credentials;
     PVFS_Request io_req;
     PVFS_size displacement = 0;
     int32_t blocklength = 0;
@@ -161,10 +158,6 @@ static int service_io_request(
         memset(&response,0,sizeof(PVFS_sysresp_io));
         memset(out_downcall,0,sizeof(pvfs2_downcall_t));
 
-	credentials.uid = 100;
-	credentials.gid = 100;
-	credentials.perms = 511;
-
 	displacement = in_upcall->req.io.offset;
 	blocklength = in_upcall->req.io.count;
 
@@ -172,9 +165,10 @@ static int service_io_request(
 	    PVFS_BYTE, &io_req);
 	assert(ret == 0);
 
-	ret = PVFS_sys_io(in_upcall->req.io.refn, io_req, 0, 
-	    in_upcall->req.io.buf, in_upcall->req.io.count, credentials, 
-	    &response, in_upcall->req.io.io_type);
+	ret = PVFS_sys_io(
+            in_upcall->req.io.refn, io_req, 0, 
+	    in_upcall->req.io.buf, in_upcall->req.io.count,
+            in_upcall->credentials, &response, in_upcall->req.io.io_type);
 	if(ret < 0)
 	{
 	    /* report an error */
@@ -199,7 +193,6 @@ static int service_getattr_request(
 {
     int ret = 1;
     uint32_t attrmask = PVFS_ATTR_SYS_ALL_NOSIZE;
-    PVFS_credentials credentials;
     PVFS_sysresp_getattr response;
 
     if (init_response && in_upcall && out_downcall)
@@ -207,16 +200,12 @@ static int service_getattr_request(
         memset(&response,0,sizeof(PVFS_sysresp_getattr));
         memset(out_downcall,0,sizeof(pvfs2_downcall_t));
 
-        credentials.uid = 100;
-        credentials.gid = 100;
-        credentials.perms = 511;
-
         printf("got a getattr request for fsid %d | handle %Ld\n",
                in_upcall->req.getattr.refn.fs_id,
                in_upcall->req.getattr.refn.handle);
 
         ret = PVFS_sys_getattr(in_upcall->req.getattr.refn, attrmask,
-                               credentials, &response);
+                               in_upcall->credentials, &response);
         if (ret < 0)
         {
             fprintf(stderr,"failed to getattr handle %Ld on fsid %d!\n",
@@ -245,15 +234,10 @@ static int service_setattr_request(
     pvfs2_downcall_t *out_downcall)
 {
     int ret = 1;
-    PVFS_credentials credentials;
 
     if (init_response && in_upcall && out_downcall)
     {
         memset(out_downcall,0,sizeof(pvfs2_downcall_t));
-
-        credentials.uid = in_upcall->req.setattr.attributes.owner;
-        credentials.gid = in_upcall->req.setattr.attributes.group;
-        credentials.perms = in_upcall->req.setattr.attributes.perms;
 
         printf("got a setattr request for fsid %d | handle %Ld\n",
                in_upcall->req.setattr.refn.fs_id,
@@ -261,7 +245,7 @@ static int service_setattr_request(
 
         ret = PVFS_sys_setattr(in_upcall->req.setattr.refn,
                                in_upcall->req.setattr.attributes,
-                               credentials);
+                               in_upcall->credentials);
         if (ret < 0)
         {
             fprintf(stderr,"failed to setattr handle %Ld on fsid %d!\n",
@@ -289,16 +273,11 @@ static int service_remove_request(
     pvfs2_downcall_t *out_downcall)
 {
     int ret = 1;
-    PVFS_credentials credentials;
     PVFS_pinode_reference parent_refn;
 
     if (init_response && in_upcall && out_downcall)
     {
         memset(out_downcall,0,sizeof(pvfs2_downcall_t));
-
-        credentials.uid = 100;
-        credentials.gid = 100;
-        credentials.perms = 511;
 
         parent_refn = in_upcall->req.remove.parent_refn;
 
@@ -307,7 +286,7 @@ static int service_remove_request(
                parent_refn.fs_id, parent_refn.handle);
 
         ret = PVFS_sys_remove(in_upcall->req.remove.d_name,
-                              parent_refn, credentials);
+                              parent_refn, in_upcall->credentials);
         if (ret < 0)
         {
             fprintf(stderr,"Failed to remove %s under handle %Ld "
@@ -336,7 +315,6 @@ static int service_mkdir_request(
     pvfs2_downcall_t *out_downcall)
 {
     int ret = 1;
-    PVFS_credentials credentials;
     PVFS_sysresp_mkdir response;
     PVFS_pinode_reference parent_refn;
     PVFS_sys_attr *attrs = NULL;
@@ -350,10 +328,6 @@ static int service_mkdir_request(
 	attrs->atime = attrs->mtime = attrs->ctime = 
 	    time(NULL);
 
-        credentials.uid = attrs->owner;
-        credentials.gid = attrs->group;
-        credentials.perms = attrs->perms;
-
         parent_refn = in_upcall->req.mkdir.parent_refn;
 
         printf("Got a mkdir request for %s (fsid %d | parent %Ld)\n",
@@ -361,7 +335,7 @@ static int service_mkdir_request(
                parent_refn.handle);
 
         ret = PVFS_sys_mkdir(in_upcall->req.mkdir.d_name, parent_refn,
-                             *attrs, credentials, &response);
+                             *attrs, in_upcall->credentials, &response);
         if (ret < 0)
         {
             fprintf(stderr,"Failed to mkdir %s under %Ld on fsid %d!\n",

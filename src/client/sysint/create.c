@@ -94,8 +94,8 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 	}
 
 	/* check permissions in parent directory */
-	ret = check_perms(parent_ptr->attr,credentials.perms,
-			    credentials.uid, credentials.gid);
+	ret = check_perms(parent_ptr->attr, parent_ptr->attr.perms,
+                          credentials.uid, credentials.gid);
 	if (ret < 0)
 	{
 	    phelper_release_pinode(parent_ptr);

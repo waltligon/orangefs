@@ -113,8 +113,8 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_refn, PVFS_Request io_req,
     }
 
     /* check permissions */
-    ret = check_perms(pinode_ptr->attr, credentials.perms,
-	credentials.uid, credentials.gid);
+    ret = check_perms(pinode_ptr->attr, pinode_ptr->attr.perms,
+                      credentials.uid, credentials.gid);
     if(ret < 0)
     {
 	return(-EACCES);

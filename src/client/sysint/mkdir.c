@@ -78,7 +78,7 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
     }
 
     /* check permissions in parent directory */
-    ret = check_perms(parent_ptr->attr,credentials.perms,
+    ret = check_perms(parent_ptr->attr,parent_ptr->attr.perms,
                       credentials.uid, credentials.gid);
     if (ret < 0)
     {

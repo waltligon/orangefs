@@ -88,8 +88,8 @@ int PVFS_sys_remove(char* entry_name, PVFS_pinode_reference parent_refn,
 	}
 
 	/* are we allowed to delete this file? */
-	ret = check_perms(pinode_ptr->attr, credentials.perms,
-				credentials.uid, credentials.gid);
+	ret = check_perms(pinode_ptr->attr, pinode_ptr->attr.perms,
+                          credentials.uid, credentials.gid);
 	if (ret < 0)
 	{ 
 	    phelper_release_pinode(pinode_ptr);

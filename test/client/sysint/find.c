@@ -83,7 +83,6 @@ int directory_walk(PVFS_sysresp_init *init_response,
     fs_id = init_response->fsid_list[0];
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = 1877;
 
     if (PVFS_sys_lookup(fs_id, name, credentials, &lk_response))
     {
@@ -102,7 +101,6 @@ int directory_walk(PVFS_sysresp_init *init_response,
     pvfs_dirent_incount = MAX_NUM_DIRENTS;
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = 1877;
 
     if (PVFS_sys_readdir(pinode_refn, token, pvfs_dirent_incount, credentials,
 			 &rd_response))

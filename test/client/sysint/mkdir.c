@@ -72,7 +72,6 @@ int main(int argc,char **argv)
     attr.perms = 1877;
     attr.atime = attr.ctime = attr.mtime =
 	time(NULL);
-    credentials.perms = 1877;
     credentials.uid = 100;
     credentials.gid = 100;
 

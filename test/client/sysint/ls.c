@@ -58,7 +58,6 @@ void print_entry(
 
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = 511;
     
     pinode_refn.handle = handle;
     pinode_refn.fs_id = fs_id;
@@ -96,7 +95,6 @@ int do_list(
     fs_id = init_response->fsid_list[0];
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = 511;
 
     if (PVFS_sys_lookup(fs_id, name, credentials, &lk_response))
     {
@@ -110,7 +108,6 @@ int do_list(
     pvfs_dirent_incount = MAX_NUM_DIRENTS;
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = 511;
 
     if (PVFS_sys_getattr(pinode_refn, PVFS_ATTR_SYS_ALL_NOSIZE,
                          credentials, &getattr_response) == 0)

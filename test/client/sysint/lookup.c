@@ -64,7 +64,6 @@ int main(int argc,char **argv)
 	printf("SYSTEM INTERFACE INITIALIZED\n");
 
 	/* lookup the root handle */
-	credentials.perms = 1877;
 	name = malloc(2);/*null terminator included*/
 	name[0] = '/';
 	name[1] = '\0';
@@ -85,7 +84,6 @@ int main(int argc,char **argv)
 
 	credentials.uid = 100;
 	credentials.gid = 100;
-	credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
 
 	ret = PVFS_sys_lookup(fs_id, filename, credentials, &resp_lk);
 	if (ret < 0)

@@ -62,7 +62,6 @@ int main(int argc,char **argv)
     parent_refn.fs_id = cur_fs;
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = 1877;
 
     ret = PVFS_sys_remove(entry_name, parent_refn, credentials);
     if (ret < 0)

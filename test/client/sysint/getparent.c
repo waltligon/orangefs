@@ -50,10 +50,8 @@ int main(int argc,char **argv)
 	}
 	printf("SYSTEM INTERFACE INITIALIZED\n");
 
-	credentials.perms = 1877;
 	credentials.uid = 100;
 	credentials.gid = 100;
-	credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
 
 	fs_id = resp_init.fsid_list[0];
 

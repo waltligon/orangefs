@@ -48,7 +48,6 @@ int main(int argc,char **argv)
     }
 
     /* lookup the root handle */
-    credentials.perms = 1877;
     name = malloc(2);/*null terminator included*/
     name[0] = '/';
     name[1] = '\0';
@@ -69,7 +68,6 @@ int main(int argc,char **argv)
     name = filename;
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
 
     ret = PVFS_sys_lookup(fs_id, name, credentials, &resp_lk);
     if (ret < 0)
@@ -84,7 +82,6 @@ int main(int argc,char **argv)
     pinode_refn.fs_id = resp_lk.pinode_refn.fs_id;
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = 1877;
 
     ret = PVFS_sys_truncate(pinode_refn, size, credentials);
     if (ret < 0)

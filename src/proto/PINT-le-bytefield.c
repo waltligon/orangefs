@@ -70,8 +70,7 @@ do{								    \
 do{							    \
     PINT_XENC_UINT32(msg_p,&((req)->op));		    \
     PINT_XENC_UINT32(msg_p,&((req)->credentials.uid));	    \
-    PINT_XENC_UINT32(msg_p,&((req)->credentials.gid));	    \
-    PINT_XENC_UINT32(msg_p,&((req)->credentials.perms));    \
+    PINT_XENC_UINT32(msg_p,&((req)->credentials.gid));      \
 }while(0)
 
 /* operates on the generic part of a response structure */

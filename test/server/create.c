@@ -100,8 +100,6 @@ int main(int argc, char **argv)	{
 	my_req->op = PVFS_SERV_CREATE;
 	my_req->credentials.uid = 0;
 	my_req->credentials.gid = 0;
-	/* TODO: fill below fields in with the correct values */
-	my_req->credentials.perms = PVFS_U_WRITE | PVFS_U_READ;  
         cur_extent.first = cur_extent.last = user_opts->handle;
         my_req->u.create.handle_extent_array.extent_count = 1;
         my_req->u.create.handle_extent_array.extent_array = &cur_extent;

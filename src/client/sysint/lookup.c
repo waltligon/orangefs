@@ -114,7 +114,7 @@ int PVFS_sys_ref_lookup(
     }
 
     /*print args to make sure we're sane*/
-    gossip_ldebug(CLIENT_DEBUG,"req->\n\tname: %s\n\tfs_id: %d\n\tcredentials:\n\t\tuid: %d\n\t\tgid: %d\n\t\tperms: %d\n",relative_pathname,fs_id, credentials.uid, credentials.gid, credentials.perms);
+    gossip_ldebug(CLIENT_DEBUG,"req->\n\tname: %s\n\tfs_id: %d\n\tcredentials:\n\t\tuid: %d\n\t\tgid: %d\n",relative_pathname,fs_id, credentials.uid, credentials.gid);
 
     /* Get  the total number of segments */
     total_segments = num_segments_remaining =
@@ -254,8 +254,8 @@ int PVFS_sys_ref_lookup(
 	    }
 
 	    /* Check permissions for path */
-	    ret = check_perms(pinode_ptr->attr,credentials.perms,
-				  credentials.uid, credentials.gid);
+	    ret = check_perms(pinode_ptr->attr, pinode_ptr->attr.perms,
+                              credentials.uid, credentials.gid);
 	    if (ret < 0)
 	    {
 		failure = CHECK_PERMS_FAILURE;

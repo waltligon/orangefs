@@ -64,7 +64,6 @@ int main(int argc,char **argv)
 	/* lookup the file we're getattr'ing */
 	credentials.uid = 100;
 	credentials.gid = 100;
-	credentials.perms = 1877;
 	name = filename;
 	fs_id = resp_init.fsid_list[0];
 	ret = PVFS_sys_lookup(fs_id, name, credentials, &resp_look);

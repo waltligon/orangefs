@@ -8,7 +8,7 @@
 #include <sys/time.h>
 #include "helper.h"
 
-/* make uid, gid and perms passed in later */
+/* make uid, gid passed in later */
 PVFS_handle lookup_parent_handle(char *filename, PVFS_fs_id fs_id)
 {
     char buf[PVFS_SEGMENT_MAX] = {0};
@@ -30,7 +30,6 @@ PVFS_handle lookup_parent_handle(char *filename, PVFS_fs_id fs_id)
     /* retrieve the parent handle */
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = 1877;
 
     gossip_debug(CLIENT_DEBUG, "looking up the parent handle of %s for fsid = %d\n",
            buf,fs_id);

@@ -82,7 +82,6 @@ int main(int argc,char **argv)
 	printf("SYSTEM INTERFACE INITIALIZED\n");
 
 	/* lookup the root handle */
-	credentials.perms = 1877;
 	name = malloc(2);/*null terminator included*/
 	name[0] = '/';
 	name[1] = '\0';
@@ -125,7 +124,6 @@ int main(int argc,char **argv)
 
 	credentials.uid = 100;
 	credentials.gid = 100;
-	credentials.perms = 1877;
 
 	parent_refn.handle = resp_look.pinode_refn.handle;
 	parent_refn.fs_id = fs_id;
@@ -467,7 +465,6 @@ int main(int argc,char **argv)
 	req_mkdir->attr.group = 56789;
 	req_mkdir->attr.perms = 63;
 	req_mkdir->attr.objtype = PVFS_TYPE_DIRECTORY;
-	req_mkdir->credentials.perms = 7;
 
 	// call mkdir 
 	ret = PVFS_sys_mkdir(req_mkdir,resp_mkdir);
@@ -497,7 +494,6 @@ int main(int argc,char **argv)
 	pvfs_dirent_incount = 6;
 	credentials.uid = 100;
 	credentials.gid = 100;
-	credentials.perms = 1877;
 
 
 	// call readdir 

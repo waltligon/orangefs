@@ -102,12 +102,11 @@ struct PVFS_pinode_reference_s
 };
 typedef struct PVFS_pinode_reference_s PVFS_pinode_reference;
 
-/* credentials (used for permission checking of operations) */
+/* credentials (stubbed for future authentication methods) */
 struct PVFS_credentials_s
 {
     PVFS_uid uid;
     PVFS_gid gid;
-    PVFS_permissions perms;
 };
 typedef struct PVFS_credentials_s PVFS_credentials;
 

@@ -171,7 +171,6 @@ int main(int argc, char **argv)	{
 	my_req.op = PVFS_SERV_CREATE;
 	my_req.credentials.uid = 0;
 	my_req.credentials.gid = 0;
-	my_req.credentials.perms = PVFS_U_WRITE | PVFS_U_READ;  
 
 	/* create specific fields */
         cur_extent.first = cur_extent.last = 4095;
@@ -303,7 +302,6 @@ int main(int argc, char **argv)	{
 	my_req.op = PVFS_SERV_IO;
 	my_req.credentials.uid = 0;
 	my_req.credentials.gid = 0;
-	my_req.credentials.perms = PVFS_U_WRITE | PVFS_U_READ;  
 
 	/* io specific fields */
 	my_req.u.io.fs_id = 9;
@@ -495,7 +493,6 @@ int main(int argc, char **argv)	{
 	my_req.op = PVFS_SERV_REMOVE;
 	my_req.credentials.uid = 0;
 	my_req.credentials.gid = 0;
-	my_req.credentials.perms = PVFS_U_WRITE | PVFS_U_READ;  
 
 	/* remove specific fields */
 	my_req.u.remove.fs_id = 9;

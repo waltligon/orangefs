@@ -101,7 +101,6 @@ int main(int argc,char **argv)
 	fs_id = resp_init.fsid_list[0];
 	credentials.uid = 100;
 	credentials.gid = 100;
-	credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
 
 	ret = PVFS_sys_lookup(fs_id, name, credentials, &resp_lk);
 	/* TODO: really we probably want to look for a specific error code,
@@ -116,7 +115,6 @@ int main(int argc,char **argv)
 		fs_id = resp_init.fsid_list[0];
 		credentials.uid = 100;
 		credentials.gid = 100;
-		credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
 
 		ret = PVFS_sys_lookup(fs_id, name, credentials, &resp_lk);
 		if(ret < 0)
@@ -138,7 +136,6 @@ int main(int argc,char **argv)
 		entry_name = &(filename[1]); /* leave off slash */
 		credentials.uid = 100;
 		credentials.gid = 100;
-		credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
 
 		ret = PVFS_sys_create(entry_name, parent_refn, attr, 
 					credentials, &resp_cr);
@@ -168,7 +165,6 @@ int main(int argc,char **argv)
 
 	credentials.uid = 100;
 	credentials.gid = 100;
-	credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
 	buffer = io_buffer;
 	buffer_size = io_size*sizeof(int);
 

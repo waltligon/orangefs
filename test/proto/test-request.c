@@ -59,8 +59,6 @@ void print_request(struct PVFS_server_req *my_req, int direction)
 			arrow(direction);
                         printf("credentials.gid = %d\n",(int) my_req->credentials.gid);
 			arrow(direction);
-                        printf("credentials.perms = %d\n",(int) my_req->credentials.perms);
-			arrow(direction);
                         printf("PVFS_servreq_readdir->handle = %d\n",(int) my_req->u.readdir.handle );
 			arrow(direction);
                         printf("PVFS_servreq_readdir->fs_id = %d\n",(int) my_req->u.readdir.fs_id );
@@ -82,8 +80,6 @@ void print_request(struct PVFS_server_req *my_req, int direction)
 			arrow(direction);
                         printf("credentials.gid = %d\n",(int) my_req->credentials.gid);
 			arrow(direction);
-                        printf("credentials.perms = %d\n",(int) my_req->credentials.perms);
-			arrow(direction);
                         printf("PVFS_servreq_getattr->handle = %d\n", (int)my_req->u.getattr.handle );
 			arrow(direction);
                         printf("PVFS_servreq_getattr->fs_id = %d\n",(int) my_req->u.getattr.fs_id );
@@ -102,8 +98,6 @@ void print_request(struct PVFS_server_req *my_req, int direction)
 			arrow(direction);
                         printf("credentials.gid = %d\n", (int)my_req->credentials.gid);
 			arrow(direction);
-                        printf("credentials.perms = %d\n", (int)my_req->credentials.perms);
-			arrow(direction);
                         printf("PVFS_servreq_remove->handle = %d\n", (int)my_req->u.remove.handle );
 			arrow(direction);
                         printf("PVFS_servreq_remove->fs_id  = %d\n", (int)my_req->u.remove.fs_id );
@@ -120,8 +114,6 @@ void print_request(struct PVFS_server_req *my_req, int direction)
                         printf("credentials.uid = %d\n",(int) my_req->credentials.uid);
 			arrow(direction);
                         printf("credentials.gid = %d\n", (int)my_req->credentials.gid);
-			arrow(direction);
-                        printf("credentials.perms = %d\n", (int)my_req->credentials.perms);
 			arrow(direction);
                         printf("PVFS_servreq_truncate->handle = %d\n", (int)my_req->u.truncate.handle );
 			arrow(direction);
@@ -142,8 +134,6 @@ void print_request(struct PVFS_server_req *my_req, int direction)
 			arrow(direction);
                         printf("credentials.gid = %d\n",(int) my_req->credentials.gid);
 			arrow(direction);
-                        printf("credentials.perms = %d\n", (int)my_req->credentials.perms);
-			arrow(direction);
                         printf("PVFS_servreq_create->handle_extent_array.extent_count = %d\n", (int)my_req->u.create.handle_extent_array.extent_count );
 			arrow(direction);
                         printf("PVFS_servreq_create->fs_id = %d\n",(int) my_req->u.create.fs_id );
@@ -163,8 +153,6 @@ void print_request(struct PVFS_server_req *my_req, int direction)
 			arrow(direction);
                         printf("credentials.gid = %d\n", (int)my_req->credentials.gid);
 			arrow(direction);
-                        printf("credentials.perms = %d\n", (int)my_req->credentials.perms);
-			arrow(direction);
 			arrow(direction);
                         printf("======================================\n");
                         break;
@@ -178,8 +166,6 @@ void print_request(struct PVFS_server_req *my_req, int direction)
                         printf("credentials.uid = %d\n", (int)my_req->credentials.uid);
 			arrow(direction);
                         printf("credentials.gid = %d\n", (int)my_req->credentials.gid);
-			arrow(direction);
-                        printf("credentials.perms = %d\n", (int)my_req->credentials.perms);
 			arrow(direction);
                         printf("PVFS_servreq_lookup_path.path = %s\n", my_req->u.lookup_path.path );
 			arrow(direction);
@@ -202,8 +188,6 @@ void print_request(struct PVFS_server_req *my_req, int direction)
 			arrow(direction);
                         printf("credentials.gid = %d\n", (int)my_req->credentials.gid);
 			arrow(direction);
-                        printf("credentials.perms = %d\n",(int) my_req->credentials.perms);
-			arrow(direction);
                         printf("PVFS_servreq_crdirent.name = %s\n", my_req->u.crdirent.name );
 			arrow(direction);
                         printf("PVFS_servreq_crdirent.new_handle = %d\n", (int)my_req->u.crdirent.new_handle );
@@ -225,8 +209,6 @@ void print_request(struct PVFS_server_req *my_req, int direction)
 			arrow(direction);
                         printf("credentials.gid = %d\n", (int)my_req->credentials.gid);
 			arrow(direction);
-                        printf("credentials.perms = %d\n", (int)my_req->credentials.perms);
-			arrow(direction);
                         printf("PVFS_servreq_rmdirent.entry = %s\n", my_req->u.rmdirent.entry );
 			arrow(direction);
                         printf("PVFS_servreq_rmdirent.parent_handle = %d\n", (int)my_req->u.rmdirent.parent_handle );
@@ -246,8 +228,6 @@ void print_request(struct PVFS_server_req *my_req, int direction)
 			arrow(direction);
                         printf("credentials.gid = %d\n", (int)my_req->credentials.gid);
 			arrow(direction);
-                        printf("credentials.perms = %d\n", (int)my_req->credentials.perms);
-			arrow(direction);
                         printf("PVFS_servreq_setattr.handle = %d\n", (int)my_req->u.setattr.handle );
 			arrow(direction);
                         printf("PVFS_servreq_setattr.fs_id = %d\n", (int)my_req->u.setattr.fs_id );
@@ -257,8 +237,6 @@ void print_request(struct PVFS_server_req *my_req, int direction)
                         printf("PVFS_servreq_setattr.attr.owner = %d\n", (int)my_req->u.setattr.attr.owner );
 			arrow(direction);
                         printf("PVFS_servreq_setattr.attr.group = %d\n", (int)my_req->u.setattr.attr.group );
-			arrow(direction);
-                        printf("PVFS_servreq_setattr.attr.perms = %d\n", (int)my_req->u.setattr.attr.perms );
 			arrow(direction);
                         printf("PVFS_servreq_setattr.attr.atime = %d\n", (int)my_req->u.setattr.attr.atime );
 			arrow(direction);
@@ -378,7 +356,6 @@ int main(int argc, char **argv)
 	request->op = PVFS_SERV_GETCONFIG;
 	request->credentials.uid = 420;
 	request->credentials.gid = 420;
-	request->credentials.perms = 420;
 	break;
 
 	// simple ops
@@ -387,7 +364,6 @@ int main(int argc, char **argv)
 	request->op = PVFS_SERV_CREATE;
 	request->credentials.uid = 420;
 	request->credentials.gid = 420;
-	request->credentials.perms = 420;
             {
                 TROVE_extent cur_extent;
 
@@ -403,7 +379,6 @@ int main(int argc, char **argv)
         request->op = PVFS_SERV_READDIR;
 	request->credentials.uid = 420;
 	request->credentials.gid = 420;
-	request->credentials.perms = 420;
         request->u.readdir.handle = 11111;
         request->u.readdir.fs_id = 22222;
         request->u.readdir.token = 33333;
@@ -414,7 +389,6 @@ int main(int argc, char **argv)
         request->op =  PVFS_SERV_GETATTR;
 	request->credentials.uid = 420;
 	request->credentials.gid = 420;
-	request->credentials.perms = 420;
         request->u.getattr.handle = 11111;
         request->u.getattr.fs_id  = 22222;
         request->u.getattr.attrmask  = 33333;
@@ -424,7 +398,6 @@ int main(int argc, char **argv)
         request->op = PVFS_SERV_REMOVE;
 	request->credentials.uid = 420;
 	request->credentials.gid = 420;
-	request->credentials.perms = 420;
         request->u.remove.handle = 11111;
         request->u.remove.fs_id  = 22222;
 	break;
@@ -433,7 +406,6 @@ int main(int argc, char **argv)
         request->op = PVFS_SERV_TRUNCATE;
 	request->credentials.uid = 420;
 	request->credentials.gid = 420;
-	request->credentials.perms = 420;
         request->u.truncate.handle = 11111;
         request->u.truncate.fs_id = 22222;
         request->u.truncate.size = 33333;
@@ -443,7 +415,6 @@ int main(int argc, char **argv)
 	request->op = PVFS_SERV_LOOKUP_PATH;
 	request->credentials.uid = 420;
 	request->credentials.gid = 420;
-	request->credentials.perms = 420;
         request->u.lookup_path.path = somechars;
         request->u.lookup_path.fs_id = 11111;
         request->u.lookup_path.starting_handle = 22222;
@@ -454,7 +425,6 @@ int main(int argc, char **argv)
         request->op = PVFS_SERV_CREATEDIRENT;
 	request->credentials.uid = 420;
 	request->credentials.gid = 420;
-	request->credentials.perms = 420;
         request->u.crdirent.name = somechars;
         request->u.crdirent.new_handle = 111111;
         request->u.crdirent.parent_handle = 222222;
@@ -465,7 +435,6 @@ int main(int argc, char **argv)
         request->op = PVFS_SERV_RMDIRENT;
 	request->credentials.uid = 420;
 	request->credentials.gid = 420;
-	request->credentials.perms = 420;
         request->u.rmdirent.entry = somechars;
         request->u.rmdirent.parent_handle = 111111;
         request->u.rmdirent.fs_id  = 2222222;
@@ -479,7 +448,6 @@ int main(int argc, char **argv)
         request->op = PVFS_SERV_SETATTR;
 	request->credentials.uid = 420;
 	request->credentials.gid = 420;
-	request->credentials.perms = 420;
         request->u.setattr.handle = 111111;
         request->u.setattr.fs_id  = 2222222;
         request->u.setattr.attrmask  = 333333;

@@ -79,8 +79,8 @@ int PVFS_sys_rename(char* old_entry, PVFS_pinode_reference old_parent_refn,
     }
 
     /* are we allowed to delete this file? */
-    ret = check_perms(old_entry_p->attr, credentials.perms,
-			    credentials.uid, credentials.gid);
+    ret = check_perms(old_entry_p->attr, old_entry_p->attr.perms,
+                      credentials.uid, credentials.gid);
     if (ret < 0)
     {
 	phelper_release_pinode(old_entry_p);
@@ -101,8 +101,8 @@ int PVFS_sys_rename(char* old_entry, PVFS_pinode_reference old_parent_refn,
     }
 
     /* check permissions in parent directory */
-    ret = check_perms(new_parent_p->attr, credentials.perms,
-				credentials.uid, credentials.gid);
+    ret = check_perms(new_parent_p->attr, new_parent_p->attr.perms,
+                      credentials.uid, credentials.gid);
     if (ret < 0)
     {
 	phelper_release_pinode(new_parent_p);

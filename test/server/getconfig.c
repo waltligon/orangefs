@@ -110,8 +110,6 @@ int main(int argc, char **argv)	{
 	server_req->op = PVFS_SERV_GETCONFIG;
 	server_req->credentials.uid = 0;
 	server_req->credentials.gid = 0;
-	/* TODO: fill below fields in with the correct values */
-	server_req->credentials.perms = PVFS_U_WRITE | PVFS_U_READ;
 
 	display_pvfs_structure(server_req,1);
 	ret = PINT_encode(server_req,PINT_ENCODE_REQ,&encoded_msg,server_addr,0);

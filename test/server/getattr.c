@@ -102,7 +102,6 @@ int main(int argc, char **argv)	{
 	my_req->op = PVFS_SERV_GETATTR;
 	my_req->credentials.uid = 0;
 	my_req->credentials.gid = 0;
-	my_req->credentials.perms = PVFS_U_WRITE | PVFS_U_READ;  
 	my_req->u.getattr.handle = user_opts->bucket;
 	my_req->u.getattr.fs_id = FS_COLL_ID;
 	my_req->u.getattr.attrmask = PVFS_ATTR_COMMON_ALL;

@@ -56,7 +56,6 @@ int main(int argc, char **argv)
     /* fake credentials here */
     credentials.uid = 100;
     credentials.gid = 100;
-    credentials.perms = (PVFS_U_READ | PVFS_U_WRITE);
 
     fs_id = resp_init.fsid_list[0];
 
@@ -100,7 +99,6 @@ int main(int argc, char **argv)
     /* use stored credentials here */
     credentials.uid = resp_getattr.attr.owner;
     credentials.gid = resp_getattr.attr.group;
-    credentials.perms = resp_getattr.attr.perms;
 
     gossip_ldebug(CLIENT_DEBUG,"about to setattr on %s\n", filename);
 
