@@ -85,6 +85,11 @@ static int pvfs2_get_blocks(
         pvfs2_print("pvfs2: skipping get_block on index %d due "
                     "to previous failure.\n", (int)lblock);
         pvfs2_inode->last_failed_block_index_read = lblock;
+        /*
+          NOTE: we don't need to worry about cleaning up the
+          mmap_ra_cache in userspace from here because on I/O
+          failure, the pvfs2-client-core will be restarted
+        */
         return -EIO;
     }
 

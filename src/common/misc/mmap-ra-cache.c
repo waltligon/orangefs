@@ -75,6 +75,8 @@ int pvfs2_mmap_ra_cache_register(PVFS_pinode_reference refn,
 
     if (MMAP_RA_CACHE_INITIALIZED())
     {
+        pvfs2_mmap_ra_cache_flush(refn);
+
         cache_elem = (mmap_ra_cache_elem_t *)
             malloc(sizeof(mmap_ra_cache_elem_t));
         if (!cache_elem)
