@@ -10,10 +10,10 @@
 
 #include <string.h>
 
-#include <bmi_types.h>
-#include <bmi_method_support.h>
+#include <bmi-types.h>
+#include <bmi-method-support.h>
 #include <id-generator.h>
-#include <reference_list.h>
+#include <reference-list.h>
 
 
 /*

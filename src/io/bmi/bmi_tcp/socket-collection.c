@@ -26,9 +26,9 @@
 #include <errno.h>
 
 #include <gossip.h>
-#include <socket_collection.h>
-#include <bmi_method_support.h>
-#include <bmi_tcp_addressing.h>
+#include <socket-collection.h>
+#include <bmi-method-support.h>
+#include <bmi-tcp-addressing.h>
 
 /* number of sockets to poll at a time */
 #define SC_POLL_SIZE 128 

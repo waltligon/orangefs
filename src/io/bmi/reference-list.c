@@ -16,7 +16,7 @@
 #include <errno.h>
 #include <string.h>
 
-#include <reference_list.h>
+#include <reference-list.h>
 #include <gossip.h>
 #include <id-generator.h>
 

@@ -12,7 +12,7 @@
 #define __BMI_METHOD_SUPPORT_H
 
 #include <quicklist.h>
-#include <bmi_types.h>
+#include <bmi-types.h>
 
 /********************************************************
  * method interfaces and data structures 

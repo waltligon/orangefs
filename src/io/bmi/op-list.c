@@ -20,8 +20,8 @@
 #include <stdlib.h>
 #include <errno.h>
 
-#include <bmi_method_support.h>
-#include <op_list.h>
+#include <bmi-method-support.h>
+#include <op-list.h>
 #include <gossip.h>
 
 

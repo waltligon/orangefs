@@ -11,11 +11,11 @@
 #include<unistd.h>
 #include<fcntl.h>
 
-#include<bmi_method_support.h>
-#include<bmi_method_callback.h>
-#include<bmi_tcp_addressing.h>
-#include<socket_collection.h>
-#include<op_list.h>
+#include<bmi-method-support.h>
+#include<bmi-method-callback.h>
+#include<bmi-tcp-addressing.h>
+#include<socket-collection.h>
+#include<op-list.h>
 #include<gossip.h>
 #include<sockio.h>
 #include<sys/poll.h>

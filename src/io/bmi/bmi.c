@@ -9,10 +9,10 @@
 #include <dlfcn.h>
 
 #include <bmi.h>
-#include <bmi_method_support.h>
+#include <bmi-method-support.h>
 #include <gossip.h>
-#include <reference_list.h>
-#include <op_list.h>
+#include <reference-list.h>
+#include <op-list.h>
 #include <gen-locks.h>
 
 static int active_method_count = 0;

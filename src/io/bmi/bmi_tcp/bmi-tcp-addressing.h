@@ -11,7 +11,7 @@
 #ifndef __BMI_TCP_ADDRESSING_H
 #define __BMI_TCP_ADDRESSING_H
 
-#include <bmi_types.h>
+#include <bmi-types.h>
 
 /*****************************************************************
  * Information specific to tcp/ip

@@ -11,7 +11,7 @@
 #ifndef __BMI_H
 #define __BMI_H
 
-#include <bmi_types.h>
+#include <bmi-types.h>
 
 /* used to describe unexpected message arrivals */
 struct unexpected_info

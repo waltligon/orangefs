@@ -1,11 +1,11 @@
 DIR := src/io/bmi
 LIBSRC += \
 	$(DIR)/bmi.c \
-	$(DIR)/bmi_method_support.c \
-	$(DIR)/op_list.c \
-	$(DIR)/reference_list.c
+	$(DIR)/bmi-method-support.c \
+	$(DIR)/op-list.c \
+	$(DIR)/reference-list.c
 SERVERSRC += \
 	$(DIR)/bmi.c \
-	$(DIR)/bmi_method_support.c \
-	$(DIR)/op_list.c \
-	$(DIR)/reference_list.c
+	$(DIR)/bmi-method-support.c \
+	$(DIR)/op-list.c \
+	$(DIR)/reference-list.c

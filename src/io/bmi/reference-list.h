@@ -14,8 +14,8 @@
 #ifndef __REFERENCE_LIST_H
 #define __REFERENCE_LIST_H
 
-#include <bmi_types.h>
-#include <bmi_method_support.h>
+#include <bmi-types.h>
+#include <bmi-method-support.h>
 #include <llist.h>
 
 /**********************************************************************/

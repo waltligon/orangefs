@@ -18,8 +18,8 @@
 #ifndef __SOCKET_COLLECTION_H
 #define __SOCKET_COLLECTION_H
 
-#include <bmi_method_support.h>
-#include <bmi_tcp_addressing.h>
+#include <bmi-method-support.h>
+#include <bmi-tcp-addressing.h>
 #include <quicklist.h>
 
 typedef struct qlist_head* socket_collection_p;

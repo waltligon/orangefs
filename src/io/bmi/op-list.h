@@ -14,8 +14,8 @@
 #define __OP_LIST_H
 
 #include <quicklist.h>
-#include <bmi_types.h>
-#include <bmi_method_support.h>
+#include <bmi-types.h>
+#include <bmi-method-support.h>
 
 typedef struct qlist_head* op_list_p;
 

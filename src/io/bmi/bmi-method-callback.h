@@ -11,7 +11,7 @@
 #ifndef __BMI_METHOD_CALLBACK_H
 #define __BMI_METHOD_CALLBACK_H
 
-#include <bmi_method_support.h>
+#include <bmi-method-support.h>
 
 int bmi_method_addr_reg_callback(method_addr_p map);
 
