@@ -238,11 +238,11 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 		failure = PCACHE_INSERT_FAILURE;
 		goto return_error;
 	    }
-	    printf("GETATTR:  ADDING TO PCACHE\n");
+	    gossip_debug(CLIENT_DEBUG, "GETATTR:  ADDING TO PCACHE\n");
 	}
 	else
 	{
-	    printf("GETATTR:   NOT ADDING TO PCACHE\n");
+	    gossip_debug(CLIENT_DEBUG, "GETATTR:   NOT ADDING TO PCACHE\n");
 	}
 
 	/* Free memory allocated for name */
