@@ -573,7 +573,8 @@ static void bmi_recv_callback_fn(void *user_ptr,
     void* tmp_user_ptr;
 
     gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-	"flowproto-multiqueue bmi_recv_callback_fn.\n");
+	"flowproto-multiqueue bmi_recv_callback_fn, error code: %d.\n",
+	error_code);
 
     q_item->posted_id = 0;
 
@@ -739,7 +740,8 @@ static void trove_read_callback_fn(void *user_ptr,
     q_item = result_tmp->q_item;
 
     gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-	"flowproto-multiqueue trove_read_callback_fn.\n");
+	"flowproto-multiqueue trove_read_callback_fn, error_code: %d.\n",
+	error_code);
 
     result_tmp->posted_id = 0;
 
@@ -843,14 +845,15 @@ static int bmi_send_callback_fn(void *user_ptr,
     PVFS_size bytes_processed = 0;
     void* tmp_user_ptr = NULL;
 
+    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
+	"flowproto-multiqueue bmi_send_callback_fn, error_code: %d, "
+	"initial_call_flag: %d.\n", error_code, initial_call_flag);
+
     if(flow_data->parent->error_code != 0 && initial_call_flag)
     {
 	/* cleanup path already triggered, don't do anything more */
 	return(1);
     }
-
-    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-	"flowproto-multiqueue bmi_send_callback_fn.\n");
 
     q_item->posted_id = 0;
 
@@ -1026,7 +1029,8 @@ static void trove_write_callback_fn(void *user_ptr,
     PVFS_size bytes_processed = 0;
 
     gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-	"flowproto-multiqueue trove_write_callback_fn.\n");
+	"flowproto-multiqueue trove_write_callback_fn, error_code: %d.\n",
+	error_code);
 
     result_tmp->posted_id = 0;
 
@@ -1273,7 +1277,8 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
     enum bmi_buffer_type buffer_type = BMI_EXT_ALLOC;
 
     gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-	"flowproto-multiqueue mem_to_bmi_callback_fn.\n");
+	"flowproto-multiqueue mem_to_bmi_callback_fn, error_code: %d.\n",
+	error_code);
 
     q_item->posted_id = 0;
 
@@ -1440,7 +1445,8 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
     PVFS_size region_size;
 
     gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-	"flowproto-multiqueue bmi_to_mem_callback_fn.\n");
+	"flowproto-multiqueue bmi_to_mem_callback_fn, error_code: %d.\n",
+	error_code);
 
     q_item->posted_id = 0;
 
