@@ -208,7 +208,7 @@ int main(int argc,char **argv)
 	}
 	
 	name = (char *)malloc(strlen(filename) + 2);
-	if (name)
+	if (!name)
 	{
 		printf("Error in malloc\n");
 		return(-1);
