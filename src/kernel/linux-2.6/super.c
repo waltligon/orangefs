@@ -619,7 +619,7 @@ struct super_block* pvfs2_get_sb(
   error_exit:
     pvfs2_error("pvfs2_get_sb: mount request failed with %d\n", ret);
 
-    if (sb && !IS_ERR(sb))
+    if (sb)
     {
         if (sb->u.generic_sbp != NULL)
         {
@@ -628,9 +628,9 @@ struct super_block* pvfs2_get_sb(
     }
 
     translate_error_if_wait_failed(ret, 0, 0);
-    if (ret || IS_ERR(sb))
+    if (ret)
     {
-        sb = ERR_PTR(sb);
+        sb = NULL;
     }
 
     if (new_op)
