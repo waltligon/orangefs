@@ -407,6 +407,7 @@ static int server_shutdown(int level,
 			   int ret,
 			   int siglevel)
 {
+    int i;
     switch (level)
     {
     case UNEXPECTED_LOOP_END:
@@ -426,9 +427,30 @@ static int server_shutdown(int level,
     case SHUTDOWN_STORAGE_INTERFACE:
 	/* Turn off Storage IFace */
 	trove_finalize();
+	for(i=0;i<user_opts->number_filesystems;i++)
+	{
+	    free(user_opts->file_systems[i]);
+	    if (user_opts->file_systems[i]->file_system_name)
+		free(user_opts->file_systems[i]->file_system_name);
+	    if (user_opts->file_systems[i]->meta_server_list)
+		free(user_opts->file_systems[i]->meta_server_list);
+	    if (user_opts->file_systems[i]->io_server_list)
+		free(user_opts->file_systems[i]->io_server_list);
+	}
+	if(user_opts->host_id)
+	    free(user_opts->host_id);
+	if(user_opts->storage_path)
+	    free(user_opts->storage_path);
+	if(user_opts->default_meta_server_list)
+	    free(user_opts->default_meta_server_list);
+	if(user_opts->default_io_server_list)
+	    free(user_opts->default_io_server_list);
+	if(user_opts->file_system_names)
+	    free(user_opts->file_system_names);
+	free(user_opts);
     case SHUTDOWN_FLOW_INTERFACE:
 	/* Turn off Flows */
-	/* PINT_flow_finalize(); */
+	PINT_flow_finalize();
     case SHUTDOWN_BMI_INTERFACE:
 	/* Turn off BMI */
 	BMI_finalize();

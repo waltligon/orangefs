@@ -98,9 +98,9 @@ machine get_attr(init, cleanup, getobj_attrib, send_bmi, release)
 
 void getattr_init_state_machine(void)
 {
-	
-	getattr_req_s.state_machine = get_attr;
-	
+
+    getattr_req_s.state_machine = get_attr;
+
 }
 
 /*
@@ -121,21 +121,21 @@ void getattr_init_state_machine(void)
 static int getattr_init(state_action_struct *s_op, job_status_s *ret)
 {
 
-	int job_post_ret;
+    int job_post_ret;
 
-	s_op->key.buffer = Trove_Common_Keys[METADATA_KEY].key;
-	s_op->key.buffer_sz = Trove_Common_Keys[METADATA_KEY].size;
+    s_op->key.buffer = Trove_Common_Keys[METADATA_KEY].key;
+    s_op->key.buffer_sz = Trove_Common_Keys[METADATA_KEY].size;
 
-	s_op->val.buffer = malloc((s_op->val.buffer_sz = sizeof(PVFS_object_attr)));
-	s_op->resp->op = s_op->req->op;
+    s_op->val.buffer = malloc((s_op->val.buffer_sz = sizeof(PVFS_object_attr)));
+    s_op->resp->op = s_op->req->op;
 
-	job_post_ret = job_req_sched_post(s_op->req,
-												 s_op,
-												 ret,
-												 &(s_op->scheduled_id));
-	
-	return(job_post_ret);
-	
+    job_post_ret = job_req_sched_post(s_op->req,
+	    s_op,
+	    ret,
+	    &(s_op->scheduled_id));
+
+    return(job_post_ret);
+
 }
 
 
@@ -155,21 +155,21 @@ static int getattr_init(state_action_struct *s_op, job_status_s *ret)
 static int getattr_getobj_attribs(state_action_struct *s_op, job_status_s *ret)
 {
 
-	int job_post_ret=0;
-	job_id_t i;
-	PVFS_vtag_s bs;
+    int job_post_ret=0;
+    job_id_t i;
+    PVFS_vtag_s bs;
 
-	job_post_ret = job_trove_keyval_read(s_op->req->u.getattr.fs_id,
-													 s_op->req->u.getattr.handle,
-													 &(s_op->key),
-													 &(s_op->val),
-													 0,
-													 bs,
-													 s_op,
-													 ret,
-													 &i);
+    job_post_ret = job_trove_keyval_read(s_op->req->u.getattr.fs_id,
+	    s_op->req->u.getattr.handle,
+	    &(s_op->key),
+	    &(s_op->val),
+	    0,
+	    bs,
+	    s_op,
+	    ret,
+	    &i);
 
-	return(job_post_ret);
+    return(job_post_ret);
 
 }
 
@@ -187,53 +187,53 @@ static int getattr_getobj_attribs(state_action_struct *s_op, job_status_s *ret)
 
 static int getattr_send_bmi(state_action_struct *s_op, job_status_s *ret)
 {
-	
-	int job_post_ret=0;
-	job_id_t i;
 
-	/* This comes from the trove operation.  Note, this operation is still
-	 * valid even though the operation may have failed.
-	 */
-	memcpy(&(s_op->resp->u.getattr.attr),s_op->val.buffer,sizeof(PVFS_object_attr));
+    int job_post_ret=0;
+    job_id_t i;
 
-	/* Prepare the message */
-	
-	s_op->resp->status = ret->error_code;
-	s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
+    /* This comes from the trove operation.  Note, this operation is still
+     * valid even though the operation may have failed.
+     */
+    memcpy(&(s_op->resp->u.getattr.attr),s_op->val.buffer,sizeof(PVFS_object_attr));
 
-	if (s_op->val.buffer && ret->error_code == 0)
-	{
-		job_post_ret = PINT_encode(s_op->resp,
-											PINT_ENCODE_RESP,
-											&(s_op->encoded),
-											s_op->addr,
-											s_op->enc_type);
-	}
-	assert(job_post_ret == 0);
-	if(ret->error_code == 0)
-		assert(s_op->encoded.buffer_list[0] != NULL);
-	else
-	{
-		/* We have failed somewhere... However, we still need to send what we have */
-		/* Set it to a noop for an error so we don't encode all the stuff we don't need to */
-		s_op->resp->op = PVFS_SERV_NOOP;
-		PINT_encode(s_op->resp,PINT_ENCODE_RESP,&(s_op->encoded),s_op->addr,s_op->enc_type);
-		/* set it back */
-		((struct PVFS_server_req_s *)s_op->encoded.buffer_list[0])->op = s_op->req->op;
-	}
+    /* Prepare the message */
 
-	/* Post message */
-	job_post_ret = job_bmi_send(s_op->addr,
-										 s_op->encoded.buffer_list[0],
-										 s_op->encoded.total_size,
-										 s_op->tag,
-										 0,
-										 0,
-										 s_op,
-										 ret,
-										 &i);
+    s_op->resp->status = ret->error_code;
+    s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
 
-	return(job_post_ret);
+    if (s_op->val.buffer && ret->error_code == 0)
+    {
+	job_post_ret = PINT_encode(s_op->resp,
+		PINT_ENCODE_RESP,
+		&(s_op->encoded),
+		s_op->addr,
+		s_op->enc_type);
+    }
+    assert(job_post_ret == 0);
+    if(ret->error_code == 0)
+	assert(s_op->encoded.buffer_list[0] != NULL);
+    else
+    {
+	/* We have failed somewhere... However, we still need to send what we have */
+	/* Set it to a noop for an error so we don't encode all the stuff we don't need to */
+	s_op->resp->op = PVFS_SERV_NOOP;
+	PINT_encode(s_op->resp,PINT_ENCODE_RESP,&(s_op->encoded),s_op->addr,s_op->enc_type);
+	/* set it back */
+	((struct PVFS_server_req_s *)s_op->encoded.buffer_list[0])->op = s_op->req->op;
+    }
+
+    /* Post message */
+    job_post_ret = job_bmi_send(s_op->addr,
+	    s_op->encoded.buffer_list[0],
+	    s_op->encoded.total_size,
+	    s_op->tag,
+	    0,
+	    0,
+	    s_op,
+	    ret,
+	    &i);
+
+    return(job_post_ret);
 
 }
 
@@ -256,14 +256,14 @@ static int getattr_send_bmi(state_action_struct *s_op, job_status_s *ret)
 static int getattr_release_posted_job(state_action_struct *s_op, job_status_s *ret)
 {
 
-	int job_post_ret=0;
-	job_id_t i;
+    int job_post_ret=0;
+    job_id_t i;
 
-	job_post_ret = job_req_sched_release(s_op->scheduled_id,
-													  s_op,
-													  ret,
-													  &i);
-	return job_post_ret;
+    job_post_ret = job_req_sched_release(s_op->scheduled_id,
+	    s_op,
+	    ret,
+	    &i);
+    return job_post_ret;
 }
 
 
@@ -286,26 +286,36 @@ static int getattr_release_posted_job(state_action_struct *s_op, job_status_s *r
 
 static int getattr_cleanup(state_action_struct *s_op, job_status_s *ret)
 {
-	
-	if(s_op->resp)
-	{
-		free(s_op->resp);
-	}
 
-	if(s_op->req)
-	{
-		free(s_op->req);
-	}
+    if(s_op->resp)
+    {
+	free(s_op->resp);
+    }
 
-	if(s_op->val.buffer)
-	{
-		free(s_op->val.buffer);
-	}
+    if(s_op->req)
+    {
+	free(s_op->req);
+    }
 
-	free(s_op->unexp_bmi_buff);
+    if(s_op->val.buffer)
+    {
+	free(s_op->val.buffer);
+    }
 
-	free(s_op);
+    free(s_op->unexp_bmi_buff);
 
-	return(0);
-	
+    free(s_op);
+
+    return(0);
+
 }
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 noexpandtab
+ */
+

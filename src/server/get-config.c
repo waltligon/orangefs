@@ -89,9 +89,9 @@ machine get_config(init, trove, good_msg, bmi_send, cleanup, error_msg)
 
 void getconfig_init_state_machine(void)
 {
-	
-	getconfig_req_s.state_machine = get_config;
-	
+
+    getconfig_req_s.state_machine = get_config;
+
 }
 
 /*
@@ -114,46 +114,46 @@ void getconfig_init_state_machine(void)
 static int getconfig_init(state_action_struct *s_op, job_status_s *ret)
 {
 
-	server_configuration_s *user_opts;
-	int job_post_ret = 1;
-	int i;
-	filesystem_configuration_s *file_system;
+    server_configuration_s *user_opts;
+    int job_post_ret = 1;
+    int i;
+    filesystem_configuration_s *file_system;
 
-	user_opts = get_server_config_struct();
-	
-	/* Set up the values we have in our Config Struct user_opts */
-	for(i=0;i<user_opts->number_filesystems;i++)
-	{
-		if(strcmp(s_op->req->u.getconfig.fs_name,
-					 user_opts->file_systems[i]->file_system_name) == 0)
-			break;
-	}
+    user_opts = get_server_config_struct();
 
-	if(i == user_opts->number_filesystems)
-	{
-		ret->error_code = -99;
-		return(1);
-	}
+    /* Set up the values we have in our Config Struct user_opts */
+    for(i=0;i<user_opts->number_filesystems;i++)
+    {
+	if(strcmp(s_op->req->u.getconfig.fs_name,
+		    user_opts->file_systems[i]->file_system_name) == 0)
+	    break;
+    }
 
-	file_system = user_opts->file_systems[i];
+    if(i == user_opts->number_filesystems)
+    {
+	ret->error_code = -99;
+	return(1);
+    }
 
-	s_op->resp->u.getconfig.meta_server_count = file_system->count_meta_servers;
-	s_op->resp->u.getconfig.io_server_count = file_system->count_io_servers;
+    file_system = user_opts->file_systems[i];
 
-	/* The new way of doing things because we have an encoding system! dw*/
-	s_op->resp->u.getconfig.meta_server_mapping = file_system->meta_server_list;
-	s_op->resp->u.getconfig.io_server_mapping = file_system->io_server_list;
-	s_op->resp->u.getconfig.fs_id = file_system->coll_id;
-	s_op->strsize = strlen(file_system->meta_server_list)+1;
-	s_op->strsize += strlen(file_system->io_server_list)+1;
-	
-	/* Set up the key/val pair for trove to get root handle */
-	s_op->key.buffer = Trove_Common_Keys[ROOT_HANDLE_KEY].key;
-	s_op->key.buffer_sz = Trove_Common_Keys[ROOT_HANDLE_KEY].size;
-	s_op->val.buffer = malloc((s_op->val.buffer_sz = sizeof(TROVE_handle)));
+    s_op->resp->u.getconfig.meta_server_count = file_system->count_meta_servers;
+    s_op->resp->u.getconfig.io_server_count = file_system->count_io_servers;
+
+    /* The new way of doing things because we have an encoding system! dw*/
+    s_op->resp->u.getconfig.meta_server_mapping = file_system->meta_server_list;
+    s_op->resp->u.getconfig.io_server_mapping = file_system->io_server_list;
+    s_op->resp->u.getconfig.fs_id = file_system->coll_id;
+    s_op->strsize = strlen(file_system->meta_server_list)+1;
+    s_op->strsize += strlen(file_system->io_server_list)+1;
+
+    /* Set up the key/val pair for trove to get root handle */
+    s_op->key.buffer = Trove_Common_Keys[ROOT_HANDLE_KEY].key;
+    s_op->key.buffer_sz = Trove_Common_Keys[ROOT_HANDLE_KEY].size;
+    s_op->val.buffer = malloc((s_op->val.buffer_sz = sizeof(TROVE_handle)));
 
 
-	return(job_post_ret);
+    return(job_post_ret);
 
 }
 
@@ -177,21 +177,21 @@ static int getconfig_init(state_action_struct *s_op, job_status_s *ret)
 static int getconfig_job_trove(state_action_struct *s_op, job_status_s *ret)
 {
 
-	int job_post_ret;
-	job_id_t i;
+    int job_post_ret;
+    job_id_t i;
 
-	/*job_post_ret = job_trove_fs_lookup(s_op->req->u.getconfig.fs_name,s_op,ret,&i);*/
-	
-	job_post_ret = job_trove_fs_geteattr(s_op->resp->u.getconfig.fs_id,
-													 &(s_op->key),
-													 &(s_op->val),
-													 0,
-													 s_op,
-													 ret,
-													 &i);
+    /*job_post_ret = job_trove_fs_lookup(s_op->req->u.getconfig.fs_name,s_op,ret,&i);*/
 
-	
-	return(job_post_ret);
+    job_post_ret = job_trove_fs_geteattr(s_op->resp->u.getconfig.fs_id,
+	    &(s_op->key),
+	    &(s_op->val),
+	    0,
+	    s_op,
+	    ret,
+	    &i);
+
+
+    return(job_post_ret);
 
 }
 
@@ -215,15 +215,15 @@ static int getconfig_job_trove(state_action_struct *s_op, job_status_s *ret)
 static int getconfig_build_bmi_error(state_action_struct *s_op, job_status_s *ret)
 {
 
-	s_op->resp->status = ret->error_code;
-	s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
-	/* Set it to a noop for an error so we don't encode all the stuff we don't need to */
-	s_op->resp->op = PVFS_SERV_NOOP;
-	PINT_encode(s_op->resp,PINT_ENCODE_RESP,&(s_op->encoded),s_op->addr,s_op->enc_type);
-	/* set it back */
-	((struct PVFS_server_req_s *)s_op->encoded.buffer_list[0])->op = PVFS_SERV_GETCONFIG;
+    s_op->resp->status = ret->error_code;
+    s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
+    /* Set it to a noop for an error so we don't encode all the stuff we don't need to */
+    s_op->resp->op = PVFS_SERV_NOOP;
+    PINT_encode(s_op->resp,PINT_ENCODE_RESP,&(s_op->encoded),s_op->addr,s_op->enc_type);
+    /* set it back */
+    ((struct PVFS_server_req_s *)s_op->encoded.buffer_list[0])->op = PVFS_SERV_GETCONFIG;
 
-	return(1);
+    return(1);
 
 }
 
@@ -247,13 +247,13 @@ static int getconfig_build_bmi_error(state_action_struct *s_op, job_status_s *re
 static int getconfig_build_bmi_good_msg(state_action_struct *s_op, job_status_s *ret)
 {
 
-	int jpret;
+    int jpret;
 
-	s_op->resp->status = ret->error_code;
-	s_op->resp->u.getconfig.root_handle = *((TROVE_handle *)s_op->val.buffer);
-	s_op->resp->rsize = sizeof(struct PVFS_server_resp_s) + s_op->strsize;
-	jpret = PINT_encode(s_op->resp,PINT_ENCODE_RESP,&(s_op->encoded),s_op->addr,s_op->enc_type);
-	return(1);
+    s_op->resp->status = ret->error_code;
+    s_op->resp->u.getconfig.root_handle = *((TROVE_handle *)s_op->val.buffer);
+    s_op->resp->rsize = sizeof(struct PVFS_server_resp_s) + s_op->strsize;
+    jpret = PINT_encode(s_op->resp,PINT_ENCODE_RESP,&(s_op->encoded),s_op->addr,s_op->enc_type);
+    return(1);
 
 }
 
@@ -277,28 +277,28 @@ static int getconfig_build_bmi_good_msg(state_action_struct *s_op, job_status_s 
 static int getconfig_job_bmi_send(state_action_struct *s_op, job_status_s *ret)
 {
 
-	int job_post_ret;
-	job_id_t i;
+    int job_post_ret;
+    job_id_t i;
 
-	assert(s_op->encoded.list_count == 1);
-	if(s_op->encoded.list_count == 1)
-	{
+    assert(s_op->encoded.list_count == 1);
+    if(s_op->encoded.list_count == 1)
+    {
 	job_post_ret = job_bmi_send(s_op->addr,
-										 s_op->encoded.buffer_list[0],
-										 s_op->encoded.total_size,
-										 s_op->tag,
-										 0,
-										 0,
-										 s_op,
-										 ret,
-										 &i);
-	}
-	else {
-		/* Send list! */
-		job_post_ret = -1;
-	}
+		s_op->encoded.buffer_list[0],
+		s_op->encoded.total_size,
+		s_op->tag,
+		0,
+		0,
+		s_op,
+		ret,
+		&i);
+    }
+    else {
+	/* Send list! */
+	job_post_ret = -1;
+    }
 
-	return(job_post_ret);
+    return(job_post_ret);
 
 }
 
@@ -322,17 +322,27 @@ static int getconfig_job_bmi_send(state_action_struct *s_op, job_status_s *ret)
 static int getconfig_cleanup(state_action_struct *s_op, job_status_s *ret)
 {
 
-	/* TODO: Free I/O Struct! */
-	if (s_op->resp)
-	{
-		free(s_op->resp);
-	}
+    /* TODO: Free I/O Struct! */
+    if (s_op->resp)
+    {
+	free(s_op->resp);
+    }
 
-	free(s_op->unexp_bmi_buff);
+    free(s_op->unexp_bmi_buff);
 
-	free(s_op);
+    free(s_op);
 
-	return(0);
+    return(0);
 
 }
+
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 noexpandtab
+ */
 

@@ -98,9 +98,9 @@ machine create(init, create, send, release, cleanup)
 
 void create_init_state_machine(void)
 {
-	
-	create_req_s.state_machine = create;
-	
+
+    create_req_s.state_machine = create;
+
 }
 
 /*
@@ -124,16 +124,16 @@ void create_init_state_machine(void)
 static int create_init(state_action_struct *s_op, job_status_s *ret)
 {
 
-	int job_post_ret;
+    int job_post_ret;
 
-	job_post_ret = job_req_sched_post(s_op->req,
-												 s_op,
-												 ret,
-												 &(s_op->scheduled_id));
-	job_post_ret = 1;
-	
-	return(job_post_ret);
-	
+    job_post_ret = job_req_sched_post(s_op->req,
+	    s_op,
+	    ret,
+	    &(s_op->scheduled_id));
+    job_post_ret = 1;
+
+    return(job_post_ret);
+
 }
 
 
@@ -157,20 +157,20 @@ static int create_init(state_action_struct *s_op, job_status_s *ret)
 static int create_create(state_action_struct *s_op, job_status_s *ret)
 {
 
-	int job_post_ret;
-	job_id_t i;
+    int job_post_ret;
+    job_id_t i;
 
-	job_post_ret = job_trove_dspace_create(s_op->req->u.create.fs_id,
-														s_op->req->u.create.bucket,
-														s_op->req->u.create.handle_mask,
-														s_op->req->u.create.object_type,
-														NULL,
-														s_op,
-													 	ret,
-													 	&i);
-	
-	return(job_post_ret);
-	
+    job_post_ret = job_trove_dspace_create(s_op->req->u.create.fs_id,
+	    s_op->req->u.create.bucket,
+	    s_op->req->u.create.handle_mask,
+	    s_op->req->u.create.object_type,
+	    NULL,
+	    s_op,
+	    ret,
+	    &i);
+
+    return(job_post_ret);
+
 }
 
 
@@ -195,39 +195,39 @@ static int create_create(state_action_struct *s_op, job_status_s *ret)
 static int create_send_bmi(state_action_struct *s_op, job_status_s *ret)
 {
 
-	int job_post_ret=0;
-	job_id_t i;
+    int job_post_ret=0;
+    job_id_t i;
 
-	s_op->resp->status = ret->error_code;
-	s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
+    s_op->resp->status = ret->error_code;
+    s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
 
-	/* Set the handle IF it was created */
-	if(ret->error_code == 0) 
-	{
-		gossip_err("Handle Created: %lld\n",ret->handle);
-		s_op->resp->u.create.handle = ret->handle;
+    /* Set the handle IF it was created */
+    if(ret->error_code == 0) 
+    {
+	gossip_err("Handle Created: %lld\n",ret->handle);
+	s_op->resp->u.create.handle = ret->handle;
 
-		/* Encode the message */
-		job_post_ret = PINT_encode(s_op->resp,
-				PINT_ENCODE_RESP,
-				&(s_op->encoded),
-				s_op->addr,
-				s_op->enc_type);
-	}
-	assert(job_post_ret == 0);
-	
-	job_post_ret = job_bmi_send(s_op->addr,
-										 s_op->encoded.buffer_list[0],
-										 s_op->encoded.total_size,
-										 s_op->tag,
-										 0,
-										 0,
-										 s_op, 
-										 ret, 
-										 &i);
-	
-	return(job_post_ret);
-	
+	/* Encode the message */
+	job_post_ret = PINT_encode(s_op->resp,
+		PINT_ENCODE_RESP,
+		&(s_op->encoded),
+		s_op->addr,
+		s_op->enc_type);
+    }
+    assert(job_post_ret == 0);
+
+    job_post_ret = job_bmi_send(s_op->addr,
+	    s_op->encoded.buffer_list[0],
+	    s_op->encoded.total_size,
+	    s_op->tag,
+	    0,
+	    0,
+	    s_op, 
+	    ret, 
+	    &i);
+
+    return(job_post_ret);
+
 }
 
 /*
@@ -248,14 +248,14 @@ static int create_send_bmi(state_action_struct *s_op, job_status_s *ret)
 static int create_release_posted_job(state_action_struct *s_op, job_status_s *ret)
 {
 
-	int job_post_ret=0;
-	job_id_t i;
+    int job_post_ret=0;
+    job_id_t i;
 
-	job_post_ret = job_req_sched_release(s_op->scheduled_id,
-													  s_op,
-													  ret,
-													  &i);
-	return job_post_ret;
+    job_post_ret = job_req_sched_release(s_op->scheduled_id,
+	    s_op,
+	    ret,
+	    &i);
+    return job_post_ret;
 }
 
 
@@ -279,22 +279,22 @@ static int create_release_posted_job(state_action_struct *s_op, job_status_s *re
 static int create_cleanup(state_action_struct *s_op, job_status_s *ret)
 {
 
-	if(s_op->resp)
-	{
-		free(s_op->resp);
-	}
+    if(s_op->resp)
+    {
+	free(s_op->resp);
+    }
 
-	if(s_op->req)
-	{
-		free(s_op->req);
-	}
+    if(s_op->req)
+    {
+	free(s_op->req);
+    }
 
-	free(s_op->unexp_bmi_buff);
+    free(s_op->unexp_bmi_buff);
 
-	free(s_op);
+    free(s_op);
 
-	return(0);
-	
+    return(0);
+
 }
 
 /*

@@ -146,7 +146,7 @@ machine crdirent(init, get_handle, get_attrib, check_perms, create, send, cleanu
 
 void crdirent_init_state_machine(void)
 {
-	crdirent_req_s.state_machine = crdirent;
+    crdirent_req_s.state_machine = crdirent;
 }
 
 /*
@@ -170,27 +170,27 @@ void crdirent_init_state_machine(void)
 
 static int crdirent_init(state_action_struct *s_op, job_status_s *ret)
 {
-	int job_post_ret;
-	gossip_ldebug(SERVER_DEBUG,
-			"Got CrDirent for %s,%lld in %lld\n",
-			s_op->req->u.crdirent.name,
-			s_op->req->u.crdirent.new_handle,
-			s_op->req->u.crdirent.parent_handle);
+    int job_post_ret;
+    gossip_ldebug(SERVER_DEBUG,
+	    "Got CrDirent for %s,%lld in %lld\n",
+	    s_op->req->u.crdirent.name,
+	    s_op->req->u.crdirent.new_handle,
+	    s_op->req->u.crdirent.parent_handle);
 
-	/* get the key and key size out of our list of common keys */
-	s_op->key.buffer = Trove_Common_Keys[METADATA_KEY].key;
-	s_op->key.buffer_sz = Trove_Common_Keys[METADATA_KEY].size;
+    /* get the key and key size out of our list of common keys */
+    s_op->key.buffer = Trove_Common_Keys[METADATA_KEY].key;
+    s_op->key.buffer_sz = Trove_Common_Keys[METADATA_KEY].size;
 
-	/* create a buffer for the trove operations (get_attrib and get_handle) */
-	s_op->val.buffer = malloc((s_op->val.buffer_sz = sizeof(PVFS_object_attr)));
-	
-	/* post a scheduler job */
-	job_post_ret = job_req_sched_post(s_op->req,
-												 s_op,
-												 ret,
-												 &(s_op->scheduled_id));
-	gossip_ldebug(SERVER_DEBUG,"jpr: %d\n",job_post_ret);
-	return(job_post_ret);
+    /* create a buffer for the trove operations (get_attrib and get_handle) */
+    s_op->val.buffer = malloc((s_op->val.buffer_sz = sizeof(PVFS_object_attr)));
+
+    /* post a scheduler job */
+    job_post_ret = job_req_sched_post(s_op->req,
+	    s_op,
+	    ret,
+	    &(s_op->scheduled_id));
+    gossip_ldebug(SERVER_DEBUG,"jpr: %d\n",job_post_ret);
+    return(job_post_ret);
 }
 
 /*
@@ -220,34 +220,34 @@ static int crdirent_init(state_action_struct *s_op, job_status_s *ret)
 
 static int crdirent_gethandle(state_action_struct *s_op, job_status_s *ret)
 {
-	int job_post_ret;
-	job_id_t i;
-	PVFS_vtag_s bs;
+    int job_post_ret;
+    job_id_t i;
+    PVFS_vtag_s bs;
 
-	gossip_ldebug(SERVER_DEBUG,"Get Handle Fxn for crdirent\n");
-	
-	/* get the key and key size out of our list of common keys */
-	s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
-	s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
+    gossip_ldebug(SERVER_DEBUG,"Get Handle Fxn for crdirent\n");
 
-	/* 
-	 *	Assert that the buffer is big enough to hold a handle.
-	 * Recall that the buffer was previously allocated for the permission checking
-	 */
-	assert(s_op->val.buffer != NULL && s_op->val.buffer_sz >= sizeof(PVFS_handle));
-	
-	job_post_ret = job_trove_keyval_read(s_op->req->u.crdirent.fs_id,
-													 	 s_op->req->u.crdirent.parent_handle,
-													 	 &(s_op->key),
-													 	 &(s_op->val),
-													 	 0,
-													 	 bs,
-													 	 s_op,
-													 	 ret,
-													 	 &i);
+    /* get the key and key size out of our list of common keys */
+    s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
+    s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
+
+    /* 
+     *	Assert that the buffer is big enough to hold a handle.
+     * Recall that the buffer was previously allocated for the permission checking
+     */
+    assert(s_op->val.buffer != NULL && s_op->val.buffer_sz >= sizeof(PVFS_handle));
+
+    job_post_ret = job_trove_keyval_read(s_op->req->u.crdirent.fs_id,
+	    s_op->req->u.crdirent.parent_handle,
+	    &(s_op->key),
+	    &(s_op->val),
+	    0,
+	    bs,
+	    s_op,
+	    ret,
+	    &i);
 
 
-	return(job_post_ret);
+    return(job_post_ret);
 }
 
 /*
@@ -273,22 +273,22 @@ static int crdirent_gethandle(state_action_struct *s_op, job_status_s *ret)
 static int crdirent_getattr(state_action_struct *s_op, job_status_s *ret)
 {
 
-	int job_post_ret;
-	job_id_t i;
-	PVFS_vtag_s bs;
+    int job_post_ret;
+    job_id_t i;
+    PVFS_vtag_s bs;
 
-	gossip_ldebug(SERVER_DEBUG,"Get attr Fxn for crdirent\n");
-	job_post_ret = job_trove_keyval_read(s_op->req->u.crdirent.fs_id,
-													 s_op->req->u.crdirent.parent_handle,
-													 &(s_op->key),
-													 &(s_op->val),
-													 0,
-													 bs,
-													 s_op,
-													 ret,
-													 &i);
+    gossip_ldebug(SERVER_DEBUG,"Get attr Fxn for crdirent\n");
+    job_post_ret = job_trove_keyval_read(s_op->req->u.crdirent.fs_id,
+	    s_op->req->u.crdirent.parent_handle,
+	    &(s_op->key),
+	    &(s_op->val),
+	    0,
+	    bs,
+	    s_op,
+	    ret,
+	    &i);
 
-	return(job_post_ret);
+    return(job_post_ret);
 }
 
 /*
@@ -311,14 +311,14 @@ static int crdirent_getattr(state_action_struct *s_op, job_status_s *ret)
 
 static int crdirent_check_perms(state_action_struct *s_op, job_status_s *ret)
 {
-	int job_post_ret;
-	/*job_id_t i;*/
+    int job_post_ret;
+    /*job_id_t i;*/
 
-	gossip_ldebug(SERVER_DEBUG,"CheckPerms Fxn for crdirent\n");
-	job_post_ret = 1;  /* Just pretend it is good right now */
-	/*IF THEY don't have permission, set ret->error_code to -ENOPERM!*/
+    gossip_ldebug(SERVER_DEBUG,"CheckPerms Fxn for crdirent\n");
+    job_post_ret = 1;  /* Just pretend it is good right now */
+    /*IF THEY don't have permission, set ret->error_code to -ENOPERM!*/
 
-	return(job_post_ret);
+    return(job_post_ret);
 }
 
 /*
@@ -341,38 +341,38 @@ static int crdirent_check_perms(state_action_struct *s_op, job_status_s *ret)
 
 static int crdirent_create_dir_handle_ph2(state_action_struct *s_op, job_status_s *ret)
 {
-	int job_post_ret;
-	job_id_t i;
+    int job_post_ret;
+    job_id_t i;
 
-	gossip_ldebug(SERVER_DEBUG,"phase2 Fxn for crdirent\n");
+    gossip_ldebug(SERVER_DEBUG,"phase2 Fxn for crdirent\n");
 
-	/* get the key and key size out of our list of common keys */
-	s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
-	s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
+    /* get the key and key size out of our list of common keys */
+    s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
+    s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
 
-	/*
-	 * Recall again, this buffer was originally allocated for check_permissions
-	 * Let's assert and continue.
-	 */
-	assert(s_op->val.buffer != NULL && s_op->val.buffer_sz >= sizeof(PVFS_handle));
+    /*
+     * Recall again, this buffer was originally allocated for check_permissions
+     * Let's assert and continue.
+     */
+    assert(s_op->val.buffer != NULL && s_op->val.buffer_sz >= sizeof(PVFS_handle));
 
-	/* we are writing to Trove, so the val is set up here */
-	*((PVFS_handle *)s_op->val.buffer) = ret->handle;
-	s_op->val.buffer_sz = sizeof(PVFS_handle);
+    /* we are writing to Trove, so the val is set up here */
+    *((PVFS_handle *)s_op->val.buffer) = ret->handle;
+    s_op->val.buffer_sz = sizeof(PVFS_handle);
 
-	gossip_debug(SERVER_DEBUG,"Kv write %lld, %lld\n",s_op->req->u.crdirent.parent_handle,*(PVFS_handle *) s_op->val.buffer);
+    gossip_debug(SERVER_DEBUG,"Kv write %lld, %lld\n",s_op->req->u.crdirent.parent_handle,*(PVFS_handle *) s_op->val.buffer);
 
-	/* adds the k/v space */
-	job_post_ret = job_trove_keyval_write(s_op->req->u.crdirent.fs_id,
-													  s_op->req->u.crdirent.parent_handle,
-													  &(s_op->key),
-													  &(s_op->val),
-													  0,
-													  ret->vtag,
-													  s_op,
-													  ret,
-													  &i);
-	return(job_post_ret);
+    /* adds the k/v space */
+    job_post_ret = job_trove_keyval_write(s_op->req->u.crdirent.fs_id,
+	    s_op->req->u.crdirent.parent_handle,
+	    &(s_op->key),
+	    &(s_op->val),
+	    0,
+	    ret->vtag,
+	    s_op,
+	    ret,
+	    &i);
+    return(job_post_ret);
 }
 
 /*
@@ -396,22 +396,22 @@ static int crdirent_create_dir_handle_ph2(state_action_struct *s_op, job_status_
 
 static int crdirent_create_dir_handle_ph1(state_action_struct *s_op, job_status_s *ret)
 {
-	int job_post_ret;
-	job_id_t i;
+    int job_post_ret;
+    job_id_t i;
 
-	gossip_ldebug(SERVER_DEBUG,"CrDirent Phase 1 Creating Handle:  %d,%lld\n",
-			s_op->req->u.crdirent.fs_id,\
-			s_op->req->u.crdirent.parent_handle);
+    gossip_ldebug(SERVER_DEBUG,"CrDirent Phase 1 Creating Handle:  %d,%lld\n",
+	    s_op->req->u.crdirent.fs_id,\
+	    s_op->req->u.crdirent.parent_handle);
 
-	job_post_ret = job_trove_dspace_create(s_op->req->u.crdirent.fs_id,
-													   s_op->req->u.crdirent.parent_handle,
-													   0x00000000, /* TODO: Change this */
-													   ATTR_DIR,
-													   NULL,
-													   s_op,
-													   ret,
-													   &i);
-	return(job_post_ret);
+    job_post_ret = job_trove_dspace_create(s_op->req->u.crdirent.fs_id,
+	    s_op->req->u.crdirent.parent_handle,
+	    0x00000000, /* TODO: Change this */
+	    ATTR_DIR,
+	    NULL,
+	    s_op,
+	    ret,
+	    &i);
+    return(job_post_ret);
 }
 
 /*
@@ -435,41 +435,41 @@ static int crdirent_create_dir_handle_ph1(state_action_struct *s_op, job_status_
 
 static int crdirent_create(state_action_struct *s_op, job_status_s *ret)
 {
-	int job_post_ret;
-	job_id_t i;
-	PVFS_handle h;
+    int job_post_ret;
+    job_id_t i;
+    PVFS_handle h;
 
-	gossip_ldebug(SERVER_DEBUG,"create Fxn for crdirent\n");
+    gossip_ldebug(SERVER_DEBUG,"create Fxn for crdirent\n");
 
-	/* Verify that we have all the information we need to store the pair */
-	assert(s_op->req->u.crdirent.name != NULL && s_op->req->u.crdirent.new_handle != 0);
-	
-	/* This buffer came from one of two places, either phase two of creating the
-	 * directory space when we wrote the value back to trove, or from the initial read
-	 * from trove.
-	 */
-	h = *((PVFS_handle *)s_op->val.buffer);
-	gossip_debug(SERVER_DEBUG,"Handle: %lld\n",h);
-	free(s_op->val.buffer);
-	
-	/* this is the name for the parent entry */
-	s_op->key.buffer = &(s_op->req->u.crdirent.name);
-	s_op->key.buffer_sz = strlen(s_op->req->u.crdirent.name) + 1;
+    /* Verify that we have all the information we need to store the pair */
+    assert(s_op->req->u.crdirent.name != NULL && s_op->req->u.crdirent.new_handle != 0);
 
-	/* this is the name for the new entry */
-	s_op->val.buffer = &(s_op->req->u.crdirent.new_handle);
-	s_op->val.buffer_sz = sizeof(PVFS_handle);
-	
-	job_post_ret = job_trove_keyval_write(s_op->req->u.crdirent.fs_id,
-													  h,
-													  &(s_op->key),
-													  &(s_op->val),
-													  0,
-													  ret->vtag, /* This needs to change for vtags */
-													  s_op,      /* Or is that right? dw */
-													  ret,
-													  &i);
-	return(job_post_ret);
+    /* This buffer came from one of two places, either phase two of creating the
+     * directory space when we wrote the value back to trove, or from the initial read
+     * from trove.
+     */
+    h = *((PVFS_handle *)s_op->val.buffer);
+    gossip_debug(SERVER_DEBUG,"Handle: %lld\n",h);
+    free(s_op->val.buffer);
+
+    /* this is the name for the parent entry */
+    s_op->key.buffer = &(s_op->req->u.crdirent.name);
+    s_op->key.buffer_sz = strlen(s_op->req->u.crdirent.name) + 1;
+
+    /* this is the name for the new entry */
+    s_op->val.buffer = &(s_op->req->u.crdirent.new_handle);
+    s_op->val.buffer_sz = sizeof(PVFS_handle);
+
+    job_post_ret = job_trove_keyval_write(s_op->req->u.crdirent.fs_id,
+	    h,
+	    &(s_op->key),
+	    &(s_op->val),
+	    0,
+	    ret->vtag, /* This needs to change for vtags */
+	    s_op,      /* Or is that right? dw */
+	    ret,
+	    &i);
+    return(job_post_ret);
 }
 
 /*
@@ -492,47 +492,47 @@ static int crdirent_create(state_action_struct *s_op, job_status_s *ret)
 
 static int crdirent_send_bmi(state_action_struct *s_op, job_status_s *ret)
 {
-	int job_post_ret=0;
-	job_id_t i;
+    int job_post_ret=0;
+    job_id_t i;
 
-	gossip_ldebug(SERVER_DEBUG,"send Fxn for crdirent %d\n",ret->error_code);
+    gossip_ldebug(SERVER_DEBUG,"send Fxn for crdirent %d\n",ret->error_code);
 
-	s_op->resp->status = ret->error_code;
-	s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
+    s_op->resp->status = ret->error_code;
+    s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
 
-	/* Set the ack IF it was created */
-	if(ret->error_code == 0) 
-	{
-		s_op->resp->u.generic.handle = s_op->req->u.crdirent.new_handle;
+    /* Set the ack IF it was created */
+    if(ret->error_code == 0) 
+    {
+	s_op->resp->u.generic.handle = s_op->req->u.crdirent.new_handle;
 
-		/* Encode the message */
-		job_post_ret = PINT_encode(s_op->resp,
-				PINT_ENCODE_RESP,
-				&(s_op->encoded),
-				s_op->addr,
-				s_op->enc_type);
-	}
-	else
-	{
-		/* Set it to a noop for an error so we don't encode all the stuff we don't need to */
-		s_op->resp->op = PVFS_SERV_NOOP;
-		PINT_encode(s_op->resp,PINT_ENCODE_RESP,&(s_op->encoded),s_op->addr,s_op->enc_type);
-		/* set it back */
-		((struct PVFS_server_req_s *)s_op->encoded.buffer_list[0])->op = s_op->req->op;
-	}
-	gossip_ldebug(SERVER_DEBUG,"jpr: %d\n",job_post_ret);
-	assert(job_post_ret == 0);
+	/* Encode the message */
+	job_post_ret = PINT_encode(s_op->resp,
+		PINT_ENCODE_RESP,
+		&(s_op->encoded),
+		s_op->addr,
+		s_op->enc_type);
+    }
+    else
+    {
+	/* Set it to a noop for an error so we don't encode all the stuff we don't need to */
+	s_op->resp->op = PVFS_SERV_NOOP;
+	PINT_encode(s_op->resp,PINT_ENCODE_RESP,&(s_op->encoded),s_op->addr,s_op->enc_type);
+	/* set it back */
+	((struct PVFS_server_req_s *)s_op->encoded.buffer_list[0])->op = s_op->req->op;
+    }
+    gossip_ldebug(SERVER_DEBUG,"jpr: %d\n",job_post_ret);
+    assert(job_post_ret == 0);
 
-	job_post_ret = job_bmi_send(s_op->addr,
-										 s_op->encoded.buffer_list[0],
-										 s_op->encoded.total_size,
-										 s_op->tag,
-										 0,
-										 0,
-										 s_op, 
-										 ret, 
-										 &i);
-	return(job_post_ret);
+    job_post_ret = job_bmi_send(s_op->addr,
+	    s_op->encoded.buffer_list[0],
+	    s_op->encoded.total_size,
+	    s_op->tag,
+	    0,
+	    0,
+	    s_op, 
+	    ret, 
+	    &i);
+    return(job_post_ret);
 }
 
 /*
@@ -553,14 +553,14 @@ static int crdirent_send_bmi(state_action_struct *s_op, job_status_s *ret)
 static int crdirent_release_posted_job(state_action_struct *s_op, job_status_s *ret)
 {
 
-	int job_post_ret=0;
-	job_id_t i;
+    int job_post_ret=0;
+    job_id_t i;
 
-	job_post_ret = job_req_sched_release(s_op->scheduled_id,
-													  s_op,
-													  ret,
-													  &i);
-	return job_post_ret;
+    job_post_ret = job_req_sched_release(s_op->scheduled_id,
+	    s_op,
+	    ret,
+	    &i);
+    return job_post_ret;
 }
 
 /*
@@ -580,25 +580,25 @@ static int crdirent_release_posted_job(state_action_struct *s_op, job_status_s *
 
 static int crdirent_cleanup(state_action_struct *s_op, job_status_s *ret)
 {
-	gossip_ldebug(SERVER_DEBUG,"clean Fxn for crdirent\n");
+    gossip_ldebug(SERVER_DEBUG,"clean Fxn for crdirent\n");
 
-/* TODO: FREE Encoded message! */
-	
-	if(s_op->resp)
-	{
-		free(s_op->resp);
-	}
+    /* TODO: FREE Encoded message! */
 
-	if(s_op->req)
-	{
-		free(s_op->req);
-	}
+    if(s_op->resp)
+    {
+	free(s_op->resp);
+    }
 
-	free(s_op->unexp_bmi_buff);
+    if(s_op->req)
+    {
+	free(s_op->req);
+    }
 
-	free(s_op);
+    free(s_op->unexp_bmi_buff);
 
-	return(0);
+    free(s_op);
+
+    return(0);
 }
 
 /*
