@@ -13,7 +13,8 @@ SERVERGENSRC := \
 	$(DIR)/remove.c \
 	$(DIR)/rmdirent.c \
 	$(DIR)/io.c \
-	$(DIR)/prelude.c
+	$(DIR)/prelude.c \
+	$(DIR)/final-response.c
 
 # "normal" c files
 SERVERSRC += \
