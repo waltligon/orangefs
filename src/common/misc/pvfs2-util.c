@@ -965,7 +965,10 @@ int PVFS_util_remove_dir_prefix(
 
     /* try to handle the case of no trailing slash */
     if (pathname[cut_index] == '\0')
+    {
         out_path[0] = '/';
+        out_path[1] = '\0';
+    }
     else
         /* copy out appropriate part of pathname */
         strcpy(out_path, &(pathname[cut_index]));
