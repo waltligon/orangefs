@@ -27,7 +27,8 @@ enum PVFS_flowproto_type
 {
     FLOWPROTO_ANY = 1,
     FLOWPROTO_BMI_TROVE = 2,
-    FLOWPROTO_DUMP_OFFSETS = 3
+    FLOWPROTO_DUMP_OFFSETS = 3,
+    FLOWPROTO_BMI_CACHE = 4
 };
 
 /* basic types used by storage subsystem */

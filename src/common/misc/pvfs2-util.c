@@ -27,6 +27,9 @@
 #include <mntent.h>
 #endif
 
+static int parse_flowproto_string(const char* input, enum PVFS_flowproto_type* 
+    flowproto);
+
 /* PVFS_util_parse_pvfstab()
  *
  * parses either the file pointed to by the PVFS2TAB_FILE env variable,
@@ -49,6 +52,7 @@ int PVFS_util_parse_pvfstab(pvfs_mntlist* pvfstab_p)
     int slashcount = 0;
     char* slash = NULL;
     char* last_slash = NULL;
+    int ret = -1;
 
     /* safety */
     pvfstab_p->ptab_count = 0;
@@ -89,6 +93,8 @@ int PVFS_util_parse_pvfstab(pvfs_mntlist* pvfstab_p)
 	sizeof(struct pvfs_mntent));
     if(!pvfstab_p->ptab_array)
 	return(-PVFS_ENOMEM);
+    memset(pvfstab_p->ptab_array, 0, 
+	pvfstab_p->ptab_count*sizeof(struct pvfs_mntent));
 
     /* reopen our chosen fstab file */
     mnt_fp = setmntent(targetfile, "r");
@@ -134,6 +140,7 @@ int PVFS_util_parse_pvfstab(pvfs_mntlist* pvfstab_p)
 		|| !pvfstab_p->ptab_array[i].mnt_dir
 		|| !pvfstab_p->ptab_array[i].mnt_opts)
 	    {
+		/* TODO: clean up mallocs */
 		endmntent(mnt_fp);
 		return(-PVFS_EINVAL);
 	    }
@@ -155,6 +162,22 @@ int PVFS_util_parse_pvfstab(pvfs_mntlist* pvfstab_p)
 	    strcpy(pvfstab_p->ptab_array[i].mnt_opts,
 		tmp_ent->mnt_opts);
 
+	    /* find out if a particular flow protocol was specified */
+	    if((hasmntopt(tmp_ent, "flowproto")))
+	    {
+		ret = parse_flowproto_string(tmp_ent->mnt_opts,
+		    &(pvfstab_p->ptab_array[i].flowproto));
+		if(ret < 0)
+		{
+		    /* TODO: clean up mallocs */
+		    endmntent(mnt_fp);
+		    return(ret);
+		}
+	    }
+	    else
+	    {
+		pvfstab_p->ptab_array[i].flowproto = FLOWPROTO_ANY;
+	    }
 	    i++;
 	}
     }
@@ -182,6 +205,7 @@ void PVFS_util_free_pvfstab(
 
     free(e_p->ptab_array);
 }
+
 
 /* PVFS_util_lookup_parent()
  *
@@ -390,6 +414,57 @@ int PVFS_util_remove_dir_prefix(
     /* copy out appropriate part of pathname */
     strcpy(out_path, &(pathname[cut_index]));
     return (0);
+}
+
+/* parse_flowproto_string()
+ *
+ * looks in the mount options string for a flowprotocol specifier and 
+ * sets the flowproto type accordingly
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
+static int parse_flowproto_string(const char* input, enum PVFS_flowproto_type* 
+    flowproto)
+{
+    int ret = 0;
+    char* start = NULL;
+    char flow[256];
+    char* comma = NULL;
+
+    start = strstr(input, "flowproto");
+    /* we must find a match if this function is being called... */
+    assert(start);
+
+    /* scan out the option */
+    ret = sscanf(start, "flowproto = %255s ,", flow);
+    if(ret != 1)
+    {
+	gossip_err("Error: malformed flowproto option in tab file.\n");
+	return(-PVFS_EINVAL);
+    }
+
+    /* chop it off at any trailing comma */
+    comma = index(flow, ',');
+    if(comma)
+    {
+	comma[0] = '\0';
+    }
+
+    if(!strcmp(flow, "any"))
+	*flowproto = FLOWPROTO_ANY;
+    else if(!strcmp(flow, "bmi_trove"))
+	*flowproto = FLOWPROTO_BMI_TROVE;
+    else if(!strcmp(flow, "dump_offsets"))
+	*flowproto = FLOWPROTO_DUMP_OFFSETS;
+    else if(!strcmp(flow, "bmi_cache"))
+	*flowproto = FLOWPROTO_BMI_CACHE;
+    else
+    {
+	gossip_err("Error: unrecognized flowproto option: %s\n", flow);
+	return(-PVFS_EINVAL);
+    }
+
+    return(0);
 }
 
 /*

@@ -49,6 +49,7 @@ struct pvfs_mntent
     char* pvfs_fs_name;		/* name of PVFS2 file system */
     char* mnt_dir;		/* local mount path */
     char* mnt_opts;		/* full option list */
+    enum PVFS_flowproto_type flowproto;	/* flow protocol */
 };
 
 struct pvfs_mntlist_s
