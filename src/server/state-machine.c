@@ -64,7 +64,7 @@ extern PINT_state_machine_s rmdirent;
 
 /* table of state machines, indexed based on PVFS_server_op enumeration */
 /* NOTE: this table is initialized at run time in PINT_state_machine_init() */
-PINT_state_machine_s *PINT_server_op_table[SERVER_OP_TABLE_SIZE] = {NULL};
+PINT_state_machine_s *PINT_server_op_table[PVFS_MAX_SERVER_OP+1] = {NULL};
 
 /* 
  * Function: PINT_state_machine_initialize_unexpected(s_op,ret)
@@ -149,7 +149,7 @@ int PINT_state_machine_init(void)
     PINT_server_op_table[PVFS_SERV_GETCONFIG] = &get_config;
 
     /* initialize each state machine */
-    for (i = 0 ; i < SERVER_OP_TABLE_SIZE; i++)
+    for (i = 0 ; i <= PVFS_MAX_SERVER_OP; i++)
     {
 	if(PINT_server_op_table[i] && PINT_server_op_table[i]->init_fun)
 	{
@@ -250,7 +250,7 @@ int PINT_state_machine_next(PINT_server_op *s,job_status_s *r)
 PINT_state_array_values *PINT_state_machine_locate(PINT_server_op *s_op)
 {
     /* check for valid inputs */
-    if (!s_op || s_op->op < 0 || s_op->op >= SERVER_OP_TABLE_SIZE)
+    if (!s_op || s_op->op < 0 || s_op->op > PVFS_MAX_SERVER_OP)
     {
 	gossip_err("State machine requested not valid\n");
 	return NULL;

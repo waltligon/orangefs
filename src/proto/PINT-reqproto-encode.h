@@ -26,12 +26,17 @@ enum PINT_encoding_type
 struct PINT_encoded_msg
 {
     bmi_addr_t dest;			    /* host this is going to */
+    enum PINT_encoding_type enc_type;	    /* type of encoding that was used */
     enum bmi_buffer_type buffer_type;	    /* buffer flag for BMI's use */
     void** buffer_list;			    /* list of buffers */
     PVFS_size* size_list;		    /* size of buffers */
     int list_count;			    /* number of buffers */
     PVFS_size total_size;		    /* aggregate size of encoding */
-    enum PINT_encoding_type enc_type;	    /* type of encoding that was used */
+
+    /* fields below this comment are meant for internal use */
+    char* ptr_current;			    /* current encoding pointer */
+    PVFS_size size_stub;		    /* used for size_list */
+    void* buffer_stub;			    /* used for buffer_list */
 };
 
 /* structure to describe messages that have been decoded */
@@ -39,6 +44,14 @@ struct PINT_decoded_msg
 {
     void* buffer;			    /* decoded buffer */
     enum PINT_encoding_type enc_type;	    /* type of encoding that was used */
+
+    /* fields below this comment are meant for internal use */
+    char* ptr_current;			    /* current encoding pointer */
+    union				    /* used for storing decoded info */
+    {
+	struct PVFS_server_req req;
+	struct PVFS_server_resp resp;
+    } stub_dec;
 };
 
 /* types of messages we will encode or decode */

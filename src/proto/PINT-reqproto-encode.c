@@ -18,6 +18,7 @@
 #define ENCODING_TABLE_SIZE 5
 
 extern PINT_encoding_table_values_s contig_buffer_table;
+extern PINT_encoding_table_values_s le_bytefield_table;
 
 PINT_encoding_table_values_s *PINT_encoding_table[ENCODING_TABLE_SIZE] = {NULL};
 
@@ -36,6 +37,15 @@ int PINT_encode_initialize(void)
     *((int32_t*)&(contig_buffer_table.generic_header[0])) = 
 	htobmi32(PVFS_RELEASE_NR);
     *((int32_t*)&(contig_buffer_table.generic_header[4])) = 
+	htobmi32(PINT_ENC_DIRECT);
+
+    /* setup little endian bytefield encoding */
+    PINT_encoding_table[PINT_ENC_LE_BFIELD] = &le_bytefield_table;
+    le_bytefield_table.init_fun();
+    /* header prepended to all messages of this type */
+    *((int32_t*)&(le_bytefield_table.generic_header[0])) = 
+	htobmi32(PVFS_RELEASE_NR);
+    *((int32_t*)&(le_bytefield_table.generic_header[4])) = 
 	htobmi32(PINT_ENC_DIRECT);
 
     return(0);

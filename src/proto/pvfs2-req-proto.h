@@ -35,15 +35,20 @@ enum PVFS_server_op
     PVFS_SERV_READDIR = 11,
     PVFS_SERV_GETCONFIG = 12,
     PVFS_SERV_WRITE_COMPLETION = 13
-/* not implemented:
- * PVFS_SERV_NOOP 
- * PVFS_SERV_GETEATTR
- * PVFS_SERV_SETEATTR,
- * PVFS_SERV_BATCH
- * PVFS_SERV_EXTENSION
- * PVFS_SERV_STATFS
- */
+    /* IMPORTANT: please remember to modify PVFS_MAX_SERVER_OP define (below)
+     * if you add a new operation to this list
+     */
+
+    /* not implemented:
+     * PVFS_SERV_NOOP 
+     * PVFS_SERV_GETEATTR
+     * PVFS_SERV_SETEATTR,
+     * PVFS_SERV_BATCH
+     * PVFS_SERV_EXTENSION
+     * PVFS_SERV_STATFS
+     */
 };
+#define PVFS_MAX_SERVER_OP 13
 
 /******************************************************************/
 /* these values define limits on the maximum size of variable length
