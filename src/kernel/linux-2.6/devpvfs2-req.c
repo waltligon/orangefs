@@ -62,11 +62,9 @@ static int pvfs2_devreq_open(
 	    open_access_count++;
             device_owner = current;
 	}
-        up(&devreq_semaphore);
     }
     else
     {
-        up(&devreq_semaphore);
 	pvfs2_error("*****************************************************\n");
 	pvfs2_error("PVFS2 Device Error:  You cannot open the device file ");
 	pvfs2_error("\n/dev/%s more than once.  Please make sure that\nthere "
@@ -76,8 +74,10 @@ static int pvfs2_devreq_open(
 	pvfs2_error("For example, you can use the lsof program as follows:\n");
 	pvfs2_error("'lsof | grep %s' (run this as root)\n",
 		    PVFS2_REQDEVICE_NAME);
+        pvfs2_error("  open_access_count = %d\n", open_access_count);
 	pvfs2_error("*****************************************************\n");
     }
+    up(&devreq_semaphore);
     pvfs2_print("pvfs2_devreq_open: open complete (ret = %d)\n", ret);
     return ret;
 }
