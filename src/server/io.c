@@ -14,8 +14,8 @@
 #include <assert.h>
 
 static int io_init(state_action_struct *s_op, job_status_s *ret);
-static int io_do_some_work(state_action_struct *s_op, job_status_s *ret);
-static int io_release_posted_job(state_action_struct *s_op, job_status_s *ret);
+static int io_send_ack(state_action_struct *s_op, job_status_s *ret);
+static int io_release(state_action_struct *s_op, job_status_s *ret);
 static int io_cleanup(state_action_struct *s_op, job_status_s *ret);
 void io_init_state_machine(void);
 
@@ -47,24 +47,23 @@ PINT_state_machine_s io_req_s =
 
 %%
 
-machine io(init, do_work, cleanup, release)
+machine io(init, send_ack, cleanup, release)
 {
 	state init
 	{
 		run io_init;
-		success => do_work;
-		default => cleanup;
+		default => send_ack;
 	}
 
-	state do_work
+	state send_ack 
 	{
-		run io_do_some_work;
+		run io_send_ack;
 		default => release;
 	}
 
 	state release
 	{
-		run io_release_posted_job;
+		run io_release;
 		default => cleanup;
 	}
 
@@ -78,7 +77,7 @@ machine io(init, do_work, cleanup, release)
 %%
 
 /*
- * Function: io_init_state_machine
+ * Function: io_init_state_machine()
  *
  * Params:   void
  *
@@ -92,14 +91,13 @@ machine io(init, do_work, cleanup, release)
  * state-comp preprocessor for request
  *           
  */
-
 void io_init_state_machine(void)
 {
 	io_req_s.state_machine = io;
 }
 
 /*
- * Function: io_init
+ * Function: io_init()
  *
  * Params:   server_op *s_op, 
  *           job_status_s *ret
@@ -115,14 +113,11 @@ void io_init_state_machine(void)
  *           the request scheduler for consistency.
  *           
  */
-
 static int io_init(state_action_struct *s_op, job_status_s *ret)
 {
 	int job_post_ret;
-	gossip_ldebug(SERVER_DEBUG,
-			"Got A Request for %d\n",
-			s_op->op);
 	
+	gossip_ldebug(SERVER_DEBUG, "IO: io_init() executed.\n");
 	/* Here, any prep work should be done including calls to allocate memory, 
 		including using the cache mechanism
 	 */
@@ -148,7 +143,7 @@ static int io_init(state_action_struct *s_op, job_status_s *ret)
 }
 
 /*
- * Function: io_do_some_work
+ * Function: io_send_ack()
  *
  * Params:   server_op *s_op, 
  *           job_status_s *ret
@@ -165,29 +160,50 @@ static int io_init(state_action_struct *s_op, job_status_s *ret)
  *           non-blocking.
  *           
  */
-
-static int io_do_some_work(state_action_struct *s_op, job_status_s *ret)
+static int io_send_ack(state_action_struct *s_op, job_status_s *ret)
 {
-	int job_post_ret = 1;
+	int ret = -1;
+	job_id_t tmp_id;
 	
-	/* Note that this call is non-blocking and the return value will be
-		handled by the server deamon and correspondingly the state-machine 
-		NOTE: THIS SHOULD BE DONE BY ALL REQUESTS
-	 */
+	gossip_ldebug(SERVER_DEBUG, "IO: io_send_ack() executed.\n");
 
-	/* We would post another job here. */
-	/*job_post_ret = job_interface_call_goes_here(params!);*/
+	s_op->resp->status = -ENOSYS;
+	s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
 
-	/* This return value will denote completion of the non-blocking interface call
-	   This DOES NOT denote the actual success of the operation.  In other words,
-		job_post_ret can be 1 signifying that a job completed, but it completed in
-		failure, and that value is denoted in ret->error_code
-	*/
-	return(job_post_ret);
+	ret = PINT_encode(
+		s_op->resp, 
+		PINT_ENCODE_RESP, 
+		&(s_op->encoded),
+		s_op->addr,
+		s_op->enc_type);
+
+	if(ret < 0)
+	{
+		/* TODO: what do I do here? */
+		/* I see the way it is handled in get-attr.c, but I think we need
+		 * to do something different/safer...
+		 */
+		gossip_lerr("IO: AIEEEeee! PINT_encode() failure.\n");
+		gossip_lerr("IO: returning -1 from state function.\n");
+	}
+	else
+	{
+		ret = job_bmi_send(s_op->addr,
+			s_op->encoded.buffer_list[0],
+			s_op->encoded.total_size,
+			s_op->tag,
+			0,
+			0,
+			s_op,
+			ret,
+			&tmp_id);
+	}
+
+	return(ret);
 }
 
 /*
- * Function: io_release_posted_job
+ * Function: io_release()
  *
  * Params:   server_op *b, 
  *           job_status_s *ret
@@ -203,12 +219,13 @@ static int io_do_some_work(state_action_struct *s_op, job_status_s *ret)
  *           with the client with respect to this operation, so we must tell 
  *           the scheduler to proceed with the next operation on our handle!
  */
-
-static int io_release_posted_job(state_action_struct *s_op, job_status_s *ret)
+static int io_release(state_action_struct *s_op, job_status_s *ret)
 {
 
 	int job_post_ret=0;
 	job_id_t i;
+
+	gossip_ldebug(SERVER_DEBUG, "IO: io_release() executed.\n");
 
 	job_post_ret = job_req_sched_release(s_op->scheduled_id,
 													  s_op,
@@ -218,7 +235,7 @@ static int io_release_posted_job(state_action_struct *s_op, job_status_s *ret)
 }
 
 /*
- * Function: io_cleanup
+ * Function: io_cleanup()
  *
  * Params:   server_op *b, 
  *           job_status_s *ret
@@ -235,11 +252,9 @@ static int io_release_posted_job(state_action_struct *s_op, job_status_s *ret)
  *           continue working on it.  After this state is done, 
  *           none of the work with respect to this request is valid.
  */
-
 static int io_cleanup(state_action_struct *s_op, job_status_s *ret)
 {
-	gossip_ldebug(SERVER_DEBUG,"clean Fxn for io request\n");
-
+	gossip_ldebug(SERVER_DEBUG, "IO: io_cleanup() executed.\n");
 	/* Free the encoded message if necessary! */
 
 	if(s_op->resp)
