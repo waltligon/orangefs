@@ -30,9 +30,6 @@ flowproto bmi_trove stuff:
   clever about multiplexing between bmi/trove and dividing up the
   max_idle_time.
 
-- finish implementing ability to test multiple collections, remove
-  HACK_global_fsid
-
 - handle corner cases (look for "TODO" entries in code); mostly error
   conditions and short I/O conditions that we can't clean up right now
 

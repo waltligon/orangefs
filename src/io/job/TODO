@@ -22,9 +22,6 @@ general
 
 - bring example programs back up to speed
 
-- finish implementing ability to test multiple collection, remove
-  HACK_global_fsid
-
 - be sure to turn off mutex locks for non-threaded version
 
 - once unpost() is fully supported, attempt to unpost any pending
