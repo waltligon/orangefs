@@ -107,6 +107,7 @@ static int server_state_machine_start_noreq(enum PVFS_server_op op);
 int main(int argc, char **argv)
 {
     int ret = -1, debug_mask = 0;
+    char *fs_conf = NULL, *server_conf = NULL;
 
 #ifdef WITH_MTRACE
     mtrace();
@@ -133,7 +134,11 @@ int main(int argc, char **argv)
     {
 	goto server_shutdown;
     }
-    if (PINT_parse_config(&server_config, argv[optind], argv[optind + 1]))
+
+    fs_conf = ((argc >= optind) ? argv[optind] : NULL);
+    server_conf = ((argc >= (optind + 1)) ? argv[optind + 1] : NULL);
+
+    if (PINT_parse_config(&server_config, fs_conf, server_conf))
     {
 	gossip_err("Fatal Error: This server requires a valid "
                    "configuration for operation.\nPlease check your "
@@ -783,7 +788,8 @@ static int server_parse_cmd_line_args(int argc, char **argv)
 		break;
 	}
     }
-    if (optind < 2)
+
+    if (argc == 1)
     {
         goto parse_cmd_line_args_failure;
     }
