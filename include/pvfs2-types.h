@@ -358,7 +358,7 @@ int32_t PVFS_get_errno_mapping(int32_t error);
 #define PVFS_EHOSTDOWN	        (55|(PVFS_ERROR_BIT))	/* Host is down */
 #define PVFS_EHOSTUNREACH	(56|(PVFS_ERROR_BIT))	/* No route to host */
 #define PVFS_EALREADY	        (57|(PVFS_ERROR_BIT))	/* Operation already in progress */
-#define PVFS_EPARTIAL           (58|(PVFS_ERROR_BIT))   /* Operation was only partially successful */
+#define PVFS_EDETAIL            (58|(PVFS_ERROR_BIT))   /* Detailed per-server errors are available */
 
 
 /***************** non-errno/pvfs2 specific error codes *****************/
@@ -491,7 +491,8 @@ struct PVFS_error_server_s {
 typedef struct PVFS_error_server_s PVFS_error_server;
 
 struct PVFS_error_details_s {
-    int count;
+    int count_allocated;
+    int count_used;
     int count_exceeded; /* set if we ran out of space for errors */
     PVFS_error_server error[1]; /* structure is alloc'd larger for more errors */
 };

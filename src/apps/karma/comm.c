@@ -17,7 +17,7 @@
 static const PVFS_util_tab* tab;
 static struct PVFS_mgmt_server_stat *visible_stats = NULL;
 static struct PVFS_mgmt_server_stat *internal_stats = NULL;
-static int *internal_errors = NULL;
+static PVFS_error_details *internal_details = NULL;
 static int visible_stat_ct;
 static int internal_stat_ct;
 
@@ -99,7 +99,8 @@ int gui_comm_setup(void)
 					 G_TYPE_INT);
 
     ret = PVFS_sys_initialize(0);
-    if (ret < 0) {
+    if (ret < 0)
+    {
 	return -1;
     }
 
@@ -112,7 +113,8 @@ int gui_comm_setup(void)
 	}
     }
 
-    for (i=0; i < tab->mntent_count; i++) {
+    for (i=0; i < tab->mntent_count; i++)
+    {
 	GtkTreeIter iter;
         PVFS_fs_id cur_fs_id;
 
@@ -207,7 +209,8 @@ void gui_comm_set_active_fs(char *contact_server,
 				  creds,
 				  PVFS_MGMT_IO_SERVER | PVFS_MGMT_META_SERVER,
 				  &outcount);
-    if (ret < 0) {
+    if (ret < 0)
+    {
 	return;
     }
 
@@ -218,17 +221,19 @@ void gui_comm_set_active_fs(char *contact_server,
     else if (internal_stats != NULL) {
 	/* free all our dynamically allocated memory for resizing */
 	free(internal_stats);
-	free(internal_errors);
 	free(internal_perf[0]);
 	free(internal_perf);
 	free(internal_perf_ids);
 	free(internal_end_time_ms);
+
+	PVFS_error_details_free(internal_details);
     }
 
     internal_stats   = (struct PVFS_mgmt_server_stat *)
 	malloc(outcount * sizeof(struct PVFS_mgmt_server_stat));
-    internal_errors  = (int *) malloc(outcount * sizeof(int));
     internal_stat_ct = outcount;
+
+    internal_details = PVFS_error_details_new(outcount);
 
     /* save addresses of servers */
     if (internal_addrs != NULL)
@@ -255,9 +260,12 @@ void gui_comm_set_active_fs(char *contact_server,
 	       sizeof(struct PVFS_mgmt_perf_stat));
     internal_perf = (struct PVFS_mgmt_perf_stat **)
 	malloc(outcount * sizeof(struct PVFS_mgmt_perf_stat *));
-    for (i=0; i < outcount; i++) {
+
+    for (i=0; i < outcount; i++)
+    {
 	internal_perf[i] = &bigperfbuf[i * GUI_COMM_PERF_HISTORY];
     }
+
     internal_perf_ids = (uint32_t *) malloc(outcount * sizeof(uint32_t));
     memset(internal_perf_ids, 0, outcount * sizeof(uint32_t));
     internal_end_time_ms = (uint64_t *) malloc(outcount * sizeof(uint64_t));
@@ -322,33 +330,27 @@ static int gui_comm_stats_collect(void)
 				creds,
 				internal_stats,
 				internal_addrs,
-				internal_errors,
-				internal_stat_ct);
+				internal_stat_ct,
+				internal_details);
     if (ret == 0) return 0;
-    else if (ret == -PVFS_EPARTIAL) {
+    else if (ret == -PVFS_EDETAIL)
+    {
 	int i;
-	for (i=0; i < internal_stat_ct; i++)
+
+	for (i=0; i < internal_details->count_used; i++)
 	{
 	    char msgbuf[64];
 
-	    if (internal_errors[i] != 0) {
-		/* note: statfs_list already clears out values,
-		 * so we don't need to zero stat fields in failure
-		 * cases.
-		 */
-		
-		snprintf(msgbuf,
-			 64,
-			 "Server %d not responding (need to map to addr!).\n",
-			 i);
-		gui_message_new(msgbuf);
-
-	    }
+	    snprintf(msgbuf,
+		     64,
+		     "Server not responding (need to map to addr!).\n");
+	    gui_message_new(msgbuf);
 	}
 
 	return 0;
     }
-    else {
+    else
+    {
 	PVFS_perror("PVFS_mgmt_statfs_list", ret);
 	return -1;
     }
@@ -370,7 +372,8 @@ static int gui_comm_perf_collect(void)
 				  internal_perf_ids,
 				  internal_addr_ct,
 				  GUI_COMM_PERF_HISTORY);
-    if (ret != 0) {
+    if (ret != 0)
+    {
 	PVFS_perror("PVFS_mgmt_perf_mon_list", ret);
 	return -1;
     }
@@ -397,7 +400,8 @@ int gui_comm_traffic_retrieve(struct gui_traffic_raw_data **svr_traffic,
     if (ret != 0) return ret;
 
     /* initialize visible_perf array if we haven't already */
-    if (visible_perf == NULL) {
+    if (visible_perf == NULL)
+    {
 	visible_perf = (struct gui_traffic_raw_data *)
 	    malloc(internal_addr_ct * sizeof(struct gui_traffic_raw_data));
 	assert(visible_perf != NULL);
@@ -407,16 +411,19 @@ int gui_comm_traffic_retrieve(struct gui_traffic_raw_data **svr_traffic,
 	   internal_addr_ct * sizeof(struct gui_traffic_raw_data));
 
     /* summarize data and store in visible_perf array */
-    for (svr=0; svr < internal_addr_ct; svr++) {
+    for (svr=0; svr < internal_addr_ct; svr++)
+    {
 	int valid_start_time = 0;
 	uint64_t start_time_ms = 0;
 
 	struct gui_traffic_raw_data *raw = &visible_perf[svr];
 
-	for (idx=0; idx < GUI_COMM_PERF_HISTORY; idx++) {
+	for (idx=0; idx < GUI_COMM_PERF_HISTORY; idx++)
+	{
 	    if (!internal_perf[svr][idx].valid_flag) continue;
 	    
-	    if (!valid_start_time) {
+	    if (!valid_start_time)
+	    {
 		/* Q: should we just assume first entry is good? */
 		valid_start_time = 1;
 		start_time_ms = internal_perf[svr][idx].start_time_ms;
@@ -428,7 +435,8 @@ int gui_comm_traffic_retrieve(struct gui_traffic_raw_data **svr_traffic,
 	    raw->meta_read_ops     = internal_perf[svr][idx].metadata_read;
 	}
 
-	if (valid_start_time) {
+	if (valid_start_time)
+	{
 	    raw->elapsed_time_ms = internal_end_time_ms[svr] - start_time_ms;
 	}
 	else
@@ -437,7 +445,8 @@ int gui_comm_traffic_retrieve(struct gui_traffic_raw_data **svr_traffic,
 	}
 
 	/* deal with format in which metadata is returned */
-	if (internal_perf[svr][0].valid_flag) {
+	if (internal_perf[svr][0].valid_flag)
+	{
 	    raw->meta_write_ops -= internal_perf[svr][0].metadata_write;
 	    raw->meta_read_ops  -= internal_perf[svr][0].metadata_read;
 

@@ -30,6 +30,10 @@ PVFS_error_details *PVFS_error_details_new(int count)
 	(count-1) * sizeof(PVFS_error_server);
 
     details = (PVFS_error_details *) malloc(sz);
+    if (details != NULL)
+    {
+	details->count_allocated = count;
+    }
 
     return details;
 }

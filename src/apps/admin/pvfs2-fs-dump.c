@@ -252,8 +252,8 @@ int build_handlelist(PVFS_fs_id cur_fs,
 				creds,
 				stat_array,
 				addr_array,
-				NULL, /* error array */
-				server_count);
+				server_count,
+				NULL /* details */);
     if (ret != 0)
     {
 	PVFS_perror("PVFS_mgmt_statfs_list", ret);

@@ -164,7 +164,7 @@ int main(int argc, char **argv)
 	}
 
 	ret = PVFS_mgmt_statfs_list(
-            cur_fs, creds, stat_array, addr_array, NULL, outcount);
+            cur_fs, creds, stat_array, addr_array, outcount, NULL);
 	if (ret < 0)
 	{
 	    PVFS_perror("PVFS_mgmt_statfs_list", ret);

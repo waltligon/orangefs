@@ -64,8 +64,8 @@ int PVFS_mgmt_statfs_list(PVFS_fs_id fs_id,
 			  PVFS_credentials credentials,
 			  struct PVFS_mgmt_server_stat *stat_array,
 			  PVFS_BMI_addr_t *addr_array,
-			  int *error_array,
-			  int count)
+			  int count,
+			  PVFS_error_details *details)
 {
     int ret = -PVFS_EINVAL, i = 0;
     PINT_client_sm *sm_p = NULL;
@@ -135,14 +135,32 @@ int PVFS_mgmt_statfs_list(PVFS_fs_id fs_id,
 
     error = sm_p->error_code;
 
-    if ((error != 0) && (error_array != NULL))
+    if ((error != 0) && (details != NULL))
     {
-	/* store server-specific errors in error_array */
+	/* store server-specific errors in error details */
+	int errct = 0;
+
+	details->count_exceeded = 0;
+
 	for (i=0; i < count; i++)
         {
-	    error_array[i] = sm_p->msgarray[i].op_status;
+	    if (sm_p->msgarray[i].op_status != 0)
+	    {
+		if (errct < details->count_allocated)
+		{
+		    details->error[errct].error = sm_p->msgarray[i].op_status;
+		    details->error[errct].addr  = sm_p->msgarray[i].svr_addr;
+		    errct++;
+		}
+		else
+		{
+		    details->count_exceeded = 1;
+		}
+	    }
 	}
-	error = -PVFS_EPARTIAL;
+	details->count_used = errct;
+
+	error = -PVFS_EDETAIL;
     }
 
  cleanup:

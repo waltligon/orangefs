@@ -139,8 +139,8 @@ int PVFS_mgmt_statfs_list(
     PVFS_credentials credentials,
     struct PVFS_mgmt_server_stat *stat_array,
     PVFS_BMI_addr_t *addr_array,
-    int *error_array,
-    int count);
+    int count,
+    PVFS_error_details *details);
 
 int PVFS_mgmt_statfs_all(
     PVFS_fs_id fs_id,
