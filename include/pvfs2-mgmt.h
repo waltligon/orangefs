@@ -11,11 +11,6 @@
 
 #include "pvfs2-types.h"
 
-enum PVFS_server_param
-{
-    PVFS_SERV_PARAM_GOSSIP_ACTIVE = 1  /* gossip debuggin on or off */
-};
-
 int PVFS_mgmt_setparam_all(
     PVFS_fs_id fs_id,
     PVFS_credentials credentials,

@@ -240,6 +240,7 @@ static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p)
 	    break;
 
 	/* things we don't check permissions on */
+	case PVFS_SERV_MGMT_SETPARAM:
 	case PVFS_SERV_CREATE:
 	case PVFS_SERV_REMOVE:
 	case PVFS_SERV_IO:

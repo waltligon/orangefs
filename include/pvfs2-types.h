@@ -124,6 +124,13 @@ struct PVFS_dirent_s
 };
 typedef struct PVFS_dirent_s PVFS_dirent;
 
+/* these are predefined server parameters that can be manipulated
+ * through the mgmt interface
+ */
+enum PVFS_server_param
+{
+    PVFS_SERV_PARAM_GOSSIP_ACTIVE = 1  /* gossip debuggin on or off */
+};
 
 /* PVFS2 errors
  *

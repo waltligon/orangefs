@@ -182,6 +182,9 @@ static inline char* PINT_map_server_op_to_string(enum PVFS_server_op op)
 	case PVFS_SERV_INVALID:
 	    ret_ptr = "invalid";
 	    break;
+	case PVFS_SERV_MGMT_SETPARAM:
+	    ret_ptr = "mgmt_setparam";
+	    break;
 	case PVFS_SERV_CREATE:
 	    ret_ptr = "create";
 	    break;

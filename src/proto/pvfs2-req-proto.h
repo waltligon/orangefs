@@ -35,7 +35,8 @@ enum PVFS_server_op
     PVFS_SERV_READDIR = 11,
     PVFS_SERV_GETCONFIG = 12,
     PVFS_SERV_WRITE_COMPLETION = 13,
-    PVFS_SERV_FLUSH = 14
+    PVFS_SERV_FLUSH = 14,
+    PVFS_SERV_MGMT_SETPARAM = 15
     /* IMPORTANT: please remember to modify PVFS_MAX_SERVER_OP define (below)
      * if you add a new operation to this list
      */
@@ -49,7 +50,7 @@ enum PVFS_server_op
      * PVFS_SERV_STATFS
      */
 };
-#define PVFS_MAX_SERVER_OP 14
+#define PVFS_MAX_SERVER_OP 15
 
 /******************************************************************/
 /* these values define limits on the maximum size of variable length
@@ -420,6 +421,35 @@ struct PVFS_servresp_write_completion
     PVFS_size total_completed;	    /* amount of data transfered */
 };
 
+/* mgmt_setparam ****************************************************/
+/* - management operation for setting runtime parameters */
+
+struct PVFS_servreq_mgmt_setparam
+{
+    PVFS_fs_id fs_id;		    /* file system */
+    enum PVFS_server_param param;   /* paramter to set */
+    int64_t value;		    /* parameter value */
+};
+
+#define PINT_SERVREQ_MGMT_SETPARAM_FILL(__req,	\
+				  __creds,	\
+				  __fsid,	\
+				  __param,	\
+				  __value)	\
+do {						\
+    memset(&(__req), 0, sizeof(__req));		\
+    (__req).op = PVFS_SERV_MGMT_SETPARAM;	\
+    (__req).credentials = (__creds);		\
+    (__req).u.mgmt_setparam.fs_id = (__fsid);	\
+    (__req).u.mgmt_setparam.param = (__param);	\
+    (__req).u.mgmt_setparam.value = (__value);	\
+} while (0)
+
+/* NOTE: no response structure; all necessary response info is 
+ * returned in generic server response structure
+ */
+
+
 /* server request *********************************************/
 /* - generic request with union of all op specific structs */
 
@@ -441,6 +471,7 @@ struct PVFS_server_req
 	struct PVFS_servreq_rmdirent rmdirent;
 	struct PVFS_servreq_truncate truncate;
 	struct PVFS_servreq_flush flush;
+	struct PVFS_servreq_mgmt_setparam mgmt_setparam;
     }
     u;
 };

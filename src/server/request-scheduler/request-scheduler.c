@@ -174,6 +174,9 @@ int PINT_req_sched_target_handle(struct PVFS_server_req*
 		case PVFS_SERV_INVALID: 
 			return(-EINVAL);
 			break;
+		case PVFS_SERV_MGMT_SETPARAM:
+			return(0);
+			break;
 		case PVFS_SERV_CREATE:
 			return(0);
 			break;
