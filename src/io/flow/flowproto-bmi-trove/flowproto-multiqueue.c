@@ -64,6 +64,7 @@ struct fp_private_data
     int initial_posts;
     gen_mutex_t flow_mutex;
     void* tmp_buffer_list[MAX_REGIONS];
+    void* intermediate;
 
     struct qlist_head src_list;
     struct qlist_head dest_list;
@@ -1017,26 +1018,41 @@ static void cleanup_buffers(struct fp_private_data* flow_data)
 {
     int i;
 
-    for(i=0; i<BUFFERS_PER_FLOW; i++)
+    if(flow_data->parent->src.endpoint_id == BMI_ENDPOINT &&
+	flow_data->parent->dest.endpoint_id == TROVE_ENDPOINT)
     {
-	if(flow_data->prealloc_array[i].buffer)
+	for(i=0; i<BUFFERS_PER_FLOW; i++)
 	{
-	    if(flow_data->parent->src.endpoint_id == BMI_ENDPOINT &&
-		flow_data->parent->dest.endpoint_id == TROVE_ENDPOINT)
+	    if(flow_data->prealloc_array[i].buffer)
 	    {
 		BMI_memfree(flow_data->parent->src.u.bmi.address,
 		    flow_data->prealloc_array[i].buffer,
 		    BUFFER_SIZE,
 		    BMI_RECV);
 	    }
-	    else if(flow_data->parent->src.endpoint_id == TROVE_ENDPOINT &&
-		flow_data->parent->dest.endpoint_id == BMI_ENDPOINT)
+	}
+    }
+    else if(flow_data->parent->src.endpoint_id == TROVE_ENDPOINT &&
+	flow_data->parent->dest.endpoint_id == BMI_ENDPOINT)
+    {
+	for(i=0; i<BUFFERS_PER_FLOW; i++)
+	{
+	    if(flow_data->prealloc_array[i].buffer)
 	    {
 		BMI_memfree(flow_data->parent->dest.u.bmi.address,
 		    flow_data->prealloc_array[i].buffer,
 		    BUFFER_SIZE,
 		    BMI_SEND);
 	    }
+	}
+    }
+    else if(flow_data->parent->src.endpoint_id == MEM_ENDPOINT &&
+	flow_data->parent->dest.endpoint_id == BMI_ENDPOINT)
+    {
+	if(flow_data->intermediate)
+	{
+	    BMI_memfree(flow_data->parent->dest.u.bmi.address,
+		flow_data->intermediate, BUFFER_SIZE, BMI_SEND);
 	}
     }
 
@@ -1059,6 +1075,9 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
     struct fp_private_data* flow_data = PRIVATE_FLOW(q_item->parent);
     int i;
     PVFS_id_gen_t tmp_id;
+    PVFS_size bytes_processed = 0;
+    char *src_ptr, *dest_ptr;
+    enum bmi_buffer_type buffer_type = BMI_EXT_ALLOC;
 
     /* TODO: error handling */
     if(error_code != 0)
@@ -1104,6 +1123,56 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
 
     /* TODO: error handling */ 
     assert(ret >= 0);
+
+    /* was MAX_REGIONS enough to satisfy this step? */
+    if(!PINT_REQUEST_DONE(flow_data->parent->file_req_state) &&
+	q_item->result_chain.result.bytes < BUFFER_SIZE)
+    {
+	/* create an intermediate buffer */
+	if(!flow_data->intermediate)
+	{
+	    flow_data->intermediate = BMI_memalloc(
+		flow_data->parent->dest.u.bmi.address,
+		BUFFER_SIZE, BMI_SEND);
+	    /* TODO: error handling */
+	    assert(flow_data->intermediate);
+	}
+
+	do
+	{
+	    /* copy what we have so far into intermediate buffer */
+	    for(i=0; i<q_item->result_chain.result.segs; i++)
+	    {
+		src_ptr = ((char*)q_item->buffer + 
+		    q_item->result_chain.offset_list[i]);
+		dest_ptr = ((char*)flow_data->intermediate + bytes_processed);
+		memcpy(dest_ptr, src_ptr, q_item->result_chain.size_list[i]);
+		bytes_processed += q_item->result_chain.size_list[i];
+	    }
+	    q_item->result_chain.result.bytemax = BUFFER_SIZE - bytes_processed;
+	    q_item->result_chain.result.bytes = 0;
+	    q_item->result_chain.result.segmax = MAX_REGIONS;
+	    q_item->result_chain.result.segs = 0;
+	    q_item->result_chain.buffer_offset = NULL;
+	    /* process ahead */
+	    ret = PINT_Process_request(q_item->parent->file_req_state,
+		q_item->parent->mem_req_state,
+		&q_item->parent->file_data,
+		&q_item->result_chain.result,
+		PINT_SERVER);
+	    /* TODO: error handling */
+	    assert(ret >= 0);
+	}while(bytes_processed < BUFFER_SIZE &&
+	    !PINT_REQUEST_DONE(q_item->parent->file_req_state));
+
+	/* setup for BMI operation */
+	flow_data->tmp_buffer_list[0] = flow_data->intermediate;
+	q_item->result_chain.result.size_array[0] = bytes_processed;
+	q_item->result_chain.result.bytes = bytes_processed;
+	q_item->result_chain.result.segs = 1;
+	buffer_type = BMI_PRE_ALLOC;
+    }
+
     /* TODO: handle highly discontiguous cases */
     assert(q_item->result_chain.result.segs <= MAX_REGIONS);
 
@@ -1127,7 +1196,7 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
 	q_item->result_chain.result.size_array,
 	q_item->result_chain.result.segs,
 	q_item->result_chain.result.bytes,
-	BMI_EXT_ALLOC,
+	buffer_type,
 	q_item->parent->tag,
 	&q_item->bmi_callback,
 	global_bmi_context);
