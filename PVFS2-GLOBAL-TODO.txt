@@ -139,16 +139,10 @@ system management utilities
 
 documentation:
 ====================================================================
+- update the coding guidelines
 - document config file options
 - a way to export to html
 - faq
-- top level README/INSTALL files
-- put quickstart in a more obvious location
-- pvfs2-users list
-- pvfs2 web site
-- status document
-- API terminology
-- general file system terminology
 - mechanism for exporting to html
 - update all design docs!
 - review
