@@ -419,7 +419,7 @@ static int server_parse_config(PVFS_servresp_getconfig *response)
     int fs_fd = 0, server_fd = 0;
     char fs_template[] = ".__pvfs_fs_configXXXXXX";
     char server_template[] = ".__pvfs_server_configXXXXXX";
-    char *args[3] = { fs_template, server_template, NULL };
+    char *args[3] = { NULL, fs_template, server_template };
 
     if (response)
     {
