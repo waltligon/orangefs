@@ -153,6 +153,10 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
             op_p->handle, op_p->u.k_read.key.buffer,
             op_p->u.k_read.val.buffer, data.size))
     {
+        /*
+          NOTE: this can happen if the keyword isn't registered,
+          or if there is no associated cache_elem for this key
+        */
         gossip_debug(
             DBPF_ATTRCACHE_DEBUG,"** CANNOT cache data retrieved "
             "(key is %s)\n", (char *)op_p->u.k_read.key.buffer);
@@ -294,7 +298,6 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
         }
     }
 
-    /* sync if requested by user */
     if (op_p->flags & TROVE_SYNC)
     {
 	if ((ret = db_p->sync(db_p, 0)) != 0)
@@ -396,7 +399,6 @@ static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p)
 	goto return_error;
     }
 
-    /* sync only if requested by user */
     if (op_p->flags & TROVE_SYNC)
     {
 	if ((ret = db_p->sync(db_p, 0)) != 0)

@@ -316,9 +316,6 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
     key.data = &op_p->handle;
     key.size = sizeof(TROVE_handle);
 
-    /* if this attr is in the dbpf attr cache, remove it */
-    dbpf_attr_cache_remove(op_p->handle);
-
     /* FIXME: no steps taken to ensure it's empty at this level */
     ret = db_p->del(db_p, NULL, &key, 0);
     switch (ret)
@@ -336,6 +333,9 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
                          "handle 0x%08Lx\n", Lu(op_p->handle));
 	    break;
     }
+
+    /* if this attr is in the dbpf attr cache, remove it */
+    dbpf_attr_cache_remove(op_p->handle);
 
     if (op_p->flags & TROVE_SYNC)
     {
@@ -565,16 +565,16 @@ return_ok:
             gossip_debug(TROVE_DEBUG, "iterate -- some other "
                          "failure @ recno\n");
         }
-
 	*op_p->u.d_iterate_handles.position_p = recno;
     }
     /* 'position' points us to the record we just read, or is set to END */
 
     *op_p->u.d_iterate_handles.count_p = i;
 
-    /* sync if requested */
-    if (op_p->flags & TROVE_SYNC) {
-	if ( (ret = db_p->sync(db_p, 0)) != 0) {
+    if (op_p->flags & TROVE_SYNC)
+    {
+	if ((ret = db_p->sync(db_p, 0)) != 0)
+        {
 	    db_p->err(db_p, ret, "dbpf_dspace_remove");
 	    goto return_error;
 	}
@@ -584,8 +584,11 @@ return_ok:
     return 1;
 
 return_error:
-    gossip_err("dbpf_dspace_iterate_handles_op_svc: %s\n", db_strerror(ret));
+
     *op_p->u.d_iterate_handles.count_p = i; 
+    gossip_err("dbpf_dspace_iterate_handles_op_svc: %s\n",
+               db_strerror(ret));
+
     if (got_db)
     {
         dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);
@@ -593,8 +596,6 @@ return_error:
     return -1;
 }
 
-/* dbpf_dspace_verify()
- */
 static int dbpf_dspace_verify(TROVE_coll_id coll_id,
 			      TROVE_handle handle,
 			      TROVE_ds_type *type_p,
@@ -769,9 +770,6 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
     dbpf_queued_op_t *q_op_p;
     struct dbpf_collection *coll_p;
 
-    /* if this attr is in the dbpf attr cache, remove it */
-    dbpf_attr_cache_remove(handle);
-
     coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL)
     {
@@ -858,7 +856,10 @@ static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p)
 	goto return_error;
     }
 
-    /* sync if requested */
+    /* now that the disk is updated, update the cache if necessary */
+    dbpf_attr_cache_ds_attr_update_cached_data(
+        op_p->handle, op_p->u.d_setattr.attr_p);
+
     if (op_p->flags & TROVE_SYNC)
     {
         if ((ret = db_p->sync(db_p, 0)) != 0)

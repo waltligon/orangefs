@@ -98,6 +98,8 @@ int dbpf_attr_cache_do_initialize(void)
         }
     }
 
+    gossip_debug(DBPF_ATTRCACHE_DEBUG, "There are %d cacheable "
+                 "keywords registered\n", num_keywords);
     ret = dbpf_attr_cache_initialize(
         s_cache_size, s_max_num_cache_elems,
         s_cacheable_keyword_array, num_keywords);
@@ -237,19 +239,23 @@ dbpf_attr_cache_elem_t *dbpf_attr_cache_elem_lookup(TROVE_handle key)
     return cache_elem;
 }
 
-int dbpf_attr_cache_ds_attr_pair_update_cached_data(
-    dbpf_attr_cache_elem_t *cached_elem,
-    TROVE_ds_attributes *src_ds_attr)
+int dbpf_attr_cache_ds_attr_update_cached_data(
+    TROVE_handle key, TROVE_ds_attributes *src_ds_attr)
 {
     int ret = -1;
+    dbpf_attr_cache_elem_t *cache_elem = NULL;
 
-    if (DBPF_ATTR_CACHE_INITIALIZED() && (cached_elem && src_ds_attr))
+    cache_elem = dbpf_attr_cache_elem_lookup(key);
+    if (cache_elem && src_ds_attr)
     {
         gen_mutex_lock(s_dbpf_attr_mutex);
-        if (cached_elem && src_ds_attr)
+        if (cache_elem && src_ds_attr)
         {
-            memcpy(&cached_elem->attr, src_ds_attr,
+            memcpy(&cache_elem->attr, src_ds_attr,
                    sizeof(TROVE_ds_attributes));
+            gossip_debug(DBPF_ATTRCACHE_DEBUG, "Updating "
+                         "cached attributes for key %Lu\n",
+                         Lu(key));
             ret = 0;
         }
         gen_mutex_unlock(s_dbpf_attr_mutex);
@@ -283,27 +289,27 @@ int dbpf_attr_cache_ds_attr_pair_fetch_cached_data(
 }
 
 dbpf_keyval_pair_cache_elem_t *dbpf_attr_cache_elem_get_data_based_on_key(
-    dbpf_attr_cache_elem_t *cached_elem, char *key)
+    dbpf_attr_cache_elem_t *cache_elem, char *key)
 {
     int i = 0;
 
     if (DBPF_ATTR_CACHE_INITIALIZED() &&
-        (cached_elem && key && cached_elem->num_keyval_pairs))
+        (cache_elem && key && cache_elem->num_keyval_pairs))
     {
         gen_mutex_lock(s_dbpf_attr_mutex);
-        for(i = 0; i < cached_elem->num_keyval_pairs; i++)
+        for(i = 0; i < cache_elem->num_keyval_pairs; i++)
         {
-            if ((strcmp(cached_elem->keyval_pairs[i].key, key) == 0) &&
-                (cached_elem->keyval_pairs[i].data != NULL))
+            if ((strcmp(cache_elem->keyval_pairs[i].key, key) == 0) &&
+                (cache_elem->keyval_pairs[i].data != NULL))
             {
                 gossip_debug(
                     DBPF_ATTRCACHE_DEBUG, "Returning data %p based on "
                     "key %Lu and key_str %s (data_sz=%d)\n",
-                    cached_elem->keyval_pairs[i].data,
-                    Lu(cached_elem->key), key,
-                    cached_elem->keyval_pairs[i].data_sz);
+                    cache_elem->keyval_pairs[i].data,
+                    Lu(cache_elem->key), key,
+                    cache_elem->keyval_pairs[i].data_sz);
                 gen_mutex_unlock(s_dbpf_attr_mutex);
-                return &cached_elem->keyval_pairs[i];
+                return &cache_elem->keyval_pairs[i];
             }
         }
         gen_mutex_unlock(s_dbpf_attr_mutex);
@@ -353,7 +359,7 @@ int dbpf_attr_cache_elem_set_data_based_on_key(
 }
 
 int dbpf_attr_cache_keyval_pair_update_cached_data(
-    dbpf_attr_cache_elem_t *cached_elem,
+    dbpf_attr_cache_elem_t *cache_elem,
     dbpf_keyval_pair_cache_elem_t *keyval_pair,
     void *src_data, int src_data_sz)
 {
@@ -362,7 +368,7 @@ int dbpf_attr_cache_keyval_pair_update_cached_data(
     if (DBPF_ATTR_CACHE_INITIALIZED() && (keyval_pair && src_data))
     {
         gen_mutex_lock(s_dbpf_attr_mutex);
-        if (cached_elem && keyval_pair)
+        if (cache_elem && keyval_pair)
         {
             if (keyval_pair->data)
             {
@@ -380,7 +386,7 @@ int dbpf_attr_cache_keyval_pair_update_cached_data(
 }
 
 int dbpf_attr_cache_keyval_pair_fetch_cached_data(
-    dbpf_attr_cache_elem_t *cached_elem,
+    dbpf_attr_cache_elem_t *cache_elem,
     dbpf_keyval_pair_cache_elem_t *keyval_pair,
     void *target_data, int *target_data_sz)
 {
@@ -390,7 +396,7 @@ int dbpf_attr_cache_keyval_pair_fetch_cached_data(
         (keyval_pair && target_data && target_data_sz))
     {
         gen_mutex_lock(s_dbpf_attr_mutex);
-        if (cached_elem && keyval_pair)
+        if (cache_elem && keyval_pair)
         {
             memcpy(target_data, keyval_pair->data, keyval_pair->data_sz);
             *target_data_sz = keyval_pair->data_sz;

@@ -74,9 +74,8 @@ int dbpf_attr_cache_elem_set_data_based_on_key(
     TROVE_handle key, char *key_str, void *data, int data_sz);
 
 /* do an atomic update of the attributes in the cache for this key */
-int dbpf_attr_cache_ds_attr_pair_update_cached_data(
-    dbpf_attr_cache_elem_t *cached_elem,
-    TROVE_ds_attributes *src_ds_attr);
+int dbpf_attr_cache_ds_attr_update_cached_data(
+    TROVE_handle key, TROVE_ds_attributes *src_ds_attr);
 /*
   do an atomic copy of the cached attributes into the provided
   target_ds_attr object based on the specified key
@@ -97,7 +96,7 @@ int dbpf_attr_cache_finalize(void);
   data if cached; NULL otherwise
 */
 dbpf_keyval_pair_cache_elem_t *dbpf_attr_cache_elem_get_data_based_on_key(
-    dbpf_attr_cache_elem_t *cached_elem, char *key);
+    dbpf_attr_cache_elem_t *cache_elem, char *key);
 
 /* map data to key_str, based on specified handle attr cache entry */ 
 int dbpf_attr_cache_elem_set_data_based_on_key(
@@ -105,7 +104,7 @@ int dbpf_attr_cache_elem_set_data_based_on_key(
 
 /* do an atomic update of the data in the cache for this keyval */
 int dbpf_attr_cache_keyval_pair_update_cached_data(
-    dbpf_attr_cache_elem_t *cached_elem,
+    dbpf_attr_cache_elem_t *cache_elem,
     dbpf_keyval_pair_cache_elem_t *keyval_pair,
     void *src_data, int src_data_sz);
 /*
@@ -114,7 +113,7 @@ int dbpf_attr_cache_keyval_pair_update_cached_data(
   data.  the size of the data is stored in target_data_sz.
 */
 int dbpf_attr_cache_keyval_pair_fetch_cached_data(
-    dbpf_attr_cache_elem_t *cached_elem,
+    dbpf_attr_cache_elem_t *cache_elem,
     dbpf_keyval_pair_cache_elem_t *keyval_pair,
     void *target_data, int *target_data_sz);
 
