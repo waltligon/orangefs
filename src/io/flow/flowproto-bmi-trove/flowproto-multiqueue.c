@@ -706,6 +706,7 @@ static void bmi_send_callback_fn(void *user_ptr,
 	    result_tmp = (struct result_chain_entry*)malloc(
 		sizeof(struct result_chain_entry));
 	    assert(result_tmp);
+	    memset(result_tmp, 0 , sizeof(struct result_chain_entry));
 	    old_result_tmp->next = result_tmp;
 	}
 	/* process request */
@@ -890,6 +891,7 @@ static void trove_write_callback_fn(void *user_ptr,
 		result_tmp = (struct result_chain_entry*)malloc(
 		    sizeof(struct result_chain_entry));
 		assert(result_tmp);
+		memset(result_tmp, 0 , sizeof(struct result_chain_entry));
 		old_result_tmp->next = result_tmp;
 	    }
 	    /* process request */
