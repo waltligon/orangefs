@@ -120,8 +120,6 @@ int main(int argc, char **argv)
     char *fs_conf = NULL, *server_conf = NULL;
     int siglevel = 0;
 
-    server_controlling_pid = getpid();
-
 #ifdef WITH_MTRACE
     mtrace();
 #endif
@@ -453,6 +451,10 @@ static int server_setup_process_environment(int background)
 	}
         assert(new_pid == getpid());
 
+	/* set this here so our "feed signals to controlling pid" logic works
+	 * correctly */
+	server_controlling_pid = new_pid;
+
         freopen("/dev/null", "r", stdin);
         freopen("/dev/null", "w", stdout);
         freopen("/dev/null", "w", stderr);
@@ -464,7 +466,11 @@ static int server_setup_process_environment(int background)
                         server_config.logfile);
 	    exit(3);
 	}
-    }
+    } else 
+	/* moved from main so we could do the right thing depending on if we
+	 * are daemonized or not */
+	server_controlling_pid = getpid();
+
     return 0;
 }
 
