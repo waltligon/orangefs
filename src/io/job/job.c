@@ -2171,7 +2171,8 @@ int job_testsome(
 	/* count how many of the id's are non zero */
 	for(i=0; i<original_count; i++)
 	{
-		real_id_count++;
+		if(id_array[i])
+			real_id_count++;
 	}
 	if(!real_id_count)
 	{
@@ -2203,7 +2204,9 @@ int job_testsome(
 	tmp_id_array =
 		(job_id_t*)malloc(original_count*sizeof(job_id_t));
 	if(!tmp_id_array)
+	{
 		return(-errno);
+	}
 	memcpy(tmp_id_array, id_array, (original_count*sizeof(job_id_t))); 
 
 	/* check before we do anything else to see if the job that we
@@ -2212,15 +2215,13 @@ int job_testsome(
 	if(returned_user_ptr_array)
 	{
 		ret = completion_query_some(tmp_id_array,  
-			inout_count_p, &out_index_array[total_completed],
-			&returned_user_ptr_array[total_completed], 
-			&out_status_array_p[total_completed]);
+			inout_count_p, out_index_array, returned_user_ptr_array, 
+			out_status_array_p);
 	}
 	else
 	{
 		ret = completion_query_some(tmp_id_array,  
-			inout_count_p, &out_index_array[total_completed],
-			NULL, &out_status_array_p[total_completed]);
+			inout_count_p, out_index_array, NULL, out_status_array_p);
 	}
 
 	/* return here on error or completion */
@@ -2242,10 +2243,10 @@ int job_testsome(
 		return(0);
 	}
 
+	for(i=0; i<(*inout_count_p); i++)
+		tmp_id_array[out_index_array[i]] = 0;
 	total_completed += *inout_count_p;
 	*inout_count_p = original_count;
-	for(i=0; i<total_completed; i++)
-		tmp_id_array[out_index_array[i]] = 0;
 
 	/* if we fall through to this point, then we need to just try
 	 * to eat up the timeout until the jobs that we want hit the
@@ -2325,10 +2326,10 @@ int job_testsome(
 				return(1);
 			}
 
+			for(i=0; i<(*inout_count_p); i++)
+				tmp_id_array[out_index_array[i + total_completed]] = 0;
 			total_completed += *inout_count_p;
 			*inout_count_p = original_count;
-			for(i=0; i<total_completed; i++)
-				tmp_id_array[out_index_array[i]] = 0;
 		}
 
 #else /* __PVFS2_JOB_THREADED__ */
@@ -2370,10 +2371,10 @@ int job_testsome(
 				return(1);
 			}
 
+			for(i=0; i<(*inout_count_p); i++)
+				tmp_id_array[out_index_array[i + total_completed]] = 0;
 			total_completed += *inout_count_p;
 			*inout_count_p = original_count;
-			for(i=0; i<total_completed; i++)
-				tmp_id_array[out_index_array[i]] = 0;
 		}
 
 #endif /* __PVFS2_JOB_THREADED__ */
