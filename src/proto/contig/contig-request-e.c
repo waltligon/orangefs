@@ -269,20 +269,22 @@ int do_encode_req(
 
 	if (request->u.setattr.attr.objtype == PVFS_TYPE_METAFILE)
 	{
-            if ((request->u.setattr.attr.u.meta.dfile_count > 0) &&
-                (request->u.setattr.attr.u.meta.dfile_count <
-                 PVFS_REQ_LIMIT_DFILE_COUNT) &&
-                (request->u.setattr.attr.u.meta.dfile_array != NULL));
+            if (request->u.setattr.attr.mask & PVFS_ATTR_META_DFILES)
 	    {
+                assert(request->u.setattr.attr.u.meta.dfile_count > 0);
+                assert(request->u.setattr.attr.u.meta.dfile_count <
+                       PVFS_REQ_LIMIT_DFILE_COUNT + 1);
+                assert(request->u.setattr.attr.u.meta.dfile_array != NULL);
+                
 		size +=
 		    request->u.setattr.attr.u.meta.dfile_count *
 		    sizeof(PVFS_handle);
 	    }
-	    if (request->u.setattr.attr.u.meta.dist != NULL)
-	    {
-		/* fill in the dist size in the attributes
-		 * while we are at it
-		 */
+
+            if (request->u.setattr.attr.mask & PVFS_ATTR_META_DIST)
+            {
+                assert(request->u.setattr.attr.u.meta.dist != NULL);
+                
 		request->u.setattr.attr.u.meta.dist_size =
 		    PINT_DIST_PACK_SIZE(request->u.setattr.attr.u.meta.dist);
 		size += request->u.setattr.attr.u.meta.dist_size;
@@ -311,11 +313,13 @@ int do_encode_req(
 	/* throw handles at the end for metadata files */
 	if (request->u.setattr.attr.objtype == PVFS_TYPE_METAFILE)
 	{
-            if ((request->u.setattr.attr.u.meta.dfile_count > 0) &&
-                (request->u.setattr.attr.u.meta.dfile_count <
-                 PVFS_REQ_LIMIT_DFILE_COUNT) &&
-                (request->u.setattr.attr.u.meta.dfile_array != NULL));
+            if (request->u.setattr.attr.mask & PVFS_ATTR_META_DFILES)
             {
+                assert(request->u.setattr.attr.u.meta.dfile_count > 0);
+                assert(request->u.setattr.attr.u.meta.dfile_count <
+                       PVFS_REQ_LIMIT_DFILE_COUNT + 1);
+                assert(request->u.setattr.attr.u.meta.dfile_array != NULL);
+
                 memcpy(enc_msg,
                        request->u.setattr.attr.u.meta.dfile_array,
                        request->u.setattr.attr.u.meta.dfile_count *
@@ -326,13 +330,11 @@ int do_encode_req(
                     sizeof(PVFS_handle);
             }
 
-	    /*pack distribution information now */
-            if (request->u.setattr.attr.u.meta.dist)
+	    /* pack distribution information now */
+            if (request->u.setattr.attr.mask & PVFS_ATTR_META_DIST)
             {
-                /*
-                  Q:we alloc'ed what the macro said the packed
-                  size was, is this enough?
-                */
+                assert(request->u.setattr.attr.u.meta.dist != NULL);
+                
                 PINT_Dist_encode(enc_msg, request->u.setattr.attr.u.meta.dist);
             }
 	}

@@ -93,26 +93,26 @@ int do_decode_req(
 
 	if (dec_msg->u.setattr.attr.objtype == PVFS_TYPE_METAFILE)
 	{
-	    dec_msg->u.setattr.attr.u.meta.dfile_array =
-		(PVFS_handle *) char_ptr;
-	    /* move the pointer past the data files, we could have
-	     * distribution information, check the size to be sure
-	     */
+            if (dec_msg->u.setattr.attr.mask & PVFS_ATTR_META_DFILES)
+            {
+                dec_msg->u.setattr.attr.u.meta.dfile_array =
+                    (PVFS_handle *) char_ptr;
 
-	    char_ptr += dec_msg->u.setattr.attr.u.meta.dfile_count
-		* sizeof(PVFS_handle);
-	    if (size > (sizeof(struct PVFS_server_req)
-			+ dec_msg->u.setattr.attr.u.meta.dfile_count
-			* sizeof(PVFS_handle)))
-	    {
-		/* update the pointer, and decode */
-		dec_msg->u.setattr.attr.u.meta.dist = (PVFS_Dist *) char_ptr;
-		PINT_Dist_decode(dec_msg->u.setattr.attr.u.meta.dist, NULL);
-	    }
+                /* move the pointer past the data files, we could have
+                 * distribution information, check the size to be sure
+                 */
+                char_ptr += dec_msg->u.setattr.attr.u.meta.dfile_count
+                    * sizeof(PVFS_handle);
+            }
+
+            if (dec_msg->u.setattr.attr.mask & PVFS_ATTR_META_DIST)
+            {
+                dec_msg->u.setattr.attr.u.meta.dist = (PVFS_Dist *) char_ptr;
+                PINT_Dist_decode(dec_msg->u.setattr.attr.u.meta.dist, NULL);
+            }
 	}
-	target_msg->buffer = dec_msg;
-
 	return (0);
+
     case PVFS_SERV_IO:
 	/* set pointers to the request and dist information */
 	tmp_count = *(int *) (char_ptr + sizeof(struct PVFS_server_req));

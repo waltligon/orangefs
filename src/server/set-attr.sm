@@ -18,8 +18,10 @@ static int setattr_init(PINT_server_op *s_op, job_status_s *ret);
 static int setattr_cleanup(PINT_server_op *s_op, job_status_s *ret);
 static int setattr_getobj_attribs(PINT_server_op *s_op, job_status_s *ret);
 static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s *ret);
-static int setattr_write_metafile_datafile_handles(PINT_server_op *s_op, job_status_s *ret);
-static int setattr_write_metafile_distribution(PINT_server_op *s_op, job_status_s *ret);
+static int setattr_write_metafile_datafile_handles_if_required(
+    PINT_server_op *s_op, job_status_s *ret);
+static int setattr_write_metafile_distribution_if_required(
+    PINT_server_op *s_op, job_status_s *ret);
 static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s *ret);
 static int setattr_release_posted_job(PINT_server_op *s_op, job_status_s *ret);
 static int setattr_send_bmi(PINT_server_op *s_op, job_status_s *ret);
@@ -34,8 +36,8 @@ machine pvfs2_set_attr_sm(init,
 			  cleanup,
 			  getobj_attrib,
 			  verify_attribs,
-			  write_metafile_datafile_handles,
-			  write_metafile_distribution,
+			  write_metafile_datafile_handles_if_required,
+			  write_metafile_distribution_if_required,
 			  setobj_attrib,
 			  send_bmi,
 			  release)
@@ -55,21 +57,21 @@ machine pvfs2_set_attr_sm(init,
 	state verify_attribs
 	{
 		run setattr_verify_attribs;
-		STATE_METAFILE => write_metafile_datafile_handles;
+		STATE_METAFILE => write_metafile_datafile_handles_if_required;
 		success        => setobj_attrib;
 		default        => send_bmi;
 	}
 
-	state write_metafile_datafile_handles
+	state write_metafile_datafile_handles_if_required
         {
-		run setattr_write_metafile_datafile_handles;
-		success => write_metafile_distribution;
+		run setattr_write_metafile_datafile_handles_if_required;
+		success => write_metafile_distribution_if_required;
 		default => send_bmi;
 	}
 
-	state write_metafile_distribution
+	state write_metafile_distribution_if_required
         {
-		run setattr_write_metafile_distribution;
+		run setattr_write_metafile_distribution_if_required;
 		success => setobj_attrib;
 		default => send_bmi;
 	}
@@ -353,19 +355,26 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s *ret)
 
 
 /*
- * Function: setattr_write_metafile_datafile_handles
+ * Function: setattr_write_metafile_datafile_handles_if_required
  */
-static int setattr_write_metafile_datafile_handles(PINT_server_op *s_op, job_status_s *ret)
+static int setattr_write_metafile_datafile_handles_if_required(
+    PINT_server_op *s_op, job_status_s *ret)
 {
     /*PVFS_object_attr *old_attr;*/
     int job_post_ret=0;
     job_id_t j_id;
 
-    gossip_debug(SERVER_DEBUG, "setattr state: write_metafile_datafile_handles\n");
+    if (!(s_op->req->u.setattr.attr.mask & PVFS_ATTR_META_DFILES))
+    {
+        /* if we don't need to write the dfiles, skip them */
+        ret->error_code = 0;
+        return 1;
+    }
+
+    gossip_debug(SERVER_DEBUG, "setattr state: "
+                 "write_metafile_datafile_handles_if_required\n");
 
     /* we should have at least one datafile... */
-#include <stdio.h>
-    fprintf(stderr,"GOT ATTRIBUTE MASK %d\n",s_op->req->u.setattr.attr.mask);
     assert(s_op->req->u.setattr.attr.u.meta.dfile_count > 0);
 
     /* set up key and value structure for keyval write */
@@ -403,15 +412,23 @@ static int setattr_write_metafile_datafile_handles(PINT_server_op *s_op, job_sta
 }
 
 /*
- * Function: setattr_write_metafile_distribution
+ * Function: setattr_write_metafile_distribution_if_required
  */
-static int setattr_write_metafile_distribution(PINT_server_op *s_op, job_status_s *ret)
+static int setattr_write_metafile_distribution_if_required(
+    PINT_server_op *s_op, job_status_s *ret)
 {
     /*PVFS_object_attr *old_attr;*/
     int job_post_ret=0;
     job_id_t j_id;
 
     gossip_debug(SERVER_DEBUG, "setattr state: write_metafile_distribution\n");
+
+    if (!(s_op->req->u.setattr.attr.mask & PVFS_ATTR_META_DIST))
+    {
+        /* if we don't need to fill in the distribution, skip it */
+        ret->error_code = 0;
+        return 1;
+    }
 
     /* distribution should take up non-negative space :) */
     assert(s_op->req->u.setattr.attr.u.meta.dist_size >= 0);

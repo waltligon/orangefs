@@ -192,11 +192,13 @@ static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s *ret)
     a_p = (PVFS_object_attr *) s_op->val.buffer;
     a_p = &s_op->resp->u.getattr.attr;
 
-    if (ret->error_code != 0) {
-	gossip_debug(SERVER_DEBUG,
-		     "  previous keyval read had an error (new metafile?); data is useless\n");
+    if (ret->error_code != 0)
+    {
+	gossip_debug(SERVER_DEBUG, "  previous keyval read had "
+                     "an error (new metafile?); data is useless\n");
     }
-    else {
+    else
+    {
 	gossip_debug(SERVER_DEBUG,
 		     "  attrs read from dspace = (owner = %d, group = %d, perms = %o, type = %d, atime = %lld, mtime = %lld, ctime = %lld)\n",
 		     a_p->owner,
@@ -209,32 +211,40 @@ static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s *ret)
     }
 
     /* TODO: HANDLE TYPES OTHER THAN METAFILES TOO, SOME DAY... */
-    if ((ret->error_code != 0 && s_op->resp->u.getattr.attr.objtype == PVFS_TYPE_METAFILE) || a_p->objtype == PVFS_TYPE_METAFILE)
+    if ((ret->error_code != 0 &&
+         s_op->resp->u.getattr.attr.objtype == PVFS_TYPE_METAFILE) ||
+        a_p->objtype == PVFS_TYPE_METAFILE)
     {
 	gossip_debug(SERVER_DEBUG,
 		     "  handle 0x%08Lx refers to a metafile\n",
 		     s_op->req->u.getattr.handle);
 	ret->error_code = STATE_METAFILE;
 
-	/* save # of datafiles so we know the size for reading later */
-	s_op->resp->u.getattr.attr.u.meta.dfile_count = a_p->u.meta.dfile_count;
-	/* TODO: put in real error handling for this condition: */
-	assert(s_op->resp->u.getattr.attr.u.meta.dfile_count 
-	    <= PVFS_REQ_LIMIT_DFILE_COUNT);
-	/* TODO: keep distribution size in here too */
+        if (s_op->resp->u.getattr.attr.mask & PVFS_ATTR_META_DFILES)
+        {
+            /* save # of datafiles so we know the size for reading later */
+            s_op->resp->u.getattr.attr.u.meta.dfile_count =
+                a_p->u.meta.dfile_count;
+
+            /* TODO: put in real error handling for this condition: */
+            assert(s_op->resp->u.getattr.attr.u.meta.dfile_count 
+                   < PVFS_REQ_LIMIT_DFILE_COUNT);
+            /* TODO: keep distribution size in here too */
+        }
     }
-    else if (ret->error_code == 0) {
-	gossip_debug(SERVER_DEBUG,
-		     "  handle 0x%08Lx refers to something other than a metafile\n",
+    else if (ret->error_code == 0)
+    {
+	gossip_debug(SERVER_DEBUG, "  handle 0x%08Lx refers to "
+                     "something other than a metafile\n",
 		     s_op->req->u.getattr.handle);
     }
-    else {
+    else
+    {
 	/* got an error reading */
 	gossip_debug(SERVER_DEBUG,
-		     "  error reading attributes for handle 0x%08Lx; sending response\n",
-		     s_op->req->u.getattr.handle);
+		     "  error reading attributes for handle 0x%08Lx; "
+                     "sending response\n", s_op->req->u.getattr.handle);
     }
-    
     return 1;
 }
 

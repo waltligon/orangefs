@@ -102,17 +102,6 @@ int PVFS_sys_setattr(PVFS_pinode_reference pinode_refn, PVFS_sys_attr attr,
 	PINT_CONVERT_ATTR(&req_p.u.setattr.attr, &attr,
                           PVFS_ATTR_SYS_ALL_SETABLE);
 
-        /*
-          we don't have the dfile info anymore at this point;
-          clear it out here to avoid crashing the encoder
-        */
-        if (req_p.u.setattr.attr.objtype == PVFS_TYPE_METAFILE)
-        {
-            req_p.u.setattr.attr.u.meta.dfile_count = 0;
-            req_p.u.setattr.attr.u.meta.dfile_array = NULL;
-            req_p.u.setattr.attr.u.meta.dist = NULL;
-        }
-
 	/* Make a server setattr request */	
 	ret = PINT_send_req(serv_addr, &req_p, max_msg_sz,
             &decoded, &encoded_resp, op_tag);
