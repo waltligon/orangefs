@@ -180,7 +180,9 @@ int main(int argc, char **argv)
 	}
     }
 
-    printf("#total empty: %f\n", total_empty);
+    printf("#total empty: %f\n", (total_empty));
+    printf("#total time: %f\n", tmp_time);
+    printf("#percentage idle: %f\n", (100*total_empty/tmp_time));
 
     free(data_array);
     fclose(infile);
