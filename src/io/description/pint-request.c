@@ -641,6 +641,7 @@ PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
 			PINT_REQUEST_STATE_SET_TARGET(mem, poff);
 			PINT_REQUEST_STATE_SET_FINAL(mem, poff + sz);
 			PINT_Process_request (mem, NULL, rfdata, result, mode|PINT_MEMREQ);
+			sz = mem->type_offset - poff;
 			gossip_debug(REQUEST_DEBUG,"*****RETURN***FROM***PROCESS*****\n");
 		}
 		else
