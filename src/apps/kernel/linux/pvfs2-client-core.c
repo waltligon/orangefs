@@ -1420,7 +1420,7 @@ int process_vfs_requests(void)
 int main(int argc, char **argv)
 {
     int ret = 0, i = 0;
-    struct rlimit lim = {0,0};
+/*    struct rlimit lim = {0,0}; */
 
     /* set rlimit to prevent core files */
 /*     ret = setrlimit(RLIMIT_CORE, &lim); */

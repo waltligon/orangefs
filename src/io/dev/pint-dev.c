@@ -206,7 +206,7 @@ int PINT_dev_test_unexpected(
     int avail = -1;
     int32_t *magic;
     int64_t *tag;
-    void* buffer;
+    void* buffer = NULL;
     int i;
 
     /* prepare to read max upcall size (magic nr and tag included) */
@@ -332,7 +332,8 @@ dev_test_unexp_error:
     /* release resources we created up to this point */
     for(i = 0; i < *outcount; i++)
     {
-        free(buffer);
+	if(buffer) 
+	    free(buffer);
     }
     return(ret);
 }
