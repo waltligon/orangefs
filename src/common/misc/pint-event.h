@@ -25,7 +25,8 @@ enum PINT_event_flag
 {
     PINT_EVENT_FLAG_NONE = 0,
     PINT_EVENT_FLAG_START = 1,
-    PINT_EVENT_FLAG_END = 2
+    PINT_EVENT_FLAG_END = 2,
+    PINT_EVENT_FLAG_INVALID = 3
 };
 
 /* what kind of operation, seperate list for each API */

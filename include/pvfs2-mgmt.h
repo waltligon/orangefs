@@ -126,6 +126,13 @@ int PVFS_mgmt_perf_mon_list(
     int server_count,
     int history_count);
 
+int PVFS_mgmt_event_mon_list(
+    PVFS_credentials credentials,
+    struct PVFS_mgmt_event** event_matrix,
+    PVFS_id_gen_t* addr_array,
+    int server_count,
+    int event_count);
+
 int PVFS_mgmt_toggle_admin_mode(
     PVFS_credentials credentials,
     int on_flag);

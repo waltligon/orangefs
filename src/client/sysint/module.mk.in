@@ -38,6 +38,7 @@ SMSRC := \
 	sys-flush.sm \
 	sys-symlink.sm \
 	mgmt-perf-mon-list.sm \
+	mgmt-event-mon-list.sm \
 	mgmt-iterate-handles-list.sm \
 	mgmt-get-dfile-array.sm
 

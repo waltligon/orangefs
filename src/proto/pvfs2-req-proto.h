@@ -672,7 +672,7 @@ struct PVFS_servreq_mgmt_event_mon
     uint32_t event_count;
 };
 
-#define PINT_SERVREQ_MGMT_EVENT_MON(__req,	\
+#define PINT_SERVREQ_MGMT_EVENT_MON_FILL(__req,	\
 					__creds,\
 					__event_count)\
 do {						\
