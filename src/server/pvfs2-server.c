@@ -341,8 +341,9 @@ int main(int argc, char **argv)
 		gossip_lerr("Error: unhandled state machine processing "
                             "error (most likely an unhandled "
                             "job error).\n");
-		/* TODO: handle this properly */
-		assert(0);
+
+                /* TODO: handle this properly */
+                assert(0);
 	    }
 
 	    if (unexpected_msg)
@@ -1153,21 +1154,21 @@ static int server_state_machine_start(
     PINT_server_op *s_op,
     job_status_s *js_p)
 {
-    int retval = -1;
+    int ret = -1;
 
-    retval = PINT_decode(s_op->unexp_bmi_buff.buffer,
-		PINT_DECODE_REQ,
-		&s_op->decoded,
-		s_op->unexp_bmi_buff.addr,
-		s_op->unexp_bmi_buff.size);
-    if(retval < 0)
+    ret = PINT_decode(s_op->unexp_bmi_buff.buffer,
+                      PINT_DECODE_REQ,
+                      &s_op->decoded,
+                      s_op->unexp_bmi_buff.addr,
+                      s_op->unexp_bmi_buff.size);
+    if (ret < 0)
     {
 	gossip_err("Error: server received a corrupt or unsupported "
                    "request message.\n");
 	return(retval);
     }
 
-    s_op->req  = (struct PVFS_server_req *) s_op->decoded.buffer;
+    s_op->req  = (struct PVFS_server_req *)s_op->decoded.buffer;
     assert(s_op->req != NULL);
 
     s_op->addr = s_op->unexp_bmi_buff.addr;
@@ -1175,7 +1176,7 @@ static int server_state_machine_start(
     s_op->op   = s_op->req->op;
     s_op->current_state = PINT_state_machine_locate(s_op);
 
-    if(!s_op->current_state)
+    if (!s_op->current_state)
     {
 	gossip_err("Error: server does not implement request type: %d\n",
                    (int)s_op->req->op);

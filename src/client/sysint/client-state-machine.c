@@ -178,19 +178,14 @@ int PINT_serv_decode_resp(void *encoded_resp_p,
 			  int actual_resp_sz,
 			  struct PVFS_server_resp **resp_out_pp)
 {
-    int ret;
-
-    ret = PINT_decode(encoded_resp_p,
-		      PINT_DECODE_RESP,
-		      decoded_resp_p, /* holds data on decoded resp */
-		      *svr_addr_p,
-		      actual_resp_sz);
-    assert(ret > -1);
-
-    /* point a reasonably typed pointer at the response data */
-    *resp_out_pp = (struct PVFS_server_resp *) decoded_resp_p->buffer;
-
-    return 0;
+    int ret = PINT_decode(encoded_resp_p, PINT_DECODE_RESP,
+                          decoded_resp_p, /* holds data on decoded resp */
+                          *svr_addr_p, actual_resp_sz);
+    if (ret > -1)
+    {
+        *resp_out_pp = (struct PVFS_server_resp *)decoded_resp_p->buffer;
+    }
+    return ret;
 }
 
 int PINT_serv_free_msgpair_resources(
