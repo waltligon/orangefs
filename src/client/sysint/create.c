@@ -316,7 +316,7 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	memcpy(pinode_ptr->attr.u.meta.dfh,df_handle_array,handle_size);
 	/* Fill in the timestamps */
 	cflags = HANDLE_TSTAMP + ATTR_TSTAMP;
-	ret = phelper_fill_timestamps(pinode_ptr,cflags);
+	ret = phelper_fill_timestamps(pinode_ptr);
 	if (ret <0)
 	{
 		goto pinode_fill_failure;

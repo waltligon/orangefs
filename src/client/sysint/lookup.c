@@ -64,7 +64,7 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
     pinode *entry_pinode = NULL, *pinode_ptr = NULL;
     char *server = NULL, *segment = NULL, *path = NULL;
     bmi_addr_t serv_addr;
-    int start_seg = 0, vflags = 0, cflags = 0, num_seg = 0;
+    int start_seg = 0, vflags = 0, num_seg = 0;
     int start_path = 0, end_path = 0, path_len = 0;
     PVFS_handle parent_handle, final_handle = 0;
     PVFS_bitfield attr_mask;
@@ -77,7 +77,7 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
         assert(0);
     }
 
-    /* Get the total number of segments */
+    /* Get  the total number of segments */
     get_no_of_segments(req->name,&num_seg);
 
     /* Get root handle using bucket table interface */
@@ -225,17 +225,16 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 		{
 		    goto check_perms_failure;
 		}
-				/* Fill in the timestamps */
-		tflags = HANDLE_TSTAMP+ ATTR_TSTAMP;	
-		ret = phelper_fill_timestamps(pinode_ptr,tflags);
+
+		/* Fill in the timestamps */
+		ret = phelper_fill_timestamps(pinode_ptr);
 		if (ret < 0)
 		{
 		    goto check_perms_failure;
 		}
 					
 		/* Set the size timestamp - size was not fetched */
-		pinode_ptr->tstamp_size.tv_sec = 0;
-		pinode_ptr->tstamp_size.tv_usec = 0;
+		pinode_ptr->size_flag = SIZE_INVALID;
 
 		/* Add to the pinode list */
 		ret = PINT_pcache_insert(pinode_ptr);
@@ -280,12 +279,11 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 	    /* If no pinode exists no error, will fetch 
 	     * attributes of segment and add a new pinode
 	     */
-	    cflags = HANDLE_VALIDATE + ATTR_VALIDATE;
 	    vflags = 0;
 	    attr_mask = ATTR_BASIC;
 	    /* Get the pinode from the cache */
 	    ret = phelper_get_pinode(entry,&entry_pinode,
-				     attr_mask,vflags,cflags,req->credentials);
+				     attr_mask,vflags,req->credentials);
 	    if (ret < 0)
 	    {
 		goto lookup_path_failure;

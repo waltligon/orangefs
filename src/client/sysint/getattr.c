@@ -20,8 +20,6 @@
 
 #define REQ_ENC_FORMAT 0
 
-static int check_expiry(struct timeval t1,struct timeval t2);
-
 /* PVFS_sys_getattr()
  *
  * obtain the attributes of a PVFS file
@@ -36,7 +34,7 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
    int ret = -1,i = 0;
    bmi_addr_t serv_addr;	            /* PVFS address type structure */ 
 	char *server = NULL;
-	int cflags = 0,vflags = 0;
+	int vflags = 0;
 	//PVFS_count32 count = 0;
 	struct timeval cur_time;
 	PVFS_size *size_array = 0, logical_size = 0;
@@ -58,61 +56,20 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 	entry.handle = req->pinode_refn.handle;
 	entry.fs_id = req->pinode_refn.fs_id;
 
-	/* Check for presence of pinode */ 
-	/*cflags = HANDLE_TSTAMP + ATTR_TSTAMP;*/
-	cflags = HANDLE_VALIDATE + ATTR_VALIDATE;
-	if (cflags & ATTR_SIZE)
-		cflags += SIZE_VALIDATE;
 	/* can't use phelper_get_pinode here because pinode helper calls 
 	 * getattr();
 	 */
-
-	ret = PINT_pcache_pinode_alloc(&entry_pinode);
-        if (ret < 0)
-        {
-                ret = -ENOMEM;
-                goto pinode_get_failure;
-        }
-
-	ret = PINT_pcache_lookup(entry, entry_pinode);
-	if (ret < 0)
-        {
-                goto pinode_get_failure;
-        }
 
 	/* do we have a valid copy? 
 	 * if any of the attributes are stale, or absent then we need to 
 	 * retrive a fresh copy.
 	 */
-
-	if (entry_pinode->pinode_ref.handle != -1)
-	{
-		/* valid copy of pinode is in the cache, if its not expired,
-		 * use this copy to return attributes
-		 */
-		/* is the handle stale? */
-		ret = check_expiry(cur_time,entry_pinode->tstamp_handle);
-		if (ret == 1)
-		{
-			/* is the timestamp stale? */
-			ret = check_expiry(cur_time,entry_pinode->tstamp_attr);
-			if (ret == 1)
-			{
-				/* is the size stale? */
-				ret = check_expiry(cur_time,entry_pinode->tstamp_size);
-				if (ret == 1)
-				{
-					resp->attr = entry_pinode->attr;
-					PINT_pcache_pinode_dealloc(entry_pinode);
-					return (0);
-				}
-			}
-		}
-
-	}
-
-	/* done with this pointer, free the space */
-	PINT_pcache_pinode_dealloc(entry_pinode);
+	ret = PINT_pcache_lookup(entry, entry_pinode);
+	if (ret  == PCACHE_LOOKUP_SUCCESS)
+        {
+		resp->attr = entry_pinode->attr;
+		return (0);
+        }
 
 	ret = config_bt_map_bucket_to_server(&server,entry.handle,entry.fs_id);
         if (ret < 0)
@@ -173,7 +130,7 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 
 #if 0
 	ret = phelper_get_pinode(entry,&entry_pinode,attr_mask,
-			vflags,cflags,req->credentials);
+			vflags,req->credentials);
 	if (ret < 0)
 	{
 		goto pinode_get_failure;
@@ -247,14 +204,12 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 		/* TODO: Check with Walt if this is the prototype of the logical
 	 	* size calculation function. It may differ slightly. 
 	 	*/
-#if 0
 		ret = dist_p->logical_size(dparm,size_array,count,&logical_size);
 
 		if (ret < 0)
 		{
 			goto map_server_failure;
 		}
-#endif
 
 		/* Need to update the pinode with size and cache it */
 		/* TODO: Need to figure out an optimum way of doing it */
@@ -278,8 +233,7 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 		goto map_server_failure;
 	}
 	/* Set the size timestamp */
-	entry_pinode->tstamp_size.tv_sec = cur_time.tv_sec + size_to.tv_sec;
-	entry_pinode->tstamp_size.tv_usec = cur_time.tv_usec + size_to.tv_usec;
+	phelper_fill_timestamps(entry_pinode);
 
 	/* Add to cache  */
 	ret = PINT_pcache_insert(entry_pinode);
@@ -313,21 +267,5 @@ printf("map_server_failure\n");
 	if (size_array)
 		free(size_array);
 
-pinode_get_failure:
-printf("pinode_get_failure\n");
-
 	return(ret);
 }
-
-static int check_expiry(struct timeval t1,struct timeval t2)
-{
-        /* Does size timestamp exceed the current time?
-         * If yes, size is valid. If no, size is stale.
-         */
-        if (t2.tv_sec > t1.tv_sec || (t2.tv_sec == t1.tv_sec && t2.tv_usec > t1.tv_usec))
-                return(0);
-
-        /* value is stale */
-        return(-1);
-}
-

@@ -287,20 +287,14 @@ static void PINT_pcache_merge_pinode(pinode *p1,pinode *p2)
 	/* Check the attribute timestamps to see which
 	 * pinode is the latest 
 	 */
-	if (p1->tstamp_attr.tv_sec > p2->tstamp_attr.tv_sec ||\
-			(p1->tstamp_attr.tv_sec == p2->tstamp_attr.tv_sec &&\
-			 p1->tstamp_attr.tv_usec > p2->tstamp_attr.tv_usec))
+	if (p1->tstamp.tv_sec > p2->tstamp.tv_sec ||
+			(p1->tstamp.tv_sec == p2->tstamp.tv_sec &&
+			 p1->tstamp.tv_usec > p2->tstamp.tv_usec))
 	{
 		p2->attr = p1->attr;
 	}
 
-	/* Check the size timestamps to see which has the latest size */
-	if (p1->tstamp_size.tv_sec > p2->tstamp_size.tv_usec ||\
-			(p1->tstamp_size.tv_sec == p2->tstamp_size.tv_sec &&\
-			 p1->tstamp_size.tv_usec > p2->tstamp_size.tv_usec))
-	{	
-		p2->size = p1->size;
-	}
+	/*TODO: when merging pinodes, what happens to the size? */
 }
 
 /* PINT_pcache_add_pinode
@@ -374,7 +368,6 @@ static void PINT_pcache_pinode_copy(pinode *new, pinode *old)
 	new->attr = old->attr;
 	new->mask = old->mask;
 	new->size = old->size;
-	new->tstamp_handle = old->tstamp_handle;
-	new->tstamp_attr = old->tstamp_attr;
-	new->tstamp_size = old->tstamp_size;
+	new->tstamp = old->tstamp;
+	new->size_flag = old->size_flag;
 }

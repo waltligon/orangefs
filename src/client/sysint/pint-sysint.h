@@ -22,6 +22,12 @@
 #include <bmi.h>
 #include <pvfs2-sysint.h>
 
+enum
+{
+    SIZE_INVALID = 0,
+    SIZE_VALID = 1
+};
+
 /* Update Pinode Flags
  * Mention specific timestamps to be updated
  */
@@ -35,6 +41,21 @@
 
 /* PCache Flags */
 #define SEARCH_NO_FETCH 1/* Check only if pinode is present,don't fill it up */
+
+/* Pinode structure */
+typedef struct
+{
+    pinode_reference pinode_ref; /* pinode reference - entity to
+
+                                    uniquely identify a pinode */
+    gen_mutex_t *pinode_mutex;        /* mutex lock */
+    struct PVFS_object_attr attr;   /* attributes of PVFS object */
+    PVFS_bitfield mask;                       /* attribute mask */
+    PVFS_size size;                           /* PVFS object size */
+    struct timeval tstamp;  /* timestamp for consistency */
+    int size_flag;	    /*flag so we know if the size is valid*/
+} pinode, *pinode_p;
+
 
 /* Max No. of Entries in the cache */
 #define MAX_ENTRIES 64 /* 32k entries for the cache */

@@ -48,12 +48,11 @@ int PVFS_sys_remove(PVFS_sysreq_remove *req, PVFS_sysresp_remove *resp)
 
 	/* Revalidate the parent handle */
 	/* Get the parent pinode */
-	cflags = HANDLE_VALIDATE;
 	vflags = 0;
 	attr_mask = ATTR_BASIC + ATTR_META;
 	/* Get the pinode either from cache or from server */
 	ret = phelper_get_pinode(parent_reference,pvfs_pcache,&pinode_ptr,\
-			attr_mask, vflags, cflags);
+			attr_mask, vflags, req->credentials );
 	if (ret < 0)
 	{
 		goto pinode_get_failure;

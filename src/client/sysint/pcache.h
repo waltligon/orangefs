@@ -16,21 +16,15 @@
 #include "pvfs2-attr.h"
 #include "pint-sysint.h"
 
-/* Pcache Related Declarations */
-/* Pinode structure */
-typedef struct
-{
-    pinode_reference pinode_ref; /* pinode reference - entity to
+#define PINT_PCACHE_HANDLE_INVALID 0
 
-				    uniquely identify a pinode */
-    gen_mutex_t *pinode_mutex;        /* mutex lock */
-    struct PVFS_object_attr attr;   /* attributes of PVFS object */
-    PVFS_bitfield mask;                       /* attribute mask */
-    PVFS_size size;                           /* PVFS object size */
-    struct timeval tstamp_handle;/* timestamp for handle consistency */
-    struct timeval tstamp_attr;  /* timestamp for attribute consistency */
-    struct timeval tstamp_size;  /* timestamp for size consistency */
-} pinode, *pinode_p;
+enum
+{
+    PCACHE_LOOKUP_FAILURE = 0,
+    PCACHE_LOOKUP_SUCCESS = 1
+};
+
+/* Pcache Related Declarations */
 
 /* Pinode Cache Element */
 struct cache_t

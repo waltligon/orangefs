@@ -49,7 +49,7 @@ int PVFS_sys_rename(PVFS_sysreq_rename *req, PVFS_sysresp_rename *resp)
 	attr_mask = ATTR_BASIC + ATTR_META;
 	/* Get the pinode either from cache or from server */
 	ret = phelper_get_pinode(req->old_parent_reference,pvfs_pcache,&pinode_ptr,\
-			attr_mask, vflags, cflags);
+			attr_mask, vflags, req->credentials);
 	if (ret < 0)
 	{
 		goto pinode_get_failure;
@@ -69,7 +69,7 @@ int PVFS_sys_rename(PVFS_sysreq_rename *req, PVFS_sysresp_rename *resp)
 	attr_mask = ATTR_BASIC + ATTR_META;
 	/* Get the pinode either from cache or from server */
 	ret = phelper_get_pinode(req->new_parent_reference,pvfs_pcache,&pinode_ptr,\
-			attr_mask, vflags, cflags);
+			attr_mask, vflags, req->credentials);
 	if (ret < 0)
 	{
 		goto pinode_get_failure;

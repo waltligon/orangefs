@@ -38,7 +38,7 @@ int PVFS_sys_setattr(PVFS_sysreq_setattr *req)
 	char *server = NULL;
 	PVFS_bitfield mask = req->attrmask;
 	pinode_reference entry;
-	PVFS_servreq_setattr req_args;
+	/*PVFS_servreq_setattr req_args;*/
 	PVFS_size handlesize = 0;
 	bmi_size_t max_msg_sz = sizeof(struct PVFS_server_resp_s);
 	struct PINT_decoded_msg decoded;
@@ -54,38 +54,27 @@ int PVFS_sys_setattr(PVFS_sysreq_setattr *req)
 	 */
 
 	/*Q: does being able to set the size make any sense at all?*/
+	/*A: NO! */
 	if ((mask & ATTR_SIZE) == ATTR_SIZE)
-		mask = mask | ATTR_META;
+		return (-1);
 
 	/* Fill in pinode reference */
 	entry.handle = req->pinode_refn.handle;
 	entry.fs_id = req->pinode_refn.fs_id;
 	
-	/* Get the pinode */
-	ret = PINT_pcache_pinode_alloc(&pinode_ptr);
-	if (ret < 0)
-	{
-		ret = -ENOMEM;
-		goto pinode_alloc_failure;
-	}
 	/* Lookup the entry...may or may not exist in the cache */
 	ret = PINT_pcache_lookup(entry,pinode_ptr);
-	if (ret < 0)
-	{
-		goto pcache_lookup_failure;
-	}
-	/* Validate the pinode for handle reuse */
 	/* Check if pinode was returned */
-	if (pinode_ptr->pinode_ref.handle != -1)
+	if (ret == PCACHE_LOOKUP_FAILURE)
 	{
-		flags = HANDLE_VALIDATE;
 		mask = mask | ATTR_BASIC;	
-		ret = phelper_validate_pinode(pinode_ptr,flags,mask,req->credentials);
+		ret = phelper_refresh_pinode(mask, pinode_ptr, entry, req->credentials);
 		if (ret < 0)
 		{
 			goto pcache_lookup_failure;
 		}
 	}
+
 	/* Free the previously allocated pinode */
 	//pcache_pinode_dealloc(pinode_ptr);
 

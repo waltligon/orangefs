@@ -6,12 +6,13 @@
 
 /* Make Directory Function Implementation */
 
-#include <pinode-helper.h>
-#include <pvfs2-sysint.h>
-#include <pint-sysint.h>
-#include <pint-dcache.h>
-#include <pint-servreq.h>
-#include <config-manage.h>
+#include "pcache.h"
+#include "pinode-helper.h"
+#include "pvfs2-sysint.h"
+#include "pint-sysint.h"
+#include "pint-dcache.h"
+#include "pint-servreq.h"
+#include "config-manage.h"
 
 static int do_lookup(PVFS_string name,pinode_reference parent,\
 		PVFS_bitfield mask,PVFS_credentials cred,pinode_reference *entry);
@@ -47,7 +48,7 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
 	//parent_reference = req->parent_refn;
 
 	/* Allocate a pinode */
-	ret = pcache_pinode_alloc(&pinode_ptr);
+	ret = PINT_pcache_pinode_alloc(&pinode_ptr);
 	if (ret < 0)
 	{
 		ret = -ENOMEM;
@@ -75,7 +76,7 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
 	if (entry.handle != PINT_DCACHE_HANDLE_INVALID)
 	{
 		/* Search in pinode cache */
-		ret = pcache_lookup(&pvfs_pcache,entry,pinode_ptr);
+		ret = PINT_pcache_lookup(entry,pinode_ptr);
 		if (ret < 0)
 		{
 			goto pinode_get_failure;
@@ -84,13 +85,13 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
 		if (pinode_ptr->pinode_ref.handle != -1)
 		{
 			/* Pinode is present, remove it */
-			ret = pcache_remove(&pvfs_pcache,entry,&item_ptr);
+			ret = PINT_pcache_remove(entry,&item_ptr);
 			if (ret < 0)
 			{
 				goto pinode_remove_failure;
 			}
 			/* Free the pinode removed from the cache */
-			pcache_pinode_dealloc(item_ptr);
+			PINT_pcache_pinode_dealloc(item_ptr);
 
 			/* Free previously allocated pinode */
 			/*if (pinode_ptr)
@@ -110,7 +111,7 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
 	/* Get the parent pinode */
 	cflags = HANDLE_VALIDATE;
 	/* Search in pinode cache */
-	ret = pcache_lookup(&pvfs_pcache,req->parent_refn,pinode_ptr);
+	ret = pcache_lookup(req->parent_refn,pinode_ptr);
 	if (ret < 0)
 	{
 		goto pinode_get_failure;
@@ -129,7 +130,7 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
 
 	/* Free the pinode allocated */
 	if (pinode_ptr)
-		pcache_pinode_dealloc(pinode_ptr);
+		PINT_pcache_pinode_dealloc(pinode_ptr);
 
 	/* Make directory server request */
 
@@ -203,7 +204,7 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
 	}
 	
 	/* Create and fill in a pinode and add it to the cache */
-	ret = pcache_pinode_alloc(&pinode_ptr);
+	ret = PINT_pcache_pinode_alloc(&pinode_ptr);
 	if (ret < 0)
 	{
 		goto crdirent_failure;
@@ -220,19 +221,14 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
 		goto crdirent_failure;
 	}
 	/* Fill in handle timestamp */
-	pinode_ptr->tstamp_handle.tv_sec = cur_time.tv_sec + handle_to.tv_sec;
-	pinode_ptr->tstamp_handle.tv_usec = cur_time.tv_usec + handle_to.tv_usec;
-	/* Fill in attribute timestamp */
-	pinode_ptr->tstamp_attr.tv_sec = cur_time.tv_sec + attr_to.tv_sec;
-	pinode_ptr->tstamp_attr.tv_usec = cur_time.tv_usec + attr_to.tv_usec;
+	ret = phelper_fill_timestamps(pinode_ptr);
 	/* Fill in size timestamp */
 	if (req->attrmask & ATTR_SIZE)
 	{
-		pinode_ptr->tstamp_size.tv_sec = cur_time.tv_sec + size_to.tv_sec;
-		pinode_ptr->tstamp_size.tv_usec = cur_time.tv_usec + size_to.tv_usec;
+		pinode_ptr->size_flag = SIZE_VALID;
 	}
 	/* Add to cache */
-	ret = pcache_insert(&pvfs_pcache,pinode_ptr);
+	ret = PINT_pcache_insert(pinode_ptr);
 	if (ret < 0)
 	{
 		goto crdirent_failure;
@@ -270,7 +266,7 @@ addr_lookup_failure:
 pinode_remove_failure:
    /* Free the pinode allocated but not added to list */
 	if (pinode_ptr)
-		pcache_pinode_dealloc(pinode_ptr);
+		PINT_pcache_pinode_dealloc(pinode_ptr);
 
 pinode_get_failure:
 	sysjob_free(serv_addr1,req_job,req_job->rsize,BMI_SEND_BUFFER,NULL);
@@ -278,7 +274,7 @@ pinode_get_failure:
 	
 	/* Free the pinode */
 	if (pinode_ptr)
-		pcache_pinode_dealloc(pinode_ptr);
+		PINT_pcache_pinode_dealloc(pinode_ptr);
 
 pinode_alloc_failure:
 	return(ret);
