@@ -98,15 +98,21 @@ int PVFS_isys_truncate(
     int ret = -PVFS_EINVAL;
     PINT_client_sm *sm_p = NULL;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "PVFS_isys_truncate entered with %Ld\n", Ld(size));
-
     if ((ref.fs_id == PVFS_FS_ID_NULL) ||
         (ref.handle == PVFS_HANDLE_NULL))
     {
-        gossip_lerr("Invalid pinode reference\n");
+        gossip_err("invalid (NULL) required argument\n");
         return ret;
     }
+
+    if (size < 0)
+    {
+        gossip_err("invalid size (negative) specified: %Ld\n", size);
+        return ret;
+    }
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "PVFS_isys_truncate entered with %Ld\n", Ld(size));
 
     sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));
     if (sm_p == NULL)
@@ -176,18 +182,11 @@ static int truncate_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
 
     assert(attr);
 
-    if (attr->objtype == PVFS_TYPE_METAFILE)
-    {
-        assert(attr->mask & PVFS_ATTR_META_DFILES);
-        assert(attr->mask & PVFS_ATTR_META_DIST);
-        assert(attr->u.meta.dfile_count > 0);
-        assert(attr->u.meta.dist_size > 0);
-    }
-    else
-    {
-        js_p->error_code = -PVFS_EPERM;
-        return 1;
-    }
+    assert(attr->objtype == PVFS_TYPE_METAFILE);
+    assert(attr->mask & PVFS_ATTR_META_DFILES);
+    assert(attr->mask & PVFS_ATTR_META_DIST);
+    assert(attr->u.meta.dfile_count > 0);
+    assert(attr->u.meta.dist_size > 0);
 
     sm_p->msgarray_count = attr->u.meta.dfile_count;
 
@@ -223,7 +222,6 @@ static int truncate_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
             sm_p->object_ref.fs_id,
             new_dfile_size,
             attr->u.meta.dfile_array[i]);
-
         /*
           no callback. the status will be in the generic response
           structure
@@ -234,9 +232,9 @@ static int truncate_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
         msg_p->comp_fn = NULL;
     }
 
-    /* fill in address of each server to contact */
     ret = PINT_serv_msgpairarray_resolve_addrs(
         sm_p->msgarray_count, sm_p->msgarray);
+
     if (ret)
     {
         gossip_err("Error: failed to resolve server addresses.\n");
@@ -264,6 +262,7 @@ static int truncate_cleanup(PINT_client_sm *sm_p,
     if (sm_p->msgarray && (sm_p->msgarray != &sm_p->msgpair))
     {
         free(sm_p->msgarray);
+        sm_p->msgarray = NULL;
     }
 
     /* add entry to acache if not already present */

@@ -113,8 +113,15 @@ int PVFS_isys_readdir(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_readdir entered\n");
 
-    if ((pvfs_dirent_incount > PVFS_REQ_LIMIT_DIRENT_COUNT) ||
+    if ((ref.handle == PVFS_HANDLE_NULL) ||
+        (ref.fs_id == PVFS_FS_ID_NULL) ||
         (resp == NULL))
+    {
+        gossip_err("invalid (NULL) required argument\n");
+        return ret;
+    }
+
+    if (pvfs_dirent_incount > PVFS_REQ_LIMIT_DIRENT_COUNT)
     {
         gossip_lerr("PVFS_isys_readdir unable to handle request "
                     "for %d entries.\n", pvfs_dirent_incount);
@@ -262,6 +269,8 @@ static int readdir_msg_comp_fn(void *v_p,
         int dirent_array_len =
             (sizeof(PVFS_dirent) *
              sm_p->u.readdir.readdir_resp->pvfs_dirent_outcount);
+
+        /* this dirent_array MUST be freed by caller */
         sm_p->u.readdir.readdir_resp->dirent_array =
             malloc(dirent_array_len);
         assert(sm_p->u.readdir.readdir_resp->dirent_array);
@@ -277,7 +286,7 @@ static int readdir_msg_comp_fn(void *v_p,
 }
 
 static int readdir_msg_failure(PINT_client_sm *sm_p,
-                                      job_status_s *js_p)
+                               job_status_s *js_p)
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "readdir state: readdir_msg_failure\n");

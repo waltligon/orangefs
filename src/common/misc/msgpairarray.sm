@@ -663,8 +663,8 @@ int PINT_serv_decode_resp(PVFS_fs_id fs_id,
 	    if (fs_id != PVFS_FS_ID_NULL)
 	    {
 		server_config = PINT_server_config_mgr_get_config(fs_id);
-		server_string = PINT_cached_config_map_addr(server_config,
-		    fs_id, *svr_addr_p, &server_type);
+		server_string = PINT_cached_config_map_addr(
+                    server_config, fs_id, *svr_addr_p, &server_type);
 		PINT_server_config_mgr_put_config(server_config);
 		gossip_err("   Server: %s.\n", server_string);
 	    }
@@ -722,14 +722,15 @@ int PINT_serv_msgpairarray_resolve_addrs(
             PINT_sm_msgpair_state *msg_p = &msgarray[i];
             assert(msg_p);
 
-            ret = PINT_cached_config_map_to_server(&msg_p->svr_addr,
-                                            msg_p->handle,
-                                            msg_p->fs_id);
+            ret = PINT_cached_config_map_to_server(
+                &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+
             if (ret != 0)
             {
                 gossip_err("Failed to map server address to handle\n");
                 break;
             }
+
             gossip_debug(GOSSIP_CLIENT_DEBUG,
                          " mapped handle %Lu to server %Ld\n",
                          Lu(msg_p->handle), Ld(msg_p->svr_addr));

@@ -227,7 +227,7 @@ static int lebf_encode_calc_max_size(
     else if(input_type == PINT_ENCODE_RESP)
 	return(max_size_array[op_type].resp);
 
-    return(-EINVAL);
+    return -PVFS_EINVAL;
 }
 
 /*
@@ -238,20 +238,20 @@ static int
 encode_common(struct PINT_encoded_msg *target_msg, int maxsize)
 {
     int ret = 0;
-    void *buf;
+    void *buf = NULL;
 
     /* this encoder always uses just one buffer */
     target_msg->buffer_list = &target_msg->buffer_stub;
     target_msg->size_list = &target_msg->size_stub;
     target_msg->list_count = 1;
     target_msg->buffer_type = BMI_PRE_ALLOC;
+
     /* allocate the max size buffer to avoid the work of calculating it */
-    if (initializing_sizes)
-	buf = malloc(maxsize);
-    else
-	buf = BMI_memalloc(target_msg->dest, maxsize, BMI_SEND);
-    if (!buf) {
-	ret = -ENOMEM;
+    buf = (initializing_sizes ? malloc(maxsize) :
+           BMI_memalloc(target_msg->dest, maxsize, BMI_SEND));
+    if (!buf)
+    {
+	ret = -PVFS_ENOMEM;
 	goto out;
     }
 
@@ -260,7 +260,7 @@ encode_common(struct PINT_encoded_msg *target_msg, int maxsize)
 
     /* generic header */
     memcpy(target_msg->ptr_current, le_bytefield_table.generic_header,
-	PINT_ENC_GENERIC_HEADER_SIZE);
+           PINT_ENC_GENERIC_HEADER_SIZE);
     target_msg->ptr_current += PINT_ENC_GENERIC_HEADER_SIZE;
 
  out:
@@ -327,7 +327,7 @@ static int lebf_encode_req(
         case PVFS_SERV_PERF_UPDATE:
         case PVFS_SERV_JOB_TIMER:
 	    gossip_err("%s: invalid operation %d\n", __func__, req->op);
-	    ret = -ENOSYS;
+	    ret = -PVFS_ENOSYS;
 	    break;
     }
 
@@ -338,8 +338,9 @@ static int lebf_encode_req(
       - (char *) target_msg->buffer_list[0];
     target_msg->size_list[0] = target_msg->total_size;
 
-    if (target_msg->total_size > max_size_array[req->op].req) {
-	ret = -ENOMEM;
+    if (target_msg->total_size > max_size_array[req->op].req)
+    {
+	ret = -PVFS_ENOMEM;
 	gossip_err("%s: op %d needed %Ld bytes but alloced only %d\n",
 	  __func__, req->op, Ld(target_msg->total_size),
 	  max_size_array[req->op].req);
@@ -411,7 +412,7 @@ static int lebf_encode_resp(
         case PVFS_SERV_PERF_UPDATE:
         case PVFS_SERV_JOB_TIMER:
 	    gossip_err("%s: invalid operation %d\n", __func__, resp->op);
-	    ret = -ENOSYS;
+	    ret = -PVFS_ENOSYS;
 	    break;
     }
 
@@ -423,7 +424,7 @@ static int lebf_encode_resp(
     target_msg->size_list[0] = target_msg->total_size;
 
     if (target_msg->total_size > max_size_array[resp->op].resp) {
-	ret = -ENOMEM;
+	ret = -PVFS_ENOMEM;
 	gossip_err("%s: op %d needed %Ld bytes but alloced only %d\n",
 	  __func__, resp->op, Ld(target_msg->total_size),
 	  max_size_array[resp->op].resp);
@@ -497,15 +498,16 @@ static int lebf_decode_req(
         case PVFS_SERV_JOB_TIMER:
 	case PVFS_SERV_PROTO_ERROR:
 	    gossip_lerr("%s: invalid operation %d.\n", __func__, req->op);
-	    ret = -EPROTO;
+	    ret = -PVFS_EPROTO;
 	    goto out;
     }
 
 #undef CASE
 
-    if (ptr != (char *)input_buffer + input_size) {
+    if (ptr != ((char *)input_buffer + input_size))
+    {
 	gossip_lerr("%s: improper input buffer size", __func__);
-	ret = -EPROTO;
+	ret = -PVFS_EPROTO;
     }
 
   out:
@@ -573,7 +575,7 @@ static int lebf_decode_resp(
         case PVFS_SERV_PERF_UPDATE:
         case PVFS_SERV_JOB_TIMER:
 	    gossip_lerr("%s: invalid operation %d.\n", __func__, resp->op);
-	    ret = -EPROTO;
+	    ret = -PVFS_EPROTO;
 	    goto out;
     }
 
@@ -581,7 +583,7 @@ static int lebf_decode_resp(
 
     if (ptr != (char *)input_buffer + input_size) {
 	gossip_lerr("%s: improper input buffer size", __func__);
-	ret = -EPROTO;
+	ret = -PVFS_EPROTO;
     }
 
   out:
@@ -600,11 +602,14 @@ static void lebf_encode_rel(
 {
     /* just a single buffer to free */
     if (initializing_sizes)
+    {
 	free(msg->buffer_list[0]);
+    }
     else
-	BMI_memfree(msg->dest, msg->buffer_list[0], msg->total_size, BMI_SEND);
-
-    return;
+    {
+	BMI_memfree(msg->dest, msg->buffer_list[0],
+                    msg->total_size, BMI_SEND);
+    }
 }
 
 /* lebf_decode_rel()
@@ -747,8 +752,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
     }
 }
 
-static int
-check_req_size(struct PVFS_server_req *req)
+static int check_req_size(struct PVFS_server_req *req)
 {
     struct PINT_encoded_msg msg;
     int size;
@@ -759,8 +763,7 @@ check_req_size(struct PVFS_server_req *req)
     return size;
 }
 
-static int
-check_resp_size(struct PVFS_server_resp *resp)
+static int check_resp_size(struct PVFS_server_resp *resp)
 {
     struct PINT_encoded_msg msg;
     int size;

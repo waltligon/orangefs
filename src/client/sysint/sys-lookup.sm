@@ -563,7 +563,9 @@ int PVFS_sys_lookup(
         parent.handle = 0;
         parent.fs_id = fs_id;
 
-        ret = PINT_cached_config_get_root_handle(parent.fs_id,&parent.handle);
+        ret = PINT_cached_config_get_root_handle(
+            parent.fs_id,&parent.handle);
+
         if (ret < 0)
         {
             return ret;
@@ -666,7 +668,7 @@ static int lookup_segment_lookup_setup_msgpair(PINT_client_sm *sm_p,
 }
 
 static int lookup_segment_lookup_failure(PINT_client_sm *sm_p,
-                                      job_status_s *js_p)
+                                         job_status_s *js_p)
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "lookup state: lookup_segment_lookup_failure\n");
@@ -805,9 +807,11 @@ static int lookup_segment_check_attr_type(PINT_client_sm *sm_p,
               user requested that we do NOT follow the last link)
             */
             if ((cur_seg->seg_attr.objtype == PVFS_TYPE_SYMLINK) &&
-                (cur_ctx->current_segment == (cur_ctx->total_segments - 1)) &&
+                (cur_ctx->current_segment ==
+                 (cur_ctx->total_segments - 1)) &&
                 (sm_p->u.lookup.current_context == 0) &&
-                (sm_p->u.lookup.follow_link == PVFS2_LOOKUP_LINK_NO_FOLLOW))
+                (sm_p->u.lookup.follow_link ==
+                 PVFS2_LOOKUP_LINK_NO_FOLLOW))
             {
                 gossip_debug(GOSSIP_LOOKUP_DEBUG, "** skipping final "
                              "symlink resolution due to user request\n");

@@ -281,17 +281,29 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s* js_p)
       setable and specified by the mask value in the request.
     */
     if (a_p->mask & PVFS_ATTR_COMMON_UID)
+    {
         dspace_a_p->owner = a_p->owner;
+    }
     if (a_p->mask & PVFS_ATTR_COMMON_GID)
+    {
         dspace_a_p->group = a_p->group;
+    }
     if (a_p->mask & PVFS_ATTR_COMMON_PERM)
+    {
         dspace_a_p->perms = a_p->perms;
+    }
     if (a_p->mask & PVFS_ATTR_COMMON_ATIME)
+    {
         dspace_a_p->atime = a_p->atime;
+    }
     if (a_p->mask & PVFS_ATTR_COMMON_CTIME)
+    {
         dspace_a_p->ctime = a_p->ctime;
+    }
     if (a_p->mask & PVFS_ATTR_COMMON_MTIME)
+    {
         dspace_a_p->mtime = a_p->mtime;
+    }
 
     dspace_a_p->u.meta.dfile_count = 0;
     dspace_a_p->u.meta.dist_size = 0;

@@ -198,15 +198,19 @@ int PVFS_isys_symlink(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_symlink entered\n");
 
-    if ((entry_name == NULL) || (resp == NULL) || (target == NULL))
+    if ((parent_ref.handle == PVFS_HANDLE_NULL) ||
+        (parent_ref.fs_id == PVFS_FS_ID_NULL) ||
+        (entry_name == NULL) || (resp == NULL) || (target == NULL))
     {
+        gossip_err("invalid (NULL) required argument\n");
         return ret;
     }
 
     if ((attr.mask & PVFS_ATTR_SYS_ALL_SETABLE) !=
         PVFS_ATTR_SYS_ALL_SETABLE)
     {
-        gossip_lerr("Error: Attribute sanity check failed\n");
+        gossip_lerr("PVFS_isys_symlink() failure: invalid attributes "
+                    "specified\n");
         return ret;
     }
 
@@ -286,6 +290,7 @@ int PVFS_sys_symlink(
 static int symlink_init(PINT_client_sm *sm_p,
 		       job_status_s *js_p)
 {
+    int ret = 1;
     job_id_t tmp_id;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "symlink state: init\n");
@@ -297,18 +302,18 @@ static int symlink_init(PINT_client_sm *sm_p,
     {
         js_p->error_code = 0;
 
-        return job_req_sched_post_timer(
+        ret = job_req_sched_post_timer(
             PVFS2_CLIENT_RETRY_DELAY, sm_p, 0, js_p, &tmp_id,
             pint_client_sm_context);
     }
-    return 1;
+    return ret;
 }
 
 static int symlink_create_comp_fn(void *v_p,
                                   struct PVFS_server_resp *resp_p,
                                   int index)
 {
-    PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
+    PINT_client_sm *sm_p = (PINT_client_sm *)v_p;
     
     gossip_debug(GOSSIP_CLIENT_DEBUG, "symlink_create_comp_fn\n");
 
@@ -334,12 +339,7 @@ static int symlink_setattr_comp_fn(void *v_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG, "symlink_setattr_comp_fn\n");
 
     assert(resp_p->op == PVFS_SERV_SETATTR);
-
-    if (resp_p->status != 0)
-    {
-	return resp_p->status;
-    }
-    return 0;
+    return resp_p->status;
 }
 
 static int symlink_crdirent_comp_fn(void *v_p,
@@ -349,12 +349,7 @@ static int symlink_crdirent_comp_fn(void *v_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG, "symlink_crdirent_comp_fn\n");
 
     assert(resp_p->op == PVFS_SERV_CRDIRENT);
-
-    if (resp_p->status != 0)
-    {
-	return resp_p->status;
-    }
-    return 0;
+    return resp_p->status;
 }
 
 static int symlink_delete_handle_comp_fn(void *v_p,
@@ -364,12 +359,7 @@ static int symlink_delete_handle_comp_fn(void *v_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG, "symlink_delete_handle_comp_fn\n");
 
     assert(resp_p->op == PVFS_SERV_REMOVE);
-
-    if (resp_p->status != 0)
-    {
-	return resp_p->status;
-    }
-    return 0;
+    return resp_p->status;
 }
 
 static int symlink_dspace_create_setup_msgpair(PINT_client_sm *sm_p,

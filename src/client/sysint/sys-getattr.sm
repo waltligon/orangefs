@@ -134,15 +134,16 @@ int PVFS_isys_getattr(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_getattr entered\n");
 
-    if (resp_p == NULL)
+    if ((ref.handle == PVFS_HANDLE_NULL) ||
+        (ref.fs_id == PVFS_FS_ID_NULL) || (resp_p == NULL))
     {
-        gossip_lerr("NULL resp pointer\n");
+        gossip_err("invalid (NULL) required argument\n");
         return ret;
     }
     
     if (attrmask & ~(PVFS_ATTR_SYS_ALL))
     {
-        gossip_lerr("invalid attrmask\n");
+        gossip_err("invalid attrmask\n");
         return ret;
     }
 

@@ -65,21 +65,21 @@ static int io_find_target_datafiles(
     int *handle_index_array, int *handle_index_out_count);
 
 /* misc constants and helper macros */
-#define IO_RECV_COMPLETED                                   1
+#define IO_RECV_COMPLETED                                    1
 
 /* possible I/O state machine phases (status_user_tag) */
-#define IO_SM_PHASE_REQ_MSGPAIR_RECV                        0
-#define IO_SM_PHASE_REQ_MSGPAIR_SEND                        1
-#define IO_SM_PHASE_FLOW                                    2
-#define IO_SM_PHASE_FINAL_ACK                               3
-#define IO_SM_NUM_PHASES                                    4
+#define IO_SM_PHASE_REQ_MSGPAIR_RECV                         0
+#define IO_SM_PHASE_REQ_MSGPAIR_SEND                         1
+#define IO_SM_PHASE_FLOW                                     2
+#define IO_SM_PHASE_FINAL_ACK                                3
+#define IO_SM_NUM_PHASES                                     4
 
-#define STATUS_USER_TAG_TYPE(tag, type)                     \
+#define STATUS_USER_TAG_TYPE(tag, type)                      \
 ((tag % IO_SM_NUM_PHASES) == type)
-#define STATUS_USER_TAG_GET_INDEX(tag, type)                \
+#define STATUS_USER_TAG_GET_INDEX(tag, type)                 \
 (tag / IO_SM_NUM_PHASES)
-#define STATUS_USER_TAG_IS_SEND_OR_RECV(tag)                \
-(STATUS_USER_TAG_TYPE(tag, IO_SM_PHASE_REQ_MSGPAIR_RECV) || \
+#define STATUS_USER_TAG_IS_SEND_OR_RECV(tag)                 \
+(STATUS_USER_TAG_TYPE(tag, IO_SM_PHASE_REQ_MSGPAIR_RECV) ||  \
  STATUS_USER_TAG_TYPE(tag, IO_SM_PHASE_REQ_MSGPAIR_SEND))
 
 #define CLEAN_PRIVATE_MEMBERS(sm_p)                          \
@@ -199,14 +199,16 @@ int PVFS_isys_io(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_io entered [%Lu]\n",
                  Lu(ref.handle));
 
-    if (resp_p == NULL)
+    if ((ref.handle == PVFS_HANDLE_NULL) ||
+        (ref.fs_id == PVFS_FS_ID_NULL) || (resp_p == NULL))
     {
-        gossip_lerr("NULL resp pointer\n");
+        gossip_err("invalid (NULL) required argument\n");
         return ret;
     }
 
     if ((io_type != PVFS_IO_READ) && (io_type != PVFS_IO_WRITE))
     {
+        gossip_err("invalid (unknown) I/O type specified\n");
         return ret;
     }
 
@@ -216,7 +218,7 @@ int PVFS_isys_io(
 
     if (!cur_fs)
     {
-        gossip_lerr("Error: invalid fs_id.\n");
+        gossip_err("invalid (unknown) fs id specified\n");
         return ret;
     }
 

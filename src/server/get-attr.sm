@@ -73,14 +73,15 @@ extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
 %%
 
-machine pvfs2_get_attr_sm(prelude,
-                          cleanup,
-                          setup_resp,
-                          final_response,
-                          verify_attribs,
-                          read_symlink_target,
-                          read_metafile_datafile_handles_if_required,
-                          read_metafile_distribution_if_required)
+machine pvfs2_get_attr_sm(
+    prelude,
+    cleanup,
+    setup_resp,
+    final_response,
+    verify_attribs,
+    read_symlink_target,
+    read_metafile_datafile_handles_if_required,
+    read_metafile_distribution_if_required)
 {
     state prelude
     {
@@ -138,10 +139,11 @@ machine pvfs2_get_attr_sm(prelude,
 
 /* getattr_verify_attribs()
  *
- * We initialize the attribute mask that will be returned in this function.
- * This mask can be augmented in some of the other states.
+ * We initialize the attribute mask that will be returned in this
+ * function.  This mask can be augmented in some of the other states.
  */
-static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
+static int getattr_verify_attribs(
+    PINT_server_op *s_op, job_status_s* js_p)
 {
     PVFS_object_attr *resp_attr = NULL;
 
@@ -406,7 +408,6 @@ static int getattr_read_metafile_datafile_handles_if_required(
 	    Lu(s_op->req->u.getattr.handle),
 	    Lu(s_op->req->u.getattr.handle),
 	    (int)s_op->req->u.getattr.fs_id);
-
 
 	js_p->error_code = -PVFS_EOVERFLOW;
 	return 1;

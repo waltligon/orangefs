@@ -35,14 +35,15 @@ static int setattr_msg_comp_fn(
 
 %%
 
-machine pvfs2_client_setattr_sm(init,
-                                setattr_getattr_setup_msgpair,
-                                setattr_getattr_xfer_msgpair,
-                                setattr_getattr_failure,
-                                setattr_msg_setup_msgpair,
-                                setattr_msg_xfer_msgpair,
-                                setattr_msg_failure,
-                                cleanup)
+machine pvfs2_client_setattr_sm(
+    init,
+    setattr_getattr_setup_msgpair,
+    setattr_getattr_xfer_msgpair,
+    setattr_getattr_failure,
+    setattr_msg_setup_msgpair,
+    setattr_msg_xfer_msgpair,
+    setattr_msg_failure,
+    cleanup)
 {
     state init
     {
@@ -111,14 +112,21 @@ int PVFS_isys_setattr(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_setattr entered\n");
 
+    if ((ref.handle == PVFS_HANDLE_NULL) ||
+        (ref.fs_id == PVFS_FS_ID_NULL))
+    {
+        gossip_err("invalid (NULL) required argument\n");
+        return ret;
+    }
+
     /*
       make sure the caller didn't set invalid mask bits; in
       particular, note that you can't set size here
     */
     if ((attr.mask & ~PVFS_ATTR_SYS_ALL_SETABLE) != 0)
     {
-        gossip_lerr("Error: PVFS_sys_setattr(): attempted to set "
-                    "invalid attributes.\n");
+        gossip_lerr("PVFS_isys_setattr() failure: invalid attributes "
+                    "specified\n");
         return ret;
     }
 
@@ -182,7 +190,6 @@ static int setattr_init(PINT_client_sm *sm_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG, "setattr state: init\n");
 
     assert(js_p->error_code == 0);
-
     return 1;
 }
 
@@ -193,12 +200,7 @@ static int setattr_msg_comp_fn(void *v_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG, "setattr_msg_comp_fn\n");
 
     assert(resp_p->op == PVFS_SERV_SETATTR);
-
-    if (resp_p->status != 0)
-    {
-	return resp_p->status;
-    }
-    return 0;
+    return resp_p->status;
 }
 
 static int setattr_msg_setup_msgpair(PINT_client_sm *sm_p,

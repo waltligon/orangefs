@@ -231,29 +231,34 @@ int PVFS_isys_create(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_create entered\n");
 
-    if ((object_name == NULL) || (resp == NULL))
+    if ((parent_ref.handle == PVFS_HANDLE_NULL) ||
+        (parent_ref.fs_id == PVFS_FS_ID_NULL) ||
+        (object_name == NULL) || (resp == NULL))
     {
+        gossip_err("invalid (NULL) required argument\n");
         return ret;
-    }
-
-    if ((strlen(object_name) + 1) > PVFS_REQ_LIMIT_SEGMENT_BYTES)
-    {
-        return -PVFS_ENAMETOOLONG;
     }
 
     if ((attr.mask & PVFS_ATTR_SYS_ALL_SETABLE) !=
         PVFS_ATTR_SYS_ALL_SETABLE)
     {
-        gossip_lerr("Error: Attribute sanity check failed\n");
+        gossip_lerr("PVFS_isys_create() failure: invalid attributes "
+                    "specified\n");
         return ret;
     }
 
     if ((attr.mask & PVFS_ATTR_SYS_DFILE_COUNT) &&
-        (attr.dfile_count < 1))
+        ((attr.dfile_count < 1) ||
+         (attr.dfile_count > PVFS_REQ_LIMIT_DFILE_COUNT)))
     {
 	gossip_err("Error: invalid number of datafiles (%d) specified "
                    "in PVFS_sys_create().\n", (int)attr.dfile_count);
 	return ret;
+    }
+
+    if ((strlen(object_name) + 1) > PVFS_REQ_LIMIT_SEGMENT_BYTES)
+    {
+        return -PVFS_ENAMETOOLONG;
     }
 
     sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));

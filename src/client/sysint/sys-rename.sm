@@ -247,8 +247,13 @@ int PVFS_isys_rename(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_rename entered\n");
 
-    if ((old_entry == NULL) || (new_entry == NULL))
+    if ((old_entry == NULL) || (new_entry == NULL) ||
+        (old_parent_ref.handle == PVFS_HANDLE_NULL) ||
+        (old_parent_ref.fs_id == PVFS_FS_ID_NULL) ||
+        (new_parent_ref.handle == PVFS_HANDLE_NULL) ||
+        (new_parent_ref.fs_id == PVFS_FS_ID_NULL))
     {
+        gossip_err("invalid (NULL) required argument\n");
         return ret;
     }
 
@@ -396,7 +401,6 @@ static int rename_lookups_comp_fn(
     else
     {
         assert(index == 1);
-
         /*
           flag the fact that we need to do a dirent exchange on the
           existing dirent, rather than creating a new one.  we flag it
@@ -417,12 +421,7 @@ static int rename_crdirent_comp_fn(void *v_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG, "rename_crdirent_comp_fn\n");
 
     assert(resp_p->op == PVFS_SERV_CRDIRENT);
-
-    if (resp_p->status != 0)
-    {
-	return resp_p->status;
-    }
-    return 0;
+    return resp_p->status;
 }
 
 static int rename_rmdirent_comp_fn(void *v_p,
@@ -441,12 +440,12 @@ static int rename_rmdirent_comp_fn(void *v_p,
     }
 
     /*
-      rmdirent returns handle of removed dirent; make sure it
-      matches the handle we asked to have removed
-      (i.e. the 'old' handle)
+      rmdirent returns handle of removed dirent; make sure it matches
+      the handle we asked to have removed (i.e. the 'old' handle)
     */
     assert(sm_p->u.rename.refns[0].handle ==
            resp_p->u.rmdirent.entry_handle);
+
     return 0;
 }
 
@@ -470,6 +469,7 @@ static int rename_chdirent_comp_fn(
     */
     sm_p->u.rename.old_dirent_handle =
         resp_p->u.chdirent.old_dirent_handle;
+
     gossip_debug(GOSSIP_CLIENT_DEBUG, "got back old dirent handle %Lu\n",
                  Lu(sm_p->u.rename.old_dirent_handle));
 
@@ -486,7 +486,6 @@ static int rename_lookups_setup_msgpair_array(PINT_client_sm *sm_p,
 
     js_p->error_code = 0;
 
-    /* allocate msgarray and set msgarray_count */
     sm_p->msgarray_count = 2;
     sm_p->msgarray = (PINT_sm_msgpair_state *)malloc(
         sm_p->msgarray_count * sizeof(PINT_sm_msgpair_state));
@@ -518,9 +517,9 @@ static int rename_lookups_setup_msgpair_array(PINT_client_sm *sm_p,
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
         msg_p->comp_fn = rename_lookups_comp_fn;
 
-        ret = PINT_cached_config_map_to_server(&msg_p->svr_addr,
-                                        msg_p->handle,
-                                        msg_p->fs_id);
+        ret = PINT_cached_config_map_to_server(
+            &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
+
         if (ret)
         {
             gossip_err("Failed to map meta server address\n");
@@ -537,8 +536,11 @@ static int rename_lookups_failure(PINT_client_sm *sm_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "rename state: rename_lookups_failure\n");
 
-    assert(sm_p->msgarray);
-    free(sm_p->msgarray);
+    if (sm_p->msgarray)
+    {
+        free(sm_p->msgarray);
+        sm_p->msgarray = NULL;
+    }
     return 1;
 }
 
@@ -603,16 +605,16 @@ static int rename_rmdirent_setup_msgpair(PINT_client_sm *sm_p,
     PINT_init_msgpair(sm_p, msg_p);
 
     /*
-      in the normal case, the state machine will lead us
-      here and we need to remove the original dirent pointing to
-      the 'old' metafile in the 'old' parent directory.
+      in the normal case, the state machine will lead us here and we
+      need to remove the original dirent pointing to the 'old'
+      metafile in the 'old' parent directory.
 
-      However, we can also be here on rename_rmdirent_failure.
-      the sm_p->u.rename.rmdirent_index is used to dictate which
-      dirent to remove in that case.  (0 is 'old'; 1 is 'new').
+      However, we can also be here on rename_rmdirent_failure.  the
+      sm_p->u.rename.rmdirent_index is used to dictate which dirent to
+      remove in that case.  (0 is 'old'; 1 is 'new').
 
-      This only happens if we fail to rmdirent the 'old' parent.
-      In that case we need to rmdirent the 'new' parent as cleanup.
+      This only happens if we fail to rmdirent the 'old' parent.  In
+      that case we need to rmdirent the 'new' parent as cleanup.
     */
     PINT_SERVREQ_RMDIRENT_FILL(
         msg_p->req,
@@ -645,9 +647,9 @@ static int rename_rmdirent_failure(PINT_client_sm *sm_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: rmdirent_failure\n");
 
     /*
-      in the normal case of failure (i.e. rmdirent_index == 0),
-      we need to rmdirent the previously created new dirent we've
-      just created.  the state machine already guides us back to
+      in the normal case of failure (i.e. rmdirent_index == 0), we
+      need to rmdirent the previously created new dirent we've just
+      created.  the state machine already guides us back to
       rmdirent_setup_msgpair, so all we need to is adjust the
       rmdirent_index to point to the 'new' dirent entry.
     */
@@ -774,13 +776,16 @@ static int rename_cleanup(PINT_client_sm *sm_p,
 static int rename_generic_timer(PINT_client_sm *sm_p,
                                 job_status_s *js_p)
 {
+    int ret = -PVFS_EINVAL;
     job_id_t tmp_id;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: generic_timer\n");
 
-    return job_req_sched_post_timer(
-	PVFS2_CLIENT_RETRY_DELAY, sm_p, 0, js_p,
-        &tmp_id, pint_client_sm_context);
+    ret = job_req_sched_post_timer(
+	PVFS2_CLIENT_RETRY_DELAY, sm_p, 0, js_p, &tmp_id,
+        pint_client_sm_context);
+
+    return ret;
 }
 
 static int rename_crdirent_retry_or_fail(PINT_client_sm *sm_p,
@@ -795,7 +800,7 @@ static int rename_crdirent_retry_or_fail(PINT_client_sm *sm_p,
     {
 	sm_p->u.rename.retry_count++;
 	js_p->error_code = RENAME_CRDIRENT_RETRY;
-	return(1);
+	return 1;
     }
 
     if ((js_p->error_code == -PVFS_EEXIST) &&
@@ -806,7 +811,7 @@ static int rename_crdirent_retry_or_fail(PINT_client_sm *sm_p,
 	 * problem along the way
 	 */
 	js_p->error_code = 0;
-	return(1);
+	return 1;
     }
 
     /* let other errors fall through to next state */
@@ -825,7 +830,7 @@ static int rename_rmdirent_retry_or_fail(PINT_client_sm *sm_p,
     {
 	sm_p->u.rename.retry_count++;
 	js_p->error_code = RENAME_RMDIRENT_RETRY;
-	return(1);
+	return 1;
     }
 
     if ((js_p->error_code == -PVFS_ENOENT) &&
@@ -838,7 +843,7 @@ static int rename_rmdirent_retry_or_fail(PINT_client_sm *sm_p,
 	 * it go without warning.
 	 */
 	js_p->error_code = 0;
-	return(1);
+	return 1;
     }
 
     /* let other errors fall through to next state */

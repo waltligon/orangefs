@@ -271,11 +271,12 @@ static int chdirent_setup_resp(PINT_server_op *s_op,
 {
     PINT_STATE_DEBUG("setup_resp");
 
-    if(js_p->error_code == 0)
+    if (js_p->error_code == 0)
     {
 	/* return original dirent handle in the response */
 	s_op->resp.u.chdirent.old_dirent_handle =
             s_op->u.chdirent.old_dirent_handle;
+
 	gossip_debug(GOSSIP_SERVER_DEBUG,
 		     "  succeeded; returning handle %Lu in response\n",
 		     Lu(s_op->resp.u.chdirent.old_dirent_handle));
@@ -291,7 +292,6 @@ static int chdirent_cleanup(PINT_server_op *s_op,
                             job_status_s* js_p)
 {
     PINT_STATE_DEBUG("cleanup");
-
     return(server_state_machine_complete(s_op));
 }
 

@@ -174,8 +174,11 @@ int PVFS_isys_remove(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_remove entered\n");
 
-    if (object_name == NULL)
+    if ((parent_ref.handle == PVFS_HANDLE_NULL) ||
+        (parent_ref.fs_id == PVFS_FS_ID_NULL) ||
+        (object_name == NULL))
     {
+        gossip_err("invalid (NULL) required argument\n");
         return ret;
     }
 
@@ -195,9 +198,6 @@ int PVFS_isys_remove(
     gossip_debug(
         GOSSIP_CLIENT_DEBUG, "Trying to remove entry %s under %Lu,%d\n",
         object_name, Lu(parent_ref.handle), parent_ref.fs_id);
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_remove calling "
-                 "PINT_client_state_machine_post()\n");
 
     return PINT_client_state_machine_post(
         sm_p, PVFS_SYS_REMOVE, op_id, user_ptr);
@@ -244,7 +244,6 @@ static int remove_init(PINT_client_sm *sm_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: init\n");
 
     assert(js_p->error_code == 0);
-
     return 1;
 }
 
@@ -408,17 +407,16 @@ static int remove_cleanup(PINT_client_sm *sm_p,
 static int remove_generic_timer(PINT_client_sm *sm_p,
                                 job_status_s *js_p)
 {
+    int ret = -PVFS_EINVAL;
     job_id_t tmp_id;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: generic_timer\n");
 
-    return job_req_sched_post_timer(
-	PVFS2_CLIENT_RETRY_DELAY,
-	sm_p,
-	0,
-	js_p,
-	&tmp_id,
+    ret = job_req_sched_post_timer(
+	PVFS2_CLIENT_RETRY_DELAY, sm_p, 0, js_p, &tmp_id,
 	pint_client_sm_context);
+
+    return ret;
 }
 
 static int remove_crdirent_retry_or_fail(PINT_client_sm *sm_p,
