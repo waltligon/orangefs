@@ -199,7 +199,7 @@ static int remove_fallback_to_dspace_getattr(PINT_server_op *s_op,
 
     gossip_debug(SERVER_DEBUG,
 		 "  reading dspace attributes (coll_id = 0x%x, "
-                 "handle = 0x%08Lx)\n",
+                 "handle = %Lu)\n",
 		 s_op->req->u.remove.fs_id,
 		 Lu(s_op->req->u.remove.handle));
 
@@ -323,7 +323,8 @@ static int remove_try_to_read_dirdata_handle(PINT_server_op *s_op,
     s_op->val.buffer_sz = sizeof(PVFS_handle);
 
     gossip_debug(SERVER_DEBUG,
-		 "  trying to read dirdata handle (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = %p (%d))\n",
+		 "  trying to read dirdata handle (coll_id = 0x%x, "
+                 "handle = %Lu, key = %s (%d), val_buf = %p (%d))\n",
 		 s_op->req->u.remove.fs_id,
 		 Lu(s_op->req->u.remove.handle),
 		 (char *) s_op->key.buffer,
@@ -360,7 +361,7 @@ static int remove_remove_dirdata_dspace(PINT_server_op *s_op,
     PINT_STATE_DEBUG("remove_dirdata_dspace");
 
     gossip_debug(SERVER_DEBUG,
-		 "  removing dirdata dspace 0x%08Lx\n",
+		 "  removing dirdata dspace %Lu\n",
 		 Lu(s_op->u.remove.dirdata_handle));
 
     ret = job_trove_dspace_remove(s_op->req->u.remove.fs_id,

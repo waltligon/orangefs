@@ -33,13 +33,6 @@
 
 #define AIOCB_ARRAY_SZ 8
 
-#ifdef __PVFS2_TROVE_AIO_THREADED__
-#include "dbpf-thread.h"
-
-extern pthread_cond_t dbpf_op_completed_cond;
-extern dbpf_op_queue_p dbpf_completion_queue_array[TROVE_MAX_CONTEXTS];
-extern gen_mutex_t *dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
-
 /* Internal prototypes */
 static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
 				       TROVE_handle handle,
@@ -64,7 +57,12 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p);
 static int dbpf_bstream_flush_op_svc(struct dbpf_op *op_p);
 static int dbpf_bstream_resize_op_svc(struct dbpf_op *op_p);
 
-/* Functions */
+#ifdef __PVFS2_TROVE_AIO_THREADED__
+#include "dbpf-thread.h"
+
+extern pthread_cond_t dbpf_op_completed_cond;
+extern dbpf_op_queue_p dbpf_completion_queue_array[TROVE_MAX_CONTEXTS];
+extern gen_mutex_t *dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
 
 static void aio_progress_notification(sigval_t sig)
 {
