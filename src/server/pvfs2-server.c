@@ -487,13 +487,13 @@ static int server_shutdown(PINT_server_status_code level,
 	trove_finalize();
 	for(i=0;i<user_opts->number_filesystems;i++)
 	{
-	    free(user_opts->file_systems[i]);
 	    if (user_opts->file_systems[i]->file_system_name)
 		free(user_opts->file_systems[i]->file_system_name);
 	    if (user_opts->file_systems[i]->meta_server_list)
 		free(user_opts->file_systems[i]->meta_server_list);
 	    if (user_opts->file_systems[i]->io_server_list)
 		free(user_opts->file_systems[i]->io_server_list);
+	    free(user_opts->file_systems[i]);
 	}
 	if(user_opts->host_id)
 	    free(user_opts->host_id);
