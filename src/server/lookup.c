@@ -7,6 +7,7 @@
 #include <string.h>
 #include <stddef.h>
 #include <assert.h>
+#include <stdio.h>
 
 #include "state-machine.h"
 #include "server-config.h"
@@ -393,8 +394,8 @@ static int lookup_dir_space(state_action_struct *s_op, job_status_s *ret)
     job_id_t i;
     PVFS_vtag_s vtag;
 
-    gossip_ldebug(SERVER_DEBUG,"Lookup Directory Space
-%lld\n",s_op->req->u.lookup_path.starting_handle);
+    gossip_ldebug(SERVER_DEBUG,"Lookup Directory Space %lld\n",
+                  s_op->req->u.lookup_path.starting_handle);
 
     job_post_ret = job_trove_keyval_read(
 	    s_op->req->u.lookup_path.fs_id,

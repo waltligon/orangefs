@@ -161,7 +161,7 @@ int main(int argc, char **argv)
 		ack.dspace_size = s_attr.b_size;
 		ack.handle = file_handle;
 
-		printf("** sending ack: handle = %d, err = %d, dspace_sz = %d\n", (int) ack.handle, ack.error_code, ack.dspace_size);
+		printf("** sending ack: handle = %d, err = %d, dspace_sz = %Ld\n", (int) ack.handle, ack.error_code, ack.dspace_size);
 
 
 		ret = BMI_post_send(&op, request_info.addr, &ack, sizeof(ack),

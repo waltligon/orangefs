@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <limits.h>
+#include <string.h>
 
 #include <flow.h>
 #include <job.h>

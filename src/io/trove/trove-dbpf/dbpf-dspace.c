@@ -87,6 +87,7 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
 	    return 0; /* try again later */
 	case DBPF_DSPACE_DBCACHE_SUCCESS:
 	    /* drop through */
+	    break;
     }
 
     /* TODO: REDO BUCKETS!!!! */
@@ -192,6 +193,7 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
 	    return 0; /* try again later */
 	case DBPF_DSPACE_DBCACHE_SUCCESS:
 	    /* drop through */
+	    break;
     }
 
     /* whereas dspace_create has to do handle-making steps, we already know
@@ -216,6 +218,7 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
 	    printf("removed dataspace with handle %Ld\n", op_p->handle);
 #endif
 	    /* drop through */
+	    break;
     }
 
     /* always sync to ensure that data made it to the disk */
@@ -299,6 +302,7 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
 	    return 0; /* try again later */
 	case DBPF_DSPACE_DBCACHE_SUCCESS:
 	    /* drop through */
+	    break;
     }
  
     /* get a cursor */
@@ -511,6 +515,7 @@ static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p)
 	    return 0; /* try again later */
 	case DBPF_DSPACE_DBCACHE_SUCCESS:
 	    /* drop through */
+	    break;
     }
 
     memset(&key, 0, sizeof(key));
@@ -563,6 +568,7 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
 	    return 0; /* try again later */
 	case DBPF_DSPACE_DBCACHE_SUCCESS:
 	    /* drop through */
+	    break;
     }
 
     /* get an fd for the bstream so we can check size */
@@ -581,6 +587,7 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
 	    if (ret < 0) goto return_error;
 	    b_size = (TROVE_size) b_stat.st_size;
 	    /* drop through */
+	    break;
     }
 
     ret = dbpf_keyval_dbcache_try_get(op_p->coll_p->coll_id, op_p->handle, 0, &kdb_p);
@@ -606,6 +613,7 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
 	    }
 	    else goto return_error;
 	    /* drop through */
+	    break;
     }
 
     memset(&key, 0, sizeof(key));
@@ -674,6 +682,7 @@ static int dbpf_dspace_test(TROVE_coll_id coll_id,
 	    return 0;
 	case DBPF_QUEUED_OP_SUCCESS:
 	    /* fall through and process */
+	    break;
     }
     
     /* for now we need to call the service function;

@@ -195,6 +195,7 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
 	    return 0;
 	case DBPF_KEYVAL_DBCACHE_SUCCESS:
 	    /* drop through */
+            break;
     }
 
     /* we have a keyval space now, maybe a brand new one. */
@@ -276,6 +277,7 @@ static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p)
 	    return 0;
 	case DBPF_KEYVAL_DBCACHE_SUCCESS:
 	    /* drop through */
+            break;
     }
     memset (&key, 0, sizeof(key));
     key.data = op_p->u.k_remove.key.buffer;
@@ -404,6 +406,7 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
 	    return 0; /* try again later */
 	case DBPF_KEYVAL_DBCACHE_SUCCESS:
 	    /* drop through */
+            break;
     }
 
     /* get a cursor */
