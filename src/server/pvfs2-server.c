@@ -648,6 +648,7 @@ static int server_setup_signal_handlers(void)
 {
     signal(SIGHUP, (void *) server_sig_handler);
     signal(SIGILL, (void *) server_sig_handler);
+    signal(SIGPIPE, (void *) server_sig_handler);
     return 0;
 }
 
@@ -700,8 +701,20 @@ static int server_shutdown(
  */
 static void *server_sig_handler(int sig)
 {
-    gossip_debug(SERVER_DEBUG, "Got Signal %d... Level...%d\n",
-		 sig, (int)server_status_flag);
+    gossip_err("PVFS2 server: got signal: %d, server_status_flag: %d\n", 
+	sig, (int)server_status_flag);
+
+    /* short circuit non critical signals here */
+    if(sig == SIGPIPE)
+    {
+	/* reset handler and continue processing */
+	signal(sig, (void*) server_sig_handler);
+	return(NULL);
+    }
+
+    /* set the signal_recvd_flag on critical errors to cause the server to 
+     * exit gracefully on the next work cycle
+     */
     signal_recvd_flag = sig;
     return NULL;
 }
