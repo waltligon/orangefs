@@ -2,6 +2,6 @@
 
 umount /tmp/mnt
 
-/sbin/rmmod pvfs2
+rmmod pvfs2
 
 
