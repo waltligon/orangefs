@@ -43,8 +43,6 @@ typedef struct
     int num_keyval_pairs;
 } dbpf_attr_cache_elem_t;
 
-#define DBPF_ATTR_CACHE_INVALID_SIZE -1
-
 /* all methods return 0 on success; -1 on failure unless noted */
 
 /*

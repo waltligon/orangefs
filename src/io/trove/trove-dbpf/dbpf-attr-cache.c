@@ -8,11 +8,13 @@
 #include <assert.h>
 #include "gossip.h"
 #include "dbpf-attr-cache.h"
+#include "gen-locks.h"
 
 /* these are based on code from src/server/request-scheduler.c */
 static int hash_key(void *key, int table_size);
 static int hash_key_compare(void *key, struct qlist_head *link);
 
+static gen_mutex_t *s_dbpf_attr_mutex = NULL;
 static int s_cache_size = DBPF_ATTR_CACHE_DEFAULT_SIZE;
 static int s_max_num_cache_elems = 
 DBPF_ATTR_CACHE_DEFAULT_MAX_NUM_CACHE_ELEMS;
@@ -21,6 +23,9 @@ static char *s_cacheable_keywords = NULL;
 static char *s_cacheable_keyword_array[
     DBPF_ATTR_CACHE_MAX_NUM_KEYVALS] = {0};
 static int s_cacheable_keyword_array_size = 0;
+
+#define DBPF_ATTR_CACHE_INITIALIZED() \
+(s_key_to_attr_table && s_dbpf_attr_mutex)
 
 int dbpf_attr_cache_set_keywords(char *keywords)
 {
@@ -129,6 +134,10 @@ int dbpf_attr_cache_initialize(
         s_max_num_cache_elems = cache_max_num_elems;
         s_key_to_attr_table = qhash_init(
             hash_key_compare, hash_key, table_size);
+
+        s_dbpf_attr_mutex = gen_mutex_build();
+        assert(s_dbpf_attr_mutex);
+
         ret = (s_key_to_attr_table ? 0 : -1);
         gossip_debug(TROVE_DEBUG, "dbpf_attr_cache_initialized\n");
     }
@@ -143,8 +152,9 @@ int dbpf_attr_cache_finalize(void)
     struct qlist_head *hash_link = NULL;
     dbpf_attr_cache_elem_t *cache_elem = NULL;
 
-    if (s_key_to_attr_table)
+    if (DBPF_ATTR_CACHE_INITIALIZED())
     {
+        gen_mutex_lock(s_dbpf_attr_mutex);
         for(i = 0; i < s_key_to_attr_table->table_size; i++)
         {
             do
@@ -162,6 +172,11 @@ int dbpf_attr_cache_finalize(void)
         ret = ((i == s_key_to_attr_table->table_size) ? 0 : -1);
         qhash_finalize(s_key_to_attr_table);
         s_key_to_attr_table = NULL;
+
+        /* FIXME: race condition here */
+        gen_mutex_unlock(s_dbpf_attr_mutex);
+        gen_mutex_destroy(s_dbpf_attr_mutex);
+        s_dbpf_attr_mutex = NULL;
         gossip_debug(TROVE_DEBUG, "dbpf_attr_cache_finalized\n");
     }
 
@@ -182,8 +197,9 @@ TROVE_ds_attributes *dbpf_attr_cache_lookup(TROVE_handle key)
     dbpf_attr_cache_elem_t *cache_elem = NULL;
     TROVE_ds_attributes *attr = NULL;
 
-    if (s_key_to_attr_table)
+    if (DBPF_ATTR_CACHE_INITIALIZED())
     {
+        gen_mutex_lock(s_dbpf_attr_mutex);
         hash_link = qhash_search(s_key_to_attr_table,&(key));
         if (hash_link)
         {
@@ -194,6 +210,7 @@ TROVE_ds_attributes *dbpf_attr_cache_lookup(TROVE_handle key)
             gossip_debug(TROVE_DEBUG, "dbpf_attr_cache_lookup: cache "
                          "hit on %Lu\n", Lu(key));
         }
+        gen_mutex_unlock(s_dbpf_attr_mutex);
     }
     return attr;
 }
@@ -203,8 +220,9 @@ dbpf_attr_cache_elem_t *dbpf_cache_elem_lookup(TROVE_handle key)
     struct qlist_head *hash_link = NULL;
     dbpf_attr_cache_elem_t *cache_elem = NULL;
 
-    if (s_key_to_attr_table)
+    if (DBPF_ATTR_CACHE_INITIALIZED())
     {
+        gen_mutex_lock(s_dbpf_attr_mutex);
         hash_link = qhash_search(s_key_to_attr_table,&(key));
         if (hash_link)
         {
@@ -214,6 +232,7 @@ dbpf_attr_cache_elem_t *dbpf_cache_elem_lookup(TROVE_handle key)
             gossip_debug(TROVE_DEBUG, "dbpf_cache_elem_lookup: cache "
                          "elem matching %Lu returned\n", Lu(key));
         }
+        gen_mutex_unlock(s_dbpf_attr_mutex);
     }
     return cache_elem;
 }
@@ -223,8 +242,10 @@ dbpf_keyval_pair_cache_elem_t *dbpf_cache_elem_get_data_based_on_key(
 {
     int i = 0;
 
-    if (cached_elem && key && cached_elem->num_keyval_pairs)
+    if (DBPF_ATTR_CACHE_INITIALIZED() &&
+        (cached_elem && key && cached_elem->num_keyval_pairs))
     {
+        gen_mutex_lock(s_dbpf_attr_mutex);
         for(i = 0; i < cached_elem->num_keyval_pairs; i++)
         {
             if ((strcmp(cached_elem->keyval_pairs[i].key, key) == 0) &&
@@ -235,9 +256,11 @@ dbpf_keyval_pair_cache_elem_t *dbpf_cache_elem_get_data_based_on_key(
                              cached_elem->keyval_pairs[i].data,
                              Lu(cached_elem->key), key,
                              cached_elem->keyval_pairs[i].data_sz);
+                gen_mutex_unlock(s_dbpf_attr_mutex);
                 return &cached_elem->keyval_pairs[i];
             }
         }
+        gen_mutex_unlock(s_dbpf_attr_mutex);
     }
     return NULL;
 }
@@ -251,6 +274,12 @@ int dbpf_cache_elem_set_data_based_on_key(
     cache_elem = dbpf_cache_elem_lookup(key);
     if (cache_elem && key_str && cache_elem->num_keyval_pairs)
     {
+        gen_mutex_lock(s_dbpf_attr_mutex);
+        if (!cache_elem || !cache_elem->num_keyval_pairs)
+        {
+            gen_mutex_unlock(s_dbpf_attr_mutex);
+            return ret;
+        }
         for(i = 0; i < cache_elem->num_keyval_pairs; i++)
         {
             if (strcmp(cache_elem->keyval_pairs[i].key, key_str) == 0)
@@ -272,6 +301,7 @@ int dbpf_cache_elem_set_data_based_on_key(
                 break;
             }
         }
+        gen_mutex_unlock(s_dbpf_attr_mutex);
     }
     return ret;
 }
@@ -286,8 +316,9 @@ int dbpf_attr_cache_insert(
 
     /* should enforce cache size boundary here (s_max_num_cache_elems) */
 
-    if (s_key_to_attr_table)
+    if (DBPF_ATTR_CACHE_INITIALIZED())
     {
+        gen_mutex_lock(s_dbpf_attr_mutex);
         hash_link = qhash_search(s_key_to_attr_table,&(key));
         if (!hash_link)
         {
@@ -333,6 +364,7 @@ int dbpf_attr_cache_insert(
             }
             ret = 0;
         }
+        gen_mutex_unlock(s_dbpf_attr_mutex);
     }
     return ret;
 }
@@ -343,8 +375,9 @@ int dbpf_attr_cache_remove(TROVE_handle key)
     struct qlist_head *hash_link = NULL;
     dbpf_attr_cache_elem_t *cache_elem = NULL;    
 
-    if (s_key_to_attr_table)
+    if (DBPF_ATTR_CACHE_INITIALIZED())
     {
+        gen_mutex_lock(s_dbpf_attr_mutex);
         hash_link = qhash_search_and_remove(s_key_to_attr_table,&(key));
         if (hash_link)
         {
@@ -368,10 +401,10 @@ int dbpf_attr_cache_remove(TROVE_handle key)
                     }
                 }
             }
-
             free(cache_elem);
             ret = 0;
         }
+        gen_mutex_unlock(s_dbpf_attr_mutex);
     }
     return ret;
 }
