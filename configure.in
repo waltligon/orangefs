@@ -135,8 +135,8 @@ dnl for their 2.4.x kernels
 REDHAT_RELEASE=""
 if test -f /etc/redhat-release; then
     AC_MSG_CHECKING(for redhat release 9 (must patch))
-    REDHAT_RELEASE=`cat /etc/redhat-release | cut -b 1-23`
-    if test "x$REDHAT_RELEASE" = "xRed Hat Linux release 9"; then
+    REDHAT_REL=`cat /etc/redhat-release | cut -b 1-23`
+    if test "x$REDHAT_REL" = "xRed Hat Linux release 9"; then
        REDHAT_RELEASE="-DREDHAT_RELEASE_9"
        AC_MSG_RESULT(yes)
     else
