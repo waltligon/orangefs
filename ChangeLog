@@ -13,6 +13,12 @@ pvfs2-0.0.4pre1
 - improved client sysint mkdir implementation (state-machine)
 - improved client sysint setattr implementation (state-machine)
 - pav and pvfs2-genconfig now run in 'perl -w' mode w/o any warnings
+- added event logging framework, instrumented a few code paths
+- example tools to manage event log (pvfs2-set-eventmask and
+  pvfs2-event-mon-example)
+- started some example perf monitor visualization tools, src/apps/vis subdir
+- new network encoding for heterogeneous systems (le-bytefield)
+- env variable to set client side debugging level
 
 	
 pvfs2-0.0.3
