@@ -362,6 +362,25 @@ int pvfs2_setattr(struct dentry *dentry, struct iattr *iattr)
     return ret;
 }
 
+int pvfs2_getattr(
+    struct vfsmount *mnt,
+    struct dentry *dentry,
+    struct kstat *kstat)
+{
+    int ret = -ENOENT;
+    struct inode *inode = dentry->d_inode;
+
+    pvfs2_print("pvfs2: pvfs2_getattr called on %s\n",
+                dentry->d_name.name);
+
+    if (pvfs2_inode_getattr(inode) == 0)
+    {
+        generic_fillattr(inode, kstat);
+        ret = 0;
+    }
+    return ret;
+}
+
 struct inode_operations pvfs2_file_inode_operations =
 {
     .truncate = pvfs2_truncate,
@@ -370,7 +389,8 @@ struct inode_operations pvfs2_file_inode_operations =
 /*     .listxattr = pvfs2_listxattr, */
 /*     .removexattr = pvfs2_removexattr, */
 /*     .permission = pvfs2_permission, */
-    .setattr = pvfs2_setattr
+    .setattr = pvfs2_setattr,
+    .getattr = pvfs2_getattr
 };
 
 struct inode *pvfs2_get_custom_inode(
