@@ -25,23 +25,17 @@ int main(int argc,char **argv)
 	PVFS_sysreq_lookup req_look;
 	PVFS_sysresp_lookup resp_look;
 	PVFS_sysreq_rmdir *req_rmdir = NULL;
-	char *dirname = NULL;
 	int ret = -1, name_sz = 0;
 	pvfs_mntlist mnt = {0,NULL};
 
 
-	if (argc > 1)
+	if (argc != 2)
 	{
-		name_sz = strlen(argv[1]) + 1; /*include null terminator*/
-		dirname = malloc(name_sz);
-		memcpy(dirname, argv[1], name_sz);
-	}
-	else
-	{
-		printf("usage: %s dir_to_remove\n", argv[0]);
-	}
+            printf("usage: %s dir_to_remove\n", argv[0]);
+            return 1;
+        }
 
-	printf("creating a file named %s\n", dirname);
+	printf("creating a file named %s\n", argv[1]);
 
 	/* Parse PVFStab */
 	ret = parse_pvfstab(NULL,&mnt);
@@ -86,7 +80,7 @@ int main(int argc,char **argv)
 		return(-1);
 	}
 
-	req_rmdir->entry_name = dirname;
+	req_rmdir->entry_name = argv[1];
 	req_rmdir->parent_refn.handle = resp_look.pinode_refn.handle;
 	req_rmdir->parent_refn.fs_id = resp_look.pinode_refn.fs_id;
 	req_rmdir->credentials.uid = 100;
@@ -102,7 +96,7 @@ int main(int argc,char **argv)
 	}
 
 	printf("===================================");
-	printf("Directory named %s has been removed.", dirname);
+	printf("Directory named %s has been removed.", argv[1]);
 
 	//close it down
 	ret = PVFS_sys_finalize();
@@ -111,8 +105,6 @@ int main(int argc,char **argv)
 		printf("finalizing sysint failed with errcode = %d\n", ret);
 		return (-1);
 	}
-
-	free(dirname);
 	return(0);
 }
 
