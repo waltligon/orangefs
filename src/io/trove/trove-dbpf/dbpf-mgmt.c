@@ -108,6 +108,10 @@ static int dbpf_collection_setinfo(TROVE_coll_id coll_id,
             ret = trove_set_handle_ranges(coll_id, context_id,
                                           (char *)parameter);
             break;
+	case TROVE_COLLECTION_HANDLE_TIMEOUT:
+	    ret = trove_set_handle_timeout(coll_id, context_id, 
+		    (struct timeval *) parameter);
+	    break;
     }
     return ret;
 }

@@ -14,11 +14,14 @@
 
 #define EXTENTLIST_SIZE 1024
 #define EXTENTLIST_TIMECHECK_FREQ 1
-/* TODO: this has to (somehow) be much larger than the pcache timout. the
- * problem is the clients set the pcache timeout 
- * TODO: (2) have a real api (like the pcache) to set the timeout values */
-#define EXTENTLIST_PURGATORY 50
 
+/* TODO: this has to be much larger than the pcache timout. the
+ * problem is the clients set the pcache timeout.  Our  solution for now is to
+ * set the purgatory timeout based on a config file value.  The pcache then
+ * will treat that purgatory timeout as a hint for its own timeout.  Not
+ * perfect, but it'll get the job done for a lot of cases. */
+/* this is in units of seconds */
+#define EXTENTLIST_PURGATORY_DEFAULT 50
 
 struct TROVE_handle_extent {
     TROVE_handle first;	/* start of the extent */
@@ -60,6 +63,7 @@ void extentlist_show(struct TROVE_handle_extentlist *elist);
 void extentlist_stats(struct TROVE_handle_extentlist *elist); 
 int extentlist_hit_cutoff(struct TROVE_handle_extentlist *elist, TROVE_handle cutoff);
 int extentlist_endured_purgatory(struct TROVE_handle_extentlist *querent, struct TROVE_handle_extentlist *reference);
+int extentlist_set_purgatory(struct timeval * timeout);
 int extentlist_addextent(struct TROVE_handle_extentlist *elist, TROVE_handle first, TROVE_handle last);
 
 /*

@@ -288,6 +288,29 @@ int trove_set_handle_ranges(TROVE_coll_id coll_id,
     return ret;
 }
 
+/*
+ * trove_set_handle_timeout: controls how long a handle, once freed, will sit
+ * on the sidelines before returning to the pool of avaliable handles 
+ */
+
+int trove_set_handle_timeout(TROVE_coll_id coll_id,
+			    TROVE_context_id context_id,
+			    struct timeval * timeout)
+{
+    int ret = -1;
+    handle_ledger_t *ledger = NULL;
+
+    ledger = get_or_add_handle_ledger(coll_id);
+    if (ledger)
+    {
+	/* assert the internal ledger struct is valid */
+	assert(ledger->ledger);
+	/* tell trove how long the timeout should be */
+	ret = trove_ledger_set_timeout(ledger->ledger, timeout);
+    }
+    return ret;
+}
+
 TROVE_handle trove_handle_alloc(TROVE_coll_id coll_id)
 {
     handle_ledger_t *ledger = NULL;

@@ -183,6 +183,14 @@ int trove_ledger_handle_free(struct handle_ledger *hl, TROVE_handle handle)
     return 0;
 }
 
+/* trove_ledger_set_timeout: 
+ *	set the handle purgatory on the underlying extentlists 
+ */
+int trove_ledger_set_timeout(struct handle_ledger *hl, 
+	struct timeval * timeout)
+{
+    return (extentlist_set_purgatory(timeout));
+}
 /* 
  * handle_recycle:  recently_freed items become free items.  overflow items
  * become recently_freed items 
@@ -199,6 +207,8 @@ static int handle_recycle(struct handle_ledger *hl)
 
     return 0;
 }
+
+
 
 
 void trove_handle_ledger_show(struct handle_ledger *hl) 

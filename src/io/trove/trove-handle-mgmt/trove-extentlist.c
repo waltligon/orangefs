@@ -17,6 +17,9 @@ enum extentlist_coalesce_status {
 	COALESCE_NONE=0,
 	COALESCE_SUCCESS=1
 };
+
+static struct timeval s_extentlist_purgatory = {EXTENTLIST_PURGATORY_DEFAULT,0};
+
 static int extentlist_coalesce_extent(struct avlnode **n, struct TROVE_handle_extent *e);
 
 static int avltree_extent_search(struct avlnode *n, TROVE_handle handle, TROVE_handle *f_p, TROVE_handle *l_p);
@@ -352,9 +355,16 @@ int extentlist_hit_cutoff(struct TROVE_handle_extentlist *elist,
  * 					than this one?
  */
 int extentlist_endured_purgatory(struct TROVE_handle_extentlist *querent, struct TROVE_handle_extentlist *reference) {
-    return ( (querent->timestamp.tv_sec - reference->timestamp.tv_sec) > EXTENTLIST_PURGATORY );
+    /* NOTE: do we want milisecond resolution here?  */
+    return ( (querent->timestamp.tv_sec - reference->timestamp.tv_sec) > s_extentlist_purgatory.tv_sec);
 }
 
+int extentlist_set_purgatory(struct timeval * timeout)
+{
+    assert(timeout->tv_sec >= 0);
+    s_extentlist_purgatory = *timeout;
+    return 0;
+}
 
 /* extentlist_handle_remove()
  *
