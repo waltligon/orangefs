@@ -450,6 +450,8 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
     memset(sm_p->msgarray, 0, (sm_p->msgarray_count *
                                sizeof(PINT_client_sm_msgpair_state)));
 
+    sm_p->u.io.total_cancellations_remaining = 0;
+
     /* initialize all per server I/O operation contexts and requests */
     for(i = 0; i < target_datafile_count; i++)
     {
@@ -738,8 +740,8 @@ static int io_datafile_complete_operations(PINT_client_sm *sm_p,
     int matched_send_or_recv = 0;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "io state: "
-                 "datafile_complete_operations (got user tag %lu)\n",
-                 status_user_tag);
+                 "(%p) datafile_complete_operations "
+                 "(got user tag %lu)\n", sm_p, status_user_tag);
 
     if (js_p->error_code)
     {
@@ -999,7 +1001,7 @@ static int io_analyze_results(PINT_client_sm *sm_p,
     */
     if (((PVFS_ERROR_CLASS(-ret) == PVFS_ERROR_BMI) ||
          (PVFS_ERROR_CLASS(-ret) == PVFS_ERROR_FLOW) ||
-         (ret == -ECONNRESET)) &&
+         (ret == -ECONNRESET) || (ret == -PVFS_EPROTO)) &&
         (sm_p->u.io.retry_count < PVFS2_CLIENT_RETRY_LIMIT))
     {
         if (sm_p->acache_hit || sm_p->pinode)
@@ -1080,8 +1082,8 @@ static inline int complete_context_send_or_recv(
         msg->recv_id = 0;
         msg->recv_status = *js_p;
 
-        assert(msg->recv_status.actual_size <= msg->max_resp_sz);
         assert(msg->recv_status.error_code <= 0);
+        assert(msg->recv_status.actual_size <= msg->max_resp_sz);
 
         cur_ctx->msg_recv_in_progress = 0;
         sm_p->u.io.msgpair_completion_count--;
@@ -1400,7 +1402,6 @@ static inline int check_context_status(
         /* size for reads are reported in the flow */
         *total_size += cur_ctx->flow_desc.total_transfered;
 
-        assert(cur_ctx->flow_has_been_posted);
         PINT_flow_reset(&cur_ctx->flow_desc);
     }
     else if (io_type == PVFS_IO_WRITE)

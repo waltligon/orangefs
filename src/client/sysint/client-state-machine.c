@@ -145,9 +145,10 @@ static inline int cancelled_io_jobs_are_pending(PINT_client_sm *sm_p)
       cancellations on the I/O operation are accounted for
     */
     assert(sm_p);
-    assert(sm_p->u.io.total_cancellations_remaining > 0);
-
-    sm_p->u.io.total_cancellations_remaining--;
+    if (sm_p->u.io.total_cancellations_remaining > 0)
+    {
+        sm_p->u.io.total_cancellations_remaining--;
+    }
 
     gossip_debug(GOSSIP_IO_DEBUG,
                  "cancelled_io_jobs_are_pending: %d remaining (op %s)\n",
