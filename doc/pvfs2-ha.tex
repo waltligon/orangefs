@@ -82,12 +82,17 @@ Some preliminary notes about installing Linux (Debian) on this hardware:
   debian-installer will probably be fixed, but beta 4 is known to work
   on this hardware.
 
-\item Once Debian is installed, build a 2.4 kernel, making sure to compile
-  in support for \texttt{AIC\_7XXX} and \texttt{MEGARAID2} scsi drivers.
-  There is a \texttt{MEGARAID} and a \texttt{MEGARAID2}; we need
-  megaraid2.  Yes, I said 2.4 -- the megaraid2 driver has not been
-  forward-ported to 2.6 as of Linux 2.6.7-rc3, though it looks like
-  there is some movement on that front. 
+\item Once Debian is installed, build a new kernel.  You can use
+  linux-2.4 or linux-2.6.  The failover tools we describe in this
+  document are userspace applications and work equally well with 2.4 and
+  2.6.  With linux-2.4, make sure to compile in support for
+  \texttt{AIC\_7XXX} and \texttt{MEGARAID2} scsi drivers.  There are
+  both a \texttt{MEGARAID} and a \texttt{MEGARAID2}; we need megaraid2.
+  The megaraid2 driver eventually made its way into linux-2.6.  Be sure
+  to run linux-2.6.9-rc2 or newer, and set
+  \texttt{CONFIG\_MEGARAID\_NEWGEN} (in menuconfig, ``LSI Logic New
+  Generation RAID Device Drivers (NEW)''),
+  \texttt{CONFIG\_MEGARAID\_MM}, and \texttt{CONFIG\_MEGARAID\_MAILBOX}
 
 \item Put the PowerVault enclosure in \emph{cluster mode}.  To do so,
   flip the little switch on the back of the PowerVault to the position
