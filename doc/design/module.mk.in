@@ -16,5 +16,6 @@ DOCSRC +=\
 	$(DIR)/storage-interface.tex\
 	$(DIR)/system-interface.tex\
 	$(DIR)/systemint-usage.tex\
-	$(DIR)/trove-dbpf.tex
+	$(DIR)/trove-dbpf.tex \
+	$(DIR)/pvfs2-client.tex
 
