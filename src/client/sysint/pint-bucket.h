@@ -18,7 +18,6 @@
  * system interface.  It is responsible for managing the list of meta
  * and data servers and mapping between handle ranges and servers.
  */
-
 int PINT_bucket_initialize(void);
 
 int PINT_bucket_finalize(void);
@@ -60,5 +59,43 @@ int PINT_bucket_get_server_name(
 int PINT_bucket_get_root_handle(
     PVFS_fs_id fsid,
     PVFS_handle *fh_root);
+
+#define map_handle_range_to_extent_list(hrange_list)             \
+do { cur = hrange_list;                                          \
+ while(cur) {                                                    \
+     cur_mapping = llist_head(cur);                              \
+     if (!cur_mapping) break;                                    \
+     assert(cur_mapping->alias_mapping);                         \
+     assert(cur_mapping->alias_mapping->host_alias);             \
+     assert(cur_mapping->handle_range);                          \
+     cur_host_extent_table = (bmi_host_extent_table_s *)malloc(  \
+         sizeof(bmi_host_extent_table_s));                       \
+     if (!cur_host_extent_table) {                               \
+         ret = -ENOMEM;                                          \
+         break;                                                  \
+     }                                                           \
+     cur_host_extent_table->bmi_address =                        \
+         PINT_server_config_get_host_addr_ptr(                   \
+             config,cur_mapping->alias_mapping->host_alias);     \
+     assert(cur_host_extent_table->bmi_address);                 \
+     cur_host_extent_table->extent_list =                        \
+         PINT_create_extent_list(cur_mapping->handle_range);     \
+     if (!cur_host_extent_table->extent_list) {                  \
+         free(cur_host_extent_table);                            \
+         ret = -ENOMEM;                                          \
+         break;                                                  \
+     }                                                           \
+     /*                                                          \
+       add this host to extent list mapping to                   \
+       config cache object's host extent table                   \
+     */                                                          \
+     ret = llist_add_to_tail(                                    \
+         cur_config_fs_cache->bmi_host_extent_tables,            \
+         cur_host_extent_table);                                 \
+     assert(ret == 0);                                           \
+     cur = llist_next(cur);                                      \
+ } } while(0)
+
+
 
 #endif /* __PINT_BUCKET_H */

@@ -86,11 +86,11 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
 {
     int ret = 0;
     char *method_name = NULL;
-    char *cur_handle_range = NULL;
+    char *cur_meta_handle_range = NULL;
+    char *cur_data_handle_range = NULL;
     struct llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs;
 
-    /* initialize BMI Interface (bmi.c) */
     printf("Passing in %s\n",user_opts.host_id);
     ret = BMI_initialize("bmi_tcp", user_opts.host_id, BMI_INIT_SERVER);
     if (ret < 0)
@@ -112,7 +112,6 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
     }
     gossip_debug(SERVER_DEBUG, "Flow Init Complete\n");
 
-    /* initialize Trove Interface */
     ret = trove_initialize(user_opts.storage_path, 0, &method_name, 0);
     if (ret < 0)
     {
@@ -135,7 +134,6 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
 	goto interface_init_failed;
     }
 
-    /* Uses filesystems in config file. */
     cur = user_opts.file_systems;
     while(cur)
     {
@@ -152,9 +150,21 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
                         cur_fs->file_system_name);
 	    goto interface_init_failed;
 	}
-        cur_handle_range =
-            PINT_server_config_get_handle_range_str(&user_opts,cur_fs);
-        if (!cur_handle_range)
+
+        cur_meta_handle_range =
+            PINT_server_config_get_meta_handle_range_str(&user_opts,cur_fs);
+        cur_data_handle_range =
+            PINT_server_config_get_data_handle_range_str(&user_opts,cur_fs);
+
+        /*
+          error out if we're not configured to house either a
+          meta or data handle range at all.
+
+          FIXME: For now this assumes that each host MUST have a handle
+          range in ALL configured filesystems.  If we want to relax this
+          contraint, here's the place to do it.
+        */
+        if (!cur_meta_handle_range && !cur_data_handle_range)
         {
 	    gossip_lerr("Error: Invalid handle range for host %s "
                         "(alias %s) specified in file system %s\n",
@@ -165,15 +175,36 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
 	    goto interface_init_failed;
         }
 
-        ret = trove_collection_setinfo(
-            cur_fs->coll_id,TROVE_COLLECTION_HANDLE_RANGES,
-            (void *)cur_handle_range);
-        if (ret < 0)
+        /* add configured meta handle range for this fs if any */
+        if (cur_meta_handle_range)
         {
-	    gossip_lerr("Error adding handle range %s to filesystem %s\n",
-                        cur_handle_range,cur_fs->file_system_name);
-	    goto interface_init_failed;
+            ret = trove_collection_setinfo(
+                cur_fs->coll_id,TROVE_COLLECTION_HANDLE_RANGES,
+                (void *)cur_meta_handle_range);
+            if (ret < 0)
+            {
+                gossip_lerr("Error adding handle range %s to "
+                            "filesystem %s\n",cur_meta_handle_range,
+                            cur_fs->file_system_name);
+                goto interface_init_failed;
+            }
         }
+
+        /* add configured data handle range for this fs if any */
+        if (cur_data_handle_range)
+        {
+            ret = trove_collection_setinfo(
+                cur_fs->coll_id,TROVE_COLLECTION_HANDLE_RANGES,
+                (void *)cur_data_handle_range);
+            if (ret < 0)
+            {
+                gossip_lerr("Error adding handle range %s to "
+                            "filesystem %s\n",cur_data_handle_range,
+                            cur_fs->file_system_name);
+                goto interface_init_failed;
+            }
+        }
+
         cur = llist_next(cur);
     }
     gossip_debug(SERVER_DEBUG, "Storage Init Complete\n");

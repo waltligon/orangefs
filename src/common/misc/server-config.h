@@ -16,13 +16,8 @@ enum
     FILESYSTEM_CONFIG = 2,
     DEFAULTS_CONFIG = 3,
     ALIASES_CONFIG = 4,
-    HANDLERANGES_CONFIG = 5
-};
-
-enum
-{
-    ENABLE_BMI_TCP = 1,
-    ENABLE_BMI_GM = 2
+    META_HANDLERANGES_CONFIG = 5,
+    DATA_HANDLERANGES_CONFIG = 6
 };
 
 typedef struct host_alias_s
@@ -33,7 +28,7 @@ typedef struct host_alias_s
 
 typedef struct host_handle_mapping_s
 {
-    char *host_alias;
+    struct host_alias_s *alias_mapping;
     char *handle_range;
 } host_handle_mapping_s;
 
@@ -41,10 +36,9 @@ typedef struct filesystem_configuration_s
 {
     TROVE_coll_id coll_id;
     char *file_system_name;
-    int  root_handle;               /* FIXME: should be 64 bit?             */
-    struct llist *meta_server_list; /* ptrs are type char*                  */
-    struct llist *data_server_list; /* ptrs are type char*                  */
-    struct llist *handle_ranges;    /* ptrs are type host_handle_mapping_s* */
+    int  root_handle;                 /* FIXME: should be 64 bit?             */
+    struct llist *meta_handle_ranges; /* ptrs are type host_handle_mapping_s* */
+    struct llist *data_handle_ranges; /* ptrs are type host_handle_mapping_s* */
 } filesystem_configuration_s;
 
 typedef struct server_configuration_s
@@ -64,38 +58,42 @@ typedef struct server_configuration_s
 } server_configuration_s;
 
 int PINT_server_config(
-		       struct server_configuration_s *config_s,
-		       char *global_config_filename,
-		       char *server_config_filename);
+    struct server_configuration_s *config_s,
+    char *global_config_filename,
+    char *server_config_filename);
 
 void PINT_server_config_release(
-				struct server_configuration_s *config_s);
+    struct server_configuration_s *config_s);
 
 char *PINT_server_config_get_host_addr_ptr(
-					   struct server_configuration_s *config_s,
-					   char *alias);
+    struct server_configuration_s *config_s,
+    char *alias);
 
 char *PINT_server_config_get_host_alias_ptr(
-					    struct server_configuration_s *config_s,
-					    char *bmi_address);
+    struct server_configuration_s *config_s,
+    char *bmi_address);
 
-char *PINT_server_config_get_handle_range_str(
-					      struct server_configuration_s *config_s,
-					      struct filesystem_configuration_s *fs);
+char *PINT_server_config_get_meta_handle_range_str(
+    struct server_configuration_s *config_s,
+    struct filesystem_configuration_s *fs);
+
+char *PINT_server_config_get_data_handle_range_str(
+    struct server_configuration_s *config_s,
+    struct filesystem_configuration_s *fs);
 
 int PINT_server_config_is_valid_configuration(
-					      struct server_configuration_s *config_s);
+    struct server_configuration_s *config_s);
 
 int PINT_server_config_is_valid_collection_id(
-					      struct server_configuration_s *config_s,
-					      TROVE_coll_id coll_id);
+    struct server_configuration_s *config_s,
+    TROVE_coll_id coll_id);
 
 int PINT_server_config_has_fs_config_info(
-					  struct server_configuration_s *config_s,
-					  char *fs_name);
+    struct server_configuration_s *config_s,
+    char *fs_name);
 
 int PINT_server_config_pvfs2_mkspace(
-				     struct server_configuration_s *config);
+    struct server_configuration_s *config);
 
 /*
  * Local variables:

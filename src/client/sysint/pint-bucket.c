@@ -98,8 +98,9 @@ int PINT_bucket_finalize(void)
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_handle_load_mapping(struct server_configuration_s *config,
-                             struct filesystem_configuration_s *fs)
+int PINT_handle_load_mapping(
+    struct server_configuration_s *config,
+    struct filesystem_configuration_s *fs)
 {
     int ret = -EINVAL;
     struct llist *cur = NULL;
@@ -109,8 +110,8 @@ int PINT_handle_load_mapping(struct server_configuration_s *config,
 
     if (config && fs)
     {
-        cur_config_fs_cache = (struct config_fs_cache_s *)malloc(
-            sizeof(struct config_fs_cache_s));
+        cur_config_fs_cache = (struct config_fs_cache_s *)
+            malloc(sizeof(struct config_fs_cache_s));
         assert(cur_config_fs_cache);
 
         cur_config_fs_cache->fs = (struct filesystem_configuration_s *)fs;
@@ -119,48 +120,16 @@ int PINT_handle_load_mapping(struct server_configuration_s *config,
         cur_config_fs_cache->bmi_host_extent_tables = llist_new();
         assert(cur_config_fs_cache->bmi_host_extent_tables);
 
-        cur = cur_config_fs_cache->fs->handle_ranges;
-        while(cur)
-        {
-            cur_mapping = llist_head(cur);
-            if (!cur_mapping)
-            {
-                break;
-            }
-            assert(cur_mapping->host_alias);
-            assert(cur_mapping->handle_range);
+        /*
+          map all meta and data handle ranges to the extent list, if any.
+          map_handle_range_to_extent_list is a macro defined in
+          pint-bucket.h for convenience only.
+        */
+        map_handle_range_to_extent_list(
+            cur_config_fs_cache->fs->meta_handle_ranges);
 
-            cur_host_extent_table = (bmi_host_extent_table_s *)malloc(
-                sizeof(bmi_host_extent_table_s));
-            if (!cur_host_extent_table)
-            {
-                ret = -ENOMEM;
-                break;
-            }
-            cur_host_extent_table->bmi_address =
-                PINT_server_config_get_host_addr_ptr(
-                    config,cur_mapping->host_alias);
-            assert(cur_host_extent_table->bmi_address);
-
-            cur_host_extent_table->extent_list =
-                PINT_create_extent_list(cur_mapping->handle_range);
-            if (!cur_host_extent_table->extent_list)
-            {
-                free(cur_host_extent_table);
-                ret = -ENOMEM;
-                break;
-            }
-            /*
-              add this host to extent list mapping to
-              config cache object's host extent table
-            */
-            ret = llist_add_to_tail(
-                cur_config_fs_cache->bmi_host_extent_tables,
-                cur_host_extent_table);
-            assert(ret == 0);
-
-            cur = llist_next(cur);
-        }
+        map_handle_range_to_extent_list(
+            cur_config_fs_cache->fs->data_handle_ranges);
 
         /*
           add config cache object to the hash table
@@ -169,9 +138,9 @@ int PINT_handle_load_mapping(struct server_configuration_s *config,
         if (ret == 0)
         {
             cur_config_fs_cache->meta_server_cursor =
-                cur_config_fs_cache->fs->meta_server_list;
+                cur_config_fs_cache->fs->meta_handle_ranges;
             cur_config_fs_cache->data_server_cursor =
-                cur_config_fs_cache->fs->data_server_list;
+                cur_config_fs_cache->fs->data_handle_ranges;
 
             qhash_add(s_fsid_config_cache_table,
                       &(cur_config_fs_cache->fs->coll_id),
@@ -197,7 +166,8 @@ int PINT_bucket_get_next_meta(
     bmi_addr_t *meta_addr)
 {
     int ret = -EINVAL;
-    char *meta_server_bmi_str = (char *)0;
+    char *meta_server_bmi_str = NULL;
+    struct host_handle_mapping_s *cur_mapping = NULL;
     struct qlist_head *hash_link = NULL;
     struct config_fs_cache_s *cur_config_cache = NULL;
 
@@ -213,21 +183,21 @@ int PINT_bucket_get_next_meta(
             assert(cur_config_cache->fs);
             assert(cur_config_cache->meta_server_cursor);
 
-            meta_server_bmi_str =
+            cur_mapping =
                 llist_head(cur_config_cache->meta_server_cursor);
-            if (!meta_server_bmi_str)
+            if (!cur_mapping)
             {
                 cur_config_cache->meta_server_cursor =
-                    cur_config_cache->fs->meta_server_list;
-                meta_server_bmi_str =
+                    cur_config_cache->fs->meta_handle_ranges;
+                cur_mapping =
                     llist_head(cur_config_cache->meta_server_cursor);
-                assert(meta_server_bmi_str);
+                assert(cur_mapping);
             }
             cur_config_cache->meta_server_cursor =
                 llist_next(cur_config_cache->meta_server_cursor);
 
             meta_server_bmi_str = PINT_server_config_get_host_addr_ptr(
-                config,meta_server_bmi_str);
+                config,cur_mapping->alias_mapping->host_alias);
 
             ret = BMI_addr_lookup(meta_addr,meta_server_bmi_str);
         }
@@ -252,6 +222,7 @@ int PINT_bucket_get_next_io(
 {
     int ret = -EINVAL;
     char *data_server_bmi_str = (char *)0;
+    struct host_handle_mapping_s *cur_mapping = NULL;
     struct qlist_head *hash_link = NULL;
     struct config_fs_cache_s *cur_config_cache = NULL;
 
@@ -270,19 +241,19 @@ int PINT_bucket_get_next_io(
             {
                 assert(cur_config_cache->data_server_cursor);
 
-                data_server_bmi_str =
+                cur_mapping =
                     llist_head(cur_config_cache->data_server_cursor);
-                if (!data_server_bmi_str)
+                if (!cur_mapping)
                 {
                     cur_config_cache->data_server_cursor =
-                        cur_config_cache->fs->data_server_list;
+                        cur_config_cache->fs->data_handle_ranges;
                     continue;
                 }
                 cur_config_cache->data_server_cursor =
                     llist_next(cur_config_cache->data_server_cursor);
 
                 data_server_bmi_str = PINT_server_config_get_host_addr_ptr(
-                    config,data_server_bmi_str);
+                    config,cur_mapping->alias_mapping->host_alias);
 
                 ret = BMI_addr_lookup(io_addr_array,data_server_bmi_str);
                 if (ret)
@@ -342,9 +313,10 @@ int PINT_bucket_get_num_meta(PVFS_fs_id fsid, int *num_meta)
                             hash_link);
             assert(cur_config_cache);
             assert(cur_config_cache->fs);
-            assert(cur_config_cache->fs->meta_server_list);
+            assert(cur_config_cache->fs->meta_handle_ranges);
 
-            *num_meta = llist_count(cur_config_cache->fs->meta_server_list);
+            *num_meta =
+                llist_count(cur_config_cache->fs->meta_handle_ranges);
             ret = 0;
         }
     }
@@ -373,9 +345,9 @@ int PINT_bucket_get_num_io(PVFS_fs_id fsid, int *num_io)
                             hash_link);
             assert(cur_config_cache);
             assert(cur_config_cache->fs);
-            assert(cur_config_cache->fs->data_server_list);
+            assert(cur_config_cache->fs->data_handle_ranges);
 
-            *num_io = llist_count(cur_config_cache->fs->data_server_list);
+            *num_io = llist_count(cur_config_cache->fs->data_handle_ranges);
             ret = 0;
         }
     }

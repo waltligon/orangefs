@@ -70,6 +70,7 @@ typedef struct {
     PVFS_handle bucket_end;
 } bucket_info;
 
+/* maps bmi address to handle ranges/extents */
 typedef struct bmi_host_extent_table_s
 {
     char *bmi_address;
@@ -86,10 +87,10 @@ typedef struct config_fs_cache_s
     /* ptrs are type bmi_host_extent_table_s */
     struct llist *bmi_host_extent_tables;
 
-    /* index into fs->meta_server_list (see server-config.h) */
+    /* index into fs->meta_handle_ranges obj (see server-config.h) */
     struct llist *meta_server_cursor;
 
-    /* index into fs->data_server_list (see server-config.h) */
+    /* index into fs->data_handle_ranges obj (see server-config.h) */
     struct llist *data_server_cursor;
 } config_fs_cache_s;
 
