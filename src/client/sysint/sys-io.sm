@@ -774,9 +774,9 @@ static int io_datafile_complete_operations(PINT_client_sm *sm_p,
     PINT_client_io_ctx *cur_ctx = NULL;
     int matched_send_or_recv = 0;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "io state: "
-                 "(%p) %s "
-                 "(got user tag %lu)\n", sm_p, __func__, status_user_tag);
+    gossip_debug(
+        GOSSIP_CLIENT_DEBUG, "(%p) io_datafile_complete_operations "
+        "(tag %lu)\n", sm_p, status_user_tag);
 
     if (js_p->error_code)
     {

@@ -329,9 +329,8 @@ int PVFS_isys_create(
     }
 
     gossip_debug(
-        GOSSIP_CLIENT_DEBUG, "Creating file named %s under parent "
-        "handle %Lu on fs %d\n", object_name, Lu(parent_ref.handle),
-        parent_ref.fs_id);
+        GOSSIP_CLIENT_DEBUG, "Creating file %s under %Lu, %d\n",
+        object_name, Lu(parent_ref.handle), parent_ref.fs_id);
 
     return PINT_client_state_machine_post(
         sm_p, PVFS_SYS_CREATE, op_id, user_ptr);
@@ -517,8 +516,8 @@ static int create_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
                      "files to PVFS_REQ_LIMIT_DFILE_COUNT\n");
     }
 
-    gossip_ldebug(GOSSIP_CLIENT_DEBUG, "Number of data files to create "
-                  "is %d\n", sm_p->u.create.num_data_files);
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "need to create %d datafiles\n",
+                 sm_p->u.create.num_data_files);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG," create: posting create req\n");
 
@@ -652,16 +651,16 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
             PVFS_TYPE_DATAFILE,
             sm_p->u.create.io_handle_extent_array[i]);
 
-        gossip_debug(
-            GOSSIP_CLIENT_DEBUG,  "create: posting data file create "
-            "req %d with extents %Lu-%Lu\n",i,
-            Lu(sm_p->u.create.io_handle_extent_array[i].extent_array[0].first),
-            Lu(sm_p->u.create.io_handle_extent_array[i].extent_array[0].last));
+        gossip_debug(GOSSIP_CLIENT_DEBUG,  "posting datafile[%d] create "
+                     "with extents %Lu-%Lu\n", i,
+                     Lu(sm_p->u.create.io_handle_extent_array[i].
+                        extent_array[0].first),
+                     Lu(sm_p->u.create.io_handle_extent_array[i].
+                        extent_array[0].last));
 
-        /* fill in msgpair structure components */
         msg_p->fs_id = sm_p->parent_ref.fs_id;
-        msg_p->handle =
-            sm_p->u.create.io_handle_extent_array[i].extent_array[0].first;
+        msg_p->handle = sm_p->u.create.io_handle_extent_array[i].
+            extent_array[0].first;
         msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
         msg_p->comp_fn = create_datafiles_comp_fn;
         msg_p->svr_addr = sm_p->u.create.data_server_addrs[i];

@@ -492,6 +492,9 @@ static inline int PINT_id_gen_safe_unregister(
     return id_gen_safe_unregister(id);
 }
 
+/* debugging method for getting a string macthing the op_type */
+char *PINT_client_get_name_str(int op_type);
+
 /* used with post call to tell the system what state machine to use
  * when processing a new PINT_client_sm structure.
  */
@@ -534,8 +537,7 @@ int PINT_client_wait_internal(
     int *out_error,
     const char *in_class_str);
 
-void PINT_sys_release(
-    PVFS_sys_op_id op_id);
+void PINT_sys_release(PVFS_sys_op_id op_id);
 
 /* internal helper macros */
 #define PINT_sys_wait(op_id, in_op_str, out_error)            \

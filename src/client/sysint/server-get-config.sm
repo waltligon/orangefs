@@ -127,7 +127,7 @@ int PINT_server_get_config(
     }
     else
     {
-        ret = PINT_sys_wait(op_id, "[non isys] get_config", &error);
+        ret = PINT_sys_wait(op_id, "X-get_config", &error);
         if (ret)
         {
             PVFS_perror_gossip("PINT_sys_wait call", ret);

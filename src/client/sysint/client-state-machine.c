@@ -352,8 +352,18 @@ int PINT_client_state_machine_post(
 
     if (sm_p->op_complete)
     {
+        gossip_debug(
+            GOSSIP_CLIENT_DEBUG, "Posted %s (immediate completion)\n",
+            PINT_client_get_name_str(pvfs_sys_op));
+
         ret = add_sm_to_completion_list(sm_p);
         assert(ret == 0);
+    }
+    else
+    {
+        gossip_debug(
+            GOSSIP_CLIENT_DEBUG, "Posted %s (waiting for test)\n",
+            PINT_client_get_name_str(pvfs_sys_op));
     }
     return ret;
 }
@@ -731,8 +741,7 @@ int PINT_client_wait_internal(
         do
         {
             gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_i%s_%s calling "
-                         "PINT_client_state_machine_test()\n",
-                         in_class_str, in_op_str);
+                         "test()\n", in_class_str, in_op_str);
             ret = PINT_client_state_machine_test(op_id, out_error);
 
         } while (!sm_p->op_complete && (ret == 0));
@@ -768,6 +777,58 @@ void PINT_sys_release(PVFS_sys_op_id op_id)
         }
         free(sm_p);
     }
+}
+
+char *PINT_client_get_name_str(int op_type)
+{
+    typedef struct
+    {
+        int type;
+        char *type_str;
+    } __sys_op_info_t;
+
+    static __sys_op_info_t op_info[] =
+    {
+        { PVFS_SYS_REMOVE, "PVFS_SYS_REMOVE" },
+        { PVFS_SYS_CREATE, "PVFS_SYS_CREATE" },
+        { PVFS_SYS_MKDIR, "PVFS_SYS_MKDIR" },
+        { PVFS_SYS_SYMLINK, "PVFS_SYS_SYMLINK" },
+        { PVFS_SYS_READDIR, "PVFS_SYS_READDIR" },
+        { PVFS_SYS_LOOKUP, "PVFS_SYS_LOOKUP" },
+	{ PVFS_SYS_RENAME, "PVFS_SYS_RENAME" },
+        { PVFS_SYS_GETATTR, "PVFS_SYS_GETATTR" },
+        { PVFS_SYS_SETATTR, "PVFS_SYS_SETATTR" },
+        { PVFS_SYS_IO, "PVFS_SYS_IO" },
+        { PVFS_SYS_FLUSH, "PVFS_SYS_FLUSH" },
+        { PVFS_MGMT_SETPARAM_LIST, "PVFS_MGMT_SETPARAM_LIST" },
+        { PVFS_MGMT_NOOP, "PVFS_MGMT_NOOP" },
+        { PVFS_SYS_TRUNCATE, "PVFS_SYS_TRUNCATE" },
+        { PVFS_MGMT_STATFS_LIST, "PVFS_MGMT_STATFS_LIST" },
+        { PVFS_MGMT_PERF_MON_LIST, "PVFS_MGMT_PERF_MON_LIST" },
+        { PVFS_MGMT_EVENT_MON_LIST, "PVFS_MGMT_EVENT_MON_LIST" },
+        { PVFS_MGMT_ITERATE_HANDLES_LIST,
+          "PVFS_MGMT_ITERATE_HANDLES_LIST" },
+        { PVFS_MGMT_GET_DFILE_ARRAY, "PVFS_MGMT_GET_DFILE_ARRAY" },
+        { PVFS_MGMT_REMOVE_OBJECT, "PVFS_MGMT_REMOVE_OBJECT" },
+        { PVFS_MGMT_REMOVE_DIRENT, "PVFS_MGMT_REMOVE_DIRENT" },
+        { PVFS_MGMT_CREATE_DIRENT, "PVFS_MGMT_CREATE_DIRENT" },
+        { PVFS_MGMT_GET_DIRDATA_HANDLE,
+          "PVFS_MGMT_GET_DIRDATA_HANDLE" },
+        { PVFS_SERVER_GET_CONFIG, "PVFS_SERVER_GET_CONFIG" },
+        { PVFS_CLIENT_JOB_TIMER, "PVFS_CLIENT_JOB_TIMER" },
+        { PVFS_DEV_UNEXPECTED, "PVFS_DEV_UNEXPECTED" },
+        { 0, "UNKNOWN" }
+    };
+
+    int i = 0, limit = (int)(sizeof(op_info) / sizeof(__sys_op_info_t));
+    for(i = 0; i < limit; i++)
+    {
+        if (op_info[i].type == op_type)
+        {
+            return op_info[i].type_str;
+        }
+    }
+    return op_info[limit-1].type_str;
 }
 
 /*

@@ -160,6 +160,7 @@ static struct qhash_table *s_ops_in_progress_table = NULL;
 static void parse_args(int argc, char **argv, options_t *opts);
 static void print_help(char *progname);
 static void reset_acache_timeout(void);
+static char *get_vfs_op_name_str(int op_type);
 
 static PVFS_object_ref perform_lookup_on_create_error(
     PVFS_object_ref parent,
@@ -183,6 +184,7 @@ do {                                                          \
     int size_list[MAX_LIST_SIZE];                             \
     int list_size = 0, total_size = 0;                        \
                                                               \
+    log_operation_timing(vfs_request);                        \
     buffer_list[0] = &vfs_request->out_downcall;              \
     size_list[0] = sizeof(pvfs2_downcall_t);                  \
     total_size = sizeof(pvfs2_downcall_t);                    \
@@ -380,6 +382,28 @@ void *exec_remount(void *ptr)
     pthread_mutex_unlock(&remount_mutex);
 
     return NULL;
+}
+
+static inline void log_operation_timing(vfs_request_t *vfs_request)
+{
+#ifdef CLIENT_CORE_OP_TIMING
+    double wtime = 0.0f, utime = 0.0f, stime = 0.0f;
+
+    PINT_time_mark(&vfs_request->end);
+    PINT_time_diff(vfs_request->start,
+                   vfs_request->end,
+                   &wtime, &utime, &stime);
+
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "%s complete (vfs_request "
+                 "%p)\n\twtime = %f, utime=%f, stime=%f (seconds)\n",
+                 get_vfs_op_name_str(vfs_request->in_upcall.type),
+                 vfs_request, wtime, utime, stime);
+#else
+    gossip_debug(
+        GOSSIP_CLIENTCORE_DEBUG, "%s complete (vfs_request %p)\n",
+        get_vfs_op_name_str(vfs_request->in_upcall.type),
+        vfs_request);
+#endif
 }
 
 static int post_lookup_request(vfs_request_t *vfs_request)
@@ -1854,26 +1878,11 @@ int process_vfs_requests(void)
             }
             else
             {
+                log_operation_timing(vfs_request);
 
-#ifdef CLIENT_CORE_OP_TIMING
-                {
-                    double wtime = 0.0f, utime = 0.0f, stime = 0.0f;
-                    PINT_time_mark(&vfs_request->end);
-                    PINT_time_diff(vfs_request->start,
-                                   vfs_request->end,
-                                   &wtime, &utime, &stime);
-
-                    gossip_debug(
-                        GOSSIP_CLIENTCORE_DEBUG, "PINT_sys_testsome"
-                        " returned completed vfs_request %p\n\twtime = %f,"
-                        "utime=%f, stime=%f (seconds)\n",
-                        vfs_request, wtime, utime, stime);
-                }
-#else
                 gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "PINT_sys_testsome"
                              " returned completed vfs_request %p\n",
                              vfs_request);
-#endif
                 /*
                   if this is not a dev unexp msg, it's a non-blocking
                   sysint operation that has just completed
@@ -2207,6 +2216,48 @@ static void reset_acache_timeout(void)
         gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "All file systems "
                      "unmounted. Not resetting the acache.\n");
     }
+}
+
+static char *get_vfs_op_name_str(int op_type)
+{
+    typedef struct
+    {
+        int type;
+        char *type_str;
+    } __vfs_op_name_info_t;
+
+    static __vfs_op_name_info_t vfs_op_info[] =
+    {
+        { PVFS2_VFS_OP_INVALID, "PVFS_VFS_OP_INVALID" },
+        { PVFS2_VFS_OP_FILE_IO, "PVFS2_VFS_OP_FILE_IO" },
+        { PVFS2_VFS_OP_LOOKUP, "PVFS2_VFS_OP_LOOKUP" },
+        { PVFS2_VFS_OP_CREATE, "PVFS2_VFS_OP_CREATE" },
+        { PVFS2_VFS_OP_GETATTR, "PVFS2_VFS_OP_GETATTR" },
+        { PVFS2_VFS_OP_REMOVE, "PVFS2_VFS_OP_REMOVE" },
+        { PVFS2_VFS_OP_MKDIR, "PVFS2_VFS_OP_MKDIR" },
+        { PVFS2_VFS_OP_READDIR, "PVFS2_VFS_OP_READDIR" },
+        { PVFS2_VFS_OP_SETATTR, "PVFS2_VFS_OP_SETATTR" },
+        { PVFS2_VFS_OP_SYMLINK, "PVFS2_VFS_OP_SYMLINK" },
+        { PVFS2_VFS_OP_RENAME, "PVFS2_VFS_OP_RENAME" },
+        { PVFS2_VFS_OP_STATFS, "PVFS2_VFS_OP_STATFS" },
+        { PVFS2_VFS_OP_TRUNCATE, "PVFS2_VFS_OP_TRUNCATE" },
+        { PVFS2_VFS_OP_MMAP_RA_FLUSH, "PVFS2_VFS_OP_MMAP_RA_FLUSH" },
+        { PVFS2_VFS_OP_FS_MOUNT, "PVFS2_VFS_OP_FS_MOUNT" },
+        { PVFS2_VFS_OP_FS_UMOUNT, "PVFS2_VFS_OP_FS_UMOUNT" },
+        { PVFS2_VFS_OP_CANCEL, "PVFS2_VFS_OP_CANCEL" },
+        { 0, "UNKNOWN" }
+    };
+
+    int i = 0;
+    int limit = (int)(sizeof(vfs_op_info) / sizeof(__vfs_op_name_info_t));
+    for(i = 0; i < limit; i++)
+    {
+        if (vfs_op_info[i].type == op_type)
+        {
+            return vfs_op_info[i].type_str;
+        }
+    }
+    return vfs_op_info[limit-1].type_str;
 }
 
 /*
