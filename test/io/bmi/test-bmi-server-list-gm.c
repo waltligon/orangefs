@@ -86,7 +86,7 @@ int main(int argc, char **argv)	{
 	/* wait for an initial request  */
 	do
 	{
-		ret = BMI_testunexpected(1, &outcount, &request_info, 10);
+		ret = BMI_testunexpected(1, &outcount, &request_info, 5000);
 	}while(ret == 0 && outcount == 0);
 	if(ret < 0)
 	{

@@ -169,6 +169,10 @@ example?).
 note that only the ENABLE_GM_BUFPOOL memory buffering method supports
 list operations!
 
+follow up on gm_blocking_receive() bug- it appears to still
+consume 99% cpu when alarms are used, despite report that bug was
+fixed.  For now still using XXX_no_spin() version.
+
 Benchmarking:
 -----------------------
 
