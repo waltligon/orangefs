@@ -2408,7 +2408,7 @@ done
 echo $ac_n "checking for SDL""... $ac_c" 1>&6
 echo "configure:2410: checking for SDL" >&5
 SDL_CONFIG=`which sdl-config 2> /dev/null`
-if ! test -z $SDL_CONFIG && test -x $SDL_CONFIG; then
+if test 1; then
    echo "$ac_t""yes" 1>&6
    SDL_VERSION=`sdl-config --version`
    VISCFLAGS=`sdl-config --cflags`
@@ -2449,7 +2449,6 @@ if eval "test \"`echo '$ac_cv_header_'$ac_safe`\" = yes"; then
 #define $ac_tr_hdr 1
 EOF
  BUILD_VIS="1"
-        
         CPPFLAGS="$CPPFLAGS $VISCFLAGS"
 else
   echo "$ac_t""no" 1>&6
@@ -2457,17 +2456,17 @@ for ac_hdr in SDL/SDL_ttf.h
 do
 ac_safe=`echo "$ac_hdr" | sed 'y%./+-%__p_%'`
 echo $ac_n "checking for $ac_hdr""... $ac_c" 1>&6
-echo "configure:2461: checking for $ac_hdr" >&5
+echo "configure:2460: checking for $ac_hdr" >&5
 if eval "test \"`echo '$''{'ac_cv_header_$ac_safe'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
   cat > conftest.$ac_ext <<EOF
-#line 2466 "configure"
+#line 2465 "configure"
 #include "confdefs.h"
 #include <$ac_hdr>
 EOF
 ac_try="$ac_cpp conftest.$ac_ext >/dev/null 2>conftest.out"
-{ (eval echo configure:2471: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
+{ (eval echo configure:2470: \"$ac_try\") 1>&5; (eval $ac_try) 2>&5; }
 ac_err=`grep -v '^ *+' conftest.out | grep -v "^conftest.${ac_ext}\$"`
 if test -z "$ac_err"; then
   rm -rf conftest*
@@ -2488,8 +2487,6 @@ if eval "test \"`echo '$ac_cv_header_'$ac_safe`\" = yes"; then
 #define $ac_tr_hdr 1
 EOF
  BUILD_VIS="1"
-            s%@BUILD_VIS@%$BUILD_VIS%g
-
             CPPFLAGS="$CPPFLAGS $VISCFLAGS"
 else
   echo "$ac_t""no" 1>&6
@@ -2500,6 +2497,7 @@ fi
 done
 
 
+   
    
    
 else
@@ -2740,6 +2738,7 @@ s%@BUILD_IB@%$BUILD_IB%g
 s%@MPICC@%$MPICC%g
 s%@BUILD_MPI@%$BUILD_MPI%g
 s%@MPI_GNUC@%$MPI_GNUC%g
+s%@BUILD_VIS@%$BUILD_VIS%g
 s%@VISCFLAGS@%$VISCFLAGS%g
 s%@VISLIBS@%$VISLIBS%g
 

@@ -340,14 +340,13 @@ if ! test -z $SDL_CONFIG && test -x $SDL_CONFIG; then
    dnl only define BUILD_VIS if we have all required parts
    AC_CHECK_HEADERS(SDL_ttf.h,
        [BUILD_VIS="1"
-        AC_SUBST(BUILD_VIS)
         CPPFLAGS="$CPPFLAGS $VISCFLAGS"],
         [AC_CHECK_HEADERS(SDL/SDL_ttf.h,
             [BUILD_VIS="1"
-            AC_SUBST(BUILD_VIS)
             CPPFLAGS="$CPPFLAGS $VISCFLAGS"],)],
 )
 
+   AC_SUBST(BUILD_VIS)
    AC_SUBST(VISCFLAGS)
    AC_SUBST(VISLIBS)
 else
