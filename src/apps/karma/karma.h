@@ -3,6 +3,9 @@
 #include "pvfs2.h"
 #include "pvfs2-mgmt.h"
 
+/* setting window title (from karma.c) */
+void gui_set_title(char *title);
+
 /* menu interface */
 GtkWidget *gui_menu_setup(GtkWidget  *window);
 
@@ -12,6 +15,9 @@ void       gui_message_new(char *message);
 
 /* communication interface */
 int gui_comm_setup(void);
+void gui_comm_set_active_fs(char *contact_server,
+			    char *fs_name,
+			    PVFS_fs_id new_fsid);
 int gui_comm_stats_retrieve(struct PVFS_mgmt_server_stat **svr_stat,
 			    int *svr_stat_ct);
 

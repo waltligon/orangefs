@@ -9,6 +9,8 @@
 
 gint timer_callback(gpointer data);
 
+static GtkWidget *main_window;
+
 static gint delete_event(GtkWidget *widget,
 			 GdkEvent  *event,
 			 gpointer   data)
@@ -21,8 +23,6 @@ static void destroy_event(GtkWidget *widget,
 {
     gtk_main_quit();
 }
-
-
 
 static GtkWidget *get_notebook_pages(GtkWidget *window)
 {
@@ -51,12 +51,15 @@ static GtkWidget *get_notebook_pages(GtkWidget *window)
     return notebook;
 }
 
+void gui_set_title(char *title)
+{
+    gtk_window_set_title(GTK_WINDOW(main_window), title);
+}
 
 int main(int   argc,
 	 char *argv[])
 {
     /* GtkWidget is the storage type for widgets */
-    GtkWidget *window;
     GtkWidget *main_vbox;
     GtkWidget *menubar, *messageframe, *notepagesframe;
 
@@ -65,22 +68,22 @@ int main(int   argc,
     gtk_init(&argc, &argv);
 
     /* create a new window */
-    window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
-    gtk_window_set_title(GTK_WINDOW(window), "Karma");
+    main_window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+    gtk_window_set_title(GTK_WINDOW(main_window), "Karma");
 
-    g_signal_connect(G_OBJECT(window),
+    g_signal_connect(G_OBJECT(main_window),
 		     "delete_event",
 		     G_CALLBACK(delete_event),
 		     NULL);
 
-    g_signal_connect(G_OBJECT(window),
+    g_signal_connect(G_OBJECT(main_window),
 		     "destroy",
 		     G_CALLBACK(destroy_event),
 		     NULL);
 
-    menubar = gui_menu_setup(window);
+    menubar = gui_menu_setup(main_window);
 
-    notepagesframe = get_notebook_pages(window);
+    notepagesframe = get_notebook_pages(main_window);
 
     messageframe = gui_message_setup();
 
@@ -89,14 +92,14 @@ int main(int   argc,
     /* create vbox, drop in menus, notepages, and message window */
     main_vbox = gtk_vbox_new(FALSE, 0);
     gtk_container_set_border_width(GTK_CONTAINER (main_vbox), 1);
-    gtk_container_add(GTK_CONTAINER(window), main_vbox);
+    gtk_container_add(GTK_CONTAINER(main_window), main_vbox);
 
     gtk_box_pack_start(GTK_BOX(main_vbox), menubar, FALSE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(main_vbox), notepagesframe, FALSE, TRUE, 0);
     gtk_box_pack_end(GTK_BOX(main_vbox), messageframe, TRUE, TRUE, 0);
 
     /* show the window */
-    gtk_widget_show_all(window);
+    gtk_widget_show_all(main_window);
 
     timer_callback(NULL);
 

@@ -17,7 +17,7 @@ static int internal_stat_ct;
 GtkListStore *gui_comm_fslist;
 
 static PVFS_credentials creds;
-static PVFS_fs_id cur_fs;
+static PVFS_fs_id cur_fsid = -1;
 
 /* internal fn prototypes */
 static int gui_comm_stats_collect(void);
@@ -31,12 +31,9 @@ static int gui_comm_stats_collect(void);
 int gui_comm_setup(void)
 {
     char msgbuf[128];
-    int ret, outcount;
+    int ret, i, j;
     PVFS_sysresp_init resp_init;
 
-    GtkTreeIter iter;
-
-    int i;
 
     /* PVFS2 init */
     if (PVFS_util_parse_pvfstab(&mnt))
@@ -49,17 +46,16 @@ int gui_comm_setup(void)
 					 G_TYPE_STRING,
 					 G_TYPE_STRING,
 					 G_TYPE_STRING,
-					 G_TYPE_UINT64);
+					 G_TYPE_INT);
 
     ret = PVFS_sys_initialize(mnt, 0, &resp_init);
     if (ret < 0) {
 	return -1;
     }
 
-    cur_fs = resp_init.fsid_list[0];
-
     for (i=0; i < mnt.ptab_count; i++) {
-	int j;
+	GtkTreeIter iter;
+
 	gtk_list_store_append(gui_comm_fslist, &iter);
 
 	for (j=strlen(mnt.ptab_array[i].pvfs_config_server); j > 0; j--)
@@ -76,41 +72,65 @@ int gui_comm_setup(void)
 			   0, mnt.ptab_array[i].mnt_dir,
 			   1, msgbuf,
 			   2, mnt.ptab_array[i].pvfs_fs_name,
-			   3, (uint64_t) resp_init.fsid_list[0],
+			   3, (gint) resp_init.fsid_list[0],
 			   -1);
     }
 
     creds.uid = getuid();
     creds.gid = getgid();
 
-    ret = PVFS_mgmt_count_servers(cur_fs,
+    for (j=strlen(mnt.ptab_array[0].pvfs_config_server); j > 0; j--)
+    {
+	if (mnt.ptab_array[0].pvfs_config_server[j] == '/') break;
+    }
+    
+    assert(j < 128);
+    strncpy(msgbuf, mnt.ptab_array[0].pvfs_config_server, j);
+    msgbuf[j] = '\0';
+
+    gui_comm_set_active_fs(msgbuf,
+			   mnt.ptab_array[0].pvfs_fs_name,
+			   resp_init.fsid_list[0]);
+
+    return 0;
+}
+
+/* gui_comm_set_active_fsid(contact_server, fsname, fsid)
+ */
+void gui_comm_set_active_fs(char *contact_server,
+			    char *fs_name,
+			    PVFS_fs_id new_fsid)
+{
+    int ret, outcount;
+    char msgbuf[80];
+
+    snprintf(msgbuf, 80, "Karma: %s/%s", contact_server, fs_name);
+    gui_set_title(msgbuf);
+
+    if (new_fsid == cur_fsid) return;
+
+    cur_fsid = new_fsid;
+
+    ret = PVFS_mgmt_count_servers(cur_fsid,
 				  creds,
 				  PVFS_MGMT_IO_SERVER | PVFS_MGMT_META_SERVER,
 				  &outcount);
     if (ret < 0) {
-	return -1;
+	return;
     }
 
     assert(outcount > 0);
-
-    /* print a quick status message at startup */
-    if (outcount > 1) {
-	snprintf(msgbuf, 64, "%d servers in file system.\n", outcount);
+    
+    /* allocate space for our stats if we need to */
+    if (internal_stats != NULL && internal_stat_ct == outcount) return;
+    else if (internal_stats != NULL) {
+	free(internal_stats);
     }
-    else {
-	snprintf(msgbuf, 64, "1 server in file system.\n");
-    }
-    gui_message_new(msgbuf);
 
-    /* allocate space for our stats */
-    visible_stats  = (struct PVFS_mgmt_server_stat *)
+    internal_stats   = (struct PVFS_mgmt_server_stat *)
 	malloc(outcount * sizeof(struct PVFS_mgmt_server_stat));
-    internal_stats = (struct PVFS_mgmt_server_stat *)
-	malloc(outcount * sizeof(struct PVFS_mgmt_server_stat));
-    visible_stat_ct  = outcount;
     internal_stat_ct = outcount;
 
-    return 0;
 }
 
 /* gui_comm_stats_retrieve(**svr_stat, *svr_stat_ct)
@@ -130,6 +150,12 @@ int gui_comm_stats_retrieve(struct PVFS_mgmt_server_stat **svr_stat,
     /* for now, call gui_comm_stats_collect() to get new data */
     ret = gui_comm_stats_collect();
     if (ret != 0) return ret;
+
+    if (visible_stats == NULL) {
+	visible_stats   = (struct PVFS_mgmt_server_stat *)
+	    malloc(internal_stat_ct * sizeof(struct PVFS_mgmt_server_stat));
+	visible_stat_ct = internal_stat_ct;
+    }
 
     memcpy(visible_stats,
 	   internal_stats,
@@ -160,7 +186,7 @@ static int gui_comm_stats_collect(void)
     }
 
     outcount = internal_stat_ct;
-    ret = PVFS_mgmt_get_server_array(cur_fs,
+    ret = PVFS_mgmt_get_server_array(cur_fsid,
 				     creds,
 				     PVFS_MGMT_IO_SERVER | PVFS_MGMT_META_SERVER,
 				     addr_array,
@@ -171,7 +197,7 @@ static int gui_comm_stats_collect(void)
 	return -1;
     }
     
-    ret = PVFS_mgmt_statfs_list(cur_fs,
+    ret = PVFS_mgmt_statfs_list(cur_fsid,
 				creds,
 				internal_stats,
 				addr_array,
