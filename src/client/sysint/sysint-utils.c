@@ -315,9 +315,7 @@ int check_perms(PVFS_object_attr attr,
 {
     int ret = 0;
 
-    if ((attr.perms & mode) == mode)
-	ret = 0;
-    else if (attr.group == gid && ((attr.perms & mode) == mode))
+    if (attr.group == gid)
 	ret = 0;
     else if (attr.owner == uid)
 	ret = 0;
