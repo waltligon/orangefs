@@ -386,10 +386,10 @@ PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
 
 	gossip_debug(REQUEST_DEBUG,"\tPINT_Distribute\n");
 	gossip_debug(REQUEST_DEBUG,
-			"\t\tof %lld sz %lld ix %d sm %d by %lld bm %lld\n",
+			"\t\tof %lld sz %lld ix %d sm %d by %lld bm %lld ",
 			offset, size, *segs, segmax, *bytes, bytemax);
 	gossip_debug(REQUEST_DEBUG,
-			"\t\tfsz %lld exfl %d\n",
+			"fsz %lld exfl %d\n",
 			rfdata->fsize, rfdata->extend_flag);
 	orig_offset = offset;
 	orig_size = size;
@@ -525,7 +525,7 @@ PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
    poff = (*rfdata->dist->methods->logical_to_physical_offset)
 			(rfdata->dist->params, rfdata->iod_num, rfdata->iod_count, loff);
 	gossip_debug(REQUEST_DEBUG,"next poff: %lld\n", poff);
-	if (poff >= rfdata->fsize)
+	if (poff >= rfdata->fsize && !rfdata->extend_flag)
 	{
 		/* end of file - thus end of request */
 		*eof_flag = 1;
