@@ -129,7 +129,7 @@ sub do_remote_command {
     my ($pid, $rc, %child);
 
     while(@commands  ||  $done < $todo) {
-	while (($pid = waitpid(-1, &WNOHANG)) > 0) {
+	while (($pid = waitpid(-1, WNOHANG)) > 0) {
 	    if (exists $child{$pid}) {
 		$rc = $? >> 8;
 		$maxrc = $rc if ($rc > $maxrc);
