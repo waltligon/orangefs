@@ -4,7 +4,9 @@
 #  expect
 #  cvs (if pulling from CVS
 
-[ -n $DEBUG ] && set -xv
+if [ $DEBUG ] ; then
+	set -xv
+fi
 
 rootdir=/tmp/pvfs2-build-test
 srcdir=$rootdir/pvfs2

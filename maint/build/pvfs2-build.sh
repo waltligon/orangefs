@@ -4,7 +4,9 @@
 #  expect
 #  cvs (if pulling from CVS
 
-[ -n $DEBUG ] && set -xv
+if [ $DEBUG ] ; then
+	set -xv
+fi
 
 rootdir=/tmp/pvfs2-build-test
 tarballurl=http://www.mcs.anl.gov/hpio/pvfs2-0.0.6.tar.gz
