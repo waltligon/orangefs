@@ -695,7 +695,7 @@ static int initialize_new_server_op(job_status_s *temp_stat)
     PINT_server_op *s_op;
 
     /* allocate space for server operation structure, and memset() it to zero */
-    s_op = (PINT_server_op *) malloc(sizeof(PINT_server_op) + ENCODED_HEADER_SIZE);
+    s_op = (PINT_server_op *) malloc(sizeof(PINT_server_op));
     if (s_op == NULL)
     {
 	return (-1);
