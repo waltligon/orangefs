@@ -31,33 +31,32 @@ int PINT_sm_common_parent_getattr_setup_msgpair(PINT_client_sm *sm_p,
 
     memset(&sm_p->msgpair, 0, sizeof(PINT_client_sm_msgpair_state));
 
-    assert(sm_p->parent_ref.fs_id != 0);
-    assert(sm_p->parent_ref.handle != 0);
+    sm_p->msgarray = &(sm_p->msgpair);
+    sm_p->msgarray_count = 1;
 
-    PINT_SERVREQ_GETATTR_FILL(sm_p->msgpair.req,
-			      *sm_p->cred_p,
-			      sm_p->parent_ref.fs_id,
-			      sm_p->parent_ref.handle,
-			      PVFS_ATTR_COMMON_ALL);
+    assert(sm_p->parent_ref.fs_id != PVFS_FS_ID_NULL);
+    assert(sm_p->parent_ref.handle != PVFS_HANDLE_NULL);
 
-    /* fill in msgpair structure components */
+    PINT_SERVREQ_GETATTR_FILL(
+        sm_p->msgpair.req,
+        *sm_p->cred_p,
+        sm_p->parent_ref.fs_id,
+        sm_p->parent_ref.handle,
+        PVFS_ATTR_COMMON_ALL);
+
     sm_p->msgpair.fs_id   = sm_p->parent_ref.fs_id;
     sm_p->msgpair.handle  = sm_p->parent_ref.handle;
     sm_p->msgpair.retry_flag = PVFS_MSGPAIR_RETRY;
-    sm_p->msgpair.comp_fn = PINT_sm_common_directory_getattr_comp_fn;
+    sm_p->msgpair.comp_fn = PINT_sm_common_object_getattr_comp_fn;
 
     ret = PINT_bucket_map_to_server(&sm_p->msgpair.svr_addr,
 				    sm_p->msgpair.handle,
 				    sm_p->msgpair.fs_id);
     if (ret)
     {
-        gossip_err("Failed to map meta server address\n");
+        PVFS_perror_gossip("Failed to map meta server address", ret);
         js_p->error_code = ret;
     }
-
-    sm_p->msgarray = &(sm_p->msgpair);
-    sm_p->msgarray_count = 1;
-
     return 1;
 }
 
@@ -81,8 +80,11 @@ int PINT_sm_common_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
 
     memset(&sm_p->msgpair, 0, sizeof(PINT_client_sm_msgpair_state));
 
-    assert(sm_p->object_ref.fs_id != 0);
-    assert(sm_p->object_ref.handle != 0);
+    sm_p->msgarray = &(sm_p->msgpair);
+    sm_p->msgarray_count = 1;
+
+    assert(sm_p->object_ref.fs_id != PVFS_FS_ID_NULL);
+    assert(sm_p->object_ref.handle != PVFS_HANDLE_NULL);
 
     PINT_SERVREQ_GETATTR_FILL(
         sm_p->msgpair.req,
@@ -91,7 +93,6 @@ int PINT_sm_common_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
         sm_p->object_ref.handle,
         (PVFS_ATTR_COMMON_ALL | PVFS_ATTR_META_ALL));
 
-    /* fill in msgpair structure components */
     sm_p->msgpair.fs_id = sm_p->object_ref.fs_id;
     sm_p->msgpair.handle = sm_p->object_ref.handle;
     sm_p->msgpair.retry_flag = PVFS_MSGPAIR_RETRY;
@@ -102,13 +103,9 @@ int PINT_sm_common_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
 				    sm_p->msgpair.fs_id);
     if (ret)
     {
-        gossip_err("Failed to map meta server address\n");
+        PVFS_perror_gossip("Failed to map meta server address", ret);
         js_p->error_code = ret;
     }
-
-    sm_p->msgarray = &(sm_p->msgpair);
-    sm_p->msgarray_count = 1;
-
     return 1;
 }
 
@@ -120,102 +117,6 @@ int PINT_sm_common_object_getattr_failure(PINT_client_sm *sm_p,
     return 1;
 }
 
-int PINT_sm_common_directory_getattr_comp_fn(
-    void *v_p,
-    struct PVFS_server_resp *resp_p,
-    int index)
-{
-    int ret = 0;
-    PVFS_object_attr *attr = NULL;
-    PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
-    
-    assert(resp_p->op == PVFS_SERV_GETATTR);
-
-    assert(sm_p->msgarray == &sm_p->msgpair);
-    sm_p->msgarray = NULL;
-    sm_p->msgarray_count = 0;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "PINT_sm_common_getattr_directory_comp_fn\n");
-
-    if (resp_p->status != 0)
-    {
-        gossip_err("Error: getattr failure\n");
-	return resp_p->status;
-    }
-
-    /*
-      if we didn't get a cache hit, we're making a copy of the
-      attributes here so that we can add a acache entry later in
-      cleanup.
-    */
-    if (!sm_p->acache_hit)
-    {
-        PINT_acache_object_attr_deep_copy(
-            &sm_p->acache_attr, &resp_p->u.getattr.attr);
-    }    
-
-    /*
-      if we got a cache hit, use those attributes, otherwise use the
-      real server replied attrs
-    */
-    attr = (sm_p->acache_hit ?
-            &sm_p->pinode->attr :
-            &resp_p->u.getattr.attr);
-    assert(attr);
-
-    if (attr->objtype == PVFS_TYPE_DIRECTORY)
-    {
-        /*
-          check permissions against parent directory to determine
-          if we're allowed to create a new entry there
-        */
-        ret = PINT_check_perms(*attr, attr->perms,
-                          sm_p->cred_p->uid, sm_p->cred_p->gid);
-        if (ret < 0)
-        {
-            gossip_err("Error: Permission failure\n");
-            return -PVFS_EPERM;
-        }
-    }
-    else
-    {
-        gossip_err("Error: Parent is not a directory\n");
-	return -PVFS_ENOTDIR;
-    }
-
-    /*
-      if our parent directory attributes are good, and not present
-      int the acache, put them in the acache now
-    */
-    if (!sm_p->acache_hit)
-    {
-        int release_required = 1;
-        PINT_pinode *pinode =
-            PINT_acache_lookup(sm_p->u.getattr.object_ref);
-        if (!pinode)
-        {
-            pinode = PINT_acache_pinode_alloc();
-            assert(pinode);
-            release_required = 0;
-        }
-        pinode->refn = sm_p->u.getattr.object_ref;
-        pinode->size = ((attr->mask & PVFS_ATTR_DATA_ALL) ?
-                        attr->u.data.size : 0);
-
-        PINT_acache_object_attr_deep_copy(
-            &pinode->attr, attr);
-
-        PINT_acache_set_valid(pinode);
-
-        if (release_required)
-        {
-            PINT_acache_release(pinode);
-        }
-    }
-    return 0;
-}
-
 int PINT_sm_common_object_getattr_comp_fn(
     void *v_p,
     struct PVFS_server_resp *resp_p,
@@ -223,18 +124,18 @@ int PINT_sm_common_object_getattr_comp_fn(
 {
     PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
     
-    assert(resp_p->op == PVFS_SERV_GETATTR);
-
-    assert(sm_p->msgarray == &sm_p->msgpair);
-    sm_p->msgarray = NULL;
-    sm_p->msgarray_count = 0;
-
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PINT_sm_common_getattr_object_comp_fn\n");
 
-    if (resp_p->status != 0)
+    assert(resp_p->op == PVFS_SERV_GETATTR);
+    assert(sm_p->msgarray == &sm_p->msgpair);
+
+    sm_p->msgarray = NULL;
+    sm_p->msgarray_count = 0;
+
+    if (resp_p->status)
     {
-        gossip_err("Error: getattr failure\n");
+        PVFS_perror_gossip("Getattr failed", resp_p->status);
 	return resp_p->status;
     }
 

@@ -19,11 +19,11 @@
   ================================
 
   PINT_acache_initialize must be the first called method, and
-  PINT_acache_finalize must be the last.  The default lifespan
-  of a valid acache entry is PINT_ACACHE_TIMEOUT seconds, but
-  you can set the timeout (at millisecond granularity) at runtime
-  by called PINT_acache_set_timeout. You can also retrieve the
-  acache timeout at any time by calling PINT_acache_get_timeout.
+  PINT_acache_finalize must be the last.  The default lifespan of a
+  valid acache entry is PINT_ACACHE_TIMEOUT_MS seconds, but you can
+  set the timeout (at millisecond granularity) at runtime by called
+  PINT_acache_set_timeout. You can also retrieve the acache timeout at
+  any time by calling PINT_acache_get_timeout.
 
   How to use the acache in 5 steps of less:
   -----------------------------------------
@@ -45,14 +45,14 @@
   tips and tricks of the acache hacking gurus:
   --------------------------------------------
   update_timestamps internally bumps up the pinode reference count to
-  make sure it stays in the pinode cache.  on expiration, the ref count
-  is dropped.  these internal ref counts are separate from the user
-  influenced ref counts (i.e. lookup, invalidate, release)
+  make sure it stays in the pinode cache.  on expiration, the ref
+  count is dropped.  these internal ref counts are separate from the
+  user influenced ref counts (i.e. lookup, invalidate, release)
 
 
-  if you define PINT_ACACHE_AUTO_CLEANUP, the following applies:
-  since the number of pinodes in existance at any time is unbounded,
-  if the internal allocator sees that a multiple of
+  if you define PINT_ACACHE_AUTO_CLEANUP, the following applies: since
+  the number of pinodes in existance at any time is unbounded, if the
+  internal allocator sees that a multiple of
   PINT_ACACHE_NUM_FLUSH_ENTRIES pinodes exist, we secretly try to
   reclaim up to PINT_ACACHE_NUM_FLUSH_ENTRIES by scanning the htable
   of used pinodes and freeing any expired, invalid, or pinodes that
@@ -61,7 +61,7 @@
   this 'feature' is mostly untested and may not be beneficial.
 */
 
-#define PINT_ACACHE_TIMEOUT                                        5
+#define PINT_ACACHE_TIMEOUT_MS                                  5000
 #define PINT_ACACHE_NUM_ENTRIES                                 1024
 #define PINT_ACACHE_NUM_FLUSH_ENTRIES  (PINT_ACACHE_NUM_ENTRIES / 4)
 #define PINT_ACACHE_HTABLE_SIZE                                  511

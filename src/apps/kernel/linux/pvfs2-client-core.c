@@ -48,7 +48,7 @@
 */
 #define STATFS_DEFAULT_BLOCKSIZE PVFS2_BUFMAP_DEFAULT_DESC_SIZE
 
-/* small default attribute cache timeout; effectively disabled */
+/* client side attribute cache timeout; 0 is effectively disabled */
 #define ACACHE_TIMEOUT_MS 0
 
 /*
@@ -619,7 +619,7 @@ do {                                                                  \
         snprintf(buf, PATH_MAX, "<DYNAMIC-%d>", dynamic_mount_id);    \
     else                                                              \
         snprintf(buf, PATH_MAX, "<DYNAMIC-%d>",                       \
-                 in_upcall.req.fs_umount.id);                        \
+                 in_upcall.req.fs_umount.id);                         \
                                                                       \
     mntent.mnt_dir = strdup(buf);                                     \
     if (!mntent.mnt_dir)                                              \
@@ -632,10 +632,10 @@ do {                                                                  \
                  (mount ? "Mount" : "Unmount"), mntent.mnt_dir);      \
                                                                       \
     if (mount)                                                        \
-        ptr = rindex(in_upcall.req.fs_mount.pvfs2_config_server,     \
+        ptr = rindex(in_upcall.req.fs_mount.pvfs2_config_server,      \
                      (int)'/');                                       \
     else                                                              \
-        ptr = rindex(in_upcall.req.fs_umount.pvfs2_config_server,    \
+        ptr = rindex(in_upcall.req.fs_umount.pvfs2_config_server,     \
                      (int)'/');                                       \
                                                                       \
     if (!ptr)                                                         \
@@ -650,10 +650,10 @@ do {                                                                  \
                                                                       \
     if (mount)                                                        \
         mntent.pvfs_config_server = strdup(                           \
-            in_upcall.req.fs_mount.pvfs2_config_server);             \
+            in_upcall.req.fs_mount.pvfs2_config_server);              \
     else                                                              \
         mntent.pvfs_config_server = strdup(                           \
-            in_upcall.req.fs_umount.pvfs2_config_server);            \
+            in_upcall.req.fs_umount.pvfs2_config_server);             \
                                                                       \
     if (!mntent.pvfs_config_server)                                   \
     {                                                                 \
@@ -682,7 +682,7 @@ do {                                                                  \
                                                                       \
     /* also fill in the fs_id for umount */                           \
     if (!mount)                                                       \
-        mntent.fs_id = in_upcall.req.fs_umount.fs_id;                \
+        mntent.fs_id = in_upcall.req.fs_umount.fs_id;                 \
                                                                       \
     ret = 0;                                                          \
 } while(0)
@@ -1034,9 +1034,6 @@ static int service_mmap_ra_flush_request(vfs_request_t *vfs_request)
 static int service_operation_cancellation(vfs_request_t *vfs_request)
 {
     int ret = -PVFS_EINVAL;
-
-    gossip_err("GOT OPERATION CANCELLATION UPCALL FOR TAG %lu\n",
-               vfs_request->in_upcall.req.cancel.op_tag);
 
     /*
       based on the tag specified in the cancellation upcall, find the
@@ -1643,11 +1640,20 @@ int process_vfs_requests(void)
                         &vfs_request->op_id, &vfs_request->jstat,
                         s_client_dev_context);
 
+                    gossip_debug(GOSSIP_CLIENT_DEBUG, "downcall write "
+                                 "returned %d\n", ret);
+
                     if (ret < 0)
                     {
-                        gossip_err("write_device_response failed (tag=%lu)\n",
-                                   (unsigned long)vfs_request->info.tag);
+                        gossip_err(
+                            "write_device_response failed (tag=%lu)\n",
+                            (unsigned long)vfs_request->info.tag);
                     }
+                }
+                else
+                {
+                    gossip_debug(GOSSIP_CLIENT_DEBUG, "skipping downcall "
+                                 "write due to previous cancellation\n");
                 }
 
                 ret = repost_unexp_vfs_request(

@@ -297,6 +297,12 @@ int PINT_client_state_machine_post(
     {
         ret = PINT_state_machine_next(sm_p, &js);
     }
+
+    if (sm_p->op_complete)
+    {
+        ret = add_sm_to_completion_list(sm_p);
+        assert(ret == 0);
+    }
     return ret;
 }
 
@@ -684,6 +690,11 @@ void PINT_sys_release(PVFS_sys_op_id op_id)
         {
             PVFS_util_release_credentials(sm_p->cred_p);
             sm_p->cred_p = NULL;
+        }
+
+        if (sm_p->acache_hit)
+        {
+            PINT_acache_release(sm_p->pinode);
         }
         free(sm_p);
     }

@@ -58,7 +58,7 @@ static int ncache_add_dentry(
 
 /* static globals required for ncache operation */
 static ncache *cache = NULL;
-static int s_pint_ncache_timeout_ms = (PINT_NCACHE_TIMEOUT * 1000);
+static int s_pint_ncache_timeout_ms = PINT_NCACHE_TIMEOUT_MS;
 
 
 /* compare

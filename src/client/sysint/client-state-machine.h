@@ -162,10 +162,7 @@ struct PINT_client_getattr_sm
 {
     PVFS_object_ref object_ref;           /* input parameter */
     uint32_t attrmask;                    /* input parameter */
-    int datafile_count;                   /* from object attribs */
-    PVFS_handle *datafile_handles;
-    PINT_dist *dist_p;
-    uint32_t dist_size;
+
     PVFS_size *size_array;                /* from datafile attribs */
     PVFS_sysresp_getattr *getattr_resp_p; /* destination for output */
 };

@@ -13,8 +13,8 @@
 /* number of entries allowed in the cache */
 #define PINT_NCACHE_MAX_ENTRIES 512
 
-/* number of seconds that cache entries will remain valid */
-#define PINT_NCACHE_TIMEOUT 5
+/* number of milliseconds that cache entries will remain valid */
+#define PINT_NCACHE_TIMEOUT_MS 5000
 
 /* TODO: replace later with real value from trove */
 /* value passed out to indicate lookups that didn't find a match */
