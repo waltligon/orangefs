@@ -161,11 +161,19 @@ static int truncate_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
             &sm_p->acache_attr);
 
     assert(attr);
-    assert(attr->objtype == PVFS_TYPE_METAFILE);
-    assert(attr->mask & PVFS_ATTR_META_DFILES);
-    assert(attr->mask & PVFS_ATTR_META_DIST);
-    assert(attr->u.meta.dfile_count > 0);
-    assert(attr->u.meta.dist_size > 0);
+
+    if (attr->objtype == PVFS_TYPE_METAFILE)
+    {
+        assert(attr->mask & PVFS_ATTR_META_DFILES);
+        assert(attr->mask & PVFS_ATTR_META_DIST);
+        assert(attr->u.meta.dfile_count > 0);
+        assert(attr->u.meta.dist_size > 0);
+    }
+    else
+    {
+        js_p->error_code = -PVFS_EPERM;
+        return 1;
+    }
 
     sm_p->msgarray_count = attr->u.meta.dfile_count;
 
@@ -237,7 +245,9 @@ static int truncate_cleanup(PINT_client_sm *sm_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) truncate state: "
                  "truncate_cleanup\n", sm_p);
 
-    if (sm_p->msgarray)
+    sm_p->error_code = js_p->error_code;
+
+    if (sm_p->msgarray && (sm_p->msgarray != &sm_p->msgpair))
     {
         free(sm_p->msgarray);
     }

@@ -240,11 +240,6 @@ static int mkdir_msg_comp_fn(void *v_p,
     return 0;
 }
 
-/* 
-   NOTE: this function only does a sanity check and doesn't
-   need to be called.  Set the completion function to NULL
-   when setting up the crdirent msgpair to avoid this
-*/
 static int mkdir_crdirent_comp_fn(void *v_p,
                                   struct PVFS_server_resp *resp_p,
                                   int index)

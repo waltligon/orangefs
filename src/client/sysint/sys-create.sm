@@ -915,7 +915,8 @@ static int create_cleanup(PINT_client_sm *sm_p,
         /* fill in outgoing response fields */
         sm_p->u.create.create_resp->ref = metafile_ref;
     }
-    else if (sm_p->u.create.retry_count < PVFS2_CLIENT_RETRY_LIMIT)
+    else if ((PVFS_ERROR_CLASS(-sm_p->error_code) == PVFS_ERROR_BMI) &&
+             (sm_p->u.create.retry_count < PVFS2_CLIENT_RETRY_LIMIT))
     {
         if ((sm_p->acache_hit != 0) || (sm_p->pinode != NULL))
         {
