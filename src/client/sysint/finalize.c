@@ -11,6 +11,7 @@
 #include "pcache.h"
 #include "pint-dcache.h"
 #include "gen-locks.h"
+#include "pint-bucket.h"
 
 extern fsconfig_array server_config;
 extern gen_mutex_t *g_session_tag_mt_lock;
