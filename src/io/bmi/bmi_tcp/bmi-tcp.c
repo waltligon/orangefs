@@ -2988,6 +2988,14 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 				id, BMI_TCP_INPROGRESS, my_header, user_ptr,
 				my_header.size, 0,
 				context_id);
+
+        /* TODO: is this causing deadlocks?  See similar call in recv
+         * path for another example.  This particular one seems to be an
+         * issue under a heavy bonnie++ load that Neill has been
+         * debugging.  Comment out for now to see if the problem goes
+         * away.
+         */
+#if 0
 	if (ret >= 0)
 	{
 	    /* go ahead and try to do some work while we are in this
@@ -2996,6 +3004,7 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 	     */
 	    ret = tcp_do_work(0);
 	}
+#endif
 	if (ret < 0)
 	{
 	    gossip_lerr("Error: enqueue_operation() or tcp_do_work() returned: %d\n", ret);
