@@ -992,6 +992,7 @@ int BMI_tcp_post_send_list(bmi_op_id_t * id,
     /* fill in the TCP-specific message header */
     if (total_size > TCP_MODE_REND_LIMIT)
     {
+	gossip_lerr("Error: BMI message too large!\n");
 	return (-EINVAL);
     }
 
@@ -2586,6 +2587,10 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 	     */
 	    ret = tcp_do_work(0);
 	}
+	if (ret < 0)
+	{
+	    gossip_lerr("Error: enqueue_operation() or tcp_do_work() returned: %d\n", ret);
+	}
 	return (ret);
     }
 
@@ -2618,6 +2623,10 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 				id, BMI_TCP_INPROGRESS, my_header, user_ptr,
 				my_header.size, 0,
 				context_id);
+	if(ret < 0)
+	{
+	    gossip_lerr("Error: enqueue_operation() returned: %d\n", ret);
+	}
 	return (ret);
     }
 
@@ -2638,6 +2647,10 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 				dest, buffer_list, size_list, list_count, 0,
 				ret, id, BMI_TCP_INPROGRESS, my_header,
 				user_ptr, my_header.size, 0, context_id);
+	if(ret < 0)
+	{
+	    gossip_lerr("Error: enqueue_operation() returned: %d\n", ret);
+	}
 	return (ret);
     }
 
@@ -2677,6 +2690,10 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 			    BMI_TCP_INPROGRESS, my_header, user_ptr,
 			    my_header.size, 0, context_id);
 
+    if(ret < 0)
+    {
+	gossip_lerr("Error: enqueue_operation() returned: %d\n", ret);
+    }
     return (ret);
 }
 
