@@ -13,11 +13,15 @@
 #include "pcache.h"
 #include "pinode-helper.h"
 #include "PINT-reqproto-encode.h"
+#include "dotconf.h"
+#include "trove.h"
+#include "server-config.h"
 
 #define REQ_ENC_FORMAT 0
 
 int g_session_tag;
 gen_mutex_t *g_session_tag_mt_lock;
+struct server_configuration_s g_server_config;
 
 /*
  * PINT_do_lookup looks up one dirent in a given parent directory

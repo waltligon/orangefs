@@ -19,7 +19,7 @@ test/server/io: test/server/io.o
 # special rule for the config dumper, which pulls an object from the server
 # this is rather gross, but it *does* avoid copying code around
 SHOWCONFIG_OBJ := test/server/showconfig.o \
-	src/server/server-config.o \
+	src/common/misc/server-config.o \
 	src/common/dotconf/dotconf.o
 test/server/showconfig: $(SHOWCONFIG_OBJ)
 	$(LD) $^ $(LDFLAGS) $(LIBS) -o $@

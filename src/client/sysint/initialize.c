@@ -9,6 +9,7 @@
 #include <errno.h>
 #include <assert.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "pcache.h"
 #include "pint-bucket.h"
@@ -18,6 +19,9 @@
 #include "gen-locks.h"
 #include "pint-servreq.h"
 #include "PINT-reqproto-encode.h"
+#include "dotconf.h"
+#include "trove.h"
+#include "server-config.h"
 
 #define BKT_STR_SIZE 7
 
@@ -25,11 +29,13 @@
 
 /* pinode cache */
 
+extern struct server_configuration_s g_server_config;
 extern fsconfig_array server_config;
 
 extern gen_mutex_t *g_session_tag_mt_lock;
 
 static int server_get_config(pvfs_mntlist mntent_list);
+static int server_parse_config(PVFS_servresp_getconfig *response);
 
 /* PVFS_sys_initialize()
  *
@@ -106,7 +112,6 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, PVFS_sysresp_init *resp)
 
     server_config.nr_fs = mntent_list.nr_entry;
     server_config.fs_info = (fsconfig *)malloc(mntent_list.nr_entry * sizeof(fsconfig));
-    memset(server_config.fs_info, 0, mntent_list.nr_entry * sizeof(fsconfig));
     if (server_config.fs_info == NULL)
     {
 	assert(0);
@@ -114,6 +119,7 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, PVFS_sysresp_init *resp)
 	ret = -ENOMEM;
 	goto return_error;
     }
+    memset(server_config.fs_info, 0, mntent_list.nr_entry * sizeof(fsconfig));
 
     /* Grab the mutex - serialize all writes to server_config */
     gen_mutex_lock(&mt_config);	
@@ -224,11 +230,11 @@ static int server_get_config(pvfs_mntlist mntent_list)
     /* Process all entries in pvfstab */
     for (i = 0; i < mntent_list.nr_entry; i++) 
     {
-	pvfs_mntent *mntent_p = &mntent_list.ptab_p[i]; /* for convenience */
+	pvfs_mntent *mntent_p = &mntent_list.ptab_p[i];
 	struct fsconfig_s *fsinfo_p;
 
    	/* Obtain the metaserver to send the request */
-	ret = BMI_addr_lookup(&serv_addr, mntent_p->meta_addr);   
+	ret = BMI_addr_lookup(&serv_addr, mntent_p->meta_addr);
 	if (ret < 0)
 	{
 	    failure = LOOKUP_FAIL;
@@ -239,19 +245,15 @@ static int server_get_config(pvfs_mntlist mntent_list)
 	/* Set up the request for getconfig */
 	name_sz = strlen(mntent_p->service_name) + 1;
 
-	req_p->op                      = PVFS_SERV_GETCONFIG;	
+	req_p->op                      = PVFS_SERV_GETCONFIG;
 	req_p->rsize                   = sizeof(struct PVFS_server_req_s) + name_sz;
 	req_p->credentials             = creds;
 
-	req_p->u.getconfig.fs_name     = mntent_p->service_name; /* just point to the mount info */
+	req_p->u.getconfig.fs_name     = mntent_p->service_name;
 	req_p->u.getconfig.max_strsize = MAX_STRING_SIZE;
 
-	gossip_ldebug(CLIENT_DEBUG,"asked for fs name = %s\n", req_p->u.getconfig.fs_name);
-
-	/* DO THE GETCONFIG */
-	/* do_getconfig() fills returns an allocated and populated PVFS_server_resp_s
-	 * pointed to by ack_p.
-	 */
+	gossip_ldebug(CLIENT_DEBUG,"asked for fs name = %s\n",
+                      req_p->u.getconfig.fs_name);
 
 	/* send the request and receive an acknowledgment */
 	ret = PINT_send_req(serv_addr, req_p, max_msg_sz,
@@ -267,6 +269,14 @@ static int server_get_config(pvfs_mntlist mntent_list)
 
 	fsinfo_p->fh_root         = ack_p->u.getconfig.root_handle;
 	fsinfo_p->fsid            = ack_p->u.getconfig.fs_id;
+
+        if (server_parse_config(&(ack_p->u.getconfig)))
+        {
+            gossip_ldebug(CLIENT_DEBUG,"Failed to getconfig from host "
+                          "%s\n",mntent_p->meta_addr);
+            continue;
+        }
+
 /* 	fsinfo_p->meta_serv_count = ack_p->u.getconfig.meta_server_count; */
 /* 	fsinfo_p->io_serv_count   = ack_p->u.getconfig.io_server_count; */
 /* 	fsinfo_p->maskbits        = ack_p->u.getconfig.maskbits; */
@@ -392,6 +402,7 @@ static int server_get_config(pvfs_mntlist mntent_list)
 	/* let go of any resources consumed by PINT_send_req() */
 	PINT_release_req(serv_addr, req_p, max_msg_sz, &decoded,
 	    &encoded_resp, op_tag);
+        break;
     }
 
     return(0); 
@@ -401,6 +412,56 @@ static int server_get_config(pvfs_mntlist mntent_list)
  return_error:
     return -1;
 }	  
+
+static int server_parse_config(PVFS_servresp_getconfig *response)
+{
+    int ret = 1;
+    int fs_fd = 0, server_fd = 0;
+    char fs_template[] = ".__pvfs_fs_configXXXXXX";
+    char server_template[] = ".__pvfs_server_configXXXXXX";
+    char *args[2] = { fs_template, server_template };
+
+    if (response)
+    {
+        assert(response->fs_config_buf);
+        assert(response->server_config_buf);
+
+        fs_fd = mkstemp(fs_template);
+        if (fs_fd == -1)
+        {
+            return ret;
+        }
+
+        server_fd = mkstemp(server_template);
+        if (server_fd == -1)
+        {
+            close(fs_fd);
+            return ret;
+        }
+
+        assert(!response->fs_config_buf[response->fs_config_buflen - 1]);
+        assert(!response->server_config_buf[response->server_config_buflen - 1]);
+
+        if (write(fs_fd,response->fs_config_buf,
+                  (response->fs_config_buflen - 1)) ==
+            (response->fs_config_buflen - 1))
+        {
+            if (write(server_fd,response->server_config_buf,
+                      (response->server_config_buflen - 1)) ==
+                (response->server_config_buflen - 1))
+            {
+                ret = PINT_server_config(&g_server_config,2,args);
+            }
+        }
+        close(fs_fd);
+        close(server_fd);
+
+        remove(fs_template);
+        remove(server_template);
+    }
+    return ret;
+}
+
 
 /*
  * Local variables:
