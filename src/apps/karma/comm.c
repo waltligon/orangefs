@@ -78,7 +78,7 @@ int gui_comm_setup(void)
 			   GUI_FSLIST_MNTPT, mnt.ptab_array[i].mnt_dir,
 			   GUI_FSLIST_SERVER, msgbuf,
 			   GUI_FSLIST_FSNAME, mnt.ptab_array[i].pvfs_fs_name,
-			   GUI_FSLIST_FSID, (gint) resp_init.fsid_list[0],
+			   GUI_FSLIST_FSID, (gint) cur_fs_id,
 			   -1);
     }
 
