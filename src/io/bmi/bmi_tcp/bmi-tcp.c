@@ -1302,7 +1302,6 @@ void BMI_tcp_close_context(bmi_context_id context_id)
  * attempt to cancel a pending bmi tcp operation
  *
  * returns 0 on success, -errno on failure
- * TODO: pick better error code than -EINTR for canceled operations
  */
 int BMI_tcp_cancel(bmi_op_id_t id, bmi_context_id context_id)
 {

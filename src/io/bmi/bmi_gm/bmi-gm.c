@@ -134,6 +134,7 @@ int BMI_gm_testunexpected(int incount,
 method_addr_p BMI_gm_method_addr_lookup(const char *id_string);
 int BMI_gm_open_context(bmi_context_id context_id);
 void BMI_gm_close_context(bmi_context_id context_id);
+int BMI_gm_cancel(bmi_op_id_t id, bmi_context_id context_id);
 
 char BMI_gm_method_name[] = "bmi_gm";
 
@@ -159,7 +160,7 @@ struct bmi_method_ops bmi_gm_ops = {
     BMI_gm_post_sendunexpected_list,
     BMI_gm_open_context,
     BMI_gm_close_context,
-    NULL
+    BMI_gm_cancel,
 };
 
 /* module parameters */
@@ -3794,6 +3795,44 @@ static int ctrl_req_handler_rend(bmi_op_id_t ctrl_op_id,
 
 }
 
+/* BMI_gm_cancel()
+ *
+ * attempt to cancel a pending bmi gm operation
+ *
+ * returns 0 on success, -errno on failure
+ */
+int BMI_gm_cancel(bmi_op_id_t id, bmi_context_id context_id)
+{
+    method_op_p query_op = (method_op_p)id_gen_safe_lookup(id);
+    struct gm_op *gm_op_data = query_op->method_data;
+
+    assert(query_op);
+
+#ifndef ENABLE_GM_BUFPOOL
+    /* we don't implement cancel for any other buffering mechanisms */
+    assert(0);
+#endif
+
+    gen_mutex_lock(&interface_mutex);
+
+    /* easy case: is the operation already completed? */
+    if(gm_op_data->complete)
+    {
+        /* do nothing */
+	gen_mutex_unlock(&interface_mutex);
+	return(0);
+    }
+
+    /* TODO: implement the rest of this; based on the op type we have to look
+     * for it in the appropriate queues and take different actions depending
+     * on what we find.
+     */
+    assert(0);
+
+    gen_mutex_unlock(&interface_mutex);
+
+    return(0);
+}
 /*
  * Local variables:
  *  c-indent-level: 4

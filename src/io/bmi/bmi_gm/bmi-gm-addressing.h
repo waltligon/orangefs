@@ -5,7 +5,7 @@
  */
 
 /*
- * tcp specific host addressing information
+ * gm specific host addressing information
  */
 
 #ifndef __BMI_GM_ADDRESSING_H

@@ -79,12 +79,6 @@
 /* Define if db library has DB_DIRTY_READ flag */
 #undef HAVE_DB_DIRTY_READ
 
-/* Define if GM is present */
-#undef HAVE_GM
-
 /* Define if sysinfo.h is present */
 #undef HAVE_SYSINFO
-
-/* Define if IB is present */
-#undef HAVE_IB
 
