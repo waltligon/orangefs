@@ -32,7 +32,7 @@
 #include "mmap-ra-cache.h"
 #define MMAP_RA_MIN_THRESHOLD     76800
 #define MMAP_RA_MAX_THRESHOLD  16777216
-#define MMAP_RA_SMALL_BUF_SIZE     4096
+#define MMAP_RA_SMALL_BUF_SIZE    16384
 #endif
 
 /*

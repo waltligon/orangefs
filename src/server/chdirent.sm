@@ -136,10 +136,10 @@ static int chdirent_verify_parent_metadata_and_read_directory_entry_handle(
     PINT_STATE_DEBUG("verify_parent_metadata_and_"
                      "read_directory_entry_handle");
 
-    s_op->key.buffer    = Trove_Common_Keys[DIR_ENT_KEY].key;
+    s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
 
-    s_op->val.buffer    = &s_op->u.chdirent.dirdata_handle;
+    s_op->val.buffer = &s_op->u.chdirent.dirdata_handle;
     s_op->val.buffer_sz = sizeof(PVFS_handle);
 
     gossip_debug(
@@ -182,9 +182,9 @@ static int chdirent_read_directory_entry(PINT_server_op *s_op,
 		 Lu(s_op->u.chdirent.dirdata_handle),
 		 s_op->req->u.chdirent.entry);
 
-    s_op->key.buffer    = s_op->req->u.chdirent.entry;
+    s_op->key.buffer = s_op->req->u.chdirent.entry;
     s_op->key.buffer_sz = strlen(s_op->req->u.chdirent.entry) + 1;
-    s_op->val.buffer    = &s_op->u.chdirent.old_dirent_handle;
+    s_op->val.buffer = &s_op->u.chdirent.old_dirent_handle;
     s_op->val.buffer_sz = sizeof(PVFS_handle);
 
     ret = job_trove_keyval_read(

@@ -67,7 +67,7 @@ static int remove_crdirent_comp_fn(
 #define PRINT_REMOVE_WARNING()                                        \
 do {                                                                  \
     gossip_err("WARNING: PVFS_sys_remove() encountered an error "     \
-               "which may lead to inconsistent state.\n");            \
+               "which may lead to\n  inconsistent state.\n");         \
     gossip_err("WARNING: PVFS2 fsck (if available) may be needed.\n");\
 } while(0)
 
@@ -331,7 +331,7 @@ static int remove_crdirent_setup_msgpair(PINT_client_sm *sm_p,
         PVFS_util_get_current_time(),
         PVFS_util_get_current_time());
 
-    gossip_debug(GOSSIP_REMOVE_DEBUG, "- doing CRDIRENT on %s (%Lu,%d) "
+    gossip_debug(GOSSIP_REMOVE_DEBUG, "- doing CRDIRENT of %s (%Lu,%d) "
                  "under %Lu,%d\n", sm_p->u.remove.object_name,
                  Lu(sm_p->object_ref.handle),
                  sm_p->object_ref.fs_id,

@@ -173,11 +173,21 @@ static int getattr_acache_lookup(PINT_client_sm *sm_p,
                 goto cache_hit;
             }
 
-            /* if we get here, we've got a cache miss */
-            goto cache_miss;
+            /*
+              normally, if we get here, we've got a cache miss.
+              setattr is an exception as it now does write-through
+              acache updates.  (i.e. it's a hit in invalid cases
+              because it'll be updated properly on success; flushed on
+              failure)
+            */
+            if (sm_p->op != PVFS_SYS_SETATTR)
+            {
+                goto cache_miss;
+            }
 
           cache_hit:
-            gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: acache hit\n");
+            gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: acache hit "
+                         "[%Lu]\n", Lu(sm_p->object_ref.handle));
 
             /* build a fake response for completion */
             fake_resp.op = PVFS_SERV_GETATTR;
@@ -201,11 +211,13 @@ static int getattr_acache_lookup(PINT_client_sm *sm_p,
           match what the caller asked for, in this case invalidate the
           entry; note invalidate implies an internal acache release
         */
-        gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: invalid acache miss\n");
+        gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: invalid acache "
+                     "miss [%Lu]\n",Lu(sm_p->object_ref.handle));
         sm_p->acache_hit = 0;
         PINT_acache_invalidate(sm_p->object_ref);
     }
-    gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: clean acache miss\n");
+    gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: clean acache miss [%Lu] "
+                 "\n", Lu(sm_p->object_ref.handle));
     
     js_p->error_code = GETATTR_ACACHE_MISS;
     return 1;
