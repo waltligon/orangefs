@@ -1531,8 +1531,60 @@ int job_trove_dspace_remove(
 	job_status_s* out_status_p,
 	job_id_t* id)
 {
-	gossip_lerr("Error: unimplemented.\n");
-	return(-ENOSYS);
+	/* post a dspace remove.  If it completes (or fails) immediately, then
+	 * return and fill in the status structure.  If it needs to be tested
+	 * for completion later, then queue up a job_desc structure.
+	 */
+	int ret = -1;
+	struct job_desc* jd = NULL;
+
+	HACK_global_fsid = coll_id;
+
+	/* create the job desc first, even though we may not use it.  This
+	 * gives us somewhere to store the BMI id and user ptr
+	 */
+	jd = alloc_job_desc(JOB_TROVE);
+	if(!jd)
+	{
+		return(-errno);
+	}
+	jd->job_user_ptr = user_ptr;
+
+	ret = trove_dspace_remove(coll_id,
+				  handle,
+				  TROVE_SYNC /* flags -- sync for now*/,
+				  jd,
+				  &(jd->u.trove.id));
+	
+	if(ret < 0)
+	{
+		/* error posting trove operation */
+		dealloc_job_desc(jd);
+		/* TODO: handle this correctly */
+		out_status_p->error_code = -EINVAL;
+		return(1);
+	}
+
+	if(ret == 1)
+	{
+		/* immediate completion */
+		out_status_p->error_code = 0;
+		dealloc_job_desc(jd);
+		return(ret);
+	}
+
+	/* if we fall through to this point, the job did not
+	 * immediately complete and we must queue up to test later
+	 */
+	gen_mutex_lock(&trove_mutex);
+		*id = jd->job_id;
+		job_desc_q_add(trove_queue, jd);
+#ifdef __PVFS2_JOB_THREADED__
+		pthread_cond_signal(&trove_cond);
+#endif /* __PVFS2_JOB_THREADED__ */
+	gen_mutex_unlock(&trove_mutex);
+
+	return(0);
 }
 
 /* job_trove_dspace_verify()
