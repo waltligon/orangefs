@@ -34,7 +34,7 @@ static int test_handle_index = 0;
 
 extern job_context_id PVFS_sys_job_context;
 
-/* this is a test program that exercises the bucket interface and
+/* this is a test program that exercises the cached_config interface and
  * demonstrates how to use it.
  */
 int main(int argc, char **argv)	
@@ -84,9 +84,9 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    if (PINT_bucket_initialize())
+    if (PINT_cached_config_initialize())
     {
-        fprintf(stderr, "PINT_bucket_initialize() failure.\n");
+        fprintf(stderr, "PINT_cached_config_initialize() failure.\n");
         return(-1);
     }
 
@@ -125,9 +125,9 @@ int main(int argc, char **argv)
         printf("\nOUTPUT OF TEST (filesystem ID is %d):\n",fs_ids[i]);
         printf("***************************************\n");
 
-        if (PINT_bucket_get_num_meta(fs_ids[i],&num_meta_servers))
+        if (PINT_cached_config_get_num_meta(fs_ids[i],&num_meta_servers))
         {
-            fprintf(stderr, "PINT_bucket_get_num_meta failure.\n");
+            fprintf(stderr, "PINT_cached_config_get_num_meta failure.\n");
             return(-1);
         }
         else
@@ -136,9 +136,9 @@ int main(int argc, char **argv)
                    num_meta_servers);
         }
 
-        if (PINT_bucket_get_num_io(fs_ids[i],&num_data_servers))
+        if (PINT_cached_config_get_num_io(fs_ids[i],&num_data_servers))
         {
-            fprintf(stderr, "PINT_bucket_get_num_io failure.\n");
+            fprintf(stderr, "PINT_cached_config_get_num_io failure.\n");
             return(-1);
         }
         else
@@ -150,12 +150,12 @@ int main(int argc, char **argv)
         printf("\n");
         for(j = 0; j < NUM_META_SERVERS_TO_QUERY; j++)
         {
-            if (PINT_bucket_get_next_meta(&server_config,
+            if (PINT_cached_config_get_next_meta(&server_config,
                                           fs_ids[i],
                                           &m_addr,
                                           &meta_handle_extent_array))
             {
-                fprintf(stderr, "PINT_bucket_get_next_meta failure.\n");
+                fprintf(stderr, "PINT_cached_config_get_next_meta failure.\n");
                 return(-1);
             }
             else
@@ -171,11 +171,11 @@ int main(int argc, char **argv)
             }
         }
 
-        if (PINT_bucket_get_next_io(&server_config, fs_ids[i],
+        if (PINT_cached_config_get_next_io(&server_config, fs_ids[i],
                                     NUM_DATA_SERVERS_TO_QUERY,
                                     d_addr, data_handle_extent_array))
         {
-            fprintf(stderr, "PINT_bucket_get_next_io failure.\n");
+            fprintf(stderr, "PINT_cached_config_get_next_io failure.\n");
             return(-1);
         }
         else
@@ -211,7 +211,7 @@ int main(int argc, char **argv)
             */
             for(m = 0; m < num_file_systems; m++)
             {
-                if (PINT_bucket_get_server_name(
+                if (PINT_cached_config_get_server_name(
                         server_name,PVFS_MAX_SERVER_ADDR_LEN,
                         test_handles[j],fs_ids[m]) == 0)
                 {
@@ -236,7 +236,7 @@ int main(int argc, char **argv)
         {
             for(m = 0; m < num_file_systems; m++)
             {
-                if (PINT_bucket_map_to_server(
+                if (PINT_cached_config_map_to_server(
                         &addr,test_handles[j],fs_ids[m]) == 0)
                 {
                     continue;
@@ -244,7 +244,7 @@ int main(int argc, char **argv)
             }
             if (m != num_file_systems)
             {
-                fprintf(stderr, "PINT_bucket_map_to_server failure.\n");
+                fprintf(stderr, "PINT_cached_config_map_to_server failure.\n");
             }
             else
             {
@@ -296,9 +296,9 @@ int main(int argc, char **argv)
         }
     }
 
-    if (PINT_bucket_finalize())
+    if (PINT_cached_config_finalize())
     {
-        fprintf(stderr, "PINT_bucket_finalize() failure.\n");
+        fprintf(stderr, "PINT_cached_config_finalize() failure.\n");
         return(-1);
     }
 

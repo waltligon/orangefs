@@ -15,23 +15,23 @@
 #include "trove.h"
 #include "server-config.h"
 
-/* This is the interface to the bucket management component of the
+/* This is the interface to the cached_config management component of the
  * system interface.  It is responsible for managing the list of meta
  * and data servers and mapping between handle ranges and servers.
  */
-int PINT_bucket_initialize(void);
+int PINT_cached_config_initialize(void);
 
-int PINT_bucket_finalize(void);
+int PINT_cached_config_finalize(void);
 
 int PINT_handle_load_mapping(struct server_configuration_s *config,
 			     struct filesystem_configuration_s *fs);
 
-int PINT_bucket_get_next_meta(struct server_configuration_s *config,
+int PINT_cached_config_get_next_meta(struct server_configuration_s *config,
 			      PVFS_fs_id fsid,
 			      PVFS_BMI_addr_t *meta_addr,
 			      PVFS_handle_extent_array *meta_extent_array);
 
-int PINT_bucket_get_next_io(struct server_configuration_s *config,
+int PINT_cached_config_get_next_io(struct server_configuration_s *config,
 			    PVFS_fs_id fsid,
 			    int num_servers,
 			    PVFS_BMI_addr_t *io_addr_array,
@@ -41,47 +41,47 @@ int PINT_bucket_get_next_io(struct server_configuration_s *config,
 #define PINT_BUCKET_META PVFS_MGMT_META_SERVER
 #define PINT_BUCKET_ALL (PINT_BUCKET_META|PINT_BUCKET_IO)
 
-const char* PINT_bucket_map_addr(struct server_configuration_s* config,
+const char* PINT_cached_config_map_addr(struct server_configuration_s* config,
 				 PVFS_fs_id fsid,
 				 PVFS_BMI_addr_t addr,
 				 int* server_type);
 
-int PINT_bucket_get_server_array(struct server_configuration_s* config,
+int PINT_cached_config_get_server_array(struct server_configuration_s* config,
 				 PVFS_fs_id fsid,
 				 int server_type,
 				 PVFS_BMI_addr_t *addr_array,
 				 int* inout_count_p);
 
-int PINT_bucket_count_servers(struct server_configuration_s* config,
+int PINT_cached_config_count_servers(struct server_configuration_s* config,
 			      PVFS_fs_id fsid,
 			      int server_type,
 			      int* count);
 
-int PINT_bucket_map_to_server(PVFS_BMI_addr_t *server_addr,
+int PINT_cached_config_map_to_server(PVFS_BMI_addr_t *server_addr,
 			      PVFS_handle handle,
 			      PVFS_fs_id fsid);
 
-int PINT_bucket_get_num_dfiles(PVFS_fs_id fsid,
+int PINT_cached_config_get_num_dfiles(PVFS_fs_id fsid,
                                PINT_dist* dist,
                                PVFS_sys_attr attr,
                                int* num_dfiles);
 
-int PINT_bucket_get_num_meta(PVFS_fs_id fsid,
+int PINT_cached_config_get_num_meta(PVFS_fs_id fsid,
 			     int *num_meta);
 
-int PINT_bucket_get_num_io(PVFS_fs_id fsid,
+int PINT_cached_config_get_num_io(PVFS_fs_id fsid,
 			   int *num_io);
 
-int PINT_bucket_get_server_name(char *server_name,
+int PINT_cached_config_get_server_name(char *server_name,
 				int max_server_name_len,
 				PVFS_handle handle,
 				PVFS_fs_id fsid);
 
-int PINT_bucket_get_server_handle_count(const char* server_addr_str,
+int PINT_cached_config_get_server_handle_count(const char* server_addr_str,
 					PVFS_fs_id fs_id,
 					uint64_t* handle_count);
     
-int PINT_bucket_get_root_handle(PVFS_fs_id fsid,
+int PINT_cached_config_get_root_handle(PVFS_fs_id fsid,
 				PVFS_handle *fh_root);
 
 #define map_handle_range_to_extent_list(hrange_list)             \

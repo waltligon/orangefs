@@ -49,7 +49,7 @@ int PINT_sm_common_parent_getattr_setup_msgpair(PINT_client_sm *sm_p,
     sm_p->msgpair.retry_flag = PVFS_MSGPAIR_RETRY;
     sm_p->msgpair.comp_fn = PINT_sm_common_object_getattr_comp_fn;
 
-    ret = PINT_bucket_map_to_server(&sm_p->msgpair.svr_addr,
+    ret = PINT_cached_config_map_to_server(&sm_p->msgpair.svr_addr,
 				    sm_p->msgpair.handle,
 				    sm_p->msgpair.fs_id);
     if (ret)
@@ -98,7 +98,7 @@ int PINT_sm_common_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
     sm_p->msgpair.retry_flag = PVFS_MSGPAIR_RETRY;
     sm_p->msgpair.comp_fn = PINT_sm_common_object_getattr_comp_fn;
 
-    ret = PINT_bucket_map_to_server(&sm_p->msgpair.svr_addr,
+    ret = PINT_cached_config_map_to_server(&sm_p->msgpair.svr_addr,
 				    sm_p->msgpair.handle,
 				    sm_p->msgpair.fs_id);
     if (ret)

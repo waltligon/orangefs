@@ -497,7 +497,7 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
         msg->retry_flag = PVFS_MSGPAIR_NO_RETRY;
         msg->comp_fn = NULL;
 
-        ret = PINT_bucket_map_to_server(
+        ret = PINT_cached_config_map_to_server(
                &msg->svr_addr, msg->handle, msg->fs_id);
         if (ret)
         {

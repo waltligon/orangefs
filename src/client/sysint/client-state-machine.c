@@ -844,7 +844,7 @@ int PINT_serv_msgpairarray_resolve_addrs(
             PINT_client_sm_msgpair_state *msg_p = &msgarray[i];
             assert(msg_p);
 
-            ret = PINT_bucket_map_to_server(&msg_p->svr_addr,
+            ret = PINT_cached_config_map_to_server(&msg_p->svr_addr,
                                             msg_p->handle,
                                             msg_p->fs_id);
             if (ret != 0)

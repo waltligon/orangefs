@@ -35,7 +35,7 @@ const char* PVFS_mgmt_map_addr(PVFS_fs_id fs_id,
 {
     struct server_configuration_s *server_config =
         PINT_get_server_config_struct(fs_id);
-    const char *ret = PINT_bucket_map_addr(
+    const char *ret = PINT_cached_config_map_addr(
         server_config, fs_id, addr, server_type);
 
     PINT_put_server_config_struct(server_config);
@@ -63,7 +63,7 @@ int PVFS_mgmt_statfs_all(PVFS_fs_id fs_id,
     server_config = PINT_get_server_config_struct(fs_id);
     assert(server_config);
 
-    ret = PINT_bucket_count_servers(
+    ret = PINT_cached_config_count_servers(
         server_config, fs_id,  PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
         &real_count);
     PINT_put_server_config_struct(server_config);
@@ -91,7 +91,7 @@ int PVFS_mgmt_statfs_all(PVFS_fs_id fs_id,
     assert(server_config);
 
     /* generate default list of servers */
-    ret = PINT_bucket_get_server_array(
+    ret = PINT_cached_config_get_server_array(
         server_config, fs_id, PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
         addr_array, &real_count);
     PINT_put_server_config_struct(server_config);
@@ -138,7 +138,7 @@ int PVFS_mgmt_setparam_all(
     server_config = PINT_get_server_config_struct(fs_id);
     assert(server_config);
 
-    ret = PINT_bucket_count_servers(
+    ret = PINT_cached_config_count_servers(
         server_config, fs_id,
         PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER, &count);
     PINT_put_server_config_struct(server_config);
@@ -158,7 +158,7 @@ int PVFS_mgmt_setparam_all(
     assert(server_config);
 
     /* generate default list of servers */
-    ret = PINT_bucket_get_server_array(
+    ret = PINT_cached_config_get_server_array(
         server_config, fs_id, PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
         addr_array, &count);
     PINT_put_server_config_struct(server_config);
@@ -201,7 +201,7 @@ int PVFS_mgmt_get_server_array(PVFS_fs_id fs_id,
     server_config = PINT_get_server_config_struct(fs_id);
     assert(server_config);
 
-    ret = PINT_bucket_get_server_array(
+    ret = PINT_cached_config_get_server_array(
         server_config, fs_id, server_type, addr_array, inout_count_p);
     PINT_put_server_config_struct(server_config);
     return ret;
@@ -225,7 +225,7 @@ int PVFS_mgmt_count_servers(PVFS_fs_id fs_id,
     server_config = PINT_get_server_config_struct(fs_id);
     assert(server_config);
 
-    ret = PINT_bucket_count_servers(
+    ret = PINT_cached_config_count_servers(
         server_config, fs_id, server_type, count);
     PINT_put_server_config_struct(server_config);
     return ret;

@@ -39,7 +39,7 @@ int PVFS_sys_finalize()
 {
     PINT_ncache_finalize();
     PINT_acache_finalize();
-    PINT_bucket_finalize();
+    PINT_cached_config_finalize();
 
     /* flush all known server configurations */
     PINT_server_config_mgr_finalize();

@@ -115,7 +115,7 @@ int PVFS_sys_fs_add(struct PVFS_sys_mntent *mntent)
       reload all handle mappings as well as the interface with the new
       configuration information
     */
-    PINT_server_config_mgr_reload_bucket_interface();
+    PINT_server_config_mgr_reload_cached_config_interface();
 
     gen_mutex_unlock(&mt_config);
     return 0;

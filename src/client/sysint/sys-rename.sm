@@ -517,7 +517,7 @@ static int rename_lookups_setup_msgpair_array(PINT_client_sm *sm_p,
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
         msg_p->comp_fn = rename_lookups_comp_fn;
 
-        ret = PINT_bucket_map_to_server(&msg_p->svr_addr,
+        ret = PINT_cached_config_map_to_server(&msg_p->svr_addr,
                                         msg_p->handle,
                                         msg_p->fs_id);
         if (ret)
@@ -580,7 +580,7 @@ static int rename_crdirent_setup_msgpair(PINT_client_sm *sm_p,
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = rename_crdirent_comp_fn;
 
-    ret = PINT_bucket_map_to_server(&msg_p->svr_addr,
+    ret = PINT_cached_config_map_to_server(&msg_p->svr_addr,
                                     msg_p->handle,
                                     msg_p->fs_id);
     if (ret)
@@ -639,7 +639,7 @@ static int rename_rmdirent_setup_msgpair(PINT_client_sm *sm_p,
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = rename_rmdirent_comp_fn;
 
-    ret = PINT_bucket_map_to_server(&msg_p->svr_addr,
+    ret = PINT_cached_config_map_to_server(&msg_p->svr_addr,
                                     msg_p->handle,
                                     msg_p->fs_id);
     if (ret)
@@ -722,7 +722,7 @@ static int rename_chdirent_setup_msgpair(PINT_client_sm *sm_p,
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = rename_chdirent_comp_fn;
 
-    ret = PINT_bucket_map_to_server(&msg_p->svr_addr,
+    ret = PINT_cached_config_map_to_server(&msg_p->svr_addr,
                                     msg_p->handle,
                                     msg_p->fs_id);
     if (ret)

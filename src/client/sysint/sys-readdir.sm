@@ -205,7 +205,7 @@ static int readdir_msg_setup_msgpair(PINT_client_sm *sm_p,
     js_p->error_code = 0;
 
     /* determine the metadata server to contact */
-    ret = PINT_bucket_map_to_server(
+    ret = PINT_cached_config_map_to_server(
         &server_addr, sm_p->u.readdir.object_ref.handle,
         sm_p->u.readdir.object_ref.fs_id);
     if (ret)

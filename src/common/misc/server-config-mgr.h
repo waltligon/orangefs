@@ -13,7 +13,7 @@ int PINT_server_config_mgr_initialize(void);
 
 int PINT_server_config_mgr_finalize(void);
 
-int PINT_server_config_mgr_reload_bucket_interface(void);
+int PINT_server_config_mgr_reload_cached_config_interface(void);
 
 int PINT_server_config_mgr_add_config(
     struct server_configuration_s *config_s,

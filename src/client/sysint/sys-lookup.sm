@@ -562,7 +562,7 @@ int PVFS_sys_lookup(
         parent.handle = 0;
         parent.fs_id = fs_id;
 
-        ret = PINT_bucket_get_root_handle(parent.fs_id,&parent.handle);
+        ret = PINT_cached_config_get_root_handle(parent.fs_id,&parent.handle);
         if (ret < 0)
         {
             return ret;
@@ -654,7 +654,7 @@ static int lookup_segment_lookup_setup_msgpair(PINT_client_sm *sm_p,
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = lookup_segment_lookup_comp_fn;
 
-    ret = PINT_bucket_map_to_server(&msg_p->svr_addr,
+    ret = PINT_cached_config_map_to_server(&msg_p->svr_addr,
                                     msg_p->handle,
                                     msg_p->fs_id);
     if (ret)
@@ -761,7 +761,7 @@ static int lookup_segment_getattr_setup_msgpair(PINT_client_sm *sm_p,
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = lookup_segment_getattr_comp_fn;
 
-    if (PINT_bucket_map_to_server(&msg_p->svr_addr,
+    if (PINT_cached_config_map_to_server(&msg_p->svr_addr,
                                   msg_p->handle,
                                   msg_p->fs_id) < 0)
     {
@@ -936,7 +936,7 @@ static int lookup_segment_handle_absolute_link(PINT_client_sm *sm_p,
       fs_id that this lookup started with.
     */
     root_refn.fs_id = sm_p->u.lookup.starting_refn.fs_id;
-    ret = PINT_bucket_get_root_handle(root_refn.fs_id, &root_refn.handle);
+    ret = PINT_cached_config_get_root_handle(root_refn.fs_id, &root_refn.handle);
     assert(ret == 0);
 
     ret = initialize_context(sm_p->u.lookup.contexts,

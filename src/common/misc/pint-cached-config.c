@@ -35,13 +35,13 @@ static int cache_server_array(
     struct server_configuration_s *config, PVFS_fs_id fsid);
 
 
-/* PINT_bucket_initialize()
+/* PINT_cached_config_initialize()
  *
- * initializes the bucket interface
+ * initializes the cached_config interface
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_bucket_initialize(void)
+int PINT_cached_config_initialize(void)
 {
     if (!PINT_fsid_config_cache_table)
     {
@@ -52,14 +52,14 @@ int PINT_bucket_initialize(void)
     return (PINT_fsid_config_cache_table ? 0 : -PVFS_ENOMEM);
 }
 
-/* PINT_bucket_finalize()
+/* PINT_cached_config_finalize()
  *
- * shuts down the bucket interface and releases any resources
+ * shuts down the cached_config interface and releases any resources
  * associated with it.
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_bucket_finalize(void)
+int PINT_cached_config_finalize(void)
 {
     int i = 0;
     struct qlist_head *hash_link = NULL;
@@ -127,15 +127,15 @@ int PINT_bucket_finalize(void)
     return 0;
 }
 
-int PINT_bucket_reinitialize(struct server_configuration_s *config)
+int PINT_cached_config_reinitialize(struct server_configuration_s *config)
 {
     int ret = -PVFS_EINVAL;
     PINT_llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs = NULL;
 
-    PINT_bucket_finalize();
+    PINT_cached_config_finalize();
 
-    ret = PINT_bucket_initialize();
+    ret = PINT_cached_config_initialize();
     if (ret == 0)
     {
         cur = config->file_systems;
@@ -225,7 +225,7 @@ int PINT_handle_load_mapping(
     return ret;
 }
 
-/* PINT_bucket_get_next_meta()
+/* PINT_cached_config_get_next_meta()
  *
  * returns the bmi address of a random server that should be used to
  * store a new piece of metadata.  This function is responsible for
@@ -239,7 +239,7 @@ int PINT_handle_load_mapping(
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_bucket_get_next_meta(
+int PINT_cached_config_get_next_meta(
     struct server_configuration_s *config,
     PVFS_fs_id fsid,
     PVFS_BMI_addr_t *meta_addr,
@@ -296,7 +296,7 @@ int PINT_bucket_get_next_meta(
     return ret;
 }
 
-/* PINT_bucket_get_next_io()
+/* PINT_cached_config_get_next_io()
  *
  * returns the address of a set of servers that should be used to
  * store new pieces of file data.  This function is responsible for
@@ -304,7 +304,7 @@ int PINT_bucket_get_next_meta(
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_bucket_get_next_io(
+int PINT_cached_config_get_next_io(
     struct server_configuration_s *config,
     PVFS_fs_id fsid,
     int num_servers,
@@ -368,14 +368,14 @@ int PINT_bucket_get_next_io(
 }
 
 
-/* PINT_bucket_map_addr()
+/* PINT_cached_config_map_addr()
  *
  * takes an opaque server address and returns the server type and
  * address string for that server
  *
  * returns pointer to string on success, NULL on failure
  */
-const char *PINT_bucket_map_addr(
+const char *PINT_cached_config_map_addr(
     struct server_configuration_s *config,
     PVFS_fs_id fsid, 
     PVFS_BMI_addr_t addr,
@@ -418,13 +418,13 @@ const char *PINT_bucket_map_addr(
     return NULL;
 }
 
-/* PINT_bucket_count_servers()
+/* PINT_cached_config_count_servers()
  *
  * counts the number of physical servers of the specified type
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_bucket_count_servers(struct server_configuration_s *config,
+int PINT_cached_config_count_servers(struct server_configuration_s *config,
                               PVFS_fs_id fsid, 
                               int server_type,
                               int *count)
@@ -471,7 +471,7 @@ int PINT_bucket_count_servers(struct server_configuration_s *config,
     return ret;
 }
 
-/* PINT_bucket_get_server_array()
+/* PINT_cached_config_get_server_array()
  *
  * fills in an array of addresses corresponding to each server of the
  * type specified by "server_type" (meta,io,or both).  If
@@ -480,7 +480,7 @@ int PINT_bucket_count_servers(struct server_configuration_s *config,
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_bucket_get_server_array(
+int PINT_cached_config_get_server_array(
     struct server_configuration_s *config,
     PVFS_fs_id fsid,
     int server_type,
@@ -565,13 +565,13 @@ int PINT_bucket_get_server_array(
     return ret;
 }
 
-/* PINT_bucket_map_to_server()
+/* PINT_cached_config_map_to_server()
  *
  * maps from a handle and fsid to a server address
  *
  * returns 0 on success to -errno on failure
  */
-int PINT_bucket_map_to_server(
+int PINT_cached_config_map_to_server(
     PVFS_BMI_addr_t *server_addr,
     PVFS_handle handle,
     PVFS_fs_id fs_id)
@@ -579,11 +579,11 @@ int PINT_bucket_map_to_server(
     int ret = -PVFS_EINVAL;
     char bmi_server_addr[PVFS_MAX_SERVER_ADDR_LEN] = {0};
 
-    ret = PINT_bucket_get_server_name(
+    ret = PINT_cached_config_get_server_name(
         bmi_server_addr, PVFS_MAX_SERVER_ADDR_LEN, handle, fs_id);
     if (ret)
     {
-        PVFS_perror_gossip("PINT_bucket_get_server_name failed", ret);
+        PVFS_perror_gossip("PINT_cached_config_get_server_name failed", ret);
     }
     return (!ret ? BMI_addr_lookup(server_addr, bmi_server_addr) : ret);
 }
@@ -594,7 +594,7 @@ int PINT_bucket_map_to_server(
  * fs id, distribution, and attributes.  If the distribution and attributes
  * do not specify a number of dfiles, the number of io servers will be used.
  */
-int PINT_bucket_get_num_dfiles(PVFS_fs_id fsid,
+int PINT_cached_config_get_num_dfiles(PVFS_fs_id fsid,
                                PINT_dist* dist,
                                PVFS_sys_attr attr,
                                int* num_dfiles)
@@ -614,7 +614,7 @@ int PINT_bucket_get_num_dfiles(PVFS_fs_id fsid,
     }
 
     /* Get the number of available servers */
-    ret = PINT_bucket_get_num_io(fsid, &num_servers_req);
+    ret = PINT_cached_config_get_num_io(fsid, &num_servers_req);
     if (0 == ret)
     {
         /* Let the distribution determine the number of dfiles to use */
@@ -629,14 +629,14 @@ int PINT_bucket_get_num_dfiles(PVFS_fs_id fsid,
     return ret;
 }
 
-/* PINT_bucket_get_num_meta()
+/* PINT_cached_config_get_num_meta()
  *
  * discovers the number of metadata servers available for a given file
  * system
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_bucket_get_num_meta(PVFS_fs_id fsid, int *num_meta)
+int PINT_cached_config_get_num_meta(PVFS_fs_id fsid, int *num_meta)
 {
     int ret = -PVFS_EINVAL;
     struct qlist_head *hash_link = NULL;
@@ -662,14 +662,14 @@ int PINT_bucket_get_num_meta(PVFS_fs_id fsid, int *num_meta)
     return ret;
 }
 
-/* PINT_bucket_get_num_io()
+/* PINT_cached_config_get_num_io()
  *
  * discovers the number of io servers available for a given file
  * system
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_bucket_get_num_io(PVFS_fs_id fsid, int *num_io)
+int PINT_cached_config_get_num_io(PVFS_fs_id fsid, int *num_io)
 {
     int ret = -PVFS_EINVAL;
     struct qlist_head *hash_link = NULL;
@@ -695,13 +695,13 @@ int PINT_bucket_get_num_io(PVFS_fs_id fsid, int *num_io)
     return ret;
 }
 
-/* PINT_bucket_get_server_handle_count()
+/* PINT_cached_config_get_server_handle_count()
  *
  * counts the number of handles associated with a given server
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int PINT_bucket_get_server_handle_count(
+int PINT_cached_config_get_server_handle_count(
     const char* server_addr_str,
     PVFS_fs_id fs_id,
     uint64_t* handle_count)
@@ -751,14 +751,14 @@ int PINT_bucket_get_server_handle_count(
     return ret;
 }
 
-/* PINT_bucket_get_server_name()
+/* PINT_cached_config_get_server_name()
  *
  * discovers the string (BMI url) name of a server that controls the
- * specified bucket.
+ * specified cached_config.
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_bucket_get_server_name(
+int PINT_cached_config_get_server_name(
     char *server_name,
     int max_server_name_len,
     PVFS_handle handle,
@@ -808,14 +808,14 @@ int PINT_bucket_get_server_name(
     return ret;
 }
 
-/* PINT_bucket_get_root_handle()
+/* PINT_cached_config_get_root_handle()
  *
  * return the root handle of any valid filesystem
  *
  * returns 0 on success -errno on failure
  *
  */
-int PINT_bucket_get_root_handle(
+int PINT_cached_config_get_root_handle(
     PVFS_fs_id fsid,
     PVFS_handle *fh_root)
 {

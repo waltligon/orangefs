@@ -195,7 +195,7 @@ int PVFS_sys_initialize(int default_debug_mask)
     client_status_flag |= CLIENT_CONFIG_MGR_INIT;
 
     /* initialize the handle mapping interface */
-    ret = PINT_bucket_initialize();
+    ret = PINT_cached_config_initialize();
     if (ret < 0)
     {
         gossip_lerr("Error initializing handle mapping interface\n");

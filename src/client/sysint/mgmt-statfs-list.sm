@@ -253,13 +253,13 @@ static int statfs_list_comp_fn(void *v_p,
             sm_p->msgarray[i].svr_addr, &sm_stat->server_type);
 	assert(sm_stat->bmi_address);
 
-	ret = PINT_bucket_get_server_handle_count(
+	ret = PINT_cached_config_get_server_handle_count(
             sm_stat->bmi_address, sm_p->u.statfs_list.fs_id,
             &sm_stat->handles_total_count);
 
         if (ret)
         {
-            PVFS_perror_gossip("PINT_bucket_get_server_handle_count failed ",
+            PVFS_perror_gossip("PINT_cached_config_get_server_handle_count failed ",
                         ret);
             return ret;
         }

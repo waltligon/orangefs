@@ -128,7 +128,7 @@ int PINT_server_config_mgr_finalize(void)
     return ret;
 }
 
-int PINT_server_config_mgr_reload_bucket_interface(void)
+int PINT_server_config_mgr_reload_cached_config_interface(void)
 {
     int ret = -PVFS_EINVAL, i = 0;
     server_config_t *config = NULL;
@@ -141,11 +141,11 @@ int PINT_server_config_mgr_reload_bucket_interface(void)
         gen_mutex_lock(s_server_config_mgr_mutex);
         SC_MGR_ASSERT_OK(ret);
 
-        PINT_bucket_finalize();
-        ret = PINT_bucket_initialize();
+        PINT_cached_config_finalize();
+        ret = PINT_cached_config_initialize();
         if (ret)
         {
-            PVFS_perror("PINT_bucket_initialize failed", ret);
+            PVFS_perror("PINT_cached_config_initialize failed", ret);
             gen_mutex_unlock(s_server_config_mgr_mutex);
             return ret;
         }

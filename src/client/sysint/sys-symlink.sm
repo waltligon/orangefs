@@ -387,7 +387,7 @@ static int symlink_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
     server_config = PINT_get_server_config_struct(
         sm_p->parent_ref.fs_id);
 
-    ret = PINT_bucket_get_next_meta(
+    ret = PINT_cached_config_get_next_meta(
         server_config, sm_p->parent_ref.fs_id,
         &msg_p->svr_addr, &meta_handle_extent_array);
 
@@ -462,7 +462,7 @@ static int symlink_crdirent_setup_msgpair(PINT_client_sm *sm_p,
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = symlink_crdirent_comp_fn;
 
-    ret = PINT_bucket_map_to_server(&msg_p->svr_addr,
+    ret = PINT_cached_config_map_to_server(&msg_p->svr_addr,
                                     sm_p->parent_ref.handle,
                                     sm_p->parent_ref.fs_id);
     if (ret < 0)
@@ -536,7 +536,7 @@ static int symlink_setattr_setup_msgpair(PINT_client_sm *sm_p,
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = symlink_setattr_comp_fn;
 
-    ret = PINT_bucket_map_to_server(&msg_p->svr_addr,
+    ret = PINT_cached_config_map_to_server(&msg_p->svr_addr,
                                     msg_p->handle,
                                     msg_p->fs_id);
     if (ret)
@@ -579,7 +579,7 @@ static int symlink_delete_handle_setup_msgpair(PINT_client_sm *sm_p,
     sm_p->msgarray = msg_p;
     sm_p->msgarray_count = 1;
 
-    ret = PINT_bucket_map_to_server(&metafile_server_addr,
+    ret = PINT_cached_config_map_to_server(&metafile_server_addr,
                                     sm_p->u.sym.symlink_handle,
                                     sm_p->parent_ref.fs_id);
     if (ret)

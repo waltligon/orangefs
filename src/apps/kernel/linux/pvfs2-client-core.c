@@ -747,7 +747,7 @@ static int service_fs_mount_request(vfs_request_t *vfs_request)
           before sending success response we need to resolve the root
           handle, given the previously resolved fs_id
         */
-        ret = PINT_bucket_get_root_handle(mntent.fs_id, &root_handle);
+        ret = PINT_cached_config_get_root_handle(mntent.fs_id, &root_handle);
         if (ret)
         {
             gossip_err("Failed to retrieve root handle for "

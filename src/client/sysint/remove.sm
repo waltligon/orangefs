@@ -186,7 +186,7 @@ static int remove_getattr_setup_msgpair(PINT_client_sm *sm_p,
     sm_p->msgpair.retry_flag = PVFS_MSGPAIR_RETRY;
     sm_p->msgpair.comp_fn = remove_getattr_comp_fn;
 
-    ret = PINT_bucket_map_to_server(&sm_p->msgpair.svr_addr,
+    ret = PINT_cached_config_map_to_server(&sm_p->msgpair.svr_addr,
                                     sm_p->msgpair.handle,
                                     sm_p->msgpair.fs_id);
     if (ret)
@@ -328,7 +328,7 @@ static int remove_check_dir_contents_setup_msgpair(PINT_client_sm *sm_p,
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = remove_check_dir_contents_comp_fn;
 
-    ret = PINT_bucket_map_to_server(&msg_p->svr_addr,
+    ret = PINT_cached_config_map_to_server(&msg_p->svr_addr,
                                     msg_p->handle,
                                     msg_p->fs_id);
     if (ret)
@@ -426,7 +426,7 @@ static int remove_object_remove_setup_msgpair(PINT_client_sm *sm_p,
     sm_p->msgpair.retry_flag = PVFS_MSGPAIR_RETRY;
     sm_p->msgpair.comp_fn = NULL;
 
-    ret = PINT_bucket_map_to_server(&sm_p->msgpair.svr_addr,
+    ret = PINT_cached_config_map_to_server(&sm_p->msgpair.svr_addr,
                                     sm_p->msgpair.handle,
                                     sm_p->msgpair.fs_id);
     if (ret)
