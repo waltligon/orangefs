@@ -99,6 +99,7 @@ void flow_ref_remove(struct flow_ref_entry* entry)
 	return;
 }
 
+
 /* flow_ref_cleanup()
  *
  * destroys a flow reference linked list and all of its entries
@@ -107,25 +108,19 @@ void flow_ref_remove(struct flow_ref_entry* entry)
  */
 void flow_ref_cleanup(flow_ref_p frp)
 {
-	flow_ref_p tmp_link = NULL;
-	flow_ref_p tmp_next_link = NULL;
+	flow_ref_p iterator = NULL;
+	flow_ref_p scratch = NULL;
 	struct flow_ref_entry* tmp_entry = NULL;
 
-	tmp_link = frp->next;
-	tmp_next_link = tmp_link->next;
-	while(tmp_link != frp)
+	qlist_for_each_safe(iterator, scratch, frp)
 	{
-		qlist_del(tmp_link);
-		tmp_entry = qlist_entry(tmp_link, struct flow_ref_entry,
+		tmp_entry = qlist_entry(iterator, struct flow_ref_entry,
 			flow_ref_link);
 		free(tmp_entry);
-		tmp_link = tmp_next_link;
-		tmp_next_link = tmp_link->next;
 	}
 
 	free(frp);
 	frp = NULL;
 	return;
 }
-
 
