@@ -161,6 +161,11 @@ RHTAG5="Red Hat Linux Advanced Server release 2.1AS"
 RHTAG6="Fedora Core release 1 (Yarrow)"
 
 
+dnl we won't be able to catch all cases, but see if we can
+dnl get the majority of platforms where we might need to work around
+dnl backported features.  Basically we give up if running on these redhat
+dnl versions 
+
 REDHAT_RELEASE=""
 if test -f /etc/redhat-release; then
     AC_MSG_CHECKING(for tagged Redhat releases (must patch))
@@ -182,13 +187,19 @@ if test -f /etc/redhat-release; then
     for a kernel.org (unmondified) kernel, then re-run
     configure with the --disable-redhat24 option.])
        fi
-       if test "$use_redhat24" = 1 ; then
-           REDHAT_RELEASE="-DREDHAT_RELEASE_9"
-       fi
     else
        AC_MSG_RESULT(no)
     fi
 fi
+
+dnl some non-redhat kernels (like whitebox linux and centos) rebuild
+dnl rhel and give the distribution a different name, so if the user sets
+dnl "enable-redhat24", then use it no matter what /etc/redhat-release might say
+
+if test "$use_redhat24" = 1 ; then
+   REDHAT_RELEASE="-DREDHAT_RELEASE_9"
+fi
+
 AC_SUBST(REDHAT_RELEASE)
 
 use_aio_thcb=1
