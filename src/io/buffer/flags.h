@@ -5,8 +5,6 @@
 #ifndef _FLAGS_H
 #define _FLAGS_H
 
-#include <asm/asm-i386/bitops.h>
-
 static inline int my_test_bit(int nr, unsigned long * addr)
 {
         int oldbit;
@@ -15,6 +13,23 @@ static inline int my_test_bit(int nr, unsigned long * addr)
 
         return oldbit;
 }
+
+#define  set_bit(nr, addr) ( ((unsigned long)*(addr)) | ( 1UL << nr ) )
+	
+static inline int test_and_set_bit(int nr, unsigned long * addr) 
+{
+	int oldbit;
+
+	oldbit = my_test_bit( nr, addr);
+	set_bit(nr, addr);
+	
+        return oldbit;
+}
+
+#define clear_bit( nr, addr) set_bit(nr, addr); 
+#define test_and_clear_bit(nr, addr) set_bit(nr, addr); 
+
+
 
 #define PG_locked	 	 0	/* Page is locked. Don't touch. */
 #define PG_error		 1
