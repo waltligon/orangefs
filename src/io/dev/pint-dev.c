@@ -101,7 +101,6 @@ void PINT_dev_finalize(void)
     if(pdev_fd > -1)
 	close(pdev_fd);
 
-    /* TODO: finish cleanup */
     return;
 }
 
@@ -127,6 +126,7 @@ int PINT_dev_test_unexpected(
     int32_t *magic;
     int64_t *tag;
     void* buffer;
+    int i;
 
     /* prepare to read max upcall size, plus magic nr and tag */
     int read_size = sizeof(int32_t) + sizeof(int64_t) + pdev_max_upsize;
@@ -146,18 +146,18 @@ int PINT_dev_test_unexpected(
 
 	if(avail < 0)
 	{
-	    /* TODO: clean up better */
 	    switch(errno)
 	    {
 		case EBADF:
-		    return(-(PVFS_EBADF|PVFS_ERROR_DEV));
+		    ret = -(PVFS_EBADF|PVFS_ERROR_DEV);
 		case ENOMEM:
-		    return(-(PVFS_ENOMEM|PVFS_ERROR_DEV));
+		    ret = -(PVFS_ENOMEM|PVFS_ERROR_DEV);
 		case EFAULT:
-		    return(-(PVFS_EFAULT|PVFS_ERROR_DEV));
+		    ret = -(PVFS_EFAULT|PVFS_ERROR_DEV);
 		default:
-		    return(-(PVFS_EIO|PVFS_ERROR_DEV));
+		    ret = -(PVFS_EIO|PVFS_ERROR_DEV);
 	    }
+	    goto dev_test_unexp_error;
 	}
 
 	/* set idle time to zero; we don't want to block on 
@@ -178,22 +178,22 @@ int PINT_dev_test_unexpected(
 	buffer = malloc(read_size);
 	if(buffer == NULL)
 	{
-	    /* TODO: clean up better */
-	    return(-(PVFS_ENOMEM|PVFS_ERROR_DEV));
+	    ret = -(PVFS_ENOMEM|PVFS_ERROR_DEV);
+	    goto dev_test_unexp_error;
 	}
 
 	ret = read(pdev_fd, buffer, read_size); 
 	if(ret < 0)
 	{
-	    /* TODO: clean up better */
-	    return(-(PVFS_EIO|PVFS_ERROR_DEV));
+	    ret = -(PVFS_EIO|PVFS_ERROR_DEV);
+	    goto dev_test_unexp_error;
 	}
 	/* make sure a payload is present */
 	if(ret < (sizeof(int32_t)+sizeof(int64_t)+1))
 	{
-	    /* TODO: cleanup better */
 	    gossip_err("Error: got short message from device.\n");
-	    return(-(PVFS_EIO|PVFS_ERROR_DEV));
+	    ret = -(PVFS_EIO|PVFS_ERROR_DEV);
+	    goto dev_test_unexp_error;
 	}
 	if(ret == 0)
 	{   
@@ -225,6 +225,16 @@ int PINT_dev_test_unexpected(
 	return(1);
     else
 	return(0);
+
+dev_test_unexp_error:
+    /* release resources we created up to this point */
+    for(i=0; i<*outcount; i++)
+    {
+	buffer = (void*)((unsigned long)info_array[i].buffer - sizeof(int32_t)
+	    - sizeof(int64_t));
+	free(buffer);
+    }
+    return(ret);
 }
 
 /* PINT_dev_release_unexpected()
