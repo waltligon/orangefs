@@ -30,6 +30,9 @@
 #include "dbpf-thread.h"
 
 extern pthread_cond_t dbpf_op_completed_cond;
+#else
+extern struct qlist_head dbpf_op_queue;
+extern gen_mutex_t dbpf_op_queue_mutex;
 #endif
 
 extern dbpf_op_queue_p dbpf_completion_queue_array[TROVE_MAX_CONTEXTS];
@@ -1200,6 +1203,7 @@ int dbpf_dspace_testcontext(
           if there's no op to service, just return.
           just waste time away for now
         */
+	*inout_count_p = 0;
         usleep((max_idle_time_ms * 1000));
     }
 #endif
