@@ -16,7 +16,6 @@
 #include "trove.h"
 #include "server-config.h"
 
-extern fsconfig_array server_config;
 extern struct server_configuration_s g_server_config;
 extern gen_mutex_t *g_session_tag_mt_lock;
 extern job_context_id PVFS_sys_job_context;

@@ -32,7 +32,6 @@ job_context_id PVFS_sys_job_context = -1;
 /* pinode cache */
 
 extern struct server_configuration_s g_server_config;
-extern fsconfig_array server_config;
 
 extern gen_mutex_t *g_session_tag_mt_lock;
 
@@ -129,17 +128,6 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, PVFS_sysresp_init *resp)
 	goto return_error;	
     }	
 
-    server_config.nr_fs = mntent_list.nr_entry;
-    server_config.fs_info = (fsconfig *)malloc(mntent_list.nr_entry * sizeof(fsconfig));
-    if (server_config.fs_info == NULL)
-    {
-	assert(0);
-	gossip_ldebug(CLIENT_DEBUG,"Error in allocating configuration parameters\n");
-	ret = -ENOMEM;
-	goto return_error;
-    }
-    memset(server_config.fs_info, 0, mntent_list.nr_entry * sizeof(fsconfig));
-
     /* Get configuration parameters from server */
     ret = server_get_config(&g_server_config,mntent_list);
     if (ret < 0)
@@ -208,8 +196,6 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, PVFS_sysresp_init *resp)
     return(0);
 
  return_error:
-    free(server_config.fs_info);
-
     switch(init_fail) {
 	case GET_CONFIG_INIT_FAIL:
 	    PINT_bucket_finalize();

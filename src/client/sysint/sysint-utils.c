@@ -21,7 +21,6 @@
 
 int g_session_tag;
 gen_mutex_t *g_session_tag_mt_lock;
-fsconfig_array server_config;
 struct server_configuration_s g_server_config;
 
 /*
