@@ -139,9 +139,11 @@ int pvfs2_mkspace(
     mkspace_print(verbose,"ID           : %d\n",coll_id);
     mkspace_print(verbose,"Root Handle  : %Lu\n",Lu(root_handle));
     mkspace_print(verbose,"Meta Handles : %s\n",
-                  (meta_handle_ranges ? meta_handle_ranges : "NONE"));
+                  (meta_handle_ranges && strlen(meta_handle_ranges) ?
+                   meta_handle_ranges : "NONE"));
     mkspace_print(verbose,"Data Handles : %s\n",
-                  (data_handle_ranges ? data_handle_ranges : "NONE"));
+                  (data_handle_ranges && strlen(data_handle_ranges) ?
+                   data_handle_ranges : "NONE"));
 
     new_root_handle = root_handle;
 
@@ -220,16 +222,17 @@ int pvfs2_mkspace(
     }
 
     /* merge the specified ranges to pass to the handle allocator */
-    if (meta_handle_ranges && data_handle_ranges)
+    if ((meta_handle_ranges && strlen(meta_handle_ranges)) &&
+        (data_handle_ranges && strlen(data_handle_ranges)))
     {
         merged_handle_ranges = PINT_merge_handle_range_strs(
             meta_handle_ranges, data_handle_ranges);
     }
-    else if (meta_handle_ranges)
+    else if (meta_handle_ranges && strlen(meta_handle_ranges))
     {
         merged_handle_ranges = strdup(meta_handle_ranges);
     }
-    else
+    else if (data_handle_ranges && strlen(data_handle_ranges))
     {
         merged_handle_ranges = strdup(data_handle_ranges);
     }
@@ -250,7 +253,8 @@ int pvfs2_mkspace(
 
     if (ret < 0)
     {
-	mkspace_print(verbose, "Error adding handle ranges\n");
+	mkspace_print(verbose, "Error adding handle ranges: %s\n",
+                      merged_handle_ranges);
         free(merged_handle_ranges);
 	return -1;
     }
@@ -632,7 +636,7 @@ int pvfs2_rmspace(
     TROVE_op_id op_id;
     static int trove_is_initialized = 0;
 
-    /* try to initialize; fails if storage space isn't there? */
+    /* try to initialize; fails if storage space isn't there */
     if (!trove_is_initialized)
     {
         ret = trove_initialize(storage_space, 0, &method_name, 0);

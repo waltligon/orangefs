@@ -23,8 +23,8 @@ typedef struct
 {
     int use_defaults;
     int verbose;
-    int coll_id;
-    int root_handle;
+    PVFS_fs_id coll_id;
+    PVFS_handle root_handle;
     int collection_only;
     int delete_storage;
     char meta_ranges[PATH_MAX];
@@ -34,13 +34,11 @@ typedef struct
 } options_t;
 
 static int default_verbose = 0;
-static int default_coll_id = 9;
-static int default_root_handle = 1048576;
+static PVFS_handle default_root_handle = PVFS_HANDLE_NULL;
 static int default_collection_only = 0;
 static char default_meta_ranges[PATH_MAX] = "4-2147483650";
 static char default_data_ranges[PATH_MAX] = "2147483651-4294967297";
 static char default_collection[PATH_MAX] = "pvfs2-fs";
-static char default_storage_space[PATH_MAX] = "/pvfs2-storage-space";
 
 static void print_help(char *progname, options_t *opts);
 
@@ -150,11 +148,21 @@ static int parse_args(int argc, char **argv, options_t *opts)
                 exit(0);
 	    case 'i':
           do_collection_id:
-		opts->coll_id = atoi(optarg);
+#ifdef HAVE_STRTOULL
+		opts->coll_id = (PVFS_fs_id)strtoull(optarg, NULL, 10);
+#else
+		opts->coll_id = (PVFS_fs_id)strtoul(optarg, NULL, 10);
+#endif
 		break;
 	    case 'r':
           do_root_handle:
-		opts->root_handle = atoi(optarg);
+#ifdef HAVE_STRTOULL
+		opts->root_handle = (PVFS_handle)
+                    strtoull(optarg, NULL, 10);
+#else
+		opts->root_handle = (PVFS_handle)
+                    strtoul(optarg, NULL, 10);
+#endif
 		break;
 	    case 'M':
           do_meta_handle_range:
@@ -201,14 +209,22 @@ static void print_options(options_t *opts)
                (opts->delete_storage ? "yes" : "no"));
         printf("\tverbose             : %s\n",
                (opts->verbose ? "ON" : "OFF"));
-        printf("\troot handle         : %d\n", opts->root_handle);
+        printf("\troot handle         : %Lu\n", Lu(opts->root_handle));
         printf("\tcollection-only mode: %s\n",
                (opts->collection_only ? "ON" : "OFF"));
         printf("\tcollection id       : %d\n", opts->coll_id);
-        printf("\tcollection name     : %s\n", opts->collection);
-        printf("\tmeta handle ranges  : %s\n", opts->meta_ranges);
-        printf("\tdata handle ranges  : %s\n", opts->data_ranges);
-        printf("\tstorage space       : %s\n", opts->storage_space);
+        printf("\tcollection name     : %s\n",
+               (strlen(opts->collection) ?
+                opts->collection : "None specified"));
+        printf("\tmeta handle ranges  : %s\n",
+               (strlen(opts->meta_ranges) ?
+                opts->meta_ranges : "None specified"));
+        printf("\tdata handle ranges  : %s\n",
+               (strlen(opts->data_ranges) ?
+                opts->data_ranges : "None specified"));
+        printf("\tstorage space       : %s\n",
+               (strlen(opts->storage_space) ?
+                opts->storage_space : "None specified"));
     }
 }
 
@@ -260,15 +276,6 @@ int main(int argc, char **argv)
     options_t opts;
     memset(&opts, 0, sizeof(options_t));
 
-    opts.verbose = default_verbose;
-    opts.coll_id = default_coll_id;
-    opts.root_handle = default_root_handle;
-    opts.collection_only = default_collection_only;
-    strncpy(opts.meta_ranges, default_meta_ranges, PATH_MAX);
-    strncpy(opts.data_ranges, default_data_ranges, PATH_MAX);
-    strncpy(opts.collection, default_collection, PATH_MAX);
-    strncpy(opts.storage_space, default_storage_space, PATH_MAX);
-
     if (parse_args(argc, argv, &opts))
     {
 	fprintf(stderr,"%s: error: argument parsing failed; "
@@ -279,16 +286,34 @@ int main(int argc, char **argv)
     if (opts.use_defaults)
     {
         opts.verbose = default_verbose;
-        opts.coll_id = default_coll_id;
         opts.root_handle = default_root_handle;
         opts.collection_only = default_collection_only;
         strncpy(opts.meta_ranges, default_meta_ranges, PATH_MAX);
         strncpy(opts.data_ranges, default_data_ranges, PATH_MAX);
         strncpy(opts.collection, default_collection, PATH_MAX);
-        strncpy(opts.storage_space, default_storage_space, PATH_MAX);
     }
 
     print_options(&opts);
+
+    if (strlen(opts.storage_space) == 0)
+    {
+        fprintf(stderr, "Error: You MUST specify a storage space\n");
+        return -1;
+    }
+
+    if (opts.coll_id == PVFS_FS_ID_NULL)
+    {
+        fprintf(stderr, "Error: You MUST specify a collection ID\n");
+        return -1;
+    }
+
+    if ((strlen(opts.meta_ranges) == 0) &&
+        (strlen(opts.data_ranges) == 0))
+    {
+        fprintf(stderr, "Error: You MUST specify either a meta or "
+                "data handle range (or both)\n");
+        return -1;
+    }
 
     if (opts.delete_storage)
     {
