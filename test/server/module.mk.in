@@ -11,29 +11,6 @@ TESTSRC += \
 	$(DIR)/io.c \
 	$(DIR)/showconfig.c
 
-# special rule for io test program, which needs several other
-# libraries at the moment
-test/server/io: test/server/io.o
-ifdef QUIET_COMPILE
-	@echo "  LD		$@"
-	@$(LD) $< $(LDFLAGS) $(LIBS) -ldb -lrt -lpthread -o $@
-else
-	$(LD) $< $(LDFLAGS) $(LIBS) -ldb -lrt -lpthread -o $@
-endif
-
-# special rule for the config dumper, which pulls an object from the server
-# this is rather gross, but it *does* avoid copying code around
-#SHOWCONFIG_OBJ := test/server/showconfig.o \
-#	src/common/misc/server-config.o \
-#	src/common/dotconf/dotconf.o \
-#	src/common/misc/mkspace.o
-#test/server/showconfig: $(SHOWCONFIG_OBJ)
-#ifdef QUIET_COMPILE
-#	@echo "  LD		$@"
-#	@$(LD) $^ $(LDFLAGS) $(LIBS) -ldb -lrt -lpthread -o $@
-#else
-#	$(LD) $^ $(LDFLAGS) $(LIBS) -ldb -lrt -lpthread -o $@
-#endif
 test/server/showconfig: test/server/showconfig.o lib/libpvfs2-server.a
 ifdef QUIET_COMPILE
 	@echo "  LD		$@"
