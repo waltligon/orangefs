@@ -317,7 +317,7 @@ sub get_storage
 	if ($opt_storage) {
 		$storage = $opt_storage;
 	} else {
-		$storage = prompt_word("Enter directory name: [Default is /tmp/pvfs2-storage-space]: ","/tmp/pvfs2-storage-space");
+		$storage = prompt_word("Enter directory name: [Default is /pvfs2-storage-space]: ","/pvfs2-storage-space");
 	}
 	return $storage;
 }
