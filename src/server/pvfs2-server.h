@@ -356,13 +356,15 @@ extern struct PINT_state_machine_s pvfs2_final_response_sm;
 /* Exported Prototypes */
 struct server_configuration_s *get_server_config_struct(void);
 
-/* INCLUDE STATE-MACHINE.H DOWN HERE */
-#define PINT_OP_STATE       PINT_server_op
-#define PINT_OP_STATE_TABLE PINT_server_op_table
-
 /* exported state machine resource reclamation function */
 int server_state_machine_complete(PINT_server_op *s_op);
 
+/* starts state machines that are not associated with an incoming request */
+int server_state_machine_start_noreq(enum PVFS_server_op op);
+
+/* INCLUDE STATE-MACHINE.H DOWN HERE */
+#define PINT_OP_STATE       PINT_server_op
+#define PINT_OP_STATE_TABLE PINT_server_op_table
 
 #include "state-machine.h"
 

@@ -125,7 +125,6 @@ static int server_parse_cmd_line_args(int argc, char **argv);
 static void server_state_table_initialize(void);
 static int server_state_machine_start(
     PINT_server_op *s_op, job_status_s *js_p);
-static int server_state_machine_start_noreq(enum PVFS_server_op op);
 #ifdef __PVFS2_SEGV_BACKTRACE__
 static void bt_sighandler(int sig, siginfo_t *info, void *secret);
 #endif
@@ -1309,7 +1308,7 @@ static int server_state_machine_start(
     return ((s_op->current_state->state_action))(s_op,js_p);
 }
 
-/* static int server_state_machine_start_noreq()
+/* server_state_machine_start_noreq()
  * 
  * similar in purpose to server_state_machine_start(), except that it
  * kicks off a state machine instance without first receiving a 
@@ -1317,7 +1316,7 @@ static int server_state_machine_start(
  *
  * returns 0 on success, -PVFS_error on failure
  */
-static int server_state_machine_start_noreq(enum PVFS_server_op op)
+int server_state_machine_start_noreq(enum PVFS_server_op op)
 {
     PINT_server_op* tmp_s_op;
     job_status_s tmp_status;
