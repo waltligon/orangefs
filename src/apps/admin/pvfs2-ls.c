@@ -41,6 +41,7 @@ struct options
 {
     int list_human_readable;
     int list_long;
+    int list_verbose;
     int list_numeric_uid_gid;
     int list_directory;
     int list_no_group;
@@ -383,6 +384,7 @@ int do_list(
     PVFS_credentials credentials;
     PVFS_object_ref ref;
     PVFS_ds_position token;
+    uint64_t dir_version = 0;
 
     name = start;
 
@@ -453,6 +455,20 @@ int do_list(
             return -1;
         }
 
+        if (dir_version == 0)
+        {
+            dir_version = rd_response.directory_version;
+        }
+        else if (opts->list_verbose)
+        {
+            if (dir_version != rd_response.directory_version)
+            {
+                fprintf(stderr, "*** directory changed! listing may "
+                        "not be correct\n");
+                dir_version = rd_response.directory_version;
+            }
+        }
+
         if (!printed_dot_info)
         {
             /*
@@ -505,6 +521,7 @@ static struct options* parse_args(int argc, char* argv[])
         {"human-readable",0,0,0},
         {"si",0,0,0},
         {"version",0,0,0},
+        {"verbose",0,0,0},
         {"numeric-uid-gid",0,0,0},
         {"directory",0,0,0},
         {"no-group",0,0,0},
@@ -522,7 +539,7 @@ static struct options* parse_args(int argc, char* argv[])
     }
     memset(tmp_opts, 0, sizeof(struct options));
 
-    while((ret = getopt_long(argc, argv, "hvndGoAaigl",
+    while((ret = getopt_long(argc, argv, "hVndGoAaigl",
                              long_opts, &option_index)) != -1)
     {
 	switch(ret)
@@ -548,6 +565,10 @@ static struct options* parse_args(int argc, char* argv[])
                 {
                     printf("%s\n", PVFS2_VERSION);
                     exit(0);
+                }
+                else if (strcmp("verbose", cur_option) == 0)
+                {
+                    goto list_verbose;
                 }
                 else if (strcmp("numeric-uid-gid", cur_option) == 0)
                 {
@@ -582,6 +603,10 @@ static struct options* parse_args(int argc, char* argv[])
             case 'h':
           list_human_readable:
                 tmp_opts->list_human_readable = 1;
+                break;
+            case 'V':
+          list_verbose:
+                tmp_opts->list_verbose = 1;
                 break;
 	    case 'l':
                 tmp_opts->list_long = 1;
@@ -666,6 +691,8 @@ static void usage(int argc, char** argv)
             "list group information\n");
     fprintf(stderr,"      --help                 display this help "
             "and exit\n");
+    fprintf(stderr,"  -V, --verbose              reports if the dir is "
+            "changing during listing\n");
     fprintf(stderr,"      --version              output version "
             "information and exit\n");
     return;
