@@ -258,7 +258,7 @@ strings.  A typical mount command (on Linux 2.6) would look like this:
 The entry in the automount config file should look like this:
 
 \begin{verbatim}
-	pvfs -fstype=pvfs2           :tcp://server0\:3334/pvfs2-fs
+	pvfs -fstype=pvfs2           tcp://server0\:3334/pvfs2-fs
 \end{verbatim}
 
 Note the backslash-escape of the colon before the port number.  Without that
