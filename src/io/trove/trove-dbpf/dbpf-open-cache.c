@@ -18,6 +18,7 @@
 #include <errno.h>
 #include <assert.h>
 #include <limits.h>
+#include <db.h>
 
 #include "trove.h"
 #include "trove-internal.h"
@@ -35,12 +36,20 @@ struct open_cache_entry
     TROVE_coll_id coll_id;
     TROVE_handle handle;
     int fd;
+    DB *db_p;
     struct qlist_head queue_link;
 };
 
-static QLIST_HEAD(free_list);
+/* "used_list" is for active objects (ref_ct > 0) */
 static QLIST_HEAD(used_list);
+/* "unused_list" is for inactive objects (ref_ct == 0) that we are still
+ * holding open in case someone asks for them again soon
+ */
 static QLIST_HEAD(unused_list);
+/* "free_list" is just a list of cache entries that have not been filled in,
+ * can be used at any time for new cache entries
+ */
+static QLIST_HEAD(free_list);
 static gen_mutex_t free_mutex = GEN_MUTEX_INITIALIZER;
 static gen_mutex_t used_mutex = GEN_MUTEX_INITIALIZER;
 static gen_mutex_t unused_mutex = GEN_MUTEX_INITIALIZER;
@@ -56,6 +65,7 @@ void dbpf_open_cache_initialize(void)
     for(i=0; i<OPEN_CACHE_SIZE; i++)
     {
 	prealloc[i].fd = -1;
+	prealloc[i].db_p = NULL;
 	qlist_add(&prealloc[i].queue_link, &free_list);
     }
 
@@ -64,7 +74,34 @@ void dbpf_open_cache_initialize(void)
 
 void dbpf_open_cache_finalize(void)
 {
-    /* TODO: fill this in */
+    struct qlist_head* tmp_link;
+    struct open_cache_entry* tmp_entry = NULL;
+
+    /* close any open fd or db references */
+    qlist_for_each(tmp_link, &used_list)
+    {
+	tmp_entry = qlist_entry(tmp_link, struct open_cache_entry,
+	    queue_link);
+	if(tmp_entry->fd > 0)
+	{
+	    DBPF_CLOSE(tmp_entry->fd);
+	}
+    }
+
+    qlist_for_each(tmp_link, &unused_list)
+    {
+	tmp_entry = qlist_entry(tmp_link, struct open_cache_entry,
+	    queue_link);
+	if(tmp_entry->fd > 0)
+	{
+	    DBPF_CLOSE(tmp_entry->fd);
+	}
+    }
+
+    /* clear lists */
+    INIT_QLIST_HEAD(&free_list);
+    INIT_QLIST_HEAD(&used_list);
+    INIT_QLIST_HEAD(&unused_list);
     return;
 }
 
