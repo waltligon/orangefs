@@ -24,15 +24,12 @@ MODULE_DESCRIPTION("The Linux Kernel VFS interface to PVFS2");
 #define pvfs2_error printk
 
 #define PVFS2_REQDEVICE_NAME          "pvfs2-req"
-#define PVFS2_FLOWDEVICE_NAME        "pvfs2-flow"
 
 #define PVFS2_MAGIC                    0x20030528
 #define PVFS2_DEVREQ_MAGIC             0x20030529
-#define PVFS2_DEVFLOW_MAGIC            0x2003052A
 #define PVFS2_ROOT_INODE_NUMBER        0x00100000
 #define PVFS2_LINK_MAX                 0x000000FF
 #define PVFS2_OP_RETRY_COUNT           0x00000005
-
 
 #define MAX_DEV_REQ_UPSIZE (sizeof(int32_t) +   \
 sizeof(int64_t) + sizeof(pvfs2_upcall_t))
@@ -43,7 +40,17 @@ sizeof(int64_t) + sizeof(pvfs2_downcall_t))
  * region into.  In some sense it governs the number of concurrent I/O
  * operations that we will allow
  */
-#define PVFS2_BUFMAP_DESC_COUNT 4
+#define PVFS2_BUFMAP_DESC_COUNT    4
+
+/*
+  by default, we assume each description size is 4MB;
+  this value dictates the initial blocksize stored in
+  the superblock, but after the request device is
+  initialized, a subsequent statfs updates the superblock
+  blocksize to be the configured decsription size (gathered
+  using pvfs_bufmap_size_query).
+*/
+#define PVFS2_BUFMAP_DEFAULT_DESC_SIZE  (4 * (1024 * 1024))
 
 /* borrowed from irda.h */
 #ifndef MSECS_TO_JIFFIES

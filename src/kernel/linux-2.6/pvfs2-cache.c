@@ -161,6 +161,20 @@ static void pvfs2_inode_cache_ctor(
     }
 }
 
+static void pvfs2_inode_cache_dtor(
+    void *old_pvfs2_inode,
+    kmem_cache_t * cachep,
+    unsigned long flags)
+{
+    pvfs2_inode_t *pvfs2_inode = (pvfs2_inode_t *)old_pvfs2_inode;
+
+    if (pvfs2_inode && pvfs2_inode->link_target)
+    {
+        kfree(pvfs2_inode->link_target);
+        pvfs2_inode->link_target = NULL;
+    }
+}
+
 void pvfs2_inode_cache_initialize(
     void)
 {
@@ -172,7 +186,8 @@ void pvfs2_inode_cache_initialize(
 					  sizeof(pvfs2_inode_t),
 					  0,
 					  SLAB_POISON | SLAB_RED_ZONE,
-					  pvfs2_inode_cache_ctor, NULL);
+					  pvfs2_inode_cache_ctor,
+                                          pvfs2_inode_cache_dtor);
     if (!pvfs2_inode_cache)
     {
 	panic("Cannot create pvfs2_inode_cache");

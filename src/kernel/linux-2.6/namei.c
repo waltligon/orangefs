@@ -239,7 +239,8 @@ static int pvfs2_rename(
     struct inode *new_dir,
     struct dentry *new_dentry)
 {
-    pvfs2_print("pvfs2: pvfs2_rename called\n");
+    pvfs2_print("pvfs2: pvfs2_rename called (%s to %s)\n",
+                old_dentry->d_name.name, new_dentry->d_name.name);
     return 0;
 }
 

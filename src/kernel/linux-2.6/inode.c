@@ -13,21 +13,124 @@
 #include <linux/backing-dev.h>
 #include <linux/pagemap.h>
 #include "pvfs2-kernel.h"
+#include "pvfs2-bufmap.h"
+
+/* defined in devpvfs2-req.c */
+void kill_device_owner(void);
+
+/*defined in file.c */
+extern ssize_t pvfs2_inode_read(
+    struct inode *inode,
+    char *buf,
+    size_t count,
+    loff_t * offset,
+    int copy_to_user);
 
 extern struct file_operations pvfs2_file_operations;
 extern struct inode_operations pvfs2_symlink_inode_operations;
 extern struct inode_operations pvfs2_dir_inode_operations;
 extern struct file_operations pvfs2_dir_operations;
 
+/*
+  FIXME:
+  we're completely ignoring the create argument for now
+*/
 static int pvfs2_get_blocks(
-    struct inode *ip,
+    struct inode *inode,
     sector_t lblock,
     unsigned long max_blocks,
     struct buffer_head *bh_result,
     int create)
 {
-    pvfs2_print("pvfs2: pvfs2_get_blocks called\n");
-    return 0;
+    int ret = -EIO;
+    uint32_t max_block = 0;
+    ssize_t bytes_read = 0;
+    void *page_data = NULL;
+    struct page *page = NULL;
+    /*
+      FIXME:
+      We're faking our inode block size to be PAGE_CACHE_SIZE
+      to play nicely with the page cache.
+
+      In some reality, inode->i_blksize != PAGE_CACHE_SIZE and
+      inode->i_blkbits != PAGE_CACHE_SHIFT
+    */
+    const uint32_t blocksize = PAGE_CACHE_SIZE;  /* inode->i_blksize */
+    const uint32_t blockbits = PAGE_CACHE_SHIFT; /* inode->i_blkbits */
+
+    pvfs2_print("pvfs2: pvfs2_get_blocks called for lblock %d\n",
+                (int)lblock);
+
+    page = bh_result->b_page;
+    page_data = kmap(page);
+
+    /*
+      make sure we're not looking for a page block past the
+      end of this file;
+
+      NOTE: this unsafely *assumes* that the size stored in
+      the inode is accurate.
+    */
+    max_block = ((inode->i_size / blocksize) + 1);
+    if (page->index < max_block)
+    {
+        loff_t blockptr_offset =
+            (((loff_t)page->index) << blockbits);
+
+        /*
+          NOTE: This is completely backwards.  we could be
+          implementing the file_read as generic_file_read and
+          doing the actual i/o here (via readpage).
+
+          The main reason it's not like that now is because
+          of the mismatch of page cache size and the inode
+          blocksize that we're using.  It's more efficient in
+          the general case to use the larger blocksize for
+          reading/writing.  For now it seems that this call
+          can *only* handle reads of PAGE_CACHE_SIZE blocks.
+        */
+        bytes_read = pvfs2_inode_read(
+            inode, page_data, blocksize, &blockptr_offset, 0);
+
+        if (bytes_read < 0)
+        {
+            pvfs2_error("pvfs_get_blocks: failed to read page block %i\n",
+                        (int)page->index);
+        }
+        else
+        {
+            pvfs2_print("pvfs2_get_blocks: read %d bytes | offset is %d | "
+                        "cur_block is %d | max_block is %d\n",
+                        (int)bytes_read, (int)blockptr_offset,
+                        (int)page->index, (int)max_block);
+        }
+    }
+    bh_result->b_data = page_data;
+    bh_result->b_size = blocksize;
+    bh_result->b_blocknr = lblock;
+    bh_result->b_bdev = inode->i_sb->s_bdev;
+
+    /* only zero remaining unread portions of the page data */
+    memset(page_data + bytes_read, 0, blocksize - bytes_read);
+
+    flush_dcache_page(page);
+    kunmap(page);
+
+    if (bytes_read < 0)
+    {
+        ret = bytes_read;
+        SetPageError(page);
+    }
+    else
+    {
+        SetPageUptodate(page);
+        if (PageError(page))
+        {
+            ClearPageError(page);
+        }
+        ret = 0;
+    }
+    return ret;
 }
 
 static int pvfs2_get_block(
@@ -36,7 +139,7 @@ static int pvfs2_get_block(
     struct buffer_head *bh_result,
     int create)
 {
-    pvfs2_print("pvfs2: pvfs2_get_block called\n");
+/*     pvfs2_print("pvfs2: pvfs2_get_block called\n"); */
     return pvfs2_get_blocks(ip, lblock, 1, bh_result, create);
 }
 
@@ -61,6 +164,10 @@ static int pvfs2_readpage(
     struct page *page)
 {
     pvfs2_print("pvfs2: pvfs2_readpage called\n");
+    /*
+      NOTE: if not using mpage support, we need to drop
+      the page lock here before returning
+    */
     return mpage_readpage(page, pvfs2_get_block);
 }
 
@@ -107,7 +214,8 @@ static int pvfs2_direct_IO(
 			      offset, nr_segs, pvfs2_get_blocks, NULL);
 }
 
-struct address_space_operations pvfs2_aops = {
+struct address_space_operations pvfs2_aops =
+{
     .readpage = pvfs2_readpage,
     .readpages = pvfs2_readpages,
     .writepage = pvfs2_writepage,
@@ -119,9 +227,10 @@ struct address_space_operations pvfs2_aops = {
     .direct_IO = pvfs2_direct_IO,
 };
 
-static struct backing_dev_info pvfs2_backing_dev_info = {
-    .ra_pages = 0,	/* no readahead */
-    .memory_backed = 1	/* does not contribute to dirty memory */
+static struct backing_dev_info pvfs2_backing_dev_info =
+{
+    .ra_pages = 8,     /* no readahead for now */
+    .memory_backed = 0
 };
 
 
@@ -145,7 +254,8 @@ int pvfs2_setattr(struct dentry *dentry, struct iattr *iattr)
     return ret;
 }
 
-struct inode_operations pvfs2_file_inode_operations = {
+struct inode_operations pvfs2_file_inode_operations =
+{
 /*     .truncate = pvfs2_truncate, */
 /*     .setxattr = pvfs2_setxattr, */
 /*     .getxattr = pvfs2_getxattr, */
@@ -185,13 +295,15 @@ struct inode *pvfs2_get_custom_inode(
 		    pvfs2_inode, inode->i_sb);
 
 	inode->i_mode = mode;
-	inode->i_rdev = NODEV;
 	inode->i_mapping->a_ops = &pvfs2_aops;
 	inode->i_mapping->backing_dev_info = &pvfs2_backing_dev_info;
 	inode->i_uid = current->uid;
 	inode->i_gid = current->gid;
-	inode->i_blocks = 1;
 	inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
+
+        inode->i_blksize = PAGE_CACHE_SIZE;
+        inode->i_blkbits = PAGE_CACHE_SHIFT;
+        inode->i_blocks = 1;
 
         if (mode & S_IFREG)
         {
@@ -199,13 +311,12 @@ struct inode *pvfs2_get_custom_inode(
 	    inode->i_fop = &pvfs2_file_operations;
 
             inode->i_blksize = pvfs_bufmap_size_query();
+            inode->i_blkbits = PAGE_CACHE_SHIFT;
         }
         else if (mode & S_IFLNK)
         {
             inode->i_op = &pvfs2_symlink_inode_operations;
             inode->i_fop = NULL;
-
-            inode->i_blksize = 0;
         }
         else if (mode & S_IFDIR)
         {
@@ -214,8 +325,6 @@ struct inode *pvfs2_get_custom_inode(
 
 	    /* dir inodes start with i_nlink == 2 (for "." entry) */
 	    inode->i_nlink++;
-
-            inode->i_blksize = PAGE_CACHE_SIZE;
         }
         else
         {

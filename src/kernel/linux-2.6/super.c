@@ -102,8 +102,10 @@ static int pvfs2_statfs(
     struct super_block *sb,
     struct kstatfs *buf)
 {
+    sb->s_blocksize = pvfs_bufmap_size_query();
+
     buf->f_type = sb->s_magic;
-    buf->f_bsize = pvfs_bufmap_size_query();
+    buf->f_bsize = sb->s_blocksize;
     buf->f_namelen = PVFS2_NAME_LEN;
     buf->f_blocks = buf->f_bfree = buf->f_bavail = 1000000;
     buf->f_files = buf->f_ffree = 100;
@@ -139,6 +141,7 @@ int pvfs2_fill_sb(
     void *data,
     int silent)
 {
+    int shift_val = 0;
     struct inode *root = NULL;
     struct dentry *root_dentry = NULL;
 
@@ -147,11 +150,20 @@ int pvfs2_fill_sb(
 	pvfs2_print("pvfs2: pvfs2_fill_sb called (sb = %p)\n", sb);
     }
 
-    sb->s_blocksize = PAGE_CACHE_SIZE;
-    sb->s_blocksize_bits = PAGE_CACHE_SHIFT;
     sb->s_magic = PVFS2_MAGIC;
     sb->s_op = &pvfs2_s_ops;
     sb->s_type = &pvfs2_fs_type;
+    sb->s_bdev = MKDEV(0,0);
+
+    sb->s_blocksize = PVFS2_BUFMAP_DEFAULT_DESC_SIZE;
+    shift_val = ((sizeof(sb->s_blocksize_bits) * 8) - 1);
+    sb->s_blocksize_bits = (1 << shift_val);
+    sb->s_blocksize_bits =
+        ((sb->s_blocksize > sb->s_blocksize_bits) ?
+         sb->s_blocksize_bits : PVFS2_BUFMAP_DEFAULT_DESC_SIZE);
+
+    shift_val = ((sizeof(sb->s_maxbytes) * 8) - 1);
+    sb->s_maxbytes = (1 << shift_val);
 
     /* alloc and initialize our root directory inode */
     root = pvfs2_get_custom_inode(sb, (S_IFDIR | 0755), 0);
@@ -199,6 +211,8 @@ struct super_block *pvfs2_get_sb(
 void pvfs2_kill_sb(
     struct super_block *sb)
 {
+    pvfs2_print("pvfs2_kill_sb: called\n");
+
     /* prune dcache based on sb */
     shrink_dcache_sb(sb);
 

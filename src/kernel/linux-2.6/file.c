@@ -38,11 +38,12 @@ int pvfs2_open(
     return generic_file_open(inode, file);
 }
 
-static ssize_t pvfs2_file_read(
-    struct file *file,
+ssize_t pvfs2_inode_read(
+    struct inode *inode,
     char *buf,
     size_t count,
-    loff_t * offset)
+    loff_t *offset,
+    int copy_to_user)
 {
     size_t each_count = 0;
     size_t total_count = 0;
@@ -51,16 +52,12 @@ static ssize_t pvfs2_file_read(
     int ret = -1, retries = PVFS2_OP_RETRY_COUNT;
     char* current_buf = buf;
     loff_t original_offset = *offset;
-    struct inode *inode = file->f_dentry->d_inode;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
 
-    pvfs2_print("pvfs2: pvfs2_file_read called on %s\n",
-		file->f_dentry->d_name.name);
-    
     new_op = kmem_cache_alloc(op_cache, SLAB_KERNEL);
     if (!new_op)
     {
-	pvfs2_error("pvfs2: ERROR -- pvfs2_file_read "
+	pvfs2_error("pvfs2: ERROR -- pvfs2_inode_read "
 		    "kmem_cache_alloc failed!\n");
 	return -ENOMEM;
     }
@@ -71,8 +68,6 @@ static ssize_t pvfs2_file_read(
 
     while(total_count < count)
     {
-	pvfs2_print("pvfs2: read iteration.\n");
-
 	/* get a buffer for the transfer */
 	/* note that we get a new buffer each time for fairness, though
 	 * it may speed things up in the common case more if we kept one
@@ -98,7 +93,7 @@ static ssize_t pvfs2_file_read(
 	new_op->upcall.req.io.offset = *offset;
 
         service_operation_with_timeout_retry(
-            new_op, "pvfs2_file_read", retries);
+            new_op, "pvfs2_inode_read", retries);
 
 	if(new_op->downcall.status != 0)
 	{
@@ -112,11 +107,25 @@ static ssize_t pvfs2_file_read(
 	    return(ret);
 	}
 
-	/* copy data out to application */
+	/* copy data out to destination */
 	if(new_op->downcall.resp.io.amt_complete)
 	{
-	    pvfs_bufmap_copy_to_user(current_buf, desc,
-		new_op->downcall.resp.io.amt_complete);
+            if (copy_to_user)
+            {
+                pvfs_bufmap_copy_to_user(
+                    current_buf, desc,
+                    new_op->downcall.resp.io.amt_complete);
+            }
+            else
+            {
+                /*
+                  NOTE: assumes size is PAGE_SIZE -- which
+                  should be okay since we're being called from
+                  get block if we're here
+                */
+                memcpy(current_buf, desc->kaddr_array[0],
+                       new_op->downcall.resp.io.amt_complete);
+            }
 	}
 
 	pvfs_bufmap_put(desc);
@@ -139,6 +148,15 @@ static ssize_t pvfs2_file_read(
     return(total_count); 
 }
 
+ssize_t pvfs2_file_read(
+    struct file *file,
+    char *buf,
+    size_t count,
+    loff_t *offset)
+{
+    return pvfs2_inode_read(
+        file->f_dentry->d_inode, buf, count, offset, 1);
+}
 
 static ssize_t pvfs2_file_write(
     struct file *file,
@@ -251,6 +269,15 @@ int pvfs2_ioctl(
     return 0;
 }
 
+static int pvfs2_file_mmap(struct file *file, struct vm_area_struct *vma)
+{
+    pvfs2_print("pvfs2: pvfs2_mmap called\n");
+/*     return generic_file_mmap(file, vma); */
+
+    /* use readonly since we don't currently implement writepage */
+    return generic_file_readonly_mmap(file, vma);
+}
+
 /*
   NOTE: gets called when all files are closed.  not when
   each file is closed. (i.e. last reference to an opened file)
@@ -287,7 +314,7 @@ struct file_operations pvfs2_file_operations = {
     .write = pvfs2_file_write,
     .aio_write = generic_file_aio_write,
     .ioctl = pvfs2_ioctl,
-    .mmap = generic_file_mmap,
+    .mmap = pvfs2_file_mmap,
     .open = pvfs2_open,
     .release = pvfs2_release,
     .fsync = pvfs2_fsync,

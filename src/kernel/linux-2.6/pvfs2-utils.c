@@ -9,6 +9,7 @@
 #include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/dcache.h>
+#include <linux/pagemap.h>
 #include "pvfs2-kernel.h"
 #include "pint-dev-shared.h"
 #include "pvfs2-dev-proto.h"
@@ -60,13 +61,30 @@ static inline int copy_attributes_to_inode(
     {
         pvfs2_inode = PVFS2_I(inode);
 
-        /* arbitrarily set the inode block size */
+        /*
+          arbitrarily set the inode block size;
+          FIXME: we need to resolve the difference
+          between the reported inode blocksize and
+          the PAGE_CACHE_SIZE, since our block count
+          will always be wrong.
+
+          For now, we're setting the block count to
+          be the proper number assuming the block size
+          is PAGE_CACHE_SIZE.
+          blkbits is wrong too.
+        */
         inode->i_blksize =  pvfs_bufmap_size_query();
+/*         inode->i_blksize = PAGE_CACHE_SIZE; */
+        inode->i_blkbits = PAGE_CACHE_SHIFT;
 
         if ((attrs->objtype == PVFS_TYPE_METAFILE) &&
             (attrs->mask & PVFS_ATTR_SYS_SIZE))
         {
             inode->i_size = (off_t)attrs->size;
+
+            /* FIXME: inode->i_blksize != PAGE_CACHE_SIZE */
+            inode->i_blocks = (unsigned long)
+                ((inode->i_size / PAGE_CACHE_SIZE) + 1);
         }
         else if ((attrs->objtype == PVFS_TYPE_SYMLINK) &&
                  (symname != NULL))
