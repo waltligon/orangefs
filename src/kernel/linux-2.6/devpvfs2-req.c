@@ -86,7 +86,7 @@ static ssize_t pvfs2_devreq_read(
     size_t count,
     loff_t * offset)
 {
-    int len = 0;
+    int ret = 0, len = 0;
     pvfs2_kernel_op_t *cur_op = NULL;
     static int32_t magic = PVFS2_DEVREQ_MAGIC;
 
@@ -158,11 +158,24 @@ static ssize_t pvfs2_devreq_read(
         len = MAX_ALIGNED_DEV_REQ_UPSIZE;
         if ((size_t) len <= count)
         {
-            copy_to_user(buf, &magic, sizeof(int32_t));
-            copy_to_user(buf + sizeof(int32_t),
-                         &cur_op->tag, sizeof(uint64_t));
-            copy_to_user(buf + sizeof(int32_t) + sizeof(uint64_t),
-                         &cur_op->upcall, sizeof(pvfs2_upcall_t));
+            ret = copy_to_user(buf, &magic, sizeof(int32_t));
+            if (ret == 0)
+            {
+                ret = copy_to_user(buf + sizeof(int32_t),
+                                   &cur_op->tag, sizeof(uint64_t));
+                if (ret == 0)
+                {
+                    ret = copy_to_user(
+                        buf + sizeof(int32_t) + sizeof(uint64_t),
+                        &cur_op->upcall, sizeof(pvfs2_upcall_t));
+                }
+            }
+
+            if (ret)
+            {
+                pvfs2_error("Failed to copy data to user space\n");
+                len = -EIO;
+            }
         }
         else
         {
@@ -194,7 +207,7 @@ static ssize_t pvfs2_devreq_writev(
     void *ptr = NULL;
     unsigned long i = 0;
     static int max_downsize = MAX_ALIGNED_DEV_REQ_DOWNSIZE;
-    int num_remaining = max_downsize;
+    int ret = 0, num_remaining = max_downsize;
     int payload_size = 0;
     int32_t magic = 0;
     uint64_t tag = 0;
@@ -202,7 +215,7 @@ static ssize_t pvfs2_devreq_writev(
     buffer = kmem_cache_alloc(dev_req_cache, PVFS2_CACHE_ALLOC_FLAGS);
     if (!buffer)
     {
-	return (-ENOMEM);
+	return -ENOMEM;
     }
     ptr = buffer;
 
@@ -212,9 +225,14 @@ static ssize_t pvfs2_devreq_writev(
 	{
 	    pvfs2_error("writev error: Freeing buffer and returning\n");
 	    kmem_cache_free(dev_req_cache, buffer);
-	    return (-EMSGSIZE);
+	    return -EMSGSIZE;
 	}
-	copy_from_user(ptr, iov[i].iov_base, iov[i].iov_len);
+	ret = copy_from_user(ptr, iov[i].iov_base, iov[i].iov_len);
+        if (ret)
+        {
+            pvfs2_error("Failed to copy data from user space\n");
+            return -EIO;
+        }
 	num_remaining -= iov[i].iov_len;
 	ptr += iov[i].iov_len;
 	payload_size += iov[i].iov_len;
@@ -392,6 +410,7 @@ static int pvfs2_devreq_ioctl(
     unsigned int command,
     unsigned long arg)
 {
+    int ret = 0;
     static int32_t magic = PVFS2_DEVREQ_MAGIC;
     static int32_t max_up_size = MAX_ALIGNED_DEV_REQ_UPSIZE;
     static int32_t max_down_size = MAX_ALIGNED_DEV_REQ_DOWNSIZE;
@@ -400,18 +419,20 @@ static int pvfs2_devreq_ioctl(
     switch (command)
     {
         case PVFS_DEV_GET_MAGIC:
-            copy_to_user((void *) arg, &magic, sizeof(int32_t));
-            return 0;
+            ret = copy_to_user((void *) arg, &magic, sizeof(int32_t));
+            return (ret ? -EIO : 0);
         case PVFS_DEV_GET_MAX_UPSIZE:
-            copy_to_user((void *) arg, &max_up_size, sizeof(int32_t));
-            return 0;
+            ret = copy_to_user((void *) arg, &max_up_size,
+                               sizeof(int32_t));
+            return (ret ? -EIO : 0);
         case PVFS_DEV_GET_MAX_DOWNSIZE:
-            copy_to_user((void *) arg, &max_down_size, sizeof(int32_t));
-            return 0;
+            ret = copy_to_user((void *) arg, &max_down_size,
+                               sizeof(int32_t));
+            return (ret ? -EIO : 0);
         case PVFS_DEV_MAP:
-            copy_from_user(&user_desc, (void *) arg,
-                           sizeof(struct PVFS_dev_map_desc));
-            return pvfs_bufmap_initialize(&user_desc);
+            ret = copy_from_user(&user_desc, (void *) arg,
+                                 sizeof(struct PVFS_dev_map_desc));
+            return (ret ? -EIO : pvfs_bufmap_initialize(&user_desc));
         case PVFS_DEV_REMOUNT_ALL:
         {
             int ret = 0;

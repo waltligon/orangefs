@@ -280,15 +280,6 @@ static void pvfs2_put_inode(
     }
 }
 
-/* called on sync ; make sure data is safe */
-static void pvfs2_write_inode(
-    struct inode *inode,
-    int do_sync)
-{
-    pvfs2_print("pvfs2_write_inode: called (inode = %d)\n",
-                (int)inode->i_ino);
-}
-
 /*
   NOTE: information filled in here is typically reflected in the
   output of the system command 'df'
@@ -477,7 +468,6 @@ struct super_operations pvfs2_s_ops =
 #ifdef PVFS2_LINUX_KERNEL_2_4
     read_inode : pvfs2_read_inode,
     statfs : pvfs2_statfs,
-    write_inode : pvfs2_write_inode,
     remount_fs : pvfs2_remount,
     put_super : pvfs2_kill_sb,
     clear_inode: pvfs2_clear_inode,
@@ -487,7 +477,6 @@ struct super_operations pvfs2_s_ops =
     .alloc_inode = pvfs2_alloc_inode,
     .destroy_inode = pvfs2_destroy_inode,
     .read_inode = pvfs2_read_inode,
-    .write_inode = pvfs2_write_inode,
     .put_inode = pvfs2_put_inode,
     .statfs = pvfs2_statfs,
     .remount_fs = pvfs2_remount
