@@ -56,11 +56,26 @@ fi
 
 eval $($srcdir/${PAV_DIR}/pav_info -c $builddir/${PAV_DIR}/configfile.sample)
 export PVFS2TAB_FILE
+export PVFSPORT
+
+cd $oldwd
+./kmod_ctrl.sh $rootdir start
+if [ $? -ne 0 ] ; then
+	echo "Failed to start PVFS2 kernel services."
+	exit 1
+fi
 
 ###################################################
-# TODO
-# run scripts to load module, etc. here
+# TODO : run tests here
+sleep 3
 ###################################################
+
+./kmod_ctrl.sh $rootdir stop
+if [ $? -ne 0 ] ; then
+	echo "Failed to stop PVFS2 kernel services."
+	exit 1
+fi
+cd $builddir
 
 # and clean up
 $srcdir/$PAV_DIR/pav_stop -c $builddir/${PAV_DIR}/configfile.sample > $rootdir/pav-shutdown.log 2>&1 &&  echo "Script completed successfully." 
