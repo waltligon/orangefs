@@ -941,6 +941,8 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
         }
         else
         {
+	    gossip_err("Error: unable to stat handle %Lu (%Lx).\n",
+		Lu(op_p->handle), Lu(op_p->handle));
             error = -TROVE_EIO;
             goto return_error;
         }
