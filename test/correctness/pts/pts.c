@@ -15,7 +15,7 @@
 #include "gossip.h"
 
 /*pvfs2 functions we're calling (mostly gossip args)*/
-#include <include/pvfs2-debug.h>
+#include <pvfs2-debug.h>
 
 /* this is where all of the individual test prototypes are */
 #include <test-protos.h>
