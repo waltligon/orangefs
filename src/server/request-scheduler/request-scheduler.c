@@ -326,6 +326,7 @@ int PINT_req_sched_post(
     tmp_element->id = *out_id;
     tmp_element->state = REQ_QUEUED;
     tmp_element->handle = handle;
+    tmp_element->list_head = NULL;
 
     /* is this a request to change the server's operating mode? */
     if(in_request->op == PVFS_SERV_MGMT_SETPARAM
@@ -590,62 +591,66 @@ int PINT_req_sched_unpost(
 
     qlist_del(&(tmp_element->list_link));
 
-    /* see if there is another request queued behind this one */
-    if (qlist_empty(&(tmp_element->list_head->req_list)))
+    /* special operations, like mode changes, may not be associated with a list */
+    if(tmp_element->list_head)
     {
-	/* queue now empty, remove from hash table and destroy */
-	qlist_del(&(tmp_element->list_head->hash_link));
-	free(tmp_element->list_head);
-    }
-    else
-    {
-	/* queue not empty, prepare next request in line for
-	 * processing if necessary
-	 */
-	if (next_ready_flag)
+	/* see if there is another request queued behind this one */
+	if (qlist_empty(&(tmp_element->list_head->req_list)))
 	{
-	    next_element =
-		qlist_entry((tmp_element->list_head->req_list.next),
-			    struct req_sched_element,
-			    list_link);
-	    /* skip looking at the next request if it is already
-	     * ready to go 
+	    /* queue now empty, remove from hash table and destroy */
+	    qlist_del(&(tmp_element->list_head->hash_link));
+	    free(tmp_element->list_head);
+	}
+	else
+	{
+	    /* queue not empty, prepare next request in line for
+	     * processing if necessary
 	     */
-	    if (next_element->state != REQ_READY_TO_SCHEDULE &&
-		next_element->state != REQ_SCHEDULED)
+	    if (next_ready_flag)
 	    {
-		next_element->state = REQ_READY_TO_SCHEDULE;
-		qlist_add_tail(&(next_element->ready_link), &ready_queue);
-		/* keep going as long as the operations are I/O requests;
-		 * we let these all go concurrently
+		next_element =
+		    qlist_entry((tmp_element->list_head->req_list.next),
+				struct req_sched_element,
+				list_link);
+		/* skip looking at the next request if it is already
+		 * ready to go 
 		 */
-		while (next_element && next_element->req_ptr->op == PVFS_SERV_IO
-		       && next_element->list_link.next !=
-		       &(tmp_element->list_head->req_list))
+		if (next_element->state != REQ_READY_TO_SCHEDULE &&
+		    next_element->state != REQ_SCHEDULED)
 		{
-		    next_element =
-			qlist_entry(next_element->list_link.next,
-				    struct req_sched_element,
-				    list_link);
-		    if (next_element
-			&& next_element->req_ptr->op == PVFS_SERV_IO)
+		    next_element->state = REQ_READY_TO_SCHEDULE;
+		    qlist_add_tail(&(next_element->ready_link), &ready_queue);
+		    /* keep going as long as the operations are I/O requests;
+		     * we let these all go concurrently
+		     */
+		    while (next_element && next_element->req_ptr->op == PVFS_SERV_IO
+			   && next_element->list_link.next !=
+			   &(tmp_element->list_head->req_list))
 		    {
-			gossip_debug(REQ_SCHED_DEBUG,
-				     "REQ SCHED allowing concurrent I/O, handle: %ld\n",
-				     (long) next_element->handle);
-			next_element->state = REQ_READY_TO_SCHEDULE;
-			qlist_add_tail(&(next_element->ready_link),
-				       &ready_queue);
+			next_element =
+			    qlist_entry(next_element->list_link.next,
+					struct req_sched_element,
+					list_link);
+			if (next_element
+			    && next_element->req_ptr->op == PVFS_SERV_IO)
+			{
+			    gossip_debug(REQ_SCHED_DEBUG,
+					 "REQ SCHED allowing concurrent I/O, handle: %ld\n",
+					 (long) next_element->handle);
+			    next_element->state = REQ_READY_TO_SCHEDULE;
+			    qlist_add_tail(&(next_element->ready_link),
+					   &ready_queue);
+			}
 		    }
 		}
 	    }
 	}
+	sched_count--;
     }
 
     /* destroy the unposted element */
     free(tmp_element);
 
-    sched_count--;
     /* prepare to schedule mode change if we can */
     /* NOTE: only transitions to admin mode are ever queued */
     if(sched_count == 0 && !qlist_empty(&mode_queue))
@@ -689,54 +694,59 @@ int PINT_req_sched_release(
     /* find the top of the queue */
     tmp_list = tmp_element->list_head;
 
-    /* find out if there is another operation queued behind it or
-     * not 
-     */
-    if (qlist_empty(&(tmp_list->req_list)))
+    /* special operations, like mode changes, may not be associated w/ a list */
+    if(tmp_list)
     {
-	/* nothing else in this queue, remove it from the hash table
-	 * and deallocate 
+	/* find out if there is another operation queued behind it or
+	 * not 
 	 */
-	qlist_del(&(tmp_list->hash_link));
-	free(tmp_list);
-    }
-    else
-    {
-	/* something is queued behind this request */
-	/* find the next request, change its state, and add it to
-	 * the queue of requests that are ready to be scheduled
-	 */
-	next_element = qlist_entry((tmp_list->req_list.next),
-				   struct req_sched_element,
-				   list_link);
-	/* skip it if the top queue item is already ready for
-	 * scheduling 
-	 */
-	if (next_element->state != REQ_READY_TO_SCHEDULE &&
-	    next_element->state != REQ_SCHEDULED)
+	if (qlist_empty(&(tmp_list->req_list)))
 	{
-	    next_element->state = REQ_READY_TO_SCHEDULE;
-	    qlist_add_tail(&(next_element->ready_link), &ready_queue);
-	    /* keep going as long as the operations are I/O requests;
-	     * we let these all go concurrently
+	    /* nothing else in this queue, remove it from the hash table
+	     * and deallocate 
 	     */
-	    while (next_element && next_element->req_ptr->op == PVFS_SERV_IO
-		   && next_element->list_link.next != &(tmp_list->req_list))
+	    qlist_del(&(tmp_list->hash_link));
+	    free(tmp_list);
+	}
+	else
+	{
+	    /* something is queued behind this request */
+	    /* find the next request, change its state, and add it to
+	     * the queue of requests that are ready to be scheduled
+	     */
+	    next_element = qlist_entry((tmp_list->req_list.next),
+				       struct req_sched_element,
+				       list_link);
+	    /* skip it if the top queue item is already ready for
+	     * scheduling 
+	     */
+	    if (next_element->state != REQ_READY_TO_SCHEDULE &&
+		next_element->state != REQ_SCHEDULED)
 	    {
-		next_element =
-		    qlist_entry(next_element->list_link.next,
-				struct req_sched_element,
-				list_link);
-		if (next_element && next_element->req_ptr->op == PVFS_SERV_IO)
+		next_element->state = REQ_READY_TO_SCHEDULE;
+		qlist_add_tail(&(next_element->ready_link), &ready_queue);
+		/* keep going as long as the operations are I/O requests;
+		 * we let these all go concurrently
+		 */
+		while (next_element && next_element->req_ptr->op == PVFS_SERV_IO
+		       && next_element->list_link.next != &(tmp_list->req_list))
 		{
-		    gossip_debug(REQ_SCHED_DEBUG,
-				 "REQ SCHED allowing concurrent I/O, handle: %ld\n",
-				 (long) next_element->handle);
-		    next_element->state = REQ_READY_TO_SCHEDULE;
-		    qlist_add_tail(&(next_element->ready_link), &ready_queue);
+		    next_element =
+			qlist_entry(next_element->list_link.next,
+				    struct req_sched_element,
+				    list_link);
+		    if (next_element && next_element->req_ptr->op == PVFS_SERV_IO)
+		    {
+			gossip_debug(REQ_SCHED_DEBUG,
+				     "REQ SCHED allowing concurrent I/O, handle: %ld\n",
+				     (long) next_element->handle);
+			next_element->state = REQ_READY_TO_SCHEDULE;
+			qlist_add_tail(&(next_element->ready_link), &ready_queue);
+		    }
 		}
 	    }
 	}
+	sched_count--;
     }
 
     gossip_debug(REQ_SCHED_DEBUG,
@@ -746,7 +756,6 @@ int PINT_req_sched_release(
     /* destroy the released request element */
     free(tmp_element);
 
-    sched_count--;
     /* prepare to schedule mode change if we can */
     /* NOTE: only transitions to admin mode are ever queued */
     if(sched_count == 0 && !qlist_empty(&mode_queue))
