@@ -28,6 +28,5 @@ LIBSRC += \
 	$(DIR)/msgpairarray.c \
 	$(DIR)/lookup-dcache.c \
 	$(DIR)/getattr-pcache.c \
-	$(DIR)/pvfs2-mgmt.c \
 	$(DIR)/mgmt-setparam-all.c 
 

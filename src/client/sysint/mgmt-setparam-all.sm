@@ -74,6 +74,62 @@ machine pvfs2_client_mgmt_setparam_all_sm(init,
 
 %%
 
+int PVFS_mgmt_setparam_all(
+    PVFS_fs_id fs_id,
+    PVFS_credentials credentials,
+    enum PVFS_server_param param,
+    int64_t value)
+{
+    int ret;
+    PINT_client_sm *sm_p;
+    PVFS_error error;
+
+    gossip_debug(CLIENT_DEBUG, "PVFS_mgmt_setparam_all entered\n");
+
+    if (param == PVFS_SERV_PARAM_INVALID) 
+    {
+	return -PVFS_EINVAL;
+    }
+
+    /* build PINT_client_sm structure */
+    /* TODO: KEEP A CACHE OF THESE AROUND SO WE'RE NOT ALWAYS MALLOC'ING? */
+    sm_p = (PINT_client_sm *) malloc(sizeof(*sm_p));
+    if (sm_p == NULL) return -PVFS_ENOMEM;
+
+    memset(sm_p, 0, sizeof(*sm_p));
+
+    sm_p->cred_p = &credentials;
+    #if 0
+    sm_p->u.setparam_all.foo = bar;
+    #endif
+
+    gossip_debug(CLIENT_DEBUG,
+		 "PVFS_mgmt_setparam_all calling PINT_client_state_machine_post()\n");
+
+    /* do something to kick off processing */
+    ret = PINT_client_state_machine_post(sm_p, PVFS_MGMT_SETPARAM_ALL);
+    assert(ret == 0);
+
+    /* while !done call progress function */
+    while (!sm_p->op_complete && ret == 0) {
+	gossip_debug(CLIENT_DEBUG,
+		     "PVFS_mgmt_setparam_all calling PINT_client_state_machine_test()\n");
+	ret = PINT_client_state_machine_test();
+    }
+
+    assert(ret == 0);
+
+    gossip_debug(CLIENT_DEBUG, "PVFS_mgmt_setparam_all completed\n");
+
+    /* save our return value */
+    error = sm_p->error_code;
+
+    /* clean up after ourselves */
+    free(sm_p);
+    return error;
+}
+
+
 static int mgmt_setparam_all_init(PINT_client_sm *sm_p,
 		       job_status_s *js_p)
 {

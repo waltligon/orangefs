@@ -149,6 +149,9 @@ struct PINT_client_flush_sm {
     PINT_client_sm_msgpair_state *msgpair; /* used in datafile flush */
 };
 
+struct PINT_client_mgmt_setparam_all_sm 
+{
+};
 
 typedef struct PINT_client_sm {
     /* STATE MACHINE VALUES */
@@ -188,6 +191,7 @@ typedef struct PINT_client_sm {
 	struct PINT_client_getattr_sm getattr;
 	struct PINT_client_io_sm      io;
 	struct PINT_client_flush_sm   flush;
+	struct PINT_client_mgmt_setparam_all_sm   setparam_all;
     } u;
 } PINT_client_sm;
 
@@ -202,7 +206,8 @@ enum {
     PVFS_SYS_REMOVE  = 1,
     PVFS_SYS_GETATTR = 2,
     PVFS_SYS_IO      = 3,
-    PVFS_SYS_FLUSH
+    PVFS_SYS_FLUSH   = 4,
+    PVFS_MGMT_SETPARAM_ALL = 5
 };
 
 /* prototypes of helper functions */
@@ -240,6 +245,7 @@ extern struct PINT_state_machine_s pvfs2_client_remove_sm;
 extern struct PINT_state_machine_s pvfs2_client_getattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_io_sm;
 extern struct PINT_state_machine_s pvfs2_client_flush_sm;
+extern struct PINT_state_machine_s pvfs2_client_mgmt_setparam_all_sm;
 
 /* nested state machines (helpers) */
 extern struct PINT_state_machine_s pvfs2_client_msgpair_sm;
