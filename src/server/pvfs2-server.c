@@ -744,6 +744,8 @@ static int server_setup_signal_handlers(void)
     sigaction (SIGTERM, &new_action, NULL);
     sigaction (SIGSEGV, &new_action, NULL);
     sigaction (SIGHUP, &new_action, NULL);
+    sigaction (SIGUSR1, &new_action, NULL);
+    sigaction (SIGUSR2, &new_action, NULL);
 
     return 0;
 }
@@ -816,10 +818,10 @@ static void server_sig_handler(int sig)
     }
 
     /* short circuit non critical signals here */
-    if(sig == SIGPIPE)
+    if(sig == SIGPIPE || sig == SIGUSR1 || sig == SIGUSR2)
     {
 	/* reset handler and continue processing */
-	signal(sig, (void*) server_sig_handler);
+	gossip_err("PVFS2 server: continuing.\n");
 	return;
     }
     if(sig == SIGHUP)
