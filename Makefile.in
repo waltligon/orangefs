@@ -11,7 +11,8 @@
 # tests      builds test programs
 # statecomp  builds only the statecomp component
 # cscope      generates information for cscope utility
-# mpitests   builds test programs that use mpi
+# mpitests   builds test programs that use mpi (PLEASE SET THE
+#            "MPICC" ENVIRONMENT VARIABLE BEFORE BUILDING)
 # 
 # NOTE: you can also specify any single object or executable to
 #    build by providing its name (including the relative path) as the
