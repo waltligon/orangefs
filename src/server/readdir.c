@@ -121,12 +121,10 @@ static int readdir_init(state_action_struct *s_op, job_status_s *ret)
 	s_op->resp->u.readdir.pvfs_dirent_array = (PVFS_dirent *)
 		malloc(s_op->req->u.readdir.pvfs_dirent_count*sizeof(PVFS_dirent));
 
-	job_post_ret = job_check_consistency(s_op->op,
-												 	 s_op->req->u.readdir.fs_id,
-													 s_op->req->u.readdir.handle,
-													 s_op,
-													 ret,
-													 &i);
+	job_post_ret = job_req_sched_post(s_op->req,
+												 s_op,
+												 ret,
+												 &(s_op->scheduled_id));
 
 	return(job_post_ret);
 	

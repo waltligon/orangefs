@@ -16,6 +16,7 @@
 static int getattr_init(state_action_struct *s_op, job_status_s *ret);
 static int getattr_cleanup(state_action_struct *s_op, job_status_s *ret);
 static int getattr_getobj_attribs(state_action_struct *s_op, job_status_s *ret);
+static int getattr_release_posted_job(state_action_struct *s_op, job_status_s *ret);
 static int getattr_send_bmi(state_action_struct *s_op, job_status_s *ret);
 void getattr_init_state_machine(void);
 
@@ -30,7 +31,7 @@ PINT_state_machine_s getattr_req_s =
 
 %%
 
-machine get_attr(init, cleanup, getobj_attrib, send_bmi)
+machine get_attr(init, cleanup, getobj_attrib, send_bmi, release)
 {
 	state init
 	{
@@ -47,6 +48,12 @@ machine get_attr(init, cleanup, getobj_attrib, send_bmi)
 	state send_bmi
 	{
 		run getattr_send_bmi;
+		default => release;
+	}
+
+	state release
+	{
+		run getattr_release_posted_job;
 		default => cleanup;
 	}
 
@@ -86,7 +93,9 @@ void getattr_init_state_machine(void)
  *
  * Returns:  int
  *
- * Synopsis: 
+ * Synopsis: We will need to allocate a buffer large enough to store the 
+ *           attributes the client is requesting.  Also, schedule it for
+ *           consistency semantics.
  *           
  */
 
@@ -95,19 +104,16 @@ static int getattr_init(state_action_struct *s_op, job_status_s *ret)
 {
 
 	int job_post_ret;
-	job_id_t i;
 
 	s_op->key.buffer = Trove_Common_Keys[METADATA_KEY].key;
 	s_op->key.buffer_sz = Trove_Common_Keys[METADATA_KEY].size;
 
-	s_op->val.buffer = (void *) malloc((s_op->val.buffer_sz = sizeof(PVFS_object_attr)));
+	s_op->val.buffer = malloc((s_op->val.buffer_sz = sizeof(PVFS_object_attr)));
 
-	job_post_ret = job_check_consistency(s_op->op,
-													 s_op->req->u.getattr.fs_id,
-													 s_op->req->u.getattr.handle,
-													 s_op,
-													 ret,
-													 &i);
+	job_post_ret = job_req_sched_post(s_op->req,
+												 s_op,
+												 ret,
+												 &(s_op->scheduled_id));
 	
 	return(job_post_ret);
 	
@@ -122,7 +128,7 @@ static int getattr_init(state_action_struct *s_op, job_status_s *ret)
  *
  * Returns:  int
  *
- * Synopsis: 
+ * Synopsis: Post a trove operation to fetch the attributes
  *           
  *           
  */
@@ -156,7 +162,7 @@ static int getattr_getobj_attribs(state_action_struct *s_op, job_status_s *ret)
  *
  * Returns:  int
  *
- * Synopsis: 
+ * Synopsis: Send the message and resulting data to the client.
  *           
  */
 
@@ -167,8 +173,12 @@ static int getattr_send_bmi(state_action_struct *s_op, job_status_s *ret)
 	job_id_t i;
 	void *a[1];
 
+	/* Set up a little array. yay */
 	s_op->encoded.buffer_list = a[0];
 
+	/* This comes from the trove operation.  Note, this operation is still
+	 * valid even though the operation may have failed.
+	 */
 	s_op->resp->u.getattr.attr = *((PVFS_object_attr *)s_op->val.buffer);
 
 	/* Prepare the message */
@@ -185,15 +195,15 @@ static int getattr_send_bmi(state_action_struct *s_op, job_status_s *ret)
 	}
 	assert(job_post_ret == 0);
 	if(ret->error_code == 0)
-		assert(s_op->encoded.buffer_list != NULL);
+		assert(s_op->encoded.buffer_list[0] != NULL);
 	else
 	{
+		/* We have failed somewhere... However, we still need to send what we have */
 		s_op->encoded.buffer_list[0] = s_op->resp;
 		s_op->encoded.total_size = sizeof(struct PVFS_server_resp_s);
 	}
 
 	/* Post message */
-
 	job_post_ret = job_bmi_send(s_op->addr,
 										 s_op->encoded.buffer_list[0],
 										 s_op->encoded.total_size,
@@ -208,11 +218,45 @@ static int getattr_send_bmi(state_action_struct *s_op, job_status_s *ret)
 
 }
 
+
+/*
+ * Function: getattr_release_posted_job
+ *
+ * Params:   server_op *b, 
+ *           job_status_s *ret
+ *
+ * Pre:      We are done!
+ *
+ * Post:     We need to let the next operation go.
+ *
+ * Returns:  int
+ *
+ * Synopsis: Free the job from the scheduler to allow next job to proceed.
+ */
+
+static int getattr_release_posted_job(state_action_struct *s_op, job_status_s *ret)
+{
+
+	int job_post_ret=0;
+	job_id_t i;
+
+	job_post_ret = job_req_sched_release(s_op->scheduled_id,
+													  s_op,
+													  ret,
+													  &i);
+	return job_post_ret;
+}
+
+
 /*
  * Function: getattr_cleanup
  *
  * Params:   server_op *b, 
  *           job_status_s *ret
+ *
+ * Pre:      Memory has been allocated
+ *
+ * Post:     All Allocated memory has been freed.
  *
  * Returns:  int
  *
@@ -226,18 +270,17 @@ static int getattr_cleanup(state_action_struct *s_op, job_status_s *ret)
 	
 	if(s_op->resp)
 	{
-		BMI_memfree(s_op->addr,
-				      s_op->resp,
-						sizeof(struct PVFS_server_resp_s),
-						BMI_SEND_BUFFER);
+		free(s_op->resp);
 	}
 
 	if(s_op->req)
 	{
-		BMI_memfree(s_op->addr,
-				      s_op->req,
-						sizeof(struct PVFS_server_resp_s),
-						BMI_SEND_BUFFER);
+		free(s_op->req);
+	}
+
+	if(s_op->val.buffer)
+	{
+		free(s_op->val.buffer);
 	}
 
 	free(s_op->unexp_bmi_buff);

@@ -15,6 +15,7 @@
 static int create_init(state_action_struct *s_op, job_status_s *ret);
 static int create_cleanup(state_action_struct *s_op, job_status_s *ret);
 static int create_create(state_action_struct *s_op, job_status_s *ret);
+static int create_release_posted_job(state_action_struct *s_op, job_status_s *ret);
 static int create_send_bmi(state_action_struct *s_op, job_status_s *ret);
 void create_init_state_machine(void);
 
@@ -27,7 +28,7 @@ PINT_state_machine_s create_req_s =
 
 %%
 
-machine create(init, create, send, cleanup)
+machine create(init, create, send, release, cleanup)
 {
 	state init
 	{
@@ -44,6 +45,12 @@ machine create(init, create, send, cleanup)
 	state send
 	{
 		run create_send_bmi;
+		default => release;
+	}
+
+	state release
+	{
+		run create_release_posted_job;
 		default => cleanup;
 	}
 
@@ -61,7 +68,11 @@ machine create(init, create, send, cleanup)
  *
  * Params:   void
  *
- * Returns:  PINT_state_array_values*
+ * Pre:      None
+ *
+ * Post:     None
+ *
+ * Returns:  void
  *
  * Synopsis: Set up the state machine for create. 
  *           
@@ -80,9 +91,14 @@ void create_init_state_machine(void)
  * Params:   server_op *s_op, 
  *           job_status_s *ret
  *
+ * Pre:      Valid request
+ *
+ * Post:     Job Scheduled
+ *
  * Returns:  int
  *
- * Synopsis: 
+ * Synopsis: Create is a relatively easy server operation.  We just need to 
+ *           schedule the creation of the new dataspace.
  *           
  */
 
@@ -91,7 +107,6 @@ static int create_init(state_action_struct *s_op, job_status_s *ret)
 {
 
 	int job_post_ret;
-	job_id_t i;
 
 	job_post_ret = job_req_sched_post(s_op->req,
 												 s_op,
@@ -109,9 +124,13 @@ static int create_init(state_action_struct *s_op, job_status_s *ret)
  * Params:   server_op *s_op, 
  *           job_status_s *ret
  *
+ * Pre:      None
+ *
+ * Post:     None
+ *
  * Returns:  int
  *
- * Synopsis: 
+ * Synopsis: Create the new dataspace with the values provided in the response.
  *           
  */
 
@@ -142,9 +161,14 @@ static int create_create(state_action_struct *s_op, job_status_s *ret)
  * Params:   server_op *s_op, 
  *           job_status_s *ret
  *
+ * Pre:      None
+ *
+ * Post:     None
+ *
  * Returns:  int
  *
- * Synopsis: 
+ * Synopsis: Send a message to the client.  If the dataspace was successfully
+ *           created, send the new handle back.
  *           
  */
 
@@ -152,18 +176,30 @@ static int create_create(state_action_struct *s_op, job_status_s *ret)
 static int create_send_bmi(state_action_struct *s_op, job_status_s *ret)
 {
 
-	int job_post_ret;
+	int job_post_ret=0;
 	job_id_t i;
+	void *a[1];
 
 	s_op->resp->status = ret->error_code;
+	s_op->encoded.buffer_list = a[0];
 
 	/* Set the handle IF it was created */
 	if(ret->error_code == 0) 
+	{
 		s_op->resp->u.create.handle = ret->handle;
+
+		/* Encode the message */
+		job_post_ret = PINT_encode(s_op->resp,
+				PINT_ENCODE_RESP,
+				&(s_op->encoded),
+				s_op->addr,
+				s_op->enc_type);
+	}
+	assert(job_post_ret == 0);
 	
 	job_post_ret = job_bmi_send(s_op->addr,
-										 s_op->resp,
-										 sizeof(struct PVFS_server_resp_s),
+										 s_op->encoded.buffer_list[0],
+										 s_op->encoded.total_size,
 										 s_op->tag,
 										 0,
 										 0,
@@ -175,6 +211,33 @@ static int create_send_bmi(state_action_struct *s_op, job_status_s *ret)
 	
 }
 
+/*
+ * Function: create_release_posted_job
+ *
+ * Params:   server_op *b, 
+ *           job_status_s *ret
+ *
+ * Pre:      We are done!
+ *
+ * Post:     We need to let the next operation go.
+ *
+ * Returns:  int
+ *
+ * Synopsis: Free the job from the scheduler to allow next job to proceed.
+ */
+
+static int create_release_posted_job(state_action_struct *s_op, job_status_s *ret)
+{
+
+	int job_post_ret=0;
+	job_id_t i;
+
+	job_post_ret = job_req_sched_release(s_op->scheduled_id,
+													  s_op,
+													  ret,
+													  &i);
+	return job_post_ret;
+}
 
 
 /*
@@ -182,6 +245,10 @@ static int create_send_bmi(state_action_struct *s_op, job_status_s *ret)
  *
  * Params:   server_op *b, 
  *           job_status_s *ret
+ *
+ * Pre:      None
+ *
+ * Post:     None
  *
  * Returns:  int
  *
@@ -195,18 +262,12 @@ static int create_cleanup(state_action_struct *s_op, job_status_s *ret)
 
 	if(s_op->resp)
 	{
-		BMI_memfree(s_op->addr,
-				      s_op->resp,
-						sizeof(struct PVFS_server_resp_s),
-						BMI_SEND_BUFFER);
+		free(s_op->resp);
 	}
 
 	if(s_op->req)
 	{
-		BMI_memfree(s_op->addr,
-				      s_op->req,
-						sizeof(struct PVFS_server_resp_s),
-						BMI_SEND_BUFFER);
+		free(s_op->req);
 	}
 
 	free(s_op->unexp_bmi_buff);

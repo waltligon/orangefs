@@ -108,12 +108,11 @@ static int setattr_init(state_action_struct *s_op, job_status_s *ret)
 
 	s_op->val.buffer = (void *) malloc((s_op->val.buffer_sz = sizeof(PVFS_object_attr)));
 	
-	job_post_ret = job_check_consistency(s_op->op,
-													 s_op->req->u.setattr.fs_id,
-													 s_op->req->u.setattr.handle,
-													 s_op,
-													 ret,
-													 &i);
+	/* post a scheduler job */
+	job_post_ret = job_req_sched_post(s_op->req,
+												 s_op,
+												 ret,
+												 &(s_op->scheduled_id));
 	
 	return(job_post_ret);
 	

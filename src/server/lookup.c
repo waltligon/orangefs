@@ -36,25 +36,26 @@ PINT_state_machine_s lookup_req_s =
 
 %%
 
-machine lookup(init, dir_space, key_val, check_params, send, cleanup)
+machine lookup(init, key_val, dir_space, check_params, send, cleanup)
 {
+
 	state init
 	{
 		run lookup_init;
 		default => key_val;
 	}
 
-	state check_params
-	{
-		run lookup_check_params;
-		success => dir_space;
-		default => send;
-	}
-
 	state key_val
 	{
 		run lookup_key_val;
 		success => check_params;
+		default => send;
+	}
+
+	state check_params
+	{
+		run lookup_check_params;
+		success => dir_space;
 		default => send;
 	}
 
@@ -76,6 +77,7 @@ machine lookup(init, dir_space, key_val, check_params, send, cleanup)
 		run lookup_cleanup;
 		default => init;
 	}
+
 }
 
 %%
@@ -104,9 +106,16 @@ void lookup_init_state_machine(void)
  * Params:   server_op *s_op, 
  *           job_status_s *ret
  *
+ * Pre:      None
+ *
+ * Post:     Scheduled
+ *
  * Returns:  int
  *
- * Synopsis: 
+ * Synopsis: Allocate all memory.  Should we just malloc one big region?
+ *           Considering how much you guys are confused already, why put
+ *           more pointers?
+ *           TODO: Right now, this does not work!!!!
  *           
  */
 
@@ -116,68 +125,94 @@ static int lookup_init(state_action_struct *s_op, job_status_s *ret)
 
 	int job_post_ret;
 	job_id_t i;
+	void *big_memory_buffer;
+
+	int memory_sz;
+	int key_a_sz,val_a_sz,key_a0_sz,val_a0_sz,handle_array_sz,attr_array_sz;
+
+	/* s_op->key_a */
+	key_a_sz = 3*sizeof(PVFS_ds_keyval_s);  
+
+	/* s_op->val_a */
+	val_a_sz = 3*sizeof(PVFS_ds_keyval_s);
+
+	/* key_a[0] */
+	key_a0_sz = Trove_Common_Keys[DIR_ENT_KEY].size > Trove_Common_Keys[METADATA_KEY].size ? \
+					  Trove_Common_Keys[DIR_ENT_KEY].size : Trove_Common_Keys[METADATA_KEY].size;
+
+
+	/* key_a[1] */
+	val_a0_sz = sizeof(PVFS_handle) > sizeof(PVFS_object_attr) ? \
+					sizeof(PVFS_handle) : sizeof(PVFS_object_attr);
+
+	/* handle_array */
+	handle_array_sz = LOOKUP_BUFF_SZ*sizeof(PVFS_handle); 
+
+	/* attr_array */
+	attr_array_sz = LOOKUP_BUFF_SZ*sizeof(PVFS_object_attr) + sizeof(PVFS_datafile_attr);
+
+	memory_sz = key_a_sz+val_a_sz+key_a0_sz+key_a1_sz+handle_array_sz+attr_array_sz;
 
 	/* Allocate space for attributes, handles, and path segments */
-	s_op->key_a = (PVFS_ds_keyval_s *) malloc(3*sizeof(PVFS_ds_keyval_s));
-	s_op->val_a = (PVFS_ds_keyval_s *) malloc(3*sizeof(PVFS_ds_keyval_s));
+	big_memory_buffer = malloc(memory_sz);
+	
+	/* Start the Pointer Calculation */
+	/* Trove key array */
+	s_op->key_a = (PVFS_ds_keyval_s *) big_memory_buffer;
+	big_memory_buffer += key_a_sz;
 
-	s_op->key_a[0].buffer_sz = s_op->key_a[1].buffer_sz = \
-		Trove_Common_Keys[DIR_ENT_KEY].size > Trove_Common_Keys[METADATA_KEY].size ? \
-		Trove_Common_Keys[DIR_ENT_KEY].size : Trove_Common_Keys[METADATA_KEY].size;
+	/* Trove value array */
+	s_op->val_a = (PVFS_ds_keyval_s *) big_memory_buffer;
+	big_memory_buffer += val_a_sz;
 
-	s_op->val_a[0].buffer_sz = s_op->val_a[1].buffer_sz = \
-		sizeof(PVFS_handle) > sizeof(PVFS_object_attr) ? \
-		sizeof(PVFS_handle) : sizeof(PVFS_object_attr);
+	/* Key Buffer 1 */
+	s_op->key_a[0].buffer = big_memory_buffer;
+	big_memory_buffer += key_a0_sz;
 
-	s_op->key_a[0].buffer = malloc(s_op->key_a[0].buffer_sz);
-	s_op->key_a[1].buffer = malloc(s_op->key_a[1].buffer_sz);
-	s_op->val_a[0].buffer = malloc(s_op->val_a[0].buffer_sz);
-	s_op->val_a[1].buffer = malloc(s_op->val_a[1].buffer_sz);
+	/* Key Buffer 2 */
+	s_op->key_a[1].buffer = big_memory_buffer;
+	big_memory_buffer += key_a0_sz;
 
-	s_op->resp->u.lookup_path.handle_array = (PVFS_handle *) BMI_memalloc(s_op->addr,
-			LOOKUP_BUFF_SZ*sizeof(PVFS_handle),
-			BMI_SEND_BUFFER);
-	s_op->resp->u.lookup_path.attr_array = \
-		(PVFS_object_attr *) BMI_memalloc(s_op->addr,
-													 LOOKUP_BUFF_SZ*sizeof(PVFS_object_attr)+\
-													 sizeof(PVFS_datafile_attr),
-													 BMI_SEND_BUFFER);
-#if 0
-	if(s_op->resp)
-	{
-		BMI_memfree(s_op->addr,
-				s_op->resp,
-				sizeof(struct PVFS_server_resp_s),
-				BMI_SEND_BUFFER);
-	}
+	/* Value Buffer 1 */
+	s_op->val_a[0].buffer = big_memory_buffer;
+	big_memory_buffer += val_a0_sz;
 
+	/* Value Buffer 2 */
+	s_op->val_a[1].buffer = big_memory_buffer;
+	big_memory_buffer += val_a0_sz;
 
-	s_op->resp = BMI_memalloc(s_op->addr,
-			sizeof(struct PVFS_server_resp_s)+\             // Response Structure
-			(LOOKUP_BUFFER_SZ*sizeof(PVFS_handle))+\      // Max Number of Handles / Req
-			(LOOKUP_BUFFER_SZ*sizeof(PVFS_object_attr))+\ // Max Number of Attr Structs
-			sizeof(PVFS_datafile_attr),                   // If d/f, need the extra attrib
-			BMI_SEND_BUFFER);
-#endif 
+	/* Handle Array */
+	s_op->resp->u.lookup_path.handle_array = (PVFS_handle *) big_memory_buffer;
+	big_memory_buffer += handle_array_sz;
+
+	/* Attribute Array */
+	s_op->resp->u.lookup_path.attr_array = (PVFS_object_attr *) big_memory_buffer;
+
+	/* We are done calculating pointers.  Check to make sure we are correct in pointer arith */
+	assert(big_memory_buffer+attr_array_sz-memory_sz == s_op->key_a);
+
+	/* Set up the right sizes that I allocated */
+	s_op->key_a[0].buffer_sz = s_op->key_a[1].buffer_sz = key_a0_sz;
+
+	s_op->val_a[0].buffer_sz = s_op->val_a[1].buffer_sz = val_a0_sz;
 
 	s_op->resp->u.lookup_path.count = -1;
 
 	/* 
-		Set up the key val iterate pair.  When we go into a nice loop to find handles,
-		it will help the state machine if the value of the handle we are looking for
-		is stored in the same place.  So, lets use the starting handle...
+	 *	Set up the key val iterate pair.  When we go into a nice loop to find handles,
+	 *	it will help the state machine if the value of the handle we are looking for
+	 *	is stored in the same place.  So, lets use the starting handle...
+	 *
 	 */
+
 	s_op->val.buffer = &(s_op->req->u.lookup_path.starting_handle);
 	s_op->val.buffer_sz = sizeof(PVFS_handle);
 
-	job_post_ret = job_check_consistency(s_op->op,
-			s_op->req->u.lookup_path.fs_id,
-			s_op->req->u.lookup_path.starting_handle,
-			s_op,
-			ret,
-			&i);
+	job_post_ret = job_req_sched_post(s_op->req,
+												 s_op,
+												 ret,
+												 &(s_op->scheduled_id));
 
-	gossip_ldebug(SERVER_DEBUG,"Init returning: %d\n",job_post_ret);
 	return(job_post_ret);
 
 }
@@ -187,6 +222,10 @@ static int lookup_init(state_action_struct *s_op, job_status_s *ret)
  *
  * Params:   server_op *s_op, 
  *           job_status_s *ret
+ *
+ * Pre:      None
+ *
+ * Post:     None
  *
  * Returns:  int
  *
@@ -201,7 +240,10 @@ static int lookup_init(state_action_struct *s_op, job_status_s *ret)
 static int lookup_check_params(state_action_struct *s_op, job_status_s *ret)
 {
 
-	int job_post_ret;
+	int job_post_ret = -1;
+
+	/* I HAVE NO IDEA WHAT THIS DOES  not my code... dw*/
+#if 0
 	job_id_t i;
 	int k;
 	int meta_data_flag,directory_handle_flag; //used to tell us that we have the data
@@ -257,6 +299,7 @@ static int lookup_check_params(state_action_struct *s_op, job_status_s *ret)
 			s_op->key.buffer_sz = strlen(s_op->key_a[2].buffer);
 		}
 	}
+#endif
 
 	gossip_ldebug(SERVER_DEBUG,"check returning: %d\n",job_post_ret);
 	return(job_post_ret);
@@ -268,6 +311,10 @@ static int lookup_check_params(state_action_struct *s_op, job_status_s *ret)
  *
  * Params:   server_op *s_op, 
  *           job_status_s *ret
+ *
+ * Pre:      None
+ *
+ * Post:     None
  *
  * Returns:  int
  *
@@ -318,6 +365,10 @@ static int lookup_dir_space(state_action_struct *s_op, job_status_s *ret)
  * Params:   server_op *s_op, 
  *           job_status_s *ret
  *
+ * Pre:      None
+ *
+ * Post:     None
+ *
  * Returns:  int
  *
  * Synopsis: Iterate through the keyval space of starting_handle
@@ -354,6 +405,10 @@ static int lookup_key_val(state_action_struct *s_op, job_status_s *ret)
  *
  * Params:   server_op *b, 
  *           job_status_s *ret
+ *
+ * Pre:      None
+ *
+ * Post:     None
  *
  * Returns:  int
  *
@@ -414,21 +469,6 @@ static int lookup_cleanup(state_action_struct *s_op, job_status_s *ret)
 
 }
 
-
-#if 0
-static void get_no_of_segments(char *path,int *num)
-{
-	char *s = path;
-	int len = strlen(path);
-	int pos = 0;
-
-	for(pos = 0;pos < len;pos++)
-	{
-		if (s[pos] == '/' && (pos + 1) < len)
-			(*num)++;
-	}
-}
-#endif
 
 /*
  * Local variables:

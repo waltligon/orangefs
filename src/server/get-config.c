@@ -97,6 +97,10 @@ void getconfig_init_state_machine(void)
  * Params:   server_op *b, 
  *           job_status_s *ret
  *
+ * Pre:      fs_id mapping exists on server
+ *
+ * Post:     None
+ *
  * Returns:  void
  *
  * Synopsis: Get information from config structure
@@ -105,11 +109,10 @@ void getconfig_init_state_machine(void)
  */
 
 static int getconfig_init(state_action_struct *s_op, job_status_s *ret)
-	{
+{
 
-	//PINT_server_op *s_op = (PINT_server_op *) b;
 	server_configuration_s *user_opts;
-	int err = 1;
+	int job_post_ret = 1;
 
 	gossip_ldebug(SERVER_DEBUG,"Starting GetConfig Request\n");
 	user_opts = get_server_config_struct();
@@ -118,34 +121,25 @@ static int getconfig_init(state_action_struct *s_op, job_status_s *ret)
 	s_op->resp->u.getconfig.meta_server_count = user_opts->count_meta_servers;
 	s_op->resp->u.getconfig.io_server_count = user_opts->count_io_servers;
 
-
-#if 0  /* Depricated */
-	s_op->resp->u.getconfig.meta_server_mapping = (PVFS_string) BMI_memalloc(s_op->addr,strlen(user_opts->meta_server_list)+1,BMI_SEND_BUFFER);
-	memcpy(s_op->resp->u.getconfig.meta_server_mapping,user_opts->meta_server_list,strlen(user_opts->meta_server_list)+1);
-	s_op->strsize = strlen(user_opts->meta_server_list)+1;
-
-	s_op->resp->u.getconfig.io_server_mapping = (PVFS_string) BMI_memalloc(s_op->addr,strlen(user_opts->io_server_list)+1,BMI_SEND_BUFFER);
-	memcpy(s_op->resp->u.getconfig.io_server_mapping,user_opts->io_server_list,strlen(user_opts->io_server_list)+1);
-	s_op->strsize += strlen(user_opts->io_server_list)+1;
-#endif 
-	
-	/* The new way of doing things! dw*/
+	/* The new way of doing things because we have an encoding system! dw*/
 	s_op->resp->u.getconfig.meta_server_mapping = user_opts->meta_server_list;
 	s_op->resp->u.getconfig.io_server_mapping = user_opts->io_server_list;
 	s_op->strsize = strlen(user_opts->meta_server_list)+1;
 	s_op->strsize += strlen(user_opts->io_server_list)+1;
 
-	/* TODO: what to do with unexpected info struct ? */
+	return(job_post_ret);
 
-	return(err);
-
-	}
+}
 
 /*
  * Function: getconfig_job_trove
  *
  * Params:   server_op *b, 
  *           job_status_s *ret
+ *
+ * Pre:      None
+ *
+ * Post:     None
  *
  * Returns:  void
  *
@@ -155,8 +149,8 @@ static int getconfig_init(state_action_struct *s_op, job_status_s *ret)
  */
 
 static int getconfig_job_trove(state_action_struct *s_op, job_status_s *ret)
-	{
-	//PINT_server_op *s_op = (PINT_server_op *) b;
+{
+
 	int job_post_ret;
 	job_id_t i;
 
@@ -164,13 +158,17 @@ static int getconfig_job_trove(state_action_struct *s_op, job_status_s *ret)
 
 	return(job_post_ret);
 
-	}
+}
 
 /*
  * Function: getconfig_build_bmi_error
  *
  * Params:   server_op *b, 
  *           job_status_s *ret
+ *
+ * Pre:      None
+ *
+ * Post:     None
  *
  * Returns:  void
  *
@@ -180,25 +178,28 @@ static int getconfig_job_trove(state_action_struct *s_op, job_status_s *ret)
  */
 
 static int getconfig_build_bmi_error(state_action_struct *s_op, job_status_s *ret)
-	{
+{
 
 	s_op->resp->status = ret->error_code;
 	s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
 
 	/* Clean up Strings if necessary!!!! */
 	/* Should not need to do this! dw*/
-	//if(s_op->resp->u.getconfig.meta_list)
-		/* BMI FREE */
+	/* BMI FREE */
 
 	return(1);
 
-	}
+}
 
 /*
  * Function: getconfig_build_bmi_good_msg
  *
  * Params:   server_op *b, 
  *           job_status_s *ret
+ *
+ * Pre:      None
+ *
+ * Post:     None
  *
  * Returns:  void
  *
@@ -208,8 +209,8 @@ static int getconfig_build_bmi_error(state_action_struct *s_op, job_status_s *re
  */
 
 static int getconfig_build_bmi_good_msg(state_action_struct *s_op, job_status_s *ret)
-	{
-	//PINT_server_op *s_op = (PINT_server_op *) b;
+{
+
 	int jpret;
 
 	gossip_ldebug(SERVER_DEBUG,"root handle:%Ld\n%d\n",ret->handle,ret->error_code);
@@ -220,13 +221,17 @@ static int getconfig_build_bmi_good_msg(state_action_struct *s_op, job_status_s 
 	jpret = PINT_encode(s_op->resp,PINT_ENCODE_RESP,&(s_op->encoded),s_op->addr,s_op->enc_type);
 	return(1);
 
-	}
+}
 
 /*
  * Function: getconfig_job_bmi_send
  *
  * Params:   server_op *b, 
  *           job_status_s *ret
+ *
+ * Pre:      None
+ *
+ * Post:     None
  *
  * Returns:  void
  *
@@ -236,7 +241,8 @@ static int getconfig_build_bmi_good_msg(state_action_struct *s_op, job_status_s 
  */
 
 static int getconfig_job_bmi_send(state_action_struct *s_op, job_status_s *ret)
-	{
+{
+
 	int job_post_ret;
 	job_id_t i;
 
@@ -254,19 +260,23 @@ static int getconfig_job_bmi_send(state_action_struct *s_op, job_status_s *ret)
 										 &i);
 	}
 	else {
-		// Send list!
+		/* Send list! */
 		job_post_ret = -1;
 	}
 
 	return(job_post_ret);
 
-	}
+}
 
 /*
  * Function: getconfig_cleanup
  *
  * Params:   server_op *b, 
  *           job_status_s *ret
+ *
+ * Pre:      None
+ *
+ * Post:     None
  *
  * Returns:  void
  *
@@ -276,17 +286,9 @@ static int getconfig_job_bmi_send(state_action_struct *s_op, job_status_s *ret)
  */
 
 static int getconfig_cleanup(state_action_struct *s_op, job_status_s *ret)
-	{
-	//PINT_server_op *s_op = (PINT_server_op *) b;
-	gossip_ldebug(SERVER_DEBUG,"Completed GetConfig\n");
+{
 
-#if 0
-	/* TODO: What do we free? */
-	if (s_op->resp->u.getconfig.meta_server_mapping)
-	{
-		BMI_memfree(s_op->addr,s_op->resp->u.getconfig.meta_server_mapping,strlen(s_op->resp->u.getconfig.meta_server_mapping),BMI_SEND_BUFFER);
-	}
-#endif
+	gossip_ldebug(SERVER_DEBUG,"Completed GetConfig\n");
 
 	/* TODO: Free I/O Struct! */
 	if (s_op->resp)
@@ -300,6 +302,5 @@ static int getconfig_cleanup(state_action_struct *s_op, job_status_s *ret)
 
 	return(0);
 
-	}
-
+}
 

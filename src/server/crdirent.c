@@ -159,7 +159,7 @@ static int crdirent_init(state_action_struct *s_op, job_status_s *ret)
 	s_op->key.buffer = Trove_Common_Keys[METADATA_KEY].key;
 	s_op->key.buffer_sz = Trove_Common_Keys[METADATA_KEY].size;
 
-	/* create a buffer for the response */
+	/* create a buffer for the trove operations (get_attrib and get_handle) */
 	s_op->val.buffer = malloc((s_op->val.buffer_sz = sizeof(PVFS_object_attr)));
 	
 	/* post a scheduler job */
@@ -183,9 +183,15 @@ static int crdirent_init(state_action_struct *s_op, job_status_s *ret)
  *
  * Returns:  int
  *
- * Synopsis: Get the directory entry handle for the directory entry k/v space
- * THIS is inadequate - I don't understand what exactly is going on
- * here.
+ * Synopsis: Get the directory entry handle for the directory entry k/v space.
+ *           Recall that directories have two key-val spaces, one of which is 
+ *           synonymous with files where the metadata is stored.  The other
+ *           space holds the filenames and their handles.  In this function, 
+ *           we attempt to retrieve the handle for the filename/handle key/val
+ *           space and if it does not exist, we need to create it.
+ *
+ *           TODO: Semantics here of whether we want to create it here, or upon
+ *                 the creation of the directory. 
  *           
  */
 
@@ -202,16 +208,10 @@ static int crdirent_gethandle(state_action_struct *s_op, job_status_s *ret)
 	s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
 
 	/* 
-	 * We do not need to do this... the buffer is plenty big from the 
-	 *	attributes fetch... just reuse it and throw the old data away
-	 *
-	 *	- IF you are going to do this, then place a pair of asserts here
-	 *	to say the buffer is not NULL and the buffer_sz is >= the
-	 *	minimum size
+	 *	Assert that the buffer is big enough to hold a handle.
+	 * Recall that the buffer was previously allocated for the permission checking
 	 */
-#if 0
-	s_op->val.buffer = malloc((s_op->val.buffer_sz = sizeof(PVFS_handle)));
-#endif
+	assert(s_op->val.buffer != NULL && s_op->val.buffer_sz >= sizeof(PVFS_handle));
 	
 	job_post_ret = job_trove_keyval_read(s_op->req->u.crdirent.fs_id,
 													 	 s_op->req->u.crdirent.parent_handle,
@@ -223,8 +223,6 @@ static int crdirent_gethandle(state_action_struct *s_op, job_status_s *ret)
 													 	 ret,
 													 	 &i);
 
-	/* why is this done? */
-	s_op->encoded.buffer_list = s_op->encoded.buffer_list[0];
 
 	return(job_post_ret);
 }
@@ -244,8 +242,8 @@ static int crdirent_gethandle(state_action_struct *s_op, job_status_s *ret)
  * Returns:  int
  *
  * Synopsis: Just returned from scheduler. init has set up key and val buffer.
- * Post Trove job to read metadata for the parent directory so we can make sure
- * that the credentials are valid.
+ *           Post Trove job to read metadata for the parent directory so we can make sure
+ *           that the credentials are valid.
  *           
  */
 
@@ -291,11 +289,11 @@ static int crdirent_getattr(state_action_struct *s_op, job_status_s *ret)
 static int crdirent_check_perms(state_action_struct *s_op, job_status_s *ret)
 {
 	int job_post_ret;
-	//job_id_t i;
+	/*job_id_t i;*/
 
 	gossip_ldebug(SERVER_DEBUG,"CheckPerms Fxn for crdirent\n");
 	job_post_ret = 1;  /* Just pretend it is good right now */
-	// IF THEY don't have permission, set ret->error_code to -ENOPERM!
+	/*IF THEY don't have permission, set ret->error_code to -ENOPERM!*/
 
 	return(job_post_ret);
 }
@@ -324,12 +322,19 @@ static int crdirent_create_dir_handle_ph2(state_action_struct *s_op, job_status_
 	job_id_t i;
 
 	gossip_ldebug(SERVER_DEBUG,"phase2 Fxn for crdirent\n");
+
 	/* get the key and key size out of our list of common keys */
 	s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
 	s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
 
+	/*
+	 * Recall again, this buffer was originally allocated for check_permissions
+	 * Let's assert and continue.
+	 */
+	assert(s_op->val.buffer != NULL && s_op->val.buffer_sz >= sizeof(PVFS_handle));
+
 	/* we are writing to Trove, so the val is set up here */
-	s_op->val.buffer = &(ret->handle);
+	*((PVFS_handle *)s_op->val.buffer) = ret->handle;
 	s_op->val.buffer_sz = sizeof(PVFS_handle);
 
 	/* adds the k/v space */
@@ -369,14 +374,13 @@ static int crdirent_create_dir_handle_ph1(state_action_struct *s_op, job_status_
 	int job_post_ret;
 	job_id_t i;
 
-	gossip_ldebug(SERVER_DEBUG,"phase1 Fxn for crdirent\n");
-	gossip_ldebug(SERVER_DEBUG,"Creating Handle:  %d,%lld\n",
+	gossip_ldebug(SERVER_DEBUG,"CrDirent Phase 1 Creating Handle:  %d,%lld\n",
 			s_op->req->u.crdirent.fs_id,\
 			s_op->req->u.crdirent.parent_handle);
 
 	job_post_ret = job_trove_dspace_create(s_op->req->u.crdirent.fs_id,
 													   s_op->req->u.crdirent.parent_handle,
-													   0xFF000000, /* TODO: Change this */
+													   0x00000000, /* TODO: Change this */
 													   ATTR_DIR,
 													   NULL,
 													   s_op,
@@ -392,8 +396,8 @@ static int crdirent_create_dir_handle_ph1(state_action_struct *s_op, job_status_
  *           job_status_s *ret
  *
  * Pre:      ret->handle is the directory entry k/v space
- *           s_op->u.crdirent.name != NULL
- *           s_op->u.crdirent.new_handle != NULL
+ *           s_op->req->u.crdirent.name != NULL
+ *           s_op->req->u.crdirent.new_handle != NULL
  *           ADD ASSERTS FOR THESE!
  *
  * Post:     key/val pair stored
@@ -411,8 +415,14 @@ static int crdirent_create(state_action_struct *s_op, job_status_s *ret)
 	PVFS_handle h;
 
 	gossip_ldebug(SERVER_DEBUG,"create Fxn for crdirent\n");
+
+	/* Verify that we have all the information we need to store the pair */
+	assert(s_op->req->u.crdirent.name != NULL && s_op->req->u.crdirent.new_handle != 0);
 	
-	/* is this an output of the trove operation? */
+	/* This buffer came from one of two places, either phase two of creating the
+	 * directory space when we wrote the value back to trove, or from the initial read
+	 * from trove.
+	 */
 	h = *((PVFS_handle *)s_op->val.buffer);
 	
 	/* this is the name for the parent entry */
