@@ -4,16 +4,15 @@
  * See COPYING in top-level directory.
  */
 
-/* Some config values for the prototype pvfs2 server */
-
 #ifndef __PVFS_SERVER_H
 #define __PVFS_SERVER_H
 
+/* Some config values for the prototype pvfs2 server */
 enum
 {
-	PVFS2_DEBUG_SERVER = 32,
-	BMI_UNEXP = 999, /* Give the Server the idea of what BMI_Unexpected Ops are */
-	MAX_JOBS = 10 /* also defined in a config file, but nice to have */
+    PVFS2_DEBUG_SERVER = 32,
+    BMI_UNEXP = 999, /* Give the Server the idea of what BMI_Unexpected Ops are */
+    MAX_JOBS = 10 /* also defined in a config file, but nice to have */
 };
 
 typedef enum
@@ -32,29 +31,51 @@ typedef enum
     UNEXPECTED_LOOP_END,           /* outside of while loop in main()    */
 } PINT_server_status_code;
 
+/* struct PINT_server_lookup_op
+ *
+ * All the data needed during lookup processing:
+ *
+ */
+struct PINT_server_lookup_op {
+    int seg_ct, seg_nr; /* current segment (0..N), number of segments in the path */
+
+    PVFS_fs_id fs_id;
+
+    char *path, *segp;
+    void *segstate;
+
+    PVFS_handle base_handle, dirent_handle, *h_a;
+    PVFS_object_attr base_attr, *oa_a;
+
+    PVFS_ds_keyval_s k_a[2], v_a[2];
+};
+
 /* This structure is passed into the void *ptr 
  * within the job interface.  Used to tell us where
  * to go next in our state machine.
  */
 typedef struct PINT_server_op
 {
-	int op;
-	int strsize;
-	int enc_type;
-	job_id_t scheduled_id;
-	PVFS_ds_keyval_s key;
-	PVFS_ds_keyval_s val;
-	PVFS_ds_keyval_s *key_a;
-	PVFS_ds_keyval_s *val_a;
-	bmi_addr_t addr;
-	bmi_msg_tag_t tag;
-	PINT_state_array_values *current_state;
-	struct PVFS_server_req_s *req;
-	struct PVFS_server_resp_s *resp;
-	struct BMI_unexpected_info unexp_bmi_buff;
-	struct PINT_encoded_msg encoded;
-	struct PINT_decoded_msg decoded;
-	flow_descriptor* flow_d;
+    int op;
+    int strsize;
+    int enc_type;
+    job_id_t scheduled_id;
+    PVFS_ds_keyval_s key;
+    PVFS_ds_keyval_s val;
+    PVFS_ds_keyval_s *key_a;
+    PVFS_ds_keyval_s *val_a;
+    bmi_addr_t addr;
+    bmi_msg_tag_t tag;
+    PINT_state_array_values *current_state;
+    struct PVFS_server_req_s *req;
+    struct PVFS_server_resp_s *resp;
+    struct BMI_unexpected_info unexp_bmi_buff;
+    struct PINT_encoded_msg encoded;
+    struct PINT_decoded_msg decoded;
+    flow_descriptor* flow_d;
+    union {
+	struct PINT_server_lookup_op lookup;
+    } u;
 } PINT_server_op;
 
 
@@ -63,4 +84,14 @@ typedef struct PINT_server_op
 /* Exported Prototypes */
 struct server_configuration_s *get_server_config_struct(void);
 
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 noexpandtab
+ */
+
 #endif /* __PVFS_SERVER_H */
+

@@ -22,13 +22,19 @@ enum
     ENO_METADATA = 200
 };
 
-static int lookup_init(state_action_struct *s_op, job_status_s *ret);
-static int lookup_cleanup(state_action_struct *s_op, job_status_s *ret);
-static int lookup_check_params(state_action_struct *s_op, job_status_s *ret);
-static int lookup_send_bmi(state_action_struct *s_op, job_status_s *ret);
-static int lookup_dir_space(state_action_struct *s_op, job_status_s *ret);
-static int lookup_key_val(state_action_struct *s_op, job_status_s *ret);
-static int lookup_release_job(state_action_struct *s_op, job_status_s *ret);
+static int PINT_string_count_segments(char *pathname);
+static int PINT_string_next_segment(char *pathname,
+				    char **inout_segp,
+				    void **opaquep);
+
+static int lookup_init(PINT_server_op *s_op, job_status_s *ret);
+static int lookup_cleanup(PINT_server_op *s_op, job_status_s *ret);
+static int lookup_verify_directory_metadata(PINT_server_op *s_op, job_status_s *ret);
+static int lookup_send_response(PINT_server_op *s_op, job_status_s *ret);
+static int lookup_read_directory_entry(PINT_server_op *s_op, job_status_s *ret);
+static int lookup_read_directory_metadata(PINT_server_op *s_op, job_status_s *ret);
+static int lookup_release_job(PINT_server_op *s_op, job_status_s *ret);
+static int lookup_setup_next_segment(PINT_server_op *s_op, job_status_s *ret);
 void lookup_init_state_machine(void);
 /* TODO: Release Scheduled Job */
 
@@ -43,55 +49,60 @@ PINT_state_machine_s lookup_req_s =
 
 %%
 
-machine lookup(init, key_val, dir_space, check_params, send, release, cleanup)
+machine lookup(init, read_directory_metadata, read_directory_entry, verify_directory_metadata, send_response, release, cleanup, setup_next_segment)
 {
-
     state init
-    {
-	run lookup_init;
-	default => key_val;
-    }
+	{
+	    run lookup_init;
+	    default => read_directory_metadata;
+	}
 
-    state key_val
-    {
-	run lookup_key_val;
-	success => check_params;
-	default => send;
-    }
+    state read_directory_metadata
+	{
+	    run lookup_read_directory_metadata;
+	    success => verify_directory_metadata;
+	    default => send_response;
+	}
 
-    state check_params
-    {
-	run lookup_check_params;
-	success => dir_space;
-	ENO_METADATA => send;
-	default => send;
-    }
+    state verify_directory_metadata
+	{
+	    run lookup_verify_directory_metadata;
+	    success      => read_directory_entry;
+	    ENO_METADATA => send_response;
+	    default      => send_response;
+	}
 
-    state dir_space
-    {
-	run lookup_dir_space;
-	success => key_val;
-	default => send;
-    }
+    state read_directory_entry
+	{
+	    run lookup_read_directory_entry;
+	    success => setup_next_segment;
+	    default => send_response;
+	}
 
-    state send
-    {
-	run lookup_send_bmi;
-	default => release;
-    }
+    state setup_next_segment
+	{
+	    run lookup_setup_next_segment;
+            success => read_directory_metadata;
+	    default => send_response;
+	}
+
+    state send_response
+	{
+	    run lookup_send_response;
+	    default => release;
+	}
 
     state release
-    {
-	run lookup_release_job;
-	default => cleanup;
-    }
+	{
+	    run lookup_release_job;
+	    default => cleanup;
+	}
 
     state cleanup
-    {
-	run lookup_cleanup;
-	default => init;
-    }
-
+	{
+	    run lookup_cleanup;
+	    default => init;
+	}
 }
 
 %%
@@ -109,9 +120,7 @@ machine lookup(init, key_val, dir_space, check_params, send, release, cleanup)
 
 void lookup_init_state_machine(void)
 {
-
     lookup_req_s.state_machine = lookup;
-
 }
 
 /*
@@ -129,129 +138,49 @@ void lookup_init_state_machine(void)
  * Synopsis: Allocate all memory.  Should we just malloc one big region?
  *           
  */
-
-
-static int lookup_init(state_action_struct *s_op, job_status_s *ret)
+static int lookup_init(PINT_server_op *s_op, job_status_s *ret)
 {
+    int seg_ret, job_post_ret;
+    char *ptr;
 
-    int job_post_ret=0;
-    /*job_id_t i;*/
-    void *big_memory_buffer;
+    gossip_debug(SERVER_DEBUG, "lookup state: lookup_init\n");
 
-    int memory_sz;
-    int key_a_sz,val_a_sz,key_a0_sz,val_a0_sz,handle_array_sz,attr_array_sz;
+    /* fill in the lookup portion of the PINT_server_op */
+    /* NOTE: it would be nice if we just decoded into this in the first place. */
+    s_op->u.lookup.path = s_op->req->u.lookup_path.path;
+    s_op->u.lookup.segp = NULL;
 
-    gossip_ldebug(SERVER_DEBUG,"Lookup_Init\n");
+    s_op->u.lookup.seg_ct = PINT_string_count_segments(s_op->u.lookup.path);
+    s_op->u.lookup.seg_nr = 0;
 
-    /* Set up the response size */
-    s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
-    
-    s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
-    s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
+    seg_ret = PINT_string_next_segment(s_op->u.lookup.path,
+				       &s_op->u.lookup.segp,
+				       &s_op->u.lookup.segstate);
 
-    s_op->val.buffer_sz = sizeof(PVFS_handle);
+    s_op->u.lookup.base_handle = s_op->req->u.lookup_path.starting_handle;
+    s_op->u.lookup.fs_id       = s_op->req->u.lookup_path.fs_id;
 
-    /* s_op->key_a */
-    /* s_op->val_a */
-    key_a_sz = val_a_sz = 3*sizeof(PVFS_ds_keyval_s);  
-
-    /* key_a[0] */
-    key_a0_sz = Trove_Common_Keys[DIR_ENT_KEY].size > Trove_Common_Keys[METADATA_KEY].size ? \
-	Trove_Common_Keys[DIR_ENT_KEY].size : Trove_Common_Keys[METADATA_KEY].size;
-
-
-    /* key_a[1] */
-    val_a0_sz = sizeof(PVFS_handle) > sizeof(PVFS_object_attr) ? \
-	sizeof(PVFS_handle) : sizeof(PVFS_object_attr);
-
-    /* handle_array */
-    handle_array_sz = LOOKUP_BUFF_SZ*sizeof(PVFS_handle); 
-
-    /* attr_array */
-    attr_array_sz = LOOKUP_BUFF_SZ*sizeof(PVFS_object_attr) + sizeof(PVFS_datafile_attr);
-
-    memory_sz = key_a_sz+val_a_sz+2*(key_a0_sz+val_a0_sz)+handle_array_sz+attr_array_sz
-	+ s_op->val.buffer_sz;
-
-    /* Allocate space for attributes, handles, and path segments */
-    big_memory_buffer = malloc(memory_sz);
-
-    /* Start the Pointer Calculation */
-    /* Trove key array */
-    s_op->key_a = (PVFS_ds_keyval_s *) big_memory_buffer;
-    big_memory_buffer += key_a_sz;
-
-    /* Trove value array */
-    s_op->val_a = (PVFS_ds_keyval_s *) big_memory_buffer;
-    big_memory_buffer += val_a_sz;
-
-    /* Key Buffer 1 */
-    s_op->key_a[0].buffer = big_memory_buffer;
-    big_memory_buffer += key_a0_sz;
-
-    /* Key Buffer 2 */
-    s_op->key_a[1].buffer = big_memory_buffer;
-    big_memory_buffer += key_a0_sz;
-
-    /* Value Buffer 1 */
-    s_op->val_a[0].buffer = big_memory_buffer;
-    big_memory_buffer += val_a0_sz;
-
-    /* Value Buffer 2 */
-    s_op->val_a[1].buffer = big_memory_buffer;
-    big_memory_buffer += val_a0_sz;
-
-    /* Handle Array */
-    s_op->resp->u.lookup_path.handle_array = (PVFS_handle *) big_memory_buffer;
-    big_memory_buffer += handle_array_sz;
-
-    /* Attribute Array */
-    s_op->resp->u.lookup_path.attr_array = (PVFS_object_attr *) big_memory_buffer;
-    big_memory_buffer += attr_array_sz;
-
-    /* Val Buffer */
-    s_op->val.buffer = (void *) big_memory_buffer;
-    big_memory_buffer += s_op->val.buffer_sz;
-
-    /* We are done calculating pointers.  Check to make sure we are correct in pointer arith */
-    assert(big_memory_buffer-memory_sz == s_op->key_a);
-
-    /* Set up the right sizes that I allocated */
-    s_op->key_a[0].buffer_sz = s_op->key_a[1].buffer_sz = key_a0_sz;
-
-    s_op->val_a[0].buffer_sz = s_op->val_a[1].buffer_sz = val_a0_sz;
-
-    s_op->resp->u.lookup_path.count = -1;
-
-    /* 
-     *	Set up the key val iterate pair.  When we go into a nice loop to find handles,
-     *	it will help the state machine if the value of the handle we are looking for
-     *	is stored in the same place.  So, lets use the starting handle...
-     * 
-     *  Note: the path will ALWAYS begin with a '/' as frank and I discussed.  dw
+    /* allocate memory
      *
+     * Note: all memory is allocated in a single block, pointed to by s_op->u.lookup.h_a
      */
-    s_op->strsize = strlen(s_op->req->u.lookup_path.path);
-    if(index(s_op->req->u.lookup_path.path,'/')-s_op->req->u.lookup_path.path == 0)
-    {
-	gossip_debug(SERVER_DEBUG,"Chopping Leading / \n");
-	s_op->req->u.lookup_path.path++;
-	s_op->strsize--;
-    }
+    ptr = malloc(s_op->u.lookup.seg_ct * (sizeof(PVFS_handle) + sizeof(PVFS_object_attr)));
+    assert(ptr != NULL);
+
+    s_op->u.lookup.h_a = (PVFS_handle *) ptr;
+    ptr += s_op->u.lookup.seg_ct * sizeof(PVFS_handle);
+    s_op->u.lookup.oa_a = (PVFS_object_attr *) ptr;
 
     job_post_ret = job_req_sched_post(s_op->req,
-	    s_op,
-	    ret,
-	    &(s_op->scheduled_id));
+				      s_op,
+				      ret,
+				      &(s_op->scheduled_id));
 
-    gossip_ldebug(SERVER_DEBUG,"/Lookup_Init\n");
-
-    return(job_post_ret);
-
+    return job_post_ret;
 }
 
 /*
- * Function: lookup_check_params
+ * Function: lookup_read_directory_metadata
  *
  * Params:   server_op *s_op, 
  *           job_status_s *ret
@@ -262,231 +191,193 @@ static int lookup_init(state_action_struct *s_op, job_status_s *ret)
  *
  * Returns:  int
  *
- * Synopsis: We have iterated through the key/val pairs
- *           and should have the metadata and the directory
- *           handle.  First, check the permissions on the directory, 
- *           Then, if they correspond, run key/val iter on the dspace
- *           
- *           TODO: This still needs a little more work... follow the TODO's!
- *                 -dw
+ * Synopsis: Given a directory handle, find the data space holding directory
+ *           entries and the attributes for the directory by looking up the
+ *           keyval pairs.
  *           
  */
-
-
-static int lookup_check_params(state_action_struct *s_op, job_status_s *ret)
+static int lookup_read_directory_metadata(PINT_server_op *s_op, job_status_s *ret)
 {
+    int job_post_ret;
+    job_id_t j_id;
+    PVFS_vtag_s vtag;
+    PVFS_handle handle;
 
-  int job_post_ret = 1;
-  /*job_id_t i; */
+    gossip_debug(SERVER_DEBUG, "lookup state: lookup_read_directory_metadata\n");
 
-  int k;
-  char *end_of_path;
-  int meta_data_flag, directory_handle_flag;	/*used to tell us that we have the data*/
+    /* use the base handle if we haven't looked up a segment yet */
+    if (s_op->u.lookup.seg_nr == 0) handle = s_op->u.lookup.base_handle;
+    else                            handle = s_op->u.lookup.h_a[s_op->u.lookup.seg_nr-1];
 
-  gossip_ldebug(SERVER_DEBUG,"Check Perms\n");
-  meta_data_flag = directory_handle_flag = 0;
+    gossip_debug(SERVER_DEBUG,
+		 "  looking up segment %s using directory handle = 0x%08Lx\n",
+		 s_op->u.lookup.segp,
+		 handle);
 
-  if (s_op->resp->u.lookup_path.count == -1)
-  {
-      s_op->resp->u.lookup_path.count++;
-      s_op->req->u.lookup_path.starting_handle =
-	  *((PVFS_handle *) s_op->val_a[0].buffer);
-  }
-  /* We are not in the root dir space.  We need to save this information */
-  else
-  {
-      if(!ret->count)
-      {
-	  /* Here, we had a handle out of the parent directory.  We need to
-	     add this in and then encode our message.  We have no more information
-	     and the client must hash on this to get more info
-	   */
-	  s_op->resp->u.lookup_path.handle_array[s_op->resp->u.lookup_path.count] 
-	      = *(PVFS_handle *) s_op->val.buffer;
-	  s_op->resp->u.lookup_path.count++;
-	  s_op->resp->rsize += sizeof(PVFS_handle);
-	  ret->error_code = ENO_METADATA;
-	  return(1);
-      }
+    /* initialize keyvals prior to read list call
+     *
+     * We will read the handle of the dspace with direntries with the first
+     * keyval, and the attributes with the second.
+     *
+     * If this is the base handle, we read attributes into base_attr rather
+     * than into the object attribute array (oa_a).
+     */
+    s_op->u.lookup.k_a[0].buffer    = Trove_Common_Keys[DIR_ENT_KEY].key;
+    s_op->u.lookup.k_a[0].buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
+    s_op->u.lookup.v_a[0].buffer    = &s_op->u.lookup.dirent_handle;
+    s_op->u.lookup.v_a[0].buffer_sz = sizeof(PVFS_handle);
 
-      for (k = 0; k < ret->count; k++)
-      {
-	  switch (((char *) (s_op->key_a[k].buffer))[0])
-	  {
-	      case 'm':
-		  memcpy (&(s_op->resp->u.lookup_path.
-			      attr_array[s_op->resp->u.lookup_path.count]),
-			  s_op->val_a[0].buffer, s_op->val_a[0].buffer_sz);
-		  meta_data_flag = 1;
-		  s_op->resp->rsize += sizeof(PVFS_object_attr);
-		  break;
-	      case 'd':
-		  s_op->resp->u.lookup_path.handle_array[s_op->resp->u.lookup_path.
-		      count] =
-		      s_op->req->u.lookup_path.starting_handle;
-		  s_op->req->u.lookup_path.starting_handle =
-		      *((PVFS_handle *) s_op->val_a[0].buffer), directory_handle_flag =
-		      1;
-		  s_op->resp->rsize += sizeof(PVFS_handle);
-		  break;
-	      default:
-		  gossip_lerr ("Handle of unknown type found\n");
+    s_op->u.lookup.k_a[1].buffer    = Trove_Common_Keys[METADATA_KEY].key;
+    s_op->u.lookup.k_a[1].buffer_sz = Trove_Common_Keys[METADATA_KEY].size;
+    if (s_op->u.lookup.seg_nr == 0) s_op->u.lookup.v_a[1].buffer = &s_op->u.lookup.base_attr;
+    else                            s_op->u.lookup.v_a[1].buffer = &s_op->u.lookup.oa_a[s_op->u.lookup.seg_nr-1];
 
-	  }
-      }
-      if (directory_handle_flag && meta_data_flag)
-      {
-	  s_op->resp->u.lookup_path.count++;
-	  // CHECK PERMISSIONS HERE on attr_array[count-1];
-      }
-      else
-      {
-	  if (!directory_handle_flag)
-	  {
-	      gossip_lerr ("Did not get directory handle\n");
-	      /* This means that this is a file and not a directory
-		 So we increment the count to say we have 
-		 these attribs and run with it.
-	       */
-	      if(meta_data_flag)
-	      {
-		  s_op->resp->u.lookup_path.handle_array[s_op->resp->u.lookup_path.
-		      count] = *(PVFS_handle *) s_op->val.buffer;
-		  s_op->resp->u.lookup_path.count++;
-		  s_op->resp->rsize += sizeof(PVFS_handle);
-		  ret->error_code = ENO_METADATA;
-		  /* Now jump to send!! */
-		  return(1);
-	      }
-	  }
-	  if(!meta_data_flag)
-	  {
-	      /* TODO: Why don't we have them?? */
-	      gossip_lerr ("Did not get metadata.\n");
-	  }
-      }
-  }
-  /* TODO: Better way of doing this??? */
-  if (s_op->strsize)
-  {
-      end_of_path = index (s_op->req->u.lookup_path.path, '/');
+    s_op->u.lookup.v_a[1].buffer_sz = sizeof(PVFS_object_attr);
 
-      /* What we are doing here is if there is a multi-part string,
-	 we need to just get the first key, and hide the rest of the
-	 string 
-       */
-      if (end_of_path)
-	  end_of_path[0] = '\0';
-#if 0
-      else
-	  if(strlen(s_op->req->u.lookup_path.path))
-#endif
-	      s_op->key.buffer = s_op->req->u.lookup_path.path;
-      s_op->key.buffer_sz = strlen (s_op->key.buffer)+1;
-      s_op->req->u.lookup_path.path += strlen (s_op->key.buffer) + 1;
-      s_op->strsize -= strlen (s_op->key.buffer) + 1;
-  }
-  gossip_ldebug (SERVER_DEBUG, "Looking up %s\n", (char *) s_op->key.buffer);
+    job_post_ret = job_trove_keyval_read_list(s_op->u.lookup.fs_id,
+					      handle,
+					      s_op->u.lookup.k_a,
+					      s_op->u.lookup.v_a,
+					      2,
+					      0 /* flags */,
+					      vtag, /* should eventually be a ptr, so we can use NULL */
+					      s_op,
+					      ret,
+					      &j_id);
+    return job_post_ret;
+}
 
-  gossip_ldebug (SERVER_DEBUG, "check returning: %d\n", job_post_ret);
-  return (job_post_ret);
+/*
+ * Function: lookup_verify_directory_metadata
+ *
+ * Params:   server_op *s_op, 
+ *           job_status_s *ret
+ *
+ * Pre:      None
+ *
+ * Post:     None
+ *
+ * Returns:  int
+ *
+ * Synopsis: The previous state tried to acquire the attribs for a directory
+ *           and the handle for the dspace with directory entries.  Here
+ *           we simply check permissions and check to see if we were able
+ *           to successfully grab this data.
+ *
+ *           If we succeeded (in the last step), we will continue to look up
+ *           path components.
+ *           If we failed, we go on to send our response (partial??? verify!).
+ *           
+ */
+static int lookup_verify_directory_metadata(PINT_server_op *s_op, job_status_s *ret)
+{
+    PVFS_object_attr *a_p;
 
+    gossip_debug(SERVER_DEBUG, "lookup state: lookup_verify_directory_metadata\n");
+
+    if (s_op->u.lookup.seg_nr == 0) a_p = &s_op->u.lookup.base_attr;
+    else                            a_p = &s_op->u.lookup.oa_a[s_op->u.lookup.seg_nr - 1];
+
+    assert(a_p->objtype == PVFS_TYPE_DIRECTORY);
+
+    gossip_debug(SERVER_DEBUG,
+		 "  dirent handle = 0x%08Lx, attrs = (owner = %d, group = %d, perms = %d, type = %d)\n",
+		 s_op->u.lookup.dirent_handle,
+		 a_p->owner,
+		 a_p->group,
+		 a_p->perms,
+		 a_p->objtype);
+
+    return 1;
 }
 
 
 /*
- * Function: lookup_dir_space
+ * Function: lookup_read_directory_entry
  *
  * Params:   server_op *s_op, 
  *           job_status_s *ret
  *
  * Returns:  int
  *
- * Synopsis: 
+ * Synopsis: Given a path component and a parent handle, find the handle
+ *           for the next component of the path.
  *           
  */
-
-
-static int lookup_dir_space(state_action_struct *s_op, job_status_s *ret)
+static int lookup_read_directory_entry(PINT_server_op *s_op, job_status_s *ret)
 {
-
-    int job_post_ret=-1;
-    job_id_t i;
+    int job_post_ret;
+    job_id_t j_id;
     PVFS_vtag_s vtag;
 
-    gossip_ldebug(SERVER_DEBUG,"Lookup Directory Space %lld\n",
-                  s_op->req->u.lookup_path.starting_handle);
-    gossip_ldebug(SERVER_DEBUG,"Trying to find %s of length %d in %lld\n",
-		    (char *)s_op->key.buffer,
-		    s_op->key.buffer_sz,
-		    s_op->req->u.lookup_path.starting_handle);
+    gossip_debug(SERVER_DEBUG, "lookup state: lookup_read_directory_entry\n");
 
-    job_post_ret = job_trove_keyval_read(
-	    s_op->req->u.lookup_path.fs_id,
-	    s_op->req->u.lookup_path.starting_handle,
-	    &(s_op->key),
-	    &(s_op->val),
-	    0,
-	    vtag,
-	    s_op,
-	    ret,
-	    &i);
-    return(job_post_ret);
+    gossip_debug(SERVER_DEBUG,
+		 "  reading from dirent handle = 0x%08Lx, segment = %s\n",
+		 s_op->u.lookup.dirent_handle,
+		 s_op->u.lookup.segp);
 
+    /* initialize keyval prior to read call
+     *
+     * We will read the handle of the current segment here.
+     */
+    s_op->u.lookup.k_a[0].buffer    = s_op->u.lookup.segp;
+    s_op->u.lookup.k_a[0].buffer_sz = strlen(s_op->u.lookup.segp) + 1;
+    s_op->u.lookup.v_a[0].buffer    = &s_op->u.lookup.h_a[s_op->u.lookup.seg_nr];
+    s_op->u.lookup.v_a[0].buffer_sz = sizeof(PVFS_handle);
+
+    job_post_ret = job_trove_keyval_read(s_op->u.lookup.fs_id,
+					 s_op->u.lookup.dirent_handle,
+					 s_op->u.lookup.k_a,
+					 s_op->u.lookup.v_a,
+					 0,
+					 vtag,
+					 s_op,
+					 ret,
+					 &j_id);
+    return job_post_ret;
 }
 
 /*
- * Function: lookup_key_val
+ * Function: lookup_setup_next_segment
  *
  * Params:   server_op *s_op, 
  *           job_status_s *ret
  *
- * Pre:      None
- *
- * Post:     None
- *
  * Returns:  int
  *
- * Synopsis: Iterate through the keyval space of starting_handle
+ * Synopsis:
  *           
  */
-
-
-static int lookup_key_val(state_action_struct *s_op, job_status_s *ret)
+static int lookup_setup_next_segment(PINT_server_op *s_op, job_status_s *ret)
 {
+    int seg_ret;
 
-    int job_post_ret=-1;
-    job_id_t i;
-    PVFS_vtag_s bs;
+    gossip_debug(SERVER_DEBUG, "lookup state: lookup_setup_next_segment\n");
 
-    if(s_op->resp->u.lookup_path.count != -1)
-	s_op->req->u.lookup_path.starting_handle = *(PVFS_handle *)s_op->val.buffer;
+    s_op->u.lookup.seg_nr++;
 
-    gossip_ldebug(SERVER_DEBUG,"Lookup: K/V Iterate %lld\n",s_op->req->u.lookup_path.starting_handle);
+    assert(s_op->u.lookup.seg_nr <= s_op->u.lookup.seg_ct);
 
-    gossip_ldebug(SERVER_DEBUG,"Sizes: %d,%d,%d,%d\n",
-	    s_op->key_a[0].buffer_sz,
-	    s_op->key_a[1].buffer_sz,
-	    s_op->val_a[0].buffer_sz,
-	    s_op->val_a[1].buffer_sz);
-
-    job_post_ret = job_trove_keyval_iterate(
-	    s_op->req->u.lookup_path.fs_id,
-	    s_op->req->u.lookup_path.starting_handle,
-	    1,
-	    s_op->key_a,
-	    s_op->val_a,
-	    2,
-	    0,
-	    bs,
-	    s_op,
-	    ret,
-	    &i);
-
-    return(job_post_ret);
-
+    if (s_op->u.lookup.seg_nr == s_op->u.lookup.seg_ct) {
+	gossip_debug(SERVER_DEBUG,
+		     "  hit end of segments\n");
+	ret->error_code = 99; /* TODO: MAKE THIS A REAL VALUE; THIS SEEMS POOR. */
+	return 1;
+    }
+    else {
+	gossip_debug(SERVER_DEBUG,
+		     "  now on segment %d of %d\n",
+		     s_op->u.lookup.seg_nr,
+		     s_op->u.lookup.seg_ct);
+    }
+	
+    seg_ret = PINT_string_next_segment(s_op->u.lookup.path,
+				       &s_op->u.lookup.segp,
+				       &s_op->u.lookup.segstate);
+    if (seg_ret != 0) assert(0);
+    return 1;
 }
-
 
 /*
  * Function: lookup_release_job
@@ -504,22 +395,23 @@ static int lookup_key_val(state_action_struct *s_op, job_status_s *ret)
  */
 
 
-static int lookup_release_job(state_action_struct *s_op, job_status_s *ret)
+static int lookup_release_job(PINT_server_op *s_op, job_status_s *ret)
 {
 
     int job_post_ret=0;
     job_id_t i;
 
-    gossip_ldebug(SERVER_DEBUG,"Release\n");
+    gossip_debug(SERVER_DEBUG,"lookup state: lookup_release_job\n");
+
     job_post_ret = job_req_sched_release(s_op->scheduled_id,
-	    s_op,
-	    ret,
-	    &i);
+					 s_op,
+					 ret,
+					 &i);
     return job_post_ret;
 }
 
 /*
- * Function: lookup_send_bmi
+ * Function: lookup_send_response
  *
  * Params:   server_op *s_op, 
  *           job_status_s *ret
@@ -533,42 +425,51 @@ static int lookup_release_job(state_action_struct *s_op, job_status_s *ret)
  * Synopsis: Encode and send
  *           
  */
-
-
-static int lookup_send_bmi(state_action_struct *s_op, job_status_s *ret)
+static int lookup_send_response(PINT_server_op *s_op, job_status_s *ret)
 {
-
-    int job_post_ret=0;
+    int encode_ret, job_post_ret, payload_sz;
     job_id_t i;
 
-    gossip_ldebug(SERVER_DEBUG,"Send BMI\n");
-    s_op->resp->rsize = sizeof(struct PVFS_server_resp_s) 
-	+ (s_op->resp->u.lookup_path.count * (sizeof(PVFS_handle)+sizeof(PVFS_object_attr)));
+    gossip_debug(SERVER_DEBUG, "lookup state: lookup_send_response\n");
 
-    job_post_ret = PINT_encode(s_op->resp,
-	    PINT_ENCODE_RESP,
-	    &(s_op->encoded),
-	    s_op->addr,
-	    s_op->enc_type);
+    payload_sz = s_op->u.lookup.seg_nr * (sizeof(PVFS_handle) + sizeof(PVFS_object_attr));
 
-    assert(job_post_ret == 0);
+    /* fill in response -- WHAT IS GUARANTEED TO BE FILLED IN ALREADY??? */
+    s_op->resp->op = PVFS_SERV_LOOKUP_PATH;
+    s_op->resp->rsize = sizeof(struct PVFS_server_resp_s) + payload_sz;
+    s_op->resp->status = 0; /* ??? */
+    s_op->resp->u.lookup_path.count        = s_op->u.lookup.seg_nr; /* # actually completed */
+    s_op->resp->u.lookup_path.handle_array = s_op->u.lookup.h_a;
+    s_op->resp->u.lookup_path.attr_array   = s_op->u.lookup.oa_a;
+
+    gossip_debug(SERVER_DEBUG,
+		 "  sending response with %d segment(s) (size %Ld)\n",
+		 s_op->u.lookup.seg_nr,
+		 s_op->resp->rsize);
+
+    encode_ret = PINT_encode(s_op->resp,
+			     PINT_ENCODE_RESP,
+			     &(s_op->encoded),
+			     s_op->addr,
+			     s_op->enc_type);
+
+    /* Q: IS ALL MY DATA OK TO BE FREED AFTER THE ENCODE??? */
+
+    assert(encode_ret == 0);
 
     /* Post message */
-    job_post_ret = job_bmi_send_list(
-	    s_op->addr,
-	    s_op->encoded.buffer_list,
-	    s_op->encoded.size_list,
-	    s_op->encoded.list_count,
-	    s_op->encoded.total_size,
-	    s_op->tag,
-	    s_op->encoded.buffer_flag,
-	    0,
-	    s_op, 
-	    ret, 
-	    &i);
-
+    job_post_ret = job_bmi_send_list(s_op->addr,
+				     s_op->encoded.buffer_list,
+				     s_op->encoded.size_list,
+				     s_op->encoded.list_count,
+				     s_op->encoded.total_size,
+				     s_op->tag,
+				     s_op->encoded.buffer_flag,
+				     0,
+				     s_op, 
+				     ret, 
+				     &i);
     return(job_post_ret);
-
 }
 
 /*
@@ -586,38 +487,125 @@ static int lookup_send_bmi(state_action_struct *s_op, job_status_s *ret)
  * Synopsis: free memory and return
  *           
  */
-
-
-static int lookup_cleanup(state_action_struct *s_op, job_status_s *ret)
+static int lookup_cleanup(PINT_server_op *s_op, job_status_s *ret)
 {
-
-    gossip_ldebug(SERVER_DEBUG,"Cleanup\n");
+    gossip_debug(SERVER_DEBUG, "lookup state: lookup_cleanup\n");
 
     PINT_encode_release(&(s_op->encoded),PINT_ENCODE_RESP,0);
     PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ,0);
 
-    if(s_op->key_a)
-    {
-	free(s_op->key_a);
-    }
-
-    if(s_op->resp)
-    {
-	free(s_op->resp);
-    }
+    free(s_op->u.lookup.h_a);
 
     /*
-    BMI_memfree(
-	    s_op->addr,
-	    s_op->req,
-	    s_op->unexp_bmi_buff->size,
-	    BMI_RECV_BUFFER
-	    );
+      BMI_memfree(
+      s_op->addr,
+      s_op->req,
+      s_op->unexp_bmi_buff->size,
+      BMI_RECV_BUFFER
+      );
     */
     free(s_op);
 
     return(0);
 
+}
+
+/* PINT_string_count_segments()
+ *
+ * Count number of segments in a path.
+ *
+ * TODO: CLEAN UP!
+ */
+static int PINT_string_count_segments(char *pathname)
+{
+    int pos, nullpos = 0, killed_slash, segct = 0;
+
+    /* insist on an absolute path */
+    if (pathname[0] != '/') return -1;
+    
+    for(;;) {
+	pos = nullpos;
+	killed_slash = 0;
+
+	/* jump to next separator */
+	while ((pathname[nullpos] != '\0') && (pathname[nullpos] != '/')) nullpos++;
+
+	if (nullpos == pos) {
+	    /* extra slash or trailing slash; ignore */
+	}
+	else {
+	    segct++; /* found another real segment */
+	}
+	if (pathname[nullpos] == '\0') break;
+	nullpos++;
+    }
+
+    return segct;
+}
+
+/* PINT_string_next_segment()
+ *
+ * Parameters:
+ * pathname   - pointer to string
+ * inout_segp - address of pointer; NULL to get first segment,
+ *              pointer to last segment to get next segment
+ * opaquep    - address of void *, used to maintain state outside
+ *              the function
+ *
+ * Returns 0 if segment is available, -1 on end of string.
+ *
+ * This approach is nice because it keeps all the necessary state
+ * outside the function and concisely stores it in two pointers.
+ *
+ * Internals:
+ * We're using opaquep to store the location of where we placed a
+ * '\0' separator to get a segment.  The value is undefined when
+ * called with *inout_segp == NULL.  Afterwards, if we place a '\0',
+ * *opaquep will point to where we placed it.  If we do not, then we
+ * know that we've hit the end of the path string before we even
+ * start processing.
+ *
+ * Note that it is possible that *opaquep != NULL and still there are
+ * no more segments; a trailing '/' could cause this, for example.
+ */
+static int PINT_string_next_segment(char *pathname,
+				    char **inout_segp,
+				    void **opaquep)
+{
+    char *ptr;
+
+    /* insist on an absolute path */
+    if (pathname[0] != '/') return -1;
+
+    /* initialize our starting position */
+    if (*inout_segp == NULL) {
+	ptr = pathname;
+    }
+    else if (*opaquep != NULL) {
+	/* replace the '/', point just past it */
+	ptr = (char *) *opaquep;
+	*ptr = '/';
+	ptr++;
+    }
+    else return -1; /* NULL *opaquep indicates last segment returned last time */
+
+    /* at this point, the string is back in its original state */
+
+    /* jump past separators */
+    while ((*ptr != '\0') && (*ptr == '/')) ptr++;
+    if (*ptr == '\0') return -1; /* all that was left was trailing '/'s */
+
+    *inout_segp = ptr;
+
+    /* find next separator */
+    while ((*ptr != '\0') && (*ptr != '/')) ptr++;
+    if (*ptr == '\0') *opaquep = NULL; /* indicate last segment */
+    else {
+	/* terminate segment and save position of terminator */
+	*ptr = '\0';
+	*opaquep = ptr;
+    }
+    return 0;
 }
 
 
