@@ -171,7 +171,7 @@ static ssize_t pvfs2_file_write(
     size_t each_count = 0;
     size_t total_count = 0;
     pvfs2_kernel_op_t *new_op = NULL;
-    struct pvfs_bufmap_desc* desc;
+    struct pvfs_bufmap_desc* desc = NULL;
     int ret = -1, retries = PVFS2_OP_RETRY_COUNT;
     char* current_buf = (char*)buf;
     loff_t original_offset = *offset;
@@ -196,8 +196,7 @@ static ssize_t pvfs2_file_write(
 
     while(total_count < count)
     {
-	pvfs2_print("pvfs2: write iteration %d (size of %d).\n",
-                    total_count, count);
+	pvfs2_print("pvfs2: writing %d bytes.\n", count);
 
 	/* get a buffer for the transfer */
 	/* note that we get a new buffer each time for fairness, though
@@ -214,18 +213,15 @@ static ssize_t pvfs2_file_write(
 	}
     
 	/* how much to transfer in this loop iteration */
-	if((count - total_count) > pvfs_bufmap_size_query())
-	    each_count = pvfs_bufmap_size_query();
-	else
-	    each_count = count - total_count;
+	each_count = (((count - total_count) > pvfs_bufmap_size_query()) ?
+                      pvfs_bufmap_size_query() : (count - total_count));
 
 	new_op->upcall.req.io.buf = desc->uaddr;
 	new_op->upcall.req.io.count = each_count;
 	new_op->upcall.req.io.offset = *offset;
 
 	/* copy data from application */
-	pvfs_bufmap_copy_from_user(desc, current_buf,
-	    each_count);
+	pvfs_bufmap_copy_from_user(desc, current_buf, each_count);
 
         service_operation_with_timeout_retry(
             new_op, "pvfs2_file_write", retries);
@@ -248,6 +244,14 @@ static ssize_t pvfs2_file_write(
 	*offset += new_op->downcall.resp.io.amt_complete;
 	total_count += new_op->downcall.resp.io.amt_complete;
 
+        /* adjust inode size if applicable */
+        if ((original_offset + new_op->downcall.resp.io.amt_complete) >
+            inode->i_size)
+        {
+            i_size_write(inode, (original_offset +
+                                 new_op->downcall.resp.io.amt_complete));
+        }
+
 	/* if we got a short write, fall out and return what we
 	 * got so far
 	 * TODO: define semantics here- kind of depends on pvfs2
@@ -257,12 +261,6 @@ static ssize_t pvfs2_file_write(
 	{
 	    break;
 	}
-
-        /* adjust inode size if applicable */
-        if ((*offset + count) > inode->i_size)
-        {
-            i_size_write(inode, (*offset + count));
-        }
     }
 
     op_release(new_op);
