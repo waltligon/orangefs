@@ -241,6 +241,6 @@ llist_p llist_next(llist_p entry){
  *  c-basic-offset: 3
  *  tab-width: 3
  *
- * vim: ts=3
+ * vim: ts=8 sts=4 sw=4 noexpandtab
  * End:
  */ 

@@ -123,5 +123,5 @@ void dbpf_queued_op_put_and_dequeue(struct dbpf_queued_op *q_op_p)
  *  c-basic-offset: 4
  * End:
  *
- * vim: ts=8 sw=4 sts=4 noexpandtab
+ * vim: ts=8 sts=4 sw=4 noexpandtab
  */

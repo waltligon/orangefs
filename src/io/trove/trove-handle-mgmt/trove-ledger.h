@@ -40,7 +40,7 @@ int trove_handle_free(struct handle_ledger *hl, TROVE_handle handle);
  *  c-basic-offset: 4
  * End:
  *
- * vim: ts=8 sw=4 noexpandtab
+ * vim: ts=8 sts=4 sw=4 noexpandtab
  */
 
 #endif

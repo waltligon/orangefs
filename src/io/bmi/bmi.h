@@ -140,5 +140,5 @@ int BMI_post_sendunexpected_list(bmi_op_id_t * id,
  *  c-basic-offset: 4
  * End:
  *
- * vim: ts=8 sw=4 noexpandtab
+ * vim: ts=8 sts=4 sw=4 noexpandtab
  */
