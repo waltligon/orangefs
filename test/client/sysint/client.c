@@ -508,9 +508,16 @@ int main(int argc,char **argv)
 	req_readdir->pinode_refn.fs_id = req_look.fs_id;
 	req_readdir->token = PVFS_TOKEN_START;
 	req_readdir->pvfs_dirent_incount = 6;
-	resp_readdir->dirent_array = (PVFS_dirent *)malloc(sizeof(PVFS_dirent) *\
+/*
+	resp_readdir->dirent_array = (PVFS_dirent *)malloc(sizeof(PVFS_dirent) *
 			req_readdir->pvfs_dirent_incount);
 	resp_readdir->pvfs_dirent_outcount = 6;
+*/
+
+	req_readdir->credentials.uid = 100;
+	req_readdir->credentials.gid = 100;
+	req_readdir->credentials.perms = 1877;
+
 
 	// call readdir 
 	ret = PVFS_sys_readdir(req_readdir,resp_readdir);
