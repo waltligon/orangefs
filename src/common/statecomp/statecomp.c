@@ -8,8 +8,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <getopt.h>
-#include <symbol.h>
 #include <unistd.h>
+
+#include "statecomp-symbol.h"
 
 #ifdef __GNUC__
 #ifdef YYPARSE_PARAM

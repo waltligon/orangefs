@@ -10,7 +10,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include "symbol.h"
+#include "statecomp-symbol.h"
 #include "state-comp.h"
 
 char *enter_string(char *);

@@ -6,11 +6,12 @@
  * See COPYING in top-level directory.
  */
 
-#include "stdio.h"
-#include "stdlib.h"
-#include "symbol.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "statecomp-symbol.h"
 #include "parser.h"
-#include "string.h"
 
 extern YYSTYPE yylval;
 
