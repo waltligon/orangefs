@@ -316,7 +316,7 @@ int PVFS_Request_resized(PVFS_Request oldreq,
     if (oldreq == NULL)
         return PVFS_ERR_REQ;
     if (oldreq->ereq && !oldreq->sreq &&
-        oldreq->num_ereqs == 1 &&
+        oldreq->offset == 0 && oldreq->num_ereqs == 1 &&
         oldreq->num_blocks == 1 && oldreq->stride == 0)
         /* existing resize record or useless vector - bypass it */
         retval = PVFS_Request_hvector(1, 1, 0, oldreq->ereq, newreq);

@@ -1,6 +1,7 @@
+
 DIR := io/description
 
-TESTSRC += \
+TEST_IO_DESC_DIR_SRC := \
 	$(DIR)/test-pack1.c\
 	$(DIR)/debug1.c\
 	$(DIR)/debug2.c\
@@ -19,6 +20,10 @@ TESTSRC += \
 	$(DIR)/debug15.c\
 	$(DIR)/debug16.c\
 	$(DIR)/debug17.c\
+	$(DIR)/debug18.c\
+	$(DIR)/debug19.c\
+	$(DIR)/debug20.c\
+	$(DIR)/debug21.c\
 	$(DIR)/debug_commit.c\
 	$(DIR)/debug_olap.c\
 	$(DIR)/test-encode-basic.c\
@@ -32,3 +37,13 @@ TESTSRC += \
 	$(DIR)/test-truncate.c \
 	$(DIR)/test-many-datafiles-import.c
 #	$(DIR)/test-req1.c\
+
+MISCSRC += $(DIR)/debug-main.o
+
+TESTSRC += $(TEST_IO_DESC_DIR_SRC)
+
+LOCALTESTS := $(patsubst %.c,%, $(TEST_IO_DESC_DIR_SRC))
+$(LOCALTESTS): %: %.o $(DIR)/debug-main.o
+	$(Q) "  LD     $@"
+	$(E)$(LD) $< $(DIR)/debug-main.o $(LDFLAGS) $(LIBS) -o $@
+
