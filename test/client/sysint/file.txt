@@ -1,4 +1,0 @@
-3
-tcp://www.yahoo.com 2
-tcp://www.parl.clemson.edu 7
-gm://www.sc2001.org 5
