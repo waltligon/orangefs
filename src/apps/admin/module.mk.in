@@ -9,16 +9,3 @@ ADMINSRC := \
 ADMINSRC_SERVER := \
 	$(DIR)/pvfs2-mkspace.c \
 	$(DIR)/pvfs2-showcoll.c \
-
-ADMINTOOLS := $(patsubst %.c, %, $(ADMINSRC))
-ADMINTOOLS_SERVER := $(patsubst %.c, %, $(ADMINSRC_SERVER))
-
-# special rules for tools which also require server components
-$(ADMINTOOLS_SERVER): %: %.o
-ifdef QUIET_COMPILE
-	@echo "  LD		$@"
-	@$(LD) $< $(LDFLAGS) $(SERVERLIBS) -o $@
-else
-	$(LD) $< $(LDFLAGS) $(SERVERLIBS) -o $@
-endif
-
