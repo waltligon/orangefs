@@ -40,12 +40,6 @@ int PINT_dev_test_unexpected(
 int PINT_dev_release_unexpected(
 	struct PINT_dev_unexp_info* info);
 
-int PINT_dev_write(
-	void* buffer,
-	int size,
-	enum PINT_dev_buffer_type buffer_type,
-	id_gen_t tag);
-
 int PINT_dev_write_list(
 	void** buffer_list,
 	int* size_list,
@@ -53,6 +47,9 @@ int PINT_dev_write_list(
 	int total_size,
 	enum PINT_dev_buffer_type buffer_type,
 	id_gen_t tag);
+
+#define PINT_dev_write(buf, size, type, tag)\
+ PINT_dev_write_list(&buf, &size, 1, size, type, tag)
 
 void* PINT_dev_memalloc(int size);
 

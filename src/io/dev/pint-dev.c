@@ -260,22 +260,6 @@ int PINT_dev_release_unexpected(
     return(0);
 }
 
-/* PINT_dev_write()
- *
- * writes a message buffer into the device
- *
- * returns 0 on success, -PVFS_error on failure
- */
-int PINT_dev_write(
-	void* buffer,
-	int size,
-	enum PINT_dev_buffer_type buffer_type,
-	id_gen_t tag)
-{
-    gossip_lerr("Error: function not implemented.\n");
-    return(-(PVFS_ENOSYS|PVFS_ERROR_DEV));
-}
-
 /* PINT_dev_write_list()
  *
  * writes a set of buffers into the device
@@ -302,8 +286,8 @@ int PINT_dev_write_list(
  */
 void* PINT_dev_memalloc(int size)
 {
-    gossip_lerr("Error: function not implemented.\n");
-    return(NULL);
+    /* no optimizations yet */
+    return(malloc(size));
 }
 
 /* PINT_dev_memfree()
@@ -314,7 +298,8 @@ void* PINT_dev_memalloc(int size)
  */
 void PINT_dev_memfree(void* buffer, int size)
 {
-    gossip_lerr("Error: function not implemented.\n");
+    /* no optimizations yet */
+    free(buffer);
     return;
 }
 
