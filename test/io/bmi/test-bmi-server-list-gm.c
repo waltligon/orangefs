@@ -121,7 +121,7 @@ int main(int argc, char **argv)	{
 	}
 	memset(my_ack, 0, sizeof(struct server_ack));
 
-#if 0
+#if 1
 	/* create 2 buffers to recv into */
 	recv_buffer1 = BMI_memalloc(client_addr, (my_req->size/2), 
 		BMI_RECV_BUFFER);
@@ -172,7 +172,7 @@ int main(int argc, char **argv)	{
 	}
 
 	/* post the recv */
-#if 0
+#if 1
 	ret = BMI_post_recv_list(&(server_ops[0]), client_addr, buffer_list, 
 		size_list, 2, my_req->size, &actual_size, BMI_PRE_ALLOC, 0, NULL,
 		context);
