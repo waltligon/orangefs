@@ -144,8 +144,8 @@ int dbpf_keyval_dbcache_try_remove(TROVE_coll_id coll_id,
 /* dbpf_keyval_dbcache_try_get()
  *
  * Right now we don't place any kind of upper limit on the number of
- * references to the same db, so this will never return BUSY.  That might
- * change at some later time.
+ * references to the same db, so this will never return BUSY.  That
+ * might change at some later time.
  *
  * Returns 0 on success, or one of -TROVE_ENOENT, -TROVE_EBUSY, -TROVE_PERM.
  *
@@ -234,13 +234,14 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
     if (ret != 0)
     {
 	    gossip_lerr("dbpf_keyval_dbcache_get: %s\n", db_strerror(ret));
-	    assert(0);
+	    error = -dbpf_db_error_to_trove_error(ret);
+	    goto return_error;
     } else
     {
 	got_db =1;
     }
 
-    db_p = keyval_db_cache[i].db_p; /* for simplicity */
+    db_p = keyval_db_cache[i].db_p;
     db_p->set_errpfx(db_p, "pvfs2");
     db_p->set_errcall(db_p, dbpf_error_report);
     /* DB_RECNUM makes it easier to iterate through every key in chunks */
@@ -300,8 +301,8 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
     return 0;
 
 failed_open_error:
-    /* db_create allocates memory -- even if db->open fails -- which can only
-     * be freed with db->close */
+    /* db_create allocates memory -- even if db->open fails -- which
+     * can only be freed with db->close */
     if (got_db && (keyval_db_cache[i].db_p != NULL))
     {
 	/* ignore errors, since we are trying to clean up anyway */

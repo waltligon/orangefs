@@ -102,11 +102,12 @@ struct PINT_client_create_sm {
     PVFS_sysresp_create          *create_resp;    /* in/out parameter*/
     PVFS_sys_attr                *sys_attr;       /* input parameter */
     int                          num_data_files;
-    PVFS_BMI_addr_t                   *data_server_addrs;
+    PVFS_BMI_addr_t              *data_server_addrs;
     PVFS_handle_extent_array     *io_handle_extent_array;
     PVFS_handle                  metafile_handle;
     PVFS_handle                  *datafile_handles;
     PVFS_Dist                    *dist;
+    int                           stored_error_code;
 };
 
 /* PINT_client_mkdir_sm */

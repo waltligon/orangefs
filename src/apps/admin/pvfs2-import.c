@@ -145,6 +145,7 @@ int main(int argc, char **argv)
         char *segp = NULL, *prev_segp = NULL;
         void *segstate = NULL;
 
+        memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
         ret = PVFS_sys_lookup(cur_fs, pvfs_path,
                               credentials, &resp_lookup,
                               PVFS2_LOOKUP_LINK_FOLLOW);
@@ -206,6 +207,17 @@ int main(int argc, char **argv)
             }
             parent_refn.fs_id = cur_fs;
         }
+    }
+
+    memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
+    ret = PVFS_sys_ref_lookup(parent_refn.fs_id, entry_name,
+                              parent_refn, credentials, &resp_lookup,
+                              PVFS2_LOOKUP_LINK_NO_FOLLOW);
+    if (ret == 0)
+    {
+        fprintf(stderr, "Target file %s already exists!\n", entry_name);
+        ret = -1;
+        goto main_out;
     }
 
     memset(&resp_create, 0, sizeof(PVFS_sysresp_create));

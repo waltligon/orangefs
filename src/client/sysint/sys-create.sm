@@ -21,26 +21,28 @@
 extern job_context_id pint_client_sm_context;
 
 /* state function prototypes */
-static int create_init(PINT_client_sm *sm_p,
-		       job_status_s *js_p);
-static int create_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
-                                              job_status_s *js_p);
-static int create_dspace_create_failure(PINT_client_sm *sm_p,
-					job_status_s *js_p);
-static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
-                                                job_status_s *js_p);
-static int create_datafiles_failure(PINT_client_sm *sm_p,
-                                    job_status_s *js_p);
-static int create_setattr_setup_msgpair(PINT_client_sm *sm_p,
-                                        job_status_s *js_p);
-static int create_setattr_failure(PINT_client_sm *sm_p,
-                                  job_status_s *js_p);
-static int create_crdirent_setup_msgpair(PINT_client_sm *sm_p,
-					 job_status_s *js_p);
-static int create_crdirent_failure(PINT_client_sm *sm_p,
-				   job_status_s *js_p);
-static int create_cleanup(PINT_client_sm *sm_p,
-                          job_status_s *js_p);
+static int create_init(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int create_dspace_create_setup_msgpair(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int create_dspace_create_failure(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int create_datafiles_setup_msgpair_array(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int create_datafiles_failure(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int create_setattr_setup_msgpair(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int create_setattr_failure(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int create_crdirent_setup_msgpair(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int create_crdirent_failure(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int create_delete_handles_setup_msgpair_array(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int create_cleanup(
+    PINT_client_sm *sm_p, job_status_s *js_p);
 
 /* completion function prototypes */
 static int create_create_comp_fn(void *v_p,
@@ -55,6 +57,9 @@ static int create_setattr_comp_fn(void *v_p,
 static int create_crdirent_comp_fn(void *v_p,
                                    struct PVFS_server_resp *resp_p,
                                    int index);
+static int create_delete_handles_comp_fn(void *v_p,
+                                         struct PVFS_server_resp *resp_p,
+                                         int index);
 
 %%
 
@@ -74,99 +79,131 @@ machine pvfs2_client_create_sm(init,
 			       crdirent_setup_msgpair,
 			       crdirent_xfer_msgpair,
 			       crdirent_failure,
+                               delete_handles_setup_msgpair_array,
+                               delete_handles_xfer_msgpair_array,
 			       cleanup)
 {
-    state init {
-	run create_init;
-	default => create_parent_getattr_setup_msgpair;
+    state init
+    {
+        run create_init;
+        default => create_parent_getattr_setup_msgpair;
     }
 
-    state create_parent_getattr_setup_msgpair {
-	run PINT_sm_common_parent_getattr_setup_msgpair;
+    state create_parent_getattr_setup_msgpair
+    {
+        run PINT_sm_common_parent_getattr_setup_msgpair;
         success => create_parent_getattr_xfer_msgpair;
-	default => create_parent_getattr_failure;
+        default => create_parent_getattr_failure;
     }
 
-    state create_parent_getattr_xfer_msgpair {
-	jump pvfs2_client_getattr_acache_sm;
+    state create_parent_getattr_xfer_msgpair
+    {
+        jump pvfs2_client_getattr_acache_sm;
         success => dspace_create_setup_msgpair;
-	default => create_parent_getattr_failure;
+        default => create_parent_getattr_failure;
     }
 
-    state create_parent_getattr_failure {
-	run PINT_sm_common_parent_getattr_failure;
-	default => cleanup;
+    state create_parent_getattr_failure
+    {
+        run PINT_sm_common_parent_getattr_failure;
+        default => cleanup;
     }
 
-    state dspace_create_setup_msgpair {
-	run create_dspace_create_setup_msgpair;
-	success => dspace_create_xfer_msgpair;
+    state dspace_create_setup_msgpair
+    {
+        run create_dspace_create_setup_msgpair;
+        success => dspace_create_xfer_msgpair;
         default => dspace_create_failure;
     }
 
-    state dspace_create_xfer_msgpair {
-	jump pvfs2_client_msgpair_sm;
+    state dspace_create_xfer_msgpair
+    {
+        jump pvfs2_client_msgpair_sm;
         success => datafiles_setup_msgpair_array;
-	default => dspace_create_failure;
+        default => dspace_create_failure;
     }
 
-    state dspace_create_failure {
-	run create_dspace_create_failure;
-	default => cleanup;
+    state dspace_create_failure
+    {
+        run create_dspace_create_failure;
+        default => cleanup;
     }
 
-    state datafiles_setup_msgpair_array {
+    state datafiles_setup_msgpair_array
+    {
         run create_datafiles_setup_msgpair_array;
         success => datafiles_xfer_msgpair_array;
         default => cleanup;
     }
 
-    state datafiles_xfer_msgpair_array {
-	jump pvfs2_client_msgpairarray_sm;
+    state datafiles_xfer_msgpair_array
+    {
+        jump pvfs2_client_msgpairarray_sm;
         success => create_setattr_setup_msgpair;
         default => datafiles_failure;
     }
 
-    state datafiles_failure {
+    state datafiles_failure
+    {
         run create_datafiles_failure;
         default => cleanup;
     }
 
-    state create_setattr_setup_msgpair {
+    state create_setattr_setup_msgpair
+    {
         run create_setattr_setup_msgpair;
         success => create_setattr_xfer_msgpair;
         default => cleanup;
     }
 
-    state create_setattr_xfer_msgpair {
-	jump pvfs2_client_msgpair_sm;
+    state create_setattr_xfer_msgpair
+    {
+        jump pvfs2_client_msgpair_sm;
         success => crdirent_setup_msgpair;
         default => create_setattr_failure;
     }
 
-    state create_setattr_failure {
+    state create_setattr_failure
+    {
         run create_setattr_failure;
         default => cleanup;
     }
 
-    state crdirent_setup_msgpair {
-	run create_crdirent_setup_msgpair;
+    state crdirent_setup_msgpair
+    {
+        run create_crdirent_setup_msgpair;
         success => crdirent_xfer_msgpair;
-	default => crdirent_failure;
+        default => crdirent_failure;
     }
 
-    state crdirent_xfer_msgpair {
-	jump pvfs2_client_msgpair_sm;
+    state crdirent_xfer_msgpair
+    {
+        jump pvfs2_client_msgpair_sm;
         success => cleanup;
         default => crdirent_failure;
     }
 
-    state crdirent_failure {
-	run create_crdirent_failure;
-	default => cleanup;
+    state crdirent_failure
+    {
+        run create_crdirent_failure;
+        default => delete_handles_setup_msgpair_array;
     }
 
-    state cleanup {
+    state delete_handles_setup_msgpair_array
+    {
+        run create_delete_handles_setup_msgpair_array;
+        success => delete_handles_xfer_msgpair_array;
+        default => cleanup;
+    }
+
+    state delete_handles_xfer_msgpair_array
+    {
+        jump pvfs2_client_msgpairarray_sm;
+        default => cleanup;
+    }
+
+    state cleanup
+    {
         run create_cleanup;
         default => terminate;
     }
@@ -218,7 +255,9 @@ int PVFS_sys_create(
     sm_p->parent_ref = parent_refn;
     sm_p->u.create.create_resp = resp;
     sm_p->u.create.sys_attr = &attr;
-    if(attr.mask & PVFS_ATTR_SYS_DFILE_COUNT)
+    sm_p->u.create.stored_error_code = 0;
+
+    if (attr.mask & PVFS_ATTR_SYS_DFILE_COUNT)
     {
 	sm_p->u.create.num_data_files = attr.dfile_count;
     }
@@ -242,7 +281,6 @@ int PVFS_sys_create(
     ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_CREATE);
     assert(ret == 0);
 
-    /* while !done call progress function */
     while (!sm_p->op_complete && ret == 0)
     {
 	gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_create calling "
@@ -254,10 +292,8 @@ int PVFS_sys_create(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_create completed\n");
 
-    /* save our return value */
     error = sm_p->error_code;
 
-    /* clean up after ourselves */
     free(sm_p);
     return error;
 }
@@ -397,14 +433,29 @@ static int create_crdirent_comp_fn(void *v_p,
 
     assert(resp_p->op == PVFS_SERV_CRDIRENT);
 
-    /* if we get an error, just return immediately, don't try to
-     * actually fill anything in.
-     */
     if (resp_p->status != 0)
     {
 	return resp_p->status;
     }
+    return 0;
+}
 
+static int create_delete_handles_comp_fn(void *v_p,
+                                         struct PVFS_server_resp *resp_p,
+                                         int index)
+{
+/*     PINT_client_sm *sm_p = (PINT_client_sm *) v_p; */
+    
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "create_delete_handles_comp_fn\n");
+
+    assert(resp_p->op == PVFS_SERV_REMOVE);
+
+    if (resp_p->status != 0)
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "Failed to remove handle %d\n",
+                     index);
+	return resp_p->status;
+    }
     return 0;
 }
 
@@ -648,7 +699,7 @@ static int create_crdirent_setup_msgpair(PINT_client_sm *sm_p,
     if (ret < 0)
     {
         gossip_err("Failed to get meta server information\n");
-        assert(0);
+        js_p->error_code = ret;
     }
     return 1;
 }
@@ -658,13 +709,105 @@ static int create_crdirent_failure(PINT_client_sm *sm_p,
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: crdirent_failure\n");
 
-    if (js_p->error_code == -PVFS_EEXIST)
+    sm_p->u.create.stored_error_code = js_p->error_code;
+
+    if (sm_p->u.create.stored_error_code == -PVFS_EEXIST)
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG, "crdirent failed: "
                      "dirent already exists!\n");
     }
     return 1;
 }
+
+/* delete the newly created meta and data handles */
+static int create_delete_handles_setup_msgpair_array(
+    PINT_client_sm *sm_p, job_status_s *js_p)
+{
+    int ret = -1, i = 0;
+    PVFS_BMI_addr_t metafile_server_addr;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: "
+                 "delete_handles_setup_msgpair_array\n");
+
+    js_p->error_code = 0;
+
+    memset(&sm_p->msgpair, 0, sizeof(PINT_client_sm_msgpair_state));
+
+    ret = PINT_bucket_map_to_server(&metafile_server_addr,
+                                    sm_p->u.create.metafile_handle,
+                                    sm_p->parent_ref.fs_id);
+    if (ret)
+    {
+	gossip_err("Error: failure mapping to server.\n");
+        return -PVFS_EADDRNOTAVAIL;
+    }
+
+    if (sm_p->msgarray)
+    {
+        free(sm_p->msgarray);
+    }
+    sm_p->msgarray = (PINT_client_sm_msgpair_state *)
+        malloc((sm_p->u.create.num_data_files + 1) *
+               sizeof(PINT_client_sm_msgpair_state));
+
+    if (sm_p->msgarray == NULL)
+    {
+        gossip_err("create: failed to allocate msgarray\n"); 
+        return -PVFS_ENOMEM;
+    }
+
+    sm_p->msgarray_count = (sm_p->u.create.num_data_files + 1);
+
+    assert(sm_p->u.create.data_server_addrs);
+
+    /*
+      for the metafile and each datafile, prepare to post
+      a remove send/recv pair
+    */
+    for(i = 0; i < (sm_p->u.create.num_data_files + 1); i++)
+    {
+        PINT_client_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
+
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "create: posting data file remove req %d\n",i);
+
+        /* arbitrarily handle deletion of the metafile last */
+        if (i == sm_p->u.create.num_data_files)
+        {
+            PINT_SERVREQ_REMOVE_FILL(
+                msg_p->req,
+                *sm_p->cred_p,
+                sm_p->parent_ref.fs_id,
+                sm_p->u.create.metafile_handle);
+
+            msg_p->fs_id = sm_p->parent_ref.fs_id;
+            msg_p->handle = sm_p->u.create.metafile_handle;
+            msg_p->comp_fn = create_delete_handles_comp_fn;
+            msg_p->svr_addr = metafile_server_addr;
+
+            gossip_debug(GOSSIP_CLIENT_DEBUG, " Preparing to remove "
+                         "metafile handle %Lu\n", Lu(msg_p->handle));
+        }
+        else
+        {
+            PINT_SERVREQ_REMOVE_FILL(
+                msg_p->req,
+                *sm_p->cred_p,
+                sm_p->parent_ref.fs_id,
+                sm_p->u.create.datafile_handles[i]);
+
+            msg_p->fs_id = sm_p->parent_ref.fs_id;
+            msg_p->handle = sm_p->u.create.datafile_handles[i];
+            msg_p->comp_fn = create_delete_handles_comp_fn;
+            msg_p->svr_addr = sm_p->u.create.data_server_addrs[i];
+
+            gossip_debug(GOSSIP_CLIENT_DEBUG, " Preparing to remove "
+                         "datafile handle %Lu\n", Lu(msg_p->handle));
+        }
+    }
+    return 1;
+}
+
 
 static int create_cleanup(PINT_client_sm *sm_p,
                           job_status_s *js_p)
@@ -673,13 +816,18 @@ static int create_cleanup(PINT_client_sm *sm_p,
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: cleanup\n");
 
-    sm_p->error_code = js_p->error_code;
+    sm_p->error_code = (sm_p->u.create.stored_error_code ?
+                        sm_p->u.create.stored_error_code :
+                        js_p->error_code);
 
-    metafile_ref.handle = sm_p->u.create.metafile_handle;
-    metafile_ref.fs_id = sm_p->parent_ref.fs_id;
+    if (sm_p->error_code == 0)
+    {
+        metafile_ref.handle = sm_p->u.create.metafile_handle;
+        metafile_ref.fs_id = sm_p->parent_ref.fs_id;
 
-    /* fill in outgoing response fields */
-    sm_p->u.create.create_resp->pinode_refn = metafile_ref;
+        /* fill in outgoing response fields */
+        sm_p->u.create.create_resp->pinode_refn = metafile_ref;
+    }
 
     if (sm_p->u.create.io_handle_extent_array)
     {
