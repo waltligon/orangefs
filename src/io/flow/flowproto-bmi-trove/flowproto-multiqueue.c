@@ -446,9 +446,9 @@ static void bmi_recv_callback_fn(void *user_ptr,
     qlist_del(&q_item->list_link);
     /* add to dest queue */
     qlist_add_tail(&q_item->list_link, &flow_data->dest_list);
-
     result_tmp = &q_item->result_chain;
     do{
+	assert(result_tmp->result.bytes);
 	ret = trove_bstream_write_list(q_item->parent->dest.u.trove.coll_id,
 	    q_item->parent->dest.u.trove.handle,
 	    (char**)&result_tmp->buffer_offset,
