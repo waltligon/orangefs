@@ -503,19 +503,22 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
 	/* calculate size of file if necessary */
 	s_attr_p->size = 0;
 
-	ret = PINT_Dist_lookup(sm_p->u.getattr.dist_p);
-	if (ret < 0) {
-	    assert(0);
-	}
+	amask = s_attr_p->mask; /* from object getattr */
 
-	s_attr_p->size = (sm_p->u.getattr.dist_p->methods->logical_file_size)
-	    (sm_p->u.getattr.dist_p->params,
-	     sm_p->u.getattr.datafile_count,
-	     sm_p->u.getattr.size_array);
+        if (amask & PVFS_ATTR_META_DIST)
+        {
+            ret = PINT_Dist_lookup(sm_p->u.getattr.dist_p);
+            if (ret < 0) {
+                assert(0);
+            }
 
+            s_attr_p->size = (sm_p->u.getattr.dist_p->methods->logical_file_size)
+                (sm_p->u.getattr.dist_p->params,
+                 sm_p->u.getattr.datafile_count,
+                 sm_p->u.getattr.size_array);
+        }
 
 	/* redo the mask */
-	amask = s_attr_p->mask; /* from object getattr */
 	s_attr_p->mask = 0;
 
 	if (amask & PVFS_ATTR_COMMON_UID)   s_attr_p->mask |= PVFS_ATTR_SYS_UID;
@@ -545,10 +548,12 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
 	if (sm_p->msgarray != NULL) {
 	    free(sm_p->msgarray);
 	}
-	if (sm_p->u.getattr.datafile_handles != NULL) {
+	if ((amask & PVFS_ATTR_META_DFILES) &&
+            (sm_p->u.getattr.datafile_handles != NULL)) {
 	    free(sm_p->u.getattr.datafile_handles);
 	}
-	if (sm_p->u.getattr.dist_p != NULL) {
+	if ((amask & PVFS_ATTR_META_DIST) &&
+            (sm_p->u.getattr.dist_p != NULL)) {
 	    free(sm_p->u.getattr.dist_p);
 	}
 
