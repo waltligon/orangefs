@@ -34,6 +34,7 @@ static __keyword_mask_t s_keyword_mask_map[] =
 {
     { "storage", GOSSIP_TROVE_DEBUG },
     { "trove", GOSSIP_TROVE_DEBUG },
+    { "trove_op", GOSSIP_TROVE_OP_DEBUG },
     { "network", GOSSIP_BMI_DEBUG_ALL },
     { "server", GOSSIP_SERVER_DEBUG },
     { "client", GOSSIP_CLIENT_DEBUG },
@@ -52,7 +53,8 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "getattr", GOSSIP_GETATTR_DEBUG },
     { "readdir", GOSSIP_READDIR_DEBUG },
     { "io", GOSSIP_IO_DEBUG },
-    { "verbose",  (__DEBUG_ALL & ~GOSSIP_REQ_SCHED_DEBUG) },
+    { "verbose",  (__DEBUG_ALL & (~GOSSIP_REQ_SCHED_DEBUG |
+                                  ~GOSSIP_TROVE_OP_DEBUG)) },
     { "none", GOSSIP_NO_DEBUG },
     { "all",  __DEBUG_ALL }
 };
