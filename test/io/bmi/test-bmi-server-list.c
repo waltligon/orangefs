@@ -54,6 +54,7 @@ int main(int argc, char **argv)	{
 	void* buffer_list[2];
 	int last = 0;
 	int i = 0;
+	bmi_context_id context;
 
 	/* grab any command line options */
 	user_opts = parse_args(argc, argv);
@@ -71,6 +72,14 @@ int main(int argc, char **argv)	{
 	if(ret < 0){
 		errno = -ret;
 		perror("BMI_initialize");
+		return(-1);
+	}
+
+	ret = BMI_open_context(&context);
+	if(ret < 0)
+	{
+		errno = -ret;
+		perror("BMI_open_context()");
 		return(-1);
 	}
 
@@ -128,7 +137,7 @@ int main(int argc, char **argv)	{
 	
 	/* post the ack */
 	ret = BMI_post_send(&(server_ops[1]), client_addr, my_ack, 
-		sizeof(struct server_ack), BMI_PRE_ALLOC, 0, NULL);
+		sizeof(struct server_ack), BMI_PRE_ALLOC, 0, NULL, context);
 	if(ret < 0)
 	{
 		fprintf(stderr, "BMI_post_send_failure.\n");
@@ -141,7 +150,7 @@ int main(int argc, char **argv)	{
 		do
 		{
 			ret = BMI_test(server_ops[1], &outcount, &error_code,
-			&actual_size, NULL, 10);
+			&actual_size, NULL, 10, context);
 		} while(ret == 0 && outcount == 0);
 
 		if(ret < 0 || error_code != 0)
@@ -153,7 +162,8 @@ int main(int argc, char **argv)	{
 
 	/* post the recv */
 	ret = BMI_post_recv_list(&(server_ops[0]), client_addr, buffer_list, 
-		size_list, 2, my_req->size, &actual_size, BMI_PRE_ALLOC, 0, NULL);
+		size_list, 2, my_req->size, &actual_size, BMI_PRE_ALLOC, 0, NULL,
+		context);
 	if(ret < 0)
 	{
 		fprintf(stderr, "BMI_post_recv_failure.\n");
@@ -166,7 +176,7 @@ int main(int argc, char **argv)	{
 		do
 		{
 			ret = BMI_test(server_ops[0], &outcount, &error_code,
-			&actual_size, NULL, 10);
+			&actual_size, NULL, 10, context);
 		} while(ret == 0 && outcount == 0);
 
 		if(ret < 0 || error_code != 0)
@@ -209,6 +219,7 @@ int main(int argc, char **argv)	{
 	free(my_req);
 
 	/* shutdown the local interface */
+	BMI_close_context(context);
 	ret = BMI_finalize();
 	if(ret < 0){
 		errno = -ret;

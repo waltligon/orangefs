@@ -397,6 +397,33 @@ int BMI_finalize(void)
     return (0);
 }
 
+/* BMI_open_context()
+ *
+ * creates a new context to be used for communication; this can be used,
+ * for example, to distinguish between operations posted by different
+ * threads 
+ *
+ * returns 0 on success, -errno on failure
+ */
+int BMI_open_context(bmi_context_id* context)
+{
+    gossip_lerr("Warning: BMI_open_context() stub called.\n");
+    *context = 0;
+    return(0);
+}
+
+/* BMI_close_context()
+ *
+ * destroys a context previous generated with BMI_open_context()
+ *
+ * no return value
+ */
+void BMI_close_context(bmi_context_id context)
+{
+    gossip_lerr("Warning: BMI_close_context() stub called.\n");
+    return;
+}
+
 
 /* BMI_post_recv()
  * 
@@ -411,7 +438,8 @@ int BMI_post_recv(bmi_op_id_t * id,
 		  bmi_size_t * actual_size,
 		  bmi_flag_t buffer_flag,
 		  bmi_msg_tag_t tag,
-		  void *user_ptr)
+		  void *user_ptr,
+		  bmi_context_id context_id)
 {
     ref_st_p tmp_ref = NULL;
     int ret = -1;
@@ -448,7 +476,8 @@ int BMI_post_send(bmi_op_id_t * id,
 		  bmi_size_t size,
 		  bmi_flag_t buffer_flag,
 		  bmi_msg_tag_t tag,
-		  void *user_ptr)
+		  void *user_ptr,
+		  bmi_context_id context_id)
 {
     ref_st_p tmp_ref = NULL;
     int ret = -1;
@@ -484,7 +513,8 @@ int BMI_post_sendunexpected(bmi_op_id_t * id,
 			    bmi_size_t size,
 			    bmi_flag_t buffer_flag,
 			    bmi_msg_tag_t tag,
-			    void *user_ptr)
+			    void *user_ptr,
+			    bmi_context_id context_id)
 {
     ref_st_p tmp_ref = NULL;
     int ret = -1;
@@ -521,7 +551,8 @@ int BMI_test(bmi_op_id_t id,
 	     bmi_error_code_t * error_code,
 	     bmi_size_t * actual_size,
 	     void **user_ptr,
-	     int max_idle_time_ms)
+	     int max_idle_time_ms,
+	     bmi_context_id context_id)
 {
     struct method_op *target_op = NULL;
     int ret = -1;
@@ -570,7 +601,8 @@ int BMI_testsome(int incount,
 		 bmi_error_code_t * error_code_array,
 		 bmi_size_t * actual_size_array,
 		 void **user_ptr_array,
-		 int max_idle_time_ms)
+		 int max_idle_time_ms,
+		 bmi_context_id context_id)
 {
     int ret = -1;
 
@@ -611,7 +643,8 @@ int BMI_testsome(int incount,
 		 bmi_error_code_t * error_code_array,
 		 bmi_size_t * actual_size_array,
 		 void **user_ptr_array,
-		 int max_idle_time_ms)
+		 int max_idle_time_ms,
+		 bmi_context_id context_id)
 {
     gossip_lerr("Please implement me correctly.\n");
     return(-ENOSYS);
@@ -1100,7 +1133,8 @@ int BMI_post_send_list(bmi_op_id_t * id,
 		       bmi_size_t total_size,
 		       bmi_flag_t buffer_flag,
 		       bmi_msg_tag_t tag,
-		       void *user_ptr)
+		       void *user_ptr,
+		       bmi_context_id context_id)
 {
     ref_st_p tmp_ref = NULL;
     int ret = -1;
@@ -1156,7 +1190,8 @@ int BMI_post_recv_list(bmi_op_id_t * id,
 		       bmi_size_t * total_actual_size,
 		       bmi_flag_t buffer_flag,
 		       bmi_msg_tag_t tag,
-		       void *user_ptr)
+		       void *user_ptr,
+		       bmi_context_id context_id)
 {
     ref_st_p tmp_ref = NULL;
     int ret = -1;
@@ -1211,7 +1246,8 @@ int BMI_post_sendunexpected_list(bmi_op_id_t * id,
 				 bmi_size_t total_size,
 				 bmi_flag_t buffer_flag,
 				 bmi_msg_tag_t tag,
-				 void *user_ptr)
+				 void *user_ptr,
+				 bmi_context_id context_id)
 {
     ref_st_p tmp_ref = NULL;
     int ret = -1;

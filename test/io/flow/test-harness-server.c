@@ -33,6 +33,7 @@ int main(int argc, char **argv)
 	int i;
 	PINT_Request* req;
 	PINT_Request_file_data file_data;
+	bmi_context_id context;
 
 	/*************************************************************/
 	/* initialization stuff */
@@ -46,6 +47,13 @@ int main(int argc, char **argv)
 	if(ret < 0)
 	{
 		fprintf(stderr, "BMI init failure.\n");
+		return(-1);
+	}
+
+	ret = BMI_open_context(&context);
+	if(ret < 0)
+	{
+		fprintf(stderr, "BMI_open_context() failure.\n");
 		return(-1);
 	}
 
@@ -181,6 +189,7 @@ int main(int argc, char **argv)
 	}
 
 	/* shut down BMI */
+	BMI_close_context(context);
 	BMI_finalize();
 
 	free(mybuffer);

@@ -18,7 +18,7 @@
 
 int bench_init(struct bench_options* opts, int argc, char* argv[], int*
 	num_clients, int* world_rank, MPI_Comm* comm, bmi_addr_t**
-	bmi_peer_array, int** mpi_peer_array)
+	bmi_peer_array, int** mpi_peer_array, bmi_context_id* context)
 {
 	int ret = -1;
 	char local_proc_name[256];
@@ -65,7 +65,7 @@ int bench_init(struct bench_options* opts, int argc, char* argv[], int*
 			(*mpi_peer_array)[i] = i+opts->num_servers;
 		}
 		ret = bench_initialize_bmi_interface(opts->method_name,
-			BMI_INIT_SERVER);
+			BMI_INIT_SERVER, context);
 	}
 	else
 	{
@@ -81,7 +81,7 @@ int bench_init(struct bench_options* opts, int argc, char* argv[], int*
 		{
 			(*mpi_peer_array)[i] = i;
 		}
-		ret = bench_initialize_bmi_interface(opts->method_name, 0);
+		ret = bench_initialize_bmi_interface(opts->method_name, 0, context);
 	}
 	if(ret < 0)
 	{
@@ -100,7 +100,7 @@ int bench_init(struct bench_options* opts, int argc, char* argv[], int*
 	else
 	{
 		ret = bench_initialize_bmi_addresses_client(opts->num_servers,
-			*num_clients, *bmi_peer_array, opts->method_name);
+			*num_clients, *bmi_peer_array, opts->method_name, *context);
 	}
 	if(ret < 0)
 	{
@@ -111,9 +111,11 @@ int bench_init(struct bench_options* opts, int argc, char* argv[], int*
 	return(0);
 }
 
-int bench_initialize_bmi_interface(char* method, int flags)
+int bench_initialize_bmi_interface(char* method, int flags,
+	bmi_context_id* context)
 {
 	char local_address[256];
+	int ret = -1;
 
 	gossip_enable_stderr();
 	gossip_set_debug_mask(0, 0);
@@ -135,13 +137,21 @@ int bench_initialize_bmi_interface(char* method, int flags)
 
 	if(flags & BMI_INIT_SERVER)
 	{
-		return(BMI_initialize(method, local_address, BMI_INIT_SERVER));
+		ret = BMI_initialize(method, local_address, BMI_INIT_SERVER);
 	}
 	else
 	{
 
-		return(BMI_initialize(method, NULL, 0));
+		ret = BMI_initialize(method, NULL, 0);
 	}
+	if(ret < 0)
+	{
+		return(ret);
+	}
+
+	ret = BMI_open_context(context);
+	return(ret);
+
 }
 
 
@@ -232,7 +242,7 @@ int bench_initialize_bmi_addresses_server(int num_servers, int num_clients,
 }
 
 int bench_initialize_bmi_addresses_client(int num_servers, int num_clients, 
-	bmi_addr_t* server_array, char* method_name)
+	bmi_addr_t* server_array, char* method_name, bmi_context_id context)
 {
 	int i=0;
 	int ret = -1;
@@ -278,13 +288,13 @@ int bench_initialize_bmi_addresses_client(int num_servers, int num_clients,
 	for(i=0; i<num_servers; i++)
 	{
 		ret = BMI_post_sendunexpected(&bmi_id, server_array[i], &ret,
-			sizeof(int), BMI_EXT_ALLOC, 0, NULL);
+			sizeof(int), BMI_EXT_ALLOC, 0, NULL, context);
 		if(ret == 0)
 		{
 			do
 			{
 				ret = BMI_test(bmi_id, &outcount, &error_code,
-					&actual_size, NULL, 0);
+					&actual_size, NULL, 0, context);
 			} while(ret == 0 && outcount == 0);
 		}
 		if(ret < 0 || error_code != 0)

@@ -24,10 +24,11 @@ int main( int argc, char *argv[])
 	int num_clients;
 	struct bench_options opts;
 	int i = 0;
+	bmi_context_id context;
 
 	/* start up benchmark environment */
 	ret = bench_init(&opts, argc, argv, &num_clients, &world_rank, &comm,
-		&bmi_peer_array, &mpi_peer_array);
+		&bmi_peer_array, &mpi_peer_array, &context);
 	if(ret < 0)
 	{
 		fprintf(stderr, "bench_init() failure.\n");
@@ -55,6 +56,7 @@ int main( int argc, char *argv[])
 	}
 
 	/* shutdown interfaces */
+	BMI_close_context(context);
 	BMI_finalize();
 	MPI_Finalize();
 	return 0;

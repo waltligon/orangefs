@@ -33,6 +33,7 @@ typedef uint32_t PVFS_permissions;
 typedef int64_t  PVFS_token;
 typedef time_t   PVFS_time; /* TODO: is this really a good idea? */
 typedef int32_t  PVFS_msg_tag_t;
+typedef int32_t  PVFS_context_id;
 
 #define PVFS_NAME_MAX    256 /* Max length of PVFS filename */
 #define PVFS_TOKEN_START 0 /* Token value for readdir */

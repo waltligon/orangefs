@@ -26,6 +26,9 @@
 /* TODO: this is temporary */
 static PVFS_fs_id HACK_global_fsid = -1;
 
+/* bmi context for use within the job interface */
+static bmi_context_id global_bmi_context = -1;
+
 /* queues of pending jobs */
 static job_desc_q_p completion_queue = NULL;
 static int completion_error = 0;
@@ -137,9 +140,17 @@ int job_initialize(int flags)
 {
     int ret = -1;
 
+    /* get a bmi context to work in */
+    ret = BMI_open_context(&global_bmi_context);
+    if(ret < 0)
+    {
+	return(ret);
+    }
+
     ret = setup_queues();
     if (ret < 0)
     {
+	BMI_close_context(global_bmi_context);
 	return (ret);
     }
 
@@ -148,6 +159,7 @@ int job_initialize(int flags)
     ret = pthread_create(&bmi_thread_id, NULL, bmi_thread_function, NULL);
     if (ret != 0)
     {
+	BMI_close_context(global_bmi_context);
 	teardown_queues();
 	return (-ret);
     }
@@ -155,6 +167,7 @@ int job_initialize(int flags)
     if (ret != 0)
     {
 	pthread_cancel(bmi_thread_id);
+	BMI_close_context(global_bmi_context);
 	teardown_queues();
 	return (-ret);
     }
@@ -163,6 +176,7 @@ int job_initialize(int flags)
     {
 	pthread_cancel(bmi_thread_id);
 	pthread_cancel(flow_thread_id);
+	BMI_close_context(global_bmi_context);
 	teardown_queues();
 	return (-ret);
     }
@@ -185,6 +199,8 @@ int job_finalize(void)
     pthread_cancel(flow_thread_id);
     pthread_cancel(trove_thread_id);
 #endif /* __PVFS2_JOB_THREADED__ */
+
+    BMI_close_context(global_bmi_context);
 
     teardown_queues();
 
@@ -231,12 +247,13 @@ int job_bmi_send(bmi_addr_t addr,
     if (!send_unexpected)
     {
 	ret = BMI_post_send(&(jd->u.bmi.id), addr, buffer, size,
-			    buffer_flag, tag, jd);
+			    buffer_flag, tag, jd, global_bmi_context);
     }
     else
     {
 	ret = BMI_post_sendunexpected(&(jd->u.bmi.id), addr,
-				      buffer, size, buffer_flag, tag, jd);
+				      buffer, size, buffer_flag, tag,
+				      jd, global_bmi_context);
     }
 
     if (ret < 0)
@@ -313,13 +330,15 @@ int job_bmi_send_list(bmi_addr_t addr,
     if (!send_unexpected)
     {
 	ret = BMI_post_send_list(&(jd->u.bmi.id), addr, buffer_list, size_list,
-				 list_count, total_size, buffer_flag, tag, jd);
+				 list_count, total_size, buffer_flag,
+				 tag, jd, global_bmi_context);
     }
     else
     {
 	ret = BMI_post_sendunexpected_list(&(jd->u.bmi.id), addr,
 					   buffer_list, size_list, list_count,
-					   total_size, buffer_flag, tag, jd);
+					   total_size, buffer_flag, tag,
+					   jd, global_bmi_context);
     }
 
     if (ret < 0)
@@ -389,7 +408,8 @@ int job_bmi_recv(bmi_addr_t addr,
     jd->job_user_ptr = user_ptr;
 
     ret = BMI_post_recv(&(jd->u.bmi.id), addr, buffer, size,
-			&(jd->u.bmi.actual_size), buffer_flag, tag, jd);
+			&(jd->u.bmi.actual_size), buffer_flag, tag, jd,
+			global_bmi_context);
 
     if (ret < 0)
     {
@@ -463,7 +483,8 @@ int job_bmi_recv_list(bmi_addr_t addr,
 
     ret = BMI_post_recv_list(&(jd->u.bmi.id), addr, buffer_list,
 			     size_list, list_count, total_expected_size,
-			     &(jd->u.bmi.actual_size), buffer_flag, tag, jd);
+			     &(jd->u.bmi.actual_size), buffer_flag, tag,
+			     jd, global_bmi_context);
 
     if (ret < 0)
     {
@@ -2776,7 +2797,7 @@ static int do_one_work_cycle_bmi(int *num_completed,
 	ret = BMI_testsome(incount, stat_bmi_id_array, &outcount,
 			   stat_bmi_index_array, stat_bmi_error_code_array,
 			   stat_bmi_actual_size_array, stat_bmi_user_ptr_array,
-			   10);
+			   10, global_bmi_context);
     }
     else
     {
@@ -2784,7 +2805,7 @@ static int do_one_work_cycle_bmi(int *num_completed,
 	ret = BMI_testsome(incount, stat_bmi_id_array, &outcount,
 			   stat_bmi_index_array, stat_bmi_error_code_array,
 			   stat_bmi_actual_size_array, stat_bmi_user_ptr_array,
-			   0);
+			   0, global_bmi_context);
     }
 
     if (ret < 0)

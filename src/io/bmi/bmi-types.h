@@ -19,6 +19,7 @@
 typedef PVFS_flag bmi_flag_t;	/* generic flag */
 typedef PVFS_size bmi_size_t;	/* data region size */
 typedef PVFS_msg_tag_t bmi_msg_tag_t;	/* message tag */
+typedef PVFS_context_id bmi_context_id; /* context identifier */
 typedef id_gen_t bmi_op_id_t;	/* network operation handle */
 typedef id_gen_t bmi_addr_t;	/* network address handle */
 

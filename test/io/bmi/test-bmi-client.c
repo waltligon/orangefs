@@ -52,6 +52,7 @@ int main(int argc, char **argv)	{
 	void* in_test_user_ptr = &server_addr;
 	void* out_test_user_ptr = NULL;
 	bmi_size_t actual_size;
+	bmi_context_id context;
 
 	/* grab any command line options */
 	user_opts = parse_args(argc, argv);
@@ -68,6 +69,14 @@ int main(int argc, char **argv)	{
 	if(ret < 0){
 		errno = -ret;
 		perror("BMI_initialize");
+		return(-1);
+	}
+
+	ret = BMI_open_context(&context);
+	if(ret < 0)
+	{
+		errno = -ret;
+		perror("BMI_open_context()");
 		return(-1);
 	}
 
@@ -93,7 +102,8 @@ int main(int argc, char **argv)	{
 
 	/* send the initial request on its way */
 	ret = BMI_post_sendunexpected(&(client_ops[1]), server_addr, my_req, 
-		sizeof(struct server_request), BMI_PRE_ALLOC, 0, in_test_user_ptr);
+		sizeof(struct server_request), BMI_PRE_ALLOC, 0, in_test_user_ptr,
+		context);
 	if(ret < 0)
 	{
 		errno = -ret;
@@ -107,7 +117,7 @@ int main(int argc, char **argv)	{
 		do
 		{
 			ret = BMI_test(client_ops[1], &outcount, &error_code, &actual_size,
-				&out_test_user_ptr, 10);
+				&out_test_user_ptr, 10, context);
 		} while(ret == 0 && outcount == 0);
 
 		if(ret < 0 || error_code != 0)
@@ -135,7 +145,7 @@ int main(int argc, char **argv)	{
 	/* post a recv for the server acknowledgement */
 	ret = BMI_post_recv(&(client_ops[0]), server_addr, my_ack, 
 		sizeof(struct server_ack), &actual_size, BMI_PRE_ALLOC, 0, 
-		in_test_user_ptr);
+		in_test_user_ptr, context);
 	if(ret < 0)
 	{
 		errno = -ret;
@@ -149,7 +159,7 @@ int main(int argc, char **argv)	{
 		do
 		{
 			ret = BMI_test(client_ops[0], &outcount, &error_code,
-				&actual_size, &out_test_user_ptr, 10);
+				&actual_size, &out_test_user_ptr, 10, context);
 		} while(ret == 0 && outcount == 0);
 
 		if(ret < 0 || error_code != 0)
@@ -195,7 +205,7 @@ int main(int argc, char **argv)	{
 	 * ability to match eager send with rend. receive
 	 */
 	ret = BMI_post_send(&(client_ops[0]), server_addr, send_buffer, 
-		15000, BMI_PRE_ALLOC, 0, in_test_user_ptr);
+		15000, BMI_PRE_ALLOC, 0, in_test_user_ptr, context);
 	if(ret < 0)
 	{
 		errno = -ret;
@@ -209,7 +219,7 @@ int main(int argc, char **argv)	{
 		do
 		{
 			ret = BMI_test(client_ops[0], &outcount, &error_code,
-				&actual_size, &out_test_user_ptr, 10);
+				&actual_size, &out_test_user_ptr, 10, context);
 		} while(ret == 0 && outcount == 0);
 
 		if(ret < 0 || error_code != 0)
@@ -237,6 +247,7 @@ int main(int argc, char **argv)	{
 		BMI_RECV_BUFFER);
 
 	/* shutdown the local interface */
+	BMI_close_context(context);
 	ret = BMI_finalize();
 	if(ret < 0){
 		errno = -ret;

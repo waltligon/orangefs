@@ -50,6 +50,7 @@ int main(int argc, char **argv)	{
 	bmi_error_code_t error_code;
 	void* send_buffer = NULL;
 	bmi_size_t actual_size;
+	bmi_context_id context;
 
 	/* grab any command line options */
 	user_opts = parse_args(argc, argv);
@@ -66,6 +67,14 @@ int main(int argc, char **argv)	{
 	if(ret < 0){
 		errno = -ret;
 		perror("BMI_initialize");
+		return(-1);
+	}
+
+	ret = BMI_open_context(&context);
+	if(ret < 0)
+	{
+		errno = -ret;
+		perror("BMI_open_context()");
 		return(-1);
 	}
 
@@ -91,7 +100,7 @@ int main(int argc, char **argv)	{
 
 	/* send the initial request on its way */
 	ret = BMI_post_sendunexpected(&(client_ops[1]), server_addr, my_req, 
-		sizeof(struct server_request), BMI_PRE_ALLOC, 0, NULL);
+		sizeof(struct server_request), BMI_PRE_ALLOC, 0, NULL, context);
 	if(ret < 0)
 	{
 		errno = -ret;
@@ -105,7 +114,7 @@ int main(int argc, char **argv)	{
 		do
 		{
 			ret = BMI_test(client_ops[1], &outcount, &error_code, 
-				&actual_size, NULL, 10);
+				&actual_size, NULL, 10, context);
 		} while(ret == 0 && outcount == 0);
 
 		if(ret < 0 || error_code != 0)
@@ -122,7 +131,8 @@ int main(int argc, char **argv)	{
 
 	/* post a recv for the server acknowledgement */
 	ret = BMI_post_recv(&(client_ops[0]), server_addr, my_ack, 
-		sizeof(struct server_ack), &actual_size, BMI_PRE_ALLOC, 0, NULL);
+		sizeof(struct server_ack), &actual_size, BMI_PRE_ALLOC, 0, NULL,
+		context);
 	if(ret < 0)
 	{
 		errno = -ret;
@@ -136,7 +146,7 @@ int main(int argc, char **argv)	{
 		do
 		{
 			ret = BMI_test(client_ops[0], &outcount, &error_code, 
-				&actual_size, NULL, 10);
+				&actual_size, NULL, 10, context);
 		} while(ret == 0 && outcount == 0);
 
 		if(ret < 0 || error_code != 0)
@@ -171,7 +181,7 @@ int main(int argc, char **argv)	{
 
 	/* send the data payload on its way */
 	ret = BMI_post_send(&(client_ops[0]), server_addr, send_buffer, 
-		user_opts->message_size, BMI_PRE_ALLOC, 0, NULL);
+		user_opts->message_size, BMI_PRE_ALLOC, 0, NULL, context);
 	if(ret < 0)
 	{
 		errno = -ret;
@@ -185,7 +195,7 @@ int main(int argc, char **argv)	{
 		do
 		{
 			ret = BMI_test(client_ops[0], &outcount, &error_code,
-				&actual_size, NULL, 10);
+				&actual_size, NULL, 10, context);
 		} while(ret == 0 && outcount == 0);
 
 		if(ret < 0 || error_code != 0)
@@ -206,6 +216,7 @@ int main(int argc, char **argv)	{
 client_exit:
 
 	/* shutdown the local interface */
+	BMI_close_context(context);
 	ret = BMI_finalize();
 	if(ret < 0){
 		errno = -ret;

@@ -30,13 +30,18 @@ int BMI_initialize(const char *method_list,
 
 int BMI_finalize(void);
 
+int BMI_open_context(bmi_context_id* context);
+
+void BMI_close_context(bmi_context_id context);
+
 int BMI_post_send(bmi_op_id_t * id,
 		  bmi_addr_t dest,
 		  void *buffer,
 		  bmi_size_t size,
 		  bmi_flag_t buffer_flag,
 		  bmi_msg_tag_t tag,
-		  void *user_ptr);
+		  void *user_ptr,
+		  bmi_context_id context_id);
 
 int BMI_post_sendunexpected(bmi_op_id_t * id,
 			    bmi_addr_t dest,
@@ -44,7 +49,8 @@ int BMI_post_sendunexpected(bmi_op_id_t * id,
 			    bmi_size_t size,
 			    bmi_flag_t buffer_flag,
 			    bmi_msg_tag_t tag,
-			    void *user_ptr);
+			    void *user_ptr,
+			    bmi_context_id context_id);
 
 int BMI_post_recv(bmi_op_id_t * id,
 		  bmi_addr_t src,
@@ -53,14 +59,16 @@ int BMI_post_recv(bmi_op_id_t * id,
 		  bmi_size_t * actual_size,
 		  bmi_flag_t buffer_flag,
 		  bmi_msg_tag_t tag,
-		  void *user_ptr);
+		  void *user_ptr,
+		  bmi_context_id context_id);
 
 int BMI_test(bmi_op_id_t id,
 	     int *outcount,
 	     bmi_error_code_t * error_code,
 	     bmi_size_t * actual_size,
 	     void **user_ptr,
-	     int max_idle_time_ms);
+	     int max_idle_time_ms,
+	     bmi_context_id context_id);
 
 int BMI_testsome(int incount,
 		 bmi_op_id_t * id_array,
@@ -69,7 +77,8 @@ int BMI_testsome(int incount,
 		 bmi_error_code_t * error_code_array,
 		 bmi_size_t * actual_size_array,
 		 void **user_ptr_array,
-		 int max_idle_time_ms);
+		 int max_idle_time_ms,
+		 bmi_context_id context_id);
 
 int BMI_testunexpected(int incount,
 		       int *outcount,
@@ -105,7 +114,8 @@ int BMI_post_send_list(bmi_op_id_t * id,
 		       bmi_size_t total_size,
 		       bmi_flag_t buffer_flag,
 		       bmi_msg_tag_t tag,
-		       void *user_ptr);
+		       void *user_ptr,
+		       bmi_context_id context_id);
 
 int BMI_post_recv_list(bmi_op_id_t * id,
 		       bmi_addr_t src,
@@ -118,7 +128,8 @@ int BMI_post_recv_list(bmi_op_id_t * id,
 		       bmi_size_t * total_actual_size,
 		       bmi_flag_t buffer_flag,
 		       bmi_msg_tag_t tag,
-		       void *user_ptr);
+		       void *user_ptr,
+		       bmi_context_id context_id);
 
 int BMI_post_sendunexpected_list(bmi_op_id_t * id,
 				 bmi_addr_t dest,
@@ -129,7 +140,8 @@ int BMI_post_sendunexpected_list(bmi_op_id_t * id,
 				 bmi_size_t total_size,
 				 bmi_flag_t buffer_flag,
 				 bmi_msg_tag_t tag,
-				 void *user_ptr);
+				 void *user_ptr,
+				 bmi_context_id context_id);
 
 
 #endif /* __BMI_H */

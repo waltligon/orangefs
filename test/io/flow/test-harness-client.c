@@ -37,6 +37,7 @@ int main(int argc, char **argv)
 	double time1, time2;
 	PINT_Request* req;
 	PINT_Request_file_data file_data;
+	bmi_context_id context;
 
 	/*************************************************************/
 	/* initialization stuff */
@@ -50,6 +51,13 @@ int main(int argc, char **argv)
 	if(ret < 0)
 	{
 		fprintf(stderr, "BMI init failure.\n");
+		return(-1);
+	}
+
+	ret = BMI_open_context(&context);
+	if(ret < 0)
+	{
+		fprintf(stderr, "BMI_open_context() failure.\n");
 		return(-1);
 	}
 
@@ -70,7 +78,7 @@ int main(int argc, char **argv)
 	}
 
 	ret = BMI_post_sendunexpected(&op, server_addr, &mybuffer, 1,
-		BMI_EXT_ALLOC, 0, NULL);
+		BMI_EXT_ALLOC, 0, NULL, context);
 	if(ret < 0)
 	{
 		fprintf(stderr, "BMI_post_sendunexpected failure.\n");
@@ -83,7 +91,7 @@ int main(int argc, char **argv)
 		do
 		{
 			ret = BMI_test(op, &outcount, &error_code, &actual_size,
-			NULL, 10);
+			NULL, 10, context);
 		} while(ret == 0 && outcount == 0);
 
 		if(ret < 0 || error_code != 0)
@@ -196,6 +204,7 @@ int main(int argc, char **argv)
 	}
 
 	/* shut down BMI */
+	BMI_close_context(context);
 	BMI_finalize();
 
 	free(mybuffer);

@@ -73,6 +73,7 @@ int main(int argc, char **argv)	{
 	struct PVFS_server_resp_s* remove_dec_ack;
 	struct PINT_encoded_msg encoded3;
 	struct PINT_decoded_msg decoded3;
+	bmi_context_id context;
 
 	/**************************************************
 	 * general setup 
@@ -119,6 +120,13 @@ int main(int argc, char **argv)	{
 	ret = BMI_initialize(user_opts->method, NULL, 0);
 	if(ret < 0){
 		fprintf(stderr, "Error: BMI_initialize() failure.\n");
+		return(-1);
+	}
+
+	ret = BMI_open_context(&context);
+	if(ret < 0)
+	{
+		fprintf(stderr, "BMI_open_context() failure.\n");
 		return(-1);
 	}
 
@@ -170,7 +178,8 @@ int main(int argc, char **argv)	{
 		encoded1.total_size, 
 		encoded1.buffer_flag, 
 		0, 
-		NULL);
+		NULL,
+		context);
 	if(ret < 0)
 	{
 		errno = -ret;
@@ -184,7 +193,7 @@ int main(int argc, char **argv)	{
 		do
 		{
 			ret = BMI_test(client_ops[1], &outcount, &error_code, &actual_size,
-				NULL, 10);
+				NULL, 10, context);
 		} while(ret == 0 && outcount == 0);
 
 		if(ret < 0 || error_code != 0)
@@ -205,7 +214,7 @@ int main(int argc, char **argv)	{
 	/* post a recv for the server acknowledgement */
 	ret = BMI_post_recv(&(client_ops[0]), server_addr, create_ack, 
 		create_ack_size, &actual_size, BMI_EXT_ALLOC, 0, 
-		NULL);
+		NULL, context);
 	if(ret < 0)
 	{
 		errno = -ret;
@@ -219,7 +228,7 @@ int main(int argc, char **argv)	{
 		do
 		{
 			ret = BMI_test(client_ops[0], &outcount, &error_code,
-				&actual_size, NULL, 10);
+				&actual_size, NULL, 10, context);
 		} while(ret == 0 && outcount == 0);
 
 		if(ret < 0 || error_code != 0)
@@ -322,7 +331,8 @@ int main(int argc, char **argv)	{
 		encoded2.total_size,
 		encoded2.buffer_flag,
 		0,
-		NULL);
+		NULL,
+		context);
 	if(ret < 0)
 	{
 		errno = -ret;
@@ -336,7 +346,7 @@ int main(int argc, char **argv)	{
 		do
 		{
 			ret = BMI_test(client_ops[1], &outcount, &error_code, &actual_size,
-				NULL, 10);
+				NULL, 10, context);
 		} while(ret == 0 && outcount == 0);
 
 		if(ret < 0 || error_code != 0)
@@ -357,7 +367,7 @@ int main(int argc, char **argv)	{
 	/* post a recv for the server acknowledgement */
 	ret = BMI_post_recv(&(client_ops[0]), server_addr, my_ack, 
 		my_ack_size, &actual_size, BMI_EXT_ALLOC, 0, 
-		NULL);
+		NULL, context);
 	if(ret < 0)
 	{
 		errno = -ret;
@@ -371,7 +381,7 @@ int main(int argc, char **argv)	{
 		do
 		{
 			ret = BMI_test(client_ops[0], &outcount, &error_code,
-				&actual_size, NULL, 10);
+				&actual_size, NULL, 10, context);
 		} while(ret == 0 && outcount == 0);
 
 		if(ret < 0 || error_code != 0)
@@ -493,7 +503,8 @@ int main(int argc, char **argv)	{
 		encoded3.total_size, 
 		encoded3.buffer_flag, 
 		0, 
-		NULL);
+		NULL,
+		context);
 	if(ret < 0)
 	{
 		errno = -ret;
@@ -507,7 +518,7 @@ int main(int argc, char **argv)	{
 		do
 		{
 			ret = BMI_test(client_ops[1], &outcount, &error_code, &actual_size,
-				NULL, 10);
+				NULL, 10, context);
 		} while(ret == 0 && outcount == 0);
 
 		if(ret < 0 || error_code != 0)
@@ -528,7 +539,7 @@ int main(int argc, char **argv)	{
 	/* post a recv for the server acknowledgement */
 	ret = BMI_post_recv(&(client_ops[0]), server_addr, remove_ack, 
 		remove_ack_size, &actual_size, BMI_EXT_ALLOC, 0, 
-		NULL);
+		NULL, context);
 	if(ret < 0)
 	{
 		errno = -ret;
@@ -542,7 +553,7 @@ int main(int argc, char **argv)	{
 		do
 		{
 			ret = BMI_test(client_ops[0], &outcount, &error_code,
-				&actual_size, NULL, 10);
+				&actual_size, NULL, 10, context);
 		} while(ret == 0 && outcount == 0);
 
 		if(ret < 0 || error_code != 0)
@@ -599,6 +610,7 @@ int main(int argc, char **argv)	{
 	PINT_decode_release(&decoded3, PINT_ENCODE_RESP, 0);
 
 	/* shutdown the local interface */
+	BMI_close_context(context);
 	ret = BMI_finalize();
 	if(ret < 0){
 		errno = -ret;

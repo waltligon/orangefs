@@ -47,6 +47,7 @@ int main(int argc, char **argv)	{
 	int outcount = 0;
 	struct BMI_unexpected_info request_info;
 	bmi_size_t actual_size;
+	bmi_context_id context;
 
 	/* grab any command line options */
 	user_opts = parse_args(argc, argv);
@@ -64,6 +65,14 @@ int main(int argc, char **argv)	{
 	if(ret < 0){
 		errno = -ret;
 		perror("BMI_initialize");
+		return(-1);
+	}
+
+	ret = BMI_open_context(&context);
+	if(ret < 0)
+	{
+		errno = -ret;
+		perror("BMI_open_context");
 		return(-1);
 	}
 
@@ -117,7 +126,7 @@ int main(int argc, char **argv)	{
 	
 	/* post the ack */
 	ret = BMI_post_send(&(server_ops[1]), client_addr, request_info.buffer, 
-		request_info.size, BMI_PRE_ALLOC, 0, NULL);
+		request_info.size, BMI_PRE_ALLOC, 0, NULL, context);
 	if(ret < 0)
 	{
 		fprintf(stderr, "BMI_post_send_failure.\n");
@@ -130,7 +139,7 @@ int main(int argc, char **argv)	{
 		do
 		{
 			ret = BMI_test(server_ops[1], &outcount, &error_code,
-			&actual_size, NULL, 10);
+			&actual_size, NULL, 10, context);
 		} while(ret == 0 && outcount == 0);
 
 		if(ret < 0 || error_code != 0)
@@ -181,6 +190,7 @@ int main(int argc, char **argv)	{
 		BMI_SEND_BUFFER);
 
 	/* shutdown the local interface */
+	BMI_close_context(context);
 	ret = BMI_finalize();
 	if(ret < 0){
 		errno = -ret;

@@ -394,6 +394,7 @@ int main(int argc, char **argv)
         bmi_size_t actual_size;
         void* bmi_resp;
         void* in_test_user_ptr = &me;
+		  bmi_context_id context;
 #endif
 
 	request = (struct PVFS_server_req_s *) malloc(sizeof(struct PVFS_server_req_s));
@@ -404,6 +405,9 @@ int main(int argc, char **argv)
 
 	RET_CHECK("BMI init Error\n")
 
+	ret = BMI_open_context(&context);
+	
+	RET_CHECK("BMI_open_context\n")
 
 	//mylen = strlen(DEFAULT_ADDRESS);
 	//server = (char*) malloc(mylen);
@@ -606,7 +610,8 @@ int main(int argc, char **argv)
                                                 encoded.size_list[0],
                                                 BMI_PRE_ALLOC,
                                                 0,
-                                                in_test_user_ptr);
+                                                in_test_user_ptr,
+																context);
 
         /* post a recv for the server acknowledgement */
 
@@ -617,7 +622,8 @@ int main(int argc, char **argv)
                                                 &actual_size,
                                                 BMI_PRE_ALLOC,
                                                 0,
-                                                in_test_user_ptr);
+                                                in_test_user_ptr,
+																context);
 
         //free(encoded.buffer_list[0]);
    //encoded.buffer_list[0] = bmi_resp;
@@ -648,6 +654,8 @@ int main(int argc, char **argv)
                                         encoded.size_list[0],
                                         BMI_RECV_BUFFER
                                         );
+	BMI_close_context(context);
+	BMI_finalize();
 #endif
 
 	}// end of for loop

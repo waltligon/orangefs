@@ -17,10 +17,10 @@
 
 static int bmi_server(struct bench_options* opts, struct mem_buffers*
 	bmi_recv_bufs, struct mem_buffers* bmi_send_bufs, bmi_addr_t addr,
-	bmi_flag_t buffer_flag, double* wtime);
+	bmi_flag_t buffer_flag, double* wtime, bmi_context_id context);
 static int bmi_client(struct bench_options* opts, struct mem_buffers*
 	bmi_recv_bufs, struct mem_buffers* bmi_send_bufs, bmi_addr_t addr,
-	bmi_flag_t buffer_flag, double* wtime);
+	bmi_flag_t buffer_flag, double* wtime, bmi_context_id context);
 static int mpi_server(struct bench_options* opts, struct mem_buffers*
 	mpi_recv_bufs, struct mem_buffers* mpi_send_bufs, int addr, double* wtime);
 static int mpi_client(struct bench_options* opts, struct mem_buffers*
@@ -41,10 +41,11 @@ int main( int argc, char *argv[])
 	struct mem_buffers bmi_recv_bufs;
 	bmi_flag_t buffer_flag = BMI_EXT_ALLOC;
 	double mpi_time, bmi_time;
+	bmi_context_id context;
 
 	/* start up benchmark environment */
 	ret = bench_init(&opts, argc, argv, &num_clients, &world_rank, &comm,
-		&bmi_peer_array, &mpi_peer_array);
+		&bmi_peer_array, &mpi_peer_array, &context);
 	if(ret < 0)
 	{
 		fprintf(stderr, "bench_init() failure.\n");
@@ -109,12 +110,12 @@ int main( int argc, char *argv[])
 	if(world_rank == 0)
 	{
 		ret = bmi_server(&opts, &bmi_recv_bufs, &bmi_send_bufs,
-			bmi_peer_array[0], buffer_flag, &bmi_time);
+			bmi_peer_array[0], buffer_flag, &bmi_time, context);
 	}
 	else
 	{
 		ret = bmi_client(&opts, &bmi_recv_bufs, &bmi_send_bufs,
-			bmi_peer_array[0], buffer_flag, &bmi_time);
+			bmi_peer_array[0], buffer_flag, &bmi_time, context);
 	}
 	if(ret < 0)
 	{
@@ -203,6 +204,7 @@ int main( int argc, char *argv[])
 	}
 
 	/* shutdown interfaces */
+	BMI_close_context(context);
 	BMI_finalize();
 	MPI_Finalize();
 	return 0;
@@ -210,7 +212,7 @@ int main( int argc, char *argv[])
 
 static int bmi_server(struct bench_options* opts, struct mem_buffers*
 	bmi_recv_bufs, struct mem_buffers* bmi_send_bufs, bmi_addr_t addr,
-	bmi_flag_t buffer_flag, double* wtime)
+	bmi_flag_t buffer_flag, double* wtime, bmi_context_id context)
 {
 	int i=0;
 	bmi_size_t actual_size;
@@ -242,13 +244,14 @@ static int bmi_server(struct bench_options* opts, struct mem_buffers*
 		/* receive a message */
 		error_code = 0;
 		ret = BMI_post_recv(&bmi_id, addr, recv_buffer, 
-			bmi_recv_bufs->size, &actual_size, buffer_flag, 0, NULL);
+			bmi_recv_bufs->size, &actual_size, buffer_flag, 0, NULL,
+			context);
 		if(ret == 0)
 		{
 			do
 			{
 				ret = BMI_test(bmi_id, &outcount, &error_code, &actual_size,
-					NULL, 0);
+					NULL, 0, context);
 			}while(ret == 0 && outcount == 0);
 		}
 		if(ret < 0 || error_code != 0)
@@ -260,13 +263,13 @@ static int bmi_server(struct bench_options* opts, struct mem_buffers*
 		/* send a message */
 		error_code = 0;
 		ret = BMI_post_send(&bmi_id, addr, send_buffer,
-			bmi_send_bufs->size, buffer_flag, 0, NULL);
+			bmi_send_bufs->size, buffer_flag, 0, NULL, context);
 		if(ret == 0)
 		{
 			do
 			{
 				ret = BMI_test(bmi_id, &outcount, &error_code, &actual_size,
-					NULL, 0);
+					NULL, 0, context);
 			}while(ret == 0 && outcount == 0);
 		}
 		if(ret < 0 || error_code != 0)
@@ -285,7 +288,7 @@ static int bmi_server(struct bench_options* opts, struct mem_buffers*
 
 static int bmi_client(struct bench_options* opts, struct mem_buffers*
 	bmi_recv_bufs, struct mem_buffers* bmi_send_bufs, bmi_addr_t addr,
-	bmi_flag_t buffer_flag, double* wtime)
+	bmi_flag_t buffer_flag, double* wtime, bmi_context_id context)
 {
 	int i=0;
 	bmi_size_t actual_size;
@@ -316,13 +319,13 @@ static int bmi_client(struct bench_options* opts, struct mem_buffers*
 		/* send a message */
 		error_code = 0;
 		ret = BMI_post_send(&bmi_id, addr, send_buffer,
-			bmi_send_bufs->size, buffer_flag, 0, NULL);
+			bmi_send_bufs->size, buffer_flag, 0, NULL, context);
 		if(ret == 0)
 		{
 			do
 			{
 				ret = BMI_test(bmi_id, &outcount, &error_code, &actual_size,
-					NULL, 0);
+					NULL, 0, context);
 			}while(ret == 0 && outcount == 0);
 		}
 		if(ret < 0 || error_code != 0)
@@ -334,13 +337,14 @@ static int bmi_client(struct bench_options* opts, struct mem_buffers*
 		/* receive a message */
 		error_code = 0;
 		ret = BMI_post_recv(&bmi_id, addr, recv_buffer, 
-			bmi_recv_bufs->size, &actual_size, buffer_flag, 0, NULL);
+			bmi_recv_bufs->size, &actual_size, buffer_flag, 0, NULL,
+			context);
 		if(ret == 0)
 		{
 			do
 			{
 				ret = BMI_test(bmi_id, &outcount, &error_code, &actual_size,
-					NULL, 0);
+					NULL, 0, context);
 			}while(ret == 0 && outcount == 0);
 		}
 		if(ret < 0 || error_code != 0)

@@ -52,6 +52,7 @@ int main(int argc, char **argv)	{
 	bmi_error_code_t error_code;
 	bmi_size_t actual_size;
 	struct PINT_encoded_msg foo;
+	bmi_context_id context;
 	//struct PINT_decoded_msg bar;
 
 	/* grab any command line options */
@@ -67,6 +68,14 @@ int main(int argc, char **argv)	{
 	/* initialize local interface */
 	ret = BMI_initialize(user_opts->method, NULL, 0);
 	if(ret < 0){
+		errno = -ret;
+		perror("BMI_initialize");
+		return(-1);
+	}
+
+	ret = BMI_open_context(&context);
+	if(ret < 0)
+	{
 		errno = -ret;
 		perror("BMI_initialize");
 		return(-1);
@@ -107,7 +116,7 @@ int main(int argc, char **argv)	{
 
 	/* send the initial request on its way */
 	ret = BMI_post_sendunexpected(&(client_ops[1]), server_addr, foo.buffer_list[0], 
-		foo.size_list[0], BMI_PRE_ALLOC, 0, NULL);
+		foo.size_list[0], BMI_PRE_ALLOC, 0, NULL, context);
 	if(ret < 0)
 	{
 		errno = -ret;
@@ -121,7 +130,7 @@ int main(int argc, char **argv)	{
 		do
 		{
 			ret = BMI_test(client_ops[1], &outcount, &error_code, &actual_size,
-				NULL, 10);
+				NULL, 10, context);
 		} while(ret == 0 && outcount == 0);
 
 		if(ret < 0 || error_code != 0)
@@ -139,7 +148,7 @@ int main(int argc, char **argv)	{
 	/* post a recv for the server acknowledgement */
 	ret = BMI_post_recv(&(client_ops[0]), server_addr, my_ack, 
 		sizeof(struct PVFS_server_resp_s)+4, &actual_size, BMI_PRE_ALLOC, 0, 
-		NULL);
+		NULL, context);
 	if(ret < 0)
 	{
 		errno = -ret;
@@ -153,7 +162,7 @@ int main(int argc, char **argv)	{
 		do
 		{
 			ret = BMI_test(client_ops[0], &outcount, &error_code,
-				&actual_size, NULL, 10);
+				&actual_size, NULL, 10, context);
 		} while(ret == 0 && outcount == 0);
 
 		if(ret < 0 || error_code != 0)
@@ -194,6 +203,7 @@ int main(int argc, char **argv)	{
 		BMI_RECV_BUFFER);
 
 	/* shutdown the local interface */
+	BMI_close_context(context);
 	ret = BMI_finalize();
 	if(ret < 0){
 		errno = -ret;

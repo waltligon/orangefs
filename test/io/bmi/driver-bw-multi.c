@@ -17,10 +17,12 @@
 
 static int bmi_server_postall(struct bench_options* opts, struct
 	mem_buffers* bmi_buf_array, int num_clients, bmi_addr_t* addr_array, 
-	bmi_flag_t buffer_flag, double* wtime, int world_rank);
+	bmi_flag_t buffer_flag, double* wtime, int world_rank, bmi_context_id
+	context);
 static int bmi_client_postall(struct bench_options* opts, struct
 	mem_buffers* bmi_buf_array, int num_servers, bmi_addr_t* addr_array, 
-	bmi_flag_t buffer_flag, double* wtime, int world_rank);
+	bmi_flag_t buffer_flag, double* wtime, int world_rank, bmi_context_id
+	context);
 static int mpi_client_postall(struct bench_options* opts, struct 
 	mem_buffers* mpi_buf_array, int num_servers, int* addr_array, 
 	double* wtime, int world_rank);
@@ -54,10 +56,11 @@ int main( int argc, char *argv[])
 	double agg_bmi_bw, agg_mpi_bw;
 	double ave_bmi_time, ave_mpi_time;
 	int total_data_xfer = 0;
+	bmi_context_id context = -1;
 
 	/* start up benchmark environment */
 	ret = bench_init(&opts, argc, argv, &num_clients, &world_rank, &comm,
-		&bmi_peer_array, &mpi_peer_array);
+		&bmi_peer_array, &mpi_peer_array, &context);
 	if(ret < 0)
 	{
 		fprintf(stderr, "bench_init() failure.\n");
@@ -165,12 +168,12 @@ int main( int argc, char *argv[])
 	if(im_a_server)
 	{
 		ret = bmi_server_postall(&opts, bmi_buf_array, num_clients, 
-			bmi_peer_array, buffer_flag, &bmi_time, world_rank);
+			bmi_peer_array, buffer_flag, &bmi_time, world_rank, context);
 	}
 	else
 	{
 		ret = bmi_client_postall(&opts, bmi_buf_array, opts.num_servers, 
-			bmi_peer_array, buffer_flag, &bmi_time, world_rank);
+			bmi_peer_array, buffer_flag, &bmi_time, world_rank, context);
 	}
 	if(ret < 0)
 	{
@@ -367,6 +370,7 @@ MPI_COMM_WORLD);
 	printf("comm size: %d\n", comm_size);
 #endif
 	/* shutdown interfaces */
+	BMI_close_context(context);
 	BMI_finalize();
 	MPI_Finalize();
 	return 0;
@@ -375,7 +379,8 @@ MPI_COMM_WORLD);
 
 static int bmi_server_postall(struct bench_options* opts, struct
 	mem_buffers* bmi_buf_array, int num_clients, bmi_addr_t* addr_array, 
-	bmi_flag_t buffer_flag, double* wtime, int world_rank)
+	bmi_flag_t buffer_flag, double* wtime, int world_rank, bmi_context_id
+	context)
 {
 	double time1, time2;
 	int i,j;
@@ -442,7 +447,8 @@ static int bmi_server_postall(struct bench_options* opts, struct
 			}
 			
 			ret = BMI_post_recv(&(ids[j][i]), addr_array[j], recv_buffer,
-				bmi_buf_array[0].size, &actual_size, buffer_flag, 0, NULL);
+				bmi_buf_array[0].size, &actual_size, buffer_flag, 0, NULL,
+				context);
 			if(ret < 0)
 			{
 				fprintf(stderr, "Server: BMI recv error.\n");
@@ -492,7 +498,7 @@ static int bmi_server_postall(struct bench_options* opts, struct
 			 * finished
 			 */
 			ret = BMI_testsome(num_clients, id_array, &outcount, index_array,
-				error_code_array, actual_size_array, NULL, 0);
+				error_code_array, actual_size_array, NULL, 0, context);
 		}while(ret == 0 && outcount == 0);
 
 		if(ret < 0)
@@ -550,7 +556,8 @@ static int bmi_server_postall(struct bench_options* opts, struct
 
 static int bmi_client_postall(struct bench_options* opts, struct
 	mem_buffers* bmi_buf_array, int num_servers, bmi_addr_t* addr_array, 
-	bmi_flag_t buffer_flag, double* wtime, int world_rank)
+	bmi_flag_t buffer_flag, double* wtime, int world_rank, bmi_context_id
+	context)
 {
 	double time1, time2;
 	int i,j;
@@ -616,7 +623,7 @@ static int bmi_client_postall(struct bench_options* opts, struct
 			}
 			
 			ret = BMI_post_send(&(ids[j][i]), addr_array[j], send_buffer,
-				bmi_buf_array[0].size, buffer_flag, 0, NULL);
+				bmi_buf_array[0].size, buffer_flag, 0, NULL, context);
 			if(ret < 0)
 			{
 				fprintf(stderr, "Client: BMI send error.\n");
@@ -666,7 +673,7 @@ static int bmi_client_postall(struct bench_options* opts, struct
 			 * finished
 			 */
 			ret = BMI_testsome(num_servers, id_array, &outcount, index_array,
-				error_code_array, actual_size_array, NULL, 0);
+				error_code_array, actual_size_array, NULL, 0, context);
 		}while(ret == 0 && outcount == 0);
 
 		if(ret < 0)

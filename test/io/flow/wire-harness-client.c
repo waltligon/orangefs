@@ -31,7 +31,8 @@ static int run_io_operation(
 	void* memory_buffer,
 	int memory_buffer_size,
 	PINT_Request* io_req,
-	PVFS_Dist* io_dist);
+	PVFS_Dist* io_dist,
+	bmi_context_id context);
 
 int main(int argc, char **argv)	
 {
@@ -47,6 +48,7 @@ int main(int argc, char **argv)
 	int commit_index = 0;
 	void* memory_buffer;
 	PVFS_size io_size = 10*1024*1024; /* 10 M transfer */
+	bmi_context_id context;
 
 
 	/*************************************************************/
@@ -61,6 +63,13 @@ int main(int argc, char **argv)
 	if(ret < 0)
 	{
 		fprintf(stderr, "BMI init failure.\n");
+		return(-1);
+	}
+
+	ret = BMI_open_context(&context);
+	if(ret < 0)
+	{
+		fprintf(stderr, "BMI_open_context() failure.\n");
 		return(-1);
 	}
 
@@ -170,7 +179,7 @@ int main(int argc, char **argv)
 
 	/* this is where all of the work happens */
 	ret = run_io_operation(server_addr, req, total_req_size, ack,
-		memory_buffer, io_size, io_req, io_dist);
+		memory_buffer, io_size, io_req, io_dist, context);
 	if(ret < 0)
 	{
 		fprintf(stderr, "Error: failed to successfully complete I/O exchange.\n");
@@ -256,7 +265,8 @@ static int run_io_operation(
 	void* memory_buffer,
 	int memory_buffer_size,
 	PINT_Request* io_req,
-	PVFS_Dist* io_dist
+	PVFS_Dist* io_dist,
+	bmi_context_id context
 	)
 {
 	int ret = -1;
@@ -273,7 +283,7 @@ static int run_io_operation(
 
 	/* send request */
 	ret = BMI_post_sendunexpected(&op, server_addr, req, total_req_size,
-		BMI_PRE_ALLOC, 0, NULL);
+		BMI_PRE_ALLOC, 0, NULL, context);
 	if(ret < 0)
 	{
 		fprintf(stderr, "BMI_post_sendunexpected failure.\n");
@@ -285,7 +295,7 @@ static int run_io_operation(
 		do
 		{
 			ret = BMI_test(op, &outcount, &error_code, &actual_size,
-			NULL, 10);
+			NULL, 10, context);
 		} while(ret == 0 && outcount == 0);
 
 		if(ret < 0 || error_code != 0)
@@ -302,7 +312,7 @@ static int run_io_operation(
 
 	/* get ack back */
 	ret = BMI_post_recv(&op, server_addr, ack, sizeof(struct
-		wire_harness_ack), &actual_size, BMI_PRE_ALLOC, 0, NULL);
+		wire_harness_ack), &actual_size, BMI_PRE_ALLOC, 0, NULL, context);
 	if(ret < 0)
 	{
 		fprintf(stderr, "BMI_post_recv failure.\n");
@@ -314,7 +324,7 @@ static int run_io_operation(
 		do
 		{
 			ret = BMI_test(op, &outcount, &error_code, &actual_size,
-			NULL, 10);
+			NULL, 10, context);
 		} while(ret == 0 && outcount == 0);
 
 		if(ret < 0 || error_code != 0)

@@ -54,6 +54,7 @@ int main(int argc, char **argv)
 	int count;
 	TROVE_ds_state state;
 	PVFS_size tmp_size;
+	bmi_context_id context;
 	
 	/* memory buffer to xfer */
 	mybuffer = (void*)malloc(TEST_SIZE);
@@ -84,6 +85,13 @@ int main(int argc, char **argv)
 		return(-1);
 	}
 
+	ret = BMI_open_context(&context);
+	if(ret < 0)
+	{
+		fprintf(stderr, "BMI_open_context() failure.\n");
+		return(-1);
+	}
+
 	/* start up trove */
 	ret = trove_initialize(storage_space, 0, &method_name, 0);
 	if (ret < 0) {
@@ -109,7 +117,7 @@ int main(int argc, char **argv)
 	}
 
 	ret = BMI_post_sendunexpected(&op, server_addr, &mybuffer, 1,
-		BMI_EXT_ALLOC, 0, NULL);
+		BMI_EXT_ALLOC, 0, NULL, context);
 	if(ret < 0)
 	{
 		fprintf(stderr, "BMI_post_sendunexpected failure.\n");
@@ -122,7 +130,7 @@ int main(int argc, char **argv)
 		do
 		{
 			ret = BMI_test(op, &outcount, &error_code, &actual_size,
-			NULL, 10);
+			NULL, 10, context);
 		} while(ret == 0 && outcount == 0);
 
 		if(ret < 0 || error_code != 0)
@@ -271,6 +279,7 @@ int main(int argc, char **argv)
 	PINT_flow_free(flow_d);
 
 	/* shut down BMI */
+	BMI_close_context(context);
 	BMI_finalize();
 
 	trove_finalize();

@@ -63,6 +63,7 @@ int main(int argc, char **argv)
 	TROVE_ds_state state;
 	char *method_name, *file_name;
 	TROVE_keyval_s key, val;
+	bmi_context_id context;
 
 	/*************************************************************/
 	/* initialization stuff */
@@ -76,6 +77,13 @@ int main(int argc, char **argv)
 	if(ret < 0)
 	{
 		fprintf(stderr, "BMI init failure.\n");
+		return(-1);
+	}
+
+	ret = BMI_open_context(&context);
+	if(ret < 0)
+	{
+		fprintf(stderr, "BMI_open_context() failure.\n");
 		return(-1);
 	}
 
@@ -280,6 +288,7 @@ int main(int argc, char **argv)
 	}
 
 	/* shut down BMI */
+	BMI_close_context(context);
 	BMI_finalize();
 
 	trove_finalize();

@@ -21,7 +21,8 @@ int send_msg(bmi_op_id_t i,
 		int size, 
 		bmi_flag_t f, 
 		bmi_msg_tag_t t, 
-		void *in_test_user_ptr)
+		void *in_test_user_ptr,
+		bmi_context_id context)
 {
 	int ret;
 	int outcount;
@@ -35,7 +36,8 @@ int send_msg(bmi_op_id_t i,
 			size,
 			f,
 			t,
-			in_test_user_ptr);
+			in_test_user_ptr,
+			context);
 
 	if(ret == 0)
 	{
@@ -44,7 +46,7 @@ int send_msg(bmi_op_id_t i,
 		do
 		{
 			ret = BMI_test(i, &outcount, &error_code, &actual_size,
-					&u2, 10);
+					&u2, 10, context);
 		} while(ret == 0 && outcount == 0);
 
 		if(ret < 0 || error_code != 0)
@@ -75,7 +77,8 @@ int recv_msg(bmi_op_id_t i,
 				bmi_size_t *as,
 				bmi_flag_t f,
 				bmi_msg_tag_t m,
-				void *in_test_user_ptr)
+				void *in_test_user_ptr,
+				bmi_context_id context)
 {
 	int ret;
 	int outcount;
@@ -90,7 +93,8 @@ int recv_msg(bmi_op_id_t i,
 								as, 
 								f, 
 								m, 
-								in_test_user_ptr);
+								in_test_user_ptr,
+								context);
 	if(ret < 0)
 	{
 		errno = -ret;
@@ -105,7 +109,7 @@ int recv_msg(bmi_op_id_t i,
 		do
 		{
 			ret = BMI_test(i, &outcount, &error_code,
-				&actual_size, &out_test_user_ptr, 10);
+				&actual_size, &out_test_user_ptr, 10, context);
 		} while(ret == 0 && outcount == 0);
 
 		if(ret < 0 || error_code != 0)

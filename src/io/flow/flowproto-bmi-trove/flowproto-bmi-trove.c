@@ -100,6 +100,9 @@ static int flowproto_bmi_trove_id = -1;
 /* TODO: this is temporary */
 static PVFS_fs_id HACK_global_fsid = -1;
 
+/* bmi context */
+static bmi_context_id global_bmi_context = -1;
+
 /* array of bmi ops in flight; filled in when needed to call testsome()
  * or waitsome() at the BMI level. */
 static bmi_op_id_t *bmi_op_array = NULL;
@@ -275,15 +278,24 @@ int flowproto_bmi_trove_initialize(int flowproto_id)
 	return (-EINVAL);
     }
 
+    /* get a BMI context */
+    ret = BMI_open_context(&global_bmi_context);
+    if(ret < 0)
+    {
+	return(ret);
+    }
+
     /* setup our queues to track low level operations */
     bmi_inflight_queue = op_id_queue_new();
     if (!bmi_inflight_queue)
     {
+	BMI_close_context(global_bmi_context);
 	return (-ENOMEM);
     }
     trove_inflight_queue = op_id_queue_new();
     if (!trove_inflight_queue)
     {
+	BMI_close_context(global_bmi_context);
 	op_id_queue_cleanup(bmi_inflight_queue);
 	return (-ENOMEM);
     }
@@ -315,6 +327,8 @@ int flowproto_bmi_trove_finalize(void)
 
     op_id_queue_cleanup(bmi_inflight_queue);
     op_id_queue_cleanup(trove_inflight_queue);
+
+    BMI_close_context(global_bmi_context);
 
     gossip_ldebug(FLOW_PROTO_DEBUG, "flowproto_bmi_trove shut down.\n");
     return (0);
@@ -507,7 +521,7 @@ int flowproto_bmi_trove_checkworld(flow_descriptor ** flow_d_array,
 	ret = BMI_testsome(bmi_count, bmi_op_array, &bmi_outcount,
 			   bmi_index_array, bmi_error_code_array,
 			   bmi_actualsize_array, bmi_usrptr_array,
-			   split_idle_time_ms);
+			   split_idle_time_ms, global_bmi_context);
 	if (ret < 0)
 	{
 	    return (ret);
@@ -1263,7 +1277,7 @@ static void service_mem_to_bmi(flow_descriptor * flow_d)
 			     flow_data->bmi_size_list,
 			     flow_data->bmi_list_count,
 			     flow_data->bmi_total_size, buffer_flag,
-			     flow_d->tag, flow_d);
+			     flow_d->tag, flow_d, global_bmi_context);
     if (ret == 1)
     {
 	/* handle immediate completion */
@@ -1322,7 +1336,8 @@ static void service_bmi_to_mem(flow_descriptor * flow_d)
 			    flow_d->src.u.bmi.address,
 			    flow_data->intermediate_buffer,
 			    flow_data->max_buffer_size, &actual_size,
-			    BMI_PRE_ALLOC, flow_d->tag, flow_d);
+			    BMI_PRE_ALLOC, flow_d->tag, flow_d,
+			    global_bmi_context);
     }
     else
     {
@@ -1335,7 +1350,8 @@ static void service_bmi_to_mem(flow_descriptor * flow_d)
 				 flow_data->bmi_size_list,
 				 flow_data->bmi_list_count,
 				 flow_data->bmi_total_size, &actual_size,
-				 BMI_EXT_ALLOC, flow_d->tag, flow_d);
+				 BMI_EXT_ALLOC, flow_d->tag, flow_d,
+				 global_bmi_context);
     }
 
     gossip_ldebug(FLOW_PROTO_DEBUG, "Recv post returned %d\n", ret);
@@ -1475,7 +1491,8 @@ static void service_bmi_to_trove(flow_descriptor * flow_d)
 				flow_d->src.u.bmi.address,
 				flow_data->fill_buffer,
 				flow_data->bmi_total_size, &actual_size,
-				BMI_PRE_ALLOC, flow_d->tag, flow_d);
+				BMI_PRE_ALLOC, flow_d->tag, flow_d,
+				global_bmi_context);
 	    if (ret == 1)
 	    {
 		bmi_completion_bmi_to_trove(0, actual_size, flow_d);
@@ -1645,7 +1662,8 @@ static void service_trove_to_bmi(flow_descriptor * flow_d)
 	ret = BMI_post_send(&flow_data->bmi_id,
 			    flow_d->dest.u.bmi.address, flow_data->drain_buffer,
 			    flow_data->drain_buffer_used,
-			    BMI_PRE_ALLOC, flow_d->tag, flow_d);
+			    BMI_PRE_ALLOC, flow_d->tag, flow_d,
+			    global_bmi_context);
 	if (ret == 1)
 	{
 	    /* handle immediate completion */
