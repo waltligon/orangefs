@@ -43,6 +43,19 @@ extern int dbpf_thread_initialize(void);
 
 struct dbpf_storage *my_storage_p = NULL;
 
+void dbpf_error_report(const char *errpfx, char *msg)
+{
+#ifdef BERKDB_ERROR_REPORTING
+    char buf[512] = {0};
+
+    if (errpfx && msg)
+    {
+        snprintf(buf, 512, "%s: %s\n", errpfx, msg);
+        gossip_lerr(buf);
+    }
+#endif
+}
+
 /* Internally used only */
 static struct dbpf_storage *dbpf_storage_lookup(char *stoname, int *err_p);
 static int dbpf_db_create(char *dbname);

@@ -213,7 +213,7 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
 	gossip_debug(TROVE_DEBUG, "handle already exists...\n");
 	return -TROVE_EEXIST;
     }
-    else if (ret != DB_NOTFOUND)
+    else if ((ret != DB_NOTFOUND) && (ret != DB_KEYEMPTY))
     {
 	gossip_err("error in dspace create (db_p->get failed).\n");
         trove_handle_free(op_p->coll_p->coll_id, new_handle);
@@ -720,9 +720,11 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
     if (dbpf_attr_cache_ds_attr_fetch_cached_data(
             handle, ds_attr_p) == 0)
     {
+#if 0
         gossip_debug(TROVE_DEBUG, "fast path attr cache hit on %Lu"
                      "(dfile_count=%d | dist_size=%d)\n", Lu(handle),
                      ds_attr_p->dfile_count, ds_attr_p->dist_size);
+#endif
         return 1;
     }
 
@@ -794,6 +796,7 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
     /* initialize op-specific members */
     q_op_p->op.u.d_setattr.attr_p = ds_attr_p;
 
+#if 0
     gossip_debug(TROVE_DEBUG, "storing attributes (1) on key %Lu, "
                  "uid = %d, mode = %d, type = %d, dfile_count = %d, "
                  "dist_size = %d\n",
@@ -803,6 +806,7 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
                  (int) ds_attr_p->type,
                  (int) ds_attr_p->dfile_count,
                  (int) ds_attr_p->dist_size);
+#endif
 
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
 
@@ -838,6 +842,7 @@ static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p)
 
     trove_ds_attr_to_stored((*op_p->u.d_setattr.attr_p), s_attr);
 
+#if 0
     gossip_debug(TROVE_DEBUG, "storing attributes (2) on key %Lu, "
                  "uid = %d, mode = %d, type = %d, dfile_count = %d, "
                  "dist_size = %d\n",
@@ -847,6 +852,7 @@ static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p)
                  (int) s_attr.type,
                  (int) s_attr.dfile_count,
                  (int) s_attr.dist_size);
+#endif
 
     ret = db_p->put(db_p, NULL, &key, &data, 0);
     if (ret != 0)
@@ -999,7 +1005,7 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
         goto return_error;
     }
 
-#if 1
+#if 0
     gossip_debug(TROVE_DEBUG, "reading attributes (1) on key %Lu, "
                  "uid = %d, mode = %d, type = %d, dfile_count "
                  "= %d, dist_size = %d\n",

@@ -263,8 +263,8 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
     }
 
     db_p = keyval_db_cache[i].db_p; /* for simplicity */
-    db_p->set_errfile(db_p, stderr);
-    db_p->set_errpfx(db_p, "xxx");
+    db_p->set_errpfx(db_p, "pvfs2");
+    db_p->set_errcall(db_p, dbpf_error_report);
     /* DB_RECNUM makes it easier to iterate through every key in chunks */
     if (( ret =  db_p->set_flags(db_p, DB_RECNUM)))
     {

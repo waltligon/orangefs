@@ -15,6 +15,12 @@ pvfs2-0.0.7pre2
   compiling, etc on a pvfs2 volume is now much more responsive)
 - fix size reporting using 'du' through the vfs interface
 - GNU/Linux PowerPC 32bit support, including the 2.6.x kernel interface
+- updated pvfs2-genconfig to account for new config file format
+- fixed an I/O bug that caused data access problems on some multiple
+  I/O server configurations
+- removed extra berkeley db error reporting since it's not integrated with
+  our gossip error reporting system.  can now be explicitly enabled using
+  a new configure option --with-berkdb-debug
 
 
 pvfs2-0.0.6

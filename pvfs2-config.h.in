@@ -61,6 +61,9 @@
 /* Define if mtrace memory leak detection was enabled */
 #undef WITH_MTRACE
 
+/* Define if berkeley db error reporting was enabled */
+#undef BERKDB_ERROR_REPORTING
+
 /* Define if DB stat function takes extra parameter */
 #undef HAVE_UNKNOWN_PARAMETER_TO_DB_STAT
 

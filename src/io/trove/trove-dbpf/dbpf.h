@@ -340,6 +340,8 @@ void dbpf_collection_clear_registered(void);
 /* function for mapping db errors to trove errors */
 PVFS_error dbpf_db_error_to_trove_error(int db_error_value);
 
+/* db error reporting callback function; defined in dbpf-mgmt.c */
+void dbpf_error_report(const char *errpfx, char *msg);
 
 #define DBPF_OPEN   open
 #define DBPF_WRITE  write

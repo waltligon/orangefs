@@ -148,8 +148,8 @@ int dbpf_dspace_dbcache_try_get(TROVE_coll_id coll_id,
     }
 
     db_p = dspace_db_cache[i].db_p;
-    db_p->set_errfile(db_p, stderr);
-    db_p->set_errpfx(db_p, "xxx");
+    db_p->set_errpfx(db_p, "pvfs2");
+    db_p->set_errcall(db_p, dbpf_error_report);
     /* DB_RECNUM makes it easier to iterate through every key in chunks */
     if (( ret =  db_p->set_flags(db_p, DB_RECNUM)) ) {
 	    db_p->err(db_p, ret, "%s: set_flags", filename);
