@@ -139,6 +139,12 @@ documentation:
 
 code cleanup:
 ====================================================================
+- audit code to make sure that all error paths are handled when
+  assertions are turned off
+- maybe make a checklist for each pvfs2 component to use as we clean 
+  up each section of the code?  (items to check for each component
+  could include stuff like symbol names, PVFS_error code usage,
+  properly error handling when assertions are off, etc.)
 - consistent formatting
 - consistent function naming
 - consistent header file inclusion
