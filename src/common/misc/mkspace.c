@@ -242,6 +242,7 @@ int pvfs2_mkspace(
           create dataspace to hold directory entries; a
           value of zero leaves the allocation to trove.
         */
+        ent_handle = 0;
         cur_extent.first = cur_extent.last = 0;
         extent_array.extent_count = 1;
         extent_array.extent_array = &cur_extent;
