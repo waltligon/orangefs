@@ -7,27 +7,26 @@
 #include <client.h>
 #include <sys/time.h>
 
-void gen_rand_str(int len, char** gen_str);
 extern int parse_pvfstab(char *fn,pvfs_mntlist *mnt);
 
 int main(int argc,char **argv)
 {
 	PVFS_sysresp_init resp_init;
-	PVFS_sysreq_lookup req_look;
-	PVFS_sysresp_lookup resp_look;
-	PVFS_sysreq_lookup *req_lk = NULL;
-	PVFS_sysresp_lookup *resp_lk = NULL;
+	PVFS_sysreq_lookup req_lk;
+	PVFS_sysresp_lookup resp_lk;
+	PVFS_sysreq_create req_cr;
+	PVFS_sysresp_create resp_cr;
+	PVFS_sysreq_io req_io;
+	PVFS_sysresp_io resp_io;
 	char *filename;
 	int name_sz;
 	int ret = -1;
 	pvfs_mntlist mnt = {0,NULL};
-
-	PVFS_handle lk_handle;
-	PVFS_handle lk_fsid;
+	int io_size = 1024 * 1024;
 
 	if (argc != 2)
 	{
-		fprintf(stderr, "USAGE: %s <file name>\n", argv[0]);
+		fprintf(stderr, "Usage: %s <file name>\n", argv[0]);
 		return(-1);
 	}
 
@@ -37,6 +36,8 @@ int main(int argc,char **argv)
 		return(-1);
 	}
 		
+	/* build the full path name (work out of the root dir) */
+
 	name_sz = strlen(argv[1]) + 2; /* include null terminator and slash */
 	filename = malloc(name_sz);
 	if(!filename)
@@ -47,85 +48,120 @@ int main(int argc,char **argv)
 	filename[0] = '/';
 
 	memcpy(&(filename[1]), argv[1], (name_sz-1));
-	printf("Operating on file: %s\n", filename);
 
 	/* parse pvfstab */
 	ret = parse_pvfstab(NULL,&mnt);
 	if (ret < 0)
 	{
-		printf("Parsing error\n");
+		fprintf(stderr, "Error: parse_pvfstab() failure.\n");
 		return(-1);
 	}
 	/* init the system interface */
 	ret = PVFS_sys_initialize(mnt, &resp_init);
 	if(ret < 0)
 	{
-		printf("PVFS_sys_initialize() failure. = %d\n", ret);
+		fprintf(stderr, "Error: PVFS_sys_initialize() failure. = %d\n", ret);
 		return(ret);
 	}
 
-#if 0
-	/* lookup the root handle */
-	req_look.credentials.perms = 1877;
-	req_look.name = malloc(2);/*null terminator included*/
-	req_look.name[0] = '/';
-	req_look.name[1] = '\0';
-	req_look.fs_id = resp_init.fsid_list[0];
-	printf("looking up the root handle for fsid = %d\n", req_look.fs_id);
-	ret = PVFS_sys_lookup(&req_look,&resp_look);
+	/*************************************************************
+	 * try to look up the target file 
+	 */
+	
+	req_lk.name = filename;
+	req_lk.fs_id = resp_init.fsid_list[0];
+	req_lk.credentials.uid = 0;
+	req_lk.credentials.gid = 0;
+	req_lk.credentials.perms = U_WRITE|U_READ;
+
+	ret = PVFS_sys_lookup(&req_lk, &resp_lk);
+	/* TODO: really we probably want to look for a specific error code,
+	 * like maybe ENOENT?
+	 */
 	if (ret < 0)
 	{
-		printf("Lookup failed with errcode = %d\n", ret);
-		return(-1);
-	}
-	// print the handle 
-	printf("--lookup--\n"); 
-	printf("ROOT Handle:%ld\n", (long int)resp_look.pinode_refn.handle);
-	
-#endif
+		printf("Lookup failed; creating new file.\n");
 
-	/* test the lookup function */
-	req_lk = (PVFS_sysreq_lookup *)malloc(sizeof(PVFS_sysreq_lookup));
-	if (!req_lk)
+		/* get root handle */
+		req_lk.name = "/";
+		req_lk.fs_id = resp_init.fsid_list[0];
+		req_lk.credentials.uid = 0;
+		req_lk.credentials.gid = 0;
+		req_lk.credentials.perms = U_WRITE|U_READ;
+
+		ret = PVFS_sys_lookup(&req_lk, &resp_lk);
+		if(ret < 0)
+		{
+			fprintf(stderr, "Error: PVFS_sys_lookup() failed to find root handle.\n");
+			return(-1);
+		}
+
+		/* create new file */
+		req_cr.entry_name = &(filename[1]); /* leave off / */
+
+		/* TODO: I'm not setting the attribute mask... not real sure
+		 * what's supposed to happen there */
+		req_cr.attr.owner = 0;
+		req_cr.attr.group = 0;
+		req_cr.attr.perms = U_WRITE|U_READ;
+		req_cr.attr.u.meta.nr_datafiles = 1;
+		req_cr.parent_refn.handle = resp_lk.pinode_refn.handle;
+		req_cr.parent_refn.fs_id = req_lk.fs_id;
+		req_cr.attr.u.meta.dist = NULL;
+
+		ret = PVFS_sys_create(&req_cr, &resp_cr);
+		if(ret < 0)
+		{
+			fprintf(stderr, "Error: PVFS_sys_create() failure.\n");
+			return(-1);
+		}
+
+		req_io.pinode_refn.fs_id = req_lk.fs_id;
+		req_io.pinode_refn.handle = resp_cr.pinode_refn.handle;
+	}
+	else
 	{
-		printf("Error in malloc\n");
-		return(-1);
+		printf("Lookup succeeded; performing I/O on existing file.\n");
+
+		req_io.pinode_refn.fs_id = req_lk.fs_id;
+		req_io.pinode_refn.handle = resp_cr.pinode_refn.handle;
 	}
-	resp_lk = (PVFS_sysresp_lookup *)malloc(sizeof(PVFS_sysresp_lookup));
-	if (!resp_lk)
+
+	/**************************************************************
+	 * carry out I/O operation
+	 */
+
+	printf("Performing I/O on handle: %ld, fs: %d\n",
+		(long)req_io.pinode_refn.handle, (int)req_io.pinode_refn.fs_id);
+
+	req_io.credentials.uid = 0;
+	req_io.credentials.gid = 0;
+	req_io.credentials.perms = U_WRITE|U_READ;
+
+	ret = PVFS_Request_contiguous(io_size, PVFS_BYTE, &(req_io.io_req));
+	if(ret < 0)
 	{
-		printf("Error in malloc\n");
+		fprintf(stderr, "Error: PVFS_Request_contiguous() failure.\n");
 		return(-1);
 	}
-	
-	req_lk->name = filename;
-	req_lk->fs_id = resp_init.fsid_list[0];
-	req_lk->credentials.uid = 100;
-	req_lk->credentials.gid = 100;
-	req_lk->credentials.perms = 1877;
 
-	ret = PVFS_sys_lookup(req_lk,resp_lk);
-	if (ret < 0)
+	ret = PVFS_sys_write(&req_io, &resp_io);
+	if(ret < 0)
 	{
-		printf("Lookup failed with errcode = %d\n", ret);
+		fprintf(stderr, "PVFS_sys_write() failure.\n");
 		return(-1);
 	}
-	// print the handle 
-	printf("--lookup--\n"); 
-	printf("\tHandle:%ld\n", (long int)resp_lk->pinode_refn.handle);
-	printf("\tFSID:%ld\n", (long int)resp_lk->pinode_refn.fs_id);
 
-	lk_handle = resp_lk->pinode_refn.handle;
-	lk_fsid = resp_lk->pinode_refn.fs_id;
+	printf("Wrote %d bytes.\n", (int)resp_io.total_completed);
 
-	free(req_lk);
-	free(resp_lk);
+	/**************************************************************
+	 * shut down pending interfaces
+	 */
 
-	//close it down
 	ret = PVFS_sys_finalize();
 	if (ret < 0)
 	{
-		printf("finalizing sysint failed with errcode = %d\n", ret);
+		fprintf(stderr, "Error: PVFS_sys_finalize() failed with errcode = %d\n", ret);
 		return (-1);
 	}
 
