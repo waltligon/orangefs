@@ -93,6 +93,7 @@ LDFLAGS += -L lib
 LIBS += @LIBS@ -lpvfs2
 # for Solaris:
 # LIBS += -lsocket -lnsl
+
   # enable BMI TCP module
 CFLAGS += -D__STATIC_METHOD_BMI_TCP__
   # enable Flow debugging protocol
@@ -183,6 +184,8 @@ MPITESTSRC :=
 # MPIMISCSRC is a collection of sources that must be built into
 #    object form using MPI
 MPIMISCSRC :=
+# files generated as part of the build that should be deleted on "make clean"
+CLEANFILES :=
 
 ################################################################
 # Top level (default) targets
@@ -268,7 +271,7 @@ DOCSCRUFT += $(patsubst %.tex,%.toc, $(filter %.tex,$(DOCSRC)))
 # DEPENDS is a global list of all of our dependency files.  
 # NOTE: sort is just a trick to remove duplicates; the order
 #   doesn't matter at all.
-DEPENDS := $(sort $(LIBDEPENDS) $(TESTDEPENDS) $(SERVERDEPENDS) $(MISCDEPENDS) $(ADMINDEPENDS) $(ADMINDEPENDS_SERVER)) 
+DEPENDS := $(sort $(LIBDEPENDS) $(TESTDEPENDS) $(SERVERDEPENDS) $(MISCDEPENDS) $(ADMINDEPENDS) $(ADMINDEPENDS_SERVER) $(PRIVATEDEPENDS))
 ifdef BUILD_MPI
 DEPENDS += $(MPITESTDEPENDS) $(MPIMISCDEPENDS)
 endif
@@ -279,7 +282,7 @@ endif
 # NOTE: This doesn't include automatically generated source code.
 #    Automatically generate source code is only removed during
 #    distclean
-CLEANFILES :=\
+CLEANFILES +=\
  src/common/statecomp/statecomp\
  src/common/statecomp/*.o \
  src/common/statecomp/scanner.c \
@@ -450,9 +453,12 @@ clean: docsclean
 distclean: clean
 	find . -name "module.mk" -exec rm \{\} \;
 	rm -f Makefile config.log config.status config.cache pvfs2-config.h
-	rm -f src/io/trove/autogen.c
-	rm -f $(SERVERGENSRC)
 	rm -f tags
+	rm -f $(SERVERGENSRC)
+	rm -f src/kernel/linux-2.6/Makefile
+	rm -f maint/mpi-depend.sh
+	rm -f include/pvfs2-types.h
+	rm -rf autom4te-*.cache
 
 # this is where we include all of our automatic dependencies.
 # NOTE: we wrap this in ifneq's in order to prevent the
