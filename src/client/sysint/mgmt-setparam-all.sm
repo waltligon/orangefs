@@ -102,6 +102,7 @@ int PVFS_mgmt_setparam_all(
 
     /* do something to kick off processing */
     ret = PINT_client_state_machine_post(sm_p, PVFS_MGMT_SETPARAM_ALL);
+    /* TODO: error handling */
     assert(ret == 0);
 
     /* while !done call progress function */
@@ -111,6 +112,7 @@ int PVFS_mgmt_setparam_all(
 	ret = PINT_client_state_machine_test();
     }
 
+    /* TODO: error handling */
     assert(ret == 0);
 
     gossip_debug(CLIENT_DEBUG, "PVFS_mgmt_setparam_all completed\n");
@@ -216,12 +218,14 @@ static int mgmt_setparam_all_setup_msgpair(PINT_client_sm *sm_p,
 static int mgmt_setparam_all_cleanup(PINT_client_sm *sm_p,
 			  job_status_s *js_p)
 {
+    /* TODO: error handling */
     assert(0);
 }
 
 static int mgmt_setparam_all_failure(PINT_client_sm *sm_p,
 			  job_status_s *js_p)
 {
+    /* TODO: error handling */
     assert(0);
 }
 
