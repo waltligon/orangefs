@@ -32,7 +32,7 @@ dnl This particular one enables tracing of memory allocation and
 dnl    freeing with the mtrace tool
 AC_ARG_WITH(mtrace,
 [  --with-mtrace                  Use mtrace for detecting memory leaks (must setenv MALLOC_TRACE to output file name).],
-CFLAGS="$CFLAGS -imcheck.h"
+CFLAGS="$CFLAGS -include mcheck.h"
 AC_DEFINE(WITH_MTRACE, 1, Define if mtrace memory leak detection was enabled)
 )
 

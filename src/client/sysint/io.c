@@ -71,10 +71,10 @@ static int io_find_target_dfiles(PVFS_Request io_req, PVFS_offset io_req_offset,
  *
  * returns 0 on success, -errno on failure
  */
-int PVFS_sys_io(PVFS_pinode_reference pinode_refn, PVFS_Request io_req, 
-		PVFS_offset io_req_offset, void* buffer, PVFS_size buffer_size, 
-		PVFS_credentials credentials, PVFS_sysresp_io *resp, 
-		enum PVFS_io_type type)
+int PVFS_sys_io_old(PVFS_pinode_reference pinode_refn, PVFS_Request io_req, 
+		    PVFS_offset io_req_offset, void* buffer, PVFS_size buffer_size, 
+		    PVFS_credentials credentials, PVFS_sysresp_io *resp, 
+		    enum PVFS_io_type type)
 {
     pinode* pinode_ptr = NULL;
     uint32_t attr_mask = 0;

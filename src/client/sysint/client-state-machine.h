@@ -133,10 +133,6 @@ struct PINT_client_io_sm {
     /* data regarding final acknowledgements (writes only) */
     int                        ack_comp_ct;
     PINT_client_sm_recv_state *ackarray;
-#if 0
-    job_id_t             *ack_id_array;
-    job_status_s         *ack_status_array;
-#endif
 
     /* output parameter */
     PVFS_sysresp_io      *io_resp_p;

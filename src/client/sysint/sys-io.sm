@@ -107,14 +107,14 @@ machine pvfs2_client_io_sm(object_getattr_setup_msgpair,
 
 /* PVFS_sys_io()
  */
-int PVFS_sys_io2(PVFS_pinode_reference pinode_ref,
-		 PVFS_Request          io_req,
-		 PVFS_offset           io_req_offset,
-		 void                 *buffer,
-		 PVFS_size             buffer_size,
-		 PVFS_credentials      credentials,
-		 PVFS_sysresp_io      *resp_p,
-		 enum PVFS_io_type     io_type)
+int PVFS_sys_io(PVFS_pinode_reference pinode_ref,
+		PVFS_Request          io_req,
+		PVFS_offset           io_req_offset,
+		void                 *buffer,
+		PVFS_size             buffer_size,
+		PVFS_credentials      credentials,
+		PVFS_sysresp_io      *resp_p,
+		enum PVFS_io_type     io_type)
 {
     int ret;
     PINT_client_sm *sm_p;
@@ -1073,17 +1073,57 @@ static int io_analyze_results(PINT_client_sm *sm_p,
 						    &decoded_resp,
 						    &msg_p->svr_addr,
 						    iosm_p->ackarray[i].recv_status.actual_size,
-						    &resp_p);		    
+						    &resp_p);
+			if (ret != 0) {
+			    assert(0);
+			}
 			gossip_debug(CLIENT_DEBUG,
 				     "  %Ld bytes written to %d.\n",
 				     resp_p->u.write_completion.total_completed,
 				     i);
 			total_size += resp_p->u.write_completion.total_completed;
+
+			/* done with this; free decode resources */
+			PINT_decode_release(&decoded_resp, PINT_DECODE_RESP);
 		    }
 		}
-	    }
+
+		/* free resources associated with this flow array element:
+		 * - flow descriptor element
+		 * - write ack, if it was a write (we decoded it if we needed
+		 *   to above, and got rid of that already)
+		 */
+		PINT_flow_free(sm_p->u.io.flow_p_array[i]);
+		sm_p->u.io.flow_p_array[i] = NULL; /* pedantic */
+		if (iosm_p->io_type == PVFS_IO_WRITE) {
+		    BMI_memfree(msg_p->svr_addr,
+				iosm_p->ackarray[i].encoded_resp_p,
+				iosm_p->ackarray[i].max_resp_sz,
+				BMI_RECV);
+		}
+
+	    } /* flow_p_array[i] != NULL */
 	}
     }
+
+    /* free the rest of the resources:
+     * - msgpairarray
+     * - datafile handle array
+     * - flow descriptor pointer array
+     * - file data array
+     * - flow id array
+     * - flow status array
+     * - session tag array
+     * - ackarray
+     */
+    free(sm_p->msgarray);
+    free(sm_p->u.io.datafile_handles);
+    free(sm_p->u.io.flow_p_array);
+    free(sm_p->u.io.file_data_array);
+    free(sm_p->u.io.flow_id_array);
+    free(sm_p->u.io.flow_status_array);
+    free(sm_p->u.io.session_tag_array);
+    free(sm_p->u.io.ackarray);
 
     /* return size, error, and set operation as complete */
     sm_p->u.io.io_resp_p->total_completed = total_size;
