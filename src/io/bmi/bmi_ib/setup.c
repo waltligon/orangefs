@@ -6,12 +6,13 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: setup.c,v 1.10 2004-05-17 19:05:13 pw Exp $
+ * $Id: setup.c,v 1.11 2004-05-17 21:04:52 pw Exp $
  */
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <sys/socket.h>
+#include <sys/poll.h>
 #include <netinet/in.h>  /* ntohs et al */
 #include <arpa/inet.h>   /* inet_ntoa */
 #include <netdb.h>       /* gethostbyname */
@@ -643,6 +644,23 @@ ib_tcp_server_check_new_connections(void)
 }
 
 /*
+ * Watch the listen_sock for activity, but do not actually respond to it.  A
+ * later call to testunexpected will pick up the new connection.
+ */
+void
+ib_tcp_server_block_new_connections(int timeout_ms)
+{
+    struct pollfd pfd;
+    int ret;
+
+    pfd.fd = listen_sock;
+    pfd.events = POLLIN;
+    ret = poll(&pfd, 1, timeout_ms);
+    if (ret < 0)
+	error_errno("%s: poll listen sock", __func__);
+}
+
+/*
  * Callers sometimes want to know odd pieces of information.  Satisfy
  * them.
  */
@@ -655,6 +673,9 @@ BMI_ib_get_info(int option, void *param)
 	case BMI_CHECK_MAXSIZE:
 	    /* reality is 2^31, but shrink to avoid negative int */
 	    *(int *)param = (1UL << 31) - 1;
+	    break;
+	case BMI_DROP_ADDR_QUERY:
+	    /* weird TCP thing, ignore */
 	    break;
 	default:
 	    warning("%s: hint %d not implemented", __func__, option);

@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.11 2004-04-30 16:27:34 pw Exp $
+ * $Id: ib.c,v 1.12 2004-05-17 21:04:52 pw Exp $
  */
 #include <stdio.h>  /* just for NULL for id-generator.h */
 #include <src/common/id-generator/id-generator.h>
@@ -1164,7 +1164,7 @@ BMI_ib_test(bmi_op_id_t id, int *outcount, bmi_error_code_t *err,
 static int
 BMI_ib_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
   bmi_error_code_t *errs, bmi_size_t *sizes, void **user_ptrs,
-  int max_idle_time __unused, bmi_context_id context_id)
+  int max_idle_time, bmi_context_id context_id)
 {
     list_t *l, *lnext;
     int n, complete;
@@ -1200,6 +1200,15 @@ BMI_ib_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
 	n += test_rq(rq, &outids[n], &errs[n], &sizes[n], up, complete);
     }
     *outcount = n;
+    if (n == 0 && max_idle_time > 0) {
+	/*
+	 * Block for up to max_idle_time to avoid spinning from BMI.  Instead
+	 * of sleeping, watch the accept socket for something new.  No way
+	 * to blockingly poll in standard VAPI.  Hopefully the job manager
+	 * sets the timeout to zero when a job is active.
+	 */
+	ib_tcp_server_block_new_connections(max_idle_time);
+    }
     gen_mutex_unlock(&interface_mutex);
     return 0;
 }
