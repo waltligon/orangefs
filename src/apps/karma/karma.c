@@ -7,7 +7,8 @@
 #include "pvfs2.h"
 #include "pvfs2-mgmt.h"
 
-gint timer_callback(gpointer data);
+static gint status_timer_callback(gpointer data);
+static gint traffic_timer_callback(gpointer data);
 
 static GtkWidget *main_window;
 
@@ -103,10 +104,15 @@ int main(int   argc,
     /* show the window */
     gtk_widget_show_all(main_window);
 
-    timer_callback(NULL);
+    status_timer_callback(NULL);
+    traffic_timer_callback(NULL);
+
+    gtk_timeout_add(5000 /* 5 seconds */,
+		    status_timer_callback,
+		    NULL);
 
     gtk_timeout_add(1000 /* 1 second */,
-		    timer_callback,
+		    traffic_timer_callback,
 		    NULL);
 
     /* handle events */
@@ -115,14 +121,11 @@ int main(int   argc,
     return 0;
 }
 
-gint timer_callback(gpointer data)
+static gint status_timer_callback(gpointer data)
 {
     struct PVFS_mgmt_server_stat *svr_stat;
     int i, ret, svr_stat_ct = 0;
     struct gui_status_graph_data *graph_data;
-    struct gui_traffic_raw_data *raw_traffic_data;
-
-    static struct gui_traffic_graph_data *traffic_graph = NULL;
 
     ret = gui_comm_stats_retrieve(&svr_stat, &svr_stat_ct);
     if (ret != 0) {
@@ -138,6 +141,16 @@ gint timer_callback(gpointer data)
     }
 
     gui_details_update(svr_stat, svr_stat_ct);
+
+    return 1; /* schedule it again */
+}
+
+static gint traffic_timer_callback(gpointer data)
+{
+    int ret, svr_stat_ct = 0;
+    struct gui_traffic_raw_data *raw_traffic_data;
+
+    static struct gui_traffic_graph_data *traffic_graph = NULL;
 
     ret = gui_comm_traffic_retrieve(&raw_traffic_data, &svr_stat_ct);
 

@@ -6,7 +6,7 @@
 
 #include "karma.h"
 
-#undef GUI_DETAILS_ENABLE_SORTING
+#define GUI_DETAILS_ENABLE_SORTING
 
 /* values used for column names; don't mess with these indescriminately */
 enum {
@@ -298,8 +298,8 @@ static gint gui_details_float_string_compare(GtkTreeModel *model,
     gtk_tree_model_get(model, iter_a, (gint) col_id, &string_a, -1);
     gtk_tree_model_get(model, iter_b, (gint) col_id, &string_b, -1);
 
-    a = strtof(string_a);
-    b = strtof(string_b);
+    a = (float) strtod(string_a, NULL);
+    b = (float) strtod(string_b, NULL);
 
     g_free(string_a);
     g_free(string_b);
