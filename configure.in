@@ -210,7 +210,6 @@ src/proto/module.mk
 src/server/module.mk
 src/server/request-scheduler/module.mk
 src/client/sysint/module.mk
-src/client/unix-io/module.mk
 src/proto/contig/module.mk
 src/kernel/linux-2.6/module.mk
 test/io/trove/module.mk
