@@ -33,6 +33,10 @@ int main(int argc,char **argv)
 	pvfs_mntlist mnt = {0,NULL};
 	int name_sz;
 
+	memset(&resp_init, 0, sizeof(resp_init));
+	memset(&req_look, 0, sizeof(req_look));
+	memset(&resp_look, 0, sizeof(resp_look));
+
 	switch(argc)
 	{
 		case 3:
@@ -106,12 +110,15 @@ int main(int argc,char **argv)
 		printf("Error in malloc\n");
 		return(-1);
 	}
+	memset(req_create, 0, sizeof(PVFS_sysreq_create));
+
 	resp_create = (PVFS_sysresp_create *)malloc(sizeof(PVFS_sysresp_create));
 	if (!resp_create)
 	{
 		printf("Error in malloc\n");
 		return(-1);
 	}
+	memset(resp_create, 0, sizeof(PVFS_sysresp_create));
 
 	// Fill in the create info 
 	req_create->entry_name = (char *)malloc(strlen(filename) + 1);
