@@ -392,7 +392,7 @@ int test_concurrent_meta(MPI_Comm * comm,
 	}
     }
 
-    PVFS_sys_finalize();
+    finalize_sysint();
     return ret;
 }
 

@@ -37,6 +37,13 @@ int initialize_sysint(void)
     return ret;
 }
 
+int finalize_sysint(void)
+{
+    int ret = PVFS_sys_finalize();
+    pvfs_helper.initialized = 0;
+    return ret;
+}
+
 /*
  * helper function to fill in the root pinode_refn
  * fs_id:   fsid of our file system

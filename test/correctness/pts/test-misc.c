@@ -90,7 +90,7 @@ static int test_meta_fields(int testcase){
 	    ret = PVFS_sys_setattr(pinode_refn, attr, credentials);
 	    break;
     }
-    PVFS_sys_finalize();
+    finalize_sysint();
     return ret;
 }
 
@@ -150,7 +150,7 @@ static int test_permissions(int testcase){
     }
     ret = PVFS_sys_read(resp_lk.pinode_refn, req_io, file_req_offset,io_buffer, req_mem,
                           credentials, &resp_io);
-    PVFS_sys_finalize();
+    finalize_sysint();
     return ret;
 
 }
@@ -218,7 +218,7 @@ static int test_size_after_write(int testcase){
     if(resp.attr.size != 100 + oldsize){
 	return -1;
     }
-    PVFS_sys_finalize();
+    finalize_sysint();
     return 0;
 }
 
@@ -303,7 +303,7 @@ static int test_sparse_files(int testcase){
     if(resp.attr.size != 100 + oldsize){
 	return -1;
     }
-    PVFS_sys_finalize();
+    finalize_sysint();
     return 0;
 }
 
@@ -384,7 +384,7 @@ static int test_read_sparse_files(int testcase){
 	debug_printf("write failed on %s\n", filename);
     }
 
-    PVFS_sys_finalize();
+    finalize_sysint();
     for(i = 0; i < 100; i++)
     {
 	if(io_buffer[i] != 0){
@@ -584,7 +584,7 @@ static int test_read_beyond(int testcase){
 	debug_printf("write failed on %s\n", filename);
     }
 
-    PVFS_sys_finalize();
+    finalize_sysint();
     return ret;
 }
 
@@ -645,7 +645,7 @@ static int test_write_beyond(int testcase){
 	debug_printf("write failed on %s\n", filename);
     }
 
-    PVFS_sys_finalize();
+    finalize_sysint();
     return ret;
 }
 
@@ -827,7 +827,7 @@ static int test_io_on_dir(int testcase)
 
     }
 
-    PVFS_sys_finalize();
+    finalize_sysint();
     return ret;
 }
 

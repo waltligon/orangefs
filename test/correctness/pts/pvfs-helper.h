@@ -40,5 +40,6 @@ int lookup_name(PVFS_pinode_reference pinode_refn, char *name,
 int get_root(PVFS_fs_id fs_id, PVFS_pinode_reference *pinode_refn);
 
 int initialize_sysint(void);
+int finalize_sysint(void);
 
 #endif /* __PVFS_HELPER_H */

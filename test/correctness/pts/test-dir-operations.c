@@ -223,7 +223,7 @@ int test_dir_operations(MPI_Comm * comm,
 	}
     }
 
-    ret = PVFS_sys_finalize();
+    ret = finalize_sysint();
     if (ret < 0)
     {
 	printf("finalizing sysint failed with errcode = %d\n", ret);
