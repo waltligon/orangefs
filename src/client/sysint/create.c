@@ -355,12 +355,20 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	 * array of data files
 	 */
 	copy_attributes(&req_p.u.setattr.attr, req->attr, io_serv_count,
-			df_handle_array);
-
-gossip_ldebug(CLIENT_DEBUG,"\towner: %d\n\tgroup: %d\n\tperms: %d\n\tatime: %ld\n\tmtime: %ld\n\tctime: %ld\n\tobjtype: %d\n",req_p.u.setattr.attr.owner, req_p.u.setattr.attr.group, req_p.u.setattr.attr.perms, req_p.u.setattr.attr.atime, req_p.u.setattr.attr.mtime, req_p.u.setattr.attr.ctime, req_p.u.setattr.attr.objtype);
-gossip_ldebug(CLIENT_DEBUG,"\t\tnr_datafiles: %d\n",req_p.u.setattr.attr.u.meta.nr_datafiles);
+			df_handle_array); 
+	gossip_ldebug(CLIENT_DEBUG,"\towner: %d\n\tgroup: %d\n\tperms: %d\n\tatime: %ld\n\tmtime: %ld\n\tctime: %ld\n\tobjtype: %d\n",
+		req_p.u.setattr.attr.owner, 
+		req_p.u.setattr.attr.group, 
+		req_p.u.setattr.attr.perms, 
+		req_p.u.setattr.attr.atime, 
+		req_p.u.setattr.attr.mtime, 
+		req_p.u.setattr.attr.ctime, 
+		req_p.u.setattr.attr.objtype);
+	gossip_ldebug(CLIENT_DEBUG,"\t\tnr_datafiles: %d\n",
+		req_p.u.setattr.attr.u.meta.nr_datafiles);
     for(i=0;i<req_p.u.setattr.attr.u.meta.nr_datafiles;i++)
-	gossip_ldebug(CLIENT_DEBUG,"\t\tdatafile handle: %lld\n",req_p.u.setattr.attr.u.meta.dfh[i]);
+	gossip_ldebug(CLIENT_DEBUG,"\t\tdatafile handle: %lld\n",
+		req_p.u.setattr.attr.u.meta.dfh[i]);
 
 	max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
 
@@ -536,11 +544,19 @@ return_error:
 static void copy_attributes(PVFS_object_attr *new,PVFS_object_attr old,
 	int handle_count, PVFS_handle *handle_array)
 {
-	/* Copy the generic attributes */	
+	/* no need to copy member by member, and we might add attributes later
+	 */
+    /* i have no idea what's going on, but i can't just copy the structures
+     * around.. PINT_Dist_decode will trigger a seg fault trying to read
+     * dist->dist_name, but won't care if i copy the structs members by hand */
+    /* *new = old;  */
 
 	new->owner = old.owner;
 	new->group = old.group;
 	new->perms = old.perms;
+	new->atime = old.atime;
+	new->mtime = old.mtime;
+	new->ctime = old.ctime;
 	new->objtype = ATTR_META;
 
 	/* Fill in the metafile attributes */
