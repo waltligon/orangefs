@@ -201,6 +201,18 @@ int fp_multiqueue_post(flow_descriptor * flow_d)
     gen_mutex_init(&flow_data->src_mutex);
     gen_mutex_init(&flow_data->dest_mutex);
     gen_mutex_init(&flow_data->empty_mutex);
+    for(i=0; i<BUFFERS_PER_FLOW; i++)
+    {
+	flow_data->prealloc_array[i].parent = flow_d;
+	flow_data->prealloc_array[i].result.size_array = 
+	    flow_data->prealloc_array[i].size_list;
+	flow_data->prealloc_array[i].result.offset_array = 
+	    flow_data->prealloc_array[i].offset_list;
+	flow_data->prealloc_array[i].bmi_callback.data = 
+	    &(flow_data->prealloc_array[i]);
+	flow_data->prealloc_array[i].trove_callback.data = 
+	    &(flow_data->prealloc_array[i]);
+    }
 
     /* if a file datatype offset was specified, go ahead and skip ahead 
      * before doing anything else
@@ -369,6 +381,17 @@ static void bmi_recv_callback_fn(void *user_ptr,
 	gen_mutex_unlock(&flow_data->empty_mutex);
 	gen_mutex_unlock(&flow_data->src_mutex);
 
+	if(!q_item->buffer)
+	{
+	    /* if the q_item has not been used, allocate a buffer */
+	    q_item->buffer = BMI_memalloc(q_item->parent->src.u.bmi.address,
+		BUFFER_SIZE, BMI_RECV);
+	    /* TODO: error handling */
+	    assert(q_item->buffer);
+	    q_item->bmi_callback.fn = bmi_recv_callback_fn;
+	    q_item->trove_callback.fn = trove_write_callback_fn;
+	}
+
 	ret = BMI_post_recv(&tmp_id,
 	    q_item->parent->src.u.bmi.address,
 	    q_item->buffer,
@@ -464,12 +487,8 @@ static void trove_write_callback_fn(void *user_ptr,
 	    BUFFER_SIZE, BMI_RECV);
 	/* TODO: error handling */
 	assert(q_item->buffer);
-	q_item->result.size_array = q_item->size_list;
-	q_item->result.offset_array = q_item->offset_list;
 	q_item->bmi_callback.fn = bmi_recv_callback_fn;
-	q_item->bmi_callback.data = q_item;
 	q_item->trove_callback.fn = trove_write_callback_fn;
-	q_item->trove_callback.data = q_item;
     }
 
     /* acquire two locks (careful about order to prevent deadlock!)
