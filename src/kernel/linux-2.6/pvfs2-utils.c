@@ -1001,7 +1001,7 @@ int pvfs2_kernel_error_code_convert(
     {
         int ret = -EPERM;
         int index = PVFS_get_errno_mapping((int32_t)pvfs2_error_code);
-        switch(index)
+        switch(PINT_non_errno_mapping[index])
         {
             case PVFS_ECANCEL:
                 ret = -EINTR;
