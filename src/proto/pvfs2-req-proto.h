@@ -901,6 +901,9 @@ struct PVFS_servresp_mgmt_event_mon
 endecode_fields_0a_struct(PVFS_servresp_mgmt_event_mon,
     uint32_t, event_count,
     PVFS_mgmt_event, event_array);
+#define extra_size_PVFS_servresp_mgmt_event_mon \
+  (PVFS_REQ_LIMIT_MGMT_EVENT_MON_COUNT * \
+   roundup8(sizeof(struct PVFS_mgmt_event)))
 
 /* server request *********************************************/
 /* - generic request with union of all op specific structs */
