@@ -1,12 +1,13 @@
 #ifndef __PVFS_HELPER_H
 #define __PVFS_HELPER_H
 
-/* pvfs specific includes */
-#include "client.h"
+/* pvfs specific includes (from test/client/sysint) */
+#include <client.h>
+#include <helper.h>
 
 /* don't change this w/o changing the test_files array */
 #define NUM_TEST_FILES                         10
-#define TEST_FILE_PREFIX       "/test_pvfs_file_"
+#define TEST_FILE_PREFIX                "/tpvfs"
 #define MAX_TEST_PATH_LEN              0x00000040
 #define TEST_PVFS_DATA_SIZE             1024*1024
 

@@ -45,8 +45,7 @@ int test_pvfs_datatype_init(MPI_Comm *mycomm, int myid, char *buf, void *params)
     */
     for(i = 0; i < pvfs_helper.num_test_files; i++)
     {
-        memset(filename,0,MAX_TEST_PATH_LEN);
-        snprintf(filename,MAX_TEST_PATH_LEN,"%s%.5d-rank%d\n",
+        snprintf(filename,MAX_TEST_PATH_LEN,"%s%.5drank%d",
                  TEST_FILE_PREFIX,i,myid);
 
         memset(&req_lk,0,sizeof(PVFS_sysreq_lookup));
@@ -69,43 +68,41 @@ int test_pvfs_datatype_init(MPI_Comm *mycomm, int myid, char *buf, void *params)
             req_lk.credentials.perms = U_WRITE|U_READ;
 
             ret = PVFS_sys_lookup(&req_lk, &resp_lk);
-            if(ret < 0)
+            if ((ret < 0) || (!resp_lk.pinode_refn.handle))
             {
                 debug_printf("Error: PVFS_sys_lookup() failed to find "
                              "root handle.\n");
                 break;
             }
 
-            /* create new file */
-
-            /*
-              TODO: I'm not setting the attribute mask...
-              not real sure what's supposed to happen there
-            */
+            /* skip leading slash */
+            req_cr.entry_name = &(filename[1]);
+            req_cr.attrmask = (ATTR_UID | ATTR_GID | ATTR_PERM);
             req_cr.attr.owner = 100;
             req_cr.attr.group = 100;
             req_cr.attr.perms = U_WRITE|U_READ;
-            req_cr.attr.u.meta.nr_datafiles = 1;
-            req_cr.attr.u.meta.dist = NULL;
-            req_cr.parent_refn.handle = resp_lk.pinode_refn.handle;
-            req_cr.parent_refn.fs_id = req_lk.fs_id;
-            /* leave off beginning slash */
-            req_cr.entry_name = &(filename[1]);
             req_cr.credentials.uid = 100;
             req_cr.credentials.gid = 100;
             req_cr.credentials.perms = U_WRITE|U_READ;
+            req_cr.attr.u.meta.dist = NULL;
+            req_cr.attr.u.meta.nr_datafiles = 1;
+            req_cr.parent_refn.handle = resp_lk.pinode_refn.handle;
+            req_cr.parent_refn.fs_id = req_lk.fs_id;
 
             ret = PVFS_sys_create(&req_cr, &resp_cr);
-            if(ret < 0)
+            if ((ret < 0) || (!resp_cr.pinode_refn.handle))
             {
                 debug_printf("Error: PVFS_sys_create() failure.\n");
                 break;
             }
+            debug_printf("Created file %s\n",req_cr.entry_name);
+            debug_printf("Got handle %Ld.\n",resp_cr.pinode_refn.handle);
             num_test_files_ok++;
         }
         else
         {
             debug_printf("lookup succeeded; skipping existing file.\n");
+            debug_printf("Got handle %Ld.\n",resp_lk.pinode_refn.handle);
             num_test_files_ok++;
         }
     }
