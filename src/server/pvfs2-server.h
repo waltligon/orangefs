@@ -193,6 +193,7 @@ typedef struct PINT_server_op
     /* state information for msgpairarray nested state machine */
     int msgarray_count;
     PINT_sm_msgpair_state *msgarray;
+    PINT_sm_msgpair_params msgarray_params;
 
     union
     {
