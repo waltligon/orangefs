@@ -91,6 +91,8 @@ int PINT_Dist_lookup(PVFS_Dist *dist)
  */
 void PINT_Dist_encode(void *buffer, PVFS_Dist *dist)
 {
+	PVFS_Dist* old_dist = dist;
+	
 	if (!dist)
 		return;
 	if (buffer)
@@ -98,6 +100,11 @@ void PINT_Dist_encode(void *buffer, PVFS_Dist *dist)
 		memcpy(buffer, dist,
 				sizeof(struct PVFS_Dist) + dist->name_size + dist->param_size);
 		dist = buffer;
+		/* adjust pointers in new buffer */
+		dist->dist_name = ((char*)dist + ((char*)old_dist->dist_name -
+			(char*)old_dist));
+		dist->params = ((char*)dist + ((char*)old_dist->params - 
+			(char*)old_dist));
 	}
 	/* convert pointers in dist to ints */
 	(int)(dist->dist_name) = (char *)(dist->dist_name) - (char *)(dist);
