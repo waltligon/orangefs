@@ -19,6 +19,7 @@ struct PINT_thread_mgr_bmi_callback
     void* data;
 };
 
+int PINT_thread_mgr_bmi_cancel(PVFS_id_gen_t id, void* user_ptr);
 int PINT_thread_mgr_bmi_start(void);
 int PINT_thread_mgr_bmi_stop(void);
 int PINT_thread_mgr_bmi_getcontext(PVFS_context_id *context);
