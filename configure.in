@@ -35,7 +35,9 @@ AC_MSG_CHECKING(whether version of Berkeley DB is new enough)
 	#endif
 	], AC_MSG_RESULT(yes),
 	AC_MSG_RESULT(no)
-		AC_MSG_ERROR(Need newer (4.x.x or later) version of Berkeley DB.)
+		AC_MSG_ERROR(Need newer (4.x.x or later) version of Berkeley DB.
+ try: http://www.sleepycat.com/download/index.shtml
+ or: /parl/pcarns/rpms/db4-4.0.14-1mdk.src.rpm (to build rpm))
 	)
 
 AC_OUTPUT(Makefile
