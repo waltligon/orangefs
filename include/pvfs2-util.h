@@ -11,6 +11,8 @@
 #ifndef __PVFS2_UTIL_H
 #define __PVFS2_UTIL_H
 
+#include "pvfs2-types.h"
+
 /* results of parsing a pvfs2 tabfile, may contain more than one entry */
 struct PVFS_util_tab_s
 {
