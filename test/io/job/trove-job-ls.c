@@ -8,6 +8,8 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <getopt.h>
+
 #include <trove.h>
 #include <trove-test.h>
 #include <job.h>
@@ -18,10 +20,7 @@ char file_system[FS_SIZE] = "fs-foo";
 char path_to_dir[PATH_SIZE] = "/";
 TROVE_handle requested_file_handle = 4095;
 
-extern char *optarg;
-
 int parse_args(int argc, char **argv);
-int path_lookup(TROVE_coll_id coll_id, char *path, TROVE_handle *out_handle_p);
 
 #define KEYVAL_ARRAY_LEN 10
 int main(int argc, char **argv)
@@ -162,50 +161,6 @@ int main(int argc, char **argv)
     return 0;
 }
 
-int path_lookup(TROVE_coll_id coll_id, char *path, TROVE_handle *out_handle_p)
-{
-    int ret;
-    TROVE_keyval_s key, val;
-    TROVE_handle handle;
-	 job_id_t foo_id;
-	 job_status_s job_stat;
-
-    char root_handle_string[] = ROOT_HANDLE_STRING;
-
-    /* get root */
-    key.buffer = root_handle_string;
-    key.buffer_sz = strlen(root_handle_string) + 1;
-    val.buffer = &handle;
-    val.buffer_sz = sizeof(handle);
-
-	ret = job_trove_fs_geteattr(coll_id, &key, &val, 0, NULL,
-		&job_stat, &foo_id);
-	if(ret < 0)
-	{
-		fprintf(stderr, "fs_geteattr failed.\n");
-		return(-1);
-	}
-	if(ret == 0)
-	{
-		ret = block_on_job(foo_id, NULL, &job_stat);
-		if(ret < 0)
-		{
-			fprintf(stderr, "fs_geteattr failed (at job_wait()).\n");
-			return(-1);
-		}
-	}
-	if(job_stat.error_code)
-	{
-		fprintf(stderr, "bad status after fs_geteattr.\n");
-		return(-1);
-	}
-
-    /* TODO: handle more than just a root handle! */
-
-    *out_handle_p = handle;
-    return 0;
-}
-
 int parse_args(int argc, char **argv)
 {
     int c;
@@ -236,4 +191,6 @@ int parse_args(int argc, char **argv)
  *  c-indent-level: 4
  *  c-basic-offset: 4
  * End:
+ *
+ * vim: ts=8 sts=4 sw=4 noexpandtab
  */

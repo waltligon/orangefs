@@ -117,11 +117,11 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
 
     /* sync? */
 
-
     dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
     return 1;
 
  return_error:
+    dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
     return -1;
 }
 

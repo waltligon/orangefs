@@ -11,12 +11,11 @@
 #include <getopt.h>
 
 #include <trove.h>
-#include <trove-test.h>
+#include "trove-test.h"
 
 char storage_space[SSPACE_SIZE] = "/tmp/storage-space-foo";
 char file_system[FS_SIZE] = "fs-foo";
 char path_to_dir[PATH_SIZE] = "/default_dir";
-TROVE_handle requested_file_handle = 1111;
 
 int parse_args(int argc, char **argv);
 int path_lookup(TROVE_coll_id coll_id, char *path, TROVE_handle *out_handle_p);
@@ -58,10 +57,6 @@ int main(int argc, char ** argv)
 	else break;
     }
     dir_name = path_to_dir + strlen(path_name);
-#if 0
-    printf("path is %s\n", path_name);
-    printf("dir is %s\n", dir_name);
-#endif
 
     /* find parent directory handle */
     ret = path_lookup(coll_id, path_name, &parent_handle);
@@ -69,7 +64,7 @@ int main(int argc, char ** argv)
 	return -1;
     }
 
-    file_handle = requested_file_handle;
+    file_handle = 0;
 
     /* create new dspace */
     ret = trove_dspace_create(coll_id,
@@ -100,6 +95,7 @@ int main(int argc, char ** argv)
     ret = trove_dspace_setattr(coll_id, file_handle, &s_attr, NULL, &op_id);
     while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
     if (ret < 0) return -1;    /* add new file name/handle pair to parent directory */
+
     key.buffer = dir_name;
     key.buffer_sz = strlen(dir_name) + 1;
     val.buffer = &file_handle;
@@ -111,33 +107,9 @@ int main(int argc, char ** argv)
 	return -1;
     }
     trove_finalize();
-    return 0;
-}
-int path_lookup(TROVE_coll_id coll_id, char *path, TROVE_handle *out_handle_p)
-{
-    int ret, count;
-    TROVE_ds_state state;
-    TROVE_keyval_s key, val;
-    TROVE_op_id op_id;
-    TROVE_handle handle;
 
-    char root_handle_string[] = ROOT_HANDLE_STRING;
+    printf("created directory %s (handle = %d)\n", dir_name, (int) file_handle);
 
-    /* get root */
-    key.buffer = root_handle_string;
-    key.buffer_sz = strlen(root_handle_string) + 1;
-    val.buffer = &handle;
-    val.buffer_sz = sizeof(handle);
-    ret = trove_collection_geteattr(coll_id, &key, &val, 0, NULL, &op_id);
-    while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
-    if (ret < 0) {
-	fprintf(stderr, "collection geteattr (for root handle) failed.\n");
-	return -1;
-    }
-
-    /* TODO: handle more than just a root handle! */
-
-    *out_handle_p = handle;
     return 0;
 }
 
@@ -145,7 +117,7 @@ int parse_args(int argc, char **argv)
 {
     int c;
 
-    while ((c = getopt(argc, argv, "s:c:p:h:")) != EOF) {
+    while ((c = getopt(argc, argv, "s:c:p:")) != EOF) {
 	switch (c) {
 	    case 's':
 		strncpy(storage_space, optarg, SSPACE_SIZE);

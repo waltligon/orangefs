@@ -19,7 +19,6 @@ char path_to_file[PATH_SIZE] = "/bar";
 TROVE_handle requested_file_handle = 4095;
 
 int parse_args(int argc, char **argv);
-int path_lookup(TROVE_coll_id coll_id, char *path, TROVE_handle *out_handle_p);
 
 int main(int argc, char **argv)
 {
@@ -130,34 +129,6 @@ int main(int argc, char **argv)
 	   (int) file_handle,
 	   (int) parent_handle);
 
-    return 0;
-}
-
-int path_lookup(TROVE_coll_id coll_id, char *path, TROVE_handle *out_handle_p)
-{
-    int ret, count;
-    TROVE_ds_state state;
-    TROVE_keyval_s key, val;
-    TROVE_op_id op_id;
-    TROVE_handle handle;
-
-    char root_handle_string[] = ROOT_HANDLE_STRING;
-
-    /* get root */
-    key.buffer = root_handle_string;
-    key.buffer_sz = strlen(root_handle_string) + 1;
-    val.buffer = &handle;
-    val.buffer_sz = sizeof(handle);
-    ret = trove_collection_geteattr(coll_id, &key, &val, 0, NULL, &op_id);
-    while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
-    if (ret < 0) {
-	fprintf(stderr, "collection geteattr (for root handle) failed.\n");
-	return -1;
-    }
-
-    /* TODO: handle more than just a root handle! */
-
-    *out_handle_p = handle;
     return 0;
 }
 

@@ -7,6 +7,8 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdio.h>
+#include <getopt.h>
+
 #include <trove.h>
 #include <trove-test.h>
 #include <job.h>
@@ -14,8 +16,6 @@
 
 char storage_space[SSPACE_SIZE] = "/tmp/storage-space-foo";
 char file_system[FS_SIZE] = "fs-foo";
-
-extern char *optarg;
 
 int parse_args(int argc, char **argv);
 
@@ -245,4 +245,6 @@ int parse_args(int argc, char **argv)
  *  c-indent-level: 4
  *  c-basic-offset: 4
  * End:
+ *
+ * vim: ts=8 sts=4 sw=4 noexpandtab
  */

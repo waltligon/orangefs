@@ -8,6 +8,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+
 #include <trove.h>
 #include <trove-test.h>
 #include <job.h>
@@ -20,7 +21,6 @@ char path_to_file[PATH_SIZE] = "/bar";
 extern char *optarg;
 
 int parse_args(int argc, char **argv);
-int path_lookup(TROVE_coll_id coll_id, char *path, TROVE_handle *out_handle_p);
 
 int main(int argc, char **argv)
 {
@@ -159,4 +159,6 @@ int parse_args(int argc, char **argv)
  *  c-indent-level: 4
  *  c-basic-offset: 4
  * End:
+ *
+ * vim: ts=8 sts=4 sw=4 noexpandtab
  */
