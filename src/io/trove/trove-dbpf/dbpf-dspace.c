@@ -715,8 +715,16 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
     if (dbpf_attr_cache_ds_attr_fetch_cached_data(
             ref, ds_attr_p) == 0)
     {
+	gossip_debug(
+	    GOSSIP_TROVE_DEBUG, "ATTRIB: dspace_getattr retrieved attributes from "
+	    "CACHE for key %Lu uid = %d, mode = %d, type = %d "
+	    "dfile_count = %d, dist_size = %d\n",
+	    Lu(handle), (int)ds_attr_p->uid, (int)ds_attr_p->mode,
+	    (int)ds_attr_p->type, (int)ds_attr_p->dfile_count, (int)ds_attr_p->dist_size);
+
+
         gossip_debug(
-            GOSSIP_DBPF_ATTRCACHE_DEBUG, "fast path attr cache hit "
+            GOSSIP_DBPF_ATTRCACHE_DEBUG, "dspace_getattr fast path attr cache hit "
             "on %Lu\n (dfile_count=%d | dist_size=%d | data_size=%Ld)\n",
             Lu(handle), ds_attr_p->dfile_count, ds_attr_p->dist_size,
             ds_attr_p->b_size);
@@ -835,8 +843,7 @@ static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p)
 
     trove_ds_attr_to_stored((*op_p->u.d_setattr.attr_p), s_attr);
 
-#if 0
-    gossip_debug(GOSSIP_TROVE_DEBUG, "storing attributes (2) on key %Lu, "
+    gossip_debug(GOSSIP_TROVE_DEBUG, "ATTRIB: dspace_setattr storing attributes (2) on key %Lu, "
                  "uid = %d, mode = %d, type = %d, dfile_count = %d, "
                  "dist_size = %d\n",
                  Lu(op_p->handle),
@@ -845,7 +852,6 @@ static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p)
                  (int) s_attr.type,
                  (int) s_attr.dfile_count,
                  (int) s_attr.dist_size);
-#endif
 
     ret = tmp_ref.db_p->put(tmp_ref.db_p, NULL, &key, &data, 0);
     if (ret != 0)
@@ -975,8 +981,8 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
     }
 
     gossip_debug(
-        GOSSIP_TROVE_DEBUG, "dspace_getattr retrieved attributes from "
-        "disk for key %Lu\n uid = %d, mode = %d, type = %d\n "
+        GOSSIP_TROVE_DEBUG, "ATTRIB: dspace_getattr retrieved attributes from "
+        "disk for key %Lu uid = %d, mode = %d, type = %d "
         "dfile_count = %d, dist_size = %d, b_size = %Ld, k_size = %Ld\n",
         Lu(op_p->handle), (int)s_attr.uid, (int)s_attr.mode,
         (int)s_attr.type, (int)s_attr.dfile_count, (int)s_attr.dist_size,
