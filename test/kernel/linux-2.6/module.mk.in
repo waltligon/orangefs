@@ -1,5 +1,6 @@
 DIR := test/kernel/linux-2.6
 
 TESTSRC += \
-	$(DIR)/pvfs2-client.c
+	$(DIR)/pvfs2-client-core.c \
+        $(DIR)/pvfs2-client.c
 
