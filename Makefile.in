@@ -10,7 +10,8 @@
 # docsclean  cleans up documentation files
 # tests      builds test programs
 # statecomp  builds only the statecomp component
-# cscope      generates information for cscope utility
+# cscope     generates information for cscope utility
+# codecheck  checks source code for nonconformance to our std.
 # mpitests   builds test programs that use mpi (PLEASE SET THE
 #            "MPICC" ENVIRONMENT VARIABLE BEFORE BUILDING)
 # 
@@ -60,7 +61,7 @@ FLEX = flex
 #    of a file that has the same name as the target.  Listing them
 #    here keeps make from accidentally doing too much work (see GNU
 #    make manual).
-.PHONY: all clean tests distclean docs docsclean cscope statecomp
+.PHONY: all clean tests distclean docs docsclean cscope codecheck statecomp
 
 ################################################################
 # Find project subdirectories
@@ -275,6 +276,9 @@ statecomp: src/common/statecomp/statecomp
 cscope:
 	find $(srcdir) -iname "*.[ch]" > $(srcdir)/cscope.files
 	( cd $(srcdir); cscope -be -i $(srcdir)/cscope.files )
+
+codecheck:
+	find $(srcdir) -iname "*.[ch]" | xargs -n 1 $(srcdir)/maint/pvfs2codecheck.pl
 
 # target for building documentation
 docs: $(DOCSPS) $(DOCSPDF)

@@ -4,8 +4,6 @@
  * See COPYING in top-level directory.
  */
 
-/* *** NOTE: NOT USED YET!!! *** */
-
 #include <unistd.h>
 #include <stdio.h>
 #include <sys/types.h>
@@ -26,8 +24,6 @@
 enum {
     DBCACHE_ENTRIES = 2
 };
-
-#undef DBCACHE_DONT_CACHE
 
 struct dspace_dbcache_entry {
     int ref_ct; /* -1 == not a valid cache entry */

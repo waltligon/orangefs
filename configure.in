@@ -35,9 +35,16 @@ dnl Options for debugging
 dnl This particular one enables tracing of memory allocation and
 dnl    freeing with the mtrace tool
 AC_ARG_WITH(mtrace,
-[  --with-mtrace                  Use mtrace for detecting memory leaks (must setenv MALLOC_TRACE).],
+[  --with-mtrace                  Use mtrace for detecting memory leaks (must setenv MALLOC_TRACE to output file name).],
 CFLAGS="$CFLAGS -imcheck.h"
 AC_DEFINE(WITH_MTRACE, 1, Define if mtrace memory leak detection was enabled)
+)
+
+dnl More options
+AC_ARG_ENABLE(fast,
+[  --enable-fast                   Disable optional debugging, enable optimizations.],
+CFLAGS="$CFLAGS -DNDEBUG -O3",
+CFLAGS="$CFLAGS -g"
 )
 
 dnl See if we have a new enough version of Berkeley DB; needed for

@@ -33,7 +33,6 @@ extern struct TROVE_bstream_ops dbpf_bstream_ops;
 extern struct TROVE_dspace_ops dbpf_dspace_ops;
 extern struct TROVE_keyval_ops dbpf_keyval_ops;
 extern struct TROVE_mgmt_ops dbpf_mgmt_ops;
-extern struct TROVE_fs_ops dbpf_fs_ops;
 
 /* struct dbpf_storage
  *
@@ -59,6 +58,9 @@ struct dbpf_collection {
     TROVE_handle root_dir_handle;
     struct dbpf_storage *storage;
     struct handle_ledger *free_handles;
+    struct dbpf_collection *next_p; /* used by dbpf_collection.c calls to
+				     * maintain list of collections
+				     */
 };
 
 /* struct dbpf_collection_db_entry
@@ -86,6 +88,10 @@ struct dbpf_dspace_iterate_handles_op {
     int *count_p;
 };
 
+struct dbpf_dspace_verify_op {
+    TROVE_ds_type *type_p;
+};
+
 struct dbpf_dspace_setattr_op {
     TROVE_ds_attributes_s *attr_p;
 };
@@ -97,21 +103,18 @@ struct dbpf_dspace_getattr_op {
 struct dbpf_keyval_read_op {
     TROVE_keyval_s key;
     TROVE_keyval_s val;
-    TROVE_ds_flags flags;
     /* vtag? */
 };
 
 struct dbpf_keyval_write_op {
     TROVE_keyval_s key;
     TROVE_keyval_s val;
-    TROVE_ds_flags flags;
     /* vtag? */
 };
 
 struct dbpf_keyval_remove_op {
     TROVE_keyval_s key;
     TROVE_keyval_s val;
-    TROVE_ds_flags flags;
     /* vtag? */
 };
 
@@ -130,13 +133,11 @@ struct dbpf_bstream_rw_at_op {
     TROVE_offset offset;
     TROVE_size size;
     void *buffer;
-    TROVE_ds_flags flags;
     /* vtag? */
 };
 
 struct dbpf_bstream_resize_op {
     TROVE_size size;
-    TROVE_ds_flags flags;
     /* vtag? */
 };
 
@@ -226,25 +227,33 @@ struct dbpf_op {
     struct dbpf_collection *coll_p; /* TODO: would this be better as an id? */
     int (*svc_fn)(struct dbpf_op *op);
     void *user_ptr;
+    TROVE_ds_flags flags;
     union {
 	/* all the op types go in here; structs are all
 	 * defined just below the prototypes for the functions.
 	 */
-	struct dbpf_dspace_create_op d_create;
+	struct dbpf_dspace_create_op          d_create;
 	/* struct dbpf_dspace_remove_op d_remove; -- EMPTY */
 	struct dbpf_dspace_iterate_handles_op d_iterate_handles;
-	struct dbpf_dspace_getattr_op d_getattr;
-	struct dbpf_dspace_setattr_op d_setattr;
-	struct dbpf_bstream_rw_at_op b_read_at;
-	struct dbpf_bstream_rw_at_op b_write_at;
-	struct dbpf_bstream_rw_list_op b_rw_list;
-	struct dbpf_bstream_resize_op b_resize;
-	struct dbpf_keyval_read_op k_read;
-	struct dbpf_keyval_write_op k_write;
-	struct dbpf_keyval_remove_op k_remove;
-	struct dbpf_keyval_iterate_op k_iterate;
+	struct dbpf_dspace_verify_op          d_verify;
+	struct dbpf_dspace_getattr_op         d_getattr;
+	struct dbpf_dspace_setattr_op         d_setattr;
+	struct dbpf_bstream_rw_at_op          b_read_at;
+	struct dbpf_bstream_rw_at_op          b_write_at;
+	struct dbpf_bstream_rw_list_op        b_rw_list;
+	struct dbpf_bstream_resize_op         b_resize;
+	struct dbpf_keyval_read_op            k_read;
+	struct dbpf_keyval_write_op           k_write;
+	struct dbpf_keyval_remove_op          k_remove;
+	struct dbpf_keyval_iterate_op         k_iterate;
     } u;
 };
+
+/* collection registration functions implemented in dbpf-collection.c */
+void dbpf_collection_register(struct dbpf_collection *coll_p);
+struct dbpf_collection *dbpf_collection_find_registered(TROVE_coll_id coll_id);
+void dbpf_collection_clear_registered(void);
+
 
 #if defined(__cplusplus)
 }

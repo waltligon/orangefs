@@ -145,6 +145,9 @@ int main(int argc, char **argv)
 	   (int) root_handle,
 	   (int) coll_id,
 	   root_handle_string);
+
+    trove_finalize();
+
     return 0;
 }
 

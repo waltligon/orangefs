@@ -32,7 +32,6 @@ char dbpf_method_name[] = "dbpf";
 
 /* Globals */
 
-struct dbpf_collection *my_coll_p = NULL;
 struct dbpf_storage *my_storage_p = NULL;
 
 /* Internally used only */
@@ -80,7 +79,7 @@ static int dbpf_collection_seteattr(
     sto_p = my_storage_p;
     if (sto_p == NULL) return -1;
 
-    coll_p = my_coll_p;
+    coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL) return -1;
 
     memset(&db_key, 0, sizeof(db_key));
@@ -125,7 +124,7 @@ static int dbpf_collection_geteattr(
     sto_p = my_storage_p;
     if (sto_p == NULL) return -1;
 
-    coll_p = my_coll_p;
+    coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL) return -1;
 
     memset(&db_key, 0, sizeof(db_key));
@@ -186,6 +185,8 @@ static int dbpf_initialize(
  */
 static int dbpf_finalize(void)
 {
+    int ret;
+
     dbpf_method_id = -1;
 
     /* TODO: clean up all internally allocated structures */
@@ -193,6 +194,31 @@ static int dbpf_finalize(void)
     dbpf_bstream_fdcache_finalize();
     dbpf_keyval_dbcache_finalize();
     dbpf_dspace_dbcache_finalize();
+
+    dbpf_collection_clear_registered();
+
+    /* manually free the cached storage space info */
+    /* always sync to ensure that data made it to the disk */
+    if ((ret = my_storage_p->sto_attr_db->sync(my_storage_p->sto_attr_db, 0)) != 0) {
+	return -1;
+    }
+    if ((ret = my_storage_p->sto_attr_db->close(my_storage_p->sto_attr_db, 0)) != 0) {
+	fprintf(stderr, "dbpf_finalize: %s\n",
+		db_strerror(ret));
+	return -1;
+    }
+
+    if ((ret = my_storage_p->coll_db->sync(my_storage_p->coll_db, 0)) != 0) {
+	return -1;
+    }
+    if ((ret = my_storage_p->coll_db->close(my_storage_p->coll_db, 0)) != 0) {
+	fprintf(stderr, "dbpf_finalize: %s\n",
+		db_strerror(ret));
+	return -1;
+    }
+    free(my_storage_p->name);
+    free(my_storage_p);
+    my_storage_p = NULL;
 
     return 1;
 }
@@ -465,11 +491,13 @@ static int dbpf_collection_lookup(
     DBT key, data;
     char path_name[PATH_MAX];
     
+#if 0
     /* look in cached values to see if it is in memory already */
     if (my_coll_p != NULL) {
 	    *coll_id_p = my_coll_p->coll_id;
 	    return 1;
     }
+#endif
     
     /* only one fs for now */
     sto_p = my_storage_p;
@@ -507,7 +535,16 @@ static int dbpf_collection_lookup(
     
     printf("coll_id = %d.\n", db_data.coll_id);
 #endif
-    
+
+    /* look to see if we have already registered this collection; if so, return */
+    coll_p = dbpf_collection_find_registered(db_data.coll_id);
+    if (coll_p != NULL) {
+	*coll_id_p = coll_p->coll_id;
+	return 1;
+    }
+
+    /* this collection hasn't been registered already (ie. looked up before) */
+
     coll_p = (struct dbpf_collection *)malloc(sizeof(struct dbpf_collection));
     if (coll_p == NULL) {
 	return -1;
@@ -533,7 +570,7 @@ static int dbpf_collection_lookup(
     coll_p->ds_db = dbpf_db_open(path_name);
     if (coll_p->ds_db == NULL) return -1;
 
-    my_coll_p = coll_p;
+    dbpf_collection_register(coll_p);
 
     /* XXX HARDCODED NAME FOR NOW... */
     coll_p->free_handles = trove_handle_ledger_init(coll_p->coll_id, "admin-foo");

@@ -24,8 +24,6 @@ enum {
     DBCACHE_ENTRIES = 16
 };
 
-#undef DBCACHE_DONT_CACHE
-
 struct keyval_dbcache_entry {
     int ref_ct; /* -1 == not a valid cache entry */
     gen_mutex_t mutex;

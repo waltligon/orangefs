@@ -250,8 +250,9 @@ Unless otherwise noted, all functions return an integer with three
 possible values:
 \begin{itemize}
 \item 0: Success.  If the operation was nonblocking, then this return
-value indicates the caller must test for completion later.
-\item 1: Success with immediate completion.  No later testing required.
+  value indicates the caller must test for completion later.
+\item 1: Success with immediate completion.  No later testing is required, and
+  no handle is returned for use in testing.
 \item -errno: Failure.  The error code is encoded in the negative return
 value.
 \end{itemize}

@@ -309,34 +309,6 @@ struct TROVE_mgmt_ops
 			       TROVE_op_id *out_op_id_p);
 };
 
-struct TROVE_fs_ops
-{
-    int (*fs_create)(
-		     /* char *stoname, */
-		     char *collname,
-		     TROVE_coll_id new_coll_id,
-		     TROVE_handle root_dir_handle,
-		     void *user_ptr,
-		     TROVE_op_id *out_op_id_p);
-    
-    int (*fs_remove)(
-		     char *collname,
-		     void *user_ptr,
-		     TROVE_op_id *out_op_id_p);
-    
-    int (*fs_lookup)(
-		     char *collname,
-		     TROVE_coll_id *coll_id_p,
-		     void *user_ptr,
-		     TROVE_op_id *out_op_id_p);
-    
-    int (*fs_get_root)(
-		       TROVE_coll_id coll_id,
-		       TROVE_handle *root_handle_p,
-		       void *user_ptr,
-		       TROVE_op_id *out_op_id_p);
-};
-
 /*
  * Local variables:
  *  c-indent-level: 4

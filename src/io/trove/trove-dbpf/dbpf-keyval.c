@@ -20,12 +20,6 @@
 #include "dbpf-op-queue.h"
 #include "dbpf-keyval.h"
 
-/* TODO: sync flag on all operations?  */
-
-/* TODO: eventually make all the interface functions static */
-
-extern struct dbpf_collection *my_coll_p;
-
 /* Internal function prototypes */
 static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p);
 static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p);
@@ -45,8 +39,8 @@ static int dbpf_keyval_read(
     struct dbpf_queued_op *q_op_p;
     struct dbpf_collection *coll_p;
 
-    /* TODO: find the collection */
-    coll_p = my_coll_p;
+    coll_p = dbpf_collection_find_registered(coll_id);
+    if (coll_p == NULL) return -1;
 
     /* validate the handle, check permissions */
 
@@ -66,11 +60,12 @@ static int dbpf_keyval_read(
 			handle,
 			coll_p,
 			dbpf_keyval_read_op_svc,
-			user_ptr);
+			user_ptr,
+			flags);
 
     /* initialize the op-specific members */
-    q_op_p->op.u.k_read.key = *key_p;
-    q_op_p->op.u.k_read.val = *val_p;
+    q_op_p->op.u.k_read.key   = *key_p;
+    q_op_p->op.u.k_read.val   = *val_p;
 	
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
 
@@ -88,7 +83,7 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
     DBT key, data;
 
     /* TODO: move into initial function so we know that the DB is around before
-     * we enqueue
+     * we enqueue (maybe?)
      */
     ret = dbpf_keyval_dbcache_try_get(op_p->coll_p->coll_id, op_p->handle, 0, &db_p);
     switch (ret) {
@@ -103,9 +98,10 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
 
     /* get keyval */
     memset(&key, 0, sizeof(key));
-    memset(&data, 0, sizeof(data));
     key.data = op_p->u.k_read.key.buffer;
     key.size = op_p->u.k_read.key.buffer_sz;
+
+    memset(&data, 0, sizeof(data));
     data.data = op_p->u.k_read.val.buffer;
     data.ulen = op_p->u.k_read.val.buffer_sz;
     data.flags = DB_DBT_USERMEM;
@@ -116,7 +112,16 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
 	goto return_error;
     }
 
-    /* sync? */
+    /* sync if requested by user
+     *
+     * Note: this is a little bit silly in some sense, but the semantics allow for it.
+     *
+     */
+    if (op_p->flags & TROVE_SYNC) {
+	if ((ret = db_p->sync(db_p, 0)) != 0) {
+	    goto return_error;
+	}
+    }
 
     dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
     return 1;
@@ -142,8 +147,8 @@ static int dbpf_keyval_write(
     struct dbpf_queued_op *q_op_p;
     struct dbpf_collection *coll_p;
 
-    /* TODO: find the collection */
-    coll_p = my_coll_p;
+    coll_p = dbpf_collection_find_registered(coll_id);
+    if (coll_p == NULL) return -1;
 
     /* validate the handle, check permissions */
 
@@ -163,11 +168,12 @@ static int dbpf_keyval_write(
 			handle,
 			coll_p,
 			dbpf_keyval_write_op_svc,
-			user_ptr);
+			user_ptr,
+			flags);
 
     /* initialize the op-specific members */
-    q_op_p->op.u.k_write.key = *key_p;
-    q_op_p->op.u.k_write.val = *val_p;
+    q_op_p->op.u.k_write.key   = *key_p;
+    q_op_p->op.u.k_write.val   = *val_p;
 
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
 	
@@ -180,7 +186,7 @@ static int dbpf_keyval_write(
  */
 static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
 {
-    int ret;
+    int ret, got_db = 0;
     DB *db_p;
     DBT key, data;
 
@@ -194,6 +200,7 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
 	case DBPF_KEYVAL_DBCACHE_BUSY:
 	    return 0;
 	case DBPF_KEYVAL_DBCACHE_SUCCESS:
+	    got_db = 1;
 	    /* drop through */
             break;
     }
@@ -212,13 +219,18 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
 	goto return_error;
     }
 
-    /* sync? */
-
+    /* sync if requested by user */
+    if (op_p->flags & TROVE_SYNC) {
+	if ((ret = db_p->sync(db_p, 0)) != 0) {
+	    goto return_error;
+	}
+    }
 
     dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
     return 1;
 
  return_error:
+    if (got_db) dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
     return -1;
 }
 
@@ -236,8 +248,8 @@ static int dbpf_keyval_remove(
     struct dbpf_queued_op *q_op_p;
     struct dbpf_collection *coll_p;
 
-    /* TODO: find the collection */
-    coll_p = my_coll_p;
+    coll_p = dbpf_collection_find_registered(coll_id);
+    if (coll_p == NULL) return -1;
 
     /* Q: what happens if someone queues a read/write request on 
      * a deleted keyval? */
@@ -252,7 +264,8 @@ static int dbpf_keyval_remove(
 			handle,
 			coll_p,
 			dbpf_keyval_remove_op_svc,
-			user_ptr);
+			user_ptr,
+			flags);
 
     /* initialize op-specific members */
     q_op_p->op.u.k_remove.key = *key_p;
@@ -264,7 +277,7 @@ static int dbpf_keyval_remove(
 
 static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p)
 {
-    int ret;
+    int ret, got_db = 0;
     DB *db_p;
     DBT key;
 
@@ -276,6 +289,7 @@ static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p)
 	case DBPF_KEYVAL_DBCACHE_BUSY:
 	    return 0;
 	case DBPF_KEYVAL_DBCACHE_SUCCESS:
+	    got_db = 1;
 	    /* drop through */
             break;
     }
@@ -288,14 +302,19 @@ static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p)
 	db_p->err(db_p, ret, "DB->del");
 	goto return_error;
     }
-    if ((ret=db_p->sync(db_p, 0) )!= 0) {
-	db_p->err(db_p, ret, "dbpf_keyval_remove_op_svc\n");
-	return -1;
+
+    /* sync only if requested by user */
+    if (op_p->flags & TROVE_SYNC) {
+	if ((ret = db_p->sync(db_p, 0)) != 0) {
+	    goto return_error;
+	}
     }
+
     dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
     return 1;
 
  return_error:
+    if (got_db) dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
     return -1;
 }
 
@@ -329,7 +348,7 @@ static int dbpf_keyval_iterate(
     struct dbpf_queued_op *q_op_p;
     struct dbpf_collection *coll_p;
 
-    coll_p = my_coll_p;
+    coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL) return -1;
 
     q_op_p = dbpf_queued_op_alloc();
@@ -341,7 +360,8 @@ static int dbpf_keyval_iterate(
 			handle,
 			coll_p,
 			dbpf_keyval_iterate_op_svc,
-			user_ptr);
+			user_ptr,
+			flags);
 
     /* initialize op-specific members */
     q_op_p->op.u.k_iterate.key_array  = key_array;
@@ -375,7 +395,7 @@ static int dbpf_keyval_iterate(
  */
 static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
 {
-    int ret, i=0;
+    int ret, i=0, got_db = 0;
     db_recno_t recno;
     DB *db_p;
     DBC *dbc_p;
@@ -405,6 +425,7 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
 	case DBPF_KEYVAL_DBCACHE_BUSY:
 	    return 0; /* try again later */
 	case DBPF_KEYVAL_DBCACHE_SUCCESS:
+	    got_db = 1;
 	    /* drop through */
             break;
     }
@@ -507,6 +528,17 @@ return_ok:
 
     *op_p->u.k_iterate.count_p = i;
 
+    /* sync if requested by user
+     *
+     * Note: this is a little bit silly in some sense, but the semantics allow for it.
+     *
+     */
+    if (op_p->flags & TROVE_SYNC) {
+	if ((ret = db_p->sync(db_p, 0)) != 0) {
+	    goto return_error;
+	}
+    }
+
     /* give up the db reference */
     dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
 
@@ -518,6 +550,7 @@ return_ok:
 return_error:
     fprintf(stderr, "dbpf_keyval_iterate_op_svc: %s\n", db_strerror(ret));
     *op_p->u.k_iterate.count_p = i;
+    if (got_db) dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
     return -1;
 }
 

@@ -9,7 +9,8 @@ LOCALTESTSRC := \
 	$(DIR)/test-listio.c \
 	$(DIR)/trove-import.c \
 	$(DIR)/trove-export.c \
-	$(DIR)/trove-touch.c
+	$(DIR)/trove-touch.c \
+	$(DIR)/trove-create-stress.c
 
 TESTSRC += $(LOCALTESTSRC)
 

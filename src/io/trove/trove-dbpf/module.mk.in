@@ -1,7 +1,7 @@
 DIR := src/io/trove/trove-dbpf
 LIBSRC += \
-	$(DIR)/dbpf-fs.c \
 	$(DIR)/dbpf-bstream.c \
+	$(DIR)/dbpf-collection.c \
 	$(DIR)/dbpf-bstream-aio.c \
 	$(DIR)/dbpf-bstream-fd-cache.c \
 	$(DIR)/dbpf-keyval.c \
@@ -11,8 +11,8 @@ LIBSRC += \
 	$(DIR)/dbpf-op-queue.c \
 	$(DIR)/dbpf-mgmt.c
 SERVERSRC += \
-	$(DIR)/dbpf-fs.c \
 	$(DIR)/dbpf-bstream.c \
+	$(DIR)/dbpf-collection.c \
 	$(DIR)/dbpf-bstream-aio.c \
 	$(DIR)/dbpf-bstream-fd-cache.c \
 	$(DIR)/dbpf-keyval.c \

@@ -22,6 +22,12 @@ enum {
     TROVE_DIR,
 };
 
+/* TROVE operation flags */
+enum {
+    TROVE_SYNC   = 1,
+    TROVE_ATOMIC = 2
+};
+
 /*
  * Local variables:
  *  c-indent-level: 4

@@ -90,14 +90,16 @@ static inline void dbpf_queued_op_init(struct dbpf_queued_op *q_op_p,
 				       TROVE_handle handle,
 				       struct dbpf_collection *coll_p,
 				       int (*svc_fn)(struct dbpf_op *op),
-				       void *user_ptr);
+				       void *user_ptr,
+				       TROVE_ds_flags flags);
 
 static inline void dbpf_queued_op_init(struct dbpf_queued_op *q_op_p,
 				       enum dbpf_op_type type,
 				       TROVE_handle handle,
 				       struct dbpf_collection *coll_p,
 				       int (*svc_fn)(struct dbpf_op *op),
-				       void *user_ptr)
+				       void *user_ptr,
+				       TROVE_ds_flags flags)
 {
     memset(q_op_p, 0, sizeof(struct dbpf_queued_op));
 
@@ -109,6 +111,7 @@ static inline void dbpf_queued_op_init(struct dbpf_queued_op *q_op_p,
     q_op_p->op.coll_p   = coll_p;
     q_op_p->op.svc_fn   = svc_fn;
     q_op_p->op.user_ptr = user_ptr;
+    q_op_p->op.flags    = flags;
 }
 
 

@@ -139,7 +139,7 @@ int parse_args(int argc, char **argv)
 {
     int c;
 
-    while ((c = getopt(argc, argv, "s:c:p:h:")) != EOF) {
+    while ((c = getopt(argc, argv, "s:c:p:")) != EOF) {
 	switch (c) {
 	    case 's':
 		strncpy(storage_space, optarg, SSPACE_SIZE);
@@ -149,11 +149,10 @@ int parse_args(int argc, char **argv)
 		break;
 	    case 'p':
 		strncpy(path_to_dir, optarg, PATH_SIZE);
-	    case 'h':
-		requested_file_handle = atoll(optarg);
 		break;
 	    case '?':
 	    default:
+		fprintf(stderr, "%s: [-c collection] [-p path]\n", argv[0]);
 		return -1;
 	}
     }
