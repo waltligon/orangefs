@@ -38,6 +38,7 @@
 #include "quicklist.h"
 #include "pint-perf-counter.h"
 #include "pint-event.h"
+#include "id-generator.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -1155,6 +1156,7 @@ static int server_state_machine_start(
     job_status_s *js_p)
 {
     int ret = -1;
+    PVFS_id_gen_t tmp_id;
 
     ret = PINT_decode(s_op->unexp_bmi_buff.buffer,
                       PINT_DECODE_REQ,
@@ -1170,6 +1172,14 @@ static int server_state_machine_start(
 
     s_op->req  = (struct PVFS_server_req *)s_op->decoded.buffer;
     assert(s_op->req != NULL);
+
+    /* start by setting a timestamp on the beginning of this state machine */
+    id_gen_fast_register(&tmp_id, s_op);
+    PINT_event_timestamp(PVFS_EVENT_API_SM,
+	(int32_t)s_op->req->op,
+	0,
+	tmp_id,
+	PVFS_EVENT_FLAG_START);
 
     s_op->addr = s_op->unexp_bmi_buff.addr;
     s_op->tag  = s_op->unexp_bmi_buff.tag;
@@ -1291,6 +1301,16 @@ static void server_state_table_initialize(void)
  */
 int server_state_machine_complete(PINT_server_op *s_op)
 {
+    PVFS_id_gen_t tmp_id;
+    
+    /* set a timestamp on the completion of the state machine */
+    id_gen_fast_register(&tmp_id, s_op);
+    PINT_event_timestamp(PVFS_EVENT_API_SM,
+	(int32_t)s_op->req->op,
+	0,
+	tmp_id,
+	PVFS_EVENT_FLAG_END);
+
     /* release the decoding of the unexpected request */
     PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ);
 
