@@ -12,8 +12,10 @@
 /* this is an example client application that uses the job interface */
 
 #include <stdio.h>
-#include <job.h>
-#include <gossip.h>
+
+#include "job.h"
+#include "gossip.h"
+#include "trove.h"
 
 /* some fake items to send around */
 struct request_foo
@@ -35,6 +37,7 @@ int main(int argc, char **argv)
 	job_status_s status1;
 	job_id_t tmp_id;
 	job_context_id context;
+	char* method_name = NULL;
 
 	/* set debugging level */
 	gossip_enable_stderr();
@@ -48,11 +51,11 @@ int main(int argc, char **argv)
 		return(-1);
 	}
 
-	/* start the flow interface */
-	ret = PINT_flow_initialize("flowproto_bmi_trove", 0);
+	ret = trove_initialize("/tmp/pvfs2-test-space",
+	    0, &method_name, 0);
 	if(ret < 0)
 	{
-		fprintf(stderr, "flow init failure.\n");
+		fprintf(stderr, "trove_initialize failure.\n");
 		return(-1);
 	}
 
@@ -160,8 +163,8 @@ int main(int argc, char **argv)
 	/* shut down the interfaces */
 	job_close_context(context);
 	job_finalize();
-	PINT_flow_finalize();
 	BMI_finalize();
+	trove_finalize();
 
 	return(0);
 }
