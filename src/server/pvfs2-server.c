@@ -75,7 +75,7 @@ void PINT_server_get_bmi_unexp_err(int ret);
 int main(int argc, char **argv) {
 
 	/* Used to check completion of interface initializations */
-	int ret = -1;
+	int ret = 1;
 
 	/* Inside for loop variable */
 	int i = 0;  
@@ -97,7 +97,7 @@ int main(int argc, char **argv) {
 
 	/* Status Structures used in job_wait_world */
 	job_status_s job_status_structs[MAX_JOBS];
-	
+
 	/* Insert Temp Trove Stuff Here */
 
 	char *method_name = NULL;
@@ -109,15 +109,15 @@ int main(int argc, char **argv) {
 
 	/* Begin Main */
 
+        /* Passed to server shutdown function */
+	server_level_init = 0;
+	
 	/* When we get a signal, we are thread based, so we need to make
 	   sure that one, the parent has the signal, and two, none of the 
 	   threads are blocking on a semaphore.  Yet another cool error
 		found and resolved.  dw
 	 */
-	signal_recvd_flag = 0; 
-
-	/* Used for shutdown function */
-	server_level_init = 0; 
+	signal_recvd_flag = 0;
 
 	/* Enable the gossip interface. */
 	gossip_enable_stderr();
@@ -134,13 +134,11 @@ int main(int argc, char **argv) {
 	 * function located in server_config.c
 	 */
 	user_opts = PINT_server_config(argc,argv);  /* server_config.c:53 */
-
 	if(!user_opts)
 	{
 		gossip_err("Error: Could not read configuration; aborting.\n");
-		server_shutdown(server_level_init,1,0);
+		goto server_shutdown;
 	}
-	server_level_init++;
 	
 	/* perform initial steps to run as a server 
 	 * This function is located at the bottom of this file
@@ -150,18 +148,18 @@ int main(int argc, char **argv) {
 	if(ret < 0)
 	{
 		gossip_err("Error: Could not start server; aborting.\n");
-		server_shutdown(server_level_init,1,0);
+		server_level_init = DEALLOC_INIT_MEMORY;
+		goto server_shutdown;
 	}
-	server_level_init++;
 	
 	/* initialize BMI Interface */
 	ret = BMI_initialize("bmi_tcp", user_opts->host_id, BMI_INIT_SERVER); /* bmi.c */
-	if(ret < 0){
+	if(ret < 0)
+	{
 		gossip_err("BMI_initialize Failed: %s\n",strerror(-ret));
-		server_shutdown(server_level_init,ret,0);
+		server_level_init = SHUTDOWN_GOSSIP_INTERFACE;
+		goto server_shutdown;
 	}
-	server_level_init++;
-
 	gossip_debug(SERVER_DEBUG,"BMI Init Complete\n");
 
 	/* initialize the flow interface */
@@ -169,19 +167,18 @@ int main(int argc, char **argv) {
 	if(ret < 0)
 	{
 		gossip_err("Flow_initialize Failed: %s\n",strerror(-ret));
-		server_shutdown(server_level_init,ret,0);
+		server_level_init = SHUTDOWN_BMI_INTERFACE;
+		goto server_shutdown;
 	}
-
-	server_level_init++;
-
 	gossip_debug(SERVER_DEBUG,"Flow Init Complete\n");
 
 	/* initialize Trove Interface */
-	
 	ret = trove_initialize(user_opts->storage_path,0,&method_name,0);
-	if(ret < 0){
+	if(ret < 0)
+	{
 		gossip_err("Trove Init Failed: %s\n",strerror(-ret));
-		server_shutdown(server_level_init,ret,0);
+		server_level_init = SHUTDOWN_FLOW_INTERFACE;
+		goto server_shutdown;
 	}
 
 	/* Uses filesystems in config file. */
@@ -195,26 +192,20 @@ int main(int argc, char **argv) {
 		{
 			gossip_lerr("Error initializing filesystem %s\n",
 					user_opts->file_systems[i]->file_system_name);
-			server_shutdown(server_level_init,ret,0);
+                        goto server_shutdown;
 		}
 	}
-
-
-	server_level_init++;
-		
 	gossip_debug(SERVER_DEBUG,"Storage Init Complete\n");
 	gossip_debug(SERVER_DEBUG,"%d filesystems initialized\n",i);
 
 	/* initialize Job Interface */
-   ret = job_initialize(0);
+	ret = job_initialize(0);
 	if(ret < 0)
 	{
 		gossip_err("Error initializing job interface: %s\n", strerror(-ret));
-		server_shutdown(server_level_init,ret,0);
+		server_level_init = SHUTDOWN_STORAGE_INTERFACE;
+		goto server_shutdown;
 	}
-
-	server_level_init++;
-
 	gossip_debug(SERVER_DEBUG,"Job Init Complete\n");
 
 	/* initialize Server State Machine */
@@ -222,24 +213,19 @@ int main(int argc, char **argv) {
 	if(ret < 0)
 	{
 		gossip_err("Error initializing state_machine interface: %s\n", strerror(-ret));
-		server_shutdown(server_level_init,ret,0);
+		server_level_init = SHUTDOWN_HIGH_LEVEL_INTERFACE;
+		goto server_shutdown;
 	}
-
-	server_level_init++;
-
 	gossip_debug(SERVER_DEBUG,"State Machine Init Complete\n");
-
 
 	/* initialize Server Request Scheduler */
 	ret = PINT_req_sched_initialize();
 	if(ret < 0)
 	{
 		gossip_err("Error initializing Request Scheduler interface: %s\n", strerror(-ret));
-		server_shutdown(server_level_init,ret,0);
+		server_level_init = STATE_MACHINE_HALT;
+		goto server_shutdown;
 	}
-
-	server_level_init++;
-
 	gossip_debug(SERVER_DEBUG,"Request Scheduler Init Complete\n");
 
 	/* Below, we initially post BMI unexpected msg buffers =) */
@@ -249,12 +235,13 @@ int main(int argc, char **argv) {
 		if (ret < 0) 
 		{
 			PINT_server_get_bmi_unexp_err(ret);
-			server_shutdown(server_level_init,ret,0);
-		} /* fi */
+			server_level_init = CHECK_DEPS_QUEUE;
+			goto server_shutdown;
+		}
 	} /* End of BMI Unexpected Requests rof */
-
-	server_level_init++;
 	gossip_debug(SERVER_DEBUG,"All BMI_unexp Posted\n");
+
+	server_level_init = UNEXPECTED_BMI_FAILURE;
 
 	/* Register Signals */
 	signal(SIGHUP, (void *)sig_handler);
@@ -267,22 +254,24 @@ int main(int argc, char **argv) {
 	if (sigaction(SIGHUP,&act,NULL) < 0)
 	{
 		gossip_err("Error Registering Signal SIGHUP.\nProgram Terminating.\n");
-		server_shutdown(server_level_init,ret,0);
+		goto server_shutdown;
 	}
 	if (sigaction(SIGSEGV,&act,NULL) < 0)
 	{
 		gossip_err("Error Registering Signal SIGSEGV.\nProgram Terminating.\n");
-		server_shutdown(server_level_init,ret,0);
+		goto server_shutdown;
 	}
 	if (sigaction(SIGPIPE,&act,NULL) < 0)
 	{
 		gossip_err("Error Registering Signal SIGPIPE.\nProgram Terminating.\n");
-		server_shutdown(server_level_init,ret,0);
+		goto server_shutdown;
 	}
 /* #else */
 	signal(SIGSEGV, (void *)sig_handler);
 	signal(SIGPIPE, (void *)sig_handler);
 #endif
+
+	server_level_init = UNEXPECTED_POSTINIT_FAILURE;
 
 	/* The do work forever loop. */
 	while(1)   
@@ -290,10 +279,11 @@ int main(int argc, char **argv) {
 		out_count = MAX_JOBS;
 		if (signal_recvd_flag != 0)
 		{
-			server_shutdown(server_level_init,signal_recvd_flag,0);
+			ret = signal_recvd_flag;
+			goto server_shutdown;
 		}
 		/* TODO: use a named default value for the timeout eventually */
-      ret = job_testworld(
+		ret = job_testworld(
 			job_id_array,
 			&out_count,
 			completed_job_pointers,
@@ -312,7 +302,10 @@ int main(int argc, char **argv) {
 			{
 #ifdef DEBUG
 				if(Temp_Jobs_Complete_Debug++ == Temp_Check_Out_Debug)
-					server_shutdown(server_level_init,-1,0);
+				{
+					ret = -1;
+					goto server_shutdown;
+                                }
 #endif
 
 				ret = PINT_state_machine_initialize_unexpected(s_op,&job_status_structs[i]); 
@@ -331,7 +324,9 @@ int main(int argc, char **argv) {
 			if(ret < 0)
 			{
 				gossip_lerr("Error on job %d, Return Code: %d\n",i,ret);
-				server_shutdown(server_level_init+1,1,0);
+				server_level_init = UNEXPECTED_LOOP_END;
+				ret = 1;
+				goto server_shutdown;
 			/* if ret < 0 oh no... job mechanism died */
 			/* TODO: fix taht */
 			}
@@ -354,9 +349,11 @@ int main(int argc, char **argv) {
 		}
 
 	}
-	server_shutdown(server_level_init+1,1,0);
+	server_level_init = UNEXPECTED_LOOP_END;
+
+  server_shutdown:
+	server_shutdown(server_level_init,ret,0);
 	return -1; /* Should never get here */
-	
 }
 
 
@@ -410,35 +407,32 @@ static int server_init(void) {
 
 static int server_shutdown(int level,int ret,int siglevel) {
 	switch(level) {
-		case 11:   /* Outside of While Loop in Main() 
-					  * This is really bad */
-		case 10:
+		case UNEXPECTED_LOOP_END:
+		case UNEXPECTED_POSTINIT_FAILURE:
 			/* TODO:  Should we do anything else here?
 			 *        Shutting down here means we were running
 			 *        perfectly  and failed somewhere inside the
 			 *        while loop.*/
-		case 9: 
-			/* BMI Unexpected Failure */
-		case 8:
-			/* Check Deps/ Queue */
-		case 7:
+		case UNEXPECTED_BMI_FAILURE:
+		case CHECK_DEPS_QUEUE:
+		case STATE_MACHINE_HALT:
 			/* State Machine */
 			PINT_state_machine_halt();
-		case 6:
+		case SHUTDOWN_HIGH_LEVEL_INTERFACE:
 			/* Turn off High Level Interface */
 			job_finalize();
-		case 5:
+		case SHUTDOWN_STORAGE_INTERFACE:
 			/* Turn off Storage IFace */
 			trove_finalize();
-		case 4:
+		case SHUTDOWN_FLOW_INTERFACE:
 			/* Turn off Flows */
-         /* PINT_flow_finalize(); */
-		case 3:
+			/* PINT_flow_finalize(); */
+		case SHUTDOWN_BMI_INTERFACE:
 			/* Turn off BMI */
 			BMI_finalize();
-		case 2:
+		case SHUTDOWN_GOSSIP_INTERFACE:
 			gossip_disable();
-		case 1:
+		case DEALLOC_INIT_MEMORY:
 			/* Unalloc any memory we have */
 			//free(user_opts->host_id);
 			//free(user_opts->tcp_path_bmi_library);

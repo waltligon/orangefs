@@ -9,7 +9,6 @@
 #ifndef __PVFS_SERVER_H
 #define __PVFS_SERVER_H
 
-
 enum
 {
 	PVFS2_DEBUG_SERVER = 32,
@@ -17,11 +16,25 @@ enum
 	MAX_JOBS = 10 /* also defined in a config file, but nice to have */
 };
 
+enum
+{
+    DEALLOC_INIT_MEMORY = 1,       /* de-alloc any memory we have        */
+    SHUTDOWN_GOSSIP_INTERFACE,     /* turn off gossip interface          */
+    SHUTDOWN_BMI_INTERFACE,        /* turn off bmi interface             */
+    SHUTDOWN_FLOW_INTERFACE,       /* turn off flow interface            */
+    SHUTDOWN_STORAGE_INTERFACE,    /* turn off storage interface         */
+    SHUTDOWN_HIGH_LEVEL_INTERFACE, /* turn off high level interface      */
+    STATE_MACHINE_HALT,            /* state machine failure              */
+    CHECK_DEPS_QUEUE,              /* Check Deps/ Queue                  */
+    UNEXPECTED_BMI_FAILURE,        /* BMI unexpected failure             */
+    UNEXPECTED_POSTINIT_FAILURE,   /* running fine; failed in while loop */
+    UNEXPECTED_LOOP_END,           /* outside of while loop in main()    */
+};
+
 /* This structure is passed into the void *ptr 
  * within the job interface.  Used to tell us where
  * to go next in our state machine.
  */
-
 typedef struct PINT_server_op
 {
 	int op;
