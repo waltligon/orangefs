@@ -9,22 +9,22 @@ if [ $? != 0 ] ; then
     exit 1
 fi
 
-echo $pvfs2bindir/pvfs2-import $pvfs2bindir/pvfs2-import /tmp/pvfs2-pav-mount/simple-test
-$pvfs2bindir/pvfs2-import $pvfs2bindir/pvfs2-import /tmp/pvfs2-pav-mount/simple-test
+echo $pvfs2bindir/pvfs2-cp -t $pvfs2bindir/pvfs2-cp /tmp/pvfs2-pav-mount/simple-test
+$pvfs2bindir/pvfs2-cp -t $pvfs2bindir/pvfs2-cp /tmp/pvfs2-pav-mount/simple-test
 if [ $? != 0 ] ; then
     echo "import failed. Aborting."
     exit 1
 fi
 
-echo $pvfs2bindir/pvfs2-export /tmp/pvfs2-pav-mount/simple-test /tmp/simple-test
-$pvfs2bindir/pvfs2-export /tmp/pvfs2-pav-mount/simple-test /tmp/simple-test
+echo $pvfs2bindir/pvfs2-cp -t /tmp/pvfs2-pav-mount/simple-test /tmp/simple-test
+$pvfs2bindir/pvfs2-cp -t /tmp/pvfs2-pav-mount/simple-test /tmp/simple-test
 if [ $? != 0 ] ; then
     echo "export failed. Aborting."
     exit 1
 fi
 
-echo diff $pvfs2bindir/pvfs2-import /tmp/simple-test
-diff $pvfs2bindir/pvfs2-import /tmp/simple-test
+echo diff $pvfs2bindir/pvfs2-cp /tmp/simple-test
+diff $pvfs2bindir/pvfs2-cp /tmp/simple-test
 if [ $? != 0 ] ; then
     echo "diff failed. Aborting."
     exit 1
