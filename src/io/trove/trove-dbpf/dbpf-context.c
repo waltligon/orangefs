@@ -10,20 +10,7 @@
 #include "dbpf-op-queue.h"
 
 static gen_mutex_t dbpf_context_mutex = GEN_MUTEX_INITIALIZER;
-static struct dbpf_queued_op *dbpf_completion_queue_array[TROVE_MAX_CONTEXTS] = {NULL};
-
-static inline struct dbpf_queued_op *dbpf_completion_queue_alloc(void)
-{
-    return dbpf_queued_op_alloc();
-}
-
-static inline void dbpf_completion_queue_release(struct dbpf_queued_op *comp_q)
-{
-    /* should really clean up ops left on queue here if any */
-    dbpf_queued_op_free(comp_q);
-}
-
-
+dbpf_op_queue_p dbpf_completion_queue_array[TROVE_MAX_CONTEXTS] = {NULL};
 
 int dbpf_open_context(TROVE_context_id *context_id)
 {
@@ -50,7 +37,7 @@ int dbpf_open_context(TROVE_context_id *context_id)
 
     /* create a new completion queue for the context */
     dbpf_completion_queue_array[context_index] =
-        dbpf_completion_queue_alloc();
+        dbpf_op_queue_new();
     if(!dbpf_completion_queue_array[context_index])
     {
 	gen_mutex_unlock(&dbpf_context_mutex);
@@ -72,7 +59,7 @@ int dbpf_close_context(TROVE_context_id context_id)
 	return 1;
     }
 
-    dbpf_completion_queue_release(dbpf_completion_queue_array[context_id]);
+    dbpf_op_queue_cleanup(dbpf_completion_queue_array[context_id]);
 
     dbpf_completion_queue_array[context_id] = NULL;
 

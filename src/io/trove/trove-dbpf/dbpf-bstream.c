@@ -66,7 +66,7 @@ static int dbpf_bstream_read_at(TROVE_coll_id coll_id,
 				TROVE_context_id context_id,
 				TROVE_op_id *out_op_id_p)
 {
-    struct dbpf_queued_op *q_op_p;
+    dbpf_queued_op_t *q_op_p;
     struct dbpf_collection *coll_p;
     
     /* find the collection */
@@ -165,7 +165,7 @@ static int dbpf_bstream_write_at(TROVE_coll_id coll_id,
 				 TROVE_context_id context_id,
 				 TROVE_op_id *out_op_id_p)
 {
-    struct dbpf_queued_op *q_op_p;
+    dbpf_queued_op_t *q_op_p;
     struct dbpf_collection *coll_p;
     
     /* find the collection */
@@ -263,7 +263,7 @@ static int dbpf_bstream_flush(
 				TROVE_context_id context_id,
 				TROVE_op_id *out_op_id_p)
 {
-    struct dbpf_queued_op *q_op_p;
+    dbpf_queued_op_t *q_op_p;
     struct dbpf_collection *coll_p;
     
     /* find the collection */
@@ -447,7 +447,7 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
 				       int opcode)
 {
     int ret, fd;
-    struct dbpf_queued_op *q_op_p;
+    dbpf_queued_op_t *q_op_p;
     struct dbpf_collection *coll_p;
 
     /* find the collection */

@@ -39,7 +39,7 @@ static int dbpf_keyval_read(
 			    TROVE_context_id context_id,
 			    TROVE_op_id *out_op_id_p)
 {
-    struct dbpf_queued_op *q_op_p;
+    dbpf_queued_op_t *q_op_p;
     struct dbpf_collection *coll_p;
 
     coll_p = dbpf_collection_find_registered(coll_id);
@@ -160,7 +160,7 @@ static int dbpf_keyval_write(
 			     TROVE_context_id context_id,
 			     TROVE_op_id *out_op_id_p)
 {
-    struct dbpf_queued_op *q_op_p;
+    dbpf_queued_op_t *q_op_p;
     struct dbpf_collection *coll_p;
 
     coll_p = dbpf_collection_find_registered(coll_id);
@@ -266,7 +266,7 @@ static int dbpf_keyval_remove(
 			      TROVE_context_id context_id,
 			      TROVE_op_id *out_op_id_p)
 {
-    struct dbpf_queued_op *q_op_p;
+    dbpf_queued_op_t *q_op_p;
     struct dbpf_collection *coll_p;
 
     coll_p = dbpf_collection_find_registered(coll_id);
@@ -369,7 +369,7 @@ static int dbpf_keyval_iterate(TROVE_coll_id coll_id,
 			       TROVE_context_id context_id,
 			       TROVE_op_id *out_op_id_p)
 {
-    struct dbpf_queued_op *q_op_p;
+    dbpf_queued_op_t *q_op_p;
     struct dbpf_collection *coll_p;
 
     coll_p = dbpf_collection_find_registered(coll_id);
@@ -623,7 +623,7 @@ static int dbpf_keyval_read_list(
 			         TROVE_context_id context_id,
 				 TROVE_op_id *out_op_id_p)
 {
-    struct dbpf_queued_op *q_op_p;
+    dbpf_queued_op_t *q_op_p;
     struct dbpf_collection *coll_p;
 
     coll_p = dbpf_collection_find_registered(coll_id);
@@ -755,7 +755,7 @@ static int dbpf_keyval_flush(
 			    TROVE_op_id *out_op_id_p)
 {
     struct dbpf_collection *coll_p;
-    struct dbpf_queued_op *q_op_p;
+    dbpf_queued_op_t *q_op_p;
     
     coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL) return -TROVE_EINVAL;

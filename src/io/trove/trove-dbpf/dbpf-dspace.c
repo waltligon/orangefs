@@ -24,6 +24,8 @@
 #include "dbpf-keyval.h"
 #include "dbpf-op-queue.h"
 
+extern dbpf_op_queue_p dbpf_completion_queue_array[TROVE_MAX_CONTEXTS];
+
 #define DBPF_FSTAT fstat
 
 static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p);
@@ -47,7 +49,7 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
 			      TROVE_context_id context_id,
 			      TROVE_op_id *out_op_id_p)
 {
-    struct dbpf_queued_op *q_op_p;
+    dbpf_queued_op_t *q_op_p;
     struct dbpf_collection *coll_p;
 
     coll_p = dbpf_collection_find_registered(coll_id);
@@ -228,7 +230,7 @@ static int dbpf_dspace_remove(TROVE_coll_id coll_id,
 			      TROVE_context_id context_id,
 			      TROVE_op_id *out_op_id_p)
 {
-    struct dbpf_queued_op *q_op_p;
+    dbpf_queued_op_t *q_op_p;
     struct dbpf_collection *coll_p;
 
     coll_p = dbpf_collection_find_registered(coll_id);
@@ -351,7 +353,7 @@ int dbpf_dspace_iterate_handles(TROVE_coll_id coll_id,
 			        TROVE_context_id context_id,
                                 TROVE_op_id *out_op_id_p)
 {
-    struct dbpf_queued_op *q_op_p;
+    dbpf_queued_op_t *q_op_p;
     struct dbpf_collection *coll_p;
 
     coll_p = dbpf_collection_find_registered(coll_id);
@@ -545,7 +547,7 @@ static int dbpf_dspace_verify(TROVE_coll_id coll_id,
 			      TROVE_context_id context_id,
 			      TROVE_op_id *out_op_id_p)
 {
-    struct dbpf_queued_op *q_op_p;
+    dbpf_queued_op_t *q_op_p;
     struct dbpf_collection *coll_p;
 
     coll_p = dbpf_collection_find_registered(coll_id);
@@ -645,7 +647,7 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
 			       TROVE_context_id context_id,
 			       TROVE_op_id *out_op_id_p)
 {
-    struct dbpf_queued_op *q_op_p;
+    dbpf_queued_op_t *q_op_p;
     struct dbpf_collection *coll_p;
 
     coll_p = dbpf_collection_find_registered(coll_id);
@@ -682,7 +684,7 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
 			       TROVE_context_id context_id,
 			       TROVE_op_id *out_op_id_p)
 {
-    struct dbpf_queued_op *q_op_p;
+    dbpf_queued_op_t *q_op_p;
     struct dbpf_collection *coll_p;
 
     coll_p = dbpf_collection_find_registered(coll_id);
@@ -913,7 +915,7 @@ static int dbpf_dspace_test(TROVE_coll_id coll_id,
 			    TROVE_ds_state *state_p)
 {
     int ret;
-    struct dbpf_queued_op *q_op_p;
+    dbpf_queued_op_t *q_op_p;
     
     /* map to queued operation */
     ret = dbpf_queued_op_try_get(id, &q_op_p);
