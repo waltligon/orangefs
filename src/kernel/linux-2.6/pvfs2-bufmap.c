@@ -20,7 +20,6 @@
 static int bufmap_init = 0;
 
 static struct page** bufmap_page_array = NULL;
-static void** bufmap_kaddr_array = NULL;
 
 /* array to track usage of buffer descriptors */
 int buffer_index_array[PVFS2_BUFMAP_DESC_COUNT] = {0};
@@ -81,15 +80,6 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc)
 	return(-ENOMEM);
     }
 
-    bufmap_kaddr_array =
-	(void**)kmalloc(BUFMAP_PAGE_COUNT*sizeof(void*),
-	PVFS2_BUFMAP_GFP_FLAGS);
-    if(!bufmap_kaddr_array)
-    {
-	kfree(bufmap_page_array);
-	return(-ENOMEM);
-    }
-
     /* map the pages */
     down_read(&current->mm->mmap_sem);
     ret = get_user_pages(
@@ -106,7 +96,6 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc)
     if(ret < 0)
     {
 	kfree(bufmap_page_array);
-	kfree(bufmap_kaddr_array);
 	return(ret);
     }
 
@@ -122,20 +111,18 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc)
 	    page_cache_release(bufmap_page_array[i]);
 	}
 	kfree(bufmap_page_array);
-	kfree(bufmap_kaddr_array);
 	return(-ENOMEM);
     }
 
     /*
       ideally we want to get kernel space pointers for each page,
       but we can't kmap that many pages at once if highmem is being
-      used.  so instead, we just store the page address and kmap/kunmap
-      each time the kaddr is needed.
+      used.  so instead, we just kmap/kunmap the page address each
+      time the kaddr is needed.
     */
     for(i = 0; i < BUFMAP_PAGE_COUNT; i++)
     {
         flush_dcache_page(bufmap_page_array[i]);
-	bufmap_kaddr_array[i] = bufmap_page_array[i];
     }
 
     /* build a list of available descriptors */
@@ -143,7 +130,6 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc* user_desc)
     for(i = 0; i < PVFS2_BUFMAP_DESC_COUNT; i++)
     {
 	desc_array[i].page_array = &bufmap_page_array[offset];
-	desc_array[i].kaddr_array = &bufmap_kaddr_array[offset];
 	desc_array[i].array_count = PAGES_PER_DESC;
 	desc_array[i].uaddr = user_desc->ptr +
 	    (i*PAGES_PER_DESC*PAGE_SIZE);
@@ -178,7 +164,6 @@ void pvfs_bufmap_finalize(void)
 	page_cache_release(bufmap_page_array[i]);
     }
     kfree(bufmap_page_array);
-    kfree(bufmap_kaddr_array);
 
     bufmap_init = 0;
 
@@ -288,10 +273,10 @@ int pvfs_bufmap_copy_to_user(void* to, int buffer_index, int size)
 	    amt_this = PAGE_SIZE;
 	else
 	    amt_this = size - amt_copied;
-	
-        from_kaddr = kmap(from->kaddr_array[index]);
+
+        from_kaddr = kmap(from->page_array[index]);
 	copy_to_user(offset, from_kaddr, amt_this);
-        kunmap(from->kaddr_array[index]);
+        kunmap(from->page_array[index]);
 
 	offset += amt_this;
 	amt_copied += amt_this;
@@ -323,10 +308,10 @@ int pvfs_bufmap_copy_to_kernel(void* to, int buffer_index, int size)
 	    amt_this = PAGE_SIZE;
 	else
 	    amt_this = size - amt_copied;
-	
-        from_kaddr = kmap(from->kaddr_array[index]);
+
+        from_kaddr = kmap(from->page_array[index]);
 	memcpy(offset, from_kaddr, amt_this);
-        kunmap(from->kaddr_array[index]);
+        kunmap(from->page_array[index]);
 
 	offset += amt_this;
 	amt_copied += amt_this;
@@ -365,9 +350,9 @@ int pvfs_bufmap_copy_from_user(int buffer_index, void* from, int size)
 	else
 	    amt_this = size - amt_copied;
 
-	to_kaddr = kmap(to->kaddr_array[index]);
+	to_kaddr = kmap(to->page_array[index]);
 	copy_from_user(to_kaddr, offset, amt_this);
-        kunmap(to->kaddr_array[index]);
+        kunmap(to->page_array[index]);
 
 	offset += amt_this;
 	amt_copied += amt_this;

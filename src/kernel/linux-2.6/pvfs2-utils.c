@@ -233,17 +233,17 @@ static inline void convert_attribute_mode_to_pvfs_sys_attr(
 
     attrs->mask |= PVFS_ATTR_SYS_PERM;
 
-    if (mode & S_IFREG)
+    if ((mode & S_IFMT) == S_IFREG)
     {
         attrs->objtype = PVFS_TYPE_METAFILE;
         attrs->mask |= PVFS_ATTR_SYS_TYPE;
     }
-    else if (mode & S_IFDIR)
+    else if ((mode & S_IFMT) == S_IFDIR)
     {
         attrs->objtype = PVFS_TYPE_DIRECTORY;
         attrs->mask |= PVFS_ATTR_SYS_TYPE;
     }
-    else if (mode & S_IFLNK)
+    else if ((mode & S_IFMT) == S_IFLNK)
     {
         attrs->objtype = PVFS_TYPE_SYMLINK;
         attrs->mask |= PVFS_ATTR_SYS_TYPE;
