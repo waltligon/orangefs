@@ -160,7 +160,8 @@ int PINT_send_req_array(bmi_addr_t* addr_array,
     void** resp_encoded_array,
     struct PINT_decoded_msg* resp_decoded_array,
     int* error_code_array,
-    int array_size)
+    int array_size,
+    PVFS_msg_tag_t op_tag)
 {
     int i;
     int ret = -1;

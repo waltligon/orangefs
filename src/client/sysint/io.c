@@ -44,19 +44,27 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
     int ret = -1;
     bmi_addr_t* addr_array = NULL;
     struct PVFS_server_req_s* req_array = NULL;
+    struct PVFS_server_resp_s* tmp_resp = NULL;
     void** resp_encoded_array = NULL;
     struct PINT_decoded_msg* resp_decoded_array = NULL;
+    PINT_Request_file_data* file_data_array = NULL;
     int* error_code_array = NULL;
+    flow_descriptor** flow_array = NULL;
     int i;
     int partial_flag = 0;
+    PVFS_msg_tag_t op_tag = get_next_session_tag();
 
     PVFS_handle HACK_foo;
     PVFS_Dist* HACK_io_dist = NULL;
     PVFS_handle* HACK_datafile_handles = &HACK_foo;
     int HACK_num_datafiles = 1;
 
-    /* find a pinode for the target file */
+    if((type != PVFS_SYS_IO_READ) && (type != PVFS_SYS_IO_WRITE))
+    {
+	return(-EINVAL);
+    }
 
+    /* find a pinode for the target file */
     attr_mask = ATTR_BASIC;
     ret = phelper_get_pinode(req->pinode_refn, &pinode_ptr,
 	attr_mask, req->credentials);
@@ -73,14 +81,10 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	return(-EACCES);
     }
 
-    /****************************************************************/
-    /* TODO: this stuff is just a hack for now so that I can test
-     * the io function; we will need to remove this stuff later
-     */
-
     gossip_err(
 	"WARNING: kludging distribution and datafile in PINT_sys_io().\n");
 
+    /* for now, create our own data file */
     ret = HACK_create(&HACK_foo, req->pinode_refn.fs_id);
     if(ret < 0)
     {
@@ -89,6 +93,7 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	exit(-1);
     }
 
+    /* for now, build our own dist */
     HACK_io_dist = PVFS_Dist_create("default_dist");
     if(!HACK_io_dist)
     {
@@ -100,8 +105,6 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
     {
 	goto out;
     }
-
-    /****************************************************************/
 
     /* allocate storage for bookkeeping information */
     /* TODO: try to do something to avoid so many mallocs */
@@ -117,12 +120,31 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	sizeof(struct PINT_decoded_msg));
     error_code_array = (int*)malloc(HACK_num_datafiles *
 	sizeof(int));
+    file_data_array = (PINT_Request_file_data*)malloc(
+	HACK_num_datafiles*sizeof(PINT_Request_file_data));
+    flow_array = (flow_descriptor**)malloc(HACK_num_datafiles *
+	sizeof(flow_descriptor*));
+    if(flow_array)
+	memset(flow_array, 0, (HACK_num_datafiles *
+	    sizeof(flow_descriptor*)));
 	
     if(!addr_array || !req_array || !resp_encoded_array ||
-	!resp_decoded_array || !error_code_array)
+	!resp_decoded_array || !error_code_array ||
+	!file_data_array || !flow_array)
     {
 	ret = -ENOMEM;
 	goto out;
+    }
+
+    /* create flow descriptors */
+    for(i=0; i<HACK_num_datafiles; i++)
+    {
+	flow_array[i] = PINT_flow_alloc();
+	if(!flow_array[i])
+	{
+	    ret = -ENOMEM;
+	    goto out;
+	}
     }
 
     /* setup the I/O request to each data server */
@@ -162,8 +184,8 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	resp_encoded_array,
 	resp_decoded_array,
 	error_code_array,
-	HACK_num_datafiles);
-
+	HACK_num_datafiles,
+	op_tag);
     if(ret < 0 && ret != -EIO)
     {
 	goto out;
@@ -182,6 +204,46 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
     /* run a flow with each I/O server that gave us a positive
      * response
      */
+    for(i=0; i<HACK_num_datafiles; i++)
+    {
+	tmp_resp = (struct
+	    PVFS_server_resp_s*)resp_decoded_array[i].buffer;
+	if(!(error_code_array[i]) && !(tmp_resp->status))
+	{
+	    flow_array[i]->file_data = &(file_data_array[i]);
+	    flow_array[i]->file_data->fsize =
+		tmp_resp->u.io.bstream_size;
+	    flow_array[i]->file_data->dist = HACK_io_dist;
+	    flow_array[i]->file_data->iod_num = i;
+	    flow_array[i]->file_data->iod_count =
+		HACK_num_datafiles;
+
+	    flow_array[i]->request = req->io_req;
+	    flow_array[i]->flags = 0;
+	    flow_array[i]->tag = op_tag;
+	    flow_array[i]->user_ptr = NULL;
+
+	    if(type == PVFS_SYS_IO_READ)
+	    {
+		flow_array[i]->file_data->extend_flag = 0;
+		flow_array[i]->src.endpoint_id = BMI_ENDPOINT;
+		flow_array[i]->src.u.bmi.address = addr_array[i];
+		flow_array[i]->dest.endpoint_id = MEM_ENDPOINT;
+		flow_array[i]->dest.u.mem.size = req->buffer_size;
+		flow_array[i]->dest.u.mem.buffer = req->buffer;
+	    }
+	    else
+	    {
+		flow_array[i]->file_data->extend_flag = 1;
+		flow_array[i]->src.endpoint_id = MEM_ENDPOINT;
+		flow_array[i]->src.u.mem.size = req->buffer_size;
+		flow_array[i]->src.u.mem.buffer = req->buffer;
+		flow_array[i]->dest.endpoint_id = BMI_ENDPOINT;
+		flow_array[i]->dest.u.mem.size = req->buffer_size;
+		flow_array[i]->dest.u.mem.buffer = req->buffer;
+	    }
+	}
+    }
 
     /* TODO: finish this up */
 
@@ -199,8 +261,18 @@ out:
 	free(resp_decoded_array);
     if(error_code_array)
 	free(error_code_array);
+    if(file_data_array)
+	free(file_data_array);
+    if(flow_array)
+    {
+	for(i=0; i<HACK_num_datafiles; i++)
+	{
+	    if(flow_array[i])
+		PINT_flow_free(flow_array[i]);
+	}
+	free(flow_array);
+    }
 
-    /* TODO: this is just temporary too */
     HACK_remove(HACK_foo, req->pinode_refn.fs_id);
     
     return(ret);

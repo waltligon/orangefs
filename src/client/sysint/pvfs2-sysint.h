@@ -267,6 +267,7 @@ struct PVFS_sysreq_io_s {
 	PVFS_credentials credentials;
 	PVFS_Request io_req;
 	void* buffer;
+	int buffer_size;
 };
 typedef struct PVFS_sysreq_io_s PVFS_sysreq_io;
 
