@@ -104,6 +104,7 @@ I/O path:
 - use better buffer size in default flow protocol
 - bmi shmem implementation
 - many items in BMI and flow TODO files
+- push device thread into thread_mgr api, don't spawn unless needed
 
 I/O description:
 ====================================================================
