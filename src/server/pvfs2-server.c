@@ -737,7 +737,6 @@ static int server_setup_signal_handlers(void)
     sigemptyset (&new_action.sa_mask);
     new_action.sa_flags = 0;
 
-    sigaction (SIGHUP, &new_action, NULL);
     sigaction (SIGPIPE, &new_action, NULL);
     sigaction (SIGILL, &new_action, NULL);
     sigaction (SIGTERM, &new_action, NULL);
