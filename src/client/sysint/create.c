@@ -410,10 +410,10 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 	/* set the type of the object */
 	req_p.u.setattr.attr.objtype = PVFS_TYPE_METAFILE;
 	/* we want to set whatever fields the caller specified, 
-	 * plus the object type and the array of datafiles.
+	 * plus the object type, array of datafiles, and distribution
 	 */
 	req_p.u.setattr.attr.mask |= PVFS_ATTR_COMMON_TYPE;
-	req_p.u.setattr.attr.mask |= PVFS_ATTR_META_DFILES;
+	req_p.u.setattr.attr.mask |= PVFS_ATTR_META_ALL;
 
 	max_msg_sz = PINT_encode_calc_max_size(PINT_ENCODE_RESP, req_p.op,
 	    PINT_CLIENT_ENC_TYPE);
