@@ -1,0 +1,98 @@
+#
+# 8 Dec 2003
+#
+
+Using Valgrind with pvfs2-client and pvfs2-client-core
+
+First, get PVFS2 ready:
+
+. Build pvfs2 with the --with-kernel option
+
+. Build pvfs2.ko
+
+. load pvfs2.ko
+
+Communication with the pvfs2 kernel module happens through ioctls, which
+valgrind will complain about.  To fix that, apply the patch at the end of this
+file.  
+
+	cd /path/to/valgrind/src
+	patch -p1 < /path/to/this/file
+
+Configure, build, and install valgrind as you normally would
+
+pvfs2-client-core reads from a device node, so you'll have to run valgrind as
+root:
+
+	cd /path/to/pvfs2/build/directory
+	valgrind --trace-children=yes \
+		./test/kernel/linux-2.6/pvfs2-client -f \
+		-p ./test/kernel/linux-2.6/pvfs2-client-core
+
+
+As of this writing, things *still* won't work well.  you'll get a message about
+a "short message" from the device.   since we seem to run into this short read
+only when running under valgrind, we probably aren't going to spend a lot of
+time making the pvfs2 device handle short reads.  Patches accepted, though :>
+
+Here's the valgrind patch:
+
+diff -burpN valgrind-2.0.0/coregrind/vg_syscalls.c valgrind-2.0.0.pvfs_ioctl/coregrind/vg_syscalls.c
+--- valgrind-2.0.0/coregrind/vg_syscalls.c	Mon Nov  3 13:15:04 2003
++++ valgrind-2.0.0.pvfs_ioctl/coregrind/vg_syscalls.c	Mon Dec  8 15:04:45 2003
+@@ -2465,6 +2465,32 @@ void VG_(perform_assumed_nonblocking_sys
+                KERNEL_DO_SYSCALL(tid,res);
+                break;
+ 
++
++	    case PVFS_DEV_GET_MAGIC:
++	       SYSCALL_TRACK(pre_mem_write, tid, "ioctl(PVFS_DEV_GET_MAGIC)", arg3, sizeof(int32_t));
++	       KERNEL_DO_SYSCALL(tid,res);
++	       if (!VG_(is_kerror)(res) && res == 0)
++		       VG_TRACK(post_mem_write,arg3, sizeof(int32_t));
++		       break;
++	    case PVFS_DEV_GET_MAX_UPSIZE:
++	       SYSCALL_TRACK(pre_mem_write, tid, "ioctl(PVFS_DEV_GET_MAX_UPSIZE)", arg3, sizeof(int32_t));
++	       KERNEL_DO_SYSCALL(tid,res);
++	       if (!VG_(is_kerror)(res) && res == 0)
++		       VG_TRACK(post_mem_write,arg3, sizeof(int32_t));
++		       break;
++
++	    case PVFS_DEV_GET_MAX_DOWNSIZE:
++	       SYSCALL_TRACK(pre_mem_write, tid, "ioctl(PVFS_DEV_GET_MAX_DOWNSIZE)", arg3, sizeof(int32_t));
++	       KERNEL_DO_SYSCALL(tid,res);
++	       if (!VG_(is_kerror)(res) && res == 0)
++		       VG_TRACK(post_mem_write,arg3, sizeof(int32_t));
++		       break;
++	    case PVFS_DEV_MAP:
++	    	SYSCALL_TRACK(pre_mem_write, tid, "ioctl(PVFS_DEV_MAP)", arg3, sizeof(struct PVFS_dev_map_desc));
++	       KERNEL_DO_SYSCALL(tid,res);
++	       if (!VG_(is_kerror)(res) && res == 0)
++		       VG_TRACK(post_mem_write,arg3, sizeof(struct PVFS_dev_map_desc));
++		       break;
+             /* We don't have any specific information on it, so
+                try to do something reasonable based on direction and
+                size bits.  The encoding scheme is described in
+diff -burpN valgrind-2.0.0/coregrind/vg_unsafe.h valgrind-2.0.0.pvfs_ioctl/coregrind/vg_unsafe.h
+--- valgrind-2.0.0/coregrind/vg_unsafe.h	Tue Nov  4 17:18:40 2003
++++ valgrind-2.0.0.pvfs_ioctl/coregrind/vg_unsafe.h	Mon Dec  8 15:04:05 2003
+@@ -89,6 +89,19 @@
+ 
+ #include <sys/poll.h>
+ 
++/* PVFS2: some defines lifed from the internal header files */
++#define PVFS_DEV_GET_MAGIC                      1
++#define PVFS_DEV_GET_MAX_UPSIZE                 2
++#define PVFS_DEV_GET_MAX_DOWNSIZE               3
++#define PVFS_DEV_MAP                            4
++
++/* describes memory regions to map in the PVFS_DEV_MAP ioctl */
++struct PVFS_dev_map_desc
++{   
++    void* ptr;
++    int size;
++};
++
+ 
+ /*--------------------------------------------------------------------*/
+ /*--- end                                              vg_unsafe.h ---*/
