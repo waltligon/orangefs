@@ -869,36 +869,36 @@ echo "$ac_t""$host" 1>&6
 
 
 MISC_TROVE_FLAGS=""
-if test x$host_os = xlinux-gnu; then
+if test "x$host_os" = "xlinux-gnu" ; then
     echo $ac_n "checking glibc version for working aio callbacks""... $ac_c" 1>&6
 echo "configure:875: checking glibc version for working aio callbacks" >&5
     libc=`echo /lib/libc.so.* | sed 1q`
-    if test x$libc != x ; then
-	if test -x $libc ; then
-	    vers=`$libc 2> /dev/null | sed 's/.*version \(.*\),.*/\1/; q'`
-            if test x$vers = x; then
-               vers=`strings /lib/libc.so.* | grep GLIBC | tail -n 2 | grep -v PRIVATE | cut -b 7-`
+    if test "x$libc" != "x" ; then
+        if test -x $libc ; then
+            vers=`$libc 2> /dev/null | sed 's/.*version \(.*\),.*/\1/; q'`
+            if test "x$vers" = "x"; then
+                vers=`strings /lib/libc.so.* | grep GLIBC | tail -n 2 | grep -v PRIVATE | cut -b 7-`
             fi
             majorminor=`echo $vers | cut -b 1-3`
             sub=`echo $vers | cut -b 5`
-            if test x$majorminor = x2.3; then
+            if test "x$majorminor" = "x2.3" ; then
                 if test $sub -gt 1; then
-		    MISC_TROVE_FLAGS="-D__PVFS2_TROVE_AIO_THREADED__"
+                    MISC_TROVE_FLAGS="-D__PVFS2_TROVE_AIO_THREADED__"
                 fi
-	    fi
+            fi
         else
             vers=`strings /lib/libc.so.* | grep GLIBC | tail -n 2 | grep -v PRIVATE | cut -b 7-`
             majorminor=`echo $vers | cut -b 1-3`
             sub=`echo $vers | cut -b 5`
-            if test x$majorminor = x2.3; then
+            if test "x$majorminor" = "x2.3" ; then
                 if test $sub -gt 1; then
-		    MISC_TROVE_FLAGS="-D__PVFS2_TROVE_AIO_THREADED__"
+                    MISC_TROVE_FLAGS="-D__PVFS2_TROVE_AIO_THREADED__"
                 fi
-	    fi
-	fi
+            fi
+        fi
     fi
 fi
-if test x$MISC_TROVE_FLAGS = x ; then
+if test "x$MISC_TROVE_FLAGS" = "x" ; then
     echo "$ac_t""no" 1>&6
 else
     echo "$ac_t""yes" 1>&6
@@ -1062,13 +1062,13 @@ fi
 # Check whether --with-pablo or --without-pablo was given.
 if test "${with_pablo+set}" = set; then
   withval="$with_pablo"
-  if test x$withval = xyes ; then
-	    { echo "configure: error: --with-pablo must be given a pathname" 1>&2; exit 1; }
+  if test "x$withval" = "xyes" ; then
+           { echo "configure: error: --with-pablo must be given a pathname" 1>&2; exit 1; }
     else
-	CFLAGS="$CFLAGS -I$withval/include"
-	LDFLAGS="$LDFLAGS -L$withval/lib"
-	LIBS="$LIBS -lPabloTrace"
-	cat >> confdefs.h <<\EOF
+       CFLAGS="$CFLAGS -I$withval/include"
+       LDFLAGS="$LDFLAGS -L$withval/lib"
+       LIBS="$LIBS -lPabloTrace"
+       cat >> confdefs.h <<\EOF
 #define HAVE_PABLO 1
 EOF
 
@@ -1080,13 +1080,13 @@ fi
 # Check whether --with-mpe or --without-mpe was given.
 if test "${with_mpe+set}" = set; then
   withval="$with_mpe"
-  if test x$withval = xyes ; then
-    	{ echo "configure: error: --with-mpe must be given a pathname" 1>&2; exit 1; }
+  if test "x$withval" = "xyes" ; then
+           { echo "configure: error: --with-mpe must be given a pathname" 1>&2; exit 1; }
     else
         CFLAGS="$CFLAGS -I$withval/include"
-	LDFLAGS="$LDFLAGS -L$withval/lib"
-	LIBS="$LIBS -lmpe -lmpich"
-	cat >> confdefs.h <<\EOF
+       LDFLAGS="$LDFLAGS -L$withval/lib"
+       LIBS="$LIBS -lmpe -lmpich"
+       cat >> confdefs.h <<\EOF
 #define HAVE_MPE 1
 EOF
 
@@ -1098,23 +1098,23 @@ fi
 # Check whether --with-kernel or --without-kernel was given.
 if test "${with_kernel+set}" = set; then
   withval="$with_kernel"
-  if test x$withval = xyes -o x$withval = x ; then
-    	{ echo "configure: error: --with-kernel must be given the path to your kernel source." 1>&2; exit 1; }
+  if test "x$withval" = "xyes" -o "x$withval" = "x" ; then
+           { echo "configure: error: --with-kernel must be given the path to your kernel source." 1>&2; exit 1; }
     fi
     if ! test -d $withval ; then
-    	{ echo "configure: error: The --with-kernel path $withval is not a directory." 1>&2; exit 1; }
+           { echo "configure: error: The --with-kernel path $withval is not a directory." 1>&2; exit 1; }
     fi
     if ! test -r $withval/include/linux/version.h ; then
-	{ echo "configure: error: The kernel source tree must have been configured." 1>&2; exit 1; }
+       { echo "configure: error: The kernel source tree must have been configured." 1>&2; exit 1; }
     fi
     vers=`sed -n '/UTS_RELEASE/{; s/.*"\(0-9\.0-9\).*".*/\1/; p; }' $withval/include/linux/version.h`
     if ! grep -q UTS_RELEASE..2\\.6\\. $withval/include/linux/version.h ; then
-	{ echo "configure: error: The kernel source tree does not appear to be 2.6" 1>&2; exit 1; }
+       { echo "configure: error: The kernel source tree does not appear to be 2.6" 1>&2; exit 1; }
     fi
     # At least up through 2.6.3 need to write .__modpost.cmd; this might get
     # fixed in the future.
     if ! test -w $withval ; then
-	{ echo "configure: error: You must have write permissions to the kernel source tree." 1>&2; exit 1; }
+       { echo "configure: error: You must have write permissions to the kernel source tree." 1>&2; exit 1; }
     fi
     LINUX_KERNEL_SRC="$withval"
     
@@ -1126,18 +1126,18 @@ fi
 # Check whether --with-kernel24 or --without-kernel24 was given.
 if test "${with_kernel24+set}" = set; then
   withval="$with_kernel24"
-  if test x$withval = xyes -o x$withval = x ; then
-    	{ echo "configure: error: --with-kernel24 must be given the path to your kernel 2.4.x source." 1>&2; exit 1; }
+  if test "x$withval" = "xyes" -o "x$withval" = "x" ; then
+           { echo "configure: error: --with-kernel24 must be given the path to your kernel 2.4.x source." 1>&2; exit 1; }
     fi
     if ! test -d $withval ; then
-    	{ echo "configure: error: The --with-kernel path $withval is not a directory." 1>&2; exit 1; }
+           { echo "configure: error: The --with-kernel path $withval is not a directory." 1>&2; exit 1; }
     fi
     if ! test -r $withval/include/linux/version.h ; then
-	{ echo "configure: error: The kernel source tree must have been configured." 1>&2; exit 1; }
+       { echo "configure: error: The kernel source tree must have been configured." 1>&2; exit 1; }
     fi
     vers=`sed -n '/UTS_RELEASE/{; s/.*"\(0-9\.0-9\).*".*/\1/; p; }' $withval/include/linux/version.h`
     if ! grep -q UTS_RELEASE..2\\.4\\. $withval/include/linux/version.h ; then
-	{ echo "configure: error: The kernel source tree does not appear to be 2.4" 1>&2; exit 1; }
+       { echo "configure: error: The kernel source tree does not appear to be 2.4" 1>&2; exit 1; }
     fi
     k24_minor_ver=`echo $vers | cut -b 26- | sed -n 's/\"//p' | head -n 1`
     tmp_k24_minor_ver=`echo $k24_minor_ver | grep \-`
@@ -1199,7 +1199,7 @@ echo "configure:1199: checking for client library thread safety support" >&5
 # Check whether --enable-disable-thread-safety or --disable-disable-thread-safety was given.
 if test "${enable_disable_thread_safety+set}" = set; then
   enableval="$enable_disable_thread_safety"
-  if test x$enableval = xno; then
+  if test "x$enableval" = "xno" ; then
     LIBCFLAGS="$LIBCFLAGS -D__GEN_NULL_LOCKING__"
     THREAD_LIB=""
     echo "$ac_t""no" 1>&6
@@ -1217,7 +1217,7 @@ fi
 # Check whether --enable-perf-counters or --disable-perf-counters was given.
 if test "${enable_perf_counters+set}" = set; then
   enableval="$enable_perf_counters"
-  if test x$enableval = xno; then
+  if test "x$enableval" = "xno" ; then
     CFLAGS="$CFLAGS -D__PVFS2_DISABLE_PERF_COUNTERS__"
 fi
 
@@ -1227,7 +1227,7 @@ fi
 # Check whether --enable-disk-io or --disable-disk-io was given.
 if test "${enable_disk_io+set}" = set; then
   enableval="$enable_disk_io"
-  if test x$enableval = xno; then
+  if test "x$enableval" = "xno" ; then
     CFLAGS="$CFLAGS -D__PVFS2_DISABLE_DISK_IO__"
 fi
 
@@ -1238,7 +1238,7 @@ MMAP_RA_CACHE="-DUSE_MMAP_RA_CACHE"
 # Check whether --enable-mmap-racache or --disable-mmap-racache was given.
 if test "${enable_mmap_racache+set}" = set; then
   enableval="$enable_mmap_racache"
-  if test x$enableval = xno; then
+  if test "x$enableval" = "xno" ; then
     MMAP_RA_CACHE=""
 fi
 
@@ -1278,7 +1278,7 @@ else
   echo "$ac_t""no" 1>&6
 fi
 
-  if test x$HAVE_PKGCONFIG = xyes ; then
+  if test "x$HAVE_PKGCONFIG" = "xyes" ; then
      echo $ac_n "checking for gtk2.0 (for karma gui)""... $ac_c" 1>&6
 echo "configure:1284: checking for gtk2.0 (for karma gui)" >&5
      if `pkg-config --exists gtk+-2.0` ; then
@@ -1299,7 +1299,7 @@ echo "configure:1284: checking for gtk2.0 (for karma gui)" >&5
 # Check whether --enable-karma or --disable-karma was given.
 if test "${enable_karma+set}" = set; then
   enableval="$enable_karma"
-   if test x$enableval = xyes; then
+   if test "x$enableval" = "xyes" ; then
       test_for_karma
    fi
 
@@ -1852,9 +1852,9 @@ else
 
 fi
 rm -f conftest*
-if test x$INTELC = x ; then
-    if test x$GCC = xyes ; then
-	GNUC=1
+if test "x$INTELC" = "x" ; then
+    if test "x$GCC" = "xyes" ; then
+       GNUC=1
     fi
 fi
 
@@ -1863,10 +1863,10 @@ fi
 # Check whether --with-efence or --without-efence was given.
 if test "${with_efence+set}" = set; then
   withval="$with_efence"
-  if test x$withval != xyes ; then
-		LDFLAGS="${LDFLAGS} -L$withval"
-	fi
-	echo $ac_n "checking for malloc in -lefence""... $ac_c" 1>&6
+  if test "x$withval" != "xyes" ; then
+              LDFLAGS="${LDFLAGS} -L$withval"
+       fi
+       echo $ac_n "checking for malloc in -lefence""... $ac_c" 1>&6
 echo "configure:1871: checking for malloc in -lefence" >&5
 ac_lib_var=`echo efence'_'malloc | sed 'y%./+-%__p_%'`
 if eval "test \"`echo '$''{'ac_cv_lib_$ac_lib_var'+set}'`\" = set"; then
@@ -1929,8 +1929,8 @@ echo $ac_n "checking for db library""... $ac_c" 1>&6
 echo "configure:1930: checking for db library" >&5
 oldlibs=$LIBS
 for lib in db4  db3  db  notfound; do
-	LIBS="${oldlibs} -l$lib"
-	cat > conftest.$ac_ext <<EOF
+       LIBS="${oldlibs} -l$lib"
+       cat > conftest.$ac_ext <<EOF
 #line 1935 "configure"
 #include "confdefs.h"
 #include <db.h>
@@ -1947,10 +1947,10 @@ else
 fi
 rm -f conftest*
 done
-if test x$lib == xnotfound ; then
-	{ echo "configure: error: could not find DB libraries" 1>&2; exit 1; }
+if test "x$lib" == "xnotfound" ; then
+       { echo "configure: error: could not find DB libraries" 1>&2; exit 1; }
 else
-	echo "$ac_t""$lib" 1>&6
+       echo "$ac_t""$lib" 1>&6
 fi
 
 
@@ -2099,8 +2099,8 @@ if eval "test \"`echo '$ac_cv_header_'$ac_safe`\" = yes"; then
 #define HAVE_GM 1
 EOF
 
-	BUILD_GM="1"
-	
+       BUILD_GM="1"
+       
 else
   echo "$ac_t""no" 1>&6
 fi
@@ -2139,7 +2139,7 @@ if eval "test \"`echo '$ac_cv_header_'$ac_safe`\" = yes"; then
 #define HAVE_SYSINFO 1
 EOF
 
-	
+       
 else
   echo "$ac_t""no" 1>&6
 fi
@@ -2190,7 +2190,7 @@ if eval "test \"`echo '$ac_cv_header_'$ac_safe`\" = yes"; then
 #define HAVE_IB 1
 EOF
 
-	BUILD_IB=1
+       BUILD_IB=1
 else
   echo "$ac_t""no" 1>&6
 fi
@@ -2253,7 +2253,7 @@ EOF
 #define _GNU_SOURCE 1
 EOF
 
-	cat >> confdefs.h <<\EOF
+       cat >> confdefs.h <<\EOF
 #define HAVE_STRNLEN 1
 EOF
 
@@ -2771,8 +2771,8 @@ else
 fi
 
 for d in src/apps src/io src/common src/client src/kernel \
-	doc src/apps/kernel test; do
-	install -d $d;
+       doc src/apps/kernel test; do
+       install -d $d;
 done
 
 trap '' 1 2 15
@@ -3271,13 +3271,13 @@ echo "$ac_t""" 1>&6
 echo "$ac_t""***** Displaying PVFS2 Configuration Information *****" 1>&6
 echo "$ac_t""------------------------------------------------------" 1>&6
 
-if test x$BUILD_KARMA = x1 ; then
+if test "x$BUILD_KARMA" = "x1" ; then
    echo "$ac_t""PVFS2 configured to build karma gui              : yes" 1>&6
 else
    echo "$ac_t""PVFS2 configured to build karma gui              :  no" 1>&6
 fi
 
-if test x$ENABLE_COVERAGE = x1 ; then
+if test "x$ENABLE_COVERAGE" = "x1" ; then
    echo "$ac_t""PVFS2 configured to perform coverage analysis    : yes" 1>&6
 else
    echo "$ac_t""PVFS2 configured to perform coverage analysis    :  no" 1>&6

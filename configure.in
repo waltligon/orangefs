@@ -38,35 +38,35 @@ dnl fi
 dnl if we're running on linux-gnu and we find glibc version 2.3.2 or
 dnl later, we assume the aio threaded callbacks work
 MISC_TROVE_FLAGS=""
-if test x$host_os = xlinux-gnu; then
+if test "x$host_os" = "xlinux-gnu" ; then
     AC_MSG_CHECKING(glibc version for working aio callbacks)
     libc=`echo /lib/libc.so.* | sed 1q`
-    if test x$libc != x ; then
-	if test -x $libc ; then
-	    vers=`$libc 2> /dev/null | sed 's/.*version \(.*\),.*/\1/; q'`
-            if test x$vers = x; then
-               vers=`strings /lib/libc.so.* | grep GLIBC | tail -n 2 | grep -v PRIVATE | cut -b 7-`
+    if test "x$libc" != "x" ; then
+        if test -x $libc ; then
+            vers=`$libc 2> /dev/null | sed 's/.*version \(.*\),.*/\1/; q'`
+            if test "x$vers" = "x"; then
+                vers=`strings /lib/libc.so.* | grep GLIBC | tail -n 2 | grep -v PRIVATE | cut -b 7-`
             fi
             majorminor=`echo $vers | cut -b 1-3`
             sub=`echo $vers | cut -b 5`
-            if test x$majorminor = x2.3; then
+            if test "x$majorminor" = "x2.3" ; then
                 if test $sub -gt 1; then
-		    MISC_TROVE_FLAGS="-D__PVFS2_TROVE_AIO_THREADED__"
+                    MISC_TROVE_FLAGS="-D__PVFS2_TROVE_AIO_THREADED__"
                 fi
-	    fi
+            fi
         else
             vers=`strings /lib/libc.so.* | grep GLIBC | tail -n 2 | grep -v PRIVATE | cut -b 7-`
             majorminor=`echo $vers | cut -b 1-3`
             sub=`echo $vers | cut -b 5`
-            if test x$majorminor = x2.3; then
+            if test "x$majorminor" = "x2.3" ; then
                 if test $sub -gt 1; then
-		    MISC_TROVE_FLAGS="-D__PVFS2_TROVE_AIO_THREADED__"
+                    MISC_TROVE_FLAGS="-D__PVFS2_TROVE_AIO_THREADED__"
                 fi
-	    fi
-	fi
+            fi
+        fi
     fi
 fi
-if test x$MISC_TROVE_FLAGS = x ; then
+if test "x$MISC_TROVE_FLAGS" = "x" ; then
     AC_MSG_RESULT(no)
 else
     AC_MSG_RESULT(yes)
@@ -97,26 +97,26 @@ AC_DEFINE(BERKDB_ERROR_REPORTING, 1, Define if berkeley db error reporting was e
 dnl use the Pablo trace library
 AC_ARG_WITH(pablo,
 [  --with-pablo=path       Use Pablo trace library installed in "path"],
-    if test x$withval = xyes ; then
-	    AC_MSG_ERROR(--with-pablo must be given a pathname)
+    if test "x$withval" = "xyes" ; then
+           AC_MSG_ERROR(--with-pablo must be given a pathname)
     else
-	CFLAGS="$CFLAGS -I$withval/include"
-	LDFLAGS="$LDFLAGS -L$withval/lib"
-	LIBS="$LIBS -lPabloTrace"
-	AC_DEFINE(HAVE_PABLO, 1, [Define if Pablo library is used])
+       CFLAGS="$CFLAGS -I$withval/include"
+       LDFLAGS="$LDFLAGS -L$withval/lib"
+       LIBS="$LIBS -lPabloTrace"
+       AC_DEFINE(HAVE_PABLO, 1, [Define if Pablo library is used])
     fi
 )
 
 dnl use MPE profiling library 
 AC_ARG_WITH(mpe,
 [  --with-mpe=path         Use MPE profiling library installed in "path"],
-    if test x$withval = xyes ; then
-    	AC_MSG_ERROR(--with-mpe must be given a pathname)
+    if test "x$withval" = "xyes" ; then
+           AC_MSG_ERROR(--with-mpe must be given a pathname)
     else
         CFLAGS="$CFLAGS -I$withval/include"
-	LDFLAGS="$LDFLAGS -L$withval/lib"
-	LIBS="$LIBS -lmpe -lmpich"
-	AC_DEFINE(HAVE_MPE, 1, [Use the MPE profiling library])
+       LDFLAGS="$LDFLAGS -L$withval/lib"
+       LIBS="$LIBS -lmpe -lmpich"
+       AC_DEFINE(HAVE_MPE, 1, [Use the MPE profiling library])
     fi
 )
 
@@ -127,23 +127,23 @@ dnl Make sure this is a usable kernel source tree too.
 dnl
 AC_ARG_WITH(kernel,
 [  --with-kernel=srcpath   Build pvfs2 kernel module against 2.6.x src],
-    if test x$withval = xyes -o x$withval = x ; then
-    	AC_MSG_ERROR(--with-kernel must be given the path to your kernel source.)
+    if test "x$withval" = "xyes" -o "x$withval" = "x" ; then
+           AC_MSG_ERROR(--with-kernel must be given the path to your kernel source.)
     fi
     if ! test -d $withval ; then
-    	AC_MSG_ERROR(The --with-kernel path $withval is not a directory.)
+           AC_MSG_ERROR(The --with-kernel path $withval is not a directory.)
     fi
     if ! test -r $withval/include/linux/version.h ; then
-	AC_MSG_ERROR(The kernel source tree must have been configured.)
+       AC_MSG_ERROR(The kernel source tree must have been configured.)
     fi
     vers=`sed -n '/UTS_RELEASE/{; s/.*"\([0-9]\.[0-9]\).*".*/\1/; p; }' $withval/include/linux/version.h`
     if ! grep -q UTS_RELEASE..2\\.6\\. $withval/include/linux/version.h ; then
-	AC_MSG_ERROR(The kernel source tree does not appear to be 2.6)
+       AC_MSG_ERROR(The kernel source tree does not appear to be 2.6)
     fi
     # At least up through 2.6.3 need to write .__modpost.cmd; this might get
     # fixed in the future.
     if ! test -w $withval ; then
-	AC_MSG_ERROR(You must have write permissions to the kernel source tree.)
+       AC_MSG_ERROR(You must have write permissions to the kernel source tree.)
     fi
     LINUX_KERNEL_SRC="$withval"
     , LINUX_KERNEL_SRC="")
@@ -155,18 +155,18 @@ dnl Make sure this is a usable kernel source tree too.
 dnl
 AC_ARG_WITH(kernel24,
 [  --with-kernel24=srcpath Build pvfs2 kernel module against 2.4.x src],
-    if test x$withval = xyes -o x$withval = x ; then
-    	AC_MSG_ERROR(--with-kernel24 must be given the path to your kernel 2.4.x source.)
+    if test "x$withval" = "xyes" -o "x$withval" = "x" ; then
+           AC_MSG_ERROR(--with-kernel24 must be given the path to your kernel 2.4.x source.)
     fi
     if ! test -d $withval ; then
-    	AC_MSG_ERROR(The --with-kernel path $withval is not a directory.)
+           AC_MSG_ERROR(The --with-kernel path $withval is not a directory.)
     fi
     if ! test -r $withval/include/linux/version.h ; then
-	AC_MSG_ERROR(The kernel source tree must have been configured.)
+       AC_MSG_ERROR(The kernel source tree must have been configured.)
     fi
     vers=`sed -n '/UTS_RELEASE/{; s/.*"\([0-9]\.[0-9]\).*".*/\1/; p; }' $withval/include/linux/version.h`
     if ! grep -q UTS_RELEASE..2\\.4\\. $withval/include/linux/version.h ; then
-	AC_MSG_ERROR(The kernel source tree does not appear to be 2.4)
+       AC_MSG_ERROR(The kernel source tree does not appear to be 2.4)
     fi
     k24_minor_ver=`echo $vers | cut -b 26- | sed -n 's/\"//p' | head -n 1`
     tmp_k24_minor_ver=`echo $k24_minor_ver | grep \-`
@@ -229,7 +229,7 @@ dnl a mechanism to turn off threads in the client library
 AC_MSG_CHECKING([for client library thread safety support])
 AC_ARG_ENABLE(disable-thread-safety,
 [  --disable-thread-safety Disables thread safety in the client library],
-[if test x$enableval = xno; then
+[if test "x$enableval" = "xno" ; then
     LIBCFLAGS="$LIBCFLAGS -D__GEN_NULL_LOCKING__"
     THREAD_LIB=""
     AC_MSG_RESULT(no)
@@ -244,7 +244,7 @@ AC_SUBST(THREAD_LIB)
 dnl a mechanism to turn off perf counters
 AC_ARG_ENABLE(perf-counters,
 [  --disable-perf-counters Disables pvfs2-server performance counters],
-[if test x$enableval = xno; then
+[if test "x$enableval" = "xno" ; then
     CFLAGS="$CFLAGS -D__PVFS2_DISABLE_PERF_COUNTERS__"
 fi]
 ,)
@@ -252,7 +252,7 @@ fi]
 dnl a mechanism to turn off disk I/O for testing/debugging
 AC_ARG_ENABLE(disk-io,
 [  --disable-disk-io       Disables pvfs2-server disk I/O (for testing)],
-[if test x$enableval = xno; then
+[if test "x$enableval" = "xno" ; then
     CFLAGS="$CFLAGS -D__PVFS2_DISABLE_DISK_IO__"
 fi]
 ,)
@@ -261,7 +261,7 @@ dnl a mechanism to turn off mmap-readahead caching (for kernel interface)
 MMAP_RA_CACHE="-DUSE_MMAP_RA_CACHE"
 AC_ARG_ENABLE(mmap-racache,
 [  --disable-mmap-racache  Disables mmap-readahead in vfs interface],
-[if test x$enableval = xno; then
+[if test "x$enableval" = "xno" ; then
     MMAP_RA_CACHE=""
 fi]
 ,)
@@ -272,7 +272,7 @@ dnl karma gui
 test_for_karma()
 {
   AC_CHECK_PROG(HAVE_PKGCONFIG, pkg-config, yes, no)
-  if test x$HAVE_PKGCONFIG = xyes ; then
+  if test "x$HAVE_PKGCONFIG" = "xyes" ; then
      AC_MSG_CHECKING([for gtk2.0 (for karma gui)])
      if `pkg-config --exists gtk+-2.0` ; then
         AC_MSG_RESULT(yes)
@@ -292,7 +292,7 @@ test_for_karma()
 dnl optionally disable building the karma gui
 AC_ARG_ENABLE(karma,
 [  --disable-karma         Disables optional gui.  (Enabled by default)],
-[ if test x$enableval = xyes; then
+[ if test "x$enableval" = "xyes" ; then
       test_for_karma
    fi
 ],
@@ -341,9 +341,9 @@ AC_TRY_COMPILE([
     ,
     AC_MSG_RESULT(no)
 )
-if test x$INTELC = x ; then
-    if test x$GCC = xyes ; then
-	GNUC=1
+if test "x$INTELC" = "x" ; then
+    if test "x$GCC" = "xyes" ; then
+       GNUC=1
     fi
 fi
 AC_SUBST(INTELC)
@@ -351,10 +351,10 @@ AC_SUBST(GNUC)
 
 AC_ARG_WITH(efence,
 [  --with-efence=<path>    Use electric fence for malloc debugging.],
-	if test x$withval != xyes ; then
-		LDFLAGS="${LDFLAGS} -L$withval"
-	fi
-	AC_CHECK_LIB(efence,malloc)
+       if test "x$withval" != "xyes" ; then
+              LDFLAGS="${LDFLAGS} -L$withval"
+       fi
+       AC_CHECK_LIB(efence,malloc)
 )
 
 dnl
@@ -363,39 +363,39 @@ dnl and valid; path can be specified at configure time
 dnl
 
 AC_ARG_WITH(db,
-	[  --with-db=<dir>         Location of installed DB package (default=/usr)],
-	LDFLAGS="${LDFLAGS} -L$withval/lib" CFLAGS="${CFLAGS} -I$withval/include")
+       [  --with-db=<dir>         Location of installed DB package (default=/usr)],
+       LDFLAGS="${LDFLAGS} -L$withval/lib" CFLAGS="${CFLAGS} -I$withval/include")
 
 AC_MSG_CHECKING([for db library])
 oldlibs=$LIBS
 for lib in db4  db3  db  notfound; do
-	LIBS="${oldlibs} -l$lib"
-	AC_TRY_LINK(
-		[#include <db.h>],
-		[DB *dbp; db_create(&dbp, NULL, 0);],
-		[break])
+       LIBS="${oldlibs} -l$lib"
+       AC_TRY_LINK(
+              [#include <db.h>],
+              [DB *dbp; db_create(&dbp, NULL, 0);],
+              [break])
 done
-if test x$lib == xnotfound ; then
-	AC_MSG_ERROR(could not find DB libraries)
+if test "x$lib" == "xnotfound" ; then
+       AC_MSG_ERROR(could not find DB libraries)
 else
-	AC_MSG_RESULT($lib)
+       AC_MSG_RESULT($lib)
 fi
 
 dnl See if we have a new enough version of Berkeley DB; needed for
 dnl    compilation of trove-dbpf component
 dnl AC_MSG_CHECKING(whether version of Berkeley DB is new enough)
-dnl	AC_TRY_COMPILE([
-dnl	#include <db.h>
-dnl	], [
-dnl	#if DB_VERSION_MAJOR < 4
-dnl		#error "DB_VERSION_MAJOR < 4; need newer Berkeley DB implementation"
-dnl	#endif
-dnl	], AC_MSG_RESULT(yes),
-dnl	AC_MSG_RESULT(no)
-dnl		AC_MSG_ERROR(Need newer (4.x.x or later) version of Berkeley DB.
+dnl       AC_TRY_COMPILE([
+dnl       #include <db.h>
+dnl       ], [
+dnl       #if DB_VERSION_MAJOR < 4
+dnl              #error "DB_VERSION_MAJOR < 4; need newer Berkeley DB implementation"
+dnl       #endif
+dnl       ], AC_MSG_RESULT(yes),
+dnl       AC_MSG_RESULT(no)
+dnl              AC_MSG_ERROR(Need newer (4.x.x or later) version of Berkeley DB.
 dnl try: http://www.sleepycat.com/download/index.shtml
 dnl or: /parl/pcarns/rpms/db4-4.0.14-1mdk.src.rpm (to build rpm))
-dnl	)
+dnl       )
 
 dnl Test to check for unknown third parameter to DB stat (four parameters total)
 AC_MSG_CHECKING(for four-parameter DB stat)
@@ -452,17 +452,17 @@ dnl look for GM headers
 CPPFLAGS_OLD="$CPPFLAGS"
 CPPFLAGS="$CPPFLAGS -I ${GM_HOME}/include -I ${GM_HOME}/include/gm"
 AC_CHECK_HEADER(gm.h,
-	AC_DEFINE(HAVE_GM, 1, Define if GM is present)
-	BUILD_GM="1"
-	)
+       AC_DEFINE(HAVE_GM, 1, Define if GM is present)
+       BUILD_GM="1"
+       )
 CPPFLAGS="$CPPFLAGS_OLD"
 
 dnl
 dnl look for sysinfo header
 dnl
 AC_CHECK_HEADER(sys/sysinfo.h,
-	AC_DEFINE(HAVE_SYSINFO, 1, Define if sysinfo.h is present)
-	)
+       AC_DEFINE(HAVE_SYSINFO, 1, Define if sysinfo.h is present)
+       )
 
 
 AC_SUBST(BUILD_GM)
@@ -473,8 +473,8 @@ AC_ARG_WITH(ib,[  --with-ib=<dir>         Location of the IB installation (defau
 CPPFLAGS_OLD="$CPPFLAGS"
 CPPFLAGS="$CPPFLAGS -I ${IB_HOME}/include"
 AC_CHECK_HEADER(vapi.h,
-	AC_DEFINE(HAVE_IB, 1, Define if IB is present)
-	BUILD_IB=1)
+       AC_DEFINE(HAVE_IB, 1, Define if IB is present)
+       BUILD_IB=1)
 CPPFLAGS="$CPPFLAGS_OLD"
 AC_SUBST(IB_HOME)
 AC_SUBST(BUILD_IB)
@@ -484,8 +484,8 @@ dnl the prototypes for some functions are exposed only after defining something
 dnl for example, strnlen needs _GNU_SOURCE defined 
 
 AC_CHECK_FUNCS(strnlen, 
-	AC_DEFINE(_GNU_SOURCE)
-	AC_DEFINE(HAVE_STRNLEN)
+       AC_DEFINE(_GNU_SOURCE)
+       AC_DEFINE(HAVE_STRNLEN)
 )
 dnl for regular functions, add them to the CHECK_FUNCS
 AC_CHECK_FUNCS(strtoull)
@@ -535,8 +535,8 @@ fi
 dnl create any missing subdirectories that wouldn't be created
 dnl by AC_OUTPUT below (which won't create intermediate dirs).
 for d in src/apps src/io src/common src/client src/kernel \
-	doc src/apps/kernel test; do
-	install -d $d;
+       doc src/apps/kernel test; do
+       install -d $d;
 done
 
 dnl output final version of top level makefile and subdirectory
@@ -594,13 +594,13 @@ AC_MSG_RESULT()
 AC_MSG_RESULT([***** Displaying PVFS2 Configuration Information *****])
 AC_MSG_RESULT([------------------------------------------------------])
 
-if test x$BUILD_KARMA = x1 ; then
+if test "x$BUILD_KARMA" = "x1" ; then
    AC_MSG_RESULT([PVFS2 configured to build karma gui              : yes])
 else
    AC_MSG_RESULT([PVFS2 configured to build karma gui              :  no])
 fi
 
-if test x$ENABLE_COVERAGE = x1 ; then
+if test "x$ENABLE_COVERAGE" = "x1" ; then
    AC_MSG_RESULT([PVFS2 configured to perform coverage analysis    : yes])
 else
    AC_MSG_RESULT([PVFS2 configured to perform coverage analysis    :  no])

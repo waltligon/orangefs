@@ -5,16 +5,48 @@ PVFS2 Release ChangeLog
 
 pvfs2-0.6.1pre1
 ===============
-- misc. updates to msgpairarray and associated tools to allow for server
-  side use
-- reorganization of server request parameters so that more (but not all yet)
-  are stored in a centralized table
-- removed some depricated test programs
-- new pint-util.[ch] to contain utility functions shared between client and
-  server
-- some refactoring of server state machines (mainly crdirent) to allow for
-  code reuse in other state machines
+- misc. updates to msgpairarray and associated tools to allow for
+  server side use
+- reorganization of server request parameters so that more (but not
+  all yet) are stored in a centralized table
+- removed some deprecated test programs
+- new pint-util.[ch] to contain utility functions shared between
+  client and server
+- some refactoring of server state machines (mainly crdirent) to allow
+  for code reuse in other state machines
 - no longer need to fix up generated html by hand
+- fixed a bug that allowed an open through the vfs without the O_CREAT
+  and O_EXCL flags to return -EEXIST (should be success in that case)
+- added a file_open.c test program that tests opens in various modes
+- error code cleanups (added PVFS_EACCES mapping to EACCES; moved
+  PVFS_EDETAIL to be a non-errno error code)
+- fixed pvfs2-ls to properly convert reported file times in user's
+  configured system localtime, rather than in UTC
+- fixed the kernel module information so that modinfo doesn't report
+  many duplicate entries
+- fixed server pidfile usage (-p cmdline option)
+- fixed msgpair retries to properly delay between retry attempts
+- added trove hooks to be able to peek at handles that will be
+  allocated later
+- cleaned up the remove state machine and removed an unnecessary
+  allocation/copy
+- fixed existing acache usage in the sysint calls to be more uniform;
+  removed some overhead in the sysint
+- fixed kernel device close to be aware if mounts are still active
+- added more tests to pvfs2-shell-test that test deeply nested
+  subdirectories
+- added a method to determine the min handle recycle time across all
+  configured servers' file systems
+- changed code formatting rules to use spaces rather than tabs in vim
+- fixed bug that didn't reload the cached config information on file
+  system removal (i.e. unmounts)
+- added a cmdline argument to pvfs2-client to specify the acache
+  timeout to use at run-time (default is 0 milliseconds, which is
+  effectively disabled).  this timeout is upper bounded by the min
+  handle recycle time across all servers, and it can change
+  dynamically as new mounts come and go
+- fixed a bug that allowed servers to create internal storage objects
+  outside of the meta handle ranges in some circumstances
 
 
 pvfs2-0.6.0
