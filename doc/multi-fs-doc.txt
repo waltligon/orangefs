@@ -1,0 +1,235 @@
+
+PVFS2 multiple file system support documentation
+------------------------------------------------
+
+
+Why have multiple file systems in pvfs2?
+--
+For starters, you can mount each file system separately through the
+Linux kernel interface.  This means you can have one file system on
+mount point A and another on mount point B, etc.  This can be useful
+for organizational and management purposes.
+
+
+Can't I just run multiple servers, each with a single file system?
+--
+Yes, you can.  There's nothing wrong with doing this either, but it's
+another server to manage.  With the provided functionality, you have a
+choice in finding a configuration that works best for you.
+
+
+Ok, so how hard is it to setup another file system?
+--
+It's pretty easy.  You need only cut and paste your primary file
+system configuration and modify a few fields.  Specifically you must
+change the ID, and Name fields.  The MetaHandleRanges and
+DataHandleRanges can be re-used on this new file system with the same
+(or different of course) meta/data allocation as your original file
+system!
+
+
+... But can I add a file system without disrupting my original file
+system?
+--
+Of course!  As always, back up your data if it's sensitive before
+trying anything like this.  All you need to do is add the new file
+system configuration (as mentioned above and as described below) to
+your server configuration file and use the pvfs2-mkspace utility to
+add the collection (file system).
+
+
+What does an example configuration for multiple file systems looks
+like?
+--
+Here's a simple example configuration with two file systems called
+"pvfs2-volume1" and "pvfs2-volume2":
+
+=============================
+<Defaults>
+        LogFile /tmp/pvfs2-server.log
+        EventLogging server
+        UnexpectedRequests 50
+        BMIModules bmi_tcp
+        FlowModules flowproto_multiqueue
+        PerfUpdateInterval 1000
+</Defaults>
+
+<Aliases>
+        Alias host1 tcp://localhost:3334
+</Aliases>
+
+<Filesystem>
+        Name pvfs2-volume1
+        ID 1709020297
+        RootHandle 1048576
+        <MetaHandleRanges>
+                Range host1 4-2147483650
+        </MetaHandleRanges>
+        <DataHandleRanges>
+                Range host1 2147483651-4294967297
+        </DataHandleRanges>
+       <StorageHints>
+                HandleRecycleTimeoutSecs 360
+                TroveSyncMeta no
+                TroveSyncData no
+                AttrCacheKeywords datafile_handles,metafile_dist
+                AttrCacheKeywords dir_ent, symlink_target
+                AttrCacheSize 4093
+                AttrCacheMaxNumElems 32768
+        </StorageHints>
+</Filesystem>
+
+<Filesystem>
+        Name pvfs2-volume2
+        ID 1486499846
+        RootHandle 1048576
+        <MetaHandleRanges>
+                Range host1 4-2147483650
+        </MetaHandleRanges>
+        <DataHandleRanges>
+                Range host1 2147483651-4294967297
+        </DataHandleRanges>
+        <StorageHints>
+                HandleRecycleTimeoutSecs 360
+                TroveSyncMeta no
+                TroveSyncData no
+                AttrCacheKeywords datafile_handles,metafile_dist
+                AttrCacheKeywords dir_ent, symlink_target
+                AttrCacheSize 4093
+                AttrCacheMaxNumElems 32768
+        </StorageHints>
+</Filesystem>
+=============================
+
+As you can see, the second file system is very similar to the first
+one, differing only in ID, and Name values.
+
+
+Wow, that's cool!  So how do I add a file system to my existing
+storage setup without disrupting my existing setup?
+--
+The pvfs2-mkspace utility is a powerful tool that can help you create
+entire storage spaces, or just add and remove existing file systems
+within that storage space (Terminology note: In PVFS2, all file
+systems exist inside a storage space, which stores one or more file
+systems).  Run pvfs2-mkspace with the -h, or --help option to see some
+more information on what it can do for you.
+
+To use pvfs2-mkspace to add a collection (file system) to an existing
+storage space, you need to add the file system information to your
+configuration file, for example, if the following was added:
+
+=============================
+<Filesystem>
+        Name pvfs2-volume3
+        ID 1709020299
+        RootHandle 1048576
+        <MetaHandleRanges>
+                Range host1 4-2147483650
+        </MetaHandleRanges>
+        <DataHandleRanges>
+                Range host1 2147483651-4294967297
+        </DataHandleRanges>
+        <StorageHints>
+                HandleRecycleTimeoutSecs 360
+                TroveSyncMeta no
+                TroveSyncData no
+                AttrCacheKeywords datafile_handles,metafile_dist
+                AttrCacheKeywords dir_ent, symlink_target
+                AttrCacheSize 4093
+                AttrCacheMaxNumElems 32768
+        </StorageHints>
+</Filesystem>
+=============================
+
+... and you need to run pvfs2-mkspace as follows:
+
+=============================
+./pvfs2-mkspace --add-coll --coll-name="pvfs2-volume3" --coll-id=1709020299 --root-handle=1048576 --meta-handle-range=4-2147483650 --data-handle-range=2147483651-4294967297 --verbose --storage-space="/tmp/pvfs2-test-space"
+
+NOTE: Alternatively, you can use the short command line options like
+
+pvfs2-mkspace -a -c pvfs2-volume3 -i 11 -r 3048576 -R 4-4294967297 -v -s /tmp/pvfs2-test-space
+=============================
+
+Notice that the -a (or --add-coll) option is specified.  This tells
+pvfs2-mkspace that an existing storage space already exists and that
+we're only adding a new collection (file system) called
+"pvfs2-volume3", with an ID of "1709020299", root handle of "1048576",
+and a meta and data handle ranges as specified.  We also use the -s
+(or --storage-space) switch to point pvfs2-mkspace to the existing
+storage space located at "/tmp/pvfs2-test-space" (make sure this
+matches where you have yours already) and the -v option for verbose
+output.  You will see output similar to the following:
+
+=============================
+neillm@glob admin $ ./pvfs2-mkspace --add-coll \
+--coll-name="pvfs2-volume3" --coll-id=1709020299 --root-handle=1048576 \
+--meta-handle-range=4-2147483650 \
+--data-handle-range=2147483651-4294967297 --verbose \
+--storage-space="/tmp/pvfs2-test-space"
+        use all defaults    : no
+        delete storage      : no
+        verbose             : ON
+        root handle         : 1048576
+        collection-only mode: ON
+        collection id       : 1709020299
+        collection name     : pvfs2-volume3
+        meta handle ranges  : 4-2147483650
+        data handle ranges  : 2147483651-4294967297
+        storage space       : /tmp/pvfs2-test-space
+Storage space: /tmp/pvfs2-test-space
+Collection   : pvfs2-volume3
+ID           : 1709020299
+Root Handle  : 1048576
+Meta Handles : 4-2147483650
+Data Handles : 2147483651-4294967297
+info: created storage space '/tmp/pvfs2-test-space'.
+info: created collection 'pvfs2-volume3'.
+info: set handle ranges to 4-2147483650,2147483651-4294967297
+info: created root directory with handle 1048576.
+info: using meta handle range 4-2147483650 for root dirent dspace
+info: created dspace for dirents with handle 4
+info: wrote attributes for root directory.
+info: using meta handle range 4-2147483650 for lost+found directory
+dspace
+info: created lost+found directory with handle 1048577.
+info: using meta handle range 4-2147483650 for lost+found dirent
+dspace
+info: created dspace for dirents with handle 1048575
+info: wrote attributes for lost+found directory.
+info: adding lost+found directory to the root directory.
+collection created:
+        root handle = 1048576, coll id = 1709020299, root string = "root_handle"
+=============================
+
+Now assuming you've added the configuration information as specified
+above to your server configuration file, you can now restart the
+server and notice that it detects all of your file systems on startup.
+For this example output, I have only the "server" EventLogging keyword
+enabled:
+
+=============================
+[15:51:50.676608] PVFS2 Server version X.Y.Z starting.
+[15:51:50.677909] Logging server (mask 32)
+[15:51:50.678660] Passing tcp://glob-8.mcs.anl.gov:3334 as BMI listen address.
+[15:51:50.694109] File system pvfs2-volume3 using handles:
+        4-2147483650,2147483651-4294967297
+[15:51:50.694299] Sync on metadata update for pvfs2-volume3: no
+[15:51:50.694355] Sync on I/O data update for pvfs2-volume3: no
+[15:51:50.695928] File system pvfs2-volume2 using handles:
+        4-2147483650,2147483651-4294967297
+[15:51:50.696477] Sync on metadata update for pvfs2-volume2: no
+[15:51:50.696548] Sync on I/O data update for pvfs2-volume2: no
+[15:51:50.697952] File system pvfs2-volume1 using handles:
+        4-2147483650,2147483651-4294967297
+[15:51:50.698099] Sync on metadata update for pvfs2-volume1: no
+[15:51:50.698156] Sync on I/O data update for pvfs2-volume1: no
+[15:51:50.698223] Storage Init Complete (aio-threaded)
+[15:51:50.698281] 3 filesystem(s) initialized
+[15:51:50.699028] Initialization completed successfully.
+=============================
+
+Now you can see all three of your file systems, meaning that each of
+them are ready to go!  Finally, be sure to update your /etc/fstab
+entries where appropriate.
