@@ -864,23 +864,36 @@ struct handlelist *fill_lost_and_found(PVFS_fs_id cur_fs,
 					filename,
 					handle,
 					creds);
-		    assert(ret == 0);
+                    assert(ret == 0);
 		}
 		break;
 	    case PVFS_TYPE_DIRECTORY:
-		sprintf(dirname + 8, "%Lu", Lu(handle));
+                /* assumption: we will often suceed in creating a new entry,
+                 * but if the file system is messed up we may not be able to
+                 * find dirdata, so match_dirdata before create_dirent */
+		if (match_dirdata(hl_all,
+				    alt_hl,
+				    handle_ref,
+				    creds)  != 0)
+                {
+                    ret = remove_object(handle_ref, 
+                            getattr_resp.attr.objtype,
+                            creds);
+                    assert(ret == 0);
+                }
 
+		sprintf(dirname + 8, "%Lu", Lu(handle));
 		ret = create_dirent(laf_ref,
 				    dirname,
 				    handle,
 				    creds);
-		assert(ret == 0);
+                if (ret != 0)
+                {
+                    ret = remove_object(handle_ref,
+                            getattr_resp.attr.objtype,
+                            creds);
+                }
 
-		ret = match_dirdata(hl_all,
-				    alt_hl,
-				    handle_ref,
-				    creds);
-		assert(ret == 0);
 		break;
 	    case PVFS_TYPE_DATAFILE:
 #if 0
