@@ -5,16 +5,18 @@
  *
  */
 
+/* this file includes definitions for trivial mgmt routines that do not 
+ * warrant their own .c file
+ */
+
 #include <assert.h>
 
 #include "pvfs2-types.h"
 #include "pvfs2-mgmt.h"
 #include "bmi.h"
 #include "pint-sysint-utils.h"
-
-/* TODO: if we add any more small mgmt functions, they should probably all 
- * be put together in one generic .c file...
- */
+#include "pint-bucket.h"
+#include "server-config.h"
 
 /* PVFS_mgmt_count_servers()
  *
