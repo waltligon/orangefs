@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <math.h>
+#include <getopt.h>
 #include <gossip.h>
 #include <mpi.h>
 #include <bmi.h>
@@ -16,10 +17,8 @@
 
 int bench_args(struct bench_options* user_opts, int argc, char** argv)
 {
-	extern char* optarg;
-	extern int optind, opterr, optopt;
 	char flags[] = "L:pm:t:l:s:r";
-	char one_opt = ' ';
+	int one_opt = ' ';
 	int got_method = 0;
 
 	int ret = -1;
