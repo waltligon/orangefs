@@ -45,6 +45,8 @@ int trove_handle_free(
 
 int trove_handle_mgmt_finalize(void);
 
+int trove_handle_get_statistics(TROVE_coll_id coll_id, uint64_t* free_count);
+
 #endif /* __TROVE_HANDLE_MGMT_H */
 
 /*

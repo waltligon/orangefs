@@ -201,9 +201,10 @@ static int statfs_list_comp_fn(void* v_p, struct PVFS_server_resp* resp_p,
 	    &sm_p->u.statfs_list.stat_array[i].server_type);
 	/* the above should always succeed in this case */
 	assert(sm_p->u.statfs_list.stat_array[i].bmi_address);
-	/* TODO: these are hardcoded for now */
-	sm_p->u.statfs_list.stat_array[i].handles_available_count = 0;
-	sm_p->u.statfs_list.stat_array[i].handles_total_count = 0;
+	sm_p->u.statfs_list.stat_array[i].handles_available_count =
+	    resp_p->u.statfs.stat.handles_available_count;
+	sm_p->u.statfs_list.stat_array[i].handles_total_count = 
+	    resp_p->u.statfs.stat.handles_total_count;
     }
  
     /* if this is the last response, check all of the status values and 

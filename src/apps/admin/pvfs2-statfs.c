@@ -111,6 +111,10 @@ int main(int argc, char **argv)
     printf("\tfs_id: %d\n", (int)resp_statfs.statfs_buf.fs_id);
     printf("\ttotal number of servers (meta and I/O): %d\n", 
 	resp_statfs.server_count);
+    printf("\thandles available (meta and I/O): %Lu\n",
+	resp_statfs.statfs_buf.handles_available_count);
+    printf("\thandles total (meta and I/O): %Lu\n",
+	resp_statfs.statfs_buf.handles_total_count);
     printf("\tbytes available: %16Ld\n", 
 	(long long)resp_statfs.statfs_buf.bytes_available);
     printf("\tbytes total:     %16Ld\n", 
@@ -178,6 +182,8 @@ int main(int argc, char **argv)
 	for(i=0; i<outcount; i++)
 	{
 	    printf("server: %s\n", stat_array[i].bmi_address);
+	    printf("\thandles available: %Lu\n", stat_array[i].handles_available_count);
+	    printf("\thandles total: %Lu\n", stat_array[i].handles_total_count);
 	    printf("\tbytes available: %16Ld\n", (long long)stat_array[i].bytes_available);
 	    printf("\tbytes total:     %16Ld\n", (long long)stat_array[i].bytes_total);
 	    if(stat_array[i].server_type & (PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER))

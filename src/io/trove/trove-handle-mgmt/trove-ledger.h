@@ -40,6 +40,8 @@ void trove_handle_ledger_set_threshold(struct handle_ledger *hl,
 					uint64_t nhandles);
 int trove_ledger_set_timeout(struct handle_ledger *hl, 
 			struct timeval *timeout);
+void trove_handle_ledger_get_statistics(struct handle_ledger *hl,
+    uint64_t* free_count);
 
 
 /*

@@ -26,8 +26,11 @@ static int avltree_extent_search(struct avlnode *n, TROVE_handle handle, TROVE_h
 
 static inline void extent_init(struct TROVE_handle_extent *e, TROVE_handle first, TROVE_handle last);
 static void extent_show(struct avlnode *n, int param, int depth);
-
+static void extent_count(struct avlnode *n,
+			int param,
+			int depth);
 static int64_t avltree_extent_search_in_range(struct avlnode *n, TROVE_extent * req_extent);
+static uint64_t g_counter;
 
 /* constructor for an extent 
  * first: start of extent range
@@ -324,6 +327,17 @@ void extentlist_show(struct TROVE_handle_extentlist *elist)
     avldepthfirst(elist->index, extent_show, 0 , 0);
 }
 
+void extentlist_count(struct TROVE_handle_extentlist *elist, uint64_t* count)
+{
+    /* NOTE: this function is not thread safe at all- we count on the 
+     * fact that the request scheduler will prevent multiple 
+     * concurrent callers 
+     */
+    g_counter = 0;
+    avldepthfirst(elist->index, extent_count, 0 , 0);
+    *count = g_counter;
+}
+
 static void extent_show(struct avlnode *n,
 			int param,
 			int depth)
@@ -331,6 +345,15 @@ static void extent_show(struct avlnode *n,
     struct TROVE_handle_extent *e = (struct TROVE_handle_extent *)(n->d);
     gossip_debug(TROVE_DEBUG, "lb: %Lu ub: %Lu\n", e->first, e->last);
 }
+
+static void extent_count(struct avlnode *n,
+			int param,
+			int depth)
+{
+    struct TROVE_handle_extent *e = (struct TROVE_handle_extent *)(n->d);
+    g_counter += (e->last - e->first);
+}
+
 
 /*
  * have so many extents been added to this list that it's time to start adding

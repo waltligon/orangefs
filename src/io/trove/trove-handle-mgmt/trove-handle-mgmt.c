@@ -402,6 +402,39 @@ int trove_handle_free(TROVE_coll_id coll_id, TROVE_handle handle)
     return ret;
 }
 
+/* trove_handle_get_statistics()
+ *
+ * retrieves handle usage statistics from given collection; right now
+ * this simply means returning the count of free handles
+ *
+ * returns 0 on success, -1 on error
+ */
+int trove_handle_get_statistics(TROVE_coll_id coll_id, uint64_t* free_count)
+{
+    handle_ledger_t *ledger = NULL;
+    struct qlist_head *hash_link = NULL;
+
+    hash_link = qhash_search(s_fsid_to_ledger_table,&(coll_id));
+    if (hash_link)
+    {
+        ledger = qlist_entry(hash_link, handle_ledger_t, hash_link);
+        if (ledger)
+        {
+	    trove_handle_ledger_get_statistics(ledger->ledger, 
+		free_count);
+	    return(0);
+        }
+	else
+	{
+	    return(-PVFS_ENOENT);
+	}
+    }
+    else
+    {
+	return(-PVFS_ENOENT);
+    }
+}
+
 int trove_handle_mgmt_finalize()
 {
     int i;

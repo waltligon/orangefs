@@ -12,6 +12,7 @@
 #include <assert.h>
 
 #include "pvfs2-server.h"
+#include "trove-handle-mgmt.h"
 
 static int statfs_cleanup(PINT_server_op *s_op, job_status_s* js_p);
 static int statfs_do_statfs(PINT_server_op *s_op, job_status_s* js_p);
@@ -56,6 +57,18 @@ static int statfs_do_statfs(PINT_server_op *s_op, job_status_s* js_p)
     int ret = -1;
     TROVE_context_id tmp_context;
     PINT_STATE_DEBUG("do_statfs");
+
+    /* first try to gather handle statistics */
+    ret = trove_handle_get_statistics(
+	s_op->req->u.statfs.fs_id,
+	&s_op->resp.u.statfs.stat.handles_available_count);
+    if(ret < 0)
+    {
+	js_p->error_code = ret;
+	return(1);
+    }
+    /* TODO: hardcoded for now... */
+    s_op->resp.u.statfs.stat.handles_total_count = 0;
 
     /* we need a context to be able to make the getinfo call */
     ret = trove_open_context(s_op->req->u.statfs.fs_id, &tmp_context);
