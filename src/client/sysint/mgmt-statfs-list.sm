@@ -211,6 +211,10 @@ static int statfs_list_comp_fn(void* v_p, struct PVFS_server_resp* resp_p,
 	    &sm_p->u.statfs_list.stat_array[i].handles_total_count);
 	/* this call should never fail here either */
 	assert(ret == 0);
+
+	/* sanity check handle counts */
+	assert(sm_p->u.statfs_list.stat_array[i].handles_total_count >=
+	    sm_p->u.statfs_list.stat_array[i].handles_available_count);
     }
  
     /* if this is the last response, check all of the status values and 
