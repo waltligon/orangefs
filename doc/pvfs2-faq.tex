@@ -238,9 +238,17 @@ and how to fix them.
 \subsection{When I try to mount, I get 'wrong fs type, bad option, bad
 superblock...'}
 
-First, make 100\% sure you typed the mount command correctly. As discussed in the PVFS2 quickstart, a mount command will look like this:
+First, make 100\% sure you typed the mount command correctly. As discussed in
+the PVFS2 quickstart, different mount commands are needed for linux-2.4 and
+linux-2.6.  A linux-2.6 mount command  will look like this: 
+
 \begin{verbatim}
 prompt# mount -t pvfs2 tcp://testhost:3334/pvfs2-fs /mnt/pvfs2
+\end{verbatim}
+
+Under linux-2.4, the mount command looks slightly different:
+\begin{verbatim}
+prompt# mount -t pvfs2 pvfs2 /mnt/pvfs2 -o tcp://testhost:3334/pvfs2-fs
 \end{verbatim}
 
 This error could also mean a pvfs2-client process is not running, either
