@@ -9,8 +9,8 @@ server operations:
   - eattrib (set/get)
   
 - unfinished:
-  - statfs
   - general error handling
+  - performance monitoring (need more metrics)
 
 general server functionality:
 ====================================================================
@@ -22,6 +22,9 @@ general server functionality:
 - don't forget to define semantics for access times
 - access control, general security model
 - testing multiple meta servers
+- add a workaround for thread problems on redhat 9
+- better signal handling, mechanisms for shutting down or restarting 
+  cleanly
 
 request scheduler:
 ====================================================================
@@ -30,6 +33,7 @@ request scheduler:
 
 system interface functionality:
 ====================================================================
+- env variable to control gossip
 - not started:
   - eattrib (set/get)?
 
@@ -39,14 +43,11 @@ system interface functionality:
   - way to pass in consistency semantics (timeout values, etc.)
   - state machine implementations for all functions
 
+- finish converting to state machines
 - define how configuration info should be passed in
   (how to do paths, fstab, url stuff, whatever)
 - define how to pass in distribution and number of datafiles for 
   cases in which the caller wants to override the defaults
-
-user interfaces:
-====================================================================
-- pvfs_XXX interface?
 
 kernel/vfs interface
 ====================================================================
@@ -56,10 +57,7 @@ kernel/vfs interface
   - add ability to mount multiple file systems
   - get fsid/root handle information at mount time
   - use /etc/fstab mount interface for volume info
-
-system installation:
-====================================================================
-- quickstart guide
+  - nfs exporting
 
 performance tuning:
 ====================================================================
@@ -94,9 +92,11 @@ I/O path:
 - ability to unpost, correct use of timeouts, preposting operations
 - semantics of short read and write operations
 - bmi_tcp scalability and robustness
-- add functionality to the job interface that lets you submit a 
-  null job and have it pop out some specific amount of time later; to be
-  used by a state machine to periodically gather statistics
+- immediate completion in trove
+- ability to toggle synch behavior in trove
+- use better buffer size in default flow protocol
+- bmi shmem implementation
+- many items in BMI and flow TODO files
 
 I/O description:
 ====================================================================
@@ -115,10 +115,13 @@ correctness/performance testing
 system management utilities
 ====================================================================
 - decide what we want/need here?
-  - performance monitoring
   - health monitoring
   - system recovery
+  - system statistics (raid stat, mem used, etc.)
   - etc.
+- performance monitoring:
+  - more metrics
+  - more viz tools
 - end user documentation
 - better logging systems
 - maybe make pvfs2-ping compute a cksum on the fs.conf from all
@@ -126,8 +129,12 @@ system management utilities
 
 documentation:
 ====================================================================
+- pvfs2-users list
+- pvfs2 web site
 - status document
-- consider automated tools like doxygen
+- API terminology
+- general file system terminology
+- mechanism for exporting to html
 - update all design docs!
 - review
 
@@ -157,3 +164,19 @@ fault tolerance:
 - what does the API look like
 - data redundancy
 - failover
+
+testing:
+=====================================================================
+- run common test programs and benchmarks, like:
+  - flash
+  - iozone
+  - dbench
+  - ior
+  - bonnie
+  - make kernel
+  - mpiiotest
+  - John May's tests?
+  - piobench
+- more pts tests
+- more datatype testing
+  - remember example of ub < lb
