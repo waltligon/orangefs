@@ -16,7 +16,7 @@ Stuff to do for the first friendly-user release:
 . handle more error cases in kernel module (ctrl-c, timeouts,
   pvfs2-client death, etc.) (Neill)
 
-. pvfs2-set-debugmask for runtime gossip settings, (Phil)
+DONE . pvfs2-set-debugmask for runtime gossip settings, (Phil)
 
 . pvfs2-ls
 
