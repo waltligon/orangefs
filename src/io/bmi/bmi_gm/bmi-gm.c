@@ -238,6 +238,7 @@ struct gm_op
     bmi_flag_t buffer_status;
     gm_remote_ptr_t remote_ptr;
     void *tmp_xfer_buffer;
+    uint8_t complete; /* indicates when operation is completed */
 };
 
 /* the local port that we are communicating on */
@@ -276,11 +277,6 @@ static void ctrl_req_callback(struct gm_port *port,
 void dealloc_gm_method_op(method_op_p op_p);
 static method_op_p alloc_gm_method_op(void);
 static int ctrl_recv_pool_init(int pool_size);
-static int test_done(bmi_op_id_t id,
-		     int *outcount,
-		     bmi_error_code_t * error_code,
-		     bmi_size_t * actual_size,
-		     void **user_ptr);
 static int gm_do_work(int wait_time);
 static void delayed_token_sweep(void);
 static int receive_cycle(int timeout);
@@ -316,16 +312,6 @@ static void immed_send_callback(struct gm_port *port,
 static void ctrl_put_callback(struct gm_port *port,
 			      void *context,
 			      gm_status_t status);
-static int test_done_some(int incount,
-			  bmi_op_id_t * id_array,
-			  int *outcount,
-			  int *index_array,
-			  bmi_error_code_t * error_code_array,
-			  bmi_size_t * actual_size_array,
-			  void **user_ptr);
-static int test_done_unexpected(int incount,
-				int *outcount,
-				struct method_unexpected_info *info);
 static void initiate_send_rend(method_op_p mop);
 static void initiate_send_immed(method_op_p mop);
 static void initiate_put_announcement(method_op_p mop);
@@ -1038,6 +1024,8 @@ int BMI_gm_test(bmi_op_id_t id,
 		bmi_context_id context_id)
 {
     int ret = -1;
+    method_op_p query_op = (method_op_p)id_gen_fast_lookup(id);
+    struct gm_op *gm_op_data = query_op->method_data;
 
     /* do some ``real work'' here */
     ret = gm_do_work(max_idle_time_ms*1000);
@@ -1046,9 +1034,21 @@ int BMI_gm_test(bmi_op_id_t id,
 	return (ret);
     }
 
-    ret = test_done(id, outcount, error_code, actual_size, user_ptr);
+    if(gm_op_data->complete)
+    {
+	/* TODO: assert that it is in the correct context */
+	op_list_remove(query_op);
+	if(user_ptr != NULL)
+	{
+	    (*user_ptr) = query_op->user_ptr;
+	}
+	(*error_code) = query_op->error_code;
+	(*actual_size) = query_op->actual_size;
+	dealloc_gm_method_op(query_op);
+	(*outcount)++;
+    }
 
-    return (ret);
+    return (0);
 }
 
 
@@ -1069,6 +1069,9 @@ int BMI_gm_testsome(int incount,
 		    bmi_context_id context_id)
 {
     int ret = -1;
+    int i;
+    method_op_p query_op;
+    struct gm_op *gm_op_data;
 
     /* do some ``real work'' here */
     ret = gm_do_work(max_idle_time_ms*1000);
@@ -1077,10 +1080,28 @@ int BMI_gm_testsome(int incount,
 	return (ret);
     }
 
-    ret = test_done_some(incount, id_array, outcount, index_array,
-			 error_code_array, actual_size_array, user_ptr_array);
+    for(i=0; i<incount; i++)
+    {
+	if(id_array[i])
+	{
+	    query_op = (method_op_p)id_gen_fast_lookup(id_array[i]);
+	    gm_op_data = query_op->method_data;
+	    if(gm_op_data->complete)
+	    {
+		/* TODO: assert that it is in the right context */
+		op_list_remove(query_op);
+		error_code_array[*outcount] = query_op->error_code;
+		actual_size_array[*outcount] = query_op->actual_size;
+		index_array[*outcount] = i;
+		if (user_ptr_array != NULL)
+		    user_ptr_array[*outcount] = query_op->user_ptr;
+		dealloc_gm_method_op(query_op);
+		(*outcount)++;
+	    }
+	}
+    }
 
-    return (ret);
+    return(0);
 }
 
 
@@ -1096,6 +1117,7 @@ int BMI_gm_testunexpected(int incount,
 			  int max_idle_time_ms)
 {
     int ret = -1;
+    method_op_p query_op = NULL;
 
     /* do some ``real work'' here */
     ret = gm_do_work(max_idle_time_ms*1000);
@@ -1104,12 +1126,23 @@ int BMI_gm_testunexpected(int incount,
 	return (ret);
     }
 
-    /* check again now that we have done some work to see if any
-     * unexpected messages completed 
-     */
-    ret = test_done_unexpected(incount, outcount, info);
+    *outcount = 0;
 
-    return (ret);
+    while ((*outcount < incount) &&
+	   (query_op =
+	    op_list_shownext(op_list_array[IND_COMPLETE_RECV_UNEXP])))
+    {
+	info[*outcount].error_code = query_op->error_code;
+	info[*outcount].addr = query_op->addr;
+	info[*outcount].buffer = query_op->buffer;
+	info[*outcount].size = query_op->actual_size;
+	info[*outcount].tag = query_op->msg_tag;
+	op_list_remove(query_op);
+	dealloc_gm_method_op(query_op);
+	(*outcount)++;
+    }
+
+    return (0);
 }
 
 
@@ -1442,6 +1475,7 @@ static void ctrl_put_callback(struct gm_port *port,
 	op_list_remove(my_op);
 	my_op->error_code = -ETIMEDOUT;
 	op_list_add(op_list_array[IND_COMPLETE], my_op);
+	gm_op_data->complete = 1;
 	return;
     }
 
@@ -1453,6 +1487,7 @@ static void ctrl_put_callback(struct gm_port *port,
 	op_list_remove(my_op);
 	my_op->error_code = -EPROTO;
 	op_list_add(op_list_array[IND_COMPLETE], my_op);
+	gm_op_data->complete = 1;
 	return;
     }
 
@@ -1460,6 +1495,7 @@ static void ctrl_put_callback(struct gm_port *port,
     op_list_remove(my_op);
     my_op->error_code = 0;
     op_list_add(op_list_array[IND_COMPLETE], my_op);
+    gm_op_data->complete = 1;
 
     gossip_ldebug(BMI_DEBUG_GM, "Finished ctrl_put_callback().\n");
 
@@ -1500,6 +1536,7 @@ static void immed_send_callback(struct gm_port *port,
 	op_list_remove(my_op);
 	my_op->error_code = -ETIMEDOUT;
 	op_list_add(op_list_array[IND_COMPLETE], my_op);
+	gm_op_data->complete = 1;
 	return;
     }
 
@@ -1511,6 +1548,7 @@ static void immed_send_callback(struct gm_port *port,
 	op_list_remove(my_op);
 	my_op->error_code = -EPROTO;
 	op_list_add(op_list_array[IND_COMPLETE], my_op);
+	gm_op_data->complete = 1;
 	return;
     }
 
@@ -1525,6 +1563,7 @@ static void immed_send_callback(struct gm_port *port,
      * message back from the target that indicates that we can continue.
      */
     op_list_add(op_list_array[IND_COMPLETE], my_op);
+    gm_op_data->complete = 1;
 
     gossip_ldebug(BMI_DEBUG_GM, "Finished immed_send_callback().\n");
 
@@ -1563,6 +1602,7 @@ static void ctrl_req_callback(struct gm_port *port,
 	op_list_remove(my_op);
 	my_op->error_code = -ETIMEDOUT;
 	op_list_add(op_list_array[IND_COMPLETE], my_op);
+	gm_op_data->complete = 1;
 	return;
     }
 
@@ -1574,6 +1614,7 @@ static void ctrl_req_callback(struct gm_port *port,
 	op_list_remove(my_op);
 	my_op->error_code = -EPROTO;
 	op_list_add(op_list_array[IND_COMPLETE], my_op);
+	gm_op_data->complete = 1;
 	return;
     }
 
@@ -1620,139 +1661,6 @@ static int ctrl_recv_pool_init(int pool_size)
 
     return (0);
 }
-
-
-/* test_done()
- * 
- * nonblocking check to see if a certain operation has
- * completed.  
- *
- * returns 0 on success, -errno on failure
- */
-static int test_done(bmi_op_id_t id,
-		     int *outcount,
-		     bmi_error_code_t * error_code,
-		     bmi_size_t * actual_size,
-		     void **user_ptr)
-{
-    method_op_p query_op = NULL;
-    struct op_list_search_key key;
-
-    *outcount = 0;
-
-    /* search for done or error unexpected ops */
-    memset(&key, 0, sizeof(struct op_list_search_key));
-    key.op_id = id;
-    key.op_id_yes = 1;
-
-    query_op = op_list_search(op_list_array[IND_COMPLETE], &key);
-    if (query_op)
-    {
-	op_list_remove(query_op);
-	(*error_code) = query_op->error_code;
-	(*actual_size) = query_op->actual_size;
-	if (user_ptr != NULL)
-	{
-	    (*user_ptr) = query_op->user_ptr;
-	}
-	dealloc_gm_method_op(query_op);
-	(*outcount)++;
-    }
-
-    return (0);
-}
-
-
-/* test_done_some()
- * 
- * nonblocking check to see if a certain set of operations have
- * completed.  Indicates which ones completed using the index array.
- *
- * returns 0 on success, -errno on failure
- */
-static int test_done_some(int incount,
-			  bmi_op_id_t * id_array,
-			  int *outcount,
-			  int *index_array,
-			  bmi_error_code_t * error_code_array,
-			  bmi_size_t * actual_size_array,
-			  void **user_ptr_array)
-{
-    method_op_p query_op = NULL;
-    struct op_list_search_key key;
-    int i = 0;
-
-    *outcount = 0;
-    memset(&key, 0, sizeof(struct op_list_search_key));
-
-    for (i = 0; i < incount; i++)
-    {
-	if (id_array[i])
-	{
-	    key.op_id = id_array[i];
-	    key.op_id_yes = 1;
-
-	    query_op = op_list_search(op_list_array[IND_COMPLETE], &key);
-	    if (query_op)
-	    {
-		op_list_remove(query_op);
-		error_code_array[*outcount] = query_op->error_code;
-		actual_size_array[*outcount] = query_op->actual_size;
-		index_array[*outcount] = i;
-		if (user_ptr_array != NULL)
-		{
-		    user_ptr_array[*outcount] = query_op->user_ptr;
-		}
-		dealloc_gm_method_op(query_op);
-		(*outcount)++;
-	    }
-	}
-    }
-
-    return (0);
-}
-
-
-/* test_done_unexpected()
- * 
- * nonblocking check to see if any unexpected operations have completed.
- * The ops may be in the complete or error state.
- *
- * returns 0 on success, -errno on failure
- */
-static int test_done_unexpected(int incount,
-				int *outcount,
-				struct method_unexpected_info *info)
-{
-    method_op_p query_op = NULL;
-    struct op_list_search_key key;
-
-    *outcount = 0;
-
-    /* search for done or error unexpected ops */
-    memset(&key, 0, sizeof(struct op_list_search_key));
-    /* TODO: since there are no search parameters, we could probably
-     * optimize this search.  We really just want to find the "next" one 
-     */
-
-    /* go through the completed list as long as we are finding stuff and 
-     * we have room in the info array for it
-     */
-    while ((*outcount < incount) &&
-	   (query_op =
-	    op_list_search(op_list_array[IND_COMPLETE_RECV_UNEXP], &key)))
-    {
-	info[*outcount].error_code = query_op->error_code;
-	info[*outcount].addr = query_op->addr;
-	info[*outcount].buffer = query_op->buffer;
-	info[*outcount].size = query_op->actual_size;
-	info[*outcount].tag = query_op->msg_tag;
-	op_list_remove(query_op);
-	dealloc_gm_method_op(query_op);
-	(*outcount)++;
-    }
-    return (0);
-};
 
 
 /* gm_do_work()
@@ -2018,6 +1926,7 @@ static int immed_unexp_recv_handler(bmi_size_t size,
 				    void *buffer)
 {
     method_op_p new_method_op = NULL;
+    struct gm_op *gm_op_data = NULL;
 
     /* we need an op structure to keep up with this */
     new_method_op = alloc_gm_method_op();
@@ -2033,8 +1942,10 @@ static int immed_unexp_recv_handler(bmi_size_t size,
     new_method_op->error_code = 0;
     new_method_op->mode = GM_MODE_UNEXP;
     new_method_op->buffer = buffer;
+    gm_op_data = new_method_op->method_data;
 
     op_list_add(op_list_array[IND_COMPLETE_RECV_UNEXP], new_method_op);
+    gm_op_data->complete = 1;
 
     return (0);
 }
@@ -2091,6 +2002,7 @@ static int recv_event_handler(gm_recv_event_t * poll_event,
     void *tmp_buffer = NULL;
     method_op_p query_op = NULL;
     struct gm_addr *gm_addr_data = NULL;
+    struct gm_op *gm_op_data = NULL;
 
     gossip_ldebug(BMI_DEBUG_GM, "recv_event_handler() called.\n");
     /* what are the possibilities here? 
@@ -2219,7 +2131,9 @@ static int recv_event_handler(gm_recv_event_t * poll_event,
 		 * thought that this would be rendezvous mode
 		 */ 
 		query_op->error_code = 0;
+		gm_op_data = query_op->method_data;
 		op_list_add(op_list_array[IND_COMPLETE], query_op);
+		gm_op_data->complete = 1;
 		ret = 0;
 	    }
 	    break;
@@ -2317,6 +2231,7 @@ static void put_recv_handler(bmi_op_id_t ctrl_op_id)
     /* done */
     query_op->error_code = 0;
     op_list_add(op_list_array[IND_COMPLETE], query_op);
+    gm_op_data->complete = 1;
     return;
 }
 
@@ -2411,6 +2326,7 @@ static void send_data_buffer(method_op_p mop)
 	    /* TODO: handle this better */
 	    mop->error_code = -ENOMEM;
 	    op_list_add(op_list_array[IND_COMPLETE], mop);
+	    gm_op_data->complete = 1;
 	    return;
 	}
 #endif /* ENABLE_GM_REGCACHE */
@@ -2423,6 +2339,7 @@ static void send_data_buffer(method_op_p mop)
 	    /* TODO: handle this better */
 	    mop->error_code = -ENOMEM;
 	    op_list_add(op_list_array[IND_COMPLETE], mop);
+	    gm_op_data->complete = 1;
 	    return;
 	}
 #endif /* ENABLE_GM_REGISTER */
@@ -2436,6 +2353,7 @@ static void send_data_buffer(method_op_p mop)
 	    gossip_lerr("Error: gm_dma_malloc().\n");
 	    mop->error_code = -ENOMEM;
 	    op_list_add(op_list_array[IND_COMPLETE], mop);
+	    gm_op_data->complete = 1;
 	    return;
 	}
 	memcpy(gm_op_data->tmp_xfer_buffer, mop->buffer, mop->actual_size);
@@ -2503,6 +2421,7 @@ static void prepare_for_recv(method_op_p mop)
 	    /* TODO: handle this error better */
 	    mop->error_code = -ENOMEM;
 	    op_list_add(op_list_array[IND_COMPLETE], mop);
+	    gm_op_data->complete = 1;
 	    return;
 	}
 #endif /* ENABLE_GM_REGCACHE */
@@ -2515,6 +2434,7 @@ static void prepare_for_recv(method_op_p mop)
 	    /* TODO: handle this better */
 	    mop->error_code = -ENOMEM;
 	    op_list_add(op_list_array[IND_COMPLETE], mop);
+	    gm_op_data->complete = 1;
 	    return;
 	}
 #endif /* ENABLE_GM_REGISTER */
@@ -2529,6 +2449,7 @@ static void prepare_for_recv(method_op_p mop)
 	    /* TODO: handle this better */
 	    mop->error_code = -ENOMEM;
 	    op_list_add(op_list_array[IND_COMPLETE], mop);
+	    gm_op_data->complete = 1;
 	    return;
 	}
 	new_ctrl->u.ack.remote_ptr = 0;
@@ -2590,6 +2511,7 @@ static void ctrl_ack_callback(struct gm_port *port,
 	op_list_remove(my_op);
 	my_op->error_code = -ETIMEDOUT;
 	op_list_add(op_list_array[IND_COMPLETE], my_op);
+	gm_op_data->complete = 1;
 	return;
     }
 
@@ -2601,6 +2523,7 @@ static void ctrl_ack_callback(struct gm_port *port,
 	op_list_remove(my_op);
 	my_op->error_code = -ETIMEDOUT;
 	op_list_add(op_list_array[IND_COMPLETE], my_op);
+	gm_op_data->complete = 1;
 	return;
     }
 
@@ -2659,6 +2582,7 @@ static void data_send_callback(struct gm_port *port,
 	op_list_remove(my_op);
 	my_op->error_code = -ETIMEDOUT;
 	op_list_add(op_list_array[IND_COMPLETE], my_op);
+	gm_op_data->complete = 1;
 	return;
     }
 
@@ -2670,6 +2594,7 @@ static void data_send_callback(struct gm_port *port,
 	op_list_remove(my_op);
 	my_op->error_code = -EPROTO;
 	op_list_add(op_list_array[IND_COMPLETE], my_op);
+	gm_op_data->complete = 1;
 	return;
     }
 
