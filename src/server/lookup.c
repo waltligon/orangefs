@@ -15,14 +15,14 @@
 #include "pvfs2-attr.h"
 #include "job-consist.h"
 
-#define LOOKUP_BUFF_SZ 5
-
+/* TODO: DO WE NEED THESE TO BE HERE?  WHAT'S THE RIGHT WAY TO DO THIS? */
 enum 
 {
     STATE_ENOTDIR = 22,
     STATE_NOMORESEGS = 23
 };
 
+/* TODO: PUT THESE IN A HEADER SOMEWHERE */
 extern int PINT_string_count_segments(char *pathname);
 extern int PINT_string_next_segment(char *pathname,
 				    char **inout_segp,
@@ -37,7 +37,6 @@ static int lookup_read_directory_entry_handle(PINT_server_op *s_op, job_status_s
 static int lookup_read_object_metadata(PINT_server_op *s_op, job_status_s *ret);
 static int lookup_release_job(PINT_server_op *s_op, job_status_s *ret);
 void lookup_init_state_machine(void);
-/* TODO: Release Scheduled Job */
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
@@ -117,14 +116,7 @@ machine lookup(init,
 %%
 
 /*
- * Function: lookup_init_state_machine
- *
- * Params:   void
- *
- * Returns:  PINT_state_array_values*
- *
- * Synopsis: Set up the state machine for set_attrib. 
- *           
+ * Function: lookup_init_state_machine           
  */
 void lookup_init_state_machine(void)
 {
@@ -134,19 +126,24 @@ void lookup_init_state_machine(void)
 /*
  * Function: lookup_init
  *
- * Params:   server_op *s_op, 
- *           job_status_s *ret
+ * Synopsis: initializes internal structures and posts job to request
+ * scheduler.
  *
- * Pre:      None
+ * Assumes req structure holds a valid path.
  *
- * Post:     Scheduled
+ * Initializes segp, seg_ct, seg_nr fields in s_op->u.lookup.
  *
- * Returns:  int
+ * Allocates memory for handle and attribute arrays that will be returned
+ * in the response.
  *
- * Synopsis: Allocate all memory.  Should we just malloc one big region?
- *           
+ * Posts the request to the request scheduler.
+ *
+ * Note: memory is allocated as one big chunk, pointed to by
+ * s_op->resp->u.lookup_path.handle_array.
+ *
  */
-static int lookup_init(PINT_server_op *s_op, job_status_s *ret)
+static int lookup_init(PINT_server_op *s_op,
+		       job_status_s *ret)
 {
     int job_post_ret;
     char *ptr;
@@ -156,6 +153,7 @@ static int lookup_init(PINT_server_op *s_op, job_status_s *ret)
     /* fill in the lookup portion of the PINT_server_op */
     /* NOTE: it would be nice if we just decoded into this in the first place. */
     s_op->u.lookup.segp = NULL;
+    s_op->u.lookup.seg_nr = 0;
     s_op->u.lookup.seg_ct = PINT_string_count_segments(s_op->req->u.lookup_path.path);
     assert(s_op->u.lookup.seg_ct >= 0);
 
@@ -181,21 +179,17 @@ static int lookup_init(PINT_server_op *s_op, job_status_s *ret)
 /*
  * Function: lookup_read_object_metadata
  *
- * Params:   server_op *s_op, 
- *           job_status_s *ret
+ * Synopsis: Given an object handle, looks up the attributes (metadata)
+ * for that handle.
  *
- * Pre:      None
+ * Initializes key and value structures to direct metadata:
+ * - if this is the starting (base) handle, store in s_op->u.lookup.base_attr
+ * - otherwise store it in the appropriate slot in the resp handle array
  *
- * Post:     None
- *
- * Returns:  int
- *
- * Synopsis: Given a directory handle, find the data space holding directory
- *           entries and the attributes for the directory by looking up the
- *           keyval pairs.
- *           
+ * Posts the keyval read to trove.
  */
-static int lookup_read_object_metadata(PINT_server_op *s_op, job_status_s *ret)
+static int lookup_read_object_metadata(PINT_server_op *s_op,
+				       job_status_s *ret)
 {
     int job_post_ret;
     job_id_t j_id;
@@ -250,26 +244,20 @@ static int lookup_read_object_metadata(PINT_server_op *s_op, job_status_s *ret)
 /*
  * Function: lookup_verify_object_metadata
  *
- * Params:   server_op *s_op, 
- *           job_status_s *ret
+ * Synopsis: Examine the metadata returned from the keyval read.
+ * If the metadata is for a directory, prepare to read the handle
+ * of the next segment, if there is one.  If the metadata is for
+ * a file, prepare to send a response.
  *
- * Pre:      None
+ * If the object is a directory, this function sets the
+ * s_op->u.lookup.segp value to point to the next segment to look up;
+ * this is used in lookup_read_directory_entry.
  *
- * Post:     None
- *
- * Returns:  int
- *
- * Synopsis: The previous state tried to acquire the attribs for a directory
- *           and the handle for the dspace with directory entries.  Here
- *           we simply check permissions and check to see if we were able
- *           to successfully grab this data.
- *
- *           If we succeeded (in the last step), we will continue to look up
- *           path components.
- *           If we failed, we go on to send our response (partial??? verify!).
- *           
+ * This function does not post an operation, but rather returns 1
+ * immediately.
  */
-static int lookup_verify_object_metadata(PINT_server_op *s_op, job_status_s *ret)
+static int lookup_verify_object_metadata(PINT_server_op *s_op,
+					 job_status_s *ret)
 {
     int seg_ret;
     PVFS_object_attr *a_p;
@@ -318,6 +306,17 @@ static int lookup_verify_object_metadata(PINT_server_op *s_op, job_status_s *ret
 
 /*
  * Function: lookup_read_directory_entry_handle
+ *
+ * Synopsis: Given a directory handle, look up the handle used to store
+ * directory entries for this directory.
+ *
+ * Initializes key and value structures to direct handle into
+ * s_op->u.lookup.dirent_handle, which is where we always store the handle
+ * used to read directory entries.  The handle to use for the read is either:
+ * - the starting handle from the req (if we haven't looked up a segment yet), or
+ * - the previous segment's handle (from response handle array).
+ *
+ * Posts the keyval read to trove.
  */
 static int lookup_read_directory_entry_handle(PINT_server_op *s_op, job_status_s *ret)
 {
@@ -360,14 +359,16 @@ static int lookup_read_directory_entry_handle(PINT_server_op *s_op, job_status_s
 /*
  * Function: lookup_read_directory_entry
  *
- * Params:   server_op *s_op, 
- *           job_status_s *ret
+ * Synopsis: Given a handle for a dspace holding directory entries, look
+ * up the current segment and obtain its handle.
  *
- * Returns:  int
+ * Initializes the key and value structures to direct the handle into the
+ * resp handle array.  The segment is pointed to by s_op->u.lookup.segp.
  *
- * Synopsis: Given a path component and a parent handle, find the handle
- *           for the next component of the path.
- *           
+ * After initializing the key and value structures, this function increments
+ * the seg_nr field so that subsequent operations will occur on the next segment.
+ *
+ * Posts the keyval read to trove.
  */
 static int lookup_read_directory_entry(PINT_server_op *s_op, job_status_s *ret)
 {
@@ -408,19 +409,10 @@ static int lookup_read_directory_entry(PINT_server_op *s_op, job_status_s *ret)
 /*
  * Function: lookup_release_job
  *
- * Params:   server_op *b, 
- *           job_status_s *ret
- *
- * Pre:      We are done!
- *
- * Post:     We need to let the next operation go.
- *
- * Returns:  int
- *
  * Synopsis: Free the job from the scheduler to allow next job to proceed.
+ *
+ * Posts release request to job scheduler.
  */
-
-
 static int lookup_release_job(PINT_server_op *s_op, job_status_s *ret)
 {
 
@@ -439,17 +431,13 @@ static int lookup_release_job(PINT_server_op *s_op, job_status_s *ret)
 /*
  * Function: lookup_send_response
  *
- * Params:   server_op *s_op, 
- *           job_status_s *ret
+ * Synopsis: Encode and send response
  *
- * Pre:      None
+ * This function fills in the remaining sections of the response structure
+ * prior to encoding the response.  It then calls PINT_encode() to
+ * encode the response.
  *
- * Post:     None
- *
- * Returns:  int
- *
- * Synopsis: Encode and send
- *           
+ * Posts send to BMI.
  */
 static int lookup_send_response(PINT_server_op *s_op, job_status_s *ret)
 {
@@ -499,39 +487,40 @@ static int lookup_send_response(PINT_server_op *s_op, job_status_s *ret)
 /*
  * Function: lookup_cleanup
  *
- * Params:   server_op *b, 
- *           job_status_s *ret
+ * Synopsis: Free memory allocated during request processing.
  *
- * Pre:      None
+ * There are a bunch of regions that must be freed after processing
+ * completes:
+ * - decoded request (s_op->decoded)
+ * - encoded request (s_op->unexp_bmi_buff.buffer)
+ * - encoded response (s_op->encoded)
+ * - original (decoded) response (s_op->resp)
+ * - dynamically allocated space (in this case 
+ *   s_op->resp->u.lookup_path.handle_array)
+ * - the server operation structure itself
  *
- * Post:     None
- *
- * Returns:  int
- *
- * Synopsis: free memory and return
- *           
+ * This function does not post an operation, but instead returns 0,
+ * indicating that this state machine is finished.           
  */
 static int lookup_cleanup(PINT_server_op *s_op, job_status_s *ret)
 {
     gossip_debug(SERVER_DEBUG, "lookup state: lookup_cleanup\n");
+    
+    /* free decoded, encoded requests */
+    PINT_decode_release(&(s_op->decoded), PINT_DECODE_REQ, 0);
+    free(s_op->unexp_bmi_buff.buffer);
 
-    PINT_encode_release(&(s_op->encoded),PINT_ENCODE_RESP,0);
-    PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ,0);
+    /* free encoded response */
+    PINT_encode_release(&(s_op->encoded), PINT_ENCODE_RESP, 0);
 
+    /* free original response, including dynamically allocated memory */
     free(s_op->resp->u.lookup_path.handle_array);
+    free(s_op->resp);
 
-    /*
-      BMI_memfree(
-      s_op->addr,
-      s_op->req,
-      s_op->unexp_bmi_buff->size,
-      BMI_RECV_BUFFER
-      );
-    */
+    /* free server operation structure */
     free(s_op);
 
     return(0);
-
 }
 
 /*
