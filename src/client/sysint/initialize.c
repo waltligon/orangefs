@@ -49,8 +49,11 @@ static int server_parse_config(PVFS_servresp_getconfig *response);
 
 int PVFS_sys_initialize(pvfs_mntlist mntent_list, PVFS_sysresp_init *resp)
 {
-    int ret = -1, i;
+    int ret = -1, i = 0;
+    int num_file_systems = 0;
     gen_mutex_t mt_config;
+    struct llist *cur = NULL;
+    struct filesystem_configuration_s *cur_fs = NULL;
 
     enum {
 	NONE_INIT_FAIL = 0,
@@ -157,9 +160,12 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, PVFS_sysresp_init *resp)
 	goto return_error;
     }
 
+    num_file_systems = llist_count(g_server_config.file_systems);
+    assert(num_file_systems);
+
     /* we need to return the fs_id's to the calling function */
-    resp->nr_fsid = server_config.nr_fs;
-    resp->fsid_list = malloc(server_config.nr_fs * sizeof(PVFS_handle));
+    resp->nr_fsid = num_file_systems;
+    resp->fsid_list = malloc(num_file_systems * sizeof(PVFS_handle));
     if (resp->fsid_list == NULL)
     {
 	init_fail = GET_CONFIG_INIT_FAIL;
@@ -167,11 +173,18 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, PVFS_sysresp_init *resp)
 	goto return_error;
     }
 
-    for(i = 0; i < server_config.nr_fs; i++)
+    cur = g_server_config.file_systems;
+    while(cur && (i < num_file_systems))
     {
-	resp->fsid_list[i] = server_config.fs_info[i].fsid;
+        cur_fs = llist_head(cur);
+        if (!cur_fs)
+        {
+            break;
+        }
+        assert(cur_fs->coll_id);
+        resp->fsid_list[i++] = cur_fs->coll_id;
+        cur = llist_next(cur);
     }
-
 
     /* Release the mutex */
     gen_mutex_unlock(&mt_config);
@@ -275,11 +288,6 @@ static int server_get_config(pvfs_mntlist mntent_list)
                              &encoded_resp, op_tag);
             continue;
         }
-
-        /* FIXME: hacked in for backward compatibility */
-	fsinfo_p = &server_config.fs_info[i];
-	fsinfo_p->fh_root         = g_server_config.root_handle;
-	fsinfo_p->fsid            = 9;
 
 	/* let go of any resources consumed by PINT_send_req() */
 	PINT_release_req(serv_addr, &serv_req, max_msg_sz, &decoded,

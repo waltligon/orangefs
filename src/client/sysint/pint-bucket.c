@@ -353,16 +353,13 @@ int PINT_bucket_get_root_handle(
 	PVFS_fs_id fsid,
 	PVFS_handle *fh_root)
 {
-	int i;
-	for(i = 0; i < server_config.nr_fs; i++)
-	{
-		if (server_config.fs_info[i].fsid == fsid)
-		{
-			*fh_root = server_config.fs_info[i].fh_root;
-			return(0);
-		}
-	}
-	return(-EINVAL);
+    int ret = -EINVAL;
+    if (fh_root && g_server_config.root_handle)
+    {
+        *fh_root = (PVFS_handle)g_server_config.root_handle;
+        ret = 0;
+    }
+    return ret;
 }
 
 #endif
