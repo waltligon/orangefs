@@ -244,6 +244,7 @@ encode_common(struct PINT_encoded_msg *target_msg, int maxsize)
     /* this encoder always uses just one buffer */
     target_msg->buffer_list = &target_msg->buffer_stub;
     target_msg->size_list = &target_msg->size_stub;
+    target_msg->alloc_size_list = &target_msg->alloc_size_stub;
     target_msg->list_count = 1;
     target_msg->buffer_type = BMI_PRE_ALLOC;
 
@@ -257,6 +258,7 @@ encode_common(struct PINT_encoded_msg *target_msg, int maxsize)
     }
 
     target_msg->buffer_list[0] = buf;
+    target_msg->alloc_size_list[0] = maxsize;
     target_msg->ptr_current = buf;
 
     /* generic header */
@@ -623,7 +625,7 @@ static void lebf_encode_rel(
     else
     {
 	BMI_memfree(msg->dest, msg->buffer_list[0],
-                    msg->total_size, BMI_SEND);
+                    msg->alloc_size_list[0], BMI_SEND);
     }
 }
 

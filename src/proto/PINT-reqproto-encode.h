@@ -22,12 +22,14 @@ struct PINT_encoded_msg
     enum bmi_buffer_type buffer_type; /* buffer flag for BMI's use */
     void **buffer_list;               /* list of buffers */
     PVFS_size *size_list;             /* size of buffers */
+    PVFS_size *alloc_size_list;       /* original size of buffers */
     int list_count;                   /* number of buffers */
     PVFS_size total_size;             /* aggregate size of encoding */
 
     /* fields below this comment are meant for internal use */
     char *ptr_current;                /* current encoding pointer */
     PVFS_size size_stub;              /* used for size_list */
+    PVFS_size alloc_size_stub;        /* used for size_list */
     void *buffer_stub;                /* used for buffer_list */
 };
 
