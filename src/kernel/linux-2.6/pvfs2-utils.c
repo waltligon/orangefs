@@ -103,11 +103,11 @@ static inline int copy_attributes_to_inode(
         else if ((attrs->objtype == PVFS_TYPE_SYMLINK) &&
                  (symname != NULL))
         {
-            i_size_write(inode, (loff_t)strlen(symname));
+            inode->i_size = (loff_t)strlen(symname);
         }
         else
         {
-            i_size_write(inode, 0);
+            inode->i_size = 0;
         }
 
 	inode->i_uid = attrs->owner;
