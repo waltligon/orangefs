@@ -2547,6 +2547,9 @@ static int recv_event_handler(gm_recv_event_t * poll_event,
     method_op_p query_op = NULL;
     struct gm_addr *gm_addr_data = NULL;
     struct gm_op *gm_op_data = NULL;
+    void* copy_buffer;
+    bmi_size_t copy_size, total_copied;
+    int i;
 
     gossip_ldebug(BMI_DEBUG_GM, "recv_event_handler() called.\n");
     /* what are the possibilities here? 
@@ -2656,23 +2659,40 @@ static int recv_event_handler(gm_recv_event_t * poll_event,
 	    else
 	    {
 		/* found a match */
-		if (fast)
+		gm_op_data = query_op->method_data;
+		if(fast)
+		    copy_buffer = gm_ntohp(poll_event->recv.message);
+		else
+		    copy_buffer = gm_ntohp(poll_event->recv.buffer);
+
+		if(gm_op_data->list_flag)
 		{
-		    memcpy(query_op->buffer, gm_ntohp(poll_event->recv.message),
-			   ctrl_copy.u.immed.actual_size);
+		    total_copied = 0;
+		    for(i=0; i<query_op->list_count; i++)
+		    {
+			if(total_copied == ctrl_copy.u.immed.actual_size)
+			    break;
+
+			copy_size = ctrl_copy.u.immed.actual_size - total_copied;
+			if(copy_size > query_op->size_list[i])
+			    copy_size = query_op->size_list[i];
+			memcpy(query_op->buffer_list[i], copy_buffer, copy_size);
+			copy_buffer = (void*)((long)copy_buffer + (long)copy_size);
+			total_copied += copy_size;
+		    }
 		}
 		else
 		{
-		    memcpy(query_op->buffer, gm_ntohp(poll_event->recv.buffer),
+		    memcpy(query_op->buffer, copy_buffer,
 			   ctrl_copy.u.immed.actual_size);
 		}
+
 		gm_provide_receive_buffer(local_port,
 					  gm_ntohp(poll_event->recv.buffer),
 					  GM_IMMED_SIZE, GM_HIGH_PRIORITY);
 		op_list_remove(query_op);
 		query_op->actual_size = ctrl_copy.u.immed.actual_size;
 		query_op->error_code = 0;
-		gm_op_data = query_op->method_data;
 		op_list_add(completion_array[query_op->context_id], query_op);
 		gm_op_data->complete = 1;
 		ret = 0;
