@@ -82,6 +82,7 @@ GtkWidget *gui_details_setup(void)
     gtk_tree_view_set_model(GTK_TREE_VIEW(gui_details_view),
 			    GTK_TREE_MODEL(gui_details_list));
 
+#if 0
     /* for all the numerical values, set up sorting */
     for (i=1; i < GUI_DETAILS_TYPE; i++) {
 	gtk_tree_sortable_set_sort_func(GTK_TREE_SORTABLE(gui_details_list),
@@ -111,7 +112,7 @@ GtkWidget *gui_details_setup(void)
     
     gtk_tree_view_column_set_sort_column_id(gui_details_col[GUI_DETAILS_TYPE],
 					    GUI_DETAILS_TYPE);
-				    
+#endif
 
     gui_details_initialized = 1;
 
