@@ -162,6 +162,69 @@ typedef struct PINT_server_op
     } u; /* TODO: RENAME TO 'scratch' */
 } PINT_server_op;
 
+/* TODO: maybe this should be put somewhere else? */
+/* PINT_map_server_op_to_string()
+ *
+ * provides a string representation of the server operation number
+ *
+ * returns a pointer to a static string (DONT FREE IT) on success,
+ * null on failure
+ */
+static inline char* PINT_map_server_op_to_string(enum PVFS_server_op op)
+{
+    char* ret_ptr = NULL;
+
+    if(op > PVFS_MAX_SERVER_OP)
+	return(NULL);
+
+    switch(op)
+    {
+	case PVFS_SERV_INVALID:
+	    ret_ptr = "invalid";
+	    break;
+	case PVFS_SERV_CREATE:
+	    ret_ptr = "create";
+	    break;
+	case PVFS_SERV_REMOVE:
+	    ret_ptr = "remove";
+	    break;
+	case PVFS_SERV_IO:
+	    ret_ptr = "io";
+	    break;
+	case PVFS_SERV_GETATTR:
+	    ret_ptr = "getattr";
+	    break;
+	case PVFS_SERV_SETATTR:
+	    ret_ptr = "setattr";
+	    break;
+	case PVFS_SERV_LOOKUP_PATH:
+	    ret_ptr = "lookup_path";
+	    break;
+	case PVFS_SERV_CREATEDIRENT:
+	    ret_ptr = "createdirent";
+	    break;
+	case PVFS_SERV_RMDIRENT:
+	    ret_ptr = "rmdirent";
+	    break;
+	case PVFS_SERV_TRUNCATE:
+	    ret_ptr = "truncate";
+	    break;
+	case PVFS_SERV_MKDIR:
+	    ret_ptr = "mkdir";
+	    break;
+	case PVFS_SERV_READDIR:
+	    ret_ptr = "readdir";
+	    break;
+	case PVFS_SERV_GETCONFIG:
+	    ret_ptr = "getconfig";
+	    break;
+	case PVFS_SERV_WRITE_COMPLETION:
+	    ret_ptr = "write_completion";
+	    break;
+    }
+    return(ret_ptr);
+}
+
 
 /* Globals for Server Interface */
 

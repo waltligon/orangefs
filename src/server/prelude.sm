@@ -72,7 +72,9 @@ static int prelude_req_sched(PINT_server_op *s_op, job_status_s *js_p)
 {
     int ret = -1;
 
-    gossip_debug(SERVER_DEBUG, "(%p) prelude state: req_sched\n", s_op);
+    gossip_debug(SERVER_DEBUG, 
+	"(%p) %s (prelude sm) state: req_sched\n", s_op,
+	PINT_map_server_op_to_string(s_op->req->op));
 
     ret = job_req_sched_post(s_op->req,
 	s_op,
@@ -95,7 +97,9 @@ static int prelude_getattr_if_needed(PINT_server_op *s_op, job_status_s *js_p)
     PVFS_fs_id target_fs_id = 0;
     job_id_t tmp_id;
 
-    gossip_debug(SERVER_DEBUG, "(%p) prelude state: getattr_if_needed\n", s_op);
+    gossip_debug(SERVER_DEBUG, 
+	"(%p) %s (prelude sm) state: getattr_if_needed\n", s_op,
+	PINT_map_server_op_to_string(s_op->req->op));
 
     /* first, run a request scheduler utility function that tells us
      * what handle this request will operate on
@@ -147,7 +151,9 @@ static int prelude_getattr_if_needed(PINT_server_op *s_op, job_status_s *js_p)
  */
 static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p)
 {
-    gossip_debug(SERVER_DEBUG, "(%p) prelude state: perm_check\n", s_op);
+    gossip_debug(SERVER_DEBUG, 
+	"(%p) %s (prelude sm) state: perm_check\n", s_op,
+	PINT_map_server_op_to_string(s_op->req->op));
 
     /* the first thing we need to do is interpret the error code from reading
      * the attributes.  Normally it is an error if that step failed, but we 
