@@ -14,6 +14,7 @@
 #include <sys/wait.h>
 #include <assert.h>
 #include <errno.h>
+#include <fcntl.h>
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -38,6 +39,7 @@ int main(int argc, char **argv)
 {
     pid_t new_pid = 0;
     options_t opts;
+    int i;
 
     memset(&opts, 0, sizeof(options_t));
 
@@ -65,6 +67,14 @@ int main(int argc, char **argv)
         {
             exit(1);
         }
+	for(i = getdtablesize(); i >= 0; --i)
+	{
+	    close(i);
+	}
+	i = open("/dev/null", O_RDWR);
+	dup(i);
+	dup(i);
+	umask(027);
     }
 
     signal(SIGHUP,  client_sig_handler);
