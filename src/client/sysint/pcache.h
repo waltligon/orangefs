@@ -16,7 +16,7 @@
 #include "pvfs2-attr.h"
 #include "pint-sysint.h"
 
-#define PINT_PCACHE_MAX_ENTRIES 64
+#define PINT_PCACHE_MAX_ENTRIES 512
 
 #define PINT_PCACHE_HANDLE_INVALID 0
 #define BAD_LINK -1
@@ -74,6 +74,8 @@ int PINT_pcache_insert_rls(pinode *pnode);
 int PINT_pcache_remove(PVFS_pinode_reference refn,pinode **item);
 int PINT_pcache_pinode_alloc(pinode **pnode);
 void PINT_pcache_pinode_dealloc(pinode *pnode);
+int PINT_pcache_get_timeout(void);
+void PINT_pcache_set_timeout(int max_timeout_ms);
 
 /*
  * Local variables:

@@ -103,8 +103,8 @@ static inline int check_dentry_expiry(struct timeval time_stamp)
          * If yes, dentry is valid. If no, it is stale.
          */
         ret = (((time_stamp.tv_sec > cur_time.tv_sec) ||
-                (time_stamp.tv_sec == cur_time.tv_sec &&
-                 time_stamp.tv_usec > cur_time.tv_usec)) ? 0 : -1);
+                ((time_stamp.tv_sec == cur_time.tv_sec) &&
+                 (time_stamp.tv_usec > cur_time.tv_usec))) ? 0 : -1);
     }
     return ret;
 }

@@ -11,7 +11,7 @@
 #include <pint-sysint.h>
 
 /* number of entries allowed in the cache */
-#define PINT_DCACHE_MAX_ENTRIES 64
+#define PINT_DCACHE_MAX_ENTRIES 512
 
 /* number of seconds that cache entries will remain valid */
 #define PINT_DCACHE_TIMEOUT 5
