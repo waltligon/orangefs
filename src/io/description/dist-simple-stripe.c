@@ -148,23 +148,23 @@ static PVFS_simple_stripe_params simple_stripe_params = {
 };
 
 static PVFS_Dist_methods simple_stripe_methods = {
-	logical_to_physical_offset,
-	physical_to_logical_offset,
-	next_mapped_offset,
-	contiguous_length,
-	logical_file_size,
-	encode,
-	decode,
-	encode_lebf,
-	decode_lebf,
+    logical_to_physical_offset,
+    physical_to_logical_offset,
+    next_mapped_offset,
+    contiguous_length,
+    logical_file_size,
+    encode,
+    decode,
+    encode_lebf,
+    decode_lebf,
 };
 
 PVFS_Dist simple_stripe_dist = {
-	"simple_stripe",
-	roundup8(14),   /* name size */
-	roundup8(sizeof(PVFS_simple_stripe_params)), /* param size */
-	&simple_stripe_params,
-	&simple_stripe_methods
+    PVFS_DIST_SIMPLE_STRIPE_NAME,
+    roundup8(PVFS_DIST_SIMPLE_STRIPE_NAME_SIZE),   /* name size */
+    roundup8(sizeof(PVFS_simple_stripe_params)), /* param size */
+    &simple_stripe_params,
+    &simple_stripe_methods
 };
 
 #ifdef MODULE
@@ -176,7 +176,7 @@ void init_module()
 
 void cleanup_module()
 {
-	 PVFS_unregister_distribution(PVFS_dist_simple_stripe_identifier);
+	 PVFS_unregister_distribution(PVFS_DIST_SIMPLE_STRIPE_NAME);
 }
 
 #endif

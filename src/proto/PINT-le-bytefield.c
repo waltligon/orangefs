@@ -15,6 +15,7 @@
 #include "bmi.h"
 #include "bmi-byteswap.h"
 #include "gossip.h"
+#include "pvfs2-dist-basic.h"
 #include "pvfs2-types.h"
 #include "pvfs2-req-proto.h"
 #include "PINT-reqproto-encode.h"
@@ -62,7 +63,7 @@ static void lebf_initialize(void)
      * for encoding to work properly.
      */
     memset(&tmp_dist, 0, sizeof(tmp_dist));
-    tmp_dist.dist_name = strdup("simple_stripe");
+    tmp_dist.dist_name = strdup(PVFS_DIST_BASIC_NAME);
     if (PINT_Dist_lookup(&tmp_dist)) {
 	gossip_err("%s: dist %s does not exist?!?\n",
 	  __func__, tmp_dist.dist_name);

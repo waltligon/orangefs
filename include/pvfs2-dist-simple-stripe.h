@@ -8,8 +8,8 @@
 #define __PVFS_DIST_SIMPLE_STRIPE_H
 
 /* Identifier to use when looking up this distribution */
-const char* const PVFS_dist_simple_stripe_id = "simple_stripe";
-const int32_t PVFS_dist_simple_stripe_id_size = 14;
+#define PVFS_DIST_SIMPLE_STRIPE_NAME "simple_stripe"
+#define PVFS_DIST_SIMPLE_STRIPE_NAME_SIZE 14
 
 /* simple stripe distribution parameters */
 struct PVFS_simple_stripe_params_s {

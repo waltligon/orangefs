@@ -8,8 +8,8 @@
 #define  __PVFS2_DIST_BASIC_H 
 
 /* Identifier to use when looking up this distribution */
-const char* const PVFS_dist_basic_id = "basic_dist";
-const int32_t PVFS_dist_basic_id_size = 11;
+#define PVFS_DIST_BASIC_NAME "basic_dist"
+#define PVFS_DIST_BASIC_NAME_SIZE 11
 
 struct PVFS_basic_params_s {
 };

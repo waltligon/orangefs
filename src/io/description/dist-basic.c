@@ -77,35 +77,35 @@ static void decode_lebf(char **pptr, void* params)
 static PVFS_basic_params basic_params;
 
 static PVFS_Dist_methods basic_methods = {
-	logical_to_physical_offset,
-	physical_to_logical_offset,
-	next_mapped_offset,
-	contiguous_length,
-	logical_file_size,
-	encode,
-	decode,
-	encode_lebf,
-	decode_lebf,
+    logical_to_physical_offset,
+    physical_to_logical_offset,
+    next_mapped_offset,
+    contiguous_length,
+    logical_file_size,
+    encode,
+    decode,
+    encode_lebf,
+    decode_lebf,
 };
 
 PVFS_Dist basic_dist = {
-	"basic_dist",
-	roundup8(11), /* name size */
-	0, /* param size */
-	&basic_params,
-	&basic_methods
+    PVFS_DIST_BASIC_NAME,
+    roundup8(PVFS_DIST_BASIC_NAME_SIZE), /* name size */
+    0, /* param size */
+    &basic_params,
+    &basic_methods
 };
 
 #ifdef MODULE
 
 void init_module()
 {
-	 PVFS_register_distribution(&basic_dist);
+    PVFS_register_distribution(&basic_dist);
 }
 
 void cleanup_module()
 {
-	 PVFS_unregister_distribution("basic_dist");
+    PVFS_unregister_distribution(PVFS_DIST_BASIC_NAME);
 }
 
 #endif

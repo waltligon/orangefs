@@ -14,12 +14,12 @@
 #include "gossip.h"
 
 /* compiled-in distributions */
-/* extern struct PVFS_Dist default_dist; */
+extern struct PVFS_Dist basic_dist;
 extern struct PVFS_Dist simple_stripe_dist;
 
 /* initial dist table - default dists */
 struct PVFS_Dist *PINT_Dist_table[PINT_DIST_TABLE_SZ] = {
-    /*&default_dist,*/
+    &basic_dist,
     &simple_stripe_dist,
     NULL
 };
