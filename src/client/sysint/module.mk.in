@@ -3,7 +3,6 @@ DIR := src/client/sysint
 CSRC := \
 	$(DIR)/finalize.c \
 	$(DIR)/initialize.c \
-	$(DIR)/lookup.c \
 	$(DIR)/pcache.c \
 	$(DIR)/getattr.c \
 	$(DIR)/pinode-helper.c \
