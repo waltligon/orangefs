@@ -397,10 +397,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
 
 		/* here we make a copy of the distribution information.
 		 *
-		 * KLUDGE: there is no copy function for distributions
-		 * right now, so we do this nasty thing.
-		 *
-		 * Also, there are assumptions in the dist code that ints
+		 * There are assumptions in the dist code that ints
 		 * and char *s are the same size.  I thought we knew better.
 		 *
 		 * If the assert() blows up, we need to fix the dist code,
@@ -408,33 +405,11 @@ static int getattr_object_getattr_comp_fn(void *v_p,
 		 */
 		assert(sizeof(int) == sizeof(char *)); /* dist time bomb */
 
-                /*
-                  NOTE:
-                  If we use PVFS_Dist_copy here, the PVFS_Dist_lookup
-                  in getattr_cleanup fails.  Not sure why yet...
-                */
-		sm_p->u.getattr.dist_p =
-		    (PVFS_Dist *) malloc(attr->u.meta.dist_size);
+		sm_p->u.getattr.dist_p = PVFS_Dist_copy(attr->u.meta.dist);
 		if (sm_p->u.getattr.dist_p == NULL) {
 		    assert(0);
 		    return -PVFS_ENOMEM;
 		}
-
-		/* this encodes the previously decoded distribution into
-		 * our new space.
-		 */
-		PINT_Dist_encode(sm_p->u.getattr.dist_p,
-				 attr->u.meta.dist);
-
-		/* this does an in-place decoding of the distribution.  now
-		 * we have a decoded version where we want it.
-		 *
-		 * NOTE: we need to free this later.
-		 */
-		PINT_Dist_decode(sm_p->u.getattr.dist_p,
-				 NULL);
-
-		/* save the size too */
 		sm_p->u.getattr.dist_size = attr->u.meta.dist_size;
 
 		/* nothing special about our return value here */

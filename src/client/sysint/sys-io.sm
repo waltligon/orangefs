@@ -317,39 +317,13 @@ static int io_object_getattr_comp_fn(void *v_p,
             PINT_pcache_release(pinode);
         }
 
-        /*
-          FIXME: Replace with PVFS_Dist_copy, which
-          causes problems when used here
-        */
-
         /* here we make a copy of the distribution information. */
-        gossip_debug(CLIENT_DEBUG,
-                     "io_object_getattr_comp_fn: copying %d bytes "
-                     "of dist.\n", r_attr_p->u.meta.dist_size);
-
-        sm_p->u.io.dist_p = (PVFS_Dist *)
-            malloc(r_attr_p->u.meta.dist_size);
+        sm_p->u.io.dist_p = PVFS_Dist_copy(r_attr_p->u.meta.dist);
         if (sm_p->u.io.dist_p == NULL)
         {
             assert(0);
             return -PVFS_ENOMEM;
         }
-
-        /* this encodes the previously decoded distribution into
-         * our new space.
-         */
-        PINT_Dist_encode(sm_p->u.io.dist_p, r_attr_p->u.meta.dist);
-
-        /* this does an in-place decoding of the distribution.  now
-         * we have a decoded version where we want it.
-         *
-         * NOTE: we need to free this later.
-         */
-        PINT_Dist_decode(sm_p->u.io.dist_p, NULL);
-
-        assert(sm_p->u.io.dist_p);
-
-        /* save the size too */
         sm_p->u.io.dist_size = r_attr_p->u.meta.dist_size;
 
         gossip_debug(CLIENT_DEBUG,
@@ -390,7 +364,7 @@ static int io_object_getattr_comp_fn(void *v_p,
     return 0;
 } /* io_object_getattr_comp_fn */
 
-/* io_datafile_setup_io()
+/* io_datafile_setup_msgpairs()
  *
  * Sets up msgpairs to send I/O requests to servers holding datafiles
  * that (might) have data for us (unless we hit EOF).
@@ -417,7 +391,7 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
     struct PINT_client_io_sm *iosm_p = &sm_p->u.io; /* convenience */
 
     gossip_debug(CLIENT_DEBUG,
-		 "(%p) io state: io_datafile_setup_io\n",
+		 "(%p) io state: io_datafile_setup_msgpairs\n",
 		 sm_p);
 
     /* NOTE: i have no idea what this function does.  presumably it has

@@ -279,27 +279,13 @@ static int truncate_object_getattr_comp_fn(
                        r_attr_p->u.meta.dfile_array,
                        r_attr_p->u.meta.dfile_count * sizeof(PVFS_handle));
 
-                /*
-                  FIXME: Replace with PVFS_Dist_copy
-                */
-                sm_p->u.truncate.distribution = (PVFS_Dist *)
-                    malloc(r_attr_p->u.meta.dist_size);
+		sm_p->u.truncate.distribution
+		      = PVFS_Dist_copy(r_attr_p->u.meta.dist);
                 if (!sm_p->u.truncate.distribution)
                 {
                     return -ENOMEM;
                 }
-                /* this encodes the previously decoded distribution into
-                 * our new space.
-                 */
-                PINT_Dist_encode(sm_p->u.truncate.distribution,
-                                 r_attr_p->u.meta.dist);
-
-                /* this does an in-place decoding of the distribution.  now
-                 * we have a decoded version where we want it.
-                 *
-                 * NOTE: we need to free this later.
-                 */
-                PINT_Dist_decode(sm_p->u.truncate.distribution, NULL);
+		sm_p->u.truncate.dist_size = r_attr_p->u.meta.dist_size;
             }
             else
             {
@@ -307,8 +293,8 @@ static int truncate_object_getattr_comp_fn(
                 sm_p->u.truncate.datafile_handles =
                     r_attr_p->u.meta.dfile_array;
                 sm_p->u.truncate.distribution = r_attr_p->u.meta.dist;
+		sm_p->u.truncate.dist_size = r_attr_p->u.meta.dist_size;
             }
-            sm_p->u.truncate.dist_size = r_attr_p->u.meta.dist_size;
             sm_p->u.truncate.datafile_count = r_attr_p->u.meta.dfile_count;
             assert(sm_p->u.truncate.distribution);
 	    return 0;
