@@ -82,7 +82,7 @@ int pvfs_getfsid(const char *fname, int *result, char **abs_fname,
 	/* mnt_dir is the mount point..client side */
 	ret = config_fsi_get_fsid(collid,ent.local_mnt_dir); 
 	/* snambuf now contains the absolute pathname on the server */
-	snprintf(snambuf, PVFS_NAME_MAX, "%s/%s", ent.serv_mnt_dir, remainder);
+	snprintf(snambuf, PVFS_NAME_MAX, "%s/%s", ent.service_name, remainder);
 
 	return(0);
 

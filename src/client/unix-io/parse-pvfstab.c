@@ -86,7 +86,7 @@ int parse_pvfstab(char *fn,pvfs_mntlist *pvfstab_p)
 			//printf("meta_attr = %s\n",META_ADDR);
 #undef META_ADDR 
 
-#define SERV_MNT pvfstab_p->ptab_p[index].serv_mnt_dir 
+#define SERV_MNT pvfstab_p->ptab_p[index].service_name 
 			/* Extract the Root Mount Point */
 			len1 = strlen(root_mnt);
 			if (len1 < 0)
@@ -237,8 +237,8 @@ void free_pvfstab_entry(pvfs_mntlist *e_p)
 	{
 		if (mnts->ptab_p[i].meta_addr) 
 			free(mnts->ptab_p[i].meta_addr); 
-		if (mnts->ptab_p[i].serv_mnt_dir)
-			free(mnts->ptab_p[i].serv_mnt_dir);
+		if (mnts->ptab_p[i].service_name)
+			free(mnts->ptab_p[i].service_name);
 		if (mnts->ptab_p[i].local_mnt_dir)
 			free(mnts->ptab_p[i].local_mnt_dir);
 		if (mnts->ptab_p[i].fs_type)
@@ -270,15 +270,15 @@ int search_pvfstab(char *fname, pvfs_mntlist mnt, pvfs_mntent *mntent)
 		lmnt_len = strlen(mnt.ptab_p[i].local_mnt_dir);
 		if (!strncmp(mnt.ptab_p[i].local_mnt_dir,fname,lmnt_len))
 		{
-			smnt_len = strlen(mnt.ptab_p[i].serv_mnt_dir);
-			mntent->serv_mnt_dir = (char *)malloc(smnt_len + 1);
-			if (!mntent->serv_mnt_dir)
+			smnt_len = strlen(mnt.ptab_p[i].service_name);
+			mntent->service_name = (char *)malloc(smnt_len + 1);
+			if (!mntent->service_name)
 			{
 				ret = -ENOMEM;
 				goto unlock_exit;
 			}
-			strncpy(mntent->serv_mnt_dir,mnt.ptab_p[i].serv_mnt_dir,smnt_len);
-			mntent->serv_mnt_dir[smnt_len] = '\0';
+			strncpy(mntent->service_name,mnt.ptab_p[i].service_name,smnt_len);
+			mntent->service_name[smnt_len] = '\0';
 			mntent->local_mnt_dir = (char *)malloc(lmnt_len + 1);
 			if (!mntent->local_mnt_dir)
 			{
@@ -298,3 +298,12 @@ unlock_exit:
 
 	return(ret);
 }
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 noexpandtab
+ */
