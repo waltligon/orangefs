@@ -4,7 +4,7 @@ Stuff to do for the first friendly-user release:
 
 . pick a license and apply to all of the code (Phil start discussion)
 
-. get rid of dependencies on -lrt and -lpthread for client side
+DONE . get rid of dependencies on -lrt and -lpthread for client side
   components (Phil)
 
 . config file utility
