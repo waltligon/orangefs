@@ -140,6 +140,15 @@ int BMI_initialize(const char* method_list, const char* listen_addr,
 			goto bmi_initialize_failure;
 		}
 	}
+	/* done with method string list now */
+	if(requested_methods){
+		for(i=0; i<active_method_count; i++){	
+			if(requested_methods[i]){
+				free(requested_methods[i]);
+			}
+		}
+		free(requested_methods);
+	}
 
 	gen_mutex_unlock(&interface_mutex);
 	return(0);
