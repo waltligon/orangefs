@@ -20,8 +20,6 @@
 #include "server-config.h"
 #include "str-utils.h"
 
-#define REQ_ENC_FORMAT 0
-
 int g_session_tag;
 gen_mutex_t *g_session_tag_mt_lock;
 struct server_configuration_s g_server_config;

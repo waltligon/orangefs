@@ -27,6 +27,9 @@
 #include "trove.h"
 #include "server-config.h"
 
+/* TODO: this should be read from config information, probably per fs */
+#define PINT_CLIENT_ENC_TYPE PINT_ENC_DIRECT
+
 enum
 {
     SIZE_INVALID = 0,

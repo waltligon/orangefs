@@ -49,38 +49,36 @@ int PINT_encode(
 		enum PINT_encode_msg_type input_type,
 		struct PINT_encoded_msg* target_msg,
 		bmi_addr_t target_addr,
-		int32_t enc_type
+		enum PINT_encoding_type enc_type
 		)
 {
     int ret=0;
     target_msg->dest = target_addr;
     target_msg->enc_type = enc_type;
 
-    if(enc_type > -1 && enc_type < ENCODING_TABLE_SIZE-1)
+    switch(enc_type)
     {
-	target_msg->enc_type = enc_type;
-	if (input_type == PINT_ENCODE_REQ)
-	{
-	    ret =  PINT_encoding_table[enc_type]->op->encode_req(input_buffer,
-							     target_msg,
-							     ENCODED_HEADER_SIZE);
-	}
-	else if(input_type == PINT_ENCODE_RESP)
-	{
-	    ret =  PINT_encoding_table[enc_type]->op->encode_resp(input_buffer,
-							      target_msg,
-							      ENCODED_HEADER_SIZE);
-	}
+	case PINT_ENC_DIRECT:
+	    if (input_type == PINT_ENCODE_REQ)
+	    {
+		ret =  PINT_encoding_table[enc_type]->op->encode_req(input_buffer,
+								 target_msg,
+								 ENCODED_HEADER_SIZE);
+	    }
+	    else if(input_type == PINT_ENCODE_RESP)
+	    {
+		ret =  PINT_encoding_table[enc_type]->op->encode_resp(input_buffer,
+								  target_msg,
+								  ENCODED_HEADER_SIZE);
+	    }
+	    break;
+	default:
+	    gossip_lerr("Error: encoding type not supported.\n");
+	    ret = -EINVAL;
+	    break;
     }
-    if (ret != 0)
-    {
-	target_msg->enc_type = -EINVAL;
-	return -EINVAL;
-    }
-    /*(int *)(target_msg->buffer_list[target_msg->list_count])=type;*/
-    /*target_msg->size_list[target_msg->list_count-1] += ENCODED_HEADER_SIZE;*/
-    /*target_msg->total_size += ENCODED_HEADER_SIZE;*/
-    return 0;
+
+    return(ret);
 }
 
 /* PINT_decode()
@@ -110,28 +108,37 @@ int PINT_decode(
 		PVFS_size size
 		)
 {
-    int32_t type = 0;
+    int ret = -1;
+    /* TODO: pull this from the input buffer... */
+    enum PINT_encoding_type type = PINT_ENC_DIRECT;
 
     target_msg->enc_type = type;
     
-    if(type > -1 && type < ENCODING_TABLE_SIZE-1)
+    switch(type)
     {
-	if (input_type == PINT_DECODE_REQ)
-	{
-	    return PINT_encoding_table[type]->op->decode_req(input_buffer,
-							     (int)size,
-							     target_msg,
-							     target_addr);
-	}
-	else if(input_type == PINT_DECODE_RESP)
-	{
-	    return PINT_encoding_table[type]->op->decode_resp(input_buffer,
-							      (int)size,
-							      target_msg,
-							      target_addr);
-	}
+	case PINT_ENC_DIRECT:
+	    if (input_type == PINT_DECODE_REQ)
+	    {
+		ret = PINT_encoding_table[type]->op->decode_req(input_buffer,
+								 (int)size,
+								 target_msg,
+								 target_addr);
+	    }
+	    else if(input_type == PINT_DECODE_RESP)
+	    {
+		ret = PINT_encoding_table[type]->op->decode_resp(input_buffer,
+								  (int)size,
+								  target_msg,
+								  target_addr);
+	    }
+	    break;
+	default:
+	    gossip_lerr("Error: encoding type not supported.\n");
+	    ret = -EINVAL;
+	    break;
     }
-    return -EINVAL;
+
+    return(ret);
 }
 	
 /* PINT_encode_release()
@@ -175,7 +182,7 @@ void PINT_decode_release(
  * returns size of encoded generic ack.
  */
 int PINT_get_encoded_generic_ack_sz(
-				    int type,
+				    enum PINT_encoding_type type,
 				    int op)
 {
     return(PINT_encoding_table[type]->op->encode_gen_ack_sz(op));

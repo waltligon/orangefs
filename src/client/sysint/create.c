@@ -18,8 +18,6 @@
 #include "PINT-reqproto-encode.h"
 #include "pvfs-distribution.h"
 
-#define REQ_ENC_FORMAT 0
-
 extern struct server_configuration_s g_server_config;
 
 static void copy_attributes(PVFS_object_attr *new,PVFS_object_attr old,

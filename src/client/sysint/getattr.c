@@ -18,8 +18,6 @@
 #include "pint-bucket.h"
 #include "PINT-reqproto-encode.h"
 
-#define REQ_ENC_FORMAT 0
-
 /* PVFS_sys_getattr()
  *
  * obtain the attributes of a PVFS file

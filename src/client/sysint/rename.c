@@ -18,9 +18,6 @@
 #include "PINT-reqproto-encode.h"
 #include "pvfs-distribution.h"
 
-#define REQ_ENC_FORMAT 0
-
-
 #if 0
 static int get_bmi_address(bmi_addr_t *io_addr_array, int32_count num_io,\
 		PVFS_handle *handle_array);

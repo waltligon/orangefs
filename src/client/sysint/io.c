@@ -22,9 +22,6 @@
 
 extern job_context_id PVFS_sys_job_context;
 
-/* TODO: where does this define really belong? */
-#define REQ_ENC_FORMAT 0
-
 /* TODO: try to do something to avoid so many mallocs
  * TODO: figure out if we have to do anything special for short
  * reads or writes
@@ -570,7 +567,7 @@ static int io_req_ack_flow_array(bmi_addr_t* addr_array,
 	if(!(error_code_array[i]))
 	{
 	    ret = PINT_encode(&(req_array[i]), PINT_ENCODE_REQ,
-		&(req_encoded_array[i]), addr_array[i], REQ_ENC_FORMAT);
+		&(req_encoded_array[i]), addr_array[i], PINT_CLIENT_ENC_TYPE);
 	    if(ret < 0)
 	    {
 		error_code_array[i] = ret;

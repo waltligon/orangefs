@@ -16,8 +16,6 @@
 #include "pcache.h"
 #include "PINT-reqproto-encode.h"
 
-#define REQ_ENC_FORMAT 0
-
 /* PVFS_sys_readdir()
  *
  * read a directory with specified attributes 

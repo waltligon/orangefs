@@ -25,8 +25,6 @@
 
 #define BKT_STR_SIZE 7
 
-#define REQ_ENC_FORMAT 0
-
 job_context_id PVFS_sys_job_context = -1;
 
 /* pinode cache */

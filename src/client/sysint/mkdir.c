@@ -18,8 +18,6 @@
 #include "pcache.h"
 #include "PINT-reqproto-encode.h"
 
-#define REQ_ENC_FORMAT 0
-
 extern struct server_configuration_s g_server_config;
 
 /* PVFS_sys_mkdir()

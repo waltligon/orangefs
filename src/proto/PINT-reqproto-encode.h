@@ -13,6 +13,14 @@
 
 #include "bmi.h"
 
+/* supported encoding types */
+enum PINT_encoding_type
+{
+    PINT_ENC_DIRECT = 0,
+    PINT_ENC_LE_BFIELD = 1,
+    PINT_ENC_XDR = 2
+};
+
 /* structure to describe messages that have been encoded */
 struct PINT_encoded_msg
 {
@@ -22,14 +30,14 @@ struct PINT_encoded_msg
     PVFS_size* size_list;		    /* size of buffers */
     int list_count;			    /* number of buffers */
     PVFS_size total_size;		    /* aggregate size of encoding */
-    int32_t enc_type;			    /* type of encoding that was used */
+    enum PINT_encoding_type enc_type;	    /* type of encoding that was used */
 };
 
 /* structure to describe messages that have been decoded */
 struct PINT_decoded_msg
 {
     void* buffer;	    /* decoded buffer */
-    int32_t enc_type;	    /* type of encoding that was used */
+    enum PINT_encoding_type enc_type;	    /* type of encoding that was used */
 };
 
 /* types of messages we will encode or decode */
@@ -59,7 +67,7 @@ int PINT_encode(
 		enum PINT_encode_msg_type input_type,
 		struct PINT_encoded_msg* target_msg,
 		bmi_addr_t target_addr,
-		int32_t enc_type
+		enum PINT_encoding_type enc_type
 		);
 
 /* PINT_decode()
@@ -109,7 +117,7 @@ void PINT_decode_release(
  * returns size of encoded generic ack.
  */
 int PINT_get_encoded_generic_ack_sz(
-			 int type,
+			 enum PINT_encoding_type type,
 			 int op
 			 );
 
