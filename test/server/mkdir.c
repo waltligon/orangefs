@@ -167,7 +167,7 @@ int main(int argc, char **argv)	{
 	}
 		
 	/* look at the ack */
-	if(my_ack->op != PVFS_SERV_CREATE)
+	if(my_ack->op != PVFS_SERV_MKDIR)
 	{
 		printf("ERROR: received ack of wrong type (%d)\n", (int)my_ack->op);
 	}
