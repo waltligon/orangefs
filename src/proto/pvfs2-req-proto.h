@@ -55,6 +55,13 @@ enum PVFS_server_op
 };
 #define PVFS_MAX_SERVER_OP 25
 
+/* a private internal type */
+typedef struct
+{
+    enum PVFS_server_op type;
+    char *type_str;
+} __req_resp_type_desc_t;
+
 /******************************************************************/
 /* these values define limits on the maximum size of variable length
  * parameters used within the request protocol

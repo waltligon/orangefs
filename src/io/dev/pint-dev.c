@@ -23,9 +23,13 @@
 #include "gossip.h"
 #include "pint-dev.h"
 
-static int setup_dev_entry(const char* dev_name);
-static int parse_devices(const char* targetfile, const char* devname, 
-    int* majornum);
+static int setup_dev_entry(
+    const char *dev_name);
+
+static int parse_devices(
+    const char *targetfile,
+    const char *devname, 
+    int *majornum);
 
 static int pdev_fd = -1;
 static int32_t pdev_magic;
@@ -39,23 +43,23 @@ static int32_t pdev_max_downsize;
  * returns 0 on success, -PVFS_error on failure
  */
 int PINT_dev_initialize(
-        const char* dev_name,
-        int flags)
+    const char *dev_name,
+    int flags)
 {
     int ret = -1;
 
     /* we have to be root to access the device */
-    if (getuid() != 0 && geteuid() != 0)
+    if ((getuid() != 0) && (geteuid() != 0))
     {
         gossip_err("Error: must be root to open pvfs2 device.\n");
-        return(-(PVFS_EPERM|PVFS_ERROR_DEV));
+        return (-(PVFS_EPERM|PVFS_ERROR_DEV));
     }
 
     /* setup /dev/ entry if needed */
     ret = setup_dev_entry(dev_name);
     if (ret < 0)
     {
-        return(-(PVFS_ENODEV|PVFS_ERROR_DEV));
+        return (-(PVFS_ENODEV|PVFS_ERROR_DEV));
     }
 
     /* try to open the device */
@@ -97,7 +101,7 @@ int PINT_dev_initialize(
         close(pdev_fd);
         return(-(PVFS_ENODEV|PVFS_ERROR_DEV));
     }
-    return(0);
+    return 0;
 }
 
 /* PINT_dev_finalize()
@@ -111,6 +115,7 @@ void PINT_dev_finalize(void)
     if (pdev_fd > -1)
     {
         close(pdev_fd);
+        pdev_fd = -1;
     }
 }
 
@@ -151,7 +156,7 @@ int PINT_dev_get_mapped_region(struct PVFS_dev_map_desc *desc, int size)
         free(desc->ptr);
         return(-(PVFS_ENOMEM|PVFS_ERROR_DEV));
     }
-    return(0);
+    return 0;
 }
 
 /* PINT_dev_put_mapped_region()
@@ -197,8 +202,8 @@ void *PINT_dev_get_mapped_buffer(
  */
 int PINT_dev_test_unexpected(
         int incount,
-        int* outcount,
-        struct PINT_dev_unexp_info* info_array,
+        int *outcount,
+        struct PINT_dev_unexp_info *info_array,
         int max_idle_time)
 {
     int ret = -1, avail = -1, i = 0;
@@ -307,7 +312,7 @@ int PINT_dev_test_unexpected(
             ret = -(PVFS_EIO|PVFS_ERROR_DEV);
             goto dev_test_unexp_error;
         }
-        
+
         magic = (int32_t*)buffer;
         tag = (int64_t*)((unsigned long)buffer + sizeof(int32_t));
 
@@ -335,10 +340,14 @@ dev_test_unexp_error:
     /* release resources we created up to this point */
     for(i = 0; i < *outcount; i++)
     {
-	if(buffer) 
-	    free(buffer);
+        if (buffer)
+        {
+            free(buffer);
+        }
     }
-    return(ret);
+
+    *outcount = 0;
+    return ret;
 }
 
 /* PINT_dev_release_unexpected()
@@ -348,14 +357,14 @@ dev_test_unexp_error:
  * returns 0 on success, -PVFS_error on failure
  */
 int PINT_dev_release_unexpected(
-        struct PINT_dev_unexp_info* info)
+        struct PINT_dev_unexp_info *info)
 {
     int ret = -PVFS_EINVAL;
-    void* buffer = NULL;
+    void *buffer = NULL;
 
     if (info && info->buffer)
     {
-        /* index backwards header size off of the buffer before freeing it */
+        /* index backwards header size off of the buffer before freeing */
         buffer = (void*)((unsigned long)info->buffer - sizeof(int32_t) - 
                          sizeof(int64_t));
         free(buffer);
@@ -363,9 +372,7 @@ int PINT_dev_release_unexpected(
         ret = 0;
     }
 
-    /* safety */
     memset(info, 0, sizeof(struct PINT_dev_unexp_info));
-
     return ret;
 }
 
@@ -375,12 +382,13 @@ int PINT_dev_release_unexpected(
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int PINT_dev_write_list(void **buffer_list,
-                        int *size_list,
-                        int list_count,
-                        int total_size,
-                        enum PINT_dev_buffer_type buffer_type,
-                        PVFS_id_gen_t tag)
+int PINT_dev_write_list(
+    void **buffer_list,
+    int *size_list,
+    int list_count,
+    int total_size,
+    enum PINT_dev_buffer_type buffer_type,
+    PVFS_id_gen_t tag)
 {
     struct iovec io_array[8];
     int io_count = 2;
@@ -415,12 +423,8 @@ int PINT_dev_write_list(void **buffer_list,
     }
 
     ret = writev(pdev_fd, io_array, io_count);
-    if (ret < 0)
-    {
-        return(-(PVFS_EIO|PVFS_ERROR_DEV));
-    }
 
-    return(0);
+    return ((ret < 0) ? -(PVFS_EIO|PVFS_ERROR_DEV) : 0);
 }
 
 /* PINT_dev_remount()
@@ -432,11 +436,12 @@ int PINT_dev_write_list(void **buffer_list,
  */
 int PINT_dev_remount(void)
 {
-    int ret = 0;
+    int ret = -PVFS_EINVAL;
 
-    if (ioctl(pdev_fd, PVFS_DEV_REMOUNT_ALL, NULL) < 0)
+    if (pdev_fd > -1)
     {
-        ret = -PVFS_ERROR_DEV;
+        ret = ((ioctl(pdev_fd, PVFS_DEV_REMOUNT_ALL, NULL) < 0) ?
+               -PVFS_ERROR_DEV : 0);
     }
     return ret;
 }
@@ -452,8 +457,8 @@ int PINT_dev_write(void *buffer,
                    enum PINT_dev_buffer_type buffer_type,
                    PVFS_id_gen_t tag)
 {
-    return(PINT_dev_write_list(
-               &buffer, &size, 1, size, buffer_type, tag));
+    return PINT_dev_write_list(
+        &buffer, &size, 1, size, buffer_type, tag);
 }
 
 /* PINT_dev_memalloc()
@@ -465,7 +470,7 @@ int PINT_dev_write(void *buffer,
 void *PINT_dev_memalloc(int size)
 {
     /* no optimizations yet */
-    return(malloc(size));
+    return malloc(size);
 }
 
 /* PINT_dev_memfree()
@@ -474,7 +479,7 @@ void *PINT_dev_memalloc(int size)
  *
  * no return value
  */
-void PINT_dev_memfree(void* buffer, int size)
+void PINT_dev_memfree(void *buffer, int size)
 {
     free(buffer);
 }
@@ -485,7 +490,7 @@ void PINT_dev_memfree(void* buffer, int size)
  *
  * returns 0 on success, -1 on failure
  */
-static int setup_dev_entry(const char* dev_name)
+static int setup_dev_entry(const char *dev_name)
 {
     int majornum = -1;
     int ret = -1;
@@ -555,14 +560,15 @@ static int setup_dev_entry(const char* dev_name)
  *
  * returns 0 on successs, -1 on failure
  */
-static int parse_devices(const char *targetfile,
-                         const char *devname, 
-                         int *majornum)
+static int parse_devices(
+    const char *targetfile,
+    const char *devname, 
+    int *majornum)
 {
     char line_buf[256];
     char dev_buf[256];
     int major_buf = -1;
-    FILE* devfile = NULL;
+    FILE *devfile = NULL;
     int ret = -1;
 
     /* initialize for safety */

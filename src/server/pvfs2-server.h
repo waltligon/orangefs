@@ -20,9 +20,10 @@
 #include "msgpairarray.h"
 #include "pvfs2-req-proto.h"
 
-/* skip everything except #includes if __SM_CHECK_DEP is already defined; this
- * allows us to get the dependencies right for msgpairarray.sm which relies
- * on conflicting headers for dependency information
+/* skip everything except #includes if __SM_CHECK_DEP is already
+ * defined; this allows us to get the dependencies right for
+ * msgpairarray.sm which relies on conflicting headers for dependency
+ * information
  */
 #ifndef __SM_CHECK_DEP
 extern job_context_id server_job_context;
