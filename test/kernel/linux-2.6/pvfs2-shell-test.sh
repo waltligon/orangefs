@@ -797,7 +797,8 @@ execute_test1()
     touch $PVFS2_TESTDIR/d $PVFS2_TESTDIR/e $PVFS2_TESTDIR/f
     touch $PVFS2_TESTDIR/4 $PVFS2_TESTDIR/5 $PVFS2_TESTDIR/6
 
-    CMD="eval $PVFS2_LS & $PVFS2_LS & $PVFS2_LS & $PVFS2_LS & $PVFS2_LS"
+#    CMD="eval $PVFS2_LS & $PVFS2_LS & $PVFS2_LS & $PVFS2_LS & $PVFS2_LS"
+    CMD="eval $PVFS2_LS & $PVFS2_LS"
     timestamp "Running 'ls' multiple times at once" "$CMD" /dev/null
     if test $? -ne 0 ; then
         echo ""

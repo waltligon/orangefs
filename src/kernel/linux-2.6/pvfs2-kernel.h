@@ -170,7 +170,7 @@ sizeof(int64_t) + sizeof(pvfs2_downcall_t))
 #else
 #define PVFS2_BUFMAP_GFP_FLAGS (GFP_KERNEL)
 #define pvfs2_kmap(page) page_address(page)
-#define pvfs2_kunmap(page) page_address(page)
+#define pvfs2_kunmap(page) do {} while(0)
 #endif /* CONFIG_HIGHMEM */
 
 /************************************
@@ -704,7 +704,8 @@ do {                                                                 \
 #define pvfs2_d_splice_alias(dentry, inode) d_add(dentry, inode)
 #define pvfs2_kernel_readpage block_read_full_page
 #define pvfs2_set_page_reserved(page) SetPageReserved(page)
-#define pvfs2_clear_page_reserved(page) ClearPageReserved(page)
+#define pvfs2_clear_page_reserved(page) \
+do { ClearPageReserved(page); put_page(page); } while(0)
 
 #define fill_default_sys_attrs(sys_attr,type,mode)\
 do                                                \
