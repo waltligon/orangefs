@@ -64,7 +64,7 @@ int test_pvfs_datatype_contig(MPI_Comm *mycomm, int myid, char *buf, void *param
         req_io_out.credentials.uid = 100;
         req_io_out.credentials.gid = 100;
         req_io_out.credentials.perms = U_WRITE|U_READ;
-        req_io_out.buffer = io_buffer_in;
+        req_io_out.buffer = io_buffer_out;
         req_io_out.buffer_size = io_size;
 
         ret = PVFS_Request_contiguous(io_size,PVFS_BYTE,&(req_io_out.io_req));
