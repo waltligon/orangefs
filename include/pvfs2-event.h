@@ -39,8 +39,6 @@ enum PVFS_event_bmi_op
 {
     PVFS_EVENT_BMI_SEND =      (1 << 0),
     PVFS_EVENT_BMI_RECV =      (1 << 1),
-    PVFS_EVENT_BMI_SEND_LIST = (1 << 2),
-    PVFS_EVENT_BMI_RECV_LIST = (1 << 3)
 };
 enum PVFS_event_trove_op
 {

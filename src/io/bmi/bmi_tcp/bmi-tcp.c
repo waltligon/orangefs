@@ -24,6 +24,15 @@
 #include "sockio.h"
 #include "bmi-byteswap.h"
 #include "id-generator.h"
+#include "pint-event.h"
+
+#define BMI_EVENT_START(__op, __size, __id) \
+ PINT_event_timestamp(PVFS_EVENT_API_BMI, __op, __size, __id, \
+ PVFS_EVENT_FLAG_START)
+
+#define BMI_EVENT_END(__op, __size, __id) \
+ PINT_event_timestamp(PVFS_EVENT_API_BMI, __op, __size, __id, \
+ PVFS_EVENT_FLAG_END)
 
 /* function prototypes */
 int BMI_tcp_initialize(method_addr_p listen_addr,
@@ -660,6 +669,7 @@ int BMI_tcp_post_send(bmi_op_id_t * id,
 		      bmi_context_id context_id)
 {
     struct tcp_msg_header my_header;
+    int ret = -1;
 
     /* clear the id field for safety */
     *id = 0;
@@ -682,9 +692,15 @@ int BMI_tcp_post_send(bmi_op_id_t * id,
     my_header.size = size;
     my_header.magic_nr = BMI_MAGIC_NR;
 
-    return (BMI_tcp_post_send_generic(id, dest, &buffer,
+    ret = BMI_tcp_post_send_generic(id, dest, &buffer,
 				      &size, 1, buffer_type, my_header,
-				      user_ptr, context_id));
+				      user_ptr, context_id);
+    if(ret >= 0)
+	BMI_EVENT_START(PVFS_EVENT_BMI_SEND, 0, *id);
+    if(ret == 1)
+	BMI_EVENT_END(PVFS_EVENT_BMI_SEND, size, *id);
+
+    return(ret);
 }
 
 
@@ -705,6 +721,7 @@ int BMI_tcp_post_sendunexpected(bmi_op_id_t * id,
 				bmi_context_id context_id)
 {
     struct tcp_msg_header my_header;
+    int ret = -1;
 
     /* clear the id field for safety */
     *id = 0;
@@ -719,9 +736,15 @@ int BMI_tcp_post_sendunexpected(bmi_op_id_t * id,
     my_header.size = size;
     my_header.magic_nr = BMI_MAGIC_NR;
 
-    return (BMI_tcp_post_send_generic(id, dest, &buffer,
+    ret = BMI_tcp_post_send_generic(id, dest, &buffer,
 				      &size, 1, buffer_type, my_header,
-				      user_ptr, context_id));
+				      user_ptr, context_id);
+    if(ret >= 0)
+	BMI_EVENT_START(PVFS_EVENT_BMI_SEND, 0, *id);
+    if(ret == 1)
+	BMI_EVENT_END(PVFS_EVENT_BMI_SEND, size, *id);
+
+    return(ret);
 }
 
 
@@ -766,6 +789,11 @@ int BMI_tcp_post_recv(bmi_op_id_t * id,
 				buffer_type, tag,
 				user_ptr, context_id);
 
+    if(ret >= 0)
+	BMI_EVENT_START(PVFS_EVENT_BMI_RECV, 0, *id);
+    if(ret == 1)
+	BMI_EVENT_END(PVFS_EVENT_BMI_RECV, *actual_size, *id);
+
     return (ret);
 }
 
@@ -807,6 +835,10 @@ int BMI_tcp_test(bmi_op_id_t id,
 	}
 	(*error_code) = query_op->error_code;
 	(*actual_size) = query_op->actual_size;
+	if(query_op->send_recv == BMI_SEND)
+	    BMI_EVENT_END(PVFS_EVENT_BMI_SEND, *actual_size, id);
+	else
+	    BMI_EVENT_END(PVFS_EVENT_BMI_RECV, *actual_size, id);
 	dealloc_tcp_method_op(query_op);
 	(*outcount)++;
     }
@@ -862,6 +894,10 @@ int BMI_tcp_testsome(int incount,
 		{
 		    user_ptr_array[*outcount] = query_op->user_ptr;
 		}
+		if(query_op->send_recv == BMI_SEND)
+		    BMI_EVENT_END(PVFS_EVENT_BMI_SEND, query_op->actual_size, id_array[i]);
+		else
+		    BMI_EVENT_END(PVFS_EVENT_BMI_RECV, query_op->actual_size, id_array[i]);
 		dealloc_tcp_method_op(query_op);
 		(*outcount)++;
 	    }
@@ -956,6 +992,10 @@ int BMI_tcp_testcontext(int incount,
 	{
 	    user_ptr_array[*outcount] = query_op->user_ptr;
 	}
+	if(query_op->send_recv == BMI_SEND)
+	    BMI_EVENT_END(PVFS_EVENT_BMI_SEND, query_op->actual_size, query_op->op_id);
+	else
+	    BMI_EVENT_END(PVFS_EVENT_BMI_RECV, query_op->actual_size, query_op->op_id);
 	dealloc_tcp_method_op(query_op);
 	(*outcount)++;
     }
@@ -985,6 +1025,7 @@ int BMI_tcp_post_send_list(bmi_op_id_t * id,
 			   bmi_context_id context_id)
 {
     struct tcp_msg_header my_header;
+    int ret = -1;
 
     /* clear the id field for safety */
     *id = 0;
@@ -1008,9 +1049,15 @@ int BMI_tcp_post_send_list(bmi_op_id_t * id,
     my_header.size = total_size;
     my_header.magic_nr = BMI_MAGIC_NR;
 
-    return (BMI_tcp_post_send_generic(id, dest, buffer_list,
+    ret = BMI_tcp_post_send_generic(id, dest, buffer_list,
 				      size_list, list_count, buffer_type,
-				      my_header, user_ptr, context_id));
+				      my_header, user_ptr, context_id);
+    if(ret >= 0)
+	BMI_EVENT_START(PVFS_EVENT_BMI_SEND, 0, *id);
+    if(ret == 1)
+	BMI_EVENT_END(PVFS_EVENT_BMI_SEND, total_size, *id);
+
+    return(ret);
 }
 
 /* BMI_tcp_post_recv_list()
@@ -1045,6 +1092,11 @@ int BMI_tcp_post_recv_list(bmi_op_id_t * id,
 				total_actual_size, buffer_type, tag, user_ptr,
 				context_id);
 
+    if(ret >= 0)
+	BMI_EVENT_START(PVFS_EVENT_BMI_RECV, 0, *id);
+    if(ret == 1)
+	BMI_EVENT_END(PVFS_EVENT_BMI_RECV, *total_actual_size, *id);
+
     return (ret);
 }
 
@@ -1069,6 +1121,7 @@ int BMI_tcp_post_sendunexpected_list(bmi_op_id_t * id,
 				     bmi_context_id context_id)
 {
     struct tcp_msg_header my_header;
+    int ret = -1;
 
     /* clear the id field for safety */
     *id = 0;
@@ -1083,9 +1136,15 @@ int BMI_tcp_post_sendunexpected_list(bmi_op_id_t * id,
     my_header.size = total_size;
     my_header.magic_nr = BMI_MAGIC_NR;
 
-    return (BMI_tcp_post_send_generic(id, dest, buffer_list,
+    ret = BMI_tcp_post_send_generic(id, dest, buffer_list,
 				      size_list, list_count, buffer_type,
-				      my_header, user_ptr, context_id));
+				      my_header, user_ptr, context_id);
+    if(ret >= 0)
+	BMI_EVENT_START(PVFS_EVENT_BMI_SEND, 0, *id);
+    if(ret == 1)
+	BMI_EVENT_END(PVFS_EVENT_BMI_SEND, total_size, *id);
+
+    return(ret);
 }
 
 
