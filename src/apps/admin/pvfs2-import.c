@@ -148,8 +148,15 @@ int main(int argc, char **argv)
     attr.mask = (PVFS_ATTR_SYS_ALL_SETABLE);
     credentials.uid = getuid();
     credentials.gid = getgid();
-    parent_refn.handle = PVFS_util_lookup_parent(pvfs_path,cur_fs);
 
+    ret = PVFS_util_lookup_parent(pvfs_path, cur_fs, credentials, 
+	&parent_refn.handle);
+    if(ret < 0)
+    {
+	PVFS_perror("PVFS_util_lookup_parent", ret);
+	ret = -1;
+	goto main_out;
+    }
     parent_refn.fs_id = cur_fs;
 
     ret = PVFS_sys_create(entry_name, parent_refn, attr, credentials,

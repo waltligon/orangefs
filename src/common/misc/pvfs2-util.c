@@ -300,15 +300,14 @@ void PVFS_util_pvfstab_mntlist_free(pvfs_mntlist *e_p)
  * given a pathname and an fsid, looks up the handle of the parent
  * directory
  *
- * returns handle value on success, 0 on failure
+ * returns 0 on success, -errno on failure
  */
-/* TODO: give this function a way to report error codes */
-/* TODO: make uid, gid passed in later */
-PVFS_handle PVFS_util_lookup_parent(char *filename, PVFS_fs_id fs_id)
+int PVFS_util_lookup_parent(char *filename, PVFS_fs_id fs_id, 
+    PVFS_credentials credentials, PVFS_handle* handle)
 {
     char buf[PVFS_SEGMENT_MAX] = {0};
-    PVFS_credentials credentials;
     PVFS_sysresp_lookup resp_look;
+    int ret = -1;
 
     memset(&resp_look,0,sizeof(PVFS_sysresp_lookup));
 
@@ -319,19 +318,21 @@ PVFS_handle PVFS_util_lookup_parent(char *filename, PVFS_fs_id fs_id)
             gossip_err("Invalid dirname (no leading '/')\n");
         }
         gossip_err("cannot get parent directory of %s\n",filename);
-        return (PVFS_handle)0;
+	/* TODO: use defined name for this */
+	*handle = 0;
+	return(-EINVAL);
     }
 
-    /* retrieve the parent handle */
-    credentials.uid = 100;
-    credentials.gid = 100;
-
-    if (PVFS_sys_lookup(fs_id, buf, credentials ,&resp_look))
+    ret = PVFS_sys_lookup(fs_id, buf, credentials ,&resp_look);
+    if (ret < 0)
     {
         gossip_err("Lookup failed on %s\n",buf);
-        return (PVFS_handle)0;
+	/* TODO: use defined name for this */
+	*handle = 0;
+        return(ret);
     }
-    return resp_look.pinode_refn.handle;
+    *handle = resp_look.pinode_refn.handle;
+    return(0);
 }
 
 /***********************/

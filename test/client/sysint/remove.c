@@ -57,7 +57,13 @@ int main(int argc,char **argv)
     cur_fs = resp_init.fsid_list[0];
 
     entry_name = str_buf;
-    parent_refn.handle = PVFS_util_lookup_parent(filename,cur_fs);
+    ret = PVFS_util_lookup_parent(filename, cur_fs, credentials,
+	&parent_refn.handle);
+    if(ret < 0)
+    {
+	PVFS_perror("PVFS_util_lookup_parent", ret);
+	return(-1);
+    }
     parent_refn.fs_id = cur_fs;
     credentials.uid = 100;
     credentials.gid = 100;

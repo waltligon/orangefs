@@ -70,7 +70,13 @@ int main(int argc, char **argv)
 	time(NULL);
     credentials.uid = 100;
     credentials.gid = 100;
-    parent_refn.handle = PVFS_util_lookup_parent(filename,cur_fs);
+    ret = PVFS_util_lookup_parent(filename, cur_fs, credentials, 
+	&parent_refn.handle);
+    if(ret < 0)
+    {
+	PVFS_perror("PVFS_util_lookup_parent", ret);
+	return(-1);
+    }
     parent_refn.fs_id = cur_fs;
 
     ret = PVFS_sys_create(entry_name, parent_refn, attr,

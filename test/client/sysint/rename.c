@@ -8,6 +8,7 @@
 #include "client.h"
 #include "pvfs2-types.h"
 #include "pvfs2-util.h"
+#include "str-utils.h"
 
 int main(int argc,char **argv)
 {
@@ -73,14 +74,27 @@ int main(int argc,char **argv)
 
     cur_fs = resp_init.fsid_list[0];
 
-    old_entry = old_buf;
-    old_parent_refn.handle = PVFS_util_lookup_parent(old_filename,cur_fs);
-    old_parent_refn.fs_id = cur_fs;
-    new_entry = new_buf;
-    new_parent_refn.handle = PVFS_util_lookup_parent(old_filename,cur_fs);
-    new_parent_refn.fs_id = cur_fs;
     credentials.uid = 100;
     credentials.gid = 100;
+
+    old_entry = old_buf;
+    ret = PVFS_util_lookup_parent(old_filename, cur_fs, credentials,
+	&old_parent_refn.handle);
+    if(ret < 0)
+    {
+	PVFS_perror("PVFS_util_lookup_parent", ret);
+	return(-1);
+    }
+    old_parent_refn.fs_id = cur_fs;
+    new_entry = new_buf;
+    ret = PVFS_util_lookup_parent(old_filename, cur_fs, credentials,
+	&new_parent_refn.handle);
+    if(ret < 0)
+    {
+	PVFS_perror("PVFS_util_lookup_parent", ret);
+	return(-1);
+    }
+    new_parent_refn.fs_id = cur_fs;
 
     ret = PVFS_sys_rename(old_entry, old_parent_refn, new_entry, 
 			new_parent_refn, credentials);
