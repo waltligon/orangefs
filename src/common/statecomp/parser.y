@@ -84,6 +84,7 @@ state_machine	  : .NESTED. MACHINE identifier
 		     LPAREN .state_decl_list. RPAREN LBRACE
 			{gen_machine($3, $6->name);}
 		    .state_def_list. RBRACE
+			 {;}
 		  ;
 
 .NESTED.	  : /* empty */
