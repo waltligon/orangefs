@@ -99,38 +99,95 @@ void getconfig_init_state_machine(void)
 static int getconfig_init(PINT_server_op *s_op, job_status_s *ret)
 {
 
-    server_configuration_s *user_opts;
+    int i = 0;
     int job_post_ret = 1;
-    int i;
-    filesystem_configuration_s *file_system;
+    char *meta_server, *data_server;
+    struct llist *cur = NULL;
+    struct host_alias_s *cur_alias = NULL;
+    struct server_configuration_s *user_opts;
+    struct filesystem_configuration_s *cur_fs;
 
     user_opts = get_server_config_struct();
 
-    /* Set up the values we have in our Config Struct user_opts */
-    for(i=0;i<user_opts->number_filesystems;i++)
+    assert(user_opts);
+
+    cur = user_opts->file_systems;
+    while(cur)
     {
-	if(strcmp(s_op->req->u.getconfig.fs_name,
-		    user_opts->file_systems[i]->file_system_name) == 0)
-	    break;
+        cur_fs = llist_head(cur);
+        if (!cur_fs)
+        {
+            break;
+        }
+        if (strcmp(s_op->req->u.getconfig.fs_name,
+                   cur_fs->file_system_name) == 0)
+        {
+            break;
+        }
+        cur = llist_next(cur);
     }
 
-    if(i == user_opts->number_filesystems)
+    if (!cur_fs)
     {
-	ret->error_code = -99;
-	return(1);
+        ret->error_code = -99;
+        return 1;
     }
 
-    file_system = user_opts->file_systems[i];
+    s_op->resp->u.getconfig.meta_server_count = llist_count(cur_fs->meta_server_list);
+    s_op->resp->u.getconfig.io_server_count = llist_count(cur_fs->data_server_list);
 
-    s_op->resp->u.getconfig.meta_server_count = file_system->count_meta_servers;
-    s_op->resp->u.getconfig.io_server_count = file_system->count_io_servers;
+    /* FIXME: BEGIN HACK for backward getconfig compatibility */
+    gossip_lerr("KLUDGE: Faking meta and data server in getconfig response.\n");
 
-    /* The new way of doing things because we have an encoding system! dw*/
-    s_op->resp->u.getconfig.meta_server_mapping = file_system->meta_server_list;
-    s_op->resp->u.getconfig.io_server_mapping = file_system->io_server_list;
-    s_op->resp->u.getconfig.fs_id = file_system->coll_id;
-    s_op->u.getconfig.strsize = strlen(file_system->meta_server_list)+1;
-    s_op->u.getconfig.strsize += strlen(file_system->io_server_list)+1;
+    assert(s_op->resp->u.getconfig.meta_server_count == 1);
+    assert(s_op->resp->u.getconfig.io_server_count == 1);
+
+    cur = user_opts->file_systems;
+    cur_fs = llist_head(cur);
+
+    meta_server = (char *)llist_head(cur_fs->meta_server_list);
+    data_server = (char *)llist_head(cur_fs->data_server_list);
+
+    /* get alias for meta server */
+    cur = user_opts->host_aliases;
+    while(cur)
+    {
+        cur_alias = llist_head(cur);
+        if (!cur_alias)
+        {
+            break;
+        }
+        if (strcmp(cur_alias->host_alias,meta_server) == 0)
+        {
+            meta_server = cur_alias->bmi_address;
+            break;
+        }
+        cur = llist_next(cur);
+    }
+
+    /* get alias for io server */
+    cur = user_opts->host_aliases;
+    while(cur)
+    {
+        cur_alias = llist_head(cur);
+        if (!cur_alias)
+        {
+            break;
+        }
+        if (strcmp(cur_alias->host_alias,data_server) == 0)
+        {
+            data_server = cur_alias->bmi_address;
+            break;
+        }
+        cur = llist_next(cur);
+    }
+
+    s_op->resp->u.getconfig.meta_server_mapping = meta_server;
+    s_op->resp->u.getconfig.io_server_mapping = data_server;
+    s_op->resp->u.getconfig.fs_id = cur_fs->coll_id;
+    s_op->u.getconfig.strsize = strlen(meta_server);
+    s_op->u.getconfig.strsize += strlen(data_server);
+    /* FIXME: END HACK for backward getconfig compatibility */
 
     /* Set up the key/val pair for trove to get root handle */
     s_op->key.buffer = Trove_Common_Keys[ROOT_HANDLE_KEY].key;

@@ -5,515 +5,611 @@
 #include <unistd.h>
 #include <linux/types.h>
 #include <linux/dirent.h>
+#include <assert.h>
+#include <ctype.h>
 
-
-#include <dotconf.h>
-
-#include <trove.h>
-#include <server-config.h>
-#include <pvfs2-storage.h>
-#include <job.h>
-#include <gossip.h>
+#include "dotconf.h"
+#include "trove.h"
+#include "server-config.h"
+#include "pvfs2-storage.h"
+#include "job.h"
+#include "gossip.h"
 
 static DOTCONF_CB(get_pvfs_server_id);
-static DOTCONF_CB(enable_tcp);
-static DOTCONF_CB(get_unexp_req);
-static DOTCONF_CB(enable_gm);
-static DOTCONF_CB(get_metaserver_list);
 static DOTCONF_CB(get_storage_space);
-static DOTCONF_CB(get_ioserver_list);
-static DOTCONF_CB(get_filesystem_name);
+static DOTCONF_CB(enter_defaults_context);
+static DOTCONF_CB(exit_defaults_context);
+static DOTCONF_CB(enter_aliases_context);
+static DOTCONF_CB(exit_aliases_context);
 static DOTCONF_CB(enter_filesystem_context);
 static DOTCONF_CB(exit_filesystem_context);
-static DOTCONF_CB(get_bucket_table_list);
-static DOTCONF_CB(get_bucket_table);
+static DOTCONF_CB(enter_bucket_context);
+static DOTCONF_CB(exit_bucket_context);
+static DOTCONF_CB(get_metaserver_list);
+static DOTCONF_CB(get_dataserver_list);
+static DOTCONF_CB(get_unexp_req);
+static DOTCONF_CB(get_filesystem_name);
+static DOTCONF_CB(get_alias_list);
+static DOTCONF_CB(get_bucket_list);
 
-static const configoption_t options[] = {
-	{"HostID",ARG_STR, get_pvfs_server_id,NULL,CTX_ALL},
-	{"BMI_TCP_Enable",ARG_TOGGLE, enable_tcp,NULL,CTX_ALL},
-	{"BMI_GM_Enable",ARG_STR, enable_gm,NULL,CTX_ALL},
-	{"StorageSpace",ARG_STR, get_storage_space,NULL,CTX_ALL},
-	{"<FileSystem>",ARG_NONE, enter_filesystem_context,NULL,CTX_ALL},
-	{"</FileSystem>",ARG_NONE, exit_filesystem_context,NULL,CTX_ALL},
-	{"MetaServerList",ARG_LIST, get_metaserver_list,NULL,CTX_ALL},
-	{"IoServerList",ARG_LIST, get_ioserver_list,NULL,CTX_ALL},
-	{"UnexpectedRequests",ARG_INT, get_unexp_req,NULL,CTX_ALL},
-	{"BucketTable",ARG_LIST, get_bucket_table,NULL,CTX_ALL},
-	{"BucketTableList",ARG_INT, get_bucket_table_list,NULL,CTX_ALL},
-	{"FS_Name",ARG_STR, get_filesystem_name,NULL,CTX_ALL},
-	/*{"<MetaServerConfig>", ARG_NONE, start_meta_server_config, NULL, CTX_ALL },*/
-	/*{"</MetaServerConfig>", ARG_NONE, end_meta_server_config, NULL, CTX_ALL },*/
-	/*{"<IOServerConfig>", ARG_NONE, start_io_server_config, NULL, CTX_ALL },*/
-	/*{"</IOServerConfig>", ARG_NONE, end_io_server_config, NULL, CTX_ALL },*/
-	LAST_OPTION
+/* misc helper functions */
+static int is_valid_alias(char *str);
+static int is_valid_bucket_range_description(char *b_range);
+static int is_valid_filesystem_configuration(struct filesystem_configuration_s *fs);
+static void free_host_bucket_mapping(void *ptr);
+static void free_host_alias(void *ptr);
+static void free_filesystem(void *ptr);
+
+static struct server_configuration_s *config_s = NULL;
+
+static const configoption_t options[] =
+{
+    {"HostID",ARG_STR, get_pvfs_server_id,NULL,CTX_ALL},
+    {"StorageSpace",ARG_STR, get_storage_space,NULL,CTX_ALL},
+    {"<Defaults>",ARG_NONE, enter_defaults_context,NULL,CTX_ALL},
+    {"</Defaults>",ARG_NONE, exit_defaults_context,NULL,CTX_ALL},
+    {"<Aliases>",ARG_NONE, enter_aliases_context,NULL,CTX_ALL},
+    {"</Aliases>",ARG_NONE, exit_aliases_context,NULL,CTX_ALL},
+    {"Alias",ARG_LIST, get_alias_list,NULL,CTX_ALL},
+    {"<FileSystem>",ARG_NONE, enter_filesystem_context,NULL,CTX_ALL},
+    {"</FileSystem>",ARG_NONE, exit_filesystem_context,NULL,CTX_ALL},
+    {"<Buckets>",ARG_NONE, enter_bucket_context,NULL,CTX_ALL},
+    {"</Buckets>",ARG_NONE, exit_bucket_context,NULL,CTX_ALL},
+    {"Bucket",ARG_LIST, get_bucket_list,NULL,CTX_ALL},
+    {"MetaServerList",ARG_LIST, get_metaserver_list,NULL,CTX_ALL},
+    {"DataServerList",ARG_LIST, get_dataserver_list,NULL,CTX_ALL},
+    {"UnexpectedRequests",ARG_INT, get_unexp_req,NULL,CTX_ALL},
+    {"FS_Name",ARG_STR, get_filesystem_name,NULL,CTX_ALL},
+    LAST_OPTION
 };
 
-static struct server_configuration_s *config_s;  /* For the configuration */
-
-DOTCONF_CB(get_bucket_table_list)
-{
-	return NULL;
-}
-DOTCONF_CB(get_bucket_table)
-{
-	return NULL;
-}
-/***********************************/
-/***********************************/
-/* System Verified from here down! */
-/***********************************/
-/***********************************/
-	
 /*
  * Function: server_config
  *
- * Params:   int argc,
+ * Params:   struct server_configuration_s*,
+ *           int argc,
  *           char **argv
  *
- * Returns:  struct server_configuration_s*
+ * Returns:  0 on success; 1 on failure
  *
  * Synopsis: Parse the config file according to parameters set
  *           configuration struct above.
  *           
  */
-
-struct server_configuration_s *PINT_server_config(int argc, char **argv)
+int PINT_server_config(struct server_configuration_s *config_obj,
+                       int argc, char **argv)
 {
-	configfile_t *configfile;
+    configfile_t *configfile = (configfile_t *)0;
 
-	config_s = (server_configuration_s *) malloc(sizeof(server_configuration_s));
-	memset(config_s,0,sizeof(server_configuration_s));
+    if (!config_obj)
+    {
+        gossip_err("Invalid server_configuration_s object\n");
+        return 1;
+    }
 
-	/* Lets support a max of PINT_SERVER_MAX_FILESYSTEMS */
-	config_s->file_system_names = (char **) malloc(sizeof(char *)*PINT_SERVER_MAX_FILESYSTEMS);
-	config_s->file_systems = (filesystem_configuration_s **) \
-				malloc(sizeof(filesystem_configuration_s *)*PINT_SERVER_MAX_FILESYSTEMS);
+    /* global assignment */
+    config_s = config_obj;
 
-	config_s->configuration_context = GLOBAL_CONFIG;
+    config_s->host_id = NULL;
+    config_s->storage_path = NULL;
+    config_s->host_aliases = NULL;
+    config_s->file_systems = NULL;
 
-	configfile = dotconf_create(argv[1] ? argv[1] : "simple.conf",
-					options, NULL, CASE_INSENSITIVE);
+    /* first read in the fs.conf defaults config file */
+    config_s->configuration_context = GLOBAL_CONFIG;
+    configfile = dotconf_create(argv[1] ? argv[1] : "fs.conf",
+                                options, NULL, CASE_INSENSITIVE);
+    if (!configfile)
+    {
+        gossip_err("Error opening config file\n");
+        return 1;
+    }
 
-	if (!configfile)
-	{
-		gossip_err("Error opening config file\n");
-		return NULL;
-	}
+    if (dotconf_command_loop(configfile) == 0)
+        gossip_err("Error reading config file\n");
 
-	if (dotconf_command_loop(configfile) == 0)
-		gossip_err("Error reading config file\n");
+    dotconf_cleanup(configfile);
 
-	dotconf_cleanup(configfile);
+    /* then read in the server.conf (host specific) config file */
+    config_s->configuration_context = GLOBAL_CONFIG;
+    configfile = dotconf_create(argv[2] ? argv[2] : "server.conf",
+                                options, NULL, CASE_INSENSITIVE);
+    if (!configfile)
+    {
+        gossip_err("Error opening config file\n");
+        return 1;
+    }
 
-	/* TODO: Fix the default pointers for meta and io servers here ! */
+    if (dotconf_command_loop(configfile) == 0)
+        gossip_err("Error reading config file\n");
 
-#ifndef DEBUG_SERVER_CONFIG
-
-	gossip_debug(SERVER_DEBUG,"\n\nConfig File Read: \nValues:\n=========\n");
-	gossip_debug(SERVER_DEBUG,"Registering Server as: %s\n",config_s->host_id);
-	if(config_s->bmi_protocols & ENABLE_BMI_TCP)
-		gossip_debug(SERVER_DEBUG,"BMI_TCP Enabled\n");
-	if(config_s->bmi_protocols & ENABLE_BMI_GM)
-		gossip_debug(SERVER_DEBUG,"BMI_GM Enabled\n");
-	gossip_debug(SERVER_DEBUG,"Total file_systems registered is %d\n",config_s->number_filesystems);
-#if 0
-	gossip_debug(SERVER_DEBUG,"Meta Servers Were: %s\n",config_s->meta_server_list);
-	gossip_debug(SERVER_DEBUG,"Meta Server Count Was: %d\n",config_s->count_meta_servers);
-	gossip_debug(SERVER_DEBUG,"IO Servers Were: %s\n",config_s->io_server_list);
-	gossip_debug(SERVER_DEBUG,"IO Server Count Was: %d\n",config_s->count_io_servers);
-#endif
-
-#endif
-
-	return config_s;
+    dotconf_cleanup(configfile);
+    return 0;
 }
-	
-/*
- * Function: get_filesystem_name
- *
- * Params:   command_t *cmd,
- *           context_t *ctx
- *
- * Returns:  const char *
- *
- * Synopsis: 
- *           
- */
-
-DOTCONF_CB(get_filesystem_name)
-{
-	char *name;
-
-	if(config_s->configuration_context != FILESYSTEM_CONFIG)
-	{
-		gossip_lerr("FS_Name Tags can only be within filesystem tags");
-		return NULL;
-	}
-	name = config_s->file_systems[config_s->number_filesystems]->file_system_name = 
-		(char *) malloc(strlen(cmd->data.str)+1);
-	memset(name,0,strlen(cmd->data.str)+1);
-	strcpy(name,cmd->data.str);
-	return NULL;
-}
-
-/*
- * Function: get_storage_space
- *
- * Params:   command_t *cmd,
- *           context_t *ctx
- *
- * Returns:  const char *
- *
- * Synopsis: 
- *           
- */
-DOTCONF_CB(get_storage_space)
-{
-	char *name;
-	if(config_s->configuration_context != GLOBAL_CONFIG)
-	{
-		gossip_lerr("Storage Space Tag can only be global");
-		return NULL;
-	}
-	if(config_s->storage_path)
-	{
-		gossip_lerr("Storage Space Tag being overwritten... You prolly don't wanna be doing that.");
-		free(config_s->storage_path);
-	}
-	name = config_s->storage_path = (char *) malloc(strlen(cmd->data.str)+1);
-	memset(name,0,strlen(cmd->data.str)+1);
-	strcpy(name,cmd->data.str);
-	return NULL;
-}
-
-
-/*
- * Function: get_metaserver_list
- *
- * Params:   command_t *cmd,
- *           context_t *ctx
- *
- * Returns:  const char *
- *
- * Synopsis: Take the list of meta servers and put them into a 
- *           contiguous string, delimiting by ;
- *           
- */
-
-DOTCONF_CB(get_metaserver_list)
-{
-
-	int str_size = 0;
-	int current_index = 0;
-	int i;
-	char *meta_server_location;
-
-	/* Calculate String Size */
-	for(i=0;i<cmd->arg_count;i++)
-	{
-		str_size+=strlen(cmd->data.list[i]) +1;
-	}
-
-	if(config_s->configuration_context == GLOBAL_CONFIG)
-	{
-		if(!config_s->default_meta_server_list)
-		{
-			gossip_debug(SERVER_DEBUG,"Setting Default Meta_servers\n");
-			meta_server_location = config_s->default_meta_server_list = (char *) malloc(str_size);
-		}
-		else
-		{
-			gossip_lerr("WARNING: Overwriting default metaservers.  I am sure this is NOT\
-what you want to do.\n");
-			free(config_s->default_meta_server_list);
-			meta_server_location = config_s->default_meta_server_list = (char *) malloc(str_size);
-		}
-		config_s->default_count_meta_servers = cmd->arg_count;
-	}
-	else
-	{
-		if(!config_s->file_systems[config_s->number_filesystems]->meta_server_list)
-		{
-			
-			meta_server_location = 
-				config_s->file_systems[config_s->number_filesystems]->meta_server_list =
-				(char *) malloc(str_size);
-		}
-		else
-		{
-			gossip_lerr("WARNING: Overwriting default metaservers.  I am sure this is NOT\
-what you want to do.\n");
-			free(config_s->file_systems[config_s->number_filesystems]->meta_server_list);
-			meta_server_location = 
-				config_s->file_systems[config_s->number_filesystems]->meta_server_list =
-				(char *) malloc(str_size);
-		}
-		config_s->file_systems[config_s->number_filesystems]->count_meta_servers = cmd->arg_count;
-	}
-
-
-	memset(meta_server_location,0,str_size);
-	current_index=-1;
-	for(i=0;i<cmd->arg_count;i++)
-	{
-		meta_server_location[current_index > 0 ? current_index : 0] = ';';
-
-		memcpy(&meta_server_location[current_index+1],cmd->data.list[i],strlen(cmd->data.list[i])+1);
-
-		/* find the null character and tell me the length */
-		current_index = strlen(meta_server_location); 
-	}
-
-	return NULL;
-
-}
-
-/*
- * Function: get_ioserver_list
- *
- * Params:   command_t *cmd,
- *           context_t *ctx
- *
- * Returns:  const char *
- *
- * Synopsis: Take the list of io servers and put them into a 
- *           contiguous string, delimiting by ;
- *           
- */
-
-DOTCONF_CB(get_ioserver_list)
-{
-
-	int str_size = 0;
-	int current_index = 0;
-	int i;
-	char *io_server_location;
-
-	/* Calculate String Size */
-	for(i=0;i<cmd->arg_count;i++)
-	{
-		str_size+=strlen(cmd->data.list[i]) +1;
-	}
-
-	if(config_s->configuration_context == GLOBAL_CONFIG)
-	{
-		if(!config_s->default_io_server_list)
-		{
-			gossip_debug(SERVER_DEBUG,"Setting Default IO_servers\n");
-			io_server_location = config_s->default_io_server_list = (char *) malloc(str_size);
-		}
-		else
-		{
-			gossip_lerr("WARNING: Overwriting default ioservers.  I am sure this is NOT\
-what you want to do.\n");
-			free(config_s->default_io_server_list);
-			io_server_location = config_s->default_io_server_list = (char *) malloc(str_size);
-		}
-		config_s->default_count_io_servers = cmd->arg_count;
-	}
-	else
-	{
-		if(!config_s->file_systems[config_s->number_filesystems]->io_server_list)
-		{
-			
-			io_server_location = 
-				config_s->file_systems[config_s->number_filesystems]->io_server_list =
-				(char *) malloc(str_size);
-		}
-		else
-		{
-			gossip_lerr("WARNING: Overwriting default ioservers.  I am sure this is NOT\
-what you want to do.\n");
-			free(config_s->file_systems[config_s->number_filesystems]->io_server_list);
-			io_server_location = 
-				config_s->file_systems[config_s->number_filesystems]->io_server_list =
-				(char *) malloc(str_size);
-		}
-		config_s->file_systems[config_s->number_filesystems]->count_io_servers = cmd->arg_count;
-	}
-
-
-	memset(io_server_location,0,str_size);
-	current_index=-1;
-	for(i=0;i<cmd->arg_count;i++)
-	{
-		io_server_location[current_index > 0 ? current_index : 0] = ';';
-
-		memcpy(&io_server_location[current_index+1],cmd->data.list[i],strlen(cmd->data.list[i])+1);
-
-		/* find the null character and tell me the length */
-		current_index = strlen(io_server_location); 
-	}
-
-	return NULL;
-}
-
-/*
- * Function: get_pvfs_server_id
- *
- * Params:   command_t *cmd,
- *           context_t *ctx
- *
- * Returns:  const char *
- *
- * Synopsis: get my host name!
- *           
- *           
- */
 
 DOTCONF_CB(get_pvfs_server_id)
 {
-
-	config_s->host_id = (char *) malloc(strlen(cmd->data.str)+1);
-	memset(config_s->host_id,0,strlen(cmd->data.str));
-	memcpy(config_s->host_id,cmd->data.str,strlen(cmd->data.str)+1);
-	return NULL;
-
+    if (config_s->configuration_context != GLOBAL_CONFIG)
+    {
+        gossip_lerr("HostID Tags can only be within the Global context");
+        return NULL;
+    }
+    if (config_s->host_id)
+    {
+        gossip_lerr("WARNING: HostID value being overwritten.");
+        free(config_s->host_id);
+    }
+    config_s->host_id = strdup(cmd->data.str);
+    return NULL;
 }
 
-/*
- * Function: get_unexp_req
- *
- * Params:   command_t *cmd,
- *           context_t *ctx
- *
- * Returns:  const char *
- *
- * Synopsis: Sets the number of initial unexpected requests
- *           TODO: do we need this?
- *           
- */
-
-DOTCONF_CB(get_unexp_req)
+DOTCONF_CB(get_storage_space)
 {
-
-	config_s->initial_unexpected_requests = cmd->data.value;
-	return NULL;
-
+    if (config_s->configuration_context != DEFAULTS_CONFIG)
+    {
+        gossip_lerr("StorageSpace Tag can only be in a Defaults block");
+        return NULL;
+    }
+    if (config_s->storage_path)
+    {
+        gossip_lerr("WARNING: StorageSpace value being overwritten.\n");
+        free(config_s->storage_path);
+    }
+    config_s->storage_path = strdup(cmd->data.str);
+    return NULL;
 }
 
-
-
-/*
- * Function: enable_gm
- *
- * Params:   command_t *cmd,
- *           context_t *ctx
- *
- * Returns:  const char *
- *
- * Synopsis: gets the location of the GM library path
- *           
- *           
- */
-
-DOTCONF_CB(enable_gm)
+DOTCONF_CB(enter_defaults_context)
 {
-
-	if(cmd->data.value == 1)
-		config_s->bmi_protocols = config_s->bmi_protocols || ENABLE_BMI_GM;
-	return NULL;
-
+    if (config_s->configuration_context != GLOBAL_CONFIG)
+    {
+        gossip_lerr("Error in context.  Cannot have Defaults tag here\n");
+        return NULL;
+    }
+    config_s->configuration_context = DEFAULTS_CONFIG;
+    return NULL;
 }
 
-/*
- * Function: enable_tcp
- *
- * Params:   command_t *cmd,
- *           context_t *ctx
- *
- * Returns:  const char *
- *
- * Synopsis: Sets the flag to enable TCP communication for BMI
- *           
- *           
- */
-
-DOTCONF_CB(enable_tcp)
+DOTCONF_CB(exit_defaults_context)
 {
-
-	if(cmd->data.value == 1)
-		config_s->bmi_protocols = config_s->bmi_protocols || ENABLE_BMI_TCP;
-	return NULL;
-
+    if (config_s->configuration_context != DEFAULTS_CONFIG)
+    {
+        gossip_lerr("Error in context.  Cannot have /Defaults tag here\n");
+        return NULL;
+    }
+    config_s->configuration_context = GLOBAL_CONFIG;
+    return NULL;
 }
 
-/*
- * Function: enter_filesystem_context
- *
- * Params:   command_t *cmd,
- *           context_t *ctx
- *
- * Returns:  const char *
- *
- * Synopsis: Allocate a new struct for a filesystem.  
- *           Note we do not increment the number of
- *           file systems until we are done.
- *           
- *           
- */
+DOTCONF_CB(enter_aliases_context)
+{
+    if (config_s->configuration_context != GLOBAL_CONFIG)
+    {
+        gossip_lerr("Error in context.  Cannot have Aliases tag here\n");
+        return NULL;
+    }
+    config_s->configuration_context = ALIASES_CONFIG;
+    return NULL;
+}
+
+DOTCONF_CB(exit_aliases_context)
+{
+    if (config_s->configuration_context != ALIASES_CONFIG)
+    {
+        gossip_lerr("Error in context.  Cannot have /Aliases tag here\n");
+        return NULL;
+    }
+    config_s->configuration_context = GLOBAL_CONFIG;
+    return NULL;
+}
 
 DOTCONF_CB(enter_filesystem_context)
 {
+    struct filesystem_configuration_s *fs_conf = NULL;
 
-	if(config_s->configuration_context != GLOBAL_CONFIG)
-	{
-		gossip_lerr("Error in context.  Cannot have filesystem tag here\n");
-		return NULL;
-	}
+    if (config_s->host_aliases == NULL)
+    {
+        gossip_lerr("Error in context.  Filesystem tag cannot "
+                    "be declared before an Aliases tag.\n");
+        return NULL;
+    }
 
-	config_s->file_systems[config_s->number_filesystems] = (filesystem_configuration_s *)
-			malloc(sizeof(filesystem_configuration_s));
+    if (config_s->configuration_context != GLOBAL_CONFIG)
+    {
+        gossip_lerr("Error in context.  Cannot have Filesystem tag here\n");
+        return NULL;
+    }
 
-	memset(config_s->file_systems[config_s->number_filesystems],0,sizeof(filesystem_configuration_s));
-	
-	config_s->configuration_context = FILESYSTEM_CONFIG;
+    fs_conf = (struct filesystem_configuration_s *)
+        malloc(sizeof(struct filesystem_configuration_s));
+    assert(fs_conf);
+    memset(fs_conf,0,sizeof(struct filesystem_configuration_s));
 
-	return NULL;
-
+    if (!config_s->file_systems)
+    {
+        config_s->file_systems = llist_new();
+    }
+    llist_add_to_head(config_s->file_systems,(void *)fs_conf);
+    assert(llist_head(config_s->file_systems) == (void *)fs_conf);
+    config_s->configuration_context = FILESYSTEM_CONFIG;
+    return NULL;
 }
-
-/*
- * Function: exit_filesystem_context
- *
- * Params:   command_t *cmd,
- *           context_t *ctx
- *
- * Returns:  const char *
- *
- * Synopsis: So the only tricky part here is how to set the metaserver stuff...
- *           TODO: When do we update the default pointers?
- *           
- *           
- */
 
 DOTCONF_CB(exit_filesystem_context)
 {
+    struct filesystem_configuration_s *fs_conf = NULL;
 
-	if(config_s->configuration_context != FILESYSTEM_CONFIG)
-	{
-		gossip_lerr("Error in context.  Cannot have /filesystem tag here\n");
-		return NULL;
-	}
-	if(!config_s->file_systems[config_s->number_filesystems]->file_system_name)
-	{
-		gossip_lerr("File system must have name %ld\n",cmd->configfile->line);
-		return NULL;
-	}
-	if(!config_s->file_systems[config_s->number_filesystems]->meta_server_list)
-	{
-		gossip_lerr("Warning: Using default metaservers for filesystem %s\n",
-				config_s->file_systems[config_s->number_filesystems]->file_system_name);
-	}
-	if(!config_s->file_systems[config_s->number_filesystems]->io_server_list)
-	{
-		gossip_lerr("Warning: Using default ioservers for filesystem %s\n",
-				config_s->file_systems[config_s->number_filesystems]->file_system_name);
-	}
-	config_s->number_filesystems++;
-	config_s->configuration_context = GLOBAL_CONFIG;
-	return NULL;
+    if (config_s->configuration_context != FILESYSTEM_CONFIG)
+    {
+        gossip_lerr("Error in context.  Cannot have /Filesystem tag here\n");
+        return NULL;
+    }
 
+    fs_conf = (struct filesystem_configuration_s *)
+        llist_head(config_s->file_systems);
+    assert(fs_conf);
+
+    /* make sure last fs config object is valid */
+    if (!is_valid_filesystem_configuration(fs_conf))
+    {
+        gossip_lerr("Error in context.  Cannot have /Filesystem tag "
+                    "before all filesystem attributes are declared\n");
+        return NULL;
+    }
+
+    config_s->configuration_context = GLOBAL_CONFIG;
+    return NULL;
+}
+
+DOTCONF_CB(enter_bucket_context)
+{
+    if (config_s->configuration_context != FILESYSTEM_CONFIG)
+    {
+        gossip_lerr("Error in context.  Cannot have Buckets tag here\n");
+        return NULL;
+    }
+    config_s->configuration_context = BUCKETS_CONFIG;
+    return NULL;
+}
+
+DOTCONF_CB(exit_bucket_context)
+{
+    struct filesystem_configuration_s *fs_conf = NULL;
+
+    if (config_s->configuration_context != BUCKETS_CONFIG)
+    {
+        gossip_lerr("Error in context.  Cannot have /Buckets tag here\n");
+        return NULL;
+    }
+
+    fs_conf = (struct filesystem_configuration_s *)
+        llist_head(config_s->file_systems);
+    assert(fs_conf);
+
+    if (!fs_conf->bucket_ranges)
+    {
+        gossip_lerr("Error! No valid bucket ranges added to %s\n",
+                    fs_conf->file_system_name);
+    }
+    config_s->configuration_context = FILESYSTEM_CONFIG;
+    return NULL;
+}
+
+DOTCONF_CB(get_metaserver_list)
+{
+    int i = 0;
+    struct filesystem_configuration_s *fs_conf = NULL;
+
+    if (config_s->configuration_context != FILESYSTEM_CONFIG)
+    {
+        gossip_lerr("Error in context.  Cannot have MetaServerList tag here\n");
+        return NULL;
+    }
+
+    fs_conf = (struct filesystem_configuration_s *)
+        llist_head(config_s->file_systems);
+    assert(fs_conf);
+
+    if (!fs_conf->meta_server_list)
+    {
+        fs_conf->meta_server_list = llist_new();
+    }
+
+    for(i = 0; i < cmd->arg_count; i++)
+    {
+        if (is_valid_alias(cmd->data.list[i]))
+        {
+            llist_add_to_head(fs_conf->meta_server_list,
+                              (void *)strdup(cmd->data.list[i]));
+        }
+        else
+        {
+            gossip_lerr("Error! %s is an unrecognized alias\n",
+                        cmd->data.list[i]);
+        }
+    }
+    return NULL;
+}
+
+DOTCONF_CB(get_dataserver_list)
+{
+    int i = 0;
+    struct filesystem_configuration_s *fs_conf = NULL;
+
+    if (config_s->configuration_context != FILESYSTEM_CONFIG)
+    {
+        gossip_lerr("Error in context.  Cannot have DataServerList tag here\n");
+        return NULL;
+    }
+
+    fs_conf = (struct filesystem_configuration_s *)
+        llist_head(config_s->file_systems);
+    assert(fs_conf);
+
+    if (!fs_conf->data_server_list)
+    {
+        fs_conf->data_server_list = llist_new();
+    }
+
+    for(i = 0; i < cmd->arg_count; i++)
+    {
+        if (is_valid_alias(cmd->data.list[i]))
+        {
+            llist_add_to_tail(fs_conf->data_server_list,
+                              (void *)strdup(cmd->data.list[i]));
+        }
+        else
+        {
+            gossip_lerr("Error! %s is an unrecognized alias\n",
+                        cmd->data.list[i]);
+        }
+    }
+    return NULL;
+}
+
+DOTCONF_CB(get_unexp_req)
+{
+    if (config_s->configuration_context != DEFAULTS_CONFIG)
+    {
+        gossip_lerr("UnexpectedRequests Tag can only be in a Defaults block");
+        return NULL;
+    }
+    config_s->initial_unexpected_requests = cmd->data.value;
+    return NULL;
+}
+
+DOTCONF_CB(get_filesystem_name)
+{
+    struct filesystem_configuration_s *fs_conf = NULL;
+
+    if (config_s->configuration_context != FILESYSTEM_CONFIG)
+    {
+        gossip_lerr("FS_Name Tags can only be within Filesystem tags");
+        return NULL;
+    }
+    fs_conf = (struct filesystem_configuration_s *)
+        llist_head(config_s->file_systems);
+    if (fs_conf->file_system_name)
+    {
+        gossip_lerr("WARNING: Overwriting %s with %s\n",
+                    fs_conf->file_system_name,cmd->data.str);
+    }
+    fs_conf->file_system_name = strdup(cmd->data.str);
+    return NULL;
+}
+
+DOTCONF_CB(get_alias_list)
+{
+    struct host_alias_s *cur_alias = NULL;
+
+    if (config_s->configuration_context != ALIASES_CONFIG)
+    {
+        gossip_lerr("Error in context.  Cannot have Alias "
+                    "outside of Aliases context\n");
+        return NULL;
+    }
+    assert(cmd->arg_count == 2);
+
+    cur_alias = (host_alias_s *)
+        malloc(sizeof(host_alias_s));
+    cur_alias->host_alias = strdup(cmd->data.list[0]);
+    cur_alias->bmi_address = strdup(cmd->data.list[1]);
+
+    if (!config_s->host_aliases)
+    {
+        config_s->host_aliases = llist_new();
+    }
+    llist_add_to_tail(config_s->host_aliases,(void *)cur_alias);
+    return NULL;
+}
+	
+DOTCONF_CB(get_bucket_list)
+{
+    int i = 0;
+    struct filesystem_configuration_s *fs_conf = NULL;
+    struct host_bucket_mapping_s *bucket_mapping = NULL;
+
+    if (config_s->configuration_context != BUCKETS_CONFIG)
+    {
+        gossip_lerr("Error in context.  Cannot have Bucket "
+                    "outside of Buckets context\n");
+        return NULL;
+    }
+
+    fs_conf = (struct filesystem_configuration_s *)
+        llist_head(config_s->file_systems);
+
+    if (!fs_conf->bucket_ranges)
+    {
+        fs_conf->bucket_ranges = llist_new();
+    }
+
+    for(i = 0; i < cmd->arg_count; i += 2)
+    {
+        if (is_valid_alias(cmd->data.list[i]))
+        {
+            i++;
+            assert(cmd->data.list[i]);
+
+            if (is_valid_bucket_range_description(cmd->data.list[i]))
+            {
+                bucket_mapping = (host_bucket_mapping_s *)malloc(
+                    sizeof(host_bucket_mapping_s));
+                assert(bucket_mapping);
+                memset(bucket_mapping,0,sizeof(host_bucket_mapping_s));
+
+                bucket_mapping->host_alias = strdup(cmd->data.list[i-1]);
+                bucket_mapping->bucket_range = strdup(cmd->data.list[i]);
+
+                llist_add_to_tail(fs_conf->bucket_ranges,
+                                  (void *)bucket_mapping);
+            }
+            else
+            {
+                gossip_lerr("Error in bucket range description.\n"
+                            "%s is invalid input data!\n",cmd->data.list[i]);
+            }
+        }
+        else
+        {
+            gossip_lerr("Error! %s is an unrecognized alias\n",
+                        cmd->data.list[i]);
+        }
+    }
+    return NULL;
+}
+
+void PINT_server_config_release(struct server_configuration_s *config_s)
+{
+    if (config_s)
+    {
+        if (config_s->host_id)
+        {
+            free(config_s->host_id);
+        }
+        if (config_s->storage_path)
+        {
+            free(config_s->storage_path);
+        }
+
+        /* free all host alias objects */
+        llist_free(config_s->host_aliases,free_host_alias);
+
+        /* free all filesystem objects */
+        llist_free(config_s->file_systems,free_filesystem);
+    }
+    return;
+}
+
+static int is_valid_alias(char *str)
+{
+    int ret = 0;
+    struct llist *cur = NULL;
+    struct host_alias_s *cur_alias;
+
+    if (str)
+    {
+        cur = config_s->host_aliases;
+        while(cur)
+        {
+            cur_alias = llist_head(cur);
+            if (!cur_alias)
+            {
+                break;
+            }
+            if (strcmp(str,cur_alias->host_alias) == 0)
+            {
+                ret = 1;
+                break;
+            }
+            cur = llist_next(cur);
+        }
+    }
+    return ret;
+}
+
+static int is_valid_bucket_range_description(char *b_range)
+{
+    int ret = 0;
+    int len = 0;
+    char *ptr = (char *)0;
+    char *end = (char *)0;
+
+    if (b_range)
+    {
+        len = strlen(b_range);
+        end = (b_range + len);
+
+        for(ptr = b_range; ptr < end; ptr++)
+        {
+            if (!isdigit((int)*ptr) && (*ptr != ',') &&
+                (*ptr != ' ') && (*ptr != '-'))
+            {
+                break;
+            }
+        }
+        if (ptr == end)
+        {
+            ret = 1;
+        }
+    }
+    return ret;
+}
+
+static int is_valid_filesystem_configuration(struct filesystem_configuration_s *fs)
+{
+    int ret = 0;
+
+    if (fs)
+    {
+        ret = (fs->file_system_name && fs->meta_server_list &&
+               fs->data_server_list && fs->bucket_ranges);
+    }
+    return ret;
+}
+
+static void free_host_bucket_mapping(void *ptr)
+{
+    struct host_bucket_mapping_s *b_mapping =
+        (struct host_bucket_mapping_s *)ptr;
+    if (b_mapping)
+    {
+        free(b_mapping->host_alias);
+        free(b_mapping->bucket_range);
+        free(b_mapping);
+    }
+}
+
+static void free_host_alias(void *ptr)
+{
+    struct host_alias_s *alias = (struct host_alias_s *)ptr;
+    if (alias)
+    {
+        free(alias->host_alias);
+        free(alias->bmi_address);
+        free(alias);
+    }
+}
+
+static void free_filesystem(void *ptr)
+{
+    struct filesystem_configuration_s *fs =
+        (struct filesystem_configuration_s *)ptr;
+    if (fs)
+    {
+        free(fs->file_system_name);
+
+        /* free all meta server strings */
+        llist_free(fs->meta_server_list,free);
+
+        /* free all data server strings */
+        llist_free(fs->data_server_list,free);
+
+        /* free all bucket ranges */
+        llist_free(fs->bucket_ranges,free_host_bucket_mapping);
+
+        free(fs);
+    }
 }
 
 /*

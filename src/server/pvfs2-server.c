@@ -42,7 +42,7 @@
 static PINT_server_status_code server_level_init;
 
 /* All parameters read in from the configuration file */
-static struct server_configuration_s *user_opts;
+static struct server_configuration_s user_opts;
 
 /* A flag to stop the main loop from processing and handle the signal 
 	after all threads complete and are no longer blocking */
@@ -72,9 +72,12 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
 {
     int ret = 0, i = 0;
     char *method_name = NULL;
+    struct llist *cur = NULL;
+    struct filesystem_configuration_s *cur_fs;
 
     /* initialize BMI Interface (bmi.c) */
-    ret = BMI_initialize("bmi_tcp", user_opts->host_id, BMI_INIT_SERVER);
+    printf("Passing in %s\n",user_opts.host_id);
+    ret = BMI_initialize("bmi_tcp", user_opts.host_id, BMI_INIT_SERVER);
     if (ret < 0)
     {
 	gossip_err("BMI_initialize Failed: %s\n", strerror(-ret));
@@ -94,7 +97,7 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
     gossip_debug(SERVER_DEBUG, "Flow Init Complete\n");
 
     /* initialize Trove Interface */
-    ret = trove_initialize(user_opts->storage_path, 0, &method_name, 0);
+    ret = trove_initialize(user_opts.storage_path, 0, &method_name, 0);
     if (ret < 0)
     {
 	gossip_err("Trove Init Failed: %s\n", strerror(-ret));
@@ -103,16 +106,24 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
     }
 
     /* Uses filesystems in config file. */
-    for (i = 0; i < user_opts->number_filesystems; i++)
+    cur = user_opts.file_systems;
+    while(cur)
     {
-       ret=trove_collection_lookup(user_opts->file_systems[i]->file_system_name,
-			      &(user_opts->file_systems[i]->coll_id),NULL,NULL);
+        cur_fs = llist_head(cur);
+        if (!cur_fs)
+        {
+            break;
+        }
+        ret = trove_collection_lookup(cur_fs->file_system_name,
+                                      &(cur_fs->coll_id),NULL,NULL);
 	if (ret < 0)
 	{
 	    gossip_lerr("Error initializing filesystem %s\n",
-                        user_opts->file_systems[i]->file_system_name);
+                        cur_fs->file_system_name);
 	    goto interface_init_failed;
 	}
+        i++;
+        cur = llist_next(cur);
     }
     gossip_debug(SERVER_DEBUG, "Storage Init Complete\n");
     gossip_debug(SERVER_DEBUG, "%d filesystems initialized\n", i);
@@ -214,7 +225,7 @@ static int initialize_server_state(PINT_server_status_code *server_level_init,
     gossip_debug(SERVER_DEBUG, "Request Scheduler Init Complete\n");
 
     /* Below, we initially post BMI unexpected msg buffers =) */
-    for (i = 0; i < user_opts->initial_unexpected_requests; i++)
+    for (i = 0; i < user_opts.initial_unexpected_requests; i++)
     {
         /* ARE THESE SUPPOSED TO BE UNINITIALIZED??? -N.M. */
 	ret = initialize_new_server_op(&job_status_structs[0]);
@@ -297,8 +308,7 @@ int main(int argc,
      * function located in server_config.c
      */
 
-    user_opts = PINT_server_config(argc, argv);
-    if (!user_opts)
+    if (PINT_server_config(&user_opts, argc, argv))
     {
 	gossip_err("Error: Could not read configuration; aborting.\n");
 	goto server_shutdown;
@@ -474,7 +484,6 @@ static int server_shutdown(PINT_server_status_code level,
 			   int ret,
 			   int siglevel)
 {
-    int i;
     switch (level)
     {
     case UNEXPECTED_LOOP_END:
@@ -494,27 +503,7 @@ static int server_shutdown(PINT_server_status_code level,
     case SHUTDOWN_STORAGE_INTERFACE:
 	/* Turn off Storage IFace */
 	trove_finalize();
-	for(i=0;i<user_opts->number_filesystems;i++)
-	{
-	    if (user_opts->file_systems[i]->file_system_name)
-		free(user_opts->file_systems[i]->file_system_name);
-	    if (user_opts->file_systems[i]->meta_server_list)
-		free(user_opts->file_systems[i]->meta_server_list);
-	    if (user_opts->file_systems[i]->io_server_list)
-		free(user_opts->file_systems[i]->io_server_list);
-	    free(user_opts->file_systems[i]);
-	}
-	if(user_opts->host_id)
-	    free(user_opts->host_id);
-	if(user_opts->storage_path)
-	    free(user_opts->storage_path);
-	if(user_opts->default_meta_server_list)
-	    free(user_opts->default_meta_server_list);
-	if(user_opts->default_io_server_list)
-	    free(user_opts->default_io_server_list);
-	if(user_opts->file_system_names)
-	    free(user_opts->file_system_names);
-	free(user_opts);
+        PINT_server_config_release(&user_opts);
     case SHUTDOWN_FLOW_INTERFACE:
 	/* Turn off Flows */
 	PINT_flow_finalize();
@@ -525,8 +514,8 @@ static int server_shutdown(PINT_server_status_code level,
 	gossip_disable();
     case DEALLOC_INIT_MEMORY:
 	/* Unalloc any memory we have */
-	//free(user_opts->host_id);
-	//free(user_opts->tcp_path_bmi_library);
+	//free(user_opts.host_id);
+	//free(user_opts.tcp_path_bmi_library);
 	//free(user_opts);
     case STATUS_UNKNOWN:
     default:
@@ -577,7 +566,7 @@ static void *sig_handler(int sig)
 
 struct server_configuration_s *get_server_config_struct(void)
 {
-    return user_opts;
+    return &user_opts;
 }
 
 /* PINT_server_cp_bmi_unexp
