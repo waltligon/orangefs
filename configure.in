@@ -45,7 +45,7 @@ if test x$host_os = xlinux-gnu; then
     libc=`echo /lib/libc.so.* | sed 1q`
     if test x$libc != x ; then
 	if test -x $libc ; then
-dnl	    vers=`$libc | sed 's/.*version \(.*\),.*/\1/; q'`
+	    vers=`$libc | sed 's/.*version \(.*\),.*/\1/; q'`
             if test x$vers = x; then
                vers=`strings /lib/libc.so.* | grep GLIBC | tail -n 2 | grep -v PRIVATE | cut -b 7-`
             fi
