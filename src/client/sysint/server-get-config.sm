@@ -270,7 +270,7 @@ static int server_get_config_setup_msgpair(PINT_client_sm *sm_p,
                                           job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL;
-    PINT_client_sm_msgpair_state *msg_p = NULL;
+    PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_BMI_addr_t serv_addr;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,

@@ -161,7 +161,7 @@ int PVFS_sys_finalize(
 
 /*
   the following values are to be used by the struct
-  PINT_client_sm_msgpair_state_s message's retry_flag variable
+  PINT_sm_msgpair_state_s message's retry_flag variable
 */
 #define PVFS_MSGPAIR_RETRY          0xFE
 #define PVFS_MSGPAIR_NO_RETRY       0xFF

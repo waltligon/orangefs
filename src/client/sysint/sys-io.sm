@@ -441,14 +441,14 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
            (target_datafile_count * sizeof(PINT_client_io_ctx)));
 
     sm_p->msgarray_count = target_datafile_count;
-    sm_p->msgarray = (PINT_client_sm_msgpair_state *)malloc(
-        (sm_p->msgarray_count * sizeof(PINT_client_sm_msgpair_state)));
+    sm_p->msgarray = (PINT_sm_msgpair_state *)malloc(
+        (sm_p->msgarray_count * sizeof(PINT_sm_msgpair_state)));
     if (!sm_p->msgarray)
     {
         goto malloc_error_exit;
     }
     memset(sm_p->msgarray, 0, (sm_p->msgarray_count *
-                               sizeof(PINT_client_sm_msgpair_state)));
+                               sizeof(PINT_sm_msgpair_state)));
 
     sm_p->u.io.total_cancellations_remaining = 0;
 
@@ -456,12 +456,12 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
     for(i = 0; i < target_datafile_count; i++)
     {
         PINT_client_io_ctx *cur_ctx = &sm_p->u.io.contexts[i];
-        PINT_client_sm_msgpair_state *msg = &sm_p->msgarray[i];
+        PINT_sm_msgpair_state *msg = &sm_p->msgarray[i];
 
         assert(msg && cur_ctx);
         
         memset(cur_ctx, 0, sizeof(PINT_client_io_ctx));
-        memset(msg, 0, sizeof(PINT_client_sm_msgpair_state));
+        memset(msg, 0, sizeof(PINT_sm_msgpair_state));
 
         gossip_debug(GOSSIP_IO_DEBUG, "initializing context[%d] %p\n",
                      i, cur_ctx);
@@ -552,7 +552,7 @@ static int io_datafile_post_msgpairs(PINT_client_sm *sm_p,
     for(i = 0; i < sm_p->u.io.datafile_count; i++)
     {
         PINT_client_io_ctx *cur_ctx = &sm_p->u.io.contexts[i];
-        PINT_client_sm_msgpair_state *msg = &sm_p->msgarray[i];
+        PINT_sm_msgpair_state *msg = &sm_p->msgarray[i];
 
         assert(cur_ctx && msg);
         assert(cur_ctx->msg == msg);
@@ -1070,7 +1070,7 @@ static inline int complete_context_send_or_recv(
     int ret = -PVFS_EINVAL, index = 0;
     unsigned long status_user_tag = 0;
     PINT_client_io_ctx *cur_ctx = NULL;
-    PINT_client_sm_msgpair_state *msg = NULL;
+    PINT_sm_msgpair_state *msg = NULL;
 
     gossip_debug(GOSSIP_IO_DEBUG,
                  "- complete_context_send_or_recv called\n");

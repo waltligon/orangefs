@@ -20,6 +20,7 @@
 #include "trove.h"
 #include "acache.h"
 #include "id-generator.h"
+#include "msgpairarray.h"
 
 #define PINT_STATE_STACK_SIZE 3
 
@@ -43,63 +44,6 @@
 
 /* the number of milliseconds to delay before retries */
 #define PVFS2_CLIENT_RETRY_DELAY  2000
-
-/*
- * This structure holds everything that we need for the state of a
- * message pair.  We need arrays of these in some cases, so it's
- * convenient to group it like this.
- *
- */
-typedef struct PINT_client_sm_msgpair_state_s
-{
-    /* NOTE: fs_id, handle, retry flag, and comp_fn, should be filled
-     * in prior to going into the msgpair code path.
-     */
-    PVFS_fs_id fs_id;
-    PVFS_handle handle;
-
-    /* should be either PVFS_MSGPAIR_RETRY, or PVFS_MSGPAIR_NO_RETRY*/
-    int retry_flag;
-
-    /* don't use this -- internal msgpairarray use only */
-    int retry_count;
-
-    /* comp_fn called after successful reception and decode of
-     * respone, if the msgpair state machine is used for processing.
-     */
-    int (* comp_fn)(void *sm_p, struct PVFS_server_resp *resp_p, int i);
-
-    /* comp_ct used to keep up with number of operations remaining */
-    int comp_ct;
-
-    /* server address */
-    PVFS_BMI_addr_t svr_addr;
-
-    /* req and encoded_req are used to send a request */
-    struct PVFS_server_req req;
-    struct PINT_encoded_msg encoded_req;
-
-    /* max_resp_sz, svr_addr, and encoded_resp_p used to recv a response */
-    int max_resp_sz;
-    void *encoded_resp_p;
-
-    /* send_id, recv_id used to track completion of operations */
-    job_id_t send_id, recv_id;
-    /* send_status, recv_status used for error handling etc. */
-    job_status_s send_status, recv_status;
-
-    /* op_status is the code returned from the server, if the
-     * operation was actually processed (recv_status.error_code == 0)
-     */
-    PVFS_error op_status;
-
-    /*
-      used in the retry code path to know if we've already completed
-      or not (to avoid re-doing the work we've already done)
-    */
-    int complete;
-
-} PINT_client_sm_msgpair_state;
 
 /* PINT_client_sm_recv_state_s
  *
@@ -190,7 +134,7 @@ typedef struct
     PVFS_handle data_handle;
 
     /* a reference to the msgpair we're using for communication */
-    PINT_client_sm_msgpair_state *msg;
+    PINT_sm_msgpair_state *msg;
 
     job_id_t flow_job_id;
     job_status_s flow_status;
@@ -419,14 +363,14 @@ typedef struct PINT_client_sm
     PVFS_object_attr acache_attr;
 
     /* generic msgpair used with msgpair substate */
-    PINT_client_sm_msgpair_state msgpair;
+    PINT_sm_msgpair_state msgpair;
 
     /* msgpair array ptr used when operations can be performed
      * concurrently.  this must be allocated within the upper-level
      * state machine and is used with the msgpairarray sm.
      */
     int msgarray_count;
-    PINT_client_sm_msgpair_state *msgarray;
+    PINT_sm_msgpair_state *msgarray;
 
     /*
       internal pvfs_object references; used in conjunction with the
@@ -582,7 +526,7 @@ int PINT_serv_free_msgpair_resources(
 
 int PINT_serv_msgpairarray_resolve_addrs(
     int count, 
-    PINT_client_sm_msgpair_state* msgarray);
+    PINT_sm_msgpair_state* msgarray);
 
 int PINT_client_bmi_cancel(job_id_t id);
 

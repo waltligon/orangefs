@@ -197,7 +197,7 @@ static int readdir_msg_setup_msgpair(PINT_client_sm *sm_p,
 {
     int ret = -PVFS_EINVAL;
     PVFS_BMI_addr_t server_addr;
-    PINT_client_sm_msgpair_state *msg_p = NULL;
+    PINT_sm_msgpair_state *msg_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "readdir state: "
                  "readdir_msg_setup_msgpair\n");
@@ -218,7 +218,7 @@ static int readdir_msg_setup_msgpair(PINT_client_sm *sm_p,
     gossip_debug(GOSSIP_READDIR_DEBUG," readdir: posting readdir req\n");
 
     msg_p = &sm_p->msgpair;
-    memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
+    memset(msg_p, 0, sizeof(PINT_sm_msgpair_state));
 
     gossip_debug(
         GOSSIP_READDIR_DEBUG, "%Lu|%d | token is %d | limit is %d\n",

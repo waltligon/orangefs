@@ -13,6 +13,7 @@
 #include <string.h>
 #include <assert.h>
 
+#include "msgpairarray.h"
 #include "client-state-machine.h"
 #include "state-machine-fns.h"
 #include "pvfs2-debug.h"
@@ -42,7 +43,7 @@ static int msgpairarray_completion_fn(
     PINT_client_sm *sm_p, job_status_s *js_p);
 
 static int count_incomplete_msgs(
-    PINT_client_sm_msgpair_state *msgarray, int array_count);
+    PINT_sm_msgpair_state *msgarray, int array_count);
 
 %%
 
@@ -92,7 +93,7 @@ static int msgpairarray_init(PINT_client_sm *sm_p,
                              job_status_s *js_p)
 {
     int i = 0;
-    PINT_client_sm_msgpair_state *msg_p = NULL;
+    PINT_sm_msgpair_state *msg_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "(%p) msgpairarray state: init (%d msgpair(s))\n",
@@ -126,7 +127,7 @@ static int msgpairarray_init(PINT_client_sm *sm_p,
 
 /* msgpairarray_post()
  *
- * The following elements of the PINT_client_sm_msgpair_state
+ * The following elements of the PINT_sm_msgpair_state
  * should be valid prior to this state (for each msgpair in array):
  * - req (unencoded request)
  * - srv_addr of each element in msg array
@@ -148,7 +149,7 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
     int ret = -PVFS_EINVAL, i = 0, tmp = 0;
     struct server_configuration_s *server_config = NULL;
     PVFS_msg_tag_t session_tag;
-    PINT_client_sm_msgpair_state *msg_p = NULL;
+    PINT_sm_msgpair_state *msg_p = NULL;
     struct filesystem_configuration_s *cur_fs = NULL;
     int num_incomplete_msgpairs = (sm_p->msgarray[0].comp_ct / 2);
 
@@ -378,7 +379,7 @@ static int msgpairarray_complete(PINT_client_sm *sm_p,
 
     if (js_p->status_user_tag < sm_p->msgarray_count)
     {
-	PINT_client_sm_msgpair_state *msg_p = 
+	PINT_sm_msgpair_state *msg_p = 
 	    &sm_p->msgarray[js_p->status_user_tag];
 
 	msg_p->recv_id = 0;
@@ -398,7 +399,7 @@ static int msgpairarray_complete(PINT_client_sm *sm_p,
     }
     else
     {
-	PINT_client_sm_msgpair_state *msg_p = &sm_p->msgarray[
+	PINT_sm_msgpair_state *msg_p = &sm_p->msgarray[
             js_p->status_user_tag - sm_p->msgarray_count];
 
 	msg_p->send_id = 0;
@@ -445,7 +446,7 @@ static int msgpairarray_completion_fn(PINT_client_sm *sm_p,
 
     for (i = 0; i < sm_p->msgarray_count; i++)
     {
-	PINT_client_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
+	PINT_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
         assert(msg_p);
 
 	if (msg_p->op_status != 0)
@@ -575,10 +576,10 @@ static int msgpairarray_completion_fn(PINT_client_sm *sm_p,
 }
 
 static int count_incomplete_msgs(
-    PINT_client_sm_msgpair_state *msgarray, int array_count)
+    PINT_sm_msgpair_state *msgarray, int array_count)
 {
     int count = 0, i = 0;
-    PINT_client_sm_msgpair_state *msg = NULL;
+    PINT_sm_msgpair_state *msg = NULL;
 
     for(i = 0; i < array_count; i++)
     {

@@ -832,7 +832,7 @@ int PINT_serv_free_msgpair_resources(
  * returns 0 on success, -PVFS_error on failure
  */
 int PINT_serv_msgpairarray_resolve_addrs(
-    int count, PINT_client_sm_msgpair_state *msgarray)
+    int count, PINT_sm_msgpair_state *msgarray)
 {
     int i = 0;
     int ret = -PVFS_EINVAL;
@@ -841,7 +841,7 @@ int PINT_serv_msgpairarray_resolve_addrs(
     {
         for(i = 0; i < count; i++)
         {
-            PINT_client_sm_msgpair_state *msg_p = &msgarray[i];
+            PINT_sm_msgpair_state *msg_p = &msgarray[i];
             assert(msg_p);
 
             ret = PINT_cached_config_map_to_server(&msg_p->svr_addr,

@@ -487,8 +487,8 @@ static int rename_lookups_setup_msgpair_array(PINT_client_sm *sm_p,
 
     /* allocate msgarray and set msgarray_count */
     sm_p->msgarray_count = 2;
-    sm_p->msgarray = (PINT_client_sm_msgpair_state *)malloc(
-        sm_p->msgarray_count * sizeof(PINT_client_sm_msgpair_state));
+    sm_p->msgarray = (PINT_sm_msgpair_state *)malloc(
+        sm_p->msgarray_count * sizeof(PINT_sm_msgpair_state));
     if (sm_p->msgarray == NULL)
     {
         gossip_err("rename: failed to allocate msgarray\n"); 
@@ -498,7 +498,7 @@ static int rename_lookups_setup_msgpair_array(PINT_client_sm *sm_p,
     /* prepare to post the lookup send/recv pairs */
     for(i = 0; i < 2; i++)
     {
-        PINT_client_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
+        PINT_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
 
         gossip_debug(GOSSIP_CLIENT_DEBUG,
                      "rename: posting lookup req %d\n",i);
@@ -545,7 +545,7 @@ static int rename_crdirent_setup_msgpair(PINT_client_sm *sm_p,
 					 job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL;
-    PINT_client_sm_msgpair_state *msg_p = NULL;
+    PINT_sm_msgpair_state *msg_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: "
                  "rename_crdirent_setup_msgpair\n");
@@ -559,7 +559,7 @@ static int rename_crdirent_setup_msgpair(PINT_client_sm *sm_p,
 	free(sm_p->msgarray);
 
     msg_p = &sm_p->msgpair;
-    memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
+    memset(msg_p, 0, sizeof(PINT_sm_msgpair_state));
 
     /*
       hook the 'old' handle up to the new parent with the 'new_entry'
@@ -600,7 +600,7 @@ static int rename_rmdirent_setup_msgpair(PINT_client_sm *sm_p,
 					 job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL;
-    PINT_client_sm_msgpair_state *msg_p = NULL;
+    PINT_sm_msgpair_state *msg_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: "
                  "rename_rmdirent_setup_msgpair\n");
@@ -610,7 +610,7 @@ static int rename_rmdirent_setup_msgpair(PINT_client_sm *sm_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG," rename: posting rmdirent req\n");
 
     msg_p = &sm_p->msgpair;
-    memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
+    memset(msg_p, 0, sizeof(PINT_sm_msgpair_state));
 
     /*
       in the normal case, the state machine will lead us
@@ -691,7 +691,7 @@ static int rename_chdirent_setup_msgpair(PINT_client_sm *sm_p,
 					 job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL;
-    PINT_client_sm_msgpair_state *msg_p = NULL;
+    PINT_sm_msgpair_state *msg_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: "
                  "rename_chdirent_setup_msgpair\n");
@@ -701,7 +701,7 @@ static int rename_chdirent_setup_msgpair(PINT_client_sm *sm_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG," rename: posting chdirent req\n");
 
     msg_p = &sm_p->msgpair;
-    memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
+    memset(msg_p, 0, sizeof(PINT_sm_msgpair_state));
 
     /*
       here, we're exhanging the existing dirent under the 'new' parent

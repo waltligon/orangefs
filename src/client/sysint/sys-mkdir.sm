@@ -323,7 +323,7 @@ static int mkdir_msg_setup_msgpair(PINT_client_sm *sm_p,
 {
     int ret = -PVFS_EINVAL;
     PVFS_handle_extent_array meta_handle_extent_array;
-    PINT_client_sm_msgpair_state *msg_p = NULL;
+    PINT_sm_msgpair_state *msg_p = NULL;
     struct server_configuration_s *server_config = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
@@ -334,7 +334,7 @@ static int mkdir_msg_setup_msgpair(PINT_client_sm *sm_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG," mkdir: posting mkdir req\n");
 
     msg_p = &sm_p->msgpair;
-    memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
+    memset(msg_p, 0, sizeof(PINT_sm_msgpair_state));
 
     server_config = PINT_get_server_config_struct(
         sm_p->parent_ref.fs_id);
@@ -385,7 +385,7 @@ static int mkdir_crdirent_setup_msgpair(PINT_client_sm *sm_p,
                                         job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL;
-    PINT_client_sm_msgpair_state *msg_p = NULL;
+    PINT_sm_msgpair_state *msg_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "mkdir state: crdirent_setup_msgpair\n");
@@ -395,7 +395,7 @@ static int mkdir_crdirent_setup_msgpair(PINT_client_sm *sm_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG," mkdir: posting crdirent req\n");
 
     msg_p = &sm_p->msgpair;
-    memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
+    memset(msg_p, 0, sizeof(PINT_sm_msgpair_state));
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "hooking dirent %s (%Lu) under "
                  "parent handle %Lu\n", sm_p->u.mkdir.object_name,
@@ -447,7 +447,7 @@ static int mkdir_delete_handle_setup_msgpair(PINT_client_sm *sm_p,
 {
     int ret = -PVFS_EINVAL;
     PVFS_BMI_addr_t metafile_server_addr;
-    PINT_client_sm_msgpair_state *msg_p = NULL;
+    PINT_sm_msgpair_state *msg_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: "
                  "delete_handle_setup_msgpair_array\n");
@@ -455,7 +455,7 @@ static int mkdir_delete_handle_setup_msgpair(PINT_client_sm *sm_p,
     js_p->error_code = 0;
 
     msg_p = &sm_p->msgpair;
-    memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
+    memset(msg_p, 0, sizeof(PINT_sm_msgpair_state));
 
     sm_p->msgarray = msg_p;
     sm_p->msgarray_count = 1;

@@ -313,7 +313,7 @@ static int remove_check_dir_contents_setup_msgpair(PINT_client_sm *sm_p,
                                                    job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL;
-    PINT_client_sm_msgpair_state *msg_p = NULL;
+    PINT_sm_msgpair_state *msg_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: "
                  "remove_check_dir_contents_setup_msgpair\n");
@@ -321,7 +321,7 @@ static int remove_check_dir_contents_setup_msgpair(PINT_client_sm *sm_p,
     js_p->error_code = 0;
 
     msg_p = &sm_p->msgpair;
-    memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
+    memset(msg_p, 0, sizeof(PINT_sm_msgpair_state));
 
     PINT_SERVREQ_READDIR_FILL(
         msg_p->req,
@@ -377,8 +377,8 @@ static int remove_datafile_remove_setup_msgpair(PINT_client_sm *sm_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "remove state: datafile_remove_setup_msgpair\n");
 
-    sm_p->msgarray = (PINT_client_sm_msgpair_state *)malloc(
-        sm_p->datafile_count * sizeof(PINT_client_sm_msgpair_state));
+    sm_p->msgarray = (PINT_sm_msgpair_state *)malloc(
+        sm_p->datafile_count * sizeof(PINT_sm_msgpair_state));
     if (!sm_p->msgarray)
     {
 	js_p->error_code = -PVFS_ENOMEM;
@@ -389,7 +389,7 @@ static int remove_datafile_remove_setup_msgpair(PINT_client_sm *sm_p,
     /* for each datafile, post a send/recv pair for the remove */
     for (i = 0; i < sm_p->datafile_count; i++)
     {
-	PINT_client_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
+	PINT_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
 
 	gossip_debug(GOSSIP_CLIENT_DEBUG,
 		     "  datafile_remove: removing handle %Lu\n",

@@ -29,7 +29,7 @@ int PINT_sm_common_parent_getattr_setup_msgpair(PINT_client_sm *sm_p,
 
     js_p->error_code = 0;
 
-    memset(&sm_p->msgpair, 0, sizeof(PINT_client_sm_msgpair_state));
+    memset(&sm_p->msgpair, 0, sizeof(PINT_sm_msgpair_state));
 
     sm_p->msgarray = &(sm_p->msgpair);
     sm_p->msgarray_count = 1;
@@ -78,7 +78,7 @@ int PINT_sm_common_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
 
     js_p->error_code = 0;
 
-    memset(&sm_p->msgpair, 0, sizeof(PINT_client_sm_msgpair_state));
+    memset(&sm_p->msgpair, 0, sizeof(PINT_sm_msgpair_state));
 
     sm_p->msgarray = &(sm_p->msgpair);
     sm_p->msgarray_count = 1;

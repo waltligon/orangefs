@@ -447,8 +447,8 @@ static int getattr_datafile_getattr_setup_msgpairarray(
             &sm_p->acache_attr);
     assert(attr);
 
-    sm_p->msgarray = (PINT_client_sm_msgpair_state *)malloc(
-        attr->u.meta.dfile_count * sizeof(PINT_client_sm_msgpair_state));
+    sm_p->msgarray = (PINT_sm_msgpair_state *)malloc(
+        attr->u.meta.dfile_count * sizeof(PINT_sm_msgpair_state));
     if (!sm_p->msgarray)
     {
         js_p->error_code = -PVFS_ENOMEM;
@@ -471,7 +471,7 @@ static int getattr_datafile_getattr_setup_msgpairarray(
     /* for each datafile, post a send/recv pair to obtain the size */
     for (i=0; i < sm_p->msgarray_count; i++)
     {
-        PINT_client_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
+        PINT_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
         assert(msg_p);
 
         gossip_debug(GOSSIP_GETATTR_DEBUG,

@@ -100,8 +100,8 @@ int PVFS_imgmt_setparam_list(
     sm_p->u.setparam_list.details = details;
 
     sm_p->msgarray_count = count;
-    sm_p->msgarray = (PINT_client_sm_msgpair_state *)malloc(
-        count * sizeof(PINT_client_sm_msgpair_state));
+    sm_p->msgarray = (PINT_sm_msgpair_state *)malloc(
+        count * sizeof(PINT_sm_msgpair_state));
     if (sm_p->msgarray == NULL)
     {
         free(sm_p);
@@ -169,7 +169,7 @@ static int mgmt_setparam_list_setup_msgpair(PINT_client_sm *sm_p,
 					    job_status_s *js_p)
 {
     int i = 0;
-    PINT_client_sm_msgpair_state *msg_p = NULL;
+    PINT_sm_msgpair_state *msg_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "setparam_list state: "
                  "mgmt_setparam_list_setup_msgpair\n");

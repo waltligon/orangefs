@@ -486,7 +486,7 @@ static int create_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
 {
     int ret = -PVFS_EINVAL;
     PVFS_handle_extent_array meta_handle_extent_array;
-    PINT_client_sm_msgpair_state *msg_p = NULL;
+    PINT_sm_msgpair_state *msg_p = NULL;
     struct server_configuration_s *server_config = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: "
@@ -507,7 +507,7 @@ static int create_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG," create: posting create req\n");
 
     msg_p = &sm_p->msgpair;
-    memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
+    memset(msg_p, 0, sizeof(PINT_sm_msgpair_state));
 
     server_config = PINT_get_server_config_struct(
         sm_p->parent_ref.fs_id);
@@ -568,16 +568,16 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
 
     js_p->error_code = 0;
 
-    memset(&sm_p->msgpair, 0, sizeof(PINT_client_sm_msgpair_state));
+    memset(&sm_p->msgpair, 0, sizeof(PINT_sm_msgpair_state));
 
     /* allocate msgarray and set msgarray_count */
     if (sm_p->msgarray && (sm_p->msgarray != &(sm_p->msgpair)))
     {
         free(sm_p->msgarray);
     }
-    sm_p->msgarray = (PINT_client_sm_msgpair_state *)malloc(
+    sm_p->msgarray = (PINT_sm_msgpair_state *)malloc(
         (sm_p->u.create.num_data_files *
-         sizeof(PINT_client_sm_msgpair_state)));
+         sizeof(PINT_sm_msgpair_state)));
     if (sm_p->msgarray == NULL)
     {
         gossip_err("create: failed to allocate msgarray\n");
@@ -635,7 +635,7 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
     /* for each datafile, prepare to post a create send/recv pair */
     for(i = 0; i < sm_p->u.create.num_data_files; i++)
     {
-        PINT_client_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
+        PINT_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
 
         PINT_SERVREQ_CREATE_FILL(
             msg_p->req,
@@ -675,7 +675,7 @@ static int create_setattr_setup_msgpair(PINT_client_sm *sm_p,
                                         job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL;
-    PINT_client_sm_msgpair_state *msg_p = NULL;
+    PINT_sm_msgpair_state *msg_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "create state: setattr_setup_msgpair\n");
@@ -685,7 +685,7 @@ static int create_setattr_setup_msgpair(PINT_client_sm *sm_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG," create: posting setattr req\n");
 
     msg_p = &sm_p->msgpair;
-    memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
+    memset(msg_p, 0, sizeof(PINT_sm_msgpair_state));
 
     sm_p->msgarray = msg_p;
     sm_p->msgarray_count = 1;
@@ -744,7 +744,7 @@ static int create_crdirent_setup_msgpair(PINT_client_sm *sm_p,
 					 job_status_s *js_p)
 {
     int ret = -1;
-    PINT_client_sm_msgpair_state *msg_p = NULL;
+    PINT_sm_msgpair_state *msg_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "create state: crdirent_setup_msgpair\n");
@@ -755,7 +755,7 @@ static int create_crdirent_setup_msgpair(PINT_client_sm *sm_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG," create: posting crdirent req\n");
 
     msg_p = &sm_p->msgpair;
-    memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
+    memset(msg_p, 0, sizeof(PINT_sm_msgpair_state));
 
     PINT_SERVREQ_CRDIRENT_FILL(msg_p->req,
                                *sm_p->cred_p,
@@ -817,7 +817,7 @@ static int create_delete_handles_setup_msgpair_array(
 
     js_p->error_code = 0;
 
-    memset(&sm_p->msgpair, 0, sizeof(PINT_client_sm_msgpair_state));
+    memset(&sm_p->msgpair, 0, sizeof(PINT_sm_msgpair_state));
 
     ret = PINT_cached_config_map_to_server(&metafile_server_addr,
                                     sm_p->u.create.metafile_handle,
@@ -849,8 +849,8 @@ static int create_delete_handles_setup_msgpair_array(
         }
     }
 
-    sm_p->msgarray = (PINT_client_sm_msgpair_state *)malloc(
-        (actual_count * sizeof(PINT_client_sm_msgpair_state)));
+    sm_p->msgarray = (PINT_sm_msgpair_state *)malloc(
+        (actual_count * sizeof(PINT_sm_msgpair_state)));
 
     if (sm_p->msgarray == NULL)
     {
@@ -869,7 +869,7 @@ static int create_delete_handles_setup_msgpair_array(
     */
     for(i = 0; i < actual_count; i++)
     {
-        PINT_client_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
+        PINT_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
 
         gossip_debug(GOSSIP_CLIENT_DEBUG,
                      "create: posting data file remove req %d\n",i);

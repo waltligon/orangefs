@@ -98,8 +98,8 @@ int PVFS_imgmt_iterate_handles_list(
     sm_p->u.iterate_handles_list.details = details;
 
     sm_p->msgarray_count = server_count;
-    sm_p->msgarray = (PINT_client_sm_msgpair_state *)malloc(
-        server_count * sizeof(PINT_client_sm_msgpair_state));
+    sm_p->msgarray = (PINT_sm_msgpair_state *)malloc(
+        server_count * sizeof(PINT_sm_msgpair_state));
     if (sm_p->msgarray == NULL)
     {
         PVFS_util_release_credentials(sm_p->cred_p);
@@ -158,7 +158,7 @@ static int mgmt_iterate_handles_list_setup_msgpair(PINT_client_sm * sm_p,
 						   job_status_s * js_p)
 {
     int i = 0, j = 0;
-    PINT_client_sm_msgpair_state *msg_p;
+    PINT_sm_msgpair_state *msg_p;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "iterate_handles_list state: "
                  "mgmt_iterate_handles_list_setup_msgpair\n");

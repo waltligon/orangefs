@@ -606,7 +606,7 @@ static int lookup_segment_lookup_setup_msgpair(PINT_client_sm *sm_p,
                                             job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL;
-    PINT_client_sm_msgpair_state *msg_p = NULL;
+    PINT_sm_msgpair_state *msg_p = NULL;
     PINT_client_lookup_sm_segment *cur_seg = NULL;
     char *seg_to_lookup = NULL;
 
@@ -620,7 +620,7 @@ static int lookup_segment_lookup_setup_msgpair(PINT_client_sm *sm_p,
     assert(cur_seg);
 
     msg_p = &sm_p->msgpair;
-    memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
+    memset(msg_p, 0, sizeof(PINT_sm_msgpair_state));
 
     /*
       the pvfs2 lookup_path server operation has an optimization that
@@ -727,7 +727,7 @@ static int lookup_segment_getattr_setup_msgpair(PINT_client_sm *sm_p,
                                                 job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL;
-    PINT_client_sm_msgpair_state *msg_p = NULL;
+    PINT_sm_msgpair_state *msg_p = NULL;
     PINT_client_lookup_sm_segment *cur_seg = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup state: "
@@ -743,7 +743,7 @@ static int lookup_segment_getattr_setup_msgpair(PINT_client_sm *sm_p,
     assert(cur_seg);
 
     msg_p = &sm_p->msgpair;
-    memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
+    memset(msg_p, 0, sizeof(PINT_sm_msgpair_state));
 
     PINT_SERVREQ_GETATTR_FILL(
         msg_p->req,
