@@ -1,9 +1,7 @@
 DIR := src/io/job
 LIBSRC += \
 	$(DIR)/job.c \
-	$(DIR)/job-client-helper.c \
 	$(DIR)/job-desc-queue.c
 SERVERSRC += \
 	$(DIR)/job.c \
-	$(DIR)/job-client-helper.c \
 	$(DIR)/job-desc-queue.c
