@@ -1,5 +1,0 @@
-DIR := common/misc
-
-TESTSRC += \
-	$(DIR)/test-event-parser.c \
-	$(DIR)/test-event-summary.c 

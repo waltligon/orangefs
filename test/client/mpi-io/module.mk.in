@@ -1,5 +1,0 @@
-DIR := client/mpi-io
-
-MPIIOTESTSRC += \
-	$(DIR)/mpi-io-test.c \
-	$(DIR)/op_test.c

@@ -1,9 +1,0 @@
-DIR := src/apps/vis
-
-VISSRC += \
-    $(DIR)/simple.c \
-    $(DIR)/pvfs2-vis-bw-2d.c
-
-VISMISCSRC += \
-    $(DIR)/pvfs2-vis.c
-
