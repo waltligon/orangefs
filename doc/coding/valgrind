@@ -26,8 +26,8 @@ root:
 
 	cd /path/to/pvfs2/build/directory
 	valgrind --trace-children=yes \
-		./test/kernel/linux-2.6/pvfs2-client -f \
-		-p ./test/kernel/linux-2.6/pvfs2-client-core
+		./src/apps/kernel/linux-2.6/pvfs2-client -f \
+		-p ./src/apps/kernel/linux-2.6/pvfs2-client-core
 
 
 As of this writing, things *still* won't work well.  you'll get a message about

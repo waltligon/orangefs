@@ -76,8 +76,8 @@ servers.  This includes:
       manipulation code, some string manipulation utilities, etc.
 \end{itemize}
 
-\texttt{src/apps} holds applications associated with PVFS2.  Right now there
-is only a \texttt{src/apps/admin} subdirectory, which holds a collection of
+\texttt{src/apps} holds applications associated with PVFS2.  The
+\texttt{src/apps/admin} subdirectory holds a collection of
 tools for setting up, monitoring, and manipulating files on a PVFS2 file
 system.  \texttt{pvfs2-genconfig} is used to create configuration files.
 \texttt{pvfs2-import} and \texttt{pvfs2-export} may be used to move files on
@@ -85,6 +85,14 @@ and off PVFS2 file systems.  \texttt{pvfs2-ping} and \texttt{pvfs2-statfs} may
 be used to check on the status of a PVFS2 file system.  \texttt{pvfs2-ls} is
 an \texttt{ls} implementation for PVFS2 file systems that does not require
 that the file system be mounted.
+
+The \texttt{src/apps/karma} subdirectory contains a gtk-based
+gui for monitoring a PVFS2 file system in real time.  The
+\texttt{src/apps/kernel/linux-2.6} subdirectory contains the
+user space component of the PVFS2 kernel driver implementation, which
+matches the kernel driver code found in \texttt{src/kernel/linux-2.6}.
+The \texttt{src/apps/vis} contains experimental code for performance
+visualization.
 
 \texttt{src/client} holds code for the ``system interface'' library, the
 lowest level library used on the client side for access.  This is in the
@@ -154,11 +162,6 @@ Valid endpoints include BMI, Trove, memory, and the buffer cache.
 
 This directory holds a great deal of test code, most of which is useless to
 the average user.
-
-One exception to this is \texttt{test/kernel/linux-2.6}, which holds the
-current version of pvfs2-client.  This version isn't intended to be a final
-version; the final version should migrate either into \texttt{src/kernel} or
-\texttt{src/client} once in place.
 
 \texttt{test/client/sysint} has a collection of tests we have used when
 implementing (or reimplementing) various system interface functions.
