@@ -114,6 +114,7 @@ static int msgpair_post(PINT_client_sm *sm_p,
 				    msg_p->handle,
 				    msg_p->fs_id);
     if (ret != 0) {
+	gossip_err("msgpair_post: failure mapping to server\n");
 	assert(ret < 0); /* return value range check */
 	assert(0); /* placeholder until we have real error handling */
     }
@@ -126,6 +127,7 @@ static int msgpair_post(PINT_client_sm *sm_p,
 		      msg_p->svr_addr,
 		      PINT_CLIENT_ENC_TYPE);
     if (ret != 0) {
+	gossip_err("msgpair_post: failure encoding request\n");
 	assert(ret < 0); /* return value range check */
 	assert(0); /* placeholder until we have real error handling */
     }
@@ -140,6 +142,7 @@ static int msgpair_post(PINT_client_sm *sm_p,
 					 msg_p->max_resp_sz,
 					 BMI_RECV);
     if (msg_p->encoded_resp_p == NULL) {
+	gossip_err("msgpair_post: failure in BMI_memalloc\n");
 	assert(0);
     }
 
@@ -162,6 +165,7 @@ static int msgpair_post(PINT_client_sm *sm_p,
 		       &msg_p->recv_id,
 		       pint_client_sm_context);
     if (ret < 0) {
+	gossip_err("msgpair_post: failure in job_bmi_recv\n");
 	assert(0);
     }
     else if (ret == 1) {
@@ -186,6 +190,7 @@ static int msgpair_post(PINT_client_sm *sm_p,
 			    &msg_p->send_id,
 			    pint_client_sm_context);
     if (ret < 0) {
+	gossip_err("msgpair_post: failure in job_bmi_send_list\n");
 	assert(0);
     }
     else if (ret == 1) {
