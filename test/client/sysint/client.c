@@ -21,9 +21,8 @@ int main(int argc,char **argv)
 	PVFS_sysreq_statfs *req_statfs = NULL;
 	PVFS_sysresp_statfs *resp_statfs = NULL;
 	*/
-   char filename[80] = "/parl/harish/file1";
-   /*char filename2[80] = "/pvfs/home/foo1";*/
-	char dirname[256] = "/parl/rharish/home";
+	char filename[80] = "/parl/fshorte/sysint/file1";
+	char dirname[256] = "/parl/fshorte/sysint/home";
 	int ret = -1,i = 0;
 	PVFS_fs_id fsid = 9;
 	pvfs_mntlist mnt = {0,NULL};
@@ -42,7 +41,9 @@ int main(int argc,char **argv)
 		printf("PVFS_sys_initialize() failure. = %d\n", ret);
 		return(ret);
 	}
+	printf("SYSTEM INTERFACE INITIALIZED\n");
 	
+#if 0
 	/* test the lookup function */
 	/*Alloc memory and fill the structures*/
 	
@@ -91,9 +92,11 @@ int main(int argc,char **argv)
 		printf("PVFS_sys_init() failure.\n");
 		return(ret);
 	}*/
+#endif
 
 	// test the setattr function 
 	//	Alloc memory and fill the structures
+	printf("SETATTR HERE===>\n");
 	req_sattr = (PVFS_sysreq_setattr *)malloc(sizeof(PVFS_sysreq_setattr));
 	if (!req_sattr)
 	{
@@ -102,7 +105,7 @@ int main(int argc,char **argv)
 	}
 	
 	// fill in the handle 
-	req_sattr->pinode_refn.handle = resp_lk->pinode_refn.handle;
+	req_sattr->pinode_refn.handle = 420;//resp_lk->pinode_refn.handle;
 	req_sattr->pinode_refn.fs_id = 1;
 	req_sattr->attrmask = ATTR_BASIC;
 	req_sattr->attr.owner = 12345;
@@ -113,7 +116,7 @@ int main(int argc,char **argv)
 	ret = PVFS_sys_setattr(req_sattr);
 	if (ret < 0)
 	{
-		printf("setattr failed\n");
+		printf("setattr failed with errcode = %d\n", ret);
 		return(-1);
 	}
 	// print the handle 
@@ -131,6 +134,8 @@ int main(int argc,char **argv)
 
 	// Test the getattr function 
 	//	Alloc memory and fill the structures 
+
+	printf("GETATTR HERE===>\n");
 	req_gattr = (PVFS_sysreq_getattr *)malloc(sizeof(PVFS_sysreq_getattr));
 	if (!req_gattr)
 	{
@@ -153,7 +158,7 @@ int main(int argc,char **argv)
 	ret = PVFS_sys_getattr(req_gattr,resp_gattr);
 	if (ret < 0)
 	{
-		printf("getattr failed\n");
+		printf("getattr failed with errcode = %d\n", ret);
 		return(-1);
 	}
 	// print the handle 
@@ -165,7 +170,7 @@ int main(int argc,char **argv)
 	printf("gid:%d\n",resp_gattr->attr.group);
 	printf("permissions:%d\n",resp_gattr->attr.perms);
 	
-/*
+#if 0
 	// close it down
 	ret = PVFS_sys_finalize();
 
@@ -228,7 +233,6 @@ int main(int argc,char **argv)
 		return(ret);
 	}
 
-*/	
 	// test the mkdir function 
 	//	Alloc memory and fill the structures
 	req_mkdir = (PVFS_sysreq_mkdir *)malloc(sizeof(PVFS_sysreq_mkdir));
@@ -343,7 +347,6 @@ int main(int argc,char **argv)
 		printf("rmdir failed\n");
 		return(-1);
 	}
-/*
 	// test the statfs function 
 	//	Alloc memory and fill the structures
 	req_statfs = (PVFS_sysreq_statfs *)malloc(sizeof(PVFS_sysreq_statfs));
@@ -434,9 +437,14 @@ int main(int argc,char **argv)
 	// print the handle 
 	printf("--create--\n"); 
 	printf("Handle:%ld\n",(long int)resp_create->pinode_no.handle);
-*/
+#endif
 	//close it down
 	ret = PVFS_sys_finalize();
+	if (ret < 0)
+	{
+		printf("finalizing sysint failed with errcode = %d\n", ret);
+		return (-1);
+	}
 
 	return(0);
 
