@@ -240,7 +240,7 @@ int main(int argc, char **argv)
     printf("File system name: %s\n", mnt.ptab_array[mnt_index].pvfs_fs_name);
     printf("Initial config server: %s\n", mnt.ptab_array[mnt_index].pvfs_config_server);
     printf("********************************************************\n");
-    printf("Bytes written: %ld\n", (long)total_written);
+    printf("Bytes written: %Ld\n", Ld(total_written));
     printf("Elapsed time: %f seconds\n", (time2-time1));
     printf("Bandwidth: %f MB/second\n",
 	(((double)total_written)/((double)(1024*1024))/(time2-time1)));
