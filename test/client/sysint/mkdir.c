@@ -8,6 +8,8 @@
 #include <sys/time.h>
 #include <time.h>
 #include <stdio.h>
+#include <unistd.h>
+#include <sys/types.h>
 
 #include "pvfs2-util.h"
 #include "str-utils.h"
@@ -72,13 +74,13 @@ int main(int argc,char **argv)
     }
     parent_refn.fs_id = cur_fs;
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-    attr.owner = 100;
-    attr.group = 100;
-    attr.perms = 1877;
+    attr.owner = getuid();
+    attr.group = getgid();
+    attr.perms = 0777;
     attr.atime = attr.ctime = attr.mtime =
 	time(NULL);
-    credentials.uid = 100;
-    credentials.gid = 100;
+    credentials.uid = getuid();
+    credentials.gid = getgid();
 
     ret = PVFS_sys_mkdir(entry_name, parent_refn, attr, 
 			credentials, &resp_mkdir);
