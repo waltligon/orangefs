@@ -97,7 +97,7 @@ sub copy_directory {
 
     my $cmd = $href->{'WORKINGDIR'} . " %node:$remote_dir";
 
-    my @nodes = (@ionodes,@compnodes,@metanodes);
+    my @nodes = uniq(sort(@ionodes,@compnodes,@metanodes));
     print "DIST: ON @nodes\n";
     $rc = do_remote_command($href->{'RCPPROG'} . " -r", 8, 60, $cmd, undef, undef, @nodes);
 
