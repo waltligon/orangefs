@@ -1684,6 +1684,7 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
 
 	query_op->list_count = list_count;
 	query_op->user_ptr = user_ptr;
+	query_op->context_id = context_id;
 	/* if there is only one item in the list, then keep the list stored
 	 * in the op structure.  This allows us to use the same code for send
 	 * and recv as we use for send_list and recv_list, without having to 
