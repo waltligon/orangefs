@@ -217,6 +217,7 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	    goto return_error;
 	}
 
+	ack_p = (struct PVFS_server_resp_s *) decoded.buffer;
 	if (ack_p->status < 0 )
         {
 	    /* this could fail for many reasons, EEXISTS will probbably be the 
