@@ -56,21 +56,37 @@ enum PVFS_ds_type_e
     PVFS_TYPE_DIRECTORY = 1 << 2,
     PVFS_TYPE_SYMLINK = 1 << 3,
     PVFS_TYPE_DIRDATA = 1 << 4
-    /* WARNING: if you add new entries to this enumeration, please make
-     * certain that they do not collide with any of the explicit
-     * PVFS_ATTR_XXX defines listed below
-     */
 };
 typedef enum PVFS_ds_type_e PVFS_ds_type;
 
-#define PVFS_ATTR_META PVFS_TYPE_METAFILE
-#define PVFS_ATTR_DATA PVFS_TYPE_DATAFILE
-#define PVFS_ATTR_DIR PVFS_TYPE_DIRECTORY
-#define PVFS_ATTR_SYM PVFS_TYPE_SYMLINK
-#define PVFS_ATTR_BASIC   (1 << 9)
-#define PVFS_ATTR_SIZE    (1 << 10)
+/* internal attribute masks, common to all obj types */
+#define PVFS_ATTR_COMMON_UID	(1 << 0)
+#define PVFS_ATTR_COMMON_GID	(1 << 1)
+#define PVFS_ATTR_COMMON_PERM	(1 << 2)
+#define PVFS_ATTR_COMMON_ATIME	(1 << 3)
+#define PVFS_ATTR_COMMON_CTIME	(1 << 4)
+#define PVFS_ATTR_COMMON_MTIME	(1 << 5)
+#define PVFS_ATTR_COMMON_ALL	0x003f
 
+/* internal attribute masks for metadata objects */
+#define PVFS_ATTR_META_DIST	(1 << 6)
+#define PVFS_ATTR_META_DFILES	(1 << 7)
+#define PVFS_ATTR_META_ALL	0x00c0 
 
+/* internal attribute masks for datafile objects */
+#define PVFS_ATTR_DATA_SIZE	(1 << 8)
+#define PVFS_ATTR_DATA_ALL	0x0100
+
+/* attribute masks used by system interface callers */
+#define PVFS_ATTR_SYS_SIZE	(1 << 9)
+#define PVFS_ATTR_SYS_UID	PVFS_ATTR_COMMON_UID
+#define PVFS_ATTR_SYS_GID	PVFS_ATTR_COMMON_GID
+#define PVFS_ATTR_SYS_PERM	PVFS_ATTR_COMMON_PERM
+#define PVFS_ATTR_SYS_ATIME	PVFS_ATTR_COMMON_ATIME
+#define PVFS_ATTR_SYS_CTIME	PVFS_ATTR_COMMON_CTIME
+#define PVFS_ATTR_SYS_MTIME	PVFS_ATTR_COMMON_MTIME
+#define PVFS_ATTR_SYS_ALL_NOSIZE PVFS_ATTR_COMMON_ALL
+#define PVFS_ATTR_SYS_ALL	(PVFS_ATTR_SYS_ALL|PVFS_ATTR_SYS_SIZE)
 
 /* pinode reference (uniquely refers to a single pinode) */
 struct PVFS_pinode_reference_s
