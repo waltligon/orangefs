@@ -24,8 +24,10 @@
 extern job_context_id pint_client_sm_context;
 
 /* values greater than zero are usable here */
+/* TODO: this is a hack, duplicated in msgpair.sm, sort out later... */
 enum {
-    REMOVE_MUST_REMOVE_DATAFILES = 1
+    REMOVE_MUST_REMOVE_DATAFILES = 1,
+    MSGPAIR_RETURN_SUCCESS = 2
 };
 
 /* state function prototypes */
@@ -93,6 +95,7 @@ machine pvfs2_client_remove_sm(init,
     state rmdirent_xfer_msgpair {
 	jump pvfs2_client_msgpair_sm;
 	success => getattr_setup_msgpair;
+	MSGPAIR_RETURN_SUCCESS => getattr_setup_msgpair;
 	default => rmdirent_failure;
     }
     state rmdirent_failure {
@@ -108,6 +111,7 @@ machine pvfs2_client_remove_sm(init,
     state getattr_xfer_msgpair {
 	jump pvfs2_client_getattr_pcache_sm;
 	success => object_remove_setup_msgpair;
+	MSGPAIR_RETURN_SUCCESS => object_remove_setup_msgpair;
 	REMOVE_MUST_REMOVE_DATAFILES => datafile_remove_setup_msgpair;
 	default => getattr_failure;
     }
@@ -139,6 +143,7 @@ machine pvfs2_client_remove_sm(init,
     state object_remove_xfer_msgpair {
 	jump pvfs2_client_msgpair_sm;
 	success => cleanup;
+	MSGPAIR_RETURN_SUCCESS => cleanup;
 	default => object_remove_failure;
     }
     state object_remove_failure {
@@ -247,6 +252,7 @@ static int remove_getattr_setup_msgpair(PINT_client_sm *sm_p,
     sm_p->msgpair.handle  = sm_p->u.remove.object_ref.handle;
     sm_p->msgpair.comp_fn = remove_getattr_comp_fn;
 
+    js_p->error_code = 0;
     return 1;
 }
 

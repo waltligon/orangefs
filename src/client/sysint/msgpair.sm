@@ -41,6 +41,19 @@ static int msgpair_post(PINT_client_sm *sm_p, job_status_s *js_p);
 static int msgpair_complete(PINT_client_sm *sm_p, job_status_s *js_p);
 static int msgpair_error(PINT_client_sm *sm_p, job_status_s *js_p);
 
+enum
+{
+    /* TODO: this is a hack- we have to pull it in from sys-remove.sm,
+     * because the comp_fn is using it as a valid return value...
+     */
+    REMOVE_MUST_REMOVE_DATAFILES = 1,
+    /* this gives us a special error_code to indicate when the completion
+     * state has been called enough times that we should return from this
+     * nested state machine
+     */
+    MSGPAIR_RETURN_SUCCESS = 2
+};
+
 %%
 
 nested machine pvfs2_client_msgpair_sm(post,
@@ -55,7 +68,10 @@ nested machine pvfs2_client_msgpair_sm(post,
 
     state complete {
 	run msgpair_complete;
-	default => return;
+	success => complete;
+	MSGPAIR_RETURN_SUCCESS => return;
+	REMOVE_MUST_REMOVE_DATAFILES => return;
+	default => error;
     }
     
     state error {
@@ -192,6 +208,7 @@ static int msgpair_post(PINT_client_sm *sm_p,
 	gossip_err("msgpair_post: failure in job_bmi_send_list\n");
 	assert(0);
     }
+#if 0
     else if (ret == 1) {
 	/* send completed immediately; decrement the completion counter */
 	gossip_debug(CLIENT_DEBUG, "  msgpair: send completed immediately.\n");
@@ -206,9 +223,10 @@ static int msgpair_post(PINT_client_sm *sm_p,
 	msg_p->comp_ct--;
 	assert(msg_p->comp_ct == 1);
     }
+#endif
     assert(ret == 0 || ret == 1); /* return value range check */
 
-    return 0;
+    return(ret);
 }
 
 /* msgpair_complete()
@@ -299,6 +317,24 @@ static int msgpair_complete(PINT_client_sm *sm_p,
 	assert(0); /* placeholder */
     }
 
+    /* TODO: is this really what we want to do?  Maybe we need to just 
+     * report this error code somewhere else so that it can get propigated
+     * back to the parent SM?  Depends on how the error handling is 
+     * supposed to work.  -Phil
+     */
+    /* TODO: note that this is especially bad right now, because it means
+     * that msgpair sm must know about valid return codes from comp_fn, like
+     * REMOVE_MUST_REMOVE_DATAFILES :(  We definitely need to change
+     * the way error values are propigated somehow.
+     */
+    if(js_p->error_code == 0)
+    {
+	/* for now, return this to indicate that all completions are done
+	 * and return out of the nested state machine
+	 */
+	js_p->error_code = MSGPAIR_RETURN_SUCCESS;
+    }
+	
     return 1;
 }
 

@@ -2599,6 +2599,18 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
     }
 
     tcp_addr_data = dest->method_data;
+
+#if 0
+    /* TODO: this is a hack for testing! */
+    /* disables immediate send completion... */
+    ret = enqueue_operation(op_list_array[IND_SEND], BMI_SEND,
+			    dest, buffer_list, size_list, list_count, 0, 0,
+			    id, BMI_TCP_INPROGRESS, my_header, user_ptr,
+			    my_header.size, 0,
+			    context_id);
+    return(ret);
+#endif
+
     if (tcp_addr_data->not_connected)
     {
 	/* if the connection is not completed, queue up for later work */
