@@ -46,7 +46,6 @@
 #define ACACHE_TIMEOUT_MS 1
 
 static int service_lookup_request(
-    PVFS_sysresp_init *init_response,
     pvfs2_upcall_t *in_upcall,
     pvfs2_downcall_t *out_downcall)
 {
@@ -54,7 +53,7 @@ static int service_lookup_request(
     PVFS_sysresp_lookup response;
     PVFS_pinode_reference parent_refn;
 
-    if (init_response && in_upcall && out_downcall)
+    if (in_upcall && out_downcall)
     {
         memset(&response,0,sizeof(PVFS_sysresp_lookup));
         memset(out_downcall,0,sizeof(pvfs2_downcall_t));
@@ -101,7 +100,6 @@ static int service_lookup_request(
 }
 
 static int service_create_request(
-    PVFS_sysresp_init *init_response,
     pvfs2_upcall_t *in_upcall,
     pvfs2_downcall_t *out_downcall)
 {
@@ -110,7 +108,7 @@ static int service_create_request(
     PVFS_pinode_reference parent_refn;
     PVFS_sys_attr *attrs = NULL;
 
-    if (init_response && in_upcall && out_downcall)
+    if (in_upcall && out_downcall)
     {
         memset(&response,0,sizeof(PVFS_sysresp_create));
         memset(out_downcall,0,sizeof(pvfs2_downcall_t));
@@ -190,7 +188,6 @@ static int service_create_request(
 }
 
 static int service_symlink_request(
-    PVFS_sysresp_init *init_response,
     pvfs2_upcall_t *in_upcall,
     pvfs2_downcall_t *out_downcall)
 {
@@ -199,7 +196,7 @@ static int service_symlink_request(
     PVFS_pinode_reference parent_refn;
     PVFS_sys_attr *attrs = NULL;
 
-    if (init_response && in_upcall && out_downcall)
+    if (in_upcall && out_downcall)
     {
         memset(&response,0,sizeof(PVFS_sysresp_symlink));
         memset(out_downcall,0,sizeof(pvfs2_downcall_t));
@@ -247,7 +244,6 @@ static int service_symlink_request(
 #ifdef USE_MMAP_RA_CACHE
 static int service_io_readahead_request(
     struct PVFS_dev_map_desc *desc,
-    PVFS_sysresp_init *init_response,
     pvfs2_upcall_t *in_upcall,
     pvfs2_downcall_t *out_downcall)
 {
@@ -257,7 +253,7 @@ static int service_io_readahead_request(
     PVFS_Request mem_req;
     void *buf = NULL, *tmp_buf = NULL;
 
-    if (desc && init_response && in_upcall && out_downcall)
+    if (desc && in_upcall && out_downcall)
     {
         memset(&response,0,sizeof(PVFS_sysresp_io));
         memset(out_downcall,0,sizeof(pvfs2_downcall_t));
@@ -349,7 +345,6 @@ static int service_io_readahead_request(
 
 static int service_io_request(
     struct PVFS_dev_map_desc *desc,
-    PVFS_sysresp_init *init_response,
     pvfs2_upcall_t *in_upcall,
     pvfs2_downcall_t *out_downcall)
 {
@@ -360,7 +355,7 @@ static int service_io_request(
     void *buf = NULL;
     size_t amt_completed = 0;
 
-    if (desc && init_response && in_upcall && out_downcall)
+    if (desc && in_upcall && out_downcall)
     {
 #ifdef USE_MMAP_RA_CACHE
         if ((in_upcall->req.io.readahead_size ==
@@ -374,7 +369,7 @@ static int service_io_request(
                   PVFS2_MMAP_RACACHE_MAX_SIZE))
         {
             ret = service_io_readahead_request(
-                desc, init_response, in_upcall, out_downcall);
+                desc, in_upcall, out_downcall);
 
             /*
               if the readahead request succeeds, return.
@@ -429,14 +424,13 @@ static int service_io_request(
 }
 
 static int service_getattr_request(
-    PVFS_sysresp_init *init_response,
     pvfs2_upcall_t *in_upcall,
     pvfs2_downcall_t *out_downcall)
 {
     int ret = 1;
     PVFS_sysresp_getattr response;
 
-    if (init_response && in_upcall && out_downcall)
+    if (in_upcall && out_downcall)
     {
         memset(&response,0,sizeof(PVFS_sysresp_getattr));
         memset(out_downcall,0,sizeof(pvfs2_downcall_t));
@@ -492,13 +486,12 @@ static int service_getattr_request(
 }
 
 static int service_setattr_request(
-    PVFS_sysresp_init *init_response,
     pvfs2_upcall_t *in_upcall,
     pvfs2_downcall_t *out_downcall)
 {
     int ret = 1;
 
-    if (init_response && in_upcall && out_downcall)
+    if (in_upcall && out_downcall)
     {
         memset(out_downcall,0,sizeof(pvfs2_downcall_t));
 
@@ -533,14 +526,13 @@ static int service_setattr_request(
 }
 
 static int service_remove_request(
-    PVFS_sysresp_init *init_response,
     pvfs2_upcall_t *in_upcall,
     pvfs2_downcall_t *out_downcall)
 {
     int ret = 1;
     PVFS_pinode_reference parent_refn;
 
-    if (init_response && in_upcall && out_downcall)
+    if (in_upcall && out_downcall)
     {
         memset(out_downcall,0,sizeof(pvfs2_downcall_t));
 
@@ -578,7 +570,6 @@ static int service_remove_request(
 }
 
 static int service_mkdir_request(
-    PVFS_sysresp_init *init_response,
     pvfs2_upcall_t *in_upcall,
     pvfs2_downcall_t *out_downcall)
 {
@@ -587,7 +578,7 @@ static int service_mkdir_request(
     PVFS_pinode_reference parent_refn;
     PVFS_sys_attr *attrs = NULL;
 
-    if (init_response && in_upcall && out_downcall)
+    if (in_upcall && out_downcall)
     {
         memset(&response,0,sizeof(PVFS_sysresp_mkdir));
         memset(out_downcall,0,sizeof(pvfs2_downcall_t));
@@ -631,7 +622,6 @@ static int service_mkdir_request(
 }
 
 static int service_readdir_request(
-    PVFS_sysresp_init *init_response,
     pvfs2_upcall_t *in_upcall,
     pvfs2_downcall_t *out_downcall)
 {
@@ -639,7 +629,7 @@ static int service_readdir_request(
     PVFS_sysresp_readdir response;
     PVFS_pinode_reference refn;
 
-    if (init_response && in_upcall && out_downcall)
+    if (in_upcall && out_downcall)
     {
         memset(&response,0,sizeof(PVFS_sysresp_readdir));
         memset(out_downcall,0,sizeof(pvfs2_downcall_t));
@@ -705,14 +695,13 @@ static int service_readdir_request(
 }
 
 static int service_rename_request(
-    PVFS_sysresp_init *init_response,
     pvfs2_upcall_t *in_upcall,
     pvfs2_downcall_t *out_downcall)
 {
     int ret = 1;
     PVFS_pinode_reference old_parent_refn, new_parent_refn;
 
-    if (init_response && in_upcall && out_downcall)
+    if (in_upcall && out_downcall)
     {
         memset(out_downcall,0,sizeof(pvfs2_downcall_t));
 
@@ -756,14 +745,13 @@ static int service_rename_request(
 }
 
 static int service_statfs_request(
-    PVFS_sysresp_init *init_response,
     pvfs2_upcall_t *in_upcall,
     pvfs2_downcall_t *out_downcall)
 {
     int ret = 1;
     PVFS_sysresp_statfs resp_statfs;
 
-    if (init_response && in_upcall && out_downcall)
+    if (in_upcall && out_downcall)
     {
         memset(&resp_statfs,0,sizeof(PVFS_sysresp_statfs));
         memset(out_downcall,0,sizeof(pvfs2_downcall_t));
@@ -813,13 +801,12 @@ static int service_statfs_request(
 }
 
 static int service_truncate_request(
-    PVFS_sysresp_init *init_response,
     pvfs2_upcall_t *in_upcall,
     pvfs2_downcall_t *out_downcall)
 {
     int ret = 1;
 
-    if (init_response && in_upcall && out_downcall)
+    if (in_upcall && out_downcall)
     {
         memset(out_downcall,0,sizeof(pvfs2_downcall_t));
 
@@ -920,9 +907,6 @@ int main(int argc, char **argv)
     pvfs2_upcall_t upcall;
     pvfs2_downcall_t downcall;
 
-    const PVFS_util_tab* tab;
-    PVFS_sysresp_init init_response;
-
     /* set rlimit to prevent core files */
     ret = setrlimit(RLIMIT_CORE, &lim);
     if(ret < 0)
@@ -931,18 +915,10 @@ int main(int argc, char **argv)
 	fprintf(stderr, "continuing...\n");
     }
 
-    tab = PVFS_util_parse_pvfstab(NULL);
-    if(!tab)
+    ret = PVFS_util_init_defaults();
+    if(ret < 0)
     {
-        fprintf(stderr, "Error parsing pvfstab!\n");
-        return 1;
-    }
-
-    memset(&init_response,0,sizeof(PVFS_sysresp_init));
-    if (PVFS_sys_initialize(*tab, 0, &init_response))
-    {
-        fprintf(stderr, "Cannot initialize system interface\n");
-        return 1;
+	PVFS_perror("PVFS_util_init_defaults", ret);
     }
 
 #ifdef USE_MMAP_RA_CACHE
@@ -1022,41 +998,40 @@ int main(int argc, char **argv)
 	switch(upcall.type)
 	{
 	    case PVFS2_VFS_OP_LOOKUP:
-		service_lookup_request(&init_response,&upcall,&downcall);
+		service_lookup_request(&upcall,&downcall);
 		break;
 	    case PVFS2_VFS_OP_CREATE:
-		service_create_request(&init_response,&upcall,&downcall);
+		service_create_request(&upcall,&downcall);
 		break;
 	    case PVFS2_VFS_OP_SYMLINK:
-		service_symlink_request(&init_response,&upcall,&downcall);
+		service_symlink_request(&upcall,&downcall);
 		break;
 	    case PVFS2_VFS_OP_GETATTR:
-		service_getattr_request(&init_response,&upcall,&downcall);
+		service_getattr_request(&upcall,&downcall);
 		break;
 	    case PVFS2_VFS_OP_SETATTR:
-		service_setattr_request(&init_response,&upcall,&downcall);
+		service_setattr_request(&upcall,&downcall);
 		break;
 	    case PVFS2_VFS_OP_REMOVE:
-		service_remove_request(&init_response,&upcall,&downcall);
+		service_remove_request(&upcall,&downcall);
 		break;
 	    case PVFS2_VFS_OP_MKDIR:
-		service_mkdir_request(&init_response,&upcall,&downcall);
+		service_mkdir_request(&upcall,&downcall);
 		break;
 	    case PVFS2_VFS_OP_READDIR:
-		service_readdir_request(&init_response,&upcall,&downcall);
+		service_readdir_request(&upcall,&downcall);
 		break;
 	    case PVFS2_VFS_OP_FILE_IO:
-		service_io_request(&desc, &init_response,
-                                   &upcall, &downcall);
+		service_io_request(&desc, &upcall, &downcall);
 		break;
 	    case PVFS2_VFS_OP_RENAME:
-		service_rename_request(&init_response, &upcall, &downcall);
+		service_rename_request(&upcall, &downcall);
 		break;
 	    case PVFS2_VFS_OP_STATFS:
-		service_statfs_request(&init_response, &upcall, &downcall);
+		service_statfs_request(&upcall, &downcall);
 		break;
 	    case PVFS2_VFS_OP_TRUNCATE:
-		service_truncate_request(&init_response, &upcall, &downcall);
+		service_truncate_request(&upcall, &downcall);
 		break;
 	    case PVFS2_VFS_OP_INVALID:
 	    default:
