@@ -20,6 +20,7 @@ pvfs2-0.0.6pre1
   using the -r command line option
 - added kernel module highmem support
 - renamed attribute cache 'pcache' to 'acache'
+- large file support bug fixes
 
 pvfs2-0.0.5
 ===========
