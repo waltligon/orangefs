@@ -27,6 +27,12 @@ extern job_context_id server_job_context;
 #define PVFS2_SERVER_DEFAULT_TIMEOUT_MS      100
 #define BMI_UNEXPECTED_OP                    999
 
+/* the server will give up on sending a response if the send does not
+ * complete in PVFS2_SERVER_RESPONSE_TIMEOUT seconds
+ */
+/* TODO: this should be read from a config file */
+#define PVFS2_SERVER_RESPONSE_TIMEOUT         30
+
 /* used to keep a random, but handy, list of keys around */
 typedef struct PINT_server_trove_keys
 {

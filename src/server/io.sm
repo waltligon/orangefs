@@ -148,7 +148,7 @@ static int io_send_ack(PINT_server_op *s_op, job_status_s* js_p)
             js_p,
             &tmp_id,
             server_job_context,
-	    JOB_TIMEOUT_INF);
+	    PVFS2_SERVER_RESPONSE_TIMEOUT);
     }
     return(err);
 }
@@ -403,7 +403,7 @@ static int io_send_completion_ack(
             js_p,
             &tmp_id,
             server_job_context,
-	    JOB_TIMEOUT_INF);
+	    PVFS2_SERVER_RESPONSE_TIMEOUT);
     }
     return(err);
 }
