@@ -3,6 +3,11 @@ PVFS2 Release ChangeLog
 -----------------------
 
 
+pvfs2-0.0.8pre1
+===============
+- 
+
+
 pvfs2-0.0.7
 ===========
 - re-worked architecture of metadata storage (generic dspace attrs are
