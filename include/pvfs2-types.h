@@ -10,30 +10,39 @@
 #include <stdint.h>
 #include <time.h>
 
+/* basic types used throughout code */
 typedef uint8_t PVFS_boolean;
+typedef int32_t PVFS_error;
 typedef int64_t PVFS_offset;
 typedef int64_t PVFS_size;
+
+/* basic types used by communication subsystems */
+typedef int32_t PVFS_msg_tag_t;
+typedef int32_t PVFS_context_id;
+
+/* basic types used by storage subsystem */
+typedef int64_t PVFS_handle;
+typedef int32_t PVFS_fs_id;
+
+/* basic types used within metadata */
+typedef uint32_t PVFS_uid;
+typedef uint32_t PVFS_gid;
+typedef uint32_t PVFS_permissions;
+
+
+/* these types are scheduled for removal or modification... */
 typedef uint32_t PVFS_bitfield;
 typedef int32_t PVFS_flag;
 typedef int32_t PVFS_count32;
 typedef int64_t PVFS_count64;
 typedef uint64_t PVFS_flow_id;
-typedef int64_t PVFS_handle;
 typedef int16_t PVFS_type;
-typedef int32_t PVFS_fs_id;
-typedef int32_t PVFS_error;
-typedef uint32_t PVFS_uid;
-typedef uint32_t PVFS_gid;
-typedef uint32_t PVFS_permissions;
 typedef int64_t PVFS_token;
 typedef time_t PVFS_time;	/* TODO: is this really a good idea? */
-typedef int32_t PVFS_msg_tag_t;
-typedef int32_t PVFS_context_id;
 
-#define PVFS_NAME_MAX    256	/* Max length of PVFS filename */
 #define MAX_STRING_SIZE  1000
 
-/* Pinode Number */
+/* pinode reference (uniquely refers to a single pinode) */
 typedef struct
 {
     int64_t handle;		/* unique identifier per PVFS2 file */
@@ -41,7 +50,17 @@ typedef struct
 }
 pinode_reference;
 
-/* PVFS directory entry */
+/* credentials (used for permission checking of operations) */
+struct PVFS_credentials_s
+{
+    PVFS_uid uid;
+    PVFS_gid gid;
+    PVFS_permissions perms;
+};
+typedef struct PVFS_credentials_s PVFS_credentials;
+
+/* directory entry */
+#define PVFS_NAME_MAX    256	/* Max length of PVFS filename */
 struct PVFS_dirent_s
 {
     /*pinode_number pinode_no; */
@@ -51,28 +70,20 @@ struct PVFS_dirent_s
 };
 typedef struct PVFS_dirent_s PVFS_dirent;
 
-/* PVFS_credentials structure */
-struct PVFS_credentials_s
-{
-    PVFS_uid uid;
-    PVFS_gid gid;
-    PVFS_permissions perms;
-};
-typedef struct PVFS_credentials_s PVFS_credentials;
-
 struct extent
 {
     int64_t first;
     int64_t last;
 };
 typedef struct extent PVFS_extent;
+
+
 /* PVFS2 errors
  *
  * Errors are made up of a code to indicate the error type and a class
  * that indicates where the error came from.  These are |'d together.
  */
 
-/* TODO: this should probably be prototyped somewhere else? */
 void PVFS_perror(char *text,
 		 int retcode);
 
