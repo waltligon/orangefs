@@ -9,5 +9,5 @@ ADMINLIBS := -ldb -lrt -lpthread
 
 ADMINTOOLS := $(patsubst %.c, %, $(ADMINSRC))
 
-$(ADMINTOOLS): %: %.o
-	$(LD) $< $(TEST_SYSINT_DIR)/helper.o $(LDFLAGS) $(LIBS) $(ADMINLIBS) -o $@
+$(ADMINTOOLS): %: %.o test/client/sysint/helper.o
+	$(LD) $< test/client/sysint/helper.o $(LDFLAGS) $(LIBS) $(ADMINLIBS) -o $@

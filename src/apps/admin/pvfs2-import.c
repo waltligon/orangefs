@@ -37,6 +37,8 @@ int main(int argc, char **argv)
     PVFS_sysresp_create resp_create;
     struct options* user_opts = NULL;
 
+    gossip_enable_stderr();
+
     user_opts = parse_args(argc, argv);
     if(!user_opts)
     {
@@ -78,6 +80,7 @@ int main(int argc, char **argv)
         }
         fprintf(stderr, "Error: cannot retrieve entry name for creation on %s\n",
                user_opts->destfile);
+	PVFS_sys_finalize();
         return(-1);
     }
 
@@ -121,6 +124,7 @@ int main(int argc, char **argv)
 	    fprintf(stderr, "Error: PVFS_sys_initialize: %s.\n", 
 		strerror(-ret));
 	}
+	PVFS_sys_finalize();
         return(-1);
     }
 	
@@ -143,6 +147,8 @@ int main(int argc, char **argv)
 	}
 	return(-1);
     }
+
+    gossip_disable();
 
     return(0);
 }
