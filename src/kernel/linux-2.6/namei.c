@@ -35,8 +35,9 @@ static int pvfs2_create(
 
     if (inode)
     {
-	dir->i_nlink++;
-	ret = 0;
+        dir->i_nlink++;
+/*         mark_inode_dirty(dir); */
+        ret = 0;
     }
     return ret;
 }
@@ -143,6 +144,7 @@ struct dentry *pvfs2_lookup(
 
 	    /* update dentry/inode pair into dcache */
 	    dentry->d_op = &pvfs2_dentry_operations;
+            d_splice_alias(inode, dentry);
 	}
 	else
 	{
@@ -157,10 +159,12 @@ struct dentry *pvfs2_lookup(
     /*
       if no inode was found, add a negative dentry to dcache
       anyway; if we don't, we don't hold expected lookup semantics
-      and we most noticeably break during directory renames
+      and we most noticeably break during directory renames.
     */
-    d_splice_alias(inode, dentry);
-
+    if (!inode)
+    {
+        d_add(dentry, inode);
+    }
     return NULL;
 }
 
@@ -188,7 +192,8 @@ static int pvfs2_unlink(
     int ret = pvfs2_remove_entry(dir, dentry);
     if (ret == 0)
     {
-	dir->i_nlink--;
+        dir->i_nlink--;
+/*         mark_inode_dirty(dir); */
     }
     return ret;
 }
@@ -198,14 +203,21 @@ static int pvfs2_symlink(
     struct dentry *dentry,
     const char *symname)
 {
-    int mode = 755;
+    int ret = -1, mode = 755;
     struct inode *inode = NULL;
 
     pvfs2_print("pvfs2: pvfs2_symlink called\n");
 
     inode = pvfs2_create_entry(
         dir, dentry, symname, mode, PVFS2_VFS_OP_SYMLINK);
-    return (inode ? 0 : -1);
+
+    if (inode)
+    {
+        dir->i_nlink++;
+/*         mark_inode_dirty(dir); */
+        ret = 0;
+    }
+    return ret;
 }
 
 static int pvfs2_mknod(
@@ -259,8 +271,10 @@ static int pvfs2_rename(
     pvfs2_kernel_op_t *new_op = NULL;
     struct super_block *sb = NULL;
 
-    pvfs2_print("pvfs2: pvfs2_rename called (%s to %s)\n",
-                old_dentry->d_name.name, new_dentry->d_name.name);
+    pvfs2_print("pvfs2: pvfs2_rename called (%s/%s => %s/%s) ct=%d\n",
+                old_dentry->d_parent->d_name.name, old_dentry->d_name.name,
+                new_dentry->d_parent->d_name.name, new_dentry->d_name.name,
+                atomic_read(&new_dentry->d_count));
 
     are_directories = S_ISDIR(old_dentry->d_inode->i_mode);
     if (are_directories && (new_dir->i_nlink >= PVFS2_LINK_MAX))
@@ -349,12 +363,18 @@ static int pvfs2_rename(
           attribute rules straight
         */
         new_dentry->d_inode->i_ctime = CURRENT_TIME;
-        mark_inode_dirty(new_dentry->d_inode);
+        if (are_directories)
+        {
+            new_dentry->d_inode->i_nlink--;
+        }
+/*         mark_inode_dirty(new_dentry->d_inode); */
     }
     else if (are_directories)
     {
         new_dir->i_nlink++;
+/*         mark_inode_dirty(new_dir); */
         old_dir->i_nlink--;
+/*         mark_inode_dirty(old_dir); */
     }
 
   error_exit:

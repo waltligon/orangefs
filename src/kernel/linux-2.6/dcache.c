@@ -19,8 +19,7 @@ int pvfs2_d_revalidate(
     int ret = 0;
     struct inode *inode = (dentry ? dentry->d_inode : NULL);
 
-    pvfs2_print("pvfs2: pvfs2_d_revalidate called (name is %s)\n",
-                (dentry ? dentry->d_name.name : "unknown"));
+    pvfs2_print("pvfs2: pvfs2_d_revalidate called\n");
 
     if (nd && (nd->flags == LOOKUP_FOLLOW) &&
         (!nd->flags & LOOKUP_CREATE))
@@ -64,7 +63,8 @@ static int pvfs2_d_compare(
 	     (memcmp(d_name->name, name->name, d_name->len) == 0));
 }
 
-struct dentry_operations pvfs2_dentry_operations = {
+struct dentry_operations pvfs2_dentry_operations =
+{
     .d_revalidate = pvfs2_d_revalidate,
     .d_hash = pvfs2_d_hash,
     .d_compare = pvfs2_d_compare,
