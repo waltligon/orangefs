@@ -300,6 +300,53 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
     return (NULL);
 }
 
+/* PVFS_util_resolve()
+ *
+ * given a local path of a file that resides on a pvfs2 volume, 
+ * determine what the fsid and fs relative path is
+ *
+ * returns 0 on succees, -PVFS_error on failure
+ */
+int PVFS_util_resolve(
+    const char* local_path,
+    PVFS_fs_id* out_fs_id,
+    char* out_fs_path,
+    int out_fs_path_max)
+{
+    int i,j;
+    int ret = -1;
+
+    gen_mutex_lock(&stat_tab_mutex);
+
+    for (i=0; i < stat_tab_count; i++)
+    {
+	for(j=0; j<stat_tab_array[i].mntent_count; j++)
+	{
+	    ret = PVFS_util_remove_dir_prefix(local_path,
+		stat_tab_array[i].mntent_array[j].mnt_dir,
+		out_fs_path,
+		out_fs_path_max);
+	    if(ret == 0)
+	    {
+		*out_fs_id = stat_tab_array[i].mntent_array[j].fs_id;
+		if(*out_fs_id == PVFS_FS_ID_NULL)
+		{
+		    gossip_err("Error: %s resides on a PVFS2 file system "
+		    "that has not yet been initialized.\n", local_path);
+
+		    gen_mutex_unlock(&stat_tab_mutex);
+		    return(-PVFS_ENXIO);
+		}
+		gen_mutex_unlock(&stat_tab_mutex);
+		return(0);
+	    }
+	}
+    }
+
+    gen_mutex_unlock(&stat_tab_mutex);
+    return(-PVFS_ENOENT);
+}
+
 /* PVFS_util_lookup_parent()
  *
  * given a pathname and an fsid, looks up the handle of the parent
@@ -440,8 +487,8 @@ int PVFS_util_remove_base_dir(
  * out_max_len not large enough for buffer, returns -ENAMETOOLONG
  */
 int PVFS_util_remove_dir_prefix(
-    char *pathname,
-    char *prefix,
+    const char *pathname,
+    const char *prefix,
     char *out_path,
     int out_max_len)
 {

@@ -12,7 +12,14 @@
 #define __PVFS2_UTIL_H
 
 /* client side config file / option management */
-const PVFS_util_tab* PVFS_util_parse_pvfstab(const char* tabfile);
+const PVFS_util_tab* PVFS_util_parse_pvfstab(
+    const char* tabfile);
+int PVFS_util_resolve(
+    const char* local_path,
+    PVFS_fs_id* out_fs_id,
+    char* out_fs_path,
+    int out_fs_path_max);
+
 
 /* path management */
 int PVFS_util_lookup_parent(
@@ -25,8 +32,8 @@ int PVFS_util_remove_base_dir(
     char *out_dir,
     int out_max_len);
 int PVFS_util_remove_dir_prefix(
-    char *pathname,
-    char *prefix,
+    const char *pathname,
+    const char *prefix,
     char *out_path,
     int out_max_len);
 
