@@ -3,12 +3,55 @@ PVFS2 Release ChangeLog
 -----------------------
 
 
-pvfs2-0.9.0pre1
-===============
+pvfs2-0.9.0
+===========
 - documentation updates to HA and FAQ documents
 - better balancing (randomization) of data server selection when
   creating new files
 - clean up a few request-related 8-byte alignment issues for alpha
+- fixed an AMD64 kernel oops due to a bad cast
+- cleaned up error code types in the exposed sysint and mgmt methods
+  (using PVFS_error rather than int)
+- added a setattr debugging mask and changed most detailed setattr
+  debugging to use it
+- added a mkdir debugging mask and changed most detailed mkdir
+  debugging to use it
+- added some inlined methods in PVFS_util (as they need to be used on
+  both the server and the client) for getting the current time in
+  PVFS_time format, encoding a PVFS_time as a version (finer grained
+  than a 'normal' PVFS_time since we can use the high 32 bits), and
+  decoding the version as a PVFS_time
+- added a compatibility hack that _should_ allow no noticeable
+  breakage on existing storage space, but will eventually migrate to
+  the slightly new storage format over time
+- modified client side sys-mkdir, sys-create, and sys-symlink to
+  encode the mtime as a version when passing it to the server (so it's
+  transparent from the server perspective)
+- modified server side get-attr to decode the version read from disk
+  back into an mtime (so it's transparent from the client perspective)
+- modified mkspace method to properly version newly created root and
+  lost+found directories
+- modified the server side mkdir operation to return -PVFS_EINVAL if
+  the object attr type is not a directory object
+- vfs readdir modifications to detect directory version changes on
+  listings; default behaviour is unchanged
+- fixed bug in collection remove that didn't remove the collection
+  information from the collection db (which manifested as having a bug
+  where a collection that was once created and then removed could
+  never be created again due to a lookup succeeding before it should)
+- added documentation on how to create multiple file systems within a
+  single pvfs2 storage space
+- added documentation on return codes of the sysint methods
+- pvfs2-mkspace improvements:
+  - now requires a collection ID, storage space and a handle range
+  - fixed types used to represent actual root handle and collection id
+    to be the proper types, rather than integers
+  - remove many defaults in favor of requiring cmdline options
+  - replace atoi calls with strtou{l}l to accomodate larger values if
+    specified
+  - cosmetic output improvements
+  - fixed mkspace method to make sure that we only use handle ranges
+    that are both non-null, AND are not an empty string
 
 
 pvfs2-0.8.0

@@ -147,9 +147,9 @@ configuration file, for example, if the following was added:
 =============================
 ./pvfs2-mkspace --add-coll --coll-name="pvfs2-volume3" --coll-id=1709020299 --root-handle=1048576 --meta-handle-range=4-2147483650 --data-handle-range=2147483651-4294967297 --verbose --storage-space="/tmp/pvfs2-test-space"
 
-NOTE: Alternatively, you can use the short command line options like
+NOTE: Alternatively, you can use the short command line option format
 
-pvfs2-mkspace -a -c pvfs2-volume3 -i 11 -r 3048576 -R 4-4294967297 -v -s /tmp/pvfs2-test-space
+pvfs2-mkspace -a -c pvfs2-volume3 -i 1709020299 -r 1048576 -M 4-2147483650 -N 2147483651-4294967297 -v -s /tmp/pvfs2-test-space
 =============================
 
 Notice that the -a (or --add-coll) option is specified.  This tells
