@@ -47,7 +47,7 @@ enum PVFS_flowproto_type
     FLOWPROTO_BMI_CACHE = 3,
     FLOWPROTO_MULTIQUEUE = 4
 };
-#define FLOWPROTO_DEFAULT FLOWPROTO_BMI_TROVE
+#define FLOWPROTO_DEFAULT FLOWPROTO_MULTIQUEUE
 
 /* supported wire encoding types */
 enum PVFS_encoding_type
