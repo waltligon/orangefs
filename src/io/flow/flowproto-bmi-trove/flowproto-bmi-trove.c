@@ -780,8 +780,11 @@ static int buffer_setup_bmi_to_mem(flow_descriptor* flow_d)
 	PVFS_boolean eof_flag = 0;
 	int i=0;
 
+	/* set the buffer size to use for this flow */
+	flow_data->max_buffer_size = DEFAULT_BUFFER_SIZE;
+
 	/* call req processing code to get first set of segments */
-	flow_data->bmi_total_size = DEFAULT_BUFFER_SIZE;
+	flow_data->bmi_total_size = flow_data->max_buffer_size;
 	flow_data->bmi_list_count = MAX_REGIONS;
 
 	gossip_ldebug(FLOW_PROTO_DEBUG, "req proc offset: %ld\n",
@@ -800,12 +803,12 @@ static int buffer_setup_bmi_to_mem(flow_descriptor* flow_d)
 	 * available < buffer size? 
 	 */
 	if(!eof_flag && flow_d->current_req_offset != -1 &&
-		flow_data->bmi_total_size != DEFAULT_BUFFER_SIZE)
+		flow_data->bmi_total_size != flow_data->max_buffer_size)
 	{
 		/* We aren't at the end, but we didn't get what we asked
 		 * for.  In this case, we want to hang onto the segment
 		 * descriptions, but provide an intermediate buffer of
-		 * DEFAULT_BUFFER_SIZE to be able to handle the next 
+		 * max_buffer_size to be able to handle the next 
 		 * incoming message.  Copy out later.  
 		 */
 		gossip_ldebug(FLOW_PROTO_DEBUG, "Warning: falling back to intermediate buffer.\n");
@@ -825,8 +828,8 @@ static int buffer_setup_bmi_to_mem(flow_descriptor* flow_d)
 		if(!flow_data->intermediate_buffer)
 		{
 			flow_data->intermediate_buffer =
-				BMI_memalloc(flow_d->src.u.bmi.address, DEFAULT_BUFFER_SIZE,
-				BMI_RECV_BUFFER);
+				BMI_memalloc(flow_d->src.u.bmi.address,
+				flow_data->max_buffer_size, BMI_RECV_BUFFER);
 			if(!flow_data->intermediate_buffer)
 			{
 				return(-ENOMEM);
@@ -872,8 +875,11 @@ static int buffer_setup_mem_to_bmi(flow_descriptor* flow_d)
 	char* src_ptr = NULL;
 	int done_flag = 0;
 
+	/* set the buffer size to use for this flow */
+	flow_data->max_buffer_size = DEFAULT_BUFFER_SIZE;
+
 	/* call req processing code to get first set of segments */
-	flow_data->bmi_total_size = DEFAULT_BUFFER_SIZE;
+	flow_data->bmi_total_size = flow_data->max_buffer_size;
 	flow_data->bmi_list_count = MAX_REGIONS;
 
 	gossip_ldebug(FLOW_PROTO_DEBUG, "req proc offset: %ld\n",
@@ -892,7 +898,7 @@ static int buffer_setup_mem_to_bmi(flow_descriptor* flow_d)
 	 * available < buffer size?
 	 */
 	if(!eof_flag && flow_d->current_req_offset != -1 &&
-		flow_data->bmi_total_size != DEFAULT_BUFFER_SIZE)
+		flow_data->bmi_total_size != flow_data->max_buffer_size)
 	{
 		/* we aren't at the end, but we didn't get the amount of data that
 		 * we asked for.  In this case, we should pack into an
@@ -911,7 +917,7 @@ static int buffer_setup_mem_to_bmi(flow_descriptor* flow_d)
 		{
 			flow_data->intermediate_buffer = 
 				BMI_memalloc(flow_d->dest.u.bmi.address,
-				DEFAULT_BUFFER_SIZE, BMI_SEND_BUFFER);
+				flow_data->max_buffer_size, BMI_SEND_BUFFER);
 			if(!flow_data->intermediate_buffer)
 			{
 				return(-ENOMEM);
@@ -934,10 +940,10 @@ static int buffer_setup_mem_to_bmi(flow_descriptor* flow_d)
 			}
 
 			if(!eof_flag && flow_d->current_req_offset != -1 &&
-				intermediate_offset < DEFAULT_BUFFER_SIZE)
+				intermediate_offset < flow_data->max_buffer_size)
 			{
 				flow_data->bmi_list_count = MAX_REGIONS;
-				flow_data->bmi_total_size = DEFAULT_BUFFER_SIZE -
+				flow_data->bmi_total_size = flow_data->max_buffer_size -
 					intermediate_offset;
 
 				ret = PINT_Process_request(flow_d->request_state,
@@ -1330,15 +1336,15 @@ static void service_bmi_to_mem(flow_descriptor* flow_d)
 
 	/* are we using an intermediate buffer? */
 	if(flow_d->current_req_offset != -1 &&
-		flow_data->bmi_total_size != DEFAULT_BUFFER_SIZE)
+		flow_data->bmi_total_size != flow_data->max_buffer_size)
 	{
 		gossip_ldebug(FLOW_PROTO_DEBUG, "Warning: posting recv to intermediate buffer.\n");
 		/* post receive to contig. intermediate buffer */
 		gossip_ldebug(FLOW_PROTO_DEBUG, "Posting recv, total size: %ld\n", 
-			(long)DEFAULT_BUFFER_SIZE);
+			(long)flow_data->max_buffer_size);
 		ret = BMI_post_recv(&flow_data->bmi_id,
 			flow_d->src.u.bmi.address,
-			flow_data->intermediate_buffer, DEFAULT_BUFFER_SIZE,
+			flow_data->intermediate_buffer, flow_data->max_buffer_size,
 			&actual_size, BMI_PRE_ALLOC, flow_d->tag, flow_d);
 	}
 	else
@@ -1919,7 +1925,7 @@ static void bmi_completion_bmi_to_mem(bmi_error_code_t error_code,
 
 	/* were we using an intermediate buffer? */
 	if(flow_d->current_req_offset != -1 &&
-		flow_data->bmi_total_size != DEFAULT_BUFFER_SIZE)
+		flow_data->bmi_total_size != flow_data->max_buffer_size)
 	{
 		gossip_ldebug(FLOW_PROTO_DEBUG, "copying out intermediate buffer.\n");
 		/* we need to memcpy out whatever we got to the correct
