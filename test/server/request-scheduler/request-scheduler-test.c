@@ -64,7 +64,7 @@ int main(
     }
 
     /* try to schedule first request- it should proceed */
-    ret = PINT_req_sched_post(&(req_array[0]), NULL, &(id_array[0]));
+    ret = PINT_req_sched_post(&(req_array[0]), 0, NULL, &(id_array[0]));
     if (ret != 1)
     {
 	fprintf(stderr, "Error: 1st post should immediately complete.\n");
@@ -72,7 +72,7 @@ int main(
     }
 
     /* try to schedule second request- it should queue up */
-    ret = PINT_req_sched_post(&(req_array[1]), NULL, &(id_array[1]));
+    ret = PINT_req_sched_post(&(req_array[1]), 0, NULL, &(id_array[1]));
     if (ret != 0)
     {
 	fprintf(stderr, "Error: 2nd post should queue.\n");
@@ -80,13 +80,13 @@ int main(
     }
 
     /* schedule two I/O requests */
-    ret = PINT_req_sched_post(&(io_req_array[1]), NULL, &(io_id_array[1]));
+    ret = PINT_req_sched_post(&(io_req_array[1]), 0, NULL, &(io_id_array[1]));
     if (ret != 0)
     {
 	fprintf(stderr, "Error: 1st I/O req should queue.\n");
 	return (-1);
     }
-    ret = PINT_req_sched_post(&(io_req_array[0]), NULL, &(io_id_array[0]));
+    ret = PINT_req_sched_post(&(io_req_array[0]), 0, NULL, &(io_id_array[0]));
     if (ret != 0)
     {
 	fprintf(stderr, "Error: 1st I/O req should queue.\n");
@@ -94,7 +94,7 @@ int main(
     }
 
     /* try to schedule third request- it should proceed */
-    ret = PINT_req_sched_post(&(req_array[2]), NULL, &(id_array[2]));
+    ret = PINT_req_sched_post(&(req_array[2]), 0, NULL, &(id_array[2]));
     if (ret != 1)
     {
 	fprintf(stderr, "Error: 3rd post should immediately complete.\n");
@@ -102,7 +102,7 @@ int main(
     }
 
     /* try to schedule fourth request- it should queue up */
-    ret = PINT_req_sched_post(&(req_array[3]), NULL, &(id_array[3]));
+    ret = PINT_req_sched_post(&(req_array[3]), 0, NULL, &(id_array[3]));
     if (ret != 0)
     {
 	fprintf(stderr, "Error: 4th post should queue.\n");
@@ -203,13 +203,13 @@ int main(
     }
 
     /* schedule two more I/O requests, should both immediately complete */
-    ret = PINT_req_sched_post(&(io_req_array[2]), NULL, &(io_id_array[2]));
+    ret = PINT_req_sched_post(&(io_req_array[2]), 0, NULL, &(io_id_array[2]));
     if (ret != 1)
     {
 	fprintf(stderr, "Error: 3rd I/O req should complete.\n");
 	return (-1);
     }
-    ret = PINT_req_sched_post(&(io_req_array[3]), NULL, &(io_id_array[3]));
+    ret = PINT_req_sched_post(&(io_req_array[3]), 0, NULL, &(io_id_array[3]));
     if (ret != 1)
     {
 	fprintf(stderr, "Error: 4th I/O req should complete.\n");

@@ -85,6 +85,7 @@ static int prelude_req_sched(PINT_server_op *s_op, job_status_s *js_p)
     }
     
     ret = job_req_sched_post(s_op->req,
+	0,
 	s_op,
 	0,
 	js_p,
@@ -114,7 +115,7 @@ static int prelude_getattr_if_needed(PINT_server_op *s_op, job_status_s *js_p)
     /* first, run a request scheduler utility function that tells us
      * what handle this request will operate on
      */
-    ret = PINT_req_sched_target_handle(s_op->req, &target_handle, 
+    ret = PINT_req_sched_target_handle(s_op->req, 0, &target_handle, 
 	&target_fs_id, &readonly_flag);
     if(ret < 0)
     {

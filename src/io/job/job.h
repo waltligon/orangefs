@@ -156,6 +156,7 @@ int job_dev_write_list(void** buffer_list,
 
 /* request scheduler post */
 int job_req_sched_post(struct PVFS_server_req *in_request,
+		       int req_index,
 		       void *user_ptr,
 		       PVFS_aint status_user_tag,
 		       job_status_s * out_status_p,

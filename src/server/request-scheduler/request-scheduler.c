@@ -192,6 +192,7 @@ int PINT_req_sched_finalize(
  */
 int PINT_req_sched_target_handle(
     struct PVFS_server_req *req,
+    int req_index,
     PVFS_handle * handle,
     PVFS_fs_id * fs_id,
     int* readonly_flag)
@@ -288,6 +289,9 @@ int PINT_req_sched_target_handle(
 	return (0);
 	break;
     case PVFS_SERV_MGMT_DSPACE_INFO_LIST:
+	if(req_index >= req->u.mgmt_dspace_info_list.handle_count)
+	    return(-EOVERFLOW);
+	*handle = req->u.mgmt_dspace_info_list.handle_array[req_index];
 	*fs_id = req->u.mgmt_dspace_info_list.fs_id;
 	return (0);
 	break;
@@ -316,6 +320,7 @@ int PINT_req_sched_target_handle(
  */
 int PINT_req_sched_post(
     struct PVFS_server_req *in_request,
+    int req_index,
     void *in_user_ptr,
     req_sched_id * out_id)
 {
@@ -332,7 +337,7 @@ int PINT_req_sched_post(
     int readonly_flag = 0;
 
     /* find the handle */
-    ret = PINT_req_sched_target_handle(in_request, &handle, &fs_id, 
+    ret = PINT_req_sched_target_handle(in_request, req_index, &handle, &fs_id, 
 	&readonly_flag);
     if (ret < 0)
     {

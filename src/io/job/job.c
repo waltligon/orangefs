@@ -931,6 +931,7 @@ int job_dev_write_list(void** buffer_list,
  * completion 
  */
 int job_req_sched_post(struct PVFS_server_req *in_request,
+		       int req_index,
 		       void *user_ptr,
 		       PVFS_aint status_user_tag,
 		       job_status_s * out_status_p,
@@ -960,7 +961,7 @@ int job_req_sched_post(struct PVFS_server_req *in_request,
     jd->context_id = context_id;
     jd->status_user_tag = status_user_tag;
 
-    ret = PINT_req_sched_post(in_request, jd, &(jd->u.req_sched.id));
+    ret = PINT_req_sched_post(in_request, req_index, jd, &(jd->u.req_sched.id));
 
     if (ret < 0)
     {
