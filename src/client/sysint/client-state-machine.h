@@ -11,6 +11,7 @@
  * DEFINE ALL THE STRUCTURES WE NEED BEFORE WE INCLUDE IT.
  */
 
+#include "pvfs2-types.h"
 #include "pvfs2-storage.h"
 #include "PINT-reqproto-encode.h"
 #include "job.h"
@@ -151,6 +152,8 @@ struct PINT_client_flush_sm {
 
 struct PINT_client_mgmt_setparam_all_sm 
 {
+    enum PVFS_server_param param;
+    int64_t value;
 };
 
 typedef struct PINT_client_sm {
