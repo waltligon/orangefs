@@ -103,7 +103,6 @@ machine pvfs2_client_lookup_sm(
 {
     state lookup_init
     {
-	/* do nothing */
 	run lookup_init;
 	success => lookup_segment_lookup_setup_msgpair;
         default => lookup_cleanup;
@@ -111,7 +110,6 @@ machine pvfs2_client_lookup_sm(
 
     state lookup_segment_lookup_setup_msgpair
     {
-	/* set up a single lookup path request */
 	run lookup_segment_lookup_setup_msgpair;
         success => lookup_segment_lookup_xfer_msgpair;
 	default => lookup_segment_lookup_failure;
@@ -119,10 +117,6 @@ machine pvfs2_client_lookup_sm(
 
     state lookup_segment_lookup_xfer_msgpair
     {
-	/* check for path segment in name cache,
-	 * send request to server (and receive ack)
-	 * if the cache lookup fails
-	 */
         jump pvfs2_client_lookup_ncache_sm;
 	success => lookup_segment_verify_attr_present;
         default => lookup_segment_lookup_failure;
@@ -130,14 +124,12 @@ machine pvfs2_client_lookup_sm(
 
     state lookup_segment_lookup_failure
     {
-	/* log debugging message for lookup failure */
 	run lookup_segment_lookup_failure;
 	default => lookup_cleanup;
     }
 
     state lookup_segment_verify_attr_present
     {
-	/* see if attributes for target are present */
 	run lookup_segment_verify_attr_present;
         success => lookup_segment_check_attr_type;
         default => lookup_segment_getattr_setup_msgpair;
@@ -145,7 +137,6 @@ machine pvfs2_client_lookup_sm(
 
     state lookup_segment_getattr_setup_msgpair
     {
-	/* perform a getattr operation on the handle */
         run lookup_segment_getattr_setup_msgpair;
         success => lookup_segment_getattr_xfer_msgpair;
         default => lookup_segment_getattr_failure;
@@ -153,7 +144,6 @@ machine pvfs2_client_lookup_sm(
 
     state lookup_segment_getattr_xfer_msgpair
     {
-	/* send request and receive acknowledgement for getattr */
 	jump pvfs2_client_getattr_acache_sm;
         success => lookup_segment_check_attr_type;
         default => lookup_segment_getattr_failure;
@@ -161,14 +151,12 @@ machine pvfs2_client_lookup_sm(
 
     state lookup_segment_getattr_failure
     {
-	/* log a debugging message for getattr failure */
         run lookup_segment_getattr_failure;
         default => lookup_cleanup;
     }
 
     state lookup_segment_check_attr_type
     {
-	/* check object type */
         run lookup_segment_check_attr_type;
         LOOKUP_TYPE_DIRECTORY => lookup_context_check_completion;
         LOOKUP_TYPE_METAFILE => lookup_context_check_completion;
@@ -180,7 +168,6 @@ machine pvfs2_client_lookup_sm(
 
     state lookup_context_check_completion
     {
-	/* traverse next path segment if needed */
         run lookup_context_check_completion;
         LOOKUP_CONTINUE => lookup_segment_lookup_setup_msgpair;
         default => lookup_cleanup;
@@ -188,7 +175,6 @@ machine pvfs2_client_lookup_sm(
 
     state lookup_segment_handle_relative_link
     {
-	/* traverse relative link */
         run lookup_segment_handle_relative_link;
         success => lookup_segment_lookup_setup_msgpair;
         default => lookup_cleanup;
@@ -196,7 +182,6 @@ machine pvfs2_client_lookup_sm(
 
     state lookup_segment_handle_absolute_link
     {
-	/* traverse absolute link */
         run lookup_segment_handle_absolute_link;
         success => lookup_segment_lookup_setup_msgpair;
         default => lookup_cleanup;
@@ -204,7 +189,6 @@ machine pvfs2_client_lookup_sm(
 
     state lookup_cleanup
     {
-	/* clean up memory allocations and complete */
         run lookup_cleanup;
         default => terminate;
     }

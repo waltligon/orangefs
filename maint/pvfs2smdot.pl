@@ -1,11 +1,5 @@
 #!/usr/bin/perl -w
 
-use Getopt::Long;
-
-my $opt_comment = '';
-
-GetOptions('comment' => \$opt_comment);
-
 #
 # this code parses state machines and dumps a dot file showing the states
 #
@@ -35,25 +29,9 @@ sub next_token()
     while (1) {
 	if ($pos >= @tokens) {
 	    $pos = 0;
-comment_loop:
 	    if ($_ = <>) {
 		if ( /%%/ ) { return ""; }
-			
-		# look for comment opening block 
-		if ( /\/\*/ ) {
-		    while(1) {
-			# store the comment, but replace newlines
-			$_ =~ s/\n/\\l/;
-			$global_comment  .= $_;
-			# keep going until we find end of comment
-			# jump out, continue looking for tokens
-			if(/\*\//) {
-			    goto comment_loop;
-			}
-			$_ = <>;
-		    }
-		}
-
+		
 		@tokens = split(/([\s|\*+|\(|\)|,])/);
 	    }
 	    else { return ""; }
@@ -96,27 +74,13 @@ sub spit_out_state
 	$node_style = "";
     }
 
-    if($opt_comment)
-    {
-	if ($nested) { 
-	    printf "%s [%s shape = record, fillcolor = %s, label = \"{ { NESTED | %s } |%s}\"];\n",
-		$sn, $node_style, $fill_color, $fn, $global_comment; 
-	}
-	else         { 
-	    printf "%s [%s shape = record, fillcolor = %s, label = \"{%s|%s}\"];\n",
-		$sn, $node_style, $fill_color, $fn, $global_comment; 
-	}
+    if ($nested) { 
+	printf "%s [%s shape = record, fillcolor = %s, label = \"%s\"];\n",
+	    $sn, $node_style, $fill_color, $fn; 
     }
-    else
-    {
-	if ($nested) { 
-	    printf "%s [%s shape = rect, fillcolor = %s, label = \"%s\"];\n",
-		$sn, $node_style, $fill_color, $fn; 
-	}
-	else         { 
-	    printf "%s [%s shape = ellipse, fillcolor = %s, label = \"%s\"];\n",
-		$sn, $node_style, $fill_color, $fn; 
-	}
+    else         { 
+	printf "%s [%s shape = ellipse, fillcolor = %s, label = \"%s\"];\n", 
+	    $sn, $node_style, $fill_color, $fn; 
     }
 }
 
@@ -150,7 +114,6 @@ spit_out_header();
 # 5 - continuing to read type of parameter
 #
 $state = 0;
-$global_comment = "";
 $token = next_token();
 
 while (1) {
@@ -160,7 +123,6 @@ while (1) {
 		printf "state 0, expected \"state\", got \"%s\"\n", $token;
 		exit -1;
 	    }
-	    $global_comment = "";
 	    $token = next_token();
 	    $ending = 0;
 	    $state = 1;
