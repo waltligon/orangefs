@@ -10,10 +10,16 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <stdio.h>
+#include <string.h>
 
 #include "pvfs2-types.h"
 #include "gossip.h"
 #include "pint-dev.h"
+
+static int setup_dev_entry(const char* dev_name);
+static int parse_devices(const char* targetfile, const char* devname, 
+    int* majornum);
 
 static int pdev_fd = -1;
 
@@ -36,7 +42,12 @@ int PINT_dev_initialize(
 	return(-(PVFS_EPERM|PVFS_ERROR_DEV));
     }
 
-    /* TODO: put in code that sets up the device, copy from pvfsd */
+    /* setup /dev/ entry if needed */
+    ret = setup_dev_entry(dev_name);
+    if(ret < 0)
+    {
+	return(-(PVFS_ENODEV|PVFS_ERROR_DEV));
+    }
 
     /* try to open the device */
     pdev_fd = open(dev_name, O_RDWR);
@@ -53,10 +64,10 @@ int PINT_dev_initialize(
 	}
     }
 
+    /* TODO: */
     /* run some ioctls to find out device parameters */
 
-    gossip_lerr("Error: function not implemented.\n");
-    return(-(PVFS_ENOSYS|PVFS_ERROR_DEV));
+    return(0);
 }
 
 /* PINT_dev_finalize()
@@ -67,7 +78,10 @@ int PINT_dev_initialize(
  */
 void PINT_dev_finalize(void)
 {
-    gossip_lerr("Error: function not implemented.\n");
+    if(pdev_fd > -1)
+	close(pdev_fd);
+
+    /* TODO: finish cleanup */
     return;
 }
 
@@ -158,6 +172,121 @@ void PINT_dev_memfree(void* buffer, int size)
 {
     gossip_lerr("Error: function not implemented.\n");
     return;
+}
+
+/* setup_dev_entry()
+ *
+ * sets up the device file
+ *
+ * returns 0 on success, -1 on failure
+ */
+static int setup_dev_entry(const char* dev_name)
+{
+    int majornum = -1;
+    int ret = -1;
+    struct stat dev_stat;
+
+    ret = parse_devices("/proc/devices", "pvfs2-req", &majornum);
+    if(ret < 0){
+	gossip_err("Error: unable to parse device file.\n");
+	return(-1);
+    }
+
+    if(majornum == -1)
+    {
+	gossip_err("Error: could not setup device %s.\n", dev_name);
+	gossip_err("Error: did you remember to load the kernel module?\n");
+	return(-1);
+    }
+
+    if(!access(dev_name, F_OK))
+    {
+	/* device file already exists */
+	ret = stat(dev_name, &dev_stat);
+	if(ret != 0)
+	{
+	    gossip_err("Error: could not stat %s.\n", dev_name);
+	    return(-1);
+	}
+	if(S_ISCHR(dev_stat.st_mode) && (major(dev_stat.st_rdev) == majornum))
+	{
+	    /* the device file already has the correct major number; we're done */
+	    return(0);
+	}
+	else
+	{
+	    /* the device file is incorrect; unlink it */
+	    ret = unlink(dev_name);
+	    if(ret != 0)
+	    {
+		gossip_err("Error: could not unlink old %s\n", dev_name);
+		return(-1);
+	    }
+	}
+    }
+
+    /* if we hit this point, then we need to create a new device file */
+    ret = mknod(dev_name, (S_IFCHR | S_IRUSR | S_IWUSR) , makedev(majornum, 0));
+    if(ret != 0)
+    {
+	gossip_err("Error: could not create new %s device entry.\n", dev_name);
+	return(-1);
+    }
+
+    return(0);
+}
+
+/* parse_devices()
+ *
+ * parses a file in the /proc/devices format looking for an entry for the
+ * given "devname".  If found, "majornum" is filled in with the major number of
+ * the device.  Else "majornum" is set to -1.
+ *
+ * returns 0 on successs, -1 on failure
+ */
+static int parse_devices(const char* targetfile, const char* devname, 
+    int* majornum)
+{
+    int max_str_len = 256;
+    char line_buf[max_str_len];
+    char dev_buf[max_str_len];
+    int major_buf = -1;
+    FILE* devfile = NULL;
+    int ret = -1;
+
+    /* initialize for safety */
+    *majornum = -1;
+
+    /* open up the file to parse */
+    devfile = fopen(targetfile, "r");
+    if(!devfile){
+	gossip_err("Error: could not open %s.\n", targetfile);
+	return(-1);
+    }
+
+    /* scan every line until we get a match or end of file */
+    while(fgets(line_buf, sizeof(line_buf), devfile))
+    {
+	/* sscanf is safe here as long as the target string is at least 
+	 * as large as the source 
+	 */
+	ret = sscanf(line_buf, " %d %s ", &major_buf, dev_buf);
+	if(ret == 2)
+	{
+	    /* this line is the correct format; see if it matches the devname */
+	    if(strncmp(devname, dev_buf, max_str_len) == 0)
+	    {
+		*majornum = major_buf;
+		/* don't break out; it doesn't cost much to scan the whole
+		 * thing, and we want the last entry if somehow(?) there are two
+		 */
+	    }
+	}
+    }
+
+    fclose(devfile);
+
+    return(0);
 }
 
 /*
