@@ -12,26 +12,34 @@
 #include "pvfs2-types.h"
 #include "gossip.h"
 
+#define MAX_PVFS_STRERROR_LEN 256
+
+/* macro defined in include/pvfs2-types.h */
+DECLARE_ERRNO_MAPPING_AND_FN();
+
 /* PVFS_perror()
  *
- * prints a message on stderr, consisting of text argument
- * followed by a colon, space, and error string for the given
- * retcode.
- * NOTE: also prints a warning if the error code is not in pvfs2
- * format and assumes errno
- *
- * no return value
+ * prints a message on stderr, consisting of text argument followed by
+ * a colon, space, and error string for the given retcode.  NOTE: also
+ * prints a warning if the error code is not in a pvfs2 format and
+ * assumes errno
  */
-void PVFS_perror(char* text, int retcode)
+void PVFS_perror(char *text, int retcode)
 {
-    if(IS_PVFS_ERROR(-retcode))
+    if (IS_PVFS_NON_ERRNO_ERROR(-retcode))
+    {
+        char buf[MAX_PVFS_STRERROR_LEN] = {0};
+        int index = PVFS_get_errno_mapping(-retcode);
+
+        snprintf(buf,MAX_PVFS_STRERROR_LEN,"%s: %s\n",text,
+                 PINT_non_errno_strerror_mapping[index]);
+        fprintf(stderr, "%s", buf);
+    }
+    else if (IS_PVFS_ERROR(-retcode))
     {
 	fprintf(stderr, "%s: %s\n", text,
 	strerror(PVFS_ERROR_TO_ERRNO(-retcode)));
-	/* TODO: probably we should do something to print
-	 * out the class too?
-	 */
-    }       
+    }
     else
     {
 	fprintf(stderr, "Warning: non PVFS2 error code:\n");
@@ -43,19 +51,24 @@ void PVFS_perror(char* text, int retcode)
 
 /* PVFS_perror_gossip()
  *
- * same as PVFS_perror, except that the output is routed through 
+ * same as PVFS_perror, except that the output is routed through
  * gossip rather than stderr
- *
- * no return value
  */
-void PVFS_perror_gossip(char* text, int retcode)
+void PVFS_perror_gossip(char *text, int retcode)
 {
-    if(IS_PVFS_ERROR(-retcode))
+    if (IS_PVFS_NON_ERRNO_ERROR(-retcode))
     {
-	gossip_err("%s: %s\n", text, strerror(PVFS_ERROR_TO_ERRNO(-retcode)));
-	/* TODO: probably we should do something to print
-	 * out the class too?
-	 */
+        char buf[MAX_PVFS_STRERROR_LEN] = {0};
+        int index = PVFS_get_errno_mapping(-retcode);
+
+        snprintf(buf,MAX_PVFS_STRERROR_LEN,"%s: %s\n",text,
+                 PINT_non_errno_strerror_mapping[index]);
+	gossip_err("%s", buf);
+    }
+    else if (IS_PVFS_ERROR(-retcode))
+    {
+	gossip_err("%s: %s\n", text,
+                   strerror(PVFS_ERROR_TO_ERRNO(-retcode)));
     }       
     else
     {
@@ -64,10 +77,6 @@ void PVFS_perror_gossip(char* text, int retcode)
     }
     return;
 }
-
-/* macro defined in include/pvfs2-types.h */
-DECLARE_ERRNO_MAPPING_AND_FN();
-
 
 /*
  * Local variables:
