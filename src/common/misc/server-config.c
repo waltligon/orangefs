@@ -138,12 +138,6 @@ int PINT_server_config(struct server_configuration_s *config_obj,
     }
     dotconf_cleanup(configfile);
 
-    if (!config_s->storage_path)
-    {
-        gossip_err("Configuration file error. No storage path specified.\n");
-        return 1;
-    }
-
     /* then read in the server.conf (host specific) config file */
     config_s->configuration_context = GLOBAL_CONFIG;
     configfile = dotconf_create(config_s->server_config_filename,
@@ -169,6 +163,11 @@ int PINT_server_config(struct server_configuration_s *config_obj,
         return 1;
     }
 
+    if (!config_s->storage_path)
+    {
+        gossip_err("Configuration file error. No storage path specified.\n");
+        return 1;
+    }
     return 0;
 }
 
@@ -176,7 +175,7 @@ DOTCONF_CB(get_pvfs_server_id)
 {
     if (config_s->configuration_context != GLOBAL_CONFIG)
     {
-        gossip_lerr("HostID Tags can only be within the Global context");
+        gossip_lerr("HostID Tag can only be in the Global context");
         return NULL;
     }
     if (config_s->host_id)
@@ -191,9 +190,9 @@ DOTCONF_CB(get_pvfs_server_id)
 
 DOTCONF_CB(get_storage_space)
 {
-    if (config_s->configuration_context != DEFAULTS_CONFIG)
+    if (config_s->configuration_context != GLOBAL_CONFIG)
     {
-        gossip_lerr("StorageSpace Tag can only be in a Defaults block");
+        gossip_lerr("StorageSpace Tag can only be in the Global context");
         return NULL;
     }
     if (config_s->storage_path)
