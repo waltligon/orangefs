@@ -7,8 +7,8 @@
 #ifndef __SERVER_CONFIG_H
 #define __SERVER_CONFIG_H
 
-#include "llist.h"
 #include "pvfs2-types.h"
+#include "src/common/llist/llist.h"
 
 #ifdef __PVFS2_TROVE_SUPPORT__
 #include "trove.h"

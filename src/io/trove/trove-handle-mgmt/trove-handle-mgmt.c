@@ -12,7 +12,6 @@
 
 #include "trove-types.h"
 #include "trove-proto.h"
-#include "llist.h"
 #include "quickhash.h"
 #include "extent-utils.h"
 #include "trove-ledger.h"

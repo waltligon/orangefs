@@ -14,7 +14,6 @@
 #include "pvfs2-types.h"
 #include "str-utils.h"
 #include "extent-utils.h"
-#include "llist.h"
 
 /* PINT_create_extent_list()
  *

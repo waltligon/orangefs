@@ -17,7 +17,6 @@
 #include "dotconf.h"
 #include "trove.h"
 #include "server-config.h"
-#include "llist.h"
 #include "quickhash.h"
 #include "extent-utils.h"
 #include "pint-cached-config.h"

@@ -10,7 +10,7 @@
 #include "pvfs2-types.h"
 #include "pvfs2-storage.h"
 #include "str-utils.h"
-#include "llist.h"
+#include "src/common/llist/llist.h"
 
 PINT_llist *PINT_create_extent_list(
     char *extent_str);
