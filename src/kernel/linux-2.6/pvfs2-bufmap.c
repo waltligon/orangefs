@@ -295,7 +295,7 @@ int pvfs_bufmap_copy_from_user(struct pvfs_bufmap_desc* to, void* from,
     int amt_copied = 0;
     int amt_this = 0;
     int index = 0;
-    void* offset = to;
+    void* offset = from;
 
     while(amt_copied < size)
     {
