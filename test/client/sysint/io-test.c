@@ -18,14 +18,12 @@
 
 int main(int argc,char **argv)
 {
-	PVFS_sysresp_init resp_init;
 	PVFS_sysresp_lookup resp_lk;
 	PVFS_sysresp_create resp_cr;
 	PVFS_sysresp_io resp_io;
 	char *filename;
 	int name_sz;
 	int ret = -1;
-	const PVFS_util_tab* tab;
 	int io_size = DEFAULT_IO_SIZE;
 	int* io_buffer = NULL;
 	int i;
@@ -81,19 +79,17 @@ int main(int argc,char **argv)
 
 	memcpy(&(filename[1]), argv[1], (name_sz-1));
 
-	/* parse pvfstab */
-	tab = PVFS_util_parse_pvfstab(NULL);
-	if (!tab)
+	ret = PVFS_util_init_defaults();
+	if (ret < 0)
 	{
-		fprintf(stderr, "Error: parse_pvfstab() failure.\n");
-		return(-1);
+		PVFS_perror("PVFS_util_init_defaults", ret);
+		return (-1);
 	}
-	/* init the system interface */
-	ret = PVFS_sys_initialize(*tab, GOSSIP_NO_DEBUG, &resp_init);
-	if(ret < 0)
+	ret = PVFS_util_get_default_fsid(&fs_id);
+	if (ret < 0)
 	{
-		fprintf(stderr, "Error: PVFS_sys_initialize() failure. = %d\n", ret);
-		return(ret);
+		PVFS_perror("PVFS_util_get_default_fsid", ret);
+		return (-1);
 	}
 
 	/*************************************************************
@@ -101,7 +97,6 @@ int main(int argc,char **argv)
 	 */
 	
 	name = filename;
-	fs_id = resp_init.fsid_list[0];
 	credentials.uid = getuid();
 	credentials.gid = getgid();
 
@@ -116,7 +111,6 @@ int main(int argc,char **argv)
 
 		/* get root handle */
 		name = "/";
-		fs_id = resp_init.fsid_list[0];
 		credentials.uid = getuid();
 		credentials.gid = getgid();
 

@@ -20,8 +20,6 @@ int main(int argc,char **argv)
     char *old_filename = (char *)0;
     char *new_filename = (char *)0;
     PVFS_fs_id cur_fs;
-    const PVFS_util_tab* tab;
-    PVFS_sysresp_init resp_init;
     char* old_entry;
     PVFS_pinode_reference old_parent_refn;
     char* new_entry;
@@ -36,18 +34,17 @@ int main(int argc,char **argv)
     old_filename = argv[1];
     new_filename = argv[2];
 
-    tab = PVFS_util_parse_pvfstab(NULL);
-    if(!tab)
+    ret = PVFS_util_init_defaults();
+    if (ret < 0)
     {
-        printf("Failed to parse pvfstab\n");
-        return ret;
+	PVFS_perror("PVFS_util_init_defaults", ret);
+	return (-1);
     }
-
-    memset(&resp_init, 0, sizeof(resp_init));
-    if (PVFS_sys_initialize(*tab, GOSSIP_NO_DEBUG, &resp_init))
+    ret = PVFS_util_get_default_fsid(&cur_fs);
+    if (ret < 0)
     {
-        printf("Failed to initialize system interface\n");
-        return ret;
+	PVFS_perror("PVFS_util_get_default_fsid", ret);
+	return (-1);
     }
 
     if (PVFS_util_remove_base_dir(old_filename, old_buf, PVFS_SEGMENT_MAX))
@@ -73,9 +70,6 @@ int main(int argc,char **argv)
         return(-1);
     }
     printf("New filename is %s\n",new_buf);
-
-
-    cur_fs = resp_init.fsid_list[0];
 
     credentials.uid = getuid();
     credentials.gid = getgid();

@@ -18,9 +18,7 @@ int main(int argc, char **argv)
     int ret = -1;
     char *filename = NULL;
     PVFS_fs_id fs_id;
-    const PVFS_util_tab* tab;
     PVFS_credentials credentials;
-    PVFS_sysresp_init resp_init;
     PVFS_sysresp_lookup resp_look;
     PVFS_sysresp_getattr resp_getattr;
     PVFS_pinode_reference pinode_refn;
@@ -36,24 +34,21 @@ int main(int argc, char **argv)
         return ret;
     }
 
-    tab = PVFS_util_parse_pvfstab(NULL);
-    if (!tab)
+    ret = PVFS_util_init_defaults();
+    if (ret < 0)
     {
-        fprintf(stderr, "Failed to parse pvfstab!\n");
-        return ret;
+	PVFS_perror("PVFS_util_init_defaults", ret);
+	return (-1);
     }
-
-    ret = PVFS_sys_initialize(*tab, GOSSIP_NO_DEBUG, &resp_init);
-    if(ret < 0)
+    ret = PVFS_util_get_default_fsid(&fs_id);
+    if (ret < 0)
     {
-        fprintf(stderr, "PVFS_sys_initialize() failure. = %d\n", ret);
-        return ret;
+	PVFS_perror("PVFS_util_get_default_fsid", ret);
+	return (-1);
     }
 
     credentials.uid = getuid();
     credentials.gid = getgid();
-
-    fs_id = resp_init.fsid_list[0];
 
     printf("about to lookup %s\n", filename);
 

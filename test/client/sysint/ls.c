@@ -100,7 +100,7 @@ void print_entry(
 }
 
 int do_list(
-    PVFS_sysresp_init *init_response,
+    PVFS_fs_id fs_id,
     char *start_dir)
 {
     int i = 0;
@@ -110,7 +110,6 @@ int do_list(
     PVFS_sysresp_lookup lk_response;
     PVFS_sysresp_readdir rd_response;
     PVFS_sysresp_getattr getattr_response;
-    PVFS_fs_id fs_id;
     PVFS_credentials credentials;
     PVFS_pinode_reference pinode_refn;
     PVFS_ds_position token;
@@ -119,7 +118,6 @@ int do_list(
     memset(&getattr_response,0,sizeof(PVFS_sysresp_getattr));
 
     name = start_dir;
-    fs_id = init_response->fsid_list[0];
     credentials.uid = 0;
     credentials.gid = 0;
 
@@ -127,12 +125,12 @@ int do_list(
                         &lk_response, PVFS2_LOOKUP_LINK_NO_FOLLOW))
     {
         fprintf(stderr,"Failed to lookup %s on fs_id %d!\n",
-                start_dir,init_response->fsid_list[0]);
+                start_dir,fs_id);
         return 1;
     }
 
     pinode_refn.handle = lk_response.pinode_refn.handle;
-    pinode_refn.fs_id = init_response->fsid_list[0];
+    pinode_refn.fs_id = fs_id;
     pvfs_dirent_incount = MAX_NUM_DIRENTS;
     credentials.uid = 0;
     credentials.gid = 0;
@@ -167,7 +165,7 @@ int do_list(
             cur_file = rd_response.dirent_array[i].d_name;
             cur_handle = rd_response.dirent_array[i].handle;
 
-            print_entry(cur_file, cur_handle, init_response->fsid_list[0]);
+            print_entry(cur_file, cur_handle, fs_id);
         }
         token += rd_response.pvfs_dirent_outcount;
 
@@ -181,8 +179,8 @@ int do_list(
 
 int main(int argc, char **argv)
 {
-    const PVFS_util_tab* tab;
-    PVFS_sysresp_init init_response;
+    int ret = -1;
+    PVFS_fs_id fs_id;
 
     if (argc > 2)
     {
@@ -191,21 +189,20 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    tab = PVFS_util_parse_pvfstab(NULL);
-    if(!tab)
+    ret = PVFS_util_init_defaults();
+    if (ret < 0)
     {
-        fprintf(stderr,"Error parsing pvfstab!\n");
-        return 1;
+	PVFS_perror("PVFS_util_init_defaults", ret);
+	return (-1);
+    }
+    ret = PVFS_util_get_default_fsid(&fs_id);
+    if (ret < 0)
+    {
+	PVFS_perror("PVFS_util_get_default_fsid", ret);
+	return (-1);
     }
 
-    memset(&init_response,0,sizeof(PVFS_sysresp_init));
-    if (PVFS_sys_initialize(*tab, 0, &init_response))
-    {
-        fprintf(stderr,"Cannot initialize system interface\n");
-        return 1;
-    }
-
-    if (do_list(&init_response,((argc == 2) ? argv[1] : "/")))
+    if (do_list(fs_id,((argc == 2) ? argv[1] : "/")))
     {
         return 1;
     }

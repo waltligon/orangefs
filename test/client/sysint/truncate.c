@@ -14,8 +14,6 @@ int main(int argc,char **argv)
 {
     int ret = -1;
     char *filename = (char *)0;
-    const PVFS_util_tab *tab;
-    PVFS_sysresp_init resp_init;
     PVFS_sysresp_lookup resp_look;
     PVFS_sysresp_lookup resp_lk;
     PVFS_size trunc_size;
@@ -39,25 +37,23 @@ int main(int argc,char **argv)
     trunc_size = ull;
     }
 
-    tab = PVFS_util_parse_pvfstab(NULL);
-    if(!tab)
+    ret = PVFS_util_init_defaults();
+    if (ret < 0)
     {
-        printf("Failed to parse pvfstab\n");
-        return ret;
+	PVFS_perror("PVFS_util_init_defaults", ret);
+	return (-1);
     }
-
-    memset(&resp_init, 0, sizeof(resp_init));
-    if (PVFS_sys_initialize(*tab, GOSSIP_CLIENT_DEBUG, &resp_init))
+    ret = PVFS_util_get_default_fsid(&fs_id);
+    if (ret < 0)
     {
-        printf("Failed to initialize system interface\n");
-        return ret;
+	PVFS_perror("PVFS_util_get_default_fsid", ret);
+	return (-1);
     }
 
     /* lookup the root handle */
     name = malloc(2);/*null terminator included*/
     name[0] = '/';
     name[1] = '\0';
-    fs_id = resp_init.fsid_list[0];
     printf("looking up the root handle for fsid = %d\n", fs_id);
     ret = PVFS_sys_lookup(fs_id, name, credentials,
                           &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
