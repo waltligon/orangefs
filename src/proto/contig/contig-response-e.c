@@ -98,21 +98,6 @@ int do_encode_resp(
 		PVFS_TYPE_METAFILE)
 	    {
 		char* pack_dest = NULL;
-
-		/* TODO: quit doing this when the client and server
-		 * can actually take it
-		 */
-		if(response->u.getattr.attr.u.meta.dist_size != 0)
-		{
-		    gossip_lerr("KLUDGE: encoder is zeroing dist for now.\n");
-		    response->u.getattr.attr.u.meta.dist_size = 0;
-		}
-		if(response->u.getattr.attr.u.meta.nr_datafiles != 0)
-		{
-		    gossip_lerr("KLUDGE: encoder is zeroing nr_datafiles for now.\n");
-		    response->u.getattr.attr.u.meta.nr_datafiles = 0;
-		}
-
 		/* make it big enough to hold datafiles and dist */
 		target_msg->size_list[0] = 
 		    target_msg->total_size = 

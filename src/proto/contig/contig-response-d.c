@@ -56,10 +56,6 @@ DECODE_RESP_HEAD(do_decode_resp)
 			if(decoded_response->u.getattr.attr.objtype ==
 				PVFS_TYPE_METAFILE)
 			{
-				/* TODO: don't take these out until getattr works right */
-				assert(response->u.getattr.attr.u.meta.dist_size == 0);
-				assert(response->u.getattr.attr.u.meta.nr_datafiles == 0);
-
 				decoded_response->u.getattr.attr.u.meta.dfh = 
 					(PVFS_handle*)(((char*)decoded_response) 
 					+ sizeof(struct PVFS_server_resp_s));
