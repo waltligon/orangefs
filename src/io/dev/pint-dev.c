@@ -219,50 +219,57 @@ int PINT_dev_test_unexpected(
 
     do
     {
-        /* see if there is anything available on the device */
-        do
-        {
-            pfd.revents = 0;
-            avail = poll(&pfd, 1, max_idle_time);
-
-        } while((avail < 0) && (errno == EINTR));
-
-        if (avail < 0)
-        {
-            switch(errno)
-            {
-                case EBADF:
-                    ret = -(PVFS_EBADF|PVFS_ERROR_DEV);
-                case ENOMEM:
-                    ret = -(PVFS_ENOMEM|PVFS_ERROR_DEV);
-                case EFAULT:
-                    ret = -(PVFS_EFAULT|PVFS_ERROR_DEV);
-                default:
-                    ret = -(PVFS_EIO|PVFS_ERROR_DEV);
-            }
-            goto dev_test_unexp_error;
-        }
-
-        /* device is emptied */
-        if (avail == 0)
-        {
-            return ((*outcount > 0) ? 1 : 0);
-        }
-
-        if (!(pfd.revents & POLLIN))
-        {
-            if (pfd.revents & POLLNVAL)
-            {
-                return -(PVFS_EBADF|PVFS_ERROR_DEV);
-            }
-            continue;
-        }
-
         /*
-          once we have data to read, set the idle time to zero because
-          we don't want to block on subsequent iterations
+          poll to see if there is anything available on the device if
+          we were given a max_idle_time.  if the max_idle_time is 0,
+          skip the poll call and immediately try to read the device
         */
-        max_idle_time = 0;
+        if (max_idle_time)
+        {
+            do
+            {
+                pfd.revents = 0;
+                avail = poll(&pfd, 1, max_idle_time);
+
+            } while((avail < 0) && (errno == EINTR));
+
+            if (avail < 0)
+            {
+                switch(errno)
+                {
+                    case EBADF:
+                        ret = -(PVFS_EBADF|PVFS_ERROR_DEV);
+                    case ENOMEM:
+                        ret = -(PVFS_ENOMEM|PVFS_ERROR_DEV);
+                    case EFAULT:
+                        ret = -(PVFS_EFAULT|PVFS_ERROR_DEV);
+                    default:
+                        ret = -(PVFS_EIO|PVFS_ERROR_DEV);
+                }
+                goto dev_test_unexp_error;
+            }
+
+            /* device is emptied */
+            if (avail == 0)
+            {
+                return ((*outcount > 0) ? 1 : 0);
+            }
+
+            if (!(pfd.revents & POLLIN))
+            {
+                if (pfd.revents & POLLNVAL)
+                {
+                    return -(PVFS_EBADF|PVFS_ERROR_DEV);
+                }
+                continue;
+            }
+
+            /*
+              once we have data to read, set the idle time to zero
+              because we don't want to block on subsequent iterations
+            */
+            max_idle_time = 0;
+        }
 
         /* prepare to read max upcall size, plus magic nr and tag */
         buffer = malloc(read_size);
@@ -289,7 +296,7 @@ int PINT_dev_test_unexpected(
 
         if (ret == 0)
         {   
-            /* this is odd -- assume we are done and return */
+            /* assume we are done and return */
           safe_exit:
             free(buffer);
             return ((*outcount > 0) ? 1 : 0);
