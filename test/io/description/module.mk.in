@@ -7,5 +7,6 @@ TESTSRC += \
 	$(DIR)/debug3.c\
 	$(DIR)/debug4.c\
 	$(DIR)/debug5.c\
-	$(DIR)/debug6.c
+	$(DIR)/debug6.c\
+	$(DIR)/debug7.c
 #	$(DIR)/test-req1.c\

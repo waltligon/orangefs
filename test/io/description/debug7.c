@@ -54,8 +54,8 @@ int main(int argc, char **argv)
 	seg1.segs = 0;
 
    /* Turn on debugging */
-	/* gossip_enable_stderr(); /**/
-	/* gossip_set_debug_mask(1,REQUEST_DEBUG); /**/
+	/* gossip_enable_stderr(); */
+	/* gossip_set_debug_mask(1,REQUEST_DEBUG); */
 
 	/* skipping logical bytes */
 	seg1.bytemax = (3 * 1024) + 512;
