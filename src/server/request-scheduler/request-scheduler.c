@@ -333,6 +333,7 @@ int PINT_req_sched_post(
     struct req_sched_element *tmp_element;
     struct req_sched_list *tmp_list;
     struct req_sched_element *next_element;
+    struct req_sched_element *last_element;
     struct req_sched_element *mode_element = NULL;
     PVFS_fs_id fs_id;
     enum PVFS_server_mode target_mode;
@@ -468,16 +469,25 @@ int PINT_req_sched_post(
 	tmp_element->state = REQ_SCHEDULED;
     else
     {
-	/* if this is an I/O operation, AND the head of the list of
-	 * pending operations for this handle is also an I/O
-	 * operation, then we can go ahead and schedule (we allow
-	 * concurrent I/O for a handle)
+	/* ok, we can we immediately return to allow concurrent I/O?
+	 * only when the following conditions are met:
+	 * - the current request is for I/O
+	 * - head of queue is a scheduled I/O operation
+	 * - tail of queue is a scheduled I/O operation
+	 * (the above indicates that the only pending ops on this handle
+	 *  are I/O operations)
 	 */
 	next_element = qlist_entry((tmp_list->req_list.next),
 				   struct req_sched_element,
 				   list_link);
+	last_element = qlist_entry((tmp_list->req_list.prev),
+				   struct req_sched_element,
+				   list_link);
 	if (in_request->op == PVFS_SERV_IO &&
-	    next_element->req_ptr->op == PVFS_SERV_IO)
+	    next_element->state == REQ_SCHEDULED &&
+	    next_element->req_ptr->op == PVFS_SERV_IO &&
+	    last_element->state == REQ_SCHEDULED &&
+	    last_element->req_ptr->op == PVFS_SERV_IO)
 	{
 	    tmp_element->state = REQ_SCHEDULED;
 	    ret = 1;
@@ -782,6 +792,7 @@ int PINT_req_sched_release(
 			gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
 				     "REQ SCHED allowing concurrent I/O, handle: %ld\n",
 				     (long) next_element->handle);
+			assert(next_element->state == REQ_QUEUED);
 			next_element->state = REQ_READY_TO_SCHEDULE;
 			qlist_add_tail(&(next_element->ready_link), &ready_queue);
 		    }
