@@ -1341,11 +1341,19 @@ void tcp_forget_addr(method_addr_p map,
 		     int error_code)
 {
     struct tcp_addr* tcp_addr_data = map->method_data;
+    int tmp_outcount;
+    method_addr_p tmp_addr;
+    int tmp_status;
 
     tcp_shutdown_addr(map);
     if (tcp_socket_collection_p)
     {
 	BMI_socket_collection_remove(tcp_socket_collection_p, map);
+	/* perform a test to force the socket collection to act on the remove
+	 * request before continuing
+	 */
+	BMI_socket_collection_testglobal(tcp_socket_collection_p,
+	    0, &tmp_outcount, &tmp_addr, &tmp_status, 0, &interface_mutex);
     }
     tcp_cleanse_addr(map, error_code);
     tcp_addr_data->addr_error = error_code;

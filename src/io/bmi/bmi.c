@@ -1054,8 +1054,6 @@ int BMI_set_info(PVFS_BMI_addr_t addr,
 	tmp_ref->ref_count--;
 	assert(tmp_ref->ref_count >= 0);
 
-	/* TODO: work on this later; too buggy right now */
-#if 0
 	if(tmp_ref->ref_count == 0)
 	{
 	    struct method_drop_addr_query query;
@@ -1079,7 +1077,6 @@ int BMI_set_info(PVFS_BMI_addr_t addr,
 		dealloc_ref_st(tmp_ref);
 	    }
 	}
-#endif
 	gen_mutex_unlock(&ref_mutex);
 	return(0);
     }
