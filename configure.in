@@ -13,7 +13,7 @@ dnl PVFS2 versioning information
 PVFS2_MAJOR=0
 PVFS2_MINOR=1
 PVFS2_SUB=3
-PVFS2_PRE="pre1"
+PVFS2_PRE="pre2"
 
 AM_INIT_AUTOMAKE(pvfs2, $PVFS2_MAJOR.$PVFS2_MINOR.$PVFS2_SUB$PVFS2_PRE)
 
@@ -222,28 +222,39 @@ fi]
 ,)
 AC_SUBST(MMAP_RA_CACHE)
 
+dnl a function to check if we have the required gtk stuff for the
+dnl karma gui
+test_for_karma()
+{
+  AC_CHECK_PROG(HAVE_PKGCONFIG, pkg-config, yes, no)
+  if test x$HAVE_PKGCONFIG = xyes ; then
+     AC_MSG_CHECKING([for gtk2.0 (for karma gui)])
+     if `pkg-config --exists gtk+-2.0` ; then
+        AC_MSG_RESULT(yes)
+        GTKLIBS=`pkg-config --libs gtk+-2.0`
+        GTKCFLAGS=`pkg-config --cflags gtk+-2.0`
+
+        AC_SUBST(GTKLIBS)
+        AC_SUBST(GTKCFLAGS)
+        BUILD_KARMA="1"
+     else
+        AC_MSG_RESULT(no)
+     fi
+  fi
+}
+
 dnl optionally disable building the karma gui
 AC_ARG_ENABLE(karma,
-[  --disable-karma         Disables optional gui.  (Enabled by default)],
-,
-[dnl Check for GTK2.0; require pkg-config to find
-AC_CHECK_PROG(HAVE_PKGCONFIG, pkg-config, yes, no)
-if test x$HAVE_PKGCONFIG = xyes ; then
-   AC_MSG_CHECKING([for gtk2.0 (for karma gui)])
-   if `pkg-config --exists gtk+-2.0` ; then
-      AC_MSG_RESULT(yes)
-      GTKLIBS=`pkg-config --libs gtk+-2.0`
-      GTKCFLAGS=`pkg-config --cflags gtk+-2.0`
-
-      AC_SUBST(GTKLIBS)
-      AC_SUBST(GTKCFLAGS)
-      BUILD_KARMA="1"
+[  --disable-karma        Disables optional gui.  (Enabled by default)],
+[ if test x$enableval = xyes; then
+      test_for_karma
    else
-      AC_MSG_RESULT(no)
+     BUILD_KARMA="0"
    fi
-fi
-AC_SUBST(BUILD_KARMA)]
+],
+[test_for_karma]
 )
+AC_SUBST(BUILD_KARMA)
 
 dnl enables a hack to print back traces out of segfault signal handler
 AC_ARG_ENABLE(segv-backtrace,
