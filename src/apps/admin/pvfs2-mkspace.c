@@ -134,7 +134,6 @@ int main(int argc, char **argv)
     root_handle = new_root_handle;
     ret = trove_dspace_create(coll_id,
 			      &root_handle,
-			      0xffffffff,
 			      PVFS_TYPE_DIRECTORY,
 			      NULL,
 			      TROVE_SYNC,
@@ -197,7 +196,6 @@ int main(int argc, char **argv)
     ent_handle = root_handle - 1; /* just put something in here */
     ret = trove_dspace_create(coll_id,
 			      &ent_handle,
-			      0xffffffff,
 			      PVFS_TYPE_DIRDATA,
 			      NULL,
 			      TROVE_SYNC,
