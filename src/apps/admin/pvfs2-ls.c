@@ -66,9 +66,8 @@ static void print_entry(
     struct options *opts);
 
 static int do_list(
-    PVFS_sysresp_init *init_response,
     char *start,
-    int fs_id_index,
+    int fs_id,
     struct options *opts);
 
 static void print_entry_attr(
@@ -109,11 +108,10 @@ int main(int argc, char **argv)
 {
     int ret = -1, i = 0, j = 0;
     char pvfs_path[MAX_NUM_PATHS][PVFS_NAME_MAX];
-    PVFS_fs_id fs_id_index_array[MAX_NUM_PATHS] = {0};
+    PVFS_fs_id fs_id_array[MAX_NUM_PATHS] = {0};
     const PVFS_util_tab* tab;
     PVFS_sysresp_init resp_init;
     struct options* user_opts = NULL;
-    int mnt_index = -1;
     char current_dir[PVFS_NAME_MAX] = {0};
 
     process_name = argv[0];
@@ -138,77 +136,37 @@ int main(int argc, char **argv)
         memset(pvfs_path[i],0,PVFS_NAME_MAX);
     }
 
-    /* see if the destination resides on any of the file systems
-     * listed in the pvfstab; find the pvfs fs relative path
-     */
-    for(i = 0; i < tab->mntent_count; i++)
-    {
-        if (user_opts->num_starts == 0)
-        {
-            snprintf(current_dir,PVFS_NAME_MAX,"%s/",
-                     tab->mntent_array[i].mnt_dir);
-            user_opts->start[0] = current_dir;
-            user_opts->num_starts = 1;
-        }
-
-        for(j = 0; j < user_opts->num_starts; j++)
-        {
-            /*
-              if the cmdline specified path is an exact match on
-              a mnt.mntent entry, use '/' as the pvfs_path
-            */
-            if (strcmp(user_opts->start[j],
-                       tab->mntent_array[i].mnt_dir) == 0)
-            {
-                strcpy(pvfs_path[j], "/");
-                ret = 0;
-            }
-            else
-            {
-                ret = PVFS_util_remove_dir_prefix(
-                    user_opts->start[j], tab->mntent_array[i].mnt_dir,
-                    pvfs_path[j], PVFS_NAME_MAX);
-            }
-            if (ret == 0)
-            {
-                mnt_index = i;
-                fs_id_index_array[j] = mnt_index;
-            }
-        }
-    }
-
-    if (mnt_index == -1)
-    {
-        /* try to determine the reason for this failure */
-        for(j = 0; j < user_opts->num_starts; j++)
-        {
-            if ((pvfs_path[j] == NULL) || (strlen(pvfs_path[j]) == 0))
-            {
-                break;
-            }
-        }
-
-        /* check for the case where a bogus path was requested */
-        if (j != user_opts->num_starts)
-        {
-            fprintf(stderr, "%s: %s: No such file or directory\n",
-                    process_name, user_opts->start[j]);
-        }
-        else
-        {
-            fprintf(stderr, "Error: could not find filesystem for %s in "
-                    "pvfstab\n", user_opts->start[j]);
-        }
-	return(-1);
-
-    }
-
     memset(&resp_init, 0, sizeof(resp_init));
     ret = PVFS_sys_initialize(*tab, GOSSIP_NO_DEBUG, &resp_init);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_sys_initialize", ret);
 	return(-1);
+    }
+
+    if (user_opts->num_starts == 0)
+    {
+	snprintf(current_dir,PVFS_NAME_MAX,"%s/",
+		 tab->mntent_array[0].mnt_dir);
+	user_opts->start[0] = current_dir;
+	user_opts->num_starts = 1;
+    }
+
+    for(j = 0; j < user_opts->num_starts; j++)
+    {
+	ret = PVFS_util_resolve(user_opts->start[j],
+	    &fs_id_array[j], pvfs_path[j], PVFS_NAME_MAX);
+	if(ret == 0 && pvfs_path[j][0] == '\0')
+	{
+	    strcpy(pvfs_path[j], "/");
+	}
+
+	if(ret < 0)
+	{
+	    fprintf(stderr, "Error: could not find file system for %s in "
+	    "pvfstab\n", user_opts->start[j]);
+	    return(-1);
+	}
     }
 
     for(i = 0; i < user_opts->num_starts; i++)
@@ -218,8 +176,7 @@ int main(int argc, char **argv)
             printf("%s:\n", pvfs_path[i]);
         }
 
-        do_list(&resp_init, pvfs_path[i],
-                fs_id_index_array[i], user_opts);
+        do_list(pvfs_path[i], fs_id_array[i], user_opts);
 
         if (user_opts->num_starts > 1)
         {
@@ -459,9 +416,8 @@ void print_entry(
 }
 
 int do_list(
-    PVFS_sysresp_init *init_response,
     char *start,
-    int fs_id_index,
+    int fs_id,
     struct options *opts)
 {
     int i = 0, printed_dot_info = 0;
@@ -474,10 +430,8 @@ int do_list(
     PVFS_credentials credentials;
     PVFS_pinode_reference pinode_refn;
     PVFS_ds_position token;
-    PVFS_fs_id fs_id;
 
     name = start;
-    fs_id = init_response->fsid_list[fs_id_index];
     credentials.uid = getuid();
     credentials.gid = getgid();
 
