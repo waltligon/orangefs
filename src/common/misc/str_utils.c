@@ -15,45 +15,31 @@
  * pathname   - pointer to string
  *
  * Returns number of segments in pathname; -1 if
- * pathname does not begin with a slash or is invalid
+ * pathname is invalid or has no components
  *
  * Example inputs and return values:
  *
- * filename          - returns -1
  * NULL              - returns -1
- * /                 - returns  0
+ * /                 - returns -1
+ * filename          - returns  1
  * /filename         - returns  1
  * /filename/        - returns  1
  * /filename//       - returns  1
  * /dirname/filename - returns  2
- *
- * NOTE (known limitation):
- * //foo             - returns  2
+ * dirname/filename
  *
  */
 int PINT_string_count_segments(char *pathname)
 {
-    int segct = 0;
-    char *cur_ch = pathname;
+    int count = 0;
+    char *segp = (char *)0;
+    void *segstate;
 
-    /* insist on a valid and an absolute path */
-    if (!cur_ch || (*cur_ch != '/')) return -1;
-
-    while(cur_ch && *cur_ch)
+    while(!PINT_string_next_segment(pathname,&segp,&segstate))
     {
-        if (*cur_ch == '/')
-        {
-            segct++;
-        }
-        cur_ch++;
+        count++;
     }
-
-    /* ignore trailing slash(es) if any */
-    while ((cur_ch > pathname) && (*(--cur_ch) == '/'))
-    {
-        segct--;
-    }
-    return segct;
+    return count;
 }
 
 /* PINT_get_base_dir()
@@ -202,10 +188,7 @@ int PINT_string_next_segment(char *pathname,
                              char **inout_segp,
                              void **opaquep)
 {
-    char *ptr;
-
-    /* insist on an absolute path */
-    if (pathname[0] != '/') return -1;
+    char *ptr = (char *)0;
 
     /* initialize our starting position */
     if (*inout_segp == NULL) {
