@@ -134,6 +134,7 @@ VISLIBS = @VISLIBS@ -lSDL_ttf
 GTKCFLAGS = @GTKCFLAGS@
 GTKLIBS = @GTKLIBS@
 MMAP_RA_CACHE = @MMAP_RA_CACHE@
+REDHAT_RELEASE = @REDHAT_RELEASE@
 # for Solaris:
 # LIBS += -lsocket -lnsl
 
@@ -257,6 +258,11 @@ ifdef MMAP_RA_CACHE
 CFLAGS += @MMAP_RA_CACHE@
 endif
 
+# enable redhat-release patches (if detected and if any)
+ifdef REDHAT_RELEASE
+CFLAGS += @REDHAT_RELEASE@
+endif
+
 # Add gcc-specific flags if we know it is a gnu compiler.
 ifdef GNUC
 CFLAGS += $(GCC_CFLAGS)
@@ -305,6 +311,8 @@ SMCGEN :=
 ################################################################
 # Top level (default) targets
 
+# SERVER_STUB is a wrapper script that export the LD_ASSUME_KERNEL variable for REDHAT releases
+SERVER_STUB := src/server/pvfs2-server-stub
 # SERVER is the pvfs2 server
 SERVER := src/server/pvfs2-server
 # LIBRARIES is a list of the pvfs2 client libraries
@@ -925,12 +933,22 @@ install:: install_doc
 	install -m 755 $(srcdir)/src/apps/admin/pvfs2-genconfig $(prefix)/bin
 
 	install -d $(prefix)/sbin
+ifeq ($(REDHAT_RELEASE),)
 	install -m 755 $(SERVER) $(prefix)/sbin
+else
+	install -m 755 $(SERVER_STUB) $(prefix)/sbin/pvfs2-server
+	install -m 755 $(SERVER) $(prefix)/sbin/pvfs2-server.bin
+endif
 	install -m 755 $(KERNAPPS) $(prefix)/sbin
 
 ifneq (,$(LINUX_KERNEL_SRC))
 
-KERNEL_VERS := $(shell grep UTS_RELEASE $(LINUX_KERNEL_SRC)/include/linux/version.h | cut -d\" -f2)
+NUM_UTS_LINES := $(shell grep -c UTS_RELEASE $(LINUX_KERNEL_SRC)/include/linux/version.h)
+ifeq ($(NUM_UTS_LINES),1)
+    KERNEL_VERS := $(shell grep UTS_RELEASE $(LINUX_KERNEL_SRC)/include/linux/version.h | cut -d\" -f2)
+else
+    KERNEL_VERS := $(shell uname -r)
+endif
 KMOD_DIR ?= /lib/modules/$(KERNEL_VERS)/kernel/fs
 
 .PHONY: kmod_install
@@ -941,7 +959,12 @@ endif
 
 ifneq (,$(LINUX24_KERNEL_SRC))
 
-KERNEL_VERS := $(shell grep UTS_RELEASE $(LINUX24_KERNEL_SRC)/include/linux/version.h | cut -d\" -f2)
+NUM_UTS_LINES := $(shell grep -c UTS_RELEASE $(LINUX24_KERNEL_SRC)/include/linux/version.h)
+ifeq ($(NUM_UTS_LINES),1)
+    KERNEL_VERS := $(shell grep UTS_RELEASE $(LINUX24_KERNEL_SRC)/include/linux/version.h | cut -d\" -f2)
+else
+    KERNEL_VERS := $(shell uname -r)
+endif
 KMOD_DIR := /lib/modules/$(KERNEL_VERS)/kernel/fs
 
 .PHONY: kmod24_install

@@ -706,14 +706,27 @@ do { inode->i_mtime = inode->i_ctime = CURRENT_TIME; } while(0)
 #define get_block_block_type long
 #define pvfs2_lock_inode(inode) do {} while(0)
 #define pvfs2_unlock_inode(inode) do {} while(0)
+#define pvfs2_d_splice_alias(dentry, inode) d_add(dentry, inode)
+#define pvfs2_kernel_readpage block_read_full_page
+
+/*
+  redhat 9 2.4.x kernels have to be treated almost like 2.6.x kernels
+  so we special case them here
+*/
+#ifdef REDHAT_RELEASE_9
+#define pvfs2_current_signal_lock current->sighand->siglock
+#define pvfs2_current_sigaction current->sighand->action
+#define pvfs2_recalc_sigpending recalc_sigpending
+#define pvfs2_set_page_reserved(page) do {} while(0)
+#define pvfs2_clear_page_reserved(page) do {} while(0)
+#else
 #define pvfs2_current_signal_lock current->sigmask_lock
 #define pvfs2_current_sigaction current->sig->action
 #define pvfs2_recalc_sigpending() recalc_sigpending(current)
-#define pvfs2_d_splice_alias(dentry, inode) d_add(dentry, inode)
-#define pvfs2_kernel_readpage block_read_full_page
 #define pvfs2_set_page_reserved(page) SetPageReserved(page)
 #define pvfs2_clear_page_reserved(page) \
 do { ClearPageReserved(page); put_page(page); } while(0)
+#endif /* REDHAT_RELEASE_9 */
 
 #define fill_default_sys_attrs(sys_attr,type,mode)\
 do                                                \
