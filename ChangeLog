@@ -9,10 +9,12 @@ pvfs2-0.0.5pre1
 - vfs stability improvements during I/O, including across client restarts
 - statfs reporting improvements (closer to correct)
 - sysint remove method fix to properly clean up datafiles
+- partial path symlink resolution support
 - vfs symlink resolution/following support
 - runtime options to choose request encoder (see pvfs2tab man page)
 - new, much faster, default flow protocol
 - streamlined support for threaded and non-threaded server builds
+
 
 pvfs2-0.0.4
 ===========

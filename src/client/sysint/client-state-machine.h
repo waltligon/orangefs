@@ -206,6 +206,11 @@ struct PINT_client_lookup_sm {
     PVFS_error                   last_error;
     int                          resolve_symlink;
     PVFS_pinode_reference        symlink_refn;
+    int                          use_symlink_parent;
+    PVFS_pinode_reference        symlink_parent_refn;
+    PVFS_pinode_reference        symlink_previous_parent_refn;
+    PVFS_pinode_reference        tmp_remaining_refn;
+    char                         *post_link_segment;
     int                          num_symlinks_followed;
 };
 
