@@ -1004,7 +1004,9 @@ void pvfs2_inode_initialize(pvfs2_inode_t *pvfs2_inode)
     pvfs2_inode->last_failed_block_index_read = 0;
     pvfs2_inode->link_target = NULL;
     pvfs2_inode->readdir_token_adjustment = 0;
+    pvfs2_inode->last_version_changed = 0;
     pvfs2_inode->num_readdir_retries = PVFS2_NUM_READDIR_RETRIES;
+    pvfs2_inode->directory_version = 0;
 }
 
 /*
@@ -1017,7 +1019,9 @@ void pvfs2_inode_finalize(pvfs2_inode_t *pvfs2_inode)
     pvfs2_inode->refn.fs_id = PVFS_FS_ID_NULL;
     pvfs2_inode->last_failed_block_index_read = 0;
     pvfs2_inode->readdir_token_adjustment = 0;
+    pvfs2_inode->last_version_changed = 0;
     pvfs2_inode->num_readdir_retries = PVFS2_NUM_READDIR_RETRIES;
+    pvfs2_inode->directory_version = 0;
 }
 
 void pvfs2_op_initialize(pvfs2_kernel_op_t *op)

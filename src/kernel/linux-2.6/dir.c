@@ -40,9 +40,7 @@ static int pvfs2_readdir(
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(dentry->d_inode);
 
-#if 0
   restart_readdir:
-#endif
 
     pos = (PVFS_ds_position)file->f_pos;
     if (pos == 0)
@@ -50,7 +48,7 @@ static int pvfs2_readdir(
         pvfs2_inode->readdir_token_adjustment = 0;
     }
 
-    pvfs2_print("pvfs2: pvfs2_readdir called on %s (pos=%d, tadj=%d, "
+    pvfs2_print("pvfs2_readdir called on %s (pos=%d, tadj=%d, "
                 "retry=%d, v=%Lu)\n", dentry->d_name.name, (int)pos,
                 (int)pvfs2_inode->readdir_token_adjustment,
                 (int)pvfs2_inode->num_readdir_retries,
@@ -157,13 +155,7 @@ static int pvfs2_readdir(
             {
                 goto graceful_termination_path;
             }
-#if 0
-            /*
-              NOTE: we can't do the retries with the token_adjustment
-              in use because an rm -rf will cause all kinds of
-              problems since the dir is changing as it's being read
-              and we don't want retries in that case.
-            */
+
             if (pvfs2_inode->directory_version == 0)
             {
                 pvfs2_inode->directory_version =
@@ -175,16 +167,49 @@ static int pvfs2_readdir(
                 if (pvfs2_inode->directory_version !=
                     new_op->downcall.resp.readdir.directory_version)
                 {
+                    /*
+                      if the token adjustment is moving rapidly, do
+                      not attempt any retries
+                    */
+                    if ((pvfs2_inode->readdir_token_adjustment) &&
+                        (pvfs2_inode->readdir_token_adjustment %
+                         MAX_DIRENT_COUNT) == 0)
+                    {
+                        pvfs2_inode->last_version_changed = 1;
+                    }
+
+                    /*
+                      don't bother to restart if the directory is
+                      changing too rapidly.  either someone is
+                      creating or removing (as in the case of a
+                      typical rm -rf operation) too quickly and we
+                      have no guarantee of the listing
+                    */
+                    if (pvfs2_inode->last_version_changed)
+                    {
+                        /* once set, do not clear until finished */
+                        goto continue_listing;
+                    }
+
                     pvfs2_print("detected directory change on listing; "
                                 "starting over\n");
 
                     file->f_pos = 0;
                     pvfs2_inode->directory_version =
                         new_op->downcall.resp.readdir.directory_version;
+                    pvfs2_inode->last_version_changed = 1;
 
                     op_release(new_op);
                     pvfs2_inode->num_readdir_retries--;
                     goto restart_readdir;
+                }
+                else
+                {
+                    /*
+                      version hasn't changed between two consecutive
+                      calls; clear the flag here
+                    */
+                    pvfs2_inode->last_version_changed = 0;
                 }
             }
             else
@@ -193,11 +218,13 @@ static int pvfs2_readdir(
                             "possible livelock (%d tries attempted)\n",
                             PVFS2_NUM_READDIR_RETRIES);
             }
-#endif
+
+          continue_listing:
 	    for (i = 0; i < new_op->downcall.resp.readdir.dirent_count; i++)
 	    {
                 len = new_op->downcall.resp.readdir.d_name_len[i];
-                current_entry = &new_op->downcall.resp.readdir.d_name[i][0];
+                current_entry =
+                    &new_op->downcall.resp.readdir.d_name[i][0];
                 current_ino =
                     pvfs2_handle_to_ino(
                         new_op->downcall.resp.readdir.refn[i].handle);
@@ -210,6 +237,7 @@ static int pvfs2_readdir(
                     pvfs2_inode->directory_version = 0;
                     pvfs2_inode->num_readdir_retries =
                         PVFS2_NUM_READDIR_RETRIES;
+                    pvfs2_inode->last_version_changed = 0;
 
                     ret = 0;
                     break;

@@ -55,7 +55,7 @@ typedef struct
 typedef struct
 {
     int dirent_count;
-    unsigned long directory_version;
+    uint64_t directory_version;
     PVFS_object_ref refn[MAX_DIRENT_COUNT];
     char d_name[MAX_DIRENT_COUNT][PVFS2_NAME_LEN];
     int d_name_len[MAX_DIRENT_COUNT];

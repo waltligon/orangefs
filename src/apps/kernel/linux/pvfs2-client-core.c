@@ -65,7 +65,7 @@
   developer and allows clean shutdown for valgrind debugging or
   getting core dumps.  this is NOT a supported run mode
 */
-/* #define STANDALONE_RUN_MODE */
+#define STANDALONE_RUN_MODE
 
 /*
   uncomment for timing of individual operation information to be
@@ -1219,7 +1219,7 @@ static PVFS_object_ref perform_lookup_on_create_error(
         char buf[64];
         PVFS_strerror_r(ret, buf, 64);
 
-        gossip_err("*** Lookup failed in %s create failure path: %s",
+        gossip_err("*** Lookup failed in %s create failure path: %s\n",
                    (follow_link ? "file" : "symlink"), buf);
     }
     else

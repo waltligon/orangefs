@@ -197,7 +197,8 @@ typedef struct
     PVFS_object_ref refn;
     PVFS_ds_position readdir_token_adjustment;
     int num_readdir_retries;
-    uint64_t directory_version;
+    int last_version_changed; 
+   uint64_t directory_version;
     char *link_target;
 #ifdef PVFS2_LINUX_KERNEL_2_4
     struct inode *vfs_inode;
