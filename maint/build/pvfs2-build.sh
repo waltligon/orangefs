@@ -55,6 +55,18 @@ tarball=`basename $tarballurl`
 tarballdir=`echo $tarball | sed -e "s/.tar.gz//" | sed -e "s/.tgz//"`
 old_wd=`pwd`
 
+# get command line arguments
+if [ $# -gt 1 ] ; then
+	echo "Too many arguments.  Aborting."
+	echo "Usage: $0 <root dir for build/install>"
+	exit 1
+fi
+if [ $# -eq 1 ] ; then
+	rootdir=$1
+fi
+
+echo "PVFS2 will be built in ${rootdir}."
+
 if [ ! -d $rootdir ] ; then
 	echo "Specified directory $rootdir does not exist.  Aborting."
 	exit 1
