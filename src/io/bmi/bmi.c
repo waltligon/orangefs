@@ -1117,6 +1117,7 @@ int BMI_get_info(bmi_addr_t addr,
     int maxsize = 0;
     int tmp_maxsize;
     int ret = 0;
+    ref_st_p tmp_ref = NULL;
 
     gen_mutex_lock(&interface_mutex);
 
@@ -1156,6 +1157,15 @@ int BMI_get_info(bmi_addr_t addr,
 	    }
 	    *((int *) inout_parameter) = maxsize;
 	}
+	break;
+    case BMI_GET_METH_ADDR:
+	tmp_ref = ref_list_search_addr(cur_ref_list, addr);
+	if(!tmp_ref)
+	{
+	    gen_mutex_unlock(&interface_mutex);
+	    return (-EINVAL);
+	}
+	*((void**) inout_parameter) = tmp_ref->method_addr;
 	break;
     default:
 	gen_mutex_unlock(&interface_mutex);

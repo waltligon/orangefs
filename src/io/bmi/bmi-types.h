@@ -47,7 +47,8 @@ enum
 {
     BMI_DROP_ADDR = 1,
     BMI_CHECK_INIT = 2,
-    BMI_CHECK_MAXSIZE = 3
+    BMI_CHECK_MAXSIZE = 3,
+    BMI_GET_METH_ADDR = 4
 };
 
 /* mappings from PVFS errors to BMI errors */
