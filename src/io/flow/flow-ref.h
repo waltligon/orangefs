@@ -18,8 +18,8 @@
 /* struct used to map pairs of endpoints to particular flow protocols */
 struct flow_ref_entry
 {
-    PVFS_endpoint_type src_endpoint;
-    PVFS_endpoint_type dest_endpoint;
+    enum flow_endpoint_type src_endpoint;
+    enum flow_endpoint_type dest_endpoint;
     int flowproto_id;
     struct qlist_head flow_ref_link;
 };
@@ -28,12 +28,12 @@ typedef struct qlist_head *flow_ref_p;
 
 flow_ref_p flow_ref_new(void);
 int flow_ref_add(flow_ref_p frp,
-		 PVFS_endpoint_type src_endpoint,
-		 PVFS_endpoint_type dest_endpoint,
+		 enum flow_endpoint_type src_endpoint,
+		 enum flow_endpoint_type dest_endpoint,
 		 int flowproto_id);
 struct flow_ref_entry *flow_ref_search(flow_ref_p frp,
-				       PVFS_endpoint_type src_endpoint,
-				       PVFS_endpoint_type dest_endpoint);
+				       enum flow_endpoint_type src_endpoint,
+				       enum flow_endpoint_type dest_endpoint);
 void flow_ref_remove(struct flow_ref_entry *entry);
 void flow_ref_cleanup(flow_ref_p frp);
 

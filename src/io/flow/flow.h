@@ -23,14 +23,12 @@
  */
 
 /* endpoint types that we know about so far */
-enum
+enum flow_endpoint_type
 {
     BMI_ENDPOINT = 1,
     TROVE_ENDPOINT = 2,
     MEM_ENDPOINT = 3
 };
-
-typedef int32_t PVFS_endpoint_type;
 
 /* describes BMI endpoints */
 struct BMI_endpoint_data
@@ -56,7 +54,7 @@ struct mem_endpoint_data
 
 struct flow_endpoint
 {
-    PVFS_endpoint_type endpoint_id;
+    enum flow_endpoint_type endpoint_id;
     union
     {
 	struct BMI_endpoint_data bmi;
@@ -67,8 +65,22 @@ struct flow_endpoint
 };
 typedef struct flow_endpoint flow_endpoint;
 
+/* valid flow descriptor states */
+enum flow_state
+{
+    FLOW_INITIAL = 1,
+    FLOW_SVC_READY = 2,
+    FLOW_TRANSMITTING = 4,
+    FLOW_COMPLETE = 8,
+    FLOW_ERROR = 16,
+    FLOW_SRC_ERROR = 32,
+    FLOW_DEST_ERROR = 64,
+    FLOW_COMPLETE_SHORT = 128,
+    FLOW_UNPOSTED = 256
+};
+
 /* supported getinfo types */
-enum
+enum flow_getinfo_option
 {
     FLOWPROTO_TYPE_QUERY = 1
 };
@@ -109,7 +121,7 @@ struct flow_descriptor
 	/***********************************************************/
     /* fields that can be read publicly upon completion */
 
-    int state;	/* final state of flow */
+    enum flow_state state;	/* final state of flow */
     PVFS_error error_code;	/* specific errno value if failure */
     PVFS_size total_transfered;	/* total amt. of data xfered */
 
@@ -128,19 +140,6 @@ struct flow_descriptor
 };
 typedef struct flow_descriptor flow_descriptor;
 
-/* valid flow descriptor states */
-enum
-{
-    FLOW_INITIAL = 1,
-    FLOW_SVC_READY = 2,
-    FLOW_TRANSMITTING = 4,
-    FLOW_COMPLETE = 8,
-    FLOW_ERROR = 16,
-    FLOW_SRC_ERROR = 32,
-    FLOW_DEST_ERROR = 64,
-    FLOW_COMPLETE_SHORT = 128,
-    FLOW_UNPOSTED = 256
-};
 
 #define FLOW_FINISH_MASK  (FLOW_COMPLETE | FLOW_ERROR | FLOW_SRC_ERROR |\
  FLOW_DEST_ERROR | FLOW_COMPLETE_SHORT | FLOW_UNPOSTED)
@@ -198,7 +197,7 @@ int PINT_flow_setinfo(flow_descriptor * flow_d,
 		      void *parameter);
 
 int PINT_flow_getinfo(flow_descriptor * flow_d,
-		      int option,
+		      enum flow_getinfo_option opt,
 		      void *parameter);
 
 #endif /* __FLOW_H */

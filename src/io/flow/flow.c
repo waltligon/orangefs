@@ -751,7 +751,7 @@ int PINT_flow_setinfo(flow_descriptor * flow_d,
  * returns 0 on success, -errno on failure
  */
 int PINT_flow_getinfo(flow_descriptor * flow_d,
-		      int option,
+		      enum flow_getinfo_option opt,
 		      void *parameter)
 {
     gen_mutex_lock(&interface_mutex);

@@ -36,8 +36,8 @@ flow_ref_p flow_ref_new(void)
  * no return value
  */
 int flow_ref_add(flow_ref_p frp,
-		 PVFS_endpoint_type src_endpoint,
-		 PVFS_endpoint_type dest_endpoint,
+		 enum flow_endpoint_type src_endpoint,
+		 enum flow_endpoint_type dest_endpoint,
 		 int flowproto_id)
 {
     struct flow_ref_entry *tmp_entry = NULL;
@@ -64,8 +64,8 @@ int flow_ref_add(flow_ref_p frp,
  * returns pointer to entry if found, NULL otherwise
  */
 struct flow_ref_entry *flow_ref_search(flow_ref_p frp,
-				       PVFS_endpoint_type src_endpoint,
-				       PVFS_endpoint_type dest_endpoint)
+				       enum flow_endpoint_type src_endpoint,
+				       enum flow_endpoint_type dest_endpoint)
 {
     flow_ref_p tmp_link = NULL;
     flow_ref_p tmp_next_link = NULL;
