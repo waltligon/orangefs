@@ -917,6 +917,11 @@ static int buffer_setup_bmi_to_trove(flow_descriptor* flow_d)
 	}
 	flow_data->drain_buffer_state = BUF_READY_TO_SWAP;
 
+	gossip_lerr("TMP OUTPUT: 1st flow buffer: %p, size: %d\n",
+		flow_data->fill_buffer, (int)flow_data->max_buffer_size);
+	gossip_lerr("TMP OUTPUT: 2nd flow buffer: %p, size: %d\n",
+		flow_data->drain_buffer, (int)flow_data->max_buffer_size);
+
 	/* set up a duplicate request processing state so that the bmi
 	 * receive half of this flow can figure out its position independent
 	 * of what the trove half is doing 
@@ -1388,6 +1393,9 @@ static void service_bmi_to_trove(flow_descriptor* flow_d)
 		gossip_ldebug(FLOW_PROTO_DEBUG, "about to call trove_bstream_write_list().\n");
 		tmp_offset = flow_data->drain_buffer +
 			flow_data->multi_stage_offset;
+		gossip_lerr("TMP OUTPUT: calling trove_bstream_write_list().\n");
+		gossip_lerr("TMP OUTPUT: buffer: %p, size: %d\n", tmp_offset,
+			(int)flow_data->trove_total_size);
 		ret = trove_bstream_write_list(flow_d->dest.u.trove.coll_id, 
 			flow_d->dest.u.trove.handle, &(tmp_offset),
 			&(flow_data->trove_total_size), 1,
