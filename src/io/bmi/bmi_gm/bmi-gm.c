@@ -924,7 +924,6 @@ int BMI_gm_post_recv(bmi_op_id_t * id,
 		     void *user_ptr,
 		     bmi_context_id context_id)
 {
-    bmi_flag_t mode = 0;
     method_op_p query_op = NULL;
     method_op_p new_method_op = NULL;
     struct op_list_search_key key;
@@ -947,22 +946,12 @@ int BMI_gm_post_recv(bmi_op_id_t * id,
     /* make sure it's not too big */
     if (expected_size > GM_MODE_REND_LIMIT)
     {
-	return (-EINVAL);
+	return (-EMSGSIZE);
     }
 
-    if (expected_size <= GM_IMMED_LENGTH)
-    {
-	mode = GM_MODE_IMMED;
-    }
-    else
-    {
-	mode = GM_MODE_REND;
-	/* check the type of buffer and pinn it if necessary */
-	if (buffer_flag != BMI_PRE_ALLOC)
-	{
-	    buffer_status = GM_BUF_METH_REG;
-	}
-    }
+    /* set flag to indicate if we need to pinn this buffer internally */ 
+    if(expected_size > GM_IMMED_LENGTH && buffer_flag != BMI_PRE_ALLOC)
+	buffer_status = GM_BUF_METH_REG;
 
     /* push work first; use this as an opportunity to make sure that the
      * receive keeps buffers moving as quickly as possible
@@ -985,6 +974,7 @@ int BMI_gm_post_recv(bmi_op_id_t * id,
     {
 	gm_addr_data = query_op->addr->method_data;
 	*id = query_op->op_id;
+
 	/* TODO: handle this more gracefully later... */
 	assert(query_op->actual_size <= expected_size);
 
@@ -1034,7 +1024,6 @@ int BMI_gm_post_recv(bmi_op_id_t * id,
 	    *id = 0;
 	    dealloc_gm_method_op(query_op);
 	    ret = 1;
-
 	}
 	else
 	{
@@ -1058,7 +1047,8 @@ int BMI_gm_post_recv(bmi_op_id_t * id,
 	new_method_op->expected_size = expected_size;
 	new_method_op->actual_size = 0;
 	new_method_op->msg_tag = tag;
-	new_method_op->mode = mode;
+	/* TODO: make sure this is ok */
+	new_method_op->mode = 0;
 	gm_op_data = new_method_op->method_data;
 	gm_op_data->buffer_status = buffer_status;
 

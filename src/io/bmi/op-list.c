@@ -220,20 +220,11 @@ static int op_list_cmp_key(struct op_list_search_key *my_key,
     {
 	return (1);
     }
-    if (my_key->expected_size_yes
-	&& (my_key->expected_size != my_op->expected_size))
-    {
-	return (1);
-    }
     if (my_key->msg_tag_yes && (my_key->msg_tag != my_op->msg_tag))
     {
 	return (1);
     }
     if (my_key->op_id_yes && (my_key->op_id != my_op->op_id))
-    {
-	return (1);
-    }
-    if (my_key->mode_mask_yes && !(my_key->mode_mask & my_op->mode))
     {
 	return (1);
     }

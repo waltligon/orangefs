@@ -30,12 +30,8 @@ struct op_list_search_key
     int method_addr_yes;
     bmi_msg_tag_t msg_tag;
     int msg_tag_yes;
-    bmi_size_t expected_size;
-    int expected_size_yes;
     bmi_op_id_t op_id;
     int op_id_yes;
-    bmi_flag_t mode_mask;
-    int mode_mask_yes;
 };
 
 int op_list_count(op_list_p olp);
