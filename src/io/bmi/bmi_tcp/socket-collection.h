@@ -21,6 +21,7 @@
 #include "bmi-method-support.h"
 #include "bmi-tcp-addressing.h"
 #include "quicklist.h"
+#include "gen-locks.h"
 
 typedef struct qlist_head *socket_collection_p;
 
@@ -46,7 +47,8 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
 				 int *outcount,
 				 method_addr_p * maps,
 				 int * status,
-				 int poll_timeout);
+				 int poll_timeout,
+				 gen_mutex_t* external_mutex);
 
 #endif /* __SOCKET_COLLECTION_H */
 

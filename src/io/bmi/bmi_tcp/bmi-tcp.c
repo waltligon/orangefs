@@ -1983,7 +1983,8 @@ static int tcp_do_work(int max_idle_time)
     /* now we need to poll and see what to work on */
     ret = BMI_socket_collection_testglobal(tcp_socket_collection_p,
 				       TCP_WORK_METRIC, &socket_count,
-				       addr_array, status_array, max_idle_time);
+				       addr_array, status_array,
+				       max_idle_time, &interface_mutex);
     if (ret < 0)
     {
 	return (ret);

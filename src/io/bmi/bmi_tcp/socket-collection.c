@@ -29,6 +29,7 @@
 #include "socket-collection.h"
 #include "bmi-method-support.h"
 #include "bmi-tcp-addressing.h"
+#include "gen-locks.h"
 
 /* number of sockets to poll at a time */
 #define SC_POLL_SIZE 128
@@ -46,6 +47,7 @@ static method_addr_p socket_collection_shownext(socket_collection_p scp);
 
 static struct pollfd big_poll_fds[SC_POLL_SIZE];
 static method_addr_p big_poll_addr[SC_POLL_SIZE];
+static gen_mutex_t big_poll_mutex = GEN_MUTEX_INITIALIZER;
 
 /*********************************************************************
  * public function implementations
@@ -209,7 +211,8 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
 				 int *outcount,
 				 method_addr_p * maps,
 				 int * status,
-				 int poll_timeout)
+				 int poll_timeout,
+				 gen_mutex_t* external_mutex)
 {
 
     int num_to_poll = 0;
@@ -225,6 +228,20 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
     {
 	return (-EINVAL);
     }
+
+    /* NOTES:
+     * Locking here is weird for now as a duct tape solution.  
+     * What we want to do is release the monster bmi-tcp lock while calling
+     * poll(), but we have to also prevent concurrent access to this
+     * function.  So we grab a mutex specific to this section of the code
+     * while in this function, while taking exceptional care with the lock
+     * ordering to prevent deadlock.  Modify at your own risk!
+     *
+     * This should all be rewritten one day...
+     */
+    gen_mutex_unlock(external_mutex);
+    gen_mutex_lock(&big_poll_mutex);
+    gen_mutex_lock(external_mutex);
 
     /* init the outgoing arguments for safety */
     *outcount = 0;
@@ -269,6 +286,9 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
 	    gossip_lerr("Error: found bad socket in socket collection.\n");
 	    gossip_lerr("Error: not handle properly....\n");
 	    /* TODO: handle this better */
+	    gen_mutex_unlock(external_mutex);
+	    gen_mutex_unlock(&big_poll_mutex);
+	    gen_mutex_lock(external_mutex);
 	    return (-EINVAL);
 	}
 	big_poll_fds[num_to_poll].fd = tcp_data->socket;
@@ -283,20 +303,28 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
     }
 
     /* we should be all set now to perform the poll operation */
+    gen_mutex_unlock(external_mutex);
     do
     {
 	ret = poll(big_poll_fds, num_to_poll, poll_timeout);
     } while (ret < 0 && errno == EINTR);
+    gen_mutex_lock(external_mutex);
 
     /* look for poll error */
     if (ret < 0)
     {
+	gen_mutex_unlock(external_mutex);
+	gen_mutex_unlock(&big_poll_mutex);
+	gen_mutex_lock(external_mutex);
 	return (-errno);
     }
 
     /* short out if nothing is ready */
     if (ret == 0)
     {
+	gen_mutex_unlock(external_mutex);
+	gen_mutex_unlock(&big_poll_mutex);
+	gen_mutex_lock(external_mutex);
 	return (0);
     }
 
@@ -349,6 +377,9 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
 		if (!(maps[num_handled]))
 		{
 		    /* TODO: handle better? */
+		    gen_mutex_unlock(external_mutex);
+		    gen_mutex_unlock(&big_poll_mutex);
+		    gen_mutex_lock(external_mutex);
 		    return (-ENOMEM);
 		}
 		tcp_data = (maps[num_handled])->method_data;
@@ -365,6 +396,9 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
 	}
     }
 
+    gen_mutex_unlock(external_mutex);
+    gen_mutex_unlock(&big_poll_mutex);
+    gen_mutex_lock(external_mutex);
     return (0);
 }
 
