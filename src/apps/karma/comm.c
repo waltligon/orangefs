@@ -387,7 +387,7 @@ int gui_comm_traffic_retrieve(struct gui_traffic_raw_data **svr_traffic,
     /* summarize data and store in visible_perf array */
     for (svr=0; svr < internal_addr_ct; svr++) {
 	int valid_start_time = 0;
-	uint64_t start_time_ms;
+	uint64_t start_time_ms = 0;
 
 	struct gui_traffic_raw_data *raw = &visible_perf[svr];
 
@@ -406,7 +406,13 @@ int gui_comm_traffic_retrieve(struct gui_traffic_raw_data **svr_traffic,
 	    raw->meta_read_ops     = internal_perf[svr][idx].metadata_read;
 	}
 
-	raw->elapsed_time_ms  = internal_end_time_ms[svr] - start_time_ms;
+	if (valid_start_time) {
+	    raw->elapsed_time_ms = internal_end_time_ms[svr] - start_time_ms;
+	}
+	else
+	{
+	    raw->elapsed_time_ms = 0;
+	}
 
 	/* deal with format in which metadata is returned */
 	if (internal_perf[svr][0].valid_flag) {
