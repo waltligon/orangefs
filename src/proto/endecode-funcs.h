@@ -356,6 +356,23 @@ static inline void decode_##name(char **pptr, struct name *x) { int i; \
 	decode_##ta1(pptr, &(x)->a1[i]); \
 }
 
+#define endecode_fields_2a_struct(name, t1, x1, tn1, n1, tn2, n2, ta1, a1) \
+static inline void encode_##name(char **pptr, const struct name *x) { int i; \
+    encode_##t1(pptr, &x->x1); \
+    encode_##tn1(pptr, &x->n1); \
+    encode_##tn2(pptr, &x->n2); \
+    for (i=0; i<x->n1; i++) \
+	encode_##ta1(pptr, &(x)->a1[i]); \
+} \
+static inline void decode_##name(char **pptr, struct name *x) { int i; \
+    decode_##t1(pptr, &x->x1); \
+    decode_##tn1(pptr, &x->n1); \
+    decode_##tn2(pptr, &x->n2); \
+    x->a1 = decode_malloc(x->n1 * sizeof(*x->a1)); \
+    for (i=0; i<x->n1; i++) \
+	decode_##ta1(pptr, &(x)->a1[i]); \
+}
+
 #define endecode_fields_3a_struct(name, t1, x1, t2, x2, t3, x3, tn1,n1,ta1,a1) \
 static inline void encode_##name(char **pptr, const struct name *x) { int i; \
     encode_##t1(pptr, &x->x1); \

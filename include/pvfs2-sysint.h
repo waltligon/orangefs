@@ -124,6 +124,7 @@ typedef struct PVFS_sysresp_io_s PVFS_sysresp_io;
 struct PVFS_sysresp_readdir_s
 {
     PVFS_ds_position token;
+    uint64_t directory_version;
     int pvfs_dirent_outcount;
     PVFS_dirent *dirent_array;
 };

@@ -267,6 +267,8 @@ static int readdir_msg_comp_fn(void *v_p,
     assert(sm_p->u.readdir.readdir_resp);
 
     sm_p->u.readdir.readdir_resp->token = resp_p->u.readdir.token;
+    sm_p->u.readdir.readdir_resp->directory_version =
+        resp_p->u.readdir.directory_version;
     sm_p->u.readdir.readdir_resp->pvfs_dirent_outcount =
         resp_p->u.readdir.dirent_count;
     if (sm_p->u.readdir.readdir_resp->pvfs_dirent_outcount > 0)
@@ -297,9 +299,11 @@ static int readdir_msg_comp_fn(void *v_p,
                 sm_p->object_ref);
         }
     }
-    gossip_debug(
-        GOSSIP_READDIR_DEBUG, "*** Got %d directory entries\n",
-        sm_p->u.readdir.readdir_resp->pvfs_dirent_outcount);
+
+    gossip_debug(GOSSIP_READDIR_DEBUG, "*** Got %d directory entries "
+                 "[version %Ld]\n",
+                 sm_p->u.readdir.readdir_resp->pvfs_dirent_outcount,
+                 sm_p->u.readdir.readdir_resp->directory_version);
 
     return 0;
 }

@@ -179,7 +179,7 @@ int do_list(
         if (rd_response.pvfs_dirent_outcount)
             free(rd_response.dirent_array);
 
-    } while(rd_response.pvfs_dirent_outcount != 0);
+    } while(rd_response.pvfs_dirent_outcount == pvfs_dirent_incount);
 
     return 0;
 }

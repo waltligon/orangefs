@@ -164,6 +164,7 @@ struct PINT_server_lookup_op
 
 struct PINT_server_readdir_op
 {
+    uint64_t directory_version;
     PVFS_handle dirent_handle;  /* holds handle of dirdata dspace from
                                    which entries are read */
 };

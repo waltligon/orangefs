@@ -144,6 +144,7 @@ static void lebf_initialize(void)
 		reqsize = extra_size_PVFS_servreq_mkdir;
 		break;
 	    case PVFS_SERV_READDIR:
+		resp.u.readdir.directory_version = 0;
 		resp.u.readdir.dirent_count = 0;
 		respsize = extra_size_PVFS_servresp_readdir;
 		break;
@@ -702,8 +703,10 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	struct PVFS_server_resp *resp = &msg->stub_dec.resp;
 	switch (resp->op) {
 
-	    case PVFS_SERV_LOOKUP_PATH: {
-		struct PVFS_servresp_lookup_path *lookup = &resp->u.lookup_path;
+	    case PVFS_SERV_LOOKUP_PATH:
+            {
+		struct PVFS_servresp_lookup_path *lookup =
+                    &resp->u.lookup_path;
 		decode_free(lookup->handle_array);
 		decode_free(lookup->attr_array);
 		break;

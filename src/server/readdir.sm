@@ -101,8 +101,8 @@ static int readdir_verify_directory_metadata(
 
     attr = &s_op->attr;
 
-    gossip_debug(GOSSIP_READDIR_DEBUG, " - attrs: owner=%d, group=%d "
-                 "perms=%d, type=%d, mtime=%Ld\n", attr->owner,
+    gossip_debug(GOSSIP_READDIR_DEBUG, " - attrs: owner=%d, group=%d, "
+                 "perms=%d\n\ttype=%d, mtime=%Ld\n", attr->owner,
                  attr->group, attr->perms, attr->objtype,
                  Ld(attr->mtime));
 
@@ -113,6 +113,8 @@ static int readdir_verify_directory_metadata(
 
 	js_p->error_code = STATE_ENOTDIR;
     }
+
+    s_op->u.readdir.directory_version = (uint64_t)attr->mtime;
     return 1;
 }
 
@@ -127,14 +129,13 @@ static int readdir_read_dirdata_handle(
     s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
 
-    /* use readdir scratch space as dest */
     s_op->val.buffer = &s_op->u.readdir.dirent_handle;
     s_op->val.buffer_sz = sizeof(PVFS_handle);
 
     gossip_debug(
-        GOSSIP_READDIR_DEBUG, " - reading metadata: coll_id=%d, "
-        "handle=%Lu, key=%s (sz=%d)\n\tval_buf=%p (sz=%d)\n",
-        s_op->req->u.readdir.fs_id, Lu(s_op->req->u.readdir.handle),
+        GOSSIP_READDIR_DEBUG, " - reading metadata: [%Lu,%d], "
+        "key=%s\n\t(sz=%d) val_buf=%p (sz=%d)\n",
+        Lu(s_op->req->u.readdir.handle), s_op->req->u.readdir.fs_id,
         (char *)s_op->key.buffer, s_op->key.buffer_sz,
         s_op->val.buffer, s_op->val.buffer_sz);
 
@@ -211,9 +212,9 @@ static int readdir_iterate_on_entries(
     }
 
     gossip_debug(
-        GOSSIP_READDIR_DEBUG, " - iterating keyvals: coll_id=%d, "
-        "handle=%Lu, token=0x%x, count=%d\n",
-        s_op->req->u.readdir.fs_id, Lu(s_op->u.readdir.dirent_handle),
+        GOSSIP_READDIR_DEBUG, " - iterating keyvals: [%Lu,%d], "
+        "\n\ttoken=0x%x, count=%d\n",
+        Lu(s_op->u.readdir.dirent_handle), s_op->req->u.readdir.fs_id,
         s_op->req->u.readdir.token, s_op->req->u.readdir.dirent_count);
 
     ret = job_trove_keyval_iterate(
@@ -249,13 +250,16 @@ static int readdir_setup_resp(
 	return 1;
     }
 
+    s_op->resp.u.readdir.directory_version =
+        s_op->u.readdir.directory_version;
     s_op->resp.u.readdir.dirent_count = js_p->count;
+
     js_p->error_code = 0;
     return 1;
 }
 
 static int readdir_cleanup(
-    PINT_server_op *s_op, job_status_s* js_p)
+    PINT_server_op *s_op, job_status_s *js_p)
 {
     PINT_STATE_DEBUG("cleanup");
 

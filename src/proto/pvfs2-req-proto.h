@@ -693,11 +693,13 @@ struct PVFS_servresp_readdir
     /* array of directory entries */
     PVFS_dirent *dirent_array;
     uint32_t dirent_count;   /* # of entries retrieved */
+    uint64_t directory_version;
 };
-endecode_fields_1a_struct(
+endecode_fields_2a_struct(
     PVFS_servresp_readdir,
     PVFS_ds_position, token,
     uint32_t, dirent_count,
+    uint64_t, directory_version,
     PVFS_dirent, dirent_array)
 #define extra_size_PVFS_servresp_readdir \
   roundup8(PVFS_REQ_LIMIT_DIRENT_COUNT * (PVFS_NAME_MAX + 1 + 8))

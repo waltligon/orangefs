@@ -43,6 +43,7 @@
 #define endecode_fields_0a_struct(n,tn1,n1,ta1,a1)
 #define endecode_fields_0aa_struct(n,tn1,n1,ta1,a1,tn2,n2,ta2,a2)
 #define endecode_fields_1a_struct(n,t1,x1,tn1,n1,ta1,a1)
+#define endecode_fields_2a_struct(n,t1,x1,tn1,n1,tn2,n2,ta1,a1) 
 #define endecode_fields_3a_struct(n,t1,x1,t2,x2,t3,x3,tn1,n1,ta1,a1)
 
 #endif  /* __PINT_REQPROTO_ENCODE_FUNCS_C */
