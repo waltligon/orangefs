@@ -16,12 +16,14 @@
 enum {
     STATE_METAFILE = 7,
     STATE_DATAFILE = 8,
+    STATE_SYMLINK  = 9
 };
 
 
 static int getattr_cleanup(PINT_server_op *s_op, job_status_s* js_p);
 static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p);
 static int getattr_read_datafile_size(PINT_server_op *s_op, job_status_s* js_p);
+static int getattr_read_symlink_target(PINT_server_op *s_op, job_status_s* js_p);
 static int getattr_read_metafile_datafile_handles_if_required(
     PINT_server_op *s_op, job_status_s* js_p);
 static int getattr_read_metafile_distribution_if_required(
@@ -33,13 +35,14 @@ extern PINT_server_trove_keys_s Trove_Common_Keys[];
 %%
 
 machine pvfs2_get_attr_sm(prelude,
-		 cleanup,
-		 setup_resp,
-		 final_response,
-		 verify_attribs,
-		 read_datafile_size,
-		 read_metafile_datafile_handles_if_required,
-		 read_metafile_distribution_if_required)
+                          cleanup,
+                          setup_resp,
+                          final_response,
+                          verify_attribs,
+                          read_datafile_size,
+                          read_symlink_target,
+                          read_metafile_datafile_handles_if_required,
+                          read_metafile_distribution_if_required)
 {
 	state prelude
 	{
@@ -52,6 +55,7 @@ machine pvfs2_get_attr_sm(prelude,
 	{
 		run getattr_verify_attribs;
                 STATE_DATAFILE => read_datafile_size;
+		STATE_SYMLINK => read_symlink_target;
 		STATE_METAFILE => read_metafile_datafile_handles_if_required;
 		default => setup_resp;
 	}
@@ -61,6 +65,12 @@ machine pvfs2_get_attr_sm(prelude,
 		run getattr_read_datafile_size;
 		default => setup_resp;
 	}
+
+        state read_symlink_target
+        {
+		run getattr_read_symlink_target;
+		default => setup_resp;
+        }
 
 	state read_metafile_datafile_handles_if_required
 	{
@@ -171,18 +181,22 @@ static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
 	gossip_debug(SERVER_DEBUG, "  handle 0x%08Lx refers to "
                      "a dirdata object. doing nothing special\n",
 		     s_op->req->u.getattr.handle);
+        a_p->mask = PVFS_ATTR_COMMON_ALL;
     }
     else if (a_p->objtype == PVFS_TYPE_SYMLINK)
     {
-	gossip_debug(SERVER_DEBUG, "  handle 0x%08Lx refers to "
-                     "a symlink. doing nothing special\n",
-		     s_op->req->u.getattr.handle);
+	gossip_debug(SERVER_DEBUG,
+                     "  handle 0x%08Lx refers to a symlink.\n",
+                     s_op->req->u.getattr.handle);
+
 	a_p->mask = PVFS_ATTR_COMMON_ALL;
+
+        js_p->error_code = STATE_SYMLINK;
     }
     else
     {
 	gossip_debug(SERVER_DEBUG, "  handle 0x%08Lx refers to something "
-                     "other than a metafile\n\t-- assuming datafile!\n",
+                     "unknown -- assuming datafile!\n",
 		     s_op->req->u.getattr.handle);
 
         a_p->objtype = PVFS_TYPE_DATAFILE;
@@ -208,6 +222,19 @@ static int getattr_read_datafile_size(PINT_server_op *s_op, job_status_s* js_p)
                                    js_p,
                                    &tmp_id,
                                    server_job_context);
+
+    return ret;
+}
+
+static int getattr_read_symlink_target(PINT_server_op *s_op, job_status_s* js_p)
+{
+    int ret = -1;
+    job_id_t tmp_id;
+
+    PINT_STATE_DEBUG("read_symlink_target");
+
+    PINT_STATE_DEBUG("FIXME: Doing nothing");
+    ret = 1;
 
     return ret;
 }

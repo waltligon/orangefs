@@ -490,18 +490,18 @@ static int symlink_setattr_failure(PINT_client_sm *sm_p,
 static int symlink_cleanup(PINT_client_sm *sm_p,
                           job_status_s *js_p)
 {
-    PVFS_pinode_reference metafile_ref;
+    PVFS_pinode_reference symlink_ref;
 
     gossip_debug(CLIENT_DEBUG, "symlink state: cleanup\n");
 
     sm_p->error_code = js_p->error_code;
 
     /* insert attributes for this new metafile into the pcache */
-    metafile_ref.handle = sm_p->u.sym.symlink_handle;
-    metafile_ref.fs_id = sm_p->parent_ref.fs_id;
+    symlink_ref.handle = sm_p->u.sym.symlink_handle;
+    symlink_ref.fs_id = sm_p->parent_ref.fs_id;
 
     /* fill in outgoing response fields */
-    sm_p->u.sym.sym_resp->pinode_refn = metafile_ref;
+    sm_p->u.sym.sym_resp->pinode_refn = symlink_ref;
 
     if (sm_p->msgarray)
     {

@@ -467,16 +467,10 @@ static int getattr_object_getattr_failure(PINT_client_sm *sm_p,
 		 "(%p) getattr state: getattr_object_getattr_failure\n",
 		 sm_p);
 
-    if (js_p->error_code == -PVFS_EINVAL)
-    {
-        gossip_err("getattr: Failed to retrieve attrs of handle %Lu | %d\n",
-                   sm_p->u.getattr.object_ref.handle,
-                   sm_p->u.getattr.object_ref.fs_id);
-    }
-    else
-    {
-        assert(0);
-    }
+    gossip_err("getattr: Failed to retrieve attrs of handle %Lu | %d\n",
+               sm_p->u.getattr.object_ref.handle,
+               sm_p->u.getattr.object_ref.fs_id);
+
     return 1;
 }
 

@@ -11,7 +11,8 @@
 #include "pvfs2-attr.h"
 
 enum {
-    STATE_METAFILE = 7
+    STATE_METAFILE = 7,
+    STATE_SYMLINK = 8
 };
 
 static int setattr_cleanup(PINT_server_op *s_op, job_status_s* js_p);
@@ -19,6 +20,8 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s* js_p);
 static int setattr_write_metafile_datafile_handles_if_required(
     PINT_server_op *s_op, job_status_s* js_p);
 static int setattr_write_metafile_distribution_if_required(
+    PINT_server_op *s_op, job_status_s* js_p);
+static int setattr_write_symlink_target_if_required(
     PINT_server_op *s_op, job_status_s* js_p);
 static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p);
 
@@ -31,6 +34,7 @@ machine pvfs2_set_attr_sm(prelude,
 			  verify_attribs,
 			  write_metafile_datafile_handles_if_required,
 			  write_metafile_distribution_if_required,
+                          write_symlink_target_if_required,
 			  setobj_attrib,
 			  final_response)
 {
@@ -45,6 +49,7 @@ machine pvfs2_set_attr_sm(prelude,
 	{
 		run setattr_verify_attribs;
 		STATE_METAFILE => write_metafile_datafile_handles_if_required;
+                STATE_SYMLINK  => write_symlink_target_if_required;
 		success        => setobj_attrib;
 		default        => final_response;
 	}
@@ -59,6 +64,13 @@ machine pvfs2_set_attr_sm(prelude,
 	state write_metafile_distribution_if_required
         {
 		run setattr_write_metafile_distribution_if_required;
+		success => setobj_attrib;
+		default => final_response;
+	}
+
+        state write_symlink_target_if_required
+        {
+		run setattr_write_symlink_target_if_required;
 		success => setobj_attrib;
 		default => final_response;
 	}
@@ -207,7 +219,11 @@ static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
                          " symlink links handle %Lu to %s\n",
                          s_op->req->u.setattr.handle,
                          req_a_p->u.sym.target_path);
+
+            a_p->u.sym.target_path_len = req_a_p->u.sym.target_path_len;
+            a_p->u.sym.target_path = req_a_p->u.sym.target_path;
         }
+        js_p->error_code = STATE_SYMLINK;
     }
     else if ((req_a_p->objtype == PVFS_TYPE_DIRDATA) ||
              (a_p->objtype == PVFS_TYPE_DIRDATA))
@@ -395,8 +411,7 @@ static int setattr_write_metafile_datafile_handles_if_required(
 static int setattr_write_metafile_distribution_if_required(
     PINT_server_op *s_op, job_status_s* js_p)
 {
-    /*PVFS_object_attr *old_attr;*/
-    int ret=0;
+    int ret = 0;
     job_id_t j_id;
 
     PINT_STATE_DEBUG("write_metafile_distribution_if_required");
@@ -448,6 +463,60 @@ static int setattr_write_metafile_distribution_if_required(
 					  server_job_context);
     return(ret);
 }
+
+static int setattr_write_symlink_target_if_required(
+    PINT_server_op *s_op, job_status_s* js_p)
+{
+    int ret = 0;
+    job_id_t j_id;
+
+    PINT_STATE_DEBUG("write_symlink_target_if_required");
+
+    /* if we don't need to fill in the symlink target, skip it */
+    if (!(s_op->req->u.setattr.attr.mask & PVFS_ATTR_SYMLNK_TARGET))
+    {
+        gossip_debug(SERVER_DEBUG, "skipping symlink target write\n");
+        js_p->error_code = 0;
+        return 1;
+    }
+
+    assert(s_op->req->u.setattr.attr.u.sym.target_path_len > 0);
+    assert(s_op->req->u.setattr.attr.u.sym.target_path);
+
+    /* set up key and value structure for keyval write */
+    s_op->key.buffer    = Trove_Common_Keys[SYMLINK_TARGET_KEY].key;
+    s_op->key.buffer_sz = Trove_Common_Keys[SYMLINK_TARGET_KEY].size;
+
+    gossip_debug(SERVER_DEBUG,
+		 "  symlink target_path_len = %d\n",
+		 s_op->req->u.setattr.attr.u.sym.target_path_len);
+
+    s_op->val.buffer    = s_op->req->u.setattr.attr.u.sym.target_path;
+    s_op->val.buffer_sz = s_op->req->u.setattr.attr.u.sym.target_path_len;
+
+    gossip_debug(SERVER_DEBUG,
+		 "  writing symlink target (coll_id = 0x%x, handle = "
+                 "0x%08Lx, key = %s (%d), val_buf = 0x%08x (%d))\n",
+		 s_op->req->u.setattr.fs_id,
+		 s_op->req->u.setattr.handle,
+		 (char *) s_op->key.buffer,
+		 s_op->key.buffer_sz,
+		 (unsigned) s_op->val.buffer,
+		 s_op->val.buffer_sz);
+
+    ret = job_trove_keyval_write(s_op->req->u.setattr.fs_id,
+                                 s_op->req->u.setattr.handle,
+                                 &(s_op->key),
+                                 &(s_op->val),
+                                 TROVE_SYNC /* flags */,
+                                 NULL,
+                                 s_op,
+                                 js_p,
+                                 &j_id,
+                                 server_job_context);
+    return ret;
+}
+
 
 /*
  * Function: setattr_cleanup

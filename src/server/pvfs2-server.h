@@ -41,6 +41,7 @@ enum
     DIR_ENT_KEY          = 2,
     METAFILE_HANDLES_KEY = 3,
     METAFILE_DIST_KEY    = 4,
+    SYMLINK_TARGET_KEY   = 5,
     KEYVAL_ARRAY_SIZE    = 6
 };
 
