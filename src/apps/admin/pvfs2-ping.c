@@ -40,11 +40,11 @@ static int noop_all_servers(PVFS_fs_id fsid);
 int main(int argc, char **argv)
 {
     int ret = -1;
+    int i;
     PVFS_fs_id cur_fs;
     const PVFS_util_tab* tab;
     struct options* user_opts = NULL;
     char pvfs_path[PVFS_NAME_MAX] = {0};
-    PVFS_sysresp_init resp_init;
     PVFS_credentials creds;
     PVFS_sysresp_lookup resp_lookup;
 
@@ -58,6 +58,7 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
+    printf("\n(1) Parsing tab file...\n");
     tab = PVFS_util_parse_pvfstab(NULL);
     if (!tab)
     {
@@ -66,10 +67,8 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    printf("\n(1) Initializing system interface and retrieving "
-           "configuration from server...\n");
-    memset(&resp_init, 0, sizeof(resp_init));
-    ret = PVFS_sys_initialize(*tab, GOSSIP_NO_DEBUG, &resp_init);
+    printf("\n(2) Initializing system interface...\n");
+    ret = PVFS_sys_initialize(GOSSIP_NO_DEBUG);
     if(ret < 0)
     {
 	PVFS_perror("PVFS_sys_initialize", ret);
@@ -78,7 +77,26 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    printf("\n(2) Searching for %s in pvfstab...\n",
+    printf("\n(3) Initializing each file system found in tab file: %s...\n\n",
+	tab->tabfile_name);
+    for(i=0; i<tab->mntent_count; i++)
+    {
+	printf("   %s: ", tab->mntent_array[i].mnt_dir);
+	ret = PVFS_sys_fs_add(&tab->mntent_array[i]);
+	if(ret < 0)
+	{
+	    printf("FAILURE!\n");
+	    fprintf(stderr, "Failure: could not initialize at least one of"
+		" the target file systems.\n");
+	    return(-1);
+	}
+	else
+	{   
+	    printf("Ok\n");
+	}
+    }
+
+    printf("\n(4) Searching for %s in pvfstab...\n",
            user_opts->fs_path_real);
 
     /* translate local path into pvfs2 relative path */
@@ -105,7 +123,7 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    printf("\n(3) Verifying that all servers are responding...\n");
+    printf("\n(5) Verifying that all servers are responding...\n");
 
     /* send noop to everyone */
     ret = noop_all_servers(cur_fs);
@@ -116,7 +134,7 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    printf("\n(4) Verifying that fsid %ld is accemntentle to all servers...\n",
+    printf("\n(6) Verifying that fsid %ld is accemntentle to all servers...\n",
 	(long)cur_fs);
 
     /* check that the fsid exists on all of the servers */
@@ -135,7 +153,7 @@ int main(int argc, char **argv)
     }
     printf("\n   Ok; all servers understand fs_id %ld\n", (long)cur_fs);
 
-    printf("\n(5) Verifying that root handle is owned by one server...\n");    
+    printf("\n(7) Verifying that root handle is owned by one server...\n");    
 
     ret = PVFS_sys_lookup(cur_fs, "/", creds,
                           &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW);

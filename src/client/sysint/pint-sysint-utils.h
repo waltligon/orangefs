@@ -23,6 +23,7 @@
 #include "pvfs2-sysint.h"
 #include "gen-locks.h"
 #include "pint-bucket.h"
+#include "pvfs2-sysint.h"
 
 #include "dotconf.h"
 #include "trove.h"
@@ -77,7 +78,7 @@ int PINT_do_lookup (
     PVFS_pinode_reference *entry);
 int PINT_server_get_config(
     struct server_configuration_s *config,
-    PVFS_util_tab tab);
+    struct PVFS_sys_mntent* mntent);
 void PINT_release_pvfstab(void);
 
 struct server_configuration_s *PINT_get_server_config_struct(void);

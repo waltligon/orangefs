@@ -91,10 +91,13 @@ int main(int argc, char **argv)
     }
 
     memset(&server_config,0,sizeof(struct server_configuration_s));
-    if (PINT_server_get_config(&server_config, *tab))
+    for(i=0; i<tab->mntent_count; i++)
     {
-        fprintf(stderr, "PINT_server_get_config failure.\n");
-        return(-1);
+	if (PINT_server_get_config(&server_config, &(tab->mntent_array[i])))
+	{
+	    fprintf(stderr, "PINT_server_get_config failure.\n");
+	    return(-1);
+	}
     }
 
     cur = server_config.file_systems;

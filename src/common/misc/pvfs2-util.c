@@ -388,8 +388,9 @@ int PVFS_util_resolve(
 int PVFS_util_init_defaults(void)
 {
     const PVFS_util_tab* tab;
-    PVFS_sysresp_init resp_init;
     int ret = -1;
+    int i;
+    int found_one = 0;
 
     /* use standard system tab files */
     tab = PVFS_util_parse_pvfstab(NULL);
@@ -401,14 +402,38 @@ int PVFS_util_init_defaults(void)
     }
 
     /* initialize pvfs system interface */
-    memset(&resp_init, 0, sizeof(resp_init));
-    ret = PVFS_sys_initialize(*tab, GOSSIP_NO_DEBUG, &resp_init);
+    ret = PVFS_sys_initialize(GOSSIP_NO_DEBUG);
     if(ret < 0)
     {
 	return(ret);
     }
 
-    return(0);
+    /* add in any file systems we found in the fstab */
+    for(i=0; i<tab->mntent_count; i++)
+    {
+	ret = PVFS_sys_fs_add(&tab->mntent_array[i]);
+	if(ret == 0)
+	{
+	    found_one = 1;
+	}
+	else
+	{
+	    gossip_err("WARNING: failed to initialize file system for mount "
+		"point %s in tab file %s\n", tab->mntent_array[i].mnt_dir,
+		tab->tabfile_name);
+	}
+    }
+
+    if(found_one)
+    {
+	return(0);
+    }
+    else
+    {
+	gossip_err("ERROR: could not initialize any file systems in %s.\n",
+	    tab->tabfile_name);
+	return(-PVFS_ENODEV);
+    }
 }
 
 /* PVFS_util_lookup_parent()

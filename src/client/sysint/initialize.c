@@ -28,8 +28,6 @@ job_context_id PVFS_sys_job_context = -1;
 
 extern gen_mutex_t *g_session_tag_mt_lock;
 
-static char* build_flow_module_list(PVFS_util_tab* tab);
-
 /* PVFS_sys_initialize()
  *
  * Initializes the PVFS system interface and any necessary internal data
@@ -40,23 +38,12 @@ static char* build_flow_module_list(PVFS_util_tab* tab);
  * env variable are the same as the EventLogging line in the server
  * configuration file.
  *
- * returns 0 on success, -errno on failure
+ * returns 0 on success, -PVFS_error on failure
  */
-
 int PVFS_sys_initialize(
-    PVFS_util_tab tab,
-    int default_debug_mask,
-    PVFS_sysresp_init *resp)
+    int default_debug_mask)
 {
-    int ret = -1, i, j;
-    int num_file_systems = 0;
-    gen_mutex_t *mt_config = NULL;
-    PINT_llist *cur = NULL;
-    struct filesystem_configuration_s *cur_fs = NULL;
-    const char **method_ptr_list;
-    int num_method_ptr_list, max_method_ptr_list;
-    char *method_list = 0;
-    char *flowproto_list = NULL;
+    int ret = -1;
     char *debug_mask_str = NULL;
     int debug_mask = 0;
     char *debug_file = 0;
@@ -70,8 +57,7 @@ int PVFS_sys_initialize(
 	JOB_CONTEXT_FAIL,
 	ACACHE_INIT_FAIL,
 	NCACHE_INIT_FAIL,
-	BUCKET_INIT_FAIL,
-	GET_CONFIG_INIT_FAIL
+	BUCKET_INIT_FAIL
     } init_fail = NONE_INIT_FAIL;
 
     gossip_enable_stderr();
@@ -86,14 +72,6 @@ int PVFS_sys_initialize(
     if (debug_file)
 	gossip_enable_file(debug_file, "w");
 
-    /* make sure we were given sane arguments */
-    if ((tab.mntent_array == NULL) || (resp == NULL))
-    {
-	ret = -EINVAL;
-	init_fail = NONE_INIT_FAIL;
-	goto return_error;
-    }
-
     /* initialize protocol encoder */
     ret = PINT_encode_initialize();
     if(ret < 0)
@@ -101,87 +79,21 @@ int PVFS_sys_initialize(
 	init_fail = ENCODER_INIT_FAIL;
 	goto return_error;
     }
-
-    /* Parse the method types from the tab */
-    num_method_ptr_list = 0;
-    max_method_ptr_list = 0;
-    method_ptr_list = 0;
-    for (i=0; i<tab.mntent_count; i++) {
-	const char *meth_name = BMI_method_from_scheme(
-	  tab.mntent_array[i].pvfs_config_server);
-	for (j=0; j<num_method_ptr_list; j++) {
-	    if (method_ptr_list[j] == meth_name)
-		break;
-	}
-	if (j == num_method_ptr_list && meth_name) {  /* ignore unknown ones */
-	    if (num_method_ptr_list == max_method_ptr_list) {
-		const char **x = method_ptr_list;
-		max_method_ptr_list += 2;
-		method_ptr_list = malloc(
-		  max_method_ptr_list * sizeof(*method_ptr_list));
-		if (!method_ptr_list) {
-		    init_fail = BMI_INIT_FAIL;
-		    ret = -ENOMEM;
-		    goto return_error;
-		}
-		if (x) {
-		    memcpy(method_ptr_list, x,
-		      num_method_ptr_list * sizeof(*method_ptr_list));
-		    free(x);
-		}
-	    }
-	    method_ptr_list[num_method_ptr_list] = meth_name;
-	    ++num_method_ptr_list;
-	}
-    }
-    if (num_method_ptr_list) {
-	j = num_method_ptr_list;  /* intervening , and ending \0 */
-	for (i=0; i<num_method_ptr_list; i++)
-	    j += strlen(method_ptr_list[i]);
-	method_list = malloc(j * sizeof(char));
-	method_list[0] = 0;
-	for (i=0; i<num_method_ptr_list; i++) {
-	    if (i > 0)
-		strcat(method_list, ",");
-	    strcat(method_list, method_ptr_list[i]);
-	}
-	free(method_ptr_list);
-    }
-
-    if(method_list == NULL)
-    {
-	gossip_err("Error: failed to parse BMI method names from tab file entries.\n");
-	ret = -EINVAL;
-	init_fail = BMI_INIT_FAIL;
-	goto return_error;
-    }
-
-    /* parse flowprotocol list as well */
-    flowproto_list = build_flow_module_list(&tab);
-    if(!flowproto_list)
-    {
-	gossip_err("Error: failed to parse flow protocols from tab file entries.\n");
-	ret = -EINVAL;
-	init_fail = BMI_INIT_FAIL;
-	goto return_error;
-    }
     
     /* Initialize BMI */
-    ret = BMI_initialize(method_list,NULL,0);
+    ret = BMI_initialize(NULL,NULL,0);
     if (ret < 0)
     {
 	init_fail = BMI_INIT_FAIL;
 	gossip_ldebug(GOSSIP_CLIENT_DEBUG,"BMI initialize failure\n");
 	goto return_error;
     }
-    if (method_list)
-	free(method_list);
 
     /* initialize bmi session identifier, TODO: DOCUMENT THIS */
     g_session_tag_mt_lock = gen_mutex_build();
 
     /* Initialize flow */
-    ret = PINT_flow_initialize(flowproto_list, 0);
+    ret = PINT_flow_initialize(NULL, 0);
     if (ret < 0)
     {
 	init_fail = FLOW_INIT_FAIL;
@@ -226,91 +138,19 @@ int PVFS_sys_initialize(
     }	
     PINT_ncache_set_timeout(PINT_NCACHE_TIMEOUT * 1000);
 
-    /* Get configuration parameters from server */
-    ret = PINT_server_get_config(PINT_get_server_config_struct(),
-                                 tab);
-    if (ret < 0)
-    {
-	init_fail = NCACHE_INIT_FAIL;
-	gossip_ldebug(GOSSIP_CLIENT_DEBUG,"Error in getting server "
-                      "config parameters\n");
-	goto return_error;
-    }
-    num_file_systems = PINT_llist_count(
-      PINT_get_server_config_struct()->file_systems);
-    assert(num_file_systems);
-
-    /* Grab the mutex - serialize all writes to server_config */
-    mt_config = gen_mutex_build();
-    if (!mt_config)
-    {
-	init_fail = NCACHE_INIT_FAIL;
-	gossip_ldebug(GOSSIP_CLIENT_DEBUG,
-                      "Failed to initialize mutex\n");
-	goto return_error;
-    }
-
-    gen_mutex_lock(mt_config);	
-
     /* Initialize the configuration management interface */
     ret = PINT_bucket_initialize();
     if (ret < 0)
     {
 	init_fail = BUCKET_INIT_FAIL;
-	gossip_ldebug(GOSSIP_CLIENT_DEBUG,"Error in initializing "
-                      "configuration management interface\n");
-	gen_mutex_unlock(mt_config);
-	goto return_error;
+	gossip_ldebug(GOSSIP_CLIENT_DEBUG,"Error initializing config management\n");
+	goto return_error;	
     }
 
-    /* we need to return the fs_id's to the calling function */
-    resp->nr_fsid = num_file_systems;
-    resp->fsid_list = malloc(num_file_systems * sizeof(PVFS_handle));
-    if (resp->fsid_list == NULL)
-    {
-	init_fail = GET_CONFIG_INIT_FAIL;
-	ret = -ENOMEM;
-	goto return_error;
-    }
-
-    /*
-      iterate over each fs for two reasons:
-      1) load mappings of each fs into the bucket interface
-      2) store fs ids into resp object
-    */
-    i = 0;
-    cur = PINT_config_get_filesystems(PINT_get_server_config_struct());
-    while(cur && (i < num_file_systems))
-    {
-        cur_fs = PINT_llist_head(cur);
-        if (!cur_fs)
-        {
-            break;
-        }
-        assert(cur_fs->coll_id);
-        if (PINT_handle_load_mapping(PINT_get_server_config_struct(), cur_fs))
-        {
-            init_fail = GET_CONFIG_INIT_FAIL;
-            gossip_ldebug(GOSSIP_CLIENT_DEBUG,
-                          "Failed to load fs info into the "
-                          "PINT_handle interface.\n");
-            gen_mutex_unlock(mt_config);
-            goto return_error;
-        }
-        resp->fsid_list[i++] = cur_fs->coll_id;
-        cur = PINT_llist_next(cur);
-    }
-
-    gen_mutex_unlock(mt_config);
-    gen_mutex_destroy(mt_config);
-
-    assert(i == num_file_systems);
     return(0);
 
  return_error:
     switch(init_fail) {
-	case GET_CONFIG_INIT_FAIL:
-	    PINT_bucket_finalize();
 	case BUCKET_INIT_FAIL:
 	    PINT_ncache_finalize();
 	case NCACHE_INIT_FAIL:
@@ -333,86 +173,6 @@ int PVFS_sys_initialize(
 
     return(ret);
 }
-
-/* build_flow_module_list()
- *
- * builds a string specifying a list of flow protocols suitable for use
- * as an argument to PINT_flow_initialize(), based on flow protocols
- * found in tabfile
- *
- * returns pointer to string on success, NULL on failure
- * NOTE: caller must free string returned by this function
- */
-static char* build_flow_module_list(PVFS_util_tab* tab)
-{
-    int i,j;
-    int found = 0;
-    int new_len = 0;
-    /* we always load up at least the default module */
-    char* ret_str = NULL;
-    char* old_ret_str = NULL;
-    char* next_mod = NULL;
-
-    /* iterate through array */
-    for(i=0; i<tab->mntent_count; i++)
-    {
-	switch(tab->mntent_array[i].flowproto)
-	{
-	    case FLOWPROTO_BMI_TROVE:
-		next_mod = "flowproto_bmi_trove";
-		break;
-	    case FLOWPROTO_DUMP_OFFSETS:
-		next_mod = "flowproto_dump_offsets";
-		break;
-	    case FLOWPROTO_BMI_CACHE:
-		next_mod = "flowproto_bmi_cache";
-		break;
-	    case FLOWPROTO_MULTIQUEUE:
-		next_mod = "flowproto_multiqueue";
-		break;
-	}
-
-	/* see if we have already found this module */
-	found = 0;
-	for(j=0; j<i; j++)
-	{
-	    if(tab->mntent_array[i].flowproto == 
-		tab->mntent_array[j].flowproto)
-	    {
-		found = 1;
-		break;
-	    }
-	}
-
-	/* if we don't already have this module in our list, add it in */
-	if(!found)
-	{
-	    old_ret_str = ret_str;
-	    new_len = strlen(next_mod) + 2;
-	    if(old_ret_str)
-		new_len += strlen(old_ret_str);
-	    ret_str = (char*)malloc(new_len);
-	    if(!ret_str)
-	    {
-		if(old_ret_str)
-		    free(old_ret_str);
-		return(NULL);
-	    }
-	    memset(ret_str, 0, new_len);
-	    if(old_ret_str)
-	    {
-		strcpy(ret_str, old_ret_str);
-		strcat(ret_str, ",");
-	    }
-	    strcat(ret_str, next_mod);
-	    if(old_ret_str)
-		free(old_ret_str);
-	}
-    }
-
-    return(ret_str);
-}
-
 
 
 /*

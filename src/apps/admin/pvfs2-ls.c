@@ -110,9 +110,9 @@ int main(int argc, char **argv)
     char pvfs_path[MAX_NUM_PATHS][PVFS_NAME_MAX];
     PVFS_fs_id fs_id_array[MAX_NUM_PATHS] = {0};
     const PVFS_util_tab* tab;
-    PVFS_sysresp_init resp_init;
     struct options* user_opts = NULL;
     char current_dir[PVFS_NAME_MAX] = {0};
+    int found_one = 0;
 
     process_name = argv[0];
 
@@ -136,11 +136,24 @@ int main(int argc, char **argv)
         memset(pvfs_path[i],0,PVFS_NAME_MAX);
     }
 
-    memset(&resp_init, 0, sizeof(resp_init));
-    ret = PVFS_sys_initialize(*tab, GOSSIP_NO_DEBUG, &resp_init);
+    ret = PVFS_sys_initialize(GOSSIP_NO_DEBUG);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_sys_initialize", ret);
+	return(-1);
+    }
+
+    /* initialize each file system that we found in the tab file */
+    for(i=0; i<tab->mntent_count; i++)
+    {
+	ret = PVFS_sys_fs_add(&tab->mntent_array[i]);
+	if(ret == 0)
+	    found_one = 1;
+    }
+    if(!found_one)
+    {
+	fprintf(stderr, "Error: could not initialize any file systems from %s\n", tab->tabfile_name);
+	PVFS_sys_finalize();
 	return(-1);
     }
 

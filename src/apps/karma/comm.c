@@ -81,7 +81,7 @@ int gui_comm_setup(void)
 {
     char msgbuf[128];
     int ret, i, j;
-    PVFS_sysresp_init resp_init;
+    PVFS_fs_id default_fsid;
 
 
     /* PVFS2 init */
@@ -98,9 +98,18 @@ int gui_comm_setup(void)
 					 G_TYPE_STRING,
 					 G_TYPE_INT);
 
-    ret = PVFS_sys_initialize(*tab, 0, &resp_init);
+    ret = PVFS_sys_initialize(0);
     if (ret < 0) {
 	return -1;
+    }
+
+    for (i=0; i < tab->mntent_count; i++)
+    {
+	ret = PVFS_sys_fs_add(&tab->mntent_array[i]);
+	if(ret < 0)
+	{
+	    return(-1);
+	}
     }
 
     for (i=0; i < tab->mntent_count; i++) {
@@ -155,9 +164,16 @@ int gui_comm_setup(void)
     strncpy(msgbuf, tab->mntent_array[0].pvfs_config_server, j);
     msgbuf[j] = '\0';
 
+    ret = PVFS_util_get_default_fsid(&default_fsid);
+    /* TODO: what sort of error handling needs to happen here? */
+    if(ret < 0)
+    {
+	return(-1);
+    }
+	
     gui_comm_set_active_fs(msgbuf,
 			   tab->mntent_array[0].pvfs_fs_name,
-			   resp_init.fsid_list[0]);
+			   default_fsid);
 
     return 0;
 }

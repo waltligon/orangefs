@@ -58,14 +58,6 @@ struct PVFS_util_tab_s
 };
 typedef struct PVFS_util_tab_s PVFS_util_tab;
 
-/* response from init */
-struct PVFS_sysresp_init_s
-{
-    int nr_fsid;		/*Number of fs_id's that we're returning */
-    PVFS_fs_id *fsid_list;
-};
-typedef struct PVFS_sysresp_init_s PVFS_sysresp_init;
-
 /* lookup (request and response) */
 struct PVFS_sysresp_lookup_s
 {
@@ -154,9 +146,9 @@ typedef struct PVFS_sysresp_getparent_s PVFS_sysresp_getparent;
 /* system interface functions */
 
 int PVFS_sys_initialize(
-    PVFS_util_tab tab,
-    int debug_mask,
-    PVFS_sysresp_init * resp);
+    int debug_mask);
+
+int PVFS_sys_fs_add(struct PVFS_sys_mntent* mntent);
 
 int PVFS_sys_finalize(
     void);

@@ -79,126 +79,100 @@ int PINT_check_perms(PVFS_object_attr attr,
 }
 
 int PINT_server_get_config(struct server_configuration_s *config,
-                           PVFS_util_tab tab)
+			    struct PVFS_sys_mntent* mntent_p)
 {
-    int ret = -1, i = 0;
+    int ret = -1;
     PVFS_BMI_addr_t serv_addr;
     struct PVFS_server_req serv_req;
     struct PVFS_server_resp *serv_resp = NULL;
     PVFS_credentials creds;
     struct PINT_decoded_msg decoded;
     void* encoded_resp;
-    struct PVFS_sys_mntent *mntent_p = NULL;
     PVFS_msg_tag_t op_tag = get_next_session_tag();
-    int found_one_good = 0;
     struct filesystem_configuration_s* cur_fs = NULL;
 
-    /*
-      for each entry in the pvfstab, attempt to query the server for
-      getconfig information.  discontinue loop when we have info.
-    */
-    for (i = 0; i < tab.mntent_count; i++)
+    /* obtain the metaserver to send the request */
+    ret = BMI_addr_lookup(&serv_addr, mntent_p->pvfs_config_server);
+    if (ret < 0)
     {
-	mntent_p = &tab.mntent_array[i];
+	gossip_ldebug(GOSSIP_CLIENT_DEBUG,"Failed to resolve BMI "
+		      "address %s\n",mntent_p->pvfs_config_server);
+	return(ret);
+    }
 
-   	/* obtain the metaserver to send the request */
-	ret = BMI_addr_lookup(&serv_addr, mntent_p->pvfs_config_server);
-	if (ret < 0)
-	{
-            gossip_ldebug(GOSSIP_CLIENT_DEBUG,"Failed to resolve BMI "
-                          "address %s\n",mntent_p->pvfs_config_server);
-	    continue;
-	}
+    creds.uid = getuid();
+    creds.gid = getgid();
 
-        creds.uid = getuid();
-        creds.gid = getgid();
+    memset(&serv_req,0,sizeof(struct PVFS_server_req));
+    serv_req.op = PVFS_SERV_GETCONFIG;
+    serv_req.credentials = creds;
 
-        memset(&serv_req,0,sizeof(struct PVFS_server_req));
-	serv_req.op = PVFS_SERV_GETCONFIG;
-	serv_req.credentials = creds;
+    gossip_ldebug(GOSSIP_CLIENT_DEBUG,"asked for fs name = %s\n",
+		  mntent_p->pvfs_fs_name);
 
-	gossip_ldebug(GOSSIP_CLIENT_DEBUG,"asked for fs name = %s\n",
-                      mntent_p->pvfs_fs_name);
+    /* send the request and receive an acknowledgment */
+    ret = PINT_send_req(serv_addr, &serv_req, mntent_p->encoding,
+			&decoded, &encoded_resp, op_tag);
+    if (ret < 0)
+    {
+	gossip_err("Error: failed to send request to initial"
+	" configuration server;\n");
+	gossip_err("       please verify that your client configuration"
+	" is correct \n       and that the server is running.\n");
+	gossip_err("       (%s)\n", mntent_p->pvfs_config_server);
+	return(ret);
+    }
 
-	/* send the request and receive an acknowledgment */
-	ret = PINT_send_req(serv_addr, &serv_req, mntent_p->encoding,
-                            &decoded, &encoded_resp, op_tag);
-	if (ret < 0)
-        {
-            gossip_err("Error: failed to send request to initial"
-	    " configuration server;\n");
-	    gossip_err("       please verify that your client configuration"
-	    " is correct \n       and that the server is running.\n");
-	    gossip_err("       (%s)\n", mntent_p->pvfs_config_server);
-	    continue;
-	}
+    serv_resp = (struct PVFS_server_resp *)decoded.buffer;
+    if (serv_resp->status != 0)
+    {
+	PVFS_perror_gossip("Error: getconfig request denied",
+			   serv_resp->status);
+	PINT_release_req(serv_addr, &serv_req, mntent_p->encoding,
+			 &decoded, &encoded_resp, op_tag);
+	return(serv_resp->status);
+    }
 
-	serv_resp = (struct PVFS_server_resp *)decoded.buffer;
-	if (serv_resp->status != 0)
-	{
-	    PVFS_perror_gossip("Error: getconfig request denied",
-                               serv_resp->status);
-	    continue;
-	}
-
-        if (server_parse_config(config,&(serv_resp->u.getconfig)))
-        {
-            gossip_err("Failed to getconfig from host %s\n",
-                       mntent_p->pvfs_config_server);
-
-            PINT_release_req(serv_addr, &serv_req, mntent_p->encoding,
-                             &decoded, &encoded_resp, op_tag);
-            continue;
-        }
+    if (server_parse_config(config,&(serv_resp->u.getconfig)))
+    {
+	gossip_err("Failed to getconfig from host %s\n",
+		   mntent_p->pvfs_config_server);
 
 	PINT_release_req(serv_addr, &serv_req, mntent_p->encoding,
-                         &decoded, &encoded_resp, op_tag);
-        break;
-    }
-
-    /* verify that each pvfstab entry is valid according to the server */
-    for (i = 0; i < tab.mntent_count; i++)
-    {
-	mntent_p = &tab.mntent_array[i];
-
-        /* make sure we have valid information about this fs */
-        cur_fs = PINT_config_find_fs_name(config, mntent_p->pvfs_fs_name);
-        if (!cur_fs)
-        {
-            gossip_err("Warning:\n Cannot retrieve information about "
-                       "pvfstab entry %s\n",
-                       mntent_p->pvfs_config_server);
-
-            /*
-              if the device has no space left on it, we can't save
-              the config file for parsing and get a failure; make
-              a note of that possibility here
-            */
-            gossip_err("\nHINTS: If you're sure that your pvfstab file "
-                       "contains valid information,\n please make sure "
-                       "that you are not out of disk space and that you "
-                       "have\n write permissions in the current "
-                       "directory or in the /tmp directory\n\n");
-            continue;
-        }
-        else
-	{
-	    found_one_good = 1;
-	    mntent_p->fs_id = cur_fs->coll_id;
-	    cur_fs->flowproto = mntent_p->flowproto;
-	    cur_fs->encoding = mntent_p->encoding;
-	}
-    }
-
-    if (found_one_good)
-    {
-	return(0); 
-    }
-    else
-    {
-	gossip_err("Error: no valid pvfs2tab entries found.\n");
+			 &decoded, &encoded_resp, op_tag);
 	return(-PVFS_ENODEV);
     }
+
+    PINT_release_req(serv_addr, &serv_req, mntent_p->encoding,
+		     &decoded, &encoded_resp, op_tag);
+
+    /* make sure we have valid information about this fs */
+    cur_fs = PINT_config_find_fs_name(config, mntent_p->pvfs_fs_name);
+    if (!cur_fs)
+    {
+	gossip_err("Warning:\n Cannot retrieve information about "
+		   "pvfstab entry %s\n",
+		   mntent_p->pvfs_config_server);
+
+	/*
+	  if the device has no space left on it, we can't save
+	  the config file for parsing and get a failure; make
+	  a note of that possibility here
+	*/
+	gossip_err("\nHINTS: If you're sure that your pvfstab file "
+		   "contains valid information,\n please make sure "
+		   "that you are not out of disk space and that you "
+		   "have\n write permissions in the current "
+		   "directory or in the /tmp directory\n\n");
+	
+	return(-PVFS_ENODEV);
+    }
+
+    mntent_p->fs_id = cur_fs->coll_id;
+    cur_fs->flowproto = mntent_p->flowproto;
+    cur_fs->encoding = mntent_p->encoding;
+
+    return(0); 
 }
 
 static int server_parse_config(struct server_configuration_s *config,

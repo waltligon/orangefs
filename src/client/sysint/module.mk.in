@@ -12,7 +12,8 @@ CSRC := \
 	$(DIR)/client-state-machine.c \
 	$(DIR)/shared-state-methods.c \
 	$(DIR)/mgmt-misc.c \
-	$(DIR)/sys-statfs.c
+	$(DIR)/sys-statfs.c \
+	$(DIR)/fs-add.c
 
 SMSRC := \
 	msgpairarray.sm \
