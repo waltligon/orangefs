@@ -619,65 +619,30 @@ http://www.kernel.org/pub/linux/kernel/v2.6/
 \end{verbatim}
 
 Once you're convinced the Linux kernel version is appropriate, it's
-time to compile the PVFS2 kernel module.  This kernel module is built
-independently from the other parts of PVFS2.  The first step in
-building this module is generating the Makefile.  To generate the
-Makefile, you need to make sure that you run './configure' with the
+time to compile the PVFS2 kernel module.  To generate the Makefile,
+you need to make sure that you run './configure' with the
 '--with-kernel=path' argument.  An example is provided here for your
 convenience:
 
 \begin{verbatim}
-gil:/usr/src/pvfs2# ./configure --with-kernel=/usr/src/linux-2.6.0-test4
+gil:/usr/src/pvfs2# ./configure --with-kernel=/usr/src/linux
 \end{verbatim}
 
 This example assumes that you've already downloaded, compiled, and are
-now running the kernel located in the /usr/src/linux-2.6.0-test4
-directory.  After this command is issued, build the PVFS2 source tree
-if it has not yet been built.
+now running the kernel located in the /usr/src/linux directory.  After
+this command is issued, build the PVFS2 source tree if it has not yet
+been built.
 
-Building the kernel module should now be a trivial task.  From the top
-level PVFS2 source directory, you need to first change directory to
-the where the code is located, and then run make.  You must perform
-this step as root so that the build process can access dependency
-information in the kernel source tree.  You should see
-output similar to the following if your environment is properly
-configured:
-
-\begin{verbatim}
-gil:/usr/src/pvfs2# cd src/kernel/linux-2.6/
-gil:/usr/src/pvfs2/src/kernel/linux-2.6# make
-touch /usr/src/pvfs2/src/kernel/linux-2.6/pvfs2.mod.c
-make -C /usr/src/linux SUBDIRS=/usr/src/pvfs2/src/kernel/linux-2.6
-modules
-make[1]: Entering directory `/usr/src/linux-2.6.0-test4'
-make[2]: `arch/i386/kernel/asm-offsets.s' is up to date.
-*** Warning: Overriding SUBDIRS on the command line can cause
-***          inconsistencies
-  CC [M]  /usr/src/pvfs2/src/kernel/linux-2.6/pvfs2.mod.o
-  CC [M]  /usr/src/pvfs2/src/kernel/linux-2.6/pvfs2-utils.o
-  CC [M]  /usr/src/pvfs2/src/kernel/linux-2.6/waitqueue.o
-  CC [M]  /usr/src/pvfs2/src/kernel/linux-2.6/devpvfs2-req.o
-  CC [M]  /usr/src/pvfs2/src/kernel/linux-2.6/pvfs2-cache.o
-  CC [M]  /usr/src/pvfs2/src/kernel/linux-2.6/dcache.o
-  CC [M]  /usr/src/pvfs2/src/kernel/linux-2.6/file.o
-  CC [M]  /usr/src/pvfs2/src/kernel/linux-2.6/inode.o
-  CC [M]  /usr/src/pvfs2/src/kernel/linux-2.6/dir.o
-  CC [M]  /usr/src/pvfs2/src/kernel/linux-2.6/namei.o
-  CC [M]  /usr/src/pvfs2/src/kernel/linux-2.6/super.o
-  CC [M]  /usr/src/pvfs2/src/kernel/linux-2.6/pvfs2-mod.o
-  CC [M]  /usr/src/pvfs2/src/kernel/linux-2.6/pvfs2-bufmap.o
-  LD [M]  /usr/src/pvfs2/src/kernel/linux-2.6/pvfs2.o
-  Building modules, stage 2.
-  MODPOST
-  CC      /usr/src/pvfs2/src/kernel/linux-2.6/pvfs2.mod.o
-  LD [M]  /usr/src/pvfs2/src/kernel/linux-2.6/pvfs2.ko
-make[1]: Leaving directory `/usr/src/linux-2.6.0-test4'
-\end{verbatim}
+Building the kernel module should now be done automatically, though
+you must perform this step as root so that the build process can
+access dependency information in the kernel source tree.  Optionally,
+you can build the module by changing directory into the
+src/kernel/linux-2.6 and typing 'make'.
 
 At this point, we have a valid PVFS2 Kernel module.  The module itself
 is contained in the output file 'pvfs2.ko' located in the directory
-where the previous 'make' command was issued.  You may copy this
-module to another location if it better suits your environment.
+src/kernel/linux-2.6/pvfs2.ko.  You may copy this module to another
+location if it better suits your environment.
 
 \section{Testing the PVFS2 Linux VFS Interface}
 \label{sec:vfs-test}
