@@ -41,15 +41,38 @@ int dbpf_thread_initialize(void)
     ret = -1;
     dbpf_op_incoming_cond_mutex = gen_mutex_build();
     dbpf_interface_lock = gen_mutex_build();
-    if (dbpf_op_incoming_cond_mutex && dbpf_interface_lock)
+    if (dbpf_op_incoming_cond_mutex)
     {
-        dbpf_thread_running = 1;
-        ret = pthread_create(&dbpf_thread, NULL,
-                             dbpf_thread_function, NULL);
-        dbpf_thread_running = ((ret == 0) ? 1 : 0);
+        if (dbpf_interface_lock)
+        {
+            dbpf_thread_running = 1;
+            ret = pthread_create(&dbpf_thread, NULL,
+                                 dbpf_thread_function, NULL);
+            if (ret == 0)
+            {
+                dbpf_thread_running = 1;
+                gossip_debug(TROVE_DEBUG,
+                             "dbpf_thread_initialize: initialized\n");
+            }
+            else
+            {
+                gen_mutex_destroy(dbpf_interface_lock);
+                dbpf_interface_lock = NULL;
+            }
+        }
+        else
+        {
+            gen_mutex_destroy(dbpf_op_incoming_cond_mutex);
+            dbpf_op_incoming_cond_mutex = NULL;
+            gossip_debug(
+                TROVE_DEBUG, "dbpf_thread_initialize: failed (1)\n");
+        }
+    }
+    else
+    {
+        gossip_debug(TROVE_DEBUG, "dbpf_thread_initialize: failed (2)\n");
     }
 #endif
-    gossip_debug(TROVE_DEBUG, "dbpf_thread_initialize: initialized\n");
     return ret;
 }
 
@@ -57,10 +80,10 @@ int dbpf_thread_finalize(void)
 {
     int ret = 0;
 #ifdef __PVFS2_TROVE_THREADED__
-    gen_mutex_lock(dbpf_interface_lock);
+    gen_mutex_trylock(dbpf_interface_lock);
     dbpf_thread_running = 0;
-    usleep(100);
     ret = pthread_cancel(dbpf_thread);
+    usleep(100);
     gen_mutex_unlock(dbpf_interface_lock);
     pthread_cond_destroy(&dbpf_op_completed_cond);
     pthread_cond_destroy(&dbpf_op_incoming_cond);
