@@ -50,6 +50,13 @@ is also using gcc/ld specific linking flags.
 General (non critical)
 -----------------------
 
+document the semantics of the timeout argument to the test
+function.  Note that I don't think -1 timeout should be allowed...
+or at least if we do allow it, then document what it does
+
+come up with some decent defaults for BMI timeouts and give them
+symbolic names to use throughout the pvfs2 code
+
 replace the use of llist in the reference list with quicklist
 
 we can probably redo op_list_search as a simpler function - I'm not sure

@@ -219,7 +219,7 @@ static int block_on_flow(flow_descriptor* flow_d)
 
 	do
 	{
-		ret = PINT_flow_waitsome(1, &flow_d, &count, &index);
+		ret = PINT_flow_testsome(1, &flow_d, &count, &index, 10);
 	}while(ret == 0 && count == 0);
 	if(ret < 0)
 	{
@@ -284,7 +284,8 @@ static int run_io_operation(
 		/* check for completion of request */
 		do
 		{
-			ret = BMI_wait(op, &outcount, &error_code, &actual_size, NULL);
+			ret = BMI_test(op, &outcount, &error_code, &actual_size,
+			NULL, 10);
 		} while(ret == 0 && outcount == 0);
 
 		if(ret < 0 || error_code != 0)
@@ -293,7 +294,7 @@ static int run_io_operation(
 			if(ret<0)
 			{
 				errno = -ret;
-				perror("BMI_wait");
+				perror("BMI_test");
 			}
 			return(-1);
 		}
@@ -312,7 +313,8 @@ static int run_io_operation(
 		/* check for completion of request */
 		do
 		{
-			ret = BMI_wait(op, &outcount, &error_code, &actual_size, NULL);
+			ret = BMI_test(op, &outcount, &error_code, &actual_size,
+			NULL, 10);
 		} while(ret == 0 && outcount == 0);
 
 		if(ret < 0 || error_code != 0)
@@ -321,7 +323,7 @@ static int run_io_operation(
 			if(ret<0)
 			{
 				errno = -ret;
-				perror("BMI_wait");
+				perror("BMI_test");
 			}
 			return(-1);
 		}

@@ -71,7 +71,7 @@ int main(int argc, char **argv)
 	 */
 	do
 	{
-		ret = BMI_waitunexpected(1, &outcount, &request_info);
+		ret = BMI_testunexpected(1, &outcount, &request_info, 10);
 	}while(ret == 0 && outcount == 0);
 	if(ret < 0 || request_info.error_code != 0)
 	{

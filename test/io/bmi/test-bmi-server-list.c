@@ -77,13 +77,13 @@ int main(int argc, char **argv)	{
 	/* wait for an initial request  */
 	do
 	{
-		ret = BMI_waitunexpected(1, &outcount, &request_info);
+		ret = BMI_testunexpected(1, &outcount, &request_info, 10);
 	}while(ret == 0 && outcount == 0);
 	if(ret < 0)
 	{
 		fprintf(stderr, "Request recv failure (bad state).\n");
 		errno = -ret;
-		perror("BMI_waitunexpected");
+		perror("BMI_testunexpected");
 		return(-1);
 	}
 	if(request_info.error_code != 0)
@@ -140,7 +140,8 @@ int main(int argc, char **argv)	{
 		/* check for completion of ack send */
 		do
 		{
-			ret = BMI_wait(server_ops[1], &outcount, &error_code, &actual_size, NULL);
+			ret = BMI_test(server_ops[1], &outcount, &error_code,
+			&actual_size, NULL, 10);
 		} while(ret == 0 && outcount == 0);
 
 		if(ret < 0 || error_code != 0)
@@ -164,7 +165,8 @@ int main(int argc, char **argv)	{
 		/* check for completion of data payload recv */
 		do
 		{
-			ret = BMI_wait(server_ops[0], &outcount, &error_code, &actual_size, NULL);
+			ret = BMI_test(server_ops[0], &outcount, &error_code,
+			&actual_size, NULL, 10);
 		} while(ret == 0 && outcount == 0);
 
 		if(ret < 0 || error_code != 0)

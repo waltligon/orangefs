@@ -154,7 +154,7 @@ int main(int argc, char **argv)
 	 */
 	do
 	{
-		ret = BMI_waitunexpected(1, &outcount, &request_info);
+		ret = BMI_testunexpected(1, &outcount, &request_info, 10);
 	}while(ret == 0 && outcount == 0);
 	if(ret < 0 || request_info.error_code != 0)
 	{
@@ -314,7 +314,7 @@ static int block_on_flow(flow_descriptor* flow_d)
 
 	do
 	{
-		ret = PINT_flow_wait(flow_d, &count);
+		ret = PINT_flow_test(flow_d, &count, 10);
 	}while(ret == 0 && count == 0);
 	if(ret < 0)
 	{

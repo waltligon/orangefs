@@ -248,7 +248,7 @@ static int bmi_server(struct bench_options* opts, struct mem_buffers*
 			do
 			{
 				ret = BMI_test(bmi_id, &outcount, &error_code, &actual_size,
-					NULL);
+					NULL, 0);
 			}while(ret == 0 && outcount == 0);
 		}
 		if(ret < 0 || error_code != 0)
@@ -266,7 +266,7 @@ static int bmi_server(struct bench_options* opts, struct mem_buffers*
 			do
 			{
 				ret = BMI_test(bmi_id, &outcount, &error_code, &actual_size,
-					NULL);
+					NULL, 0);
 			}while(ret == 0 && outcount == 0);
 		}
 		if(ret < 0 || error_code != 0)
@@ -322,7 +322,7 @@ static int bmi_client(struct bench_options* opts, struct mem_buffers*
 			do
 			{
 				ret = BMI_test(bmi_id, &outcount, &error_code, &actual_size,
-					NULL);
+					NULL, 0);
 			}while(ret == 0 && outcount == 0);
 		}
 		if(ret < 0 || error_code != 0)
@@ -340,7 +340,7 @@ static int bmi_client(struct bench_options* opts, struct mem_buffers*
 			do
 			{
 				ret = BMI_test(bmi_id, &outcount, &error_code, &actual_size,
-					NULL);
+					NULL, 0);
 			}while(ret == 0 && outcount == 0);
 		}
 		if(ret < 0 || error_code != 0)

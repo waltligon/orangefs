@@ -62,23 +62,4 @@ int PINT_req_sched_testworld(
 	void** returned_user_ptr_array,
 	req_sched_error_code* out_status_array);
 
-int PINT_req_sched_wait(
-	req_sched_id in_id,
-	int* out_count_p,
-	void** returned_user_ptr_p,
-	req_sched_error_code* out_status);
-
-int PINT_req_sched_waitsome(
-	req_sched_id* in_id_array,
-	int* inout_count_p,
-	int* out_index_array,
-	void** returned_user_ptr_array,
-	req_sched_error_code* out_status_array);
-
-int PINT_req_sched_waitworld(
-	int* inout_count_p,
-	req_sched_id* out_id_array,
-	void** returned_user_ptr_array,
-	req_sched_error_code* out_status_array);
-
 #endif /* __REQUEST_SCHEDULER_H */

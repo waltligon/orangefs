@@ -104,8 +104,8 @@ int main(int argc, char **argv)	{
 		/* check for completion of request */
 		do
 		{
-			ret = BMI_wait(client_ops[1], &outcount, &error_code, 
-				&actual_size, NULL);
+			ret = BMI_test(client_ops[1], &outcount, &error_code, 
+				&actual_size, NULL, 10);
 		} while(ret == 0 && outcount == 0);
 
 		if(ret < 0 || error_code != 0)
@@ -114,7 +114,7 @@ int main(int argc, char **argv)	{
 			if(ret<0)
 			{
 				errno = -ret;
-				perror("BMI_wait");
+				perror("BMI_test");
 			}
 			goto client_exit;
 		}
@@ -135,8 +135,8 @@ int main(int argc, char **argv)	{
 		/* check for completion of ack recv */
 		do
 		{
-			ret = BMI_wait(client_ops[0], &outcount, &error_code, 
-				&actual_size, NULL);
+			ret = BMI_test(client_ops[0], &outcount, &error_code, 
+				&actual_size, NULL, 10);
 		} while(ret == 0 && outcount == 0);
 
 		if(ret < 0 || error_code != 0)
@@ -184,7 +184,8 @@ int main(int argc, char **argv)	{
 		/* check for completion of data payload send */
 		do
 		{
-			ret = BMI_wait(client_ops[0], &outcount, &error_code, &actual_size, NULL);
+			ret = BMI_test(client_ops[0], &outcount, &error_code,
+				&actual_size, NULL, 10);
 		} while(ret == 0 && outcount == 0);
 
 		if(ret < 0 || error_code != 0)

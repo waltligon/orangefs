@@ -73,18 +73,12 @@ struct bmi_method_ops
 		bmi_size_t, bmi_flag_t, bmi_msg_tag_t, void*);
 	int (*BMI_meth_post_recv)(bmi_op_id_t*, method_addr_p, void*,
 		bmi_size_t, bmi_size_t*, bmi_flag_t, bmi_msg_tag_t, void*);
-	int (*BMI_meth_wait)(bmi_op_id_t, int*, bmi_error_code_t*, bmi_size_t*, 
-		void**);
-	int (*BMI_meth_waitsome)(int, bmi_op_id_t*, int*, int*,
-		bmi_error_code_t*, bmi_size_t*, void**);
-	int (*BMI_meth_waitunexpected)(int, int*, struct
-		method_unexpected_info*);
 	int (*BMI_meth_test)(bmi_op_id_t, int*, bmi_error_code_t*, 
-		bmi_size_t*, void**);
+		bmi_size_t*, void**, int);
 	int (*BMI_meth_testsome)(int, bmi_op_id_t*, int*, int*,
-		bmi_error_code_t*, bmi_size_t*, void**);
+		bmi_error_code_t*, bmi_size_t*, void**, int);
 	int (*BMI_meth_testunexpected)(int, int*, struct
-		method_unexpected_info*);
+		method_unexpected_info*, int);
 	method_addr_p (*BMI_meth_method_addr_lookup)(const char*);
 	int (*BMI_meth_post_send_list)(bmi_op_id_t*, method_addr_p, void**, 
 		bmi_size_t*, int, bmi_size_t, bmi_flag_t, bmi_msg_tag_t, void*); 

@@ -436,10 +436,13 @@ int BMI_post_sendunexpected(bmi_op_id_t* id, bmi_addr_t dest, void* buffer,
  * returns 0 on success, -errno on failure
  */
 int BMI_test(bmi_op_id_t id, int* outcount, bmi_error_code_t* error_code, 
-	bmi_size_t* actual_size, void** user_ptr)
+	bmi_size_t* actual_size, void** user_ptr, int timeout_ms)
 {
 	struct method_op* target_op = NULL;
 	int ret = -1;
+
+	if(timeout_ms < 0)
+		return(-EINVAL);
 
 	gen_mutex_lock(&interface_mutex);
 
@@ -453,36 +456,7 @@ int BMI_test(bmi_op_id_t id, int* outcount, bmi_error_code_t* error_code,
 	}
 
 	ret = active_method_table[target_op->addr->method_type]->BMI_meth_test(id,
-		outcount, error_code, actual_size, user_ptr);
-	gen_mutex_unlock(&interface_mutex);
-	return(ret);
-}
-
-/* BMI_wait()
- * 
- * Checks to see if a particular message has completed.
- *
- * returns 0 on success, -errno on failure
- */
-int BMI_wait(bmi_op_id_t id, int* outcount, bmi_error_code_t* error_code,
-	bmi_size_t* actual_size, void** user_ptr)
-{
-	struct method_op* target_op = NULL;
-	int ret = -1;
-
-	gen_mutex_lock(&interface_mutex);
-
-	*outcount = 0;
-
-	target_op = id_gen_fast_lookup(id);
-	if(target_op->op_id != id)
-	{
-		gen_mutex_unlock(&interface_mutex);
-		return(-EINVAL);
-	}
-
-	ret = active_method_table[target_op->addr->method_type]->BMI_meth_wait(id,
-		outcount, error_code, actual_size, user_ptr);
+		outcount, error_code, actual_size, user_ptr, timeout_ms);
 	gen_mutex_unlock(&interface_mutex);
 	return(ret);
 }
@@ -498,9 +472,12 @@ int BMI_wait(bmi_op_id_t id, int* outcount, bmi_error_code_t* error_code,
 int BMI_testsome(int incount, bmi_op_id_t* id_array, int* outcount, int*
 	index_array, bmi_error_code_t* error_code_array, 
 	bmi_size_t* actual_size_array,
-	void** user_ptr_array)
+	void** user_ptr_array, int timeout_ms)
 {
 	int ret = -1;
+
+	if(timeout_ms < 0)
+		return(-EINVAL);
 
 	gen_mutex_lock(&interface_mutex);
 
@@ -508,7 +485,7 @@ int BMI_testsome(int incount, bmi_op_id_t* id_array, int* outcount, int*
 
 	ret = active_method_table[0]->BMI_meth_testsome(incount,
 		id_array, outcount, index_array, error_code_array, 
-		actual_size_array, user_ptr_array);
+		actual_size_array, user_ptr_array, timeout_ms);
 	if(ret < 0)
 	{
 		gen_mutex_unlock(&interface_mutex);
@@ -523,7 +500,7 @@ int BMI_testsome(int incount, bmi_op_id_t* id_array, int* outcount, int*
 int BMI_testsome(int incount, bmi_op_id_t* id_array, int* outcount, int*
 	index_array, bmi_error_code_t* error_code_array, 
 	bmi_size_t* actual_size_array,
-	void** user_ptr_array)
+	void** user_ptr_array, int timeout_ms)
 {
 	/* this is not going to be pretty :( */
 
@@ -541,12 +518,24 @@ int BMI_testsome(int incount, bmi_op_id_t* id_array, int* outcount, int*
 	int final_index = 0;
 	struct method_op* target_op = NULL;
 	int ret = -1;
+	int timeout_per_method = 0;
+
+	if(timeout_ms < 0)
+		return(-EINVAL);
 
 	gen_mutex_lock(&interface_mutex);
 
 	*outcount = 0;
 
 	memset(sub_incount, 0, active_method_count*sizeof(int));
+
+	/* TODO: do something more clever here */
+	if(timeout_ms)
+	{
+		timeout_per_method = timeout_ms / active_method_count;
+		if(!timeout_per_method)
+			timeout_per_method = 1;
+	}
 
 	/* look at each op */
 	for(i=0; i<incount; i++)
@@ -575,7 +564,7 @@ int BMI_testsome(int incount, bmi_op_id_t* id_array, int* outcount, int*
 			ret = active_method_table[i]->BMI_meth_testsome(sub_incount[i],
 				sub_id_array[i], &sub_outcount, sub_index_array[i], 
 				sub_error_code_array[i], sub_actual_size_array[i], 
-				sub_user_ptr_array[i]);
+				sub_user_ptr_array[i], timeout_per_method);
 			if(ret < 0)
 			{
 				/* can't recover from this */
@@ -609,125 +598,6 @@ int BMI_testsome(int incount, bmi_op_id_t* id_array, int* outcount, int*
 #endif /* __BMI_SINGLE_METHOD__ */
 
 
-/* BMI_waitsome()
- * 
- * Checks to see if any messages from the specified list have completed.
- *
- * returns 0 on success, -errno on failure
- */
-#ifdef __BMI_SINGLE_METHOD__
-int BMI_waitsome(int incount, bmi_op_id_t* id_array, int* outcount, int*
-	index_array, bmi_error_code_t* error_code_array, bmi_size_t* 
-	actual_size_array, void** user_ptr_array)
-{
-	int ret = -1;
-
-	gen_mutex_lock(&interface_mutex);
-
-	*outcount = 0;
-
-	ret = active_method_table[0]->BMI_meth_waitsome(incount,
-		id_array, outcount, index_array, error_code_array, 
-		actual_size_array, user_ptr_array);
-	if(ret < 0)
-	{
-		gen_mutex_unlock(&interface_mutex);
-		return(ret);
-	}
-
-	gen_mutex_unlock(&interface_mutex);
-	return(0);
-}
-
-#else /* not __BMI_SINGLE_METHOD__ */
-int BMI_waitsome(int incount, bmi_op_id_t* id_array, int* outcount, int*
-	index_array, bmi_error_code_t* error_code_array, bmi_size_t* 
-	actual_size_array, void** user_ptr_array)
-{
-	/* this is not going to be pretty :( */
-
-	bmi_op_id_t sub_id_array[active_method_count][incount];
-	bmi_error_code_t sub_error_code_array[active_method_count][incount];
-	int sub_index_array[active_method_count][incount];
-	void* sub_user_ptr_array[active_method_count][incount];
-	bmi_size_t sub_actual_size_array[active_method_count][incount];
-	int place_holder[active_method_count][incount];
-	int sub_incount[active_method_count];
-	int sub_outcount=0;
-	int i = 0;
-	int j = 0;
-	int mod_index = 0;
-	int final_index = 0;
-	struct method_op* target_op = NULL;
-	int ret = -1;
-
-	gen_mutex_lock(&interface_mutex);
-
-	*outcount = 0;
-
-	memset(sub_incount, 0, active_method_count*sizeof(int));
-
-	/* look at each op */
-	for(i=0; i<incount; i++)
-	{
-		if(id_array[i] != 0)
-		{
-			target_op = id_gen_fast_lookup(id_array[i]);
-			mod_index = target_op->addr->method_type;
-			if(mod_index >= active_method_count)
-			{
-				gen_mutex_unlock(&interface_mutex);
-				return(-EINVAL);
-			}
-
-			sub_id_array[mod_index][sub_incount[mod_index]] = id_array[i];
-			place_holder[mod_index][sub_incount[mod_index]] = i;
-			(sub_incount[mod_index])++;
-		}
-	}
-
-	/* call waitsome for each method which has ops in the array */
-	for(i=0; i<active_method_count; i++)
-	{
-		if(sub_incount[i] > 0)
-		{
-			ret = active_method_table[i]->BMI_meth_waitsome(sub_incount[i],
-				sub_id_array[i], &sub_outcount, sub_index_array[i], 
-				sub_error_code_array[i], sub_actual_size_array[i],
-				sub_user_ptr_array[i]);
-			if(ret < 0)
-			{
-				/* can't recover from this */
-				gossip_lerr("Error: critical BMI_waitsome failure.\n");
-				gen_mutex_unlock(&interface_mutex);
-				return(ret);
-			}
-			*outcount += sub_outcount;
-			for(j=0; j< sub_outcount; j++)
-			{
-				/* setup our answer */
-				index_array[final_index] =
-					place_holder[i][sub_index_array[i][j]];
-				error_code_array[final_index] = 
-					sub_error_code_array[i][j];
-				actual_size_array[final_index] = 
-					sub_actual_size_array[i][j];
-				if(user_ptr_array != NULL)
-				{
-					user_ptr_array[final_index] = 
-						sub_user_ptr_array[i][j];
-				}
-				final_index++;
-			}
-		}
-	}
-	
-	gen_mutex_unlock(&interface_mutex);
-	return(0);
-}
-#endif /* __BMI_SINGLE_METHOD__ */
-
-
 /* BMI_testunexpected()
  * 
  * Checks to see if any unexpected messages have completed.
@@ -735,7 +605,7 @@ int BMI_waitsome(int incount, bmi_op_id_t* id_array, int* outcount, int*
  * returns 0 on success, -errno on failure
  */
 int BMI_testunexpected(int incount, int* outcount, struct
-	unexpected_info* info_array)
+	unexpected_info* info_array, int timeout_ms)
 {
 	int i = 0;
 	int ret = -1;
@@ -743,15 +613,29 @@ int BMI_testunexpected(int incount, int* outcount, struct
 	int tmp_outcount = 0;
 	struct method_unexpected_info sub_info[incount];
 	ref_st_p tmp_ref = NULL;
+	int timeout_per_method = 0;
+
+	if(timeout_ms < 0)
+		return(-EINVAL);
 
 	gen_mutex_lock(&interface_mutex);
 
 	*outcount = 0;
 
+	/* TODO: do something more clever here */
+	if(timeout_ms)
+	{
+		timeout_per_method = timeout_ms / active_method_count;
+		if(!timeout_per_method)
+			timeout_per_method = 1;
+	}
+
 	while(position < incount && i<active_method_count)
 	{
-		ret = active_method_table[i]->BMI_meth_testunexpected((incount-position),
-			&tmp_outcount, (&(sub_info[position])));
+		ret = 
+			active_method_table[i]->BMI_meth_testunexpected((incount-position),
+			&tmp_outcount, (&(sub_info[position])),
+			timeout_per_method);
 		if(ret < 0)
 		{
 			/* can't recover from this */
@@ -784,65 +668,6 @@ int BMI_testunexpected(int incount, int* outcount, struct
 	gen_mutex_unlock(&interface_mutex);
 	return(0);
 }
-
-
-/* BMI_waitunexpected()
- * 
- * Checks to see if any unexpected messages have completed.
- *
- * returns 0 on success, -errno on failure
- */
-int BMI_waitunexpected(int incount, int* outcount, struct
-	unexpected_info* info_array)
-{
-	int i = 0;
-	int ret = -1;
-	int position = 0;
-	int tmp_outcount = 0;
-	struct method_unexpected_info sub_info[incount];
-	ref_st_p tmp_ref = NULL;
-
-	gen_mutex_lock(&interface_mutex);
-
-	*outcount = 0;
-
-	while(position < incount && i<active_method_count)
-	{
-		ret = active_method_table[i]->BMI_meth_waitunexpected((incount-position),
-			&tmp_outcount, (&(sub_info[position])));
-		if(ret < 0)
-		{
-			/* can't recover from this */
-			gossip_lerr("Error: critical BMI_waitunexpected failure.\n");
-			gen_mutex_unlock(&interface_mutex);
-			return(ret);
-		}
-		position += tmp_outcount;
-		(*outcount)+= tmp_outcount;
-		i++;
-	}
-
-	for(i=0; i<(*outcount); i++)
-	{
-		info_array[i].error_code = sub_info[i].error_code;
-		info_array[i].buffer = sub_info[i].buffer;
-		info_array[i].size = sub_info[i].size;
-		info_array[i].tag = sub_info[i].tag;
-		tmp_ref = ref_list_search_method_addr(cur_ref_list,
-			sub_info[i].addr);
-		if(!tmp_ref)
-		{
-			/* yeah, right */
-			gossip_lerr("Error: critical BMI_waitunexpected failure.\n");
-			gen_mutex_unlock(&interface_mutex);
-			return(-EPROTO);
-		}
-		info_array[i].addr = tmp_ref->bmi_addr;
-	}
-	gen_mutex_unlock(&interface_mutex);
-	return(0);
-}
-
 
 /* BMI_memalloc()
  * 

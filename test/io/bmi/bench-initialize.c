@@ -218,7 +218,7 @@ int bench_initialize_bmi_addresses_server(int num_servers, int num_clients,
 	{
 		do
 		{
-			ret = BMI_testunexpected(1, &outcount, &this_info);
+			ret = BMI_testunexpected(1, &outcount, &this_info, 0);
 		} while(ret == 0 && outcount == 0);
 		if(ret < 0)
 		{
@@ -283,7 +283,8 @@ int bench_initialize_bmi_addresses_client(int num_servers, int num_clients,
 		{
 			do
 			{
-				ret = BMI_test(bmi_id, &outcount, &error_code, &actual_size, NULL);
+				ret = BMI_test(bmi_id, &outcount, &error_code,
+					&actual_size, NULL, 0);
 			} while(ret == 0 && outcount == 0);
 		}
 		if(ret < 0 || error_code != 0)

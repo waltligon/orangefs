@@ -23,9 +23,6 @@
  *
  * SHORT TERM
  * TODO: document that this isn't thread safe
- * TODO: think about how to do waitXXX functions - maybe even get
- *  rid of them, they can't every complete unless another req
- *  scheduler function is called...
  * TODO: add some gossip calls for logging, in particular announce
  *  error (inconsistent state machine) if test calls fail
  */
@@ -75,7 +72,7 @@ struct req_sched_element
 static struct qhash_table* req_sched_table;
 
 /* queue of requests that are ready for service (in case
- * test_world or wait_world is called 
+ * test_world is called 
  */
 static QLIST_HEAD(ready_queue);
 
@@ -505,34 +502,6 @@ int PINT_req_sched_testworld(
 		(*inout_count_p)++;
 	}
 	return(0);
-}
-
-int PINT_req_sched_wait(
-	req_sched_id in_id,
-	int* out_count_p,
-	void** returned_user_ptr_p,
-	req_sched_error_code* out_status)
-{
-	return(-ENOSYS);
-}
-
-int PINT_req_sched_waitsome(
-	req_sched_id* in_id_array,
-	int* inout_count_p,
-	int* out_index_array,
-	void** returned_user_ptr_array,
-	req_sched_error_code* out_status_array)
-{
-	return(-ENOSYS);
-}
-
-int PINT_req_sched_waitworld(
-	int* inout_count_p,
-	req_sched_id* out_id_array,
-	void** returned_user_ptr_array,
-	req_sched_error_code* out_status_array)
-{
-	return(-ENOSYS);
 }
 
 /* hash_handle()

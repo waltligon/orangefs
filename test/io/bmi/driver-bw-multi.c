@@ -492,7 +492,7 @@ static int bmi_server_postall(struct bench_options* opts, struct
 			 * finished
 			 */
 			ret = BMI_testsome(num_clients, id_array, &outcount, index_array,
-				error_code_array, actual_size_array, NULL);
+				error_code_array, actual_size_array, NULL, 0);
 		}while(ret == 0 && outcount == 0);
 
 		if(ret < 0)
@@ -666,7 +666,7 @@ static int bmi_client_postall(struct bench_options* opts, struct
 			 * finished
 			 */
 			ret = BMI_testsome(num_servers, id_array, &outcount, index_array,
-				error_code_array, actual_size_array, NULL);
+				error_code_array, actual_size_array, NULL, 0);
 		}while(ret == 0 && outcount == 0);
 
 		if(ret < 0)

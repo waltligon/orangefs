@@ -50,6 +50,19 @@ static int split_string_list(char*** tokens, const char* comma_list);
 static int setup_flow_queues(void);
 static int teardown_flow_queues(void);
 
+static int flow_quick_test(
+	flow_descriptor* flow_d, 
+	int* outcount);
+static int flow_quick_testsome(
+	int incount, 
+	flow_descriptor** flow_array, 
+	int* outcount, 
+	int* index_array);
+static int flow_quick_testworld(
+	int incount, 
+	flow_descriptor** flow_array, 
+	int* outcount);
+
 /* tunable parameters */
 enum
 {
@@ -451,13 +464,13 @@ int PINT_flow_memfree(
 }
 
 
-/* PINT_flow_test()
+/* flow_quick_test()
  *
  * Instantaneous check for completion of a particular flow
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_flow_test(
+static int flow_quick_test(
 	flow_descriptor* flow_d, 
 	int* outcount)
 {
@@ -484,14 +497,14 @@ int PINT_flow_test(
 }
 
 
-/* PINT_flow_testsome()
+/* flow_quick_testsome()
  *
  * Instantaneouse check for completion of any of a specified set of
  * flows
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_flow_testsome(
+static int flow_quick_testsome(
 	int incount, 
 	flow_descriptor** flow_array, 
 	int* outcount, 
@@ -526,14 +539,14 @@ int PINT_flow_testsome(
 }
 
 
-/* PINT_flow_testworld()
+/* flow_quick_testworld()
  * 
  * Instantaneous check for completion of any flows in progress for the
  * flow interface.  This may return unexpected flows as well.
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_flow_testworld(
+static int flow_quick_testworld(
 	int incount, 
 	flow_descriptor** flow_array, 
 	int* outcount)
@@ -558,16 +571,17 @@ int PINT_flow_testworld(
 }
 
 
-/* PINT_flow_wait()
+/* PINT_flow_test()
  *
  * Check for completion of a particular flow; is allowed to do work or
  * briefly block within function
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_flow_wait(
+int PINT_flow_test(
 	flow_descriptor* flow_d, 
-	int* outcount)
+	int* outcount, 
+	int timeout_ms)
 {
 	int ret = -1;
 	int num_completed;
@@ -575,7 +589,7 @@ int PINT_flow_wait(
 	/* see if the particular flow is already finished before we do
 	 * anything
 	 */
-	ret = PINT_flow_test(flow_d, outcount);
+	ret = flow_quick_test(flow_d, outcount);
 	if(ret < 0)
 	{
 		return(ret);
@@ -585,6 +599,9 @@ int PINT_flow_wait(
 		/* done */
 		return(0);
 	}
+
+	if(timeout_ms == 0)
+		return(0);
 
 	gen_mutex_lock(&interface_mutex);
 		/* push on work for one round */
@@ -602,29 +619,30 @@ int PINT_flow_wait(
 	}
 	
 	/* check again to see if the flow finished */
-	ret = PINT_flow_test(flow_d, outcount);
+	ret = flow_quick_test(flow_d, outcount);
 	return(ret);
 }
 
 
-/* PINT_flow_waitsome()
+/* PINT_flow_testsome()
  *
  * Check for completion of any of a specified set of
  * flows; is allowed to do work or briefly block within function
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_flow_waitsome(
+int PINT_flow_testsome(
 	int incount, 
 	flow_descriptor** flow_array, 
 	int* outcount, 
-	int* index_array)
+	int* index_array, 
+	int timeout_ms)
 {
 	int ret = -1;
 	int num_completed;
 
 	/* see if any of these are already completed */
-	ret = PINT_flow_testsome(incount, flow_array, outcount, index_array);
+	ret = flow_quick_testsome(incount, flow_array, outcount, index_array);
 	if(ret < 0)
 	{
 		return(ret);
@@ -633,6 +651,9 @@ int PINT_flow_waitsome(
 	{
 		return(0);
 	}
+
+	if(timeout_ms == 0)
+		return(0);
 
 	gen_mutex_lock(&interface_mutex);
 		/* push on work for one round */
@@ -650,12 +671,12 @@ int PINT_flow_waitsome(
 	}
 
 	/* check again to see if any of the flows completed */
-	ret = PINT_flow_testsome(incount, flow_array, outcount, index_array);
+	ret = flow_quick_testsome(incount, flow_array, outcount, index_array);
 	return(ret);
 }
 
 
-/* PINT_flow_waitworld()
+/* PINT_flow_testworld()
  * 
  * Check for completion of any flows in progress for the
  * flow interface; is allowed to do work or briefly block within
@@ -663,10 +684,11 @@ int PINT_flow_waitsome(
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_flow_waitworld(
+int PINT_flow_testworld(
 	int incount, 
 	flow_descriptor** flow_array, 
-	int* outcount)
+	int* outcount,
+	int timeout_ms)
 {
 	flow_descriptor* flow_d = NULL;
 	int num_completed = 0;
@@ -675,6 +697,9 @@ int PINT_flow_waitworld(
 	gen_mutex_lock(&interface_mutex);
 
 	*outcount = 0;
+
+	if(timeout_ms == 0 && flow_queue_empty(completion_queue))
+		return(0);
 
 	/* do some work if the completion queue is empty */
 	if(flow_queue_empty(completion_queue))

@@ -40,19 +40,13 @@ int BMI_tcp_post_recv(bmi_op_id_t* id, method_addr_p src, void* buffer,
 	bmi_size_t expected_size, bmi_size_t* actual_size, bmi_flag_t 
 	buffer_flag, bmi_msg_tag_t tag, void* user_ptr);
 int BMI_tcp_test(bmi_op_id_t id, int* outcount, bmi_error_code_t*
-	error_code, bmi_size_t* actual_size, void** user_ptr);
+	error_code, bmi_size_t* actual_size, void** user_ptr,
+	int timeout_ms);
 int BMI_tcp_testsome(int incount, bmi_op_id_t* id_array, int* outcount,
 	int* index_array, bmi_error_code_t* error_code_array, bmi_size_t*
-	actual_size_array, void** user_ptr_array);
+	actual_size_array, void** user_ptr_array, int timeout_ms);
 int BMI_tcp_testunexpected(int incount, int* outcount, struct
-	method_unexpected_info* info);
-int BMI_tcp_wait(bmi_op_id_t id, int* outcount, bmi_error_code_t*
-	error_code, bmi_size_t* actual_size, void** user_ptr);
-int BMI_tcp_waitsome(int incount, bmi_op_id_t* id_array, int* outcount,
-	int* index_array, bmi_error_code_t* error_code_array, bmi_size_t*
-	actual_size_array, void** user_ptr_array);
-int BMI_tcp_waitunexpected(int incount, int* outcount, struct
-	method_unexpected_info* info);
+	method_unexpected_info* info, int timeout_ms);
 method_addr_p BMI_tcp_method_addr_lookup(const char* id_string);
 int BMI_tcp_post_send_list(bmi_op_id_t* id, method_addr_p dest,
 	void** buffer_list, bmi_size_t* size_list, int list_count,
@@ -125,14 +119,6 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t* id, method_addr_p dest,
 	void** buffer_list, bmi_size_t* size_list, int list_count, 
 	bmi_flag_t buffer_flag, struct tcp_msg_header my_header, void* 
 	user_ptr, int free_lists_flag);
-static int tcp_generic_testwait(bmi_op_id_t id, int* outcount, 
-	bmi_error_code_t* error_code, bmi_size_t* actual_size, void** user_ptr, 
-	int wait_time);
-static int tcp_generic_testwaitsome(int incount, bmi_op_id_t* id_array, 
-	int* outcount, int* index_array, bmi_error_code_t* error_code_array, 
-	bmi_size_t* actual_size_array, void** user_ptr_array, int wait_time);
-static int tcp_generic_testwaitunexpected(int incount, int* outcount,
-	struct method_unexpected_info* info, int wait_time);
 static int hash_op_id(void* id, int table_size);
 static int hash_op_id_compare(void* key, struct qlist_head* link);
 static int tcp_post_recv_generic(bmi_op_id_t* id, method_addr_p src,
@@ -154,9 +140,6 @@ struct bmi_method_ops bmi_tcp_ops =
 	BMI_tcp_post_send,
 	BMI_tcp_post_sendunexpected,
 	BMI_tcp_post_recv,
-	BMI_tcp_wait,
-	BMI_tcp_waitsome,
-	BMI_tcp_waitunexpected,
 	BMI_tcp_test,
 	BMI_tcp_testsome,
 	BMI_tcp_testunexpected,
@@ -712,25 +695,22 @@ int BMI_tcp_post_recv(bmi_op_id_t* id, method_addr_p src, void* buffer,
  *
  * returns 0 on success, -errno on failure
  */
-int BMI_tcp_test(bmi_op_id_t id, int* outcount, bmi_error_code_t*
-	error_code, bmi_size_t* actual_size, void** user_ptr)
+int BMI_tcp_test(bmi_op_id_t id, int* outcount, bmi_error_code_t* 
+	error_code, bmi_size_t* actual_size, void** user_ptr, 
+	int wait_time)
 {
-	return(tcp_generic_testwait(id, outcount, error_code, actual_size, 
-		user_ptr, 0));
-}
+	int ret = -1;
 
-/* BMI_tcp_wait()
- * 
- * Checks to see if a particular message has completed.  Will briefly
- * block even if there is initially nothing to do.
- *
- * returns 0 on success, -errno on failure
- */
-int BMI_tcp_wait(bmi_op_id_t id, int* outcount, bmi_error_code_t*
-	error_code, bmi_size_t* actual_size, void** user_ptr)
-{
-	return(tcp_generic_testwait(id, outcount, error_code, actual_size, user_ptr,
-		TCP_WAIT_METRIC));
+	/* do some ``real work'' here */
+	ret = tcp_do_work(wait_time);
+	if(ret < 0)
+	{
+		return(ret);
+	}
+
+	ret = test_done(id, outcount, error_code, actual_size, user_ptr);
+
+	return(ret);
 }
 
 /* BMI_tcp_testsome()
@@ -739,29 +719,25 @@ int BMI_tcp_wait(bmi_op_id_t id, int* outcount, bmi_error_code_t*
  *
  * returns 0 on success, -errno on failure
  */
-int BMI_tcp_testsome(int incount, bmi_op_id_t* id_array, int* outcount, int*
-	index_array, bmi_error_code_t* error_code_array, bmi_size_t* actual_size_array,
-	void** user_ptr_array)
+int BMI_tcp_testsome(int incount, bmi_op_id_t* id_array, 
+	int* outcount, int* index_array, bmi_error_code_t* error_code_array,
+	bmi_size_t* actual_size_array, void** user_ptr_array, int wait_time)
 {
-	return(tcp_generic_testwaitsome(incount, id_array, outcount,
-		index_array, error_code_array, actual_size_array, user_ptr_array, 0));
+	int ret = -1;
+
+	/* do some ``real work'' here */
+	ret = tcp_do_work(wait_time);
+	if(ret < 0)
+	{
+		return(ret);
+	}
+
+	ret = test_done_some(incount, id_array, outcount, index_array,
+		error_code_array, actual_size_array, user_ptr_array);
+
+	return(ret);
 }
 
-/* BMI_tcp_waitsome()
- * 
- * Checks to see if any messages from the specified list have completed.
- * Will briefly block even if there is initially nothing to do
- *
- * returns 0 on success, -errno on failure
- */
-int BMI_tcp_waitsome(int incount, bmi_op_id_t* id_array, int* outcount, int*
-	index_array, bmi_error_code_t* error_code_array, bmi_size_t* 
-	actual_size_array, void** user_ptr_array)
-{
-	return(tcp_generic_testwaitsome(incount, id_array, outcount,
-		index_array, error_code_array, actual_size_array, user_ptr_array, 
-		TCP_WAIT_METRIC));
-}
 
 /* BMI_tcp_testunexpected()
  * 
@@ -770,24 +746,22 @@ int BMI_tcp_waitsome(int incount, bmi_op_id_t* id_array, int* outcount, int*
  * returns 0 on success, -errno on failure
  */
 int BMI_tcp_testunexpected(int incount, int* outcount, struct
-	method_unexpected_info* info)
+	method_unexpected_info* info, int wait_time)
 {
-	return(tcp_generic_testwaitunexpected(incount, outcount, info, 0));
+	int ret = -1;
+
+	/* do some ``real work'' here */
+	ret = tcp_do_work(wait_time);
+	if(ret < 0)
+	{
+		return(ret);
+	}
+
+	ret = test_done_unexpected(incount, outcount, info);
+
+	return(ret);
 }
 
-/* BMI_tcp_waitunexpected()
- * 
- * Checks to see if any unexpected messages have completed.  Will
- * briefly block even if there is initiallly nothing to do.
- *
- * returns 0 on success, -errno on failure
- */
-int BMI_tcp_waitunexpected(int incount, int* outcount, struct
-	method_unexpected_info* info)
-{
-	return(tcp_generic_testwaitunexpected(incount, outcount, info,
-		TCP_WAIT_METRIC));
-}
 
 /* BMI_tcp_post_send_list()
  *
@@ -2502,79 +2476,6 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t* id, method_addr_p dest,
 		dest, buffer_list, size_list, list_count, amt_complete, 
 		sizeof(struct tcp_msg_header), 1, id, BMI_TCP_INPROGRESS, 
 		my_header, user_ptr, free_lists_flag, my_header.size, 0);
-
-	return(ret);
-}
-
-
-/* tcp_generic_testwait()
- * 
- * Checks to see if a particular message has completed.
- *
- * returns 0 on success, -errno on failure
- */
-static int tcp_generic_testwait(bmi_op_id_t id, int* outcount, 
-	bmi_error_code_t* error_code, bmi_size_t* actual_size, void** user_ptr, 
-	int wait_time)
-{
-	int ret = -1;
-
-	/* do some ``real work'' here */
-	ret = tcp_do_work(wait_time);
-	if(ret < 0)
-	{
-		return(ret);
-	}
-
-	ret = test_done(id, outcount, error_code, actual_size, user_ptr);
-
-	return(ret);
-}
-
-/* tcp_generic_testwaitsome()
- * 
- * Checks to see if any messages from the specified list have completed.
- *
- * returns 0 on success, -errno on failure
- */
-static int tcp_generic_testwaitsome(int incount, bmi_op_id_t* id_array, 
-	int* outcount, int* index_array, bmi_error_code_t* error_code_array,
-	bmi_size_t* actual_size_array, void** user_ptr_array, int wait_time)
-{
-	int ret = -1;
-
-	/* do some ``real work'' here */
-	ret = tcp_do_work(wait_time);
-	if(ret < 0)
-	{
-		return(ret);
-	}
-
-	ret = test_done_some(incount, id_array, outcount, index_array,
-		error_code_array, actual_size_array, user_ptr_array);
-
-	return(ret);
-}
-
-/* tcp_generic_testwaitunexpected()
- * 
- * Checks to see if any unexpected messages have completed.
- *
- * returns 0 on success, -errno on failure
- */
-static int tcp_generic_testwaitunexpected(int incount, int* outcount, struct
-	method_unexpected_info* info, int wait_time)
-{
-	int ret = -1;
-
-	/* do some ``real work'' here */
-	ret = tcp_do_work(wait_time);
-	if(ret < 0)
-	{
-		return(ret);
-	}
-
-	ret = test_done_unexpected(incount, outcount, info);
 
 	return(ret);
 }

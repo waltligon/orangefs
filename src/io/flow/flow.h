@@ -182,32 +182,20 @@ int PINT_flow_memfree(
 
 int PINT_flow_test(
 	flow_descriptor* flow_d, 
-	int* outcount);
+	int* outcount,
+	int timeout_ms);
 
 int PINT_flow_testsome(int incount, 
 	flow_descriptor** flow_array, 
 	int* outcount, 
-	int* index_array);
+	int* index_array,
+	int timeout_ms);
 
 int PINT_flow_testworld(
 	int incount, 
 	flow_descriptor** flow_array, 
-	int* outcount);
-
-int PINT_flow_wait(
-	flow_descriptor* flow_d, 
-	int* outcount);
-
-int PINT_flow_waitsome(
-	int incount, 
-	flow_descriptor** flow_array, 
-	int* outcount, 
-	int* index_array);
-
-int PINT_flow_waitworld(
-	int incount, 
-	flow_descriptor** flow_array, 
-	int* outcount);
+	int* outcount,
+	int timeout_ms);
 
 int PINT_flow_setinfo(flow_descriptor* flow_d, 
 	int option, 

@@ -43,8 +43,8 @@ int send_msg(bmi_op_id_t i,
 		/* check for completion of request */
 		do
 		{
-			ret = BMI_wait(i, &outcount, &error_code, &actual_size,
-					&u2);
+			ret = BMI_test(i, &outcount, &error_code, &actual_size,
+					&u2, 10);
 		} while(ret == 0 && outcount == 0);
 
 		if(ret < 0 || error_code != 0)
@@ -53,7 +53,7 @@ int send_msg(bmi_op_id_t i,
 			if(ret<0)
 			{
 				errno = -ret;
-				perror("BMI_wait");
+				perror("BMI_test");
 			}
 			return(-1);
 		}
@@ -104,8 +104,8 @@ int recv_msg(bmi_op_id_t i,
 		/* check for completion of ack recv */
 		do
 		{
-			ret = BMI_wait(i, &outcount, &error_code,
-				&actual_size, &out_test_user_ptr);
+			ret = BMI_test(i, &outcount, &error_code,
+				&actual_size, &out_test_user_ptr, 10);
 		} while(ret == 0 && outcount == 0);
 
 		if(ret < 0 || error_code != 0)

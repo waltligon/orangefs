@@ -64,7 +64,8 @@ int BMI_test(
 	int* outcount, 
 	bmi_error_code_t* error_code,
 	bmi_size_t* actual_size, 
-	void** user_ptr);
+	void** user_ptr,
+	int timeout_ms);
 
 int BMI_testsome(
 	int incount, 
@@ -73,33 +74,14 @@ int BMI_testsome(
 	int* index_array, 
 	bmi_error_code_t* error_code_array, 
 	bmi_size_t* actual_size_array, 
-	void** user_ptr_array);
+	void** user_ptr_array,
+	int timeout_ms);
 
 int BMI_testunexpected(
 	int incount, 
 	int* outcount, 
-	struct unexpected_info* info_array);
-
-int BMI_wait(
-	bmi_op_id_t id, 
-	int* outcount, 
-	bmi_error_code_t* error_code,
-	bmi_size_t* actual_size, 
-	void** user_ptr);
-
-int BMI_waitsome(
-	int incount, 
-	bmi_op_id_t* id_array, 
-	int* outcount, 
-	int* index_array, 
-	bmi_error_code_t* error_code_array, 
-	bmi_size_t* actual_size_array, 
-	void** user_ptr_array);
-
-int BMI_waitunexpected(
-	int incount, 
-	int* outcount, 
-	struct unexpected_info* info_array);
+	struct unexpected_info* info_array,
+	int timeout_ms);
 
 void* BMI_memalloc(
 	bmi_addr_t addr, 

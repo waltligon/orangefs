@@ -525,7 +525,7 @@ int flowproto_bmi_trove_checkworld(
 		/* test for completion */
 		ret = BMI_testsome(bmi_count, bmi_op_array, &bmi_outcount,
 			bmi_index_array, bmi_error_code_array, bmi_actualsize_array,
-			bmi_usrptr_array);
+			bmi_usrptr_array, 0);
 		if(ret < 0)
 		{
 			return(ret);

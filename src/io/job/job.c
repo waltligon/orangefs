@@ -520,7 +520,7 @@ int job_bmi_unexp(
 	jd->job_user_ptr = user_ptr;
 	jd->u.bmi_unexp.info = bmi_unexp_d;
 
-	ret = BMI_testunexpected(1, &outcount, jd->u.bmi_unexp.info);
+	ret = BMI_testunexpected(1, &outcount, jd->u.bmi_unexp.info, 0);
 	
 	if(ret < 0)
 	{
@@ -2389,16 +2389,16 @@ static int do_one_work_cycle_bmi(int* num_completed, int wait_flag)
 	if(wait_flag)
 	{
 		/* nothing else going on, we can afford to wait */
-		ret = BMI_waitsome(incount, stat_bmi_id_array, &outcount,
+		ret = BMI_testsome(incount, stat_bmi_id_array, &outcount,
 			stat_bmi_index_array, stat_bmi_error_code_array,
-			stat_bmi_actual_size_array, stat_bmi_user_ptr_array);
+			stat_bmi_actual_size_array, stat_bmi_user_ptr_array, 10);
 	}
 	else
 	{
 		/* just test */
 		ret = BMI_testsome(incount, stat_bmi_id_array, &outcount,
 			stat_bmi_index_array, stat_bmi_error_code_array,
-			stat_bmi_actual_size_array, stat_bmi_user_ptr_array);
+			stat_bmi_actual_size_array, stat_bmi_user_ptr_array, 0);
 	}
 
 	if(ret < 0)
@@ -2464,11 +2464,13 @@ static int do_one_work_cycle_bmi_unexp(int* num_completed, int wait_flag)
 
 	if(wait_flag)
 	{
-		ret = BMI_waitunexpected(incount, &outcount, stat_bmi_unexp_array);
+		ret = BMI_testunexpected(incount, &outcount,
+			stat_bmi_unexp_array, 10);
 	}
 	else
 	{
-		ret = BMI_waitunexpected(incount, &outcount, stat_bmi_unexp_array);
+		ret = BMI_testunexpected(incount, &outcount,
+		stat_bmi_unexp_array, 0);
 	}
 
 	if(ret < 0)
@@ -2530,8 +2532,8 @@ static int do_one_work_cycle_flow(int* num_completed)
 	gen_mutex_unlock(&flow_mutex);
 	incount = offset;
 
-	ret = PINT_flow_waitsome(incount, stat_flow_array, &outcount,
-		stat_flow_index_array);
+	ret = PINT_flow_testsome(incount, stat_flow_array, &outcount,
+		stat_flow_index_array, 10);
 	if(ret < 0)
 	{
 		/* critical failure */

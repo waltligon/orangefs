@@ -81,7 +81,7 @@ int main(int argc, char **argv)
 		/* wait for a request via BMI */
 		do
 		{
-			ret = BMI_waitunexpected(1, &outcount, &request_info);
+			ret = BMI_testunexpected(1, &outcount, &request_info, 10);
 		}while(ret == 0 && outcount == 0);
 		if(ret < 0 || request_info.error_code != 0)
 		{
@@ -176,7 +176,8 @@ int main(int argc, char **argv)
 			/* check for completion of request */
 			do
 			{
-				ret = BMI_wait(op, &outcount, &error_code, &actual_size, NULL);
+				ret = BMI_test(op, &outcount, &error_code,
+				&actual_size, NULL, 10);
 			} while(ret == 0 && outcount == 0);
 
 			if(ret < 0 || error_code != 0)
@@ -185,7 +186,7 @@ int main(int argc, char **argv)
 				if(ret<0)
 				{
 					errno = -ret;
-					perror("BMI_wait");
+					perror("BMI_test");
 				}
 				return(-1);
 			}
@@ -282,7 +283,7 @@ static int block_on_flow(flow_descriptor* flow_d)
 
 	do
 	{
-		ret = PINT_flow_wait(flow_d, &count);
+		ret = PINT_flow_test(flow_d, &count, 10);
 	}while(ret == 0 && count == 0);
 	if(ret < 0)
 	{

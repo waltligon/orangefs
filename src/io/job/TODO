@@ -2,6 +2,10 @@
 general
 ==========================================
 
+- go back to everywhere that BMI_testXXX is called and do the
+  right thing with the timeout flag (for now it is simply set to
+  10 or 0 milliseconds in different cases)
+
 - switch to using trove_testsome() instead of trove_test() once it is
   avaiable.
 
