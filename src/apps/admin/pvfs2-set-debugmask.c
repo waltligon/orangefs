@@ -206,6 +206,7 @@ static void usage(int argc, char** argv)
         if ((i % 4) == 0)
             fprintf(stderr,"\n");
     }
+    fprintf(stderr, "\n");
 
     return;
 }
