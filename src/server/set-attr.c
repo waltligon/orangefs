@@ -421,6 +421,8 @@ static int setattr_write_metafile_distribution(PINT_server_op *s_op, job_status_
     s_op->val.buffer    = s_op->req->u.setattr.attr.u.meta.dist;
     s_op->val.buffer_sz = s_op->req->u.setattr.attr.u.meta.dist_size;
 
+
+#if 0
     gossip_debug(SERVER_DEBUG,
 		 "  writing distribution (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = 0x%08x (%d))\n",
 		 s_op->req->u.setattr.fs_id,
@@ -430,7 +432,6 @@ static int setattr_write_metafile_distribution(PINT_server_op *s_op, job_status_
 		 (unsigned) s_op->val.buffer,
 		 s_op->val.buffer_sz);
 
-#if 0
     job_post_ret = job_trove_keyval_write(s_op->req->u.setattr.fs_id,
 					  s_op->req->u.setattr.handle,
 					  &(s_op->key),
@@ -460,63 +461,42 @@ static int setattr_write_metafile_distribution(PINT_server_op *s_op, job_status_
 
 static int setattr_send_bmi(PINT_server_op *s_op, job_status_s *ret)
 {
-
     int job_post_ret=0;
     job_id_t i;
 
-    /* Prepare the message */
+    gossip_ldebug(SERVER_DEBUG, "setattr state: setattr_send_bmi\n");
 
+    /* Prepare the message */
     s_op->resp->u.generic.handle = s_op->req->u.setattr.handle;
     s_op->resp->status = ret->error_code;
-    gossip_ldebug(SERVER_DEBUG,"Returning Status %d\n",ret->error_code);
+
+    gossip_debug(SERVER_DEBUG,"  Returning Status %d\n",ret->error_code);
+
     s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
     
     s_op->encoded.dest = s_op->addr;
 
     job_post_ret = PINT_encode(s_op->resp,
-	    PINT_ENCODE_RESP,
-	    &(s_op->encoded),
-	    s_op->addr,
-	    s_op->enc_type);
+			       PINT_ENCODE_RESP,
+			       &(s_op->encoded),
+			       s_op->addr,
+			       s_op->enc_type);
 
     assert(job_post_ret == 0);
     
     /* Post message */
-
-#ifdef PVFS2_SERVER_DEBUG_BMI
-
     job_post_ret = job_bmi_send_list(
-	    s_op->addr,
-	    s_op->encoded.buffer_list,
-	    s_op->encoded.size_list,
-	    s_op->encoded.list_count,
-	    s_op->encoded.total_size,
-	    s_op->tag,
-	    s_op->encoded.buffer_flag,
-	    0,
-	    s_op, 
-	    ret, 
-	    &i);
-
-#else
-
-    job_post_ret = job_bmi_send(
-	    s_op->addr,
-	    s_op->encoded.buffer_list[0],
-	    s_op->encoded.total_size,
-	    s_op->tag,
-#ifdef PVFS2_SERVER_DEBUG_BMI
-	    s_op->encoded.buffer_flag,
-#else
-	    0,
-#endif
-	    0,
-	    s_op,
-	    ret,
-	    &i);
-
-#endif
-
+				     s_op->addr,
+				     s_op->encoded.buffer_list,
+				     s_op->encoded.size_list,
+				     s_op->encoded.list_count,
+				     s_op->encoded.total_size,
+				     s_op->tag,
+				     s_op->encoded.buffer_flag,
+				     0,
+				     s_op, 
+				     ret, 
+				     &i);
 
     return(job_post_ret);
 
@@ -544,9 +524,9 @@ static int setattr_release_posted_job(PINT_server_op *s_op, job_status_s *ret)
     job_id_t i;
 
     job_post_ret = job_req_sched_release(s_op->scheduled_id,
-	    s_op,
-	    ret,
-	    &i);
+					 s_op,
+					 ret,
+					 &i);
     return job_post_ret;
 }
 
@@ -566,30 +546,19 @@ static int setattr_release_posted_job(PINT_server_op *s_op, job_status_s *ret)
 static int setattr_cleanup(PINT_server_op *s_op, job_status_s *ret)
 {
 
-    PINT_encode_release(&(s_op->encoded),PINT_ENCODE_RESP,0);
+    gossip_debug(SERVER_DEBUG, "setattr state: setattr_cleanup\n");
+
+    /* free decoded, encoded requests */
     PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ,0);
+    free(s_op->unexp_bmi_buff.buffer);
 
-    /*
-    if(s_op->val.buffer)
-    {
-	free(s_op->val.buffer);
-    }
-    */
+    /* free encoded response */
+    PINT_encode_release(&(s_op->encoded),PINT_ENCODE_RESP,0);
 
-    if(s_op->resp)
-    {
-	free(s_op->resp);
-    }
+    /* free original response */
+    free(s_op->resp);
 
-    /*
-    BMI_memfree(
-	    s_op->addr,
-	    s_op->req,
-	    s_op->unexp_bmi_buff->size,
-	    BMI_RECV_BUFFER
-	    );
-    */
-
+    /* free server operation structure */
     free(s_op);
 
     return(0);
