@@ -140,11 +140,31 @@ typedef struct
     sector_t last_failed_block_index_read;
 } pvfs2_inode_t;
 
+/*
+  these are the available mount options that we accept:
+
+  for now, the root handle and collection id are specified as mount
+  options.  it may seem extraneous since we have these stored in the
+  sb private info, but this is mostly for compatibility in case one
+  day these are not passed as mount options.
+
+  the intr option is inspired by the nfs intr option that interrupts
+  the operation in progress if a signal is received if set, and
+  ignores the signal otherwise.  THIS IS NOT YET SUPPORTED.
+*/
+typedef struct
+{
+    PVFS_handle root_handle;
+    PVFS_fs_id coll_id;
+    int intr;
+} pvfs2_mount_options_t;
+
 /* per superblock private pvfs2 info */
 typedef struct
 {
-    PVFS_handle handle;
-    PVFS_fs_id fs_id;
+    PVFS_handle root_handle;
+    PVFS_fs_id coll_id;
+    pvfs2_mount_options_t mnt_options;
 } pvfs2_sb_info;
 
 /*

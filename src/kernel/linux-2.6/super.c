@@ -134,7 +134,7 @@ static int pvfs2_statfs(
     pvfs2_kernel_op_t *new_op = NULL;
 
     pvfs2_print("pvfs2_: pvfs2_statfs called on sb %p "
-                "(fs_id is %d)\n", sb, (int)(PVFS2_SB(sb)->fs_id));
+                "(fs_id is %d)\n", sb, (int)(PVFS2_SB(sb)->coll_id));
 
     new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
     if (!new_op)
@@ -143,7 +143,7 @@ static int pvfs2_statfs(
 	return ret;
     }
     new_op->upcall.type = PVFS2_VFS_OP_STATFS;
-    new_op->upcall.req.statfs.fs_id = PVFS2_SB(sb)->fs_id;
+    new_op->upcall.req.statfs.fs_id = PVFS2_SB(sb)->coll_id;
 
     service_operation_with_timeout_retry(
         new_op, "pvfs2_statfs", retries);
@@ -212,17 +212,101 @@ struct super_operations pvfs2_s_ops =
 
 static struct export_operations pvfs2_export_ops = { };
 
+static int parse_mount_options(
+    char *option_str, struct super_block *sb, int silent)
+{
+    int ret = -EINVAL;
+    char *options = option_str;
+    pvfs2_sb_info *pvfs2_sb = NULL;
+
+    if (!silent)
+    {
+        pvfs2_print("pvfs2: parse_mount_options called with:\n");
+        pvfs2_print(" %s\n", options);
+    }
+
+    if (options && sb)
+    {
+        pvfs2_sb = PVFS2_SB(sb);
+        memset(&pvfs2_sb->mnt_options, 0, sizeof(pvfs2_mount_options_t));
+
+        if (!options || (strncmp(options, "coll_id=", 8) != 0))
+        {
+            pvfs2_error("pvfs2: Invalid coll_id specification %s\n",
+                        option_str);
+            return ret;
+        }
+        options += 8;
+        pvfs2_sb->mnt_options.coll_id =
+            simple_strtoul(options, &options, 0);
+
+        if (*options && (*options != ','))
+        {
+            pvfs2_error("pvfs2: Invalid coll_id specification %s\n",
+                        option_str);
+            return ret;
+        }
+
+        if (*options == ',')
+        {
+            options++;
+        }
+
+        if (!options || (strncmp(options, "root_handle=", 12) != 0))
+        {
+            pvfs2_print("pvfs2: Invalid root_handle specification\n");
+            return ret;
+        }
+        options += 12;
+        pvfs2_sb->mnt_options.root_handle =
+            simple_strtoul(options, &options, 0);
+
+        if (*options == ',')
+        {
+            options++;
+        }
+
+        /* handle misc trailing mount options here */
+        if (options && (strncmp(options, "intr", 4) == 0))
+        {
+            if (!silent)
+            {
+                pvfs2_print("pvfs2: mount option intr specified\n");
+            }
+            pvfs2_sb->mnt_options.intr = 1;
+        }
+
+        if ((pvfs2_sb->mnt_options.coll_id == 0) ||
+            (pvfs2_sb->mnt_options.root_handle == 0))
+        {
+            pvfs2_error("pvfs2: Invalid coll_id or root_handle "
+                        "specification: %s\n", option_str);
+            return ret;
+        }
+        else
+        {
+            if (!silent)
+            {
+                pvfs2_print(
+                    "pvfs2: got coll_id %d | root_handle %Lu | "
+                    "intr? %s\n", (int)pvfs2_sb->mnt_options.coll_id,
+                    Lu(pvfs2_sb->mnt_options.root_handle),
+                    (pvfs2_sb->mnt_options.intr ? "yes" : "no"));
+            }
+            ret = 0;
+        }
+    }
+    return ret;
+}
+
 int pvfs2_fill_sb(
     struct super_block *sb,
     void *data,
     int silent)
 {
-    int shift_val = 0;
+    int ret = -EINVAL, shift_val = 0;
     struct inode *root = NULL;
     struct dentry *root_dentry = NULL;
-    char *options = (char *)data;
-    unsigned long coll_id = 0;
-    unsigned long root_handle = 0;
 
     /* alloc and init our private pvfs2 sb info */
     sb->s_fs_info = kmalloc(sizeof(pvfs2_sb_info), PVFS2_GFP_FLAGS);
@@ -231,48 +315,14 @@ int pvfs2_fill_sb(
 	return -ENOMEM;
     }
 
-    if (!silent)
+    ret = parse_mount_options((char *)data, sb, silent);
+    if (ret)
     {
-        pvfs2_print("pvfs2_fill_sb: called with coll_id %s\n", options);
+        return ret;
     }
 
-    if (!options || (strncmp(options, "coll_id=", 8) != 0))
-    {
-	pvfs2_print("pvfs2_fill_sb called with invalid coll_id\n");
-        return -EINVAL;
-    }
-    options += 8;
-    coll_id = simple_strtoul(options, &options, 0);
-    if (*options && (*options != ','))
-    {
-        pvfs2_error("pvfs2: Invalid coll_id specification %s\n",
-                    (char *)data);
-        return -EINVAL;
-    }
-    if (*options == ',')
-    {
-        options++;
-    }
-
-    if (!options || (strncmp(options, "root_handle=", 12) != 0))
-    {
-	pvfs2_print("pvfs2_fill_sb called with invalid root_handle\n");
-        return 1;
-    }
-    options += 12;
-    root_handle = simple_strtoul(options, &options, 0);
-
-    if ((coll_id == 0) || (root_handle == 0))
-    {
-        pvfs2_error("pvfs2: Invalid coll_id or root_handle "
-                    "specification %s\n", (char *)data);
-        return 1;
-    }
-    else if (!silent)
-    {
-        pvfs2_print("pvfs2: got coll_id %lu | root_handle %lu\n",
-                    coll_id, root_handle);
-    }
+    PVFS2_SB(sb)->root_handle = PVFS2_SB(sb)->mnt_options.root_handle;
+    PVFS2_SB(sb)->coll_id = PVFS2_SB(sb)->mnt_options.coll_id;
 
     sb->s_magic = PVFS2_MAGIC;
     sb->s_op = &pvfs2_s_ops;
@@ -301,12 +351,9 @@ int pvfs2_fill_sb(
     {
 	return -ENOMEM;
     }
-    root->i_ino = (ino_t)root_handle;
-    PVFS2_I(root)->refn.handle = (PVFS_handle)root_handle;
-    PVFS2_I(root)->refn.fs_id = (PVFS_fs_id)coll_id;
-
-    PVFS2_SB(sb)->handle = PVFS2_I(root)->refn.handle;
-    PVFS2_SB(sb)->fs_id = PVFS2_I(root)->refn.fs_id;
+    root->i_ino = (ino_t)PVFS2_SB(sb)->root_handle;
+    PVFS2_I(root)->refn.handle = PVFS2_SB(sb)->root_handle;
+    PVFS2_I(root)->refn.fs_id = PVFS2_SB(sb)->coll_id;
 
     /* allocates and places root dentry in dcache */
     root_dentry = d_alloc_root(root);

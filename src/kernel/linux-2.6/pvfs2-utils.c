@@ -367,7 +367,7 @@ int pvfs2_inode_getattr(
 	}
 	if (pvfs2_inode->refn.fs_id == 0)
 	{
-	    pvfs2_inode->refn.fs_id = PVFS2_SB(inode->i_sb)->fs_id;
+	    pvfs2_inode->refn.fs_id = PVFS2_SB(inode->i_sb)->coll_id;
 	}
 
 	/*
@@ -445,9 +445,9 @@ int pvfs2_inode_setattr(
         {
             struct super_block *sb = inode->i_sb;
             new_op->upcall.req.lookup.parent_refn.handle =
-                PVFS2_SB(sb)->handle;
+                PVFS2_SB(sb)->root_handle;
             new_op->upcall.req.lookup.parent_refn.fs_id =
-                PVFS2_SB(sb)->fs_id;
+                PVFS2_SB(sb)->coll_id;
         }
         copy_attributes_from_inode(
             inode, &new_op->upcall.req.setattr.attributes, iattr);
@@ -501,7 +501,7 @@ static inline struct inode *pvfs2_create_file(
 	    new_op->upcall.req.create.parent_refn.handle =
 		pvfs2_ino_to_handle(dir->i_ino);
 	    new_op->upcall.req.create.parent_refn.fs_id =
-		PVFS2_SB(dir->i_sb)->fs_id;
+		PVFS2_SB(dir->i_sb)->coll_id;
 	}
         copy_attributes_from_inode(
             inode, &new_op->upcall.req.create.attributes, NULL);
@@ -600,7 +600,7 @@ static inline struct inode *pvfs2_create_dir(
 	    new_op->upcall.req.mkdir.parent_refn.handle =
 		pvfs2_ino_to_handle(dir->i_ino);
 	    new_op->upcall.req.mkdir.parent_refn.fs_id =
-		PVFS2_SB(dir->i_sb)->fs_id;
+		PVFS2_SB(dir->i_sb)->coll_id;
 	}
         copy_attributes_from_inode(
             inode, &new_op->upcall.req.mkdir.attributes, NULL);
@@ -700,7 +700,7 @@ static inline struct inode *pvfs2_create_symlink(
 	    new_op->upcall.req.sym.parent_refn.handle =
 		pvfs2_ino_to_handle(dir->i_ino);
 	    new_op->upcall.req.sym.parent_refn.fs_id =
-		PVFS2_SB(dir->i_sb)->fs_id;
+		PVFS2_SB(dir->i_sb)->coll_id;
 	}
         copy_attributes_from_inode(
             inode, &new_op->upcall.req.sym.attributes, NULL);
@@ -835,7 +835,7 @@ int pvfs2_remove_entry(
 	    new_op->upcall.req.remove.parent_refn.handle =
 		pvfs2_ino_to_handle(dir->i_ino);
 	    new_op->upcall.req.remove.parent_refn.fs_id =
-		PVFS2_SB(dir->i_sb)->fs_id;
+		PVFS2_SB(dir->i_sb)->coll_id;
 	}
 	strncpy(new_op->upcall.req.remove.d_name,
 		dentry->d_name.name, PVFS2_NAME_LEN);
