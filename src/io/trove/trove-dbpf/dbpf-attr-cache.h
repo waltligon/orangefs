@@ -82,6 +82,13 @@ int dbpf_attr_cache_ds_attr_update_cached_data_bsize(
     TROVE_object_ref key, PVFS_size b_size);
 
 /*
+  do an atomic update of the attr's k_size in the cache
+  for this key
+*/
+int dbpf_attr_cache_ds_attr_update_cached_data_ksize(
+    TROVE_object_ref key, PVFS_size k_size);
+
+/*
   do an atomic copy of the cached attributes into the provided
   target_ds_attr object based on the specified key
 */

@@ -227,6 +227,8 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
     DBT key, data;
     dbpf_attr_cache_elem_t *cache_elem = NULL;
     TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
+    TROVE_size k_size;
+    DB_BTREE_STAT *k_stat_p;
 
     ret = dbpf_open_cache_get(
         op_p->coll_p->coll_id, op_p->handle, 1, DBPF_OPEN_DB, &tmp_ref);
@@ -285,6 +287,29 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
                 "written (key is %s)\n",
                 (char *)op_p->u.k_write.key.buffer);
         }
+    }
+
+    /* this may have increased the number of keyvals stored in this object;
+     * update the k_size in the cache
+     */
+    ret = tmp_ref.db_p->stat(tmp_ref.db_p,
+        &k_stat_p,
+#ifdef HAVE_UNKNOWN_PARAMETER_TO_DB_STAT
+        NULL,
+#endif 
+        0);
+    if(ret == 0)
+    {
+        k_size = (TROVE_size)k_stat_p->bt_ndata;
+        free(k_stat_p);
+
+        dbpf_attr_cache_ds_attr_update_cached_data_ksize(ref, k_size);
+    }
+    else
+    {
+        tmp_ref.db_p->err(tmp_ref.db_p, ret, "DB->stat");
+        error = -dbpf_db_error_to_trove_error(ret);
+        goto return_error;
     }
 
     DBPF_DB_SYNC_IF_NECESSARY(op_p, tmp_ref.db_p);
@@ -347,6 +372,9 @@ static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p)
     int error, ret, got_db = 0;
     struct open_cache_ref tmp_ref;
     DBT key;
+    TROVE_size k_size;
+    DB_BTREE_STAT *k_stat_p;
+    TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
 
     /* absolutely no need to create the db if we are removing entries */
     ret = dbpf_open_cache_get(
@@ -372,6 +400,30 @@ static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p)
         error = -dbpf_db_error_to_trove_error(ret);
         goto return_error;
     }
+
+    /* this may have decreased the number of keyvals stored in this object;
+     * update the k_size in the cache
+     */
+    ret = tmp_ref.db_p->stat(tmp_ref.db_p,
+        &k_stat_p,
+#ifdef HAVE_UNKNOWN_PARAMETER_TO_DB_STAT
+        NULL,
+#endif 
+        0);
+    if(ret == 0)
+    {
+        k_size = (TROVE_size)k_stat_p->bt_ndata;
+        free(k_stat_p);
+
+        dbpf_attr_cache_ds_attr_update_cached_data_ksize(ref, k_size);
+    }
+    else
+    {
+        tmp_ref.db_p->err(tmp_ref.db_p, ret, "DB->stat");
+        error = -dbpf_db_error_to_trove_error(ret);
+        goto return_error;
+    }
+
 
     DBPF_DB_SYNC_IF_NECESSARY(op_p, tmp_ref.db_p);
 
