@@ -42,6 +42,18 @@
 #define PVFS2_VERSION "Unknown"
 #endif
 
+#ifdef __PVFS2_TROVE_THREADED__
+#ifdef __PVFS2_TROVE_AIO_THREADED__
+#define SERVER_STORAGE_MODE "aio-threaded"
+#else
+#define SERVER_STORAGE_MODE "threaded"
+#endif
+#else
+#define SERVER_STORAGE_MODE "non-threaded"
+#endif
+
+#define PVFS2_VERSION_REQUEST 0xFF
+
 /* this controls how many jobs we will test for per job_testcontext()
  * call. NOTE: this is currently independent of the config file
  * parameter that governs how many unexpected BMI jobs are kept posted
@@ -138,7 +150,12 @@ int main(int argc, char **argv)
     /* Determine initial server configuration, looking at both command
      * line arguments and the configuration file.
      */
-    if (server_parse_cmd_line_args(argc, argv) != 0)
+    ret = server_parse_cmd_line_args(argc, argv);
+    if (ret == PVFS2_VERSION_REQUEST)
+    {
+        return 0;
+    }
+    else if (ret != 0)
     {
 	goto server_shutdown;
     }
@@ -676,18 +693,9 @@ static int server_initialize_subsystems(
 
         cur = PINT_llist_next(cur);
     }
-#ifdef __PVFS2_TROVE_THREADED__
-#ifdef __PVFS2_TROVE_AIO_THREADED__
+
     gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "Storage Init Complete (aio-threaded)\n");
-#else
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "Storage Init Complete (threaded)\n");
-#endif
-#else
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "Storage Init Complete (non-threaded)\n");
-#endif
+                 "Storage Init Complete (%s)\n", SERVER_STORAGE_MODE);
     gossip_debug(GOSSIP_SERVER_DEBUG, "%d filesystem(s) initialized\n",
                  PINT_llist_count(server_config.file_systems));
 
@@ -1017,8 +1025,9 @@ static int server_parse_cmd_line_args(int argc, char **argv)
                 break;
             case 'v':
           do_version:
-                printf("%s\n", PVFS2_VERSION);
-                return 1;
+                printf("%s (mode: %s)\n", PVFS2_VERSION,
+                       SERVER_STORAGE_MODE);
+                return PVFS2_VERSION_REQUEST;
             case 'r':
           do_rmfs:
                 server_remove_storage_space = 1;
