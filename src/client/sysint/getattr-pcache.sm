@@ -78,6 +78,7 @@ nested machine pvfs2_client_getattr_pcache_sm(lookup,
 
 %%
 
+
 /* The idea is to check pcache to see if we have an entry.  if so, set
  * up a fake, decoded response structure with the results so that
  * we can then call the comp_fn to copy data out of the response

@@ -187,7 +187,7 @@ static int truncate_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
 			      *sm_p->cred_p,
 			      sm_p->u.truncate.object_ref.fs_id,
 			      sm_p->u.truncate.object_ref.handle,
-			      PVFS_ATTR_META_DFILES|PVFS_ATTR_META_DIST);
+			      PVFS_ATTR_META_ALL);
     
     /* fill in msgpair structure components */
     sm_p->msgpair.fs_id   = sm_p->u.getattr.object_ref.fs_id;
@@ -216,16 +216,17 @@ static int truncate_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
  * truncate on a directory has no meaning
  */
 
-static int truncate_object_getattr_comp_fn(void *v_p,
-					struct PVFS_server_resp *resp_p,
-					int index)
+static int truncate_object_getattr_comp_fn(
+    void *v_p,
+    struct PVFS_server_resp *resp_p,
+    int index)
 {
     /* this is a little kludge to get around some struct definition
      * issues in the headers.  maybe fix later?
      */
     PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
 
-    PVFS_object_attr *r_attr_p = &resp_p->u.getattr.attr;
+    PVFS_object_attr *r_attr_p = NULL;
 
     assert(resp_p->op == PVFS_SERV_GETATTR); /* sanity check */
 
@@ -236,36 +237,82 @@ static int truncate_object_getattr_comp_fn(void *v_p,
 	return resp_p->status;
     }
 
+    if (!sm_p->pcache_hit)
+    {
+        r_attr_p = &resp_p->u.getattr.attr;
+        PINT_pcache_object_attr_deep_copy(
+            &sm_p->pcache_attr, &resp_p->u.getattr.attr);
+    }
+    else
+    {
+        r_attr_p = &sm_p->pinode->attr;
+    }
+    assert(r_attr_p);
+
     /* copy in the attributes we care about from the response */
     switch (resp_p->u.getattr.attr.objtype)
     {
 	case PVFS_TYPE_METAFILE:
+        {
 	    /* sanity checks */
-	    assert(r_attr_p->mask & 
-		    (PVFS_ATTR_META_DFILES|PVFS_ATTR_META_DIST));
+	    assert(r_attr_p->mask & (PVFS_ATTR_META_ALL));
 	    assert(r_attr_p->u.meta.dfile_count > 0);
-	    
+	    assert(r_attr_p->u.meta.dist_size > 0);
+
 	    gossip_debug(CLIENT_DEBUG,
 			 "truncate_object_getattr_comp_fn: %d datafiles.\n",
 			 r_attr_p->u.meta.dfile_count); 
-	    /* save the datafile handles prior to freeing up the
-	     * buffers we used for messages.  we could keep them around
-	     * i suppose, but we're not going to do that for now.  later
-	     * it is likely that this stuff will be stuck in the pcache
-	     * anyway, so we'll be able to just reference it from there.
-	     */
-	    sm_p->u.truncate.datafile_handles = (PVFS_handle *) 
-		malloc((r_attr_p->u.meta.dfile_count) *sizeof(PVFS_handle));
-	    if (sm_p->u.truncate.datafile_handles == NULL) {
-		assert(0);
-	    }
-	    sm_p->u.truncate.datafile_count = r_attr_p->u.meta.dfile_count;
-	    memcpy(sm_p->u.truncate.datafile_handles,
-		    r_attr_p->u.meta.dfile_array,
-		    r_attr_p->u.meta.dfile_count * sizeof(PVFS_handle));
-	    sm_p->u.truncate.distribution = r_attr_p->u.meta.dist;
+
+            if (!sm_p->pcache_hit)
+            {
+                /* save the datafile handles prior to freeing up the
+                 * buffers we used for messages.  we could keep them around
+                 * i suppose, but we're not going to do that for now.  later
+                 * it is likely that this stuff will be stuck in the pcache
+                 * anyway, so we'll be able to just reference it from there.
+                 */
+                sm_p->u.truncate.datafile_handles = (PVFS_handle *) 
+                    malloc((r_attr_p->u.meta.dfile_count) *
+                           sizeof(PVFS_handle));
+                assert(sm_p->u.truncate.datafile_handles);
+                memcpy(sm_p->u.truncate.datafile_handles,
+                       r_attr_p->u.meta.dfile_array,
+                       r_attr_p->u.meta.dfile_count * sizeof(PVFS_handle));
+
+                /*
+                  FIXME: Replace with PVFS_Dist_copy
+                */
+                sm_p->u.truncate.distribution = (PVFS_Dist *)
+                    malloc(r_attr_p->u.meta.dist_size);
+                if (!sm_p->u.truncate.distribution)
+                {
+                    return -ENOMEM;
+                }
+                /* this encodes the previously decoded distribution into
+                 * our new space.
+                 */
+                PINT_Dist_encode(sm_p->u.truncate.distribution,
+                                 r_attr_p->u.meta.dist);
+
+                /* this does an in-place decoding of the distribution.  now
+                 * we have a decoded version where we want it.
+                 *
+                 * NOTE: we need to free this later.
+                 */
+                PINT_Dist_decode(sm_p->u.truncate.distribution, NULL);
+            }
+            else
+            {
+                /* on pcache hit use cached dfile handle array */
+                sm_p->u.truncate.datafile_handles =
+                    r_attr_p->u.meta.dfile_array;
+                sm_p->u.truncate.distribution = r_attr_p->u.meta.dist;
+            }
+            sm_p->u.truncate.dist_size = r_attr_p->u.meta.dist_size;
+            sm_p->u.truncate.datafile_count = r_attr_p->u.meta.dfile_count;
+            assert(sm_p->u.truncate.distribution);
 	    return 0;
-	    break;
+        }
 	/* no idea what truncate means on these things, so do nothing */
 	case PVFS_TYPE_DIRECTORY:
 	case PVFS_TYPE_SYMLINK:
@@ -300,7 +347,7 @@ static int truncate_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
     PINT_client_sm_msgpair_state *msg_p;
     int ret = -1;
     PVFS_offset new_dfile_size;
-    PVFS_Dist *dist;		    /* convienence pointer */
+    PVFS_Dist *dist = NULL;
 
     gossip_debug(CLIENT_DEBUG,
 	    "(%p) truncate state: datafile_setup_msgpairarray\n",
@@ -320,11 +367,14 @@ static int truncate_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
     sm_p->msgarray_count = sm_p->u.truncate.datafile_count;
 
     dist = sm_p->u.truncate.distribution;
+    fprintf(stderr,"Calling DistLookup on %p (name is %s)\n",
+            dist, dist->dist_name);
     ret = PINT_Dist_lookup(dist);
     assert (ret == 0);
 
     /* post our send/recv pairs for the datafile truncate requests */
-    for (i=0; i< sm_p->u.truncate.datafile_count; i++) {
+    for (i=0; i< sm_p->u.truncate.datafile_count; i++)
+    {
 	msg_p = &sm_p->msgarray[i];
 
 	gossip_debug(CLIENT_DEBUG,
@@ -333,22 +383,24 @@ static int truncate_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
 	new_dfile_size = 
 	    dist->methods->logical_to_physical_offset(dist->params, i, 
 		    sm_p->u.truncate.datafile_count, sm_p->u.truncate.size);
-		
-	PINT_SERVREQ_TRUNCATE_FILL(msg_p->req,
-				*sm_p->cred_p,
-				sm_p->u.truncate.object_ref.fs_id,
-				new_dfile_size,
-				sm_p->u.truncate.datafile_handles[i]);
+
+        PINT_SERVREQ_TRUNCATE_FILL(
+            msg_p->req,
+            *sm_p->cred_p,
+            sm_p->u.truncate.object_ref.fs_id,
+            new_dfile_size,
+            sm_p->u.truncate.datafile_handles[i]);
 
 	/* no callback. the status will be in the generic response structure */
 	msg_p->fs_id = sm_p->u.truncate.object_ref.fs_id;
 	msg_p->handle = sm_p->u.truncate.object_ref.handle;
 	msg_p->comp_fn = NULL;
     }
+
     /* fill in address of each server to contact */
-    ret = PINT_serv_msgpairarray_resolve_addrs(sm_p->msgarray_count, 
-	    sm_p->msgarray);
-    if (ret < 0 )
+    ret = PINT_serv_msgpairarray_resolve_addrs(
+        sm_p->msgarray_count, sm_p->msgarray);
+    if (ret < 0)
     {
 	gossip_lerr("Error: failed to resolve server addresses.\n");
 	js_p->error_code = ret;
@@ -378,9 +430,45 @@ static int truncate_cleanup(PINT_client_sm *sm_p,
 	if(sm_p->msgarray != NULL) {
 	    free(sm_p->msgarray);
 	}
-	if (sm_p->u.truncate.datafile_handles != NULL) {
-	    free(sm_p->u.truncate.datafile_handles);
-	}
+
+        /* add entry to pcache if not already present */
+        if (!sm_p->pcache_hit)
+        {
+            int release_required = 1;
+            PINT_pinode *pinode =
+                PINT_pcache_lookup(sm_p->u.truncate.object_ref);
+            if (!pinode)
+            {
+                pinode = PINT_pcache_pinode_alloc();
+                assert(pinode);
+                release_required = 0;
+            }
+            pinode->size = sm_p->u.truncate.size;
+            pinode->refn = sm_p->u.truncate.object_ref;
+
+            PINT_pcache_object_attr_deep_copy(
+                &pinode->attr, &sm_p->pcache_attr);
+            PINT_pcache_object_attr_deep_free(
+                &sm_p->pcache_attr);
+
+            PINT_pcache_set_valid(pinode);
+
+            if (release_required)
+            {
+                PINT_pcache_release(pinode);
+            }
+            sm_p->pcache_hit = 0;
+
+            /* finally, free previously allocated memory if any */
+            if (sm_p->u.truncate.datafile_handles != NULL)
+            {
+                free(sm_p->u.truncate.datafile_handles);
+            }
+            if (sm_p->u.truncate.distribution)
+            {
+                PVFS_Dist_free(sm_p->u.truncate.distribution);
+            }
+        }
     }
     sm_p->op_complete = 1;
 

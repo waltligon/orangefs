@@ -416,16 +416,27 @@ int PINT_server_get_config(struct server_configuration_s *config,
     {
 	mntent_p = &mntent_list.ptab_array[i];
 
-        /* make sure we valid information about this fs */
-        if (!(cur_fs = PINT_config_find_fs_name(config,mntent_p->pvfs_fs_name)))
+        /* make sure we have valid information about this fs */
+        cur_fs = PINT_config_find_fs_name(config, mntent_p->pvfs_fs_name);
+        if (!cur_fs)
         {
             gossip_ldebug(CLIENT_DEBUG,"Warning:  Cannot retrieve "
                           "information about pvfstab entry %s\n",
                           mntent_p->pvfs_config_server);
+
+            /*
+              if the device has no space left on it, we can't save
+              the config file for parsing and get a failure; make
+              a note of that possibility here
+            */
+            gossip_ldebug(CLIENT_DEBUG,"If you're sure that your pvfstab "
+                          "file contains valid information, please make "
+                          "sure that you are not out of disk space\n");
             continue;
-        } else
+        }
+        else
 	{
-	    found_one_good=1;
+	    found_one_good = 1;
 	    cur_fs->flowproto = mntent_p->flowproto;
 	}
     }
