@@ -1,19 +1,4 @@
 DIR := src/io/trove/trove-dbpf
-LIBSRC += \
-	$(DIR)/dbpf-bstream.c \
-	$(DIR)/dbpf-collection.c \
-	$(DIR)/dbpf-bstream-aio.c \
-	$(DIR)/dbpf-bstream-fd-cache.c \
-	$(DIR)/dbpf-keyval.c \
-	$(DIR)/dbpf-keyval-db-cache.c \
-	$(DIR)/dbpf-dspace.c \
-	$(DIR)/dbpf-dspace-db-cache.c \
-        $(DIR)/dbpf-context.c \
-	$(DIR)/dbpf-op.c \
-	$(DIR)/dbpf-op-queue.c \
-	$(DIR)/dbpf-thread.c \
-	$(DIR)/dbpf-error.c \
-	$(DIR)/dbpf-mgmt.c
 SERVERSRC += \
 	$(DIR)/dbpf-bstream.c \
 	$(DIR)/dbpf-collection.c \

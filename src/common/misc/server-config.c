@@ -56,9 +56,6 @@ static int cache_config_files(
     char *server_config_filename);
 static int is_populated_filesystem_configuration(
     struct filesystem_configuration_s *fs);
-static int is_root_handle_in_my_range(
-    struct server_configuration_s *config_s,
-    struct filesystem_configuration_s *fs);
 static int is_root_handle_in_a_meta_range(
     struct server_configuration_s *config_s,
     struct filesystem_configuration_s *fs);
@@ -792,68 +789,6 @@ static int is_populated_filesystem_configuration(
              fs->root_handle) ? 1 : 0);
 }
 
-static int is_root_handle_in_my_range(
-    struct server_configuration_s *config,
-    struct filesystem_configuration_s *fs)
-{
-    int ret = 0;
-    struct llist *cur = NULL;
-    struct llist *extent_list = NULL;
-    char *cur_host_id = (char *)0;
-    host_handle_mapping_s *cur_h_mapping = NULL;
-
-    if (config && is_populated_filesystem_configuration(fs))
-    {
-        /*
-          check if the root handle is within one of the
-          specified meta host's handle ranges for this fs;
-          a root handle can't exist in a data handle range!
-        */
-        cur = fs->meta_handle_ranges;
-        while(cur)
-        {
-            cur_h_mapping = llist_head(cur);
-            if (!cur_h_mapping)
-            {
-                break;
-            }
-            assert(cur_h_mapping->alias_mapping);
-            assert(cur_h_mapping->alias_mapping->host_alias);
-            assert(cur_h_mapping->alias_mapping->bmi_address);
-            assert(cur_h_mapping->handle_range);
-
-            cur_host_id = cur_h_mapping->alias_mapping->bmi_address;
-            if (!cur_host_id)
-            {
-                gossip_err("Invalid host ID for alias %s.\n",
-                           cur_h_mapping->alias_mapping->host_alias);
-                break;
-            }
-
-            /* only check if this is *our* range */
-            if (strcmp(config->host_id,cur_host_id) == 0)
-            {
-                extent_list = PINT_create_extent_list(
-                    cur_h_mapping->handle_range);
-                if (!extent_list)
-                {
-                    gossip_err("Failed to create extent list.\n");
-                    break;
-                }
-
-                ret = PINT_handle_in_extent_list(
-                    extent_list,fs->root_handle);
-                PINT_release_extent_list(extent_list);
-                if (ret == 1)
-                {
-                    break;
-                }
-            }
-            cur = llist_next(cur);
-        }
-    }
-    return ret;
-}
 
 static int is_root_handle_in_a_meta_range(
     struct server_configuration_s *config,
@@ -1591,81 +1526,6 @@ int PINT_config_has_fs_config_info(
                 ret = 1;
                 break;
             }
-            cur = llist_next(cur);
-        }
-    }
-    return ret;
-}
-
-/*
-  create a storage space based on configuration settings object
-  with the particular host settings local to the caller
-*/
-int PINT_config_pvfs2_mkspace(
-    struct server_configuration_s *config)
-{
-    int ret = 1;
-    PVFS_handle root_handle = 0;
-    int create_collection_only = 0;
-    struct llist *cur = NULL;
-    char *cur_handle_range = (char *)0;
-    filesystem_configuration_s *cur_fs = NULL;
-
-    if (config)
-    {
-        cur = config->file_systems;
-        while(cur)
-        {
-            cur_fs = llist_head(cur);
-            if (!cur_fs)
-            {
-                break;
-            }
-
-            cur_handle_range =
-                PINT_config_get_meta_handle_range_str(
-                    config, cur_fs);
-            if (!cur_handle_range)
-            {
-                gossip_err("Invalid configuration handle range\n");
-                break;
-            }
-
-            /*
-              check if root handle is in our handle range for this fs.
-              if it is, we're responsible for creating it on disk when
-              creating the storage space
-            */
-            root_handle = (is_root_handle_in_my_range(config,cur_fs) ?
-                           cur_fs->root_handle : PVFS_HANDLE_NULL);
-
-            /*
-              for the first fs/collection we encounter, create
-              the storage space if it doesn't exist.
-            */
-            gossip_debug(SERVER_DEBUG,"\n*****************************\n");
-            gossip_debug(SERVER_DEBUG,"Creating new PVFS2 %s\n",
-                    (create_collection_only ? "collection" :
-                     "storage space"));
-            ret = pvfs2_mkspace(config->storage_path,
-                                cur_fs->file_system_name,
-                                cur_fs->coll_id,
-                                root_handle,
-                                cur_handle_range,
-                                create_collection_only,
-                                1);
-            gossip_debug(SERVER_DEBUG,"\n*****************************\n");
-
-            /*
-              now that the storage space is created, set the
-              create_collection_only variable so that subsequent
-              calls to pvfs2_mkspace will not fail when it finds
-              that the storage space already exists; this causes
-              pvfs2_mkspace to only add the collection to the
-              already existing storage space.
-            */
-            create_collection_only = 1;
-
             cur = llist_next(cur);
         }
     }

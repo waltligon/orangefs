@@ -106,6 +106,7 @@ int PINT_config_has_fs_config_info(
     struct server_configuration_s *config_s,
     char *fs_name);
 
+/* NOTE: this function is defined in mkspace.c now */
 int PINT_config_pvfs2_mkspace(
     struct server_configuration_s *config);
 

@@ -29,7 +29,9 @@
 /* contexts for use within the job interface */
 static bmi_context_id global_bmi_context = -1;
 static FLOW_context_id global_flow_context = -1;
+#ifdef __PVFS2_TROVE_SUPPORT__
 static TROVE_context_id global_trove_context = -1;
+#endif
 
 /* queues of pending jobs */
 static job_desc_q_p completion_queue_array[JOB_MAX_CONTEXTS] = {NULL};
@@ -184,7 +186,9 @@ int job_initialize(int flags)
     {
 	PINT_flow_close_context(global_flow_context);
 	BMI_close_context(global_bmi_context);
+#ifdef __PVFS2_TROVE_SUPPORT__
         trove_close_context(/*FIXME: HACK*/9,global_trove_context);
+#endif
 	return (ret);
     }
 
