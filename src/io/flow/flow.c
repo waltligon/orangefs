@@ -439,6 +439,7 @@ int PINT_flow_post(flow_descriptor * flow_d, FLOW_context_id context_id)
     {
 	flow_release(flow_d);
 	gen_mutex_unlock(&interface_mutex);
+	gossip_err("Error: requested flow protocol %d, which doesn't appear to be loaded.\n", (int)type);
 	return (-ENOPROTOOPT);
     }
 
