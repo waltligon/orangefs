@@ -32,13 +32,14 @@
 
 static int final_response_release(PINT_server_op *s_op, job_status_s *js_p);
 static int final_response_send_resp(PINT_server_op *s_op, job_status_s *js_p);
+static int final_response_cleanup(PINT_server_op *s_op, job_status_s *js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 extern job_context_id PINT_server_job_context;
 
 %%
 
-nested machine pvfs2_final_response_sm(release, send_resp)
+nested machine pvfs2_final_response_sm(release, send_resp, cleanup)
 {
     state release
     {
@@ -49,6 +50,12 @@ nested machine pvfs2_final_response_sm(release, send_resp)
     state send_resp
     {
 	run final_response_send_resp;
+	default => cleanup;
+    }
+
+    state cleanup
+    {
+	run final_response_cleanup;
 	default => return;
     }
 }
@@ -131,6 +138,20 @@ static int final_response_send_resp(PINT_server_op *s_op, job_status_s *js_p)
     return(ret);
 }
 
+
+/* final_response_cleanup()
+ *
+ * cleans up resources allocated while in this nested machine.  Right now 
+ * that just means releasing the encoding of the response
+ */
+static int final_response_cleanup(PINT_server_op *s_op, job_status_s *js_p)
+{
+
+    PINT_encode_release(&s_op->encoded, PINT_ENCODE_RESP);
+
+    js_p->error_code = 0;
+    return(1);
+}
 
 /*
  * Local variables:
