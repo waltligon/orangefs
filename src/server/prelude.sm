@@ -208,9 +208,27 @@ static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p)
             if (s_op->attr.mask == 0)
             {
                 js_p->error_code = 0;
-                break;
             }
-            /* drop through to check mode */
+	    else
+	    {
+                /*
+                  NOTE: on other file systems, getattr doesn't seem to
+                  require read permissions by the user, group OR
+                  other, so long as the user matches (or is root)
+                */
+                if (((s_op->attr.mask & PVFS_ATTR_COMMON_UID) &&
+                     ((s_op->attr.owner == 0) ||
+                      (s_op->attr.owner == s_op->req->credentials.uid))) ||
+                    (s_op->req->credentials.uid == 0))
+                {
+                    js_p->error_code = 0;
+                }
+                else
+                {
+                    js_p->error_code = -PVFS_EPERM;
+                }
+	    }
+            break;
 	case PVFS_SERV_READDIR:
 	    /* TODO: figure out something cleaner looking than using 
 	     * PVFS_U_READ here to indicate we need read access; its 
@@ -238,16 +256,28 @@ static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p)
 	 * already has attributes
 	 */
 	case PVFS_SERV_SETATTR:
-	    if(s_op->attr.mask == 0)
+	    if (s_op->attr.mask == 0)
 	    {
 		js_p->error_code = 0;
 	    }
 	    else
 	    {
-		js_p->error_code = check_mode(&(s_op->attr), 
-		    s_op->req->credentials.uid,
-		    s_op->req->credentials.gid,
-		    PVFS_U_WRITE);
+                /*
+                  NOTE: on other file systems, setattr doesn't seem to
+                  require write permissions by the user, group OR
+                  other, so long as the user matches (or is root)
+                */
+                if (((s_op->attr.mask & PVFS_ATTR_COMMON_UID) &&
+                     ((s_op->attr.owner == 0) ||
+                      (s_op->attr.owner == s_op->req->credentials.uid))) ||
+                    (s_op->req->credentials.uid == 0))
+                {
+                    js_p->error_code = 0;
+                }
+                else
+                {
+                    js_p->error_code = -PVFS_EPERM;
+                }
 	    }
 	    break;
 
@@ -290,29 +320,50 @@ static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p)
  *
  * returns 0 on success, -PVFS_EPERM on failure
  */
-static int check_mode(PVFS_object_attr* attr, PVFS_uid uid, PVFS_gid gid,
+static int check_mode(
+    PVFS_object_attr *attr,
+    PVFS_uid uid, PVFS_gid gid,
     PVFS_permissions mode)
 {
     uint32_t perm_mask = (PVFS_ATTR_COMMON_UID |
                           PVFS_ATTR_COMMON_GID | PVFS_ATTR_COMMON_PERM);
 
-    /* if we don't have masks for the permission information that we need,
-     * then the system is broken 
+    /* if we don't have masks for the permission information that we
+     * need, then the system is broken
      */
     assert((attr->mask & perm_mask) == perm_mask);
 
-    /* give root permissions, no matter what */
-    if(attr->owner == 0)
-	return(0);
+    /*
+      give root permissions, no matter what.
+
+      NOTE: this is odd because it's only checking if the file owner
+      is root (as dictated by the owner on disk), not the credentials
+      of the request (i.e. uid).  we may need to make different
+      options to either honor the credentials of the request (like
+      no_root_squash, etc) in the future
+    */
+    if (attr->owner == 0)
+    {
+	return 0;
+    }
+
     /* uid test */
-    if((attr->owner == uid) && (((attr->perms >> 6) & mode) == mode))
-	return(0);
+    if ((attr->owner == uid) && (((attr->perms >> 6) & mode) == mode))
+    {
+	return 0;
+    }
+
     /* gid test */
-    if((attr->group == gid) && (((attr->perms >> 3) & mode) == mode))
-	return(0);
+    if ((attr->group == gid) && (((attr->perms >> 3) & mode) == mode))
+    {
+	return 0;
+    }
+
     /* other test */
-    if((attr->perms & mode) == mode)
-	return(0);
+    if ((attr->perms & mode) == mode)
+    {
+	return 0;
+    }
 
     /* access denied */
     return(-PVFS_EPERM);

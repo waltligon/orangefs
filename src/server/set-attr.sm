@@ -102,7 +102,6 @@ machine pvfs2_set_attr_sm(
 
 %%
 
-
 static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
 {
     PVFS_object_attr *a_p, *req_a_p;
@@ -293,6 +292,10 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s* js_p)
         dspace_a_p->ctime = a_p->ctime;
     if (a_p->mask & PVFS_ATTR_COMMON_MTIME)
         dspace_a_p->mtime = a_p->mtime;
+
+    dspace_a_p->u.meta.dfile_count = 0;
+    dspace_a_p->u.meta.dist_size = 0;
+
     if (a_p->mask & PVFS_ATTR_COMMON_TYPE)
     {
         dspace_a_p->objtype = a_p->objtype;
@@ -300,11 +303,6 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s* js_p)
         {
             dspace_a_p->u.meta.dfile_count = a_p->u.meta.dfile_count;
             dspace_a_p->u.meta.dist_size = a_p->u.meta.dist_size;
-        }
-        else
-        {
-            dspace_a_p->u.meta.dfile_count = 0;
-            dspace_a_p->u.meta.dist_size = 0;
         }
     }
 

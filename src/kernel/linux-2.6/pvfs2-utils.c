@@ -205,61 +205,26 @@ static inline void convert_attribute_mode_to_pvfs_sys_attr(
     int mode,
     PVFS_sys_attr *attrs)
 {
-    if (mode & S_IXOTH)
-        attrs->perms |= PVFS_O_EXECUTE;
-    else
-        attrs->perms &= ~PVFS_O_EXECUTE;
-    if (mode & S_IWOTH)
-        attrs->perms |= PVFS_O_WRITE;
-    else
-        attrs->perms &= ~PVFS_O_WRITE;
-    if (mode & S_IROTH)
-        attrs->perms |= PVFS_O_READ;
-    else
-        attrs->perms &= ~PVFS_O_READ;
-
-    if (mode & S_IXGRP)
-        attrs->perms |= PVFS_G_EXECUTE;
-    else
-        attrs->perms &= ~PVFS_G_EXECUTE;
-    if (mode & S_IWGRP)
-        attrs->perms |= PVFS_G_WRITE;
-    else
-        attrs->perms &= ~PVFS_G_WRITE;
-    if (mode & S_IRGRP)
-        attrs->perms |= PVFS_G_READ;
-    else
-        attrs->perms &= ~PVFS_G_READ;
-
-    if (mode & S_IXUSR)
-        attrs->perms |= PVFS_U_EXECUTE;
-    else
-        attrs->perms &= ~PVFS_U_EXECUTE;
-    if (mode & S_IWUSR)
-        attrs->perms |= PVFS_U_WRITE;
-    else
-        attrs->perms &= ~PVFS_U_WRITE;
-    if (mode & S_IRUSR)
-        attrs->perms |= PVFS_U_READ;
-    else
-        attrs->perms &= ~PVFS_U_READ;
-
+    attrs->perms = pvfs2_translate_mode(mode);
     attrs->mask |= PVFS_ATTR_SYS_PERM;
 
-    if ((mode & S_IFMT) == S_IFREG)
+    pvfs2_print("mode is %d | translated perms is %d\n", mode,
+                attrs->perms);
+
+    switch(mode & S_IFMT)
     {
-        attrs->objtype = PVFS_TYPE_METAFILE;
-        attrs->mask |= PVFS_ATTR_SYS_TYPE;
-    }
-    else if ((mode & S_IFMT) == S_IFDIR)
-    {
-        attrs->objtype = PVFS_TYPE_DIRECTORY;
-        attrs->mask |= PVFS_ATTR_SYS_TYPE;
-    }
-    else if ((mode & S_IFMT) == S_IFLNK)
-    {
-        attrs->objtype = PVFS_TYPE_SYMLINK;
-        attrs->mask |= PVFS_ATTR_SYS_TYPE;
+        case S_IFREG:
+            attrs->objtype = PVFS_TYPE_METAFILE;
+            attrs->mask |= PVFS_ATTR_SYS_TYPE;
+            break;
+        case S_IFDIR:
+            attrs->objtype = PVFS_TYPE_DIRECTORY;
+            attrs->mask |= PVFS_ATTR_SYS_TYPE;
+            break;
+        case S_IFLNK:
+            attrs->objtype = PVFS_TYPE_SYMLINK;
+            attrs->mask |= PVFS_ATTR_SYS_TYPE;
+            break;
     }
 }
 
@@ -337,11 +302,17 @@ static inline int copy_attributes_from_inode(
         attrs->mask |= PVFS_ATTR_SYS_SIZE;
 
         if (iattr && (iattr->ia_valid & ATTR_MODE))
+        {
+            pvfs2_print("[1] CONVERTING ATTR MODE %d\n", iattr->ia_mode);
             convert_attribute_mode_to_pvfs_sys_attr(
                 iattr->ia_mode, attrs);
+        }
         else
+        {
+            pvfs2_print("[2] CONVERTING ATTR MODE %d\n", inode->i_mode);
             convert_attribute_mode_to_pvfs_sys_attr(
                 inode->i_mode, attrs);
+        }
         attrs->mask = PVFS_ATTR_SYS_ALL_SETABLE;
 
         ret = 0;
@@ -442,7 +413,7 @@ int pvfs2_inode_setattr(
     struct inode *inode,
     struct iattr *iattr)
 {
-    int ret = -1, retries = PVFS2_OP_RETRY_COUNT;
+    int ret = -ENOMEM, retries = PVFS2_OP_RETRY_COUNT;
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
 
@@ -476,6 +447,7 @@ int pvfs2_inode_setattr(
 
       error_exit:
         ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
+        pvfs2_print("pvfs2_inode_setattr: returning %d\n", ret);
 
         /* when request is serviced properly, free req op struct */
         op_release(new_op);
@@ -787,14 +759,12 @@ struct inode *pvfs2_create_entry(
             case PVFS2_VFS_OP_SYMLINK:
                 return pvfs2_create_symlink(
                     dir, dentry, symname, mode, error_code);
-            default:
-                pvfs2_error("pvfs2_create_entry got a bad "
-                            "op_type (%d)\n", op_type);
         }
     }
 
     if (error_code)
     {
+        pvfs2_error("pvfs2_create_entry: invalid op_type %d\n", op_type);
         *error_code = -EINVAL;
     }
     return NULL;

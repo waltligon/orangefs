@@ -717,43 +717,30 @@ do                                                \
  ************************************/
 static inline int pvfs2_translate_mode(int mode)
 {
-    int ret = 0;
+    int ret = 0, i = 0;
+    static int modes[9] =
+    {
+        S_IXOTH, S_IWOTH, S_IROTH,
+        S_IXGRP, S_IWGRP, S_IRGRP,
+        S_IXUSR, S_IWUSR, S_IRUSR
+    };
+    static int pvfs2_modes[9] =
+    {
+        PVFS_O_EXECUTE, PVFS_O_WRITE, PVFS_O_READ,
+        PVFS_G_EXECUTE, PVFS_G_WRITE, PVFS_G_READ,
+        PVFS_U_EXECUTE, PVFS_U_WRITE, PVFS_U_READ,
+    };
 
-    if (mode & S_IXOTH)
+    for(i = 0; i < 9; i++)
     {
-        ret |= PVFS_O_EXECUTE;
-    }
-    if (mode & S_IWOTH)
-    {
-        ret |= PVFS_O_WRITE;
-    }
-    if (mode & S_IROTH)
-    {
-        ret |= PVFS_O_READ;
-    }
-    if (mode & S_IXGRP)
-    {
-        ret |= PVFS_G_EXECUTE;
-    }
-    if (mode & S_IWGRP)
-    {
-        ret |= PVFS_G_WRITE;
-    }
-    if (mode & S_IRGRP)
-    {
-        ret |= PVFS_G_READ;
-    }
-    if (mode & S_IXUSR)
-    {
-        ret |= PVFS_U_EXECUTE;
-    }
-    if (mode & S_IWUSR)
-    {
-        ret |= PVFS_U_WRITE;
-    }
-    if (mode & S_IRUSR)
-    {
-        ret |= PVFS_U_READ;
+        if (mode & modes[i])
+        {
+            ret |= pvfs2_modes[i];
+        }
+        else
+        {
+            ret &= ~pvfs2_modes[i];
+        }
     }
     return ret;
 }

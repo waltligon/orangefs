@@ -200,16 +200,15 @@ static void pvfs2_read_inode(
     pvfs2_inode_initialize(pvfs2_inode);
 
     /*
-       need to populate the freshly allocated (passed in)
-       inode here.  this gets called if the vfs can't find
-       this inode in the inode cache.  we need to getattr here
-       because d_revalidate isn't called after a successful
-       dentry lookup if the inode is not present in the inode
-       cache already.  so this is our chance.
+       need to populate the freshly allocated (passed in) inode here.
+       this gets called if the vfs can't find this inode in the inode
+       cache.  we need to getattr here because d_revalidate isn't
+       called after a successful dentry lookup if the inode is not
+       present in the inode cache already.  so this is our chance.
     */
     if (pvfs2_inode_getattr(inode) != 0)
     {
-        /* assume an I/O error and flag inode as bad */
+        /* assume an I/O error and mark the inode as bad */
         pvfs2_make_bad_inode(inode);
     }
 }
