@@ -3969,17 +3969,20 @@ int BMI_gm_cancel(bmi_op_id_t id, bmi_context_id context_id)
         }
     }
 
-    /* easy case for recv: have not been contacted yet */
+    /* recv case */
     if(query_op->send_recv == BMI_RECV)
     {
-        /* must run queue to find out */
         memset(&key, 0, sizeof(struct op_list_search_key));
         key.op_id = query_op->op_id;
         key.op_id_yes = 1;
 
+        /* easy case for recv: have we even been contacted yet? */
         tmp_op = op_list_search(op_list_array[IND_NEED_CTRL_MATCH], &key);
         if(tmp_op)
         {
+            gossip_debug(GOSSIP_BMI_DEBUG_GM, 
+                "BMI_gm_cancel: nothing received yet.\n");
+            /* nothing to do, no resources consumed */
             assert(tmp_op == query_op);
             op_list_remove(query_op);
             query_op->error_code = -PVFS_ECANCEL;
@@ -3988,11 +3991,31 @@ int BMI_gm_cancel(bmi_op_id_t id, bmi_context_id context_id)
 	    gen_mutex_unlock(&interface_mutex);
             return(0);
         }
+
+        /* are we waiting on resources to send a ctrl ack? */
+        tmp_op = op_list_search(op_list_array[IND_NEED_SEND_TOK_HI_CTRLACK], &key);
+        if(tmp_op)
+        {
+            gossip_debug(GOSSIP_BMI_DEBUG_GM, 
+                "BMI_gm_cancel: nothing received yet.\n");
+            assert(tmp_op == query_op);
+            /* luckily no resources are consumed at this stage, just clean
+             * up and get out
+             */
+            op_list_remove(query_op);
+            query_op->error_code = -PVFS_ECANCEL;
+            op_list_add(completion_array[query_op->context_id], query_op);
+            gm_op_data->complete = 1;
+	    gen_mutex_unlock(&interface_mutex);
+            return(0);
+        }
+
+        /* TODO: final case: IND_RECVING */
+        assert(0);
     }
 
-    /* TODO: implement the rest of this; based on the op type we have to look
-     * for it in the appropriate queues and take different actions depending
-     * on what we find.
+    /* if we fall through to here then something has gone terribly wrong,
+     * we lost track of the operation or something
      */
     assert(0);
 
