@@ -381,7 +381,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
         return 0;
     }
 
-    switch (resp_p->u.getattr.attr.objtype)
+    switch (attr->objtype)
     {
 	case PVFS_TYPE_METAFILE:
 	    if (sm_p->msgpair.req.u.getattr.attrmask & PVFS_ATTR_META_DIST)
@@ -500,8 +500,8 @@ static int getattr_object_getattr_comp_fn(void *v_p,
 	    /* fall through */
 	default:
 	    gossip_err("error: getattr_object_getattr_comp_fn: "
-                       "unhandled object type\n");
-	    assert(0);
+                       "handle refers to invalid object type\n");
+	    return -PVFS_EINVAL;
     } /* end of switch() */
 
     return -PVFS_EINVAL; /* should not get here */
@@ -515,12 +515,8 @@ static int getattr_object_getattr_failure(PINT_client_sm *sm_p,
 		 "(%p) getattr state: getattr_object_getattr_failure\n",
 		 sm_p);
 
-    gossip_err("getattr: Failed to retrieve attrs of handle %Lu | %d\n",
-               sm_p->u.getattr.object_ref.handle,
-               sm_p->u.getattr.object_ref.fs_id);
-
     /* ENOENT is a legal failure; for now others will die */
-    if (js_p->error_code != -PVFS_ENOENT)
+    if (js_p->error_code != -PVFS_ENOENT && js_p->error_code != -PVFS_EINVAL)
     {
         gossip_err("getattr: Failed with error code %d\n",
                    js_p->error_code);
@@ -592,7 +588,7 @@ static int getattr_datafile_getattr_setup_msgpairarray(PINT_client_sm *sm_p,
 	/* TODO: handle this properly */
 	assert(0);
 	js_p->error_code = ret;
-	return(1);
+	return 1;
     }
 
     /* return immediately; next state jumps to msgpairarray machine */
@@ -762,6 +758,13 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
             }
             sm_p->pcache_hit = 0;
         }
+    }
+    else {
+	/* error */
+	memset(sm_p->u.getattr.getattr_resp_p,
+	       0,
+	       sizeof(PVFS_sysresp_getattr));
+	sm_p->error_code = js_p->error_code;
     }
 
     /* mark operation as complete */

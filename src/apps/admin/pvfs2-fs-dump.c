@@ -160,15 +160,6 @@ int main(int argc, char **argv)
     creds.uid = getuid();
     creds.gid = getgid();
 
-#if 0
-    ret = PVFS_sys_statfs(cur_fs, creds, &statfs_resp);
-    if (ret != 0) {
-	PVFS_perror("PVFS_sys_statfs", ret);
-	return -1;
-    }
-    server_count = statfs_resp.server_count;
-#endif
-
     /* count how many servers we have */
     ret = PVFS_mgmt_count_servers(cur_fs, creds, 
 	PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER,
@@ -235,19 +226,6 @@ int main(int argc, char **argv)
 			      addr_array,
 			      creds,
 			      user_opts->dot_format);
-
-#if 0
-    printf("remaining handles:\n");
-
-    while (handlelist_return_handle(&handle, &server_idx) == 0) {
-	printf("%s: 0x%08Lx\n",
-	       PVFS_mgmt_map_addr(cur_fs,
-				  creds,
-				  addr_array[server_idx],
-				  &tmp_type),
-	       handle);
-    }
-#endif
 
     print_trailer(user_opts->dot_format);
 
@@ -389,18 +367,16 @@ int build_handlelist(PVFS_fs_id cur_fs,
 
 	for(i=0; i<server_count; i++)
 	{
+	    for(j=0; j<handle_count_array[i]; j++)
+	    {
+		/* it would be good to verify that handles are
+		 * within valid ranges for the given server here.
+		 */
+	    }
+
 	    handlelist_add_handles(handle_matrix[i],
 				   handle_count_array[i],
 				   i);
-
-	    for(j=0; j<handle_count_array[i]; j++)
-	    {
-#if 0
-		printf("%s: 0x%08Lx\n", PVFS_mgmt_map_addr(cur_fs,
-		    creds, addr_array[i], &tmp_type),
-		    handle_matrix[i][j]);
-#endif
-	    }
 	}
 
 	/* find out if any servers have more handles to dump */
@@ -570,12 +546,10 @@ void verify_datafiles(PVFS_fs_id cur_fs,
 	df_ref.handle = df_handles[i];
 	df_ref.fs_id  = cur_fs;
 
-	printf("going after 0x%08Lx\n", df_ref.handle);
-
-	PVFS_sys_getattr(df_ref,
-			 PVFS_ATTR_SYS_ALL,
-			 creds,
-			 &df_getattr_resp);
+	ret = PVFS_sys_getattr(df_ref,
+			       PVFS_ATTR_SYS_ALL,
+			       creds,
+			       &df_getattr_resp);
 #endif
 
 	ret = handlelist_find_handle(df_handles[i], &server_idx);
