@@ -15,28 +15,48 @@ cover the MPI-IO interface.
 
 We provide an implementation of the UNIX I/O interface for clients running
 Linux versions 2.4 (2.4.19 and later) and 2.6.  This interface implements the
-traditional \texttt{open()}, \texttt{read()}, \texttt{write()}, and
-\texttt{close()} interface as well as providing the directory operations
+traditional \texttt{open}, \texttt{read}, \texttt{write}, and
+\texttt{close} interface as well as providing the directory operations
 necessary for applications such as \texttt{ls} to work.
 
 It is important to note that there is a difference between implementing the
-UNIX I/O API and implementing the POSIX semantics for this API.  We do not
-implement the latter of these two.  Here we will document aspects of the POSIX
-semantics that we do not implement.
+UNIX I/O API and implementing the POSIX semantics for this API.  File systems
+exported via NFS (versions 2 and 3) do not exhibit many of the POSIX
+semantics, and even local file systems may not guarantee atomicity of writes
+that cross disk block boundaries.  We also do not implement the full POSIX
+semantics.  Here we will document aspects of the POSIX semantics that we do
+not implement.
 
 \subsubsection{Permission Checking}
 
+To understand why PVFS2 permission checking behaves differently from the POSIX
+standard, it is useful to discuss how PVFS2 performs permission checking.
 PVFS2 does not really implement the \texttt{open} etc. interface, but instead
 uses a stateless approach that relies on the client to \texttt{lookup} a file
 name to convert it into a \emph{handle} that can be used for subsequent read
 and write accesses.  This handle may be used for many read and write accesses
-and may be cached under certain guidelines.
+and may be cached under certain guidelines.  This lookup operation is
+performed at file open time.
 
 Permission checking is performed in two places.  First, the VFS checks
 permissions on the client and will prevent users from performing invalid
 operations.  Second, the server performs rudimentary checks for specific
 operations; however, it (currently) relies on the client to provide accurate
-user and group information to be used for this purpose.
+user and group information to be used for this purpose.  No recursive
+directory permission checking is performed by the servers, for example.
+
+\subsubsection{Permissions and File Access}
+
+POSIX semantics dictate that once a file has been opened it may
+continue to be accessed by the process until closed, regardless of changes to
+permissions.
+
+In PVFS2, the effect of permission changes on a file may or may not be
+immediately apparent to a client holding an open file descriptor.  Because
+of the manner in which PVFS2 performs permission checking and file lookup, it
+is possible that a client may lose the ability to access a file that it has
+previously opened due to permission change, if for example the cached handle
+is lost and a lookup is performed again.
 
 \subsubsection{Access to Removed Files}
 
@@ -55,18 +75,6 @@ no longer exists.
 
 \emph{ Neill: Is this completely true, or do clients delay removal in
   pvfs2-client if someone is still accessing? }
-
-\subsubsection{Permissions and File Access}
-
-Likewise, POSIX semantics dictate that once a file has been opened it may
-continue to be accessed by the process until closed, regardless of changes to
-permissions.
-
-In PVFS2 the effect of permission changes on a file may or may not be
-immediately apparent to a client holding an open file descriptor.  Because
-of the manner in which PVFS2 performs permission checking and file lookup, it
-is possible that a client may lose the ability to access a file that it has
-previously opened due to permission change.
 
 \subsubsection{Overlapping I/O Operations}
 
@@ -87,18 +95,18 @@ combination of the bytes being written to storage, while read operations that
 conflict with write operations will see some undefined combination of original
 data and write data.
 
-\emph{ Add diagrams? }
+% TODO: ADD DIAGRAMS IF NEEDED.
 
 \subsubsection{Locks}
 
-BSD provides the \texttt{flock()} mechanism for locking file regions as a way
+BSD provides the \texttt{flock} mechanism for locking file regions as a way
 to perform atomic modifications to files.  POSIX provides this functionality
-through options to \texttt{fcntl()}.  Both of these are advisory locks, which
+through options to \texttt{fcntl}.  Both of these are advisory locks, which
 means that processes not using the locks can access the file regions.
 
 PVFS2 does not implement a locking infrastructure as part of the file system.
 At this time there is no add-on advisory locking component either.  Thus
-neither the \texttt{flock()} function nor the \texttt{fcntl()} advisory locks
+neither the \texttt{flock} function nor the \texttt{fcntl} advisory locks
 are supported by PVFS2.
 
 \subsection{MPI-IO Interface}
@@ -115,12 +123,18 @@ for PVFS2.
 
 \subsubsection{MPI-IO Atomic Mode}
 
-Atomic mode is enabled by ROMIO uses file locking to implement the MPI-IO
-atomic mode functionality.
+Atomic mode is enabled by calling \texttt{MPI\_File\_set\_atomicity} and
+setting the atomicity to true.  Atomic mode guarantees that data written on
+one process is immediately visible to another process (as in the POSIX default
+semantics).
+
+ROMIO currently uses file locking to implement the MPI-IO atomic mode
+functionality.  Because we do not support locks in PVFS2, atomic mode is not
+currently supported.
 
 \subsubsection{MPI-IO Shared Pointer Mode}
 
-Shared pointers are used in the \texttt{\_shared()} and \texttt{\_ordered()}
+Shared pointers are used in the \texttt{\_shared} and \texttt{\_ordered}
 families of functions.
 
 The ROMIO implementation relies on the use of locking support from the file
