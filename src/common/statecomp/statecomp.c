@@ -83,6 +83,7 @@ static void parse_args(int argc, char **argv)
 
 			default:
 				fprintf(stderr,"%s: undefined option %c given\n", argv[0], c);
+				exit(EXIT_FAILURE);
 		}
 	}
 	if (!out_file_flag)
@@ -101,7 +102,7 @@ static void parse_args(int argc, char **argv)
 	if (!out_file_flag)
 	{
 		fprintf(stderr, "%s: cannot continue with these arguments\n", argv[0]);
-		exit(-1);
+		exit(EXIT_FAILURE);
 	}
 }
 
@@ -117,6 +118,7 @@ static void finalize(void)
 void yyerror(char *s)
 {
 	fprintf(stderr,"syntax error line %d: %s\n", line, s);
+	exit(EXIT_FAILURE);
 }
 
 void yywrap(void)
