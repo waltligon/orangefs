@@ -125,7 +125,7 @@ ssize_t pvfs2_inode_read(
 
         if (new_op->downcall.status != 0)
         {
-            pvfs2_error("pvfs2_inode_read: error: io downcall status.\n");
+            int dc_status = new_op->downcall.status;
 
           error_exit:
             /* this macro is defined in pvfs2-kernel.h */
@@ -143,8 +143,12 @@ ssize_t pvfs2_inode_read(
             }
             else
             {
-                pvfs2_error("pvfs2_inode_read: returning error %d "
-                            "(error_exit=%d)\n", ret, error_exit);
+                pvfs2_error(
+                    "pvfs2_inode_read: error reading from handle %Lu, "
+                    "\n  -- downcall status is %d, returning %d "
+                    "(error_exit=%d)\n",
+                    Lu(pvfs2_ino_to_handle(inode->i_ino)),
+                    dc_status, ret, error_exit);
             }
             return ret;
         }
@@ -287,7 +291,7 @@ static ssize_t pvfs2_file_write(
 
         if (new_op->downcall.status != 0)
         {
-            pvfs2_error("pvfs2_file_write: io downcall status error\n");
+            int dc_status = new_op->downcall.status;
 
           error_exit:
             /* this macro is defined in pvfs2-kernel.h */
@@ -305,8 +309,14 @@ static ssize_t pvfs2_file_write(
             }
             else
             {
-                pvfs2_error("pvfs2_file_write: returning error %d "
-                            "(error_exit=%d)\n", ret, error_exit);
+                pvfs2_error(
+                    "pvfs2_inode_write: error writing to handle %Lu, "
+                    "FILE: %s\n  -- downcall status is %d, returning %d "
+                    "(error_exit=%d)\n",
+                    Lu(pvfs2_ino_to_handle(inode->i_ino)),
+                    (file && file->f_dentry && file->f_dentry->d_name.name ?
+                     (char *)file->f_dentry->d_name.name : "UNKNOWN"),
+                    dc_status, ret, error_exit);
             }
             return ret;
         }

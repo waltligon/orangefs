@@ -638,18 +638,16 @@ do {                                                      \
     {                                                     \
         ret = pvfs2_cancel_op_in_progress(new_op->tag);   \
         op_release(new_op);                               \
-        pvfs_bufmap_put(buffer_index);                    \
     }                                                     \
     else                                                  \
     {                                                     \
         ret = pvfs2_kernel_error_code_convert(            \
                  new_op->downcall.status);                \
         translate_error_if_wait_failed(ret, -EIO, 0);     \
-        *offset = original_offset;                        \
         wake_up_device_for_return(new_op);                \
-        pvfs_bufmap_put(buffer_index);                    \
     }                                                     \
     *offset = original_offset;                            \
+    pvfs_bufmap_put(buffer_index);                        \
 } while(0)
 
 #define get_interruptible_flag(inode)                     \
