@@ -16,15 +16,15 @@ if [ $? != 0 ] ; then
     exit 1
 fi
 
-echo $pvfs2bindir/pvfs2-export /tmp/pvfs2-pav-mount/simple-test /home/pcarns/nightly/simple-test
-$pvfs2bindir/pvfs2-export /tmp/pvfs2-pav-mount/simple-test /home/pcarns/nightly/simple-test
+echo $pvfs2bindir/pvfs2-export /tmp/pvfs2-pav-mount/simple-test /tmp/simple-test
+$pvfs2bindir/pvfs2-export /tmp/pvfs2-pav-mount/simple-test /tmp/simple-test
 if [ $? != 0 ] ; then
     echo "export failed. Aborting."
     exit 1
 fi
 
-echo diff $pvfs2bindir/pvfs2-import /home/pcarns/nightly/simple-test
-diff $pvfs2bindir/pvfs2-import /home/pcarns/nightly/simple-test
+echo diff $pvfs2bindir/pvfs2-import /tmp/simple-test
+diff $pvfs2bindir/pvfs2-import /tmp/simple-test
 if [ $? != 0 ] ; then
     echo "diff failed. Aborting."
     exit 1
