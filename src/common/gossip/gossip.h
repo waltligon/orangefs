@@ -1,34 +1,19 @@
 /*
- * copyright (c) 2000-2003 Clemson University, all rights reserved.
+ * (C) 2001 Clemson University and The University of Chicago
  *
- * Written by Phil Carns.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published
- * by the Free Software Foundation; either version 2 of the License,
- * or any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- * General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
- *
- * Contacts:  Phil Carns  pcarns@parl.clemson.edu
+ * See COPYING in top-level directory.
  */
+
 
 /*
  * April 2001
  *
  * This is a basic application logging facility.  It uses printf style
  * formatting and provides several mechanisms for output. 
- */ 
+ */
 
 #ifndef __GOSSIP_H
-#define __GOSSIP_H 
+#define __GOSSIP_H
 
 #include <syslog.h>
 
@@ -36,29 +21,41 @@
  * Visible interface
  */
 
-int gossip_enable_syslog(int priority);
-int gossip_enable_stderr(void);
-int gossip_enable_file(const char* filename, const char* mode);
-int gossip_disable(void);
-int gossip_set_debug_mask(int debug_on, int mask);
+int gossip_enable_syslog(
+    int priority);
+int gossip_enable_stderr(
+    void);
+int gossip_enable_file(
+    const char *filename,
+    const char *mode);
+int gossip_disable(
+    void);
+int gossip_set_debug_mask(
+    int debug_on,
+    int mask);
 
 
 #ifdef __GNUC__
 
 /* do printf style type checking if built with gcc */
-int __gossip_debug(int mask, const char* format, ...) __attribute__ ((format (printf, 2, 3)));
-int gossip_err(const char* format, ...) __attribute__ ((format (printf, 1, 2)));
+int __gossip_debug(
+    int mask,
+    const char *format,
+    ...) __attribute__ ((format(printf, 2, 3)));
+int gossip_err(
+    const char *format,
+    ...) __attribute__ ((format(printf, 1, 2)));
 
 #ifdef GOSSIP_DISABLE_DEBUG
-    #define gossip_debug(mask, format, f...)	\
+#define gossip_debug(mask, format, f...)	\
 	do { } while(0)
 #else
-    extern int gossip_debug_on;
-    extern int gossip_debug_mask;
-    extern int gossip_facility;
+extern int gossip_debug_on;
+extern int gossip_debug_mask;
+extern int gossip_facility;
 
     /* try to avoid function call overhead by checking masks in macro */
-    #define gossip_debug(mask, format, f...)						\
+#define gossip_debug(mask, format, f...)						\
         do {										\
 	    if ((gossip_debug_on) && (gossip_debug_mask & mask) && (gossip_facility))	\
             {										\
@@ -81,16 +78,24 @@ int gossip_err(const char* format, ...) __attribute__ ((format (printf, 1, 2)));
 	} while(0)
 #else /* ! __GNUC__ */
 
-int __gossip_debug(int mask, const char* format, ...);
-int __gossip_debug_stub(int mask, const char* format, ...);
-int gossip_err(const char* format, ...);
+int __gossip_debug(
+    int mask,
+    const char *format,
+    ...);
+int __gossip_debug_stub(
+    int mask,
+    const char *format,
+    ...);
+int gossip_err(
+    const char *format,
+    ...);
 
 #ifdef GOSSIP_DISABLE_DEBUG
-    #define gossip_debug __gossip_debug_stub
-    #define gossip_ldebug __gossip_debug_stub
+#define gossip_debug __gossip_debug_stub
+#define gossip_ldebug __gossip_debug_stub
 #else
-    #define gossip_debug __gossip_debug
-    #define gossip_ldebug __gossip_debug
+#define gossip_debug __gossip_debug
+#define gossip_ldebug __gossip_debug
 #endif /* GOSSIP_DISABLE_DEBUG */
 
 #define gossip_lerr gossip_err
