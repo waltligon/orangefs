@@ -547,7 +547,7 @@ root@cluster1:~# for i in `seq 1 8`; do
 > done
 \end{verbatim}
 
-\subsection{starting the servers}
+\subsection{Starting the servers}
 
 As with the single-machine case, you must run pvfs2-server with a special
 argument to create the storage space on all the nodes if it does not already
@@ -829,5 +829,18 @@ and server state machines.  \emph{WARNING: this may result in extremely
 large log files!}  The logging masks can also be set at runtime using the
 pvfs2-set-debugmask command line tool.  Usage information and a list of
 supported masks will be shown if it is run with no arguments.
+
+Similarly, run-time client debugging information can be gathered by
+using environment variables before running the client application.
+The default client logging method is to set the variable
+PVFS2\_DEBUGMASK to values such as ``client,network''.  Many of the
+supported client debugging masks overlap the server masks that can be
+verified using pvfs2-set-debugmask.  By default, setting
+PVFS2\_DEBUGMASK emits debugging information to stderr, often
+intermixed with the client program output.  If you'd like to redirect
+client debugging to a file, set the PVFS2\_DEBUGFILE environment
+variable to a valid file name.  This causes all debug information
+specified by the PVFS2\_DEBUGMASK to be stored in the file specified,
+no longer intermixing the output with the client program.
 
 \end{document}
