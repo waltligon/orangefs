@@ -384,6 +384,29 @@ int main(int argc, char **argv)
     return -1;
 }
 
+static const char *pidfile = 0;
+
+static void
+create_pidfile(void)
+{
+    FILE *fp;
+
+    unlink(pidfile);
+    fp = fopen(pidfile, "w");
+    if (!fp)
+	gossip_err("Open pid file %s: %s\n", pidfile, strerror(errno));
+    fprintf(fp, "%d\n", getpid());
+    fchmod(fileno(fp), 0644);
+    fclose(fp);  /* force flush */
+}
+
+static void
+remove_pidfile(void)
+{
+    if (pidfile)
+	unlink(pidfile);
+}
+
 /* server_initialize()
  *
  * Handles:
@@ -407,6 +430,11 @@ static int server_initialize(
 	gossip_err("Error: Could not start server; aborting.\n");
         return ret;
     }
+
+    /* optionally manage a pid file for init scripts */
+    if (pidfile)
+	create_pidfile();
+    atexit(remove_pidfile);
 
     /* Initialize the bmi, flow, trove and job interfaces */
     ret = server_initialize_subsystems(server_status_flag);
@@ -1049,6 +1077,7 @@ static void usage(int argc, char **argv)
                "remove file system storage and exit\n");
     gossip_err("  -v, --version\t\toutput version information "
                "and exit\n");
+    gossip_err("  -p, --pidfile <file>\twrite process id to file\n");
 }
 
 static int server_parse_cmd_line_args(int argc, char **argv)
@@ -1062,10 +1091,11 @@ static int server_parse_cmd_line_args(int argc, char **argv)
         {"help",0,0,0},
         {"rmfs",0,0,0},
         {"version",0,0,0},
+        {"pidfile",1,0,0},
         {0,0,0,0}
     };
 
-    while ((ret = getopt_long(argc, argv,"dfhrv",
+    while ((ret = getopt_long(argc, argv,"dfhrvp",
                               long_opts, &option_index)) != -1)
     {
 	switch (ret)
@@ -1094,6 +1124,10 @@ static int server_parse_cmd_line_args(int argc, char **argv)
                 {
                     goto do_version;
                 }
+                else if (strcmp("pidfile", cur_option) == 0)
+                {
+                    goto do_pidfile;
+                }
                 break;
             case 'v':
           do_version:
@@ -1110,6 +1144,10 @@ static int server_parse_cmd_line_args(int argc, char **argv)
 	    case 'd':
           do_foreground:
 		server_background = 0;
+		break;
+	    case 'p':
+	  do_pidfile:
+		pidfile = optarg;
 		break;
 	    case '?':
 	    case 'h':
