@@ -96,6 +96,7 @@ int PINT_do_lookup (PVFS_string name,pinode_reference parent,
         /* we should never get multiple handles back for the meta file*/
         if (ack_p->u.lookup_path.count != 1)
         {
+	    ret = -EINVAL;
             failure = INVAL_LOOKUP_FAILURE;
             goto return_error;
         }
