@@ -287,6 +287,65 @@ int PINT_bucket_get_next_io(
 }
 
 
+/* PINT_bucket_count_servers()
+ *
+ * counts the number of phyical servers of the specified type
+ *
+ * returns 0 on success, -errno on failure
+ */
+int PINT_bucket_count_servers(struct server_configuration_s* config,
+    PVFS_fs_id fsid, 
+    int server_type,
+    int* count)
+{
+    int ret = -EINVAL;
+    struct qlist_head *hash_link = NULL;
+    struct config_fs_cache_s *cur_config_cache = NULL;
+
+    if (!(config && server_type))
+    {
+	return(-EINVAL);
+    }
+
+    /* find the correct fs in our config information */
+    hash_link = qhash_search(PINT_fsid_config_cache_table,&(fsid));
+    if (!hash_link)
+    {
+	return(-EINVAL);
+    }
+    cur_config_cache =
+	qlist_entry(hash_link, struct config_fs_cache_s,
+		    hash_link);
+    assert(cur_config_cache);
+    assert(cur_config_cache->fs);
+
+    ret = cache_server_array(config, fsid);
+    if(ret < 0)
+    {
+	return(ret);
+    }
+
+    if(server_type == PINT_BUCKET_META)
+    {
+	*count = cur_config_cache->fs->meta_server_count;
+	return(0);
+    }
+    else if(server_type == PINT_BUCKET_IO)
+    {
+	*count = cur_config_cache->fs->io_server_count;
+	return(0);
+    }
+    else if(server_type == (PINT_BUCKET_META|PINT_BUCKET_IO))
+    {
+	*count = cur_config_cache->fs->server_count;
+	return(0);
+    }
+    else
+    {
+	return(-EINVAL);
+    }
+}
+
 /* PINT_bucket_get_server_array()
  *
  * fills in an array of addresses corresponding to each server of the
@@ -356,7 +415,7 @@ int PINT_bucket_get_server_array(
 	return(0);
 
     }
-    else if (server_type == (PINT_BUCKET_META & PINT_BUCKET_IO))
+    else if (server_type == (PINT_BUCKET_META | PINT_BUCKET_IO))
     {
 	if(*inout_count_p < cur_config_cache->fs->server_count)
 	    return(-EMSGSIZE);
@@ -768,8 +827,9 @@ static int cache_server_array(
     bmi_addr_t tmp_bmi_addr;
     int dup_flag = 0;
     int i;
+    int j;
     int current = 0;
-    int array_index,array_index2 = 0;
+    int array_index = 0,array_index2 = 0;
 
     if (!config)
     {
@@ -799,15 +859,19 @@ static int cache_server_array(
 	/* iterate through lists to come up with an upper bound for the 
 	 * size of the arrays that we need 
 	 */
+	tmp_server = cur_config_cache->fs->meta_handle_ranges;
 	while((cur_mapping = 
-	    PINT_llist_head(cur_config_cache->fs->meta_handle_ranges)))
+	    PINT_llist_head(tmp_server)))
 	{
+	    tmp_server = PINT_llist_next(tmp_server);
 	    cur_config_cache->fs->meta_server_count++;
 	    cur_config_cache->fs->server_count++;
 	}
+	tmp_server = cur_config_cache->fs->data_handle_ranges;
 	while((cur_mapping = 
-	    PINT_llist_head(cur_config_cache->fs->data_handle_ranges)))
+	    PINT_llist_head(tmp_server)))
 	{
+	    tmp_server = PINT_llist_next(tmp_server);
 	    cur_config_cache->fs->io_server_count++;
 	    cur_config_cache->fs->server_count++;
 	}
@@ -863,9 +927,9 @@ static int cache_server_array(
 
 		/* see if we have already listed this BMI address */
 		dup_flag = 0;
-		for(i=0; i<array_index; i++)
+		for(j=0; j<array_index; j++)
 		{
-		    if(cur_config_cache->fs->server_array[i].addr
+		    if(cur_config_cache->fs->server_array[j].addr
 			== tmp_bmi_addr)
 		    {
 			dup_flag = 1;

@@ -30,7 +30,8 @@ int PVFS_sys_statfs(
     PVFS_size min_bytes_total = 0;
 
     /* first, determine how many servers are in the file system */
-    ret = PVFS_mgmt_count_servers(fs_id, credentials, &num_servers);
+    ret = PVFS_mgmt_count_servers(fs_id, credentials, 
+	(PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER), &num_servers);
     if(ret < 0)
     {
 	return(ret);

@@ -81,6 +81,12 @@ int PINT_bucket_get_server_array(
     PVFS_id_gen_t* addr_array,
     int* inout_count_p);
 
+int PINT_bucket_count_servers(
+    struct server_configuration_s* config,
+    PVFS_fs_id fsid,
+    int server_type,
+    int* count);
+
 int PINT_bucket_map_to_server(
     bmi_addr_t *server_addr,
     PVFS_handle handle,

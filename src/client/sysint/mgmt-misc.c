@@ -30,20 +30,11 @@ extern struct server_configuration_s g_server_config;
 int PVFS_mgmt_count_servers(
     PVFS_fs_id fs_id,
     PVFS_credentials credentials,
+    int server_type,
     int* count)
 {
-    int ret = -1;
-    struct PINT_bucket_server_info* info_array;
-
-    ret = PINT_collect_physical_server_info(fs_id, count, &info_array);
-
-    /* the above call allocates an array of information, actually not 
-     * needed here 
-     */
-    if(ret == 0)
-	free(info_array);
-    
-    return(ret);
+    return(PINT_bucket_count_servers(&g_server_config,
+	fs_id, server_type, count));
 }
 
 /* PVFS_mgmt_build_virt_server_list()

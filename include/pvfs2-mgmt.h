@@ -33,6 +33,7 @@ enum
 int PVFS_mgmt_count_servers(
     PVFS_fs_id fs_id,
     PVFS_credentials credentials,
+    int server_type,
     int* count);
 
 int PVFS_mgmt_setparam_all(
