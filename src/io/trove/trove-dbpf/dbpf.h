@@ -408,53 +408,53 @@ do {                                                      \
         {                                                 \
             tmp_errno = errno;                            \
             ret = -trove_errno_to_trove_error(tmp_errno); \
-            gossip_err("aio fd [%d] sync failed: %s\n",fd,\
+            gossip_err("aio fd [%d] SYNC failed: %s\n",fd,\
                        strerror(tmp_errno));              \
         }                                                 \
         gossip_debug(                                     \
-          GOSSIP_TROVE_DEBUG,"aio fd [%d] sync called "   \
+          GOSSIP_TROVE_DEBUG, "aio fd [%d] SYNC called "  \
           "servicing op type %s\n", fd,                   \
           dbpf_op_type_to_str(dbpf_op_ptr->type));        \
     }                                                     \
 } while(0)
 
-#define DBPF_ERROR_SYNC_IF_NECESSARY(dbpf_op_ptr, fd)\
-do {                                                 \
-    int tmp_ret, tmp_errno;                          \
-    if (dbpf_op_ptr->flags & TROVE_SYNC)             \
-    {                                                \
-        if ((tmp_ret = DBPF_SYNC(fd)) != 0)          \
-        {                                            \
-            tmp_errno = errno;                       \
-            gossip_err("fd [%d] sync failed: %s\n",  \
-                       fd, strerror(tmp_errno));     \
+#define DBPF_ERROR_SYNC_IF_NECESSARY(dbpf_op_ptr, fd)    \
+do {                                                     \
+    int tmp_ret, tmp_errno;                              \
+    if (dbpf_op_ptr->flags & TROVE_SYNC)                 \
+    {                                                    \
+        if ((tmp_ret = DBPF_SYNC(fd)) != 0)              \
+        {                                                \
+            tmp_errno = errno;                           \
+            gossip_err("fd [%d] SYNC failed: %s\n",      \
+                       fd, strerror(tmp_errno));         \
             ret = -trove_errno_to_trove_error(tmp_errno);\
-            goto return_error;                       \
-        }                                            \
-        gossip_debug(                                \
-          GOSSIP_TROVE_DEBUG,"fd [%d] sync called "  \
-          "servicing op type %s\n", fd,              \
-          dbpf_op_type_to_str(dbpf_op_ptr->type));   \
-    }                                                \
+            goto return_error;                           \
+        }                                                \
+        gossip_debug(                                    \
+          GOSSIP_TROVE_DEBUG,"fd [%d] SYNC called "      \
+          "servicing op type %s\n", fd,                  \
+          dbpf_op_type_to_str(dbpf_op_ptr->type));       \
+    }                                                    \
 } while(0)
 
-#define DBPF_DB_SYNC_IF_NECESSARY(dbpf_op_ptr, db_ptr) \
-do {                                                   \
-    int tmp_ret;                                       \
-    if (dbpf_op_ptr->flags & TROVE_SYNC)               \
-    {                                                  \
-        if ((tmp_ret = db_ptr->sync(db_ptr, 0)) != 0)  \
-        {                                              \
-            gossip_err("db_p->sync failed: %s\n",      \
-                       db_strerror(tmp_ret));          \
-            ret = -dbpf_db_error_to_trove_error(tmp_ret);  \
-            goto return_error;                         \
-        }                                              \
-        gossip_debug(                                  \
-          GOSSIP_TROVE_DEBUG,"db_p->sync called "      \
-          "servicing op type %s\n",                    \
-          dbpf_op_type_to_str(dbpf_op_ptr->type));     \
-    }                                                  \
+#define DBPF_DB_SYNC_IF_NECESSARY(dbpf_op_ptr, db_ptr)   \
+do {                                                     \
+    int tmp_ret;                                         \
+    if (dbpf_op_ptr->flags & TROVE_SYNC)                 \
+    {                                                    \
+        if ((tmp_ret = db_ptr->sync(db_ptr, 0)) != 0)    \
+        {                                                \
+            gossip_err("db SYNC failed: %s\n",           \
+                       db_strerror(tmp_ret));            \
+            ret = -dbpf_db_error_to_trove_error(tmp_ret);\
+            goto return_error;                           \
+        }                                                \
+        gossip_debug(                                    \
+          GOSSIP_TROVE_DEBUG, "db SYNC called "          \
+          "servicing op type %s\n",                      \
+          dbpf_op_type_to_str(dbpf_op_ptr->type));       \
+    }                                                    \
 } while(0)
 
 

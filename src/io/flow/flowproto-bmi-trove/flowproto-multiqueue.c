@@ -1962,7 +1962,7 @@ static int cancel_pending_trove(struct qlist_head *list)
 #ifdef __PVFS2_TROVE_SUPPORT__
 static int get_data_sync_mode(TROVE_coll_id coll_id)
 {
-    int mode = 0;
+    int mode = TROVE_SYNC;
     id_sync_mode_t *cur_info = NULL;
     struct qlist_head *tmp_link = NULL;
 
@@ -1975,6 +1975,8 @@ static int get_data_sync_mode(TROVE_coll_id coll_id)
             break;
         }
     }
+    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, "get_data_sync_mode "
+                 "returning %d\n", mode);
     return mode;
 }
 #endif
