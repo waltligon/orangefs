@@ -26,4 +26,4 @@ LIBSRC += \
 
 # rule for automatically generated source files
 $(SERVERGENSRC): %.c: %.sm src/common/statecomp/statecomp
-	src/common/statecomp/statecomp $<
+	src/common/statecomp/statecomp $< $@

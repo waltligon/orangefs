@@ -88,18 +88,17 @@ static void parse_args(int argc, char **argv)
 	if (optind == argc)
 	{
 		/* input file name missing */
-		fprintf(stderr, "usage: %s [-l] input_file.sm\n", argv[0]);
+		fprintf(stderr, "usage: %s [-l] input_file.sm [output_file.c]\n", argv[0]);
 		exit(-1);
 	}
 	/* we have an input file argument */
-	file_name_size = strlen(argv[optind]);
-	file_name = malloc(file_name_size);
-	strcpy (file_name, argv[optind]);
 	/* let's see if it has the suffix */
-	if (strcmp(&file_name[file_name_size-3], ".sm"))
+	file_name = argv[optind];
+	file_name_size = strlen(file_name) + 1;
+	if (file_name_size <= 4 || strcmp(&file_name[file_name_size-4], ".sm"))
 	{
 		/* input file name has wrong suffix */
-		fprintf(stderr, "usage: %s [-l] input_file.sm\n", argv[0]);
+		fprintf(stderr, "usage: %s [-l] input_file.sm [output_file.c]\n", argv[0]);
 		exit(-1);
 	}
 	/* open input file as stdin */
@@ -109,21 +108,34 @@ static void parse_args(int argc, char **argv)
 		perror("opening input file");
 		exit(-1);
 	}
-	/* construct output file name */
-	file_name[file_name_size-2] = 'c';
-	file_name[file_name_size-1] = 0;
-	/* open output file */
-	if (!(out_file = fopen(file_name, "w")))
-	{
+	if (argc == optind + 1) {
+	    /* construct output file name from input file name */
+	    file_name = malloc(file_name_size);
+	    strcpy (file_name, argv[optind]);
+	    file_name[file_name_size-3] = 'c';
+	    file_name[file_name_size-2] = 0;
+	    /* open output file */
+	    if (!(out_file = fopen(file_name, "w")))
+	    {
 		/* error opening output file */
 		perror("opening output file");
 		exit(-1);
+	    }
+	    free(file_name);
+	}
+	else {
+	    if (!(out_file = fopen(argv[optind+1], "w")))
+	    {
+		/* error opening output file */
+		perror("opening output file");
+		exit(-1);
+	    }
 	}
 	/* check for any extra arguments */
-	if (argc > optind+1)
+	if (argc > optind + 2)
 	{
 		/* report we are ignoring them */
-		fprintf(stderr, "usage: %s [-l] input_file.sm\n", argv[0]);
+		fprintf(stderr, "usage: %s [-l] input_file.sm [output_file.c]\n", argv[0]);
 		fprintf(stderr, "ignoring extra arguments\n");
 	}
 }
