@@ -74,8 +74,8 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc *user_desc)
     }
 
     /* allocate storage to track our page mappings */
-    bufmap_page_array = (struct page**)kmalloc(
-        BUFMAP_PAGE_COUNT*sizeof(struct page*), PVFS2_BUFMAP_GFP_FLAGS);
+    bufmap_page_array = (struct page **)kmalloc(
+        BUFMAP_PAGE_COUNT*sizeof(struct page *), PVFS2_BUFMAP_GFP_FLAGS);
     if (!bufmap_page_array)
     {
         ret = -ENOMEM;
@@ -138,7 +138,7 @@ int pvfs_bufmap_initialize(struct PVFS_dev_map_desc *user_desc)
         desc_array[i].page_array = &bufmap_page_array[offset];
         desc_array[i].array_count = PAGES_PER_DESC;
         desc_array[i].uaddr =
-            (user_desc->ptr + (i * PAGES_PER_DESC*PAGE_SIZE));
+            (user_desc->ptr + (i * PAGES_PER_DESC * PAGE_SIZE));
         offset += PAGES_PER_DESC;
     }
 
@@ -275,6 +275,9 @@ int pvfs_bufmap_copy_to_user(void *to, int buffer_index, int size)
     void *offset = to, *from_kaddr = NULL;
     struct pvfs_bufmap_desc *from = &desc_array[buffer_index];
 
+    pvfs2_print("pvfs_bufmap_copy_to_user: to %p, from %p, index %d, "
+                "size %d\n", to, from, buffer_index, size);
+
     if (bufmap_init == 0)
     {
         pvfs2_print("pvfs2_bufmap_copy_to_user: not yet "
@@ -305,6 +308,9 @@ int pvfs_bufmap_copy_to_kernel(void *to, int buffer_index, int size)
     int cur_copy_size = 0, index = 0;
     void *offset = to, *from_kaddr = NULL;
     struct pvfs_bufmap_desc *from = &desc_array[buffer_index];
+
+    pvfs2_print("pvfs_bufmap_copy_to_kernel: to %p, index %d, size %d\n",
+                to, buffer_index, size);
 
     if (bufmap_init == 0)
     {
@@ -342,6 +348,9 @@ int pvfs_bufmap_copy_from_user(int buffer_index, void *from, int size)
     int cur_copy_size = 0, index = 0;
     void *offset = from, *to_kaddr = NULL;
     struct pvfs_bufmap_desc *to = &desc_array[buffer_index];
+
+    pvfs2_print("pvfs_bufmap_copy_from_user: from %p, index %d, "
+                "size %d\n", from, buffer_index, size);
 
     if (bufmap_init == 0)
     {

@@ -135,26 +135,26 @@ int PINT_dev_get_mapped_region(struct PVFS_dev_map_desc *desc, int size)
     /* we would like to use a memaligned region that is a multiple
      * of the system page size
      */
-    page_count = size/page_size;
-    if ((size%page_size) != 0)
+    page_count = (int)(size / page_size);
+    if ((size % page_size) != 0)
     {
         page_count++;
     }
 
     desc->ptr = PINT_mem_aligned_alloc(
-        (page_count*page_size), page_size);
+        (page_count * page_size), page_size);
     if (!desc->ptr)
     {
-        return(-(PVFS_ENOMEM|PVFS_ERROR_DEV));
+        return -(PVFS_ENOMEM|PVFS_ERROR_DEV);
     }
     desc->size = (page_count * page_size);
-    
+
     /* ioctl to ask driver to map pages */
     ret = ioctl(pdev_fd, PVFS_DEV_MAP, desc);
     if (ret < 0)
     {
         free(desc->ptr);
-        return(-(PVFS_ENOMEM|PVFS_ERROR_DEV));
+        return -(PVFS_ENOMEM|PVFS_ERROR_DEV);
     }
     return 0;
 }

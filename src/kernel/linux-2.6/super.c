@@ -237,19 +237,16 @@ static void pvfs2_read_inode(
         pvfs2_inode_initialize(pvfs2_inode);
         inode->u.generic_ip = pvfs2_inode;
         pvfs2_inode->vfs_inode = inode;
+
+        if (pvfs2_inode_getattr(inode) != 0)
+        {
+            pvfs2_make_bad_inode(inode);
+        }
     }
     else
     {
         pvfs2_error("Could not allocate pvfs2_inode from "
                     "pvfs2_inode_cache\n");
-        pvfs2_make_bad_inode(inode);
-        return;
-    }
-
-    /* Need to do a getattr() on the inode */
-    if (pvfs2_inode_getattr(inode) != 0)
-    {
-        /* flag any I/O errors */
         pvfs2_make_bad_inode(inode);
     }
 }

@@ -354,24 +354,12 @@ struct inode *pvfs2_get_custom_inode(
                         "DATA NOT ALLOCATED\n");
             return NULL;
         }
-	else
-        {
-	    pvfs2_inode->refn.handle = PVFS_HANDLE_NULL;
-	    pvfs2_inode->refn.fs_id = PVFS_FS_ID_NULL;
-        }
-	pvfs2_print("pvfs2_get_custom_inode: inode %p allocated\n  "
-		    "(pvfs2_inode is %p | sb is %p)\n", inode,
-		    pvfs2_inode, inode->i_sb);
 
-	inode->i_mode = mode;
+        inode->i_mode = mode;
         inode->i_mapping->host = inode;
-	inode->i_mapping->a_ops = &pvfs2_address_operations;
-#ifndef PVFS2_LINUX_KERNEL_2_4
-	inode->i_mapping->backing_dev_info = &pvfs2_backing_dev_info;
-#endif
-	inode->i_uid = current->fsuid;
-	inode->i_gid = current->fsgid;
-	inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
+        inode->i_uid = current->fsuid;
+        inode->i_gid = current->fsgid;
+        inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
         inode->i_size = PAGE_CACHE_SIZE;
         inode->i_blksize = PAGE_CACHE_SIZE;
         inode->i_blkbits = PAGE_CACHE_SHIFT;
@@ -379,6 +367,14 @@ struct inode *pvfs2_get_custom_inode(
         inode->i_rdev = dev;
         inode->i_bdev = NULL;
         inode->i_cdev = NULL;
+        inode->i_mapping->a_ops = &pvfs2_address_operations;
+#ifndef PVFS2_LINUX_KERNEL_2_4
+        inode->i_mapping->backing_dev_info = &pvfs2_backing_dev_info;
+#endif
+
+	pvfs2_print("pvfs2_get_custom_inode: inode %p allocated\n  "
+		    "(pvfs2_inode is %p | sb is %p)\n", inode,
+		    pvfs2_inode, inode->i_sb);
 
         if ((mode & S_IFMT) == S_IFREG)
         {

@@ -332,11 +332,11 @@ int pvfs2_inode_getattr(struct inode *inode)
            if the inode were already in the inode cache, it looks like:
            lookup --> revalidate --> here
         */
-        if (pvfs2_inode->refn.handle == 0)
+        if (pvfs2_inode->refn.handle == PVFS_HANDLE_NULL)
         {
             pvfs2_inode->refn.handle = pvfs2_ino_to_handle(inode->i_ino);
         }
-        if (pvfs2_inode->refn.fs_id == 0)
+        if (pvfs2_inode->refn.fs_id == PVFS_FS_ID_NULL)
         {
             pvfs2_inode->refn.fs_id = PVFS2_SB(inode->i_sb)->fs_id;
         }
