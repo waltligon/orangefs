@@ -24,6 +24,9 @@ dnl fi
 dnl Check byte ordering
 AC_C_BIGENDIAN
 
+dnl Check size of pointer type; needed by id-generator
+AC_CHECK_SIZEOF(void *)
+
 dnl Options for debugging
 dnl This particular one enables tracing of memory allocation and
 dnl    freeing with the mtrace tool

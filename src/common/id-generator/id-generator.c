@@ -35,6 +35,7 @@
 #include <stdlib.h>
 #include <inttypes.h>
 #include <id-generator.h>
+#include "pvfs2-config.h"
 
 /* id_gen_fast_register()
  * 
@@ -51,13 +52,13 @@ int id_gen_fast_register(id_gen_t* new_id, void* item)
 		return(-EINVAL);
 	}
 
-#if __WORDSIZE == 32
+#if SIZEOF_VOID_P == 4
 	
 	*new_id = 0;
 
 	*new_id += (int32_t)item;
 
-#elif __WORDSIZE == 64
+#elif SIZEOF_VOID_P == 8 
 
 	*new_id = (int64_t)item;
 
@@ -90,13 +91,13 @@ void* id_gen_fast_lookup(id_gen_t id)
 		return(NULL);
 	}
 
-#if __WORDSIZE == 32
+#if SIZEOF_VOID_P == 4
 
 	little_int += id;
 
 	return((void*)little_int);
 
-#elif __WORDSIZE == 64
+#elif SIZEOF_VOID_P == 8
 	
 	return((void*)id);
 
