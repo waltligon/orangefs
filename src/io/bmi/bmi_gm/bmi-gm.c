@@ -2199,7 +2199,7 @@ static void ctrl_put_callback(struct gm_port *port,
     {
 	
 	gossip_lerr("Error: GM send failure, detected in callback.\n");
-	gossip_err("Error: %s (%d)\n", gm_strerror(status), (int)status;
+	gossip_err("Error: %s (%d)\n", gm_strerror(status), (int)status);
 	gossip_err("Sending from %s to %s\n", gm_host_name,
 	    gm_node_id_to_host_name(local_port, gm_addr_data->node_id));
 	op_list_remove(my_op);
