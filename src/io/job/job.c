@@ -251,8 +251,9 @@ int job_bmi_send(
 	if(ret < 0)
 	{
 		/* error posting */
+		out_status_p->error_code = ret;
 		dealloc_job_desc(jd);
-		return(ret);
+		return(1);
 	}
 
 	if(ret == 1)
@@ -334,8 +335,9 @@ int job_bmi_send_list(
 	if(ret < 0)
 	{
 		/* error posting */
+		out_status_p->error_code = ret;
 		dealloc_job_desc(jd);
-		return(ret);
+		return(1);
 	}
 
 	if(ret == 1)
@@ -403,8 +405,9 @@ int job_bmi_recv(
 	if(ret < 0)
 	{
 		/* error posting */
+		out_status_p->error_code = ret;
 		dealloc_job_desc(jd);
-		return(ret);
+		return(1);
 	}
 
 	if(ret == 1)
@@ -477,8 +480,9 @@ int job_bmi_recv_list(
 	if(ret < 0)
 	{
 		/* error posting */
+		out_status_p->error_code = ret;
 		dealloc_job_desc(jd);
-		return(ret);
+		return(1);
 	}
 
 	if(ret == 1)
@@ -620,6 +624,9 @@ int job_req_sched_post(
 
 	ret = PINT_req_sched_post(in_request, jd, &(jd->u.req_sched.id));
 
+	/* NOTE: I am letting the return value propigate here, rather
+	 * than just setting the status.  Failure here is bad...
+	 */
 	if(ret < 0)
 	{
 		/* error posting */
@@ -683,6 +690,9 @@ int job_req_sched_release(
 	
 	dealloc_job_desc(match_jd);
 
+	/* NOTE: I am letting the return value propigate here, rather
+	 * than just setting the status.  Failure here is bad...
+	 */
 	if(ret < 0)
 	{
 		/* error posting */
@@ -737,8 +747,9 @@ int job_flow(flow_descriptor* flow_d, void* user_ptr, job_status_s*
 	ret = PINT_flow_post(flow_d);
 	if(ret < 0)
 	{
+		out_status_p->error_code = ret;
 		dealloc_job_desc(jd);
-		return(ret);
+		return(1);
 	}
 	if(ret == 1)
 	{
