@@ -38,7 +38,7 @@ int pvfs2_mkspace(
     static char root_handle_string[PATH_MAX] = "root_handle";
     PVFS_handle_extent cur_extent;
     PVFS_handle_extent_array extent_array;
-    TROVE_context_id trove_context;
+    TROVE_context_id trove_context = -1;
 
     if (verbose)
     {
@@ -322,7 +322,10 @@ int pvfs2_mkspace(
         }
     }
 
-    trove_close_context(coll_id, trove_context);
+    if (trove_context != -1)
+    {
+        trove_close_context(coll_id, trove_context);
+    }
     trove_finalize();
 
     if (verbose)

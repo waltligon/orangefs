@@ -67,8 +67,12 @@ int dbpf_close_context(
 	return 1;
     }
 
+    /*
+      FIXME: can't free these, as gen_mutex_destroy thinks it can
+      so I have to resort to using pthread_mutex_destroy instead
+    */
+    pthread_mutex_destroy(&dbpf_completion_queue_array_mutex[context_id]);
     dbpf_op_queue_cleanup(dbpf_completion_queue_array[context_id]);
-    gen_mutex_destroy(&dbpf_completion_queue_array_mutex[context_id]);
 
     dbpf_completion_queue_array[context_id] = NULL;
 
