@@ -155,25 +155,20 @@ static int lookup_init(PINT_server_op *s_op, job_status_s *ret)
 
     /* fill in the lookup portion of the PINT_server_op */
     /* NOTE: it would be nice if we just decoded into this in the first place. */
-    s_op->u.lookup.path = s_op->req->u.lookup_path.path;
     s_op->u.lookup.segp = NULL;
-
-    s_op->u.lookup.seg_ct = PINT_string_count_segments(s_op->u.lookup.path);
+    s_op->u.lookup.seg_ct = PINT_string_count_segments(s_op->req->u.lookup_path.path);
     assert(s_op->u.lookup.seg_ct >= 0);
-
-    s_op->u.lookup.base_handle = s_op->req->u.lookup_path.starting_handle;
-    s_op->u.lookup.fs_id       = s_op->req->u.lookup_path.fs_id;
 
     /* allocate memory
      *
-     * Note: all memory is allocated in a single block, pointed to by s_op->u.lookup.h_a
+     * Note: all memory is allocated in a single block, pointed to by s_op->resp->u.lookup_path.handle_array
      */
     ptr = malloc(s_op->u.lookup.seg_ct * (sizeof(PVFS_handle) + sizeof(PVFS_object_attr)));
     assert(ptr != NULL);
 
-    s_op->u.lookup.h_a = (PVFS_handle *) ptr;
+    s_op->resp->u.lookup_path.handle_array = (PVFS_handle *) ptr;
     ptr += s_op->u.lookup.seg_ct * sizeof(PVFS_handle);
-    s_op->u.lookup.oa_a = (PVFS_object_attr *) ptr;
+    s_op->resp->u.lookup_path.attr_array = (PVFS_object_attr *) ptr;
 
     job_post_ret = job_req_sched_post(s_op->req,
 				      s_op,
@@ -211,8 +206,8 @@ static int lookup_read_object_metadata(PINT_server_op *s_op, job_status_s *ret)
     assert(s_op->u.lookup.seg_nr <= s_op->u.lookup.seg_ct);
 
     /* use the base handle if we haven't looked up a segment yet */
-    if (s_op->u.lookup.seg_nr == 0) handle = s_op->u.lookup.base_handle;
-    else                            handle = s_op->u.lookup.h_a[s_op->u.lookup.seg_nr-1];
+    if (s_op->u.lookup.seg_nr == 0) handle = s_op->req->u.lookup_path.starting_handle;
+    else                            handle = s_op->resp->u.lookup_path.handle_array[s_op->u.lookup.seg_nr-1];
 
     /* initialize keyvals prior to read list call
      *
@@ -227,20 +222,20 @@ static int lookup_read_object_metadata(PINT_server_op *s_op, job_status_s *ret)
     s_op->u.lookup.k_a[0].buffer_sz = Trove_Common_Keys[METADATA_KEY].size;
 
     if (s_op->u.lookup.seg_nr == 0) s_op->u.lookup.v_a[0].buffer = &s_op->u.lookup.base_attr;
-    else                            s_op->u.lookup.v_a[0].buffer = &s_op->u.lookup.oa_a[s_op->u.lookup.seg_nr-1];
+    else                            s_op->u.lookup.v_a[0].buffer = &s_op->resp->u.lookup_path.attr_array[s_op->u.lookup.seg_nr-1];
 
     s_op->u.lookup.v_a[0].buffer_sz = sizeof(PVFS_object_attr);
 
     gossip_debug(SERVER_DEBUG,
 		 "  reading metadata (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf =  0x%08x (%d))\n",
-		 s_op->u.lookup.fs_id,
+		 s_op->req->u.lookup_path.fs_id,
 		 handle,
 		 (char *) s_op->u.lookup.k_a->buffer,
 		 s_op->u.lookup.k_a->buffer_sz,
 		 (unsigned) s_op->u.lookup.v_a->buffer,
 		 s_op->u.lookup.v_a->buffer_sz);
 
-    job_post_ret = job_trove_keyval_read(s_op->u.lookup.fs_id,
+    job_post_ret = job_trove_keyval_read(s_op->req->u.lookup_path.fs_id,
 					 handle,
 					 s_op->u.lookup.k_a,
 					 s_op->u.lookup.v_a,
@@ -282,7 +277,7 @@ static int lookup_verify_object_metadata(PINT_server_op *s_op, job_status_s *ret
     gossip_debug(SERVER_DEBUG, "lookup state: lookup_verify_object_metadata\n");
 
     if (s_op->u.lookup.seg_nr == 0) a_p = &s_op->u.lookup.base_attr;
-    else                            a_p = &s_op->u.lookup.oa_a[s_op->u.lookup.seg_nr - 1];
+    else                            a_p = &s_op->resp->u.lookup_path.attr_array[s_op->u.lookup.seg_nr - 1];
 
     assert(a_p->objtype == PVFS_TYPE_DIRECTORY || a_p->objtype == PVFS_TYPE_METAFILE);
 
@@ -309,7 +304,7 @@ static int lookup_verify_object_metadata(PINT_server_op *s_op, job_status_s *ret
     }
 
     /* find the segment that we should look up in the directory */
-    seg_ret = PINT_string_next_segment(s_op->u.lookup.path,
+    seg_ret = PINT_string_next_segment(s_op->req->u.lookup_path.path,
 				       &s_op->u.lookup.segp,
 				       &s_op->u.lookup.segstate);
     assert(seg_ret == 0);
@@ -338,8 +333,8 @@ static int lookup_read_directory_entry_handle(PINT_server_op *s_op, job_status_s
      */
 
     /* use the base handle if we haven't looked up a segment yet */
-    if (s_op->u.lookup.seg_nr == 0) handle = s_op->u.lookup.base_handle;
-    else                            handle = s_op->u.lookup.h_a[s_op->u.lookup.seg_nr-1];
+    if (s_op->u.lookup.seg_nr == 0) handle = s_op->req->u.lookup_path.starting_handle;
+    else                            handle = s_op->resp->u.lookup_path.handle_array[s_op->u.lookup.seg_nr-1];
 
     gossip_debug(SERVER_DEBUG,
 		 "  reading dirent handle value from handle 0x%08Lx\n",
@@ -350,7 +345,7 @@ static int lookup_read_directory_entry_handle(PINT_server_op *s_op, job_status_s
     s_op->u.lookup.v_a[0].buffer    = &s_op->u.lookup.dirent_handle;
     s_op->u.lookup.v_a[0].buffer_sz = sizeof(PVFS_handle);
 
-    job_post_ret = job_trove_keyval_read(s_op->u.lookup.fs_id,
+    job_post_ret = job_trove_keyval_read(s_op->req->u.lookup_path.fs_id,
 					 handle,
 					 s_op->u.lookup.k_a,
 					 s_op->u.lookup.v_a,
@@ -392,12 +387,12 @@ static int lookup_read_directory_entry(PINT_server_op *s_op, job_status_s *ret)
      */
     s_op->u.lookup.k_a[0].buffer    = s_op->u.lookup.segp;
     s_op->u.lookup.k_a[0].buffer_sz = strlen(s_op->u.lookup.segp) + 1;
-    s_op->u.lookup.v_a[0].buffer    = &s_op->u.lookup.h_a[s_op->u.lookup.seg_nr];
+    s_op->u.lookup.v_a[0].buffer    = &s_op->resp->u.lookup_path.handle_array[s_op->u.lookup.seg_nr];
     s_op->u.lookup.v_a[0].buffer_sz = sizeof(PVFS_handle);
 
     s_op->u.lookup.seg_nr++;
 
-    job_post_ret = job_trove_keyval_read(s_op->u.lookup.fs_id,
+    job_post_ret = job_trove_keyval_read(s_op->req->u.lookup_path.fs_id,
 					 s_op->u.lookup.dirent_handle,
 					 s_op->u.lookup.k_a,
 					 s_op->u.lookup.v_a,
@@ -470,8 +465,6 @@ static int lookup_send_response(PINT_server_op *s_op, job_status_s *ret)
     s_op->resp->rsize = sizeof(struct PVFS_server_resp_s) + payload_sz;
     s_op->resp->status = 0; /* ??? */
     s_op->resp->u.lookup_path.count        = s_op->u.lookup.seg_nr; /* # actually completed */
-    s_op->resp->u.lookup_path.handle_array = s_op->u.lookup.h_a;
-    s_op->resp->u.lookup_path.attr_array   = s_op->u.lookup.oa_a;
 
     gossip_debug(SERVER_DEBUG,
 		 "  sending response with %d segment(s) (size %Ld)\n",
@@ -525,7 +518,7 @@ static int lookup_cleanup(PINT_server_op *s_op, job_status_s *ret)
     PINT_encode_release(&(s_op->encoded),PINT_ENCODE_RESP,0);
     PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ,0);
 
-    free(s_op->u.lookup.h_a);
+    free(s_op->resp->u.lookup_path.handle_array);
 
     /*
       BMI_memfree(

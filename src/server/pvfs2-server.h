@@ -4,8 +4,8 @@
  * See COPYING in top-level directory.
  */
 
-#ifndef __PVFS_SERVER_H
-#define __PVFS_SERVER_H
+#ifndef __PVFS2_SERVER_H
+#define __PVFS2_SERVER_H
 
 /* Some config values for the prototype pvfs2 server */
 enum
@@ -38,16 +38,13 @@ typedef enum
  */
 struct PINT_server_lookup_op {
     int seg_ct, seg_nr; /* current segment (0..N), number of segments in the path */
-
-    PVFS_fs_id fs_id;
-
-    char *path, *segp;
+    char *segp;
     void *segstate;
 
-    PVFS_handle base_handle, dirent_handle, *h_a;
-    PVFS_object_attr base_attr, *oa_a;
+    PVFS_handle dirent_handle;
+    PVFS_object_attr base_attr; /* used to hold attributes of the base handle, which don't go in resp */
 
-    PVFS_ds_keyval_s k_a[2], v_a[2];
+    PVFS_ds_keyval_s k_a[1], v_a[1]; /* not sure that this is really necessary... */
 };
 
 /* This structure is passed into the void *ptr 
@@ -60,10 +57,12 @@ typedef struct PINT_server_op
     int strsize;
     int enc_type;
     job_id_t scheduled_id;
+
     PVFS_ds_keyval_s key;
     PVFS_ds_keyval_s val;
     PVFS_ds_keyval_s *key_a;
     PVFS_ds_keyval_s *val_a;
+
     bmi_addr_t addr;
     bmi_msg_tag_t tag;
     PINT_state_array_values *current_state;
