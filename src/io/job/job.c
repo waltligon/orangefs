@@ -1056,7 +1056,8 @@ int job_req_sched_post_timer(int msecs,
     /* if we hit this point, job did not immediately complete-
      * queue to test later
      */
-    *id = jd->job_id;
+    if (id)
+        *id = jd->job_id;
 
     return (0);
 }
@@ -3092,7 +3093,7 @@ int job_null(
  * check for completion of a particular job, don't return until
  * either job completes or timeout expires 
  *
- * returns 0 on success, -errno on failure 
+ * returns 0 if nothing done, 1 if something done, -errno on failure
  */
 int job_test(job_id_t id,
              int *out_count_p,
@@ -3216,7 +3217,7 @@ int job_testsome(job_id_t * id_array,
  * check for completion of a set of jobs, don't return until
  * either all jobs complete or timeout expires 
  *
- * returns 0 on success, -errno on failure
+ * returns 0 if nothing done, 1 if something done, -errno on failure
  */
 int job_testsome(job_id_t * id_array,
                  int *inout_count_p,
@@ -3912,7 +3913,9 @@ static int do_one_test_cycle_req_sched(void)
 }
 
 
-/* TODO: fill in comment */
+/*
+ * Appears to return <0 if problem, 0 if not done, 1 if done.
+ */
 static int completion_query_some(job_id_t * id_array,
                                  int *inout_count_p,
                                  int *out_index_array,
