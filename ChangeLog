@@ -8,6 +8,10 @@ pvfs2-0.0.6pre1
 - improved kernel truncate support
 - fixed ioctl return values so that 'tar -xvzf' works on pvfs2 volumes
 - minor configuration file format changes
+- improved performance monitoring framework
+- pvfs2-vis-bw-2d tool for server throughput monitoring
+- many symbol name cleanups
+- removal of depricated code
 
 
 pvfs2-0.0.5
