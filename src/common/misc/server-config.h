@@ -1,3 +1,9 @@
+/*
+ * (C) 2001 Clemson University and The University of Chicago
+ *
+ * See COPYING in top-level directory.
+ */
+
 #ifndef __SERVER_CONFIG_H
 #define __SERVER_CONFIG_H
 
@@ -58,36 +64,46 @@ typedef struct server_configuration_s
 } server_configuration_s;
 
 int PINT_server_config(
-    struct server_configuration_s *config_s,
-    int argc,char **argv);
+		       struct server_configuration_s *config_s,
+		       char *global_config_filename,
+		       char *server_config_filename);
 
 void PINT_server_config_release(
-    struct server_configuration_s *config_s);
+				struct server_configuration_s *config_s);
 
 char *PINT_server_config_get_host_addr_ptr(
-    struct server_configuration_s *config_s,
-    char *alias);
+					   struct server_configuration_s *config_s,
+					   char *alias);
 
 char *PINT_server_config_get_host_alias_ptr(
-    struct server_configuration_s *config_s,
-    char *bmi_address);
+					    struct server_configuration_s *config_s,
+					    char *bmi_address);
 
 char *PINT_server_config_get_handle_range_str(
-    struct server_configuration_s *config_s,
-    struct filesystem_configuration_s *fs);
+					      struct server_configuration_s *config_s,
+					      struct filesystem_configuration_s *fs);
 
 int PINT_server_config_is_valid_configuration(
-    struct server_configuration_s *config_s);
+					      struct server_configuration_s *config_s);
 
 int PINT_server_config_is_valid_collection_id(
-    struct server_configuration_s *config_s,
-    TROVE_coll_id coll_id);
+					      struct server_configuration_s *config_s,
+					      TROVE_coll_id coll_id);
 
 int PINT_server_config_has_fs_config_info(
-    struct server_configuration_s *config_s,
-    char *fs_name);
+					  struct server_configuration_s *config_s,
+					  char *fs_name);
 
 int PINT_server_config_pvfs2_mkspace(
-    struct server_configuration_s *config);
+				     struct server_configuration_s *config);
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 noexpandtab
+ */
 
 #endif  /* __SERVER_CONFIG_H */

@@ -627,7 +627,6 @@ static int server_parse_config(struct server_configuration_s *config,
     int fs_fd = 0, server_fd = 0;
     char fs_template[] = ".__pvfs_fs_configXXXXXX";
     char server_template[] = ".__pvfs_server_configXXXXXX";
-    char *args[3] = { NULL, fs_template, server_template };
 
     if (config && response)
     {
@@ -658,7 +657,7 @@ static int server_parse_config(struct server_configuration_s *config,
                       (response->server_config_buflen - 1)) ==
                 (response->server_config_buflen - 1))
             {
-                ret = PINT_server_config(config,3,args);
+                ret = PINT_server_config(config, fs_template, server_template);
             }
         }
         close(fs_fd);

@@ -359,7 +359,7 @@ int main(int argc, char **argv)
      *      Read configuration options...
      * function located in server_config.c
      */
-    if (PINT_server_config(&user_opts, argc, argv))
+    if (PINT_server_config(&user_opts, argv[1], argv[2]))
     {
 	gossip_err("Error: Could not read configuration; aborting.\n");
 	goto server_shutdown;

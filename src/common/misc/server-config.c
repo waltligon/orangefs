@@ -1,3 +1,9 @@
+/*
+ * (C) 2001 Clemson University and The University of Chicago
+ *
+ * See COPYING in top-level directory.
+ */
+
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
@@ -39,19 +45,17 @@ static DOTCONF_CB(get_alias_list);
 static DOTCONF_CB(get_range_list);
 
 /* misc helper functions */
-static int cache_config_files(int argc, char **argv);
+static int cache_config_files(char *global_config_filename,
+			      char *server_config_filename);
 static int is_valid_alias(char *str);
 static int is_valid_handle_range_description(char *h_range);
-static int is_populated_filesystem_configuration(
-    struct filesystem_configuration_s *fs);
-static int is_valid_filesystem_configuration(
-    struct filesystem_configuration_s *fs);
+static int is_populated_filesystem_configuration(struct filesystem_configuration_s *fs);
+static int is_valid_filesystem_configuration(struct filesystem_configuration_s *fs);
 static void free_host_handle_mapping(void *ptr);
 static void free_host_alias(void *ptr);
 static void free_filesystem(void *ptr);
-static int is_root_handle_in_my_range(
-    struct server_configuration_s *config_s,
-    struct filesystem_configuration_s *fs);
+static int is_root_handle_in_my_range(struct server_configuration_s *config_s,
+				      struct filesystem_configuration_s *fs);
 
 
 static struct server_configuration_s *config_s = NULL;
@@ -83,17 +87,17 @@ static const configoption_t options[] =
  * Function: PINT_server_config
  *
  * Params:   struct server_configuration_s*,
- *           int argc,
- *           char **argv
+ *           global_config_filename - common config file for all servers
+ *                                    and clients
+ *           server_config_filename - config file specific to one server
+ *                                    (ignored on client side)
  *
  * Returns:  0 on success; 1 on failure
  *
- * Synopsis: Parse the config file according to parameters set
- *           configuration struct above.
- *           
  */
 int PINT_server_config(struct server_configuration_s *config_obj,
-                       int argc, char **argv)
+		       char *global_config_filename,
+		       char *server_config_filename)
 {
     configfile_t *configfile = (configfile_t *)0;
 
@@ -115,7 +119,7 @@ int PINT_server_config(struct server_configuration_s *config_obj,
     config_s->server_config_buf = NULL;
     config_s->server_config_buflen = 0;
 
-    if (cache_config_files(argc,argv))
+    if (cache_config_files(global_config_filename, server_config_filename))
     {
         gossip_err("Failed to read config files.  "
                    "Please make sure they exist and are valid!\n");
@@ -543,8 +547,8 @@ DOTCONF_CB(get_range_list)
 
             if (is_valid_handle_range_description(cmd->data.list[i]))
             {
-                handle_mapping = (host_handle_mapping_s *)malloc(
-                    sizeof(host_handle_mapping_s));
+                handle_mapping = (host_handle_mapping_s *) 
+		    malloc(sizeof(host_handle_mapping_s));
                 assert(handle_mapping);
                 memset(handle_mapping,0,sizeof(host_handle_mapping_s));
 
@@ -680,8 +684,7 @@ static int is_valid_handle_range_description(char *h_range)
     return ret;
 }
 
-static int is_populated_filesystem_configuration(
-    struct filesystem_configuration_s *fs)
+static int is_populated_filesystem_configuration(struct filesystem_configuration_s *fs)
 {
     return ((fs && fs->coll_id && fs->file_system_name &&
              fs->meta_server_list && fs->data_server_list &&
@@ -689,8 +692,8 @@ static int is_populated_filesystem_configuration(
 }
 
 static int is_root_handle_in_my_range(
-    struct server_configuration_s *config,
-    struct filesystem_configuration_s *fs)
+				      struct server_configuration_s *config,
+				      struct filesystem_configuration_s *fs)
 {
     int ret = 0;
     struct llist *cur = NULL;
@@ -716,7 +719,7 @@ static int is_root_handle_in_my_range(
             assert(cur_h_mapping->handle_range);
 
             cur_host_id = PINT_server_config_get_host_addr_ptr(
-                config,cur_h_mapping->host_alias);
+							       config,cur_h_mapping->host_alias);
             if (!cur_host_id)
             {
                 gossip_err("Invalid host ID for alias %s.\n",
@@ -728,7 +731,7 @@ static int is_root_handle_in_my_range(
             if (strcmp(config->host_id,cur_host_id) == 0)
             {
                 extent_list = PINT_create_extent_list(
-                    cur_h_mapping->handle_range);
+						      cur_h_mapping->handle_range);
                 if (!extent_list)
                 {
                     gossip_err("Failed to create extent list.\n");
@@ -736,7 +739,7 @@ static int is_root_handle_in_my_range(
                 }
 
                 ret = PINT_handle_in_extent_list(
-                    extent_list,fs->root_handle);
+						 extent_list,fs->root_handle);
                 PINT_release_extent_list(extent_list);
                 if (ret == 1)
                 {
@@ -749,8 +752,7 @@ static int is_root_handle_in_my_range(
     return ret;
 }
 
-static int is_valid_filesystem_configuration(
-    struct filesystem_configuration_s *fs)
+static int is_valid_filesystem_configuration(struct filesystem_configuration_s *fs)
 {
     int ret = 0;
     struct llist *cur = NULL;
@@ -940,9 +942,8 @@ char *PINT_server_config_get_host_alias_ptr(struct server_configuration_s *confi
  *           filesystem that matches the host specific configuration
  *           
  */
-char *PINT_server_config_get_handle_range_str(
-    struct server_configuration_s *config_s,
-    struct filesystem_configuration_s *fs)
+char *PINT_server_config_get_handle_range_str(struct server_configuration_s *config_s,
+					      struct filesystem_configuration_s *fs)
 {
     char *ret = (char *)0;
     char *my_alias = (char *)0;
@@ -952,7 +953,7 @@ char *PINT_server_config_get_handle_range_str(
     if (config_s && config_s->host_id && fs)
     {
         my_alias = PINT_server_config_get_host_alias_ptr(
-            config_s,config_s->host_id);
+							 config_s,config_s->host_id);
         if (my_alias)
         {
             cur = fs->handle_ranges;
@@ -986,31 +987,39 @@ char *PINT_server_config_get_handle_range_str(
   even if this call fails half way into it, a PINT_server_config_release
   call should properly de-alloc all consumed memory.
 */
-static int cache_config_files(int argc, char **argv)
+static int cache_config_files(char *global_config_filename,
+			      char *server_config_filename)
 {
     int fd = 0, nread = 0;
     struct stat statbuf;
-    char *working_dir = (char *)0;
-    char *fs_config_filename = (char *)0;
-    char *server_config_filename = (char *)0;
+    char *working_dir = NULL;
+    char *my_global_fn = NULL;
+    char *my_server_fn = NULL;
     char buf[512] = {0};
 
     assert(config_s);
 
     working_dir = getenv("PWD");
-    fs_config_filename = (argv[1] ? argv[1] : "fs.conf");
-    server_config_filename = (argv[2] ? argv[2] : "server.conf");
 
-    memset(&statbuf,0,sizeof(struct stat));
-    if (stat(fs_config_filename,&statbuf) == 0)
+    /* pick some filenames if some aren't provided */
+    my_global_fn = ((global_config_filename != NULL) ? global_config_filename : "fs.conf");
+    my_server_fn = ((server_config_filename != NULL) ? server_config_filename : "server.conf");
+
+    memset(&statbuf, 0, sizeof(struct stat));
+    if (stat(my_global_fn, &statbuf) == 0)
     {
-        config_s->fs_config_filename = strdup(fs_config_filename);
+        config_s->fs_config_filename = strdup(my_global_fn);
         config_s->fs_config_buflen = statbuf.st_size + 1;
+    }
+    else if (errno == ENOENT) {
+	gossip_err("Failed to find global config file %s; does not exist.\n",
+		   my_global_fn);
+	return 1;
     }
     else
     {
         assert(working_dir);
-        snprintf(buf,512,"%s/%s",working_dir,fs_config_filename);
+        snprintf(buf, 512, "%s/%s",working_dir, my_global_fn);
         memset(&statbuf,0,sizeof(struct stat));
         if (stat(buf,&statbuf) == 0)
         {
@@ -1027,17 +1036,22 @@ static int cache_config_files(int argc, char **argv)
     }
 
     memset(&statbuf,0,sizeof(struct stat));
-    if (stat(server_config_filename,&statbuf) == 0)
+    if (stat(my_server_fn, &statbuf) == 0)
     {
-        config_s->server_config_filename = strdup(server_config_filename);
+        config_s->server_config_filename = strdup(my_server_fn);
         config_s->server_config_buflen = statbuf.st_size + 1;
+    }
+    else if (errno == ENOENT) {
+	gossip_err("Failed to find server config file %s; does not exist.\n",
+		   my_server_fn);
+	return 1;
     }
     else
     {
         assert(working_dir);
-        snprintf(buf,512,"%s/%s",working_dir,server_config_filename);
-        memset(&statbuf,0,sizeof(struct stat));
-        if (stat(buf,&statbuf) == 0)
+        snprintf(buf, 512, "%s/%s", working_dir, my_server_fn);
+        memset(&statbuf, 0, sizeof(struct stat));
+        if (stat(buf, &statbuf) == 0)
         {
             config_s->server_config_filename = strdup(buf);
             config_s->server_config_buflen = statbuf.st_size + 1;
@@ -1051,37 +1065,39 @@ static int cache_config_files(int argc, char **argv)
         return 1;
     }
 
-    if ((fd = open(fs_config_filename,O_RDONLY)) == -1)
+    if ((fd = open(my_global_fn, O_RDONLY)) == -1)
     {
         gossip_err("Failed to open fs config file %s.\n",
-                   fs_config_filename);
+                   my_global_fn);
         return 1;
     }
 
-    config_s->fs_config_buf = (char *)malloc(config_s->fs_config_buflen);
+    config_s->fs_config_buf = (char *) malloc(config_s->fs_config_buflen);
     if (!config_s->fs_config_buf)
     {
         gossip_err("Failed to allocate %d bytes for caching the fs "
-                   "config file\n",config_s->fs_config_buflen);
+                   "config file\n", config_s->fs_config_buflen);
         return 1;
     }
 
-    memset(config_s->fs_config_buf,0,config_s->fs_config_buflen);
-    nread = read(fd,config_s->fs_config_buf,
+    memset(config_s->fs_config_buf, 0, config_s->fs_config_buflen);
+    nread = read(fd,
+		 config_s->fs_config_buf,
                  (config_s->fs_config_buflen - 1));
     if (nread != (config_s->fs_config_buflen - 1))
     {
         gossip_err("Failed to read fs config file %s (nread is %d)\n",
-                   fs_config_filename,nread);
+                   my_global_fn,
+		   nread);
         close(fd);
         return 1;
     }
     close(fd);
 
-    if ((fd = open(server_config_filename,O_RDONLY)) == -1)
+    if ((fd = open(my_server_fn,O_RDONLY)) == -1)
     {
         gossip_err("Failed to open fs config file %s.\n",
-                   fs_config_filename);
+                   my_server_fn);
         return 1;
     }
 
@@ -1094,13 +1110,15 @@ static int cache_config_files(int argc, char **argv)
         return 1;
     }
 
-    memset(config_s->server_config_buf,0,config_s->server_config_buflen);
-    nread = read(fd,config_s->server_config_buf,
+    memset(config_s->server_config_buf, 0, config_s->server_config_buflen);
+    nread = read(fd,
+		 config_s->server_config_buf,
                  (config_s->server_config_buflen - 1));
     if (nread != (config_s->server_config_buflen - 1))
     {
         gossip_err("Failed to read server config file %s (nread is %d)\n",
-                   server_config_filename,nread);
+                   my_server_fn,
+		   nread);
         close(fd);
         return 1;
     }
@@ -1112,8 +1130,7 @@ static int cache_config_files(int argc, char **argv)
   returns 1 if the specified configuration object is valid
   (i.e. contains values that make sense); 0 otherwise
 */
-int PINT_server_config_is_valid_configuration(
-    struct server_configuration_s *config_s)
+int PINT_server_config_is_valid_configuration(struct server_configuration_s *config_s)
 {
     int ret = 0, fs_count = 0;
     struct llist *cur = NULL;
@@ -1146,8 +1163,8 @@ int PINT_server_config_is_valid_configuration(
   returns 1 if the specified coll_id is valid based on
   the specified server_configuration struct; 0 otherwise
 */
-int PINT_server_config_is_valid_collection_id(
-    struct server_configuration_s *config_s, TROVE_coll_id coll_id)
+int PINT_server_config_is_valid_collection_id(struct server_configuration_s *config_s,
+					      TROVE_coll_id coll_id)
 {
     int ret = 0;
     struct llist *cur = NULL;
@@ -1178,8 +1195,8 @@ int PINT_server_config_is_valid_collection_id(
   returns 1 if the config object has information on the specified
   filesystem; 0 otherwise
 */
-int PINT_server_config_has_fs_config_info(
-    struct server_configuration_s *config_s, char *fs_name)
+int PINT_server_config_has_fs_config_info(struct server_configuration_s *config_s,
+					  char *fs_name)
 {
     int ret = 0;
     struct llist *cur = NULL;
@@ -1231,8 +1248,8 @@ int PINT_server_config_pvfs2_mkspace(struct server_configuration_s *config)
                 break;
             }
 
-            cur_handle_range = PINT_server_config_get_handle_range_str(
-                config,cur_fs);
+            cur_handle_range = PINT_server_config_get_handle_range_str(config,
+								       cur_fs);
             if (!cur_handle_range)
             {
                 gossip_err("Invalid configuration handle range\n");
@@ -1279,6 +1296,10 @@ int PINT_server_config_pvfs2_mkspace(struct server_configuration_s *config)
 }
 
 /*
-  vim:set ts=4:
-  vim:set shiftwidth=4:
-*/
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 noexpandtab
+ */
