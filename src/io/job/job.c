@@ -329,8 +329,6 @@ int job_bmi_send(PVFS_BMI_addr_t addr,
     user_ptr_internal = &jd->bmi_callback;
     JOB_EVENT_START(PVFS_EVENT_BMI_SEND, jd->job_id);
 
-    gen_mutex_lock(&completion_mutex);
-
     /* post appropriate type of send */
     if (!send_unexpected)
     {
@@ -348,7 +346,6 @@ int job_bmi_send(PVFS_BMI_addr_t addr,
     if (ret < 0)
     {
         /* error posting */
-        gen_mutex_unlock(&completion_mutex);
         out_status_p->error_code = ret;
         out_status_p->status_user_tag = status_user_tag;
         JOB_EVENT_END(PVFS_EVENT_BMI_SEND, 0, jd->job_id);
@@ -360,7 +357,6 @@ int job_bmi_send(PVFS_BMI_addr_t addr,
     if (ret == 1)
     {
         /* immediate completion */
-        gen_mutex_unlock(&completion_mutex);
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
         out_status_p->actual_size = size;
@@ -377,9 +373,7 @@ int job_bmi_send(PVFS_BMI_addr_t addr,
     bmi_pending_count++;
     jd->event_type = PVFS_EVENT_BMI_SEND;
 
-    ret = job_time_mgr_add(jd, timeout_sec);
-    gen_mutex_unlock(&completion_mutex);
-    return(ret);
+    return(job_time_mgr_add(jd, timeout_sec));
 }
 
 
@@ -431,7 +425,6 @@ int job_bmi_send_list(PVFS_BMI_addr_t addr,
     user_ptr_internal = &jd->bmi_callback;
     JOB_EVENT_START(PVFS_EVENT_BMI_SEND, jd->job_id);
 
-    gen_mutex_lock(&completion_mutex);
     /* post appropriate type of send */
     if (!send_unexpected)
     {
@@ -452,7 +445,6 @@ int job_bmi_send_list(PVFS_BMI_addr_t addr,
     if (ret < 0)
     {
         /* error posting */
-        gen_mutex_unlock(&completion_mutex);
         out_status_p->error_code = ret;
         out_status_p->status_user_tag = status_user_tag;
         JOB_EVENT_END(PVFS_EVENT_BMI_SEND, 0, jd->job_id);
@@ -464,7 +456,6 @@ int job_bmi_send_list(PVFS_BMI_addr_t addr,
     if (ret == 1)
     {
         /* immediate completion */
-        gen_mutex_unlock(&completion_mutex);
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
         out_status_p->actual_size = total_size;
@@ -480,9 +471,7 @@ int job_bmi_send_list(PVFS_BMI_addr_t addr,
     *id = jd->job_id;
     bmi_pending_count++;
     jd->event_type = PVFS_EVENT_BMI_SEND;
-    ret = job_time_mgr_add(jd, timeout_sec);
-    gen_mutex_unlock(&completion_mutex);
-    return(ret);
+    return(job_time_mgr_add(jd, timeout_sec));
 }
 
 /* job_bmi_recv()
@@ -528,8 +517,6 @@ int job_bmi_recv(PVFS_BMI_addr_t addr,
     user_ptr_internal = &jd->bmi_callback;
     JOB_EVENT_START(PVFS_EVENT_BMI_RECV, jd->job_id);
 
-    gen_mutex_lock(&completion_mutex);
-
     ret = BMI_post_recv(&(jd->u.bmi.id), addr, buffer, size,
                         &(jd->u.bmi.actual_size), buffer_type, tag, 
                         user_ptr_internal, 
@@ -537,7 +524,6 @@ int job_bmi_recv(PVFS_BMI_addr_t addr,
     if (ret < 0)
     {
         /* error posting */
-        gen_mutex_unlock(&completion_mutex);
         out_status_p->error_code = ret;
         out_status_p->status_user_tag = status_user_tag;
         JOB_EVENT_END(PVFS_EVENT_BMI_RECV, 0, jd->job_id);
@@ -549,7 +535,6 @@ int job_bmi_recv(PVFS_BMI_addr_t addr,
     if (ret == 1)
     {
         /* immediate completion */
-        gen_mutex_unlock(&completion_mutex);
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
         out_status_p->actual_size = jd->u.bmi.actual_size;
@@ -567,9 +552,7 @@ int job_bmi_recv(PVFS_BMI_addr_t addr,
     bmi_pending_count++;
     jd->event_type = PVFS_EVENT_BMI_RECV;
 
-    ret = job_time_mgr_add(jd, timeout_sec);
-    gen_mutex_unlock(&completion_mutex);
-    return(ret);
+    return(job_time_mgr_add(jd, timeout_sec));
 }
 
 
@@ -620,7 +603,6 @@ int job_bmi_recv_list(PVFS_BMI_addr_t addr,
     user_ptr_internal = &jd->bmi_callback;
     JOB_EVENT_START(PVFS_EVENT_BMI_RECV, jd->job_id);
 
-    gen_mutex_lock(&completion_mutex);
     ret = BMI_post_recv_list(&(jd->u.bmi.id), addr, buffer_list,
                              size_list, list_count, total_expected_size,
                              &(jd->u.bmi.actual_size), buffer_type, tag,
@@ -629,7 +611,6 @@ int job_bmi_recv_list(PVFS_BMI_addr_t addr,
     if (ret < 0)
     {
         /* error posting */
-        gen_mutex_unlock(&completion_mutex);
         out_status_p->error_code = ret;
         out_status_p->status_user_tag = status_user_tag;
         JOB_EVENT_END(PVFS_EVENT_BMI_RECV, 0, jd->job_id);
@@ -641,7 +622,6 @@ int job_bmi_recv_list(PVFS_BMI_addr_t addr,
     if (ret == 1)
     {
         /* immediate completion */
-        gen_mutex_unlock(&completion_mutex);
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
         out_status_p->actual_size = jd->u.bmi.actual_size;
@@ -659,9 +639,7 @@ int job_bmi_recv_list(PVFS_BMI_addr_t addr,
     bmi_pending_count++;
     jd->event_type = PVFS_EVENT_BMI_RECV;
 
-    ret = job_time_mgr_add(jd, timeout_sec);
-    gen_mutex_unlock(&completion_mutex);
-    return(ret);
+    return(job_time_mgr_add(jd, timeout_sec));
 }
 
 /* job_bmi_unexp()
@@ -1197,11 +1175,9 @@ int job_flow(flow_descriptor * flow_d,
     JOB_EVENT_START(PVFS_EVENT_FLOW, jd->job_id);
 
     /* post the flow */
-    gen_mutex_lock(&completion_mutex);
     ret = PINT_flow_post(flow_d);
     if (ret < 0)
     {
-        gen_mutex_unlock(&completion_mutex);
         out_status_p->error_code = ret;
         out_status_p->status_user_tag = status_user_tag;
         JOB_EVENT_END(PVFS_EVENT_FLOW, 0, jd->job_id);
@@ -1212,7 +1188,6 @@ int job_flow(flow_descriptor * flow_d,
     if (ret == 1)
     {
         /* immediate completion */
-        gen_mutex_unlock(&completion_mutex);
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
         out_status_p->actual_size = flow_d->total_transfered;
@@ -1227,9 +1202,7 @@ int job_flow(flow_descriptor * flow_d,
     flow_pending_count++;
     jd->event_type = PVFS_EVENT_FLOW;
 
-    ret = job_time_mgr_add(jd, timeout_sec);
-    gen_mutex_unlock(&completion_mutex);
-    return(ret);
+    return(job_time_mgr_add(jd, timeout_sec));
 }
 
 /* job_flow_cancel()
