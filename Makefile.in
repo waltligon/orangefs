@@ -28,8 +28,10 @@ CFLAGS +=\
  -D__STATIC_FLOWPROTO_BMI_TROVE__\
  -DUSE_BMI_MSGS=1\
  -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE\
- -Wconversion -Wall -Wstrict-prototypes -pipe -I $(srcdir)/include\
- -I src/common/statecomp
+ -I src/common/statecomp\
+ -Wall -Wstrict-prototypes -pipe -I $(srcdir)/include
+# TODO: add -Wconversion back into the flags later; it generates too many
+# warnings for us to just leave in there right now
 LDFLAGS += -L lib
 LIBS += -lpvfs2
 SERVERLIBS = -ldb -lrt -lpthread
