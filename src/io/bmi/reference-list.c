@@ -123,7 +123,7 @@ ref_st_p ref_list_search_str(ref_list_p rlp,
     {
 	tmp_entry = qlist_entry(tmp_link, struct ref_st,
 				list_link);
-	if (!strcmp(tmp_entry->id_string, idstring))
+	if (tmp_entry->id_string && !strcmp(tmp_entry->id_string, idstring))
 	    return (tmp_entry);
     }
     return (NULL);
