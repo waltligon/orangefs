@@ -102,14 +102,11 @@ int main(int argc, char **argv)
 	    return -1;
 	}
 
-	
-
 	/* build the request packet */
 	/* is this stuff right?  I'm not sure about the dist stuff... */
 	total_req_size = sizeof(struct wire_harness_req) +
 		PINT_REQUEST_PACK_SIZE(io_req) +
-		sizeof(struct PVFS_Dist) + io_dist->name_size +
-		io_dist->param_size;
+		PINT_DIST_PACK_SIZE(io_dist);
 
 	req = (struct wire_harness_req*)BMI_memalloc(server_addr,
 		total_req_size, BMI_SEND_BUFFER);
@@ -121,8 +118,7 @@ int main(int argc, char **argv)
 	memset(req, 0, total_req_size);
 
 	req->io_req_size = PINT_REQUEST_PACK_SIZE(io_req);
-	req->dist_size = sizeof(struct PVFS_Dist) + io_dist->name_size + 
-		io_dist->param_size;
+	req->dist_size = PINT_DIST_PACK_SIZE(io_dist);
 	
 	/* pack the io description */
 	encode_io_req = 
