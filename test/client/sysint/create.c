@@ -85,7 +85,7 @@ int main(int argc, char **argv)
                           credentials, &resp_create);
     if (ret < 0)
     {
-        printf("create failed with errcode = %d\n", ret);
+        PVFS_perror("create failed with errcode", ret);
         return(-1);
     }
 	
