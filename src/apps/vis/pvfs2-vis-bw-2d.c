@@ -24,11 +24,14 @@ struct options
 {
     char* mnt_point;
     int mnt_point_set;
+    int width;
+    int width_set;
 };
 
 static void* thread_fn(void* foo);
 static struct options* parse_args(int argc, char* argv[]);
 static void usage(int argc, char** argv);
+static struct options* user_opts = NULL;
 
 #define S_LOCK() do{ \
 if (SDL_MUSTLOCK(screen) ) { \
@@ -48,7 +51,6 @@ struct drawbar
 
 int main(int argc, char **argv)	
 {
-    struct options* user_opts = NULL;
     int ret = -1;
 
     /* look at command line arguments */
@@ -81,7 +83,7 @@ static struct options* parse_args(int argc, char* argv[])
     /* getopt stuff */
     extern char* optarg;
     extern int optind, opterr, optopt;
-    char flags[] = "vm:";
+    char flags[] = "vm:w:";
     int one_opt = 0;
     int len = 0;
 
@@ -123,13 +125,22 @@ static struct options* parse_args(int argc, char* argv[])
 		strcat(tmp_opts->mnt_point, "/");
 		tmp_opts->mnt_point_set = 1;
 		break;
+	    case('w'):
+		ret = sscanf(optarg, "%d", &tmp_opts->width);
+		if(ret < 1)
+		{
+		    free(tmp_opts);
+		    return(NULL);
+		}
+		tmp_opts->width_set = 1;
+		break;
 	    case('?'):
 		usage(argc, argv);
 		exit(EXIT_FAILURE);
 	}
     }
 
-    if(!tmp_opts->mnt_point_set)
+    if(!tmp_opts->mnt_point_set || !tmp_opts->width_set)
     {
 	free(tmp_opts);
 	return(NULL);
@@ -173,7 +184,8 @@ static void* thread_fn(void* foo)
 	return(NULL);
     }
 	
-    screen = SDL_SetVideoMode(800, 600, 0, SDL_HWSURFACE|SDL_DOUBLEBUF);
+    screen = SDL_SetVideoMode(user_opts->width, ((user_opts->width * 3)/4), 
+	0, SDL_HWSURFACE|SDL_DOUBLEBUF);
     if(!screen)
     {
 	fprintf(stderr, "SDL_SetVideoMode: %s\n", SDL_GetError());
@@ -270,9 +282,9 @@ static void* thread_fn(void* foo)
 static void usage(int argc, char** argv)
 {
     fprintf(stderr, "\n");
-    fprintf(stderr, "Usage  : %s [-m fs_mount_point]\n",
+    fprintf(stderr, "Usage  : %s -m [fs_mount_point] -w [width in pixels]\n",
 	argv[0]);
-    fprintf(stderr, "Example: %s -m /mnt/pvfs2\n",
+    fprintf(stderr, "Example: %s -m /mnt/pvfs2 -w 800\n",
 	argv[0]);
     return;
 }
