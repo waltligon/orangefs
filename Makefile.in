@@ -626,6 +626,7 @@ install: install_doc
 	install -m 644 $(srcdir)/include/pvfs2-mgmt.h $(prefix)/include
 	install -m 644 $(srcdir)/include/pvfs2-types.h $(prefix)/include
 	install -m 644 $(srcdir)/include/pvfs2-util.h $(prefix)/include
+	install -m 644 $(srcdir)/include/pvfs2-encode-stubs.h $(prefix)/include
 
 	install -d $(prefix)/lib
 	install -m 755 $(LIBRARIES) $(prefix)/lib
