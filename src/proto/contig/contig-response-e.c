@@ -47,12 +47,11 @@ int do_encode_resp(
 	     *	There is an int64_t here...
 	     *	but handled correctly so far!
 	     */
+	    target_msg->size_list[0] = target_msg->total_size = sizeof(struct PVFS_server_resp_s);
 	    target_msg->buffer_list[0] = BMI_memalloc(target_msg->dest, 
-						      sizeof(struct PVFS_server_resp_s)+
-						      header_size,
+						      sizeof(struct PVFS_server_resp_s) + header_size,
 						      BMI_SEND_BUFFER);
 	    memcpy(target_msg->buffer_list[0], response, sizeof(struct PVFS_server_resp_s));
-	    target_msg->size_list[0] = target_msg->total_size = sizeof(struct PVFS_server_resp_s);
 	    return(0);
 
 	case PVFS_SERV_SETATTR:
@@ -79,11 +78,11 @@ int do_encode_resp(
 	     *	PVFS_metafile_attr.  DW
 	     */
 				// if (resp->u.getattr.objtype != METAFILE) ?? DW
+	    target_msg->size_list[0] = 
+		target_msg->total_size = sizeof(struct PVFS_server_resp_s);
 	    target_msg->buffer_list[0] = BMI_memalloc(target_msg->dest, 
 						      sizeof(struct PVFS_server_resp_s) + header_size,
 						      BMI_SEND_BUFFER);
-	    target_msg->size_list[0] = 
-		target_msg->total_size = sizeof(struct PVFS_server_resp_s);
 				// else pack it!
 	    return(0);
 
@@ -95,11 +94,11 @@ int do_encode_resp(
 	    strlen1 = strlen(response->u.getconfig.meta_server_mapping) + 1; /* include NULL terminator */
 	    strlen2 = strlen(response->u.getconfig.io_server_mapping) + 1;
 
-	    target_msg->size_list[0] = sizeof(struct PVFS_server_resp_s) + strlen1 + strlen2 + header_size;
-	    target_msg->total_size=target_msg->size_list[0];
+	    target_msg->size_list[0] = sizeof(struct PVFS_server_resp_s) + strlen1 + strlen2;
+	    target_msg->total_size = target_msg->size_list[0];
 
 	    respbuf = target_msg->buffer_list[0] = BMI_memalloc(target_msg->dest,
-								target_msg->total_size,
+								target_msg->total_size + header_size,
 								BMI_SEND_BUFFER);
 
 	    /* use respbuf as a temporary pointer to clean this up */
@@ -111,52 +110,42 @@ int do_encode_resp(
 	    return(0);
 				
 	case PVFS_SERV_LOOKUP_PATH:
+	    assert(response->u.lookup_path.handle_array != NULL);
 
-	    target_msg->buffer_list[0] = 
-		BMI_memalloc(target_msg->dest,
-			     (target_msg->size_list[0] = 
-			      sizeof(struct PVFS_server_resp_s)+
-			      response->u.lookup_path.count*sizeof(PVFS_handle)+
-			      response->u.lookup_path.count*sizeof(PVFS_object_attr))+
-			     header_size,
-			     BMI_SEND_BUFFER);
-
-	    memcpy(target_msg->buffer_list[0],
-		   response,
-		   sizeof(struct PVFS_server_resp_s));
-
-	    while(i++ < response->u.lookup_path.count)
-	    {
-		// Wonder if Memcpy is correct here.	
-		memcpy((target_msg->buffer_list[0]+
-			sizeof(struct PVFS_server_resp_s)+
-			(i-1)*sizeof(PVFS_handle)),
-		       &(response->u.lookup_path.handle_array[i-1]),
-		       sizeof(PVFS_handle));
-
-		memcpy((target_msg->buffer_list[0]+
-			sizeof(struct PVFS_server_resp_s)+
-			response->u.lookup_path.count*sizeof(PVFS_handle)+
-			(i-1)*sizeof(PVFS_object_attr)),
-		       &(response->u.lookup_path.attr_array[i-1]),
-		       sizeof(PVFS_object_attr));
-	    }
-	    target_msg->total_size=target_msg->size_list[0];
-	    return(0);
-
-	case PVFS_SERV_READDIR:
-	    target_msg->size_list[0] = sizeof(struct PVFS_server_resp_s) + 
-		(response->u.readdir.pvfs_dirent_count * sizeof(PVFS_dirent)) +
-		header_size;
+	    target_msg->size_list[0] = sizeof(struct PVFS_server_resp_s) +
+		response->u.lookup_path.count * sizeof(PVFS_handle) +
+		response->u.lookup_path.count * sizeof(PVFS_object_attr);
 	    target_msg->total_size = target_msg->size_list[0];
 	    respbuf = target_msg->buffer_list[0] = BMI_memalloc(target_msg->dest,
-							        target_msg->total_size,
+								target_msg->total_size + header_size,
 								BMI_SEND_BUFFER);
 
 	    memcpy(respbuf, response, sizeof(struct PVFS_server_resp_s));
 	    respbuf += sizeof(struct PVFS_server_resp_s);
 
-	    for (i=0; i < response->u.lookup_path.count; i++)
+	    /* make two passes, first to copy handles, second for attribs */
+	    for (i=0; i < response->u.lookup_path.count; i++) {
+		memcpy(respbuf, &(response->u.lookup_path.handle_array[i]), sizeof(PVFS_handle));
+		respbuf += sizeof(PVFS_handle);
+	    }
+	    for (i=0; i < response->u.lookup_path.count; i++) {
+		memcpy(respbuf, &(response->u.lookup_path.attr_array[i]), sizeof(PVFS_object_attr));
+		respbuf += sizeof(PVFS_object_attr);
+	    }
+	    return(0);
+
+	case PVFS_SERV_READDIR:
+	    target_msg->size_list[0] = sizeof(struct PVFS_server_resp_s) + 
+		response->u.readdir.pvfs_dirent_count * sizeof(PVFS_dirent);
+	    target_msg->total_size = target_msg->size_list[0];
+	    respbuf = target_msg->buffer_list[0] = BMI_memalloc(target_msg->dest,
+							        target_msg->total_size + header_size,
+								BMI_SEND_BUFFER);
+
+	    memcpy(respbuf, response, sizeof(struct PVFS_server_resp_s));
+	    respbuf += sizeof(struct PVFS_server_resp_s);
+
+	    for (i=0; i < response->u.readdir.pvfs_dirent_count; i++)
 	    {
 		memcpy(respbuf, &(response->u.readdir.pvfs_dirent_array[i]), sizeof(PVFS_dirent));
 		respbuf += sizeof(PVFS_dirent);
