@@ -15,6 +15,8 @@
 #include "gossip.h"
 #include "PINT-reqproto-encode.h"
 #include "PINT-reqproto-module.h"
+#include "pint-request.h"
+#include "pint-distribution.h"
 
 int do_decode_req(
 		  void *input_buffer,
@@ -25,6 +27,8 @@ int do_decode_req(
     struct PVFS_server_req_s * dec_msg = NULL;
     char* char_ptr = (char *) input_buffer;
     int size = 0;
+    int tmp_count;
+    int ret = -1;
 
     size = ((struct PVFS_server_req_s *)input_buffer)->rsize;
 
@@ -83,12 +87,29 @@ int do_decode_req(
 
 	    return(0);
 	case PVFS_SERV_IO: 
-	    /* TODO: finish filling this one in.  For now it just looks
-	     * like the self contained operations listed below, but more
-	     * will be added later
-	     */
-
-	     return(0);
+	    /* set pointers to the request and dist information */
+	    tmp_count = *(int*)(char_ptr + sizeof(struct
+		PVFS_server_req_s));
+	    char_ptr += sizeof(struct PVFS_server_req_s) +
+		2*sizeof(int);
+	    dec_msg->u.io.io_req = (PVFS_Request)char_ptr;
+	    char_ptr += tmp_count;
+	    dec_msg->u.io.io_dist = (PVFS_Dist*)char_ptr;
+	    /* decode the request and dist */
+	    ret = PINT_Request_decode(dec_msg->u.io.io_req);
+	    if(ret < 0)
+	    {
+		free(dec_msg);
+		return(ret);
+	    }
+	    PINT_Dist_decode(dec_msg->u.io.io_dist, NULL);
+	    ret = PINT_Dist_lookup(dec_msg->u.io.io_dist);
+	    if(ret < 0)
+	    {
+		free(dec_msg);
+		return(ret);
+	    }
+	    return(0);
 	case PVFS_SERV_RMDIR: /*these structures are all self contained (no pointers that need to be packed) */
 	case PVFS_SERV_CREATE:
 	case PVFS_SERV_READDIR:

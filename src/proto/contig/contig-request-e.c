@@ -249,6 +249,13 @@ int do_encode_req(
 	    size = sizeof(struct PVFS_server_req_s) + 2*sizeof(int) +
 		PINT_REQUEST_PACK_SIZE(request->u.io.io_req) +
 		PINT_DIST_PACK_SIZE(request->u.io.io_dist);
+	    /* override the rsize, so the receiver knows how much data
+	     * is in here (we packed more than the caller knew about in
+	     * order to indicate sizes of variable length structs)
+	     */
+	    request->rsize = size;
+
+	    /* create buffer for encoded message */
 	    enc_msg = BMI_memalloc( target_msg->dest, (bmi_size_t)(size + header_size), BMI_SEND_BUFFER ) ;
 	    if (enc_msg == NULL)
 	    {

@@ -13,6 +13,8 @@
 #include <job-consist.h>
 #include <assert.h>
 
+#define SKIP_FLOW_STATE 2
+
 static int io_init(state_action_struct *s_op, job_status_s *ret);
 static int io_get_size(state_action_struct *s_op, job_status_s *ret);
 static int io_send_ack(state_action_struct *s_op, job_status_s *ret);
