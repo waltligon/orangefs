@@ -1607,13 +1607,13 @@ int job_trove_keyval_write(PVFS_fs_id coll_id,
  */
 
 int job_trove_keyval_flush(PVFS_fs_id coll_id,
-			    PVFS_handle handle,
-			    PVFS_ds_flags flags,
-			    void * user_ptr,
-			    job_aint status_user_tag,
-			    job_status_s * out_status_p,
-			    job_id_t * id,
-			    job_context_id context_id)
+                           PVFS_handle handle,
+                           PVFS_ds_flags flags,
+                           void * user_ptr,
+                           job_aint status_user_tag,
+                           job_status_s * out_status_p,
+                           job_id_t * id,
+                           job_context_id context_id)
 {
     int ret = -1;
     struct job_desc *jd = NULL;
