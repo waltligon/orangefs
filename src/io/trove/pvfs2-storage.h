@@ -13,7 +13,6 @@
  * Types and structures specific to the storage interface
  */
 
-/* getinfo options */
 enum PVFS_coll_getinfo_options_e
 {
     PVFS_COLLECTION_STATFS = 1
@@ -42,16 +41,19 @@ typedef struct PVFS_vtag_s PVFS_vtag;
 /* dataspace attributes that are not explicitly stored within the
  * dataspace itself.
  *
- * Note: this is what is being stored by the trove code as the attributes
- * right now.  Do we need to have a separation between the attributes as
- * sent across the wire/to the user vs. what is stored in trove?  Is that
- * already done?
+ * Note: this is what is being stored by the trove code as the
+ * attributes right now.  this is separate from the attributes as sent
+ * across the wire/to the user, so some translation is done.
+ *
+ * PVFS_object_attr attributes are what the users and the server deal
+ * with.  Trove only deals with *_ds_storedattr objects (trove on disk
+ * formats) and *_ds_attributes (trove in memory format).
  */
 struct PVFS_ds_attributes_s
 {
-    PVFS_fs_id fs_id;		/* REQUIRED */
-    PVFS_handle handle;		/* REQUIRED */
-    PVFS_ds_type type;		/* REQUIRED */
+    PVFS_fs_id fs_id;
+    PVFS_handle handle;
+    PVFS_ds_type type;
     PVFS_uid uid;
     PVFS_gid gid;
     PVFS_permissions mode;
@@ -60,9 +62,10 @@ struct PVFS_ds_attributes_s
     PVFS_time atime;
     uint32_t dfile_count;
     uint32_t dist_size;
-    /* NOTE: PUT NON-STORED AT THE BOTTOM!!! */
-    PVFS_size b_size;		/* bstream size */
-    PVFS_size k_size;		/* keyval size; # of keys */
+
+    /* non-stored attributes need to be below here */
+    PVFS_size b_size; /* bstream size */
+    PVFS_size k_size; /* keyval size; # of keys */
 };
 typedef struct PVFS_ds_attributes_s PVFS_ds_attributes;
 
