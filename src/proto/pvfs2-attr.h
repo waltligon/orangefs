@@ -62,9 +62,8 @@ struct PVFS_metafile_attr_s {
 	PVFS_handle *dfh;
 	/* Number of datafiles */
 	PVFS_count32 nr_datafiles;
-	/* Used by server to communicate size back to client
-	 * during getattr
-	 */
+	/* size of the distribution info */
+	PVFS_size dist_size;
 };
 typedef struct PVFS_metafile_attr_s PVFS_metafile_attr;
 
