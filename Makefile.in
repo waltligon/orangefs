@@ -113,11 +113,13 @@ CFLAGS += -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE
   # include current directory (for pvfs2-config.h)
 CFLAGS += -I .
   # setup general warning levels and gcc options
-CFLAGS += -Wall -Wstrict-prototypes -pipe -I $(srcdir)/include -I include
+CFLAGS += -I $(srcdir)/include -I include
   # add all module directories into include path
 CFLAGS += $(patsubst %, -I $(srcdir)/%, $(MODULES))
   # add package version information
 CFLAGS += -DPVFS2_VERSION="\"@PVFS2_VERSION@\""
+  # special gcc options
+GCC_CFLAGS := -Wall -Wstrict-prototypes -pipe
 
 ################################################################
 # Setup component specific flags
@@ -159,6 +161,10 @@ ifdef BUILD_IB
     LIBS += $(IBLIBS)
     SERVERLIBS += $(IBLIBS)
 endif
+
+# in case MPICC is not gcc, only add gcc-particular ones to CFLAGS
+MPICFLAGS := $(CFLAGS)
+CFLAGS += $(GCC_CFLAGS)
 
 #################################################################
 # Starter variables 
@@ -377,9 +383,9 @@ $(MPITESTOBJS): %.o: %.c
 ifdef BUILD_MPI
 ifdef QUIET_COMPILE
 	@echo "  MPICC		$@"
-	@$(MPICC) $(LIBCFLAGS) $(CFLAGS) $< -c -o $@
+	@$(MPICC) $(LIBCFLAGS) $(MPICFLAGS) $< -c -o $@
 else
-	$(MPICC) $(LIBCFLAGS) $(CFLAGS) $< -c -o $@
+	$(MPICC) $(LIBCFLAGS) $(MPICFLAGS) $< -c -o $@
 endif
 else
 	@echo Error: You must specify --with-mpi=dir at configure time 
@@ -392,9 +398,9 @@ $(MPIIOTESTOBJS): %.o: %.c
 ifdef BUILD_MPI
 ifdef QUIET_COMPILE
 	@echo "  MPICC		$@"
-	@$(MPICC) $(LIBCFLAGS) $(CFLAGS) $< -c -o $@
+	@$(MPICC) $(LIBCFLAGS) $(MPICFLAGS) $< -c -o $@
 else
-	$(MPICC) $(LIBCFLAGS) $(CFLAGS) $< -c -o $@
+	$(MPICC) $(LIBCFLAGS) $(MPICFLAGS) $< -c -o $@
 endif
 else
 	@echo Error: You must specify --with-mpi=dir at configure time 
@@ -407,9 +413,9 @@ $(MPIMISCOBJS): %.o: %.c
 ifdef BUILD_MPI
 ifdef QUIET_COMPILE
 	@echo "  MPICC		$@"
-	@$(MPICC) $(LIBCFLAGS) $(CFLAGS) $< -c -o $@
+	@$(MPICC) $(LIBCFLAGS) $(MPICFLAGS) $< -c -o $@
 else
-	$(MPICC) $(LIBCFLAGS) $(CFLAGS) $< -c -o $@
+	$(MPICC) $(LIBCFLAGS) $(MPICFLAGS) $< -c -o $@
 endif
 else
 	@echo Error: You must specify --with-mpi=dir at configure time 
@@ -463,6 +469,24 @@ else
 	$(CC) $(LIBCFLAGS) $(CFLAGS) $< -c -o $@
 endif
 
+# handy rule to generate cpp-output file, for debugging
+.PHONY: FORCE
+%-server.i: %.c FORCE
+ifdef QUIET_COMPILE
+	@echo "  CPP		$@"
+	@$(CC) $(SERVERCFLAGS) $(CFLAGS) $< -E -o $@
+else
+	$(CC) $(SERVERCFLAGS) $(CFLAGS) $< -E -o $@
+endif
+
+%.i: %.c FORCE
+ifdef QUIET_COMPILE
+	@echo "  CPP		$@"
+	@$(CC) $(LIBCFLAGS) $(CFLAGS) $< -E -o $@
+else
+	$(CC) $(LIBCFLAGS) $(CFLAGS) $< -E -o $@
+endif
+
 # all test programs depend on the pvfs2 library
 $(TESTS): %: %.o $(LIBRARIES)
 $(ADMINTOOLS): %: %.o $(LIBRARIES)
@@ -512,7 +536,7 @@ cleaner: clean
 	rm -f src/kernel/linux-2.6/Makefile
 	rm -f maint/mpi-depend.sh
 	rm -f examples/pvfs2-server.rc
-	rm -rf autom4te-*.cache
+	rm -rf autom4te*.cache
 	rm -f $(srcdir)/cscope.out $(srcdir)/cscope.files
 	rm -f config.log config.status config.cache 
 	rm -f pvfs2-@PVFS2_VERSION@.tar.gz
@@ -530,9 +554,12 @@ distclean: cleaner docsclean
 # NOTE: we wrap this in ifneq's in order to prevent the
 #    dependencies from being generated for special targets that don't 
 #    require them
-ifeq (,$(filter statecomp clean distclean dist docs cscope tags,$(MAKECMDGOALS)))
+ifeq (,$(filter statecomp clean distclean dist docs cscope tags nodep,$(MAKECMDGOALS)))
 -include $(DEPENDS)
 endif
+# add this as a make goal to disable rebuilding dependencies
+.PHONY: nodep
+nodep:; @:
 
 # rule for generating dependency files for MPI code
 #
@@ -542,17 +569,17 @@ $(MPITESTDEPENDS): %.d: %.c
 ifdef QUIET_COMPILE
 	@echo "  DEP		$@"
 else
-	@echo generating dependency file $@.
+	@echo generating mpitest dependency file $@.
 endif
-	@sh ./maint/mpi-depend.sh `dirname $*` $(CFLAGS) $< > $@
+	@sh ./maint/mpi-depend.sh `dirname $*` $(MPICFLAGS) $< > $@
 
 $(MPIMISCDEPENDS): %.d: %.c
 ifdef QUIET_COMPILE
 	@echo "  DEP		$@"
 else
-	@echo generating dependency file $@.
+	@echo generating mpimisc dependency file $@.
 endif
-	@sh ./maint/mpi-depend.sh `dirname $*` $(CFLAGS) $< > $@
+	@sh ./maint/mpi-depend.sh `dirname $*` $(MPICFLAGS) $< > $@
 
 # default rule for generating dependency files
 %.d: %.c
