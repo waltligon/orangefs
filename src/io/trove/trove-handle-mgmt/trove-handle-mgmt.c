@@ -117,8 +117,7 @@ static int trove_check_handle_ranges(TROVE_coll_id coll_id,
     return ret;
 }
 
-static int trove_map_handle_ranges(TROVE_coll_id coll_id,
-                                   struct llist *extent_list,
+static int trove_map_handle_ranges( struct llist *extent_list,
                                    struct handle_ledger *ledger)
 {
     int ret = -1;
@@ -270,7 +269,7 @@ int trove_set_handle_ranges(TROVE_coll_id coll_id,
                 assert(ledger->ledger);
 		
 		/* tell trove what are our valid ranges are */
-		ret = trove_map_handle_ranges(coll_id,extent_list, 
+		ret = trove_map_handle_ranges(extent_list, 
 			ledger->ledger);
 		if (ret != 0) return ret;
 
