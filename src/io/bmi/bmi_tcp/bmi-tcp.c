@@ -180,6 +180,9 @@ enum bmi_tcp_state
     BMI_TCP_COMPLETE
 };
 
+/* max number of zero reads to allow; usually indictaes dead connection */
+#define BMI_TCP_ZERO_READ_LIMIT  10
+
 /* tcp private portion of operation structure */
 struct tcp_op
 {
@@ -192,6 +195,7 @@ struct tcp_op
      */
     void *buffer_list_stub;
     bmi_size_t size_list_stub;
+    int zero_read_limit;
 };
 
 /* static io vector for use with readv and writev; we can only use
@@ -2282,12 +2286,30 @@ static int tcp_do_work_recv(method_addr_p map, int* stall_flag)
 	{
 	    old_amt_complete = active_method_op->amt_complete;
 	    ret = work_on_recv_op(active_method_op, stall_flag);
-	    if(ret == 0 && old_amt_complete ==
-		active_method_op->amt_complete && active_method_op->actual_size)
+            gossip_debug(GOSSIP_BMI_DEBUG_TCP, "actual_size=%d, "
+                         "amt_complete=%d, old_amt_complete=%d\n",
+                         (int)active_method_op->actual_size,
+                         (int)active_method_op->amt_complete,
+                         (int)old_amt_complete);
+	    if ((ret == 0) &&
+                (old_amt_complete == active_method_op->amt_complete) &&
+                active_method_op->actual_size &&
+                (active_method_op->amt_complete <
+                 active_method_op->actual_size))
 	    {
-		gossip_debug(GOSSIP_BMI_DEBUG_TCP, "Warning: bmi_tcp unable to recv any data reported by poll().\n");
-		gossip_debug(GOSSIP_BMI_DEBUG_TCP, "...dropping connection.\n");
-		tcp_forget_addr(map, 0, -EPIPE);
+                struct tcp_op *tcp_op = (struct tcp_op *)
+                    active_method_op->method_data;
+                assert(tcp_op);
+
+		gossip_debug(
+                    GOSSIP_BMI_DEBUG_TCP, "Warning: bmi_tcp unable "
+                    "to recv any data reported by poll().\n");
+                if (tcp_op->zero_read_limit++ == BMI_TCP_ZERO_READ_LIMIT)
+                {
+                    gossip_debug(GOSSIP_BMI_DEBUG_TCP,
+                                 "...dropping connection.\n");
+                    tcp_forget_addr(map, 0, -EPIPE);
+                }
 	    }
 	    return(ret);
 	}
