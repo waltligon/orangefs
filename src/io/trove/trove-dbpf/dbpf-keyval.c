@@ -164,8 +164,6 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
             (char *)op_p->u.k_read.key.buffer);
     }
 
-    DBPF_DB_SYNC_IF_NECESSARY(op_p, tmp_ref.db_p);
-
     dbpf_open_cache_put(&tmp_ref);
     return 1;
 
@@ -456,14 +454,15 @@ static int dbpf_keyval_iterate(TROVE_coll_id coll_id,
  * position of the last read keyval.
  *
  * If position is TROVE_ITERATE_END, then we hit the end previously,
- * so we just return that we are done and that there are 0 things read.
+ * so we just return that we are done and that there are 0 things
+ * read.
  *
  * Otherwise we read and return the position of the last read keyval.
  *
- * In all cases we read using DB_NEXT.  This is ok because it behaves like
- * DB_FIRST (read the first record) when called with an uninitialized
- * cursor (so we just don't initialize the cursor in the TROVE_ITERATE_START
- * case).
+ * In all cases we read using DB_NEXT.  This is ok because it behaves
+ * like DB_FIRST (read the first record) when called with an
+ * uninitialized cursor (so we just don't initialize the cursor in the
+ * TROVE_ITERATE_START case).
  *
  */
 static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
@@ -634,8 +633,6 @@ return_ok:
 
     *op_p->u.k_iterate.count_p = i;
 
-    DBPF_DB_SYNC_IF_NECESSARY(op_p, tmp_ref.db_p);
-
     /* free the cursor */
     ret = dbc_p->c_close(dbc_p);
     if (ret != 0)
@@ -764,8 +761,6 @@ static int dbpf_keyval_read_list_op_svc(struct dbpf_op *op_p)
 
         op_p->u.k_read_list.val_array[i].read_sz = data.size;
     }
-
-    DBPF_DB_SYNC_IF_NECESSARY(op_p, tmp_ref.db_p);
 
     dbpf_open_cache_put(&tmp_ref);
     return 1;

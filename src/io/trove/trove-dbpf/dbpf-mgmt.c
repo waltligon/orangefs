@@ -923,15 +923,6 @@ static int dbpf_collection_iterate(TROVE_ds_position *inout_position_p,
 
     *inout_count_p = i;
 
-    if (flags & TROVE_SYNC)
-    {
-        if ((ret = db_p->sync(db_p, 0)) != 0)
-        {
-	    error = -dbpf_db_error_to_trove_error(ret);
-	    goto return_error;
-        }
-    }
-
     ret = dbc_p->c_close(dbc_p);
     if (ret != 0)
     {

@@ -275,7 +275,7 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
     /* add retrieved ds_attr to dbpf_attr cache here */
     ref.handle = new_handle;
     dbpf_attr_cache_insert(ref, &attr);
-    
+
     DBPF_DB_SYNC_IF_NECESSARY(op_p, tmp_ref.db_p);
 
     *op_p->u.d_create.out_handle_p = new_handle;
@@ -538,7 +538,7 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
         }
     }
 
-return_ok:
+  return_ok:
     if (ret == DB_NOTFOUND)
     {
         /* if we ran off the end of the database, return TROVE_ITERATE_END */
@@ -576,8 +576,6 @@ return_ok:
 
     *op_p->u.d_iterate_handles.count_p = i;
 
-    DBPF_DB_SYNC_IF_NECESSARY(op_p, tmp_ref.db_p);
- 
     if(dbc_p)
     {
         dbc_p->c_close(dbc_p);
@@ -690,8 +688,6 @@ static int dbpf_dspace_verify_op_svc(struct dbpf_op *op_p)
 
     /* copy type value back into user's memory */
     *op_p->u.d_verify.type_p = s_attr.type;
-
-    DBPF_DB_SYNC_IF_NECESSARY(op_p, tmp_ref.db_p);
 
     dbpf_open_cache_attr_put(&tmp_ref);
     return 1;
@@ -991,8 +987,6 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
 
     /* add retrieved ds_attr to dbpf_attr cache here */
     dbpf_attr_cache_insert(ref, attr);
-
-    DBPF_DB_SYNC_IF_NECESSARY(op_p, attr_ref.db_p);
 
     if (got_db)
     {

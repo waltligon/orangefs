@@ -128,8 +128,12 @@ static void aio_progress_notification(sigval_t sig)
         gossip_debug(GOSSIP_TROVE_DEBUG, " aio_progress_notification: "
                      "op completed\n");
 
-        DBPF_AIO_SYNC_IF_NECESSARY(
-            op_p, op_p->u.b_rw_list.fd, ret, error_code);
+        if ((op_p->type == BSTREAM_WRITE_AT) ||
+            (op_p->type == BSTREAM_WRITE_LIST))
+        {
+            DBPF_AIO_SYNC_IF_NECESSARY(
+                op_p, op_p->u.b_rw_list.fd, ret, error_code);
+        }
 
         dbpf_open_cache_put(&op_p->u.b_rw_list.open_ref);
         op_p->u.b_rw_list.fd = -1;
@@ -145,8 +149,8 @@ static void aio_progress_notification(sigval_t sig)
                      "(state is %d)\n",op_p->u.b_rw_list.list_proc_state);
 
         /* no operations currently in progress; convert and post some more */
-        op_p->u.b_rw_list.aiocb_array_count  = AIOCB_ARRAY_SZ;
-        op_p->u.b_rw_list.aiocb_array        = aiocb_p;
+        op_p->u.b_rw_list.aiocb_array_count = AIOCB_ARRAY_SZ;
+        op_p->u.b_rw_list.aiocb_array = aiocb_p;
 
         /* convert listio arguments into aiocb structures */
         aiocb_inuse_count = op_p->u.b_rw_list.aiocb_array_count;
@@ -285,8 +289,6 @@ static int dbpf_bstream_read_at_op_svc(struct dbpf_op *op_p)
         goto return_error;
     }
     
-    DBPF_ERROR_SYNC_IF_NECESSARY(op_p, tmp_ref.fd);
-
     dbpf_open_cache_put(&tmp_ref);
 
     gossip_debug(GOSSIP_TROVE_DEBUG, "read %d bytes.\n", ret);
@@ -425,11 +427,7 @@ static int dbpf_bstream_flush(TROVE_coll_id coll_id,
                         flags,
                         context_id);
     
-    /* initialize the op-specific members */
-    /* there are none for flush */
-   
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
-    
     return 0;
 }
 
@@ -842,7 +840,6 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
                  "(handle %Lu) and returned %d\n", q_op_p,
                  Lu(handle), ret);
 #endif
-
     return 0;
 }
 
@@ -911,13 +908,13 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
         memset(aiocb_p, 0, AIOCB_ARRAY_SZ*sizeof(struct aiocb));
         for (i=0; i < AIOCB_ARRAY_SZ; i++)
         {
-            aiocb_p[i].aio_lio_opcode            = LIO_NOP;
+            aiocb_p[i].aio_lio_opcode = LIO_NOP;
             aiocb_p[i].aio_sigevent.sigev_notify = SIGEV_NONE;
         }
 
-        op_p->u.b_rw_list.aiocb_array_count  = AIOCB_ARRAY_SZ;
-        op_p->u.b_rw_list.aiocb_array        = aiocb_p;
-        op_p->u.b_rw_list.list_proc_state    = LIST_PROC_INPROGRESS;
+        op_p->u.b_rw_list.aiocb_array_count = AIOCB_ARRAY_SZ;
+        op_p->u.b_rw_list.aiocb_array = aiocb_p;
+        op_p->u.b_rw_list.list_proc_state = LIST_PROC_INPROGRESS;
         op_p->u.b_rw_list.sigev.sigev_notify = SIGEV_NONE;
     }
     else
@@ -974,6 +971,13 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
         ret = 1;
 
       final_aio_cleanup:
+        if ((op_p->type == BSTREAM_WRITE_AT) ||
+            (op_p->type == BSTREAM_WRITE_LIST))
+        {
+            DBPF_AIO_SYNC_IF_NECESSARY(
+                op_p, op_p->u.b_rw_list.fd, ret, error_code);
+        }
+
         dbpf_open_cache_put(&op_p->u.b_rw_list.open_ref);
         op_p->u.b_rw_list.fd = -1;
 
