@@ -93,7 +93,8 @@ static inline void dbpf_queued_op_init(struct dbpf_queued_op *q_op_p,
 				       struct dbpf_collection *coll_p,
 				       int (*svc_fn)(struct dbpf_op *op),
 				       void *user_ptr,
-				       TROVE_ds_flags flags);
+				       TROVE_ds_flags flags,
+                                       TROVE_context_id context_id);
 
 static inline void dbpf_queued_op_init(struct dbpf_queued_op *q_op_p,
 				       enum dbpf_op_type type,
@@ -101,19 +102,21 @@ static inline void dbpf_queued_op_init(struct dbpf_queued_op *q_op_p,
 				       struct dbpf_collection *coll_p,
 				       int (*svc_fn)(struct dbpf_op *op),
 				       void *user_ptr,
-				       TROVE_ds_flags flags)
+				       TROVE_ds_flags flags,
+                                       TROVE_context_id context_id)
 {
     memset(q_op_p, 0, sizeof(struct dbpf_queued_op));
 
     gen_mutex_init(&q_op_p->mutex);
-    q_op_p->op.type     = type;
-    q_op_p->op.state    = OP_NOT_QUEUED;
-    q_op_p->op.handle   = handle;
-    q_op_p->op.id       = 0; /* filled in when queued */
-    q_op_p->op.coll_p   = coll_p;
-    q_op_p->op.svc_fn   = svc_fn;
-    q_op_p->op.user_ptr = user_ptr;
-    q_op_p->op.flags    = flags;
+    q_op_p->op.type       = type;
+    q_op_p->op.state      = OP_NOT_QUEUED;
+    q_op_p->op.handle     = handle;
+    q_op_p->op.id         = 0; /* filled in when queued */
+    q_op_p->op.coll_p     = coll_p;
+    q_op_p->op.svc_fn     = svc_fn;
+    q_op_p->op.user_ptr   = user_ptr;
+    q_op_p->op.flags      = flags;
+    q_op_p->op.context_id = context_id;
 }
 
 

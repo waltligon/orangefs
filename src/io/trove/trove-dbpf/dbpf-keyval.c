@@ -64,7 +64,8 @@ static int dbpf_keyval_read(
 			coll_p,
 			dbpf_keyval_read_op_svc,
 			user_ptr,
-			flags);
+			flags,
+                        context_id);
 
     /* initialize the op-specific members */
     q_op_p->op.u.k_read.key   = *key_p;
@@ -184,7 +185,8 @@ static int dbpf_keyval_write(
 			coll_p,
 			dbpf_keyval_write_op_svc,
 			user_ptr,
-			flags);
+			flags,
+                        context_id);
 
     /* initialize the op-specific members */
     q_op_p->op.u.k_write.key   = *key_p;
@@ -284,7 +286,8 @@ static int dbpf_keyval_remove(
 			coll_p,
 			dbpf_keyval_remove_op_svc,
 			user_ptr,
-			flags);
+			flags,
+                        context_id);
 
     /* initialize op-specific members */
     q_op_p->op.u.k_remove.key = *key_p;
@@ -382,7 +385,8 @@ static int dbpf_keyval_iterate(TROVE_coll_id coll_id,
 			coll_p,
 			dbpf_keyval_iterate_op_svc,
 			user_ptr,
-			flags);
+			flags,
+                        context_id);
 
     /* initialize op-specific members */
     q_op_p->op.u.k_iterate.key_array  = key_array;
@@ -644,7 +648,8 @@ static int dbpf_keyval_read_list(
 			coll_p,
 			dbpf_keyval_read_list_op_svc,
 			user_ptr,
-			flags);
+			flags,
+                        context_id);
 
     /* initialize the op-specific members */
     q_op_p->op.u.k_read_list.key_array = key_array;
@@ -767,7 +772,8 @@ static int dbpf_keyval_flush(
 			coll_p,
 			dbpf_keyval_flush_op_svc,
 			user_ptr,
-			flags);
+			flags,
+                        context_id);
 
     /* initialize the op-specific members */
     /* there are no op-specific members for sync */

@@ -65,8 +65,8 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
 			coll_p,
 			dbpf_dspace_create_op_svc,
 			user_ptr,
-			flags);
-
+			flags,
+                        context_id);
 
     /* no op-specific members here */
     q_op_p->op.u.d_create.extent_array.extent_count =
@@ -245,7 +245,8 @@ static int dbpf_dspace_remove(TROVE_coll_id coll_id,
 			coll_p,
 			dbpf_dspace_remove_op_svc,
 			user_ptr,
-			flags);
+			flags,
+                        context_id);
 
     /* no op-specific members here */
 
@@ -369,7 +370,8 @@ int dbpf_dspace_iterate_handles(TROVE_coll_id coll_id,
 			coll_p,
 			dbpf_dspace_iterate_handles_op_svc,
 			user_ptr,
-			flags);
+			flags,
+                        context_id);
 
     /* initialize op-specific members */
     q_op_p->op.u.d_iterate_handles.handle_array = handle_array;
@@ -561,7 +563,8 @@ static int dbpf_dspace_verify(TROVE_coll_id coll_id,
 			coll_p,
 			dbpf_dspace_verify_op_svc,
 			user_ptr,
-			flags);
+			flags,
+                        context_id);
 
     /* initialize op-specific members */
     q_op_p->op.u.d_verify.type_p = type_p;
@@ -660,7 +663,8 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
 			coll_p,
 			dbpf_dspace_getattr_op_svc,
 			user_ptr,
-			flags);
+			flags,
+                        context_id);
 
     /* initialize op-specific members */
     q_op_p->op.u.d_getattr.attr_p = ds_attr_p;
@@ -696,7 +700,8 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
 			coll_p,
 			dbpf_dspace_setattr_op_svc,
 			user_ptr,
-			flags);
+			flags,
+                        context_id);
 
     /* initialize op-specific members */
     q_op_p->op.u.d_setattr.attr_p = ds_attr_p;

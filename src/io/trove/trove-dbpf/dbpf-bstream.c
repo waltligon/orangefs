@@ -93,7 +93,8 @@ static int dbpf_bstream_read_at(TROVE_coll_id coll_id,
 			coll_p,
 			dbpf_bstream_read_at_op_svc,
 			user_ptr,
-			flags);
+			flags,
+                        context_id);
     
     /* initialize the op-specific members */
     q_op_p->op.u.b_read_at.offset =  offset;
@@ -190,7 +191,8 @@ static int dbpf_bstream_write_at(TROVE_coll_id coll_id,
 			coll_p,
 			dbpf_bstream_write_at_op_svc,
 			user_ptr,
-			flags);
+			flags,
+                        context_id);
     
     /* initialize the op-specific members */
     q_op_p->op.u.b_write_at.offset =  offset;
@@ -280,7 +282,8 @@ static int dbpf_bstream_flush(
 			coll_p,
 			dbpf_bstream_flush_op_svc,
 			user_ptr,
-			flags);
+			flags,
+                        context_id);
     
     /* initialize the op-specific members */
     /* there are none for flush */
@@ -464,7 +467,8 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
 			coll_p,
 			dbpf_bstream_rw_list_op_svc,
 			user_ptr,
-			flags);
+			flags,
+                        context_id);
 
     /* initialize op-specific members */
     q_op_p->op.u.b_rw_list.fd                  = -1;
