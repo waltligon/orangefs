@@ -217,7 +217,7 @@ int PINT_state_machine_halt(void)
 
 /* Function: PINT_state_machine_next()
    Params: 
-   Returns:   void
+   Returns:   return value of state action
    Synopsis:  Runs through a list of return values to find the
 	           next function to call.  Calls that function.  Once
 				  that function is called, this one exits and we go
