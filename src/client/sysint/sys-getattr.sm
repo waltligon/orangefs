@@ -395,16 +395,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
                              "copying %d bytes of dist.\n",
                              attr->u.meta.dist_size);
 
-		/* here we make a copy of the distribution information.
-		 *
-		 * There are assumptions in the dist code that ints
-		 * and char *s are the same size.  I thought we knew better.
-		 *
-		 * If the assert() blows up, we need to fix the dist code,
-		 * not this code.
-		 */
-		assert(sizeof(int) == sizeof(char *)); /* dist time bomb */
-
+		/* here we make a copy of the distribution information. */
 		sm_p->u.getattr.dist_p = PVFS_Dist_copy(attr->u.meta.dist);
 		if (sm_p->u.getattr.dist_p == NULL) {
 		    assert(0);
