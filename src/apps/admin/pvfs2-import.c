@@ -7,6 +7,8 @@
 #include <client.h>
 #include "helper.h"
 
+#define DEFAULT_TAB "/etc/pvfs2tab"
+
 int main(int argc, char **argv)
 {
     int ret = -1;
@@ -25,9 +27,9 @@ int main(int argc, char **argv)
     }
     filename = argv[1];
 
-    if (parse_pvfstab(NULL,&mnt))
+    if (parse_pvfstab(DEFAULT_TAB, &mnt))
     {
-        fprintf(stderr, "Error: failed to parse pvfstab.\n");
+        fprintf(stderr, "Error: failed to parse pvfstab %s.\n", DEFAULT_TAB);
         return ret;
     }
 
