@@ -1,0 +1,533 @@
+/* 
+ * (C) 2003 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+#include <string.h>
+#include <assert.h>
+
+#include "client-state-machine.h"
+#include "state-machine-fns.h"
+#include "pvfs2-debug.h"
+#include "job.h"
+#include "gossip.h"
+#include "str-utils.h"
+
+#include "pinode-helper.h"
+#include "pint-dcache.h"
+#include "pint-servreq.h"
+#include "pint-bucket.h"
+#include "pcache.h"
+#include "PINT-reqproto-encode.h"
+#include "shared-state-methods.h"
+
+extern job_context_id pint_client_sm_context;
+
+enum
+{
+    LOOKUP_CONTINUE = 2
+};
+
+/* state function prototypes */
+static int lookup_init(PINT_client_sm *sm_p,
+		       job_status_s *js_p);
+static int lookup_load_next_segment(PINT_client_sm *sm_p,
+                                    job_status_s *js_p);
+static int lookup_check_completion(PINT_client_sm *sm_p,
+                                   job_status_s *js_p);
+static int lookup_msg_setup_msgpair(PINT_client_sm *sm_p,
+                                    job_status_s *js_p);
+static int lookup_msg_failure(PINT_client_sm *sm_p,
+                              job_status_s *js_p);
+static int lookup_cleanup(PINT_client_sm *sm_p,
+                          job_status_s *js_p);
+
+/* completion function prototypes */
+static int lookup_msg_comp_fn(void *v_p,
+                              struct PVFS_server_resp *resp_p,
+                              int index);
+
+%%
+
+machine pvfs2_client_lookup_sm(init,
+                               lookup_load_next_segment,
+                               lookup_check_completion,
+                               lookup_msg_setup_msgpair,
+			       lookup_msg_xfer_msgpair,
+			       lookup_msg_failure,
+			       cleanup)
+{
+    state init {
+	run lookup_init;
+	default => lookup_load_next_segment;
+    }
+
+    state lookup_load_next_segment {
+        run lookup_load_next_segment;
+        success => lookup_msg_setup_msgpair;
+        default => lookup_check_completion;
+    }
+
+    state lookup_check_completion {
+	run lookup_check_completion;
+        success => cleanup;
+        LOOKUP_CONTINUE => lookup_load_next_segment;
+	default => lookup_msg_failure;
+    }
+
+    state lookup_msg_setup_msgpair {
+	run lookup_msg_setup_msgpair;
+        success => lookup_msg_xfer_msgpair;
+	default => lookup_msg_failure;
+    }
+
+    state lookup_msg_xfer_msgpair {
+	jump pvfs2_client_msgpair_sm;
+        success => lookup_load_next_segment;
+	default => lookup_check_completion;
+    }
+
+    state lookup_msg_failure {
+	run lookup_msg_failure;
+	default => cleanup;
+    }
+
+    state cleanup {
+        run lookup_cleanup;
+        default => init;
+    }
+}
+
+%%
+
+int PVFS_sys_ref_lookup(
+    PVFS_fs_id fs_id,
+    char* relative_pathname,
+    PVFS_pinode_reference parent,
+    PVFS_credentials credentials,
+    PVFS_sysresp_lookup *resp)
+{
+    int ret = -PVFS_EINVAL, pathlen = 0, num_segments = 0;
+    PINT_client_sm *sm_p = NULL;
+    PVFS_error error;
+
+    gossip_debug(CLIENT_DEBUG, "PVFS_sys_ref_lookup entered\n");
+
+    /* parameter checking goes here.  assume everything from the user
+     * is ok past this point.
+     */
+    if ((relative_pathname == NULL) || (resp == NULL))
+    {
+        return ret;
+    }
+
+    pathlen = strlen(relative_pathname);
+    num_segments = PINT_string_count_segments(relative_pathname);
+
+    if ((pathlen == 0) || (num_segments == 0))
+    {
+        return ret;
+    }
+
+    if ((pathlen > (PVFS_REQ_LIMIT_PATH_NAME_BYTES - 1)) ||
+        (num_segments > PVFS_REQ_LIMIT_PATH_SEGMENT_COUNT))
+    {
+        gossip_lerr("Error: Filename %s is too long\n",
+                    relative_pathname);
+	return -PVFS_ENAMETOOLONG;
+    }
+
+    sm_p = (PINT_client_sm *) malloc(sizeof(*sm_p));
+    if (sm_p == NULL)
+    {
+        return -PVFS_ENOMEM;
+    }
+    memset(sm_p, 0, sizeof(*sm_p));
+
+    sm_p->cred_p = &credentials;
+    sm_p->u.lookup.orig_pathname = relative_pathname;
+    sm_p->u.lookup.starting_refn = parent;
+    sm_p->u.lookup.lookup_resp = resp;
+    sm_p->u.lookup.num_segments = num_segments;
+    sm_p->u.lookup.remaining_pathname = (char *)
+        malloc(sizeof(char) * PVFS_SEGMENT_MAX);
+    assert(sm_p->u.lookup.remaining_pathname);
+    strncpy(sm_p->u.lookup.remaining_pathname, relative_pathname,
+            PVFS_SEGMENT_MAX);
+    sm_p->u.lookup.remaining_starting_refn.fs_id = fs_id;
+    sm_p->u.lookup.remaining_starting_refn.handle = parent.handle;
+    sm_p->u.lookup.segment_space = NULL;
+    sm_p->u.lookup.segment_state = NULL;
+
+    gossip_debug(CLIENT_DEBUG, "Looking up %s under parent handle "
+                 "%Lu on fs %d\n", relative_pathname, parent.handle,
+                 parent.fs_id);
+
+    ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_LOOKUP);
+    assert(ret == 0);
+
+    /* while !done call progress function */
+    while (!sm_p->op_complete && (ret == 0))
+    {
+	gossip_debug(CLIENT_DEBUG, "PVFS_sys_ref_lookup calling "
+                     "PINT_client_state_machine_test()\n");
+	ret = PINT_client_state_machine_test();
+    }
+    assert(ret == 0);
+
+    gossip_debug(CLIENT_DEBUG, "PVFS_sys_ref_lookup completed\n");
+
+    /* save our return value */
+    error = sm_p->error_code;
+
+    /* clean up after ourselves */
+    free(sm_p);
+    return error;
+}
+
+int PVFS_sys_lookup(
+    PVFS_fs_id fs_id, char* name,
+    PVFS_credentials credentials,
+    PVFS_sysresp_lookup *resp)
+{
+    int ret = -EINVAL;
+    PVFS_pinode_reference parent;
+
+    if (name && resp)
+    {
+        parent.handle = 0;
+        parent.fs_id = fs_id;
+
+        ret = PINT_bucket_get_root_handle(parent.fs_id,&parent.handle);
+        if (ret < 0)
+        {
+            return ret;
+        }
+
+        /* NOTE: special case is that we're doing a lookup of the root
+         * handle (which we got during the getconfig) so we want to check
+         * to see if we're looking up "/"; if so, then get the root handle
+         * from the bucket table interface and return
+         */
+        if (!strcmp(name, "/"))
+        {
+            resp->pinode_refn.handle = parent.handle;
+            resp->pinode_refn.fs_id = fs_id;
+            ret = 0;
+        }
+        else
+        {
+            /*
+              strip off leading slash (if any) and lookup the rest
+              of the path.  NOTE: If it's always an error to not
+              have a leading slash, we should check that above
+              without doing this function call.
+            */
+            char *path = ((name[0] == '/') ? &name[1] : name);
+            ret = PVFS_sys_ref_lookup(fs_id, path, parent,
+                                      credentials, resp);
+        }
+    }
+    return ret;
+}
+
+/****************************************************************/
+
+static int lookup_init(PINT_client_sm *sm_p,
+		       job_status_s *js_p)
+{
+    PVFS_handle_extent_array meta_handle_extent_array;
+    gossip_debug(CLIENT_DEBUG, "lookup state: init\n");
+
+    assert(js_p->error_code == 0);
+
+    /*
+      grab a pointer to the server configuration object.
+      we need this later for mapping handles to servers
+      during meta/data handle creation
+    */
+    sm_p->server_config = PINT_get_server_config_struct();
+    assert(sm_p->server_config);
+
+    /* store an initial meta server to start with */
+    if (PINT_bucket_get_next_meta(
+            sm_p->server_config,
+            sm_p->u.lookup.starting_refn.fs_id,
+            &sm_p->u.lookup.meta_server_addr,
+            &meta_handle_extent_array) < 0)
+    {
+        gossip_err("Failed to get meta server information\n");
+        assert(0);
+    }
+    sm_p->u.lookup.num_meta_tries++;
+
+    /* do the request scheduler thing, if necessary */
+
+    return 1;
+}
+
+static int lookup_load_next_segment(PINT_client_sm *sm_p,
+                                    job_status_s *js_p)
+{
+    gossip_debug(CLIENT_DEBUG,
+                 "lookup state: lookup_load_next_segment\n");
+
+    js_p->error_code = 0;
+
+    sm_p->u.lookup.segment_space = sm_p->u.lookup.remaining_pathname;
+    return 1;
+}
+
+static int lookup_check_completion(PINT_client_sm *sm_p,
+                                   job_status_s *js_p)
+{
+    gossip_debug(CLIENT_DEBUG,
+                 "lookup state: lookup_check_completion\n");
+
+    /*
+      if there are no more segments, we've finished properly
+      at this point; if not, we've encountered an error
+    */
+    if (sm_p->u.lookup.num_segments == 0)
+    {
+        /* direct state machine to cleanup */
+        js_p->error_code = 0;
+    }
+    else
+    {
+        /*
+          determine if we need to contact another meta server
+          for the remaining path segment lookups, or if we've
+          actually got a bad lookup request.
+
+          we know if the last positively resolved handle
+          has the same meta server mapping as the previously
+          mapped meta server, the entry truly doesn't exist.
+          otherwise, we have to update our meta server and
+          continue to try the lookup there.
+
+          NOTE:
+          this 'num_meta_tries' thing is a hack that needs
+          to be fixed since path components may ping-pong
+          between meta-servers ... *sigh*
+        */
+        bmi_addr_t tmp_addr;
+        int num_meta_servers = 0;
+        PVFS_handle_extent_array meta_handle_extent_array;
+        PINT_bucket_get_num_meta(sm_p->u.lookup.starting_refn.fs_id,
+                                 &num_meta_servers);
+        assert(num_meta_servers);
+
+        if ((sm_p->u.lookup.num_segments > 1) &&
+            (sm_p->u.lookup.num_meta_tries++ < num_meta_servers))
+        {
+            if (PINT_bucket_get_next_meta(
+                    sm_p->server_config,
+                    sm_p->u.lookup.starting_refn.fs_id,
+                    &tmp_addr, &meta_handle_extent_array) == 0)
+            {
+                gossip_debug(CLIENT_DEBUG,
+                             "Comparing Meta Server %lu to %lu\n",
+                             (unsigned long)tmp_addr,
+                             (unsigned long)sm_p->u.lookup.meta_server_addr);
+
+                /*
+                  if the meta servers are different, we need to continue
+                  with the lookup from where we are
+                */
+                if (tmp_addr != sm_p->u.lookup.meta_server_addr)
+                {
+                    sm_p->u.lookup.meta_server_addr = tmp_addr;
+                    js_p->error_code = LOOKUP_CONTINUE;
+                    goto lookup_continue;
+                }
+            }
+        }
+
+        /* otherwise just direct state machine to failure */
+        js_p->error_code = (sm_p->u.lookup.last_error ?
+                            sm_p->u.lookup.last_error :
+                            -PVFS_ENOENT);
+        PVFS_perror("Restoring last error code of",
+                    js_p->error_code);
+    }
+  
+  lookup_continue:
+
+    return 1;
+}
+
+static int lookup_msg_setup_msgpair(PINT_client_sm *sm_p,
+                                    job_status_s *js_p)
+{
+    PINT_client_sm_msgpair_state *msg_p = NULL;
+
+    gossip_debug(CLIENT_DEBUG,
+                 "lookup state: lookup_msg_setup_msgpair\n");
+
+    /* clear error field in job */
+    js_p->error_code = 0;
+
+    gossip_debug(CLIENT_DEBUG," lookup: posting lookup_path req\n");
+
+    msg_p = &sm_p->msgpair;
+    memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
+
+    PINT_SERVREQ_LOOKUP_PATH_FILL(
+        msg_p->req,
+        *sm_p->cred_p,
+        sm_p->u.lookup.segment_space,
+        sm_p->u.lookup.remaining_starting_refn.fs_id,
+        sm_p->u.lookup.remaining_starting_refn.handle,
+        PVFS_ATTR_COMMON_ALL);
+
+    gossip_debug(CLIENT_DEBUG,
+                 "Looking up path %s under handle %Lu and fs %d\n",
+                 sm_p->u.lookup.segment_space,
+                 sm_p->u.lookup.remaining_starting_refn.handle,
+                 sm_p->u.lookup.remaining_starting_refn.fs_id);
+
+    /* fill in msgpair structure components */
+    msg_p->fs_id = sm_p->u.lookup.remaining_starting_refn.fs_id;
+    msg_p->handle = sm_p->u.lookup.remaining_starting_refn.handle;
+    msg_p->comp_fn = lookup_msg_comp_fn;
+    msg_p->svr_addr = sm_p->u.lookup.meta_server_addr;
+
+    return 1;
+}
+
+static int lookup_msg_comp_fn(void *v_p,
+                              struct PVFS_server_resp *resp_p,
+                              int index)
+{
+    int i = 0;
+    PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
+    char buf[PVFS_SEGMENT_MAX] = {0};
+    
+    gossip_debug(CLIENT_DEBUG, "lookup_msg_comp_fn\n");
+
+    assert(resp_p->op == PVFS_SERV_LOOKUP_PATH);
+
+    /*
+      If we get an error here, we need to at least partially
+      process the returned attrs and handles, so just stash
+      the error value in case we need it later, while resetting
+      the error code to allow us to continue processing.
+    */
+    if (resp_p->status != 0)
+    {
+        PVFS_perror("Got error from server: ", resp_p->status);
+    }
+    sm_p->u.lookup.last_error = resp_p->status;
+    resp_p->status = 0;
+
+    /* need to check for SYMLINK HERE */
+
+    gossip_debug(CLIENT_DEBUG, "Got %d handle(s) & %d attr(s) returned\n",
+                 resp_p->u.lookup_path.handle_count,
+                 resp_p->u.lookup_path.attr_count);
+
+    /* INSERT ALL ATTRS IN ARRAY INTO PCACHE HERE */
+    /* handle_array, attr_array */
+
+
+    /* adjust local lookup processing state */
+    sm_p->u.lookup.num_segments =
+        (PINT_string_count_segments(sm_p->u.lookup.remaining_pathname) -
+         resp_p->u.lookup_path.handle_count);
+    assert(sm_p->u.lookup.num_segments > -1);
+
+    if (sm_p->u.lookup.num_segments == 0)
+    {
+        /* restore the real error code */
+        resp_p->status = sm_p->u.lookup.last_error;
+
+        /* copy out the final looked up handle value to sys response */
+        sm_p->u.lookup.lookup_resp->pinode_refn.handle =
+            resp_p->u.lookup_path.handle_array[
+                resp_p->u.lookup_path.handle_count - 1];
+        /*
+          FIXME: for now requires that the final resolved name must be
+          on the same fs as the starting name to be resolved
+        */
+        sm_p->u.lookup.lookup_resp->pinode_refn.fs_id =
+            sm_p->u.lookup.starting_refn.fs_id;
+    }
+    else if (resp_p->u.lookup_path.handle_count > 0)
+    {
+#if 1
+        /* FIXME: remove since this is debugging only */
+        for(i = 0; i < resp_p->u.lookup_path.handle_count; i++)
+        {
+            gossip_debug(CLIENT_DEBUG, "[%d] Got partial lookup "
+                         "Handle %Lu back\n", i,
+                         resp_p->u.lookup_path.handle_array[i]);
+        }
+#endif
+        gossip_debug(CLIENT_DEBUG, "Getting path element %d from "
+                     "path %s\n", resp_p->u.lookup_path.handle_count,
+                     sm_p->u.lookup.remaining_pathname);
+
+        /* overwrite remaining pathname with newly remaining pathname */
+        snprintf(buf, PVFS_SEGMENT_MAX, "%s",
+                 sm_p->u.lookup.remaining_pathname);
+        memset(sm_p->u.lookup.remaining_pathname, 0, PVFS_SEGMENT_MAX);
+        PINT_get_path_element(
+            buf, resp_p->u.lookup_path.handle_count,
+            sm_p->u.lookup.remaining_pathname, PVFS_SEGMENT_MAX);
+
+        /* update our starting lookup reference handle */
+        sm_p->u.lookup.remaining_starting_refn.handle =
+            resp_p->u.lookup_path.handle_array[
+                resp_p->u.lookup_path.handle_count - 1];
+        /*
+          FIXME: will server ever pass a different fs_id ?
+          lookup resp from server doesn't ever pass an fs_id back;
+          if it ever does, be sure to stash that here
+        */
+
+        gossip_debug(CLIENT_DEBUG, "Remaining pathname is %s | "
+                     "new starting handle is %Lu\n",
+                     sm_p->u.lookup.remaining_pathname,
+                     sm_p->u.lookup.remaining_starting_refn.handle);
+    }
+    return 1;
+}
+
+static int lookup_msg_failure(PINT_client_sm *sm_p,
+                              job_status_s *js_p)
+{
+    gossip_debug(CLIENT_DEBUG, "lookup state: lookup_msg_failure\n");
+    return 1;
+}
+
+
+static int lookup_cleanup(PINT_client_sm *sm_p,
+                          job_status_s *js_p)
+{
+    gossip_debug(CLIENT_DEBUG, "lookup state: cleanup\n");
+
+    sm_p->error_code = js_p->error_code;
+
+    if (sm_p->u.lookup.remaining_pathname)
+    {
+        free(sm_p->u.lookup.remaining_pathname);
+    }
+
+    /* mark operation as complete */
+    sm_p->op_complete = 1;
+
+    return 0;
+}
+
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 noexpandtab
+ */

@@ -17,7 +17,7 @@
 #include "PINT-reqproto-encode.h"
 #include "str-utils.h"
 
-/* PVFS_sys_ref_lookup()
+/* PVFS_sys_ref_lookup_old() : DEPRECATED -- see sys-lookup.sm
  *
  * steps in lookup
  * --------------
@@ -61,7 +61,7 @@
  * 1). All [p|d]cache entries that we resolve are added to the [p|d]cache
  *
  */
-int PVFS_sys_ref_lookup(
+int PVFS_sys_ref_lookup_old(
     PVFS_fs_id fs_id,
     char* relative_pathname,
     PVFS_pinode_reference parent,
@@ -318,7 +318,7 @@ return_error:
     return(ret);
 }
 
-/* PVFS_sys_lookup()
+/* PVFS_sys_lookup() : DEPRECATED -- see sys-lookup.sm
  *
  * See documentation for PVFS_sys_ref_lookup.
  *
@@ -326,7 +326,7 @@ return_error:
  * 1). If the user passes in "/" we return the root handle.
  *
  */
-int PVFS_sys_lookup(
+int PVFS_sys_lookup_old(
     PVFS_fs_id fs_id, char* name,
     PVFS_credentials credentials,
     PVFS_sysresp_lookup *resp)

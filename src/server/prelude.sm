@@ -170,7 +170,7 @@ static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p)
     /* the first thing we need to do is interpret the error code from reading
      * the attributes.  Normally it is an error if that step failed, but we 
      * have to look for the special case in which we set attributes on a file
-     * that did not have attributes previously.  
+     * that did not have attributes previously.
      */
     /* also, we aren't storing any attributes with datafiles yet */
     /* also, we do both a keyval and a bstream flush on a handle, one of which
@@ -181,7 +181,7 @@ static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p)
          s_op->req->op == PVFS_SERV_GETATTR ||
 	 s_op->req->op == PVFS_SERV_REMOVE ||
 	 s_op->req->op == PVFS_SERV_FLUSH ||
-	 s_op->req->op == PVFS_SERV_TRUNCATE ))
+	 s_op->req->op == PVFS_SERV_TRUNCATE))
     {
 	js_p->error_code = 0;
     }

@@ -247,8 +247,8 @@ static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
     sm_p->msgpair.handle  = sm_p->u.getattr.object_ref.handle;
     sm_p->msgpair.comp_fn = getattr_object_getattr_comp_fn;
     ret = PINT_bucket_map_to_server(&sm_p->msgpair.svr_addr,
-	sm_p->msgpair.handle,
-	sm_p->msgpair.fs_id);
+                                    sm_p->msgpair.handle,
+                                    sm_p->msgpair.fs_id);
     if(ret != 0)
     {
 	gossip_err("Error: failure mapping to server.\n");
@@ -522,23 +522,23 @@ static int getattr_datafile_getattr_setup_msgpairarray(PINT_client_sm *sm_p,
      *       SOME EXTRA MALLOCS? -- RobR
      */
     sm_p->msgarray = (PINT_client_sm_msgpair_state *)
-	malloc(sm_p->u.getattr.datafile_count * sizeof(PINT_client_sm_msgpair_state));
-    if (sm_p->msgarray == NULL) {
-	assert(0);
-    }
+	malloc(sm_p->u.getattr.datafile_count *
+               sizeof(PINT_client_sm_msgpair_state));
+    assert(sm_p->msgarray);
+
     sm_p->u.getattr.size_array = (PVFS_size *)
 	malloc(sm_p->u.getattr.datafile_count * sizeof(PVFS_size));
-    if (sm_p->u.getattr.size_array == NULL) {
-	assert(0);
-    }
+    assert(sm_p->u.getattr.size_array);
+
     sm_p->msgarray_count = sm_p->u.getattr.datafile_count;
 
     /* for each datafile, post a send/recv pair to obtain the size */
-    for (i=0; i < sm_p->msgarray_count; i++) {
+    for (i=0; i < sm_p->msgarray_count; i++)
+    {
 	PINT_client_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
 
 	gossip_debug(CLIENT_DEBUG,
-		     "  datafile_getattr: getting size for 0x%08Lx\n", 
+		     "  datafile_getattr: getting size for handle %Lu\n", 
 		     sm_p->u.getattr.datafile_handles[i]);
 
 	/* fill in getattr request; all we care about is the size */
@@ -550,13 +550,13 @@ static int getattr_datafile_getattr_setup_msgpairarray(PINT_client_sm *sm_p,
 	
 	/* fill in msgpair structure components */
 	msg_p->fs_id   = sm_p->u.getattr.object_ref.fs_id;
-	msg_p->handle  = sm_p->u.getattr.object_ref.handle;
+	msg_p->handle  = sm_p->u.getattr.datafile_handles[i];
 	msg_p->comp_fn = getattr_datafile_getattr_comp_fn;
     }
 
     /* fill in address of each server to contact */
-    ret = PINT_serv_msgpairarray_resolve_addrs(sm_p->msgarray_count,
-	sm_p->msgarray);
+    ret = PINT_serv_msgpairarray_resolve_addrs(
+        sm_p->msgarray_count, sm_p->msgarray);
     if(ret < 0)
     {
 	gossip_lerr("Error: failed to resolve server addresses.\n");

@@ -4,12 +4,16 @@ PVFS2 Release ChangeLog
 
 pvfs2-0.0.4pre1
 ===============
-- improved truncate support
-- kernel truncate support
+- improved truncate support (pcache usage/integration)
+- kernel truncate support (improved file size reporting)
 - removed several run-time verbose (expected) warnings
 - fixed a handle rollover bug in extentlist handler
 - fixed bit-rotted non-threaded trove/job compilation
+- improved client sysint readdir implementation (state-machine)
+- improved client sysint mkdir implementation (state-machine)
+- improved client sysint setattr implementation (state-machine)
 
+	
 pvfs2-0.0.3
 ===========
 - more pts tests for pvfs2 datatypes

@@ -98,7 +98,6 @@ struct PINT_client_create_sm {
     PVFS_sysresp_create          *create_resp;    /* in/out parameter*/
     PVFS_sys_attr                *sys_attr;       /* input parameter */
     int                          num_data_files;
-    bmi_addr_t                   meta_server_addr;
     bmi_addr_t                   *data_server_addrs;
     PVFS_handle_extent_array     *io_handle_extent_array;
     PVFS_handle                  metafile_handle;
@@ -195,6 +194,21 @@ struct PINT_client_readdir_sm {
     PVFS_ds_position              pos_token;      /* input parameter */
     int                           dirent_limit;   /* input parameter */
     PVFS_sysresp_readdir          *readdir_resp;  /* in/out parameter*/
+};
+
+/* PINT_client_lookup_sm */
+struct PINT_client_lookup_sm {
+    char                         *orig_pathname;/* input parameter */
+    PVFS_pinode_reference        starting_refn; /* input parameter */
+    PVFS_sysresp_lookup          *lookup_resp;  /* in/out parameter*/
+    bmi_addr_t                   meta_server_addr;
+    int                          num_meta_tries;
+    int                          num_segments;
+    char                         *remaining_pathname;
+    PVFS_pinode_reference        remaining_starting_refn;
+    char                         *segment_space;
+    void                         *segment_state;
+    PVFS_error                   last_error;
 };
 
 struct PINT_client_mgmt_setparam_list_sm 
@@ -318,6 +332,7 @@ typedef struct PINT_client_sm {
 	struct PINT_client_io_sm io;
 	struct PINT_client_flush_sm flush;
 	struct PINT_client_readdir_sm readdir;
+	struct PINT_client_lookup_sm lookup;
 	struct PINT_client_mgmt_setparam_list_sm setparam_list;
 	struct PINT_client_truncate_sm  truncate;
 	struct PINT_client_mgmt_statfs_list_sm statfs_list;
@@ -346,6 +361,7 @@ enum {
     PVFS_SYS_TRUNCATE= 8,
     PVFS_SYS_READDIR = 9,
     PVFS_SYS_SETATTR = 10,
+    PVFS_SYS_LOOKUP  = 11,
     PVFS_MGMT_SETPARAM_LIST = 70,
     PVFS_MGMT_NOOP   = 71,
     PVFS_MGMT_STATFS_LIST = 72,
@@ -401,6 +417,7 @@ extern struct PINT_state_machine_s pvfs2_client_setattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_io_sm;
 extern struct PINT_state_machine_s pvfs2_client_flush_sm;
 extern struct PINT_state_machine_s pvfs2_client_readdir_sm;
+extern struct PINT_state_machine_s pvfs2_client_lookup_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_setparam_list_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_statfs_list_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_perf_mon_list_sm;

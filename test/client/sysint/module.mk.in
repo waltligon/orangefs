@@ -8,6 +8,7 @@ TESTSRC += \
 	$(DIR)/get-info.c\
 	$(DIR)/set-info.c\
 	$(DIR)/mkdir.c\
+	$(DIR)/dmkdir.c\
 	$(DIR)/remove.c\
 	$(DIR)/rename.c\
 	$(DIR)/find.c \

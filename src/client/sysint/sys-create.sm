@@ -432,24 +432,23 @@ static int create_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
     gossip_ldebug(CLIENT_DEBUG, "Number of data files to create "
                   "is %d\n", sm_p->u.create.num_data_files);
 
+    gossip_debug(CLIENT_DEBUG," create: posting create req\n");
+
+    msg_p = &sm_p->msgpair;
+    memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
+
     /*
       determine the metadata server and the appropriate
       handle range for a new file.
     */
     ret = PINT_bucket_get_next_meta(
         sm_p->server_config, sm_p->parent_ref.fs_id,
-        &sm_p->u.create.meta_server_addr,
-        &meta_handle_extent_array);
+        &msg_p->svr_addr, &meta_handle_extent_array);
     if (ret < 0)
     {
         gossip_err("Failed to get meta server information\n");
         assert(0);
     }
-
-    gossip_debug(CLIENT_DEBUG," create: posting create req\n");
-
-    msg_p = &sm_p->msgpair;
-    memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
 
     PINT_SERVREQ_CREATE_FILL(msg_p->req,
                              *sm_p->cred_p,
@@ -461,9 +460,6 @@ static int create_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
     msg_p->fs_id = sm_p->parent_ref.fs_id;
     msg_p->handle = meta_handle_extent_array.extent_array[0].first;
     msg_p->comp_fn = create_create_comp_fn;
-
-    /* we've already resolved the appropriate meta server */
-    msg_p->svr_addr = sm_p->u.create.meta_server_addr;
 
     return 1;
 }
@@ -486,16 +482,6 @@ static int create_crdirent_setup_msgpair(PINT_client_sm *sm_p,
     /* clear error field in job */
     js_p->error_code = 0;
 
-    /* get meta server to create dir entry on */
-    ret = PINT_bucket_map_to_server(&sm_p->u.create.meta_server_addr,
-                                    sm_p->parent_ref.handle,
-                                    sm_p->parent_ref.fs_id);
-    if (ret < 0)
-    {
-        gossip_err("Failed to get meta server information\n");
-        assert(0);
-    }
-
     gossip_debug(CLIENT_DEBUG," create: posting crdirent req\n");
 
     msg_p = &sm_p->msgpair;
@@ -513,8 +499,14 @@ static int create_crdirent_setup_msgpair(PINT_client_sm *sm_p,
     msg_p->handle = sm_p->u.create.metafile_handle;
     msg_p->comp_fn = create_crdirent_comp_fn;
 
-    /* we've already resolved the appropriate meta server */
-    msg_p->svr_addr = sm_p->u.create.meta_server_addr;
+    ret = PINT_bucket_map_to_server(&msg_p->svr_addr,
+                                    msg_p->handle,
+                                    msg_p->fs_id);
+    if (ret < 0)
+    {
+        gossip_err("Failed to get meta server information\n");
+        assert(0);
+    }
 
     return 1;
 }
@@ -667,12 +659,13 @@ static int create_setattr_setup_msgpair(PINT_client_sm *sm_p,
     msg_p->handle = sm_p->u.create.metafile_handle;
     msg_p->comp_fn = create_setattr_comp_fn;
 
-    /*
-      we've already resolved the appropriate meta
-      server from the previous metafile create
-     */
-    msg_p->svr_addr = sm_p->u.create.meta_server_addr;
-
+    if (PINT_bucket_map_to_server(&msg_p->svr_addr,
+                                  msg_p->handle,
+                                  msg_p->fs_id) < 0)
+    {
+        gossip_err("Failed to get meta server information\n");
+        assert(0);
+    }
     return 1;
 }
 

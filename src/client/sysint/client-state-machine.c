@@ -71,6 +71,9 @@ int PINT_client_state_machine_post(PINT_client_sm *sm_p,
 	case PVFS_SYS_READDIR:
 	    sm_p->current_state = pvfs2_client_readdir_sm.state_machine + 1;
 	    break;
+	case PVFS_SYS_LOOKUP:
+	    sm_p->current_state = pvfs2_client_lookup_sm.state_machine + 1;
+	    break;
 	case PVFS_SYS_GETATTR:
 	    sm_p->current_state = pvfs2_client_getattr_sm.state_machine + 1;
 	    break;
@@ -293,7 +296,8 @@ int PINT_serv_msgpairarray_resolve_addrs(int count,
     assert(count > 0); /* sanity check */
 
     /* run through array of msgpairarray */
-    for (i=0; i < count; i++) {
+    for (i=0; i < count; i++)
+    {
 	PINT_client_sm_msgpair_state *msg_p = &msgarray[i];
 
 	/* determine server address from fs_id/handle pair.
@@ -302,11 +306,15 @@ int PINT_serv_msgpairarray_resolve_addrs(int count,
 	ret = PINT_bucket_map_to_server(&msg_p->svr_addr,
 					msg_p->handle,
 					msg_p->fs_id);
-	if (ret != 0) {
-	    gossip_lerr("bucket map to server failed; probably invalid svr_addr\n");
+	if (ret != 0)
+        {
+	    gossip_lerr("bucket map to server failed; "
+                        "probably invalid svr_addr\n");
 	    assert(ret < 0); /* return value range check */
 	    return(ret);
 	}
+        gossip_debug(CLIENT_DEBUG, " mapped handle %d to server %lu\n",
+                     msg_p->handle, (unsigned long)msg_p->svr_addr);
     }
     
     return(0);

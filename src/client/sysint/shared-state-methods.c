@@ -218,7 +218,6 @@ int sm_common_object_getattr_comp_fn(void *v_p,
                                      struct PVFS_server_resp *resp_p,
                                      int index)
 {
-    PVFS_object_attr *attr = NULL;
     PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
     
     assert(resp_p->op == PVFS_SERV_GETATTR);
