@@ -1,39 +1,55 @@
 #include <client.h>
 
+/*why were these commented out?*/
+
+#define ATTR_UID 1
+#define ATTR_GID 2
+#define ATTR_PERM 4
+#define ATTR_ATIME 8
+#define ATTR_CTIME 16
+#define ATTR_MTIME 32
+#define ATTR_TYPE 2048
+
 extern int parse_pvfstab(char *fn,pvfs_mntlist *mnt);
 
 int main(int argc,char **argv)
 {
 
+	PVFS_sysresp_init resp_init;
+	PVFS_sysreq_lookup req_look;
+	PVFS_sysresp_lookup resp_look;
 	PVFS_sysreq_lookup *req_lk = NULL;
 	PVFS_sysresp_lookup *resp_lk = NULL;
 	PVFS_sysreq_getattr *req_gattr = NULL;
 	PVFS_sysresp_getattr *resp_gattr = NULL;
 	PVFS_sysreq_setattr *req_sattr = NULL;
+#if 0
 	PVFS_sysreq_mkdir *req_mkdir = NULL;
 	PVFS_sysresp_mkdir *resp_mkdir = NULL;
 	PVFS_sysreq_rmdir *req_rmdir = NULL;
 	PVFS_sysreq_readdir *req_readdir = NULL;
 	PVFS_sysresp_readdir *resp_readdir = NULL;
-#if 0
-	PVFS_sysreq_create *req_create = NULL;
-	PVFS_sysresp_create *resp_create = NULL;
 	PVFS_sysreq_statfs *req_statfs = NULL;
 	PVFS_sysresp_statfs *resp_statfs = NULL;
 #endif
-	char filename[80] = "/parl/fshorte/sysint/file1";
-	char dirname[256] = "/parl/fshorte/sysint/home";
+	PVFS_sysreq_create *req_create = NULL;
+	PVFS_sysresp_create *resp_create = NULL;
+	char filename[80] = "file1";
+	//char dirname[256] = "/parl/fshorte/sysint/home";
 	int ret = -1,i = 0;
 	PVFS_fs_id fsid = 9;
 	pvfs_mntlist mnt = {0,NULL};
-	int64_t cmd_handle=1048572; /*handle that already exists on the server*/
-	PVFS_handle some_datafile = 42069; /*handle to a datafile */
 
+	PVFS_handle lk_handle;
+	PVFS_handle lk_fsid;
+
+/*
 	if (argc > 1)
 	{
-		sscanf(argv[1], "%d", &cmd_handle);
-		printf("using handle %d\n", cmd_handle);
+		sscanf(argv[1], "%d", (int*)&cmd_handle);
+		printf("using handle %d\n",(int) cmd_handle);
 	}
+*/
 
 	/* Parse PVFStab */
 	ret = parse_pvfstab(NULL,&mnt);
@@ -43,18 +59,92 @@ int main(int argc,char **argv)
 		return(-1);
 	}
 	/*Init the system interface*/
-	ret = PVFS_sys_initialize(mnt);
+	ret = PVFS_sys_initialize(mnt, &resp_init);
 	if(ret < 0)
 	{
 		printf("PVFS_sys_initialize() failure. = %d\n", ret);
 		return(ret);
 	}
 	printf("SYSTEM INTERFACE INITIALIZED\n");
+
+	/* lookup the root handle */
+	req_look.credentials.perms = 7;
+	req_look.name = malloc(2);/*null terminator included*/
+	req_look.name[0] = "/";
+	req_look.name[1] = "/0";
+	req_look.fs_id = resp_init.fsid_list[0];
+	printf("looking up the root handle for fsid = %d\n", req_look.fs_id);
+	ret = PVFS_sys_lookup(&req_look,&resp_look);
+	if (ret < 0)
+	{
+		printf("Lookup failed with errcode = %d\n", ret);
+		return(-1);
+	}
+	// print the handle 
+	printf("--lookup--\n"); 
+	printf("ROOT Handle:%ld\n", (long int)resp_look.pinode_refn.handle);
+	
+
+	/* test create */
+	req_create = (PVFS_sysreq_create *)malloc(sizeof(PVFS_sysreq_create));
+	if (!req_create)
+	{
+		printf("Error in malloc\n");
+		return(-1);
+	}
+	resp_create = (PVFS_sysresp_create *)malloc(sizeof(PVFS_sysresp_create));
+	if (!resp_create)
+	{
+		printf("Error in malloc\n");
+		return(-1);
+	}
+
+	// Fill in the create info 
+	req_create->entry_name = (char *)malloc(strlen(filename) + 1);
+	if (!req_create->entry_name)
+	{
+		printf("Error in malloc\n");
+		return(-1);
+	}
+	memcpy(req_create->entry_name,filename,strlen(filename) + 1);
+	req_create->attrmask = (ATTR_UID | ATTR_GID | ATTR_PERM);
+	req_create->attr.owner = 12345;
+	req_create->attr.group = 56789;
+	req_create->attr.perms = 642;
+
+//	req_create->parent_refn.handle = ;
+//	req_create->parent_refn.fs_id = ;
+	
 	
 #if 0
-	/* test the lookup function */
-	/*Alloc memory and fill the structures*/
+	// Fill in the dist 
+	//req_create->dist = malloc(sizeof(PVFS_dist));
+	req_create->dist.type = PVFS_DIST_STRIPED;
+	req_create->dist.u.striped.base = 0;
+	req_create->dist.u.striped.pcount = 3;
+	req_create->dist.u.striped.ssize = 512;
+#endif
+
+	// call create 
+	ret = PVFS_sys_create(req_create,resp_create);
+	if (ret < 0)
+	{
+		printf("create failed\n");
+		return(-1);
+	}
 	
+	// print the handle 
+	printf("--create--\n"); 
+	printf("Handle:%ld\n",(long int)resp_create->pinode_refn.handle);
+
+	free(req_create->entry_name);
+	free(req_create);
+	free(resp_create);
+
+
+
+
+	/* test the lookup function */
 	req_lk = (PVFS_sysreq_lookup *)malloc(sizeof(PVFS_sysreq_lookup));
 	if (!req_lk)
 	{
@@ -74,8 +164,7 @@ int main(int argc,char **argv)
 		printf("Error in malloc\n");
 		return(-1);
 	}
-	strncpy(req_lk->name,filename,strlen(filename));
-	req_lk->name[strlen(filename)] = '\0';
+	memcpy(req_lk->name,filename,strlen(filename) + 1 );
 	req_lk->fs_id = fsid;
 	req_lk->credentials.perms = 7;
 	ret = PVFS_sys_lookup(req_lk,resp_lk);
@@ -89,9 +178,59 @@ int main(int argc,char **argv)
 	printf("Handle:%ld\n", (long int)resp_lk->pinode_refn.handle);
 	printf("FSID:%ld\n", (long int)resp_lk->pinode_refn.fs_id);
 
-#endif
+	lk_handle = resp_lk->pinode_refn.handle;
+	lk_fsid = resp_lk->pinode_refn.fs_id;
+
+	free(req_lk->name);
+	free(req_lk);
+	free(resp_lk);
+
+
+
+
+
+	/* Test the getattr function */
+	printf("GETATTR HERE===>\n");
+	req_gattr = (PVFS_sysreq_getattr *)malloc(sizeof(PVFS_sysreq_getattr));
+	if (!req_gattr)
+	{
+		printf("Error in malloc\n");
+		return(-1);
+	}
+	resp_gattr = (PVFS_sysresp_getattr *)malloc(sizeof(PVFS_sysresp_getattr));
+	if (!resp_gattr)
+	{
+		printf("Error in malloc\n");
+		return(-1);
+	}
+	
+	// Fill in the handle 
+	req_gattr->pinode_refn.handle = lk_handle;
+	req_gattr->pinode_refn.fs_id = lk_fsid;
+	req_gattr->attrmask = ATTR_META;
+
+	// Use it 
+	ret = PVFS_sys_getattr(req_gattr,resp_gattr);
+	if (ret < 0)
+	{
+		printf("getattr failed with errcode = %d\n", ret);
+		return(-1);
+	}
+	// print the handle 
+	printf("--getattr--\n"); 
+	printf("Handle:%ld\n",(long int)req_gattr->pinode_refn.handle);
+	printf("FSID:%ld\n",(long int)req_gattr->pinode_refn.fs_id);
+	printf("mask:%d\n",req_gattr->attrmask);
+	printf("uid:%d\n",resp_gattr->attr.owner);
+	printf("gid:%d\n",resp_gattr->attr.group);
+	printf("permissions:%d\n",resp_gattr->attr.perms);
+	printf("atime:%d\n",(int)resp_gattr->attr.atime);
+	printf("mtime:%d\n",(int)resp_gattr->attr.mtime);
+	printf("ctime:%d\n",(int)resp_gattr->attr.ctime);
+	printf("nr_datafiles:%d\n",resp_gattr->attr.u.meta.nr_datafiles);
+	
+
 	// test the setattr function 
-	//	Alloc memory and fill the structures
 	printf("SETATTR HERE===>\n");
 	req_sattr = (PVFS_sysreq_setattr *)malloc(sizeof(PVFS_sysreq_setattr));
 	if (!req_sattr)
@@ -101,8 +240,8 @@ int main(int argc,char **argv)
 	}
 	
 	// fill in the handle 
-	req_sattr->pinode_refn.handle = cmd_handle;//resp_lk->pinode_refn.handle;
-	req_sattr->pinode_refn.fs_id = 9;
+	req_sattr->pinode_refn.handle = lk_handle;//resp_lk->pinode_refn.handle;
+	req_sattr->pinode_refn.fs_id = lk_fsid;
 	req_sattr->attrmask = ATTR_META;
 	req_sattr->attr.owner = 12345;
 	req_sattr->attr.group = 56789;
@@ -111,8 +250,11 @@ int main(int argc,char **argv)
 	req_sattr->attr.mtime = 2222222;
 	req_sattr->attr.ctime = 3333333;
 	req_sattr->attr.objtype = ATTR_META;
-	req_sattr->attr.u.meta.dfh = &some_datafile;
-	req_sattr->attr.u.meta.nr_datafiles = 1;
+
+	req_sattr->attr.u.meta.dfh = NULL;
+	req_sattr->attr.u.meta.nr_datafiles = 0;
+	//req_sattr->attr.u.meta.dfh = &some_datafile;
+	//req_sattr->attr.u.meta.nr_datafiles = 1;
 
 	//use it
 	ret = PVFS_sys_setattr(req_sattr);
@@ -129,15 +271,13 @@ int main(int argc,char **argv)
 	printf("uid:%d\n",req_sattr->attr.owner);
 	printf("gid:%d\n",req_sattr->attr.group);
 	printf("permissions:%d\n",req_sattr->attr.perms);
-	printf("atime:%d\n",req_sattr->attr.atime);
-	printf("mtime:%d\n",req_sattr->attr.mtime);
-	printf("ctime:%d\n",req_sattr->attr.ctime);
+	printf("atime:%d\n",(int)req_sattr->attr.atime);
+	printf("mtime:%d\n",(int)req_sattr->attr.mtime);
+	printf("ctime:%d\n",(int)req_sattr->attr.ctime);
 	printf("nr_datafiles:%d\n",req_sattr->attr.u.meta.nr_datafiles);
 		
 
-	// Test the getattr function 
-	//	Alloc memory and fill the structures 
-
+	/* Test the getattr function */
 	printf("GETATTR HERE===>\n");
 	req_gattr = (PVFS_sysreq_getattr *)malloc(sizeof(PVFS_sysreq_getattr));
 	if (!req_gattr)
@@ -172,9 +312,9 @@ int main(int argc,char **argv)
 	printf("uid:%d\n",resp_gattr->attr.owner);
 	printf("gid:%d\n",resp_gattr->attr.group);
 	printf("permissions:%d\n",resp_gattr->attr.perms);
-	printf("atime:%d\n",resp_gattr->attr.atime);
-	printf("mtime:%d\n",resp_gattr->attr.mtime);
-	printf("ctime:%d\n",resp_gattr->attr.ctime);
+	printf("atime:%d\n",(int)resp_gattr->attr.atime);
+	printf("mtime:%d\n",(int)resp_gattr->attr.mtime);
+	printf("ctime:%d\n",(int)resp_gattr->attr.ctime);
 	printf("nr_datafiles:%d\n",resp_gattr->attr.u.meta.nr_datafiles);
 	
 #if 0
@@ -393,57 +533,6 @@ int main(int argc,char **argv)
 	printf("filestotal:%u\n",resp_statfs->statfs.iostat.filetotal);
 	printf("filefree id:%u\n",resp_statfs->statfs.iostat.filefree);
 
-	// test the create function 
-	//	Alloc memory and fill the structures
-	req_create = (PVFS_sysreq_create *)malloc(sizeof(PVFS_sysreq_create));
-	if (!req_create)
-	{
-		printf("Error in malloc\n");
-		return(-1);
-	}
-	resp_create = (PVFS_sysresp_create *)malloc(sizeof(PVFS_sysresp_create));
-	if (!resp_create)
-	{
-		printf("Error in malloc\n");
-		return(-1);
-	}
-
-	// Fill in the create info 
-	req_create->name = (char *)malloc(strlen(filename2) + 1);
-	if (!req_create->name)
-	{
-		printf("Error in malloc\n");
-		return(-1);
-	}
-	strncpy(req_create->name,filename2,strlen(filename2));
-	req_create->name[strlen(filename2)] = '\0';
-	//req_create->pinode_no.handle = 0;
-	//req_create->handles = NULL;
-	//req_create->handle_cnt = 0; 
-	req_create->attrmask = ATTR_UID + ATTR_GID + ATTR_SIZE + ATTR_PERM;
-	req_create->attr.owner = 12345;
-	req_create->attr.group = 56789;
-	req_create->attr.u.meta.size = 512;
-	req_create->attr.perms = 642;
-	
-	// Fill in the dist 
-	//req_create->dist = malloc(sizeof(PVFS_dist));
-	req_create->dist.type = PVFS_DIST_STRIPED;
-	req_create->dist.u.striped.base = 0;
-	req_create->dist.u.striped.pcount = 3;
-	req_create->dist.u.striped.ssize = 512;
-
-	// call create 
-	ret = PVFS_sys_create(req_create,resp_create);
-	if (ret < 0)
-	{
-		printf("create failed\n");
-		return(-1);
-	}
-	
-	// print the handle 
-	printf("--create--\n"); 
-	printf("Handle:%ld\n",(long int)resp_create->pinode_no.handle);
 #endif
 	//close it down
 	ret = PVFS_sys_finalize();
