@@ -5,16 +5,16 @@
  */
 
 
-#include <queue-list.h>
-#include <gossip.h>
+#include "queue-list.h"
+#include "gossip.h"
 
 struct queue_list_entry
 {
-	op_id_queue_p queue;
-	PVFS_fs_id fsid;
-	queue_list_p list_head;
+    op_id_queue_p queue;
+    PVFS_fs_id fsid;
+    queue_list_p list_head;
 
-	struct qlist_head list_link;
+    struct qlist_head list_link;
 };
 
 /* queue_list_new()
@@ -26,15 +26,15 @@ struct queue_list_entry
 queue_list_p queue_list_new(void)
 {
 
-	queue_list_p tmp_list = NULL;
+    queue_list_p tmp_list = NULL;
 
-	tmp_list = (queue_list_p)malloc(sizeof(struct qlist_head));
-	if(tmp_list)
-	{
-		INIT_QLIST_HEAD(tmp_list);
-	}
+    tmp_list = (queue_list_p) malloc(sizeof(struct qlist_head));
+    if (tmp_list)
+    {
+	INIT_QLIST_HEAD(tmp_list);
+    }
 
-	return(tmp_list);
+    return (tmp_list);
 }
 
 
@@ -48,48 +48,58 @@ queue_list_p queue_list_new(void)
  */
 void queue_list_cleanup(queue_list_p list)
 {
-	queue_list_p tmp_link = NULL;
-	struct queue_list_entry* tmp_entry = NULL;
-	struct queue_list_entry* prev_entry = NULL;
+    queue_list_p tmp_link = NULL;
+    struct queue_list_entry *tmp_entry = NULL;
+    struct queue_list_entry *prev_entry = NULL;
 
-	qlist_for_each(tmp_link, list)
-	{
-		/* TODO: pick up here; still thinking about what is safe to
-		 * free...
-		 */
-	}
+    qlist_for_each(tmp_link, list)
+    {
+	/* TODO: pick up here; still thinking about what is safe to
+	 * free...
+	 */
+    }
 
-	gossip_lerr("UNIMPLEMENTED.\n");
-	/* TODO: finish */
+    gossip_lerr("UNIMPLEMENTED.\n");
+    /* TODO: finish */
 
-	return;
+    return;
 }
 
-void queue_list_add(queue_list_p list, op_id_queue_p queue,
-	PVFS_fs_id fsid)
+void queue_list_add(queue_list_p list,
+		    op_id_queue_p queue,
+		    PVFS_fs_id fsid)
 {
 
-	gossip_lerr("UNIMPLEMENTED.\n");
-	/* TODO: finish */
+    gossip_lerr("UNIMPLEMENTED.\n");
+    /* TODO: finish */
 
-	return;
+    return;
 }
 
-op_id_queue_p queue_list_query(queue_list_p list, PVFS_fs_id fsid)
+op_id_queue_p queue_list_query(queue_list_p list,
+			       PVFS_fs_id fsid)
 {
 
-	gossip_lerr("UNIMPLEMENTED.\n");
-	/* TODO: finish */
+    gossip_lerr("UNIMPLEMENTED.\n");
+    /* TODO: finish */
 
-	return(NULL);
+    return (NULL);
 }
 
-PVFS_fs_id queue_list_iterate(queue_list_p* current)
+PVFS_fs_id queue_list_iterate(queue_list_p * current)
 {
 
-	gossip_lerr("UNIMPLEMENTED.\n");
-	/* TODO: finish */
+    gossip_lerr("UNIMPLEMENTED.\n");
+    /* TODO: finish */
 
-	return(-1);
+    return (-1);
 }
 
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 noexpandtab
+ */

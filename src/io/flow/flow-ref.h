@@ -12,26 +12,38 @@
 #ifndef __FLOW_REF_H
 #define __FLOW_REF_H
 
-#include <quicklist.h>
-#include <flow.h>
+#include "quicklist.h"
+#include "flow.h"
 
 /* struct used to map pairs of endpoints to particular flow protocols */
 struct flow_ref_entry
 {
-	PVFS_endpoint_type src_endpoint;
-	PVFS_endpoint_type dest_endpoint;
-	int flowproto_id;
-	struct qlist_head flow_ref_link;
+    PVFS_endpoint_type src_endpoint;
+    PVFS_endpoint_type dest_endpoint;
+    int flowproto_id;
+    struct qlist_head flow_ref_link;
 };
 
-typedef struct qlist_head* flow_ref_p;
+typedef struct qlist_head *flow_ref_p;
 
 flow_ref_p flow_ref_new(void);
-int flow_ref_add(flow_ref_p frp, PVFS_endpoint_type src_endpoint, 
-	PVFS_endpoint_type dest_endpoint, int flowproto_id);
-struct flow_ref_entry* flow_ref_search(flow_ref_p frp, 
-	PVFS_endpoint_type src_endpoint, PVFS_endpoint_type dest_endpoint);
-void flow_ref_remove(struct flow_ref_entry* entry);
+int flow_ref_add(flow_ref_p frp,
+		 PVFS_endpoint_type src_endpoint,
+		 PVFS_endpoint_type dest_endpoint,
+		 int flowproto_id);
+struct flow_ref_entry *flow_ref_search(flow_ref_p frp,
+				       PVFS_endpoint_type src_endpoint,
+				       PVFS_endpoint_type dest_endpoint);
+void flow_ref_remove(struct flow_ref_entry *entry);
 void flow_ref_cleanup(flow_ref_p frp);
 
 #endif /* __FLOW_REF_H */
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 noexpandtab
+ */

@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include <errno.h>
 
-#include <flow-ref.h>
+#include "flow-ref.h"
 
 /* flow_ref_new()
  *
@@ -18,15 +18,15 @@
  */
 flow_ref_p flow_ref_new(void)
 {
-	struct qlist_head* tmp_frp = NULL;
+    struct qlist_head *tmp_frp = NULL;
 
-	tmp_frp = (struct qlist_head*)malloc(sizeof(struct qlist_head));
-	if(tmp_frp)
-	{
-		INIT_QLIST_HEAD(tmp_frp);
-	}
+    tmp_frp = (struct qlist_head *) malloc(sizeof(struct qlist_head));
+    if (tmp_frp)
+    {
+	INIT_QLIST_HEAD(tmp_frp);
+    }
 
-	return(tmp_frp);
+    return (tmp_frp);
 }
 
 /* flow_ref_add()
@@ -35,25 +35,26 @@ flow_ref_p flow_ref_new(void)
  * 
  * no return value
  */
-int flow_ref_add(flow_ref_p frp, PVFS_endpoint_type src_endpoint, 
-	PVFS_endpoint_type dest_endpoint, int flowproto_id)
+int flow_ref_add(flow_ref_p frp,
+		 PVFS_endpoint_type src_endpoint,
+		 PVFS_endpoint_type dest_endpoint,
+		 int flowproto_id)
 {
-	struct flow_ref_entry* tmp_entry = NULL;
+    struct flow_ref_entry *tmp_entry = NULL;
 
-	tmp_entry = (struct flow_ref_entry*)malloc(sizeof(struct
-		flow_ref_entry));
-	if(!tmp_entry)
-	{
-		return(-ENOMEM);
-	}
+    tmp_entry = (struct flow_ref_entry *) malloc(sizeof(struct flow_ref_entry));
+    if (!tmp_entry)
+    {
+	return (-ENOMEM);
+    }
 
-	tmp_entry->src_endpoint = src_endpoint;
-	tmp_entry->dest_endpoint = dest_endpoint;
-	tmp_entry->flowproto_id = flowproto_id;
+    tmp_entry->src_endpoint = src_endpoint;
+    tmp_entry->dest_endpoint = dest_endpoint;
+    tmp_entry->flowproto_id = flowproto_id;
 
-	qlist_add(&(tmp_entry->flow_ref_link), frp);
+    qlist_add(&(tmp_entry->flow_ref_link), frp);
 
-	return(0);
+    return (0);
 }
 
 /* flow_ref_search()
@@ -62,29 +63,30 @@ int flow_ref_add(flow_ref_p frp, PVFS_endpoint_type src_endpoint,
  *
  * returns pointer to entry if found, NULL otherwise
  */
-struct flow_ref_entry* flow_ref_search(flow_ref_p frp, 
-	PVFS_endpoint_type src_endpoint, PVFS_endpoint_type dest_endpoint)
+struct flow_ref_entry *flow_ref_search(flow_ref_p frp,
+				       PVFS_endpoint_type src_endpoint,
+				       PVFS_endpoint_type dest_endpoint)
 {
-	flow_ref_p tmp_link = NULL;
-	flow_ref_p tmp_next_link = NULL;
-	struct flow_ref_entry* tmp_entry = NULL;
+    flow_ref_p tmp_link = NULL;
+    flow_ref_p tmp_next_link = NULL;
+    struct flow_ref_entry *tmp_entry = NULL;
 
-	tmp_link = frp->next;
-	tmp_next_link = tmp_link->next;
-	while(tmp_link != frp)
+    tmp_link = frp->next;
+    tmp_next_link = tmp_link->next;
+    while (tmp_link != frp)
+    {
+	tmp_entry = qlist_entry(tmp_link, struct flow_ref_entry,
+				flow_ref_link);
+	if (tmp_entry->src_endpoint == src_endpoint &&
+	    tmp_entry->dest_endpoint == dest_endpoint)
 	{
-		tmp_entry = qlist_entry(tmp_link, struct flow_ref_entry,
-			flow_ref_link);
-		if(tmp_entry->src_endpoint == src_endpoint &&
-			tmp_entry->dest_endpoint == dest_endpoint)
-		{
-			return(tmp_entry);
-		}
-		tmp_link = tmp_next_link;
-		tmp_next_link = tmp_link->next;
+	    return (tmp_entry);
 	}
+	tmp_link = tmp_next_link;
+	tmp_next_link = tmp_link->next;
+    }
 
-	return(NULL);
+    return (NULL);
 }
 
 /* flow_ref_remove()
@@ -93,10 +95,10 @@ struct flow_ref_entry* flow_ref_search(flow_ref_p frp,
  *
  * no return value
  */
-void flow_ref_remove(struct flow_ref_entry* entry)
+void flow_ref_remove(struct flow_ref_entry *entry)
 {
-	qlist_del(&(entry->flow_ref_link));
-	return;
+    qlist_del(&(entry->flow_ref_link));
+    return;
 }
 
 
@@ -108,19 +110,27 @@ void flow_ref_remove(struct flow_ref_entry* entry)
  */
 void flow_ref_cleanup(flow_ref_p frp)
 {
-	flow_ref_p iterator = NULL;
-	flow_ref_p scratch = NULL;
-	struct flow_ref_entry* tmp_entry = NULL;
+    flow_ref_p iterator = NULL;
+    flow_ref_p scratch = NULL;
+    struct flow_ref_entry *tmp_entry = NULL;
 
-	qlist_for_each_safe(iterator, scratch, frp)
-	{
-		tmp_entry = qlist_entry(iterator, struct flow_ref_entry,
-			flow_ref_link);
-		free(tmp_entry);
-	}
+    qlist_for_each_safe(iterator, scratch, frp)
+    {
+	tmp_entry = qlist_entry(iterator, struct flow_ref_entry,
+				flow_ref_link);
+	free(tmp_entry);
+    }
 
-	free(frp);
-	frp = NULL;
-	return;
+    free(frp);
+    frp = NULL;
+    return;
 }
 
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 noexpandtab
+ */

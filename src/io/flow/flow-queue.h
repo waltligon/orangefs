@@ -11,20 +11,33 @@
 #ifndef __FLOW_QUEUE_H
 #define __FLOW_QUEUE_H
 
-#include <quicklist.h>
-#include <flow.h>
+#include "quicklist.h"
+#include "flow.h"
 
-typedef struct qlist_head* flow_queue_p;
+typedef struct qlist_head *flow_queue_p;
 
 flow_queue_p flow_queue_new(void);
 void flow_queue_cleanup(flow_queue_p fqp);
-void flow_queue_add(flow_queue_p fqp, struct flow_descriptor* flow_d);
-void flow_queue_remove(struct flow_descriptor* desc);
+void flow_queue_add(flow_queue_p fqp,
+		    struct flow_descriptor *flow_d);
+void flow_queue_remove(struct flow_descriptor *desc);
 int flow_queue_empty(flow_queue_p fqp);
-struct flow_descriptor* flow_queue_shownext(flow_queue_p fqp);
-flow_descriptor* flow_queue_search(flow_queue_p fqp, flow_descriptor*
-	flow_d);
-int flow_queue_search_multi(flow_queue_p fqp, int incount, 
-	flow_descriptor** flow_array, int* outcount, int* index_array);
+struct flow_descriptor *flow_queue_shownext(flow_queue_p fqp);
+flow_descriptor *flow_queue_search(flow_queue_p fqp,
+				   flow_descriptor * flow_d);
+int flow_queue_search_multi(flow_queue_p fqp,
+			    int incount,
+			    flow_descriptor ** flow_array,
+			    int *outcount,
+			    int *index_array);
 
 #endif /* __FLOW_QUEUE_H */
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 noexpandtab
+ */
