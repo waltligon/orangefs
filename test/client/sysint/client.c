@@ -25,7 +25,7 @@ int main(int argc,char **argv)
    /*char filename2[80] = "/pvfs/home/foo1";*/
 	char dirname[256] = "/parl/rharish/home";
 	int ret = -1,i = 0;
-	PVFS_fs_id fsid = 1;
+	PVFS_fs_id fsid = 9;
 	pvfs_mntlist mnt = {0,NULL};
 
 	/* Parse PVFStab */

@@ -74,7 +74,6 @@ static int server_shutdown(int level,int ret,int sig);
 static void *sig_handler(int sig);
 int PINT_server_cp_bmi_unexp(PINT_server_op *s_op, job_status_s *ret);
 void PINT_server_get_bmi_unexp_err(int ret);
-int PINT_trove_initialize(void);
 
 /* Functions  */
 
@@ -99,8 +98,6 @@ int main(int argc, char **argv) {
 	/* Insert Temp Trove Stuff Here */
 
 	TROVE_coll_id coll_id;
-	
-	
 
 	server_level_init = 0; /* Used for shutdown function */
 
