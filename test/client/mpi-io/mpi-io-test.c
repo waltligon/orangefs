@@ -42,11 +42,12 @@ int     opt_correct   = 0;
 int	opt_sync	= 0;
 int     amode         = O_RDWR | O_CREAT;
 char    opt_file[256] = "/foo/test.out\0";
-char    opt_pvfstab[256] = "notset\0";
+char    opt_pvfs2tab[256] = "notset\0";
 int     opt_pvfstab_set = 0;
 
 /* function prototypes */
 int parse_args(int argc, char **argv);
+void usage(void);
 double Wtime(void);
 
 extern int debug_on;
@@ -88,7 +89,7 @@ int main(int argc, char **argv)
 	 * the appropriate environment variable: */
 	
 	if (opt_pvfstab_set) {
-		if((setenv("PVFSTAB_FILE", opt_pvfstab, 1)) < 0){
+		if((setenv("PVFS2TAB_FILE", opt_pvfs2tab, 1)) < 0){
 			perror("setenv");
 			goto die_jar_jar_die;
 		}
@@ -286,7 +287,7 @@ int parse_args(int argc, char **argv)
 {
 	int c;
 	
-	while ((c = getopt(argc, argv, "s:b:i:f:p:cy")) != EOF) {
+	while ((c = getopt(argc, argv, "s:b:i:f:p:cyh")) != EOF) {
 		switch (c) {
 			case 's': /* stripe */
 				opt_stripe = atoi(optarg);
@@ -301,7 +302,7 @@ int parse_args(int argc, char **argv)
 				strncpy(opt_file, optarg, 255);
 				break;
 			case 'p': /* pvfstab file */
-				strncpy(opt_pvfstab, optarg, 255);
+				strncpy(opt_pvfs2tab, optarg, 255);
 				opt_pvfstab_set = 1;
 				break;
 			case 'c': /* correctness */
@@ -309,7 +310,11 @@ int parse_args(int argc, char **argv)
 				break;
 			case 'y': /* sYnc */
 				opt_sync = 1;
+				break;
+			case 'h':
 			case '?': /* unknown */
+				usage();
+				exit(1);
 			default:
 				break;
 		}
@@ -326,6 +331,19 @@ double Wtime()
 	return((double)t.tv_sec + (double)t.tv_usec / 1000000);
 }
 
+void usage(void)
+{
+		  printf("usage: mpi-io-test <OPTIONS>\n");
+		  printf("\n<OPTIONS> is one of\n");
+		  printf(" -s       stripe size (UNUSED)\n");
+		  printf(" -b       block size (in bytes) [default: 16777216]\n");
+		  printf(" -i       iterations [default: 1]\n");
+		  printf(" -f       filename [default: /foo/test.out]\n");
+		  printf(" -p       path to pvfs2tab file to use [default: notset]\n");
+		  printf(" -c       verify correctness of file data [default: off]\n");
+		  printf(" -y       sYnc the file after each write [default: off]\n");
+		  printf(" -h       print this help\n");
+}
 
 /*
  * Local variables:
