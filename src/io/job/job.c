@@ -2157,6 +2157,7 @@ int job_testsome(
 	struct timeval end;
 	int total_completed = 0;
 	int original_count = *inout_count_p;
+	int real_id_count = 0;
 	job_id_t* tmp_id_array = NULL;
 	int i;
 
@@ -2166,6 +2167,17 @@ int job_testsome(
 	 * because I haven't implemented an intelligent way to only
 	 * look if the job you were interested in completed.
 	 */
+
+	/* count how many of the id's are non zero */
+	for(i=0; i<original_count; i++)
+	{
+		real_id_count++;
+	}
+	if(!real_id_count)
+	{
+		gossip_lerr("job_testsome() called with nothing to do.\n");
+		return(-EINVAL);
+	}
 
 	/* TODO: here is another cheap shot.  I don't want to special
 	 * case the -1 (infinite) timeout possibility right now (maybe
@@ -2217,7 +2229,7 @@ int job_testsome(
 		free(tmp_id_array);
 		return(ret);
 	}
-	if(ret == 0 && (*inout_count_p == original_count))
+	if(ret == 0 && (*inout_count_p == real_id_count))
 	{
 		free(tmp_id_array);
 		return(1);
@@ -2231,7 +2243,7 @@ int job_testsome(
 	}
 
 	total_completed += *inout_count_p;
-	*inout_count_p = original_count - *inout_count_p;
+	*inout_count_p = original_count;
 	for(i=0; i<total_completed; i++)
 		tmp_id_array[out_index_array[i]] = 0;
 
@@ -2306,15 +2318,15 @@ int job_testsome(
 				return(ret);
 			}
 			if(ret == 0 && 
-				(*inout_count_p + total_completed == original_count))
+				(*inout_count_p + total_completed == real_id_count))
 			{
-				*inout_count_p = original_count;
+				*inout_count_p = real_id_count;
 				free(tmp_id_array);
 				return(1);
 			}
 
 			total_completed += *inout_count_p;
-			*inout_count_p = original_count - *inout_count_p;
+			*inout_count_p = original_count;
 			for(i=0; i<total_completed; i++)
 				tmp_id_array[out_index_array[i]] = 0;
 		}
@@ -2351,15 +2363,15 @@ int job_testsome(
 				return(ret);
 			}
 			if(ret == 0 && 
-				(*inout_count_p + total_completed == original_count))
+				(*inout_count_p + total_completed == real_id_count))
 			{
-				*inout_count_p = original_count;
+				*inout_count_p = real_id_count;
 				free(tmp_id_array);
 				return(1);
 			}
 
 			total_completed += *inout_count_p;
-			*inout_count_p = original_count - *inout_count_p;
+			*inout_count_p = original_count;
 			for(i=0; i<total_completed; i++)
 				tmp_id_array[out_index_array[i]] = 0;
 		}
