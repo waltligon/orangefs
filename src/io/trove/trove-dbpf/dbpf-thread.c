@@ -181,7 +181,7 @@ int dbpf_do_one_work_cycle(int *out_count)
         }
         else
         {
-            dbpf_queued_op_queue(cur_op);
+            dbpf_queued_op_queue_nolock(cur_op);
         }
 
     } while(--max_num_ops_to_service);

@@ -42,9 +42,10 @@ int dbpf_op_queue_empty(
 dbpf_queued_op_t *dbpf_op_queue_shownext(
     dbpf_op_queue_p op_queue);
 
-
-
 TROVE_op_id dbpf_queued_op_queue(
+    dbpf_queued_op_t *q_op_p);
+
+TROVE_op_id dbpf_queued_op_queue_nolock(
     dbpf_queued_op_t *q_op_p);
 
 int dbpf_queued_op_try_get(

@@ -178,6 +178,22 @@ TROVE_op_id dbpf_queued_op_queue(dbpf_queued_op_t *q_op_p)
 
     gen_mutex_lock(&dbpf_op_queue_mutex);
 
+    tmp_id = dbpf_queued_op_queue_nolock(q_op_p);
+
+    gen_mutex_unlock(&dbpf_op_queue_mutex);
+
+    return tmp_id;
+}
+
+/* dbpf_queued_op_queue_nolock()
+ *
+ * same as dbpf_queued_op_queue(), but assumes dbpf_op_queue_mutex already
+ * held
+ */
+TROVE_op_id dbpf_queued_op_queue_nolock(dbpf_queued_op_t *q_op_p)
+{
+    TROVE_op_id tmp_id = 0;
+
     dbpf_op_queue_add(&dbpf_op_queue, q_op_p);
 
     gen_mutex_lock(&q_op_p->mutex);
@@ -193,9 +209,9 @@ TROVE_op_id dbpf_queued_op_queue(dbpf_queued_op_t *q_op_p)
     pthread_cond_signal(&dbpf_op_incoming_cond);
 #endif
 
-    gen_mutex_unlock(&dbpf_op_queue_mutex);
     return tmp_id;
 }
+
 
 /* dbpf_queued_op_dequeue()
  *
