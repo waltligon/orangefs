@@ -22,8 +22,6 @@ static int setattr_write_metafile_datafile_handles_if_required(
 static int setattr_write_metafile_distribution_if_required(
     PINT_server_op *s_op, job_status_s* js_p);
 static int setattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p);
-static int setattr_release_posted_job(PINT_server_op *s_op, job_status_s* js_p);
-static int setattr_send_bmi(PINT_server_op *s_op, job_status_s* js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 extern job_context_id PINT_server_job_context;
@@ -39,8 +37,7 @@ machine pvfs2_set_attr_sm(prelude,
 			  write_metafile_datafile_handles_if_required,
 			  write_metafile_distribution_if_required,
 			  setobj_attrib,
-			  send_bmi,
-			  release)
+			  final_response)
 {
 	state prelude
 	{
@@ -59,38 +56,32 @@ machine pvfs2_set_attr_sm(prelude,
 		run setattr_verify_attribs;
 		STATE_METAFILE => write_metafile_datafile_handles_if_required;
 		success        => setobj_attrib;
-		default        => send_bmi;
+		default        => final_response;
 	}
 
 	state write_metafile_datafile_handles_if_required
         {
 		run setattr_write_metafile_datafile_handles_if_required;
 		success => write_metafile_distribution_if_required;
-		default => send_bmi;
+		default => final_response;
 	}
 
 	state write_metafile_distribution_if_required
         {
 		run setattr_write_metafile_distribution_if_required;
 		success => setobj_attrib;
-		default => send_bmi;
+		default => final_response;
 	}
 
 	state setobj_attrib
 	{
 		run setattr_setobj_attribs;
-		default => send_bmi;
+		default => final_response;
 	}
 
-	state send_bmi
+	state final_response
 	{
-		run setattr_send_bmi;
-		default => release;
-	}
-
-	state release
-	{
-		run setattr_release_posted_job;
+		jump pvfs2_final_response_sm;
 		default => cleanup;
 	}
 
@@ -436,84 +427,6 @@ static int setattr_write_metafile_distribution_if_required(
 }
 
 /*
- * Function: setattr_send_bmi
- *
- * Params:   server_op *b, 
- *           job_status_s* js_p
- *
- * Returns:  int
- *
- * Synopsis: 
- *           
- */
-
-static int setattr_send_bmi(PINT_server_op *s_op, job_status_s* js_p)
-{
-    int ret=0;
-    job_id_t i;
-
-    gossip_ldebug(SERVER_DEBUG, "setattr state: setattr_send_bmi\n");
-
-    /* fill in response -- status field is the only generic one we should have to set */
-    s_op->resp.status = js_p->error_code;
-
-    gossip_debug(SERVER_DEBUG,"  returning Status %d\n",js_p->error_code);
-
-    ret = PINT_encode(&s_op->resp,
-			       PINT_ENCODE_RESP,
-			       &(s_op->encoded),
-			       s_op->addr,
-			       s_op->decoded.enc_type);
-    assert(ret == 0);
-    
-    /* Post message */
-    ret = job_bmi_send_list(
-				     s_op->addr,
-				     s_op->encoded.buffer_list,
-				     s_op->encoded.size_list,
-				     s_op->encoded.list_count,
-				     s_op->encoded.total_size,
-				     s_op->tag,
-				     s_op->encoded.buffer_type,
-				     0,
-				     s_op, 
-				     js_p, 
-				     &i,
-				     PINT_server_job_context);
-    return ret;
-
-}
-
-/*
- * Function: setattr_release_posted_job
- *
- * Params:   server_op *b, 
- *           job_status_s* js_p
- *
- * Pre:      We are done!
- *
- * Post:     We need to let the next operation go.
- *
- * Returns:  int
- *
- * Synopsis: Free the job from the scheduler to allow next job to proceed.
- */
-
-static int setattr_release_posted_job(PINT_server_op *s_op, job_status_s* js_p)
-{
-
-    int ret=0;
-    job_id_t i;
-
-    ret = job_req_sched_release(s_op->scheduled_id,
-					 s_op,
-					 js_p,
-					 &i,
-					 PINT_server_job_context);
-    return ret;
-}
-
-/*
  * Function: setattr_cleanup
  *
  * Params:   server_op *b, 
@@ -529,9 +442,6 @@ static int setattr_cleanup(PINT_server_op *s_op, job_status_s* js_p)
 
     gossip_debug(SERVER_DEBUG, "setattr state: setattr_cleanup\n");
  
-    /* free encoded response */
-    PINT_encode_release(&(s_op->encoded),PINT_ENCODE_RESP);
-
     return(PINT_state_machine_completion(s_op));
 }
 
