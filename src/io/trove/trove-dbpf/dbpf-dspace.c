@@ -1114,7 +1114,6 @@ int dbpf_dspace_testcontext(
     int ret = 0;
     dbpf_queued_op_t *cur_op = NULL;
 #ifdef __PVFS2_TROVE_THREADED__
-    int already_rechecked = 0;
     int out_count = 0, limit = *inout_count_p;
     gen_mutex_t *context_mutex = NULL;
     void **user_ptr_p = NULL;
@@ -1132,12 +1131,45 @@ int dbpf_dspace_testcontext(
       them in the provided ds_id_array (up to inout_count_p).
       otherwise, cond_timedwait for max_idle_time_ms.
 
-      even if we fill some outgoing completed ops, we'll wait
-      for up to max_idle_time_ms, for any more completions to
-      occur and check again (assuming out_count < limit).
+      we will only sleep if there is nothing to do; otherwise 
+      we return whatever we find ASAP
     */
-  check_completion_queue:
-    if (!dbpf_op_queue_empty(dbpf_completion_queue_array[context_id]))
+    if (dbpf_op_queue_empty(dbpf_completion_queue_array[context_id]))
+    {
+        struct timeval base;
+        struct timespec wait_time;
+
+        /* compute how long to wait */
+        gettimeofday(&base, NULL);
+        wait_time.tv_sec = base.tv_sec +
+            (max_idle_time_ms / 1000);
+        wait_time.tv_nsec = base.tv_usec * 1000 + 
+            ((max_idle_time_ms % 1000) * 1000000);
+        if (wait_time.tv_nsec > 1000000000)
+        {
+            wait_time.tv_nsec = wait_time.tv_nsec - 1000000000;
+            wait_time.tv_sec++;
+        }
+
+        gen_mutex_lock(context_mutex);
+        ret = pthread_cond_timedwait(&dbpf_op_completed_cond,
+                                     context_mutex, &wait_time);
+        gen_mutex_unlock(context_mutex);
+
+        if (ret == ETIMEDOUT)
+        {
+	    /* we timed out without being awoken- this means there is
+	     * no point in checking the completion queue, we should just
+	     * return
+	     */
+	    *inout_count_p = 0;
+	    return(0);
+        }
+
+    }
+
+    while(!dbpf_op_queue_empty(dbpf_completion_queue_array[context_id])
+	&& out_count < limit)
     {
         cur_op = dbpf_op_queue_shownext(
             dbpf_completion_queue_array[context_id]);
@@ -1170,46 +1202,9 @@ int dbpf_dspace_testcontext(
 
         dbpf_queued_op_free(cur_op);
 
-        if (++out_count < limit)
-        {
-            goto check_completion_queue;
-        }
+	out_count++;
     }
-    else if (!already_rechecked)
-    {
-        struct timeval base;
-        struct timespec wait_time;
 
-        /* compute how long to wait */
-        gettimeofday(&base, NULL);
-        wait_time.tv_sec = base.tv_sec +
-            (max_idle_time_ms / 1000);
-        wait_time.tv_nsec = base.tv_usec * 1000 + 
-            ((max_idle_time_ms % 1000) * 1000000);
-        if (wait_time.tv_nsec > 1000000000)
-        {
-            wait_time.tv_nsec = wait_time.tv_nsec - 1000000000;
-            wait_time.tv_sec++;
-        }
-
-        gen_mutex_lock(context_mutex);
-        ret = pthread_cond_timedwait(&dbpf_op_completed_cond,
-                                     context_mutex, &wait_time);
-        gen_mutex_unlock(context_mutex);
-
-        if (ret != ETIMEDOUT)
-        {
-            /*
-              since we were signaled awake (rather than timed out
-              while sleeping), we're going to rescan ops here for
-              completion.  if nothing completes the second time
-              around, we're giving up and won't be back here.
-            */
-            already_rechecked = 1;
-
-            goto check_completion_queue;
-        }
-    }
     *inout_count_p = out_count;
     ret = 0;
 #else
