@@ -10,6 +10,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <limits.h>
 
 #include <flow.h>
 #include <job.h>
@@ -1942,6 +1943,16 @@ int job_test_HACK(
 	 * because I haven't implemented an intelligent way to only
 	 * look if the job you were interested in completed.
 	 */
+
+	/* TODO: here is another cheap shot.  I don't want to special
+	 * case the -1 (infinite) timeout possibility right now (maybe
+	 * later), but I want the semantics to work.  So.. if that's the
+	 * timeout I get, then set the remaining time to the maximum
+	 * value that an integer can take on.  That will hold it in
+	 * this function for nearly a month. 
+	 */
+	if(timeout_ms == -1)
+		timeout_remaining = INT_MAX;
 	
 	/* use this as a chance to do a cheap test on the request
 	 * scheduler
