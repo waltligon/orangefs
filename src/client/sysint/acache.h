@@ -105,14 +105,6 @@ PINT_pinode *PINT_acache_pinode_alloc(void);
 void PINT_acache_release_refn(PVFS_object_ref refn);
 void PINT_acache_release(PINT_pinode *pinode);
 
-
-/* these should be moved to pvfs2-utils */
-int PINT_acache_object_attr_deep_copy(
-    PVFS_object_attr *dest,
-    PVFS_object_attr *src);
-void PINT_acache_object_attr_deep_free(
-    PVFS_object_attr *attr);
-
 /*
  * Local variables:
  *  c-indent-level: 4

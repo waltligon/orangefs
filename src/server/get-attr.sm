@@ -22,6 +22,7 @@
 #include "pvfs2-attr.h"
 #include "pvfs2-types.h"
 #include "pvfs2-types-debug.h"
+#include "pint-util.h"
 
 enum
 {
@@ -621,35 +622,7 @@ static int getattr_cleanup(PINT_server_op *s_op, job_status_s* js_p)
 {
     PINT_STATE_DEBUG("getattr_cleanup");
 
-    if (s_op->resp.u.getattr.attr.objtype == PVFS_TYPE_METAFILE)
-    {
-        if (s_op->resp.u.getattr.attr.mask & PVFS_ATTR_META_DFILES)
-        {
-            if (s_op->resp.u.getattr.attr.u.meta.dfile_array)
-            {
-                free(s_op->resp.u.getattr.attr.u.meta.dfile_array);
-            }
-        }
-
-        if (s_op->resp.u.getattr.attr.mask & PVFS_ATTR_META_DIST)
-        {
-            if (s_op->resp.u.getattr.attr.u.meta.dist)
-            {
-                free(s_op->resp.u.getattr.attr.u.meta.dist);
-            }
-        }
-    }
-
-    if (s_op->resp.u.getattr.attr.objtype == PVFS_TYPE_SYMLINK)
-    {
-        if (s_op->resp.u.getattr.attr.mask & PVFS_ATTR_SYMLNK_TARGET)
-        {
-            if (s_op->resp.u.getattr.attr.u.sym.target_path)
-            {
-                free(s_op->resp.u.getattr.attr.u.sym.target_path);
-            }
-        }
-    }
+    PINT_free_object_attr(&s_op->resp.u.getattr.attr);
     return(server_state_machine_complete(s_op));
 }
 

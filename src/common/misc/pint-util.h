@@ -10,6 +10,7 @@
 #define __PINT_UTIL_H
 
 #include "pvfs2-types.h"
+#include "pvfs2-attr.h"
 
 /* converts common fields between sys attr and obj attr structures */
 #define PINT_CONVERT_ATTR(dest, src, attrmask)  \
@@ -25,6 +26,9 @@ do{                                             \
 }while(0)
 
 PVFS_msg_tag_t PINT_util_get_next_tag(void);
+
+int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src);
+void PINT_free_object_attr(PVFS_object_attr *attr);
 
 #endif /* __PINT_UTIL_H */
 

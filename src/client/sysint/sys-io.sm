@@ -1105,7 +1105,7 @@ static int io_cleanup(PINT_client_sm *sm_p,
     }
     else
     {
-        PINT_acache_object_attr_deep_free(&sm_p->acache_attr);
+        PINT_free_object_attr(&sm_p->acache_attr);
     }
 
     sm_p->error_code = js_p->error_code;

@@ -13,6 +13,7 @@
 #include "job.h"
 #include "gossip.h"
 #include "str-utils.h"
+#include "pint-util.h"
 
 #include "pint-servreq.h"
 #include "pint-cached-config.h"
@@ -147,8 +148,8 @@ int PINT_sm_common_object_getattr_comp_fn(
     if (!sm_p->acache_hit)
     {
         memset(&sm_p->acache_attr, 0, sizeof(PVFS_object_attr));
-        PINT_acache_object_attr_deep_copy(
-            &sm_p->acache_attr, &resp_p->u.getattr.attr);
+        PINT_copy_object_attr(&sm_p->acache_attr,
+                              &resp_p->u.getattr.attr);
     }
     return 0;
 }

@@ -306,8 +306,8 @@ static int getattr_object_getattr_comp_fn(
     */
     if (!sm_p->acache_hit)
     {
-        PINT_acache_object_attr_deep_copy(
-            &sm_p->acache_attr, &resp_p->u.getattr.attr);
+        PINT_copy_object_attr(&sm_p->acache_attr,
+                              &resp_p->u.getattr.attr);
     }
 
     attr = (sm_p->acache_hit ?
@@ -670,10 +670,8 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
                 sm_p->acache_attr.mask |= PVFS_ATTR_META_ALL;
             }
 
-            PINT_acache_object_attr_deep_copy(
-                &pinode->attr, &sm_p->acache_attr);
-            PINT_acache_object_attr_deep_free(
-                &sm_p->acache_attr);
+            PINT_copy_object_attr(&pinode->attr, &sm_p->acache_attr);
+            PINT_free_object_attr(&sm_p->acache_attr);
 
             PINT_acache_set_valid(pinode);
 
