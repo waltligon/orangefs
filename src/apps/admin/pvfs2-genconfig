@@ -309,7 +309,7 @@ for($i = 0; $i < $num_nodes; $i++)
     {
         $output_target = FILEOUT + $i + 10;
 
-        $filename = "$ARGV[1]0";
+        $filename = "$ARGV[1]$i";
         unless (open($output_target, ">", $filename))
         {
             print STDERR "Can't open specified file $ARGV[1]: $!\n";
