@@ -4,4 +4,5 @@ TESTSRC += \
 	$(DIR)/test-req1.c\
 	$(DIR)/test-pack1.c\
 	$(DIR)/debug1.c\
-	$(DIR)/debug2.c
+	$(DIR)/debug2.c\
+	$(DIR)/debug3.c
