@@ -74,7 +74,7 @@ int main(int argc, char **argv)
 	/*********************************************************/
 
 	/* test the second one and make sure it doesn't finish */
-	ret = job_test(id_array[1], &count, NULL, &stat); 
+	ret = job_test(id_array[1], &count, NULL, &stat, 0); 
 	if(ret != 0 || count != 0)
 	{
 		fprintf(stderr, "Error: test of 2nd request failed.\n");
@@ -92,7 +92,7 @@ int main(int argc, char **argv)
 	}
 	
 	/* now the 2nd request should be ready to go */
-	ret = job_test(id_array[1], &count, NULL, &stat); 
+	ret = job_test(id_array[1], &count, NULL, &stat, 0); 
 	if(ret != 0 || count != 1 || stat.error_code != 0)
 	{
 		fprintf(stderr, "Error: test of 2nd request failed.\n");

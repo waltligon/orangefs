@@ -93,7 +93,7 @@ int main(int argc, char **argv)
 		ret = block_on_job(foo_id, NULL, &job_stat);
 		if(ret == 0)
 		{
-			fprintf(stderr, "collection lookup succeeded before it should (at job_wait()).\n");
+			fprintf(stderr, "collection lookup succeeded before it should (at job_test()).\n");
 			return(-1);
 		}
 	}
@@ -111,7 +111,7 @@ int main(int argc, char **argv)
 		ret = block_on_job(foo_id, NULL, &job_stat);
 		if(ret < 0)
 		{
-			fprintf(stderr, "fs create failed (at job_wait()).\n");
+			fprintf(stderr, "fs create failed (at job_test()).\n");
 			return(-1);
 		}
 	}
@@ -135,7 +135,7 @@ int main(int argc, char **argv)
 		ret = block_on_job(foo_id, NULL, &job_stat);
 		if(ret < 0)
 		{
-			fprintf(stderr, "collection lookup failed (at job_wait()).\n");
+			fprintf(stderr, "collection lookup failed (at job_test()).\n");
 			return(-1);
 		}
 	}
@@ -170,7 +170,7 @@ int main(int argc, char **argv)
 		ret = block_on_job(foo_id, NULL, &job_stat);
 		if(ret < 0)
 		{
-			fprintf(stderr, "dspace_create failed (at job_wait()).\n");
+			fprintf(stderr, "dspace_create failed (at job_test()).\n");
 			return(-1);
 		}
 	}
@@ -202,7 +202,7 @@ int main(int argc, char **argv)
 		ret = block_on_job(foo_id, NULL, &job_stat);
 		if(ret < 0)
 		{
-			fprintf(stderr, "fs_seteattr failed (at job_wait()).\n");
+			fprintf(stderr, "fs_seteattr failed (at job_test()).\n");
 			return(-1);
 		}
 	}

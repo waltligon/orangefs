@@ -80,15 +80,8 @@ int job_bmi_send_blocking(
 	if(ret == 0)
 	{
 		/* need to wait until the job finishes */
-		do
-		{
-			ret = job_wait(block_id, &count, NULL, out_status_p);
-		} while(ret == 0 && count == 0);
-		if(ret < 0)
-		{
-			/* failure; return error code */
-			return(ret);
-		}
+		ret = job_test(block_id, &count, NULL, out_status_p, -1);
+		return(ret);
 	}
 
 	return(0);
@@ -124,15 +117,8 @@ int job_bmi_recv_blocking(
 	if(ret == 0)
 	{
 		/* need to wait for completion */
-		do
-		{
-			ret = job_wait(block_id, &count, NULL, out_status_p);
-		} while(ret == 0 && count == 0);
-		if(ret < 0)
-		{
-			/* failure; return error code */
-			return(ret);
-		}
+		ret = job_test(block_id, &count, NULL, out_status_p, -1);
+		return(ret);
 	}
 
 	return(0);

@@ -8,10 +8,7 @@ int block_on_job(job_id_t id, void** returned_user_ptr,
 	int outcount = 0;
 	int ret = -1;
 
-	do
-	{
-		ret = job_wait(id, &outcount, returned_user_ptr, out_status_p);
-	}while(ret == 0 && outcount == 0);
+	ret = job_test(id, &outcount, returned_user_ptr, out_status_p, -1);
 
 	if(ret < 0)
 	{

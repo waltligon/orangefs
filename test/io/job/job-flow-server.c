@@ -212,10 +212,7 @@ static int block_on_flow(flow_descriptor* flow_d)
 		return(ret);
 	}
 
-	do
-	{
-		ret = job_wait(tmp_id, &count, NULL, &tmp_stat);
-	}while(ret == 0 && count == 0);
+	ret = job_test(tmp_id, &count, NULL, &tmp_stat, -1);
 	if(ret < 0)
 	{
 		fprintf(stderr, "flow_test failure.\n");

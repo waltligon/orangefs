@@ -96,7 +96,6 @@ int main(int argc, char **argv)
 			fprintf(stderr, "job_testworld() failure.\n");
 			return(-1);
 		}
-#else
 
 		/* alternatively, try out the testsome interface */
 		outcount = 1;
@@ -104,6 +103,15 @@ int main(int argc, char **argv)
 		if(ret < 0 || outcount == 0)
 		{
 			fprintf(stderr, "job_testsome() failure.\n");
+			return(-1);
+		}
+#else
+
+		/* ... or maybe even give job_test() a whirl */
+		ret = job_test(job_id, &outcount, NULL, &status1, 5000);
+		if(ret < 0 || outcount == 0)
+		{
+			fprintf(stderr, "job_test() failure.\n");
 			return(-1);
 		}
 

@@ -86,7 +86,7 @@ int main(int argc, char **argv)
 		ret = block_on_job(foo_id, NULL, &job_stat);
 		if(ret < 0)
 		{
-			fprintf(stderr, "collection lookup failed (at job_wait()).\n");
+			fprintf(stderr, "collection lookup failed (at job_test()).\n");
 			return(-1);
 		}
 	}
@@ -137,7 +137,7 @@ int main(int argc, char **argv)
 			ret = block_on_job(foo_id, NULL, &job_stat);
 			if(ret < 0)
 			{
-				fprintf(stderr, "keyval iterate failed (at job_wait()).\n");
+				fprintf(stderr, "keyval iterate failed (at job_test()).\n");
 				return(-1);
 			}
 		}

@@ -345,7 +345,8 @@ int job_test(
 	job_id_t id,
 	int* out_count_p,
 	void** returned_user_ptr_p,
-	job_status_s* out_status_p);
+	job_status_s* out_status_p,
+	int timeout_ms);
 
 int job_testsome(
 	job_id_t* id_array,
@@ -361,12 +362,5 @@ int job_testworld(
 	void** returned_user_ptr_array,
 	job_status_s* out_status_array_p,
 	int timeout_ms);
-
-/* TODO: get rid of soon */
-int job_wait(
-	job_id_t id,
-	int* out_count_p,
-	void** returned_user_ptr_p,
-	job_status_s* out_status_p);
 
 #endif /* __JOB_H */

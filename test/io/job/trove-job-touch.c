@@ -81,7 +81,7 @@ int main(int argc, char **argv)
 		ret = block_on_job(foo_id, NULL, &job_stat);
 		if(ret < 0)
 		{
-			fprintf(stderr, "fs lookup failed (at job_wait()).\n");
+			fprintf(stderr, "fs lookup failed (at job_test()).\n");
 			return(-1);
 		}
 	}
@@ -133,7 +133,7 @@ int main(int argc, char **argv)
 		ret = block_on_job(foo_id, NULL, &job_stat);
 		if(ret < 0)
 		{
-			fprintf(stderr, "dspace_create failed (at job_wait()).\n");
+			fprintf(stderr, "dspace_create failed (at job_test()).\n");
 			return(-1);
 		}
 	}
@@ -165,7 +165,7 @@ int main(int argc, char **argv)
 		ret = block_on_job(foo_id, NULL, &job_stat);
 		if(ret < 0)
 		{
-			fprintf(stderr, "dspace_create failed (at job_wait()).\n");
+			fprintf(stderr, "dspace_create failed (at job_test()).\n");
 			return(-1);
 		}
 	}
