@@ -91,7 +91,7 @@ void dbpf_open_cache_finalize(void)
     {
 	tmp_entry = qlist_entry(tmp_link, struct open_cache_entry,
 	    queue_link);
-	if(tmp_entry->fd > 0)
+	if(tmp_entry->fd > -1)
 	{
 	    DBPF_CLOSE(tmp_entry->fd);
 	    tmp_entry->fd = -1;
@@ -107,7 +107,7 @@ void dbpf_open_cache_finalize(void)
     {
 	tmp_entry = qlist_entry(tmp_link, struct open_cache_entry,
 	    queue_link);
-	if(tmp_entry->fd > 0)
+	if(tmp_entry->fd > -1)
 	{
 	    DBPF_CLOSE(tmp_entry->fd);
 	    tmp_entry->fd = -1;
@@ -252,7 +252,7 @@ int dbpf_open_cache_get(
 	gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
 	    "dbpf_open_cache_get: resetting entry from unused list.\n");
 
-	if(tmp_entry->fd > 0)
+	if(tmp_entry->fd > -1)
 	{
 	    DBPF_CLOSE(tmp_entry->fd);
 	    tmp_entry->fd = -1;
@@ -381,7 +381,7 @@ void dbpf_open_cache_put(
 	gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
 	    "dbpf_open_cache_put: uncached entry.\n");
 	/* this wasn't cached; go ahead and close up */
-	if(in_ref->fd > 0)
+	if(in_ref->fd > -1)
 	{
 	    DBPF_CLOSE(in_ref->fd);
 	    in_ref->fd = -1;
@@ -446,7 +446,7 @@ int dbpf_open_cache_remove(
     {
 	gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
 	    "dbpf_open_cache_remove: unused entry.\n");
-	if(tmp_entry->fd > 0)
+	if(tmp_entry->fd > -1)
 	{
 	    DBPF_CLOSE(tmp_entry->fd);
 	    tmp_entry->fd = -1;
