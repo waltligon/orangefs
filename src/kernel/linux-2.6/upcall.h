@@ -1,3 +1,9 @@
+/*
+ * (C) 2001 Clemson University and The University of Chicago
+ *
+ * See COPYING in top-level directory.
+ */
+
 #ifndef __UPCALL_H
 #define __UPCALL_H
 
@@ -59,15 +65,24 @@ typedef struct
 
     union
     {
-        pvfs2_read_request_t read;
-        pvfs2_write_request_t write;
-        pvfs2_lookup_request_t lookup;
-        pvfs2_create_request_t create;
-        pvfs2_getattr_request_t getattr;
-        pvfs2_remove_request_t remove;
-        pvfs2_mkdir_request_t mkdir;
-        pvfs2_readdir_request_t readdir;
+	pvfs2_read_request_t read;
+	pvfs2_write_request_t write;
+	pvfs2_lookup_request_t lookup;
+	pvfs2_create_request_t create;
+	pvfs2_getattr_request_t getattr;
+	pvfs2_remove_request_t remove;
+	pvfs2_mkdir_request_t mkdir;
+	pvfs2_readdir_request_t readdir;
     } req;
 } pvfs2_upcall_t;
 
 #endif /* __UPCALL_H */
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 noexpandtab
+ */

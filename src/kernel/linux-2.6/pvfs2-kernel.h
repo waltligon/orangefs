@@ -1,3 +1,9 @@
+/*
+ * (C) 2001 Clemson University and The University of Chicago
+ *
+ * See COPYING in top-level directory.
+ */
+
 #ifndef __PVFS2KERNEL_H
 #define __PVFS2KERNEL_H
 
@@ -81,9 +87,9 @@ typedef struct
 typedef struct
 {
     PVFS_pinode_reference refn;
-    PVFS_ds_position readdir_token; /* REMOVE ME; unused */
+    PVFS_ds_position readdir_token;	/* REMOVE ME; unused */
     struct inode vfs_inode;
-} pvfs2_inode_t; /* RENAME THIS TO pvfs2_inode_info */
+} pvfs2_inode_t;		/* RENAME THIS TO pvfs2_inode_info */
 
 /* per superblock private pvfs2 info */
 typedef struct
@@ -95,14 +101,16 @@ typedef struct
   NOTE: See Documentation/filesystems/porting for information
   on implementing FOO_I and properly accessing fs private data
 */
-static inline pvfs2_inode_t *PVFS2_I(struct inode *inode)
+static inline pvfs2_inode_t *PVFS2_I(
+    struct inode *inode)
 {
     return container_of(inode, pvfs2_inode_t, vfs_inode);
 }
 
-static inline pvfs2_sb_info *PVFS2_SB(struct super_block *sb)
+static inline pvfs2_sb_info *PVFS2_SB(
+    struct super_block *sb)
 {
-    return (pvfs2_sb_info *)sb->s_fs_info;
+    return (pvfs2_sb_info *) sb->s_fs_info;
 }
 
 /************************************
@@ -162,20 +170,26 @@ do {                                                          \
 /****************************
  * defined in pvfs2-cache.c
  ****************************/
-void op_cache_initialize(void);
-void op_cache_finalize(void);
+void op_cache_initialize(
+    void);
+void op_cache_finalize(
+    void);
 void op_release(
     void *op);
-void dev_req_cache_initialize(void);
-void dev_req_cache_finalize(void);
-void pvfs2_inode_cache_initialize(void);
-void pvfs2_inode_cache_finalize(void);
+void dev_req_cache_initialize(
+    void);
+void dev_req_cache_finalize(
+    void);
+void pvfs2_inode_cache_initialize(
+    void);
+void pvfs2_inode_cache_finalize(
+    void);
 
 /****************************
  * defined in waitqueue.c
  ****************************/
 int wait_for_matching_downcall(
-    pvfs2_kernel_op_t *op);
+    pvfs2_kernel_op_t * op);
 
 /****************************
  * defined in pvfs2-utils.c
@@ -195,3 +209,12 @@ int pvfs2_remove_entry(
 
 
 #endif /* __PVFS2KERNEL_H */
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 noexpandtab
+ */

@@ -1,3 +1,9 @@
+/*
+ * (C) 2001 Clemson University and The University of Chicago
+ *
+ * See COPYING in top-level directory.
+ */
+
 
 /* TODO: we might want to try to avoid this inclusion  */
 #include "pvfs2-sysint.h"
@@ -56,17 +62,26 @@ typedef struct
 
     union
     {
-        pvfs2_read_response_t read;
-        pvfs2_write_response_t write;
-        pvfs2_lookup_response_t lookup;
-        pvfs2_create_response_t create;
-        pvfs2_getattr_response_t getattr;
+	pvfs2_read_response_t read;
+	pvfs2_write_response_t write;
+	pvfs2_lookup_response_t lookup;
+	pvfs2_create_response_t create;
+	pvfs2_getattr_response_t getattr;
 /*         pvfs2_remove_response_t remove; */
-        pvfs2_mkdir_response_t mkdir;
-        pvfs2_readdir_response_t readdir;
+	pvfs2_mkdir_response_t mkdir;
+	pvfs2_readdir_response_t readdir;
     } resp;
 } pvfs2_downcall_t;
 
 
 
 #endif /* __DOWNCALL_H */
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 noexpandtab
+ */

@@ -1,3 +1,9 @@
+/*
+ * (C) 2001 Clemson University and The University of Chicago
+ *
+ * See COPYING in top-level directory.
+ */
+
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/module.h>
@@ -17,148 +23,167 @@ extern kmem_cache_t *dev_req_cache;
 extern kmem_cache_t *pvfs2_inode_cache;
 
 static void op_cache_ctor(
-    void *kernel_op, kmem_cache_t *cachep, unsigned long flags)
+    void *kernel_op,
+    kmem_cache_t * cachep,
+    unsigned long flags)
 {
-    pvfs2_kernel_op_t *op = (pvfs2_kernel_op_t *)kernel_op;
+    pvfs2_kernel_op_t *op = (pvfs2_kernel_op_t *) kernel_op;
 
     if (flags & SLAB_CTOR_CONSTRUCTOR)
     {
-        memset(op,0,sizeof(*op));
+	memset(op, 0, sizeof(*op));
 
-        INIT_LIST_HEAD(&op->list);
-        spin_lock_init(&op->lock);
-        init_waitqueue_head(&op->waitq);
+	INIT_LIST_HEAD(&op->list);
+	spin_lock_init(&op->lock);
+	init_waitqueue_head(&op->waitq);
 
-        op->upcall.type = PVFS2_VFS_OP_INVALID;
-        op->downcall.type = PVFS2_VFS_OP_INVALID;
+	op->upcall.type = PVFS2_VFS_OP_INVALID;
+	op->downcall.type = PVFS2_VFS_OP_INVALID;
 
-        op->op_state = PVFS2_VFS_STATE_UNKNOWN;
-        op->tag = (unsigned long)atomic_read(&next_tag_value);
-        atomic_inc(&next_tag_value);
+	op->op_state = PVFS2_VFS_STATE_UNKNOWN;
+	op->tag = (unsigned long) atomic_read(&next_tag_value);
+	atomic_inc(&next_tag_value);
     }
 }
 
-void op_cache_initialize()
+void op_cache_initialize(
+    )
 {
     /*
-      NOTE: the SLAB_POISION and SLAB_RED_ZONE flags
-      are for debugging only and should be removed
-    */
+       NOTE: the SLAB_POISION and SLAB_RED_ZONE flags
+       are for debugging only and should be removed
+     */
     op_cache = kmem_cache_create("pvfs2_op_cache",
-                                 sizeof(pvfs2_kernel_op_t),
-                                 0,
-                                 SLAB_POISON | SLAB_RED_ZONE,
-                                 op_cache_ctor,
-                                 NULL);
+				 sizeof(pvfs2_kernel_op_t),
+				 0,
+				 SLAB_POISON | SLAB_RED_ZONE,
+				 op_cache_ctor, NULL);
     if (!op_cache)
     {
-        panic("Cannot create pvfs2_op_cache");
+	panic("Cannot create pvfs2_op_cache");
     }
 
     /* initialize our atomic tag counter */
     atomic_set(&next_tag_value, 100);
 }
 
-void op_cache_finalize()
+void op_cache_finalize(
+    )
 {
     if (kmem_cache_destroy(op_cache) != 0)
     {
-        panic("Failed to destroy pvfs2_op_cache");
+	panic("Failed to destroy pvfs2_op_cache");
     }
 }
 
-void op_release(void *op)
+void op_release(
+    void *op)
 {
-    pvfs2_kernel_op_t *pvfs2_op = (pvfs2_kernel_op_t *)op;
+    pvfs2_kernel_op_t *pvfs2_op = (pvfs2_kernel_op_t *) op;
 
     /* need to free specific upcall/downcall fields here */
-    printk("Freeing OP with tag %lu\n",pvfs2_op->tag);
+    printk("Freeing OP with tag %lu\n", pvfs2_op->tag);
 
     kmem_cache_free(op_cache, op);
 }
 
 
 static void dev_req_cache_ctor(
-    void *req, kmem_cache_t *cachep, unsigned long flags)
+    void *req,
+    kmem_cache_t * cachep,
+    unsigned long flags)
 {
     if (flags & SLAB_CTOR_CONSTRUCTOR)
     {
-        memset(req,0,sizeof(MAX_DEV_REQ_DOWNSIZE));
+	memset(req, 0, sizeof(MAX_DEV_REQ_DOWNSIZE));
     }
 }
 
-void dev_req_cache_initialize()
+void dev_req_cache_initialize(
+    )
 {
     /*
-      NOTE: the SLAB_POISION and SLAB_RED_ZONE flags
-      are for debugging only and should be removed
-    */
+       NOTE: the SLAB_POISION and SLAB_RED_ZONE flags
+       are for debugging only and should be removed
+     */
     dev_req_cache = kmem_cache_create("pvfs2_dev_req_cache",
-                                      MAX_DEV_REQ_DOWNSIZE,
-                                      0,
-                                      SLAB_POISON | SLAB_RED_ZONE,
-                                      dev_req_cache_ctor,
-                                      NULL);
+				      MAX_DEV_REQ_DOWNSIZE,
+				      0,
+				      SLAB_POISON | SLAB_RED_ZONE,
+				      dev_req_cache_ctor, NULL);
     if (!dev_req_cache)
     {
-        panic("Cannot create pvfs2_dev_req_cache");
+	panic("Cannot create pvfs2_dev_req_cache");
     }
 }
 
-void dev_req_cache_finalize()
+void dev_req_cache_finalize(
+    )
 {
     if (kmem_cache_destroy(dev_req_cache) != 0)
     {
-        panic("Failed to destroy pvfs2_dev_req_cache");
+	panic("Failed to destroy pvfs2_dev_req_cache");
     }
 }
 
 static void pvfs2_inode_cache_ctor(
-    void *new_pvfs2_inode, kmem_cache_t *cachep, unsigned long flags)
+    void *new_pvfs2_inode,
+    kmem_cache_t * cachep,
+    unsigned long flags)
 {
-    pvfs2_inode_t *pvfs2_inode = (pvfs2_inode_t *)new_pvfs2_inode;
+    pvfs2_inode_t *pvfs2_inode = (pvfs2_inode_t *) new_pvfs2_inode;
 
     if (flags & SLAB_CTOR_CONSTRUCTOR)
     {
-        memset(pvfs2_inode,0,sizeof(pvfs2_inode_t));
+	memset(pvfs2_inode, 0, sizeof(pvfs2_inode_t));
 
-        pvfs2_inode->refn.handle = 0;
-        pvfs2_inode->refn.fs_id = 0;
+	pvfs2_inode->refn.handle = 0;
+	pvfs2_inode->refn.fs_id = 0;
 
-        /*
-          inode_init_once is from inode.c;
-          it's normally run when an inode is allocated by the
-          system's inode slab allocator.  we call it here since
-          we're overloading the system's inode allocation with
-          this routine, thus we have to init vfs inodes manually
-        */
-        inode_init_once(&pvfs2_inode->vfs_inode);
-        pvfs2_inode->vfs_inode.i_version = 1;
+	/*
+	   inode_init_once is from inode.c;
+	   it's normally run when an inode is allocated by the
+	   system's inode slab allocator.  we call it here since
+	   we're overloading the system's inode allocation with
+	   this routine, thus we have to init vfs inodes manually
+	 */
+	inode_init_once(&pvfs2_inode->vfs_inode);
+	pvfs2_inode->vfs_inode.i_version = 1;
     }
 }
 
-void pvfs2_inode_cache_initialize(void)
+void pvfs2_inode_cache_initialize(
+    void)
 {
     /*
-      NOTE: the SLAB_POISION and SLAB_RED_ZONE flags
-      are for debugging only and should be removed
-    */
+       NOTE: the SLAB_POISION and SLAB_RED_ZONE flags
+       are for debugging only and should be removed
+     */
     pvfs2_inode_cache = kmem_cache_create("pvfs2_inode_cache",
-                                          sizeof(pvfs2_inode_t),
-                                          0,
-                                          SLAB_POISON | SLAB_RED_ZONE,
-                                          pvfs2_inode_cache_ctor,
-                                          NULL);
+					  sizeof(pvfs2_inode_t),
+					  0,
+					  SLAB_POISON | SLAB_RED_ZONE,
+					  pvfs2_inode_cache_ctor, NULL);
     if (!pvfs2_inode_cache)
     {
-        panic("Cannot create pvfs2_inode_cache");
+	panic("Cannot create pvfs2_inode_cache");
     }
 }
 
-void pvfs2_inode_cache_finalize()
+void pvfs2_inode_cache_finalize(
+    )
 {
     if (kmem_cache_destroy(pvfs2_inode_cache) != 0)
     {
-        panic("Failed to destroy pvfs2_inode_cache");
+	panic("Failed to destroy pvfs2_inode_cache");
     }
 }
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 noexpandtab
+ */
