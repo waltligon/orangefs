@@ -14,15 +14,17 @@ cd $HOME/testing/$DATE
 expect -c "spawn -noecho cvs -Q -d $cvsroot login; send \r;"
 cvs -Q -d $cvsroot co pvfs2
 if [ $? -ne 0 ] ; then
-    echo "Pulling PVFS2 from $cvsroot
-    failed."
+    echo "Pulling PVFS2 from $cvsroot failed."
     exit 1
 fi
 
 cd pvfs2/test/automated/
 
-# TODO: send email if this doesn't work too!
 ./run-test-adenine.sh 
+if [ $? -ne 0 ] ; then
+    echo "run-test-adenine.sh failed."
+    exit 1
+fi
 
 exit 0
 
