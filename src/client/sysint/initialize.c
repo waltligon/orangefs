@@ -25,11 +25,10 @@
 
 job_context_id PVFS_sys_job_context = -1;
 
-/* pinode cache */
-
 extern struct server_configuration_s g_server_config;
-
 extern gen_mutex_t *g_session_tag_mt_lock;
+
+static char* build_flow_module_list(pvfs_mntlist* mntlist);
 
 /* PVFS_sys_initialize()
  *
@@ -50,6 +49,7 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, int debug_mask,
     const char **method_ptr_list;
     int num_method_ptr_list, max_method_ptr_list;
     char *method_list = 0;
+    char *flowproto_list = NULL;
 
     enum {
 	NONE_INIT_FAIL = 0,
@@ -141,6 +141,16 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, int debug_mask,
 	goto return_error;
     }
 
+    /* parse flowprotocol list as well */
+    flowproto_list = build_flow_module_list(&mntent_list);
+    if(!flowproto_list)
+    {
+	gossip_err("Error: failed to parse flow protocols from tab file entries.\n");
+	ret = -EINVAL;
+	init_fail = BMI_INIT_FAIL;
+	goto return_error;
+    }
+    
     /* Initialize BMI */
     ret = BMI_initialize(method_list,NULL,0);
     if (ret < 0)
@@ -156,13 +166,7 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, int debug_mask,
     g_session_tag_mt_lock = gen_mutex_build();
 
     /* Initialize flow */
-#if 0
-    ret =
-	PINT_flow_initialize("flowproto_bmi_trove,flowproto_dump_offsets", 0);
-#else
-    ret =
-	PINT_flow_initialize("flowproto_bmi_trove", 0);
-#endif
+    ret = PINT_flow_initialize(flowproto_list, 0);
     if (ret < 0)
     {
 	init_fail = FLOW_INIT_FAIL;
@@ -311,6 +315,83 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, int debug_mask,
 
     return(ret);
 }
+
+/* build_flow_module_list()
+ *
+ * builds a string specifying a list of flow protocols suitable for use
+ * as an argument to PINT_flow_initialize(), based on flow protocols
+ * found in mntlist
+ *
+ * returns pointer to string on success, NULL on failure
+ * NOTE: caller must free string returned by this function
+ */
+static char* build_flow_module_list(pvfs_mntlist* mntlist)
+{
+    int i,j;
+    int found = 0;
+    int new_len = 0;
+    /* we always load up at least the default module */
+    char* ret_str = NULL;
+    char* old_ret_str = NULL;
+    char* next_mod = NULL;
+
+    /* iterate through array */
+    for(i=0; i<mntlist->ptab_count; i++)
+    {
+	switch(mntlist->ptab_array[i].flowproto)
+	{
+	    case FLOWPROTO_BMI_TROVE:
+		next_mod = "flowproto_bmi_trove";
+		break;
+	    case FLOWPROTO_DUMP_OFFSETS:
+		next_mod = "flowproto_dump_offsets";
+		break;
+	    case FLOWPROTO_BMI_CACHE:
+		next_mod = "flowproto_bmi_cache";
+		break;
+	}
+
+	/* see if we have already found this module */
+	found = 0;
+	for(j=0; j<i; j++)
+	{
+	    if(mntlist->ptab_array[i].flowproto == 
+		mntlist->ptab_array[j].flowproto)
+	    {
+		found = 1;
+		break;
+	    }
+	}
+
+	/* if we don't already have this module in our list, add it in */
+	if(!found)
+	{
+	    old_ret_str = ret_str;
+	    new_len = strlen(next_mod) + 2;
+	    if(old_ret_str)
+		new_len += strlen(old_ret_str);
+	    ret_str = (char*)malloc(new_len);
+	    if(!ret_str)
+	    {
+		if(old_ret_str)
+		    free(old_ret_str);
+		return(NULL);
+	    }
+	    memset(ret_str, 0, new_len);
+	    if(old_ret_str)
+	    {
+		strcpy(ret_str, old_ret_str);
+		strcat(ret_str, ",");
+	    }
+	    strcat(ret_str, next_mod);
+	    if(old_ret_str)
+		free(old_ret_str);
+	}
+    }
+
+    return(ret_str);
+}
+
 
 
 /*
