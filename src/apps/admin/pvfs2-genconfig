@@ -12,6 +12,9 @@ use Getopt::Long;
 # ugly global variables for option parsing
 my $opt_protocol = '';
 my $opt_port = '';
+my $opt_tcpport = '';
+my $opt_gmport = '';
+my $opt_ibport = '';
 my @opt_ioservers = ();
 my @opt_metaservers = ();
 my $opt_logfile = '';
@@ -269,15 +272,18 @@ sub usage
     print "\nUsage: pvfs2-genconfig [OPTIONS] <fs.conf> <server.conf>\n\n";
     
     print "OPTIONS can be one or all of\n";
-    print "     --protocol    <PROTO>          protocol to use (tcp,gm,ib)\n";
-    print "     --port        <NUM>            port to use\n";
-    print "     --ioservers   <STRING>         hostnames of data servers\n";
-    print "     --metaservers <STRING>         hostnames of meta servers\n";
-    print "     --logfile     <STRING>         logfile location\n";
-    print "     --logging     <STRING>         debugging mask for log messages.\n";
-    print "     --storage     <STRING>         storage space location\n";
-    print "     --notrovesync                  sync metadata only upon request\n";
-    print "     --quiet                        run silently\n\n";
+    print "     --protocol    <PROTO>[,<PROTO>..] protocol(s) to use (tcp,gm,ib)\n";
+    print "     --port        <NUM>               port to use (single protocol)\n";
+    print "     --tcpport     <NUM>               TCP port to use\n";
+    print "     --gmport      <NUM>               GM port to use\n";
+    print "     --ibport      <NUM>               IB port to use\n";
+    print "     --ioservers   <STRING>            hostnames of data servers\n";
+    print "     --metaservers <STRING>            hostnames of meta servers\n";
+    print "     --logfile     <STRING>            logfile location\n";
+    print "     --logging     <STRING>            debugging mask for log messages.\n";
+    print "     --storage     <STRING>            storage space location\n";
+    print "     --notrovesync                     sync metadata only upon request\n";
+    print "     --quiet                           run silently\n\n";
 
     print "The two arguments specify the names of the configuration files\n";
     print " that will be written.  This utility will create one fs.conf file.\n";
@@ -315,6 +321,7 @@ sub get_protocol
 		print "\n";
 		print "You must first select the network protocol that your file system will use.\n";
 		print "The only currently supported options are \"tcp\", \"gm\", and \"ib\".\n";
+		print "(For multi-homed configurations, use e.g. \"ib,tcp\".)\n";
 	}
 	if ($opt_protocol) {
 		$type = $opt_protocol;
@@ -370,8 +377,11 @@ sub tcp_get_port
 		print "Choose a TCP/IP port for the servers to listen on.  Note that this\n";
 		print "script assumes that all servers will use the same port number.\n";
 	}
-	if ($opt_port) {
+	if ($opt_tcpport) {
+		$port = $opt_tcpport;
+	} elsif ($opt_port) {
 		$port = $opt_port;
+		$opt_port = '';
 	} else {
 		$port = prompt_num("Enter port number [Default is 3334]: ","3334");
 	}
@@ -383,8 +393,11 @@ sub gm_get_port
 		print "Choose a GM port (in the range of 0 to 7) for the servers to listen on. \n";
 		print "This script assumes that all servers will use the same port number.\n";
 	}
-	if ($opt_port) {
+	if ($opt_gmport) {
+		$port = $opt_gmport;
+	} elsif ($opt_port) {
 		$port = $opt_port;
+		$opt_port = '';
 	} else {
 		$port = prompt_num("Enter port number [Default is 6]: ","6");
 	}
@@ -392,6 +405,22 @@ sub gm_get_port
 	# with more than that, we'll have to adapt
 	($port < 8) or die "GM ports must be in the range 0 to 7";
 
+	return  $port;
+}
+sub ib_get_port
+{
+	if (!$opt_quiet) { 
+		print "Choose a TCP/IP port for the servers to listen on for IB communications.  Note that this\n";
+		print "script assumes that all servers will use the same port number.\n";
+	}
+	if ($opt_ibport) {
+		$port = $opt_ibport;
+	} elsif ($opt_port) {
+		$port = $opt_port;
+		$opt_port = '';
+	} else {
+		$port = prompt_num("Enter port number [Default is 3335]: ","3335");
+	}
 	return  $port;
 }
 sub get_ionames
@@ -439,11 +468,20 @@ sub get_metanames
 # bmi_prot_mung(): makes bmi strings of the form protocol//host:port
 sub bmi_prot_mung
 {
-	my($protocol, $port, @bmi_array);
-	$protocol = pop @_;
-	$port = pop @_;
-	for ($i=0; $i <= $#_; $i++) {
-		$bmi_array[$i] = "$protocol://$_[$i]:$port";
+	my (@bmi_array);
+	my (@hosts) = @_;
+	my $num;
+
+	for ($i=0; $i <= $#hosts; $i++) {
+	    $bmi_array[$i] = "";
+	    $num = 0;
+	    foreach (split(',', $type)) {
+		++$num;
+		if ($num > 1) {
+		    $bmi_array[$i] .= ",";
+		}
+		$bmi_array[$i] .= "$_://$hosts[$i]:" . $port{$_};
+	    }
 	}
 	return @bmi_array;
 }
@@ -458,6 +496,9 @@ my $show_help = '';
 $opt_quiet = 0;
 GetOptions('protocol=s'    => \$opt_protocol,
 	   'port=i'        => \$opt_port,
+	   'tcpport=i'     => \$opt_tcpport,
+	   'gmport=i'      => \$opt_gmport,
+	   'ibport=i'      => \$opt_ibport,
 	   'ioservers=s'   => \@opt_ioservers,
 	   'metaservers=s' => \@opt_metaservers,
 	   'logfile=s'     => \$opt_logfile,
@@ -495,39 +536,23 @@ $num_unexp_reqs = 50;
 print_welcome();
 
 $type = get_protocol();
-if ( $type eq "tcp") 
-{
-	$port = tcp_get_port();
-	@io_aliases = get_ionames();
-	@meta_aliases = get_metanames();
-
-	$bmi_module = "bmi_tcp";
-
+foreach (split(',', $type)) {
+    if ($_ eq "tcp") {
+	$port{$_} = tcp_get_port();
+    } elsif ($_ eq "gm") {
+	$port{$_} = gm_get_port();
+    } elsif ($_ eq "ib") {
+	$port{$_} = ib_get_port();
+    } else {
+	print "Sorry.  At this time, only the tcp,gm, and ib protocols are available\n";
+	print "for use with this configuration utility.\n";
+	exit 1;
+    }
 }
-elsif ($type eq "gm") 
-{
-	$port = gm_get_port();
-	@io_aliases = get_ionames();
-	@meta_aliases = get_metanames();
+$bmi_module = join(',', map("bmi_" . $_, split(',', $type)));
 
-	$bmi_module = "bmi_gm";
-
-}
-elsif ($type eq "ib") {
-
-        # we use TCP routines to listen for connections
-	$port = tcp_get_port();
-	@io_aliases = get_ionames();
-	@meta_aliases = get_metanames();
-
-	$bmi_module = "bmi_ib";
-
-}
-else {
-    print "Sorry.  At this time, only the tcp and gm protocols are available\n";
-    print "for use with this configuration utility.\n";
-    exit 1;
-}
+@io_aliases = get_ionames();
+@meta_aliases = get_metanames();
 
 # union is the union of io and meta nodes
 my %nonunion_aliases = ();
@@ -538,9 +563,9 @@ foreach(@io_aliases,@meta_aliases){
 @union_aliases = sort @union_aliases;
 
 # tack on BMI style notation
-@io_bmi = bmi_prot_mung(@io_aliases, $port, $type);
-@meta_bmi = bmi_prot_mung(@meta_aliases, $port, $type);
-@union_bmi = bmi_prot_mung(@union_aliases, $port, $type);
+@io_bmi = bmi_prot_mung(@io_aliases);
+@meta_bmi = bmi_prot_mung(@meta_aliases);
+@union_bmi = bmi_prot_mung(@union_aliases);
 
 
 if (!$opt_quiet) {
