@@ -88,6 +88,12 @@ struct dbpf_dspace_create_op {
 
 /* struct dbpf_dspace_remove_op {}; -- nothing belongs in here */
 
+struct dbpf_dspace_iterate_handles_op {
+    TROVE_handle *handle_array;
+    TROVE_ds_position *position_p;
+    int *count_p;
+};
+
 struct dbpf_keyval_read_op {
     TROVE_keyval_s key;
     TROVE_keyval_s val;
@@ -189,6 +195,7 @@ enum dbpf_op_type {
     KEYVAL_WRITE_LIST,
     DSPACE_CREATE,
     DSPACE_REMOVE,
+    DSPACE_ITERATE_HANDLES,
     DSPACE_VERIFY,
     DSPACE_GETATTRIB
 };
@@ -221,6 +228,7 @@ struct dbpf_op {
 	 */
 	struct dbpf_dspace_create_op d_create;
 	/* struct dbpf_dspace_remove_op d_remove; -- EMPTY */
+	struct dbpf_dspace_iterate_handles_op d_iterate_handles;
 	struct dbpf_bstream_rw_at_op b_read_at;
 	struct dbpf_bstream_rw_at_op b_write_at;
 	struct dbpf_bstream_rw_list_op b_rw_list;

@@ -166,7 +166,7 @@ DB *dbpf_keyval_dbcache_get(TROVE_coll_id coll_id,
 void dbpf_keyval_dbcache_put(TROVE_coll_id coll_id,
 			     TROVE_handle handle)
 {
-    int i, ret;
+    int i;
 
     for (i=0; i < DBCACHE_ENTRIES; i++) {
 	if (keyval_db_cache[i].ref_ct  >= 0 &&
@@ -182,6 +182,8 @@ void dbpf_keyval_dbcache_put(TROVE_coll_id coll_id,
 
 #ifdef DBCACHE_DONT_CACHE
     if (keyval_db_cache[i].ref_ct == 0) {
+    	int ret;
+
 	ret = keyval_db_cache[i].db_p->close(db_p, 0);
 	if (ret != 0) assert(0);
 

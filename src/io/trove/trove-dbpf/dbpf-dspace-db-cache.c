@@ -4,6 +4,8 @@
  * See COPYING in top-level directory.
  */
 
+/* *** NOTE: NOT USED YET!!! *** */
+
 #include <unistd.h>
 #include <stdio.h>
 #include <sys/types.h>

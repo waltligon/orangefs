@@ -19,7 +19,9 @@ enum extentlist_coalesce_status {
 };
 static int extentlist_coalesce_extent(struct avlnode **n, struct TROVE_handle_extent *e);
 
-static void extent_init(struct TROVE_handle_extent *e, TROVE_handle first, TROVE_handle last);
+static int avltree_extent_search(struct avlnode *n, TROVE_handle handle, TROVE_handle *f_p, TROVE_handle *l_p);
+
+static inline void extent_init(struct TROVE_handle_extent *e, TROVE_handle first, TROVE_handle last);
 static void extent_show(struct avlnode *n, int param, int depth);
 
 /* constructor for an extent 
@@ -27,9 +29,9 @@ static void extent_show(struct avlnode *n, int param, int depth);
  * last: end of extent range
  * returns: nothing. what could go wrong?
  */
-static void extent_init(struct TROVE_handle_extent *e,
-			TROVE_handle first,
-			TROVE_handle last) 
+static inline void extent_init(struct TROVE_handle_extent *e,
+			       TROVE_handle first,
+			       TROVE_handle last) 
 {
     e->first = first;
     e->last = last;
@@ -321,6 +323,81 @@ int extentlist_hit_cutoff(struct TROVE_handle_extentlist *elist)
  */
 int extentlist_endured_purgatory(struct TROVE_handle_extentlist *querent, struct TROVE_handle_extentlist *reference) {
     return ( (reference->timestamp.tv_sec - querent->timestamp.tv_sec) > EXTENTLIST_PURGATORY );
+}
+
+
+/* extentlist_handle_remove()
+ *
+ * finds a specific handle in an extentlist and removes it from the free list,
+ * splitting the original extent into two if necessary.
+ *
+ * returns 0 on success, -1 on failure (not present in extentlist).
+ */
+int extentlist_handle_remove(struct TROVE_handle_extentlist *elist,
+			     TROVE_handle handle)
+{
+    int ret;
+    TROVE_handle key_handle, last_handle;
+    struct TROVE_handle_extent *old_e, *new_e;
+
+    ret = avltree_extent_search(elist->index, handle, &key_handle, &last_handle);
+    if (ret == -1) return -1;
+
+    avlremove(&(elist->index), key_handle);
+    if (old_e->first == old_e->last) return 0; /* done, length 1 extent now gone */
+    else {
+	if ((old_e = (struct TROVE_handle_extent *)malloc(sizeof(struct TROVE_handle_extent)) ) == NULL ) {
+	    assert(0);
+	}
+	if (key_handle == handle) {
+	    old_e->first = key_handle + 1;
+	    avlinsert(&(elist->index), old_e);
+	}
+	else if (old_e->last == handle) {
+	    old_e->last = last_handle - 1;
+	    avlinsert(&(elist->index), old_e);
+	}
+	else {
+	    /* splitting extent into two */
+	    if ((new_e = (struct TROVE_handle_extent *)malloc(sizeof(struct TROVE_handle_extent)) ) == NULL ) {
+		assert(0);
+	    }
+	    old_e->first = key_handle;
+	    old_e->last  = handle - 1;
+	    new_e->first = handle + 1;
+	    new_e->last  = last_handle;
+	    avlinsert(&(elist->index), old_e);
+	    avlinsert(&(elist->index), new_e);
+	}
+	return 0;
+    }
+}
+
+/* avltree_extent_search()
+ *
+ * finds an extent containing the given handle.
+ *
+ * returns -1 if not found, or 0 if the handle is found in an
+ * extent.  In that case first and last are returned...
+ */
+static int avltree_extent_search(struct avlnode *n,
+				 TROVE_handle handle,
+				 TROVE_handle *first_p,
+				 TROVE_handle *last_p)
+{
+    struct TROVE_handle_extent *e;
+
+    if (!n) return -1;
+
+    e = (struct TROVE_handle_extent *) n->d;
+    
+    if (e->first > handle) return avltree_extent_search(n->left, handle, first_p, last_p);
+    else if (e->last < handle) return avltree_extent_search(n->right, handle, first_p, last_p);
+    else {
+	*first_p = e->first;
+	*last_p  = e->last;
+	return 0;
+    }
 }
 
 /*

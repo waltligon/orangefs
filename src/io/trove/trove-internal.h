@@ -133,7 +133,7 @@ struct TROVE_keyval_ops
 			  TROVE_ds_position *inout_position_p,
 			  TROVE_keyval_s *out_key_array,
 			  TROVE_keyval_s *out_val_array,
-			  int *count_p,
+			  int *inout_count_p,
 			  TROVE_ds_flags flags,
 			  TROVE_vtag_s *inout_vtag,
 			  void *user_ptr,
@@ -144,7 +144,7 @@ struct TROVE_keyval_ops
 			       TROVE_handle handle,
 			       TROVE_ds_position *inout_position_p,
 			       TROVE_keyval_s *out_key_array,
-			       int count,
+			       int *inout_count_p,
 			       TROVE_ds_flags flags,
 			       TROVE_vtag_s *vtag,
 			       void *user_ptr,
@@ -189,7 +189,17 @@ struct TROVE_dspace_ops
 			 TROVE_handle handle,
 			 void *user_ptr,
 			 TROVE_op_id *out_op_id_p);
-    
+
+    int (*dspace_iterate_handles)(
+			 	  TROVE_coll_id coll_id,
+				  TROVE_ds_position *position_p,
+			 	  TROVE_handle *handle_array,
+				  int *inout_count_p,
+		 		  TROVE_ds_flags flags,
+				  TROVE_vtag_s *vtag,
+				  void *user_ptr,
+				  TROVE_op_id *out_op_id_p);
+
     int (*dspace_verify)(
 			 TROVE_coll_id coll_id,
 			 TROVE_handle handle,

@@ -159,7 +159,7 @@ int trove_keyval_iterate(
 			 TROVE_ds_position *position_p,
 			 TROVE_keyval_s *key_array,
 			 TROVE_keyval_s *val_array,
-			 int *count_p,
+			 int *inout_count_p,
 			 TROVE_ds_flags flags,
 			 TROVE_vtag_s *vtag,
 			 void *user_ptr,
@@ -170,7 +170,7 @@ int trove_keyval_iterate_keys(
 			      TROVE_handle handle,
 			      TROVE_ds_position *position_p,
 			      TROVE_keyval_s *key_array,
-			      int count,
+			      int *inout_count_p,
 			      TROVE_ds_flags flags,
 			      TROVE_vtag_s *vtag,
 			      void *user_ptr,
@@ -211,6 +211,16 @@ int trove_dspace_remove(TROVE_coll_id coll_id,
 			TROVE_handle handle,
 			void *user_ptr,
 			TROVE_op_id *out_op_id_p);
+
+int trove_dspace_iterate_handles(
+			      TROVE_coll_id coll_id,
+			      TROVE_ds_position *position_p,
+			      TROVE_handle *handle_array,
+			      int *inout_count_p,
+			      TROVE_ds_flags flags,
+			      TROVE_vtag_s *vtag,
+			      void *user_ptr,
+			      TROVE_op_id *out_op_id_p);
 
 int trove_dspace_verify(TROVE_coll_id coll_id,
 			TROVE_handle handle,

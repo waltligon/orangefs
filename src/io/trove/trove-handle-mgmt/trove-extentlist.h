@@ -55,6 +55,7 @@ int extentlist_init(struct TROVE_handle_extentlist * elist );
 void extentlist_free(struct TROVE_handle_extentlist *e);
 int extentlist_merge(struct TROVE_handle_extentlist *dest, struct TROVE_handle_extentlist *src);
 TROVE_handle extentlist_get_and_dec_extent(struct TROVE_handle_extentlist *elist);
+int extentlist_handle_remove(struct TROVE_handle_extentlist *elist, TROVE_handle handle);
 void extentlist_show(struct TROVE_handle_extentlist *elist);
 void extentlist_stats(struct TROVE_handle_extentlist *elist); 
 int extentlist_hit_cutoff(struct TROVE_handle_extentlist *elist);

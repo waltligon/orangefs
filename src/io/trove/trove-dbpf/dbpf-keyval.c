@@ -326,7 +326,7 @@ static int dbpf_keyval_iterate(
 			       TROVE_ds_position *position_p,
 			       TROVE_keyval_s *key_array,
 			       TROVE_keyval_s *val_array,
-			       int *count,
+			       int *inout_count_p,
 			       TROVE_ds_flags flags,
 			       TROVE_vtag_s *vtag,
 			       void *user_ptr,
@@ -357,7 +357,7 @@ static int dbpf_keyval_iterate(
     q_op_p->op.u.k_iterate.key_array  = key_array;
     q_op_p->op.u.k_iterate.val_array  = val_array;
     q_op_p->op.u.k_iterate.position_p = position_p;
-    q_op_p->op.u.k_iterate.count      = count;
+    q_op_p->op.u.k_iterate.count      = inout_count_p;
 
     dbpf_queued_op_queue(q_op_p);
     *out_op_id_p = new_id;
@@ -405,25 +405,28 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
     /* position the cursor and grab the first key/value pair */
     ret = dbc_p->c_get(dbc_p, &key, &data, DB_SET_RECNO);
     if (ret == DB_NOTFOUND) {
-	    /* no more pairs: tell caller how many we processed */
-	    *(op_p->u.k_iterate.count)=0; 
+	/* no more pairs: tell caller how many we processed */
+	*(op_p->u.k_iterate.count)=0; 
     }
     else if (ret != 0) goto return_error;
-
-    for (i=1; i < *(op_p->u.k_iterate.count); i++) {
-	key.data = op_p->u.k_iterate.key_array[i].buffer;
-	key.size = key.ulen = op_p->u.k_iterate.key_array[i].buffer_sz;
-	key.flags |= DB_DBT_USERMEM;
-	data.data = op_p->u.k_iterate.val_array[i].buffer;
-	data.size = data.ulen = op_p->u.k_iterate.val_array[i].buffer_sz;
-	data.flags |= DB_DBT_USERMEM;
-
-	ret = dbc_p->c_get(dbc_p, &key, &data, DB_NEXT);
-	if (ret == DB_NOTFOUND) {
-	    /* no more pairs: tell caller how many we processed */
-	    *(op_p->u.k_iterate.count)=i; 
+    else {
+	for (i=1; i < *(op_p->u.k_iterate.count); i++) {
+	    key.data = op_p->u.k_iterate.key_array[i].buffer;
+	    key.size = key.ulen = op_p->u.k_iterate.key_array[i].buffer_sz;
+	    key.flags |= DB_DBT_USERMEM;
+	    data.data = op_p->u.k_iterate.val_array[i].buffer;
+	    data.size = data.ulen = op_p->u.k_iterate.val_array[i].buffer_sz;
+	    data.flags |= DB_DBT_USERMEM;
+	    
+	    ret = dbc_p->c_get(dbc_p, &key, &data, DB_NEXT);
+	    if (ret == DB_NOTFOUND) {
+		/* no more pairs: tell caller how many we processed */
+		*(op_p->u.k_iterate.count)=i; 
+	    }
+	    else if (ret != 0) goto return_error;
 	}
-	else if (ret != 0) goto return_error;
+
+	*(op_p->u.k_iterate.position_p) += i;
     }
 
     /* 'position' is the record we will read next time through */
@@ -434,12 +437,12 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
      * consistent) if posistion always pointed to the 'next' place to access,
      * even if that's one place past the end of the database ... or maybe i'm
      * putting too much weight on 'posistion's value at the end */
-    *(op_p->u.k_iterate.position_p) += i;
+
+    dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
+
     /* free the cursor */
     ret = dbc_p->c_close(dbc_p);
     if (ret != 0) goto return_error;
-
-    dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle);
 
     op_p->state = OP_COMPLETED;
     return 1;
@@ -456,7 +459,7 @@ static int dbpf_keyval_iterate_keys(
 				    TROVE_handle handle,
 				    TROVE_ds_position *position_p,
 				    TROVE_keyval_s *key_array,
-				    int count,
+				    int *inout_count_p,
 				    TROVE_ds_flags flags,
 				    TROVE_vtag_s *vtag,
 				    void *user_ptr,

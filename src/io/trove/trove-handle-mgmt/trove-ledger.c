@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 #include "trove-extentlist.h"
 #include "trove-ledger.h"
@@ -298,13 +299,17 @@ static int handle_store_load(TROVE_coll_id coll_id,
 			     char *admin_name,
 			     struct handle_ledger *ledger) 
 {
+    int i, ret;
     char *method_name;
     TROVE_coll_id admin_id;
     TROVE_op_id op_id;
-    int ret;
     TROVE_handle free_list_handle = FREE_EXTENTLIST_HANDLE;
     TROVE_handle overflow_list_handle = OVERFLOW_EXTENTLIST_HANDLE;
     TROVE_handle recently_freed_list_handle = RECENTLY_FREED_EXTENTLIST_HANDLE;
+
+    int count, array_count, state;
+    TROVE_handle *handle_array;
+    TROVE_ds_position pos = SI_START_POSITION; /* ??? */
 
 #if 0
     /* SHOULD ALREADY HAVE BEEN DONE */
@@ -320,8 +325,36 @@ static int handle_store_load(TROVE_coll_id coll_id,
     extentlist_init(&ledger->recently_freed_list);
     extentlist_init(&ledger->overflow_list);
 
+    /* add everything onto the free list for now */
     extentlist_addextent(&(ledger->free_list), MIN_HANDLE, MAX_HANDLE);
 
+    /* now take off everything that has been used...time consuming, but accurate. */
+    array_count = 256;
+    handle_array = malloc(256 * sizeof(TROVE_handle));
+    if (!handle_array) assert(0);
+
+    /* HACK -- NEED TO REPEAT CALL */
+    ret = trove_dspace_iterate_handles(coll_id,
+				       &pos,
+				       handle_array,
+				       &array_count,
+				       0, /* flags */
+				       0, /* vtag */
+				       0, /* user_ptr */
+				       &op_id);
+    if (ret < 0) assert(0);
+
+    while (ret != 1) {
+	ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+	if (ret < 0) assert(0);
+    }
+
+    printf("handle_store_load: found %d handles used.\n", array_count);
+
+    for (i=0; i < array_count; i++) {
+	printf("  handle_store_load: removing %Ld.\n", handle_array[i]);
+	extentlist_handle_remove(&ledger->free_list, handle_array[i]);
+    }
 
 #if 0
     ret = trove_collection_lookup(admin_name, &admin_id, NULL, &op_id);

@@ -23,6 +23,7 @@
 #include <dbpf.h>
 #include <dbpf-bstream.h>
 #include <dbpf-keyval.h>
+#include <trove-ledger.h>
 
 #include <limits.h>
 

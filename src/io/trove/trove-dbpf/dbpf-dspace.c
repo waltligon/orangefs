@@ -17,10 +17,13 @@
 #include <dbpf.h>
 #include <dbpf-op-queue.h>
 #include <id-generator.h>
+#include <trove-ledger.h>
 
-/* TODO: move both of these into header file */
+/* TODO: move both of these into header file? */
 extern struct dbpf_collection *my_coll_p;
 extern TROVE_handle dbpf_last_handle;
+
+static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p);
 
 /* TODO: should this have a ds_attributes with it? */
 int dbpf_dspace_create(TROVE_coll_id coll_id,
@@ -142,6 +145,140 @@ static int dbpf_dspace_remove(TROVE_coll_id coll_id,
 
 	return 1;
 
+}
+int dbpf_dspace_iterate_handles(
+                                TROVE_coll_id coll_id,
+                                TROVE_ds_position *position_p,
+                                TROVE_handle *handle_array,
+                                int *inout_count_p,
+                                TROVE_ds_flags flags,
+                                TROVE_vtag_s *vtag,
+                                void *user_ptr,
+                                TROVE_op_id *out_op_id_p)
+{
+    TROVE_op_id new_id;
+    struct dbpf_queued_op *q_op_p;
+    struct dbpf_collection *coll_p;
+
+    coll_p = my_coll_p;
+    if (coll_p == NULL) return -1;
+
+    q_op_p = dbpf_queued_op_alloc();
+    if (q_op_p == NULL) return -1;
+
+    id_gen_fast_register(&new_id, q_op_p);
+
+    /* initialize all the common members */
+    dbpf_queued_op_init(q_op_p,
+			KEYVAL_ITERATE,
+			0, /* handle -- ignored in this case */
+			new_id,
+			coll_p,
+			dbpf_dspace_iterate_handles_op_svc,
+			user_ptr);
+
+    /* initialize op-specific members */
+    q_op_p->op.u.d_iterate_handles.handle_array = handle_array;
+    q_op_p->op.u.d_iterate_handles.position_p   = position_p;
+    q_op_p->op.u.d_iterate_handles.count_p      = inout_count_p;
+
+    dbpf_queued_op_queue(q_op_p);
+    *out_op_id_p = new_id;
+
+    return 0;
+}
+
+/* dbpf_dspace_iterate_handles_op_svc()
+ */
+static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
+{
+    int ret, i=0;
+    DB *db_p;
+    DBC *dbc_p;
+    DBT key, data;
+    struct dbpf_dspace_attr attr;
+
+    db_p = op_p->coll_p->ds_db;
+    if (db_p == NULL) goto return_error;
+
+    /* grab out key/value pairs */
+
+    /* get a cursor */
+    ret = db_p->cursor(db_p, NULL, &dbc_p, 0);
+    if (ret != 0) goto return_error;
+
+    memset(&key, 0, sizeof(key));
+    memset(&data, 0, sizeof(data));
+
+    /* we have two choices here: 'seek' to a specific key by either a:
+     * specifying a key or b: using record numbers in the db.  record numbers
+     * will serialize multiple modification requests. We are going with record
+     * numbers for now. i don't know if that's a problem, but it is something
+     * to keep in mind if at some point simultaneous modifications to pvfs
+     * perform badly.   -- robl */
+
+#if 0
+    key.data  = op_p->u.d_iterate_handles.handle_array;
+#endif
+    key.size  = key.ulen = sizeof(TROVE_handle);
+    data.data = &attr;
+    data.size = data.ulen = sizeof(attr);
+
+    /* copy position into key.data */
+    *(TROVE_ds_position *)key.data = *(op_p->u.k_iterate.position_p);
+    /* TODO: WHAT SHOULD THE SIZE REALLY BE??? */
+    key.flags |= DB_DBT_USERMEM;
+    data.flags |= DB_DBT_USERMEM;
+
+    /* position the cursor and grab the first key/value pair */
+    ret = dbc_p->c_get(dbc_p, &key, &data, DB_SET_RECNO);
+    if (ret == DB_NOTFOUND) {
+	/* no more pairs: tell caller how many we processed */
+	*op_p->u.d_iterate_handles.count_p = 0;
+    }
+    else if (ret != 0) goto return_error;
+    else {
+	for (i=1; i < *(op_p->u.k_iterate.count); i++) {
+	    key.data = &op_p->u.d_iterate_handles.handle_array[i];
+	    key.size = key.ulen = sizeof(TROVE_handle);
+	    key.flags |= DB_DBT_USERMEM;
+	    /* just throwing the data away at the moment */
+	    data.data = &attr;
+	    data.size = data.ulen = sizeof(attr);
+	    data.flags |= DB_DBT_USERMEM;
+	    
+	    ret = dbc_p->c_get(dbc_p, &key, &data, DB_NEXT);
+	    if (ret == DB_NOTFOUND) {
+		/* no more pairs: tell caller how many we processed */
+		*op_p->u.d_iterate_handles.count_p = i; 
+	    }
+	    else if (ret != 0) goto return_error;
+	}
+
+	*(op_p->u.d_iterate_handles.position_p) += i;
+    }
+
+    /* 'position' is the record we will read next time through */
+    /* XXX: right now, 'posistion' gets set to garbage when we hit the end.
+     * well, not exactly 'garbage', but it gets incremented here even in the
+     * end-of-database case ( come in, ask for one, read zero (hit end):
+     * position still gets incremented ).  It might be helpful (or at least
+     * consistent) if posistion always pointed to the 'next' place to access,
+     * even if that's one place past the end of the database ... or maybe i'm
+     * putting too much weight on 'posistion's value at the end */
+    /* free the cursor */
+    ret = dbc_p->c_close(dbc_p);
+    if (ret != 0) goto return_error;
+
+    op_p->state = OP_COMPLETED;
+    return 1;
+
+ return_error:
+    fprintf(stderr, "dbpf_keyval_iterate_op_svc: %s\n", db_strerror(ret));
+    *(op_p->u.d_iterate_handles.count_p) = i; 
+    op_p->state = OP_COMPLETED;
+
+    return -1;
 }
 
 /* dbpf_dspace_verify()
@@ -279,6 +416,7 @@ struct TROVE_dspace_ops dbpf_dspace_ops =
 {
     dbpf_dspace_create,
     dbpf_dspace_remove,
+    dbpf_dspace_iterate_handles,
     dbpf_dspace_verify,
     dbpf_dspace_getattr,
     dbpf_dspace_setattr,
