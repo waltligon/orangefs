@@ -38,17 +38,11 @@ int do_encode_resp(
 
     switch(response->op)
     {
+	/* these first response types have no trailing data */
 	case PVFS_SERV_CREATE:
 	case PVFS_SERV_MKDIR:
 	case PVFS_SERV_RMDIRENT:
 	case PVFS_SERV_IO:
-
-	    /* 
-	     *	There is no response struct for
-	     *	these requests below.  Therefore
-	     *	we should not call it.
-	     * TODO: Are we still using Generic ACK? dw 07.01.03
-	     */
 	case PVFS_SERV_NOOP:
 	case PVFS_SERV_SETATTR:
 	case PVFS_SERV_REMOVE:
@@ -64,7 +58,7 @@ int do_encode_resp(
 	    target_msg->list_count  = 1;
 	    target_msg->buffer_flag = BMI_PRE_ALLOC;
 	    target_msg->size_list[0] = target_msg->total_size 
-		= sizeof(struct PVFS_server_resp_s);
+		= sizeof(struct PVFS_server_resp_s) + header_size;
 	    target_msg->buffer_list[0] 
 		= BMI_memalloc(target_msg->dest, 
 			sizeof(struct PVFS_server_resp_s) + header_size,
@@ -74,6 +68,9 @@ int do_encode_resp(
 		    response, 
 		    sizeof(struct PVFS_server_resp_s)
 		  );
+	    /* set accurate rsize for encoded version */
+	    ((struct PVFS_server_resp_s*)(target_msg->buffer_list[0]))->rsize
+		= target_msg->total_size - header_size;
 	    return(0);
 
 	case PVFS_SERV_GETATTR:
@@ -127,12 +124,6 @@ int do_encode_resp(
 		    pack_dest +=
 			(response->u.getattr.attr.u.meta.nr_datafiles
 			* sizeof(PVFS_handle));
-#if 0
-		    memcpy(
-			pack_dest,
-			response->u.getattr.attr.u.meta.dist,
-			response->u.getattr.attr.u.meta.dist_size);
-#endif
 		    PINT_Dist_encode(pack_dest,
 			response->u.getattr.attr.u.meta.dist);
 		}
@@ -157,7 +148,7 @@ int do_encode_resp(
 
 	    /* set rsize for the "on-the-wire" version */
 	    ((struct PVFS_server_resp_s*)target_msg->buffer_list[0])->rsize =
-		target_msg->total_size;
+		target_msg->total_size - header_size;
 	    return(0);
 
 	case PVFS_SERV_GETCONFIG:
@@ -196,6 +187,13 @@ int do_encode_resp(
 		target_msg->total_size = target_msg->size_list[0];
 	    }
 
+	    /* TODO: this one is special; it doesn't have
+	     * header_size tacked onto it (!?)
+	     */
+
+	    /* set accurate rsize for encoded version */
+	    ((struct PVFS_server_resp_s*)(target_msg->buffer_list[0]))->rsize
+		= target_msg->total_size;
 	    /* we are sending a list now... so no need to do this anymore... yay. */
 #if 0
 	    memcpy(respbuf, response, sizeof(struct PVFS_server_resp_s));
@@ -208,6 +206,11 @@ int do_encode_resp(
 
 	case PVFS_SERV_LOOKUP_PATH:
 	    assert(response->u.lookup_path.handle_array != NULL);
+	    /* TODO: this one is really special; it relies on
+	     * rsize being set _on the way in_, and also does not
+	     * have header_size tacked onto it (!?)
+	     */
+	    assert(response->rsize > 0);
 
 	    /* We need to lookout for the fact that we may not have the attributes for
 	       a single segment within the path. In this case we will only have a handle
@@ -293,6 +296,14 @@ int do_encode_resp(
 		respbuf += sizeof(PVFS_dirent);
 	    }
 #endif
+	    /* TODO: this one is special; it doesn't have
+	     * header_size tacked onto it (!?)
+	     */
+
+	    /* set accurate rsize for encoded version */
+	    ((struct PVFS_server_resp_s*)(target_msg->buffer_list[0]))->rsize
+		= target_msg->total_size;
+
 	    return 0;
 
 	default:
