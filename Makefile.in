@@ -103,8 +103,15 @@ clean:
 distclean: clean
 	find . -name "module.mk" -exec rm \{\} \;
 	rm -f $(SRCFILES) Makefile
+	rm -f config.log config.status pvfs2-config.h
 
+# we don't want to include dependencies in the makefile if we are just
+# running make clean or make distclean
+ifneq ($(MAKECMDGOALS),clean)
+ifneq ($(MAKECMDGOALS),distclean)
 -include $(DEPENDS)
+endif
+endif
 
 # @ suppresses output from the depend shell script.
 %.d: %.c $(SRCFILES)
