@@ -185,9 +185,14 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_ref,
     /* invalidate pinode entry's size on write if pinode exists */
     if (sm_p->pcache_hit && (io_type == PVFS_IO_WRITE))
     {
+        int tmp = sm_p->pinode->attr.mask;
+
         /* invalidate the size attribute in the pinode */
         sm_p->pinode->attr.mask &= ~PVFS_ATTR_DATA_SIZE;
+        sm_p->pinode->size = 0;
 
+        fprintf(stderr,"DOING AN I/O SETVALID (old = %d | new = %d)\n",
+                tmp, sm_p->pinode->attr.mask);
         PINT_pcache_set_valid(sm_p->pinode);
         PINT_pcache_release(sm_p->pinode);
         sm_p->pcache_hit = 0;
@@ -280,18 +285,18 @@ static int io_object_getattr_comp_fn(void *v_p,
                 &sm_p->pinode->attr :
                 &resp_p->u.getattr.attr);
 
+    if (r_attr_p->objtype != PVFS_TYPE_METAFILE)
+    {
+	/* invalid type - we only do I/O on files */
+	return -PVFS_EINVAL;
+    }
+
     /* sanity checks */
     assert(r_attr_p->mask & PVFS_ATTR_COMMON_TYPE);
     assert(r_attr_p->mask & PVFS_ATTR_META_DIST);
     assert(r_attr_p->u.meta.dist_size > 0);
     assert(r_attr_p->mask & PVFS_ATTR_META_DFILES);
     assert(r_attr_p->u.meta.dfile_count > 0);
-
-    if (r_attr_p->objtype != PVFS_TYPE_METAFILE)
-    {
-	/* invalid type - we only do I/O on files */
-	return -PVFS_EINVAL;
-    }
 
     if (!sm_p->pcache_hit)
     {
@@ -376,6 +381,8 @@ static int io_object_getattr_comp_fn(void *v_p,
     {
         /* fast path; no copying needed */
         assert(sm_p->pinode);
+        assert(sm_p->pinode->attr.u.meta.dist_size > 0);
+        assert(sm_p->pinode->attr.u.meta.dfile_count > 0);
 
         sm_p->u.io.dist_p = sm_p->pinode->attr.u.meta.dist;
         sm_p->u.io.dist_size = sm_p->pinode->attr.u.meta.dist_size;

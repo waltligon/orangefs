@@ -303,7 +303,7 @@ struct address_space_operations pvfs2_address_operations =
 
 struct backing_dev_info pvfs2_backing_dev_info =
 {
-    .ra_pages = 8,     /* no readahead for now */
+    .ra_pages = 8,
     .memory_backed = 0
 };
 

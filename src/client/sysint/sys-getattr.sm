@@ -742,7 +742,18 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
             if (sm_p->u.getattr.attrmask & PVFS_ATTR_SYS_SIZE)
             {
                 pinode->size = s_attr_p->size;
-                pinode->attr.mask |= PVFS_ATTR_DATA_SIZE;
+                /*
+                  update the attr mask in the src object so that
+                  we properly copy out all required fields in the
+                  deep copy below to the pinode object
+                */
+                sm_p->pcache_attr.mask |= PVFS_ATTR_DATA_SIZE;
+                /*
+                  if we have the size, be sure to set the
+                  META_ALL related bits since we also have
+                  that information at this point
+                */
+                sm_p->pcache_attr.mask |= PVFS_ATTR_META_ALL;
             }
 
             PINT_pcache_object_attr_deep_copy(

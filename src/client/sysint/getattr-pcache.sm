@@ -167,7 +167,8 @@ static int getattr_pcache_lookup(PINT_client_sm *sm_p,
             goto cache_miss;
 
           cache_hit:
-            gossip_debug(PCACHE_DEBUG, "pcache: pcache hit\n"); 
+            gossip_debug(PCACHE_DEBUG, "pcache: pcache hit\n");
+
             /* build a fake response for completion */
             fake_resp.op = PVFS_SERV_GETATTR;
             fake_resp.status = 0;

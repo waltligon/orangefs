@@ -335,17 +335,32 @@ int PINT_pcache_object_attr_deep_copy(
             dest->objtype = src->objtype;
         }
 
-        if (src->mask & PVFS_ATTR_DATA_SIZE)
-        {
-            assert(src->objtype == PVFS_TYPE_DATAFILE);
+        /*
+          NOTE:
+          we only copy the size out if we're actually a
+          datafile object.  sometimes the size field is
+          valid when the objtype is a metafile because
+          of different uses of the pcache.  In this case
+          (namely, getattr), the size is stored in the
+          pcache before this deep copy, so it's okay
+          that we're not copying here even though the
+          size mask bit is set.
 
+          if we don't do this trick, the metafile that
+          caches the size will have it's union data
+          overwritten with a bunk size.
+        */
+        if ((src->mask & PVFS_ATTR_DATA_SIZE) &&
+            (src->mask & PVFS_ATTR_COMMON_TYPE) &&
+            (src->objtype == PVFS_TYPE_DATAFILE))
+        {
             dest->u.data.size = src->u.data.size;
         }
 
-	if (src->mask & PVFS_ATTR_META_DFILES)
+	if ((src->mask & PVFS_ATTR_COMMON_TYPE) &&
+            (src->objtype == PVFS_TYPE_METAFILE) &&
+            (src->mask & PVFS_ATTR_META_DFILES))
 	{
-            assert(src->objtype == PVFS_TYPE_METAFILE);
-
             dest->u.meta.dfile_array = NULL;
             dest->u.meta.dfile_count = src->u.meta.dfile_count;
             df_array_size = src->u.meta.dfile_count *
@@ -368,11 +383,13 @@ int PINT_pcache_object_attr_deep_copy(
             }
 	}
 
-	if (src->mask & PVFS_ATTR_META_DIST)
+	if ((src->mask & PVFS_ATTR_COMMON_TYPE) &&
+            (src->objtype == PVFS_TYPE_METAFILE) &&
+            (src->mask & PVFS_ATTR_META_DIST))
 	{
-            assert(src->objtype == PVFS_TYPE_METAFILE);
-            dest->u.meta.dist_size = src->u.meta.dist_size;
+            assert(src->u.meta.dist_size > 0);
 
+            dest->u.meta.dist_size = src->u.meta.dist_size;
             if (dest->u.meta.dist)
             {
                 PVFS_Dist_free(dest->u.meta.dist);
@@ -403,8 +420,6 @@ int PINT_pcache_object_attr_deep_copy(
 
         if (src->mask & PVFS_ATTR_SYMLNK_TARGET)
         {
-            assert(src->objtype == PVFS_TYPE_SYMLINK);
-
             dest->u.sym.target_path_len = src->u.sym.target_path_len;
             dest->u.sym.target_path = strdup(src->u.sym.target_path);
             if (dest->u.sym.target_path == NULL)
@@ -413,9 +428,7 @@ int PINT_pcache_object_attr_deep_copy(
             }
         }
 
-	/* add mask to existing values */
-	dest->mask |= src->mask;
-
+	dest->mask = src->mask;
         ret = 0;
     }
     return ret;
@@ -444,7 +457,6 @@ void PINT_pcache_object_attr_deep_free(PVFS_object_attr *attr)
     {
         if (attr->mask & PVFS_ATTR_META_DFILES)
         {
-            assert(attr->objtype == PVFS_TYPE_METAFILE);
             if (attr->u.meta.dfile_array)
             {
                 free(attr->u.meta.dfile_array);
@@ -452,7 +464,6 @@ void PINT_pcache_object_attr_deep_free(PVFS_object_attr *attr)
         }
         if (attr->mask & PVFS_ATTR_META_DIST)
         {
-            assert(attr->objtype == PVFS_TYPE_METAFILE);
             if (attr->u.meta.dist)
             {
                 PVFS_Dist_free(attr->u.meta.dist);
@@ -460,7 +471,6 @@ void PINT_pcache_object_attr_deep_free(PVFS_object_attr *attr)
         }
         if (attr->mask & PVFS_ATTR_SYMLNK_TARGET)
         {
-            assert(attr->objtype == PVFS_TYPE_SYMLINK);
             if ((attr->u.sym.target_path_len > 0) &&
                 attr->u.sym.target_path)
             {
