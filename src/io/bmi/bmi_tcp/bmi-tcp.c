@@ -42,14 +42,16 @@ int BMI_tcp_post_send(bmi_op_id_t * id,
 		      bmi_size_t size,
 		      bmi_flag_t buffer_flag,
 		      bmi_msg_tag_t tag,
-		      void *user_ptr);
+		      void *user_ptr,
+		      bmi_context_id context_id);
 int BMI_tcp_post_sendunexpected(bmi_op_id_t * id,
 				method_addr_p dest,
 				void *buffer,
 				bmi_size_t size,
 				bmi_flag_t buffer_flag,
 				bmi_msg_tag_t tag,
-				void *user_ptr);
+				void *user_ptr,
+				bmi_context_id context_id);
 int BMI_tcp_post_recv(bmi_op_id_t * id,
 		      method_addr_p src,
 		      void *buffer,
@@ -57,13 +59,15 @@ int BMI_tcp_post_recv(bmi_op_id_t * id,
 		      bmi_size_t * actual_size,
 		      bmi_flag_t buffer_flag,
 		      bmi_msg_tag_t tag,
-		      void *user_ptr);
+		      void *user_ptr,
+		      bmi_context_id context_id);
 int BMI_tcp_test(bmi_op_id_t id,
 		 int *outcount,
 		 bmi_error_code_t * error_code,
 		 bmi_size_t * actual_size,
 		 void **user_ptr,
-		 int max_idle_time_ms);
+		 int max_idle_time_ms,
+		 bmi_context_id context_id);
 int BMI_tcp_testsome(int incount,
 		     bmi_op_id_t * id_array,
 		     int *outcount,
@@ -71,7 +75,8 @@ int BMI_tcp_testsome(int incount,
 		     bmi_error_code_t * error_code_array,
 		     bmi_size_t * actual_size_array,
 		     void **user_ptr_array,
-		     int max_idle_time_ms);
+		     int max_idle_time_ms,
+		     bmi_context_id context_id);
 int BMI_tcp_testunexpected(int incount,
 			   int *outcount,
 			   struct method_unexpected_info *info,
@@ -85,7 +90,8 @@ int BMI_tcp_post_send_list(bmi_op_id_t * id,
 			   bmi_size_t total_size,
 			   bmi_flag_t buffer_flag,
 			   bmi_msg_tag_t tag,
-			   void *user_ptr);
+			   void *user_ptr,
+			   bmi_context_id context_id);
 int BMI_tcp_post_recv_list(bmi_op_id_t * id,
 			   method_addr_p src,
 			   void **buffer_list,
@@ -95,7 +101,8 @@ int BMI_tcp_post_recv_list(bmi_op_id_t * id,
 			   bmi_size_t * total_actual_size,
 			   bmi_flag_t buffer_flag,
 			   bmi_msg_tag_t tag,
-			   void *user_ptr);
+			   void *user_ptr,
+			   bmi_context_id context_id);
 int BMI_tcp_post_sendunexpected_list(bmi_op_id_t * id,
 				     method_addr_p dest,
 				     void **buffer_list,
@@ -104,7 +111,8 @@ int BMI_tcp_post_sendunexpected_list(bmi_op_id_t * id,
 				     bmi_size_t total_size,
 				     bmi_flag_t buffer_flag,
 				     bmi_msg_tag_t tag,
-				     void *user_ptr);
+				     void *user_ptr,
+				     bmi_context_id context_id);
 
 char BMI_tcp_method_name[] = "bmi_tcp";
 
@@ -601,7 +609,8 @@ int BMI_tcp_post_send(bmi_op_id_t * id,
 		      bmi_size_t size,
 		      bmi_flag_t buffer_flag,
 		      bmi_msg_tag_t tag,
-		      void *user_ptr)
+		      void *user_ptr,
+		      bmi_context_id context_id)
 {
     struct tcp_msg_header my_header;
 
@@ -644,7 +653,8 @@ int BMI_tcp_post_sendunexpected(bmi_op_id_t * id,
 				bmi_size_t size,
 				bmi_flag_t buffer_flag,
 				bmi_msg_tag_t tag,
-				void *user_ptr)
+				void *user_ptr,
+				bmi_context_id context_id)
 {
     struct tcp_msg_header my_header;
 
@@ -681,7 +691,8 @@ int BMI_tcp_post_recv(bmi_op_id_t * id,
 		      bmi_size_t * actual_size,
 		      bmi_flag_t buffer_flag,
 		      bmi_msg_tag_t tag,
-		      void *user_ptr)
+		      void *user_ptr,
+		      bmi_context_id context_id)
 {
     int ret = -1;
 
@@ -720,7 +731,8 @@ int BMI_tcp_test(bmi_op_id_t id,
 		 bmi_error_code_t * error_code,
 		 bmi_size_t * actual_size,
 		 void **user_ptr,
-		 int max_idle_time)
+		 int max_idle_time,
+		 bmi_context_id context_id)
 {
     int ret = -1;
     method_op_p query_op = (method_op_p)id_gen_fast_lookup(id);
@@ -764,7 +776,8 @@ int BMI_tcp_testsome(int incount,
 		     bmi_error_code_t * error_code_array,
 		     bmi_size_t * actual_size_array,
 		     void **user_ptr_array,
-		     int max_idle_time)
+		     int max_idle_time,
+		     bmi_context_id context_id)
 {
     int ret = -1;
     method_op_p query_op = NULL;
@@ -866,7 +879,8 @@ int BMI_tcp_post_send_list(bmi_op_id_t * id,
 			   bmi_size_t total_size,
 			   bmi_flag_t buffer_flag,
 			   bmi_msg_tag_t tag,
-			   void *user_ptr)
+			   void *user_ptr,
+			   bmi_context_id context_id)
 {
     struct tcp_msg_header my_header;
 
@@ -912,7 +926,8 @@ int BMI_tcp_post_recv_list(bmi_op_id_t * id,
 			   bmi_size_t * total_actual_size,
 			   bmi_flag_t buffer_flag,
 			   bmi_msg_tag_t tag,
-			   void *user_ptr)
+			   void *user_ptr,
+			   bmi_context_id context_id)
 {
     int ret = -1;
 
@@ -946,7 +961,8 @@ int BMI_tcp_post_sendunexpected_list(bmi_op_id_t * id,
 				     bmi_size_t total_size,
 				     bmi_flag_t buffer_flag,
 				     bmi_msg_tag_t tag,
-				     void *user_ptr)
+				     void *user_ptr,
+				     bmi_context_id context_id)
 {
     struct tcp_msg_header my_header;
 

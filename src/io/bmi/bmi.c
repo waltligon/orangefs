@@ -458,7 +458,7 @@ int BMI_post_recv(bmi_op_id_t * id,
     ret = tmp_ref->interface->BMI_meth_post_recv(id, tmp_ref->method_addr,
 						 buffer, expected_size,
 						 actual_size, buffer_flag, tag,
-						 user_ptr);
+						 user_ptr, context_id);
     gen_mutex_unlock(&interface_mutex);
     return (ret);
 }
@@ -495,7 +495,7 @@ int BMI_post_send(bmi_op_id_t * id,
 
     ret = tmp_ref->interface->BMI_meth_post_send(id, tmp_ref->method_addr,
 						 buffer, size, buffer_flag, tag,
-						 user_ptr);
+						 user_ptr, context_id);
     gen_mutex_unlock(&interface_mutex);
     return (ret);
 }
@@ -534,7 +534,8 @@ int BMI_post_sendunexpected(bmi_op_id_t * id,
 							   tmp_ref->method_addr,
 							   buffer, size,
 							   buffer_flag, tag,
-							   user_ptr);
+							   user_ptr,
+							   context_id);
     gen_mutex_unlock(&interface_mutex);
     return (ret);
 }
@@ -576,7 +577,8 @@ int BMI_test(bmi_op_id_t id,
 									   error_code,
 									   actual_size,
 									   user_ptr,
-									   max_idle_time_ms);
+									   max_idle_time_ms,
+									   context_id);
     gen_mutex_unlock(&interface_mutex);
     /* return 1 if anything completed */
     if (ret == 0 && *outcount == 1)
@@ -619,7 +621,8 @@ int BMI_testsome(int incount,
 						    error_code_array,
 						    actual_size_array,
 						    user_ptr_array,
-						    max_idle_time_ms);
+						    max_idle_time_ms,
+						    context_id);
     if (ret < 0)
     {
 	gen_mutex_unlock(&interface_mutex);
@@ -1158,7 +1161,8 @@ int BMI_post_send_list(bmi_op_id_t * id,
 							  size_list, list_count,
 							  total_size,
 							  buffer_flag, tag,
-							  user_ptr);
+							  user_ptr,
+							  context_id);
 	gen_mutex_unlock(&interface_mutex);
 	return (ret);
     }
@@ -1216,7 +1220,8 @@ int BMI_post_recv_list(bmi_op_id_t * id,
 							  total_expected_size,
 							  total_actual_size,
 							  buffer_flag, tag,
-							  user_ptr);
+							  user_ptr,
+							  context_id);
 	gen_mutex_unlock(&interface_mutex);
 	return (ret);
     }
@@ -1274,7 +1279,8 @@ int BMI_post_sendunexpected_list(bmi_op_id_t * id,
 								    total_size,
 								    buffer_flag,
 								    tag,
-								    user_ptr);
+								    user_ptr,
+								    context_id);
 	gen_mutex_unlock(&interface_mutex);
 	return (ret);
     }

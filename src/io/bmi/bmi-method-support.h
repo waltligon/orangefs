@@ -80,14 +80,16 @@ struct bmi_method_ops
 			       bmi_size_t,
 			       bmi_flag_t,
 			       bmi_msg_tag_t,
-			       void *);
+			       void *,
+			       bmi_context_id);
     int (*BMI_meth_post_sendunexpected) (bmi_op_id_t *,
 					 method_addr_p,
 					 void *,
 					 bmi_size_t,
 					 bmi_flag_t,
 					 bmi_msg_tag_t,
-					 void *);
+					 void *,
+					 bmi_context_id);
     int (*BMI_meth_post_recv) (bmi_op_id_t *,
 			       method_addr_p,
 			       void *,
@@ -95,13 +97,15 @@ struct bmi_method_ops
 			       bmi_size_t *,
 			       bmi_flag_t,
 			       bmi_msg_tag_t,
-			       void *);
+			       void *,
+			       bmi_context_id);
     int (*BMI_meth_test) (bmi_op_id_t,
 			  int *,
 			  bmi_error_code_t *,
 			  bmi_size_t *,
 			  void **,
-			  int);
+			  int,
+			  bmi_context_id);
     int (*BMI_meth_testsome) (int,
 			      bmi_op_id_t *,
 			      int *,
@@ -109,7 +113,8 @@ struct bmi_method_ops
 			      bmi_error_code_t *,
 			      bmi_size_t *,
 			      void **,
-			      int);
+			      int,
+			      bmi_context_id);
     int (*BMI_meth_testunexpected) (int,
 				    int *,
 				    struct method_unexpected_info *,
@@ -123,7 +128,8 @@ struct bmi_method_ops
 				    bmi_size_t,
 				    bmi_flag_t,
 				    bmi_msg_tag_t,
-				    void *);
+				    void *,
+				    bmi_context_id);
     int (*BMI_meth_post_recv_list) (bmi_op_id_t *,
 				    method_addr_p,
 				    void **,
@@ -133,7 +139,8 @@ struct bmi_method_ops
 				    bmi_size_t *,
 				    bmi_flag_t,
 				    bmi_msg_tag_t,
-				    void *);
+				    void *,
+				    bmi_context_id);
     int (*BMI_meth_post_sendunexpected_list) (bmi_op_id_t *,
 					      method_addr_p,
 					      void **,
@@ -142,7 +149,8 @@ struct bmi_method_ops
 					      bmi_size_t,
 					      bmi_flag_t,
 					      bmi_msg_tag_t,
-					      void *);
+					      void *,
+					      bmi_context_id);
 };
 
 
