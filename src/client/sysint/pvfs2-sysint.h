@@ -208,29 +208,12 @@ typedef struct PVFS_sysreq_rename_s PVFS_sysreq_rename;
 /* no data returned in rename response */
 
 /* symlink */
-struct PVFS_sysreq_symlink_s {
-	char* name;
-	PVFS_fs_id fs_id;	
-	char* target;
-	PVFS_object_attr attr;
-	/* Q: should these bitmasks be part of the attr structure? */
-	uint32_t attrmask;
-	PVFS_credentials credentials;
-};
-typedef struct PVFS_sysreq_symlink_s PVFS_sysreq_symlink;
-
 struct PVFS_sysresp_symlink_s {
 	pinode_reference pinode_refn;
 };
 typedef struct PVFS_sysresp_symlink_s PVFS_sysresp_symlink;
 
 /* readlink */
-struct PVFS_sysreq_readlink_s {
-	pinode_reference pinode_refn;
-	PVFS_credentials credentials;
-};
-typedef struct PVFS_sysreq_readlink_s PVFS_sysreq_readlink;
-
 struct PVFS_sysresp_readlink_s {
 	char* target;
 };
@@ -253,24 +236,9 @@ typedef struct PVFS_sysresp_io_s PVFS_sysresp_io;
 
 /* allocate */
 /* Q: SHOULD THIS BE A TRUNCATE INSTEAD? */
-struct PVFS_sysreq_allocate_s {
-	pinode_reference pinode_refn;
-	PVFS_size size;
-};
-typedef struct PVFS_sysreq_allocate_s PVFS_sysreq_allocate;
-
 /* no data returned in allocate response */
 
 /* Duplicate (only on a file) */
-struct PVFS_sysreq_duplicate_s {
-	pinode_reference old_reference;
-	char* new_entry; /* single path segment */
-	pinode_reference new_parent_reference;
-	PVFS_fs_id fs_id;
-	/* Q: copies attributes as well? */
-};
-typedef struct PVFS_sysreq_duplicate_s PVFS_sysreq_duplicate;
-
 struct PVFS_sysresp_duplicate_s {
 	pinode_reference pinode_refn; /* handle,fs id of new file */
 };
@@ -372,11 +340,7 @@ struct PVFS_system_req_s {
 		PVFS_sysreq_create create;
 		PVFS_sysreq_remove remove;
 		PVFS_sysreq_rename rename;
-		PVFS_sysreq_symlink symlink;
-		PVFS_sysreq_readlink readlink;
 		PVFS_sysreq_io io;
-		PVFS_sysreq_allocate allocate;
-		PVFS_sysreq_duplicate duplicate;
 		PVFS_sysreq_lock lock;
 		PVFS_sysreq_unlock unlock;
 		PVFS_sysreq_statfs statfs;
@@ -448,15 +412,20 @@ int PVFS_sys_readdir(PVFS_sysreq_readdir *req, PVFS_sysresp_readdir *resp);
 int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp);
 int PVFS_sys_remove(PVFS_sysreq_remove *req);
 int PVFS_sys_rename(PVFS_sysreq_rename *req);
-int PVFS_sys_symlink(PVFS_sysreq_symlink *req, PVFS_sysresp_symlink *resp);
-int PVFS_sys_readlink(PVFS_sysreq_readlink *req, PVFS_sysresp_readlink *resp);
+int PVFS_sys_symlink(PVFS_fs_id fs_id, char* name, char* target, 
+		uint32_t attrmask, PVFS_object_attr attr, 
+		PVFS_credentials credentials, PVFS_sysresp_symlink *resp);
+int PVFS_sys_readlink(pinode_reference pinode_refn, 
+		PVFS_credentials credentials, PVFS_sysresp_readlink *resp);
 int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp, 
 	enum PVFS_sys_io_type type);
 #define PVFS_sys_read(x,y) PVFS_sys_io(x,y,PVFS_SYS_IO_READ)
 #define PVFS_sys_write(x,y) PVFS_sys_io(x,y,PVFS_SYS_IO_WRITE)
-int PVFS_sys_allocate(PVFS_sysreq_allocate *req);
+int PVFS_sys_allocate(pinode_reference pinode_refn, PVFS_size size);
 int PVFS_sys_truncate(PVFS_sysreq_truncate *req);
-int PVFS_sys_duplicate(PVFS_sysreq_duplicate *req,PVFS_sysresp_duplicate *resp);
+int PVFS_sys_duplicate(PVFS_fs_id fs_id, pinode_reference old_reference, 
+		char* new_entry, pinode_reference new_parent_reference, 
+		PVFS_sysresp_duplicate *resp);
 int PVFS_sys_lock(PVFS_sysreq_lock *req, PVFS_sysresp_lock *resp);
 int PVFS_sys_unlock(PVFS_sysreq_unlock *req);
 int PVFS_sys_statfs(PVFS_sysreq_statfs *req, PVFS_sysresp_statfs *resp);
