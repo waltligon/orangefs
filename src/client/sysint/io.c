@@ -188,7 +188,12 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_refn, PVFS_Request io_req,
     PINT_Free_request_state(req_state);
     req_state = NULL;
 
-    assert(target_handle_count > 0);
+    if (target_handle_count > 0) {
+	/* not necessarily an error: we might have gotten a 
+	 * zero-byte request.  that's fine.. less work for us! */
+	resp->total_completed = 0;
+	goto sys_io_out;
+    }
 
     /* create storage for book keeping information */
     addr_array = (bmi_addr_t*)malloc(target_handle_count *
