@@ -550,10 +550,11 @@ static int service_remove_request(
                        "on fsid %d!\n", in_upcall->req.remove.d_name,
                        Lu(parent_refn.handle), parent_refn.fs_id);
             gossip_err("Remove returned error code %d\n",ret);
+            PVFS_perror("Remove failed ",ret);
 
             /* we need to send a blank error response */
             out_downcall->type = PVFS2_VFS_OP_REMOVE;
-            out_downcall->status = -1;
+            out_downcall->status = ret;
         }
         else
         {
