@@ -5,7 +5,8 @@ PVFS2 Release ChangeLog
 
 pvfs2-0.0.9pre1
 ===============
-- add karma administration gui
+- added karma administration (new gtk+ gui) for interactive
+  monitoring of pvfs2 servers (statistics and performance)
 - fix support for creating/using/removing multiple collections
   (file systems) within a storage space
 - improved pvfs2-client backgrounding (better descriptor management)
@@ -27,12 +28,13 @@ pvfs2-0.0.9pre1
   explicit termination of state machines
 - initial work on ability to gracefully cancel pending I/O operations 
   within the system
-- added new gtk gui program (karma) for interactive monitoring of pvfs2
-  servers (statistics and performance)
 - sync and truncate bug fixes
 - mpi-io-test reports variance among processes
 - fix potential bug in le-bytefield encoder
 - use correct compiler flags with Intel cc
+- fixed and enhanced the pvfs2-mkspace program for creating/removing
+  collections and storage spaces
+- adjusted all gossip masks to have a standard prefix
 
 	
 pvfs2-0.0.8
