@@ -1246,25 +1246,6 @@ static void free_filesystem(void *ptr)
             fs->attr_cache_keywords = NULL;
         }
 
-        /* if the 'cached server arrays' are used, free them too */
-        if (fs->io_server_count && fs->io_server_array)
-        {
-            free(fs->io_server_array);
-            fs->io_server_array = NULL;
-        }
-
-        if (fs->meta_server_count && fs->meta_server_array)
-        {
-            free(fs->meta_server_array);
-            fs->meta_server_array = NULL;
-        }
-
-        if (fs->server_count && fs->server_array)
-        {
-            free(fs->server_array);
-            fs->server_array = NULL;
-        }
-
         free(fs);
         fs = NULL;
     }

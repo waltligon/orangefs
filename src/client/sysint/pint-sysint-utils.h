@@ -64,6 +64,18 @@ typedef struct config_fs_cache_s
 
     /* index into fs->data_handle_ranges obj (see server-config.h) */
     PINT_llist *data_server_cursor;
+
+    /*
+      the following fields are used to cache arrays of unique physical
+      server addresses, of particular use to the mgmt interface
+    */
+    phys_server_desc_s* io_server_array;
+    int io_server_count;
+    phys_server_desc_s* meta_server_array;
+    int meta_server_count;
+    phys_server_desc_s* server_array;
+    int server_count;
+
 } config_fs_cache_s;
 
 int PINT_check_perms(
