@@ -3,8 +3,8 @@ PVFS2 Release ChangeLog
 -----------------------
 
 
-pvfs2-0.0.6pre1
-===============
+pvfs2-0.0.6
+===========
 - improved kernel truncate support
 - fixed kernel ioctl return values
   (so that 'tar -xv[z|j]f' can work on pvfs2 volumes)
