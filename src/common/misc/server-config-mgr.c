@@ -351,7 +351,7 @@ void PINT_server_config_mgr_put_config(
     if (SC_MGR_INITIALIZED() && config_s)
     {
         gen_mutex_lock(s_server_config_mgr_mutex);
-        SC_MGR_ASSERT_OK();
+        SC_MGR_ASSERT_OK( );
 
         cur = config_s->file_systems;
         assert(PINT_llist_count(config_s->file_systems) == 1);
