@@ -9,20 +9,13 @@ server operations:
 - not started:
   - noop
   - eattrib (set/get)
-  - allocate
   - truncate
   - statfs
   - iostatfs?
-
-- depricated (need to clean out):
-  - getdist
-  - revlookup
   
 - unfinished:
   **** general error handling
-  **** size in getattr for datafiles
-  **** config file parsing
-  **** getconfig
+  **** retrieving size in getattr for datafiles
 
 general server functionality:
 ====================================================================
@@ -31,6 +24,9 @@ general server functionality:
 **** getting multiple servers working (io + metadata)
 **** finishing file system semantics documentation
 **** access control, general security model
+- better error handling when unsupported request received
+- making server run as background daemon
+- testing multiple meta servers
 
 request scheduler:
 ====================================================================
@@ -41,20 +37,12 @@ system interface functionality:
 ====================================================================
 - not started:
   - eattrib (set/get)?
-  - allocate
-  - truncate
   - statfs
-  - rename
 
 - unfinished:
-  **** aggregate size on getattr
-  **** getconfig
-  **** caches (pcache)
   **** thread safety
   **** way to pass in consistency semantics (timeout values, etc.)
-  **** handling max size of responses (getattr)
   **** using a state machine for I/O operations
-  **** bucket table interface
 
 user interfaces:
 ====================================================================
@@ -63,8 +51,17 @@ user interfaces:
 - ROMIO module
 - pvfs_XXX interface?
 
+system installation:
+====================================================================
+- make install target
+- reducing number of headers required for installation
+- creating pvfs2.h
+- reducing number of libraries needed by libpvfs2.a
+- quickstart guide
+
 performance tuning:
 ====================================================================
+- instrumenting
 - steal what we can from mpich2
 - architecture specific locking, etc.
 - thread tuning
@@ -83,13 +80,13 @@ error codes:
 I/O path:
 ====================================================================
 - optimizing small reads and writes (packing data into req/ack messages)
-- GM support in BMI and flow
+- native GM flowprotocol
 - threads in trove?
 - general optimizations (lock granularity, immediate completion, etc.)
-- network encoding BMI message headers
-- trove support for buckets
 - ability to unpost, correct use of timeouts, preposting operations
 - semantics of short read and write operations
+- bmi_tcp scalability and robustness
+- improve job thread layout
 
 I/O description:
 ====================================================================
@@ -110,6 +107,7 @@ system management utilities
   - system recovery
   - etc.
 - end user documentation
+- better logging systems
 
 documentation:
 ====================================================================
