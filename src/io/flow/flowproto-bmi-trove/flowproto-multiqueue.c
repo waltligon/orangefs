@@ -52,6 +52,7 @@ do{								\
 
 struct result_chain_entry
 {
+    PVFS_id_gen_t posted_id;
     void* buffer_offset;
     PINT_Request_result result;
     PVFS_size size_list[MAX_REGIONS];
@@ -399,6 +400,7 @@ static void bmi_recv_callback_fn(void *user_ptr,
     result_tmp = &q_item->result_chain;
     do{
 	assert(result_tmp->result.bytes);
+	q_item->posted_id = 0;
 	ret = trove_bstream_write_list(q_item->parent->dest.u.trove.coll_id,
 	    q_item->parent->dest.u.trove.handle,
 	    (char**)&result_tmp->buffer_offset,
@@ -412,7 +414,7 @@ static void bmi_recv_callback_fn(void *user_ptr,
 	    NULL,
 	    &q_item->trove_callback,
 	    global_trove_context,
-	    &q_item->posted_id);
+	    &result_tmp->posted_id);
 	result_tmp = result_tmp->next;
 
 	if(ret < 0)
@@ -579,6 +581,7 @@ static void trove_read_callback_fn(void *user_ptr,
 	if(old_result_tmp != &q_item->result_chain)
 	    free(old_result_tmp);
     }while(result_tmp);
+    q_item->result_chain.next = NULL;
     q_item->result_chain_count = 0;
 
     /* while we hold dest lock, look for next seq no. to send */
@@ -783,6 +786,7 @@ static int bmi_send_callback_fn(void *user_ptr,
     do{
 	assert(q_item->buffer_used);
 	assert(result_tmp->result.bytes);
+	q_item->posted_id = 0;
 	ret = trove_bstream_read_list(q_item->parent->src.u.trove.coll_id,
 	    q_item->parent->src.u.trove.handle,
 	    (char**)&result_tmp->buffer_offset,
@@ -796,7 +800,7 @@ static int bmi_send_callback_fn(void *user_ptr,
 	    NULL,
 	    &q_item->trove_callback,
 	    global_trove_context,
-	    &q_item->posted_id);
+	    &result_tmp->posted_id);
 	result_tmp = result_tmp->next;
 
 	if(ret < 0)
@@ -873,6 +877,7 @@ static void trove_write_callback_fn(void *user_ptr,
 	if(old_result_tmp != &q_item->result_chain)
 	    free(old_result_tmp);
     }while(result_tmp);
+    q_item->result_chain.next = NULL;
     q_item->result_chain_count = 0;
 
     /* if this was the last operation, then mark the flow as done */
@@ -1011,6 +1016,8 @@ static void trove_write_callback_fn(void *user_ptr,
 static void cleanup_buffers(struct fp_private_data* flow_data)
 {
     int i;
+    struct result_chain_entry* result_tmp;
+    struct result_chain_entry* old_result_tmp;
 
     if(flow_data->parent->src.endpoint_id == BMI_ENDPOINT &&
 	flow_data->parent->dest.endpoint_id == TROVE_ENDPOINT)
@@ -1024,6 +1031,15 @@ static void cleanup_buffers(struct fp_private_data* flow_data)
 		    BUFFER_SIZE,
 		    BMI_RECV);
 	    }
+	    result_tmp = &(flow_data->prealloc_array[i].result_chain);
+	    do{
+		old_result_tmp = result_tmp;
+		result_tmp = result_tmp->next;
+		if(old_result_tmp !=
+		    &(flow_data->prealloc_array[i].result_chain))
+		    free(old_result_tmp);
+	    }while(result_tmp);
+	    flow_data->prealloc_array[i].result_chain.next = NULL;
 	}
     }
     else if(flow_data->parent->src.endpoint_id == TROVE_ENDPOINT &&
@@ -1038,6 +1054,15 @@ static void cleanup_buffers(struct fp_private_data* flow_data)
 		    BUFFER_SIZE,
 		    BMI_SEND);
 	    }
+	    result_tmp = &(flow_data->prealloc_array[i].result_chain);
+	    do{
+		old_result_tmp = result_tmp;
+		result_tmp = result_tmp->next;
+		if(old_result_tmp !=
+		    &(flow_data->prealloc_array[i].result_chain))
+		    free(old_result_tmp);
+	    }while(result_tmp);
+	    flow_data->prealloc_array[i].result_chain.next = NULL;
 	}
     }
     else if(flow_data->parent->src.endpoint_id == MEM_ENDPOINT &&
