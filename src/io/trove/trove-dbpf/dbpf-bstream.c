@@ -437,7 +437,11 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
 
 	if (aiocb_p == NULL) assert(0);
 
-	/* initialize, paying particular attention to set the opcode to NOP */
+	/* initialize, paying particular attention to set the opcode to NOP.
+	 *
+	 * Also, it appears to be important to do all this SIGEV_NONE stuff,
+	 * although some man pages seem to indicate that it is not.
+	 */
 	memset(aiocb_p, 0, AIOCB_ARRAY_SZ*sizeof(struct aiocb));
 	for (i=0; i < AIOCB_ARRAY_SZ; i++) {
 	    aiocb_p[i].aio_lio_opcode            = LIO_NOP;
