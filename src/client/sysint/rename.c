@@ -207,7 +207,7 @@ int PVFS_sys_rename(
       I don't think this is true anymore ... will verify on rewrite;
       this seems to always fail now
     */
-/*     assert(ack_p->u.rmdirent.entry_handle == old_entry); */
+/*     assert(ack_p->u.rmdirent.entry_handle == old_parent_refn.handle); */
 
     PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
 			&encoded_resp, op_tag);
