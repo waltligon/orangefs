@@ -63,6 +63,9 @@ int main(int argc, char **argv)
 	TROVE_size output_size;
 	void *user_ptr_array[1] = { (char *) 13 };
 
+        TROVE_extent cur_extent;
+        TROVE_handle_extent_array extent_array;
+
 	/*************************************************************/
 	/* initialization stuff */
 
@@ -95,10 +98,13 @@ int main(int argc, char **argv)
 	    return -1;
 	}
 
-	file_handle = requested_file_handle;
+	file_handle = 0;
 
-    /* create the new dspace */
+        cur_extent.first = cur_extent.last = requested_file_handle;
+        extent_array.extent_count = 1;
+        extent_array.extent_array = &cur_extent;
 	ret = trove_dspace_create(coll_id,
+                                  &extent_array,
 				  &file_handle,
 				  TROVE_TEST_FILE,
 				  NULL,

@@ -41,6 +41,8 @@ int main(int argc, char **argv)
     char *method_name, *file_name;
     char path_name[PATH_SIZE];
     char *buf;
+    TROVE_extent cur_extent;
+    TROVE_handle_extent_array extent_array;
 
     ret = parse_args(argc, argv);
     if (ret < 0) {
@@ -85,10 +87,13 @@ int main(int argc, char **argv)
     }
 
     /* Q: how do I know what handle to use for the new file? */
-    file_handle = requested_file_handle;
+    file_handle = 0;
 
-    /* create the new dspace */
+    cur_extent.first = cur_extent.last = requested_file_handle;
+    extent_array.extent_count = 1;
+    extent_array.extent_array = &cur_extent;
     ret = trove_dspace_create(coll_id,
+                              &extent_array,
 			      &file_handle,
 			      TROVE_TEST_FILE,
 			      NULL,

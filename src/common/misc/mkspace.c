@@ -36,6 +36,8 @@ int pvfs2_mkspace(
     char entstring[]  = "dir_ent";
     struct PVFS_object_attr attr; /* from proto/pvfs2-attr.h */
     static char root_handle_string[PATH_MAX] = "root_handle";
+    PVFS_handle_extent cur_extent;
+    PVFS_handle_extent_array extent_array;
 
     if (verbose)
     {
@@ -150,7 +152,12 @@ int pvfs2_mkspace(
     */
     if (new_root_handle)
     {
+        cur_extent.first = cur_extent.last = new_root_handle;
+        extent_array.extent_count = 1;
+        extent_array.extent_array = &cur_extent;
+
         ret = trove_dspace_create(coll_id,
+                                  &extent_array,
                                   &new_root_handle,
                                   PVFS_TYPE_DIRECTORY,
                                   NULL,
@@ -235,8 +242,12 @@ int pvfs2_mkspace(
           create dataspace to hold directory entries; a
           value of zero leaves the allocation to trove.
         */
-        ent_handle = 0;
+        cur_extent.first = cur_extent.last = 0;
+        extent_array.extent_count = 1;
+        extent_array.extent_array = &cur_extent;
+
         ret = trove_dspace_create(coll_id,
+                                  &extent_array,
                                   &ent_handle,
                                   PVFS_TYPE_DIRDATA,
                                   NULL,

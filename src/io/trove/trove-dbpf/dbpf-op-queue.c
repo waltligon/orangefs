@@ -27,6 +27,10 @@ struct dbpf_queued_op *dbpf_queued_op_alloc(void)
 
 void dbpf_queued_op_free(struct dbpf_queued_op *q_op_p)
 {
+    if (q_op_p->op.type == DSPACE_CREATE)
+    {
+        free(q_op_p->op.u.d_create.extent_array.extent_array);
+    }
     free(q_op_p);
 }
 

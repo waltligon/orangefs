@@ -316,7 +316,7 @@ int job_trove_keyval_iterate_keys(PVFS_fs_id coll_id,
 
 /* create a new data space object */
 int job_trove_dspace_create(PVFS_fs_id coll_id,
-			    PVFS_handle handle,
+			    PVFS_handle_extent_array *handle_extent_array,
 			    PVFS_ds_type type,
 			    void *hint,
 			    void *user_ptr,

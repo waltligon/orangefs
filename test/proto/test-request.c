@@ -5,16 +5,17 @@
  */
 
 #define USE_BMI_MSGS 1
-#include <bmi.h>
-#include <pvfs2-req-proto.h>
-#include <gossip.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <errno.h>
-#include <PINT-reqproto-encode.h>
+#include "bmi.h"
+#include "pvfs2-req-proto.h"
+#include "gossip.h"
+#include "stdlib.h"
+#include "stdio.h"
+#include "string.h"
+#include "errno.h"
+#include "trove.h"
+#include "PINT-reqproto-encode.h"
 #ifdef USE_BMI_MSGS
-#include <bmi-send-recv.h>
+#include "bmi-send-recv.h"
 #endif
 
 
@@ -143,7 +144,7 @@ void print_request(struct PVFS_server_req *my_req, int direction)
 			arrow(direction);
                         printf("credentials.perms = %d\n", (int)my_req->credentials.perms);
 			arrow(direction);
-                        printf("PVFS_servreq_create->requested_handle = %d\n", (int)my_req->u.create.requested_handle );
+                        printf("PVFS_servreq_create->handle_extent_array.extent_count = %d\n", (int)my_req->u.create.handle_extent_array.extent_count );
 			arrow(direction);
                         printf("PVFS_servreq_create->fs_id = %d\n",(int) my_req->u.create.fs_id );
 			arrow(direction);
@@ -387,7 +388,13 @@ int main(int argc, char **argv)
 	request->credentials.uid = 420;
 	request->credentials.gid = 420;
 	request->credentials.perms = 420;
-	request->u.create.requested_handle = 69;
+            {
+                TROVE_extent cur_extent;
+
+                cur_extent.first = cur_extent.last = 69;
+                request->u.create.handle_extent_array.extent_count = 1;
+                request->u.create.handle_extent_array.extent_array = &cur_extent;
+            }
 	request->u.create.fs_id = 11111;
 	request->u.create.object_type = 11111;
 	break;

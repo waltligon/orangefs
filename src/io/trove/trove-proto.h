@@ -204,7 +204,8 @@ int trove_keyval_write_list(
 
 
 int trove_dspace_create(TROVE_coll_id coll_id,
-			TROVE_handle *handle_p,
+			TROVE_handle_extent_array *handle_extent_array,
+                        TROVE_handle *out_handle,
 			TROVE_ds_type type,
 			TROVE_keyval_s *hint,
 			TROVE_ds_flags flags,

@@ -245,12 +245,32 @@ static int handle_store_extentlist_create(TROVE_coll_id coll_id,
 					  TROVE_handle bstream_handle,
 					  struct TROVE_handle_extentlist *elist)
 {
-    int ret, count;
+    int ret = -1, count, i = 0;
     TROVE_ds_state state;
     TROVE_op_id op_id;
     TROVE_size buffsz;
+    TROVE_handle_extent_array extent_array;
+
+    /*
+      convert from a TROVE_handle_extentlist type to a
+      TROVE_handle_extent_array type.  This bites.
+    */
+    extent_array.extent_count = elist->num_extents;
+    extent_array.extent_array = malloc(
+        elist->num_extents * sizeof(TROVE_extent));
+    if (!extent_array.extent_array)
+    {
+        return ret;
+    }
+
+    for(i = 0; i < elist->num_extents; i++)
+    {
+        extent_array.extent_array[i].first = elist->extents[i].first;
+        extent_array.extent_array[i].last = elist->extents[i].last;
+    }
 	
-    ret = trove_dspace_create(coll_id, 
+    ret = trove_dspace_create(coll_id,
+                              &extent_array,
 			      &bstream_handle,
 			      TROVE_PLAIN_FILE, /* not sure exactly what to
 						   call this, but
@@ -261,6 +281,7 @@ static int handle_store_extentlist_create(TROVE_coll_id coll_id,
 			      NULL,
 			      &op_id);
     while ( ret == 0) trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+    free(extent_array.extent_array);
     if (ret < 0) {
 	fprintf(stderr, "dspace create failed\n");
 	return -1;

@@ -120,6 +120,7 @@ struct dbpf_collection_db_entry {
 
 
 struct dbpf_dspace_create_op {
+    TROVE_handle_extent_array extent_array;
     TROVE_handle *out_handle_p;
     TROVE_ds_type type;
     /* hint? */

@@ -13,12 +13,12 @@
 #include <string.h>
 #include <sys/time.h>
 
-#include <gossip.h>
-#include <flow.h>
-#include <flowproto-support.h>
-#include <trove.h>
-#include <pvfs-distribution.h>
-#include <pvfs-request.h>
+#include "gossip.h"
+#include "flow.h"
+#include "flowproto-support.h"
+#include "trove.h"
+#include "pvfs-distribution.h"
+#include "pvfs-request.h"
 
 #define ROOT_HANDLE_STRING "root_handle"
 #define TROVE_TEST_BSTREAM 3
@@ -57,6 +57,8 @@ int main(int argc, char **argv)
 	PVFS_size tmp_size;
 	bmi_context_id context;
 	FLOW_context_id flow_context;
+        TROVE_extent cur_extent;
+        TROVE_handle_extent_array extent_array;
 	
 	/* memory buffer to xfer */
 	mybuffer = (void*)malloc(TEST_SIZE);
@@ -168,8 +170,13 @@ int main(int argc, char **argv)
 		return -1;
 	}
 	
-	file_handle = requested_file_handle;
+	file_handle = 0;
+
+        cur_extent.first = cur_extent.last = requested_file_handle;
+        extent_array.extent_count = 1;
+        extent_array.extent_array = &cur_extent;
 	ret = trove_dspace_create(coll_id,
+                                  &extent_array,
 				  &file_handle,
 				  TROVE_TEST_BSTREAM,
 				  NULL,

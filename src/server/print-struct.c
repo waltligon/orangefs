@@ -64,7 +64,9 @@ void display_pvfs_structure(void *s,int r)
 		{
 			case PVFS_SERV_CREATE:
 				printf("Create Request Structure\n");
-				printf("Requested Handle: %Ld\n",p->u.create.requested_handle);
+				printf("Num Requested Handle Ranges: %d\n",
+                                       p->u.create.handle_extent_array.extent_count);
+                                /* todo: print the ranges */
 				printf("FSid: %d\n",p->u.create.fs_id);
 				printf("ObjectType: %d\n",p->u.create.object_type);
 				break;

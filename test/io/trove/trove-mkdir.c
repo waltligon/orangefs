@@ -10,7 +10,7 @@
 #include <time.h>
 #include <getopt.h>
 
-#include <trove.h>
+#include "trove.h"
 #include "trove-test.h"
 
 char storage_space[SSPACE_SIZE] = "/tmp/trove-test-space";
@@ -32,6 +32,9 @@ int main(int argc, char ** argv)
     TROVE_handle parent_handle, file_handle;
     TROVE_ds_attributes_s s_attr;
     TROVE_keyval_s key, val;
+
+    TROVE_extent cur_extent;
+    TROVE_handle_extent_array extent_array;
 
     ret = parse_args(argc, argv);
     if ( ret < 0 ) { 
@@ -66,8 +69,11 @@ int main(int argc, char ** argv)
 
     file_handle = 0;
 
-    /* create new dspace */
+    cur_extent.first = cur_extent.last = file_handle;
+    extent_array.extent_count = 1;
+    extent_array.extent_array = &cur_extent;
     ret = trove_dspace_create(coll_id,
+                              &extent_array,
 			      &file_handle,
 			      TROVE_TEST_DIR,
 			      NULL,

@@ -62,6 +62,14 @@ int do_decode_req(
 	dec_msg->u.rmdirent.entry = char_ptr;
 	return (0);
 
+    case PVFS_SERV_CREATE:
+	char_ptr += sizeof(struct PVFS_server_req);
+        dec_msg->u.create.handle_extent_array.extent_count =
+            *char_ptr;
+        dec_msg->u.create.handle_extent_array.extent_array =
+            (PVFS_handle_extent *)((char *)char_ptr + sizeof(int));
+        return (0);
+
     case PVFS_SERV_MKDIR:
 	char_ptr += sizeof(struct PVFS_server_req);
 	if (dec_msg->u.mkdir.attr.objtype == PVFS_TYPE_METAFILE)
@@ -118,7 +126,6 @@ int do_decode_req(
 	}
 	return (0);
 	/*these structures are all self contained (no pointers that need to be packed) */
-    case PVFS_SERV_CREATE:
     case PVFS_SERV_READDIR:
     case PVFS_SERV_GETATTR:
     case PVFS_SERV_REMOVE:

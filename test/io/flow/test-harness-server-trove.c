@@ -12,13 +12,14 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/time.h>
-#include <gossip.h>
-#include <flow.h>
-#include <flowproto-support.h>
-#include <pvfs-distribution.h>
-#include <pvfs-request.h>
 
-#include <trove.h>
+#include "gossip.h"
+#include "flow.h"
+#include "flowproto-support.h"
+#include "pvfs-distribution.h"
+#include "pvfs-request.h"
+
+#include "trove.h"
 
 #define ROOT_HANDLE_STRING "root_handle"
 
@@ -66,6 +67,8 @@ int main(int argc, char **argv)
 	TROVE_keyval_s key, val;
 	bmi_context_id context;
 	FLOW_context_id flow_context;
+        PVFS_handle_extent cur_extent;
+        PVFS_handle_extent_array extent_array;
 
 	/*************************************************************/
 	/* initialization stuff */
@@ -133,10 +136,13 @@ int main(int argc, char **argv)
 	    return -1;
 	}
 
-	file_handle = requested_file_handle;
+	file_handle = 0;
 
-    /* create the new dspace */
+        cur_extent.first = cur_extent.last = requested_file_handle;
+        extent_array.extent_count = 1;
+        extent_array.extent_array = &cur_extent;
 	ret = trove_dspace_create(coll_id,
+                                  &extent_array,
 				  &file_handle,
 				  TROVE_TEST_FILE,
 				  NULL,

@@ -11,7 +11,7 @@
 #include <time.h>
 #include <getopt.h>
 
-#include <trove.h>
+#include "trove.h"
 #include "trove-test.h"
 
 char storage_space[SSPACE_SIZE] = "/tmp/trove-test-space";
@@ -35,7 +35,8 @@ int main(int argc, char **argv)
     char *method_name, *file_name;
     char path_name[PATH_SIZE];
     time_t mytime;
-
+    TROVE_extent cur_extent;
+    TROVE_handle_extent_array extent_array;
 
     ret = parse_args(argc, argv);
     if (ret < 0) {
@@ -82,10 +83,13 @@ int main(int argc, char **argv)
     
     for (i=0; i < file_count; i++) {
 	char tmp_file_name[PATH_SIZE];
-	file_handle = requested_file_handle;
+	file_handle = 0;
 
-	/* create the new dspace */
+        cur_extent.first = cur_extent.last = requested_file_handle;
+        extent_array.extent_count = 1;
+        extent_array.extent_array = &cur_extent;
 	ret = trove_dspace_create(coll_id,
+                                  &extent_array,
 				  &file_handle,
 				  TROVE_TEST_FILE,
 				  NULL,

@@ -4,16 +4,16 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <bmi.h>
-#include <gossip.h>
-#include <pvfs2-req-proto.h>
-#include <print-struct.h>
-#include <PINT-reqproto-encode.h>
-#include <pvfs-request.h>
-#include <pint-request.h>
-#include <pvfs-distribution.h>
-#include <pint-distribution.h>
-#include <flow.h>
+#include "bmi.h"
+#include "gossip.h"
+#include "pvfs2-req-proto.h"
+#include "print-struct.h"
+#include "PINT-reqproto-encode.h"
+#include "pvfs-request.h"
+#include "pint-request.h"
+#include "pvfs-distribution.h"
+#include "pint-distribution.h"
+#include "flow.h"
 
 
 /*
@@ -76,6 +76,7 @@ int main(int argc, char **argv)	{
 	struct PINT_decoded_msg decoded3;
 	bmi_context_id context;
 	FLOW_context_id flow_context;
+        PVFS_handle_extent cur_extent;
 
 	/**************************************************
 	 * general setup 
@@ -173,7 +174,9 @@ int main(int argc, char **argv)	{
 	my_req.credentials.perms = PVFS_U_WRITE | PVFS_U_READ;  
 
 	/* create specific fields */
-	my_req.u.create.requested_handle = 4095;
+        cur_extent.first = cur_extent.last = 4095;
+        my_req.u.create.handle_extent_array.extent_count = 1;
+        my_req.u.create.handle_extent_array.extent_array = &cur_extent;
 	my_req.u.create.fs_id = 9;
 	my_req.u.create.object_type = PVFS_TYPE_DATAFILE;
 

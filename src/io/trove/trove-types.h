@@ -9,24 +9,25 @@
 
 
 /* PVFS type mappings */
-#include <pvfs2-types.h>
-#include <pvfs2-storage.h>
+#include "pvfs2-types.h"
+#include "pvfs2-storage.h"
 
-typedef PVFS_handle          TROVE_handle;
-typedef PVFS_size            TROVE_size;
-typedef PVFS_offset          TROVE_offset;
-typedef PVFS_id_gen_t        TROVE_op_id;
-typedef PVFS_fs_id           TROVE_coll_id;
-typedef PVFS_ds_type         TROVE_ds_type;
-typedef PVFS_vtag            TROVE_vtag_s;
-typedef PVFS_ds_flags        TROVE_ds_flags;
-typedef PVFS_ds_keyval       TROVE_keyval_s;
-typedef PVFS_ds_position     TROVE_ds_position;
-typedef PVFS_ds_attributes   TROVE_ds_attributes_s;
-typedef PVFS_ds_storedattr   TROVE_ds_storedattr_s;
-typedef PVFS_error           TROVE_ds_state;
+typedef PVFS_handle                TROVE_handle;
+typedef PVFS_handle_extent         TROVE_extent;
+typedef PVFS_handle_extent_array   TROVE_handle_extent_array;
+typedef PVFS_size                  TROVE_size;
+typedef PVFS_offset                TROVE_offset;
+typedef PVFS_id_gen_t              TROVE_op_id;
+typedef PVFS_fs_id                 TROVE_coll_id;
+typedef PVFS_ds_type               TROVE_ds_type;
+typedef PVFS_vtag                  TROVE_vtag_s;
+typedef PVFS_ds_flags              TROVE_ds_flags;
+typedef PVFS_ds_keyval             TROVE_keyval_s;
+typedef PVFS_ds_position           TROVE_ds_position;
+typedef PVFS_ds_attributes         TROVE_ds_attributes_s;
+typedef PVFS_ds_storedattr         TROVE_ds_storedattr_s;
+typedef PVFS_error                 TROVE_ds_state;
 
-typedef PVFS_handle_extent   TROVE_extent;
 #define trove_ds_attr_to_stored PVFS_ds_attr_to_stored
 #define trove_ds_stored_to_attr PVFS_ds_stored_to_attr
 

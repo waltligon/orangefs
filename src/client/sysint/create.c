@@ -36,7 +36,7 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 	int attr_mask, last_handle_created = 0;
 	pinode *parent_ptr = NULL, *pinode_ptr = NULL;
 	bmi_addr_t serv_addr1,serv_addr2,*bmi_addr_list = NULL;
-	PVFS_handle *df_handle_array = NULL, new_bkt = 0;
+	PVFS_handle *df_handle_array = NULL;
 	PVFS_pinode_reference entry;
 	struct PINT_decoded_msg decoded;
 	void* encoded_resp;
@@ -180,7 +180,10 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 	/* send the create request for the meta file */
 	req_p.op = PVFS_SERV_CREATE;
 	req_p.credentials = credentials;
-	req_p.u.create.requested_handle = new_bkt;
+	req_p.u.create.handle_extent_array.extent_count =
+            meta_handle_extent_array.extent_count;
+	req_p.u.create.handle_extent_array.extent_array =
+            meta_handle_extent_array.extent_array;
 	req_p.u.create.fs_id = parent_refn.fs_id;
 
 	/* Q: is this sane?  pretty sure we're creating meta files here, but do 
@@ -341,7 +344,10 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 	for(i = 0;i < io_serv_count; i++)
 	{
 		/* Fill in the parameters */
-		req_p.u.create.requested_handle = df_handle_array[i];
+		PVFS_handle_extent cur_extent;
+                cur_extent.first = cur_extent.last = df_handle_array[i];
+		req_p.u.create.handle_extent_array.extent_count = 1;
+		req_p.u.create.handle_extent_array.extent_array = &cur_extent;
 
 		op_tag = get_next_session_tag();
 

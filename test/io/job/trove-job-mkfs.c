@@ -27,9 +27,11 @@ int main(int argc, char **argv)
     TROVE_handle root_handle;
     TROVE_keyval_s key, val;
     char *method_name;
-	 job_status_s job_stat;
-	 job_id_t foo_id;
-	job_context_id context;
+    job_status_s job_stat;
+    job_id_t foo_id;
+    job_context_id context;
+    TROVE_extent cur_extent;
+    TROVE_handle_extent_array extent_array;
 
     char root_handle_string[] = ROOT_HANDLE_STRING;
 
@@ -160,10 +162,13 @@ int main(int argc, char **argv)
 
     /* create a dataspace to hold the root directory */
     /* Q: where are we going to define the dspace types? -- trove-test.h for now. */
-    root_handle = 7;
-
+    root_handle = 0;
+    cur_extent.first = cur_extent.last = 7;
+    extent_array.extent_count = 1;
+    extent_array.extent_array = &cur_extent;
+    
 	ret = job_trove_dspace_create(coll_id,
-		root_handle, 
+		&extent_array,
 		TROVE_TEST_DIR,
 		NULL,
 		NULL,

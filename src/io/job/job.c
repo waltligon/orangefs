@@ -1830,7 +1830,7 @@ int job_trove_keyval_iterate_keys(PVFS_fs_id coll_id,
  * failure
  */
 int job_trove_dspace_create(PVFS_fs_id coll_id,
-			    PVFS_handle handle,
+			    PVFS_handle_extent_array *handle_extent_array,
 			    PVFS_ds_type type,
 			    void *hint,
 			    void *user_ptr,
@@ -1854,10 +1854,11 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
 	return (-errno);
     }
     jd->job_user_ptr = user_ptr;
-    jd->u.trove.handle = handle;
+    jd->u.trove.handle = 0;
     jd->context_id = context_id;
 
     ret = trove_dspace_create(coll_id,
+                              handle_extent_array,
 			      &(jd->u.trove.handle),
 			      type,
 			      hint, TROVE_SYNC /* flags -- sync for now */ ,

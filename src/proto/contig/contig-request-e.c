@@ -162,6 +162,40 @@ int do_encode_req(
 	((struct PVFS_server_req *) enc_msg)->u.rmdirent.entry = NULL;
 	return (0);
 
+    case PVFS_SERV_CREATE:
+        size = sizeof(struct PVFS_server_req) + sizeof(int)
+            + PINT_ENC_GENERIC_HEADER_SIZE;
+
+        /*
+          we need to alloc space for the variably sized handle
+          extent array.
+        */
+        size += (request->u.create.handle_extent_array.extent_count *
+                 sizeof(PVFS_handle_extent));
+
+        enc_msg = BMI_memalloc(target_msg->dest, (bmi_size_t) size, BMI_SEND);
+        if (!enc_msg)
+        {
+            return (-ENOMEM);
+        }
+
+        target_msg->buffer_list[0] = enc_msg;
+        target_msg->size_list[0] = size;
+        target_msg->total_size = size;
+
+        memcpy(enc_msg, contig_buffer_table.generic_header,
+               PINT_ENC_GENERIC_HEADER_SIZE);
+        enc_msg = (void *)((char *)enc_msg + PINT_ENC_GENERIC_HEADER_SIZE);
+        memcpy(enc_msg, request, sizeof(struct PVFS_server_req));
+        *((int *)((char *)enc_msg + sizeof(struct PVFS_server_req))) =
+            request->u.create.handle_extent_array.extent_count;
+        memcpy(enc_msg + sizeof(struct PVFS_server_req) + sizeof(int),
+               request->u.create.handle_extent_array.extent_array,
+               (request->u.create.handle_extent_array.extent_count *
+                sizeof(PVFS_handle_extent)));
+
+        return (0);
+
     case PVFS_SERV_MKDIR:
 	size =
 	    sizeof(struct PVFS_server_req) + sizeof(struct PVFS_object_attr) +
@@ -330,7 +364,6 @@ int do_encode_req(
 	PINT_Dist_encode(encode_io_dist, request->u.io.io_dist);
 	return (0);
 	/*these structures are all self contained (no pointers that need to be packed) */
-    case PVFS_SERV_CREATE:
     case PVFS_SERV_READDIR:
     case PVFS_SERV_GETATTR:
     case PVFS_SERV_REMOVE:

@@ -26,11 +26,13 @@ int main(int argc, char **argv)
 {
     int ret, i;
     TROVE_coll_id coll_id;
-    TROVE_handle file_handle;
     char *method_name;
-	 job_id_t foo_id;
-	 job_status_s job_stat;
-	job_context_id context;
+    job_id_t foo_id;
+    job_status_s job_stat;
+    job_context_id context;
+    TROVE_extent cur_extent;
+    TROVE_handle_extent_array extent_array;
+
 
 
     ret = parse_args(argc, argv);
@@ -102,12 +104,13 @@ int main(int argc, char **argv)
 
 	for(i=0; i<20; i++)
 	{
-		/* lets assume bucket 1, 8 bit handle mask */
-		 file_handle = 0x01000000;
+            cur_extent.first = cur_extent.last = 0x01000000;
+            extent_array.extent_count = 1;
+            extent_array.extent_array = &cur_extent;
 
 		 /* create the new dspace */
 		ret = job_trove_dspace_create(coll_id,
-			file_handle, 
+			&extent_array,                        
 			TROVE_TEST_FILE,
 			NULL,
 			NULL,

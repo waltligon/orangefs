@@ -37,6 +37,7 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p);
  * TODO: should this have a ds_attributes with it?
  */
 static int dbpf_dspace_create(TROVE_coll_id coll_id,
+			      TROVE_handle_extent_array *extent_array,
 			      TROVE_handle *handle_p,
 			      TROVE_ds_type type,
 			      TROVE_keyval_s *hint, /* TODO: What is this? */
@@ -63,6 +64,16 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
 			flags);
 
     /* no op-specific members here */
+    q_op_p->op.u.d_create.extent_array.extent_count =
+        extent_array->extent_count;
+    q_op_p->op.u.d_create.extent_array.extent_array =
+        malloc(extent_array->extent_count * sizeof(TROVE_extent));
+    if (q_op_p->op.u.d_create.extent_array.extent_array == NULL) return -1;
+
+    memcpy(q_op_p->op.u.d_create.extent_array.extent_array,
+           extent_array->extent_array,
+           extent_array->extent_count * sizeof(TROVE_extent));
+    
     q_op_p->op.u.d_create.out_handle_p = handle_p;
     q_op_p->op.u.d_create.type         = type;
 

@@ -26,8 +26,9 @@ int main(int argc, char **argv)
     TROVE_ds_state state;
     TROVE_keyval_s key, val;
     char *method_name;
-
     char root_handle_string[] = ROOT_HANDLE_STRING;
+    TROVE_extent cur_extent;
+    TROVE_handle_extent_array extent_array;
 
     ret = parse_args(argc, argv);
     if (ret < 0) {
@@ -87,12 +88,17 @@ int main(int argc, char **argv)
 #if 0
     printf("creating root directory\n");
 #endif
-    root_handle = 7;
+    root_handle = 0;
+
+    cur_extent.first = cur_extent.last = 7;
+    extent_array.extent_count = 1;
+    extent_array.extent_array = &cur_extent;
     ret = trove_dspace_create(coll_id,
+                              &extent_array,
 			      &root_handle,
 			      TROVE_TEST_DIR,
 			      NULL,
-			      TROVE_SYNC,
+			      (TROVE_SYNC | TROVE_FORCE_REQUESTED_HANDLE),
 			      NULL,
 			      &op_id);
     while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);

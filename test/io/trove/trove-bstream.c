@@ -33,6 +33,8 @@ int main(int argc, char ** argv )
     TROVE_ds_state state;
     TROVE_handle file_handle, parent_handle;
     char *method_name;
+    TROVE_extent cur_extent;
+    TROVE_handle_extent_array extent_array;
 
     struct teststruct foo = { 8, 8, 0, NULL };
     struct teststruct bar;
@@ -57,9 +59,13 @@ int main(int argc, char ** argv )
 	return -1;
     }
 
-    file_handle = requested_file_handle;
+    file_handle = 0;
+    cur_extent.first = cur_extent.last = requested_file_handle;
+    extent_array.extent_count = 1;
+    extent_array.extent_array = &cur_extent;
     ret = trove_dspace_create(coll_id,
-			      &file_handle,
+			      &extent_array,
+                              &file_handle,
 			      TROVE_TEST_BSTREAM,
 			      NULL,
 			      TROVE_SYNC /* flags */,
