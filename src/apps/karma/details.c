@@ -38,15 +38,15 @@ GtkWidget *gui_details_setup(void)
 
     gui_details_list = gtk_list_store_new(9,
 					  G_TYPE_STRING,  /* name */
-					  G_TYPE_FLOAT,   /* ram total */
-					  G_TYPE_FLOAT,   /* ram avail */
-					  G_TYPE_FLOAT,   /* uptime */
-					  G_TYPE_FLOAT,   /* handles total */
-					  G_TYPE_FLOAT,   /* handles avail */
-					  G_TYPE_FLOAT,   /* space total */
-					  G_TYPE_FLOAT,   /* space avail */
+					  G_TYPE_STRING,  /* ram total */
+					  G_TYPE_STRING,  /* ram avail */
+					  G_TYPE_STRING,  /* uptime */
+					  G_TYPE_STRING,  /* handles total */
+					  G_TYPE_STRING,  /* handles avail */
+					  G_TYPE_STRING,  /* space total */
+					  G_TYPE_STRING,  /* space avail */
 					  G_TYPE_STRING); /* server type */
-    
+   
 
     gui_details_view = gtk_tree_view_new();
 
@@ -173,9 +173,25 @@ void gui_details_update(struct PVFS_mgmt_server_stat *server_stat,
     for (i=0; i < server_stat_ct; i++) {
 	GtkTreeIter iter;
 	char *type, meta[] = "meta", data[] = "data", both[] = "both";
+	char fmtbuf[GUI_DETAILS_TYPE][12];
 
-	gtk_list_store_append(gui_details_list, &iter);
+	snprintf(fmtbuf[GUI_DETAILS_RAM_TOT], 12, "%.2f",
+		 (float) server_stat[i].ram_total_bytes / rt_div);
+	snprintf(fmtbuf[GUI_DETAILS_RAM_AVAIL], 12, "%.2f",
+		 (float) server_stat[i].ram_free_bytes / ra_div);
+	snprintf(fmtbuf[GUI_DETAILS_UPTIME], 12, "%.2f",
+		 (float) server_stat[i].uptime_seconds / up_div);
+	snprintf(fmtbuf[GUI_DETAILS_HANDLES_TOT], 12, "%.2f",
+		 (float) server_stat[i].handles_total_count / ht_div);
+	snprintf(fmtbuf[GUI_DETAILS_HANDLES_AVAIL], 12, "%.2f",
+		 (float) server_stat[i].handles_available_count / ha_div);
+	snprintf(fmtbuf[GUI_DETAILS_SPACE_TOT], 12, "%.2f",
+		 (float) server_stat[i].bytes_total / bt_div);
+	snprintf(fmtbuf[GUI_DETAILS_SPACE_AVAIL], 12, "%.2f",
+		 (float) server_stat[i].bytes_available / ba_div);
 
+
+	/* final formatting of data */
 	if ((server_stat[i].server_type & PVFS_MGMT_IO_SERVER) &&
 	    (server_stat[i].server_type & PVFS_MGMT_META_SERVER))
 	{
@@ -190,23 +206,27 @@ void gui_details_update(struct PVFS_mgmt_server_stat *server_stat,
 	    type = meta;
 	}
 
+	/* drop into list */
+	gtk_list_store_append(gui_details_list, &iter);
+
 	gtk_list_store_set(gui_details_list,
 			   &iter,
-			   GUI_DETAILS_NAME, server_stat[i].bmi_address,
+			   GUI_DETAILS_NAME,
+			   server_stat[i].bmi_address,
 			   GUI_DETAILS_RAM_TOT,
-			   (float) server_stat[i].ram_total_bytes / rt_div,
+			   fmtbuf[GUI_DETAILS_RAM_TOT],
 			   GUI_DETAILS_RAM_AVAIL,
-			   (float) server_stat[i].ram_free_bytes / ra_div,
+			   fmtbuf[GUI_DETAILS_RAM_AVAIL],
 			   GUI_DETAILS_UPTIME,
-			   (float) server_stat[i].uptime_seconds / up_div,
+			   fmtbuf[GUI_DETAILS_UPTIME],
 			   GUI_DETAILS_HANDLES_TOT,
-			   (float) server_stat[i].handles_total_count / ht_div,
+			   fmtbuf[GUI_DETAILS_HANDLES_TOT],
 			   GUI_DETAILS_HANDLES_AVAIL,
-			   (float) server_stat[i].handles_available_count / ha_div,
+			   fmtbuf[GUI_DETAILS_HANDLES_AVAIL],
 			   GUI_DETAILS_SPACE_TOT,
-			   (float) server_stat[i].bytes_total / bt_div,
+			   fmtbuf[GUI_DETAILS_SPACE_TOT],
 			   GUI_DETAILS_SPACE_AVAIL,
-			   (float) server_stat[i].bytes_available / ba_div,
+			   fmtbuf[GUI_DETAILS_SPACE_AVAIL],
 			   GUI_DETAILS_TYPE, type,
 			   -1);
     }
