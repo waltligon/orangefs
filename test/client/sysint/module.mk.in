@@ -7,6 +7,7 @@ TEST_SYSINT_DIR_SRC += \
 	$(DIR)/client.c\
 	$(DIR)/lookup.c\
 	$(DIR)/dcache-torture.c\
+	$(DIR)/pcache-torture.c\
 	$(DIR)/get-info.c\
 	$(DIR)/mkdir.c\
 	$(DIR)/remove.c\
