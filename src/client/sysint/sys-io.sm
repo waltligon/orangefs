@@ -428,14 +428,6 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
 	PINT_flow_reset(&iosm_p->flow_array[i]);
     }
 
-    /* flow id array */
-    iosm_p->flow_id_array = (job_id_t *)
-	malloc(target_datafile_count * sizeof(job_id_t));
-    if (iosm_p->flow_id_array == NULL) {
-	assert(0);
-    }
-    memset(iosm_p->flow_id_array, 0,
-	target_datafile_count*sizeof(job_id_t));
     /* flow status array */
     iosm_p->flow_status_array = (job_status_s *)
 	malloc(target_datafile_count * sizeof(job_status_s));
@@ -678,6 +670,7 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 {
     int i, ret;
     int matched_msgpair = 0, matched_flow = 0, matched_ack = 0, recv_match = -1;
+    job_id_t tmp_id;
 
     gossip_debug(CLIENT_DEBUG, "io state: datafile_complete\n");
 
@@ -907,7 +900,7 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 			   sm_p, /* user pointer */
 			   (sm_p->msgarray_count*2 + recv_match),
 			   &iosm_p->flow_status_array[recv_match],
-			   &iosm_p->flow_id_array[recv_match],
+			   &tmp_id,
 			   pint_client_sm_context);
 	    if (ret < 0) {
 		gossip_lerr("post of flow failed.\n");
@@ -918,10 +911,6 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 		gossip_debug(CLIENT_DEBUG,
 			     "  flow for %d completed immediately!\n",
 			     recv_match);
-
-		/* mark as completed */
-		iosm_p->flow_id_array[recv_match] = 0;
-			   
 		assert(iosm_p->flow_status_array[recv_match].error_code == 0);
 	    }
 	    else {
@@ -952,8 +941,6 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
     {
 	/* the third set of N user tags correspond to flows */
 	matched_flow = 1;
-	sm_p->u.io.flow_id_array[js_p->status_user_tag-(sm_p->msgarray_count*2)]
-	    = 0;
 	sm_p->u.io.flow_status_array[js_p->status_user_tag-(sm_p->msgarray_count*2)] 
 	    = *js_p;
 	sm_p->u.io.flow_comp_ct--;
@@ -1154,7 +1141,6 @@ static int io_analyze_results(PINT_client_sm *sm_p,
         free(sm_p->u.io.datafile_handles);
     }
     free(sm_p->u.io.flow_array);
-    free(sm_p->u.io.flow_id_array);
     free(sm_p->u.io.flow_status_array);
     free(sm_p->u.io.session_tag_array);
     free(sm_p->u.io.ackarray);
