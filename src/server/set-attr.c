@@ -304,11 +304,14 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s *ret)
     a_p = &s_op->req->u.setattr.attr;
 
     gossip_debug(SERVER_DEBUG,
-		 "  attrs to write = (owner = %d, group = %d, perms = %o, type = %d)\n",
+		 "  attrs to write = (owner = %d, group = %d, perms = %o, type = %d, atime = %ld, mtime = %ld, ctime = %ld)\n",
 		 a_p->owner,
 		 a_p->group,
 		 a_p->perms,
-		 a_p->objtype);
+		 a_p->objtype,
+		 a_p->atime,
+		 a_p->mtime,
+		 a_p->ctime);
 
     /* set up key and value structure for keyval write */
     s_op->key.buffer    = Trove_Common_Keys[METADATA_KEY].key;

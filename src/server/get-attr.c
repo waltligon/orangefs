@@ -238,11 +238,14 @@ static int getattr_verify_attribs(state_action_struct *s_op, job_status_s *ret)
     }
     else {
 	gossip_debug(SERVER_DEBUG,
-		     "  attrs read from dspace = (owner = %d, group = %d, perms = %o, type = %d)\n",
+		     "  attrs read from dspace = (owner = %d, group = %d, perms = %o, type = %d, atime = %ld, mtime = %ld, ctime = %ld)\n",
 		     a_p->owner,
 		     a_p->group,
 		     a_p->perms,
-		     a_p->objtype);
+		     a_p->objtype,
+		     a_p->atime,
+		     a_p->mtime,
+		     a_p->ctime);
     }
 
     /* TODO: HANDLE TYPES OTHER THAN METAFILES TOO, SOME DAY... */
@@ -389,11 +392,14 @@ static int getattr_send_bmi(state_action_struct *s_op, job_status_s *ret)
 
 
     gossip_debug(SERVER_DEBUG,
-		 "  sending attrs (owner = %d, group = %d, perms = %o, type = %d)\n",
+		 "  sending attrs (owner = %d, group = %d, perms = %o, type = %d, atime = %ld, mtime = %ld, ctime = %ld)\n",
 		 a_p->owner,
 		 a_p->group,
 		 a_p->perms,
-		 a_p->objtype);
+		 a_p->objtype,
+		 a_p->atime,
+		 a_p->mtime,
+		 a_p->ctime);
 
     /* Prepare the message */
     s_op->resp->status = ret->error_code;
