@@ -139,6 +139,7 @@ documentation:
 
 code cleanup:
 ====================================================================
+- rename all gossip masks to GOSSIP_xxx
 - audit code to make sure that all error paths are handled when
   assertions are turned off
 - maybe make a checklist for each pvfs2 component to use as we clean 
