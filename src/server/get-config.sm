@@ -11,7 +11,6 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-#include "state-machine.h"
 #include "server-config.h"
 #include "pvfs2-server.h"
 

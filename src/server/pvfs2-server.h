@@ -7,6 +7,10 @@
 #ifndef __PVFS2_SERVER_H
 #define __PVFS2_SERVER_H
 
+/* NOTE: STATE-MACHINE.H IS INCLUDED AT THE BOTTOM!  THIS IS SO WE CAN
+ * DEFINE ALL THE STRUCTURES WE NEED BEFORE WE INCLUDE IT.
+ */
+
 #include "pvfs2-debug.h"
 #include "pvfs2-storage.h"
 #include "job.h"
@@ -15,7 +19,7 @@
 
 #include "PINT-reqproto-encode.h"
 
-#define PINTSTACKSIZE 8  /* size of stack for nested state machines */
+#define PINT_STATE_STACK_SIZE 8  /* size of stack for nested state machines */
 
 typedef union PINT_state_array_values PINT_state_array_values;
 
@@ -117,7 +121,7 @@ typedef struct PINT_server_op
     int op; /* op == req->op after initialize_unexpected */
     int stackptr; /* stack of contexts for nested state machines */
     PINT_state_array_values *current_state; /* initialized in initialize_unexpected */
-    PINT_state_array_values *state_stack[PINTSTACKSIZE]; 
+    PINT_state_array_values *state_stack[PINT_STATE_STACK_SIZE]; 
 
     /* SERVER-SPECIFIC VALUES */
     job_id_t scheduled_id; /* holds id from request scheduler so we can release it later */
@@ -153,6 +157,10 @@ typedef struct PINT_server_op
 
 /* Exported Prototypes */
 struct server_configuration_s *get_server_config_struct(void);
+
+/* INCLUDE STATE-MACHINE.H DOWN HERE */
+#define PINT_OP_STATE PINT_server_op
+#include <state-machine.h>
 
 /*
  * Local variables:

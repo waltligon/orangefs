@@ -4,13 +4,13 @@
  * See COPYING in top-level directory.
  */
 
-#include <state-machine.h>
-#include <server-config.h>
-#include <pvfs2-server.h>
 #include <string.h>
-#include <pvfs2-attr.h>
 #include <assert.h>
-#include <gossip.h>
+
+#include "server-config.h"
+#include "pvfs2-server.h"
+#include "pvfs2-attr.h"
+#include "gossip.h"
 
 static int create_init(PINT_server_op *s_op, job_status_s *ret);
 static int create_cleanup(PINT_server_op *s_op, job_status_s *ret);

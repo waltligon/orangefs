@@ -29,7 +29,7 @@
 #include "request-scheduler.h"
 
 #include "pvfs2-server.h"
-#include "state-machine.h"
+#include "state-machine-fns.h"
 #include "mkspace.h"
 #include "server-config.h"
 #include "quicklist.h"

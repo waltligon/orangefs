@@ -10,7 +10,6 @@
 #include <stdio.h>
 #include <malloc.h>
 
-#include "state-machine.h"
 #include "server-config.h"
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"

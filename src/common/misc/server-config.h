@@ -7,8 +7,8 @@
 #ifndef __SERVER_CONFIG_H
 #define __SERVER_CONFIG_H
 
-/* FIXME: header in header */
 #include "llist.h"
+#include "trove.h"
 
 enum 
 {

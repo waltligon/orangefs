@@ -4,28 +4,9 @@
  * See COPYING in top-level directory.
  */
 
-
-/*
-
-SMS:  1. Errors should be handled correctly
-      2. Request Scheduler used
-      3. Documented
-					      
-SFS:  1. Needs some pre/post
-      2. Some assertions
-		      
-TS:   Implemented but not thorough.
-
-My TODO list for this SM:
-
- Finish asserts and documentation.  Again, this is a fairly trivial machine
-
-*/
-
 #include <string.h>
 #include <assert.h>
 
-#include "state-machine.h"
 #include "server-config.h"
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"

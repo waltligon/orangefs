@@ -5,16 +5,16 @@
  */
 
 
-#include <state-machine.h>
-#include <server-config.h>
-#include <pvfs2-server.h>
 #include <string.h>
-#include <pvfs2-attr.h>
 #include <assert.h>
-#include <pvfs-distribution.h>
-#include <pvfs-request.h>
-#include <pint-distribution.h>
-#include <pint-request.h>
+
+#include "server-config.h"
+#include "pvfs2-server.h"
+#include "pvfs2-attr.h"
+#include "pvfs-distribution.h"
+#include "pvfs-request.h"
+#include "pint-distribution.h"
+#include "pint-request.h"
 
 static int io_init(PINT_server_op *s_op, job_status_s *ret);
 static int io_get_size(PINT_server_op *s_op, job_status_s *ret);

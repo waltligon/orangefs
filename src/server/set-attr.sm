@@ -4,12 +4,10 @@
  * See COPYING in top-level directory.
  */
 
-#include <state-machine.h>
-#include <pvfs2-server.h>
-#include <pvfs2-server.h>
 #include <string.h>
 #include <assert.h>
 
+#include "pvfs2-server.h"
 #include "pvfs2-attr.h"
 
 enum {

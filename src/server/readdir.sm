@@ -8,11 +8,10 @@
 #include <string.h>
 #include <assert.h>
 
-#include "state-machine.h"
 #include "server-config.h"
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
-#include "trove.h" /* TODO -- REMOVE TROVE REFERENCES IF POSSIBLE */
+#include "trove.h"
 
 enum {
     STATE_ENOTDIR = 7

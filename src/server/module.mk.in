@@ -17,7 +17,7 @@ SERVERGENSRC := \
 # "normal" c files
 SERVERSRC += \
 	$(DIR)/pvfs2-server.c \
-	$(DIR)/state-machine.c \
+	$(DIR)/server-state-machine.c \
 	$(SERVERGENSRC)
 
 # added to the library so that test programs will work
