@@ -1123,11 +1123,6 @@ endecode_fields_0a_struct(
 /* server request *********************************************/
 /* - generic request with union of all op specific structs */
 
-enum PVFS_server_req_flags
-{
-    PVFS_SERVER_REQ_ADMIN_MODE = 1
-};
-
 struct PVFS_server_req
 {
     enum PVFS_server_op op;
