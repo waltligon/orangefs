@@ -222,6 +222,21 @@ int PVFS_sys_create(
     sm_p->parent_ref = parent_refn;
     sm_p->u.create.create_resp = resp;
     sm_p->u.create.sys_attr = &attr;
+    if(attr.mask & PVFS_ATTR_SYS_DFILE_COUNT)
+    {
+	sm_p->u.create.num_data_files = attr.dfile_count;
+    }
+    else
+    {
+	ret = PINT_bucket_get_num_io(sm_p->parent_ref.fs_id,
+				     &sm_p->u.create.num_data_files);
+	if (ret < 0)
+	{
+	    gossip_err("Failed to get number of data servers\n");
+	    free(sm_p);
+	    return(ret);
+	}
+    }
 
     gossip_debug(CLIENT_DEBUG, "Creating file named %s under parent handle "
                  "%Lu on fs %d\n", object_name, parent_refn.handle,
@@ -407,22 +422,10 @@ static int create_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
     /* clear error field in job */
     js_p->error_code = 0;
 
-    /*
-      FIXME: right now there's no good way to request a certain
-      number of data files.  Just go with the system default
-    */
-    ret = PINT_bucket_get_num_io(sm_p->parent_ref.fs_id,
-                                 &sm_p->u.create.num_data_files);
-    if (ret < 0)
-    {
-        gossip_err("Failed to get number of data servers\n");
-        assert(0);
-    }
-
     if (sm_p->u.create.num_data_files > PVFS_REQ_LIMIT_DFILE_COUNT)
     {
         sm_p->u.create.num_data_files = PVFS_REQ_LIMIT_DFILE_COUNT;
-        gossip_debug(CLIENT_DEBUG, "Warning: reducing number of data "
+        gossip_err("Warning: reducing number of data "
                      "files to PVFS_REQ_LIMIT_DFILE_COUNT\n");
     }
 

@@ -224,6 +224,11 @@ static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
         attrmask |= PVFS_ATTR_DATA_SIZE;
     }
 
+    if(attrmask & PVFS_ATTR_SYS_DFILE_COUNT)
+    {
+	attrmask |= PVFS_ATTR_META_DFILES;
+    }
+
     if (attrmask & PVFS_ATTR_SYS_LNK_TARGET)
     {
         attrmask &= ~PVFS_ATTR_SYS_LNK_TARGET;
@@ -345,6 +350,14 @@ static int getattr_object_getattr_comp_fn(void *v_p,
                 return -PVFS_ENOMEM;
             }
         }
+    }
+
+    /* special case for when users ask for dfile count */
+    if(attr->objtype == PVFS_TYPE_METAFILE && (sm_p->u.getattr.attrmask & 
+	PVFS_ATTR_SYS_DFILE_COUNT))
+    {
+	sm_p->u.getattr.getattr_resp_p->attr.dfile_count = 
+	    attr->u.meta.dfile_count;
     }
 
     /* transform the attributes from the response

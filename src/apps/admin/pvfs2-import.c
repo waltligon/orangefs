@@ -147,6 +147,9 @@ int main(int argc, char **argv)
     attr.mtime = attr.atime;
     attr.ctime = attr.atime;
     attr.mask = (PVFS_ATTR_SYS_ALL_SETABLE);
+    attr.dfile_count = user_opts->num_datafiles;
+    if(attr.dfile_count > 0)
+	attr.mask |= PVFS_ATTR_SYS_DFILE_COUNT;
     credentials.uid = getuid();
     credentials.gid = getgid();
 
@@ -305,9 +308,6 @@ static struct options* parse_args(int argc, char* argv[])
 		}
 		break;
 	    case('n'):
-		fprintf(stderr, "Error: num datafiles option not supported.\n");
-		free(tmp_opts);
-		return(NULL);
 		ret = sscanf(optarg, "%d", &tmp_opts->num_datafiles);
 		if(ret < 1){
 		    free(tmp_opts);
