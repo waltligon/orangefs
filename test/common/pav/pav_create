@@ -335,7 +335,6 @@ sub split_machines {
     @compnodes = ();
 
     my $count=0;
-    my $node_index=0;
 
     # let's try something....if for whatever reason we cannot open NODEFILE,
     # let's assume it had one entry: localhost
@@ -360,7 +359,6 @@ sub split_machines {
 	    close(FH);
     }
 
-
     if ($count < ($href->{'IONCOUNT'} + $href->{'UNIQUEMETA'} * $href->{'METACOUNT'})) {
 	print STDERR "ERROR: requested more server nodes than are available\n";
 	return(1);
@@ -368,32 +366,22 @@ sub split_machines {
     
     my $ionum = $href->{'IONCOUNT'};
     my $metanum = $href->{'METACOUNT'};
-    my $compnum = $count - $href->{'IONCOUNT'} - $href->{'METACOUNT'};
+    my $compnum = $count - ($href->{'IONCOUNT'} + $href->{'UNIQUEMETA'} * $href->{'METACOUNT'});
 
-    if (!$href->{'UNIQUEMETA'}) {
-	$compnum++;
+    if ($href->{'UNIQUEMETA'}) {
+        for ($i=0; $i<$metanum; $i++) {
+		$metanodes[$i] = shift @nodelist;
+	}
+    } else {
+    	@metanodes = @nodelist[0..$metanum-1];
     }
 
-    if ($href->{'COMPUTENODES_LAST'} == 0) {
-	# chose compute nodes first 
-	@compnodes = @nodelist[$node_index..$compnum-1];
-	$node_index += $compnum;
-	@metanodes = @nodelist[$node_index..$node_index+$metanum-1];
-	if ($href->{'UNIQUEMETA'}) {
-	    $node_index += $metanum;
-	}
-	@ionodes = @nodelist[$node_index..$node_index+$ionum-1];
-    }
-    else
-    {
-	# chose compute nodes last
-	@metanodes = @nodelist[$node_index..$node_index+$metanum-1];
-	if ($href->{'UNIQUEMETA'}) {
-	    $node_index += $metanum;
-	}
-	@ionodes = @nodelist[$node_index..$node_index+$ionum-1];
-	$node_index += $ionum;
-	@compnodes = @nodelist[$node_index..$compnum-1];
+    if ($href->{'COMPUTENODES_LAST'}) {
+	    @ionodes = @nodelist[0..$ionum-1];
+	    @compnodes = @nodelist[$ionum..$count-1];
+    } else {
+	    @compnodes = @nodelist[0..$compnum-1];
+	    @ionodes = @nodelist[$compnum..$count-1];
     }
     
     $href->{'MGR'} = \@metanodes;
