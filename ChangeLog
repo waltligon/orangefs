@@ -5,6 +5,7 @@ PVFS2 Release ChangeLog
 
 pvfs2-0.0.9pre1
 ===============
+- add karma administration gui
 - fix support for creating/using/removing multiple collections
   (file systems) within a storage space
 - improved pvfs2-client backgrounding (better descriptor management)
