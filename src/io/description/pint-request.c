@@ -828,7 +828,7 @@ int PINT_Request_decode(struct PINT_Request *req)
 }
     
 
-void PINT_Dump_packed_request(PVFS_Request req)
+void PINT_Dump_packed_request(PINT_Request *req)
 {
 	int i;
 	if (!PINT_REQUEST_IS_PACKED(req))
@@ -839,7 +839,7 @@ void PINT_Dump_packed_request(PVFS_Request req)
 	}
 }
 
-void PINT_Dump_request(PVFS_Request req)
+void PINT_Dump_request(PINT_Request *req)
 {
 	gossip_debug(REQUEST_DEBUG,"**********************\n");
 	gossip_debug(REQUEST_DEBUG,"address:\t%x\n",(unsigned int)req);
