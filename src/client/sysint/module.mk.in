@@ -1,5 +1,5 @@
 DIR := src/client/sysint
-LIBSRC += \
+CSRC := \
 	$(DIR)/create.c \
 	$(DIR)/finalize.c \
 	$(DIR)/initialize.c \
@@ -19,18 +19,25 @@ LIBSRC += \
 	$(DIR)/pint-bucket.c \
 	$(DIR)/getparent.c \
 	$(DIR)/client-state-machine.c \
-        $(DIR)/shared-state-methods.c \
-	$(DIR)/sys-remove.c \
-        $(DIR)/sys-create.c \
-        $(DIR)/sys-symlink.c \
-	$(DIR)/sys-getattr.c \
-	$(DIR)/sys-io.c \
-	$(DIR)/sys-flush.c \
-	$(DIR)/msgpair.c \
-	$(DIR)/msgpairarray.c \
-	$(DIR)/lookup-dcache.c \
-	$(DIR)/getattr-pcache.c \
-	$(DIR)/mgmt-noop.c \
-	$(DIR)/mgmt-setparam-all.c \
-	$(DIR)/sys-truncate.c
+	$(DIR)/shared-state-methods.c
 
+SMSRC := \
+	getattr-pcache.sm \
+	msgpair.sm \
+	sys-getattr.sm \
+	sys-truncate.sm \
+	lookup-dcache.sm \
+	msgpairarray.sm \
+	sys-io.sm \
+	mgmt-noop.sm \
+	sys-create.sm \
+	sys-remove.sm \
+	mgmt-setparam-all.sm \
+	sys-flush.sm \
+	sys-symlink.sm
+
+SMCGEN := $(patsubst %.sm,$(DIR)/%.c,$(SMSRC))
+
+LIBSRC += $(CSRC) $(SMCGEN)
+
+CLEANFILES += $(SMCGEN)
