@@ -9,6 +9,7 @@
 
 #include "state-machine.h"
 #include "server-config.h"
+#include "pvfs2-storage.h"
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
 #include "gossip.h"
@@ -20,6 +21,8 @@ static int remove_cleanup(PINT_server_op *s_op, job_status_s *ret);
 static int remove_remove_dspace(PINT_server_op *s_op, job_status_s *ret);
 static int remove_release_posted_job(PINT_server_op *s_op, job_status_s *ret);
 static int remove_send_response(PINT_server_op *s_op, job_status_s *ret);
+static int remove_fallback_to_dspace_getattr(PINT_server_op *s_op, job_status_s *ret);
+static int remove_verify_dspace_attributes(PINT_server_op *s_op, job_status_s *ret);
 void remove_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
@@ -36,6 +39,8 @@ PINT_state_machine_s remove_req_s =
 machine remove(init,
 	       read_object_metadata,
 	       verify_object_metadata,
+	       fallback_to_dspace_getattr,
+	       verify_dspace_attributes,
 	       remove_dspace,
 	       send_response,
 	       release,
@@ -51,9 +56,22 @@ machine remove(init,
 	{
 		run remove_read_object_metadata;
 		success => verify_object_metadata;
-		default => send_response;
+		default => fallback_to_dspace_getattr;
 	}
 
+	state fallback_to_dspace_getattr
+	    {
+		run remove_fallback_to_dspace_getattr;
+		success => verify_dspace_attributes;
+		default => send_response;
+	    }
+
+	state verify_dspace_attributes
+	    {
+		run remove_verify_dspace_attributes;
+		success => remove_dspace;
+		default => send_response;
+	    }
 	state verify_object_metadata
 	{
 		run remove_verify_object_metadata;
@@ -164,6 +182,70 @@ static int remove_read_object_metadata(PINT_server_op *s_op,
 }
 
 /*
+ * Function: remove_fallback_to_dspace_getattr
+ *
+ * Initiate a dspace_getattr to read the attributes for the object, since we were
+ * unable to find the metadata as a keyval.
+ * Metadata will be read into the remove scratch space (s_op->u.remove.object_attr).
+ *
+ * Note: PVFS_ds_attributes_s structure is returned in the job_status_s (member ds_attr).
+ */
+static int remove_fallback_to_dspace_getattr(PINT_server_op *s_op,
+					     job_status_s *ret)
+{
+    int job_post_ret;
+    job_id_t j_id;
+
+    gossip_debug(SERVER_DEBUG, "remove state: fallback_to_dspace_getattr\n");
+
+    gossip_debug(SERVER_DEBUG,
+		 "  reading dspace attributes (coll_id = 0x%x, handle = 0x%08Lx)\n",
+		 s_op->req->u.remove.fs_id,
+		 s_op->req->u.remove.handle);
+
+    job_post_ret = job_trove_dspace_getattr(s_op->req->u.remove.fs_id,
+					    s_op->req->u.remove.handle,
+					    s_op, /* user ptr */
+					    ret,
+					    &j_id);
+    return job_post_ret;
+}
+
+/*
+ * Function: remove_verify_dspace_attributes
+ *
+ *
+ * TODO: do permission checking, probably with some shared function.
+ */
+
+static int remove_verify_dspace_attributes(PINT_server_op *s_op,
+					   job_status_s *ret)
+{
+
+    gossip_debug(SERVER_DEBUG, "remove state: verify_dspace_attributes\n");
+
+    if (ret->error_code != 0) {
+	gossip_debug(SERVER_DEBUG,
+		     "  previous dspace getattr had an error; data is useless\n");
+	ret->error_code = -EINVAL;
+    }
+    else {
+	struct PVFS_ds_attributes *a_p = &ret->ds_attr;
+
+	gossip_debug(SERVER_DEBUG,
+		     "  attrs read from dspace = (..., type = %d)\n",
+		     a_p->type);
+
+	/* TODO: MAKE THIS AN ERROR INSTEAD */
+	assert(a_p->type == PVFS_TYPE_DATAFILE);
+
+	/* TODO: CHECK PERMISSIONS */
+
+    }
+    return 1;
+}
+
+/*
  * Function: remove_verify_object_metadata
  *
  * Verifies that metadata was successfully read.  If so, verifies that
@@ -187,7 +269,7 @@ static int remove_verify_object_metadata(PINT_server_op *s_op,
 	PVFS_object_attr *a_p = &s_op->u.remove.object_attr;
 
 	gossip_debug(SERVER_DEBUG,
-		     "  attrs read from dspace = (owner = %d, group = %d, perms = %o, type = %d)\n",
+		     "  attrs read from keyval = (owner = %d, group = %d, perms = %o, type = %d)\n",
 		     a_p->owner,
 		     a_p->group,
 		     a_p->perms,

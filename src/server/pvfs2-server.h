@@ -63,7 +63,7 @@ struct PINT_server_crdirent_op {
 };
 
 struct PINT_server_remove_op {
-    PVFS_object_attr object_attr; /* used to hold attributes of object to be removed */
+    PVFS_object_attr object_attr; /* used to hold attributes of object to be removed as read from keyval space*/
 };
 
 struct PINT_server_getconfig_op {
