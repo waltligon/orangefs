@@ -90,12 +90,12 @@ typedef enum PVFS_ds_type_e PVFS_ds_type;
 #define PVFS_ATTR_SYS_ALL	(PVFS_ATTR_SYS_ALL|PVFS_ATTR_SYS_SIZE)
 
 /* pinode reference (uniquely refers to a single pinode) */
-typedef struct
+struct PVFS_pinode_reference_s
 {
-    int64_t handle;		/* unique identifier per PVFS2 file */
-    PVFS_fs_id fs_id;		/* Filesystem ID */
-}
-PVFS_pinode_reference;
+    PVFS_handle handle;
+    PVFS_fs_id fs_id;
+};
+typedef struct PVFS_pinode_reference_s PVFS_pinode_reference;
 
 /* credentials (used for permission checking of operations) */
 struct PVFS_credentials_s
