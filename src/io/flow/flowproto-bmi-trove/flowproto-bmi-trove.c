@@ -136,7 +136,10 @@ static int trove_pending_count = 0;
  * have not yet been passed back by flow_proto_checkXXX()
  */
 static QLIST_HEAD(done_checking_queue);
-static gen_mutex_t done_checking_queue_mutex = GEN_MUTEX_INITIALIZER;
+/* all other known flows */
+static QLIST_HEAD(pending_queue);
+/* one mutex for both of the above queues */
+static gen_mutex_t queue_mutex = GEN_MUTEX_INITIALIZER;
 
 #ifdef __PVFS2_JOB_THREADED__
 static pthread_cond_t bmi_cond = PTHREAD_COND_INITIALIZER;
@@ -464,6 +467,11 @@ int flowproto_bmi_trove_announce_flow(flow_descriptor * flow_d)
 	return (ret);
     }
 
+    gen_mutex_lock(&queue_mutex);
+    qlist_add_tail(&(PRIVATE_FLOW(flow_d)->queue_link),
+	&pending_queue);
+    gen_mutex_unlock(&queue_mutex);
+
     flow_d->flowproto_id = flowproto_bmi_trove_id;
 
     if (ret == 1)
@@ -566,17 +574,19 @@ int flowproto_bmi_trove_checkworld(flow_descriptor ** flow_d_array,
 					  bmi_actualsize_array[i],
 					  bmi_error_code_array[i]);
 
+gen_mutex_lock(&queue_mutex);
 gen_mutex_lock(&(PRIVATE_FLOW(active_flowd)->mutex));
 	    /* put flows into done_checking_queue if needed */
 	    if (active_flowd->state & FLOW_FINISH_MASK ||
 		active_flowd->state == FLOW_SVC_READY)
 	    {
-gen_mutex_lock(&done_checking_queue_mutex);
+		gossip_ldebug(FLOW_PROTO_DEBUG, "adding %p to queue.\n", active_flowd);
+		qlist_del(&(PRIVATE_FLOW(active_flowd)->queue_link));
 		qlist_add_tail(&(PRIVATE_FLOW(active_flowd)->queue_link),
 			       &done_checking_queue);
-gen_mutex_unlock(&done_checking_queue_mutex);
 	    }
 gen_mutex_unlock(&(PRIVATE_FLOW(active_flowd)->mutex));
+gen_mutex_unlock(&queue_mutex);
 	}
     }
 #endif
@@ -639,17 +649,19 @@ gen_mutex_unlock(&(PRIVATE_FLOW(active_flowd)->mutex));
                                        tmp_coll_id);
                     trove_pending_count--;
 
+gen_mutex_lock(&queue_mutex);
 gen_mutex_lock(&(PRIVATE_FLOW(active_flowd)->mutex));
                     /* put flows into done_checking_queue if needed */
                     if (active_flowd->state & FLOW_FINISH_MASK ||
                         active_flowd->state == FLOW_SVC_READY)
                     {
-gen_mutex_lock(&done_checking_queue_mutex);
+			gossip_ldebug(FLOW_PROTO_DEBUG, "adding %p to queue.\n", active_flowd);
+			qlist_del(&(PRIVATE_FLOW(active_flowd)->queue_link));
                         qlist_add_tail(&(PRIVATE_FLOW(active_flowd)->queue_link),
                                        &done_checking_queue);
-gen_mutex_unlock(&done_checking_queue_mutex);
                     }
 gen_mutex_unlock(&(PRIVATE_FLOW(active_flowd)->mutex));
+gen_mutex_unlock(&queue_mutex);
                 }
             }
 	    trove_count = incount;
@@ -691,7 +703,7 @@ gen_mutex_unlock(&(PRIVATE_FLOW(active_flowd)->mutex));
     }
 #endif
 
-gen_mutex_lock(&done_checking_queue_mutex);
+gen_mutex_lock(&queue_mutex);
     /* collect flows out of the done_checking_queue and return */
     *count = 0;
     while (*count < incount && !qlist_empty(&done_checking_queue))
@@ -699,16 +711,24 @@ gen_mutex_lock(&done_checking_queue_mutex);
 	flow_data = qlist_entry(done_checking_queue.next,
 				struct bmi_trove_flow_data,
 				queue_link);
+gen_mutex_lock(&flow_data->mutex);
 	active_flowd = flow_data->parent;
+	gossip_ldebug(FLOW_PROTO_DEBUG, "found %p in queue.\n", active_flowd);
 	qlist_del(done_checking_queue.next);
 	if (active_flowd->state & FLOW_FINISH_MASK)
 	{
+gen_mutex_unlock(&flow_data->mutex);
 	    release_flow(active_flowd);
+	}
+	else
+	{
+	    qlist_add_tail(&flow_data->queue_link, &pending_queue);    
+gen_mutex_unlock(&flow_data->mutex);
 	}
 	flow_d_array[*count] = active_flowd;
 	(*count)++;
     }
-gen_mutex_unlock(&done_checking_queue_mutex);
+gen_mutex_unlock(&queue_mutex);
     return (0);
 }
 
@@ -758,17 +778,20 @@ int flowproto_bmi_trove_service(flow_descriptor * flow_d)
 	break;
     }
 
+gen_mutex_lock(&queue_mutex);
 gen_mutex_lock(&(PRIVATE_FLOW(flow_d)->mutex));
     /* clean up before returning if the flow completed */
     if (flow_d->state & FLOW_FINISH_MASK)
     {
 	gen_mutex_unlock(&(PRIVATE_FLOW(flow_d)->mutex));
+	qlist_del(&(PRIVATE_FLOW(flow_d)->queue_link));
 	release_flow(flow_d);
     }
     else
     {
 	gen_mutex_unlock(&(PRIVATE_FLOW(flow_d)->mutex));
     }
+gen_mutex_unlock(&queue_mutex);
 
     return (0);
 }
@@ -788,37 +811,45 @@ static void release_flow(flow_descriptor * flow_d)
 {
     struct bmi_trove_flow_data *tmp_data = NULL;
 
-    if (flow_d)
+    assert(flow_d != NULL);
+
+    tmp_data = PRIVATE_FLOW(flow_d);
+    assert(tmp_data != NULL);
+
+    gossip_debug(FLOW_PROTO_DEBUG, "releasing flow (start addr): %p\n",
+	flow_d);
+    gossip_debug(FLOW_PROTO_DEBUG, "releasing flow (end addr): %p\n",
+	((char*)flow_d + sizeof(flow_descriptor)));
+    gossip_debug(FLOW_PROTO_DEBUG, "releasing flow_data (start addr): %p\n",
+	tmp_data);
+    gossip_debug(FLOW_PROTO_DEBUG, "releasing flow_data (end addr): %p\n",
+	((char*)tmp_data + sizeof(struct bmi_trove_flow_data)));
+	
+    switch (tmp_data->type)
     {
-        tmp_data = PRIVATE_FLOW(flow_d);
-        assert(tmp_data);
-
-        switch (tmp_data->type)
-        {
-            case BMI_TO_MEM:
-                buffer_teardown_bmi_to_mem(flow_d);
-                break;
-            case MEM_TO_BMI:
-                buffer_teardown_mem_to_bmi(flow_d);
-                break;
-            case TROVE_TO_BMI:
-                buffer_teardown_trove_to_bmi(flow_d);
-                break;
-            case BMI_TO_TROVE:
-                buffer_teardown_bmi_to_trove(flow_d);
-                break;
-            default:
-                gossip_lerr("Error: Unknown/unimplemented "
-                            "endpoint combination.\n");
-                flow_d->state = FLOW_ERROR;
-                flow_d->error_code = -EINVAL;
-                break;
+	case BMI_TO_MEM:
+	    buffer_teardown_bmi_to_mem(flow_d);
+	    break;
+	case MEM_TO_BMI:
+	    buffer_teardown_mem_to_bmi(flow_d);
+	    break;
+	case TROVE_TO_BMI:
+	    buffer_teardown_trove_to_bmi(flow_d);
+	    break;
+	case BMI_TO_TROVE:
+	    buffer_teardown_bmi_to_trove(flow_d);
+	    break;
+	default:
+	    gossip_lerr("Error: Unknown/unimplemented "
+			"endpoint combination.\n");
+	    flow_d->state = FLOW_ERROR;
+	    flow_d->error_code = -EINVAL;
+	    break;
     }
 
-        /* free flowproto data */
-        free(flow_d->flow_protocol_data);
-        flow_d->flow_protocol_data = NULL;
-    }
+    /* free flowproto data */
+    free(flow_d->flow_protocol_data);
+    flow_d->flow_protocol_data = NULL;
     return;
 }
 
@@ -1978,17 +2009,19 @@ static void bmi_callback(void *user_ptr,
 
     flow_d = bmi_completion(user_ptr, actual_size, error_code);
 
+gen_mutex_lock(&queue_mutex);
 gen_mutex_lock(&(PRIVATE_FLOW(flow_d)->mutex));
     /* put flows into done_checking_queue if needed */
     if (flow_d->state & FLOW_FINISH_MASK ||
 	flow_d->state == FLOW_SVC_READY)
     {
-gen_mutex_lock(&done_checking_queue_mutex);
+	gossip_ldebug(FLOW_PROTO_DEBUG, "adding %p to queue.\n", flow_d);
+	qlist_del(&(PRIVATE_FLOW(flow_d)->queue_link));
 	qlist_add_tail(&(PRIVATE_FLOW(flow_d)->queue_link),
 		       &done_checking_queue);
-gen_mutex_unlock(&done_checking_queue_mutex);
     }
 gen_mutex_unlock(&(PRIVATE_FLOW(flow_d)->mutex));
+gen_mutex_unlock(&queue_mutex);
 
     /* wake up anyone who may be sleeping in checkworld */
 #ifdef __PVFS2_JOB_THREADED__
