@@ -32,6 +32,8 @@ int main(int argc, char **argv)
 	PINT_Request_result seg1;
 	int32_t* len_array = NULL;
 	PVFS_offset* off_array = NULL;
+	PVFS_size total_bytes_client = 0;
+	PVFS_size total_bytes_server = 0;
 
 	/* PVFS_Process_request arguments */
 	int retval;
@@ -102,6 +104,7 @@ int main(int argc, char **argv)
 		{
 			printf("results of PINT_Process_request():\n");
 			printf("%d segments with %lld bytes\n", seg1.segs, seg1.bytes);
+			total_bytes_client += seg1.bytes;
 			for(i=0; i<seg1.segs; i++)
 			{
 				printf("  segment %d: offset: %d size: %d\n",
@@ -134,6 +137,7 @@ int main(int argc, char **argv)
 		{
 			printf("results of PINT_Process_request():\n");
 			printf("%d segments with %lld bytes\n", seg1.segs, seg1.bytes);
+			total_bytes_server += seg1.bytes;
 			for(i=0; i<seg1.segs; i++)
 			{
 				printf("  segment %d: offset: %d size: %d\n",
@@ -151,6 +155,18 @@ int main(int argc, char **argv)
 	if(PINT_REQUEST_DONE(file_state_server))
 	{
 		printf("**** request done.\n");
+	}
+
+	printf("total bytes processed on client side: %Ld\n", (long long)total_bytes_client);
+	printf("total bytes processed on server side: %Ld\n", (long long)total_bytes_server);
+
+	if(total_bytes_client == total_bytes_server)
+	{
+	    printf("SUCCESS.\n");
+	}
+	else
+	{
+	    printf("FAILURE!!!\n");
 	}
 
 	return 0;
