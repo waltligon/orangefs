@@ -163,6 +163,61 @@ int main(int argc, char **argv)
 
 	PVFS_Request_hindexed(64, len_array, disp_array, r, &r1);
 
+	/* set up request state */
+	rs1 = PINT_New_request_state(r1);
+
+	/* set up file data for request */
+	rf1.iod_num = 0;
+	rf1.iod_count = 2;
+	rf1.fsize = 508;
+	rf1.dist = PVFS_Dist_create("simple_stripe");
+	rf1.extend_flag = 1;
+	PINT_Dist_lookup(rf1.dist);
+
+	/* set up result struct */
+	seg1.offset_array = (int64_t *)malloc(SEGMAX * sizeof(int64_t));
+	seg1.size_array = (int64_t *)malloc(SEGMAX * sizeof(int64_t));
+	seg1.bytemax = BYTEMAX;
+	seg1.segmax = SEGMAX;
+	seg1.bytes = 0;
+	seg1.segs = 0;
+		
+	printf("\n************************************\n");
+	do
+	{
+		seg1.bytes = 0;
+		seg1.segs = 0;
+
+		/* process request */
+		retval = PINT_Process_request(rs1, NULL, &rf1, &seg1, PINT_CKSIZE_MODIFY_OFFSET);
+
+		if(retval >= 0)
+		{
+			printf("results of PINT_Process_request():\n");
+			printf("%d segments with %lld bytes\n", seg1.segs, seg1.bytes);
+#if 0
+			for(i=0; i<seg1.segs; i++)
+			{
+				printf("  segment %d: offset: %d size: %d\n",
+					i, (int)seg1.offset_array[i], (int)seg1.size_array[i]);
+			}
+#endif
+		}
+
+	} while(!PINT_REQUEST_DONE(rs1) && retval >= 0);
+	
+	if(retval < 0)
+	{
+		fprintf(stderr, "Error: PINT_Process_request() failure.\n");
+		return(-1);
+	}
+	if(PINT_REQUEST_DONE(rs1))
+	{
+		printf("**** request done.\n");
+	}
+
+
+
 	/* allocate a new request and pack the original one into it */
 	pack_size = PINT_REQUEST_PACK_SIZE(r1);
 	fprintf(stderr, "pack size is %d\n",pack_size);
