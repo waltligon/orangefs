@@ -1,0 +1,85 @@
+#
+# Makefile stub for bmi_ib.
+#
+# Copyright (C) 2003 Pete Wyckoff <pw@osc.edu>
+#
+# See COPYING in top-level directory.
+#
+# $Id: module.mk.in,v 1.1 2003-08-26 19:07:14 pw Exp $
+#
+
+# only do any of this if configure decided to use IB
+ifdef BUILD_IB
+
+# local definitions
+subdir := src/io/bmi/bmi_ib
+bmi_ib_src := $(patsubst %,$(subdir)/%,ib.c setup.c util.c)
+bmi_ib_obj := $(bmi_ib_src:.c=.o)
+bmi_ib_dep := $(bmi_ib_src:.c=.d)
+
+# Feed these to the controlling makefile, a bit convoluted since
+# this file does not really exist, but the rules below cause the
+# predicted .o to be generated.
+LIBSRC    += $(subdir)/bmi_ib.c
+SERVERSRC += $(subdir)/bmi_ib.c
+PRIVATEDEPENDS += $(bmi_ib_dep)
+
+$(subdir)/bmi_ib-server.o: $(subdir)/bmi_ib.o
+	test -e $@ || ln -s $(notdir $<) $@
+
+$(subdir)/bmi_ib.o: $(bmi_ib_obj)
+	ld -r -o $@ $^
+
+# make sure this gets pulled into libpvfs
+LIBSRC += $(subdir)/../bmi_tcp/sockio.c
+
+# delete our internal .o files too
+CLEANFILES += $(bmi_ib_obj) $(bmi_ib_dep)
+
+# minimal cflags, removing the million include paths auto-generated from MODULES
+bmi_ib_bad_mod_inc := $(patsubst %, -I $(srcdir)/%, $(MODULES))
+bmi_ib_cflags := $(patsubst $(bmi_ib_bad_mod_inc),,$(CFLAGS))
+# Now add back include directories required by included files which include
+# other files without explicit paths.
+bmi_ib_cflags += -Isrc/common/quicklist
+bmi_ib_cflags += -Isrc/common/id-generator
+bmi_ib_cflags += -Isrc/io/bmi
+# And finally the IB_HOME defined from configure and some flags.
+bmi_ib_cflags += -I@IB_HOME@/include
+bmi_ib_cflags += -fno-common
+bmi_ib_cflags += -Werror -Wall -W -Wpointer-arith
+bmi_ib_cflags += -Wcast-align -Wcast-qual -Wbad-function-cast
+bmi_ib_cflags += -Wmissing-prototypes -Wmissing-declarations
+bmi_ib_cflags += -Wnested-externs
+bmi_ib_cflags += -Wshadow -Wstrict-prototypes -Wredundant-decls
+# Do not use these, because mellanox writes bad code:
+#   -Wundef -Wwrite-strings
+# This one gives too many false positives:
+#   -Wconversion
+
+#
+# The value for IBCFLAGS comes from top-level Makefile.in which gets
+# it from configure-time path given by --with-ib=PATH.  No need to
+# expose that directory to the rest of the pvfs2 compile.
+#
+$(bmi_ib_obj): %.o: %.c
+ifdef QUIET_COMPILE
+	@echo "  CC		$@"
+	@$(CC) $(IBCFLAGS) $(LIBCFLAGS) $(bmi_ib_cflags) $< -c -o $@
+else
+	$(CC) $(IBCFLAGS) $(LIBCFLAGS) $(bmi_ib_cflags) $< -c -o $@
+endif
+
+$(bmi_ib_dep): %.d: %.c
+ifdef QUIET_COMPILE
+	@echo "  DEP		$@"
+else
+	@echo generating ib dependency file $@
+endif
+	@$(srcdir)/maint/depend.sh `dirname $*` $(bmi_ib_cflags) $< > $@
+
+# just to satisfy DEPENDS, not really used
+$(subdir)/bmi_ib.d:
+	@echo $(subdir)/bmi_ib.c: $(bmi_ib_src) >> $@
+
+endif  # BUILD_IB
