@@ -107,8 +107,16 @@ int main(int argc, char **argv)
 	return -1;
     }
 
-    create_lost_and_found(cur_fs,
-			  &creds);
+    ret = create_lost_and_found(cur_fs,
+				&creds);
+    if (ret != 0) {
+	if (ret == -PVFS_EAGAIN) {
+	    printf("Failed to create lost+found: likely the system is "
+		   "already in admin mode.  Use pvfs2-set-mode to change "
+		   "back to normal mode prior to running pvfs2-fsck.\n");
+	}
+	return -1;
+    }
 
     /* put the servers into administrative mode */
     ret = PVFS_mgmt_setparam_list(cur_fs,
@@ -956,9 +964,8 @@ int create_lost_and_found(PVFS_fs_id cur_fs,
     else {
 	ret = 0;
     }
-    assert(ret == 0);
 		   
-    return 0;
+    return ret;
 }
 
 int create_dirent(PVFS_object_ref dir_ref,
@@ -974,7 +981,14 @@ int create_dirent(PVFS_object_ref dir_ref,
 	   Lu(handle),
 	   Lu(dir_ref.handle));
 
-    return 0;
+    if (fsck_opts->destructive) {
+	ret = 0;
+    }
+    else {
+	ret = 0;
+    }
+
+    return ret;
 }
 
 int remove_directory_entry(PVFS_object_ref dir_ref,
