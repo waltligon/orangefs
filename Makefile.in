@@ -556,11 +556,13 @@ cscope:
 		 > $(srcdir)/cscope.files
 	( cd $(srcdir); cscope -be -i $(srcdir)/cscope.files )
 
-# build editor tags file over just the modules of interest
+# build editor tags file over all source files *.[ch] *.sm and
+# some known scripts
 tags:
-	find $(addprefix $(srcdir)/,$(MODULES)) $(srcdir)/include . \
-	  -maxdepth 1 -name '*.[ch]' -o -name '*.sm' |\
-	  ctags --excmd=pattern -B --langmap=c:+.sm -I __hidden,DOTCONF_CB -L-
+	( find $(addprefix $(srcdir)/,$(MODULES)) $(srcdir)/include . \
+	    -maxdepth 1 -name '*.[ch]' -o -name '*.sm' ;\
+	  echo $(srcdir)/src/apps/admin/pvfs2-genconfig \
+	) | ctags --excmd=pattern -B --langmap=c:+.sm -I __hidden,DOTCONF_CB -L-
 
 # rule for running code check
 codecheck:
