@@ -191,7 +191,6 @@ int main(int argc, char **argv)	{
 		return(-1);
 	}
 
-	printf("Act size: %d\n",(int)actual_size);
 	dec_ack = bar.buffer;
 	if(dec_ack->op != PVFS_SERV_IO)
 	{
@@ -217,6 +216,7 @@ int main(int argc, char **argv)	{
 	/* turn off debugging stuff */
 	gossip_disable();
 
+	free(my_ack);
 	free(user_opts->hostid);
 	free(user_opts->method);
 	free(user_opts);
