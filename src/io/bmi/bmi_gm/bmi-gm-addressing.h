@@ -23,8 +23,6 @@
 
 /* mask of ports that are off limits to user applications (see GM FAQ) */
 #define BMI_GM_MAX_PORTS 8
-static unsigned int bmi_gm_reserved_ports[BMI_GM_MAX_PORTS] = 
-    {1,1,0,1,0,0,0,0};
 
 /* TODO: this should be configurable */
 #define BMI_GM_UNIT_NUM  0

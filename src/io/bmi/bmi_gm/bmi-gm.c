@@ -30,6 +30,8 @@
 #endif
 
 static gen_mutex_t interface_mutex = GEN_MUTEX_INITIALIZER;
+static unsigned int bmi_gm_reserved_ports[BMI_GM_MAX_PORTS] = 
+    {1,1,0,1,0,0,0,0};
 
 /* function prototypes */
 int BMI_gm_initialize(method_addr_p listen_addr,
