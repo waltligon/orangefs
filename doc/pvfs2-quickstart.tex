@@ -177,6 +177,8 @@ In this simple configuration, we can accept the default options for every
 field.  We will use the hostname ``testhost'' rather than ``localhost'' however.
 
 \begin{verbatim}
+root@testhost:~# /usr/bin/pvfs2-genconfig  \
+	/etc/pvfs2-fs.conf /etc/pvfs2-server.conf
 **********************************************************************
 	Welcome to the PVFS2 Configuration Generator:
 
@@ -254,7 +256,7 @@ you may run the server as follows:
 
 \begin{verbatim}
 bash-2.05b# /usr/sbin/pvfs2-server /etc/pvfs2-fs.conf \
-	/etc/pvfs2-server.conf -d
+	/etc/pvfs2-server.conf-testhost -d
 \end{verbatim}
 
 \subsubsection{Automatic server startup and shutdown}
