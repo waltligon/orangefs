@@ -185,6 +185,7 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, PVFS_sysresp_init *resp)
 	case BMI_INIT_FAIL:
 	case NONE_INIT_FAIL:
 	    /* nothing to do for either of these */
+	    break;
     }
     return(ret);
 }
