@@ -37,40 +37,40 @@ int initialize_sysint(void)
 }
 
 /*
- * helper function to get the root handle
+ * helper function to fill in the root pinode_refn
  * fs_id:   fsid of our file system
  *
- * returns:  handle to the root directory
+ * returns:  0 on success; 
  *      -1 if a problem
  */
-
-PVFS_handle get_root(PVFS_fs_id fs_id)
+int get_root(PVFS_fs_id fs_id, PVFS_pinode_reference *pinode_refn)
 {
     int ret = -1;
     PVFS_credentials credentials;
     PVFS_sysresp_lookup resp_look;
 
-    memset(&resp_look, 0, sizeof(resp_look));
-
-    credentials.perms = 1877;
-    printf("looking up the root handle for fsid = %d\n", fs_id);
-    ret = PVFS_sys_lookup(fs_id, "/", credentials, &resp_look);
-    if (ret < 0)
+    if (pinode_refn)
     {
-        printf("Lookup failed with errcode = %d\n", ret);
-        return (-1);
+        memset(&resp_look, 0, sizeof(resp_look));
+
+        credentials.uid = 100;
+        credentials.gid = 100;
+        credentials.perms = 1877;
+
+        printf("looking up the root handle for fsid = %d\n", fs_id);
+        ret = PVFS_sys_lookup(fs_id, "/", credentials, &resp_look);
+        if (ret < 0)
+        {
+            printf("Lookup failed with errcode = %d\n", ret);
+        }
+        memcpy(pinode_refn, &resp_look.pinode_refn,
+               sizeof(PVFS_pinode_reference));
     }
-    return (PVFS_handle) resp_look.pinode_refn.handle;
+    return ret;
 }
 
-/*
- * simple helper to make a pvfs2 directory
- *
- * returns a handle to the new directory
- *          -1 if some error happened
- */
-PVFS_handle create_dir(PVFS_pinode_reference parent_refn,
-                       PVFS_fs_id fs_id, char *name)
+int create_dir(PVFS_pinode_reference parent_refn, char *name,
+               PVFS_pinode_reference *out_refn)
 {
     int ret = -1;
     uint32_t attrmask;
@@ -80,7 +80,7 @@ PVFS_handle create_dir(PVFS_pinode_reference parent_refn,
 
     memset(&resp_mkdir, 0, sizeof(resp_mkdir));
 
-    attrmask = PVFS_ATTR_SYS_ALL_NOSIZE;
+    attrmask = (PVFS_ATTR_SYS_UID | PVFS_ATTR_SYS_GID | PVFS_ATTR_SYS_PERM);
     attr.owner = 100;
     attr.group = 100;
     attr.perms = 1877;
@@ -97,7 +97,12 @@ PVFS_handle create_dir(PVFS_pinode_reference parent_refn,
         printf("mkdir failed\n");
         return (-1);
     }
-    return (PVFS_handle) resp_mkdir.pinode_refn.handle;
+    if (out_refn)
+    {
+        memcpy(out_refn, &resp_mkdir.pinode_refn,
+               sizeof(PVFS_pinode_reference));
+    }
+    return 0;
 }
 
 /*
@@ -106,8 +111,7 @@ PVFS_handle create_dir(PVFS_pinode_reference parent_refn,
  * returns 0 on success.
  *          -1 if some error happened.
  */
-int remove_file(PVFS_pinode_reference parent_refn,
-                PVFS_fs_id fs_id, char *name)
+int remove_file(PVFS_pinode_reference parent_refn, char *name)
 {
     int ret = -1;
     PVFS_credentials credentials;
@@ -131,10 +135,9 @@ int remove_file(PVFS_pinode_reference parent_refn,
  * returns 0 on success.
  *          -1 if some error happened.
  */
-int remove_dir(PVFS_pinode_reference parent_refn,
-               PVFS_fs_id fs_id, char *name)
+int remove_dir(PVFS_pinode_reference parent_refn, char *name)
 {
-    return remove_file(parent_refn,fs_id,name);
+    return remove_file(parent_refn, name);
 }
 
 /*
@@ -143,7 +146,8 @@ int remove_dir(PVFS_pinode_reference parent_refn,
  * returns a handle to the new directory
  *          -1 if some error happened
  */
-PVFS_handle lookup_name(char *name, PVFS_fs_id fs_id)
+int lookup_name(PVFS_pinode_reference pinode_refn, char *name,
+                PVFS_pinode_reference *out_refn)
 {
     int ret = -1;
     PVFS_credentials credentials;
@@ -155,11 +159,17 @@ PVFS_handle lookup_name(char *name, PVFS_fs_id fs_id)
     credentials.gid = 100;
     credentials.perms = (PVFS_U_WRITE | PVFS_U_READ);
 
-    ret = PVFS_sys_lookup(fs_id, name, credentials, &resp_lookup);
+    ret = PVFS_sys_lookup(pinode_refn.fs_id, name,
+                          credentials, &resp_lookup);
     if (ret < 0)
     {
        printf("Lookup failed with errcode = %d\n", ret);
        return(-1);
     }
-    return (PVFS_handle) resp_lookup.pinode_refn.handle;
+    if (out_refn)
+    {
+        memcpy(out_refn, &resp_lookup.pinode_refn,
+               sizeof(PVFS_pinode_reference));
+    }
+    return 0;
 }

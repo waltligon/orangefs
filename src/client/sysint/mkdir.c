@@ -128,7 +128,7 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
     op_tag = get_next_session_tag();
 
     ret = PINT_send_req(serv_addr1, &req_p, max_msg_sz,
-	&decoded, &encoded_resp, op_tag);
+                        &decoded, &encoded_resp, op_tag);
     if (ret < 0)
     {
 	failure = LOOKUP_SERVER_FAILURE;
@@ -193,7 +193,7 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
     op_tag = get_next_session_tag();
     /* Make server request */
     ret = PINT_send_req(serv_addr2, &req_p, max_msg_sz,
-	&decoded, &encoded_resp, op_tag);
+                        &decoded, &encoded_resp, op_tag);
     if (ret < 0)
     {
 	failure = MKDIR_MSG_FAILURE;
@@ -214,7 +214,7 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
     }
 
     PINT_release_req(serv_addr2, &req_p, max_msg_sz, &decoded,
-	&encoded_resp, op_tag);
+                     &encoded_resp, op_tag);
 
     /* add the new directory to the dcache and pinode caches */
     ret = PINT_dcache_insert(entry_name, entry, parent_refn);
@@ -284,16 +284,20 @@ return_error:
 	    max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
 	    op_tag = get_next_session_tag();
 	    ret = PINT_send_req(serv_addr1, &req_p, max_msg_sz,
-		&decoded, &encoded_resp, op_tag);
-	    PINT_release_req(serv_addr1, &req_p, max_msg_sz, &decoded,
-		&encoded_resp, op_tag);
+                                &decoded, &encoded_resp, op_tag);
+
+            PINT_release_req(serv_addr1, &req_p, max_msg_sz, &decoded,
+                             &encoded_resp, op_tag);
+            decoded.buffer = NULL;
 
 	case MKDIR_MSG_FAILURE:
 	    gossip_ldebug(CLIENT_DEBUG,"MKDIR_MSG_FAILURE\n");
 	    /*op_tag should still be valid if the pointer is non-null*/
 	    if (decoded.buffer != NULL)
+            {
 		PINT_release_req(serv_addr1, &req_p, max_msg_sz, &decoded,
-		    &encoded_resp, op_tag);
+                                 &encoded_resp, op_tag);
+            }
 
 	case LOOKUP_SERVER_FAILURE:
 	    gossip_ldebug(CLIENT_DEBUG,"LOOKUP_SERVER_FAILURE\n");

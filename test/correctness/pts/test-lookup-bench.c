@@ -16,32 +16,23 @@ extern int parse_pvfstab(char *filename,
 /*
  * simple helper to lookup a handle given a filename
  *
- * parent:   handle of parent directory
- * fs_id:    fsid of filesystem on which parent dir exists
- * name:     name of directory to create
- *
  * returns a handle to the new directory
  *          -1 if some error happened
  */
-PVFS_handle lookup_name(char *name,
-		       PVFS_fs_id fs_id)
+static PVFS_handle simple_lookup_name(char *name,
+                                      PVFS_fs_id fs_id)
 {
-    PVFS_sysreq_lookup req_lookup;
+    int ret = -1;
+    PVFS_credentials credentials;
     PVFS_sysresp_lookup resp_lookup;
 
-    int ret = -1;
+    memset(&resp_lookup, 0, sizeof(resp_lookup));
 
-    memset(&req_lookup, 0, sizeof(req_lookup));
-    memset(&resp_lookup, 0, sizeof(req_lookup));
+    credentials.uid = 100;
+    credentials.gid = 100;
+    credentials.perms = (PVFS_U_WRITE | PVFS_U_READ);
 
-
-    req_lookup.name = name;
-    req_lookup.fs_id = fs_id;
-    req_lookup.credentials.uid = 100;
-    req_lookup.credentials.gid = 100;
-    req_lookup.credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
-
-    ret = PVFS_sys_lookup(&req_lookup,&resp_lookup);
+    ret = PVFS_sys_lookup(fs_id, name, credentials, &resp_lookup);
     if (ret < 0)
     {
        printf("Lookup failed with errcode = %d\n", ret);
@@ -51,23 +42,17 @@ PVFS_handle lookup_name(char *name,
     return (PVFS_handle) resp_lookup.pinode_refn.handle;
 }
 
-/*
- * handle:  handle of parent directory
- * fs_id:   our file system
- * depth:   how many directories to make at this level
- * rank:    rank in the mpi process group 
- */
-
-int do_create_lookup(PVFS_handle handle,
-			 PVFS_fs_id fs_id,
-			 int depth,
-			 int ndirs,
-			 int rank)
+int do_create_lookup(PVFS_pinode_reference parent_refn,
+                     PVFS_fs_id fs_id,
+                     int depth,
+                     int ndirs,
+                     int rank)
 {
     int i;
     char name[PVFS_NAME_MAX];
     char path[PVFS_NAME_MAX]; /*same as name except it has a slash prepending the path*/
     PVFS_handle dir_handle, lookup_handle;
+    PVFS_pinode_reference out_refn;
     double before, after, running_total = 0, max=0.0, min = 10000.0, total = 0, current;
 
     /* base case: we've gone far enough */
@@ -78,14 +63,14 @@ int do_create_lookup(PVFS_handle handle,
     {
 	snprintf(name, PVFS_NAME_MAX, "depth=%d-rank=%d-iter=%d", depth, rank, i);
 	snprintf(path, PVFS_NAME_MAX, "/%s", name);
-	dir_handle = create_dir(handle, fs_id, name);
-	if (dir_handle < 0)
+	create_dir(parent_refn, name, &out_refn);
+	if (out_refn.handle < 0)
 	{
 	    return -1;
 	}
 	/* lookup the directory we just created */
 	before = MPI_Wtime();
-	lookup_handle = lookup_name(path, fs_id);
+	lookup_handle = simple_lookup_name(path, fs_id);
 	after = MPI_Wtime();
 	if (lookup_handle != dir_handle)
 	    return -1;
@@ -125,7 +110,7 @@ int test_lookup_bench(MPI_Comm * comm,
 {
     int ret = -1;
     PVFS_fs_id fs_id;
-    PVFS_handle root_handle;
+    PVFS_pinode_reference root_refn;
     generic_params *myparams = (generic_params *) rawparams;
     int nerrs = 0;
     PVFS_sysresp_init resp_init;
@@ -160,10 +145,16 @@ int test_lookup_bench(MPI_Comm * comm,
 	    return (fs_id);
 	}
 
-	root_handle = get_root(fs_id);
+        ret = get_root(fs_id, &root_refn);
+	if (ret < 0)
+        {
+	    printf("failed to get root pinode refn: errcode = %d\n", ret);
+	    return (-1);
+        }
 
 	/* this will make n directories and look up each */
-	nerrs = do_create_lookup(root_handle, fs_id, myparams->mode, myparams->mode, rank);
+	nerrs = do_create_lookup(root_refn, fs_id, myparams->mode,
+                                 myparams->mode, rank);
 
 	ret = PVFS_sys_finalize();
 	if (ret < 0)
@@ -172,7 +163,6 @@ int test_lookup_bench(MPI_Comm * comm,
 	    return (-1);
 	}
     }
-
     return -nerrs;
 }
 

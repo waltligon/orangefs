@@ -27,7 +27,7 @@
  * returns 0 on success, -errno on failure
  */
 int PVFS_sys_remove(char* entry_name, PVFS_pinode_reference parent_refn, 
-                        PVFS_credentials credentials)
+                    PVFS_credentials credentials)
 {
 	struct PVFS_server_req_s req_p;		    /* server request */
 	struct PVFS_server_resp_s *ack_p = NULL;    /* server response */

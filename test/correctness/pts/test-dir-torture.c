@@ -60,23 +60,28 @@ int recursive_create_dir(PVFS_handle handle,
 {
     int i;
     char name[PVFS_NAME_MAX];
-    PVFS_handle dir_handle;
+    PVFS_pinode_reference refn;
+    PVFS_pinode_reference out_refn;
 
     /* base case: we've gone far enough */
     if (depth == 0)
 	return 0;
 
+    refn.handle = handle;
+    refn.fs_id = fs_id;
+
     for (i = 0; i < ndirs; i++)
     {
 	snprintf(name, PVFS_NAME_MAX, "depth=%d-rank=%d-iter=%d", depth, rank, i);
-	dir_handle = create_dir(handle, fs_id, name);
-	if (dir_handle < 0)
+	create_dir(refn, name, &out_refn);
+	if (out_refn.handle < 0)
 	{
 	    return -1;
 	}
 	else
 	{
-	    recursive_create_dir(dir_handle, fs_id, depth - 1, ndirs, rank);
+	    recursive_create_dir(out_refn.handle, out_refn.fs_id,
+                                 depth - 1, ndirs, rank);
 	}
     }
     return 0;
@@ -100,7 +105,7 @@ int test_dir_torture(MPI_Comm * comm,
 {
     int ret = -1;
     PVFS_fs_id fs_id;
-    PVFS_handle root_handle;
+    PVFS_pinode_reference root_refn;
     generic_params *myparams = (generic_params *) rawparams;
     int nerrs = 0;
 
@@ -111,10 +116,14 @@ int test_dir_torture(MPI_Comm * comm,
 	return (fs_id);
     }
 
-    root_handle = get_root(fs_id);
+    get_root(fs_id, &root_refn);
 
-    /* this will make n^n directories, so be careful about running the test with mode=100 */
-    nerrs = recursive_create_dir(root_handle, fs_id, myparams->mode, myparams->mode, rank);
+    /*
+      this will make n^n directories, so be careful
+      about running the test with mode=100
+    */
+    nerrs = recursive_create_dir(root_refn.handle, root_refn.fs_id,
+                                 myparams->mode, myparams->mode, rank);
 
     ret = PVFS_sys_finalize();
     if (ret < 0)

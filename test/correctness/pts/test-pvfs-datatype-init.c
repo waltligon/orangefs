@@ -10,9 +10,10 @@ extern pvfs_helper_t pvfs_helper;
 int test_pvfs_datatype_init(MPI_Comm *mycomm, int myid, char *buf, void *params)
 {
     int ret = -1, i = 0, num_test_files_ok;
-    PVFS_sysreq_lookup req_lk;
+    uint32_t attrmask;
+    PVFS_object_attr attr;
+    PVFS_credentials credentials;
     PVFS_sysresp_lookup resp_lk;
-    PVFS_sysreq_create req_cr;
     PVFS_sysresp_create resp_cr;
     generic_params *args = (generic_params *)params;
     char filename[MAX_TEST_PATH_LEN];
@@ -31,6 +32,10 @@ int test_pvfs_datatype_init(MPI_Comm *mycomm, int myid, char *buf, void *params)
                      args->mode);
     }
 
+    credentials.uid = 100;
+    credentials.gid = 100;
+    credentials.perms = (PVFS_U_WRITE | PVFS_U_READ);
+
     /*
       verify that all test files exist.  it's okay if they
       don't exist as we'll try to create them.
@@ -47,26 +52,15 @@ int test_pvfs_datatype_init(MPI_Comm *mycomm, int myid, char *buf, void *params)
         snprintf(filename,MAX_TEST_PATH_LEN,"%s%.5drank%d",
                  TEST_FILE_PREFIX,i,myid);
 
-        memset(&req_lk,0,sizeof(PVFS_sysreq_lookup));
-        req_lk.name = filename;
-        req_lk.fs_id = pvfs_helper.resp_init.fsid_list[0];
-        req_lk.credentials.uid = 100;
-        req_lk.credentials.gid = 100;
-        req_lk.credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
-
-        ret = PVFS_sys_lookup(&req_lk, &resp_lk);
+        ret = PVFS_sys_lookup(pvfs_helper.resp_init.fsid_list[0],
+                              filename, credentials, &resp_lk);
         if (ret < 0)
         {
             debug_printf("init: lookup failed.  creating new file.\n");
 
             /* get root handle */
-            req_lk.name = "/";
-            req_lk.fs_id = pvfs_helper.resp_init.fsid_list[0];
-            req_lk.credentials.uid = 100;
-            req_lk.credentials.gid = 100;
-            req_lk.credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
-
-            ret = PVFS_sys_lookup(&req_lk, &resp_lk);
+            ret = PVFS_sys_lookup(pvfs_helper.resp_init.fsid_list[0],
+                                  "/", credentials, &resp_lk);
             if ((ret < 0) || (!resp_lk.pinode_refn.handle))
             {
                 debug_printf("Error: PVFS_sys_lookup() failed to find "
@@ -74,27 +68,23 @@ int test_pvfs_datatype_init(MPI_Comm *mycomm, int myid, char *buf, void *params)
                 break;
             }
 
-            /* skip leading slash */
-            req_cr.entry_name = &(filename[1]);
-            req_cr.attrmask = (ATTR_UID | ATTR_GID | ATTR_PERM);
-            req_cr.attr.owner = 100;
-            req_cr.attr.group = 100;
-            req_cr.attr.perms = PVFS_U_WRITE|PVFS_U_READ;
-            req_cr.credentials.uid = 100;
-            req_cr.credentials.gid = 100;
-            req_cr.credentials.perms = PVFS_U_WRITE|PVFS_U_READ;
-            req_cr.attr.u.meta.dist = NULL;
-            req_cr.attr.u.meta.nr_datafiles = 1;
-            req_cr.parent_refn.handle = resp_lk.pinode_refn.handle;
-            req_cr.parent_refn.fs_id = req_lk.fs_id;
 
-            ret = PVFS_sys_create(&req_cr, &resp_cr);
+            attrmask = PVFS_ATTR_SYS_ALL_NOSIZE;
+            attr.owner = 100;
+            attr.group = 100;
+            attr.perms = 1877;
+            attr.objtype = PVFS_TYPE_METAFILE;
+            attr.u.meta.dist = NULL;
+            attr.u.meta.nr_datafiles = 1;
+
+            ret = PVFS_sys_create(&(filename[1]),resp_lk.pinode_refn,
+                                  attrmask, attr, credentials, &resp_cr);
             if ((ret < 0) || (!resp_cr.pinode_refn.handle))
             {
                 debug_printf("Error: PVFS_sys_create() failure.\n");
                 break;
             }
-            debug_printf("Created file %s\n",req_cr.entry_name);
+            debug_printf("Created file %s\n",&(filename[1]));
             debug_printf("Got handle %Ld.\n",resp_cr.pinode_refn.handle);
             num_test_files_ok++;
         }
