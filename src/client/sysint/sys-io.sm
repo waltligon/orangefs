@@ -53,40 +53,40 @@ static int io_find_target_datafiles(
     int *handle_index_array,
     int *handle_count_out_p);
 
-#define CLEAN_PRIVATE_MEMBERS(iosm_p)       \
-do {                                        \
-    if (iosm_p->datafile_index_array)       \
-    {                                       \
-        free(iosm_p->datafile_index_array); \
-        iosm_p->datafile_index_array = NULL;\
-    }                                       \
-    if (sm_p->msgarray &&                   \
-        (sm_p->msgarray != &sm_p->msgpair)) \
-    {                                       \
-        free(sm_p->msgarray);               \
-        sm_p->msgarray = NULL;              \
-        sm_p->msgarray_count = 0;           \
-    }                                       \
-    if (iosm_p->flow_array)                 \
-    {                                       \
-        free(iosm_p->flow_array);           \
-        iosm_p->flow_array = NULL;          \
-    }                                       \
-    if (iosm_p->flow_status_array)          \
-    {                                       \
-        free(iosm_p->flow_status_array);    \
-        iosm_p->flow_status_array = NULL;   \
-    }                                       \
-    if (iosm_p->session_tag_array)          \
-    {                                       \
-        free(iosm_p->session_tag_array);    \
-        iosm_p->session_tag_array = NULL;   \
-    }                                       \
-    if (iosm_p->ackarray)                   \
-    {                                       \
-        free(iosm_p->ackarray);             \
-        iosm_p->ackarray = NULL;            \
-    }                                       \
+#define CLEAN_PRIVATE_MEMBERS(iosm)        \
+do {                                       \
+    if (iosm.datafile_index_array)         \
+    {                                      \
+        free(iosm.datafile_index_array);   \
+        iosm.datafile_index_array = NULL;  \
+    }                                      \
+    if (sm_p->msgarray &&                  \
+        (sm_p->msgarray != &sm_p->msgpair))\
+    {                                      \
+        free(sm_p->msgarray);              \
+        sm_p->msgarray = NULL;             \
+        sm_p->msgarray_count = 0;          \
+    }                                      \
+    if (iosm.flow_array)                   \
+    {                                      \
+        free(iosm.flow_array);             \
+        iosm.flow_array = NULL;            \
+    }                                      \
+    if (iosm.flow_status_array)            \
+    {                                      \
+        free(iosm.flow_status_array);      \
+        iosm.flow_status_array = NULL;     \
+    }                                      \
+    if (iosm.session_tag_array)            \
+    {                                      \
+        free(iosm.session_tag_array);      \
+        iosm.session_tag_array = NULL;     \
+    }                                      \
+    if (iosm.ackarray)                     \
+    {                                      \
+        free(iosm.ackarray);               \
+        iosm.ackarray = NULL;              \
+    }                                      \
 } while(0)
 
 %%
@@ -227,12 +227,10 @@ int PVFS_isys_io(
     sm_p->u.io.encoding = cur_fs->encoding;
     sm_p->u.io.stored_error_code = 0;
     sm_p->u.io.retry_count = 0;
-    sm_p->u.io.datafile_handles = NULL;
-    sm_p->u.io.datafile_index_array = NULL;
     sm_p->msgarray = NULL;
-    sm_p->u.io.dist_p = NULL;
-    sm_p->u.io.dist_size = 0;
+    sm_p->u.io.datafile_index_array = NULL;
     sm_p->u.io.datafile_handles = NULL;
+    sm_p->u.io.orig_datafile_count = 0;
     sm_p->u.io.datafile_count = 0;
     sm_p->u.io.flow_array = NULL;
     sm_p->u.io.flow_status_array = NULL;
@@ -331,8 +329,6 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
     int ret = -PVFS_EINVAL, i = 0;
     int target_datafile_count = 0;
     PVFS_object_attr *attr = NULL;
-    PVFS_handle *target_datafile_array = NULL;
-    struct PINT_client_io_sm *iosm_p = &sm_p->u.io;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: "
                  "io_datafile_setup_msgpairs\n", sm_p);
@@ -368,75 +364,57 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
             return 1;
     }
 
-    /*
-      assign internal io ptrs for convenience here (without copying)
-      if unassigned
-    */
-    if (!sm_p->u.io.dist_p)
-    {
-        sm_p->u.io.dist_p = attr->u.meta.dist;
-    }
-    if (!sm_p->u.io.dist_size)
-    {
-        sm_p->u.io.dist_size = attr->u.meta.dist_size;
-    }
-    if (!sm_p->u.io.datafile_handles)
-    {
-        sm_p->u.io.datafile_handles = attr->u.meta.dfile_array;
-    }
-    if (!sm_p->u.io.datafile_count)
-    {
-        sm_p->u.io.datafile_count = attr->u.meta.dfile_count;
-    }
-
-    ret = PINT_dist_lookup(iosm_p->dist_p);
+    ret = PINT_dist_lookup(attr->u.meta.dist);
     assert(ret == 0);
 
-    if (!target_datafile_array)
+    if (!sm_p->u.io.datafile_handles)
     {
-        target_datafile_array = (PVFS_handle *)malloc(
-            (iosm_p->datafile_count * sizeof(PVFS_handle)));
+        sm_p->u.io.datafile_handles = (PVFS_handle *)malloc(
+            (attr->u.meta.dfile_count * sizeof(PVFS_handle)));
     }
-    if (!target_datafile_array)
+
+    if (!sm_p->u.io.datafile_handles)
     {
         js_p->error_code = -PVFS_ENOMEM;
         return 1;
     }
 
-    if (!iosm_p->datafile_index_array)
+    if (!sm_p->u.io.datafile_index_array)
     {
-        iosm_p->datafile_index_array = (int *)malloc(
-            (iosm_p->datafile_count * sizeof(int)));
-    }
-    if (!iosm_p->datafile_index_array)
-    {
-        goto malloc_error_exit;
+        sm_p->u.io.datafile_index_array = (int *)malloc(
+            (attr->u.meta.dfile_count * sizeof(int)));
+
+        if (!sm_p->u.io.datafile_index_array)
+        {
+            goto malloc_error_exit;
+        }
     }
 
     ret = io_find_target_datafiles(
-        iosm_p->mem_req,
-        iosm_p->file_req,
-        iosm_p->file_req_offset,
-        iosm_p->dist_p,
-        iosm_p->datafile_handles,
-        iosm_p->datafile_count,
-        target_datafile_array,
-        iosm_p->datafile_index_array,
+        sm_p->u.io.mem_req,
+        sm_p->u.io.file_req,
+        sm_p->u.io.file_req_offset,
+        attr->u.meta.dist,
+        attr->u.meta.dfile_array,
+        attr->u.meta.dfile_count,
+        sm_p->u.io.datafile_handles,
+        sm_p->u.io.datafile_index_array,
         &target_datafile_count);
+
     assert(ret == 0);
 
     if (target_datafile_count == 0)
     {
-        if (target_datafile_array)
+        if (sm_p->u.io.datafile_handles)
         {
-            free(target_datafile_array);
-            target_datafile_array = NULL;
+            free(sm_p->u.io.datafile_handles);
+            sm_p->u.io.datafile_handles = NULL;
         }
 
-        if (iosm_p->datafile_index_array)
+        if (sm_p->u.io.datafile_index_array)
         {
-            free(iosm_p->datafile_index_array);
-            iosm_p->datafile_index_array = NULL;
+            free(sm_p->u.io.datafile_index_array);
+            sm_p->u.io.datafile_index_array = NULL;
         }
 
         /* the no data case should be caught earlier than this */
@@ -462,62 +440,62 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
     sm_p->msgarray_count = target_datafile_count;
 
     /* setup flow descriptor array */
-    if (!iosm_p->flow_array)
+    if (!sm_p->u.io.flow_array)
     {
-        iosm_p->flow_array = (flow_descriptor *)malloc(
+        sm_p->u.io.flow_array = (flow_descriptor *)malloc(
             (target_datafile_count * sizeof(flow_descriptor)));
     }
-    if (!iosm_p->flow_array)
+    if (!sm_p->u.io.flow_array)
     {
         goto malloc_error_exit;
     }
-    iosm_p->flow_comp_ct = 0;
+    sm_p->u.io.flow_comp_ct = 0;
 
     /* set each flow descriptor to initial values */
     for(i = 0; i < target_datafile_count; i++)
     {
-        PINT_flow_reset(&iosm_p->flow_array[i]);
+        PINT_flow_reset(&sm_p->u.io.flow_array[i]);
     }
 
     /* setup flow status array */
-    if (!iosm_p->flow_status_array)
+    if (!sm_p->u.io.flow_status_array)
     {
-        iosm_p->flow_status_array = (job_status_s *)malloc(
+        sm_p->u.io.flow_status_array = (job_status_s *)malloc(
             (target_datafile_count * sizeof(job_status_s)));
     }
-    if (!iosm_p->flow_status_array)
+    if (!sm_p->u.io.flow_status_array)
     {
         goto malloc_error_exit;
     }
 
     /* setup session tag array */
-    if (!iosm_p->session_tag_array)
+    if (!sm_p->u.io.session_tag_array)
     {
-        iosm_p->session_tag_array = (PVFS_msg_tag_t *)malloc(
+        sm_p->u.io.session_tag_array = (PVFS_msg_tag_t *)malloc(
             (target_datafile_count * sizeof(PVFS_msg_tag_t)));
     }
-    if (!iosm_p->session_tag_array)
+    if (!sm_p->u.io.session_tag_array)
     {
         goto malloc_error_exit;
     }
 
     /* setup space for final ack if we're doing a write */
-    if (iosm_p->io_type == PVFS_IO_WRITE)
+    if (sm_p->u.io.io_type == PVFS_IO_WRITE)
     {
         /* setup the write acknowledgement array */
-        if (!iosm_p->ackarray)
+        if (!sm_p->u.io.ackarray)
         {
-            iosm_p->ackarray = (PINT_client_sm_recv_state *)malloc(
+            sm_p->u.io.ackarray = (PINT_client_sm_recv_state *)malloc(
                 (target_datafile_count *
                  sizeof(PINT_client_sm_recv_state)));
         }
-        if (!iosm_p->ackarray)
+        if (!sm_p->u.io.ackarray)
         {
             goto malloc_error_exit;
         }
-        memset(iosm_p->ackarray, 0,
+        memset(sm_p->u.io.ackarray, 0,
             target_datafile_count*sizeof(PINT_client_sm_recv_state));
-        iosm_p->ack_comp_ct = 0;
+        sm_p->u.io.ack_comp_ct = 0;
     }
 
     /* fill in all the I/O requests */
@@ -528,37 +506,37 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
         assert(msg_p);
 
         gossip_debug(GOSSIP_IO_DEBUG, "  sending I/O request "
-                     "for %Lu\n", Lu(target_datafile_array[i]));
+                     "for %Lu\n", Lu(sm_p->u.io.datafile_handles[i]));
 
         /* find the original index for the handle */
-        for (orig_index = 0; orig_index < iosm_p->datafile_count;
+        for (orig_index = 0; orig_index < attr->u.meta.dfile_count;
              orig_index++)
         {
-            if (target_datafile_array[i] ==
-                iosm_p->datafile_handles[orig_index])
+            if (sm_p->u.io.datafile_handles[i] ==
+                attr->u.meta.dfile_array[orig_index])
             {
                 break;
             }
         }
-        assert(orig_index < iosm_p->datafile_count);
+        assert(orig_index < attr->u.meta.dfile_count);
 
         PINT_SERVREQ_IO_FILL(
             msg_p->req,
             *sm_p->cred_p,
             sm_p->object_ref.fs_id,
-            target_datafile_array[i],
-            iosm_p->io_type,
-            iosm_p->flowproto_type,
+            sm_p->u.io.datafile_handles[i],
+            sm_p->u.io.io_type,
+            sm_p->u.io.flowproto_type,
             orig_index,
-            iosm_p->datafile_count,
-            iosm_p->dist_p,
-            iosm_p->file_req,
-            iosm_p->file_req_offset,
-            PINT_REQUEST_TOTAL_BYTES(iosm_p->mem_req));
+            attr->u.meta.dfile_count,
+            attr->u.meta.dist,
+            sm_p->u.io.file_req,
+            sm_p->u.io.file_req_offset,
+            PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req));
 
         /* fill in msgpair structure components */
         msg_p->fs_id = sm_p->object_ref.fs_id;
-        msg_p->handle = target_datafile_array[i];
+        msg_p->handle = sm_p->u.io.datafile_handles[i];
         msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
         msg_p->comp_fn = NULL;
 
@@ -573,28 +551,17 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
         }
     }
 
-    /* swap the new list in for the old one, freeing the old list */
-    if (!sm_p->acache_hit && iosm_p->datafile_handles)
-    {
-        free(iosm_p->datafile_handles);
-    }
-
-    if (target_datafile_array)
-    {
-        iosm_p->datafile_handles = target_datafile_array;
-    }
-
     /*
       store the original datafile_count before it's modified,
       as we'll need it later in io_datafile_complete_msgpairs
     */
-    iosm_p->orig_datafile_count = iosm_p->datafile_count;
-    iosm_p->datafile_count = target_datafile_count;
+    sm_p->u.io.orig_datafile_count = attr->u.meta.dfile_count;
+    sm_p->u.io.datafile_count = target_datafile_count;
 
     return 1;
 
   malloc_error_exit:
-    CLEAN_PRIVATE_MEMBERS(iosm_p);
+    CLEAN_PRIVATE_MEMBERS(sm_p->u.io);
 
     js_p->error_code = -PVFS_ENOMEM;
     return 1;
@@ -769,10 +736,16 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
     int matched_msgpair = 0, matched_flow = 0;
     int matched_ack = 0, recv_match = -1;
     job_id_t tmp_id;
+    PVFS_object_attr *attr = NULL;
     PINT_client_sm_msgpair_state *msg_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "io state: "
                  "datafile_complete_msgpairs\n");
+
+    attr = (sm_p->acache_hit ?
+            &sm_p->pinode->attr :
+            &sm_p->acache_attr);
+    assert(attr);
 
     assert(sm_p->msgarray_count == sm_p->u.io.datafile_count);
     assert(sm_p->msgarray[0].comp_ct >= 0);
@@ -884,7 +857,6 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
         else
         {
             flow_descriptor *fl_p = NULL;
-            struct PINT_client_io_sm *iosm_p = &sm_p->u.io;
 
             gossip_debug(GOSSIP_IO_DEBUG, "  building flow for %d.\n",
                          recv_match);
@@ -894,17 +866,17 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 
             /* fill in file_data structure */
             fl_p->file_data.fsize = resp_p->u.io.bstream_size;
-            fl_p->file_data.dist = iosm_p->dist_p;
+            fl_p->file_data.dist = attr->u.meta.dist;
             fl_p->file_data.server_nr =
-                iosm_p->datafile_index_array[recv_match];
-            fl_p->file_data.server_ct = iosm_p->orig_datafile_count;
+                sm_p->u.io.datafile_index_array[recv_match];
+            fl_p->file_data.server_ct = sm_p->u.io.orig_datafile_count;
 
             /* this is the file datatype */
-            fl_p->file_req = iosm_p->file_req;
-            fl_p->file_req_offset = iosm_p->file_req_offset;
+            fl_p->file_req = sm_p->u.io.file_req;
+            fl_p->file_req_offset = sm_p->u.io.file_req_offset;
 
             /* this is the memory datatype */
-            fl_p->mem_req = iosm_p->mem_req;
+            fl_p->mem_req = sm_p->u.io.mem_req;
 
             gossip_debug(
                 GOSSIP_IO_DEBUG, "    bstream_size = %Ld, datafile_nr = "
@@ -913,12 +885,12 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
                 fl_p->file_data.server_ct, Ld(fl_p->file_req_offset));
 
             /* session tag, same as the one used in the send/recv */
-            fl_p->tag = iosm_p->session_tag_array[recv_match];
+            fl_p->tag = sm_p->u.io.session_tag_array[recv_match];
 
             /* this user_ptr should be left alone */
             fl_p->user_ptr = NULL;
 
-            fl_p->type = iosm_p->flowproto_type;
+            fl_p->type = sm_p->u.io.flowproto_type;
 
             /* done with msgpair resources; free them now */
             ret = PINT_serv_free_msgpair_resources(
@@ -928,7 +900,7 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
             
             resp_p = NULL;
 
-            if (iosm_p->io_type == PVFS_IO_READ)
+            if (sm_p->u.io.io_type == PVFS_IO_READ)
             {
                 /* Set up read-specific values
                  * - don't keep going past EOF
@@ -939,16 +911,16 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
                 fl_p->src.endpoint_id = BMI_ENDPOINT;
                 fl_p->src.u.bmi.address = msg_p->svr_addr;
                 fl_p->dest.endpoint_id = MEM_ENDPOINT;
-                fl_p->dest.u.mem.buffer = iosm_p->buffer;
+                fl_p->dest.u.mem.buffer = sm_p->u.io.buffer;
             }
             else
             {
-                assert (iosm_p->io_type == PVFS_IO_WRITE);
+                assert (sm_p->u.io.io_type == PVFS_IO_WRITE);
 
                 /* do allow writes to extend the file */
                 fl_p->file_data.extend_flag = 1;
                 fl_p->src.endpoint_id = MEM_ENDPOINT;
-                fl_p->src.u.mem.buffer = iosm_p->buffer;
+                fl_p->src.u.mem.buffer = sm_p->u.io.buffer;
                 fl_p->dest.endpoint_id = BMI_ENDPOINT;
                 fl_p->dest.u.bmi.address = msg_p->svr_addr;
 
@@ -956,27 +928,27 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
                              "ack for %d.\n", recv_match);
 
                 /* prepost the ack receive now */
-                iosm_p->ackarray[recv_match].max_resp_sz =
+                sm_p->u.io.ackarray[recv_match].max_resp_sz =
                     PINT_encode_calc_max_size(
                         PINT_ENCODE_RESP, PVFS_SERV_WRITE_COMPLETION,
-                        iosm_p->encoding);
-                iosm_p->ackarray[recv_match].encoded_resp_p =
+                        sm_p->u.io.encoding);
+                sm_p->u.io.ackarray[recv_match].encoded_resp_p =
                     BMI_memalloc(
                         msg_p->svr_addr,
-                        iosm_p->ackarray[recv_match].max_resp_sz,
+                        sm_p->u.io.ackarray[recv_match].max_resp_sz,
                         BMI_RECV);
-                assert(iosm_p->ackarray[recv_match].encoded_resp_p);
+                assert(sm_p->u.io.ackarray[recv_match].encoded_resp_p);
 
                 ret = job_bmi_recv(
                     msg_p->svr_addr,
-                    iosm_p->ackarray[recv_match].encoded_resp_p,
-                    iosm_p->ackarray[recv_match].max_resp_sz,
-                    iosm_p->session_tag_array[recv_match],
+                    sm_p->u.io.ackarray[recv_match].encoded_resp_p,
+                    sm_p->u.io.ackarray[recv_match].max_resp_sz,
+                    sm_p->u.io.session_tag_array[recv_match],
                     BMI_PRE_ALLOC,
                     sm_p,
                     (sm_p->msgarray_count*3 + recv_match),
-                    &iosm_p->ackarray[recv_match].recv_status,
-                    &iosm_p->ackarray[recv_match].recv_id,
+                    &sm_p->u.io.ackarray[recv_match].recv_status,
+                    &sm_p->u.io.ackarray[recv_match].recv_id,
                     pint_client_sm_context,
 		    PVFS2_CLIENT_JOB_TIMEOUT);
 
@@ -987,7 +959,7 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
                 }
                 assert(ret == 0);
                 
-                iosm_p->ack_comp_ct++;
+                sm_p->u.io.ack_comp_ct++;
             }
 
             /* post the flow:
@@ -999,7 +971,7 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
              */
             ret = job_flow(
                 fl_p, sm_p, (sm_p->msgarray_count*2 + recv_match),
-                &iosm_p->flow_status_array[recv_match], &tmp_id,
+                &sm_p->u.io.flow_status_array[recv_match], &tmp_id,
                 pint_client_sm_context, PVFS2_CLIENT_JOB_TIMEOUT);
 
             if (ret < 0)
@@ -1012,7 +984,7 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
                 /* flow completed immediately */
                 gossip_debug(GOSSIP_IO_DEBUG, "  flow for %d completed "
                              "immediately!\n", recv_match);
-                assert(!iosm_p->flow_status_array[recv_match].error_code);
+                assert(!sm_p->u.io.flow_status_array[recv_match].error_code);
             }
             else
             {
@@ -1022,7 +994,7 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
                              recv_match);
 
                 /* record that we have a flow that still needs to complete */
-                iosm_p->flow_comp_ct++;
+                sm_p->u.io.flow_comp_ct++;
             }
         }
         return 0;
@@ -1111,7 +1083,6 @@ static int io_analyze_results(PINT_client_sm *sm_p,
 {
     int i = 0, ret = -PVFS_EINVAL, error = 0, error_count = 0;
     PVFS_size total_size = 0;
-    struct PINT_client_io_sm *iosm_p = &sm_p->u.io;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: "
                  "analyze_results\n", sm_p);
@@ -1161,46 +1132,46 @@ static int io_analyze_results(PINT_client_sm *sm_p,
                     error = msg_p->recv_status.error_code;
                 }
             }
-            else if (iosm_p->flow_array[i].file_req != NULL)
+            else if (sm_p->u.io.flow_array[i].file_req != NULL)
             {
                 /* NOTE: this is a little bit of a hack to determine if we
                  * have actually used this flow descriptor; we don't
                  * really care what the file_req is
                  */
-                if (iosm_p->flow_status_array[i].error_code != 0)
+                if (sm_p->u.io.flow_status_array[i].error_code != 0)
                 {
                     gossip_debug(
                         GOSSIP_IO_DEBUG, "  error (%d) in flow for %d.\n",
-                        iosm_p->flow_status_array[i].error_code, i);
+                        sm_p->u.io.flow_status_array[i].error_code, i);
                     error_count++;
                     if (error == 0)
                     {
-                        error = iosm_p->flow_status_array[i].error_code;
+                        error = sm_p->u.io.flow_status_array[i].error_code;
                     }
                 }
-                else if (iosm_p->io_type == PVFS_IO_READ)
+                else if (sm_p->u.io.io_type == PVFS_IO_READ)
                 {
                     /* size for reads is reported in the flow;
                      * size for writes is reported in the final ack.
                      */
                     gossip_debug(
                         GOSSIP_IO_DEBUG, "  %Ld bytes read from %d.\n",
-                        Ld(iosm_p->flow_array[i].total_transfered), i);
-                    total_size += iosm_p->flow_array[i].total_transfered;
+                        Ld(sm_p->u.io.flow_array[i].total_transfered), i);
+                    total_size += sm_p->u.io.flow_array[i].total_transfered;
                 }
-                else if (iosm_p->io_type == PVFS_IO_WRITE)
+                else if (sm_p->u.io.io_type == PVFS_IO_WRITE)
                 {
-                    if (iosm_p->ackarray[i].recv_status.error_code != 0)
+                    if (sm_p->u.io.ackarray[i].recv_status.error_code != 0)
                     {
                         gossip_debug(
                             GOSSIP_IO_DEBUG,
                             "  error (%d) in write ack for %d.\n",
-                            iosm_p->ackarray[i].recv_status.error_code,
+                            sm_p->u.io.ackarray[i].recv_status.error_code,
                             i);
                         error_count++;
                         if (error == 0)
                         {
-                            error = iosm_p->ackarray[i].recv_status.error_code;
+                            error = sm_p->u.io.ackarray[i].recv_status.error_code;
                         }
                     }
                     else
@@ -1217,10 +1188,10 @@ static int io_analyze_results(PINT_client_sm *sm_p,
                          */
                         ret = PINT_serv_decode_resp(
 			    msg_p->fs_id,
-                            iosm_p->ackarray[i].encoded_resp_p,
+                            sm_p->u.io.ackarray[i].encoded_resp_p,
                             &decoded_resp,
                             &msg_p->svr_addr,
-                            iosm_p->ackarray[i].recv_status.actual_size,
+                            sm_p->u.io.ackarray[i].recv_status.actual_size,
                             &resp_p);
                         assert(ret == 0);
 
@@ -1241,18 +1212,18 @@ static int io_analyze_results(PINT_client_sm *sm_p,
                  * already)
                  */
                 PINT_flow_reset(&sm_p->u.io.flow_array[i]);
-                if (iosm_p->io_type == PVFS_IO_WRITE)
+                if (sm_p->u.io.io_type == PVFS_IO_WRITE)
                 {
                     BMI_memfree(msg_p->svr_addr,
-                                iosm_p->ackarray[i].encoded_resp_p,
-                                iosm_p->ackarray[i].max_resp_sz,
+                                sm_p->u.io.ackarray[i].encoded_resp_p,
+                                sm_p->u.io.ackarray[i].max_resp_sz,
                                 BMI_RECV);
                 }
             }
         }
     }
 
-    if (!sm_p->acache_hit)
+    if (sm_p->u.io.datafile_handles)
     {
         free(sm_p->u.io.datafile_handles);
         sm_p->u.io.datafile_handles = NULL;
@@ -1285,7 +1256,7 @@ static int io_analyze_results(PINT_client_sm *sm_p,
         return 1;
     }
 
-    CLEAN_PRIVATE_MEMBERS(iosm_p);
+    CLEAN_PRIVATE_MEMBERS(sm_p->u.io);
 
     /* return size, error, and set operation as complete */
     sm_p->u.io.io_resp_p->total_completed = total_size;

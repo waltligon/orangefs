@@ -174,40 +174,38 @@ struct PINT_client_setattr_sm
  *
  * Data specific to I/O operations on the client side.
  */
-struct PINT_client_io_sm {
+struct PINT_client_io_sm
+{
     /* input parameters */
-    enum PVFS_io_type     io_type;
-    PVFS_Request          file_req;
-    PVFS_offset           file_req_offset;
-    void                 *buffer;
-    PVFS_Request          mem_req;
-    int                   stored_error_code;
-    int                   retry_count;
-
-    /* cached from object attributes */
-    int                   orig_datafile_count;
-    int                   datafile_count;
-    PVFS_handle          *datafile_handles;
-    int			 *datafile_index_array;
-    PINT_dist            *dist_p;
-    uint32_t              dist_size;
+    enum PVFS_io_type         io_type;
+    PVFS_Request              file_req;
+    PVFS_offset               file_req_offset;
+    void                      *buffer;
+    PVFS_Request              mem_req;
+    int                       stored_error_code;
+    int                       retry_count;
 
     /* data regarding flows */
-    int                     flow_comp_ct;
-    flow_descriptor        *flow_array;
-    job_status_s           *flow_status_array;
-    enum PVFS_flowproto_type flowproto_type;
-    enum PVFS_encoding_type encoding;
+    int                       flow_comp_ct;
+    flow_descriptor           *flow_array;
+    job_status_s              *flow_status_array;
+    enum PVFS_flowproto_type  flowproto_type;
+    enum PVFS_encoding_type   encoding;
 
     /* session tags, used in all messages */
-    PVFS_msg_tag_t         *session_tag_array;
+    PVFS_msg_tag_t            *session_tag_array;
 
     /* data regarding final acknowledgements (writes only) */
-    int                        ack_comp_ct;
+    int                       ack_comp_ct;
     PINT_client_sm_recv_state *ackarray;
 
+    int                       *datafile_index_array;
+    int                       orig_datafile_count;
+    int                       datafile_count;
+    PVFS_handle               *datafile_handles;
+
     /* output parameter */
-    PVFS_sysresp_io      *io_resp_p;
+    PVFS_sysresp_io           *io_resp_p;
 };
 
 /* PINT_client_flush_sm */
@@ -561,15 +559,15 @@ PINT_client_wait_internal(op_id, in_op_str, out_error, "mgmt")
 
 #define PINT_mgmt_release(op_id) PINT_sys_release(op_id)
 
-#define PINT_init_sysint_credentials(sm_p_cred_p, user_cred_p)  \
-do {                                                            \
-    sm_p_cred_p = PVFS_util_dup_credentials(user_cred_p);       \
-    if (!sm_p_cred_p)                                           \
-    {                                                           \
-        gossip_lerr("Failed to copy user credentials\n");       \
-        free(sm_p);                                             \
-        return -PVFS_ENOMEM;                                    \
-    }                                                           \
+#define PINT_init_sysint_credentials(sm_p_cred_p, user_cred_p)\
+do {                                                          \
+    sm_p_cred_p = PVFS_util_dup_credentials(user_cred_p);     \
+    if (!sm_p_cred_p)                                         \
+    {                                                         \
+        gossip_lerr("Failed to copy user credentials\n");     \
+        free(sm_p);                                           \
+        return -PVFS_ENOMEM;                                  \
+    }                                                         \
 } while(0)
 
 /* misc helper methods */
