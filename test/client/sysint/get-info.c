@@ -128,7 +128,7 @@ int main(int argc,char **argv)
 
 		case ATTR_DATA:
 		printf("DATAFILE?? we shouldn't see these\n");
-		printf("size written on server = %ld", resp_gattr->attr.u.data.size);
+		printf("size written on server = %Ld", resp_gattr->attr.u.data.size);
 		break;
 
 		case ATTR_DIR:

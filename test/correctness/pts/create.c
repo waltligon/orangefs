@@ -139,8 +139,6 @@ int create_file(PVFS_fs_id fs_id,
 int compare_attribs(PVFS_object_attr attr1,
 		    PVFS_object_attr attr2)
 {
-    int i;
-
     if (attr1.owner != attr2.owner)
     {
 	printf("compare_attribs: owner differs\n");

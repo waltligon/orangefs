@@ -12,6 +12,7 @@
 #include <mpi.h>
 #include "pts.h"
 #include <generic.h>
+#include "gossip.h"
 
 /*pvfs2 functions we're calling (mostly gossip args)*/
 #include <include/pvfs2-debug.h>

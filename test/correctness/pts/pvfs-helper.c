@@ -1,8 +1,7 @@
+#include "pint-sysint.h"
 #include "pvfs-helper.h"
 
 pvfs_helper_t pvfs_helper;
-
-extern int parse_pvfstab(char *fn,  pvfs_mntlist *mnt);
 
 int initialize_sysint()
 {

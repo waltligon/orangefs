@@ -28,4 +28,6 @@ typedef struct
     PVFS_sysresp_init resp_init;
 } pvfs_helper_t;
 
+int initialize_sysint(void);
+
 #endif /* __PVFS_HELPER_H */

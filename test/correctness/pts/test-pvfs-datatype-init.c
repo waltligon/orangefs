@@ -3,7 +3,6 @@
 #include <stdio.h>
 
 extern pvfs_helper_t pvfs_helper;
-extern int initialize_sysint();
 
 /*
   initialize the sysint and create files to be used by subsequent tests.
