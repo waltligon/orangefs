@@ -193,7 +193,6 @@ struct bmi_trove_flow_data
 	 */
 	PINT_Request_state* dup_req_state;
 	PVFS_offset dup_req_offset;
-	PVFS_offset old_dup_req_offset;
 };
 
 /****************************************************
@@ -1452,7 +1451,6 @@ static void service_bmi_to_trove(flow_descriptor* flow_d)
 		{
 			/* see how much more is in the pipe */
 			flow_data->bmi_total_size = flow_data->max_buffer_size;
-			flow_data->old_dup_req_offset = flow_data->dup_req_offset;
 			ret = process_request_discard_regions(flow_data->dup_req_state,
 				flow_d->file_data, &flow_data->dup_req_offset,
 				&flow_data->bmi_total_size);
