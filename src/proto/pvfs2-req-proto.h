@@ -113,6 +113,7 @@ do {                                                   \
     (__req).op = PVFS_SERV_CREATE;                     \
     (__req).credentials = (__creds);                   \
     (__req).u.create.fs_id = (__fsid);                 \
+    (__req).u.create.object_type = (__objtype);        \
     (__req).u.create.handle_extent_array.extent_count =\
         (__ext_array.extent_count);                    \
     (__req).u.create.handle_extent_array.extent_array =\
