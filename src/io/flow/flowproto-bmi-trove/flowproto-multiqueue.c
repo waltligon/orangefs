@@ -537,6 +537,7 @@ static void bmi_recv_callback_fn(void *user_ptr,
     return;
 }
 
+
 /* trove_read_callback_fn()
  *
  * function to be called upon completion of a trove read operation
@@ -546,11 +547,68 @@ static void bmi_recv_callback_fn(void *user_ptr,
 static void trove_read_callback_fn(void *user_ptr,
 		           PVFS_error error_code)
 {
-    /* TODO: error handling */
-    assert(error_code == 0);
+    struct fp_queue_item* q_item = user_ptr;
+    int ret;
+    struct fp_private_data* flow_data = PRIVATE_FLOW(q_item->parent);
+    PVFS_size bytes_to_send = 0;
+    struct result_chain_entry* result_tmp;
+    struct result_chain_entry* old_result_tmp;
+    PVFS_id_gen_t tmp_id;
 
-    /* TODO: fill this in */
-    assert(0);
+    /* TODO: error handling */
+    if(error_code != 0)
+    {
+	PVFS_perror_gossip("bmi_recv_callback_fn error_code", error_code);
+	assert(0);
+    }
+
+    /* don't do anything until the last read completes */
+    if(q_item->result_chain_count > 1)
+    {
+	q_item->result_chain_count--;
+	return;
+    }
+
+    /* remove from current queue */
+    gen_mutex_lock(&flow_data->src_mutex);
+    qlist_del(&q_item->list_link);
+    gen_mutex_unlock(&flow_data->src_mutex);
+
+    result_tmp = &q_item->result_chain;
+    do{
+	bytes_to_send += result_tmp->result.bytes;
+	old_result_tmp = result_tmp;
+	result_tmp = result_tmp->next;
+	if(old_result_tmp != &q_item->result_chain)
+	    free(old_result_tmp);
+    }while(result_tmp);
+    q_item->result_chain_count = 0;
+
+    flow_data->bytes_from_src += bytes_to_send;
+
+    /* add to dest queue */
+    gen_mutex_lock(&flow_data->dest_mutex);
+    qlist_add_tail(&q_item->list_link, &flow_data->dest_list);
+    gen_mutex_unlock(&flow_data->dest_mutex);
+
+    ret = BMI_post_send(&tmp_id,
+	q_item->parent->dest.u.bmi.address,
+	q_item->buffer,
+	bytes_to_send,
+	BMI_PRE_ALLOC,
+	q_item->parent->tag,
+	&q_item->bmi_callback,
+	global_bmi_context);
+    
+    /* TODO: error handling */
+    assert(ret >= 0);
+
+    if(ret == 1)
+    {
+	/* immediate completion; trigger callback ourselves */
+	bmi_send_callback_fn(q_item, bytes_to_send, 0);
+    }
+
     return;
 }
 
@@ -585,6 +643,12 @@ static void bmi_send_callback_fn(void *user_ptr,
 	    &completion_queue);
 	pthread_cond_signal(&completion_cond);
 	gen_mutex_unlock(&completion_mutex);
+	return;
+    }
+
+    /* if there are no more reads to post, just return */
+    if(flow_data->bytes_from_src == flow_data->parent->aggregate_size)
+    {
 	return;
     }
 
