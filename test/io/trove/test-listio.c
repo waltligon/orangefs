@@ -156,7 +156,7 @@ int main(int argc, char **argv)
 	}
 	memset(mybuffer, 0, TEST_SIZE);
 
-	mem_offset_array[1] = mybuffer;
+	mem_offset_array[0] = mybuffer;
 
 	/********************************/
 
