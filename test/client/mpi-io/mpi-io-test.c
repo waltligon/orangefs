@@ -215,7 +215,7 @@ int main(int argc, char **argv)
 	   read_tim += (etim - stim);
 
 	   if (err < 0) fprintf(stderr, "node %d, read error, loc = %lld: %s\n",
-			mynod, mynod*opt_block, strerror(myerrno));
+			mynod, (long long) mynod*opt_block, strerror(myerrno));
 
 		/* if the user wanted to check correctness, compare the write
 		 * buffer to the read buffer */
@@ -296,9 +296,9 @@ int main(int argc, char **argv)
 	   write_bw = (opt_block*nprocs*opt_iter)/(max_write_tim*1.0e6);
 		
 			printf("nr_procs = %d, nr_iter = %d, blk_sz = %lld\n", nprocs,
-		opt_iter, opt_block);
+		opt_iter, (long long) opt_block);
 			
-			printf("# total_size = %lld\n", opt_block*nprocs*opt_iter);
+			printf("# total_size = %lld\n", (long long) opt_block*nprocs*opt_iter);
 			
 			printf("# Write: min_t = %f, max_t = %f, mean_t = %f, var_t = %f\n", 
 				min_write_tim, max_write_tim, ave_write_tim, var_write_tim);
