@@ -116,6 +116,13 @@ int main(int argc, char **argv)
 		/* decode distribution info */
 		PINT_Dist_decode(io_dist, NULL);
 
+		/* lookup the distribution */
+		ret = PINT_Dist_lookup(io_dist);
+		if(ret < 0)
+		{
+			fprintf(stderr, "Error: PINT_Dist_lookup() failure.\n");
+			return(-1);
+		}
 		
 		/* TODO: talk to trove; get file size, make sure file is there,
 		 * etc.
