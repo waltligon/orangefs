@@ -4,8 +4,6 @@
  * See COPYING in top-level directory.
  */
 
-/* stubs for bmi/trove flowprotocol */
-
 #include <errno.h>
 #include <string.h>
 #include <stdio.h>
@@ -245,8 +243,8 @@ int flowproto_dump_offsets_checkworld(flow_descriptor ** flow_d_array,
 				   int *count,
 				   int max_idle_time_ms)
 {
-
-    return (-ENOSYS);
+    *count = 0;
+    return(0);
 }
 
 /* flowproto_dump_offsets_service()
@@ -396,7 +394,7 @@ static void service_mem_to_bmi(flow_descriptor * flow_d)
 	for(i=0; i<segmax; i++)
 	{
 	    gossip_err(
-	    "DUMP OFFSETS %p: seg: %d, mem offset: %ld, size: %ld\n", 
+	    "DUMP OFFSETS %p: seg: %d, mem offset: 0x%lx, size: %ld\n", 
 		flow_d, i, ((long)offset_array[i] +
 		(long)flow_d->src.u.mem.buffer), (long)size_array[i]);
 	}
@@ -460,7 +458,7 @@ static void service_bmi_to_mem(flow_descriptor * flow_d)
 	for(i=0; i<segmax; i++)
 	{
 	    gossip_err(
-	    "DUMP OFFSETS %p: seg: %d, mem offset: %ld, size: %ld\n", 
+	    "DUMP OFFSETS %p: seg: %d, mem offset: 0x%lx, size: %ld\n", 
 		flow_d, i, ((long)offset_array[i] +
 		(long)flow_d->src.u.mem.buffer), (long)size_array[i]);
 	}

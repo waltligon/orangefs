@@ -43,7 +43,8 @@ static int io_req_ack_flow_array(bmi_addr_t* addr_array,
     PVFS_msg_tag_t* op_tag_array,
     PVFS_object_attr* attr_p,
     PVFS_sysreq_io* req,
-    enum PVFS_sys_io_type type);
+    enum PVFS_sys_io_type type,
+    enum flowproto_type flow_type);
 static void io_release_req_ack_flow_array(bmi_addr_t* addr_array,
     struct PVFS_server_req_s* req_array,
     bmi_size_t max_resp_size,
@@ -78,6 +79,8 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
     PVFS_handle* target_handle_array = NULL;
     int total_errors = 0;
     PVFS_msg_tag_t* op_tag_array = NULL;
+    /* TODO: might want hooks to set this from app. level later */
+    enum flowproto_type flow_type = FLOWPROTO_ANY;
 
     struct PINT_Request_state* req_state = NULL;
     PINT_Request_file_data tmp_file_data;
@@ -228,6 +231,7 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	req_array[i].credentials = req->credentials;
 	req_array[i].u.io.handle = target_handle_array[i];
 	req_array[i].u.io.fs_id = req->pinode_refn.fs_id;
+	req_array[i].u.io.flow_type = flow_type;
 	/* TODO: this is silly */
 	for(j=0; j<pinode_ptr->attr.u.meta.nr_datafiles; j++)
 	{
@@ -260,7 +264,8 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	op_tag_array,
 	&pinode_ptr->attr,
 	req,
-	type);
+	type,
+	flow_type);
     if(ret < 0)
     {
 	gossip_lerr("Error: io_req_ack_flow_array() failure.\n");
@@ -417,7 +422,8 @@ static int io_req_ack_flow_array(bmi_addr_t* addr_array,
     PVFS_msg_tag_t* op_tag_array,
     PVFS_object_attr* attr_p,
     PVFS_sysreq_io* req,
-    enum PVFS_sys_io_type type)
+    enum PVFS_sys_io_type type,
+    enum flowproto_type flow_type)
 {
     int i;
     int ret = -1;
@@ -670,6 +676,7 @@ static int io_req_ack_flow_array(bmi_addr_t* addr_array,
 		flow_array[i]->flags = 0;
 		flow_array[i]->tag = op_tag_array[i];
 		flow_array[i]->user_ptr = NULL;
+		flow_array[i]->type = flow_type;
 
 		if(type == PVFS_SYS_IO_READ)
 		{

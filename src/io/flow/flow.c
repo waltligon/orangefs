@@ -1065,6 +1065,7 @@ static int split_string_list(char ***tokens,
     holder = comma_list;
     while ((holder = index(holder, ',')))
     {
+	holder++;
 	tokencount++;
     }
 
