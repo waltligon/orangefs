@@ -688,32 +688,25 @@ gen_mutex_unlock(&bmi_notify_mutex);
 		return (ret);
 	    }
 
-            if (trove_count == 0)
-            {
-                usleep(100);
-            }
-            else
-            {
-                /* handle each completed trove operation */
-                for (i = 0; i < trove_count; i++)
-                {
-                    active_flowd = trove_completion(trove_error_code_array[i],
-                                                    trove_usrptr_array[i]);
-                    trove_id_queue_del(trove_inflight_queue,
-                                       trove_op_array[trove_index_array[i]], 
-                                       tmp_coll_id);
-                    trove_pending_count--;
+	    /* handle each completed trove operation */
+	    for (i = 0; i < trove_count; i++)
+	    {
+		active_flowd = trove_completion(trove_error_code_array[i],
+						trove_usrptr_array[i]);
+		trove_id_queue_del(trove_inflight_queue,
+				   trove_op_array[trove_index_array[i]], 
+				   tmp_coll_id);
+		trove_pending_count--;
 
-                    /* put flows into done_checking_queue if needed */
-                    if (active_flowd->state & FLOW_FINISH_MASK ||
-                        active_flowd->state == FLOW_SVC_READY)
-                    {
-			gossip_ldebug(FLOW_PROTO_DEBUG, "adding %p to queue.\n", active_flowd);
-                        qlist_add_tail(&(PRIVATE_FLOW(active_flowd)->queue_link),
-                                       &done_checking_queue);
-                    }
-                }
-            }
+		/* put flows into done_checking_queue if needed */
+		if (active_flowd->state & FLOW_FINISH_MASK ||
+		    active_flowd->state == FLOW_SVC_READY)
+		{
+		    gossip_ldebug(FLOW_PROTO_DEBUG, "adding %p to queue.\n", active_flowd);
+		    qlist_add_tail(&(PRIVATE_FLOW(active_flowd)->queue_link),
+				   &done_checking_queue);
+		}
+	    }
 	    trove_count = incount;
 
             if (trove_error_code_array != scratch_error_code_array)
