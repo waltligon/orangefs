@@ -18,6 +18,7 @@
 #include <sys/stat.h>
 #include <alloca.h>
 #include <pvfs2-sysint.h>
+#include <gen-locks.h>
 
 
 #define PVFS_NR_OPEN 1024 /* No. of files open in PVFS */

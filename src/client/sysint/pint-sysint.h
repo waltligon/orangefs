@@ -20,6 +20,7 @@
 #include <job.h>
 #include <bmi.h>
 #include <pvfs2-sysint.h>
+#include <gen-locks.h>
 
 enum
 {
