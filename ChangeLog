@@ -3,6 +3,11 @@ PVFS2 Release ChangeLog
 -----------------------
 
 
+pvfs2-0.1.4pre1
+===============
+-
+
+
 pvfs2-0.1.3
 ===========
 - added event logging to request encoder, server state machines, and most
