@@ -37,14 +37,10 @@ enum {
     MSGPAIRS_COMPLETE = 1
 };
 
-int msgpairarray_post(PINT_client_sm *sm_p, job_status_s *js_p);
-int msgpairarray_complete(PINT_client_sm *sm_p, job_status_s *js_p);
-int msgpairarray_completion_fn(PINT_client_sm *sm_p, job_status_s *js_p);
-int msgpairarray_error(PINT_client_sm *sm_p, job_status_s *js_p);
-
-/* WARNING: if you change the state transitions here, please also adjust
- * msgpairarray_explicit.sm
- */
+static int msgpairarray_post(PINT_client_sm *sm_p, job_status_s *js_p);
+static int msgpairarray_complete(PINT_client_sm *sm_p, job_status_s *js_p);
+static int msgpairarray_completion_fn(PINT_client_sm *sm_p, job_status_s *js_p);
+static int msgpairarray_error(PINT_client_sm *sm_p, job_status_s *js_p);
 
 %%
 
@@ -97,7 +93,7 @@ nested machine pvfs2_client_msgpairarray_sm(post,
  * (7) stores job ids for later matching
  *
  */
-int msgpairarray_post(PINT_client_sm *sm_p,
+static int msgpairarray_post(PINT_client_sm *sm_p,
 			     job_status_s *js_p)
 {
     int ret, i;
@@ -228,7 +224,7 @@ int msgpairarray_post(PINT_client_sm *sm_p,
 /* msgpairarray_complete()
  *
  */     
-int msgpairarray_complete(PINT_client_sm *sm_p,
+static int msgpairarray_complete(PINT_client_sm *sm_p,
 				 job_status_s *js_p)
 {
     int matched_job = 0;
@@ -275,7 +271,7 @@ int msgpairarray_complete(PINT_client_sm *sm_p,
     }
 }
 
-int msgpairarray_completion_fn(PINT_client_sm *sm_p,
+static int msgpairarray_completion_fn(PINT_client_sm *sm_p,
 				      job_status_s *js_p)
 {
     int ret, i;
@@ -349,7 +345,7 @@ int msgpairarray_completion_fn(PINT_client_sm *sm_p,
     
 /* msgpairarray_error()
  */
-int msgpairarray_error(PINT_client_sm *sm_p,
+static int msgpairarray_error(PINT_client_sm *sm_p,
 			      job_status_s *js_p)
 {
     assert(0); /* placeholder */
