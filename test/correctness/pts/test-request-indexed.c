@@ -12,7 +12,7 @@
  * 0 (first segment with 4M of space) 
  * 4M (second segment with 4M of space)
  * 8M (third segment with 2M of space)
- * Author: Michael Speth
+ * Author: Michael Speth, Testing code written & designed by Phil C.
  * Date: 8/14/2003
  * Last Updated: 8/21/2003
  */

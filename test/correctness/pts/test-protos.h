@@ -24,6 +24,7 @@
 #include <test-misc.h>
 #include <test-concurrent-meta.h>
 #include <test-request-indexed.h>
+#include <test-request-contiguous.h>
 
 enum test_types { 
    TEST_CREATE,
@@ -42,7 +43,8 @@ enum test_types {
 	TEST_FINALIZED,
 	TEST_MISC,
 	TEST_CONCURRENT_META,
-	TEST_REQUEST_INDEXED
+	TEST_REQUEST_INDEXED,
+	TEST_REQUEST_CONTIGUOUS
 };
 
 void setup_ptstests(config *myconfig) {
@@ -98,6 +100,8 @@ void setup_ptstests(config *myconfig) {
    myconfig->testpool[TEST_CONCURRENT_META].test_name = str_malloc("test_concurrent_meta");
    myconfig->testpool[TEST_REQUEST_INDEXED].test_func = (void *)test_request_indexed;
    myconfig->testpool[TEST_REQUEST_INDEXED].test_name = str_malloc("test_request_indexed");
+   myconfig->testpool[TEST_REQUEST_CONTIGUOUS].test_func = (void *)test_request_contiguous;
+   myconfig->testpool[TEST_REQUEST_CONTIGUOUS].test_name = str_malloc("test_request_contiguous");
 }
 
 #endif
