@@ -1262,7 +1262,7 @@ static DB *dbpf_db_open(char *dbname,
     }
 
     db_p->set_errfile(db_p, stderr);
-    db_p->set_errpfx(db_p, "xxx");
+    db_p->set_errpfx(db_p, "pvfs2-trove-dbpf");
 
     /* DB_RECNUM makes it easier to iterate through every key in chunks */
     if ((ret = db_p->set_flags(db_p, DB_RECNUM)) != 0)
