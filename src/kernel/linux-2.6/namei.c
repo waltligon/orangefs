@@ -59,13 +59,13 @@ struct dentry *pvfs2_lookup(
       create.  normally this results in an expensive failed
       lookup; we're avoiding that here.
     */
-    if (nd && (nd->flags & LOOKUP_CREATE) &&
-        !(nd->flags & LOOKUP_CONTINUE))
-    {
-        pvfs2_print("pvfs2: pvfs2_lookup -- skipping operation "
-                    "based on create intent\n");
-        return NULL;
-    }
+/*     if (nd && (nd->flags & LOOKUP_CREATE) && */
+/*         !(nd->flags & LOOKUP_CONTINUE)) */
+/*     { */
+/*         pvfs2_print("pvfs2: pvfs2_lookup -- skipping operation " */
+/*                     "based on create intent\n"); */
+/*         return NULL; */
+/*     } */
 
     /* same thing for an exclusive open */
     if (nd && (nd->flags & LOOKUP_OPEN) &&
