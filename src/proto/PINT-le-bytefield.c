@@ -52,7 +52,7 @@ static void lebf_initialize(void)
     int i;
     int reqsize, respsize;
     int noreq;
-    PVFS_Dist tmp_dist;
+    PINT_dist tmp_dist;
     PINT_Request tmp_req;
     char *tmp_name = strdup("foo");
     const int init_big_size = 1024 * 1024;

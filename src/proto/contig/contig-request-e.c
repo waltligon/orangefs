@@ -27,7 +27,7 @@ int do_encode_req(
     void *enc_msg;
     bmi_size_t size = 0, name_sz = 0;
     PINT_Request *encode_file_req = NULL;
-    PVFS_Dist *encode_io_dist = NULL;
+    PINT_dist *encode_io_dist = NULL;
     int ret = -1;
 
     /* all the messages that we build in this function are one contig. block */
@@ -466,7 +466,7 @@ int do_encode_req(
 					  sizeof(struct PVFS_server_req) +
 					  2 * sizeof(int));
 	encode_io_dist =
-	    (PVFS_Dist *) ((char *) (encode_file_req) +
+	    (PINT_dist *) ((char *) (encode_file_req) +
 			   PINT_REQUEST_PACK_SIZE(request->u.io.file_req));
 	/* pack the I/O description */
 	ret = PINT_Request_commit(encode_file_req, request->u.io.file_req);

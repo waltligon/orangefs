@@ -99,7 +99,7 @@ int do_decode_resp(
                     (PVFS_handle *) (((char *) decoded_response)
                                      + sizeof(struct PVFS_server_resp));
                 decoded_response->u.getattr.attr.u.meta.dist =
-                    (PVFS_Dist *) (((char *) decoded_response)
+                    (PINT_dist *) (((char *) decoded_response)
                                    + sizeof(struct PVFS_server_resp)
                                    +
                                    (decoded_response->u.getattr.attr.u.meta.

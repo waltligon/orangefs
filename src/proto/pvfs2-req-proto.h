@@ -663,7 +663,7 @@ struct PVFS_servreq_io
     uint32_t server_ct;
 
     /* distribution */
-    PVFS_Dist *io_dist;
+    PINT_dist *io_dist;
     /* file datatype */
     PVFS_Request file_req;
     /* offset into file datatype */

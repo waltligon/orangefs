@@ -15,7 +15,7 @@
 struct PVFS_metafile_attr_s
 {
     /* distribution */
-    PVFS_Dist *dist;
+    PINT_dist *dist;
     uint32_t dist_size;  /* not sent across wire, each side may be diff */
 
     /* list of datafiles */
