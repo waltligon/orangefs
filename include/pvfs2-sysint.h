@@ -55,6 +55,7 @@ struct PVFS_sys_dist_s
     /* empty for now; this is just a stub so that we can start getting the
      * arguments right on existing system interface functions
      */
+    void* dist_params;
 };
 typedef struct PVFS_sys_dist_s PVFS_sys_dist;
 
@@ -289,6 +290,16 @@ int PVFS_sys_statfs(
     PVFS_fs_id fs_id,
     PVFS_credentials credentials,
     PVFS_sysresp_statfs* resp);
+
+PVFS_sys_dist* PVFS_sys_dist_lookup(const char* dist_identifier);
+
+int PVFS_sys_dist_free(PVFS_sys_dist* dist);
+
+int PVFS_sys_dist_setparam(
+    PVFS_sys_dist* dist,
+    const char* param,
+    void* value);
+
 
 #endif
 

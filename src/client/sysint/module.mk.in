@@ -11,6 +11,7 @@ CSRC := \
 	$(DIR)/client-state-machine.c \
 	$(DIR)/shared-state-methods.c \
 	$(DIR)/mgmt-misc.c \
+	$(DIR)/sys-dist.c \
 	$(DIR)/sys-statfs.c \
 	$(DIR)/error-details.c \
 	$(DIR)/fs-add.c
