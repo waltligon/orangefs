@@ -910,6 +910,12 @@ static void trove_write_callback_fn(void *user_ptr,
 	}while(bytes_processed < BUFFER_SIZE && 
 	    !PINT_REQUEST_DONE(q_item->parent->file_req_state));
 
+	if(bytes_processed == 0)
+	{
+	    /* nothing to do */
+	    return;
+	}
+
 	/* TODO: what if we recv less than expected? */
 	ret = BMI_post_recv(&tmp_id,
 	    q_item->parent->src.u.bmi.address,
