@@ -8,6 +8,7 @@
 #define __PINT_BUCKET_H
 
 #include <pvfs2-types.h>
+#include <bmi.h>
 
 /* This is the interface to the bucket management component of the
  * system interface.  It is responsible for managing the list of meta
