@@ -168,6 +168,7 @@ static int msgpairarray_post(PARENT_SM *sm_p,
     struct filesystem_configuration_s *cur_fs = NULL;
     int num_incomplete_msgpairs = (sm_p->msgarray_params.comp_ct / 2);
     int must_loop_encodings = 0;
+    int local_enc_and_alloc = 0;
 
     gossip_debug(
         GOSSIP_MSGPAIR_DEBUG, "(%p) msgpairarray state: post "
@@ -260,6 +261,7 @@ static int msgpairarray_post(PARENT_SM *sm_p,
                 js_p->error_code = -PVFS_ENOMEM;
                 return 1;
             }
+            local_enc_and_alloc = 1;
         }
 
 	session_tag = PINT_util_get_next_tag();
@@ -314,6 +316,16 @@ static int msgpairarray_post(PARENT_SM *sm_p,
 	    msg_p->send_status.error_code = msg_p->recv_status.error_code;
 	    msg_p->op_status = msg_p->recv_status.error_code;
 	    sm_p->msgarray_params.comp_ct -= 2;
+
+            if (local_enc_and_alloc)
+            {
+                PINT_encode_release(&msg_p->encoded_req, PINT_ENCODE_REQ);
+                BMI_memfree(msg_p->svr_addr,msg_p->encoded_resp_p,
+                            msg_p->max_resp_sz, BMI_RECV);
+                msg_p->encoded_resp_p = NULL;
+                local_enc_and_alloc = 0;
+            }
+
 	    /* continue to send other array entries if possible */
 	    continue;
 	}

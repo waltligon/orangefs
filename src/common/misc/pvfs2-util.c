@@ -879,15 +879,14 @@ int PVFS_util_init_defaults(void)
 
     if (found_one)
     {
-        return(0);
+        return 0;
     }
-    else
-    {
-        gossip_err(
-            "ERROR: could not initialize any file systems in %s.\n",
-            tab->tabfile_name);
-        return(-PVFS_ENODEV);
-    }
+
+    gossip_err("ERROR: could not initialize any file systems "
+               "in %s.\n", tab->tabfile_name);
+
+    PVFS_sys_finalize();
+    return -PVFS_ENODEV;
 }
 
 /*********************/
