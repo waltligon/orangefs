@@ -202,9 +202,6 @@ extern int32_t PINT_errno_mapping[];
 #define PVFS_EHOSTDOWN	        55	/* Host is down */
 #define PVFS_EHOSTUNREACH	56	/* No route to host */
 #define PVFS_EALREADY	        57	/* Operation already in progress */
-#define PVFS_EREMOTEIO	        58	/* Remote I/O error */
-#define PVFS_ENOMEDIUM	        59	/* No medium found */
-#define PVFS_EMEDIUMTYPE	60	/* Wrong medium type */
 
 /* NOTE: PLEASE DO NOT ARBITRARILY ADD NEW ERROR CODES!
  *
@@ -213,7 +210,7 @@ extern int32_t PINT_errno_mapping[];
  * A MAPPING TO A UNIX ERRNO VALUE IN src/common/misc/errno-mapping.c
  */
 
-#define PVFS_ERRNO_MAX          60
+#define PVFS_ERRNO_MAX          57
 
 #endif /* __PVFS2_TYPES_H */
 
