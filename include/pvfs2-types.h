@@ -371,21 +371,23 @@ int32_t PVFS_get_errno_mapping(int32_t error);
 #define PVFS_EHOSTDOWN	        (55|(PVFS_ERROR_BIT))	/* Host is down */
 #define PVFS_EHOSTUNREACH	(56|(PVFS_ERROR_BIT))	/* No route to host */
 #define PVFS_EALREADY	        (57|(PVFS_ERROR_BIT))	/* Operation already in progress */
-#define PVFS_EDETAIL            (58|(PVFS_ERROR_BIT))   /* Detailed per-server errors are available */
+#define PVFS_EACCES	        (58|(PVFS_ERROR_BIT))	/* Operation already in progress */
 
 
 /***************** non-errno/pvfs2 specific error codes *****************/
 #define PVFS_ECANCEL    (1|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT)) 
 #define PVFS_EDEVINIT   (2|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT)) 
+#define PVFS_EDETAIL    (3|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
 
 /* NOTE: PLEASE DO NOT ARBITRARILY ADD NEW ERRNO ERROR CODES!
  *
- * IF YOU CHOOSE TO ADD A NEW ERROR CODE (DESPITE OUR PLEA),
- * YOU ALSO NEED TO INCREMENT PVFS_ERRNO MAX (BELOW) AND ADD
- * A MAPPING TO A UNIX ERRNO VALUE IN src/common/misc/errno-mapping.c
+ * IF YOU CHOOSE TO ADD A NEW ERROR CODE (DESPITE OUR PLEA), YOU ALSO
+ * NEED TO INCREMENT PVFS_ERRNO MAX (BELOW) AND ADD A MAPPING TO A
+ * UNIX ERRNO VALUE IN THE MACROS BELOW (USED IN
+ * src/common/misc/errno-mapping.c and the kernel module)
  */
 
-#define PVFS_ERRNO_MAX          58
+#define PVFS_ERRNO_MAX          59
 
 #define DECLARE_ERRNO_MAPPING()                       \
 int32_t PINT_errno_mapping[PVFS_ERRNO_MAX + 1] = {    \
@@ -446,18 +448,21 @@ int32_t PINT_errno_mapping[PVFS_ERRNO_MAX + 1] = {    \
     ECONNREFUSED,                                     \
     EHOSTDOWN,                                        \
     EHOSTUNREACH,                                     \
-    EALREADY,   /* 57 */                              \
-    0 /* EPARTIAL */                                  \
+    EALREADY,                                         \
+    EACCES,   /* 58 */                                \
+    0         /* PVFS_ERRNO_MAX */                    \
 };                                                    \
 char *PINT_non_errno_strerror_mapping[] = {           \
     "Success", /* 0 */                                \
     "Operation cancelled (possibly due to timeout)",  \
-    "Device initialization failed"                    \
+    "Device initialization failed",                   \
+    "Detailed per-server errors are available"        \
 };                                                    \
 int32_t PINT_non_errno_mapping[] = {                  \
     0,     /* leave this one empty */                 \
-    PVFS_ECANCEL,  /* 1 */                            \
-    PVFS_EDEVINIT  /* 2 */                            \
+    PVFS_ECANCEL,   /* 1 */                           \
+    PVFS_EDEVINIT,  /* 2 */                           \
+    PVFS_EDETAIL    /* 3 */                           \
 }
 
 /*

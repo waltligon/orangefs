@@ -6,10 +6,11 @@
   unexpected way
 
   compile with:
-  gcc file_open.c -o file_open
+  gcc -D_LARGEFILE64_SOURCE file_open.c -o file_open
+  or for no largefile support tests, gcc file_open.c -o file_open
 
   run like:
-  ./file_open /mnt/pvfs/testfile
+  ./file_open /mnt/pvfs2/testfile
 
   for comparison, try running it on another file system such as
   ext2/ext3
@@ -37,6 +38,10 @@ static open_info_t oinfo[] =
 {
     REMOVE_FILE_INDICATOR,
 
+#ifdef _LARGEFILE64_SOURCE
+    { (O_RDONLY | O_LARGEFILE), 0666,
+      "O_RDONLY | O_LARGEFILE", 0, ENOENT },
+#endif
     { (O_RDONLY | O_APPEND), 0666,
       "O_RDONLY | O_APPEND", 0, ENOENT },
 
@@ -45,12 +50,20 @@ static open_info_t oinfo[] =
 
     { (O_CREAT | O_WRONLY), 0666,
       "O_CREAT | O_WRONLY", 0, 0 },
-
+#ifdef _LARGEFILE64_SOURCE
+    { (O_RDONLY | O_LARGEFILE), 0666,
+      "O_RDONLY | O_LARGEFILE", 0, 0 },
+#endif
     REMOVE_FILE_INDICATOR,
 
     { (O_CREAT | O_RDONLY), 0666,
       "O_CREAT | O_RDONLY", 0, 0 },
 
+    REMOVE_FILE_INDICATOR,
+#ifdef _LARGEFILE64_SOURCE
+    { (O_CREAT | O_RDONLY | O_LARGEFILE), 0666,
+      "O_CREAT | O_RDONLY", 0, 0 },
+#endif
     REMOVE_FILE_INDICATOR,
 
     { (O_SYNC | O_RDONLY), 0666,

@@ -130,6 +130,12 @@ static int hash_key(void *key, int table_size);
 static int hash_key_compare(void *key, struct qlist_head *link);
 static struct qhash_table *s_ops_in_progress_table = NULL;
 
+static PVFS_object_ref perform_lookup_on_create_error(
+    PVFS_object_ref parent,
+    char *entry_name,
+    PVFS_credentials *credentials,
+    int follow_link);
+
 static int write_device_response(
     void *buffer_list,
     int *size_list,
@@ -1068,6 +1074,35 @@ static int service_operation_cancellation(vfs_request_t *vfs_request)
     return 0;
 }
 
+static PVFS_object_ref perform_lookup_on_create_error(
+    PVFS_object_ref parent,
+    char *entry_name,
+    PVFS_credentials *credentials,
+    int follow_link)
+{
+    int ret = 0;
+    PVFS_sysresp_lookup lookup_response;
+    PVFS_object_ref refn = { PVFS_HANDLE_NULL, PVFS_FS_ID_NULL };
+
+    ret = PVFS_sys_ref_lookup(
+        parent.fs_id, entry_name, parent, credentials,
+        &lookup_response, follow_link);
+
+    if (ret)
+    {
+        char buf[64];
+        PVFS_strerror_r(ret, buf, 64);
+
+        gossip_err("*** Lookup failed in %s create failure path: %s",
+                   (follow_link ? "file" : "symlink"), buf);
+    }
+    else
+    {
+        refn = lookup_response.ref;
+    }
+    return refn;
+}
+
 int write_device_response(
     void *buffer_list,
     int *size_list,
@@ -1150,18 +1185,20 @@ static inline void copy_dirents_to_downcall(vfs_request_t *vfs_request)
     vfs_request->response.readdir.dirent_array = NULL;
 }
 
+/* 
+   this method has the ability to overwrite/scrub the error code
+   passed down to the vfs
+*/
 static inline void package_downcall_members(
-    vfs_request_t *vfs_request, int error_code)
+    vfs_request_t *vfs_request, int *error_code)
 {
     assert(vfs_request);
-
-    vfs_request->out_downcall.status = error_code;
-    vfs_request->out_downcall.type = vfs_request->in_upcall.type;
+    assert(error_code);
 
     switch(vfs_request->in_upcall.type)
     {
         case PVFS2_VFS_OP_LOOKUP:
-            if (error_code)
+            if (*error_code)
             {
                 vfs_request->out_downcall.resp.lookup.refn.handle =
                     PVFS_HANDLE_NULL;
@@ -1175,7 +1212,7 @@ static inline void package_downcall_members(
             }
             break;
         case PVFS2_VFS_OP_CREATE:
-            if (error_code)
+            if (*error_code)
             {
                 /*
                   unless O_EXCL was specified at open time from the
@@ -1190,12 +1227,46 @@ static inline void package_downcall_members(
                   handles the translated error code (which ends up
                   being -EEXIST) in the open path and does the right
                   thing when O_EXCL is specified (i.e. return -EEXIST,
-                  otherwise success).
+                  otherwise success).  this always works fine for the
+                  serial vfs opens, but with enough clients issuing
+                  them, this error code is still propagated downward,
+                  so as a second line of defense, we're doing the
+                  lookup in this case as well.
                 */
-                vfs_request->out_downcall.resp.create.refn.handle =
-                    PVFS_HANDLE_NULL;
-                vfs_request->out_downcall.resp.create.refn.fs_id =
-                    PVFS_FS_ID_NULL;
+                if (*error_code == -PVFS_EEXIST)
+                {
+                    vfs_request->out_downcall.resp.create.refn =
+                        perform_lookup_on_create_error(
+                            vfs_request->in_upcall.req.create.parent_refn,
+                            vfs_request->in_upcall.req.create.d_name,
+                            &vfs_request->in_upcall.credentials, 1);
+
+                    if (vfs_request->out_downcall.resp.create.refn.handle ==
+                        PVFS_HANDLE_NULL)
+                    {
+                        gossip_debug(
+                            GOSSIP_CLIENT_DEBUG, "Overwriting error "
+                            "code -PVFS_EEXIST with -PVFS_EACCES "
+                            "(create)\n");
+
+                        *error_code = -PVFS_EACCES;
+                    }
+                    else
+                    {
+                        gossip_debug(
+                            GOSSIP_CLIENT_DEBUG, "Overwriting error "
+                            "code -PVFS_EEXIST with 0 (create)\n");
+
+                        *error_code = 0;
+                    }
+                }
+                else
+                {
+                    vfs_request->out_downcall.resp.create.refn.handle =
+                        PVFS_HANDLE_NULL;
+                    vfs_request->out_downcall.resp.create.refn.fs_id =
+                        PVFS_FS_ID_NULL;
+                }
             }
             else
             {
@@ -1204,12 +1275,43 @@ static inline void package_downcall_members(
             }
             break;
         case PVFS2_VFS_OP_SYMLINK:
-            if (error_code)
+            if (*error_code)
             {
-                vfs_request->out_downcall.resp.sym.refn.handle =
-                    PVFS_HANDLE_NULL;
-                vfs_request->out_downcall.resp.sym.refn.fs_id =
-                    PVFS_FS_ID_NULL;
+                /* see comments for create path above */
+                if (*error_code == -PVFS_EEXIST)
+                {
+                    vfs_request->out_downcall.resp.sym.refn =
+                        perform_lookup_on_create_error(
+                            vfs_request->in_upcall.req.sym.parent_refn,
+                            vfs_request->in_upcall.req.sym.entry_name,
+                            &vfs_request->in_upcall.credentials, 0);
+
+                    if (vfs_request->out_downcall.resp.sym.refn.handle ==
+                        PVFS_HANDLE_NULL)
+                    {
+                        gossip_debug(
+                            GOSSIP_CLIENT_DEBUG, "Overwriting error "
+                            "code -PVFS_EEXIST with -PVFS_EACCES "
+                            "(symlink)\n");
+
+                        *error_code = -PVFS_EACCES;
+                    }
+                    else
+                    {
+                        gossip_debug(
+                            GOSSIP_CLIENT_DEBUG, "Overwriting error "
+                            "code -PVFS_EEXIST with 0 (symlink)\n");
+
+                        *error_code = 0;
+                    }
+                }
+                else
+                {
+                    vfs_request->out_downcall.resp.sym.refn.handle =
+                        PVFS_HANDLE_NULL;
+                    vfs_request->out_downcall.resp.sym.refn.fs_id =
+                        PVFS_FS_ID_NULL;
+                }
             }
             else
             {
@@ -1218,7 +1320,7 @@ static inline void package_downcall_members(
             }
             break;
         case PVFS2_VFS_OP_GETATTR:
-            if (error_code == 0)
+            if (*error_code == 0)
             {
                 PVFS_sys_attr *attr = &vfs_request->response.getattr.attr;
 
@@ -1250,7 +1352,7 @@ static inline void package_downcall_members(
         case PVFS2_VFS_OP_REMOVE:
             break;
         case PVFS2_VFS_OP_MKDIR:
-            if (error_code)
+            if (*error_code)
             {
                 vfs_request->out_downcall.resp.mkdir.refn.handle =
                     PVFS_HANDLE_NULL;
@@ -1264,7 +1366,7 @@ static inline void package_downcall_members(
             }
             break;
         case PVFS2_VFS_OP_READDIR:
-            if (error_code)
+            if (*error_code)
             {
                 vfs_request->out_downcall.resp.readdir.dirent_count = 0;
             }
@@ -1278,7 +1380,7 @@ static inline void package_downcall_members(
         case PVFS2_VFS_OP_TRUNCATE:
             break;
         case PVFS2_VFS_OP_FILE_IO:
-            if (error_code == 0)
+            if (*error_code == 0)
             {
 #ifdef USE_MMAP_RA_CACHE
                 if ((vfs_request->in_upcall.req.io.io_type ==
@@ -1338,6 +1440,9 @@ static inline void package_downcall_members(
                        vfs_request->in_upcall.type);
             break;
     }
+
+    vfs_request->out_downcall.status = *error_code;
+    vfs_request->out_downcall.type = vfs_request->in_upcall.type;
 }
 
 static inline int repost_unexp_vfs_request(
@@ -1660,7 +1765,7 @@ int process_vfs_requests(void)
                 }
 
                 package_downcall_members(
-                    vfs_request, error_code_array[i]);
+                    vfs_request, &error_code_array[i]);
 
                 /*
                   write the downcall if the operation was NOT a
