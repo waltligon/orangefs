@@ -168,7 +168,6 @@ static int create_create(PINT_server_op *s_op, job_status_s *ret)
 
     job_post_ret = job_trove_dspace_create(s_op->req->u.create.fs_id,
 	    s_op->req->u.create.bucket,
-	    s_op->req->u.create.handle_mask,
 	    s_op->req->u.create.object_type,
 	    NULL,
 	    s_op,

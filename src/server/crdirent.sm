@@ -396,7 +396,6 @@ static int crdirent_create_dirdata_dspace(PINT_server_op *s_op,
 
     job_post_ret = job_trove_dspace_create(s_op->req->u.crdirent.fs_id,
 					   0, /* TODO: WHAT SHOULD HANDLE BE? */
-					   0x00000000, /* TODO: Change this */
 					   PVFS_TYPE_DIRDATA,
 					   NULL,
 					   s_op,
