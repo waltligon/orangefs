@@ -4,9 +4,22 @@
  * See COPYING in top-level directory.
  */
 
+/** \addtogroup troveint
+ *
+ * @{
+ */
+
+/** \file
+ *  Types and other defines used throughout Trove.  Many of the Trove
+ *  types are defined in terms of PVFS2 types rather than using the
+ *  PVFS2 types themselves.  This is because we wanted to separate the
+ *  Trove package, in case it was useful in other projects.  It may be
+ *  that at some later date we will make a pass through Trove and
+ *  eliminate many of these "extra" types.
+ */
+
 #ifndef __TROVE_TYPES_H
 #define __TROVE_TYPES_H
-
 
 /* PVFS type mappings */
 #include "pvfs2-types.h"
@@ -104,6 +117,8 @@ typedef PVFS_object_ref            TROVE_object_ref;
 #define TROVE_ECANCEL         (PVFS_ECANCEL | PVFS_ERROR_TROVE)
 
 #endif
+
+/* @} */
 
 /*
  * Local variables:

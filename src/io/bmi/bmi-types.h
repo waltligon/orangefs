@@ -4,10 +4,18 @@
  * See COPYING in top-level directory.
  */
 
-/** \file
- *  \ingroup bmiint
+/** \addtogroup bmiint
  *
- *  Types and other defines used throughout the BMI.
+ * @{
+ */
+
+/** \file
+ *  Types and other defines used throughout BMI.  Many of the BMI
+ *  types are defined in terms of PVFS2 types rather than using the PVFS2
+ *  types themselves.  This is because we wanted to separate the BMI
+ *  package, in case it was useful in other projects.  It may be that at
+ *  some later date we will make a pass through BMI and eliminate many of
+ *  these "extra" types.
  */
 
 #ifndef __BMI_TYPES_H
@@ -17,11 +25,14 @@
 #include "pvfs2-debug.h"
 #include "pvfs2-types.h"
 
-/* PVFS type mapping */
-typedef PVFS_size bmi_size_t;	/* data region size */
-typedef PVFS_msg_tag_t bmi_msg_tag_t;	/* message tag */
-typedef PVFS_context_id bmi_context_id; /* context identifier */
-typedef PVFS_id_gen_t bmi_op_id_t;	/* network operation handle */
+/** Data region size */
+typedef PVFS_size bmi_size_t;
+/** User-specified message tag */
+typedef PVFS_msg_tag_t bmi_msg_tag_t;
+/** Context identifier */
+typedef PVFS_context_id bmi_context_id;
+/** Reference to ongoing network operation */
+typedef PVFS_id_gen_t bmi_op_id_t;
 
 /* TODO: not using a real type for this yet; need to specify what
  * error codes look like */
@@ -130,6 +141,8 @@ enum
 int bmi_errno_to_pvfs(int error);
 
 #endif /* __BMI_TYPES_H */
+
+/* @} */
 
 /*
  * Local variables:
