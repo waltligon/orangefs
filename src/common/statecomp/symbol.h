@@ -26,7 +26,7 @@ typedef struct sym_ent
 
 sym_ent_p symenter(char *name);
 sym_ent_p symlook(char *name);
-void init_symbol_table();
+void init_symbol_table(void);
 
 #endif
 

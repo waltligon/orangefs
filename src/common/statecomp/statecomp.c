@@ -5,12 +5,24 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <getopt.h>
 #include <symbol.h>
+#include <unistd.h>
 
-static void initialize();
+#ifdef __GNUC__
+#ifdef YYPARSE_PARAM
+int yyparse (void *);
+#else
+int yyparse (void);
+#endif
+#endif
+
+
+static void initialize(void);
 static void parse_args(int argc, char **argv);
-static void finalize();
+static void finalize(void);
+void gen_init(void);
 
 /*
  * Global Variables
@@ -23,7 +35,7 @@ int out_file_flag = 0;
 FILE *out_file;
 int line = 1;
 
-main(int argc, char **argv)
+int main(int argc, char **argv)
 {
 	initialize();
 	parse_args(argc, argv);
@@ -40,10 +52,10 @@ static void initialize()
 static void parse_args(int argc, char **argv)
 {
 	int c;
-	int digit_optind = 0;
+	//int digit_optind = 0;
 	while(1)
 	{
-		int this_option_optind = optind ? optind : 1;
+		//int this_option_optind = optind ? optind : 1;
 		int option_index = 0;
 		static struct option long_options[] = {
 			/* {"option_name", has_arg, *flag, val}, */
@@ -99,18 +111,18 @@ static void finalize()
 	}
 }
 
-yyerror(s)
+void yyerror(s)
 {
 	fprintf(stderr,"syntax error line %d: %s\n", line, s);
 }
 
-yywrap()
+void yywrap()
 {
 }
 
 void produce_listing(int line, char *listing)
 {
-	/* fprintf(stderr, "produce_listing\n"); /* */
+	/* fprintf(stderr, "produce_listing\n"); */
 	if (list_flag)
 		fprintf(list_file, "[%d]\t%s\n", line, listing);
 }

@@ -92,9 +92,9 @@ int main(int argc, char **argv)	{
 	/* TODO: fill below fields in with the correct values */
 	my_req->credentials.perms = U_WRITE | U_READ;  
 	my_req->u.crdirent.name = "foo.c";
-	my_req->u.crdirent.new_handle = 4095;
-	my_req->u.crdirent.parent_handle = 7;
-	my_req->u.crdirent.fs_id = 7;
+	my_req->u.crdirent.new_handle = 1048575;
+	my_req->u.crdirent.parent_handle = 1048576;
+	my_req->u.crdirent.fs_id = 9;
 	my_req->rsize = sizeof(struct PVFS_server_req_s)+strlen(my_req->u.crdirent.name)+1;
 
 	display_pvfs_structure(my_req,1);

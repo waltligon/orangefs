@@ -94,12 +94,11 @@ int main(int argc, char **argv)	{
 	/* TODO: fill below fields in with the correct values */
 	my_req->credentials.perms = U_WRITE | U_READ;  
 	my_req->u.create.bucket = user_opts->bucket;
-	my_req->u.create.handle_mask = 0xffffffff;
-	my_req->u.create.fs_id = 7;
-	my_req->u.create.object_type = 0; /* TODO: where is the define/enum for this? */
+	my_req->u.create.handle_mask = 0;
+	my_req->u.create.fs_id = 9;
+	my_req->u.create.object_type = 2; /* TODO: where is the define/enum for this? */
 
 	display_pvfs_structure(my_req,1);
-	exit(0);
 
 	/* send the initial request on its way */
 	ret = BMI_post_sendunexpected(&(client_ops[1]), server_addr, my_req, 

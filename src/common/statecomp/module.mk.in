@@ -7,4 +7,6 @@ $(DIR)/parser.c: $(DIR)/parser.y
 	$(BISON) -d $< -o $@
 
 $(DIR)/scanner.c: $(DIR)/scanner.l
-	$(FLEX) -d -o$@ $<
+	#$(FLEX) -d -o$@ $<
+	$(FLEX) -o$@ $<
+	

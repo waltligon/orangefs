@@ -7,14 +7,19 @@
  */
 
 #include "stdio.h"
+#include "stdlib.h"
 #include "symbol.h"
 #include "parser.h"
+#include "string.h"
+
 extern YYSTYPE yylval;
 
 extern FILE *out_file;
+void produce_listing(int line, char *listing);
 
-int      atoi();
-double   atof();
+/* int      atoi();
+ * double   atof();
+ */
 
 #define	LIST				strcat(text,yytext);
 #define	RETURNVAL(x)	yylval.i = (int)(token = x); return((int)x);

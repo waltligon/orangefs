@@ -14,6 +14,7 @@
 #include <pvfs2-req-proto.h>
 #include <pack.h>
 #include <print-struct.h>
+#include <PINT-reqproto-encode.h>
 
 /**************************************************************
  * Data structures 
@@ -48,6 +49,8 @@ int main(int argc, char **argv)	{
 	int outcount = 0;
 	bmi_error_code_t error_code;
 	bmi_size_t actual_size;
+	struct PINT_encoded_msg foo;
+	struct PINT_decoded_msg bar;
 
 	/* grab any command line options */
 	user_opts = parse_args(argc, argv);
@@ -85,7 +88,7 @@ int main(int argc, char **argv)	{
 		return(-1);
 	}
 	my_req->u.getconfig.fs_name = (PVFS_string) BMI_memalloc(server_addr,
-		strlen("gen2")+1,BMI_SEND_BUFFER);
+		strlen("fs-foo")+1,BMI_SEND_BUFFER);
 
 	/* setup create request */
 	my_req->op = PVFS_SERV_GETCONFIG;
@@ -93,17 +96,19 @@ int main(int argc, char **argv)	{
 	my_req->credentials.gid = 0;
 	/* TODO: fill below fields in with the correct values */
 	my_req->credentials.perms = U_WRITE | U_READ;  
-	strcpy(my_req->u.getconfig.fs_name,"gen2");
+	strcpy(my_req->u.getconfig.fs_name,"fs-foo\0");
 	my_req->u.getconfig.max_strsize = 8192;
 	my_req->rsize = sizeof(struct PVFS_server_req_s)+
 							strlen(my_req->u.getconfig.fs_name)+1;
 
 	display_pvfs_structure(my_req,1);
-	my_req = pack_pvfs_struct(my_req,1,server_addr,0);
+	ret = PINT_encode(my_req,PINT_ENCODE_REQ,&foo,server_addr,0);
+	printf("---\n\nfoo---\n");
+	display_pvfs_structure(foo.buffer_list[0],1);
 
 	/* send the initial request on its way */
-	ret = BMI_post_sendunexpected(&(client_ops[1]), server_addr, my_req, 
-		my_req->rsize, BMI_PRE_ALLOC, 0, NULL);
+	ret = BMI_post_sendunexpected(&(client_ops[1]), server_addr, foo.buffer_list[0], 
+		foo.total_size, BMI_PRE_ALLOC, 0, NULL);
 	if(ret < 0)
 	{
 		errno = -ret;
@@ -169,7 +174,7 @@ int main(int argc, char **argv)	{
 	}
 		
 	/* look at the ack */
-	my_ack = unpack_pvfs_struct(my_ack,2,0,0);
+	ret = PINT_decode(my_ack,PINT_ENCODE_RESP,&bar,server_addr,actual_size,NULL);
 	if(my_ack->op != PVFS_SERV_GETCONFIG)
 	{
 		printf("ERROR: received ack of wrong type (%d)\n", (int)my_ack->op);

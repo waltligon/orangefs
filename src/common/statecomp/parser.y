@@ -11,6 +11,14 @@
 #include <stdlib.h>
 
 char *enter_string(char *);
+void gen_init(void);
+void gen_state_decl(char *state_name);
+void gen_state_array(char *machine_name, char *first_state_name);
+void gen_state_start(char *state_name);
+void gen_state_run(char *run_func);
+void gen_return_code(char *return_code);
+void gen_new_state(char *new_state);
+void gen_state_end();
 
 %}
 

@@ -1,6 +1,3 @@
-
-
-
 /*
  * This is an example of a client program that uses the BMI library
  * for communications.
@@ -96,7 +93,7 @@ int main(int argc, char **argv)	{
 	my_req->credentials.gid = 0;
 	my_req->credentials.perms = U_WRITE | U_READ;  
 	my_req->u.getattr.handle = user_opts->bucket;
-	my_req->u.getattr.fs_id = 7;
+	my_req->u.getattr.fs_id = 9;
 	/*my_req->u.setattr.attrmask = ATTR_UID | ATTR_GID | ATTR_PERM | ATTR_TYPE;*/
 	my_req->u.setattr.attrmask = ATTR_BASIC;
 
@@ -238,7 +235,7 @@ static struct options* parse_args(int argc, char* argv[]){
 	/* fill in defaults */
 	memcpy(tmp_opts->hostid, default_hostid, strlen(default_hostid) + 1);
 	memcpy(tmp_opts->method, default_method, strlen(default_method) + 1);
-	tmp_opts->bucket=4095;
+	tmp_opts->bucket=1048575;
 
 	/* look at command line arguments */
 	while((one_opt = getopt(argc, argv, flags)) != EOF){
