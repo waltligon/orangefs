@@ -4,7 +4,9 @@
  * See COPYING in top-level directory.
  */
 
+#include <stdio.h>
 #include <client.h>
+#include <string.h>
 #include <sys/time.h>
 
 /* these should be in a common place... */
@@ -16,6 +18,7 @@
 #define ATTR_MTIME         32
 #define ATTR_TYPE        2048
 #define MAX_NUM_DIRENTS   512
+#define MAX_TEST_PATH_LEN 512
 
 extern int parse_pvfstab(char *fn,pvfs_mntlist *mnt);
 
@@ -59,7 +62,7 @@ int is_directory(PVFS_handle handle, PVFS_fs_id fs_id)
 }
 
 int directory_walk(PVFS_sysresp_init *init_response,
-                   char *start_dir, int depth)
+                   char *start_dir, char *base_dir, int depth)
 {
     int i = 0;
     int is_dir = 0;
@@ -68,15 +71,28 @@ int directory_walk(PVFS_sysresp_init *init_response,
     PVFS_sysresp_lookup lk_response;
     PVFS_sysreq_readdir rd_request;
     PVFS_sysresp_readdir rd_response;
+    char full_path[MAX_TEST_PATH_LEN] = {0};
 
-    printf("DIRECTORY WALK CALLED WITH %s\n",start_dir);
+    printf("DIRECTORY WALK CALLED WITH base %s | %s\n",base_dir,start_dir);
 
     memset(&lk_request,0,sizeof(PVFS_sysreq_lookup));
     memset(&lk_response,0,sizeof(PVFS_sysresp_lookup));
 
-    lk_request.credentials.perms = 1877;
-    lk_request.name = start_dir;
+    if (base_dir)
+    {
+        strncpy(full_path,base_dir,MAX_TEST_PATH_LEN);
+        strncat(full_path,start_dir,MAX_TEST_PATH_LEN);
+        lk_request.name = full_path;
+    }
+    else
+    {
+        strcpy(full_path,"/");
+        lk_request.name = start_dir;
+    }
     lk_request.fs_id = init_response->fsid_list[0];
+    lk_request.credentials.uid = 100;
+    lk_request.credentials.gid = 100;
+    lk_request.credentials.perms = 1877;
 
     if (PVFS_sys_lookup(&lk_request,&lk_response))
     {
@@ -135,7 +151,7 @@ int directory_walk(PVFS_sysresp_init *init_response,
                 break;
             case 1:
                 /* if we have a dir, recurse */
-                if(directory_walk(init_response,cur_file,depth+1))
+                if(directory_walk(init_response,cur_file,full_path,depth+1))
                 {
                     fprintf(stderr,"Failed directory walk at depth %d\n",
                             depth+1);
@@ -147,14 +163,9 @@ int directory_walk(PVFS_sysresp_init *init_response,
     return 0;
 }
 
-/*
-  FIXME:
 
-  This code has not been tested because the getattr calls fail.
-*/
 int main(int argc, char **argv)
 {
-    int depth = 0;
     pvfs_mntlist mnt = {0,NULL};
     PVFS_sysresp_init init_response;
 
@@ -177,7 +188,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    if (directory_walk(&init_response,argv[1],0))
+    if (directory_walk(&init_response,argv[1],NULL,0))
     {
         fprintf(stderr,"Failed to do directory walk\n");
         return 1;
