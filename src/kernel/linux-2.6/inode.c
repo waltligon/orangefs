@@ -317,7 +317,8 @@ struct inode_operations pvfs2_file_inode_operations =
 struct inode *pvfs2_get_custom_inode(
     struct super_block *sb,
     int mode,
-    dev_t dev)
+    dev_t dev,
+    unsigned long ino)
 {
     struct inode *inode = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
@@ -326,7 +327,7 @@ struct inode *pvfs2_get_custom_inode(
                 "MAJOR(dev)=%u | MINOR(dev)=%u)\n", sb, MAJOR(dev),
                 MINOR(dev));
 
-    inode = new_inode(sb);
+    inode = iget(sb, ino);
     if (inode)
     {
 	/* initialize pvfs2 specific private data */

@@ -29,11 +29,6 @@ extern struct inode_operations pvfs2_dir_inode_operations;
 extern struct file_operations pvfs2_dir_operations;
 extern struct dentry_operations pvfs2_dentry_operations;
 
-extern struct inode *pvfs2_get_custom_inode(
-    struct super_block *sb,
-    int mode,
-    dev_t dev);
-
 
 int pvfs2_gen_credentials(
     PVFS_credentials *credentials)
@@ -507,7 +502,9 @@ static inline struct inode *pvfs2_create_file(
 
     if (new_op->downcall.status > -1)
     {
-        inode = pvfs2_get_custom_inode(dir->i_sb, (S_IFREG | mode), 0);
+        inode = pvfs2_get_custom_inode(
+            dir->i_sb, (S_IFREG | mode), 0, pvfs2_handle_to_ino(
+                new_op->downcall.resp.create.refn.handle));
         if (!inode)
         {
             pvfs2_error("*** Failed to allocate pvfs2 file inode\n");
@@ -515,9 +512,6 @@ static inline struct inode *pvfs2_create_file(
             *error_code = -ENOMEM;
             return NULL;
         }
-
-        inode->i_ino = pvfs2_handle_to_ino(
-            new_op->downcall.resp.create.refn.handle);
 
         pvfs2_print("Assigned file inode new number of %d\n",
                     (int)inode->i_ino);
@@ -598,7 +592,9 @@ static inline struct inode *pvfs2_create_dir(
 
     if (new_op->downcall.status > -1)
     {
-        inode = pvfs2_get_custom_inode(dir->i_sb, (S_IFDIR | mode), 0);
+        inode = pvfs2_get_custom_inode(
+            dir->i_sb, (S_IFDIR | mode), 0, pvfs2_handle_to_ino(
+                new_op->downcall.resp.mkdir.refn.handle));
         if (!inode)
         {
             pvfs2_error("*** Failed to allocate pvfs2 dir inode\n");
@@ -606,9 +602,6 @@ static inline struct inode *pvfs2_create_dir(
             *error_code = -ENOMEM;
             return NULL;
         }
-
-        inode->i_ino = pvfs2_handle_to_ino(
-            new_op->downcall.resp.mkdir.refn.handle);
 
         pvfs2_print("Assigned dir inode new number of %d\n",
                     (int) inode->i_ino);
@@ -691,7 +684,9 @@ static inline struct inode *pvfs2_create_symlink(
 
     if (new_op->downcall.status > -1)
     {
-        inode = pvfs2_get_custom_inode(dir->i_sb, (S_IFLNK | mode), 0);
+        inode = pvfs2_get_custom_inode(
+            dir->i_sb, (S_IFLNK | mode), 0, pvfs2_handle_to_ino(
+                new_op->downcall.resp.sym.refn.handle));
         if (!inode)
         {
             pvfs2_error("*** Failed to allocate pvfs2 symlink inode\n");
@@ -699,9 +694,6 @@ static inline struct inode *pvfs2_create_symlink(
             *error_code = -ENOMEM;
             return NULL;
         }
-
-        inode->i_ino = pvfs2_handle_to_ino(
-            new_op->downcall.resp.sym.refn.handle);
 
         pvfs2_print("Assigned symlink inode new number of %d\n",
                     (int)inode->i_ino);
@@ -962,9 +954,21 @@ int pvfs2_kernel_error_code_convert(
 
 void pvfs2_inode_initialize(pvfs2_inode_t *pvfs2_inode)
 {
-    pvfs2_inode->refn.handle = 0;
-    pvfs2_inode->refn.fs_id = 0;
+    pvfs2_inode->refn.handle = PVFS_HANDLE_NULL;
+    pvfs2_inode->refn.fs_id = PVFS_FS_ID_NULL;
+    pvfs2_inode->last_failed_block_index_read = 0;
+    pvfs2_inode->readdir_token_adjustment = 0;
     pvfs2_inode->link_target = NULL;
+}
+
+/*
+  this is called from super:pvfs2_destroy_inode.
+  pvfs2_inode_cache_dtor frees the link_target if any
+*/
+void pvfs2_inode_finalize(pvfs2_inode_t *pvfs2_inode)
+{
+    pvfs2_inode->refn.handle = PVFS_HANDLE_NULL;
+    pvfs2_inode->refn.fs_id = PVFS_FS_ID_NULL;
     pvfs2_inode->last_failed_block_index_read = 0;
     pvfs2_inode->readdir_token_adjustment = 0;
 }

@@ -16,8 +16,6 @@
 
 extern struct file_system_type pvfs2_fs_type;
 extern struct dentry_operations pvfs2_dentry_operations;
-extern struct inode *pvfs2_get_custom_inode(
-    struct super_block *sb, int mode, dev_t dev);
 
 extern kmem_cache_t *pvfs2_inode_cache;
 
@@ -91,7 +89,8 @@ static void pvfs2_destroy_inode(struct inode *inode)
     pvfs2_print("pvfs2_destroy_inode: destroying inode %d\n",
                 (int)inode->i_ino);
 
-    pvfs2_inode_initialize(pvfs2_inode);
+    
+    pvfs2_inode_finalize(pvfs2_inode);
     kmem_cache_free(pvfs2_inode_cache, pvfs2_inode);
 }
 
@@ -373,12 +372,12 @@ int pvfs2_fill_sb(
     sb->s_maxbytes = MAX_LFS_FILESIZE;
 
     /* alloc and initialize our root directory inode */
-    root = pvfs2_get_custom_inode(sb, (S_IFDIR | 0755), 0);
+    root = pvfs2_get_custom_inode(sb, (S_IFDIR | 0755),
+                                  0, PVFS2_SB(sb)->root_handle);
     if (!root)
     {
 	return -ENOMEM;
     }
-    root->i_ino = (ino_t)PVFS2_SB(sb)->root_handle;
     PVFS2_I(root)->refn.handle = PVFS2_SB(sb)->root_handle;
     PVFS2_I(root)->refn.fs_id = PVFS2_SB(sb)->fs_id;
 

@@ -230,9 +230,16 @@ int pvfs2_remount(
 /****************************
  * defined in inode.c
  ****************************/
+struct inode *pvfs2_get_custom_inode(
+    struct super_block *sb,
+    int mode,
+    dev_t dev,
+    unsigned long ino);
+
 int pvfs2_setattr(
     struct dentry *dentry,
     struct iattr *iattr);
+
 int pvfs2_getattr(
     struct vfsmount *mnt,
     struct dentry *dentry,
@@ -282,6 +289,9 @@ int pvfs2_kernel_error_code_convert(
     int pvfs2_error_code);
 
 void pvfs2_inode_initialize(
+    pvfs2_inode_t *pvfs2_inode);
+
+void pvfs2_inode_finalize(
     pvfs2_inode_t *pvfs2_inode);
 
 void pvfs2_op_initialize(
