@@ -16,20 +16,13 @@ static int create_cleanup(PINT_server_op *s_op, job_status_s *ret);
 static int create_create(PINT_server_op *s_op, job_status_s *ret);
 static int create_release_posted_job(PINT_server_op *s_op, job_status_s *ret);
 static int create_send_bmi(PINT_server_op *s_op, job_status_s *ret);
-static int create_foo(PINT_server_op *s_op, job_status_s *ret);
 
 extern job_context_id PINT_server_job_context;
 
 %%
 
-machine pvfs2_create_sm(foo, prelude, create2, send, release, cleanup)
+machine pvfs2_create_sm(prelude, create2, send, release, cleanup)
 {
-	state foo
-	{
-		run create_foo;
-		default => prelude;
-	}
-
 	state prelude
 	{
 		jump pvfs2_prelude_sm;
@@ -62,13 +55,6 @@ machine pvfs2_create_sm(foo, prelude, create2, send, release, cleanup)
 }
 
 %%
-
-/* TODO: this is a hack! remove later. */
-static int create_foo(PINT_server_op *s_op, job_status_s *ret)
-{
-    ret->error_code = 0;
-    return(1);
-}
 
 /*
  * Function: create_create

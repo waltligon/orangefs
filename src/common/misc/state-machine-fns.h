@@ -150,6 +150,8 @@ static inline int PINT_state_machine_next(struct PINT_OP_STATE *s,
 
 static union PINT_state_array_values *PINT_state_machine_locate(struct PINT_OP_STATE *s_op)
 {
+    union PINT_state_array_values *current_tmp;
+
     /* check for valid inputs */
     if (!s_op || s_op->op < 0 || s_op->op > PVFS_MAX_SERVER_OP)
     {
@@ -158,11 +160,22 @@ static union PINT_state_array_values *PINT_state_machine_locate(struct PINT_OP_S
     }
     if (PINT_OP_STATE_TABLE[s_op->op] != NULL)
     {
+	current_tmp = PINT_OP_STATE_TABLE[s_op->op]->state_machine;
+	/* handle the case in which the first state points to a nested
+	 * machine, rather than a simple function
+	 */
+	while(current_tmp->flag == SM_JUMP)
+	{
+	    PINT_push_state(s_op, current_tmp);
+	    current_tmp += 1;
+	    current_tmp = ((struct PINT_state_machine_s *)current_tmp->nested_machine)->state_machine;
+	}
 	/* this returns a pointer to a "PINT_state_array_values"
 	 * structure, whose state_action member is the function to call.
 	 */
-	return PINT_OP_STATE_TABLE[s_op->op]->state_machine + 1;
+	return current_tmp + 1;
     }
+
     gossip_err("State machine not found for operation %d\n",s_op->op);
     return NULL;
 }
