@@ -152,7 +152,7 @@ int PINT_server_get_config(
     if (ret)
     {
 	gossip_err("Failed to get_config from host %s\n",
-                   mntent_p->pvfs_config_server); 
+                   mntent_p->the_pvfs_config_server); 
 	error = -PVFS_ENODEV;
         goto exit_path;
     }
@@ -162,7 +162,7 @@ int PINT_server_get_config(
     {
 	gossip_err("Warning:\n Cannot retrieve information about "
 		"pvfstab entry %s\n",
-		mntent_p->pvfs_config_server);
+		mntent_p->the_pvfs_config_server);
 
 	/*
           if the device has no space left on it, we can't save
@@ -288,11 +288,11 @@ static int server_get_config_setup_msgpair(PINT_client_sm *sm_p,
     msg_p = &sm_p->msgarray[0];
 
     ret = BMI_addr_lookup(&serv_addr,
-	    sm_p->u.get_config.mntent->pvfs_config_server);
+	    sm_p->u.get_config.mntent->the_pvfs_config_server);
     if (ret < 0)
     {
         gossip_lerr("Failed to resolve BMI address %s\n",
-                    sm_p->u.get_config.mntent->pvfs_config_server);
+                    sm_p->u.get_config.mntent->the_pvfs_config_server);
         return ret;
     }
 

@@ -39,7 +39,9 @@ typedef struct PVFS_sys_attr_s PVFS_sys_attr;
 /* describes active file systems */
 struct PVFS_sys_mntent
 {
-    char *pvfs_config_server;	/* address of server with config info */
+    char **pvfs_config_servers;	/* addresses of servers with config info */
+    int num_pvfs_config_servers;
+    char *the_pvfs_config_server; /* first of the entries above that works */
     char *pvfs_fs_name;		/* name of PVFS2 file system */
     enum PVFS_flowproto_type flowproto;	/* flow protocol */
     enum PVFS_encoding_type encoding;   /* wire data encoding */

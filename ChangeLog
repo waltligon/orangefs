@@ -16,6 +16,8 @@ pvfs2-0.7.0pre1
 - configure: fix GM and IB to enable only when explicitly requested
 - add timestamps to gossip debugging to file and stderr (not syslog)
 - ib: initial cancel support, works for pvfs2-ls
+- add multihome support: servers can listen on multiple addresses (and
+  BMI types), clients choose the first address from tabfile that works
 
 
 pvfs2-0.6.5

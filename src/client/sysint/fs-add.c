@@ -36,6 +36,7 @@ gen_mutex_t mt_config = GEN_MUTEX_INITIALIZER;
 int PVFS_sys_fs_add(struct PVFS_sys_mntent *mntent)
 {
     int ret = -PVFS_EINVAL;
+    int i;
     struct server_configuration_s *new_server_config = NULL;
     PVFS_BMI_addr_t test_addr;
 
@@ -50,11 +51,17 @@ int PVFS_sys_fs_add(struct PVFS_sys_mntent *mntent)
     }
 
     /* make sure BMI knows how to handle this method, else fail quietly */
-    ret = BMI_addr_lookup(&test_addr, mntent->pvfs_config_server);
-    if (ret == bmi_errno_to_pvfs(-ENOPROTOOPT))
-    {
-	goto error_exit;
+    for (i=0; i<mntent->num_pvfs_config_servers; i++) {
+        ret = BMI_addr_lookup(&test_addr, mntent->pvfs_config_servers[i]);
+        if (ret == 0)
+            break;
     }
+    if (i == mntent->num_pvfs_config_servers) {
+        gossip_err("%s: Failed to initialize any appropriate BMI methods.\n",
+          __func__);
+        goto error_exit;
+    }
+    mntent->the_pvfs_config_server = mntent->pvfs_config_servers[i];
 
     new_server_config = (struct server_configuration_s *)malloc(
         sizeof(struct server_configuration_s));

@@ -174,10 +174,6 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
     const char *targetfile = NULL;
     struct mntent *tmp_ent;
     int i, j;
-    int slashcount = 0;
-    char *slash = NULL;
-    char *last_slash = NULL;
-    const char *cp;
     int ret = -1;
     int tmp_mntent_count = 0;
     PVFS_util_tab *current_tab = NULL;
@@ -281,63 +277,92 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
     {
         if (strcmp(tmp_ent->mnt_type, "pvfs2") == 0)
         {
-            slash = tmp_ent->mnt_fsname;
-            slashcount = 0;
-            while ((slash = index(slash, '/')))
-            {
-                slash++;
-                slashcount++;
-            }
+            struct PVFS_sys_mntent *me = &current_tab->mntent_array[i];
+            char *cp;
+            int cur_server;
 
-            /* find a reference point in the string */
-            last_slash = rindex(tmp_ent->mnt_fsname, '/');
-
-            if (slashcount != 3)
-            {
-                gossip_lerr("Error: invalid tab file entry: %s\n",
-                            tmp_ent->mnt_fsname);
-                endmntent(mnt_fp);
-                gen_mutex_unlock(&s_stat_tab_mutex);
-                return (NULL);
-            }
+            /* comma-separated list of ways to contact a config server */
+            me->num_pvfs_config_servers = 1;
+            for (cp=tmp_ent->mnt_fsname; *cp; cp++)
+                if (*cp == ',')
+                    ++me->num_pvfs_config_servers;
 
             /* allocate room for our copies of the strings */
-            current_tab->mntent_array[i].pvfs_config_server =
-                (char *)malloc(strlen(tmp_ent->mnt_fsname) + 1);
-            current_tab->mntent_array[i].mnt_dir =
-                (char *)malloc(strlen(tmp_ent->mnt_dir) + 1);
-            current_tab->mntent_array[i].mnt_opts =
-                (char *)malloc(strlen(tmp_ent->mnt_opts) + 1);
+            me->pvfs_config_servers = malloc(me->num_pvfs_config_servers
+              * sizeof(*me->pvfs_config_servers));
+            if (!me->pvfs_config_servers)
+                goto error_exit;
+            memset(me->pvfs_config_servers, 0,
+              me->num_pvfs_config_servers * sizeof(*me->pvfs_config_servers));
+            me->mnt_dir = malloc(strlen(tmp_ent->mnt_dir) + 1);
+            me->mnt_opts = malloc(strlen(tmp_ent->mnt_opts) + 1);
 
             /* bail if any mallocs failed */
-            if (!current_tab->mntent_array[i].pvfs_config_server ||
-                !current_tab->mntent_array[i].mnt_dir ||
-                !current_tab->mntent_array[i].mnt_opts)
+            if (!me->mnt_dir || !me->mnt_opts)
             {
                 goto error_exit;
             }
 
-            /* make our own copy of parameters of interest */
-            /* config server and fs name are a special case, take one 
-             * string and split it in half on "/" delimiter
-             */
-            *last_slash = '\0';
-            strcpy(current_tab->mntent_array[i].pvfs_config_server,
-                   tmp_ent->mnt_fsname);
-            last_slash++;
+            /* parse server list and make sure fsname is same */
+            cp = tmp_ent->mnt_fsname;
+            cur_server = 0;
+            for (;;) {
+                char *tok;
+                int slashcount;
+                char *slash;
+                char *last_slash;
 
+                tok = strsep(&cp, ",");
+                if (!tok) break;
+
+                slash = tok;
+                slashcount = 0;
+                while ((slash = index(slash, '/')))
+                {
+                    slash++;
+                    slashcount++;
+                }
+                if (slashcount != 3)
+                {
+                    gossip_lerr("Error: invalid tab file entry: %s\n",
+                                tmp_ent->mnt_fsname);
+                    goto error_exit;
+                }
+
+                /* find a reference point in the string */
+                last_slash = rindex(tok, '/');
+                *last_slash = '\0';
+
+                /* config server and fs name are a special case, take one 
+                 * string and split it in half on "/" delimiter
+                 */
+                me->pvfs_config_servers[cur_server] = strdup(tok);
+                if (!me->pvfs_config_servers[cur_server])
+                    goto error_exit;
+
+                ++last_slash;
+
+                if (cur_server == 0) {
+                    me->pvfs_fs_name = strdup(last_slash);
+                    if (!me->pvfs_fs_name)
+                        goto error_exit;
+                } else {
+                    if (strcmp(last_slash, me->pvfs_fs_name) != 0) {
+                        gossip_lerr(
+                          "Error: different fs names in server addresses: %s\n",
+                          tmp_ent->mnt_fsname);
+                        goto error_exit;
+                    }
+                }
+                ++cur_server;
+            }
+
+            /* make our own copy of parameters of interest */
             /* mnt_dir and mnt_opts are verbatim copies */
             strcpy(current_tab->mntent_array[i].mnt_dir,
                    tmp_ent->mnt_dir);
             strcpy(current_tab->mntent_array[i].mnt_opts,
                    tmp_ent->mnt_opts);
-
-            current_tab->mntent_array[i].pvfs_fs_name =
-                strdup(last_slash);
-            if (!current_tab->mntent_array[i].pvfs_fs_name)
-            {
-                goto error_exit;
-            }
 
             /* find out if a particular flow protocol was specified */
             if ((hasmntopt(tmp_ent, "flowproto")))
@@ -381,30 +406,35 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
   error_exit:
     for (; i > -1; i--)
     {
-        if (current_tab->mntent_array[i].pvfs_config_server)
+        struct PVFS_sys_mntent *me = &current_tab->mntent_array[i];
+
+        if (me->pvfs_config_servers)
         {
-            free(current_tab->mntent_array[i].
-                 pvfs_config_server);
-            current_tab->mntent_array[i].pvfs_config_server =
-                NULL;
+            int j;
+            for (j=0; j<me->num_pvfs_config_servers; j++)
+                if (me->pvfs_config_servers[j])
+                    free(me->pvfs_config_servers[j]);
+            free(me->pvfs_config_servers);
+            me->pvfs_config_servers = NULL;
+            me->num_pvfs_config_servers = 0;
         }
 
-        if (current_tab->mntent_array[i].mnt_dir)
+        if (me->mnt_dir)
         {
-            free(current_tab->mntent_array[i].mnt_dir);
-            current_tab->mntent_array[i].mnt_dir = NULL;
+            free(me->mnt_dir);
+            me->mnt_dir = NULL;
         }
 
-        if (current_tab->mntent_array[i].mnt_opts)
+        if (me->mnt_opts)
         {
-            free(current_tab->mntent_array[i].mnt_opts);
-            current_tab->mntent_array[i].mnt_opts = NULL;
+            free(me->mnt_opts);
+            me->mnt_opts = NULL;
         }
 
-        if (current_tab->mntent_array[i].pvfs_fs_name)
+        if (me->pvfs_fs_name)
         {
-            free(current_tab->mntent_array[i].pvfs_fs_name);
-            current_tab->mntent_array[i].pvfs_fs_name = NULL;
+            free(me->pvfs_fs_name);
+            me->pvfs_fs_name = NULL;
         }
     }
     endmntent(mnt_fp);
@@ -1009,10 +1039,15 @@ void PVFS_sys_free_mntent(
 {
     if (mntent)
     {
-        if (mntent->pvfs_config_server)
+        if (mntent->pvfs_config_servers)
         {
-            free(mntent->pvfs_config_server);
-            mntent->pvfs_config_server = NULL;
+            int j;
+            for (j=0; j<mntent->num_pvfs_config_servers; j++)
+                if (mntent->pvfs_config_servers[j])
+                    free(mntent->pvfs_config_servers[j]);
+            free(mntent->pvfs_config_servers);
+            mntent->pvfs_config_servers = NULL;
+            mntent->num_pvfs_config_servers = 0;
         }
         if (mntent->pvfs_fs_name)
         {
@@ -1044,11 +1079,21 @@ static int copy_mntent(
 
     if (dest_mntent && src_mntent)
     {
+        int i;
+
         memset(dest_mntent, 0, sizeof(struct PVFS_sys_mntent));
 
-        dest_mntent->pvfs_config_server =
-            strdup(src_mntent->pvfs_config_server);
-        assert(dest_mntent->pvfs_config_server);
+        dest_mntent->num_pvfs_config_servers =
+            src_mntent->num_pvfs_config_servers;
+        dest_mntent->pvfs_config_servers =
+            malloc(dest_mntent->num_pvfs_config_servers *
+            sizeof(*dest_mntent->pvfs_config_servers));
+        assert(dest_mntent->pvfs_config_servers);
+        for (i=0; i<dest_mntent->num_pvfs_config_servers; i++) {
+            dest_mntent->pvfs_config_servers[i] =
+                strdup(src_mntent->pvfs_config_servers[i]);
+            assert(dest_mntent->pvfs_config_servers[i]);
+        }
 
         dest_mntent->pvfs_fs_name = strdup(src_mntent->pvfs_fs_name);
         assert(dest_mntent->pvfs_fs_name);
