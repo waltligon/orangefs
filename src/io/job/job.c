@@ -2250,7 +2250,7 @@ static void teardown_queues(void)
 	if(req_sched_queue)
 		job_desc_q_cleanup(req_sched_queue);
 	if(req_sched_inprogress_queue)
-		job_desc_q_cleanup(req_sched_queue);
+		job_desc_q_cleanup(req_sched_inprogress_queue);
 
 	return;
 }
