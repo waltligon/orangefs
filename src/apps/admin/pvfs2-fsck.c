@@ -18,6 +18,7 @@
 
 #include "pvfs2.h"
 #include "pvfs2-mgmt.h"
+#include "pvfs2-fsck.h"
 
 #define HANDLE_BATCH 1000
 
@@ -27,99 +28,10 @@
 
 struct options
 {
-    char* mnt_point;
+    char *mnt_point;
     int mnt_point_set;
-    int key;
-    char *fontname;
+    int verbose;
 };
-
-struct handlelist {
-    int server_ct;
-    PVFS_handle **list_array;
-    int *size_array;
-    int *used_array;
-};
-
-static struct options* parse_args(int argc, char* argv[]);
-static void usage(int argc, char** argv);
-
-static char *get_type_str(int type);
-
-struct handlelist *build_handlelist(PVFS_fs_id cur_fs,
-				    PVFS_BMI_addr_t *addr_array,
-				    int server_count,
-				    PVFS_credentials *creds);
-
-/* directory tree traversal functions */
-int traverse_directory_tree(PVFS_fs_id cur_fs,
-			    struct handlelist *hl,
-			    PVFS_BMI_addr_t *addr_array,
-			    int server_count,
-			    PVFS_credentials *creds,
-			    struct options *opts_p);
-int descend(PVFS_fs_id cur_fs,
-	    struct handlelist *hl,
-	    struct handlelist *alt_hl,
-	    PVFS_object_ref pref,
-	    PVFS_credentials *creds);
-
-int verify_datafiles(PVFS_fs_id cur_fs,
-		     struct handlelist *hl,
-		     struct handlelist *alt_hl,
-		     PVFS_object_ref mf_ref,
-		     int df_count,
-		     PVFS_credentials *creds);
-
-struct handlelist *second_pass(PVFS_fs_id cur_fs,
-			       struct handlelist *hl,
-			       PVFS_id_gen_t *addr_array,
-			       PVFS_credentials *creds);
-
-struct handlelist *third_pass(PVFS_fs_id cur_fs,
-			      struct handlelist *hl,
-			      PVFS_id_gen_t *addr_array,
-			      PVFS_credentials *creds);
-
-void fourth_pass(PVFS_fs_id cur_fs,
-		 struct handlelist *hl,
-		 PVFS_id_gen_t *addr_array,
-		 PVFS_credentials *creds);
-
-/* print functions */
-static void print_root_entry(PVFS_handle handle,
-			     int server_idx,
-			     char *fontname);
-static void print_entry(char *name,
-			PVFS_handle handle,
-			PVFS_handle parent_handle,
-			PVFS_ds_type objtype,
-			int server_idx,
-			int error,
-			char *fontname);
-
-
-/* handlelist functions */
-static struct handlelist *handlelist_initialize(int *handle_counts,
-						int server_count);
-static void handlelist_add_handle(struct handlelist *hl,
-				  PVFS_handle handles,
-				  int server_idx);
-static void handlelist_add_handles(struct handlelist *hl,
-				   PVFS_handle *handles,
-				   int handle_count,
-				   int server_idx);
-static void handlelist_finished_adding_handles(struct handlelist *hl);
-static int handlelist_find_handle(struct handlelist *hl,
-				  PVFS_handle handle,
-				  int *server_idx_p);
-static void handlelist_remove_handle(struct handlelist *hl,
-				     PVFS_handle handle,
-				     int server_idx);
-static int handlelist_return_handle(struct handlelist *hl,
-				    PVFS_handle *handle_p,
-				    int *server_idx_p);
-static void handlelist_finalize(struct handlelist **hl);
-static void handlelist_print(struct handlelist *hl);
 
 int main(int argc, char **argv)
 {
@@ -130,7 +42,7 @@ int main(int argc, char **argv)
     PVFS_credentials creds;
     int server_count;
     PVFS_BMI_addr_t *addr_array;
-    struct handlelist *hl_all, *hl_second, *hl_third;
+    struct handlelist *hl_all, *hl_unrefd, *hl_notree;
 
     /* look at command line arguments */
     user_opts = parse_args(argc, argv);
@@ -221,8 +133,15 @@ int main(int argc, char **argv)
 
     printf("# fsid is %Lu.\n", Lu(cur_fs));
 
-    /* traverse the directory tree, cleaning up any dangling direntries
-     * and fixing or removing any files that are missing datafiles.
+    /***************************************************************/
+
+
+    /* first pass traverses the directory tree:
+     * - cleans up any direntries that refer to missing objects
+     * - verifies that files in the tree have all their datafiles 
+     *   (or repairs if possible)
+     * - verifies that all directories have their dirdata
+     *   (or repairs if possible)
      */
     printf("# traversing directory tree.\n");
     traverse_directory_tree(cur_fs,
@@ -232,25 +151,44 @@ int main(int argc, char **argv)
 			    &creds,
 			    user_opts);
 
-    /* try to make sense of any handles that remain, moving complete
-     * directories and files into lost+found.
+    /* second pass examines handles not in the directory tree:
+     * - finds orphaned "sub trees" and keeps references to head
+     *   - verifies files in the sub tree have all datafiles
+     *     (or repairs if possible)
+     *   - verifies all sub tree directories have their dirdata
+     *     (or repairs if possible)
+     * - builds list of metafile, dirdata, and datafiles not referenced
+     *   in some sub tree to be processed later
      */
-    printf("# analyzing remaining handles.\n");
-    hl_second = second_pass(cur_fs,
-			    hl_all,
-			    addr_array,
-			    &creds);
+    printf("# finding orphaned sub trees.\n");
+    hl_notree = find_sub_trees(cur_fs,
+			       hl_all,
+			       addr_array,
+			       &creds);
 
     handlelist_finalize(&hl_all);
 
-    /* drop orphaned dir trees and files into lost and found */
-    hl_third = third_pass(cur_fs, hl_second, addr_array, &creds);
+    /* third pass moves salvagable objects into lost+found:
+     * - moves sub trees into lost+found
+     * - verifies that orphaned files have all their datafiles
+     *   (or repairs if possible)
+     *   - if orphaned file is salvagable, moves into lost+found
+     * - builds list of remaining dirdata and datafiles not
+     *   referenced in sub tree or orphaned file
+     */
+    printf("# moving orphaned sub trees and files to lost+found.\n");
+    hl_unrefd = fill_lost_and_found(cur_fs,
+				    hl_notree,
+				    addr_array,
+				    &creds);
+    handlelist_finalize(&hl_notree);
 
-    handlelist_finalize(&hl_second);
-
-    fourth_pass(cur_fs, hl_third, addr_array, &creds);
-
-    handlelist_finalize(&hl_third);
+    /* fourth pass removes orphaned dirdata and datafiles
+     * left from the previous passes.
+     */
+    printf("# removing unreferenced objects.\n");
+    cull_leftovers(cur_fs, hl_unrefd, addr_array, &creds);
+    handlelist_finalize(&hl_unrefd);
 
     /* get us out of admin mode */
     PVFS_mgmt_setparam_list(cur_fs,
@@ -699,25 +637,10 @@ int verify_datafiles(PVFS_fs_id cur_fs,
     return (error) ? -1 : 0;
 }
 
-/* analyze_remaining_handles
- *
- * At this point we have a list of handles that weren't referenced in
- * the directory tree.
- *
- * Plan:
- * - Make a pass to figure out what everything is
- * - For each directory, do a descend, clean up, and put it in lost+found
- *   with a name based on the handle (for uniqueness)
- *   - Later we might be smarter about keeping the structure by looking
- *     for the topmost directories in related trees, but not now?
- * - After that, for each file, verify the datafiles and if everything is ok
- *   drop them (with a name based on the handle) in lost+found
- * - After that get rid of the remaining datafiles, because they are orphans
- */
-struct handlelist *second_pass(PVFS_fs_id cur_fs,
-			       struct handlelist *hl_all,
-			       PVFS_BMI_addr_t *addr_array,
-			       PVFS_credentials *creds)
+struct handlelist *find_sub_trees(PVFS_fs_id cur_fs,
+				  struct handlelist *hl_all,
+				  PVFS_BMI_addr_t *addr_array,
+				  PVFS_credentials *creds)
 {
     int ret;
     int server_idx;
@@ -794,15 +717,10 @@ struct handlelist *second_pass(PVFS_fs_id cur_fs,
 }
 
 
-/* third_pass()
- *
- * In this pass we take orphaned metafiles and directories and
- * place them in lost+found.
- */
-struct handlelist *third_pass(PVFS_fs_id cur_fs,
-			      struct handlelist *hl_all,
-			      PVFS_BMI_addr_t *addr_array,
-			      PVFS_credentials *creds)
+struct handlelist *fill_lost_and_found(PVFS_fs_id cur_fs,
+				       struct handlelist *hl_all,
+				       PVFS_BMI_addr_t *addr_array,
+				       PVFS_credentials *creds)
 {
     int ret;
     int server_idx;
@@ -885,18 +803,13 @@ struct handlelist *third_pass(PVFS_fs_id cur_fs,
 
     }
 
-    printf("# finished third pass.\n");
-
     return alt_hl;
 }
 
-/* fourth pass - remove remaining datafiles (I think),
- * remove dirdata objects that weren't matched to something else.
- */
-void fourth_pass(PVFS_fs_id cur_fs,
-		 struct handlelist *hl_all,
-		 PVFS_BMI_addr_t *addr_array,
-		 PVFS_credentials *creds)
+void cull_leftovers(PVFS_fs_id cur_fs,
+		    struct handlelist *hl_all,
+		    PVFS_BMI_addr_t *addr_array,
+		    PVFS_credentials *creds)
 {
     int ret;
     int server_idx;
@@ -945,22 +858,14 @@ void fourth_pass(PVFS_fs_id cur_fs,
 	}
 
     }
-
-    printf("# finished fourth pass.\n");
 }
 
 /********************************************/
 
 /* handlelist_initialize()
  *
- * Does whatever is necessary to initialize the handlelist structures
- * prior to adding handles.
- *
  * handle_counts - array of counts per server
  * server_count  - number of servers
- *
- * TODO: ADD IN SUPPORT FOR TELLING THIS ABOUT RANGES?
- * TODO: REDO THIS USING QUICKLIST CODE
  */
 static struct handlelist *handlelist_initialize(int *handle_counts,
 						int server_count)
@@ -971,7 +876,9 @@ static struct handlelist *handlelist_initialize(int *handle_counts,
     hl = (struct handlelist *) malloc(sizeof(struct handlelist));
 
     hl->server_ct = server_count;
-    hl->list_array = (PVFS_handle **) malloc(server_count * sizeof(PVFS_handle *));
+    hl->list_array = (PVFS_handle **)
+	malloc(server_count * sizeof(PVFS_handle *));
+
     hl->size_array = (int *) malloc(server_count * sizeof(int));
     hl->used_array = (int *) malloc(server_count * sizeof(int));
 
@@ -983,8 +890,6 @@ static struct handlelist *handlelist_initialize(int *handle_counts,
     }
 
     /* TODO: CHECK ALL MALLOC RETURN VALUES */
-
-    printf("initialized for %d server(s).\n", server_count);
 
     return hl;
 }
@@ -1010,19 +915,11 @@ static void handlelist_add_handles(struct handlelist *hl,
 
     for (i = 0; i < handle_count; i++) {
 	hl->list_array[server_idx][start_off + i] = handles[i];
-
-	printf("adding %Ld for server %d\n", handles[i], server_idx);
     }
 
     hl->used_array[server_idx] += handle_count;
 
-#if 0
-    for (i=0; i < hl->used_array[server_idx]; i++) {
-	printf("s[%d] = %Lu\n", server_idx, Lu(hl->list_array[server_idx][i]));
-    }
-#endif
 }
-
 
 static void handlelist_add_handle(struct handlelist *hl,
 				  PVFS_handle handle,
@@ -1039,20 +936,13 @@ static void handlelist_add_handle(struct handlelist *hl,
 
     hl->list_array[server_idx][start_off] = handle;
     hl->used_array[server_idx]++;
-
-    printf("after add: ");
-    handlelist_print(hl);
 }
 
-/* handlelist_finished_adding_handles()
- */
 static void handlelist_finished_adding_handles(struct handlelist *hl)
 {
     int i;
     
     for (i = 0; i < hl->server_ct; i++) {
-	printf("# %d handles for server %d\n", hl->size_array[i], i);
-
 	if (hl->used_array[i] != hl->size_array[i]) {
 	    printf("warning: only found %d of %d handles for server %d.\n",
 		   hl->used_array[i],
@@ -1094,9 +984,6 @@ static void handlelist_remove_handle(struct handlelist *hl,
 {
     int i;
 
-    printf("# before: ");
-    handlelist_print(hl);
-
     for (i = 0; i < hl->used_array[server_idx]; i++)
     {
 	if (hl->list_array[server_idx][i] == handle)
@@ -1113,27 +1000,15 @@ static void handlelist_remove_handle(struct handlelist *hl,
 	}
     }
 
-    printf("# after: ");
-    handlelist_print(hl);
-
     assert(i < hl->used_array[server_idx]);
-}
-
-static void handlelist_print(struct handlelist *hl)
-{
-    int i;
-
-    for (i=0; i < hl->used_array[0]; i++) {
-	printf("%Lu ", Lu(hl->list_array[0][i]));
-    }
-    printf("\n");
 }
 
 /* handlelist_return_handle()
  *
- * Returns some handle still in the handlelist, removing it from the list.
+ * Places some handle still in the handlelist in the location pointed
+ * to by handle_p, removing it from the list.
  *
- * Returns 0 on success, -1 on failure.
+ * Returns 0 on success, -1 on failure (out of handles).
  */
 static int handlelist_return_handle(struct handlelist *hl,
 				    PVFS_handle *handle_p,
@@ -1174,124 +1049,67 @@ static void handlelist_finalize(struct handlelist **hlp)
     return;
 }
 
-/**********************************************/
-
-static void print_root_entry(PVFS_handle handle,
-			     int server_idx,
-			     char *fontname)
+static void handlelist_print(struct handlelist *hl)
 {
-    printf("File: <Root>\n  handle = %Lu, type = %s, server = %d\n",
-	   Lu(handle),
-	   get_type_str(PVFS_TYPE_DIRECTORY),
-	   server_idx);
-}
+    int i;
 
-/* print_entry()
- *
- * Parameters:
- * name          - name of object, ignored for datafiles
- * handle        - handle of object
- * parent_handle - handle of parent, for drawing connections
- * objtype       - type of object (e.g. PVFS_TYPE_DIRECTORY)
- * server_idx    - index into list of servers for location of this handle
- * error         - boolean indicating if there is an error with this entry
- */
-static void print_entry(char *name,
-			PVFS_handle handle,
-			PVFS_handle parent_handle,
-			PVFS_ds_type objtype,
-			int server_idx,
-			int error,
-			char *fontname)
-{
-    switch (objtype)
-    {
-	case PVFS_TYPE_DATAFILE:
-	    printf("  handle = %Lu, type = %s, server = %d\n",
-		   Lu(handle),
-		   get_type_str(objtype),
-		   server_idx);
-	    break;
-	default:
-	    printf("File: %s\n  handle = %Lu, type = %s, server = %d\n",
-		   name,
-		   Lu(handle),
-		   get_type_str(objtype),
-		   server_idx);
-	    break;
+    for (i=0; i < hl->used_array[0]; i++) {
+	printf("%Lu ", Lu(hl->list_array[0][i]));
     }
+    printf("\n");
 }
+
 
 /**********************************************/
 
-/* parse_args()
- *
- * parses command line arguments
- *
- * returns pointer to options structure on success, NULL on failure
- */
-static struct options* parse_args(int argc, char* argv[])
+static struct options *parse_args(int argc, char *argv[])
 {
     /* getopt stuff */
-    extern char* optarg;
+    extern char *optarg;
     extern int optind, opterr, optopt;
-    char flags[] = "vkm:f:";
-    int one_opt = 0;
-    int len = 0;
 
-    struct options* tmp_opts = NULL;
-    int ret = -1;
+    int one_opt = 0, len = 0, ret = -1;
+    struct options *opts = NULL;
 
     /* create storage for the command line options */
-    tmp_opts = (struct options*) malloc(sizeof(struct options));
-    if (tmp_opts == NULL)
+    opts = (struct options *) malloc(sizeof(struct options));
+    if (opts == NULL)
     {
 	return NULL;
     }
-    memset(tmp_opts, 0, sizeof(struct options));
+    memset(opts, 0, sizeof(struct options));
 
     /* look at command line arguments */
-    while((one_opt = getopt(argc, argv, flags)) != EOF){
+    while((one_opt = getopt(argc, argv, "vVm:")) != EOF){
 	switch(one_opt)
         {
-            case 'v':
+            case 'V':
                 printf("%s\n", PVFS2_VERSION);
                 exit(0);
+            case 'v':
+		opts->verbose++;
+		break;
 	    case 'm':
 		len = strlen(optarg)+1;
-		tmp_opts->mnt_point = (char *) malloc(len + 1);
-		if (tmp_opts->mnt_point == NULL)
+		opts->mnt_point = (char *) malloc(len + 1);
+		if (opts->mnt_point == NULL)
 		{
-		    free(tmp_opts);
+		    free(opts);
 		    return NULL;
 		}
-		memset(tmp_opts->mnt_point, 0, len+1);
-		ret = sscanf(optarg, "%s", tmp_opts->mnt_point);
+		memset(opts->mnt_point, 0, len+1);
+		ret = sscanf(optarg, "%s", opts->mnt_point);
 		if (ret < 1)
 		{
-		    free(tmp_opts);
+		    free(opts);
 		    return NULL;
 		}
 		/* TODO: dirty hack... fix later.  The remove_dir_prefix()
 		 * function expects some trailing segments or at least
 		 * a slash off of the mount point
 		 */
-		strcat(tmp_opts->mnt_point, "/");
-		tmp_opts->mnt_point_set = 1;
-		break;
-	    case 'k':
-		tmp_opts->key = 1;
-		break;
-	    case 'f':
-		if ((len = strlen(optarg)) > 0)
-		{
-		    tmp_opts->fontname = (char *) malloc(len + 1);
-		    strncpy(tmp_opts->fontname, optarg, len);
-		}
-		else {
-		    usage(argc, argv);
-		    exit(EXIT_FAILURE);
-		}
+		strcat(opts->mnt_point, "/");
+		opts->mnt_point_set = 1;
 		break;
 	    case '?':
 		usage(argc, argv);
@@ -1299,25 +1117,24 @@ static struct options* parse_args(int argc, char* argv[])
 	}
     }
 
-    if(!tmp_opts->mnt_point_set)
+    if(!opts->mnt_point_set)
     {
-	free(tmp_opts);
+	free(opts);
 	return NULL;
     }
 
-    return tmp_opts;
+    return opts;
 }
 
 
 static void usage(int argc, char** argv)
 {
     fprintf(stderr, "\n");
-    fprintf(stderr, "Usage  : %s [-dv] [-m fs_mount_point]\n",
+    fprintf(stderr, "Usage  : %s [-vV] [-m fs_mount_point]\n",
 	argv[0]);
     fprintf(stderr, "Display information about contents of file system.\n");
-    fprintf(stderr, "    -k            when used with -d, prints key\n");
-    fprintf(stderr, "    -f <font>     when used with -d, specifies a font name (e.g. Helvetica)\n");
-    fprintf(stderr, "  -v              print version and exit\n");
+    fprintf(stderr, "  -V              print version and exit\n");
+    fprintf(stderr, "  -v              verbose operation\n");
     fprintf(stderr, "Example: %s -m /mnt/pvfs2\n",
 	argv[0]);
     return;
