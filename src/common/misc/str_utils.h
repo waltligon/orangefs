@@ -26,7 +26,11 @@ int PINT_remove_dir_prefix(
     char* prefix, 
     char *out_path, 
     int out_max_len);
-
+int PINT_parse_handle_ranges(
+    char *range, 
+    int *first, 
+    int *last, 
+    int *status);
 #endif
 /*
  * Local variables:

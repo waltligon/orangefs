@@ -330,6 +330,66 @@ int PINT_remove_dir_prefix(char *pathname, char* prefix, char *out_path,
 }
 
 /*
+ * PINT_parse_handle_ranges:  the first time this is called, set 'status' to
+ * zero.  get back the first range in the string in the 'first' and 'last'
+ * variables.  keep calling PINT_parse_handle_ranges until it returns zero
+ *
+ * range:   string representing our ranges
+ * first:   (output) beginning of range
+ * last:    (output) end of range
+ * status:  (opaque) how far we are in the range string 
+ *
+ * returns:
+ *  0: no more ranges
+ *  1: found a range.  look at 'first' and 'last' for the values
+ *  -1: something bad happened
+ */
+int PINT_parse_handle_ranges(char *range, int *first, int *last, int *status)
+{ 
+    /* what started out as a "hm, maybe i can use strtoul to help parse this"
+     * turned into a lot harier parser than i had hoped. */
+    char *p, *endchar; 
+
+    p = range + *status;
+
+    /* from strtol(3):
+       If endptr is not NULL, strtoul() stores the address of the
+       first invalid character in *endptr.  If there were no dig­
+       its at all, strtoul() stores the original value of nptr in
+       *endptr  (and  returns 0).  In particular, if *nptr is not
+       `\0' but **endptr is `\0' on return, the entire string  is
+       valid.  */ 
+    *first = *last = (int) strtoul(p, &endchar, 0);
+    if ( p == endchar )  /* all done */
+	return 0; 
+    /* strtoul eats leading space, but not trailing space.  take care of ws
+     * between number and delimiter (- or ,) */
+    while (isspace(*endchar)) endchar++; 
+    
+    p = endchar+1; /* skip over the ',' or '-'*/
+
+    switch (*endchar) {
+	case '-': /* we got the first half of the range. grab 2nd half */
+	    *last = (int)strtoul(p, &endchar, 0);
+	    /* again, skip trailing space ...*/
+	    while (isspace(*endchar)) endchar++;
+	    /* ... and the delimiter */ 
+	    if (*endchar == ',') endchar ++;
+	    /* 'status' tells us how far we are in the string */
+	    *status = ( endchar - range);
+	    break; 
+	case ',': /* end of a range */
+	case '\0': /* end of the whole string */
+	    *status = ( p - range );
+	    break;
+	default:
+	    printf("illegal characher %c\n", *endchar);
+	    return -1;
+    }
+    return 1;
+}
+
+/*
  * Local variables:
  *  c-indent-level: 4
  *  c-basic-offset: 4
