@@ -75,21 +75,25 @@ static int fp_multiqueue_id = -1;
 static bmi_context_id global_bmi_context = -1;
 static TROVE_context_id global_trove_context = -1;
 static gen_mutex_t completion_mutex = GEN_MUTEX_INITIALIZER;
+#ifdef __PVFS2_JOB_THREADED__
 static pthread_cond_t completion_cond = PTHREAD_COND_INITIALIZER;
+#endif
 static QLIST_HEAD(completion_queue); 
 
+#ifdef __PVFS2_TROVE_SUPPORT__
 static void bmi_recv_callback_fn(void *user_ptr,
 		         PVFS_size actual_size,
 		         PVFS_error error_code);
 static void bmi_send_callback_fn(void *user_ptr,
 		         PVFS_size actual_size,
 		         PVFS_error error_code);
-static void cleanup_buffers(struct fp_private_data* flow_data);
-
 static void trove_read_callback_fn(void *user_ptr,
 		           PVFS_error error_code);
 static void trove_write_callback_fn(void *user_ptr,
 		           PVFS_error error_code);
+#endif
+static void cleanup_buffers(struct fp_private_data* flow_data);
+
 
 /* interface prototypes */
 int fp_multiqueue_initialize(int flowproto_id);
@@ -280,6 +284,7 @@ int fp_multiqueue_post(flow_descriptor * flow_d)
     flow_data->initial_posts = initial_posts;
     for(i=0; i<initial_posts; i++)
     {
+#ifdef __PVFS2_TROVE_SUPPORT__
 	/* all progress is driven through callbacks; so we may as well use
 	 * the same functions to start
 	 */
@@ -291,6 +296,7 @@ int fp_multiqueue_post(flow_descriptor * flow_d)
 	{
 	    bmi_send_callback_fn(&(flow_data->prealloc_array[i]), 0, 0);
 	}
+#endif
     }
 
     return (0);
@@ -309,8 +315,10 @@ int fp_multiqueue_find_serviceable(flow_descriptor ** flow_d_array,
     int incount = *count;
     struct fp_private_data* tmp_data;
     int ret;
+#ifdef __PVFS2_JOB_THREADED__
     struct timeval base;
     struct timespec pthread_timeout;
+#endif
 
     *count = 0;
 
@@ -318,6 +326,7 @@ int fp_multiqueue_find_serviceable(flow_descriptor ** flow_d_array,
     /* see if anything has completed */
     if(qlist_empty(&completion_queue))
     {	
+#ifdef __PVFS2_JOB_THREADED__
 	/* figure out how long to wait */
 	gettimeofday(&base, NULL);
 	pthread_timeout.tv_sec = base.tv_sec + max_idle_time_ms / 1000;
@@ -331,7 +340,10 @@ int fp_multiqueue_find_serviceable(flow_descriptor ** flow_d_array,
 
 	ret = pthread_cond_timedwait(&completion_cond, 
 	    &completion_mutex, &pthread_timeout);
-
+#else
+	/* TODO: fill in */
+	ret = 0;
+#endif
 	if(ret == ETIMEDOUT)
 	{
 	    gen_mutex_unlock(&completion_mutex);
@@ -369,6 +381,7 @@ int fp_multiqueue_service(flow_descriptor * flow_d)
     return (-PVFS_ENOSYS);
 }
 
+#ifdef __PVFS2_TROVE_SUPPORT__
 /* bmi_recv_callback_fn()
  *
  * function to be called upon completion of a BMI recv operation
@@ -669,7 +682,9 @@ static void bmi_send_callback_fn(void *user_ptr,
 	gen_mutex_lock(&completion_mutex);
 	qlist_add_tail(&(flow_data->list_link), 
 	    &completion_queue);
+#ifdef __PVFS2_JOB_THREADED__
 	pthread_cond_signal(&completion_cond);
+#endif
 	gen_mutex_unlock(&completion_mutex);
 	gen_mutex_unlock(&flow_data->flow_mutex);
 	return;
@@ -843,7 +858,9 @@ static void trove_write_callback_fn(void *user_ptr,
 	gen_mutex_lock(&completion_mutex);
 	qlist_add_tail(&(flow_data->list_link), 
 	    &completion_queue);
+#ifdef __PVFS2_JOB_THREADED__
 	pthread_cond_signal(&completion_cond);
+#endif
 	gen_mutex_unlock(&completion_mutex);
 	gen_mutex_unlock(&flow_data->flow_mutex);
 	return;
@@ -958,6 +975,7 @@ static void trove_write_callback_fn(void *user_ptr,
     gen_mutex_unlock(&flow_data->flow_mutex);
     return;
 };
+#endif
 
 /* cleanup_buffers()
  *
