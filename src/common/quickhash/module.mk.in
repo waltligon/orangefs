@@ -1,0 +1,2 @@
+DIR := src/common/quickhash
+LIBSRC += $(DIR)/quickhash.c

@@ -1,0 +1,5 @@
+DIR := src/io/trove/trove-handle-mgmt
+LIBSRC += \
+	$(DIR)/avltree.c \
+	$(DIR)/trove-extentlist.c \
+	$(DIR)/trove-ledger.c
