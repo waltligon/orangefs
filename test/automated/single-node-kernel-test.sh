@@ -68,14 +68,29 @@ fi
 ###################################################
 # begin tests
 
+echo "PVFS2-SHELL-TEST RESULTS ======================================"
 bash $srcdir/test/kernel/linux-2.6/pvfs2-shell-test.sh $rootdir/INSTALL-pvfs2/mnt/pvfs2 > /tmp/pvfs2-shell-test.${USER} 2>&1
 if [ $? -ne 0 ] ; then
 	cat /tmp/pvfs2-shell-test.${USER}
+	echo "*** pvfs2-shell-test.sh failed."
 	exit 1
 else
 	# only show summary of output if it succeeds
 	cat /tmp/pvfs2-shell-test.${USER} | grep PASS
 fi
+
+echo "[END] PVFS2-SHELL-TEST RESULTS ================================"
+
+
+echo "PVFS2-SHELL-TEST RESULTS ======================================"
+./bonnie++.sh -d $rootdir/INSTALL-pvfs2/mnt/pvfs2/bonnie++ 
+if [ $? -ne 0 ] ; then
+	echo "*** bonnie++.sh failed."
+	exit 1
+fi
+
+echo "[END] PVFS2-SHELL-TEST RESULTS ================================"
+
 
 # end tests
 ###################################################
