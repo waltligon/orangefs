@@ -3,8 +3,7 @@
 # 
 #
 
-PUT A POINTER AT THE TOP OF THIS FILE TO THE HIGH LEVEL STATUS
-DOCUMENT IN THE doc SUBDIR
+NOTE: Some (dated) status information can be found in doc/pvfs2-status.tex
 
 improving robustness of I/O apis:
 ====================================================================
@@ -140,6 +139,7 @@ system management utilities
 - better logging systems
 - maybe make pvfs2-ping compute a cksum on the fs.conf from all
   servers and issue a warning if they don't all match?
+- come up with a more descriptive name for 'HandlePurgatory' (config)
 
 documentation:
 ====================================================================
