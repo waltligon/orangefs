@@ -373,12 +373,15 @@ endif
 endif
 
 # rule for generating dependency files for MPI code
+#
+# note: mpi-depend.sh is automatically generated, so it is in
+#       the build directory already.
 $(MPITESTDEPENDS): %.d: %.c
 	@echo generating dependency file $@.
-	@sh $(srcdir)/maint/mpi-depend.sh `dirname $*` $(CFLAGS) $< > $@
+	@sh ./maint/mpi-depend.sh `dirname $*` $(CFLAGS) $< > $@
 $(MPIMISCDEPENDS): %.d: %.c
 	@echo generating dependency file $@.
-	@sh $(srcdir)/maint/mpi-depend.sh `dirname $*` $(CFLAGS) $< > $@
+	@sh ./maint/mpi-depend.sh `dirname $*` $(CFLAGS) $< > $@
 
 # default rule for generating dependency files
 %.d: %.c
