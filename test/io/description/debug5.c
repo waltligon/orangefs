@@ -83,7 +83,7 @@ int main(int argc, char **argv)
 
 	if(retval >= 0)
 	{
-		fprintf(stderr, "results of PINT_Process_request(PINT_CLIENT):\n");
+		fprintf(stderr, "results of PINT_Process_request(PINT_SERVER):\n");
 		fprintf(stderr, "req proc offset: %d\n", (int)offset);
 		fprintf(stderr, "total size: %d\n", (int)bytemax);
 		for(i=0; i<segmax; i++)
@@ -146,6 +146,9 @@ int main(int argc, char **argv)
 	bytemax = 393216;
 
 	/* process request */
+	// gossip_enable_stderr(); 
+	// gossip_set_debug_mask(1,REQUEST_DEBUG);
+	
 	retval = PINT_Process_request(rs2, &rf2, &segmax,
 		offset_array, size_array, &offset, &bytemax, 
 		&eof_flag, PINT_CLIENT);
