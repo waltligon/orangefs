@@ -7,7 +7,7 @@ int main(int argc, char **argv)
 {
 	struct PINT_Request *r;
 	struct PINT_Request *r_packed;
-	int r_size, an_int;
+	int r_size;
 
 	/* build a request */
 	PVFS_Request_vector(16, 4, 64, PVFS_DOUBLE, &r);
@@ -16,8 +16,7 @@ int main(int argc, char **argv)
 	/* pack the request */
 	r_size = PINT_REQUEST_PACK_SIZE(r);
 	r_packed = (struct PINT_Request *)malloc(r_size);
-	an_int = 0; /* this must be zero */
-	PINT_Request_commit(r_packed, r, &an_int);
+	PINT_Request_commit(r_packed, r);
 	PVFS_Dump_request(r_packed);
 
 	/* now prepare for sending on wire */
