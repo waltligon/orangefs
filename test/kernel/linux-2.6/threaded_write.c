@@ -33,6 +33,8 @@ void *write_file(void *ptr)
     threaded_write_info_t *info = (threaded_write_info_t *)ptr;
     struct iovec iov[2];
 
+    sleep(2);
+
     if (info)
     {
         buf = (char *)malloc(info->size);

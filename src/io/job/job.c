@@ -3032,7 +3032,7 @@ int job_test(job_id_t id,
 	return(completion_error);
     }
     query = id_gen_safe_lookup(id);
-    if(query->completed_flag)
+    if(query && query->completed_flag)
     {
 	job_desc_q_remove(query);
 	gen_mutex_unlock(&completion_mutex);
@@ -3098,7 +3098,7 @@ int job_test(job_id_t id,
 		return(completion_error);
 	    }
 	    query = id_gen_safe_lookup(id);
-	    if(query->completed_flag)
+	    if(query && query->completed_flag)
 	    {
 		job_desc_q_remove(query);
 		gen_mutex_unlock(&completion_mutex);

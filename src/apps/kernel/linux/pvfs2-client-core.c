@@ -1604,7 +1604,11 @@ int process_vfs_requests(void)
         {
             vfs_request = vfs_request_array[i];
             assert(vfs_request);
-            assert(vfs_request->op_id == op_id_array[i]);
+/*             assert(vfs_request->op_id == op_id_array[i]); */
+            if (vfs_request->op_id != op_id_array[i])
+            {
+                continue;
+            }
 
             /* check if this is a new dev unexp request */
             if (vfs_request->is_dev_unexp)

@@ -104,7 +104,8 @@ ssize_t pvfs2_inode_read(
         ret = pvfs_bufmap_get(&buffer_index);
         if (ret < 0)
         {
-            pvfs2_error("pvfs2_inode_read: pvfs_bufmap_get() failure.\n");
+            pvfs2_error("pvfs2_inode_read: pvfs_bufmap_get() "
+                        "failure (%d)\n", ret);
             op_release(new_op);
             *offset = original_offset;
             return ret;
@@ -253,7 +254,8 @@ static ssize_t pvfs2_file_write(
         ret = pvfs_bufmap_get(&buffer_index);
         if (ret < 0)
         {
-            pvfs2_error("pvfs2_file_write: pvfs_bufmap_get() failure.\n");
+            pvfs2_error("pvfs2_file_write: pvfs_bufmap_get() "
+                        "failure (%d)\n", ret);
             op_release(new_op);
             *offset = original_offset;
             return ret;

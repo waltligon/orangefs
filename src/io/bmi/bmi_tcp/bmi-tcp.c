@@ -3033,7 +3033,9 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 	&cur_index_complete, BMI_SEND, my_header.enc_hdr, &env_amt_complete);
     if (ret < 0)
     {
-	gossip_lerr("Error: payload_progress: %s\n", strerror(-ret));
+        char buf[64] = {0};
+        PVFS_strerror_r(-ret, buf, 64);
+	gossip_lerr("Error: payload_progress: %s\n", buf);
 	tcp_forget_addr(dest, 0, ret);
 	return (ret);
     }

@@ -172,12 +172,13 @@ static void *bmi_thread_function(void *ptr)
 
 	    ret = BMI_testunexpected(
                 incount, &outcount, stat_bmi_unexp_array, 0);
-	    if(ret < 0)
+	    if (ret < 0)
 	    {
-		/* critical failure */
-		/* TODO: how to handle this? */
-		assert(0);
-		gossip_lerr("Error: critical BMI failure.\n");
+                PVFS_perror_gossip("critical BMI failure", ret);
+#ifdef __PVFS2_JOB_THREADED__
+                continue;
+#endif
+                return NULL;
 	    }
 
 	    /* execute callback for each completed unexpected message */

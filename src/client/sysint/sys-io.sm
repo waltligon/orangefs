@@ -1076,6 +1076,7 @@ static inline int complete_context_send_or_recv(
                  "- complete_context_send_or_recv called\n");
 
     assert(sm_p && js_p);
+    assert(sm_p->op == PVFS_SYS_IO);
 
     status_user_tag = (unsigned long)js_p->status_user_tag;
 
