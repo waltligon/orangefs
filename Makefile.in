@@ -37,7 +37,7 @@ LIBS += -lpvfs2
 SERVERLIBS = -ldb -lrt -lpthread
 # here we differentiate cflags between some components
 LIBCFLAGS = -D__GEN_NULL_LOCKING__
-SERVERCFLAGS = -D__GEN_POSIX_LOCKING__
+SERVERCFLAGS = -D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__
 # add all module directories into include path
 CFLAGS += $(patsubst %, -I $(srcdir)/%, $(MODULES))
 
