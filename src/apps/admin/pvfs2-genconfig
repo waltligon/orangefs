@@ -127,10 +127,11 @@ sub tcp_parse_hostlist
 
 sub emit_defaults
 {
-    my($target,$num_unexp,$bmi_module);
+    my($target,$num_unexp,$bmi_module,$handle_purg);
     $target = $_[0];
     $num_unexp = $_[1];
     $bmi_module = $_[2];
+    $handle_purg = $_[3];
 
     # remove quotes from logfile if any
     if ($logfile =~ /\".*\"/)
@@ -144,6 +145,7 @@ sub emit_defaults
     print $target "\tEventLogging none\n";
     print $target "\tBMIModules $bmi_module\n";
     print $target "\tFlowModules flowproto_bmi_trove\n";
+    print $target "\tHandlePurgatory $handle_purg\n"
     print $target "</Defaults>\n";
 }
 
@@ -383,6 +385,11 @@ print "Choose a directory for each server to store data in.\n";
 
 $storage = prompt_word("Enter directory name: [Default is /tmp/pvfs2-storage-space]: ","/tmp/pvfs2-storage-space");
 
+#
+# could prompt for handle purgatory time, but it is probably best if we pick a
+# reasonable value w/o prompting
+$handle_purgatory = 50;
+
 # ----------------------------------------------------------
 # now that we have all the info, emit the configuration data
 # ----------------------------------------------------------
@@ -396,7 +403,7 @@ if ($using_stdout == 1)
     print "\n";
 }
 
-emit_defaults($output_target, $num_unexp_reqs, $bmi_module);
+emit_defaults($output_target, $num_unexp_reqs, $bmi_module, $handle_purgatory);
 emit_aliases($output_target, $num_nodes);
 emit_filesystem($output_target, "pvfs2-fs", 9, 1048576);
 

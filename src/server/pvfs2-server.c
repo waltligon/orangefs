@@ -576,6 +576,14 @@ static int server_initialize_subsystems(
             trove_close_context(cur_fs->coll_id, trove_context);
             free(cur_merged_handle_range);
         }
+	ret = trove_collection_setinfo(cur_fs->coll_id, trove_context, 
+				    TROVE_COLLECTION_HANDLE_TIMEOUT,
+				    &(server_config.handle_purgatory));
+	if (ret < 0)
+	{
+	    gossip_lerr("Error setting handle timeout\n");
+	    return ret;
+	}
 
         cur = PINT_llist_next(cur);
     }

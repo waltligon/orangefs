@@ -65,6 +65,7 @@ typedef struct server_configuration_s
     ssize_t server_config_buflen;   /* the server.conf file length      */
     char *server_config_buf;        /* the server.conf file contents    */
     int  initial_unexpected_requests;
+    struct timeval handle_purgatory; /* how long before freed handle reused */
     char *logfile;
     char *event_logging;
     char *bmi_modules;              /* BMI modules */
