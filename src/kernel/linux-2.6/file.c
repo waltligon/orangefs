@@ -328,6 +328,17 @@ int pvfs2_fsync(
 
 loff_t pvfs2_file_llseek(struct file *file, loff_t offset, int origin)
 {
+    struct inode *inode = file->f_dentry->d_inode;
+
+    /* revalidate inode if we have a zero file size */
+    if (inode && (inode->i_size == 0))
+    {
+        if (pvfs2_inode_getattr(inode))
+        {
+            return -EINVAL;
+        }
+    }
+
     /*
       NOTE: if .llseek is overriden, we must acquire lock as
       described in Documentation/filesystems/Locking
