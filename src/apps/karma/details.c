@@ -15,7 +15,7 @@ static GtkWidget *gui_details_view    = NULL;
 static GtkTreeViewColumn *gui_details_col[GUI_DETAILS_TYPE + 1];
 
 /* THESE MUST MATCH WITH ENUM IN KARMA.H! */
-static char *gui_details_column_name[] = { "Server Address (BMI)",
+static char *gui_details_column_name[] = { "Server Address\n(BMI)",
 					   "Total RAM",
 					   "Available RAM",
 					   "Uptime",
@@ -224,37 +224,37 @@ void gui_details_view_fill(GtkWidget *view,
     ba_units = gui_units_size(s_stat[max].bytes_available, &ba_div);
 
     /* update column titles */
-    snprintf(titlebuf, sizeof(titlebuf), "%s (%s)",
+    snprintf(titlebuf, sizeof(titlebuf), "%s\n(%s)",
 	     gui_details_column_name[GUI_DETAILS_RAM_TOT], rt_units);
     gtk_tree_view_column_set_title(col[GUI_DETAILS_RAM_TOT],
 				   titlebuf);
 
-    snprintf(titlebuf, sizeof(titlebuf), "%s (%s)",
+    snprintf(titlebuf, sizeof(titlebuf), "%s\n(%s)",
 	     gui_details_column_name[GUI_DETAILS_RAM_AVAIL], ra_units);
     gtk_tree_view_column_set_title(col[GUI_DETAILS_RAM_AVAIL],
 				   titlebuf);
 
-    snprintf(titlebuf, sizeof(titlebuf), "%s (%s)",
+    snprintf(titlebuf, sizeof(titlebuf), "%s\n(%s)",
 	     gui_details_column_name[GUI_DETAILS_UPTIME], up_units);
     gtk_tree_view_column_set_title(col[GUI_DETAILS_UPTIME],
 				   titlebuf);
 
-    snprintf(titlebuf, sizeof(titlebuf), "%s (%s)",
+    snprintf(titlebuf, sizeof(titlebuf), "%s\n(%s)",
 	     gui_details_column_name[GUI_DETAILS_HANDLES_TOT], ht_units);
     gtk_tree_view_column_set_title(col[GUI_DETAILS_HANDLES_TOT],
 				   titlebuf);
 
-    snprintf(titlebuf, sizeof(titlebuf), "%s (%s)",
+    snprintf(titlebuf, sizeof(titlebuf), "%s\n(%s)",
 	     gui_details_column_name[GUI_DETAILS_HANDLES_AVAIL], ha_units);
     gtk_tree_view_column_set_title(col[GUI_DETAILS_HANDLES_AVAIL],
 				   titlebuf);
 
-    snprintf(titlebuf, sizeof(titlebuf), "%s (%s)",
+    snprintf(titlebuf, sizeof(titlebuf), "%s\n(%s)",
 	     gui_details_column_name[GUI_DETAILS_SPACE_TOT], bt_units);
     gtk_tree_view_column_set_title(col[GUI_DETAILS_SPACE_TOT],
 				   titlebuf);
 
-    snprintf(titlebuf, sizeof(titlebuf), "%s (%s)",
+    snprintf(titlebuf, sizeof(titlebuf), "%s\n(%s)",
 	     gui_details_column_name[GUI_DETAILS_SPACE_AVAIL], ba_units);
     gtk_tree_view_column_set_title(col[GUI_DETAILS_SPACE_AVAIL],
 				   titlebuf);
