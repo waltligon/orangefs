@@ -111,7 +111,7 @@ static int lookup_dcache_lookup(PINT_client_sm *sm_p,
 	fake_resp.u.lookup_path.handle_count = 1;
 	fake_resp.u.lookup_path.attr_count   = 0;
 
-	ret = sm_p->msgpair.comp_fn(sm_p, &fake_resp);
+	ret = sm_p->msgpair.comp_fn(sm_p, &fake_resp, 0);
 	return 1;
     }
 
