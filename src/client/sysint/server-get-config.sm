@@ -109,6 +109,11 @@ int PINT_server_get_config(
     PINT_init_sysint_credentials(sm_p->cred_p, &creds);
     sm_p->u.get_config.mntent = mntent_p;
 
+    if (ENCODING_IS_VALID(mntent_p->encoding))
+    {
+        sm_p->msgpair.enc_type = mntent_p->encoding;
+    }
+
     sm_p->msgarray_count = 1;
     sm_p->msgarray = &(sm_p->msgpair);
 

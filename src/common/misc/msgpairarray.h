@@ -44,6 +44,9 @@ typedef struct PINT_sm_msgpair_state_s
     struct PVFS_server_req req;
     struct PINT_encoded_msg encoded_req;
 
+    /* the encoding type to use for the req */
+    enum PVFS_encoding_type enc_type;
+
     /* max_resp_sz, svr_addr, and encoded_resp_p used to recv a response */
     int max_resp_sz;
     void *encoded_resp_p;
@@ -73,8 +76,10 @@ typedef struct PINT_sm_msgpair_params_s
     int retry_delay;
     int retry_limit;
     job_context_id job_context;
+
     /* comp_ct used to keep up with number of operations remaining */
     int comp_ct;
+
 } PINT_sm_msgpair_params;
 
 

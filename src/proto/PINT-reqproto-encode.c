@@ -82,13 +82,11 @@ void PINT_encode_finalize(void)
  * 
  * returns 0 on success, -PVFS_error on failure
  */
-int PINT_encode(
-		void* input_buffer,
+int PINT_encode(void* input_buffer,
 		enum PINT_encode_msg_type input_type,
 		struct PINT_encoded_msg* target_msg,
 		PVFS_BMI_addr_t target_addr,
-		enum PVFS_encoding_type enc_type
-		)
+		enum PVFS_encoding_type enc_type)
 {
     int ret = -1;
     target_msg->dest = target_addr;
@@ -150,13 +148,11 @@ int PINT_encode(
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int PINT_decode(
-		void* input_buffer,
+int PINT_decode(void* input_buffer,
 		enum PINT_encode_msg_type input_type,
 		struct PINT_decoded_msg* target_msg,
 		PVFS_BMI_addr_t target_addr,
-		PVFS_size size
-		)
+		PVFS_size size)
 {
     int i=0;
     char* buffer_index = (char*)input_buffer + PINT_ENC_GENERIC_HEADER_SIZE;
@@ -248,10 +244,8 @@ int PINT_decode(
  *
  * no return value
  */
-void PINT_encode_release(
-			 struct PINT_encoded_msg* input_buffer,
-			 enum PINT_encode_msg_type input_type
-			 )
+void PINT_encode_release(struct PINT_encoded_msg* input_buffer,
+			 enum PINT_encode_msg_type input_type)
 { 
     PINT_encoding_table[input_buffer->enc_type]->op->encode_release(
 	input_buffer, input_type);
@@ -266,15 +260,11 @@ void PINT_encode_release(
  *
  * no return value
  */
-void PINT_decode_release(
-			 struct PINT_decoded_msg* input_buffer,
-			 enum PINT_encode_msg_type input_type
-			 )
+void PINT_decode_release(struct PINT_decoded_msg* input_buffer,
+			 enum PINT_encode_msg_type input_type)
 {
     PINT_encoding_table[input_buffer->enc_type]->op->decode_release(
 	input_buffer, input_type);
-    
-    return;
 }
 
 
