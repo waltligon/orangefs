@@ -35,18 +35,18 @@ enum {
 
 %%
 
-machine crdirent(init,
-		 read_directory_entry_handle,
-		 read_parent_metadata,
-		 verify_parent_metadata,
-		 write_directory_entry,
-		 send,
-		 cleanup,
-		 create_dirdata_dspace,
-		 write_dirdata_handle,
-		 release,
-		 check_exist_directory_entry,
-		 handle_eexist)
+machine pvfs2_crdirent_sm(init,
+			  read_directory_entry_handle,
+			  read_parent_metadata,
+			  verify_parent_metadata,
+			  write_directory_entry,
+			  send,
+			  cleanup,
+			  create_dirdata_dspace,
+			  write_dirdata_handle,
+			  release,
+			  check_exist_directory_entry,
+			  handle_eexist)
 {
 	state init
 	{

@@ -27,7 +27,14 @@ extern job_context_id PINT_server_job_context;
 
 %%
 
-machine mkdir_(init, create, set_attrib, release, send, err_msg, critical_error, cleanup)
+machine pvfs2_mkdir_sm(init,
+		       create,
+		       set_attrib,
+		       release,
+		       send,
+		       err_msg,
+		       critical_error,
+		       cleanup)
 {
 	state init
 	{

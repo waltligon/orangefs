@@ -23,7 +23,7 @@ extern job_context_id PINT_server_job_context;
 
 %%
 
-machine get_config(init, bmi_send, cleanup)
+machine pvfs2_get_config_sm(init, bmi_send, cleanup)
 {
 	state init
 	{

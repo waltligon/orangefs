@@ -31,7 +31,7 @@ extern job_context_id PINT_server_job_context;
 
 %%
 
-machine get_attr(init,
+machine pvfs2_get_attr_sm(init,
 		 cleanup,
 		 getobj_attrib,
 		 send_bmi,

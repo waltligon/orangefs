@@ -30,15 +30,15 @@ extern job_context_id PINT_server_job_context;
 
 %%
 
-machine set_attr(init,
-		 cleanup,
-		 getobj_attrib,
-		 verify_attribs,
-		 write_metafile_datafile_handles,
-		 write_metafile_distribution,
-		 setobj_attrib,
-		 send_bmi,
-		 release)
+machine pvfs2_set_attr_sm(init,
+			  cleanup,
+			  getobj_attrib,
+			  verify_attribs,
+			  write_metafile_datafile_handles,
+			  write_metafile_distribution,
+			  setobj_attrib,
+			  send_bmi,
+			  release)
 {
 	state init
 	{

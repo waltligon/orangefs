@@ -75,17 +75,17 @@ extern job_context_id PINT_server_job_context;
 
 %%
 
-machine remove_(init,
-	       read_object_metadata,
-	       verify_object_metadata,
-	       fallback_to_dspace_getattr,
-	       verify_dspace_attributes,
-	       remove_dspace,
-	       try_to_read_dirdata_handle,
-	       remove_dirdata_dspace,
-	       send_response,
-	       release,
-	       cleanup)
+machine pvfs2_remove_sm(init,
+			read_object_metadata,
+			verify_object_metadata,
+			fallback_to_dspace_getattr,
+			verify_dspace_attributes,
+			remove_dspace,
+			try_to_read_dirdata_handle,
+			remove_dirdata_dspace,
+			send_response,
+			release,
+			cleanup)
 {
 	state init
 	{

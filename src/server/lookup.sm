@@ -37,14 +37,14 @@ extern job_context_id PINT_server_job_context;
 
 %%
 
-machine lookup(init,
-	       read_object_metadata,
-	       read_directory_entry_handle,
-	       read_directory_entry,
-	       verify_object_metadata,
-	       send_response,
-	       release,
-	       cleanup)
+machine pvfs2_lookup_sm(init,
+		        read_object_metadata,
+		        read_directory_entry_handle,
+		        read_directory_entry,
+		        verify_object_metadata,
+		        send_response,
+			release,
+			cleanup)
 {
     state init
 	{

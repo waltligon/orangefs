@@ -10,17 +10,17 @@
 #include "pvfs2-server.h"
 #include "state-machine-fns.h"
 
-extern PINT_state_machine get_config;
-extern PINT_state_machine get_attr;
-extern PINT_state_machine set_attr;
-extern PINT_state_machine create;
-extern PINT_state_machine crdirent;
-extern PINT_state_machine mkdir_;
-extern PINT_state_machine readdir_;
-extern PINT_state_machine lookup;
-extern PINT_state_machine io;
-extern PINT_state_machine remove_;
-extern PINT_state_machine rmdirent;
+extern PINT_state_machine pvfs2_get_config_sm;
+extern PINT_state_machine pvfs2_get_attr_sm;
+extern PINT_state_machine pvfs2_set_attr_sm;
+extern PINT_state_machine pvfs2_create_sm;
+extern PINT_state_machine pvfs2_crdirent_sm;
+extern PINT_state_machine pvfs2_mkdir_sm;
+extern PINT_state_machine pvfs2_readdir_sm;
+extern PINT_state_machine pvfs2_lookup_sm;
+extern PINT_state_machine pvfs2_io_sm;
+extern PINT_state_machine pvfs2_remove_sm;
+extern PINT_state_machine pvfs2_rmdirent_sm;
 
 /* table of state machines, indexed based on PVFS_server_op enumeration */
 /* NOTE: this table is initialized at run time in PINT_state_machine_init() */
@@ -101,18 +101,18 @@ int PINT_state_machine_init(void)
     int i;
 
     /* fill in indexes for each supported request type */
-    PINT_server_op_table[PVFS_SERV_INVALID] = NULL;
-    PINT_server_op_table[PVFS_SERV_CREATE] = &create;
-    PINT_server_op_table[PVFS_SERV_REMOVE] = &remove_;
-    PINT_server_op_table[PVFS_SERV_IO] = &io;
-    PINT_server_op_table[PVFS_SERV_GETATTR] = &get_attr;
-    PINT_server_op_table[PVFS_SERV_SETATTR] = &set_attr;
-    PINT_server_op_table[PVFS_SERV_LOOKUP_PATH] = &lookup;
-    PINT_server_op_table[PVFS_SERV_CREATEDIRENT] = &crdirent;
-    PINT_server_op_table[PVFS_SERV_RMDIRENT] = &rmdirent;
-    PINT_server_op_table[PVFS_SERV_MKDIR] = &mkdir_;
-    PINT_server_op_table[PVFS_SERV_READDIR] = &readdir_;
-    PINT_server_op_table[PVFS_SERV_GETCONFIG] = &get_config;
+    PINT_server_op_table[PVFS_SERV_INVALID]      = NULL;
+    PINT_server_op_table[PVFS_SERV_CREATE]       = &pvfs2_create_sm;
+    PINT_server_op_table[PVFS_SERV_REMOVE]       = &pvfs2_remove_sm;
+    PINT_server_op_table[PVFS_SERV_IO]           = &pvfs2_io_sm;
+    PINT_server_op_table[PVFS_SERV_GETATTR]      = &pvfs2_get_attr_sm;
+    PINT_server_op_table[PVFS_SERV_SETATTR]      = &pvfs2_set_attr_sm;
+    PINT_server_op_table[PVFS_SERV_LOOKUP_PATH]  = &pvfs2_lookup_sm;
+    PINT_server_op_table[PVFS_SERV_CREATEDIRENT] = &pvfs2_crdirent_sm;
+    PINT_server_op_table[PVFS_SERV_RMDIRENT]     = &pvfs2_rmdirent_sm;
+    PINT_server_op_table[PVFS_SERV_MKDIR]        = &pvfs2_mkdir_sm;
+    PINT_server_op_table[PVFS_SERV_READDIR]      = &pvfs2_readdir_sm;
+    PINT_server_op_table[PVFS_SERV_GETCONFIG]    = &pvfs2_get_config_sm;
 
     /* initialize each state machine */
     for (i = 0 ; i <= PVFS_MAX_SERVER_OP; i++)

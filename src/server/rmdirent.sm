@@ -27,7 +27,7 @@ extern job_context_id PINT_server_job_context;
 
 %%
 
-machine rmdirent(init,
+machine pvfs2_rmdirent_sm(init,
 		 read_parent_metadata,
 		 verify_parent_metadata_and_read_directory_entry_handle,
 		 read_directory_entry,

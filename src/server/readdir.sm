@@ -32,14 +32,14 @@ extern job_context_id PINT_server_job_context;
 
 %%
 
-machine readdir_(init,
-		iterate_on_entries,
-		read_dirdata_handle,
-		read_directory_metadata,
-		verify_directory_metadata,
-		send,
-		release,
-		cleanup)
+machine pvfs2_readdir_sm(init,
+			 iterate_on_entries,
+			 read_dirdata_handle,
+			 read_directory_metadata,
+			 verify_directory_metadata,
+			 send,
+			 release,
+			 cleanup)
 {
 	state init
 	{

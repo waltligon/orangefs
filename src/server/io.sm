@@ -40,7 +40,7 @@ extern job_context_id PINT_server_job_context;
 
 %%
 
-machine io(init, get_size, send_positive_ack, send_negative_ack, 
+machine pvfs2_io_sm(init, get_size, send_positive_ack, send_negative_ack, 
 	start_flow, cleanup, release, send_completion_ack)
 {
 	state init

@@ -23,7 +23,7 @@ extern job_context_id PINT_server_job_context;
 
 %%
 
-machine create(init, create2, send, release, cleanup)
+machine pvfs2_create_sm(init, create2, send, release, cleanup)
 {
 	state init
 	{
