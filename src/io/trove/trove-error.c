@@ -5,7 +5,6 @@
  */
 
 #include <errno.h>
-#include <db.h>
 
 #include "trove.h"
 #include "trove-internal.h"
@@ -81,12 +80,15 @@ PVFS_error trove_errno_to_trove_error(int errno_value)
 {
     int i;
 
+    /* don't try to map invalid values */
+    if (errno_value <= 0) return errno_value;
+
     while (trove_error_map[i].errno_value != 0) {
 	if (trove_error_map[i].errno_value == errno_value) {
 	    return trove_error_map[i].trove_value;
 	}
     }
-    return -4242;
+    return 4242; /* just return some identifiable number */
 }
 
 /*
