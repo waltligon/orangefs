@@ -165,10 +165,16 @@ int dcache_remove(struct dcache *cache,char *name,pinode_reference parent,
 			/* Remove the cache element */
 			dcache_remove_dentry(cache,i);
 			*item_found = 1;
+			gossip_ldebug(DCACHE_DEBUG, "dcache removing entry.\n");
 			break;
 		}
 		/* Get next element in cache */
 		i = cache->element[i].next;
+	}
+
+	if(*item_found == 0)
+	{
+		gossip_ldebug(DCACHE_DEBUG, "dcache found no entry to remove.\n");
 	}
 
 	/* Relase the mutex */
