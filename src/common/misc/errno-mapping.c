@@ -37,7 +37,7 @@ int PVFS_strerror_r(int errnum, char *buf, int n)
         char *tmpbuf = strerror_r(tmp, buf, limit);
         if (tmpbuf && (strcmp(tmpbuf, buf)))
         {
-            limit = PVFS_util_min(limit, strlen(tmpbuf));
+            limit = PVFS_util_min(limit, strlen(tmpbuf)+1);
             strncpy(buf, tmpbuf, (size_t)limit);
         }
         ret = (tmpbuf ? 0 : -1);
