@@ -176,6 +176,7 @@ int main(int argc, char **argv)	{
 	BMI_memfree(client_addr, recv_buffer, my_req->size, BMI_RECV_BUFFER);
 	BMI_memfree(client_addr, my_ack, sizeof(struct server_ack), 
 		BMI_SEND_BUFFER);
+	free(my_req);
 
 	/* shutdown the local interface */
 	ret = BMI_finalize();
@@ -188,6 +189,8 @@ int main(int argc, char **argv)	{
 	/* turn off debugging stuff */
 	gossip_disable();
 
+	free(user_opts->hostid);
+	free(user_opts);
 
 	return(0);
 }
