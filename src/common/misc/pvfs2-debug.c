@@ -27,7 +27,7 @@ GOSSIP_FLOW_DEBUG | GOSSIP_NCACHE_DEBUG | GOSSIP_ACACHE_DEBUG |   \
 GOSSIP_DIST_DEBUG | GOSSIP_DBPF_ATTRCACHE_DEBUG |                 \
 GOSSIP_MMAP_RCACHE_DEBUG | GOSSIP_LOOKUP_DEBUG |                  \
 GOSSIP_REMOVE_DEBUG | GOSSIP_GETATTR_DEBUG | GOSSIP_READDIR_DEBUG|\
-GOSSIP_IO_DEBUG)
+GOSSIP_IO_DEBUG | GOSSIP_DBPF_OPEN_CACHE_DEBUG)
 
 /* map all config keywords to pvfs2 debug masks here */
 static __keyword_mask_t s_keyword_mask_map[] =
@@ -53,6 +53,7 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "getattr", GOSSIP_GETATTR_DEBUG },
     { "readdir", GOSSIP_READDIR_DEBUG },
     { "io", GOSSIP_IO_DEBUG },
+    { "open_cache", GOSSIP_DBPF_OPEN_CACHE_DEBUG }, 
     { "verbose",  (__DEBUG_ALL & ~GOSSIP_REQ_SCHED_DEBUG)},
     { "none", GOSSIP_NO_DEBUG },
     { "all",  __DEBUG_ALL }

@@ -26,6 +26,7 @@
 #include "dbpf-keyval.h"
 #include "dbpf-op-queue.h"
 #include "dbpf-attr-cache.h"
+#include "dbpf-open-cache.h"
 
 #ifdef __PVFS2_TROVE_THREADED__
 #include <pthread.h>
@@ -383,16 +384,8 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
       remove bstream file if it exists. failure here is not a fatal
       error; this might have never been created.
     */
-    ret = dbpf_bstream_fdcache_try_remove(
+    ret = dbpf_open_cache_remove(
         op_p->coll_p->coll_id, op_p->handle);
-
-    switch (ret)
-    {
-	case DBPF_BSTREAM_FDCACHE_BUSY:
-	case DBPF_BSTREAM_FDCACHE_ERROR:
-	case DBPF_BSTREAM_FDCACHE_SUCCESS:
-	    break;
-    }
 
     /* return handle to free list */
     trove_handle_free(op_p->coll_p->coll_id,op_p->handle);
@@ -909,7 +902,8 @@ return_error:
 
 static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
 {
-    int ret, fd, got_db = 0, error = -TROVE_EINVAL;
+    int ret, got_db = 0, error = -TROVE_EINVAL;
+    struct open_cache_ref tmp_ref;
     DB *db_p, *kdb_p;
     DBT key, data;
     TROVE_ds_storedattr_s s_attr;
@@ -939,36 +933,27 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
     }
 
     /* get an fd for the bstream so we can check size */
-    ret = dbpf_bstream_fdcache_try_get(
-        op_p->coll_p->coll_id, op_p->handle, 0, &fd);
-    switch (ret)
+    ret = dbpf_open_cache_get(
+        op_p->coll_p->coll_id, op_p->handle, 0, DBPF_OPEN_FD, &tmp_ref);
+    if(ret < 0)
     {
-        case DBPF_BSTREAM_FDCACHE_ERROR:
-            /*
-              TODO:
-              how do we tell a real error from
-              'haven't yet created yet' error
-            */
-            /* b_size is already set to zero */
-	    break;
-	case DBPF_BSTREAM_FDCACHE_BUSY:
-            error = 0;
-            goto return_error;
-	case DBPF_BSTREAM_FDCACHE_SUCCESS:
-	    ret = DBPF_FSTAT(fd, &b_stat);
-            dbpf_bstream_fdcache_put(
-                op_p->coll_p->coll_id, op_p->handle);
-	    if (ret < 0)
-            {
-                error = -TROVE_EBADF;
-                goto return_error;
-            }
-	    b_size = (TROVE_size) b_stat.st_size;
-	    break;
-        default:
-            error = -TROVE_EINVAL;
-            goto return_error;
-            break;
+	/*
+	  TODO:
+	  how do we tell a real error from
+	  'haven't yet created yet' error
+	*/
+	/* b_size is already set to zero */
+    }
+    else
+    {
+	ret = DBPF_FSTAT(tmp_ref.fd, &b_stat);
+	dbpf_open_cache_put(&tmp_ref);
+	if (ret < 0)
+	{
+	    error = -TROVE_EBADF;
+	    goto return_error;
+	}
+	b_size = (TROVE_size) b_stat.st_size;
     }
 
     ret = dbpf_keyval_dbcache_try_get(

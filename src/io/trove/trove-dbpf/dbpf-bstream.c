@@ -22,6 +22,7 @@
 #include "dbpf-bstream.h"
 #include "dbpf-attr-cache.h"
 #include "pint-event.h"
+#include "dbpf-open-cache.h"
 
 #define AIOCB_ARRAY_SZ 8
 
@@ -260,29 +261,27 @@ static int dbpf_bstream_read_at(TROVE_coll_id coll_id,
  */
 static int dbpf_bstream_read_at_op_svc(struct dbpf_op *op_p)
 {
-    int ret, fd, got_fd = 0;
+    int ret, got_fd = 0;
+    struct open_cache_ref tmp_ref;
 
-    /* grab the FD (also increments a reference count) */
-    ret = dbpf_bstream_fdcache_try_get(
-        op_p->coll_p->coll_id, op_p->handle, 0, &fd);
-    switch (ret)
+    ret = dbpf_open_cache_get(op_p->coll_p->coll_id,
+	op_p->handle,
+	0,
+	DBPF_OPEN_FD,
+	&tmp_ref);
+    if(ret < 0)
     {
-	case DBPF_BSTREAM_FDCACHE_ERROR:
-	    goto return_error;
-	case DBPF_BSTREAM_FDCACHE_BUSY:
-	    return 0;
-	case DBPF_BSTREAM_FDCACHE_SUCCESS:
-	    got_fd = 1;
-            break;
+	goto return_error;
     }
+    got_fd = 1;
 
-    ret = DBPF_LSEEK(fd, op_p->u.b_read_at.offset, SEEK_SET);
+    ret = DBPF_LSEEK(tmp_ref.fd, op_p->u.b_read_at.offset, SEEK_SET);
     if (ret < 0)
     {
         goto return_error;
     }
     
-    ret = DBPF_READ(fd, op_p->u.b_read_at.buffer, op_p->u.b_read_at.size);
+    ret = DBPF_READ(tmp_ref.fd, op_p->u.b_read_at.buffer, op_p->u.b_read_at.size);
     if (ret < 0)
     {
         goto return_error;
@@ -290,13 +289,13 @@ static int dbpf_bstream_read_at_op_svc(struct dbpf_op *op_p)
     
     if (op_p->flags & TROVE_SYNC)
     {
-	if ((ret = DBPF_SYNC(fd)) != 0)
+	if ((ret = DBPF_SYNC(tmp_ref.fd)) != 0)
         {
 	    goto return_error;
 	}
     }
 
-    dbpf_bstream_fdcache_put(op_p->coll_p->coll_id, op_p->handle);
+    dbpf_open_cache_put(&tmp_ref);
 
     gossip_debug(GOSSIP_TROVE_DEBUG, "read %d bytes.\n", ret);
 
@@ -306,8 +305,9 @@ static int dbpf_bstream_read_at_op_svc(struct dbpf_op *op_p)
  return_error:
     if (got_fd)
     {
-        dbpf_bstream_fdcache_put(op_p->coll_p->coll_id, op_p->handle);
+	dbpf_open_cache_put(&tmp_ref);
     }
+    /* TODO: shouldn't this return a real error code? */
     return -1;
 }
 
@@ -359,29 +359,25 @@ static int dbpf_bstream_write_at(TROVE_coll_id coll_id,
 
 static int dbpf_bstream_write_at_op_svc(struct dbpf_op *op_p)
 {
-    int ret, fd, got_fd = 0;
+    int ret, got_fd = 0;
+    struct open_cache_ref tmp_ref;
 
     /* grab the FD (also increments a reference count) */
-    ret = dbpf_bstream_fdcache_try_get(
-        op_p->coll_p->coll_id, op_p->handle, 1, &fd);
-    switch (ret)
+    ret = dbpf_open_cache_get(op_p->coll_p->coll_id,
+	op_p->handle, 1, DBPF_OPEN_FD, &tmp_ref);
+    if (ret < 0)
     {
-	case DBPF_BSTREAM_FDCACHE_ERROR:
-	    goto return_error;
-	case DBPF_BSTREAM_FDCACHE_BUSY:
-	    return 0;
-	case DBPF_BSTREAM_FDCACHE_SUCCESS:
-	    got_fd = 1;
-            break;
+        goto return_error;
     }
+    got_fd = 1;
     
-    ret = DBPF_LSEEK(fd, op_p->u.b_write_at.offset, SEEK_SET);
+    ret = DBPF_LSEEK(tmp_ref.fd, op_p->u.b_write_at.offset, SEEK_SET);
     if (ret < 0)
     {
         goto return_error;
     }
     
-    ret = DBPF_WRITE(fd, op_p->u.b_write_at.buffer,
+    ret = DBPF_WRITE(tmp_ref.fd, op_p->u.b_write_at.buffer,
                      op_p->u.b_write_at.size);
     if (ret < 0)
     {
@@ -390,12 +386,12 @@ static int dbpf_bstream_write_at_op_svc(struct dbpf_op *op_p)
 
     if (op_p->flags & TROVE_SYNC)
     {
-	if ((ret = DBPF_SYNC(fd)) != 0)
+	if ((ret = DBPF_SYNC(tmp_ref.fd)) != 0)
         {
 	    goto return_error;
 	}
     }
-    dbpf_bstream_fdcache_put(op_p->coll_p->coll_id, op_p->handle);
+    dbpf_open_cache_put(&tmp_ref);
 
     gossip_debug(GOSSIP_TROVE_DEBUG, "wrote %d bytes.\n", ret);
 
@@ -405,8 +401,9 @@ static int dbpf_bstream_write_at_op_svc(struct dbpf_op *op_p)
  return_error:
     if (got_fd)
     {
-        dbpf_bstream_fdcache_put(op_p->coll_p->coll_id, op_p->handle);
+	dbpf_open_cache_put(&tmp_ref);
     }
+    /* TODO: shouldn't this return a real error code? */
     return -1;
 }
 
@@ -453,43 +450,32 @@ static int dbpf_bstream_flush(TROVE_coll_id coll_id,
  */
 static int dbpf_bstream_flush_op_svc(struct dbpf_op *op_p)
 {
-    int ret, error, fd, got_fd = 0;
+    int ret, error, got_fd = 0;
+    struct open_cache_ref tmp_ref;
 
     /* grab the FD (also increments a reference count) */
-    ret = dbpf_bstream_fdcache_try_get(
-        op_p->coll_p->coll_id, op_p->handle, 0, &fd);
-    switch (ret)
+    ret = dbpf_open_cache_get(
+        op_p->coll_p->coll_id, op_p->handle, 0, DBPF_OPEN_FD, &tmp_ref);
+    if(ret < 0)
     {
-	/*
-          TODO: fix the bstream error codes to
-          be like the keyval error codes
-        */
-	case -TROVE_ENOENT:
-	    error = ret;
-	    goto return_error;
-	case DBPF_BSTREAM_FDCACHE_ERROR:
-	    error = -1;
-	    goto return_error;
-	case DBPF_BSTREAM_FDCACHE_BUSY:
-	    return 0;
-	case DBPF_BSTREAM_FDCACHE_SUCCESS:
-	    got_fd = 1;
-            break;
+	error = -trove_errno_to_trove_error(ret);
+	goto return_error;
     }
+    got_fd = 1;
 
-    ret = DBPF_SYNC(fd);
+    ret = DBPF_SYNC(tmp_ref.fd);
     if (ret != 0)
     {
 	error = -trove_errno_to_trove_error(errno);
 	goto return_error;
     }
-    dbpf_bstream_fdcache_put(op_p->coll_p->coll_id, op_p->handle);
+    dbpf_open_cache_put(&tmp_ref);
     return 1;
 
 return_error:
     if (got_fd)
     {
-        dbpf_bstream_fdcache_put(op_p->coll_p->coll_id, op_p->handle);
+	dbpf_open_cache_put(&tmp_ref);
     }
     return error;
 }
@@ -540,38 +526,27 @@ static int dbpf_bstream_resize(TROVE_coll_id coll_id,
  */
 static int dbpf_bstream_resize_op_svc(struct dbpf_op *op_p)
 {
-    int ret, error, fd, got_fd = 0;
+    int ret, error, got_fd = 0;
+    struct open_cache_ref tmp_ref;
     TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
 
     /* grab the FD (also increments a reference count) */
-    ret = dbpf_bstream_fdcache_try_get(
-        op_p->coll_p->coll_id, op_p->handle, 1, &fd);
-    switch (ret)
+    ret = dbpf_open_cache_get(
+        op_p->coll_p->coll_id, op_p->handle, 1, DBPF_OPEN_FD, &tmp_ref);
+    if(ret < 0)
     {
-	/*
-          TODO: fix the bstream error codes to
-          be like the keyval error codes
-        */
-	case -TROVE_ENOENT:
-	    error = ret;
-	    goto return_error;
-	case DBPF_BSTREAM_FDCACHE_ERROR:
-	    error = -1;
-	    goto return_error;
-	case DBPF_BSTREAM_FDCACHE_BUSY:
-	    return 0;
-	case DBPF_BSTREAM_FDCACHE_SUCCESS:
-	    got_fd = 1;
-            break;
+	error = -trove_errno_to_trove_error(ret);
+	goto return_error;
     }
+    got_fd = 1;
 
-    ret = DBPF_RESIZE(fd, op_p->u.b_resize.size);
+    ret = DBPF_RESIZE(tmp_ref.fd, op_p->u.b_resize.size);
     if ( ret != 0)
     {
 	error = -trove_errno_to_trove_error(errno);
 	goto return_error;
     }
-    dbpf_bstream_fdcache_put(op_p->coll_p->coll_id, op_p->handle);
+    dbpf_open_cache_put(&tmp_ref);
 
     /* adjust size in cached attribute element, if present */
     dbpf_attr_cache_ds_attr_update_cached_data_bsize(
@@ -582,7 +557,7 @@ static int dbpf_bstream_resize_op_svc(struct dbpf_op *op_p)
 return_error:
     if (got_fd)
     {
-        dbpf_bstream_fdcache_put(op_p->coll_p->coll_id, op_p->handle);
+	dbpf_open_cache_put(&tmp_ref);
     }
     return error;
 }
@@ -684,7 +659,7 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
 				       TROVE_op_id *out_op_id_p,
 				       int opcode)
 {
-    int ret, fd;
+    int ret;
     dbpf_queued_op_t *q_op_p;
     struct dbpf_collection *coll_p;
     enum dbpf_op_type tmp_type;
@@ -757,16 +732,17 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
       get an FD so we can access the file; last
       parameter controls file creation
     */
-    ret = dbpf_bstream_fdcache_try_get(
-        coll_id, handle, (opcode == LIO_WRITE) ? 1 : 0, &fd);
+    ret = dbpf_open_cache_get(
+        coll_id, handle, (opcode == LIO_WRITE) ? 1 : 0, DBPF_OPEN_FD,
+	&q_op_p->op.u.b_rw_list.open_ref);
     if (ret < 0)
     {
 	dbpf_queued_op_free(q_op_p);
 	gossip_ldebug(GOSSIP_TROVE_DEBUG,
                       "warning: useless error value\n");
-	return -1;
+        return -trove_errno_to_trove_error(ret);
     }
-    q_op_p->op.u.b_rw_list.fd = fd;
+    q_op_p->op.u.b_rw_list.fd = q_op_p->op.u.b_rw_list.open_ref.fd;
 
     /*
       if we're doing an i/o write, remove the cached
@@ -795,7 +771,7 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     aiocb_p = (struct aiocb *)malloc(AIOCB_ARRAY_SZ*sizeof(struct aiocb));
     if (aiocb_p == NULL)
     {
-        dbpf_bstream_fdcache_put(op_p->coll_p->coll_id, handle);
+	dbpf_open_cache_put(&q_op_p->op.u.b_rw_list.open_ref);
         return -TROVE_ENOMEM;
     }
 
@@ -873,7 +849,7 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     if (ret != 0)
     {
         gossip_lerr("lio_listio() returned %d\n", ret);
-	dbpf_bstream_fdcache_put(op_p->coll_p->coll_id, handle);
+	dbpf_open_cache_put(&q_op_p->op.u.b_rw_list.open_ref);
         return -trove_errno_to_trove_error(errno);
     }
     gossip_debug(GOSSIP_TROVE_DEBUG, " +++ lio_listio posted %p "
@@ -898,7 +874,7 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
  * method.
  *
  * Assumptions:
- * - FD has been retrieved from fdcache, is refct'd so it won't go
+ * - FD has been retrieved from open cache, is refct'd so it won't go
  *   away
  * - lio_state in the op is valid
  * - opcode is set to LIO_READ or LIO_WRITE (corresponding to a

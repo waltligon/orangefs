@@ -15,6 +15,7 @@ extern "C" {
 #include <aio.h>
 #include "trove.h"
 #include "gen-locks.h"
+#include "dbpf-open-cache.h"
 
 #define TROVE_DBPF_VERSION_KEY                       "trove-dbpf-version"
 #define TROVE_DBPF_VERSION_VALUE                                  "0.0.1"
@@ -282,6 +283,7 @@ enum
  */
 struct dbpf_bstream_rw_list_op
 {
+    struct open_cache_ref open_ref;
     int fd, list_proc_state, opcode;
     int aiocb_array_count, mem_array_count, stream_array_count;
     char **mem_offset_array;
