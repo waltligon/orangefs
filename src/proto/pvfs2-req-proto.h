@@ -374,7 +374,7 @@ struct PVFS_servreq_io_s
     PVFS_handle handle;		/* handle to operate on */
     PVFS_fs_id fs_id;		/* file system id */
     enum PVFS_servreq_io_type io_type;	/* type of I/O operation */
-    enum flowproto_type flow_type;	/* type of flow protocol */
+    enum PVFS_flowproto_type flow_type;	/* type of flow protocol */
     /* relative number of this I/O server in distribution */
     PVFS_count32 iod_num;
     /* total number of I/O servers involved in distribution */

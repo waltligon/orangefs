@@ -44,7 +44,7 @@ static int io_req_ack_flow_array(bmi_addr_t* addr_array,
     PVFS_object_attr* attr_p,
     PVFS_sysreq_io* req,
     enum PVFS_sys_io_type type,
-    enum flowproto_type flow_type);
+    enum PVFS_flowproto_type flow_type);
 static void io_release_req_ack_flow_array(bmi_addr_t* addr_array,
     struct PVFS_server_req_s* req_array,
     bmi_size_t max_resp_size,
@@ -80,7 +80,7 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
     int total_errors = 0;
     PVFS_msg_tag_t* op_tag_array = NULL;
     /* TODO: might want hooks to set this from app. level later */
-    enum flowproto_type flow_type = FLOWPROTO_ANY;
+    enum PVFS_flowproto_type flow_type = FLOWPROTO_ANY;
 
     struct PINT_Request_state* req_state = NULL;
     PINT_Request_file_data tmp_file_data;
@@ -432,7 +432,7 @@ static int io_req_ack_flow_array(bmi_addr_t* addr_array,
     PVFS_object_attr* attr_p,
     PVFS_sysreq_io* req,
     enum PVFS_sys_io_type type,
-    enum flowproto_type flow_type)
+    enum PVFS_flowproto_type flow_type)
 {
     int i;
     int ret = -1;

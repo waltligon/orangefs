@@ -18,6 +18,12 @@ typedef int64_t PVFS_size;
 /* basic types used by communication subsystems */
 typedef int32_t PVFS_msg_tag_t;
 typedef int32_t PVFS_context_id;
+enum PVFS_flowproto_type
+{
+    FLOWPROTO_ANY = 1,
+    FLOWPROTO_BMI_TROVE = 2,
+    FLOWPROTO_DUMP_OFFSETS = 3
+};
 
 /* basic types used by storage subsystem */
 typedef int64_t PVFS_handle;
@@ -35,7 +41,6 @@ typedef uint32_t PVFS_bitfield;
 typedef int32_t PVFS_flag;
 typedef int32_t PVFS_count32;
 typedef int64_t PVFS_count64;
-typedef uint64_t PVFS_flow_id;
 typedef int16_t PVFS_type;
 typedef int64_t PVFS_token;
 
