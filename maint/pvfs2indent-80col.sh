@@ -21,4 +21,5 @@ indent --brace-indent0 \
        --no-space-after-function-call-names \
        --dont-break-procedure-type \
        -st \
+       -nut \
        $@
