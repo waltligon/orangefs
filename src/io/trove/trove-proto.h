@@ -311,8 +311,7 @@ int trove_dspace_test(TROVE_coll_id coll_id,
 		      TROVE_ds_state *state_p,
 		      int max_idle_time_ms);
 
-int trove_dspace_testsome(
-			  TROVE_coll_id coll_id,
+int trove_dspace_testsome(TROVE_coll_id coll_id,
 			  TROVE_context_id context_id,
 			  TROVE_op_id *ds_id_array,
 			  int *inout_count_p,
@@ -322,8 +321,7 @@ int trove_dspace_testsome(
 			  TROVE_ds_state *state_array,
 			  int max_idle_time_ms);
 
-int trove_dspace_testcontext(
-			     TROVE_coll_id coll_id,
+int trove_dspace_testcontext(TROVE_coll_id coll_id,
 			     TROVE_op_id *ds_id_array,
 			     int *inout_count_p,
 			     TROVE_ds_state *state_array,

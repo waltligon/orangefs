@@ -79,7 +79,7 @@ static void aio_progress_notification(sigval_t sig)
     assert(op_p);
 
     gossip_debug(
-        GOSSIP_TROVE_DEBUG,"aio_progress_notification called "
+        GOSSIP_TROVE_DEBUG," --- aio_progress_notification called "
         "with %p (handle %Lu)\n", sig.sival_ptr, Lu(op_p->handle));
 
     aiocb_p = op_p->u.b_rw_list.aiocb_array;
@@ -109,10 +109,9 @@ static void aio_progress_notification(sigval_t sig)
         {
             /* aio_return gets the return value of the individual op */
             ret = aio_return(&aiocb_p[i]);
-#if 0
+
             gossip_debug(GOSSIP_TROVE_DEBUG,
                          "  aio_return() says %d\n", ret);
-#endif
 
             /* mark as a NOP so we ignore it from now on */
             aiocb_p[i].aio_lio_opcode = LIO_NOP;
@@ -892,6 +891,9 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
 	dbpf_bstream_fdcache_put(op_p->coll_p->coll_id, handle);
         return -trove_errno_to_trove_error(errno);
     }
+    gossip_debug(GOSSIP_TROVE_DEBUG, " +++ lio_listio posted %p "
+                 "(handle %Lu) and returned %d\n", q_op_p,
+                 Lu(handle), ret);
 #endif
 
     return 0;
