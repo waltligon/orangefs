@@ -13,7 +13,7 @@
 #include "pvfs-request.h"
 #include "flow.h"
 
-typedef enum
+enum PVFS_server_op
 {
     PVFS_SERV_INVALID = 0,
     PVFS_SERV_CREATE = 1,
@@ -37,8 +37,7 @@ typedef enum
  * PVFS_SERV_EXTENSION
  * PVFS_SERV_STATFS
  */
-}
-PVFS_server_op;
+};
 
 /* Metaserver status structure */
 struct PVFS_mserv_stat_s
@@ -386,7 +385,7 @@ typedef struct PVFS_servresp_write_completion_s PVFS_servresp_write_completion;
  */
 struct PVFS_server_req_s
 {
-    PVFS_server_op op;
+    enum PVFS_server_op op;
     PVFS_size rsize;
     PVFS_credentials credentials;
     union
@@ -415,7 +414,7 @@ struct PVFS_server_req_s
 
 struct PVFS_server_resp_s
 {
-    PVFS_server_op op;
+    enum PVFS_server_op op;
     PVFS_size rsize;
     PVFS_error status;
     union
