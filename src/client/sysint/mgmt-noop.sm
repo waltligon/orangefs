@@ -20,35 +20,34 @@
 
 extern job_context_id pint_client_sm_context;
 
-/* state function prototypes */
-static int mgmt_noop_setup_msgpair(PINT_client_sm *sm_p,
-                                   job_status_s *js_p);
-
-static int mgmt_noop_cleanup(PINT_client_sm *sm_p,
-                             job_status_s *js_p);
+static int mgmt_noop_setup_msgpair(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int mgmt_noop_cleanup(
+    PINT_client_sm *sm_p, job_status_s *js_p);
 
 %%
 
-machine pvfs2_client_mgmt_noop_sm(
-    setup_msgpair,
-    xfer_msgpair,
-    cleanup)
+machine pvfs2_client_mgmt_noop_sm(setup_msgpair,
+                                  xfer_msgpair,
+                                  cleanup)
 {
-
-    state setup_msgpair {
-	run mgmt_noop_setup_msgpair;
-	success => xfer_msgpair;
-	default => cleanup;
+    state setup_msgpair
+    {
+        run mgmt_noop_setup_msgpair;
+        success => xfer_msgpair;
+        default => cleanup;
     }
 
-    state xfer_msgpair {
-	jump pvfs2_client_msgpair_sm;
-	default => cleanup;
+    state xfer_msgpair
+    {
+        jump pvfs2_client_msgpair_sm;
+        default => cleanup;
     }
 
-    state cleanup {
-	run mgmt_noop_cleanup;
-	default => terminate;
+    state cleanup
+    {
+        run mgmt_noop_cleanup;
+        default => terminate;
     }
 }
 
@@ -58,53 +57,52 @@ int PVFS_mgmt_noop(PVFS_fs_id fs_id,
 		   PVFS_credentials credentials,
 		   PVFS_BMI_addr_t addr)
 {
-    int ret;
-    PINT_client_sm *sm_p;
+    int ret = -PVFS_EINVAL;
+    PINT_client_sm *sm_p = NULL;
     PVFS_error error;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_noop entered\n");
 
-    sm_p = (PINT_client_sm *) malloc(sizeof(*sm_p));
-    if (sm_p == NULL) return -PVFS_ENOMEM;
-
+    sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));
+    if (!sm_p)
+    {
+        return -PVFS_ENOMEM;
+    }
     memset(sm_p, 0, sizeof(*sm_p));
 
     sm_p->cred_p = &credentials;
-    sm_p->msgpair.fs_id    = fs_id;
+    sm_p->msgpair.fs_id = fs_id;
     sm_p->msgpair.svr_addr = addr;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_noop calling "
                  "PINT_client_state_machine_post()\n");
 
-    /* do something to kick off processing */
     ret = PINT_client_state_machine_post(sm_p, PVFS_MGMT_NOOP);
     if (ret < 0)
     {
-	/* this should not fail under normal conditions */
-	assert(0);
 	gossip_lerr("Error: PINT_client_state_machine_post() failure.\n");
+        free(sm_p);
 	return ret;
     }
 
-    /* while !done call progress function */
-    while (!sm_p->op_complete && ret == 0)
+    while (!sm_p->op_complete && (ret == 0))
     {
 	gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_noop calling "
                      "PINT_client_state_machine_test()\n");
 	ret = PINT_client_state_machine_test();
     }
-    if (ret < 0)
+
+    if (ret)
     {
 	gossip_lerr("Error: PINT_client_state_machine_test() failure.\n");
+        free(sm_p);
 	return ret;
     }
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_mgmt_noop completed\n");
 
-    /* save our return value */
     error = sm_p->error_code;
 
-    /* clean up after ourselves */
     free(sm_p);
     return error;
 }
@@ -115,11 +113,8 @@ static int mgmt_noop_setup_msgpair(PINT_client_sm *sm_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "noop state: mgmt_noop_setup_msgpair\n");
 
-    /* fill in noop request */
-    PINT_SERVREQ_MGMT_NOOP_FILL(sm_p->msgpair.req,
-	*sm_p->cred_p);
+    PINT_SERVREQ_MGMT_NOOP_FILL(sm_p->msgpair.req, *sm_p->cred_p);
 
-    /* immediate return: next state jumps to msgpairarray machine */
     js_p->error_code = 0;
     return 1;
 }
@@ -127,11 +122,9 @@ static int mgmt_noop_setup_msgpair(PINT_client_sm *sm_p,
 static int mgmt_noop_cleanup(PINT_client_sm *sm_p,
 			     job_status_s *js_p)
 {
-    /* NOTE: leaving the js_p->error_code intact on purpose, so that
-     * it gets propigated to calling state machine
-     */
-    sm_p->op_complete = 1;
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "noop state: mgmt_noop_cleanup\n");
 
+    sm_p->op_complete = 1;
     return 0;
 }
 

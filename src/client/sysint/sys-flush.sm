@@ -98,8 +98,8 @@ int PVFS_sys_flush(PVFS_pinode_reference refn,
     if ((refn.fs_id == PVFS_FS_ID_NULL) ||
         (refn.handle == PVFS_HANDLE_NULL))
     {
-	gossip_err("Invalid handle/fs_id specified\n");
-	return ret;
+        gossip_err("Invalid handle/fs_id specified\n");
+        return ret;
     }
 
     sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));
@@ -115,23 +115,23 @@ int PVFS_sys_flush(PVFS_pinode_reference refn,
     ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_FLUSH);
     if (ret)
     {
-	gossip_lerr("Error: PINT_client_state_machine_post() failure.\n");
+        gossip_lerr("Error: PINT_client_state_machine_post() failure.\n");
         free(sm_p);
         return ret;
     }
 
     while (!sm_p->op_complete && (ret == 0))
     {
-	gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_flush calling "
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_flush calling "
                      "PINT_client_state_machine_test()\n");
-	ret = PINT_client_state_machine_test();
+        ret = PINT_client_state_machine_test();
     }
 
     if (ret)
     {
-	gossip_lerr("Error: PINT_client_state_machine_test() failure.\n");
-	free(sm_p);
-	return(ret);
+        gossip_lerr("Error: PINT_client_state_machine_test() failure.\n");
+        free(sm_p);
+        return(ret);
     }
 
     error = sm_p->error_code;
@@ -141,7 +141,7 @@ int PVFS_sys_flush(PVFS_pinode_reference refn,
 }
 
 static int flush_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
-					    job_status_s *js_p)
+                                             job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL, i = 0;
     PVFS_object_attr *attr = NULL;
@@ -166,7 +166,7 @@ static int flush_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
 
     /* allocate memory for datafile message pairs and the metafile */
     sm_p->msgarray = (PINT_client_sm_msgpair_state *)
-	malloc(sm_p->msgarray_count *
+        malloc(sm_p->msgarray_count *
                sizeof(PINT_client_sm_msgpair_state));
     if (!sm_p->msgarray)
     {
@@ -176,7 +176,7 @@ static int flush_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
 
     for(i = 0; i < sm_p->msgarray_count; i++)
     {
-	msg_p = &sm_p->msgarray[i];
+        msg_p = &sm_p->msgarray[i];
 
         if (i < attr->u.meta.dfile_count)
         {
@@ -217,23 +217,23 @@ static int flush_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
         sm_p->msgarray_count, sm_p->msgarray);
     if (ret)
     {
-	gossip_err("Error: failed to resolve server addresses.\n");
+        gossip_err("Error: failed to resolve server addresses.\n");
         js_p->error_code = ret;
     }
     return 1;
 }
 
 static int flush_datafile_flush_failure(PINT_client_sm *sm_p,
-					job_status_s *js_p)
+                                        job_status_s *js_p)
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-		 "(%p) flush state: datafile_flush_failure\n",
-		 sm_p);
+                 "(%p) flush state: datafile_flush_failure\n",
+                 sm_p);
     return 1;
 }
 
 static int flush_cleanup(PINT_client_sm *sm_p,
-			job_status_s *js_p)
+                         job_status_s *js_p)
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "(%p) flush state: flush_cleanup\n", sm_p);
