@@ -114,7 +114,7 @@ int PVFS_sys_io_old(PVFS_pinode_reference pinode_refn, PVFS_Request file_req,
     }
 
     /* check permissions */
-    ret = check_perms(pinode_ptr->attr, pinode_ptr->attr.perms,
+    ret = PINT_check_perms(pinode_ptr->attr, pinode_ptr->attr.perms,
                       credentials.uid, credentials.gid);
     if(ret < 0)
     {

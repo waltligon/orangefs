@@ -82,7 +82,7 @@ int PVFS_sys_rename(
     }
 
     /* are we allowed to delete this file? */
-    ret = check_perms(old_entry_p->attr, old_entry_p->attr.perms,
+    ret = PINT_check_perms(old_entry_p->attr, old_entry_p->attr.perms,
                       credentials.uid, credentials.gid);
     if (ret < 0)
     {
@@ -104,7 +104,7 @@ int PVFS_sys_rename(
     }
 
     /* check permissions in parent directory */
-    ret = check_perms(new_parent_p->attr, new_parent_p->attr.perms,
+    ret = PINT_check_perms(new_parent_p->attr, new_parent_p->attr.perms,
                       credentials.uid, credentials.gid);
     if (ret < 0)
     {

@@ -101,7 +101,7 @@ int PVFS_sys_create_old(
         assert(parent_ptr);
 
 	/* check permissions in parent directory */
-	ret = check_perms(parent_ptr->attr, parent_ptr->attr.perms,
+	ret = PINT_check_perms(parent_ptr->attr, parent_ptr->attr.perms,
                           credentials.uid, credentials.gid);
 	if (ret < 0)
 	{

@@ -92,7 +92,7 @@ int PVFS_sys_remove_old(char* entry_name,
     }
 
     /* are we allowed to delete this file? */
-    ret = check_perms(pinode_ptr->attr, pinode_ptr->attr.perms,
+    ret = PINT_check_perms(pinode_ptr->attr, pinode_ptr->attr.perms,
 		      credentials.uid, credentials.gid);
     if (ret < 0)
     { 

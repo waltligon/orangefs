@@ -250,7 +250,7 @@ int PVFS_sys_ref_lookup(
 	    }
 
 	    /* Check permissions for path */
-	    ret = check_perms(pinode_ptr->attr, pinode_ptr->attr.perms,
+	    ret = PINT_check_perms(pinode_ptr->attr, pinode_ptr->attr.perms,
                               credentials.uid, credentials.gid);
 	    if (ret < 0)
 	    {

@@ -303,13 +303,13 @@ int get_next_session_tag(void)
 }
 
 
-/* check_perms
+/* PINT_check_perms
  *
  * check permissions of a PVFS object against the access mode
  *
  * returns 0 on success, -1 on error
  */
-int check_perms(PVFS_object_attr attr,
+int PINT_check_perms(PVFS_object_attr attr,
 		PVFS_permissions mode,
 		int uid,
 		int gid)

@@ -149,7 +149,7 @@ int sm_common_getattr_comp_fn(void *v_p,
           check permissions against parent directory to determine
           if we're allowed to create a new entry there
         */
-        ret = check_perms(*attr, attr->perms,
+        ret = PINT_check_perms(*attr, attr->perms,
                           sm_p->cred_p->uid, sm_p->cred_p->gid);
         if (ret < 0)
         {
