@@ -145,42 +145,25 @@ static int getconfig_init(PINT_server_op *s_op, job_status_s *ret)
     cur = user_opts->file_systems;
     cur_fs = llist_head(cur);
 
+    /*
+      this is a hack because we're only grabbing the top servers
+      here from the list instead of packing all of them.  Before 'fixing'
+      this, we need to decide if the getconfig as currently implemented
+      is worth preserving, or if it should be changed entirely.
+
+      (For example, buckets assignments can't be passed at all until
+      this is updated)
+    */
     meta_server = (char *)llist_head(cur_fs->meta_server_list);
     data_server = (char *)llist_head(cur_fs->data_server_list);
 
     /* get alias for meta server */
-    cur = user_opts->host_aliases;
-    while(cur)
-    {
-        cur_alias = llist_head(cur);
-        if (!cur_alias)
-        {
-            break;
-        }
-        if (strcmp(cur_alias->host_alias,meta_server) == 0)
-        {
-            meta_server = cur_alias->bmi_address;
-            break;
-        }
-        cur = llist_next(cur);
-    }
-
+    meta_server = PINT_server_config_get_host_alias_ptr(user_opts,meta_server);
+    assert(meta_server);
+ 
     /* get alias for io server */
-    cur = user_opts->host_aliases;
-    while(cur)
-    {
-        cur_alias = llist_head(cur);
-        if (!cur_alias)
-        {
-            break;
-        }
-        if (strcmp(cur_alias->host_alias,data_server) == 0)
-        {
-            data_server = cur_alias->bmi_address;
-            break;
-        }
-        cur = llist_next(cur);
-    }
+    data_server = PINT_server_config_get_host_alias_ptr(user_opts,data_server);
+    assert(data_server);
 
     s_op->resp->u.getconfig.meta_server_mapping = meta_server;
     s_op->resp->u.getconfig.io_server_mapping = data_server;

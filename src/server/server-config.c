@@ -612,6 +612,34 @@ static void free_filesystem(void *ptr)
     }
 }
 
+char *PINT_server_config_get_host_alias_ptr(struct server_configuration_s *config_s,
+                                            char *alias)
+{
+    char *ret = (char *)0;
+    struct llist *cur = NULL;
+    struct host_alias_s *cur_alias = NULL;
+
+    if (config_s && alias)
+    {
+        cur = config_s->host_aliases;
+        while(cur)
+        {
+            cur_alias = llist_head(cur);
+            if (!cur_alias)
+            {
+                break;
+            }
+            if (strcmp(cur_alias->host_alias,alias) == 0)
+            {
+                ret = cur_alias->bmi_address;
+                break;
+            }
+        }
+    }
+    return ret;
+}
+
+
 /*
   vim:set ts=4:
   vim:set shiftwidth=4:
