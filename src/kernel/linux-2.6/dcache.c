@@ -13,12 +13,12 @@
 /* should return 1 if dentry can still be trusted, else 0 */
 int pvfs2_d_revalidate(
     struct dentry *dentry,
-    int flag)
+    struct nameidata *nd)
 {
     int ret = 0;
     struct inode *inode = dentry->d_inode;
 
-    pvfs2_print("pvfs2: pvfs2_d_revalidate called (flag is %d)\n", flag);
+    pvfs2_print("pvfs2: pvfs2_d_revalidate called\n");
 
     if (inode)
     {

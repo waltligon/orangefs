@@ -24,7 +24,8 @@ extern struct dentry_operations pvfs2_dentry_operations;
 static int pvfs2_create(
     struct inode *dir,
     struct dentry *dentry,
-    int mode)
+    int mode,
+    struct nameidata *nd)
 {
     struct inode *inode =
 	pvfs2_create_entry(dir, dentry, mode, PVFS2_VFS_OP_CREATE);
@@ -34,7 +35,8 @@ static int pvfs2_create(
 
 static struct dentry *pvfs2_lookup(
     struct inode *dir,
-    struct dentry *dentry)
+    struct dentry *dentry,
+    struct nameidata *nd)
 {
     int ret = -1;
     struct inode *inode = NULL;
@@ -43,7 +45,9 @@ static struct dentry *pvfs2_lookup(
     pvfs2_inode_t *found_pvfs2_inode = NULL;
 
     if (dentry->d_name.len > PVFS2_NAME_LEN)
+    {
 	return ERR_PTR(-ENAMETOOLONG);
+    }
 
     new_op = kmem_cache_alloc(op_cache, SLAB_KERNEL);
     if (!new_op)

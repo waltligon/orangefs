@@ -53,6 +53,11 @@ static inline int copy_attributes_to_inode(
 
     if (inode && attrs)
     {
+        if (attrs->mask & PVFS_ATTR_SYS_SIZE)
+            inode->i_size = (off_t)attrs->size;
+        else
+            inode->i_size = 0;
+
 	inode->i_uid = attrs->owner;
 	inode->i_gid = attrs->group;
 	inode->i_atime.tv_sec = (time_t) attrs->atime;
@@ -351,10 +356,12 @@ int pvfs2_inode_setattr(
 {
     int ret = -1;
     pvfs2_kernel_op_t *new_op = NULL;
-    pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
+    pvfs2_inode_t *pvfs2_inode = NULL;
 
     if (inode)
     {
+        pvfs2_inode = PVFS2_I(inode);
+
 	new_op = kmem_cache_alloc(op_cache, SLAB_KERNEL);
 	if (!new_op)
 	{
