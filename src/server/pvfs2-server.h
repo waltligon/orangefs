@@ -101,6 +101,13 @@ struct PINT_server_getconfig_op {
 struct PINT_server_io_op {
     flow_descriptor* flow_d;
 };
+
+struct PINT_server_flush_op {
+    PVFS_handle handle;	    /* handle of data we want to flush to disk */
+    int flags;		    /* any special flags for flush */
+};
+
+
     
 /* This structure is passed into the void *ptr 
  * within the job interface.  Used to tell us where
@@ -151,6 +158,7 @@ typedef struct PINT_server_op
 	struct PINT_server_remove_op    remove;
 	struct PINT_server_rmdirent_op  rmdirent;
 	struct PINT_server_io_op	io;
+	struct PINT_server_flush_op	flush;
     } u; /* TODO: RENAME TO 'scratch' */
 } PINT_server_op;
 

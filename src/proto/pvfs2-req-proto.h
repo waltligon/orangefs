@@ -324,6 +324,20 @@ struct PVFS_servreq_truncate
  * returned in generic server response structure
  */
 
+/* flush
+ * - flush data to disk (or other storage device) */
+
+struct PVFS_servreq_flush
+{
+    PVFS_handle handle;		    /* handle of object to flush */
+    PVFS_fs_id fs_id;		    /* file system */
+    int flags;			    
+};
+
+/* NOTE: no response structure: all necessary response info is returned in
+ * generic server response structure
+ */
+
 /* io **********************************************************/
 /* - performs a read or write operation */
 
@@ -384,6 +398,7 @@ struct PVFS_server_req
 	struct PVFS_servreq_createdirent crdirent;
 	struct PVFS_servreq_rmdirent rmdirent;
 	struct PVFS_servreq_truncate truncate;
+	struct PVFS_servreq_flush flush;
     }
     u;
 };

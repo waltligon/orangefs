@@ -1,0 +1,171 @@
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+#include <stdio.h>
+#include <string.h>
+#include <assert.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+#include "server-config.h"
+#include "pvfs2-server.h"
+
+static int flush_keyval_flush(PINT_server_op *s_op, job_status_s * js_p);
+static int flush_bstream_flush(PINT_server_op *s_op, job_status_s * js_p);
+static int flush_cleanup(PINT_server_op *s_op, job_status_s *ret);
+static int flush_check_error(PINT_server_op *s_op, job_status_s *js_p);
+void flush_init_state_machine(void);
+
+extern job_context_id PINT_server_job_context;
+
+%%
+
+machine pvfs2_flush_sm(prelude, kflush, kflush_check_error, bflush, 
+	bflush_check_error, final_response, cleanup)
+{
+    state prelude
+    {
+	jump pvfs2_prelude_sm;
+	success => kflush;
+	default => final_response;
+    }
+
+    state kflush
+    {
+	run flush_keyval_flush;
+	default => kflush_check_error;
+    }
+
+    state kflush_check_error
+    {
+	run flush_check_error;
+	success => bflush;
+	default => final_response;
+    }
+
+    state bflush
+    {
+	run flush_bstream_flush;
+	default => bflush_check_error;
+    }
+
+    state bflush_check_error
+    {
+	run flush_check_error;
+	default => final_response;
+    }
+
+    state final_response
+    {
+	jump pvfs2_final_response_sm;
+	default => cleanup;
+    }
+
+    state cleanup
+    {
+	run flush_cleanup;
+	default => prelude;
+    }
+}
+
+%%
+/*
+ * Function: flush_keyval_flush
+ *
+ * Params:  server_op *s_op,
+ *	    job_status_s *js_p
+ *
+ * Pre: None
+ * Post: None
+ * Returns: int
+ *
+ * Synopsys: send a keyval flush request to storage
+ *
+ */
+
+static int flush_keyval_flush(PINT_server_op *s_op, job_status_s * js_p)
+{
+    int ret;
+    job_id_t i;
+
+    ret = job_trove_keyval_flush(s_op->req->u.flush.fs_id,
+	    s_op->req->u.flush.handle,
+	    s_op->req->u.flush.flags,
+	    s_op,
+	    js_p,
+	    &i,
+	    PINT_server_job_context);
+
+    return (ret);
+}
+
+/* flush_check_error
+ *
+ * TROVE_ENOENT is an error we can safely ignore since we flush both keyval and
+ * bstream spaces. ( if there is neither a bstream nor a keyval associated with
+ * a handle, then i'm not sure how we should handle this... )
+ */
+
+static int flush_check_error(PINT_server_op *s_op, job_status_s *js_p)
+{
+    if (js_p->error_code == -TROVE_ENOENT)
+	js_p->error_code = 0;
+    return (1);
+}
+
+
+/*
+ * Function: flush_bstream_flush_
+ *
+ * Params:  server_op *s_op,
+ *	    job_status_s *js_p
+ *
+ * Pre: None
+ * Post: None
+ * Returns: int
+ *
+ * Synopsys: send a bstream flush request to storage
+ *
+ */
+
+static int flush_bstream_flush(PINT_server_op *s_op, job_status_s * js_p)
+{
+    int ret;
+    job_id_t i;
+
+    ret = job_trove_bstream_flush(s_op->req->u.flush.fs_id,
+	    s_op->req->u.flush.handle,
+	    s_op->req->u.flush.flags,
+	    s_op,
+	    js_p,
+	    &i,
+	    PINT_server_job_context);
+
+    return (ret);
+}
+	    
+/* cleanup()
+ */
+static int flush_cleanup(PINT_server_op *s_op, job_status_s *js_p)
+{
+    return(PINT_state_machine_complete(s_op));
+}
+
+/*
+ * also, bug neill about multiple data servers, single meta server
+ */
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 noexpandtab
+ */
+

@@ -13,6 +13,7 @@ SERVERGENSRC := \
 	$(DIR)/remove.c \
 	$(DIR)/rmdirent.c \
 	$(DIR)/io.c \
+	$(DIR)/flush.c \
 	$(DIR)/prelude.c \
 	$(DIR)/final-response.c
 
