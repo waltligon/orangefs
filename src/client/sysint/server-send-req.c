@@ -144,26 +144,25 @@ int PINT_server_send_req(bmi_addr_t addr,
     return ret;
 }
 
-/* server_send_req_array()
+/* PINT_send_req_array()
  *
  * TODO: prepost receives 
- * TODO: add more gossip output
+ * TODO: use timeouts rather than infinite blocking
  *
  * Sends an array of requests and waits for an acknowledgement for each.
- * Fills in PINT_decoded_msg array pointed to by decoded_array.  The
- * caller must call PINT_decode_release() for each array element later
- * on.
  *
+ * returns 0 on success, -EIO on partial failure, -errno on total
+ * failure
  */
-int PINT_server_send_req_array(bmi_addr_t* addr_array,
-			 struct PVFS_server_req_s* req_array,
-			 bmi_size_t max_resp_size,
-			 void** resp_encoded_array,
-			 struct PINT_decoded_msg* resp_decoded_array,
-			 int* error_code_array,
-			 int array_size)
+int PINT_send_req_array(bmi_addr_t* addr_array,
+    struct PVFS_server_req_s* req_array,
+    bmi_size_t max_resp_size,
+    void** resp_encoded_array,
+    struct PINT_decoded_msg* resp_decoded_array,
+    int* error_code_array,
+    int array_size)
 {
-    int i, j;
+    int i;
     int ret = -1;
     struct PINT_encoded_msg* req_encoded_array = NULL;
     PVFS_msg_tag_t op_tag = get_next_session_tag();
@@ -172,16 +171,7 @@ int PINT_server_send_req_array(bmi_addr_t* addr_array,
     int* index_array = NULL;
     int total_completed = 0;
     int count;
-
-    enum
-    {
-	NONE_FAIL,
-	MEM_FAIL
-    } failure_state = NONE_FAIL;
-
-    /* clear some of the arrays for safety */
-    memset(error_code_array, 0, (array_size*sizeof(int)));
-    memset(resp_encoded_array, 0, (array_size*sizeof(void*)));
+    int total_errors = 0;
 
     /* allocate some bookkeeping fields */
     req_encoded_array = (struct PINT_encoded_msg*)malloc(array_size *
@@ -191,12 +181,20 @@ int PINT_server_send_req_array(bmi_addr_t* addr_array,
     index_array = (int*)malloc(array_size * sizeof(int));
     id_array = (job_id_t*)malloc(array_size * sizeof(job_id_t));
 
-    if(!req_encoded_array || !status_array || !id_array)
+    if(!req_encoded_array || !status_array || !id_array ||
+	!index_array)
     {
 	ret = -ENOMEM;
-	failure_state = MEM_FAIL;
 	goto out;
     }
+
+    /* clear some of the arrays for safety */
+    memset(error_code_array, 0, (array_size*sizeof(int)));
+    memset(resp_encoded_array, 0, (array_size*sizeof(void*)));
+    memset(req_encoded_array, 0, (array_size*sizeof(struct
+	PINT_encoded_msg)));
+    memset(resp_decoded_array, 0, (array_size*sizeof(struct
+	PINT_decoded_msg)));
 
     /* encode all of the requests */
     for(i=0; i<array_size; i++)
@@ -205,14 +203,8 @@ int PINT_server_send_req_array(bmi_addr_t* addr_array,
 	    &(req_encoded_array[i]), addr_array[i], REQ_ENC_FORMAT);
 	if(ret < 0)
 	{
-	    /* go back and release earlier encodings */
-	    for(j=(i-1); j>-1; j++)
-	    {
-		PINT_encode_release(&(req_encoded_array[i]),
-		    PINT_ENCODE_REQ, REQ_ENC_FORMAT);
-	    }
-	    failure_state = MEM_FAIL;
-	    goto out;
+	    total_errors++;
+	    error_code_array[i] = ret;
 	}
     }
 
@@ -221,45 +213,48 @@ int PINT_server_send_req_array(bmi_addr_t* addr_array,
     total_completed = 0;
     for(i=0; i<array_size; i++)
     {
-	ret = job_bmi_send_list(
-	    req_encoded_array[i].dest, 
-	    req_encoded_array[i].buffer_list,
-	    req_encoded_array[i].size_list,
-	    req_encoded_array[i].list_count,
-	    req_encoded_array[i].total_size,
-	    op_tag,
-	    req_encoded_array[i].buffer_flag,
-	    0,
-	    NULL,
-	    &(status_array[i]),
-	    &(id_array[i]));
-	if(ret < 0)
+	if(!(error_code_array[i]))
 	{
-	    /* set the error code array entry; as a side effect, this
-	     * will keep us from looking for a response to this
-	     * particular request later 
-	     */
-	    total_completed++;
-	    error_code_array[i] = ret;
-	    id_array[i] = 0;
-	}
-	else if (ret == 1)
-	{
-	    /* immediate completion */
-	    /* increment our completed count, make sure this id_array
-	     * entry is cleared
-	     */
-	    total_completed++;
-	    error_code_array[i] = status_array[i].error_code;
-	    id_array[i] = 0;
+	    ret = job_bmi_send_list(
+		req_encoded_array[i].dest, 
+		req_encoded_array[i].buffer_list,
+		req_encoded_array[i].size_list,
+		req_encoded_array[i].list_count,
+		req_encoded_array[i].total_size,
+		op_tag,
+		req_encoded_array[i].buffer_flag,
+		0,
+		NULL,
+		&(status_array[i]),
+		&(id_array[i]));
+	    if(ret < 0)
+	    {
+		/* immediate error */
+		total_errors++;
+		error_code_array[i] = ret;
+		id_array[i] = 0;
+	    }
+	    else if (ret == 1)
+	    {
+		/* immediate completion */
+		error_code_array[i] = status_array[i].error_code;
+		if(error_code_array[i])
+		{
+		    total_errors++;
+		}
+		else
+		{
+		    total_completed++;
+		}
+		id_array[i] = 0;
+	    }
 	}
     }
 
     /* see if anything needs to be tested for completion */
-    if(total_completed < array_size)
+    if((total_completed+total_errors) < array_size)
     {
 	count = array_size;
-	/* TODO: do a timeout here later */
 	ret = job_testsome(id_array, &count, index_array, NULL,
 	    status_array, -1);
 	if(ret < 0)
@@ -270,11 +265,24 @@ int PINT_server_send_req_array(bmi_addr_t* addr_array,
 	}
 	    
 	/* all sends are complete now, fill in error codes */
-	total_completed = array_size;
 	for(i=0; i<count; i++)
 	{
 	    error_code_array[index_array[i]] =
 		status_array[i].error_code;
+	    if(status_array[i].error_code)
+	    {
+		total_errors++;
+	    }
+	}
+    }
+
+    /* release request encodings */
+    for(i=0; i<array_size; i++)
+    {
+	if(req_encoded_array[i].total_size)
+	{
+	    PINT_encode_release(&(req_encoded_array[i]),
+		PINT_ENCODE_REQ, REQ_ENC_FORMAT);
 	}
     }
 
@@ -288,31 +296,158 @@ int PINT_server_send_req_array(bmi_addr_t* addr_array,
 	    if(!resp_encoded_array[i])
 	    {
 		error_code_array[i] = -ENOMEM;
+		total_errors++;
 	    }
 	}
     }
 
-    /* TODO: add cleanup of resp_encoded_array at bottom */
-    /* TODO: this function isn't completed yet */
-    ret = -ENOSYS;
+    /* post a bunch of receives */
+    /* keep up with job ids and the number of immediate completions */
+    memset(id_array, 0, (array_size*sizeof(job_id_t)));
+    total_completed = 0;
+    for(i=0; i<array_size; i++)
+    {
+	/* skip servers that have already experienced communication
+	 * failure 
+	 */
+	if(!(error_code_array[i]))
+	{
+	    ret = job_bmi_recv(
+		addr_array[i],
+		resp_encoded_array[i], 
+		max_resp_size, 
+		op_tag,
+		BMI_PRE_ALLOC,
+		NULL, 
+		&(status_array[i]), 
+		&(id_array[i]));
+	    if(ret < 0)
+	    {
+		/* immediate error */
+		total_errors++;
+		error_code_array[i] = ret;
+		id_array[i] = 0;
+	    }
+	    else if (ret == 1)
+	    {
+		/* immediate completion */
+		error_code_array[i] = status_array[i].error_code;
+		if(error_code_array[i])
+		{
+		    total_errors++;
+		}
+		else
+		{
+		    total_completed++;
+		}
+		id_array[i] = 0;
+	    }
+	}
+    }
+
+    /* see if anything needs to be tested for completion */
+    if((total_completed + total_errors) < array_size)
+    {
+	count = array_size;
+	ret = job_testsome(id_array, &count, index_array, NULL,
+	    status_array, -1);
+	if(ret < 0)
+	{
+	    /* TODO: there is no real way cleanup from this right now */
+	    gossip_lerr("Error: PINT_server_send_req_array() critical failure.\n");
+	    exit(-1);
+	}
+
+	/* all receives are completed now, fill in error codes */
+	for(i=0; i<count; i++)
+	{
+	    error_code_array[index_array[i]] =
+		status_array[i].error_code;
+	    if(status_array[i].error_code)
+	    {
+		total_errors++;
+	    }
+	}
+    }
+
+    /* decode any responses that we successfully received */
+    for(i=0; i<array_size; i++)
+    {
+	if(!(error_code_array[i]))
+	{
+	    ret = PINT_decode(resp_encoded_array[i], PINT_DECODE_RESP,
+		&(resp_decoded_array[i]), addr_array[i],
+		status_array[i].actual_size, NULL);
+	    if(ret < 0)
+	    {
+		error_code_array[i] = ret;
+		total_errors++;
+	    }
+	}
+    }
+
+    gossip_ldebug(CLIENT_DEBUG, 
+	"PINT_server_send_req_array() called for %d requests, %d failures.\n", 
+	    array_size, total_errors);
+
+    if(total_errors)
+    {
+	ret = -EIO;
+    }
+    else
+    {
+	ret = 0;
+    }
 
 out:
 
-    switch(failure_state)
-    {
-	case NONE_FAIL:
-	case MEM_FAIL:
-	    if(req_encoded_array)
-		free(req_encoded_array);
-	    if(status_array)
-		free(status_array);
-	    if(id_array)
-		free(id_array);
-	    if(index_array)
-		free(index_array);
-	    break;
-    }
+    if(req_encoded_array)
+	free(req_encoded_array);
+    if(status_array)
+	free(status_array);
+    if(id_array)
+	free(id_array);
+    if(index_array)
+	free(index_array);
+
     return(ret);
+}
+
+/* PINT_release_req_array()
+ *
+ * partner function to PINT_send_req_array(); should be called to
+ * release resources allocated in earlier call
+ *
+ * no return value
+ */
+void PINT_release_req_array(bmi_addr_t* addr_array,
+    struct PVFS_server_req_s* req_array,
+    bmi_size_t max_resp_size,
+    void** resp_encoded_array,
+    struct PINT_decoded_msg* resp_decoded_array,
+    int* error_code_array,
+    int array_size)
+{
+    int i;
+
+    /* this really just means getting rid of the receive buffer and
+     * decoded response
+     */
+    for(i=0; i<array_size; i++)
+    {
+	if(resp_decoded_array[i].buffer)
+	{
+	    PINT_decode_release(&(resp_decoded_array[i]),
+		PINT_DECODE_RESP, REQ_ENC_FORMAT);
+	}
+	if(resp_encoded_array[i])
+	{
+	    BMI_memfree(addr_array[i], resp_encoded_array[i],
+		max_resp_size, BMI_RECV_BUFFER);
+	}
+    }
+
+    return;
 }
 
 /*
