@@ -56,6 +56,22 @@ int PINT_server_send_req(bmi_addr_t addr,
 			 bmi_size_t max_resp_sz,
 			 struct PINT_decoded_msg *decoded_p);
 
+int PINT_send_req_array(bmi_addr_t* addr_array,
+    struct PVFS_server_req_s* req_array,
+    bmi_size_t max_resp_size,
+    void** resp_encoded_array,
+    struct PINT_decoded_msg* resp_decoded_array,
+    int* error_code_array,
+    int array_size);
+
+void PINT_release_req_array(bmi_addr_t* addr_array,
+    struct PVFS_server_req_s* req_array,
+    bmi_size_t max_resp_size,
+    void** resp_encoded_array,
+    struct PINT_decoded_msg* resp_decoded_array,
+    int* error_code_array,
+    int array_size);
+
 /* dunno where these belong, but here is better than nowhere. -- rob */
 void debug_print_type(void* thing, int type);
 PVFS_msg_tag_t get_next_session_tag(void);

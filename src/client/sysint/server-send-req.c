@@ -260,7 +260,8 @@ int PINT_send_req_array(bmi_addr_t* addr_array,
 	if(ret < 0)
 	{
 	    /* TODO: there is no real way cleanup from this right now */
-	    gossip_lerr("Error: PINT_server_send_req_array() critical failure.\n");
+	    gossip_lerr(
+		"Error: PINT_server_send_req_array() critical failure.\n");
 	    exit(-1);
 	}
 	    
@@ -388,7 +389,7 @@ int PINT_send_req_array(bmi_addr_t* addr_array,
 
     gossip_ldebug(CLIENT_DEBUG, 
 	"PINT_server_send_req_array() called for %d requests, %d failures.\n", 
-	    array_size, total_errors);
+        array_size, total_errors);
 
     if(total_errors)
     {
