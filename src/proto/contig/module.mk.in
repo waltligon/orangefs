@@ -1,0 +1,17 @@
+DIR := src/proto/contig
+LIBSRC += \
+	$(DIR)/PINT-contig.c \
+	$(DIR)/contig-decode-rel.c \
+	$(DIR)/contig-encode-rel.c \
+	$(DIR)/contig-request-d.c \
+	$(DIR)/contig-request-e.c \
+	$(DIR)/contig-response-d.c \
+	$(DIR)/contig-response-e.c 
+SERVERSRC += \
+	$(DIR)/PINT-contig.c \
+	$(DIR)/contig-decode-rel.c \
+	$(DIR)/contig-encode-rel.c \
+	$(DIR)/contig-request-d.c \
+	$(DIR)/contig-request-e.c \
+	$(DIR)/contig-response-d.c \
+	$(DIR)/contig-response-e.c 
