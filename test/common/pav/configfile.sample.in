@@ -1,4 +1,11 @@
+#
+# BUGS
+#	. comments in this file are ignored only at the beginning of a line
+#	. trailing whitespace can confuse some parts of PAV
+# 
+
 SRCDIR=@srcdir@
+SRCDIR_TOP=@SRC_TOP_LEVEL@
 BUILDDIR=@BUILD_TOP_LEVEL@
 # primative bakctick expansion is allowed: 
 # NODEFILE=`sort $PBS_NODEFILE | uniq > machines ; echo machines`
@@ -22,7 +29,9 @@ WORKINGDIR="/tmp/pvfs-pav-working"
 
 # be careful: the port has to be a port apropriate for the protocol
 PROTOCOL=tcp
-PVFSPORT=3335
+
+# hopefully random enough...
+PVFSPORT=3349
 #  --  could be --
 # PROTOCOL=gm
 # PVFSPORT=6
@@ -51,9 +60,9 @@ PROGROOT=$SRCDIR
 #PINGPROG=$PVFS/bin/pvfs2-ping
 #GENCONFIG=$PVFS/bin/pvfs2-genconfig
 
-SERVER=$BUILDDIR/server/pvfs2-server
+SERVER=$BUILDDIR/src/server/pvfs2-server
 PINGPROG=$BUILDDIR/src/apps/admin/pvfs2-ping
-GENCONFIG=$SRCDIR/src/apps/admin/pvfs2-genconfig
+GENCONFIG=$SRCDIR_TOP/src/apps/admin/pvfs2-genconfig
 
 # set this to 1 if the machines used by pav need the important pvfs2
 # binaries copied out to them.  set it to 0 if using, for example, NFS
