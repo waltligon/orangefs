@@ -1,11 +1,11 @@
 #
 # Makefile stub for bmi_ib.
 #
-# Copyright (C) 2003 Pete Wyckoff <pw@osc.edu>
+# Copyright (C) 2003-4 Pete Wyckoff <pw@osc.edu>
 #
 # See COPYING in top-level directory.
 #
-# $Id: module.mk.in,v 1.4 2003-10-22 10:05:53 pw Exp $
+# $Id: module.mk.in,v 1.5 2004-03-07 02:14:57 pw Exp $
 #
 
 # only do any of this if configure decided to use IB
@@ -15,6 +15,7 @@ ifdef BUILD_IB
 bmi_ib_subdir := src/io/bmi/bmi_ib
 bmi_ib_src := $(patsubst %,$(bmi_ib_subdir)/%,ib.c setup.c util.c)
 bmi_ib_obj := $(bmi_ib_src:.c=.o)
+bmi_ib_picobj := $(bmi_ib_src:.c=.po)
 bmi_ib_server_obj := $(bmi_ib_src:.c=-server.o)
 bmi_ib_dep := $(bmi_ib_src:.c=.d)
 
@@ -52,6 +53,14 @@ ifdef QUIET_COMPILE
 	@$(CC) $(IBCFLAGS) $(LIBCFLAGS) $(bmi_ib_cflags) $< -c -o $@
 else
 	$(CC) $(IBCFLAGS) $(LIBCFLAGS) $(bmi_ib_cflags) $< -c -o $@
+endif
+
+$(bmi_ib_picobj): %.po: %.c
+ifdef QUIET_COMPILE
+	@echo "  IBCCPIC	$@"
+	@$(CC) $(IBCFLAGS) $(LIBCFLAGS) $(PICFLAGS) $(bmi_ib_cflags) $< -c -o $@
+else
+	$(CC) $(IBCFLAGS) $(LIBCFLAGS) $(PICFLAGS) $(bmi_ib_cflags) $< -c -o $@
 endif
 
 $(bmi_ib_server_obj): %-server.o: %.c

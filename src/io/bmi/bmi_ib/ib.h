@@ -1,11 +1,11 @@
 /*
  * Private header shared by BMI InfiniBand implementation files.
  *
- * Copyright (C) 2003 Pete Wyckoff <pw@osc.edu>
+ * Copyright (C) 2003-4 Pete Wyckoff <pw@osc.edu>
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.h,v 1.2 2003-10-22 10:05:53 pw Exp $
+ * $Id: ib.h,v 1.3 2004-03-07 02:14:57 pw Exp $
  */
 #ifndef __ib_h
 #define __ib_h
@@ -21,7 +21,6 @@
 
 typedef struct qlist_head list_t;  /* easier to type */
 
-struct S_incoming;
 struct S_buf_head;
 /*
  * Connection record.  Each machine gets its own set of buffers and
@@ -54,11 +53,6 @@ typedef struct {
     list_t eager_recv_buf_free;
     struct S_buf_head *eager_send_buf_head_contig;
     struct S_buf_head *eager_recv_buf_head_contig;
-
-    /* array of incoming message structures, alloced here to keep them
-     * with the connection, but threaded onto the single incomingq list */
-    struct S_incoming *incoming_contig;
-    list_t incoming_free;
 } ib_connection_t;
 
 /*
@@ -223,20 +217,6 @@ typedef struct {
 } ib_recv_t;
 
 /*
- * List of things arriving from the network that are not
- * yet dealt with.  Until they are dealt with the messages
- * sit in eager bufs, so we only need a static number of these
- * too, per connection.
- */
-typedef struct S_incoming {
-    list_t list;
-    ib_connection_t *c;  /* uplink to owning connection */
-    buf_head_t *bh;      /* derived from incoming message */
-    u_int32_t byte_len;
-    ib_send_t *sq;       /* if null, message is for receive side */
-} incoming_t;
-
-/*
  * Header structure used on top of eager sends, and also used to request
  * rendez-vous mode sends, or to indicate eager ack.
  * Make sure these stay fully 64-bit aligned.
@@ -333,7 +313,6 @@ extern int listen_sock;  /* TCP sock on whih to listen for new connections */
 extern list_t connection; /* list of current connections */
 extern list_t sendq;
 extern list_t recvq;
-extern list_t incomingq;
 /*
  * Temp array for filling scatter/gather lists to pass to IB functions,
  * allocated once at start to max size defined as reported by the qp.
@@ -348,7 +327,7 @@ extern int sg_max_len;
  * sits in the buffer where it was received until the user posts or tests
  * for it.
  */
-static const bmi_size_t EAGER_BUF_NUM = 3;
+static const bmi_size_t EAGER_BUF_NUM = 20;
 static const bmi_size_t EAGER_BUF_SIZE = 8 << 10;  /* 8 kB */
 extern bmi_size_t EAGER_BUF_PAYLOAD;
 
@@ -389,5 +368,14 @@ extern bmi_size_t EAGER_BUF_PAYLOAD;
  */
 #define FORMAT_BMI_SIZE_T "%Ld"
 #define FORMAT_U_INT64_T  "%Ld"
+
+/*
+ * Tell the compiler we really do not expect this to happen.
+ */
+#if defined(__GNUC_MINOR__) && (__GNUC_MINOR__ < 96)
+# define __builtin_expect(x, v) (x)
+#endif
+#define likely(x)       __builtin_expect(!!(x), 1)
+#define unlikely(x)     __builtin_expect(!!(x), 0)
 
 #endif  /* __ib_h */

@@ -2,11 +2,11 @@
  * InfiniBand BMI method initialization and other out-of-line
  * boring stuff.
  *
- * Copyright (C) 2003 Pete Wyckoff <pw@osc.edu>
+ * Copyright (C) 2003-4 Pete Wyckoff <pw@osc.edu>
  *
  * See COPYING in top-level directory.
  *
- * $Id: setup.c,v 1.6 2004-01-30 16:26:57 pw Exp $
+ * $Id: setup.c,v 1.7 2004-03-07 02:14:57 pw Exp $
  */
 #include <fcntl.h>
 #include <unistd.h>
@@ -88,16 +88,6 @@ ib_new_connection(int s, int is_server)
 	ebr->buf = (char *) c->eager_recv_buf_contig + i * EAGER_BUF_SIZE;
 	qlist_add_tail(&ebs->list, &c->eager_send_buf_free);
 	qlist_add_tail(&ebr->list, &c->eager_recv_buf_free);
-    }
-
-    /* one set for incoming messages, another for acks of our messages */
-    c->incoming_contig = Malloc(2 * EAGER_BUF_NUM
-      * sizeof(*c->incoming_contig));
-    INIT_QLIST_HEAD(&c->incoming_free);
-    for (i=0; i<2*EAGER_BUF_NUM; i++) {
-	incoming_t *in = &c->incoming_contig[i];
-	in->c = c;
-	qlist_add_tail(&in->list, &c->incoming_free);
     }
 
     /* register memory region, recv */
@@ -452,7 +442,6 @@ ib_close_connection(ib_connection_t *c)
     free(c->eager_recv_buf_contig);
     free(c->eager_send_buf_head_contig);
     free(c->eager_recv_buf_head_contig);
-    free(c->incoming_contig);
     free(c->remote_map);
     qlist_del(&c->list);
 }
@@ -814,7 +803,6 @@ BMI_ib_initialize(struct method_addr *listen_addr, int method_id,
     INIT_QLIST_HEAD(&connection);
     INIT_QLIST_HEAD(&sendq);
     INIT_QLIST_HEAD(&recvq);
-    INIT_QLIST_HEAD(&incomingq);
 
     EAGER_BUF_PAYLOAD = EAGER_BUF_SIZE - sizeof(msg_header_t);
 
