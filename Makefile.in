@@ -299,8 +299,6 @@ KARMASRC :=
 KERNAPPSRC :=
 # MISCSRC are sources that don't fall into the other categories
 MISCSRC := 
-# files created by trove-autogen.pl
-TROVE_AUTOGEN_FILES :=
 # c files generated from state machines
 SMCGEN :=
 
@@ -647,7 +645,7 @@ clean::
 endif
 
 # builds a tarball of the source tree suitable for distribution
-dist: $(SMCGEN) $(TROVE_AUTOGEN_FILES) cleaner
+dist: $(SMCGEN) cleaner
 	@sh $(srcdir)/maint/make-dist.sh $(srcdir) @PVFS2_VERSION@
 
 # some stuff that is cleaned in both distclean and dist targets
@@ -672,7 +670,6 @@ distclean: cleaner docsclean
 	rm -f src/server/server.conf-localhost
 	rm -f src/apps/admin/pvfs2-config
 ifndef DIST_RELEASE
-	rm -f $(TROVE_AUTOGEN_FILES)
 	rm -f $(SMCGEN)
 endif
 
