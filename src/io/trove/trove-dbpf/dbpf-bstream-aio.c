@@ -160,7 +160,7 @@ static void aiocb_print(struct aiocb *ptr)
 	(ptr->aio_lio_opcode == LIO_NOP) ? lio_nop : invalid_value;
     sigev = (ptr->aio_sigevent.sigev_notify == SIGEV_NONE) ? sigev_none : invalid_value;
 
-    printf("aio_fildes = %d, aio_offset = %d, aio_buf = %x, aio_nbytes = %d, aio_reqprio = %d, aio_lio_opcode = %s, aio_sigevent.sigev_notify = %s\n",
+    gossip_debug(TROVE_DEBUG, "aio_fildes = %d, aio_offset = %d, aio_buf = %x, aio_nbytes = %d, aio_reqprio = %d, aio_lio_opcode = %s, aio_sigevent.sigev_notify = %s\n",
 	   ptr->aio_fildes,
 	   (int) ptr->aio_offset,
 	   (unsigned int) ptr->aio_buf,

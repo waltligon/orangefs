@@ -59,7 +59,7 @@ void dbpf_keyval_dbcache_finalize(void)
 
     for (i=0; i < DBCACHE_ENTRIES; i++) {
 	if (keyval_db_cache[i].ref_ct > 0) {
-	    printf("warning: ref_ct = %d on handle %Lx in dbcache\n",
+	    gossip_debug(TROVE_DEBUG, "warning: ref_ct = %d on handle %Lx in dbcache\n",
 		   keyval_db_cache[i].ref_ct,
 		   keyval_db_cache[i].handle);
 	}
@@ -103,7 +103,7 @@ int dbpf_keyval_dbcache_try_remove(TROVE_coll_id coll_id,
 	/* close it */
 	ret = keyval_db_cache[i].db_p->close(keyval_db_cache[i].db_p, 0);
 	if (ret != 0) {
-	    printf("db: close error\n");
+	    gossip_debug(TROVE_DEBUG, "db: close error\n");
 	}
 	keyval_db_cache[i].ref_ct = -1;
 	keyval_db_cache[i].db_p   = NULL;
@@ -116,7 +116,7 @@ int dbpf_keyval_dbcache_try_remove(TROVE_coll_id coll_id,
 			   coll_id,
 			   handle);
 #if 0
-    printf("file name = %s\n", filename);
+    gossip_debug(TROVE_DEBUG, "file name = %s\n", filename);
 #endif
 
     ret = DBPF_UNLINK(filename);
@@ -165,7 +165,7 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
     if (i < DBCACHE_ENTRIES) {
 	/* found cached DB */
 #if 0
-	printf("dbcache: found cached db at index %d\n", i);
+	gossip_debug(TROVE_DEBUG, "dbcache: found cached db at index %d\n", i);
 #endif
 	keyval_db_cache[i].ref_ct++;
 	*db_pp = keyval_db_cache[i].db_p;
@@ -179,7 +179,7 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
 	    keyval_db_cache[i].ref_ct == -1)
 	{
 #if 0
-	    printf("dbcache: found empty entry at %d\n", i);
+	    gossip_debug(TROVE_DEBUG, "dbcache: found empty entry at %d\n", i);
 #endif
 	    break;
 	}
@@ -193,12 +193,12 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
 		keyval_db_cache[i].ref_ct == 0)
 	    {
 #if 0
-		printf("dbcache: no empty entries; found unused entry at %d\n", i);
+		gossip_debug(TROVE_DEBUG, "dbcache: no empty entries; found unused entry at %d\n", i);
 #endif
 		
 		ret = keyval_db_cache[i].db_p->close(keyval_db_cache[i].db_p, 0);
 		if (ret != 0) {
-		    printf("db: close error\n");
+		    gossip_debug(TROVE_DEBUG, "db: close error\n");
 		}
 		keyval_db_cache[i].ref_ct = -1;
 		keyval_db_cache[i].db_p   = NULL;
@@ -213,7 +213,7 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
 
     DBPF_GET_KEYVAL_DBNAME(filename, PATH_MAX, my_storage_p->name, coll_id, handle);
 #if 0
-    printf("file name = %s\n", filename);
+    gossip_debug(TROVE_DEBUG, "file name = %s\n", filename);
 #endif
 
     ret = db_create(&(keyval_db_cache[i].db_p), NULL, 0);
@@ -291,7 +291,7 @@ void dbpf_keyval_dbcache_put(TROVE_coll_id coll_id,
 	else gen_mutex_unlock(&keyval_db_cache[i].mutex);
     }
     if (i == DBCACHE_ENTRIES) {
-	printf("warning: no matching entry for dbcache_put op\n");
+	gossip_debug(TROVE_DEBUG, "warning: no matching entry for dbcache_put op\n");
 	return;
     }
 

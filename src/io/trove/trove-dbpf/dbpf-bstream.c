@@ -146,7 +146,7 @@ static int dbpf_bstream_read_at_op_svc(struct dbpf_op *op_p)
     
     /* TODO: any way to return partial success? */
     
-    printf("read %d bytes.\n", ret);
+    gossip_debug(TROVE_DEBUG, "read %d bytes.\n", ret);
     return 1;
    
  return_error:
@@ -247,7 +247,7 @@ static int dbpf_bstream_write_at_op_svc(struct dbpf_op *op_p)
     
     /* TODO: any way to return partial success? */
     
-    printf("wrote %d bytes.\n", ret);
+    gossip_debug(TROVE_DEBUG, "wrote %d bytes.\n", ret);
     return 1;
     
  return_error:
@@ -548,7 +548,7 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
     struct aiocb *aiocb_p, *aiocb_ptr_array[AIOCB_ARRAY_SZ];
 
 #if 0
-    printf("dbpf_bstream_rw_list_op_svc() entered.\n");
+    gossip_debug(TROVE_DEBUG, "dbpf_bstream_rw_list_op_svc() entered.\n");
 #endif
 
     /* allocate space for aiocb array if necessary */
@@ -590,7 +590,7 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
 		/* this particular operation completed w/out error */
 
 		ret = aio_return(&aiocb_p[i]); /* gets the return value of the individual op */
-		printf("   aio_return() says %d\n", ret);
+		gossip_debug(TROVE_DEBUG, "   aio_return() says %d\n", ret);
 		/* WHAT DO WE DO WITH PARTIAL READ/WRITES??? */
 
 		/* mark as a NOP so we ignore it from now on */
@@ -598,7 +598,7 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
 	    }
 	    else if (ret != EINPROGRESS) {
 		/* we got an error of some sort */
-		printf("error %d (%s) from aio_error/aio_return on block %d; skipping\n", ret, strerror(ret), i);
+		gossip_debug(TROVE_DEBUG, "error %d (%s) from aio_error/aio_return on block %d; skipping\n", ret, strerror(ret), i);
 		aiocb_p[i].aio_lio_opcode = LIO_NOP;
 	    }
 	    else {
@@ -651,7 +651,7 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
 	    aiocb_ptr_array[i] = &aiocb_p[i];
 	}
 
-	printf("calling lio_listio w/count of %d\n", aiocb_inuse_count);
+	gossip_debug(TROVE_DEBUG, "calling lio_listio w/count of %d\n", aiocb_inuse_count);
 	fflush(stdout);
 
 	ret = lio_listio(LIO_NOWAIT, aiocb_ptr_array, aiocb_inuse_count, &op_p->u.b_rw_list.sigev);

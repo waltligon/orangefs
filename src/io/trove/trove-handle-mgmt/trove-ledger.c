@@ -12,6 +12,7 @@
 #include "trove-extentlist.h"
 #include "trove-ledger.h"
 #include "trove.h"
+#include "gossip.h"
 
 /* struct handle_ledger
  *
@@ -201,18 +202,18 @@ static int handle_recycle(struct handle_ledger *hl)
 
 void trove_handle_ledger_show(struct handle_ledger *hl) 
 {
-    printf("====== free list\n");
+    gossip_debug(TROVE_DEBUG, "====== free list\n");
     extentlist_show(&(hl->free_list));
-    printf("====== recently_freed list\n");
+    gossip_debug(TROVE_DEBUG, "====== recently_freed list\n");
     extentlist_show(&(hl->recently_freed_list));
-    printf("====== overflow list\n");
+    gossip_debug(TROVE_DEBUG, "====== overflow list\n");
     extentlist_show(&(hl->overflow_list));
 
-    printf("====== free list\n");
+    gossip_debug(TROVE_DEBUG, "====== free list\n");
     extentlist_stats(&(hl->free_list));
-    printf("====== recently_freed list\n");
+    gossip_debug(TROVE_DEBUG, "====== recently_freed list\n");
     extentlist_stats(&(hl->recently_freed_list));
-    printf("====== overflow list\n");
+    gossip_debug(TROVE_DEBUG, "====== overflow list\n");
     extentlist_stats(&(hl->overflow_list));
 }
 

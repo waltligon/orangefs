@@ -150,7 +150,7 @@ int extentlist_merge(struct TROVE_handle_extentlist *dest,
 		     struct TROVE_handle_extentlist *src)
 {
     struct avlnode *n = src->index;
-    printf("merging extentlists\n");
+    gossip_debug(TROVE_DEBUG, "merging extentlists\n");
     while(n != NULL) {
 	extentlist_addextent(dest, n->d->first, n->d->last);
 	avlremove(&n, n->d->first);
@@ -313,7 +313,7 @@ TROVE_handle extentlist_get_from_extent(struct TROVE_handle_extentlist *elist,
 }
 void extentlist_stats(struct TROVE_handle_extentlist *elist)
 {
-    printf("handle/extent ratio: %f\n", (double)elist->num_handles/ (double)elist->num_extents);
+    gossip_debug(TROVE_DEBUG, "handle/extent ratio: %f\n", (double)elist->num_handles/ (double)elist->num_extents);
 }
 
 void extentlist_show(struct TROVE_handle_extentlist *elist)
@@ -326,7 +326,7 @@ static void extent_show(struct avlnode *n,
 			int depth)
 {
     struct TROVE_handle_extent *e = (struct TROVE_handle_extent *)(n->d);
-    printf("lb: %Ld ub: %Ld\n", e->first, e->last);
+    gossip_debug(TROVE_DEBUG, "lb: %Ld ub: %Ld\n", e->first, e->last);
 }
 
 /*

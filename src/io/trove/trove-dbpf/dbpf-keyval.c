@@ -557,8 +557,8 @@ return_ok:
 	data.flags |= DB_DBT_USERMEM;
 
 	ret = dbc_p->c_get(dbc_p, &key, &data, DB_GET_RECNO);
-	if (ret == DB_NOTFOUND) printf("warning: keyval iterate -- notfound\n");
-	else if (ret != 0) printf("warning: keyval iterate -- some other failure @ recno\n");
+	if (ret == DB_NOTFOUND) gossip_debug(TROVE_DEBUG, "warning: keyval iterate -- notfound\n");
+	else if (ret != 0) gossip_debug(TROVE_DEBUG, "warning: keyval iterate -- some other failure @ recno\n");
 
 	assert(recno != TROVE_ITERATE_START && recno != TROVE_ITERATE_END);
 	*op_p->u.k_iterate.position_p = recno;

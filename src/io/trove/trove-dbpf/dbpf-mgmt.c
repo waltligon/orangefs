@@ -115,7 +115,7 @@ static int dbpf_collection_seteattr(TROVE_coll_id coll_id,
     }
 
 #if 0
-    printf("seteattr done.\n");
+    gossip_debug(TROVE_DEBUG, "seteattr done.\n");
 #endif
     return 1;
 }
@@ -284,7 +284,7 @@ static int dbpf_storage_remove(char *stoname,
 
     /* TODO: REMOVE ALL THE OTHER FILES!!! */
 #if 0
-    printf("databases for storage space removed.\n");
+    gossip_debug(TROVE_DEBUG, "databases for storage space removed.\n");
 #endif
     return 1;
 }
@@ -333,13 +333,13 @@ static int dbpf_collection_create(char *collname,
     ret = sto_p->coll_db->get(sto_p->coll_db, NULL, &key, &data, 0);
     if (ret != DB_NOTFOUND) {
 #if 0
-	printf("coll %s already exists with coll_id %d, len = %d.\n",
+	gossip_debug(TROVE_DEBUG, "coll %s already exists with coll_id %d, len = %d.\n",
 	       collname, db_data.coll_id, data.size);
 #endif
 	return -1;
     }
 #if 0
-    printf("collection %s didn't already exist.\n", collname);
+    gossip_debug(TROVE_DEBUG, "collection %s didn't already exist.\n", collname);
 #endif
     
     key.data = collname;
@@ -361,7 +361,7 @@ static int dbpf_collection_create(char *collname,
     }
 
 #if 0    
-    printf("collection db updated, coll_id = %d.\n", new_coll_id);
+    gossip_debug(TROVE_DEBUG, "collection db updated, coll_id = %d.\n", new_coll_id);
 #endif
 
     /* Create both the base directory, if necessary, then the new collection
@@ -383,7 +383,7 @@ static int dbpf_collection_create(char *collname,
     
     DBPF_GET_COLL_DIRNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
 #if 0
-    printf("dirname = %s\n", path_name);
+    gossip_debug(TROVE_DEBUG, "dirname = %s\n", path_name);
 #endif
     ret = mkdir(path_name, 0755);
     if (ret != 0) {
@@ -435,7 +435,7 @@ static int dbpf_collection_create(char *collname,
     }
 
 #if 0
-    printf("subdirectories for storing bstreams and keyvals created.\n");
+    gossip_debug(TROVE_DEBUG, "subdirectories for storing bstreams and keyvals created.\n");
 #endif
     return 1;
 }
@@ -487,7 +487,7 @@ static int dbpf_collection_remove(char *collname,
     rmdir(path_name);
 
 #if 0
-    printf("databases and directories for collection removed.\n");
+    gossip_debug(TROVE_DEBUG, "databases and directories for collection removed.\n");
 #endif
 
     return 1;
@@ -615,8 +615,8 @@ return_ok:
 	data.flags |= DB_DBT_USERMEM;
 
 	ret = dbc_p->c_get(dbc_p, &key, &data, DB_GET_RECNO);
-	if (ret == DB_NOTFOUND) printf("warning: keyval iterate -- notfound\n");
-	else if (ret != 0) printf("warning: keyval iterate -- some other failure @ recno\n");
+	if (ret == DB_NOTFOUND) gossip_debug(TROVE_DEBUG, "warning: keyval iterate -- notfound\n");
+	else if (ret != 0) gossip_debug(TROVE_DEBUG, "warning: keyval iterate -- some other failure @ recno\n");
 
 	assert(recno != TROVE_ITERATE_START && recno != TROVE_ITERATE_END);
 	*inout_position_p = recno;
@@ -675,21 +675,21 @@ static int dbpf_collection_lookup(char *collname,
     if (ret == DB_NOTFOUND) {
 	/* not an error per se */
 #if 0
-	printf("lookup didn't find collection\n");
+	gossip_debug(TROVE_DEBUG, "lookup didn't find collection\n");
 #endif
 	return -1;
     }
     else if (ret != 0) {
 	/* really an error of some kind */
 	sto_p->coll_db->err(sto_p->coll_db, ret, "DB->get");
-	printf("lookup got error\n");
+	gossip_debug(TROVE_DEBUG, "lookup got error\n");
 	return -1;
     }
 
 #if 0
-    printf("found collection %s in database.\n", collname);
+    gossip_debug(TROVE_DEBUG, "found collection %s in database.\n", collname);
     
-    printf("coll_id = %d.\n", db_data.coll_id);
+    gossip_debug(TROVE_DEBUG, "coll_id = %d.\n", db_data.coll_id);
 #endif
 
     /* look to see if we have already registered this collection; if so, return */
@@ -907,7 +907,7 @@ static int dbpf_db_create(char *dbname)
 #if 0
     /* store the time string -- removed because it is dirtying up the space */
     if ((ret = db_p->put(db_p, NULL, &key, &data, 0)) == 0)
-	printf("db: %s: key stored.\n", (char *)key.data);
+	gossip_debug(TROVE_DEBUG, "db: %s: key stored.\n", (char *)key.data);
     else {
 	db_p->err(db_p, ret, "DB->put");
 	return -1;

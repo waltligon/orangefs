@@ -67,7 +67,7 @@ void dbpf_bstream_fdcache_finalize(void)
 
     for (i=0; i < FDCACHE_ENTRIES; i++) {
 	if (bstream_fd_cache[i].ref_ct > 0) {
-	    printf("warning: ref_ct = %d on handle %Lx in fdcache\n",
+	    gossip_debug(TROVE_DEBUG, "warning: ref_ct = %d on handle %Lx in fdcache\n",
 		   bstream_fd_cache[i].ref_ct,
 		   bstream_fd_cache[i].handle);
 	}
@@ -125,7 +125,7 @@ int dbpf_bstream_fdcache_try_remove(TROVE_coll_id coll_id,
 
     DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX, my_storage_p->name, coll_id, handle);
 #if 0
-    printf("file name = %s\n", filename);
+    gossip_debug(TROVE_DEBUG, "file name = %s\n", filename);
 #endif
 
     ret = DBPF_UNLINK(filename);
@@ -178,7 +178,7 @@ int dbpf_bstream_fdcache_try_get(TROVE_coll_id coll_id,
     if (i < FDCACHE_ENTRIES) {
 	/* found cached FD, and have the lock */
 #if 0
-	printf("fdcache: found cached fd at index %d\n", i);
+	gossip_debug(TROVE_DEBUG, "fdcache: found cached fd at index %d\n", i);
 #endif
 	bstream_fd_cache[i].ref_ct++;
 	*fd_p = bstream_fd_cache[i].fd;
@@ -192,7 +192,7 @@ int dbpf_bstream_fdcache_try_get(TROVE_coll_id coll_id,
 	    !bstream_fd_cache[i].valid) 
 	{
 #if 0
-	    printf("fdcache: found empty entry at %d\n", i);
+	    gossip_debug(TROVE_DEBUG, "fdcache: found empty entry at %d\n", i);
 #endif
 	    break;
 	}
@@ -205,7 +205,7 @@ int dbpf_bstream_fdcache_try_get(TROVE_coll_id coll_id,
 		bstream_fd_cache[i].ref_ct == 0)
 	    {
 #if 0
-		printf("fdcache: no empty entries; found unused entry at %d\n", i);
+		gossip_debug(TROVE_DEBUG, "fdcache: no empty entries; found unused entry at %d\n", i);
 #endif
 		DBPF_CLOSE(bstream_fd_cache[i].fd);
 		bstream_fd_cache[i].valid = 0;
@@ -221,7 +221,7 @@ int dbpf_bstream_fdcache_try_get(TROVE_coll_id coll_id,
 
     DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX, my_storage_p->name, coll_id, handle);
 #if 0
-    printf("file name = %s\n", filename);
+    gossip_debug(TROVE_DEBUG, "file name = %s\n", filename);
 #endif
     
     /* note: we don't really need the coll_id for this operation,
@@ -231,11 +231,11 @@ int dbpf_bstream_fdcache_try_get(TROVE_coll_id coll_id,
     fd = DBPF_OPEN(filename, O_RDWR, 0);
     if (fd < 0 && errno == ENOENT && create_flag) {
 #if 0
-	printf("creating new dataspace\n");
+	gossip_debug(TROVE_DEBUG, "creating new dataspace\n");
 #endif
 	if ((fd = DBPF_OPEN(filename, O_RDWR|O_CREAT|O_EXCL, 0644)) < 0)
 	{
-	    printf("error trying to create!\n");
+	    gossip_debug(TROVE_DEBUG, "error trying to create!\n");
 	    goto return_error;
 	}
     }
@@ -279,7 +279,7 @@ void dbpf_bstream_fdcache_put(TROVE_coll_id coll_id,
 	else gen_mutex_unlock(&bstream_fd_cache[i].mutex);
     }
     if (i == FDCACHE_ENTRIES) {
-	printf("warning: no matching entry for fdcache_put op\n");
+	gossip_debug(TROVE_DEBUG, "warning: no matching entry for fdcache_put op\n");
 	return;
     }
 

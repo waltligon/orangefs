@@ -55,7 +55,7 @@ void dbpf_dspace_dbcache_finalize(void)
 
     for (i=0; i < DBCACHE_ENTRIES; i++) {
 	if (dspace_db_cache[i].ref_ct > 0) {
-	    printf("warning: ref_ct = %d on coll_id %Lx in dspace dbcache\n",
+	    gossip_debug(TROVE_DEBUG, "warning: ref_ct = %d on coll_id %Lx in dspace dbcache\n",
 		   dspace_db_cache[i].ref_ct,
 		   (int64_t) dspace_db_cache[i].coll_id);
 	}
@@ -92,7 +92,7 @@ int dbpf_dspace_dbcache_try_get(TROVE_coll_id coll_id,
     if (i < DBCACHE_ENTRIES) {
 	/* found cached DB */
 #if 0
-	printf("dspace dbcache: found cached db at index %d\n", i);
+	gossip_debug(TROVE_DEBUG, "dspace dbcache: found cached db at index %d\n", i);
 #endif
 	dspace_db_cache[i].ref_ct++;
 	*db_pp = dspace_db_cache[i].db_p;
@@ -106,7 +106,7 @@ int dbpf_dspace_dbcache_try_get(TROVE_coll_id coll_id,
 	    dspace_db_cache[i].ref_ct == -1)
 	{
 #if 0
-	    printf("dspace dbcache: found empty entry at %d\n", i);
+	    gossip_debug(TROVE_DEBUG, "dspace dbcache: found empty entry at %d\n", i);
 #endif
 	    break;
 	}
@@ -120,12 +120,12 @@ int dbpf_dspace_dbcache_try_get(TROVE_coll_id coll_id,
 		dspace_db_cache[i].ref_ct == 0)
 	    {
 #if 0
-		printf("dspace dbcache: no empty entries; found unused entry at %d\n", i);
+		gossip_debug(TROVE_DEBUG, "dspace dbcache: no empty entries; found unused entry at %d\n", i);
 #endif
 		
 		ret = dspace_db_cache[i].db_p->close(dspace_db_cache[i].db_p, 0);
 		if (ret != 0) {
-		    printf("dspace db: close error\n");
+		    gossip_debug(TROVE_DEBUG, "dspace db: close error\n");
 		}
 		dspace_db_cache[i].ref_ct = -1;
 		dspace_db_cache[i].db_p   = NULL;
@@ -138,7 +138,7 @@ int dbpf_dspace_dbcache_try_get(TROVE_coll_id coll_id,
 
     DBPF_GET_DS_ATTRIB_DBNAME(filename, PATH_MAX, my_storage_p->name, coll_id);
 #if 0
-    printf("file name = %s\n", filename);
+    gossip_debug(TROVE_DEBUG, "file name = %s\n", filename);
 #endif
 
     ret = db_create(&(dspace_db_cache[i].db_p), NULL, 0);
@@ -200,7 +200,7 @@ void dbpf_dspace_dbcache_put(TROVE_coll_id coll_id)
 	    dspace_db_cache[i].coll_id == coll_id) break;
     }
     if (i == DBCACHE_ENTRIES) {
-	printf("warning: no matching entry for dspace dbcache_put op\n");
+	gossip_debug(TROVE_DEBUG, "warning: no matching entry for dspace dbcache_put op\n");
 	return;
     }
 
