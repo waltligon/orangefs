@@ -1,0 +1,282 @@
+/* 
+ * (C) 2003 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+#include <string.h>
+#include <assert.h>
+
+#include "client-state-machine.h"
+#include "state-machine-fns.h"
+#include "pvfs2-debug.h"
+#include "job.h"
+#include "gossip.h"
+#include "str-utils.h"
+
+#include "pinode-helper.h"
+#include "pint-dcache.h"
+#include "pint-servreq.h"
+#include "pint-bucket.h"
+#include "pcache.h"
+#include "PINT-reqproto-encode.h"
+
+/* pvfs2_client_truncate_sm
+ *
+ * implementes the truncate system interface function
+ *
+ * input parameters held in sm_p->u.truncate
+ *
+ * somewhat similar to flush:  getattr on the passed-in handle to get datafile
+ * servers and distribution information.  compute the new sizes on the servers
+ * and send truncate requests to all involved parties
+ */
+
+extern job_context_id pint_client_sm_context;
+
+/* static function prototypes */
+
+static int truncate_cleanup(PINT_client_sm *sm_p,
+			    job_status_s *js_p);
+
+static int truncate_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
+						job_status_s *js_p);
+
+static int truncate_object_getattr_comp_fn(void *v_p,
+					struct PVFS_server_resp *resp_p,
+					int index);
+
+static int truncate_object_getattr_failure(PINT_client_sm *sm_p,
+					job_status_s *js_p);
+
+static int truncate_check_parameters(PINT_client_sm *sm_p,
+				    job_status_s *js_p);
+%% 
+
+machine pvfs2_client_truncate_sm(check_parameters, 
+				object_getattr_setup_msgpair,
+				object_getattr_xfer_msgpair,
+				object_getattr_failure,
+				cleanup)
+{
+    state check_parameters {
+	run truncate_check_parameters;
+	success => object_getattr_setup_msgpair;
+	default => cleanup;
+    }
+
+    state object_getattr_setup_msgpair {
+	run truncate_object_getattr_setup_msgpair;
+	success => object_getattr_xfer_msgpair;
+	default => cleanup;
+    }
+
+    state object_getattr_xfer_msgpair {
+	run truncate_object_getattr_setup_msgpair;
+	default => cleanup;
+    }
+
+    state object_getattr_failure {
+	run truncate_object_getattr_failure;
+	default => cleanup;
+    }
+
+    state cleanup {
+	run truncate_cleanup;
+	default => check_parameters;
+    }
+}
+
+%%
+
+int PVFS_sys_truncate_new(PVFS_pinode_reference pinode_ref,
+			PVFS_size size,
+			PVFS_credentials credentials)
+{
+    int ret; 
+    PINT_client_sm *sm_p;
+    PVFS_error error;
+
+    gossip_debug(CLIENT_DEBUG, "PVFS_sys_truncate_new entered\n");
+
+    /* do parameter checking here, then assume things are ok below.
+     * assert()s are still ok of course :).
+     */
+    if (pinode_ref.fs_id == 0 || pinode_ref.handle == 0) {
+	gossip_lerr("Invalid pinode reference\n");
+	return -PVFS_EINVAL;
+    }
+    
+    /* build PINT_client_sm structure */
+    /* TODO: KEEP A CACHE OF THESE AROUND SO WE'RE NOT ALWAYS MALLOC'ING? */
+    sm_p = (PINT_client_sm *) malloc(sizeof(*sm_p));
+    if (sm_p == NULL) return -PVFS_ENOMEM;
+
+    memset(sm_p, 0, sizeof(*sm_p));
+
+    sm_p->cred_p = &credentials;
+    sm_p->u.truncate.object_ref     = pinode_ref;
+    sm_p->u.truncate.size	    = size;
+
+    ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_TRUNCATE);
+    assert(ret == 0);
+
+    while (!sm_p->op_complete && ret == 0) {
+	ret = PINT_client_state_machine_test();
+    }
+    assert(ret == 0);
+
+    error = sm_p->error_code;
+
+    free(sm_p);
+    return error;
+}
+			    
+/* TODO: actually check parameters */
+static int truncate_check_parameters(PINT_client_sm *sm_p,
+				    job_status_s *js_p)
+{
+    return 1;
+}
+
+/* truncate_object_getattr_setup_msgpair()
+ *
+ * fills in sm_p->msgpair to perform a getattr using the getattr_pcache state
+ * machine
+ */
+static int truncate_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
+						job_status_s *js_p)
+{
+    int ret = -1;
+
+    gossip_debug(CLIENT_DEBUG,
+	    "(%p) truncate state: getattr_setup_msgpair\n",
+	    sm_p);
+
+    /* fill in getattr request.  we need is what handles are
+     * associated with the object and the distribution */
+    PINT_SERVREQ_GETATTR_FILL(sm_p->msgpair.req,
+			      *sm_p->cred_p,
+			      sm_p->u.truncate.object_ref.fs_id,
+			      sm_p->u.truncate.object_ref.handle,
+			      PVFS_ATTR_META_DFILES|PVFS_ATTR_META_DIST);
+    
+    /* fill in msgpair structure components */
+    sm_p->msgpair.fs_id   = sm_p->u.getattr.object_ref.fs_id;
+    sm_p->msgpair.handle  = sm_p->u.getattr.object_ref.handle;
+    sm_p->msgpair.comp_fn = truncate_object_getattr_comp_fn;
+    ret = PINT_bucket_map_to_server(&sm_p->msgpair.svr_addr,
+	sm_p->msgpair.handle, sm_p->msgpair.fs_id);
+    if(ret != 0)
+    {
+	gossip_err("Error: failure mapping to server.\n");
+	assert(ret < 0); /* return value range check */
+	assert(0); /* TODO: real error handling */
+    }
+
+    /* drop through and jump to getattr_pcache state machine */
+    return 1;
+}
+
+/*
+ * truncate_object_getattr_comp_fn
+ * copy data from the getattr response into our PINT_client_sm structure
+ *
+ * the client should only be working with metafiles, so anything else is an
+ * error... hey, prove me wrong and i'll change it 
+ *
+ * truncate on a directory has no meaning
+ */
+
+static int truncate_object_getattr_comp_fn(void *v_p,
+					struct PVFS_server_resp *resp_p,
+					int index)
+{
+    /* this is a little kludge to get around some struct definition
+     * issues in the headers.  maybe fix later?
+     */
+    PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
+
+    PVFS_object_attr *r_attr_p = &resp_p->u.getattr.attr;
+
+    assert(resp_p->op == PVFS_SERV_GETATTR); /* sanity check */
+
+    /* if we get an error, just return immediately, don't try to
+     * actually fill anything in.
+     */
+    if (resp_p->status != 0) {
+	return resp_p->status;
+    }
+
+    /* copy in the attributes we care about from the response */
+    switch (resp_p->u.getattr.attr.objtype)
+    {
+	case PVFS_TYPE_METAFILE:
+	    /* sanity checks */
+	    assert(r_attr_p->mask & 
+		    (PVFS_ATTR_META_DFILES|PVFS_ATTR_META_DIST));
+	    assert(r_attr_p->u.meta.dfile_count > 0);
+	    
+	    gossip_debug(CLIENT_DEBUG,
+			 "truncate_object_getattr_comp_fn: %d datafiles.\n",
+			 r_attr_p->u.meta.dfile_count); 
+	    /* save the datafile handles prior to freeing up the
+	     * buffers we used for messages.  we could keep them around
+	     * i suppose, but we're not going to do that for now.  later
+	     * it is likely that this stuff will be stuck in the pcache
+	     * anyway, so we'll be able to just reference it from there.
+	     */
+	    sm_p->u.truncate.datafile_handles = (PVFS_handle *) 
+		malloc((r_attr_p->u.meta.dfile_count) *sizeof(PVFS_handle));
+	    if (sm_p->u.truncate.datafile_handles == NULL) {
+		assert(0);
+	    }
+	    sm_p->u.truncate.datafile_count = r_attr_p->u.meta.dfile_count;
+	    memcpy(sm_p->u.truncate.datafile_handles,
+		    r_attr_p->u.meta.dfile_array,
+		    r_attr_p->u.meta.dfile_count * sizeof(PVFS_handle));
+	    return 0;
+	    break;
+	/* no idea what truncate means on these things, so do nothing */
+	case PVFS_TYPE_DIRECTORY:
+	case PVFS_TYPE_SYMLINK:
+	case PVFS_TYPE_DATAFILE:
+	case PVFS_TYPE_DIRDATA:
+	default:
+	    gossip_err("error: truncate_object_getattr_comp_fn: unhandled object type\n");
+	    assert(0);
+    } /* end of switch() */
+    return -PVFS_EINVAL; /* should not get here */
+}
+
+/* not really sure what to do here...  */
+static int truncate_object_getattr_failure(PINT_client_sm *sm_p,
+					job_status_s *js_p)
+{
+    gossip_debug(CLIENT_DEBUG,
+		 "(%p) truncate state: object_getattr_failure\n",
+		 sm_p);
+    assert(0);
+
+    return 1;
+}
+
+/* truncate_cleanup: deallocate memory */
+static int truncate_cleanup(PINT_client_sm *sm_p,
+			    job_status_s *js_p)
+{
+    gossip_debug(CLIENT_DEBUG, "(%p) truncate state: truncate_cleanup\n", sm_p);
+    sm_p->op_complete = 1;
+
+    return 0;
+}
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 noexpandtab
+ */

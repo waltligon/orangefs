@@ -31,5 +31,6 @@ LIBSRC += \
 	$(DIR)/lookup-dcache.c \
 	$(DIR)/getattr-pcache.c \
 	$(DIR)/mgmt-noop.c \
-	$(DIR)/mgmt-setparam-all.c 
+	$(DIR)/mgmt-setparam-all.c \
+	$(DIR)/sys-truncate.c
 

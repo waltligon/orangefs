@@ -190,6 +190,14 @@ struct PINT_client_mgmt_noop_sm
     char* host;
 };
 
+struct PINT_client_truncate_sm {
+    PVFS_pinode_reference	object_ref;	/* input parameter */
+    PVFS_size			size;		/* in(out?) parameter */
+    int				datafile_count;	/* from attribs */
+    PVFS_handle			*datafile_handles;
+    PINT_client_sm_msgpair_state *msgpair;	/* used in truncate op */
+};
+
 typedef struct PINT_client_sm {
     /* STATE MACHINE VALUES */
     int stackptr; /* stack of contexts for nested state machines */
@@ -239,6 +247,7 @@ typedef struct PINT_client_sm {
 	struct PINT_client_flush_sm flush;
 	struct PINT_client_mgmt_setparam_all_sm setparam_all;
 	struct PINT_client_mgmt_noop_sm noop;
+	struct PINT_client_truncate_sm  truncate;
     } u;
 } PINT_client_sm;
 
@@ -257,8 +266,9 @@ enum {
     PVFS_SYS_GETATTR = 5,
     PVFS_SYS_IO      = 6,
     PVFS_SYS_FLUSH   = 7,
-    PVFS_MGMT_SETPARAM_ALL = 8,
-    PVFS_MGMT_NOOP   = 9
+    PVFS_SYS_TRUNCATE= 8,
+    PVFS_MGMT_SETPARAM_ALL = 9,
+    PVFS_MGMT_NOOP   = 10
 };
 
 /* prototypes of helper functions */
@@ -307,6 +317,7 @@ extern struct PINT_state_machine_s pvfs2_client_io_sm;
 extern struct PINT_state_machine_s pvfs2_client_flush_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_setparam_all_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_noop_sm;
+extern struct PINT_state_machine_s pvfs2_client_truncate_sm;
 
 /* nested state machines (helpers) */
 extern struct PINT_state_machine_s pvfs2_client_msgpair_sm;
