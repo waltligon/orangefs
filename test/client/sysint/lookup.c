@@ -21,23 +21,9 @@ int main(int argc,char **argv)
 	PVFS_sysresp_lookup resp_look;
 	PVFS_sysreq_lookup *req_lk = NULL;
 	PVFS_sysresp_lookup *resp_lk = NULL;
-	PVFS_sysreq_getattr *req_gattr = NULL;
-	PVFS_sysresp_getattr *resp_gattr = NULL;
-	PVFS_sysreq_setattr *req_sattr = NULL;
-	PVFS_sysreq_readdir *req_readdir = NULL;
-	PVFS_sysresp_readdir *resp_readdir = NULL;
-#if 0
-	PVFS_sysreq_mkdir *req_mkdir = NULL;
-	PVFS_sysresp_mkdir *resp_mkdir = NULL;
-	PVFS_sysreq_rmdir *req_rmdir = NULL;
-	PVFS_sysreq_statfs *req_statfs = NULL;
-	PVFS_sysresp_statfs *resp_statfs = NULL;
-#endif
-	PVFS_sysreq_create *req_create = NULL;
-	PVFS_sysresp_create *resp_create = NULL;
 	char *filename;
 	int name_sz;
-	int ret = -1,i = 0;
+	int ret = -1;
 	pvfs_mntlist mnt = {0,NULL};
 
 	PVFS_handle lk_handle;

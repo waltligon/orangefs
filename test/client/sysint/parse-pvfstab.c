@@ -74,7 +74,7 @@ int parse_pvfstab(char *fn,pvfs_mntlist *pvfstab_p)
 			META_ADDR[strlen(tok) - strlen(root_mnt)] = '\0';
 #undef META_ADDR 
 
-#define SERV_MNT pvfstab_p->ptab_p[index].serv_mnt_dir 
+#define SERV_MNT pvfstab_p->ptab_p[index].service_name 
 			/* Extract the Root Mount Point */
 			SERV_MNT = (PVFS_string)malloc(strlen(root_mnt) + 1);
 			if (!SERV_MNT)
@@ -188,8 +188,8 @@ void free_pvfstab_entry(pvfs_mntlist *e_p)
 	{
 		if (mnts->ptab_p[i].meta_addr) 
 			free(mnts->ptab_p[i].meta_addr); 
-		if (mnts->ptab_p[i].serv_mnt_dir)
-			free(mnts->ptab_p[i].serv_mnt_dir);
+		if (mnts->ptab_p[i].service_name)
+			free(mnts->ptab_p[i].service_name);
 		if (mnts->ptab_p[i].local_mnt_dir)
 			free(mnts->ptab_p[i].local_mnt_dir);
 		if (mnts->ptab_p[i].fs_type)

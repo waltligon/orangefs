@@ -19,24 +19,12 @@ int main(int argc,char **argv)
 	PVFS_sysresp_init resp_init;
 	PVFS_sysreq_lookup req_look;
 	PVFS_sysresp_lookup resp_look;
-	PVFS_sysreq_lookup *req_lk = NULL;
-	PVFS_sysresp_lookup *resp_lk = NULL;
-	PVFS_sysreq_getattr *req_gattr = NULL;
-	PVFS_sysresp_getattr *resp_gattr = NULL;
-	PVFS_sysreq_setattr *req_sattr = NULL;
-	PVFS_sysreq_readdir *req_readdir = NULL;
-	PVFS_sysresp_readdir *resp_readdir = NULL;
 	PVFS_sysreq_create *req_create = NULL;
 	PVFS_sysresp_create *resp_create = NULL;
 	char *filename;
-	//char dirname[256] = "/parl/fshorte/sysint/home";
-	int ret = -1,i = 0;
+	int ret = -1;
 	pvfs_mntlist mnt = {0,NULL};
 	int name_sz;
-
-	PVFS_handle lk_handle;
-	PVFS_handle lk_fsid;
-
 
 
 	if (argc > 1)
