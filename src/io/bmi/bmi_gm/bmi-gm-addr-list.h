@@ -18,7 +18,8 @@ void gm_addr_add(struct qlist_head *head,
 		 method_addr_p map);
 void gm_addr_del(method_addr_p map);
 method_addr_p gm_addr_search(struct qlist_head *head,
-			     unsigned int node_id);
+			     unsigned int node_id,
+                             unsigned int port_id);
 
 
 

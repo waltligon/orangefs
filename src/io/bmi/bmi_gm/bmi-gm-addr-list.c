@@ -51,7 +51,8 @@ void gm_addr_del(method_addr_p map)
  * returns pointer to method address on success, NULL on failure
  */
 method_addr_p gm_addr_search(struct qlist_head * head,
-			     unsigned int node_id)
+			     unsigned int node_id,
+                             unsigned int port_id)
 {
     struct qlist_head *tmp_entry = NULL;
     struct gm_addr *gm_addr_data = NULL;
@@ -60,7 +61,8 @@ method_addr_p gm_addr_search(struct qlist_head * head,
     {
 	gm_addr_data = qlist_entry(tmp_entry, struct gm_addr,
 				   gm_addr_list);
-	if (gm_addr_data->node_id == node_id)
+	if (gm_addr_data->node_id == node_id &&
+            gm_addr_data->port_id == port_id)
 	{
 	    /* pointer magic :) we know that the method addr structure and
 	     * gm_addr structure are adjacent and contiguous.

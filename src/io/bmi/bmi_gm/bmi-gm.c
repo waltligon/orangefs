@@ -349,7 +349,8 @@ static void ctrl_ack_handler(bmi_op_id_t ctrl_op_id,
 static int ctrl_req_handler_rend(bmi_op_id_t ctrl_op_id,
 				 bmi_size_t ctrl_actual_size,
 				 bmi_msg_tag_t ctrl_tag,
-				 unsigned int node_id);
+				 unsigned int node_id,
+                                 unsigned int port_id);
 static int immed_unexp_recv_handler(bmi_size_t size,
 				    bmi_msg_tag_t msg_tag,
 				    method_addr_p map,
@@ -2912,7 +2913,9 @@ static int recv_event_handler(gm_recv_event_t * poll_event,
 					    ctrl_copy.u.req.actual_size,
 					    ctrl_copy.u.req.msg_tag,
 					    gm_ntohs(poll_event->recv.
-						     sender_node_id));
+						     sender_node_id),
+					    gm_ntoh_u8(poll_event->recv.
+						     sender_port_id));
 	    break;
 	case CTRL_PUT_TYPE: 
 	    put_recv_handler(ctrl_copy.u.put.receiver_op_id);
@@ -2922,7 +2925,8 @@ static int recv_event_handler(gm_recv_event_t * poll_event,
 	    /* try to find a matching post from the receiver so that we don't
 	     * have to buffer this yet again */
 	    map = gm_addr_search(&gm_addr_list,
-				 gm_ntohs(poll_event->recv.sender_node_id));
+				 gm_ntohs(poll_event->recv.sender_node_id),
+				 gm_ntoh_u8(poll_event->recv.sender_port_id));
 	    if (!map)
 	    {
 		/* TODO: handle this error better */
@@ -3007,7 +3011,8 @@ static int recv_event_handler(gm_recv_event_t * poll_event,
 	    break;
 	case CTRL_UNEXP_TYPE:
 	    map = gm_addr_search(&gm_addr_list,
-				 gm_ntohs(poll_event->recv.sender_node_id));
+				 gm_ntohs(poll_event->recv.sender_node_id),
+				 gm_ntoh_u8(poll_event->recv.sender_port_id));
 	    if (!map)
 	    {
 		/* new address! */
@@ -3671,7 +3676,8 @@ static void data_send_callback(struct gm_port *port,
 static int ctrl_req_handler_rend(bmi_op_id_t ctrl_op_id,
 				 bmi_size_t ctrl_actual_size,
 				 bmi_msg_tag_t ctrl_tag,
-				 unsigned int node_id)
+				 unsigned int node_id,
+                                 unsigned int port_id)
 {
     method_addr_p map = NULL;
     struct gm_addr *gm_addr_data = NULL;
@@ -3692,7 +3698,7 @@ static int ctrl_req_handler_rend(bmi_op_id_t ctrl_op_id,
      *      - queue up as need receive post
      */
 
-    map = gm_addr_search(&gm_addr_list, node_id);
+    map = gm_addr_search(&gm_addr_list, node_id, port_id);
     if (!map)
     {
 	/* where did this come from?! */
