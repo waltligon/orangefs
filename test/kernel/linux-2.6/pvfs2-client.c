@@ -14,8 +14,8 @@
 #include <sys/wait.h>
 #include <assert.h>
 
-#ifndef VERSION
-#define VERSION "0.0.1"
+#ifndef PVFS2_VERSION
+#define PVFS2_VERSION "Unknown"
 #endif
 
 #define PVFS2_CLIENT_CORE_PATH  "./pvfs2-client-core"
@@ -216,7 +216,7 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 exit(0);
             case 'v':
           do_version:
-                printf("%s\n", VERSION);
+                printf("%s\n", PVFS2_VERSION);
                 exit(0);
             case 'V':
           do_verbose:
