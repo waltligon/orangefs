@@ -118,6 +118,9 @@ static int msgpair_post(PINT_client_sm *sm_p,
 
     msg_p = &sm_p->msgpair;
 
+    assert(msg_p->handle != 0);
+    assert(msg_p->fs_id != 0);
+
     /* NOTE: THIS IS REPLICATED IN PINT_SERV_PREPARE_MSGPAIR();
      * WE SHOULD GET RID OF ONE OF THEM OR SOMETHING...
      */
@@ -354,5 +357,5 @@ static int msgpair_error(PINT_client_sm *sm_p,
  *  c-basic-offset: 4
  * End:
  *
- * vim: ts=8 sts=4 sw=4 noexpandtab
+ * vim: ft=c ts=8 sts=4 sw=4 noexpandtab
  */
