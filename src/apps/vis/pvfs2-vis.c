@@ -310,37 +310,36 @@ static void* poll_for_updates(void* args)
 	pthread_mutex_lock(&pint_vis_mutex);
 	for(i=0; i<server_count; i++)
 	{
+	    new_count = 0;
 	    for(j=0; j<history_count; j++)
 	    {
-		new_count = 0;
 		if(tmp_matrix[i][j].valid_flag)
 		{
 		    new_count++;
 		    new_flag = 1;
 		}
-		if(new_count > 0)
+	    }
+	    if(new_count > 0)
+	    {
+		/* if we hit this point, we need to shift one or more
+		 * new measurements into position
+		 */
+		for(k=new_count; k<history_count; k++)
 		{
-
-		    /* if we hit this point, we need to shift one or more
-		     * new measurements into position
-		     */
-		    for(k=new_count; k<history_count; k++)
-		    {
-			/* move old ones over */
-			pint_vis_shared.io_perf_matrix[i][k-new_count]
-			    = pint_vis_shared.io_perf_matrix[i][k];
-		    }
-		    for(k=(history_count-new_count); k<history_count; k++)
-		    {
-			/* drop new ones in */
-			pint_vis_shared.io_perf_matrix[i][k] = 
-			    tmp_matrix[i][k-(history_count-new_count)];
-		    }
-		    /* update end time */
-		    pint_vis_shared.io_end_time_ms_array[i] 
-			= end_time_ms_array[i];
-
+		    /* move old ones over */
+		    pint_vis_shared.io_perf_matrix[i][k-new_count]
+			= pint_vis_shared.io_perf_matrix[i][k];
 		}
+		for(k=(history_count-new_count); k<history_count; k++)
+		{
+		    /* drop new ones in */
+		    pint_vis_shared.io_perf_matrix[i][k] = 
+			tmp_matrix[i][k-(history_count-new_count)];
+		}
+		/* update end time */
+		pint_vis_shared.io_end_time_ms_array[i] 
+		    = end_time_ms_array[i];
+
 	    }
 	}
 
