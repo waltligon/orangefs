@@ -152,24 +152,9 @@ int job_waitall_blocking(
 	job_status_s* out_status_array_p)
 {
 
-	/* commented out for now because our test harnesses don't provide
-	 * job_waitsome() yet
-	 */
 	int ret = -1;
-	job_id_t* internal_id_array = NULL;
 	int* internal_index_array = NULL;
-	int internal_count = in_count;
-	int old_internal_count = in_count;
-	int current_position = 0;
 	int i = 0;
-
-	/* setup our own copy of the id array so that we can safely modify it */
-	internal_id_array = (job_id_t*)alloca(in_count*sizeof(job_id_t));
-	if(!internal_id_array)
-	{
-		return(-ENOMEM);
-	}
-	memcpy(internal_id_array, id_array, (in_count*sizeof(job_id_t)));
 
 	/* setup an index array to use internally */
 	internal_index_array = (int*)alloca(in_count*sizeof(int));
@@ -178,31 +163,15 @@ int job_waitall_blocking(
 		return(-ENOMEM);
 	}
 
-	do
+	/* attempt to wait on some of the pending jobs */
+	ret = job_testsome(id_array, &in_count,
+		internal_index_array,
+		returned_user_ptr_array,
+		out_status_array_p, -1);
+	if(ret < 0)
 	{
-		/* save the old count; it gets overwritten by this call */
-		old_internal_count = internal_count;
-		/* attempt to wait on some of the pending jobs */
-		ret = job_waitsome(internal_id_array, &internal_count,
-			&(internal_index_array[current_position]),
-			&(returned_user_ptr_array[current_position]),
-			&(out_status_array_p[current_position]));
-		if(ret < 0)
-		{
-			return(ret);
-		}
-		for(i=0; i<internal_count; i++)
-		{
-			/* zero out any id's that have completed; the job interface
-			 * will now skip over these entries
-			 */
-			internal_index_array[internal_index_array[current_position+i]] = 0;
-		}
-		/* upate our indexs */
-		current_position = current_position + internal_count;
-		internal_count = old_internal_count - internal_count;
-	} while(internal_count > 0);
-	/* quit loop once all jobs are accounted for */
+		return(ret);
+	}
 
 	return(0);
 }

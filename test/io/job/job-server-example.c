@@ -86,6 +86,8 @@ int main(int argc, char **argv)
 	}
 	if(ret != 1)
 	{
+		int foo;
+#if 0
 		/* exercise testworld() interface, block indefinitely */
 		outcount = 1;
 		ret = job_testworld(&job_id, &outcount, NULL, &status1, -1);
@@ -94,6 +96,18 @@ int main(int argc, char **argv)
 			fprintf(stderr, "job_testworld() failure.\n");
 			return(-1);
 		}
+#else
+
+		/* alternatively, try out the testsome interface */
+		outcount = 1;
+		ret = job_testsome(&job_id, &outcount, &foo, NULL, &status1, -1);
+		if(ret < 0 || outcount == 0)
+		{
+			fprintf(stderr, "job_testsome() failure.\n");
+			return(-1);
+		}
+
+#endif
 	}
 
 	/* check status */

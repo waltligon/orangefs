@@ -341,26 +341,20 @@ int job_trove_fs_geteattr(
  * job test/wait for completion functions 
  */
 
-/* instantaneous check for completion of a particular job */
 int job_test(
 	job_id_t id,
 	int* out_count_p,
 	void** returned_user_ptr_p,
 	job_status_s* out_status_p);
 
-/* instantaneous check for completion of one or more of a specified set
- * of jobs 
- */
 int job_testsome(
 	job_id_t* id_array,
 	int* inout_count_p,
 	int* out_index_array,
 	void** returned_user_ptr_array,
-	job_status_s* out_status_array_p);
+	job_status_s* out_status_array_p,
+	int timeout_ms);
 
-/* instantaneous check for completion of one or more of any currently
- * pending jobs
- */
 int job_testworld(
 	job_id_t* out_id_array_p,
 	int* inout_count_p,
@@ -368,21 +362,11 @@ int job_testworld(
 	job_status_s* out_status_array_p,
 	int timeout_ms);
 
-/* briefly blocking check for completion of a particular job */
+/* TODO: get rid of soon */
 int job_wait(
 	job_id_t id,
 	int* out_count_p,
 	void** returned_user_ptr_p,
 	job_status_s* out_status_p);
-
-/* briefly blocking check for completion of one or more of a specified
- * set of jobs
- */
-int job_waitsome(
-	job_id_t* id_array,
-	int* inout_count_p,
-	int* out_index_array,
-	void** returned_user_ptr_array,
-	job_status_s* out_status_array_p);
 
 #endif /* __JOB_H */
