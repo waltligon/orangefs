@@ -4,19 +4,8 @@
  * See COPYING in top-level directory.
  */
 
-/* PVFS Server Request Protocol 
- * 
- * We keep a simple set of operations for the I/O server.  The
- * motivation here is that there is going to be a switch based on object
- * type anyway, so we use the same request types to perform operations
- * on specific objects using the semantics of the object.
- *
- * I think.
- *
- */
-
-#ifndef _PVFS2_REQ_PROTO_H
-#define _PVFS2_REQ_PROTO_H
+#ifndef __PVFS2_REQ_PROTO_H
+#define __PVFS2_REQ_PROTO_H
 
 #include "pvfs2-types.h"
 #include "pvfs2-attr.h"
