@@ -582,7 +582,6 @@ extern struct PINT_state_machine_s pvfs2_client_job_timer_sm;
 extern struct PINT_state_machine_s pvfs2_server_get_config_sm;
 
 /* nested state machines (helpers) */
-extern struct PINT_state_machine_s pvfs2_msgpairarray_sm;
 extern struct PINT_state_machine_s pvfs2_client_getattr_acache_sm;
 extern struct PINT_state_machine_s pvfs2_client_lookup_ncache_sm;
 extern struct PINT_state_machine_s pvfs2_client_remove_helper_sm;

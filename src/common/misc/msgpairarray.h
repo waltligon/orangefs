@@ -12,6 +12,8 @@
 #include "PINT-reqproto-encode.h"
 #include "job.h"
 
+extern struct PINT_state_machine_s pvfs2_msgpairarray_sm;
+
 /*
  * This structure holds everything that we need for the state of a
  * message pair.  We need arrays of these in some cases, so it's
