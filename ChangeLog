@@ -2,6 +2,44 @@
 PVFS2 Release ChangeLog
 -----------------------
 
+pvfs2-0.0.3
+===========
+- more pts tests for pvfs2 datatypes
+- ability to specify flowprotocol in pvfs2tab file per fs
+- truncate implementation
+- new flow design document
+- statfs implementation
+- rewritten mgmt interface, and several new functions
+- pvfs2-statfs admin tool
+- configurable handle timeout on server
+- fixed symbol name collisions with pvfs1
+- better sigpipe handling
+- added backtrace feature to gossip_lerr()
+- improved mmap() support in kernel
+- non interactive mode for pvfs2-genconfig
+- request scheduler support for timer events
+- server performance counters
+- mgmt functions and example tool (pvfs2-perf-mon-example) for gathering
+  real time performance statistics from servers
+- kernel statfs() support
+- added CREDITS file
+- addition of PAV (PVFS auto volume) tool for automated test runs
+- kernel rename() improvements
+- import of mpi-io-test program
+- redhat style rc script for server
+- addition of administrative mode for servers 
+- pvfs2-set-mode admin tool to toggle admin mode for file system
+- mgmt API hooks necessary for fsck and dumping fs
+- beginning of pvfs2-fs-dump tool, that can show file system structure
+  and potential problems, optional dotty output
+- "make dist" build target
+- removal of depricated test programs
+- man pages for many admin tools etc.
+- new/updated quickstart, users guide, and status document, README, and INSTALL
+- removal of depricated design documents
+- request scheduler support for batch/list operations
+- many many many bug fixes and code cleanups
+
 pvfs2-0.0.3pre1
 ===========
 - vfs mmap and execution support (read-only)
