@@ -313,6 +313,14 @@ developers.
 Finally, be sure there are no typos in your command line, as this is
 commonly the case!
 
+\subsection{PVFS2 server consumes 100\% of the CPU}
+
+On some systems, the pvfs2-server will start consuming 100\% of the CPU after
+you try to read or write a file to PVFS2.  Please check to see if your
+distribution has an updated glibc package.  RHEL3, for example, will exhibit
+this behavior with glibc-2.3.2-95.6, but not with the updated glibc-2.3.2-95.20
+package.
+
 %
 % PERFORMANCE
 %
@@ -387,6 +395,24 @@ In the end, if you plan on running application XXX, or a similar workload,  and
 the NFS consistency semantics are adequate for what you're doing, then you
 should just use NFS.  There's no point in throwing PVFS2 at a serial workload,
 particularly one with small accesses.
+
+\subsection{Can the underlying local file system affect PVFS2 performance?}
+
+The interaction between the PVFS2 servers and the local file system hosting the
+storage space has not been fully explored.  No doubt a great deal of time could
+be spent on different file systems and their parameters.  
+
+People have looked at sync performance for a variety of file systems.  Some
+file systems will flush all dirty buffers when \texttt{fsync} is called.  Other
+file systems will only flush dirty buffers belonging to the file. See the
+threads starting here
+\url{http://www.parl.clemson.edu/pipermail/pvfs2-developers/2004-July/000740.html}
+and here
+\url{http://www.parl.clemson.edu/pipermail/pvfs2-developers/2004-July/000741.html}.
+
+These tests demonstrate wide variance in file system behavior.  Interested
+users are encouraged to experiment and discuss their findings on the PVFS2
+lists.
 
 %
 % REDUNDANCY
