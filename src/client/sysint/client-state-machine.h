@@ -178,9 +178,6 @@ struct PINT_client_setattr_sm
 
 typedef struct
 {
-    /* a reference to the msgpair we're using for communication */
-    PINT_client_sm_msgpair_state *msg;
-
     /* the index of the current context (in the context array) */
     int index;
 
@@ -190,14 +187,24 @@ typedef struct
     /* the data handle we're responsible for doing I/O on */
     PVFS_handle data_handle;
 
-    int flow_in_progress;
+    /* a reference to the msgpair we're using for communication */
+    PINT_client_sm_msgpair_state *msg;
+
     job_id_t flow_job_id;
     job_status_s flow_status;
     flow_descriptor flow_desc;
     PVFS_msg_tag_t session_tag;
 
-    int write_ack_in_progress;
     PINT_client_sm_recv_state write_ack;
+
+    /*
+      all *_in_progress fields are used at cancellation time to
+      determine what operations are currently in flight
+    */
+    int msg_send_in_progress;
+    int msg_recv_in_progress;
+    int flow_in_progress;
+    int write_ack_in_progress;
 
 } PINT_client_io_ctx;
 

@@ -1759,6 +1759,8 @@ int main(int argc, char **argv)
         pthread_cancel(remount_thread);
     }
 
+    finalize_ops_in_progress_table();
+
     /* free all allocated resources */
     for(i = 0; i < MAX_NUM_OPS; i++)
     {
@@ -1766,7 +1768,6 @@ int main(int argc, char **argv)
         PINT_sys_release(s_vfs_request_array[i]->op_id);
         free(s_vfs_request_array[i]);
     }
-    finalize_ops_in_progress_table();
 
     job_close_context(s_client_dev_context);
 

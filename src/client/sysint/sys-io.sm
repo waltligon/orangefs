@@ -600,6 +600,8 @@ static int io_datafile_post_msgpairs(PINT_client_sm *sm_p,
             &msg->recv_status, &msg->recv_id, pint_client_sm_context,
             PVFS2_CLIENT_JOB_TIMEOUT);
 
+        cur_ctx->msg_recv_in_progress = 1;
+
         if (ret == 0)
         {
             int tmp = 0;
@@ -632,6 +634,7 @@ static int io_datafile_post_msgpairs(PINT_client_sm *sm_p,
 
             PVFS_perror_gossip("recv completed before send failure", ret);
 
+            cur_ctx->msg_recv_in_progress = 0;
             sm_p->u.io.msgpair_completion_count--;
 
             /* FIXME: see above FIXME */
@@ -653,6 +656,8 @@ static int io_datafile_post_msgpairs(PINT_client_sm *sm_p,
             msg->encoded_req.buffer_type, 1, sm_p, status_user_tag,
             &msg->send_status, &msg->send_id, pint_client_sm_context,
             PVFS2_CLIENT_JOB_TIMEOUT);
+
+        cur_ctx->msg_recv_in_progress = 1;
 
         if ((ret < 0) ||
             ((ret == 1) && (msg->send_status.error_code != 0)))
@@ -677,6 +682,7 @@ static int io_datafile_post_msgpairs(PINT_client_sm *sm_p,
             gossip_err("Send error: canceling recv.\n");
 
             PINT_client_bmi_cancel(msg->recv_id);
+            cur_ctx->msg_send_in_progress = 0;
             sm_p->u.io.msgpair_completion_count--;
 
             /* FIXME: see above FIXME */
@@ -690,6 +696,7 @@ static int io_datafile_post_msgpairs(PINT_client_sm *sm_p,
             /* 0 is the valid "completed job id" value */
             msg->send_id = 0;
 
+            cur_ctx->msg_send_in_progress = 0;
             sm_p->u.io.msgpair_completion_count--;
 
             if (msg->send_status.error_code != 0)
@@ -848,7 +855,7 @@ static int io_datafile_complete_operations(PINT_client_sm *sm_p,
 
     if (sm_p->op_cancelled)
     {
-        gossip_debug(GOSSIP_IO_DEBUG, "detected I/O cancelation with "
+        gossip_debug(GOSSIP_IO_DEBUG, "detected I/O cancellation with "
                      "%d flow(s) and %d write ack(s) pending\n",
                      sm_p->u.io.flow_completion_count,
                      sm_p->u.io.write_ack_completion_count);
@@ -1004,6 +1011,7 @@ static inline int complete_context_send_or_recv(
         assert(msg->recv_status.actual_size <= msg->max_resp_sz);
         assert(msg->recv_status.error_code <= 0);
 
+        cur_ctx->msg_recv_in_progress = 0;
         sm_p->u.io.msgpair_completion_count--;
 
         ret = IO_RECV_COMPLETED;
@@ -1026,6 +1034,7 @@ static inline int complete_context_send_or_recv(
 
         assert(msg->send_status.error_code <= 0);
 
+        cur_ctx->msg_send_in_progress = 0;
         sm_p->u.io.msgpair_completion_count--;
 
         ret = 0;

@@ -115,6 +115,8 @@ static int completion_list_retrieve_completed(
                 user_ptr_array[i] = (void *)sm_p->user_ptr;
             }
             s_completion_list[i] = NULL;
+
+            PINT_sys_release(sm_p->sys_op_id);
         }
         else
         {
@@ -132,6 +134,31 @@ static int completion_list_retrieve_completed(
     return 0;
 }
 
+/*
+  NOTE: important usage notes regarding post(), test(), and testsome()
+
+  thread safety: test() and testsome() can be called in any order by
+  the same thread.  if you need to call test() and testsome()
+  simultaneously from different threads, you need to serialize the
+  calls yourself.
+
+  calling semantics: the non-blocking calls (i.e. PVFS_isys_* or
+  PVFS_imgmt_* calls) allocate the state machine pointer (sm_p) used
+  for each operation.  the blocking calls DO NOT allocate this, but
+  call the non-blocking method (which does allocate it) and waits for
+  completion.  On completion, the blocking call frees the state
+  machine pointer (via PINT_sys_release).  the blocking calls only
+  ever call the test() function, which does not free the state machine
+  pointer on completion.
+
+  the testsome() function frees the state machine pointers allocated
+  from the non-blocking calls on completion because any caller of
+  testsome() *should* be using the non-blocking calls with it.  this
+  means that if you are calling test() with a non-blocking operation
+  that you manually issued (with a PVFS_isys* or PVFS_imgmt* call),
+  you need to call PVFS_sys_release on your own when the operation
+  completes.
+*/
 int PINT_client_state_machine_post(
     PINT_client_sm *sm_p,
     int pvfs_sys_op,
@@ -369,6 +396,36 @@ int PINT_client_io_cancel(PVFS_sys_op_id id)
     {
         PINT_client_io_ctx *cur_ctx = &sm_p->u.io.contexts[i];
         assert(cur_ctx);
+
+        if (cur_ctx->msg_send_in_progress)
+        {
+            gossip_debug(GOSSIP_CLIENT_DEBUG,  "[%d] Posting "
+                         "cancellation of type: BMI Send "
+                         "(Request)\n",i);
+
+            ret = job_bmi_cancel(cur_ctx->msg->send_id,
+                                 pint_client_sm_context);
+            if (ret < 0)
+            {
+                PVFS_perror_gossip("job_bmi_cancel failed", ret);
+                break;
+            }
+        }
+
+        if (cur_ctx->msg_recv_in_progress)
+        {
+            gossip_debug(GOSSIP_CLIENT_DEBUG,  "[%d] Posting "
+                         "cancellation of type: BMI Recv "
+                         "(Response)\n",i);
+
+            ret = job_bmi_cancel(cur_ctx->msg->recv_id,
+                                 pint_client_sm_context);
+            if (ret < 0)
+            {
+                PVFS_perror_gossip("job_bmi_cancel failed", ret);
+                break;
+            }
+        }
 
         if (cur_ctx->flow_in_progress)
         {

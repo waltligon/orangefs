@@ -3,31 +3,6 @@
  *
  * See COPYING in top-level directory.
  */
-
-/* pvfs2_client_getattr_sm
- *
- * This state machine implements the getattr system interface function.
- *
- * The input parameters are held in sm_p->u.getattr.
- *
- * The sm_p->msgpair structure is used to get the attributes of the
- * object itself.  We convert the original attribute mask (in
- * sm_p->u.getattr.attrmask) to ask for datafile and distribution info
- * if the user asked for file size (PVFS_ATTR_SYS_SIZE).  This allows us
- * to obtain this information (if the object turns out to be a metafile)
- * so that we can later look up the datafile sizes and calculate the overall
- * file size.
- *
- * The datafile handles and distribution information are stored in
- * sm_p->u.getattr also, if the object turns out to be a metafile and the 
- * caller asked for the size.  These need to be freed once we are done with
- * them.
- *
- * The sm_p->msgpairarray is used to get datafile sizes, if it turns out that
- * we need them.  This space will also need to be freed, if we grab these
- * sizes.
- */
-
 #include <string.h>
 #include <assert.h>
 
@@ -42,6 +17,26 @@
 #include "pint-servreq.h"
 #include "pint-bucket.h"
 #include "PINT-reqproto-encode.h"
+
+/* pvfs2_client_getattr_sm
+ *
+ * The sm_p->msgpair structure is used to get the attributes of the
+ * object itself.  We convert the original attribute mask (in
+ * sm_p->u.getattr.attrmask) to ask for datafile and distribution info
+ * if the user asked for file size (PVFS_ATTR_SYS_SIZE).  This allows
+ * us to obtain this information (if the object turns out to be a
+ * metafile) so that we can later look up the datafile sizes and
+ * calculate the overall file size.
+ *
+ * The datafile handles and distribution information are stored in
+ * sm_p->u.getattr also, if the object turns out to be a metafile and
+ * the caller asked for the size.  These need to be freed once we are
+ * done with them.
+ *
+ * The sm_p->msgpairarray is used to get datafile sizes, if it turns
+ * out that we need them.  This space will also need to be freed, if
+ * we grab these sizes.
+ */
 
 extern job_context_id pint_client_sm_context;
 
