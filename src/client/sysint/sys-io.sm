@@ -1,0 +1,112 @@
+/* 
+ * (C) 2003 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+#include <string.h>
+#include <assert.h>
+
+#include "client-state-machine.h"
+#include "state-machine-fns.h"
+#include "pvfs2-types-debug.h"
+#include "pvfs2-debug.h"
+#include "job.h"
+#include "gossip.h"
+#include "str-utils.h"
+
+#include "pinode-helper.h"
+#include "pint-dcache.h"
+#include "pint-servreq.h"
+#include "pint-bucket.h"
+#include "pcache.h"
+#include "PINT-reqproto-encode.h"
+
+extern job_context_id pint_client_sm_context;
+
+/* state function prototypes */
+static int io_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
+					   job_status_s *js_p);
+
+%%
+
+machine pvfs2_client_io_sm(object_getattr_setup_msgpair)
+{
+    state object_getattr_setup_msgpair {
+	run io_object_getattr_setup_msgpair;
+	default => object_getattr_setup_msgpair;
+    }
+}
+
+%%
+
+/* PVFS_sys_io()
+ */
+int PVFS_sys_io2(PVFS_pinode_reference pinode_ref,
+		 PVFS_Request          io_req,
+		 PVFS_offset           io_req_offset,
+		 void                 *buffer,
+		 PVFS_size             buffer_size,
+		 PVFS_credentials      credentials,
+		 PVFS_sysresp_io      *resp_p,
+		 enum PVFS_sys_io_type io_type)
+{
+    int ret;
+    PINT_client_sm *sm_p;
+    PVFS_error error;
+
+    if (resp_p == NULL) {
+	gossip_lerr("NULL resp pointer\n");
+	return -PVFS_EINVAL;
+    }
+
+    /* allocate and build PINT_client_sm structure */
+    sm_p = (PINT_client_sm *) malloc(sizeof(*sm_p));
+    if (sm_p == NULL) return -PVFS_ENOMEM;
+
+    memset(sm_p, 0, sizeof(*sm_p));
+
+    sm_p->cred_p = &credentials;
+    sm_p->u.io.object_ref    = pinode_ref;
+    sm_p->u.io.io_req        = io_req;
+    sm_p->u.io.io_req_offset = io_req_offset;
+    sm_p->u.io.buffer        = buffer;
+    sm_p->u.io.buffer_size   = buffer_size;
+    sm_p->u.io.io_resp_p     = resp_p;
+
+    ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_IO);
+    assert(ret == 0);
+
+    while (!sm_p->op_complete && ret == 0) {
+	ret = PINT_client_state_machine_test();
+    }
+    assert(ret == 0);
+
+    error = sm_p->error_code;
+
+    free(sm_p);
+
+    return error;
+}
+
+/*******************************************************************/
+
+static int io_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
+					   job_status_s *js_p)
+{
+    return 0;
+}
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 noexpandtab
+ */
+
+
+
+

@@ -134,8 +134,8 @@ machine pvfs2_client_getattr_sm(check_parameters,
 /* PVFS_sys_getattr()
  */
 int PVFS_sys_getattr(PVFS_pinode_reference pinode_ref,
-		     uint32_t attrmask, 
-		     PVFS_credentials credentials,
+		     uint32_t              attrmask, 
+		     PVFS_credentials      credentials,
 		     PVFS_sysresp_getattr *resp_p)
 {
     int ret;

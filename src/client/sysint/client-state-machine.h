@@ -77,14 +77,24 @@ struct PINT_client_remove_sm {
 
 /* PINT_client_getattr_sm */
 struct PINT_client_getattr_sm {
-    PVFS_pinode_reference object_ref; /* input parameter */
-    uint32_t              attrmask; /* input parameter */
+    PVFS_pinode_reference object_ref;     /* input parameter */
+    uint32_t              attrmask;       /* input parameter */
     int                   datafile_count; /* from object attribs */
     PVFS_handle          *datafile_handles;
     PVFS_Dist            *dist_p;
     uint32_t              dist_size;
-    PVFS_size            *size_array; /* from datafile attribs */
+    PVFS_size            *size_array;     /* from datafile attribs */
     PVFS_sysresp_getattr *getattr_resp_p; /* destination for output */
+};
+
+/* PINT_client_io_sm */
+struct PINT_client_io_sm {
+    PVFS_pinode_reference object_ref; /* input parameter */
+    PVFS_Request          io_req;
+    PVFS_offset           io_req_offset;
+    void                 *buffer;
+    PVFS_size             buffer_size;
+    PVFS_sysresp_io      *io_resp_p;
 };
 
 typedef struct PINT_client_sm {
@@ -123,6 +133,7 @@ typedef struct PINT_client_sm {
     union {
 	struct PINT_client_remove_sm  remove;
 	struct PINT_client_getattr_sm getattr;
+	struct PINT_client_io_sm      io;
     } u;
 } PINT_client_sm;
 
@@ -135,7 +146,8 @@ int PINT_client_state_machine_test(void);
  */
 enum {
     PVFS_SYS_REMOVE  = 1,
-    PVFS_SYS_GETATTR = 2
+    PVFS_SYS_GETATTR = 2,
+    PVFS_SYS_IO      = 3
 };
 
 /* prototypes of helper functions */
@@ -171,6 +183,7 @@ int PINT_serv_free_msgpair_resources(struct PINT_encoded_msg *encoded_req_p,
 /* system interface function state machines */
 extern struct PINT_state_machine_s pvfs2_client_remove_sm;
 extern struct PINT_state_machine_s pvfs2_client_getattr_sm;
+extern struct PINT_state_machine_s pvfs2_client_io_sm;
 
 /* nested state machines (helpers) */
 extern struct PINT_state_machine_s pvfs2_client_msgpair_sm;
