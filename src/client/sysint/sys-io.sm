@@ -103,8 +103,6 @@ machine pvfs2_client_io_sm(object_getattr_setup_msgpair,
 
 %%
 
-/* PVFS_sys_io()
- */
 int PVFS_sys_io(PVFS_pinode_reference pinode_ref,
 		PVFS_Request          file_req,
 		PVFS_offset           file_req_offset,
@@ -114,20 +112,20 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_ref,
 		PVFS_sysresp_io      *resp_p,
 		enum PVFS_io_type     io_type)
 {
-    int ret;
-    PINT_client_sm *sm_p;
+    int ret = -PVFS_EINVAL;
+    PINT_client_sm *sm_p = NULL;
     PVFS_error error;
     struct filesystem_configuration_s* cur_fs = NULL;
 
     if (resp_p == NULL)
     {
 	gossip_lerr("NULL resp pointer\n");
-	return -PVFS_EINVAL;
+	return ret;
     }
 
     if ((io_type != PVFS_IO_READ) && (io_type != PVFS_IO_WRITE))
     {
-	return -PVFS_EINVAL;
+	return ret;
     }
 
     cur_fs = PINT_config_find_fs_id(PINT_get_server_config_struct(),
@@ -135,7 +133,7 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_ref,
     if (!cur_fs)
     {
 	gossip_lerr("Error: invalid fs_id.\n");
-	return(-PVFS_EINVAL);
+	return ret;
     }
 
     /* look for zero byte operations */
@@ -145,7 +143,7 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_ref,
 	gossip_ldebug(GOSSIP_CLIENT_DEBUG, "Warning: 0 byte I/O operation "
                       "attempted.\n");
 	resp_p->total_completed = 0;
-	return(0);
+	return 0;
     }
 
     sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));
@@ -168,9 +166,9 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_ref,
     sm_p->u.io.encoding = cur_fs->encoding;
 
     ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_IO);
-    assert(ret == 0);
 
-    while (!sm_p->op_complete && ret == 0) {
+    while (!sm_p->op_complete && ret == 0)
+    {
 	ret = PINT_client_state_machine_test();
     }
     assert(ret == 0);
@@ -691,7 +689,6 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "io state: datafile_complete\n");
 
-    /* loads of sanity checks */
     assert(sm_p->msgarray_count == sm_p->u.io.datafile_count);
     assert(sm_p->msgarray[0].comp_ct >= 0);
     assert(sm_p->u.io.flow_comp_ct >= 0);
@@ -805,7 +802,6 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 	    fl_p = &sm_p->u.io.flow_array[recv_match];
 
 	    /* fill in file_data structure */
-	    /* TODO: MACRO TO FILL THIS IN? */
 	    fl_p->file_data.fsize     = resp_p->u.io.bstream_size;
 	    fl_p->file_data.dist      = iosm_p->dist_p;
 	    fl_p->file_data.server_nr   = iosm_p->datafile_index_array[recv_match];
