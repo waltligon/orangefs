@@ -71,11 +71,6 @@ sub copy_pvfsbinaries {
 		print STDERR "ERROR: copying file with command: '$cmd'\n";
 		return(1);
 	    }
-	    # TODO: find a better way to strip binaries.  This works ok for now
-	    # note that since this function is only called if COPYBINS is set,
-	    # so debugging information can be retained if you use a shared file
-	    # system (only a problem on Chiba City )
-	    $cmd = "strip " . $href->{'WORKINGDIR'} . "/{pvfs2-server,pvfs2-ping}";
 	    system ("$cmd");
 	} else {
 	    print STDERR "ERROR: no such file $prog found, check configs\n";
