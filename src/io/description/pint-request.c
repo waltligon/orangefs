@@ -749,6 +749,8 @@ int PINT_Do_clear_commit(PINT_Request *node, int32_t depth)
 PINT_Request *PINT_Do_Request_commit(PINT_Request *region, PINT_Request *node,
 		int32_t *index, int32_t depth)
 {
+	int node_was_committed = 0;
+
 	/* Leaf Node? */
 	if(node == NULL)
 		return NULL;
@@ -759,6 +761,7 @@ PINT_Request *PINT_Do_Request_commit(PINT_Request *region, PINT_Request *node,
 	if (node->committed == -1)
 	{
 		node->committed = 0;
+		node_was_committed = 1;
 	}
 
 	/* this node was previously committed */
@@ -802,6 +805,11 @@ PINT_Request *PINT_Do_Request_commit(PINT_Request *region, PINT_Request *node,
 		PINT_Do_clear_commit(node, 0);
 		/* this indicates the region is packed */
 		region->committed = -1;
+		/* if the original request was committed, this restores that */
+		if (node_was_committed)
+		{
+			node->committed = -1;
+		}
 	}
 
 	/* Return the index of the committed struct */ 
