@@ -1,19 +1,15 @@
 DIR := src/client/sysint
+# old getattr still needed by phelper_get_pinode used through rename
 CSRC := \
-	$(DIR)/create.c \
 	$(DIR)/finalize.c \
 	$(DIR)/initialize.c \
 	$(DIR)/lookup.c \
-	$(DIR)/mkdir.c \
 	$(DIR)/pcache.c \
 	$(DIR)/getattr.c \
 	$(DIR)/pinode-helper.c \
 	$(DIR)/pint-dcache.c \
 	$(DIR)/server-send-req.c \
-	$(DIR)/readdir.c \
-	$(DIR)/remove.c \
 	$(DIR)/rename.c \
-	$(DIR)/setattr.c \
 	$(DIR)/pint-sysint-utils.c \
 	$(DIR)/pint-bucket.c \
 	$(DIR)/getparent.c \
@@ -33,13 +29,13 @@ SMSRC := \
 	sys-io.sm \
 	mgmt-noop.sm \
 	sys-create.sm \
-        sys-mkdir.sm \
+	sys-mkdir.sm \
 	sys-remove.sm \
 	mgmt-setparam-list.sm \
 	mgmt-statfs-list.sm \
 	sys-flush.sm \
 	sys-symlink.sm \
-        sys-readdir.sm \
+	sys-readdir.sm \
 	mgmt-perf-mon-list.sm \
 	mgmt-event-mon-list.sm \
 	mgmt-iterate-handles-list.sm \

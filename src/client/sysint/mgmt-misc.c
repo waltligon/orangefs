@@ -17,8 +17,8 @@
 #include "pint-sysint-utils.h"
 #include "pint-bucket.h"
 #include "server-config.h"
+#include "client-state-machine.h"
 
-extern struct server_configuration_s g_server_config;
 extern int g_admin_mode;
 
 /* PVFS_mgmt_map_addr()
@@ -34,7 +34,7 @@ const char* PVFS_mgmt_map_addr(
     PVFS_id_gen_t addr,
     int* server_type)
 {
-    return(PINT_bucket_map_addr(&g_server_config, fs_id,
+    return(PINT_bucket_map_addr(PINT_get_server_config_struct(), fs_id,
 	addr, server_type));
 }
 
@@ -55,7 +55,7 @@ int PVFS_mgmt_statfs_all(
     int real_count = 0;
     int ret = -1;
 
-    ret = PINT_bucket_count_servers(&g_server_config, fs_id, 
+    ret = PINT_bucket_count_servers(PINT_get_server_config_struct(), fs_id, 
 	(PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER), &real_count);
     if(ret < 0)
 	return(ret);
@@ -70,7 +70,7 @@ int PVFS_mgmt_statfs_all(
 	return(-PVFS_ENOMEM);
 
     /* generate default list of servers */
-    ret = PINT_bucket_get_server_array(&g_server_config,
+    ret = PINT_bucket_get_server_array(PINT_get_server_config_struct(),
 	fs_id,
 	(PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER),
 	addr_array, 
@@ -112,7 +112,7 @@ int PVFS_mgmt_setparam_all(
     int count = 0;
     int ret = -1;
 
-    ret = PINT_bucket_count_servers(&g_server_config, fs_id, 
+    ret = PINT_bucket_count_servers(PINT_get_server_config_struct(), fs_id, 
 	(PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER), &count);
     if(ret < 0)
 	return(ret);
@@ -122,7 +122,7 @@ int PVFS_mgmt_setparam_all(
 	return(-PVFS_ENOMEM);
 
     /* generate default list of servers */
-    ret = PINT_bucket_get_server_array(&g_server_config,
+    ret = PINT_bucket_get_server_array(PINT_get_server_config_struct(),
 	fs_id,
 	(PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER),
 	addr_array, 
@@ -161,7 +161,7 @@ int PVFS_mgmt_get_server_array(
     PVFS_id_gen_t* addr_array,
     int* inout_count_p)
 {
-    return(PINT_bucket_get_server_array(&g_server_config, fs_id, 
+    return(PINT_bucket_get_server_array(PINT_get_server_config_struct(), fs_id, 
 	server_type, addr_array, inout_count_p));
 }
 
@@ -178,7 +178,7 @@ int PVFS_mgmt_count_servers(
     int server_type,
     int* count)
 {
-    return(PINT_bucket_count_servers(&g_server_config,
+    return(PINT_bucket_count_servers(PINT_get_server_config_struct(),
 	fs_id, server_type, count));
 }
 

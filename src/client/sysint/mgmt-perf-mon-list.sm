@@ -23,7 +23,6 @@
 #include "PINT-reqproto-encode.h"
 
 extern job_context_id pint_client_sm_context;
-extern struct server_configuration_s g_server_config;
 
 /* state function prototypes */
 static int mgmt_perf_mon_list_setup_msgpair(PINT_client_sm *sm_p,

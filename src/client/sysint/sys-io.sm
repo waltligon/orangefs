@@ -23,7 +23,6 @@
 #include "PINT-reqproto-encode.h"
 
 extern job_context_id pint_client_sm_context;
-extern struct server_configuration_s g_server_config;
 
 enum {
     IO_NO_DATA = 1,
@@ -134,7 +133,8 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_ref,
     }
 
     /* find file system configuration */
-    cur_fs = PINT_config_find_fs_id(&g_server_config, pinode_ref.fs_id);
+    cur_fs = PINT_config_find_fs_id(PINT_get_server_config_struct(),
+      pinode_ref.fs_id);
     if(!cur_fs)
     {
 	gossip_lerr("Error: invalid fs_id.\n");

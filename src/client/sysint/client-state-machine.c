@@ -24,14 +24,6 @@
 #include "job.h"
 #include "gossip.h"
 
-extern struct server_configuration_s g_server_config;
-
-/* analogous to 'get_server_config_struct' in pvfs2-server.c */
-struct server_configuration_s *PINT_get_server_config_struct(void)
-{
-    return &g_server_config;
-}
-
 job_context_id pint_client_sm_context;
 
 /* all stuff used in test function */
@@ -183,6 +175,7 @@ int PINT_client_state_machine_test(void)
     return 0;
 }
 
+#if 0  /* seems unused  --pw */
 /* PINT_serv_prepare_msgpair()
  *
  * TODO: cache some values locally and assign at the end.
@@ -234,6 +227,7 @@ int PINT_serv_prepare_msgpair(PVFS_pinode_reference object_ref,
 
     return 0;
 }
+#endif
 
 int PINT_serv_decode_resp(void *encoded_resp_p,
 			  struct PINT_decoded_msg *decoded_resp_p,

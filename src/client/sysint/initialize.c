@@ -22,10 +22,10 @@
 #include "dotconf.h"
 #include "trove.h"
 #include "server-config.h"
+#include "client-state-machine.h"
 
 job_context_id PVFS_sys_job_context = -1;
 
-extern struct server_configuration_s g_server_config;
 extern gen_mutex_t *g_session_tag_mt_lock;
 
 static char* build_flow_module_list(pvfs_mntlist* mntlist);
@@ -223,14 +223,15 @@ int PVFS_sys_initialize(
     PINT_dcache_set_timeout(PINT_DCACHE_TIMEOUT * 1000);
 
     /* Get configuration parameters from server */
-    ret = PINT_server_get_config(&g_server_config,mntent_list);
+    ret = PINT_server_get_config(PINT_get_server_config_struct(),mntent_list);
     if (ret < 0)
     {
 	init_fail = DCACHE_INIT_FAIL;
 	gossip_ldebug(CLIENT_DEBUG,"Error in getting server config parameters\n");
 	goto return_error;
     }
-    num_file_systems = PINT_llist_count(g_server_config.file_systems);
+    num_file_systems = PINT_llist_count(
+      PINT_get_server_config_struct()->file_systems);
     assert(num_file_systems);
 
     /* Grab the mutex - serialize all writes to server_config */
@@ -271,7 +272,7 @@ int PVFS_sys_initialize(
       1) load mappings into bucket interface
       2) store fs ids into resp object
     */
-    cur = g_server_config.file_systems;
+    cur = PINT_get_server_config_struct()->file_systems;
     i = 0;
     while(cur && (i < num_file_systems))
     {
@@ -281,7 +282,7 @@ int PVFS_sys_initialize(
             break;
         }
         assert(cur_fs->coll_id);
-        if (PINT_handle_load_mapping(&g_server_config,cur_fs))
+        if (PINT_handle_load_mapping(PINT_get_server_config_struct(), cur_fs))
         {
             init_fail = GET_CONFIG_INIT_FAIL;
             gossip_ldebug(CLIENT_DEBUG,"Failed to load fs info into the "

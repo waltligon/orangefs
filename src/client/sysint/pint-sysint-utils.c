@@ -19,9 +19,15 @@
 #include "server-config.h"
 #include "str-utils.h"
 
-int g_session_tag;
+static int g_session_tag;
 gen_mutex_t *g_session_tag_mt_lock = NULL;
-struct server_configuration_s g_server_config;
+static struct server_configuration_s g_server_config;
+
+/* analogous to 'get_server_config_struct' in pvfs2-server.c */
+struct server_configuration_s *PINT_get_server_config_struct(void)
+{
+    return &g_server_config;
+}
 
 static int server_parse_config(
     struct server_configuration_s *config,
