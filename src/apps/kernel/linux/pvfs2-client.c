@@ -55,7 +55,7 @@ int main(int argc, char **argv)
      * we don't see the message. */
     if ((getuid() != 0) && (geteuid() != 0))
     {
-        gossip_err("Error: must be run as root\n");
+        fprintf(stderr, "Error: must be run as root\n");
 	return(-1);
     }
 
