@@ -41,7 +41,7 @@ struct job_desc *alloc_job_desc(int type)
     }
     memset(jd, 0, sizeof(struct job_desc));
 
-    if (id_gen_fast_register(&(jd->job_id), jd) < 0)
+    if (id_gen_safe_register(&(jd->job_id), jd) < 0)
     {
 	free(jd);
 	return (NULL);
@@ -59,6 +59,7 @@ struct job_desc *alloc_job_desc(int type)
  */
 void dealloc_job_desc(struct job_desc *jd)
 {
+    id_gen_safe_unregister(jd->job_id);
     free(jd);
     return;
 }
@@ -135,12 +136,13 @@ void job_desc_q_add(job_desc_q_p jdqp,
         gen_mutex_lock(s_job_desc_q_mutex);
         if (jdqp)
         {
+            assert(desc);
+
             /* note that we are adding to tail to preserve fifo order */
             qlist_add_tail(&(desc->job_desc_q_link), jdqp);
         }
         gen_mutex_unlock(s_job_desc_q_mutex);
     }
-    return;
 }
 
 /* job_desc_q_remove()
@@ -151,8 +153,8 @@ void job_desc_q_add(job_desc_q_p jdqp,
  */
 void job_desc_q_remove(struct job_desc *desc)
 {
+    assert(desc);
     qlist_del(&(desc->job_desc_q_link));
-    return;
 }
 
 /* job_desc_q_empty()

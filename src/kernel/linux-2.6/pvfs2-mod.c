@@ -58,7 +58,6 @@ module_param(hash_table_size, int, 0);
 static int pvfs2_dev_major = 0;
 
 /* the pvfs2 memory caches (see pvfs2-cache.c) */
-kmem_cache_t *op_cache = NULL;
 kmem_cache_t *dev_req_cache = NULL;
 kmem_cache_t *pvfs2_inode_cache = NULL;
 

@@ -6,6 +6,7 @@
 
 #include <pthread.h>
 #include <stdlib.h>
+#include <string.h>
 #include <assert.h>
 
 #include "pvfs2-types.h"
@@ -209,6 +210,9 @@ static void *bmi_thread_function(void *ptr)
 	incount = THREAD_MGR_TEST_COUNT;
 	bmi_test_count = 0;
 
+        memset(stat_bmi_user_ptr_array, 0,
+               (THREAD_MGR_TEST_COUNT * sizeof(void *)));
+
 	ret = BMI_testcontext(incount, stat_bmi_id_array, &bmi_test_count,
 	    stat_bmi_error_code_array, stat_bmi_actual_size_array,
 	    stat_bmi_user_ptr_array, test_timeout, global_bmi_context);
@@ -236,7 +240,7 @@ static void *bmi_thread_function(void *ptr)
 	    /* sanity check */
 	    assert(tmp_callback != NULL);
 	    assert(tmp_callback->fn != NULL);
-	
+
 	    tmp_callback->fn(tmp_callback->data, stat_bmi_actual_size_array[i],
 		stat_bmi_error_code_array[i]);
 	}
@@ -266,8 +270,9 @@ static void *dev_thread_function(void *ptr)
 	    incount = THREAD_MGR_TEST_COUNT;
 	gen_mutex_unlock(&dev_mutex);
 
-	ret = PINT_dev_test_unexpected(incount, &outcount,
-	    stat_dev_unexp_array, timeout);
+	ret = PINT_dev_test_unexpected(
+            incount, &outcount, stat_dev_unexp_array, timeout);
+
 	if(ret < 0)
 	{
 	    /* critical failure */

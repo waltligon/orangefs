@@ -29,6 +29,8 @@
 
 job_context_id PVFS_sys_job_context = -1;
 
+PINT_client_sm *g_sm_p = NULL;
+
 extern gen_mutex_t *g_session_tag_mt_lock;
 
 typedef enum
@@ -72,6 +74,9 @@ int PVFS_sys_initialize(int default_debug_mask)
     {
 	return(-PVFS_ENOMEM);
     }
+
+    /* keep track of this pointer for freeing on finalize */
+    g_sm_p = sm_p;
     memset(sm_p, 0, sizeof(*sm_p));
 
     gossip_enable_stderr();

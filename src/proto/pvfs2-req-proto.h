@@ -245,6 +245,12 @@ endecode_fields_1_struct(
 #define extra_size_PVFS_servresp_getattr \
     extra_size_PVFS_object_attr
 
+#define PINT_SERVRESP_GETATTR_FREE(resp)                       \
+do {                                                           \
+    PINT_acache_object_attr_deep_free(&resp->u.getattr.attr);  \
+    memset(&resp->u.getattr.attr, 0, sizeof(PVFS_object_attr));\
+} while(0)
+
 /* setattr ****************************************************/
 /* - sets attributes specified by mask of PVFS_ATTR_XXX values */
 
@@ -336,6 +342,27 @@ endecode_fields_0aa_struct(
 * or lots of handles, just use the max io req limit */
 #define extra_size_PVFS_servresp_lookup_path \
   (PVFS_REQ_LIMIT_IOREQ_BYTES)
+
+#define PINT_SERVRESP_LOOKUP_PATH_FREE(resp)               \
+do {                                                       \
+    if (resp->u.lookup_path.handle_count &&                \
+        resp->u.lookup_path.handle_array)                  \
+    {                                                      \
+        free(resp->u.lookup_path.handle_array);            \
+        resp->u.lookup_path.handle_array = NULL;           \
+    }                                                      \
+    if (resp->u.lookup_path.attr_count &&                  \
+        resp->u.lookup_path.attr_array)                    \
+    {                                                      \
+        int i = 0;                                         \
+        for(i = 0; i < resp->u.lookup_path.attr_count; i++)\
+        {   PINT_acache_object_attr_deep_free(             \
+                &resp->u.lookup_path.attr_array[i]);       \
+        }                                                  \
+        free(resp->u.lookup_path.attr_array);              \
+        resp->u.lookup_path.attr_array = NULL;             \
+    }                                                      \
+} while(0)
 
 /* mkdir *******************************************************/
 /* - makes a new directory object */
@@ -559,6 +586,17 @@ endecode_fields_1a_struct(
     PVFS_dirent, dirent_array)
 #define extra_size_PVFS_servresp_readdir \
   roundup8(PVFS_REQ_LIMIT_DIRENT_COUNT * (PVFS_NAME_MAX + 1 + 8))
+
+#define PINT_SERVRESP_READDIR_FREE(resp)     \
+do {                                         \
+    if (resp->u.readdir.dirent_array)        \
+    {                                        \
+        free(resp->u.readdir.dirent_array);  \
+        resp->u.readdir.dirent_array = NULL; \
+    }                                        \
+    resp->u.readdir.dirent_count = 0;        \
+} while (0)
+
 
 /* getconfig ***************************************************/
 /* - retrieves initial configuration information from server */

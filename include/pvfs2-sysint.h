@@ -186,7 +186,7 @@ int PVFS_sys_finalize(
 #define PVFS2_LOOKUP_LINK_NO_FOLLOW 0
 #define PVFS2_LOOKUP_LINK_FOLLOW    1
 
-int PVFS_sys_iref_lookup(
+int PVFS_isys_ref_lookup(
     PVFS_fs_id fs_id,
     char *relative_pathname,
     PVFS_object_ref parent_ref,
@@ -298,6 +298,15 @@ int PVFS_sys_remove(
     char *entry_name,
     PVFS_object_ref ref,
     PVFS_credentials *credentials);
+
+int PVFS_isys_rename(
+    char *old_entry,
+    PVFS_object_ref old_parent_ref,
+    char *new_entry,
+    PVFS_object_ref new_parent_ref,
+    PVFS_credentials *credentials,
+    PVFS_sys_op_id *op_id,
+    void *user_ptr);
 
 int PVFS_sys_rename(
     char *old_entry,

@@ -261,6 +261,7 @@ static int readdir_msg_comp_fn(void *v_p,
 
     if (resp_p->status != 0)
     {
+        PINT_SERVRESP_READDIR_FREE(resp_p);
 	return resp_p->status;
     }
 
@@ -286,6 +287,7 @@ static int readdir_msg_comp_fn(void *v_p,
         GOSSIP_READDIR_DEBUG, "*** Got %d directory entries\n",
         sm_p->u.readdir.readdir_resp->pvfs_dirent_outcount);
 
+    PINT_SERVRESP_READDIR_FREE(resp_p);
     return 0;
 }
 

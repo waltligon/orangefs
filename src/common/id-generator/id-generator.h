@@ -64,6 +64,9 @@ static inline void *id_gen_fast_lookup(PVFS_id_gen_t id)
 #endif
 }
 
+#define id_gen_fast_unregister(id) do { } while(0)
+
+
 /* id_gen_safe_register()
  * 
  * registers a piece of data (a pointer of some sort) and returns an

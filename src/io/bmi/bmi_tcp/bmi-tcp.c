@@ -1043,9 +1043,11 @@ int BMI_tcp_testcontext(int incount,
 
     /* pop as many items off of the completion queue as we can */
     while((*outcount < incount) && (query_op = 
-	op_list_shownext(completion_array[context_id]))) 
+	op_list_shownext(completion_array[context_id])))
     {
+        assert(query_op);
 	assert(query_op->context_id == context_id);
+
 	/* this one's done; pop it out */
 	op_list_remove(query_op);
 	error_code_array[*outcount] = query_op->error_code;
@@ -1061,6 +1063,7 @@ int BMI_tcp_testcontext(int incount,
 	    BMI_EVENT_END(PVFS_EVENT_BMI_RECV, query_op->actual_size, query_op->op_id);
 
 	dealloc_tcp_method_op(query_op);
+        query_op = NULL;
 	(*outcount)++;
     }
 

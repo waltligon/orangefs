@@ -7,7 +7,7 @@
 #include "pvfs2-kernel.h"
 
 /* a cache for pvfs2 upcall/downcall operations */
-extern kmem_cache_t *op_cache;
+static kmem_cache_t *op_cache = NULL;
 
 static atomic_t next_tag_value;
 
@@ -25,7 +25,7 @@ static void op_cache_ctor(
     kmem_cache_t *cachep,
     unsigned long flags)
 {
-    pvfs2_kernel_op_t *op = (pvfs2_kernel_op_t *) kernel_op;
+    pvfs2_kernel_op_t *op = (pvfs2_kernel_op_t *)kernel_op;
 
     if (flags & SLAB_CTOR_CONSTRUCTOR)
     {
@@ -39,8 +39,7 @@ static void op_cache_ctor(
 
         pvfs2_op_initialize(op);
 
-        op->tag = (unsigned long)atomic_read(&next_tag_value);
-        atomic_inc(&next_tag_value);
+        op->tag = 0;
 
         /* preemptively fill in the upcall credentials */
         pvfs2_gen_credentials(&op->upcall.credentials);
@@ -71,6 +70,23 @@ void op_cache_finalize(void)
     }
 }
 
+pvfs2_kernel_op_t *op_alloc(void)
+{
+    pvfs2_kernel_op_t *new_op = NULL;
+
+    new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
+    if (new_op)
+    {
+        new_op->tag = (unsigned long)atomic_read(&next_tag_value);
+        atomic_inc(&next_tag_value);
+    }
+    else
+    {
+        pvfs2_error("op_alloc: kmem_cache_alloc failed!\n");
+    }
+    return new_op;
+}
+
 void op_release(void *op)
 {
     pvfs2_kernel_op_t *pvfs2_op = (pvfs2_kernel_op_t *)op;
@@ -78,7 +94,6 @@ void op_release(void *op)
     pvfs2_op_initialize(pvfs2_op);
     kmem_cache_free(op_cache, op);
 }
-
 
 static void dev_req_cache_ctor(
     void *req,

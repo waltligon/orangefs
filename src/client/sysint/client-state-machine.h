@@ -420,13 +420,36 @@ int PINT_client_state_machine_post(
     PVFS_sys_op_id *op_id,
     void *user_ptr);
 
+int PINT_sys_dev_unexp(
+    struct PINT_dev_unexp_info *info,
+    job_status_s *jstat,
+    PVFS_sys_op_id *op_id,
+    void *user_ptr);
+
 int PINT_client_state_machine_test(
     PVFS_sys_op_id op_id,
     int *error_code);
 
 int PINT_client_state_machine_testsome(
     PVFS_sys_op_id *op_id_array,
-    int *op_count); /* in/out */
+    int *op_count, /* in/out */
+    void **user_ptr_array,
+    int *error_code_array,
+    int timeout_ms);
+
+/* exposed wrapper around the client-state-machine testsome function */
+
+static inline int PINT_sys_testsome(
+    PVFS_sys_op_id *op_id_array,
+    int *op_count, /* in/out */
+    void **user_ptr_array,
+    int *error_code_array,
+    int timeout_ms)
+{
+    return PINT_client_state_machine_testsome(
+        op_id_array, op_count, user_ptr_array,
+        error_code_array, timeout_ms);
+}
 
 /* exposed wrappers around the id-generator code */
 static inline int PINT_id_gen_safe_register(
@@ -451,28 +474,30 @@ static inline int PINT_id_gen_safe_unregister(
 /* used with post call to tell the system what state machine to use
  * when processing a new PINT_client_sm structure.
  */
-enum {
-    PVFS_SYS_REMOVE  = 1,
-    PVFS_SYS_CREATE  = 2,
-    PVFS_SYS_MKDIR   = 3,
-    PVFS_SYS_SYMLINK = 4,
-    PVFS_SYS_GETATTR = 5,
-    PVFS_SYS_IO      = 6,
-    PVFS_SYS_FLUSH   = 7,
-    PVFS_SYS_TRUNCATE= 8,
-    PVFS_SYS_READDIR = 9,
-    PVFS_SYS_SETATTR = 10,
-    PVFS_SYS_LOOKUP  = 11,
-    PVFS_SYS_RENAME  = 12,
-    PVFS_MGMT_SETPARAM_LIST = 70,
-    PVFS_MGMT_NOOP   = 71,
-    PVFS_MGMT_STATFS_LIST = 72,
-    PVFS_MGMT_PERF_MON_LIST = 73,
+enum
+{
+    PVFS_SYS_REMOVE                = 1,
+    PVFS_SYS_CREATE                = 2,
+    PVFS_SYS_MKDIR                 = 3,
+    PVFS_SYS_SYMLINK               = 4,
+    PVFS_SYS_GETATTR               = 5,
+    PVFS_SYS_IO                    = 6,
+    PVFS_SYS_FLUSH                 = 7,
+    PVFS_SYS_TRUNCATE              = 8,
+    PVFS_SYS_READDIR               = 9,
+    PVFS_SYS_SETATTR               = 10,
+    PVFS_SYS_LOOKUP                = 11,
+    PVFS_SYS_RENAME                = 12,
+    PVFS_MGMT_SETPARAM_LIST        = 70,
+    PVFS_MGMT_NOOP                 = 71,
+    PVFS_MGMT_STATFS_LIST          = 72,
+    PVFS_MGMT_PERF_MON_LIST        = 73,
     PVFS_MGMT_ITERATE_HANDLES_LIST = 74,
-    PVFS_MGMT_GET_DFILE_ARRAY = 75,
-    PVFS_MGMT_EVENT_MON_LIST = 76,
-    PVFS_SERVER_GET_CONFIG = 77,
-    PVFS_CLIENT_JOB_TIMER = 200
+    PVFS_MGMT_GET_DFILE_ARRAY      = 75,
+    PVFS_MGMT_EVENT_MON_LIST       = 76,
+    PVFS_SERVER_GET_CONFIG         = 77,
+    PVFS_CLIENT_JOB_TIMER          = 200,
+    PVFS_DEV_UNEXPECTED            = 300
 };
 
 /* prototypes of helper functions */

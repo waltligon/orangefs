@@ -25,10 +25,113 @@
 
 job_context_id pint_client_sm_context;
 
-static job_id_t job_id_array[MAX_RETURNED_JOBS];
-static void *client_sm_p_array[MAX_RETURNED_JOBS];
-static job_status_s job_status_array[MAX_RETURNED_JOBS];
-static int job_count = 0;
+static int got_context = 0;
+
+/*
+  used for locally storing completed operations from test() call so
+  that we can retrieve them in testsome() while still making progress
+  (and possible completing operations in the test() call
+*/
+static int s_completion_list_index = 0;
+static PINT_client_sm *s_completion_list[MAX_RETURNED_JOBS] = {NULL};
+static gen_mutex_t s_completion_list_mutex = GEN_MUTEX_INITIALIZER;
+
+#define CLIENT_SM_INIT_ONCE()                                        \
+do {                                                                 \
+    if (got_context == 0)                                            \
+    {                                                                \
+	/* get a context for our state machine operations */         \
+	job_open_context(&pint_client_sm_context);                   \
+	got_context = 1;                                             \
+    }                                                                \
+} while(0)
+
+#define CLIENT_SM_ASSERT_INITIALIZED()  \
+do { assert(got_context); } while(0)
+
+static int add_sm_to_completion_list(PINT_client_sm *sm_p)
+{
+    gen_mutex_lock(&s_completion_list_mutex);
+    assert(s_completion_list_index < MAX_RETURNED_JOBS);
+    s_completion_list[s_completion_list_index++] = sm_p;
+    gen_mutex_unlock(&s_completion_list_mutex);
+    return 0;
+}
+
+static int conditional_remove_sm_if_in_completion_list(
+    PINT_client_sm *sm_p)
+{
+    int found = 0, i = 0;
+
+    gen_mutex_lock(&s_completion_list_mutex);
+    for(i = 0; i < s_completion_list_index; i++)
+    {
+        if (s_completion_list[i] == sm_p)
+        {
+            s_completion_list[i] = NULL;
+            found = 1;
+            break;
+        }
+    }
+    gen_mutex_unlock(&s_completion_list_mutex);
+    return found;
+}
+
+static int completion_list_retrieve_completed(
+    PVFS_sys_op_id *op_id_array,
+    void **user_ptr_array,
+    int *error_code_array,
+    int limit,
+    int *out_count)
+{
+    int i = 0, new_list_index = 0;
+    PINT_client_sm *sm_p = NULL;
+    PINT_client_sm *tmp_completion_list[MAX_RETURNED_JOBS] = {NULL};
+
+    assert(op_id_array);
+    assert(error_code_array);
+    assert(out_count);
+
+    memset(tmp_completion_list, 0,
+           (MAX_RETURNED_JOBS * sizeof(PINT_client_sm *)));
+
+    gen_mutex_lock(&s_completion_list_mutex);
+    for(i = 0; i < s_completion_list_index; i++)
+    {
+        if (s_completion_list[i] == NULL)
+        {
+            continue;
+        }
+
+        sm_p = s_completion_list[i];
+        assert(sm_p);
+
+        if (i < limit)
+        {
+            op_id_array[i] = sm_p->sys_op_id;
+            error_code_array[i] = sm_p->error_code;
+
+            if (user_ptr_array)
+            {
+                user_ptr_array[i] = (void *)sm_p->user_ptr;
+            }
+            s_completion_list[i] = NULL;
+        }
+        else
+        {
+            tmp_completion_list[new_list_index++] = sm_p;
+        }
+    }
+    *out_count = i;
+
+    /* clean up and adjust the list and it's book keeping */
+    s_completion_list_index = new_list_index;
+    memcpy(s_completion_list, tmp_completion_list,
+           (MAX_RETURNED_JOBS * sizeof(PINT_client_sm *)));
+    
+    gen_mutex_unlock(&s_completion_list_mutex);
+    return 0;
+}
 
 int PINT_client_state_machine_post(
     PINT_client_sm *sm_p,
@@ -38,19 +141,20 @@ int PINT_client_state_machine_post(
 {
     int ret = -PVFS_EINVAL;
     job_status_s js;
-    static int got_context = 0;
+
+#if 0
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "PINT_client_state_machine_post called\n");
+#endif
+
+    CLIENT_SM_INIT_ONCE();
 
     if (!sm_p)
     {
         return ret;
     }
 
-    if (got_context == 0)
-    {
-	/* get a context for our state machine operations */
-	job_open_context(&pint_client_sm_context);
-	got_context = 1;
-    }
+    memset(&js, 0, sizeof(js));
 
     /* save operation type; mark operation as unfinished */
     sm_p->user_ptr = user_ptr;
@@ -143,68 +247,115 @@ int PINT_client_state_machine_post(
 	    sm_p->current_state =
                 (pvfs2_client_job_timer_sm.state_machine + 1);
 	    break;
+        case PVFS_DEV_UNEXPECTED:
+            gossip_err("You should be using PINT_sys_dev_unexp for "
+                       "posting this type of operation!  Failing.\n");
+            return ret;
 	default:
             gossip_lerr("FIXME: Unrecognized sysint operation!\n");
             return ret;
     }
 
-    /* clear job status structure */
-    memset(&js, 0, sizeof(js));
-
-    /* call function, continue calling as long as we get immediate
-     * success.
-     */
-    ret = sm_p->current_state->state_action(sm_p, &js);
-    while (ret == 1)
-    {
-	/* PINT_state_machine_next() calls next function and
-	 * returns the result.
-	 */
-	ret = PINT_state_machine_next(sm_p, &js);
-    }
-
-    /* note: job_status_s pointed to by js_p is ok to use after
-     * we return regardless of whether or not we finished.
-     */
-
     if (op_id)
     {
         ret = PINT_id_gen_safe_register(op_id, (void *)sm_p);
+        sm_p->sys_op_id = *op_id;
+    }
+
+    /*
+      start state machine and continue advancing while we're getting
+      immediate completions
+    */
+    ret = sm_p->current_state->state_action(sm_p, &js);
+    while(ret == 1)
+    {
+        ret = PINT_state_machine_next(sm_p, &js);
+    }
+    return ret;
+}
+
+int PINT_sys_dev_unexp(
+    struct PINT_dev_unexp_info *info,
+    job_status_s *jstat,
+    PVFS_sys_op_id *op_id,
+    void *user_ptr)
+{
+    int ret = -PVFS_EINVAL;
+    PINT_client_sm *sm_p = NULL;
+
+    CLIENT_SM_INIT_ONCE();
+
+    /* we require more input args than the regular post method above */
+    if (!info || !jstat || !op_id)
+    {
+        return -PVFS_EINVAL;
+    }
+
+    sm_p = (PINT_client_sm *)malloc(sizeof(PINT_client_sm));
+    if (!sm_p)
+    {
+        return -PVFS_ENOMEM;
+    }
+    memset(sm_p, 0, sizeof(PINT_client_sm));
+    sm_p->user_ptr = user_ptr;
+    sm_p->op = PVFS_DEV_UNEXPECTED;
+    sm_p->op_complete = 0;
+    sm_p->cred_p = NULL;
+
+    memset(jstat, 0, sizeof(job_status_s));
+    ret = job_dev_unexp(info, (void *)sm_p, 0, jstat, op_id,
+                        JOB_NO_IMMED_COMPLETE, pint_client_sm_context);
+    if (ret)
+    {
+        PVFS_perror_gossip("PINT_sys_dev_unexp failed", ret);
+        free(sm_p);
+    }
+    else
+    {
+        sm_p->sys_op_id = *op_id;
     }
     return ret;
 }
 
 /* PINT_client_bmi_cancel()
  *
- * wrapper function for job_bmi_cancel that handles race conditions of
- * jobs that have completed in the job_testcontext() loop but have not
- * yet triggered a state transition
+ * wrapper function for job_bmi_cancel
  *
  * returns 0 on success, -PVFS_error on failure
  */
 int PINT_client_bmi_cancel(job_id_t id)
 {
-    int i;
+    return job_bmi_cancel(id, pint_client_sm_context);
+}
 
-    /* TODO: this is not thread safe */
-    for(i=0; i<job_count; i++)
-    {
-	if(job_id_array[i] == id)
-	{
-	    /* job has already completed; do nothing */
-	    return(0);
-	}
-    }
-
-    return(job_bmi_cancel(id, pint_client_sm_context));
+/* PINT_client_io_cancel()
+ *
+ * cancels in progress I/O operations
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
+int PINT_client_io_cancel(PVFS_sys_op_id id)
+{
+    /* FIXME: this isn't right, but it's a stub for now */
+    return job_flow_cancel(id, pint_client_sm_context);
 }
 
 int PINT_client_state_machine_test(
     PVFS_sys_op_id op_id,
     int *error_code)
 {
-    int ret = -PVFS_EINVAL, i = 0;
+    int ret = -PVFS_EINVAL, i = 0, job_count = 0;
     PINT_client_sm *sm_p, *tmp_sm_p = NULL;
+    job_id_t job_id_array[MAX_RETURNED_JOBS];
+    job_status_s job_status_array[MAX_RETURNED_JOBS];
+    void *client_sm_p_array[MAX_RETURNED_JOBS] = {NULL};
+
+#if 0
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "PINT_client_state_machine_test called\n");
+#endif
+
+    CLIENT_SM_ASSERT_INITIALIZED();
 
     job_count = MAX_RETURNED_JOBS;
 
@@ -218,20 +369,19 @@ int PINT_client_state_machine_test(
     {
         return ret;
     }
-    assert(sm_p);
 
     if (sm_p->op_complete)
     {
         *error_code = sm_p->error_code;
+        conditional_remove_sm_if_in_completion_list(sm_p);
         return 0;
     }
 
-    /* TODO: this isn't thread safe... */
     ret = job_testcontext(job_id_array,
 			  &job_count, /* in/out parameter */
 			  client_sm_p_array,
 			  job_status_array,
-			  100, /* timeout? */
+			  10,
 			  pint_client_sm_context);
     assert(ret > -1);
 
@@ -240,46 +390,84 @@ int PINT_client_state_machine_test(
     {
 	tmp_sm_p = (PINT_client_sm *)client_sm_p_array[i];
 
-        do
+        if (tmp_sm_p->op == PVFS_DEV_UNEXPECTED)
         {
-            ret = PINT_state_machine_next(tmp_sm_p, &job_status_array[i]);
+            tmp_sm_p->op_complete = 1;
+        }
 
-        } while (ret == 1);
+        if (!tmp_sm_p->op_complete)
+        {
+            do
+            {
+                ret = PINT_state_machine_next(
+                    tmp_sm_p, &job_status_array[i]);
 
-        /* (ret < 0) indicates a problem from the job system
-         * itself; the return value of the underlying operation
-         * is kept in the job status structure.
-         */
-        assert(ret == 0);
+            } while (ret == 1);
+
+            assert(ret == 0);
+        }
+
+        /*
+          if we've found a completed operation and it's NOT the op
+          being tested here, we add it to our local completion list so
+          that later calls to the sysint test/testsome can find it
+        */
+        if ((tmp_sm_p != sm_p) && (tmp_sm_p->op_complete == 1))
+        {
+            ret = add_sm_to_completion_list(tmp_sm_p);
+            assert(ret == 0);
+        }
     }
 
     if (sm_p->op_complete)
     {
         *error_code = sm_p->error_code;
+        conditional_remove_sm_if_in_completion_list(sm_p);
     }
     return 0;
 }
 
-int PINT_client_state_machine_testsome(PVFS_sys_op_id *op_id_array,
-                                       int *op_count) /* in/out */
+int PINT_client_state_machine_testsome(
+    PVFS_sys_op_id *op_id_array,
+    int *op_count, /* in/out */
+    void **user_ptr_array,
+    int *error_code_array,
+    int timeout_ms)
 {
-    int ret = -PVFS_EINVAL, i = 0, count = 0;
-    int limit = (*op_count - 1);
+    int ret = -PVFS_EINVAL, i = 0;
+    int limit = 0, job_count = 0;
     PINT_client_sm *sm_p = NULL;
+    job_id_t job_id_array[MAX_RETURNED_JOBS];
+    job_status_s job_status_array[MAX_RETURNED_JOBS];
+    void *client_sm_p_array[MAX_RETURNED_JOBS] = {NULL};
 
-    job_count = MAX_RETURNED_JOBS;
+#if 0
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "PINT_client_state_machine_testsome called\n");
+#endif
 
-    if (!op_id_array || !op_count)
+    CLIENT_SM_ASSERT_INITIALIZED();
+
+    if (!op_id_array || !op_count || !error_code_array)
     {
+        PVFS_perror_gossip("PINT_client_state_machine_testsome", ret);
         return ret;
     }
 
-    /* TODO: this isn't thread safe... */
+    if ((*op_count < 1) || (*op_count > MAX_RETURNED_JOBS))
+    {
+        PVFS_perror_gossip("testsome() got invalid op_count", ret);
+        return ret;
+    }
+
+    job_count = MAX_RETURNED_JOBS;
+    limit = *op_count;
+
     ret = job_testcontext(job_id_array,
 			  &job_count, /* in/out parameter */
 			  client_sm_p_array,
 			  job_status_array,
-			  100, /* timeout? */
+			  timeout_ms,
 			  pint_client_sm_context);
     assert(ret > -1);
 
@@ -288,31 +476,47 @@ int PINT_client_state_machine_testsome(PVFS_sys_op_id *op_id_array,
     {
 	sm_p = (PINT_client_sm *)client_sm_p_array[i];
 
-        do
+        /*
+          note that dev unexp messages found here are treated as
+          complete since if we see them at all in here, they're ready
+          to be passed back to the caller
+        */
+        if (sm_p->op == PVFS_DEV_UNEXPECTED)
         {
-            ret = PINT_state_machine_next(sm_p, &job_status_array[i]);
+            sm_p->op_complete = 1;
+        }
 
-        } while (ret == 1);
+        if (!sm_p->op_complete)
+        {
+            do
+            {
+                ret = PINT_state_machine_next(
+                    sm_p, &job_status_array[i]);
 
-        /* (ret < 0) indicates a problem from the job system
-         * itself; the return value of the underlying operation
-         * is kept in the job status structure.
-         */
-        assert(ret == 0);
+            } while (ret == 1);
 
+            /* (ret < 0) indicates a problem from the job system
+             * itself; the return value of the underlying operation is
+             * kept in the job status structure.
+             */
+            assert(ret == 0);
+        }
+
+        /*
+          by adding the completed op to our completion list, we can
+          keep progressing on operations in progress here and just
+          grab all completed operations when we're finished
+          (i.e. outside of this loop).
+        */
         if (sm_p->op_complete)
         {
-            op_id_array[count++] = sm_p->sys_op_id;
-            if (count > limit)
-            {
-                break;
-            }
+            ret = add_sm_to_completion_list(sm_p);
+            assert(ret == 0);
         }
     }
 
-    *op_count = count;
-
-    return 0;
+    return completion_list_retrieve_completed(
+        op_id_array, user_ptr_array, error_code_array, limit, op_count);
 }
 
 int PINT_client_wait_internal(
@@ -357,8 +561,11 @@ void PINT_sys_release(PVFS_sys_op_id op_id)
     {
         PINT_id_gen_safe_unregister(op_id);
 
-        assert(sm_p->cred_p);
-        PVFS_util_release_credentials(sm_p->cred_p);
+        if (sm_p->op && sm_p->cred_p)
+        {
+            PVFS_util_release_credentials(sm_p->cred_p);
+            sm_p->cred_p = NULL;
+        }
         free(sm_p);
     }
 }

@@ -39,9 +39,9 @@
   what we could do is disable the use of the acache
   if locks are not available on the system, but for now...
 */
-#ifndef __GEN_POSIX_LOCKING__
-#error "Cannot use acache without functioning mutex locking"
-#endif
+/* #ifndef __GEN_POSIX_LOCKING__ */
+/* #error "Cannot use acache without functioning mutex locking" */
+/* #endif */
 
 static struct qhash_table *s_acache_htable = NULL;
 static gen_mutex_t *s_acache_htable_mutex = NULL;
@@ -539,6 +539,8 @@ static void pinode_free(PINT_pinode *pinode)
             gen_mutex_destroy(pinode->mutex);
             pinode->mutex = NULL;
         }
+
+        PINT_acache_object_attr_deep_free(&pinode->attr);
         free(pinode);
         s_acache_allocated_entries--;
         pinode = NULL;
@@ -570,7 +572,6 @@ static void pinode_invalidate(PINT_pinode *pinode)
         gen_mutex_unlock(s_acache_htable_mutex);
         acache_debug("*** pinode_invalidate: removed from htable\n");
     }
-    PINT_acache_object_attr_deep_free(&pinode->attr);
     gen_mutex_unlock(pinode->mutex);
     pinode_free(pinode);
     acache_debug("*** pinode_invalidate: freed pinode\n");

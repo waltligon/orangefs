@@ -10,7 +10,6 @@
 /* defined in devpvfs2-req.c */
 void kill_device_owner(void);
 
-extern kmem_cache_t *op_cache;
 extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
 extern wait_queue_head_t pvfs2_request_list_waitq;
@@ -94,10 +93,9 @@ ssize_t pvfs2_inode_read(
 
     while(total_count < count)
     {
-        new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
+        new_op = op_alloc();
         if (!new_op)
         {
-            pvfs2_error("pvfs2_inode_read: kmem_cache_alloc failed!\n");
             return -ENOMEM;
         }
 
@@ -244,11 +242,9 @@ static ssize_t pvfs2_file_write(
 
     while(total_count < count)
     {
-        new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
+        new_op = op_alloc();
         if (!new_op)
         {
-            pvfs2_error("pvfs2: ERROR -- pvfs2_file_write "
-                        "kmem_cache_alloc failed!\n");
             return -ENOMEM;
         }
 

@@ -207,14 +207,13 @@ SERVERCFLAGS = -D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__ \
 # server side flow protocol connecting BMI with NCAC cache
 SERVERCFLAGS += -D__STATIC_FLOWPROTO_BMI_CACHE__
 
-SERVERLIBS = -lrt -lpthread -lpvfs2-server @LIBS@ 
-# the client libraries are not threaded (at the moment at least)
-#    and therefore can disable locking in the I/O subsystems
-#LIBCFLAGS = -D__GEN_NULL_LOCKING__
-# No longer trye!  The new pcache now requires locks
-# This is hack and should be fixed.
-LIBCFLAGS = -D__GEN_POSIX_LOCKING__
-LIBS += -lpthread
+SERVERLIBS = -lrt -lpthread -lpvfs2-server @LIBS@
+# you can optionally disable thread safety support in the client
+# though it's not recommended unless *required*.
+#
+# run ./configure --help for information on how to do this cleanly.
+LIBCFLAGS=@LIBCFLAGS@
+LIBS += @THREAD_LIB@
 
 # VISCFLAGS/VISLIBS: special build flags for vis tools
 # configure has already filled in special graphics flags, we just tack

@@ -8,6 +8,7 @@
 #include <string.h>
 #include <assert.h>
 #include <stdlib.h>
+#include <time.h>
 
 #include "pvfs2-types.h"
 #include "pvfs2-attr.h"

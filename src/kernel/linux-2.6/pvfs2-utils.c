@@ -10,7 +10,6 @@
 #include "pvfs2-dev-proto.h"
 #include "pvfs2-bufmap.h"
 
-extern kmem_cache_t *op_cache;
 extern kmem_cache_t *pvfs2_inode_cache;
 extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
@@ -365,13 +364,10 @@ int pvfs2_inode_getattr(
            post a getattr request here; make dentry valid if getattr
            passes
         */
-        new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
+        new_op = op_alloc();
         if (!new_op)
         {
-            pvfs2_error("pvfs2_inode_getattr: kmem_cache_alloc "
-                        "failed!\n");
-            ret = -ENOMEM;
-            return ret;
+            return -ENOMEM;
         }
         new_op->upcall.type = PVFS2_VFS_OP_GETATTR;
         new_op->upcall.req.getattr.refn = pvfs2_inode->refn;
@@ -421,7 +417,7 @@ int pvfs2_inode_setattr(
     {
         pvfs2_inode = PVFS2_I(inode);
 
-        new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
+        new_op = op_alloc();
         if (!new_op)
         {
             return ret;
@@ -467,10 +463,9 @@ static inline struct inode *pvfs2_create_file(
     pvfs2_inode_t *pvfs2_inode = NULL;
     struct inode *inode = NULL;
 
-    new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
+    new_op = op_alloc();
     if (!new_op)
     {
-        pvfs2_error("pvfs2_create_file: kmem_cache_alloc failed!\n");
         *error_code = -ENOMEM;
         return NULL;
     }
@@ -557,10 +552,9 @@ static inline struct inode *pvfs2_create_dir(
     pvfs2_inode_t *pvfs2_inode = NULL;
     struct inode *inode = NULL;
 
-    new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
+    new_op = op_alloc();
     if (!new_op)
     {
-        pvfs2_error("pvfs2_create_dir: kmem_cache_alloc failed!\n");
         *error_code = -ENOMEM;
         return NULL;
     }
@@ -648,10 +642,9 @@ static inline struct inode *pvfs2_create_symlink(
     pvfs2_inode_t *pvfs2_inode = NULL;
     struct inode *inode = NULL;
 
-    new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
+    new_op = op_alloc();
     if (!new_op)
     {
-        pvfs2_error("pvfs2_create_symlink: kmem_cache_alloc failed!\n");
         *error_code = -ENOMEM;
         return NULL;
     }
@@ -785,7 +778,8 @@ int pvfs2_remove_entry(
                     "Parent is %Lu | fs_id %d\n", dentry->d_name.name,
                     (int)inode->i_ino, parent->refn.handle,
                     parent->refn.fs_id);
-        new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
+
+        new_op = op_alloc();
         if (!new_op)
         {
             return -ENOMEM;
@@ -847,7 +841,7 @@ int pvfs2_truncate_inode(
                 (int)inode->i_ino, pvfs2_inode->refn.handle,
                 pvfs2_inode->refn.fs_id, (unsigned long)size);
 
-    new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
+    new_op = op_alloc();
     if (!new_op)
     {
         return -ENOMEM;
@@ -885,7 +879,7 @@ int pvfs2_flush_mmap_racache(struct inode *inode)
                 "Handle is %Lu | fs_id %d\n",(int)inode->i_ino,
                 pvfs2_inode->refn.handle, pvfs2_inode->refn.fs_id);
 
-    new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
+    new_op = op_alloc();
     if (!new_op)
     {
         return -ENOMEM;
@@ -915,7 +909,7 @@ int pvfs2_unmount_sb(struct super_block *sb)
 
     pvfs2_print("pvfs2_unmount_sb called on sb %p\n", sb);
 
-    new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
+    new_op = op_alloc();
     if (!new_op)
     {
         return -ENOMEM;

@@ -181,8 +181,17 @@ static ssize_t pvfs2_devreq_read(
         else
         {
             pvfs2_error("Read buffer is too small to copy pvfs2 op\n");
-            len = -1;
+            len = -EIO;
         }
+    }
+    else if (file->f_flags & O_NONBLOCK)
+
+    {
+        /*
+          if in non-blocking mode, return EAGAIN since no requests are
+          ready yet
+        */
+        len = -EAGAIN;
     }
     return len;
 }
@@ -454,6 +463,21 @@ static int pvfs2_devreq_ioctl(
     return -ENOSYS;
 }
 
+static unsigned int pvfs2_devreq_poll(
+    struct file *file,
+    struct poll_table_struct *poll_table)
+{
+    int poll_revent_mask = 0;
+
+    spin_lock(&pvfs2_request_list_lock);
+    if (!list_empty(&pvfs2_request_list))
+    {
+        poll_revent_mask |= POLL_IN;
+    }
+    spin_unlock(&pvfs2_request_list_lock);
+
+    return poll_revent_mask;
+}
 
 struct file_operations pvfs2_devreq_file_operations =
 {
@@ -463,13 +487,15 @@ struct file_operations pvfs2_devreq_file_operations =
     writev : pvfs2_devreq_writev,
     open : pvfs2_devreq_open,
     release : pvfs2_devreq_release,
-    ioctl : pvfs2_devreq_ioctl
+    ioctl : pvfs2_devreq_ioctl,
+    poll : pvfs2_devreq_poll
 #else
     .read = pvfs2_devreq_read,
     .writev = pvfs2_devreq_writev,
     .open = pvfs2_devreq_open,
     .release = pvfs2_devreq_release,
-    .ioctl = pvfs2_devreq_ioctl
+    .ioctl = pvfs2_devreq_ioctl,
+    .poll = pvfs2_devreq_poll
 #endif
 };
 

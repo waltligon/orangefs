@@ -141,6 +141,7 @@ int PINT_sm_common_directory_getattr_comp_fn(
     if (resp_p->status != 0)
     {
         gossip_err("Error: getattr failure\n");
+        PINT_SERVRESP_GETATTR_FREE(resp_p);
 	return resp_p->status;
     }
 
@@ -153,6 +154,10 @@ int PINT_sm_common_directory_getattr_comp_fn(
     {
         PINT_acache_object_attr_deep_copy(
             &sm_p->acache_attr, &resp_p->u.getattr.attr);
+    }
+    else
+    {
+        PINT_SERVRESP_GETATTR_FREE(resp_p);
     }
 
     /*
@@ -235,6 +240,7 @@ int PINT_sm_common_object_getattr_comp_fn(
     if (resp_p->status != 0)
     {
         gossip_err("Error: getattr failure\n");
+        PINT_SERVRESP_GETATTR_FREE(resp_p);
 	return resp_p->status;
     }
 
@@ -248,6 +254,10 @@ int PINT_sm_common_object_getattr_comp_fn(
         memset(&sm_p->acache_attr, 0, sizeof(PVFS_object_attr));
         PINT_acache_object_attr_deep_copy(
             &sm_p->acache_attr, &resp_p->u.getattr.attr);
+    }
+    else
+    {
+        PINT_SERVRESP_GETATTR_FREE(resp_p);
     }
     return 0;
 }

@@ -312,6 +312,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
      */
     if (resp_p->status != 0)
     {
+        PINT_SERVRESP_GETATTR_FREE(resp_p);
 	return resp_p->status;
     }
 
@@ -328,9 +329,9 @@ static int getattr_object_getattr_comp_fn(void *v_p,
     }
 
     /*
-      if we didn't get a cache hit, we're making a
-      copy of the attributes here so that we can add
-      a acache entry later in cleanup.
+      if we didn't get a cache hit, we're making a copy of the
+      attributes here so that we can add a acache entry later in
+      cleanup.
     */
     if (!sm_p->acache_hit)
     {
@@ -339,8 +340,8 @@ static int getattr_object_getattr_comp_fn(void *v_p,
     }
 
     /*
-      if we got a cache hit, use those attributes,
-      otherwise use the real server replied attrs
+      if we got a cache hit, use those attributes, otherwise use the
+      real server replied attrs
     */
     attr = (sm_p->acache_hit ?
             &sm_p->pinode->attr :
@@ -363,6 +364,10 @@ static int getattr_object_getattr_comp_fn(void *v_p,
                 strdup(attr->u.sym.target_path);
             if (!sm_p->u.getattr.getattr_resp_p->attr.link_target)
             {
+                if (!sm_p->acache_hit)
+                {
+                    PINT_SERVRESP_GETATTR_FREE(resp_p);
+                }
                 return -PVFS_ENOMEM;
             }
         }
@@ -395,6 +400,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
     /* on cache hit, we can skip all of the copying below;  joy! */
     if (sm_p->acache_hit)
     {
+        PINT_SERVRESP_GETATTR_FREE(resp_p);
         return 0;
     }
 
@@ -414,10 +420,7 @@ static int getattr_object_getattr_comp_fn(void *v_p,
 
 		/* here we make a copy of the distribution information. */
 		sm_p->u.getattr.dist_p = PINT_dist_copy(attr->u.meta.dist);
-		if (sm_p->u.getattr.dist_p == NULL) {
-		    assert(0);
-		    return -PVFS_ENOMEM;
-		}
+		assert(sm_p->u.getattr.dist_p);
 		sm_p->u.getattr.dist_size = attr->u.meta.dist_size;
 
 		/* nothing special about our return value here */
@@ -450,6 +453,8 @@ static int getattr_object_getattr_comp_fn(void *v_p,
 		   attr->u.meta.dfile_array,
 		   attr->u.meta.dfile_count * sizeof(PVFS_handle));
 
+                PINT_SERVRESP_GETATTR_FREE(resp_p);
+
                 if (need_datafiles == 0)
                 {
                     /*
@@ -467,14 +472,11 @@ static int getattr_object_getattr_comp_fn(void *v_p,
 		    return GETATTR_NEED_DATAFILE_SIZES;
 		}
 	    }
-	    else return 0;
-	    break;
+            return 0;
 	case PVFS_TYPE_DIRECTORY:
 	    return 0;
-	    break;
 	case PVFS_TYPE_SYMLINK:
             return 0;
-            break;
 	case PVFS_TYPE_DATAFILE:
 	    /* fall through */
 	case PVFS_TYPE_DIRDATA:
@@ -482,10 +484,9 @@ static int getattr_object_getattr_comp_fn(void *v_p,
 	default:
 	    gossip_err("error: getattr_object_getattr_comp_fn: "
                        "handle refers to invalid object type\n");
-	    return -PVFS_EINVAL;
     }
-
-    return -PVFS_EINVAL; /* should not get here */
+    PINT_SERVRESP_GETATTR_FREE(resp_p);
+    return -PVFS_EINVAL;
 }
 
 
@@ -570,6 +571,7 @@ static int getattr_datafile_getattr_comp_fn(
 
     if (resp_p->status != 0)
     {
+        PINT_SERVRESP_GETATTR_FREE(resp_p);
 	return resp_p->status;
     }
 
@@ -588,6 +590,7 @@ static int getattr_datafile_getattr_comp_fn(
 
     sm_p->u.getattr.size_array[index] = resp_p->u.getattr.attr.u.data.size;
 
+    PINT_SERVRESP_GETATTR_FREE(resp_p);
     return 0;
 }
 

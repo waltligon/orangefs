@@ -27,6 +27,8 @@ extern job_context_id PVFS_sys_job_context;
 extern gen_mutex_t *g_session_tag_mt_lock;
 extern gen_mutex_t *g_server_config_mutex;
 
+extern PINT_client_sm *g_sm_p;
+
 /* PVFS_finalize
  *
  * shuts down the PVFS system interface
@@ -65,6 +67,8 @@ int PVFS_sys_finalize()
     PINT_release_pvfstab();
 
     gossip_disable();
+
+    free(g_sm_p);
 
     return 0;
 }

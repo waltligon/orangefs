@@ -297,6 +297,10 @@ int PINT_server_config_mgr_remove_config(
             PINT_config_release(config->server_config);
             free(config->server_config);
 
+            if (gen_mutex_trylock(config->server_config_mutex) == EBUSY)
+            {
+                gossip_err("FIXME: Destroying mutex that is in use!\n");
+            }
             gen_mutex_unlock(config->server_config_mutex);
             gen_mutex_destroy(config->server_config_mutex);
 

@@ -279,6 +279,8 @@ void op_cache_initialize(
     void);
 void op_cache_finalize(
     void);
+pvfs2_kernel_op_t *op_alloc(
+    void);
 void op_release(
     void *op);
 void dev_req_cache_initialize(
@@ -425,7 +427,6 @@ do {                                                         \
     spin_unlock(&pvfs2_request_list_lock);                   \
                                                              \
     spin_unlock(&op->lock);                                  \
-                                                             \
     wake_up_interruptible(&pvfs2_request_list_waitq);        \
 } while(0)
 
