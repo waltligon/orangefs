@@ -1,3 +1,6 @@
+Nathan Poznick <poznick@conwaycorp.net> -- extensive testing and suggestions,
+particularly using the 2.6.x vfs interface.
+
 Pete Wyckoff <pw@osc.edu> did a lot of Infiniband work
 
 Jiesheng Wu <email address?> contributed a buffer cache 

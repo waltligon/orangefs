@@ -27,6 +27,7 @@ typedef struct
     char *path;
 } options_t;
 
+static void client_sig_handler(int signum);
 static void parse_args(int argc, char **argv, options_t *opts);
 static int verify_pvfs2_client_path(options_t *opts);
 static int monitor_pvfs2_client(options_t *opts);
@@ -71,8 +72,22 @@ int main(int argc, char **argv)
             exit(1);
         }
     }
+
+    signal(SIGHUP,  client_sig_handler);
+    signal(SIGPIPE, client_sig_handler);
+    signal(SIGILL,  client_sig_handler);
+    signal(SIGTERM, client_sig_handler);
+    signal(SIGSEGV, client_sig_handler);
+
     return monitor_pvfs2_client(&opts);
 }
+
+
+static void client_sig_handler(int signum)
+{
+    kill(0, signum);
+}
+
 
 static int verify_pvfs2_client_path(options_t *opts)
 {
@@ -113,7 +128,7 @@ static int monitor_pvfs2_client(options_t *opts)
         {
             if (opts->verbose)
             {
-                printf("Waiting on child with pid %d\n",(int)new_pid);
+                printf("Waiting on child with pid %d\n", (int)new_pid);
             }
             wpid = waitpid(new_pid, &ret, 0);
             assert(wpid != -1);
