@@ -373,6 +373,7 @@ int main(int argc,
 #endif
 		ret = PINT_state_machine_initialize_unexpected(s_op,
 			&job_status_structs[i]);
+	    }
             do
             {
                 ret = PINT_state_machine_next(s_op, &job_status_structs[i]);
@@ -387,7 +388,7 @@ int main(int argc,
 		/* if ret < 0 oh no... job mechanism died */
 		/* TODO: fix this */
 	    }
-	    if (postBMIFlag)
+	    if (postBMIFlag) /* unexpected message */
 	    {
 		postBMIFlag = 0;
 		ret = PINT_server_cp_bmi_unexp(s_op, &job_status_structs[i]);
@@ -402,8 +403,8 @@ int main(int argc,
 		    exit(-1);
 		}
 	    }
-	}
-    }
+	} /* ... for i < out_count */
+    } /* ... while (1) */
     server_level_init = UNEXPECTED_LOOP_END;
 
   server_shutdown:
