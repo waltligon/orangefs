@@ -16,7 +16,7 @@ typedef struct
     size_t count;
     loff_t offset;
     PVFS_pinode_reference refn;
-    enum PVFS_sys_io_type io_type;
+    enum PVFS_io_type io_type;
 } pvfs2_io_request_t;
 
 typedef struct

@@ -63,7 +63,7 @@ static ssize_t pvfs2_file_read(
     }
 
     new_op->upcall.type = PVFS2_VFS_OP_FILE_IO;
-    new_op->upcall.req.io.io_type = PVFS_SYS_IO_READ;
+    new_op->upcall.req.io.io_type = PVFS_IO_READ;
     new_op->upcall.req.io.refn = pvfs2_inode->refn;
 
     while(total_count < count)
@@ -177,7 +177,7 @@ static ssize_t pvfs2_file_write(
     }
 
     new_op->upcall.type = PVFS2_VFS_OP_FILE_IO;
-    new_op->upcall.req.io.io_type = PVFS_SYS_IO_WRITE;
+    new_op->upcall.req.io.io_type = PVFS_IO_WRITE;
     new_op->upcall.req.io.refn = pvfs2_inode->refn;
 
     while(total_count < count)

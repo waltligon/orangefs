@@ -227,6 +227,12 @@ extern int32_t PINT_errno_mapping[];
 
 #define PVFS_ERRNO_MAX          57
 
+/* PVFS I/O operation types, used in both system and server interfaces */
+enum PVFS_io_type {
+    PVFS_IO_READ = 1,
+    PVFS_IO_WRITE = 2
+};
+
 #endif /* __PVFS2_TYPES_H */
 
 /*

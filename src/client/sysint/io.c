@@ -48,7 +48,7 @@ static int io_req_ack_flow_array(bmi_addr_t* addr_array,
     void* buffer, 
     PVFS_size buffer_size, 
     PVFS_credentials credentials, /* end changed by frank */
-    enum PVFS_sys_io_type type,
+    enum PVFS_io_type type,
     enum PVFS_flowproto_type flow_type);
 
 static void io_release_req_ack_flow_array(bmi_addr_t* addr_array,
@@ -74,7 +74,7 @@ static int io_find_target_dfiles(PVFS_Request io_req, PVFS_offset io_req_offset,
 int PVFS_sys_io(PVFS_pinode_reference pinode_refn, PVFS_Request io_req, 
 		PVFS_offset io_req_offset, void* buffer, PVFS_size buffer_size, 
 		PVFS_credentials credentials, PVFS_sysresp_io *resp, 
-		enum PVFS_sys_io_type type)
+		enum PVFS_io_type type)
 {
     pinode* pinode_ptr = NULL;
     uint32_t attr_mask = 0;
@@ -94,7 +94,7 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_refn, PVFS_Request io_req,
     /* TODO: might want hooks to set this from app. level later */
     enum PVFS_flowproto_type flow_type = FLOWPROTO_ANY;
 
-    if((type != PVFS_SYS_IO_READ) && (type != PVFS_SYS_IO_WRITE))
+    if((type != PVFS_IO_READ) && (type != PVFS_IO_WRITE))
     {
 	return(-EINVAL);
     }
@@ -231,10 +231,7 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_refn, PVFS_Request io_req,
 	req_array[i].u.io.io_req = io_req;
 	req_array[i].u.io.io_req_offset = io_req_offset;
 	req_array[i].u.io.io_dist = pinode_ptr->attr.u.meta.dist;
-	if(type == PVFS_SYS_IO_READ)
-	    req_array[i].u.io.io_type = PVFS_IO_READ;
-	if(type == PVFS_SYS_IO_WRITE)
-	    req_array[i].u.io.io_type = PVFS_IO_WRITE;
+	req_array[i].u.io.io_type = type;
     }
    
     /* run the I/O series for each server */
@@ -272,7 +269,7 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_refn, PVFS_Request io_req,
     /* if this was a read, tally up the total I/O size based on
      * results of the flows
      */
-    if(type == PVFS_SYS_IO_READ)
+    if(type == PVFS_IO_READ)
     {
 	for(i=0; i<target_handle_count; i++)
 	{
@@ -302,7 +299,7 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_refn, PVFS_Request io_req,
      * final ack from the data servers indicating the status of
      * the operation
      */
-    if(type == PVFS_SYS_IO_WRITE)
+    if(type == PVFS_IO_WRITE)
     {
 	/* wait for all of the final acks */
 	ret = PINT_recv_ack_array(
@@ -516,7 +513,7 @@ static int io_req_ack_flow_array(bmi_addr_t* addr_array,
     void* buffer, 
     PVFS_size buffer_size, 
     PVFS_credentials credentials, /* end changed by frank */
-    enum PVFS_sys_io_type type,
+    enum PVFS_io_type type,
     enum PVFS_flowproto_type flow_type)
 {
     int i;
@@ -774,7 +771,7 @@ static int io_req_ack_flow_array(bmi_addr_t* addr_array,
 		flow_array[i]->user_ptr = NULL;
 		flow_array[i]->type = flow_type;
 
-		if(type == PVFS_SYS_IO_READ)
+		if(type == PVFS_IO_READ)
 		{
 		    flow_array[i]->file_data->extend_flag = 0;
 		    flow_array[i]->src.endpoint_id = BMI_ENDPOINT;

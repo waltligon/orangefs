@@ -250,15 +250,6 @@ struct PVFS_system_resp_s {
 
 /*declarations*/
 
-/* an enumeration that controls what type of operation is performed in
- * PVFS_sys_io()
- */
-enum PVFS_sys_io_type
-{
-	PVFS_SYS_IO_READ,
-	PVFS_SYS_IO_WRITE
-};
-
 /* PVFS System Request Prototypes
  *
  * That's fine, except that we KNOW that this interface is just a
@@ -354,13 +345,13 @@ int PVFS_sys_io(
     PVFS_size buffer_size,
     PVFS_credentials credentials, 
     PVFS_sysresp_io *resp,
-    enum PVFS_sys_io_type type);
+    enum PVFS_io_type type);
 
 #define PVFS_sys_read(x1,x2,x3,x4,x5,x6,y) \
-PVFS_sys_io(x1,x2,x3,x4,x5,x6,y,PVFS_SYS_IO_READ)
+PVFS_sys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_READ)
 
 #define PVFS_sys_write(x1,x2,x3,x4,x5,x6,y) \
-PVFS_sys_io(x1,x2,x3,x4,x5,x6,y,PVFS_SYS_IO_WRITE)
+PVFS_sys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_WRITE)
 
 int PVFS_sys_allocate(
     PVFS_pinode_reference pinode_refn,

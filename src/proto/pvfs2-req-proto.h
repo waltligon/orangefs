@@ -358,22 +358,19 @@ struct PVFS_servreq_truncate
 /* io **********************************************************/
 /* - performs a read or write operation */
 
-enum PVFS_servreq_io_type
-{
-    PVFS_IO_READ = 1,
-    PVFS_IO_WRITE = 2
-};
-
 struct PVFS_servreq_io
 {
     PVFS_handle handle;		    /* target datafile */
     PVFS_fs_id fs_id;		    /* file system */
     /* type of I/O operation to perform */
-    enum PVFS_servreq_io_type io_type;
+    enum PVFS_io_type io_type; /* enum defined in pvfs2-sysint.h */
+
     /* type of flow protocol to use for I/O transfer */
     enum PVFS_flowproto_type flow_type;
+
     /* relative number of this I/O server in distribution */
     uint32_t iod_num;
+
     /* total number of I/O servers involved in distribution */
     uint32_t iod_count;
     /* distribution */

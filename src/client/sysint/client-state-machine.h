@@ -107,7 +107,7 @@ struct PINT_client_getattr_sm {
 struct PINT_client_io_sm {
     /* input parameters */
     PVFS_pinode_reference object_ref;
-    enum PVFS_sys_io_type io_type;
+    enum PVFS_io_type     io_type;
     PVFS_Request          io_req;
     PVFS_offset           io_req_offset;
     void                 *buffer;
