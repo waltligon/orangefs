@@ -472,10 +472,10 @@ struct PINT_Request_state *PINT_New_request_state (PINT_Request *request)
 {
 	struct PINT_Request_state *req;
 	int32_t rqdepth;
-	gossip_debug(REQUEST_DEBUG,"PINT_New_req\n");
+	gossip_debug(REQUEST_DEBUG,"PINT_New_request_state\n",__func__);
 	if (!(req = (struct PINT_Request_state *)malloc(sizeof(struct PINT_Request_state))))
 	{
-		gossip_lerr("PINT_New_req failed to malloc req !!!!!!!\n");
+		gossip_lerr("PINT_New_request_state failed to malloc req !!!!!!!\n");
 		return NULL;
 	}
 	req->lvl = 0;
@@ -498,7 +498,7 @@ struct PINT_Request_state *PINT_New_request_state (PINT_Request *request)
 	if (!(req->cur = (struct PINT_reqstack *)malloc(rqdepth *
 			sizeof(struct PINT_reqstack))))
 	{
-		gossip_lerr("PINT_New_req failed to malloc rqstack !!!!!!\n");
+		gossip_lerr("PINT_New_request_state failed to malloc rqstack !!!!!!\n");
 		return NULL;
 	}
 	req->cur[req->lvl].maxel = 1; /* transfer one instance of request */
