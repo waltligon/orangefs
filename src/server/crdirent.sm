@@ -14,8 +14,6 @@
 
 static int crdirent_validate(PINT_server_op *s_op, job_status_s* js_p);
 static int crdirent_read_directory_entry_handle(PINT_server_op *s_op, job_status_s* js_p);
-static int crdirent_read_parent_metadata(PINT_server_op *s_op, job_status_s* js_p);
-static int crdirent_verify_parent_metadata(PINT_server_op *s_op, job_status_s* js_p);
 static int crdirent_write_directory_entry(PINT_server_op *s_op, job_status_s* js_p);
 static int crdirent_check_exist_directory_entry(PINT_server_op *s_op, job_status_s* js_p);
 static int crdirent_handle_eexist(PINT_server_op *s_op, job_status_s* js_p);
@@ -35,8 +33,6 @@ enum {
 machine pvfs2_crdirent_sm(prelude,
 			  validate,
 			  read_directory_entry_handle,
-			  read_parent_metadata,
-			  verify_parent_metadata,
 			  write_directory_entry,
 			  cleanup,
 			  create_dirdata_dspace,
@@ -56,21 +52,7 @@ machine pvfs2_crdirent_sm(prelude,
 	{
 		run crdirent_validate;
 		ERROR_BADNAME => final_response;
-		default => read_parent_metadata;
-	}
-
-	state read_parent_metadata
-	{
-		run crdirent_read_parent_metadata;
-		success => verify_parent_metadata;
-		default => final_response;
-	}
-
-	state verify_parent_metadata
-	{
-		run crdirent_verify_parent_metadata;
-		success => read_directory_entry_handle;
-		default => final_response;
+		default => read_directory_entry_handle;
 	}
 	
 	state read_directory_entry_handle
@@ -180,95 +162,6 @@ static int crdirent_validate(PINT_server_op *s_op,
 
 
 /*
- * Function: crdirent_read_parent_metadata
- *
- * Synopsis: Post Trove job to read metadata for the parent directory so we can make sure
- *           that the credentials are valid.
- */
-static int crdirent_read_parent_metadata(PINT_server_op *s_op,
-					 job_status_s* js_p)
-{
-
-    int ret;
-    job_id_t i;
-
-    gossip_ldebug(SERVER_DEBUG,"crdirent state: read_parent_metadata\n");
-
-    assert(s_op->scheduled_id != 0);
-
-    s_op->key.buffer    = Trove_Common_Keys[METADATA_KEY].key;
-    s_op->key.buffer_sz = Trove_Common_Keys[METADATA_KEY].size;
-
-    /* store parent attributes in crdirent scratch space */
-    s_op->val.buffer    = &s_op->u.crdirent.parent_attr;
-    s_op->val.buffer_sz = sizeof(PVFS_object_attr);
-
-    gossip_debug(SERVER_DEBUG,
-		 "  reading metadata (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = 0x%08x (%d))\n",
-		 s_op->req->u.crdirent.fs_id,
-		 s_op->req->u.crdirent.parent_handle,
-		 (char *) s_op->key.buffer,
-		 s_op->key.buffer_sz,
-		 (unsigned) s_op->val.buffer,
-		 s_op->val.buffer_sz);
-
-    ret = job_trove_keyval_read(s_op->req->u.crdirent.fs_id,
-					 s_op->req->u.crdirent.parent_handle,
-					 &s_op->key,
-					 &s_op->val,
-					 0,
-					 NULL,
-					 s_op,
-					 js_p,
-					 &i,
-					 PINT_server_job_context);
-    return ret;
-}
-
-/*
- * Function: crdirent_verify_parent_metadata
- *
- * Params:   server_op *s_op, 
- *           job_status_s* js_p
- *
- * Pre:      s_op->val.buffer is a valid PVFS_object_attr structure
- *
- * Post:     User has permission to perform operation
- *
- * Returns:  int
- *
- * Synopsis: This should use a global function that verifies that the user
- *           has the necessary permissions to perform the operation it wants
- *           to do.
- *           
- */
-static int crdirent_verify_parent_metadata(PINT_server_op *s_op,
-					   job_status_s* js_p)
-{
-    PVFS_object_attr *a_p;
-
-    a_p = &s_op->u.crdirent.parent_attr;
-
-    gossip_debug(SERVER_DEBUG,"crdirent state: verify_parent_metadata\n");
-
-    gossip_debug(SERVER_DEBUG,
-		 "  attrs = (owner = %d, group = %d, perms = %o, type = %d)\n",
-		 a_p->owner,
-		 a_p->group,
-		 a_p->perms,
-		 a_p->objtype);
-
-    /* recall attributes are in s_op->u.crdirent.parent_attr */
-    /* TODO: MAKE THIS AN ERROR CHECK INSTEAD LATER */
-    assert(s_op->u.crdirent.parent_attr.objtype == PVFS_TYPE_DIRECTORY);
-
-    /*IF THEY don't have permission, set js_p->error_code to -ENOPERM!*/
-
-    return 1;
-}
-
-
-/*
  * Function: crdirent_read_directory_entry_handle
  *
  * Params:   server_op *s_op, 
@@ -302,6 +195,10 @@ static int crdirent_read_directory_entry_handle(PINT_server_op *s_op,
     job_id_t i;
 
     gossip_debug(SERVER_DEBUG, "crdirent state: gethandle\n");
+
+    /* TODO: MAKE THIS AN ERROR CHECK INSTEAD LATER */
+    assert(s_op->attr.mask & PVFS_ATTR_COMMON_TYPE);
+    assert(s_op->attr.objtype == PVFS_TYPE_DIRECTORY);
 
     /* get the key and key size out of our list of common keys */
     s_op->key.buffer    = Trove_Common_Keys[DIR_ENT_KEY].key;

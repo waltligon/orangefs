@@ -89,7 +89,6 @@ struct PINT_server_rmdirent_op {
 };
 
 struct PINT_server_crdirent_op {
-    PVFS_object_attr parent_attr; /* holds attributes of the parent directory */
     PVFS_handle dirent_handle;    /* holds handle of dirdata dspace that we'll write the dirent into */
 };
 
