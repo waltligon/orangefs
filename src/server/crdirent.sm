@@ -95,50 +95,51 @@ nested machine pvfs2_check_entry_not_exist_sm(
     }
 }
 
-machine pvfs2_crdirent_sm(prelude,
-                          setup_op,
-                          check_not_exist,
-                          write_directory_entry,
-                          cleanup,
-                          final_response)
+machine pvfs2_crdirent_sm(
+    prelude,
+    setup_op,
+    check_not_exist,
+    write_directory_entry,
+    cleanup,
+    final_response)
 {
-        state prelude
-        {
-                jump pvfs2_prelude_sm;
-                success => setup_op;
-                default => final_response;
-        }
+    state prelude
+    {
+        jump pvfs2_prelude_sm;
+        success => setup_op;
+        default => final_response;
+    }
 
-        state setup_op
-        {
-                run crdirent_setup_op;
-                default => check_not_exist;
-        }
+    state setup_op
+    {
+        run crdirent_setup_op;
+        default => check_not_exist;
+    }
 
-        state check_not_exist
-        {
-                jump pvfs2_check_entry_not_exist_sm;
-                success => write_directory_entry;
-                default => final_response;
-        }
+    state check_not_exist
+    {
+        jump pvfs2_check_entry_not_exist_sm;
+        success => write_directory_entry;
+        default => final_response;
+    }
 
-        state write_directory_entry
-        {
-                run crdirent_write_directory_entry;
-                default => final_response;
-        }
+    state write_directory_entry
+    {
+        run crdirent_write_directory_entry;
+        default => final_response;
+    }
 
-        state final_response
-        {
-                jump pvfs2_final_response_sm;
-                default => cleanup;
-        }
+    state final_response
+    {
+        jump pvfs2_final_response_sm;
+        default => cleanup;
+    }
 
-        state cleanup
-        {
-                run crdirent_cleanup;
-                default => terminate;
-        }
+    state cleanup
+    {
+        run crdirent_cleanup;
+        default => terminate;
+    }
 }
 
 %%
@@ -146,19 +147,21 @@ machine pvfs2_crdirent_sm(prelude,
 /*
  * Function: crdirent_validate
  *
- * Synopsis: verifies that entry name is valid
+ * Synopsis: verifies that entry name and object type is valid
  */
 static int crdirent_validate(PINT_server_op *s_op,
                              job_status_s* js_p)
 {
-    char *ptr;
+    char *ptr = NULL;
 
     PINT_STATE_DEBUG("validate");
 
-    /* verify input values -- some of this should be caught as
-     * legitimate errors later! */
-    assert(s_op->u.crdirent.name != NULL);
-    assert(s_op->u.crdirent.parent_handle != 0);
+    if ((s_op->u.crdirent.name == NULL) ||
+        (s_op->u.crdirent.parent_handle == PVFS_HANDLE_NULL))
+    {
+        js_p->error_code = -PVFS_EINVAL;
+        return 1;
+    }
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
             "  got crdirent for %s (with handle %Lu) in %Lu\n",
@@ -410,7 +413,6 @@ static int crdirent_write_dirdata_handle(PINT_server_op *s_op,
  * Pre:      s_op->u.crdirent.dirent_handle is the directory entry k/v space
  *           s_op->u.crdirent.name != NULL
  *           s_op->u.crdirent.new_handle != NULL
- *           ADD ASSERTS FOR THESE!
  *
  * Post:     key/val pair stored
  *
@@ -422,9 +424,10 @@ static int crdirent_write_dirdata_handle(PINT_server_op *s_op,
 static int crdirent_write_directory_entry(PINT_server_op *s_op,
                                           job_status_s* js_p)
 {
-    int ret;
+    int ret = -PVFS_EINVAL;
     job_id_t i;
-    struct server_configuration_s *user_opts = get_server_config_struct();
+    struct server_configuration_s *user_opts =
+        get_server_config_struct();
 
     PINT_STATE_DEBUG("write_directory_entry");
 
