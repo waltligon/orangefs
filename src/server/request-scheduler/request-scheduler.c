@@ -81,8 +81,6 @@ static QLIST_HEAD(ready_queue);
 static int hash_handle(void* handle, int table_size);
 static int hash_handle_compare(void* key, struct qlist_head*
 	link);
-static int handle_from_request(struct PVFS_server_req*
-	req, PVFS_handle* handle);
 
 /* setup and teardown */
 
@@ -154,6 +152,77 @@ int PINT_req_sched_finalize(
 	return(0);
 }
 
+/* PINT_req_sched_target_handle()
+ *
+ * finds the handle that the given request will operate on
+ *
+ * returns 0 on success, -errno on failure
+ * NOTE: a handle value of 0 and a return value of 0 indicates
+ * that the request does not operate on any particular handle
+ */
+int PINT_req_sched_target_handle(struct PVFS_server_req*
+	req, PVFS_handle* handle)
+{
+	*handle = 0;
+
+	switch(req->op)
+	{
+		case PVFS_SERV_INVALID: 
+			return(-EINVAL);
+			break;
+		case PVFS_SERV_CREATE:
+			return(0);
+			break;
+		case PVFS_SERV_REMOVE:
+			*handle = req->u.remove.handle;
+			return(0);
+			break;
+		case PVFS_SERV_IO:
+			*handle = req->u.io.handle;
+			return(0);
+			break;
+		case PVFS_SERV_GETATTR:
+			*handle = req->u.getattr.handle;
+			return(0);
+			break;
+		case PVFS_SERV_SETATTR:
+			*handle = req->u.setattr.handle;
+			return(0);
+			break;
+		case PVFS_SERV_LOOKUP_PATH:
+			*handle = req->u.lookup_path.starting_handle;
+			return(0);
+			break;
+		case PVFS_SERV_CREATEDIRENT:
+			*handle = req->u.crdirent.parent_handle;
+			return(0);
+			break;
+		case PVFS_SERV_RMDIRENT:
+			*handle = req->u.rmdirent.parent_handle;
+			return(0);
+			break;
+		case PVFS_SERV_TRUNCATE:
+			*handle = req->u.truncate.handle;
+			return(0);
+			break;
+		case PVFS_SERV_MKDIR:
+			return(0);
+			break;
+		case PVFS_SERV_READDIR:
+			*handle = req->u.readdir.handle;
+			return(0);
+			break;
+		case PVFS_SERV_GETCONFIG:
+			return(0);
+			break;
+		case PVFS_SERV_WRITE_COMPLETION:
+			return(0);
+			break;
+	}
+
+	return(0);
+}
+
 /* scheduler submission */
 
 /* PINT_req_sched_post()
@@ -176,7 +245,7 @@ int PINT_req_sched_post(
 	struct req_sched_element* next_element;
 
 	/* find the handle */
-	ret = handle_from_request(in_request, &handle);
+	ret = PINT_req_sched_target_handle(in_request, &handle);
 	if(ret < 0)
 	{
 		return(ret);
@@ -651,78 +720,6 @@ static int hash_handle_compare(void* key, struct qlist_head* link)
 	if(my_list->handle == *real_handle)
 	{
 		return(1);
-	}
-
-	return(0);
-}
-
-/* handle_from_request()
- *
- * pulls the handle out of a request structure and fills in
- * argument
- *
- * returns 0 on success, -errno on failure
- * NOTE: a handle value of 0 and a return value of 0 indicates
- * that the request does not operate on any particular handle
- */
-static int handle_from_request(struct PVFS_server_req*
-	req, PVFS_handle* handle)
-{
-	*handle = 0;
-
-	switch(req->op)
-	{
-		case PVFS_SERV_INVALID: 
-			return(-EINVAL);
-			break;
-		case PVFS_SERV_CREATE:
-			return(0);
-			break;
-		case PVFS_SERV_REMOVE:
-			*handle = req->u.remove.handle;
-			return(0);
-			break;
-		case PVFS_SERV_IO:
-			*handle = req->u.io.handle;
-			return(0);
-			break;
-		case PVFS_SERV_GETATTR:
-			*handle = req->u.getattr.handle;
-			return(0);
-			break;
-		case PVFS_SERV_SETATTR:
-			*handle = req->u.setattr.handle;
-			return(0);
-			break;
-		case PVFS_SERV_LOOKUP_PATH:
-			*handle = req->u.lookup_path.starting_handle;
-			return(0);
-			break;
-		case PVFS_SERV_CREATEDIRENT:
-			*handle = req->u.crdirent.parent_handle;
-			return(0);
-			break;
-		case PVFS_SERV_RMDIRENT:
-			*handle = req->u.rmdirent.parent_handle;
-			return(0);
-			break;
-		case PVFS_SERV_TRUNCATE:
-			*handle = req->u.truncate.handle;
-			return(0);
-			break;
-		case PVFS_SERV_MKDIR:
-			return(0);
-			break;
-		case PVFS_SERV_READDIR:
-			*handle = req->u.readdir.handle;
-			return(0);
-			break;
-		case PVFS_SERV_GETCONFIG:
-			return(0);
-			break;
-		case PVFS_SERV_WRITE_COMPLETION:
-			return(0);
-			break;
 	}
 
 	return(0);

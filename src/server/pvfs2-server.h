@@ -134,16 +134,24 @@ typedef struct PINT_server_op
     PVFS_ds_keyval *key_a;
     PVFS_ds_keyval *val_a;
 
+    /* attributes structure associated with target of operation; may be 
+     * partially filled in by prelude nested state machine (for 
+     * permission checking); may be used/modified by later states as well
+     */
+    PVFS_object_attr attr;
+
     bmi_addr_t addr;   /* address of client that contacted us */
     bmi_msg_tag_t tag; /* operation tag */
     /* information about unexpected message that initiated this operation */
     struct BMI_unexpected_info unexp_bmi_buff;
+
     /* decoded request and response structures */
     struct PVFS_server_req *req; 
     struct PVFS_server_resp resp; 
     /* encoded request and response structures */
     struct PINT_encoded_msg encoded;
     struct PINT_decoded_msg decoded;
+
     union {
 	/* request-specific scratch spaces for use during processing */
 	struct PINT_server_getconfig_op getconfig;

@@ -24,6 +24,11 @@ int PINT_req_sched_initialize(
 int PINT_req_sched_finalize(
 	void);
 
+/* retrieving information about incoming requests */
+int PINT_req_sched_target_handle(
+	struct PVFS_server_req* req,
+	PVFS_handle* handle);
+
 /* scheduler submission */
 
 int PINT_req_sched_post(

@@ -25,17 +25,25 @@
 
 static int prelude_req_sched(PINT_server_op *s_op, job_status_s *js_p);
 static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p);
+static int prelude_getattr_if_needed(PINT_server_op *s_op, job_status_s *js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 extern job_context_id PINT_server_job_context;
 
 %%
 
-nested machine pvfs2_prelude_sm(req_sched, perm_check)
+nested machine pvfs2_prelude_sm(req_sched, getattr_if_needed, perm_check)
 {
     state req_sched
     {
 	run prelude_req_sched;
+	success => getattr_if_needed;
+	default => return;
+    }
+
+    state getattr_if_needed
+    {
+	run prelude_getattr_if_needed;
 	success => perm_check;
 	default => return;
     }
@@ -67,6 +75,18 @@ static int prelude_req_sched(PINT_server_op *s_op, job_status_s *js_p)
 	PINT_server_job_context);
 
     return(ret);
+}
+
+/* prelude_getattr_if_needed()
+ *
+ * reads basic attributes of target object, if there is a particular target
+ * object for the operation
+ */
+static int prelude_getattr_if_needed(PINT_server_op *s_op, job_status_s *js_p)
+{
+
+    js_p->error_code = 0;
+    return(1);
 }
 
 /* prelude_perm_check()
