@@ -2,6 +2,7 @@
 %
 \documentclass[11pt, letterpaper]{article}
 \usepackage[dvips]{graphicx}
+\usepackage{html}
 \usepackage{psfig}
 \usepackage{rotating}
 \usepackage{times}
@@ -18,6 +19,7 @@
 \evensidemargin 0.0in
 \headsep 0.0in
 \headheight 0.0in
+
 
 \title{A Quick Start Guide to PVFS2}
 \author{ PVFS2 Development Team }
@@ -49,8 +51,8 @@ cluster environment with multiple servers and/or clients.
 
 \subsection{Versions}
 
-This document only applies to alpha snapshots of PVFS2 as of September
-2003.
+This document only applies to alpha snapshots of PVFS2 as of March
+2004.
 
 \section{Downloading and compiling PVFS2}
 
@@ -88,7 +90,7 @@ ROMIO supports PVFS2.  It is not provided with pvfs2, but can be found as part
 of the following MPI implementations:
 
 \begin{itemize}
-\item MPICH2-0.94 or newer
+\item MPICH2-0.96b2 or newer
 \end{itemize}
 
 \subsection{Untarring the packages}
@@ -810,18 +812,21 @@ specified by the PVFS2\_DEBUGMASK to be stored in the file specified,
 no longer intermixing the output with the client program.
 
 \section{ROMIO Support}
+\label{sec:romio}
 
 Building ROMIO with PVFS2 support can be a bit tricky, and is certainly
 not well documented.  While ROMIO has been updated with PVFS2 support,
 only MPICH2 has included a recent snapshot of ROMIO.  
 
-% footnotes for urls?
-First, get the software.  Download MPICH2 from
-{\tt http://www.mcs.anl.gov/mpi/mpich2/}.  While MPICH2 contains a ROMIO
-with PVFS2 support, the PVFS2 API continues to stabalize.  The latest
-patch to syncronize the ROMIO in MPICH2 with PVFS2 can be found at
-{\tt http://www.mcs.anl.gov/romio/romio-PVFS2-latest\_fixes.diff}.  For
-example's sake, assume all software was downloaded to {\tt~/src}. 
+First, get the software.  Download MPICH2 from \htmladdnormallink{
+http://www.mcs.anl.gov/mpi/mpich2/}{http://www.mcs.anl.gov/mpi/mpich2/}.
+While MPICH2 contains a ROMIO with PVFS2 support, the PVFS2 API has
+continued to stabalize since MPICH2 was last released.  Patches to
+syncronize the ROMIO in MPICH2 with PVFS2 can be found at
+\htmladdnormallink{
+http://www.mcs.anl.gov/romio/pvfs2-patches.html}{http://www.mcs.anl.gov/romio/pvfs2-patches.html}.
+There is also a patch in the PVFS2 source in {\tt doc/coding}. For
+example's sake, assume all software was downloaded to {\tt \$\{HOME\}/src}. 
 
 Unpack mpich2, then change to the src/mpi/romio directory.  Apply the
 ROMIO patch.  The patch makes changes to the ROMIO configure scripts, so you'll have to re-run {\tt autoconf} to generate a new configure file.
@@ -829,7 +834,7 @@ ROMIO patch.  The patch makes changes to the ROMIO configure scripts, so you'll 
 \begin{verbatim}
 prompt% tar xzf ~/src/mpich2-0.96p2.tar.gz     # unpack mpich2 source
 prompt% cd mpich2-0.96p2/src/mpi/romio         # change to ROMIO dir
-prompt% patch -p0 < ~/src/romio-PVFS2-latest_fixes.diff   #apply patch
+prompt% patch -p0 < ~/src/romio-<CORRECT_VERSION>.diff   #apply patch
 prompt% autoconf                               # create a new 'configure'
 prompt% cd ../../..                            # return to top of src
 prompt% 
