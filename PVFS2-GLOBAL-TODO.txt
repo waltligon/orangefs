@@ -49,6 +49,8 @@ system interface functionality:
 
 - define how configuration info should be passed in
   (how to do paths, fstab, url stuff, whatever)
+- define how to pass in distribution and number of datafiles for 
+  cases in which the caller wants to override the defaults
 
 user interfaces:
 ====================================================================
