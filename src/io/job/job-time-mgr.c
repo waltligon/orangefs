@@ -140,6 +140,9 @@ static int __job_time_mgr_add(struct job_desc* jd, int timeout_sec)
 	tmp_bucket = new_bucket;
     }
 
+    assert(tmp_bucket);
+    assert(tmp_bucket->expire_time_sec >= expire_time_sec);
+
     /* add the job descriptor onto the correct bucket */
     qlist_add_tail(&jd->job_time_link, &tmp_bucket->jd_queue);
     jd->time_bucket = tmp_bucket;

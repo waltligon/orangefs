@@ -48,6 +48,18 @@ static int remove_getattr_comp_fn(
 static int remove_check_dir_contents_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int i);
 
+#define HANDLE_REMOVE_ERROR(state)                                     \
+do {                                                                   \
+    char buf[64] = {0};                                                \
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: %s\n", state);    \
+    PVFS_strerror_r(js_p->error_code, buf, 64);                        \
+    gossip_err("WARNING: PVFS_sys_remove() encountered an error which "\
+               "may lead\n  to inconsistent state: %s\n", buf);        \
+    gossip_err("WARNING: PVFS2 fsck (if available) may be needed.\n"); \
+    sm_p->u.remove.stored_error_code = js_p->error_code;               \
+    js_p->error_code = 0;                                              \
+} while(0)
+
 %%
 
 nested machine pvfs2_client_remove_helper_sm(
@@ -198,6 +210,7 @@ static int remove_getattr_setup_msgpair(PINT_client_sm *sm_p,
     if (sm_p->msgarray && (sm_p->msgarray != &sm_p->msgpair))
     {
         free(sm_p->msgarray);
+        sm_p->msgarray = NULL;
     }
     sm_p->msgarray = &(sm_p->msgpair);
     sm_p->msgarray_count = 1;
@@ -340,6 +353,7 @@ static int remove_check_dir_contents_setup_msgpair(PINT_client_sm *sm_p,
     if (sm_p->msgarray && (sm_p->msgarray != &sm_p->msgpair))
     {
         free(sm_p->msgarray);
+        sm_p->msgarray = NULL;
     }
     sm_p->msgarray = msg_p;
     sm_p->msgarray_count = 1;
@@ -363,11 +377,13 @@ static int remove_datafile_remove_setup_msgpair(PINT_client_sm *sm_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "remove state: datafile_remove_setup_msgpair\n");
 
-    /* allocate msgarray and set msgarray_count */
     sm_p->msgarray = (PINT_client_sm_msgpair_state *)malloc(
         sm_p->datafile_count * sizeof(PINT_client_sm_msgpair_state));
-    assert(sm_p->msgarray);
-
+    if (!sm_p->msgarray)
+    {
+	js_p->error_code = -PVFS_ENOMEM;
+        return 1;
+    }
     sm_p->msgarray_count = sm_p->datafile_count;
     
     /* for each datafile, post a send/recv pair for the remove */
@@ -400,7 +416,6 @@ static int remove_datafile_remove_setup_msgpair(PINT_client_sm *sm_p,
 	gossip_lerr("Error: failed to resolve server addresses.\n");
 	js_p->error_code = ret;
     }
-
     return 1;
 }
 
@@ -438,6 +453,7 @@ static int remove_object_remove_setup_msgpair(PINT_client_sm *sm_p,
     if (sm_p->msgarray && (sm_p->msgarray != &sm_p->msgpair))
     {
         free(sm_p->msgarray);
+        sm_p->msgarray = NULL;
     }
     sm_p->msgarray = &(sm_p->msgpair);
     sm_p->msgarray_count = 1;
@@ -448,41 +464,21 @@ static int remove_object_remove_setup_msgpair(PINT_client_sm *sm_p,
 static int remove_getattr_failure(PINT_client_sm *sm_p,
 				  job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: getattr_failure\n");
-
-    gossip_err("WARNING: PVFS_sys_remove() encountered an error which "
-               "may lead to inconsistent state.\n");
-    gossip_err("WARNING: PVFS2 fsck (if available) may be needed.\n");
-    js_p->error_code = 0;
-
+    HANDLE_REMOVE_ERROR("remove_getattr_failure");
     return 1;
 }
 
 static int remove_datafile_remove_failure(PINT_client_sm *sm_p,
 					  job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "remove state: datafile_remove_failure\n");
-	 
-    gossip_err("WARNING: PVFS_sys_remove() encountered an error which "
-               "may lead to inconsistent state.\n");
-    gossip_err("WARNING: PVFS2 fsck (if available) may be needed.\n");
-    js_p->error_code = 0;
-
+    HANDLE_REMOVE_ERROR("datafile_remove_failure");
     return 1;
 }
 
 static int remove_object_remove_failure(PINT_client_sm *sm_p,
 					job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "remove state: object_remove_failure\n");	 
-
-    gossip_err("WARNING: PVFS_sys_remove() encountered an error which "
-               "may lead to inconsistent state.\n");
-    gossip_err("WARNING: PVFS2 fsck (if available) may be needed.\n");
-    js_p->error_code = 0;
-
+    HANDLE_REMOVE_ERROR("object_remove_failure");
     return 1;
 }
 
@@ -500,6 +496,7 @@ static int remove_helper_cleanup(PINT_client_sm *sm_p,
     if (sm_p->msgarray && (sm_p->msgarray != &sm_p->msgpair))
     {
         free(sm_p->msgarray);
+        sm_p->msgarray = NULL;
     }
 
     if (sm_p->datafile_handles)

@@ -282,6 +282,7 @@ static int remove_rmdirent_setup_msgpair(PINT_client_sm *sm_p,
     if (sm_p->msgarray && (sm_p->msgarray != &sm_p->msgpair))
     {
         free(sm_p->msgarray);
+        sm_p->msgarray = NULL;
     }
     sm_p->msgarray = &(sm_p->msgpair);
     sm_p->msgarray_count = 1;
@@ -334,6 +335,7 @@ static int remove_crdirent_setup_msgpair(PINT_client_sm *sm_p,
     if (sm_p->msgarray && (sm_p->msgarray != &sm_p->msgpair))
     {
         free(sm_p->msgarray);
+        sm_p->msgarray = NULL;
     }
     sm_p->msgarray = &(sm_p->msgpair);
     sm_p->msgarray_count = 1;
@@ -408,6 +410,7 @@ static int remove_cleanup(PINT_client_sm *sm_p,
     if (sm_p->msgarray && (sm_p->msgarray != &sm_p->msgpair))
     {
         free(sm_p->msgarray);
+        sm_p->msgarray = NULL;
     }
 
     sm_p->op_complete = 1;
