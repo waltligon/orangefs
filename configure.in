@@ -237,6 +237,7 @@ test_for_karma()
         AC_SUBST(GTKLIBS)
         AC_SUBST(GTKCFLAGS)
         BUILD_KARMA="1"
+        AC_SUBST(BUILD_KARMA)
      else
         AC_MSG_RESULT(no)
      fi
@@ -248,13 +249,10 @@ AC_ARG_ENABLE(karma,
 [  --disable-karma        Disables optional gui.  (Enabled by default)],
 [ if test x$enableval = xyes; then
       test_for_karma
-   else
-     BUILD_KARMA="0"
    fi
 ],
 [test_for_karma]
 )
-AC_SUBST(BUILD_KARMA)
 
 dnl enables a hack to print back traces out of segfault signal handler
 AC_ARG_ENABLE(segv-backtrace,
