@@ -233,3 +233,47 @@ int job_desc_q_search_multi(job_desc_q_p jdqp, job_id_t* id_array, int*
 
 	return(0);
 }
+
+
+/* job_desc_q_dump()
+ *
+ * prints out the contents of the desired job desc queue
+ *
+ * no return value
+ */
+void job_desc_q_dump(job_desc_q_p jdqp)
+{
+	struct qlist_head* tmp_link = NULL;
+	struct job_desc* tmp_entry = NULL;
+
+	gossip_err("job_desc_q_dump():\n");
+	gossip_err("------------------\n");
+
+	/* iterate all the way through the queue */
+	qlist_for_each(tmp_link, jdqp)
+	{
+		tmp_entry = qlist_entry(tmp_link, struct job_desc,
+			job_desc_q_link);
+		gossip_err("  id: %ld.\n", (long)tmp_entry->job_id);
+		switch(tmp_entry->type)
+		{
+			case JOB_BMI:
+				gossip_err("    type: JOB_BMI.\n");
+				break;
+			case JOB_BMI_UNEXP:
+				gossip_err("    type: JOB_BMI_UNEXP.\n");
+				break;
+			case JOB_TROVE:
+				gossip_err("    type: JOB_TROVE.\n");
+				break;
+			case JOB_FLOW:
+				gossip_err("    type: JOB_FLOW.\n");
+				break;
+			case JOB_REQ_SCHED:
+				gossip_err("    type: JOB_REQ_SCHED.\n");
+				break;
+		}
+	}
+
+	return;
+}
