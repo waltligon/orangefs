@@ -49,7 +49,10 @@ w     [ \t\n]*
 <CODE>"\%\%"		{BEGIN(0);}
 
 <CODE>"machine" 	{LIST; RETURNVAL(MACHINE);}
+<CODE>"nested" 	{LIST; RETURNVAL(NESTED);}
 <CODE>"state"	 	{LIST; RETURNVAL(STATE);}
+<CODE>"extern"	 	{LIST; RETURNVAL(EXTERN);}
+<CODE>"return"	 	{LIST; RETURNVAL(STATE_RETURN);}
 <CODE>"run"			{LIST; RETURNVAL(RUN);}
 <CODE>"success"	{LIST; RETURNVAL(SUCCESS);}
 <CODE>"default"	{LIST; RETURNVAL(DEFAULT);}
