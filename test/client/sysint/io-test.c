@@ -23,7 +23,9 @@ int main(int argc,char **argv)
 	int ret = -1;
 	pvfs_mntlist mnt = {0,NULL};
 	int io_size = 1024 * 1024;
-	void* io_buffer = NULL;
+	int* io_buffer = NULL;
+	int i;
+	int errors;
 
 	if (argc != 2)
 	{
@@ -38,10 +40,15 @@ int main(int argc,char **argv)
 	}
 		
 	/* create a buffer for running I/O on */
-	io_buffer = (void*)malloc(io_size);
+	io_buffer = (int*)malloc(io_size*sizeof(int));
 	if(!io_buffer)
 	{
 		return(-1);
+	}
+
+	/* put some data in the buffer so we can verify */
+	for (i=0; i<io_size; i++) {
+		io_buffer[i]=i;
 	}
 
 	/* build the full path name (work out of the root dir for this test) */
@@ -142,7 +149,7 @@ int main(int argc,char **argv)
 	 * carry out I/O operation
 	 */
 
-	printf("IO-TEST: performing I/O on handle: %ld, fs: %d\n",
+	printf("IO-TEST: performing write on handle: %ld, fs: %d\n",
 		(long)req_io.pinode_refn.handle, (int)req_io.pinode_refn.fs_id);
 
 	req_io.credentials.uid = 100;
@@ -167,6 +174,32 @@ int main(int argc,char **argv)
 
 	printf("IO-TEST: wrote %d bytes.\n", (int)resp_io.total_completed);
 
+	/* uncomment and try out the readback-and-verify stuff that follows
+	 * once reading back actually works */
+#if 0
+	memset(req_io.buffer, 0, io_size);
+	memset(io_buffer, 0, io_size);
+
+	/* verify */
+	printf("IO-TEST: performing read on handle: %ld, fs: %d\n",
+		(long)req_io.pinode_refn.handle, (int)req_io.pinode_refn.fs_id);
+	ret = PVFS_sys_read(&req_io, &resp_io);
+	if(ret < 0)
+	{
+		fprintf(stderr, "Error: PVFS_sys_read() failure.\n");
+		return(-1);
+	}
+	printf("IO-TEST: read %d bytes.\n", (int)resp_io.total_completed);
+	for(i=0; i<(int)resp_io.total_completed; i++) {
+		if (i != ((int*)(req_io.buffer))[i] )
+			/*
+			fprintf(stder, "error: element %d differs: should be %d, is %d\n", i, i, req_io.buffer[i]); */
+			errors++;
+	}
+	if (errors != 0 ) fprintf(stderr, "ERROR: found %d errors\n", errors);
+#endif
+
+
 	/**************************************************************
 	 * shut down pending interfaces
 	 */
@@ -179,7 +212,6 @@ int main(int argc,char **argv)
 	}
 
 	free(filename);
+	free(io_buffer);
 	return(0);
 }
-
-
