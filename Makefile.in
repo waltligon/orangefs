@@ -49,6 +49,7 @@
 # define a few generic variables that we need to use
 srcdir = @srcdir@
 prefix = @prefix@
+mandir = @mandir@
 exec_prefix = @exec_prefix@
 
 VPATH = $(srcdir)
@@ -583,7 +584,13 @@ else
 endif
 endif
 
-install:
+install_doc:
+	install -d $(mandir)/man1
+	install -d $(mandir)/man5
+	install -m 644 $(srcdir)/doc/man/*.1 $(mandir)/man1
+	install -m 644 $(srcdir)/doc/man/*.5 $(mandir)/man5
+
+install: install_doc
 	install -d $(prefix)/include
 	install -m 644 $(srcdir)/include/pvfs2.h $(prefix)/include
 	install -m 644 $(srcdir)/include/pvfs2-request.h $(prefix)/include
