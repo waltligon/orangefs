@@ -1074,7 +1074,7 @@ static int dbpf_dspace_test(TROVE_coll_id coll_id,
     dbpf_queued_op_put(cur_op, 0);
     gossip_debug(TROVE_DEBUG,
                  "dbpf_dspace_test returning no progress.\n");
-    sleep(1);
+    usleep((max_idle_time_ms * 1000));
     return 0;
 #endif
 }
@@ -1088,9 +1088,121 @@ int dbpf_dspace_testcontext(
     TROVE_context_id context_id)
 {
     int ret = 0;
+    dbpf_queued_op_t *cur_op = NULL;
+#ifdef __PVFS2_TROVE_THREADED__
+    int already_rechecked = 0;
+    int out_count = 0, limit = *inout_count_p;
+    gen_mutex_t *context_mutex = NULL;
+    void **user_ptr_p = NULL;
 
-    assert(0);
+    assert(dbpf_completion_queue_array[context_id]);
 
+    context_mutex = dbpf_completion_queue_array_mutex[context_id];
+    assert(context_mutex);
+
+    assert(inout_count_p);
+    *inout_count_p = 0;
+
+    /*
+      check completion queue for any completed ops and return
+      them in the provided ds_id_array (up to inout_count_p).
+      otherwise, cond_timedwait for max_idle_time_ms.
+
+      even if we fill some outgoing completed ops, we'll wait
+      for up to max_idle_time_ms, for any more completions to
+      occur and check again (assuming out_count < limit).
+    */
+  check_completion_queue:
+    if (!dbpf_op_queue_empty(dbpf_completion_queue_array[context_id]))
+    {
+        cur_op = dbpf_op_queue_shownext(
+            dbpf_completion_queue_array[context_id]);
+        assert(cur_op);
+        assert(cur_op->op.state == OP_COMPLETED);
+
+        /* pull the op out of the context specific completion queue */
+        gen_mutex_lock(context_mutex);
+        dbpf_op_queue_remove(cur_op);
+        gen_mutex_unlock(context_mutex);
+
+        state_array[out_count] = cur_op->state;
+
+        user_ptr_p = &user_ptr_array[out_count];
+        if (user_ptr_p != NULL)
+        {
+            *user_ptr_p = cur_op->op.user_ptr;
+        }
+        dbpf_queued_op_free(cur_op);
+
+        if (++out_count < limit)
+        {
+            goto check_completion_queue;
+        }
+    }
+    else if (!already_rechecked)
+    {
+        struct timeval base;
+        struct timespec wait_time;
+
+        /* compute how long to wait */
+        gettimeofday(&base, NULL);
+        wait_time.tv_sec = base.tv_sec +
+            (max_idle_time_ms / 1000);
+        wait_time.tv_nsec = base.tv_usec * 1000 + 
+            ((max_idle_time_ms % 1000) * 1000000);
+        if (wait_time.tv_nsec > 1000000000)
+        {
+            wait_time.tv_nsec = wait_time.tv_nsec - 1000000000;
+            wait_time.tv_sec++;
+        }
+
+        gen_mutex_lock(context_mutex);
+        ret = pthread_cond_timedwait(&dbpf_op_completed_cond,
+                                     context_mutex, &wait_time);
+        gen_mutex_unlock(context_mutex);
+
+        if (ret != ETIMEDOUT)
+        {
+            /*
+              since we were signaled awake (rather than timed out
+              while sleeping), we're going to rescan ops here for
+              completion.  if nothing completes the second time
+              around, we're giving up and won't be back here.
+            */
+            already_rechecked = 1;
+
+            goto check_completion_queue;
+        }
+    }
+    *inout_count_p = out_count;
+    ret = 0;
+#else
+    /*
+      without threads, we're going to just test the
+      first operation we can get our hands on in the
+      operation queue.  so we grab the trove id of the
+      next op from the op queue and test it for
+      completion here.
+    */
+    gen_mutex_lock(&dbpf_op_queue_mutex);
+    cur_op = dbpf_op_queue_shownext(&dbpf_op_queue);
+    gen_mutex_unlock(&dbpf_op_queue_mutex);
+
+    if (cur_op)
+    {
+        ret = dbpf_dspace_test(
+            coll_id, cur_op->op.id, context_id, inout_count_p, NULL,
+            &(user_ptr_array[0]), &(state_array[0]), max_idle_time_ms);
+    }
+    else
+    {
+        /*
+          if there's no op to service, just return.
+          just waste time away for now
+        */
+        usleep((max_idle_time_ms * 1000));
+    }
+#endif
     return ret;
 }
 
