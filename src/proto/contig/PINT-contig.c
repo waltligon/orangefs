@@ -40,7 +40,7 @@ int do_encode_calc_max_size(
 void init_contig(
     void);
 
-PINT_encoding_functions_s contig_buffer_functions = {
+PINT_encoding_functions contig_buffer_functions = {
     do_encode_req,
     do_encode_resp,
     do_decode_req,
@@ -50,7 +50,7 @@ PINT_encoding_functions_s contig_buffer_functions = {
     do_encode_calc_max_size
 };
 
-PINT_encoding_table_values_s contig_buffer_table = {
+PINT_encoding_table_values contig_buffer_table = {
     &contig_buffer_functions,
     "Contiguous",
     init_contig

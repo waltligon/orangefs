@@ -18,7 +18,7 @@
 #include "pint-distribution.h"
 #include "pint-request.h"
 
-extern PINT_encoding_table_values_s contig_buffer_table;
+extern PINT_encoding_table_values contig_buffer_table;
 
 int do_encode_req(
     struct PVFS_server_req *request,

@@ -16,7 +16,7 @@
 #include "PINT-reqproto-module.h"
 #include "pint-distribution.h"
 
-extern PINT_encoding_table_values_s contig_buffer_table;
+extern PINT_encoding_table_values contig_buffer_table;
 
 /* do_encode_resp()
  * 

@@ -212,7 +212,7 @@ static int lebf_encode_alloc_req(
     struct PINT_encoded_msg* target_msg);
     
 
-static PINT_encoding_functions_s lebf_functions = {
+static PINT_encoding_functions lebf_functions = {
     lebf_encode_req,
     lebf_encode_resp,
     lebf_decode_req,
@@ -222,7 +222,7 @@ static PINT_encoding_functions_s lebf_functions = {
     lebf_encode_calc_max_size
 };
 
-PINT_encoding_table_values_s le_bytefield_table = {
+PINT_encoding_table_values le_bytefield_table = {
     &lebf_functions,
     "little endian bytefield",
     lebf_initialize

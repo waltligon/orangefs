@@ -17,11 +17,11 @@
 
 #define ENCODING_TABLE_SIZE 5
 
-extern PINT_encoding_table_values_s contig_buffer_table;
-extern PINT_encoding_table_values_s le_bytefield_table;
+extern PINT_encoding_table_values contig_buffer_table;
+extern PINT_encoding_table_values le_bytefield_table;
 int g_admin_mode = 0;
 
-PINT_encoding_table_values_s *PINT_encoding_table[ENCODING_TABLE_SIZE] = {NULL};
+PINT_encoding_table_values *PINT_encoding_table[ENCODING_TABLE_SIZE] = {NULL};
 
 /* PINT_encode_initialize()
  *

@@ -10,7 +10,7 @@
 #define PINT_ENCODING_MODULE_H
 
 /*defines the interface to the encoding modules */
-typedef struct PINT_encoding_functions
+typedef struct
 {
     int (*encode_req) (
 	struct PVFS_server_req * request,
@@ -37,20 +37,20 @@ typedef struct PINT_encoding_functions
     int (*encode_calc_max_size) (
 	enum PINT_encode_msg_type input_type,
 	enum PVFS_server_op op_type);
-} PINT_encoding_functions_s;
+} PINT_encoding_functions;
 
 /* size of generic header placed at the beginning of all encoded buffers;
  * indicates encoding type and protocol version
  */
 #define PINT_ENC_GENERIC_HEADER_SIZE 8
 
-typedef struct PINT_encoding_table_values
+typedef struct
 {
-    PINT_encoding_functions_s *op;
+    PINT_encoding_functions *op;
     char *name;
     void (*init_fun) (void);
     char generic_header[PINT_ENC_GENERIC_HEADER_SIZE];
-} PINT_encoding_table_values_s;
+} PINT_encoding_table_values;
 
 #endif /* PINT_ENCODING_MODULE_H */
 
