@@ -33,13 +33,14 @@ int main(int argc, char **argv)
     TROVE_keyval_s key, val;
     char *method_name, *file_name;
     char path_name[PATH_SIZE];
-	 job_id_t foo_id;
-	 job_status_s job_stat;
-	 char buffer1[BUF_SIZE];
-	 char buffer2[BUF_SIZE];
-	 char testkey[] = "foo";
-	job_context_id context;
-
+    job_id_t foo_id;
+    job_status_s job_stat;
+    char buffer1[BUF_SIZE];
+    char buffer2[BUF_SIZE];
+    char testkey[] = "foo";
+    job_context_id context;
+    TROVE_extent cur_extent;
+    TROVE_handle_extent_array extent_array;
 
     ret = parse_args(argc, argv);
     if (ret < 0) {
@@ -127,11 +128,11 @@ int main(int argc, char **argv)
     /* TODO: verify that this is in fact a directory! */
     
     /* Q: how do I know what handle to use for the new file? */
-    file_handle = requested_file_handle;
-
-    /* create the new dspace */
+    cur_extent.first = cur_extent.last = requested_file_handle;
+    extent_array.extent_count = 1;
+    extent_array.extent_array = &cur_extent;
 	ret = job_trove_dspace_create(coll_id,
-		file_handle, 
+		&extent_array,
 		TROVE_TEST_FILE,
 		NULL,
 		NULL,

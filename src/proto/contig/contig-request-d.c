@@ -65,13 +65,23 @@ int do_decode_req(
     case PVFS_SERV_CREATE:
 	char_ptr += sizeof(struct PVFS_server_req);
         dec_msg->u.create.handle_extent_array.extent_count =
-            *char_ptr;
+            *((int *)char_ptr);
         dec_msg->u.create.handle_extent_array.extent_array =
             (PVFS_handle_extent *)((char *)char_ptr + sizeof(int));
         return (0);
 
     case PVFS_SERV_MKDIR:
 	char_ptr += sizeof(struct PVFS_server_req);
+
+        dec_msg->u.mkdir.handle_extent_array.extent_count =
+            *((int *)char_ptr);
+        char_ptr += sizeof(int);
+
+        dec_msg->u.mkdir.handle_extent_array.extent_array =
+            (PVFS_handle_extent *)char_ptr;
+        char_ptr += (dec_msg->u.mkdir.handle_extent_array.extent_count *
+                     sizeof(PVFS_handle_extent));
+
 	if (dec_msg->u.mkdir.attr.objtype == PVFS_TYPE_METAFILE)
 	{
 	    dec_msg->u.mkdir.attr.u.meta.dfile_array = (PVFS_handle *) char_ptr;

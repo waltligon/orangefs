@@ -100,7 +100,9 @@ void display_pvfs_structure(void *s,int r)
 				break;
 			case PVFS_SERV_MKDIR:
 				printf("Mkdir Req\n");
-				printf("Requested Handle: %Ld\n",p->u.mkdir.requested_handle);
+				printf("Num Requested Handle Ranges: %d\n",
+                                       p->u.mkdir.handle_extent_array.extent_count);
+                                /* todo: print the ranges */
 				printf("FSid: %d\n",p->u.mkdir.fs_id);
 				printf("Attribs:\n");
 				dump_attribs(p->u.mkdir.attr);

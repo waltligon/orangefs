@@ -9,10 +9,10 @@
 #include <stdio.h>
 #include <getopt.h>
 
-#include <trove.h>
-#include <trove-test.h>
-#include <job.h>
-#include <job-help.h>
+#include "trove.h"
+#include "trove-test.h"
+#include "job.h"
+#include "job-help.h"
 
 char storage_space[SSPACE_SIZE] = "/tmp/trove-test-space";
 char file_system[FS_SIZE] = "fs-foo";

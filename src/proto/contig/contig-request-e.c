@@ -197,11 +197,22 @@ int do_encode_req(
         return (0);
 
     case PVFS_SERV_MKDIR:
-	size =
-	    sizeof(struct PVFS_server_req) + sizeof(struct PVFS_object_attr) +
+	size = sizeof(struct PVFS_server_req) +
+            sizeof(struct PVFS_object_attr) + sizeof(int) +
 	    PINT_ENC_GENERIC_HEADER_SIZE;
 
-	/* if we're mkdir'ing a meta file, we need to alloc space for the attributes */
+
+        /*
+          we need to alloc space for the variably sized handle
+          extent array.
+        */
+        size += (request->u.mkdir.handle_extent_array.extent_count *
+                 sizeof(PVFS_handle_extent));
+
+	/*
+          if we're mkdir'ing a meta file, we need to alloc
+          space for the attributes
+        */
 	if (request->u.mkdir.attr.objtype == PVFS_TYPE_METAFILE)
 	{
 	    size +=
@@ -225,12 +236,20 @@ int do_encode_req(
 	    PINT_ENC_GENERIC_HEADER_SIZE);
 	enc_msg = (void*)((char*)enc_msg + PINT_ENC_GENERIC_HEADER_SIZE);
 	memcpy(enc_msg, request, sizeof(struct PVFS_server_req));
+        *((int *)((char *)enc_msg + sizeof(struct PVFS_server_req))) =
+            request->u.mkdir.handle_extent_array.extent_count;
+        memcpy(enc_msg + sizeof(struct PVFS_server_req) + sizeof(int),
+               request->u.mkdir.handle_extent_array.extent_array,
+               (request->u.mkdir.handle_extent_array.extent_count *
+                sizeof(PVFS_handle_extent)));
 
 	/* throw handles at the end for metadata files */
 	if (request->u.mkdir.attr.objtype == PVFS_TYPE_METAFILE)
 	{
 	    /* handles */
-	    memcpy(enc_msg + sizeof(struct PVFS_server_req),
+	    memcpy((enc_msg + sizeof(struct PVFS_server_req) + sizeof(int) +
+                   (request->u.mkdir.handle_extent_array.extent_count *
+                    sizeof(PVFS_handle_extent))),
 		   request->u.mkdir.attr.u.meta.dfile_array,
 		   request->u.mkdir.attr.u.meta.dfile_count *
 		   sizeof(PVFS_handle));

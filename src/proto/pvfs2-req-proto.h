@@ -167,10 +167,16 @@ struct PVFS_servresp_lookup_path
 
 struct PVFS_servreq_mkdir
 {
-    /* suggestion for what handle to use */
-    PVFS_handle requested_handle;
     PVFS_fs_id fs_id;		    /* file system */
     PVFS_object_attr attr;	    /* initial attributes */
+
+    /*
+      an array of handle extents that we use to suggest to
+      the server from which handle range to allocate for the
+      newly created handle(s).  To request a single handle,
+      a single extent with first = last should be used.
+    */
+    PVFS_handle_extent_array handle_extent_array;
 };
 
 struct PVFS_servresp_mkdir

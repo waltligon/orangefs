@@ -53,6 +53,7 @@ int main(int argc, char **argv)	{
 	bmi_error_code_t error_code;
 	bmi_size_t actual_size;
 	bmi_context_id context;
+        PVFS_handle_extent cur_extent;
 
 	/* grab any command line options */
 	user_opts = parse_args(argc, argv);
@@ -104,7 +105,9 @@ int main(int argc, char **argv)	{
 	my_req->credentials.gid = 0;
 	/* TODO: fill below fields in with the correct values */
 	my_req->credentials.perms = PVFS_U_WRITE | PVFS_U_READ;  
-	my_req->u.mkdir.requested_handle = user_opts->handle;
+        cur_extent.first = cur_extent.last = user_opts->handle;
+        my_req->u.mkdir.handle_extent_array.extent_count = 1;
+        my_req->u.mkdir.handle_extent_array.extent_array = &cur_extent;
 	my_req->u.mkdir.fs_id = TROVE_FS_ID;
 
 	/* send the initial request on its way */

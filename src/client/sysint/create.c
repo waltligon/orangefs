@@ -43,7 +43,6 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 	PVFS_msg_tag_t op_tag;
 	bmi_size_t max_msg_sz;
 	int old_ret = -1;
-        PVFS_handle_extent_array meta_handle_extent_array;
 
 	enum {
 	    NONE_FAILURE = 0,
@@ -170,7 +169,7 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 	ret = PINT_bucket_get_next_meta(&g_server_config,
                                         parent_refn.fs_id,
                                         &serv_addr1,
-                                        &meta_handle_extent_array);
+                                        &req_p.u.create.handle_extent_array);
 	if (ret < 0)
 	{
 	    failure = LOOKUP_SERVER_FAILURE;
@@ -180,10 +179,10 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 	/* send the create request for the meta file */
 	req_p.op = PVFS_SERV_CREATE;
 	req_p.credentials = credentials;
-	req_p.u.create.handle_extent_array.extent_count =
-            meta_handle_extent_array.extent_count;
-	req_p.u.create.handle_extent_array.extent_array =
-            meta_handle_extent_array.extent_array;
+        /*
+          NOTE: handle_extent_array is filled in above in the call
+          to PINT_bucket_get_next_meta
+        */
 	req_p.u.create.fs_id = parent_refn.fs_id;
 
 	/* Q: is this sane?  pretty sure we're creating meta files here, but do 

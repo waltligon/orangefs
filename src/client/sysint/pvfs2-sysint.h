@@ -268,54 +268,145 @@ enum PVFS_sys_io_type
  * a function per system operation anyway, so what we're really doing is
  * avoiding an extra function call.
  */
-int PVFS_sys_initialize(pvfs_mntlist mntent_list, PVFS_sysresp_init *resp);
+int PVFS_sys_initialize(
+    pvfs_mntlist mntent_list,
+    PVFS_sysresp_init *resp);
+
 int PVFS_sys_finalize(void);
-int PVFS_sys_lookup(PVFS_fs_id fs_id, char* name, PVFS_credentials 
-		credentials, PVFS_sysresp_lookup *resp);
-int PVFS_sys_getattr(PVFS_pinode_reference pinode_refn, uint32_t attrmask, 
-		PVFS_credentials credentials, PVFS_sysresp_getattr *resp);
-int PVFS_sys_setattr(PVFS_pinode_reference pinode_refn, PVFS_sys_attr attr,
-		PVFS_credentials credentials);
-int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn, 
-		PVFS_sys_attr attr, 
-		PVFS_credentials credentials, PVFS_sysresp_mkdir *resp);
-int PVFS_sys_readdir(PVFS_pinode_reference pinode_refn, PVFS_ds_position token, 
-		int pvfs_dirent_incount, PVFS_credentials credentials, 
-		PVFS_sysresp_readdir *resp);
-int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn, 
-		PVFS_sys_attr attr, 
-		PVFS_credentials credentials, PVFS_sysresp_create *resp);
-int PVFS_sys_remove(char* entry_name, PVFS_pinode_reference parent_refn, 
-		PVFS_credentials credentials);
-int PVFS_sys_rename(char* old_entry, PVFS_pinode_reference old_parent_refn, 
-		char* new_entry, PVFS_pinode_reference new_parent_refn, 
-		PVFS_credentials credentials);
-int PVFS_sys_symlink(PVFS_fs_id fs_id, char* name, char* target, 
-		PVFS_sys_attr attr, 
-		PVFS_credentials credentials, PVFS_sysresp_symlink *resp);
-int PVFS_sys_readlink(PVFS_pinode_reference pinode_refn, 
-		PVFS_credentials credentials, PVFS_sysresp_readlink *resp);
-int PVFS_sys_io(PVFS_pinode_reference pinode_refn, PVFS_Request io_req, 
-		PVFS_offset io_req_offset, void* buffer, PVFS_size 
-		buffer_size, PVFS_credentials credentials, 
-		PVFS_sysresp_io *resp, enum PVFS_sys_io_type type);
-#define PVFS_sys_read(x1,x2,x3,x4,x5,x6,y) PVFS_sys_io(x1,x2,x3,x4,x5,x6,y,PVFS_SYS_IO_READ)
-#define PVFS_sys_write(x1,x2,x3,x4,x5,x6,y) PVFS_sys_io(x1,x2,x3,x4,x5,x6,y,PVFS_SYS_IO_WRITE)
-int PVFS_sys_allocate(PVFS_pinode_reference pinode_refn, PVFS_size size);
-int PVFS_sys_truncate(PVFS_pinode_reference pinode_refn, PVFS_size size, 
-		PVFS_credentials credentials);
-int PVFS_sys_duplicate(PVFS_fs_id fs_id, PVFS_pinode_reference old_reference, 
-		char* new_entry, PVFS_pinode_reference new_parent_reference, 
-		PVFS_sysresp_duplicate *resp);
-int PVFS_sys_lock(PVFS_pinode_reference pinode_refn, PVFS_credentials credentials,
-		PVFS_sysresp_lock *resp);
-int PVFS_sys_unlock(PVFS_pinode_reference pinode_refn, PVFS_credentials credentials);
-int PVFS_sys_statfs(PVFS_fs_id fs_id, PVFS_credentials credentials,
-		PVFS_sysresp_statfs *resp);
-int PVFS_sys_config(PVFS_handle handle, PVFS_sysresp_config *resp);
-int PVFS_sys_hint(int undefined,  PVFS_sysresp_hint *resp);
-int PVFS_sys_extension(int undefined, PVFS_sysresp_extension *resp);
-int PVFS_sys_getparent(PVFS_fs_id fs_id, char *entry_name, 
-		PVFS_credentials credentials, PVFS_sysresp_getparent *resp);
+
+int PVFS_sys_ref_lookup(
+    PVFS_fs_id fs_id,
+    char* relative_pathname,
+    PVFS_pinode_reference parent,
+    PVFS_credentials credentials,
+    PVFS_sysresp_lookup *resp);
+
+int PVFS_sys_lookup(
+    PVFS_fs_id fs_id,
+    char* name,
+    PVFS_credentials 
+    credentials,
+    PVFS_sysresp_lookup *resp);
+
+int PVFS_sys_getattr(
+    PVFS_pinode_reference pinode_refn,
+    uint32_t attrmask, 
+    PVFS_credentials credentials,
+    PVFS_sysresp_getattr *resp);
+
+int PVFS_sys_setattr(
+    PVFS_pinode_reference pinode_refn,
+    PVFS_sys_attr attr,
+    PVFS_credentials credentials);
+
+int PVFS_sys_mkdir(
+    char* entry_name,
+    PVFS_pinode_reference parent_refn, 
+    PVFS_sys_attr attr, 
+    PVFS_credentials credentials,
+    PVFS_sysresp_mkdir *resp);
+
+int PVFS_sys_readdir(
+    PVFS_pinode_reference pinode_refn,
+    PVFS_ds_position token, 
+    int pvfs_dirent_incount,
+    PVFS_credentials credentials, 
+    PVFS_sysresp_readdir *resp);
+
+int PVFS_sys_create(
+    char* entry_name,
+    PVFS_pinode_reference parent_refn, 
+    PVFS_sys_attr attr, 
+    PVFS_credentials credentials,
+    PVFS_sysresp_create *resp);
+
+int PVFS_sys_remove(
+    char* entry_name,
+    PVFS_pinode_reference parent_refn, 
+    PVFS_credentials credentials);
+
+int PVFS_sys_rename(
+    char* old_entry,
+    PVFS_pinode_reference old_parent_refn, 
+    char* new_entry,
+    PVFS_pinode_reference new_parent_refn, 
+    PVFS_credentials credentials);
+
+int PVFS_sys_symlink(
+    PVFS_fs_id fs_id,
+    char* name,
+    char* target, 
+    PVFS_sys_attr attr, 
+    PVFS_credentials credentials,
+    PVFS_sysresp_symlink *resp);
+
+int PVFS_sys_readlink(
+    PVFS_pinode_reference pinode_refn, 
+    PVFS_credentials credentials,
+    PVFS_sysresp_readlink *resp);
+
+int PVFS_sys_io(
+    PVFS_pinode_reference pinode_refn,
+    PVFS_Request io_req, 
+    PVFS_offset io_req_offset,
+    void* buffer,
+    PVFS_size buffer_size,
+    PVFS_credentials credentials, 
+    PVFS_sysresp_io *resp,
+    enum PVFS_sys_io_type type);
+
+#define PVFS_sys_read(x1,x2,x3,x4,x5,x6,y) \
+PVFS_sys_io(x1,x2,x3,x4,x5,x6,y,PVFS_SYS_IO_READ)
+
+#define PVFS_sys_write(x1,x2,x3,x4,x5,x6,y) \
+PVFS_sys_io(x1,x2,x3,x4,x5,x6,y,PVFS_SYS_IO_WRITE)
+
+int PVFS_sys_allocate(
+    PVFS_pinode_reference pinode_refn,
+    PVFS_size size);
+
+int PVFS_sys_truncate(
+    PVFS_pinode_reference pinode_refn,
+    PVFS_size size, 
+    PVFS_credentials credentials);
+
+int PVFS_sys_duplicate(
+    PVFS_fs_id fs_id,
+    PVFS_pinode_reference old_reference, 
+    char* new_entry,
+    PVFS_pinode_reference new_parent_reference, 
+    PVFS_sysresp_duplicate *resp);
+
+int PVFS_sys_lock(
+    PVFS_pinode_reference pinode_refn,
+    PVFS_credentials credentials,
+    PVFS_sysresp_lock *resp);
+
+int PVFS_sys_unlock(
+    PVFS_pinode_reference pinode_refn,
+    PVFS_credentials credentials);
+
+int PVFS_sys_statfs(
+    PVFS_fs_id fs_id,
+    PVFS_credentials credentials,
+    PVFS_sysresp_statfs *resp);
+
+int PVFS_sys_config(
+    PVFS_handle handle,
+    PVFS_sysresp_config *resp);
+
+int PVFS_sys_hint(
+    int undefined,
+    PVFS_sysresp_hint *resp);
+
+int PVFS_sys_extension(
+    int undefined,
+    PVFS_sysresp_extension *resp);
+
+int PVFS_sys_getparent(
+    PVFS_fs_id fs_id,
+    char *entry_name, 
+    PVFS_credentials credentials,
+    PVFS_sysresp_getparent *resp);
 
 #endif

@@ -68,12 +68,14 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
         extent_array->extent_count;
     q_op_p->op.u.d_create.extent_array.extent_array =
         malloc(extent_array->extent_count * sizeof(TROVE_extent));
-    if (q_op_p->op.u.d_create.extent_array.extent_array == NULL) return -1;
+
+    if (q_op_p->op.u.d_create.extent_array.extent_array == NULL)
+        return -1;
 
     memcpy(q_op_p->op.u.d_create.extent_array.extent_array,
            extent_array->extent_array,
            extent_array->extent_count * sizeof(TROVE_extent));
-    
+
     q_op_p->op.u.d_create.out_handle_p = handle_p;
     q_op_p->op.u.d_create.type         = type;
 
