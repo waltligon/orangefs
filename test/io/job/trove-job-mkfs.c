@@ -29,6 +29,7 @@ int main(int argc, char **argv)
     char *method_name;
 	 job_status_s job_stat;
 	 job_id_t foo_id;
+	job_context_id context;
 
     char root_handle_string[] = ROOT_HANDLE_STRING;
 
@@ -60,6 +61,14 @@ int main(int argc, char **argv)
 		return(-1);
 	}
 
+	ret = job_open_context(&context);
+	if(ret < 0)
+	{
+		fprintf(stderr, "job_open_context() failure.\n");
+		return(-1);
+	}
+
+
     /* try to initialize; fails if storage space isn't there? */
     ret = trove_initialize(storage_space, 0, &method_name, 0);
     if (ret < 0) {
@@ -82,7 +91,8 @@ int main(int argc, char **argv)
     }
 
 	/* try to look up collection used to store file system */
-	ret = job_trove_fs_lookup(file_system, NULL, &job_stat, &foo_id);
+	ret = job_trove_fs_lookup(file_system, NULL, &job_stat, &foo_id,
+	context);
 	if(ret == 1 && job_stat.error_code == 0)
 	{
 		fprintf(stderr, "collection lookup succeeded before it should.\n");
@@ -90,7 +100,7 @@ int main(int argc, char **argv)
 	}
 	if(ret == 0)
 	{
-		ret = block_on_job(foo_id, NULL, &job_stat);
+		ret = block_on_job(foo_id, NULL, &job_stat, context);
 		if(ret == 0)
 		{
 			fprintf(stderr, "collection lookup succeeded before it should (at job_test()).\n");
@@ -100,7 +110,7 @@ int main(int argc, char **argv)
 
 	/* create the collection */
 	ret = job_trove_fs_create(file_system, FS_COLL_ID, NULL,
-		&job_stat, &foo_id);
+		&job_stat, &foo_id, context);
 	if(ret < 0)
 	{
 		fprintf(stderr, "fs create failed.\n");
@@ -108,7 +118,7 @@ int main(int argc, char **argv)
 	}
 	if(ret == 0)
 	{
-		ret = block_on_job(foo_id, NULL, &job_stat);
+		ret = block_on_job(foo_id, NULL, &job_stat, context);
 		if(ret < 0)
 		{
 			fprintf(stderr, "fs create failed (at job_test()).\n");
@@ -124,7 +134,8 @@ int main(int argc, char **argv)
     /* lookup collection.  this is redundant because we just gave it a coll. id to use,
      * but it's a good test i guess...
      */
-	ret = job_trove_fs_lookup(file_system, NULL, &job_stat, &foo_id);
+	ret = job_trove_fs_lookup(file_system, NULL, &job_stat, &foo_id,
+	context);
 	if(ret < 0)
 	{
 		fprintf(stderr, "collection lookup failed.\n");
@@ -132,7 +143,7 @@ int main(int argc, char **argv)
 	}
 	if(ret == 0)
 	{
-		ret = block_on_job(foo_id, NULL, &job_stat);
+		ret = block_on_job(foo_id, NULL, &job_stat, context);
 		if(ret < 0)
 		{
 			fprintf(stderr, "collection lookup failed (at job_test()).\n");
@@ -159,7 +170,8 @@ int main(int argc, char **argv)
 		NULL,
 		NULL,
 		&job_stat,
-		&foo_id);
+		&foo_id,
+		context);
 	if(ret < 0)
 	{
 		fprintf(stderr, "job_trove_dspace_create() failure.\n");
@@ -167,7 +179,7 @@ int main(int argc, char **argv)
 	}
 	if(ret == 0)
 	{
-		ret = block_on_job(foo_id, NULL, &job_stat);
+		ret = block_on_job(foo_id, NULL, &job_stat, context);
 		if(ret < 0)
 		{
 			fprintf(stderr, "dspace_create failed (at job_test()).\n");
@@ -191,7 +203,7 @@ int main(int argc, char **argv)
     val.buffer_sz = sizeof(root_handle);
 
 	ret = job_trove_fs_seteattr(coll_id, &key, &val, 0, NULL,
-		&job_stat, &foo_id);
+		&job_stat, &foo_id, context);
 	if(ret < 0)
 	{
 		fprintf(stderr, "job_trove_fs_seteattr() failure.\n");
@@ -199,7 +211,7 @@ int main(int argc, char **argv)
 	}
 	if(ret == 0)
 	{
-		ret = block_on_job(foo_id, NULL, &job_stat);
+		ret = block_on_job(foo_id, NULL, &job_stat, context);
 		if(ret < 0)
 		{
 			fprintf(stderr, "fs_seteattr failed (at job_test()).\n");
@@ -214,6 +226,7 @@ int main(int argc, char **argv)
 
     /* add attribute to collection for last used handle ??? */
 
+	job_close_context(context);
 	 job_finalize();
 	 trove_finalize();
     

@@ -4,6 +4,6 @@
 #include <job.h>
 
 int block_on_job(job_id_t id, void** returned_user_ptr,
-	job_status_s* out_status_p);
+	job_status_s* out_status_p, job_context_id context);
 
 #endif /* JOB_HELP_H */

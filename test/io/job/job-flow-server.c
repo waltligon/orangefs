@@ -20,7 +20,8 @@
 
 
 int TEST_SIZE=1024*1024*20; /* 20M */
-static int block_on_flow(flow_descriptor* flow_d);
+static int block_on_flow(flow_descriptor* flow_d, job_context_id
+	context);
 static double Wtime(void);
 
 int main(int argc, char **argv)	
@@ -34,6 +35,7 @@ int main(int argc, char **argv)
 	int i;
 	PINT_Request* req;
 	PINT_Request_file_data file_data;
+	job_context_id context;
 
 	/*************************************************************/
 	/* initialization stuff */
@@ -64,6 +66,14 @@ int main(int argc, char **argv)
 		fprintf(stderr, "job init failure.\n");
 		return(-1);
 	}
+
+	ret = job_open_context(&context);
+	if(ret < 0)
+	{
+		fprintf(stderr, "job_open_context() failure.\n");
+		return(-1);
+	}
+
 
 	/* wait for an initial communication via BMI */
 	/* we don't give a crap about that message except that it tells us
@@ -148,7 +158,7 @@ int main(int argc, char **argv)
 	 */
 
 	time1 = Wtime();
-	ret = block_on_flow(flow_d);
+	ret = block_on_flow(flow_d, context);
 	if(ret < 0)
 	{
 		return(-1);
@@ -177,6 +187,7 @@ int main(int argc, char **argv)
 		}
 	}
 
+	job_close_context(context);
 	job_finalize();
 
 	/* shut down flow interface */
@@ -194,14 +205,15 @@ int main(int argc, char **argv)
 	return(0);
 }
 
-static int block_on_flow(flow_descriptor* flow_d)
+static int block_on_flow(flow_descriptor* flow_d, job_context_id
+	context)
 {
 	int ret = -1;
 	int count = 0;
 	job_status_s tmp_stat;
 	job_id_t tmp_id;
 
-	ret = job_flow(flow_d, NULL, &tmp_stat, &tmp_id);
+	ret = job_flow(flow_d, NULL, &tmp_stat, &tmp_id, context);
 	if(ret == 1)
 	{
 		return(0);
@@ -212,7 +224,7 @@ static int block_on_flow(flow_descriptor* flow_d)
 		return(ret);
 	}
 
-	ret = job_test(tmp_id, &count, NULL, &tmp_stat, -1);
+	ret = job_test(tmp_id, &count, NULL, &tmp_stat, -1, context);
 	if(ret < 0)
 	{
 		fprintf(stderr, "flow_test failure.\n");

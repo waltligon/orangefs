@@ -30,6 +30,7 @@ int main(int argc, char **argv)
     char *method_name;
 	 job_id_t foo_id;
 	 job_status_s job_stat;
+	job_context_id context;
 
 
     ret = parse_args(argc, argv);
@@ -66,8 +67,17 @@ int main(int argc, char **argv)
 		return(-1);
 	}
 
+	ret = job_open_context(&context);
+	if(ret < 0)
+	{
+		fprintf(stderr, "job_open_context() failure.\n");
+		return(-1);
+	}
+
+
     /* try to look up collection used to store file system */
-	ret = job_trove_fs_lookup(file_system, NULL, &job_stat, &foo_id);
+	ret = job_trove_fs_lookup(file_system, NULL, &job_stat, &foo_id,
+	context);
 	if(ret < 0)
 	{
 		fprintf(stderr, "fs lookup failed.\n");
@@ -75,7 +85,7 @@ int main(int argc, char **argv)
 	}
 	if(ret == 0)
 	{
-		ret = block_on_job(foo_id, NULL, &job_stat);
+		ret = block_on_job(foo_id, NULL, &job_stat, context);
 		if(ret < 0)
 		{
 			fprintf(stderr, "fs lookup failed (at job_test()).\n");
@@ -104,7 +114,8 @@ int main(int argc, char **argv)
 			NULL,
 			NULL,
 			&job_stat,
-			&foo_id);
+			&foo_id,
+			context);
 		if(ret < 0)
 		{
 			fprintf(stderr, "job_trove_dspace_create() failure.\n");
@@ -112,7 +123,8 @@ int main(int argc, char **argv)
 		}
 		if(ret == 0)
 		{
-			ret = block_on_job(foo_id, NULL, &job_stat);
+			ret = block_on_job(foo_id, NULL, &job_stat,
+			context);
 			if(ret < 0)
 			{
 				fprintf(stderr, "dspace_create failed (at job_test()).\n");
@@ -128,6 +140,9 @@ int main(int argc, char **argv)
 		printf("trove created handle: %ld\n",
 			(long)job_stat.handle);
 	}
+
+	job_close_context(context);
+	job_finalize();
 
     return 0;
 }

@@ -34,6 +34,7 @@ int main(int argc, char **argv)
 	bmi_addr_t server_addr;
 	job_status_s status1;
 	job_id_t tmp_id;
+	job_context_id context;
 
 	/* set debugging level */
 	gossip_enable_stderr();
@@ -63,6 +64,13 @@ int main(int argc, char **argv)
 		return(-1);
 	}
 
+	ret = job_open_context(&context);
+	if(ret < 0)
+	{
+		fprintf(stderr, "job_open_context() failure.\n");
+		return(-1);
+	}
+
 	/* lookup the server to get a BMI style address for it */
 	ret = BMI_addr_lookup(&server_addr, "tcp://localhost:3414");
 	if(ret < 0)
@@ -84,7 +92,7 @@ int main(int argc, char **argv)
 
 	/* send a message */
 	ret = job_bmi_send(server_addr, req, sizeof(struct request_foo),
-		0, BMI_PRE_ALLOC, 1, NULL, &status1, &tmp_id);
+		0, BMI_PRE_ALLOC, 1, NULL, &status1, &tmp_id, context);
 	if(ret < 0)
 	{
 		fprintf(stderr, "job_bmi_send() failure.\n");
@@ -93,7 +101,7 @@ int main(int argc, char **argv)
 	if(ret == 0)
 	{
 		int count = 0;
-		ret = job_test(tmp_id, &count, NULL, &status1, -1);
+		ret = job_test(tmp_id, &count, NULL, &status1, -1, context);
 		if(ret < 0)
 		{
 			fprintf(stderr, "job_test() failure.\n");
@@ -110,7 +118,7 @@ int main(int argc, char **argv)
 
 	/* receive a message */
 	ret = job_bmi_recv(server_addr, ack, sizeof(struct ack_foo),
-		0, BMI_PRE_ALLOC, NULL, &status1, &tmp_id);
+		0, BMI_PRE_ALLOC, NULL, &status1, &tmp_id, context);
 	if(ret < 0)
 	{
 		fprintf(stderr, "job_bmi_recv() failure.\n");
@@ -119,7 +127,7 @@ int main(int argc, char **argv)
 	if(ret == 0)
 	{
 		int count = 0;
-		ret = job_test(tmp_id, &count, NULL, &status1, -1);
+		ret = job_test(tmp_id, &count, NULL, &status1, -1, context);
 		if(ret < 0)
 		{
 			fprintf(stderr, "job_test() failure.\n");
@@ -148,6 +156,7 @@ int main(int argc, char **argv)
 		BMI_RECV_BUFFER);
 
 	/* shut down the interfaces */
+	job_close_context(context);
 	job_finalize();
 	PINT_flow_finalize();
 	BMI_finalize();

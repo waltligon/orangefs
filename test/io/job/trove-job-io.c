@@ -38,6 +38,7 @@ int main(int argc, char **argv)
 	 char buffer1[BUF_SIZE];
 	 char buffer2[BUF_SIZE];
 	 char testkey[] = "foo";
+	job_context_id context;
 
 
     ret = parse_args(argc, argv);
@@ -74,8 +75,17 @@ int main(int argc, char **argv)
 		return(-1);
 	}
 
+	ret = job_open_context(&context);
+	if(ret < 0)
+	{
+		fprintf(stderr, "job_open_context() failure.\n");
+		return(-1);
+	}
+
+
     /* try to look up collection used to store file system */
-	ret = job_trove_fs_lookup(file_system, NULL, &job_stat, &foo_id);
+	ret = job_trove_fs_lookup(file_system, NULL, &job_stat, &foo_id,
+	context);
 	if(ret < 0)
 	{
 		fprintf(stderr, "fs lookup failed.\n");
@@ -83,7 +93,7 @@ int main(int argc, char **argv)
 	}
 	if(ret == 0)
 	{
-		ret = block_on_job(foo_id, NULL, &job_stat);
+		ret = block_on_job(foo_id, NULL, &job_stat, context);
 		if(ret < 0)
 		{
 			fprintf(stderr, "fs lookup failed (at job_test()).\n");
@@ -127,7 +137,8 @@ int main(int argc, char **argv)
 		NULL,
 		NULL,
 		&job_stat,
-		&foo_id);
+		&foo_id,
+		context);
 	if(ret < 0)
 	{
 		fprintf(stderr, "job_trove_dspace_create() failure.\n");
@@ -135,7 +146,7 @@ int main(int argc, char **argv)
 	}
 	if(ret == 0)
 	{
-		ret = block_on_job(foo_id, NULL, &job_stat);
+		ret = block_on_job(foo_id, NULL, &job_stat, context);
 		if(ret < 0)
 		{
 			fprintf(stderr, "dspace_create failed (at job_test()).\n");
@@ -159,7 +170,7 @@ int main(int argc, char **argv)
     val.buffer_sz = sizeof(file_handle);
 
 	ret = job_trove_keyval_write(coll_id, parent_handle, &key,
-		&val, 0, NULL, NULL, &job_stat, &foo_id);
+		&val, 0, NULL, NULL, &job_stat, &foo_id, context);
 	if(ret < 0)
 	{
 		fprintf(stderr, "job_trove_keyval_write() failure.\n");
@@ -167,7 +178,7 @@ int main(int argc, char **argv)
 	}
 	if(ret == 0)
 	{
-		ret = block_on_job(foo_id, NULL, &job_stat);
+		ret = block_on_job(foo_id, NULL, &job_stat, context);
 		if(ret < 0)
 		{
 			fprintf(stderr, "dspace_create failed (at job_test()).\n");
@@ -196,7 +207,7 @@ int main(int argc, char **argv)
 	val.buffer_sz = BUF_SIZE;
 
 	ret = job_trove_keyval_write(coll_id, file_handle, &key,
-		&val, 0, NULL, NULL, &job_stat, &foo_id);
+		&val, 0, NULL, NULL, &job_stat, &foo_id, context);
 	if(ret < 0)
 	{
 		fprintf(stderr, "job_trove_keyval_write() failure.\n");
@@ -204,7 +215,7 @@ int main(int argc, char **argv)
 	}
 	if(ret == 0)
 	{
-		ret = block_on_job(foo_id, NULL, &job_stat);
+		ret = block_on_job(foo_id, NULL, &job_stat, context);
 		if(ret < 0)
 		{
 			fprintf(stderr, "dspace_create failed (at job_test()).\n");
@@ -224,7 +235,7 @@ int main(int argc, char **argv)
 	val.buffer_sz = BUF_SIZE;
 
 	ret = job_trove_keyval_read(coll_id, file_handle, &key,
-		&val, 0, NULL, NULL, &job_stat, &foo_id);
+		&val, 0, NULL, NULL, &job_stat, &foo_id, context);
 	if(ret < 0)
 	{
 		fprintf(stderr, "job_trove_keyval_read() failure.\n");
@@ -232,7 +243,7 @@ int main(int argc, char **argv)
 	}
 	if(ret == 0)
 	{
-		ret = block_on_job(foo_id, NULL, &job_stat);
+		ret = block_on_job(foo_id, NULL, &job_stat, context);
 		if(ret < 0)
 		{
 			fprintf(stderr, "keyval_read failed (at job_test()).\n");
@@ -254,7 +265,7 @@ int main(int argc, char **argv)
 
 	/* remove the key/val entry */
 	ret = job_trove_keyval_remove(coll_id, file_handle, &key,
-		0, NULL, NULL, &job_stat, &foo_id);
+		0, NULL, NULL, &job_stat, &foo_id, context);
 	if(ret < 0)
 	{
 		fprintf(stderr, "job_trove_keyval_remove() failure.\n");
@@ -262,7 +273,7 @@ int main(int argc, char **argv)
 	}
 	if(ret == 0)
 	{
-		ret = block_on_job(foo_id, NULL, &job_stat);
+		ret = block_on_job(foo_id, NULL, &job_stat, context);
 		if(ret < 0)
 		{
 			fprintf(stderr, "keyval_remove failed (at job_test()).\n");
@@ -277,7 +288,8 @@ int main(int argc, char **argv)
 
 	/* write the buffer out into the bytestream space */
 	ret = job_trove_bstream_write_at(coll_id, file_handle, 0,
-		buffer1, BUF_SIZE, 0, NULL, NULL, &job_stat, &foo_id);
+		buffer1, BUF_SIZE, 0, NULL, NULL, &job_stat, &foo_id,
+		context);
 	if(ret < 0)
 	{
 		fprintf(stderr, "job_trove_bstream_write_at() failure.\n");
@@ -285,7 +297,7 @@ int main(int argc, char **argv)
 	}
 	if(ret == 0)
 	{
-		ret = block_on_job(foo_id, NULL, &job_stat);
+		ret = block_on_job(foo_id, NULL, &job_stat, context);
 		if(ret < 0)
 		{
 			fprintf(stderr, "job_trove_bstream_write_at() failed (at job_test()).\n");
@@ -300,7 +312,8 @@ int main(int argc, char **argv)
 
 	/* read the buffer out into the bytestream space */
 	ret = job_trove_bstream_read_at(coll_id, file_handle, 0,
-		buffer2, BUF_SIZE, 0, NULL, NULL, &job_stat, &foo_id);
+		buffer2, BUF_SIZE, 0, NULL, NULL, &job_stat, &foo_id,
+		context);
 	if(ret < 0)
 	{
 		fprintf(stderr, "job_trove_bstream_read_at() failure.\n");
@@ -308,7 +321,7 @@ int main(int argc, char **argv)
 	}
 	if(ret == 0)
 	{
-		ret = block_on_job(foo_id, NULL, &job_stat);
+		ret = block_on_job(foo_id, NULL, &job_stat, context);
 		if(ret < 0)
 		{
 			fprintf(stderr, "job_trove_bstream_read_at() failed (at job_test()).\n");
@@ -327,6 +340,7 @@ int main(int argc, char **argv)
 		return(-1);
 	}
 
+	job_close_context(context);
 	job_finalize();
     trove_finalize();
 

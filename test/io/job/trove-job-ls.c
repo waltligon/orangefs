@@ -34,6 +34,7 @@ int main(int argc, char **argv)
     char path_name[PATH_SIZE];
 	 job_status_s job_stat;
 	 job_id_t foo_id;
+	job_context_id context;
 
     TROVE_handle ls_handle[KEYVAL_ARRAY_LEN];
     char ls_name[KEYVAL_ARRAY_LEN][PATH_SIZE];
@@ -73,8 +74,17 @@ int main(int argc, char **argv)
 		return(-1);
 	}
 
+	ret = job_open_context(&context);
+	if(ret < 0)
+	{
+		fprintf(stderr, "job_open_context() failure.\n");
+		return(-1);
+	}
+
+
     /* try to look up collection used to store file system */
-	ret = job_trove_fs_lookup(file_system, NULL, &job_stat, &foo_id);
+	ret = job_trove_fs_lookup(file_system, NULL, &job_stat, &foo_id,
+	context);
 	if(ret < 0)
 	{
 		fprintf(stderr, "collection lookup failed.\n");
@@ -82,7 +92,7 @@ int main(int argc, char **argv)
 	}
 	if(ret == 0)
 	{
-		ret = block_on_job(foo_id, NULL, &job_stat);
+		ret = block_on_job(foo_id, NULL, &job_stat, context);
 		if(ret < 0)
 		{
 			fprintf(stderr, "collection lookup failed (at job_test()).\n");
@@ -125,7 +135,7 @@ int main(int argc, char **argv)
     while ( num_processed == chunk ) 
 	{
 		ret = job_trove_keyval_iterate(coll_id, handle, pos, key, val, chunk,
-			0, NULL, NULL, &job_stat, &foo_id);
+			0, NULL, NULL, &job_stat, &foo_id, context);
 		if(ret < 0)
 		{
 			fprintf(stderr, "keyval iterate failed.\n");
@@ -133,7 +143,8 @@ int main(int argc, char **argv)
 		}
 		if(ret == 0)
 		{
-			ret = block_on_job(foo_id, NULL, &job_stat);
+			ret = block_on_job(foo_id, NULL, &job_stat,
+			context);
 			if(ret < 0)
 			{
 				fprintf(stderr, "keyval iterate failed (at job_test()).\n");
@@ -154,6 +165,7 @@ int main(int argc, char **argv)
 		}
 	}
 
+	job_close_context(context);
 	job_finalize();
     trove_finalize();
 

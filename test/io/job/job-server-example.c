@@ -38,6 +38,7 @@ int main(int argc, char **argv)
 	job_id_t job_id;
 	int outcount;
 	job_id_t tmp_id;
+	job_context_id context;
 
 	/* set debugging level */
 	gossip_enable_stderr();
@@ -68,9 +69,17 @@ int main(int argc, char **argv)
 		return(-1);
 	}
 
+	ret = job_open_context(&context);
+	if(ret < 0)
+	{
+		fprintf(stderr, "job_open_context() failure.\n");
+		return(-1);
+	}
+
+
 
 	/* post a job for unexpected receive */
-	ret = job_bmi_unexp(&req_info, NULL, &status1, &job_id, 0);
+	ret = job_bmi_unexp(&req_info, NULL, &status1, &job_id, 0, context);
 	if(ret < 0)
 	{
 		fprintf(stderr, "job_bmi_unexp() failure.\n");
@@ -99,7 +108,7 @@ int main(int argc, char **argv)
 #else
 
 		/* ... or maybe even give job_test() a whirl */
-		ret = job_test(job_id, &outcount, NULL, &status1, 5000);
+		ret = job_test(job_id, &outcount, NULL, &status1, 5000, context);
 		if(ret < 0 || outcount == 0)
 		{
 			fprintf(stderr, "job_test() failure.\n");
@@ -127,7 +136,7 @@ int main(int argc, char **argv)
 
 	/* send a message */
 	ret = job_bmi_send(req_info.addr, ack, sizeof(struct ack_foo),
-		0, BMI_PRE_ALLOC, 0, NULL, &status1, &tmp_id);
+		0, BMI_PRE_ALLOC, 0, NULL, &status1, &tmp_id, context);
 	if(ret < 0)
 	{
 		fprintf(stderr, "job_bmi_send() failure.\n");
@@ -136,7 +145,7 @@ int main(int argc, char **argv)
 	if(ret == 0)
 	{
 		int count = 0;
-		ret = job_test(tmp_id, &count, NULL, &status1, -1);
+		ret = job_test(tmp_id, &count, NULL, &status1, -1, context);
 		if(ret < 0)
 		{
 			fprintf(stderr, "job_test() failure.\n");
@@ -156,6 +165,7 @@ int main(int argc, char **argv)
 	free(req_info.buffer);
 
 	/* shut down the interfaces */
+	job_close_context(context);
 	job_finalize();
 	PINT_flow_finalize();
 	BMI_finalize();

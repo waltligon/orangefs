@@ -20,6 +20,7 @@ int main(int argc, char **argv)
 	job_id_t id_arrayB[3];
 	int count = 0;
 	struct job_status stat;
+	job_context_id context;
 
 	/* setup some requests to test */
 	req_array[0].op = PVFS_SERV_GETATTR;
@@ -47,8 +48,17 @@ int main(int argc, char **argv)
 		return(-1);
 	}
 
+	ret = job_open_context(&context);
+	if(ret < 0)
+	{
+		fprintf(stderr, "job_open_context() failure.\n");
+		return(-1);
+	}
+
+
 	/* try to schedule first request- it should proceed */
-	ret = job_req_sched_post(&(req_array[0]), NULL, &stat, &(id_array[0]));
+	ret = job_req_sched_post(&(req_array[0]), NULL, &stat,
+	&(id_array[0]), context);
 	if(ret != 1)
 	{
 		fprintf(stderr, "Error: 1st post should immediately complete.\n");
@@ -56,7 +66,8 @@ int main(int argc, char **argv)
 	}
 
 	/* try to schedule second request- it should queue up */
-	ret = job_req_sched_post(&(req_array[1]), NULL, &stat, &(id_array[1]));
+	ret = job_req_sched_post(&(req_array[1]), NULL, &stat,
+	&(id_array[1]), context);
 	if(ret != 0)
 	{
 		fprintf(stderr, "Error: 2nd post should queue.\n");
@@ -64,7 +75,8 @@ int main(int argc, char **argv)
 	}
 
 	/* try to schedule third request- it should proceed */
-	ret = job_req_sched_post(&(req_array[2]), NULL, &stat, &(id_array[2]));
+	ret = job_req_sched_post(&(req_array[2]), NULL, &stat,
+	&(id_array[2]), context);
 	if(ret != 1)
 	{
 		fprintf(stderr, "Error: 3rd post should immediately complete.\n");
@@ -74,7 +86,7 @@ int main(int argc, char **argv)
 	/*********************************************************/
 
 	/* test the second one and make sure it doesn't finish */
-	ret = job_test(id_array[1], &count, NULL, &stat, 0); 
+	ret = job_test(id_array[1], &count, NULL, &stat, 0, context); 
 	if(ret != 0 || count != 0)
 	{
 		fprintf(stderr, "Error: test of 2nd request failed.\n");
@@ -83,7 +95,7 @@ int main(int argc, char **argv)
 
 	/* complete the first request */
 	ret = job_req_sched_release(id_array[0], NULL,
-		&stat, &(id_arrayB[0]));
+		&stat, &(id_arrayB[0]), context);
 	if(ret != 1)
 	{
 		fprintf(stderr, "Error: release didn't immediately complete.\n");
@@ -91,7 +103,7 @@ int main(int argc, char **argv)
 	}
 	
 	/* now the 2nd request should be ready to go */
-	ret = job_test(id_array[1], &count, NULL, &stat, 0); 
+	ret = job_test(id_array[1], &count, NULL, &stat, 0, context); 
 	if(ret != 1 || count != 1 || stat.error_code != 0)
 	{
 		fprintf(stderr, "Error: test of 2nd request failed.\n");
@@ -100,7 +112,7 @@ int main(int argc, char **argv)
 
 	/* complete the 3rd request */
 	ret = job_req_sched_release(id_array[2], NULL,
-		&stat, &(id_arrayB[2]));
+		&stat, &(id_arrayB[2]), context);
 	if(ret != 1)
 	{
 		fprintf(stderr, "Error: release didn't immediately complete.\n");
@@ -108,6 +120,7 @@ int main(int argc, char **argv)
 	}
 
 	/* shut down job interface */
+	job_close_context(context);
 	job_finalize();
 
 	/* shut down scheduler */

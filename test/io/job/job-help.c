@@ -3,12 +3,13 @@
 #include<job-help.h>
 
 int block_on_job(job_id_t id, void** returned_user_ptr,
-	job_status_s* out_status_p)
+	job_status_s* out_status_p, job_context_id context)
 {
 	int outcount = 0;
 	int ret = -1;
 
-	ret = job_test(id, &outcount, returned_user_ptr, out_status_p, -1);
+	ret = job_test(id, &outcount, returned_user_ptr, out_status_p, -1,
+		context);
 
 	if(ret < 0)
 	{
