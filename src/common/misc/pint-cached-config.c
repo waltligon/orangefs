@@ -236,6 +236,7 @@ int PINT_handle_load_mapping(
  * match the meta handle range configured for the returned meta
  * server.  This array MUST NOT be freed by the caller, nor cached for
  * later use.
+ * NOTE: address resolution is skipped if meta_addr is set to NULL
  *
  * returns 0 on success, -errno on failure
  */
@@ -251,7 +252,7 @@ int PINT_cached_config_get_next_meta(
     struct qlist_head *hash_link = NULL;
     struct config_fs_cache_s *cur_config_cache = NULL;
 
-    if (config && meta_addr && ext_array)
+    if (config && ext_array)
     {
         hash_link = qhash_search(PINT_fsid_config_cache_table,&(fsid));
         if (hash_link)
@@ -290,7 +291,14 @@ int PINT_cached_config_get_next_meta(
             ext_array->extent_array =
                 cur_mapping->handle_extent_array.extent_array;
 
-            ret = BMI_addr_lookup(meta_addr,meta_server_bmi_str);
+	    if(meta_addr != NULL)
+	    {
+		ret = BMI_addr_lookup(meta_addr,meta_server_bmi_str);
+	    }
+	    else
+	    {
+		ret = 0;
+	    }
         }
     }
     return ret;
