@@ -111,8 +111,6 @@ int BMI_get_info(PVFS_BMI_addr_t addr,
 		 int option,
 		 void *inout_parameter);
 
-const char *BMI_method_from_scheme(const char *uri);
-
 int BMI_addr_lookup(PVFS_BMI_addr_t * new_addr,
 		    const char *id_string);
 

@@ -17,8 +17,9 @@
 #include "str-utils.h"
 #include "id-generator.h"
 
-static int active_method_count = 0;
-static struct bmi_method_ops **active_method_table = NULL;
+/*
+ * List of BMI addrs currently managed.
+ */
 static ref_list_p cur_ref_list = NULL;
 
 /* array to keep up with active contexts */
@@ -26,41 +27,53 @@ static int context_array[BMI_MAX_CONTEXTS] = { 0 };
 static gen_mutex_t context_mutex = GEN_MUTEX_INITIALIZER;
 static gen_mutex_t ref_mutex = GEN_MUTEX_INITIALIZER;
 
-#if defined(__STATIC_METHOD_BMI_TCP__) \
-  + defined(__STATIC_METHOD_BMI_GM__) \
-  + defined(__STATIC_METHOD_BMI_IB__) == 1
-/* define if there is only one active method to maybe speed up testsome() */
-#define __BMI_SINGLE_METHOD__
-#endif
-
 /*
- * Static list of defined BMI methods.  This must be done before
- * initialize time, as it is necessary to parse the mntent list on
- * the client before initializing BMI.
+ * Static list of defined BMI methods.  These are pre-compiled into
+ * the client libraries and into the server.
  */
 #ifdef __STATIC_METHOD_BMI_TCP__
 extern struct bmi_method_ops bmi_tcp_ops;
-#endif /* __STATIC_METHOD_BMI_TCP__ */
+#endif
 #ifdef __STATIC_METHOD_BMI_GM__
 extern struct bmi_method_ops bmi_gm_ops;
-#endif /* __STATIC_METHOD_BMI_GM__ */
+#endif
 #ifdef __STATIC_METHOD_BMI_IB__
 extern struct bmi_method_ops bmi_ib_ops;
-#endif /* __STATIC_METHOD_BMI_IB__ */
+#endif
 
-static struct bmi_method_ops *bmi_static_methods[] = {
+static struct bmi_method_ops *const static_methods[] = {
 #ifdef __STATIC_METHOD_BMI_TCP__
     &bmi_tcp_ops,
-#endif				/* __STATIC_METHOD_BMI_TCP__ */
+#endif
 #ifdef __STATIC_METHOD_BMI_GM__
     &bmi_gm_ops,
-#endif				/* __STATIC_METHOD_BMI_GM__ */
+#endif
 #ifdef __STATIC_METHOD_BMI_IB__
     &bmi_ib_ops,
-#endif				/* __STATIC_METHOD_BMI_IB__ */
+#endif
     NULL
 };
 
+/*
+ * List of "known" BMI methods.  This is dynamic, starting with
+ * just the static ones above, and perhaps adding more if we turn
+ * back on dynamic module loading.
+ */
+static int known_method_count = 0;
+static struct bmi_method_ops **known_method_table = 0;
+
+/*
+ * List of active BMI methods.  These are the ones that will be
+ * dealt with for a test call, for example.  On a client, known methods
+ * become active only when someone calls BMI_addr_lookup().  On
+ * a server, all possibly active methods are known at startup time
+ * because we listen on them for the duration.
+ */
+static int active_method_count = 0;
+static struct bmi_method_ops **active_method_table = NULL;
+
+static int activate_method(const char *name, const char *listen_addr,
+    int flags);
 
 /* BMI_initialize()
  * 
@@ -68,11 +81,6 @@ static struct bmi_method_ops *bmi_static_methods[] = {
  * functions.  method_list is a comma separated list of BMI methods to
  * use, listen_addr is a comma separated list of addresses to listen on
  * for each method (if needed), and flags are initialization flags.
- *
- * NOTE: if method_list is NULL, then all compiled in modules will be
- * initialized
- * TODO: eventually update this so that modules can be initialized on the
- * fly as needed
  *
  * returns 0 on success, -errno on failure
  */
@@ -83,82 +91,19 @@ int BMI_initialize(const char *method_list,
     int ret = -1;
     int i = 0;
     char **requested_methods = NULL;
-    method_addr_p new_addr = NULL;
-    struct bmi_method_ops **tmp_method_ops = NULL;
 
-    if ((flags & BMI_INIT_SERVER) && ((!listen_addr) || (!method_list)))
-    {
-	return (bmi_errno_to_pvfs(-EINVAL));
-    }
-  
-    if(method_list)
-    {
-	/* separate out the method list */
-	active_method_count = PINT_split_string_list(
-            &requested_methods, method_list);
-	if (active_method_count < 1)
-	{
-	    gossip_lerr("Error: bad method list.\n");
-	    ret = bmi_errno_to_pvfs(-EINVAL);
-	    goto bmi_initialize_failure;
-	}
-    }
-    else
-    {
-	active_method_count = 0;
-	tmp_method_ops = bmi_static_methods;
-	while ((*tmp_method_ops) != NULL)
-	{
-	    tmp_method_ops++;
-	    active_method_count++;
+    /* server must specify method list at startup, optional for client */
+    if (flags & BMI_INIT_SERVER) {
+	if (!listen_addr || !method_list)
+	    return bmi_errno_to_pvfs(-EINVAL);
+    } else {
+	if (listen_addr)
+	    return bmi_errno_to_pvfs(-EINVAL);
+	if (flags) {
+	    gossip_lerr("Warning: flags ignored on client.\n");
 	}
     }
 
-    /* create a table to keep up with the active methods */
-    active_method_table = (struct bmi_method_ops **)malloc(
-        active_method_count * sizeof(struct bmi_method_ops *));
-    if (!active_method_table)
-    {
-	ret = bmi_errno_to_pvfs(-ENOMEM);
-	goto bmi_initialize_failure;
-    }
-    memset(active_method_table, 0,
-           active_method_count * sizeof(struct bmi_method_ops *));
-
-    /* find the interface for each requested method and load it into the
-     * active table
-     */
-    if(method_list)
-    {
-	for (i = 0; i < active_method_count; i++)
-	{
-	    tmp_method_ops = bmi_static_methods;
-	    while ((*tmp_method_ops) != NULL &&
-		   strcmp((*tmp_method_ops)->method_name,
-			  requested_methods[i]) != 0)
-	    {
-		tmp_method_ops++;
-	    }
-	    if ((*tmp_method_ops) == NULL)
-	    {
-		gossip_lerr("Error: no method available for %s.\n",
-			    requested_methods[i]);
-		ret = -ENOPROTOOPT;
-		goto bmi_initialize_failure;
-	    }
-	    active_method_table[i] = (*tmp_method_ops);
-	}
-    }
-    else
-    {
-	tmp_method_ops = bmi_static_methods;
-	for(i=0; i<active_method_count; i++)
-	{
-	    active_method_table[i] = (*tmp_method_ops);
-	    tmp_method_ops++;
-	}
-    }
- 
     /* make a new reference list */
     cur_ref_list = ref_list_new();
     if (!cur_ref_list)
@@ -167,47 +112,40 @@ int BMI_initialize(const char *method_list,
 	goto bmi_initialize_failure;
     }
 
-    /* initialize methods */
-    for (i = 0; i < active_method_count; i++)
-    {
-	if (flags & BMI_INIT_SERVER)
+    /* initialize the known method list from the null-terminated static list */
+    known_method_count = sizeof(static_methods) / sizeof(static_methods[0]) - 1;
+    known_method_table = malloc(
+	known_method_count * sizeof(*known_method_table));
+    if (!known_method_table)
+	return bmi_errno_to_pvfs(-ENOMEM);
+    memcpy(known_method_table, static_methods,
+	known_method_count * sizeof(*known_method_table));
+
+    if (!method_list) {
+	/* nothing active until lookup */
+	active_method_count = 0;
+    } else {
+	/* split and initialize the requested method list */
+	int numreq = PINT_split_string_list(&requested_methods, method_list);
+	if (numreq < 1)
 	{
-	    if ((new_addr =
-		 active_method_table[i]->
-		 BMI_meth_method_addr_lookup(listen_addr)) != NULL)
-	    {
-		/* this is a bit of a hack */
-		new_addr->method_type = i;
-		ret = active_method_table[i]->BMI_meth_initialize(
-                    new_addr, i, flags);
-	    }
-	    else
-	    {
-		ret = -1;
-	    }
-	}
-	else
-	{
-	    ret = active_method_table[i]->BMI_meth_initialize(
-                NULL, i, flags);
-	}
-	if (ret < 0)
-	{
-	    gossip_err("Error: initializing method: %s\n",
-			requested_methods[i]);
-	    active_method_table[i] = NULL;
+	    gossip_lerr("Error: bad method list.\n");
+	    ret = bmi_errno_to_pvfs(-EINVAL);
 	    goto bmi_initialize_failure;
 	}
-    }
-    /* done with method string list now */
-    if (requested_methods)
-    {
-	for (i = 0; i < active_method_count; i++)
-	{
-	    if (requested_methods[i])
-	    {
-		free(requested_methods[i]);
+
+	/*
+	 * XXX: the same listen_addr is obviously not going to work on
+	 * all the requested methods, though.  Figure out how to deal with
+	 * this someday.
+	 */
+	for (i=0; i<numreq; i++) {
+	    ret = activate_method(requested_methods[i], listen_addr, flags);
+	    if (ret < 0) {
+		ret = bmi_errno_to_pvfs(ret);
+		goto bmi_initialize_failure;
 	    }
+	    free(requested_methods[i]);
 	}
 	free(requested_methods);
     }
@@ -233,6 +171,11 @@ int BMI_initialize(const char *method_list,
 	    }
 	}
 	free(active_method_table);
+    }
+
+    if (known_method_table) {
+	free(known_method_table);
+	known_method_count = 0;
     }
 
     /* get rid of method string list */
@@ -429,6 +372,9 @@ int BMI_finalize(void)
     active_method_count = 0;
     free(active_method_table);
 
+    free(known_method_table);
+    known_method_count = 0;
+
     /* destroy the reference list */
     /* (side effect: destroys all method addresses as well) */
     ref_list_cleanup(cur_ref_list);
@@ -448,7 +394,7 @@ int BMI_open_context(bmi_context_id* context_id)
 {
     int context_index;
     int i,j;
-    int ret = -1;
+    int ret = 0;
 
     gen_mutex_lock(&context_mutex);
 
@@ -696,42 +642,6 @@ int BMI_test(bmi_op_id_t id,
  *
  * returns 0 on success, -errno on failure
  */
-#ifdef __BMI_SINGLE_METHOD__
-int BMI_testsome(int incount,
-		 bmi_op_id_t * id_array,
-		 int *outcount,
-		 int *index_array,
-		 bmi_error_code_t * error_code_array,
-		 bmi_size_t * actual_size_array,
-		 void **user_ptr_array,
-		 int max_idle_time_ms,
-		 bmi_context_id context_id)
-{
-    int ret;
-
-    if (max_idle_time_ms < 0)
-	return (bmi_errno_to_pvfs(-EINVAL));
-
-    *outcount = 0;
-
-    ret = active_method_table[0]->BMI_meth_testsome(
-        incount, id_array, outcount, index_array,
-        error_code_array, actual_size_array, user_ptr_array,
-        max_idle_time_ms, context_id);
-    if (ret < 0)
-    {
-	return (ret);
-    }
-
-    /* return 1 if anything completed */
-    if (ret == 0 && *outcount > 0)
-    {
-	return (1);
-    }
-    return (0);
-}
-
-#else /* not __BMI_SINGLE_METHOD__ */
 int BMI_testsome(int incount,
 		 bmi_op_id_t * id_array,
 		 int *outcount,
@@ -754,6 +664,20 @@ int BMI_testsome(int incount,
 	return (bmi_errno_to_pvfs(-EINVAL));
 
     *outcount = 0;
+
+    if (active_method_count == 1) {
+	/* shortcircuit for perhaps common case of only one method */
+	ret = active_method_table[0]->BMI_meth_testsome(
+	    incount, id_array, outcount, index_array,
+	    error_code_array, actual_size_array, user_ptr_array,
+	    max_idle_time_ms, context_id);
+
+	/* return 1 if anything completed */
+	if (ret == 0 && *outcount > 0)
+	    return (1);
+	else
+	    return ret;
+    }
 
     /* TODO: do something more clever here */
     if (max_idle_time_ms)
@@ -819,7 +743,6 @@ int BMI_testsome(int incount,
     else
 	return(0);
 }
-#endif /* __BMI_SINGLE_METHOD__ */
 
 
 /* BMI_testunexpected()
@@ -1193,27 +1116,6 @@ int BMI_get_info(PVFS_BMI_addr_t addr,
     return (0);
 }
 
-
-/*
- * Quickly scan an address to figure out the method type.  Do not parse
- * completely, just match on prefix.
- *
- * Returns a pointer to the method name, or null if not found.
- */
-const char *
-BMI_method_from_scheme(const char *uri)
-{
-    struct bmi_method_ops **bo;
-
-    for (bo=bmi_static_methods; *bo; bo++) {
-	/* well-known that mapping is "x" -> "bmi_x" */
-	const char *name = (*bo)->method_name + 4;
-	if (!strncmp(uri, name, strlen(name)))
-	    return (*bo)->method_name;
-    }
-    return 0;
-}
-
 /*
  * BMI_addr_lookup()
  *
@@ -1262,6 +1164,31 @@ int BMI_addr_lookup(PVFS_BMI_addr_t * new_addr,
              BMI_meth_method_addr_lookup(id_string)))
     {
 	i++;
+    }
+
+    /* if not found, try to bring it up now */
+    if (!meth_addr) {
+	for (i=0; i<known_method_count; i++) {
+	    /* only bother with those not active */
+	    int j;
+	    for (j=0; j<active_method_count; j++)
+		if (known_method_table[i] == active_method_table[j])
+		    break;
+	    if (j < active_method_count)
+		continue;
+
+	    /* well-known that mapping is "x" -> "bmi_x" */
+	    const char *name = known_method_table[i]->method_name + 4;
+	    if (!strncmp(id_string, name, strlen(name))) {
+	        ret = activate_method(known_method_table[i]->method_name, 0, 0);
+	        if (ret < 0)
+		    return bmi_errno_to_pvfs(ret);
+		meth_addr = known_method_table[i]->
+		    BMI_meth_method_addr_lookup(id_string);
+		i = active_method_count - 1;  /* point at the new one */
+		break;
+	    }
+	}
     }
 
     /* make sure one was successful */
@@ -1598,6 +1525,87 @@ int bmi_method_addr_reg_callback(method_addr_p map)
     return (0);
 }
 
+/*
+ * Attempt to insert this name into the list of active methods,
+ * and bring it up.
+ */
+static int
+activate_method(const char *name, const char *listen_addr, int flags)
+{
+    int i, ret;
+    void *x;
+    struct bmi_method_ops *meth;
+    method_addr_p new_addr;
+
+    /* already active? */
+    for (i=0; i<active_method_count; i++)
+	if (!strcmp(active_method_table[i]->method_name, name)) break;
+    if (i < active_method_count)
+	return 0;
+
+    /* is the method known? */
+    for (i=0; i<known_method_count; i++)
+	if (!strcmp(known_method_table[i]->method_name, name)) break;
+    if (i == known_method_count) {
+	gossip_lerr("Error: no method available for %s.\n", name);
+	return -ENOPROTOOPT;
+    }
+    meth = known_method_table[i];
+
+    /*
+     * Later: try to load a dynamic module, growing the known method
+     * table and search it again.
+     */
+
+    /* toss it into the active table */
+    x = active_method_table;
+    active_method_table = malloc(
+	(active_method_count + 1) * sizeof(*active_method_table));
+    if (!active_method_table) {
+	active_method_table = x;
+	return -ENOMEM;
+    }
+    if (active_method_count) {
+	memcpy(active_method_table, x,
+	    active_method_count * sizeof(*active_method_table));
+	free(x);
+    }
+    active_method_table[active_method_count] = meth;
+    ++active_method_count;
+
+    /* initialize it */
+    new_addr = 0;
+    if (listen_addr) {
+	new_addr = meth->BMI_meth_method_addr_lookup(listen_addr);
+	if (!new_addr) {
+	    gossip_err(
+		"Error: failed to lookup listen address %s for method %s.\n",
+		listen_addr, name);
+	    --active_method_count;
+	    return -EINVAL;
+	}
+	/* this is a bit of a hack */
+	new_addr->method_type = active_method_count - 1;
+    }
+    ret = meth->BMI_meth_initialize(new_addr, active_method_count - 1, flags);
+    if (ret < 0) {
+	gossip_err("Error: failed to initialize method %s.\n", name);
+	--active_method_count;
+	return ret;
+    }
+
+    /* tell it about any open contexts */
+    for (i=0; i<BMI_MAX_CONTEXTS; i++)
+	if (context_array[i]) {
+	    ret = meth->BMI_meth_open_context(i);
+	    if (ret < 0)
+		break;
+	}
+
+    return ret;
+}
+
+ 
 int bmi_errno_to_pvfs(int error)
 {
     int bmi_errno = error;
