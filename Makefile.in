@@ -459,6 +459,7 @@ distclean: clean
 	rm -f maint/mpi-depend.sh
 	rm -f include/pvfs2-types.h
 	rm -rf autom4te-*.cache
+	rm -f $(srcdir)/cscope.out $(srcdir)/cscope.files
 
 # this is where we include all of our automatic dependencies.
 # NOTE: we wrap this in ifneq's in order to prevent the
