@@ -27,6 +27,8 @@
 
 #define REQ_ENC_FORMAT 0
 
+job_context_id PVFS_sys_job_context = -1;
+
 /* pinode cache */
 
 extern struct server_configuration_s g_server_config;
@@ -55,6 +57,7 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, PVFS_sysresp_init *resp)
 	BMI_INIT_FAIL,
 	FLOW_INIT_FAIL,
 	JOB_INIT_FAIL,
+	JOB_CONTEXT_FAIL,
 	PCACHE_INIT_FAIL,
 	DCACHE_INIT_FAIL,
 	BUCKET_INIT_FAIL,
@@ -89,6 +92,14 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, PVFS_sysresp_init *resp)
     {
 	init_fail = JOB_INIT_FAIL;
 	gossip_ldebug(CLIENT_DEBUG,"Error initializing job interface: %s\n",strerror(-ret));
+	goto return_error;
+    }
+
+    ret = job_open_context(&PVFS_sys_job_context);
+    if(ret < 0)
+    {
+	init_fail = JOB_CONTEXT_FAIL;
+	gossip_ldebug(CLIENT_DEBUG, "job_open_context() failure.\n");
 	goto return_error;
     }
 	
@@ -179,6 +190,7 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, PVFS_sysresp_init *resp)
 	case DCACHE_INIT_FAIL:
 	    PINT_pcache_finalize();
 	case PCACHE_INIT_FAIL:
+	case JOB_CONTEXT_FAIL:
 	    job_finalize();
 	case JOB_INIT_FAIL:
 	    PINT_flow_finalize();

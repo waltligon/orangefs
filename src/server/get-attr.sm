@@ -46,6 +46,7 @@ static int getattr_read_metafile_distribution(PINT_server_op *s_op, job_status_s
 void getattr_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
+extern job_context_id PINT_server_job_context;
 
 #if 0
 PINT_state_machine_s getattr_req_s = 
@@ -167,7 +168,8 @@ static int getattr_init(PINT_server_op *s_op, job_status_s *ret)
     job_post_ret = job_req_sched_post(s_op->req,
 				      s_op,
 				      ret,
-				      &(s_op->scheduled_id));
+				      &(s_op->scheduled_id),
+				      PINT_server_job_context);
 
     return(job_post_ret);
 
@@ -218,7 +220,8 @@ static int getattr_getobj_attribs(PINT_server_op *s_op, job_status_s *ret)
 					 NULL,
 					 s_op,
 					 ret,
-					 &i);
+					 &i,
+					 PINT_server_job_context);
     return(job_post_ret);
 }
 
@@ -326,7 +329,8 @@ static int getattr_read_metafile_datafile_handles(PINT_server_op *s_op, job_stat
 					 NULL,
 					 s_op,
 					 ret,
-					 &i);
+					 &i,
+					 PINT_server_job_context);
 
     return job_post_ret;
 }
@@ -364,7 +368,8 @@ static int getattr_read_metafile_distribution(PINT_server_op *s_op, job_status_s
 					 NULL,
 					 s_op,
 					 ret,
-					 &i);
+					 &i,
+					 PINT_server_job_context);
     return job_post_ret;
 }
 
@@ -444,7 +449,8 @@ static int getattr_send_bmi(PINT_server_op *s_op, job_status_s *ret)
 				     0,
 				     s_op, 
 				     ret, 
-				     &i);
+				     &i,
+				     PINT_server_job_context);
 
 #else
 
@@ -490,7 +496,8 @@ static int getattr_release_posted_job(PINT_server_op *s_op, job_status_s *ret)
     job_post_ret = job_req_sched_release(s_op->scheduled_id,
 	    s_op,
 	    ret,
-	    &i);
+	    &i,
+	    PINT_server_job_context);
     return job_post_ret;
 }
 

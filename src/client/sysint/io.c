@@ -19,6 +19,8 @@
 #include <pint-bucket.h>
 #include <PINT-reqproto-encode.h>
 
+extern job_context_id PVFS_sys_job_context;
+
 /* TODO: where does this define really belong? */
 #define REQ_ENC_FORMAT 0
 
@@ -500,7 +502,8 @@ static int io_req_ack_flow_array(bmi_addr_t* addr_array,
 		1,
 		NULL,
 		&(status_array[i]),
-		&(id_array[i]));
+		&(id_array[i]),
+		PVFS_sys_job_context);
 	    if(ret < 0)
 	    {
 		/* immediate error */
@@ -525,7 +528,7 @@ static int io_req_ack_flow_array(bmi_addr_t* addr_array,
     {
 	count = array_size;
 	ret = job_testsome(id_array, &count, index_array, NULL,
-	    status_array, -1);
+	    status_array, -1, PVFS_sys_job_context);
 	if(ret < 0)
 	{
 	    /* TODO: there is no real way cleanup from this right now */
@@ -587,7 +590,8 @@ static int io_req_ack_flow_array(bmi_addr_t* addr_array,
 		BMI_PRE_ALLOC,
 		NULL, 
 		&(status_array[i]), 
-		&(id_array[i]));
+		&(id_array[i]),
+		PVFS_sys_job_context);
 	    if(ret < 0)
 	    {
 		/* immediate error */
@@ -690,7 +694,8 @@ static int io_req_ack_flow_array(bmi_addr_t* addr_array,
 		    flow_array[i],
 		    NULL,
 		    &(status_array[0]),
-		    &(id_array[i+array_size]));
+		    &(id_array[i+array_size]),
+		    PVFS_sys_job_context);
 		if(ret < 0)
 		{
 		    error_code_array[i] = ret;
@@ -717,7 +722,7 @@ static int io_req_ack_flow_array(bmi_addr_t* addr_array,
 	{
 	    count = array_size * 2;
 	    ret = job_testsome(id_array, &count, index_array, NULL,
-		status_array, 1);
+		status_array, 1, PVFS_sys_job_context);
 	    if(ret < 0)
 	    {
 		/* TODO: there is no real way cleanup from this right now */

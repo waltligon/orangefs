@@ -35,6 +35,8 @@
 
 #include "quicklist.h"
 
+job_context_id PINT_server_job_context = -1;
+
 /* Internal Globals */
 
 
@@ -153,6 +155,15 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
 	*server_level_init = SHUTDOWN_STORAGE_INTERFACE;
 	goto interface_init_failed;
     }
+    
+    ret = job_open_context(&PINT_server_job_context);
+    if(ret < 0)
+    {
+	gossip_err("Error opening job context.\n");
+	*server_level_init = SHUTDOWN_JOB_INTERFACE;
+	goto interface_init_failed;
+    }
+
     gossip_debug(SERVER_DEBUG, "Job Init Complete\n");
 
   interface_init_failed:
@@ -358,8 +369,9 @@ int main(int argc,
 	    goto server_shutdown;
 	}
 	/* TODO: use a named default value for the timeout eventually */
-	ret = job_testworld(job_id_array, &out_count,
-		completed_job_pointers, job_status_structs, 100);
+	ret = job_testcontext(job_id_array, &out_count,
+		completed_job_pointers, job_status_structs, 100,
+		PINT_server_job_context);
 	if (ret < 0)
 	{
 	    gossip_lerr("FREAK OUT.\n");
@@ -515,7 +527,8 @@ static int server_shutdown(PINT_server_status_code level,
 	/* State Machine */
 	PINT_state_machine_halt();
     case SHUTDOWN_HIGH_LEVEL_INTERFACE:
-	/* Turn off High Level Interface */
+	job_close_context(PINT_server_job_context);
+    case SHUTDOWN_JOB_INTERFACE:
 	job_finalize();
     case SHUTDOWN_STORAGE_INTERFACE:
 	/* Turn off Storage IFace */
@@ -621,7 +634,8 @@ static int initialize_new_server_op(job_status_s *temp_stat)
 			s_op, /* user ptr */
 			temp_stat,
 			&j_id,
-			JOB_NO_IMMED_COMPLETE);
+			JOB_NO_IMMED_COMPLETE,
+			PINT_server_job_context);
     if (ret < 0) {
 	free(s_op);
 	return -1; /* TODO: ????????? */

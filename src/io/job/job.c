@@ -219,6 +219,32 @@ int job_finalize(void)
     return (0);
 }
 
+
+/* job_open_context()
+ *
+ * opens a new context for the job interface
+ *
+ * returns 0 on success, -errno on failure
+ */
+int job_open_context(job_context_id* context_id)
+{
+    gossip_lerr("Warning: executing job_open_context() stub.\n");
+    *context_id = 0;
+    return(0);
+}
+
+/* job_close_context()
+ *
+ * destroys a context previously created with job_open_context()
+ *
+ * no return value 
+ */
+void job_close_context(job_context_id context_id)
+{
+    gossip_lerr("Warning: executing job_close_context() stub.\n");
+    return;
+}
+
 /* job_bmi_send()
  *
  * posts a job to send a BMI message
@@ -234,7 +260,8 @@ int job_bmi_send(bmi_addr_t addr,
 		 bmi_flag_t send_unexpected,
 		 void *user_ptr,
 		 job_status_s * out_status_p,
-		 job_id_t * id)
+		 job_id_t * id,
+		 job_context_id context_id)
 {
     /* post a bmi send.  If it completes (or fails) immediately, then
      * return and fill in the status structure.  If it needs to be tested
@@ -317,7 +344,8 @@ int job_bmi_send_list(bmi_addr_t addr,
 		      bmi_flag_t send_unexpected,
 		      void *user_ptr,
 		      job_status_s * out_status_p,
-		      job_id_t * id)
+		      job_id_t * id,
+		      job_context_id context_id)
 {
     /* post a bmi send.  If it completes (or fails) immediately, then
      * return and fill in the status structure.  If it needs to be tested
@@ -398,7 +426,8 @@ int job_bmi_recv(bmi_addr_t addr,
 		 bmi_flag_t buffer_flag,
 		 void *user_ptr,
 		 job_status_s * out_status_p,
-		 job_id_t * id)
+		 job_id_t * id,
+		 job_context_id context_id)
 {
 
     /* post a bmi recv.  If it completes (or fails) immediately, then
@@ -472,7 +501,8 @@ int job_bmi_recv_list(bmi_addr_t addr,
 		      bmi_flag_t buffer_flag,
 		      void *user_ptr,
 		      job_status_s * out_status_p,
-		      job_id_t * id)
+		      job_id_t * id,
+		      job_context_id context_id)
 {
 
     /* post a bmi recv.  If it completes (or fails) immediately, then
@@ -541,7 +571,8 @@ int job_bmi_unexp(struct BMI_unexpected_info *bmi_unexp_d,
 		  void *user_ptr,
 		  job_status_s * out_status_p,
 		  job_id_t * id,
-		  enum job_flags flags)
+		  enum job_flags flags,
+		  job_context_id context_id)
 {
     /* post a bmi recv for an unexpected message.  We will do a quick
      * test to see if an unexpected message is available.  If so, we
@@ -619,7 +650,8 @@ int job_bmi_unexp(struct BMI_unexpected_info *bmi_unexp_d,
 int job_req_sched_post(struct PVFS_server_req_s *in_request,
 		       void *user_ptr,
 		       job_status_s * out_status_p,
-		       job_id_t * id)
+		       job_id_t * id,
+		       job_context_id context_id)
 {
     /* post a request to the scheduler.  If it completes (or fails)
      * immediately, then return and fill in the status structure.
@@ -683,7 +715,8 @@ int job_req_sched_post(struct PVFS_server_req_s *in_request,
 int job_req_sched_release(job_id_t in_completed_id,
 			  void *user_ptr,
 			  job_status_s * out_status_p,
-			  job_id_t * out_id)
+			  job_id_t * out_id,
+			  job_context_id context_id)
 {
     /* this function is a little odd.  We need to
      * do is retrieve the job desc that we queued up in the
@@ -749,7 +782,8 @@ int job_req_sched_release(job_id_t in_completed_id,
 int job_flow(flow_descriptor * flow_d,
 	     void *user_ptr,
 	     job_status_s * out_status_p,
-	     job_id_t * id)
+	     job_id_t * id,
+	     job_context_id context_id)
 {
     struct job_desc *jd = NULL;
     int ret = -1;
@@ -810,7 +844,8 @@ int job_trove_bstream_write_at(PVFS_coll_id coll_id,
 			       PVFS_vtag_s * vtag,
 			       void *user_ptr,
 			       job_status_s * out_status_p,
-			       job_id_t * id)
+			       job_id_t * id,
+			       job_context_id context_id)
 {
     /* post a trove write.  If it completes (or fails) immediately, then
      * return and fill in the status structure.  If it needs to be tested
@@ -886,7 +921,8 @@ int job_trove_bstream_read_at(PVFS_coll_id coll_id,
 			      PVFS_vtag_s * vtag,
 			      void *user_ptr,
 			      job_status_s * out_status_p,
-			      job_id_t * id)
+			      job_id_t * id,
+			      job_context_id context_id)
 {
     /* post a trove read.  If it completes (or fails) immediately, then
      * return and fill in the status structure.  If it needs to be tested
@@ -961,7 +997,8 @@ int job_trove_keyval_read(PVFS_coll_id coll_id,
 			  PVFS_vtag_s * vtag,
 			  void *user_ptr,
 			  job_status_s * out_status_p,
-			  job_id_t * id)
+			  job_id_t * id,
+			  job_context_id context_id)
 {
     /* post a trove keyval read.  If it completes (or fails)
      * immediately, then return and fill in the status structure.  
@@ -1034,7 +1071,8 @@ int job_trove_keyval_read_list(PVFS_coll_id coll_id,
 			       PVFS_vtag_s * vtag,
 			       void *user_ptr,
 			       job_status_s * out_status_p,
-			       job_id_t * id)
+			       job_id_t * id,
+			       job_context_id context_id)
 {
     /* post a trove keyval read.  If it completes (or fails)
      * immediately, then return and fill in the status structure.  
@@ -1107,7 +1145,8 @@ int job_trove_keyval_write(PVFS_coll_id coll_id,
 			   PVFS_vtag_s * vtag,
 			   void *user_ptr,
 			   job_status_s * out_status_p,
-			   job_id_t * id)
+			   job_id_t * id,
+			   job_context_id context_id)
 {
     /* post a trove keyval write.  If it completes (or fails)
      * immediately, then return and fill in the status structure.  
@@ -1175,7 +1214,8 @@ int job_trove_dspace_getattr(PVFS_coll_id coll_id,
 			     PVFS_handle handle,
 			     void *user_ptr,
 			     job_status_s * out_status_p,
-			     job_id_t * id)
+			     job_id_t * id,
+			     job_context_id context_id)
 {
     /* post a trove operation dspace get attr.  If it completes (or
      * fails) immediately, then return and fill in the status
@@ -1243,7 +1283,8 @@ int job_trove_dspace_setattr(PVFS_coll_id coll_id,
 			     PVFS_ds_attributes_s * ds_attr_p,
 			     void *user_ptr,
 			     job_status_s * out_status_p,
-			     job_id_t * id)
+			     job_id_t * id,
+			     job_context_id context_id)
 {
     /* post a trove operation dspace set attr.  If it completes (or
      * fails) immediately, then return and fill in the status
@@ -1311,7 +1352,8 @@ int job_trove_bstream_resize(PVFS_coll_id coll_id,
 			     PVFS_vtag_s * vtag,
 			     void *user_ptr,
 			     job_status_s * out_status_p,
-			     job_id_t * id)
+			     job_id_t * id,
+			     job_context_id context_id)
 {
     gossip_lerr("Error: unimplemented.\n");
     return (-ENOSYS);
@@ -1329,7 +1371,8 @@ int job_trove_bstream_validate(PVFS_coll_id coll_id,
 			       PVFS_vtag_s * vtag,
 			       void *user_ptr,
 			       job_status_s * out_status_p,
-			       job_id_t * id)
+			       job_id_t * id,
+			       job_context_id context_id)
 {
     gossip_lerr("Error: unimplemented.\n");
     return (-ENOSYS);
@@ -1349,7 +1392,8 @@ int job_trove_keyval_remove(PVFS_coll_id coll_id,
 			    PVFS_vtag_s * vtag,
 			    void *user_ptr,
 			    job_status_s * out_status_p,
-			    job_id_t * id)
+			    job_id_t * id,
+			    job_context_id context_id)
 {
     /* post a trove keyval remove.  If it completes (or fails)
      * immediately, then return and fill in the status structure.  
@@ -1418,7 +1462,8 @@ int job_trove_keyval_validate(PVFS_coll_id coll_id,
 			      PVFS_vtag_s * vtag,
 			      void *user_ptr,
 			      job_status_s * out_status_p,
-			      job_id_t * id)
+			      job_id_t * id,
+			      job_context_id context_id)
 {
     gossip_lerr("Error: unimplemented.\n");
     return (-ENOSYS);
@@ -1441,7 +1486,8 @@ int job_trove_keyval_iterate(PVFS_coll_id coll_id,
 			     PVFS_vtag_s * vtag,
 			     void *user_ptr,
 			     job_status_s * out_status_p,
-			     job_id_t * id)
+			     job_id_t * id,
+			     job_context_id context_id)
 {
     /* post a trove keyval iterate.  If it completes (or fails)
      * immediately, then return and fill in the status structure.  
@@ -1520,7 +1566,8 @@ int job_trove_keyval_iterate_keys(PVFS_coll_id coll_id,
 				  PVFS_vtag_s * vtag,
 				  void *user_ptr,
 				  job_status_s * out_status_p,
-				  job_id_t * id)
+				  job_id_t * id,
+				  job_context_id context_id)
 {
     gossip_lerr("Error: unimplemented.\n");
     return (-ENOSYS);
@@ -1540,7 +1587,8 @@ int job_trove_dspace_create(PVFS_coll_id coll_id,
 			    void *hint,
 			    void *user_ptr,
 			    job_status_s * out_status_p,
-			    job_id_t * id)
+			    job_id_t * id,
+			    job_context_id context_id)
 {
     /* post a dspace create.  If it completes (or fails) immediately, then
      * return and fill in the status structure.  If it needs to be tested
@@ -1612,7 +1660,8 @@ int job_trove_dspace_remove(PVFS_coll_id coll_id,
 			    PVFS_handle handle,
 			    void *user_ptr,
 			    job_status_s * out_status_p,
-			    job_id_t * id)
+			    job_id_t * id,
+			    job_context_id context_id)
 {
     /* post a dspace remove.  If it completes (or fails) immediately, then
      * return and fill in the status structure.  If it needs to be tested
@@ -1679,7 +1728,8 @@ int job_trove_dspace_verify(PVFS_coll_id coll_id,
 			    PVFS_handle handle,
 			    void *user_ptr,
 			    job_status_s * out_status_p,
-			    job_id_t * id)
+			    job_id_t * id,
+			    job_context_id context_id)
 {
     gossip_lerr("Error: unimplemented.\n");
     return (-ENOSYS);
@@ -1696,7 +1746,8 @@ int job_trove_fs_create(char *collname,
 			PVFS_coll_id new_coll_id,
 			void *user_ptr,
 			job_status_s * out_status_p,
-			job_id_t * id)
+			job_id_t * id,
+			job_context_id context_id)
 {
     /* post an fs create.  If it completes (or fails) immediately, then
      * return and fill in the status structure.  If it needs to be tested
@@ -1760,7 +1811,8 @@ int job_trove_fs_create(char *collname,
 int job_trove_fs_remove(char *collname,
 			void *user_ptr,
 			job_status_s * out_status_p,
-			job_id_t * id)
+			job_id_t * id,
+			job_context_id context_id)
 {
     gossip_lerr("Error: unimplemented.\n");
     return (-ENOSYS);
@@ -1776,7 +1828,8 @@ int job_trove_fs_remove(char *collname,
 int job_trove_fs_lookup(char *collname,
 			void *user_ptr,
 			job_status_s * out_status_p,
-			job_id_t * id)
+			job_id_t * id,
+			job_context_id context_id)
 {
     /* post a collection lookup.  If it completes (or fails) immediately, then
      * return and fill in the status structure.  If it needs to be tested
@@ -1844,7 +1897,8 @@ int job_trove_fs_seteattr(PVFS_coll_id coll_id,
 			  PVFS_ds_flags flags,
 			  void *user_ptr,
 			  job_status_s * out_status_p,
-			  job_id_t * id)
+			  job_id_t * id,
+			  job_context_id context_id)
 {
     /* post a trove collection set eattr.  If it completes (or fails)
      * immediately, then return and fill in the status structure.  
@@ -1912,7 +1966,8 @@ int job_trove_fs_geteattr(PVFS_coll_id coll_id,
 			  PVFS_ds_flags flags,
 			  void *user_ptr,
 			  job_status_s * out_status_p,
-			  job_id_t * id)
+			  job_id_t * id,
+			  job_context_id context_id)
 {
     /* post a trove collection get eattr.  If it completes (or fails)
      * immediately, then return and fill in the status structure.  
@@ -1979,7 +2034,8 @@ int job_test(job_id_t id,
 	     int *out_count_p,
 	     void **returned_user_ptr_p,
 	     job_status_s * out_status_p,
-	     int timeout_ms)
+	     int timeout_ms,
+	     job_context_id context_id)
 {
     int ret = -1;
 #ifdef __PVFS2_JOB_THREADED__
@@ -2175,7 +2231,8 @@ int job_testsome(job_id_t * id_array,
 		 int *out_index_array,
 		 void **returned_user_ptr_array,
 		 job_status_s * out_status_array_p,
-		 int timeout_ms)
+		 int timeout_ms,
+		 job_context_id context_id)
 {
     int ret = -1;
 #ifdef __PVFS2_JOB_THREADED__
@@ -2435,7 +2492,7 @@ int job_testsome(job_id_t * id_array,
 	return (0);
 }
 
-/* job_testworld()
+/* job_testcontext()
  *
  * check for completion of any jobs currently in progress.  Don't return
  * until either at least one job has completed or the timeout has
@@ -2443,11 +2500,12 @@ int job_testsome(job_id_t * id_array,
  *
  * returns 0 on success, -errno on failure
  */
-int job_testworld(job_id_t * out_id_array_p,
+int job_testcontext(job_id_t * out_id_array_p,
 		  int *inout_count_p,
 		  void **returned_user_ptr_array,
 		  job_status_s * out_status_array_p,
-		  int timeout_ms)
+		  int timeout_ms,
+		  job_context_id context_id)
 {
     int ret = -1;
 #ifdef __PVFS2_JOB_THREADED__

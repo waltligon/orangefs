@@ -10,6 +10,7 @@
 
 #include <errno.h>
 #include <assert.h>
+#include <stdlib.h>
 
 #include "op-id-queue.h"
 #include "quicklist.h"

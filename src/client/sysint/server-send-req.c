@@ -15,6 +15,8 @@
 #include "bmi.h"
 #include "PINT-reqproto-encode.h"
 
+extern job_context_id PVFS_sys_job_context;
+
 #define REQ_ENC_FORMAT 0
 
 /* PINT_send_req()
@@ -68,7 +70,8 @@ int PINT_send_req(bmi_addr_t addr,
 	1,
 	NULL,
 	&tmp_status,
-	&tmp_id);
+	&tmp_id,
+	PVFS_sys_job_context);
     if(ret < 0)
     {
 	goto send_req_out;
@@ -87,7 +90,8 @@ int PINT_send_req(bmi_addr_t addr,
     else
     {
 	/* we need to test for completion */
-	ret = job_test(tmp_id, &count, NULL, &tmp_status, -1);
+	ret = job_test(tmp_id, &count, NULL, &tmp_status, -1,
+	PVFS_sys_job_context);
 	if(ret < 0)
 	{
 	    /* TODO: there is no real way cleanup from this right now */
@@ -118,7 +122,8 @@ int PINT_send_req(bmi_addr_t addr,
 	BMI_PRE_ALLOC,
 	NULL,
 	&tmp_status,
-	&tmp_id);
+	&tmp_id,
+	PVFS_sys_job_context);
     if(ret < 0)
     {
 	goto send_req_out;
@@ -135,7 +140,8 @@ int PINT_send_req(bmi_addr_t addr,
     else
     {
 	/* we need to test for completion */
-	ret = job_test(tmp_id, &count, NULL, &tmp_status, -1);
+	ret = job_test(tmp_id, &count, NULL, &tmp_status, -1,
+	PVFS_sys_job_context);
 	if(ret < 0)
 	{
 	    /* TODO: there is no real way cleanup from this right now */
@@ -296,7 +302,8 @@ int PINT_send_req_array(bmi_addr_t* addr_array,
 		1,
 		NULL,
 		&(status_array[i]),
-		&(id_array[i]));
+		&(id_array[i]),
+		PVFS_sys_job_context);
 	    gossip_err("SEND_REQ_ARRAY(): send %d returned %d.\n",
 		i, ret);
 	    if(ret < 0)
@@ -325,7 +332,7 @@ int PINT_send_req_array(bmi_addr_t* addr_array,
 	    need_to_test);
 	count = array_size;
 	ret = job_testsome(id_array, &count, index_array, NULL,
-	    status_array, -1);
+	    status_array, -1, PVFS_sys_job_context);
 	if(ret < 0)
 	{
 	    /* TODO: there is no real way cleanup from this right now */
@@ -385,7 +392,8 @@ int PINT_send_req_array(bmi_addr_t* addr_array,
 		BMI_PRE_ALLOC,
 		NULL, 
 		&(status_array[i]), 
-		&(id_array[i]));
+		&(id_array[i]),
+		PVFS_sys_job_context);
 	    gossip_err("SEND_REQ_ARRAY(): recv %d returned %d.\n",
 		i, ret);
 	    if(ret < 0)
@@ -414,7 +422,7 @@ int PINT_send_req_array(bmi_addr_t* addr_array,
 	    need_to_test);
 	count = array_size;
 	ret = job_testsome(id_array, &count, index_array, NULL,
-	    status_array, -1);
+	    status_array, -1, PVFS_sys_job_context);
 	if(ret < 0)
 	{
 	    /* TODO: there is no real way cleanup from this right now */
@@ -577,7 +585,8 @@ int PINT_recv_ack_array(bmi_addr_t* addr_array,
 		BMI_PRE_ALLOC,
 		NULL, 
 		&(status_array[i]), 
-		&(id_array[i]));
+		&(id_array[i]),
+		PVFS_sys_job_context);
 	    if(ret < 0)
 	    {
 		/* immediate error */
@@ -602,7 +611,7 @@ int PINT_recv_ack_array(bmi_addr_t* addr_array,
     {
 	count = array_size;
 	ret = job_testsome(id_array, &count, index_array, NULL,
-	    status_array, -1);
+	    status_array, -1, PVFS_sys_job_context);
 	if(ret < 0)
 	{
 	    /* TODO: there is no real way cleanup from this right now */

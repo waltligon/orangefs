@@ -33,6 +33,7 @@ static int lookup_release_job(PINT_server_op *s_op, job_status_s *ret);
 void lookup_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
+extern job_context_id PINT_server_job_context;
 
 #if 0
 PINT_state_machine_s lookup_req_s = 
@@ -175,7 +176,8 @@ static int lookup_init(PINT_server_op *s_op,
     job_post_ret = job_req_sched_post(s_op->req,
 				      s_op,
 				      ret,
-				      &(s_op->scheduled_id));
+				      &(s_op->scheduled_id),
+				      PINT_server_job_context);
 
     return job_post_ret;
 }
@@ -234,7 +236,8 @@ static int lookup_read_object_metadata(PINT_server_op *s_op,
 					 NULL,
 					 s_op,
 					 ret,
-					 &j_id);
+					 &j_id,
+					 PINT_server_job_context);
     return job_post_ret;
 }
 
@@ -350,7 +353,8 @@ static int lookup_read_directory_entry_handle(PINT_server_op *s_op,
 					 NULL,
 					 s_op,
 					 ret,
-					 &j_id);
+					 &j_id,
+					 PINT_server_job_context);
     return job_post_ret;
 }
 
@@ -403,7 +407,8 @@ static int lookup_read_directory_entry(PINT_server_op *s_op,
 					 NULL,
 					 s_op,
 					 ret,
-					 &j_id);
+					 &j_id,
+					 PINT_server_job_context);
     return job_post_ret;
 }
 
@@ -464,7 +469,8 @@ static int lookup_send_response(PINT_server_op *s_op,
 				     0,
 				     s_op, 
 				     ret, 
-				     &j_id);
+				     &j_id,
+				     PINT_server_job_context);
     return job_post_ret;
 }
 
@@ -488,7 +494,8 @@ static int lookup_release_job(PINT_server_op *s_op,
     job_post_ret = job_req_sched_release(s_op->scheduled_id,
 					 s_op,
 					 ret,
-					 &j_id);
+					 &j_id,
+					 PINT_server_job_context);
     return job_post_ret;
 }
 

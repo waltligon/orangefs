@@ -72,6 +72,7 @@ static int remove_verify_dspace_attributes(PINT_server_op *s_op, job_status_s *r
 void remove_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
+extern job_context_id PINT_server_job_context;
 
 #if 0
 PINT_state_machine_s remove_req_s = 
@@ -200,7 +201,8 @@ static int remove_init(PINT_server_op *s_op,
     job_post_ret = job_req_sched_post(s_op->req,
 				      s_op,
 				      ret,
-				      &(s_op->scheduled_id));
+				      &(s_op->scheduled_id),
+				      PINT_server_job_context);
     return job_post_ret;
 }
 
@@ -243,7 +245,8 @@ static int remove_read_object_metadata(PINT_server_op *s_op,
 					 NULL,
 					 s_op,
 					 ret,
-					 &j_id);
+					 &j_id,
+					 PINT_server_job_context);
     return job_post_ret;
 }
 
@@ -273,7 +276,8 @@ static int remove_fallback_to_dspace_getattr(PINT_server_op *s_op,
 					    s_op->req->u.remove.handle,
 					    s_op, /* user ptr */
 					    ret,
-					    &j_id);
+					    &j_id,
+					    PINT_server_job_context);
     return job_post_ret;
 }
 
@@ -400,7 +404,8 @@ static int remove_try_to_read_dirdata_handle(PINT_server_op *s_op,
 					 NULL,
 					 s_op,
 					 ret,
-					 &j_id);
+					 &j_id,
+					 PINT_server_job_context);
     return job_post_ret;
 }
 
@@ -426,7 +431,8 @@ static int remove_remove_dirdata_dspace(PINT_server_op *s_op,
 					   s_op->u.remove.dirdata_handle,
 					   s_op,
 					   ret,
-					   &j_id);
+					   &j_id,
+					   PINT_server_job_context);
     return job_post_ret;
 }
 
@@ -448,7 +454,8 @@ static int remove_remove_dspace(PINT_server_op *s_op,
 					   s_op->req->u.remove.handle,
 					   s_op,
 					   ret,
-					   &j_id);
+					   &j_id,
+					   PINT_server_job_context);
     return job_post_ret;
 }
 
@@ -507,7 +514,8 @@ static int remove_send_response(PINT_server_op *s_op,
 				     0,
 				     s_op, 
 				     ret, 
-				     &j_id);
+				     &j_id,
+				     PINT_server_job_context);
     return job_post_ret;
 }
 
@@ -527,7 +535,8 @@ static int remove_release_posted_job(PINT_server_op *s_op,
     job_post_ret = job_req_sched_release(s_op->scheduled_id,
 					 s_op,
 					 ret,
-					 &j_id);
+					 &j_id,
+					 PINT_server_job_context);
     return job_post_ret;
 }
 

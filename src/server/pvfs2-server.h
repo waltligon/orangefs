@@ -25,6 +25,7 @@ typedef enum
     SHUTDOWN_BMI_INTERFACE,        /* turn off bmi interface             */
     SHUTDOWN_FLOW_INTERFACE,       /* turn off flow interface            */
     SHUTDOWN_STORAGE_INTERFACE,    /* turn off storage interface         */
+    SHUTDOWN_JOB_INTERFACE,        /* turn off job interface             */
     SHUTDOWN_HIGH_LEVEL_INTERFACE, /* turn off high level interface      */
     STATE_MACHINE_HALT,            /* state machine failure              */
     CHECK_DEPS_QUEUE,              /* Check Deps/ Queue                  */

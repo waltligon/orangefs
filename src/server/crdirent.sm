@@ -28,6 +28,7 @@ static int crdirent_release_posted_job(PINT_server_op *s_op, job_status_s *ret);
 void crdirent_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
+extern job_context_id PINT_server_job_context;
 
 #if 0
 PINT_state_machine_s crdirent_req_s = 
@@ -213,7 +214,8 @@ static int crdirent_init(PINT_server_op *s_op,
     job_post_ret = job_req_sched_post(s_op->req,
 				      s_op,
 				      ret,
-				      &(s_op->scheduled_id));
+				      &(s_op->scheduled_id),
+				      PINT_server_job_context);
     return job_post_ret;
 }
 
@@ -259,7 +261,8 @@ static int crdirent_read_parent_metadata(PINT_server_op *s_op,
 					 NULL,
 					 s_op,
 					 ret,
-					 &i);
+					 &i,
+					 PINT_server_job_context);
     return job_post_ret;
 }
 
@@ -357,7 +360,8 @@ static int crdirent_read_directory_entry_handle(PINT_server_op *s_op,
 					 NULL,
 					 s_op,
 					 ret,
-					 &i);
+					 &i,
+					 PINT_server_job_context);
     return job_post_ret;
 }
 
@@ -397,7 +401,8 @@ static int crdirent_create_dirdata_dspace(PINT_server_op *s_op,
 					   NULL,
 					   s_op,
 					   ret,
-					   &i);
+					   &i,
+					   PINT_server_job_context);
     return job_post_ret;
 }
 
@@ -452,7 +457,8 @@ static int crdirent_write_dirdata_handle(PINT_server_op *s_op,
 					  NULL,
 					  s_op,
 					  ret,
-					  &i);
+					  &i,
+					  PINT_server_job_context);
     return job_post_ret;
 }
 
@@ -510,7 +516,8 @@ static int crdirent_write_directory_entry(PINT_server_op *s_op,
 					  NULL,
 					  s_op,
 					  ret,
-					  &i);
+					  &i,
+					  PINT_server_job_context);
     return job_post_ret;
 }
 
@@ -568,7 +575,8 @@ static int crdirent_check_exist_directory_entry(PINT_server_op *s_op,
 					  NULL,
 					  s_op,
 					  ret,
-					  &i);
+					  &i,
+					  PINT_server_job_context);
     return job_post_ret;
 }
 
@@ -651,7 +659,8 @@ static int crdirent_send_bmi(PINT_server_op *s_op,
 				     0,
 				     s_op, 
 				     ret, 
-				     &i);
+				     &i,
+				     PINT_server_job_context);
     return job_post_ret;
 }
 
@@ -687,7 +696,8 @@ static int crdirent_release_posted_job(PINT_server_op *s_op,
 	job_post_ret = job_req_sched_release(s_op->scheduled_id,
 					     s_op,
 					     ret,
-					     &i);
+					     &i,
+					     PINT_server_job_context);
 	return job_post_ret;
     }
 }

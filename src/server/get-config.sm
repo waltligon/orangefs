@@ -22,6 +22,7 @@ static int getconfig_init(PINT_server_op *s_op, job_status_s *ret);
 void getconfig_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
+extern job_context_id PINT_server_job_context;
 
 #if 0
 PINT_state_machine_s getconfig_req_s = 
@@ -182,7 +183,8 @@ static int getconfig_job_trove(PINT_server_op *s_op, job_status_s *ret)
 	    0,
 	    s_op,
 	    ret,
-	    &i);
+	    &i,
+	    PINT_server_job_context);
 
     return(job_post_ret);
 }
@@ -245,7 +247,8 @@ static int getconfig_job_bmi_send(PINT_server_op *s_op, job_status_s *ret)
 	    0,
 	    s_op,
 	    ret,
-	    &i);
+	    &i,
+	    PINT_server_job_context);
 
     return(job_post_ret);
 }
