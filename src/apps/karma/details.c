@@ -49,6 +49,19 @@ static gint gui_details_text_compare(GtkTreeModel *model,
 				     gpointer col_id);
 #endif
 
+/* internal helper fn prototypes */
+static void gui_details_view_insert(GtkListStore *list,
+				    struct PVFS_mgmt_server_stat *s_stat,
+				    float rt_div,
+				    float ra_div,
+				    float up_div,
+				    float ht_div,
+				    float ha_div,
+				    float bt_div,
+				    float ba_div);
+
+/* gui_details_setup()
+ */
 GtkWidget *gui_details_setup(void)
 {
     gui_details_view = gui_details_view_new(&gui_details_list,
@@ -264,33 +277,59 @@ void gui_details_view_fill(GtkWidget *view,
     gtk_list_store_clear(list);
 
     for (i=0; i < s_stat_ct; i++) {
+	gui_details_view_insert(list,
+				&s_stat[i],
+				rt_div,
+				ra_div,
+				up_div,
+				ht_div,
+				ha_div,
+				bt_div,
+				ba_div);
+    }
+
+    /* reattach model to view */
+    gtk_tree_view_set_model(GTK_TREE_VIEW(view), model);
+    g_object_unref(model);
+}
+
+static void gui_details_view_insert(GtkListStore *list,
+				    struct PVFS_mgmt_server_stat *s_stat,
+				    float rt_div,
+				    float ra_div,
+				    float up_div,
+				    float ht_div,
+				    float ha_div,
+				    float bt_div,
+				    float ba_div)
+{
 	GtkTreeIter iter;
 	char *type, meta[] = "meta", data[] = "data", both[] = "both";
 	char fmtbuf[GUI_DETAILS_TYPE][12]; /* don't need one for type */
 
 	snprintf(fmtbuf[GUI_DETAILS_RAM_TOT], 12, "%.2f",
-		 (float) s_stat[i].ram_total_bytes / rt_div);
+		 (float) s_stat->ram_total_bytes / rt_div);
 	snprintf(fmtbuf[GUI_DETAILS_RAM_AVAIL], 12, "%.2f",
-		 (float) s_stat[i].ram_free_bytes / ra_div);
+		 (float) s_stat->ram_free_bytes / ra_div);
 	snprintf(fmtbuf[GUI_DETAILS_UPTIME], 12, "%.2f",
-		 (float) s_stat[i].uptime_seconds / up_div);
+		 (float) s_stat->uptime_seconds / up_div);
 	snprintf(fmtbuf[GUI_DETAILS_HANDLES_TOT], 12, "%.2f",
-		 (float) s_stat[i].handles_total_count / ht_div);
+		 (float) s_stat->handles_total_count / ht_div);
 	snprintf(fmtbuf[GUI_DETAILS_HANDLES_AVAIL], 12, "%.2f",
-		 (float) s_stat[i].handles_available_count / ha_div);
+		 (float) s_stat->handles_available_count / ha_div);
 	snprintf(fmtbuf[GUI_DETAILS_SPACE_TOT], 12, "%.2f",
-		 (float) s_stat[i].bytes_total / bt_div);
+		 (float) s_stat->bytes_total / bt_div);
 	snprintf(fmtbuf[GUI_DETAILS_SPACE_AVAIL], 12, "%.2f",
-		 (float) s_stat[i].bytes_available / ba_div);
+		 (float) s_stat->bytes_available / ba_div);
 
 
 	/* final formatting of data */
-	if ((s_stat[i].server_type & PVFS_MGMT_IO_SERVER) &&
-	    (s_stat[i].server_type & PVFS_MGMT_META_SERVER))
+	if ((s_stat->server_type & PVFS_MGMT_IO_SERVER) &&
+	    (s_stat->server_type & PVFS_MGMT_META_SERVER))
 	{
 	    type = both;
 	}
-	else if (s_stat[i].server_type & PVFS_MGMT_IO_SERVER)
+	else if (s_stat->server_type & PVFS_MGMT_IO_SERVER)
 	{
 	    type = data;
 	}
@@ -305,7 +344,7 @@ void gui_details_view_fill(GtkWidget *view,
 	gtk_list_store_set(list,
 			   &iter,
 			   GUI_DETAILS_NAME,
-			   s_stat[i].bmi_address,
+			   s_stat->bmi_address,
 			   GUI_DETAILS_RAM_TOT,
 			   fmtbuf[GUI_DETAILS_RAM_TOT],
 			   GUI_DETAILS_RAM_AVAIL,
@@ -322,11 +361,6 @@ void gui_details_view_fill(GtkWidget *view,
 			   fmtbuf[GUI_DETAILS_SPACE_AVAIL],
 			   GUI_DETAILS_TYPE, type,
 			   -1);
-    }
-
-    /* reattach model to view */
-    gtk_tree_view_set_model(GTK_TREE_VIEW(view), model);
-    g_object_unref(model);
 }
 
 #ifdef GUI_DETAILS_ENABLE_SORTING
