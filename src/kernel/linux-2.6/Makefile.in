@@ -15,8 +15,19 @@ else
     relative_src_dir = $(top)/${src_relative_top}
 endif
 
-ifndef V
-  QUIET_COMPILE = @QUIET_COMPILE@
+QUIET_COMPILE = @QUIET_COMPILE@
+ifdef V
+    QUIET_COMPILE = 0
+endif
+
+ifeq ($(QUIET_COMPILE),1)
+  # say a one-line description of the action, do not echo the command
+  Q=@echo
+  E=@
+else
+  # do not say the short Q lines, but do echo the entire command
+  Q=@echo >/dev/null
+  E=
 endif
 
 csrc = \
@@ -70,38 +81,24 @@ KDIR    := @LINUX_KERNEL_SRC@
 PWD	:= $(shell pwd)
 
 default: links
-ifdef QUIET_COMPILE
-	@$(MAKE) -C $(KDIR) SUBDIRS=$(PWD) modules
-else
-	$(MAKE) -C $(KDIR) SUBDIRS=$(PWD) modules
-endif
+	$(E)$(MAKE) -C $(KDIR) SUBDIRS=$(PWD) modules
 
 # link to real source directory if out-of-tree build
 links:
-	@for i in $(csrc) $(hsrc); do \
+	$(E)for i in $(csrc) $(hsrc); do \
 	    if [[ ! -f $$i  &&  ! -L $$i ]] ; then \
 		ln -s $(relative_src_dir)/$(here)/$$i ;\
 	    fi ;\
 	done
 
 clean:
-ifdef QUIET_COMPILE
-	@for i in $(csrc) $(hsrc); do \
+	$(E)for i in $(csrc) $(hsrc); do \
 	    if [[ -L $$i ]] ; then \
 		rm -f $$i ;\
 	    fi ;\
 	done
-	@rm -f $(objs) $(othergen) $(cmds)
-	@rm -rf $(othergendir)
-else
-	for i in $(csrc) $(hsrc); do \
-	    if [[ -L $$i ]] ; then \
-		rm -f $$i ;\
-	    fi ;\
-	done
-	rm -f $(objs) $(othergen) $(cmds)
-	rm -rf $(othergendir)
-endif
+	$(E)rm -f $(objs) $(othergen) $(cmds)
+	$(E)rm -rf $(othergendir)
 
 endif
 

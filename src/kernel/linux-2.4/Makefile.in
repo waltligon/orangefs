@@ -16,8 +16,19 @@ else
     relative_src_dir = $(top)/${src_relative_top}
 endif
 
-ifndef V
-	QUIET_COMPILE = @QUIET_COMPILE@
+QUIET_COMPILE = @QUIET_COMPILE@
+ifdef V
+    QUIET_COMPILE = 0
+endif
+
+ifeq ($(QUIET_COMPILE),1)
+  # say a one-line description of the action, do not echo the command
+  Q=@echo
+  E=@
+else
+  # do not say the short Q lines, but do echo the entire command
+  Q=@echo >/dev/null
+  E=
 endif
 
 csrc = \
@@ -79,32 +90,20 @@ include $(KDIR)/arch/$(ARCH)/Makefile
 all: pvfs2.o
 
 pvfs2.o: $(objs)
-ifdef QUIET_COMPILE
-	@echo "  LD [M]  $(absolute_src_dir)/$(here)/$@"
-	@$(LD) -r -o $@ $^
-else
-	$(LD) -r -o $@ $^
-endif
+	$(Q) "  LD [M]  $(absolute_src_dir)/$(here)/$@"
+	$(E)$(LD) -r -o $@ $^
 
 $(objs):%.o: %.c
-ifdef QUIET_COMPILE
-	@echo "  CC [M]  $(absolute_src_dir)/$(here)/$@"
-	@$(CC) $(CFLAGS) -c $< -o $@
-else
-	$(CC) $(CFLAGS) -c $< -o $@
-endif
+	$(Q) "  CC [M]  $(absolute_src_dir)/$(here)/$@"
+	$(E)$(CC) $(CFLAGS) -c $< -o $@
 
 $(deps):%.d: %.c
-	@touch $@
+	$(E)touch $@
 
 $(preps):%.i: %.c
-ifdef QUIET_COMPILE
-	@$(CC) $(CFLAGS) -E $< -o $@
-else
-	$(CC) $(CFLAGS) -E $< -o $@
-endif
+	$(E)$(CC) $(CFLAGS) -E $< -o $@
 
 clean:
-	@rm -f $(objs) $(deps) $(preps) $(othergen) $(csrc) $(hsrc)
+	$(E)rm -f $(objs) $(deps) $(preps) $(othergen) $(csrc) $(hsrc)
 
 -include $(deps)
