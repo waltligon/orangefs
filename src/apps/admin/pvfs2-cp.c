@@ -609,7 +609,7 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials,
                 stat(srcname, &stat_buf);
 		make_attribs(&(obj->pvfs2.attr), credentials, nr_datafiles,
                              (int)stat_buf.st_mode);
-                if (strip_size){
+                if (strip_size > 0) {
                     new_dist = PVFS_sys_dist_lookup("simple_stripe");
                     ret = PVFS_sys_dist_setparam(new_dist, "strip_size", &strip_size);
                     if (ret < 0)
