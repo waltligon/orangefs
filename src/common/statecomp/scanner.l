@@ -38,6 +38,7 @@ void produce_listing(int line, char *listing);
 #define	MAKELIST	produce_listing(line,text);text[0]=0;
 char     text[132];
 int      token;
+int comment_caller;
 
 %}
 
@@ -50,6 +51,7 @@ id          [_a-zA-Z][_0-9a-zA-Z]*
 w           [ \t\n]*
 
 %x		CODE
+%x		COMMENT 
 
 %%
 
@@ -77,6 +79,13 @@ w           [ \t\n]*
 <CODE>"\,"	   {LIST; RETURNVAL(COMMA);}
 <CODE>"\;"	   {LIST; RETURNVAL(SEMICOLON);}
 <CODE>"\=\>"	   {LIST; RETURNVAL(ARROW);}
+
+<CODE>"/*"         {comment_caller = CODE; BEGIN(COMMENT);}
+<COMMENT>[^*\n]*        /* eat anything that's not a '*' */
+<COMMENT>"*"+[^*/\n]*   /* eat up '*'s not followed by '/'s */
+<COMMENT>\n             line++;
+<COMMENT>"*"+"/"        BEGIN(comment_caller);
+
 
 <CODE>{id}     	{LIST; yylval.c = yytext; return(IDENTIFIER);}
 <CODE>{int}    	{LIST; yylval.c = yytext; return(INTEGER);}
