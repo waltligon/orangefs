@@ -5,10 +5,9 @@
  */
 
 /* 
- * test-finalized: the system is initialized and imediatly after finalize is called, then all other functions are tested thereafter
- * Author: Michael Speth
- * Date: 6/26/2003
- * Tab Size: 3
+ * test-finalized: the system is initialized and imediatly after
+ * finalize is called, then all other functions are tested thereafter
+ * Author: Michael Speth Date: 6/26/2003 Tab Size: 3
  */
 
 #include <time.h>
@@ -20,6 +19,7 @@
 #include "mpi.h"
 #include "pts.h"
 #include "pvfs-helper.h"
+#include "pvfs2-util.h"
 #include "null_params.h"
 #include "test-finalized.h"
 
@@ -46,8 +46,7 @@ static int test_lookup(void)
     }
     PVFS_sys_finalize();
 
-    credentials.uid = 100;
-    credentials.gid = 100;
+    PVFS_util_gen_credentials(&credentials);
 
     ret = PVFS_sys_lookup(-1, name, credentials,
                           &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW);
@@ -81,8 +80,7 @@ static int test_getattr(void)
     PVFS_sys_finalize();
     fs_id = pvfs_helper.fs_id;
 
-    credentials.uid = 100;
-    credentials.gid = 100;
+    PVFS_util_gen_credentials(&credentials);
 
     if ((ret = PVFS_sys_lookup(
              fs_id, name, credentials,
@@ -136,8 +134,7 @@ static int test_mkdir(void)
     PVFS_sys_finalize();
     fs_id = pvfs_helper.fs_id;
 
-    credentials.uid = 100;
-    credentials.gid = 100;
+    PVFS_util_gen_credentials(&credentials);
     if ((ret = PVFS_sys_lookup(
              fs_id, name, credentials,
              &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
@@ -148,13 +145,11 @@ static int test_mkdir(void)
 
     parent_refn = resp_lookup.pinode_refn;
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-    attr.owner = 100;
-    attr.group = 100;
+    attr.owner = credentials.uid;
+    attr.group = credentials.gid;
     attr.perms = 1877;
     attr.atime = attr.mtime = attr.ctime = 
 	time(NULL);
-    credentials.uid = 100;
-    credentials.gid = 100;
 
     ret = PVFS_sys_mkdir(name, parent_refn, attr, credentials, &resp_mkdir);
     return ret;
@@ -192,8 +187,7 @@ static int test_readdir(void)
     PVFS_sys_finalize();
     fs_id = pvfs_helper.fs_id;
 
-    credentials.uid = 100;
-    credentials.gid = 100;
+    PVFS_util_gen_credentials(&credentials);
     if ((ret = PVFS_sys_lookup(
              fs_id, name, credentials,
              &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
@@ -205,9 +199,6 @@ static int test_readdir(void)
     pinode_refn = resp_lookup.pinode_refn;
     token = PVFS_READDIR_START;
     pvfs_dirent_incount = 1;
-
-    credentials.uid = 100;
-    credentials.gid = 100;
 
     ret =
 	PVFS_sys_readdir(pinode_refn, token, pvfs_dirent_incount, credentials,
@@ -246,12 +237,11 @@ static int test_create(void)
     filename = (char *) malloc(sizeof(char) * 100);
     filename = strcpy(filename, "name");
 
-    attr.owner = 100;
-    attr.group = 100;
+    PVFS_util_gen_credentials(&credentials);
+    attr.owner = credentials.uid;
+    attr.group = credentials.gid;
     attr.perms = 1877;
     attr.atime = attr.mtime = attr.ctime = time(NULL);
-    credentials.uid = 100;
-    credentials.gid = 100;
 
     if (initialize_sysint() < 0)
     {
@@ -292,9 +282,7 @@ static int test_remove(void)
     filename = (char *) malloc(sizeof(char) * 100);
     filename = strcpy(filename, "name");
 
-    credentials.uid = 100;
-    credentials.gid = 100;
-
+    PVFS_util_gen_credentials(&credentials);
     if (initialize_sysint() < 0)
     {
 	debug_printf("UNABLE TO INIT THE SYSTEM INTERFACE\n");
@@ -366,8 +354,7 @@ static int test_read(void)
     memset(&req_mem, 0, sizeof(PVFS_Request));
     memset(&resp_io, 0, sizeof(PVFS_sysresp_io));
 
-    credentials.uid = 100;
-    credentials.gid = 100;
+    PVFS_util_gen_credentials(&credentials);
     memset(&resp_lk, 0, sizeof(PVFS_sysresp_lookup));
 
     if (initialize_sysint() < 0)
@@ -415,8 +402,7 @@ static int test_write(void)
     memset(&req_mem, 0, sizeof(PVFS_Request));
     memset(&resp_io, 0, sizeof(PVFS_sysresp_io));
 
-    credentials.uid = 100;
-    credentials.gid = 100;
+    PVFS_util_gen_credentials(&credentials);
     memset(&resp_lk, 0, sizeof(PVFS_sysresp_lookup));
 
     if (initialize_sysint() < 0)

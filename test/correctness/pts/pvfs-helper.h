@@ -6,6 +6,7 @@
 
 /* pvfs specific includes (from test/client/sysint) */
 #include "client.h"
+#include "pvfs2-util.h"
 
 /* don't change this w/o changing the test_files array */
 #define NUM_TEST_FILES                         10

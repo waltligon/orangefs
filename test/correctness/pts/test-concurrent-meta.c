@@ -5,10 +5,8 @@
  */
 
 /* 
- * test-invalid-files: tests behavior of all sys-init functions with an invalid file
- * Author: Michael Speth
- * Date: 6/25/2003
- * Tab Size: 3
+ * test-invalid-files: tests behavior of all sys-init functions with
+ * an invalid file Author: Michael Speth Date: 6/25/2003 Tab Size: 3
  */
 #include <sys/time.h>
 #include <time.h>
@@ -18,6 +16,7 @@
 #include "client.h"
 #include "mpi.h"
 #include "pts.h"
+#include "pvfs2-util.h"
 #include "pvfs-helper.h"
 #include "null_params.h"
 #include "test-concurrent-meta.h"
@@ -38,8 +37,7 @@ static int lookup(char *name, int fs_id)
 
     ret = -2;
 
-    credentials.uid = 100;
-    credentials.gid = 100;
+    PVFS_util_gen_credentials(&credentials);
     if ((ret = PVFS_sys_lookup(
              fs_id, name, credentials,
              &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
@@ -69,8 +67,7 @@ static int getattr(char *name, int fs_id)
 
     ret = -2;
 
-    credentials.uid = 100;
-    credentials.gid = 100;
+    PVFS_util_gen_credentials(&credentials);
     if ((ret = PVFS_sys_lookup(
              fs_id, name, credentials,
              &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
@@ -103,8 +100,7 @@ static int remove_file_dir(char *name, int fs_id)
 
     ret = -2;
 
-    credentials.uid = 100;
-    credentials.gid = 100;
+    PVFS_util_gen_credentials(&credentials);
 
     ret = PVFS_sys_lookup(fs_id, name, credentials,
                           &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
@@ -139,8 +135,8 @@ static int list_dir(char *test_dir, int fs_id)
 
     ret = -2;
 
-    credentials.uid = 100;
-    credentials.gid = 100;
+    PVFS_util_gen_credentials(&credentials);
+
     if ((ret = PVFS_sys_lookup(
              fs_id, test_dir, credentials,
              &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
@@ -152,9 +148,6 @@ static int list_dir(char *test_dir, int fs_id)
     pinode_refn = resp_lookup.pinode_refn;
     token = PVFS_READDIR_START;
     pvfs_dirent_incount = 1;
-
-    credentials.uid = 100;
-    credentials.gid = 100;
 
     ret = PVFS_sys_readdir(pinode_refn, token, pvfs_dirent_incount,
                              credentials, &resp_readdir);
@@ -181,13 +174,13 @@ static int create_file(char *filename, char *directory, int fs_id)
 
     ret = -2;
 
+    PVFS_util_gen_credentials(&credentials);
+
     attr.mask = PVFS_ATTR_SYS_ALL_NOSIZE;
-    attr.owner = 100;
-    attr.group = 100;
+    attr.owner = credentials.uid;
+    attr.group = credentials.gid;
     attr.perms = 1877;
     attr.atime = attr.mtime = attr.ctime = 0xdeadbeef;
-    credentials.uid = 100;
-    credentials.gid = 100;
 
     ret = PVFS_sys_lookup(fs_id, directory, credentials,
                           &resp_look, PVFS2_LOOKUP_LINK_NO_FOLLOW);
@@ -197,8 +190,8 @@ static int create_file(char *filename, char *directory, int fs_id)
         return (-1);
     }
 
-    ret = PVFS_sys_create(filename, resp_look.pinode_refn, attr, credentials,
-                            &resp_create);
+    ret = PVFS_sys_create(filename, resp_look.pinode_refn,
+                          attr, credentials, &resp_create);
    return ret;
 }
 
@@ -220,8 +213,7 @@ static int create_dir2(char *name, int fs_id)
     PVFS_credentials credentials;
     PVFS_sysresp_lookup resp_lookup;
 
-    credentials.uid = 100;
-    credentials.gid = 100;
+    PVFS_util_gen_credentials(&credentials);
     if ((ret = PVFS_sys_lookup(
              fs_id, "/", credentials,
              &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
@@ -232,13 +224,11 @@ static int create_dir2(char *name, int fs_id)
 
     parent_refn = resp_lookup.pinode_refn;
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-    attr.owner = 100;
-    attr.group = 100;
+    attr.owner = credentials.uid;
+    attr.group = credentials.gid;
     attr.perms = 1877;
     attr.atime = attr.mtime = attr.ctime =
 	time(NULL);
-    credentials.uid = 100;
-    credentials.gid = 100;
 
     ret = PVFS_sys_mkdir(name, parent_refn, attr, credentials, &resp_mkdir);
     return ret;

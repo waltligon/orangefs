@@ -64,8 +64,8 @@ static int build_nested_path(int levels, char *format, int rank, int test_symlin
                 Lu(root_refn.handle), root_refn.fs_id);
 
         attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-        attr.owner = getuid();
-        attr.group = getgid();
+        attr.owner = credentials.uid;
+        attr.group = credentials.gid;
         attr.perms = 1877;
         attr.atime = attr.ctime = attr.mtime = time(NULL);
 

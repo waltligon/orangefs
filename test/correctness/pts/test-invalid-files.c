@@ -19,6 +19,7 @@
 #include "client.h"
 #include "mpi.h"
 #include "pts.h"
+#include "pvfs2-util.h"
 #include "pvfs-helper.h"
 #include "null_params.h"
 #include "test-invalid-files.h"
@@ -45,8 +46,7 @@ static int test_lookup(void)
 	return -1;
     }
 
-    credentials.uid = 100;
-    credentials.gid = 100;
+    PVFS_util_gen_credentials(&credentials);
 
     ret = PVFS_sys_lookup(-1, name, credentials,
                           &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW);
@@ -79,8 +79,7 @@ static int test_getattr(int testcase)
     }
     fs_id = pvfs_helper.fs_id;
 
-    credentials.uid = 100;
-    credentials.gid = 100;
+    PVFS_util_gen_credentials(&credentials);
 
     if ((ret = PVFS_sys_lookup(
              fs_id, name, credentials,
@@ -147,8 +146,7 @@ static int test_mkdir(int testcase)
     }
     fs_id = pvfs_helper.fs_id;
 
-    credentials.uid = 100;
-    credentials.gid = 100;
+    PVFS_util_gen_credentials(&credentials);
     if ((ret = PVFS_sys_lookup(
              fs_id, name, credentials,
              &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
@@ -159,13 +157,11 @@ static int test_mkdir(int testcase)
 
     parent_refn = resp_lookup.pinode_refn;
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-    attr.owner = 100;
-    attr.group = 100;
+    attr.owner = credentials.uid;
+    attr.group = credentials.gid;
     attr.perms = 1877;
     attr.atime = attr.mtime = attr.ctime =
 	time(NULL);
-    credentials.uid = 100;
-    credentials.gid = 100;
 
     switch (testcase)
     {
@@ -214,8 +210,7 @@ static int test_readdir(int testcase)
     }
     fs_id = pvfs_helper.fs_id;
 
-    credentials.uid = 100;
-    credentials.gid = 100;
+    PVFS_util_gen_credentials(&credentials);
     if ((ret = PVFS_sys_lookup(
              fs_id, name, credentials,
              &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW)) < 0)
@@ -227,9 +222,6 @@ static int test_readdir(int testcase)
     pinode_refn = resp_lookup.pinode_refn;
     token = PVFS_READDIR_START;
     pvfs_dirent_incount = 1;
-
-    credentials.uid = 100;
-    credentials.gid = 100;
 
     switch (testcase)
     {
@@ -267,14 +259,14 @@ static int test_create(int testcase)
     filename = (char *) malloc(sizeof(char) * 100);
     filename = strcpy(filename, "name");
 
+    PVFS_util_gen_credentials(&credentials);
+
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-    attr.owner = 100;
-    attr.group = 100;
+    attr.owner = credentials.uid;
+    attr.group = credentials.gid;
     attr.perms = 1877;
     attr.atime = attr.mtime = attr.ctime =
 	time(NULL);
-    credentials.uid = 100;
-    credentials.gid = 100;
 
     if (initialize_sysint() < 0)
     {
@@ -329,8 +321,7 @@ static int test_remove(int testcase)
     filename = (char *) malloc(sizeof(char) * 100);
     filename = strcpy(filename, "name");
 
-    credentials.uid = 100;
-    credentials.gid = 100;
+    PVFS_util_gen_credentials(&credentials);
 
     if (initialize_sysint() < 0)
     {
@@ -414,8 +405,7 @@ static int test_read(int testcase)
     memset(&req_mem, 0, sizeof(PVFS_Request));
     memset(&resp_io, 0, sizeof(PVFS_sysresp_io));
 
-    credentials.uid = 100;
-    credentials.gid = 100;
+    PVFS_util_gen_credentials(&credentials);
     memset(&resp_lk, 0, sizeof(PVFS_sysresp_lookup));
 
     if (initialize_sysint() < 0)
@@ -474,8 +464,7 @@ static int test_write(int testcase)
     memset(&req_mem, 0, sizeof(PVFS_Request));
     memset(&resp_io, 0, sizeof(PVFS_sysresp_io));
 
-    credentials.uid = 100;
-    credentials.gid = 100;
+    PVFS_util_gen_credentials(&credentials);
     memset(&resp_lk, 0, sizeof(PVFS_sysresp_lookup));
 
     if (initialize_sysint() < 0)
@@ -523,14 +512,13 @@ static int init_file(void)
     filename = (char *) malloc(sizeof(char) * 100);
     filename = strcpy(filename, "name");
 
+    PVFS_util_gen_credentials(&credentials);
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-    attr.owner = 100;
-    attr.group = 100;
+    attr.owner = credentials.uid;
+    attr.group = credentials.gid;
     attr.perms = 1877;
     attr.atime = attr.mtime = attr.ctime =
 	time(NULL);
-    credentials.uid = 100;
-    credentials.gid = 100;
 
     if (initialize_sysint() < 0)
     {

@@ -57,8 +57,7 @@ int get_root(PVFS_fs_id fs_id, PVFS_pinode_reference *pinode_refn)
     {
         memset(&resp_look, 0, sizeof(resp_look));
 
-        credentials.uid = getuid();
-        credentials.gid = getgid();
+        PVFS_util_gen_credentials(&credentials);
 
         printf("looking up the root handle for fsid = %d\n", fs_id);
         ret = PVFS_sys_lookup(fs_id, root, credentials,
@@ -83,15 +82,14 @@ int create_dir(PVFS_pinode_reference parent_refn, char *name,
 
     memset(&resp_mkdir, 0, sizeof(resp_mkdir));
 
-    attr.owner = getuid();
-    attr.group = getgid();
+    PVFS_util_gen_credentials(&credentials);
+
+    attr.owner = credentials.uid;
+    attr.group = credentials.gid;
     attr.atime = attr.mtime = attr.ctime = 
 	time(NULL);
     attr.perms = (PVFS_U_WRITE | PVFS_U_READ);
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-
-    credentials.uid = getuid();
-    credentials.gid = getgid();
 
     ret = PVFS_sys_mkdir(name, parent_refn,
                          attr, credentials, &resp_mkdir);
@@ -120,8 +118,7 @@ int remove_file(PVFS_pinode_reference parent_refn, char *name)
     int ret = -1;
     PVFS_credentials credentials;
 
-    credentials.uid = getuid();
-    credentials.gid = getgid();
+    PVFS_util_gen_credentials(&credentials);
 
     ret = PVFS_sys_remove(name, parent_refn, credentials);
     if (ret < 0)
@@ -158,8 +155,7 @@ int lookup_name(PVFS_pinode_reference pinode_refn, char *name,
 
     memset(&resp_lookup, 0, sizeof(resp_lookup));
 
-    credentials.uid = getuid();
-    credentials.gid = getgid();
+    PVFS_util_gen_credentials(&credentials);
 
     ret = PVFS_sys_lookup(pinode_refn.fs_id, name,
                           credentials, &resp_lookup,

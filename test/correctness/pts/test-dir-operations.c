@@ -10,6 +10,7 @@
 #include "client.h"
 #include "mpi.h"
 #include "pts.h"
+#include "pvfs2-util.h"
 #include "pvfs-helper.h"
 #include "test-dir-operations.h"
 
@@ -48,11 +49,10 @@ static int read_dirs(PVFS_pinode_reference refn,
 
     memset(&resp_readdir,0,sizeof(PVFS_sysresp_readdir));
 
-    credentials.uid = 100;
-    credentials.gid = 100;
+    PVFS_util_gen_credentials(&credentials);
 
-    /* call readdir */
-    printf("Calling readdir with handle %Ld and fsid %d\n", Ld(refn.handle), refn.fs_id);
+    printf("Calling readdir with handle %Ld and fsid %d\n",
+           Ld(refn.handle), refn.fs_id);
     printf("ndirs is %d\n",ndirs);
     ret = PVFS_sys_readdir(refn, PVFS_READDIR_START, ndirs,
                            credentials, &resp_readdir);

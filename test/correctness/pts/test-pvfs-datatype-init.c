@@ -1,12 +1,23 @@
-#include "pvfs-helper.h"
+/*
+ * (C) 2002 Clemson University and The University of Chicago
+ *
+ * See COPYING in top-level directory.
+ */
+
 #include <time.h>
-#include <test-pvfs-datatype-init.h>
 #include <stdio.h>
+#include "pvfs-helper.h"
+#include "test-pvfs-datatype-init.h"
 
 /*
-  initialize the sysint and create files to be used by subsequent tests.
+  initialize the sysint and create files to be used by subsequent
+  tests.
 */
-int test_pvfs_datatype_init(MPI_Comm *mycomm __unused, int myid, char *buf __unused, void *params)
+int test_pvfs_datatype_init(
+    MPI_Comm *mycomm __unused,
+    int myid,
+    char *buf __unused,
+    void *params)
 {
     int ret = -1, i = 0, num_test_files_ok = 0;
     PVFS_sys_attr attr;
@@ -30,8 +41,7 @@ int test_pvfs_datatype_init(MPI_Comm *mycomm __unused, int myid, char *buf __unu
                      args->mode);
     }
 
-    credentials.uid = getuid();
-    credentials.gid = getgid();
+    PVFS_util_gen_credentials(&credentials);
 
     /*
       verify that all test files exist.  it's okay if they
@@ -69,8 +79,8 @@ int test_pvfs_datatype_init(MPI_Comm *mycomm __unused, int myid, char *buf __unu
 
 
             attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-            attr.owner = getuid();
-            attr.group = getgid();
+            attr.owner = credentials.uid;
+            attr.group = credentials.gid;
             attr.perms = 1877;
 	    attr.atime = attr.mtime = attr.ctime = 
 		time(NULL);

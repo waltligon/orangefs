@@ -1,8 +1,18 @@
-#include "pvfs-helper.h"
-#include <test-pvfs-datatype-hvector.h>
-#include <stdio.h>
+/*
+ * (C) 2002 Clemson University and The University of Chicago
+ *
+ * See COPYING in top-level directory.
+ */
 
-int test_pvfs_datatype_hvector(MPI_Comm *mycomm __unused, int myid, char *buf __unused, void *params __unused)
+#include <stdio.h>
+#include "pvfs-helper.h"
+#include "test-pvfs-datatype-hvector.h"
+
+int test_pvfs_datatype_hvector(
+    MPI_Comm *mycomm __unused,
+    int myid,
+    char *buf __unused,
+    void *params __unused)
 {
     int ret = -1, i = 0, j = 0, num_ok = 0;
     PVFS_credentials credentials;
@@ -31,8 +41,7 @@ int test_pvfs_datatype_hvector(MPI_Comm *mycomm __unused, int myid, char *buf __
         io_buffer[i] = (char) ti;
     }
 
-    credentials.uid = getuid();
-    credentials.gid = getgid();
+    PVFS_util_gen_credentials(&credentials);
 
     for(i = 0; i < pvfs_helper.num_test_files; i++)
     {
