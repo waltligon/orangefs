@@ -53,15 +53,19 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
     int i;
     int partial_flag = 0;
     PVFS_msg_tag_t op_tag = get_next_session_tag();
+    int target_handle_count = 0;
+    PVFS_handle* target_handle_array = NULL;
+    struct PINT_Request_state* req_state = NULL;
+    PINT_Request_file_data tmp_file_data;
+    PVFS_count32 segmax = 1;
+    PVFS_size bytemax = 1;
+    PVFS_offset offset = 0;
+    PVFS_boolean eof_flag = 0;
 
     PVFS_handle HACK_foo;
     PVFS_Dist* HACK_io_dist = NULL;
     PVFS_handle* HACK_datafile_handles = &HACK_foo;
     int HACK_num_datafiles = 1;
-
-    /* TODO: figure out which servers we really need to contact.  It may
-     * not really be all of them 
-     */
 
     if((type != PVFS_SYS_IO_READ) && (type != PVFS_SYS_IO_WRITE))
     {
@@ -110,27 +114,71 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	goto out;
     }
 
+    /* TODO: figure out which servers we really need to contact.  It may
+     * not really be all of them 
+     */
+    target_handle_array = (PVFS_handle*)malloc(HACK_num_datafiles
+	* sizeof(PVFS_handle));
+    if(!target_handle_array)
+    {
+	ret = -errno;
+	goto out;
+    }
+
+    req_state = PINT_New_request_state(req->io_req);
+    if(!req_state)
+    {
+	ret = -ENOMEM;
+	goto out;
+    }
+    for(i=0; i<HACK_num_datafiles; i++)
+    {
+	tmp_file_data.fsize = 0;  /* don't worry about file size yet */
+	tmp_file_data.dist = HACK_io_dist;
+	tmp_file_data.iod_num = i;
+	tmp_file_data.iod_count = HACK_num_datafiles;
+	tmp_file_data.extend_flag = 1;
+
+	ret = PINT_Process_request(req_state, &tmp_file_data,
+	    &segmax, NULL, NULL, &offset, &bytemax, &eof_flag,
+	    PINT_CKSIZE);
+	if(ret < 0)
+	{
+	    goto out;
+	}
+
+	/* does any of the requested data belong to this handle? */
+	if(bytemax)
+	{
+	    target_handle_array[target_handle_count] =
+		HACK_datafile_handles[i]; 
+	    target_handle_count++;
+	}
+    }
+    PINT_Free_request_state(req_state);
+    req_state = NULL;
+
     /* allocate storage for bookkeeping information */
     /* TODO: try to do something to avoid so many mallocs */
-    addr_array = (bmi_addr_t*)malloc(HACK_num_datafiles *
+    addr_array = (bmi_addr_t*)malloc(target_handle_count *
 	sizeof(bmi_addr_t));
     req_array = (struct PVFS_server_req_s*)
-	malloc(HACK_num_datafiles * 
+	malloc(target_handle_count * 
 	sizeof(struct PVFS_server_req_s));
-    resp_encoded_array = (void**)malloc(HACK_num_datafiles *
+    resp_encoded_array = (void**)malloc(target_handle_count *
 	sizeof(void*));
     resp_decoded_array = (struct PINT_decoded_msg*)
-	malloc(HACK_num_datafiles * 
+	malloc(target_handle_count * 
 	sizeof(struct PINT_decoded_msg));
-    error_code_array = (int*)malloc(HACK_num_datafiles *
+    error_code_array = (int*)malloc(target_handle_count *
 	sizeof(int));
     file_data_array = (PINT_Request_file_data*)malloc(
-	HACK_num_datafiles*sizeof(PINT_Request_file_data));
+	target_handle_count*sizeof(PINT_Request_file_data));
 
-    flow_array = (flow_descriptor**)malloc(HACK_num_datafiles *
+    flow_array = (flow_descriptor**)malloc(target_handle_count *
 	sizeof(flow_descriptor*));
     if(flow_array)
-	memset(flow_array, 0, (HACK_num_datafiles *
+	memset(flow_array, 0, (target_handle_count *
 	    sizeof(flow_descriptor*)));
 	
     if(!addr_array || !req_array || !resp_encoded_array ||
@@ -142,12 +190,12 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
     }
 
     /* setup the I/O request to each data server */
-    for(i=0; i<HACK_num_datafiles; i++)
+    for(i=0; i<target_handle_count; i++)
     {
 	/* resolve the address of the server */
 	ret = PINT_bucket_map_to_server(
 	    &(addr_array[i]),
-	    HACK_datafile_handles[i],
+	    target_handle_array[i],
 	    req->pinode_refn.fs_id);
 	if(ret < 0)
 	{
@@ -158,7 +206,7 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	req_array[i].op = PVFS_SERV_IO;
 	req_array[i].rsize = sizeof(struct PVFS_server_req_s);
 	req_array[i].credentials = req->credentials;
-	req_array[i].u.io.handle = HACK_datafile_handles[i];
+	req_array[i].u.io.handle = target_handle_array[i];
 	req_array[i].u.io.fs_id = req->pinode_refn.fs_id;
 	req_array[i].u.io.iod_num = i;
 	req_array[i].u.io.iod_count = HACK_num_datafiles;
@@ -178,7 +226,7 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	resp_encoded_array,
 	resp_decoded_array,
 	error_code_array,
-	HACK_num_datafiles,
+	target_handle_count,
 	op_tag);
     if(ret < 0 && ret != -EIO)
     {
@@ -198,7 +246,7 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
     /* setup a flow for each I/O server that gave us a positive
      * response
      */
-    for(i=0; i<HACK_num_datafiles; i++)
+    for(i=0; i<target_handle_count; i++)
     {
 	tmp_resp = (struct
 	    PVFS_server_resp_s*)resp_decoded_array[i].buffer;
@@ -239,16 +287,49 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 		flow_array[i]->src.u.mem.size = req->buffer_size;
 		flow_array[i]->src.u.mem.buffer = req->buffer;
 		flow_array[i]->dest.endpoint_id = BMI_ENDPOINT;
-		flow_array[i]->dest.u.mem.size = req->buffer_size;
-		flow_array[i]->dest.u.mem.buffer = req->buffer;
+		flow_array[i]->dest.u.bmi.address = addr_array[i];
 	    }
 	}
     }
 
-    /* TODO: finish this up */
+    /* actually run any flows that are needed */
+    /* NOTE: we don't have to check if any flows are necessary or
+     * not; this function will exit without doing anything if no
+     * flows are runnable
+     */
+    ret = PINT_flow_array(flow_array, error_code_array,
+	target_handle_count);
+    if(ret < 0)
+    {
+	goto out;
+    }
 
-    ret = -ENOSYS;
+    /* now we need to take stock of how many operations (if any)
+     * failed, and report how much total data was transferred
+     */
+    resp->total_completed = 0;
+    for(i=0; i<target_handle_count; i++)
+    {
+	if(error_code_array[i] || flow_array[i]->error_code)
+	{
+	    /* TODO: note that in the future, we could return
+	     * information about which servers actually failed in
+	     * this case
+	     */
+	    ret = -EIO;
+	}
+	else
+	{
+	    resp->total_completed +=
+		flow_array[i]->total_transfered;
+	}
+    }
 
+    /* TODO: do we need to do anything special for "short" reads
+     * or writes?
+     */
+
+    /* drop through and pass out return value */
 out:
     
     if(addr_array)
@@ -263,9 +344,11 @@ out:
 	free(error_code_array);
     if(file_data_array)
 	free(file_data_array);
+    if(target_handle_array)
+	free(target_handle_array);
     if(flow_array)
     {
-	for(i=0; i<HACK_num_datafiles; i++)
+	for(i=0; i<target_handle_count; i++)
 	{
 	    if(flow_array[i])
 		PINT_flow_free(flow_array[i]);
@@ -273,10 +356,17 @@ out:
 	free(flow_array);
     }
 
+    if(HACK_io_dist)
+    {
+	free(HACK_io_dist);
+    }
+
+    if(req_state)
+	PINT_Free_request_state(req_state);
+
     HACK_remove(HACK_foo, req->pinode_refn.fs_id);
     
     return(ret);
-
 }
 
 /* TODO: remove these later */

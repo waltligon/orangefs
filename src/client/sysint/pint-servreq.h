@@ -73,6 +73,11 @@ void PINT_release_req_array(bmi_addr_t* addr_array,
     int* error_code_array,
     int array_size);
 
+int PINT_flow_array(
+    flow_descriptor** flow_array,
+    int* error_code_array,
+    int array_size);
+
 /* dunno where these belong, but here is better than nowhere. -- rob */
 void debug_print_type(void* thing, int type);
 PVFS_msg_tag_t get_next_session_tag(void);

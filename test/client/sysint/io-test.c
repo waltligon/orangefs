@@ -23,6 +23,7 @@ int main(int argc,char **argv)
 	int ret = -1;
 	pvfs_mntlist mnt = {0,NULL};
 	int io_size = 1024 * 1024;
+	void* io_buffer = NULL;
 
 	if (argc != 2)
 	{
@@ -36,6 +37,13 @@ int main(int argc,char **argv)
 		return(-1);
 	}
 		
+	/* create a buffer for running I/O on */
+	io_buffer = (void*)malloc(io_size);
+	if(!io_buffer)
+	{
+		return(-1);
+	}
+
 	/* build the full path name (work out of the root dir) */
 
 	name_sz = strlen(argv[1]) + 2; /* include null terminator and slash */
@@ -140,6 +148,8 @@ int main(int argc,char **argv)
 	req_io.credentials.uid = 100;
 	req_io.credentials.gid = 100;
 	req_io.credentials.perms = U_WRITE|U_READ;
+	req_io.buffer = io_buffer;
+	req_io.buffer_size = io_size;
 
 	ret = PVFS_Request_contiguous(io_size, PVFS_BYTE, &(req_io.io_req));
 	if(ret < 0)
