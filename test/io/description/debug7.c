@@ -39,7 +39,7 @@ int main(int argc, char **argv)
 	/* set up file data for request */
 	rf1.iod_num = 1;
 	rf1.iod_count = 8;
-	rf1.fsize = 10000000;
+	rf1.fsize = 0;
 	rf1.dist = PVFS_Dist_create("simple_stripe");
 	rf1.extend_flag = 1;
 	PINT_Dist_lookup(rf1.dist);
@@ -63,6 +63,12 @@ int main(int argc, char **argv)
 	retval = PINT_Process_request(rs1, NULL, &rf1, &seg1,
 		PINT_CKSIZE_LOGICAL_SKIP); /**/
 
+	if(PINT_REQUEST_STATE_OFFSET(rs1) == -1)
+	{
+	    printf("bytes: %d\n", (int)seg1.bytes);
+	    printf("CRAP, we hit state == -1\n");
+	    return(-1);
+	}
 	/* need to reset bytemax before we contrinue */
 	seg1.bytemax = BYTEMAX;
 
