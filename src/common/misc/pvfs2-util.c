@@ -1132,11 +1132,20 @@ static int copy_mntent(
 
     if (dest_mntent && src_mntent)
     {
+        memset(dest_mntent, 0, sizeof(struct PVFS_sys_mntent));
+
         dest_mntent->pvfs_config_server =
             strdup(src_mntent->pvfs_config_server);
         dest_mntent->pvfs_fs_name = strdup(src_mntent->pvfs_fs_name);
-        dest_mntent->mnt_dir = strdup(src_mntent->mnt_dir);
-        dest_mntent->mnt_opts = strdup(src_mntent->mnt_opts);
+
+        if (src_mntent->mnt_dir)
+        {
+            dest_mntent->mnt_dir = strdup(src_mntent->mnt_dir);
+        }
+        if (src_mntent->mnt_opts)
+        {
+            dest_mntent->mnt_opts = strdup(src_mntent->mnt_opts);
+        }
         dest_mntent->flowproto = src_mntent->flowproto;
         dest_mntent->encoding = src_mntent->encoding;
         dest_mntent->fs_id = src_mntent->fs_id;

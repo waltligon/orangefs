@@ -339,6 +339,7 @@ int pvfs2_fill_sb(
 	return -ENOMEM;
     }
 
+    pvfs2_print("About to parse mount options %s\n",(char *)data);
     ret = parse_mount_options((char *)data, sb, silent);
     if (ret)
     {
@@ -393,7 +394,74 @@ struct super_block *pvfs2_get_sb(
     const char *devname,
     void *data)
 {
-    return get_sb_nodev(fst, flags, data, pvfs2_fill_sb);
+    struct super_block *sb = ERR_PTR(-EINVAL);
+    int ret = -EINVAL;
+    char buf[PVFS2_MAX_MOUNT_OPT_LEN];
+    pvfs2_kernel_op_t *new_op = NULL;
+
+    if (devname)
+    {
+        new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
+        if (!new_op)
+        {
+            return ERR_PTR(-ENOMEM);
+        }
+        new_op->upcall.type = PVFS2_VFS_OP_FS_MOUNT;
+        strncpy(new_op->upcall.req.fs_mount.pvfs2_config_server,
+                devname, PVFS_MAX_SERVER_ADDR_LEN);
+
+        pvfs2_print("Attempting PVFS2 Mount via host %s\n",
+                    new_op->upcall.req.fs_mount.pvfs2_config_server);
+
+        if (data)
+        {
+            strncpy(new_op->upcall.req.fs_mount.options,
+                    (char *)data, PVFS2_MAX_MOUNT_OPT_LEN);
+            pvfs2_print("Got mount options: %s\n",
+                        new_op->upcall.req.fs_mount.options);
+        }
+
+        service_operation(new_op, "pvfs2_fs_mount", 0);
+        ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
+
+        pvfs2_print("pvfs2_fs_mount: got return value of %d\n", ret);
+        if (ret)
+        {
+            sb = ERR_PTR(ret);
+            goto error_exit;
+        }
+
+        if (data)
+        {
+            snprintf(buf, PVFS2_MAX_MOUNT_OPT_LEN,
+                     "coll_id=%d,root_handle=%Lu,%s",
+                     new_op->downcall.resp.fs_mount.fs_id,
+                     new_op->downcall.resp.fs_mount.root_handle,
+                     (char *)data);
+        }
+        else
+        {
+            snprintf(buf, PVFS2_MAX_MOUNT_OPT_LEN,
+                     "coll_id=%d,root_handle=%Lu",
+                     new_op->downcall.resp.fs_mount.fs_id,
+                     new_op->downcall.resp.fs_mount.root_handle);
+        }
+
+        pvfs2_print("Formatted mount options are: %s\n", buf);
+        sb = get_sb_nodev(fst, flags, buf, pvfs2_fill_sb);
+    }
+    else
+    {
+        sb = get_sb_nodev(fst, flags, data, pvfs2_fill_sb);
+    }
+
+  error_exit:
+    if (new_op)
+    {
+        op_release(new_op);
+    }
+
+    return sb;
 }
 
 void pvfs2_kill_sb(

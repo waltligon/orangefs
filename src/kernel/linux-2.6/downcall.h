@@ -82,6 +82,12 @@ typedef struct
 
 typedef struct
 {
+    PVFS_fs_id fs_id;
+    PVFS_handle root_handle;
+} pvfs2_fs_mount_response_t;
+
+typedef struct
+{
     int type;
     int status;
 
@@ -99,6 +105,7 @@ typedef struct
 /*      pvfs2_rename_response_t rename; */
 	pvfs2_statfs_response_t statfs;
 /* 	pvfs2_truncate_response_t truncate; */
+        pvfs2_fs_mount_response_t fs_mount;
     } resp;
 } pvfs2_downcall_t;
 

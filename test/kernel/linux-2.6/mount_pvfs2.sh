@@ -24,9 +24,13 @@ if [ ! -d /tmp/mnt ]; then
    mkdir /tmp/mnt
 fi
 
+echo "Starting pvfs2-client"
+./pvfs2-client -p ./pvfs2-client-core
+
 if [ "`mount | grep -c pvfs2`" = "0" ]; then
    echo "Mounting pvfs2 on /tmp/mnt"
-   mount -t pvfs2 pvfs2 /tmp/mnt -o coll_id=9,root_handle=1048576
+#   mount -t pvfs2 pvfs2 /tmp/mnt -o coll_id=9,root_handle=1048576
+    mount -t pvfs2 tcp://lain.mcs.anl.gov:3334/pvfs2-fs /tmp/mnt
 else
    echo "Uh...I think pvfs2 is already mounted."
 fi

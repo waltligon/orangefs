@@ -23,6 +23,8 @@
 #include "pint-dev-shared.h"
 #include "pvfs2-dev-proto.h"
 #include "pvfs2-util.h"
+#include "pint-bucket.h"
+#include "pvfs2-sysint.h"
 
 #ifdef USE_MMAP_RA_CACHE
 #include "mmap-ra-cache.h"
@@ -844,7 +846,7 @@ static int service_truncate_request(
 }
 
 #ifdef USE_MMAP_RA_CACHE
-static int pvfs2_flush_mmap_racache(
+static int service_mmap_ra_flush_request(
     pvfs2_upcall_t *in_upcall,
     pvfs2_downcall_t *out_downcall)
 {
@@ -871,6 +873,131 @@ static int pvfs2_flush_mmap_racache(
     return ret;
 }
 #endif
+
+static int service_fs_mount_request(
+    pvfs2_upcall_t *in_upcall,
+    pvfs2_downcall_t *out_downcall)
+{
+    int ret = 1;
+    struct PVFS_sys_mntent mntent;
+    PVFS_handle root_handle;
+    char *ptr = NULL;
+
+    if (in_upcall && out_downcall)
+    {
+        memset(&mntent, 0, sizeof(struct PVFS_sys_mntent));
+        memset(out_downcall,0,sizeof(pvfs2_downcall_t));
+
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "Got an fs mount request via host %s\n",
+                     in_upcall->req.fs_mount.pvfs2_config_server);
+
+        /*
+          since we got a mount request from the vfs, we know that some
+          mntent entries are not filled in, so add some defaults here
+          if they weren't passed in the options.
+        */
+        ptr = in_upcall->req.fs_mount.options;
+        if (ptr && *ptr == '/')
+        {
+            while(ptr && (*ptr != '\0') && (*ptr != ','))
+            {
+                ptr++;
+            }
+            *ptr = '\0';
+            ptr++;
+            mntent.mnt_dir = strdup(in_upcall->req.fs_mount.options);
+            if (!mntent.mnt_dir)
+            {
+                ret = -PVFS_ENOMEM;
+                goto fail_downcall;
+            }
+        }
+        else
+        {
+            mntent.mnt_dir = strdup("<DYNAMIC>");
+            if (!mntent.mnt_dir)
+            {
+                ret = -PVFS_ENOMEM;
+                goto fail_downcall;
+            }
+        }
+
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "Using Mount Point %s\n",
+                     mntent.mnt_dir);
+
+        ptr = rindex(in_upcall->req.fs_mount.pvfs2_config_server, (int)'/');
+        if (!ptr)
+        {
+            gossip_err("Configuration server MUST be of the form "
+                       "protocol://address/fs_name\n");
+            ret = -PVFS_EINVAL;
+            goto fail_downcall;
+        }
+        *ptr = '\0';
+        ptr++;
+
+        mntent.pvfs_config_server = strdup(
+            in_upcall->req.fs_mount.pvfs2_config_server);
+        if (!mntent.pvfs_config_server)
+        {
+            ret = -PVFS_ENOMEM;
+            goto fail_downcall;
+        }
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "Got Configuration Server: %s\n",
+                     mntent.pvfs_config_server);
+
+        mntent.pvfs_fs_name = strdup(ptr);
+        if (!mntent.pvfs_config_server)
+        {
+            ret = -PVFS_ENOMEM;
+            goto fail_downcall;
+        }
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "Got FS Name: %s\n",
+                     mntent.pvfs_fs_name);
+
+        mntent.encoding = ENCODING_DEFAULT;
+        mntent.flowproto = FLOWPROTO_DEFAULT;
+
+        ret = PVFS_sys_fs_add(&mntent);
+        if (ret < 0)
+        {
+          fail_downcall:
+            gossip_err("Failed to mount via host %s\n",
+                       in_upcall->req.fs_mount.pvfs2_config_server);
+            PVFS_perror("Mount failure", ret);
+
+            /* we need to send a blank error response */
+            out_downcall->type = PVFS2_VFS_OP_FS_MOUNT;
+            out_downcall->status = ret;
+        }
+        else
+        {
+            /*
+              we need to send a blank success response, but first we
+              need to resolve the root handle, given the previously
+              resolved fs_id
+            */
+            if (PINT_bucket_get_root_handle(mntent.fs_id, &root_handle))
+            {
+                gossip_err("Failed to retrieve root handle for "
+                           "resolved fs_id %d\n",mntent.fs_id);
+                goto fail_downcall;
+            }
+            
+            gossip_debug(GOSSIP_CLIENT_DEBUG,
+                         "FS mount got root handle %Lu on fs id %d\n",
+                         root_handle, mntent.fs_id);
+
+            out_downcall->type = PVFS2_VFS_OP_FS_MOUNT;
+            out_downcall->status = 0;
+            out_downcall->resp.fs_mount.fs_id = mntent.fs_id;
+            out_downcall->resp.fs_mount.root_handle = root_handle;
+            ret = 0;
+        }
+    }
+    return ret;
+}
 
 int write_device_response(
     void *buffer_list,
@@ -945,11 +1072,22 @@ int main(int argc, char **argv)
 	fprintf(stderr, "continuing...\n");
     }
 
-    ret = PVFS_util_init_defaults();
+    /*
+      initialize pvfs system interface
+
+      NOTE: we do not rely on a pvfstab file at all in here, as
+      mounting a pvfs2 volume through the kernel interface now
+      requires you to specify a server and fs name in the form of:
+
+      protocol://server/fs_name
+
+      At mount time, we dynamically resolve and add the file
+      systems/mount information
+    */
+    ret = PVFS_sys_initialize(GOSSIP_NO_DEBUG);
     if(ret < 0)
     {
-	PVFS_perror("PVFS_util_init_defaults", ret);
-	return(-1);
+        return(ret);
     }
 
 #ifdef USE_MMAP_RA_CACHE
@@ -1066,9 +1204,12 @@ int main(int argc, char **argv)
 		break;
 #ifdef USE_MMAP_RA_CACHE
             case PVFS2_VFS_OP_MMAP_RA_FLUSH:
-                pvfs2_flush_mmap_racache(&upcall, &downcall);
+                service_mmap_ra_flush_request(&upcall, &downcall);
                 break;
 #endif
+            case PVFS2_VFS_OP_FS_MOUNT:
+                service_fs_mount_request(&upcall, &downcall);
+                break;
 	    case PVFS2_VFS_OP_INVALID:
 	    default:
 		gossip_err("Got an unrecognized vfs operation of "

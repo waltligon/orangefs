@@ -7,8 +7,9 @@
 #ifndef __UPCALL_H
 #define __UPCALL_H
 
-/* TODO: we might want to try to avoid this inclusion  */
 #include "pvfs2-sysint.h"
+
+#define PVFS2_MAX_MOUNT_OPT_LEN        0x00000080
 
 typedef struct
 {
@@ -95,7 +96,13 @@ typedef struct
 typedef struct
 {
     PVFS_object_ref refn;
-} pvfs2_mmap_ra_cache_flush_t;
+} pvfs2_mmap_ra_cache_flush_request_t;
+
+typedef struct
+{
+    char pvfs2_config_server[PVFS_MAX_SERVER_ADDR_LEN];
+    char options[PVFS2_MAX_MOUNT_OPT_LEN];
+} pvfs2_fs_mount_request_t;
 
 typedef struct
 {
@@ -116,7 +123,8 @@ typedef struct
 	pvfs2_rename_request_t rename;
         pvfs2_statfs_request_t statfs;
         pvfs2_truncate_request_t truncate;
-        pvfs2_mmap_ra_cache_flush_t ra_cache_flush;
+        pvfs2_mmap_ra_cache_flush_request_t ra_cache_flush;
+        pvfs2_fs_mount_request_t fs_mount;
     } req;
 } pvfs2_upcall_t;
 
