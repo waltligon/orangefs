@@ -8,12 +8,49 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
-#include "gossip.h"
+#include <assert.h>
+#include <string.h>
 #include <mpi.h>
+#include "gossip.h"
 #include "bmi.h"
 #include "bench-initialize.h"
 #include "bench-args.h"
 #include "bench-mem.h"
+
+#define TESTCOUNT 10
+
+struct svr_xfer_state
+{
+    int step;
+
+    PVFS_BMI_addr_t addr;
+    bmi_msg_tag_t tag;
+
+    void* unexp_buffer;
+    bmi_size_t unexp_size;
+
+    struct request* req;
+    struct response* resp;
+};
+
+struct request
+{
+    int foo;
+};
+
+struct response
+{
+    int bar;
+};
+
+int num_done = 0;
+
+int svr_handle_next(struct svr_xfer_state* state, bmi_context_id context);
+int client_handle_next(struct svr_xfer_state* state, bmi_context_id context);
+int prepare_states(struct svr_xfer_state* state_array, PVFS_BMI_addr_t*
+    addr_array, int count, int svr_flag);
+int teardown_states(struct svr_xfer_state* state_array, PVFS_BMI_addr_t*
+    addr_array, int count, int svr_flag);
 
 int main(
     int argc,
@@ -40,6 +77,18 @@ int main(
     double ave_bmi_time, ave_mpi_time;
     int total_data_xfer = 0;
     bmi_context_id context = -1;
+    struct svr_xfer_state* state_array = NULL;
+    struct svr_xfer_state* tmp_state = NULL;
+    int num_requested = 0;
+    struct BMI_unexpected_info info_array[TESTCOUNT];
+    bmi_op_id_t id_array[TESTCOUNT];
+    bmi_error_code_t error_array[TESTCOUNT];
+    bmi_size_t size_array[TESTCOUNT];
+    void* user_ptr_array[TESTCOUNT];
+    int outcount = 0;
+    int indexer = 0;
+    int state_size;
+    int i;
 
     /* start up benchmark environment */
     ret = bench_init(&opts, argc, argv, &num_clients, &world_rank, &comm,
@@ -58,6 +107,75 @@ int main(
 
     num_messages = opts.total_len / opts.message_len;
 
+    if(im_a_server)
+        state_size = num_clients;
+    else
+        state_size = opts.num_servers;
+
+    /* allocate array to hold state of concurrent xfers */
+    state_array = (struct
+        svr_xfer_state*)malloc(state_size*sizeof(struct svr_xfer_state));
+    assert(state_array);
+    memset(state_array, 0, state_size*sizeof(struct svr_xfer_state));
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    if(im_a_server)
+    {
+        while(num_done < num_clients)
+        {
+            ret = BMI_testunexpected(TESTCOUNT, &outcount, info_array, 0);
+            assert(ret >= 0);
+            indexer = 0;
+            while(ret == 1 && indexer < outcount)
+            {
+                assert(info_array[indexer].error_code == 0);
+                state_array[num_requested].addr = info_array[indexer].addr;
+                state_array[num_requested].tag = info_array[indexer].tag;
+                state_array[num_requested].unexp_buffer = info_array[indexer].buffer;
+                state_array[num_requested].unexp_size = info_array[indexer].size;
+                ret = svr_handle_next(&state_array[num_requested], context);
+                assert(ret == 0);
+                indexer++;
+                num_requested++;
+            }
+
+            ret = BMI_testcontext(TESTCOUNT, id_array, &outcount,
+                error_array, size_array, user_ptr_array, 0, context);
+            assert(ret == 0);
+            indexer = 0;
+            while(ret == 1 && indexer < outcount)
+            {
+                assert(error_array[indexer] == 0);
+                tmp_state = user_ptr_array[indexer];
+                ret = svr_handle_next(tmp_state, context);
+                indexer++;
+            }
+        }
+    }
+    else
+    {
+        for(i=0; i< opts.num_servers; i++)
+        {
+            ret = client_handle_next(&state_array[i], context);
+            assert(ret == 0);
+        }
+
+        while(num_done < opts.num_servers)
+        {
+            ret = BMI_testcontext(TESTCOUNT, id_array, &outcount,
+                error_array, size_array, user_ptr_array, 0, context);
+            assert(ret == 0);
+            indexer = 0;
+            while(ret == 1 && indexer < outcount)
+            {
+                assert(error_array[indexer] == 0);
+                tmp_state = user_ptr_array[indexer];
+                ret = client_handle_next(tmp_state, context);
+                indexer++;
+            }
+        }
+    }
 
     MPI_Barrier(MPI_COMM_WORLD);
 
@@ -153,6 +271,161 @@ int main(
     MPI_Finalize();
     return 0;
 }
+
+int client_handle_next(struct svr_xfer_state* state, bmi_context_id context)
+{
+    int ret = 0;
+    bmi_op_id_t tmp_id;
+    bmi_size_t actual_size;
+
+    switch(state->step)
+    {
+        case 0:
+            /* post recv for response */
+            ret = BMI_post_recv(&tmp_id, state->addr, state->resp,
+                sizeof(struct response), &actual_size, BMI_PRE_ALLOC,
+                state->tag, state, context);
+            assert(ret == 0);
+
+            /* send request */
+            ret = BMI_post_sendunexpected(&tmp_id, state->addr, state->req,
+                sizeof(struct request), BMI_PRE_ALLOC, state->tag,
+                state, context);
+            assert(ret >= 0);        
+            state->step++;
+            if(ret == 1)
+                return(client_handle_next(state, context));
+            else
+                return(0);
+            break;
+
+        case 1:
+            /* send completed */
+            state->step++;
+            return(0);
+            break;
+
+        case 2: 
+            /* recv completed */
+            state->step++;
+            /* TODO: temporary, mark done */
+            num_done++;
+            return(0);
+            break;
+
+        default:
+            assert(0);
+    }
+
+    return(0);
+};
+
+int svr_handle_next(struct svr_xfer_state* state, bmi_context_id context)
+{
+    int ret = 0;
+    bmi_op_id_t tmp_id;
+
+    switch(state->step)
+    {
+        case 0:
+            /* received a request */
+            free(state->unexp_buffer);
+            /* post a response send */
+            ret = BMI_post_send(&tmp_id, state->addr, state->resp,
+                sizeof(struct response), BMI_PRE_ALLOC, state->tag,
+                state, context);
+            assert(ret >= 0);
+            state->step++;
+            if(ret == 1)
+                return(client_handle_next(state, context));
+            else
+                return(0);
+            break;
+
+        case 1:
+            /* response send completed */
+            state->step++;
+            /* TODO: temporary, mark done */
+            num_done++;
+            return(0);
+            break;
+
+        default:
+            assert(0);
+            break;
+    }
+    
+    return(0);
+};
+
+int prepare_states(struct svr_xfer_state* state_array, PVFS_BMI_addr_t*
+    addr_array, int count, int svr_flag)
+{
+    int i;
+
+    if(svr_flag == 0)
+    {
+        for(i=0; i<count; i++)
+        {
+            state_array[i].addr = addr_array[i];
+            state_array[i].tag = 0;
+            /* allocate request */
+            state_array[i].req = BMI_memalloc(addr_array[i],
+                sizeof(struct request), BMI_SEND);
+            assert(state_array[i].req);
+            /* allocate response */
+            state_array[i].resp = BMI_memalloc(addr_array[i],
+                sizeof(struct response), BMI_RECV);
+            assert(state_array[i].resp);
+        }
+    }
+    else
+    {
+        for(i=0; i<count; i++)
+        {
+            /* allocate response */
+            state_array[i].resp = BMI_memalloc(addr_array[i],
+                sizeof(struct response), BMI_SEND);
+            assert(state_array[i].resp);
+        }
+    }
+
+    return(0);
+}
+
+int teardown_states(struct svr_xfer_state* state_array, PVFS_BMI_addr_t*
+    addr_array, int count, int svr_flag)
+{
+    int i;
+
+    if(svr_flag == 0)
+    {
+        for(i=0; i<count; i++)
+        {
+            /* free request */
+            BMI_memfree(addr_array[i], state_array[i].req, 
+                sizeof(struct request), BMI_SEND);
+            assert(state_array[i].req);
+            /* free response */
+            BMI_memfree(addr_array[i], state_array[i].resp, 
+                sizeof(struct request), BMI_RECV);
+            assert(state_array[i].resp);
+        }
+    }
+    else
+    {
+        for(i=0; i<count; i++)
+        {
+            /* free response */
+            BMI_memfree(addr_array[i], state_array[i].resp, 
+                sizeof(struct request), BMI_SEND);
+            assert(state_array[i].resp);
+        }
+    }
+
+    return(0);
+}
+
 
 /*
  * Local variables:
