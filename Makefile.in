@@ -96,5 +96,7 @@ distclean: clean
 
 -include $(DEPENDS)
 
+# @ suppresses output from the depend shell script.
 %.d: %.c $(SRCFILES)
-	$(srcdir)/maint/depend.sh `dirname $*` $(CFLAGS) $< > $@
+	@echo generating dependency file $@.
+	@$(srcdir)/maint/depend.sh `dirname $*` $(CFLAGS) $< > $@
