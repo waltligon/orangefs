@@ -200,7 +200,8 @@ struct flowproto_ops fp_bmi_cache_ops = {
     fp_bmi_cache_finalize,
     fp_bmi_cache_getinfo,
     fp_bmi_cache_setinfo,
-    fp_bmi_cache_post
+    fp_bmi_cache_post,
+    NULL
 };
 
 /* fp_bmi_cache_initialize()

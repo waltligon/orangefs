@@ -366,6 +366,7 @@ int PINT_flow_post(flow_descriptor * flow_d)
     flow_d->release = flow_release;
 
     /* post the flow to the flow protocol level */
+    flow_d->flowproto_id = flowproto_id;
     ret = active_flowproto_table[flowproto_id]->flowproto_post(flow_d);
     gen_mutex_unlock(&interface_mutex);
     return (ret);
@@ -380,8 +381,24 @@ int PINT_flow_post(flow_descriptor * flow_d)
  */
 int PINT_flow_cancel(flow_descriptor * flow_d)
 {
-    gossip_lerr("function not implemented.\n");
-    return (-ENOSYS);
+    int ret;
+
+    gen_mutex_lock(&interface_mutex);
+    assert(flow_d);
+    assert(flow_d->flowproto_id >= 0);
+
+    if(active_flowproto_table[flow_d->flowproto_id]->flowproto_cancel)
+    {
+	ret =
+	active_flowproto_table[flow_d->flowproto_id]->flowproto_cancel(flow_d);
+    }
+    else
+    {
+	ret = -PVFS_ENOSYS;
+    }
+    
+    gen_mutex_unlock(&interface_mutex);
+    return (ret);
 }
 
 

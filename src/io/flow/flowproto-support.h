@@ -26,6 +26,7 @@ struct flowproto_ops
 			      int option,
 			      void *parameter);
     int (*flowproto_post) (flow_descriptor * flow_d);
+    int (*flowproto_cancel) (flow_descriptor * flow_d);
 };
 
 /* used to query protocols to determine which endpoint pairs are

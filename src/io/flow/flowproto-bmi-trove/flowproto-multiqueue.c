@@ -265,7 +265,8 @@ struct flowproto_ops fp_multiqueue_ops = {
     fp_multiqueue_finalize,
     fp_multiqueue_getinfo,
     fp_multiqueue_setinfo,
-    fp_multiqueue_post
+    fp_multiqueue_post,
+    NULL
 };
 
 /* fp_multiqueue_initialize()
