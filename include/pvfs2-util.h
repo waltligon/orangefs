@@ -67,6 +67,14 @@ static inline int PVFS_util_object_to_sys_attr_mask(int obj_mask)
     {
         sys_mask |= PVFS_ATTR_SYS_TYPE;
     }
+    if (obj_mask & PVFS_ATTR_DATA_SIZE)
+    {
+        sys_mask |= PVFS_ATTR_DATA_SIZE;
+    }
+    if (obj_mask & PVFS_ATTR_SYMLNK_TARGET)
+    {
+        sys_mask |= PVFS_ATTR_SYS_LNK_TARGET;
+    }
     return sys_mask;
 }
 

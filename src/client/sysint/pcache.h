@@ -38,8 +38,9 @@
   - if it's NOT valid, you can update the contents of the pinode
     and call PINT_pcache_set_valid() to properly add it to the pcache,
     or just call PINT_pcache_release to get rid of it
-  - whether it's valid or not, you MUST call PINT_pcache_release()
-    on the pinode returned from lookup when you're finished with it
+  - don't call PINT_pcache_release on a freshly allocated pinode
+    that you've just done a set_valid on, otherwise, it won't remain
+    in the pcache.
 
   tips and tricks of the pcache hacking gurus:
   --------------------------------------------

@@ -62,9 +62,18 @@ static inline int copy_attributes_to_inode(
 
         if ((attrs->objtype == PVFS_TYPE_METAFILE) &&
             (attrs->mask & PVFS_ATTR_SYS_SIZE))
+        {
             inode->i_size = (off_t)attrs->size;
+        }
+        else if ((attrs->objtype == PVFS_TYPE_SYMLINK) &&
+                 (symname != NULL))
+        {
+            inode->i_size = strlen(symname);
+        }
         else
+        {
             inode->i_size = 0;
+        }
 
 	inode->i_uid = attrs->owner;
 	inode->i_gid = attrs->group;

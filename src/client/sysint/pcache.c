@@ -17,13 +17,13 @@
 #include "pcache.h"
 #include "quickhash.h"
 
-/* uncomment the following for vebose pcache debugging */
+/* uncomment the following for verbose pcache debugging */
 /* #define VERBOSE_PCACHE_DEBUG */
 
 /*
   uncomment the following for an experimental pinode
   cleanup mechanism for trying to bound the number of
-  pinod entries in the pcache at any given time
+  pinode entries in the pcache at any given time
 */
 /* #define PINT_PCACHE_AUTO_CLEANUP */
 
@@ -361,7 +361,7 @@ int PINT_pcache_object_attr_deep_copy(
                     (PVFS_handle *)malloc(df_array_size);
 		if (!dest->u.meta.dfile_array)
 		{
-                    return(-ENOMEM);
+                    return -ENOMEM;
 		}
 		memcpy(dest->u.meta.dfile_array,
                        src->u.meta.dfile_array, df_array_size);
@@ -385,7 +385,7 @@ int PINT_pcache_object_attr_deep_copy(
                 malloc(src->u.meta.dist_size);
             if (dest->u.meta.dist == NULL)
             {
-                return(-ENOMEM);
+                return -ENOMEM;
             }
 
             /* this encodes the previously decoded distribution into
@@ -407,7 +407,10 @@ int PINT_pcache_object_attr_deep_copy(
 
             dest->u.sym.target_path_len = src->u.sym.target_path_len;
             dest->u.sym.target_path = strdup(src->u.sym.target_path);
-            assert(dest->u.sym.target_path);
+            if (dest->u.sym.target_path == NULL)
+            {
+                return -ENOMEM;
+            }
         }
 
 	/* add mask to existing values */

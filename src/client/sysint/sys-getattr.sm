@@ -203,9 +203,14 @@ static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
     int ret = -1;
     uint32_t attrmask;
 
-    gossip_debug(CLIENT_DEBUG, "(%p) getattr state: getattr_setup_msgpair\n", sm_p);
+    gossip_debug(CLIENT_DEBUG, "(%p) getattr state: "
+                 "getattr_setup_msgpair\n", sm_p);
 
-    /* adjust parameters as necessary */
+    /*
+      adjust parameters as necessary; what's happening here
+      is that we're converting sys_attr masks to obj_attr masks
+      before passing the getattr request to the server.
+    */
     attrmask = sm_p->u.getattr.attrmask;
     if (attrmask & PVFS_ATTR_SYS_SIZE)
     {
@@ -213,13 +218,13 @@ static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
 	 * datafile handles and know what function to call to get
 	 * the file size.
 	 */
-	attrmask &= ~(PVFS_ATTR_SYS_SIZE);
-	attrmask |= PVFS_ATTR_META_DFILES | PVFS_ATTR_META_DIST;
+	attrmask &= ~PVFS_ATTR_SYS_SIZE;
+	attrmask |= (PVFS_ATTR_META_DFILES | PVFS_ATTR_META_DIST);
     }
 
     if (attrmask & PVFS_ATTR_SYS_LNK_TARGET)
     {
-        attrmask &= ~(PVFS_ATTR_SYS_LNK_TARGET);
+        attrmask &= ~PVFS_ATTR_SYS_LNK_TARGET;
         attrmask |= PVFS_ATTR_SYMLNK_TARGET;
     }
 
@@ -229,7 +234,7 @@ static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
 			      sm_p->u.getattr.object_ref.fs_id,
 			      sm_p->u.getattr.object_ref.handle,
 			      attrmask);
-    
+
     /* fill in msgpair structure components */
     sm_p->msgpair.fs_id   = sm_p->u.getattr.object_ref.fs_id;
     sm_p->msgpair.handle  = sm_p->u.getattr.object_ref.handle;
@@ -300,25 +305,6 @@ static int getattr_object_getattr_comp_fn(void *v_p,
     }
 
     /*
-      if we got a symlink target, copy it for caller; this target
-      path will be handed all the way back up to the caller via
-      the PVFS_sys_attr object.  caller must free it.
-    */
-    if (resp_p->u.getattr.attr.objtype == PVFS_TYPE_SYMLINK)
-    {
-        assert(resp_p->u.getattr.attr.u.sym.target_path_len > 0);
-        assert(resp_p->u.getattr.attr.u.sym.target_path);
-
-        sm_p->u.getattr.getattr_resp_p->attr.link_target =
-            strdup(resp_p->u.getattr.attr.u.sym.target_path);
-        if (!sm_p->u.getattr.getattr_resp_p->attr.link_target)
-        {
-            return -PVFS_ENOMEM;
-        }
-        resp_p->u.getattr.attr.mask |= PVFS_ATTR_SYMLNK_TARGET;
-    }
-
-    /*
       if we didn't get a cache hit, we're making a
       copy of the attributes here so that we can add
       a pcache entry later in cleanup.
@@ -337,6 +323,24 @@ static int getattr_object_getattr_comp_fn(void *v_p,
             &sm_p->pinode->attr :
             &resp_p->u.getattr.attr);
     assert(attr);
+
+    /*
+      if we got a symlink target, copy it for caller; this target
+      path will be handed all the way back up to the caller via
+      the PVFS_sys_attr object.  caller must free it.
+    */
+    if (attr->objtype == PVFS_TYPE_SYMLINK)
+    {
+        assert(attr->u.sym.target_path_len > 0);
+        assert(attr->u.sym.target_path);
+
+        sm_p->u.getattr.getattr_resp_p->attr.link_target =
+            strdup(attr->u.sym.target_path);
+        if (!sm_p->u.getattr.getattr_resp_p->attr.link_target)
+        {
+            return -PVFS_ENOMEM;
+        }
+    }
 
     /* transform the attributes from the response
      *
@@ -651,9 +655,16 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
 	s_attr_p->mask = PVFS_util_object_to_sys_attr_mask(s_attr_p->mask);
 
 	/* we know we grabbed the size if they asked for it */
-	if (sm_p->u.getattr.attrmask & PVFS_ATTR_SYS_SIZE) {
+	if (sm_p->u.getattr.attrmask & PVFS_ATTR_SYS_SIZE)
+        {
 	    s_attr_p->mask |= PVFS_ATTR_SYS_SIZE;
 	}
+
+        /* if this is a symlink, we know we have the target */
+        if (sm_p->u.getattr.attrmask & PVFS_ATTR_SYS_LNK_TARGET)
+        {
+            s_attr_p->mask |= PVFS_ATTR_SYS_LNK_TARGET;
+        }
 
 	PINT_attrmask_print(CLIENT_DEBUG, s_attr_p->mask);
 
@@ -691,12 +702,14 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
         /* add entry to pcache if not already present */
         if (!sm_p->pcache_hit)
         {
+            int release_required = 1;
             PINT_pinode *pinode =
                 PINT_pcache_lookup(sm_p->u.getattr.object_ref);
             if (!pinode)
             {
                 pinode = PINT_pcache_pinode_alloc();
                 assert(pinode);
+                release_required = 0;
             }
             pinode->refn = sm_p->u.getattr.object_ref;
             pinode->size = s_attr_p->size;
@@ -707,6 +720,11 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
                 &sm_p->pcache_attr);
 
             PINT_pcache_set_valid(pinode);
+
+            if (release_required)
+            {
+                PINT_pcache_release(pinode);
+            }
             sm_p->pcache_hit = 0;
         }
     }

@@ -300,7 +300,8 @@ static int service_getattr_request(
               explicitly copy the link target (if any) into a
               reserved string space in the getattr downcall object
             */
-            if (response.attr.objtype == PVFS_TYPE_SYMLINK)
+            if ((response.attr.objtype == PVFS_TYPE_SYMLINK) &&
+                (response.attr.mask & PVFS_ATTR_SYS_LNK_TARGET))
             {
                 assert(response.attr.link_target);
 
