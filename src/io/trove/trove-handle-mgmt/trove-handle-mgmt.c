@@ -450,7 +450,7 @@ int trove_handle_mgmt_finalize()
         do
         {
             hash_link =
-                qhash_search_at_index(s_fsid_to_ledger_table, i);
+                qhash_search_and_remove_at_index(s_fsid_to_ledger_table, i);
             if (hash_link)
             {
                 ledger = qlist_entry(hash_link, handle_ledger_t, hash_link);
