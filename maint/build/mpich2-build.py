@@ -30,7 +30,7 @@ def get_build_MPICH2():
 	# look for a patch that matches it- don't error out if this fails; 
 	# the mpich2 version we downloaded may not need a patch
 	os.system('ls pvfs2/doc/coding/romio-MPICH2-`head -n1 tarout | cut -d "-" -f 2 | cut -d "/" -f 1`-PVFS2* > target_patch')
-	os.system('patch -s -p0 -d mpich2-src/src/mpi/romio < `cat target_patch`')
+	os.system('patch -s -p1 -d mpich2-src/src/mpi/romio < `cat target_patch`')
 
 	os.remove('tarout')
 
