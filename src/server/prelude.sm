@@ -234,10 +234,17 @@ static int prelude_perm_check(
             {
                 js_p->error_code = 0;
             }
-            else
+	    else if (s_op->req->op == PVFS_SERV_GETATTR)
+	    {
+		/* getting attributes is always ok -- permission
+		 * is checked on the parent directory at read time
+		 */
+		js_p->error_code = 0;
+	    }
+            else /* setattr */
             {
                 /*
-                  NOTE: on other file systems, getattr/setattr doesn't
+                  NOTE: on other file systems, setattr doesn't
                   seem to require read permissions by the user, group
                   OR other, so long as the user or group matches (or
                   is root)
