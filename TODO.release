@@ -11,7 +11,7 @@ DONE . get rid of dependencies on -lrt and -lpthread for client side
 
 . quickstart guide
 
-. mpich2 and pvfs2 cannot be built together (Rob L.)
+DONE (thanks phil) . mpich2 and pvfs2 cannot be built together (Rob L.)
 
 . handle more error cases in kernel module (ctrl-c, timeouts,
   pvfs2-client death, etc.) (Neill)
