@@ -61,7 +61,8 @@ machine lookup(init,
     state init
 	{
 	    run lookup_init;
-	    default => read_object_metadata;
+	    STATE_ENOTDIR => send_response;
+	    default       => read_object_metadata;
 	}
 
     state read_object_metadata
@@ -155,7 +156,12 @@ static int lookup_init(PINT_server_op *s_op,
     s_op->u.lookup.segp = NULL;
     s_op->u.lookup.seg_nr = 0;
     s_op->u.lookup.seg_ct = PINT_string_count_segments(s_op->req->u.lookup_path.path);
-    assert(s_op->u.lookup.seg_ct >= 0);
+    if (s_op->u.lookup.seg_ct < 0) {
+	gossip_debug(SERVER_DEBUG,
+		     "  invalid path %s; put a leading / on your paths!!!\n",
+		     s_op->req->u.lookup_path.path);
+	ret->error_code = ENOTDIR;
+    }
 
     /* allocate memory
      *
