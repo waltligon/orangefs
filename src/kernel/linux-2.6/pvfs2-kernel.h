@@ -35,7 +35,6 @@ MODULE_DESCRIPTION("The Linux Kernel VFS interface to PVFS2");
 
 #define PVFS2_MAGIC                    0x20030528
 #define PVFS2_DEVREQ_MAGIC             0x20030529
-#define PVFS2_ROOT_INODE_NUMBER        0x00100000
 #define PVFS2_LINK_MAX                 0x000000FF
 #define PVFS2_OP_RETRY_COUNT           0x00000005
 
@@ -156,7 +155,7 @@ static inline pvfs2_inode_t *PVFS2_I(
 static inline pvfs2_sb_info *PVFS2_SB(
     struct super_block *sb)
 {
-    return (pvfs2_sb_info *) sb->s_fs_info;
+    return (pvfs2_sb_info *)sb->s_fs_info;
 }
 
 /************************************

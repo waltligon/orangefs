@@ -208,10 +208,58 @@ int pvfs2_fill_sb(
     int shift_val = 0;
     struct inode *root = NULL;
     struct dentry *root_dentry = NULL;
+    char *options = (char *)data;
+    unsigned long coll_id = 0;
+    unsigned long root_handle = 0;
+
+    /* alloc and init our private pvfs2 sb info */
+    sb->s_fs_info = kmalloc(sizeof(pvfs2_sb_info), PVFS2_GFP_FLAGS);
+    if (!PVFS2_SB(sb))
+    {
+	return -ENOMEM;
+    }
 
     if (!silent)
     {
-	pvfs2_print("pvfs2: pvfs2_fill_sb called (sb = %p)\n", sb);
+        pvfs2_print("pvfs2_fill_sb: called with coll_id %s\n", options);
+    }
+
+    if (!options || (strncmp(options, "coll_id=", 8) != 0))
+    {
+	pvfs2_print("pvfs2_fill_sb called with invalid coll_id\n");
+        return -EINVAL;
+    }
+    options += 8;
+    coll_id = simple_strtoul(options, &options, 0);
+    if (*options && (*options != ','))
+    {
+        pvfs2_error("pvfs2: Invalid coll_id specification %s\n",
+                    (char *)data);
+        return -EINVAL;
+    }
+    if (*options == ',')
+    {
+        options++;
+    }
+
+    if (!options || (strncmp(options, "root_handle=", 12) != 0))
+    {
+	pvfs2_print("pvfs2_fill_sb called with invalid root_handle\n");
+        return 1;
+    }
+    options += 12;
+    root_handle = simple_strtoul(options, &options, 0);
+
+    if ((coll_id == 0) || (root_handle == 0))
+    {
+        pvfs2_error("pvfs2: Invalid coll_id or root_handle "
+                    "specification %s\n", (char *)data);
+        return 1;
+    }
+    else if (!silent)
+    {
+        pvfs2_print("pvfs2: got coll_id %lu | root_handle %lu\n",
+                    coll_id, root_handle);
     }
 
     sb->s_magic = PVFS2_MAGIC;
@@ -242,25 +290,15 @@ int pvfs2_fill_sb(
 	return -ENOMEM;
     }
 
-    /* alloc and init our private pvfs2 sb info */
-    sb->s_fs_info = kmalloc(sizeof(pvfs2_sb_info), PVFS2_GFP_FLAGS);
-    if (!PVFS2_SB(sb))
-    {
-	iput(root);
-	return -ENOMEM;
-    }
-
-    /* FIXME: this is a hack...but we need this info from somewhere */
-    root->i_ino = (ino_t) PVFS2_ROOT_INODE_NUMBER;
-    PVFS2_SB(sb)->fs_id = (PVFS_fs_id) 9;
-    PVFS2_SB(sb)->handle = (PVFS_handle)PVFS2_ROOT_INODE_NUMBER;
+    root->i_ino = (ino_t)root_handle;
+    PVFS2_SB(sb)->fs_id = (PVFS_fs_id)coll_id;
+    PVFS2_SB(sb)->handle = (PVFS_handle)root_handle;
 
     /* allocates and places root dentry in dcache */
     root_dentry = d_alloc_root(root);
     if (!root_dentry)
     {
 	iput(root);
-	kfree(PVFS2_SB(sb));
 	return -ENOMEM;
     }
     root_dentry->d_op = &pvfs2_dentry_operations;
@@ -291,10 +329,15 @@ void pvfs2_kill_sb(
     kill_litter_super(sb);
 
     /* release the allocated root dentry */
-    dput(sb->s_root);
+    if (sb->s_root)
+    {
+        dput(sb->s_root);
+    }
 
     /* free the pvfs2 superblock private data */
     kfree(PVFS2_SB(sb));
+
+    pvfs2_print("pvfs2_kill_sb returning normally\n");
 }
 
 /*
