@@ -595,6 +595,7 @@ static void bmi_recv_callback_fn(void *user_ptr,
 	result_tmp->trove_callback.data = result_tmp;
 	result_tmp->trove_callback.fn = trove_write_callback_wrapper;
 	tmp_user_ptr = &result_tmp->trove_callback;
+	assert(result_tmp->result.bytes);
 	ret = trove_bstream_write_list(q_item->parent->dest.u.trove.coll_id,
 	    q_item->parent->dest.u.trove.handle,
 	    (char**)&result_tmp->buffer_offset,
@@ -981,6 +982,7 @@ static int bmi_send_callback_fn(void *user_ptr,
 	result_tmp->trove_callback.data = result_tmp;
 	result_tmp->trove_callback.fn = trove_read_callback_wrapper;
 	tmp_user_ptr = &result_tmp->trove_callback;
+	assert(result_tmp->result.bytes);
 	ret = trove_bstream_read_list(q_item->parent->src.u.trove.coll_id,
 	    q_item->parent->src.u.trove.handle,
 	    (char**)&result_tmp->buffer_offset,
@@ -1411,6 +1413,7 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
 	}
     }
 
+    assert(q_item->result_chain.result.bytes);
     ret = BMI_post_send_list(&q_item->posted_id,
 	q_item->parent->dest.u.bmi.address,
 	(const void**)flow_data->tmp_buffer_list,
@@ -1601,6 +1604,7 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
 	}
     }
 
+    assert(total_size);
     ret = BMI_post_recv_list(&q_item->posted_id,
 	q_item->parent->src.u.bmi.address,
 	flow_data->tmp_buffer_list,
