@@ -11,7 +11,6 @@
 #include <stdio.h>
 #include <errno.h>
 #include <PINT-reqproto-encode.h>
-#include <print-struct.h>
 #include <bmi-send-recv.h>
 
 #define RET_CHECK(__name) if(ret != 0) {printf(__name);exit(-1);}

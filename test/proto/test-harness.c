@@ -12,9 +12,8 @@
 #include <errno.h>
 #include <string.h>
 #include <PINT-reqproto-encode.h>
-#include <print-struct.h>
 #ifdef USE_BMI_MSGS
-#include <bmi_send_recv.h>
+#include <bmi-send-recv.h>
 #endif
 
 #define RET_CHECK(__name) if(ret != 0) {printf(__name);exit(-1);}
