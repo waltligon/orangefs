@@ -498,14 +498,16 @@ root@cluster1:~# for i in `seq 1 8`; do
 
 As with the single-machine case, you must run pvfs2-server with a special
 argument to create the storage space on all the nodes if it does not already
-exist.
+exist.  Do a command like this on every metadata or IO node in the cluster:
 
 \begin{verbatim}
 root@cluster1# /usr/sbin/pvfs2-server /etc/pvfs2-fs.conf \
 	/etc/pvfs2-server.conf -f
 \end{verbatim}
 
-Then once the storage space is created, start the server for real:
+Then once the storage space is created, start the server for real with a
+command like this on every metadata or IO node in the cluster:
+
 \begin{verbatim}
 root@cluster1# /usr/sbin/pvfs2-server /etc/pvfs2-fs.conf \
 	/etc/pvfs2-server.conf
@@ -521,7 +523,6 @@ Setting up a client for multiple servers is the same as setting up a client for 
 \subsection {Testing your Installation}
 
 Testing a multiple-server pvfs2 installation is the same as testing a single-server pvfs2 installation.  Refer to section \ref{subsec:testing}
-
 
 
 \end{document}
