@@ -24,7 +24,7 @@ int do_decode_req(
 {
     struct PVFS_server_req_s * dec_msg = NULL;
     char* char_ptr = (char *) input_buffer;
-    int size = 0, i = 0;
+    int size = 0;
 
     size = ((struct PVFS_server_req_s *)input_buffer)->rsize;
 
