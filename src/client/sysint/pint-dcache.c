@@ -56,7 +56,7 @@ static int dcache_get_lru(void);
 static int compare(struct dcache_t element,char *name,pinode_reference refn);
 
 /* The PVFS Dcache */
-static dcache* cache;
+static dcache* cache = NULL;
 
 /* dcache_lookup
  *
@@ -330,11 +330,15 @@ int PINT_dcache_initialize(void)
 int PINT_dcache_finalize(void)
 {
 #if ENABLE_DCACHE
-    /* Destroy the mutex */
-    gen_mutex_destroy(cache->mt_lock);
 
-    if (cache != NULL);
+    if (cache != NULL)
+    {
+	/* Destroy the mutex */
+	gen_mutex_destroy(cache->mt_lock);
 	free(cache);
+    }
+
+    cache = NULL;
 
     return(0);
 #else
