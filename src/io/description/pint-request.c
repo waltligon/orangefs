@@ -184,10 +184,10 @@ int PINT_Process_request(PINT_Request_state *req,
 		if (req->cur[req->lvl].rq)
 		{
 		/* print the current state of the decoding process */
-		gossip_debug(GOSSIP_REQUEST_DEBUG,"\tDo seq of %lld ne %d st %lld nb %d ",
+		gossip_debug(GOSSIP_REQUEST_DEBUG,"\tDo seq of %lld ne %d st %lld nb %d "
+		"ub %lld lb %lld as %lld co %llu\n",
 				Ld(req->cur[req->lvl].rq->offset), req->cur[req->lvl].rq->num_ereqs,
-				Ld(req->cur[req->lvl].rq->stride), req->cur[req->lvl].rq->num_blocks);
-		gossip_debug(GOSSIP_REQUEST_DEBUG,"ub %lld lb %lld as %lld co %llu\n",
+				Ld(req->cur[req->lvl].rq->stride), req->cur[req->lvl].rq->num_blocks,
 				Ld(req->cur[req->lvl].rq->ub), Ld(req->cur[req->lvl].rq->lb),
 				Ld(req->cur[req->lvl].rq->aggregate_size),
 				Ld(req->cur[req->lvl].chunk_offset));
@@ -676,10 +676,11 @@ PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
 			Ld(offset), Ld(size), result->segs, result->segmax, Ld(result->bytes),
 			Ld(result->bytemax));
 	/* find physical offset for this loff */
-	gossip_debug(GOSSIP_REQUEST_DEBUG,"\t\t\tnext loff: %lld ", Ld(loff));
    poff = (*rfdata->dist->methods->logical_to_physical_offset)
 			(rfdata->dist->params, rfdata->server_nr, rfdata->server_ct, loff);
-	gossip_debug(GOSSIP_REQUEST_DEBUG,"next poff: %lld\n", Ld(poff));
+	gossip_debug(GOSSIP_REQUEST_DEBUG,
+	  "\t\t\tnext loff: %lld next poff: %lld\n", Ld(loff), Ld(poff));
+
 	if (poff >= rfdata->fsize && !rfdata->extend_flag)
 	{
 		/* end of file - thus end of request */
@@ -690,21 +691,15 @@ PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
 	}
 	if (loff >= orig_offset + orig_size)
 	{
-		gossip_debug(GOSSIP_REQUEST_DEBUG,"\t\t\t(return value) %lld", Ld(orig_size));
-		if (*eof_flag)
-			gossip_debug(GOSSIP_REQUEST_DEBUG," (EOF)\n");
-		else
-			gossip_debug(GOSSIP_REQUEST_DEBUG,"\n");
+		gossip_debug(GOSSIP_REQUEST_DEBUG,
+		  "\t\t\t(return value) %lld%s\n", Ld(orig_size),
+		  *eof_flag ? " (EOF)" : "");
 		return orig_size;
 	}
 	else
 	{
-		gossip_debug(GOSSIP_REQUEST_DEBUG,"\t\t\treturn value %lld",
-				Ld(offset - orig_offset));
-		if (*eof_flag)
-			gossip_debug(GOSSIP_REQUEST_DEBUG," (EOF)\n");
-		else
-			gossip_debug(GOSSIP_REQUEST_DEBUG,"\n");
+		gossip_debug(GOSSIP_REQUEST_DEBUG,"\t\t\treturn value %lld%s\n",
+			Ld(offset - orig_offset), *eof_flag ? " (EOF)" : "");
 		return (offset - orig_offset);
 	}
 }
