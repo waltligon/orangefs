@@ -33,9 +33,13 @@ if !(-f ../pvfs2-config.h.in) then
 	exit 1
 endif
 
+echo "PVFS2 mangling ${1}."
+
 ./pvfs2indent-80col.sh ${1} > /tmp/mangle1
 ./pvfs2-quote-includes.sh ../ /tmp/mangle1 > /tmp/mangle2
 ./pvfs2codecheck.pl --fix /tmp/mangle2 > /tmp/mangle3
 cp /tmp/mangle3 ${1}
+
+echo "...done."
 
 exit 0
