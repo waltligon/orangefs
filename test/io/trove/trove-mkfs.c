@@ -117,7 +117,7 @@ int main(int argc, char **argv)
 			      NULL,
 			      NULL,
 			      &op_id);
-    while (ret == 0) trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+    while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
     if (ret < 0) {
 	fprintf(stderr, "dspace create (for root dir) failed.\n");
 	return -1;
@@ -131,7 +131,7 @@ int main(int argc, char **argv)
     val.buffer = &root_handle;
     val.buffer_sz = sizeof(root_handle);
     ret = trove_collection_seteattr(coll_id, &key, &val, 0, NULL, &op_id);
-    while (ret == 0) trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+    while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
     if (ret < 0) {
 	fprintf(stderr, "collection seteattr (for root handle) failed.\n");
 	return -1;

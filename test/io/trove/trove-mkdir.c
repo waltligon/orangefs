@@ -77,7 +77,7 @@ int main(int argc, char ** argv)
 			      &op_id);
     if (ret < 0) return -1;
 
-    while (ret == 0) trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+    while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
     if (ret < 0 ) {
 	fprintf(stderr, "dspace create (for %s) failed.\n", dir_name);
 	return -1;
@@ -113,7 +113,7 @@ int path_lookup(TROVE_coll_id coll_id, char *path, TROVE_handle *out_handle_p)
     val.buffer = &handle;
     val.buffer_sz = sizeof(handle);
     ret = trove_collection_geteattr(coll_id, &key, &val, 0, NULL, &op_id);
-    while (ret == 0) trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+    while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
     if (ret < 0) {
 	fprintf(stderr, "collection geteattr (for root handle) failed.\n");
 	return -1;

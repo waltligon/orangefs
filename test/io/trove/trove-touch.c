@@ -83,9 +83,7 @@ int main(int argc, char **argv)
 			      NULL,
 			      NULL,
 			      &op_id);
-    if (ret < 0) return -1;
-
-    while (ret != 1) trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+    while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
     if (ret < 0) {
 	fprintf(stderr, "dspace create failed.\n");
 	return -1;
@@ -99,16 +97,18 @@ int main(int argc, char **argv)
     s_attr.gid    = getgid();
     s_attr.mode   = 0755;
     s_attr.ctime  = time(NULL);
-    ret = trove_dspace_setattr(coll_id, file_handle, &s_attr, NULL, &op_id);
-    if (ret == -1) return -1;
     count = 1;
+
+    ret = trove_dspace_setattr(coll_id, file_handle, &s_attr, NULL, &op_id);
     while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+    if (ret < 0) return -1;
 
     /* add new file name/handle pair to parent directory */
     key.buffer = file_name;
     key.buffer_sz = strlen(file_name) + 1;
     val.buffer = &file_handle;
     val.buffer_sz = sizeof(file_handle);
+
     ret = trove_keyval_write(coll_id, parent_handle, &key, &val, 0, NULL, NULL, &op_id);
     while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
     if (ret < 0) {
@@ -135,8 +135,10 @@ int path_lookup(TROVE_coll_id coll_id, char *path, TROVE_handle *out_handle_p)
     key.buffer_sz = strlen(root_handle_string) + 1;
     val.buffer = &handle;
     val.buffer_sz = sizeof(handle);
+
     ret = trove_collection_geteattr(coll_id, &key, &val, 0, NULL, &op_id);
-    while (ret == 0) trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+    while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+
     if (ret < 0) {
 	fprintf(stderr, "collection geteattr (for root handle) failed.\n");
 	return -1;
