@@ -111,7 +111,7 @@ int PVFS_mgmt_statfs_list(PVFS_fs_id fs_id,
     ret = PINT_client_state_machine_post(sm_p, PVFS_MGMT_STATFS_LIST);
     if (ret < 0)
     {
-	PVFS_perror("Error: PINT_client_state_machine_post() "
+	PVFS_perror_gossip("Error: PINT_client_state_machine_post() "
                     "failure.\n",ret);
 	error = ret;
 	goto cleanup;
@@ -251,7 +251,7 @@ static int statfs_list_comp_fn(void *v_p,
 
         if (ret)
         {
-            PVFS_perror("PINT_bucket_get_server_handle_count failed ",
+            PVFS_perror_gossip("PINT_bucket_get_server_handle_count failed ",
                         ret);
             return ret;
         }

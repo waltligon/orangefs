@@ -220,7 +220,7 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 			   PVFS2_CLIENT_JOB_TIMEOUT);
 	if (ret < 0)
         {
-	    PVFS_perror("Post of receive failed", ret);
+	    PVFS_perror_gossip("Post of receive failed", ret);
 	    /* decrement count, we won't bother to post send */
 	    sm_p->msgarray[0].comp_ct--;
             js_p->error_code = ret;
@@ -231,7 +231,7 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 	    /* we can get this if we have lost connectivity to this server */
 	    assert(msg_p->recv_status.error_code != 0);
 
-	    PVFS_perror("Receive immediately failed",
+	    PVFS_perror_gossip("Receive immediately failed",
                         msg_p->recv_status.error_code);
 
 	    msg_p->recv_id = 0;
@@ -295,7 +295,7 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 				PVFS2_CLIENT_JOB_TIMEOUT);
 	if (ret < 0)
         {
-	    PVFS_perror("Post of send failed; should cancel recv", ret);
+	    PVFS_perror_gossip("Post of send failed; should cancel recv", ret);
 
 	    assert(msg_p->send_status.error_code != 0);
 
@@ -316,7 +316,7 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 
 	    if (msg_p->send_status.error_code != 0)
             {
-                PVFS_perror("Canceling recv due to send failure:",
+                PVFS_perror_gossip("Canceling recv due to send failure:",
                             msg_p->send_status.error_code);
 
                 ret = PINT_client_bmi_cancel(msg_p->recv_id);
@@ -444,7 +444,7 @@ static int msgpairarray_completion_fn(PINT_client_sm *sm_p,
                 return 1;
             }
 
-	    PVFS_perror("*** msgpair did not complete successfully",
+	    PVFS_perror_gossip("*** msgpair did not complete successfully",
                         msg_p->op_status);
 
 	    js_p->error_code = msg_p->op_status;
@@ -459,7 +459,7 @@ static int msgpairarray_completion_fn(PINT_client_sm *sm_p,
 				    &resp_p);
 	if (ret != 0)
         {
-            PVFS_perror("msgpairarray decode error", ret);
+            PVFS_perror_gossip("msgpairarray decode error", ret);
             js_p->error_code = ret;
             return 1;
 	}
@@ -520,7 +520,7 @@ static int msgpairarray_completion_fn(PINT_client_sm *sm_p,
 					       msg_p->max_resp_sz);
 	if (ret != 0)
         {
-            PVFS_perror("Failed to free msgpair resources", ret);
+            PVFS_perror_gossip("Failed to free msgpair resources", ret);
             js_p->error_code = ret;
             return 1;
 	}

@@ -476,7 +476,7 @@ static int symlink_crdirent_failure(PINT_client_sm *sm_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "symlink state: crdirent_failure\n");
 
-    PVFS_perror("crdirent failure", js_p->error_code);
+    PVFS_perror_gossip("crdirent failure", js_p->error_code);
     return 1;
 }
 

@@ -116,7 +116,7 @@ int PVFS_mgmt_perf_mon_list(PVFS_fs_id fs_id,
     if (ret < 0)
     {
 	/* this should not fail under normal conditions */
-        PVFS_perror("Error: PINT_client_state_machine_post() "
+        PVFS_perror_gossip("Error: PINT_client_state_machine_post() "
                     "failure", ret);
 	error = ret;
 	goto cleanup;

@@ -560,7 +560,7 @@ int PINT_bucket_map_to_server(
         bmi_server_addr, PVFS_MAX_SERVER_ADDR_LEN, handle, fs_id);
     if (ret)
     {
-        PVFS_perror("PINT_bucket_get_server_name failed", ret);
+        PVFS_perror_gossip("PINT_bucket_get_server_name failed", ret);
     }
     return (!ret ? BMI_addr_lookup(server_addr, bmi_server_addr) : ret);
 }

@@ -118,7 +118,7 @@ int PINT_server_get_config(struct server_configuration_s *config,
     ret = PINT_client_state_machine_post(sm_p, PVFS_SERVER_GET_CONFIG);
     if (ret < 0)
     {
-	PVFS_perror("Error: PINT_client_state_machine_post() "
+	PVFS_perror_gossip("Error: PINT_client_state_machine_post() "
                     "failure.\n",ret);
 	error = ret;
 	goto cleanup;

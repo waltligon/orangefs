@@ -44,7 +44,7 @@ int PVFS_sys_fs_add(struct PVFS_sys_mntent *mntent)
     if (new_server_config)
     {
         PINT_server_config_mgr_put_config(new_server_config);
-        PVFS_perror("Configuration for fs already exists", ret);
+        PVFS_perror_gossip("Configuration for fs already exists", ret);
         return -PVFS_EEXIST;
     }
 
@@ -53,7 +53,7 @@ int PVFS_sys_fs_add(struct PVFS_sys_mntent *mntent)
     if (!new_server_config)
     {
         ret = -PVFS_ENOMEM;
-        PVFS_perror("Failed to allocate configuration object", ret);
+        PVFS_perror_gossip("Failed to allocate configuration object", ret);
         goto error_exit;
     }
     memset(new_server_config, 0, sizeof(struct server_configuration_s));
@@ -62,7 +62,7 @@ int PVFS_sys_fs_add(struct PVFS_sys_mntent *mntent)
     ret = PINT_server_get_config(new_server_config, mntent);
     if (ret < 0)
     {
-        PVFS_perror("PINT_server_get_config failed", ret);
+        PVFS_perror_gossip("PINT_server_get_config failed", ret);
         goto error_exit;
     }
 
@@ -75,7 +75,7 @@ int PVFS_sys_fs_add(struct PVFS_sys_mntent *mntent)
         new_server_config, mntent->fs_id);
     if (ret < 0)
     {
-        PVFS_perror(
+        PVFS_perror_gossip(
             "PINT_config_trim_filesystems_except failed", ret);
         goto error_exit;
     }
@@ -90,7 +90,7 @@ int PVFS_sys_fs_add(struct PVFS_sys_mntent *mntent)
     ret = PVFS_util_add_dynamic_mntent(mntent);
     if (ret < 0)
     {
-        PVFS_perror("PVFS_util_add_mnt failed", ret);
+        PVFS_perror_gossip("PVFS_util_add_mnt failed", ret);
         goto error_exit;
     }
 
@@ -100,7 +100,7 @@ int PVFS_sys_fs_add(struct PVFS_sys_mntent *mntent)
     if (ret < 0)
     {
         PVFS_util_remove_internal_mntent(mntent);
-        PVFS_perror("PINT_server_config_mgr_add_config failed", ret);
+        PVFS_perror_gossip("PINT_server_config_mgr_add_config failed", ret);
         goto error_exit;
     }
 
@@ -143,7 +143,7 @@ int PVFS_sys_fs_remove(struct PVFS_sys_mntent *mntent)
             ret = PINT_server_config_mgr_remove_config(mntent->fs_id);
             if (ret < 0)
             {
-                PVFS_perror("PINT_server_config_mgr_remove_config "
+                PVFS_perror_gossip("PINT_server_config_mgr_remove_config "
                             "failed", ret);
             }
         }
