@@ -86,8 +86,7 @@ int main(int argc, char **argv)
 		&stat, &(id_arrayB[0]));
 	if(ret != 1)
 	{
-		fprintf(stderr, "Error: release didn't immediately
-			complete.\n");
+		fprintf(stderr, "Error: release didn't immediately complete.\n");
 		return(-1);
 	}
 	
@@ -104,8 +103,7 @@ int main(int argc, char **argv)
 		&stat, &(id_arrayB[2]));
 	if(ret != 1)
 	{
-		fprintf(stderr, "Error: release didn't immediately
-			complete.\n");
+		fprintf(stderr, "Error: release didn't immediately complete.\n");
 		return(-1);
 	}
 

@@ -188,8 +188,7 @@ int main(int argc, char **argv)
 	ret = PINT_Dist_lookup(file_data.dist);
 	if(ret != 0)
 	{
-		fprintf(stderr, "Error: failed to
-		lookup dist.\n");
+		fprintf(stderr, "Error: failed to lookup dist.\n");
 		return(-1);
 	}
 
