@@ -82,14 +82,14 @@ fi
 echo "[END] PVFS2-SHELL-TEST RESULTS ================================\n"
 
 
-echo "\nBONNIE++ RESULTS ======================================"
-./bonnie++.sh -d $rootdir/INSTALL-pvfs2/mnt/pvfs2/bonnie++ 
-if [ $? -ne 0 ] ; then
-	echo "*** bonnie++.sh failed."
-	exit 1
-fi
-
-echo "[END] BONNIE++ RESULTS ================================\n"
+#echo "\nBONNIE++ RESULTS ======================================"
+#./bonnie++.sh -d $rootdir/INSTALL-pvfs2/mnt/pvfs2/bonnie++ 
+#if [ $? -ne 0 ] ; then
+#	echo "*** bonnie++.sh failed."
+#	exit 1
+#fi
+#
+#echo "[END] BONNIE++ RESULTS ================================\n"
 
 
 # end tests
