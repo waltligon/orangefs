@@ -113,17 +113,19 @@ int PINT_handle_in_extent_list(
  *
  * counts the total number of handles represented in an extent list
  *
- * returns the extent count total on success, -PVFS_error on failure
+ * returns the 0 on success and fills in the specified count argument
+ * with the extent count total.  returns -PVFS_error on error
  */
-int64_t PINT_extent_list_count_total(PINT_llist *extent_list)
+int PINT_extent_list_count_total(
+    PINT_llist *extent_list, uint64_t *count)
 {
-    int64_t count = -PVFS_EINVAL;
+    int ret = -PVFS_EINVAL;
     PINT_llist *cur = NULL;
     PVFS_handle_extent *cur_extent = NULL;
 
-    if (extent_list)
+    if (extent_list && count)
     {
-        count = 0;
+        *count = 0;
 
         cur = extent_list;
         while(cur)
@@ -134,11 +136,12 @@ int64_t PINT_extent_list_count_total(PINT_llist *extent_list)
                 break;
             }
 
-            count += (cur_extent->last - cur_extent->first + 1);
+            *count += (cur_extent->last - cur_extent->first + 1);
             cur = PINT_llist_next(cur);
         }
+        ret = 0;
     }
-    return count;
+    return ret;
 }
 
 /* PINT_release_extent_list()

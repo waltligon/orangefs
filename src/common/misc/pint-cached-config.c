@@ -742,19 +742,17 @@ int PINT_cached_config_get_server_handle_count(
             assert(cur_host_extent_table->bmi_address);
             assert(cur_host_extent_table->extent_list);
 
-            if (!strcmp(cur_host_extent_table->bmi_address, server_addr_str))
+            if (strcmp(cur_host_extent_table->bmi_address,
+                       server_addr_str) == 0)
             {
-                tmp_count = PINT_extent_list_count_total(
-                    cur_host_extent_table->extent_list);
+                ret = PINT_extent_list_count_total(
+                    cur_host_extent_table->extent_list, &tmp_count);
 
-                if (tmp_count > -1)
+                if (ret)
                 {
-                    *handle_count += tmp_count;
+                    return ret;
                 }
-                else
-                {
-                    return tmp_count;
-                }
+                *handle_count += tmp_count;
             }
             cur = PINT_llist_next(cur);
         }

@@ -20,8 +20,8 @@ int PINT_handle_in_extent(
 int PINT_handle_in_extent_list(
     PINT_llist *extent_list,
     PVFS_handle handle);
-int64_t PINT_extent_list_count_total(
-    PINT_llist *extent_list);
+int PINT_extent_list_count_total(
+    PINT_llist *extent_list, uint64_t *count);
 void PINT_release_extent_list(
     PINT_llist *extent_list);
 
