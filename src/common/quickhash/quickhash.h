@@ -6,8 +6,6 @@
 #ifndef QUICKHASH_H
 #define QUICKHASH_H
 
-#include "quicklist.h"
-
 #ifdef __KERNEL__
 
 #define qhash_malloc(x)            kmalloc(x, GFP_KERNEL)
@@ -24,6 +22,8 @@
 #define qhash_unlock(lock_ptr)     spin_unlock(lock_ptr)
 
 #else
+
+#include "quicklist.h"
 
 #define qhash_malloc(x)            malloc(x)
 #define qhash_free(x)              free(x)
@@ -61,6 +61,10 @@ void qhash_finalize(
 	struct qhash_table* old_table);
 
 struct qhash_head* qhash_search(
+	struct qhash_table* table,
+	void* key);
+
+struct qhash_head* qhash_search_and_remove(
 	struct qhash_table* table,
 	void* key);
 
