@@ -12,6 +12,7 @@
 #include <pint-dcache.h>
 #include <pint-servreq.h>
 #include <config-manage.h>
+#include <pcache.h>
 
 static int get_bmi_addr(char **name,int count,bmi_addr_t *addr);
 static int copy_attributes(PVFS_object_attr new,PVFS_object_attr old,\
