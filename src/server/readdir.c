@@ -4,21 +4,28 @@
  * See COPYING in top-level directory.
  */
 
-
-#include <state-machine.h>
-#include <server-config.h>
-#include <pvfs2-server.h>
+#include <malloc.h>
 #include <string.h>
-#include <pvfs2-attr.h>
-#include <trove.h>
 #include <assert.h>
 
-static int readdir_init(state_action_struct *s_op, job_status_s *ret);
-static int readdir_cleanup(state_action_struct *s_op, job_status_s *ret);
-static int readdir_kvread(state_action_struct *s_op, job_status_s *ret);
-static int readdir_get_kvspace(state_action_struct *s_op, job_status_s *ret);
-static int readdir_send_bmi(state_action_struct *s_op, job_status_s *ret);
-static int readdir_unpost_req(state_action_struct *s_op, job_status_s *ret);
+#include "state-machine.h"
+#include "server-config.h"
+#include "pvfs2-server.h"
+#include "pvfs2-attr.h"
+#include "trove.h" /* TODO -- REMOVE TROVE REFERENCES IF POSSIBLE */
+
+enum {
+    STATE_ENOTDIR = 7
+};
+
+static int readdir_init(PINT_server_op *s_op, job_status_s *ret);
+static int readdir_cleanup(PINT_server_op *s_op, job_status_s *ret);
+static int readdir_read_dirdata_handle(PINT_server_op *s_op, job_status_s *ret);
+static int readdir_iterate_on_entries(PINT_server_op *s_op, job_status_s *ret);
+static int readdir_send_bmi(PINT_server_op *s_op, job_status_s *ret);
+static int readdir_unpost_req(PINT_server_op *s_op, job_status_s *ret);
+static int readdir_verify_directory_metadata(PINT_server_op *s_op, job_status_s *ret);
+static int readdir_read_directory_metadata(PINT_server_op *s_op, job_status_s *ret);
 void readdir_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
@@ -32,12 +39,46 @@ PINT_state_machine_s readdir_req_s =
 
 %%
 
-machine readdir(init, kvspace, kvread, send, unpost, cleanup)
+machine readdir(init,
+		iterate_on_entries,
+		read_dirdata_handle,
+		read_directory_metadata,
+		verify_directory_metadata,
+		send,
+		unpost,
+		cleanup)
 {
 	state init
 	{
 		run readdir_init;
-		default => kvread;
+		default => read_directory_metadata;
+	}
+
+	state read_directory_metadata
+	    {
+		run readdir_read_directory_metadata;
+		success => verify_directory_metadata;
+		default => send;
+	    }
+
+	state verify_directory_metadata
+	    {
+		run readdir_verify_directory_metadata;
+		success => read_dirdata_handle;
+		default => send;
+	    }
+
+	state read_dirdata_handle
+	{
+		run readdir_read_dirdata_handle;
+		success => iterate_on_entries;
+		default => send;
+	}
+
+	state iterate_on_entries
+	{
+		run readdir_iterate_on_entries;
+		default => send;
 	}
 
 	state send
@@ -57,19 +98,6 @@ machine readdir(init, kvspace, kvread, send, unpost, cleanup)
 		run readdir_cleanup;
 		default => init;
 	}
-
-	state kvspace
-	{
-		run readdir_get_kvspace;
-		default => send;
-	}
-	
-	state kvread
-	{
-		run readdir_kvread;
-		success => kvspace;
-		default => send;
-	}
 }
 
 %%
@@ -81,10 +109,7 @@ machine readdir(init, kvspace, kvread, send, unpost, cleanup)
  *
  * Returns:  PINT_state_array_values*
  *
- * Synopsis: Set up the state machine for set_attrib. 
- *           
  */
-
 void readdir_init_state_machine(void)
 {
 
@@ -103,102 +128,153 @@ void readdir_init_state_machine(void)
  * Synopsis: Allocate Memory for readdir.pvfs_dirent_count
  *           
  */
-
-
-static int readdir_init(state_action_struct *s_op, job_status_s *ret)
+static int readdir_init(PINT_server_op *s_op, job_status_s *ret)
 {
 
     int job_post_ret;
-    int j;
-    int key_a_sz, val_a_sz, dirent_buff_sz;
-    int handle_sz;
-    char *big_memory_buffer,*check_buffer;
 
-    gossip_ldebug(SERVER_DEBUG,"Init\n");
+    gossip_debug(SERVER_DEBUG, "readdir state: init\n");
 
-    /**** 
-      We need to malloc key and val space for dirents and handles.
-     ****/
-    key_a_sz = sizeof(TROVE_keyval_s)*s_op->req->u.readdir.pvfs_dirent_count;
-    val_a_sz = sizeof(TROVE_keyval_s)*s_op->req->u.readdir.pvfs_dirent_count;
-    s_op->val.buffer_sz = sizeof(PVFS_handle);
-    dirent_buff_sz = s_op->req->u.readdir.pvfs_dirent_count*sizeof(PVFS_dirent);
-
-    handle_sz = sizeof(PVFS_handle);
-
-    big_memory_buffer = (char *) calloc(1,key_a_sz+val_a_sz+s_op->val.buffer_sz+dirent_buff_sz);
-    check_buffer = big_memory_buffer;
-
-    s_op->key_a = (TROVE_keyval_s *) big_memory_buffer;
-    big_memory_buffer+=key_a_sz;
-
-    s_op->val_a = (TROVE_keyval_s *) big_memory_buffer;
-    big_memory_buffer+=val_a_sz;
-
-    s_op->val.buffer = (void *) big_memory_buffer;
-    big_memory_buffer+=s_op->val.buffer_sz;
-
-    s_op->resp->u.readdir.pvfs_dirent_array = (PVFS_dirent *) big_memory_buffer;
-    big_memory_buffer+=dirent_buff_sz;
-
-    assert(big_memory_buffer - check_buffer ==  key_a_sz + val_a_sz + s_op->val.buffer_sz + dirent_buff_sz);
-
-    for(j=0;j<s_op->req->u.readdir.pvfs_dirent_count;j++)
-    {
-	s_op->key_a[j].buffer = s_op->resp->u.readdir.pvfs_dirent_array[j].d_name;
-	s_op->key_a[j].buffer_sz = PVFS_NAME_MAX;
-
-	s_op->val_a[j].buffer = &(s_op->resp->u.readdir.pvfs_dirent_array[j].handle);
-	s_op->val_a[j].buffer_sz = handle_sz;
-    }
+    s_op->key_a = NULL; /* we're going to use this to point to an allocated region later, so initialize it now. */
 
     job_post_ret = job_req_sched_post(s_op->req,
-	    s_op,
-	    ret,
-	    &(s_op->scheduled_id));
+				      s_op,
+				      ret,
+				      &(s_op->scheduled_id));
 
-    return(job_post_ret);
-
+    return job_post_ret;
 }
 
+
 /*
- * Function: readdir_kvread
+ * Function: readdir_read_directory_metadata
  *
- * Params:   server_op *s_op, 
- *           job_status_s *ret
+ * Synopsis: Given an object handle, looks up the attributes (metadata)
+ * for that handle.
  *
- * Returns:  int
- *
- * Synopsis: 
- *           
+ * Posts the keyval read to trove.
  */
-
-static int readdir_kvread(state_action_struct *s_op, job_status_s *ret)
+static int readdir_read_directory_metadata(PINT_server_op *s_op,
+					   job_status_s *ret)
 {
-
     int job_post_ret;
-    job_id_t i;
+    job_id_t j_id;
 
-    gossip_ldebug(SERVER_DEBUG,"Kvread %lld\n",s_op->req->u.readdir.handle);
-    s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
-    s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
+    gossip_debug(SERVER_DEBUG, "readdir state: read_directory_metadata\n");
+
+    /* initialize keyvals prior to read list call */
+    s_op->key.buffer    = Trove_Common_Keys[METADATA_KEY].key;
+    s_op->key.buffer_sz = Trove_Common_Keys[METADATA_KEY].size;
+    s_op->val.buffer    = &s_op->u.readdir.directory_attr;
+    s_op->val.buffer_sz = sizeof(PVFS_object_attr);
+
+    gossip_debug(SERVER_DEBUG,
+		 "  reading metadata (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = 0x%08x (%d))\n",
+		 s_op->req->u.readdir.fs_id,
+		 s_op->req->u.readdir.handle,
+		 (char *) s_op->key.buffer,
+		 s_op->key.buffer_sz,
+		 (unsigned) s_op->val.buffer,
+		 s_op->val.buffer_sz);
 
     job_post_ret = job_trove_keyval_read(s_op->req->u.readdir.fs_id,
-	    s_op->req->u.readdir.handle,
-	    &(s_op->key),
-	    &(s_op->val),
-	    0,
-	    NULL,
-	    s_op,
-	    ret,
-	    &i);
-
-    return(job_post_ret);
-
+					 s_op->req->u.readdir.handle,
+					 &s_op->key,
+					 &s_op->val,
+					 0,
+					 NULL,
+					 s_op,
+					 ret,
+					 &j_id);
+    return job_post_ret;
 }
 
 /*
- * Function: readdir_kvspace
+ * Function: readdir_verify_directory_metadata
+ *
+ * Synopsis: Examine the metadata returned from the keyval read.
+ * If the metadata is for a directory, continue.  Otherwise prepare error.
+ *
+ * This function does not post an operation, but rather returns 1
+ * immediately.
+ */
+static int readdir_verify_directory_metadata(PINT_server_op *s_op,
+					     job_status_s *ret)
+{
+    PVFS_object_attr *a_p;
+
+    gossip_debug(SERVER_DEBUG, "readdir state: verify_directory_metadata\n");
+
+    a_p = &s_op->u.readdir.directory_attr;
+
+    gossip_debug(SERVER_DEBUG,
+		 "  attrs = (owner = %d, group = %d, perms = %o, type = %d)\n",
+		 a_p->owner,
+		 a_p->group,
+		 a_p->perms,
+		 a_p->objtype);
+
+    if (a_p->objtype != PVFS_TYPE_DIRECTORY) {
+	gossip_debug(SERVER_DEBUG, "  object is not a directory; halting readdir and sending response\n");
+	ret->error_code = STATE_ENOTDIR;
+	return 1;
+    }
+
+    /* TODO: permission checking */
+
+    return 1;
+}
+
+
+/*
+ * Function: readdir_read_dirdata_handle
+ *
+ * Params:   server_op *s_op, 
+ *           job_status_s *ret
+ *
+ * Returns:  int
+ *
+ * Synopsis: read the handle of the dirdata space from the directory's keyval space
+ *           
+ */
+static int readdir_read_dirdata_handle(PINT_server_op *s_op,
+				       job_status_s *ret)
+{
+    int job_post_ret;
+    job_id_t i;
+
+    gossip_debug(SERVER_DEBUG, "readdir state: read_dirdata handle\n");
+
+    s_op->key.buffer    = Trove_Common_Keys[DIR_ENT_KEY].key;
+    s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
+
+    /* read handle into readdir scratch space */
+    s_op->val.buffer    = &s_op->u.readdir.dirent_handle;
+    s_op->val.buffer_sz = sizeof(PVFS_handle);
+
+    gossip_debug(SERVER_DEBUG,
+		 "  reading metadata (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = 0x%08x (%d))\n",
+		 s_op->req->u.readdir.fs_id,
+		 s_op->req->u.readdir.handle,
+		 (char *) s_op->key.buffer,
+		 s_op->key.buffer_sz,
+		 (unsigned) s_op->val.buffer,
+		 s_op->val.buffer_sz);
+
+    job_post_ret = job_trove_keyval_read(s_op->req->u.readdir.fs_id,
+					 s_op->req->u.readdir.handle,
+					 &s_op->key,
+					 &s_op->val,
+					 0,
+					 NULL,
+					 s_op,
+					 ret,
+					 &i);
+    return job_post_ret;
+}
+
+/*
+ * Function: readdir_iterate_on_entries
  *
  * Params:   server_op *s_op, 
  *           job_status_s *ret
@@ -206,35 +282,68 @@ static int readdir_kvread(state_action_struct *s_op, job_status_s *ret)
  * Returns:  int
  *
  * Synopsis: 
- *           
+ *
+ * NOTE: allocates a big chunk of memory, pointed to by s_op->key_a!
  */
-
-static int readdir_get_kvspace(state_action_struct *s_op, job_status_s *ret)
+static int readdir_iterate_on_entries(PINT_server_op *s_op,
+				      job_status_s *ret)
 {
-
+    int j;
+    int memory_size, kv_array_size;
+    char *memory_buffer;
     int job_post_ret;
-    job_id_t i;
-    PVFS_handle h;
+    job_id_t j_id;
 
-    h = *((PVFS_handle *)s_op->val.buffer);
-    gossip_ldebug(SERVER_DEBUG,"KVSpace %lld\n",h);
+    gossip_debug(SERVER_DEBUG, "readdir state: iterate_on_entries\n");
 
-    job_post_ret = job_trove_keyval_iterate(
-	    s_op->req->u.readdir.fs_id,
-	    h,
-	    s_op->req->u.readdir.token,
-	    s_op->key_a,
-	    s_op->val_a,
-	    s_op->req->u.readdir.pvfs_dirent_count,
-	    0,
-	    NULL,
-	    s_op,
-	    ret, 
-	    &i);
+    /* calculate total memory needed:
+     * - 2 * dirent_count keyval structures to pass to iterate function
+     * - dirent_count dirent structures to hold the results
+     */
+    kv_array_size = s_op->req->u.readdir.pvfs_dirent_count * sizeof(TROVE_keyval_s);
+    memory_size = 2 * kv_array_size + s_op->req->u.readdir.pvfs_dirent_count * sizeof(PVFS_dirent);
 
+    memory_buffer = malloc(memory_size);
+    assert(memory_buffer != NULL);
 
-    return(job_post_ret);
+    /* set up all the pointers into the one big buffer */
+    s_op->key_a = (TROVE_keyval_s *) memory_buffer;
+    memory_buffer += kv_array_size;
 
+    s_op->val_a = (TROVE_keyval_s *) memory_buffer;
+    memory_buffer += kv_array_size;
+
+    s_op->resp->u.readdir.pvfs_dirent_array = (PVFS_dirent *) memory_buffer;
+
+    /* fill in values into all keyval structures prior to iterate call */
+    for (j = 0; j < s_op->req->u.readdir.pvfs_dirent_count; j++)
+    {
+	s_op->key_a[j].buffer    = s_op->resp->u.readdir.pvfs_dirent_array[j].d_name;
+	s_op->key_a[j].buffer_sz = PVFS_NAME_MAX;
+
+	s_op->val_a[j].buffer    = &(s_op->resp->u.readdir.pvfs_dirent_array[j].handle);
+	s_op->val_a[j].buffer_sz = sizeof(PVFS_handle);
+    }
+
+    gossip_debug(SERVER_DEBUG,
+		 "  iterating over keyvals (coll_id = 0x%x, handle = 0x%08Lx, token = 0x%Lx, count = %d)\n",
+		 s_op->req->u.readdir.fs_id,
+		 s_op->u.readdir.dirent_handle,
+		 s_op->req->u.readdir.token,
+		 s_op->req->u.readdir.pvfs_dirent_count);
+
+    job_post_ret = job_trove_keyval_iterate(s_op->req->u.readdir.fs_id,
+					    s_op->u.readdir.dirent_handle,
+					    s_op->req->u.readdir.token,
+					    s_op->key_a,
+					    s_op->val_a,
+					    s_op->req->u.readdir.pvfs_dirent_count,
+					    0,
+					    NULL,
+					    s_op,
+					    ret, 
+					    &j_id);
+    return job_post_ret;
 }
 
 
@@ -249,50 +358,51 @@ static int readdir_get_kvspace(state_action_struct *s_op, job_status_s *ret)
  * Synopsis: Assembles the directory space entries... and ships them off 
  *           
  */
-
-
-static int readdir_send_bmi(state_action_struct *s_op, job_status_s *ret)
+static int readdir_send_bmi(PINT_server_op *s_op, job_status_s *ret)
 {
-
-    int job_post_ret;
+    int encode_ret, job_post_ret;
     job_id_t i;
 
-    if((s_op->resp->status = ret->error_code) < 0)
-    {
+    gossip_debug(SERVER_DEBUG, "readdir state: send_bmi\n");
+
+    if (ret->error_code == STATE_ENOTDIR) {
+	s_op->resp->status = -EINVAL;
 	s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
     }
-    else
-    {
-	s_op->resp->rsize = sizeof(struct PVFS_server_resp_s) 
-	    + ret->count *sizeof(PVFS_dirent);
+    else if (ret->error_code != 0) {
+	/* for now let's assume this is an "empty" directory */
+	s_op->resp->status = 0;
+	s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
+	s_op->resp->u.readdir.pvfs_dirent_count = 0;
     }
-    
+    else {
+	s_op->resp->status = 0;
+	s_op->resp->rsize = sizeof(struct PVFS_server_resp_s) + ret->count * sizeof(PVFS_dirent);
+	s_op->resp->u.readdir.pvfs_dirent_count = ret->count;
+    }
 
-    s_op->resp->u.readdir.pvfs_dirent_count = ret->count;
+    encode_ret = PINT_encode(s_op->resp,
+			     PINT_ENCODE_RESP,
+			     &(s_op->encoded),
+			     s_op->addr,
+			     s_op->enc_type);
 
-    job_post_ret = PINT_encode(
-	    s_op->resp,
-	    PINT_ENCODE_RESP,
-	    &(s_op->encoded),
-	    s_op->addr,
-	    s_op->enc_type);
+    assert(encode_ret == 0);
 
     /* Post message */
     job_post_ret = job_bmi_send_list(
-	    s_op->addr,
-	    s_op->encoded.buffer_list,
-	    s_op->encoded.size_list,
-	    s_op->encoded.list_count,
-	    s_op->encoded.total_size,
-	    s_op->tag,
-	    s_op->encoded.buffer_flag,
-	    0,
-	    s_op,
-	    ret,
-	    &i);
-
-    return(job_post_ret);
-
+				     s_op->addr,
+				     s_op->encoded.buffer_list,
+				     s_op->encoded.size_list,
+				     s_op->encoded.list_count,
+				     s_op->encoded.total_size,
+				     s_op->tag,
+				     s_op->encoded.buffer_flag,
+				     0,
+				     s_op,
+				     ret,
+				     &i);
+    return job_post_ret;
 }
 
 
@@ -310,21 +420,20 @@ static int readdir_send_bmi(state_action_struct *s_op, job_status_s *ret)
  *
  * Synopsis: Free the job from the scheduler to allow next job to proceed.
  */
-
-static int readdir_unpost_req(state_action_struct *s_op, job_status_s *ret)
+static int readdir_unpost_req(PINT_server_op *s_op, job_status_s *ret)
 {
 
     int job_post_ret=0;
     job_id_t i;
 
+    gossip_debug(SERVER_DEBUG, "readdir state: unpost_req\n");
+
     job_post_ret = job_req_sched_release(s_op->scheduled_id,
-	    s_op,
-	    ret,
-	    &i);
+					 s_op,
+					 ret,
+					 &i);
     return job_post_ret;
 }
-
-
 
 
 /*
@@ -338,31 +447,24 @@ static int readdir_unpost_req(state_action_struct *s_op, job_status_s *ret)
  * Synopsis: free memory and return
  *           
  */
-
-
-static int readdir_cleanup(state_action_struct *s_op, job_status_s *ret)
+static int readdir_cleanup(PINT_server_op *s_op,
+			   job_status_s *ret)
 {
 
-    PINT_encode_release(&(s_op->encoded),PINT_ENCODE_RESP,0);
+    gossip_debug(SERVER_DEBUG, "readdir state: cleanup\n");
 
+    /* free decoded, encoded requests */
     PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ,0);
+    free(s_op->unexp_bmi_buff.buffer);
 
-    if(s_op->key_a)
-	free(s_op->key_a);
+    /* free encoded, original responses */
+    PINT_encode_release(&(s_op->encoded),PINT_ENCODE_RESP,0);
+    free(s_op->resp);
 
-    if(s_op->resp)
-	free(s_op->resp);
+    /* free dynamically allocated space */
+    if (s_op->key_a) free(s_op->key_a);
 
-    /*
-    BMI_memfree(
-	    s_op->addr,
-	    s_op->req,
-	    s_op->unexp_bmi_buff->size,
-	    BMI_RECV_BUFFER
-	    );
-    */
-
-
+    /* free server operation structure */
     free(s_op);
 
     return(0);
@@ -378,4 +480,3 @@ static int readdir_cleanup(state_action_struct *s_op, job_status_s *ret)
  *
  * vim: ts=8 sts=4 sw=4 noexpandtab
  */
-

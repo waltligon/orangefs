@@ -47,6 +47,11 @@ struct PINT_server_lookup_op {
     PVFS_ds_keyval_s k_a[1], v_a[1]; /* not sure that this is really necessary... */
 };
 
+struct PINT_server_readdir_op {
+    PVFS_object_attr directory_attr; /* used to hold attributes of directory to read */
+    PVFS_handle dirent_handle; /* used to hold handle of dirdata dspace from which entries are read */
+};
+
 struct PINT_server_crdirent_op {
     PVFS_object_attr parent_attr; /* used to hold attributes of the parent directory */
     PVFS_handle dirent_handle; /* used to hold handle of dirdata dspace that we'll write the dirent into */
@@ -80,6 +85,7 @@ typedef struct PINT_server_op
     union {
 	struct PINT_server_lookup_op   lookup;
 	struct PINT_server_crdirent_op crdirent;
+	struct PINT_server_readdir_op  readdir;
     } u;
 } PINT_server_op;
 

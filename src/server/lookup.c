@@ -209,14 +209,7 @@ static int lookup_read_object_metadata(PINT_server_op *s_op,
     if (s_op->u.lookup.seg_nr == 0) handle = s_op->req->u.lookup_path.starting_handle;
     else                            handle = s_op->resp->u.lookup_path.handle_array[s_op->u.lookup.seg_nr-1];
 
-    /* initialize keyvals prior to read list call
-     *
-     * We will read the handle of the dspace with direntries with the first
-     * keyval, and the attributes with the second.
-     *
-     * If this is the base handle, we read attributes into base_attr rather
-     * than into the object attribute array (oa_a).
-     */
+    /* initialize keyvals prior to read list call */
 
     s_op->u.lookup.k_a[0].buffer    = Trove_Common_Keys[METADATA_KEY].key;
     s_op->u.lookup.k_a[0].buffer_sz = Trove_Common_Keys[METADATA_KEY].size;
