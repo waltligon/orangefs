@@ -102,10 +102,11 @@ nested machine pvfs2_client_msgpair_sm(post,
 static int msgpair_post(PINT_client_sm *sm_p,
 			job_status_s *js_p)
 {
-    int ret;
+    int ret = -PVFS_EINVAL, tmp = 0;
     PVFS_msg_tag_t session_tag;
-    struct filesystem_configuration_s *cur_fs;
+    struct filesystem_configuration_s *cur_fs = NULL;
     struct server_configuration_s *server_config = NULL;
+    job_status_s status;
 
     PINT_client_sm_msgpair_state *msg_p; /* for convenience */
 
@@ -127,6 +128,9 @@ static int msgpair_post(PINT_client_sm *sm_p,
     cur_fs = PINT_config_find_fs_id(server_config, msg_p->fs_id);
     PINT_put_server_config_struct(server_config);
     assert(cur_fs);
+
+    assert((msg_p->retry_flag == PVFS_MSGPAIR_RETRY) ||
+           (msg_p->retry_flag == PVFS_MSGPAIR_NO_RETRY));
 
     ret = PINT_encode(&msg_p->req,
 		      PINT_ENCODE_REQ,
@@ -152,6 +156,8 @@ static int msgpair_post(PINT_client_sm *sm_p,
 	gossip_err("msgpair_post: failure in BMI_memalloc\n");
 	assert(0);
     }
+
+  post_msg_receive:
 
     /* get session tag to associate with send and receive.
      * session tag is kept as a local variable.
@@ -197,6 +203,28 @@ static int msgpair_post(PINT_client_sm *sm_p,
         return 1;
     }
     assert(ret == 0); /* return value range check */
+
+    /*
+      before posting the send, we need to be sure the recv did not
+      fail.  if it failed, we may be able to retry the operation
+      depending on the retry flag which can cause an underlying
+      reconnect
+    */
+    memset(&status, 0, sizeof(job_status_s));
+    ret = job_test(msg_p->recv_id, &tmp, NULL,
+                   &status, 0, pint_client_sm_context);
+    if (ret != 0)
+    {
+        if ((msg_p->retry_flag == PVFS_MSGPAIR_RETRY) ||
+            (PVFS_ERROR_CLASS((-status.error_code)) == PVFS_ERROR_BMI))
+        {
+            gossip_debug(GOSSIP_CLIENT_DEBUG,
+                         "*** Reposting receive due to failure (%d)\n",
+                         ret);
+            msg_p->recv_status.error_code = 0;
+            goto post_msg_receive;
+        }
+    }
 
     /* post send of request; job_id stored in send_id */
     ret = job_bmi_send_list(msg_p->encoded_req.dest,

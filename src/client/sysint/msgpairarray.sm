@@ -95,7 +95,8 @@ nested machine pvfs2_client_msgpairarray_sm(post,
 static int msgpairarray_post(PINT_client_sm *sm_p,
 			     job_status_s *js_p)
 {
-    int ret = -PVFS_EINVAL, i = 0;
+    int ret = -PVFS_EINVAL, i = 0, tmp = 0;
+    job_status_s status;
     struct server_configuration_s *server_config = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
@@ -150,6 +151,7 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
             return 1;
 	}
 
+      post_msg_receive:
 	session_tag = get_next_session_tag();
 
 	/* post receive of response; job_id stored in recv_id */
@@ -188,6 +190,27 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 	    continue;
 	}
 	assert(ret == 0);
+
+        /*
+          before posting the send, we need to be sure the recv did not
+          fail.  if it failed, we may be able to retry the operation
+          depending on the retry flag which can cause an underlying
+          reconnect
+        */
+        memset(&status, 0, sizeof(job_status_s));
+        ret = job_test(msg_p->recv_id, &tmp, NULL,
+                       &status, 0, pint_client_sm_context);
+        if (ret != 0)
+        {
+            if ((msg_p->retry_flag == PVFS_MSGPAIR_RETRY) &&
+                (PVFS_ERROR_CLASS(status.error_code) == PVFS_ERROR_BMI))
+            {
+                gossip_debug(GOSSIP_CLIENT_DEBUG,
+                             "*** Reposting receive due to failure (%d)\n",
+                             ret);
+                goto post_msg_receive;
+            }
+        }
 
 	/* post send of request; job_id stored in send_id */
 	ret = job_bmi_send_list(msg_p->encoded_req.dest,
