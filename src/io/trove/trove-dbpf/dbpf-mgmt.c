@@ -266,7 +266,8 @@ static int dbpf_initialize(char *stoname,
     sto_p = dbpf_storage_lookup(stoname, &error);
     if (sto_p == NULL)
     {
-        gossip_err("dbpf_initialize failure: storage lookup failed\n");
+        gossip_debug(TROVE_DEBUG, "dbpf_initialize failure: storage "
+                     "lookup failed\n");
         return -1;
     }
     
