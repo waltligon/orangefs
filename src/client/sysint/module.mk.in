@@ -25,5 +25,6 @@ LIBSRC += \
 	$(DIR)/rmdir.c \
 	$(DIR)/setattr.c \
 	$(DIR)/sysint-utils.c \
-	$(DIR)/pint-bucket.c
+	$(DIR)/pint-bucket.c \
+	$(DIR)/io.c
 

@@ -34,8 +34,10 @@ typedef enum {
 	PVFS_SYS_SYMLINK = 9,
 	PVFS_SYS_READLINK = 10,
 	/* Q: function for removing a link?  REMOVE DOES IT ALL? */
+#if 0
 	PVFS_SYS_READ = 11,
 	PVFS_SYS_WRITE = 12,
+#endif
 	PVFS_SYS_ALLOCATE = 13,
 	PVFS_SYS_CLONE = 14,
 	PVFS_SYS_LOCK = 15,
@@ -51,6 +53,7 @@ typedef enum {
 	PVFS_SYS_REVLOOKUP = 25,
 	PVFS_SYS_READDIR = 26,
 	PVFS_SYS_TRUNCATE = 27,
+	PVFS_SYS_IO = 28,
 	PVFS_SYS_EXTENSION = 99,
 } PVFS_system_op;
 
@@ -257,33 +260,16 @@ struct PVFS_sysresp_readlink_s {
 };
 typedef struct PVFS_sysresp_readlink_s PVFS_sysresp_readlink;
 
-/* read */
-struct PVFS_sysreq_read_s {
+/* read/write */
+struct PVFS_sysreq_io_s {
 	pinode_reference pinode_refn;
-	/* I/O description */
 };
-typedef struct PVFS_sysreq_read_s PVFS_sysreq_read;
+typedef struct PVFS_sysreq_io_s PVFS_sysreq_io;
 
-struct PVFS_sysresp_read_s {
+struct PVFS_sysresp_io_s {
 	pinode_reference pinode_refn;
-	/* indicator of what was actually read */
-	/* maybe something about failed servers? */
 };
-typedef struct PVFS_sysresp_read_s PVFS_sysresp_read;
-
-/* write */
-struct PVFS_sysreq_write_s {
-	pinode_reference pinode_refn;
-	/* I/O description */
-};
-typedef struct PVFS_sysreq_write_s PVFS_sysreq_write;
-
-struct PVFS_sysresp_write_s {
-	pinode_reference pinode_refn;
-	/* indicator of what was actually written */
-	/* maybe something about failed servers? */
-};
-typedef struct PVFS_sysresp_write_s PVFS_sysresp_write;
+typedef struct PVFS_sysresp_io_s PVFS_sysresp_io;
 
 /* allocate */
 /* Q: SHOULD THIS BE A TRUNCATE INSTEAD? */
@@ -428,8 +414,7 @@ struct PVFS_system_req_s {
 		PVFS_sysreq_rename rename;
 		PVFS_sysreq_symlink symlink;
 		PVFS_sysreq_readlink readlink;
-		PVFS_sysreq_read read;
-		PVFS_sysreq_write write;
+		PVFS_sysreq_io io;
 		PVFS_sysreq_allocate allocate;
 		PVFS_sysreq_duplicate duplicate;
 		PVFS_sysreq_lock lock;
@@ -455,8 +440,7 @@ struct PVFS_system_resp_s {
 		PVFS_sysresp_create create;
 		PVFS_sysresp_symlink symlink;
 		PVFS_sysresp_readlink readlink;
-		PVFS_sysresp_read read;
-		PVFS_sysresp_write write;
+		PVFS_sysresp_io io;
 		PVFS_sysresp_duplicate duplicate;
 		PVFS_sysresp_lock lock;
 		PVFS_sysresp_statfs statfs;
@@ -474,6 +458,15 @@ struct PVFS_system_resp_s {
 	char **table_p;
 	int number;
 };*/
+
+/* an enumeration that controls what type of operation is performed in
+ * PVFS_sys_io()
+ */
+enum PVFS_sys_io_type
+{
+	PVFS_SYS_IO_READ,
+	PVFS_SYS_IO_WRITE
+};
 
 /* PVFS System Request Prototypes
  *
@@ -497,8 +490,10 @@ int PVFS_sys_remove(PVFS_sysreq_remove *req);
 int PVFS_sys_rename(PVFS_sysreq_rename *req);
 int PVFS_sys_symlink(PVFS_sysreq_symlink *req, PVFS_sysresp_symlink *resp);
 int PVFS_sys_readlink(PVFS_sysreq_readlink *req, PVFS_sysresp_readlink *resp);
-int PVFS_sys_read(PVFS_sysreq_read *req, PVFS_sysresp_read *resp);
-int PVFS_sys_write(PVFS_sysreq_write *req, PVFS_sysresp_write *resp);
+int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp, 
+	enum PVFS_sys_io_type type);
+#define PVFS_sys_read(x,y) PVFS_sys_io(x,y,PVFS_SYS_IO_READ)
+#define PVFS_sys_write(x,y) PVFS_sys_io(x,y,PVFS_SYS_IO_WRITE)
 int PVFS_sys_allocate(PVFS_sysreq_allocate *req);
 int PVFS_sys_duplicate(PVFS_sysreq_duplicate *req,PVFS_sysresp_duplicate *resp);
 int PVFS_sys_lock(PVFS_sysreq_lock *req, PVFS_sysresp_lock *resp);
