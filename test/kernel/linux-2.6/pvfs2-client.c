@@ -194,12 +194,13 @@ static void parse_args(int argc, char **argv, options_t *opts)
         {"version",0,0,0},
         {"verbose",0,0,0},
         {"foreground",0,0,0},
-        {"path",1,0,0}
+        {"path",1,0,0},
+	{0,0,0,0}
     };
 
     assert(opts);
 
-    while((ret = getopt_long(argc, argv, "-hvVfp:",
+    while((ret = getopt_long(argc, argv, "hvVfp:",
                              long_opts, &option_index)) != -1)
     {
         switch(ret)
