@@ -130,6 +130,7 @@ int do_decode_resp(
     case PVFS_SERV_CRDIRENT:
     case PVFS_SERV_MKDIR:
     case PVFS_SERV_RMDIRENT:
+    case PVFS_SERV_CHDIRENT:
     case PVFS_SERV_IO:
     case PVFS_SERV_WRITE_COMPLETION:
     case PVFS_SERV_FLUSH:

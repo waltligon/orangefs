@@ -123,6 +123,10 @@ static void lebf_initialize(void)
 		req.u.rmdirent.entry = tmp_name;
 		reqsize = extra_size_PVFS_servreq_rmdirent;
 		break;
+	    case PVFS_SERV_CHDIRENT:
+		req.u.chdirent.entry = tmp_name;
+		reqsize = extra_size_PVFS_servreq_chdirent;
+		break;
 	    case PVFS_SERV_TRUNCATE:
 		/* nothing special */
 		break;
@@ -290,6 +294,7 @@ static int lebf_encode_req(
 	CASE(PVFS_SERV_SETATTR, setattr);
 	CASE(PVFS_SERV_CRDIRENT, crdirent);
 	CASE(PVFS_SERV_RMDIRENT, rmdirent);
+	CASE(PVFS_SERV_CHDIRENT, chdirent);
 	CASE(PVFS_SERV_TRUNCATE, truncate);
 	CASE(PVFS_SERV_MKDIR, mkdir);
 	CASE(PVFS_SERV_READDIR, readdir);
@@ -369,6 +374,7 @@ static int lebf_encode_resp(
 	CASE(PVFS_SERV_IO, io);
 	CASE(PVFS_SERV_GETATTR, getattr);
 	CASE(PVFS_SERV_RMDIRENT, rmdirent);
+	CASE(PVFS_SERV_CHDIRENT, chdirent);
 	CASE(PVFS_SERV_MKDIR, mkdir);
 	CASE(PVFS_SERV_READDIR, readdir);
 	CASE(PVFS_SERV_STATFS, statfs);
@@ -454,6 +460,7 @@ static int lebf_decode_req(
 	CASE(PVFS_SERV_SETATTR, setattr);
 	CASE(PVFS_SERV_CRDIRENT, crdirent);
 	CASE(PVFS_SERV_RMDIRENT, rmdirent);
+	CASE(PVFS_SERV_CHDIRENT, chdirent);
 	CASE(PVFS_SERV_TRUNCATE, truncate);
 	CASE(PVFS_SERV_MKDIR, mkdir);
 	CASE(PVFS_SERV_READDIR, readdir);
@@ -525,6 +532,7 @@ static int lebf_decode_resp(
 	CASE(PVFS_SERV_IO, io);
 	CASE(PVFS_SERV_GETATTR, getattr);
 	CASE(PVFS_SERV_RMDIRENT, rmdirent);
+	CASE(PVFS_SERV_CHDIRENT, chdirent);
 	CASE(PVFS_SERV_MKDIR, mkdir);
 	CASE(PVFS_SERV_READDIR, readdir);
 	CASE(PVFS_SERV_STATFS, statfs);
@@ -630,6 +638,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	    case PVFS_SERV_GETATTR:
 	    case PVFS_SERV_CRDIRENT:
 	    case PVFS_SERV_RMDIRENT:
+	    case PVFS_SERV_CHDIRENT:
 	    case PVFS_SERV_TRUNCATE:
 	    case PVFS_SERV_READDIR:
 	    case PVFS_SERV_FLUSH:
@@ -696,6 +705,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	    case PVFS_SERV_SETATTR:
 	    case PVFS_SERV_CRDIRENT:
 	    case PVFS_SERV_RMDIRENT:
+	    case PVFS_SERV_CHDIRENT:
 	    case PVFS_SERV_TRUNCATE:
 	    case PVFS_SERV_MKDIR:
 	    case PVFS_SERV_FLUSH:

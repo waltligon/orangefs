@@ -104,6 +104,13 @@ struct PINT_server_readdir_op {
     PVFS_handle dirent_handle;       /* holds handle of dirdata dspace from which entries are read */
 };
 
+struct PINT_server_chdirent_op
+{
+    PVFS_handle dirdata_handle;
+    PVFS_handle old_dirent_handle;
+    PVFS_handle new_dirent_handle;
+};
+
 struct PINT_server_rmdirent_op {
     PVFS_handle dirdata_handle, entry_handle; /* holds handle of dirdata object, removed entry */
 };
@@ -181,18 +188,20 @@ typedef struct PINT_server_op
     struct PINT_encoded_msg encoded;
     struct PINT_decoded_msg decoded;
 
-    union {
+    union
+    {
 	/* request-specific scratch spaces for use during processing */
 	struct PINT_server_getconfig_op getconfig;
 	struct PINT_server_lookup_op    lookup;
 	struct PINT_server_crdirent_op  crdirent;
 	struct PINT_server_readdir_op   readdir;
 	struct PINT_server_remove_op    remove;
+	struct PINT_server_chdirent_op  chdirent;
 	struct PINT_server_rmdirent_op  rmdirent;
 	struct PINT_server_io_op	io;
 	struct PINT_server_flush_op	flush;
 	struct PINT_server_truncate_op  truncate;
-    } u; /* TODO: RENAME TO 'scratch' */
+    } u;
 } PINT_server_op;
 
 /* TODO: maybe this should be put somewhere else? */
@@ -241,6 +250,9 @@ static inline char* PINT_map_server_op_to_string(enum PVFS_server_op op)
 	    break;
 	case PVFS_SERV_RMDIRENT:
 	    ret_ptr = "rmdirent";
+	    break;
+	case PVFS_SERV_CHDIRENT:
+	    ret_ptr = "chdirent";
 	    break;
 	case PVFS_SERV_TRUNCATE:
 	    ret_ptr = "truncate";
@@ -317,6 +329,7 @@ extern struct PINT_state_machine_s pvfs2_lookup_sm;
 extern struct PINT_state_machine_s pvfs2_io_sm;
 extern struct PINT_state_machine_s pvfs2_remove_sm;
 extern struct PINT_state_machine_s pvfs2_rmdirent_sm;
+extern struct PINT_state_machine_s pvfs2_chdirent_sm;
 extern struct PINT_state_machine_s pvfs2_flush_sm;
 extern struct PINT_state_machine_s pvfs2_truncate_sm;
 extern struct PINT_state_machine_s pvfs2_setparam_sm;

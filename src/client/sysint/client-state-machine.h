@@ -243,22 +243,24 @@ typedef struct
 /* PINT_client_lookup_sm */
 struct PINT_client_lookup_sm
 {
-    char                         *orig_pathname;/* input parameter */
-    PVFS_object_ref        starting_refn; /* input parameter */
-    PVFS_sysresp_lookup          *lookup_resp;  /* in/out parameter*/
-    int                          follow_link;   /* input parameter */
-    int                          current_context;
-    PINT_client_lookup_sm_ctx    contexts[MAX_LOOKUP_CONTEXTS];
+    char                       *orig_pathname;/* input parameter */
+    PVFS_object_ref            starting_refn; /* input parameter */
+    PVFS_sysresp_lookup        *lookup_resp;  /* in/out parameter*/
+    int                        follow_link;   /* input parameter */
+    int                        current_context;
+    PINT_client_lookup_sm_ctx  contexts[MAX_LOOKUP_CONTEXTS];
 };
 
 /* PINT_client_rename_sm */
 struct PINT_client_rename_sm {
-    char                  *entries[2];     /* old/new entry names;
-                                              input parameter */
+    char            *entries[2];     /* old/new entry names;
+                                        input parameter */
     PVFS_object_ref parent_refns[2]; /* old/new parent pinode refns;
-                                              input parameter */
+                                        input parameter */
     PVFS_object_ref refns[2];        /* old/new pinode ref */
-    int                   rmdirent_index;
+    int             rmdirent_index;
+    int             target_dirent_exists;
+    PVFS_handle     old_dirent_handle;
 };
 
 struct PINT_client_mgmt_setparam_list_sm 

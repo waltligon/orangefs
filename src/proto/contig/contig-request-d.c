@@ -66,6 +66,11 @@ int do_decode_req(
 	dec_msg->u.rmdirent.entry = char_ptr;
 	return (0);
 
+    case PVFS_SERV_CHDIRENT:
+	char_ptr += sizeof(struct PVFS_server_req);
+	dec_msg->u.chdirent.entry = char_ptr;
+	return (0);
+
     case PVFS_SERV_CREATE:
 	char_ptr += sizeof(struct PVFS_server_req);
         dec_msg->u.create.handle_extent_array.extent_count =

@@ -15,8 +15,9 @@
 
 /* Implementation notes
  *
- * This is a complicated machine.  It is capable of removing the three externally visible
- * PVFS2 object types: datafiles, metafiles, and directories.
+ * This is a complicated machine.  It is capable of removing the three
+ * externally visible PVFS2 object types: datafiles, metafiles, and
+ * directories.
  *
  * For a datafile, the path through the state machine looks like:
  * 1) prelude
@@ -44,93 +45,97 @@
  * 7) final_response
  * 8) cleanup
  *
- * A directory that never had entries will skip step (5), as there would be no
- * dirdata dspace.
- *
- * Hopefully this will help in understanding all that goes on here... -- Rob
+ * A directory that never had entries will skip step (5), as there
+ * would be no dirdata dspace.
  */
 
-/* TODO: this could be organized better now, probably */
-
-enum {
+enum
+{
     STATE_TYPE_DIRECTORY = 1,
     STATE_TYPE_DATAFILE = 2
 };
 
-static int remove_check_object_type(PINT_server_op *s_op, job_status_s* js_p);
-static int remove_verify_object_metadata(PINT_server_op *s_op, job_status_s* js_p);
-static int remove_cleanup(PINT_server_op *s_op, job_status_s* js_p);
-static int remove_remove_dspace(PINT_server_op *s_op, job_status_s* js_p);
-static int remove_try_to_read_dirdata_handle(PINT_server_op *s_op, job_status_s* js_p);
-static int remove_remove_dirdata_dspace(PINT_server_op *s_op, job_status_s* js_p);
+static int remove_check_object_type(
+    PINT_server_op *s_op, job_status_s* js_p);
+static int remove_verify_object_metadata(
+    PINT_server_op *s_op, job_status_s* js_p);
+static int remove_cleanup(
+    PINT_server_op *s_op, job_status_s* js_p);
+static int remove_remove_dspace(
+    PINT_server_op *s_op, job_status_s* js_p);
+static int remove_try_to_read_dirdata_handle(
+    PINT_server_op *s_op, job_status_s* js_p);
+static int remove_remove_dirdata_dspace(
+    PINT_server_op *s_op, job_status_s* js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
 %%
 
-machine pvfs2_remove_sm(prelude,
-			check_object_type,
-			verify_object_metadata,
-			remove_dspace,
-			try_to_read_dirdata_handle,
-			remove_dirdata_dspace,
-			final_response,
-			cleanup)
+machine pvfs2_remove_sm(
+    prelude,
+    check_object_type,
+    verify_object_metadata,
+    remove_dspace,
+    try_to_read_dirdata_handle,
+    remove_dirdata_dspace,
+    final_response,
+    cleanup)
 {
-	state prelude
-	{
-		jump pvfs2_prelude_sm;
-		success => check_object_type;
-		default => final_response;
-	}
+    state prelude
+    {
+        jump pvfs2_prelude_sm;
+        success => check_object_type;
+        default => final_response;
+    }
 
-	state check_object_type
-	{
-		run remove_check_object_type;
-		success => verify_object_metadata;
-		STATE_TYPE_DATAFILE => remove_dspace;
-		default => final_response;
-	}
+    state check_object_type
+    {
+        run remove_check_object_type;
+        success => verify_object_metadata;
+        STATE_TYPE_DATAFILE => remove_dspace;
+        default => final_response;
+    }
 
-        state verify_object_metadata
-	{
-            run remove_verify_object_metadata;
-            STATE_TYPE_DIRECTORY => try_to_read_dirdata_handle;
-            success => remove_dspace;
-            default => final_response;
-	}
+    state verify_object_metadata
+    {
+        run remove_verify_object_metadata;
+        STATE_TYPE_DIRECTORY => try_to_read_dirdata_handle;
+        success => remove_dspace;
+        default => final_response;
+    }
 
-	state remove_dspace
-	{
-            run remove_remove_dspace;
-            default => final_response;
-	}
+    state remove_dspace
+    {
+        run remove_remove_dspace;
+        default => final_response;
+    }
 
-	state try_to_read_dirdata_handle
-	{
-            run remove_try_to_read_dirdata_handle;
-            success => remove_dirdata_dspace;
-            default => remove_dspace;
-        }
+    state try_to_read_dirdata_handle
+    {
+        run remove_try_to_read_dirdata_handle;
+        success => remove_dirdata_dspace;
+        default => remove_dspace;
+    }
 
-	state remove_dirdata_dspace
-        {
-            run remove_remove_dirdata_dspace;
-            success => remove_dspace;
-            default => final_response;
-        }
+    state remove_dirdata_dspace
+    {
+        run remove_remove_dirdata_dspace;
+        success => remove_dspace;
+        default => final_response;
+    }
 
-	state final_response
-	{
-            jump pvfs2_final_response_sm;
-            default => cleanup;
-	}
+    state final_response
+    {
+        jump pvfs2_final_response_sm;
+        default => cleanup;
+    }
 
-	state cleanup
-	{
-            run remove_cleanup;
-            default => terminate;
-	}
+    state cleanup
+    {
+        run remove_cleanup;
+        default => terminate;
+    }
 }
 
 %%
@@ -138,13 +143,13 @@ machine pvfs2_remove_sm(prelude,
 /*
  * Function: remove_check_object_type
  *
- * decides whether to follow the path for datafile removal or non-datafile
- * removal, based on whether we were able to successfully retrive object
- * attributes earlier
+ * decides whether to follow the path for datafile removal or
+ * non-datafile removal, based on whether we were able to successfully
+ * retrive object attributes earlier
  *
  */
 static int remove_check_object_type(PINT_server_op *s_op,
-				       job_status_s* js_p)
+                                    job_status_s* js_p)
 {
     PINT_STATE_DEBUG("check_object_type");
 
@@ -164,14 +169,14 @@ static int remove_check_object_type(PINT_server_op *s_op,
 /*
  * Function: remove_verify_object_metadata
  *
- * Verifies that the user has permission to access the file
- * (not yet implemented).
- * Also directs removal of dirdata dspace in the case of a directory.
+ * Verifies that the user has permission to access the file (not yet
+ * implemented).  Also directs removal of dirdata dspace in the case
+ * of a directory.
  *
  * This state has changed some over time; it might need a new name.
  *
- * Note: errors from the previous state are redirected elsewhere, so we
- * know that we have metadata if we make it here.
+ * Note: errors from the previous state are redirected elsewhere, so
+ * we know that we have metadata if we make it here.
  */
 static int remove_verify_object_metadata(PINT_server_op *s_op,
 					 job_status_s* js_p)
@@ -207,9 +212,9 @@ static int remove_verify_object_metadata(PINT_server_op *s_op,
 
 /* Function: remove_try_to_read_dirdata_handle
  *
- * Note: this is "try to read" because the dirdata handle is dropped in lazily.
- * so, the dirdata object might not exist (in the case of a directory that never
- * had an object placed in it, for example).
+ * Note: this is "try to read" because the dirdata handle is dropped
+ * in lazily.  so, the dirdata object might not exist (in the case of
+ * a directory that never had an object placed in it, for example).
  *
  */
 static int remove_try_to_read_dirdata_handle(PINT_server_op *s_op,
@@ -256,7 +261,7 @@ static int remove_try_to_read_dirdata_handle(PINT_server_op *s_op,
 /*
  * Function: remove_remove_dirdata_dspace
  *
- * Remove the dirdata dspace using the handle that we ready in the 
+ * Remove the dirdata dspace using the handle that we ready in the
  * read_dirdata_handle state.
  */
 static int remove_remove_dirdata_dspace(PINT_server_op *s_op,

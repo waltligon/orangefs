@@ -41,6 +41,7 @@ int do_encode_resp(
     case PVFS_SERV_CREATE:
     case PVFS_SERV_MKDIR:
     case PVFS_SERV_RMDIRENT:
+    case PVFS_SERV_CHDIRENT:
     case PVFS_SERV_IO:
     case PVFS_SERV_SETATTR:
     case PVFS_SERV_REMOVE:

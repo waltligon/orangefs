@@ -13,6 +13,7 @@ SERVERGENSRC := \
 	$(DIR)/get-config.c \
 	$(DIR)/remove.c \
 	$(DIR)/rmdirent.c \
+	$(DIR)/chdirent.c \
 	$(DIR)/io.c \
 	$(DIR)/flush.c \
 	$(DIR)/truncate.c\

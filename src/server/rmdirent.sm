@@ -106,10 +106,11 @@ machine pvfs2_rmdirent_sm(
 static int rmdirent_verify_parent_metadata_and_read_directory_entry_handle(
     PINT_server_op *s_op, job_status_s* js_p)
 {
-    int ret;
+    int ret = -PVFS_EINVAL;
     job_id_t i;
 
-    PINT_STATE_DEBUG("verify_parent_metadata_and_read_directory_entry_handle");
+    PINT_STATE_DEBUG("verify_parent_metadata_and_"
+                     "read_directory_entry_handle");
 
     /* set up key and value structures to read directory entry */
     s_op->key.buffer    = Trove_Common_Keys[DIR_ENT_KEY].key;
@@ -156,7 +157,7 @@ static int rmdirent_verify_parent_metadata_and_read_directory_entry_handle(
 static int rmdirent_read_directory_entry(PINT_server_op *s_op,
 					 job_status_s* js_p)
 {
-    int ret;
+    int ret = -PVFS_EINVAL;
     job_id_t j_id;
 
     PINT_STATE_DEBUG("read_directory_entry");
@@ -227,10 +228,10 @@ static int rmdirent_read_directory_entry_failure(PINT_server_op *s_op,
  * from the dirdata object.
  *           
  */
-static int rmdirent_remove_directory_entry(
-    PINT_server_op *s_op, job_status_s* js_p)
+static int rmdirent_remove_directory_entry(PINT_server_op *s_op,
+                                           job_status_s* js_p)
 {
-    int ret;
+    int ret = -PVFS_EINVAL;
     job_id_t j_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
 
@@ -297,7 +298,8 @@ static int rmdirent_remove_directory_entry_failure(PINT_server_op *s_op,
     return 1;
 }
 
-static int rmdirent_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
+static int rmdirent_setup_resp(PINT_server_op *s_op,
+                               job_status_s* js_p)
 {
     PINT_STATE_DEBUG("setup_resp");
 
@@ -326,7 +328,8 @@ static int rmdirent_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
     return(1);
 }
 
-static int rmdirent_cleanup(PINT_server_op *s_op, job_status_s* js_p)
+static int rmdirent_cleanup(PINT_server_op *s_op,
+                            job_status_s* js_p)
 {
     PINT_STATE_DEBUG("cleanup");
 

@@ -205,112 +205,96 @@ int PINT_req_sched_target_handle(
     {
     case PVFS_SERV_INVALID:
 	return (-EINVAL);
-	break;
     case PVFS_SERV_MGMT_SETPARAM:
 	return (0);
-	break;
     case PVFS_SERV_CREATE:
 	*readonly_flag = 0;
 	return (0);
-	break;
     case PVFS_SERV_REMOVE:
 	*readonly_flag = 0;
 	*handle = req->u.remove.handle;
 	*fs_id = req->u.remove.fs_id;
 	return (0);
-	break;
     case PVFS_SERV_IO:
 	if(req->u.io.io_type == PVFS_IO_WRITE)
 	    *readonly_flag = 0;
 	*handle = req->u.io.handle;
 	*fs_id = req->u.io.fs_id;
 	return (0);
-	break;
     case PVFS_SERV_GETATTR:
 	*handle = req->u.getattr.handle;
 	*fs_id = req->u.getattr.fs_id;
 	return (0);
-	break;
     case PVFS_SERV_SETATTR:
 	*readonly_flag = 0;
 	*handle = req->u.setattr.handle;
 	*fs_id = req->u.setattr.fs_id;
 	return (0);
-	break;
     case PVFS_SERV_LOOKUP_PATH:
 	*handle = req->u.lookup_path.starting_handle;
 	*fs_id = req->u.lookup_path.fs_id;
 	return (0);
-	break;
     case PVFS_SERV_CRDIRENT:
 	*readonly_flag = 0;
 	*handle = req->u.crdirent.parent_handle;
 	*fs_id = req->u.crdirent.fs_id;
 	return (0);
-	break;
     case PVFS_SERV_RMDIRENT:
 	*readonly_flag = 0;
 	*handle = req->u.rmdirent.parent_handle;
 	*fs_id = req->u.rmdirent.fs_id;
 	return (0);
-	break;
+    case PVFS_SERV_CHDIRENT:
+	*readonly_flag = 0;
+	*handle = req->u.chdirent.parent_handle;
+	*fs_id = req->u.chdirent.fs_id;
+	return (0);
     case PVFS_SERV_TRUNCATE:
 	*readonly_flag = 0;
 	*handle = req->u.truncate.handle;
 	*fs_id = req->u.truncate.fs_id;
 	return (0);
-	break;
     case PVFS_SERV_MKDIR:
 	*readonly_flag = 0;
 	return (0);
-	break;
     case PVFS_SERV_READDIR:
 	*handle = req->u.readdir.handle;
 	*fs_id = req->u.readdir.fs_id;
 	return (0);
-	break;
     case PVFS_SERV_GETCONFIG:
 	return (0);
-	break;
     case PVFS_SERV_FLUSH:
 	*readonly_flag = 0;
 	*handle = req->u.flush.handle;
 	*fs_id = req->u.flush.fs_id;
 	return (0);
-	break;
     case PVFS_SERV_MGMT_NOOP:
 	return (0);
-	break;
     case PVFS_SERV_MGMT_PERF_MON:
 	return (0);
-	break;
     case PVFS_SERV_MGMT_EVENT_MON:
 	return (0);
-	break;
     case PVFS_SERV_MGMT_ITERATE_HANDLES:
 	*fs_id = req->u.mgmt_iterate_handles.fs_id;
 	return (0);
-	break;
     case PVFS_SERV_MGMT_DSPACE_INFO_LIST:
 	if(req_index >= req->u.mgmt_dspace_info_list.handle_count)
+        {
 	    return(-EOVERFLOW);
+        }
 	*handle = req->u.mgmt_dspace_info_list.handle_array[req_index];
 	*fs_id = req->u.mgmt_dspace_info_list.fs_id;
 	return (0);
-	break;
     case PVFS_SERV_STATFS:
 	*fs_id = req->u.statfs.fs_id;
 	return (0);
-	break;
     case PVFS_SERV_WRITE_COMPLETION:
     case PVFS_SERV_PERF_UPDATE:
     case PVFS_SERV_JOB_TIMER:
     case PVFS_SERV_PROTO_ERROR:
 	/* these should never show up here */
 	return (-EINVAL);
-	break;
     }
-
     return (0);
 }
 

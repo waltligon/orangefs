@@ -199,6 +199,34 @@ int do_encode_req(
 	((struct PVFS_server_req *) enc_msg)->u.rmdirent.entry = NULL;
 	return (0);
 
+    case PVFS_SERV_CHDIRENT:
+	assert(request->u.chdirent.entry != NULL);
+
+	name_sz = strlen(request->u.chdirent.entry) + 1;
+	size = (sizeof(struct PVFS_server_req) +
+                PINT_ENC_GENERIC_HEADER_SIZE + name_sz);
+	enc_msg = BMI_memalloc(target_msg->dest, (bmi_size_t) size, BMI_SEND);
+
+	if (enc_msg == NULL)
+	{
+	    return (-ENOMEM);
+	}
+	target_msg->buffer_list[0] = enc_msg;
+	target_msg->size_list[0] = size;
+	target_msg->total_size = size;
+
+	memcpy(enc_msg, contig_buffer_table.generic_header,
+	    PINT_ENC_GENERIC_HEADER_SIZE);
+	enc_msg = (void*)((char*)enc_msg + PINT_ENC_GENERIC_HEADER_SIZE);
+	memcpy(enc_msg, request, sizeof(struct PVFS_server_req));
+
+	/* copy a null terminated string to another */
+	memcpy(enc_msg + sizeof(struct PVFS_server_req),
+	       request->u.chdirent.entry, name_sz);
+
+	((struct PVFS_server_req *) enc_msg)->u.chdirent.entry = NULL;
+	return (0);
+
     case PVFS_SERV_CREATE:
         size = sizeof(struct PVFS_server_req) + sizeof(uint32_t)
             + PINT_ENC_GENERIC_HEADER_SIZE;
