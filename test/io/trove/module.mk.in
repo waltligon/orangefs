@@ -14,12 +14,11 @@ LOCALTESTSRC := \
 
 TESTSRC += $(LOCALTESTSRC)
 
-LOCALLIBS := -ldb -lrt -lpthread 
 LOCALTESTS := $(patsubst %.c,%, $(LOCALTESTSRC))
 $(LOCALTESTS): %: %.o
 ifdef QUIET_COMPILE
 	@echo "  LD		$@"
-	@$(LD) $< $(LDFLAGS) $(LIBS) $(LOCALLIBS) -o $@
+	@$(LD) $< $(LDFLAGS) $(SERVERLIBS) -o $@
 else
-	$(LD) $< $(LDFLAGS) $(LIBS) $(LOCALLIBS) -o $@
+	$(LD) $< $(LDFLAGS) $(SERVERLIBS) -o $@
 endif
