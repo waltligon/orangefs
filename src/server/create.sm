@@ -289,5 +289,5 @@ static int create_cleanup(PINT_server_op *s_op, job_status_s *ret)
  *  c-basic-offset: 4
  * End:
  *
- * vim: ts=8 sts=4 sw=4 noexpandtab
+ * vim: ft=c ts=8 sts=4 sw=4 noexpandtab
  */
