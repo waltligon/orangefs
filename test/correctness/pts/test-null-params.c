@@ -376,3 +376,95 @@ static int test_readdir(int nullCase){
 	}
 	return -2;
 }
+
+/* Preconditions: none
+ * Parameters: nullCase - the test case that is checked for this function
+ * Postconditions: returns error code of readdir
+ */
+static int test_create(int nullCase){
+   int ret;
+   PVFS_object_attr attr;
+   PVFS_credentials credentials;
+   PVFS_sysresp_lookup resp_look;
+   PVFS_sysresp_create resp_create;
+   PVFS_sysresp_getattr resp_getattr;
+	char *filename;	
+
+	filename = (char *)malloc(sizeof(char)*100);
+	filename = strcpy(filename,"name");
+
+   credentials.uid = 100;
+   credentials.gid = 100;
+   credentials.perms = 1877;
+
+   ret = PVFS_sys_lookup(fs_id, dirname, credentials, &resp_look);
+   if (ret < 0)
+   {
+       printf("Lookup failed with errcode = %d\n", ret);
+       return (-1);
+   }
+
+	switch(nullCase){
+		case 0:
+			return PVFS_sys_create(NULL, NULL, NULL, NULL, NULL, NULL);
+			break;
+		case 1:
+			return PVFS_sys_create(NULL, resp_look.pinode_refn, attrmask, attr, credentials, &resp_create);
+			break;
+		case 2:
+			return PVFS_sys_create(filename, NULL, attrmask, attr, credentials, &resp_create);
+			break;
+		case 3:
+			resp_look.pinode_refn.handle = NULL;
+			return PVFS_sys_create(filename, resp_look.pinode_refn, attrmask, attr, credentials, &resp_create);
+			break;
+		case 4:
+   		pinode_refn.fs_id = NULL
+			return PVFS_sys_create(filename, resp_look.pinode_refn, attrmask, attr, credentials, &resp_create);
+			break;
+		case 5:
+			return PVFS_sys_create(filename, resp_look.pinode_refn, NULL, attr, credentials, &resp_create);
+			break;
+		case 6:
+			return PVFS_sys_create(filename, resp_look.pinode_refn, attrmask, NULL, credentials, &resp_create);
+			break;
+		case 7:
+			attr.owner = NULL;
+			return PVFS_sys_create(filename, resp_look.pinode_refn, attrmask, attr, credentials, &resp_create);
+			break;
+		case 8:
+			attr.group = NULL;
+			return PVFS_sys_create(filename, resp_look.pinode_refn, attrmask, attr, credentials, &resp_create);
+			break;
+		case 9:
+			attr.perms = NULL;
+			return PVFS_sys_create(filename, resp_look.pinode_refn, attrmask, attr, credentials, &resp_create);
+			break;
+		case 10:
+			attr.objtype = NULL;
+			return PVFS_sys_create(filename, resp_look.pinode_refn, attrmask, attr, credentials, &resp_create);
+			break;
+		case 11:
+			return PVFS_sys_create(filename, resp_look.pinode_refn, attrmask, attr, NULL, &resp_create);
+			break;
+		case 12:
+			credentials.gid = NULL;
+			return PVFS_sys_create(filename, resp_look.pinode_refn, attrmask, attr, credentials, &resp_create);
+			break;
+		case 13:
+			credentials.uid = NULL;
+			return PVFS_sys_create(filename, resp_look.pinode_refn, attrmask, attr, credentials, &resp_create);
+			break;
+		case 14:
+			credentials.perms = NULL;
+			return PVFS_sys_create(filename, resp_look.pinode_refn, attrmask, attr, credentials, &resp_create);
+			break;
+		case 15:
+			return PVFS_sys_create(filename, resp_look.pinode_refn, attrmask, attr, credentials, NULL);
+			break;
+		default:
+			fprintf(stderr,"Error - incorect case number \n");	
+			return -3;
+	}
+	return -2;
+}
