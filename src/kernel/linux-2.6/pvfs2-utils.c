@@ -1082,7 +1082,7 @@ PVFS_time pvfs2_convert_time_field(void *time_ptr)
 {
     PVFS_time pvfs2_time;
 #ifdef PVFS2_LINUX_KERNEL_2_4
-    pvfs2_time = (PVFS_time)(*time_ptr);
+    pvfs2_time = (PVFS_time)(*(time_t *)time_ptr);
 #else
     struct timespec *tspec = (struct timespec *)time_ptr;
     pvfs2_time = (PVFS_time)((time_t)tspec->tv_sec);
