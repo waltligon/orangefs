@@ -218,7 +218,7 @@ struct ctrl_req
 };
 struct ctrl_ack
 {
-    id_gen_t sender_op_id;	/* used for matching ctrl's */
+    PVFS_id_gen_t sender_op_id;	/* used for matching ctrl's */
     bmi_op_id_t receiver_op_id;	/* used for matching ctrl's */
     gm_remote_ptr_t remote_ptr;	/* peer address to target */
 };

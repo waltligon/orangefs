@@ -8,14 +8,13 @@
 #define __PINT_DEV_H
 
 #include "pvfs2-types.h"
-#include "id-generator.h"
 
 /* describes unexpected messages coming out of the device */
 struct PINT_dev_unexp_info
 {
 	void* buffer;
 	int size;
-	id_gen_t tag;
+	PVFS_id_gen_t tag;
 };
 
 /* types of memory buffers accepted in the write calls */
@@ -46,13 +45,13 @@ int PINT_dev_write_list(
 	int list_count,
 	int total_size,
 	enum PINT_dev_buffer_type buffer_type,
-	id_gen_t tag);
+	PVFS_id_gen_t tag);
 
 int PINT_dev_write(
 	void* buffer,
 	int size,
 	enum PINT_dev_buffer_type buffer_type,
-	id_gen_t tag);
+	PVFS_id_gen_t tag);
 
 void* PINT_dev_memalloc(int size);
 

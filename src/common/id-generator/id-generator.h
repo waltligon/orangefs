@@ -31,16 +31,14 @@
 #ifndef __ID_GENERATOR_H
 #define __ID_GENERATOR_H 
 
-#include <inttypes.h>
-
-typedef int64_t id_gen_t;
+#include "pvfs2-types.h"
 
 /********************************************************************
  * Visible interface
  */
 
-int id_gen_fast_register(id_gen_t* new_id, void* item);
-void* id_gen_fast_lookup(id_gen_t id);
+int id_gen_fast_register(PVFS_id_gen_t* new_id, void* item);
+void* id_gen_fast_lookup(PVFS_id_gen_t id);
 
 #endif /* __ID_GENERATOR_H */
 

@@ -7,14 +7,13 @@
 #ifndef __REQUEST_SCHEDULER_H
 #define __REQUEST_SCHEDULER_H
 
-#include <id-generator.h>
 #include <pvfs2-req-proto.h>
 
 /* this file contains the API for doing server side scheduling at
  * the request level.  
  */
 
-typedef id_gen_t req_sched_id;
+typedef PVFS_id_gen_t req_sched_id;
 typedef int req_sched_error_code;
 
 /* setup and teardown */

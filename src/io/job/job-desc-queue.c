@@ -14,6 +14,7 @@
 
 #include "job-desc-queue.h"
 #include "gossip.h"
+#include "id-generator.h"
 
 /***************************************************************
  * Visible functions

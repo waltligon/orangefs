@@ -44,7 +44,7 @@
  *
  * returns 0 on success, -errno on failure
  */
-int id_gen_fast_register(id_gen_t* new_id, void* item)
+int id_gen_fast_register(PVFS_id_gen_t* new_id, void* item)
 {
 
 	if(!item)
@@ -81,7 +81,7 @@ int id_gen_fast_register(id_gen_t* new_id, void* item)
  *
  * returns pointer to data on success, NULL on failure
  */
-void* id_gen_fast_lookup(id_gen_t id)
+void* id_gen_fast_lookup(PVFS_id_gen_t id)
 {
 
 	int32_t little_int = 0;

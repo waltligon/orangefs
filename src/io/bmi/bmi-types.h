@@ -11,7 +11,6 @@
 #define __BMI_TYPES_H
 
 #include <stdlib.h>
-#include "id-generator.h"
 #include "pvfs2-debug.h"
 #include "pvfs2-types.h"
 
@@ -19,8 +18,8 @@
 typedef PVFS_size bmi_size_t;	/* data region size */
 typedef PVFS_msg_tag_t bmi_msg_tag_t;	/* message tag */
 typedef PVFS_context_id bmi_context_id; /* context identifier */
-typedef id_gen_t bmi_op_id_t;	/* network operation handle */
-typedef id_gen_t bmi_addr_t;	/* network address handle */
+typedef PVFS_id_gen_t bmi_op_id_t;	/* network operation handle */
+typedef PVFS_id_gen_t bmi_addr_t;	/* network address handle */
 
 /* TODO: not using a real type for this yet; need to specify what
  * error codes look like */

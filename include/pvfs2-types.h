@@ -14,6 +14,7 @@ typedef uint8_t PVFS_boolean;
 typedef int32_t PVFS_error;
 typedef int64_t PVFS_offset;
 typedef int64_t PVFS_size;
+typedef int64_t PVFS_id_gen_t;
 
 /* basic types used by communication subsystems */
 typedef int32_t PVFS_msg_tag_t;

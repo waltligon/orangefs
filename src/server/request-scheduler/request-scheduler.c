@@ -34,6 +34,7 @@
 #include <pvfs2-req-proto.h>
 #include <pvfs2-debug.h>
 #include <gossip.h>
+#include "id-generator.h"
 
 /* element states */
 enum req_sched_states

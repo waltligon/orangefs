@@ -14,6 +14,7 @@
 #include "reference-list.h"
 #include "op-list.h"
 #include "gen-locks.h"
+#include "id-generator.h"
 
 static int active_method_count = 0;
 static struct bmi_method_ops **active_method_table = NULL;

@@ -24,6 +24,7 @@
 #include "request-scheduler.h"
 #include "trove-id-queue.h"
 #include "pint-dev.h"
+#include "id-generator.h"
 
 /* contexts for use within the job interface */
 static bmi_context_id global_bmi_context = -1;
@@ -770,7 +771,7 @@ int job_dev_unexp(struct PINT_dev_unexp_info* dev_unexp_d,
  */
 int job_dev_write(void* buffer,
     int size,
-    id_gen_t tag,
+    PVFS_id_gen_t tag,
     enum PINT_dev_buffer_type buffer_type,
     void* user_ptr,
     job_status_s * out_status_p,
@@ -809,7 +810,7 @@ int job_dev_write_list(void** buffer_list,
     int* size_list,
     int list_count,
     int total_size,
-    id_gen_t tag,
+    PVFS_id_gen_t tag,
     enum PINT_dev_buffer_type buffer_type,
     void* user_ptr,
     job_status_s* out_status_p,

@@ -22,6 +22,7 @@
 #include "gossip.h"
 #include "sockio.h"
 #include "bmi-byteswap.h"
+#include "id-generator.h"
 
 /* function prototypes */
 int BMI_tcp_initialize(method_addr_p listen_addr,

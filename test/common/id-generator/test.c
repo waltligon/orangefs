@@ -31,7 +31,7 @@
  * are actually representing with the handle.
  */
 
-typedef id_gen_t example_handle;
+typedef PVFS_id_gen_t example_handle;
 
 struct example_struct{
 	int x;

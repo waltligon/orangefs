@@ -281,7 +281,7 @@ int PINT_dev_write_list(
 	int list_count,
 	int total_size,
 	enum PINT_dev_buffer_type buffer_type,
-	id_gen_t tag)
+	PVFS_id_gen_t tag)
 {
     struct iovec io_array[8];
     int io_count = 2;
@@ -334,7 +334,7 @@ int PINT_dev_write(
 	void* buffer,
 	int size,
 	enum PINT_dev_buffer_type buffer_type,
-	id_gen_t tag)
+	PVFS_id_gen_t tag)
 {
     return(PINT_dev_write_list(&buffer, &size, 1, size, buffer_type, tag));
 }
