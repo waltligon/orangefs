@@ -184,6 +184,7 @@ int PINT_server_get_config(struct server_configuration_s *config,
         else
 	{
 	    found_one_good = 1;
+	    mntent_p->fs_id = cur_fs->coll_id;
 	    cur_fs->flowproto = mntent_p->flowproto;
 	    cur_fs->encoding = mntent_p->encoding;
 	}

@@ -120,6 +120,10 @@ int PVFS_util_parse_pvfstab(const char* tabfile, pvfs_mntlist* pvfstab_p)
     }
     memset(pvfstab_p->ptab_array, 0, 
 	pvfstab_p->ptab_count*sizeof(struct PVFS_sys_mntent));
+    for(i=0; i<pvfstab_p->ptab_count; i++)
+    {
+	pvfstab_p->ptab_array[i].fs_id = PVFS_FS_ID_NULL;
+    }
 
     /* reopen our chosen fstab file */
     mnt_fp = setmntent(targetfile, "r");

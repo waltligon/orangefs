@@ -44,6 +44,8 @@ struct PVFS_sys_mntent
     char *pvfs_fs_name;		/* name of PVFS2 file system */
     enum PVFS_flowproto_type flowproto;	/* flow protocol */
     enum PVFS_encoding_type encoding;   /* wire data encoding */
+    /* fs id, filled in by system interface when it looks up the fs */
+    PVFS_fs_id fs_id;           
 
     /* the following fields are included for convenience;
      * useful if the file system is "mounted" */
