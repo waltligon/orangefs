@@ -64,6 +64,12 @@
 /* Define if berkeley db error reporting was enabled */
 #undef BERKDB_ERROR_REPORTING
 
+/* Define if Pablo library is used */
+#undef HAVE_PABLO
+
+/* Use the MPE profiling library */
+#undef HAVE_MPE
+
 /* Define if DB stat function takes extra parameter */
 #undef HAVE_UNKNOWN_PARAMETER_TO_DB_STAT
 

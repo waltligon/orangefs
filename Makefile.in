@@ -100,7 +100,7 @@ CFLAGS = @CFLAGS@
 LDFLAGS = @LDFLAGS@
 LD = gcc
 LDFLAGS += -L lib 
-LIBS += @LIBS@ -lpvfs2
+LIBS += -lpvfs2 @LIBS@ 
 VISCFLAGS = @VISCFLAGS@
 VISLIBS = @VISLIBS@ -lSDL_ttf
 GTKCFLAGS = @GTKCFLAGS@
@@ -176,7 +176,7 @@ SERVERCFLAGS = -D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__ \
 -D__PVFS2_TROVE_THREADED__ @MISC_TROVE_FLAGS@ \
 -D__PVFS2_TROVE_SUPPORT__
 
-SERVERLIBS = @LIBS@ -lrt -lpthread -lpvfs2-server
+SERVERLIBS = -lrt -lpthread -lpvfs2-server @LIBS@ 
 # the client libraries are not threaded (at the moment at least)
 #    and therefore can disable locking in the I/O subsystems
 #LIBCFLAGS = -D__GEN_NULL_LOCKING__
@@ -452,9 +452,9 @@ mpiiotests: $(MPIIOTESTS)
 $(SERVER): src/server/pvfs2-server-server.o lib/libpvfs2-server.a 
 ifdef QUIET_COMPILE
 	@echo "  LD		$@"
-	@$(LD) $(LDFLAGS) $(SERVERLIBS) $^ -o $@
+	@$(LD) $^ -o $@ $(LDFLAGS) $(SERVERLIBS)
 else
-	$(LD) $(LDFLAGS) $(SERVERLIBS) $^ -o $@
+	$(LD) $^ -o $@ $(LDFLAGS) $(SERVERLIBS)
 endif
 
 # special rules for admin tools which also require server components
@@ -508,9 +508,9 @@ ifdef BUILD_KARMA
 $(KARMA): $(KARMAOBJS) $(LIBRARIES)
 ifdef QUIET_COMPILE
 	@echo "  LD		$@"
-	@$(LD) $(LDFLAGS) $(KARMALIBS) $^ -o $@
+	@$(LD) $^ -o $@ $(LDFLAGS) $(KARMALIBS)
 else
-	$(LD) $(LDFLAGS) $(KARMALIBS) $^ -o $@
+	$(LD) $^ -o $@ $(LDFLAGS) $(KARMALIBS)
 endif
 
 $(KARMAOBJS): %.o: %.c
