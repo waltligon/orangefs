@@ -19,5 +19,6 @@ TESTSRC += \
 	$(DIR)/test-encode-complex-in.c\
 	$(DIR)/test-encode-twice-out.c\
 	$(DIR)/test-encode-twice-in.c\
-	$(DIR)/test-romio-noncontig-pattern.c
+	$(DIR)/test-romio-noncontig-pattern.c\
+	$(DIR)/test-romio-noncontig-pattern2.c
 #	$(DIR)/test-req1.c\
