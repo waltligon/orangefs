@@ -18,6 +18,7 @@ pvfs2-0.7.0pre1
 - ib: initial cancel support, works for pvfs2-ls
 - add multihome support: servers can listen on multiple addresses (and
   BMI types), clients choose the first address from tabfile that works
+- bmi: poll adaptively based on recent usage
 
 
 pvfs2-0.6.5

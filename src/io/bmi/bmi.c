@@ -7,6 +7,7 @@
 #include <errno.h>
 #include <string.h>
 #include <assert.h>
+#include <sys/time.h>
 
 #include "bmi.h"
 #include "bmi-method-support.h"
@@ -72,6 +73,23 @@ static struct bmi_method_ops **known_method_table = 0;
 static int active_method_count = 0;
 static gen_mutex_t active_method_count_mutex = GEN_MUTEX_INITIALIZER;
 static struct bmi_method_ops **active_method_table = NULL;
+static struct {
+    struct timeval active;
+    struct timeval polled;
+    int plan;
+} *method_usage = NULL;
+
+#ifndef timersub
+# define timersub(a, b, result) \
+  do { \
+    (result)->tv_sec = (a)->tv_sec - (b)->tv_sec; \
+    (result)->tv_usec = (a)->tv_usec - (b)->tv_usec; \
+    if ((result)->tv_usec < 0) { \
+      --(result)->tv_sec; \
+      (result)->tv_usec += 1000000; \
+    } \
+  } while (0)
+#endif
 
 static int activate_method(const char *name, const char *listen_addr,
     int flags);
@@ -654,6 +672,9 @@ int BMI_test(bmi_op_id_t id,
  * Checks to see if any messages from the specified list have completed.
  *
  * returns 0 on success, -errno on failure
+ *
+ * XXX: never used.  May want to add adaptive polling strategy of testcontext
+ * if it becomes used again.
  */
 int BMI_testsome(int incount,
 		 bmi_op_id_t * id_array,
@@ -763,6 +784,55 @@ int BMI_testsome(int incount,
 }
 
 
+/*
+ * If some method was recently active, poll it again for speed,
+ * but be sure not to starve any method.  If multiple active,
+ * poll them all.  Return idle_time per method too.
+ */
+static void
+construct_poll_plan(int nmeth, int *idle_time_ms)
+{
+    struct timeval now, delta;
+    int i, numplan;
+
+    gettimeofday(&now, 0);
+    numplan = 0;
+    for (i=0; i<nmeth; i++) {
+        method_usage[i].plan = 0;
+        timersub(&now, &method_usage[i].polled, &delta);
+        if (delta.tv_sec >= 1) {
+            method_usage[i].plan = 1;  /* >= 1s starving */
+            method_usage[i].polled = now;
+            ++numplan;
+        } else {
+            timersub(&now, &method_usage[i].active, &delta);
+            if (delta.tv_sec == 0) {
+                method_usage[i].plan = 1;  /* < 1s busy, prefer poll */
+                method_usage[i].polled = now;
+                ++numplan;
+            }
+        } 
+    }
+
+    /* if nothing is starving or busy, poll everybody */
+    if (numplan == 0) {
+        for (i=0; i<nmeth; i++) {
+            method_usage[i].plan = 1;
+            method_usage[i].polled = now;
+        }
+        numplan = nmeth;
+    }
+
+    /* spread idle time evenly */
+    if (*idle_time_ms)
+    {
+	*idle_time_ms /= numplan;
+	if (!*idle_time_ms)
+	    *idle_time_ms = 1;
+    }
+}
+
+
 /* BMI_testunexpected()
  * 
  * Checks to see if any unexpected messages have completed.
@@ -780,7 +850,6 @@ int BMI_testunexpected(int incount,
     int tmp_outcount = 0;
     struct method_unexpected_info sub_info[incount];
     ref_st_p tmp_ref = NULL;
-    int idle_per_method = 0;
     int tmp_active_method_count = 0;
 
     gen_mutex_lock(&active_method_count_mutex);
@@ -792,27 +861,25 @@ int BMI_testunexpected(int incount,
 
     *outcount = 0;
 
-    /* TODO: do something more clever here */
-    if (max_idle_time_ms)
-    {
-	idle_per_method = max_idle_time_ms / tmp_active_method_count;
-	if (!idle_per_method)
-	    idle_per_method = 1;
-    }
+    construct_poll_plan(tmp_active_method_count, &max_idle_time_ms);
 
     while (position < incount && i < tmp_active_method_count)
     {
-	ret = active_method_table[i]->BMI_meth_testunexpected(
-            (incount - position), &tmp_outcount,
-            (&(sub_info[position])), idle_per_method);
-	if (ret < 0)
-	{
-	    /* can't recover from this */
-	    gossip_lerr("Error: critical BMI_testunexpected failure.\n");
-	    return (ret);
-	}
-	position += tmp_outcount;
-	(*outcount) += tmp_outcount;
+        if (method_usage[i].plan) {
+            ret = active_method_table[i]->BMI_meth_testunexpected(
+                (incount - position), &tmp_outcount,
+                (&(sub_info[position])), max_idle_time_ms);
+            if (ret < 0)
+            {
+                /* can't recover from this */
+                gossip_lerr("Error: critical BMI_testunexpected failure.\n");
+                return (ret);
+            }
+            position += tmp_outcount;
+            (*outcount) += tmp_outcount;
+            if (tmp_outcount)
+                gettimeofday(&method_usage[i].active, 0);
+        }
 	i++;
     }
 
@@ -864,7 +931,6 @@ int BMI_testcontext(int incount,
     int ret = -1;
     int position = 0;
     int tmp_outcount = 0;
-    int idle_per_method = 0;
     int tmp_active_method_count = 0;
     struct timespec ts;
 
@@ -889,48 +955,31 @@ int BMI_testcontext(int incount,
 	return(0);
     }
 
-    /* TODO: do something more clever here */
-    if (max_idle_time_ms)
-    {
-	idle_per_method = max_idle_time_ms / tmp_active_method_count;
-	if (!idle_per_method)
-	    idle_per_method = 1;
-    }
+    construct_poll_plan(tmp_active_method_count, &max_idle_time_ms);
 
     while (position < incount && i < tmp_active_method_count)
     {
-	if(user_ptr_array)
-	{
-	    ret = active_method_table[i]->BMI_meth_testcontext(
-                (incount - position), 
-                (&(out_id_array[position])),
+        if (method_usage[i].plan) {
+            ret = active_method_table[i]->BMI_meth_testcontext(
+                incount - position, 
+                &out_id_array[position],
                 &tmp_outcount,
-                (&(error_code_array[position])), 
-                (&(actual_size_array[position])),
-                (&(user_ptr_array[position])),
-                idle_per_method,
+                &error_code_array[position], 
+                &actual_size_array[position],
+                user_ptr_array ?  &user_ptr_array[position] : NULL,
+                max_idle_time_ms,
                 context_id);
-	}
-	else
-	{
-	    ret = active_method_table[i]->BMI_meth_testcontext(
-                (incount - position), 
-                (&(out_id_array[position])),
-                &tmp_outcount,
-                (&(error_code_array[position])), 
-                (&(actual_size_array[position])),
-                NULL,
-                idle_per_method,
-                context_id);
-	}
-	if (ret < 0)
-	{
-	    /* can't recover from this */
-	    gossip_lerr("Error: critical BMI_testcontext failure.\n");
-	    return (ret);
-	}
-	position += tmp_outcount;
-	(*outcount) += tmp_outcount;
+            if (ret < 0)
+            {
+                /* can't recover from this */
+                gossip_lerr("Error: critical BMI_testcontext failure.\n");
+                return (ret);
+            }
+            position += tmp_outcount;
+            (*outcount) += tmp_outcount;
+            if (tmp_outcount)
+                gettimeofday(&method_usage[i].active, 0);
+        }
 	i++;
     }
 
@@ -1221,6 +1270,7 @@ int BMI_addr_lookup(PVFS_BMI_addr_t * new_addr,
     method_addr_p meth_addr = NULL;
     int ret = -1;
     int i = 0;
+    int failed;
 
     if((strlen(id_string)+1) > BMI_MAX_ADDR_LEN)
     {
@@ -1257,6 +1307,7 @@ int BMI_addr_lookup(PVFS_BMI_addr_t * new_addr,
     }
 
     /* if not found, try to bring it up now */
+    failed = 0;
     if (!meth_addr) {
 	for (i=0; i<known_method_count; i++) {
 	    const char *name;
@@ -1272,8 +1323,10 @@ int BMI_addr_lookup(PVFS_BMI_addr_t * new_addr,
 	    name = known_method_table[i]->method_name + 4;
 	    if (!strncmp(id_string, name, strlen(name))) {
 	        ret = activate_method(known_method_table[i]->method_name, 0, 0);
-	        if (ret < 0)
-		    return bmi_errno_to_pvfs(ret);
+	        if (ret < 0) {
+                    failed = 1;
+                    break;
+                }
 		meth_addr = known_method_table[i]->
 		    BMI_meth_method_addr_lookup(id_string);
 		i = active_method_count - 1;  /* point at the new one */
@@ -1282,6 +1335,8 @@ int BMI_addr_lookup(PVFS_BMI_addr_t * new_addr,
 	}
     }
     gen_mutex_unlock(&active_method_count_mutex);
+    if (failed)
+        return bmi_errno_to_pvfs(ret);
 
     /* make sure one was successful */
     if (!meth_addr)
@@ -1663,6 +1718,19 @@ activate_method(const char *name, const char *listen_addr, int flags)
 	free(x);
     }
     active_method_table[active_method_count] = meth;
+
+    x = method_usage;
+    method_usage = malloc((active_method_count + 1) * sizeof(*method_usage));
+    if (!method_usage) {
+        method_usage = x;
+        return -ENOMEM;
+    }
+    if (active_method_count) {
+        memcpy(method_usage, x, active_method_count * sizeof(*method_usage));
+        free(x);
+    }
+    memset(&method_usage[active_method_count], 0, sizeof(*method_usage));
+
     ++active_method_count;
 
     /* initialize it */
@@ -1681,7 +1749,8 @@ activate_method(const char *name, const char *listen_addr, int flags)
     }
     ret = meth->BMI_meth_initialize(new_addr, active_method_count - 1, flags);
     if (ret < 0) {
-	gossip_err("Error: failed to initialize method %s.\n", name);
+	gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
+          "failed to initialize method %s.\n", name);
 	--active_method_count;
 	return ret;
     }
