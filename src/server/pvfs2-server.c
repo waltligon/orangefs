@@ -316,8 +316,7 @@ int main(int argc, char **argv)
                     s_op, &server_job_status_array[i]);
 		if(ret < 0)
 		{
-		    gossip_err("Error: server unable to handle request, "
-                               "error code: %d.\n", (int)ret);
+		    PVFS_perror_gossip("server_state_machine_start", ret);
 		    free(s_op->unexp_bmi_buff.buffer);
 		    /* TODO: tell BMI to drop this address? */
 		    /* set return code to zero to allow server to continue
@@ -1192,8 +1191,6 @@ static int server_state_machine_start(
                       s_op->unexp_bmi_buff.size);
     if (ret < 0)
     {
-	gossip_err("Error: server received a corrupt or unsupported "
-                   "request message.\n");
 	return(ret);
     }
 

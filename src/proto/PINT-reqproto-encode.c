@@ -89,7 +89,7 @@ void PINT_encode_finalize(void)
  * encodes a buffer (containing a PVFS2 request or response) to be
  * sent over the network
  * 
- * returns 0 on success, -ERRNO on failure
+ * returns 0 on success, -PVFS_error on failure
  */
 int PINT_encode(
 		void* input_buffer,
@@ -134,7 +134,7 @@ int PINT_encode(
 	    break;
 	default:
 	    gossip_lerr("Error: encoding type not supported.\n");
-	    ret = -EINVAL;
+	    ret = -PVFS_EINVAL;
 	    break;
     }
 
@@ -158,7 +158,7 @@ int PINT_encode(
  *   in order for the memory allocated during the decode process to be
  *   freed.
  *
- * returns 0 on success, -ERRNO on failure
+ * returns 0 on success, -PVFS_error on failure
  */
 int PINT_decode(
 		void* input_buffer,
@@ -173,6 +173,7 @@ int PINT_decode(
     int size_index = (int)size - PINT_ENC_GENERIC_HEADER_SIZE;
     char* enc_type_ptr = (char*)input_buffer + 4;
     int ret;
+    int32_t enc_type_recved, proto_ver_recved;
 
     /* compare the header of the incoming buffer against the precalculated
      * header associated with each module
@@ -214,19 +215,41 @@ int PINT_decode(
 	    }
 	    else
 	    {
-		return(-EINVAL);
+		return(-PVFS_EINVAL);
 	    }
 	}
     }
 
     gossip_err("Error: poorly formatted protocol message received.\n");
-    gossip_err("   total size of message: %d\n", (int)size);
-    gossip_err("   encoding type: %d\n", 
-	(int)bmitoh32(*((int32_t*)enc_type_ptr)));
-    gossip_err("   release nr: %d\n", 
-	(int)bmitoh32(*((int32_t*)input_buffer)));
-    return(-EPROTO);
 
+    enc_type_recved = bmitoh32(*((int32_t*)enc_type_ptr));
+    proto_ver_recved = (int)bmitoh32(*((int32_t*)input_buffer));
+
+    if(size < PINT_ENC_GENERIC_HEADER_SIZE)
+    {
+	gossip_err("   Too small: message only %Ld bytes.\n",
+	    Ld(size));
+	return(-PVFS_EPROTO);
+    }
+
+    if(enc_type_recved != ENCODING_DIRECT && enc_type_recved !=
+	ENCODING_LE_BFIELD)
+    {
+	gossip_err("   Encoding type mismatch: received type %d when "
+	    "expecting %d or %d.\n", (int)enc_type_recved, ENCODING_DIRECT,
+	    ENCODING_LE_BFIELD);
+    }
+
+    if(proto_ver_recved != PVFS_RELEASE_NR)
+    {
+	gossip_err("   Protocol version mismatch: received version %d when "
+	    "expecting version %d.\n", (int)proto_ver_recved,
+	    PVFS_RELEASE_NR);
+	gossip_err("   Please verify your PVFS2 installation and make sure "
+	"that the version is\n   consistent.\n");
+    }
+
+    return(-PVFS_EPROTO);
 }
 	
 /* PINT_encode_release()
@@ -288,7 +311,7 @@ int PINT_encode_calc_max_size(
 	    break;
 	default:
 	    gossip_lerr("Error: encoding type not supported.\n");
-	    ret = -EINVAL;
+	    ret = -PVFS_EINVAL;
 	    break;
     }
 
