@@ -50,6 +50,15 @@ int main(int argc, char **argv)
 
     parse_args(argc, argv, &opts);
 
+    /* pvfs2-client-core will call PINT_dev_initialize and hit 
+     * this error, however since we close all file descriptors 
+     * we don't see the message. */
+    if ((getuid() != 0) && (geteuid() != 0))
+    {
+        gossip_err("Error: must be run as root\n");
+	return(-1);
+    }
+
     if (opts.verbose)
     {
         printf("pvfs2-client starting\n");
