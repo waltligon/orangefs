@@ -74,6 +74,20 @@ sub create_sessionfile {
     return(0);
 }
 
+sub uniq(@) {
+    return if (!@_);
+    my $entry = shift;
+    while (@_) {
+        my $next = $_[0];
+        if ($entry ne $next) {
+            last;
+        }
+        shift;
+    }
+    return $entry, &uniq(@_);
+}
+
+
 # executes "$_[1]" instances of remote-execing command "$_[0]" (rsh or ssh),
 # giving up after "$_[2]" seconds.  The remote machine will execute "$_[3]".  
 # XXX: i don't know what $precmd and $postcmd will do
@@ -92,6 +106,7 @@ sub do_remote_command {
     my $pcount = 0;
     my %nodecommand;
 
+    @nodes = uniq(sort(@nodes));
     foreach $node (@nodes) {
 	my $nodecmd = $cmd;
 	$nodecmd =~ s/%node/$node/g;
@@ -140,6 +155,7 @@ sub do_remote_command {
 	    $SIG{ALRM} = \&earlyexit;
 	    alarm($timeout);
 	    
+	    #print "Running remote command $cmd\n";
 	    $rc = system($cmd);
 	    exit($rc >> 8);
 	}
@@ -249,6 +265,11 @@ sub read_configfile {
 	my ($key, $val) = split("=", $line);
 	$val =~ s/"//g;
 #	print "key: $key val: $val\n";
+
+        if ($val =~ s/^`(.*)`$//) {
+           $val = `$1`;
+           chomp($val);
+        }
 	
 	$href->{"$key"} = $val;
 

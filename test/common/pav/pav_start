@@ -90,9 +90,12 @@ sub init {
 	       'c|config:s',
 	       'r|root:s',
 	       'm|machinefile:s',
-	       'h|help:s'
+	       'h|help'
 	       );
 
+    $prog_name = $0;
+    $pid = $$;
+ 
     if ($args{'h'}) {
 	usage();
 	return(1);
@@ -139,9 +142,6 @@ sub init {
     $config{'PROGROOT'} = $args{'r'} || $config{'PROGROOT'};
     $config{'NODEFILE'} = $args{'m'} || $config{'NODEFILE'};
     
-    $prog_name = $0;
-    $pid = $$;
- 
     return(0);
 }
 

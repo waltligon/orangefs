@@ -2,6 +2,7 @@
 
 use Getopt::Long;
 use POSIX "sys_wait_h";
+use File::Basename;
 
 #globals
 my $session_file;
@@ -81,7 +82,7 @@ sub init {
     my ($gid) = split(/\s*/, $();
     ($config{'GROUPNAME'}) = getgrgid($gid);
 
-    $config{'PROGROOT'} = $args{'r'} || $config{'PROGROOT'};
+    $config{'PROGROOT'} = $args{'r'} || real_dir($0) || $config{'PROGROOT'};
     my $prog_root = $config{'PROGROOT'};
     require "$prog_root/pav_lib.pl";
 
@@ -113,3 +114,22 @@ sub init {
     return(0);
 }
 
+sub real_dir {
+   my ($file, $reldir, $suffix) = fileparse(shift);
+   my ($realdir, $envpwd);
+
+   if ($reldir =~ /^\//) {
+      $realdir = $reldir;
+   } else {
+      if (!$ENV{PWD}) {
+         chomp($envpwd = `pwd`);
+      } else {
+         $envpwd = $ENV{PWD};
+      }
+      $realdir = $envpwd . "/$reldir";
+   }
+   $realdir .= '/';
+   $realdir =~ s#/./#/#g;
+   $realdir =~ s#//#/#g;
+   return($realdir);
+}

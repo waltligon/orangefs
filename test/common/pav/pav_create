@@ -37,10 +37,12 @@ if ($rc) {
 }
 
 #copy binaries in
-$rc = copy_pvfsbinaries(\%config);
-if ($rc) {
-    print "returning $rc\n";
-    exit($rc);
+if ($config{'COPYBINS'} > 0) {
+    $rc = copy_pvfsbinaries(\%config);
+    if ($rc) {
+       print "returning $rc\n";
+       exit($rc);
+    }
 }
 
 #make session file
@@ -69,6 +71,9 @@ sub copy_pvfsbinaries {
 		return(1);
 	    }
 	    # TODO: find a better way to strip binaries.  This works ok for now
+	    # note that since this function is only called if COPYBINS is set,
+	    # so debugging information can be retained if you use a shared file
+	    # system (only a problem on Chiba City )
 	    $cmd = "strip " . $href->{'WORKINGDIR'} . "/{pvfs2-server,pvfs2-ping}";
 	    system ("$cmd");
 	} else {
@@ -115,17 +120,23 @@ sub create_nodefiles {
 sub create_pvfs2config 
 {
     my $href = shift;
-    my $conffile = $href->{'WORKINGDIR'} . "/pav.conf";
+    my $conffile = $href->{'WORKINGDIR'} . "/fs.conf";
     my $serverfile = $href->{'WORKINGDIR'} ."/server.conf";
     my $ioservers = '';
     my $metaservers = '';
     my $rc = -1;
 
     foreach $server (@{$href->{'IONODES'}}) {
-    	$ioservers = $ioservers . "," . $server;
+    	if ($ioservers ne "") {
+		$ioservers .= ",";
+	}
+	$ioservers .= $server;
     }
     foreach $server (@{$href->{'MGR'}}) {
-    	$metaservers = $metaservers . "," . $server
+    	if ($metaservers ne "") {
+		$metaservers .= ",";
+	}
+	$metaservers .= $server;
     }
 
     my $cmd = $href->{'GENCONFIG'} 
@@ -210,7 +221,8 @@ sub init {
 	       'BINDIR' => "/tmp/bin",
 	       'SERVER' => "pvfs2-server",
 	       'PINGPROG' => "pvfs2-ping",
-	       'PROGROOT' => "./"
+	       'PROGROOT' => "./",
+	       'COPYBINS' => 0
 	       );
     
     ($config{'USERNAME'}) = getpwuid($>);
@@ -311,7 +323,7 @@ sub split_machines {
     my $count=0;
 
     if (!open(FH, $href->{'NODEFILE'})) {
-	print STDERR "ERROR: cannot open nodefile\n";
+	print STDERR "ERROR: cannot open nodefile $href->{NODEFILE}\n";
 	return(2);
     }
     
@@ -328,7 +340,7 @@ sub split_machines {
     }
     close(FH);
 
-    if ($count < ($href->{'IONCOUNT'} + $href->{'METACOUNT'})) {
+    if ($count < ($href->{'IONCOUNT'} + $href->{'UNIQUEMETA'} * $href->{'METACOUNT'})) {
 	print STDERR "ERROR: requested more server nodes than are available\n";
 	return(1);
     }

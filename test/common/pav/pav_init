@@ -29,16 +29,17 @@ sub start_servers{
     my @nodes = ();
     my $rc = 0;
 
-    if ($href->{'UNIQEMETA'} ) {
-    	@nodes = (@{$href->{'IONODES'}}, @{$href->{'MGR'}});
-    } else  {  
-        # some subset of the io nodes will also be our meta servers
-    	@nodes = (@{$href->{'IONODES'}} )
+    @nodes = (@{$href->{'IONODES'}}, @{$href->{'MGR'}});
+    # quite possibly some or all of the IONODES are also META servers
+    @nodes = uniq(sort(@nodes));
+
+    my $binary;
+    if ($href->{'COPYBINS'} > 0) {
+    	$binary = $href->{'BINDIR'} . "/pvfs2-server";
+    } else {
+    	$binary = $href->{'SERVER'};
     }
-
-
-    my $binary = $href->{'BINDIR'} . "/pvfs2-server";
-    my $serverconf = $href->{'WORKINGDIR'} . "/pav.conf";
+    my $serverconf = $href->{'WORKINGDIR'} . "/fs.conf";
     my $localconf = $href->{'WORKINGDIR'} . "/server.conf";
 
     # once to make the storage space, then a second time to run the servers
@@ -73,6 +74,9 @@ sub init {
 	       'h|help'
 	       );
 
+    $prog_name = $0;
+    $pid = $$;
+
     if ($args{'h'}) {
 	usage();
 	return(1);
@@ -94,7 +98,8 @@ sub init {
 
     %config = ('RCMDPROG' => "ssh",
 	       'RCPPROG' => "scp",
-	       'PROGROOT' => "./"
+	       'PROGROOT' => "./",
+	       'COPYBINS' => 0,
 	       );
 
     $config{'PROGROOT'} = $args{'r'} || $config{'PROGROOT'};
@@ -109,9 +114,6 @@ sub init {
 
     $config{'RCMDPROG'} = $args{'rsh'} || $config{'RCMDPROG'};
     $config{'RCPPROG'} = $args{'rcp'} || $config{'RCPPROG'};
-
-    $prog_name = $0;
-    $pid = $$;
 
     return(0);
 }

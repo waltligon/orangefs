@@ -32,12 +32,14 @@ if ($rc) {
 }
 
 #mv remote files to remote directories
-$rc = setup_remotedirs(\%config);
-if ($rc) {
-    print STDERR "WARNING: failed to move files on remote node $rc, trying to recover\n";
-    
-    $rc = recover_from_bad(\%config, $rc);
-    exit($rc);
+if ( $config{'COPYBINS'} > 0) {
+    $rc = setup_remotedirs(\%config);
+    if ($rc) {
+       print STDERR "WARNING: failed to move files on remote node $rc, trying to recover\n";
+       
+       $rc = recover_from_bad(\%config, $rc);
+       exit($rc);
+    }
 }
 
 #done
@@ -57,7 +59,7 @@ sub setup_remotedirs {
     my $storage_dir = $href->{'STORAGE'};
     my $working_dir = $href->{'WORKINGDIR'};
 
-    my $cmd = "%node \'cp -af $working_dir/pvfs2-server $working_dir/pvfs2-ping $working_dir/pav.conf  $bin_dir\'";
+    my $cmd = "%node \'cp -af $working_dir/pvfs2-server $working_dir/pvfs2-ping $working_dir/fs.conf  $bin_dir\'";
    
     $rc = do_remote_command($href->{'RCMDPROG'}, 8, 30, $cmd, undef, undef, @servers);
 
@@ -124,6 +126,8 @@ sub init {
 	       'r|root:s',
 	       'h|help'
 	       );
+    $prog_name = $0;
+    $pid = $$;
 
     if ($args{'h'}) {
 	usage();
@@ -146,7 +150,8 @@ sub init {
 
     %config = ('RCMDPROG' => "ssh",
 	       'RCPPROG' => "scp",
-	       'PROGROOT' => "./"
+	       'PROGROOT' => "./",
+	       'COPYBINS' => 0,
 	       );
 
     $config{'PROGROOT'} = $args{'r'} || $config{'PROGROOT'};
@@ -161,9 +166,6 @@ sub init {
 
     $config{'RCMDPROG'} = $args{'rsh'} || $config{'RCMDPROG'};
     $config{'RCPPROG'} = $args{'rcp'} || $config{'RCPPROG'};
-
-    $prog_name = $0;
-    $pid = $$;
 
     return(0);
 }
