@@ -1319,12 +1319,15 @@ void tcp_forget_addr(method_addr_p map,
 		     int dealloc_flag,
 		     int error_code)
 {
+    struct tcp_addr* tcp_addr_data = map->method_data;
+
     tcp_shutdown_addr(map);
     if (tcp_socket_collection_p)
     {
 	BMI_socket_collection_remove(tcp_socket_collection_p, map);
     }
     tcp_cleanse_addr(map, error_code);
+    tcp_addr_data->error_code = error_code;
     if (dealloc_flag)
     {
 	dealloc_tcp_method_addr(map);
@@ -1514,6 +1517,12 @@ static int tcp_sock_init(method_addr_p my_method_addr)
     if (tcp_addr_data->server_port)
     {
 	return (-EINVAL);
+    }
+    if(tcp_addr_data->error_code)
+    {
+	/* this address is bad, don't try to do anything with it */
+	gossip_err("Warning: BMI communication attempted on an address in failure mode.\n");
+	return(tcp_addr_data->error_code);
     }
 
     /* is there already a socket? */
@@ -1758,6 +1767,14 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
     int copy_size = 0;
     bmi_size_t total_copied = 0;
     int i;
+
+    tcp_addr_data = src->method_data;
+    if(tcp_addr_data->error_code)
+    {
+	/* this address is bad, don't try to do anything with it */
+	gossip_err("Warning: BMI communication attempted on an address in failure mode.\n");
+	return(tcp_addr_data->error_code);
+    }
 
     /* lets make sure that the message hasn't already been fully
      * buffered in eager mode before doing anything else
