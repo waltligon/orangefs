@@ -138,12 +138,12 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
     if (ret != 0)
     {
         gossip_debug(GOSSIP_TROVE_DEBUG,
-                     "warning: keyval read error (get() failed on "
-                     "handle %Lu and key: %s)\n", Lu(op_p->handle),
-                     (char *)key.data);
-	error = -dbpf_db_error_to_trove_error(ret);
+                     "warning: keyval read error on handle %Lu and "
+                     "key=%s (%s)\n", Lu(op_p->handle),
+                     (char *)key.data, db_strerror(ret));
+        error = -dbpf_db_error_to_trove_error(ret);
 
-	goto return_error;
+        goto return_error;
     }
 
     op_p->u.k_read.val.read_sz = data.size;

@@ -25,7 +25,8 @@ GOSSIP_CLIENT_DEBUG | GOSSIP_JOB_DEBUG | GOSSIP_REQUEST_DEBUG |   \
 GOSSIP_REQ_SCHED_DEBUG | GOSSIP_FLOW_PROTO_DEBUG |                \
 GOSSIP_FLOW_DEBUG | GOSSIP_NCACHE_DEBUG | GOSSIP_ACACHE_DEBUG |   \
 GOSSIP_DIST_DEBUG | GOSSIP_DBPF_ATTRCACHE_DEBUG |                 \
-GOSSIP_MMAP_RCACHE_DEBUG | GOSSIP_LOOKUP_DEBUG)
+GOSSIP_MMAP_RCACHE_DEBUG | GOSSIP_LOOKUP_DEBUG |                  \
+GOSSIP_REMOVE_DEBUG)
 
 /* map all config keywords to pvfs2 debug masks here */
 static __keyword_mask_t s_keyword_mask_map[] =
@@ -46,6 +47,7 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "distribution", GOSSIP_DIST_DEBUG },
     { "dbpfattrcache", GOSSIP_DBPF_ATTRCACHE_DEBUG },
     { "lookup", GOSSIP_LOOKUP_DEBUG },
+    { "remove", GOSSIP_REMOVE_DEBUG },
     { "verbose",  (__DEBUG_ALL & ~GOSSIP_REQ_SCHED_DEBUG) },
     { "none", GOSSIP_NO_DEBUG },
     { "all",  __DEBUG_ALL }

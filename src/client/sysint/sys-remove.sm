@@ -96,128 +96,142 @@ machine pvfs2_client_remove_sm(init,
 			       crdirent_xfer_msgpair,
 			       crdirent_failure)
 {
-    state init {
-	run remove_init;
-	default => rmdirent_setup_msgpair;
+    state init
+    {
+        run remove_init;
+        default => rmdirent_setup_msgpair;
     }
 
-    state rmdirent_setup_msgpair {
-	run remove_rmdirent_setup_msgpair;
-	success => rmdirent_xfer_msgpair;
-	default => rmdirent_failure;
+    state rmdirent_setup_msgpair
+    {
+        run remove_rmdirent_setup_msgpair;
+        success => rmdirent_xfer_msgpair;
+        default => rmdirent_failure;
     }
 
-    state rmdirent_xfer_msgpair {
-	jump pvfs2_client_msgpair_sm;
-	success => getattr_setup_msgpair;
-	MSGPAIR_RETURN_SUCCESS => getattr_setup_msgpair;
-	default => rmdirent_failure;
+    state rmdirent_xfer_msgpair
+    {
+        jump pvfs2_client_msgpair_sm;
+        success => getattr_setup_msgpair;
+        MSGPAIR_RETURN_SUCCESS => getattr_setup_msgpair;
+        default => rmdirent_failure;
     }
 
-    state rmdirent_failure {
-	run remove_rmdirent_failure;
-	default => cleanup;
+    state rmdirent_failure
+    {
+        run remove_rmdirent_failure;
+        default => cleanup;
     }
 
-    state getattr_setup_msgpair {
-	run remove_getattr_setup_msgpair;
-	success => getattr_xfer_msgpair;
-	default => getattr_failure;
+    state getattr_setup_msgpair
+    {
+        run remove_getattr_setup_msgpair;
+        success => getattr_xfer_msgpair;
+        default => getattr_failure;
     }
 
-    state getattr_xfer_msgpair {
-	jump pvfs2_client_getattr_acache_sm;
-	success => object_remove_setup_msgpair;
-	MSGPAIR_RETURN_SUCCESS => object_remove_setup_msgpair;
-	REMOVE_MUST_REMOVE_DATAFILES => datafile_remove_setup_msgpair;
+    state getattr_xfer_msgpair
+    {
+        jump pvfs2_client_getattr_acache_sm;
+        success => object_remove_setup_msgpair;
+        MSGPAIR_RETURN_SUCCESS => object_remove_setup_msgpair;
+        REMOVE_MUST_REMOVE_DATAFILES => datafile_remove_setup_msgpair;
         REMOVE_MUST_CHECK_DIR_CONTENTS => check_dir_contents_setup_msgpair;
-	default => getattr_failure;
+        default => getattr_failure;
     }
 
-    state getattr_failure {
-	run remove_getattr_failure;
-	default => cleanup;
+    state getattr_failure
+    {
+        run remove_getattr_failure;
+        default => cleanup;
     }
 
     state check_dir_contents_setup_msgpair
     {
-	run remove_check_dir_contents_setup_msgpair;
-	success => check_dir_contents_xfer_msgpair;
-	default => check_dir_contents_failure;
+        run remove_check_dir_contents_setup_msgpair;
+        success => check_dir_contents_xfer_msgpair;
+        default => check_dir_contents_failure;
     }
 
     state check_dir_contents_xfer_msgpair
     {
-	jump pvfs2_client_msgpair_sm;
-	success => object_remove_setup_msgpair;
-	default => check_dir_contents_failure;
+        jump pvfs2_client_msgpair_sm;
+        success => object_remove_setup_msgpair;
+        default => check_dir_contents_failure;
     }
 
     state check_dir_contents_failure
     {
         run remove_check_dir_contents_failure;
-	default => crdirent_setup_msgpair;
+        default => crdirent_setup_msgpair;
     }
 
-    state datafile_remove_setup_msgpair {
-	run remove_datafile_remove_setup_msgpair;
-	success => datafile_remove_xfer_msgpair;
-	default => datafile_remove_failure;
+    state datafile_remove_setup_msgpair
+    {
+        run remove_datafile_remove_setup_msgpair;
+        success => datafile_remove_xfer_msgpair;
+        default => datafile_remove_failure;
     }
 
-    state datafile_remove_xfer_msgpair {
-	jump pvfs2_client_msgpairarray_sm;
-	success => object_remove_setup_msgpair;
-	default => datafile_remove_failure;
+    state datafile_remove_xfer_msgpair
+    {
+        jump pvfs2_client_msgpairarray_sm;
+        success => object_remove_setup_msgpair;
+        default => datafile_remove_failure;
     }
 
-    state datafile_remove_failure {
-	run remove_datafile_remove_failure;
-	default => cleanup;
+    state datafile_remove_failure
+    {
+        run remove_datafile_remove_failure;
+        default => cleanup;
     }
     
-    state object_remove_setup_msgpair {
-	run remove_object_remove_setup_msgpair;
-	success => object_remove_xfer_msgpair;
-	default => object_remove_failure;
+    state object_remove_setup_msgpair
+    {
+        run remove_object_remove_setup_msgpair;
+        success => object_remove_xfer_msgpair;
+        default => object_remove_failure;
     }
 
-    state object_remove_xfer_msgpair {
-	jump pvfs2_client_msgpair_sm;
-	success => cleanup;
-	MSGPAIR_RETURN_SUCCESS => cleanup;
-	default => object_remove_failure;
+    state object_remove_xfer_msgpair
+    {
+        jump pvfs2_client_msgpair_sm;
+        success => cleanup;
+        MSGPAIR_RETURN_SUCCESS => cleanup;
+        default => object_remove_failure;
     }
 
-    state object_remove_failure {
-	run remove_object_remove_failure;
-	default => cleanup;
+    state object_remove_failure
+    {
+        run remove_object_remove_failure;
+        default => cleanup;
     }
 
     state crdirent_setup_msgpair
     {
-	run remove_crdirent_setup_msgpair;
-	success => crdirent_xfer_msgpair;
-	default => crdirent_failure;
+        run remove_crdirent_setup_msgpair;
+        success => crdirent_xfer_msgpair;
+        default => crdirent_failure;
     }
 
     state crdirent_xfer_msgpair
     {
-	jump pvfs2_client_msgpair_sm;
-	success => cleanup;
-	MSGPAIR_RETURN_SUCCESS => cleanup;
-	default => crdirent_failure;
+        jump pvfs2_client_msgpair_sm;
+        success => cleanup;
+        MSGPAIR_RETURN_SUCCESS => cleanup;
+        default => crdirent_failure;
     }
 
     state crdirent_failure
     {
-	run remove_crdirent_failure;
-	default => cleanup;
+        run remove_crdirent_failure;
+        default => cleanup;
     }
 
-    state cleanup {
-	run remove_cleanup;
-	default => terminate;
+    state cleanup
+    {
+        run remove_cleanup;
+        default => terminate;
     }
 }
 
@@ -241,19 +255,22 @@ int PVFS_sys_remove(char *object_name,
 		    PVFS_pinode_reference parent_ref, 
 		    PVFS_credentials credentials)
 {
-    int ret;
-    PINT_client_sm *sm_p;
+    int ret = -PVFS_EINVAL;
+    PINT_client_sm *sm_p = NULL;
     PVFS_error error;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_remove entered\n");
 
-    /* do parameter checking here, then assume things are ok below.
-     * assert()s are still ok of course :).
-     */
-    if (object_name == NULL) return -PVFS_EINVAL;
+    if (object_name == NULL)
+    {
+        return ret;
+    }
 
-    sm_p = (PINT_client_sm *) malloc(sizeof(*sm_p));
-    if (sm_p == NULL) return -PVFS_ENOMEM;
+    sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));
+    if (sm_p == NULL)
+    {
+        return -PVFS_ENOMEM;
+    }
 
     memset(sm_p, 0, sizeof(*sm_p));
 
@@ -271,16 +288,13 @@ int PVFS_sys_remove(char *object_name,
 
     /* do something to kick off processing */
     ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_REMOVE);
-    assert(ret == 0);
 
-    /* while !done call progress function */
     while (!sm_p->op_complete && ret == 0)
     {
 	gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_remove calling "
                      "PINT_client_state_machine_test()\n");
 	ret = PINT_client_state_machine_test();
     }
-
     assert(ret == 0);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_remove completed\n");
@@ -296,7 +310,6 @@ int PVFS_sys_remove(char *object_name,
         PINT_acache_invalidate(sm_p->u.remove.object_ref);
     }
 
-    /* clean up after ourselves */
     free(sm_p);
     return error;
 }
@@ -309,9 +322,7 @@ static int remove_init(PINT_client_sm *sm_p,
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: init\n");
 
-    assert(js_p->error_code == 0); /* sanity check */
-
-    /* do the request scheduler thing, if necessary */
+    assert(js_p->error_code == 0);
 
     return 1;
 }
@@ -327,13 +338,17 @@ static int remove_getattr_setup_msgpair(PINT_client_sm *sm_p,
     assert(sm_p->u.remove.object_ref.fs_id != 0);
     assert(sm_p->u.remove.object_ref.handle != 0);
 
-    /* fill in getattr request */
-    PINT_SERVREQ_GETATTR_FILL(sm_p->msgpair.req,
-			      *sm_p->cred_p,
-			      sm_p->u.remove.object_ref.fs_id,
-			      sm_p->u.remove.object_ref.handle,
-			      PVFS_ATTR_COMMON_ALL|PVFS_ATTR_META_DFILES);
-    
+    gossip_debug(GOSSIP_REMOVE_DEBUG, "- doing GETATTR on %Lu,%d\n",
+                 Lu(sm_p->u.remove.object_ref.handle),
+                 sm_p->u.remove.object_ref.fs_id);
+
+    PINT_SERVREQ_GETATTR_FILL(
+        sm_p->msgpair.req,
+        *sm_p->cred_p,
+        sm_p->u.remove.object_ref.fs_id,
+        sm_p->u.remove.object_ref.handle,
+        PVFS_ATTR_COMMON_ALL|PVFS_ATTR_META_DFILES);
+
     /* fill in msgpair structure components */
     sm_p->msgpair.fs_id   = sm_p->u.remove.object_ref.fs_id;
     sm_p->msgpair.handle  = sm_p->u.remove.object_ref.handle;
@@ -369,18 +384,16 @@ static int remove_getattr_comp_fn(void *v_p,
 				  struct PVFS_server_resp *resp_p,
 				  int index)
 {
-    /* this is a little kludge to get around some struct definition
-     * issues in the headers.  maybe fix later?
-     */
-    PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
+    PINT_client_sm *sm_p = (PINT_client_sm *)v_p;
     
-    assert(resp_p->op == PVFS_SERV_GETATTR); /* sanity check */
+    assert(resp_p->op == PVFS_SERV_GETATTR);
 
     /* if we get an error, just return immediately, don't try to
      * actually fill anything in.
      */
-    if (resp_p->status != 0) {
-	return resp_p->status;
+    if (resp_p->status != 0)
+    {
+        return resp_p->status;
     }
 
     switch (resp_p->u.getattr.attr.objtype)
@@ -389,8 +402,6 @@ static int remove_getattr_comp_fn(void *v_p,
 	    /* need to save datafile handles and remove them;
 	     * redirect us to those states.
 	     */
-
-	    /* sanity checks */
 	    assert(resp_p->u.getattr.attr.mask & PVFS_ATTR_META_DFILES);
 	    assert(resp_p->u.getattr.attr.u.meta.dfile_count > 0);
 	    
@@ -399,21 +410,21 @@ static int remove_getattr_comp_fn(void *v_p,
                 "remove_getattr_comp_fn: %d datafiles to remove too.\n",
                 resp_p->u.getattr.attr.u.meta.dfile_count);
 
-	    /* save the datafile handles prior to freeing up the
-	     * buffers we used for messages.  we could keep them around
-	     * i suppose, but we're not going to do that for now.  later
-	     * it is likely that this stuff will be stuck in the acache
-	     * anyway, so we'll be able to just reference it from there.
-	     */
-	    sm_p->u.remove.datafile_handles = (PVFS_handle *)
+            /* save the datafile handles prior to freeing up the
+             * buffers we used for messages.  we could keep them around
+             * i suppose, but we're not going to do that for now.  later
+             * it is likely that this stuff will be stuck in the acache
+             * anyway, so we'll be able to just reference it from there.
+             */
+            sm_p->u.remove.datafile_handles = (PVFS_handle *)
                 malloc(resp_p->u.getattr.attr.u.meta.dfile_count *
                        sizeof(PVFS_handle));
             assert(sm_p->u.remove.datafile_handles);
-	    sm_p->u.remove.datafile_count =
+            sm_p->u.remove.datafile_count =
                 resp_p->u.getattr.attr.u.meta.dfile_count;
-	    memcpy(sm_p->u.remove.datafile_handles,
-		   resp_p->u.getattr.attr.u.meta.dfile_array,
-		   resp_p->u.getattr.attr.u.meta.dfile_count *
+            memcpy(sm_p->u.remove.datafile_handles,
+	 	   resp_p->u.getattr.attr.u.meta.dfile_array,
+                   resp_p->u.getattr.attr.u.meta.dfile_count *
                    sizeof(PVFS_handle));
 
 	    return REMOVE_MUST_REMOVE_DATAFILES;
@@ -440,16 +451,19 @@ static int remove_rmdirent_setup_msgpair(PINT_client_sm *sm_p,
     /* NOTE: we remove the dirent first because this gets the object
      * out of the system fastest.
      */
-
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "remove state: rmdirent_setup_msgpair\n");
 
-    /* fill in rmdirent request */
     PINT_SERVREQ_RMDIRENT_FILL(sm_p->msgpair.req,
 			       *sm_p->cred_p,
 			       sm_p->u.remove.parent_ref.fs_id,
 			       sm_p->u.remove.parent_ref.handle,
 			       sm_p->u.remove.object_name);
+
+    gossip_debug(GOSSIP_REMOVE_DEBUG, "- doing RMDIRENT on %s "
+                 "under %Lu,%d\n", sm_p->u.remove.object_name,
+                 Lu(sm_p->u.remove.parent_ref.handle),
+                 sm_p->u.remove.parent_ref.fs_id);
 
     /* fill in msgpair structure components */
     sm_p->msgpair.fs_id   = sm_p->u.remove.parent_ref.fs_id;
@@ -470,7 +484,7 @@ static int remove_rmdirent_setup_msgpair(PINT_client_sm *sm_p,
 static int remove_check_dir_contents_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int i)
 {
-    PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
+    PINT_client_sm *sm_p = (PINT_client_sm *)v_p;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "remove_check_dir_contents_comp_fn\n");
@@ -502,12 +516,20 @@ static int remove_crdirent_setup_msgpair(PINT_client_sm *sm_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "remove state: crdirent_setup_msgpair\n");
 
-    PINT_SERVREQ_CRDIRENT_FILL(sm_p->msgpair.req,
-			       *sm_p->cred_p,
-			       sm_p->u.remove.object_name,
-			       sm_p->u.remove.object_ref.handle,
-			       sm_p->u.remove.parent_ref.handle,
-			       sm_p->u.remove.parent_ref.fs_id);
+    PINT_SERVREQ_CRDIRENT_FILL(
+        sm_p->msgpair.req,
+        *sm_p->cred_p,
+        sm_p->u.remove.object_name,
+        sm_p->u.remove.object_ref.handle,
+        sm_p->u.remove.parent_ref.handle,
+        sm_p->u.remove.parent_ref.fs_id);
+
+    gossip_debug(GOSSIP_REMOVE_DEBUG, "- doing CRDIRENT on %s (%Lu,%d) "
+                 "under %Lu,%d\n", sm_p->u.remove.object_name,
+                 Lu(sm_p->u.remove.object_ref.handle),
+                 sm_p->u.remove.object_ref.fs_id,
+                 Lu(sm_p->u.remove.parent_ref.handle),
+                 sm_p->u.remove.parent_ref.fs_id);
 
     /* fill in msgpair structure components */
     sm_p->msgpair.fs_id   = sm_p->u.remove.parent_ref.fs_id;
@@ -534,12 +556,12 @@ static int remove_rmdirent_comp_fn(void *v_p,
     assert(resp_p->op == PVFS_SERV_RMDIRENT);
 
     /* don't attempt to parse the response if there was an error */
-    if (resp_p->status != 0) {
+    if (resp_p->status != 0)
+    {
 	assert(resp_p->status < 0); /* parameter range check */
 	return resp_p->status;
     }
 
-    /* parameter range checks */
     assert(resp_p->u.rmdirent.entry_handle != 0);
     assert(sm_p->u.remove.parent_ref.fs_id != 0);
 
@@ -559,8 +581,6 @@ static int remove_crdirent_comp_fn(void *v_p,
 				   struct PVFS_server_resp *resp_p,
 				   int index)
 {
-/*     PINT_client_sm *sm_p = (PINT_client_sm *) v_p; */
-
     assert(resp_p->op == PVFS_SERV_CRDIRENT);
 
     if (resp_p->status != 0)
@@ -587,12 +607,17 @@ static int remove_check_dir_contents_setup_msgpair(PINT_client_sm *sm_p,
     msg_p = &sm_p->msgpair;
     memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
 
-    PINT_SERVREQ_READDIR_FILL(msg_p->req,
-			     *sm_p->cred_p,
-                              sm_p->u.remove.object_ref.fs_id,
-                              sm_p->u.remove.object_ref.handle,
-                              PVFS_READDIR_START,
-                              1);
+    PINT_SERVREQ_READDIR_FILL(
+        msg_p->req,
+        *sm_p->cred_p,
+        sm_p->u.remove.object_ref.fs_id,
+        sm_p->u.remove.object_ref.handle,
+        PVFS_READDIR_START,
+        1);
+
+    gossip_debug(GOSSIP_REMOVE_DEBUG, "- doing READDIR on %Lu,%d\n",
+                 Lu(sm_p->u.remove.object_ref.handle),
+                 sm_p->u.remove.object_ref.fs_id);
 
     /* fill in msgpair structure components */
     msg_p->fs_id   = sm_p->u.remove.object_ref.fs_id;
@@ -617,18 +642,16 @@ static int remove_datafile_remove_setup_msgpair(PINT_client_sm *sm_p,
     int ret = -1;
 
    /* post all datafile remove requests and responses simultaneously.
-     *
-     * NOTE: it's easier to clean up from a metafile with no datafiles
-     * than the other way around!  so we remove datafiles first.
-     */
+    *
+    * NOTE: it's easier to clean up from a metafile with no datafiles
+    * than the other way around!  so we remove datafiles first.
+    */
 
     /* clear error field in job */
     js_p->error_code = 0;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "remove state: datafile_remove_setup_msgpair\n");
-
-    /* do parameter checking */
 
     /* allocate msgarray and set msgarray_count */
     sm_p->msgarray = (PINT_client_sm_msgpair_state *)
@@ -647,10 +670,11 @@ static int remove_datafile_remove_setup_msgpair(PINT_client_sm *sm_p,
 		     "  datafile_remove: removing handle %Lu\n",
 		     Lu(sm_p->u.remove.datafile_handles[i]));
 
-	PINT_SERVREQ_REMOVE_FILL(msg_p->req,
-				 *sm_p->cred_p,
-				 sm_p->u.remove.object_ref.fs_id,
-				 sm_p->u.remove.datafile_handles[i]);
+	PINT_SERVREQ_REMOVE_FILL(
+            msg_p->req,
+            *sm_p->cred_p,
+            sm_p->u.remove.object_ref.fs_id,
+            sm_p->u.remove.datafile_handles[i]);
 
 	/* fill in msgpair structure components */
 	msg_p->fs_id   = sm_p->u.remove.object_ref.fs_id;
@@ -677,11 +701,11 @@ static int remove_object_remove_setup_msgpair(PINT_client_sm *sm_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "remove state: object_remove_setup_msgpair\n");
 
-    /* fill in remove request */
-    PINT_SERVREQ_REMOVE_FILL(sm_p->msgpair.req,
-			     *sm_p->cred_p,
-			     sm_p->u.remove.object_ref.fs_id,
-			     sm_p->u.remove.object_ref.handle);
+    PINT_SERVREQ_REMOVE_FILL(
+        sm_p->msgpair.req,
+        *sm_p->cred_p,
+        sm_p->u.remove.object_ref.fs_id,
+        sm_p->u.remove.object_ref.handle);
 
     /* fill in msgpair structure components */
     sm_p->msgpair.fs_id   = sm_p->u.remove.object_ref.fs_id;
@@ -717,9 +741,16 @@ static int remove_cleanup(PINT_client_sm *sm_p,
 	PINT_acache_release(sm_p->pinode);
     }
 
-    /* free dynamically allocated resouces */
-    free(sm_p->msgarray);
-    free(sm_p->u.remove.datafile_handles);
+    if (sm_p->msgarray)
+    {
+        free(sm_p->msgarray);
+        sm_p->msgarray = NULL;
+    }
+    if (sm_p->u.remove.datafile_handles)
+    {
+        free(sm_p->u.remove.datafile_handles);
+        sm_p->u.remove.datafile_handles = NULL;
+    }
 
     /* mark operation as complete */
     sm_p->op_complete = 1;
