@@ -158,25 +158,32 @@ static int getattr_verify_attribs(PINT_server_op *s_op, job_status_s* js_p)
 
 	a_p->mask = PVFS_ATTR_COMMON_ALL;
 
-/*         if (s_op->req->u.getattr.attrmask & PVFS_ATTR_META_DFILES) */
-        if (a_p->mask & PVFS_ATTR_META_DFILES)
+        if (s_op->req->u.getattr.attrmask & PVFS_ATTR_META_DFILES)
         {
             gossip_debug(SERVER_DEBUG, " dspace has dfile_count of %d\n",
                          s_op->attr.u.meta.dfile_count);
 
             /* copy over the dfile count for reading later */
             a_p->u.meta.dfile_count = s_op->attr.u.meta.dfile_count;
+
+            a_p->mask |= PVFS_ATTR_META_DFILES;
         }
-        if (a_p->mask & PVFS_ATTR_META_DIST)
+
+        if (s_op->req->u.getattr.attrmask & PVFS_ATTR_META_DIST)
         {
             gossip_debug(SERVER_DEBUG, " dspace has dist size of %d\n",
                          s_op->attr.u.meta.dist_size);
 
             /* copy over the dist size for reading later */
             a_p->u.meta.dist_size = s_op->attr.u.meta.dist_size;
+
+            a_p->mask |= PVFS_ATTR_META_DIST;
         }
 
-	js_p->error_code = STATE_METAFILE;
+        if (a_p->mask != PVFS_ATTR_COMMON_ALL)
+        {
+            js_p->error_code = STATE_METAFILE;
+        }
     }
     else if (a_p->objtype == PVFS_TYPE_DATAFILE)
     {
