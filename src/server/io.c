@@ -162,7 +162,7 @@ static int io_init(state_action_struct *s_op, job_status_s *ret)
  */
 static int io_send_ack(state_action_struct *s_op, job_status_s *ret)
 {
-	int ret = -1;
+	int err = -1;
 	job_id_t tmp_id;
 	
 	gossip_ldebug(SERVER_DEBUG, "IO: io_send_ack() executed.\n");
@@ -170,36 +170,36 @@ static int io_send_ack(state_action_struct *s_op, job_status_s *ret)
 	s_op->resp->status = -ENOSYS;
 	s_op->resp->rsize = sizeof(struct PVFS_server_resp_s);
 
-	ret = PINT_encode(
+	err = PINT_encode(
 		s_op->resp, 
 		PINT_ENCODE_RESP, 
 		&(s_op->encoded),
 		s_op->addr,
 		s_op->enc_type);
 
-	if(ret < 0)
+	if(err < 0)
 	{
 		/* TODO: what do I do here? */
-		/* I see the way it is handled in get-attr.c, but I think we need
-		 * to do something different/safer...
-		 */
 		gossip_lerr("IO: AIEEEeee! PINT_encode() failure.\n");
 		gossip_lerr("IO: returning -1 from state function.\n");
 	}
 	else
 	{
-		ret = job_bmi_send(s_op->addr,
-			s_op->encoded.buffer_list[0],
+		err = job_bmi_send_list(
+			s_op->addr,
+			s_op->encoded.buffer_list,
+			s_op->encoded.size_list,
+			s_op->encoded.list_count,
 			s_op->encoded.total_size,
 			s_op->tag,
-			0,
+			s_op->encoded.buffer_flag,
 			0,
 			s_op,
 			ret,
 			&tmp_id);
 	}
 
-	return(ret);
+	return(err);
 }
 
 /*
