@@ -23,6 +23,7 @@
 #include "gossip.h"
 #include "request-scheduler.h"
 #include "trove-id-queue.h"
+#include "pint-dev.h"
 
 /* contexts for use within the job interface */
 static bmi_context_id global_bmi_context = -1;
@@ -672,6 +673,64 @@ int job_bmi_unexp(struct BMI_unexpected_info *bmi_unexp_d,
 
     return (0);
 }
+
+/* job_dev_unexp()
+ *
+ * posts a job for an unexpected device message
+ *
+ * returns 0 on success, -errno on failure, and 1 on immediate
+ * completion
+ */
+int job_dev_unexp(struct PINT_dev_unexp_info* dev_unexp_d,
+    void* user_ptr,
+    job_status_s * out_status_p,
+    job_id_t* id,
+    job_context_id context_id)
+{
+    gossip_lerr("Error: unimplemented.\n");
+    return(-ENOSYS);
+}
+
+/* job_dev_write()
+ *
+ * posts a device write
+ *
+ * returns 0 on success, -errno on failure, and 1 on immediate completion
+ */
+int job_dev_write(void* buffer,
+    int size,
+    id_gen_t tag,
+    enum PINT_dev_buffer_type buffer_type,
+    void* user_ptr,
+    job_status_s * out_status_p,
+    job_id_t * id,
+    job_context_id context_id)
+{
+    gossip_lerr("Error: unimplemented.\n");
+    return(-ENOSYS);
+}
+
+/* job_dev_write_list()
+ *
+ * posts a device write for multiple buffers
+ *
+ * returns 0 on success, -errno on failure, and 1 on immediate completion
+ */
+int job_dev_write_list(void** buffer_list,
+    int* size_list,
+    int list_count,
+    int total_size,
+    id_gen_t tag,
+    enum PINT_dev_buffer_type buffer_type,
+    void* user_ptr,
+    job_status_s* out_status_p,
+    job_id_t* id,
+    job_context_id context_id)
+{
+    gossip_lerr("Error: unimplemented.\n");
+    return(-ENOSYS);
+}
+
 
 /* job_req_sched_post()
  *

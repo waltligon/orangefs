@@ -15,6 +15,7 @@
 #include "pvfs2-types.h"
 #include "pvfs2-storage.h"
 #include "pvfs2-req-proto.h"
+#include "pint-dev.h"
 
 typedef id_gen_t job_id_t;
 typedef PVFS_context_id job_context_id;
@@ -116,6 +117,35 @@ int job_bmi_unexp(struct BMI_unexpected_info *bmi_unexp_d,
 		  enum job_flags flags,
 		  job_context_id context_id);
 
+/* unexpected device receive */
+int job_dev_unexp(struct PINT_dev_unexp_info* dev_unexp_d,
+    void* user_ptr,
+    job_status_s * out_status_p,
+    job_id_t* id,
+    job_context_id context_id);
+
+/* device write */
+int job_dev_write(void* buffer,
+    int size,
+    id_gen_t tag,
+    enum PINT_dev_buffer_type buffer_type,
+    void* user_ptr,
+    job_status_s * out_status_p,
+    job_id_t * id,
+    job_context_id context_id);
+
+/* device write list */
+int job_dev_write_list(void** buffer_list,
+    int* size_list,
+    int list_count,
+    int total_size,
+    id_gen_t tag,
+    enum PINT_dev_buffer_type buffer_type,
+    void* user_ptr,
+    job_status_s* out_status_p,
+    job_id_t* id,
+    job_context_id context_id);
+
 /* request scheduler post */
 int job_req_sched_post(struct PVFS_server_req *in_request,
 		       void *user_ptr,
@@ -129,6 +159,7 @@ int job_req_sched_release(job_id_t in_completed_id,
 			  job_status_s * out_status_p,
 			  job_id_t * out_id,
 			  job_context_id context_id);
+
 
 /* complex I/O operation (disk, net, or mem) */
 int job_flow(flow_descriptor * flow_d,
