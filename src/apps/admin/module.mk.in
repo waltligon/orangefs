@@ -14,7 +14,8 @@ ADMINSRC := \
 	$(DIR)/pvfs2-perf-mon-example.c \
 	$(DIR)/pvfs2-event-mon-example.c \
 	$(DIR)/pvfs2-mkdir.c \
-	$(DIR)/pvfs2-fs-dump.c
+	$(DIR)/pvfs2-fs-dump.c\
+	$(DIR)/pvfs2-cp.c
 
 ADMINSRC_SERVER := \
 	$(DIR)/pvfs2-mkspace.c \

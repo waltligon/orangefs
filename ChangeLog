@@ -10,6 +10,8 @@ pvfs2-0.5.1pre1
 - pay attention to BMI timeouts in IB layer
 - fail quitely on unrecognized BMI method types in pvfs2tab
 - disable TCP method for IB builds
+- added pvfs2-cp, which should have all of the functionaly of pvfs2-import 
+  and pvfs2-export, but none of the bugs (!)
 
 
 pvfs2-0.5.0
