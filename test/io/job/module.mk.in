@@ -13,7 +13,6 @@ TEST_IO_JOB_DIR_SRC := \
 	$(DIR)/job-dev-test.c \
 	$(DIR)/thread-bench2.c \
 	$(DIR)/thread-bench3.c
-#	$(DIR)/job-flow-server.c 
 
 MISCSRC += $(DIR)/job-help.c
 
