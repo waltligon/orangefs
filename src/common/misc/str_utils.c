@@ -21,6 +21,7 @@
  *
  * filename          - returns -1
  * NULL              - returns -1
+ * /                 - returns  0
  * /filename         - returns  1
  * /filename/        - returns  1
  * /filename//       - returns  1
@@ -48,7 +49,7 @@ int PINT_string_count_segments(char *pathname)
     }
 
     /* ignore trailing slash(es) if any */
-    while (*(--cur_ch) == '/')
+    while ((cur_ch > pathname) && (*(--cur_ch) == '/'))
     {
         segct--;
     }
