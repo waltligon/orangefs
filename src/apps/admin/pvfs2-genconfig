@@ -174,25 +174,31 @@ sub confirm
 # entry point of script
 # ---------------------
 
+$using_stdout = 0;
+
 if ((@ARGV == 1) && ($ARGV[0] eq "-"))
 {
     $output_target = STDOUT;
+    $using_stdout = 1;
 }
 elsif (@ARGV != 2)
 {
     print "Usage: pvfs2-genconfig <fs.conf> <server.conf template>\n";
     print "The server.conf template is used for generating server\n";
     print "  specific configuration files.  One file will be generated\n";
-    print "  for each server configured with this program.\n";
+    print "  for each server configured with this program.  The generated\n";
+    print "  filename will be based on the specified server.conf template\n";
     print "NOTE: If <fs.conf> is '-', output is directed to stdout\n";
     exit;
 }
-
-$output_target = FILEOUT;
-unless (open($output_target, ">", $ARGV[0]))
+else
 {
-    print STDERR "Can't open specified file $ARGV[0]: $!\n";
-    return;
+    $output_target = FILEOUT;
+    unless (open($output_target, ">", $ARGV[0]))
+    {
+        print STDERR "Can't open specified file $ARGV[0]: $!\n";
+        return;
+    }
 }
 
 @server_addrs = undef;
@@ -288,7 +294,10 @@ emit_aliases($output_target, $num_nodes);
 emit_filesystem($output_target, "fs-foo", 9, 1048576, $num_nodes);
 
 # close fs.conf
-close($output_target);
+if ($using_stdout == 0)
+{
+    close($output_target);
+}
 
 print "\nAbout to generate $num_nodes server specific setting files\n\n";
 for($i = 0; $i < $num_nodes; $i++)
@@ -296,13 +305,16 @@ for($i = 0; $i < $num_nodes; $i++)
     my($storage, $filename);
 
     # and open server.conf files
-    $output_target = FILEOUT + $i + 10;
-
-    $filename = "$ARGV[1]0";
-    unless (open($output_target, ">", $filename))
+    if ($using_stdout == 0)
     {
-        print STDERR "Can't open specified file $ARGV[1]: $!\n";
-        return;
+        $output_target = FILEOUT + $i + 10;
+
+        $filename = "$ARGV[1]0";
+        unless (open($output_target, ">", $filename))
+        {
+            print STDERR "Can't open specified file $ARGV[1]: $!\n";
+            return;
+        }
     }
 
     print "Please specify a storage location for host $server_addrs[$i]\n";
@@ -310,9 +322,11 @@ for($i = 0; $i < $num_nodes; $i++)
 
     emit_server_conf($output_target, $server_addrs[$i], $storage);
 
-    close($output_target);
-
-    print "Wrote server specific configuration file $filename!\n";
+    if ($using_stdout == 0)
+    {
+        close($output_target);
+        print "Wrote server specific configuration file $filename!\n";
+    }
 }
 
 print "Configuration files written!\n";
