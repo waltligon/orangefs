@@ -10,7 +10,7 @@
  */
 
 #ifndef __PVFS2_H
-#define __PVFS2__H
+#define __PVFS2_H
 
 #include "pvfs2-types.h"
 #include "pvfs2-sysint.h"
