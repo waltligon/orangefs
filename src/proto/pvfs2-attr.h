@@ -84,7 +84,7 @@ typedef struct PVFS_datafile_attr_s PVFS_datafile_attr;
  *
  */
 struct PVFS_directory_attr_s {
-	//PVFS_handle *dfh;
+	PVFS_handle dfh;
 };
 typedef struct PVFS_directory_attr_s PVFS_directory_attr;
 
