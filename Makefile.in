@@ -85,6 +85,8 @@ LDFLAGS = @LDFLAGS@
 LD = gcc
 LDFLAGS += -L lib
 LIBS += @LIBS@ -lpvfs2
+# for Solaris:
+# LIBS += -lsocket -lnsl
   # enable BMI TCP module
 CFLAGS += -D__STATIC_METHOD_BMI_TCP__
   # enable Flow debugging protocol
