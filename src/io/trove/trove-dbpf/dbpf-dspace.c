@@ -952,8 +952,8 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
 
     gossip_debug(
         GOSSIP_TROVE_DEBUG, "ATTRIB: retrieved attributes "
-        "from DISK for key %Lu\nuid = %d, mode = %d, type = %d\n  "
-        "dfile_count = %d, dist_size = %d, b_size = %Ld, k_size = %Ld\n",
+        "from DISK for key %Lu\n\tuid = %d, mode = %d, type = %d, "
+        "dfile_count = %d, dist_size = %d\n\tb_size = %Ld, k_size = %Ld\n",
         Lu(op_p->handle), (int)s_attr.uid, (int)s_attr.mode,
         (int)s_attr.type, (int)s_attr.dfile_count, (int)s_attr.dist_size,
         Lu(b_size), Lu(k_size));

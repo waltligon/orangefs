@@ -408,11 +408,11 @@ do {                                                      \
         {                                                 \
             tmp_errno = errno;                            \
             ret = -trove_errno_to_trove_error(tmp_errno); \
-            gossip_err("aio fd [%d] SYNC failed: %s\n",fd,\
-                       strerror(tmp_errno));              \
+            gossip_err("aio [fd = %d] SYNC failed: %s\n", \
+                       fd, strerror(tmp_errno));          \
         }                                                 \
         gossip_debug(                                     \
-          GOSSIP_TROVE_DEBUG, "aio fd [%d] SYNC called "  \
+          GOSSIP_TROVE_DEBUG, "aio [fd = %d] SYNC called "\
           "servicing op type %s\n", fd,                   \
           dbpf_op_type_to_str(dbpf_op_ptr->type));        \
     }                                                     \
@@ -426,13 +426,13 @@ do {                                                     \
         if ((tmp_ret = DBPF_SYNC(fd)) != 0)              \
         {                                                \
             tmp_errno = errno;                           \
-            gossip_err("fd [%d] SYNC failed: %s\n",      \
+            gossip_err("[fd = %d] SYNC failed: %s\n",    \
                        fd, strerror(tmp_errno));         \
             ret = -trove_errno_to_trove_error(tmp_errno);\
             goto return_error;                           \
         }                                                \
         gossip_debug(                                    \
-          GOSSIP_TROVE_DEBUG,"fd [%d] SYNC called "      \
+          GOSSIP_TROVE_DEBUG,"[fd = %d] SYNC called "    \
           "servicing op type %s\n", fd,                  \
           dbpf_op_type_to_str(dbpf_op_ptr->type));       \
     }                                                    \

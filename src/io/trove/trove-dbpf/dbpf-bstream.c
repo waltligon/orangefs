@@ -114,11 +114,11 @@ static void aio_progress_notification(sigval_t sig)
             /* aio_return gets the return value of the individual op */
             ret = aio_return(&aiocb_p[i]);
 
-            gossip_debug(GOSSIP_TROVE_DEBUG,
-                         "  %s complete: aio_return() says %d\n",
+            gossip_debug(GOSSIP_TROVE_DEBUG, "  %s complete: "
+                         "aio_return() says %d [fd = %d]\n",
                          ((op_p->type == BSTREAM_WRITE_LIST) ||
                           (op_p->type == BSTREAM_WRITE_AT) ?
-                          "WRITE" : "READ"), ret);
+                          "WRITE" : "READ"), ret, op_p->u.b_rw_list.fd);
 
             /* mark as a NOP so we ignore it from now on */
             aiocb_p[i].aio_lio_opcode = LIO_NOP;
@@ -388,6 +388,7 @@ static int dbpf_bstream_read_at(TROVE_coll_id coll_id,
     {
         return -TROVE_EINVAL;
     }
+
     q_op_p = dbpf_queued_op_alloc();
     if (q_op_p == NULL)
     {
@@ -479,6 +480,7 @@ static int dbpf_bstream_write_at(TROVE_coll_id coll_id,
     {
         return -TROVE_EINVAL;
     }
+
     q_op_p = dbpf_queued_op_alloc();
     if (q_op_p == NULL)
     {
@@ -568,6 +570,7 @@ static int dbpf_bstream_flush(TROVE_coll_id coll_id,
     {
         return -TROVE_EINVAL;
     }
+
     q_op_p = dbpf_queued_op_alloc();
     if (q_op_p == NULL)
     {
@@ -636,6 +639,7 @@ static int dbpf_bstream_resize(TROVE_coll_id coll_id,
     {
         return -TROVE_EINVAL;
     }
+
     q_op_p = dbpf_queued_op_alloc();
     if (q_op_p == NULL)
     {
@@ -675,11 +679,16 @@ static int dbpf_bstream_resize_op_svc(struct dbpf_op *op_p)
     got_fd = 1;
 
     ret = DBPF_RESIZE(tmp_ref.fd, op_p->u.b_resize.size);
-    if ( ret != 0)
+    if (ret != 0)
     {
         ret = -trove_errno_to_trove_error(errno);
         goto return_error;
     }
+
+    gossip_debug(GOSSIP_TROVE_DEBUG, "  RESIZED bstream %Lu [fd = %d] "
+                 "to %Ld \n", op_p->handle, tmp_ref.fd,
+                 op_p->u.b_resize.size);
+
     dbpf_open_cache_put(&tmp_ref);
 
     /* adjust size in cached attribute element, if present */
@@ -782,7 +791,7 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
                                        char **mem_offset_array, 
                                        TROVE_size *mem_size_array,
                                        int mem_count,
-                                       TROVE_offset *stream_offset_array, 
+                                       TROVE_offset *stream_offset_array,
                                        TROVE_size *stream_size_array,
                                        int stream_count,
                                        TROVE_size *out_size_p,
@@ -1082,11 +1091,12 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
                 */
                 ret = aio_return(&aiocb_p[i]);
 
-                gossip_debug(GOSSIP_TROVE_DEBUG,
-                             "  %s complete: aio_return() says %d\n",
+                gossip_debug(GOSSIP_TROVE_DEBUG, "  %s complete: "
+                             "aio_return() says %d [fd = %d]\n",
                              ((op_p->type == BSTREAM_WRITE_LIST) ||
                               (op_p->type == BSTREAM_WRITE_AT) ?
-                              "WRITE" : "READ"), ret);
+                              "WRITE" : "READ"), ret,
+                             op_p->u.b_rw_list.fd);
 
                 /* mark as a NOP so we ignore it from now on */
                 aiocb_p[i].aio_lio_opcode = LIO_NOP;
