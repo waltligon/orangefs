@@ -145,8 +145,30 @@ GtkWidget *gui_details_view_new(GtkListStore **list_p,
     return list_view;
 }
 
-void gui_details_update(struct PVFS_mgmt_server_stat *server_stat,
-			int server_stat_ct)
+void gui_details_update(struct PVFS_mgmt_server_stat *s_stat,
+			int s_stat_ct)
+{
+    gui_details_view_fill(gui_details_view,
+			  gui_details_list,
+			  gui_details_col,
+			  s_stat,
+			  s_stat_ct,
+			  NULL);
+			  
+}
+
+/* gui_details_view_fill()
+ *
+ * Parameters:
+ * view
+ * server_stat
+ */
+void gui_details_view_fill(GtkWidget *view,
+			   GtkListStore *list,
+			   GtkTreeViewColumn *col[],
+			   struct PVFS_mgmt_server_stat *s_stat,
+			   int s_stat_ct,
+			   int *server_list)
 {
     int i, max;
     GtkTreeModel *model;
@@ -160,40 +182,40 @@ void gui_details_update(struct PVFS_mgmt_server_stat *server_stat,
     if (gui_details_initialized == 0) return;
 
     /* calculate units and divisors for everything (find max; call unit fn) */
-    for (max=0, i=1; i < server_stat_ct; i++) {
-	if (server_stat[i].ram_total_bytes > server_stat[max].ram_total_bytes) max = i;
+    for (max=0, i=1; i < s_stat_ct; i++) {
+	if (s_stat[i].ram_total_bytes > s_stat[max].ram_total_bytes) max = i;
     }
-    rt_units = gui_units_size(server_stat[max].ram_total_bytes, &rt_div);
+    rt_units = gui_units_size(s_stat[max].ram_total_bytes, &rt_div);
 
-    for (max=0, i=1; i < server_stat_ct; i++) {
-	if (server_stat[i].ram_free_bytes > server_stat[max].ram_free_bytes) max = i;
+    for (max=0, i=1; i < s_stat_ct; i++) {
+	if (s_stat[i].ram_free_bytes > s_stat[max].ram_free_bytes) max = i;
     }
-    ra_units = gui_units_size(server_stat[max].ram_free_bytes, &ra_div);
+    ra_units = gui_units_size(s_stat[max].ram_free_bytes, &ra_div);
 
-    for (max=0, i=1; i < server_stat_ct; i++) {
-	if (server_stat[i].uptime_seconds > server_stat[max].uptime_seconds) max = i;
+    for (max=0, i=1; i < s_stat_ct; i++) {
+	if (s_stat[i].uptime_seconds > s_stat[max].uptime_seconds) max = i;
     }
-    up_units = gui_units_time(server_stat[max].uptime_seconds, &up_div);
+    up_units = gui_units_time(s_stat[max].uptime_seconds, &up_div);
 
-    for (max=0, i=1; i < server_stat_ct; i++) {
-	if (server_stat[i].handles_total_count > server_stat[max].handles_total_count) max = i;
+    for (max=0, i=1; i < s_stat_ct; i++) {
+	if (s_stat[i].handles_total_count > s_stat[max].handles_total_count) max = i;
     }
-    ht_units = gui_units_count(server_stat[max].handles_total_count, &ht_div);
+    ht_units = gui_units_count(s_stat[max].handles_total_count, &ht_div);
 
-    for (max=0, i=1; i < server_stat_ct; i++) {
-	if (server_stat[i].handles_available_count > server_stat[max].handles_available_count) max = i;
+    for (max=0, i=1; i < s_stat_ct; i++) {
+	if (s_stat[i].handles_available_count > s_stat[max].handles_available_count) max = i;
     }
-    ha_units = gui_units_count(server_stat[max].handles_available_count, &ha_div);
+    ha_units = gui_units_count(s_stat[max].handles_available_count, &ha_div);
 
-    for (max=0, i=1; i < server_stat_ct; i++) {
-	if (server_stat[i].bytes_total > server_stat[max].bytes_total) max = i;
+    for (max=0, i=1; i < s_stat_ct; i++) {
+	if (s_stat[i].bytes_total > s_stat[max].bytes_total) max = i;
     }
-    bt_units = gui_units_size(server_stat[max].bytes_total, &bt_div);
+    bt_units = gui_units_size(s_stat[max].bytes_total, &bt_div);
 
-    for (max=0, i=1; i < server_stat_ct; i++) {
-	if (server_stat[i].bytes_available > server_stat[max].bytes_available) max = i;
+    for (max=0, i=1; i < s_stat_ct; i++) {
+	if (s_stat[i].bytes_available > s_stat[max].bytes_available) max = i;
     }
-    ba_units = gui_units_size(server_stat[max].bytes_available, &ba_div);
+    ba_units = gui_units_size(s_stat[max].bytes_available, &ba_div);
 
     /* update column titles */
     snprintf(titlebuf, sizeof(titlebuf), "%s (%s)",
@@ -234,41 +256,41 @@ void gui_details_update(struct PVFS_mgmt_server_stat *server_stat,
     /* update table of data */
 
     /* detach model from view until we're done updating */
-    model = gtk_tree_view_get_model(GTK_TREE_VIEW(gui_details_view));
+    model = gtk_tree_view_get_model(GTK_TREE_VIEW(view));
     g_object_ref(model);
-    gtk_tree_view_set_model(GTK_TREE_VIEW(gui_details_view), NULL);
+    gtk_tree_view_set_model(GTK_TREE_VIEW(view), NULL);
 
     /* just clear out the list and then refill it */
-    gtk_list_store_clear(gui_details_list);
+    gtk_list_store_clear(list);
 
-    for (i=0; i < server_stat_ct; i++) {
+    for (i=0; i < s_stat_ct; i++) {
 	GtkTreeIter iter;
 	char *type, meta[] = "meta", data[] = "data", both[] = "both";
 	char fmtbuf[GUI_DETAILS_TYPE][12]; /* don't need one for type */
 
 	snprintf(fmtbuf[GUI_DETAILS_RAM_TOT], 12, "%.2f",
-		 (float) server_stat[i].ram_total_bytes / rt_div);
+		 (float) s_stat[i].ram_total_bytes / rt_div);
 	snprintf(fmtbuf[GUI_DETAILS_RAM_AVAIL], 12, "%.2f",
-		 (float) server_stat[i].ram_free_bytes / ra_div);
+		 (float) s_stat[i].ram_free_bytes / ra_div);
 	snprintf(fmtbuf[GUI_DETAILS_UPTIME], 12, "%.2f",
-		 (float) server_stat[i].uptime_seconds / up_div);
+		 (float) s_stat[i].uptime_seconds / up_div);
 	snprintf(fmtbuf[GUI_DETAILS_HANDLES_TOT], 12, "%.2f",
-		 (float) server_stat[i].handles_total_count / ht_div);
+		 (float) s_stat[i].handles_total_count / ht_div);
 	snprintf(fmtbuf[GUI_DETAILS_HANDLES_AVAIL], 12, "%.2f",
-		 (float) server_stat[i].handles_available_count / ha_div);
+		 (float) s_stat[i].handles_available_count / ha_div);
 	snprintf(fmtbuf[GUI_DETAILS_SPACE_TOT], 12, "%.2f",
-		 (float) server_stat[i].bytes_total / bt_div);
+		 (float) s_stat[i].bytes_total / bt_div);
 	snprintf(fmtbuf[GUI_DETAILS_SPACE_AVAIL], 12, "%.2f",
-		 (float) server_stat[i].bytes_available / ba_div);
+		 (float) s_stat[i].bytes_available / ba_div);
 
 
 	/* final formatting of data */
-	if ((server_stat[i].server_type & PVFS_MGMT_IO_SERVER) &&
-	    (server_stat[i].server_type & PVFS_MGMT_META_SERVER))
+	if ((s_stat[i].server_type & PVFS_MGMT_IO_SERVER) &&
+	    (s_stat[i].server_type & PVFS_MGMT_META_SERVER))
 	{
 	    type = both;
 	}
-	else if (server_stat[i].server_type & PVFS_MGMT_IO_SERVER)
+	else if (s_stat[i].server_type & PVFS_MGMT_IO_SERVER)
 	{
 	    type = data;
 	}
@@ -278,12 +300,12 @@ void gui_details_update(struct PVFS_mgmt_server_stat *server_stat,
 	}
 
 	/* drop into list */
-	gtk_list_store_append(gui_details_list, &iter);
+	gtk_list_store_append(list, &iter);
 
-	gtk_list_store_set(gui_details_list,
+	gtk_list_store_set(list,
 			   &iter,
 			   GUI_DETAILS_NAME,
-			   server_stat[i].bmi_address,
+			   s_stat[i].bmi_address,
 			   GUI_DETAILS_RAM_TOT,
 			   fmtbuf[GUI_DETAILS_RAM_TOT],
 			   GUI_DETAILS_RAM_AVAIL,
@@ -303,7 +325,7 @@ void gui_details_update(struct PVFS_mgmt_server_stat *server_stat,
     }
 
     /* reattach model to view */
-    gtk_tree_view_set_model(GTK_TREE_VIEW(gui_details_view), model);
+    gtk_tree_view_set_model(GTK_TREE_VIEW(view), model);
     g_object_unref(model);
 }
 

@@ -91,8 +91,16 @@ extern GtkListStore *gui_comm_fslist;
 
 /* details page interface (details.c) */
 GtkWidget *gui_details_setup(void);
-void gui_details_update(struct PVFS_mgmt_server_stat *server_stat,
-			int server_stat_ct);
+void gui_details_update(struct PVFS_mgmt_server_stat *s_stat,
+			int s_stat_ct);
+
+/* details view functions (details.c) - more generic */
+void gui_details_view_fill(GtkWidget *view,
+			   GtkListStore *list,
+			   GtkTreeViewColumn *col[],
+			   struct PVFS_mgmt_server_stat *server_stat,
+			   int server_stat_ct,
+			   int *server_list);
 GtkWidget *gui_details_view_new(GtkListStore **list_p,
 				GtkTreeViewColumn **col,
 				gint sortable);
