@@ -99,9 +99,7 @@ if [ $? != 0 ] ; then
 	exit 1
 fi
 
-echo "BONNIE++ RESULTS ========================================"
 cat $bonnie_log
-echo "END BONNIE++ RESULTS ===================================="
 
 #usage: bonnie++ [-d scratch-dir] [-s size(Mb)[:chunk-size(b)]]
 #                [-n number-to-stat[:max-size[:min-size][:num-directories]]]
