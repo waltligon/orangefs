@@ -33,6 +33,12 @@
     PINT_acache_pinode_alloc()
   - if existing, check whether that pinode object is valid
     by calling PINT_acache_pinode_status()
+
+  NOTE: this has been changed -- if lookup success, the status will be
+  returned in the specified status ptr (if any).  this is solely to
+  avoid calling the status method (more efficient).  however, the
+  status function can still be called at any time
+
   - if it's valid, do your business with it, and the call
     PINT_acache_release() on it
   - if it's NOT valid, you can update the contents of the pinode
@@ -107,7 +113,7 @@ int PINT_acache_get_timeout(void);
 void PINT_acache_set_timeout(int max_timeout_ms);
 int PINT_acache_get_size(void);
 
-PINT_pinode *PINT_acache_lookup(PVFS_object_ref refn);
+PINT_pinode *PINT_acache_lookup(PVFS_object_ref refn, int *status);
 int PINT_acache_pinode_status(PINT_pinode *pinode);
 void PINT_acache_set_valid(PINT_pinode *pinode);
 void PINT_acache_invalidate(PVFS_object_ref refn);

@@ -292,8 +292,8 @@ static int getattr_object_getattr_comp_fn(
 
     /*
       if we got a metafile that didn't get a cache hit *and* we need
-      the size, that should be only time we're going to have to do a
-      full data file fetch.  (that's expensive)
+      the size, that should be the only time we're going to have to do
+      a full data file fetch.  (that's expensive)
     */
     if ((resp_p->u.getattr.attr.objtype == PVFS_TYPE_METAFILE) &&
         (!sm_p->acache_hit) &&
@@ -357,7 +357,6 @@ static int getattr_object_getattr_comp_fn(
     sm_p->u.getattr.getattr_resp_p->attr.size  = 0;
     sm_p->u.getattr.getattr_resp_p->attr.objtype = attr->objtype;
 
-    /* on cache hit, we can skip all of the copying below;  joy! */
     if (sm_p->acache_hit)
     {
         return 0;
@@ -476,7 +475,7 @@ static int getattr_datafile_getattr_setup_msgpairarray(
         assert(msg_p);
 
         gossip_debug(GOSSIP_GETATTR_DEBUG,
-                     "  datafile_getattr: getting size for handle %Lu\n", 
+                     "  datafile_getattr: getting size for handle %Lu\n",
                      Lu(attr->u.meta.dfile_array[i]));
 
         PINT_SERVREQ_GETATTR_FILL(
@@ -616,7 +615,7 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
         {
             int release_required = 1;
             PINT_pinode *pinode = PINT_acache_lookup(
-                sm_p->object_ref);
+                sm_p->object_ref, NULL);
             if (!pinode)
             {
                 pinode = PINT_acache_pinode_alloc();

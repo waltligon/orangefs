@@ -1154,13 +1154,13 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
         }
         
         /* mark unused with LIO_NOPs */
-        for (i = aiocb_inuse_count;
-             i < op_p->u.b_rw_list.aiocb_array_count; i++)
+        for(i = aiocb_inuse_count;
+            i < op_p->u.b_rw_list.aiocb_array_count; i++)
         {
             aiocb_p[i].aio_lio_opcode = LIO_NOP;
         }
 
-        for (i=0; i < aiocb_inuse_count; i++)
+        for(i = 0; i < aiocb_inuse_count; i++)
         {
             aiocb_ptr_array[i] = &aiocb_p[i];
         }

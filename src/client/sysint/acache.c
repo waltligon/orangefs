@@ -45,20 +45,50 @@ static int s_acache_initialized = 0;
 static int s_acache_timeout_ms = PINT_ACACHE_TIMEOUT_MS;
 static int s_acache_allocated_entries = 0;
 
-/* static internal helper methods */
-static int pinode_hash_refn(void *refn_p, int table_size);
-static int pinode_hash_refn_compare(void *key, struct qlist_head *link);
+static int pinode_hash_refn(
+    void *refn_p, int table_size);
+static int pinode_hash_refn_compare(
+    void *key, struct qlist_head *link);
 static PINT_pinode *pinode_alloc(void);
-static void pinode_free(PINT_pinode *pinode);
-static int pinode_status(PINT_pinode *pinode);
-static void pinode_update_timestamp(PINT_pinode **pinode);
-static void pinode_invalidate(PINT_pinode *pinode);
-static void acache_internal_release(PINT_pinode *pinode);
-static PINT_pinode *acache_internal_lookup(PVFS_object_ref refn);
+static void pinode_free(
+    PINT_pinode *pinode);
+static int pinode_status(
+    PINT_pinode *pinode);
+static void pinode_update_timestamp(
+    PINT_pinode **pinode);
+static void pinode_invalidate(
+    PINT_pinode *pinode);
+static void acache_internal_release(
+    PINT_pinode *pinode);
+static PINT_pinode *acache_internal_lookup(
+    PVFS_object_ref refn);
+static int acache_internal_status(
+    PINT_pinode *pinode);
 #ifdef PINT_ACACHE_AUTO_CLEANUP
 static void reclaim_pinode_entries(void);
 #endif
 
+static inline char *get_status_str(int status)
+{
+    typedef struct
+    {
+        int status;
+        char *status_str;
+    } acache_status_t;
+
+    static acache_status_t ast[4] =
+    {
+        { PINODE_STATUS_VALID, "PINODE_STATUS_VALID" },
+        { PINODE_STATUS_INVALID, "PINODE_STATUS_INVALID" },
+        { PINODE_STATUS_EXPIRED, "PINODE_STATUS_EXPIRED" },
+        { 0, "PINODE_STATUS_UNKNOWN" },
+    };
+
+    return (((ast[0].status == status) ? ast[0].status_str :
+             (ast[1].status == status) ? ast[1].status_str :
+             (ast[2].status == status) ? ast[2].status_str :
+             ast[3].status_str));
+}
 
 /*
   initializes acache; MUST be called before
@@ -193,8 +223,10 @@ static PINT_pinode *acache_internal_lookup(PVFS_object_ref refn)
   NOTE: if a pinode is returned, it is returned with the lock held.
   That means no one else can use it before the lock is released (in
   release, or set_valid);
+  if status is specified, the pinode status will be filled to avoid
+  calling the status method after this call
 */
-PINT_pinode *PINT_acache_lookup(PVFS_object_ref refn)
+PINT_pinode *PINT_acache_lookup(PVFS_object_ref refn, int *status)
 {
     PINT_pinode *pinode = NULL;
     struct qhash_head *link = NULL;
@@ -220,6 +252,10 @@ PINT_pinode *PINT_acache_lookup(PVFS_object_ref refn)
         gen_mutex_lock(pinode->mutex);
         assert(pinode->flag = PINODE_INTERNAL_FLAG_HASHED);
         pinode->ref_cnt++;
+        if (status)
+        {
+            *status = acache_internal_status(pinode);
+        }
     }
     gen_mutex_unlock(&s_acache_interface_mutex);
     acache_debug("PINT_acache_lookup exiting\n");
@@ -520,28 +556,49 @@ static int pinode_status(PINT_pinode *pinode)
         }
     }
 
-    gossip_debug(GOSSIP_ACACHE_DEBUG, " pinode [%Lu] entry status: ",
-                 Lu(pinode->refn.handle));
-    switch(ret)
-    {
-        case PINODE_STATUS_VALID:
-            acache_debug("PINODE STATUS VALID\n");
-            break;
-        case PINODE_STATUS_INVALID:
-            acache_debug("PINODE STATUS INVALID\n");
-            break;
-        case PINODE_STATUS_EXPIRED:
-            acache_debug("PINODE STATUS EXPIRED\n");
-            break;
-        default:
-            acache_debug("UNKNOWN\n");
-    }
+    gossip_debug(GOSSIP_ACACHE_DEBUG, "pinode [%Lu] entry status: %s\n",
+                 Lu(pinode->refn.handle), get_status_str(ret));
+
     if (ret == PINODE_STATUS_EXPIRED)
     {
         pinode->ref_cnt--;
     }
     gen_mutex_unlock(pinode->mutex);
     acache_debug("pinode_status exited\n");
+    return ret;
+}
+
+static int acache_internal_status(PINT_pinode *pinode)
+{
+    struct timeval now;
+    int ret = PINODE_STATUS_INVALID;
+
+    acache_debug("acache_internal_status entered\n");
+
+    ret = pinode->status;
+    if (ret == PINODE_STATUS_VALID)
+    {
+        ret = PINODE_STATUS_INVALID;
+        if (pinode->ref_cnt > 0)
+        {
+            if (gettimeofday(&now, NULL) == 0)
+            {
+                ret = (((pinode->time_stamp.tv_sec < now.tv_sec) ||
+                        ((pinode->time_stamp.tv_sec == now.tv_sec) &&
+                         (pinode->time_stamp.tv_usec < now.tv_usec))) ?
+                       PINODE_STATUS_EXPIRED : PINODE_STATUS_VALID);
+            }
+        }
+    }
+
+    gossip_debug(GOSSIP_ACACHE_DEBUG, "pinode [%Lu] entry status: %s\n",
+                 Lu(pinode->refn.handle), get_status_str(ret));
+
+    if (ret == PINODE_STATUS_EXPIRED)
+    {
+        pinode->ref_cnt--;
+    }
+    acache_debug("acache_internal_status exited\n");
     return ret;
 }
 

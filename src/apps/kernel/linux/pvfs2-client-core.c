@@ -1561,8 +1561,8 @@ static inline int repost_unexp_vfs_request(
     }
     else
     {
-        gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "[*] reposted unexpected "
-                     "request [%p] due to %s\n", vfs_request,
+        gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "[*] reposted unexp "
+                     "req [%p] due to %s\n", vfs_request,
                      completion_handle_desc);
     }
     return ret;
@@ -1583,8 +1583,8 @@ static inline int handle_unexp_vfs_request(vfs_request_t *vfs_request)
     }
 
     gossip_debug(
-        GOSSIP_CLIENTCORE_DEBUG, "Got dev request message: "
-        "size: %d, tag: %Ld, payload: %p, op_type: %d\n",
+        GOSSIP_CLIENTCORE_DEBUG, "Got dev req msg: "
+        "size: %d, tag: %Ld, payload: %p, type: %d\n",
         vfs_request->info.size, Ld(vfs_request->info.tag),
         vfs_request->info.buffer, vfs_request->in_upcall.type);
 
