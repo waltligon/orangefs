@@ -729,10 +729,10 @@ static int is_root_handle_in_my_range(
             }
             assert(cur_h_mapping->alias_mapping);
             assert(cur_h_mapping->alias_mapping->host_alias);
+            assert(cur_h_mapping->alias_mapping->bmi_address);
             assert(cur_h_mapping->handle_range);
 
-            cur_host_id = PINT_server_config_get_host_addr_ptr(
-                config,cur_h_mapping->alias_mapping->host_alias);
+            cur_host_id = cur_h_mapping->alias_mapping->bmi_address;
             if (!cur_host_id)
             {
                 gossip_err("Invalid host ID for alias %s.\n",
