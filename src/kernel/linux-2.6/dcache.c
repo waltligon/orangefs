@@ -42,7 +42,7 @@ int pvfs2_d_revalidate(
     if (nd && (nd->flags & LOOKUP_FOLLOW) &&
         (!nd->flags & LOOKUP_CREATE))
     {
-        pvfs2_print("pvfs2_d_revalidate: Trusting intent; "
+        pvfs2_print("\npvfs2_d_revalidate: Trusting intent; "
                     "skipping getattr\n");
         ret = 1;
     }
