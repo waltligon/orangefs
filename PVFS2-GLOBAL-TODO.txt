@@ -21,7 +21,6 @@ improving robustness of I/O apis:
   - job
   - request scheduler
   - device interface
-  - ?
 
 server operations:
 ====================================================================
@@ -37,18 +36,12 @@ general server functionality:
 - attributes (permissions, etc.) on datafiles
 - defining "on disk" format for metadata
   - short term goal of using dspace attribs for storing pvfs2 object attribs
-- getting multiple servers working (io + metadata)
 - finishing file system semantics documentation
 - don't forget to define semantics for access times
 - access control, general security model
-- testing multiple meta servers
-- add a workaround for thread problems on redhat 9
-- better signal handling, mechanisms for shutting down or restarting 
-  cleanly
+- ability to restart server (maybe with a signal)
 - try out existing failover solutions w/ pvfs2 (need to acquire
   some hardware first)
-- maybe add temporary check in config parser and genconfig to make sure that
-  people don't try to create mult-metaserver file systems
 
 request scheduler:
 ====================================================================
@@ -57,18 +50,13 @@ request scheduler:
 
 system interface functionality:
 ====================================================================
-- test/client/sysint/remove will destroy directories that are not empty;
-  propably a rmdir bug, but luckily does not affect vfs
 - not started:
   - eattrib (set/get)?
 
 - unfinished:
   - thread safety
-  - statfs
   - way to pass in consistency semantics (timeout values, etc.)
-  - state machine implementations for all functions
 
-- finish converting to state machines
 - define how configuration info should be passed in
   (how to do paths, fstab, url stuff, whatever)
 - define how to pass in distribution and number of datafiles for 
@@ -97,7 +85,6 @@ performance tuning:
 
 request encoding:
 ====================================================================
-- finish "real" wire encoding scheme
 - come up with a mechanism for handling requests that go beyond
   the BMI defined limit for unexpected messages (mainly an issue
   on read/write with complex datatypes, but also potentially a 
@@ -117,19 +104,14 @@ I/O path:
 - ability to unpost, correct use of timeouts, preposting operations
 - semantics of short read and write operations
 - bmi_tcp scalability and robustness
-- immediate completion in trove
 - ability to toggle synch behavior in trove
 - use better buffer size in default flow protocol
 - bmi shmem implementation
 - many items in BMI and flow TODO files
-- push device thread into thread_mgr api, don't spawn unless needed
+- ability to compile out device support, or at least prevent device thread
+  from spawning if not used
 - come up with a scheme to handle cases in dbpf-bstream-fd-cache in which
   the number of fd's in use exceeds FDCACHE_ENTRIES
-
-I/O description:
-====================================================================
-- how to encode io descriptions and dist for wire protocol
-- use new methods for copying and freeing requests and distributions
 
 correctness/performance testing
 ====================================================================
