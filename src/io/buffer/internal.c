@@ -296,14 +296,24 @@ static inline int NCAC_rwjob_prepare_single(NCAC_req_t *ncac_req)
     foff[0] = ncac_req->pos - firstoff;
     cbufoff[0] = (char*)firstoff;     /* offsize to the extent address */
     cbufsize[0] = NCAC_dev.extsize - firstoff;
+    cbufflag[0] = NCAC_COMM_NOT_READY;
 
     for ( i= 1; i < comcnt; i++){
-        foff[i] = foff[i-1] + cbufsize[i-1];
+        foff[i] = foff[i-1] + NCAC_dev.extsize;
         cbufoff[i] = 0;
         cbufsize[i] = NCAC_dev.extsize;
         cbufflag[i] = NCAC_COMM_NOT_READY;
     }
+    /* adjust the size of the last buffer in each segment. */
     cbufsize[comcnt-1] = (ncac_req->pos + ncac_req->size)% NCAC_dev.extsize;
+
+#if 1
+    fprintf(stderr, "[%s] exit %d comm buffers\n", __FUNCTION__, comcnt);
+    for (i=0; i<comcnt; i++){
+        fprintf(stderr, "fpos:%Ld, buf_off:%ld, size:%Ld\n", foff[i],
+(unsigned long)cbufoff[i], cbufsize[i]);
+    }
+#endif
 
     fprintf(stderr, "[%s] exit %d comm buffers\n", __FUNCTION__, comcnt);
     return 0;
