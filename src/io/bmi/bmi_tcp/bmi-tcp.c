@@ -132,6 +132,7 @@ struct tcp_msg_header
     bmi_flag_t mode;		/* eager, rendezvous, etc. */
     bmi_msg_tag_t tag;		/* user specified message tag */
     bmi_size_t size;		/* length of trailing message */
+    uint32_t magic_nr;          /* magic number */
 };
 
 /* enumerate states that we care about */
@@ -651,6 +652,7 @@ int BMI_tcp_post_send(bmi_op_id_t * id,
     }
     my_header.tag = tag;
     my_header.size = size;
+    my_header.magic_nr = BMI_MAGIC_NR;
 
     return (BMI_tcp_post_send_generic(id, dest, &buffer,
 				      &size, 1, buffer_flag, my_header,
@@ -687,6 +689,7 @@ int BMI_tcp_post_sendunexpected(bmi_op_id_t * id,
     my_header.mode = TCP_MODE_UNEXP;
     my_header.tag = tag;
     my_header.size = size;
+    my_header.magic_nr = BMI_MAGIC_NR;
 
     return (BMI_tcp_post_send_generic(id, dest, &buffer,
 				      &size, 1, buffer_flag, my_header,
@@ -973,6 +976,7 @@ int BMI_tcp_post_send_list(bmi_op_id_t * id,
     }
     my_header.tag = tag;
     my_header.size = total_size;
+    my_header.magic_nr = BMI_MAGIC_NR;
 
     return (BMI_tcp_post_send_generic(id, dest, buffer_list,
 				      size_list, list_count, buffer_flag,
@@ -1047,6 +1051,7 @@ int BMI_tcp_post_sendunexpected_list(bmi_op_id_t * id,
     my_header.mode = TCP_MODE_UNEXP;
     my_header.tag = tag;
     my_header.size = total_size;
+    my_header.magic_nr = BMI_MAGIC_NR;
 
     return (BMI_tcp_post_send_generic(id, dest, buffer_list,
 				      size_list, list_count, buffer_flag,
@@ -2054,9 +2059,13 @@ static int tcp_do_work_recv(method_addr_p map)
      * f) eager message for which a rend. recv has been posted
      */
 
-    /* TODO: check the magic number of the header.  If it is bad, goto
-     * bottom of function and trash socket.
-     */
+    /* check magic number of message */
+    if(new_header.magic_nr != BMI_MAGIC_NR)
+    {
+	gossip_err("Error: bad magic in BMI TCP message.\n");
+	tcp_forget_addr(map, 0);
+	return(0);
+    }
 
     gossip_ldebug(BMI_DEBUG_TCP, "Received new message; mode: %d.\n",
 		  (int) new_header.mode);

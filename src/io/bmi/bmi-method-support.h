@@ -16,6 +16,9 @@
 
 #define BMI_MAX_CONTEXTS 16
 
+/* magic number for BMI headers and control messages */
+#define BMI_MAGIC_NR 51903
+
 /********************************************************
  * method interfaces and data structures 
  */
