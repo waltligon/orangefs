@@ -722,7 +722,7 @@ Now that the module is loaded, we can mount our PVFS2 file system (and
 verify that it's properly mounted) as follows:
 
 \begin{verbatim}
-gil:~# mount -t pvfs2 pvfs2 /mnt/pvfs2 coll_id=9,root_handle=1048576
+gil:~# mount -t pvfs2 pvfs2 /mnt/pvfs2 -o coll_id=9,root_handle=1048576
 gil:~# mount
 /dev/hda3 on / type ext3 (rw,errors=remount-ro)
 proc on /proc type proc (rw)
