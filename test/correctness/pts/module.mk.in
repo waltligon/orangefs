@@ -9,7 +9,8 @@ TEST_PTS_MISC := \
 	$(DIR)/test_pvfs_datatype_init.c \
 	$(DIR)/test_pvfs_datatype_contig.c \
 	$(DIR)/test_pvfs_datatype_vector.c \
-	$(DIR)/test_pvfs_datatype_hvector.c
+	$(DIR)/test_pvfs_datatype_hvector.c \
+	$(DIR)/test_dir_torture.c
 
 MPIMISCSRC += $(TEST_PTS_MISC)
 

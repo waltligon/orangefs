@@ -7,6 +7,7 @@
 
 /* include all test specific header files */
 #include <test_create.h>
+#include <test_dir_torture.h>
 #include <test_pvfs_datatype_init.h>
 #include <test_pvfs_datatype_contig.h>
 #include <test_pvfs_datatype_vector.h>
@@ -17,7 +18,8 @@ enum test_types {
         TEST_PVFSDATATYPE_INIT,
         TEST_PVFSDATATYPE_CONTIG,
         TEST_PVFSDATATYPE_VECTOR,
-        TEST_PVFSDATATYPE_HVECTOR
+        TEST_PVFSDATATYPE_HVECTOR,
+	TEST_DIR_TORTURE
 };
 
 void setup_ptstests(config *myconfig) {
@@ -42,6 +44,8 @@ void setup_ptstests(config *myconfig) {
 
    myconfig->testpool[TEST_PVFSDATATYPE_HVECTOR].test_func = (void *)test_pvfs_datatype_hvector;
    myconfig->testpool[TEST_PVFSDATATYPE_HVECTOR].test_name = str_malloc("test_pvfs_datatype_hvector");
+   myconfig->testpool[TEST_DIR_TORTURE].test_func = (void *)test_dir_torture;
+   myconfig->testpool[TEST_DIR_TORTURE].test_name = str_malloc("test_dir_torture");
 }
 
 #endif
