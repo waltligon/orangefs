@@ -173,9 +173,15 @@ int dbpf_do_one_work_cycle(int *out_count)
         {
             return ret;
         }
-        
+
         /* otherwise, service the current operation now */
+        gossip_debug(GOSSIP_TROVE_DEBUG,"***** STARTING TROVE "
+                     "SERVICE ROUTINE (%s) *****\n",
+                     dbpf_op_type_to_str(cur_op->op.type));
         ret = cur_op->op.svc_fn(&(cur_op->op));
+        gossip_debug(GOSSIP_TROVE_DEBUG,"***** FINISHED TROVE "
+                     "SERVICE ROUTINE (%s) *****\n",
+                     dbpf_op_type_to_str(cur_op->op.type));
         if (ret != 0)
         {
             /* operation is done and we are telling the caller;

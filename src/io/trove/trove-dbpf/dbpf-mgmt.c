@@ -1300,6 +1300,55 @@ struct TROVE_mgmt_ops dbpf_mgmt_ops =
     dbpf_collection_geteattr
 };
 
+typedef struct
+{
+    enum dbpf_op_type op_type;
+    char op_type_str[32];
+} __dbpf_op_type_str_map_t;
+
+static __dbpf_op_type_str_map_t s_dbpf_op_type_str_map[] =
+{
+    { BSTREAM_READ_AT, "BSTREAM_READ_AT" },
+    { BSTREAM_WRITE_AT, "BSTREAM_WRITE_AT" },
+    { BSTREAM_RESIZE, "BSTREAM_RESIZE" },
+    { BSTREAM_READ_LIST, "BSTREAM_READ_LIST" },
+    { BSTREAM_WRITE_LIST, "BSTREAM_WRITE_LIST" },
+    { BSTREAM_VALIDATE, "BSTREAM_VALIDATE" },
+    { BSTREAM_FLUSH, "BSTREAM_FLUSH" },
+    { KEYVAL_READ, "KEYVAL_READ" },
+    { KEYVAL_WRITE, "KEYVAL_WRITE" },
+    { KEYVAL_REMOVE_KEY, "KEYVAL_REMOVE_KEY" },
+    { KEYVAL_VALIDATE, "KEYVAL_VALIDATE" },
+    { KEYVAL_ITERATE, "KEYVAL_ITERATE" },
+    { KEYVAL_ITERATE_KEYS, "KEYVAL_ITERATE_KEYS" },
+    { KEYVAL_READ_LIST, "KEYVAL_READ_LIST" },
+    { KEYVAL_WRITE_LIST, "KEYVAL_WRITE_LIST" },
+    { KEYVAL_FLUSH, "KEYVAL_FLUSH" },
+    { DSPACE_CREATE, "DSPACE_CREATE" },
+    { DSPACE_REMOVE, "DSPACE_REMOVE" },
+    { DSPACE_ITERATE_HANDLES, "DSPACE_ITERATE_HANDLES" },
+    { DSPACE_VERIFY, "DSPACE_VERIFY" },
+    { DSPACE_GETATTR, "DSPACE_GETATTR" },
+    { DSPACE_SETATTR, "DSPACE_SETATTR" }
+};
+
+char *dbpf_op_type_to_str(enum dbpf_op_type op_type)
+{
+    int i = 0;
+    char *ret = NULL;
+    int num_elems = (sizeof(s_dbpf_op_type_str_map) /
+                     sizeof(__dbpf_op_type_str_map_t));
+
+    for(i = 0; i < num_elems; i++)
+    {
+        if (op_type == s_dbpf_op_type_str_map[i].op_type)
+        {
+            ret = s_dbpf_op_type_str_map[i].op_type_str;
+            break;
+        }
+    }
+    return ret;
+}
 
 /*
  * Local variables:

@@ -304,6 +304,12 @@ enum dbpf_op_type
     DSPACE_SETATTR
 };
 
+/*
+  a function useful for debugging that returns a human readable
+  op_type name given an op_type; returns NULL if no match is found
+*/
+char *dbpf_op_type_to_str(enum dbpf_op_type op_type);
+
 enum dbpf_op_state
 {
     OP_UNITIALIZED = 0,

@@ -66,7 +66,6 @@ void dbpf_queued_op_free(
 void dbpf_queued_op_touch(
     dbpf_queued_op_t *q_op_p);
 
-
 #if defined(__cplusplus)
 }
 #endif
