@@ -151,6 +151,10 @@ static int lookup_init(PINT_server_op *s_op, job_status_s *ret)
     s_op->u.lookup.segp = NULL;
 
     s_op->u.lookup.seg_ct = PINT_string_count_segments(s_op->u.lookup.path);
+    if (s_op->u.lookup.seg_ct == -1)
+    {
+        s_op->u.lookup.seg_ct = 0;
+    }
     s_op->u.lookup.seg_nr = 0;
 
     seg_ret = PINT_string_next_segment(s_op->u.lookup.path,
