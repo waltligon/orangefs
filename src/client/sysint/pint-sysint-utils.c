@@ -136,6 +136,10 @@ int PINT_server_get_config(
     PVFS_msg_tag_t op_tag = get_next_session_tag();
     struct filesystem_configuration_s* cur_fs = NULL;
 
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "PINT_server_get_config called with config server %s\n",
+                 mntent_p->pvfs_config_server);
+
     if (!config || !mntent_p)
     {
         return ret;
@@ -156,8 +160,8 @@ int PINT_server_get_config(
     serv_req.op = PVFS_SERV_GETCONFIG;
     serv_req.credentials = creds;
 
-    gossip_ldebug(GOSSIP_CLIENT_DEBUG,"asked for fs name = %s\n",
-		  mntent_p->pvfs_fs_name);
+    gossip_debug(GOSSIP_CLIENT_DEBUG,"asked for fs name = %s\n",
+                 mntent_p->pvfs_fs_name);
 
     /* send the request and receive an acknowledgment */
     ret = PINT_send_req(serv_addr, &serv_req, mntent_p->encoding,

@@ -77,10 +77,15 @@ typedef struct filesystem_configuration_s
     int attr_cache_max_num_elems;
     int trove_sync_mode;
 
-    /* the following fields will be used to cache arrays of
-     * unique physical server addresses, of particular use to the 
-     * mgmt interface
-     */
+    /*
+      the following fields will be used to cache arrays of unique
+      physical server addresses, of particular use to the mgmt
+      interface
+
+      FIXME: these *should* be in the config cache table in the bucket
+      interface code -- which exists purely to cache per fs
+      configuration fields.
+    */
     phys_server_desc_s* io_server_array;
     int io_server_count;
     phys_server_desc_s* meta_server_array;

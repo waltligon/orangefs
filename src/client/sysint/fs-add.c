@@ -44,6 +44,13 @@ int PVFS_sys_fs_add(struct PVFS_sys_mntent* mntent)
     /* get exclusive access to the (global) server config object */
     server_config = PINT_get_server_config_struct();
 
+    /*
+      free any existing configuration elements before retrieving new
+      configuration information
+    */
+    PINT_config_release(server_config);
+    memset(server_config, 0, sizeof(struct server_configuration_s));
+
     /* get configuration parameters from server */
     ret = PINT_server_get_config(server_config, mntent);
     if (ret < 0)

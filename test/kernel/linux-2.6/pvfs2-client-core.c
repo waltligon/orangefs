@@ -928,7 +928,7 @@ do {                                                                  \
     if (!mntent.mnt_dir)                                              \
     {                                                                 \
         ret = -PVFS_ENOMEM;                                           \
-        goto fail_mntent;                                             \
+        goto fail_downcall;                                           \
     }                                                                 \
                                                                       \
     gossip_debug(GOSSIP_CLIENT_DEBUG, "Using %s Point %s\n",          \
@@ -946,7 +946,7 @@ do {                                                                  \
         gossip_err("Configuration server MUST be of the form "        \
                    "protocol://address/fs_name\n");                   \
         ret = -PVFS_EINVAL;                                           \
-        goto fail_mntent;                                             \
+        goto fail_downcall;                                           \
     }                                                                 \
     *ptr = '\0';                                                      \
     ptr++;                                                            \
@@ -961,7 +961,7 @@ do {                                                                  \
     if (!mntent.pvfs_config_server)                                   \
     {                                                                 \
         ret = -PVFS_ENOMEM;                                           \
-        goto fail_mntent;                                             \
+        goto fail_downcall;                                           \
     }                                                                 \
                                                                       \
     gossip_debug(                                                     \
@@ -973,7 +973,7 @@ do {                                                                  \
     if (!mntent.pvfs_config_server)                                   \
     {                                                                 \
         ret = -PVFS_ENOMEM;                                           \
-        goto fail_mntent;                                             \
+        goto fail_downcall;                                           \
     }                                                                 \
                                                                       \
     gossip_debug(                                                     \
@@ -1055,7 +1055,6 @@ static int service_fs_mount_request(
             ret = 0;
         }
 
-      fail_mntent:
         PVFS_sys_free_mntent(&mntent);
     }
     return ret;
@@ -1065,7 +1064,7 @@ static int service_fs_umount_request(
     pvfs2_upcall_t *in_upcall,
     pvfs2_downcall_t *out_downcall)
 {
-    int ret = 1;
+    int ret = -PVFS_ENODEV;
     struct PVFS_sys_mntent mntent;
     char *ptr = NULL;
     char buf[PATH_MAX] = {0};
@@ -1090,6 +1089,7 @@ static int service_fs_umount_request(
 
         if (ret < 0)
         {
+          fail_downcall:
             gossip_err("Failed to umount via host %s\n",
                        in_upcall->req.fs_umount.pvfs2_config_server);
             PVFS_perror("UMOUNT failure", ret);
@@ -1107,7 +1107,6 @@ static int service_fs_umount_request(
             ret = 0;
         }
 
-      fail_mntent:
         PVFS_sys_free_mntent(&mntent);
     }
     return ret;
