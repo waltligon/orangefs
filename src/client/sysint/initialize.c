@@ -395,6 +395,7 @@ static int server_get_config(pvfs_mntlist mntent_list)
 	/* let go of any resources consumed by PINT_send_req() */
 	PINT_release_req(serv_addr, req_p, max_msg_sz, &decoded,
 	    &encoded_resp, op_tag);
+	free(req_p);
     }
 
     return(0); 
