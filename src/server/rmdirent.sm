@@ -361,7 +361,7 @@ static int rmdirent_send_bmi(PINT_server_op *s_op,
 			       PINT_ENCODE_RESP,
 			       &(s_op->encoded),
 			       s_op->addr,
-			       s_op->enc_type);
+			       s_op->decoded.enc_type);
     assert(job_post_ret == 0);
 
     job_post_ret = job_bmi_send_list(s_op->addr,
@@ -422,11 +422,11 @@ static int rmdirent_cleanup(PINT_server_op *s_op, job_status_s *ret)
     gossip_debug(SERVER_DEBUG, "rmdirent state: cleanup\n");
 
     /* free decoded, encoded requests */
-    PINT_decode_release(&(s_op->decoded), PINT_DECODE_REQ, 0);
+    PINT_decode_release(&(s_op->decoded), PINT_DECODE_REQ);
     free(s_op->unexp_bmi_buff.buffer);
     
     /* free original, encoded responses */
-    PINT_encode_release(&(s_op->encoded), PINT_ENCODE_RESP, 0);
+    PINT_encode_release(&(s_op->encoded), PINT_ENCODE_RESP);
     free(s_op->resp);
 
     /* free server operation structure */

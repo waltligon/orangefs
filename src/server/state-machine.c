@@ -89,8 +89,7 @@ int PINT_state_machine_initialize_unexpected(PINT_server_op *s_op,
 		PINT_ENCODE_REQ,
 		&s_op->decoded,
 		s_op->unexp_bmi_buff.addr,
-		s_op->unexp_bmi_buff.size,
-		&(s_op->enc_type));
+		s_op->unexp_bmi_buff.size);
 
     s_op->req  = (struct PVFS_server_req *) s_op->decoded.buffer;
     assert(s_op->req != NULL);

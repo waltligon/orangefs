@@ -49,30 +49,32 @@ int PINT_encode(
 		enum PINT_encode_msg_type input_type,
 		struct PINT_encoded_msg* target_msg,
 		bmi_addr_t target_addr,
-		int type
+		int32_t enc_type
 		)
 {
     int ret=0;
     target_msg->dest = target_addr;
-    if(type > -1 && type < ENCODING_TABLE_SIZE-1)
+    target_msg->enc_type = enc_type;
+
+    if(enc_type > -1 && enc_type < ENCODING_TABLE_SIZE-1)
     {
-	target_msg->type = type;
+	target_msg->enc_type = enc_type;
 	if (input_type == PINT_ENCODE_REQ)
 	{
-	    ret =  PINT_encoding_table[type]->op->encode_req(input_buffer,
+	    ret =  PINT_encoding_table[enc_type]->op->encode_req(input_buffer,
 							     target_msg,
 							     ENCODED_HEADER_SIZE);
 	}
 	else if(input_type == PINT_ENCODE_RESP)
 	{
-	    ret =  PINT_encoding_table[type]->op->encode_resp(input_buffer,
+	    ret =  PINT_encoding_table[enc_type]->op->encode_resp(input_buffer,
 							      target_msg,
 							      ENCODED_HEADER_SIZE);
 	}
     }
     if (ret != 0)
     {
-	target_msg->type = -EINVAL;
+	target_msg->enc_type = -EINVAL;
 	return -EINVAL;
     }
     /*(int *)(target_msg->buffer_list[target_msg->list_count])=type;*/
@@ -92,7 +94,6 @@ int PINT_encode(
  * target_msg   - pointer to struct PINT_decoded_msg, hold pointer to
  *                allocated memory holding decoded message, etc.
  * size         - size of encoded input
- * type_ptr     - *** I HAVE NO IDEA WHAT THIS IS FOR ***
  *
  * Notes:
  * - One must call PINT_decode_release(target_msg, input_type, 0)
@@ -106,17 +107,12 @@ int PINT_decode(
 		enum PINT_encode_msg_type input_type,
 		struct PINT_decoded_msg* target_msg,
 		bmi_addr_t target_addr,
-		PVFS_size size,
-		int *type_ptr
+		PVFS_size size
 		)
 {
-    int type;
-    type = 0;
-    /*
-    type = *((int *)(input_buffer+size-sizeof(int)));
-    if (type_ptr)
-	*type_ptr = type;
-    */
+    int32_t type = 0;
+
+    target_msg->enc_type = type;
     
     if(type > -1 && type < ENCODING_TABLE_SIZE-1)
     {
@@ -147,11 +143,10 @@ int PINT_decode(
  */
 void PINT_encode_release(
 			 struct PINT_encoded_msg* input_buffer,
-			 enum PINT_encode_msg_type input_type,
-			 int type
+			 enum PINT_encode_msg_type input_type
 			 )
 {
-    PINT_encoding_table[type]->op->encode_release(input_buffer,
+    PINT_encoding_table[input_buffer->enc_type]->op->encode_release(input_buffer,
 						  input_type);
 }
 
@@ -164,11 +159,10 @@ void PINT_encode_release(
  */
 void PINT_decode_release(
 			 struct PINT_decoded_msg* input_buffer,
-			 enum PINT_encode_msg_type input_type,
-			 int type
+			 enum PINT_encode_msg_type input_type
 			 )
 {
-    PINT_encoding_table[type]->op->decode_release(input_buffer,
+    PINT_encoding_table[input_buffer->enc_type]->op->decode_release(input_buffer,
 						  input_type);
 }
 

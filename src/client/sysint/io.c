@@ -645,7 +645,7 @@ static int io_req_ack_flow_array(bmi_addr_t* addr_array,
 	if(req_encoded_array[i].total_size)
 	{
 	    PINT_encode_release(&(req_encoded_array[i]),
-		PINT_ENCODE_REQ, REQ_ENC_FORMAT);
+		PINT_ENCODE_REQ);
 	}
     }
 
@@ -726,8 +726,7 @@ static int io_req_ack_flow_array(bmi_addr_t* addr_array,
 
 		ret = PINT_decode(resp_encoded_array[i], PINT_DECODE_RESP,
 		    &(resp_decoded_array[i]), addr_array[i],
-		    PINT_get_encoded_generic_ack_sz(0, PVFS_SERV_IO),
-		    NULL);
+		    PINT_get_encoded_generic_ack_sz(0, PVFS_SERV_IO));
 		if(ret < 0)
 		{
 		    error_code_array[i] = ret;
@@ -897,7 +896,7 @@ static void io_release_req_ack_flow_array(bmi_addr_t* addr_array,
 	if(resp_decoded_array[i].buffer)
 	{
 	    PINT_decode_release(&(resp_decoded_array[i]),
-		PINT_DECODE_RESP, REQ_ENC_FORMAT);
+		PINT_DECODE_RESP);
 	}
 	if(resp_encoded_array[i])
 	{

@@ -231,7 +231,7 @@ static int io_send_ack(PINT_server_op *s_op, job_status_s *ret)
 		PINT_ENCODE_RESP, 
 		&(s_op->encoded),
 		s_op->addr,
-		s_op->enc_type);
+		s_op->decoded.enc_type);
 
 	if(err < 0)
 	{
@@ -431,8 +431,7 @@ static int io_cleanup(PINT_server_op *s_op, job_status_s *ret)
 	 */
 	if(s_op->encoded.total_size)
 	{
-		PINT_encode_release(&s_op->encoded, PINT_ENCODE_RESP,
-			s_op->enc_type);
+		PINT_encode_release(&s_op->encoded, PINT_ENCODE_RESP);
 	}
 
 	/* let go of our non-encoded response buffer */
@@ -446,8 +445,7 @@ static int io_cleanup(PINT_server_op *s_op, job_status_s *ret)
 	{
 		PINT_decode_release(
 			&s_op->decoded,
-			PINT_ENCODE_REQ,
-			s_op->enc_type);
+			PINT_ENCODE_REQ);
 	}
 
 	/* let go of original, non-decoded request buffer */
@@ -506,7 +504,7 @@ static int io_send_completion_ack(PINT_server_op *s_op,
 		PINT_ENCODE_RESP, 
 		&(s_op->encoded),
 		s_op->addr,
-		s_op->enc_type);
+		s_op->decoded.enc_type);
 
 	if(err < 0)
 	{

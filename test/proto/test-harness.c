@@ -92,8 +92,7 @@ int main(int argc, char **argv)
 							PINT_ENCODE_RESP,
 							&decoded,
 							me,
-							encoded.total_size,
-							NULL);
+							encoded.total_size);
 
 #ifndef USE_BMI_MSGS
 	PINT_encode_release(&encoded,
@@ -193,8 +192,7 @@ int main(int argc, char **argv)
 							PINT_ENCODE_RESP,
 							&decoded,
 							me,
-							encoded.total_size,
-							NULL);
+							encoded.total_size);
 	RET_CHECK("Error in Decoding GetConfig Resp\n")
 	
 	if(((struct PVFS_server_resp *)decoded.buffer)->op != PVFS_SERV_GETCONFIG)
@@ -303,8 +301,7 @@ int main(int argc, char **argv)
 							PINT_ENCODE_RESP,
 							&decoded,
 							me,
-							encoded.total_size,
-							NULL);
+							encoded.total_size);
 	RET_CHECK("Error in Decoding Lookup Resp\n")
 	
 	if(((struct PVFS_server_resp *)decoded.buffer)->op != PVFS_SERV_LOOKUP_PATH)

@@ -179,7 +179,7 @@ int main(int argc, char **argv)	{
 	}
 
 	ret = PINT_decode(server_resp,PINT_ENCODE_RESP,
-                          &decoded_msg,server_addr,actual_size,NULL);
+                          &decoded_msg,server_addr,actual_size);
 	printf("Decoded response size: %d\n",(int)actual_size);
 	printf("\n---decoded_msg (server_resp) ---\n");
 	display_pvfs_structure(decoded_msg.buffer,0);

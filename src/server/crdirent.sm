@@ -640,7 +640,7 @@ static int crdirent_send_bmi(PINT_server_op *s_op,
 			       PINT_ENCODE_RESP,
 			       &(s_op->encoded),
 			       s_op->addr,
-			       s_op->enc_type);
+			       s_op->decoded.enc_type);
 
     assert(job_post_ret == 0);
 
@@ -709,11 +709,11 @@ static int crdirent_cleanup(PINT_server_op *s_op,
     gossip_debug(SERVER_DEBUG, "crdirent state: crdirent_cleanup\n");
 
     /* free decoded, encoded requests */
-    PINT_decode_release(&s_op->decoded, PINT_DECODE_REQ, 0);
+    PINT_decode_release(&s_op->decoded, PINT_DECODE_REQ);
     free(s_op->unexp_bmi_buff.buffer);
 
     /* free encoded, decoded responses */
-    PINT_encode_release(&s_op->encoded, PINT_ENCODE_RESP, 0);
+    PINT_encode_release(&s_op->encoded, PINT_ENCODE_RESP);
     free(s_op->resp);
 
     /* free server operation structure */

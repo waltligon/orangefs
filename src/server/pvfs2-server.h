@@ -88,7 +88,6 @@ struct PINT_server_io_op {
 typedef struct PINT_server_op
 {
     int op; /* op == req->op after initialize_unexpected */
-    int enc_type;
     job_id_t scheduled_id; /* holds id from request scheduler so we can release it later */
 
     PVFS_ds_keyval key, val; /* generic structures used in most server operations */

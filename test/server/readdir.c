@@ -180,7 +180,7 @@ int main(int argc, char **argv)	{
 			return(-1);
 		}
 	}
-	ret = PINT_decode(my_ack,PINT_ENCODE_RESP,&bar,server_addr,actual_size,NULL);
+	ret = PINT_decode(my_ack,PINT_ENCODE_RESP,&bar,server_addr,actual_size);
 	BMI_memfree(server_addr, my_ack, sizeof(struct PVFS_server_resp)+8192, 
 		BMI_RECV);
 	my_ack = bar.buffer;

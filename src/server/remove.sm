@@ -501,7 +501,7 @@ static int remove_send_response(PINT_server_op *s_op,
 			       PINT_ENCODE_RESP,
 			       &(s_op->encoded),
 			       s_op->addr,
-			       s_op->enc_type);
+			       s_op->decoded.enc_type);
     assert(job_post_ret == 0);
 
     job_post_ret = job_bmi_send_list(s_op->addr,
@@ -554,11 +554,11 @@ static int remove_cleanup(PINT_server_op *s_op,
     gossip_debug(SERVER_DEBUG, "(%p) remove state: cleanup\n", s_op);
 
     /* free decoded, encoded requests */
-    PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ,0);
+    PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ);
     free(s_op->unexp_bmi_buff.buffer);
 
     /* free encoded, original responses */
-    PINT_encode_release(&(s_op->encoded),PINT_ENCODE_RESP,0);
+    PINT_encode_release(&(s_op->encoded),PINT_ENCODE_RESP);
     free(s_op->resp);
 
     /* free server operation structure */

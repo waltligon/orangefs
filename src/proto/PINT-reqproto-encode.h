@@ -22,13 +22,14 @@ struct PINT_encoded_msg
     PVFS_size* size_list;		    /* size of buffers */
     int list_count;			    /* number of buffers */
     PVFS_size total_size;		    /* aggregate size of encoding */
-    int type;
+    int32_t enc_type;			    /* type of encoding that was used */
 };
 
 /* structure to describe messages that have been decoded */
 struct PINT_decoded_msg
 {
-    void* buffer;
+    void* buffer;	    /* decoded buffer */
+    int32_t enc_type;	    /* type of encoding that was used */
 };
 
 /* types of messages we will encode or decode */
@@ -56,7 +57,7 @@ int PINT_encode(
 		enum PINT_encode_msg_type input_type,
 		struct PINT_encoded_msg* target_msg,
 		bmi_addr_t target_addr,
-		int type
+		int32_t enc_type
 		);
 
 /* PINT_decode()
@@ -71,8 +72,7 @@ int PINT_decode(
 		enum PINT_encode_msg_type input_type,
 		struct PINT_decoded_msg* target_msg,
 		bmi_addr_t target_addr,
-		PVFS_size size,
-		int *type
+		PVFS_size size
 		);
 	
 /* PINT_encode_release()
@@ -84,8 +84,7 @@ int PINT_decode(
  */
 void PINT_encode_release(
 			 struct PINT_encoded_msg* msg,
-			 enum PINT_encode_msg_type input_type,
-			 int type
+			 enum PINT_encode_msg_type input_type
 			 );
 
 /* PINT_decode_release()
@@ -97,8 +96,7 @@ void PINT_encode_release(
  */
 void PINT_decode_release(
 			 struct PINT_decoded_msg* msg,
-			 enum PINT_encode_msg_type input_type,
-			 int type
+			 enum PINT_encode_msg_type input_type
 			 );
 
 /* PINT_get_encoded_generic_ack_sz(int type, int op)

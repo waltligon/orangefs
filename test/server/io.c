@@ -217,7 +217,7 @@ int main(int argc, char **argv)	{
 	}
 
 	/* release the encoded message */
-	PINT_encode_release(&encoded1, PINT_ENCODE_REQ, 0);
+	PINT_encode_release(&encoded1, PINT_ENCODE_REQ);
 
 	/* post a recv for the server acknowledgement */
 	ret = BMI_post_recv(&(client_ops[0]), server_addr, create_ack, 
@@ -261,8 +261,7 @@ int main(int argc, char **argv)	{
 		PINT_ENCODE_RESP,
 		&decoded1,
 		server_addr,
-		actual_size,
-		NULL);
+		actual_size);
 	if(ret < 0)
 	{
 		fprintf(stderr, "Error: PINT_decode() failure.\n");
@@ -369,7 +368,7 @@ int main(int argc, char **argv)	{
 	}
 
 	/* release the encoded message */
-	PINT_encode_release(&encoded2, PINT_ENCODE_REQ, 0);
+	PINT_encode_release(&encoded2, PINT_ENCODE_REQ);
 
 	/* post a recv for the server acknowledgement */
 	ret = BMI_post_recv(&(client_ops[0]), server_addr, my_ack, 
@@ -413,8 +412,7 @@ int main(int argc, char **argv)	{
 		PINT_ENCODE_RESP,
 		&decoded2,
 		server_addr,
-		actual_size,
-		NULL);
+		actual_size);
 	if(ret < 0)
 	{
 		fprintf(stderr, "Error: PINT_decode() failure.\n");
@@ -540,7 +538,7 @@ int main(int argc, char **argv)	{
 	}
 
 	/* release the encoded message */
-	PINT_encode_release(&encoded3, PINT_ENCODE_REQ, 0);
+	PINT_encode_release(&encoded3, PINT_ENCODE_REQ);
 
 	/* post a recv for the server acknowledgement */
 	ret = BMI_post_recv(&(client_ops[0]), server_addr, remove_ack, 
@@ -584,8 +582,7 @@ int main(int argc, char **argv)	{
 		PINT_ENCODE_RESP,
 		&decoded3,
 		server_addr,
-		actual_size,
-		NULL);
+		actual_size);
 	if(ret < 0)
 	{
 		fprintf(stderr, "Error: PINT_decode() failure.\n");
@@ -611,9 +608,9 @@ int main(int argc, char **argv)	{
 	 */
 
 	/* release the decoded buffers */
-	PINT_decode_release(&decoded1, PINT_ENCODE_RESP, 0);
-	PINT_decode_release(&decoded2, PINT_ENCODE_RESP, 0);
-	PINT_decode_release(&decoded3, PINT_ENCODE_RESP, 0);
+	PINT_decode_release(&decoded1, PINT_ENCODE_RESP);
+	PINT_decode_release(&decoded2, PINT_ENCODE_RESP);
+	PINT_decode_release(&decoded3, PINT_ENCODE_RESP);
 
 	PINT_flow_close_context(flow_context);
 	PINT_flow_finalize();

@@ -540,19 +540,16 @@ int main(int argc, char **argv)
 							PINT_ENCODE_REQ,
 							&decoded,
 							me,
-							actual_size,
-							NULL);
+							actual_size);
 	RET_CHECK("Error in Decoding Create Resp\n")
 
 	print_request( (struct PVFS_server_req *)decoded.buffer , 1 );
 
 	PINT_encode_release(	&encoded,
-				PINT_ENCODE_REQ,
-        			0);
+				PINT_ENCODE_REQ);
 
 	PINT_decode_release(	&decoded,
-				PINT_ENCODE_REQ,
-        			0);
+				PINT_ENCODE_REQ);
 #ifdef USE_BMI_MSGS
         BMI_memfree(me,
                                         bmi_resp,

@@ -220,7 +220,7 @@ static int create_send_bmi(PINT_server_op *s_op, job_status_s *ret)
 	    PINT_ENCODE_RESP,
 	    &(s_op->encoded),
 	    s_op->addr,
-	    s_op->enc_type);
+	    s_op->decoded.enc_type);
     assert(job_post_ret == 0);
 
 #ifndef PVFS2_SERVER_DEBUG_BMI
@@ -310,9 +310,9 @@ static int create_release_posted_job(PINT_server_op *s_op, job_status_s *ret)
 static int create_cleanup(PINT_server_op *s_op, job_status_s *ret)
 {
 
-    PINT_encode_release(&(s_op->encoded),PINT_ENCODE_RESP,0);
+    PINT_encode_release(&(s_op->encoded),PINT_ENCODE_RESP);
 
-    PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ,0);
+    PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ);
 
     if(s_op->resp)
     {

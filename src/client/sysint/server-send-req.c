@@ -160,8 +160,7 @@ int PINT_send_req(bmi_addr_t addr,
 	PINT_DECODE_RESP,
 	decoded_resp,
 	addr,
-	tmp_status.actual_size,
-	NULL);
+	tmp_status.actual_size);
     if (ret < 0)
     {
 	goto send_req_out;
@@ -173,8 +172,7 @@ send_req_out:
 
     PINT_encode_release(
 	&encoded_req, 
-	PINT_ENCODE_REQ,
-	REQ_ENC_FORMAT);
+	PINT_ENCODE_REQ);
 
     /* cleanup the encoded buffer if we are returning error;
      * otherwise the caller is responsible for doing it with
@@ -208,8 +206,7 @@ void PINT_release_req(bmi_addr_t addr,
 
     PINT_decode_release(
 	decoded_resp,
-	PINT_DECODE_RESP,
-	REQ_ENC_FORMAT);
+	PINT_DECODE_RESP);
 
     BMI_memfree(addr, *encoded_resp, max_resp_size,
 	BMI_RECV);
@@ -355,7 +352,7 @@ int PINT_send_req_array(bmi_addr_t* addr_array,
 	if(req_encoded_array[i].total_size)
 	{
 	    PINT_encode_release(&(req_encoded_array[i]),
-		PINT_ENCODE_REQ, REQ_ENC_FORMAT);
+		PINT_ENCODE_REQ);
 	}
     }
 
@@ -449,7 +446,7 @@ int PINT_send_req_array(bmi_addr_t* addr_array,
 	{
 	    ret = PINT_decode(resp_encoded_array[i], PINT_DECODE_RESP,
 		&(resp_decoded_array[i]), addr_array[i],
-		max_resp_size, NULL);
+		max_resp_size);
 	    if(ret < 0)
 	    {
 		error_code_array[i] = ret;
@@ -498,7 +495,7 @@ void PINT_release_req_array(bmi_addr_t* addr_array,
 	if(resp_decoded_array[i].buffer)
 	{
 	    PINT_decode_release(&(resp_decoded_array[i]),
-		PINT_DECODE_RESP, REQ_ENC_FORMAT);
+		PINT_DECODE_RESP);
 	}
 	if(resp_encoded_array[i])
 	{
@@ -642,7 +639,7 @@ int PINT_recv_ack_array(bmi_addr_t* addr_array,
 	{
 	    ret = PINT_decode(resp_encoded_array[i], PINT_DECODE_RESP,
 		&(resp_decoded_array[i]), addr_array[i],
-		max_resp_size, NULL);
+		max_resp_size);
 	    if(ret < 0)
 	    {
 		error_code_array[i] = ret;
@@ -689,7 +686,7 @@ void PINT_release_ack_array(bmi_addr_t* addr_array,
 	if(resp_decoded_array[i].buffer)
 	{
 	    PINT_decode_release(&(resp_decoded_array[i]),
-		PINT_DECODE_RESP, REQ_ENC_FORMAT);
+		PINT_DECODE_RESP);
 	}
 	if(resp_encoded_array[i])
 	{

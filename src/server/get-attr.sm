@@ -439,7 +439,7 @@ static int getattr_send_bmi(PINT_server_op *s_op, job_status_s *ret)
 			       PINT_ENCODE_RESP,
 			       &(s_op->encoded),
 			       s_op->addr,
-			       s_op->enc_type);
+			       s_op->decoded.enc_type);
 
     assert(job_post_ret == 0);
 
@@ -533,11 +533,11 @@ static int getattr_cleanup(PINT_server_op *s_op, job_status_s *ret)
     gossip_debug(SERVER_DEBUG, "getattr state: cleanup\n");
 
     /* free decoded, encoded requests */
-    PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ,0);
+    PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ);
     free(s_op->unexp_bmi_buff.buffer);
 
     /* free encoded response */
-    PINT_encode_release(&(s_op->encoded),PINT_ENCODE_RESP,0);
+    PINT_encode_release(&(s_op->encoded),PINT_ENCODE_RESP);
 
     /* if this is a metafile, we allocated space for the datafile handles; free that. */
     if (s_op->resp->u.getattr.attr.objtype == PVFS_TYPE_METAFILE) {
