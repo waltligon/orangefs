@@ -714,77 +714,91 @@ PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
 int PINT_Request_commit(PINT_Request *region, PINT_Request *node)
 {
 	int32_t index = 0;
-	return PINT_Do_Request_commit(region, node, &index, 0);
+	PINT_Do_Request_commit(region, node, &index, 0);
+	return 0;
 }
 
-int PINT_Do_clear_commit(PINT_Request *node)
+int PINT_Do_clear_commit(PINT_Request *node, int32_t depth)
 {
 	if (node == NULL)
 		return -1;
 
-	if (!node->committed)
+	if (!node->committed && depth > 0)
 		return 0;
 	
-	PINT_Do_clear_commit(node->ereq);
-	PINT_Do_clear_commit(node->sreq);
 	node->committed = 0;
+
+	if (node->ereq)
+	{
+		PINT_Do_clear_commit(node->ereq, depth+1);
+	}
+	if (node->sreq)
+	{
+		PINT_Do_clear_commit(node->sreq, depth+1);
+	}
 	return 0;
 }
 
-int PINT_Do_Request_commit(PINT_Request *region, PINT_Request *node,
+PINT_Request *PINT_Do_Request_commit(PINT_Request *region, PINT_Request *node,
 		int32_t *index, int32_t depth)
 {
-	int32_t start_index = *index;
-	int32_t child_index;
-
 	/* Leaf Node? */
 	if(node == NULL)
-		return -1;
+		return NULL;
   
 	gossip_debug(REQUEST_DEBUG,"commit node %p\n", node);
+
+	/* catches any previously packed structures */
+	if (node->committed == -1)
+	{
+		node->committed = 0;
+	}
 
 	/* this node was previously committed */
 	if (node->committed)
 	{
 		gossip_debug(REQUEST_DEBUG,"previously commited %d\n", node->committed);
-		return node->committed; /* should contain the index */
+		return &region[node->committed]; /* should contain the index */
 	}
 
 	/* Copy node to contiguous region */
 	gossip_debug(REQUEST_DEBUG,"node stored at %d\n", *index);
 	memcpy(&region[*index], node, sizeof(struct PINT_Request));
+	node->committed = *index;
 	*index = *index + 1;
 
 	/* Update ereq so that the relative positions are maintained */
-	child_index = PINT_Do_Request_commit(region, node->ereq, index, depth+1);
-	gossip_debug(REQUEST_DEBUG,"child at %d\n", child_index);
-	if (child_index == -1)
-		region[start_index].ereq = NULL;
-	else
-		region[start_index].ereq = &region[child_index];
-
-	/* prevents re-packing of the ereq */
 	if (node->ereq)
-		node->ereq->committed = child_index;
+	{
+		region[node->committed].ereq =
+				PINT_Do_Request_commit(region, node->ereq, index, depth+1);
+	}
+	else
+	{
+		region[node->committed].ereq = NULL;
+	}
 
 	/* Update sreq so that the relative positions are maintained */
-	child_index = PINT_Do_Request_commit(region, node->sreq, index, depth+1);
-	gossip_debug(REQUEST_DEBUG,"sibling at %d\n", child_index);
-	if (child_index == -1)
-		region[start_index].sreq = NULL;
+	if (node->sreq)
+	{
+		region[node->committed].sreq =
+				PINT_Do_Request_commit(region, node->sreq, index, depth+1);
+	}
 	else
-		region[start_index].sreq = &region[child_index];
+	{
+		region[node->committed].sreq = NULL;
+	}
 
 	if (depth == 0)
 	{
 		gossip_debug(REQUEST_DEBUG,"clearing tree\n");
-		PINT_Do_clear_commit(node);
+		PINT_Do_clear_commit(node, 0);
 		/* this indicates the region is packed */
 		region->committed = -1;
 	}
 
 	/* Return the index of the committed struct */ 
-	return start_index; 
+	return &region[node->committed]; 
 }
 
 /* This function converts pointers to array indexes for transport

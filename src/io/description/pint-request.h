@@ -124,9 +124,9 @@ PVFS_size PINT_Distribute(PVFS_offset offset,
 
 /* pack request from node into a contiguous buffer pointed to by region */
 int PINT_Request_commit(PINT_Request *region, PINT_Request *node);
-int PINT_Do_Request_commit(PINT_Request *region, PINT_Request *node,
+PINT_Request *PINT_Do_Request_commit(PINT_Request *region, PINT_Request *node,
 		int32_t *index, int32_t depth);
-int PINT_Do_clear_commit(PINT_Request *node);
+int PINT_Do_clear_commit(PINT_Request *node, int32_t depth);
 
 /* encode packed request in place for sending over wire */
 int PINT_Request_encode(struct PINT_Request *req);
