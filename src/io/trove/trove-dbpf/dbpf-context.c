@@ -14,7 +14,9 @@ dbpf_op_queue_p dbpf_completion_queue_array[TROVE_MAX_CONTEXTS] = {NULL};
 
 int dbpf_open_context(TROVE_context_id *context_id)
 {
-    int context_index;
+    int context_index = 0;
+
+    assert(context_id);
 
     gen_mutex_lock(&dbpf_context_mutex);
 

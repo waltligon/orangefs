@@ -281,6 +281,16 @@ struct TROVE_dspace_ops
 			   TROVE_vtag_s *vtag_array,
 			   void **returned_user_ptr_array,
 			   TROVE_ds_state *out_state_array);
+
+    /* TODO: replace 'testsome' with this.  this is the future */
+    int (*dspace_testcontext)(
+			      TROVE_coll_id coll_id,
+			      TROVE_op_id *ds_id_array,
+			      int *inout_count_p,
+			      TROVE_ds_state *state_array,
+			      void** user_ptr_array,
+			      int max_idle_time_ms,
+			      TROVE_context_id context_id);
 };
 
 struct TROVE_mgmt_ops

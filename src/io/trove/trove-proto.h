@@ -313,6 +313,15 @@ int trove_dspace_testsome(
 			  void **returned_user_ptr_array,
 			  TROVE_ds_state *state_array);
 
+int trove_dspace_testcontext(
+			     TROVE_coll_id coll_id,
+			     TROVE_op_id *ds_id_array,
+			     int *inout_count_p,
+			     TROVE_ds_state *state_array,
+			     void** user_ptr_array,
+			     int max_idle_time_ms,
+			     TROVE_context_id context_id);
+
 int trove_collection_geteattr(
 			      TROVE_coll_id coll_id,
 			      TROVE_keyval_s *key_p,

@@ -112,7 +112,8 @@ CFLAGS += $(patsubst %, -I $(srcdir)/%, $(MODULES))
 # Setup component specific flags
 
 # the server will use a threaded job library 
-SERVERCFLAGS = -D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__
+SERVERCFLAGS = -D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__ \
+-D__PVFS2_TROVE_THREADED__
 SERVERLIBS = @LIBS@ -ldb -lrt -lpthread
 # the client libraries are not threaded (at the moment at least)
 #    and therefore can disable locking in the I/O subsystems

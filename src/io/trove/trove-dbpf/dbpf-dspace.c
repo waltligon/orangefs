@@ -19,6 +19,7 @@
 #include "trove-ledger.h"
 #include "trove-handle-mgmt.h"
 #include "dbpf.h"
+#include "dbpf-thread.h"
 #include "dbpf-dspace.h"
 #include "dbpf-bstream.h"
 #include "dbpf-keyval.h"
@@ -43,7 +44,7 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
 			      TROVE_handle_extent_array *extent_array,
 			      TROVE_handle *handle_p,
 			      TROVE_ds_type type,
-			      TROVE_keyval_s *hint, /* TODO: What is this? */
+			      TROVE_keyval_s *hint,
 			      TROVE_ds_flags flags,
 			      void *user_ptr,
 			      TROVE_context_id context_id,
@@ -973,44 +974,59 @@ static int dbpf_dspace_test(TROVE_coll_id coll_id,
     return 0;
 }
 
+int dbpf_dspace_testcontext(
+    TROVE_op_id *ds_id_array,
+    int *inout_count_p,
+    TROVE_ds_state *state_array,
+    void** user_ptr_array,
+    int max_idle_time_ms,
+    TROVE_context_id context_id)
+{
+    int ret = 0;
+
+
+    return ret;
+}
+
 /* dbpf_dspace_testsome()
  *
  * Returns 0 if nothing completed, 1 if something is completed (successfully
  * or with error).
  *
- * The error state of the completed operation is returned via the state_p,
- * more to follow on this...
- *
+ * The error state of the completed operation is returned via the state_p.
  */
 static int dbpf_dspace_testsome(
-				TROVE_coll_id coll_id,
-			        TROVE_context_id context_id,
-				TROVE_op_id *ds_id_array,
-				int *inout_count_p,
-				int *out_index_array,
-				TROVE_vtag_s *vtag_array,
-				void **returned_user_ptr_array,
-				TROVE_ds_state *state_array
-				)
+    TROVE_coll_id coll_id,
+    TROVE_context_id context_id,
+    TROVE_op_id *ds_id_array,
+    int *inout_count_p,
+    int *out_index_array,
+    TROVE_vtag_s *vtag_array,
+    void **returned_user_ptr_array,
+    TROVE_ds_state *state_array)
 {
     int i, out_count = 0, ret, tmp_count;
 
-    for (i=0; i < *inout_count_p; i++) {
-	ret = dbpf_dspace_test(coll_id,
-			       ds_id_array[i],
-			       context_id,
-			       &tmp_count,
-			       &vtag_array[i], /* TODO: this doesn't seem right! */
-			       (returned_user_ptr_array != NULL) ?  &returned_user_ptr_array[out_count] : NULL,
-			       &state_array[out_count]);
-	
-	if (ret != 0) {
+    for (i=0; i < *inout_count_p; i++)
+    {
+	ret = dbpf_dspace_test(
+            coll_id,
+            ds_id_array[i],
+            context_id,
+            &tmp_count,
+            &vtag_array[i],
+            ((returned_user_ptr_array != NULL) ?
+             &returned_user_ptr_array[out_count] : NULL),
+            &state_array[out_count]);
+
+	if (ret != 0)
+        {
 	    /* operation is done and we are telling the caller;
 	     * ok to pull off queue now.
 	     */
 	    out_index_array[out_count] = i;
 	    out_count++;
-	}    
+	}
     }
 
     *inout_count_p = out_count;

@@ -11,6 +11,7 @@ LIBSRC += \
         $(DIR)/dbpf-context.c \
 	$(DIR)/dbpf-op.c \
 	$(DIR)/dbpf-op-queue.c \
+	$(DIR)/dbpf-thread.c \
 	$(DIR)/dbpf-error.c \
 	$(DIR)/dbpf-mgmt.c
 SERVERSRC += \
@@ -25,5 +26,6 @@ SERVERSRC += \
         $(DIR)/dbpf-context.c \
 	$(DIR)/dbpf-op.c \
 	$(DIR)/dbpf-op-queue.c \
+	$(DIR)/dbpf-thread.c \
 	$(DIR)/dbpf-error.c \
 	$(DIR)/dbpf-mgmt.c

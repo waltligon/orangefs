@@ -26,6 +26,7 @@
 #include "dbpf-bstream.h"
 #include "dbpf-keyval.h"
 #include "dbpf-dspace.h"
+#include "dbpf-thread.h"
 #include "trove-ledger.h"
 #include "trove-handle-mgmt.h"
 
@@ -159,7 +160,6 @@ static int dbpf_collection_geteattr(TROVE_coll_id coll_id,
 
 /* dbpf_initialize()
  *
- * TODO: what's the method_id good for?
  */
 static int dbpf_initialize(char *stoname,
 			   TROVE_ds_flags flags,
@@ -187,8 +187,8 @@ static int dbpf_initialize(char *stoname,
     dbpf_dspace_dbcache_initialize();
     dbpf_bstream_fdcache_initialize();
     dbpf_keyval_dbcache_initialize();
-    
-    return 1;
+
+    return dbpf_thread_initialize();
 }
 
 /* dbpf_finalize()
@@ -198,6 +198,8 @@ static int dbpf_finalize(void)
     int ret;
 
     dbpf_method_id = -1;
+
+    dbpf_thread_finalize();
 
     /* TODO: clean up all internally allocated structures */
 
