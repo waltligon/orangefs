@@ -25,12 +25,13 @@ typedef int32_t PVFS_coll_id;
 typedef int32_t PVFS_ds_type;
 
 /* PVFS object types; "other" is used for misc. stuff (e.g. directory dirent space) */
-enum {
-    PVFS_TYPE_METAFILE  = 128,
-    PVFS_TYPE_DATAFILE  = 256,
+enum
+{
+    PVFS_TYPE_METAFILE = 128,
+    PVFS_TYPE_DATAFILE = 256,
     PVFS_TYPE_DIRECTORY = 512,
-    PVFS_TYPE_SYMLINK   = 1024,
-    PVFS_TYPE_DIRDATA   = 8192
+    PVFS_TYPE_SYMLINK = 1024,
+    PVFS_TYPE_DIRDATA = 8192
 };
 
 /* unique identifiers associated with dataspace operations */
@@ -44,10 +45,11 @@ typedef int32_t PVFS_ds_flags;
 
 /* Bit values of flags for various dspace operations */
 /* TODO: do we use a flag to get a vtag back or do we use VTAG_RETURN? */
-enum {
-    DSPACE_SYNC = 1, /* sync storage on completion of operation */
-    DSPACE_PREALLOC = 2, /* preallocate space (for resize op only) */
-    DSPACE_CALC_VTAG = 4, /* calculate and return a vtag (?) */
+enum
+{
+    DSPACE_SYNC = 1,		/* sync storage on completion of operation */
+    DSPACE_PREALLOC = 2,	/* preallocate space (for resize op only) */
+    DSPACE_CALC_VTAG = 4,	/* calculate and return a vtag (?) */
 };
 
 /* used to keep up with the current position when iterating through
@@ -58,7 +60,7 @@ typedef int32_t PVFS_ds_position;
 /* vtag */
 struct PVFS_vtag
 {
-    int foo; /* TODO: we haven't defined what vtags look like yet */
+    int foo;			/* TODO: we haven't defined what vtags look like yet */
 };
 typedef struct PVFS_vtag PVFS_vtag_s;
 
@@ -72,16 +74,16 @@ typedef struct PVFS_vtag PVFS_vtag_s;
  */
 struct PVFS_ds_attributes
 {
-    PVFS_fs_id fs_id; /* REQUIRED */
-    PVFS_handle handle; /* REQUIRED */
-    PVFS_type type; /* REQUIRED */
+    PVFS_fs_id fs_id;		/* REQUIRED */
+    PVFS_handle handle;		/* REQUIRED */
+    PVFS_type type;		/* REQUIRED */
     PVFS_uid uid;
     PVFS_gid gid;
     PVFS_permissions mode;
     PVFS_time ctime;
     /* NOTE: PUT NON-STORED AT THE BOTTOM!!! */
-    PVFS_size b_size; /* bstream size */
-    PVFS_size k_size; /* keyval size; # of keys */
+    PVFS_size b_size;		/* bstream size */
+    PVFS_size k_size;		/* keyval size; # of keys */
 };
 typedef struct PVFS_ds_attributes PVFS_ds_attributes_s;
 
@@ -114,11 +116,13 @@ do {									\
 struct PVFS_ds_keyval
 {
     /* TODO: not really defined yet */
-    void   *buffer;
-    int32_t buffer_sz; /* size of memory region pointed to by buffer */
-    int32_t read_sz; /* size of data read into buffer (only valid after a read) */
+    void *buffer;
+    int32_t buffer_sz;		/* size of memory region pointed to by buffer */
+    int32_t read_sz;		/* size of data read into buffer (only valid after a read) */
 };
 typedef struct PVFS_ds_keyval PVFS_ds_keyval_s;
+
+#endif /* __PVFS2_STORAGE_H */
 
 /*
  * Local variables:
@@ -128,5 +132,3 @@ typedef struct PVFS_ds_keyval PVFS_ds_keyval_s;
  *
  * vim: ts=8 sts=4 sw=4 noexpandtab
  */
-
-#endif /* __PVFS2_STORAGE_H */

@@ -12,31 +12,31 @@
 #include <stdint.h>
 #include <time.h>
 
-typedef char    *PVFS_string;
-typedef uint8_t  PVFS_boolean;
-typedef int64_t  PVFS_offset;
-typedef int64_t  PVFS_size;
+typedef char *PVFS_string;
+typedef uint8_t PVFS_boolean;
+typedef int64_t PVFS_offset;
+typedef int64_t PVFS_size;
 typedef uint32_t PVFS_bitfield;
-typedef int32_t  PVFS_flag;
-typedef int32_t  PVFS_count32;
-typedef int64_t  PVFS_count64;
+typedef int32_t PVFS_flag;
+typedef int32_t PVFS_count32;
+typedef int64_t PVFS_count64;
 typedef uint64_t PVFS_volume_id;
 typedef uint64_t PVFS_flow_id;
-typedef int64_t  PVFS_handle;
-typedef int16_t  PVFS_type;
-typedef int32_t  PVFS_fs_id;
-typedef int32_t  PVFS_error;
-typedef int32_t  PVFS_magic;
+typedef int64_t PVFS_handle;
+typedef int16_t PVFS_type;
+typedef int32_t PVFS_fs_id;
+typedef int32_t PVFS_error;
+typedef int32_t PVFS_magic;
 typedef uint32_t PVFS_uid;
 typedef uint32_t PVFS_gid;
 typedef uint32_t PVFS_permissions;
-typedef int64_t  PVFS_token;
-typedef time_t   PVFS_time; /* TODO: is this really a good idea? */
-typedef int32_t  PVFS_msg_tag_t;
-typedef int32_t  PVFS_context_id;
+typedef int64_t PVFS_token;
+typedef time_t PVFS_time;	/* TODO: is this really a good idea? */
+typedef int32_t PVFS_msg_tag_t;
+typedef int32_t PVFS_context_id;
 
-#define PVFS_NAME_MAX    256 /* Max length of PVFS filename */
-#define PVFS_TOKEN_START 0 /* Token value for readdir */
+#define PVFS_NAME_MAX    256	/* Max length of PVFS filename */
+#define PVFS_TOKEN_START 0	/* Token value for readdir */
 #define PVFS_TOKEN_END   1
 #define MAX_STRING_SIZE  1000
 
@@ -45,26 +45,30 @@ typedef struct
 {
     int64_t handle;		/* unique identifier per PVFS2 file */
     PVFS_fs_id fs_id;		/* Filesystem ID */
-} pinode_reference;
+}
+pinode_reference;
 
 /* PVFS directory entry */
-struct PVFS_dirent_s {
-    /*pinode_number pinode_no;*/
+struct PVFS_dirent_s
+{
+    /*pinode_number pinode_no; */
     char d_name[PVFS_NAME_MAX + 1];
-     PVFS_handle handle;
+    PVFS_handle handle;
     /* something about how to get to the next one ? */
 };
 typedef struct PVFS_dirent_s PVFS_dirent;
 
 /* PVFS_credentials structure */
-struct PVFS_credentials_s {
+struct PVFS_credentials_s
+{
     PVFS_uid uid;
     PVFS_gid gid;
     PVFS_permissions perms;
 };
 typedef struct PVFS_credentials_s PVFS_credentials;
 
-struct extent {
+struct extent
+{
     int64_t first;
     int64_t last;
 };
@@ -76,19 +80,20 @@ typedef struct extent PVFS_extent;
  */
 
 /* TODO: this should probably be prototyped somewhere else? */
-void PVFS_perror(char* text, int retcode);
+void PVFS_perror(char *text,
+		 int retcode);
 
 /* 7 bits are used for the error code */
 #define PVFS_ERROR_CODE(__error)  ((__error) &   (int32_t) 0x7f)
 #define PVFS_ERROR_CLASS(__error) ((__error) & ~((int32_t) 0x7f))
 
-#define PVFS_ERROR_BMI    (1 << 7) /* BMI-specific error (e.g. socket got closed ) */
-#define PVFS_ERROR_TROVE  (2 << 7) /* Trove-specific error (e.g. no space on device) */
+#define PVFS_ERROR_BMI    (1 << 7)	/* BMI-specific error (e.g. socket got closed ) */
+#define PVFS_ERROR_TROVE  (2 << 7)	/* Trove-specific error (e.g. no space on device) */
 #define PVFS_ERROR_FLOW   (3 << 7)
-#define PVFS_ERROR_SM     (4 << 7) /* state machine specific error */
+#define PVFS_ERROR_SM     (4 << 7)	/* state machine specific error */
 #define PVFS_ERROR_SCHED  (5 << 7)
 #define PVFS_ERROR_CLIENT (6 << 7)
-#define PVFS_ERROR_FS     (7 << 7) /* general file system semantics error (e.g. no such file) */
+#define PVFS_ERROR_FS     (7 << 7)	/* general file system semantics error (e.g. no such file) */
 
 /* PVFS_ERROR_TO_ERRNO - macro for mapping from a PVFS error value
  * to a local UNIX errno value
@@ -167,6 +172,8 @@ extern int32_t PINT_errno_mapping[];
 
 #define PVFS_ERRNO_MAX          60
 
+#endif /* __PVFS2_TYPES_H */
+
 /*
  * Local variables:
  *  c-indent-level: 4
@@ -175,5 +182,3 @@ extern int32_t PINT_errno_mapping[];
  *
  * vim: ts=8 sts=4 sw=4 noexpandtab
  */
-
-#endif /* __PVFS2_TYPES_H */
