@@ -252,6 +252,21 @@ struct PVFS_servreq_rmdirent
     PVFS_fs_id fs_id;		    /* file system */
 };
 
+#define PINT_SERVREQ_RMDIRENT_FILL(__req,		\
+				   __creds,		\
+				   __fsid,		\
+				   __handle,		\
+				   __entry)		\
+do {							\
+    memset(&(__req), 0, sizeof(__req));			\
+    (__req).op = PVFS_SERV_RMDIRENT;			\
+    (__req).credentials = (__creds);			\
+    (__req).u.rmdirent.fs_id = (__fsid);		\
+    (__req).u.rmdirent.parent_handle = (__handle);	\
+    (__req).u.rmdirent.entry = (__entry);	       	\
+} while (0);
+
+
 struct PVFS_servresp_rmdirent
 {
     PVFS_handle entry_handle;	    /* handle of removed entry */

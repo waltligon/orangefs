@@ -57,6 +57,20 @@ static int remove_datafile_remove_failure(PINT_client_sm *sm_p,
 static int remove_recv_datafile_remove_resp(PINT_client_sm *sm_p,
 					    job_status_s *js_p);
 
+static int remove_post_rmdirent_sendrecv(PINT_client_sm *sm_p,
+					 job_status_s *js_p);
+static int remove_rmdirent_failure(PINT_client_sm *sm_p,
+				   job_status_s *js_p);
+static int remove_recv_rmdirent_resp(PINT_client_sm *sm_p,
+				     job_status_s *js_p);
+
+static int remove_post_object_remove_sendrecv(PINT_client_sm *sm_p,
+					      job_status_s *js_p);
+static int remove_object_remove_failure(PINT_client_sm *sm_p,
+					job_status_s *js_p);
+static int remove_recv_object_remove_resp(PINT_client_sm *sm_p,
+					  job_status_s *js_p);
+
 static int remove_cleanup(PINT_client_sm *sm_p,
 			  job_status_s *js_p);
 
@@ -80,7 +94,13 @@ machine pvfs2_client_remove_sm(init,
 			       recv_getattr_resp,
 			       post_datafile_remove_sendrecv,
 			       datafile_remove_failure,
-			       recv_datafile_remove_resp)
+			       recv_datafile_remove_resp,
+			       post_rmdirent_sendrecv,
+			       rmdirent_failure,
+			       recv_rmdirent_resp,
+			       post_object_remove_sendrecv,
+			       object_remove_failure,
+			       recv_object_remove_resp)
 {
     state init
 	{
@@ -106,7 +126,7 @@ machine pvfs2_client_remove_sm(init,
     state recv_lookup_resp
 	{
 	    run remove_recv_lookup_resp;
-	    success => post_getattr_sendrecv;
+	    success => post_rmdirent_sendrecv;
 	    default => cleanup;
 	}
 
@@ -127,7 +147,27 @@ machine pvfs2_client_remove_sm(init,
 	{
 	    run remove_recv_getattr_resp;
 	    REMOVE_MUST_REMOVE_DATAFILES => post_datafile_remove_sendrecv;
+	    success => post_object_remove_sendrecv;
 	    default => cleanup;
+	}
+
+    state post_rmdirent_sendrecv
+	{
+	    run remove_post_rmdirent_sendrecv;
+	    success => recv_rmdirent_resp;
+	    default => rmdirent_failure;
+	}
+
+    state rmdirent_failure
+	{
+	    run remove_rmdirent_failure;
+	    default => cleanup;
+	}
+
+    state recv_rmdirent_resp
+	{
+	    run remove_recv_rmdirent_resp;
+	    default => post_getattr_sendrecv;
 	}
 
     state post_datafile_remove_sendrecv
@@ -146,6 +186,25 @@ machine pvfs2_client_remove_sm(init,
     state recv_datafile_remove_resp
 	{
 	    run remove_recv_datafile_remove_resp;
+	    default => post_object_remove_sendrecv;
+	}
+
+    state post_object_remove_sendrecv
+	{
+	    run remove_post_object_remove_sendrecv;
+	    success => recv_object_remove_resp;
+	    default => object_remove_failure;
+	}
+
+    state object_remove_failure
+	{
+	    run remove_object_remove_failure;
+	    default => cleanup;
+	}
+
+    state recv_object_remove_resp
+	{
+	    run remove_recv_object_remove_resp;
 	    default => cleanup;
 	}
 
@@ -290,16 +349,16 @@ int PVFS_sys_remove2(char *object_name,
     return 0;
 }
 
-/* PINT_serv_prepare_reqresp()
+/* PINT_serv_prepare_msgpair()
  *
  * TODO: cache some values locally and assign at the end.
  */
-static int PINT_serv_prepare_reqresp(PVFS_pinode_reference object_ref,
+static int PINT_serv_prepare_msgpair(PVFS_pinode_reference object_ref,
 				     struct PVFS_server_req *req_p,
 				     struct PINT_encoded_msg *encoded_req_out_p,
 				     void **encoded_resp_out_pp,
 				     bmi_addr_t *svr_addr_p,
-				     int *max_msg_sz_out_p,
+				     int *max_resp_sz_out_p,
 				     PVFS_msg_tag_t *session_tag_out_p)
 {
     int ret;
@@ -325,12 +384,12 @@ static int PINT_serv_prepare_reqresp(PVFS_pinode_reference object_ref,
     }
 
     /* calculate maximum response message size and allocate space */
-    *max_msg_sz_out_p = PINT_encode_calc_max_size(PINT_ENCODE_RESP,
+    *max_resp_sz_out_p = PINT_encode_calc_max_size(PINT_ENCODE_RESP,
 						  req_p->op,
 						  PINT_CLIENT_ENC_TYPE);
 
     *encoded_resp_out_pp = BMI_memalloc(*svr_addr_p,
-					*max_msg_sz_out_p,
+					*max_resp_sz_out_p,
 					BMI_RECV);
     if (*encoded_resp_out_pp == NULL) {
 	assert(0);
@@ -366,11 +425,11 @@ static int PINT_serv_decode_resp(void *encoded_resp_p,
     return 0;
 }
 
-static int PINT_serv_free_reqresp_resources(struct PINT_encoded_msg *encoded_req_p,
+static int PINT_serv_free_msgpair_resources(struct PINT_encoded_msg *encoded_req_p,
 					    void *encoded_resp_p,
 					    struct PINT_decoded_msg *decoded_resp_p,
 					    bmi_addr_t *svr_addr_p,
-					    int max_msg_sz)
+					    int max_resp_sz)
 {
     PINT_encode_release(encoded_req_p,
 			PINT_ENCODE_REQ);
@@ -382,7 +441,7 @@ static int PINT_serv_free_reqresp_resources(struct PINT_encoded_msg *encoded_req
 
     BMI_memfree(*svr_addr_p,
 		encoded_resp_p,
-		max_msg_sz,
+		max_resp_sz,
 		BMI_RECV);
 
     return 0;
@@ -509,12 +568,12 @@ static int remove_post_lookup_sendrecv(PINT_client_sm *sm_p,
      * - allocates memory for that response
      * - gets a session tag
      */
-    ret = PINT_serv_prepare_reqresp(sm_p->u.remove.parent_ref,
+    ret = PINT_serv_prepare_msgpair(sm_p->u.remove.parent_ref,
 				    &sm_p->req,
 				    &sm_p->encoded_req,
 				    &sm_p->encoded_resp_p,
 				    &sm_p->svr_addr,
-				    &sm_p->max_msg_sz,
+				    &sm_p->max_resp_sz,
 				    &session_tag);
     if (ret != 0) {
 	assert(0);
@@ -523,7 +582,7 @@ static int remove_post_lookup_sendrecv(PINT_client_sm *sm_p,
     /* post receive of response */
     ret = job_bmi_recv(sm_p->svr_addr,
 		       sm_p->encoded_resp_p,
-		       sm_p->max_msg_sz,
+		       sm_p->max_resp_sz,
 		       session_tag,
 		       BMI_PRE_ALLOC,
 		       sm_p, /* user pointer -- used to get to next state */
@@ -619,11 +678,11 @@ static int remove_recv_lookup_resp(PINT_client_sm *sm_p,
 		 sm_p->u.remove.object_ref.handle);
 
     /* free all the resources that we used to send and receive. */
-    ret = PINT_serv_free_reqresp_resources(&sm_p->encoded_req,
+    ret = PINT_serv_free_msgpair_resources(&sm_p->encoded_req,
 					   sm_p->encoded_resp_p,
 					   &decoded_resp,
 					   &sm_p->svr_addr,
-					   sm_p->max_msg_sz);
+					   sm_p->max_resp_sz);
     if (ret != 0) {
 	assert(0);
     }
@@ -672,12 +731,12 @@ static int remove_post_getattr_sendrecv(PINT_client_sm *sm_p,
      * - allocates memory for that response
      * - gets a session tag
      */
-    ret = PINT_serv_prepare_reqresp(sm_p->u.remove.parent_ref,
+    ret = PINT_serv_prepare_msgpair(sm_p->u.remove.parent_ref,
 				    &sm_p->req,
 				    &sm_p->encoded_req,
 				    &sm_p->encoded_resp_p,
 				    &sm_p->svr_addr,
-				    &sm_p->max_msg_sz,
+				    &sm_p->max_resp_sz,
 				    &session_tag);
     if (ret != 0) {
 	assert(0);
@@ -686,7 +745,7 @@ static int remove_post_getattr_sendrecv(PINT_client_sm *sm_p,
     /* post receive of response */
     ret = job_bmi_recv(sm_p->svr_addr,
 		       sm_p->encoded_resp_p,
-		       sm_p->max_msg_sz,
+		       sm_p->max_resp_sz,
 		       session_tag,
 		       BMI_PRE_ALLOC,
 		       sm_p, /* user pointer -- used to get to next state */
@@ -824,11 +883,11 @@ static int remove_recv_getattr_resp(PINT_client_sm *sm_p,
 
     /* TODO: POPULATE THE PCACHE? */
 
-    ret = PINT_serv_free_reqresp_resources(&sm_p->encoded_req,
+    ret = PINT_serv_free_msgpair_resources(&sm_p->encoded_req,
 					   sm_p->encoded_resp_p,
 					   &decoded_resp,
 					   &sm_p->svr_addr,
-					   sm_p->max_msg_sz);
+					   sm_p->max_resp_sz);
     if (ret != 0) {
 	assert(0);
     }
@@ -846,21 +905,143 @@ static int remove_recv_getattr_resp(PINT_client_sm *sm_p,
 
 
 
-
+/* remove_post_rmdirent_sendrecv()
+ */
 static int remove_post_rmdirent_sendrecv(PINT_client_sm *sm_p,
 					 job_status_s *js_p)
 {
+    int ret;
+    PVFS_msg_tag_t session_tag;
+    job_status_s send_status, recv_status;
+    job_id_t send_id, recv_id;
+
     /* NOTE:  we remove the dirent first because this gets the
      * object out of the system fastest.
      */
 
-    return 1;
+    gossip_debug(CLIENT_DEBUG, "remove state: post_rmdirent_sendrecv\n");
+
+    /* do parameter checking */
+
+    /* mark that we have two messages to receive */
+    sm_p->comp_ct = 2;
+
+    /* fill in getattr request */
+    PINT_SERVREQ_RMDIRENT_FILL(sm_p->req,
+			       *sm_p->cred_p,
+			       sm_p->u.remove.parent_ref.fs_id,
+			       sm_p->u.remove.parent_ref.handle,
+			       sm_p->u.remove.object_name);
+    
+    ret = PINT_serv_prepare_msgpair(sm_p->u.remove.parent_ref,
+				    &sm_p->req,
+				    &sm_p->encoded_req,
+				    &sm_p->encoded_resp_p,
+				    &sm_p->svr_addr,
+				    &sm_p->max_resp_sz,
+				    &session_tag);
+    if (ret != 0) {
+	assert(0);
+    }
+
+    /* post receive of response */
+    ret = job_bmi_recv(sm_p->svr_addr,
+		       sm_p->encoded_resp_p,
+		       sm_p->max_resp_sz,
+		       session_tag,
+		       BMI_PRE_ALLOC,
+		       sm_p,
+		       &recv_status,
+		       &recv_id,
+		       pint_client_sm_context);
+    if (ret < 0) {
+	assert(0);
+    }
+    else if (ret == 1) {
+	assert(0);
+    }
+    assert(ret == 0);
+
+    /* post send of request */
+    ret = job_bmi_send_list(sm_p->encoded_req.dest,
+			    sm_p->encoded_req.buffer_list,
+			    sm_p->encoded_req.size_list,
+			    sm_p->encoded_req.list_count,
+			    sm_p->encoded_req.total_size,
+			    session_tag,
+			    sm_p->encoded_req.buffer_type,
+			    1,
+			    sm_p,
+			    &send_status,
+			    &send_id,
+			    pint_client_sm_context);
+    if (ret < 0) {
+	assert(0);
+    }
+    else if (ret == 1) {
+	/* send completed immediately; decrement the completion counter */
+	gossip_debug(CLIENT_DEBUG, "remove: rmdirent send completed immediately.\n");
+
+	/* TODO: CHECK THE STATUS!!! */
+	assert(send_status.error_code == 0);
+
+	sm_p->comp_ct--;
+	assert(sm_p->comp_ct == 1);
+    }
+
+    /* TODO: keep up with job ids, so we can match later. */
+
+    return 0;
 }
 
+/* remove_recv_rmdirent_resp()
+ */
 static int remove_recv_rmdirent_resp(PINT_client_sm *sm_p,
 				     job_status_s *js_p)
 {
     /* receive rmdirent response from the server */
+    int ret;
+    struct PINT_decoded_msg decoded_resp; /* data about decoded resp */
+    struct PVFS_server_resp *resp_p; /* response structure (decoded) */
+
+    gossip_debug(CLIENT_DEBUG, "remove state: recv_rmdirent_resp\n");
+
+    /* decrement until both operations have completed */
+    if (--sm_p->comp_ct > 0) return 0;
+    assert(sm_p->comp_ct == 0);
+
+    /* in the success case we can assume that the last thing we received
+     * was the response.  we get the actual size of the received message
+     * from the job status structure.
+     */
+
+    /* decode; resp_p will point to response */
+    ret = PINT_serv_decode_resp(sm_p->encoded_resp_p,
+				&decoded_resp,
+				&sm_p->svr_addr,
+				js_p->actual_size,
+				&resp_p);
+    if (ret < 0) {
+	assert(0);
+    }
+
+    /* check status of response */
+    if (resp_p->status != 0) {
+	assert(0);
+    }
+
+    /* pull out the data that we wanted */
+    assert(sm_p->u.remove.object_ref.handle == resp_p->u.rmdirent.entry_handle);
+
+    /* free all the resources that we used to send and receive. */
+    ret = PINT_serv_free_msgpair_resources(&sm_p->encoded_req,
+					   sm_p->encoded_resp_p,
+					   &decoded_resp,
+					   &sm_p->svr_addr,
+					   sm_p->max_resp_sz);
+    if (ret != 0) {
+	assert(0);
+    }
 
     return 1;
 }
@@ -882,9 +1063,9 @@ static int remove_post_datafile_remove_sendrecv(PINT_client_sm *sm_p,
 
     /* do parameter checking */
 
-    sm_p->u.remove.dfremove_array = (PINT_client_sm_msgpair_state *)
+    sm_p->u.remove.msgpair = (PINT_client_sm_msgpair_state *)
 	malloc(sm_p->u.remove.datafile_count * sizeof(PINT_client_sm_msgpair_state));
-    if (sm_p->u.remove.dfremove_array == NULL) {
+    if (sm_p->u.remove.msgpair == NULL) {
 	assert(0);
     }
 
@@ -898,26 +1079,26 @@ static int remove_post_datafile_remove_sendrecv(PINT_client_sm *sm_p,
 	job_status_s recv_status;
 	job_id_t send_id, recv_id;
 
-	PINT_SERVREQ_REMOVE_FILL(sm_p->u.remove.dfremove_array[i].req,
+	PINT_SERVREQ_REMOVE_FILL(sm_p->u.remove.msgpair[i].req,
 				 *sm_p->cred_p,
 				  sm_p->u.remove.object_ref.fs_id,
 				 sm_p->u.remove.datafile_handles[i]);
     
-	ret = PINT_serv_prepare_reqresp(sm_p->u.remove.parent_ref,
-					&sm_p->u.remove.dfremove_array[i].req,
-					&sm_p->u.remove.dfremove_array[i].encoded_req,
-					&sm_p->u.remove.dfremove_array[i].encoded_resp_p,
-					&sm_p->u.remove.dfremove_array[i].svr_addr,
-					&sm_p->u.remove.dfremove_array[i].max_msg_sz,
+	ret = PINT_serv_prepare_msgpair(sm_p->u.remove.parent_ref,
+					&sm_p->u.remove.msgpair[i].req,
+					&sm_p->u.remove.msgpair[i].encoded_req,
+					&sm_p->u.remove.msgpair[i].encoded_resp_p,
+					&sm_p->u.remove.msgpair[i].svr_addr,
+					&sm_p->u.remove.msgpair[i].max_resp_sz,
 					&session_tag);
 	if (ret != 0) {
 	    assert(0);
 	}
 
 	/* post receive of response */
-	ret = job_bmi_recv(sm_p->u.remove.dfremove_array[i].svr_addr,
-			   sm_p->u.remove.dfremove_array[i].encoded_resp_p,
-			   sm_p->u.remove.dfremove_array[i].max_msg_sz,
+	ret = job_bmi_recv(sm_p->u.remove.msgpair[i].svr_addr,
+			   sm_p->u.remove.msgpair[i].encoded_resp_p,
+			   sm_p->u.remove.msgpair[i].max_resp_sz,
 			   session_tag,
 			   BMI_PRE_ALLOC,
 			   sm_p,
@@ -930,16 +1111,20 @@ static int remove_post_datafile_remove_sendrecv(PINT_client_sm *sm_p,
 	else if (ret == 1) {
 	    assert(0);
 	}
-	assert(ret == 0); /* just to see that we don't get odd values */
+
+	assert(ret == 0);
+
+	/* save the job id for reference later */
+	sm_p->u.remove.msgpair[i].recv_id = recv_id;
 
 	/* post send of request */
-	ret = job_bmi_send_list(sm_p->u.remove.dfremove_array[i].encoded_req.dest,
-				sm_p->u.remove.dfremove_array[i].encoded_req.buffer_list,
-				sm_p->u.remove.dfremove_array[i].encoded_req.size_list,
-				sm_p->u.remove.dfremove_array[i].encoded_req.list_count,
-				sm_p->u.remove.dfremove_array[i].encoded_req.total_size,
+	ret = job_bmi_send_list(sm_p->u.remove.msgpair[i].encoded_req.dest,
+				sm_p->u.remove.msgpair[i].encoded_req.buffer_list,
+				sm_p->u.remove.msgpair[i].encoded_req.size_list,
+				sm_p->u.remove.msgpair[i].encoded_req.list_count,
+				sm_p->u.remove.msgpair[i].encoded_req.total_size,
 				session_tag,
-				sm_p->u.remove.dfremove_array[i].encoded_req.buffer_type,
+				sm_p->u.remove.msgpair[i].encoded_req.buffer_type,
 				1,
 				sm_p,
 				&send_status,
@@ -953,10 +1138,10 @@ static int remove_post_datafile_remove_sendrecv(PINT_client_sm *sm_p,
 	    gossip_debug(CLIENT_DEBUG, "remove: datafile remove send completed immediately.\n");
 	    /* TODO: CHECK THE STATUS!!! */
 	    assert(send_status.error_code == 0);
+
+	    sm_p->u.remove.msgpair[i].send_id = 0; /* mark as done */
 	    sm_p->comp_ct--;
 	}
-
-	/* TODO: keep up with job ids, so we can match later. */
     }
 
     gossip_debug(CLIENT_DEBUG, "remove sm: post_datafile_remove_sendrecv: count = %d\n",
@@ -982,7 +1167,30 @@ static int remove_recv_datafile_remove_resp(PINT_client_sm *sm_p,
     gossip_debug(CLIENT_DEBUG, "remove sm: recv_datafile_remove_resp: count = %d\n",
 		 sm_p->comp_ct);
 
-    if (--sm_p->comp_ct > 0) return 0;
+    if (--sm_p->comp_ct > 0) {
+	int matched_job = 0;
+
+	for (i=0; i < sm_p->u.remove.datafile_count; i++)
+	{
+	    if (sm_p->u.remove.msgpair[i].recv_id == js_p->id)
+	    {
+		sm_p->u.remove.msgpair[i].recv_id = 0;
+		sm_p->u.remove.msgpair[i].actual_resp_sz = js_p->actual_size;
+		matched_job = 1;
+		break;
+	    }
+	    else if (sm_p->u.remove.msgpair[i].send_id == js_p->id)
+	    {
+		sm_p->u.remove.msgpair[i].send_id = 0;
+		/* don't need actual size for sends, only receives */
+		matched_job = 1;
+		break;
+	    }
+	}
+	assert(matched_job == 1);
+
+	return 0;
+    }
     assert(sm_p->comp_ct == 0);
 
     /* we have received all the responses successfully */
@@ -995,9 +1203,9 @@ static int remove_recv_datafile_remove_resp(PINT_client_sm *sm_p,
     /* for each remove message, decode, check status, and free resources */
     for (i=0; i < sm_p->u.remove.datafile_count; i++) {
 	/* decode; resp_p will point to response */
-	ret = PINT_serv_decode_resp(sm_p->u.remove.dfremove_array[i].encoded_resp_p,
+	ret = PINT_serv_decode_resp(sm_p->u.remove.msgpair[i].encoded_resp_p,
 				    &decoded_resp,
-				    &sm_p->u.remove.dfremove_array[i].svr_addr,
+				    &sm_p->u.remove.msgpair[i].svr_addr,
 				    js_p->actual_size,
 				    &resp_p);
 	if (ret < 0) {
@@ -1012,11 +1220,11 @@ static int remove_recv_datafile_remove_resp(PINT_client_sm *sm_p,
 	}
 
 	/* free resources */
-	ret = PINT_serv_free_reqresp_resources(&sm_p->u.remove.dfremove_array[i].encoded_req,
-					       sm_p->u.remove.dfremove_array[i].encoded_resp_p,
+	ret = PINT_serv_free_msgpair_resources(&sm_p->u.remove.msgpair[i].encoded_req,
+					       sm_p->u.remove.msgpair[i].encoded_resp_p,
 					       &decoded_resp,
-					       &sm_p->u.remove.dfremove_array[i].svr_addr,
-					       sm_p->u.remove.dfremove_array[i].max_msg_sz);
+					       &sm_p->u.remove.msgpair[i].svr_addr,
+					       sm_p->u.remove.msgpair[i].max_resp_sz);
 	if (ret != 0) {
 	    assert(0);
 	}
@@ -1025,21 +1233,128 @@ static int remove_recv_datafile_remove_resp(PINT_client_sm *sm_p,
     return 1;
 }
 
-static int remove_post_remove_sendrecv(PINT_client_sm *sm_p,
-				       job_status_s *js_p)
+static int remove_post_object_remove_sendrecv(PINT_client_sm *sm_p,
+					      job_status_s *js_p)
 {
-    /* post remove request and response; this would catch
-     * metafiles or directories as appropriate.
-     */
+    int ret;
+    PVFS_msg_tag_t session_tag;
+    job_status_s send_status, recv_status;
+    job_id_t send_id, recv_id;
 
-    return 1;
+    gossip_debug(CLIENT_DEBUG, "remove state: post_object_remove_sendrecv\n");
+
+    /* mark that we have two messages to receive */
+    sm_p->comp_ct = 2;
+
+    /* fill in getattr request */
+    PINT_SERVREQ_REMOVE_FILL(sm_p->req,
+			     *sm_p->cred_p,
+			     sm_p->u.remove.object_ref.fs_id,
+			     sm_p->u.remove.object_ref.handle);
+    
+    ret = PINT_serv_prepare_msgpair(sm_p->u.remove.parent_ref,
+				    &sm_p->req,
+				    &sm_p->encoded_req,
+				    &sm_p->encoded_resp_p,
+				    &sm_p->svr_addr,
+				    &sm_p->max_resp_sz,
+				    &session_tag);
+    if (ret != 0) {
+	assert(0);
+    }
+
+    /* post receive of response */
+    ret = job_bmi_recv(sm_p->svr_addr,
+		       sm_p->encoded_resp_p,
+		       sm_p->max_resp_sz,
+		       session_tag,
+		       BMI_PRE_ALLOC,
+		       sm_p,
+		       &recv_status,
+		       &recv_id,
+		       pint_client_sm_context);
+    if (ret < 0) {
+	assert(0);
+    }
+    else if (ret == 1) {
+	assert(0);
+    }
+    assert(ret == 0);
+
+    /* post send of request */
+    ret = job_bmi_send_list(sm_p->encoded_req.dest,
+			    sm_p->encoded_req.buffer_list,
+			    sm_p->encoded_req.size_list,
+			    sm_p->encoded_req.list_count,
+			    sm_p->encoded_req.total_size,
+			    session_tag,
+			    sm_p->encoded_req.buffer_type,
+			    1,
+			    sm_p,
+			    &send_status,
+			    &send_id,
+			    pint_client_sm_context);
+    if (ret < 0) {
+	assert(0);
+    }
+    else if (ret == 1) {
+	/* send completed immediately; decrement the completion counter */
+	gossip_debug(CLIENT_DEBUG, "remove: object remove send completed immediately.\n");
+
+	/* TODO: CHECK THE STATUS!!! */
+	assert(send_status.error_code == 0);
+
+	sm_p->comp_ct--;
+	assert(sm_p->comp_ct == 1);
+    }
+
+    /* TODO: keep up with job ids, so we can match later. */
+
+    return 0;
 }
 
-static int remove_recv_remove_resp(PINT_client_sm *sm_p,
-				   job_status_s *js_p)
+static int remove_recv_object_remove_resp(PINT_client_sm *sm_p,
+					  job_status_s *js_p)
 {
-    /* receive response from server.
+    int ret;
+    struct PINT_decoded_msg decoded_resp; /* data about decoded resp */
+    struct PVFS_server_resp *resp_p; /* response structure (decoded) */
+
+    gossip_debug(CLIENT_DEBUG, "remove state: recv_object_remove_resp\n");
+
+    /* decrement until both operations have completed */
+    if (--sm_p->comp_ct > 0) return 0;
+    assert(sm_p->comp_ct == 0);
+
+    /* in the success case we can assume that the last thing we received
+     * was the response.  we get the actual size of the received message
+     * from the job status structure.
      */
+
+    /* decode; resp_p will point to response */
+    ret = PINT_serv_decode_resp(sm_p->encoded_resp_p,
+				&decoded_resp,
+				&sm_p->svr_addr,
+				js_p->actual_size,
+				&resp_p);
+    if (ret < 0) {
+	assert(0);
+    }
+
+    /* check status of response */
+    if (resp_p->status != 0) {
+	assert(0);
+    }
+
+    /* free all the resources that we used to send and receive. */
+    ret = PINT_serv_free_msgpair_resources(&sm_p->encoded_req,
+					   sm_p->encoded_resp_p,
+					   &decoded_resp,
+					   &sm_p->svr_addr,
+					   sm_p->max_resp_sz);
+    if (ret != 0) {
+	assert(0);
+    }
 
     return 1;
 }
@@ -1115,6 +1430,22 @@ static int remove_datafile_remove_failure(PINT_client_sm *sm_p,
 					  job_status_s *js_p)
 {
     gossip_debug(CLIENT_DEBUG, "remove state: datafile_remove_failure\n");
+
+    return 1;
+}
+
+static int remove_rmdirent_failure(PINT_client_sm *sm_p,
+				   job_status_s *js_p)
+{
+    gossip_debug(CLIENT_DEBUG, "remove state: rmdirent_failure\n");
+
+    return 1;
+}
+
+static int remove_object_remove_failure(PINT_client_sm *sm_p,
+					job_status_s *js_p)
+{
+    gossip_debug(CLIENT_DEBUG, "remove state: object_remove_failure\n");
 
     return 1;
 }

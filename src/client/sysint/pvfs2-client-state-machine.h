@@ -36,9 +36,10 @@ typedef struct PINT_client_sm_msgpair_state_s {
     struct PINT_encoded_msg encoded_req;
 
     /* max_msg_sz, svr_addr, and encoded_resp_p needed to recv a response */
-    int max_msg_sz;
+    int max_resp_sz, actual_resp_sz;
     bmi_addr_t svr_addr;
     void *encoded_resp_p;
+    job_id_t send_id, recv_id;
 } PINT_client_sm_msgpair_state;
 
 
@@ -48,7 +49,7 @@ struct PINT_client_remove_sm {
     PVFS_pinode_reference         object_ref;  /* looked up */
     int                           datafile_count; /* from attribs */
     PVFS_handle                  *datafile_handles;
-    PINT_client_sm_msgpair_state *dfremove_array;
+    PINT_client_sm_msgpair_state *msgpair; /* used in datafile remove */
 };
 
 
@@ -81,8 +82,8 @@ typedef struct PINT_client_sm_s {
     struct PVFS_server_req req;
     struct PINT_encoded_msg encoded_req;
 
-    /* max_msg_sz, svr_addr, and encoded_resp_p needed to recv a response */
-    int max_msg_sz;
+    /* max_resp_sz, svr_addr, and encoded_resp_p needed to recv a response */
+    int max_resp_sz;
     bmi_addr_t svr_addr;
     void *encoded_resp_p;
 
