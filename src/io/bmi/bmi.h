@@ -164,4 +164,5 @@ int BMI_post_sendunexpected_list(
 	bmi_msg_tag_t tag,
 	void* user_ptr);
 
+
 #endif /* __BMI_H */
