@@ -355,15 +355,21 @@ static int crdirent_create_dirdata_dspace(PINT_server_op *s_op,
 {
     int job_post_ret;
     job_id_t i;
+    PVFS_handle_extent extent;
+    PVFS_handle_extent_array extent_array;
 
     gossip_debug(SERVER_DEBUG, "crdirent state: create_dirdata_dspace\n");
 
     gossip_debug(SERVER_DEBUG, "  creating dspace (coll_id = 0x%x)\n",
 		 s_op->req->u.crdirent.fs_id);
 
-    /* specify a zero handle to create a new arbitrary handle */
+    /* FIXME: arbitrary handle here, or honor a range? */
+    extent.first = extent.last = 0;
+    extent_array.extent_count = 1;
+    extent_array.extent_array = &extent;
+
     job_post_ret = job_trove_dspace_create(s_op->req->u.crdirent.fs_id,
-					   0,
+					   &extent_array,
 					   PVFS_TYPE_DIRDATA,
 					   NULL,
 					   s_op,

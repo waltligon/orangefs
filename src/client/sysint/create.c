@@ -181,7 +181,8 @@ int PVFS_sys_create(char* entry_name, PVFS_pinode_reference parent_refn,
 	req_p.credentials = credentials;
         /*
           NOTE: handle_extent_array is filled in above in the call
-          to PINT_bucket_get_next_meta
+          to PINT_bucket_get_next_meta since we don't need a specific
+          handle value, but rather any valid one on that meta server.
         */
 	req_p.u.create.fs_id = parent_refn.fs_id;
 

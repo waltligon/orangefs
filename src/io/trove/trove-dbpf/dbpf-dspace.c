@@ -120,8 +120,7 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
               fails since the handle will already exist, but
               since we know it here, handle it here ?
             */
-            trove_handle_set_used(op_p->coll_p->coll_id,
-                                  (TROVE_handle)new_handle);
+            trove_handle_set_used(op_p->coll_p->coll_id, new_handle);
         }
         else
         {
@@ -135,8 +134,7 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
             */
             do
             {
-                ret = trove_handle_set_used(op_p->coll_p->coll_id,
-                                            (TROVE_handle)new_handle);
+                ret = trove_handle_set_used(op_p->coll_p->coll_id, new_handle);
             } while((ret != 0) && (++new_handle));
         }
     }
