@@ -231,6 +231,7 @@ directory_test1()
 # create a dir
 # create 256 files in that dir
 # create 256 directories in that dir
+# create 256 symlinks in the 256 directories to those files in that dir
 # do a find on that dir > /dev/null
 # do a recursive ls -al on that dir > /dev/null
 # rm -rf the dir
@@ -279,73 +280,6 @@ directory_test2()
     DATE=`date`
     echo "$DATE: Finished"
 
-    CMD="find $PVFS2_TESTDIR"
-    timestamp "Running Find $PVFS2_TESTDIR" "$CMD" /dev/null
-
-    CMD="ls -alR $PVFS2_TESTDIR"
-    timestamp "Running ls -alR $PVFS2_TESTDIR" "$CMD" /dev/null
-
-    remove_testdir $PVFS2_TESTDIR
-
-    echo ""
-    echo "******************************************"
-    echo "* PASSED DIRECTORY TEST 2"
-    echo "******************************************"
-    return 0
-}
-
-# create a dir
-# create 256 files in that dir
-# create 256 directories in that dir
-# create 256 symlinks in the 256 directories to those files in that dir
-# do a find on that dir > /dev/null
-# do a recursive ls -al on that dir > /dev/null
-# rm -rf the dir
-directory_test3()
-{
-    echo ""
-    echo "******************************************"
-    echo "* RUNNING DIRECTORY TEST 3"
-    echo "******************************************"
-
-    setup_testdir $PVFS2_TESTDIR
-
-    DATE=`date`
-    echo "$DATE: Creating 256 new files"
-    for f in `seq 1 100`; do
-        CUR_FILE=$PVFS2_TESTDIR/testfile1$f
-
-        touch $CUR_FILE
-
-        if test $? -ne 0 ; then
-            echo ""
-            echo "******************************************"
-            echo "* FAILED DIRECTORY TEST 3 [stage 1]"
-            echo "******************************************"
-            return 1
-        fi
-    done
-    DATE=`date`
-    echo "$DATE: Finished"
-
-    DATE=`date`
-    echo "$DATE: Creating 256 new directories"
-    for f in `seq 1 100`; do
-        CUR_DIR=$PVFS2_TESTDIR/testdir1$f
-
-        mkdir $CUR_DIR
-
-        if test $? -ne 0 ; then
-            echo ""
-            echo "******************************************"
-            echo "* FAILED DIRECTORY TEST 3 [stage 2]"
-            echo "******************************************"
-            return 1
-        fi
-    done
-    DATE=`date`
-    echo "$DATE: Finished"
-
     DATE=`date`
     echo "$DATE: Creating 256 new symlinks"
     for f in `seq 1 100`; do
@@ -384,11 +318,11 @@ directory_test3()
 # create 100 nested subdirectories
 # ls -alR the top-level dir
 # rm -rf the dir
-directory_test4()
+directory_test3()
 {
     echo ""
     echo "******************************************"
-    echo "* RUNNING DIRECTORY TEST 4"
+    echo "* RUNNING DIRECTORY TEST 3"
     echo "******************************************"
 
     setup_testdir $PVFS2_TESTDIR
@@ -412,7 +346,7 @@ directory_test4()
     if test $NUMDIRS -ne 102 ; then
         echo ""
         echo "******************************************"
-        echo "* FAILED DIRECTORY TEST 4 [stage 1]"
+        echo "* FAILED DIRECTORY TEST 3 [stage 1]"
         echo "******************************************"
         return 1
     fi
@@ -429,7 +363,7 @@ directory_test4()
 
     echo ""
     echo "******************************************"
-    echo "* PASSED DIRECTORY TEST 4"
+    echo "* PASSED DIRECTORY TEST 3"
     echo "******************************************"
     return 0
 }
@@ -438,11 +372,11 @@ directory_test4()
 # touch 1 file in each of the directories
 # ls -alR the top-level dir
 # rm -rf the dir
-directory_test5()
+directory_test4()
 {
     echo ""
     echo "******************************************"
-    echo "* RUNNING DIRECTORY TEST 5"
+    echo "* RUNNING DIRECTORY TEST 4"
     echo "******************************************"
 
     setup_testdir $PVFS2_TESTDIR
@@ -466,7 +400,7 @@ directory_test5()
     if test $NUMDIRS -ne 52 ; then
         echo ""
         echo "******************************************"
-        echo "* FAILED DIRECTORY TEST 5 [stage 1]"
+        echo "* FAILED DIRECTORY TEST 4 [stage 1]"
         echo "******************************************"
         return 1
     fi
@@ -479,7 +413,7 @@ directory_test5()
         if test $? -ne 0 ; then
             echo ""
             echo "******************************************"
-            echo "* FAILED DIRECTORY TEST 5 [stage 2]"
+            echo "* FAILED DIRECTORY TEST 4 [stage 2]"
             echo "******************************************"
             return 1
         fi
@@ -497,11 +431,63 @@ directory_test5()
 
     echo ""
     echo "******************************************"
-    echo "* PASSED DIRECTORY TEST 5"
+    echo "* PASSED DIRECTORY TEST 4"
     echo "******************************************"
     return 0
 }
 
+# create 256 nested subdirectories
+# ls -alR the top-level dir
+# rm -rf the dir
+directory_test5()
+{
+    echo ""
+    echo "******************************************"
+    echo "* RUNNING DIRECTORY TEST 5"
+    echo "******************************************"
+
+    setup_testdir $PVFS2_TESTDIR
+
+    old_dir=`pwd`
+    cd $PVFS2_TESTDIR
+    mkdir $PVFS2_TESTDIR/256
+
+    DATE=`date`
+    echo "$DATE: Creating 256 nested subdirectories"
+
+    # no error checking inside the loop as we're playing
+    # a shell trick in there to get the nesting right
+    echo "256" ;
+    for f in `seq 1 256`; do
+        mkdir $_/testdir.$f
+    done
+
+    # now make sure all dirs exist
+    NUMDIRS=`find . | grep -c .`
+    if test $NUMDIRS -ne 258 ; then
+        echo ""
+        echo "******************************************"
+        echo "* FAILED DIRECTORY TEST 5 [stage 1]"
+        echo "******************************************"
+        return 1
+    fi
+
+    DATE=`date`
+    echo "$DATE: Finished"
+
+    CMD="ls -alR $PVFS2_TESTDIR/256"
+    timestamp "Running ls -alR $PVFS2_TESTDIR/256" "$CMD" /dev/null
+
+    cd $old_dir
+
+    remove_testdir $PVFS2_TESTDIR
+
+    echo ""
+    echo "******************************************"
+    echo "* PASSED DIRECTORY TEST 5"
+    echo "******************************************"
+    return 0
+}
 
 #####################################
 # simple permission test functions
@@ -1173,7 +1159,6 @@ if ! test -z "$ENABLE_DIRECTORY_TESTS"; then
     directory_test5
 
 fi
-
 
 if ! test -z "$ENABLE_IO_TESTS"; then
 
