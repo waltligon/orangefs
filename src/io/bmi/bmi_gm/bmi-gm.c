@@ -271,15 +271,15 @@ static struct bufferpool *io_pool = NULL;
 /* internal utility functions */
 static method_addr_p alloc_gm_method_addr(void);
 static void dealloc_gm_method_addr(method_addr_p map);
-static int gm_post_send_check_resource(bmi_op_id_t * id,
-				       method_addr_p dest,
-				       void *buffer,
-				       bmi_size_t size,
-				       bmi_msg_tag_t tag,
-				       bmi_flag_t mode,
-				       bmi_flag_t buffer_status,
-				       void *user_ptr,
-				       bmi_context_id context_id);
+static int gm_post_send_check_resource(struct method_op* mop);
+static int gm_post_send_build_op(bmi_op_id_t * id,
+    method_addr_p dest,
+    void *buffer,
+    bmi_size_t size,
+    bmi_msg_tag_t tag,
+    bmi_flag_t mode,
+    bmi_flag_t buffer_status,
+    void *user_ptr, bmi_context_id context_id);
 static void ctrl_req_callback(struct gm_port *port,
 			      void *context,
 			      gm_status_t status);
@@ -326,6 +326,7 @@ static void initiate_send_immed(method_op_p mop);
 static void initiate_put_announcement(method_op_p mop);
 static void send_data_buffer(method_op_p mop);
 static void prepare_for_recv(method_op_p mop);
+static void setup_send_data_buffer(method_op_p mop);
 
 /*************************************************************************
  * Visible Interface 
@@ -780,7 +781,7 @@ int BMI_gm_post_send(bmi_op_id_t * id,
 	new_ctrl_msg->ctrl_type = CTRL_IMMED_TYPE;
 	new_ctrl_msg->u.immed.actual_size = size;
 	new_ctrl_msg->u.immed.msg_tag = tag;
-	return (gm_post_send_check_resource(id, dest, buffer, size,
+	return (gm_post_send_build_op(id, dest, buffer, size,
 					    tag,
 					    GM_MODE_IMMED,
 					    buffer_status, user_ptr, context_id));
@@ -788,7 +789,7 @@ int BMI_gm_post_send(bmi_op_id_t * id,
     else
     {
 	/* 3 way rendezvous mode */
-	return (gm_post_send_check_resource(id, dest, buffer, size,
+	return (gm_post_send_build_op(id, dest, buffer, size,
 					    tag, GM_MODE_REND,
 					    buffer_status, user_ptr, context_id));
     }
@@ -855,7 +856,7 @@ int BMI_gm_post_sendunexpected(bmi_op_id_t * id,
     new_ctrl_msg->u.immed.expected_size = 0;
     new_ctrl_msg->u.immed.msg_tag = tag;
 
-    return (gm_post_send_check_resource(id, dest, buffer, size,
+    return (gm_post_send_build_op(id, dest, buffer, size,
 					tag, GM_MODE_UNEXP,
 					buffer_status, user_ptr, context_id));
 }
@@ -1320,32 +1321,25 @@ void dealloc_gm_method_op(method_op_p op_p)
 }
 
 
-/* gm_post_send_check_resource()
+/* gm_post_send_build_op()
  *
- * Checks to see if communication can proceed for a given send operation
+ * builds a method op structure for the specified send operation
  *
  * returns 0 on success, -errno on failure
  */
-static int gm_post_send_check_resource(bmi_op_id_t * id,
-				       method_addr_p dest,
-				       void *buffer,
-				       bmi_size_t size,
-				       bmi_msg_tag_t tag,
-				       bmi_flag_t mode,
-				       bmi_flag_t buffer_status,
-				       void *user_ptr, bmi_context_id context_id)
+static int gm_post_send_build_op(bmi_op_id_t * id,
+    method_addr_p dest,
+    void *buffer,
+    bmi_size_t size,
+    bmi_msg_tag_t tag,
+    bmi_flag_t mode,
+    bmi_flag_t buffer_status,
+    void *user_ptr, bmi_context_id context_id)
 {
     method_op_p new_method_op = NULL;
-    int ret = -1;
-    struct gm_addr *gm_data = NULL;
     struct gm_op *gm_op_data = NULL;
 
-    gossip_ldebug(BMI_DEBUG_GM, "gm_post_send_check_resource() called.\n");
-
-    /* what do we want to do here? 
-     * For now, try to send a control message and then bail out.  The
-     * poll function will drive the rest of the way.
-     */
+    gossip_ldebug(BMI_DEBUG_GM, "gm_post_send_build_op() called.\n");
 
     /* we need an op structure to keep up with this send */
     new_method_op = alloc_gm_method_op();
@@ -1366,16 +1360,36 @@ static int gm_post_send_check_resource(bmi_op_id_t * id,
     new_method_op->mode = mode;
     new_method_op->context_id = context_id;
 
-    gm_data = dest->method_data;
     gm_op_data = new_method_op->method_data;
     gm_op_data->buffer_status = buffer_status;
+
+    return (gm_post_send_check_resource(new_method_op));
+}
+
+
+/* gm_post_send_check_resource()
+ *
+ * Checks to see if communication can proceed for a given send operation
+ *
+ * returns 0 on success, -errno on failure
+ */
+static int gm_post_send_check_resource(struct method_op* mop)
+{
+    int ret = -1;
+
+    gossip_ldebug(BMI_DEBUG_GM, "gm_post_send_check_resource() called.\n");
+
+    /* what do we want to do here? 
+     * For now, try to send a control message and then bail out.  The
+     * poll function will drive the rest of the way.
+     */
 
     /* make sure that we are not bypassing any operation that has stalled
      * waiting on tokens
      */
     if (!op_list_empty(op_list_array[IND_NEED_SEND_TOK_HI_CTRL]))
     {
-	op_list_add(op_list_array[IND_NEED_SEND_TOK_HI_CTRL], new_method_op);
+	op_list_add(op_list_array[IND_NEED_SEND_TOK_HI_CTRL], mop);
 	/* push on existing work rather than attempting this send */
 	return (gm_do_work(0));
     }
@@ -1384,21 +1398,21 @@ static int gm_post_send_check_resource(bmi_op_id_t * id,
     if (!gm_alloc_send_token(local_port, GM_HIGH_PRIORITY))
     {
 	/* queue up and wait for a token */
-	op_list_add(op_list_array[IND_NEED_SEND_TOK_HI_CTRL], new_method_op);
+	op_list_add(op_list_array[IND_NEED_SEND_TOK_HI_CTRL], mop);
 	/* push on existing work rather than attempting this send */
 	ret = gm_do_work(0);
     }
     else
     {
 	gossip_ldebug(BMI_DEBUG_GM, "Proceeding with communication.\n");
-	if (mode == GM_MODE_REND)
+	if (mop->mode == GM_MODE_REND)
 	{
-	    initiate_send_rend(new_method_op);
+	    initiate_send_rend(mop);
 	    ret = 0;
 	}
 	else
 	{
-	    initiate_send_immed(new_method_op);
+	    initiate_send_immed(mop);
 	    ret = 0;
 	}
     }
@@ -1832,7 +1846,9 @@ static void delayed_token_sweep(void)
 #endif /* ENABLE_GM_BUFPOOL */
 		query_op =
 		    op_list_shownext(op_list_array[IND_NEED_SEND_TOK_LOW]);
+		
 		op_list_remove(query_op);
+		setup_send_data_buffer(query_op);
 		send_data_buffer(query_op);
 		return;
 #ifdef ENABLE_GM_BUFPOOL
@@ -2353,29 +2369,23 @@ static void ctrl_ack_handler(bmi_op_id_t ctrl_op_id,
     }
 #endif /* ENABLE_GM_BUFPOOL */
 
+    setup_send_data_buffer(query_op);
     send_data_buffer(query_op);
     return;
 }
 
 
-/* send_data_buffer()
+/* setup_send_data_buffer()
  *
- * sends the actual message data for an operation.  Assumes that a low
- * priority send token has already been acquired
+ * prepares a buffer to be sent 
  *
- * returns 0 on success, -errno on failure.
+ * no return value
  */
-static void send_data_buffer(method_op_p mop)
+static void setup_send_data_buffer(method_op_p mop)
 {
-    struct gm_addr *gm_addr_data = mop->addr->method_data;
     struct gm_op *gm_op_data = mop->method_data;
     bmi_size_t pinned_size = 0;
 
-    /* send actual buffer */
-    /* NOTE: the ctrl message communication leading up to this send allows 
-     * us to use the "actual size" field here rather than the expected 
-     * size when transfering data
-     */
     if (gm_op_data->buffer_status == GM_BUF_METH_REG)
     {
 #ifdef ENABLE_GM_REGCACHE
@@ -2431,6 +2441,29 @@ static void send_data_buffer(method_op_p mop)
 #endif /* ENABLE_GM_BUFPOOL */
 
     }
+
+    return;
+}
+
+/* send_data_buffer()
+ *
+ * sends the actual message data for an operation.  Assumes that a low
+ * priority send token has already been acquired, and that the
+ * send buffer has already been prepared.
+ *
+ * no return value
+ */
+static void send_data_buffer(method_op_p mop)
+{
+    struct gm_addr *gm_addr_data = mop->addr->method_data;
+    struct gm_op *gm_op_data = mop->method_data;
+
+    /* send actual buffer */
+    /* NOTE: the ctrl message communication leading up to this send allows 
+     * us to use the "actual size" field here rather than the expected 
+     * size when transfering data
+     */
+
     gm_directed_send_with_callback(local_port, mop->buffer,
 				   gm_op_data->remote_ptr,
 				   mop->actual_size, GM_LOW_PRIORITY,
