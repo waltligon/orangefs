@@ -132,7 +132,7 @@ struct dentry *pvfs2_lookup(
     strncpy(new_op->upcall.req.lookup.d_name,
 	    dentry->d_name.name, PVFS2_NAME_LEN);
 
-    service_lookup_op_with_timeout_retry(
+    service_error_exit_op_with_timeout_retry(
         new_op, "pvfs2_lookup", retries, error_exit);
 
     /* check what kind of goodies we got */

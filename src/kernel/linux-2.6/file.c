@@ -62,7 +62,7 @@ ssize_t pvfs2_inode_read(
     int copy_to_user,
     int readahead_size)
 {
-    int ret = -1;
+    int ret = -1, error_exit = 0;
     size_t each_count = 0, amt_complete = 0;
     size_t total_count = 0;
     pvfs2_kernel_op_t *new_op = NULL;
@@ -112,33 +112,46 @@ ssize_t pvfs2_inode_read(
 	new_op->upcall.req.io.count = each_count;
 	new_op->upcall.req.io.offset = *offset;
 
-        service_operation_with_timeout_retry(
-            new_op, "pvfs2_inode_read", retries);
+        service_error_exit_op_with_timeout_retry(
+            new_op, "pvfs2_inode_read", retries, error_exit);
 
 	if (new_op->downcall.status != 0)
 	{
 	    pvfs2_error("pvfs2_inode_read: error: io downcall status.\n");
 
           error_exit:
-            /*
-              FIXME: do a better I/O return code translation.  We
-              can't do this until the sys-io sm returns meaningful
-              error codes (other than the two below).
-
-              NOTE:
-              DO NOT kill the device owner in this case, as the I/O
-              has already been completed so there's no danger.  Also,
-              DO NOT free the op, since this code path relies on the
-              devreq code to free it.  signal it normally before
-              returning the error code.
-            */
-	    ret = ((new_op->downcall.status == -PVFS_ENOENT) ?
-                   -ENOENT : -EIO);
-	    *offset = original_offset;
-            wake_up_device_for_return(new_op);
+            if (error_exit)
+            {
+                /*
+                  this means that the waitqueue code failed to
+                  retrieve a proper downcall (either via timeout or a
+                  signal being raised).  in this case, we need to kill
+                  the device_owner and free the op ourselves, to avoid
+                  having the device start writing to our shared bufmap
+                  pages.
+                */
+                ret = -EIO;
+                kill_device_owner();
+                op_release(new_op);
+            }
+            else
+            {
+                /*
+                  NOTE: DO NOT kill the device owner in this case, as
+                  the I/O has already been completed so there's no
+                  danger in corrupting our bufmap or reqlist.  Also,
+                  DO NOT free the op, since this code path relies on
+                  the devreq code to free it.  signal it normally
+                  before returning the error code.
+                */
+                ret = ((new_op->downcall.status == -PVFS_ENOENT) ?
+                       -ENOENT : -EIO);
+                *offset = original_offset;
+                wake_up_device_for_return(new_op);
+            }
             pvfs_bufmap_put(buffer_index);
-	    pvfs2_error("pvfs2_inode_read: returning error code %d\n",
-                        ret);
+	    pvfs2_error("pvfs2_inode_read: returning error %d "
+                        "(error_exit=%d)\n", ret, error_exit);
 	    return(ret);
 	}
 
@@ -202,7 +215,6 @@ ssize_t pvfs2_file_read(
     size_t count,
     loff_t *offset)
 {
-    /* NOTE: no read-ahead here for now */
     return pvfs2_inode_read(
         file->f_dentry->d_inode, buf, count, offset, 1, 0);
 }
@@ -213,13 +225,12 @@ static ssize_t pvfs2_file_write(
     size_t count,
     loff_t * offset)
 {
-    size_t each_count = 0;
-    size_t total_count = 0;
-    pvfs2_kernel_op_t *new_op = NULL;
-    int buffer_index = -1;
     int ret = -1, retries = PVFS2_OP_RETRY_COUNT;
+    pvfs2_kernel_op_t *new_op = NULL;
     char* current_buf = (char*)buf;
     loff_t original_offset = *offset;
+    int buffer_index = -1, error_exit = 0;
+    size_t each_count = 0, total_count = 0;
     struct inode *inode = file->f_dentry->d_inode;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
 
@@ -277,8 +288,8 @@ static ssize_t pvfs2_file_write(
 	    return(ret);
         }
 
-        service_operation_with_timeout_retry(
-            new_op, "pvfs2_file_write", retries);
+        service_error_exit_op_with_timeout_retry(
+            new_op, "pvfs2_file_write", retries, error_exit);
 
 	if (new_op->downcall.status != 0)
 	{
