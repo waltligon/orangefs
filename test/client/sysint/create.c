@@ -6,6 +6,8 @@
 
 #include <time.h>
 #include <stdio.h>
+#include <unistd.h>
+#include <sys/types.h>
 
 #include "client.h"
 #include "pvfs2-util.h"
@@ -63,13 +65,13 @@ int main(int argc, char **argv)
 
     entry_name = str_buf;
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-    attr.owner = 100;
-    attr.group = 100;
+    attr.owner = getuid();
+    attr.group = getgid();
     attr.perms = 1877;
     attr.atime = attr.ctime = attr.mtime = 
 	time(NULL);
-    credentials.uid = 100;
-    credentials.gid = 100;
+    credentials.uid = getuid();
+    credentials.gid = getgid();
     ret = PVFS_util_lookup_parent(filename, cur_fs, credentials, 
 	&parent_refn.handle);
     if(ret < 0)

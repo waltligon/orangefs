@@ -20,15 +20,15 @@
 
 extern struct server_configuration_s g_server_config;
 
-/* PVFS_sys_mkdir()
+/* PVFS_sys_mkdir_old() : DEPRECATED -- see sys-mkdir.sm
  *
  * create a directory with specified attributes 
  *
  * returns 0 on success, -errno on failure
  */
-int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn, 
-                        PVFS_sys_attr attr, 
-                        PVFS_credentials credentials, PVFS_sysresp_mkdir *resp)
+int PVFS_sys_mkdir_old(char* entry_name, PVFS_pinode_reference parent_refn, 
+                       PVFS_sys_attr attr, 
+                       PVFS_credentials credentials, PVFS_sysresp_mkdir *resp)
 {
     struct PVFS_server_req req_p;		/* server request */
     struct PVFS_server_resp *ack_p = NULL;	/* server response */
@@ -146,6 +146,9 @@ int PVFS_sys_mkdir(char* entry_name, PVFS_pinode_reference parent_refn,
     /* set the object type */
     req_p.u.mkdir.attr.mask |= PVFS_ATTR_COMMON_TYPE;
     req_p.u.mkdir.attr.objtype = PVFS_TYPE_DIRECTORY;
+
+    fprintf(stderr,"PASSING MKDIR ATTR MASK OF %d\n",
+            req_p.u.mkdir.attr.mask);
 
     max_msg_sz = PINT_encode_calc_max_size(PINT_ENCODE_RESP, req_p.op, 
 	PINT_CLIENT_ENC_TYPE);

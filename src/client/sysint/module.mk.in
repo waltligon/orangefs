@@ -32,6 +32,7 @@ SMSRC := \
 	sys-io.sm \
 	mgmt-noop.sm \
 	sys-create.sm \
+        sys-mkdir.sm \
 	sys-remove.sm \
 	mgmt-setparam-list.sm \
 	mgmt-statfs-list.sm \

@@ -1,0 +1,415 @@
+/* 
+ * (C) 2003 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+#include <string.h>
+#include <assert.h>
+
+#include "client-state-machine.h"
+#include "state-machine-fns.h"
+#include "pvfs2-debug.h"
+#include "job.h"
+#include "gossip.h"
+#include "str-utils.h"
+
+#include "pinode-helper.h"
+#include "pint-dcache.h"
+#include "pint-servreq.h"
+#include "pint-bucket.h"
+#include "pcache.h"
+#include "PINT-reqproto-encode.h"
+#include "shared-state-methods.h"
+
+extern job_context_id pint_client_sm_context;
+
+/* state function prototypes */
+static int mkdir_init(PINT_client_sm *sm_p,
+                      job_status_s *js_p);
+static int mkdir_msg_setup_msgpair(PINT_client_sm *sm_p,
+                                   job_status_s *js_p);
+static int mkdir_msg_failure(PINT_client_sm *sm_p,
+                             job_status_s *js_p);
+static int mkdir_crdirent_setup_msgpair(PINT_client_sm *sm_p,
+                                        job_status_s *js_p);
+static int mkdir_crdirent_failure(PINT_client_sm *sm_p,
+                                  job_status_s *js_p);
+static int mkdir_cleanup(PINT_client_sm *sm_p,
+                          job_status_s *js_p);
+
+/* completion function prototypes */
+static int mkdir_msg_comp_fn(void *v_p,
+                             struct PVFS_server_resp *resp_p,
+                             int index);
+static int mkdir_crdirent_comp_fn(void *v_p,
+                                  struct PVFS_server_resp *resp_p,
+                                  int index);
+
+%%
+
+machine pvfs2_client_mkdir_sm(init,
+                              mkdir_parent_getattr_setup_msgpair,
+                              mkdir_parent_getattr_xfer_msgpair,
+                              mkdir_parent_getattr_failure,
+                              mkdir_msg_setup_msgpair,
+                              mkdir_msg_xfer_msgpair,
+                              mkdir_msg_failure,
+                              mkdir_crdirent_setup_msgpair,
+			      mkdir_crdirent_xfer_msgpair,
+			      mkdir_crdirent_failure,
+                              cleanup)
+{
+    state init {
+	run mkdir_init;
+	default => mkdir_parent_getattr_setup_msgpair;
+    }
+
+    state mkdir_parent_getattr_setup_msgpair {
+	run sm_common_parent_getattr_setup_msgpair;
+        success => mkdir_parent_getattr_xfer_msgpair;
+	default => mkdir_parent_getattr_failure;
+    }
+
+    state mkdir_parent_getattr_xfer_msgpair {
+	jump pvfs2_client_getattr_pcache_sm;
+        success => mkdir_msg_setup_msgpair;
+	default => mkdir_parent_getattr_failure;
+    }
+
+    state mkdir_parent_getattr_failure {
+	run sm_common_parent_getattr_failure;
+	default => cleanup;
+    }
+
+    state mkdir_msg_setup_msgpair {
+	run mkdir_msg_setup_msgpair;
+	success => mkdir_msg_xfer_msgpair;
+        default => mkdir_msg_failure;
+    }
+
+    state mkdir_msg_xfer_msgpair {
+	jump pvfs2_client_msgpair_sm;
+        success => mkdir_crdirent_setup_msgpair;
+	default => mkdir_msg_failure;
+    }
+
+    state mkdir_msg_failure {
+	run mkdir_msg_failure;
+	default => cleanup;
+    }
+
+    state mkdir_crdirent_setup_msgpair {
+	run mkdir_crdirent_setup_msgpair;
+        success => mkdir_crdirent_xfer_msgpair;
+	default => mkdir_crdirent_failure;
+    }
+
+    state mkdir_crdirent_xfer_msgpair {
+	jump pvfs2_client_msgpair_sm;
+        success => cleanup;
+        default => mkdir_crdirent_failure;
+    }
+
+    state mkdir_crdirent_failure {
+	run mkdir_crdirent_failure;
+	default => cleanup;
+    }
+
+    state cleanup {
+        run mkdir_cleanup;
+        default => init;
+    }
+}
+
+%%
+
+int PVFS_sys_mkdir(
+    char *object_name,
+    PVFS_pinode_reference parent_refn,
+    PVFS_sys_attr attr,
+    PVFS_credentials credentials,
+    PVFS_sysresp_mkdir *resp)
+{
+    int ret = -PVFS_EINVAL;
+    PINT_client_sm *sm_p = NULL;
+    PVFS_error error;
+
+    gossip_debug(CLIENT_DEBUG, "PVFS_sys_mkdir entered\n");
+
+    /* parameter checking goes here.  assume everything from the user
+     * is ok past this point.
+     */
+    if ((object_name == NULL) || (resp == NULL))
+    {
+        return ret;
+    }
+
+    if ((strlen(object_name) + 1) > PVFS_REQ_LIMIT_SEGMENT_BYTES)
+    {
+        return -PVFS_ENAMETOOLONG;
+    }
+
+    if ((attr.mask & PVFS_ATTR_SYS_ALL_SETABLE) !=
+        PVFS_ATTR_SYS_ALL_SETABLE)
+    {
+        gossip_lerr("Error: Attribute sanity check failed\n");
+        return ret;
+    }
+
+    sm_p = (PINT_client_sm *) malloc(sizeof(*sm_p));
+    if (sm_p == NULL)
+    {
+        return -PVFS_ENOMEM;
+    }
+    memset(sm_p, 0, sizeof(*sm_p));
+
+    sm_p->cred_p = &credentials;
+    sm_p->u.mkdir.object_name = object_name;
+    sm_p->parent_ref = parent_refn;
+    sm_p->u.mkdir.sys_attr = &attr;
+    sm_p->u.mkdir.mkdir_resp = resp;
+
+    gossip_debug(CLIENT_DEBUG, "Creating directory named %s under "
+                 "parent handle %Lu on fs %d\n", object_name,
+                 parent_refn.handle, parent_refn.fs_id);
+
+    ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_MKDIR);
+    assert(ret == 0);
+
+    /* while !done call progress function */
+    while (!sm_p->op_complete && ret == 0)
+    {
+	gossip_debug(CLIENT_DEBUG, "PVFS_sys_mkdir calling "
+                     "PINT_client_state_machine_test()\n");
+	ret = PINT_client_state_machine_test();
+    }
+    assert(ret == 0);
+
+    gossip_debug(CLIENT_DEBUG, "PVFS_sys_mkdir completed\n");
+
+    /* save our return value */
+    error = sm_p->error_code;
+
+    /* clean up after ourselves */
+    free(sm_p);
+    return error;
+}
+
+/****************************************************************/
+
+static int mkdir_init(PINT_client_sm *sm_p,
+                      job_status_s *js_p)
+{
+    gossip_debug(CLIENT_DEBUG, "mkdir state: init\n");
+
+    assert(js_p->error_code == 0);
+
+    /*
+      grab a pointer to the server configuration object.
+      we need this later for mapping handles to servers
+      during meta/data handle creation
+    */
+    sm_p->server_config = PINT_get_server_config_struct();
+    assert(sm_p->server_config);
+
+    /* do the request scheduler thing, if necessary */
+
+    return 1;
+}
+
+static int mkdir_msg_comp_fn(void *v_p,
+                             struct PVFS_server_resp *resp_p,
+                             int index)
+{
+    PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
+    
+    gossip_debug(CLIENT_DEBUG, "mkdir_msg_comp_fn\n");
+
+    assert(resp_p->op == PVFS_SERV_MKDIR);
+
+    /* if we get an error, just return immediately, don't try to
+     * actually fill anything in.
+     */
+    if (resp_p->status != 0)
+    {
+	return resp_p->status;
+    }
+
+    /* otherwise, just stash the newly created meta handle */
+    sm_p->u.mkdir.metafile_handle = resp_p->u.mkdir.handle;
+
+    gossip_debug(CLIENT_DEBUG, "*** Got newly created dir handle %Lu\n",
+                 sm_p->u.mkdir.metafile_handle);
+
+    return 0;
+}
+
+/* 
+   NOTE: this function only does a sanity check and doesn't
+   need to be called.  Set the completion function to NULL
+   when setting up the crdirent msgpair to avoid this
+*/
+static int mkdir_crdirent_comp_fn(void *v_p,
+                                  struct PVFS_server_resp *resp_p,
+                                  int index)
+{
+/*     PINT_client_sm *sm_p = (PINT_client_sm *) v_p; */
+    
+    gossip_debug(CLIENT_DEBUG, "mkdir_crdirent_comp_fn\n");
+
+    assert(resp_p->op == PVFS_SERV_CRDIRENT);
+
+    /* if we get an error, just return immediately, don't try to
+     * actually fill anything in.
+     */
+    if (resp_p->status != 0)
+    {
+	return resp_p->status;
+    }
+    return 0;
+}
+
+static int mkdir_msg_setup_msgpair(PINT_client_sm *sm_p,
+                                   job_status_s *js_p)
+{
+    int ret = -1;
+    PVFS_handle_extent_array meta_handle_extent_array;
+    PINT_client_sm_msgpair_state *msg_p = NULL;
+
+    gossip_debug(CLIENT_DEBUG, "mkdir state: mkdir_msg_setup_msgpair\n");
+
+    /* clear error field in job */
+    js_p->error_code = 0;
+
+    /*
+      Determine the initial metaserver and the appropriate
+      handle range for a new dir.  This extent array of
+      handles should NOT be freed.
+    */
+    ret = PINT_bucket_get_next_meta(
+        sm_p->server_config, sm_p->parent_ref.fs_id,
+        &sm_p->u.mkdir.meta_server_addr,
+        &meta_handle_extent_array);
+    if (ret < 0)
+    {
+        gossip_err("Failed to get meta server information\n");
+        assert(0);
+    }
+
+    gossip_debug(CLIENT_DEBUG," mkdir: posting mkdir req\n");
+
+    msg_p = &sm_p->msgpair;
+    memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
+
+    PINT_SERVREQ_MKDIR_FILL(msg_p->req,
+                            *sm_p->cred_p,
+                            sm_p->parent_ref.fs_id,
+                            meta_handle_extent_array,
+                            *sm_p->u.mkdir.sys_attr,
+                            PVFS_ATTR_SYS_ALL_NOSIZE);
+
+    /* fill in msgpair structure components */
+    msg_p->fs_id = sm_p->parent_ref.fs_id;
+    msg_p->handle = meta_handle_extent_array.extent_array[0].first;
+    msg_p->comp_fn = mkdir_msg_comp_fn;
+
+    /* we've already resolved the appropriate meta server */
+    msg_p->svr_addr = sm_p->u.mkdir.meta_server_addr;
+
+    return 1;
+}
+
+static int mkdir_msg_failure(PINT_client_sm *sm_p,
+                             job_status_s *js_p)
+{
+    gossip_debug(CLIENT_DEBUG, "mkdir state: mkdir_msg_failure\n");
+    return 1;
+}
+
+static int mkdir_crdirent_setup_msgpair(PINT_client_sm *sm_p,
+                                        job_status_s *js_p)
+{
+    int ret = -1;
+    PINT_client_sm_msgpair_state *msg_p = NULL;
+
+    gossip_debug(CLIENT_DEBUG, "mkdir state: crdirent_setup_msgpair\n");
+
+    /* clear error field in job */
+    js_p->error_code = 0;
+
+    /* get meta server to create dir entry on */
+    ret = PINT_bucket_map_to_server(&sm_p->u.mkdir.meta_server_addr,
+                                    sm_p->parent_ref.handle,
+                                    sm_p->parent_ref.fs_id);
+    if (ret < 0)
+    {
+        gossip_err("Failed to get meta server information\n");
+        assert(0);
+    }
+
+    gossip_debug(CLIENT_DEBUG," mkdir: posting crdirent req\n");
+
+    msg_p = &sm_p->msgpair;
+    memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
+
+    PINT_SERVREQ_CRDIRENT_FILL(msg_p->req,
+                               *sm_p->cred_p,
+                               sm_p->u.mkdir.object_name,
+                               sm_p->u.mkdir.metafile_handle,
+                               sm_p->parent_ref.handle,
+                               sm_p->parent_ref.fs_id);
+
+    /* fill in msgpair structure components */
+    msg_p->fs_id = sm_p->parent_ref.fs_id;
+    msg_p->handle = sm_p->u.mkdir.metafile_handle;
+    msg_p->comp_fn = mkdir_crdirent_comp_fn;
+
+    /* we've already resolved the appropriate meta server */
+    msg_p->svr_addr = sm_p->u.mkdir.meta_server_addr;
+
+    return 1;
+}
+
+static int mkdir_crdirent_failure(PINT_client_sm *sm_p,
+				   job_status_s *js_p)
+{
+    gossip_debug(CLIENT_DEBUG, "mkdir state: crdirent_failure\n");
+
+    if (js_p->error_code == -PVFS_EEXIST)
+    {
+        gossip_debug(CLIENT_DEBUG, "mkdir crdirent failed: "
+                     "dirent already exists!\n");
+    }
+    return 1;
+}
+
+static int mkdir_cleanup(PINT_client_sm *sm_p,
+                         job_status_s *js_p)
+{
+    gossip_debug(CLIENT_DEBUG, "mkdir state: cleanup\n");
+
+    sm_p->error_code = js_p->error_code;
+
+    /* fill in outgoing response fields */
+    sm_p->u.mkdir.mkdir_resp->pinode_refn.handle =
+        sm_p->u.mkdir.metafile_handle;
+    sm_p->u.mkdir.mkdir_resp->pinode_refn.fs_id =
+        sm_p->parent_ref.fs_id;
+
+    /* mark operation as complete */
+    sm_p->op_complete = 1;
+
+    return 0;
+}
+
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 noexpandtab
+ */

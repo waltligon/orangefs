@@ -351,6 +351,29 @@ endecode_fields_3_struct(PVFS_servreq_mkdir,
 #define extra_size_PVFS_servreq_mkdir \
     (PVFS_REQ_LIMIT_HANDLES_COUNT * sizeof(PVFS_handle_extent))
 
+#define PINT_SERVREQ_MKDIR_FILL(__req,			\
+				__creds,		\
+				__fs_id,		\
+				__ext_array,		\
+				__attr,			\
+				__amask)		\
+do {							\
+    memset(&(__req), 0, sizeof(__req));			\
+    (__req).op = PVFS_SERV_MKDIR;			\
+    (__req).credentials = (__creds);			\
+    (__req).u.mkdir.fs_id = __fs_id;			\
+    (__req).u.mkdir.handle_extent_array.extent_count =	\
+        (__ext_array.extent_count);			\
+    (__req).u.mkdir.handle_extent_array.extent_array =	\
+        (__ext_array.extent_array);			\
+    PINT_CONVERT_ATTR(&(__req).u.mkdir.attr,		\
+       &(__attr), PVFS_ATTR_COMMON_ALL);		\
+    (__req).u.mkdir.attr.mask &=			\
+        PVFS_ATTR_SYS_ALL_NOSIZE;			\
+    (__req).u.mkdir.attr.mask |= PVFS_ATTR_COMMON_TYPE;	\
+    (__req).u.mkdir.attr.objtype = PVFS_TYPE_DIRECTORY;	\
+} while (0)
+
 struct PVFS_servresp_mkdir
 {
     PVFS_handle handle;		    /* handle of new directory */

@@ -108,7 +108,11 @@ struct PINT_client_create_sm {
 
 /* PINT_client_mkdir_sm */
 struct PINT_client_mkdir_sm {
-/* ENOTIMPL ;-) */
+    char                         *object_name;    /* input parameter  */
+    PVFS_sysresp_mkdir           *mkdir_resp;     /* in/out parameter */
+    PVFS_sys_attr                *sys_attr;       /* input parameter  */
+    bmi_addr_t                   meta_server_addr;
+    PVFS_handle                  metafile_handle;
 };
 
 /* PINT_client_symlink_sm */
@@ -373,7 +377,7 @@ struct server_configuration_s *PINT_get_server_config_struct(void);
 /* system interface function state machines */
 extern struct PINT_state_machine_s pvfs2_client_remove_sm;
 extern struct PINT_state_machine_s pvfs2_client_create_sm;
-/* extern struct PINT_state_machine_s pvfs2_client_mkdir_sm; */
+extern struct PINT_state_machine_s pvfs2_client_mkdir_sm;
 extern struct PINT_state_machine_s pvfs2_client_symlink_sm;
 extern struct PINT_state_machine_s pvfs2_client_getattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_io_sm;

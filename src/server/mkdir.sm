@@ -90,15 +90,23 @@ static int mkdir_create(PINT_server_op *s_op, job_status_s* js_p)
 
     gossip_debug(SERVER_DEBUG, "mkdir state: create\n");
 
-    ret = job_trove_dspace_create(s_op->req->u.mkdir.fs_id,
-	    &s_op->req->u.mkdir.handle_extent_array,
-	    PVFS_TYPE_DIRECTORY,
-	    NULL,
-	    s_op,
-	    0,
-	    js_p,
-	    &i,
-	    server_job_context);
+    gossip_debug(
+        SERVER_DEBUG, "\ttrying to dspace create on "
+        "fs_id %d | handle-range[0]: %Lu-%Lu\n",
+        s_op->req->u.mkdir.fs_id,
+        s_op->req->u.mkdir.handle_extent_array.extent_array[0].first,
+        s_op->req->u.mkdir.handle_extent_array.extent_array[0].last);
+
+    ret = job_trove_dspace_create(
+        s_op->req->u.mkdir.fs_id,
+        &s_op->req->u.mkdir.handle_extent_array,
+        PVFS_TYPE_DIRECTORY,
+        NULL,
+        s_op,
+        0,
+        js_p,
+        &i,
+        server_job_context);
 
     return(ret);
 }
