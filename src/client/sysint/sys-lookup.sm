@@ -28,9 +28,6 @@ extern job_context_id pint_client_sm_context;
 sm_p->u.lookup.contexts[sm_p->u.lookup.current_context].current_segment])
 #define GET_CURRENT_CONTEXT()                                             \
 &(sm_p->u.lookup.contexts[sm_p->u.lookup.current_context])
-#define GET_PREVIOUS_CONTEXT()                                            \
-(sm_p->u.lookup.current_context ?                                         \
- &(sm_p->u.lookup.contexts[sm_p->u.lookup.current_context - 1]) : NULL)
 
 enum
 {
@@ -79,8 +76,8 @@ static int lookup_segment_getattr_comp_fn(
 
 /* helper function prototypes */
 static int initialize_context(
-    PINT_client_lookup_sm_ctx *ctx,
-    PINT_client_lookup_sm_ctx *prev_ctx,
+    PINT_client_lookup_sm_ctx *ctx_array,
+    int current_ctx_index,
     char *pathname,
     PVFS_pinode_reference ctx_starting_refn);
 
@@ -200,22 +197,29 @@ machine pvfs2_client_lookup_sm(
 %%
 
 static int initialize_context(
-    PINT_client_lookup_sm_ctx *ctx,
-    PINT_client_lookup_sm_ctx *prev_ctx,
+    PINT_client_lookup_sm_ctx *ctx_array,
+    int current_ctx_index,
     char *pathname,
     PVFS_pinode_reference ctx_starting_refn)
 {
     int ret = -PVFS_EINVAL, pathlen = 0, num_segments = 0;
     void *state = NULL;
-    int cur_seg_index = 0;
+    int cur_seg_index = 0, prev_ctx_index = 0;
     char *cur_seg_name = NULL;
     PINT_client_lookup_sm_segment *cur_seg = NULL;
     int num_consecutive_prev_ctx_dot_dots = 0;
+    PINT_client_lookup_sm_ctx *ctx = NULL;
+    PINT_client_lookup_sm_ctx *prev_ctx = NULL;
 
     gossip_debug(LOOKUP_DEBUG, "initialize_context called\n");
 
-    if (ctx && pathname)
+    if (ctx_array && pathname && (current_ctx_index > -1))
     {
+        ctx = &ctx_array[current_ctx_index];
+        assert(ctx);
+
+        prev_ctx_index = (current_ctx_index - 1);
+
         pathlen = strlen(pathname);
         num_segments = PINT_string_count_segments(pathname);
 
@@ -274,10 +278,21 @@ static int initialize_context(
                         LOOKUP_DEBUG, "  got a '..' segment that "
                         "requires attention of the previous context\n");
 
+                  init_next_prev_segment:
                     /*
-                      in this case, a previous ctx MUST have been
-                      provided, otherwise, the lookup should fail
+                      grab the previous context to access the segments
+                      within it, assuming a previous context is
+                      available
                     */
+                    if (prev_ctx_index < 0)
+                    {
+                        gossip_debug(
+                            LOOKUP_DEBUG, "there are no more previous "
+                            "contexts available: failing lookup\n");
+                        return -PVFS_ENOENT;
+                    }
+
+                    prev_ctx = &ctx_array[prev_ctx_index];
                     assert(prev_ctx);
                     assert(prev_ctx->current_segment > 0);
 
@@ -288,19 +303,30 @@ static int initialize_context(
                         "is now %d\n", num_consecutive_prev_ctx_dot_dots);
 
                     /*
-                      further, if we have a number of consecutive
-                      '..' segments, we need to keep backing up
-                      into the previous context (so long as there
-                      are that many segments in the previous ctx!)
+                      further, if we have a number of consecutive '..'
+                      segments, we may need to keep backing up into
+                      the previous contexts' space
                     */
                     if (prev_ctx->current_segment -
                         num_consecutive_prev_ctx_dot_dots < 0)
                     {
+                        /* skip to next previous context, if any */
+                        if (prev_ctx_index > -1)
+                        {
+                            /*
+                              bump down dot dot count since it wasn't
+                              used yet if we got here
+                            */
+                            num_consecutive_prev_ctx_dot_dots--;
+                            prev_ctx_index--;
+                            goto init_next_prev_segment;
+                        }
                         gossip_debug(
                             LOOKUP_DEBUG, "there are no more segments "
                             "in the previous context: failing lookup\n");
                         return -PVFS_ENOENT;
                     }
+
                     prev_ctx_prev_seg = &prev_ctx->segments[
                         prev_ctx->current_segment -
                         num_consecutive_prev_ctx_dot_dots];
@@ -432,7 +458,8 @@ int PVFS_sys_ref_lookup(
     sm_p->u.lookup.follow_link = follow_link;
     sm_p->u.lookup.current_context = 0;
 
-    ret = initialize_context(&(sm_p->u.lookup.contexts[0]), NULL,
+    ret = initialize_context(sm_p->u.lookup.contexts,
+                             sm_p->u.lookup.current_context,
                              relative_pathname, parent);
     if (ret != 0)
     {
@@ -753,8 +780,6 @@ static int lookup_segment_handle_relative_link(PINT_client_sm *sm_p,
                                                job_status_s *js_p)
 {
     int ret = -1;
-    PINT_client_lookup_sm_ctx *cur_ctx = NULL;
-    PINT_client_lookup_sm_ctx *prev_ctx = NULL;
     PINT_client_lookup_sm_segment *cur_seg = NULL;
     char *relative_symlink_target = NULL;
 
@@ -784,11 +809,6 @@ static int lookup_segment_handle_relative_link(PINT_client_sm *sm_p,
         return 1;
     }
 
-    cur_ctx = GET_CURRENT_CONTEXT();
-    assert(cur_ctx);
-
-    prev_ctx = GET_PREVIOUS_CONTEXT();
-
     /*
       and initialize the new context with the information we have so
       that it can resolve this absolute link.
@@ -797,7 +817,8 @@ static int lookup_segment_handle_relative_link(PINT_client_sm *sm_p,
       the segment that resolves to this relative link, since the
       link must be relative to that starting parent
     */
-    ret = initialize_context(cur_ctx, prev_ctx,
+    ret = initialize_context(sm_p->u.lookup.contexts,
+                             sm_p->u.lookup.current_context,
                              relative_symlink_target,
                              cur_seg->seg_starting_refn);
     if (ret != 0)
@@ -811,8 +832,6 @@ static int lookup_segment_handle_absolute_link(PINT_client_sm *sm_p,
                                                job_status_s *js_p)
 {
     int ret = -1;
-    PINT_client_lookup_sm_ctx *cur_ctx = NULL;
-    PINT_client_lookup_sm_ctx *prev_ctx = NULL;
     PINT_client_lookup_sm_segment *cur_seg = NULL;
     char *absolute_symlink_target = NULL;
     PVFS_pinode_reference root_refn;
@@ -841,11 +860,6 @@ static int lookup_segment_handle_absolute_link(PINT_client_sm *sm_p,
         return 1;
     }
 
-    cur_ctx = GET_CURRENT_CONTEXT();
-    assert(cur_ctx);
-
-    prev_ctx = GET_PREVIOUS_CONTEXT();
-
     /*
       and initialize the new context with the information we have so
       that it can resolve this absolute link.
@@ -857,7 +871,8 @@ static int lookup_segment_handle_absolute_link(PINT_client_sm *sm_p,
     ret = PINT_bucket_get_root_handle(root_refn.fs_id, &root_refn.handle);
     assert(ret == 0);
 
-    ret = initialize_context(cur_ctx, prev_ctx,
+    ret = initialize_context(sm_p->u.lookup.contexts,
+                             sm_p->u.lookup.current_context,
                              absolute_symlink_target,
                              root_refn);
     if (ret != 0)
