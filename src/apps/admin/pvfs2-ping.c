@@ -27,6 +27,7 @@ struct options
 
 static struct options* parse_args(int argc, char* argv[]);
 static void usage(int argc, char** argv);
+static void print_mntent(struct pvfs_mntent_s* entry);
 
 int main(int argc, char **argv)
 {
@@ -49,10 +50,15 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
+    printf("\n(1) Searching for %s in %s...\n", user_opts->fs_path,
+	DEFAULT_TAB);
+
     /* look at pvfstab */
-    if(PVFS_util_parse_pvfstab(DEFAULT_TAB, &mnt))
+    ret = PVFS_util_parse_pvfstab(DEFAULT_TAB, &mnt);
+    if(ret < 0)
     {
-        fprintf(stderr, "Error: failed to parse pvfstab %s.\n", DEFAULT_TAB);
+	PVFS_perror("PVFS_util_parse_pvfstab", ret);
+        fprintf(stderr, "Failure: could not parse pvfstab %s.\n", DEFAULT_TAB);
         return(-1);
     }
 
@@ -72,7 +78,7 @@ int main(int argc, char **argv)
 
     if(mnt_index == -1)
     {
-	fprintf(stderr, "Error: could not find filesystem for %s in pvfstab %s\n", 
+	fprintf(stderr, "Failure: could not find filesystem for %s in pvfstab %s\n", 
 	    user_opts->fs_path, DEFAULT_TAB);
 	return(-1);
     }
@@ -84,14 +90,18 @@ int main(int argc, char **argv)
     mnt.nr_entry = 1;
     mnt_index = 0;
 
+    print_mntent(mnt.ptab_p);
+
     creds.uid = getuid();
     creds.gid = getgid();
 
+    printf("\n(2) Initializing system interface and retrieving configuration from server...\n");
     memset(&resp_init, 0, sizeof(resp_init));
     ret = PVFS_sys_initialize(mnt, 0, &resp_init);
     if(ret < 0)
     {
 	PVFS_perror("PVFS_sys_initialize", ret);
+	fprintf(stderr, "Failure: could not initialize system interface.\n");
 	return(-1);
     }
 
@@ -102,6 +112,19 @@ int main(int argc, char **argv)
     return(ret);
 }
 
+
+/* print_mntent()
+ *
+ * prints out pvfstab information 
+ *
+ * no return value
+ */
+static void print_mntent(struct pvfs_mntent_s* entry)
+{
+    printf("   Initial server: %s\n", entry->meta_addr);
+    printf("   Storage name: %s\n", entry->service_name);
+    printf("   Local mount point: %s\n", entry->local_mnt_dir);
+}
 
 /* parse_args()
  *
