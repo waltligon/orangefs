@@ -13,6 +13,10 @@ QLIST_HEAD(dbpf_op_queue);
 /* lock to be obtained before manipulating dbpf_op_queue */
 gen_mutex_t dbpf_op_queue_mutex = GEN_MUTEX_INITIALIZER;
 
+#ifdef __PVFS2_TROVE_THREADED__
+extern pthread_cond_t dbpf_op_incoming_cond;
+#endif
+
 /* dbpf_queued_op_put_and_dequeue()
  *
  * Assumption: we already have gotten responsibility for the op by
@@ -171,11 +175,23 @@ void dbpf_queued_op_put(dbpf_queued_op_t *q_op_p, int completed)
 TROVE_op_id dbpf_queued_op_queue(dbpf_queued_op_t *q_op_p)
 {
     gen_mutex_lock(&dbpf_op_queue_mutex);
+
     dbpf_op_queue_add(&dbpf_op_queue, q_op_p);
+
+    gen_mutex_lock(&q_op_p->mutex);
     q_op_p->op.state = OP_QUEUED;
+    id_gen_fast_register(&q_op_p->op.id, q_op_p);
+    gen_mutex_unlock(&q_op_p->mutex);
+
     gen_mutex_unlock(&dbpf_op_queue_mutex);
 
-    id_gen_fast_register(&q_op_p->op.id, q_op_p);
+#ifdef __PVFS2_TROVE_THREADED__
+    /*
+      wake up our operation thread if it's sleeping to let
+      it know that a new op is available for servicing
+    */
+    pthread_cond_signal(&dbpf_op_incoming_cond);
+#endif
     return q_op_p->op.id;
 }
 

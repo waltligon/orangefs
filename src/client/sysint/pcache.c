@@ -627,10 +627,10 @@ static void reclaim_pinode_entries()
       reclaim_exit:
         gen_mutex_unlock(s_pcache_htable_mutex);
     }
-    fprintf(stderr,"reclaim_pinode_entries reclaimed %d entries\n",
-            num_reclaimed);
-    fprintf(stderr,"Total allocated is %d\n",
-            s_pcache_allocated_entries);
+/*     fprintf(stderr,"reclaim_pinode_entries reclaimed %d entries\n", */
+/*             num_reclaimed); */
+/*     fprintf(stderr,"Total allocated is %d\n", */
+/*             s_pcache_allocated_entries); */
     pcache_debug("reclaim_pinode_entries exited\n");
 }
 #endif /* PINT_PCACHE_AUTO_CLEANUP */

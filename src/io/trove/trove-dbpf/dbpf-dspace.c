@@ -29,7 +29,7 @@
 #include <pthread.h>
 #include "dbpf-thread.h"
 
-extern pthread_cond_t dbpf_op_cond;
+extern pthread_cond_t dbpf_op_completed_cond;
 #endif
 
 extern dbpf_op_queue_p dbpf_completion_queue_array[TROVE_MAX_CONTEXTS];
@@ -962,8 +962,8 @@ static int dbpf_dspace_test(TROVE_coll_id coll_id,
         wait_time.tv_nsec = ((max_idle_time_ms % 1000) * 1000000);
 
         gen_mutex_lock(context_mutex);
-        ret = pthread_cond_timedwait(
-            &dbpf_op_cond, context_mutex, &wait_time);
+        ret = pthread_cond_timedwait(&dbpf_op_completed_cond,
+                                     context_mutex, &wait_time);
         gen_mutex_unlock(context_mutex);
 
         if (ret == ETIMEDOUT)
@@ -1078,6 +1078,7 @@ int dbpf_dspace_testcontext(
 {
     int ret = 0;
 
+    assert(0);
 
     return ret;
 }
@@ -1179,13 +1180,24 @@ static int dbpf_dspace_testsome(
     /* if no op completed, wait for up to max_idle_time_ms */
     if ((wait == 0) && (out_count == 0) && (max_idle_time_ms > 0))
     {
+        struct timeval base;
         struct timespec wait_time;
-        wait_time.tv_sec = (max_idle_time_ms / 1000);
-        wait_time.tv_nsec = ((max_idle_time_ms % 1000) * 1000000);
+
+        /* compute how long to wait */
+        gettimeofday(&base, NULL);
+        wait_time.tv_sec = base.tv_sec +
+            (max_idle_time_ms / 1000);
+        wait_time.tv_nsec = base.tv_usec * 1000 + 
+            ((max_idle_time_ms % 1000) * 1000000);
+        if (wait_time.tv_nsec > 1000000000)
+        {
+            wait_time.tv_nsec = wait_time.tv_nsec - 1000000000;
+            wait_time.tv_sec++;
+        }
 
         gen_mutex_lock(context_mutex);
-        ret = pthread_cond_timedwait(
-            &dbpf_op_cond, context_mutex, &wait_time);
+        ret = pthread_cond_timedwait(&dbpf_op_completed_cond,
+                                     context_mutex, &wait_time);
         gen_mutex_unlock(context_mutex);
 
         if (ret != ETIMEDOUT)

@@ -26,7 +26,9 @@ extern dbpf_op_queue_p dbpf_completion_queue_array[TROVE_MAX_CONTEXTS];
 extern gen_mutex_t *dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
 
 #ifdef __PVFS2_TROVE_THREADED__
-pthread_cond_t dbpf_op_cond = PTHREAD_COND_INITIALIZER;
+pthread_cond_t dbpf_op_completed_cond = PTHREAD_COND_INITIALIZER;
+pthread_cond_t dbpf_op_incoming_cond = PTHREAD_COND_INITIALIZER;
+static gen_mutex_t *dbpf_op_incoming_cond_mutex = NULL;
 static pthread_t dbpf_thread;
 static int dbpf_thread_running = 0;
 #endif
@@ -35,8 +37,15 @@ int dbpf_thread_initialize(void)
 {
     int ret = 0;
 #ifdef __PVFS2_TROVE_THREADED__
-    ret = pthread_create(&dbpf_thread, NULL, dbpf_thread_function, NULL);
-    dbpf_thread_running = ((ret == 0) ? 1 : 0);
+    ret = -1;
+    dbpf_op_incoming_cond_mutex = gen_mutex_build();
+    if (dbpf_op_incoming_cond_mutex)
+    {
+        dbpf_thread_running = 1;
+        ret = pthread_create(&dbpf_thread, NULL,
+                             dbpf_thread_function, NULL);
+        dbpf_thread_running = ((ret == 0) ? 1 : 0);
+    }
 #endif
     return ret;
 }
@@ -48,7 +57,9 @@ int dbpf_thread_finalize(void)
     dbpf_thread_running = 0;
     usleep(500);
     ret = pthread_cancel(dbpf_thread);
-    pthread_cond_destroy(&dbpf_op_cond);
+    pthread_cond_destroy(&dbpf_op_completed_cond);
+    pthread_cond_destroy(&dbpf_op_incoming_cond);
+    gen_mutex_destroy(dbpf_op_incoming_cond_mutex);
 #endif
     return ret;
 }
@@ -56,17 +67,55 @@ int dbpf_thread_finalize(void)
 void *dbpf_thread_function(void *ptr)
 {
 #ifdef __PVFS2_TROVE_THREADED__
-    int out_count = 0;
+    int ret = 0, out_count = 0, op_queued_empty = 0;
+    struct timeval base;
+    struct timespec wait_time;
+
     gossip_debug(TROVE_DEBUG, "dbpf_thread_function started\n");
 
-    do
+    while(dbpf_thread_running)
     {
+        /* check if we any have ops to service in our work queue */
+        gen_mutex_lock(&dbpf_op_queue_mutex);
+        op_queued_empty = qlist_empty(&dbpf_op_queue);
+        gen_mutex_unlock(&dbpf_op_queue_mutex);
 
-        dbpf_do_one_work_cycle(&out_count);
-        usleep((DBPF_OPS_PER_WORK_CYCLE * 10) -
-               (out_count * 10));
+        if (!op_queued_empty)
+        {
+            dbpf_do_one_work_cycle(&out_count);
+        }
 
-    } while(dbpf_thread_running);
+        /*
+          if we have no work to do, wait nicely until an
+          operation to be serviced has entered the system.
+
+          if the queue isn't empty, and the out_count is 0,
+          that means that we're driving i/o operations without
+          using the aio callback completion.  we sleep between
+          those calls to avoid busy waiting (i.e. the timedwait
+          call is okay in those cases)
+        */
+        if ((op_queued_empty) || (!op_queued_empty && (out_count == 0)))
+        {
+            /* compute how long to wait */
+            gettimeofday(&base, NULL);
+            wait_time.tv_sec = base.tv_sec +
+                (TROVE_DEFAULT_TEST_TIMEOUT / 1000);
+            wait_time.tv_nsec = base.tv_usec * 1000 + 
+                ((TROVE_DEFAULT_TEST_TIMEOUT % 1000) * 1000000);
+            if (wait_time.tv_nsec > 1000000000)
+            {
+                wait_time.tv_nsec = wait_time.tv_nsec - 1000000000;
+                wait_time.tv_sec++;
+            }
+
+            gen_mutex_lock(dbpf_op_incoming_cond_mutex);
+            ret = pthread_cond_timedwait(&dbpf_op_incoming_cond,
+                                         dbpf_op_incoming_cond_mutex,
+                                         &wait_time);
+            gen_mutex_unlock(dbpf_op_incoming_cond_mutex);
+        }
+    }
 
     gossip_debug(TROVE_DEBUG, "dbpf_thread_function ending\n");
 #endif
