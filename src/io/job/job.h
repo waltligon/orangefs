@@ -194,6 +194,15 @@ int job_trove_bstream_read_at(PVFS_fs_id coll_id,
 			      job_id_t * id,
 			      job_context_id context_id);
 
+/* byte stream flush to storage */
+int job_trove_bstream_flush(PVFS_fs_id coll_id
+			    PVFS_handle handle,
+			    PVFS_ds_flags flags,
+			    void *user_ptr,
+			    job_status_s * out_status_p,
+			    job_id_t * id,
+			    job_context_id context_id);
+	
 /* storage key/value read */
 int job_trove_keyval_read(PVFS_fs_id coll_id,
 			  PVFS_handle handle,
@@ -230,6 +239,15 @@ int job_trove_keyval_write(PVFS_fs_id coll_id,
 			   job_status_s * out_status_p,
 			   job_id_t * id,
 			   job_context_id context_id);
+
+/* flush keyval data to storage */
+int job_trove_keyval_flush(PVFS_fs_id coll_id,
+			    PVFS_handle handle,
+			    PVFS_ds_flags flags,
+			    void * user_ptr,
+			    job_status_s * out_status_p,
+			    job_id_t * id,
+			    job_context_id context_id);
 
 /* read generic dspace attributes */
 int job_trove_dspace_getattr(PVFS_fs_id coll_id,

@@ -1192,6 +1192,71 @@ int job_trove_bstream_read_at(PVFS_fs_id coll_id,
     return (0);
 }
 
+/* job_trove_bstream_flush()
+ *
+ * ask the storage layer to flush data to disk
+ *
+ * returns 0 on success, 1 on immediate completion, and -errno on failure
+ */
+
+int job_trove_bstream_flush(PVFS_fs_id coll_id
+			    PVFS_handle handle,
+			    PVFS_ds_flags flags,
+			    void *user_ptr,
+			    job_status_s * out_status_p,
+			    job_id_t * id,
+			    job_context_id context_id)
+			    
+{
+    int ret = -1;
+    struct job_desc *jd = NULL;
+
+    /* create the job desc first, even though we may not use it.  This
+     * gives us somewhere to store the BMI id and user ptr
+     */
+    if (!jd)
+    {
+	return (-errno);
+    }
+    jd->job_user_ptr = user_ptr;
+    jd->context_id = context_id;
+
+    ret = trove_bstream_flush(coll_id, handle, flags, jd, &(jd->u.trove.id));
+
+    if (ret < 0)
+    {
+	/* error posting trove operation */
+	dealloc_job_desc(jd);
+	out_status_p->error_code = ret;
+	return (1);
+    }
+    if (ret == 1)
+    {
+	/* immediate completion */
+	out_status_p->error_code = 0;
+	dealloc_job_desc(jd);
+	return (ret);
+    }
+    /* if we fall through to this point, the job did not
+     * immediately complete and we must queue up to test later
+     */
+    gen_mutex_lock(&trove_mutex);
+    *id = jd->job_id;
+    ret = trove_id_queue_add(trove_inflight_queue, jd->u.trove.id, coll_id);
+    if(ret < 0)
+    {
+	/* TODO: handle this correctly */
+	return(ret);
+    }
+    trove_pending_count++;
+#ifdef __PVFS2_JOB_THREADED__
+    pthread_cond_signal(&trove_cond);
+#endif /* __PVFS2_JOB_THREADED__ */
+    gen_mutex_unlock(&trove_mutex);
+
+    return (0);
+}
+
 /* job_trove_keyval_read()
  *
  * storage key/value read 
@@ -1427,6 +1492,74 @@ int job_trove_keyval_write(PVFS_fs_id coll_id,
 
     return (0);
 }
+
+/* job_trove_keyval_flush()
+ *
+ * ask the storage layer to flush keyvals to disk
+ *
+ * returns 0 on success, 1 on immediate completion, and -errno on failure
+ */
+
+int job_trove_keyval_flush(PVFS_fs_id coll_id,
+			    PVFS_handle handle,
+			    PVFS_ds_flags flags,
+			    void * user_ptr,
+			    job_status_s * out_status_p,
+			    job_id_t * id,
+			    job_context_id context_id)
+{
+    int ret = -1;
+    struct job_desc *jd = NULL;
+
+    /* create the job desc first, even though we may not use it.  This
+     * gives us somewhere to store the BMI id and user ptr
+     */
+    jd = alloc_job_desc(JOB_TROVE);
+    if (!jd)
+    {
+	return (-errno);
+    }
+    jd->job_user_ptr = user_ptr;
+    jd->context_id = context_id;
+
+    ret = trove_keyval_flush(coll_id, handle, jd, &(jd->u.trove.id));
+
+    if (ret < 0)
+    {
+	/* error posting trove operation */
+	dealloc_job_desc(jd);
+	out_status_p->error_code = ret;
+	return (1);
+    }
+
+    if (ret == 1)
+    {
+	/* immediate completion */
+	out_status_p->error_code = 0;
+	dealloc_job_desc(jd);
+	return (ret);
+    }
+
+    /* if we fall through to this point, the job did not
+     * immediately complete and we must queue up to test later
+     */
+    gen_mutex_lock(&trove_mutex);
+    *id = jd->job_id;
+    ret = trove_id_queue_add(trove_inflight_queue, jd->u.trove.id, coll_id);
+    if(ret < 0)
+    {
+	/* TODO: handle this correctly */
+	return(ret);
+    }
+    trove_pending_count++;
+#ifdef __PVFS2_JOB_THREADED__
+    pthread_cond_signal(&trove_cond);
+#endif /* __PVFS2_JOB_THREADED__ */
+    gen_mutex_unlock(&trove_mutex);
+
+    return (0);
+}
+
 
 /* job_trove_dspace_getattr()
  *
