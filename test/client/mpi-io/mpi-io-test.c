@@ -36,7 +36,7 @@
 
 
 /* DEFAULT VALUES FOR OPTIONS */
-static int     opt_block     = 16*1024*1024;
+static int64_t opt_block     = 16*1024*1024;
 static int     opt_iter      = 1;
 static int     opt_correct   = 0;
 static int     opt_sync      = 0;
@@ -51,10 +51,14 @@ static int parse_args(int argc, char **argv);
 static void usage(void);
 static void handle_error(int errcode, char *str);
 
+/* global vars */
+static int mynod = 0;
+static int nprocs = 1;
+
 int main(int argc, char **argv)
 {
 	char *buf, *tmp=NULL, *check;
-	int i, j, v, mynod=0, nprocs=1, err, sync_err=0, my_correct = 1, correct, myerrno;
+	int i, j, v, err, sync_err=0, my_correct = 1, correct, myerrno;
 	double stim, etim;
 	double write_tim = 0;
 	double read_tim = 0;
@@ -107,7 +111,7 @@ int main(int argc, char **argv)
 	iter_jump = nprocs * opt_block;
 		
 	/* setup a buffer of data to write */
-	if (!(tmp = malloc(opt_block + 256))) {
+	if (!(tmp = malloc((size_t) opt_block + 256))) {
 		perror("malloc");
 		goto die_jar_jar_die;
 	}
@@ -146,7 +150,7 @@ int main(int argc, char **argv)
 	   stim = MPI_Wtime();
 
 		/* write out the data */
-		nchars = opt_block/sizeof(char);
+		nchars = (int) (opt_block/sizeof(char));
 		err = MPI_File_write(fh, buf, nchars, MPI_CHAR, &status);
 		if(err){
 			fprintf(stderr, "node %d, write error: %s\n", mynod, 
@@ -210,7 +214,7 @@ int main(int argc, char **argv)
 	   etim = MPI_Wtime();
 	   read_tim += (etim - stim);
 
-	   if (err < 0) fprintf(stderr, "node %d, read error, loc = %Ld: %s\n",
+	   if (err < 0) fprintf(stderr, "node %d, read error, loc = %lld: %s\n",
 			mynod, mynod*opt_block, strerror(myerrno));
 
 		/* if the user wanted to check correctness, compare the write
@@ -288,13 +292,13 @@ int main(int argc, char **argv)
 	
 	/* print out the results on one node */
 	if (mynod == 0) {
-	   read_bw = ((int64_t)opt_block*nprocs*opt_iter)/(max_read_tim*1.0e6);
-	   write_bw = ((int64_t)opt_block*nprocs*opt_iter)/(max_write_tim*1.0e6);
+	   read_bw = (opt_block*nprocs*opt_iter)/(max_read_tim*1.0e6);
+	   write_bw = (opt_block*nprocs*opt_iter)/(max_write_tim*1.0e6);
 		
-			printf("nr_procs = %d, nr_iter = %d, blk_sz = %ld\n", nprocs,
-		opt_iter, (long)opt_block);
+			printf("nr_procs = %d, nr_iter = %d, blk_sz = %lld\n", nprocs,
+		opt_iter, opt_block);
 			
-			printf("# total_size = %lld\n", (int64_t)opt_block*nprocs*opt_iter);
+			printf("# total_size = %lld\n", opt_block*nprocs*opt_iter);
 			
 			printf("# Write: min_t = %f, max_t = %f, mean_t = %f, var_t = %f\n", 
 				min_write_tim, max_write_tim, ave_write_tim, var_write_tim);
@@ -349,10 +353,12 @@ static int parse_args(int argc, char **argv)
 				opt_verbose = 1;
 				break;
 			case 'h':
-				usage();
+				if (mynod == 0)
+					 usage();
 				exit(0);
 			case '?': /* unknown */
-				usage();
+				if (mynod == 0)
+					 usage();
 				exit(1);
 			default:
 				break;
