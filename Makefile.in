@@ -558,8 +558,8 @@ cscope:
 
 # build editor tags file over just the modules of interest
 tags:
-	find $(MODULES) include . -maxdepth 1 -name '*.[ch]' -print |\
-	  ctags --excmd=pattern -B -I __hidden,DOTCONF_CB -L-
+	find $(MODULES) include . -maxdepth 1 -name '*.[ch]' -o -name '*.sm' |\
+	  ctags --excmd=pattern -B --langmap=c:+.sm -I __hidden,DOTCONF_CB -L-
 
 # rule for running code check
 codecheck:
