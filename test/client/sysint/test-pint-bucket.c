@@ -6,200 +6,263 @@
 
 #include <stdio.h>
 
-#include <pint-bucket.h>
-#include <gossip.h>
+#include "pvfs2-sysint.h"
+#include "pint-sysint.h"
+#include "gossip.h"
+#include "dotconf.h"
+#include "trove.h"
+#include "server-config.h"
+#include "pint-bucket.h"
+
+#define MAX_NUM_FS                   67
+#define MAX_BMI_ADDR_LEN            512
+
+/* determines how many times to call '_get_next_meta' */
+#define NUM_META_SERVERS_TO_QUERY     3
+
+/* determines how many i/o servers to request from '_get_next_io' */
+#define NUM_DATA_SERVERS_TO_QUERY     3
+
+/*
+  determines which handles to test mappings on.  the handles
+  placed below MUST be within a valid range of a filesystem
+  in the server's fs.conf for this test to pass.
+*/
+#define NUM_TEST_HANDLES              5
+static PVFS_handle test_handles[NUM_TEST_HANDLES] =
+{
+    1048494,
+    1047881,
+    1047871,
+    1048531,
+    1048525
+};
 
 /* this is a test program that exercises the bucket interface and
  * demonstrates how to use it.
  */
 int main(int argc, char **argv)	
 {
-#if 0
-	int ret = -1;
-	int num_meta_servers = 0;
-	int num_io_servers = 0;
-	char big_buff[256];
-	bmi_addr_t test_server_addr;
-	int count = 0;
-	PVFS_handle test_bucket;
-	PVFS_handle test_mask;
+    int i = 0, j = 0, k = 0, num_file_systems = 0;
+    pvfs_mntlist mnt = {0,NULL};
+    job_context_id PVFS_sys_job_context = -1;
+    struct server_configuration_s server_config;
+    struct llist *cur = NULL;
+    struct filesystem_configuration_s *cur_fs = NULL;
+    int fs_ids[MAX_NUM_FS] = {0};
+    int num_meta_servers = 0, num_data_servers = 0;
+    bmi_addr_t addr, m_addr, d_addr[NUM_DATA_SERVERS_TO_QUERY];
+    char server_name[MAX_BMI_ADDR_LEN] = {0};
+    int test_handles_verified[NUM_TEST_HANDLES] = {0};
 
-	bmi_addr_t meta_server_addr;
-	PVFS_handle meta_server_bucket;
-	PVFS_handle meta_server_mask;
+    gossip_enable_stderr();
+    gossip_set_debug_mask(0, 0);
 
-	bmi_addr_t io_server_addr_array[2];
-	PVFS_handle io_server_bucket_array[2];
-	PVFS_handle io_server_mask;
+    if (parse_pvfstab(NULL,&mnt))
+    {
+        fprintf(stderr, "parse_pvfstab failure.\n");
+        return(-1);
+    }
 
-	/* these are things we must retrieve from the server and or pvfstab
-	 * in order to load new mappings into the bucket interface:
-	 */
-	/*****************************/
-	char meta_mapping[] = "foo";
-	char io_mapping[] = "bar";
-	PVFS_handle handle_mask = 0;
-	PVFS_fs_id fsid = 3;
-	/*****************************/
+    if (BMI_initialize("bmi_tcp",NULL,0))
+    {
+        fprintf(stderr, "BMI_initialize failure.\n");
+        return(-1);
+    }
 
-	/* set debugging stuff */
-	gossip_enable_stderr();
-	gossip_set_debug_mask(0, 0);
+    if (job_initialize(0))
+    {
+        fprintf(stderr, "job_initialize failure.\n");
+        return(-1);
+    }
 
-	/* start up BMI just so that we an resolve server addresses correctly */
-	ret = BMI_initialize("bmi_tcp", NULL, 0);
-	if(ret < 0)
-	{
-		fprintf(stderr, "BMI_initialize failure.\n");
-		return(-1);
-	}
+    if (job_open_context(&PVFS_sys_job_context))
+    {
+        fprintf(stderr, "job_open_context failure.\n");
+        return(-1);
+    }
 
-	/* start up the interface */
-	ret = PINT_bucket_initialize();
-	if(ret < 0)
-	{
-		fprintf(stderr, "PINT_bucket_initialize() failure.\n");
-		return(-1);
-	}
+    if (PINT_bucket_initialize())
+    {
+        fprintf(stderr, "PINT_bucket_initialize() failure.\n");
+        return(-1);
+    }
 
-	/* load up a mapping */
-	/* NOTE: this ignores the meta_mapping and io_mapping for now */
-/* FIXME: Commented out while transitioning to handle mappings... */
-/* 	ret = PINT_bucket_load_mapping(meta_mapping, 1, io_mapping, 1, */
-/* 		handle_mask, fsid); */
-/* FIXME: Commented out while transitioning to handle mappings... */
-	if(ret < 0)
-	{
-		fprintf(stderr, "PINT_bucket_load_mapping() failure.\n");
-		return(-1);
-	}
+    memset(&server_config,0,sizeof(struct server_configuration_s));
+    if (PINT_server_get_config(&server_config, mnt))
+    {
+        fprintf(stderr, "PINT_server_get_config failure.\n");
+        return(-1);
+    }
 
-	/* check the number of servers we have available now */
-	ret = PINT_bucket_get_num_meta(fsid, &num_meta_servers);
-	if(ret < 0)
-	{
-		fprintf(stderr, "PINT_bucket_get_num_meta() failure.\n");
-		return(-1);
-	}
+    cur = server_config.file_systems;
+    while(cur)
+    {
+        cur_fs = llist_head(cur);
+        if (!cur_fs)
+        {
+            break;
+        }
+        printf("Loading mappings of filesystem %s\n",
+               cur_fs->file_system_name);
+        if (PINT_handle_load_mapping(&server_config,cur_fs))
+        {
+            fprintf(stderr, "PINT_handle_load_mapping failure.\n");
+            return(-1);
+        }
+        fs_ids[i++] = (int)cur_fs->coll_id;
+        cur = llist_next(cur);
+    }
 
-	printf("OUTPUT OF TEST:\n");
-	printf("***************************************\n");
+    /* run all pint-bucket tests for each filesystem we know about */
+    num_file_systems = llist_count(server_config.file_systems);
+    for(i = 0; i < num_file_systems; i++)
+    {
+        printf("\nOUTPUT OF TEST (filesystem ID is %d):\n",fs_ids[i]);
+        printf("***************************************\n");
 
-	printf("\n");
-	printf("Number of meta servers available: %d\n", num_meta_servers);
+        if (PINT_bucket_get_num_meta(fs_ids[i],&num_meta_servers))
+        {
+            fprintf(stderr, "PINT_bucket_get_num_meta failure.\n");
+            return(-1);
+        }
+        else
+        {
+            printf("\nNumber of meta servers available: %d\n",
+                   num_meta_servers);
+        }
 
-	ret = PINT_bucket_get_num_io(fsid, &num_io_servers);
-	if(ret < 0)
-	{
-		fprintf(stderr, "PINT_bucket_get_num_io() failure.\n");
-		return(-1);
-	}
+        if (PINT_bucket_get_num_io(fs_ids[i],&num_data_servers))
+        {
+            fprintf(stderr, "PINT_bucket_get_num_io failure.\n");
+            return(-1);
+        }
+        else
+        {
+            printf("Number of I/O servers available: %d\n",
+                   num_data_servers);
+        }
 
-	printf("Number of I/O servers available: %d\n", num_io_servers);
+        printf("\n");
+        for(j = 0; j < NUM_META_SERVERS_TO_QUERY; j++)
+        {
+            if (PINT_bucket_get_next_meta(&server_config,fs_ids[i], &m_addr))
+            {
+                fprintf(stderr, "PINT_bucket_get_next_meta failure.\n");
+                return(-1);
+            }
+            else
+            {
+                printf("Next meta server addr: %lu\n",(long)m_addr);
+            }
+        }
 
-	/* find out which meta server should be used next for placing meta
-	 * objects
-	 */
-	ret = PINT_bucket_get_next_meta(fsid, &meta_server_addr,
-		&meta_server_bucket, &meta_server_mask);
-	if(ret < 0)
-	{
-		fprintf(stderr, "PINT_bucket_get_next_meta() failure.\n");
-		return(-1);
-	}
-	
-	printf("\n");
-	printf("Next meta server: addr: %ld, bucket: %ld, mask: %ld\n", 
-		(long)meta_server_addr, (long)meta_server_bucket,
-		(long)meta_server_mask);
+        if (PINT_bucket_get_next_io(&server_config,fs_ids[i],
+                                    NUM_DATA_SERVERS_TO_QUERY,d_addr))
+        {
+            fprintf(stderr, "PINT_bucket_get_next_io failure.\n");
+            return(-1);
+        }
+        else
+        {
+            printf("\nAsked for %d I/O servers and got the following:\n",
+                   NUM_DATA_SERVERS_TO_QUERY);
+            for(j = 0; j < NUM_DATA_SERVERS_TO_QUERY; j++)
+            {
+                printf("I/O server %d addr: %lu\n",j,(long)d_addr[j]);
+            }
+        }
 
+        printf("\n");
+        for(j = 0; j < NUM_TEST_HANDLES; j++)
+        {
+            if (PINT_bucket_get_server_name(server_name,MAX_BMI_ADDR_LEN,
+                                            test_handles[j],fs_ids[i]))
+            {
+                printf("Error retrieving name of server managing handle "
+                       "%Ld!\n",test_handles[j]);
+                printf("** This may be okay if the handle (%Ld) exists "
+                       "on a different fs (than id %d))\n",
+                       test_handles[j],fs_ids[i]);
+                continue;
+            }
+            else
+            {
+                printf("Retrieved name of server managing handle "
+                       "%Ld is %s\n",test_handles[j],server_name);
+                test_handles_verified[j]++;
+            }
+        }
 
-	/* find out which I/O servers should be used next for placing new file data
-	 * objects
-	 */
-	ret = PINT_bucket_get_next_io(fsid, 2, io_server_addr_array,
-		io_server_bucket_array, &io_server_mask);
-	if(ret < 0)
-	{
-		fprintf(stderr, "Pint_bucket_get_next_io() failure.\n");
-		return(-1);
-	}
-	
-	printf("\n");
-	printf("Asked for two I/O servers and got the following:\n");
-	printf("I/O server 0: addr: %ld, bucket: %ld, mask: %ld\n",
-		(long)io_server_addr_array[0], (long)io_server_bucket_array[0],
-		(long)io_server_mask);
-	printf("I/O server 1: addr: %ld, bucket: %ld, mask: %ld\n",
-		(long)io_server_addr_array[1], (long)io_server_bucket_array[1],
-		(long)io_server_mask);
+        printf("\n");
+        for(j = 0; j < NUM_TEST_HANDLES; j++)
+        {
+            if (PINT_bucket_map_to_server(&addr,test_handles[j],fs_ids[i]))
+            {
+                fprintf(stderr, "PINT_bucket_map_to_server failure.\n");
+                printf("** This may be okay if the handle (%Ld) exists "
+                       "on a different fs (than id %d))\n",
+                       test_handles[j],fs_ids[i]);
+                continue;
+            }
+            else
+            {
+                /*
+                  make sure the returned address is either a known
+                  meta or data server address
+                */
+                for(k = 0; k < NUM_TEST_HANDLES; k++)
+                {
+                    if (d_addr[k] == addr)
+                    {
+                        break;
+                    }
+                }
+                if ((k == NUM_TEST_HANDLES) && (m_addr != addr))
+                {
+                    printf("*** Failed to verify ability to map servers "
+                           "to handles.\n");
+                    return(-1);
+                }
+                else
+                {
+                    printf("Retrieved address of server managing handle "
+                           "%Ld is %lu\n",test_handles[j],(long)addr);
+                    test_handles_verified[j]++;
+                }
+            }
+        }
 
-	/* retrieve the string (BMI URL) associated with a bucket */
-	ret = PINT_bucket_get_server_name(big_buff, 256, meta_server_bucket,
-		fsid);
-	if(ret < 0)
-	{
-		fprintf(stderr, "PINT_bucket_get_server_name() failure.\n");
-		return(-1);
-	}
+        printf("\n");
+        for(j = 0; j < NUM_TEST_HANDLES; j++)
+        {
+            if (test_handles_verified[j] != 2)
+            {
+                break;
+            }
+            test_handles_verified[j] = 0;
+        }
+        if (j == NUM_TEST_HANDLES)
+        {
+            printf("Successfully verified ability to map servers to handles.\n");
+        }
+        else
+        {
+            printf("** Failed to verify ability to map servers to handles.\n");
+            printf("** Handle value %Ld failed cannot be mapped.\n",
+                   test_handles[j-1]);
+            return -1;
+        }
+    }
 
-	printf("\n");
-	printf("Retrieved string name of server from bucket: %s\n",
-		big_buff);
-	
+    if (PINT_bucket_finalize())
+    {
+        fprintf(stderr, "PINT_bucket_finalize() failure.\n");
+        return(-1);
+    }
 
-	/* try mapping a bucket to a server address */
-	ret = PINT_bucket_map_to_server(&test_server_addr,
-		meta_server_bucket, fsid);
-	if(ret < 0)
-	{
-		fprintf(stderr, "PINT_bucket_map_to_server() failure.\n");
-		return(-1);
-	}
-
-	printf("\n");
-	if(test_server_addr == meta_server_addr)
-	{
-		printf("Successfully verified ability to map buckets to servers.\n");
-	}
-	else
-	{
-		printf("*** Failed to verify ability to map buckets to servers.\n");
-	}
-		
-	/* try mapping a server to a bucket */
-	count = 1;
-	ret = PINT_bucket_map_from_server(big_buff, &count, &test_bucket,
-		&test_mask);
-	if(ret < 0)
-	{
-		fprintf(stderr, "PINT_bucket_map_from_server failure.\n");
-		return(-1);
-	}
-
-	if(count == 1 && test_bucket == meta_server_bucket && test_mask ==
-		handle_mask)
-	{
-		printf("Successfully verified ability to map servers to buckets.\n");
-	}
-	else
-	{
-		printf("*** Failed to verify ability to map servers to buckets.\n");
-	}
-
-
-	
-	/* shut down the interface */
-	ret = PINT_bucket_finalize();
-	if(ret < 0)
-	{
-		fprintf(stderr, "PINT_bucket_finalize() failure.\n");
-		return(-1);
-	}
-
-	BMI_finalize();
-
-	gossip_disable();
-#endif
-	return(0);
+    job_finalize();
+    BMI_finalize();
+    gossip_disable();
+    return(0);
 }

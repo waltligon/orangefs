@@ -13,6 +13,7 @@
 #include <string.h>
 #include <sys/time.h>
 #include <errno.h>
+#include <assert.h>
 
 #include <pvfs2-types.h>
 #include <pvfs2-attr.h>
@@ -21,6 +22,10 @@
 #include <bmi.h>
 #include <pvfs2-sysint.h>
 #include <gen-locks.h>
+
+#include "dotconf.h"
+#include "trove.h"
+#include "server-config.h"
 
 enum
 {
@@ -114,6 +119,7 @@ struct error_stats
     int num_pending;
 };
 
+
 /* PVFS Object - File name + Collection ID */
 
 /* PVFStab parameters */
@@ -131,7 +137,6 @@ void job_waitblock(job_id_t *id_array,
 		   job_status_s *status_array,
 		   int *failure);
 int server_getconfig(pvfs_mntlist mntent_list);
-void get_no_of_segments(char *path,int *num);
 int get_next_path(char *path, char **newpath, int skip);
 #if 0
 int get_next_segment(char *inout,char **output,int *start);
@@ -142,6 +147,10 @@ int PINT_do_lookup (PVFS_string name,pinode_reference parent,PVFS_bitfield mask,
                 PVFS_credentials cred,pinode_reference *entry);
 
 int get_path_element(char *path, char** segment, int element);
+
+int PINT_server_get_config(
+    struct server_configuration_s *config,
+    pvfs_mntlist mntent_list);
 
 /*
  * Local variables:
