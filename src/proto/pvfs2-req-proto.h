@@ -439,7 +439,7 @@ do {						\
     memset(&(__req), 0, sizeof(__req));		\
     (__req).op = PVFS_SERV_STATFS;		\
     (__req).credentials = (__creds);		\
-    (__req).u.truncate.fs_id = (__fsid);	\
+    (__req).u.statfs.fs_id = (__fsid);		\
 } while (0)
 
 struct PVFS_servresp_statfs
