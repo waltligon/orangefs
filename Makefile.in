@@ -368,7 +368,7 @@ statecomp: src/common/statecomp/statecomp
 	
 # rule for generating cscope information
 cscope:
-	find $(srcdir) -iname "*.[ch]" > $(srcdir)/cscope.files
+	find $(srcdir) -iname "*.[ch]" -o -iname "*.sm"> $(srcdir)/cscope.files
 	( cd $(srcdir); cscope -be -i $(srcdir)/cscope.files )
 
 # rule for running code check
