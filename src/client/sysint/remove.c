@@ -18,7 +18,6 @@ static int do_crdirent(char *name,PVFS_handle parent,PVFS_fs_id fsid,\
 		PVFS_handle entry_handle,bmi_addr_t addr);
 
 extern pcache pvfs_pcache; 
-extern dcache pvfs_dcache;
 
 /* PVFS_sys_remove()
  *
@@ -186,7 +185,7 @@ int PVFS_sys_remove(PVFS_sysreq_remove *req, PVFS_sysresp_remove *resp)
 	/* Remove the dentry from the dcache */
 	/* TODO: Need we track the error as otherwise the entire operation
 	 * has completed? */
-	ret = dcache_remove(pvfs_dcache,req->entry_name,parent_reference,\
+	ret = PINT_dcache_remove(req->entry_name,parent_reference,\
 			&item_found);
 	/*if (ret < 0)
 	{

@@ -18,7 +18,6 @@ static int do_crdirent(char *name,PVFS_handle parent,PVFS_fs_id fsid,\
 		PVFS_handle entry_handle,bmi_addr_t addr);
 
 extern pcache pvfs_pcache; 
-extern dcache pvfs_dcache;
 
 /* PVFS_sys_remove()
  *
@@ -166,14 +165,14 @@ int PVFS_sys_rename(PVFS_sysreq_rename *req, PVFS_sysresp_rename *resp)
 	/* TODO: We need to note down that this failed but let the rename 
 	 * complete successfully. The mechanism for that ain't in place yet!!
 	 */
-	ret = dcache_remove(pvfs_dcache,req->old_entry,old_parent_reference,\
+	ret = PINT_dcache_remove(req->old_entry,old_parent_reference,\
 			&item_found);
 	/*if (ret < 0)
 	{
 		goto remove_failure;
 	}*/
 	/* Insert the new entry into dcache */
-	ret = dcache_insert(pvfs_dcache,req->new_entry,entry,new_parent_reference);
+	ret = PINT_dcache_insert(req->new_entry,entry,new_parent_reference);
 
 	return(0);
 

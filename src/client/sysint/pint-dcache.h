@@ -20,6 +20,8 @@
 /* value passed out to indicate lookups that didn't find a match */
 #define PINT_DCACHE_HANDLE_INVALID 0
 
+/* TODO: move these definitions into the c file */
+
 /* Dcache Entry */
 struct dcache_entry_s {
 	pinode_reference parent;   /* the pinode of the parent directory */
@@ -49,28 +51,25 @@ typedef struct dcache dcache;
 
 
 /* Function Prototypes */
-int dcache_lookup(
-	struct dcache *cache, 
+int PINT_dcache_lookup(
 	char *name, 
 	pinode_reference parent,
 	pinode_reference *entry);
 
-int dcache_insert(
-	struct dcache *cache, 
+int PINT_dcache_insert(
 	char *name, 
 	pinode_reference entry,
 	pinode_reference parent);
 
-int dcache_flush(struct dcache cache);
+int PINT_dcache_flush(void);
 
-int dcache_remove(
-	struct dcache *cache, 
+int PINT_dcache_remove(
 	char *name, 
 	pinode_reference parent,
 	int *item_found);
 
-int dcache_initialize(struct dcache *cache);
+int PINT_dcache_initialize(void);
 
-int dcache_finalize(struct dcache *cache);
+int PINT_dcache_finalize(void);
 
 #endif 

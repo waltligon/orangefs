@@ -13,7 +13,6 @@
 #include <pint-servreq.h>
 #include <config-manage.h>
 
-extern struct dcache pvfs_dcache;
 extern pcache pvfs_pcache;
 
 /* PVFS_sys_lookup()
@@ -97,7 +96,7 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
     while(segment && ((end_path + 1) < strlen(req->name)))
     {
 	/* Search in the dcache */
-	ret = dcache_lookup(&pvfs_dcache,segment,parent,&entry);
+	ret = PINT_dcache_lookup(segment,parent,&entry);
 	if(ret < 0)
 	{
 	    goto dcache_lookup_failure;
@@ -156,7 +155,7 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 		entry.fs_id = req->fs_id;
 
 				/* Add entry to dcache */
-		ret = dcache_insert(&pvfs_dcache,segment,entry,parent);
+		ret = PINT_dcache_insert(segment,entry,parent);
 		if (ret < 0)
 		{
 		    goto lookup_path_failure;

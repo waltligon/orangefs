@@ -15,7 +15,6 @@
 #include <config-manage.h>
 
 extern pcache pvfs_pcache;
-extern struct dcache pvfs_dcache;
 
 /* PVFS_sys_getattr()
  *

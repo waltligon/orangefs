@@ -20,7 +20,6 @@ static int copy_attributes(PVFS_object_attr new,PVFS_object_attr old,\
 static int do_lookup(PVFS_string name,pinode_reference parent,\
 		PVFS_bitfield mask,PVFS_credentials cred,pinode_reference *entry);
 
-extern dcache pvfs_dcache;
 extern pcache pvfs_pcache;
 
 /* PVFS_sys_create()
@@ -64,7 +63,7 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	 * find the entry in the dcache. In this case, it may end up
 	 * creating the pinode. Is that what we want?
 	 */
-	ret = dcache_lookup(&pvfs_dcache,req->entry_name,req->parent_refn,&entry);
+	ret = PINT_dcache_lookup(req->entry_name,req->parent_refn,&entry);
 	if (ret < 0)
 	{
 		/* Entry not in dcache */
@@ -101,7 +100,7 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 			pcache_pinode_dealloc(item_ptr);
 		}
 		/* Remove dcache entry */
-		ret = dcache_remove(&pvfs_dcache,req->entry_name,req->parent_refn,&item);
+		ret = PINT_dcache_remove(req->entry_name,req->parent_refn,&item);
 		if (ret < 0)
 		{
 			goto pinode_remove_failure;
@@ -291,7 +290,7 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	segment = (char *)malloc(name_sz + 1);
 	strncpy(segment,req->entry_name,name_sz);
 	segment[name_sz] = '\0';
-	ret = dcache_insert(&pvfs_dcache,segment,entry,req->parent_refn);
+	ret = PINT_dcache_insert(segment,entry,req->parent_refn);
 	if (ret < 0)
 	{
 		goto dcache_add_failure;

@@ -16,7 +16,6 @@
 static int do_crdirent(char *name,pinode_reference parent,\
 	PVFS_handle entry_handle,PVFS_credentials credentials,bmi_addr_t addr);
 
-extern dcache pvfs_dcache;
 extern pcache pvfs_pcache;
 
 /* PVFS_sys_rmdir()
@@ -145,7 +144,7 @@ int PVFS_sys_rmdir(PVFS_sysreq_rmdir *req)
 	pcache_pinode_dealloc(item_ptr);
 	
 	/* Create and fill in a dentry and add it to the dcache */
-	ret = dcache_remove(&pvfs_dcache,req->entry_name,req->parent_refn,\
+	ret = PINT_dcache_remove(req->entry_name,req->parent_refn,\
 			&item_found);
 	if (ret < 0)
 	{

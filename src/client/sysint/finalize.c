@@ -14,7 +14,6 @@
 #include "gen-locks.h"
 
 extern pcache pvfs_pcache;
-extern dcache pvfs_dcache;
 extern fsconfig_array server_config;
 extern gen_mutex_t *g_session_tag_mt_lock;
 
@@ -29,7 +28,7 @@ int PVFS_sys_finalize()
     int ret = 0;
 	
     /* Free the dcache */
-    dcache_finalize(&pvfs_dcache);
+    PINT_dcache_finalize();
     /* free all pinode structures */
     pcache_finalize(pvfs_pcache);
 	

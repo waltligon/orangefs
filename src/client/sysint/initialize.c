@@ -31,8 +31,7 @@ static int server_send_req(bmi_addr_t addr,
 
 /* pinode cache */
 extern pcache pvfs_pcache; 
-/* PVFS directory cache */
-extern struct dcache pvfs_dcache;
+
 extern fsconfig_array server_config;
 
 extern gen_mutex_t *g_session_tag_mt_lock;
@@ -104,7 +103,7 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list)
     }
 
     /* Initialize the directory cache */
-    ret = dcache_initialize(&pvfs_dcache);
+    ret = PINT_dcache_initialize();
     if (ret < 0)
     {
 	init_fail = DCACHE_INIT_FAIL;
@@ -160,7 +159,7 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list)
 	case GET_CONFIG_INIT_FAIL:
 	    PINT_bucket_finalize();
 	case BUCKET_INIT_FAIL:
-	    dcache_finalize(&pvfs_dcache);
+	    PINT_dcache_finalize();
 	case DCACHE_INIT_FAIL:
 	    pcache_finalize(pvfs_pcache);
 	case PCACHE_INIT_FAIL:

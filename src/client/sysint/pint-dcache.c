@@ -8,20 +8,16 @@
 
 #include <pint-dcache.h>
 
-/* TODO: Figure out how timeouts are going to be used to invalidate
- * the cache entries 
- */
-
-static void dcache_remove_dentry(struct dcache *cache, int16_t item);
+static void dcache_remove_dentry(int16_t item);
 static int dcache_update_dentry_timestamp(dcache_entry* entry); 
 static int check_dentry_expiry(struct timeval t2);
-static int dcache_add_dentry(struct dcache *cache,char *name,
+static int dcache_add_dentry(char *name,
 	pinode_reference parent,pinode_reference entry);
-static int dcache_get_next_free(struct dcache *cache);
+static int dcache_get_next_free(void);
 static int compare(struct dcache_t element,char *name,pinode_reference refn);
 
 /* The PVFS Dcache */
-dcache pvfs_dcache;
+static dcache* cache;
 
 /* dcache_lookup
  *
@@ -29,8 +25,10 @@ dcache pvfs_dcache;
  *
  * returns 0 on success, -1 on failure
  */
-int dcache_lookup(struct dcache *cache,char *name,pinode_reference parent,
-		pinode_reference *entry)
+int PINT_dcache_lookup(
+	char *name,
+	pinode_reference parent,
+	pinode_reference *entry)
 {
 	int16_t i = 0;
 	int ret = 0;
@@ -58,7 +56,7 @@ int dcache_lookup(struct dcache *cache,char *name,pinode_reference parent,
 				gossip_ldebug(DCACHE_DEBUG, "dcache entry expired.\n");
 				/* Dentry is stale */
 				/* Remove the entry from the cache */
-				dcache_remove_dentry(cache,i);
+				dcache_remove_dentry(i);
 				/* Release the mutex */
 				gen_mutex_unlock(cache->mt_lock);
 				
@@ -85,8 +83,10 @@ int dcache_lookup(struct dcache *cache,char *name,pinode_reference parent,
  *
  * returns 0 on success, -1 on failure
  */
-int dcache_insert(struct dcache *cache,char *name,pinode_reference entry,
-		pinode_reference parent)
+int PINT_dcache_insert(
+	char *name,
+	pinode_reference entry,
+	pinode_reference parent)
 {
 	int16_t i = 0,index = 0, ret = 0;
 	unsigned char entry_found = 0;
@@ -113,7 +113,7 @@ int dcache_insert(struct dcache *cache,char *name,pinode_reference entry,
 	if (!entry_found)
 	{
 		/* Element absent in cache, add it */
-		dcache_add_dentry(cache,name,parent,entry);
+		dcache_add_dentry(name,parent,entry);
 	}
 	else
 	{
@@ -143,7 +143,9 @@ int dcache_insert(struct dcache *cache,char *name,pinode_reference entry,
  *
  * returns 0 on success, -1 on failure
  */
-int dcache_remove(struct dcache *cache,char *name,pinode_reference parent,
+int PINT_dcache_remove(
+	char *name,
+	pinode_reference parent,
 	int *item_found)
 {
 	int16_t i = 0;
@@ -163,7 +165,7 @@ int dcache_remove(struct dcache *cache,char *name,pinode_reference parent,
 		if (compare(cache->element[i],name,parent))
 		{
 			/* Remove the cache element */
-			dcache_remove_dentry(cache,i);
+			dcache_remove_dentry(i);
 			*item_found = 1;
 			gossip_ldebug(DCACHE_DEBUG, "dcache removing entry.\n");
 			break;
@@ -189,7 +191,7 @@ int dcache_remove(struct dcache *cache,char *name,pinode_reference parent,
  *
  * returns 0 on success, -1 on failure
  */
-int dcache_flush(struct dcache cache)
+int PINT_dcache_flush(void)
 {
 	return(-ENOSYS);
 }
@@ -200,9 +202,15 @@ int dcache_flush(struct dcache cache)
  *
  * returns 0 on success, -1 on failure
  */
-int dcache_initialize(struct dcache *cache)
+int PINT_dcache_initialize(void)
 {
 	int16_t i = 0;	
+
+	cache = (dcache*)malloc(sizeof(dcache));
+	if(!cache)
+	{
+		return(-errno);
+	}
 
 	/* Init the mutex lock */
 	cache->mt_lock = gen_mutex_build();
@@ -227,17 +235,13 @@ int dcache_initialize(struct dcache *cache)
  *
  * returns 0 on success, -1 on failure
  */
-int dcache_finalize(struct dcache *cache)
+int PINT_dcache_finalize(void)
 {
-	/* make sure this doesn't look like a populated dcache if someone
-	 * accesses it late 
-	 */
-	cache->top = -1;
-	cache->bottom = -1;
-	cache->free = 0;
 
 	/* Destroy the mutex */
 	gen_mutex_destroy(cache->mt_lock);
+
+	free(cache);
 
 	return(0);
 }
@@ -268,14 +272,14 @@ static int compare(struct dcache_t element,char *name,pinode_reference refn)
  *
  * returns 0 on success, -errno on failure
  */
-static int dcache_add_dentry(struct dcache *cache,char *name,
+static int dcache_add_dentry(char *name,
 		pinode_reference parent,pinode_reference entry)
 {
 	int16_t free = 0;
 	int size = strlen(name),ret = 0;
 
 	/* Get the free item */
-	dcache_get_next_free(cache);
+	dcache_get_next_free();
 
 	/* Update the free list by pointing to next free item */
 	free = cache->free;
@@ -311,7 +315,7 @@ static int dcache_add_dentry(struct dcache *cache,char *name,
  *
  * returns 0 on success, -errno on failure
  */
-static int dcache_get_next_free(struct dcache *cache)
+static int dcache_get_next_free(void)
 {
 	int16_t free = 0;
 
@@ -363,7 +367,7 @@ static int check_dentry_expiry(struct timeval t2)
  *
  * returns nothing
  */
-static void dcache_remove_dentry(struct dcache *cache, int16_t item)
+static void dcache_remove_dentry(int16_t item)
 {
 	int16_t i = item,prev = 0,next = 0;
 

@@ -19,7 +19,6 @@ static int do_rmdir(PVFS_handle entry_handle,PVFS_fs_id fsid,\
 		bmi_addr_t addr, PVFS_credentials credentials);
 
 extern pcache pvfs_pcache;
-extern struct dcache pvfs_dcache;
 
 /* PVFS_sys_mkdir()
  *
@@ -57,7 +56,7 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
 	/* Check for pinode existence */
 
 	/* Lookup handle(if it exists) in dcache */
-	ret = dcache_lookup(&pvfs_dcache,req->entry_name,req->parent_refn,&entry);
+	ret = PINT_dcache_lookup(req->entry_name,req->parent_refn,&entry);
 	if (ret < 0)
 	{
 		/* Entry not in dcache */
@@ -100,7 +99,7 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
 		/* Remove dcache entry */
 		/* At this stage, dcache entry does exist. 
 		 * This needs to handled the right way */
-		ret = dcache_remove(&pvfs_dcache,req->entry_name,req->parent_refn,&item);
+		ret = PINT_dcache_remove(req->entry_name,req->parent_refn,&item);
 		if (ret < 0)
 		{
 			goto pinode_remove_failure;
@@ -240,7 +239,7 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
 	}
 	
 	/* Create and fill in a dentry and add it to the dcache */
-	ret = dcache_insert(&pvfs_dcache,req->entry_name,entry,req->parent_refn);
+	ret = PINT_dcache_insert(req->entry_name,entry,req->parent_refn);
 	if (ret < 0)
 	{
 		goto crdirent_failure;

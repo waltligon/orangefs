@@ -14,9 +14,6 @@
  * demonstrates how to use it.
  */
 
-/* create a static dcache to test here */
-static struct dcache test_dcache;
-
 int main(int argc, char **argv)	
 {
 	int ret = -1;
@@ -41,7 +38,7 @@ int main(int argc, char **argv)
 
 
 	/* initialize the cache */
-	ret = dcache_initialize(&test_dcache);
+	ret = PINT_dcache_initialize();
 	if(ret < 0)
 	{
 		fprintf(stderr, "dcache_initialize() failure.\n");
@@ -49,7 +46,7 @@ int main(int argc, char **argv)
 	}
 
 	/* try to lookup something when there is nothing in there */
-	ret = dcache_lookup(&test_dcache, "first", root_ref, &test_ref);
+	ret = PINT_dcache_lookup("first", root_ref, &test_ref);
 	if(ret < 0)
 	{
 		fprintf(stderr, "dcache_lookup() failure.\n");
@@ -62,21 +59,21 @@ int main(int argc, char **argv)
 	}
 
 	/* insert a few things */
-	ret = dcache_insert(&test_dcache, first_name, first_ref,
+	ret = PINT_dcache_insert(first_name, first_ref,
 		root_ref);
 	if(ret < 0)
 	{
 		fprintf(stderr, "Error: failed to insert entry.\n");
 		return(-1);
 	}
-	ret = dcache_insert(&test_dcache, second_name, second_ref,
+	ret = PINT_dcache_insert(second_name, second_ref,
 		first_ref);
 	if(ret < 0)
 	{
 		fprintf(stderr, "Error: failed to insert entry.\n");
 		return(-1);
 	}
-	ret = dcache_insert(&test_dcache, third_name, third_ref,
+	ret = PINT_dcache_insert(third_name, third_ref,
 		second_ref);
 	if(ret < 0)
 	{
@@ -85,7 +82,7 @@ int main(int argc, char **argv)
 	}
 
 	/* lookup a few things */
-	ret = dcache_lookup(&test_dcache, "first", root_ref, &test_ref);
+	ret = PINT_dcache_lookup("first", root_ref, &test_ref);
 	if(ret < 0)
 	{
 		fprintf(stderr, "dcache_lookup() failure.\n");
@@ -97,7 +94,7 @@ int main(int argc, char **argv)
 		return(-1);
 	}
 
-	ret = dcache_lookup(&test_dcache, "second", first_ref, &test_ref);
+	ret = PINT_dcache_lookup("second", first_ref, &test_ref);
 	if(ret < 0)
 	{
 		fprintf(stderr, "dcache_lookup() failure.\n");
@@ -109,7 +106,7 @@ int main(int argc, char **argv)
 		return(-1);
 	}
 
-	ret = dcache_lookup(&test_dcache, "third", second_ref, &test_ref);
+	ret = PINT_dcache_lookup("third", second_ref, &test_ref);
 	if(ret < 0)
 	{
 		fprintf(stderr, "dcache_lookup() failure.\n");
@@ -125,7 +122,7 @@ int main(int argc, char **argv)
 	printf("sleeping a few seconds before trying cache again.\n");
 	sleep(7);
 
-	ret = dcache_lookup(&test_dcache, "second", first_ref, &test_ref);
+	ret = PINT_dcache_lookup("second", first_ref, &test_ref);
 	if(ret < 0)
 	{
 		fprintf(stderr, "dcache_lookup() failure.\n");
@@ -137,7 +134,7 @@ int main(int argc, char **argv)
 		return(-1);
 	}
 
-	ret = dcache_lookup(&test_dcache, "first", root_ref, &test_ref);
+	ret = PINT_dcache_lookup("first", root_ref, &test_ref);
 	if(ret < 0)
 	{
 		fprintf(stderr, "dcache_lookup() failure.\n");
@@ -149,7 +146,7 @@ int main(int argc, char **argv)
 		return(-1);
 	}
 
-	ret = dcache_lookup(&test_dcache, "third", second_ref, &test_ref);
+	ret = PINT_dcache_lookup("third", second_ref, &test_ref);
 	if(ret < 0)
 	{
 		fprintf(stderr, "dcache_lookup() failure.\n");
@@ -162,14 +159,14 @@ int main(int argc, char **argv)
 	}
 
 	/* try inserting twice */
-	ret = dcache_insert(&test_dcache, first_name, first_ref,
+	ret = PINT_dcache_insert(first_name, first_ref,
 		root_ref);
 	if(ret < 0)
 	{
 		fprintf(stderr, "Error: failed to insert entry.\n");
 		return(-1);
 	}
-	ret = dcache_insert(&test_dcache, first_name, first_ref,
+	ret = PINT_dcache_insert(first_name, first_ref,
 		root_ref);
 	if(ret < 0)
 	{
@@ -178,7 +175,7 @@ int main(int argc, char **argv)
 	}
 
 	/* then remove once */
-	ret = dcache_remove(&test_dcache, first_name, root_ref,
+	ret = PINT_dcache_remove(first_name, root_ref,
 		&found_flag);
 	if(ret < 0)
 	{
@@ -192,7 +189,7 @@ int main(int argc, char **argv)
 	}
 
 	/* lookup the same entry, shouldn't get it */
-	ret = dcache_lookup(&test_dcache, "first", root_ref, &test_ref);
+	ret = PINT_dcache_lookup("first", root_ref, &test_ref);
 	if(ret < 0)
 	{
 		fprintf(stderr, "dcache_lookup() failure.\n");
@@ -205,7 +202,7 @@ int main(int argc, char **argv)
 	}
 
 	/* then remove again - found flag should be zero now */
-	ret = dcache_remove(&test_dcache, first_name, root_ref,
+	ret = PINT_dcache_remove(first_name, root_ref,
 		&found_flag);
 	if(ret < 0)
 	{
@@ -219,7 +216,7 @@ int main(int argc, char **argv)
 	}
 
 	/* finalize the cache */
-	ret = dcache_finalize(&test_dcache);
+	ret = PINT_dcache_finalize();
 	if(ret < 0)
 	{
 		fprintf(stderr, "dcache_finalize() failure.\n");
