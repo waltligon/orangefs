@@ -46,6 +46,8 @@ enum job_flags
     JOB_NO_IMMED_COMPLETE = 1
 };
 
+#define JOB_TIMEOUT_INF (-1)
+
 /******************************************************************
  * management functions 
  */
@@ -73,7 +75,8 @@ int job_bmi_send(PVFS_BMI_addr_t addr,
 		 job_aint status_user_tag,
 		 job_status_s * out_status_p,
 		 job_id_t * id,
-		 job_context_id context_id);
+		 job_context_id context_id,
+		 int timeout_sec);
 
 /* network send (list of buffers) */
 int job_bmi_send_list(PVFS_BMI_addr_t addr,
@@ -88,7 +91,8 @@ int job_bmi_send_list(PVFS_BMI_addr_t addr,
 		      job_aint status_user_tag,
 		      job_status_s * out_status_p,
 		      job_id_t * id,
-		      job_context_id context_id);
+		      job_context_id context_id,
+		      int timeout_sec);
 
 /* network receive */
 int job_bmi_recv(PVFS_BMI_addr_t addr,
@@ -100,7 +104,8 @@ int job_bmi_recv(PVFS_BMI_addr_t addr,
 		 job_aint status_user_tag,
 		 job_status_s * out_status_p,
 		 job_id_t * id,
-		 job_context_id context_id);
+		 job_context_id context_id,
+		 int timeout_sec);
 
 /* network receive (list of buffers) */
 int job_bmi_recv_list(PVFS_BMI_addr_t addr,
@@ -114,7 +119,8 @@ int job_bmi_recv_list(PVFS_BMI_addr_t addr,
 		      job_aint status_user_tag,
 		      job_status_s * out_status_p,
 		      job_id_t * id,
-		      job_context_id context_id);
+		      job_context_id context_id,
+		      int timeout_sec);
 
 /* unexpected network receive */
 int job_bmi_unexp(struct BMI_unexpected_info *bmi_unexp_d,
@@ -191,7 +197,8 @@ int job_flow(flow_descriptor * flow_d,
 	     job_aint status_user_tag,
 	     job_status_s * out_status_p,
 	     job_id_t * id,
-	     job_context_id context_id);
+	     job_context_id context_id,
+	     int timeout_sec);
 
 int job_flow_cancel(job_id_t id, job_context_id context_id);
 

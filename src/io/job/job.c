@@ -246,7 +246,8 @@ int job_bmi_send(PVFS_BMI_addr_t addr,
 		 job_aint status_user_tag,
 		 job_status_s * out_status_p,
 		 job_id_t * id,
-		 job_context_id context_id)
+		 job_context_id context_id,
+		 int timeout_sec)
 {
     /* post a bmi send.  If it completes (or fails) immediately, then
      * return and fill in the status structure.  If it needs to be tested
@@ -339,7 +340,8 @@ int job_bmi_send_list(PVFS_BMI_addr_t addr,
 		      job_aint status_user_tag,
 		      job_status_s * out_status_p,
 		      job_id_t * id,
-		      job_context_id context_id)
+		      job_context_id context_id,
+		      int timeout_sec)
 {
     /* post a bmi send.  If it completes (or fails) immediately, then
      * return and fill in the status structure.  If it needs to be tested
@@ -431,7 +433,8 @@ int job_bmi_recv(PVFS_BMI_addr_t addr,
 		 job_aint status_user_tag,
 		 job_status_s * out_status_p,
 		 job_id_t * id,
-		 job_context_id context_id)
+		 job_context_id context_id,
+		 int timeout_sec)
 {
     /* post a bmi recv.  If it completes (or fails) immediately, then
      * return and fill in the status structure.  If it needs to be tested
@@ -513,7 +516,8 @@ int job_bmi_recv_list(PVFS_BMI_addr_t addr,
 		      job_aint status_user_tag,
 		      job_status_s * out_status_p,
 		      job_id_t * id,
-		      job_context_id context_id)
+		      job_context_id context_id,
+		      int timeout_sec)
 {
 
     /* post a bmi recv.  If it completes (or fails) immediately, then
@@ -1056,7 +1060,8 @@ int job_flow(flow_descriptor * flow_d,
 	     job_aint status_user_tag,
 	     job_status_s * out_status_p,
 	     job_id_t * id,
-	     job_context_id context_id)
+	     job_context_id context_id,
+	     int timeout_sec)
 {
     struct job_desc *jd = NULL;
     int ret = -1;

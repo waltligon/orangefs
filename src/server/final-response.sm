@@ -149,7 +149,8 @@ static int final_response_send_resp(PINT_server_op *s_op, job_status_s *js_p)
 			    0,
 			    js_p,
 			    &tmp_id,
-			    server_job_context);
+			    server_job_context,
+			    JOB_TIMEOUT_INF);
 
     return ret;
 }

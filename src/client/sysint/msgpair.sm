@@ -171,7 +171,8 @@ static int msgpair_post(PINT_client_sm *sm_p,
 		       0,
 		       &msg_p->recv_status,
 		       &msg_p->recv_id,
-		       pint_client_sm_context);
+		       pint_client_sm_context,
+		       JOB_TIMEOUT_INF);
     if (ret < 0) {
 	gossip_err("msgpair_post: failure in job_bmi_recv\n");
 	assert(0);
@@ -210,7 +211,8 @@ static int msgpair_post(PINT_client_sm *sm_p,
 			    0,
 			    &msg_p->send_status,
 			    &msg_p->send_id,
-			    pint_client_sm_context);
+			    pint_client_sm_context,
+			    JOB_TIMEOUT_INF);
     if (ret < 0) {
 	gossip_err("msgpair_post: failure in job_bmi_send_list\n");
 	assert(0);

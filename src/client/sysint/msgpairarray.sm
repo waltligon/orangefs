@@ -162,7 +162,8 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 			   i,
 			   &msg_p->recv_status,
 			   &msg_p->recv_id,
-			   pint_client_sm_context);
+			   pint_client_sm_context,
+			   JOB_TIMEOUT_INF);
 	if (ret < 0) {
 	    gossip_lerr("post of receive failed\n");
 	    assert(0);
@@ -198,7 +199,8 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 				sm_p->msgarray_count+i,
 				&msg_p->send_status,
 				&msg_p->send_id,
-				pint_client_sm_context);
+				pint_client_sm_context,
+				JOB_TIMEOUT_INF);
 	if (ret < 0) {
 	    gossip_lerr("post of send failed; should cancel recv\n");
 

@@ -72,7 +72,8 @@ int PINT_send_req(PVFS_BMI_addr_t addr,
 	0,
 	&tmp_status,
 	&tmp_id,
-	PVFS_sys_job_context);
+	PVFS_sys_job_context,
+	JOB_TIMEOUT_INF);
     if(ret < 0)
     {
 	goto send_req_out;
@@ -125,7 +126,8 @@ int PINT_send_req(PVFS_BMI_addr_t addr,
 	0,
 	&tmp_status,
 	&tmp_id,
-	PVFS_sys_job_context);
+	PVFS_sys_job_context,
+	JOB_TIMEOUT_INF);
     if(ret < 0)
     {
 	goto send_req_out;
@@ -306,7 +308,8 @@ int PINT_send_req_array(PVFS_BMI_addr_t* addr_array,
 		0,
 		&(status_array[i]),
 		&(id_array[i]),
-		PVFS_sys_job_context);
+		PVFS_sys_job_context,
+		JOB_TIMEOUT_INF);
 	    gossip_err("SEND_REQ_ARRAY(): send %d returned %d.\n",
 		i, ret);
 	    if(ret < 0)
@@ -397,7 +400,8 @@ int PINT_send_req_array(PVFS_BMI_addr_t* addr_array,
 		0,
 		&(status_array[i]), 
 		&(id_array[i]),
-		PVFS_sys_job_context);
+		PVFS_sys_job_context,
+		JOB_TIMEOUT_INF);
 	    gossip_err("SEND_REQ_ARRAY(): recv %d returned %d.\n",
 		i, ret);
 	    if(ret < 0)
@@ -596,7 +600,8 @@ int PINT_recv_ack_array(PVFS_BMI_addr_t* addr_array,
 		0,
 		&(status_array[i]), 
 		&(id_array[i]),
-		PVFS_sys_job_context);
+		PVFS_sys_job_context,
+		JOB_TIMEOUT_INF);
 	    if(ret < 0)
 	    {
 		/* immediate error */

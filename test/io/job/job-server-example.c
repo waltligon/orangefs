@@ -136,7 +136,8 @@ int main(int argc, char **argv)
 
 	/* send a message */
 	ret = job_bmi_send(req_info.addr, ack, sizeof(struct ack_foo),
-		0, BMI_PRE_ALLOC, 0, NULL, 0, &status1, &tmp_id, context);
+		0, BMI_PRE_ALLOC, 0, NULL, 0, &status1, &tmp_id, context,
+		JOB_TIMEOUT_INF);
 	if(ret < 0)
 	{
 		fprintf(stderr, "job_bmi_send() failure.\n");

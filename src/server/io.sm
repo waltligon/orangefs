@@ -147,7 +147,8 @@ static int io_send_ack(PINT_server_op *s_op, job_status_s* js_p)
             0,
             js_p,
             &tmp_id,
-            server_job_context);
+            server_job_context,
+	    JOB_TIMEOUT_INF);
     }
     return(err);
 }
@@ -250,7 +251,7 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s* js_p)
     }
 
     err = job_flow(s_op->u.io.flow_d, s_op, 0, js_p, &tmp_id,
-                   server_job_context);
+                   server_job_context, JOB_TIMEOUT_INF);
 
     return(err);
 }
@@ -401,7 +402,8 @@ static int io_send_completion_ack(
             0,
             js_p,
             &tmp_id,
-            server_job_context);
+            server_job_context,
+	    JOB_TIMEOUT_INF);
     }
     return(err);
 }
