@@ -120,6 +120,16 @@ int dbpf_attr_cache_initialize(
                 (num_cacheable_keywords >
                  DBPF_ATTR_CACHE_MAX_NUM_KEYVALS))
             {
+                gossip_err("****************************************\n");
+                gossip_err(
+                    "Warning: There are too many specified cacheable "
+                    "keywords.\nEither reduce this in your "
+                    "configuration settings, or adjust the value\n"
+                    "DBPF_ATTR_CACHE_MAX_NUM_KEYVALS in "
+                    "the file dbpf-attr-cache.h and recompile.\n");
+                gossip_err(
+                    "No specified Attribute Keywords will be cached\n");
+                gossip_err("****************************************\n");
                 goto return_error;
             }
 

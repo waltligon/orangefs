@@ -256,9 +256,6 @@ static int dbpf_dspace_remove(TROVE_coll_id coll_id,
     dbpf_queued_op_t *q_op_p;
     struct dbpf_collection *coll_p;
 
-    /* if this attr is in the dbpf attr cache, remove it */
-    dbpf_attr_cache_remove(handle);
-
     coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL) return -TROVE_EINVAL;
 
@@ -288,7 +285,7 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
 {
     int error, ret, got_db = 0;
     DBT key;
-    DB *db_p;
+    DB *db_p = NULL;
 
     ret = dbpf_dspace_dbcache_try_get(op_p->coll_p->coll_id, 0, &db_p);
     switch (ret)
@@ -303,17 +300,17 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
 	    break;
     }
 
-    /* whereas dspace_create has to do handle-making steps, we already know
-     * the handle we want to wack
-     */
-
     memset(&key, 0, sizeof(key));
     key.data = &op_p->handle;
     key.size = sizeof(TROVE_handle);
 
-    /* XXX: no steps taken to ensure it's empty... */
+    /* if this attr is in the dbpf attr cache, remove it */
+    dbpf_attr_cache_remove(op_p->handle);
+
+    /* FIXME: no steps taken to ensure it's empty at this level */
     ret = db_p->del(db_p, NULL, &key, 0);
-    switch (ret) {
+    switch (ret)
+    {
 	case DB_NOTFOUND:
 	    gossip_err("tried to remove non-existant dataspace\n");
 	    error = -TROVE_ENOENT;
@@ -328,9 +325,10 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
 	    break;
     }
 
-    /* sync if requested */
-    if (op_p->flags & TROVE_SYNC) {
-	if ( (ret = db_p->sync(db_p, 0)) != 0) {
+    if (op_p->flags & TROVE_SYNC)
+    {
+	if ((ret = db_p->sync(db_p, 0)) != 0)
+        {
 	    db_p->err(db_p, ret, "dbpf_dspace_remove");
 	    error = -1;
 	    goto return_error;
@@ -341,14 +339,16 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
      *
      * NOTE: this is not a fatal error; this might have never been created.
      */
-    ret = dbpf_keyval_dbcache_try_remove(op_p->coll_p->coll_id, op_p->handle);
-    if (ret == -TROVE_EBUSY) assert(0);
+    ret = dbpf_keyval_dbcache_try_remove(
+        op_p->coll_p->coll_id, op_p->handle);
+    assert(ret != -TROVE_EBUSY);
 
     /* remove bstream file if it exists
      *
      * NOTE: this is not a fatal error; this might have never been created.
      */
-    ret = dbpf_bstream_fdcache_try_remove(op_p->coll_p->coll_id, op_p->handle);
+    ret = dbpf_bstream_fdcache_try_remove(
+        op_p->coll_p->coll_id, op_p->handle);
     switch (ret)
     {
 	case DBPF_BSTREAM_FDCACHE_BUSY:
@@ -364,7 +364,10 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
     return 1;
 
 return_error:
-    if (got_db) dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);
+    if (got_db)
+    {
+        dbpf_dspace_dbcache_put(op_p->coll_p->coll_id);
+    }
     return error;
 }
 
@@ -382,15 +385,21 @@ int dbpf_dspace_iterate_handles(TROVE_coll_id coll_id,
     struct dbpf_collection *coll_p;
 
     coll_p = dbpf_collection_find_registered(coll_id);
-    if (coll_p == NULL) return -TROVE_EINVAL;
+    if (coll_p == NULL)
+    {
+        return -TROVE_EINVAL;
+    }
 
     q_op_p = dbpf_queued_op_alloc();
-    if (q_op_p == NULL) return -TROVE_ENOMEM;
+    if (q_op_p == NULL)
+    {
+        return -TROVE_ENOMEM;
+    }
 
     /* initialize all the common members */
     dbpf_queued_op_init(q_op_p,
 			DSPACE_ITERATE_HANDLES,
-			TROVE_HANDLE_NULL, /* handle -- ignored in this case */
+			TROVE_HANDLE_NULL,
 			coll_p,
 			dbpf_dspace_iterate_handles_op_svc,
 			user_ptr,
@@ -412,8 +421,8 @@ int dbpf_dspace_iterate_handles(TROVE_coll_id coll_id,
 static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
 {
     int ret = 0, i = 0, got_db = 0;
-    DB *db_p;
-    DBC *dbc_p;
+    DB *db_p = NULL;
+    DBC *dbc_p = NULL;
     DBT key, data;
     db_recno_t recno;
     TROVE_ds_storedattr_s s_attr;
