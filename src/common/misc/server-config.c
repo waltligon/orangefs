@@ -822,9 +822,6 @@ static int is_root_handle_in_my_range(
             assert(cur_h_mapping->alias_mapping->bmi_address);
             assert(cur_h_mapping->handle_range);
 
-            fprintf(stderr, "CURRENT META SERVER IS %s\n",
-                    cur_h_mapping->alias_mapping->host_alias);
-
             cur_host_id = cur_h_mapping->alias_mapping->bmi_address;
             if (!cur_host_id)
             {

@@ -7,9 +7,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <pvfs2-types.h>
-#include <pint-distribution.h>
-#include <pvfs-distribution.h>
+#include "pvfs2-types.h"
+#include "pint-distribution.h"
+#include "pvfs-distribution.h"
+#include "pvfs2-debug.h"
+#include "gossip.h"
 
 /* compiled-in distributions */
 extern struct PVFS_Dist default_dist;
@@ -137,12 +139,12 @@ void PINT_Dist_decode(struct PVFS_Dist *dist, void *buffer)
 
 void PINT_Dist_dump(PVFS_Dist *dist)
 {
-	fprintf(stderr,"******************************\n");
-	fprintf(stderr,"address\t\t%x\n", (unsigned int)dist);
-	fprintf(stderr,"dist_name\t%s\n", dist->dist_name);
-	fprintf(stderr,"name_size\t%d\n", dist->name_size);
-	fprintf(stderr,"param_size\t%d\n", dist->param_size);
-	fprintf(stderr,"params\t\t%x\n", (unsigned int)dist->params);
-	fprintf(stderr,"methods\t\t%x\n", (unsigned int)dist->methods);
-	fprintf(stderr,"******************************\n");
+	gossip_debug(DIST_DEBUG,"******************************\n");
+	gossip_debug(DIST_DEBUG,"address\t\t%x\n", (unsigned int)dist);
+	gossip_debug(DIST_DEBUG,"dist_name\t%s\n", dist->dist_name);
+	gossip_debug(DIST_DEBUG,"name_size\t%d\n", dist->name_size);
+	gossip_debug(DIST_DEBUG,"param_size\t%d\n", dist->param_size);
+	gossip_debug(DIST_DEBUG,"params\t\t%x\n", (unsigned int)dist->params);
+	gossip_debug(DIST_DEBUG,"methods\t\t%x\n", (unsigned int)dist->methods);
+	gossip_debug(DIST_DEBUG,"******************************\n");
 }

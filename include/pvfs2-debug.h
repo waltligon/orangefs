@@ -33,6 +33,7 @@ enum
     REQ_SCHED_DEBUG =	    (1 << 14),
     PCACHE_DEBUG =	    (1 << 15),
     TROVE_DEBUG =           (1 << 16),
+    DIST_DEBUG =            (1 << 17),
 
     BMI_DEBUG_ALL = BMI_DEBUG_TCP + BMI_DEBUG_CONTROL +
 	+BMI_DEBUG_GM + BMI_DEBUG_OFFSETS
@@ -57,7 +58,8 @@ static keyword_mask_t s_keyword_mask_map[] =
     { "reqsched", REQ_SCHED_DEBUG },
     { "flowproto", FLOW_PROTO_DEBUG },
     { "flow", FLOW_DEBUG },
-    { "pcache", PCACHE_DEBUG }
+    { "pcache", PCACHE_DEBUG },
+    { "distribution", DIST_DEBUG }
 };
 
 /*

@@ -93,7 +93,7 @@ static int server_state_machine_start(
  */
 int main(int argc, char **argv)
 {
-    int ret;
+    int ret, debug_mask = 0;
 
     /* Passed to server shutdown function */
     server_status_flag = SERVER_DEFAULT_INIT;
@@ -133,8 +133,10 @@ int main(int argc, char **argv)
     /* Reset the gossip debug mask based on configuration
      * settings that we now have access to.
      */
-    gossip_set_debug_mask(
-        1, PVFS_debug_eventlog_to_mask(server_config.event_logging));
+    debug_mask = PVFS_debug_eventlog_to_mask(server_config.event_logging);
+    gossip_set_debug_mask(1, debug_mask);
+    gossip_debug(SERVER_DEBUG,"Logging %s (mask %d)\n",
+                 server_config.event_logging, debug_mask);
 
     /* If we were directed to create a storage space, do so and then
      * exit.
