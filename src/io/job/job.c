@@ -3104,8 +3104,9 @@ int job_test(job_id_t id,
              job_context_id context_id)
 {
     int ret = -1;
-    *out_count_p = 1;
     int tmp_index;
+
+    *out_count_p = 1;
 
     /* job_test() is really just a special case of job_testsome() */
     ret = job_testsome(&id, out_count_p, &tmp_index, returned_user_ptr_p,
