@@ -4,8 +4,12 @@
 // Author: Walt Ligon
 // Date: Summer 2000
 
-// $Header: /root/MIGRATE/CVS2SVN/cvs/pvfs2-1/src/io/description/pvfs-request.c,v 1.10 2003-07-23 12:05:33 neill Exp $
+// $Header: /root/MIGRATE/CVS2SVN/cvs/pvfs2-1/src/io/description/pvfs-request.c,v 1.11 2003-07-23 12:40:22 neill Exp $
 // $Log: not supported by cvs2svn $
+// Revision 1.10  2003/07/23 12:05:33  neill
+// added a DIST_DEBUG flag for gossip; gossipified some fprintfs in dist
+// code; added a line in the server to log what it's logging.
+//
 // Revision 1.9  2003/07/17 23:22:44  pcarns
 // header shuffling- you probably have to do a distclean to build after
 // updating
@@ -500,20 +504,20 @@ int PVFS_Pack_size(int incount, PVFS_Request request, PVFS_Comm comm, int *size)
 
 void PVFS_Dump_request(PVFS_Request req)
 {
-	gossip_debug(DIST_DEBUG,"**********************\n");
-	gossip_debug(DIST_DEBUG,"address:\t%x\n",(unsigned int)req);
-	gossip_debug(DIST_DEBUG,"offset:\t\t%d\n",(int)req->offset);
-	gossip_debug(DIST_DEBUG,"num_ereqs:\t%d\n",(int)req->num_ereqs);
-	gossip_debug(DIST_DEBUG,"num_blocks:\t%d\n",(int)req->num_blocks);
-	gossip_debug(DIST_DEBUG,"stride:\t\t%d\n",(int)req->stride);
-	gossip_debug(DIST_DEBUG,"ub:\t\t%d\n",(int)req->ub);
-	gossip_debug(DIST_DEBUG,"lb:\t\t%d\n",(int)req->lb);
-	gossip_debug(DIST_DEBUG,"agg_size:\t%d\n",(int)req->aggregate_size);
-	gossip_debug(DIST_DEBUG,"num_chunk:\t%d\n",(int)req->num_contig_chunks);
-	gossip_debug(DIST_DEBUG,"depth:\t\t%d\n",(int)req->depth);
-	gossip_debug(DIST_DEBUG,"num_nest:\t%d\n",(int)req->num_nested_req);
-	gossip_debug(DIST_DEBUG,"commit:\t\t%d\n",(int)req->committed);
-	gossip_debug(DIST_DEBUG,"ereq:\t\t%x\n",(int)req->ereq);
-	gossip_debug(DIST_DEBUG,"sreq:\t\t%x\n",(int)req->sreq);
-	gossip_debug(DIST_DEBUG,"**********************\n");
+	gossip_debug(REQUEST_DEBUG,"**********************\n");
+	gossip_debug(REQUEST_DEBUG,"address:\t%x\n",(unsigned int)req);
+	gossip_debug(REQUEST_DEBUG,"offset:\t\t%d\n",(int)req->offset);
+	gossip_debug(REQUEST_DEBUG,"num_ereqs:\t%d\n",(int)req->num_ereqs);
+	gossip_debug(REQUEST_DEBUG,"num_blocks:\t%d\n",(int)req->num_blocks);
+	gossip_debug(REQUEST_DEBUG,"stride:\t\t%d\n",(int)req->stride);
+	gossip_debug(REQUEST_DEBUG,"ub:\t\t%d\n",(int)req->ub);
+	gossip_debug(REQUEST_DEBUG,"lb:\t\t%d\n",(int)req->lb);
+	gossip_debug(REQUEST_DEBUG,"agg_size:\t%d\n",(int)req->aggregate_size);
+	gossip_debug(REQUEST_DEBUG,"num_chunk:\t%d\n",(int)req->num_contig_chunks);
+	gossip_debug(REQUEST_DEBUG,"depth:\t\t%d\n",(int)req->depth);
+	gossip_debug(REQUEST_DEBUG,"num_nest:\t%d\n",(int)req->num_nested_req);
+	gossip_debug(REQUEST_DEBUG,"commit:\t\t%d\n",(int)req->committed);
+	gossip_debug(REQUEST_DEBUG,"ereq:\t\t%x\n",(int)req->ereq);
+	gossip_debug(REQUEST_DEBUG,"sreq:\t\t%x\n",(int)req->sreq);
+	gossip_debug(REQUEST_DEBUG,"**********************\n");
 }

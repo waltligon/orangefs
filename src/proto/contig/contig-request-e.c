@@ -418,7 +418,7 @@ int do_encode_req(
 	memcpy(enc_msg, request, sizeof(struct PVFS_server_req));
 	return (0);
     default:
-	printf("op: %d not defined\n", request->op);
+	gossip_debug(REQUEST_DEBUG, "op: %d not defined\n", request->op);
 	target_msg = NULL;
 	return -1;
     }

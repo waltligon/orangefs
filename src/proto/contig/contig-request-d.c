@@ -144,8 +144,8 @@ int do_decode_req(
     case PVFS_SERV_FLUSH:
 	return (0);
     default:
-	printf("Unpacking Req Op: %d Not Supported\n",
-	       ((struct PVFS_server_req *) char_ptr)->op);
+        gossip_debug(REQUEST_DEBUG, "Unpacking Req Op: %d Not Supported\n",
+                     ((struct PVFS_server_req *) char_ptr)->op);
 	return -1;
     }
 }
