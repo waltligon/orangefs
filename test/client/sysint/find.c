@@ -184,7 +184,7 @@ int directory_walk(PVFS_sysresp_init *init_response,
 
 int main(int argc, char **argv)
 {
-    pvfs_mntlist mnt = {0,NULL};
+    PVFS_util_tab mnt = {0,NULL};
     PVFS_sysresp_init init_response;
     int go_twice = 0;
 

@@ -31,14 +31,14 @@ struct options
 };
 
 static struct options* parse_args(int argc, char* argv[],
-                                  const pvfs_mntlist *mnt);
+                                  const PVFS_util_tab *mnt);
 static void usage(int argc, char** argv);
 
 int main(int argc, char **argv)
 {
     int ret = -1;
     PVFS_fs_id cur_fs;
-    pvfs_mntlist mnt = {0,NULL};
+    PVFS_util_tab mnt = {0,NULL};
     struct options* user_opts = NULL;
     int mnt_index = -1;
     char pvfs_path[PVFS_NAME_MAX] = {0};
@@ -65,10 +65,10 @@ int main(int argc, char **argv)
     /* see if the destination resides on any of the file systems
      * listed in the pvfstab; find the pvfs fs relative path
      */
-    for(i=0; i<mnt.ptab_count; i++)
+    for(i=0; i<mnt.mntent_count; i++)
     {
 	ret = PVFS_util_remove_dir_prefix(user_opts->mnt_point,
-	    mnt.ptab_array[i].mnt_dir, pvfs_path, PVFS_NAME_MAX);
+	    mnt.mntent_array[i].mnt_dir, pvfs_path, PVFS_NAME_MAX);
 	if(ret == 0)
 	{
 	    mnt_index = i;
@@ -112,7 +112,8 @@ int main(int argc, char **argv)
  *
  * returns pointer to options structure on success, NULL on failure
  */
-static struct options* parse_args(int argc, char* argv[], const pvfs_mntlist *mnt)
+static struct options* parse_args(int argc, char* argv[], const
+    PVFS_util_tab *mnt)
 {
     /* getopt stuff */
     extern char* optarg;
@@ -179,12 +180,12 @@ static struct options* parse_args(int argc, char* argv[], const pvfs_mntlist *mn
 
     /* typical case of just a single tab entry requires no -m argument */
     if (!tmp_opts->mnt_point_set) {
-	if (mnt->ptab_count == 1) {
+	if (mnt->mntent_count == 1) {
 	    /* see dirty hack above */
-	    char *x = malloc(strlen(mnt->ptab_array[0].mnt_dir) + 2);
+	    char *x = malloc(strlen(mnt->mntent_array[0].mnt_dir) + 2);
 	    if (!x)
 		return 0;
-	    strcpy(x, mnt->ptab_array[0].mnt_dir);
+	    strcpy(x, mnt->mntent_array[0].mnt_dir);
 	    strcat(x, "/");
 	    tmp_opts->mnt_point = x;
 	} else

@@ -53,6 +53,14 @@ struct PVFS_sys_mntent
     char *mnt_opts;		/* full option list */
 };
 
+/* results of parsing a pvfs2 tabfile, may contain more than one entry */
+struct PVFS_util_tab_s
+{
+    int mntent_count;
+    struct PVFS_sys_mntent *mntent_array;
+};
+typedef struct PVFS_util_tab_s PVFS_util_tab;
+
 struct pvfs_mntlist_s
 {
     int ptab_count;		/* number of tab file entries */
@@ -166,7 +174,7 @@ typedef struct PVFS_sysresp_getparent_s PVFS_sysresp_getparent;
  * avoiding an extra function call.
  */
 int PVFS_sys_initialize(
-    pvfs_mntlist mntent_list,
+    PVFS_util_tab tab,
     int debug_mask,
     PVFS_sysresp_init * resp);
 

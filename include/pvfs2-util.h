@@ -14,9 +14,9 @@
 /* client side config file / option management */
 int PVFS_util_parse_pvfstab(
     const char* tabfile, 
-    pvfs_mntlist * mnt);
+    PVFS_util_tab * tab);
 void PVFS_util_free_pvfstab(
-    pvfs_mntlist * e_p);
+    PVFS_util_tab * tab);
 
 /* path management */
 int PVFS_util_lookup_parent(

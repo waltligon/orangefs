@@ -18,7 +18,7 @@ int main(int argc, char **argv)
     int ret = -1;
     char *filename = NULL;
     PVFS_fs_id fs_id;
-    pvfs_mntlist mnt = {0,NULL};
+    PVFS_util_tab mnt = {0,NULL};
     PVFS_credentials credentials;
     PVFS_sysresp_init resp_init;
     PVFS_sysresp_lookup resp_look;

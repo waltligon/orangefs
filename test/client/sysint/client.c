@@ -35,7 +35,7 @@ int main(int argc,char **argv)
 	char *filename;
 	//char dirname[256] = "/parl/fshorte/sysint/home";
 	int ret = -1,i = 0;
-	pvfs_mntlist mnt = {0,NULL};
+	PVFS_util_tab mnt = {0,NULL};
 	PVFS_fs_id fs_id;
 	char* name = "/";
 	PVFS_credentials credentials;

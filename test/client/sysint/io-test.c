@@ -25,7 +25,7 @@ int main(int argc,char **argv)
 	char *filename;
 	int name_sz;
 	int ret = -1;
-	pvfs_mntlist mnt = {0,NULL};
+	PVFS_util_tab mnt = {0,NULL};
 	int io_size = DEFAULT_IO_SIZE;
 	int* io_buffer = NULL;
 	int i;

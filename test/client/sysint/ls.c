@@ -181,7 +181,7 @@ int do_list(
 
 int main(int argc, char **argv)
 {
-    pvfs_mntlist mnt = {0,NULL};
+    PVFS_util_tab mnt = {0,NULL};
     PVFS_sysresp_init init_response;
 
     if (argc > 2)

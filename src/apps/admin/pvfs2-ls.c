@@ -110,7 +110,7 @@ int main(int argc, char **argv)
     int ret = -1, i = 0, j = 0;
     char pvfs_path[MAX_NUM_PATHS][PVFS_NAME_MAX];
     PVFS_fs_id fs_id_index_array[MAX_NUM_PATHS] = {0};
-    pvfs_mntlist mnt = {0,NULL};
+    PVFS_util_tab mnt = {0,NULL};
     PVFS_sysresp_init resp_init;
     struct options* user_opts = NULL;
     int mnt_index = -1;
@@ -140,12 +140,12 @@ int main(int argc, char **argv)
     /* see if the destination resides on any of the file systems
      * listed in the pvfstab; find the pvfs fs relative path
      */
-    for(i = 0; i < mnt.ptab_count; i++)
+    for(i = 0; i < mnt.mntent_count; i++)
     {
         if (user_opts->num_starts == 0)
         {
             snprintf(current_dir,PVFS_NAME_MAX,"%s/",
-                     mnt.ptab_array[i].mnt_dir);
+                     mnt.mntent_array[i].mnt_dir);
             user_opts->start[0] = current_dir;
             user_opts->num_starts = 1;
         }
@@ -154,10 +154,10 @@ int main(int argc, char **argv)
         {
             /*
               if the cmdline specified path is an exact match on
-              a mnt.ptab entry, use '/' as the pvfs_path
+              a mnt.mntent entry, use '/' as the pvfs_path
             */
             if (strcmp(user_opts->start[j],
-                       mnt.ptab_array[i].mnt_dir) == 0)
+                       mnt.mntent_array[i].mnt_dir) == 0)
             {
                 strcpy(pvfs_path[j], "/");
                 ret = 0;
@@ -165,7 +165,7 @@ int main(int argc, char **argv)
             else
             {
                 ret = PVFS_util_remove_dir_prefix(
-                    user_opts->start[j], mnt.ptab_array[i].mnt_dir,
+                    user_opts->start[j], mnt.mntent_array[i].mnt_dir,
                     pvfs_path[j], PVFS_NAME_MAX);
             }
             if (ret == 0)

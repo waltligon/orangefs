@@ -28,7 +28,7 @@ job_context_id PVFS_sys_job_context = -1;
 
 extern gen_mutex_t *g_session_tag_mt_lock;
 
-static char* build_flow_module_list(pvfs_mntlist* mntlist);
+static char* build_flow_module_list(PVFS_util_tab* tab);
 
 /* PVFS_sys_initialize()
  *
@@ -44,7 +44,7 @@ static char* build_flow_module_list(pvfs_mntlist* mntlist);
  */
 
 int PVFS_sys_initialize(
-    pvfs_mntlist mntent_list,
+    PVFS_util_tab tab,
     int default_debug_mask,
     PVFS_sysresp_init *resp)
 {
@@ -87,7 +87,7 @@ int PVFS_sys_initialize(
 	gossip_enable_file(debug_file, "w");
 
     /* make sure we were given sane arguments */
-    if ((mntent_list.ptab_array == NULL) || (resp == NULL))
+    if ((tab.mntent_array == NULL) || (resp == NULL))
     {
 	ret = -EINVAL;
 	init_fail = NONE_INIT_FAIL;
@@ -102,13 +102,13 @@ int PVFS_sys_initialize(
 	goto return_error;
     }
 
-    /* Parse the method types from the mntent_list */
+    /* Parse the method types from the tab */
     num_method_ptr_list = 0;
     max_method_ptr_list = 0;
     method_ptr_list = 0;
-    for (i=0; i<mntent_list.ptab_count; i++) {
+    for (i=0; i<tab.mntent_count; i++) {
 	const char *meth_name = BMI_method_from_scheme(
-	  mntent_list.ptab_array[i].pvfs_config_server);
+	  tab.mntent_array[i].pvfs_config_server);
 	for (j=0; j<num_method_ptr_list; j++) {
 	    if (method_ptr_list[j] == meth_name)
 		break;
@@ -157,7 +157,7 @@ int PVFS_sys_initialize(
     }
 
     /* parse flowprotocol list as well */
-    flowproto_list = build_flow_module_list(&mntent_list);
+    flowproto_list = build_flow_module_list(&tab);
     if(!flowproto_list)
     {
 	gossip_err("Error: failed to parse flow protocols from tab file entries.\n");
@@ -228,7 +228,7 @@ int PVFS_sys_initialize(
 
     /* Get configuration parameters from server */
     ret = PINT_server_get_config(PINT_get_server_config_struct(),
-                                 mntent_list);
+                                 tab);
     if (ret < 0)
     {
 	init_fail = NCACHE_INIT_FAIL;
@@ -338,12 +338,12 @@ int PVFS_sys_initialize(
  *
  * builds a string specifying a list of flow protocols suitable for use
  * as an argument to PINT_flow_initialize(), based on flow protocols
- * found in mntlist
+ * found in tabfile
  *
  * returns pointer to string on success, NULL on failure
  * NOTE: caller must free string returned by this function
  */
-static char* build_flow_module_list(pvfs_mntlist* mntlist)
+static char* build_flow_module_list(PVFS_util_tab* tab)
 {
     int i,j;
     int found = 0;
@@ -354,9 +354,9 @@ static char* build_flow_module_list(pvfs_mntlist* mntlist)
     char* next_mod = NULL;
 
     /* iterate through array */
-    for(i=0; i<mntlist->ptab_count; i++)
+    for(i=0; i<tab->mntent_count; i++)
     {
-	switch(mntlist->ptab_array[i].flowproto)
+	switch(tab->mntent_array[i].flowproto)
 	{
 	    case FLOWPROTO_BMI_TROVE:
 		next_mod = "flowproto_bmi_trove";
@@ -376,8 +376,8 @@ static char* build_flow_module_list(pvfs_mntlist* mntlist)
 	found = 0;
 	for(j=0; j<i; j++)
 	{
-	    if(mntlist->ptab_array[i].flowproto == 
-		mntlist->ptab_array[j].flowproto)
+	    if(tab->mntent_array[i].flowproto == 
+		tab->mntent_array[j].flowproto)
 	    {
 		found = 1;
 		break;

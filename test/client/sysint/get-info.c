@@ -25,7 +25,7 @@ int main(int argc,char **argv)
     PVFS_credentials credentials;
     char *filename = NULL;
     int ret = -1;
-    pvfs_mntlist mnt = {0,NULL};
+    PVFS_util_tab mnt = {0,NULL};
     time_t r_atime, r_mtime, r_ctime;
 
     if (argc == 2)

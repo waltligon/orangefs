@@ -40,7 +40,7 @@ extern job_context_id PVFS_sys_job_context;
 int main(int argc, char **argv)	
 {
     int i = 0, j = 0, k = 0, n = 0, m = 0, num_file_systems = 0;
-    pvfs_mntlist mnt = {0,NULL};
+    PVFS_util_tab mnt = {0,NULL};
     struct server_configuration_s server_config;
     PINT_llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs = NULL;

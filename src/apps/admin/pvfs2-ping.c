@@ -41,7 +41,7 @@ int main(int argc, char **argv)
 {
     int ret = -1;
     PVFS_fs_id cur_fs;
-    pvfs_mntlist mnt = {0,NULL};
+    PVFS_util_tab mnt = {0,NULL};
     struct options* user_opts = NULL;
     int mnt_index = -1;
     char pvfs_path[PVFS_NAME_MAX] = {0};
@@ -74,10 +74,10 @@ int main(int argc, char **argv)
     /* see if the destination resides on any of the file systems
      * listed in the pvfstab; find the pvfs fs relative path
      */
-    for(i = 0; i < mnt.ptab_count; i++)
+    for(i = 0; i < mnt.mntent_count; i++)
     {
 	ret = PVFS_util_remove_dir_prefix(
-            user_opts->fs_path_hack, mnt.ptab_array[i].mnt_dir,
+            user_opts->fs_path_hack, mnt.mntent_array[i].mnt_dir,
             pvfs_path, PVFS_NAME_MAX);
 	if (ret == 0)
 	{
@@ -98,7 +98,7 @@ int main(int argc, char **argv)
                "entry %d\n", mnt_index);
     }
 
-    print_mntent(mnt.ptab_array, mnt.ptab_count);
+    print_mntent(mnt.mntent_array, mnt.mntent_count);
 
     creds.uid = getuid();
     creds.gid = getgid();
@@ -117,11 +117,11 @@ int main(int argc, char **argv)
 
     cur_fs = PINT_config_get_fs_id_by_fs_name(
         PINT_get_server_config_struct(),
-        mnt.ptab_array[mnt_index].pvfs_fs_name);
+        mnt.mntent_array[mnt_index].pvfs_fs_name);
     if (cur_fs == (PVFS_fs_id)0)
     {
 	fprintf(stderr, "Failure: could not get fs configuration "
-                "for %s.\n", mnt.ptab_array[mnt_index].pvfs_fs_name);
+                "for %s.\n", mnt.mntent_array[mnt_index].pvfs_fs_name);
 	return(-1);
     }
 
@@ -145,7 +145,7 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    printf("\n(4) Verifying that fsid %ld is acceptable to all servers...\n",
+    printf("\n(4) Verifying that fsid %ld is accemntentle to all servers...\n",
 	(long)cur_fs);
 
     /* check that the fsid exists on all of the servers */

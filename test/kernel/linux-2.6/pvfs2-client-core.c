@@ -920,7 +920,7 @@ int main(int argc, char **argv)
     pvfs2_upcall_t upcall;
     pvfs2_downcall_t downcall;
 
-    pvfs_mntlist mnt = {0,NULL};
+    PVFS_util_tab mnt = {0,NULL};
     PVFS_sysresp_init init_response;
 
     /* set rlimit to prevent core files */

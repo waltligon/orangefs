@@ -19,7 +19,7 @@ int main(int argc,char **argv)
     PVFS_sysresp_lookup resp_look;
     PVFS_sysresp_readdir resp_readdir;
     int ret = -1, i = 0;
-    pvfs_mntlist mnt = {0,NULL};
+    PVFS_util_tab mnt = {0,NULL};
     int max_dirents_returned = 25;
     char starting_point[256] = "/";
     PVFS_fs_id fs_id;

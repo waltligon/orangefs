@@ -15,7 +15,7 @@ int main(int argc,char **argv)
 {
 	PVFS_sysresp_init resp_init;
 	int ret = -1;
-	pvfs_mntlist mnt = {0,NULL};
+	PVFS_util_tab mnt = {0,NULL};
 
 	/* Parse PVFStab */
 	ret = PVFS_util_parse_pvfstab(NULL, &mnt);

@@ -18,7 +18,7 @@ int main(int argc,char **argv)
     char str_buf[256] = {0};
     char *filename = (char *)0;
     PVFS_fs_id cur_fs;
-    pvfs_mntlist mnt = {0,NULL};
+    PVFS_util_tab mnt = {0,NULL};
     PVFS_sysresp_init resp_init;
     char* entry_name;
     PVFS_pinode_reference parent_refn;

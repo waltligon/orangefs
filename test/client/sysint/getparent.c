@@ -18,7 +18,7 @@ int main(int argc,char **argv)
     PVFS_sysresp_init resp_init;
     PVFS_sysresp_getparent resp_getparent;
     int ret = -1;
-    pvfs_mntlist mnt = {0,NULL};
+    PVFS_util_tab mnt = {0,NULL};
     PVFS_fs_id fs_id;
     PVFS_credentials credentials;
 

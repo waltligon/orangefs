@@ -79,7 +79,7 @@ int PINT_check_perms(PVFS_object_attr attr,
 }
 
 int PINT_server_get_config(struct server_configuration_s *config,
-                           pvfs_mntlist mntent_list)
+                           PVFS_util_tab tab)
 {
     int ret = -1, i = 0;
     PVFS_BMI_addr_t serv_addr;
@@ -97,9 +97,9 @@ int PINT_server_get_config(struct server_configuration_s *config,
       for each entry in the pvfstab, attempt to query the server for
       getconfig information.  discontinue loop when we have info.
     */
-    for (i = 0; i < mntent_list.ptab_count; i++)
+    for (i = 0; i < tab.mntent_count; i++)
     {
-	mntent_p = &mntent_list.ptab_array[i];
+	mntent_p = &tab.mntent_array[i];
 
    	/* obtain the metaserver to send the request */
 	ret = BMI_addr_lookup(&serv_addr, mntent_p->pvfs_config_server);
@@ -157,9 +157,9 @@ int PINT_server_get_config(struct server_configuration_s *config,
     }
 
     /* verify that each pvfstab entry is valid according to the server */
-    for (i = 0; i < mntent_list.ptab_count; i++)
+    for (i = 0; i < tab.mntent_count; i++)
     {
-	mntent_p = &mntent_list.ptab_array[i];
+	mntent_p = &tab.mntent_array[i];
 
         /* make sure we have valid information about this fs */
         cur_fs = PINT_config_find_fs_name(config, mntent_p->pvfs_fs_name);

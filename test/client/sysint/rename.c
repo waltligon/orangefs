@@ -20,7 +20,7 @@ int main(int argc,char **argv)
     char *old_filename = (char *)0;
     char *new_filename = (char *)0;
     PVFS_fs_id cur_fs;
-    pvfs_mntlist mnt = {0,NULL};
+    PVFS_util_tab mnt = {0,NULL};
     PVFS_sysresp_init resp_init;
     char* old_entry;
     PVFS_pinode_reference old_parent_refn;

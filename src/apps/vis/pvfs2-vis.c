@@ -68,7 +68,7 @@ int pvfs2_vis_stop(void)
 int pvfs2_vis_start(char* path, int update_interval)
 {
     PVFS_fs_id cur_fs;
-    pvfs_mntlist mnt = {0,NULL};
+    PVFS_util_tab mnt = {0,NULL};
     char pvfs_path[PVFS_NAME_MAX] = {0};
     int i,j;
     int mnt_index = -1;
@@ -104,10 +104,10 @@ int pvfs2_vis_start(char* path, int update_interval)
     /* see if the destination resides on any of the file systems
      * listed in the pvfstab; find the pvfs fs relative path
      */
-    for(i=0; i<mnt.ptab_count; i++)
+    for(i=0; i<mnt.mntent_count; i++)
     {
 	ret = PVFS_util_remove_dir_prefix(path,
-	    mnt.ptab_array[i].mnt_dir, pvfs_path, PVFS_NAME_MAX);
+	    mnt.mntent_array[i].mnt_dir, pvfs_path, PVFS_NAME_MAX);
 	if(ret == 0)
 	{
 	    mnt_index = i;

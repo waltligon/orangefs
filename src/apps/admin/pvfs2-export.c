@@ -38,7 +38,7 @@ int main(int argc, char **argv)
     char str_buf[PVFS_NAME_MAX] = {0};
     char pvfs_path[PVFS_NAME_MAX] = {0};
     PVFS_fs_id cur_fs;
-    pvfs_mntlist mnt = {0,NULL};
+    PVFS_util_tab mnt = {0,NULL};
     PVFS_sysresp_init resp_init;
     PVFS_sysresp_lookup resp_lookup;
     PVFS_sysresp_io resp_io;
@@ -90,10 +90,10 @@ int main(int argc, char **argv)
     /* see if the destination resides on any of the file systems
      * listed in the pvfstab; find the pvfs fs relative path
      */
-    for(i=0; i<mnt.ptab_count; i++)
+    for(i=0; i<mnt.mntent_count; i++)
     {
 	ret = PVFS_util_remove_dir_prefix(user_opts->srcfile,
-	    mnt.ptab_array[i].mnt_dir, pvfs_path, PVFS_NAME_MAX);
+	    mnt.mntent_array[i].mnt_dir, pvfs_path, PVFS_NAME_MAX);
 	if(ret == 0)
 	{
 	    mnt_index = i;
@@ -218,8 +218,8 @@ int main(int argc, char **argv)
     printf("********************************************************\n");
     printf("Source path (local): %s\n", user_opts->srcfile);
     printf("Source path (PVFS2 file system): %s\n", pvfs_path);
-    printf("File system name: %s\n", mnt.ptab_array[mnt_index].pvfs_fs_name);
-    printf("Initial config server: %s\n", mnt.ptab_array[mnt_index].pvfs_config_server);
+    printf("File system name: %s\n", mnt.mntent_array[mnt_index].pvfs_fs_name);
+    printf("Initial config server: %s\n", mnt.mntent_array[mnt_index].pvfs_config_server);
     printf("********************************************************\n");
     printf("Bytes written: %Ld\n", Ld(total_written));
     printf("Elapsed time: %f seconds\n", (time2-time1));

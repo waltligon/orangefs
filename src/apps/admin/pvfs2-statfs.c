@@ -40,7 +40,7 @@ int main(int argc, char **argv)
 {
     int ret = -1;
     PVFS_fs_id cur_fs;
-    pvfs_mntlist mnt = {0,NULL};
+    PVFS_util_tab mnt = {0,NULL};
     struct options *user_opts = NULL;
     int mnt_index = -1;
     char pvfs_path[PVFS_NAME_MAX] = {0};
@@ -74,10 +74,10 @@ int main(int argc, char **argv)
     /* see if the destination resides on any of the file systems
      * listed in the pvfstab; find the pvfs fs relative path
      */
-    for(i=0; i<mnt.ptab_count; i++)
+    for(i=0; i<mnt.mntent_count; i++)
     {
 	ret = PVFS_util_remove_dir_prefix(user_opts->mnt_point,
-	    mnt.ptab_array[i].mnt_dir, pvfs_path, PVFS_NAME_MAX);
+	    mnt.mntent_array[i].mnt_dir, pvfs_path, PVFS_NAME_MAX);
 	if(ret == 0)
 	{
 	    mnt_index = i;
@@ -102,11 +102,11 @@ int main(int argc, char **argv)
 
     cur_fs = PINT_config_get_fs_id_by_fs_name(
         PINT_get_server_config_struct(),
-        mnt.ptab_array[mnt_index].pvfs_fs_name);
+        mnt.mntent_array[mnt_index].pvfs_fs_name);
     if (cur_fs == (PVFS_fs_id)0)
     {
 	fprintf(stderr, "Failure: could not get fs configuration "
-                "for %s.\n", mnt.ptab_array[mnt_index].pvfs_fs_name);
+                "for %s.\n", mnt.mntent_array[mnt_index].pvfs_fs_name);
 	return(-1);
     }
 
