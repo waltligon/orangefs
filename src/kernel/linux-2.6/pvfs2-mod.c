@@ -21,10 +21,11 @@ static int hash_compare(void *key, struct qhash_head *link);
 /* the size of the hash tables for ops in progress */
 static int hash_table_size = 509;
 
-#ifdef PVFS2_LINUX_KERNEL_2_4
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("PVFS2 Development Team");
 MODULE_DESCRIPTION("The Linux Kernel VFS interface to PVFS2");
+
+#ifdef PVFS2_LINUX_KERNEL_2_4
 /*
   for 2.4.x nfs exporting, we need to add fsid=# to the /etc/exports
   file rather than using the FS_REQUIRES_DEV flag

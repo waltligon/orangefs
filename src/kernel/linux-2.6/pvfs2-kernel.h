@@ -62,12 +62,6 @@ typedef unsigned long sector_t;
 #include "pint-dev-shared.h"
 #include "pvfs2-dev-proto.h"
 
-#ifndef PVFS2_LINUX_KERNEL_2_4
-MODULE_LICENSE("GPL");
-MODULE_AUTHOR("PVFS2 Development Team");
-MODULE_DESCRIPTION("The Linux Kernel VFS interface to PVFS2");
-#endif
-
 #define pvfs2_error printk
 
 #ifdef PVFS2_KERNEL_DEBUG
