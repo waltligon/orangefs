@@ -561,7 +561,14 @@ int PINT_thread_mgr_bmi_stop(void)
 	assert(bmi_thread_ref_count == 0); /* sanity check */
 	bmi_thread_running = 0;
 #ifdef __PVFS2_JOB_THREADED__
+        /*
+          unlock bmi_mutex before joining in case the thread is now
+          sleeping while trying to aquire the lock; this may need to
+          be replaced with cancellation handlers if it's not safe
+        */
+        gen_mutex_unlock(&bmi_mutex);
 	pthread_join(bmi_thread_id, NULL);
+        gen_mutex_lock(&bmi_mutex);
 #endif
 	BMI_close_context(global_bmi_context);
     }
