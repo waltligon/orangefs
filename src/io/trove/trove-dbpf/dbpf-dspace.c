@@ -371,19 +371,11 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
     /* if this attr is in the dbpf attr cache, remove it */
     dbpf_attr_cache_remove(ref);
 
-    /*
-      remove keyval db if it exists. failure here is not a fatal
-      error; this might have never been created.
-    */
-    ret = dbpf_keyval_dbcache_try_remove(
-        op_p->coll_p->coll_id, op_p->handle);
-
     DBPF_DB_SYNC_IF_NECESSARY(op_p, db_p);
 
-    /*
-      remove bstream file if it exists. failure here is not a fatal
-      error; this might have never been created.
-    */
+    /* remove both bstream and keyval db if they exist.  Not a fatal error
+     * if this fails (may not have ever been created)
+     */
     ret = dbpf_open_cache_remove(
         op_p->coll_p->coll_id, op_p->handle);
 
@@ -904,7 +896,7 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
 {
     int ret, got_db = 0, error = -TROVE_EINVAL;
     struct open_cache_ref tmp_ref;
-    DB *db_p, *kdb_p;
+    DB *db_p;
     DBT key, data;
     TROVE_ds_storedattr_s s_attr;
     TROVE_ds_attributes *attr = NULL;
@@ -956,24 +948,19 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
 	b_size = (TROVE_size) b_stat.st_size;
     }
 
-    ret = dbpf_keyval_dbcache_try_get(
-        op_p->coll_p->coll_id, op_p->handle, 0, &kdb_p);
-    if (ret == -TROVE_EBUSY)
+    ret = dbpf_open_cache_get(
+        op_p->coll_p->coll_id, op_p->handle, 0, DBPF_OPEN_DB, &tmp_ref);
+    if (ret == 0)
     {
-        error = 0;
-        goto return_error;
-    }
-    else if (ret == 0)
-    {
-        ret = kdb_p->stat(kdb_p,
+        ret = tmp_ref.db_p->stat(tmp_ref.db_p,
                           &k_stat_p,
 #ifdef HAVE_UNKNOWN_PARAMETER_TO_DB_STAT
                           NULL,
 #endif
                           0);
 
-        dbpf_keyval_dbcache_put(
-            op_p->coll_p->coll_id, op_p->handle);
+        dbpf_open_cache_put(
+            &tmp_ref);
 
         if (ret == 0)
         {

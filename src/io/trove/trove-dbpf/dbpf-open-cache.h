@@ -7,13 +7,15 @@
 #ifndef __DBPF_OPEN_CACHE_H__
 #define __DBPF_OPEN_CACHE_H__
 
+#include <db.h>
+
 #include "trove.h"
 #include "trove-internal.h"
 
 struct open_cache_ref
 {
     int fd;
-    /* TODO: add db info */
+    DB *db_p;
     void* internal; /* pointer to underlying data structure */
 };
 

@@ -55,6 +55,15 @@ static gen_mutex_t used_mutex = GEN_MUTEX_INITIALIZER;
 static gen_mutex_t unused_mutex = GEN_MUTEX_INITIALIZER;
 static struct open_cache_entry prealloc[OPEN_CACHE_SIZE];
 
+static int open_fd(int* fd, 
+    TROVE_coll_id coll_id,
+    TROVE_handle handle,
+    int create_flag);
+static int open_db(DB** db, 
+    TROVE_coll_id coll_id,
+    TROVE_handle handle,
+    int create_flag);
+
 void dbpf_open_cache_initialize(void)
 {
     int i;
@@ -85,6 +94,12 @@ void dbpf_open_cache_finalize(void)
 	if(tmp_entry->fd > 0)
 	{
 	    DBPF_CLOSE(tmp_entry->fd);
+	    tmp_entry->fd = -1;
+	}
+	if(tmp_entry->db_p)
+	{
+	    tmp_entry->db_p->close(tmp_entry->db_p, 0);
+	    tmp_entry->db_p = NULL;
 	}
     }
 
@@ -95,6 +110,12 @@ void dbpf_open_cache_finalize(void)
 	if(tmp_entry->fd > 0)
 	{
 	    DBPF_CLOSE(tmp_entry->fd);
+	    tmp_entry->fd = -1;
+	}
+	if(tmp_entry->db_p)
+	{
+	    tmp_entry->db_p->close(tmp_entry->db_p, 0);
+	    tmp_entry->db_p = NULL;
 	}
     }
 
@@ -115,16 +136,11 @@ int dbpf_open_cache_get(
     struct qlist_head* tmp_link;
     struct open_cache_entry* tmp_entry = NULL;
     int found = 0;
-    char filename[PATH_MAX];
     int ret;
 
     gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
 	"dbpf_open_cache_get: type: %d\n", (int)type);
-    
-    /* we haven't implemented db support yet */
-    /* TODO: remove this eventually */
-    assert(type == DBPF_OPEN_FD);
-
+   
     /* check the list of already opened objects first, reuse ref if possible */
     gen_mutex_lock(&used_mutex);
     gen_mutex_lock(&unused_mutex);
@@ -163,26 +179,27 @@ int dbpf_open_cache_get(
     {
 	if((type & DBPF_OPEN_FD) && (tmp_entry->fd < 0))
 	{
-	    /* need to open bstream */
-	    DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX,
-				      my_storage_p->name, coll_id, Lu(handle));
-	    tmp_entry->fd = DBPF_OPEN(filename, O_RDWR, 0);
-	    if(tmp_entry->fd < 0 && errno == ENOENT && create_flag)
+	    ret = open_fd(&(tmp_entry->fd), coll_id, handle, create_flag);
+	    if(ret < 0)
 	    {
-		tmp_entry->fd = DBPF_OPEN(filename,
-		    O_RDWR|O_CREAT|O_EXCL,
-		    TROVE_DB_MODE);
-	    }
-	    
-	    if(tmp_entry->fd < 0)
-	    {
-		ret = -trove_errno_to_trove_error(errno);
 		gen_mutex_unlock(&unused_mutex);
 		gen_mutex_unlock(&used_mutex);
 		return(ret);
 	    }
 	}
 
+	if((type & DBPF_OPEN_DB) && (tmp_entry->db_p == NULL))
+	{
+	    ret = open_db(&(tmp_entry->db_p), coll_id, handle, create_flag);
+	    if(ret < 0)
+	    {
+		gen_mutex_unlock(&unused_mutex);
+		gen_mutex_unlock(&used_mutex);
+		return(ret);
+	    }
+	}
+
+	out_ref->db_p = tmp_entry->db_p;
 	out_ref->fd = tmp_entry->fd;
 	out_ref->internal = tmp_entry;
 	tmp_entry->ref_ct++;
@@ -238,6 +255,12 @@ int dbpf_open_cache_get(
 	if(tmp_entry->fd > 0)
 	{
 	    DBPF_CLOSE(tmp_entry->fd);
+	    tmp_entry->fd = -1;
+	}
+	if(tmp_entry->db_p != NULL)
+	{
+	    tmp_entry->db_p->close(tmp_entry->db_p, 0);
+	    tmp_entry->db_p = NULL;
 	}
     }
     gen_mutex_unlock(&unused_mutex);
@@ -248,22 +271,13 @@ int dbpf_open_cache_get(
 	tmp_entry->ref_ct = 1;
 	tmp_entry->coll_id = coll_id;
 	tmp_entry->handle = handle;
+	tmp_entry->db_p = NULL;
+	tmp_entry->fd = -1;
 	if(type & DBPF_OPEN_FD)
 	{
-	    /* need to open bstream */
-	    DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX,
-				      my_storage_p->name, coll_id, Lu(handle));
-	    tmp_entry->fd = DBPF_OPEN(filename, O_RDWR, 0);
-	    if(tmp_entry->fd < 0 && errno == ENOENT && create_flag)
+	    ret = open_fd(&(tmp_entry->fd), coll_id, handle, create_flag);
+	    if(ret < 0)
 	    {
-		tmp_entry->fd = DBPF_OPEN(filename,
-		    O_RDWR|O_CREAT|O_EXCL,
-		    TROVE_DB_MODE);
-	    }
-	    
-	    if(tmp_entry->fd < 0)
-	    {
-		ret = -trove_errno_to_trove_error(errno);
 		gen_mutex_lock(&free_mutex);
 		qlist_add(&tmp_entry->queue_link, &free_list);
 		gen_mutex_unlock(&free_mutex);
@@ -272,7 +286,22 @@ int dbpf_open_cache_get(
 		return(ret);
 	    }
 	}
+
+	if(type & DBPF_OPEN_DB)
+	{
+	    /* need to open db */
+	    ret = open_db(&(tmp_entry->db_p), coll_id, handle, create_flag);
+	    if(ret < 0)
+	    {
+		gen_mutex_lock(&free_mutex);
+		qlist_add(&tmp_entry->queue_link, &free_list);
+		gen_mutex_unlock(&free_mutex);
+		return(ret);
+	    }
+	}
+
 	out_ref->fd = tmp_entry->fd;
+	out_ref->db_p = tmp_entry->db_p;
 	out_ref->internal = tmp_entry;
 	gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
 	    "dbpf_open_cache_get: moving to used list.\n");
@@ -286,27 +315,30 @@ int dbpf_open_cache_get(
      * create a new entry for it (cache exhausted).  In this case just open
      * the file and hand out a reference that will not be cached
      */
+    out_ref->fd = -1;
+    out_ref->db_p = NULL;
+
     if(type & DBPF_OPEN_FD)
     {
 	gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
 	    "dbpf_open_cache_get: missed cache entirely.\n");
-	/* need to open bstream */
-	DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX,
-				  my_storage_p->name, coll_id, Lu(handle));
-	out_ref->fd = DBPF_OPEN(filename, O_RDWR, 0);
-	if(out_ref->fd < 0 && errno == ENOENT && create_flag)
+	ret = open_fd(&(out_ref->fd), coll_id, handle, create_flag);
+	if(ret < 0)
 	{
-	    out_ref->fd = DBPF_OPEN(filename,
-		O_RDWR|O_CREAT|O_EXCL,
-		TROVE_DB_MODE);
-	}
-	
-	if(out_ref->fd < 0)
-	{
-	    ret = -trove_errno_to_trove_error(errno);
 	    return(ret);
 	}
     }
+
+    if(type & DBPF_OPEN_DB)
+    {
+	/* need to open db */
+	ret = open_db(&(out_ref->db_p), coll_id, handle, create_flag);
+	if(ret < 0)
+	{
+	    return(ret);
+	}
+    }
+
     out_ref->internal = NULL;
     return(0);
 }
@@ -352,6 +384,12 @@ void dbpf_open_cache_put(
 	if(in_ref->fd > 0)
 	{
 	    DBPF_CLOSE(in_ref->fd);
+	    in_ref->fd = -1;
+	}
+	if(in_ref->db_p != NULL)
+	{
+	    in_ref->db_p->close(in_ref->db_p, 0);
+	    in_ref->db_p = NULL;
 	}
     }
 
@@ -368,6 +406,8 @@ int dbpf_open_cache_remove(
     char filename[PATH_MAX];
     int ret = -1;
     struct qlist_head* scratch;
+    DB* db_p = NULL;
+    int tmp_error = 0;
 
     /* for error checking for now, let's make sure that this object is _not_
      * in the used list (we shouldn't be able to delete while another thread
@@ -406,8 +446,16 @@ int dbpf_open_cache_remove(
     {
 	gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
 	    "dbpf_open_cache_remove: unused entry.\n");
-	DBPF_CLOSE(tmp_entry->fd);
-	tmp_entry->fd = -1;
+	if(tmp_entry->fd > 0)
+	{
+	    DBPF_CLOSE(tmp_entry->fd);
+	    tmp_entry->fd = -1;
+	}
+	if(tmp_entry->db_p != NULL)
+	{
+	    tmp_entry->db_p->close(tmp_entry->db_p, 0);
+	    tmp_entry->db_p = NULL;
+	}
 	gen_mutex_lock(&free_mutex);
 	qlist_add(&tmp_entry->queue_link, &free_list);
 	gen_mutex_unlock(&free_mutex);
@@ -418,14 +466,128 @@ int dbpf_open_cache_remove(
 	    "dbpf_open_cache_remove: uncached entry.\n");
     }
 
+    tmp_error = 0;
+
     DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX,
                               my_storage_p->name, coll_id, Lu(handle));
 
     ret = DBPF_UNLINK(filename);
     if (ret != 0 && errno != ENOENT)
     {
-	return -trove_errno_to_trove_error(errno); 
+	tmp_error =  -trove_errno_to_trove_error(errno); 
     }
+
+    DBPF_GET_KEYVAL_DBNAME(filename, PATH_MAX, my_storage_p->name,
+                           coll_id, handle);
+    ret = db_create(&db_p, NULL, 0);
+    assert(ret == 0);
+
+    ret = db_p->remove(db_p, filename, NULL, 0);
+    if (ret != 0 && ret != ENOENT)
+    {
+	tmp_error = -dbpf_db_error_to_trove_error(ret);
+    }
+
+    return(tmp_error);
+}
+
+static int open_fd(int* fd, 
+    TROVE_coll_id coll_id,
+    TROVE_handle handle,
+    int create_flag)
+{
+    char filename[PATH_MAX];
+
+    DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX,
+			      my_storage_p->name, coll_id, Lu(handle));
+    *fd = DBPF_OPEN(filename, O_RDWR, 0);
+    if((*fd) < 0 && errno == ENOENT && create_flag)
+    {
+	*fd = DBPF_OPEN(filename,
+	    O_RDWR|O_CREAT|O_EXCL,
+	    TROVE_DB_MODE);
+    }
+    
+    if(*fd < 0)
+    {
+	return -trove_errno_to_trove_error(errno);
+    }
+    return(0);
+}
+
+static int open_db(DB** db_pp, 
+    TROVE_coll_id coll_id,
+    TROVE_handle handle,
+    int create_flag)
+{
+    char filename[PATH_MAX];
+    int ret = -1;
+
+    gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
+	"dbpf_open_cache open_db: opening db %Lu (%Lx).\n",
+	Lu(handle), Lu(handle));
+
+    DBPF_GET_KEYVAL_DBNAME(filename, PATH_MAX,
+	my_storage_p->name, coll_id, Lu(handle));
+    ret = db_create(db_pp, NULL, 0);
+    if(ret != 0)
+    {
+	ret = -dbpf_db_error_to_trove_error(ret);
+	return(ret);
+    }
+
+    (*db_pp)->set_errpfx((*db_pp), "pvfs2");
+    (*db_pp)->set_errcall((*db_pp), dbpf_error_report);
+    /* DB_RECNUM makes it easier to iterate through every key in chunks */
+    if ((ret = (*db_pp)->set_flags((*db_pp), DB_RECNUM)))
+    {
+	(*db_pp)->err((*db_pp), ret, "%s: set_flags", 
+	    filename);
+	assert(0);
+    }
+    ret = (*db_pp)->open(*db_pp,
+#ifdef HAVE_TXNID_PARAMETER_TO_DB_OPEN
+		     NULL,
+#endif
+		     filename,
+		     NULL,
+		     DB_UNKNOWN,
+		     TROVE_DB_OPEN_FLAGS,
+		     0);
+
+    if ((ret == ENOENT) && (create_flag != 0))
+    {
+	gossip_debug(GOSSIP_TROVE_DEBUG, "About to create new DB "
+		     "file %s ... ", filename);
+	ret = (*db_pp)->open(*db_pp,
+#ifdef HAVE_TXNID_PARAMETER_TO_DB_OPEN
+			 NULL,
+#endif
+			 filename,
+			 NULL,
+			 TROVE_DB_TYPE,
+			 TROVE_DB_CREATE_FLAGS,
+			 TROVE_DB_MODE);
+
+	gossip_debug(GOSSIP_TROVE_DEBUG, "done\n");
+
+	/* this can easily happen if the server is out of disk space */
+	if (ret)
+	{
+	    ret = -dbpf_db_error_to_trove_error(ret);
+	    (*db_pp)->close(*db_pp, 0);
+	    *db_pp = NULL;
+	    return(ret);
+	}
+    }
+    else if (ret != 0)
+    {
+	ret = -dbpf_db_error_to_trove_error(ret);
+	(*db_pp)->close((*db_pp), 0);
+	*db_pp = NULL;
+	return(ret);
+    }
+
     return(0);
 }
 

@@ -285,7 +285,6 @@ static int dbpf_initialize(char *stoname,
 
     dbpf_dspace_dbcache_initialize();
     dbpf_open_cache_initialize();
-    dbpf_keyval_dbcache_initialize();
 
     return dbpf_thread_initialize();
 }
@@ -298,7 +297,6 @@ static int dbpf_finalize(void)
 
     dbpf_thread_finalize();
     dbpf_open_cache_finalize();
-    dbpf_keyval_dbcache_finalize();
     dbpf_dspace_dbcache_finalize();
     dbpf_attr_cache_finalize();
 
