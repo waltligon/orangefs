@@ -268,6 +268,13 @@ int pvfs_bufmap_copy_to_user(void* to, int buffer_index,
     void* offset = to;
     struct pvfs_bufmap_desc* from = &desc_array[buffer_index];
     
+    if(bufmap_init == 0)
+    {
+        pvfs2_print("pvfs2_bufmap_copy_to_user: not yet "
+                    "initialized; returning\n");
+	return 1;
+    }
+
     while(amt_copied < size)
     {
 	if((size - amt_copied) > PAGE_SIZE)
@@ -293,6 +300,13 @@ int pvfs_bufmap_copy_to_kernel(void* to, int buffer_index,
     int index = 0;
     void* offset = to;
     struct pvfs_bufmap_desc* from = &desc_array[buffer_index];
+
+    if(bufmap_init == 0)
+    {
+        pvfs2_print("pvfs2_bufmap_copy_to_kernel: not yet "
+                    "initialized; returning\n");
+	return 1;
+    }
 
     while(amt_copied < size)
     {
@@ -325,6 +339,13 @@ int pvfs_bufmap_copy_from_user(int buffer_index, void* from,
     int index = 0;
     void* offset = from;
     struct pvfs_bufmap_desc* to = &desc_array[buffer_index];
+
+    if(bufmap_init == 0)
+    {
+        pvfs2_print("pvfs2_bufmap_copy_from_user: not yet "
+                    "initialized; returning\n");
+	return 1;
+    }
 
     while(amt_copied < size)
     {

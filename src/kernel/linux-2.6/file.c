@@ -126,15 +126,22 @@ ssize_t pvfs2_inode_read(
 	{
             if (copy_to_user)
             {
-                pvfs_bufmap_copy_to_user(
+                ret = pvfs_bufmap_copy_to_user(
                     current_buf, buffer_index,
                     new_op->downcall.resp.io.amt_complete);
             }
             else
             {
-		pvfs_bufmap_copy_to_kernel(
+		ret = pvfs_bufmap_copy_to_kernel(
                     current_buf, buffer_index,
                     new_op->downcall.resp.io.amt_complete);
+            }
+
+            if (ret)
+            {
+                pvfs2_error("Failed to copy user buffer.  Please make "
+                            "sure that the pvfs2-client is running.\n");
+                goto error_exit;
             }
 	}
 
@@ -198,20 +205,20 @@ static ssize_t pvfs2_file_write(
 		(file && file->f_dentry && file->f_dentry->d_name.name ?
                  (char *)file->f_dentry->d_name.name : "UNKNOWN"));
 
-    new_op = kmem_cache_alloc(op_cache, SLAB_KERNEL);
-    if (!new_op)
-    {
-	pvfs2_error("pvfs2: ERROR -- pvfs2_file_write "
-		    "kmem_cache_alloc failed!\n");
-	return -ENOMEM;
-    }
-
-    new_op->upcall.type = PVFS2_VFS_OP_FILE_IO;
-    new_op->upcall.req.io.io_type = PVFS_IO_WRITE;
-    new_op->upcall.req.io.refn = pvfs2_inode->refn;
-
     while(total_count < count)
     {
+        new_op = kmem_cache_alloc(op_cache, SLAB_KERNEL);
+        if (!new_op)
+        {
+            pvfs2_error("pvfs2: ERROR -- pvfs2_file_write "
+                        "kmem_cache_alloc failed!\n");
+            return -ENOMEM;
+        }
+
+        new_op->upcall.type = PVFS2_VFS_OP_FILE_IO;
+        new_op->upcall.req.io.io_type = PVFS_IO_WRITE;
+        new_op->upcall.req.io.refn = pvfs2_inode->refn;
+
 	pvfs2_print("pvfs2: writing %d bytes.\n", count);
 
 	/* get a buffer for the transfer */
@@ -222,10 +229,8 @@ static ssize_t pvfs2_file_write(
 	ret = pvfs_bufmap_get(&buffer_index);
 	if(ret < 0)
 	{
-	    *offset = original_offset;
-	    op_release(new_op);
 	    pvfs2_error("pvfs2: error: pvfs_bufmap_get() failure.\n");
-	    return(ret);
+            goto error_exit;
 	}
     
 	/* how much to transfer in this loop iteration */
@@ -237,24 +242,29 @@ static ssize_t pvfs2_file_write(
 	new_op->upcall.req.io.offset = *offset;
 
 	/* copy data from application */
-	pvfs_bufmap_copy_from_user(buffer_index, current_buf, each_count);
+	if (pvfs_bufmap_copy_from_user(
+                buffer_index, current_buf, each_count))
+        {
+            pvfs2_error("Failed to copy user buffer.  Please make sure "
+                        "that the pvfs2-client is running.\n");
+            goto error_exit;
+        }
 
         service_operation_with_timeout_retry(
             new_op, "pvfs2_file_write", retries);
 
-	if(new_op->downcall.status != 0)
+	if (new_op->downcall.status != 0)
 	{
+	    pvfs2_error("pvfs2_file_write: error: io downcall status.\n");
+
           error_exit:
+	    ret = new_op->downcall.status;
+            wake_up_device_for_return(new_op);
             kill_device_owner();
 	    pvfs_bufmap_put(buffer_index);
-	    ret = new_op->downcall.status;
-	    op_release(new_op);
 	    *offset = original_offset;
-	    pvfs2_error("pvfs2_file_write: error: io downcall status.\n");
 	    return(ret);
 	}
-
-	pvfs_bufmap_put(buffer_index);
 
 	current_buf += new_op->downcall.resp.io.amt_complete;
 	*offset += new_op->downcall.resp.io.amt_complete;
@@ -268,19 +278,24 @@ static ssize_t pvfs2_file_write(
                                  new_op->downcall.resp.io.amt_complete));
         }
 
+        /*
+          tell the device file owner waiting on I/O that
+          this read has completed and it can return now
+        */
+        wake_up_device_for_return(new_op);
+
+	pvfs_bufmap_put(buffer_index);
+
 	/* if we got a short write, fall out and return what we
 	 * got so far
 	 * TODO: define semantics here- kind of depends on pvfs2
 	 * semantics that don't really exist yet
 	 */
-	if(new_op->downcall.resp.io.amt_complete < each_count)
+	if (new_op->downcall.resp.io.amt_complete < each_count)
 	{
 	    break;
 	}
     }
-
-    op_release(new_op);
-
     return(total_count); 
 }
 

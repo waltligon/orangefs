@@ -325,10 +325,14 @@ static ssize_t pvfs2_devreq_writev(
               if this operation is an I/O operation, we need to
               wait for all data to be copied before we can return
               to avoid buffer corruption and races that can pull
-              the buffers out from under us
+              the buffers out from under us.
+
+              Essentially we're synchronizing with other parts of
+              the vfs implicitly by not allow the user space
+              application reading/writing this device to return
+              until the buffers are done being used.
             */
-            if ((op->upcall.type == PVFS2_VFS_OP_FILE_IO) &&
-                (op->upcall.req.io.io_type == PVFS_IO_READ))
+            if (op->upcall.type == PVFS2_VFS_OP_FILE_IO)
             {
                 int timed_out = 0;
                 DECLARE_WAITQUEUE(wait_entry, current);
@@ -368,7 +372,13 @@ static ssize_t pvfs2_devreq_writev(
                 set_current_state(TASK_RUNNING);
                 remove_wait_queue(&op->io_completion_waitq, &wait_entry);
 
-                /* special case: we release op in this case */
+                /*
+                  NOTE: for I/O operations we handle releasing the
+                  op object except in the case of timeout.  the reason
+                  we can't free the op in timeout cases is that the
+                  op service logic in the vfs retries operations using
+                  the same op ptr, thus it can't be freed.
+                */
                 if (!timed_out)
                 {
                     op_release(op);
@@ -377,8 +387,9 @@ static ssize_t pvfs2_devreq_writev(
             else
             {
                 /*
-                  for every other operation, we need to wake up
-                  the callers for downcall completion notification
+                  for every other operation (i.e. non-I/O), we need
+                  to wake up the callers for downcall completion
+                  notification
                 */
                 wake_up_interruptible(&op->waitq);
             }
