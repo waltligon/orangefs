@@ -741,6 +741,17 @@ client application running in the foreground.
 The -p argument is required unless the pvfs2-client-core is installed
 and can be found in your PATH.
 
+Also worth noting is the -a argument (not required).  For reference,
+this sets the timeout value (in milliseconds) of the client side
+attribute cache.  Setting this to a large value will improve attribute
+read times (e.g. running ``ls'' repeatedly), but can reflect incorrect
+attributes if a remote client is modifying them.  The default value is
+0 milliseconds, effectively disabling this client side attribute
+cache.
+
+Other arguments and descriptions can be viewed by running the program
+with the -h option.
+
 Now that the module is loaded, and the pvfs2-server and pvfs2-client
 programs are running, we can mount our PVFS2 file system (and verify
 that it's properly mounted) as follows:
@@ -817,23 +828,25 @@ to this file.  A tcsh example would be: ``setenv PVFS2TAB\_FILE
 
 \section{Debugging your PVFS2 configuration}
 
-Bug reports and questions should be directed to the PVFS2 users mailing list
-for best results (see the PVFS2 web site for details:
-http://www.pvfs.org/pvfs2/lists.html).  It is helpful to
-include a description of your problem, the PVFS2 version number, and include
-relevant log information from /var/log/messages and /tmp/pvfs2-server.log. 
+Bug reports and questions should be directed to the PVFS2 users
+mailing list for best results (see the PVFS2 web site for details:
+http://www.pvfs.org/pvfs2/lists.html).  It is helpful to include a
+description of your problem, the PVFS2 version number, and include
+relevant log information from /var/log/messages and
+/tmp/pvfs2-server.log.
 
 People who wish to find more verbose information about what the file
 system is doing can enable extra logging messages from the server.
-This is done by adjusting the ``EventLogging'' field in the file system
-configuration file.  By default it is set to ``none''.  You can set it to
-a comma seperated list of log masks to get more information.  An example
-would be ``EventLogging storage,network,server'', which will result
-in verbose messages from the storage subsystem, the network subsystem,
-and server state machines.  \emph{WARNING: this may result in extremely
-large log files!}  The logging masks can also be set at runtime using the
-pvfs2-set-debugmask command line tool.  Usage information and a list of
-supported masks will be shown if it is run with no arguments.
+This is done by adjusting the ``EventLogging'' field in the file
+system configuration file.  By default it is set to ``none''.  You can
+set it to a comma seperated list of log masks to get more information.
+An example would be ``EventLogging storage,network,server'', which
+will result in verbose messages from the storage subsystem, the
+network subsystem, and server state machines.  \emph{WARNING: this may
+result in extremely large log files!}  The logging masks can also be
+set at runtime using the pvfs2-set-debugmask command line tool.  Usage
+information and a list of supported masks will be shown if it is run
+with no arguments.
 
 Similarly, run-time client debugging information can be gathered by
 using environment variables before running the client application.
@@ -846,7 +859,9 @@ intermixed with the client program output.  If you'd like to redirect
 client debugging to a file, set the PVFS2\_DEBUGFILE environment
 variable to a valid file name.  This causes all debug information
 specified by the PVFS2\_DEBUGMASK to be stored in the file specified,
-no longer intermixing the output with the client program.
+no longer intermixing the output with the client program.  The file
+specified in the PVFS2\_DEBUGFILE environment variable will be
+appended if it already exists.
 
 \section{ROMIO Support}
 \label{sec:romio}

@@ -363,56 +363,70 @@ Try running a parallel file system benchmark like IOR
 See question \ref{sec:badperf}.  If the program uses small block sizes to
 access a PVFS2 file, performance will suffer.  
 
-The \texttt{TroveSyncMode}
-config file option can improve performance in some situations, but if the
-server dies, you will lose data.   PVFS2 has an Attribute Cache, which can
-speed up applications which read a lot of attributes (\texttt{ls}, for
-example).  Playing around with the \texttt{AttrCache*} config file settings
-might yield some performance improvements, or it might not. 
+Setting both (or either of) the \texttt{TroveSyncMeta} and
+\texttt{TroveSyncData} options to \texttt{no} in the config file can
+improve performance in some situations.  By default these values are
+both set to \texttt{yes}, which means that server will issue a sync
+call after each metadata or data update, respectively.  If you set the
+value to no and the server is terminated unexpectedly, you will likely
+lose data (or access to it).  Also, PVFS2 has a transparent server
+side attribute cache (enabled by default), which can speed up
+applications which read a lot of attributes (\texttt{ls}, for
+example).  Playing around with the \texttt{AttrCache*} config file
+settings may yield some performance improvements.  If you're running a
+serial application on a single node, you can also use the client side
+attribute cache (disabled by default).  This timeout is adjustable as
+a command line argument to pvfs2-client.
 
-\subsection{NFS outperforms PVFS2 for application XXX. What gives?}
+\subsection{NFS outperforms PVFS2 for application XXX. Why?}
 
-In a situation where there is one client accessing a file on one server, NFS
-will beat PVFS2 in most benchmarks.  NFS has completely different consistency
-semantics, which work very well when just one process accesses a file.  We do
-have some ongoing work here that will implement similar consistency semantics
-for PVFS2, at which point we will be playing on a level field, so to speak.  If
-you insist on benchmarking PVFS2 and NFS in a single-client test, there are
-some adjustments you can make.
+In an environment where there is one client accessing a file on one
+server, NFS will outperform PVFS2 in most benchmarks.  NFS has
+completely different consistency semantics, which work very well when
+just one process accesses a file.  There is some ongoing work that
+will optionally offer similar consistency semantics for PVFS2, at
+which point we will be playing on a level field, so to speak.
+However, if you insist on benchmarking PVFS2 and NFS in a
+single-client test, there are some immediate adjustments you can make.
 
-The easiest way to improve PVFS2 performance is to increase the block size of
-each access.  Large block sizes help all file systems, but for PVFS2 they make a
-much larger difference in performance than they do for other file systems.  
+The easiest way to improve PVFS2 performance is to increase the block
+size of each access.  Large block sizes help most file systems, but
+for PVFS2 they make a much larger difference in performance than they
+do for other file systems.
 
-If the \texttt{TroveSyncMode} option is set to \texttt{nosync} in your PVFS2
-config file, the server will sync data to disk only when a flush or close
-operation is called.  This option is set to \texttt{sync} by default, to limit
-the amount of data that could be lost if a server crashes.  Another approach
-would be to mount NFS with the \texttt{sync} flag, forcing both file systems to
-sync data after each operation.
+Also, if the \texttt{TroveSyncMeta} and \texttt{TroveSyncData} options
+are set to \texttt{no} in your PVFS2 configuration file, the server
+will sync data to disk only when a flush or close operation is called.
+This option is set to \texttt{yes} by default, to limit the amount of
+data that could be lost if a server is terminated unexpectedly.  With
+this option enabled, it is somewhat analogous to mounting your NFS
+volume with the \texttt{sync} flag, forcing it to sync data after each
+operation.
 
-In the end, if you plan on running application XXX, or a similar workload,  and
-the NFS consistency semantics are adequate for what you're doing, then you
-should just use NFS.  There's no point in throwing PVFS2 at a serial workload,
+As a final note on the issue, if you plan on running application XXX,
+or a similar workload, and the NFS consistency semantics are adequate
+for what you're doing, then perhaps PVFS2 is not a wise choice of file
+system for you.  PVFS2 is not designed for serial workloads,
 particularly one with small accesses.
 
 \subsection{Can the underlying local file system affect PVFS2 performance?}
 
-The interaction between the PVFS2 servers and the local file system hosting the
-storage space has not been fully explored.  No doubt a great deal of time could
-be spent on different file systems and their parameters.  
+The interaction between the PVFS2 servers and the local file system
+hosting the storage space has not been fully explored.  No doubt a
+great deal of time could be spent on different file systems and their
+parameters.
 
-People have looked at sync performance for a variety of file systems.  Some
-file systems will flush all dirty buffers when \texttt{fsync} is called.  Other
-file systems will only flush dirty buffers belonging to the file. See the
-threads starting here
+People have looked at sync performance for a variety of file systems.
+Some file systems will flush all dirty buffers when \texttt{fsync} is
+called.  Other file systems will only flush dirty buffers belonging to
+the file. See the threads starting at
 \url{http://www.parl.clemson.edu/pipermail/pvfs2-developers/2004-July/000740.html}
-and here
+and at
 \url{http://www.parl.clemson.edu/pipermail/pvfs2-developers/2004-July/000741.html}.
 
-These tests demonstrate wide variance in file system behavior.  Interested
-users are encouraged to experiment and discuss their findings on the PVFS2
-lists.
+These tests demonstrate wide variance in file system behavior.
+Interested users are encouraged to experiment and discuss their
+findings on the PVFS2 lists.
 
 %
 % REDUNDANCY
