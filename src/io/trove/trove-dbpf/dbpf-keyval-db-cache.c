@@ -146,8 +146,6 @@ int dbpf_keyval_dbcache_try_remove(TROVE_coll_id coll_id,
                 break;
         }
 
-        gossip_err("REMOVE COMPLETE\n");
-
 	keyval_db_cache[i].ref_ct = -1;
 	keyval_db_cache[i].db_p   = NULL;
 	gen_mutex_unlock(&keyval_db_cache[i].mutex);
