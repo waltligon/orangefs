@@ -20,6 +20,11 @@ int pvfs_init(void)
 {
 	int ret = 0;
 
+	/*TODO: figure out how we want to handle this, it probbably needs to be
+	 * global, but I'm just going to make it so this compiles for the time
+	 * being */
+	PVFS_sysresp_init resp_init;
+
 	/* Do we need to lock now? Will initialize ever be called
 	 * by multiple threads? */
 	/* Grab the mutex */
@@ -34,7 +39,7 @@ int pvfs_init(void)
 		return(-1);
 	}
 	/* Initialize System Interface and pass in the above struct */
-	ret = PVFS_sys_initialize(mnt);
+	ret = PVFS_sys_initialize(mnt, &resp_init);
 	if (ret < 0)
 	{	
 		printf("Error in initializing System Interface\n");
