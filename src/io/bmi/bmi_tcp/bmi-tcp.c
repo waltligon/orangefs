@@ -1461,6 +1461,7 @@ static int enqueue_operation(op_list_p target_list,
     method_op_p new_method_op = NULL;
     int bit_added = 0;
     struct tcp_op *tcp_op_data = NULL;
+    int i;
 
     /* allocate the operation structure */
     new_method_op = alloc_tcp_method_op();
@@ -1488,26 +1489,26 @@ static int enqueue_operation(op_list_p target_list,
     new_method_op->mode = header.mode;
     new_method_op->list_count = list_count;
     new_method_op->context_id = context_id;
-    if (amt_complete > size_list[0])
+
+    /* set our current position in list processing */
+    i=0;
+    new_method_op->list_index = 0;
+    new_method_op->cur_index_complete = 0;
+    while(amt_complete > 0)
     {
-	/* we don't handle this yet */
-	gossip_lerr("Error: completed more than one segment before queue.\n");
-	gossip_lerr("Error: not supported.\n");
-	free(new_method_op);
-	return (-EINVAL);
+	if(amt_complete >= size_list[i])
+	{
+	    amt_complete -= size_list[i];
+	    new_method_op->list_index++;
+	    i++;
+	}
+	else
+	{
+	    new_method_op->cur_index_complete = amt_complete;
+	    amt_complete = 0;
+	}
     }
-    if (amt_complete == size_list[0])
-    {
-	/* first segment is done */
-	new_method_op->list_index = 1;
-	new_method_op->cur_index_complete = 0;
-    }
-    else
-    {
-	/* more to send on first segment */
-	new_method_op->list_index = 0;
-	new_method_op->cur_index_complete = amt_complete;
-    }
+
     tcp_op_data = new_method_op->method_data;
     tcp_op_data->tcp_op_state = tcp_op_state;
     tcp_op_data->env = header;
@@ -2306,7 +2307,7 @@ static int work_on_send_op(method_op_p my_method_op,
 	    &(my_method_op->cur_index_complete));
 	if (ret < 0)
 	{
-	    gossip_lerr("Error: send_payload_progress: %s\n", strerror(errno));
+	    gossip_lerr("Error: send_payload_progress: %s\n", strerror(-ret));
 	    tcp_forget_addr(my_method_op->addr, 0);
 	    return (0);
 	}
@@ -2571,6 +2572,8 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
     int tmp_errno = 0;
     bmi_size_t amt_complete = 0;
     struct op_list_search_key key;
+    int list_index = 0;
+    bmi_size_t cur_index_complete = 0;
 
     /* Three things can happen here:
      * a) another op is already in queue for the address, so we just
@@ -2662,13 +2665,14 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
     if (my_header.size != 0)
     {
 	/* try to send some actual message data */
-	ret = nbsend(tcp_addr_data->socket, buffer_list[0], size_list[0]);
+	ret = send_payload_progress(tcp_addr_data->socket, buffer_list,
+	    size_list, list_count, my_header.size, &list_index,
+	    &cur_index_complete);
 	if (ret < 0)
 	{
-	    tmp_errno = errno;
-	    gossip_lerr("Error: nbsend: %s\n", strerror(tmp_errno));
+	    gossip_lerr("Error: send_payload_progress: %s\n", strerror(-ret));
 	    tcp_forget_addr(dest, 0);
-	    return (-tmp_errno);
+	    return (ret);
 	}
     }
     else
@@ -2736,7 +2740,7 @@ static int send_payload_progress(int s, void** buffer_list, bmi_size_t*
 
     /* if error or nothing done, return now */
     if(ret <= 0)
-	return(ret);
+	return(-errno);
 
     /* update position */
     completed = ret;
@@ -2753,7 +2757,7 @@ static int send_payload_progress(int s, void** buffer_list, bmi_size_t*
 	else
 	{
 	    *current_index_complete += completed;
-	    break;
+	    completed = 0;
 	}
     }
 
