@@ -159,8 +159,10 @@ CFLAGS += -I $(srcdir)/include -I include -I $(srcdir)
 CFLAGS += $(patsubst %,-I$(srcdir)/%,$(INCLUDES))
   # add package version information
 CFLAGS += -DPVFS2_VERSION="\"@PVFS2_VERSION@\""
-  # special Intel cc options
-INTEL_CFLAGS := -Wall
+  # special Intel cc options, all warnings, but disable:
+  # remark #279: controlling expression is constant
+  #   shows up in ifdefs such as "do { ... } while (0)" construct
+INTEL_CFLAGS := -Wall -wd279
   # special gcc options
 GCC_CFLAGS := -Wall -Wstrict-prototypes -pipe
 
@@ -977,6 +979,7 @@ KMOD_DIR := /lib/modules/$(KERNEL_VERS)/kernel/fs
 
 .PHONY: kmod_install
 kmod_install:
+	install -d $(KMOD_DIR)
 	install -m 755 src/kernel/linux-2.6/pvfs2.ko $(KMOD_DIR)
 endif
 
