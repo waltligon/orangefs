@@ -126,7 +126,40 @@ GCC_CFLAGS := -Wall -Wstrict-prototypes -pipe
 ################################################################
 # Setup component specific flags
 
-# the server will use a threaded job library 
+# the server can use a threaded trove and job configuration.
+# Working combinations of trove/job thread configurations
+# are as follows:
+#
+# NOTE: __PVFS2_TROVE_SUPPORT__, and __GEN_POSIX_LOCKING__
+# are required for all server configurations 
+#
+# config 1)
+# =========
+# __PVFS2_TROVE_THREADED__
+# __PVFS2_JOB_THREADED__
+# __PVFS2_TROVE_AIO_THREADED__ (auto detected MISC_TROVE_FLAGS)
+# e.g.
+#
+#SERVERCFLAGS = -D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__ \
+#-D__PVFS2_TROVE_THREADED__ @MISC_TROVE_FLAGS@ \
+#-D__PVFS2_TROVE_SUPPORT__
+#
+# config 2)
+# =========
+# __PVFS2_TROVE_THREADED__
+# __PVFS2_JOB_THREADED__
+# e.g.
+#
+#SERVERCFLAGS = -D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__ \
+#-D__PVFS2_TROVE_THREADED__ -D__PVFS2_TROVE_SUPPORT__
+#
+# config 3)
+# =========
+# none (non-threaded)
+# e.g.
+#
+#SERVERCFLAGS = -D__GEN_POSIX_LOCKING__ -D__PVFS2_TROVE_SUPPORT__
+
 SERVERCFLAGS = -D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__ \
 -D__PVFS2_TROVE_THREADED__ @MISC_TROVE_FLAGS@ \
 -D__PVFS2_TROVE_SUPPORT__
@@ -550,7 +583,6 @@ cleaner: clean
 	rm -f config.log config.status config.cache 
 	rm -f pvfs2-@PVFS2_VERSION@.tar.gz
 
-	
 # _really_ clean the tree; should go back to pristine state
 distclean: cleaner docsclean
 	find . -name "module.mk" -exec rm \{\} \;
