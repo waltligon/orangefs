@@ -5,9 +5,10 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.12 2004-05-17 21:04:52 pw Exp $
+ * $Id: ib.c,v 1.13 2004-09-29 13:47:55 pw Exp $
  */
 #include <stdio.h>  /* just for NULL for id-generator.h */
+#include <sys/time.h>
 #include <src/common/id-generator/id-generator.h>
 #include <src/common/quicklist/quicklist.h>
 #include <src/io/bmi/bmi-method-support.h>
@@ -28,6 +29,7 @@ list_t sendq __hidden;
 list_t recvq __hidden;
 VAPI_sg_lst_entry_t *sg_tmp_array __hidden;
 int sg_max_len __hidden;
+int max_outstanding_wr __hidden;
 
 static int send_cts(ib_recv_t *rq);
 static void post_sr(const buf_head_t *bh, u_int32_t len);
@@ -52,7 +54,7 @@ static void encourage_recv_to_send_cts(ib_recv_t *rq);
  * walk the incomingq looking for things to do to them.  Returns
  * number of new things that arrived.
  */
-static void
+static int
 check_cq(void)
 {
     VAPI_wc_desc_t desc;
@@ -63,14 +65,24 @@ check_cq(void)
 	if (vret < 0) {
 	    if (vret == VAPI_CQ_EMPTY)
 		break;
-	    error_verrno(ret, "%s: VAPI_poll_cq", __func__);
+	    error_verrno(vret, "%s: VAPI_poll_cq", __func__);
 	}
 
 	debug(2, "%s: found something", __func__);
-	if (desc.status != VAPI_SUCCESS)
-	    error("%s: entry id 0x%Lx opcode %s error %s", __func__,
+	++ret;
+	if (desc.status != VAPI_SUCCESS) {
+	    warning("%s: entry id 0x%Lx opcode %s error %s", __func__,
 	      desc.id, VAPI_cqe_opcode_sym(desc.opcode),
 	      VAPI_wc_status_sym(desc.status));
+	    if (desc.opcode == VAPI_CQE_SQ_SEND_DATA) {
+		if (desc.id) {
+		    ib_connection_t *c = ptr_from_int64(desc.id);
+		    if (c->cancelled)
+			debug(0, "%s: ignoring error on cancelled conn %p",
+			  __func__, c);
+		}
+	    }
+	}
 
 	if (desc.opcode == VAPI_CQE_RQ_SEND_DATA) {
 	    /*
@@ -134,6 +146,12 @@ check_cq(void)
 	    ib_send_t *sq = ptr_from_int64(desc.id);
 	    encourage_send_send_completed(sq);
 
+	} else if (desc.opcode == VAPI_CQE_SQ_SEND_DATA) {
+
+	    /* XXX: debugging post_sr_ack queue filling up */
+	    ib_connection_t *c = ptr_from_int64(desc.id);
+	    debug(2, "%s: sr ack to %s send completed", __func__, c->peername);
+
 	} else {
 	    const char *ops = VAPI_cqe_opcode_sym(desc.opcode);
 	    if (!ops)
@@ -142,6 +160,7 @@ check_cq(void)
 	      desc.id, ops, desc.opcode);
 	}
     }
+    return ret;
 }
 
 /*
@@ -610,17 +629,29 @@ post_rr(const ib_connection_t *c, buf_head_t *bh)
  * Explicitly return a credit.  Immediate data says for which local
  * buffer on the sender is this ack.  Buffers are tied together, so
  * we use our local bufnum which is the same as his.
+ *
+ * Don't want to get a local completion from this, but if we don't do
+ * so every once in a while, the NIC will fill up apparently.  So we
+ * generate one every N - 100, where N =~ 5000, the number asked for
+ * at QP build time.
  */
 static void
 post_sr_ack(const ib_connection_t *c, const buf_head_t *bh)
 {
     VAPI_sr_desc_t sr;
     int ret;
+    static int num_sr_ack = 0;
 
-    debug(2, "%s: %s bh %d", __func__, c->peername, bh->num);
+    debug(2, "%s: %s bh %d wr %d/%d", __func__, c->peername, bh->num,
+      num_sr_ack, max_outstanding_wr);
     memset(&sr, 0, sizeof(sr));
     sr.opcode = VAPI_SEND_WITH_IMM;
-    sr.comp_type = VAPI_UNSIGNALED;  /* == 1 */
+    sr.id = int64_from_ptr(c);  /* for error checking if send fails */
+    if (++num_sr_ack + 10 == max_outstanding_wr) {
+	num_sr_ack = 0;
+	sr.comp_type = VAPI_SIGNALED;
+    } else
+	sr.comp_type = VAPI_UNSIGNALED;  /* == 1 */
     sr.imm_data = bh->num;
     sr.sg_lst_len = 0;
     ret = VAPI_post_sr(nic_handle, c->qp_ack, &sr);
@@ -650,6 +681,7 @@ post_rr_ack(const ib_connection_t *c, const buf_head_t *bh)
     debug(2, "%s: %s bh %d", __func__, c->peername, bh->num);
     memset(&rr, 0, sizeof(rr));
     rr.opcode = VAPI_RECEIVE;
+    rr.comp_type = VAPI_SIGNALED;  /* ask to get these, == 0 */
     rr.id = int64_from_ptr(bh);
     ret = VAPI_post_rr(nic_handle, c->qp_ack, &rr);
     if (ret < 0)
@@ -1159,6 +1191,12 @@ BMI_ib_test(bmi_op_id_t id, int *outcount, bmi_error_code_t *err,
 }
 
 /*
+ * Used by testcontext and testunexpected to block if not much is going on
+ * since the timeouts at the BMI job layer are too coarse.
+ */
+static struct timeval last_action = { 0, 0 };
+
+/*
  * Test for multiple completions matching a particular user context.
  */
 static int
@@ -1200,14 +1238,25 @@ BMI_ib_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
 	n += test_rq(rq, &outids[n], &errs[n], &sizes[n], up, complete);
     }
     *outcount = n;
-    if (n == 0 && max_idle_time > 0) {
+    if (n > 0) {
+	gettimeofday(&last_action, 0);
+    } else if (max_idle_time > 0) {
 	/*
 	 * Block for up to max_idle_time to avoid spinning from BMI.  Instead
 	 * of sleeping, watch the accept socket for something new.  No way
-	 * to blockingly poll in standard VAPI.  Hopefully the job manager
-	 * sets the timeout to zero when a job is active.
+	 * to blockingly poll in standard VAPI.
 	 */
-	ib_tcp_server_block_new_connections(max_idle_time);
+	struct timeval now;
+	gettimeofday(&now, 0);
+	now.tv_sec -= last_action.tv_sec;
+	if (now.tv_sec == 1) {
+	    now.tv_usec -= last_action.tv_usec;
+	    if (now.tv_usec < 0)
+		--now.tv_sec;
+	}
+	if (now.tv_sec > 0)  /* spin for 1 sec following any activity */
+	    if (ib_tcp_server_block_new_connections(max_idle_time))
+		gettimeofday(&last_action, 0);
     }
     gen_mutex_unlock(&interface_mutex);
     return 0;
@@ -1215,20 +1264,23 @@ BMI_ib_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
 
 /*
  * Non-blocking test to look for any incoming unexpected messages.
- * This is also where we check for new connections on the TCP socket.
+ * This is also where we check for new connections on the TCP socket, since
+ * those would show up as unexpected the first time anything is sent.
+ * Return 0 for success, or -1 for failure; number of things in *outcount.
  */
 static int
 BMI_ib_testunexpected(int incount __unused, int *outcount,
   struct method_unexpected_info *ui, int max_idle_time __unused)
 {
-    int ret = 0;
+    int num_action;
     list_t *l;
 
     gen_mutex_lock(&interface_mutex);
 
     /* Check CQ, then look for the first unexpected message.  */
-    check_cq();
+    num_action = check_cq();
 
+    *outcount = 0;
     qlist_for_each(l, &recvq) {
 	ib_recv_t *rq = qlist_upcast(l);
 	if (rq->state == RQ_EAGER_WAITING_USER_TESTUNEXPECTED) {
@@ -1244,19 +1296,20 @@ BMI_ib_testunexpected(int incount __unused, int *outcount,
 	    post_rr(rq->c, rq->bh);
 	    /* freed our eager buffer, ack it */
 	    post_sr_ack(rq->c, rq->bh);
-	    ret = 1;
+	    *outcount = 1;
 	    qlist_del(&rq->list);
 	    free(rq);
 	    goto out;
 	}
     }
 
-    ib_tcp_server_check_new_connections();
+    num_action += ib_tcp_server_check_new_connections();
+    if (num_action)
+	gettimeofday(&last_action, 0);
 
   out:
-    *outcount = ret;
     gen_mutex_unlock(&interface_mutex);
-    return ret;
+    return 0;
 }
 
 /*

@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: setup.c,v 1.11 2004-05-17 21:04:52 pw Exp $
+ * $Id: setup.c,v 1.12 2004-09-29 13:47:55 pw Exp $
  */
 #include <fcntl.h>
 #include <unistd.h>
@@ -32,7 +32,7 @@
 static const char *VAPI_DEVICE = "InfiniHost0";
 static const int VAPI_PORT = 1;
 static const unsigned int VAPI_NUM_CQ_ENTRIES = 1024;
-static const int VAPI_MTU = MTU2048;  /* default mtu */
+static const int VAPI_MTU = MTU1024;  /* default mtu, 1k best here */
 
 /*
  * BMI_ib_initialize is not called before BMI_ib_method_addr_lookup.
@@ -144,12 +144,12 @@ ib_new_connection(int s, const char *peername, int is_server)
     } else {
 	if ((int)prop.cap.max_sg_size_sq < sg_max_len)
 	    error(
-	      "%s: new connection has smaller (send) scatter/gather array size,"
-	      " %d vs %d", __func__, prop.cap.max_sg_size_rq, sg_max_len);
+	      "%s: new connection has smaller send scatter/gather array size,"
+	      " %d vs %d", __func__, prop.cap.max_sg_size_sq, sg_max_len);
 	if ((int)prop.cap.max_sg_size_rq < sg_max_len)
 	    error(
-	      "%s: new connection has smaller (recv) scatter/gather array size,"
-	      " %d vs %d", __func__, prop.cap.max_sg_size_sq, sg_max_len);
+	      "%s: new connection has smaller recv scatter/gather array size,"
+	      " %d vs %d", __func__, prop.cap.max_sg_size_rq, sg_max_len);
     }
 
     /* and qp ack */
@@ -159,13 +159,16 @@ ib_new_connection(int s, const char *peername, int is_server)
     c->qp_ack_num = prop.qp_num;
     if ((int)prop.cap.max_sg_size_sq < sg_max_len)
 	error(
-	  "%s: new ack connection has smaller (send) scatter/gather array size,"
-	  " %d vs %d", __func__, prop.cap.max_sg_size_rq, sg_max_len);
+	  "%s: new ack connection has smaller send scatter/gather array size,"
+	  " %d vs %d", __func__, prop.cap.max_sg_size_sq, sg_max_len);
     if ((int)prop.cap.max_sg_size_rq < sg_max_len)
 	error(
-	  "%s: new ack connection has smaller (recv) scatter/gather array size,"
-	  " %d vs %d", __func__, prop.cap.max_sg_size_sq, sg_max_len);
-    
+	  "%s: new ack connection has smaller recv scatter/gather array size,"
+	  " %d vs %d", __func__, prop.cap.max_sg_size_rq, sg_max_len);
+
+    /* remember this for post_sr_ack */
+    max_outstanding_wr = prop.cap.max_oust_wr_sq;
+
     exchange_connection_data(c, s, is_server);
 
     init_connection_modify_qp(c->qp, c->remote_qp_num,
@@ -220,10 +223,10 @@ exchange_connection_data(ib_connection_t *c, int s, int is_server)
 
     /* sanity check sizes of things (actually only 24 bits in qp_num) */
     assert(sizeof(connection_handshake.lid) == sizeof(u_int16_t),
-      "%s: connection_handshake lid size %d expecting %d", __func__,
+      "%s: connection_handshake.lid size %d expecting %d", __func__,
       sizeof(connection_handshake.lid), sizeof(u_int16_t));
     assert(sizeof(connection_handshake.qp_num) == sizeof(u_int32_t),
-      "%s: connection_handshake qp_num size %d expecting %d", __func__,
+      "%s: connection_handshake.qp_num size %d expecting %d", __func__,
       sizeof(connection_handshake.qp_num), sizeof(u_int32_t));
 
     /* exchange information: server reads first, then writes; client opposite */
@@ -232,10 +235,10 @@ exchange_connection_data(ib_connection_t *c, int s, int is_server)
 	    ret = read_full(s, &connection_handshake,
 	      sizeof(connection_handshake));
 	    if (ret < 0)
-		error_errno("%s: read new connection handshake info", __func__);
+		error_errno("%s: read", __func__);
 	    if (ret != sizeof(connection_handshake))
-		error("%s: partial read of handshake info, %d / %d", __func__,
-		  ret, sizeof(connection_handshake));
+		error("%s: partial read, %d / %d", __func__, ret,
+		  sizeof(connection_handshake));
 	    c->remote_lid = ntohs(connection_handshake.lid);
 	    c->remote_qp_num = ntohl(connection_handshake.qp_num);
 	    c->remote_qp_ack_num = ntohl(connection_handshake.qp_ack_num);
@@ -246,8 +249,7 @@ exchange_connection_data(ib_connection_t *c, int s, int is_server)
 	    ret = write_full(s, &connection_handshake,
 	      sizeof(connection_handshake));
 	    if (ret < 0)
-		error_errno("%s: write new connection handshake info",
-		  __func__);
+		error_errno("%s: write", __func__);
 	}
     }
 }
@@ -448,6 +450,7 @@ ib_close_connection(ib_connection_t *c)
     free(c->remote_map);
     free(c->peername);
     qlist_del(&c->list);
+    free(c);
 }
 
 /*
@@ -606,13 +609,13 @@ ib_tcp_server_init_listen_socket(struct method_addr *addr)
 
 /*
  * Check for new connections.  The listening socket is left nonblocking
- * so this test can be quick.
+ * so this test can be quick.  Returns >0 if an accept worked.
  */
-void
+int
 ib_tcp_server_check_new_connections(void)
 {
     struct sockaddr_in ssin;
-    int s, len;
+    int s, len, ret = 0;
 
     len = sizeof(ssin);
     s = accept(listen_sock, (struct sockaddr *) &ssin, &len);
@@ -620,7 +623,6 @@ ib_tcp_server_check_new_connections(void)
 	if (!(errno == EAGAIN))
 	    error_errno("%s: accept listen sock", __func__);
     } else {
-	int ret;
 	char peername[2048];
 	ib_connection_t *c;
 
@@ -639,15 +641,17 @@ ib_tcp_server_check_new_connections(void)
 	  c->peername);
 	if (close(s) < 0)
 	    error_errno("%s: close new sock", __func__);
-
+	ret = 1;
     }
+    return ret;
 }
 
 /*
  * Watch the listen_sock for activity, but do not actually respond to it.  A
- * later call to testunexpected will pick up the new connection.
+ * later call to testunexpected will pick up the new connection.  Returns >0
+ * if an accept would work on another call (later _unexpected will find it).
  */
-void
+int
 ib_tcp_server_block_new_connections(int timeout_ms)
 {
     struct pollfd pfd;
@@ -656,8 +660,13 @@ ib_tcp_server_block_new_connections(int timeout_ms)
     pfd.fd = listen_sock;
     pfd.events = POLLIN;
     ret = poll(&pfd, 1, timeout_ms);
-    if (ret < 0)
-	error_errno("%s: poll listen sock", __func__);
+    if (ret < 0) {
+	if (errno == EINTR)  /* these are okay, debugging or whatever */
+	    ret = 0;
+	else
+	    error_errno("%s: poll listen sock", __func__);
+    }
+    return ret;
 }
 
 /*
@@ -812,16 +821,13 @@ BMI_ib_initialize(struct method_addr *listen_addr, int method_id,
 
     reinit_mosal();
 
-    /* open device; discard const char* for silly mellanox prototype */
-    ret = VAPI_open_hca((char *)(unsigned long) VAPI_DEVICE, &nic_handle);
-    /*
-     * Buggy vapi lib always returns EBUSY, ignore this return value.
-     *
-    if (ret < 0)
-	error_verrno(ret, "%s: VAPI_open_hca", __func__);
-    */
-
-    /* starts all the ib threads */
+   /*
+     * Apparently VAPI_open_hca() is a once-per-machine sort of thing, and
+     * users are not expected to call it.  It returns EBUSY every time.
+     * This call initializes the per-process user resources and starts up
+     * all the threads.  Discard const char* for silly mellanox prototype;
+     * it really is treated as constant.
+     */
     ret = EVAPI_get_hca_hndl((char *)(unsigned long) VAPI_DEVICE, &nic_handle);
     if (ret < 0)
 	error_verrno(ret, "%s: EVAPI_get_hca_hndl", __func__);

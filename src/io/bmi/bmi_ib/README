@@ -2,7 +2,7 @@ Notes on the BMI InfiniBand implementation
 
 Copyright (C) 2003 Pete Wyckoff <pw@osc.edu>
 
-$Id: README,v 1.1 2003-08-26 19:07:13 pw Exp $
+$Id: README,v 1.2 2004-09-29 13:47:55 pw Exp $
 
 Connection management
 ---------------------
@@ -224,6 +224,8 @@ On QP allocation failure, probe remote side of existing QPs to see if
 any have become disconnected.  Close those connections, which might
 result from a client crash.
 
+If client crashes or fails to call BMI_finalize() make sure server does
+the right thing.
 
 
 % vi: set tw=78 :

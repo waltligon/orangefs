@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.h,v 1.5 2004-05-17 21:04:52 pw Exp $
+ * $Id: ib.h,v 1.6 2004-09-29 13:47:55 pw Exp $
  */
 #ifndef __ib_h
 #define __ib_h
@@ -56,6 +56,9 @@ typedef struct {
     list_t eager_recv_buf_free;
     struct S_buf_head *eager_send_buf_head_contig;
     struct S_buf_head *eager_recv_buf_head_contig;
+
+    int cancelled;  /* was any operation cancelled by BMI */
+
 } ib_connection_t;
 
 /*
@@ -259,8 +262,8 @@ typedef struct {
 extern void ib_close_connection(ib_connection_t *c);
 extern void ib_tcp_client_connect(ib_method_addr_t *ibmap,
   struct method_addr *remote_map);
-extern void ib_tcp_server_check_new_connections(void);
-extern void ib_tcp_server_block_new_connections(int timeout_ms);
+extern int ib_tcp_server_check_new_connections(void);
+extern int ib_tcp_server_block_new_connections(int timeout_ms);
 extern void ib_mem_register(ib_buflist_t *buflist, int send_or_recv_type);
 extern void ib_mem_deregister(ib_buflist_t *buflist);
 
@@ -334,6 +337,12 @@ extern int sg_max_len;
 static const bmi_size_t EAGER_BUF_NUM = 20;
 static const bmi_size_t EAGER_BUF_SIZE = 8 << 10;  /* 8 kB */
 extern bmi_size_t EAGER_BUF_PAYLOAD;
+/*
+ * Maximum number of outstanding work requests in the NIC, same for both
+ * SQ and RQ, though we only care about SQ on the ack QP.  Used to decide
+ * when to use a SIGNALED completion on a send to avoid WQE buildup.
+ */
+extern int max_outstanding_wr;
 
 #define htonq(x) swab64(x)
 #define ntohq(x) swab64(x)
@@ -350,7 +359,7 @@ extern bmi_size_t EAGER_BUF_PAYLOAD;
  * Debugging macros.
  */
 #if 1
-#define DEBUG_LEVEL 6
+#define DEBUG_LEVEL 2
 #define debug(lvl,fmt,args...) \
     do { \
 	if (lvl <= DEBUG_LEVEL) \
