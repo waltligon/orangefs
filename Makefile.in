@@ -428,7 +428,7 @@ clean: docsclean
 # _really_ clean the tree; should go back to pristine state
 distclean: clean
 	find . -name "module.mk" -exec rm \{\} \;
-	rm -f Makefile config.log config.status pvfs2-config.h
+	rm -f Makefile config.log config.status config.cache pvfs2-config.h
 	rm -f src/io/trove/autogen.c
 	rm -f $(SERVERGENSRC)
 

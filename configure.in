@@ -43,6 +43,20 @@ AC_C_BIGENDIAN
 dnl Check size of pointer type; needed by id-generator
 AC_CHECK_SIZEOF(void *)
 
+dnl decide how large the PVFS_aint type should be, based on above
+AC_MSG_CHECKING(typedef to use for PVFS_aint type)
+if test x$ac_cv_sizeof_void_p = x4; then
+    PVFS_AINT=int32_t
+    AC_SUBST(PVFS_AINT)
+    AC_MSG_RESULT(int32_t)
+elif test x$ac_cv_sizeof_void_p = x8; then
+    PVFS_AINT=int64_t
+    AC_SUBST(PVFS_AINT)
+    AC_MSG_RESULT(int64_t)
+else
+    AC_MSG_ERROR(pointer size check failure?)
+fi
+
 dnl Options for debugging
 dnl This particular one enables tracing of memory allocation and
 dnl    freeing with the mtrace tool
@@ -260,6 +274,7 @@ doc/coding/module.mk
 doc/design/module.mk
 doc/random/module.mk
 maint/mpi-depend.sh
+include/pvfs2-types.h
 )
 
 
