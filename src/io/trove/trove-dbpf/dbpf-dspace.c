@@ -1080,6 +1080,7 @@ static int dbpf_dspace_test(TROVE_coll_id coll_id,
 }
 
 int dbpf_dspace_testcontext(
+    TROVE_coll_id coll_id,
     TROVE_op_id *ds_id_array,
     int *inout_count_p,
     TROVE_ds_state *state_array,
@@ -1351,7 +1352,8 @@ struct TROVE_dspace_ops dbpf_dspace_ops =
     dbpf_dspace_getattr,
     dbpf_dspace_setattr,
     dbpf_dspace_test,
-    dbpf_dspace_testsome
+    dbpf_dspace_testsome,
+    dbpf_dspace_testcontext
 };
 
 /*
