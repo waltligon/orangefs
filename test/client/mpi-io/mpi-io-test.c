@@ -39,7 +39,8 @@ int64_t opt_block     = 1048576*16;
 int     opt_iter      = 1;
 int     opt_stripe    = -1;
 int     opt_correct   = 0;
-int	opt_sync	= 0;
+int     opt_sync      = 0;
+int     opt_single    = 0;
 int     amode         = O_RDWR | O_CREAT;
 char    opt_file[256] = "/foo/test.out\0";
 char    opt_pvfs2tab[256] = "notset\0";
@@ -120,9 +121,14 @@ int main(int argc, char **argv)
 	 * specified on the command line */
 	for (j=0; j < opt_iter; j++) {
 
-		/* seek to an appropriate position depending on the iteration and
-		 * rank of the current process */
-		seek_position = (j*iter_jump)+(mynod*opt_block);
+		/* reading and writing to the same block is cheating, but sometimes
+		 * we want to measure cached performance of file servers */
+		if (opt_single == 1)
+				  seek_position = 0;
+		else
+				  /* seek to an appropriate position depending on the iteration 
+					* and rank of the current process */
+				  seek_position = (j*iter_jump)+(mynod*opt_block);
 
 		MPI_File_seek(fh, seek_position, MPI_SEEK_SET);
 
@@ -176,9 +182,16 @@ int main(int argc, char **argv)
 	/* we are going to repeat the read operation the number of iterations
 	 * specified */
 	for (j=0; j < opt_iter; j++) {
-		/* seek to the appropriate spot give the current iteration and
-		 * rank within the MPI processes */
-		seek_position = (j*iter_jump)+(mynod*opt_block);
+
+		/* reading and writing to the same block is cheating, but sometimes
+		 * we want to measure cached performance of file servers */
+		if (opt_single == 1)
+				  seek_position = 0;
+		else
+				  /* seek to an appropriate position depending on the iteration 
+					* and rank of the current process */
+				  seek_position = (j*iter_jump)+(mynod*opt_block);
+
 		MPI_File_seek(fh, seek_position, MPI_SEEK_SET);
 
 		/* discover the start time */
@@ -288,7 +301,7 @@ int parse_args(int argc, char **argv)
 {
 	int c;
 	
-	while ((c = getopt(argc, argv, "s:b:i:f:p:cyh")) != EOF) {
+	while ((c = getopt(argc, argv, "s:b:i:f:p:cySh")) != EOF) {
 		switch (c) {
 			case 's': /* stripe */
 				opt_stripe = atoi(optarg);
@@ -311,6 +324,9 @@ int parse_args(int argc, char **argv)
 				break;
 			case 'y': /* sYnc */
 				opt_sync = 1;
+				break;
+			case 'S': /* Single region */
+				opt_single = 1;
 				break;
 			case 'h':
 			case '?': /* unknown */
@@ -343,6 +359,7 @@ void usage(void)
 		  printf(" -p       path to pvfs2tab file to use [default: notset]\n");
 		  printf(" -c       verify correctness of file data [default: off]\n");
 		  printf(" -y       sYnc the file after each write [default: off]\n");
+		  printf(" -S       all process write to same Single region of file [default: off]\n");
 		  printf(" -h       print this help\n");
 }
 
