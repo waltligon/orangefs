@@ -407,11 +407,22 @@ static int print_config(PVFS_fs_id fsid)
  */
 static void print_mntent(struct PVFS_sys_mntent *entries, int num_entries)
 {
-    int i;
+    int i, j;
 
     for (i = 0; i < num_entries; i++)
     {
-        printf("\n   PVFS2 server: %s\n", entries[i].pvfs_config_server);
+        printf("\n   PVFS2 servers:");
+        for (j=0; j<entries[i].num_pvfs_config_servers; j++) {
+            printf(" %s", entries[i].pvfs_config_servers[j]);
+            if (entries[i].num_pvfs_config_servers > 1) {
+                if (entries[i].the_pvfs_config_server
+                  == entries[i].pvfs_config_servers[j])
+                    printf(" (active)");
+                if (j < entries[i].num_pvfs_config_servers-1)
+                    printf(",");
+            }
+        }
+        printf("\n");
         printf("   Storage name: %s\n", entries[i].pvfs_fs_name);
         printf("   Local mount point: %s\n", entries[i].mnt_dir);
     }
