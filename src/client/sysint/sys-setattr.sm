@@ -188,6 +188,7 @@ static int setattr_msg_comp_fn(void *v_p,
 static int setattr_msg_setup_msgpair(PINT_client_sm *sm_p,
                                      job_status_s *js_p)
 {
+    int ret = -PVFS_EINVAL;
     PVFS_object_attr *attr = NULL;
     PINT_client_sm_msgpair_state *msg_p = NULL;
 
@@ -245,9 +246,10 @@ static int setattr_msg_setup_msgpair(PINT_client_sm *sm_p,
     msg_p->handle = sm_p->u.setattr.refn.handle;
     msg_p->comp_fn = setattr_msg_comp_fn;
 
-    if (PINT_bucket_map_to_server(&msg_p->svr_addr,
-                                  msg_p->handle,
-                                  msg_p->fs_id) < 0)
+    ret = PINT_bucket_map_to_server(&msg_p->svr_addr,
+                                    msg_p->handle,
+                                    msg_p->fs_id);
+    if (ret)
     {
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
