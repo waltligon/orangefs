@@ -14,6 +14,7 @@
 #include "gossip.h"
 #include "PINT-reqproto-encode.h"
 #include "PINT-reqproto-module.h"
+#include "pint-distribution.h"
 
 /* do_encode_resp()
  * 

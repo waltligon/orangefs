@@ -15,6 +15,8 @@
 #include <PINT-reqproto-module.h>
 #include <assert.h>
 
+#include "pint-distribution.h"
+
 DECODE_RESP_HEAD(do_decode_resp)
 {
 

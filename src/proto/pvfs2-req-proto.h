@@ -11,7 +11,6 @@
 #include "pvfs2-attr.h"
 #include "pvfs-distribution.h"
 #include "pvfs-request.h"
-#include "flow.h"
 
 enum PVFS_server_op
 {
