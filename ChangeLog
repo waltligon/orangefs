@@ -3,6 +3,10 @@ PVFS2 Release ChangeLog
 -----------------------
 
 
+pvfs2-0.0.7pre1
+===============
+- 
+
 pvfs2-0.0.6
 ===========
 - improved kernel truncate support
