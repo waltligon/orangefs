@@ -370,7 +370,7 @@ void print_entry_attr(
     format_size_string(group,8,&formatted_group,0);
 
     snprintf(buf,128,"%s%c%c%c%c%c%c%c%c%c%c    1 %s %s %s "
-             "%.4d-%.2d-%.2d %.2d:%.2d %s\n",
+             "%.4d-%.2d-%.2d %.2d:%.2d %s",
              inode,
              ((attr->objtype == PVFS_TYPE_DIRECTORY) ? 'd' : '-'),
              ((attr->perms & PVFS_U_READ) ? 'r' : '-'),
@@ -404,7 +404,18 @@ void print_entry_attr(
     {
         free(formatted_group);
     }
-    printf("%s",buf);
+
+    if (attr->objtype == PVFS_TYPE_SYMLINK)
+    {
+        assert(attr->link_target);
+
+        printf("%s -> %s\n", buf, attr->link_target);
+        free(attr->link_target);
+    }
+    else
+    {
+        printf("%s\n",buf);
+    }
 }
 
 void print_entry(
