@@ -69,7 +69,6 @@ int main(int argc, char **argv)	{
 	int my_ack_size, create_ack_size, remove_ack_size;
 	PVFS_size io_size = 10 * 1024 * 1024;
 	void* memory_buffer = NULL;
-	PINT_Request_file_data file_data;
 	flow_descriptor* flow_d = NULL;
 	struct PVFS_server_resp* remove_dec_ack;
 	struct PINT_encoded_msg encoded3;
@@ -449,11 +448,6 @@ int main(int argc, char **argv)	{
 	 * flow 
 	 */
 
-	file_data.fsize = io_dec_ack->u.io.bstream_size;
-	file_data.iod_num = 0;
-	file_data.iod_count = 1;
-	file_data.dist = my_req.u.io.io_dist;
-
 	flow_d = PINT_flow_alloc();
 	if(!flow_d)
 	{
@@ -461,13 +455,17 @@ int main(int argc, char **argv)	{
 		return(-1);
 	}
 
+	flow_d->file_data.fsize = io_dec_ack->u.io.bstream_size;
+	flow_d->file_data.iod_num = 0;
+	flow_d->file_data.iod_count = 1;
+	flow_d->file_data.dist = my_req.u.io.io_dist;
+
 	flow_d->io_req = my_req.u.io.io_req;
-	flow_d->file_data = &file_data;
 	flow_d->tag = 0;
 	flow_d->user_ptr = NULL;
 
 	/* the following section assumes we are doing a write */
-	file_data.extend_flag = 1;
+	flow_d->file_data.extend_flag = 1;
 	flow_d->src.endpoint_id = MEM_ENDPOINT;
 	flow_d->src.u.mem.size = io_size;
 	flow_d->src.u.mem.buffer = memory_buffer;

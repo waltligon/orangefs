@@ -58,7 +58,6 @@ int main(int argc, char **argv)
 	double time1, time2;
 	int i;
 	PINT_Request* req;
-	PINT_Request_file_data file_data;
 	char path_name[PATH_SIZE];
 	TROVE_op_id op_id;
 	TROVE_coll_id coll_id;
@@ -211,23 +210,6 @@ int main(int argc, char **argv)
 		return(-1);
 	}
 
-	/* file data */
-	file_data.fsize = TEST_SIZE; 
-	file_data.iod_num = 0;
-	file_data.iod_count = 1;
-	file_data.extend_flag = 1;
-	file_data.dist = PVFS_Dist_create("default_dist");
-	if(!file_data.dist)
-	{
-		fprintf(stderr, "Error: failed to create dist.\n");
-		return(-1);
-	}
-	ret = PINT_Dist_lookup(file_data.dist);
-	if(ret != 0)
-	{
-		fprintf(stderr, "Error: failed to lookup dist.\n");
-		return(-1);
-	}
 
 	/******************************************************/
 	/* setup communicaton stuff */
@@ -240,8 +222,24 @@ int main(int argc, char **argv)
 		return(-1);
 	}
 
+	/* file data */
+	flow_d->file_data.fsize = TEST_SIZE; 
+	flow_d->file_data.iod_num = 0;
+	flow_d->file_data.iod_count = 1;
+	flow_d->file_data.extend_flag = 1;
+	flow_d->file_data.dist = PVFS_Dist_create("default_dist");
+	if(!flow_d->file_data.dist)
+	{
+		fprintf(stderr, "Error: failed to create dist.\n");
+		return(-1);
+	}
+	ret = PINT_Dist_lookup(flow_d->file_data.dist);
+	if(ret != 0)
+	{
+		fprintf(stderr, "Error: failed to lookup dist.\n");
+		return(-1);
+	}
 	flow_d->io_req    = req;
-	flow_d->file_data = &file_data;
 	flow_d->tag       = 0;
 	flow_d->user_ptr  = NULL;
 
@@ -271,7 +269,6 @@ int main(int argc, char **argv)
 	PINT_flow_reset(flow_d);
 
 	flow_d->request   = &req1;
-	flow_d->file_data = &file_data;
 	flow_d->tag       = 0;
 	flow_d->user_ptr  = NULL;
 

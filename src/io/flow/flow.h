@@ -97,17 +97,7 @@ struct flow_descriptor
     PINT_Request *io_req;
     PVFS_offset io_req_offset;
     PINT_Request *mem_req;
-    PINT_Request_file_data *file_data;
-
-#if 0
-    /* TODO: maybe these two should be renamed to reflect that they 
-     * describe the file relative datatype?
-     */
-    PINT_Request *request;	/* I/O request description */
-    PVFS_offset request_offset;	/* offset into the above description */
-    /* information about the file that we are accessing */
-    PINT_Request_file_data *file_data;
-#endif
+    PINT_Request_file_data file_data;
 
 	/***********************************************************/
     /* fields that can be read publicly upon completion */

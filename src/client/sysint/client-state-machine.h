@@ -125,7 +125,6 @@ struct PINT_client_io_sm {
     /* data regarding flows */
     int                     flow_comp_ct;
     flow_descriptor       **flow_p_array;
-    PINT_Request_file_data *file_data_array;
     job_id_t               *flow_id_array;
     job_status_s           *flow_status_array;
 

@@ -229,29 +229,20 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s* js_p)
 		return(1);
 	}
 
-	s_op->u.io.flow_d->file_data =
-		(PINT_Request_file_data*)malloc(sizeof(PINT_Request_file_data));
-	if(!s_op->u.io.flow_d->file_data)
-	{
-		/* critical error, jump to next error state */
-		js_p->error_code = -PVFS_ENOMEM;
-		return(1);
-	}
-
 	/* we still have the file size stored in the response structure 
 	 * that we sent in the previous state, other details come from
 	 * request
 	 */
-	s_op->u.io.flow_d->file_data->fsize = s_op->resp.u.io.bstream_size;
-	s_op->u.io.flow_d->file_data->dist = s_op->req->u.io.io_dist;
-	s_op->u.io.flow_d->file_data->iod_num = s_op->req->u.io.iod_num;
-	s_op->u.io.flow_d->file_data->iod_count = s_op->req->u.io.iod_count;
+	s_op->u.io.flow_d->file_data.fsize = s_op->resp.u.io.bstream_size;
+	s_op->u.io.flow_d->file_data.dist = s_op->req->u.io.io_dist;
+	s_op->u.io.flow_d->file_data.iod_num = s_op->req->u.io.iod_num;
+	s_op->u.io.flow_d->file_data.iod_count = s_op->req->u.io.iod_count;
 
 	/* on writes, we allow the bstream to be extended at EOF */
 	if(s_op->req->u.io.io_type == PVFS_IO_WRITE)
-		s_op->u.io.flow_d->file_data->extend_flag = 1;
+		s_op->u.io.flow_d->file_data.extend_flag = 1;
 	else
-		s_op->u.io.flow_d->file_data->extend_flag = 0;
+		s_op->u.io.flow_d->file_data.extend_flag = 0;
 
 	s_op->u.io.flow_d->io_req = s_op->req->u.io.io_req;
 	s_op->u.io.flow_d->io_req_offset = s_op->req->u.io.io_req_offset;
@@ -351,10 +342,6 @@ static int io_cleanup(PINT_server_op *s_op, job_status_s* js_p)
 
 	if(s_op->u.io.flow_d)
 	{
-		if(s_op->u.io.flow_d->file_data)
-		{
-			free(s_op->u.io.flow_d->file_data);
-		}
 		PINT_flow_free(s_op->u.io.flow_d);
 	}
 

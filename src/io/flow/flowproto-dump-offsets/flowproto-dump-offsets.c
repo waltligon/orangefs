@@ -376,7 +376,7 @@ static void service_mem_to_bmi(flow_descriptor * flow_d)
 	gossip_err("DUMP OFFSETS %p: PINT_Process_request().\n",
 	    flow_d);
 	ret = PINT_Process_request(flow_d->io_req_state,
-	    flow_d->mem_req_state, flow_d->file_data, &tmp_result,
+	    flow_d->mem_req_state, &flow_d->file_data, &tmp_result,
 	    PINT_CLIENT);
 #if 0
 	ret = PINT_Process_request(flow_d->request_state, 
@@ -449,7 +449,7 @@ static void service_bmi_to_mem(flow_descriptor * flow_d)
 	gossip_err("DUMP OFFSETS %p: PINT_Process_request().\n",
 	    flow_d);
 	ret = PINT_Process_request(flow_d->io_req_state,
-	    flow_d->mem_req_state, flow_d->file_data, &tmp_result,
+	    flow_d->mem_req_state, &flow_d->file_data, &tmp_result,
 	    PINT_CLIENT);
 #if 0
 	ret = PINT_Process_request(flow_d->request_state, 
@@ -521,7 +521,7 @@ static void service_bmi_to_trove(flow_descriptor * flow_d)
 	gossip_err("DUMP OFFSETS %p: PINT_Process_request().\n",
 	    flow_d);
 	ret = PINT_Process_request(flow_d->io_req_state,
-	    flow_d->mem_req_state, flow_d->file_data, &tmp_result,
+	    flow_d->mem_req_state, &flow_d->file_data, &tmp_result,
 	    PINT_SERVER);
 #if 0
 	ret = PINT_Process_request(flow_d->request_state, 
@@ -604,7 +604,7 @@ static void service_trove_to_bmi(flow_descriptor * flow_d)
 	    PINT_SERVER);
 #endif
 	ret = PINT_Process_request(flow_d->io_req_state,
-	    flow_d->mem_req_state, flow_d->file_data, &tmp_result,
+	    flow_d->mem_req_state, &flow_d->file_data, &tmp_result,
 	    PINT_SERVER);
 	if(ret < 0)
 	{

@@ -290,7 +290,6 @@ static int run_io_operation(
 	int outcount = 0;
 	PVFS_size actual_size = 0;
 	double time1 = 0, time2 = 0;
-	PINT_Request_file_data file_data;
 	flow_descriptor* flow_d = NULL;
 
 	printf("** sending req: fsid (ignored) = %d, handle = %d, op = %d, io_r_sz = %d, dist_sz = %d\n",
@@ -367,14 +366,6 @@ static int run_io_operation(
 
 	printf("** received ack: handle = %d, err = %d, dspace_sz = %d\n", (int) ack->handle, ack->error_code, (int)ack->dspace_size);
 
-	/* setup flow */
-	file_data.fsize = ack->dspace_size;
-	file_data.iod_num = 0;
-	file_data.iod_count = 1;
-	/* TODO: remember to set this to one if we were doing a write */
-	file_data.extend_flag = 0;
-	file_data.dist = io_dist;
-
 	flow_d = PINT_flow_alloc();
 	if(!flow_d)
 	{
@@ -382,8 +373,15 @@ static int run_io_operation(
 		return(-1);
 	}
 
+	/* setup flow */
+	flow_d->file_data.fsize = ack->dspace_size;
+	flow_d->file_data.iod_num = 0;
+	flow_d->file_data.iod_count = 1;
+	/* TODO: remember to set this to one if we were doing a write */
+	flow_d->file_data.extend_flag = 0;
+	flow_d->file_data.dist = io_dist;
+
 	flow_d->io_req = io_req;
-	flow_d->file_data =  &file_data;
 	flow_d->tag = 0;
 	flow_d->user_ptr = NULL;
 

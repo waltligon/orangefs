@@ -429,12 +429,6 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
     if (iosm_p->flow_status_array == NULL) {
 	assert(0);
     }
-    /* file data array */
-    iosm_p->file_data_array = (PINT_Request_file_data *)
-	malloc(target_datafile_count * sizeof(PINT_Request_file_data));
-    if (iosm_p->file_data_array == NULL) {
-	assert(0);
-    }
 
     /* session tag array */
     iosm_p->session_tag_array = (PVFS_msg_tag_t *)
@@ -785,11 +779,10 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 	    }
 	    /* fill in file_data structure */
 	    /* TODO: MACRO TO FILL THIS IN? */
-	    fl_p->file_data            = &iosm_p->file_data_array[recv_match];
-	    fl_p->file_data->fsize     = resp_p->u.io.bstream_size;
-	    fl_p->file_data->dist      = iosm_p->dist_p;
-	    fl_p->file_data->iod_num   = recv_match;
-	    fl_p->file_data->iod_count = iosm_p->datafile_count;
+	    fl_p->file_data.fsize     = resp_p->u.io.bstream_size;
+	    fl_p->file_data.dist      = iosm_p->dist_p;
+	    fl_p->file_data.iod_num   = recv_match;
+	    fl_p->file_data.iod_count = iosm_p->datafile_count;
 
 	    /* this is the file datatype */
 	    /* TODO: RENAME? */
@@ -798,9 +791,9 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 
 	    gossip_debug(CLIENT_DEBUG,
 			 "    bstream_size = %Ld, datafile_nr = %d, datafile_ct = %d, io_req_off = %Ld\n",
-			 fl_p->file_data->fsize,
-			 fl_p->file_data->iod_num,
-			 fl_p->file_data->iod_count,
+			 fl_p->file_data.fsize,
+			 fl_p->file_data.iod_num,
+			 fl_p->file_data.iod_count,
 			 fl_p->io_req_offset);
 
 	    /* this is the memory datatype */
@@ -835,7 +828,7 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 		 * - data is coming from BMI and going into memory
 		 * - data is coming from the same server we got the recv from
 		 */
-		fl_p->file_data->extend_flag = 0;
+		fl_p->file_data.extend_flag = 0;
 		fl_p->src.endpoint_id   = BMI_ENDPOINT;
 		fl_p->src.u.bmi.address = msg_p->svr_addr;
 		fl_p->dest.endpoint_id  = MEM_ENDPOINT;
@@ -846,7 +839,7 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 		assert (iosm_p->io_type == PVFS_IO_WRITE); /* sanity check */
 
 		/* do allow writes to extend the file */
-		fl_p->file_data->extend_flag = 1;
+		fl_p->file_data.extend_flag = 1;
 		fl_p->src.endpoint_id    = MEM_ENDPOINT;
 		fl_p->src.u.mem.buffer   = iosm_p->buffer;
 		fl_p->src.u.mem.size     = iosm_p->buffer_size;
@@ -1145,7 +1138,6 @@ static int io_analyze_results(PINT_client_sm *sm_p,
     free(sm_p->msgarray);
     free(sm_p->u.io.datafile_handles);
     free(sm_p->u.io.flow_p_array);
-    free(sm_p->u.io.file_data_array);
     free(sm_p->u.io.flow_id_array);
     free(sm_p->u.io.flow_status_array);
     free(sm_p->u.io.session_tag_array);

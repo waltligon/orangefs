@@ -38,7 +38,6 @@ int main(int argc, char **argv)
 	PVFS_size actual_size;
 	bmi_error_code_t error_code;
 	TROVE_ds_attributes_s s_attr;
-	PINT_Request_file_data file_data;
 	char *method_name;
 	flow_descriptor* flow_d = NULL;
 	double time1 = 0, time2 = 0;
@@ -225,13 +224,6 @@ int main(int argc, char **argv)
 		}
 
 		/* setup flow */
-		file_data.fsize = ack.dspace_size;
-		file_data.iod_num = 0;
-		file_data.iod_count = 1;
-		/* TODO: remember to set this to one if we were doing a write */
-		file_data.extend_flag = 0;
-		file_data.dist = io_dist;
-
 		flow_d = PINT_flow_alloc();
 		if(!flow_d)
 		{
@@ -239,8 +231,14 @@ int main(int argc, char **argv)
 			return(-1);
 		}
 
+		flow_d->file_data.fsize = ack.dspace_size;
+		flow_d->file_data.iod_num = 0;
+		flow_d->file_data.iod_count = 1;
+		/* TODO: remember to set this to one if we were doing a write */
+		flow_d->file_data.extend_flag = 0;
+		flow_d->file_data.dist = io_dist;
+
 		flow_d->io_req = io_req;
-		flow_d->file_data =  &file_data;
 		flow_d->tag = 0;
 		flow_d->user_ptr = NULL;
 

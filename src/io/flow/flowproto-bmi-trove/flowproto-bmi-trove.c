@@ -792,7 +792,7 @@ static int buffer_setup_bmi_to_mem(flow_descriptor * flow_d)
     flow_d->result.bytes = 0;
     flow_d->result.segs = 0;
     ret  = PINT_Process_request(flow_d->io_req_state, flow_d->mem_req_state,
-	flow_d->file_data, &flow_d->result, PINT_CLIENT);
+	&flow_d->file_data, &flow_d->result, PINT_CLIENT);
     if (ret < 0)
     {
 	return (ret);
@@ -886,7 +886,7 @@ static int buffer_setup_mem_to_bmi(flow_descriptor * flow_d)
     flow_d->result.bytes = 0;
     flow_d->result.segs = 0;
     ret  = PINT_Process_request(flow_d->io_req_state, flow_d->mem_req_state,
-	flow_d->file_data, &flow_d->result, PINT_CLIENT);
+	&flow_d->file_data, &flow_d->result, PINT_CLIENT);
     if (ret < 0)
     {
 	return (ret);
@@ -951,7 +951,7 @@ static int buffer_setup_mem_to_bmi(flow_descriptor * flow_d)
 		flow_d->result.segs = 0;
 		ret  = PINT_Process_request(flow_d->io_req_state, 
 		    flow_d->mem_req_state,
-		    flow_d->file_data, &flow_d->result, PINT_CLIENT);
+		    &flow_d->file_data, &flow_d->result, PINT_CLIENT);
 		if (ret < 0)
 		{
 		    return (ret);
@@ -1127,7 +1127,7 @@ static int buffer_setup_trove_to_bmi(flow_descriptor * flow_d)
     flow_d->result.bytes = 0;
     flow_d->result.segs = 0;
     ret  = PINT_Process_request(flow_d->io_req_state, flow_d->mem_req_state,
-	flow_d->file_data, &flow_d->result, PINT_SERVER);
+	&flow_d->file_data, &flow_d->result, PINT_SERVER);
 
     if (ret < 0)
     {
@@ -1453,7 +1453,7 @@ static void service_bmi_to_trove(flow_descriptor * flow_d)
 	flow_d->result.bytes = 0;
 	flow_d->result.segs = 0;
 	ret  = PINT_Process_request(flow_d->io_req_state, flow_d->mem_req_state,
-	    flow_d->file_data, &flow_d->result, PINT_SERVER);
+	    &flow_d->file_data, &flow_d->result, PINT_SERVER);
 	flow_data->trove_list_count = flow_d->result.segs;
 	flow_data->drain_buffer_stepsize = flow_d->result.bytes;
 	if (ret < 0)
@@ -1494,7 +1494,7 @@ static void service_bmi_to_trove(flow_descriptor * flow_d)
 	    flow_d->result.segs = 0;
 	    ret  = PINT_Process_request(flow_data->dup_io_req_state, 
 		flow_d->mem_req_state,
-		flow_d->file_data, &flow_d->result, PINT_CKSIZE_MODIFY_OFFSET);
+		&flow_d->file_data, &flow_d->result, PINT_CKSIZE_MODIFY_OFFSET);
 	    flow_data->bmi_total_size = flow_d->result.bytes;
 	    if (ret < 0)
 	    {
@@ -1650,7 +1650,7 @@ static void service_trove_to_bmi(flow_descriptor * flow_d)
 	    flow_d->result.segs = 0;
 	    ret  = PINT_Process_request(flow_d->io_req_state, 
 		flow_d->mem_req_state,
-		flow_d->file_data, &flow_d->result, PINT_SERVER);
+		&flow_d->file_data, &flow_d->result, PINT_SERVER);
 	    if (ret < 0)
 	    {
 		gossip_lerr("Error: PINT_Process_request() failure.\n");
@@ -2018,7 +2018,7 @@ static void bmi_completion_bmi_to_mem(bmi_error_code_t error_code,
 
 		ret  = PINT_Process_request(flow_d->io_req_state, 
 		    flow_d->mem_req_state,
-		    flow_d->file_data, &flow_d->result, PINT_CLIENT);
+		    &flow_d->file_data, &flow_d->result, PINT_CLIENT);
 		if (ret < 0)
 		{
 		    flow_d->state = FLOW_DEST_ERROR;
@@ -2165,7 +2165,7 @@ static void trove_completion_trove_to_bmi(PVFS_error error_code,
 	flow_d->result.bytes = 0;
 	flow_d->result.segs = 0;
 	ret  = PINT_Process_request(flow_d->io_req_state, flow_d->mem_req_state,
-	    flow_d->file_data, &flow_d->result, PINT_SERVER);
+	    &flow_d->file_data, &flow_d->result, PINT_SERVER);
 	if (ret < 0)
 	{
 	    gossip_lerr("Error: unimplemented condition encountered.\n");
@@ -2382,7 +2382,7 @@ static void trove_completion_bmi_to_trove(PVFS_error error_code,
 	flow_d->result.bytes = 0;
 	flow_d->result.segs = 0;
 	ret  = PINT_Process_request(flow_d->io_req_state, flow_d->mem_req_state,
-	    flow_d->file_data, &flow_d->result, PINT_SERVER);
+	    &flow_d->file_data, &flow_d->result, PINT_SERVER);
 	if (ret < 0)
 	{
 	    gossip_lerr("Error: unimplemented condition encountered.\n");
