@@ -76,13 +76,13 @@ extern PINT_server_trove_keys_s Trove_Common_Keys[];
 PINT_state_machine_s remove_req_s = 
 {
 	NULL,
-	"remove",
+	"remove",	
 	remove_init_state_machine
 };
 
 %%
 
-machine remove(init,
+machine remove_(init,
 	       read_object_metadata,
 	       verify_object_metadata,
 	       fallback_to_dspace_getattr,
@@ -177,7 +177,8 @@ machine remove(init,
 void remove_init_state_machine(void)
 {
 
-    remove_req_s.state_machine = remove;
+    /* 'remove' collides with remove(3) */
+    remove_req_s.state_machine = remove_;
 
 }
 
