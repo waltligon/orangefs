@@ -355,7 +355,7 @@ int gossip_err(
 
 #ifdef GOSSIP_ENABLE_BACKTRACE
     #ifndef GOSSIP_BACKTRACE_DEPTH
-    #define GOSSIP_BACKTRACE_DEPTH 8
+    #define GOSSIP_BACKTRACE_DEPTH 12
     #endif
 /* gossip_backtrace()
  *
