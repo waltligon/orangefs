@@ -16,7 +16,6 @@ SERVERGENSRC := \
 
 # "normal" c files
 SERVERSRC += \
-	$(DIR)/memory-cache.c \
 	$(DIR)/server-config.c \
 	$(DIR)/pvfs2-server.c \
 	$(DIR)/state-machine.c \
