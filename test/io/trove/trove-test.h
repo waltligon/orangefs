@@ -24,6 +24,7 @@ static int path_lookup(TROVE_coll_id coll_id, char *path, TROVE_handle *out_hand
     TROVE_keyval_s key, val;
     TROVE_op_id op_id;
     TROVE_handle handle, parent_handle;
+    TROVE_ds_attributes_s s_attr;
     char dir[PATH_SIZE];
 
     char root_handle_string[] = ROOT_HANDLE_STRING;
@@ -69,6 +70,18 @@ static int path_lookup(TROVE_coll_id coll_id, char *path, TROVE_handle *out_hand
 	    fprintf(stderr, "keyval read failed.\n");
 	    return -1;
 	}
+
+	/* TODO: verify that this is in fact a directory! */
+	ret = trove_dspace_getattr(coll_id, handle, &s_attr, NULL, &op_id);
+	while (ret == 0) ret = trove_dspace_test(coll_id, op_id, &count, NULL, NULL, &state);
+	if (ret < 0) return -1;
+	if (state != 0) return -1;
+	
+	if (s_attr.type != TROVE_TEST_DIR) {
+	    fprintf(stderr, "%s is not a directory.\n", dir);
+	    return -1;
+	}
+
 	printf("  path_lookup: handle for path component %s is %d\n", dir, (int) handle);
     }
 
