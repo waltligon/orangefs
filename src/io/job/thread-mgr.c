@@ -449,11 +449,8 @@ int PINT_thread_mgr_dev_stop(void)
 #ifdef __PVFS2_JOB_THREADED__
         gen_mutex_unlock(&dev_mutex);
 	pthread_join(dev_thread_id, NULL);
-        gen_mutex_lock(&dev_mutex);
 #endif
     }
-    gen_mutex_unlock(&dev_mutex);
-
     return(0);
 }
 
@@ -532,6 +529,7 @@ int PINT_thread_mgr_trove_stop(void)
 	assert(trove_thread_ref_count == 0); /* sanity check */
 	trove_thread_running = 0;
 #ifdef __PVFS2_JOB_THREADED__
+        gen_mutex_unlock(&trove_mutex);
 	pthread_join(trove_thread_id, NULL);
 #endif
 #ifdef __PVFS2_TROVE_SUPPORT__
@@ -540,8 +538,6 @@ int PINT_thread_mgr_trove_stop(void)
 	assert(0);
 #endif
     }
-    gen_mutex_unlock(&trove_mutex);
-
     return(0);
 }
 
@@ -561,19 +557,11 @@ int PINT_thread_mgr_bmi_stop(void)
 	assert(bmi_thread_ref_count == 0); /* sanity check */
 	bmi_thread_running = 0;
 #ifdef __PVFS2_JOB_THREADED__
-        /*
-          unlock bmi_mutex before joining in case the thread is now
-          sleeping while trying to aquire the lock; this may need to
-          be replaced with cancellation handlers if it's not safe
-        */
         gen_mutex_unlock(&bmi_mutex);
 	pthread_join(bmi_thread_id, NULL);
-        gen_mutex_lock(&bmi_mutex);
 #endif
 	BMI_close_context(global_bmi_context);
     }
-    gen_mutex_unlock(&bmi_mutex);
-
     return(0);
 }
 
