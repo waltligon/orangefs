@@ -897,6 +897,57 @@ int pvfs2_truncate_inode(
     return ret;
 }
 
+int pvfs2_empty_dir(struct dentry *dentry)
+{
+    int ret = 0, retries = PVFS2_OP_RETRY_COUNT;
+    struct inode *inode = dentry->d_inode;
+    pvfs2_kernel_op_t *new_op = NULL;
+    pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
+
+    pvfs2_print("pvfs2: pvfs2_empty_dir called on %s (inode %d)\n",
+                dentry->d_name.name, (int)inode->i_ino);
+
+    new_op = kmem_cache_alloc(op_cache, SLAB_KERNEL);
+    if (!new_op)
+    {
+        pvfs2_error("pvfs2: pvfs2_empty_dir -- "
+                    "kmem_cache_alloc failed!\n");
+        return -ENOMEM;
+    }
+    new_op->upcall.type = PVFS2_VFS_OP_READDIR;
+    if (pvfs2_inode && pvfs2_inode->refn.handle && pvfs2_inode->refn.fs_id)
+    {
+        new_op->upcall.req.readdir.refn = pvfs2_inode->refn;
+    }
+    else
+    {
+        new_op->upcall.req.readdir.refn.handle =
+            pvfs2_ino_to_handle(dentry->d_inode->i_ino);
+        new_op->upcall.req.readdir.refn.fs_id =
+            PVFS2_SB(dentry->d_inode->i_sb)->fs_id;
+    }
+    new_op->upcall.req.readdir.max_dirent_count = MAX_DIRENT_COUNT;
+    new_op->upcall.req.readdir.token = PVFS_READDIR_START;
+
+    service_operation_with_timeout_retry(
+        new_op, "pvfs2_empty_dir", retries);
+
+    /* need to check downcall.status value */
+    pvfs2_print("Readdir downcall status is %d (dirent_count "
+                "is %d)\n", new_op->downcall.status,
+                new_op->downcall.resp.readdir.dirent_count);
+    if ((new_op->downcall.status == 0) &&
+        (new_op->downcall.resp.readdir.dirent_count == 0))
+    {
+        /* yes, we have an empty directory at this point */
+        ret = 1;
+    }
+
+  error_exit:
+    op_release(new_op);
+
+    return ret;
+}
 
 /*
  * Local variables:

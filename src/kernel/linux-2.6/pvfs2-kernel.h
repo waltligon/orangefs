@@ -239,6 +239,8 @@ struct dentry *pvfs2_lookup(
     struct dentry *dentry,
     struct nameidata *nd);
 
+int pvfs2_empty_dir(struct dentry *dentry);
+
 /****************************
  * defined in pvfs2-utils.c
  ****************************/

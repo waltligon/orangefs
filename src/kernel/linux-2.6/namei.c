@@ -202,7 +202,7 @@ static int pvfs2_unlink(
     struct inode *dir,
     struct dentry *dentry)
 {
-    int ret = -1;
+    int ret = -ENOENT;
     struct inode *inode = dentry->d_inode;
 
     ret = pvfs2_remove_entry(dir, dentry);
@@ -210,7 +210,7 @@ static int pvfs2_unlink(
     {
         inode->i_ctime = dir->i_ctime;
 	inode->i_nlink--;
-	dir->i_nlink--;
+/* 	dir->i_nlink--; */
         /* mark_inode_dirty(inode); */
     }
     return ret;
@@ -269,7 +269,20 @@ static int pvfs2_rmdir(
     struct inode *dir,
     struct dentry *dentry)
 {
-    return pvfs2_unlink(dir, dentry);
+    int ret = -ENOTEMPTY;
+    struct inode *inode = dentry->d_inode;
+
+    if (pvfs2_empty_dir(dentry))
+    {
+        ret = pvfs2_unlink(dir, dentry);
+        if (ret == 0)
+        {
+            inode->i_size = 0;
+            inode->i_nlink--;
+            dir->i_nlink--;
+        }
+    }
+    return ret;
 }
 
 static int pvfs2_rename(

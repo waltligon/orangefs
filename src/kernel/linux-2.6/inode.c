@@ -179,8 +179,8 @@ static int pvfs2_writepage(
     struct writeback_control *wbc)
 {
     pvfs2_print("pvfs2: pvfs2_writepage called\n");
-/*     return block_write_full_page(page, pvfs2_get_block, wbc); */
-    return 0;
+    return block_write_full_page(page, pvfs2_get_block, wbc);
+/*     return 0; */
 }
 
 static int pvfs2_writepages(
@@ -188,8 +188,8 @@ static int pvfs2_writepages(
     struct writeback_control *wbc)
 {
     pvfs2_print("pvfs2: pvfs2_writepages called\n");
-/*     return mpage_writepages(mapping, wbc, pvfs2_get_block); */
-    return 0;
+    return mpage_writepages(mapping, wbc, pvfs2_get_block);
+/*     return 0; */
 }
 
 static int pvfs2_sync_page(struct page *page)
@@ -220,15 +220,15 @@ static int pvfs2_readpages(
     return mpage_readpages(mapping, pages, nr_pages, pvfs2_get_block);
 }
 
-/* static int pvfs2_prepare_write( */
-/*     struct file *file, */
-/*     struct page *page, */
-/*     unsigned from, */
-/*     unsigned to) */
-/* { */
-/*     pvfs2_print("pvfs2: pvfs2_prepare_write called\n"); */
-/*     return block_prepare_write(page, from, to, pvfs2_get_block); */
-/* } */
+static int pvfs2_prepare_write(
+    struct file *file,
+    struct page *page,
+    unsigned from,
+    unsigned to)
+{
+    pvfs2_print("pvfs2: pvfs2_prepare_write called\n");
+    return block_prepare_write(page, from, to, pvfs2_get_block);
+}
 
 static int pvfs2_set_page_dirty(struct page *page)
 {
@@ -238,15 +238,15 @@ static int pvfs2_set_page_dirty(struct page *page)
     return 0;
 }
 
-/* static int pvfs2_commit_write( */
-/*     struct file *file, */
-/*     struct page *page, */
-/*     unsigned offset, */
-/*     unsigned to) */
-/* { */
-/*     pvfs2_print("pvfs2: pvfs2_commit_write called\n"); */
-/*     return 0; */
-/* } */
+static int pvfs2_commit_write(
+    struct file *file,
+    struct page *page,
+    unsigned offset,
+    unsigned to)
+{
+    pvfs2_print("pvfs2: pvfs2_commit_write called\n");
+    return 0;
+}
 
 static sector_t pvfs2_bmap(
     struct address_space *mapping,
@@ -295,8 +295,8 @@ struct address_space_operations pvfs2_address_operations =
     .writepage = pvfs2_writepage,
     .writepages = pvfs2_writepages,
     .sync_page = pvfs2_sync_page,
-/*     .prepare_write = pvfs2_prepare_write, */
-/*     .commit_write = generic_commit_write, */
+    .prepare_write = pvfs2_prepare_write,
+    .commit_write = pvfs2_commit_write,
     .set_page_dirty = pvfs2_set_page_dirty,
     .bmap = pvfs2_bmap,
     .invalidatepage = pvfs2_invalidatepage,
