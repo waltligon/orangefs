@@ -152,9 +152,10 @@ static int remove_post_lookup_sendrecv(PINT_client_sm *sm,
      * (8) call job fn. to post send
      */
 
-    if ((sm->u.remove.object_name > PVFS_REQ_LIMIT_PATH_NAME_BYTES) ||
+    if ((strlen(sm->u.remove.object_name) + 1 >
+	 PVFS_REQ_LIMIT_PATH_NAME_BYTES) ||
 	(PINT_string_count_segments(sm->u.remove.object_name) >
-	PVFS_REQ_LIMIT_PATH_SEGMENT_COUNT))
+	 PVFS_REQ_LIMIT_PATH_SEGMENT_COUNT))
     {
 	/* TODO: CLEAN UP... */
 	assert(0);
@@ -202,15 +203,15 @@ static int remove_post_lookup_sendrecv(PINT_client_sm *sm,
     session_tag = get_next_session_tag();
 
     /* post receive of response */
-    ret = job_bmi_recv_list(svr_addr,
-			    encoded_resp_p,
-			    max_msg_sz,
-			    session_tag,
-			    BMI_PRE_ALLOC,
-			    NULL, /* USER PTR */
-			    &recv_status,
-			    &recv_id,
-			    pint_client_sm_context);
+    ret = job_bmi_recv(svr_addr,
+		       encoded_resp_p,
+		       max_msg_sz,
+		       session_tag,
+		       BMI_PRE_ALLOC,
+		       NULL, /* USER PTR */
+		       &recv_status,
+		       &recv_id,
+		       pint_client_sm_context);
     if (ret < 0) {
 	assert(0);
     }
@@ -237,6 +238,8 @@ static int remove_post_lookup_sendrecv(PINT_client_sm *sm,
     }
     else if (ret == 1) {
 	/* send has already completed! decrement the completion counter */
+	
+	/* TODO: CHECK THE STATUS!!! */
 	sm->comp_ct--;
     }
 
