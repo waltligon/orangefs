@@ -143,6 +143,7 @@ int do_decode_req(
     case PVFS_SERV_GETCONFIG:
     case PVFS_SERV_FLUSH:
     case PVFS_SERV_MGMT_SETPARAM:
+    case PVFS_SERV_MGMT_NOOP:
 	return (0);
 
     /* invalid request types */

@@ -48,6 +48,7 @@ int do_encode_resp(
     case PVFS_SERV_WRITE_COMPLETION:
     case PVFS_SERV_MGMT_SETPARAM:
     case PVFS_SERV_TRUNCATE:
+    case PVFS_SERV_MGMT_NOOP:
 	/* 
 	 *  There is an int64_t here...
 	 *  but handled correctly so far!

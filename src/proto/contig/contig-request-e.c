@@ -403,6 +403,7 @@ int do_encode_req(
     case PVFS_SERV_TRUNCATE:
     case PVFS_SERV_FLUSH:
     case PVFS_SERV_MGMT_SETPARAM:
+    case PVFS_SERV_MGMT_NOOP:
 	/* XXX: is PVFS_SERV_FLUSH really 'self contained' ?*/
 	size = sizeof(struct PVFS_server_req) + PINT_ENC_GENERIC_HEADER_SIZE;
 	enc_msg = BMI_memalloc(target_msg->dest, (bmi_size_t) size, BMI_SEND);

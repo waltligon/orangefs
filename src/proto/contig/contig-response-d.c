@@ -100,6 +100,7 @@ int do_decode_resp(
     case PVFS_SERV_FLUSH:
     case PVFS_SERV_MGMT_SETPARAM:
     case PVFS_SERV_TRUNCATE:
+    case PVFS_SERV_MGMT_NOOP:
 	return 0;
 
     /* invalid response types: */

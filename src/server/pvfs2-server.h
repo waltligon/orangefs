@@ -229,6 +229,9 @@ static inline char* PINT_map_server_op_to_string(enum PVFS_server_op op)
 	case PVFS_SERV_FLUSH:
 	    ret_ptr = "flush";
 	    break;
+	case PVFS_SERV_MGMT_NOOP:
+	    ret_ptr = "mgmt_noop";
+	    break;
     }
     return(ret_ptr);
 }

@@ -36,13 +36,13 @@ enum PVFS_server_op
     PVFS_SERV_GETCONFIG = 12,
     PVFS_SERV_WRITE_COMPLETION = 13,
     PVFS_SERV_FLUSH = 14,
-    PVFS_SERV_MGMT_SETPARAM = 15
+    PVFS_SERV_MGMT_SETPARAM = 15,
+    PVFS_SERV_MGMT_NOOP = 16
     /* IMPORTANT: please remember to modify PVFS_MAX_SERVER_OP define (below)
      * if you add a new operation to this list
      */
 
     /* not implemented:
-     * PVFS_SERV_NOOP 
      * PVFS_SERV_GETEATTR
      * PVFS_SERV_SETEATTR,
      * PVFS_SERV_BATCH
@@ -50,7 +50,7 @@ enum PVFS_server_op
      * PVFS_SERV_STATFS
      */
 };
-#define PVFS_MAX_SERVER_OP 15
+#define PVFS_MAX_SERVER_OP 16
 
 /******************************************************************/
 /* these values define limits on the maximum size of variable length
@@ -446,6 +446,14 @@ do {						\
  * returned in generic server response structure
  */
 
+/* mgmt_noop ********************************************************/
+/* - does nothing except contact a server to see if it is responding
+ * to requests
+ */
+
+/* NOTE: not request or response structure; all necessary information
+ * is contained in generic server request and response structures
+ */
 
 /* server request *********************************************/
 /* - generic request with union of all op specific structs */
