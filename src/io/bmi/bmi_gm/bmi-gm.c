@@ -1212,6 +1212,7 @@ int BMI_gm_post_recv(bmi_op_id_t * id,
 	gm_addr_data = query_op->addr->method_data;
 	*id = query_op->op_id;
 	query_op->context_id = context_id;
+	query_op->user_ptr = user_ptr;
 	gm_op_data = query_op->method_data;
 	gm_op_data->buffer_status = buffer_status;
 
@@ -1395,6 +1396,7 @@ int BMI_gm_post_recv_list(bmi_op_id_t * id,
 	gm_addr_data = query_op->addr->method_data;
 	*id = query_op->op_id;
 	query_op->context_id = context_id;
+	query_op->user_ptr = user_ptr;
 
 	if(query_op->actual_size > total_expected_size)
 	{
