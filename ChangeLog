@@ -14,6 +14,7 @@ pvfs2-0.6.1pre1
   server
 - some refactoring of server state machines (mainly crdirent) to allow for
   code reuse in other state machines
+- no longer need to fix up generated html by hand
 
 
 pvfs2-0.6.0
