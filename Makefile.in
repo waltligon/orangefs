@@ -10,6 +10,7 @@
 # docsclean  cleans up documentation files
 # tests      builds test programs
 # admintools builds admin tools
+# kernapps   builds userland helper programs for kernel driver 
 # statecomp  builds only the statecomp component
 # cscope     generates information for cscope utility
 # tags       generates tags file for use by editors
@@ -86,7 +87,7 @@ build_static = @build_static@
 #    of a file that has the same name as the target.  Listing them
 #    here keeps make from accidentally doing too much work (see GNU
 #    make manual).
-.PHONY: all clean tests dist distclean docs docsclean cscope tags codecheck statecomp admintools
+.PHONY: all clean tests dist distclean docs docsclean cscope tags codecheck statecomp admintools kernapps
 
 ################################################################
 # Find project subdirectories
@@ -315,6 +316,8 @@ VISSRC :=
 VISMISCSRC :=
 # KARMASRC is source for the karma gui
 KARMASRC :=
+# userland helper programs for kernel drivers
+KERNAPPSRC :=
 # files generated as part of the build that should be deleted on "make clean"
 CLEANFILES :=
 # files created by trove-autogen.pl
@@ -341,7 +344,7 @@ ifdef BUILD_KARMA
 	KARMA := src/apps/karma/karma
 endif
 # default rule builds server, library, and test programs
-all: $(SERVER) $(KARMA) $(LIBRARIES) tests admintools
+all: $(SERVER) $(KARMA) $(LIBRARIES) tests admintools kernapps
 
 ################################################################
 # Makefile includes
@@ -405,6 +408,14 @@ MPITESTS := $(patsubst %.c,%, $(filter %.c, $(MPITESTSRC)))
 # TESTDEPENDS is a list of dependency files for MPI test programs
 MPITESTDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(MPITESTSRC)))
 
+# KERNAPPOBJS is a list of kernel driver userland objects
+KERNAPPOBJS := $(patsubst %.c,%.o, $(filter %.c,$(KERNAPPSRC)))
+# KERNAPPS is a list of kernel driver userland executables
+KERNAPPS := $(patsubst %.c,%, $(filter %.c, $(KERNAPPSRC)))
+# KERNAPPDEPENDS is a list of dependency files for kernel driver userland
+# objects
+KERNAPPDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(KERNAPPSRC)))
+
 # MPIIOTESTOBJS is a list of MPI-IO test program objects
 MPIIOTESTOBJS := $(patsubst %.c,%.o, $(filter %.c,$(MPIIOTESTSRC)))
 # MPIIOTESTS is a list of MPI-IO test program executables
@@ -444,7 +455,7 @@ DOCSCRUFT += $(patsubst %.tex,%.toc, $(filter %.tex,$(DOCSRC)))
 # DEPENDS is a global list of all of our dependency files.  
 # NOTE: sort is just a trick to remove duplicates; the order
 #   doesn't matter at all.
-DEPENDS := $(sort $(LIBDEPENDS) $(TESTDEPENDS) $(SERVERDEPENDS) $(MISCDEPENDS) $(ADMINDEPENDS) $(ADMINDEPENDS_SERVER) $(PRIVATEDEPENDS))
+DEPENDS := $(sort $(LIBDEPENDS) $(TESTDEPENDS) $(SERVERDEPENDS) $(MISCDEPENDS) $(ADMINDEPENDS) $(ADMINDEPENDS_SERVER) $(PRIVATEDEPENDS) $(KERNAPPDEPENDS))
 ifdef BUILD_MPI
 DEPENDS += $(MPITESTDEPENDS) $(MPIMISCDEPENDS)
 endif
@@ -473,6 +484,9 @@ CLEANFILES +=\
 
 # target for building admin tools
 admintools: $(ADMINTOOLS) $(ADMINTOOLS_SERVER)
+
+# target for building kernel driver userland programs
+kernapps: $(KERNAPPS)
 
 # target for building the test program executables
 tests: $(TESTS)
@@ -752,6 +766,7 @@ endif
 $(TESTS): %: %.o $(LIBRARIES)
 $(ADMINTOOLS): %: %.o $(LIBRARIES)
 $(ADMINTOOLS_SERVER): %: %.o $(LIBRARIES) lib/libpvfs2-server.a
+$(KERNAPPS): %: %.o $(LIBRARIES)
 
 # target for building _just_ the statecomp tool
 statecomp: src/common/statecomp/statecomp
@@ -790,6 +805,7 @@ ifdef QUIET_COMPILE
 		$(MPITESTS) $(MPITESTOBJS) $(MPITESTDEPENDS) $(MPIMISCDEPENDS) \
 		$(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
 		$(ADMINTOOLS_SERVER) lib/libpvfs2-server.a\
+		$(KERNAPPOBJS) $(KERNAPPS) \
 		$(VISS) $(VISMISCOBJS) $(VISOBJS) $(VISDEPENDS)\
 		$(VISMISCDEPENDS) $(KARMAOBJS) $(LIBPICOBJS) \
 		src/server/pvfs2-server-server.o $(MPIIOTESTS) \
@@ -800,6 +816,7 @@ else
 		$(MPITESTS) $(MPITESTOBJS) $(MPITESTDEPENDS) $(MPIMISCDEPENDS) \
 		$(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
 		$(ADMINTOOLS_SERVER) lib/libpvfs2-server.a\
+		$(KERNAPPOBJS) $(KERNAPPS) \
 		$(VISS) $(VISMISCOBJS) $(VISOBJS) $(VISDEPENDS)\
 		$(VISMISCDEPENDS) $(KARMAOBJS) $(LIBPICOBJS) \
 		src/server/pvfs2-server-server.o $(MPIIOTESTS) \
@@ -971,9 +988,7 @@ install:: install_doc
 
 	install -d $(prefix)/sbin
 	install -m 755 $(SERVER) $(prefix)/sbin
-
-	install -m 755 src/apps/kernel/linux-2.6/pvfs2-client $(prefix)/sbin
-	install -m 755 src/apps/kernel/linux-2.6/pvfs2-client-core $(prefix)/sbin
+	install -m 755 $(KERNAPPS) $(prefix)/sbin
 
 ifneq (,$(LINUX_KERNEL_SRC))
 
