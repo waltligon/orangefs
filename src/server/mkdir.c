@@ -10,6 +10,7 @@
 #include <pvfs2-server.h>
 #include <string.h>
 #include <pvfs2-attr.h>
+#include <assert.h>
 
 static int mkdir_init(state_action_struct *s_op, job_status_s *ret);
 static int mkdir_create(state_action_struct *s_op, job_status_s *ret);
@@ -17,6 +18,9 @@ static int mkdir_setattrib(state_action_struct *s_op, job_status_s *ret);
 static int mkdir_release(state_action_struct *s_op, job_status_s *ret);
 static int mkdir_send_bmi(state_action_struct *s_op, job_status_s *ret);
 static int mkdir_cleanup(state_action_struct *s_op, job_status_s *ret);
+static int mkdir_fill_handle(state_action_struct *s_op, job_status_s *ret);
+static int mkdir_error(state_action_struct *s_op, job_status_s *ret);
+static int mkdir_critical_error(state_action_struct *s_op, job_status_s *ret);
 void mkdir_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
@@ -30,38 +34,58 @@ PINT_state_machine_s mkdir_req_s =
 
 %%
 
-machine mkdir(init, create, set_attrib, release, send, cleanup)
+machine mkdir(init, create, set_attrib, fill_handle, release, send, err_msg, critical_error, cleanup)
 {
 	state init
 	{
 		run mkdir_init;
 		success => create;
-		default => send;
+		default => err_msg;
 	}
 
 	state create
 	{
 		run mkdir_create;
 		success => set_attrib;
-		default => send;
+		default => err_msg;
 	}
 
 	state set_attrib
 	{
 		run mkdir_setattrib;
-		default => release;
+		success => fill_handle;
+		default => err_msg;
+	}
+	
+	state fill_handle
+	{
+	    run mkdir_fill_handle;
+	    default => release;
 	}
 
 	state release
 	{
 		run mkdir_release;
-		default => send;
+		success => send;
+		default => critical_error;
 	}
 
 	state send
 	{
 		run mkdir_send_bmi;
 		default => cleanup;
+	}
+
+	state err_msg 
+	{
+	    run mkdir_error;
+	    default => release;
+	}
+
+	state critical_error 
+	{
+	    run mkdir_critical_error;
+	    default => cleanup;
 	}
 
 	state cleanup
@@ -243,10 +267,6 @@ static int mkdir_send_bmi(state_action_struct *s_op, job_status_s *ret)
 
     s_op->resp->status = ret->error_code;
 
-    /* Set the handle IF it was mkdird */
-    if(ret->error_code == 0) 
-	s_op->resp->u.mkdir.handle = ret->handle;
-
     job_post_ret = job_bmi_send(s_op->addr,
 	    s_op->resp,
 	    sizeof(struct PVFS_server_resp_s),
@@ -298,6 +318,28 @@ static int mkdir_cleanup(state_action_struct *s_op, job_status_s *ret)
 
 }
 
+/* TODO: fix comment block */
+static int mkdir_fill_handle(state_action_struct *s_op, job_status_s *ret)
+{
+    /* if the error_code *isn't* zero, we should be in a different state */
+    assert(ret->error_code == 0);
+    s_op->resp->u.mkdir.handle = ret->handle;
+
+    return(1);
+}
+    
+/* TODO: fix comment block */
+static int mkdir_error(state_action_struct *s_op, job_status_s *ret)
+{
+    ret->error_code = -1;
+    return(1);
+}
+/* TODO: fix comment block */
+static int mkdir_critical_error(state_action_struct *s_op, job_status_s *ret)
+{
+    /* make the server stop processing requests */
+    return(-1);
+}
 /*
  * Local variables:
  *  c-indent-level: 4
