@@ -15,4 +15,9 @@ STATECOMPGEN := \
     $(DIR)/parser.c \
     $(DIR)/parser.h \
 
+statecomp: $(STATECOMP)
+$(STATECOMP): $(STATECOMPSRC)
+	$(Q) "  CC		$@"
+	$(E)$(BUILD_CC) $(LIBCFLAGS) $(CFLAGS) $(call modcflags, $<) $^ -o $@
+
 .SECONDARY: $(STATECOMPGEN)

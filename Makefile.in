@@ -133,6 +133,8 @@ INCLUDES := \
 # for compiling and linking unless otherwise noted
 CC = @CC@
 LD = @CC@
+BUILD_CC = @BUILD_CC@
+BUILD_LD = @BUILD_CC@
 CFLAGS = @CFLAGS@
 LDFLAGS = @LDFLAGS@
 LDSHARED = $(CC) -shared
@@ -402,8 +404,10 @@ KARMAOBJS := $(patsubst %.c,%.o, $(filter %.c,$(KARMASRC)))
 KARMADEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(KARMASRC)))
 
 # state machine generation tool
-STATECOMPOBJS := $(patsubst %.c,%.o,$(STATECOMPSRC))
-STATECOMPDEPS := $(patsubst %.c,%.d,$(STATECOMPSRC))
+# cannot build statecomp objects with the cross compiler, as we 
+# build and run the tool on the build host at compile-time
+#STATECOMPOBJS := $(patsubst %.c,%.o,$(STATECOMPSRC))
+#STATECOMPDEPS := $(patsubst %.c,%.d,$(STATECOMPSRC))
 
 # DOCSPDF, DOCSPS, and DOCSHTML are lists of documentation files generated 
 #   from latex
@@ -583,10 +587,10 @@ $(ADMINTOOLS_SERVER): %: %.o $(LIBRARIES) lib/libpvfs2-server.a
 $(KERNAPPS): %: %.o $(LIBRARIES)
 
 # target for building _just_ the statecomp tool
-statecomp: $(STATECOMP)
-$(STATECOMP): $(STATECOMPOBJS)
-	$(Q) "  LD		$@"
-	$(E)$(LD) -o $@ $(LDFLAGS) $(STATECOMPOBJS)
+#statecomp: $(STATECOMP)
+#$(STATECOMP): $(STATECOMPOBJS)
+#	$(Q) "  LD		$@"
+#	$(E)$(LD) -o $@ $(LDFLAGS) $(STATECOMPOBJS)
 
 # rule for generating cscope information
 cscope:
