@@ -174,8 +174,8 @@ int PVFS_sys_rename(
      * old one
      */
 
-    ret = PINT_bucket_map_to_server(&serv_addr,new_parent_refn.handle,
-					new_parent_refn.fs_id);
+    ret = PINT_bucket_map_to_server(&serv_addr,old_parent_refn.handle,
+					old_parent_refn.fs_id);
     if (ret < 0)
     {
 	gossip_ldebug(CLIENT_DEBUG,"unable to map a server to the old parent\n");
