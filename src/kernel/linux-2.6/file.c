@@ -56,6 +56,7 @@ ssize_t pvfs2_inode_read(
     int buffer_index = -1;
     char* current_buf = buf;
     loff_t original_offset = *offset;
+    int retries = PVFS2_OP_RETRY_COUNT;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
 
     new_op = kmem_cache_alloc(op_cache, SLAB_KERNEL);
@@ -96,7 +97,8 @@ ssize_t pvfs2_inode_read(
 	new_op->upcall.req.io.count = each_count;
 	new_op->upcall.req.io.offset = *offset;
 
-        service_operation(new_op, "pvfs2_inode_read");
+        service_operation_with_timeout_retry(
+            new_op, "pvfs2_inode_read", retries);
 
 	if(new_op->downcall.status != 0)
 	{
