@@ -5,8 +5,10 @@
  */
 
 #include <stdio.h>
-#include <client.h>
+#include <unistd.h>
+#include <sys/types.h>
 
+#include "client.h"
 #include "pvfs2-util.h"
 #include "str-utils.h"
 
@@ -65,13 +67,13 @@ int main(int argc,char **argv)
 	return(-1);
     }
     parent_refn.fs_id = cur_fs;
-    credentials.uid = 100;
-    credentials.gid = 100;
+    credentials.uid = getuid();
+    credentials.gid = getgid();
 
     ret = PVFS_sys_remove(entry_name, parent_refn, credentials);
     if (ret < 0)
     {
-        printf("remove failed with errcode = %d\n",ret);
+        PVFS_perror("remove failed ", ret);
         return(-1);
     }
 
