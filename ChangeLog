@@ -30,6 +30,8 @@ pvfs2-0.0.9pre1
   servers (statistics and performance)
 - sync and truncate bug fixes
 - mpi-io-test reports variance among processes
+- fix potential bug in le-bytefield encoder
+- use correct compiler flags with Intel cc
 
 	
 pvfs2-0.0.8
