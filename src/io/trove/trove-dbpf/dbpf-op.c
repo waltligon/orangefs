@@ -61,11 +61,6 @@ void dbpf_queued_op_free(dbpf_queued_op_t *q_op_p)
     else if ((q_op_p->op.type == BSTREAM_READ_LIST) ||
              (q_op_p->op.type == BSTREAM_WRITE_LIST))
     {
-        if (q_op_p->op.u.b_rw_list.fd != -1)
-        {
-            dbpf_open_cache_put(&q_op_p->op.u.b_rw_list.open_ref);
-            q_op_p->op.u.b_rw_list.fd = -1;
-        }
         if (q_op_p->op.u.b_rw_list.aiocb_array)
         {
             free(q_op_p->op.u.b_rw_list.aiocb_array);
