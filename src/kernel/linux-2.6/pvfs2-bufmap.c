@@ -288,9 +288,9 @@ int pvfs_bufmap_copy_to_user(void *to, int buffer_index, int size)
         cur_copy_size =
             ((amt_remaining > PAGE_SIZE) ? PAGE_SIZE : amt_remaining);
 
-        from_kaddr = kmap(from->page_array[index]);
+        from_kaddr = pvfs2_kmap(from->page_array[index]);
         copy_to_user(offset, from_kaddr, cur_copy_size);
-        kunmap(from->page_array[index]);
+        pvfs2_kunmap(from->page_array[index]);
 
         offset += cur_copy_size;
         amt_copied += cur_copy_size;
@@ -319,9 +319,9 @@ int pvfs_bufmap_copy_to_kernel(void *to, int buffer_index, int size)
         cur_copy_size =
             ((amt_remaining > PAGE_SIZE) ? PAGE_SIZE : amt_remaining);
 
-        from_kaddr = kmap(from->page_array[index]);
+        from_kaddr = pvfs2_kmap(from->page_array[index]);
         memcpy(offset, from_kaddr, cur_copy_size);
-        kunmap(from->page_array[index]);
+        pvfs2_kunmap(from->page_array[index]);
 
         offset += cur_copy_size;
         amt_copied += cur_copy_size;
@@ -356,9 +356,9 @@ int pvfs_bufmap_copy_from_user(int buffer_index, void *from, int size)
         cur_copy_size =
             ((amt_remaining > PAGE_SIZE) ? PAGE_SIZE : amt_remaining);
 
-        to_kaddr = kmap(to->page_array[index]);
+        to_kaddr = pvfs2_kmap(to->page_array[index]);
         copy_from_user(to_kaddr, offset, cur_copy_size);
-        kunmap(to->page_array[index]);
+        pvfs2_kunmap(to->page_array[index]);
 
         offset += cur_copy_size;
         amt_copied += cur_copy_size;

@@ -783,7 +783,7 @@ int pvfs2_remove_entry(
 
     if (inode && parent && dentry)
     {
-        pvfs2_print("pvfs2: pvfs2_remove_entry on %s\n  (inode %d): "
+        pvfs2_print("pvfs2_remove_entry: called on %s\n  (inode %d): "
                     "Parent is %Lu | fs_id %d\n", dentry->d_name.name,
                     (int)inode->i_ino, parent->refn.handle,
                     parent->refn.fs_id);

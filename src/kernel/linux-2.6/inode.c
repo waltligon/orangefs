@@ -81,7 +81,7 @@ static int pvfs2_get_blocks(
     }
 
     page = bh_result->b_page;
-    page_data = kmap(page);
+    page_data = pvfs2_kmap(page);
 
     /*
       NOTE: this unsafely *assumes* that the size stored in the inode
@@ -147,7 +147,7 @@ static int pvfs2_get_blocks(
 
     /* takes care of potential aliasing */
     flush_dcache_page(page);
-    kunmap(page);
+    pvfs2_kunmap(page);
 
     if (bytes_read < 0)
     {

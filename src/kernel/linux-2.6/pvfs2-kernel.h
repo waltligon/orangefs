@@ -165,10 +165,13 @@ sizeof(int64_t) + sizeof(pvfs2_downcall_t))
 
 #ifdef CONFIG_HIGHMEM
 #define PVFS2_BUFMAP_GFP_FLAGS (GFP_ATOMIC)
+#define pvfs2_kmap(page) kmap(page)
+#define pvfs2_kunmap(page) kunmap(page)
 #else
 #define PVFS2_BUFMAP_GFP_FLAGS (GFP_KERNEL)
+#define pvfs2_kmap(page) page
+#define pvfs2_kunmap(page) page
 #endif /* CONFIG_HIGHMEM */
-
 
 /************************************
  * pvfs2 data structures
@@ -646,8 +649,8 @@ do {                                                      \
         translate_error_if_wait_failed(ret, -EIO, 0);     \
         wake_up_device_for_return(new_op);                \
     }                                                     \
-    *offset = original_offset;                            \
     pvfs_bufmap_put(buffer_index);                        \
+    *offset = original_offset;                            \
 } while(0)
 
 #define get_interruptible_flag(inode)                     \

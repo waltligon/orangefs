@@ -97,7 +97,8 @@ int wait_for_matching_downcall(pvfs2_kernel_op_t * op)
 	    if (!schedule_timeout
 		(MSECS_TO_JIFFIES(1000 * MAX_SERVICE_WAIT_IN_SECONDS)))
 	    {
-                pvfs2_print("*** operation timed out\n");
+                pvfs2_print("*** operation timed out (tag %Ld)\n",
+                            Ld(op->tag));
                 clean_up_interrupted_operation(op);
 		ret = PVFS2_WAIT_TIMEOUT_REACHED;
 		break;
@@ -105,7 +106,8 @@ int wait_for_matching_downcall(pvfs2_kernel_op_t * op)
 	    continue;
 	}
 
-        pvfs2_print("*** operation interrupted by a signal\n");
+        pvfs2_print("*** operation interrupted by a signal (tag %Ld)\n",
+                    Ld(op->tag));
         clean_up_interrupted_operation(op);
         ret = PVFS2_WAIT_SIGNAL_RECVD;
         break;
