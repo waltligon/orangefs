@@ -3,8 +3,8 @@ PVFS2 Release ChangeLog
 -----------------------
 
 
-pvfs2-0.6.4pre1
-===============
+pvfs2-0.6.4
+===========
 - added a pvfs2-config tool to help when compiling against pvfs2
 - new PAV option (COMPUTENODES_LAST) that controls whether compute
   nodes are chosen first or last out of the total set of nodes
