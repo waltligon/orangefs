@@ -398,11 +398,11 @@ int BMI_tcp_initialize(method_addr_p listen_addr,
     if (tcp_method_params.method_flags & BMI_INIT_SERVER)
     {
 	tcp_addr_data = tcp_method_params.listen_addr->method_data;
-	tcp_socket_collection_p = socket_collection_init(tcp_addr_data->socket);
+	tcp_socket_collection_p = BMI_socket_collection_init(tcp_addr_data->socket);
     }
     else
     {
-	tcp_socket_collection_p = socket_collection_init(-1);
+	tcp_socket_collection_p = BMI_socket_collection_init(-1);
     }
 
     if (!tcp_socket_collection_p)
@@ -426,7 +426,7 @@ int BMI_tcp_initialize(method_addr_p listen_addr,
     }
     if (tcp_socket_collection_p)
     {
-	socket_collection_finalize(tcp_socket_collection_p);
+	BMI_socket_collection_finalize(tcp_socket_collection_p);
     }
     return (tmp_errno);
 }
@@ -462,7 +462,7 @@ int BMI_tcp_finalize(void)
     /* get rid of socket collection */
     if (tcp_socket_collection_p)
     {
-	socket_collection_finalize(tcp_socket_collection_p);
+	BMI_socket_collection_finalize(tcp_socket_collection_p);
 	tcp_socket_collection_p = NULL;
     }
 
@@ -1199,7 +1199,7 @@ void tcp_forget_addr(method_addr_p map,
     tcp_shutdown_addr(map);
     if (tcp_socket_collection_p)
     {
-	socket_collection_remove(tcp_socket_collection_p, map);
+	BMI_socket_collection_remove(tcp_socket_collection_p, map);
     }
     tcp_cleanse_addr(map);
     if (dealloc_flag)
@@ -1591,10 +1591,10 @@ static int enqueue_operation(op_list_p target_list,
     }
 
     /* add the socket to poll on */
-    socket_collection_add(tcp_socket_collection_p, map);
+    BMI_socket_collection_add(tcp_socket_collection_p, map);
     if(send_recv == BMI_SEND)
     {
-	socket_collection_add_write_bit(tcp_socket_collection_p, map);
+	BMI_socket_collection_add_write_bit(tcp_socket_collection_p, map);
 	bit_added = 1;
     }
 
@@ -1921,7 +1921,7 @@ static int tcp_do_work(int max_idle_time)
     int i = 0;
 
     /* now we need to poll and see what to work on */
-    ret = socket_collection_testglobal(tcp_socket_collection_p,
+    ret = BMI_socket_collection_testglobal(tcp_socket_collection_p,
 				       TCP_WORK_METRIC, &socket_count,
 				       addr_array, status_array, max_idle_time);
     if (ret < 0)
@@ -2050,7 +2050,7 @@ static int handle_new_connection(method_addr_p map)
 	dealloc_tcp_method_addr(map);
 	return (ret);
     }
-    socket_collection_add(tcp_socket_collection_p, new_addr);
+    BMI_socket_collection_add(tcp_socket_collection_p, new_addr);
 
     dealloc_tcp_method_addr(map);
     return (0);
@@ -2370,7 +2370,7 @@ static int work_on_send_op(method_op_p my_method_op,
     {
 	/* we are done */
 	my_method_op->error_code = 0;
-	socket_collection_remove_write_bit(tcp_socket_collection_p,
+	BMI_socket_collection_remove_write_bit(tcp_socket_collection_p,
 					   my_method_op->addr);
 	op_list_remove(my_method_op);
 	((struct tcp_op*)(my_method_op->method_data))->tcp_op_state = 

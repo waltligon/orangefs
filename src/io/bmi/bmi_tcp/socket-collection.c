@@ -61,7 +61,7 @@ static method_addr_p big_poll_addr[SC_POLL_SIZE];
  *
  * returns a pointer to the collection on success, NULL on failure.
  */
-socket_collection_p socket_collection_init(bmi_sock_t new_server_socket)
+socket_collection_p BMI_socket_collection_init(bmi_sock_t new_server_socket)
 {
 
     socket_collection_p tmp_scp = NULL;
@@ -88,7 +88,7 @@ socket_collection_p socket_collection_init(bmi_sock_t new_server_socket)
  *
  * returns 0 on success, -errno on failure.
  */
-void socket_collection_add(socket_collection_p scp,
+void BMI_socket_collection_add(socket_collection_p scp,
 			   method_addr_p map)
 {
 
@@ -122,7 +122,7 @@ void socket_collection_add(socket_collection_p scp,
  *
  * returns 0 on success, -errno on failure.
  */
-void socket_collection_remove(socket_collection_p scp,
+void BMI_socket_collection_remove(socket_collection_p scp,
 			      method_addr_p map)
 {
 
@@ -143,7 +143,7 @@ void socket_collection_remove(socket_collection_p scp,
  * 
  * returns 0 on success, -errno on failure.
  */
-void socket_collection_add_write_bit(socket_collection_p scp,
+void BMI_socket_collection_add_write_bit(socket_collection_p scp,
 				     method_addr_p map)
 {
 
@@ -163,7 +163,7 @@ void socket_collection_add_write_bit(socket_collection_p scp,
  *
  * returns 0 on success, -errno on failure.
  */
-void socket_collection_remove_write_bit(socket_collection_p scp,
+void BMI_socket_collection_remove_write_bit(socket_collection_p scp,
 					method_addr_p map)
 {
 
@@ -186,7 +186,7 @@ void socket_collection_remove_write_bit(socket_collection_p scp,
  *
  * no return values.
  */
-void socket_collection_finalize(socket_collection_p scp)
+void BMI_socket_collection_finalize(socket_collection_p scp)
 {
 
     /* not much to do here */
@@ -204,7 +204,7 @@ void socket_collection_finalize(socket_collection_p scp)
  *
  * returns 0 on success, -errno on failure.
  */
-int socket_collection_testglobal(socket_collection_p scp,
+int BMI_socket_collection_testglobal(socket_collection_p scp,
 				 int incount,
 				 int *outcount,
 				 method_addr_p * maps,
@@ -261,7 +261,7 @@ int socket_collection_testglobal(socket_collection_p scp,
 	   big_poll_fds[1].fd)
     {
 	/* remove the job; add it back at the end of the queue */
-	socket_collection_remove(scp, tmp_map);
+	BMI_socket_collection_remove(scp, tmp_map);
 	tcp_data = tmp_map->method_data;
 	if (tcp_data->socket < 0)
 	{
