@@ -563,7 +563,7 @@ static int rename_crdirent_setup_msgpair(PINT_client_sm *sm_p,
     /*
       hook the 'old' handle up to the new parent with the 'new_entry'
       name -- on success we will have 2 dirents pointing to the same
-      metafile
+      metafile; only update the mtime and ctime, leaving atime as 0
     */
     PINT_SERVREQ_CRDIRENT_FILL(
         msg_p->req,
@@ -571,7 +571,10 @@ static int rename_crdirent_setup_msgpair(PINT_client_sm *sm_p,
         sm_p->u.rename.entries[1],
         sm_p->u.rename.refns[0].handle,
         sm_p->u.rename.parent_refns[1].handle,
-        sm_p->u.rename.parent_refns[1].fs_id);
+        sm_p->u.rename.parent_refns[1].fs_id,
+        0,
+        PVFS_util_get_current_time(),
+        PVFS_util_get_current_time());
 
     msg_p->fs_id = sm_p->u.rename.parent_refns[1].fs_id;
     msg_p->handle = sm_p->u.rename.parent_refns[1].handle;
@@ -621,7 +624,10 @@ static int rename_rmdirent_setup_msgpair(PINT_client_sm *sm_p,
         *sm_p->cred_p,
         sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index].fs_id,
         sm_p->u.rename.parent_refns[sm_p->u.rename.rmdirent_index].handle,
-        sm_p->u.rename.entries[sm_p->u.rename.rmdirent_index]);
+        sm_p->u.rename.entries[sm_p->u.rename.rmdirent_index],
+        0,
+        PVFS_util_get_current_time(),
+        PVFS_util_get_current_time());
 
     msg_p->fs_id = sm_p->u.rename.parent_refns[
         sm_p->u.rename.rmdirent_index].fs_id;
@@ -697,7 +703,10 @@ static int rename_chdirent_setup_msgpair(PINT_client_sm *sm_p,
         sm_p->u.rename.parent_refns[1].fs_id,
         sm_p->u.rename.parent_refns[1].handle,
         sm_p->u.rename.refns[0].handle,
-        sm_p->u.rename.entries[1]);
+        sm_p->u.rename.entries[1],
+        0,
+        PVFS_util_get_current_time(),
+        PVFS_util_get_current_time());
 
     msg_p->fs_id = sm_p->u.rename.parent_refns[1].fs_id;
     msg_p->handle = sm_p->u.rename.parent_refns[1].handle;

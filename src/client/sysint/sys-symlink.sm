@@ -441,7 +441,10 @@ static int symlink_crdirent_setup_msgpair(PINT_client_sm *sm_p,
         sm_p->u.sym.link_name,
         sm_p->u.sym.symlink_handle,
         sm_p->parent_ref.handle,
-        sm_p->parent_ref.fs_id);
+        sm_p->parent_ref.fs_id,
+        sm_p->u.sym.sys_attr.atime,
+        sm_p->u.sym.sys_attr.mtime,
+        sm_p->u.sym.sys_attr.ctime);
 
     msg_p->fs_id = sm_p->parent_ref.fs_id;
     msg_p->handle = sm_p->parent_ref.handle;

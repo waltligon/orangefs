@@ -1385,8 +1385,7 @@ int server_state_machine_start_noreq(PINT_server_op *new_op)
     if (new_op)
     {
         /* execute first state */
-        ret = new_op->current_state->state_action(
-            new_op, &tmp_status);
+        ret = new_op->current_state->state_action(new_op, &tmp_status);
         if (ret < 0)
         {
             gossip_lerr("Error: failed to start state machine.\n");
@@ -1408,7 +1407,6 @@ int server_state_machine_start_noreq(PINT_server_op *new_op)
     return ret;
 }
 
-
 /* server_state_machine_complete()
  *
  * function to be called at the completion of state machine execution;
@@ -1428,13 +1426,13 @@ int server_state_machine_complete(PINT_server_op *s_op)
                          0, tmp_id, PVFS_EVENT_FLAG_END);
 
     /* release the decoding of the unexpected request */
-    if(ENCODING_IS_VALID(s_op->decoded.enc_type))
+    if (ENCODING_IS_VALID(s_op->decoded.enc_type))
     {
         PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ);
     }
 
     /* free the buffer that the unexpected request came in on */
-    if(s_op->unexp_bmi_buff.buffer)
+    if (s_op->unexp_bmi_buff.buffer)
     {
         free(s_op->unexp_bmi_buff.buffer);
     }
@@ -1485,41 +1483,41 @@ static void init_req_table(void)
                     PINT_SERVER_CHECK_NONE,
                     PINT_SERVER_ATTRIBS_REQUIRED, &pvfs2_create_sm);
             OP_CASE(PVFS_SERV_REMOVE, "remove",
-                    PINT_SERVER_CHECK_NONE, 
+                    PINT_SERVER_CHECK_NONE,
                     PINT_SERVER_ATTRIBS_NOT_REQUIRED, &pvfs2_remove_sm);
             OP_CASE(PVFS_SERV_MGMT_REMOVE_OBJECT, "mgmt-remove-object",
-                    PINT_SERVER_CHECK_NONE, 
+                    PINT_SERVER_CHECK_NONE,
                     PINT_SERVER_ATTRIBS_NOT_REQUIRED,
                     &pvfs2_mgmt_remove_object_sm);
             OP_CASE(PVFS_SERV_MGMT_REMOVE_DIRENT, "mgmt-remove-dirent",
-                    PINT_SERVER_CHECK_NONE, 
+                    PINT_SERVER_CHECK_NONE,
                     PINT_SERVER_ATTRIBS_NOT_REQUIRED,
                     &pvfs2_mgmt_remove_dirent_sm);
             OP_CASE(PVFS_SERV_MGMT_GET_DIRDATA_HANDLE,
                     "mgmt-get-dirdata-handle",
-                    PINT_SERVER_CHECK_NONE, 
+                    PINT_SERVER_CHECK_NONE,
                     PINT_SERVER_ATTRIBS_NOT_REQUIRED,
                     &pvfs2_mgmt_get_dirdata_handle_sm);
             OP_CASE(PVFS_SERV_IO, "io",
-                    PINT_SERVER_CHECK_NONE, 
+                    PINT_SERVER_CHECK_NONE,
                     PINT_SERVER_ATTRIBS_NOT_REQUIRED, &pvfs2_io_sm);
             OP_CASE(PVFS_SERV_GETATTR, "getattr",
                     PINT_SERVER_CHECK_ATTR,
                     PINT_SERVER_ATTRIBS_NOT_REQUIRED, &pvfs2_get_attr_sm);
             OP_CASE(PVFS_SERV_SETATTR, "setattr",
-                    PINT_SERVER_CHECK_ATTR, 
+                    PINT_SERVER_CHECK_ATTR,
                     PINT_SERVER_ATTRIBS_NOT_REQUIRED, &pvfs2_set_attr_sm);
             OP_CASE(PVFS_SERV_LOOKUP_PATH, "lookup_path",
-                    PINT_SERVER_CHECK_NONE, 
+                    PINT_SERVER_CHECK_NONE,
                     PINT_SERVER_ATTRIBS_REQUIRED, &pvfs2_lookup_sm);
             OP_CASE(PVFS_SERV_CRDIRENT, "crdirent",
-                    PINT_SERVER_CHECK_WRITE, 
+                    PINT_SERVER_CHECK_WRITE,
                     PINT_SERVER_ATTRIBS_REQUIRED, &pvfs2_crdirent_sm);
             OP_CASE(PVFS_SERV_RMDIRENT, "rmdirent",
-                    PINT_SERVER_CHECK_WRITE, 
+                    PINT_SERVER_CHECK_WRITE,
                     PINT_SERVER_ATTRIBS_REQUIRED, &pvfs2_rmdirent_sm);
             OP_CASE(PVFS_SERV_CHDIRENT, "chdirent",
-                    PINT_SERVER_CHECK_WRITE, 
+                    PINT_SERVER_CHECK_WRITE,
                     PINT_SERVER_ATTRIBS_REQUIRED, &pvfs2_chdirent_sm);
             OP_CASE(PVFS_SERV_TRUNCATE, "truncate",
                     PINT_SERVER_CHECK_NONE,
@@ -1540,10 +1538,10 @@ static void init_req_table(void)
                     PINT_SERVER_CHECK_NONE,
                     PINT_SERVER_ATTRIBS_NOT_REQUIRED, &pvfs2_flush_sm);
             OP_CASE(PVFS_SERV_MGMT_SETPARAM, "mgmt_setparam",
-                    PINT_SERVER_CHECK_NONE, 
+                    PINT_SERVER_CHECK_NONE,
                     PINT_SERVER_ATTRIBS_REQUIRED, &pvfs2_setparam_sm);
             OP_CASE(PVFS_SERV_MGMT_NOOP, "mgmt_noop",
-                    PINT_SERVER_CHECK_NONE, 
+                    PINT_SERVER_CHECK_NONE,
                     PINT_SERVER_ATTRIBS_REQUIRED, &pvfs2_noop_sm);
             OP_CASE(PVFS_SERV_STATFS, "statfs",
                     PINT_SERVER_CHECK_NONE,
@@ -1552,7 +1550,7 @@ static void init_req_table(void)
                     PINT_SERVER_CHECK_INVALID, 
                     PINT_SERVER_ATTRIBS_REQUIRED, &pvfs2_perf_update_sm);
             OP_CASE(PVFS_SERV_MGMT_PERF_MON, "mgmt_perf_mon",
-                    PINT_SERVER_CHECK_NONE, 
+                    PINT_SERVER_CHECK_NONE,
                     PINT_SERVER_ATTRIBS_REQUIRED, &pvfs2_perf_mon_sm);
             OP_CASE(PVFS_SERV_MGMT_ITERATE_HANDLES,
                     "mgmt_iterate_handles", PINT_SERVER_CHECK_NONE, 
@@ -1563,13 +1561,13 @@ static void init_req_table(void)
                     PINT_SERVER_CHECK_NONE,
                     PINT_SERVER_ATTRIBS_REQUIRED, NULL);
             OP_CASE(PVFS_SERV_MGMT_EVENT_MON, "mgmt_event_mon", 
-                    PINT_SERVER_CHECK_NONE, 
+                    PINT_SERVER_CHECK_NONE,
                     PINT_SERVER_ATTRIBS_REQUIRED, &pvfs2_event_mon_sm);
             OP_CASE(PVFS_SERV_JOB_TIMER, "job_timer",
-                    PINT_SERVER_CHECK_INVALID, 
+                    PINT_SERVER_CHECK_INVALID,
                     PINT_SERVER_ATTRIBS_REQUIRED, &pvfs2_job_timer_sm);
             OP_CASE(PVFS_SERV_PROTO_ERROR, "proto_error",
-                    PINT_SERVER_CHECK_INVALID, 
+                    PINT_SERVER_CHECK_INVALID,
                     PINT_SERVER_ATTRIBS_REQUIRED, &pvfs2_proto_error_sm);
         }
     }

@@ -12,7 +12,11 @@
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
 
-#define INVALID_OBJECT 131
+enum
+{
+    INVALID_OBJECT = 131,
+    UPDATE_DIR_ATTR_REQUIRED
+};
 
 static int crdirent_setup_op(
     PINT_server_op *s_op, job_status_s *js_p);
@@ -27,6 +31,10 @@ static int crdirent_check_exist_directory_entry(
 static int crdirent_create_dirdata_dspace(
     PINT_server_op *s_op, job_status_s *js_p);
 static int crdirent_write_dirdata_handle(
+    PINT_server_op *s_op, job_status_s *js_p);
+static int crdirent_check_for_req_dir_update(
+    PINT_server_op *s_op, job_status_s *js_p);
+static int crdirent_update_directory_attr(
     PINT_server_op *s_op, job_status_s *js_p);
 static int crdirent_cleanup(
     PINT_server_op *s_op, job_status_s *js_p);
@@ -100,6 +108,8 @@ machine pvfs2_crdirent_sm(
     setup_op,
     check_not_exist,
     write_directory_entry,
+    check_for_req_dir_update,
+    update_directory_attr,
     cleanup,
     final_response)
 {
@@ -126,6 +136,19 @@ machine pvfs2_crdirent_sm(
     state write_directory_entry
     {
         run crdirent_write_directory_entry;
+        default => check_for_req_dir_update;
+    }
+
+    state check_for_req_dir_update
+    {
+        run crdirent_check_for_req_dir_update;
+        UPDATE_DIR_ATTR_REQUIRED => update_directory_attr;
+        default => final_response;
+    }
+
+    state update_directory_attr
+    {
+        run crdirent_update_directory_attr;
         default => final_response;
     }
 
@@ -208,7 +231,6 @@ static int crdirent_validate(PINT_server_op *s_op,
     return 1;
 }
 
-
 /*
  * Function: crdirent_read_directory_entry_handle
  *
@@ -232,9 +254,6 @@ static int crdirent_validate(PINT_server_op *s_op,
  * attempt to retrieve the handle for the filename/handle key/val
  * space and if it does not exist, we need to create it.
  *
- * TODO: Semantics here of whether we want to create it here, or upon
- * the creation of the directory.
- *           
  */
 static int crdirent_read_directory_entry_handle(
     PINT_server_op *s_op, job_status_s *js_p)
@@ -408,7 +427,6 @@ static int crdirent_write_dirdata_handle(PINT_server_op *s_op,
     return ret;
 }
 
-
 /*
  * Function: crdirent_write_directory_entry
  *
@@ -436,38 +454,102 @@ static int crdirent_write_directory_entry(PINT_server_op *s_op,
 
     PINT_STATE_DEBUG("write_directory_entry");
 
+    js_p->error_code = 0;
+
     /* This buffer came from one of two places, either phase two of
      * creating the directory space when we wrote the value back to
      * trove, or from the initial read from trove.
      */
 
     /* this is the name for the parent entry */
-    s_op->key.buffer    = s_op->u.crdirent.name;
+    s_op->key.buffer = s_op->u.crdirent.name;
     s_op->key.buffer_sz = strlen(s_op->u.crdirent.name) + 1;
 
-    s_op->val.buffer    = &s_op->u.crdirent.new_handle;
+    s_op->val.buffer = &s_op->u.crdirent.new_handle;
     s_op->val.buffer_sz = sizeof(PVFS_handle);
 
-    gossip_debug(
-        GOSSIP_SERVER_DEBUG, "  writing new directory entry "
-        "for %s (handle = %Lu) to dirdata dspace %Lu\n",
-        s_op->u.crdirent.name,
-        Lu(s_op->u.crdirent.new_handle),
-        Lu(s_op->u.crdirent.dirent_handle));
+    gossip_debug(GOSSIP_SERVER_DEBUG, "  writing new directory entry "
+                 "for %s (handle = %Lu) to dirdata dspace %Lu\n",
+                 s_op->u.crdirent.name, Lu(s_op->u.crdirent.new_handle),
+                 Lu(s_op->u.crdirent.dirent_handle));
 
     ret = job_trove_keyval_write(
-        s_op->u.crdirent.fs_id,
-        s_op->u.crdirent.dirent_handle,
-        &s_op->key,
-        &s_op->val,
-        PINT_config_get_trove_sync_meta(
+        s_op->u.crdirent.fs_id, s_op->u.crdirent.dirent_handle,
+        &s_op->key, &s_op->val, PINT_config_get_trove_sync_meta(
             user_opts, s_op->u.crdirent.fs_id),
-        NULL,
-        s_op,
-        0,
-        js_p,
-        &i,
-        server_job_context);
+        NULL, s_op, 0, js_p, &i, server_job_context);
+
+    /*
+      check if any attributes have changed on the parent that require
+      an update; object times only are considered
+    */
+    if (s_op->req->u.crdirent.parent_atime ||
+        s_op->req->u.crdirent.parent_mtime ||
+        s_op->req->u.crdirent.parent_ctime)
+    {
+        s_op->u.crdirent.dir_attr_update_required = 1;
+    }
+    return ret;
+}
+
+static int crdirent_check_for_req_dir_update(
+    PINT_server_op *s_op, job_status_s *js_p)
+{
+    if ((js_p->error_code == 0) &&
+        (s_op->u.crdirent.dir_attr_update_required))
+    {
+        js_p->error_code = UPDATE_DIR_ATTR_REQUIRED;
+    }
+    return 1;
+}
+
+static int crdirent_update_directory_attr(
+    PINT_server_op *s_op, job_status_s *js_p)
+{
+    int ret = -1;
+    job_id_t j_id;
+    PVFS_object_attr tmp_attr, *tmp_attr_ptr = &tmp_attr;
+    PVFS_object_attr *dspace_attr = NULL;
+    PVFS_ds_attributes *ds_attr = NULL;
+    struct server_configuration_s *user_opts = get_server_config_struct();
+
+    PINT_STATE_DEBUG("update_directory_entry");
+
+    if (js_p->error_code != UPDATE_DIR_ATTR_REQUIRED)
+    {
+        PVFS_perror_gossip("previous keyval write failed",
+                           js_p->error_code);
+        return 1;
+    }
+
+    memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
+    dspace_attr = &s_op->attr;
+    ds_attr = &(s_op->ds_attr);
+
+    PVFS_object_attr_overwrite_setable(tmp_attr_ptr, dspace_attr);
+
+    /* overwrite all non-null attribute time fields */
+    if (s_op->req->u.crdirent.parent_atime)
+    {
+        tmp_attr_ptr->atime = s_op->req->u.crdirent.parent_atime;
+    }
+    if (s_op->req->u.crdirent.parent_mtime)
+    {
+        tmp_attr_ptr->mtime = s_op->req->u.crdirent.parent_mtime;
+    }
+    if (s_op->req->u.crdirent.parent_ctime)
+    {
+        tmp_attr_ptr->ctime = s_op->req->u.crdirent.parent_ctime;
+    }
+
+    ds_attr = &(s_op->ds_attr);
+    PVFS_object_attr_to_ds_attr(tmp_attr_ptr, ds_attr);
+
+    ret = job_trove_dspace_setattr(
+        s_op->req->u.crdirent.fs_id, s_op->req->u.crdirent.parent_handle,
+        ds_attr, PINT_config_get_trove_sync_meta(
+            user_opts, s_op->req->u.crdirent.fs_id),
+        s_op, 0, js_p, &j_id, server_job_context);
 
     return ret;
 }
@@ -579,6 +661,7 @@ static int crdirent_setup_op(
     s_op->u.crdirent.new_handle = s_op->req->u.crdirent.new_handle;
     s_op->u.crdirent.parent_handle = s_op->req->u.crdirent.parent_handle;
     s_op->u.crdirent.fs_id = s_op->req->u.crdirent.fs_id;
+    s_op->u.crdirent.dir_attr_update_required = 0;
 
     js_p->error_code = 0;
     return 1;

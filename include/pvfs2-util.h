@@ -75,6 +75,8 @@ void PVFS_util_make_size_human_readable(
     int max_out_len,
     int use_si_units);
 
+PVFS_time PVFS_util_get_current_time(void);
+
 static inline int PVFS_util_object_to_sys_attr_mask(
     int obj_mask)
 {

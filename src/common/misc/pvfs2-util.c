@@ -12,6 +12,7 @@
 #include <assert.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <sys/time.h>
 
 #include "pvfs2-config.h"
 #include "pvfs2-sysint.h"
@@ -34,7 +35,6 @@
 #ifndef PVFS_util_min
 #define PVFS_util_min(x1,x2) ((x1) > (x2))? (x2):(x1)
 #endif
-
 
 #define PVFS2_MAX_INVALID_MNTENTS                     256
 #define PVFS2_MAX_TABFILES                              8
@@ -1177,10 +1177,17 @@ void PINT_release_pvfstab(void)
     }
 
     gen_mutex_unlock(&s_stat_tab_mutex);
-    return;
 }
 
+PVFS_time PVFS_util_get_current_time(void)
+{
+    struct timeval t = {0,0};
+    PVFS_time current_time = 0;
 
+    gettimeofday(&t, NULL);
+    current_time = (PVFS_time)t.tv_sec;
+    return current_time;
+}
 
 /*
  * Local variables:

@@ -40,14 +40,15 @@ extern job_context_id server_job_context;
 /* TODO: this should be read from a config file */
 #define PVFS2_SERVER_RESPONSE_TIMEOUT         30
 
-/* the server will give up on a flow if more than PVFS2_SERVER_FLOW_TIMEOUT
- * seconds pass without any progress being made on it
+/* the server will give up on a flow if more than
+ * PVFS2_SERVER_FLOW_TIMEOUT seconds pass without any progress being
+ * made on it
  */
 /* TODO: this should be read from a config file */
 #define PVFS2_SERVER_FLOW_TIMEOUT             30
 
-/* types of permission checking that a server may need to perform
- * for incoming requests
+/* types of permission checking that a server may need to perform for
+ * incoming requests
  */
 enum PINT_server_req_permissions
 {
@@ -59,16 +60,16 @@ enum PINT_server_req_permissions
                                       needs ownership */
 };
 
-/* indicates if the attributes for the target object must exist for the 
- * operation to proceed (see prelude.sm)
+/* indicates if the attributes for the target object must exist for
+ * the operation to proceed (see prelude.sm)
  */
 enum PINT_server_req_attrib_flags
 {
     PINT_SERVER_ATTRIBS_INVALID = 0,
     PINT_SERVER_ATTRIBS_REQUIRED = 1,
-    /* operations that operate on datafiles or on incomplete metafiles do
-     * not expect to necessarily find attributes present before starting the
-     * operation
+    /* operations that operate on datafiles or on incomplete metafiles
+     * do not expect to necessarily find attributes present before
+     * starting the operation
      */
     PINT_SERVER_ATTRIBS_NOT_REQUIRED = 2
 };
@@ -82,11 +83,10 @@ struct PINT_server_req_params
     struct PINT_state_machine_s* sm;
 };
 
-extern struct PINT_server_req_params
-    PINT_server_req_table[];
+extern struct PINT_server_req_params PINT_server_req_table[];
 
-/* TODO: maybe this should be put somewhere else? */
-/* PINT_map_server_op_to_string()
+/*
+ * PINT_map_server_op_to_string()
  *
  * provides a string representation of the server operation number
  *
@@ -95,13 +95,9 @@ extern struct PINT_server_req_params
  */
 static inline char* PINT_map_server_op_to_string(enum PVFS_server_op op)
 {
-    if(op > PVFS_MAX_SERVER_OP)
-	return(NULL);
-
-    return(PINT_server_req_table[op].string_name);
+    return (((op < 0) || (op > PVFS_MAX_SERVER_OP)) ? NULL :
+            PINT_server_req_table[op].string_name);
 }
-
-
 
 /* used to keep a random, but handy, list of keys around */
 typedef struct PINT_server_trove_keys
@@ -148,7 +144,8 @@ typedef enum
  * All the data needed during lookup processing:
  *
  */
-struct PINT_server_lookup_op {
+struct PINT_server_lookup_op
+{
     /* current segment (0..N), number of segments in the path */
     int seg_ct, seg_nr; 
 
@@ -165,8 +162,29 @@ struct PINT_server_lookup_op {
     PVFS_ds_attributes *ds_attr_array;
 };
 
-struct PINT_server_readdir_op {
-    PVFS_handle dirent_handle;       /* holds handle of dirdata dspace from which entries are read */
+struct PINT_server_readdir_op
+{
+    PVFS_handle dirent_handle;  /* holds handle of dirdata dspace from
+                                   which entries are read */
+};
+
+struct PINT_server_crdirent_op
+{
+    char *name;
+    PVFS_handle new_handle;
+    PVFS_handle parent_handle;
+    PVFS_fs_id fs_id;
+    PVFS_handle dirent_handle;  /* holds handle of dirdata dspace that
+                                 * we'll write the dirent into */
+    int dir_attr_update_required;
+};
+
+struct PINT_server_rmdirent_op
+{
+    PVFS_handle dirdata_handle;
+    PVFS_handle entry_handle; /* holds handle of dirdata object,
+                               * removed entry */
+    int dir_attr_update_required;
 };
 
 struct PINT_server_chdirent_op
@@ -174,22 +192,14 @@ struct PINT_server_chdirent_op
     PVFS_handle dirdata_handle;
     PVFS_handle old_dirent_handle;
     PVFS_handle new_dirent_handle;
+    int dir_attr_update_required;
 };
 
-struct PINT_server_rmdirent_op {
-    PVFS_handle dirdata_handle, entry_handle; /* holds handle of dirdata object, removed entry */
-};
-
-struct PINT_server_crdirent_op {
-    char* name;
-    PVFS_handle new_handle;
-    PVFS_handle parent_handle;
-    PVFS_fs_id fs_id;
-    PVFS_handle dirent_handle;    /* holds handle of dirdata dspace that we'll write the dirent into */
-};
-
-struct PINT_server_remove_op {
-    PVFS_handle dirdata_handle;   /* holds dirdata dspace handle in the event that we are removing a directory */
+struct PINT_server_remove_op
+{
+    PVFS_handle dirdata_handle;   /* holds dirdata dspace handle in
+                                   * the event that we are removing a
+                                   * directory */
 };
 
 struct PINT_server_mgmt_remove_dirent_op
@@ -202,20 +212,25 @@ struct PINT_server_mgmt_get_dirdata_op
     PVFS_handle dirdata_handle;
 };
 
-struct PINT_server_getconfig_op {
-    int strsize; /* used to hold string lengths during getconfig processing */
+struct PINT_server_getconfig_op
+{
+    int strsize; /* used to hold string lengths during getconfig
+                  * processing */
 };
 
-struct PINT_server_io_op {
+struct PINT_server_io_op
+{
     flow_descriptor* flow_d;
 };
 
-struct PINT_server_flush_op {
+struct PINT_server_flush_op
+{
     PVFS_handle handle;	    /* handle of data we want to flush to disk */
     int flags;		    /* any special flags for flush */
 };
 
-struct PINT_server_truncate_op {
+struct PINT_server_truncate_op
+{
     PVFS_handle handle;	    /* handle of datafile we resize */
     PVFS_offset size;	    /* new size of datafile */
 };
@@ -317,9 +332,6 @@ typedef struct PINT_server_op
     gossip_debug(GOSSIP_SERVER_DEBUG, "(%p) %s state: %s\n", s_op,\
     PINT_map_server_op_to_string(s_op->op), fn_name);
 
-/* Globals for Server Interface */
-
-
 /* server operation state machines */
 extern struct PINT_state_machine_s pvfs2_get_config_sm;
 extern struct PINT_state_machine_s pvfs2_get_attr_sm;
@@ -360,16 +372,20 @@ struct server_configuration_s *get_server_config_struct(void);
 /* exported state machine resource reclamation function */
 int server_state_machine_complete(PINT_server_op *s_op);
 
-/* starts state machines that are not associated with an incoming request */
-int server_state_machine_alloc_noreq(enum PVFS_server_op op, PINT_server_op**
-    new_op);
-int server_state_machine_start_noreq(PINT_server_op* new_op);
+/* starts state machines not associated with an incoming request */
+int server_state_machine_alloc_noreq(
+    enum PVFS_server_op op, PINT_server_op** new_op);
+int server_state_machine_start_noreq(
+    PINT_server_op *new_op);
 
 /* INCLUDE STATE-MACHINE.H DOWN HERE */
 #define PINT_OP_STATE       PINT_server_op
 #define PINT_OP_STATE_TABLE PINT_server_req_table
 
 #include "state-machine.h"
+
+#endif /* __SM_CHECK_DEP */ 
+#endif /* __PVFS_SERVER_H */
 
 /*
  * Local variables:
@@ -379,7 +395,3 @@ int server_state_machine_start_noreq(PINT_server_op* new_op);
  *
  * vim: ts=8 sts=4 sw=4 expandtab
  */
-
-#endif /* __SM_CHECK_DEP */ 
-#endif /* __PVFS_SERVER_H */
-

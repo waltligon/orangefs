@@ -12,12 +12,21 @@
 #include "pvfs2-attr.h"
 #include "gossip.h"
 
+enum
+{
+    UPDATE_DIR_ATTR_REQUIRED = 133
+};
+
 static int rmdirent_verify_parent_metadata_and_read_directory_entry_handle(
     PINT_server_op *s_op, job_status_s* js_p);
 static int rmdirent_cleanup(
     PINT_server_op *s_op, job_status_s* js_p);
 static int rmdirent_remove_directory_entry(
     PINT_server_op *s_op, job_status_s* js_p);
+static int rmdirent_check_for_req_dir_update(
+    PINT_server_op *s_op, job_status_s *js_p);
+static int rmdirent_update_directory_attr(
+    PINT_server_op *s_op, job_status_s *js_p);
 static int rmdirent_read_directory_entry(
     PINT_server_op *s_op, job_status_s* js_p);
 static int rmdirent_read_directory_entry_failure(
@@ -38,6 +47,8 @@ machine pvfs2_rmdirent_sm(
     read_directory_entry_failure,
     remove_directory_entry,
     remove_directory_entry_failure,
+    check_for_req_dir_update,
+    update_directory_attr,
     setup_resp,
     final_response,
     cleanup)
@@ -72,13 +83,26 @@ machine pvfs2_rmdirent_sm(
     state remove_directory_entry
     {
         run rmdirent_remove_directory_entry;
-        success => setup_resp;
+        success => check_for_req_dir_update;
         default => remove_directory_entry_failure;
     }
 
     state remove_directory_entry_failure
     {
         run rmdirent_remove_directory_entry_failure;
+        default => setup_resp;
+    }
+
+    state check_for_req_dir_update
+    {
+        run rmdirent_check_for_req_dir_update;
+        UPDATE_DIR_ATTR_REQUIRED => update_directory_attr;
+        default => setup_resp;
+    }
+
+    state update_directory_attr
+    {
+        run rmdirent_update_directory_attr;
         default => setup_resp;
     }
 
@@ -238,27 +262,86 @@ static int rmdirent_remove_directory_entry(PINT_server_op *s_op,
     PINT_STATE_DEBUG("remove_directory_entry");
 
     /* set up key and structure for keyval remove */
-    s_op->key.buffer    = s_op->req->u.rmdirent.entry;
+    s_op->key.buffer = s_op->req->u.rmdirent.entry;
     s_op->key.buffer_sz = strlen(s_op->req->u.rmdirent.entry) + 1;
 
-    gossip_debug(
-        GOSSIP_SERVER_DEBUG,
-        "  removing entry %s from dirdata object (handle = %Lu)\n",
-        s_op->req->u.rmdirent.entry,
-        Lu(s_op->u.rmdirent.dirdata_handle));
+    gossip_debug(GOSSIP_SERVER_DEBUG, "  removing entry %s from dirdata "
+                 "object (handle = %Lu)\n", s_op->req->u.rmdirent.entry,
+                 Lu(s_op->u.rmdirent.dirdata_handle));
 
     ret = job_trove_keyval_remove(
-        s_op->req->u.rmdirent.fs_id,
-        s_op->u.rmdirent.dirdata_handle,
-        &s_op->key,
-        PINT_config_get_trove_sync_meta(
+        s_op->req->u.rmdirent.fs_id, s_op->u.rmdirent.dirdata_handle,
+        &s_op->key, PINT_config_get_trove_sync_meta(
             user_opts, s_op->req->u.rmdirent.fs_id),
-        NULL,
-        s_op,
-        0,
-        js_p,
-        &j_id,
-        server_job_context);
+        NULL, s_op, 0, js_p, &j_id, server_job_context);
+
+    if (s_op->req->u.rmdirent.parent_atime ||
+        s_op->req->u.rmdirent.parent_mtime ||
+        s_op->req->u.rmdirent.parent_ctime)
+    {
+        s_op->u.rmdirent.dir_attr_update_required = 1;
+    }
+    return ret;
+}
+
+static int rmdirent_check_for_req_dir_update(
+    PINT_server_op *s_op, job_status_s *js_p)
+{
+    if ((js_p->error_code == 0) &&
+        (s_op->u.rmdirent.dir_attr_update_required))
+    {
+        js_p->error_code = UPDATE_DIR_ATTR_REQUIRED;
+    }
+    return 1;
+}
+
+static int rmdirent_update_directory_attr(
+    PINT_server_op *s_op, job_status_s *js_p)
+{
+    int ret = -1;
+    job_id_t j_id;
+    PVFS_object_attr tmp_attr, *tmp_attr_ptr = &tmp_attr;
+    PVFS_object_attr *dspace_attr = NULL;
+    PVFS_ds_attributes *ds_attr = NULL;
+    struct server_configuration_s *user_opts = get_server_config_struct();
+
+    PINT_STATE_DEBUG("update_directory_entry");
+
+    if (js_p->error_code != UPDATE_DIR_ATTR_REQUIRED)
+    {
+        PVFS_perror_gossip("previous keyval remove failed",
+                           js_p->error_code);
+        return 1;
+    }
+
+    memset(&tmp_attr, 0, sizeof(PVFS_object_attr));
+    dspace_attr = &s_op->attr;
+    ds_attr = &(s_op->ds_attr);
+
+    PVFS_object_attr_overwrite_setable(tmp_attr_ptr, dspace_attr);
+
+    /* overwrite all non-null attribute time fields */
+    if (s_op->req->u.rmdirent.parent_atime)
+    {
+        tmp_attr_ptr->atime = s_op->req->u.rmdirent.parent_atime;
+    }
+    if (s_op->req->u.rmdirent.parent_mtime)
+    {
+        tmp_attr_ptr->mtime = s_op->req->u.rmdirent.parent_mtime;
+    }
+    if (s_op->req->u.rmdirent.parent_ctime)
+    {
+        tmp_attr_ptr->ctime = s_op->req->u.rmdirent.parent_ctime;
+    }
+
+    ds_attr = &(s_op->ds_attr);
+    PVFS_object_attr_to_ds_attr(tmp_attr_ptr, ds_attr);
+
+    ret = job_trove_dspace_setattr(
+        s_op->req->u.rmdirent.fs_id, s_op->req->u.rmdirent.parent_handle,
+        ds_attr, PINT_config_get_trove_sync_meta(
+            user_opts, s_op->req->u.rmdirent.fs_id),
+        s_op, 0, js_p, &j_id, server_job_context);
 
     return ret;
 }

@@ -117,6 +117,36 @@ do {                                                       \
     __dsa->dist_size = __oa->u.meta.dist_size;             \
 } while(0)
 
+#define PVFS_object_attr_overwrite_setable(dest, src)          \
+do {                                                           \
+    if (src->mask & PVFS_ATTR_COMMON_UID)                      \
+        dest->owner = src->owner;                              \
+    if (src->mask & PVFS_ATTR_COMMON_GID)                      \
+        dest->group = src->group;                              \
+    if (src->mask & PVFS_ATTR_COMMON_PERM)                     \
+        dest->perms = src->perms;                              \
+    if (src->mask & PVFS_ATTR_COMMON_ATIME)                    \
+        dest->atime = src->atime;                              \
+    if (src->mask & PVFS_ATTR_COMMON_CTIME)                    \
+        dest->ctime = src->ctime;                              \
+    if (src->mask & PVFS_ATTR_COMMON_MTIME)                    \
+        dest->mtime = src->mtime;                              \
+                                                               \
+    dest->u.meta.dfile_count = 0;                              \
+    dest->u.meta.dist_size = 0;                                \
+                                                               \
+    if (src->mask & PVFS_ATTR_COMMON_TYPE)                     \
+    {                                                          \
+        dest->objtype = src->objtype;                          \
+        if ((src->objtype == PVFS_TYPE_METAFILE) &&            \
+            (src->mask & PVFS_ATTR_META_DIST))                 \
+            dest->u.meta.dist_size = src->u.meta.dist_size;    \
+        if ((src->objtype == PVFS_TYPE_METAFILE) &&            \
+            (src->mask & PVFS_ATTR_META_DFILES))               \
+            dest->u.meta.dfile_count = src->u.meta.dfile_count;\
+    }                                                          \
+} while(0)
+
 #endif /* __PVFS2_STORAGE_H */
 
 /*
