@@ -168,10 +168,6 @@ static int setattr_init(PINT_server_op *s_op, job_status_s *ret)
 		 s_op->req->u.setattr.fs_id,
 		 s_op->req->u.setattr.handle);
 
-    /* allocate space for holding read attributes */
-    /* TODO: MOVE THIS INTO A SETATTR-SPECIFIC SCRATCH SPACE IN THE S_OP STRUCTURE */
-    s_op->val.buffer = (void *) malloc((s_op->val.buffer_sz = sizeof(PVFS_object_attr)));
-
     /* post a scheduler job */
     job_post_ret = job_req_sched_post(s_op->req,
 	    s_op,
@@ -192,8 +188,6 @@ static int setattr_init(PINT_server_op *s_op, job_status_s *ret)
  * Returns:  int
  *
  * Synopsis: 
- *           
- *           
  */
 
 static int setattr_getobj_attribs(PINT_server_op *s_op, job_status_s *ret)
@@ -205,12 +199,12 @@ static int setattr_getobj_attribs(PINT_server_op *s_op, job_status_s *ret)
 
     gossip_debug(SERVER_DEBUG, "setattr state: getobj_attribs\n");
 
-    /* Dale noted that if ATTR_TYPE is set, the object might have just been
-     * created and we might want to just skip this.  But he wasn't sure.
-     */
-
     s_op->key.buffer    = Trove_Common_Keys[METADATA_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[METADATA_KEY].size;
+
+    /* allocate temporary space for holding read attributes; freed in verify step. */
+    /* TODO: MOVE THIS INTO A SETATTR-SPECIFIC SCRATCH SPACE IN THE S_OP STRUCTURE */
+    s_op->val.buffer = (void *) malloc((s_op->val.buffer_sz = sizeof(PVFS_object_attr)));
 
     gossip_debug(SERVER_DEBUG,
 		 "  reading attributes (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = 0x%08x (%d))\n",
@@ -338,17 +332,16 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s *ret)
 		 (unsigned) s_op->val.buffer,
 		 s_op->val.buffer_sz);
 
-    job_post_ret = job_trove_keyval_write(
-					  s_op->req->u.setattr.fs_id,
+    job_post_ret = job_trove_keyval_write(s_op->req->u.setattr.fs_id,
 					  s_op->req->u.setattr.handle,
-					  &(s_op->key),
-					  &(s_op->val),
+					  &s_op->key,
+					  &s_op->val,
 					  TROVE_SYNC /* flags */,
 					  NULL,
 					  s_op,
 					  ret,
 					  &j_id);
-    return(job_post_ret);
+    return job_post_ret;
 }
 
 
@@ -396,8 +389,7 @@ static int setattr_write_metafile_datafile_handles(PINT_server_op *s_op, job_sta
 					  ret,
 					  &j_id);
 
-    return(job_post_ret);
-
+    return job_post_ret;
 }
 
 /*
@@ -428,6 +420,7 @@ static int setattr_write_metafile_distribution(PINT_server_op *s_op, job_status_
     s_op->val.buffer_sz = s_op->req->u.setattr.attr.u.meta.dist_size;
 
 
+    /* TODO: ENABLE THIS WHEN DISTRIBUTIONS ARE CORRECTLY PASSED IN */
 #if 0
     gossip_debug(SERVER_DEBUG,
 		 "  writing distribution (coll_id = 0x%x, handle = 0x%08Lx, key = %s (%d), val_buf = 0x%08x (%d))\n",
@@ -547,8 +540,6 @@ static int setattr_release_posted_job(PINT_server_op *s_op, job_status_s *ret)
  * Synopsis: free memory and return
  *           
  */
-
-
 static int setattr_cleanup(PINT_server_op *s_op, job_status_s *ret)
 {
 
@@ -568,10 +559,7 @@ static int setattr_cleanup(PINT_server_op *s_op, job_status_s *ret)
     free(s_op);
 
     return(0);
-
 }
-
-
 
 /*
  * Local variables:
