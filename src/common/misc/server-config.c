@@ -1622,7 +1622,7 @@ static int cache_config_files(
     {
         gossip_err("Failed to read fs config file %s "
                    "(nread is %d | config_buflen is %d)\n",
-                   my_global_fn, nread, (config_s->fs_config_buflen - 1));
+                   my_global_fn, nread, (int)(config_s->fs_config_buflen - 1));
         goto close_fd_fail;
     }
     close(fd);
@@ -1651,7 +1651,7 @@ static int cache_config_files(
         gossip_err("Failed to read server config file %s "
                    "(nread is %d | config_buflen is %d)\n",
                    my_server_fn, nread,
-                   (config_s->server_config_buflen - 1));
+                   (int)(config_s->server_config_buflen - 1));
         goto close_fd_fail;
     }
 
