@@ -10,12 +10,17 @@
  * Date: 6/26/2003
  */
 
-#include "client.h"
+#include <stdio.h>
+#include <stdlib.h>
 #include <sys/time.h>
+#include <assert.h>
+
+#include "client.h"
 #include "mpi.h"
 #include "pts.h"
 #include "pvfs-helper.h"
 #include "null_params.h"
+#include "pvfs-request.h"
 
 extern pvfs_helper_t pvfs_helper;
 
@@ -256,6 +261,9 @@ static int test_sparse_files(int testcase){
 
     oldsize = resp.attr.size;
 
+    assert(0);
+    /* TODO: what is this?  We shouldn't edit these fields directly -Phil */
+#if 0
     switch(testcase)
     {
     case 0:
@@ -268,6 +276,7 @@ static int test_sparse_files(int testcase){
 	req_io->offset = 330000;
 	break;
     }
+#endif
 
     for(i = 0; i < 100; i++)
     {
@@ -335,6 +344,9 @@ static int test_read_sparse_files(int testcase){
 
     oldsize = resp.attr.size;
 
+    assert(0);
+    /* TODO: what's this?  we shouldn't edit these fields directly -Phil */
+#if 0
     switch(testcase)
     {
     case 0:
@@ -347,6 +359,7 @@ static int test_read_sparse_files(int testcase){
 	req_io->offset = 330000;
 	break;
     }
+#endif
 
     for(i = 0; i < 100; i++)
     {

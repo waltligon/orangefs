@@ -4,8 +4,10 @@
  * See COPYING in top-level directory.
  */
 
-#include <client.h>
 #include <sys/time.h>
+#include <stdio.h>
+
+#include "client.h"
 #include "mpi.h"
 #include "pts.h"
 #include "pvfs-helper.h"

@@ -10,9 +10,11 @@
  * Date: 6/19/2003
  */
 
-#include "client.h"
 #include <unistd.h>
 #include <sys/time.h>
+#include <stdlib.h>
+
+#include "client.h"
 #include "mpi.h"
 #include "pts.h"
 #include "pvfs-helper.h"

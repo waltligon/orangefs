@@ -2,8 +2,7 @@
 #define __PVFS_HELPER_H
 
 /* pvfs specific includes (from test/client/sysint) */
-#include <client.h>
-#include <helper.h>
+#include "client.h"
 
 /* don't change this w/o changing the test_files array */
 #define NUM_TEST_FILES                         10

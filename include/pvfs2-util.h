@@ -11,8 +11,13 @@
 #ifndef __PVFS2_UTIL_H
 #define __PVFS2_UTIL_H
 
+/* client side config file / option management */
 int PVFS_util_parse_pvfstab(char* filename, pvfs_mntlist *mnt);
 void PVFS_util_pvfstab_mntlist_free(pvfs_mntlist* e_p);
+
+/* path management */
+/* TODO: this function needs better error handling... */
+PVFS_handle PVFS_util_lookup_parent(char *filename, PVFS_fs_id fs_id);
 
 #endif /* __PVFS2_UTIL_H */
 

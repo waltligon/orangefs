@@ -27,19 +27,16 @@ TEST_SYSINT_DIR_SRC += \
 	$(DIR)/initialize.c \
 	$(DIR)/getparent.c
 
-MISCSRC += \
-	$(DIR)/helper.c
-
 TESTSRC += $(TEST_SYSINT_DIR_SRC)
 
 LOCALLIBS := -ldb -lrt -lpthread
 LOCALTESTS := $(patsubst %.c,%, $(TEST_SYSINT_DIR_SRC))
-$(LOCALTESTS): %: %.o $(TEST_JOBINT_DIR)/job.o $(TEST_REALSYSINT_DIR)/parse-pvfstab.o $(TEST_SYSINT_DIR)/helper.o
+$(LOCALTESTS): %: %.o $(TEST_JOBINT_DIR)/job.o $(TEST_REALSYSINT_DIR)/parse-pvfstab.o
 ifdef QUIET_COMPILE
 	@echo "  LD		$@"
-	@$(LD) $< $(TEST_JOBINT_DIR)/job.o $(TEST_REALSYSINT_DIR)/parse-pvfstab.o $(TEST_SYSINT_DIR)/helper.o\
+	@$(LD) $< $(TEST_JOBINT_DIR)/job.o $(TEST_REALSYSINT_DIR)/parse-pvfstab.o \
 	$(LDFLAGS) $(LIBS) $(LOCALLIBS) -o $@
 else
-	$(LD) $< $(TEST_JOBINT_DIR)/job.o $(TEST_REALSYSINT_DIR)/parse-pvfstab.o $(TEST_SYSINT_DIR)/helper.o\
+	$(LD) $< $(TEST_JOBINT_DIR)/job.o $(TEST_REALSYSINT_DIR)/parse-pvfstab.o \
 	$(LDFLAGS) $(LIBS) $(LOCALLIBS) -o $@
 endif

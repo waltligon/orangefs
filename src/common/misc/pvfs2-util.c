@@ -11,6 +11,8 @@
 
 #include "pvfs2-sysint.h"
 #include "pvfs2-util.h"
+#include "str-utils.h"
+#include "gossip.h"
 
 #define PARSER_MAX_LINE_LENGTH 255
 
@@ -293,6 +295,46 @@ void PVFS_util_pvfstab_mntlist_free(pvfs_mntlist *e_p)
 
 }
 
+/* PVFS_util_lookup_parent()
+ *
+ * given a pathname and an fsid, looks up the handle of the parent
+ * directory
+ *
+ * returns handle value on success, 0 on failure
+ */
+/* TODO: give this function a way to report error codes */
+/* TODO: make uid, gid passed in later */
+PVFS_handle PVFS_util_lookup_parent(char *filename, PVFS_fs_id fs_id)
+{
+    char buf[PVFS_SEGMENT_MAX] = {0};
+    PVFS_credentials credentials;
+    PVFS_sysresp_lookup resp_look;
+
+    memset(&resp_look,0,sizeof(PVFS_sysresp_lookup));
+
+    if (PINT_get_base_dir(filename,buf,PVFS_SEGMENT_MAX))
+    {
+        if (filename[0] != '/')
+        {
+            gossip_err("Invalid dirname (no leading '/')\n");
+        }
+        gossip_err("cannot get parent directory of %s\n",filename);
+        return (PVFS_handle)0;
+    }
+
+    /* retrieve the parent handle */
+    credentials.uid = 100;
+    credentials.gid = 100;
+
+    if (PVFS_sys_lookup(fs_id, buf, credentials ,&resp_look))
+    {
+        gossip_err("Lookup failed on %s\n",buf);
+        return (PVFS_handle)0;
+    }
+    return resp_look.pinode_refn.handle;
+}
+
+/***********************/
 
 /* mntlist_new
  *

@@ -13,6 +13,9 @@
 
 #include <time.h>
 #include <sys/time.h>
+#include <stdio.h>
+#include <stdlib.h>
+
 #include "client.h"
 #include "mpi.h"
 #include "pts.h"

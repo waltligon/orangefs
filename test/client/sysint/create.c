@@ -5,10 +5,11 @@
  */
 
 #include <time.h>
-#include <client.h>
-#include "helper.h"
+#include <stdio.h>
 
+#include "client.h"
 #include "pvfs2-util.h"
+#include "str-utils.h"
 
 int main(int argc, char **argv)
 {
@@ -69,8 +70,7 @@ int main(int argc, char **argv)
 	time(NULL);
     credentials.uid = 100;
     credentials.gid = 100;
-    parent_refn.handle =
-        lookup_parent_handle(filename,cur_fs);
+    parent_refn.handle = PVFS_util_lookup_parent(filename,cur_fs);
     parent_refn.fs_id = cur_fs;
 
     ret = PVFS_sys_create(entry_name, parent_refn, attr,

@@ -4,8 +4,10 @@
  * See COPYING in top-level directory.
  */
 
-#include <client.h>
-#include "helper.h"
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "client.h"
 #include "pvfs2-util.h"
 
 int main(int argc,char **argv)

@@ -15,6 +15,7 @@
 
 #include "pvfs2.h"
 #include "trove.h"
+#include "pvfs2-attr.h"
 
 static char storage_space[PATH_MAX] = "/tmp/pvfs2-test-space";
 static char collection[PATH_MAX];

@@ -12,7 +12,10 @@
  */
 
 #include <time.h>
+#include <stdlib.h>
+#include <stdio.h>
 #include <sys/time.h>
+
 #include "client.h"
 #include "mpi.h"
 #include "pts.h"

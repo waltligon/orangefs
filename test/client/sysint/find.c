@@ -7,8 +7,13 @@
 #include <stdio.h>
 #include <client.h>
 #include <string.h>
-#include "helper.h"
 #include "pvfs2-util.h"
+
+/* TODO: this can be larger after system interface readdir logic
+ * is in place to break up large readdirs into multiple operations
+ */
+#define MAX_NUM_DIRENTS    32
+
 
 void print_at_depth(char *name, int depth)
 {

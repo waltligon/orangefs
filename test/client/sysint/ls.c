@@ -9,9 +9,15 @@
 #include <string.h>
 #include <time.h>
 #include <assert.h>
+#include <stdlib.h>
 
-#include "helper.h"
 #include "pvfs2-util.h"
+#include "str-utils.h"
+
+/* TODO: this can be larger after system interface readdir logic
+ * is in place to break up large readdirs into multiple operations
+ */
+#define MAX_NUM_DIRENTS    32
 
 void print_entry_attr(
     char *entry_name,

@@ -7,6 +7,8 @@
 #ifndef __MKSPACE_H
 #define __MKSPACE_H
 
+#include "trove.h"
+
 int pvfs2_mkspace(
     char *storage_space,
     char *collection,

@@ -4,8 +4,8 @@
  * See COPYING in top-level directory.
  */
 
-#include <client.h>
-#include "helper.h"
+#include <stdio.h>
+#include "client.h"
 #include "pvfs2-types.h"
 #include "pvfs2-util.h"
 
@@ -74,12 +74,10 @@ int main(int argc,char **argv)
     cur_fs = resp_init.fsid_list[0];
 
     old_entry = old_buf;
-    old_parent_refn.handle =
-        lookup_parent_handle(old_filename,cur_fs);
+    old_parent_refn.handle = PVFS_util_lookup_parent(old_filename,cur_fs);
     old_parent_refn.fs_id = cur_fs;
     new_entry = new_buf;
-    new_parent_refn.handle =
-        lookup_parent_handle(old_filename,cur_fs);
+    new_parent_refn.handle = PVFS_util_lookup_parent(old_filename,cur_fs);
     new_parent_refn.fs_id = cur_fs;
     credentials.uid = 100;
     credentials.gid = 100;

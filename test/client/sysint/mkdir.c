@@ -7,8 +7,10 @@
 #include <client.h>
 #include <sys/time.h>
 #include <time.h>
-#include "helper.h"
+#include <stdio.h>
+
 #include "pvfs2-util.h"
+#include "str-utils.h"
 
 int main(int argc,char **argv)
 {
@@ -61,8 +63,7 @@ int main(int argc,char **argv)
     cur_fs = resp_init.fsid_list[0];
 
     entry_name = str_buf;
-    parent_refn.handle =
-        lookup_parent_handle(dirname,cur_fs);
+    parent_refn.handle = PVFS_util_lookup_parent(dirname,cur_fs);
     parent_refn.fs_id = cur_fs;
     attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
     attr.owner = 100;
