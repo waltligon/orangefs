@@ -53,7 +53,7 @@ int PVFS_sys_rename(
     PINT_pinode *new_parent_p = NULL, *old_entry_p = NULL;
     bmi_addr_t serv_addr;	/* PVFS address type structure */
     uint32_t attr_mask;
-    PVFS_pinode_reference old_entry_refn;
+    PVFS_pinode_reference old_entry_refn, target_entry_refn;
     struct PINT_decoded_msg decoded;
     bmi_size_t max_msg_sz;
     void* encoded_resp;
@@ -71,6 +71,18 @@ int PVFS_sys_rename(
     if (ret < 0)
     {
 	goto return_error;
+    }
+
+    ret = PINT_do_lookup(new_entry, new_parent_refn,
+                         credentials, &target_entry_refn);
+    if (ret == 0)
+    {
+        /* if target exists; remove it here....what?  error handling?! */
+        if (PVFS_sys_remove(new_entry, new_parent_refn, credentials) < 0)
+        {
+            gossip_err("Failed to remove target file %s\n", new_entry);
+            goto return_error;
+        }
     }
 
     /* get the pinode for the thing we're renaming */
