@@ -119,6 +119,17 @@ int main(int argc, char **argv)
 
     file_handle = 0;
 
+    /* first remove the file handle we're about to use if it exists */
+    ret = trove_dspace_remove(coll_id, requested_file_handle,
+                              0, NULL, trove_context, &op_id);
+
+    while (ret == 0)
+    {
+        ret = trove_dspace_test(
+            coll_id, op_id, trove_context, &count, NULL, NULL, &state,
+            TROVE_DEFAULT_TEST_TIMEOUT);
+    }
+
     cur_extent.first = cur_extent.last = requested_file_handle;
     extent_array.extent_count = 1;
     extent_array.extent_array = &cur_extent;
@@ -131,10 +142,14 @@ int main(int argc, char **argv)
                               NULL,
                               trove_context,
                               &op_id);
-    while (ret == 0) ret = trove_dspace_test(
-        coll_id, op_id, trove_context, &count, NULL, NULL, &state,
-        TROVE_DEFAULT_TEST_TIMEOUT);
-    if (ret < 0)
+    while (ret == 0)
+    {
+        ret = trove_dspace_test(
+            coll_id, op_id, trove_context, &count, NULL, NULL, &state,
+            TROVE_DEFAULT_TEST_TIMEOUT);
+    }
+
+    if ((ret < 0) || (file_handle == TROVE_HANDLE_NULL))
     {
         fprintf(stderr, "dspace create failed.\n");
         return -1;

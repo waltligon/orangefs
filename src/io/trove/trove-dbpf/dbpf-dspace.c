@@ -264,10 +264,16 @@ static int dbpf_dspace_remove(TROVE_coll_id coll_id,
     struct dbpf_collection *coll_p;
 
     coll_p = dbpf_collection_find_registered(coll_id);
-    if (coll_p == NULL) return -TROVE_EINVAL;
+    if (coll_p == NULL)
+    {
+        return -TROVE_EINVAL;
+    }
 
     q_op_p = dbpf_queued_op_alloc();
-    if (q_op_p == NULL) return -TROVE_ENOMEM;
+    if (q_op_p == NULL)
+    {
+        return -TROVE_ENOMEM;
+    }
 
     /* initialize all the common members */
     dbpf_queued_op_init(q_op_p,
@@ -279,10 +285,7 @@ static int dbpf_dspace_remove(TROVE_coll_id coll_id,
 			flags,
                         context_id);
 
-    /* no op-specific members here */
-
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
-
     return 0;
 }
 
@@ -309,7 +312,6 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
     key.data = &op_p->handle;
     key.size = sizeof(TROVE_handle);
 
-    /* FIXME: no steps taken to ensure it's empty at this level */
     ret = db_p->del(db_p, NULL, &key, 0);
     switch (ret)
     {
@@ -323,7 +325,7 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
 	    goto return_error;
 	case 0:
 	    gossip_debug(GOSSIP_TROVE_DEBUG, "removed dataspace with "
-                         "handle 0x%08Lx\n", Lu(op_p->handle));
+                         "handle %Lu\n", Lu(op_p->handle));
 	    break;
     }
 
