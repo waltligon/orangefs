@@ -1125,7 +1125,7 @@ static int buffer_setup_trove_to_bmi(flow_descriptor * flow_d)
     flow_d->result.bytes = 0;
     flow_d->result.segs = 0;
     ret  = PINT_Process_request(flow_d->io_req_state, flow_d->mem_req_state,
-	flow_d->file_data, &flow_d->result, PINT_CLIENT);
+	flow_d->file_data, &flow_d->result, PINT_SERVER);
 #if 0
     ret = PINT_Process_request(flow_d->request_state,
 			       flow_d->file_data, &flow_data->trove_list_count,
@@ -1466,7 +1466,7 @@ static void service_bmi_to_trove(flow_descriptor * flow_d)
 	flow_d->result.bytes = 0;
 	flow_d->result.segs = 0;
 	ret  = PINT_Process_request(flow_d->io_req_state, flow_d->mem_req_state,
-	    flow_d->file_data, &flow_d->result, PINT_CLIENT);
+	    flow_d->file_data, &flow_d->result, PINT_SERVER);
 	flow_data->trove_list_count = flow_d->result.segs;
 	flow_data->drain_buffer_stepsize = flow_d->result.bytes;
 #if 0
