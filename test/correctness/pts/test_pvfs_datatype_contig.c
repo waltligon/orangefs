@@ -3,7 +3,6 @@
 #include <stdio.h>
 
 extern pvfs_helper_t pvfs_helper;
-extern char *pvfs_test_files[NUM_TEST_FILES];
 
 int test_pvfs_datatype_contig(MPI_Comm *mycomm, int myid, char *buf, void *params)
 {
@@ -17,6 +16,7 @@ int test_pvfs_datatype_contig(MPI_Comm *mycomm, int myid, char *buf, void *param
     int io_size = TEST_PVFS_DATA_SIZE;
     char *io_buffer_in  = (char *)0;
     char *io_buffer_out = (char *)0;
+    char filename[MAX_TEST_PATH_LEN];
 
     debug_printf("test_pvfs_datatype_contig called\n");
 
@@ -43,8 +43,12 @@ int test_pvfs_datatype_contig(MPI_Comm *mycomm, int myid, char *buf, void *param
 
     for(i = 0; i < NUM_TEST_FILES; i++)
     {
+        memset(filename,0,MAX_TEST_PATH_LEN);
+        snprintf(filename,MAX_TEST_PATH_LEN,"%s%.5d\n",
+                 TEST_FILE_PREFIX,i);
+
         memset(&req_lk,0,sizeof(PVFS_sysreq_lookup));
-        req_lk.name = pvfs_test_files[i];
+        req_lk.name = filename;
         req_lk.fs_id = pvfs_helper.resp_init.fsid_list[0];
         req_lk.credentials.uid = 100;
         req_lk.credentials.gid = 100;
@@ -54,7 +58,7 @@ int test_pvfs_datatype_contig(MPI_Comm *mycomm, int myid, char *buf, void *param
         if (ret < 0)
         {
             debug_printf("test_pvfs_datatype_contig: lookup failed "
-                         "on %s\n",pvfs_test_files[i]);
+                         "on %s\n",filename);
             break;
         }
 

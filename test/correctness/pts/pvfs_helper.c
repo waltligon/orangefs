@@ -2,15 +2,6 @@
 
 pvfs_helper_t pvfs_helper;
 
-char *pvfs_test_files[NUM_TEST_FILES] =
-{
-    "/__test_pvfs_file_01",
-    "/__test_pvfs_file_02",
-    "/__test_pvfs_file_03",
-    "/__test_pvfs_file_04",
-    "/__test_pvfs_file_05"
-};
-
 extern int parse_pvfstab(char *fn,  pvfs_mntlist *mnt);
 
 int initialize_sysint()

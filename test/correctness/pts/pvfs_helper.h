@@ -5,9 +5,10 @@
 #include "client.h"
 
 /* don't change this w/o changing the test_files array */
-#define NUM_TEST_FILES               5
-
-#define TEST_PVFS_DATA_SIZE  1024*1024
+#define NUM_TEST_FILES                         10
+#define TEST_FILE_PREFIX     "/__test_pvfs_file_"
+#define MAX_TEST_PATH_LEN              0x00000040
+#define TEST_PVFS_DATA_SIZE             1024*1024
 
 #ifdef __GNUC__
 #define debug_printf(format, f...)                              \
@@ -24,7 +25,5 @@ typedef struct
     pvfs_mntlist mnt;
     PVFS_sysresp_init resp_init;
 } pvfs_helper_t;
-
-extern int initialize_sysint();
 
 #endif /* __PVFS_HELPER_H */
