@@ -213,21 +213,6 @@ int main(int argc, char **argv)
         exit(ret);
     }
 
-    /* manage a pid file if requested (for init scripts) */
-    if (s_server_options.pidfile)
-    {
-        ret = create_pidfile(s_server_options.pidfile);
-        if (ret)
-        {
-            gossip_err("Failed to create pid file %s: %s\n",
-                       s_server_options.pidfile, strerror(ret));
-        }
-        else
-        {
-            atexit(remove_pidfile);
-        }
-    }
-
     server_job_id_array = (job_id_t *)
         malloc(PVFS_SERVER_TEST_COUNT * sizeof(job_id_t));
     server_completed_job_p_array = (void **)
@@ -266,6 +251,21 @@ int main(int argc, char **argv)
     {
         gossip_err("Error: Could not initialize server; aborting.\n");
         goto server_shutdown;
+    }
+
+    /* manage a pid file if requested (for init scripts), after fork */
+    if (s_server_options.pidfile)
+    {
+        ret = create_pidfile(s_server_options.pidfile);
+        if (ret)
+        {
+            gossip_err("Failed to create pid file %s: %s\n",
+                       s_server_options.pidfile, strerror(ret));
+        }
+        else
+        {
+            atexit(remove_pidfile);
+        }
     }
 
 #ifndef __PVFS2_DISABLE_PERF_COUNTERS__
