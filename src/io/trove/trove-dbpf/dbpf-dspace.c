@@ -1089,7 +1089,8 @@ static int dbpf_dspace_cancel(
     dbpf_queued_op_t *cur_op = NULL;
 #endif
 
-    gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_dspace_cancel called\n");
+    gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_dspace_cancel called for id %Lu.\n",
+	Lu(id));
 
 #ifdef __PVFS2_TROVE_THREADED__
 
@@ -1435,6 +1436,7 @@ int dbpf_dspace_testcontext(
         {
             *user_ptr_p = cur_op->op.user_ptr;
         }
+	ds_id_array[out_count] = cur_op->op.id;
 
         organize_post_op_statistics(cur_op->op.type, cur_op->op.id);
         dbpf_queued_op_free(cur_op);
@@ -1461,6 +1463,8 @@ int dbpf_dspace_testcontext(
         ret = dbpf_dspace_test(
             coll_id, cur_op->op.id, context_id, inout_count_p, NULL,
             &(user_ptr_array[0]), &(state_array[0]), max_idle_time_ms);
+	if(ret == 1)
+	    ds_id_array[0] = cur_op->op.id;
     }
     else
     {
