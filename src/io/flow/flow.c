@@ -24,7 +24,7 @@
 
 /* internal queues */
 /* note: a flow can exist in at most one of these queues at a time */
-static flow_queue_p completion_queue;
+static flow_queue_p completion_queue_array[FLOW_MAX_CONTEXTS] = {NULL};
 static flow_queue_p transmitting_queue;
 static flow_queue_p need_svc_queue;
 static flow_queue_p scheduled_queue;
@@ -315,9 +315,36 @@ void PINT_flow_free(flow_descriptor * flow_d)
  */
 int PINT_flow_open_context(FLOW_context_id* context_id)
 {
-    gossip_lerr("WARNING: PINT_flow_open_context() stub executed.\n");
-    /* TODO: implement this for real */
-    *context_id = 0;
+    int context_index;
+
+    gen_mutex_lock(&interface_mutex);
+
+    /* find an unused context id */
+    for(context_index=0; context_index<FLOW_MAX_CONTEXTS; context_index++)
+    {
+	if(completion_queue_array[context_index] == NULL)
+	{
+	    break;
+	}
+    }
+
+    if(context_index >= FLOW_MAX_CONTEXTS)
+    {
+	/* we don't have any more available! */
+	gen_mutex_unlock(&interface_mutex);
+	return(-EBUSY);
+    }
+
+    /* create a new completion queue for the context */
+    completion_queue_array[context_index] = flow_queue_new();
+    if(!completion_queue_array[context_index])
+    {
+	gen_mutex_unlock(&interface_mutex);
+	return(-ENOMEM);
+    }
+
+    *context_id = context_index;
+    gen_mutex_unlock(&interface_mutex);
     return(0);
 }
 
@@ -330,9 +357,22 @@ int PINT_flow_open_context(FLOW_context_id* context_id)
  */
 void PINT_flow_close_context(FLOW_context_id context_id)
 {
-    gossip_lerr("WARNING: PINT_flow_close_context() stub executed.\n");
-    /* TODO: implement this for real */
+
+    gen_mutex_lock(&interface_mutex);
+
+    if(!completion_queue_array[context_id])
+    {
+	gen_mutex_unlock(&interface_mutex);
+	return;
+    }
+
+    flow_queue_cleanup(completion_queue_array[context_id]);
+
+    completion_queue_array[context_id] = NULL;
+
+    gen_mutex_unlock(&interface_mutex);
     return;
+
 }
 
 
@@ -366,6 +406,8 @@ int PINT_flow_post(flow_descriptor * flow_d, FLOW_context_id context_id)
 	return (-ENOPROTOOPT);
     }
 
+    flow_d->context_id = context_id;
+
     /* setup the request processing state */
     flow_d->request_state = PINT_New_request_state(flow_d->request);
     if (!flow_d->request_state)
@@ -389,7 +431,7 @@ int PINT_flow_post(flow_descriptor * flow_d, FLOW_context_id context_id)
      */
     if (flow_d->state & FLOW_FINISH_MASK)
     {
-	flow_queue_add(completion_queue, flow_d);
+	flow_queue_add(completion_queue_array[flow_d->context_id], flow_d);
     }
     else if (flow_d->state == FLOW_TRANSMITTING)
     {
@@ -647,7 +689,7 @@ int PINT_flow_testcontext(int incount,
     *outcount = 0;
 
     /* do some work if the completion queue is empty */
-    if (flow_queue_empty(completion_queue))
+    if (flow_queue_empty(completion_queue_array[context_id]))
     {
 	ret = do_one_work_cycle(&num_completed, max_idle_time_ms);
 	if (ret < 0)
@@ -657,7 +699,7 @@ int PINT_flow_testcontext(int incount,
     }
 
     while (*outcount < incount && (flow_d =
-				   flow_queue_shownext(completion_queue)))
+				   flow_queue_shownext(completion_queue_array[context_id])))
     {
 	flow_array[*outcount] = flow_d;
 	flow_queue_remove(flow_d);
@@ -768,7 +810,9 @@ static int do_one_work_cycle(int *num_completed,
 		/* move the flow to the completion queue */
 		flow_queue_remove(flow_array[j]);
 
-		flow_queue_add(completion_queue, flow_array[j]);
+		flow_queue_add(
+		    completion_queue_array[flow_array[j]->context_id], 
+		    flow_array[j]);
 	    }
 	    else if (flow_array[j]->state == FLOW_SVC_READY)
 	    {
@@ -808,7 +852,7 @@ static int do_one_work_cycle(int *num_completed,
 	/* put the flow in the correct queue based on the result */
 	if (tmp_flow->state & FLOW_FINISH_MASK)
 	{
-	    flow_queue_add(completion_queue, tmp_flow);
+	    flow_queue_add(completion_queue_array[tmp_flow->context_id], tmp_flow);
 	}
 	else if (tmp_flow->state == FLOW_SVC_READY)
 	{
@@ -839,16 +883,12 @@ static int do_one_work_cycle(int *num_completed,
  */
 static int setup_flow_queues(void)
 {
-    completion_queue = flow_queue_new();
     transmitting_queue = flow_queue_new();
     need_svc_queue = flow_queue_new();
     scheduled_queue = flow_queue_new();
 
-    if (!completion_queue || !transmitting_queue ||
-	!need_svc_queue || !scheduled_queue)
+    if (!transmitting_queue || !need_svc_queue || !scheduled_queue)
     {
-	if (completion_queue)
-	    flow_queue_cleanup(completion_queue);
 	if (transmitting_queue)
 	    flow_queue_cleanup(transmitting_queue);
 	if (need_svc_queue)
@@ -869,7 +909,6 @@ static int setup_flow_queues(void)
  */
 static int teardown_flow_queues(void)
 {
-    flow_queue_cleanup(completion_queue);
     flow_queue_cleanup(transmitting_queue);
     flow_queue_cleanup(need_svc_queue);
     flow_queue_cleanup(scheduled_queue);

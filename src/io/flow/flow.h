@@ -75,6 +75,8 @@ enum
 /* context id type */
 typedef PVFS_context_id FLOW_context_id;
 
+#define FLOW_MAX_CONTEXTS 16
+
 /********************************************************************
  * flow descriptor
  */
@@ -103,6 +105,7 @@ struct flow_descriptor
 	/***********************************************************/
     /* fields reserved strictly for internal use */
 
+    FLOW_context_id context_id; /* which context the flow belongs to */
     int flowproto_id;		/* identifies which protocol owns this */
     PVFS_bitfield priority;	/* priority of this flow */
     struct qlist_head sched_queue_link;	/* used by scheduler */
