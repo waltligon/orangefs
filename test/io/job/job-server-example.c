@@ -89,13 +89,14 @@ int main(int argc, char **argv)
 		/* wait until the request has arrived */
 		do
 		{
-			/* exercise waitworld() interface */
+			/* exercise testworld() interface */
 			outcount = 1;
-			ret = job_waitworld(&job_id, &outcount, NULL, &status1);
+			ret = job_testworld(&job_id, &outcount, NULL, &status1,
+			100);
 		} while(ret == 0 && outcount == 0);
 		if(ret < 0)
 		{	
-			fprintf(stderr, "job_waitworld() failure.\n");
+			fprintf(stderr, "job_testworld() failure.\n");
 			return(-1);
 		}
 	}
