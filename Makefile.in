@@ -153,8 +153,6 @@ CFLAGS += -D__STATIC_METHOD_BMI_TCP__
 #CFLAGS += -D__STATIC_FLOWPROTO_BMI_TROVE__
   # enable new style Flow BMI/Trove protocol
 CFLAGS += -D__STATIC_FLOWPROTO_MULTIQUEUE__
-  # enable new style Flow BMI/Trove protocol
-CFLAGS += -DUSE_BMI_MSGS=1
   # turn on large file support by default
 CFLAGS += -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE
   # include current directory (for pvfs2-config.h)

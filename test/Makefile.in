@@ -94,7 +94,6 @@ LDSHARED = $(CC) -shared
 PICFLAGS = -fPIC
 LDFLAGS += -L lib 
 
-CFLAGS += -DUSE_BMI_MSGS
   # turn on large file support by default
 CFLAGS += -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE
   # include current directory (for pvfs2-test-config.h)
