@@ -58,16 +58,17 @@ int dbpf_bstream_listio_convert(
     TROVE_offset cur_stream_off;
     struct aiocb *cur_aiocb_ptr;
 
-    if (lio_state == NULL) {
+    if (lio_state == NULL)
+    {
 	mct             = 0;
 	sct             = 0;
-	cur_mem_size    = mem_size_array[0];
-	cur_mem_off     = mem_offset_array[0];
-	cur_stream_size = stream_size_array[0];
-	cur_stream_off  = stream_offset_array[0];
+	cur_mem_size    = mem_size_array[mct];
+	cur_mem_off     = mem_offset_array[mct++];
+	cur_stream_size = stream_size_array[sct];
+	cur_stream_off  = stream_offset_array[sct++];
     }
-    else {
-        /* load state */
+    else
+    {
 	mct             = lio_state->mem_ct;
 	sct             = lio_state->stream_ct;
 	cur_mem_size    = lio_state->cur_mem_size;
@@ -78,6 +79,9 @@ int dbpf_bstream_listio_convert(
     cur_aiocb_ptr   = aiocb_array;
 
     /* _POSIX_AIO_LISTIO_MAX */
+
+    /* a usage assumption is that these two counts are always equal*/
+    assert(mem_count == stream_count);
 
     while (act < *aiocb_count_p && 
 	   mct < mem_count) /* don't need to check sct too; see assumptions */
