@@ -66,6 +66,15 @@ int PINT_do_lookup (PVFS_string name,pinode_reference parent,
 
         name_sz = strlen(name) + 1; /*include the null terminator*/
 
+        /*
+          we have to mask off ATTR_META if specified because
+          we're not issuing a getattr even if it is specified.
+          It's confusing the pcache, so for now, remove it.
+          in short, we CANNOT add a pnode to the pinode cache with
+          this attribute set since it's not valid at this point.
+        */
+        mask &= ~ATTR_META;
+
         req_p.op = PVFS_SERV_LOOKUP_PATH;
         req_p.credentials = cred;
         req_p.rsize = name_sz + sizeof(struct PVFS_server_req_s);
