@@ -62,6 +62,8 @@ BUILD_GM = @BUILD_GM@
 BUILD_IB = @BUILD_IB@
 BUILD_MPI = @BUILD_MPI@
 MPICC = @MPICC@
+GNUC = @GNUC@
+MPI_GNUC = @MPI_GNUC@
 # override default quiet mode with "make V=1"
 ifndef V
   QUIET_COMPILE = @QUIET_COMPILE@
@@ -162,9 +164,16 @@ ifdef BUILD_IB
     SERVERLIBS += $(IBLIBS)
 endif
 
-# in case MPICC is not gcc, only add gcc-particular ones to CFLAGS
+# Use these same cflags for the mpi test codes.
 MPICFLAGS := $(CFLAGS)
+
+# Add gcc-specific flags if we know it is a gnu compiler.
+ifdef GNUC
 CFLAGS += $(GCC_CFLAGS)
+endif
+ifdef MPI_GNUC
+MPICFLAGS += $(GCC_CFLAGS)
+endif
 
 #################################################################
 # Starter variables 

@@ -138,6 +138,14 @@ AC_CHECK_PROG(HAVE_FIND, find, yes, no)
 AC_CHECK_PROG(HAVE_BISON, bison, yes, no)
 AC_CHECK_PROG(HAVE_FLEX, flex, yes, no)
 
+dnl See if CC is a GNU compiler.  This may require a real test in future
+dnl versions of autoconf.  In 2.13 it is a side-effect of AC_PROG_CC.
+GNUC=
+if test x$GCC = xyes ; then
+    GNUC=1
+fi
+AC_SUBST(GNUC)
+
 AC_ARG_WITH(efence,
 [  --with-efence           Use electric fence for malloc debugging.],
 AC_CHECK_LIB(efence,malloc)
@@ -257,6 +265,7 @@ AC_ARG_WITH(mpi,
     fi
 )
 
+MPI_GNUC=
 if test x$BUILD_MPI = x1; then
     AC_MSG_CHECKING(whether the mpicc compiler works)
     saveCC="$CC"
@@ -266,10 +275,23 @@ if test x$BUILD_MPI = x1; then
 	AC_MSG_RESULT(no)
 	AC_MSG_ERROR($CC doesn't appear to be a valid MPI compiler)
     )
+    dnl See if mpicc is a GNU compiler.
+    AC_MSG_CHECKING(whether mpicc is a GNU compiler)
+    AC_TRY_COMPILE([
+    #ifndef __GNUC__
+	   choke me
+    #endif
+    ], [],
+	AC_MSG_RESULT(yes)
+	MPI_GNUC=1
+	,
+	AC_MSG_RESULT(no)
+    )
     CC="$saveCC"
     AC_SUBST(MPICC)
     AC_SUBST(BUILD_MPI)
 fi
+AC_SUBST(MPI_GNUC)
 
 dnl if we use functions that might not be on every platform, add them here
 dnl the prototypes for some functions are exposed only after defining something
