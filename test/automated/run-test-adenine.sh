@@ -13,7 +13,7 @@ email=`grep EMAIL CONFIG | cut -d "=" -f 2`
 
 cd ../../maint/build/
 
-./pvfs2-build.sh /home/$USER/testing/$DATE/work > tmp.out 2>&1
+./pvfs2-build.sh -r /home/$USER/testing/$DATE/work > tmp.out 2>&1
 if [ $? != 0 ] ; then
     mail -s "PVFS2 test: FAIL (pvfs2-build.sh)" "$email" < tmp.out
     exit 1

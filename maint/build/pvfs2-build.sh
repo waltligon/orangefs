@@ -54,16 +54,26 @@ get_cvs() {
 tarball=`basename $tarballurl`
 tarballdir=`echo $tarball | sed -e "s/.tar.gz//" | sed -e "s/.tgz//"`
 old_wd=`pwd`
+build_kernel="false"
+kerneldir=""
+
+usage()
+{
+    echo "USAGE: pvfs2-build.sh <-k kernel source> <-r dir>"
+    echo "  -k: path to kernel source (enables module build)"
+    echo "  -r: path to directory to build and install in"
+    return
+}
 
 # get command line arguments
-if [ $# -gt 1 ] ; then
-	echo "Too many arguments.  Aborting."
-	echo "Usage: $0 <root dir for build/install>"
-	exit 1
-fi
-if [ $# -eq 1 ] ; then
-	rootdir=$1
-fi
+while getopts k:r: opt
+do
+    case "$opt" in
+	k) build_kernel="true"; kerneldir="$OPTARG";;
+	r) rootdir="$OPTARG";;
+	\?) usage; exit 1;; 
+    esac
+done   
 
 echo "PVFS2 will be built in ${rootdir}."
 
@@ -96,7 +106,11 @@ get_cvs || exit 1
 mkdir $builddir
 mkdir $installdir
 cd $builddir
-$srcdir/configure $configureopts --prefix=$installdir 2>&1 > $rootdir/configure.log
+if [ $build_kernel == "true" ] ; then
+	$srcdir/configure $configureopts --with-kernel=$kerneldir --prefix=$installdir 2>&1 > $rootdir/configure.log
+else
+	$srcdir/configure $configureopts --prefix=$installdir 2>&1 > $rootdir/configure.log
+fi
 
 if [ $? != 0 ] ; then
 	echo "Configure failed; see $rootdir/configure.log.  Aborting."
@@ -128,12 +142,27 @@ if [ $? != 0 ] ; then
 	exit 1
 fi
 
+# make kernel stuff if necessary
+if [ $build_kernel == "true" ] ; then
+	make kmod 2>&1 >> $rootdir/make.log
+fi
+
+if [ $? != 0 ] ; then
+	echo "Make kmod failed; see $rootdir/make.log.  Aborting."
+	exit 1
+fi
+
 # make install
 make install 2>&1 > $rootdir/make-install.log
 
 if [ $? != 0 ] ; then
 	echo "Make install failed; see $rootdir/make-install.log.  Aborting."
 	exit 1
+fi
+
+# not sure where to put this; just go with sbin for now?
+if [ $build_kernel == "true" ] ; then
+	cp $builddir/src/kernel/linux-2.6/pvfs2.ko $installdir/sbin/
 fi
 
 exit 0
