@@ -25,7 +25,9 @@ typedef struct PINT_dist_param_offset_s
 
 /* Dist param table */
 static PINT_dist_param_offset* PINT_dist_param_table = 0;
+static size_t PINT_dist_param_table_entries = 0;
 static size_t PINT_dist_param_table_size = 0;
+static int PINT_dist_param_table_alloc_inc = 10;
 
 /* Return a pointer to the dist param offset for this parameter, or null
  *  if none exists
@@ -37,7 +39,7 @@ static PINT_dist_param_offset* PINT_get_param_offset(const char* dist_name,
     if (0 != PINT_dist_param_table)
     {
         int i;
-        for (i = 0; i < PINT_dist_param_table_size; i++)
+        for (i = 0; i < PINT_dist_param_table_entries; i++)
         {
             dpo = PINT_dist_param_table + i;
             if (0 == strcmp(dpo->dist_name, dist_name) &&
@@ -65,7 +67,13 @@ int PINT_dist_initialize(void)
 /* PINT_dist_finalize implementation */
 void PINT_dist_finalize(void)
 {
-    /* Nothing yet */
+    int i;
+    for (i = 0; i < PINT_dist_param_table_entries; i++)
+    {
+        free(PINT_dist_param_table[i].dist_name);
+        free(PINT_dist_param_table[i].param_name);
+    }
+    free(PINT_dist_param_table);
 }
 
 /*  PINT_dist_default_get_num_dfiles implementation */
@@ -108,9 +116,58 @@ int PINT_dist_register_param_offset(const char* dist_name,
                                     size_t offset,
                                     size_t field_size)
 {
-    /*fprintf(stderr, "Attempting to reg: %s %s %u %u\n",
-            dist_name, param_name, offset, field_size);
-    */
+    int dist_len, param_len;
+    
+    /* Increase the size of the param table if its full */
+    if (PINT_dist_param_table_entries >= PINT_dist_param_table_size)
+    {
+        PINT_dist_param_offset* buf;
+        int new_table_size = PINT_dist_param_table_size +
+            PINT_dist_param_table_alloc_inc;
+
+        buf = malloc(new_table_size * sizeof(PINT_dist_param_offset));
+        if (0 != buf)
+        {
+            memcpy(buf, PINT_dist_param_table,
+                   PINT_dist_param_table_size * sizeof(PINT_dist_param_offset));
+            memset(buf + PINT_dist_param_table_size, 0,
+                   PINT_dist_param_table_alloc_inc * sizeof(PINT_dist_param_offset));
+
+            free(PINT_dist_param_table);
+            PINT_dist_param_table_size = new_table_size;
+            PINT_dist_param_table = buf;
+        }
+        else
+        {
+            return -1;
+        }
+    }
+
+    /* Allocate memory for the dist and param name */
+    dist_len = strlen(dist_name) + 1;
+    param_len = strlen(param_name) + 1;
+    PINT_dist_param_table[PINT_dist_param_table_entries].dist_name =
+        malloc(dist_len);
+    if (0 == PINT_dist_param_table[PINT_dist_param_table_entries].dist_name)
+    {
+        return -1;
+    }
+    
+    PINT_dist_param_table[PINT_dist_param_table_entries].param_name =
+        malloc(param_len);
+    if (0 == PINT_dist_param_table[PINT_dist_param_table_entries].param_name)
+    {
+        return -1;
+    }    
+    
+    /* Register the parameter information for later lookup */
+    strncpy(PINT_dist_param_table[PINT_dist_param_table_entries].dist_name,
+           dist_name, dist_len);
+    strncpy(PINT_dist_param_table[PINT_dist_param_table_entries].param_name,
+           param_name, param_len);
+    PINT_dist_param_table[PINT_dist_param_table_entries].offset = offset;
+    PINT_dist_param_table[PINT_dist_param_table_entries].size = field_size;
+    PINT_dist_param_table_entries += 1;
     return 0;
 }
 

@@ -13,6 +13,7 @@
 #include "pvfs2-util.h"
 #include "str-utils.h"
 #include "pint-sysint-utils.h"
+#include "pvfs2-dist-simple-stripe.h"
 
 int main(int argc, char **argv)
 {
@@ -26,7 +27,8 @@ int main(int argc, char **argv)
     PVFS_sys_attr attr;
     PVFS_credentials credentials;
     PVFS_sys_dist *dist = NULL;
-
+    int new_strip_size = 8192;
+    
     if (argc != 2)
     {
         fprintf(stderr,"Usage: %s filename\n",argv[0]);
@@ -82,13 +84,22 @@ int main(int argc, char **argv)
            str_buf, Lu(parent_refn.handle));
 
     /* Lookup the distribution to use */
-    dist = PVFS_sys_dist_lookup("basic_dist");
+    dist = PVFS_sys_dist_lookup("simple_stripe");
     if (0 == dist)
     {
-        printf("Failed to create distribution basic_dist.");
+        printf("Failed to lookup distribution basic_dist.");
         return -1;
     }
-    
+
+    /* Modify a distribution parameter */
+    ret = PVFS_sys_dist_setparam(dist, "strip_size", &new_strip_size);
+    if (0 != ret)
+    {
+        printf("Failed to set distribution parameter strip_size.\n");
+        return -1;
+    }
+    /*printf("strip size: %i\n",
+      ((PVFS_simple_stripe_params*)dist->params)->strip_size);*/
     ret = PVFS_sys_create(entry_name, parent_refn, attr,
                           &credentials, dist, &resp_create);
     if (ret < 0)
@@ -100,7 +111,7 @@ int main(int argc, char **argv)
     /* Free the distribution */
     PVFS_sys_dist_free(dist);
     
-    // print the handle 
+    /* print the handle */ 
     printf("--create--\n"); 
     printf("Handle: %Ld\n",Ld(resp_create.ref.handle));
 
