@@ -89,6 +89,10 @@ static ssize_t pvfs2_file_read(
 
 	/* TODO: submit upcall */
 	/* TODO: wait for downcall */
+	/* TODO: we need a way for the downcall to report if the read was
+	 * short (EOF, etc.) - if so, then don't copy so much, and fall out of 
+	 * loop...
+	 */
 
 	/* copy data out to application */
 	pvfs_bufmap_copy_to_user(current_buf, desc, each_count);
