@@ -23,7 +23,6 @@ int main(int argc,char **argv)
 {
 	PVFS_sysresp_init resp_init;
 	PVFS_sysresp_lookup resp_look;
-	PVFS_sysreq_readdir *req_readdir = NULL;
 	PVFS_sysresp_readdir *resp_readdir = NULL;
 	int ret = -1,i = 0, name_sz = 0;
 	pvfs_mntlist mnt = {0,NULL};
@@ -32,6 +31,9 @@ int main(int argc,char **argv)
 	PVFS_fs_id fs_id;
 	char* name;
 	PVFS_credentials credentials;
+	pinode_reference pinode_refn;
+	PVFS_ds_position token;
+	int pvfs_dirent_incount;
 
 	gossip_enable_stderr();
 	gossip_set_debug_mask(1,CLIENT_DEBUG);
@@ -85,12 +87,6 @@ int main(int argc,char **argv)
 	/*printf("ROOT Handle:%ld\n", (long int)resp_look.pinode_refn.handle);*/
 	
 
-	req_readdir = (PVFS_sysreq_readdir *)malloc(sizeof(PVFS_sysreq_readdir));
-	if (req_readdir == NULL)
-	{
-		printf("Error in malloc\n");
-		return(-1);
-	}
 	resp_readdir = (PVFS_sysresp_readdir *)malloc(sizeof(PVFS_sysresp_readdir));
 	if (resp_readdir == NULL)
 	{
@@ -100,19 +96,20 @@ int main(int argc,char **argv)
 
 	printf("LOOKUP_RESPONSE===>\n\tresp_look.pinode_refn.handle = %Ld\n\tresp_look.pinode_refn.fs_id = %d\n",resp_look.pinode_refn.handle, resp_look.pinode_refn.fs_id);
 
-	req_readdir->pinode_refn.handle = resp_look.pinode_refn.handle;
-	req_readdir->pinode_refn.fs_id = fs_id;
-	req_readdir->token = PVFS2_READDIR_START;
-	req_readdir->pvfs_dirent_incount = max_dirents_returned;
+	pinode_refn.handle = resp_look.pinode_refn.handle;
+	pinode_refn.fs_id = fs_id;
+	token = PVFS2_READDIR_START;
+	pvfs_dirent_incount = max_dirents_returned;
 
-	req_readdir->credentials.uid = 100;
-	req_readdir->credentials.gid = 100;
-	req_readdir->credentials.perms = 1877;
+	credentials.uid = 100;
+	credentials.gid = 100;
+	credentials.perms = 1877;
 
 
 	/* call readdir */
         memset(resp_readdir,0,sizeof(PVFS_sysresp_readdir));
-	ret = PVFS_sys_readdir(req_readdir,resp_readdir);
+	ret = PVFS_sys_readdir(pinode_refn, token, pvfs_dirent_incount, 
+				credentials,resp_readdir);
 	if (ret < 0)
 	{
 		printf("readdir failed with errcode = %d\n", ret);
@@ -137,7 +134,6 @@ int main(int argc,char **argv)
 	}
         if (resp_readdir->pvfs_dirent_outcount)
             free(resp_readdir->dirent_array); /*allocated by the system interface*/
-	free(req_readdir);		/* allocated by us */
 	free(resp_readdir);		/* allocated by us */
 
 	free(starting_point);

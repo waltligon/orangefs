@@ -16,8 +16,12 @@ int main(int argc,char **argv)
     PVFS_fs_id cur_fs;
     pvfs_mntlist mnt = {0,NULL};
     PVFS_sysresp_init resp_init;
-    PVFS_sysreq_mkdir req_mkdir;
     PVFS_sysresp_mkdir resp_mkdir;
+    char* entry_name;
+    pinode_reference parent_refn;
+    uint32_t attrmask;
+    PVFS_object_attr attr;
+    PVFS_credentials credentials;
 
     gossip_enable_stderr();
     gossip_set_debug_mask(1,CLIENT_DEBUG);
@@ -54,25 +58,25 @@ int main(int argc,char **argv)
     }
     printf("Directory to be created is %s\n",str_buf);
 
-    memset(&req_mkdir, 0, sizeof(PVFS_sysreq_mkdir));
     memset(&resp_mkdir, 0, sizeof(PVFS_sysresp_mkdir));
 
     cur_fs = resp_init.fsid_list[0];
 
-    req_mkdir.entry_name = str_buf;
-    req_mkdir.parent_refn.handle =
+    entry_name = str_buf;
+    parent_refn.handle =
         lookup_parent_handle(dirname,cur_fs);
-    req_mkdir.parent_refn.fs_id = cur_fs;
-    req_mkdir.attrmask = ATTR_BASIC;
-    req_mkdir.attr.owner = 100;
-    req_mkdir.attr.group = 100;
-    req_mkdir.attr.perms = 1877;
-    req_mkdir.attr.objtype = PVFS_TYPE_DIRECTORY;
-    req_mkdir.credentials.perms = 1877;
-    req_mkdir.credentials.uid = 100;
-    req_mkdir.credentials.gid = 100;
+    parent_refn.fs_id = cur_fs;
+    attrmask = ATTR_BASIC;
+    attr.owner = 100;
+    attr.group = 100;
+    attr.perms = 1877;
+    attr.objtype = PVFS_TYPE_DIRECTORY;
+    credentials.perms = 1877;
+    credentials.uid = 100;
+    credentials.gid = 100;
 
-    ret = PVFS_sys_mkdir(&req_mkdir,&resp_mkdir);
+    ret = PVFS_sys_mkdir(entry_name, parent_refn, attrmask, attr, 
+			credentials, &resp_mkdir);
     if (ret < 0)
     {
         printf("mkdir failed\n");
@@ -81,7 +85,7 @@ int main(int argc,char **argv)
     // print the handle 
     printf("--mkdir--\n"); 
     printf("Handle:%Ld\n",resp_mkdir.pinode_refn.handle);
-    printf("FSID:%d\n",req_mkdir.parent_refn.fs_id);
+    printf("FSID:%d\n",parent_refn.fs_id);
 
     //close it down
     ret = PVFS_sys_finalize();

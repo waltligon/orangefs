@@ -53,12 +53,14 @@ int directory_walk(PVFS_sysresp_init *init_response,
     char *cur_file = (char *)0;
     PVFS_handle cur_handle;
     PVFS_sysresp_lookup lk_response;
-    PVFS_sysreq_readdir rd_request;
     PVFS_sysresp_readdir rd_response;
     char full_path[MAX_PVFS_PATH_LEN] = {0};
     PVFS_fs_id fs_id;
     char* name;
     PVFS_credentials credentials;
+    pinode_reference pinode_refn;
+    PVFS_ds_position token;
+    int pvfs_dirent_incount;
 
     printf("DIRECTORY WALK CALLED WITH base %s | %s\n",base_dir,start_dir);
 
@@ -92,18 +94,18 @@ int directory_walk(PVFS_sysresp_init *init_response,
 
     print_at_depth(name,depth);
 
-    memset(&rd_request,0,sizeof(PVFS_sysreq_readdir));
     memset(&rd_response,0,sizeof(PVFS_sysresp_readdir));
 
-    rd_request.pinode_refn.handle = lk_response.pinode_refn.handle;
-    rd_request.pinode_refn.fs_id = init_response->fsid_list[0];
-    rd_request.token = PVFS2_READDIR_START;
-    rd_request.pvfs_dirent_incount = MAX_NUM_DIRENTS;
-    rd_request.credentials.uid = 100;
-    rd_request.credentials.gid = 100;
-    rd_request.credentials.perms = 1877;
+    pinode_refn.handle = lk_response.pinode_refn.handle;
+    pinode_refn.fs_id = init_response->fsid_list[0];
+    token = PVFS2_READDIR_START;
+    pvfs_dirent_incount = MAX_NUM_DIRENTS;
+    credentials.uid = 100;
+    credentials.gid = 100;
+    credentials.perms = 1877;
 
-    if (PVFS_sys_readdir(&rd_request,&rd_response))
+    if (PVFS_sys_readdir(pinode_refn, token, pvfs_dirent_incount, credentials,
+			 &rd_response))
     {
         fprintf(stderr,"Failed to perform readdir operation\n");
         return 1;

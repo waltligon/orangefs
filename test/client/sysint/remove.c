@@ -15,7 +15,9 @@ int main(int argc,char **argv)
     PVFS_fs_id cur_fs;
     pvfs_mntlist mnt = {0,NULL};
     PVFS_sysresp_init resp_init;
-    PVFS_sysreq_remove req_remove;
+    char* entry_name;
+    pinode_reference parent_refn;
+    PVFS_credentials credentials;
 
     gossip_enable_stderr();
     gossip_set_debug_mask(1,CLIENT_DEBUG);
@@ -52,19 +54,17 @@ int main(int argc,char **argv)
     }
     printf("File to be removed is %s\n",str_buf);
 
-    memset(&req_remove,0,sizeof(PVFS_sysreq_remove));
-
     cur_fs = resp_init.fsid_list[0];
 
-    req_remove.entry_name = str_buf;
-    req_remove.parent_refn.handle =
+    entry_name = str_buf;
+    parent_refn.handle =
         lookup_parent_handle(filename,cur_fs);
-    req_remove.parent_refn.fs_id = cur_fs;
-    req_remove.credentials.uid = 100;
-    req_remove.credentials.gid = 100;
-    req_remove.credentials.perms = 1877;
+    parent_refn.fs_id = cur_fs;
+    credentials.uid = 100;
+    credentials.gid = 100;
+    credentials.perms = 1877;
 
-    ret = PVFS_sys_remove(&req_remove);
+    ret = PVFS_sys_remove(entry_name, parent_refn, credentials);
     if (ret < 0)
     {
         printf("remove failed with errcode = %d\n",ret);

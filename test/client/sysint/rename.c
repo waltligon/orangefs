@@ -19,7 +19,11 @@ int main(int argc,char **argv)
     PVFS_fs_id cur_fs;
     pvfs_mntlist mnt = {0,NULL};
     PVFS_sysresp_init resp_init;
-    PVFS_sysreq_rename req_rename;
+    char* old_entry;
+    pinode_reference old_parent_refn;
+    char* new_entry;
+    pinode_reference new_parent_refn;
+    PVFS_credentials credentials;
 
     gossip_enable_stderr();
     gossip_set_debug_mask(1,CLIENT_DEBUG);
@@ -69,23 +73,23 @@ int main(int argc,char **argv)
     }
     printf("New filename is %s\n",new_buf);
 
-    memset(&req_rename,0,sizeof(PVFS_sysreq_rename));
 
     cur_fs = resp_init.fsid_list[0];
 
-    req_rename.old_entry = old_buf;
-    req_rename.old_parent_refn.handle =
+    old_entry = old_buf;
+    old_parent_refn.handle =
         lookup_parent_handle(old_filename,cur_fs);
-    req_rename.old_parent_refn.fs_id = cur_fs;
-    req_rename.new_entry = new_buf;
-    req_rename.new_parent_refn.handle =
+    old_parent_refn.fs_id = cur_fs;
+    new_entry = new_buf;
+    new_parent_refn.handle =
         lookup_parent_handle(old_filename,cur_fs);
-    req_rename.new_parent_refn.fs_id = cur_fs;
-    req_rename.credentials.uid = 100;
-    req_rename.credentials.gid = 100;
-    req_rename.credentials.perms = 1877;
+    new_parent_refn.fs_id = cur_fs;
+    credentials.uid = 100;
+    credentials.gid = 100;
+    credentials.perms = 1877;
 
-    ret = PVFS_sys_rename(&req_rename);
+    ret = PVFS_sys_rename(old_entry, old_parent_refn, new_entry, 
+			new_parent_refn, credentials);
     if (ret < 0)
     {
         printf("rename failed with errcode = %d\n",ret);

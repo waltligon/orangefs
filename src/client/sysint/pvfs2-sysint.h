@@ -156,15 +156,6 @@ typedef struct PVFS_sysresp_getattr_s PVFS_sysresp_getattr;
 /* no data returned in setattr response */
 
 /* mkdir */
-struct PVFS_sysreq_mkdir_s {
-	char* entry_name; /* single segment */
-	pinode_reference parent_refn;
-	PVFS_object_attr attr;
-	uint32_t attrmask;
-	PVFS_credentials credentials;
-};
-typedef struct PVFS_sysreq_mkdir_s PVFS_sysreq_mkdir;
-
 struct PVFS_sysresp_mkdir_s {
 	pinode_reference pinode_refn;
 };
@@ -177,25 +168,9 @@ struct PVFS_sysresp_create_s {
 typedef struct PVFS_sysresp_create_s PVFS_sysresp_create;
 
 /* remove */
-struct PVFS_sysreq_remove_s {
-	char* entry_name; /* single path segment */
-	pinode_reference parent_refn;
-	PVFS_credentials credentials;
-};
-typedef struct PVFS_sysreq_remove_s PVFS_sysreq_remove;
-
 /* no data returned in remove response */
 
 /* rename */
-struct PVFS_sysreq_rename_s {
-	char* old_entry; /* single path segment */
-	pinode_reference old_parent_refn;
-	char* new_entry;
-	pinode_reference new_parent_refn;
-	PVFS_credentials credentials;
-};
-typedef struct PVFS_sysreq_rename_s PVFS_sysreq_rename;
-
 /* no data returned in rename response */
 
 /* symlink */
@@ -227,13 +202,6 @@ struct PVFS_sysresp_duplicate_s {
 typedef struct PVFS_sysresp_duplicate_s PVFS_sysresp_duplicate;
 
 /* lock */
-struct PVFS_sysreq_lock_s {
-	pinode_reference pinode_refn; 
-	PVFS_credentials credentials;
-	/* region extension */
-};
-typedef struct PVFS_sysreq_lock_s PVFS_sysreq_lock;
-
 struct PVFS_sysresp_lock_s {
 	pinode_reference pinode_refn; 
 	/* lock id? */
@@ -242,23 +210,9 @@ struct PVFS_sysresp_lock_s {
 typedef struct PVFS_sysresp_lock_s PVFS_sysresp_lock;
 
 /* unlock */
-struct PVFS_sysreq_unlock_s {
-	pinode_reference pinode_refn; 
-	PVFS_credentials credentials;
-	/* lock id? */
-};
-typedef struct PVFS_sysreq_unlock_s PVFS_sysreq_unlock;
-
 /* no data returned in unlock response */
 
 /* statfs */
-struct PVFS_sysreq_statfs_s {
-	PVFS_fs_id fs_id; /* Filesystem ID */
-	PVFS_credentials credentials;
-
-};
-typedef struct PVFS_sysreq_statfs_s PVFS_sysreq_statfs;
-
 struct PVFS_sysresp_statfs_s {
 	PVFS_statfs statfs;
 };
@@ -272,15 +226,6 @@ struct PVFS_sysresp_config_s {
 typedef struct PVFS_sysresp_config_s PVFS_sysresp_config;
 
 /* readdir */
-struct PVFS_sysreq_readdir_s {
-	pinode_reference pinode_refn;
-	PVFS_ds_position token;
-	int pvfs_dirent_incount;
-	PVFS_credentials credentials;
-	
-};
-typedef struct PVFS_sysreq_readdir_s PVFS_sysreq_readdir;
-
 struct PVFS_sysresp_readdir_s {
 	PVFS_ds_position token;  
 	int pvfs_dirent_outcount;
@@ -304,6 +249,9 @@ struct PVFS_sysresp_extension_s {
 };
 typedef struct PVFS_sysresp_extension_s PVFS_sysresp_extension;
 
+#if 0
+/* is this relevant to anything? */
+
 /* PVFS system request structure
  */
 struct PVFS_system_req_s {
@@ -314,12 +262,11 @@ struct PVFS_system_req_s {
 		PVFS_sysreq_mkdir mkdir;
 		PVFS_sysreq_remove remove;
 		PVFS_sysreq_rename rename;
-		PVFS_sysreq_lock lock;
-		PVFS_sysreq_unlock unlock;
-		PVFS_sysreq_statfs statfs;
 		PVFS_sysreq_readdir readdir;
 	} u;
 };
+
+#endif
 
 /* PVFS system response structure
  */
@@ -380,13 +327,20 @@ int PVFS_sys_getattr(pinode_reference pinode_refn, uint32_t attrmask,
 int PVFS_sys_setattr(pinode_reference pinode_refn, PVFS_object_attr attr,
 		uint32_t attrmask, PVFS_credentials credentials, 
 		PVFS_attr_extended extended);
-int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp);
-int PVFS_sys_readdir(PVFS_sysreq_readdir *req, PVFS_sysresp_readdir *resp);
+int PVFS_sys_mkdir(char* entry_name, pinode_reference parent_refn, 
+			uint32_t attrmask, PVFS_object_attr attr, 
+			PVFS_credentials credentials, PVFS_sysresp_mkdir *resp);
+int PVFS_sys_readdir(pinode_reference pinode_refn, PVFS_ds_position token, 
+			int pvfs_dirent_incount, PVFS_credentials credentials, 
+			PVFS_sysresp_readdir *resp);
 int PVFS_sys_create(char* entry_name, pinode_reference parent_refn, 
 		uint32_t attrmask, PVFS_object_attr attr, 
 		PVFS_credentials credentials, PVFS_sysresp_create *resp);
-int PVFS_sys_remove(PVFS_sysreq_remove *req);
-int PVFS_sys_rename(PVFS_sysreq_rename *req);
+int PVFS_sys_remove(char* entry_name, pinode_reference parent_refn, 
+			PVFS_credentials credentials);
+int PVFS_sys_rename(char* old_entry, pinode_reference old_parent_refn, 
+			char* new_entry, pinode_reference new_parent_refn, 
+			PVFS_credentials credentials);
 int PVFS_sys_symlink(PVFS_fs_id fs_id, char* name, char* target, 
 		uint32_t attrmask, PVFS_object_attr attr, 
 		PVFS_credentials credentials, PVFS_sysresp_symlink *resp);
@@ -403,9 +357,11 @@ int PVFS_sys_truncate(pinode_reference pinode_refn, PVFS_size size,
 int PVFS_sys_duplicate(PVFS_fs_id fs_id, pinode_reference old_reference, 
 		char* new_entry, pinode_reference new_parent_reference, 
 		PVFS_sysresp_duplicate *resp);
-int PVFS_sys_lock(PVFS_sysreq_lock *req, PVFS_sysresp_lock *resp);
-int PVFS_sys_unlock(PVFS_sysreq_unlock *req);
-int PVFS_sys_statfs(PVFS_sysreq_statfs *req, PVFS_sysresp_statfs *resp);
+int PVFS_sys_lock(pinode_reference pinode_refn, PVFS_credentials credentials,
+			PVFS_sysresp_lock *resp);
+int PVFS_sys_unlock(pinode_reference pinode_refn, PVFS_credentials credentials);
+int PVFS_sys_statfs(PVFS_fs_id fs_id, PVFS_credentials credentials,
+			PVFS_sysresp_statfs *resp);
 int PVFS_sys_config(PVFS_handle handle, PVFS_sysresp_config *resp);
 int PVFS_sys_hint(int undefined,  PVFS_sysresp_hint *resp);
 int PVFS_sys_extension(int undefined, PVFS_sysresp_extension *resp);

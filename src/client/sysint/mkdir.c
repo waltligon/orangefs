@@ -28,7 +28,9 @@ extern struct server_configuration_s g_server_config;
  *
  * returns 0 on success, -errno on failure
  */
-int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
+int PVFS_sys_mkdir(char* entry_name, pinode_reference parent_refn, 
+                        uint32_t attrmask, PVFS_object_attr attr, 
+                        PVFS_credentials credentials, PVFS_sysresp_mkdir *resp)
 {
     struct PVFS_server_req_s req_p;		/* server request */
     struct PVFS_server_resp_s *ack_p = NULL;	/* server response */
@@ -58,8 +60,8 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
 
     /* get the pinode of the parent so we can check permissions */
     attr_mask = ATTR_BASIC | ATTR_META;
-    ret = phelper_get_pinode(req->parent_refn, &parent_ptr, attr_mask,
-				   req->credentials);
+    ret = phelper_get_pinode(parent_refn, &parent_ptr, attr_mask,
+				   credentials);
     if(ret < 0)
     {
 	/* parent pinode doesn't exist ?!? */
@@ -69,8 +71,8 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
     }
 
     /* check permissions in parent directory */
-    ret = check_perms(parent_ptr->attr,req->credentials.perms,
-			req->credentials.uid, req->credentials.gid);
+    ret = check_perms(parent_ptr->attr,credentials.perms,
+			credentials.uid, credentials.gid);
     if (ret < 0)
     {
 	phelper_release_pinode(parent_ptr);
@@ -83,7 +85,7 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
     phelper_release_pinode(parent_ptr);
 
     /* Lookup handle(if it exists) in dcache */
-    ret = PINT_dcache_lookup(req->entry_name,req->parent_refn,&entry);
+    ret = PINT_dcache_lookup(entry_name,parent_refn,&entry);
     if (ret < 0 )
     {
 	/* there was an error, bail*/
@@ -103,7 +105,7 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
 
     /* Determine the initial metaserver for new file */
     ret = PINT_bucket_get_next_meta(&g_server_config,
-                                    req->parent_refn.fs_id,&serv_addr1);
+                                    parent_refn.fs_id,&serv_addr1);
     if (ret < 0)
     {
 	failure = LOOKUP_SERVER_FAILURE;
@@ -113,11 +115,11 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
     /* send the create request for the meta file */
     req_p.op = PVFS_SERV_MKDIR;
     req_p.rsize = sizeof(struct PVFS_server_req_s);
-    req_p.credentials = req->credentials;
+    req_p.credentials = credentials;
     req_p.u.mkdir.requested_handle = 0;
-    req_p.u.mkdir.fs_id = req->parent_refn.fs_id;
-    req_p.u.mkdir.attr = req->attr;
-    req_p.u.mkdir.attrmask = req->attrmask;
+    req_p.u.mkdir.fs_id = parent_refn.fs_id;
+    req_p.u.mkdir.attr = attr;
+    req_p.u.mkdir.attrmask = attrmask;
 
     max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
 
@@ -143,7 +145,7 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
 
     /* save the handle for the meta file so we can refer to it later */
     entry.handle = ack_p->u.mkdir.handle;
-    entry.fs_id = req->parent_refn.fs_id;
+    entry.fs_id = parent_refn.fs_id;
 
     /* these fields are the only thing we need to set for the response to
      * the calling function
@@ -157,8 +159,8 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
 
     /* the all the dirents for files/directories are stored on whatever server
      * holds the parent handle */
-    ret = PINT_bucket_map_to_server(&serv_addr2,req->parent_refn.handle,
-    req->parent_refn.fs_id);
+    ret = PINT_bucket_map_to_server(&serv_addr2,parent_refn.handle,
+    parent_refn.fs_id);
     if (ret < 0)
     {
 	failure = MKDIR_MSG_FAILURE;
@@ -168,22 +170,22 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
     /* send crdirent to associate a name with the meta file we just made */
 
     /* remove leading slashes from name; this isn't a complete fix. */
-    while (*req->entry_name == '/') req->entry_name++;
+    while (*entry_name == '/') entry_name++;
 
-    name_sz = strlen(req->entry_name) + 1; /*include null terminator*/
+    name_sz = strlen(entry_name) + 1; /*include null terminator*/
     req_p.op = PVFS_SERV_CREATEDIRENT;
     req_p.rsize = sizeof(struct PVFS_server_req_s) + name_sz;
 
-    /* credentials come from req->credentials and are set in the previous
+    /* credentials come from credentials and are set in the previous
      * create request.  so we don't have to set those again.
      */
 
     /* just update the pointer, it'll get malloc'ed when its sent on the
      * wire.
      */
-    req_p.u.crdirent.name = req->entry_name;
+    req_p.u.crdirent.name = entry_name;
     req_p.u.crdirent.new_handle = entry.handle;
-    req_p.u.crdirent.parent_handle = req->parent_refn.handle;
+    req_p.u.crdirent.parent_handle = parent_refn.handle;
     req_p.u.crdirent.fs_id = entry.fs_id;
 
     /* max response size is the same as the previous request */
@@ -215,7 +217,7 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
 	&encoded_resp, op_tag);
 
     /* add the new directory to the dcache and pinode caches */
-    ret = PINT_dcache_insert(req->entry_name, entry, req->parent_refn);
+    ret = PINT_dcache_insert(entry_name, entry, parent_refn);
     if (ret < 0)
     {
 	failure = DCACHE_INSERT_FAILURE;
@@ -231,9 +233,9 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
 
     /* Fill up the pinode */
     pinode_ptr->pinode_ref.handle = entry.handle;
-    pinode_ptr->pinode_ref.fs_id = req->parent_refn.fs_id;
-    pinode_ptr->mask = req->attrmask;
-    pinode_ptr->attr = req->attr;
+    pinode_ptr->pinode_ref.fs_id = parent_refn.fs_id;
+    pinode_ptr->mask = attrmask;
+    pinode_ptr->attr = attr;
 
     /* Fill in the timestamps */
     ret = phelper_fill_timestamps(pinode_ptr);
@@ -275,7 +277,7 @@ return_error:
 	    /* rollback mkdir message */
 	    req_p.op = PVFS_SERV_REMOVE;
 	    req_p.rsize = sizeof(struct PVFS_server_req_s);
-	    req_p.credentials = req->credentials;
+	    req_p.credentials = credentials;
 	    req_p.u.remove.handle = entry.handle;
 	    req_p.u.remove.fs_id = entry.fs_id;
 

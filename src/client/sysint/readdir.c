@@ -24,7 +24,9 @@
  *
  * returns 0 on success, -errno on failure
  */
-int PVFS_sys_readdir(PVFS_sysreq_readdir *req, PVFS_sysresp_readdir *resp)
+int PVFS_sys_readdir(pinode_reference pinode_refn, PVFS_ds_position token, 
+                        int pvfs_dirent_incount, PVFS_credentials credentials,
+			PVFS_sysresp_readdir *resp)
 {
 	struct PVFS_server_req_s req_p;			/* server request */
 	struct PVFS_server_resp_s *ack_p = NULL;	/* server response */
@@ -49,8 +51,8 @@ int PVFS_sys_readdir(PVFS_sysreq_readdir *req, PVFS_sysresp_readdir *resp)
 	/* Revalidate directory handle */
 	/* Get the directory pinode */
 	attr_mask = ATTR_BASIC;
-	ret = phelper_get_pinode(req->pinode_refn,&pinode_ptr,
-			attr_mask, req->credentials);
+	ret = phelper_get_pinode(pinode_refn,&pinode_ptr,
+			attr_mask, credentials);
 	if (ret < 0)
 	{
 	    failure = GET_PINODE_FAILURE;
@@ -62,8 +64,8 @@ int PVFS_sys_readdir(PVFS_sysreq_readdir *req, PVFS_sysresp_readdir *resp)
 	/* Read directory server request */
 
 	/* Query the BTI to get initial meta server */
-	ret = PINT_bucket_map_to_server(&serv_addr, req->pinode_refn.handle,
-	  		req->pinode_refn.fs_id);
+	ret = PINT_bucket_map_to_server(&serv_addr, pinode_refn.handle,
+	  		pinode_refn.fs_id);
 	if (ret < 0)
 	{
 	    failure = SERVER_LOOKUP_FAILURE;
@@ -72,15 +74,15 @@ int PVFS_sys_readdir(PVFS_sysreq_readdir *req, PVFS_sysresp_readdir *resp)
 
 	/* send a readdir message to the server */
 	req_p.op = PVFS_SERV_READDIR;
-	req_p.credentials = req->credentials;
+	req_p.credentials = credentials;
 	req_p.rsize = sizeof(struct PVFS_server_req_s);
-	req_p.u.readdir.handle = req->pinode_refn.handle;
-	req_p.u.readdir.fs_id = req->pinode_refn.fs_id;
-	req_p.u.readdir.token = req->token;
-	req_p.u.readdir.pvfs_dirent_count = req->pvfs_dirent_incount;
+	req_p.u.readdir.handle = pinode_refn.handle;
+	req_p.u.readdir.fs_id = pinode_refn.fs_id;
+	req_p.u.readdir.token = token;
+	req_p.u.readdir.pvfs_dirent_count = pvfs_dirent_incount;
 
 	max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op)
-			+ req->pvfs_dirent_incount * sizeof(PVFS_dirent);
+			+ pvfs_dirent_incount * sizeof(PVFS_dirent);
 
 	/*send the readdir request to the server*/
 

@@ -43,7 +43,9 @@ extern pcache pvfs_pcache;
  *
  * returns 0 on success, -errno on failure
  */
-int PVFS_sys_rename(PVFS_sysreq_rename *req)
+int PVFS_sys_rename(char* old_entry, pinode_reference old_parent_refn, 
+                        char* new_entry, pinode_reference new_parent_refn, 
+                        PVFS_credentials credentials)
 {
     struct PVFS_server_req_s req_p;		/* server request */
     struct PVFS_server_resp_s *ack_p = NULL;	/* server response */
@@ -52,7 +54,7 @@ int PVFS_sys_rename(PVFS_sysreq_rename *req)
     bmi_addr_t serv_addr;	/* PVFS address type structure */
     int name_sz = 0;
     uint32_t attr_mask;
-    pinode_reference old_entry;
+    pinode_reference old_entry_refn;
     struct PINT_decoded_msg decoded;
     bmi_size_t max_msg_sz;
     void* encoded_resp;
@@ -60,15 +62,15 @@ int PVFS_sys_rename(PVFS_sysreq_rename *req)
 
     attr_mask = ATTR_BASIC | ATTR_META;
 
-    ret = PINT_do_lookup(req->old_entry, req->old_parent_refn, attr_mask,
-			    req->credentials, &old_entry);
+    ret = PINT_do_lookup(old_entry, old_parent_refn, attr_mask,
+			    credentials, &old_entry_refn);
     if (ret < 0)
     {
 	goto return_error;
     }
 
     /* get the pinode for the thing we're renaming */
-    ret = phelper_get_pinode(old_entry, &old_entry_p, attr_mask, req->credentials);
+    ret = phelper_get_pinode(old_entry_refn, &old_entry_p, attr_mask, credentials);
 
     if (ret < 0)
     {
@@ -76,8 +78,8 @@ int PVFS_sys_rename(PVFS_sysreq_rename *req)
     }
 
     /* are we allowed to delete this file? */
-    ret = check_perms(old_entry_p->attr, req->credentials.perms,
-			    req->credentials.uid, req->credentials.gid);
+    ret = check_perms(old_entry_p->attr, credentials.perms,
+			    credentials.uid, credentials.gid);
     if (ret < 0)
     {
 	phelper_release_pinode(old_entry_p);
@@ -88,8 +90,8 @@ int PVFS_sys_rename(PVFS_sysreq_rename *req)
 
     /* make sure the new parent exists */
 
-    ret = phelper_get_pinode(req->new_parent_refn, &new_parent_p, 
-				attr_mask, req->credentials);
+    ret = phelper_get_pinode(new_parent_refn, &new_parent_p, 
+				attr_mask, credentials);
     if(ret < 0)
     {
 	/* parent pinode doesn't exist ?!? */
@@ -98,8 +100,8 @@ int PVFS_sys_rename(PVFS_sysreq_rename *req)
     }
 
     /* check permissions in parent directory */
-    ret = check_perms(new_parent_p->attr, req->credentials.perms,
-				req->credentials.uid, req->credentials.gid);
+    ret = check_perms(new_parent_p->attr, credentials.perms,
+				credentials.uid, credentials.gid);
     if (ret < 0)
     {
 	phelper_release_pinode(new_parent_p);
@@ -109,23 +111,23 @@ int PVFS_sys_rename(PVFS_sysreq_rename *req)
     }
     phelper_release_pinode(new_parent_p);
 
-    ret = PINT_bucket_map_to_server(&serv_addr,req->new_parent_refn.handle,
-					req->new_parent_refn.fs_id);
+    ret = PINT_bucket_map_to_server(&serv_addr,new_parent_refn.handle,
+					new_parent_refn.fs_id);
     if (ret < 0)
     {
 	gossip_ldebug(CLIENT_DEBUG,"unable to map a server to the new parent via the bucket table interface\n");
 	goto return_error;
     }
 
-    name_sz = strlen(req->new_entry) + 1; /*include null terminator*/
+    name_sz = strlen(new_entry) + 1; /*include null terminator*/
     req_p.op = PVFS_SERV_CREATEDIRENT;
     req_p.rsize = sizeof(struct PVFS_server_req_s) + name_sz;
-    req_p.credentials = req->credentials;
+    req_p.credentials = credentials;
 
-    req_p.u.crdirent.name = req->new_entry;
-    req_p.u.crdirent.new_handle = old_entry.handle;
-    req_p.u.crdirent.parent_handle = req->new_parent_refn.handle;
-    req_p.u.crdirent.fs_id = req->new_parent_refn.fs_id;
+    req_p.u.crdirent.name = new_entry;
+    req_p.u.crdirent.new_handle = old_entry_refn.handle;
+    req_p.u.crdirent.parent_handle = new_parent_refn.handle;
+    req_p.u.crdirent.fs_id = new_parent_refn.fs_id;
 
     /* create requests get a generic response */
     max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
@@ -157,8 +159,8 @@ int PVFS_sys_rename(PVFS_sysreq_rename *req)
      * old one
      */
 
-    ret = PINT_bucket_map_to_server(&serv_addr,req->new_parent_refn.handle,
-					req->new_parent_refn.fs_id);
+    ret = PINT_bucket_map_to_server(&serv_addr,new_parent_refn.handle,
+					new_parent_refn.fs_id);
     if (ret < 0)
     {
 	gossip_ldebug(CLIENT_DEBUG,"unable to map a server to the old parent\n");
@@ -169,13 +171,13 @@ int PVFS_sys_rename(PVFS_sysreq_rename *req)
      * req_p.credentials
      */
 
-    name_sz = strlen(req->old_entry) + 1; /*include null terminator*/
+    name_sz = strlen(old_entry) + 1; /*include null terminator*/
     req_p.op = PVFS_SERV_RMDIRENT;
     req_p.rsize = sizeof(struct PVFS_server_req_s) + name_sz;
 
-    req_p.u.rmdirent.entry = req->old_entry;
-    req_p.u.rmdirent.parent_handle = req->old_parent_refn.handle;
-    req_p.u.rmdirent.fs_id = req->old_parent_refn.fs_id;
+    req_p.u.rmdirent.entry = old_entry;
+    req_p.u.rmdirent.parent_handle = old_parent_refn.handle;
+    req_p.u.rmdirent.fs_id = old_parent_refn.fs_id;
 
     op_tag = get_next_session_tag();
 
@@ -201,7 +203,7 @@ int PVFS_sys_rename(PVFS_sysreq_rename *req)
      * out what we deleted and figure out why the server had the wrong link.
      */
 
-    assert(ack_p->u.rmdirent.entry_handle == req->old_parent_refn.handle);
+    assert(ack_p->u.rmdirent.entry_handle == old_parent_refn.handle);
     PINT_release_req(serv_addr, &req_p, max_msg_sz, &decoded,
 			&encoded_resp, op_tag);
 

@@ -26,7 +26,8 @@
  *
  * returns 0 on success, -errno on failure
  */
-int PVFS_sys_remove(PVFS_sysreq_remove *req)
+int PVFS_sys_remove(char* entry_name, pinode_reference parent_refn, 
+                        PVFS_credentials credentials)
 {
 	struct PVFS_server_req_s req_p;		    /* server request */
 	struct PVFS_server_resp_s *ack_p = NULL;    /* server response */
@@ -53,8 +54,8 @@ int PVFS_sys_remove(PVFS_sysreq_remove *req)
 	/* lookup meta file */
 	attr_mask = ATTR_BASIC | ATTR_META;
 
-	ret = PINT_do_lookup(req->entry_name, req->parent_refn, attr_mask,
-				req->credentials, &entry);
+	ret = PINT_do_lookup(entry_name, parent_refn, attr_mask,
+				credentials, &entry);
 	if (ret < 0)
 	{
 	    failure = GET_PINODE_FAILURE;
@@ -63,7 +64,7 @@ int PVFS_sys_remove(PVFS_sysreq_remove *req)
 
 	/* get the pinode for the thing we're deleting */
 	ret = phelper_get_pinode(entry, &pinode_ptr,
-			attr_mask, req->credentials );
+			attr_mask, credentials );
 	if (ret < 0)
 	{
 	    failure = GET_PINODE_FAILURE;
@@ -71,8 +72,8 @@ int PVFS_sys_remove(PVFS_sysreq_remove *req)
 	}
 
 	/* are we allowed to delete this file? */
-	ret = check_perms(pinode_ptr->attr, req->credentials.perms,
-				req->credentials.uid, req->credentials.gid);
+	ret = check_perms(pinode_ptr->attr, credentials.perms,
+				credentials.uid, credentials.gid);
 	if (ret < 0)
 	{ 
 	    phelper_release_pinode(pinode_ptr);
@@ -91,9 +92,9 @@ int PVFS_sys_remove(PVFS_sysreq_remove *req)
 	/* send remove message to the meta file */
 	req_p.op = PVFS_SERV_REMOVE;
 	req_p.rsize = sizeof(struct PVFS_server_req_s);
-	req_p.credentials = req->credentials;
+	req_p.credentials = credentials;
 	req_p.u.remove.handle = pinode_ptr->pinode_ref.handle;
-	req_p.u.remove.fs_id = req->parent_refn.fs_id;
+	req_p.u.remove.fs_id = parent_refn.fs_id;
 	max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
 
 	op_tag = get_next_session_tag();
@@ -120,21 +121,21 @@ int PVFS_sys_remove(PVFS_sysreq_remove *req)
             &encoded_resp, op_tag);
 
 	/* rmdirent the dir entry */
-	ret = PINT_bucket_map_to_server(&serv_addr, req->parent_refn.handle, req->parent_refn.fs_id);
+	ret = PINT_bucket_map_to_server(&serv_addr, parent_refn.handle, parent_refn.fs_id);
 	if (ret < 0)
 	{
 	    failure = SERVER_LOOKUP_FAILURE;
 	    goto return_error;
 	}
 
-	name_sz = strlen(req->entry_name) + 1; /*include null terminator*/
+	name_sz = strlen(entry_name) + 1; /*include null terminator*/
 
 	req_p.op = PVFS_SERV_RMDIRENT;
 	req_p.rsize = sizeof(struct PVFS_server_req_s) + name_sz;
-	req_p.credentials = req->credentials;
-	req_p.u.rmdirent.entry = req->entry_name;
-	req_p.u.rmdirent.parent_handle = req->parent_refn.handle;
-	req_p.u.rmdirent.fs_id = req->parent_refn.fs_id;
+	req_p.credentials = credentials;
+	req_p.u.rmdirent.entry = entry_name;
+	req_p.u.rmdirent.parent_handle = parent_refn.handle;
+	req_p.u.rmdirent.fs_id = parent_refn.fs_id;
 
 	op_tag = get_next_session_tag();
 
@@ -177,8 +178,8 @@ int PVFS_sys_remove(PVFS_sysreq_remove *req)
 	/* none of this stuff changes, so we don't need to set it in a loop */
 	req_p.op = PVFS_SERV_REMOVE;
 	req_p.rsize = sizeof(struct PVFS_server_req_s);
-	req_p.credentials = req->credentials;
-	req_p.u.remove.fs_id = req->parent_refn.fs_id;
+	req_p.credentials = credentials;
+	req_p.u.remove.fs_id = parent_refn.fs_id;
 	max_msg_sz = PINT_get_encoded_generic_ack_sz(0, req_p.op);
 
 	ioserv_count = pinode_ptr->attr.u.meta.nr_datafiles;
@@ -190,7 +191,7 @@ int PVFS_sys_remove(PVFS_sysreq_remove *req)
 	     * to get the correct server from the bucket table interface
 	     */
 	    req_p.u.remove.handle = pinode_ptr->attr.u.meta.dfh[i];
-	    ret = PINT_bucket_map_to_server(&serv_addr, req_p.u.remove.handle, req->parent_refn.fs_id);
+	    ret = PINT_bucket_map_to_server(&serv_addr, req_p.u.remove.handle, parent_refn.fs_id);
 	    if (ret < 0)
 	    {
 		failure = SERVER_LOOKUP_FAILURE;
@@ -223,7 +224,7 @@ int PVFS_sys_remove(PVFS_sysreq_remove *req)
 	phelper_release_pinode(pinode_ptr);
 
 	/* Remove the dentry from the dcache */
-	ret = PINT_dcache_remove(req->entry_name,req->parent_refn,&items_found);
+	ret = PINT_dcache_remove(entry_name,parent_refn,&items_found);
 	if (ret < 0)
 	{
 	    failure = REMOVE_CACHE_FAILURE;

@@ -25,7 +25,6 @@ int main(int argc,char **argv)
 	PVFS_sysresp_init resp_init;
 	PVFS_sysresp_lookup resp_look;
 	PVFS_sysresp_lookup *resp_lk = NULL;
-	PVFS_sysreq_readdir *req_readdir = NULL;
 	PVFS_sysresp_readdir *resp_readdir = NULL;
 #if 0
 	PVFS_sysreq_getattr *req_gattr = NULL;
@@ -49,6 +48,9 @@ int main(int argc,char **argv)
 	pinode_reference parent_refn;
 	uint32_t attrmask;
 	PVFS_object_attr attr;
+	pinode_reference pinode_refn;
+	PVFS_ds_position token;
+	int pvfs_dirent_incount;
 
 	PVFS_handle lk_handle;
 	PVFS_handle lk_fsid;
@@ -488,12 +490,6 @@ int main(int argc,char **argv)
 	printf("FSID:%ld\n",(long int)req_mkdir->parent_refn.fs_id);
 #endif
 
-	req_readdir = (PVFS_sysreq_readdir *)malloc(sizeof(PVFS_sysreq_readdir));
-	if (!req_readdir)
-	{
-		printf("Error in malloc\n");
-		return(-1);
-	}
 	resp_readdir = (PVFS_sysresp_readdir *)malloc(sizeof(PVFS_sysresp_readdir));
 	if (!resp_readdir)
 	{
@@ -503,23 +499,18 @@ int main(int argc,char **argv)
 
 	// Fill in the dir info 
 
-	req_readdir->pinode_refn.handle = resp_look.pinode_refn.handle;
-	req_readdir->pinode_refn.fs_id = fs_id;
-	req_readdir->token = PVFS2_READDIR_START;
-	req_readdir->pvfs_dirent_incount = 6;
-/*
-	resp_readdir->dirent_array = (PVFS_dirent *)malloc(sizeof(PVFS_dirent) *
-			req_readdir->pvfs_dirent_incount);
-	resp_readdir->pvfs_dirent_outcount = 6;
-*/
-
-	req_readdir->credentials.uid = 100;
-	req_readdir->credentials.gid = 100;
-	req_readdir->credentials.perms = 1877;
+	pinode_refn.handle = resp_look.pinode_refn.handle;
+	pinode_refn.fs_id = fs_id;
+	token = PVFS2_READDIR_START;
+	pvfs_dirent_incount = 6;
+	credentials.uid = 100;
+	credentials.gid = 100;
+	credentials.perms = 1877;
 
 
 	// call readdir 
-	ret = PVFS_sys_readdir(req_readdir,resp_readdir);
+	ret = PVFS_sys_readdir(pinode_refn, token, pvfs_dirent_incount, 
+				credentials,resp_readdir);
 	if (ret < 0)
 	{
 		printf("readdir failed with errcode = %d\n", ret);
