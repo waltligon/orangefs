@@ -147,7 +147,6 @@ documentation:
   - also document headers that bmi tacks on, at least for bmi_tcp
 - update the coding guidelines
 - document config file options
-- a way to export to html
 - faq
 - mechanism for exporting to html
 - update all design docs!

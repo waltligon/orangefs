@@ -175,7 +175,8 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 	    msg_p->send_id = 0;
 
 	    /* mark send as bad too and don't post it */
-	    msg_p->send_status.error_code = PVFS_EIO; /* ??? */
+	    /* TODO: what should this error be?  copy of recv? */
+	    msg_p->send_status.error_code = -PVFS_EIO;
 	    continue;
 	}
 	assert(ret == 0); /* return value range check */
@@ -293,7 +294,13 @@ static int msgpairarray_completion_fn(PINT_client_sm *sm_p,
 	if (msg_p->send_status.error_code != 0 ||
 	    msg_p->recv_status.error_code != 0)
 	{
-	    js_p->error_code = msg_p->send_status.error_code;
+	    /* save a failed error code */
+	    if (msg_p->send_status.error_code) {
+		js_p->error_code = msg_p->send_status.error_code;
+	    }
+	    else {
+		js_p->error_code = msg_p->recv_status.error_code;
+	    }
 
 	    /* don't call comp fn on these -- RobR */
 	    gossip_err("msg pair did not complete; skipping comp_fn\n");
