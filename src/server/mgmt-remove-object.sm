@@ -79,7 +79,7 @@ static int mgmt_remove_dspace(
     return ret;
 }
 
-static int remove_cleanup(
+static int mgmt_remove_cleanup(
     PINT_server_op *s_op, job_status_s *js_p)
 {
     PINT_STATE_DEBUG("cleanup");
