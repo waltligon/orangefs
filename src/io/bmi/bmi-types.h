@@ -4,7 +4,10 @@
  * See COPYING in top-level directory.
  */
 
-/* Header file for types and other defines used throughout the BMI.
+/** \file
+ *  \ingroup bmiint
+ *
+ *  Types and other defines used throughout the BMI.
  */
 
 #ifndef __BMI_TYPES_H
