@@ -47,9 +47,11 @@ cmds = $(patsubst %,.%.cmd,$(objs) $(othergen))
 ifneq ($(KERNELRELEASE),)
 
 EXTRA_CFLAGS = \
+    -I$(absolute_src_dir)/ \
     -I$(absolute_src_dir)/include \
     -I$(absolute_src_dir)/src/io/dev \
-    -I$(absolute_src_dir)/src/common/quickhash
+    -I$(absolute_src_dir)/src/common/quickhash \
+    -I$(absolute_src_dir)/src/common/id-generator
 
 EXTRA_CFLAGS += @MMAP_RA_CACHE@
 

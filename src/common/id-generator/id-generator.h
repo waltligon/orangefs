@@ -20,7 +20,6 @@
 
 #include "pvfs2-types.h"
 #include "pvfs2-config.h"
-#include "errno.h"
 
 /* id_gen_fast_register()
  * 

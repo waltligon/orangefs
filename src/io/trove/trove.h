@@ -8,6 +8,7 @@
 #define __TROVE_H
 
 #include <limits.h>
+#include <errno.h>
 
 #include "pvfs2-config.h"
 #include "pvfs2-debug.h"

@@ -469,8 +469,8 @@ loff_t pvfs2_file_llseek(struct file *file, loff_t offset, int origin)
                 "inode size is %lu\n", (int)offset, origin,
                 (unsigned long)file->f_dentry->d_inode->i_size);
 
-/*     return generic_file_llseek(file, offset, origin); */
-    return remote_llseek(file, offset, origin);
+    return generic_file_llseek(file, offset, origin);
+/*     return remote_llseek(file, offset, origin); */
 }
 
 struct file_operations pvfs2_file_operations =
