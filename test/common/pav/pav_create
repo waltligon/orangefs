@@ -333,6 +333,7 @@ sub split_machines {
     @ionodes = (),
     @metanodes = ();
     @compnodes = ();
+    @servernodes = ();
 
     my $count=0;
 
@@ -359,31 +360,47 @@ sub split_machines {
 	    close(FH);
     }
 
-    if ($count < ($href->{'IONCOUNT'} + $href->{'UNIQUEMETA'} * $href->{'METACOUNT'})) {
+    # decide how many total servers there will be
+    if ($href->{'UNIQUEMETA'}) {
+	$servernum = $href->{'IONCOUNT'} + $href->{'METACOUNT'};
+    } else {
+	# if servers are not unique, choose enough to satisfy larger of meta
+	# or io requirement
+	if ($href->{'METACOUNT'} >= $href->{'IONCOUNT'}) {
+	    $servernum = $href->{'METACOUNT'};
+	} else {
+	    $servernum = $href->{'IONCOUNT'};
+	}
+    }
+
+    if ($count < $servernum) {
 	print STDERR "ERROR: requested more server nodes than are available\n";
 	return(1);
     }
-    
+
     my $ionum = $href->{'IONCOUNT'};
     my $metanum = $href->{'METACOUNT'};
-    my $compnum = $count - ($href->{'IONCOUNT'} + $href->{'UNIQUEMETA'} * $href->{'METACOUNT'});
+    my $compnum = $count - $servernum;
 
-    if ($href->{'UNIQUEMETA'}) {
-        for ($i=0; $i<$metanum; $i++) {
-		$metanodes[$i] = shift @nodelist;
-	}
-    } else {
-    	@metanodes = @nodelist[0..$metanum-1];
-    }
-
+    # split total set into servers and clients
     if ($href->{'COMPUTENODES_LAST'}) {
-	    @ionodes = @nodelist[0..$ionum-1];
-	    @compnodes = @nodelist[$ionum..$count-1];
+	@servernodes = @nodelist[0..($servernum-1)];
+	@compnodes = @nodelist[$servernum..($count-1)];
     } else {
-	    @compnodes = @nodelist[0..$compnum-1];
-	    @ionodes = @nodelist[$compnum..$count-1];
+	@compnodes = @nodelist[0..($compnum-1)];
+	@servernodes = @nodelist[$compnum..($count-1)];
     }
-    
+
+    # pick meta nodes 
+    @metanodes = @servernodes[0..($metanum-1)];
+
+    # pick io nodes
+    if ($href->{'UNIQUEMETA'}) {
+	@ionodes = @servernodes[$metanum..($servernum-1)];
+    } else {
+	@ionodes = @servernodes[0..($ionum-1)];
+    }
+
     $href->{'MGR'} = \@metanodes;
     $href->{'IONODES'} = \@ionodes;
     $href->{'COMPNODES'} = \@compnodes;
