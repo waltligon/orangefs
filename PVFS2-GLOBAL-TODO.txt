@@ -1,18 +1,15 @@
 ####################################################################
 # TODO list for pvfs2 project as a whole
 # 
-# note: high priority areas have been marked with "****"
 #
 
 server operations:
 ====================================================================
 - not started:
-  - noop
   - eattrib (set/get)
-  - truncate
-  - statfs
   
 - unfinished:
+  - statfs
   - general error handling
 
 general server functionality:
@@ -25,11 +22,6 @@ general server functionality:
 - don't forget to define semantics for access times
 - access control, general security model
 - testing multiple meta servers
-- more config file options:
-  - bmi, trove, and flow methods
-  - encoding type
-  - etc.
-- memory datatype processing
 
 request scheduler:
 ====================================================================
@@ -40,10 +32,10 @@ system interface functionality:
 ====================================================================
 - not started:
   - eattrib (set/get)?
-  - statfs
 
 - unfinished:
   - thread safety
+  - statfs
   - way to pass in consistency semantics (timeout values, etc.)
   - state machine implementations for all functions
 
@@ -54,7 +46,6 @@ system interface functionality:
 
 user interfaces:
 ====================================================================
-- ROMIO module
 - pvfs_XXX interface?
 
 kernel/vfs interface
@@ -63,10 +54,8 @@ kernel/vfs interface
   - quick modification of existing pvfs-kernel and/or full rewrite
 - 2.6.x pvfs2-kernel implementation
   - add ability to mount multiple file systems
-  - properly handle vfs interruption cases (signals)
   - get fsid/root handle information at mount time
   - use /etc/fstab mount interface for volume info
-  - auto generate makefile for module to get srcdir right
 
 system installation:
 ====================================================================
@@ -111,9 +100,8 @@ I/O path:
 
 I/O description:
 ====================================================================
-- how to free request descriptions and distribution structures
-- how to copy dist information
 - how to encode io descriptions and dist for wire protocol
+- use new methods for copying and freeing requests and distributions
 
 correctness/performance testing
 ====================================================================
@@ -133,7 +121,6 @@ system management utilities
   - etc.
 - end user documentation
 - better logging systems
-- more tools like pvfs2-ls, pvfs2-import, etc.
 - maybe make pvfs2-ping compute a cksum on the fs.conf from all
   servers and issue a warning if they don't all match?
 
