@@ -475,7 +475,7 @@ AC_ARG_WITH(gm,
     fi
 )
 if test -n "$GM_HOME" ; then
-    CPPFLAGS="$CPPFLAGS -I ${GM_HOME}/include ${GM_HOME}/include/gm"
+    CPPFLAGS="$CPPFLAGS -I ${GM_HOME}/include -I ${GM_HOME}/include/gm"
     AC_CHECK_HEADER(gm.h,, AC_MSG_ERROR([Header gm.h not found.]))
     BUILD_GM=1
     CPPFLAGS="$CPPFLAGS_OLD"

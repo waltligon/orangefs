@@ -4545,7 +4545,7 @@ echo "$as_me: error: Option --with-gm requires the path to your GM tree." >&2;}
 
 fi;
 if test -n "$GM_HOME" ; then
-    CPPFLAGS="$CPPFLAGS -I ${GM_HOME}/include ${GM_HOME}/include/gm"
+    CPPFLAGS="$CPPFLAGS -I ${GM_HOME}/include -I ${GM_HOME}/include/gm"
     if test "${ac_cv_header_gm_h+set}" = set; then
   echo "$as_me:$LINENO: checking for gm.h" >&5
 echo $ECHO_N "checking for gm.h... $ECHO_C" >&6
