@@ -5,6 +5,11 @@ Stuff to do for the first friendly-user release:
 
 . use fstab to describe pvfs2 volumes
 
+. make pvfs2-client stuff capable of mounting multiple file systems
+
+. handle more error cases in kernel module (ctrl-c, timeouts,
+  pvfs2-client death, etc.)
+
 . config file utility
 
 . more admin tools (pvfs2-ls, pvfs2-rm, pvfs2-statfs, etc.) that

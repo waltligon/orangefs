@@ -76,6 +76,8 @@ performance tuning:
 - architecture specific locking, etc.
 - thread tuning
 - memory allocation cache
+- do some benchmarking of thread context switches to help decide
+  how trove/job/flow interfaces should interact
 
 request encoding:
 ====================================================================
