@@ -357,6 +357,7 @@ int PINT_server_get_config(struct server_configuration_s *config,
     PVFS_size max_msg_sz;
     pvfs_mntent *mntent_p = NULL;
     PVFS_msg_tag_t op_tag = get_next_session_tag();
+    int found_one_good=0;	/* do we have at least one valid filesystem? */
 
     /* TODO: Fill up the credentials information */
 
@@ -378,7 +379,7 @@ int PINT_server_get_config(struct server_configuration_s *config,
 	{
             gossip_ldebug(CLIENT_DEBUG,"Failed to resolve BMI "
                           "address %s\n",mntent_p->meta_addr);
-            return -1;
+	    continue;
 	}
 
 	/* Set up the request for getconfig */
@@ -395,7 +396,7 @@ int PINT_server_get_config(struct server_configuration_s *config,
 	if (ret < 0)
         {
             gossip_ldebug(CLIENT_DEBUG,"PINT_send_req failed\n");
-            return -1;
+	    continue;
 	}
 	serv_resp = (struct PVFS_server_resp *) decoded.buffer;
 
@@ -425,13 +426,17 @@ int PINT_server_get_config(struct server_configuration_s *config,
         if (PINT_config_has_fs_config_info(
 						  config,mntent_p->service_name) == 0)
         {
-            gossip_ldebug(CLIENT_DEBUG,"Error:  Cannot retrieve "
+            gossip_ldebug(CLIENT_DEBUG,"Warning:  Cannot retrieve "
                           "information about pvfstab entry %s\n",
                           mntent_p->meta_addr);
-            return -1;
-        }
+            continue;
+        } else
+	    found_one_good=1;
     }
-    return(0); 
+    if (found_one_good)
+	return(0); 
+    else
+	return -1;
 }
 
 static int server_parse_config(struct server_configuration_s *config,
