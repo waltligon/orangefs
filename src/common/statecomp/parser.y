@@ -48,9 +48,7 @@ void yyerror(char *);
 %token <c> IDENTIFIER
 %token <c> INTEGER
 
-%type <i> state_machine, .state_body., state_body
-
-%type <f>
+%type <i> state_machine .state_body. state_body
 
 %type <c> identifier, return_code
 
