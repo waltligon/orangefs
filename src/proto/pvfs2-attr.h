@@ -56,7 +56,7 @@
  */
 struct PVFS_metafile_attr_s {
 	/* distribution info */
-	PVFS_Dist dist;
+	PVFS_Dist *dist;
 	/* array of datafile handles */
 	PVFS_handle *dfh;
 	/* Number of datafiles */
