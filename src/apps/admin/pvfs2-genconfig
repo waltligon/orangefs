@@ -385,6 +385,10 @@ $storage = prompt_word("Enter directory name: [Default is /tmp/pvfs2-storage-spa
 # arrays are properly populated from above
 
 print "Writing fs config file... ";
+if ($using_stdout == 1)
+{
+    print "\n";
+}
 
 emit_defaults($output_target, $num_unexp_reqs);
 emit_aliases($output_target, $num_nodes);
