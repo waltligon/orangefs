@@ -341,8 +341,8 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
     assert(attr->u.meta.dfile_count > 0);
 
     /*
-      assign internal io ptrs for convenience here (without
-      copying) if unassigned
+      assign internal io ptrs for convenience here (without copying)
+      if unassigned
     */
     if (!sm_p->u.io.dist_p)
     {

@@ -751,9 +751,17 @@ int PVFS_util_init_defaults(void)
     }
 
     /* remove any mount entries that couldn't be added here */
-    for(; j > -1; j--)
+    for(i = 0; i < PVFS2_MAX_INVALID_MNTENTS; i++)
     {
-        PVFS_util_remove_internal_mntent(&tab->mntent_array[j]);
+        if (failed_indices[i])
+        {
+            PVFS_util_remove_internal_mntent(
+                &tab->mntent_array[failed_indices[i]]);
+        }
+        else
+        {
+            break;
+        }
     }
 
     if (found_one)
