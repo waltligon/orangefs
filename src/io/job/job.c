@@ -2669,36 +2669,37 @@ static void teardown_queues(void)
 static int do_one_work_cycle_all(int *num_completed,
 				 int wait_flag)
 {
-    int bmi_pending, bmi_unexp_pending, flow_pending, trove_pending;
+    int bmi_pending_flag, bmi_unexp_pending_flag, flow_pending_flag, 
+	trove_pending_flag;
     int bmi_completed = 0;
     int bmi_unexp_completed = 0;
     int flow_completed = 0;
     int trove_completed = 0;
-    int total_pending = 0;
+    int total_interfaces_pending = 0;
     int ret = -1;
 
     /* the first thing to do is to determine which interfaces have jobs
      * pending
      */
     gen_mutex_lock(&bmi_mutex);
-    bmi_pending = !job_desc_q_empty(bmi_queue);
-    bmi_unexp_pending = !job_desc_q_empty(bmi_unexp_queue);
+    bmi_pending_flag = !job_desc_q_empty(bmi_queue);
+    bmi_unexp_pending_flag = !job_desc_q_empty(bmi_unexp_queue);
     gen_mutex_unlock(&bmi_mutex);
     gen_mutex_lock(&flow_mutex);
-    flow_pending = !job_desc_q_empty(flow_queue);
+    flow_pending_flag = !job_desc_q_empty(flow_queue);
     gen_mutex_unlock(&flow_mutex);
     gen_mutex_lock(&trove_mutex);
-    trove_pending = !job_desc_q_empty(trove_queue);
+    trove_pending_flag = !job_desc_q_empty(trove_queue);
     gen_mutex_unlock(&trove_mutex);
 
     /* count the number of interfaces with jobs pending */
-    total_pending = bmi_pending + bmi_unexp_pending + flow_pending +
-	trove_pending;
+    total_interfaces_pending = bmi_pending_flag + bmi_unexp_pending_flag 
+	+ flow_pending_flag + trove_pending_flag;
 
     /* TODO: need to check return values in here! */
 
     /* handle BMI first */
-    if (bmi_pending && (total_pending == 1) && wait_flag)
+    if (bmi_pending_flag && (total_interfaces_pending == 1) && wait_flag)
     {
 	/* nothing else going on, we can afford to wait */
 	if ((ret = do_one_work_cycle_bmi(&bmi_completed, 1)) < 0)
@@ -2706,7 +2707,7 @@ static int do_one_work_cycle_all(int *num_completed,
 	    return (ret);
 	}
     }
-    else if (bmi_pending)
+    else if (bmi_pending_flag)
     {
 	/* just test */
 	if ((ret = do_one_work_cycle_bmi(&bmi_completed, 0)) < 0)
@@ -2716,14 +2717,14 @@ static int do_one_work_cycle_all(int *num_completed,
     }
 
     /* now check for unexpected BMI messages */
-    if (bmi_unexp_pending && (total_pending == 1) && wait_flag)
+    if (bmi_unexp_pending_flag && (total_interfaces_pending == 1) && wait_flag)
     {
 	if ((ret = do_one_work_cycle_bmi_unexp(&bmi_unexp_completed, 1)) < 0)
 	{
 	    return (ret);
 	}
     }
-    else if (bmi_unexp_pending)
+    else if (bmi_unexp_pending_flag)
     {
 	if ((ret = do_one_work_cycle_bmi_unexp(&bmi_unexp_completed, 0)) < 0)
 	{
@@ -2732,7 +2733,7 @@ static int do_one_work_cycle_all(int *num_completed,
     }
 
     /* trove operations */
-    if (trove_pending)
+    if (trove_pending_flag)
     {
 	if ((ret = do_one_work_cycle_trove(&trove_completed)) < 0)
 	{
@@ -2741,7 +2742,7 @@ static int do_one_work_cycle_all(int *num_completed,
     }
 
     /* flow operations */
-    if (flow_pending)
+    if (flow_pending_flag)
     {
 	if ((ret = do_one_work_cycle_flow(&flow_completed)) < 0)
 	{
@@ -3106,7 +3107,7 @@ static void fill_status(struct job_desc *jd,
  */
 static void *bmi_thread_function(void *foo)
 {
-    int bmi_pending, bmi_unexp_pending;
+    int bmi_pending_flag, bmi_unexp_pending_flag;
     int num_bmi_completed, num_bmi_unexp_completed;
     int ret = -1;
 
@@ -3114,13 +3115,13 @@ static void *bmi_thread_function(void *foo)
     {
 	/* figure out what types of bmi jobs are pending */
 	gen_mutex_lock(&bmi_mutex);
-	bmi_pending = !job_desc_q_empty(bmi_queue);
-	bmi_unexp_pending = !job_desc_q_empty(bmi_unexp_queue);
+	bmi_pending_flag = !job_desc_q_empty(bmi_queue);
+	bmi_unexp_pending_flag = !job_desc_q_empty(bmi_unexp_queue);
 	gen_mutex_unlock(&bmi_mutex);
 
 	num_bmi_completed = 0;
 	num_bmi_unexp_completed = 0;
-	if (bmi_pending && bmi_unexp_pending)
+	if (bmi_pending_flag && bmi_unexp_pending_flag)
 	{
 	    ret = do_one_work_cycle_bmi(&num_bmi_completed, 0);
 	    if (ret < 0)
@@ -3139,7 +3140,7 @@ static void *bmi_thread_function(void *foo)
 		gen_mutex_unlock(&completion_mutex);
 	    }
 	}
-	else if (bmi_pending)
+	else if (bmi_pending_flag)
 	{
 	    ret = do_one_work_cycle_bmi(&num_bmi_completed, 1);
 	    if (ret < 0)
@@ -3150,7 +3151,7 @@ static void *bmi_thread_function(void *foo)
 		gen_mutex_unlock(&completion_mutex);
 	    }
 	}
-	else if (bmi_unexp_pending)
+	else if (bmi_unexp_pending_flag)
 	{
 	    ret = do_one_work_cycle_bmi_unexp(&num_bmi_unexp_completed, 1);
 	    if (ret < 0)
@@ -3192,7 +3193,7 @@ static void *bmi_thread_function(void *foo)
  */
 static void *flow_thread_function(void *foo)
 {
-    int flow_pending;
+    int flow_pending_flag;
     int num_completed;
     int ret = -1;
 
@@ -3200,11 +3201,11 @@ static void *flow_thread_function(void *foo)
     {
 	/* figure out if there is any flow work to do */
 	gen_mutex_lock(&flow_mutex);
-	flow_pending = !job_desc_q_empty(flow_queue);
+	flow_pending_flag = !job_desc_q_empty(flow_queue);
 	gen_mutex_unlock(&flow_mutex);
 
 	num_completed = 0;
-	if (flow_pending)
+	if (flow_pending_flag)
 	{
 	    ret = do_one_work_cycle_flow(&num_completed);
 	    if (ret < 0)
@@ -3246,7 +3247,7 @@ static void *flow_thread_function(void *foo)
  */
 static void *trove_thread_function(void *foo)
 {
-    int trove_pending;
+    int trove_pending_flag;
     int num_completed;
     int ret = -1;
 
@@ -3254,11 +3255,11 @@ static void *trove_thread_function(void *foo)
     {
 	/* figure out if there is any trove work to do */
 	gen_mutex_lock(&trove_mutex);
-	trove_pending = !job_desc_q_empty(trove_queue);
+	trove_pending_flag = !job_desc_q_empty(trove_queue);
 	gen_mutex_unlock(&trove_mutex);
 
 	num_completed = 0;
-	if (trove_pending)
+	if (trove_pending_flag)
 	{
 	    ret = do_one_work_cycle_trove(&num_completed);
 	    if (ret < 0)
