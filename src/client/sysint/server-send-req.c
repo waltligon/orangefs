@@ -30,11 +30,11 @@ extern job_context_id PVFS_sys_job_context;
  * returns 0 on success, -errno on failure
  */
 int PINT_send_req(bmi_addr_t addr,
-    struct PVFS_server_req *req_p,
-    bmi_size_t max_resp_size,
-    struct PINT_decoded_msg *decoded_resp,
-    void** encoded_resp,
-    PVFS_msg_tag_t op_tag)
+		  struct PVFS_server_req *req_p,
+		  bmi_size_t max_resp_size,
+		  struct PINT_decoded_msg *decoded_resp,
+		  void** encoded_resp,
+		  PVFS_msg_tag_t op_tag)
 {
     int ret;
     struct PINT_encoded_msg encoded_req;

@@ -12,6 +12,7 @@
  */
 
 #include "pvfs2-storage.h"
+#include "PINT-reqproto-encode.h"
 #include "job.h"
 #include "trove.h"
 
@@ -33,15 +34,22 @@ typedef struct PINT_client_sm_s {
     PINT_state_array_values *state_stack[PINT_STATE_STACK_SIZE];
 
     /* CLIENT SM VALUES */
-#if 0
-    int op; /* ??? */
-#endif
+    int op_complete; /* used to indicate that the operation as a 
+		      * whole is finished.
+		      */
     int comp_ct; /* used to keep up with completion of multiple
 		  * jobs for some some states; typically set and
 		  * then decremented to zero as jobs complete */
 
+    /* req and encoded_req are needed to send a request */
     struct PVFS_server_req req;
-    struct PVFS_server_resp *resp_p; /* */
+    struct PINT_encoded_msg encoded_req;
+
+    /* max_msg_sz, svr_addr, and encoded_resp_p needed to recv a response */
+    int max_msg_sz;
+    bmi_addr_t svr_addr;
+    void *encoded_resp_p;
+
     PVFS_credentials *cred_p;
     union {
 	struct PINT_client_remove_sm remove;
