@@ -82,6 +82,11 @@ int PINT_bucket_get_server_name(
     PVFS_handle handle,
     PVFS_fs_id fsid);
 
+int PINT_bucket_get_server_handle_count(
+    const char* server_addr_str,
+    PVFS_fs_id fs_id,
+    uint64_t* handle_count);
+    
 int PINT_bucket_get_root_handle(
     PVFS_fs_id fsid,
     PVFS_handle *fh_root);

@@ -567,6 +567,63 @@ int PINT_bucket_get_num_io(PVFS_fs_id fsid, int *num_io)
     return ret;
 }
 
+/* PINT_bucket_get_server_handle_count()
+ *
+ * counts the number of handles associated with a given server
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
+int PINT_bucket_get_server_handle_count(
+    const char* server_addr_str,
+    PVFS_fs_id fs_id,
+    uint64_t* handle_count)
+{
+    int ret = -EINVAL;
+    PINT_llist *cur = NULL;
+    struct bmi_host_extent_table_s *cur_host_extent_table = NULL;
+    struct qlist_head *hash_link = NULL;
+    struct config_fs_cache_s *cur_config_cache = NULL;
+    uint64_t tmp_count;
+
+    *handle_count = 0;
+
+    assert(PINT_fsid_config_cache_table);
+
+    hash_link = qhash_search(PINT_fsid_config_cache_table,&(fs_id));
+    if (hash_link)
+    {
+        cur_config_cache =
+            qlist_entry(hash_link, struct config_fs_cache_s,
+                        hash_link);
+        assert(cur_config_cache);
+        assert(cur_config_cache->fs);
+        assert(cur_config_cache->bmi_host_extent_tables);
+
+        cur = cur_config_cache->bmi_host_extent_tables;
+        while(cur)
+        {
+            cur_host_extent_table = PINT_llist_head(cur);
+            if (!cur_host_extent_table)
+            {
+                break;
+            }
+            assert(cur_host_extent_table->bmi_address);
+            assert(cur_host_extent_table->extent_list);
+
+	    if(!strcmp(cur_host_extent_table->bmi_address,
+		server_addr_str))
+	    {
+		PINT_extent_list_count_total(cur_host_extent_table->extent_list,
+		    &tmp_count);
+		*handle_count += tmp_count;
+	    }
+            cur = PINT_llist_next(cur);
+        }
+	return(0);
+    }
+    return ret;
+}
+
 /* PINT_bucket_get_server_name()
  *
  * discovers the string (BMI url) name of a server that controls the

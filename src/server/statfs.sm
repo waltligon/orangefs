@@ -56,6 +56,7 @@ static int statfs_do_statfs(PINT_server_op *s_op, job_status_s* js_p)
 {
     int ret = -1;
     TROVE_context_id tmp_context;
+
     PINT_STATE_DEBUG("do_statfs");
 
     /* first try to gather handle statistics */
@@ -67,7 +68,7 @@ static int statfs_do_statfs(PINT_server_op *s_op, job_status_s* js_p)
 	js_p->error_code = ret;
 	return(1);
     }
-    /* TODO: hardcoded for now... */
+    /* NOTE: we let the client side code compute this on its own */
     s_op->resp.u.statfs.stat.handles_total_count = 0;
 
     /* we need a context to be able to make the getinfo call */

@@ -351,7 +351,7 @@ static void extent_count(struct avlnode *n,
 			int depth)
 {
     struct TROVE_handle_extent *e = (struct TROVE_handle_extent *)(n->d);
-    g_counter += (e->last - e->first);
+    g_counter += (e->last - e->first + 1);
 }
 
 

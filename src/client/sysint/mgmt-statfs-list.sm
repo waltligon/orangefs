@@ -184,6 +184,7 @@ static int statfs_list_comp_fn(void* v_p, struct PVFS_server_resp* resp_p,
 {
     int j = 0;
     PINT_client_sm* sm_p = (PINT_client_sm*)v_p;
+    int ret = -1;
 
     /* if this particular request was successful, then store the 
      * statfs information in an array to be returned to caller
@@ -203,8 +204,13 @@ static int statfs_list_comp_fn(void* v_p, struct PVFS_server_resp* resp_p,
 	assert(sm_p->u.statfs_list.stat_array[i].bmi_address);
 	sm_p->u.statfs_list.stat_array[i].handles_available_count =
 	    resp_p->u.statfs.stat.handles_available_count;
-	sm_p->u.statfs_list.stat_array[i].handles_total_count = 
-	    resp_p->u.statfs.stat.handles_total_count;
+
+	ret = PINT_bucket_get_server_handle_count(
+	    sm_p->u.statfs_list.stat_array[i].bmi_address,
+	    sm_p->u.statfs_list.fs_id,
+	    &sm_p->u.statfs_list.stat_array[i].handles_total_count);
+	/* this call should never fail here either */
+	assert(ret == 0);
     }
  
     /* if this is the last response, check all of the status values and 
