@@ -8,7 +8,15 @@ pvfs2-1.0.1
 - ib: add configure-time checks for mosal library variations
 - ib: flush send queue work requests periodically
 - ib: search receive queue for both eager and rts (D. Beilloin)
--
+- improved support for some cases of file holes (that require zero fill)
+- fixed a crash bug due to incorrect assertion regarding zero fill
+- applied annotations and cleanups to the kernel module in response to
+  using the automated correctness checker called 'sparse'
+- fixed a bug that did not properly allow storage space removals when
+  using ReiserFS as the underlying file system
+- added more redhat checks for determining if we need to patch the
+  kernel module code to work properly with particular releases
+- FAQ documentation update
 
 
 pvfs2-1.0.0
