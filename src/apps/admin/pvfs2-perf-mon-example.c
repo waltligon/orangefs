@@ -195,10 +195,9 @@ int main(int argc, char **argv)
 		    next_time = perf_matrix[i][j+1].start_time_ms;
 
 		/* bw calculation */
-		bw = (float)perf_matrix[i][j].read / (float)(1024*1024);
-		bw = bw / ((float)next_time 
-		    - (float)perf_matrix[i][j].start_time_ms);
-		bw = bw*1000.0;
+		bw = ((float)perf_matrix[i][j].read * 1000.0)/ 
+		    (float)(next_time - perf_matrix[i][j].start_time_ms);
+		bw = bw / (float)(1024.0*1024.0);
 		printf("%10f ", bw);
 	    }
 
@@ -224,10 +223,9 @@ int main(int argc, char **argv)
 		    next_time = perf_matrix[i][j+1].start_time_ms;
 
 		/* bw calculation */
-		bw = (float)perf_matrix[i][j].write / (float)(1024*1024);
-		bw = bw / ((float)next_time 
-		    - (float)perf_matrix[i][j].start_time_ms);
-		bw = bw*1000.0;
+		bw = ((float)perf_matrix[i][j].write * 1000.0)/ 
+		    (float)(next_time - perf_matrix[i][j].start_time_ms);
+		bw = bw / (float)(1024.0*1024.0);
 		printf("%10f ", bw);
 	    }
 	    printf("\ntimestep:                             ");
