@@ -47,7 +47,7 @@ struct PVFS_sys_attr_s
 };
 typedef struct PVFS_sys_attr_s PVFS_sys_attr;
 
-/* Describes active file systems. */
+/** Describes a PVFS2 file system. */
 struct PVFS_sys_mntent
 {
     char **pvfs_config_servers;	/* addresses of servers with config info */

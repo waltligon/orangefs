@@ -3,6 +3,14 @@
  *
  * See COPYING in top-level directory.
  */
+
+/** \file
+ *  \ingroup sysint
+ *
+ *  PVFS2 system interface bootstrapping routine to tell the interface
+ *  about available file systems.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <malloc.h>
@@ -27,11 +35,9 @@
 
 gen_mutex_t mt_config = GEN_MUTEX_INITIALIZER;
 
-/* PVFS_sys_fs_add()
+/** Tell the system interface about the location of a PVFS2 file system.
  *
- * tells the system interface to dynamically "mount" a new file system
- *
- * returns 0 on success, -PVFS_error on failure
+ * \return 0 on success, -PVFS_error on failure.
  */
 int PVFS_sys_fs_add(struct PVFS_sys_mntent *mntent)
 {
