@@ -335,7 +335,7 @@ static void bmi_recv_callback_fn(void *user_ptr,
 	&q_item->result,
 	PINT_SERVER);
     /* TODO: error handling */ 
-    assert(ret == 0);
+    assert(ret >= 0);
     
      /* TODO: implement handling of > MAX_REGIONS discontig parts */
     assert(q_item->result.bytes == actual_size);
