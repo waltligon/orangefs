@@ -173,6 +173,7 @@ int pvfs2_fill_sb(
     /* FIXME: this is a hack...but we need this info from somewhere */
     root->i_ino = (ino_t) PVFS2_ROOT_INODE_NUMBER;
     PVFS2_SB(sb)->fs_id = (PVFS_fs_id) 9;
+    PVFS2_SB(sb)->handle = (PVFS_handle)PVFS2_ROOT_INODE_NUMBER;
 
     /* allocates and places root dentry in dcache */
     root_dentry = d_alloc_root(root);

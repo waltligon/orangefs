@@ -34,7 +34,7 @@ static int pvfs2_create(
     return (inode ? 0 : -1);
 }
 
-static struct dentry *pvfs2_lookup(
+struct dentry *pvfs2_lookup(
     struct inode *dir,
     struct dentry *dentry,
     struct nameidata *nd)
@@ -42,8 +42,9 @@ static struct dentry *pvfs2_lookup(
     int ret = -1, retries = PVFS2_OP_RETRY_COUNT;
     struct inode *inode = NULL;
     pvfs2_kernel_op_t *new_op = (pvfs2_kernel_op_t *) 0;
-    pvfs2_inode_t *parent = PVFS2_I(dir);
+    pvfs2_inode_t *parent = NULL;
     pvfs2_inode_t *found_pvfs2_inode = NULL;
+    struct super_block *sb = NULL;
 
     /*
       we can skip doing anything knowing that the intent is to
@@ -79,16 +80,35 @@ static struct dentry *pvfs2_lookup(
 	return NULL;
     }
     new_op->upcall.type = PVFS2_VFS_OP_LOOKUP;
-    if (parent && parent->refn.handle && parent->refn.fs_id)
+
+    if (dir)
     {
-	new_op->upcall.req.lookup.parent_refn = parent->refn;
+        sb = dir->i_sb;
+        parent = PVFS2_I(dir);
+        if (parent && parent->refn.handle && parent->refn.fs_id)
+        {
+            new_op->upcall.req.lookup.parent_refn = parent->refn;
+        }
+        else
+        {
+            new_op->upcall.req.lookup.parent_refn.handle =
+                pvfs2_ino_to_handle(dir->i_ino);
+            new_op->upcall.req.lookup.parent_refn.fs_id =
+                PVFS2_SB(sb)->fs_id;
+        }
     }
     else
     {
+        /*
+          if no parent at all was provided, use the root
+          handle and file system id stored in the super
+          block for the specified dentry's inode
+        */
+        sb = dentry->d_inode->i_sb;
 	new_op->upcall.req.lookup.parent_refn.handle =
-	    pvfs2_ino_to_handle(dir->i_ino);
+	    PVFS2_SB(sb)->handle;
 	new_op->upcall.req.lookup.parent_refn.fs_id =
-	    PVFS2_SB(dir->i_sb)->fs_id;
+	    PVFS2_SB(sb)->fs_id;
     }
     strncpy(new_op->upcall.req.lookup.d_name,
 	    dentry->d_name.name, PVFS2_NAME_LEN);
@@ -104,7 +124,7 @@ static struct dentry *pvfs2_lookup(
     /* lookup inode matching name (or add if not there) */
     if (new_op->downcall.status > -1)
     {
-	inode = iget(dir->i_sb, pvfs2_handle_to_ino(
+	inode = iget(sb, pvfs2_handle_to_ino(
                          new_op->downcall.resp.lookup.refn.handle));
 	if (inode)
 	{
@@ -222,19 +242,6 @@ static int pvfs2_rename(
     pvfs2_print("pvfs2: pvfs2_rename called\n");
     return 0;
 }
-
-/*
-  for the rules of this game, see:
-  http://www.cryptofreak.org/projects/port/#inode_ops
-
-  this op should only be required for symlink support.
-*/
-/* static int pvfs2_follow_link(struct dentry *dentry, struct nameidata *nd) */
-/* { */
-/*     pvfs2_print("pvfs2: pvfs2_follow_link called on %s\n", */
-/*            dentry->d_name.name); */
-/*     return 1; */
-/* } */
 
 struct inode_operations pvfs2_dir_inode_operations = {
     .create = pvfs2_create,

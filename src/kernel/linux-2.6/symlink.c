@@ -16,11 +16,15 @@
 extern kmem_cache_t *op_cache;
 extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
+extern struct dentry_operations pvfs2_dentry_operations;
 
-static int pvfs2_readlink(
+/* defined in namei.c */
+struct dentry *pvfs2_lookup(
+    struct inode *dir,
     struct dentry *dentry,
-    char *buffer,
-    int buflen)
+    struct nameidata *nd);
+
+static int pvfs2_readlink(struct dentry *dentry, char *buffer, int buflen)
 {
     int len = 0;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(dentry->d_inode);
@@ -41,10 +45,20 @@ static int pvfs2_readlink(
     return len;
 }
 
+/*
+  see some rules at:
+  http://www.cryptofreak.org/projects/port/#inode_ops
+*/
+static int pvfs2_follow_link(struct dentry *dentry, struct nameidata *nd)
+{
+    printk("pvfs2_follow_link called on inode %d\n",
+                (int)dentry->d_inode->i_ino);
+    return 0;
+}
 
 struct inode_operations pvfs2_symlink_inode_operations = {
-    .readlink     = pvfs2_readlink
-/*     .follow_link = pvfs2_follow_link, */
+    .readlink     = pvfs2_readlink,
+    .follow_link  = pvfs2_follow_link
 /*     .setxattr    = pvfs2_setxattr, */
 /*     .getxattr    = pvfs2_getxattr, */
 /*     .listxattr   = pvfs2_listxattr, */

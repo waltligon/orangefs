@@ -99,6 +99,7 @@ typedef struct
 /* per superblock private pvfs2 info */
 typedef struct
 {
+    PVFS_handle handle;
     PVFS_fs_id fs_id;
 } pvfs2_sb_info;
 
