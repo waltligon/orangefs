@@ -576,7 +576,7 @@ install:
 	install -m 644 $(srcdir)/include/pvfs2-debug.h $(prefix)/include
 	install -m 644 $(srcdir)/include/pvfs2-sysint.h $(prefix)/include
 	install -m 644 $(srcdir)/include/pvfs2-mgmt.h $(prefix)/include
-	install -m 644 $(srcdir)include/pvfs2-types.h $(prefix)/include
+	install -m 644 $(srcdir)/include/pvfs2-types.h $(prefix)/include
 	install -m 644 $(srcdir)/include/pvfs2-util.h $(prefix)/include
 
 	install -d $(prefix)/lib
