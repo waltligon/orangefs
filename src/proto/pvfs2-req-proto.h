@@ -83,7 +83,8 @@ enum PVFS_server_op
 #define PVFS_REQ_LIMIT_DFILE_COUNT        1024
 /* max count of directory entries per readdir request */
 #define PVFS_REQ_LIMIT_DIRENT_COUNT       64
-
+/* max number of perf metrics returned by mgmt perf mon op */
+#define PVFS_REQ_LIMIT_MGMT_PERF_MON_COUNT 16
 
 /* create *********************************************************/
 /* - used to create new metafile and datafile objects */

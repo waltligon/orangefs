@@ -90,6 +90,10 @@ int do_encode_calc_max_size(
 	case PVFS_SERV_READDIR:
 	    size += (PVFS_REQ_LIMIT_DIRENT_COUNT*sizeof(PVFS_dirent));
 	    break;
+	case PVFS_SERV_MGMT_PERF_MON:
+	    size += (PVFS_REQ_LIMIT_MGMT_PERF_MON_COUNT
+		* sizeof(struct PVFS_mgmt_perf_stat));
+	    break;
 	default:
 	    break;
     }
