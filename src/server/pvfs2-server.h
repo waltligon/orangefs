@@ -70,8 +70,7 @@ typedef struct PINT_server_op
     int enc_type;
     job_id_t scheduled_id; /* holds id from request scheduler so we can release it later */
 
-    PVFS_ds_keyval_s key;
-    PVFS_ds_keyval_s val;
+    PVFS_ds_keyval_s key, val; /* generic structures used in most server operations */
     PVFS_ds_keyval_s *key_a;
     PVFS_ds_keyval_s *val_a;
 

@@ -411,7 +411,7 @@ static int getattr_send_bmi(state_action_struct *s_op, job_status_s *ret)
     gossip_debug(SERVER_DEBUG,
 		 "  sending status %d, rsize = %Ld\n",
 		 s_op->resp->status,
-		 (int)s_op->resp->rsize);
+		 s_op->resp->rsize);
 
     job_post_ret = PINT_encode(s_op->resp,
 			       PINT_ENCODE_RESP,

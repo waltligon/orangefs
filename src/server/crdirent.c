@@ -4,29 +4,6 @@
  * See COPYING in top-level directory.
  */
 
-
-/*
-
-SMS:  1. Needs permission checking
-      2. Request Scheduler used
-      3. Documented
-				      
-SFS:  1. Almost all Pre/Post
-      2. Some assertions
-		      
-TS:   1. It exists, but not thorough.
-
-My TODO list for this SM:
-
- It needs to make sure the k/v pair does not already exist.  
- Now, I don't know if this is a 1. trove could return an error 
- for duplicates or 2. we need to run a read_keyval op.  
- There are a couple of asserts that could be in there that I 
- haven't done yet.  That implies one or two Pre Post comments 
- are not in place.  
-
-*/
-
 #include <ctype.h>
 #include <string.h>
 #include <assert.h>
@@ -39,8 +16,8 @@ My TODO list for this SM:
 
 static int crdirent_init(PINT_server_op *s_op, job_status_s *ret);
 static int crdirent_read_directory_entry_handle(PINT_server_op *s_op, job_status_s *ret);
-static int crdirent_getattr(PINT_server_op *s_op, job_status_s *ret);
-static int crdirent_check_perms(PINT_server_op *s_op, job_status_s *ret);
+static int crdirent_read_parent_metadata(PINT_server_op *s_op, job_status_s *ret);
+static int crdirent_verify_parent_metadata(PINT_server_op *s_op, job_status_s *ret);
 static int crdirent_write_directory_entry(PINT_server_op *s_op, job_status_s *ret);
 static int crdirent_create_dirdata_dspace(PINT_server_op *s_op, job_status_s *ret);
 static int crdirent_write_dirdata_handle(PINT_server_op *s_op, job_status_s *ret);
@@ -66,8 +43,8 @@ enum {
 
 machine crdirent(init,
 		 read_directory_entry_handle,
-		 get_attrib,
-		 check_perms,
+		 read_parent_metadata,
+		 verify_parent_metadata,
 		 write_directory_entry,
 		 send,
 		 cleanup,
@@ -79,19 +56,19 @@ machine crdirent(init,
 	{
 		run crdirent_init;
 		ERROR_BADNAME => send;
-		default => get_attrib;
+		default => read_parent_metadata;
 	}
 
-	state get_attrib
+	state read_parent_metadata
 	{
-		run crdirent_getattr;
-		success => check_perms;
+		run crdirent_read_parent_metadata;
+		success => verify_parent_metadata;
 		default => send;
 	}
 
-	state check_perms
+	state verify_parent_metadata
 	{
-		run crdirent_check_perms;
+		run crdirent_verify_parent_metadata;
 		success => read_directory_entry_handle;
 		default => send;
 	}
@@ -168,22 +145,11 @@ void crdirent_init_state_machine(void)
 /*
  * Function: crdirent_init
  *
- * Params:   server_op *s_op, 
- *           job_status_s *ret
- *
- * Pre:      a properly formatted request structure.
- *
- * Post:     s_op->scheduled_id filled in.
- *            
- * Returns:  int
- *
  * Synopsis: This function sets up the buffers in preparation for
  *           the trove operation to get the attribute structure
  *           used in check permissions.  Also runs the operation through
  *           the request scheduler for consistency.
  *
- * NOTE: ALLOCATES MEMORY, POINTED TO BY VAL.BUFFER.
- *           
  */
 static int crdirent_init(PINT_server_op *s_op,
 			 job_status_s *ret)
@@ -233,31 +199,19 @@ static int crdirent_init(PINT_server_op *s_op,
 
 
 /*
- * Function: crdirent_getattr
- *
- * Params:   server_op *s_op, 
- *           job_status_s *ret
- *
- * Pre:      s_op->val.buffer is big enough to hold sizeof(PVFS_object_attr)
- *           s_op->u.crdirent.parent_handle is the correct directory entry.
- *
- * Post:     s_op->val.buffer contains the object attribs for directory used
- *                     in check permissions.
- *
- * Returns:  int
+ * Function: crdirent_read_parent_metadata
  *
  * Synopsis: Post Trove job to read metadata for the parent directory so we can make sure
  *           that the credentials are valid.
- *           
  */
-static int crdirent_getattr(PINT_server_op *s_op,
-			    job_status_s *ret)
+static int crdirent_read_parent_metadata(PINT_server_op *s_op,
+					 job_status_s *ret)
 {
 
     int job_post_ret;
     job_id_t i;
 
-    gossip_ldebug(SERVER_DEBUG,"crdirent state: getattr\n");
+    gossip_ldebug(SERVER_DEBUG,"crdirent state: read_parent_metadata\n");
 
     assert(s_op->scheduled_id != 0);
 
@@ -290,7 +244,7 @@ static int crdirent_getattr(PINT_server_op *s_op,
 }
 
 /*
- * Function: crdirent_check_perms
+ * Function: crdirent_verify_parent_metadata
  *
  * Params:   server_op *s_op, 
  *           job_status_s *ret
@@ -306,14 +260,14 @@ static int crdirent_getattr(PINT_server_op *s_op,
  *           to do.
  *           
  */
-static int crdirent_check_perms(PINT_server_op *s_op,
-				job_status_s *ret)
+static int crdirent_verify_parent_metadata(PINT_server_op *s_op,
+					   job_status_s *ret)
 {
     PVFS_object_attr *a_p;
 
     a_p = &s_op->u.crdirent.parent_attr;
 
-    gossip_debug(SERVER_DEBUG,"crdirent state: check_perms\n");
+    gossip_debug(SERVER_DEBUG,"crdirent state: verify_parent_metadata\n");
 
     gossip_debug(SERVER_DEBUG,
 		 "  attrs = (owner = %d, group = %d, perms = %o, type = %d)\n",
@@ -636,9 +590,6 @@ static int crdirent_release_posted_job(PINT_server_op *s_op,
 
 /*
  * Function: crdirent_cleanup
- *
- * Params:   server_op *b, 
- *           job_status_s *ret
  *
  * Synopsis: free memory and return
  */
