@@ -42,6 +42,11 @@ static int split_string_list(char ***tokens,
  * initializes the flow interface.  Should be called exactly once before
  * any other operations are performed.
  *
+ * flowproto_list specifies which flow protocols to initialize; if NULL,
+ * all compiled in flowprotocols will be started
+ * TODO: change this so that we can add flowprotocols on the fly as needed
+ * rather than having to make the decision on what to init right now
+ *
  * returns 0 on success, -errno on failure
  */
 int PINT_flow_initialize(const char *flowproto_list,
@@ -90,14 +95,28 @@ int PINT_flow_initialize(const char *flowproto_list,
 
     gen_mutex_lock(&interface_mutex);
 
-    /* seperate out the list of flowprotos to activate */
-    active_flowproto_count = split_string_list(&requested_flowprotos,
-					       flowproto_list);
-    if (active_flowproto_count < 1)
+    if(flowproto_list)
     {
-	gossip_lerr("Error: bad flow protocol list.\n");
-	ret = -EINVAL;
-	goto PINT_flow_initialize_failure;
+	/* seperate out the list of flowprotos to activate */
+	active_flowproto_count = split_string_list(&requested_flowprotos,
+						   flowproto_list);
+	if (active_flowproto_count < 1)
+	{
+	    gossip_lerr("Error: bad flow protocol list.\n");
+	    ret = -EINVAL;
+	    goto PINT_flow_initialize_failure;
+	}
+    }
+    else
+    {
+	/* count compiled in flow protocols, we will activate all of them */
+	tmp_flowproto_ops = static_flowprotos;
+	active_flowproto_count = 0;
+	while ((*tmp_flowproto_ops) != NULL)
+	{
+	    tmp_flowproto_ops++;
+	    active_flowproto_count++;
+	}
     }
 
     /* create table to keep up with active flow protocols */
@@ -116,23 +135,35 @@ int PINT_flow_initialize(const char *flowproto_list,
     /* find the interface for each requested method and load it into the
      * active table.
      */
-    for (i = 0; i < active_flowproto_count; i++)
+    if(flowproto_list)
+    {
+	for (i = 0; i < active_flowproto_count; i++)
+	{
+	    tmp_flowproto_ops = static_flowprotos;
+	    while ((*tmp_flowproto_ops) != NULL &&
+		   strcmp((*tmp_flowproto_ops)->flowproto_name,
+			  requested_flowprotos[i]) != 0)
+	    {
+		tmp_flowproto_ops++;
+	    }
+	    if ((*tmp_flowproto_ops) == NULL)
+	    {
+		gossip_lerr("Error: no flowproto available for: %s\n",
+			    requested_flowprotos[i]);
+		ret = -ENOPROTOOPT;
+		goto PINT_flow_initialize_failure;
+	    }
+	    active_flowproto_table[i] = (*tmp_flowproto_ops);
+	}
+    }
+    else
     {
 	tmp_flowproto_ops = static_flowprotos;
-	while ((*tmp_flowproto_ops) != NULL &&
-	       strcmp((*tmp_flowproto_ops)->flowproto_name,
-		      requested_flowprotos[i]) != 0)
+	for(i=0; i<active_flowproto_count; i++)
 	{
+	    active_flowproto_table[i] = (*tmp_flowproto_ops);
 	    tmp_flowproto_ops++;
 	}
-	if ((*tmp_flowproto_ops) == NULL)
-	{
-	    gossip_lerr("Error: no flowproto available for: %s\n",
-			requested_flowprotos[i]);
-	    ret = -ENOPROTOOPT;
-	    goto PINT_flow_initialize_failure;
-	}
-	active_flowproto_table[i] = (*tmp_flowproto_ops);
     }
 
     /* create a cache of mappings to flow protocols */
