@@ -1,0 +1,38 @@
+dnl Process this file with autoconf to produce a configure script.
+AC_INIT(include/pvfs2-types.h)
+AC_CONFIG_HEADER(pvfs2-config.h)
+AC_CONFIG_AUX_DIR(maint/config)
+
+dnl Checks for host type
+dnl Ensures we can compile on this OS
+AC_CANONICAL_HOST
+AC_MSG_CHECKING(whether we know how to compile for this OS)
+if test x$host_os != xlinux-gnu; then AC_MSG_ERROR($host_os not supported.)
+else AC_MSG_RESULT(yes)
+fi
+
+dnl Check for uname, cut, grep, install, cc
+AC_PROG_INSTALL
+AC_PROG_CC
+AC_PROG_CPP
+AC_CHECK_PROG(HAVE_UNAME, uname, yes, no)
+AC_CHECK_PROG(HAVE_CUT, cut, yes, no)
+AC_CHECK_PROG(HAVE_GREP, grep, yes, no)
+AC_CHECK_PROG(HAVE_PERL, perl, yes, no)
+AC_CHECK_PROG(HAVE_FIND, find, yes, no)
+
+AC_OUTPUT(Makefile
+src/io/trove/module.mk
+src/io/trove/trove-handle-mgmt/module.mk
+src/io/trove/trove-dbpf/module.mk
+src/common/quickhash/module.mk
+src/common/quicklist/module.mk
+src/common/dotconf/module.mk
+src/common/id-generator/module.mk
+src/common/gossip/module.mk
+test/io/trove/module.mk
+test/common/quicklist/module.mk
+test/common/id-generator/module.mk
+test/common/gossip/module.mk
+)
+

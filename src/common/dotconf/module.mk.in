@@ -1,0 +1,2 @@
+DIR := src/common/dotconf
+LIBSRC += $(DIR)/dotconf.c

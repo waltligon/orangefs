@@ -1,0 +1,247 @@
+/*
+ * (C) 2002 Clemson University and The University of Chicago
+ *
+ * See COPYING in top-level directory.
+ */
+
+#ifndef __DBPF_H__
+#define __DBPF_H__
+
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
+#include <db.h>
+#include <trove.h>
+
+#define TROVE_DIR "/tmp/trove/"
+#define STO_ATTRIB_DBNAME "/tmp/storage_attributes.db"
+#define COLLECTIONS_DBNAME "/tmp/collections.db"
+/* these four aren't supposed to be used alone. rather, glue them together with
+ * TROVE_DIR and the collection id */
+#define COLL_ATTRIB_DBNAME "/collection_attributes.db"
+#define DS_ATTRIB_DBNAME "/dataspace_attributes.db"
+#define BSTREAM_DIRNAME "/bstreams"
+#define KEYVAL_DIRNAME "/keyvals"
+
+#define LAST_HANDLE_STRING "last_handle"
+#define ROOT_HANDLE_STRING "root_handle"
+
+extern struct TROVE_bstream_ops dbpf_bstream_ops;
+extern struct TROVE_dspace_ops dbpf_dspace_ops;
+extern struct TROVE_keyval_ops dbpf_keyval_ops;
+extern struct TROVE_mgmt_ops dbpf_mgmt_ops;
+extern struct TROVE_fs_ops dbpf_fs_ops;
+
+/* struct dbpf_storage
+ *
+ * used to store storage space info in memory.
+ */
+struct dbpf_storage {
+    int refct;
+    char *name;
+    DB *sto_attr_db;
+    DB *coll_db;
+};
+
+/* struct dbpf_dspace_attr
+ *
+ * used to store dspace attributes in the dspace attributes database.
+ */
+struct dbpf_dspace_attr {
+    TROVE_coll_id coll_id;
+    TROVE_ds_type type;
+    /* plus all the other stuff...create time, mod. time, creator? */
+};
+
+/* struct dbpf_collection
+ *
+ * used to store collection info in memory.
+ */
+struct dbpf_collection {
+    int refct;
+    char *name;
+    DB *coll_attr_db;
+    DB *ds_db;
+    TROVE_coll_id coll_id;
+    TROVE_handle root_dir_handle;
+    struct dbpf_storage *storage;
+    struct handle_ledger *free_handles;
+};
+
+/* struct dbpf_collection_db_entry
+ *
+ * Structure stored as data in collections database with collection
+ * directory name as key.
+ */
+struct dbpf_collection_db_entry {
+    TROVE_coll_id coll_id;
+};
+
+
+struct dbpf_dspace_create_op {
+    TROVE_handle new_handle;
+    TROVE_handle bitmask;
+    TROVE_ds_type type;
+    /* hint? */
+};
+
+/* struct dbpf_dspace_remove_op {}; -- nothing belongs in here */
+
+struct dbpf_keyval_read_op {
+    TROVE_keyval_s key;
+    TROVE_keyval_s val;
+    TROVE_ds_flags flags;
+    /* vtag? */
+};
+
+struct dbpf_keyval_write_op {
+    TROVE_keyval_s key;
+    TROVE_keyval_s val;
+    TROVE_ds_flags flags;
+    /* vtag? */
+};
+
+struct dbpf_keyval_remove_op {
+    TROVE_keyval_s key;
+    TROVE_keyval_s val;
+    TROVE_ds_flags flags;
+    /* vtag? */
+};
+
+struct dbpf_keyval_iterate_op {
+    TROVE_keyval_s *key_array;
+    TROVE_keyval_s *val_array;
+    TROVE_ds_position *position_p;
+    int *count;
+    /* vtag? */
+};
+
+/* Defined in bstream.c */
+
+/* used for both read and write at */
+struct dbpf_bstream_rw_at_op {
+    TROVE_offset offset;
+    TROVE_size size;
+    void *buffer;
+    TROVE_ds_flags flags;
+    /* vtag? */
+};
+
+struct dbpf_bstream_resize_op {
+    TROVE_size size;
+    TROVE_ds_flags flags;
+    /* vtag? */
+};
+
+/* struct bstream_listio_state
+ *
+ * Used to maintain state of partial processing of a listio operation
+ */
+struct bstream_listio_state {
+    int mem_ct, stream_ct, cur_mem_size;
+    char *cur_mem_off;
+    TROVE_size cur_stream_size;
+    TROVE_offset cur_stream_off;
+};
+
+
+/* Values for list_proc_state below */
+enum {
+    LIST_PROC_INITIALIZED,  /* list state initialized, but no aiocb array */
+    LIST_PROC_INPROGRESS,   /* aiocb array allocated, ops in progress */
+    LIST_PROC_ALLCONVERTED, /* all list elements converted */
+    LIST_PROC_ALLPOSTED     /* all list elements also posted */
+};
+/* struct dbpf_bstream_rw_list_op
+ *
+ * Used for both read and write list
+ *
+ * list_proc_state is used to retain the status of processing on the list
+ * arrays.
+ */
+struct dbpf_bstream_rw_list_op {
+    int fd, list_proc_state, opcode;
+    int aiocb_array_count, mem_array_count, stream_array_count;
+    char **mem_offset_array;
+    TROVE_size *mem_size_array;
+    TROVE_offset *stream_offset_array;
+    TROVE_size *stream_size_array;
+    struct aiocb *aiocb_array;
+    struct bstream_listio_state lio_state;
+};
+
+/* List of operation types that might be queued */
+enum dbpf_op_type {
+    BSTREAM_READ_AT = 1,
+    BSTREAM_WRITE_AT,
+    BSTREAM_RESIZE,
+    BSTREAM_READ_LIST,
+    BSTREAM_WRITE_LIST,
+    BSTREAM_VALIDATE,
+    KEYVAL_READ,
+    KEYVAL_WRITE,
+    KEYVAL_REMOVE_KEY,
+    KEYVAL_VALIDATE,
+    KEYVAL_ITERATE,
+    KEYVAL_ITERATE_KEYS,
+    KEYVAL_READ_LIST,
+    KEYVAL_WRITE_LIST,
+    DSPACE_CREATE,
+    DSPACE_REMOVE,
+    DSPACE_VERIFY,
+    DSPACE_GETATTRIB
+};
+
+enum dbpf_op_state {
+    OP_UNITIALIZED = 0,
+    OP_NOT_QUEUED,
+    OP_QUEUED,
+    OP_IN_SERVICE,
+    OP_COMPLETED,
+    OP_DEQUEUED
+};
+
+
+/* struct dbpf_op
+ *
+ * Used to keep in-memory copy of parameters for queued operations
+ */
+struct dbpf_op {
+    enum dbpf_op_type type;
+    enum dbpf_op_state state;
+    TROVE_handle handle;
+    TROVE_op_id id;
+    struct dbpf_collection *coll_p; /* TODO: would this be better as an id? */
+    int (*svc_fn)(struct dbpf_op *op);
+    void *user_ptr;
+    union {
+	/* all the op types go in here; structs are all
+	 * defined just below the prototypes for the functions.
+	 */
+	struct dbpf_dspace_create_op d_create;
+	/* struct dbpf_dspace_remove_op d_remove; -- EMPTY */
+	struct dbpf_bstream_rw_at_op b_read_at;
+	struct dbpf_bstream_rw_at_op b_write_at;
+	struct dbpf_bstream_rw_list_op b_rw_list;
+	struct dbpf_bstream_resize_op b_resize;
+	struct dbpf_keyval_read_op k_read;
+	struct dbpf_keyval_write_op k_write;
+	struct dbpf_keyval_remove_op k_remove;
+	struct dbpf_keyval_iterate_op k_iterate;
+    } u;
+};
+
+#if defined(__cplusplus)
+}
+#endif
+
+#endif
+
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ */

@@ -1,0 +1,4 @@
+DIR := test/common/gossip
+TESTSRC += \
+	$(DIR)/test-gossip.c \
+	$(DIR)/time-gossip.c

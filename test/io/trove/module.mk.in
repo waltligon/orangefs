@@ -1,0 +1,17 @@
+DIR := test/io/trove
+
+LOCALTESTSRC := \
+	$(DIR)/trove-bstream.c \
+	$(DIR)/trove-ls.c \
+	$(DIR)/trove-mkdir.c \
+	$(DIR)/trove-mkfs.c \
+	$(DIR)/trove-rm.c \
+	$(DIR)/trove-touch.c
+
+TESTSRC += $(LOCALTESTSRC)
+
+LOCALLIBS := -ldb -lrt -lpthread -lefence
+LOCALTESTS := $(patsubst %.c,%, $(LOCALTESTSRC))
+$(LOCALTESTS): %: %.o
+	$(LD) $< $(LDFLAGS) $(LIBS) $(LOCALLIBS) -o $@
+
