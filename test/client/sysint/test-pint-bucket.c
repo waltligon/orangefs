@@ -285,7 +285,7 @@ int main(int argc, char **argv)
     {
 	int incount = 0;
 	int outcount = 0;
-	bmi_addr_t* phys_array = NULL;
+	struct PINT_bucket_server_info* info_array = NULL;
 	int ret = -1;
 	int num_io = 0;
 	int num_meta = 0;
@@ -305,15 +305,16 @@ int main(int argc, char **argv)
 	    return(-1);
 	}
 	incount = num_meta + num_io;
-	phys_array = (bmi_addr_t*)malloc(incount*sizeof(bmi_addr_t));
-	if(!phys_array)
+	info_array = (struct PINT_bucket_server_info*)malloc(incount*
+	    sizeof(struct PINT_bucket_server_info));
+	if(!info_array)
 	{
 	    perror("malloc");
 	    return(-1);
 	}
 
 	ret = PINT_bucket_get_physical_io(&server_config, fs_ids[0],
-	    incount, &outcount, phys_array);
+	    incount, &outcount, info_array);
 	if(ret < 0)
 	{
 	    fprintf(stderr, "PINT_bucket_get_physical_io() failure.\n");
@@ -322,11 +323,11 @@ int main(int argc, char **argv)
 	printf("PINT_bucket_get_physical_io() found %d servers.\n", outcount);
 	for(j = 0; j < outcount; j++)
 	{
-	    printf("I/O server %d addr: %lu\n",j,(long)phys_array[j]);
+	    printf("I/O server %d addr: %lu\n",j,(long)info_array[j].addr);
 	}
 
 	ret = PINT_bucket_get_physical_meta(&server_config, fs_ids[0],
-	    incount, &outcount, phys_array);
+	    incount, &outcount, info_array);
 	if(ret < 0)
 	{
 	    fprintf(stderr, "PINT_bucket_get_physical_meta() failure.\n");
@@ -335,11 +336,11 @@ int main(int argc, char **argv)
 	printf("PINT_bucket_get_physical_meta() found %d servers.\n", outcount);
 	for(j = 0; j < outcount; j++)
 	{
-	    printf("meta server %d addr: %lu\n",j,(long)phys_array[j]);
+	    printf("meta server %d addr: %lu\n",j,(long)info_array[j].addr);
 	}
 
 	ret = PINT_bucket_get_physical_all(&server_config, fs_ids[0],
-	    incount, &outcount, phys_array);
+	    incount, &outcount, info_array);
 	if(ret < 0)
 	{
 	    fprintf(stderr, "PINT_bucket_get_physical_all() failure.\n");
@@ -348,7 +349,7 @@ int main(int argc, char **argv)
 	printf("PINT_bucket_get_physical_all() found %d servers.\n", outcount);
 	for(j = 0; j < outcount; j++)
 	{
-	    printf("server %d addr: %lu\n",j,(long)phys_array[j]);
+	    printf("server %d addr: %lu\n",j,(long)info_array[j].addr);
 	}
 
     }

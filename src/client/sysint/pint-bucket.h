@@ -39,12 +39,19 @@ int PINT_bucket_get_next_io(
     bmi_addr_t *io_addr_array,
     PVFS_handle_extent_array *io_handle_extent_array);
 
+struct PINT_bucket_server_info
+{
+    bmi_addr_t addr;
+    char* addr_string;
+    int server_type;
+};
+
 int PINT_bucket_get_physical(
     struct server_configuration_s *config,
     PVFS_fs_id fsid,
     int incount,
     int* outcount,
-    bmi_addr_t *addr_array,
+    struct PINT_bucket_server_info* info_array,
     int server_type);
 
 #define PINT_BUCKET_META 1

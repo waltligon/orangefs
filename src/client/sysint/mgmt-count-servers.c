@@ -29,15 +29,15 @@ int PVFS_mgmt_count_servers(
     int* count)
 {
     int ret = -1;
-    bmi_addr_t* addr_array;
+    struct PINT_bucket_server_info* info_array;
 
-    ret = PINT_collect_physical_addrs(fs_id, count, &addr_array);
+    ret = PINT_collect_physical_server_info(fs_id, count, &info_array);
 
-    /* the above call allocates a list of addresses, which we actually
-     * don't need here 
+    /* the above call allocates an array of information, actually not 
+     * needed here 
      */
     if(ret == 0)
-	free(addr_array);
+	free(info_array);
     
     return(ret);
 }

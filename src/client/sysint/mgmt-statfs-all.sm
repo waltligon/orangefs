@@ -13,6 +13,7 @@
 #include "job.h"
 #include "gossip.h"
 #include "str-utils.h"
+#include "pvfs2-mgmt.h"
 
 #include "pinode-helper.h"
 #include "pint-dcache.h"
@@ -65,7 +66,7 @@ int PVFS_mgmt_statfs_all(
     int incount,
     int* outcount,
     int* overflow_flag,
-    PVFS_statfs* statfs_array)
+    struct PVFS_mgmt_server_stat* stat_array)
 {
     int ret;
     PINT_client_sm *sm_p;
@@ -73,7 +74,7 @@ int PVFS_mgmt_statfs_all(
 
     gossip_debug(CLIENT_DEBUG, "PVFS_mgmt_statfs_all entered\n");
 
-    if(incount < 1 || !statfs_array)
+    if(incount < 1 || !stat_array)
     {
 	return(-PVFS_EINVAL);
     }
@@ -87,10 +88,13 @@ int PVFS_mgmt_statfs_all(
 
     sm_p->cred_p = &credentials;
     sm_p->u.statfs_all.fs_id = fs_id;
-    sm_p->u.statfs_all.statfs_array = statfs_array;
+    sm_p->u.statfs_all.stat_array = stat_array;
     sm_p->u.statfs_all.incount = incount;
     sm_p->u.statfs_all.outcount = outcount;
     sm_p->u.statfs_all.overflow_flag = overflow_flag;
+
+    /* safety */
+    memset(sm_p->u.statfs_all.stat_array, 0, incount*sizeof(struct PVFS_mgmt_server_stat));
 
     gossip_debug(CLIENT_DEBUG,
 		 "PVFS_mgmt_statfs_all calling PINT_client_state_machine_post()\n");
@@ -132,7 +136,7 @@ static int mgmt_statfs_all_setup_msgpair(PINT_client_sm *sm_p,
 {
     int ret = -1;
     int num_phys_servers = 0;
-    bmi_addr_t *addr_array;
+    struct PINT_bucket_server_info* info_array;
     int i;
     PINT_client_sm_msgpair_state *msg_p;
 
@@ -141,8 +145,8 @@ static int mgmt_statfs_all_setup_msgpair(PINT_client_sm *sm_p,
     /* the first thing we have to do is find out how many physical servers
      * are present, and build and array of addresses to reach them
      */
-    ret = PINT_collect_physical_addrs(sm_p->u.statfs_all.fs_id,
-	&num_phys_servers, &addr_array);
+    ret = PINT_collect_physical_server_info(sm_p->u.statfs_all.fs_id,
+	&num_phys_servers, &info_array);
     if(ret < 0)
     {
 	js_p->error_code = ret;
@@ -162,6 +166,17 @@ static int mgmt_statfs_all_setup_msgpair(PINT_client_sm *sm_p,
 	*sm_p->u.statfs_all.outcount = sm_p->u.statfs_all.incount;
 	*sm_p->u.statfs_all.overflow_flag = 1;
     }
+    
+    /* go ahead and fill in the information that is available locally */
+    for(i=0; i < *sm_p->u.statfs_all.outcount; i++)
+    {
+	sm_p->u.statfs_all.stat_array[i].fs_id = sm_p->u.statfs_all.fs_id;
+	sm_p->u.statfs_all.stat_array[i].bmi_address = info_array[i].addr_string;
+	if(info_array[i].server_type & PINT_BUCKET_META)
+	    sm_p->u.statfs_all.stat_array[i].flags += PVFS_MGMT_META_SERVER;
+	if(info_array[i].server_type & PINT_BUCKET_IO)
+	    sm_p->u.statfs_all.stat_array[i].flags += PVFS_MGMT_IO_SERVER;
+    }
 
     /* allocate memory for msgpair array */
     sm_p->msgarray_count = *sm_p->u.statfs_all.outcount;
@@ -169,7 +184,7 @@ static int mgmt_statfs_all_setup_msgpair(PINT_client_sm *sm_p,
     malloc((*sm_p->u.statfs_all.outcount)*sizeof(PINT_client_sm_msgpair_state));
     if(!sm_p->msgarray)
     {
-	free(addr_array);
+	free(info_array);
 	js_p->error_code = -PVFS_ENOMEM;
 	return(1);
     }
@@ -186,10 +201,10 @@ static int mgmt_statfs_all_setup_msgpair(PINT_client_sm *sm_p,
 	msg_p->fs_id = sm_p->u.statfs_all.fs_id;
 	msg_p->handle = PVFS_HANDLE_NULL;
 	msg_p->comp_fn = statfs_all_comp_fn;
-	msg_p->svr_addr = addr_array[i];
+	msg_p->svr_addr = info_array[i].addr;
     }
 
-    free(addr_array);
+    free(info_array);
 
     /* immediate return: next state jumps to msgpairarray machine */
     js_p->error_code = 0;
@@ -219,7 +234,10 @@ static int statfs_all_comp_fn(void* v_p, struct PVFS_server_resp* resp_p,
      */
     if(sm_p->msgarray[i].op_status == 0)
     {
-	sm_p->u.statfs_all.statfs_array[i] = resp_p->u.statfs.stat;
+	sm_p->u.statfs_all.stat_array[i].bytes_available = 
+	    resp_p->u.statfs.stat.bytes_available;
+	sm_p->u.statfs_all.stat_array[i].bytes_total = 
+	    resp_p->u.statfs.stat.bytes_total;
     }
  
     /* if this is the last response, check all of the status values and 

@@ -130,7 +130,7 @@ static int mgmt_setparam_all_setup_msgpair(PINT_client_sm *sm_p,
 {
     int ret = -1;
     int num_phys_servers = 0;
-    bmi_addr_t *addr_array;
+    struct PINT_bucket_server_info* info_array;
     int i;
     PINT_client_sm_msgpair_state *msg_p;
 
@@ -139,8 +139,8 @@ static int mgmt_setparam_all_setup_msgpair(PINT_client_sm *sm_p,
     /* the first thing we have to do is find out how many physical servers
      * are present, and build and array of addresses to reach them
      */
-    ret = PINT_collect_physical_addrs(sm_p->u.setparam_all.fs_id,
-	&num_phys_servers, &addr_array);
+    ret = PINT_collect_physical_server_info(sm_p->u.setparam_all.fs_id,
+	&num_phys_servers, &info_array);
     if(ret < 0)
     {
 	js_p->error_code = ret;
@@ -156,7 +156,7 @@ static int mgmt_setparam_all_setup_msgpair(PINT_client_sm *sm_p,
     malloc(num_phys_servers*sizeof(PINT_client_sm_msgpair_state));
     if(!sm_p->msgarray)
     {
-	free(addr_array);
+	free(info_array);
 	js_p->error_code = -PVFS_ENOMEM;
 	return(1);
     }
@@ -178,10 +178,10 @@ static int mgmt_setparam_all_setup_msgpair(PINT_client_sm *sm_p,
 	    msg_p->comp_fn = root_check_comp_fn;
 	else
 	    msg_p->comp_fn = NULL;
-	msg_p->svr_addr = addr_array[i];
+	msg_p->svr_addr = info_array[i].addr;
     }
 
-    free(addr_array);
+    free(info_array);
 
     /* immediate return: next state jumps to msgpairarray machine */
     js_p->error_code = 0;

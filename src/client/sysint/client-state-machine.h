@@ -188,7 +188,7 @@ struct PINT_client_mgmt_setparam_all_sm
 struct PINT_client_mgmt_statfs_all_sm
 {
     PVFS_fs_id fs_id;
-    PVFS_statfs* statfs_array;
+    struct PVFS_mgmt_server_stat* stat_array;
     int incount; 
     int* outcount;
     int* overflow_flag;

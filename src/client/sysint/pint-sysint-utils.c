@@ -481,7 +481,7 @@ static int server_parse_config(struct server_configuration_s *config,
 }
 
 
-/* PINT_collect_physical_addrs()
+/* PINT_collect_physical_server_info()
  *
  * builds an array of BMI addresses, one for each physical server in the 
  * file system
@@ -489,10 +489,10 @@ static int server_parse_config(struct server_configuration_s *config,
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int PINT_collect_physical_addrs(
+int PINT_collect_physical_server_info(
     PVFS_fs_id fs_id,
     int* outcount,
-    bmi_addr_t** addr_array)
+    struct PINT_bucket_server_info** info_array)
 {
     int ret = -1;
     int num_meta = 0;
@@ -517,15 +517,16 @@ int PINT_collect_physical_addrs(
 
     /* allocate space to store BMI addresses */
     total_bound = num_io + num_meta;
-    *addr_array = (bmi_addr_t*)malloc(total_bound*sizeof(bmi_addr_t));
-    if(!*addr_array)
+    *info_array = (struct PINT_bucket_server_info*)malloc(total_bound
+	*sizeof(struct PINT_bucket_server_info));
+    if(!*info_array)
     {
 	return(-PVFS_ENOMEM);
     }
 
     /* map to actual server instances */
     ret = PINT_bucket_get_physical_all(&g_server_config, 
-	fs_id, total_bound, outcount, *addr_array);
+	fs_id, total_bound, outcount, *info_array);
 
     return(ret);
 }

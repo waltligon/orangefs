@@ -307,7 +307,7 @@ int PINT_bucket_get_physical(
     PVFS_fs_id fsid,
     int incount,
     int* outcount,
-    bmi_addr_t *addr_array,
+    struct PINT_bucket_server_info* info_array,
     int server_type)
 {
     int ret = -EINVAL;
@@ -319,10 +319,11 @@ int PINT_bucket_get_physical(
     bmi_addr_t tmp_bmi_addr;
     int dup_flag = 0;
     int i;
+    int current = 0;
 
     *outcount = 0;
 
-    if (!(config && incount && addr_array && server_type))
+    if (!(config && incount && info_array && server_type))
     {
 	return(-EINVAL);
     }
@@ -342,11 +343,13 @@ int PINT_bucket_get_physical(
 	    {
 		tmp_server = cur_config_cache->fs->data_handle_ranges;
 		server_type -= PINT_BUCKET_IO;
+		current = PINT_BUCKET_IO;
 	    }
 	    else if(server_type & PINT_BUCKET_META)
 	    {
 		tmp_server = cur_config_cache->fs->meta_handle_ranges;
 		server_type -= PINT_BUCKET_META;
+		current = PINT_BUCKET_META;
 	    }
 	    else
 	    {
@@ -378,13 +381,18 @@ int PINT_bucket_get_physical(
 		dup_flag = 0;
 		for(i=0; i<*outcount; i++)
 		{
-		    if(addr_array[i] == tmp_bmi_addr)
+		    if(info_array[i].addr == tmp_bmi_addr)
+		    {
 			dup_flag = 1;
+			info_array[i].server_type |= current;
+		    }
 		}
 		
 		if(!dup_flag)
 		{
-		    addr_array[*outcount] = tmp_bmi_addr;
+		    info_array[*outcount].addr = tmp_bmi_addr;
+		    info_array[*outcount].addr_string = server_bmi_str;
+		    info_array[*outcount].server_type = current;
 		    (*outcount)++;
 		}
 	    }

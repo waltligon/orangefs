@@ -23,7 +23,7 @@ int PVFS_sys_statfs(
     int check_num_servers = 0;
     int overflow_flag = 0;
     int ret = -1;
-    PVFS_statfs* statfs_array = NULL;
+    struct PVFS_mgmt_server_stat* stat_array = NULL;
     int i;
 
     /* first, determine how many servers are in the file system */
@@ -34,8 +34,9 @@ int PVFS_sys_statfs(
     }
 
     /* allocate room for statfs info from all servers */
-    statfs_array = (PVFS_statfs*)malloc(num_servers*sizeof(PVFS_statfs));
-    if(!statfs_array)
+    stat_array = (struct PVFS_mgmt_server_stat*)malloc(num_servers*sizeof(struct 
+	PVFS_mgmt_server_stat));
+    if(!stat_array)
     {
 	return(-PVFS_ENOMEM);
     }
@@ -47,10 +48,10 @@ int PVFS_sys_statfs(
 	num_servers,
 	&check_num_servers,
 	&overflow_flag,
-	statfs_array);
+	stat_array);
     if(ret < 0)
     {
-	free(statfs_array);
+	free(stat_array);
 	return(ret);
     }
 
@@ -71,12 +72,12 @@ int PVFS_sys_statfs(
     resp->statfs_buf.bytes_total = 0;
     for(i=0; i<num_servers; i++)
     {
-	resp->statfs_buf.bytes_available += statfs_array[i].bytes_available;
-	resp->statfs_buf.bytes_total += statfs_array[i].bytes_total;
+	resp->statfs_buf.bytes_available += stat_array[i].bytes_available;
+	resp->statfs_buf.bytes_total += stat_array[i].bytes_total;
     }
     resp->server_count = num_servers;
 
-    free(statfs_array);
+    free(stat_array);
 
     return(0);
 }

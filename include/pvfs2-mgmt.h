@@ -11,6 +11,24 @@
 
 #include "pvfs2-types.h"
 
+/* low level statfs style information for each server */
+/* see PVFS_mgmt_statfs_all() */
+struct PVFS_mgmt_server_stat
+{
+    PVFS_fs_id fs_id;
+    PVFS_size bytes_available;
+    PVFS_size bytes_total;
+    char* bmi_address;
+    int flags;
+};
+
+/* values which may be or'd together in the flags field above */
+enum
+{
+    PVFS_MGMT_IO_SERVER = 1,
+    PVFS_MGMT_META_SERVER = 2
+};
+
 int PVFS_mgmt_setparam_all(
     PVFS_fs_id fs_id,
     PVFS_credentials credentials,
@@ -32,7 +50,7 @@ int PVFS_mgmt_statfs_all(
     int incount,
     int* outcount,
     int* overflow_flag,
-    PVFS_statfs* statfs_array);
+    struct PVFS_mgmt_server_stat* stat_array);
 
 #endif /* __PVFS2_MGMT_H */
 
