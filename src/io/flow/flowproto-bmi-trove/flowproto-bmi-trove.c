@@ -1284,6 +1284,7 @@ static void service_bmi_to_mem(flow_descriptor * flow_d)
     {
 	gossip_ldebug(FLOW_PROTO_DEBUG,
 		      "Warning: posting recv to intermediate buffer.\n");
+
 	/* post receive to contig. intermediate buffer */
 	gossip_ldebug(FLOW_PROTO_DEBUG, "Posting recv, total size: %ld\n",
 		      (long) flow_data->max_buffer_size);
@@ -1296,6 +1297,14 @@ static void service_bmi_to_mem(flow_descriptor * flow_d)
     }
     else
     {
+	
+	if(flow_data->bmi_total_size == 0)
+	{
+	    gossip_lerr("WARNING: encountered odd request state; assuming flow is done.\n");
+	    flow_d->state = FLOW_COMPLETE;
+	    return;
+	}
+
 	/* post normal list operation */
 	gossip_ldebug(FLOW_PROTO_DEBUG, "Posting recv, total size: %ld\n",
 		      (long) flow_data->bmi_total_size);
