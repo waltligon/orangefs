@@ -41,6 +41,7 @@ int PVFS_sys_rename(PVFS_sysreq_rename *req, PVFS_sysresp_rename *resp)
 	pinode_reference entry,parent_reference;
 	PVFS_servreq_rmdirent req_rmdirent;
 	PVFS_servreq_createdirent req_crdirent;
+	int item_found;
 	
 	/* Revalidate the old_parent handle */
 	/* Get the parent pinode */

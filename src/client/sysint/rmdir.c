@@ -34,7 +34,7 @@ int PVFS_sys_rmdir(PVFS_sysreq_rmdir *req)
 	bmi_addr_t serv_addr1,serv_addr2;	/* PVFS address type structure */
 	char *server1 = NULL,*server2 = NULL;
 	int cflags = 0,name_sz = 0;
-	unsigned char item_found = 0;
+	int item_found = 0;
 	PVFS_bitfield mask;
 	pinode_reference entry;
 	PVFS_servreq_rmdir req_rmdir;

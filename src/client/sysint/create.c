@@ -34,7 +34,7 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	struct PVFS_server_req_s *req_job = NULL;		/* server request */
 	struct PVFS_server_resp_s *ack_job = NULL;	/* server response */
 	int ret = -1, ret1 = -1, cflags = 0, name_sz = 0, mask = 0;
-	unsigned char item = 0;
+	int item = 0;
 	PVFS_size handle_size = 0;
 	pinode *pinode_ptr = NULL, *item_ptr = NULL;
 	PVFS_servreq_create req_create;

@@ -8,18 +8,15 @@
 
 #include <pint-dcache.h>
 
-/* Timeout for a dcache entry */
-static struct timeval dentry_to;
-
 /* TODO: Figure out how timeouts are going to be used to invalidate
  * the cache entries 
  */
 
 static void dcache_remove_dentry(struct dcache *cache, int16_t item);
-static int dcache_update_dentry_timestamp(dcache_entry entry); 
+static int dcache_update_dentry_timestamp(dcache_entry* entry); 
 static int check_dentry_expiry(struct timeval t2);
 static int dcache_add_dentry(struct dcache *cache,char *name,
-		pinode_reference parent,pinode_reference entry);
+	pinode_reference parent,pinode_reference entry);
 static int dcache_get_next_free(struct dcache *cache);
 static int compare(struct dcache_t element,char *name,pinode_reference refn);
 
@@ -54,9 +51,11 @@ int dcache_lookup(struct dcache *cache,char *name,pinode_reference parent,
 		{
 			/* Got a match */
 			/* Check the timestamp for validity */
+			gossip_ldebug(DCACHE_DEBUG, "dcache match; checking timestamp.\n");
 			ret = check_dentry_expiry(cache->element[i].dentry.tstamp_valid);
 			if (ret < 0)
 			{
+				gossip_ldebug(DCACHE_DEBUG, "dcache entry expired.\n");
 				/* Dentry is stale */
 				/* Remove the entry from the cache */
 				dcache_remove_dentry(cache,i);
@@ -67,6 +66,7 @@ int dcache_lookup(struct dcache *cache,char *name,pinode_reference parent,
 			}
 			entry->handle = cache->element[i].dentry.entry.handle;
 			entry->fs_id = cache->element[i].dentry.entry.fs_id;	
+			gossip_ldebug(DCACHE_DEBUG, "dcache entry valid.\n");
 			break;
 		}
 		/* Get next element in cache */
@@ -120,7 +120,9 @@ int dcache_insert(struct dcache *cache,char *name,pinode_reference entry,
 		/* For now we just leave the entry in place, update its
 		 * timestamp and return 
 		 */
-		ret = dcache_update_dentry_timestamp(cache->element[index].dentry); 
+		gossip_ldebug(DCACHE_DEBUG, "dache inserting entry already present; timestamp update.\n");
+		ret = dcache_update_dentry_timestamp(
+			&cache->element[index].dentry); 
 		if (ret < 0)
 		{
 			/* Release the mutex */
@@ -142,7 +144,7 @@ int dcache_insert(struct dcache *cache,char *name,pinode_reference entry,
  * returns 0 on success, -1 on failure
  */
 int dcache_remove(struct dcache *cache,char *name,pinode_reference parent,
-		unsigned char *item_found)
+	int *item_found)
 {
 	int16_t i = 0;
 
@@ -281,7 +283,8 @@ static int dcache_add_dentry(struct dcache *cache,char *name,
 	strncpy(cache->element[free].dentry.name,name,size);
 	cache->element[free].dentry.name[size] = '\0';
 	/* Set the timestamp */
-	ret = gettimeofday(&cache->element[free].dentry.tstamp_valid,NULL);
+	ret = dcache_update_dentry_timestamp(
+		&cache->element[free].dentry);
 	if (ret < 0)
 	{
 		return(ret);	
@@ -394,29 +397,18 @@ static void dcache_remove_dentry(struct dcache *cache, int16_t item)
  *
  * returns 0 on success, -1 on failure
  */
-static int dcache_update_dentry_timestamp(dcache_entry entry) 
+static int dcache_update_dentry_timestamp(dcache_entry* entry) 
 {
 	int ret = 0;
-	struct timeval cur_time;
-	int64_t val = 0;
 	
 	/* Update the timestamp */
-	ret = gettimeofday(&cur_time,NULL);
+	ret = gettimeofday(&entry->tstamp_valid,NULL);
 	if (ret < 0)
 	{
 		return(-1);
 	}
-	/* Handle the case where sum of usecs adds an extra second */
-	val = cur_time.tv_usec + dentry_to.tv_usec;
-	if (val >= 1000000)
-	{
-		entry.tstamp_valid.tv_usec = val % 1000000; 
-		entry.tstamp_valid.tv_sec = cur_time.tv_sec + dentry_to.tv_sec + 1;
-	}
-	else
-	{
-		entry.tstamp_valid.tv_usec = val; 
-		entry.tstamp_valid.tv_sec = cur_time.tv_sec + dentry_to.tv_sec;
-	}
+
+	entry->tstamp_valid.tv_sec += PINT_DCACHE_TIMEOUT;
+
 	return(0);
 }

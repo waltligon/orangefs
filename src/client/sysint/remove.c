@@ -41,6 +41,7 @@ int PVFS_sys_remove(PVFS_sysreq_remove *req, PVFS_sysresp_remove *resp)
 	pinode_reference entry,parent_reference;
 	PVFS_servreq_remove req_remove;
 	PVFS_servreq_createdirent req_crdirent;
+	int item_found;
 	
 	/* Fill in parent pinode reference */
 	parent_reference.handle = req->parent_handle;

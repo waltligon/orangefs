@@ -35,7 +35,7 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
 	pinode_p pinode_ptr = NULL, item_ptr = NULL;
 	bmi_addr_t serv_addr1,serv_addr2;	/* PVFS address type structure */
 	char *server1 = NULL,*server2 = NULL;
-	unsigned char item = 0;
+	int item = 0;
 	int cflags = 0,name_sz = 0;
 	PVFS_bitfield mask;
 	struct timeval cur_time;

@@ -10,9 +10,14 @@
 
 #include <pint-sysint.h>
 
+/* number of entries allowed in the cache */
 #define PINT_DCACHE_MAX_ENTRIES 64
 
+/* number of seconds that cache entries will remain valid */
+#define PINT_DCACHE_TIMEOUT 5
+
 /* TODO: replace later with real value from trove */
+/* value passed out to indicate lookups that didn't find a match */
 #define PINT_DCACHE_HANDLE_INVALID 0
 
 /* Dcache Entry */
@@ -62,7 +67,7 @@ int dcache_remove(
 	struct dcache *cache, 
 	char *name, 
 	pinode_reference parent,
-	unsigned char *item_found);
+	int *item_found);
 
 int dcache_initialize(struct dcache *cache);
 
