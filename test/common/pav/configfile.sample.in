@@ -51,7 +51,7 @@ RCPPROG=scp
 #
 # LOCATION OF IMPORTANT BINARIES LOCALLY
 #
-PROGROOT=$SRCDIR_TOP/test/common/pav
+PROGROOT=$SRCDIR_TOP/common/pav
 
 # pav understands simple shell-like variables
 #PVFS=/homes/robl/pvfs2
