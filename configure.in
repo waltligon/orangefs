@@ -642,6 +642,7 @@ fi
 # end of NEED_BERKELEY_DB section
 
 AC_CHECK_HEADERS(netdb.h)
+AC_CHECK_HEADERS(arpa/inet.h)
 dnl check for gethostbyname function
 AC_MSG_CHECKING(for gethostbyname)
 AC_TRY_COMPILE([
@@ -651,7 +652,8 @@ gethostbyname("localhost");
 ],
 AC_MSG_RESULT(yes)
 AC_DEFINE(HAVE_GETHOSTBYNAME, 1, Define if gethostbyname function exists),
-AC_MSG_RESULT(no))
+AC_MSG_RESULT(no)
+WARN_ABOUT_HOSTNAMES="yes")
 
 dnl configure options for GM install path
 GM_HOME=
@@ -867,6 +869,10 @@ if test "x$BUILD_SERVER" = "x1"; then
 else
    AC_MSG_RESULT([PVFS2 server will be built                        :  no])
 
+fi
+
+if test "x$WARN_ABOUT_HOSTNAMES" = "xyes" ; then
+   AC_MSG_RESULT(WARNING: gethostbyname is not supported on this machine: ALL ADDRESSES MUST BE IN DOT NOTATION.)
 fi
 
 

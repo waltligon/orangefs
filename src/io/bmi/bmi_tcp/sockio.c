@@ -19,6 +19,9 @@
 #ifdef HAVE_NETDB_H
 #include <netdb.h>
 #endif
+#ifdef HAVE_ARPA_INET_H
+#include <arpa/inet.h>
+#endif
 #include <sys/poll.h>
 #include <sys/uio.h>
 
@@ -75,9 +78,11 @@ int BMI_sockio_connect_sock(int sockd,
     return (sockd);
 }
 
+#ifdef HAVE_GETHOSTBYNAME
+/* gethostbyname version */
 int BMI_sockio_init_sock(struct sockaddr *saddrp,
-	      const char *name,
-	      int service)
+			 const char *name,
+			 int service)
 {
     struct hostent *hep;
 
@@ -99,6 +104,35 @@ int BMI_sockio_init_sock(struct sockaddr *saddrp,
 	  hep->h_length);
     return (0);
 }
+#else
+/* inet_aton version */
+int BMI_sockio_init_sock(struct sockaddr *saddrp,
+			 const char *name,
+			 int service)
+{
+    int ret;
+    struct in_addr addr;
+
+    bzero((char *) saddrp, sizeof(struct sockaddr_in));
+    if (name == NULL)
+    {
+	ret = inet_aton("127.0.0.1", &addr);
+    }
+    else
+    {
+	ret = inet_aton(name, &addr);
+    }
+
+    if (ret) return -1;
+
+    ((struct sockaddr_in *) saddrp)->sin_family = AF_INET;
+    ((struct sockaddr_in *) saddrp)->sin_port = htons((u_short) service);
+    bcopy(&addr, (char *) &(((struct sockaddr_in *) saddrp)->sin_addr),
+	  sizeof(addr));
+
+    return 0;
+}
+#endif
 
 
 /* blocking receive */
