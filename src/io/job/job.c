@@ -13,6 +13,7 @@
 #include <limits.h>
 #include <string.h>
 #include <assert.h>
+#include <time.h>
 
 #include "flow.h"
 #include "job.h"
@@ -3845,6 +3846,9 @@ static int completion_query_context(job_id_t * out_id_array_p,
  */
 static void do_one_work_cycle_all(int idle_time_ms)
 {
+    int total_pending_count = 0;
+    struct timespec ts;
+
     if(bmi_pending_count || bmi_unexp_pending_count || flow_pending_count)
 	PINT_thread_mgr_bmi_push(idle_time_ms);
     if(dev_unexp_pending_count)
@@ -3853,6 +3857,19 @@ static void do_one_work_cycle_all(int idle_time_ms)
     if(trove_pending_count || flow_pending_count)
 	PINT_thread_mgr_trove_push(idle_time_ms);
 #endif
+
+    total_pending_count = bmi_pending_count + bmi_unexp_pending_count
+	+ flow_pending_count + dev_unexp_pending_count + trove_pending_count;
+    if(total_pending_count == 0 && idle_time_ms != 0)
+    {
+	/* The caller would like for us to idle if necessary, but we really
+	 * don't have a single thing to do.  Sleep here to prevent busy
+	 * spins.
+	 */
+	ts.tv_sec = idle_time_ms/1000;
+	ts.tv_nsec = (idle_time_ms%1000)*1000*1000;
+	nanosleep(&ts, NULL);
+    }
 
     return;
 }
