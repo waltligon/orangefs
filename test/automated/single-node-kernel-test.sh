@@ -71,6 +71,7 @@ fi
 bash $srcdir/test/kernel/linux-2.6/pvfs2-shell-test.sh $rootdir/INSTALL-pvfs2/mnt/pvfs2 > /tmp/pvfs2-shell-test.${USER} 2>&1
 if [ $? -ne 0 ] ; then
 	cat /tmp/pvfs2-shell-test.${USER}
+	exit 1
 else
 	# only show summary of output if it succeeds
 	cat /tmp/pvfs2-shell-test.${USER} | grep PASS
