@@ -21,12 +21,14 @@ core design, documentation and implementation by:
 Robert Ross <rross@mcs.anl.gov>
 Walt Ligon <walt@parl.clemson.edu>
 Phil Carns <pcarns@parl.clemson.edu>
-Neill Miller <neillm@mcs.anl.gov>
 Robert Latham <robl@mcs.anl.gov>
 
 
 Other Authors
 =============
+
+Neill Miller <neillm@mcs.anl.gov> (01/2003 - 01/2005)
+-- retired author, maintainer, and release manager
 
 Frank Shorter <fshorte@parl.clemson.edu>
 -- client side API development, system test harnesses
