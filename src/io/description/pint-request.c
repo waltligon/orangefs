@@ -774,9 +774,9 @@ int PINT_Do_Request_commit(PINT_Request *region, PINT_Request *node,
 	if (depth == 0)
 	{
 		gossip_debug(REQUEST_DEBUG,"clearing tree\n");
+		PINT_Do_clear_commit(node);
 		/* this indicates the region is packed */
-		region->num_nested_req *= -1;
-		PINT_Do_clear_commit(region);
+		region->committed = -1;
 	}
 
 	/* Return the index of the committed struct */ 

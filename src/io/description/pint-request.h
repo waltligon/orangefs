@@ -140,8 +140,7 @@ void PINT_Dump_request(struct PINT_Request *req);
 /********* macros for accessing key fields in a request *********/
 
 #define PINT_REQUEST_NEST_SIZE(reqp)\
-	((reqp)->num_nested_req >= 0 ? \
-		(reqp)->num_nested_req : -((reqp)->num_nested_req))
+		((reqp)->num_nested_req)
 
 /* returns the number of bytes used by a contiguous packing of the
  * request struct pointed to by reqp
@@ -153,7 +152,7 @@ void PINT_Dump_request(struct PINT_Request *req);
  * struct
  */
 #define PINT_REQUEST_IS_PACKED(reqp)\
-	((reqp)->num_nested_req < 0)
+	((reqp)->committed < 0)
 
 /* returns the number of contiguous memory regions referenced by the
  * request struct pointed to by reqp
