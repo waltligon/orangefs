@@ -412,14 +412,14 @@ PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
 				(rfdata->dist->params, rfdata->iod_num, rfdata->iod_count, loff);
 		/* find how much of requested region remains after loff */
       sz = size - diff;
-		/* check for append  */
+		/* check for append - can't we check check flag below? */
       if (poff+sz > rfdata->fsize && rfdata->extend_flag)
       {
          /* update the file size info */
 			gossip_debug(REQUEST_DEBUG,"\t\tfile being extended\n");
 			rfdata->fsize = poff + sz;
       }
-		/* stop at end of file */
+		/* stop at end of file - only in SERVER mode? */
 		if (poff+sz > rfdata->fsize)
 		{
 			/* hit end of file */

@@ -68,6 +68,29 @@ static PVFS_size contiguous_size (PVFS_Dist_params *dparam,
 }
 #endif
 
+static PVFS_size logical_file_size (PVFS_Dist_params *dparam,
+		PVFS_count32 iod_count, PVFS_size *psizes)
+{
+	/* take the max of the max offset on each server */
+	PVFS_size max;
+	int s;
+	if (!psizes)
+		return -1;
+	max = 0;
+	for (s = 0; s < iod_count; s++)
+	{
+		PVFS_size smax;
+		PVFS_size disp;
+		PVFS_size stripes;
+		stripes = psizes[s] / dparam->strip_size;
+		disp = psizes[s] % dparam->strip_size;
+		smax = disp + ((((stripes - 1) * iod_count) + s) * dparam->strip_size);
+		if (smax > max)
+			max = smax;
+	}
+	return max;
+}  
+
 static void encode (PVFS_Dist_params *dparam, void *buffer)
 {
 	memcpy(buffer, dparam, sizeof(PVFS_Dist_params));
@@ -87,6 +110,7 @@ static PVFS_Dist_methods simple_stripe_methods = {
 	physical_to_logical_offset,
 	next_mapped_offset,
 	contiguous_length,
+	logical_file_size,
 	encode,
 	decode
 };

@@ -36,6 +36,8 @@ typedef struct PVFS_Dist_methods {
 	PVFS_size (*contiguous_length) (PVFS_Dist_params *dparam,
 			PVFS_count32 iod_num, PVFS_count32 iod_count,
 			PVFS_offset physical_offset);
+	PVFS_size (*logical_file_size) (PVFS_Dist_params *dparam,
+			PVFS_count32 iod_count, PVFS_size *psizes);
 	void (*encode) (PVFS_Dist_params *dparam, void *buffer);
 	void (*decode) (PVFS_Dist_params *dparam, void *buffer);
 } PVFS_Dist_methods;

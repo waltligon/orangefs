@@ -13,6 +13,8 @@
 
 #define CONTIGBLOCKSZ 65536
 
+/* in this distribution all data is stored on a single server */
+
 static PVFS_offset logical_to_physical_offset (PVFS_Dist_params *dparam,
 		PVFS_count32 iod_num, PVFS_count32 iod_count, PVFS_offset logical_offset)
 {
@@ -52,6 +54,14 @@ static PVFS_size contiguous_size (PVFS_Dist_params *dparam,
 }
 #endif
 
+static PVFS_size logical_file_size (PVFS_Dist_params *dparam,
+		PVFS_count32 iod_count, PVFS_size *psizes)
+{
+	if (!psizes)
+		return -1;
+	return psizes[0];
+}
+
 static void encode (PVFS_Dist_params *dparam, void *buffer)
 {
 	memcpy(buffer, dparam, sizeof(PVFS_Dist_params));
@@ -69,6 +79,7 @@ static PVFS_Dist_methods default_methods = {
 	physical_to_logical_offset,
 	next_mapped_offset,
 	contiguous_length,
+	logical_file_size,
 	encode,
 	decode
 };

@@ -101,10 +101,10 @@ void PINT_Dist_encode(void *buffer, struct PVFS_Dist *dist)
 				sizeof(struct PVFS_Dist) + dist->name_size + dist->param_size);
 		dist = buffer;
 		/* adjust pointers in new buffer */
-		dist->dist_name = ((char*)dist + ((char*)old_dist->dist_name -
-			(char*)old_dist));
-		dist->params = ((char*)dist + ((char*)old_dist->params - 
-			(char*)old_dist));
+		dist->dist_name = ((char *)dist + ((char *)old_dist->dist_name -
+			(char *)old_dist));
+		dist->params = (struct PVFS_Dist_params *)
+			((char *)dist + ((char *)old_dist->params - (char *)old_dist));
 	}
 	/* convert pointers in dist to ints */
 	(int)(dist->dist_name) = (char *)(dist->dist_name) - (char *)(dist);
