@@ -1,0 +1,27 @@
+
+pinode storage
+-------------------------
+- utilize list_mutex and pinode locks as necessary to provide thread
+  safety
+- are we trying to make the system interface thread safe?  If so, we
+  have a lot of fixing to do.  If not, then we probably should get rid
+  of the lock_pinode and unlock_pinode functions. Some changes towards
+  this have already been made.
+- need to eventually have a mechanism for garbage collection in the
+  pinode storage interface
+- (long term) replace linked list with faster data structure
+- need to figure out mechanism for pinode revalidation
+
+
+system interface
+-------------------------
+- convert all printf calls to gossip interface
+- come up with scheme for reading configuration information
+- fix comments marked with "TODO" string
+- implement free_serv_table()
+- move map() function out of hash.c and into this code somewhere
+  (hash.c should only contain generic code- nothing specific to pvfs)
+- consider coming up with a naming convention for groups of functions
+  that handle similar functionality (like the helper functions that
+  handle job posting and allocation) and maybe break them out into a
+  seperate file and header to be used strictly by the system interface

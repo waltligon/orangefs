@@ -2149,7 +2149,7 @@ else
 echo "${ECHO_T}no" >&6
 fi
 
-ac_config_files="$ac_config_files Makefile src/io/trove/module.mk src/io/trove/trove-handle-mgmt/module.mk src/io/trove/trove-dbpf/module.mk src/common/quickhash/module.mk src/common/quicklist/module.mk src/common/dotconf/module.mk src/common/id-generator/module.mk src/common/gossip/module.mk src/common/gen-locks/module.mk src/common/llist/module.mk src/io/bmi/module.mk src/io/bmi/bmi_tcp/module.mk src/io/description/module.mk src/io/flow/module.mk src/io/flow/flowproto-bmi-trove/module.mk src/io/flow/flowproto-template/module.mk src/io/job/module.mk src/proto/module.mk src/server/request-scheduler/module.mk src/sysint/module.mk test/io/trove/module.mk test/common/quicklist/module.mk test/common/id-generator/module.mk test/common/gossip/module.mk test/common/gen-locks/module.mk test/io/bmi/module.mk test/io/description/module.mk test/io/flow/module.mk test/io/job/module.mk doc/coding/module.mk"
+ac_config_files="$ac_config_files Makefile src/io/trove/module.mk src/io/trove/trove-handle-mgmt/module.mk src/io/trove/trove-dbpf/module.mk src/common/quickhash/module.mk src/common/quicklist/module.mk src/common/dotconf/module.mk src/common/id-generator/module.mk src/common/gossip/module.mk src/common/gen-locks/module.mk src/common/llist/module.mk src/io/bmi/module.mk src/io/bmi/bmi_tcp/module.mk src/io/description/module.mk src/io/flow/module.mk src/io/flow/flowproto-bmi-trove/module.mk src/io/flow/flowproto-template/module.mk src/io/job/module.mk src/proto/module.mk src/server/request-scheduler/module.mk src/client/sysint/module.mk test/io/trove/module.mk test/common/quicklist/module.mk test/common/id-generator/module.mk test/common/gossip/module.mk test/common/gen-locks/module.mk test/io/bmi/module.mk test/io/description/module.mk test/io/flow/module.mk test/io/job/module.mk doc/coding/module.mk"
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
 # tests run on this system so they can be shared between configure
@@ -2476,7 +2476,7 @@ do
   "src/io/job/module.mk" ) CONFIG_FILES="$CONFIG_FILES src/io/job/module.mk" ;;
   "src/proto/module.mk" ) CONFIG_FILES="$CONFIG_FILES src/proto/module.mk" ;;
   "src/server/request-scheduler/module.mk" ) CONFIG_FILES="$CONFIG_FILES src/server/request-scheduler/module.mk" ;;
-  "src/sysint/module.mk" ) CONFIG_FILES="$CONFIG_FILES src/sysint/module.mk" ;;
+  "src/client/sysint/module.mk" ) CONFIG_FILES="$CONFIG_FILES src/client/sysint/module.mk" ;;
   "test/io/trove/module.mk" ) CONFIG_FILES="$CONFIG_FILES test/io/trove/module.mk" ;;
   "test/common/quicklist/module.mk" ) CONFIG_FILES="$CONFIG_FILES test/common/quicklist/module.mk" ;;
   "test/common/id-generator/module.mk" ) CONFIG_FILES="$CONFIG_FILES test/common/id-generator/module.mk" ;;
