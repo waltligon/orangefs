@@ -352,8 +352,10 @@ static int handle_store_load(TROVE_coll_id coll_id,
     printf("handle_store_load: found %d handles used.\n", array_count);
 
     for (i=0; i < array_count; i++) {
-	printf("  handle_store_load: removing %Ld.\n", handle_array[i]);
+	printf("  handle_store_load: removing %Ld from free list.\n", handle_array[i]);
 	extentlist_handle_remove(&ledger->free_list, handle_array[i]);
+	extentlist_show(&(ledger->free_list));
+
     }
 
 #if 0

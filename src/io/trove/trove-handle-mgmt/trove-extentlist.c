@@ -344,7 +344,7 @@ int extentlist_handle_remove(struct TROVE_handle_extentlist *elist,
     if (ret == -1) return -1;
 
     avlremove(&(elist->index), key_handle);
-    if (old_e->first == old_e->last) return 0; /* done, length 1 extent now gone */
+    if (key_handle == last_handle) return 0; /* done, length 1 extent now gone */
     else {
 	if ((old_e = (struct TROVE_handle_extent *)malloc(sizeof(struct TROVE_handle_extent)) ) == NULL ) {
 	    assert(0);
