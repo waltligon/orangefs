@@ -42,6 +42,7 @@
 #include "PINT-reqproto-encode.h"
 #include "pvfs2-util.h"
 #include "pint-util.h"
+#include "server-config-mgr.h"
 
 enum
 {
@@ -198,13 +199,13 @@ static int msgpairarray_post(PARENT_SM *sm_p,
         {
             if (msg_p->fs_id != PVFS_FS_ID_NULL)
             {
-                server_config = PINT_get_server_config_struct(
+                server_config = PINT_server_config_mgr_get_config(
                     msg_p->fs_id);
                 assert(server_config);
 
                 cur_fs = PINT_config_find_fs_id(
                     server_config, msg_p->fs_id);
-                PINT_put_server_config_struct(server_config);
+                PINT_server_config_mgr_put_config(server_config);
                 assert(cur_fs);
                 msg_p->enc_type = cur_fs->encoding;
             }
