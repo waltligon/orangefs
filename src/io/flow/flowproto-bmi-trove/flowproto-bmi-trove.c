@@ -1032,8 +1032,6 @@ static int buffer_setup_mem_to_bmi(flow_descriptor * flow_d)
 static int buffer_setup_bmi_to_trove(flow_descriptor * flow_d)
 {
     struct bmi_trove_flow_data *flow_data = PRIVATE_FLOW(flow_d);
-    int ret = -1;
-    PINT_Request_result tmp_result;
 
     /* set the buffer size to use for this flow */
     flow_data->max_buffer_size = DEFAULT_BUFFER_SIZE;
@@ -1099,27 +1097,8 @@ static int buffer_setup_bmi_to_trove(flow_descriptor * flow_d)
      * before doing anything else
      */
     if(flow_d->io_req_offset)
-    {
-	memset(&tmp_result, 0, sizeof(PINT_Request_result));
-	tmp_result.segmax = INT_MAX;
-	tmp_result.bytemax = flow_d->io_req_offset;
-	ret = PINT_Process_request(flow_d->io_req_state, NULL,
-	    flow_d->file_data, &flow_d->result, PINT_CKSIZE_LOGICAL_SKIP);
-	if(ret < 0)
-	{
-	    BMI_memfree(flow_d->src.u.bmi.address,
-			flow_data->fill_buffer, flow_data->max_buffer_size,
-			BMI_RECV);
-	    BMI_memfree(flow_d->src.u.bmi.address,
-			flow_data->drain_buffer, flow_data->max_buffer_size,
-			BMI_RECV);
-	    PINT_Free_request_state(flow_data->dup_io_req_state);
-#if 0
-	    PINT_Free_request_state(flow_data->dup_mem_req_state);
-#endif
-	    return (-EINVAL);
-	}
-    }
+	PINT_REQUEST_STATE_SET_TARGET(flow_d->io_req_state, 
+	    flow_d->io_req_offset);
 
     return (0);
 }
@@ -1267,7 +1246,6 @@ static int alloc_flow_data(flow_descriptor * flow_d)
 {
     struct bmi_trove_flow_data *flow_data = NULL;
     int ret = -1;
-    PINT_Request_result tmp_result;
 
     /* allocate the structure */
     flow_data = (struct bmi_trove_flow_data *) malloc(sizeof(struct
@@ -1284,20 +1262,9 @@ static int alloc_flow_data(flow_descriptor * flow_d)
      * before doing anything else
      */
     if(flow_d->io_req_offset)
-    {
-	memset(&tmp_result, 0, sizeof(PINT_Request_result));
-	tmp_result.segmax = INT_MAX;
-	tmp_result.bytemax = flow_d->io_req_offset;
-	ret = PINT_Process_request(flow_d->io_req_state, NULL,
-	    flow_d->file_data, &tmp_result, PINT_CKSIZE_LOGICAL_SKIP);
-	if(ret < 0)
-	{
-	    free(flow_data);
-	    gossip_lerr("Error: bad offset.\n");
-	    return (-EINVAL);
-	}
-    }
-
+	PINT_REQUEST_STATE_SET_TARGET(flow_d->io_req_state,
+	    flow_d->io_req_offset);
+    
     /* the rest of the buffer setup varies depending on the endpoints */
     if (flow_d->src.endpoint_id == BMI_ENDPOINT &&
 	flow_d->dest.endpoint_id == MEM_ENDPOINT)

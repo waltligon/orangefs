@@ -141,8 +141,14 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_ref,
     sm_p->u.io.io_req        = io_req;
     sm_p->u.io.io_req_offset = io_req_offset;
     sm_p->u.io.buffer        = buffer;
-    sm_p->u.io.buffer_size   = buffer_size;
     sm_p->u.io.io_resp_p     = resp_p;
+
+    /* TODO: this is a hack for now; I think that I am
+     * doing something wrong...
+     */
+    /* sm_p->u.io.buffer_size   = buffer_size; */
+    sm_p->u.io.buffer_size   = (void*)((char*)buffer_size -
+	io_req_offset);
 
     ret = PINT_client_state_machine_post(sm_p, PVFS_SYS_IO);
     assert(ret == 0);
@@ -1207,30 +1213,7 @@ static int io_find_target_datafiles(PVFS_Request io_req,
 	 * before calculating
 	 */
 	if (io_req_offset)
-	{
-	    memset(&tmp_result, 0, sizeof(PINT_Request_result));
-	    tmp_result.bytemax = io_req_offset;
-	    tmp_result.segmax = INT_MAX;
-	    /* TODO: this is a a hack for now */
-	    tmp_file_data.fsize = INT64_MAX;
-
-	    /* PINT_Process_request() returns number of bytes processed */
-	    ret = PINT_Process_request(req_state,
-				       NULL,
-				       &tmp_file_data,
-				       &tmp_result,
-				       PINT_CKSIZE_LOGICAL_SKIP);
-	    if (ret < 0)
-	    {
-		PINT_Free_request_state(req_state);
-		return ret;
-	    }
-	    if (PINT_REQUEST_STATE_OFFSET(req_state) == -1)
-	    {
-		/* no data here */
-		continue;
-	    }
-	}
+	    PINT_REQUEST_STATE_SET_TARGET(req_state, io_req_offset);
 
 	memset(&tmp_result, 0, sizeof(PINT_Request_result));
 	tmp_result.bytemax = 1;

@@ -35,6 +35,8 @@
 #define PINT_EQ_MEMREQ(x)          ((x) == PINT_MEMREQ)
 #define PINT_SET_SEEKING(x)        ((x) |= PINT_SEEKING)
 #define PINT_CLR_SEEKING(x)        ((x) &= ~(PINT_SEEKING))
+#define PINT_SET_LOGICAL_SKIP(x)   ((x) |= PINT_LOGICAL_SKIP)
+#define PINT_CLR_LOGICAL_SKIP(x)   ((x) &= ~(PINT_LOGICAL_SKIP))
 
 /* PVFS Request Processing Stuff */
 
@@ -68,10 +70,17 @@ typedef struct PINT_Request_state {
 	struct PINT_reqstack *cur; /* request element chain stack */
 	int32_t      lvl;          /* level in element chain */
 	PVFS_size    bytes;        /* bytes in current contiguous chunk processed */
-	PVFS_offset  buf_offset;   /* byte offset in user buffer */
-	PVFS_offset  last_offset;	/* last offset in previous call to process */
-	PVFS_offset  start_offset;	/* first offset in next call to process */
+	PVFS_offset  type_offset;  /* logical offset within request type */
+	PVFS_offset  target_offset;/* first type offset to process */
+	PVFS_offset  final_offset; /* last type offset to process */
+	PVFS_offset  file_offset;	/* last file offset in previous call to process */
+	PVFS_offset  start_offset;	/* first file offset in next call to process - probably obsolete because not used */
 } PINT_Request_state;           
+/* NOTE - I think buf_offset is superceded by type_offset
+ * and start_offset can be completely replced with last_offset
+ * at which point target_offset could be renamed start_offset
+ * and last_offset could be renamed file_offset
+ */
 
 typedef struct PINT_Request_result {
 	PVFS_offset  *offset_array;/* array of offsets for each segment output */
@@ -105,7 +114,6 @@ int PINT_Process_request(PINT_Request_state *req,
 /* internal function */
 PVFS_size PINT_Distribute(PVFS_offset offset,
 		PVFS_size size,
-		PVFS_offset seq_offset,
 		PINT_Request_file_data *rfdata,
 		PINT_Request_state *mem,
 		PINT_Request_result *result,
@@ -147,11 +155,61 @@ int PINT_Request_decode(struct PINT_Request *req);
 #define PINT_REQUEST_TOTAL_BYTES(reqp)\
 	((reqp)->aggregate_size)
 
+/* returns the start_offset */
 #define PINT_REQUEST_STATE_OFFSET(reqp)\
 	((reqp)->start_offset)
 
+/* sets the start_offset to the given value */
 #define PINT_REQUEST_STATE_SET_OFFSET(reqp,val)\
 	((reqp)->start_offset) = (val)
+
+/* sets the target_offset to the given value */
+#define PINT_REQUEST_STATE_SET_TARGET(reqp,val)\
+	((reqp)->target_offset) = (val)
+
+/* sets the final_offset to the given value */
+#define PINT_REQUEST_STATE_SET_FINAL(reqp,val)\
+	((reqp)->final_offset) = (val)
+
+/* this one does not zero the start_offset 
+ * mainly used inside of process_request */
+#define PINT_REQUEST_STATE_RST(reqp)\
+	do {\
+	((reqp)->lvl) = 0;\
+	((reqp)->bytes) = 0;\
+	((reqp)->type_offset) = 0;\
+	((reqp)->file_offset) = 0;\
+	((reqp)->cur[0].el) = 0;\
+	((reqp)->cur[0].rq) = ((reqp)->cur[0].rqbase);\
+	((reqp)->cur[0].blk) = 0;\
+	((reqp)->cur[0].chunk_offset) = 0;\
+	}while(0)
+
+/* this one DOES zero the start_offset 
+ * intended for flow code to reset a request to the beginning */
+#define PINT_REQUEST_STATE_RESET(reqp)\
+	do {\
+	PINT_REQUEST_STATE_RST(reqp);\
+	PINT_REQUEST_STATE_SET_OFFSET((reqp),0);\
+	}while(0)
+
+/* checks to see if you have run out of request */
+#define PINT_REQUEST_STATE_DONE(reqp)\
+	(((reqp)->type_offset >= (reqp)->final_offset) ||\
+	 ((reqp)->start_offset == -1))
+
+/* checks to see if you have run out of segments or bytes 
+ * or hit EOF */
+#define PINT_REQUEST_RESULT_DONE(resp)\
+	((resp)->segs >= (resp)->segmax ||\
+	 (resp)->bytes >= (resp)->bytemax ||\
+	  (resp)->eof_flag)
+
+/* checks to see if you have run out of request or segments or bytes 
+ * or hit EOF */
+#define PINT_REQUEST_DONE(reqp,resp)\
+	(PINT_REQUEST_STATE_DONE(reqp) ||\
+	 PINT_REQUEST_RESULT_DONE(resp))
 
 /* set ref count of request to 1
  * never modify a refcount below zero
