@@ -1,9 +1,12 @@
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <assert.h>
 #include <gtk/gtk.h>
 
 #include "karma.h"
 
+/* values used for column names; don't mess with these indescriminately */
 enum {
     GUI_DETAILS_NAME = 0,
     GUI_DETAILS_RAM_TOT,
@@ -31,6 +34,16 @@ static GtkListStore *gui_details_list;
 static GtkWidget *gui_details_view;
 
 static GtkTreeViewColumn *gui_details_col[GUI_DETAILS_TYPE];
+
+static gint gui_details_float_string_compare(GtkTreeModel *model,
+					     GtkTreeIter *iter_a,
+					     GtkTreeIter *iter_b,
+					     gpointer col_id);
+
+static gint gui_details_text_compare(GtkTreeModel *model,
+				     GtkTreeIter *iter_a,
+				     GtkTreeIter *iter_b,
+				     gpointer col_id);
 
 GtkWidget *gui_details_setup(void)
 {
@@ -68,6 +81,37 @@ GtkWidget *gui_details_setup(void)
 
     gtk_tree_view_set_model(GTK_TREE_VIEW(gui_details_view),
 			    GTK_TREE_MODEL(gui_details_list));
+
+    /* for all the numerical values, set up sorting */
+    for (i=1; i < GUI_DETAILS_TYPE; i++) {
+	gtk_tree_sortable_set_sort_func(GTK_TREE_SORTABLE(gui_details_list),
+					i,
+					gui_details_float_string_compare,
+					GINT_TO_POINTER(i),
+					NULL);
+
+	gtk_tree_view_column_set_sort_column_id(gui_details_col[i], i);
+    }
+
+    /* for the text values, set up sorting */
+    gtk_tree_sortable_set_sort_func(GTK_TREE_SORTABLE(gui_details_list),
+				    GUI_DETAILS_NAME,
+				    gui_details_text_compare,
+				    GINT_TO_POINTER(GUI_DETAILS_NAME),
+				    NULL);
+    
+    gtk_tree_view_column_set_sort_column_id(gui_details_col[GUI_DETAILS_NAME],
+					    GUI_DETAILS_NAME);
+
+    gtk_tree_sortable_set_sort_func(GTK_TREE_SORTABLE(gui_details_list),
+				    GUI_DETAILS_TYPE,
+				    gui_details_text_compare,
+				    GINT_TO_POINTER(GUI_DETAILS_TYPE),
+				    NULL);
+    
+    gtk_tree_view_column_set_sort_column_id(gui_details_col[GUI_DETAILS_TYPE],
+					    GUI_DETAILS_TYPE);
+				    
 
     gui_details_initialized = 1;
 
@@ -234,4 +278,46 @@ void gui_details_update(struct PVFS_mgmt_server_stat *server_stat,
     /* reattach model to view */
     gtk_tree_view_set_model(GTK_TREE_VIEW(gui_details_view), model);
     g_object_unref(model);
+}
+
+static gint gui_details_float_string_compare(GtkTreeModel *model,
+					     GtkTreeIter *iter_a,
+					     GtkTreeIter *iter_b,
+					     gpointer col_id)
+{
+    gchar *string_a, *string_b;
+    float a, b;
+
+    gtk_tree_model_get(model, iter_a, (gint) col_id, &string_a, -1);
+    gtk_tree_model_get(model, iter_b, (gint) col_id, &string_b, -1);
+
+    a = strtof(string_a);
+    b = strtof(string_b);
+
+    g_free(string_a);
+    g_free(string_b);
+
+    if (a < b) return -1;
+    else if (a == b) return 0;
+    else return 1;
+}
+
+static gint gui_details_text_compare(GtkTreeModel *model,
+				     GtkTreeIter *iter_a,
+				     GtkTreeIter *iter_b,
+				     gpointer col_id)
+{
+    int ret;
+    gchar *string_a, *string_b;
+
+    gtk_tree_model_get(model, iter_a, (gint) col_id, &string_a, -1);
+    gtk_tree_model_get(model, iter_b, (gint) col_id, &string_b, -1);
+
+    /* TODO: use some glib function instead? */
+    ret = strcmp(string_a, string_b);
+
+    g_free(string_a);
+    g_free(string_b);
+
+    return ret;
 }
