@@ -930,6 +930,51 @@ int pvfs2_flush_mmap_racache(struct inode *inode)
 }
 #endif
 
+int pvfs2_unmount_sb(struct super_block *sb)
+{
+    int ret = -1;
+    pvfs2_kernel_op_t *new_op = NULL;
+
+    pvfs2_print("pvfs2_unmount_sb called on sb %p\n", sb);
+
+    new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
+    if (!new_op)
+    {
+        return -ENOMEM;
+    }
+    new_op->upcall.type = PVFS2_VFS_OP_FS_UMOUNT;
+    new_op->upcall.req.fs_umount.id = PVFS2_SB(sb)->id;
+    new_op->upcall.req.fs_umount.fs_id = PVFS2_SB(sb)->coll_id;
+    strncpy(new_op->upcall.req.fs_umount.pvfs2_config_server,
+            PVFS2_SB(sb)->devname, PVFS_MAX_SERVER_ADDR_LEN);
+
+    pvfs2_print("Attempting PVFS2 Unmount via host %s\n",
+                new_op->upcall.req.fs_umount.pvfs2_config_server);
+
+    service_operation(new_op, "pvfs2_fs_umount", 0);
+    ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
+
+    pvfs2_print("pvfs2_unmount: got return value of %d\n", ret);
+    if (ret)
+    {
+        sb = ERR_PTR(ret);
+        goto error_exit;
+    }
+
+    /*
+      the unmount has no downcall members to retrieve, but
+      the status value tells us if it went through ok or not
+    */
+    ret = new_op->downcall.status;
+
+    pvfs2_print("pvfs2_unmount got return value of %d\n",ret);
+
+  error_exit:
+    op_release(new_op);
+
+    return ret;
+}
+
 /* macro defined in include/pvfs2-types.h */
 DECLARE_ERRNO_MAPPING_AND_FN();
 

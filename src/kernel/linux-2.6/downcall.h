@@ -84,7 +84,13 @@ typedef struct
 {
     PVFS_fs_id fs_id;
     PVFS_handle root_handle;
+    int id;
 } pvfs2_fs_mount_response_t;
+
+/* the umount response is a blank downcall */
+typedef struct
+{
+} pvfs2_fs_umount_response_t;
 
 typedef struct
 {
@@ -106,6 +112,7 @@ typedef struct
 	pvfs2_statfs_response_t statfs;
 /* 	pvfs2_truncate_response_t truncate; */
         pvfs2_fs_mount_response_t fs_mount;
+/* 	pvfs2_fs_umount_response_t fs_umount; */
     } resp;
 } pvfs2_downcall_t;
 

@@ -106,6 +106,13 @@ typedef struct
 
 typedef struct
 {
+    char pvfs2_config_server[PVFS_MAX_SERVER_ADDR_LEN];
+    int id;
+    PVFS_fs_id fs_id;
+} pvfs2_fs_umount_request_t;
+
+typedef struct
+{
     int type;
     PVFS_credentials credentials;
 
@@ -125,6 +132,7 @@ typedef struct
         pvfs2_truncate_request_t truncate;
         pvfs2_mmap_ra_cache_flush_request_t ra_cache_flush;
         pvfs2_fs_mount_request_t fs_mount;
+        pvfs2_fs_umount_request_t fs_umount;
     } req;
 } pvfs2_upcall_t;
 

@@ -26,6 +26,7 @@
 #define PVFS2_VFS_OP_TRUNCATE          0xFF00000C
 #define PVFS2_VFS_OP_MMAP_RA_FLUSH     0xFF00000D
 #define PVFS2_VFS_OP_FS_MOUNT          0xFF00000E
+#define PVFS2_VFS_OP_FS_UMOUNT         0xFF00000F
 
 /* misc constants */
 #define PVFS2_NAME_LEN                 0x000000FF

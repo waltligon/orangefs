@@ -267,6 +267,13 @@ int pvfs2_remount(
             goto error_exit;
         }
 
+        /*
+          store the id assigned to this sb -- it's just a short-lived
+          mapping that the system interface uses to map this
+          superblock to a particular mount entry
+        */
+        PVFS2_SB(sb)->id = new_op->downcall.resp.fs_mount.id;
+
       error_exit:
         op_release(new_op);
     }
@@ -341,6 +348,19 @@ static int parse_mount_options(
             options++;
         }
 
+        if (!options || (strncmp(options, "id=", 3) != 0))
+        {
+            pvfs2_print("pvfs2: Invalid id specification\n");
+            return ret;
+        }
+        options += 3;
+        pvfs2_sb->id = simple_strtoul(options, &options, 0);
+
+        if (*options == ',')
+        {
+            options++;
+        }
+
         /* handle misc trailing mount options here */
         if (options && (strncmp(options, "intr", 4) == 0))
         {
@@ -363,9 +383,9 @@ static int parse_mount_options(
             if (!silent)
             {
                 pvfs2_print(
-                    "pvfs2: got coll_id %d | root_handle %Lu | "
+                    "pvfs2: got coll_id %d | root_handle %Lu | id %d | "
                     "intr? %s\n", (int)pvfs2_sb->mnt_options.coll_id,
-                    Lu(pvfs2_sb->mnt_options.root_handle),
+                    Lu(pvfs2_sb->mnt_options.root_handle), pvfs2_sb->id,
                     (pvfs2_sb->mnt_options.intr ? "yes" : "no"));
             }
             ret = 0;
@@ -487,17 +507,19 @@ struct super_block *pvfs2_get_sb(
         if (data)
         {
             snprintf(buf, PVFS2_MAX_MOUNT_OPT_LEN,
-                     "coll_id=%d,root_handle=%Lu,%s",
+                     "coll_id=%d,root_handle=%Lu,id=%d,%s",
                      new_op->downcall.resp.fs_mount.fs_id,
                      new_op->downcall.resp.fs_mount.root_handle,
+                     new_op->downcall.resp.fs_mount.id,
                      (char *)data);
         }
         else
         {
             snprintf(buf, PVFS2_MAX_MOUNT_OPT_LEN,
-                     "coll_id=%d,root_handle=%Lu",
+                     "coll_id=%d,root_handle=%Lu,id=%d",
                      new_op->downcall.resp.fs_mount.fs_id,
-                     new_op->downcall.resp.fs_mount.root_handle);
+                     new_op->downcall.resp.fs_mount.root_handle,
+                     new_op->downcall.resp.fs_mount.id);
         }
 
         pvfs2_print("Formatted mount options are: %s\n", buf);
@@ -540,6 +562,12 @@ void pvfs2_kill_sb(
     struct super_block *sb)
 {
     pvfs2_print("pvfs2_kill_sb: called\n");
+
+    /*
+      issue the unmount to userspace to tell it to remove the dynamic
+      mount info it has for this superblock
+    */
+    pvfs2_unmount_sb(sb);
 
     /* remove the sb from our list of pvfs2 specific sb's */
     remove_pvfs2_sb(sb);

@@ -164,6 +164,7 @@ typedef struct
 {
     PVFS_handle root_handle;
     PVFS_fs_id coll_id;
+    int id;
     pvfs2_mount_options_t mnt_options;
     char data[PVFS2_MAX_MOUNT_OPT_LEN];
     char devname[PVFS_MAX_SERVER_ADDR_LEN];
@@ -293,6 +294,9 @@ void unmask_blocked_signals(
 int pvfs2_flush_mmap_racache(
     struct inode *inode);
 #endif
+
+int pvfs2_unmount_sb(
+    struct super_block *sb);
 
 /************************************
  * misc convenience macros

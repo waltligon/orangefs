@@ -40,6 +40,8 @@ int PVFS_util_add_dynamic_mntent(
     struct PVFS_sys_mntent *mntent);
 int PVFS_util_remove_internal_mntent(
     struct PVFS_sys_mntent *mntent);
+void PVFS_sys_free_mntent(
+    struct PVFS_sys_mntent *mntent);
 
 /* path management */
 int PVFS_util_lookup_parent(

@@ -46,9 +46,6 @@ static int parse_encoding_string(
     const char *cp,
     enum PVFS_encoding_type *et);
 
-static void free_mntent(
-    struct PVFS_sys_mntent *mntent);
-
 static int copy_mntent(
     struct PVFS_sys_mntent *dest_mntent,
     struct PVFS_sys_mntent *src_mntent);
@@ -470,7 +467,7 @@ int PVFS_util_add_dynamic_mntent(struct PVFS_sys_mntent *mntent)
                 current_mnt = &s_stat_tab_array[
                     PVFS2_DYNAMIC_TAB_INDEX].mntent_array[i];
                 copy_mntent(&tmp_mnt_array[i], current_mnt);
-                free_mntent(current_mnt);
+                PVFS_sys_free_mntent(current_mnt);
             }
 
             /* finally, swap the mntent arrays */
@@ -590,7 +587,7 @@ int PVFS_util_remove_internal_mntent(
                 if ((current_mnt->fs_id == mntent->fs_id) &&
                     (strcmp(current_mnt->mnt_dir, mntent->mnt_dir) == 0))
                 {
-                    free_mntent(current_mnt);
+                    PVFS_sys_free_mntent(current_mnt);
                     continue;
                 }
                 copy_mntent(&tmp_mnt_array[new_count++], current_mnt);
@@ -610,7 +607,8 @@ int PVFS_util_remove_internal_mntent(
               array here.  since this is the case, we also free the
               array since we know it's now empty.
             */
-            free_mntent(&s_stat_tab_array[found_index].mntent_array[0]);
+            PVFS_sys_free_mntent(
+                &s_stat_tab_array[found_index].mntent_array[0]);
             free(s_stat_tab_array[found_index].mntent_array);
             s_stat_tab_array[found_index].mntent_array = NULL;
             s_stat_tab_array[found_index].mntent_count = 0;
@@ -1092,7 +1090,7 @@ static int parse_flowproto_string(
     return (0);
 }
 
-static void free_mntent(
+void PVFS_sys_free_mntent(
     struct PVFS_sys_mntent *mntent)
 {
     if (mntent)
@@ -1229,7 +1227,7 @@ void PINT_release_pvfstab(void)
     {
         for (j = 0; j < s_stat_tab_array[i].mntent_count; j++)
         {
-            free_mntent(&s_stat_tab_array[i].mntent_array[j]);
+            PVFS_sys_free_mntent(&s_stat_tab_array[i].mntent_array[j]);
         }
         free(s_stat_tab_array[i].mntent_array);
     }
@@ -1238,8 +1236,9 @@ void PINT_release_pvfstab(void)
     for (j = 0; j < s_stat_tab_array[
              PVFS2_DYNAMIC_TAB_INDEX].mntent_count; j++)
     {
-        free_mntent(&s_stat_tab_array[
-                        PVFS2_DYNAMIC_TAB_INDEX].mntent_array[j]);
+        PVFS_sys_free_mntent(
+            &s_stat_tab_array[
+                PVFS2_DYNAMIC_TAB_INDEX].mntent_array[j]);
     }
     if (s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].mntent_array)
     {
