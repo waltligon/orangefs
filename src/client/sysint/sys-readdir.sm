@@ -140,7 +140,7 @@ int PVFS_sys_readdir(
     sm_p->parent_ref = pinode_refn;
     sm_p->u.readdir.object_ref = pinode_refn;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "Doing readdir on parent handle "
+    gossip_debug(GOSSIP_READDIR_DEBUG, "Doing readdir on parent handle "
                  "%Lu on fs %d\n", Lu(pinode_refn.handle),
                  pinode_refn.fs_id);
 
@@ -199,13 +199,13 @@ static int readdir_msg_setup_msgpair(PINT_client_sm *sm_p,
         return 1;
     }
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG," readdir: posting readdir req\n");
+    gossip_debug(GOSSIP_READDIR_DEBUG," readdir: posting readdir req\n");
 
     msg_p = &sm_p->msgpair;
     memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
 
     gossip_debug(
-        GOSSIP_CLIENT_DEBUG, "%Lu|%d | token is %d | limit is %d\n",
+        GOSSIP_READDIR_DEBUG, "%Lu|%d | token is %d | limit is %d\n",
         Lu(sm_p->u.readdir.object_ref.handle),
         sm_p->u.readdir.object_ref.fs_id,
         sm_p->u.readdir.pos_token,
@@ -261,7 +261,7 @@ static int readdir_msg_comp_fn(void *v_p,
                resp_p->u.readdir.dirent_array, dirent_array_len);
     }
     gossip_debug(
-        GOSSIP_CLIENT_DEBUG, "*** Got %d directory entries\n",
+        GOSSIP_READDIR_DEBUG, "*** Got %d directory entries\n",
         sm_p->u.readdir.readdir_resp->pvfs_dirent_outcount);
 
     return 0;
