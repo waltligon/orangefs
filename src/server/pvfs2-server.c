@@ -201,6 +201,16 @@ int main(int argc, char **argv)
 		unexpected_msg = 1;
 		ret = server_state_machine_start(s_op,
 						 &server_job_status_array[i]);
+		if(ret < 0)
+		{
+		    gossip_err("Error: server unable to handle request, error code: %d.\n", (int)ret);
+		    free(s_op->unexp_bmi_buff.buffer);
+		    /* TODO: tell BMI to drop this address? */
+		    /* set return code to zero to allow server to continue 
+		     * processing 
+		     */
+		    ret = 0;
+		}
 	    }
 	    else {
 		/* NOTE: PINT_state_machine_next() is a function that is
@@ -730,7 +740,7 @@ static int server_post_unexpected_recv(job_status_s *temp_stat)
  * initializes fields in the s_op structure and begins execution of
  * the appropriate state machine
  *
- * returns 0 on success, -errno on failure
+ * returns 0 on success, -PVFS_errno on failure
  */
 static int server_state_machine_start(PINT_server_op *s_op, job_status_s *ret)
 {
@@ -743,6 +753,7 @@ static int server_state_machine_start(PINT_server_op *s_op, job_status_s *ret)
 		s_op->unexp_bmi_buff.size);
     if(retval < 0)
     {
+	gossip_err("Error: server received a corrupt or unsupported request message.\n");
 	return(retval);
     }
 
@@ -756,8 +767,9 @@ static int server_state_machine_start(PINT_server_op *s_op, job_status_s *ret)
 
     if(!s_op->current_state)
     {
-	gossip_err("System not init for function\n");
-	return(-1);
+	gossip_err("Error: server does not implement request type: %d\n", (int)s_op->req->op);
+	PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ);
+	return(-PVFS_ENOSYS);
     }
 
     s_op->resp.op = s_op->req->op;

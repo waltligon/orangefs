@@ -157,6 +157,8 @@ int do_decode_req(
     /* if we hit this point, it must be a request type that we
      * don't understand
      */
+    gossip_err("Error: received request with unknown op type: %d\n",
+	(int)((struct PVFS_server_req *) char_ptr)->op);
     free(dec_msg);
     return(-EPROTO);
 }
