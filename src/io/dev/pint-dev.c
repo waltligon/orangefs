@@ -386,6 +386,25 @@ int PINT_dev_write_list(void **buffer_list,
     return(0);
 }
 
+/* PINT_dev_remount()
+ *
+ * asks the kernel to re-issues upcall mount operations to refill the
+ * dynamic mount information to the pvfs2-client-core
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
+int PINT_dev_remount(void)
+{
+    int ret = 0;
+
+    if (ioctl(pdev_fd, PVFS_DEV_REMOUNT_ALL, NULL) < 0)
+    {
+        ret = -PVFS_ERROR_DEV;
+    }
+    return ret;
+}
+
+
 /* PINT_dev_write()
  *
  * writes a buffer into the device

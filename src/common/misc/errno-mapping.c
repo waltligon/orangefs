@@ -6,6 +6,7 @@
 
 #include <errno.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "pvfs2-types.h"
@@ -37,7 +38,6 @@ void PVFS_perror(char* text, int retcode)
 	fprintf(stderr, "%s: %s\n", text,
 	strerror(-retcode));
     }
-
     return;
 }
 
@@ -62,76 +62,12 @@ void PVFS_perror_gossip(char* text, int retcode)
 	gossip_err("Warning: non PVFS2 error code:\n");
 	gossip_err("%s: %s\n", text, strerror(-retcode));
     }
-
     return;
 }
 
+/* macro defined in include/pvfs2-types.h */
+DECLARE_ERRNO_MAPPING_AND_FN();
 
-/* NOTE: PVFS error values are defined in include/pvfs2-types.h
- */
-
-int32_t PINT_errno_mapping[PVFS_ERRNO_MAX + 1] =
-{
-    0,     /* leave this one empty */
-    EPERM, /* 1 */
-    ENOENT,
-    EINTR,
-    EIO,
-    ENXIO,
-    EBADF,
-    EAGAIN,
-    ENOMEM,
-    EFAULT,
-    EBUSY, /* 10 */
-    EEXIST,
-    ENODEV,
-    ENOTDIR,
-    EISDIR,
-    EINVAL,
-    EMFILE,
-    EFBIG,
-    ENOSPC,
-    EROFS,
-    EMLINK, /* 20 */
-    EPIPE,
-    EDEADLK,
-    ENAMETOOLONG,
-    ENOLCK,
-    ENOSYS,
-    ENOTEMPTY,
-    ELOOP,
-    EWOULDBLOCK,
-    ENOMSG,
-    EUNATCH, /* 30 */
-    EBADR,
-    EDEADLOCK,
-    ENODATA,
-    ETIME,
-    ENONET,
-    EREMOTE,
-    ECOMM,
-    EPROTO,
-    EBADMSG,
-    EOVERFLOW, /* 40 */
-    ERESTART,
-    EMSGSIZE,
-    EPROTOTYPE,
-    ENOPROTOOPT,
-    EPROTONOSUPPORT,
-    EOPNOTSUPP,
-    EADDRINUSE,
-    EADDRNOTAVAIL,
-    ENETDOWN,
-    ENETUNREACH, /* 50 */
-    ENETRESET,
-    ENOBUFS,
-    ETIMEDOUT,
-    ECONNREFUSED,
-    EHOSTDOWN,
-    EHOSTUNREACH,
-    EALREADY,   /* 57 */
-    0 /* EPARTIAL */
-};
 
 /*
  * Local variables:

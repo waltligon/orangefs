@@ -12,6 +12,7 @@
 #include <errno.h>
 #include <sys/resource.h>
 #include <unistd.h>
+#include <pthread.h>
 
 #include "gossip.h"
 #include "pint-dev.h"
@@ -47,6 +48,37 @@
 
 /* small default attribute cache timeout; effectively disabled */
 #define ACACHE_TIMEOUT_MS 1
+
+/*
+  this client core *requires* pthreads now, regardless of if the pvfs2
+  system interface has threading enabled or not.  we need it for async
+  remounts on restart to retrieve our dynamic mount information (if
+  any) from the kernel, which means we call a blocking ioctl that must
+  be serviced by our regular handlers.  to do both, we use a thread
+  for the blocking ioctl.
+*/
+static pthread_t remount_thread;
+static pthread_mutex_t remount_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+void *exec_remount(void *ptr)
+{
+    int ret = 0;
+
+    pthread_mutex_lock(&remount_mutex);
+    /*
+      when the remount mutex is unlocked, tell the kernel to remount
+      any file systems that may have been mounted previously, which
+      will fill in our dynamic mount information by triggering mount
+      upcalls for each fs mounted by the kernel at this point
+     */
+    ret = PINT_dev_remount();
+    if (ret)
+    {
+        gossip_err("*** Failed to remount filesystems!\n");
+    }
+    pthread_mutex_unlock(&remount_mutex);
+    return (void *)0;
+}
 
 static int service_lookup_request(
     pvfs2_upcall_t *in_upcall,
@@ -960,6 +992,11 @@ static int service_fs_mount_request(
         mntent.flowproto = FLOWPROTO_DEFAULT;
 
         ret = PVFS_sys_fs_add(&mntent);
+
+        free(mntent.pvfs_fs_name);
+        free(mntent.pvfs_config_server);
+        free(mntent.mnt_dir);
+
         if (ret < 0)
         {
           fail_downcall:
@@ -1119,9 +1156,32 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
+    /*
+      lock the remount mutex to make sure the remount isn't started
+      until we're ready
+    */
+    pthread_mutex_lock(&remount_mutex);
+
+    if (pthread_create(&remount_thread, NULL, exec_remount, NULL))
+    {
+	gossip_err("Cannot create remount thread!");
+	return(-1);
+    }
+
     while(1)
     {
         int outcount = 0;
+        static int remounted_already = 0;
+
+        /*
+          signal the remount thread to go ahead with the remount
+          attempts (and make sure it's done only once)
+        */
+        if (!remounted_already)
+        {
+            pthread_mutex_unlock(&remount_mutex);
+            remounted_already = 1;
+        }
 
 	ret = job_dev_unexp(&info, NULL, 0, &jstat, &job_id, context);
 	if(ret == 0)
@@ -1231,6 +1291,9 @@ int main(int argc, char **argv)
 	    gossip_err("write_device_response failed on tag %lu\n",tag);
 	}
     }
+
+    /* join the remount thread, which should long be done by now */
+    pthread_join(remount_thread, NULL);
 
     job_close_context(context);
 

@@ -10,6 +10,7 @@
 #include <linux/fs.h>
 #include <linux/dcache.h>
 #include <linux/pagemap.h>
+#include "pvfs2-types.h"
 #include "pvfs2-kernel.h"
 #include "pint-dev-shared.h"
 #include "pvfs2-dev-proto.h"
@@ -929,45 +930,13 @@ int pvfs2_flush_mmap_racache(struct inode *inode)
 }
 #endif
 
+/* macro defined in include/pvfs2-types.h */
+DECLARE_ERRNO_MAPPING_AND_FN();
+
 int pvfs2_kernel_error_code_convert(
     int pvfs2_error_code)
 {
-    int ret = pvfs2_error_code;
-
-    switch(pvfs2_error_code)
-    {
-        case -PVFS_EINVAL:
-            ret = -EINVAL;
-            break;
-        case -PVFS_ENOMEM:
-            ret = -ENOMEM;
-            break;
-        case -PVFS_ENOTEMPTY:
-            ret = -ENOTEMPTY;
-            break;
-        case -PVFS_ENOSPC:
-            ret = -ENOSPC;
-            break;
-        case -PVFS_ENOENT:
-            ret = -ENOENT;
-            break;
-        case -PVFS_EINTR:
-            ret = -EINTR;
-            break;
-        case -PVFS_EIO:
-            ret = -EIO;
-            break;
-        case -PVFS_EAGAIN:
-            ret = -EAGAIN;
-            break;
-        case 0:
-            ret = 0;
-            break;
-        default:
-            pvfs2_print("Got an unknown pvfs2 error code: %d\n",
-                        pvfs2_error_code);
-    }
-    return ret;
+    return (int)PVFS_get_errno_mapping((int32_t)pvfs2_error_code);
 }
 
 void pvfs2_inode_initialize(pvfs2_inode_t *pvfs2_inode)
@@ -993,8 +962,23 @@ void pvfs2_op_initialize(pvfs2_kernel_op_t *op)
 
 void pvfs2_make_bad_inode(struct inode *inode)
 {
-    pvfs2_print("*** making bad inode %lu\n", inode->i_ino);
-    make_bad_inode(inode);
+    if (pvfs2_handle_to_ino(PVFS2_SB(inode->i_sb)->root_handle) ==
+        inode->i_ino)
+    {
+        /*
+          if this occurs, the pvfs2-client-core was killed and we need
+          to secretly remount the file system to restore the dynamic
+          mount tables in the client
+        */
+        pvfs2_print("*** NOT making bad root inode %lu\n", inode->i_ino);
+        pvfs2_print("  --  attempting remount now --\n");
+        pvfs2_remount(inode->i_sb, NULL, PVFS2_SB(inode->i_sb)->data);
+    }
+    else
+    {
+        pvfs2_print("*** making bad inode %lu\n", inode->i_ino);
+        make_bad_inode(inode);
+    }
 }
 
 /* this code is based on linux/net/sunrpc/clnt.c:rpc_clnt_sigmask */

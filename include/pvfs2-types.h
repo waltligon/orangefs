@@ -276,6 +276,7 @@ void PVFS_perror(char *text,
 		 int retcode);
 void PVFS_perror_gossip(char* text,
 			int retcode);
+int32_t PVFS_get_errno_mapping(int32_t error);
 
 /* special bit used to differentiate PVFS error codes from system
  * errno values
@@ -370,8 +371,86 @@ extern int32_t PINT_errno_mapping[];
 
 #define PVFS_ERRNO_MAX          58
 
+#define DECLARE_ERRNO_MAPPING()                   \
+int32_t PINT_errno_mapping[PVFS_ERRNO_MAX + 1] = {\
+    0,     /* leave this one empty */             \
+    EPERM, /* 1 */                                \
+    ENOENT,                                       \
+    EINTR,                                        \
+    EIO,                                          \
+    ENXIO,                                        \
+    EBADF,                                        \
+    EAGAIN,                                       \
+    ENOMEM,                                       \
+    EFAULT,                                       \
+    EBUSY, /* 10 */                               \
+    EEXIST,                                       \
+    ENODEV,                                       \
+    ENOTDIR,                                      \
+    EISDIR,                                       \
+    EINVAL,                                       \
+    EMFILE,                                       \
+    EFBIG,                                        \
+    ENOSPC,                                       \
+    EROFS,                                        \
+    EMLINK, /* 20 */                              \
+    EPIPE,                                        \
+    EDEADLK,                                      \
+    ENAMETOOLONG,                                 \
+    ENOLCK,                                       \
+    ENOSYS,                                       \
+    ENOTEMPTY,                                    \
+    ELOOP,                                        \
+    EWOULDBLOCK,                                  \
+    ENOMSG,                                       \
+    EUNATCH, /* 30 */                             \
+    EBADR,                                        \
+    EDEADLOCK,                                    \
+    ENODATA,                                      \
+    ETIME,                                        \
+    ENONET,                                       \
+    EREMOTE,                                      \
+    ECOMM,                                        \
+    EPROTO,                                       \
+    EBADMSG,                                      \
+    EOVERFLOW, /* 40 */                           \
+    ERESTART,                                     \
+    EMSGSIZE,                                     \
+    EPROTOTYPE,                                   \
+    ENOPROTOOPT,                                  \
+    EPROTONOSUPPORT,                              \
+    EOPNOTSUPP,                                   \
+    EADDRINUSE,                                   \
+    EADDRNOTAVAIL,                                \
+    ENETDOWN,                                     \
+    ENETUNREACH, /* 50 */                         \
+    ENETRESET,                                    \
+    ENOBUFS,                                      \
+    ETIMEDOUT,                                    \
+    ECONNREFUSED,                                 \
+    EHOSTDOWN,                                    \
+    EHOSTUNREACH,                                 \
+    EALREADY,   /* 57 */                          \
+    0 /* EPARTIAL */                              \
+}
+
+#define DECLARE_ERRNO_MAPPING_AND_FN()                     \
+extern int32_t PINT_errno_mapping[];                       \
+int32_t PVFS_get_errno_mapping(int32_t error)              \
+{                                                          \
+    int32_t ret = error;                                   \
+    int32_t positive = ((error > -1) ? 1 : 0);             \
+    ret = PINT_errno_mapping[                              \
+        PVFS_ERROR_CODE(((positive ? error : abs(error))) &\
+                        ~(PVFS_ERROR_BIT))];               \
+    return (positive ? ret : -ret);                        \
+}                                                          \
+DECLARE_ERRNO_MAPPING()
+
+
 /* PVFS I/O operation types, used in both system and server interfaces */
-enum PVFS_io_type {
+enum PVFS_io_type
+{
     PVFS_IO_READ = 1,
     PVFS_IO_WRITE = 2
 };

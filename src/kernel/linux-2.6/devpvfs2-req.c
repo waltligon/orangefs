@@ -22,6 +22,12 @@ extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
 extern wait_queue_head_t pvfs2_request_list_waitq;
 extern struct qhash_table *htable_ops_in_progress;
+extern struct file_system_type pvfs2_fs_type;
+
+/* defined in super.c */
+extern struct list_head pvfs2_superblocks;
+extern spinlock_t pvfs2_superblocks_lock;
+
 
 static int open_access_count = 0;
 
@@ -363,19 +369,51 @@ static int pvfs2_devreq_ioctl(
 
     switch (command)
     {
-    case PVFS_DEV_GET_MAGIC:
-	copy_to_user((void *) arg, &magic, sizeof(int32_t));
-	return 0;
-    case PVFS_DEV_GET_MAX_UPSIZE:
-	copy_to_user((void *) arg, &max_up_size, sizeof(int32_t));
-	return 0;
-    case PVFS_DEV_GET_MAX_DOWNSIZE:
-	copy_to_user((void *) arg, &max_down_size, sizeof(int32_t));
-	return 0;
-    case PVFS_DEV_MAP:
-	copy_from_user(&user_desc, (void *) arg, sizeof(struct
-	    PVFS_dev_map_desc));
-	return pvfs_bufmap_initialize(&user_desc);
+        case PVFS_DEV_GET_MAGIC:
+            copy_to_user((void *) arg, &magic, sizeof(int32_t));
+            return 0;
+        case PVFS_DEV_GET_MAX_UPSIZE:
+            copy_to_user((void *) arg, &max_up_size, sizeof(int32_t));
+            return 0;
+        case PVFS_DEV_GET_MAX_DOWNSIZE:
+            copy_to_user((void *) arg, &max_down_size, sizeof(int32_t));
+            return 0;
+        case PVFS_DEV_MAP:
+            copy_from_user(&user_desc, (void *) arg,
+                           sizeof(struct PVFS_dev_map_desc));
+            return pvfs_bufmap_initialize(&user_desc);
+        case PVFS_DEV_REMOUNT_ALL:
+        {
+            int ret = 0;
+            struct list_head *tmp = NULL;
+            pvfs2_sb_info *pvfs2_sb = NULL;
+
+            pvfs2_print("ioctl: pvfs_dev_remount_all called\n");
+
+            /*
+              remount all mounted pvfs2 volumes to regain the lost
+              dynamic mount tables (if any) -- NOTE: this is done
+              without keeping the superblock list locked due to the
+              upcall/downcall waiting.
+            */
+            list_for_each(tmp, &pvfs2_superblocks) {
+                pvfs2_sb = list_entry(tmp, pvfs2_sb_info, list);
+                if (pvfs2_sb && (pvfs2_sb->sb))
+                {
+                    pvfs2_print("Remounting SB %p\n", pvfs2_sb);
+
+                    ret = pvfs2_remount(pvfs2_sb->sb, NULL,
+                                        pvfs2_sb->data);
+                    if (ret)
+                    {
+                        pvfs2_error("Failed to mount SB %p\n", pvfs2_sb);
+                        break;
+                    }
+                }
+            }
+            return ret;
+        }
+        break;
     default:
 	return -ENOSYS;
     }

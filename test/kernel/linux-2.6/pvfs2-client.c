@@ -39,16 +39,17 @@ int main(int argc, char **argv)
 {
     pid_t new_pid = 0;
     options_t opts;
-    int i;
 
     memset(&opts, 0, sizeof(options_t));
 
     parse_args(argc, argv, &opts);
 
-    if (opts.foreground && opts.verbose)
+    if (opts.verbose)
     {
         printf("pvfs2-client starting\n");
     }
+
+    umask(027);
 
     if (!opts.foreground)
     {
@@ -63,18 +64,10 @@ int main(int argc, char **argv)
         {
             exit(0);
         }
-        else if (setsid < 0)
+        else if (setsid() < 0)
         {
             exit(1);
         }
-	for(i = getdtablesize(); i >= 0; --i)
-	{
-	    close(i);
-	}
-	i = open("/dev/null", O_RDWR);
-	dup(i);
-	dup(i);
-	umask(027);
     }
 
     signal(SIGHUP,  client_sig_handler);
@@ -92,14 +85,14 @@ static void client_sig_handler(int signum)
     kill(0, signum);
     switch (signum)
     {
-	case SIGPIPE:
-	case SIGILL:
-	case SIGSEGV:
-	    exit(1);
-	case SIGHUP:
-	case SIGINT:
-	case SIGTERM:
-	    exit(0);
+        case SIGPIPE:
+        case SIGILL:
+        case SIGSEGV:
+            exit(1);
+        case SIGHUP:
+        case SIGINT:
+        case SIGTERM:
+            exit(0);
     }
 }
 
@@ -111,11 +104,12 @@ static int verify_pvfs2_client_path(options_t *opts)
     if (opts)
     {
         memset(&statbuf, 0 , sizeof(struct stat));
-        
+
         if (stat(opts->path, &statbuf) == 0)
         {
             ret = ((S_ISREG(statbuf.st_mode) &&
                     (statbuf.st_mode & S_IXUSR)) ? 0 : 1);
+            
         }
     }
     return ret;
@@ -123,7 +117,7 @@ static int verify_pvfs2_client_path(options_t *opts)
 
 static int monitor_pvfs2_client(options_t *opts)
 {
-    int ret = 1;
+    int ret = 1, fd = 0;
     pid_t new_pid = 0, wpid = 0;
 
     assert(opts);
@@ -153,7 +147,15 @@ static int monitor_pvfs2_client(options_t *opts)
                     printf("Child process with pid %d exited with "
                            "value %d\n", new_pid, (int)WEXITSTATUS(ret));
                 }
-                break;
+
+                if ((opts->path[0] != '/') && (opts->path [0] != '.'))
+                {
+                    printf("*** The pvfs2-client-core has exited ***\n");
+                    printf("If the pvfs2-client-core is not in your "
+                           "configured PATH, please specify the\n full "
+                           "path name (instead of \"%s\")\n",opts->path);
+                }
+                    break;
             }
 
             if (WIFSIGNALED(ret))
@@ -172,10 +174,20 @@ static int monitor_pvfs2_client(options_t *opts)
             {
                 printf("About to exec %s\n",opts->path);
             }
+
+            for(fd = getdtablesize(); fd > -1; fd--)
+            {
+                close(fd);
+            }
+
+            freopen("/dev/null", "r", stdin);
+            freopen("/dev/null", "w", stdout);
+            freopen("/dev/null", "w", stderr);
+
             ret = execvp(opts->path, NULL);
-	    fprintf(stderr, "Could not exec %s, errno is %d\n",
-		    opts->path, errno);
-	    exit(1);
+            fprintf(stderr, "Could not exec %s, errno is %d\n",
+                    opts->path, errno);
+            exit(1);
         }
     }
     return ret;
@@ -205,7 +217,7 @@ static void parse_args(int argc, char **argv, options_t *opts)
         {"verbose",0,0,0},
         {"foreground",0,0,0},
         {"path",1,0,0},
-	{0,0,0,0}
+        {0,0,0,0}
     };
 
     assert(opts);
@@ -260,12 +272,12 @@ static void parse_args(int argc, char **argv, options_t *opts)
             case 'p':
           do_path:
                 opts->path = optarg;
-		if (verify_pvfs2_client_path(opts))
-		{
-		    fprintf(stderr, "Invalid pvfs2-client-core path: %s\n",
-			    opts->path);
-		    exit(1);
-		}
+                if (verify_pvfs2_client_path(opts))
+                {
+                    fprintf(stderr, "Invalid pvfs2-client-core path: %s\n",
+                            opts->path);
+                    exit(1);
+                }
                 break;
             default:
                 fprintf(stderr, "Unrecognized option.  "
@@ -275,8 +287,8 @@ static void parse_args(int argc, char **argv, options_t *opts)
     }
     if (!opts->path)
     {
-	/* Since they didn't specify a specific path, we're going
-	 * to let execvp() sort things out later */
+        /* Since they didn't specify a specific path, we're going
+         * to let execvp() sort things out later */
       opts->path = PVFS2_CLIENT_CORE_NAME;
     }
 }

@@ -50,6 +50,8 @@ int PINT_dev_write_list(void **buffer_list,
 			enum PINT_dev_buffer_type buffer_type,
 			PVFS_id_gen_t tag);
 
+int PINT_dev_remount(void);
+
 int PINT_dev_write(void *buffer,
 		   int size,
 		   enum PINT_dev_buffer_type buffer_type,

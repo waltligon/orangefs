@@ -26,6 +26,11 @@ extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
 extern wait_queue_head_t pvfs2_request_list_waitq;
 
+/* list for storing pvfs2 specific superblocks in use */
+LIST_HEAD(pvfs2_superblocks);
+
+/* used to protect the above superblock list */
+spinlock_t pvfs2_superblocks_lock = SPIN_LOCK_UNLOCKED;
 
 static struct inode *pvfs2_alloc_inode(
     struct super_block *sb)
@@ -213,13 +218,59 @@ static int pvfs2_statfs(
     return ret;
 }
 
-static int pvfs2_remount(
+/*
+  the idea here is that given a valid superblock, we're
+  re-initializing the user space client with the initial mount
+  information specified when the super block was first initialized.
+  this is very different than the first initialization/creation of a
+  superblock
+*/
+int pvfs2_remount(
     struct super_block *sb,
     int *flags,
     char *data)
 {
+    int ret = -EINVAL;
+    pvfs2_kernel_op_t *new_op = NULL;
+
     pvfs2_print("pvfs2: pvfs2_remount called\n");
-    return 0;
+
+    if (sb && PVFS2_SB(sb))
+    {
+        new_op = kmem_cache_alloc(op_cache, PVFS2_CACHE_ALLOC_FLAGS);
+        if (!new_op)
+        {
+            return -ENOMEM;
+        }
+        new_op->upcall.type = PVFS2_VFS_OP_FS_MOUNT;
+        strncpy(new_op->upcall.req.fs_mount.pvfs2_config_server,
+                PVFS2_SB(sb)->devname, PVFS_MAX_SERVER_ADDR_LEN);
+
+        pvfs2_print("Attempting PVFS2 Remount via host %s\n",
+                    new_op->upcall.req.fs_mount.pvfs2_config_server);
+
+        if (data)
+        {
+            strncpy(new_op->upcall.req.fs_mount.options,
+                    (char *)data, PVFS2_MAX_MOUNT_OPT_LEN);
+            pvfs2_print("Got mount options: %s\n",
+                        new_op->upcall.req.fs_mount.options);
+        }
+
+        service_operation(new_op, "pvfs2_fs_mount", 0);
+        ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
+
+        pvfs2_print("pvfs2_remount: got return value of %d\n", ret);
+        if (ret)
+        {
+            sb = ERR_PTR(ret);
+            goto error_exit;
+        }
+
+      error_exit:
+        op_release(new_op);
+    }
+    return ret;
 }
 
 struct super_operations pvfs2_s_ops =
@@ -338,6 +389,8 @@ int pvfs2_fill_sb(
     {
 	return -ENOMEM;
     }
+    memset(sb->s_fs_info, 0, sizeof(pvfs2_sb_info));
+    PVFS2_SB(sb)->sb = sb;
 
     pvfs2_print("About to parse mount options %s\n",(char *)data);
     ret = parse_mount_options((char *)data, sb, silent);
@@ -394,10 +447,10 @@ struct super_block *pvfs2_get_sb(
     const char *devname,
     void *data)
 {
-    struct super_block *sb = ERR_PTR(-EINVAL);
     int ret = -EINVAL;
-    char buf[PVFS2_MAX_MOUNT_OPT_LEN];
+    struct super_block *sb = ERR_PTR(-EINVAL);
     pvfs2_kernel_op_t *new_op = NULL;
+    char buf[PVFS2_MAX_MOUNT_OPT_LEN];
 
     if (devname)
     {
@@ -449,10 +502,30 @@ struct super_block *pvfs2_get_sb(
 
         pvfs2_print("Formatted mount options are: %s\n", buf);
         sb = get_sb_nodev(fst, flags, buf, pvfs2_fill_sb);
+
+        /* on successful mount, store the devname and data used */
+        if (data)
+        {
+            strncpy(PVFS2_SB(sb)->data, data, PVFS2_MAX_MOUNT_OPT_LEN);
+        }
+        strncpy(PVFS2_SB(sb)->devname, devname, PVFS_MAX_SERVER_ADDR_LEN);
+
+        /* add this sb to our list of known pvfs2 sb's */
+        add_pvfs2_sb(sb);
     }
     else
     {
         sb = get_sb_nodev(fst, flags, data, pvfs2_fill_sb);
+
+        /* on successful mount, store the devname and data used */
+        if (data)
+        {
+            strncpy(PVFS2_SB(sb)->data, data, PVFS2_MAX_MOUNT_OPT_LEN);
+        }
+        strncpy(PVFS2_SB(sb)->devname, devname, PVFS_MAX_SERVER_ADDR_LEN);
+
+        /* add this sb to our list of known pvfs2 sb's */
+        add_pvfs2_sb(sb);
     }
 
   error_exit:
@@ -460,7 +533,6 @@ struct super_block *pvfs2_get_sb(
     {
         op_release(new_op);
     }
-
     return sb;
 }
 
@@ -468,6 +540,9 @@ void pvfs2_kill_sb(
     struct super_block *sb)
 {
     pvfs2_print("pvfs2_kill_sb: called\n");
+
+    /* remove the sb from our list of pvfs2 specific sb's */
+    remove_pvfs2_sb(sb);
 
     /* prune dcache based on sb */
     shrink_dcache_sb(sb);

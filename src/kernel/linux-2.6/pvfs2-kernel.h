@@ -165,6 +165,11 @@ typedef struct
     PVFS_handle root_handle;
     PVFS_fs_id coll_id;
     pvfs2_mount_options_t mnt_options;
+    char data[PVFS2_MAX_MOUNT_OPT_LEN];
+    char devname[PVFS_MAX_SERVER_ADDR_LEN];
+    struct super_block *sb;
+
+    struct list_head list;
 } pvfs2_sb_info;
 
 /*
@@ -206,6 +211,14 @@ void pvfs2_inode_cache_finalize(
  ****************************/
 int wait_for_matching_downcall(
     pvfs2_kernel_op_t * op);
+
+/****************************
+ * defined in super.c
+ ****************************/
+int pvfs2_remount(
+    struct super_block *sb,
+    int *flags,
+    char *data);
 
 /****************************
  * defined in inode.c
@@ -465,6 +478,31 @@ do {                                                      \
 #define clear_inode_mmap_ra_cache(inode)
 #endif /* USE_MMAP_RA_CACHE */
 
+#define add_pvfs2_sb(sb)                                             \
+do {                                                                 \
+    pvfs2_print("Adding SB %p to pvfs2 superblocks\n", PVFS2_SB(sb));\
+    spin_lock(&pvfs2_superblocks_lock);                              \
+    list_add_tail(&PVFS2_SB(sb)->list, &pvfs2_superblocks);          \
+    spin_unlock(&pvfs2_superblocks_lock);                            \
+} while(0)
+
+#define remove_pvfs2_sb(sb)                                          \
+do {                                                                 \
+    struct list_head *tmp = NULL;                                    \
+    pvfs2_sb_info *pvfs2_sb = NULL;                                  \
+                                                                     \
+    spin_lock(&pvfs2_superblocks_lock);                              \
+    list_for_each(tmp, &pvfs2_superblocks) {                         \
+        pvfs2_sb = list_entry(tmp, pvfs2_sb_info, list);             \
+        if (pvfs2_sb && (pvfs2_sb->sb == sb)) {                      \
+            pvfs2_print("Removing SB %p from pvfs2 superblocks\n",   \
+                        pvfs2_sb);                                   \
+            list_del(&pvfs2_sb->list);                               \
+            break;                                                   \
+        }                                                            \
+    }                                                                \
+    spin_unlock(&pvfs2_superblocks_lock);                            \
+} while(0)
 
 #endif /* __PVFS2KERNEL_H */
 
