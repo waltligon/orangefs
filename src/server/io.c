@@ -265,6 +265,10 @@ static int io_start_flow(state_action_struct *s_op, job_status_s *ret)
 	
 	gossip_ldebug(SERVER_DEBUG, "IO: io_start_flow() executed.\n");
 
+	s_op->flow_d = PINT_flow_alloc();
+
+/* TODO: what the heck do I do if the above fails? */
+
 #if 0
 	/* this is where we report the file size to the client before
 	 * starting the I/O transfer, or else report an error if we

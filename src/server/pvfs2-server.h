@@ -53,6 +53,7 @@ typedef struct PINT_server_op
 	struct PVFS_server_resp_s *resp;
 	struct BMI_unexpected_info *unexp_bmi_buff;
 	struct PINT_encoded_msg encoded;
+	flow_descriptor* flow_d;
 } PINT_server_op;
 
 
