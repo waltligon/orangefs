@@ -12,6 +12,7 @@
 #include <fcntl.h>
 #include <assert.h>
 #include <stdio.h>
+#include <gm.h>
 
 #include "bmi-method-support.h"
 #include "bmi-method-callback.h"
@@ -20,12 +21,12 @@
 #include "bmi-gm-addr-list.h"
 #include "gossip.h"
 #include "quicklist.h"
-#include "bmi-gm-regcache.h"
 #include "bmi-gm-bufferpool.h"
 #include "pvfs2-config.h"
 #include "id-generator.h"
-
-#include<gm.h>
+#ifdef ENABLE_GM_REGCACHE
+#include "bmi-gm-regcache.h"
+#endif
 
 /* function prototypes */
 int BMI_gm_initialize(method_addr_p listen_addr,
