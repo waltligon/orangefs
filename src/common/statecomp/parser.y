@@ -7,29 +7,20 @@
  * See COPYING in top-level directory.
  */
 
-/*
- * Local variables:
- *  c-indent-level: 4
- *  c-basic-offset: 4
- * End:
- *
- * vim: ts=8 sts=4 sw=4 noexpandtab
- */
-
 #include <stdlib.h>
 #include <stdio.h>
 
 #include "symbol.h"
+#include <../../server/state-comp.h>
 
 char *enter_string(char *);
 void gen_init(void);
 void gen_state_decl(char *state_name);
 void gen_state_array(char *machine_name, char *first_state_name);
-void gen_state_start(char *state_name, int flag);
-void gen_state_return(void);
-void gen_state_run(char *run_func);
+void gen_state_start(char *state_name);
+void gen_state_action(char *run_func, int flag);
 void gen_return_code(char *return_code);
-void gen_new_state(char *new_state);
+void gen_next_state(int flag, char *new_state);
 void gen_state_end(void);
 
 int yylex(void);
@@ -46,9 +37,11 @@ void yyerror(char *);
 
 %token <i> MACHINE
 %token <i> NESTED
+%token <i> INIT
 %token <i> STATE
 %token <i> EXTERN
 %token <i> RUN
+%token <i> JUMP
 %token <i> STATE_RETURN
 %token <i> SUCCESS
 %token <c> DEFAULT
@@ -62,133 +55,125 @@ void yyerror(char *);
 %token <c> IDENTIFIER
 %token <c> INTEGER
 
-%type <i> .state_body. state_body .NESTED.
+%type <i> .state_body. state_body state_action .NESTED. .EXTERN.
 
-%type <c> identifier return_code
+%type <c> identifier return_code .init_func.
 
 %type <s> state_decl_list .state_decl_list. state_decl,
 			 state_def state_def_list .state_def_list.,
-			 transition transition_list state_machine
+			 transition transition_list state_machine target
 
 %start state_machine
 
 %%
 
 state_machine		: .NESTED. MACHINE identifier
-                          {
-			      $$ = symenter($3);
-			      $$->type = TYPE_MACHINE;
-			  }
-			  LPAREN .state_decl_list. RPAREN LBRACE
-			  {
-			      gen_state_array($3, $6->name);
-			      $6->flag = $1;
-			  }
-			  .state_def_list. RBRACE
-			;
+								{$$ = symenter($3);
+								 $$->type = TYPE_MACHINE;
+								 $$->flag = $1;}
+							LPAREN .state_decl_list. RPAREN LBRACE .init_func.
+								{gen_machine($3, $6->name, $9);}
+						  .state_def_list. RBRACE
+						;
 
-.NESTED.		: /* empty */ { $$ = 0; }
-			| NESTED { $$ = 1; }
-			;
+.NESTED.				: /* empty */
+							{$$ = SM_NONE;}
+						| NESTED
+							{$$ = SM_NESTED;}
+						;
 
-.state_decl_list.	: /* empty */ { $$ = NULL; }
-			| state_decl_list
-			;
+.init_func.			: /* empty */
+							{$$ = NULL;}
+						| INIT ARROW identifier SEMICOLON
+							{$$ = $3;}
+						;
 
-state_decl_list	        : state_decl
-			| state_decl COMMA state_decl_list
-			;
+.state_decl_list.	: /* empty */
+							{$$ = NULL;}
+						| state_decl_list
+						;
 
-state_decl		: identifier 
-                          {
-			      $$ = symlook($1);
-			      if ($$ != NULL) {
-				  fprintf(stderr,"parse error: identifier already declared %s\n", $1);
-				  exit(EXIT_FAILURE);
-			      }
-			      else {
-				  $$ = symenter($1);
-				  $$->type = TYPE_STATE;
-				  $$->flag = 0;
-				  gen_state_decl($1);
-			      }
-			  }
-                        | EXTERN identifier
-			  {
-			      $$ = symlook($2);
-			      if ($$ != NULL) {
-				  fprintf(stderr,"parse error: identifier already declared %s\n", $2);
-				  exit(EXIT_FAILURE);
-			      }
-			      else {
-				  $$ = symenter($2);
-				  $$->type = TYPE_STATE;
-				  $$->flag = 0;
-				  gen_state_decl($2);
-			      }
-			  }
-                        ;
+state_decl_list	: state_decl
+						| state_decl COMMA state_decl_list
+						;
 
-.state_def_list.	: /* empty */ { $$ = NULL; }
-			| state_def_list
-			;
+state_decl			: .EXTERN. identifier
+							{$$ = symlook($2);
+							 if ($$ != NULL)
+							 	fprintf(stderr,"identifier already declared %s\n", $2);
+							 else {
+							 	$$ = symenter($2);
+							 	$$->type = TYPE_STATE;
+							 	$$->flag = $1;
+							 	gen_state_decl($2);}}
+						;
+
+.EXTERN.				: /* empty */
+							{$$ = SM_NONE;}
+						| EXTERN 
+							{$$ = SM_EXTERN;}
+						;
+
+.state_def_list.	: /* empty */
+							{$$ = NULL;}
+						| state_def_list
+						;
 
 state_def_list		: state_def
-			| state_def state_def_list
-			;
+						| state_def state_def_list
+						;
 
-state_def		: STATE identifier LBRACE
-			  {
-			      $$ = symlook($2);
-			      if ($$->type != TYPE_STATE) {
-				  fprintf(stderr,"parse error: bad state identifier %s\n", $2);
-				  exit(EXIT_FAILURE);
-			      }
-			      else {
-				  gen_state_start($2, $$->flag);
-			      }
-			  }
-                          .state_body. RBRACE
-                          { gen_state_end(); }
-			;
+state_def			: STATE identifier LBRACE
+							{$$ = symlook($2);
+							 if ($$->type != TYPE_STATE){
+							 	fprintf(stderr,"bad state identifier %s\n", $2);
+							 	fprintf(stderr,"declared as another type\n");}
+							 else{
+							 	gen_state_start($2);}}
+						  .state_body. RBRACE
+						 	{gen_state_end();}
+						;
 
-.state_body.		: /* empty */ { $$ = 0; }
-                        | state_body
-			;
+.state_body.		: /* empty */
+							{$$ = 0;}
+						| state_body
+						;
 
-state_body		: RUN identifier SEMICOLON
-			  { gen_state_run($2); }
-			  transition_list
-			;
+state_body			: state_action transition_list
+						;
 
-transition_list	        : transition 
-			| transition transition_list
-			;
+state_action		: RUN identifier SEMICOLON
+							{gen_state_action($2, SM_NONE);}
+						| JUMP identifier SEMICOLON
+							{gen_state_action($2, SM_JUMP);}
+						;
 
-transition		: return_code ARROW identifier SEMICOLON
-                          {
-			      $$ = symlook($3);
-			      if ($$ == NULL) {
-				  fprintf(stderr,"parse error: jump to undeclared state %s\n", $3);
-				  exit(EXIT_FAILURE);
-			      }
-			      else {
-				  gen_return_code($1);
-				  gen_new_state($$->name);
-			      }
-			  }
-                        | return_code ARROW STATE_RETURN SEMICOLON
-                          {
-			      $$ = NULL;
-			      gen_return_code($1);
-			      gen_state_return();
-			  }
-                        ;
+transition_list	: transition 
+						| transition transition_list
+						;
 
-return_code		: SUCCESS    { $$ = "0"; }
-			| INTEGER    { $$ = enter_string($1); }
-			| identifier { $$ = $1; }
-			| DEFAULT    { $$ = "-1"; }
-			;
+transition			: return_code
+					 		{gen_return_code($1);}
+						  ARROW target SEMICOLON
+							{$$ = $4;}
+						;
 
-identifier		: IDENTIFIER { $$ = enter_string($1); }
+target				: identifier
+							{$$ = symlook($1);
+							 if ($$ == NULL){
+							 	fprintf(stderr,"jump to undeclared state %s\n", $1);}
+							 else{
+							 	gen_next_state(SM_NEXT, $$->name);}}
+						| STATE_RETURN
+							{$$ = NULL;
+							 gen_next_state(SM_RETURN, NULL);}
+						;
+
+return_code			: SUCCESS {$$ = "0";}
+						| INTEGER {$$ = enter_string($1);}
+						| identifier {$$ = $1;} /* check for decl */
+						| DEFAULT {$$ = "-1";}
+						;
+
+identifier			: IDENTIFIER {$$ = enter_string($1);}
+						;

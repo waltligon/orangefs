@@ -24,7 +24,7 @@ void produce_listing(int line, char *listing);
 #define	LIST				strcat(text,yytext);
 #define	RETURNVAL(x)	yylval.i = (int)(token = x); return((int)x);
 #define	MAKELIST			produce_listing(line,text);text[0]=0;
-char     text[500];
+char     text[132];
 int      token;
 
 %}
@@ -50,10 +50,12 @@ w     [ \t\n]*
 
 <CODE>"machine" 	{LIST; RETURNVAL(MACHINE);}
 <CODE>"nested" 	{LIST; RETURNVAL(NESTED);}
+<CODE>"initialize" {LIST; RETURNVAL(INIT);}
 <CODE>"state"	 	{LIST; RETURNVAL(STATE);}
 <CODE>"extern"	 	{LIST; RETURNVAL(EXTERN);}
 <CODE>"return"	 	{LIST; RETURNVAL(STATE_RETURN);}
 <CODE>"run"			{LIST; RETURNVAL(RUN);}
+<CODE>"jump"		{LIST; RETURNVAL(JUMP);}
 <CODE>"success"	{LIST; RETURNVAL(SUCCESS);}
 <CODE>"default"	{LIST; RETURNVAL(DEFAULT);}
 <CODE>"\{"			{LIST; RETURNVAL(LBRACE);}
