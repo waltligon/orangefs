@@ -11,32 +11,47 @@
  *
  * Count number of segments in a path.
  *
- * TODO: CLEAN UP!
+ * Parameters:
+ * pathname   - pointer to string
+ *
+ * Returns number of segments in pathname; -1 if
+ * pathname does not begin with a slash or is invalid
+ *
+ * Example inputs and return values:
+ *
+ * filename          - returns -1
+ * NULL              - returns -1
+ * /filename         - returns  1
+ * /filename/        - returns  1
+ * /filename//       - returns  1
+ * /dirname/filename - returns  2
+ *
+ * NOTE (known limitation):
+ * //foo             - returns  2
+ *
  */
 int PINT_string_count_segments(char *pathname)
 {
-    int pos, nullpos = 0, killed_slash, segct = 0;
+    int segct = 0;
+    char *cur_ch = pathname;
 
-    /* insist on an absolute path */
-    if (pathname[0] != '/') return -1;
-    
-    for(;;) {
-	pos = nullpos;
-	killed_slash = 0;
+    /* insist on a valid and an absolute path */
+    if (!cur_ch || (*cur_ch != '/')) return -1;
 
-	/* jump to next separator */
-	while ((pathname[nullpos] != '\0') && (pathname[nullpos] != '/')) nullpos++;
-
-	if (nullpos == pos) {
-	    /* extra slash or trailing slash; ignore */
-	}
-	else {
-	    segct++; /* found another real segment */
-	}
-	if (pathname[nullpos] == '\0') break;
-	nullpos++;
+    while(cur_ch && *cur_ch)
+    {
+        if (*cur_ch == '/')
+        {
+            segct++;
+        }
+        cur_ch++;
     }
 
+    /* ignore trailing slash(es) if any */
+    while (*(--cur_ch) == '/')
+    {
+        segct--;
+    }
     return segct;
 }
 
