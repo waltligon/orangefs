@@ -47,6 +47,8 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 	    NONE_FAILURE = 0,
 	    MAP_SERVER_FAILURE,
 	    SEND_REQ_FAILURE,
+	    MALLOC_DFH_FAILURE,
+	    PCACHE_INSERT_FAILURE,
 	} failure = NONE_FAILURE;
 
 	/* Let's check if size is to be fetched here, If so
@@ -143,8 +145,33 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
         }
 
 	resp->attr = ack_p->u.getattr.attr;
-	/* TODO: uncomment when extended attributes are defined */
+    /*the server isn't returning the data handles yet, put this back in when
+     * dale fixes it */
+#if 0
+	if (resp->attr.objtype == ATTR_META)
+	{
+	    if(resp->attr.u.meta.nr_datafiles > 0)
+	    {
+		assert(ack_p->u.getattr.attr.u.meta.dfh != NULL);
+
+		resp->attr.u.meta.dfh = malloc(resp->attr.u.meta.nr_datafiles * sizeof(PVFS_handle));
+		if (resp->attr.u.meta.dfh ==  NULL)
+		{
+		    ret = (-ENOMEM);
+		    failure = MALLOC_DFH_FAILURE;
+		    goto return_error;
+		}
+		memcpy(	resp->attr.u.meta.dfh, 
+			ack_p->u.getattr.attr.u.meta.dfh, 
+			resp->attr.u.meta.nr_datafiles * sizeof(PVFS_handle));
+	    }
+	}
+#endif
+	
+	/* TODO: copy extended attributes just like normal attr */
 	/* resp->eattr = ack_p.u.getattr.eattr; */
+
+	PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
 
 	/* do size calculations here? */
 
@@ -180,7 +207,7 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 	ret = gettimeofday(&cur_time,NULL);
 	if (ret < 0)
 	{
-		failure = SEND_REQ_FAILURE;
+		failure = PCACHE_INSERT_FAILURE;
 		goto return_error;
 	}
 	/* Set the size timestamp */
@@ -192,7 +219,7 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 	    ret = PINT_pcache_insert(entry_pinode);
 	    if (ret < 0)
 	    {
-		failure = SEND_REQ_FAILURE;
+		failure = PCACHE_INSERT_FAILURE;
 		goto return_error;
 	    }
 	    printf("GETATTR:  ADDING TO PCACHE\n");
@@ -206,8 +233,6 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 	if (size_array)
 	    free(size_array);
 
-	/* Free the jobs */	
-	PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
 
 	return(0);
 
@@ -215,6 +240,9 @@ return_error:
 
 	switch( failure ) 
 	{
+		case PCACHE_INSERT_FAILURE:
+		    free(resp->attr.u.meta.dfh);
+		case MALLOC_DFH_FAILURE:
 		case SEND_REQ_FAILURE:
 		case MAP_SERVER_FAILURE:
 			if (ack_p)

@@ -64,11 +64,7 @@ int phelper_get_pinode(pinode_reference pref, pinode **pinode_ptr,
 				goto pinode_refresh_failure;
 			}
 
-			ret = PINT_pcache_insert(*pinode_ptr);
-			if (ret < 0)
-			{
-				goto pinode_insert_failure;	
-			}
+			/*its already in the cache so we don't need to update it*/
 		}
 	}
 

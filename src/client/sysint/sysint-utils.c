@@ -179,6 +179,9 @@ void debug_print_type(void* thing, int type)
 			case PVFS_SERV_GETATTR:
 				printf("getattr request");
 				break;
+			case PVFS_SERV_READDIR:
+				printf("readdir request");
+				break;
 			default:
 				printf("unknown request = %d", req->op);
 				break;
@@ -189,6 +192,9 @@ void debug_print_type(void* thing, int type)
 		struct PVFS_server_resp_s * resp = thing;
 		switch( resp->op )
 		{
+			case PVFS_SERV_READDIR:
+				printf("readdir response");
+				break;
 			case PVFS_SERV_CREATE:
 				printf("create response");
 				break;

@@ -70,13 +70,15 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
     PVFS_bitfield attr_mask;
     pinode_reference entry, parent;
 
+    /*print args to make sure we're sane*/
+    printf("req->\n\tname: %s\n\tfs_id: %d\n\tcredentials:\n\t\tuid: %d\n\t\tgid: %d\n\t\tperms: %d\n",req->name,req->fs_id, req->credentials.uid, req->credentials.gid, req->credentials.perms);
+
     /* NOTE: special case is that we're doing a lookup on the root handle (which
      * we got during the getconfig) so we want to check to see if we're looking
      * up "/"; if so, then get the root handle from the bucket table interface
      * and return
      */
     resp->pinode_refn.fs_id = req->fs_id;
-    printf("looking up string %s\n",req->name);
 
     if (!strcmp(req->name, "/"))
     {
