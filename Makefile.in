@@ -432,7 +432,7 @@ DEPENDS := $(sort $(LIBDEPENDS) $(SERVERDEPENDS) $(MISCDEPENDS) \
 # Rules and dependencies
 
 # default rule builds server, library, and applications
-all:: $(SERVER) $(KARMA) $(LIBRARIES) admintools kernapps $(VISS) $(KARMA)
+all:: $(SERVER) $(KARMA) $(LIBRARIES) admintools $(VISS) $(KARMA)
 
 # target for building admin tools
 admintools: $(ADMINTOOLS) $(ADMINTOOLS_SERVER)
@@ -446,7 +446,7 @@ kernapps: $(KERNAPPS)
 LINUX_KERNEL_SRC = @LINUX_KERNEL_SRC@
 ifneq (,$(LINUX_KERNEL_SRC))
 .PHONY: kmod
-kmod:
+kmod: kernapps
 	@$(MAKE) --no-print-directory -C src/kernel/linux-2.6
 endif
 
@@ -454,7 +454,7 @@ endif
 LINUX24_KERNEL_SRC = @LINUX24_KERNEL_SRC@
 ifneq (,$(LINUX24_KERNEL_SRC))
 .PHONY: kmod24
-kmod24:
+kmod24: kernapps
 	@$(MAKE) --no-print-directory -C src/kernel/linux-2.4
 endif
 
@@ -773,7 +773,6 @@ ifdef BUILD_SERVER
 	install -m 755 $(SERVER) $(prefix)/sbin/pvfs2-server.bin
     endif
 endif
-	install -m 755 $(KERNAPPS) $(prefix)/sbin
 
 ifneq (,$(LINUX_KERNEL_SRC))
 
@@ -787,6 +786,7 @@ KMOD_DIR ?= /lib/modules/$(KERNEL_VERS)/kernel/fs
 
 .PHONY: kmod_install
 kmod_install:
+	install -m 755 $(KERNAPPS) $(prefix)/sbin
 	install -d $(KMOD_DIR)
 	install -m 755 src/kernel/linux-2.6/pvfs2.ko $(KMOD_DIR)
 endif
@@ -803,6 +803,7 @@ KMOD_DIR := /lib/modules/$(KERNEL_VERS)/kernel/fs
 
 .PHONY: kmod24_install
 kmod24_install:
+	install -m 755 $(KERNAPPS) $(prefix)/sbin
 	install -d $(KMOD_DIR)
 	install -m 755 src/kernel/linux-2.4/pvfs2.o $(KMOD_DIR)
 endif
