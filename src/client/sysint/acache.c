@@ -166,6 +166,8 @@ static PINT_pinode *acache_internal_lookup(PVFS_object_ref refn)
     {
         pinode = qlist_entry(link, PINT_pinode, link);
         assert(pinode);
+        gossip_debug(GOSSIP_ACACHE_DEBUG, "*** acache internal lookup "
+                     "found pinode [%Lu]\n", pinode->refn.handle);
     }
     gen_mutex_unlock(s_acache_htable_mutex);
 
@@ -201,6 +203,8 @@ PINT_pinode *PINT_acache_lookup(PVFS_object_ref refn)
     {
         pinode = qlist_entry(link, PINT_pinode, link);
         assert(pinode);
+        gossip_debug(GOSSIP_ACACHE_DEBUG, "*** acache lookup found "
+                     "pinode [%Lu]\n", pinode->refn.handle);
     }
     gen_mutex_unlock(s_acache_htable_mutex);
 
@@ -269,9 +273,9 @@ void PINT_acache_set_valid(PINT_pinode *pinode)
             gen_mutex_unlock(s_acache_htable_mutex);
 
             pinode->flag = PINODE_INTERNAL_FLAG_HASHED;
-            acache_debug("*** added pinode to htable\n");
-/*             fprintf(stderr,"There are %d allocated entries\n", */
-/*                     s_acache_allocated_entries); */
+            gossip_debug(GOSSIP_ACACHE_DEBUG, "+++ added pinode "
+                         "to htable [%Lu] (%d entries)\n",
+                         pinode->refn.handle, s_acache_allocated_entries);
         }
 
         pinode->status = PINODE_STATUS_VALID;
@@ -297,6 +301,9 @@ void PINT_acache_invalidate(PVFS_object_ref refn)
     {
         /* forcefully expire the entry */
         pinode->status = PINODE_STATUS_EXPIRED;
+
+        gossip_debug(GOSSIP_ACACHE_DEBUG, "--- Invalidating pinode "
+                     "entry [%Lu]\n", pinode->refn.handle);
 
         PINT_acache_release(pinode);
     }
@@ -661,7 +668,9 @@ static int pinode_status(PINT_pinode *pinode)
             }
         }
     }
-    acache_debug("PINODE STATUS IS ");
+
+    gossip_debug(GOSSIP_ACACHE_DEBUG, " pinode [%Lu] entry status: ",
+                 pinode->refn.handle);
     switch(ret)
     {
         case PINODE_STATUS_VALID:

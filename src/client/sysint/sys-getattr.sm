@@ -629,6 +629,20 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
                          (release_required ? "already" : "not"));
             pinode->refn = sm_p->u.getattr.object_ref;
 
+            sm_p->acache_attr.mask |= PVFS_ATTR_COMMON_ALL;
+
+            if (sm_p->acache_attr.objtype == PVFS_TYPE_METAFILE)
+            {
+                if (sm_p->u.getattr.attrmask & PVFS_ATTR_META_DIST)
+                {
+                    sm_p->acache_attr.mask |= PVFS_ATTR_META_DIST;
+                }
+                if (sm_p->u.getattr.attrmask & PVFS_ATTR_META_DFILES)
+                {
+                    sm_p->acache_attr.mask |= PVFS_ATTR_META_DFILES;
+                }
+            }
+
             if (sm_p->acache_attr.objtype == PVFS_TYPE_SYMLINK)
             {
                 sm_p->acache_attr.mask &=

@@ -197,7 +197,8 @@ int PVFS_isys_io(
     struct filesystem_configuration_s* cur_fs = NULL;
     struct server_configuration_s *server_config = NULL;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_io entered\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_io entered [%Lu]\n",
+                 ref.handle);
 
     if (resp_p == NULL)
     {

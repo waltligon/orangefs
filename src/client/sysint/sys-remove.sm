@@ -352,26 +352,21 @@ static int remove_rmdirent_comp_fn(void *v_p,
 
     assert(resp_p->op == PVFS_SERV_RMDIRENT);
 
-    /* don't attempt to parse the response if there was an error */
-    if (resp_p->status != 0)
+    if (resp_p->status == 0)
     {
-	assert(resp_p->status < 0); /* parameter range check */
-	return resp_p->status;
+        assert(resp_p->u.rmdirent.entry_handle != 0);
+        assert(sm_p->parent_ref.fs_id != 0);
+
+        /* pull handle out of response, also copy in fs_id from before */
+        sm_p->object_ref.handle = resp_p->u.rmdirent.entry_handle;
+        sm_p->object_ref.fs_id  = sm_p->parent_ref.fs_id;
+
+        gossip_debug(
+            GOSSIP_CLIENT_DEBUG,
+            "  remove_rmdirent_comp_fn: metafile handle = %Lu\n",
+            Lu(sm_p->object_ref.handle));
     }
-
-    assert(resp_p->u.rmdirent.entry_handle != 0);
-    assert(sm_p->parent_ref.fs_id != 0);
-
-    /* pull handle out of response, also copy in fs_id from before */
-    sm_p->object_ref.handle = resp_p->u.rmdirent.entry_handle;
-    sm_p->object_ref.fs_id  = sm_p->parent_ref.fs_id;
-
-    gossip_debug(
-        GOSSIP_CLIENT_DEBUG,
-        "  remove_rmdirent_comp_fn: metafile handle = %Lu\n",
-        Lu(sm_p->object_ref.handle));
-
-    return 0;
+    return resp_p->status;
 }
 
 static int remove_crdirent_comp_fn(void *v_p,
@@ -380,14 +375,12 @@ static int remove_crdirent_comp_fn(void *v_p,
 {
     assert(resp_p->op == PVFS_SERV_CRDIRENT);
 
-    if (resp_p->status != 0)
+    if (resp_p->status == 0)
     {
-	return resp_p->status;
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                     "  remove_crdirent_comp_fn: OK\n");
     }
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "  remove_crdirent_comp_fn: OK\n");
-
-    return 0;
+    return resp_p->status;
 }
 
 static int remove_cleanup(PINT_client_sm *sm_p,
@@ -395,9 +388,6 @@ static int remove_cleanup(PINT_client_sm *sm_p,
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: cleanup\n");
 
-    /* store enough information in the sm structure that the caller
-     * can tell what happened.
-     */
     sm_p->error_code = (sm_p->u.remove.stored_error_code ?
                         sm_p->u.remove.stored_error_code :
                         js_p->error_code);
