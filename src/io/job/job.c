@@ -3989,6 +3989,13 @@ static int do_one_work_cycle_all(void)
     int ret = -1;
     int num_completed;
 
+    if(bmi_pending_count || bmi_unexp_pending_count || flow_pending_count)
+	PINT_thread_mgr_bmi_push(10);
+#ifdef __PVFS2_TROVE_SUPPORT__
+    if(trove_pending_count || flow_pending_count)
+	PINT_thread_mgr_trove_push(10);
+#endif
+
     if(flow_pending_count)
     {
 	ret = do_one_work_cycle_flow(&num_completed);
@@ -4002,13 +4009,6 @@ static int do_one_work_cycle_all(void)
 	if(ret < 0)
 	    return(ret);
     }
-
-    if(bmi_pending_count || bmi_unexp_pending_count)
-	PINT_thread_mgr_bmi_push(10);
-#ifdef __PVFS2_TROVE_SUPPORT__
-    if(trove_pending_count)
-	PINT_thread_mgr_trove_push(10);
-#endif
 
     return(0);
 }

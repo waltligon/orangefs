@@ -145,20 +145,6 @@ static TROVE_context_id global_trove_context = -1;
 #endif
 
 #define BMI_TEST_SIZE 8
-/* array of bmi ops in flight; filled in when needed to call
- * testcontext() 
- */
-#ifndef __PVFS2_JOB_THREADED__
-static bmi_op_id_t bmi_op_array[BMI_TEST_SIZE];
-static int bmi_error_code_array[BMI_TEST_SIZE];
-static void* bmi_usrptr_array[BMI_TEST_SIZE];
-static bmi_size_t bmi_actualsize_array[BMI_TEST_SIZE];
-static PVFS_error trove_error_code_array[BMI_TEST_SIZE];
-static void* trove_usrptr_array[BMI_TEST_SIZE];
-#ifdef __PVFS2_TROVE_SUPPORT__
-static TROVE_op_id trove_op_array[BMI_TEST_SIZE];
-#endif
-#endif
 
 static int bmi_pending_count = 0;
 /* continuously updated list of trove ops in flight */
@@ -293,8 +279,6 @@ static void service_bmi_to_mem(flow_descriptor * flow_d);
 static flow_descriptor *bmi_completion(void *user_ptr,
 				       bmi_size_t actual_size,
 				       bmi_error_code_t error_code);
-static flow_descriptor *trove_completion(PVFS_error error_code,
-					 void *user_ptr);
 static void bmi_completion_bmi_to_mem(bmi_error_code_t error_code,
 				      bmi_size_t actual_size,
 				      flow_descriptor * flow_d);
@@ -317,6 +301,8 @@ static void trove_callback_fn(void *user_ptr,
 #ifdef __PVFS2_TROVE_SUPPORT__
 static int buffer_setup_trove_to_bmi(flow_descriptor * flow_d);
 static int buffer_setup_bmi_to_trove(flow_descriptor * flow_d);
+static flow_descriptor *trove_completion(PVFS_error error_code,
+					 void *user_ptr);
 #endif
 
 /****************************************************
@@ -360,7 +346,6 @@ int flowproto_bmi_trove_initialize(int flowproto_id)
 	return (-EINVAL);
     }
 
-#ifdef __PVFS2_JOB_THREADED__
     /* take advantage of the thread that the job interface is
      * going to use for BMI operations...
      */
@@ -387,24 +372,6 @@ int flowproto_bmi_trove_initialize(int flowproto_id)
     assert(ret == 0);
 #endif
 
-#else
-    /* get a BMI context */
-    ret = BMI_open_context(&global_bmi_context);
-    if(ret < 0)
-    {
-	return(ret);
-    }
-
-#ifdef __PVFS2_TROVE_SUPPORT__
-    /* get a TROVE context */
-    ret = trove_open_context(/*FIXME: HACK*/9,&global_trove_context);
-    if (ret < 0)
-    {
-        return(ret);
-    }
-#endif
-#endif /* __PVFS2_JOB_THREADED__ */
-
     flowproto_bmi_trove_id = flowproto_id;
 
     return (0);
@@ -419,16 +386,9 @@ int flowproto_bmi_trove_initialize(int flowproto_id)
 int flowproto_bmi_trove_finalize(void)
 {
 
-#ifdef __PVFS2_JOB_THREADED__
     PINT_thread_mgr_bmi_stop();
 #ifdef __PVFS2_TROVE_SUPPORT__
     PINT_thread_mgr_trove_stop();
-#endif
-#else
-    BMI_close_context(global_bmi_context);
-#ifdef __PVFS2_TROVE_SUPPORT__
-    trove_close_context(/*FIXME: HACK*/9,global_trove_context);
-#endif
 #endif
 
     gossip_ldebug(FLOW_PROTO_DEBUG, "flowproto_bmi_trove shut down.\n");
@@ -523,19 +483,12 @@ int flowproto_bmi_trove_find_serviceable(flow_descriptor ** flow_d_array,
 #ifdef __PVFS2_JOB_THREADED__
     struct timespec pthread_timeout;
     struct timeval base;
+#endif
     int bmi_notify_queue_empty = 0;
     int trove_notify_queue_empty = 0;
     struct bmi_completion_notification* notification = NULL;
-    struct trove_completion_notification* trove_notification = NULL;
-#else
-    int split_idle_time_ms = max_idle_time_ms;
-    int bmi_outcount = 0;
-    int i = 0;
-    int trove_count = *count;
 #ifdef __PVFS2_TROVE_SUPPORT__
-    /* TODO: fix later, this is a HACK */
-    PVFS_fs_id HACK_coll_id = 9;
-#endif
+    struct trove_completion_notification* trove_notification = NULL;
 #endif
 
     /* TODO: do something more clever with the max_idle_time_ms
@@ -555,7 +508,6 @@ int flowproto_bmi_trove_find_serviceable(flow_descriptor ** flow_d_array,
      */
 
 
-#ifdef __PVFS2_JOB_THREADED__
     /* if we are in threaded mode with callbacks, and the completion queues 
      * are empty, then we will block briefly on a condition variable 
      * to prevent busy spinning until the callback occurs
@@ -570,6 +522,7 @@ gen_mutex_unlock(&trove_notify_mutex);
     if(bmi_notify_queue_empty && trove_notify_queue_empty)
     {
 	
+#ifdef __PVFS2_JOB_THREADED__
 	/* figure out how long to wait */
 	gettimeofday(&base, NULL);
 	pthread_timeout.tv_sec = base.tv_sec + max_idle_time_ms / 1000;
@@ -584,6 +537,11 @@ gen_mutex_unlock(&trove_notify_mutex);
 	gen_mutex_lock(&callback_mutex);
 	ret = pthread_cond_timedwait(&callback_cond, &callback_mutex, &pthread_timeout);
 	gen_mutex_unlock(&callback_mutex);
+#else
+	/* TODO: need to fix timing here later */
+	ret = 0;
+#endif
+
 	if(ret != 0 && ret != ETIMEDOUT)
 	{
 	    /* TODO: handle this */
@@ -636,92 +594,6 @@ gen_mutex_lock(&trove_notify_mutex);
 	}
     }
 gen_mutex_unlock(&trove_notify_mutex);
-#endif
-
-
-#else /* not __PVFS2_JOB_THREADED__ */
-    /* divide up the idle time if we need to */
-    if (max_idle_time_ms && bmi_pending_count && trove_pending_count)
-    {
-	split_idle_time_ms = max_idle_time_ms / 2;
-	if (!split_idle_time_ms)
-	    split_idle_time_ms = 1;
-    }
-
-    if (bmi_pending_count > 0)
-    {
-	/* test for completion */
-	ret = BMI_testcontext(BMI_TEST_SIZE, bmi_op_array, &bmi_outcount,
-			   bmi_error_code_array,
-			   bmi_actualsize_array, bmi_usrptr_array,
-			   split_idle_time_ms, global_bmi_context);
-	if (ret < 0)
-	{
-	    return (ret);
-	}
-
-	bmi_pending_count -= bmi_outcount;
-
-	/* handle each completed bmi operation */
-	for (i = 0; i < bmi_outcount; i++)
-	{
-	    active_flowd = bmi_completion(bmi_usrptr_array[i],
-					  bmi_actualsize_array[i],
-					  bmi_error_code_array[i]);
-
-	    /* put flows into done_checking_queue if needed */
-	    if (active_flowd->state & FLOW_FINISH_MASK ||
-		active_flowd->state == FLOW_SVC_READY)
-	    {
-		gossip_ldebug(FLOW_PROTO_DEBUG, "adding %p to queue.\n", active_flowd);
-		qlist_add_tail(&(PRIVATE_FLOW(active_flowd)->queue_link),
-			       &done_checking_queue);
-	    }
-	}
-    }
-
-    /* manage in flight trove operations */
-    if (trove_pending_count > 0)
-    {
-	if(trove_pending_count > BMI_TEST_SIZE)
-	    trove_count = BMI_TEST_SIZE;
-	else
-	    trove_count = trove_pending_count;
-
-#ifdef __PVFS2_TROVE_SUPPORT__
-	ret = trove_dspace_testcontext(HACK_coll_id,
-	    trove_op_array,
-	    &trove_count,
-	    trove_error_code_array,
-	    trove_usrptr_array,
-	    split_idle_time_ms,
-	    global_trove_context);
-#endif
-	if (ret < 0)
-	{
-	    /* TODO: cleanup properly */
-	    gossip_lerr("Error: unimplemented condition encountered.\n");
-	    exit(-1);
-	    return (ret);
-	}
-
-	/* handle each completed trove operation */
-	for (i = 0; i < trove_count; i++)
-	{
-	    active_flowd = trove_completion(trove_error_code_array[i],
-					    trove_usrptr_array[i]);
-	    trove_pending_count--;
-
-	    /* put flows into done_checking_queue if needed */
-	    if (active_flowd->state & FLOW_FINISH_MASK ||
-		active_flowd->state == FLOW_SVC_READY)
-	    {
-		gossip_ldebug(FLOW_PROTO_DEBUG, "adding %p to queue.\n", active_flowd);
-		qlist_add_tail(&(PRIVATE_FLOW(active_flowd)->queue_link),
-			       &done_checking_queue);
-	    }
-	}
-    }
 #endif
 
     /* collect flows out of the done_checking_queue and return */
@@ -1413,9 +1285,7 @@ static void service_mem_to_bmi(flow_descriptor * flow_d)
 
     flow_data->bmi_callback.fn = bmi_callback_fn;
     flow_data->bmi_callback.data = flow_d;
-#ifdef __PVFS2_JOB_THREADED__
     user_ptr = &flow_data->bmi_callback;
-#endif
 
     /* post list send */
     gossip_ldebug(FLOW_PROTO_DEBUG, "Posting send, total size: %Ld\n",
@@ -1467,9 +1337,7 @@ static void service_bmi_to_mem(flow_descriptor * flow_d)
 
     flow_data->bmi_callback.fn = bmi_callback_fn;
     flow_data->bmi_callback.data = flow_d;
-#ifdef __PVFS2_JOB_THREADED__
     user_ptr = &flow_data->bmi_callback;
-#endif
 
     /* are we using an intermediate buffer? */
     if(!PINT_REQUEST_DONE(flow_d->file_req_state)
@@ -1612,9 +1480,7 @@ static void service_bmi_to_trove(flow_descriptor * flow_d)
 	{
 	    flow_data->bmi_callback.fn = bmi_callback_fn;
 	    flow_data->bmi_callback.data = flow_d;
-#ifdef __PVFS2_JOB_THREADED__
 	    user_ptr = &flow_data->bmi_callback;
-#endif
 
 	    /* see how much more is in the pipe */
 	    flow_data->bmi_total_size = flow_data->max_buffer_size;
@@ -1681,9 +1547,7 @@ static void service_bmi_to_trove(flow_descriptor * flow_d)
     {
 	flow_data->trove_callback.fn = trove_callback_fn;
         flow_data->trove_callback.data = flow_d;
-#ifdef __PVFS2_JOB_THREADED__
 	user_ptr = &flow_data->trove_callback;
-#endif
 	gossip_ldebug(FLOW_PROTO_DEBUG,
 		      "about to call trove_bstream_write_list().\n");
 	tmp_offset = flow_data->drain_buffer + flow_data->drain_buffer_offset;
@@ -1807,9 +1671,7 @@ static void service_trove_to_bmi(flow_descriptor * flow_d)
     {
 	flow_data->bmi_callback.fn = bmi_callback_fn;
 	flow_data->bmi_callback.data = flow_d;
-#ifdef __PVFS2_JOB_THREADED__
 	user_ptr = &flow_data->bmi_callback;
-#endif
 
 	gossip_ldebug(FLOW_PROTO_DEBUG, "Posting send, total size: %ld\n",
 		      (long) flow_data->drain_buffer_used);
@@ -1858,9 +1720,7 @@ static void service_trove_to_bmi(flow_descriptor * flow_d)
     {
 	flow_data->trove_callback.fn = trove_callback_fn;
         flow_data->trove_callback.data = flow_d;
-#ifdef __PVFS2_JOB_THREADED__
 	user_ptr = &flow_data->trove_callback;
-#endif
 	gossip_ldebug(FLOW_PROTO_DEBUG,
 		      "about to call trove_bstream_read_list().\n");
 	tmp_offset = flow_data->fill_buffer + flow_data->fill_buffer_offset;
@@ -2352,6 +2212,7 @@ static void trove_completion_trove_to_bmi(PVFS_error error_code,
     return;
 }
 
+#ifdef __PVFS2_TROVE_SUPPORT__
 /* trove_completion()
  *
  * handles completion of the specified trove operation
@@ -2380,7 +2241,7 @@ static flow_descriptor *trove_completion(PVFS_error error_code,
 
     return (flow_d);
 }
-
+#endif
 
 /* buffer_teardown_trove_to_bmi()
  *
