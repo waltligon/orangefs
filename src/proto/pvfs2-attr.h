@@ -16,13 +16,34 @@ struct PVFS_metafile_attr_s
 {
     /* distribution */
     PVFS_Dist *dist;
-    uint32_t dist_size;
+    uint32_t dist_size;  /* not sent across wire, each side may be diff */
 
     /* list of datafiles */
     PVFS_handle *dfile_array;
     uint32_t dfile_count;
 };
 typedef struct PVFS_metafile_attr_s PVFS_metafile_attr;
+#ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
+#define encode_PVFS_metafile_attr_dist(pptr,x) do { \
+    encode_PVFS_Dist(pptr, &(x)->dist); \
+} while (0)
+#define decode_PVFS_metafile_attr_dist(pptr,x) do { \
+    decode_PVFS_Dist(pptr, &(x)->dist); \
+    (x)->dist_size = PINT_DIST_PACK_SIZE((x)->dist); \
+} while (0)
+#define encode_PVFS_metafile_attr_dfiles(pptr,x) do { int i; \
+    encode_uint32_t(pptr, &(x)->dfile_count); \
+    for (i=0; i<(x)->dfile_count; i++) \
+	encode_PVFS_handle(pptr, &(x)->dfile_array[i]); \
+} while (0)
+#define decode_PVFS_metafile_attr_dfiles(pptr,x) do { int i; \
+    decode_uint32_t(pptr, &(x)->dfile_count); \
+    (x)->dfile_array = decode_malloc((x)->dfile_count \
+      * sizeof(*(x)->dfile_array)); \
+    for (i=0; i<(x)->dfile_count; i++) \
+	decode_PVFS_handle(pptr, &(x)->dfile_array[i]); \
+} while (0)
+#endif
 
 /* attributes specific to datafile objects */
 struct PVFS_datafile_attr_s
@@ -30,6 +51,7 @@ struct PVFS_datafile_attr_s
     PVFS_size size;
 };
 typedef struct PVFS_datafile_attr_s PVFS_datafile_attr;
+endecode_fields_1(PVFS_datafile_attr, PVFS_size, size);
 
 /* attributes specific to directory objects */
 struct PVFS_directory_attr_s
@@ -45,6 +67,9 @@ struct PVFS_symlink_attr_s
     char *target_path;
 };
 typedef struct PVFS_symlink_attr_s PVFS_symlink_attr;
+endecode_fields_2(PVFS_symlink_attr,
+  uint32_t, target_path_len,
+  string, target_path);
 
 /* generic attributes; applies to all objects */
 struct PVFS_object_attr
@@ -67,6 +92,48 @@ struct PVFS_object_attr
     u;
 };
 typedef struct PVFS_object_attr PVFS_object_attr;
+#ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
+#define encode_PVFS_object_attr(pptr,x) do { \
+    encode_PVFS_uid(pptr, &(x)->owner); \
+    encode_PVFS_gid(pptr, &(x)->group); \
+    encode_PVFS_permissions(pptr, &(x)->perms); \
+    encode_PVFS_time(pptr, &(x)->atime); \
+    encode_PVFS_time(pptr, &(x)->mtime); \
+    encode_PVFS_time(pptr, &(x)->ctime); \
+    encode_uint32_t(pptr, &(x)->mask); \
+    encode_PVFS_ds_type(pptr, &(x)->objtype); \
+    if ((x)->mask & PVFS_ATTR_META_DIST) \
+	encode_PVFS_metafile_attr_dist(pptr, &(x)->u.meta); \
+    if ((x)->mask & PVFS_ATTR_META_DFILES) \
+	encode_PVFS_metafile_attr_dfiles(pptr, &(x)->u.meta); \
+    if ((x)->mask & PVFS_ATTR_DATA_SIZE) \
+	encode_PVFS_datafile_attr(pptr, &(x)->u.data); \
+    if ((x)->mask & PVFS_ATTR_SYMLNK_TARGET) \
+	encode_PVFS_symlink_attr(pptr, &(x)->u.sym); \
+} while (0)
+#define decode_PVFS_object_attr(pptr,x) do { \
+    decode_PVFS_uid(pptr, &(x)->owner); \
+    decode_PVFS_gid(pptr, &(x)->group); \
+    decode_PVFS_permissions(pptr, &(x)->perms); \
+    decode_PVFS_time(pptr, &(x)->atime); \
+    decode_PVFS_time(pptr, &(x)->mtime); \
+    decode_PVFS_time(pptr, &(x)->ctime); \
+    decode_uint32_t(pptr, &(x)->mask); \
+    decode_PVFS_ds_type(pptr, &(x)->objtype); \
+    if ((x)->mask & PVFS_ATTR_META_DIST) \
+	decode_PVFS_metafile_attr_dist(pptr, &(x)->u.meta); \
+    if ((x)->mask & PVFS_ATTR_META_DFILES) \
+	decode_PVFS_metafile_attr_dfiles(pptr, &(x)->u.meta); \
+    if ((x)->mask & PVFS_ATTR_DATA_SIZE) \
+	decode_PVFS_datafile_attr(pptr, &(x)->u.data); \
+    if ((x)->mask & PVFS_ATTR_SYMLNK_TARGET) \
+	decode_PVFS_symlink_attr(pptr, &(x)->u.sym); \
+} while (0)
+#endif
+/* could have one each of PVFS_Dist, dfile_array, symlink_target */
+#define extra_size_PVFS_object_attr (PVFS_REQ_LIMIT_DIST_BYTES + \
+  PVFS_REQ_LIMIT_DFILE_COUNT * sizeof(PVFS_handle) + \
+  PVFS_REQ_LIMIT_PATH_NAME_BYTES)
 
 #endif /* __PVFS2_ATTR_H */
 
