@@ -21,6 +21,7 @@
 #include <test-invalid-files.h>
 #include <test-uninitialized.h>
 #include <test-finalized.h>
+#include <test-misc.h>
 
 enum test_types { 
    TEST_CREATE,
@@ -36,7 +37,8 @@ enum test_types {
 	PVFS_STOP_SERVER,
 	TEST_INVALID_FILES,
 	TEST_UNINITIALIZED,
-	TEST_FINALIZED
+	TEST_FINALIZED,
+	TEST_MISC
 };
 
 void setup_ptstests(config *myconfig) {
@@ -84,6 +86,9 @@ void setup_ptstests(config *myconfig) {
    myconfig->testpool[TEST_FINALIZED].test_func = (void *)test_finalized;
    myconfig->testpool[TEST_FINALIZED].test_param_init = (void *)null_params_parser;
    myconfig->testpool[TEST_FINALIZED].test_name = str_malloc("test_finalized");
+   myconfig->testpool[TEST_MISC].test_func = (void *)test_finalized;
+   myconfig->testpool[TEST_MISC].test_param_init = (void *)test_misc;
+   myconfig->testpool[TEST_MISC].test_name = str_malloc("test_misc");
 }
 
 #endif

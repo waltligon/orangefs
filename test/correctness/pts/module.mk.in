@@ -19,7 +19,8 @@ TEST_PTS_MISC := \
 	$(DIR)/null-params-parser.c \
 	$(DIR)/test-invalid-files.c \
 	$(DIR)/test-uninitialized.c \
-	$(DIR)/test-finalized.c
+	$(DIR)/test-finalized.c \
+	$(DIR)/test-misc.c
 
 MPIMISCSRC += $(TEST_PTS_MISC)
 
