@@ -144,10 +144,8 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, PVFS_sysresp_init *resp)
     ret = server_get_config(&g_server_config,mntent_list);
     if (ret < 0)
     {
-	init_fail = GET_CONFIG_INIT_FAIL;
+	init_fail = DCACHE_INIT_FAIL;
 	gossip_ldebug(CLIENT_DEBUG,"Error in getting server config parameters\n");
-	/* Release the mutex */
-	gen_mutex_unlock(&mt_config);
 	goto return_error;
     }
     num_file_systems = llist_count(g_server_config.file_systems);
@@ -205,8 +203,8 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, PVFS_sysresp_init *resp)
 
     /* Release the mutex */
     gen_mutex_unlock(&mt_config);
-	
-    /* load the server info from config file to table */
+
+    assert(i == num_file_systems);
     return(0);
 
  return_error:
@@ -272,7 +270,7 @@ static int server_get_config(struct server_configuration_s *config,
 	{
             gossip_ldebug(CLIENT_DEBUG,"Failed to resolve BMI "
                           "address %s\n",mntent_p->meta_addr);
-            return 1;
+            return -1;
 	}
 
 	/* Set up the request for getconfig */
@@ -291,7 +289,7 @@ static int server_get_config(struct server_configuration_s *config,
 	if (ret < 0)
         {
             gossip_ldebug(CLIENT_DEBUG,"PINT_send_req failed\n");
-            return 1;
+            return -1;
 	}
 	serv_resp = (struct PVFS_server_resp_s *) decoded.buffer;
 
@@ -324,7 +322,7 @@ static int server_get_config(struct server_configuration_s *config,
             gossip_ldebug(CLIENT_DEBUG,"Error:  Cannot retrieve "
                           "information about pvfstab entry %s\n",
                           mntent_p->meta_addr);
-            return 1;
+            return -1;
         }
     }
     return(0); 
