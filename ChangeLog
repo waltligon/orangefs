@@ -5,7 +5,10 @@ PVFS2 Release ChangeLog
 
 pvfs2-0.8.0pre1
 ===============
-- 
+- adjusted mask values for event logging to skip 0 mask
+- moved handle counting in statfs to server side so that it is
+  done in parallel
+- replaced uniq() subroutine in PAV to avoid recursion
 
 
 pvfs2-0.7.0
