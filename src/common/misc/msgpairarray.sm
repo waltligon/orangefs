@@ -642,7 +642,8 @@ int PINT_serv_decode_resp(PVFS_fs_id fs_id,
 			  struct PVFS_server_resp **resp_out_pp)
 {
     int ret = -1, server_type = 0;
-    PVFS_credentials creds;
+    struct server_configuration_s *server_config;
+    const char *server_string;
 
     ret = PINT_decode(encoded_resp_p, PINT_DECODE_RESP,
                       decoded_resp_p, /* holds data on decoded resp */
@@ -658,11 +659,12 @@ int PINT_serv_decode_resp(PVFS_fs_id fs_id,
 	    gossip_err("   Please check server logs for more "
                        "information.\n");
 
-            PVFS_util_gen_credentials(&creds);
 	    if (fs_id != PVFS_FS_ID_NULL)
 	    {
-		const char *server_string = PVFS_mgmt_map_addr(
-                    fs_id, &creds, *svr_addr_p, &server_type);
+		server_config = PINT_server_config_mgr_get_config(fs_id);
+		server_string = PINT_cached_config_map_addr(server_config,
+		    fs_id, *svr_addr_p, &server_type);
+		PINT_put_server_config_struct(server_config);
 		gossip_err("   Server: %s.\n", server_string);
 	    }
 	    else
