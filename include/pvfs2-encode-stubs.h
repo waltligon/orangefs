@@ -16,6 +16,13 @@
 #define roundup8(x) (((x)+7) & ~7)
 
 /*
+ * Look at the pointer value, push it up to the next 8 bytes.
+ */
+#define align8(pptr) do { \
+    *(pptr) = ((void *)(((unsigned long)(*(pptr)) + 8) & ~7)); \
+} while(0);
+
+/*
  * Files that want full definitions for the encoding and decoding functions
  * will define this.  They need access to the full source tree.  Most users
  * expect these noop #defines.
