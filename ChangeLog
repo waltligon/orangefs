@@ -3,6 +3,11 @@ PVFS2 Release ChangeLog
 -----------------------
 
 
+pvfs2-0.7.0pre1
+===============
+- 
+
+
 pvfs2-0.6.5
 ===========
 - broke several server state machines into multiple nested machines
@@ -50,7 +55,7 @@ pvfs2-0.6.5
 - fixed memory leak on check_fs_id setparam
 - fixed 64bit compile warnings (AMD64/Opteron)
 - split msgpair debugging into it's own class (no longer part of
-'client')
+  'client')
 - break out clientcore debugging into its own debugging mask
 - fixed trove error codes
 - give trove flush and resize operations the ability to create the
