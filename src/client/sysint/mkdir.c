@@ -165,6 +165,9 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
 
     /* send crdirent to associate a name with the meta file we just made */
 
+    /* remove leading slashes from name; this isn't a complete fix. */
+    while (*req->entry_name == '/') req->entry_name++;
+
     name_sz = strlen(req->entry_name) + 1; /*include null terminator*/
     req_p.op = PVFS_SERV_CREATEDIRENT;
     req_p.rsize = sizeof(struct PVFS_server_req_s) + name_sz;
