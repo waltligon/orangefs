@@ -112,6 +112,9 @@ int main(int argc,char **argv)
 		break;
             case PVFS_TYPE_SYMLINK:
                 printf("symlink\n");
+                printf("target      : %s\n",
+                       resp_gattr->attr.link_target);
+                free(resp_gattr->attr.link_target);
                 break;
             default:
 		printf("unknown object type!\n");

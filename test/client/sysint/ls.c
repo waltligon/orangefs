@@ -14,9 +14,6 @@
 #include "pvfs2-util.h"
 #include "str-utils.h"
 
-/* TODO: this can be larger after system interface readdir logic
- * is in place to break up large readdirs into multiple operations
- */
 #define MAX_NUM_DIRENTS    32
 
 void print_entry_attr(
@@ -33,6 +30,10 @@ void print_entry_attr(
         (attr->mask & PVFS_ATTR_SYS_SIZE))
     {
         computed_size = attr->size;
+    }
+    else if (attr->objtype == PVFS_TYPE_SYMLINK)
+    {
+        computed_size = (PVFS_size)strlen(attr->link_target);
     }
 
     snprintf(buf,128,"%c%c%c%c%c%c%c%c%c%c    1 %d   %d\t%Ld "
