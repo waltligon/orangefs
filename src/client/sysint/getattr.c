@@ -160,8 +160,15 @@ int PVFS_sys_getattr(PVFS_sysreq_getattr *req, PVFS_sysresp_getattr *resp)
 		num_data_servers = entry_pinode->attr.u.meta.nr_datafiles;
 		/**/
 
-		entry_pinode->size_flag = SIZE_VALID
+		entry_pinode->size_flag = SIZE_VALID;
 #endif
+	}
+	else
+	{
+	    /* if we get everything but the size, the updated pinode timestamp
+	     * doesn't have anything to do with the size.
+	     */
+	    entry_pinode->size_flag = SIZE_INVALID;
 	}
 
 	ret = gettimeofday(&cur_time,NULL);
