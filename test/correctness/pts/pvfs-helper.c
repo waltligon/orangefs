@@ -13,7 +13,7 @@ int initialize_sysint(void)
     memset(&pvfs_helper,0,sizeof(pvfs_helper));
 
     pvfs_helper.tab = PVFS_util_parse_pvfstab(NULL);
-    if (!pvfs_helper.tab)
+    if (pvfs_helper.tab)
     {
         /* init the system interface */
         ret = PVFS_sys_initialize(*pvfs_helper.tab, 0,
