@@ -488,7 +488,7 @@ else
 }
 
 #$num_unexp_reqs = prompt_num("How many unexpected requests should we be prepared to receive?  ");
-$num_unexp_reqs = 10;
+$num_unexp_reqs = 50;
 
 print_welcome();
 
