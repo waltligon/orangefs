@@ -15,6 +15,7 @@
 
 #include "pvfs2-sysint.h"
 #include "helper.h"
+#include "simple-stripe.h"
 
 #define DEFAULT_TAB "/etc/pvfs2tab"
 
@@ -153,7 +154,22 @@ int main(int argc, char **argv)
     /* Fill in the dist -- NULL means the system interface used the 
      * "default_dist" as the default
      */
-    req_create.attr.u.meta.dist = NULL;
+    if(user_opts->strip_size == -1)
+    {
+	req_create.attr.u.meta.dist = NULL;
+    }
+    else
+    {
+	req_create.attr.u.meta.dist = PVFS_Dist_create("simple_stripe");
+	if(!req_create.attr.u.meta.dist)
+	{
+	    fprintf(stderr, "Error: PVFS_Dist_create() failure.\n");
+	    ret = -1;
+	    goto main_out;
+	}
+	req_create.attr.u.meta.dist->params->strip_size =
+	    user_opts->strip_size;
+    }
 
     ret = PVFS_sys_create(&req_create,&resp_create);
     if (ret < 0)
@@ -205,6 +221,9 @@ int main(int argc, char **argv)
 	if(current_size != resp_io.total_completed)
 	{
 	    fprintf(stderr, "Error: short write!\n");
+	    fprintf(stderr, "Tried to write %d bytes at offset %d.\n", 
+		(int)current_size, (int)total_written);
+	    fprintf(stderr, "Only got %d bytes.\n", (int)resp_io.total_completed);
 	    ret = -1;
 	    goto main_out;
 	}
@@ -278,7 +297,7 @@ static struct options* parse_args(int argc, char* argv[])
     memset(tmp_opts, 0, sizeof(struct options));
 
     /* fill in defaults (except for hostid) */
-    tmp_opts->strip_size = 256 * 1024;
+    tmp_opts->strip_size = -1;
     tmp_opts->num_datafiles = -1;
     tmp_opts->buf_size = 10*1024*1024;
 
