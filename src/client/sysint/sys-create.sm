@@ -31,10 +31,6 @@ static int create_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
                                               job_status_s *js_p);
 static int create_dspace_create_failure(PINT_client_sm *sm_p,
 					job_status_s *js_p);
-static int create_crdirent_setup_msgpair(PINT_client_sm *sm_p,
-					 job_status_s *js_p);
-static int create_crdirent_failure(PINT_client_sm *sm_p,
-				   job_status_s *js_p);
 static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
                                                 job_status_s *js_p);
 static int create_datafiles_failure(PINT_client_sm *sm_p,
@@ -43,6 +39,10 @@ static int create_setattr_setup_msgpair(PINT_client_sm *sm_p,
                                         job_status_s *js_p);
 static int create_setattr_failure(PINT_client_sm *sm_p,
                                   job_status_s *js_p);
+static int create_crdirent_setup_msgpair(PINT_client_sm *sm_p,
+					 job_status_s *js_p);
+static int create_crdirent_failure(PINT_client_sm *sm_p,
+				   job_status_s *js_p);
 static int create_cleanup(PINT_client_sm *sm_p,
                           job_status_s *js_p);
 
@@ -50,15 +50,15 @@ static int create_cleanup(PINT_client_sm *sm_p,
 static int create_create_comp_fn(void *v_p,
                                  struct PVFS_server_resp *resp_p,
                                  int index);
-static int create_crdirent_comp_fn(void *v_p,
-                                   struct PVFS_server_resp *resp_p,
-                                   int index);
 static int create_datafiles_comp_fn(void *v_p,
                                     struct PVFS_server_resp *resp_p,
                                     int index);
 static int create_setattr_comp_fn(void *v_p,
                                   struct PVFS_server_resp *resp_p,
                                   int index);
+static int create_crdirent_comp_fn(void *v_p,
+                                   struct PVFS_server_resp *resp_p,
+                                   int index);
 
 %%
 
@@ -69,15 +69,15 @@ machine pvfs2_client_create_sm(init,
 			       dspace_create_setup_msgpair,
 			       dspace_create_xfer_msgpair,
 			       dspace_create_failure,
-			       crdirent_setup_msgpair,
-			       crdirent_xfer_msgpair,
-			       crdirent_failure,
                                datafiles_setup_msgpair_array,
                                datafiles_xfer_msgpair_array,
                                datafiles_failure,
                                create_setattr_setup_msgpair,
                                create_setattr_xfer_msgpair,
                                create_setattr_failure,
+			       crdirent_setup_msgpair,
+			       crdirent_xfer_msgpair,
+			       crdirent_failure,
 			       cleanup)
 {
     state init {
@@ -110,29 +110,12 @@ machine pvfs2_client_create_sm(init,
 
     state dspace_create_xfer_msgpair {
 	jump pvfs2_client_msgpair_sm;
-        success => crdirent_setup_msgpair;
+        success => datafiles_setup_msgpair_array;
 	default => dspace_create_failure;
     }
 
     state dspace_create_failure {
 	run create_dspace_create_failure;
-	default => cleanup;
-    }
-
-    state crdirent_setup_msgpair {
-	run create_crdirent_setup_msgpair;
-        success => crdirent_xfer_msgpair;
-	default => crdirent_failure;
-    }
-
-    state crdirent_xfer_msgpair {
-	jump pvfs2_client_msgpair_sm;
-        success => datafiles_setup_msgpair_array;
-        default => crdirent_failure;
-    }
-
-    state crdirent_failure {
-	run create_crdirent_failure;
 	default => cleanup;
     }
 
@@ -161,13 +144,30 @@ machine pvfs2_client_create_sm(init,
 
     state create_setattr_xfer_msgpair {
 	jump pvfs2_client_msgpair_sm;
-        success => cleanup;
+        success => crdirent_setup_msgpair;
         default => create_setattr_failure;
     }
 
     state create_setattr_failure {
         run create_setattr_failure;
         default => cleanup;
+    }
+
+    state crdirent_setup_msgpair {
+	run create_crdirent_setup_msgpair;
+        success => crdirent_xfer_msgpair;
+	default => crdirent_failure;
+    }
+
+    state crdirent_xfer_msgpair {
+	jump pvfs2_client_msgpair_sm;
+        success => cleanup;
+        default => crdirent_failure;
+    }
+
+    state crdirent_failure {
+	run create_crdirent_failure;
+	default => cleanup;
     }
 
     state cleanup {
@@ -314,32 +314,6 @@ static int create_create_comp_fn(void *v_p,
     return 0;
 }
 
-/* 
-   NOTE: this function only does a sanity check and doesn't
-   need to be called.  Set the completion function to NULL
-   when setting up the crdirent msgpair to avoid this
-*/
-static int create_crdirent_comp_fn(void *v_p,
-                                   struct PVFS_server_resp *resp_p,
-                                   int index)
-{
-/*     PINT_client_sm *sm_p = (PINT_client_sm *) v_p; */
-    
-    gossip_debug(CLIENT_DEBUG, "create_crdirent_comp_fn\n");
-
-    assert(resp_p->op == PVFS_SERV_CRDIRENT);
-
-    /* if we get an error, just return immediately, don't try to
-     * actually fill anything in.
-     */
-    if (resp_p->status != 0)
-    {
-	return resp_p->status;
-    }
-
-    return 0;
-}
-
 static int create_datafiles_comp_fn(void *v_p,
                                     struct PVFS_server_resp *resp_p,
                                     int index)
@@ -409,6 +383,32 @@ static int create_setattr_comp_fn(void *v_p,
     return 0;
 }
 
+/* 
+   NOTE: this function only does a sanity check and doesn't
+   need to be called.  Set the completion function to NULL
+   when setting up the crdirent msgpair to avoid this
+*/
+static int create_crdirent_comp_fn(void *v_p,
+                                   struct PVFS_server_resp *resp_p,
+                                   int index)
+{
+/*     PINT_client_sm *sm_p = (PINT_client_sm *) v_p; */
+    
+    gossip_debug(CLIENT_DEBUG, "create_crdirent_comp_fn\n");
+
+    assert(resp_p->op == PVFS_SERV_CRDIRENT);
+
+    /* if we get an error, just return immediately, don't try to
+     * actually fill anything in.
+     */
+    if (resp_p->status != 0)
+    {
+	return resp_p->status;
+    }
+
+    return 0;
+}
+
 static int create_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
                                               job_status_s *js_p)
 {
@@ -464,58 +464,6 @@ static int create_dspace_create_failure(PINT_client_sm *sm_p,
 					job_status_s *js_p)
 {
     gossip_debug(CLIENT_DEBUG, "create state: dspace_create_failure\n");
-    return 1;
-}
-
-static int create_crdirent_setup_msgpair(PINT_client_sm *sm_p,
-					 job_status_s *js_p)
-{
-    int ret = -1;
-    PINT_client_sm_msgpair_state *msg_p = NULL;
-
-    gossip_debug(CLIENT_DEBUG, "create state: crdirent_setup_msgpair\n");
-
-    /* clear error field in job */
-    js_p->error_code = 0;
-
-    gossip_debug(CLIENT_DEBUG," create: posting crdirent req\n");
-
-    msg_p = &sm_p->msgpair;
-    memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
-
-    PINT_SERVREQ_CRDIRENT_FILL(msg_p->req,
-                               *sm_p->cred_p,
-                               sm_p->u.create.object_name,
-                               sm_p->u.create.metafile_handle,
-                               sm_p->parent_ref.handle,
-                               sm_p->parent_ref.fs_id);
-
-    /* fill in msgpair structure components */
-    msg_p->fs_id = sm_p->parent_ref.fs_id;
-    msg_p->handle = sm_p->u.create.metafile_handle;
-    msg_p->comp_fn = create_crdirent_comp_fn;
-
-    ret = PINT_bucket_map_to_server(&msg_p->svr_addr,
-                                    sm_p->parent_ref.handle,
-                                    sm_p->parent_ref.fs_id);
-    if (ret < 0)
-    {
-        gossip_err("Failed to get meta server information\n");
-        assert(0);
-    }
-    return 1;
-}
-
-static int create_crdirent_failure(PINT_client_sm *sm_p,
-				   job_status_s *js_p)
-{
-    gossip_debug(CLIENT_DEBUG, "create state: crdirent_failure\n");
-
-    if (js_p->error_code == -PVFS_EEXIST)
-    {
-        gossip_debug(CLIENT_DEBUG, "crdirent failed: "
-                     "dirent already exists!\n");
-    }
     return 1;
 }
 
@@ -658,6 +606,58 @@ static int create_setattr_failure(PINT_client_sm *sm_p,
                                   job_status_s *js_p)
 {
     gossip_debug(CLIENT_DEBUG, "create state: setattr_failure\n");
+    return 1;
+}
+
+static int create_crdirent_setup_msgpair(PINT_client_sm *sm_p,
+					 job_status_s *js_p)
+{
+    int ret = -1;
+    PINT_client_sm_msgpair_state *msg_p = NULL;
+
+    gossip_debug(CLIENT_DEBUG, "create state: crdirent_setup_msgpair\n");
+
+    /* clear error field in job */
+    js_p->error_code = 0;
+
+    gossip_debug(CLIENT_DEBUG," create: posting crdirent req\n");
+
+    msg_p = &sm_p->msgpair;
+    memset(msg_p, 0, sizeof(PINT_client_sm_msgpair_state));
+
+    PINT_SERVREQ_CRDIRENT_FILL(msg_p->req,
+                               *sm_p->cred_p,
+                               sm_p->u.create.object_name,
+                               sm_p->u.create.metafile_handle,
+                               sm_p->parent_ref.handle,
+                               sm_p->parent_ref.fs_id);
+
+    /* fill in msgpair structure components */
+    msg_p->fs_id = sm_p->parent_ref.fs_id;
+    msg_p->handle = sm_p->u.create.metafile_handle;
+    msg_p->comp_fn = create_crdirent_comp_fn;
+
+    ret = PINT_bucket_map_to_server(&msg_p->svr_addr,
+                                    sm_p->parent_ref.handle,
+                                    sm_p->parent_ref.fs_id);
+    if (ret < 0)
+    {
+        gossip_err("Failed to get meta server information\n");
+        assert(0);
+    }
+    return 1;
+}
+
+static int create_crdirent_failure(PINT_client_sm *sm_p,
+				   job_status_s *js_p)
+{
+    gossip_debug(CLIENT_DEBUG, "create state: crdirent_failure\n");
+
+    if (js_p->error_code == -PVFS_EEXIST)
+    {
+        gossip_debug(CLIENT_DEBUG, "crdirent failed: "
+                     "dirent already exists!\n");
+    }
     return 1;
 }
 
