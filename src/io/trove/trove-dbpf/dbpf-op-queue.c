@@ -7,6 +7,10 @@
 #include <dbpf-op-queue.h>
 #include <malloc.h>
 
+/* dbpf_op_queue_mutex - lock to be obtained before manipulating queue
+ */
+gen_mutex_t dbpf_op_queue_mutex = GEN_MUTEX_INITIALIZER;
+
 struct dbpf_queued_op *dbpf_op_queue_head = NULL;
 
 /* Note: the majority of the operations on the queue are static inlines
@@ -30,10 +34,13 @@ void dbpf_queue_list(void)
 {
     struct dbpf_queued_op *q_op, *start_op;
 
+    gen_mutex_lock(&dbpf_op_queue_mutex);
+
     q_op = dbpf_op_queue_head;
 
     if (q_op == NULL) {
 	printf("<queue empty>\n");
+	gen_mutex_unlock(&dbpf_op_queue_mutex);
 	return;
     }
     
@@ -53,6 +60,8 @@ void dbpf_queue_list(void)
 	       q_op->op.handle);
 	q_op = q_op->next_p;
     }
+
+    gen_mutex_unlock(&dbpf_op_queue_mutex);
 }
 
 /*
