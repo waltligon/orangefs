@@ -3,7 +3,6 @@
  *
  * See COPYING in top-level directory.
  */
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -18,7 +17,6 @@
 #include "gen-locks.h"
 #include "mmap-ra-cache.h"
 
-/* these are based on code from src/server/request-scheduler.c */
 static int hash_key(void *key, int table_size);
 static int hash_key_compare(void *key, struct qlist_head *link);
 
@@ -259,8 +257,7 @@ int pvfs2_mmap_ra_cache_finalize(void)
 static int hash_key(void *key, int table_size)
 {
     unsigned long tmp = 0;
-    PVFS_object_ref *refn =
-        (PVFS_object_ref *)key;
+    PVFS_object_ref *refn = (PVFS_object_ref *)key;
 
     tmp += ((refn->handle << 2) | (refn->fs_id));
     tmp = (tmp % table_size);
@@ -278,20 +275,15 @@ static int hash_key(void *key, int table_size)
 static int hash_key_compare(void *key, struct qlist_head *link)
 {
     mmap_ra_cache_elem_t *cache_elem = NULL;
-    PVFS_object_ref *refn =
-        (PVFS_object_ref *)key;
+    PVFS_object_ref *refn = (PVFS_object_ref *)key;
 
     cache_elem = qlist_entry(link, mmap_ra_cache_elem_t, hash_link);
     assert(cache_elem);
 
-    if ((cache_elem->refn.handle == refn->handle) &&
-        (cache_elem->refn.fs_id == refn->fs_id))
-    {
-        return(1);
-    }
-    return(0);
-
+    return (((cache_elem->refn.handle == refn->handle) &&
+             (cache_elem->refn.fs_id == refn->fs_id)) ? 1 : 0);
 }
+
 /*
  * Local variables:
  *  c-indent-level: 4

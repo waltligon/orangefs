@@ -26,21 +26,6 @@ extern spinlock_t pvfs2_superblocks_lock;
 
 static int open_access_count = 0;
 
-/* a pointer to the task that opens the dev-req device file */
-static struct task_struct *device_owner = NULL;
-
-
-/* a function that forces termination of the device owner */
-void kill_device_owner(void)
-{
-    down(&devreq_semaphore);
-    if (device_owner)
-    {
-        force_sig(SIGKILL, device_owner);
-    }
-    up(&devreq_semaphore);
-}
-
 static int pvfs2_devreq_open(
     struct inode *inode,
     struct file *file)
@@ -64,7 +49,6 @@ static int pvfs2_devreq_open(
             if (ret == 0)
             {
                 open_access_count++;
-                device_owner = current;
             }
             else
             {
@@ -370,7 +354,6 @@ static int pvfs2_devreq_release(
     pvfs_bufmap_finalize();
 
     open_access_count--;
-    device_owner = NULL;
 
 #ifdef PVFS2_LINUX_KERNEL_2_4
 /*     MOD_DEC_USE_COUNT; */

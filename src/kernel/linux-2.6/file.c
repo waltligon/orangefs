@@ -7,9 +7,6 @@
 #include "pvfs2-kernel.h"
 #include "pvfs2-bufmap.h"
 
-/* defined in devpvfs2-req.c */
-void kill_device_owner(void);
-
 extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
 extern wait_queue_head_t pvfs2_request_list_waitq;

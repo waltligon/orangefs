@@ -7,9 +7,6 @@
 #include "pvfs2-kernel.h"
 #include "pvfs2-bufmap.h"
 
-/* defined in devpvfs2-req.c */
-void kill_device_owner(void);
-
 /* defined in file.c */
 extern ssize_t pvfs2_inode_read(
     struct inode *inode,

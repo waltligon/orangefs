@@ -904,7 +904,7 @@ int pvfs2_flush_mmap_racache(struct inode *inode)
 
 int pvfs2_unmount_sb(struct super_block *sb)
 {
-    int ret = -1;
+    int ret = -EINVAL;
     pvfs2_kernel_op_t *new_op = NULL;
 
     pvfs2_print("pvfs2_unmount_sb called on sb %p\n", sb);
@@ -936,6 +936,41 @@ int pvfs2_unmount_sb(struct super_block *sb)
     op_release(new_op);
 
     return ret;
+}
+
+/*
+  NOTE: on successful cancellation, be sure to return -EINTR, as
+  that's the return value the caller expects
+*/
+int pvfs2_cancel_op_in_progress(unsigned long tag)
+{
+    int ret = -EINVAL;
+    pvfs2_kernel_op_t *new_op = NULL;
+
+    pvfs2_print("pvfs2_cancel_op_in_progress called on op %p\n", op);
+
+    new_op = op_alloc();
+    if (!new_op)
+    {
+        return -ENOMEM;
+    }
+    new_op->upcall.type = PVFS2_VFS_OP_CANCEL;
+    new_op->upcall.req.cancel.op_tag = tag;
+
+    pvfs2_print("Attempting PVFS2 operation cancellation of tag %lu\n",
+                new_op->upcall.req.cancel.op_tag);
+
+    service_operation(new_op, "pvfs2_op_cancel", 0);
+    ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
+
+    /* SCRUB RET/ERROR CODE HERE */
+    pvfs2_print("pvfs2_cancel_op_in_progress: got return "
+                "value of %d\n", ret);
+
+  error_exit:
+    op_release(new_op);
+
+    return -EINTR;
 }
 
 /* macro defined in include/pvfs2-types.h */

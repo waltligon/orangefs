@@ -3,7 +3,6 @@
  *
  * See COPYING in top-level directory.
  */
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -90,6 +89,8 @@ typedef struct
 
     int was_handled_inline;
 
+    struct qlist_head hash_link;
+
     union
     {
         PVFS_sysresp_lookup lookup;
@@ -110,6 +111,13 @@ static struct PVFS_dev_map_desc s_io_desc;
 
 /* used only for deleting all allocated vfs_request objects */
 vfs_request_t *s_vfs_request_array[MAX_NUM_OPS] = {NULL};
+
+/* this hashtable is used to keep track of operations in progress */
+#define DEFAULT_OPS_IN_PROGRESS_HTABLE_SIZE 67
+static int hash_key(void *key, int table_size);
+static int hash_key_compare(void *key, struct qlist_head *link);
+static struct qhash_table *s_ops_in_progress_table = NULL;
+
 
 int write_device_response(
     void *buffer_list,
@@ -147,6 +155,129 @@ do {                                                          \
 static void client_core_sig_handler(int signum)
 {
     s_client_is_processing = 0;
+}
+
+static int hash_key(void *key, int table_size)
+{
+    unsigned long tag = *((unsigned long *)key);
+    return (tag % table_size);
+}
+
+static int hash_key_compare(void *key, struct qlist_head *link)
+{
+    vfs_request_t *vfs_request = NULL;
+    unsigned long tag = *((unsigned long *)key);
+
+    vfs_request = qlist_entry(link, vfs_request_t, hash_link);
+    assert(vfs_request);
+
+    return (((unsigned long)vfs_request->info.tag == tag) ? 1 : 0);
+}
+
+static int initialize_ops_in_progress_table(void)
+{
+    if (!s_ops_in_progress_table)
+    {
+        s_ops_in_progress_table = qhash_init(
+            hash_key_compare, hash_key,
+            DEFAULT_OPS_IN_PROGRESS_HTABLE_SIZE);
+    }
+    return (s_ops_in_progress_table ? 0 : -PVFS_ENOMEM);
+}
+
+static int add_op_to_op_in_progress_table(
+    vfs_request_t *vfs_request)
+{
+    int ret = -PVFS_EINVAL;
+
+    if (vfs_request)
+    {
+        qhash_add(s_ops_in_progress_table,
+                  (void *)(&vfs_request->info.tag),
+                  &vfs_request->hash_link);
+        gossip_err("HASHED TAG %lu to REQ %p\n",
+                   (unsigned long)vfs_request->info.tag, vfs_request);
+        ret = 0;
+    }
+    return ret;
+}
+
+static int cancel_op_in_progress(unsigned long tag)
+{
+    int ret = -PVFS_EINVAL;
+    struct qlist_head *hash_link = NULL;
+    vfs_request_t *vfs_request = NULL;
+
+    if (vfs_request)
+    {
+        hash_link = qhash_search(
+            s_ops_in_progress_table, (void *)&tag);
+        if (hash_link)
+        {
+            vfs_request = qhash_entry(
+                hash_link, vfs_request_t, hash_link);
+            assert(vfs_request);
+            assert((unsigned long)vfs_request->info.tag == tag);
+            /*
+              for now, cancellation is ONLY support on I/O operations,
+              so assert that this is an I/O operation
+            */
+            assert(vfs_request->in_upcall.type == PVFS2_VFS_OP_FILE_IO);
+
+            gossip_err("CANCELLING I/O REQ %p FROM TAG %lu\n",
+                       vfs_request, tag);
+
+            ret = PINT_client_io_cancel(vfs_request->op_id);
+        }
+    }
+    return ret;
+}
+
+static int remove_op_from_op_in_progress_table(
+    vfs_request_t *vfs_request)
+{
+    int ret = -PVFS_EINVAL;
+    struct qlist_head *hash_link = NULL;
+    vfs_request_t *tmp_vfs_request = NULL;
+
+    if (vfs_request)
+    {
+        hash_link = qhash_search_and_remove(
+            s_ops_in_progress_table, (void *)(&vfs_request->info.tag));
+        if (hash_link)
+        {
+            tmp_vfs_request = qhash_entry(
+                hash_link, vfs_request_t, hash_link);
+            assert(tmp_vfs_request);
+            assert(tmp_vfs_request == vfs_request);
+
+            gossip_err("UNHASHED TAG %lu FROM REQ %p\n",
+                       (unsigned long)vfs_request->info.tag, vfs_request);
+            ret = 0;
+        }
+    }
+    return ret;
+}
+
+static void finalize_ops_in_progress_table(void)
+{
+    int i = 0;
+    struct qlist_head *hash_link = NULL;
+
+    if (s_ops_in_progress_table)
+    {
+        for(i = 0; i < s_ops_in_progress_table->table_size; i++)
+        {
+            do
+            {
+                hash_link = qhash_search_and_remove_at_index(
+                    s_ops_in_progress_table, i);
+
+            } while(hash_link);
+        }
+        qhash_finalize(s_ops_in_progress_table);
+        s_ops_in_progress_table = NULL;
+    }
 }
 
 void *exec_remount(void *ptr)
@@ -855,6 +986,30 @@ static int service_mmap_ra_flush_request(vfs_request_t *vfs_request)
 }
 #endif
 
+static int service_operation_cancellation(vfs_request_t *vfs_request)
+{
+    int ret = -PVFS_EINVAL;
+
+    gossip_err("GOT OPERATION CANCELLATION UPCALL FOR TAG %lu\n",
+               vfs_request->in_upcall.req.cancel.op_tag);
+
+    /*
+      based on the tag specified in the cancellation upcall, find the
+      operation currently in progress and issue a cancellation on it
+    */
+    ret = cancel_op_in_progress(
+        vfs_request->in_upcall.req.cancel.op_tag);
+
+    /* SCRUB RETURN VALUE HERE */
+
+    /* we need to send a blank success response */
+    vfs_request->out_downcall.type = PVFS2_VFS_OP_CANCEL;
+    vfs_request->out_downcall.status = ret;
+
+    write_inlined_device_response(vfs_request);
+    return 0;
+}
+
 int write_device_response(
     void *buffer_list,
     int *size_list,
@@ -1246,6 +1401,9 @@ static inline int handle_unexp_vfs_request(vfs_request_t *vfs_request)
             ret = service_mmap_ra_flush_request(vfs_request);
             break;
 #endif
+        case PVFS2_VFS_OP_CANCEL:
+            ret = service_operation_cancellation(vfs_request);
+            break;
         case PVFS2_VFS_OP_INVALID:
         default:
             gossip_err(
@@ -1276,9 +1434,11 @@ static inline int handle_unexp_vfs_request(vfs_request_t *vfs_request)
             {
                 /*
                   otherwise, we've just properly posted a non-blocking
-                  op; mark it as no longer a dev unexp msg
+                  op; mark it as no longer a dev unexp msg and add it
+                  to the ops in progress table
                 */
                 vfs_request->is_dev_unexp = 0;
+                ret = add_op_to_op_in_progress_table(vfs_request);
             }
         }
         break;
@@ -1347,16 +1507,6 @@ int process_vfs_requests(void)
             op_id_array, &op_count, (void **)vfs_request_array,
             error_code_array, PVFS2_CLIENT_DEFAULT_TEST_TIMEOUT_MS);
 
-        /*
-          FIXME: NEED TO TRACK IN PROGRESS TAGS AND MAKE SURE WE'RE
-          NOT ADDING ONE FOR AN OP ALREADY IN PROGRESS!!
-
-          also, this helps us also in that we can track in progress
-          I/O operations so that when we get a signal (priority
-          upcall?) from the kernel to cancel it, we can quickly have
-          access to the job_id/fs_id in it to pass to
-          PINT_client_io_cancel (or whatever).  HASH ON TAG?
-        */
         for(i = 0; i < op_count; i++)
         {
             vfs_request = vfs_request_array[i];
@@ -1384,6 +1534,15 @@ int process_vfs_requests(void)
                   sysint operation that has just completed
                 */
                 assert(vfs_request->in_upcall.type);
+
+                /*
+                  even if the op was cancelled, if we get here, we
+                  will have to remove the op from the in progress
+                  table.  the error code on cancelled operations is
+                  already set appropriately
+                */
+                ret = remove_op_from_op_in_progress_table(vfs_request);
+                assert(ret == 0);
 
                 package_downcall_members(
                     vfs_request, error_code_array[i]);
@@ -1456,6 +1615,13 @@ int main(int argc, char **argv)
 
     PINT_acache_set_timeout(ACACHE_TIMEOUT_MS);
 
+    ret = initialize_ops_in_progress_table();
+    if (ret)
+    {
+	PVFS_perror("initialize_ops_in_progress_table", ret);
+        return ret;
+    }   
+
     ret = PINT_dev_initialize("/dev/pvfs2-req", 0);
     if (ret < 0)
     {
@@ -1514,6 +1680,7 @@ int main(int argc, char **argv)
         PINT_sys_release(s_vfs_request_array[i]->op_id);
         free(s_vfs_request_array[i]);
     }
+    finalize_ops_in_progress_table();
 
     job_close_context(s_client_dev_context);
 

@@ -412,6 +412,9 @@ int pvfs2_flush_mmap_racache(
 int pvfs2_unmount_sb(
     struct super_block *sb);
 
+int pvfs2_cancel_op_in_progress(
+    unsigned long tag);
+
 /************************************
  * misc convenience macros
  ************************************/
@@ -605,8 +608,7 @@ do {                                                                \
 do {                                                      \
     if (error_exit)                                       \
     {                                                     \
-        ret = -EINTR;                                     \
-        kill_device_owner();                              \
+        ret = pvfs2_cancel_op_in_progress(new_op->tag);   \
         op_release(new_op);                               \
     }                                                     \
     else                                                  \

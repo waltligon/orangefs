@@ -532,6 +532,8 @@ int PINT_serv_msgpairarray_resolve_addrs(
 
 int PINT_client_bmi_cancel(job_id_t id);
 
+int PINT_client_io_cancel(job_id_t id);
+
 /* INCLUDE STATE-MACHINE.H DOWN HERE */
 #define PINT_OP_STATE       PINT_client_sm
 #if 0
