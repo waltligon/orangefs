@@ -102,7 +102,7 @@ machine pvfs2_client_remove_sm(init,
 
     state lookup_post_msgpair
 	{
-	    run remove_lookup_post_msgpair;
+	    jump pvfs2_client_msgpair_sm;
 	    success => lookup_complete_msgpair;
 	    REMOVE_DCACHE_HIT => getattr_post_msgpair;
 	    REMOVE_PCACHE_HIT => cleanup;

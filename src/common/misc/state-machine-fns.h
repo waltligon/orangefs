@@ -117,7 +117,7 @@ static inline int PINT_state_machine_next(struct PINT_OP_STATE *s,
     /* To do nested states, we check to see if the next state is
      * a nested state machine, and if so we push the return state
      * onto a stack */
-    while (s->current_state->flag == SM_NESTED)
+    while (s->current_state->flag == SM_JUMP)
     {
 	PINT_push_state(s, NULL);
 	s->current_state += 1; /* skip state flag; now we point to the state
