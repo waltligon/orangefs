@@ -14,7 +14,7 @@ ac_default_prefix=/usr/local
 ac_help="$ac_help
   --with-mtrace           Use mtrace for detecting memory leaks (must setenv MALLOC_TRACE to output file name)."
 ac_help="$ac_help
-  --with-kernel=src_path   Build pvfs2 kernel module against specified src (2.6.x only)."
+  --with-kernel=src_path  Build pvfs2 kernel module against specified src (2.6.x only)."
 ac_help="$ac_help
   --enable-fast           Disable optional debugging, enable optimizations."
 ac_help="$ac_help

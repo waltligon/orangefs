@@ -71,7 +71,7 @@ dnl Enables the kernel module to build if the appropriate
 dnl linux-2.6.x path is specified
 dnl
 AC_ARG_WITH(kernel,
-[  --with-kernel=src_path   Build pvfs2 kernel module against specified src (2.6.x only).], LINUX_KERNEL_SRC="$withval",LINUX_KERNEL_SRC="")
+[  --with-kernel=src_path  Build pvfs2 kernel module against specified src (2.6.x only).], LINUX_KERNEL_SRC="$withval",LINUX_KERNEL_SRC="")
 
 SRC_TOP_LEVEL=`pwd`
 AC_SUBST(SRC_TOP_LEVEL)
