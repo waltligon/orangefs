@@ -304,7 +304,7 @@ int PINT_bucket_get_next_io(
  *
  * returns pointer to string on success, NULL on failure
  */
-const char* PINT_bucket_map_addr(
+const char *PINT_bucket_map_addr(
     struct server_configuration_s *config,
     PVFS_fs_id fsid, 
     PVFS_BMI_addr_t addr,

@@ -33,11 +33,11 @@ const char* PVFS_mgmt_map_addr(PVFS_fs_id fs_id,
 			       PVFS_BMI_addr_t addr,
 			       int *server_type)
 {
-    char *ret = NULL;
-    struct server_configuration_s *server_config = NULL;
+    struct server_configuration_s *server_config =
+        PINT_get_server_config_struct();
+    const char *ret = PINT_bucket_map_addr(
+        server_config, fs_id, addr, server_type);
 
-    server_config = PINT_get_server_config_struct();
-    ret = PINT_bucket_map_addr(server_config, fs_id, addr, server_type);
     PINT_put_server_config_struct(server_config);
     return ret;
 }
