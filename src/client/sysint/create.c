@@ -16,6 +16,7 @@
 #include "pint-bucket.h"
 #include "pcache.h"
 #include "PINT-reqproto-encode.h"
+#include "pvfs-distribution.h"
 
 #define REQ_ENC_FORMAT 0
 
@@ -101,6 +102,28 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	    ret = (-EEXIST);
 	    failure = DCACHE_LOOKUP_FAILURE;
 	    goto return_error;
+	}
+
+	/* how many data files do we need to create? */
+	io_serv_count = req->attr.u.meta.nr_datafiles;
+
+	/* if the user passed in -1, we're going to assume that's the default
+	 * and create one datafile per server */
+	if (io_serv_count == -1)
+	{
+	    PINT_bucket_get_num_io( req->parent_refn.fs_id, &io_serv_count);
+	}
+
+	gossip_ldebug(CLIENT_DEBUG,"number of data files to create = %d\n",io_serv_count);
+
+	/* if the user passed in a NULL pointer for the distribution, we
+	 * need to get the default distribution for them
+	 */
+
+	if (req->attr.u.meta.dist == NULL)
+	{
+	    req->attr.u.meta.dist = PVFS_Dist_create("default_dist");
+	    //PINT_Dist_dump(req->attr.u.meta.dist);
 	}
 
 	/* Determine the initial metaserver for new file */
@@ -204,18 +227,6 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
             failure = CRDIRENT_MSG_FAILURE;
             goto return_error;
         }
-
-	/* how many data files do we need to create? */
-	io_serv_count = req->attr.u.meta.nr_datafiles;
-
-	/* if the user passed in -1, we're going to assume that's the default
-	 * and create one datafile per server */
-	if (io_serv_count == -1)
-	{
-	    PINT_bucket_get_num_io( req->parent_refn.fs_id, &io_serv_count);
-	}
-
-	gossip_ldebug(CLIENT_DEBUG,"number of data files to create = %d\n",io_serv_count);
 
 	/* we need one BMI address for each data file */
 	bmi_addr_list = (bmi_addr_t *)malloc(sizeof(bmi_addr_t)*io_serv_count);
@@ -508,11 +519,7 @@ static void copy_attributes(PVFS_object_attr *new,PVFS_object_attr old,
 	new->objtype = ATTR_META;
 
 	/* Fill in the metafile attributes */
-	/* TODO: fill in the distribution information when we settle on that */
-#if 0
-	/* REMOVED BY PHIL WHEN MOVING TO NEW TREE */
-	new.u.meta.dist = old.u.meta.dist;
-#endif
+	new->u.meta.dist = old.u.meta.dist;
 	new->u.meta.dfh = handle_array;
 	new->u.meta.nr_datafiles = handle_count;
 }

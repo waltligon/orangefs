@@ -192,6 +192,9 @@ void debug_print_type(void* thing, int type)
 			case PVFS_SERV_RMDIR:
 				gossip_ldebug(CLIENT_DEBUG,"rmdir request\n");
 				break;
+			case PVFS_SERV_RMDIRENT:
+				gossip_ldebug(CLIENT_DEBUG,"rmdirent request\n");
+				break;
 			default:
 				gossip_ldebug(CLIENT_DEBUG,"unknown request = %d\n", req->op);
 				break;
@@ -202,6 +205,9 @@ void debug_print_type(void* thing, int type)
 		struct PVFS_server_resp_s * resp = thing;
 		switch( resp->op )
 		{
+			case PVFS_SERV_RMDIRENT:
+				gossip_ldebug(CLIENT_DEBUG,"rmdirent response\n");
+				break;
 			case PVFS_SERV_MKDIR:
 				gossip_ldebug(CLIENT_DEBUG,"mkdir response\n");
 				break;
