@@ -144,7 +144,7 @@ int main(int argc, char **argv)
     req_create.credentials.uid = 100;
     req_create.credentials.gid = 100;
     req_create.credentials.perms = 1877;
-    req_create.attr.u.meta.nr_datafiles = -1;
+    req_create.attr.u.meta.nr_datafiles = user_opts->num_datafiles;
     req_create.parent_refn.handle =
         lookup_parent_handle(pvfs_path,cur_fs);
     req_create.parent_refn.fs_id = cur_fs;
