@@ -516,20 +516,13 @@ static int lookup_cleanup(PINT_server_op *s_op,
 {
     gossip_debug(SERVER_DEBUG, "lookup state: lookup_cleanup\n");
     
-    /* free decoded, encoded requests */
-    PINT_decode_release(&(s_op->decoded), PINT_DECODE_REQ);
-    free(s_op->unexp_bmi_buff.buffer);
-
     /* free encoded response */
     PINT_encode_release(&(s_op->encoded), PINT_ENCODE_RESP);
 
-    /* free original response, including dynamically allocated memory */
+    /* free dynamically allocated parts of non-encoded response */
     free(s_op->resp.u.lookup_path.handle_array);
 
-    /* free server operation structure */
-    free(s_op);
-
-    return 0;
+    return(PINT_state_machine_completion(s_op));
 }
 
 /*

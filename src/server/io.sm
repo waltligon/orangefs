@@ -350,7 +350,6 @@ static int io_release(PINT_server_op *s_op, job_status_s* js_p)
 static int io_cleanup(PINT_server_op *s_op, job_status_s* js_p)
 {
 	gossip_ldebug(SERVER_DEBUG, "IO: io_cleanup() executed.\n");
-	/* Free the encoded message if necessary! */
 
 	if(s_op->u.io.flow_d)
 	{
@@ -369,24 +368,7 @@ static int io_cleanup(PINT_server_op *s_op, job_status_s* js_p)
 		PINT_encode_release(&s_op->encoded, PINT_ENCODE_RESP);
 	}
 
-	/* let go of our decoded request buffer */
-	if(s_op->decoded.buffer)
-	{
-		PINT_decode_release(
-			&s_op->decoded,
-			PINT_ENCODE_REQ);
-	}
-
-	/* let go of original, non-decoded request buffer */
-	free(s_op->unexp_bmi_buff.buffer);
-
-	free(s_op);
-
-#ifndef DO_NOT_DEBUG_SERVER_OPS
-    return(899);
-#endif
-
-	return(0);
+	return(PINT_state_machine_completion(s_op));
 }
 
 /*

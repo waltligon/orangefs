@@ -70,6 +70,7 @@ enum {
 
 /* Prototypes for functions provided by user */
 int PINT_state_machine_initialize_unexpected(struct PINT_OP_STATE *, job_status_s *ret);
+int PINT_state_machine_completion(struct PINT_OP_STATE *);
 int PINT_state_machine_init(void);
 
 /* NOTE: All other function prototypes are defined in state-machine-fns.h */

@@ -302,12 +302,8 @@ static int mkdir_cleanup(PINT_server_op *s_op, job_status_s* js_p)
 {
 
     PINT_encode_release(&(s_op->encoded),PINT_ENCODE_RESP);
-    PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ);
    	
-    free(s_op);
-
-    return(0);
-
+    return(PINT_state_machine_completion(s_op));
 }
 
 /* TODO: fix comment block */

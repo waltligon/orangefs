@@ -76,6 +76,28 @@ int PINT_state_machine_initialize_unexpected(PINT_server_op *s_op,
     return ((s_op->current_state->state_action))(s_op,ret);
 }
 
+/* PINT_state_machine_completion()
+ *
+ * function to be called at the completion of state machine execution;
+ * it frees up any resources associated with the state machine that were
+ * allocated before the state machine started executing.  Also returns
+ * appropriate return value to make the state machine stop transitioning
+ *
+ * returns 0
+ */
+int PINT_state_machine_completion(PINT_server_op *s_op)
+{
+    /* release the decoding of the unexpected request */
+    PINT_decode_release(&(s_op->decoded),PINT_DECODE_REQ);
+
+    /* free the buffer that the unexpected request came in on */
+    free(s_op->unexp_bmi_buff.buffer);
+
+    /* free the operation structure itself */
+    free(s_op);
+
+    return(0);
+}
 
 /* Function: PINT_state_machine_init(void)
    Params: None
