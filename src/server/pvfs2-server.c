@@ -980,7 +980,8 @@ static int server_shutdown(
 
     if (status & SERVER_CACHED_CONFIG_INIT)
     {
-        gossip_debug(GOSSIP_SERVER_DEBUG, "* halting cached_config interface ... ");
+        gossip_debug(GOSSIP_SERVER_DEBUG, "* halting cached "
+                     "config interface   ... ");
         PINT_cached_config_finalize();
         gossip_debug(GOSSIP_SERVER_DEBUG, "done.\n");
     }
