@@ -137,7 +137,8 @@ int do_list(
     if (PVFS_sys_getattr(pinode_refn, PVFS_ATTR_SYS_ALL,
                          credentials, &getattr_response) == 0)
     {
-        if (getattr_response.attr.objtype == PVFS_TYPE_METAFILE)
+        if ((getattr_response.attr.objtype == PVFS_TYPE_METAFILE) ||
+            (getattr_response.attr.objtype == PVFS_TYPE_SYMLINK))
         {
             char segment[128] = {0};
             PVFS_util_remove_base_dir(name, segment, 128);
