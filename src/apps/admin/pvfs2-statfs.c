@@ -29,6 +29,7 @@ struct options
     char* mnt_point;
     int mnt_point_set;
     int human_readable;
+    int use_si_units;
 };
 
 static struct options *parse_args(int argc, char *argv[]);
@@ -100,10 +101,10 @@ int main(int argc, char **argv)
     if (user_opts->human_readable) {
 	PVFS_util_make_size_human_readable(
 		(long long)resp_statfs.statfs_buf.bytes_available,
-		scratch_size, SCRATCH_LEN);
+		scratch_size, SCRATCH_LEN, user_opts->use_si_units);
 	PVFS_util_make_size_human_readable(
 		(long long)resp_statfs.statfs_buf.bytes_total,
-		scratch_total, SCRATCH_LEN);
+		scratch_total, SCRATCH_LEN, user_opts->use_si_units);
 	printf("\tbytes available:                        %s\n", scratch_size);
 	printf("\tbytes total:                            %s\n", scratch_size); 
     } else {
@@ -190,12 +191,12 @@ int main(int argc, char **argv)
             {
 		PVFS_util_make_size_human_readable(
 			(long long)stat_array[i].ram_total_bytes,
-			scratch_size,
-			SCRATCH_LEN);
+			scratch_size, SCRATCH_LEN,
+                        user_opts->use_si_units);
 		PVFS_util_make_size_human_readable(
 			(long long)stat_array[i].ram_free_bytes,
-			scratch_total,
-			SCRATCH_LEN);
+			scratch_total, SCRATCH_LEN,
+                        user_opts->use_si_units);
 		printf("\tRAM total        : %s\n", scratch_size);
 		printf("\tRAM free         : %s\n", scratch_total);
                 printf("\tuptime           : %d hours, %.2d minutes\n",
@@ -220,10 +221,12 @@ int main(int argc, char **argv)
             {
 		PVFS_util_make_size_human_readable(
 			(long long)stat_array[i].bytes_available,
-			scratch_size, SCRATCH_LEN);
+			scratch_size, SCRATCH_LEN,
+                        user_opts->use_si_units);
 		PVFS_util_make_size_human_readable(
 			(long long)stat_array[i].bytes_total,
-			scratch_total, SCRATCH_LEN);
+			scratch_total, SCRATCH_LEN,
+                        user_opts->use_si_units);
 		printf("\tbytes available  : %s\n", scratch_size);
 		printf("\tbytes total      : %s\n", scratch_total);
 	    }
@@ -269,7 +272,7 @@ static struct options* parse_args(int argc, char *argv[])
     /* getopt stuff */
     extern char *optarg;
     extern int optind, opterr, optopt;
-    char flags[] = "hvm:";
+    char flags[] = "hHvm:";
     int one_opt = 0;
     int len = 0;
 
@@ -294,6 +297,10 @@ static struct options* parse_args(int argc, char *argv[])
                 exit(0);
 	    case('h'):
 		tmp_opts->human_readable = 1;
+		break;
+	    case('H'):
+		tmp_opts->human_readable = 1;
+		tmp_opts->use_si_units = 1;
 		break;
 	    case('m'):
 		len = strlen(optarg)+1;
@@ -337,11 +344,8 @@ static struct options* parse_args(int argc, char *argv[])
 static void usage(int argc, char** argv)
 {
     fprintf(stderr, "\n");
-    fprintf(stderr, "Usage  : %s [-m fs_mount_point]\n",
-	argv[0]);
-    fprintf(stderr, "Example: %s -m /mnt/pvfs2\n",
-	argv[0]);
-    return;
+    fprintf(stderr, "Usage  : %s [-m fs_mount_point] [-h,-H]\n", argv[0]);
+    fprintf(stderr, "Example: %s -m /mnt/pvfs2\n", argv[0]);
 }
 
 /*

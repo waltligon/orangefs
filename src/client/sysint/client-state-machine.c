@@ -281,6 +281,7 @@ int PINT_sys_dev_unexp(
     void *user_ptr)
 {
     int ret = -PVFS_EINVAL;
+    job_id_t id;
     PINT_client_sm *sm_p = NULL;
 
     CLIENT_SM_INIT_ONCE();
@@ -303,7 +304,7 @@ int PINT_sys_dev_unexp(
     sm_p->cred_p = NULL;
 
     memset(jstat, 0, sizeof(job_status_s));
-    ret = job_dev_unexp(info, (void *)sm_p, 0, jstat, op_id,
+    ret = job_dev_unexp(info, (void *)sm_p, 0, jstat, &id,
                         JOB_NO_IMMED_COMPLETE, pint_client_sm_context);
     if (ret)
     {
@@ -312,6 +313,7 @@ int PINT_sys_dev_unexp(
     }
     else
     {
+        ret = PINT_id_gen_safe_register(op_id, (void *)sm_p);
         sm_p->sys_op_id = *op_id;
     }
     return ret;

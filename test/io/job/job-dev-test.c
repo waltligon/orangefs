@@ -48,8 +48,6 @@ int main(int argc, char **argv)
 	    return(-1);
     }
 
-
-
     ret = job_initialize(0);
     if(ret < 0)
     {
@@ -65,7 +63,7 @@ int main(int argc, char **argv)
     }
 	
     /* post job for unexpected device messages */
-    ret = job_dev_unexp(&info, NULL, 0, &jstat, &tmp_id, context);
+    ret = job_dev_unexp(&info, NULL, 0, &jstat, &tmp_id, 0, context);
     if(ret < 0)
     {
 	PVFS_perror("job_dev_unexp()", ret);

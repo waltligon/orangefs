@@ -10,6 +10,7 @@
 #include "dbpf-op.h"
 #include "dbpf-bstream.h"
 #include "gossip.h"
+#include "dbpf-open-cache.h"
 
 dbpf_queued_op_t *dbpf_queued_op_alloc(void)
 {
@@ -61,8 +62,7 @@ void dbpf_queued_op_free(dbpf_queued_op_t *q_op_p)
     {
         if (q_op_p->op.u.b_rw_list.fd != -1)
         {
-            dbpf_bstream_fdcache_put(q_op_p->op.coll_p->coll_id,
-                                     q_op_p->op.handle);
+            dbpf_open_cache_put(&q_op_p->op.u.b_rw_list.open_ref);
             q_op_p->op.u.b_rw_list.fd = -1;
         }
         if (q_op_p->op.u.b_rw_list.aiocb_array)
