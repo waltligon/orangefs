@@ -12,6 +12,9 @@ pvfs2-0.5.1pre1
 - disable TCP method for IB builds
 - added pvfs2-cp, which should have all of the functionaly of pvfs2-import 
   and pvfs2-export, but none of the bugs (!)
+- bug fix to idle detection logic in job.c (non-threaded case)
+- some tweaks to BMI timeout behavior
+- removal of some depricated BMI code
 
 
 pvfs2-0.5.0
