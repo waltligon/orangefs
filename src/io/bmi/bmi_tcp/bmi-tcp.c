@@ -667,7 +667,7 @@ int BMI_tcp_post_send(bmi_op_id_t * id,
     /* fill in the TCP-specific message header */
     if (size > TCP_MODE_REND_LIMIT)
     {
-	return (-EINVAL);
+	return (-EMSGSIZE);
     }
 
     if (size <= TCP_MODE_EAGER_LIMIT)
@@ -711,7 +711,7 @@ int BMI_tcp_post_sendunexpected(bmi_op_id_t * id,
 
     if (size > TCP_MODE_EAGER_LIMIT)
     {
-	return (-EINVAL);
+	return (-EMSGSIZE);
     }
 
     my_header.mode = TCP_MODE_UNEXP;
@@ -993,7 +993,7 @@ int BMI_tcp_post_send_list(bmi_op_id_t * id,
     if (total_size > TCP_MODE_REND_LIMIT)
     {
 	gossip_lerr("Error: BMI message too large!\n");
-	return (-EINVAL);
+	return (-EMSGSIZE);
     }
 
     if (total_size <= TCP_MODE_EAGER_LIMIT)
@@ -1075,7 +1075,7 @@ int BMI_tcp_post_sendunexpected_list(bmi_op_id_t * id,
 
     if (total_size > TCP_MODE_EAGER_LIMIT)
     {
-	return (-EINVAL);
+	return (-EMSGSIZE);
     }
 
     my_header.mode = TCP_MODE_UNEXP;
