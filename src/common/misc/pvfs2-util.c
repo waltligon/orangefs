@@ -1085,17 +1085,19 @@ static int parse_encoding_string(
     const char *cp,
     enum PVFS_encoding_type *et)
 {
-    const char *cq;
-    int i;
+    int i = 0;
+    const char *cq = NULL;
+
     struct
     {
         const char *name;
         enum PVFS_encoding_type val;
-    } enc_str[] = {
-        { "direct", ENCODING_DIRECT },
-        { "le_bfield", ENCODING_LE_BFIELD },
-        { "xdr", ENCODING_XDR }
-    };
+    } enc_str[] =
+        { { "default", ENCODING_DEFAULT },
+          { "defaults", ENCODING_DEFAULT },
+          { "direct", ENCODING_DIRECT },
+          { "le_bfield", ENCODING_LE_BFIELD },
+          { "xdr", ENCODING_XDR } };
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: input is %s\n",
                  __func__, cp);
