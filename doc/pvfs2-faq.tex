@@ -415,6 +415,31 @@ run-time.  There are two ways to teach the system where to find libraries:
 I would suggest the ld.so.conf approach, since that will work for all users on
 your system.
 
+\subsection{Make kmod24 fails with ``structure has no member...'' errors}
+
+On some Redhat and Redhat-derived distributions, ``make kmod24'' might
+fail with errors like this:
+
+\begin{verbatim}
+console]:make kmod24
+ CC [M]  /usr/src/pvfs2/src/kernel/linux-2.4/pvfs2-utils.o
+pvfs2-utils.c: In function `mask_blocked_signals':
+pvfs2-utils.c:1063: structure has no member named `sig'
+pvfs2-utils.c:1070: structure has no member named `sigmask_lock'
+pvfs2-utils.c:1073: too many arguments to function `recalc_sigpending'
+pvfs2-utils.c: In function `unmask_blocked_signals':
+pvfs2-utils.c:1082: structure has no member named `sigmask_lock'
+pvfs2-utils.c:1084: too many arguments to function `recalc_sigpending'
+make[1]: *** [pvfs2-utils.o] Error 1
+make: *** [kmod24] Error 2
+\end{verbatim}
+
+Redhat, and derived distributions, have a linux-2.4 based kernel with many
+linux-2.6 features backported.  These backported features change the
+interface to the kernel fairly significantly.  PVFS2 versions newer than
+1.0.1 have a new configure option \texttt{--enable-redhat24}.  With this
+option, we will be able to accomodate the backported features (and the
+associated interface changes).
 
 \subsection{I'm running Redhat and the pvfs2-server can't be killed! What's wrong?}
 
