@@ -367,11 +367,6 @@ int main(int argc, char **argv)
     /* Status Structures used in job_wait_world */
     job_status_s job_status_structs[MAX_JOBS];
 
-#ifdef DEBUG
-    int Temp_Check_Out_Debug = 10;
-    int Temp_Jobs_Complete_Debug = 0;
-#endif
-
     /* Passed to server shutdown function */
     server_level_init = STATUS_UNKNOWN;
 
@@ -484,13 +479,6 @@ int main(int argc, char **argv)
 	    if (s_op->op == BMI_UNEXP)
 	    {
 		postBMIFlag = 1;
-#ifdef DEBUG
-		if (Temp_Jobs_Complete_Debug++ == Temp_Check_Out_Debug)
-		{
-		    ret = -1;
-		    goto server_shutdown;
-		}
-#endif
 		ret = PINT_state_machine_start(s_op, &job_status_structs[i]);
 	    }
 	    
