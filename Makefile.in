@@ -575,12 +575,22 @@ docsclean:
 
 # top rule for cleaning up tree
 clean: 
+ifdef QUIET_COMPILE
+	@echo "  CLEAN"
+	@rm -f $(LIBOBJS) $(TESTOBJS) $(SERVEROBJS) $(MISCOBJS) $(TESTS)\
+		$(LIBRARIES) $(DEPENDS) $(CLEANFILES) $(SERVER) $(MPIMISCOBJS)\
+		$(MPITESTS) $(MPITESTOBJS) $(MPITESTDEPENDS) $(MPIMISCDEPENDS) \
+		$(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
+		$(ADMINTOOLS_SERVER) lib/libpvfs2-server.a\
+		src/server/pvfs2-server-server.o $(MPIIOTESTS)
+else
 	rm -f $(LIBOBJS) $(TESTOBJS) $(SERVEROBJS) $(MISCOBJS) $(TESTS)\
 		$(LIBRARIES) $(DEPENDS) $(CLEANFILES) $(SERVER) $(MPIMISCOBJS)\
 		$(MPITESTS) $(MPITESTOBJS) $(MPITESTDEPENDS) $(MPIMISCDEPENDS) \
 		$(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
 		$(ADMINTOOLS_SERVER) lib/libpvfs2-server.a\
 		src/server/pvfs2-server-server.o $(MPIIOTESTS)
+endif
 
 # builds a tarball of the source tree suitable for distribution
 dist: $(SERVERGENSRC) $(SMCGEN) $(TROVE_AUTOGEN_FILES) cleaner
