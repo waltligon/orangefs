@@ -2,6 +2,8 @@
  * (C) 2001 Clemson University and The University of Chicago
  *
  * See COPYING in top-level directory.
+ *
+ * based on io-test.c, but with flushing of data
  */
 
 #include <time.h>
