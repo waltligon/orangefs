@@ -574,10 +574,12 @@ $handle_purgatory = 50;
 # NOTE: we assume that server_aliases and server_addrs
 # arrays are properly populated from above
 
-print "Writing fs config file... ";
-if ($using_stdout == 1)
-{
-    print "\n";
+if (!$opt_quiet) {
+    print "Writing fs config file... ";
+    if ($using_stdout == 1)
+    {
+	print "\n";
+    }
 }
 
 emit_defaults($output_target, $num_unexp_reqs, $bmi_module, $handle_purgatory);
@@ -591,12 +593,14 @@ if ($using_stdout == 0)
     close($output_target);
 }
 
-print "Done.\n";
+if (!$opt_quiet) {
+    print "Done.\n";
 
-print "Writing ", ($#union_aliases + 1), " server config file(s)... ";
-if ($using_stdout == 1)
-{
-    print "\n";
+    print "Writing ", ($#union_aliases + 1), " server config file(s)... ";
+    if ($using_stdout == 1)
+    {
+	print "\n";
+    }
 }
 for($i = 0; $i <= $#union_aliases; $i++)
 {
@@ -619,6 +623,7 @@ for($i = 0; $i <= $#union_aliases; $i++)
         close(FILEOUT);
     }
 }
-print "Done.\n";
+if (!$opt_quiet) {
+    print "Done.\n";
+}
 
-print "\nConfiguration complete!\n";
