@@ -47,6 +47,13 @@ int PVFS_sys_readdir(PVFS_pinode_reference pinode_refn, PVFS_ds_position token,
 	    _FAILURE,
 	} failure = NONE_FAILURE;
 	
+	/* TODO: fix this - need to break into multiple reqs */
+	if(pvfs_dirent_incount > PVFS_REQ_LIMIT_DIRENT_COUNT)
+	{
+	    gossip_lerr("Error: PVFS_sys_readdir unable to handle request for %d entries.\n", pvfs_dirent_incount);
+	    return(-EINVAL);
+	}
+
 	/* Revalidate directory handle */
 	/* Get the directory pinode */
 	ret = phelper_get_pinode(pinode_refn,&pinode_ptr,
