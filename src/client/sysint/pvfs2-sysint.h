@@ -25,6 +25,25 @@
  */
 #define PVFS2_READDIR_START (INT_MAX-1)
 
+/* attributes */
+struct PVFS_sys_attr_s
+{
+    PVFS_uid owner;
+    PVFS_gid group;
+    PVFS_permissions perms;
+    PVFS_time atime;
+    PVFS_time mtime;
+    PVFS_time ctime;
+    PVFS_size size;
+    PVFS_ds_type obj_type;
+    uint32_t mask;
+
+    /* TODO: we may want to later add some sort of enumerated value
+     * that can be used to determine distribution type? 
+     */
+};
+typedef struct PVFS_sys_attr_s PVFS_sys_attr;
+
 /* IO server stats */
 struct PVFS_io_stat_s {
 	/*PVFS_volume_id vid;*/
