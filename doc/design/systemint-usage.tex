@@ -1,0 +1,1170 @@
+%
+%
+\documentclass[11pt, letterpaper]{article}
+\usepackage[dvips]{graphicx}
+\usepackage{psfig}
+\usepackage{rotating}
+\usepackage{float}
+
+\graphicspath{{./}{figs/}} 
+
+\restylefloat{table}
+
+\pagestyle{plain}
+
+%
+% GET THE MARGINS RIGHT, THE UGLY WAY
+%
+\topmargin 0.0in
+\textwidth 6.5in
+\textheight 9.0in
+\columnsep 0.25in
+\oddsidemargin 0.0in
+\evensidemargin 0.0in
+\headsep 0.0in
+\headheight 0.0in
+
+\title{The PVFS2 System Interface Usage Document}
+\author{ PVFS Development Team }
+\date{ December, 2002 }
+
+%
+% BEGINNING OF DOCUMENT
+%
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+\section{Introduction}
+
+This document covers usage notes for the PVFS2 System Interface.  This 
+document intends to specify the semantics associated with the System
+Interface API.  The System Interface is a client side interface made up
+of functions that interact with the PVFS file system. It is intended to
+be the low level client side interface that components such as the PVFS2
+library and VFS interface are built on top of.
+
+This document will discuss the list of functions provided by the system 
+interface, the parameters that need to be passed and the return values
+of the functions.  There will also be a mention of the terminology
+used in the System Interface the user needs to be aware of.  Each function
+description will include an overview of the objective, the function 
+parameters, and the return value.
+
+In order to understand the PVFS system interface, we will also need to
+discuss a few other concepts and components.  The first such concept is
+the PVFS user object.   PVFS user objects are entities that are used to
+represent the file system organization and data at the user level i.e.
+above the System Interface. These objects comprise files, directories,
+symbolic links, and collections.  
+
+\section{User objects}
+
+There are four objects visible to the user and the System Interface supports
+various operations on these objects. They are files, directories, symbolic
+links, and collections. This document will give an overview of the operations. All PVFS objects have
+attributes associated with them.  Some of these are common to all objects,
+while others are specific to a particular file system object. As an example,
+the distribution parameters would be specific to files. As of now,
+operations on symbolic links are not implemented.
+
+It's important to note that attribute operations are by definition
+atomic in PVFS, while this is not necessarily true for I/O operations.
+
+%
+% FILES
+%
+\subsection{File}
+
+A file is a logical entity that contains data. PVFS supports operations
+to read/write the data in the file and also read/modify the attributes of
+the file. The System Interface provides users the ability to distribute
+file data over multiple I/O nodes. The file distribution is specified
+during its creation.
+
+\subsection{File attributes}
+The file attributes that the user could read/modify are:
+
+\begin{itemize}
+\item owner
+\item group
+\item permissions
+\item access, modification, and creation times
+\item size
+\item distribution information.\emph{Can this be modified?}
+\end{itemize}
+
+\subsection{Operations on files}
+
+The various operations defined on the file are creation/removal,
+attribute modification, and I/O operations such as read/write.
+
+%
+% DIRECTORIES
+%
+\subsection{Directories}
+
+The file system paradigm relies on directories as a mechanism for
+organizing objects into a hierarchy. The directory is typically a file
+that contains directory entries.
+
+\subsubsection{Directory Attributes}
+
+Directories have no additional attributes defined.
+
+\subsubsection{Operations on directories}
+
+The operations defined on a directory are creation, removal, and
+operations on the directory attributes.
+
+%
+% SYMBOLIC LINKS
+%
+\subsection{Symbolic Link}
+
+They are special files that act as pointers or shortcuts to other files.
+They do not contain any data.
+
+\subsubsection{Symlink Attributes}
+
+A Symlink has an additional attribute, its {\em target}.  This is a
+path, presumably to another PVFS object.  This object does not in fact
+have to exist.
+
+\subsubsection{Operations on symlinks}
+
+The operations defined on a symlink are creation, removal and reading
+the contents of the link.
+
+%
+%COLLECTIONS
+%
+\subsection{Collection}
+
+A collection is an abstraction for a file system or a group of file
+systems. The collection encompasses all the file system objects. The
+collection is uniquely identified by a collection identifier.
+
+\subsubsection{Attributes}
+
+A symlink has an additional attribute, its {\em target}.  This is a
+path, presumably to another PVFS object.  This object does not in fact
+have to exist.
+
+
+\section{System Interface Concepts}
+
+In order to make the discussion of the System Interface clearer, we will
+first describe a few terms that occur frequently in the discussion.
+
+\subsection{Pinode}
+
+The purpose of the pinode is to provide a mechanism for associating
+information with a handle.  It is somewhat analogous to an inode in the
+Linux kernel.  The pinode structure is maintained only at the system
+interface layer and will be transparent to the user.  
+
+\subsection{Pinode Reference}
+
+A pinode reference is an opaque type that is a unique reference to a
+PVFS file system object. It is to be noted that the file system objects
+are not the same as the objects visible at the user level. All
+references to a user object in the System Interface API are in terms of
+the object name or the pinode reference.
+
+\section{System interface}
+
+This section provides a list of all the functions defined in the 
+system interface. The System Interface API can be logically organized
+into 5 groups.
+
+\begin{itemize}
+\item\textbf{Interface Management Operations}\\
+The interface management operations are initialize and finalize.
+
+\item\textbf{Object creation, query, and destruction operations}\\
+The object creation, query, and destruction operations are 
+\begin{itemize}
+\item lookup
+\item getattr
+\item setattr
+\item mkdir
+\item rmdir
+\item create
+\item remove
+\item rename
+\item symlink
+\item readlink
+\end{itemize}
+
+\item\textbf{I/O operations}\\
+The I/O operations are
+\begin{itemize}
+\item read
+\item write
+\item allocate
+\item duplicate
+\end{itemize}
+
+\item\textbf{Object locking operations}\\
+The object locking operations are lock and unlock.
+
+\item\textbf{File system query operations}\\
+The file system query operations are statfs, readdir, and fhdump.
+\end{itemize}
+
+\section{System Interface function specification}
+
+Most of the System Interface functions have a request and response
+structure as parameters. Some functions don't have a response structure
+as they don't return a response. This section defines the purpose of
+each function along with listing its parameter structures and return
+values.
+
+\subsection{Interface Management operations}
+
+\subsubsection{PVFS\_sys\_initialize(pvfs\_mntlist mntent\_list)}
+
+Initialize the System Interface. This function is to be called before
+any other System Interface function. The input to the function is a
+structure containing configuration information obtained either from the
+pvfstab file or the mount command line. The pvfs\_mntlist structure is
+shown in table \ref{tab:reqinit}. The pvfs\_mntlist structure contains
+a count of the number of mount entry structures and a pointer to the mount
+entry structures(refer table. \ref{tab:mntent}).
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline 
+Field & Type & Description \\
+\hline
+\hline
+nr\_entry & int & number of mounted entries \\
+\hline
+ptab\_p & pvfs\_mntent* & array pointing to mounted entry details \\
+\hline
+mt\_lock & gen\_mutex\_t* & mutex lock \\
+\hline
+\end{tabular}
+\caption{struct pvfs\_mntlist}\label{tab:reqinit}
+\end{table}
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+Field & Type & Description \\
+\hline
+\hline
+meta\_addr & PVFS\_string & metaserver address \\
+\hline
+serv\_mnt\_dir & PVFS\_string & root mount point \\
+\hline
+local\_mnt\_dir & PVFS\_string & local mount point \\
+\hline
+fs\_type & PVFS\_string & file system type \\
+\hline
+opt1 & PVFS\_string & options \\
+\hline
+opt2 & PVFS\_string & options \\
+\hline
+\end{tabular}
+\caption{struct pvfs\_mntent}\label{tab:mntent}
+\end{table}
+
+The function returns 0 on success and the negative of the error number
+on failure.	
+
+\subsubsection{PVFS\_sys\_finalize(void)}
+
+Shut down the System Interface. This is to be called after all 
+System Interface operations are done.
+
+The function returns 0 on success and the negative of the error number
+on failure.	
+
+\subsection{Object creation, query, and destruction operations}
+
+\subsubsection{PVFS\_sys\_lookup(
+PVFS\_sysreq\_lookup *req,
+PVFS\_sysresp\_lookup *resp
+)}
+
+Obtain the pinode reference for a file, directory, or a symlink.
+This function is used to convert an absolute pathname to a unique
+identifier recognised by the file system. The function also performs
+permission checking for the entire path that is looked up. The
+contents of the request and response structures are shown in
+table. \ref{tab:reqlook} and table. \ref{tab:resplook} respectively.
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+Field & Type & Description \\
+\hline
+\hline
+name & PVFS\_string & object name \\
+\hline
+fs\_id & PVFS\_fs\_id & file system identifier \\
+\hline
+credentials & PVFS\_credentials & uid, gid, permissions \\
+\hline
+\end{tabular}
+\caption{struct pvfs\_sysreq\_lookup}\label{tab:reqlook}
+\end{table}
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+Field & Type & Description \\
+\hline
+\hline
+uid & PVFS\_uid & owner \\ 
+\hline
+gid & PVFS\_gid & group \\
+\hline
+perms & PVFS\_permissions & permissions \\
+\hline
+\end{tabular}
+\caption{struct PVFS\_credentials}\label{tab:cred}
+\end{table}
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+Field & Type & Description \\
+\hline
+\hline
+pinode\_refn & pinode\_reference & handle, file system id \\
+\hline
+\end{tabular}
+\caption{struct pvfs\_sysresp\_lookup}\label{tab:resplook}
+\end{table}
+
+The function returns 0 on success and the negative of the error number
+on failure.
+
+\subsubsection{PVFS\_sys\_getattr(
+PVFS\_sysreq\_getattr *req,
+PVFS\_sysresp\_getattr *resp
+)}
+
+Obtain the attributes of a file, directory, or symlink identified by
+the pinode reference passed as input. The attributes that could be read
+are listed in table. \ref{tab:objattr}. The attribute mask allows the 
+option of fetching attributes selectively. The attribute mask is
+constructed by oring together the attribute options shown in table.
+\ref{tab:optattr}. The request and response structures to the function
+are shown in table. \ref{tab:reqgattr} and table. \ref{tab:respgattr}
+respectively.
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+Field & Type & Description \\
+\hline
+\hline
+pinode\_refn & pinode\_reference & handle, file system id \\
+\hline
+attrmask & PVFS\_bitfield & attributes to be fetched \\
+\hline
+credentials & PVFS\_credentials & uid, gid, permissions \\
+\hline
+\end{tabular}
+\caption{struct pvfs\_sysreq\_getattr}\label{tab:reqgattr}
+\end{table}
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+Field & Type & Description \\
+\hline
+\hline
+attr & PVFS\_object\_attr & attributes obtained \\
+\hline
+extended & PVFS\_attr\_extended & extended attributes \\ 
+\hline
+\end{tabular}
+\caption{struct pvfs\_sysresp\_getattr}\label{tab:respgattr}
+\end{table}
+	
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+Field & Type & Description \\
+\hline
+\hline
+owner & PVFS\_uid & owner identifier \\
+\hline
+group & PVFS\_gid & group identifier \\
+\hline
+perms & PVFS\_permissions & permissions \\
+\hline
+atime & PVFS\_atime & access time \\ 
+\hline
+mtime & PVFS\_mtime & modification time \\
+\hline
+ctime & PVFS\_ctime & creation time \\
+\hline
+objtype & int & type of file system object \\
+\hline
+u & union & object specific attributes \\
+\hline
+\end{tabular}
+\caption{struct PVFS\_object\_attr}\label{tab:objattr}
+\end{table}
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+Mask & Description \\
+\hline
+\hline
+ATTR\_BASIC & Attributes common to all objects except size \\
+\hline
+ATTR\_SIZE & File Size \\
+\hline
+ATTR\_META & Attributes specific to a metafile \\
+\hline
+ATTR\_DATA & Attributes specific to a datafile \\
+\hline
+ATTR\_DIR & Attributes specific to a directory \\
+\hline
+ATTR\_SYM & Attributes specific to a symbolic link \\
+\hline
+\end{tabular}
+\caption{Options for the attribute mask}\label{tab:optattr}
+\end{table}
+
+
+The structures shown in table. \ref{tab:metaattr}, table. \ref{tab:dataattr},
+table. \ref{tab:dirattr}, and table. \ref{tab:symattr} make up the union in
+table. \ref{tab:objattr}.
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+Field & Type & Description \\
+\hline
+\hline
+dist & PVFS\_Distribution & distribution parameters for file \\
+\hline
+dfh & PVFS\_Handle* & array of datafile handles \\
+\hline
+nr\_datafiles & PVFS\_count32 & number of datafiles \\
+\hline
+\end{tabular}
+\caption{PVFS\_metafile\_attr}\label{tab:metaattr}
+\end{table}
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+Field & Type & Description \\
+\hline
+\hline
+size & PVFS\_size & size of datafile \\
+\hline
+dfh & PVFS\_Handle & datafile handle \\
+\hline
+\end{tabular}
+\caption{PVFS\_datafile\_attr}\label{tab:dataattr}
+\end{table}
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+Field & Type & Description \\
+\hline
+\hline
+Not Defined &  & \\
+\hline
+\end{tabular}
+\caption{PVFS\_directory\_attr}\label{tab:dirattr}
+\end{table}
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+Field & Type & Description \\
+\hline
+\hline
+Not Defined &  & \\
+\hline
+\end{tabular}
+\caption{PVFS\_symlink\_attr}\label{tab:symattr}
+\end{table}
+
+The function returns 0 on success and the negative of the error number
+on failure.
+
+\subsubsection{PVFS\_sys\_setattr(
+PVFS\_sysreq\_setattr *req
+)}
+
+Set the attributes of a file, directory, or symlink identified by
+the pinode reference passed as input. The attributes that could be set
+are listed in table. \ref{tab:objattr}. The attribute mask allows the
+option of setting attributes selectively. The attribute mask is
+constructed by oring together the attribute options shown in table.
+\ref{tab:optattr}. The request structure to the function is shown in
+table. \ref{tab:reqsattr}. No response structure is returned to the 
+caller function.
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+Field & Type & Description \\
+\hline
+\hline
+pinode\_refn & pinode\_reference & handle, file system id \\
+\hline
+attr & PVFS\_object\_attr & modified attribute values \\
+\hline
+attrmask & PVFS\_bitfield & attributes to be set  \\
+\hline
+credentials & PVFS\_credentials & uid, gid, permissions \\
+\hline
+extended & PVFS\_attr\_extended & extended attributes \\
+\hline
+\end{tabular}
+\caption{struct pvfs\_sysreq\_setattr}\label{tab:reqsattr}
+\end{table}
+
+The function returns 0 on success and the negative of the error
+number on failure.
+
+\subsubsection{PVFS\_sys\_mkdir(
+PVFS\_sysreq\_mkdir *req,
+PVFS\_sysresp\_mkdir *resp
+)}
+
+Create a new directory with specified attributes and return a pinode
+reference to the created directory. The attribute structure and the mask
+specify which attributes are filled in(refer table. \ref{tab:objattr} for
+the definition of the attribute structure). The request and response
+structures are shown in table. \ref{tab:reqmkdir} and table.
+\ref{tab:respmkdir} respectively.
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+Field & Type & Description \\
+\hline
+\hline
+entry\_name & PVFS\_string &  name of new directory \\
+\hline
+parent\_refn & pinode\_reference & pinode reference of parent directory \\ 
+\hline
+attr & PVFS\_object\_attr & attributes of new directory \\
+\hline
+attrmask & PVFS\_bitfield & mask specifying selective attributes \\
+\hline
+credentials & PVFS\_credentials & uid, gid, permissions \\
+\hline
+\end{tabular}
+\caption{struct pvfs\_sysreq\_mkdir}\label{tab:reqmkdir}
+\end{table}
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+Field & Type & Description \\
+\hline
+\hline
+pinode\_refn & pinode\_reference & pinode reference of created directory
+\\
+\hline
+\end{tabular}
+\caption{struct pvfs\_sysresp\_mkdir}\label{tab:respmkdir}
+\end{table}
+
+The function returns 0 on success and the negative of the error number
+on failure.
+
+\subsubsection{PVFS\_sys\_rmdir(
+PVFS\_sysreq\_rmdir *req
+)}
+
+Remove the specified directory. The request structure is shown in table.
+ \ref{tab:reqrmdir}. No response structure is returned to the caller
+function.
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+Field & Type & Description \\
+\hline
+\hline
+entry\_name & PVFS\_string &  name of directory to be removed \\
+\hline
+parent\_refn & pinode\_reference & pinode reference of parent directory \\ 
+\hline
+credentials & PVFS\_credentials & uid, gid, permissions \\
+\hline
+\end{tabular}
+\caption{struct pvfs\_sysreq\_rmdir}\label{tab:reqrmdir}
+\end{table}
+
+The function returns 0 on success and the negative of the error
+number on failure.
+
+\subsubsection{PVFS\_sys\_create(
+PVFS\_sysreq\_create *req,
+PVFS\_sysreq\_create *resp
+)}
+		
+Create a file with specified attributes and return the pinode
+reference of the newly created file. The attribute structure is
+shown in table. \ref{tab:objattr}. The request and response structures
+are shown in table. \ref{tab:reqcreate} and table. \ref{tab:respcreate}
+respectively.
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+Field & Type & Description \\
+\hline
+\hline
+entry\_name & PVFS\_string & name of file to be created \\
+\hline
+parent\_refn & pinode\_reference & pinode reference of parent directory
+\\
+\hline
+attr & PVFS\_object\_attr & attributes of new file \\
+\hline
+attrmask & PVFS\_bitfield & mask to select attributes \\
+\hline
+credentials & PVFS\_credentials & uid, gid, permissions \\
+\hline
+\end{tabular}
+\caption{struct pvfs\_sysreq\_create}\label{tab:reqcreate}
+\end{table}
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+Field & Type & Description \\
+\hline
+\hline
+pinode\_refn & pinode\_reference & handle, file system id of new file \\
+\hline
+\end{tabular}
+\caption{struct pvfs\_sysreq\_create}\label{tab:respcreate}
+\end{table}
+
+The function returns 0 on success and the negative of the error
+number on failure.
+
+\subsubsection{PVFS\_sys\_remove(
+PVFS\_sysreq\_remove *req
+)}
+
+Remove the specified file. The request structure is shown in table.
+ \ref{tab:reqrem}. No response structure is returned to the caller
+function.
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+Field & Type & Description \\
+\hline
+\hline
+entry\_name & PVFS\_string & name of file to be removed \\
+\hline
+parent\_refn & pinode\_reference & pinode reference of parent directory
+\\
+credentials & PVFS\_credentials & uid, gid, permissions \\
+\hline
+\end{tabular}
+\caption{struct pvfs\_sysreq\_remove}\label{tab:reqrem}
+\end{table}
+
+The function returns 0 on success and the negative of the error
+number on failure.
+
+\subsubsection{PVFS\_sys\_rename(
+PVFS\_sysreq\_rename *req
+)}
+
+Rename the specified file. The request structure is shown in table.
+ \ref{tab:reqrename}. No response structure is returned to the caller
+function.
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+Field & Type & Description \\
+\hline
+\hline
+old\_entry & PVFS\_string & old file name \\
+\hline
+old\_parent\_reference & pinode\_reference & pinode reference of old parent \\
+\hline
+new\_entry & PVFS\_string & new file name \\
+\hline
+pinode\_reference & new\_parent\_reference & pinode reference of new
+parent  \\
+\hline
+fs\_id & PVFS\_fs\_id & file system id \\
+\hline
+credentials & PVFS\_credentials & uid, gid, permissions \\
+\hline
+\end{tabular}
+\caption{struct pvfs\_sysreq\_rename}\label{tab:reqrename}
+\end{table}
+
+The function returns 0 on success and the negative of the error
+number on failure.
+
+\subsubsection{PVFS\_sys\_symlink(
+PVFS\_sysreq\_symlink *req,
+PVFS\_sysresp\_symlink *resp
+)}
+
+Create a symbolic link to specified file with given attributes. The
+request structure is shown in table. \ref{tab:reqsym} and the response
+structure is shown in table. \ref{tab:respsym} respectively. The
+attribute structure is shown in table. \ref{tab:objattr}.
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+Field & Type & Description \\
+\hline
+\hline
+name & PVFS\_string & name of symbolic link \\
+\hline
+fs\_id & PVFS\_fs\_id & file system id \\
+\hline
+target & PVFS\_string & file to create a link to \\
+\hline
+attr & PVFS\_object\_attr & attributes of link \\
+\hline
+attrmask & PVFS\_bitfield & mask to select attributes \\
+\hline
+credentials & PVFS\_credentials & uid, gid, permissions \\
+\hline
+\end{tabular}
+\caption{struct pvfs\_sysreq\_symlink}\label{tab:reqsym}
+\end{table}
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+Field & Type & Description \\
+\hline
+\hline
+pinode\_refn & pinode\_reference & pinode reference of symbolic link \\ 
+\hline
+\end{tabular}
+\caption{struct pvfs\_sysresp\_symlink}\label{tab:respsym}
+\end{table}
+
+The function returns 0 on success and the negative of the error
+number on failure.
+
+\subsubsection{PVFS\_sys\_readlink(
+PVFS\_sysreq\_readlink *req,
+PVFS\_sysresp\_readlink *resp
+)}
+
+Return the file name pointed to by the specified symbolic link. The request
+structure is shown in table. \ref{tab:reqreadlk} and the response structure
+is shown in table. \ref{tab:respreadlk} respectively. 
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+Field & Type & Description \\
+\hline
+\hline
+pinode\_refn & pinode\_reference & pinode reference of symbolic link \\
+\hline
+credentials & PVFS\_credentials & uid, gid, permissions \\
+\hline
+\end{tabular}
+\caption{struct pvfs\_sysreq\_readlink}\label{tab:reqreadlk}
+\end{table}
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+Field & Type & Description \\
+\hline
+\hline
+target & PVFS\_string & target pointed to by symbolic link \\
+\hline
+\end{tabular}
+\caption{struct pvfs\_sysresp\_readlink}\label{tab:respreadlk}
+\end{table}
+
+The function returns 0 on success and the negative of the error
+number on failure.
+
+\subsection{Input/Output operations}
+
+\subsubsection{PVFS\_sys\_read(
+PVFS\_sysreq\_read *req,
+PVFS\_sysresp\_read *resp
+)}
+
+Read data from a given file specified by the pinode reference
+and the I/O description. The request and response structures
+are not yet specified.
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+Field & Type & Description \\
+\hline
+\hline
+Not defined & & \\
+\hline
+\end{tabular}
+\caption{struct pvfs\_sysreq\_read}\label{tab:reqread}
+\end{table}
+
+The function returns 0 on success and the negative of the error
+number on failure.
+
+\subsubsection{PVFS\_sys\_write(
+PVFS\_sysreq\_write *req,
+PVFS\_sysresp\_write *resp
+)}
+
+Write data to a file specified by the pinode reference and the
+I/O description. The request and reponse structures are not yet 
+specified.
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+Field & Type & Description \\
+\hline
+\hline
+Not defined & & \\
+\hline
+\end{tabular}
+\caption{struct pvfs\_sysreq\_write}\label{tab:reqwrite}
+\end{table}
+
+The function returns 0 on success and the negative of the error
+number on failure.
+
+\subsubsection{PVFS\_sys\_allocate(
+PVFS\_sysreq\_allocate *req,
+PVFS\_sysresp\_allocate *resp
+)}
+
+Allocate space of specified size on I/O servers indicated in the
+request. The request and response structures are not yet specified.
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+Field & Type & Description \\
+\hline
+\hline
+Not defined & & \\
+\hline
+\end{tabular}
+\caption{struct pvfs\_sysreq\_allocate}\label{tab:reqalloc}
+\end{table}
+
+The function returns 0 on success and the negative of the error
+number on failure.
+
+\subsubsection{PVFS\_sys\_duplicate(
+PVFS\_sysreq\_duplicate *req,
+PVFS\_sysresp\_duplicate *resp
+)}
+
+Create a new file that has the same distribution and attributes as
+specified in the request. The file to be duplicated is indicated by its
+pinode reference and the new file is indicated by its name and the
+pinode reference of the directory that contains it. The request and
+response structures are shown in table. \ref{tab:reqdup} and table.
+\ref{tab:respdup} respectively.
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+Field & Type & Description \\
+\hline
+\hline
+old\_reference & pinode\_reference & pinode reference of file to be
+duplicated \\
+\hline
+new\_entry & PVFS\_string & name of new file \\
+\hline
+new\_parent\_reference & pinode\_reference & pinode reference of the
+parent of new file \\
+\hline
+fs\_id & PVFS\_fs\_id & file system identifier \\
+\hline
+\end{tabular}
+\caption{struct pvfs\_sysreq\_duplicate}\label{tab:reqdup}
+\end{table}
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+Field & Type & Description \\
+\hline
+\hline
+pinode\_refn & pinode\_reference & handle, fs id \\
+\hline
+\end{tabular}
+\caption{struct pvfs\_sysresp\_duplicate}\label{tab:respdup}
+\end{table}
+
+The function returns 0 on success and the negative of the error
+number on failure.
+
+\subsection{Object locking operations}
+
+\subsubsection{PVFS\_sys\_lock(
+PVFS\_sysreq\_lock *req,
+PVFS\_sysresp\_lock *resp
+)}
+
+Not defined.
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+Field & Type & Description \\
+\hline
+\hline
+Not defined & & \\
+\hline
+\end{tabular}
+\caption{struct pvfs\_sysreq\_lock}\label{tab:reqlock}
+\end{table}
+
+The function returns 0 on success and the negative of the error
+number on failure.
+
+\subsubsection{PVFS\_sys\_unlock(
+PVFS\_sysreq\_unlock *req,
+PVFS\_sysresp\_unlock *resp
+)}
+
+Not defined.
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+Field & Type & Description \\
+\hline
+\hline
+Not defined & & \\
+\hline
+\end{tabular}
+\caption{struct pvfs\_sysreq\_unlock}\label{tab:requnlock}
+\end{table}
+
+The function returns 0 on success and the negative of the error
+number on failure.
+
+\subsection{File system query operations}
+
+\subsubsection{PVFS\_sys\_statfs(
+PVFS\_sysreq\_statfs *req,
+PVFS\_sysresp\_statfs *resp
+)}
+
+Statfs returns the statistics of the file system specified by the id in
+the request. The returned information is separated into metaserver related
+and I/O server related information. The request structure is shown in
+table. \ref{tab:reqstatfs} and the response structure is shown in table.
+\ref{tab:respstatfs} respectively. The response structure contains the
+PVFS\_statfs structure shown in table. \ref{tab:statfs}. The PVFS\_statfs
+structure is divided into metaserver and I/O server statistics. The
+metaserver statistics structure is displayed in table. \ref{tab:metastat}
+and the I/O server statistics structure is shown in table. \ref{tab:iostat}.
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+Field & Type & Description \\
+\hline
+\hline
+fs\_id & PVFS\_fs\_id & file system identifier \\
+\hline
+credentials & PVFS\_credentials & uid, gid, permissions \\
+\hline
+\end{tabular}
+\caption{struct pvfs\_sysreq\_statfs}\label{tab:reqstatfs}
+\end{table}
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+Field & Type & Description \\
+\hline
+\hline
+statfs & PVFS\_statfs & statistics - metaserver and I/O server\\
+\hline
+\end{tabular}
+\caption{struct pvfs\_sysresp\_statfs}\label{tab:respstatfs}
+\end{table}
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+Field & Type & Description \\
+\hline
+\hline
+mstat & PVFS\_meta\_stat & statistics - metaserver \\
+\hline
+iostat & PVFS\_io\_stat & statistics - I/O server \\
+\hline
+\end{tabular}
+\caption{PVFS\_statfs}\label{tab:statfs}
+\end{table}
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+Field & Type & Description \\
+\hline
+\hline
+filetotal & PVFS\_count32 & total number of metafiles on server \\
+\hline
+\end{tabular}
+\caption{PVFS\_meta\_stat}\label{tab:metastat}
+\end{table}
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+Field & Type & Description \\
+\hline
+\hline
+blksize & PVFS\_size & file system block size \\
+\hline
+blkfree & PVFS\_count32 & number of file blocks \\
+\hline
+blktotal & PVFS\_count32 & total number of blocks available \\
+\hline 
+filetotal & PVFS\_count32 & total number of files \\
+\hline 
+filefree & PVFS\_count32 & number of free files \\
+\hline
+\end{tabular}
+\caption{PVFS\_io\_stat}\label{tab:iostat}
+\end{table}
+
+The function returns 0 on success and the negative of the error
+number on failure.
+
+\subsubsection{PVFS\_sys\_fhdump(
+PVFS\_sysreq\_fhdump *req,
+PVFS\_sysresp\_fhdump *resp
+)}
+
+Not defined.
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+Field & Type & Description \\
+\hline
+\hline
+Not defined & & \\
+\hline
+\end{tabular}
+\caption{struct pvfs\_sysreq\_fhdump}\label{tab:reqfhdump}
+\end{table}
+
+The function returns 0 on success and the negative of the error
+number on failure.
+
+\subsubsection{PVFS\_sys\_readdir(
+PVFS\_sysreq\_readdir *req,
+PVFS\_sysresp\_readdir *resp
+)}
+
+Readdir is used to read the contents of a directory. The directory
+to be read is specified by the pinode reference of the directory
+and number of entries to be read is indicated by the incount in the
+request. The token field is an opaque type that is initialized to
+TOKEN\_START. If the specified directory entries can't be read then
+the outcount in the response has the number of entries actually read.
+The readdir request can be repeatedly used to read a fixed number of
+directory entries each time until all the entries in the directory
+are covered. In this case, the token returned in each response is
+passed in as the token in the subsequent request. This is done until
+all entries are read. The request and response structures are shown 
+in table. \ref{tab:reqreaddir} and table. \ref{tab:respreaddir} 
+respectively. The directory entry is shown in table. \ref{tab:dirent}.
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+Field & Type & Description \\
+\hline
+\hline
+pinode\_refn & pinode\_reference & pinode reference of directory to be
+read \\
+\hline
+token & PVFS\_token & opaque type indicating current position in directory \\
+\hline
+pvfs\_dirent\_incount & PVFS\_count32 & number of directory entries to
+be read \\
+\hline
+\hline
+\end{tabular}
+\caption{struct pvfs\_sysreq\_readdir}\label{tab:reqreaddir}
+\end{table}
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+Field & Type & Description \\
+\hline
+\hline
+token &  PVFS\_token &  current position in directory \\
+\hline
+pvfs\_dirent\_outcount & number of entries actually read \\
+\hline
+dirent\_array & PVFS\_dirent* & array of directory entries read \\
+\hline
+\end{tabular}
+\caption{struct pvfs\_sysresp\_readdir}\label{tab:respreaddir}
+\end{table}
+
+\begin{table}[H]
+\begin{tabular}{|l|l|l|}
+\hline
+Field & Type & Description \\
+\hline
+\hline
+d\_name[PVFS\_NAME\_MAX + 1] & char & directory entry name \\
+\hline
+\end{tabular}
+\caption{PVFS\_dirent}\label{tab:dirent}
+\end{table}
+
+The function returns 0 on success and the negative of the error
+number on failure.
+
+\section{Packaging}
+
+This has to be decided.  How the system interface will be accessed by
+the user program.
+
+\end{document}
+
+
+
+
+
+
+
+
+
+
+

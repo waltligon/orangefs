@@ -64,5 +64,6 @@ test/client/sysint/module.mk
 test/proto/module.mk
 test/server/module.mk
 doc/coding/module.mk
+doc/design/module.mk
 )
 

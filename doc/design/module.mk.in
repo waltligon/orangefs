@@ -1,0 +1,19 @@
+DIR := doc/design
+DOCSRC +=\
+	$(DIR)/bmi-design.tex\
+	$(DIR)/concepts.tex\
+	$(DIR)/distributions.tex\
+	$(DIR)/flow-design.tex\
+	$(DIR)/fs-semantics.tex\
+	$(DIR)/handle-allocator.tex\
+	$(DIR)/handle-bucket.tex\
+	$(DIR)/job-design.tex\
+	$(DIR)/reqproto.tex\
+	$(DIR)/request-design.tex\
+	$(DIR)/server.tex\
+	$(DIR)/state-machine.tex\
+	$(DIR)/storage-interface.tex\
+	$(DIR)/system-interface.tex\
+	$(DIR)/systemint-usage.tex\
+	$(DIR)/trove-dbpf.tex
+

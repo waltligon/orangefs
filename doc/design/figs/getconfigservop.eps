@@ -1,0 +1,657 @@
+%!PS-Adobe-2.0 EPSF-2.0
+%%Creator: Box::print() by Christian Lindig
+%%BoundingBox: 42 35 552 238
+%%Pages: 1
+%%EndComments
+
+gsave
+39 239 translate
+0.382309 -0.382309 scale
+% $Id: getconfigservop.eps,v 1.1 2003-01-24 23:29:21 pcarns Exp $
+% Header for DDD PostScript Box output
+
+% Copyright (C) 1995-1998 Technische Universitaet Braunschweig, Germany.
+% Written by Christian Lindig <lindig@ips.cs.tu-bs.de>.
+% 
+% This file is part of DDD.
+% 
+% DDD is free software; you can redistribute it and/or
+% modify it under the terms of the GNU General Public
+% License as published by the Free Software Foundation; either
+% version 2 of the License, or (at your option) any later version.
+% 
+% DDD is distributed in the hope that it will be useful,
+% but WITHOUT ANY WARRANTY; without even the implied warranty of
+% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+% See the GNU General Public License for more details.
+% 
+% You should have received a copy of the GNU General Public
+% License along with DDD -- see the file COPYING.
+% If not, write to the Free Software Foundation, Inc.,
+% 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+% 
+% DDD is the data display debugger.
+% For details, see the DDD World-Wide-Web page, 
+% `http://www.gnu.org/software/ddd/',
+% or send a mail to the DDD developers <ddd@gnu.org>.
+
+% Make all definitions local to the ddddict dictionary
+/ddddict 25 dict def 
+
+ddddict begin		% make dict active 
+
+
+% Global variables
+/fontSize+ 12 def
+/font+ /Courier def  
+
+
+% Some small utilities
+/cm { 28.34646 mul } bind def
+
+
+% ISOLATIN1* - reencode a font to ISO Latin 1 encoding
+%
+% newfont table oldfont isolatin1*
+
+/isolatin1* {
+	findfont
+	dup maxlength dict begin
+	{
+		1 index /FID ne { def } { pop pop } ifelse
+	} forall
+	/Encoding exch def
+	dup /FontName exch def
+	currentdict end definefont pop
+} bind def
+
+
+% Define the ISO Latin 1 encoding of a font
+ 
+/isotable[
+/.notdef/.notdef/.notdef/.notdef/.notdef/.notdef/.notdef/.notdef/.notdef
+/.notdef/.notdef/.notdef/.notdef/.notdef/.notdef/.notdef/.notdef/.notdef
+/.notdef/.notdef/.notdef/.notdef/.notdef/.notdef/.notdef/.notdef/.notdef
+/.notdef/.notdef/.notdef/.notdef/.notdef/space/exclam/quotedbl/numbersign
+/dollar/percent/ampersand/quoteright/parenleft/parenright/asterisk/plus/comma
+/hyphen/period/slash/zero/one/two/three/four/five/six/seven/eight/nine/colon
+/semicolon/less/equal/greater/question/at/A/B/C/D/E/F/G/H/I/J/K/L/M/N/O/P/Q/R/S
+/T/U/V/W/X/Y/Z/bracketleft/backslash/bracketright/asciicircum/underscore
+/quoteleft/a/b/c/d/e/f/g/h/i/j/k/l/m/n/o/p/q/r/s/t/u/v/w/x/y/z/braceleft/bar
+/braceright/asciitilde/.notdef/.notdef/.notdef/.notdef/.notdef/.notdef/.notdef
+/.notdef/.notdef/.notdef/.notdef/.notdef/.notdef/.notdef/.notdef/.notdef
+/.notdef/dotlessi/grave/acute/circumflex/tilde/macron/breve/dotaccent/dieresis
+/.notdef/ring/cedilla/.notdef/hungarumlaut/ogonek/caron/.notdef/exclamdown/cent
+/sterling/currency/yen/brokenbar/section/dieresis/copyright/ordfeminine
+/guilsinglleft/logicalnot/hyphen/registered/macron/degree/plusminus/twosuperior
+/threesuperior/acute/mu/paragraph/periodcentered/cedilla/onesuperior
+/ordmasculine/guilsinglright/onequarter/onehalf/threequarters/questiondown
+/Agrave/Aacute/Acircumflex/Atilde/Adieresis/Aring/AE/Ccedilla/Egrave/Eacute
+/Ecircumflex/Edieresis/Igrave/Iacute/Icircumflex/Idieresis/Eth/Ntilde/Ograve
+/Oacute/Ocircumflex/Otilde/Odieresis/multiply/Oslash/Ugrave/Uacute/Ucircumflex
+/Udieresis/Yacute/Thorn/germandbls/agrave/aacute/acircumflex/atilde/adieresis
+/aring/ae/ccedilla/egrave/eacute/ecircumflex/edieresis/igrave/iacute
+/icircumflex/idieresis/eth/ntilde/ograve/oacute/ocircumflex/otilde/odieresis
+/divide/oslash/ugrave/uacute/ucircumflex/udieresis/yacute/thorn/ydieresis
+] def
+
+
+% YCORRECT*
+% The reference point of a string ist NOT its lower left corner but 
+% its baseline.  Therefore, the y coordinate must be corrected.  
+% Returns the correction for the current font.
+%
+% ycorrect* y
+
+/ycorrect* {
+	currentfont /FontBBox get
+	aload pop pop pop
+	currentfont /FontMatrix get dtransform
+	exch pop
+} def 
+
+
+% TEXT*
+% print out a string and make sure not to require more space than
+% specified.
+% font xsize ysize xorigin yorigin (string) text*
+
+/text* {
+
+	/string+ exch def		% set up some variables ..
+	moveto				% move to (xorigin,yorigin)
+	/ysize+ exch def
+	/xsize+ exch def
+	/thefont+ exch def
+
+	% is the right font already selected ?
+
+	thefont+ font+ ne 
+	ysize+ fontSize+ ne
+	or {	
+		% set up the right font - reencode it	
+		
+		/Symbol thefont+ eq 
+		{
+			thefont+ findfont
+		}{
+
+			/isofont+ isotable thefont+ isolatin1*	
+			/isofont+ findfont
+		}ifelse
+
+		[ysize+ 0 0 ysize+ neg 0 0] makefont
+		setfont
+		
+		/font+ thefont+ def
+		/fontSize+ ysize+ def
+	} if
+
+	% correct current point 
+
+	0 ycorrect* neg rmoveto
+
+	% string too long?  Scale it down ...
+	% The actual font is scaled. There is a good chance,
+	% that this will not happen too often when the font is not
+	% changed during the calls of text*
+
+	xsize+ string+ stringwidth pop div dup dup
+	1 lt {
+		0 0 1 0 0 6 array astore currentfont exch 
+		makefont setfont
+		pop
+	}{ 
+		% string is too short ... scale it up
+
+		1.05 gt {
+			0 0 1 0 0 6 array astore currentfont exch 
+			makefont setfont	
+		}{
+			pop
+
+		} ifelse
+	} ifelse
+	
+	string+ show
+
+} bind def
+
+	
+% ARROWLINE*
+% Draw a line of given width with an arrow at its end
+% len gives the height of the triangle forming the head of the arrow
+% and angle the angle at its top
+%	
+% angle len  x1 y1 x2 y2 linewidth arrowline*
+
+/arrowline* {
+	setlinewidth			% angle len x1 y1 x2 y2
+	/y2 exch def
+	/x2 exch def
+	/y1 exch def
+	/x1 exch def
+	/len+ exch def			% height of triangle
+
+	/alpha+ 
+		y2 y1 sub		% define alpha+
+		x2 x1 sub
+		atan
+	def
+
+	/base+				% define half of baseline
+		exch 
+		2 div dup		% angle angle
+		sin exch cos 	 	% sin(angle) cos(angle)
+		div			% tan(angle)
+		len+
+		mul			% half of baseline
+	def  
+	
+	newpath				% draw the line
+	x1 y1 moveto 
+	x2 len+ alpha+ cos mul sub 	% shorten the line to the end  
+	y2 len+ alpha+ sin mul sub 	% of the triangle
+	lineto
+	stroke		
+
+	gsave				% set the origin to the head of
+	0 setlinewidth			% the arrow and rotate the system
+	x2 y2 
+	translate			% origin now at x2 y2
+
+	alpha+ 90 sub rotate 		% rotate the system
+
+	newpath				% draw a triangle
+	0 0 moveto
+	base+ len+ neg rlineto
+	base+ 2 mul neg 0 rlineto
+	closepath
+	fill
+	
+	grestore
+} bind def
+
+% ARROWHEAD*
+% draw an arrow head inclined by alpha at (x,y)
+%
+% angle len alpha x y
+
+/arrowhead* {
+	/y exch def
+	/x exch def
+	/alpha+ exch def
+	/len+ exch def			% height of triangle
+
+	/base+				% define half of baseline
+		exch 
+		2 div dup		% angle angle
+		sin exch cos 	 	% sin(angle) cos(angle)
+		div			% tan(angle)
+		len+
+		mul			% half of baseline
+	def
+
+	gsave				% set the origin to the head of
+	0 setlinewidth			% the arrow and rotate the system
+	x y 
+	translate			% origin now at x y
+
+	alpha+ 90 sub rotate 		% rotate the system
+
+	newpath				% draw a triangle
+	0 0 moveto
+	base+ len+ neg rlineto
+	base+ 2 mul neg 0 rlineto
+	closepath
+	fill
+	
+	grestore
+} bind def
+
+
+% LINE*
+% draw a line of given width from (x1,y1) to (x2,y2)
+%
+% x1 y1 x2 y2 width line*
+
+/line* {
+	setlinewidth	% x1 y1 x2 y2
+	newpath
+	4 2 roll 	% x2 y2 x1 y1
+	moveto		% x2 y2
+	lineto		
+	stroke
+} bind def
+
+
+% CLEAN*
+%
+% fill a box given by four points with white colour ..
+% x1 y1 x2 y2 x3 y3 x4 y4 clean*
+
+/clean* {
+	gsave
+	1 setgray
+	0 setlinewidth
+	newpath
+	moveto  lineto  lineto lineto
+	closepath
+	fill
+	grestore
+} bind def
+
+
+% BOX*
+% fill a box given by four points
+%
+% x1 y1 x2 y2 x3 y3 x4 y4 box*
+
+/box* {
+	0 setlinewidth
+	newpath
+	moveto 	lineto 	lineto lineto
+	closepath
+	fill
+} bind def
+
+
+% ARC*
+% draw an ellipse with center (cx,cy), radius dx dy, starting at start
+% and ending at end.
+%
+% start end dx dy cx cy width arc*
+
+/arc* {
+	gsave
+	setlinewidth
+	translate
+	newpath
+	dup 3 1 roll		% start end dy dx dy
+	div 1 scale		% dy dx/dy 1 scale => start end dy
+	
+	0 exch  0 exch		% start end 0 0 dy 
+	5 -2 roll 		% 0 0 dy start end
+
+	dup
+	0 eq {			% replace 0 by 360
+		pop 
+		360
+	} if
+	arc
+	stroke
+	grestore
+} bind def
+
+
+% BEGINCOLOR* / ENDCOLOR*
+% Draw something using a specific foreground color
+%
+% red green blue begincolor* SOMETHING endcolor*
+
+/begincolor* {
+        currentrgbcolor         % red green blue red' green' blue'
+        6 3 roll                % red' green' blue' red green blue
+	setrgbcolor             % red' green' blue'
+} bind def
+
+/endcolor* {
+	setrgbcolor
+} bind def
+
+
+% Set up the right font to the right size
+
+/isofont+ isotable font+ isolatin1* 	% reencode font+
+					% and make it the current font
+/isofont+ findfont
+[fontSize+ 0 0 fontSize+ neg 0 0] makefont
+setfont
+
+
+%%EndProlog
+30 10 220 77 314 77 1 arrowline*
+/Helvetica-Narrow 9 11 263 75 (*\(\)) text*
+30 10 400 151 361 197 1 arrowline*
+/Helvetica-Narrow 12 11 375 172 (req) text*
+30 10 572 151 638 194 1 arrowline*
+/Helvetica-Narrow 16 11 597 170 (resp) text*
+30 10 608 77 760 77 1 arrowline*
+/Helvetica-Narrow 53 11 658 75 (location.index) text*
+7 197 439 197 439 534 7 534 clean*
+7 197 438 197 438 198 7 198 box* %(7, 197)(431, 1)
+7 198 8 198 8 532 7 532 box* %(7, 198)(1, 334)
+10 200 435 200 435 201 10 201 box* %(10, 200)(425, 1)
+10 201 11 201 11 529 10 529 box* %(10, 201)(1, 328)
+/Courier 14 13 25 216 (op) text*
+/Courier 21 13 60 216 ( = ) text*
+/Courier 133 13 81 216 (PVFS_SERV_GETCONFIG) text*
+/Courier 35 13 25 229 (rsize) text*
+/Courier 21 13 60 229 ( = ) text*
+/Courier 21 13 81 229 (118) text*
+/Courier 7 13 25 384 (u) text*
+/Courier 21 13 60 384 ( = ) text*
+81 229 432 229 432 230 81 230 box* %(81, 229)(351, 1)
+81 230 82 230 82 526 81 526 box* %(81, 230)(1, 296)
+/Courier 42 13 96 245 (create) text*
+/Courier 21 13 173 245 ( = ) text*
+/Courier 35 13 194 245 ({...}) text*
+/Courier 42 13 96 258 (remove) text*
+/Courier 21 13 173 258 ( = ) text*
+/Courier 35 13 194 258 ({...}) text*
+/Courier 14 13 96 271 (io) text*
+/Courier 21 13 173 271 ( = ) text*
+/Courier 35 13 194 271 ({...}) text*
+/Courier 35 13 96 284 (batch) text*
+/Courier 21 13 173 284 ( = ) text*
+/Courier 35 13 194 284 ({...}) text*
+/Courier 49 13 96 297 (getattr) text*
+/Courier 21 13 173 297 ( = ) text*
+/Courier 35 13 194 297 ({...}) text*
+/Courier 49 13 96 310 (setattr) text*
+/Courier 21 13 173 310 ( = ) text*
+/Courier 35 13 194 310 ({...}) text*
+/Courier 35 13 96 323 (mkdir) text*
+/Courier 21 13 173 323 ( = ) text*
+/Courier 35 13 194 323 ({...}) text*
+/Courier 35 13 96 336 (rmdir) text*
+/Courier 21 13 173 336 ( = ) text*
+/Courier 35 13 194 336 ({...}) text*
+/Courier 49 13 96 349 (readdir) text*
+/Courier 21 13 173 349 ( = ) text*
+/Courier 35 13 194 349 ({...}) text*
+/Courier 42 13 96 362 (statfs) text*
+/Courier 21 13 173 362 ( = ) text*
+/Courier 35 13 194 362 ({...}) text*
+/Courier 56 13 96 375 (geteattr) text*
+/Courier 21 13 173 375 ( = ) text*
+/Courier 35 13 194 375 ({...}) text*
+/Courier 56 13 96 388 (seteattr) text*
+/Courier 21 13 173 388 ( = ) text*
+/Courier 21 13 194 388 (...) text*
+/Courier 77 13 96 401 (lookup_path) text*
+/Courier 21 13 173 401 ( = ) text*
+/Courier 35 13 194 401 ({...}) text*
+/Courier 49 13 96 414 (getdist) text*
+/Courier 21 13 173 414 ( = ) text*
+/Courier 35 13 194 414 ({...}) text*
+/Courier 56 13 96 427 (crdirent) text*
+/Courier 21 13 173 427 ( = ) text*
+/Courier 35 13 194 427 ({...}) text*
+/Courier 63 13 96 449 (getconfig) text*
+/Courier 21 13 173 449 ( = ) text*
+194 427 429 427 429 428 194 428 box* %(194, 427)(235, 1)
+194 428 195 428 195 458 194 458 box* %(194, 428)(1, 30)
+/Courier 49 13 209 443 (fs_name) text*
+/Courier 21 13 286 443 ( = ) text*
+/Courier 119 13 307 443 (0x804e9c2 \"/pvfs\") text*
+/Courier 77 13 209 456 (max_strsize) text*
+/Courier 21 13 286 456 ( = ) text*
+/Courier 28 13 307 456 (1024) text*
+428 428 429 428 429 458 428 458 box* %(428, 428)(1, 30)
+194 458 429 458 429 459 194 459 box* %(194, 458)(235, 1)
+/Courier 56 13 96 472 (rmdirent) text*
+/Courier 21 13 173 472 ( = ) text*
+/Courier 35 13 194 472 ({...}) text*
+/Courier 63 13 96 485 (revlookup) text*
+/Courier 21 13 173 485 ( = ) text*
+/Courier 35 13 194 485 ({...}) text*
+/Courier 56 13 96 498 (allocate) text*
+/Courier 21 13 173 498 ( = ) text*
+/Courier 21 13 194 498 (...) text*
+/Courier 56 13 96 511 (truncate) text*
+/Courier 21 13 173 511 ( = ) text*
+/Courier 21 13 194 511 (...) text*
+/Courier 63 13 96 524 (extension) text*
+/Courier 21 13 173 524 ( = ) text*
+/Courier 21 13 194 524 (...) text*
+431 230 432 230 432 526 431 526 box* %(431, 230)(1, 296)
+81 526 432 526 432 527 81 527 box* %(81, 526)(351, 1)
+434 201 435 201 435 529 434 529 box* %(434, 201)(1, 328)
+10 529 435 529 435 530 10 530 box* %(10, 529)(425, 1)
+437 198 438 198 438 532 437 532 box* %(437, 198)(1, 334)
+7 532 438 532 438 533 7 533 box* %(7, 532)(431, 1)
+438 198 439 198 439 533 438 533 box* %(438, 198)(1, 335)
+8 533 439 533 439 534 8 534 box* %(8, 533)(431, 1)
+314 3 609 3 609 152 314 152 clean*
+314 3 608 3 608 4 314 4 box* %(314, 3)(294, 1)
+314 4 315 4 315 150 314 150 box* %(314, 4)(1, 146)
+317 6 605 6 605 7 317 7 box* %(317, 6)(288, 1)
+317 7 318 7 318 147 317 147 box* %(317, 7)(1, 140)
+/Courier 14 13 332 22 (op) text*
+/Courier 21 13 430 22 ( = ) text*
+/Courier 14 13 451 22 (23) text*
+/Courier 49 13 332 35 (strsize) text*
+/Courier 21 13 430 35 ( = ) text*
+/Courier 21 13 451 35 (117) text*
+/Courier 28 13 332 48 (addr) text*
+/Courier 21 13 430 48 ( = ) text*
+/Courier 7 13 451 48 (5) text*
+/Courier 21 13 332 61 (tag) text*
+/Courier 21 13 430 61 ( = ) text*
+/Courier 7 13 451 61 (2) text*
+/Courier 56 13 332 90 (location) text*
+/Courier 21 13 430 90 ( = ) text*
+451 61 602 61 602 62 451 62 box* %(451, 61)(151, 1)
+451 62 452 62 452 105 451 105 box* %(451, 62)(1, 43)
+/Courier 42 13 466 77 (retVal) text*
+/Courier 21 13 515 77 ( = ) text*
+/Courier 63 13 536 77 (134548772) text*
+/Courier 49 13 466 90 (handler) text*
+/Courier 21 13 515 90 ( = ) text*
+/Courier 63 13 536 90 (0x8050d24) text*
+/Courier 35 13 466 103 (index) text*
+/Courier 21 13 515 103 ( = ) text*
+/Courier-BoldOblique 63 13 536 103 (0x8050d24) text*
+601 62 602 62 602 105 601 105 box* %(601, 62)(1, 43)
+451 105 602 105 602 106 451 106 box* %(451, 105)(151, 1)
+/Courier 21 13 332 119 (req) text*
+/Courier 21 13 430 119 ( = ) text*
+/Courier-BoldOblique 63 13 451 119 (0x8050308) text*
+/Courier 28 13 332 132 (resp) text*
+/Courier 21 13 430 132 ( = ) text*
+/Courier-BoldOblique 63 13 451 132 (0x8051260) text*
+/Courier 98 13 332 145 (unexp_bmi_buff) text*
+/Courier 21 13 430 145 ( = ) text*
+/Courier 63 13 451 145 (0x8050dd8) text*
+604 7 605 7 605 147 604 147 box* %(604, 7)(1, 140)
+317 147 605 147 605 148 317 148 box* %(317, 147)(288, 1)
+607 4 608 4 608 150 607 150 box* %(607, 4)(1, 146)
+314 150 608 150 608 151 314 151 box* %(314, 150)(294, 1)
+608 4 609 4 609 151 608 151 box* %(608, 4)(1, 147)
+315 151 609 151 609 152 315 152 box* %(315, 151)(294, 1)
+18 59 221 59 221 95 18 95 clean*
+18 59 220 59 220 60 18 60 box* %(18, 59)(202, 1)
+18 60 19 60 19 93 18 93 box* %(18, 60)(1, 33)
+/Courier 7 13 21 75 (3) text*
+/Courier 14 13 28 75 (: ) text*
+/Courier-BoldOblique 28 13 42 75 (s_op) text*
+21 75 217 75 217 76 21 76 box* %(21, 75)(196, 1)
+/Courier-BoldOblique 196 13 21 91 (\(PINT_server_op *\) 0x8050db0) text*
+219 60 220 60 220 93 219 93 box* %(219, 60)(1, 33)
+18 93 220 93 220 94 18 94 box* %(18, 93)(202, 1)
+220 60 221 60 221 94 220 94 box* %(220, 60)(1, 34)
+19 94 221 94 221 95 19 95 box* %(19, 94)(202, 1)
+760 51 876 51 876 103 760 103 clean*
+760 51 875 51 875 52 760 52 box* %(760, 51)(115, 1)
+760 52 761 52 761 101 760 101 box* %(760, 52)(1, 49)
+763 54 872 54 872 55 763 55 box* %(763, 54)(109, 1)
+763 55 764 55 764 98 763 98 box* %(763, 55)(1, 43)
+/Courier 42 13 778 70 (retVal) text*
+/Courier 21 13 827 70 ( = ) text*
+/Courier 7 13 848 70 (0) text*
+/Courier 49 13 778 83 (handler) text*
+/Courier 21 13 827 83 ( = ) text*
+/Courier 7 13 848 83 (0) text*
+/Courier 35 13 778 96 (index) text*
+/Courier 21 13 827 96 ( = ) text*
+/Courier 21 13 848 96 (0x0) text*
+871 55 872 55 872 98 871 98 box* %(871, 55)(1, 43)
+763 98 872 98 872 99 763 99 box* %(763, 98)(109, 1)
+874 52 875 52 875 101 874 101 box* %(874, 52)(1, 49)
+760 101 875 101 875 102 760 102 box* %(760, 101)(115, 1)
+875 52 876 52 876 102 875 102 box* %(875, 52)(1, 50)
+761 102 876 102 876 103 761 103 box* %(761, 102)(115, 1)
+440 194 1341 194 1341 531 440 531 clean*
+440 194 1340 194 1340 195 440 195 box* %(440, 194)(900, 1)
+440 195 441 195 441 529 440 529 box* %(440, 195)(1, 334)
+443 197 1337 197 1337 198 443 198 box* %(443, 197)(894, 1)
+443 198 444 198 444 526 443 526 box* %(443, 198)(1, 328)
+/Courier 14 13 458 213 (op) text*
+/Courier 21 13 500 213 ( = ) text*
+/Courier 133 13 521 213 (PVFS_SERV_GETCONFIG) text*
+/Courier 35 13 458 226 (rsize) text*
+/Courier 21 13 500 226 ( = ) text*
+/Courier 7 13 521 226 (0) text*
+/Courier 42 13 458 239 (status) text*
+/Courier 21 13 500 239 ( = ) text*
+/Courier 7 13 521 239 (0) text*
+/Courier 7 13 458 388 (u) text*
+/Courier 21 13 500 388 ( = ) text*
+521 239 1334 239 1334 240 521 240 box* %(521, 239)(813, 1)
+521 240 522 240 522 523 521 523 box* %(521, 240)(1, 283)
+/Courier 42 13 536 255 (create) text*
+/Courier 21 13 613 255 ( = ) text*
+/Courier 35 13 634 255 ({...}) text*
+/Courier 35 13 536 268 (batch) text*
+/Courier 21 13 613 268 ( = ) text*
+/Courier 35 13 634 268 ({...}) text*
+/Courier 49 13 536 281 (getattr) text*
+/Courier 21 13 613 281 ( = ) text*
+/Courier 35 13 634 281 ({...}) text*
+/Courier 35 13 536 294 (mkdir) text*
+/Courier 21 13 613 294 ( = ) text*
+/Courier 35 13 634 294 ({...}) text*
+/Courier 49 13 536 307 (readdir) text*
+/Courier 21 13 613 307 ( = ) text*
+/Courier 35 13 634 307 ({...}) text*
+/Courier 42 13 536 320 (statfs) text*
+/Courier 21 13 613 320 ( = ) text*
+/Courier 35 13 634 320 ({...}) text*
+/Courier 56 13 536 333 (geteattr) text*
+/Courier 21 13 613 333 ( = ) text*
+/Courier 21 13 634 333 (...) text*
+/Courier 56 13 536 346 (seteattr) text*
+/Courier 21 13 613 346 ( = ) text*
+/Courier 21 13 634 346 (...) text*
+/Courier 77 13 536 359 (lookup_path) text*
+/Courier 21 13 613 359 ( = ) text*
+/Courier 35 13 634 359 ({...}) text*
+/Courier 49 13 536 372 (getdist) text*
+/Courier 21 13 613 372 ( = ) text*
+/Courier 35 13 634 372 ({...}) text*
+/Courier 56 13 536 385 (rmdirent) text*
+/Courier 21 13 613 385 ( = ) text*
+/Courier 21 13 634 385 (...) text*
+/Courier 63 13 536 398 (revlookup) text*
+/Courier 21 13 613 398 ( = ) text*
+/Courier 35 13 634 398 ({...}) text*
+/Courier 63 13 536 446 (getconfig) text*
+/Courier 21 13 613 446 ( = ) text*
+634 398 1331 398 1331 399 634 399 box* %(634, 398)(697, 1)
+634 399 635 399 635 481 634 481 box* %(634, 399)(1, 82)
+/Courier 35 13 649 414 (fs_id) text*
+/Courier 21 13 782 414 ( = ) text*
+/Courier 7 13 803 414 (0) text*
+/Courier 77 13 649 427 (root_handle) text*
+/Courier 21 13 782 427 ( = ) text*
+/Courier 7 13 803 427 (0) text*
+/Courier 119 13 649 440 (meta_server_count) text*
+/Courier 21 13 782 440 ( = ) text*
+/Courier 7 13 803 440 (5) text*
+/Courier 133 13 649 453 (meta_server_mapping) text*
+/Courier 21 13 782 453 ( = ) text*
+/Courier 448 13 803 453 (0x80512d8 \"tcp://foo1;tcp://bar1;tcp://bar2;gm://foo1;gm://bar1\") text*
+/Courier 105 13 649 466 (io_server_count) text*
+/Courier 21 13 782 466 ( = ) text*
+/Courier 7 13 803 466 (6) text*
+/Courier 119 13 649 479 (io_server_mapping) text*
+/Courier 21 13 782 479 ( = ) text*
+/Courier 525 13 803 479 (0x8051318 \"tcp://foo1;tcp://foo2;tcp://bar1;tcp://bar2;gm://foo1;gm://bar1\") text*
+1330 399 1331 399 1331 481 1330 481 box* %(1330, 399)(1, 82)
+634 481 1331 481 1331 482 634 482 box* %(634, 481)(697, 1)
+/Courier 56 13 536 495 (allocate) text*
+/Courier 21 13 613 495 ( = ) text*
+/Courier 21 13 634 495 (...) text*
+/Courier 56 13 536 508 (truncate) text*
+/Courier 21 13 613 508 ( = ) text*
+/Courier 21 13 634 508 (...) text*
+/Courier 63 13 536 521 (extension) text*
+/Courier 21 13 613 521 ( = ) text*
+/Courier 21 13 634 521 (...) text*
+1333 240 1334 240 1334 523 1333 523 box* %(1333, 240)(1, 283)
+521 523 1334 523 1334 524 521 524 box* %(521, 523)(813, 1)
+1336 198 1337 198 1337 526 1336 526 box* %(1336, 198)(1, 328)
+443 526 1337 526 1337 527 443 527 box* %(443, 526)(894, 1)
+1339 195 1340 195 1340 529 1339 529 box* %(1339, 195)(1, 334)
+440 529 1340 529 1340 530 440 530 box* %(440, 529)(900, 1)
+1340 195 1341 195 1341 530 1340 530 box* %(1340, 195)(1, 335)
+441 530 1341 530 1341 531 441 531 box* %(441, 530)(900, 1)
+%%Trailer
+
+% $Id: getconfigservop.eps,v 1.1 2003-01-24 23:29:21 pcarns Exp $
+% Trailer for DDD PostScript Box output
+
+grestore
+showpage
+end		% of ddddict 

@@ -1,0 +1,776 @@
+%
+% flow design
+%
+
+\documentclass[10pt]{article} % FORMAT CHANGE
+\usepackage[dvips]{graphicx}
+\usepackage{times}
+
+\graphicspath{{./}{figs/}} 
+
+%
+% GET THE MARGINS RIGHT, THE UGLY WAY
+%
+% \topmargin 0.2in
+% \textwidth 6.5in
+% \textheight 8.75in
+% \columnsep 0.25in
+% \oddsidemargin 0.0in
+% \evensidemargin 0.0in
+% \headsep 0.0in
+% \headheight 0.0in
+
+\pagestyle{plain}
+
+\addtolength{\hoffset}{-2cm}
+\addtolength{\textwidth}{4cm}
+
+\addtolength{\voffset}{-1.5cm}
+\addtolength{\textheight}{3cm}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{11pt}
+
+\title{Trove: The PVFS2 Storage Interface}
+\author{PVFS Development Team}
+% \date{December 2000}
+
+\begin{document}
+
+\maketitle
+
+\section{Motivation and Goals}
+
+The Trove storage interface will be the lowest level interface used by the
+PVFS server for storing both file data and metadata.  It will be used by
+individual servers (and servers only) to keep track of locally stored
+information.  There are several goals and ideas that we should keep in
+mind when discussing this interface:
+
+\begin{itemize}
+\item \textbf{Multiple storage instances}: This interface is intended to
+hide the use of multiple storage instances for storage of data.  This
+data can be roughly categorized into two types, bytestream and keyval
+spaces, which are described in further detail below.
+
+\item \textbf{Contiguous and noncontiguous data access}:  The first cut
+of this interface will probably only handle contiguous data access.
+However, we would like to also support some form of noncontiguous access.  We
+think that this will be done through list I/O type operations, as we don't
+necessarily want anything more complicated at this level.
+
+\item \textbf{Metadata storage}:  This
+interface will be used as a building block for storing metadata in 
+addition to file data.  This includes extended metadata.
+
+\item \textbf{Nonblocking semantics}:  This interface will be completely
+nonblocking for both file data and metadata operations.  The usual
+argument for scalability and flexible interaction with other I/O
+devices applies here.  We should try to provide this
+functionality without sacrificing latency if possible.
+\emph{The interface will not require interface calls to be made in order
+for progress to occur.}  This implies that threads will be used
+underneath where necessary.
+
+\item \textbf{Compatibility with flows}:  Flows will almost certainly be
+built on top of this interface.  Both the default BMI flow
+implementation and custom implementations should be able to use this
+interface.
+
+\item \textbf{Consistency semantics}:  If we are going to support
+consistency, locking, etc, then we need to be able to enforce
+consistency semantics at the storage interface level.  The interface
+will provide the option for serializing access to a dataspace and a vtag
+interface.
+
+\item \textbf{Error recovery}:  The system must detect and report errors
+occurring while accessing data storage.  The system may or may not
+implement redundancy, journaling, etc. for recovering from errors
+resulting in data loss.
+\end{itemize}
+
+Our first cut implementation of this interface will have the following
+restrictions:
+\begin{itemize}
+\item only one type of storage for bytestreams and one type for keyvals
+      will be supported
+\item consistency semantics will not be implemented
+\item errors will be reported, but no measures will be taken to recover
+\item noncontiguous access will not be enabled
+\item only one process/thread will be accessing a given storage instance
+      through this interface at a time
+\end{itemize}
+
+\emph{PARTIAL COMPLETION SEMANTICS NEED MUCH WORK!!!}
+
+\section{Storage space concepts}
+
+A server controls one storage space.
+
+Within this storage space are some number of \emph{collections}, which
+are akin to file systems.  Collections serve as a mechanism for
+supporting multiple traditional file systems on a single server and for
+separating the use of various physical resources.  (Collections can span
+multiple underlying storage devices, and hints would be used in that case to
+specify the device on which to place files.  This concept might be used in
+systems that can migrate data from slow storage to faster storage as well).
+
+Two collections will be created for each file system: one collection will
+support the dataspaces needed for the file system's data and metadata objects.
+A second collection will be created for administrative purposes.  If the
+underlying implementation needs to perform disk i/o, for example, it can use
+bstream and keyval objects from the administration collection. 
+
+A collection id will be used in conjunction with other parameters in
+order to specify a unique entity on a server to access or modify, just as a
+file system ID might be used.
+
+%
+% DATASPACE CONCEPTS
+%
+\section{Dataspace concepts}
+
+This storage interface stores and accesses what we will call
+\emph{dataspaces}.  These are logical collections of data organized in one
+of two possible ways.  The first organization for a dataspace is the
+traditional ``byte stream''.  This term refers to arbitrary binary data
+that can be referenced using offsets and sizes.  The second organization
+is ``keyword/value'' data.  This term refers to information that is
+accessed in a simplified database-like manner.  The data is indexed by way of a
+variable length key rather than an offset and size.  Both keyword and
+value are arbitrary byte arrays with a length parameter (i.e.~ need not
+be readable strings).  We will refer to a
+dataspace organized as a byte stream as a bytestream dataspace or simply
+a \emph{bytestream space}, and a dataspace organized by keyword/value
+pairs as a keyval dataspace or \emph{keyval space}.
+Each dataspace will have an identifier that is unique to its server,
+which we will simply call a \emph{handle}.  Physically these dataspaces
+may be stored in any number of ways on underlying storage.
+
+Here are some potential uses of each type:
+\begin{itemize}
+\item Byte stream
+\begin{itemize}
+\item traditional file data
+\item binary metadata storage (as is currently done in PVFS 1)
+\end{itemize}
+\item Key/value
+\begin{itemize}
+\item extended metadata attributes 
+\item directory entries
+\end{itemize}
+\end{itemize}
+
+% All storage interface level data will be stored in discrete \emph{objects}.  
+% Each object can be accessed using both key/value and byte stream
+% methods.  These two halves of the object are known as \emph{data
+% spaces}.  The same handle is used for each data space.  The implementor
+% may choose to access either data space depending on what data is needed.
+
+In our design thus far (reference the system interface documents) we have
+defined four types of \emph{system level objects}.  These are data files,
+metadata files, directories, and symlinks.  All four of these will be
+implemented using a combination of bytestream and/or keyval dataspaces.
+At the storage interface level there is no real distinction between
+different types of system level objects.
+
+%
+% VTAG CONCEPTS
+%
+\section{Vtag concepts}
+
+Vtags are a capability that can be used to implement atomic updates in
+shared storage systems.  In this case they can be used to implement
+atomic access to a set of shared storage devices through the storage
+interface.  To clarify, these would be of particular use when multiple
+threads are using the storage interface to access local storage or when
+multiple servers are accessing shared storage devices such as a MySQL
+database or SAN storage.
+
+This section can be skipped if you are not interested in consistency
+semantics.  Vtags will probably not be implemented in the first cut
+anyway.
+
+\subsection{Phil's poor explanation}
+
+Vtags are an approach to ensuring consistency for multiple readers
+and writers that avoids the use of locks and their associated problems
+within a distributed environment.  These problems include complexity,
+poor performance in the general case, and awkward error recovery.
+
+
+A vtag fundamentally provides a version number for any region of a byte
+stream or any individual key/value pair.  This allows the implementation
+of an optimistic approach to consistency.  Take the example of a
+read-modify-write operation.  The caller first reads a data region,
+obtaining a version tag in the process.  It then modifies it's own copy
+of the data.  When it writes the data back, it gives the vtag back to
+the storage interface.  The storage interface compares the given vtag against
+the current vtag for the region.  If the vtags match, it indicates that
+the data has not been modified since it was read by the caller, and the
+operation succeeds.  If the vtags do not match, then the operation fails
+and the caller must retry the operation.
+
+This is an optimistic approach in that the caller always assumes that
+the region has not been modified.  
+
+Many different locking primitives can be built upon the vtag concept...
+
+\subsection{Use of vtags}
+
+Layers above trove can take advantage of vtags as a way to simplify the
+enforcement of consistency semantics (rather than keeping complicated lists of
+concurrent operations, simply use the vtag facility to ensure that operations
+occur atomically).  Alternatively they could be used to handle the case of
+trove resources shared by multiple upper layers.  Finally they might be used
+in conjunction with higher level consistency control in some complimentary
+fashion (dunno yet...).
+
+%
+% STORAGE INTERFACE
+%
+\section{The storage interface}
+
+In this section we describe all the functions that make up the storage
+interface.  The storage interface functions can be divided into four
+categories: dataspace management functions, bytestream access functions,
+keyval access functions, and completion test functions.  The access
+functions can be further subdivided into contiguous and noncontiguous
+access capabilities.
+
+First we describe the return values and error values for the interface.
+Then we describe special vtag values and the implementation of keys.
+Next we describe the dataspace management functions.  Next we
+describe the contiguous and noncontiguous dataspace access functions.
+Finally we cover the completion test functions.
+
+\subsection{Return values}
+
+Unless otherwise noted, all functions return an integer with three
+possible values:
+\begin{itemize}
+\item 0: Success.  If the operation was nonblocking, then this return
+value indicates the caller must test for completion later.
+\item 1: Success with immediate completion.  No later testing required.
+\item -errno: Failure.  The error code is encoded in the negative return
+value.
+\end{itemize}
+
+\subsection{Error values}
+
+Table~\ref{table:storage_errors} shows values.  All values will be returned as
+integers in the native format (size and byte order).
+
+\emph{Needs to be fleshed out.  Need to pick a reasonable prefix.}
+
+\emph{Phil:  Once this is fleshed out, can we apply the same sort of
+scheme to BMI?  BMI doesn't have a particularly informative error
+reporting mechanism.} 
+
+\emph{Rob: Definitely.  I would really like to make sure that in
+addition to getting error values back, the error values actually make
+sense :).  This was (and still is in some cases) a real problem for
+PVFS1.}
+
+\begin{table}
+\caption{Error values for storage interface}
+\begin{center}
+\begin{tabular}{|l|l|}
+\hline
+Value & Meaning \\
+\hline
+TROVE\_ENOENT & no such dataspace \\
+TROVE\_EIO    & I/O error \\
+TROVE\_ENOSPC & no space on storage device \\
+TROVE\_EVTAG  & vtag didn't match \\
+TROVE\_ENOMEM & unable to allocate memory for operation \\
+TROVE\_EINVAL & invalid input parameter \\
+\hline
+\end{tabular}
+\end{center}
+\label{table:storage_errors}
+\end{table}
+
+\subsection{Flags related to vtags}
+
+As mentioned earlier, the usage of vtags is not manditory.  Therefore we
+define two flags values that can be used to control the behavior of the calls
+with respect to vtags:
+
+\emph{TODO: pick a reasonable prefix for our flags.}
+
+\begin{itemize}
+\item \textbf{FLAG\_VTAG}:  Indicates that the vtag is valid.
+The caller does not have a valid vtag for input, nor does he desire a
+valid vtag in response.
+\item \textbf{FLAG\_VTAG\_RETURN}:  Indicates that the caller wishes to obtain
+a vtag from the operation.  However, the caller does not wish to use a
+vtag for input.  
+\end{itemize}
+
+By default calls ignore vtag values on input and do not create vtag values for output.
+
+\subsection {Implementation of keys, values, and hints}
+
+\emph{TODO: sync. with code on data\_sz element.}
+
+\begin{verbatim}
+struct TROVE_keyval {
+    void *  buffer;
+    int32_t buffer_sz;
+    int32_t data_sz;
+};
+typedef struct TROVE_keyval TROVE_keyval_s;
+\end{verbatim}
+
+Keys, values, and hints are all implemented with the same TROVE\_keyval
+structure (do we want a different name?), shown above.  Keys and values used
+in keyval spaces are arbitrary binary data values with an associated length.
+
+Hint keys and values have the additional constraint of being null-terminated,
+readable strings.  This makes them very similar to MPI\_Info key/value pairs.
+
+\emph{TODO: we should build hints out of a pair of the TROVE\_keyvals.  We'll
+call them a TROVE\_hint\_s in here for now.}
+
+\subsection{Functions}
+
+\emph{Note: need to add valid error values for each function.}
+
+\emph{TODO: find a better format for function descriptions.}
+
+\subsubsection{IDs}
+
+In this context, IDs are unique identifiers assigned to each storage interface
+operation.  They are used as handles to test for completion of operations once
+they have been submitted.  If an operation completes immediately, then the ID
+field should be ignored.
+
+These IDs are only unique in the context of the storage interface, so upper
+layers may have to handle management of multiple ID spaces (if working with
+both a storage interface and a network interface, for instance).
+
+The type for these IDs is TROVE\_op\_id.
+
+\subsubsection{User pointers}
+
+Each function allows the user to pass in a pointer value (void *).  This value
+is returned by the test functions, and it allows for quick reference to user
+data structures associated with the completed operation.
+
+To motivate, normally there is some data at the caller's level that
+corresponds with the trove operation.  Without some help, the caller would
+have to map IDs for completed operations back to the caller data structures
+manually.  By providing a parameter that the caller can pass in, they can
+directly reference these structures on trove operation completion.
+
+%
+% DATASPACE MANAGEMENT
+%
+\subsubsection{Dataspace management}
+\begin{itemize}
+\item \textbf{ds\_create(
+[in]coll\_id,
+[in/out]handle,
+[in]bitmask, 
+[in]type,
+[in/out]hint,
+[in]user\_ptr,
+[out]id
+)}:
+Creates a new storage interface object.  The interface will
+fill any any portion of the handle that is not already filled in and
+ensure that it is unique.  For example, if the caller wants to
+specify the first 16 bits of the handle, it may do so by setting the
+appropriate bits and then specifying with the bitmask that the storage
+interface should not modify those bits.  
+
+The type field can be used by the caller to assign an arbitrary integer
+type to the object.  This may, for example, be used to distinguish
+between directories, symlinks, datafiles, and metadata files.  The storage
+interface does not assign any meaning to the type value. \emph{Do we even need
+this type field?}
+
+The hint field may be used to specify what type of underlying storage
+should be used for this dataspace in the case where multiple potential
+underlying storage methods are available.
+
+\item \textbf{ds\_remove(
+[in]handle, 
+[in]user\_ptr,
+[out]id
+)}:
+Removes an existing object from the system.
+
+\item \textbf{ds\_verify(
+[in]coll\_id,
+[in]handle,
+[out]type,
+[in]user\_ptr,
+[out]id
+)}:
+Verifies that an object exists with the specified handle.  If the object
+does exist, then the type of the object is also returned.  Useful for
+verifying sanity of handles provided by client.
+
+\item \textbf{ds\_getattr(
+[in]coll\_id,
+[in]handle,
+[out]ds\_attr,
+[in]user\_ptr,
+[out]id
+)}:
+Obtains statistics about the given dataspace that aren't actually stored
+within the dataspace.  This may include information such as number of
+key/value pairs, size of byte stream, access statistics, on what medium
+it is stored, etc.
+
+\item \textbf{ds\_setattr() ???}
+
+\item \textbf{ds\_hint(
+[in]coll\_id,
+[in]handle,
+[in/out]hint
+);}:
+Passes a hint to the underlying trove implementation.  Used to indicate
+caching needs, access patterns, begin/end of use, etc.
+
+\item \textbf{ds\_migrate(
+[in]coll\_id,
+[in]handle,
+[in/out]hint,
+[in]user\_ptr,
+[out]id
+);}:
+Used to indicate that a dataspace should be migrated to another medium.
+\emph{could this be done with just the hint call?  having an id in this case
+is particularly useful ... so we know the operation is completed...}
+\end{itemize}
+
+%
+% BYTESTREAM ACCESS
+%
+\subsubsection{Byte stream access}
+
+Parameters in read and write at calls are ordered similarly to pread and pwrite.
+
+\begin{itemize}
+\item \textbf{bstream\_read\_at(
+[in]coll\_id,
+[in]handle, 
+[in]buffer,
+[in]size,
+[in]offset,
+[in]flags,
+[out]vtag,
+[in]user\_ptr,
+[out]id
+)}:
+Reads a contiguous region from bytestream.  Most of the arguments are self
+explanatory.  The flags are not yet defined, but may include such
+possibilities as specifying atomic operations.  The vtag returned from this
+function applies to the region of the byte stream defined by the requested
+offset and size.  \underline{A flag can be passed in if the caller does not
+want a vtag returned.}  This allows the underlying implementation to avoid the
+overhead of calculating the value.
+
+\emph{The size is [in/out] in code?  Figure out semantics!!!}
+
+\item \textbf{bstream\_write\_at(
+[in]coll\_id,
+[in]handle,
+[in]buffer,
+[in]size,
+[in]offset,
+[in]flags,
+[in/out]vtag,
+[in]user\_ptr,
+[out]id
+)}:
+
+Writes a contiguous region to the bytestream.  Same arguments as
+read\_bytestream, except that the vtag is an in/out parameter.
+
+\emph{The size is [in/out] in code?  Figure out semantics!!!}
+
+\item \textbf{bstream\_resize(
+[in]coll\_id,
+[in]handle,
+[in]size,
+[in]flags,
+[in/out]vtag,
+[in]user\_ptr,
+[out]id
+)}:
+Used to truncate or allocate storage for a bytestream.  Flags are used
+to specify if preallocation is desired.
+
+\item \textbf{bstream\_validate(
+[in]handle,
+[in/out]vtag,
+[in]user\_ptr,
+[out]id
+)}:
+This function may be used to check for modification of a particular
+bytestream.  
+
+\emph{Flags?}
+
+\end{itemize}
+
+%
+% KEYVAL ACCESS
+%
+\subsubsection{Key/value access}
+
+An important call for keyval spaces is the iterator function.  The
+iterator function is used to obtain all keyword/value pairs from the
+keyval space with a sequence of calls from the client.  The iterator
+function returns a logical, opaque ``position'' value that allows a
+client to continue reading pairs from the keyval space where it last
+left off.
+
+\begin{itemize}
+\item \textbf{keyval\_read(
+[in]coll\_id,
+[in]handle,
+[in]key,
+[out]val,
+[in]flags,
+[out]vtag,
+[in]user\_ptr,
+[out]id
+)}:
+Reads the value corresponding to a given key.  Fails if the key does
+not exist.  A buffer is provided for the value to be placed in (the
+value may be an arbitrary type).  
+
+The amount of data actually placed in the value buffer should be indicated by
+the data\_sz element of the structure.
+
+\item \textbf{keyval\_write(
+[in]coll\_id,
+[in]handle,
+[in]key,
+[in]val,
+[in]flags,
+[in/out]vtag,
+[in]user\_ptr,
+[out]id
+)}:
+Writes out a value for a given key.  If the key does not exist, it is
+added.  
+\item \textbf{keyval\_remove(
+[in]coll\_id,
+[in]handle,
+[in]key,
+[in]flags,
+[in/out]vtag,
+[in]user\_ptr,
+[out]id
+)}:
+Removes a key/value pair from the keyval data space.
+
+\item \textbf{keyval\_validate(
+[in]coll\_id,
+[in]handle,
+[in/out]vtag,
+[in]user\_ptr,
+[out]id
+)}:
+Used to check for modification of a particular key/value pair.
+\item \textbf{keyval\_iterate(
+[in]coll\_id,
+[in]handle,
+[in/out]position, 
+[out]key\_array,
+[out]val\_array,
+[in/out]count,
+[in]flags,
+[in/out]vtag,
+[in]user\_ptr,
+[out]id
+)}:
+Reads count keyword/value pairs from the provided logical position in
+the keyval space.  Fails if the vtag doesn't match.  The position
+SI\_START\_POSITION is used to start at the beginning, and a new
+position is returned allowing the caller to continue where they left
+off.
+
+keyval\_iterate will always read \emph{count} items, unless it hits the end
+of the keyval space (EOK).  After hitting EOK, \emph{count} will be set to
+the number of pairs processed.  Thus, callers must compare \emph{count}
+after calling and compare with the value it had before the function call:
+if they are different, EOK has been reached.  If there are N items left in
+the keyspace, and keyval\_iterate requests N items, there will be no
+indication that EOK has been reached and only after making another call
+will the caller know he is at EOK.  The value of \emph{position} is not
+meaningful after reaching EOK.
+
+\item \textbf{keyval\_iterate\_keys(
+[in]coll\_id,
+[in]handle,
+[in/out]position, 
+[out]key\_array,
+[in]count,
+[in]flags,
+[in/out]vtag,
+[in]user\_ptr,
+[out]id
+)}:
+Similar to above, but only returns keys, not corresponding values. \emph{need
+to fix parameters}
+\end{itemize}
+
+\subsubsection{Noncontiguous (list) access}
+These functions are used to read noncontiguous byte stream regions or
+multiple key/value pairs.
+
+\emph{How do vtags work with noncontiguous calls?}
+
+The byte stream functions will implement simple listio style
+noncontiguous access.  Any more advanced data types should be unrolled
+into flat regions before reaching this interface.  The process for unrolling
+is outside the scope of this document, but examples are available in the ROMIO code.
+
+\emph{TODO: SEMANTICS!!!!!}
+
+\emph{TODO: how to we report partial success for listio calls?}
+
+\begin{itemize}
+\item \textbf{bstream\_read\_list(
+[in]coll\_id,
+[in]handle,
+[in]mem\_offset\_array,
+[in]mem\_size\_array,
+[in]mem\_count,
+[in]stream\_offset\_array,
+[in]stream\_size\_array,
+[in]stream\_count,
+[in]flags,
+[out]vtag(?),
+[in]user\_ptr,
+[out]id
+)}:
+
+\item \textbf{bstream\_write\_list(
+[in]coll\_id,
+[in]handle,
+[in]mem\_offset\_array,
+[in]mem\_size\_array,
+[in]mem\_count,
+[in]stream\_offset\_array,
+[in]stream\_size\_array,
+[in]stream\_count,
+[in]flags,
+[in/out]vtag(?),
+[in]user\_ptr,
+[out]id
+)}:
+
+\item \textbf{keyval\_read\_list(
+[in]coll\_id,
+[in]handle,
+[in]key\_array,
+[in]value\_array,
+[in]count,
+[in]flags,
+[out]vtag,
+[in]user\_ptr,
+[out]id
+)}:
+
+\item \textbf{keyval\_write\_list(
+[in]coll\_id,
+[in]handle,
+[in]key\_array,
+[in]value\_array,
+[in]count,
+[in]flags,
+[in/out]vtag,
+[in]user\_ptr,
+[out]id
+)}:
+\end{itemize}
+
+\subsubsection{Testing for completion}
+
+\emph{Do we need coll\_ids here?}
+
+\begin{itemize}
+\item \textbf{test(
+[in]coll\_id,
+[in]id,
+[out]count,
+[out]vtag,
+[out]user\_ptr,
+[out]state
+)}:
+Tests for completion of a storage interface operation.  The count field
+indicates how many operations completed (in this case either 1 or 0).
+If an operation completes, then the final status of the operation should
+be checked using the state parameter.  Note the vtag output argument
+here; it is used to provide vtags for operations that did not complete
+immediately.
+% \item \textbf{testglobal(
+% [in]coll\_id,
+% [in/out]id\_array,
+% [in/out]count,
+% [out]vtag\_array,
+% [out]user\_ptr\_array,
+% [out]state\_array
+% )}:
+% Tests for completion of any storage interface operation(s).  The
+% id\_array is filled in with some number of completed operation ids.  The
+% number must not exceed the input value of count, and count is set to the
+% number of returned ids on exit. \emph{this name is nonintuitive to me}.
+
+\item \textbf{testsome(
+[in]coll\_id,
+[in/out]id\_array,
+[in/out]count,
+[out]vtag\_array,
+[out]user\_ptr\_array,
+[out]state\_array
+)}:
+Tests for completion of one or more trove operations.  The id\_array lists
+operations to test on.  A value of TROVE\_OP\_ID\_NULL will be ignored.  Count is
+set to the number of completed items on return.
+
+\emph{TODO: fix up semantics for testsome; look at MPI functions for ideas.}
+
+\emph{wait function for testing purposes if nothing else?}
+
+\end{itemize}
+
+\emph{Note: need to discuss completion queue, internal or external?}
+
+\emph{Phil: See pvfs2-internal email at \\
+http://beowulf-underground.org/pipermail/pvfs2-internal/2001-October/000010.html
+for my thoughts on this topic.}
+
+\subsubsection{Batch operations}
+
+Batch operations are used to perform a sequence of operations possibly as an
+atomic whole.  These will be handled at a higher level.
+
+\section{Optimizations}
+
+This section lists some potential optimizations that might be applied at this
+layer or that are related to this layer.
+
+\subsection{Metadata Stuffing}
+
+In many file systems ``inode stuffing'' is used to store the data for small
+files in the space used to store pointers to indirect blocks.  The analogous
+approach for PVFS2 would be to store the data for small files in the
+bytestream space associated with the metafile.
+
+\end{document}
+
+
+
+
+
+
+

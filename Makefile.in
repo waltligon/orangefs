@@ -170,14 +170,14 @@ endif
 	@echo generating dependency file $@.
 	@$(srcdir)/maint/depend.sh `dirname $*` $(CFLAGS) $< > $@
 
-# TODO: this is all broken; I'm just commenting it out for now...
+# TODO: these documentation rules are broken for out of tree builds
 # default rules for building documents in .tex format:
-#%.dvi: %.tex
-#	cd $(@D); latex $(srcdir)/doc/coding/$(<F); latex $(srcdir)/doc/coding/$(<F)
-#
-#%.ps: %.dvi
-#	dvips -t letter $< -o $@
-#
-#%.pdf: %.tex
-#	cd $(@D); pdflatex $(srcdir)/doc/coding/$(<F); pdflatex $(srcdir)/doc/coding/$(<F)
-#
+%.dvi: %.tex
+	cd $(@D); latex $(<F); latex $(<F)
+
+%.ps: %.dvi
+	cd $(@D); dvips -t letter $(<F) -o $(@F)
+
+%.pdf: %.dvi
+	cd $(@D); dvipdf $(<F) $(@F)
+

@@ -1,0 +1,432 @@
+%!PS-Adobe-2.0
+%%Creator: dot version gviz 1.7.3b (Mon Feb 26 14:10:22 EST 2001)
+%%For: (pcarns) Carns Philip H
+%%Title: G
+%%Pages: (atend)
+%%BoundingBox: 36 36 521 657
+%%EndComments
+%%BeginProlog
+save
+/DotDict 200 dict def
+DotDict begin
+
+%%BeginResource: procset
+/coord-font-family /Times-Roman def
+/default-font-family /Times-Roman def
+/coordfont coord-font-family findfont 8 scalefont def
+
+/InvScaleFactor 1.0 def
+/set_scale {
+	dup 1 exch div /InvScaleFactor exch def
+	dup scale
+} bind def
+
+% styles
+/solid { } bind def
+/dashed { [9 InvScaleFactor mul dup ] 0 setdash } bind def
+/dotted { [1 InvScaleFactor mul 6 InvScaleFactor mul] 0 setdash } bind def
+/invis {/fill {newpath} def /stroke {newpath} def /show {pop newpath} def} bind def
+/bold { 2 setlinewidth } bind def
+/filled { } bind def
+/unfilled { } bind def
+/rounded { } bind def
+/diagonals { } bind def
+
+% hooks for setting color 
+/nodecolor { sethsbcolor } bind def
+/edgecolor { sethsbcolor } bind def
+/graphcolor { sethsbcolor } bind def
+/nopcolor {pop pop pop} bind def
+
+/beginpage {	% i j npages
+	/npages exch def
+	/j exch def
+	/i exch def
+	/str 10 string def
+	npages 1 gt {
+		gsave
+			coordfont setfont
+			0 0 moveto
+			(\() show i str cvs show (,) show j str cvs show (\)) show
+		grestore
+	} if
+} bind def
+
+/set_font {
+	findfont exch
+	scalefont setfont
+} def
+
+% draw aligned label in bounding box aligned to current point
+% alignfactor tells what fraction to place on the left.
+% -.5 is centered.
+/alignedtext {			% text labelwidth fontsz alignfactor
+	/alignfactor exch def
+	/fontsz exch def
+	/width exch def
+	/text exch def
+	gsave
+		% even if node or edge is dashed, don't paint text with dashes
+		[] 0 setdash
+		currentpoint newpath moveto
+		text stringwidth pop
+		alignfactor mul fontsz -.3 mul rmoveto
+		text show
+	grestore
+} def
+
+/boxprim {				% xcorner ycorner xsize ysize
+		4 2 roll
+		moveto
+		2 copy
+		exch 0 rlineto
+		0 exch rlineto
+		pop neg 0 rlineto
+		closepath
+} bind def
+
+/ellipse_path {
+	/ry exch def
+	/rx exch def
+	/y exch def
+	/x exch def
+	matrix currentmatrix
+	newpath
+	x y translate
+	rx ry scale
+	0 0 1 0 360 arc
+	setmatrix
+} bind def
+
+/endpage { showpage } bind def
+
+/layercolorseq
+	[	% layer color sequence - darkest to lightest
+		[0 0 0]
+		[.2 .8 .8]
+		[.4 .8 .8]
+		[.6 .8 .8]
+		[.8 .8 .8]
+	]
+def
+
+/setlayer {/maxlayer exch def /curlayer exch def
+	layercolorseq curlayer get
+	aload pop sethsbcolor
+	/nodecolor {nopcolor} def
+	/edgecolor {nopcolor} def
+	/graphcolor {nopcolor} def
+} bind def
+
+/onlayer { curlayer ne {invis} if } def
+
+/onlayers {
+	/myupper exch def
+	/mylower exch def
+	curlayer mylower lt
+	curlayer myupper gt
+	or
+	{invis} if
+} def
+
+/curlayer 0 def
+
+%%EndProlog
+%%BeginSetup
+14 default-font-family set_font
+1 setmiterlimit
+% /arrowlength 10 def
+% /arrowwidth 5 def
+
+% make sure pdfmark is harmless for PS-interpreters other than Distiller
+/pdfmark where {pop} {userdict /pdfmark /cleartomark load put} ifelse
+% make '<<' and '>>' safe on PS Level 1 devices
+/languagelevel where {pop languagelevel}{1} ifelse
+2 lt {
+    userdict (<<) cvn ([) cvn load put
+    userdict (>>) cvn ([) cvn load put
+} if
+
+%%EndResource
+%%EndSetup
+%%Page: 1 1
+%%PageBoundingBox: 36 36 521 657
+%%PageOrientation: Portrait
+gsave
+35 35 486 622 boxprim clip newpath
+36 36 translate
+0 0 1 beginpage
+0 0 translate 0 rotate
+[ /CropBox [36 36 521 657] /PAGES pdfmark
+0.000 0.000 0.000 graphcolor
+14.00 /Times-Roman set_font
+
+%	pending queue
+gsave 10 dict begin
+newpath 407 234 moveto
+311 234 lineto
+311 198 lineto
+407 198 lineto
+closepath
+stroke
+gsave 10 dict begin
+359 217 moveto (pending queue) 81 14.00 -0.50 alignedtext
+end grestore
+end grestore
+
+%	service queue
+gsave 10 dict begin
+newpath 117 44 moveto
+27 44 lineto
+27 8 lineto
+117 8 lineto
+closepath
+stroke
+gsave 10 dict begin
+72 27 moveto (service queue) 76 14.00 -0.50 alignedtext
+end grestore
+end grestore
+
+%	check consistency
+gsave 10 dict begin
+newpath 337 322 moveto
+251 304 lineto
+337 286 lineto
+423 304 lineto
+closepath
+stroke
+gsave 10 dict begin
+337 305 moveto (check consistency) 101 14.00 -0.50 alignedtext
+end grestore
+end grestore
+
+%	check consistency -> pending queue
+newpath 341 287 moveto
+344 275 349 258 352 243 curveto
+stroke
+newpath 349 243 moveto
+354 234 lineto
+354 244 lineto
+closepath
+gsave 0 setgray stroke grestore fill
+gsave 10 dict begin
+413 261 moveto (operation must wait) 111 14.00 -0.50 alignedtext
+end grestore
+
+%	call service handler
+gsave 10 dict begin
+newpath 195 234 moveto
+104 216 lineto
+195 198 lineto
+286 216 lineto
+closepath
+stroke
+gsave 10 dict begin
+195 217 moveto (call service handler) 108 14.00 -0.50 alignedtext
+end grestore
+end grestore
+
+%	check consistency -> call service handler
+newpath 304 293 moveto
+285 286 262 276 249 268 curveto
+238 261 226 250 216 239 curveto
+stroke
+newpath 214 241 moveto
+209 232 lineto
+218 237 lineto
+closepath
+gsave 0 setgray stroke grestore fill
+gsave 10 dict begin
+294 261 moveto (clear to begin) 76 14.00 -0.50 alignedtext
+end grestore
+
+%	create state structure
+gsave 10 dict begin
+newpath 330 430 moveto
+235 412 lineto
+330 394 lineto
+425 412 lineto
+closepath
+stroke
+gsave 10 dict begin
+330 413 moveto (create state structure) 114 14.00 -0.50 alignedtext
+end grestore
+end grestore
+
+%	create state structure -> check consistency
+newpath 331 394 moveto
+332 377 333 351 335 331 curveto
+stroke
+newpath 332 332 moveto
+336 322 lineto
+337 332 lineto
+closepath
+gsave 0 setgray stroke grestore fill
+
+%	add to queue\n(if necessary)
+gsave 10 dict begin
+newpath 72 146 moveto
+0 114 lineto
+72 82 lineto
+144 114 lineto
+closepath
+stroke
+gsave 10 dict begin
+72 123 moveto (add to queue) 71 14.00 -0.50 alignedtext
+72 107 moveto (\(if necessary\)) 75 14.00 -0.50 alignedtext
+end grestore
+end grestore
+
+%	call service handler -> add to queue\n(if necessary)
+newpath 163 204 moveto
+147 197 129 189 118 180 curveto
+110 173 101 160 93 149 curveto
+stroke
+newpath 90 150 moveto
+87 140 lineto
+95 147 lineto
+closepath
+gsave 0 setgray stroke grestore fill
+gsave 10 dict begin
+165 173 moveto (not completed) 79 14.00 -0.50 alignedtext
+end grestore
+
+%	remove from queue;\nrelease resources
+gsave 10 dict begin
+newpath 261 146 moveto
+162 114 lineto
+261 82 lineto
+360 114 lineto
+closepath
+stroke
+gsave 10 dict begin
+261 123 moveto (remove from queue;) 113 14.00 -0.50 alignedtext
+261 107 moveto (release resources) 94 14.00 -0.50 alignedtext
+end grestore
+end grestore
+
+%	call service handler -> remove from queue;\nrelease resources
+newpath 206 200 moveto
+215 186 228 167 239 149 curveto
+stroke
+newpath 237 148 moveto
+244 141 lineto
+241 151 lineto
+closepath
+gsave 0 setgray stroke grestore fill
+gsave 10 dict begin
+264 173 moveto (completed) 58 14.00 -0.50 alignedtext
+end grestore
+
+%	find existing state structure
+gsave 10 dict begin
+newpath 187 376 moveto
+65 358 lineto
+187 340 lineto
+309 358 lineto
+closepath
+stroke
+gsave 10 dict begin
+187 359 moveto (find existing state structure) 151 14.00 -0.50 alignedtext
+end grestore
+end grestore
+
+%	find existing state structure -> call service handler
+newpath 188 340 moveto
+189 316 191 271 193 243 curveto
+stroke
+newpath 190 244 moveto
+194 234 lineto
+195 244 lineto
+closepath
+gsave 0 setgray stroke grestore fill
+
+%	wait for jobs to complete
+gsave 10 dict begin
+newpath 260 612 moveto
+147 594 lineto
+260 576 lineto
+373 594 lineto
+closepath
+stroke
+gsave 10 dict begin
+260 595 moveto (wait for jobs to complete) 139 14.00 -0.50 alignedtext
+end grestore
+end grestore
+
+%	Known job
+gsave 10 dict begin
+224 466 41 18 ellipse_path
+stroke
+gsave 10 dict begin
+224 467 moveto (Known job) 62 14.00 -0.50 alignedtext
+end grestore
+end grestore
+
+%	wait for jobs to complete -> Known job
+newpath 255 577 moveto
+249 555 238 518 231 492 curveto
+stroke
+newpath 229 494 moveto
+229 484 lineto
+234 493 lineto
+closepath
+gsave 0 setgray stroke grestore fill
+
+%	Unexpected job
+gsave 10 dict begin
+315 520 54 18 ellipse_path
+stroke
+gsave 10 dict begin
+315 521 moveto (Unexpected job) 88 14.00 -0.50 alignedtext
+end grestore
+end grestore
+
+%	wait for jobs to complete -> Unexpected job
+newpath 272 578 moveto
+279 568 288 556 296 546 curveto
+stroke
+newpath 294 545 moveto
+302 538 lineto
+298 548 lineto
+closepath
+gsave 0 setgray stroke grestore fill
+
+%	add to queue\n(if necessary) -> service queue
+newpath 72 82 moveto
+72 72 72 62 72 53 curveto
+stroke
+newpath 70 54 moveto
+72 44 lineto
+75 54 lineto
+closepath
+gsave 0 setgray stroke grestore fill
+
+%	Known job -> find existing state structure
+newpath 218 448 moveto
+212 431 203 403 196 383 curveto
+stroke
+newpath 194 385 moveto
+193 375 lineto
+199 383 lineto
+closepath
+gsave 0 setgray stroke grestore fill
+
+%	Unexpected job -> create state structure
+newpath 318 502 moveto
+321 485 324 459 327 439 curveto
+stroke
+newpath 324 440 moveto
+328 430 lineto
+329 440 lineto
+closepath
+gsave 0 setgray stroke grestore fill
+endpage
+grestore
+%%PageTrailer
+%%EndPage: 1
+%%Trailer
+%%Pages: 1
+end
+restore
+%%EOF
