@@ -196,7 +196,7 @@ int phelper_fill_timestamps(pinode *pnode)
  */
 int phelper_fill_attr(pinode *ptr,PVFS_object_attr attr)
 {
-	PVFS_size df_array_size = attr.u.meta.dfile_count * sizeof(PVFS_handle);
+	PVFS_size df_array_size = 0;
 
 	/* set common attributes if needed */
 	if(attr.mask & PVFS_ATTR_COMMON_UID)
@@ -215,22 +215,27 @@ int phelper_fill_attr(pinode *ptr,PVFS_object_attr attr)
 		ptr->attr.objtype = attr.objtype;
 
 	/* set distribution if needed */
-	if ((attr.mask & PVFS_ATTR_META_DIST) &&
+	if ((attr.mask & PVFS_ATTR_META_DFILES) &&
             (attr.u.meta.dfile_count > 0))
 	{
-		if(ptr->attr.u.meta.dfile_array)
-			free(ptr->attr.u.meta.dfile_array);
-		ptr->attr.u.meta.dfile_array = (PVFS_handle *)malloc(df_array_size);
+		df_array_size = attr.u.meta.dfile_count *
+                    sizeof(PVFS_handle);
+
+		if (ptr->attr.u.meta.dfile_array)
+                    free(ptr->attr.u.meta.dfile_array);
+		ptr->attr.u.meta.dfile_array = (PVFS_handle *)
+                    malloc(df_array_size);
 		if (!(ptr->attr.u.meta.dfile_array))
 		{
 			return(-ENOMEM);
 		}
-		memcpy(ptr->attr.u.meta.dfile_array, attr.u.meta.dfile_array, df_array_size);
+		memcpy(ptr->attr.u.meta.dfile_array,
+                       attr.u.meta.dfile_array, df_array_size);
 		ptr->attr.u.meta.dfile_count = attr.u.meta.dfile_count;
 	}
 
 	/* set datafile array if needed */
-	if ((attr.mask & PVFS_ATTR_META_DFILES) &&
+	if ((attr.mask & PVFS_ATTR_META_DIST) &&
             (attr.u.meta.dist_size > 0))
 	{
 		gossip_lerr("WARNING: packing distribution to memcpy it.\n");
@@ -251,7 +256,7 @@ int phelper_fill_attr(pinode *ptr,PVFS_object_attr attr)
 	/* add mask to existing values */
 	ptr->attr.mask |= attr.mask;
 
-	assert(!(attr.mask & PVFS_ATTR_DATA_ALL));
+/* 	assert(!(attr.mask & PVFS_ATTR_DATA_ALL)); */
 	
 	return(0);
 }

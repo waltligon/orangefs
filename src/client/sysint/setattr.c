@@ -72,7 +72,7 @@ int PVFS_sys_setattr(PVFS_pinode_reference pinode_refn, PVFS_sys_attr attr,
 		pinode_was_in_cache = 0;
 		ret = phelper_get_pinode(entry, &pinode_ptr,
 		    PVFS_ATTR_COMMON_ALL, credentials);
-		if (ret < 0)
+		if ((ret < 0) || (pinode_ptr == NULL))
 		{
 		    failure = PCACHE_LOOKUP_FAILURE;
 		    goto return_error;
@@ -80,6 +80,7 @@ int PVFS_sys_setattr(PVFS_pinode_reference pinode_refn, PVFS_sys_attr attr,
 	}
 
 	/* by this point we definately have a pinode cache entry */
+        assert(pinode_ptr);
 
 	/* Get the server thru the BTI using the handle */
 	ret = PINT_bucket_map_to_server(&serv_addr,entry.handle,entry.fs_id);
