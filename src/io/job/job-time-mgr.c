@@ -279,6 +279,7 @@ int job_time_mgr_expire(void)
                              "job_timer: cancelling trove.\n");
 		ret = job_trove_dspace_cancel(
                     jd->u.trove.fsid, jd->job_id, jd->context_id);
+                break;
 	    default:
 		ret = 0;
 		break;
