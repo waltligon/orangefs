@@ -156,10 +156,6 @@ dma_malloc() for control buffers- this would be more space efficient and
 would only slow down initialization, not communication (see GM
 FAQ).
 
-There is a segfault in the gm method if initialization does not succeed.
-The easiest way to trigger it is to run test_bmi_client_gm while
-test_bmi_server_gm is running on the same machine.
-
 Look at mpich-gm (gmpriv.c) and the way that send callbacks are used.
 It looks like (in some cases) that sends are considered completed after
 posting, rather than waiting for callback.  This would explain some of
