@@ -359,6 +359,11 @@ static int getattr_object_getattr_comp_fn(void *v_p,
 		 */
 		assert(sizeof(int) == sizeof(char *)); /* dist time bomb */
 
+                /*
+                  NOTE:
+                  If we use PVFS_Dist_copy here, the PVFS_Dist_lookup
+                  in getattr_cleanup fails.  Not sure why yet...
+                */
 		sm_p->u.getattr.dist_p =
 		    (PVFS_Dist *) malloc(attr->u.meta.dist_size);
 		if (sm_p->u.getattr.dist_p == NULL) {
@@ -646,7 +651,7 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
             }
             if ((amask & PVFS_ATTR_META_DIST) &&
                 (sm_p->u.getattr.dist_p != NULL)) {
-                free(sm_p->u.getattr.dist_p);
+                PVFS_Dist_free(sm_p->u.getattr.dist_p);
             }
         }
 
