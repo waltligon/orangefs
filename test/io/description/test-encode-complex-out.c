@@ -30,7 +30,6 @@ int main(int argc, char **argv)
 {
 	PINT_Request *r;
 	PINT_Request *r1;
-	PINT_Request *r2;
 	PINT_Request *r_enc;
 	int ret = -1;
 	int pack_size = 0;
@@ -40,7 +39,20 @@ int main(int argc, char **argv)
 	PINT_Request_result seg1;
 	int retval;
 	int i;
+	int count = 64;
+	int32_t* len_array;
+	PVFS_offset* disp_array;
 
+	len_array = (int32_t*)malloc(count*sizeof(int32_t));
+	assert(len_array);
+	disp_array = (PVFS_offset*)malloc(count*sizeof(PVFS_offset));
+	assert(disp_array);
+
+	for(i=0; i<count; i++)
+	{
+	    len_array[i] = 4;
+	    disp_array[i] = i*8;
+	}
 
 	fd = open("enc_tmp.dat", O_WRONLY|O_CREAT|O_TRUNC, S_IRWXU);
 	if(fd < 0)
@@ -51,11 +63,10 @@ int main(int argc, char **argv)
 	
 	r = PVFS_BYTE;
 
-	PVFS_Request_vector(16, 4, 64, r, &r1);
-	PVFS_Request_vector(8, 2, 32, r1, &r2);
+	PVFS_Request_hindexed(64, len_array, disp_array, r, &r1);
 
 	/* set up request state */
-	rs1 = PINT_New_request_state(r2);
+	rs1 = PINT_New_request_state(r1);
 
 	/* set up file data for request */
 	rf1.iod_num = 0;
@@ -109,12 +120,12 @@ int main(int argc, char **argv)
 	
 
 	/* allocate a new request and pack the original one into it */
-	pack_size = PINT_REQUEST_PACK_SIZE(r2);
+	pack_size = PINT_REQUEST_PACK_SIZE(r1);
 	fprintf(stderr, "pack size is %d\n",pack_size);
 	r_enc = (PINT_Request*)malloc(pack_size);
 	assert(r_enc != NULL);
 
-	ret = PINT_Request_commit(r_enc, r2);
+	ret = PINT_Request_commit(r_enc, r1);
 	if(ret < 0)
 	{
 		fprintf(stderr, "PINT_Request_commit() failure.\n");
