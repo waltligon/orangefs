@@ -327,6 +327,7 @@ int PINT_cached_config_get_next_io(
     struct host_handle_mapping_s *cur_mapping = NULL;
     struct qlist_head *hash_link = NULL;
     struct config_fs_cache_s *cur_config_cache = NULL;
+    int jitter = 0, num_io_servers = 0;
 
     if (config && num_servers && io_handle_extent_array)
     {
@@ -338,6 +339,27 @@ int PINT_cached_config_get_next_io(
 
             assert(cur_config_cache);
             assert(cur_config_cache->fs);
+
+            num_io_servers = PINT_llist_count(
+                cur_config_cache->fs->data_handle_ranges);
+
+            /* pick random starting point */
+            jitter = (rand() % num_io_servers);
+            while(jitter-- > -1)
+            {
+                cur_mapping = PINT_llist_head(
+                    cur_config_cache->data_server_cursor);
+                if (!cur_mapping)
+                {
+                    cur_config_cache->data_server_cursor =
+                        cur_config_cache->fs->data_handle_ranges;
+                    cur_mapping = PINT_llist_head(
+                        cur_config_cache->data_server_cursor);
+                    assert(cur_mapping);
+                }
+                cur_config_cache->data_server_cursor = PINT_llist_next(
+                    cur_config_cache->data_server_cursor);
+            }
 
             while(num_servers)
             {
