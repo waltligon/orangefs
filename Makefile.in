@@ -73,6 +73,10 @@ ifndef V
   QUIET_COMPILE = @QUIET_COMPILE@
 endif
 
+# build which client libs
+build_shared = @build_shared@
+build_static = @build_static@
+
 # Eliminate all default suffixes.  We want explicit control.
 .SUFFIXES:
 
@@ -99,6 +103,8 @@ CC = @CC@
 CFLAGS = @CFLAGS@
 LDFLAGS = @LDFLAGS@
 LD = gcc
+LDSHARED = $(CC) -shared
+PICFLAGS = -fPIC
 LDFLAGS += -L lib 
 LIBS += -lpvfs2 @LIBS@ 
 VISCFLAGS = @VISCFLAGS@
@@ -287,7 +293,16 @@ TROVE_AUTOGEN_FILES :=
 # SERVER is the pvfs2 server
 SERVER := src/server/pvfs2-server
 # LIBRARIES is a list of the pvfs2 client libraries
-LIBRARIES := lib/libpvfs2.a
+LIBRARIES :=
+ifeq ($(build_shared),yes)
+LIBRARIES_SHARED = lib/libpvfs2.so
+LIBRARIES += $(LIBRARIES_SHARED)
+endif
+ifeq ($(build_static),yes)
+LIBRARIES_STATIC = lib/libpvfs2.a
+LIBRARIES += $(LIBRARIES_STATIC)
+endif
+
 # KARMA is the karma gui, if we are building it
 ifdef BUILD_KARMA
 	KARMA := src/apps/karma/karma
@@ -313,6 +328,8 @@ include $(patsubst %, %/module.mk, $(MODULES))
 
 # LIBOBJS is a list of objects to put in the client lib
 LIBOBJS := $(patsubst %.c,%.o, $(filter %.c,$(LIBSRC)))
+# LIBPICOBJS are the same, but compiled for use in a shared library
+LIBPICOBJS := $(patsubst %.c,%.po, $(filter %.c,$(LIBSRC)))
 # LIBDEPENDS is a list of dependency files for the client lib
 LIBDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(LIBSRC)))
 
@@ -477,6 +494,17 @@ else
 	ar rcs $@ $(LIBOBJS)
 endif
 
+# rule for building the pvfs2 library
+lib/libpvfs2.so: $(LIBPICOBJS)
+ifdef QUIET_COMPILE
+	@echo "  LDSO		$@"
+	@$(INSTALL) -d lib
+	@$(LDSHARED) -o $@ $(LIBPICOBJS)
+else
+	$(INSTALL) -d lib
+	$(LDSHARED) -o $@ $(LIBPICOBJS)
+endif
+
 # rule for building the pvfs2 server library
 lib/libpvfs2-server.a: $(SERVEROBJS)
 ifdef QUIET_COMPILE
@@ -637,6 +665,15 @@ else
 	$(CC) $(LIBCFLAGS) $(CFLAGS) $< -c -o $@
 endif
 
+# rule for building shared objects 
+%.po: %.c
+ifdef QUIET_COMPILE
+	@echo "  CCPIC		$@"
+	@$(CC) $(LIBCFLAGS) $(CFLAGS) $(PICFLAGS) $< -c -o $@
+else
+	$(CC) $(LIBCFLAGS) $(CFLAGS) $(PICFLAGS) $< -c -o $@
+endif
+
 # handy rule to generate cpp-output file, for debugging
 .PHONY: FORCE
 %-server.i: %.c FORCE
@@ -698,7 +735,7 @@ ifdef QUIET_COMPILE
 		$(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
 		$(ADMINTOOLS_SERVER) lib/libpvfs2-server.a\
 		$(VISS) $(VISMISCOBJS) $(VISOBJS) $(VISDEPENDS)\
-		$(VISMISCDEPENDS) $(KARMAOBJS) \
+		$(VISMISCDEPENDS) $(KARMAOBJS) $(LIBPICOBJS) \
 		src/server/pvfs2-server-server.o $(MPIIOTESTS) \
 		src/apps/karma/karma
 else
@@ -708,7 +745,7 @@ else
 		$(ADMINOBJS) $(ADMINOBJS_SERVER) $(ADMINTOOLS)\
 		$(ADMINTOOLS_SERVER) lib/libpvfs2-server.a\
 		$(VISS) $(VISMISCOBJS) $(VISOBJS) $(VISDEPENDS)\
-		$(VISMISCDEPENDS) $(KARMAOBJS) \
+		$(VISMISCDEPENDS) $(KARMAOBJS) $(LIBPICOBJS) \
 		src/server/pvfs2-server-server.o $(MPIIOTESTS) \
 		src/apps/karma/karma
 endif
