@@ -514,7 +514,7 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
 			     iosm_p->io_type,
 			     iosm_p->flowproto_type,
 			     orig_index,
-			     target_datafile_count,
+			     iosm_p->datafile_count,
 			     iosm_p->dist_p,
 			     iosm_p->file_req,
 			     iosm_p->file_req_offset,
@@ -534,6 +534,13 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
         free(iosm_p->datafile_handles);
     }
     iosm_p->datafile_handles = target_datafile_array;
+
+    /*
+      store the original datafile_count before it's modified,
+      as we'll need it later in io_datafile_complete_msgpairs
+    */
+    iosm_p->orig_datafile_count = iosm_p->datafile_count;
+
     iosm_p->datafile_count   = target_datafile_count;
     
     return 1;
@@ -831,7 +838,7 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 	    fl_p->file_data.fsize     = resp_p->u.io.bstream_size;
 	    fl_p->file_data.dist      = iosm_p->dist_p;
 	    fl_p->file_data.server_nr   = iosm_p->datafile_index_array[recv_match];
-	    fl_p->file_data.server_ct = iosm_p->datafile_count;
+	    fl_p->file_data.server_ct = iosm_p->orig_datafile_count;
 
 	    /* this is the file datatype */
 	    fl_p->file_req        = iosm_p->file_req;

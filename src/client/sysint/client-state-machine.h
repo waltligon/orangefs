@@ -155,6 +155,7 @@ struct PINT_client_io_sm {
     PVFS_Request          mem_req;
 
     /* cached from object attributes */
+    int                   orig_datafile_count;
     int                   datafile_count;
     PVFS_handle          *datafile_handles;
     int			 *datafile_index_array;
