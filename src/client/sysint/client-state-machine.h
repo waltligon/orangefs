@@ -106,15 +106,6 @@ typedef struct PINT_client_sm {
     int msgarray_count;
     PINT_client_sm_msgpair_state *msgarray;
 
-    /* req and encoded_req are needed to send a request */
-    struct PVFS_server_req req;
-    struct PINT_encoded_msg encoded_req;
-
-    /* max_resp_sz, svr_addr, and encoded_resp_p needed to recv a response */
-    int max_resp_sz;
-    bmi_addr_t svr_addr;
-    void *encoded_resp_p;
-
     PVFS_credentials *cred_p;
     union {
 	struct PINT_client_remove_sm remove;

@@ -25,21 +25,17 @@ extern job_context_id pint_client_sm_context;
 
 /* values greater than zero are usable here */
 enum {
-    REMOVE_DCACHE_HIT = 1,
-    REMOVE_PCACHE_HIT = 2,
-    REMOVE_MUST_REMOVE_DATAFILES = 3
+    REMOVE_MUST_REMOVE_DATAFILES = 1
 };
 
 /* state function prototypes */
 static int remove_init(PINT_client_sm *sm_p,
 		       job_status_s *js_p);
 
-static int remove_lookup_post_msgpair(PINT_client_sm *sm_p,
+static int remove_lookup_setup_msgpair(PINT_client_sm *sm_p,
 				       job_status_s *js_p);
 static int remove_lookup_failure(PINT_client_sm *sm_p,
 				 job_status_s *js_p);
-static int remove_lookup_complete_msgpair(PINT_client_sm *sm_p,
-				   job_status_s *js_p);
 
 static int remove_getattr_setup_msgpair(PINT_client_sm *sm_p,
 					job_status_s *js_p);
@@ -67,13 +63,16 @@ static int remove_cleanup(PINT_client_sm *sm_p,
 /* completion function prototypes */
 static int remove_getattr_comp_fn(void *v_p,
 				  struct PVFS_server_resp *resp_p);
+static int remove_lookup_comp_fn(void *v_p,
+				 struct PVFS_server_resp *resp_p);
+
 %%
 
 machine pvfs2_client_remove_sm(init,
 			       cleanup,
-			       lookup_post_msgpair,
+			       lookup_setup_msgpair,
+			       lookup_xfer_msgpair,
 			       lookup_failure,
-			       lookup_complete_msgpair,
 			       getattr_setup_msgpair,
 			       getattr_xfer_msgpair,
 			       getattr_failure,
@@ -89,25 +88,21 @@ machine pvfs2_client_remove_sm(init,
 {
     state init {
 	run remove_init;
-	default => lookup_post_msgpair;
+	default => lookup_setup_msgpair;
     }
 
-    state lookup_post_msgpair {
-	run remove_lookup_post_msgpair;
-	success => lookup_complete_msgpair;
-	REMOVE_DCACHE_HIT => getattr_setup_msgpair;
-	REMOVE_PCACHE_HIT => cleanup;
+    state lookup_setup_msgpair {
+	run remove_lookup_setup_msgpair;
+	success => lookup_xfer_msgpair;
 	default => lookup_failure;
     }
-
+    state lookup_xfer_msgpair {
+	jump pvfs2_client_lookup_dcache_sm;
+	success => rmdirent_setup_msgpair;
+	default => lookup_failure;
+    }
     state lookup_failure {
 	run remove_lookup_failure;
-	default => cleanup;
-    }
-
-    state lookup_complete_msgpair {
-	run remove_lookup_complete_msgpair;
-	success => rmdirent_setup_msgpair;
 	default => cleanup;
     }
 
@@ -246,87 +241,11 @@ static int remove_init(PINT_client_sm *sm_p,
     return 1;
 }
 
-/* remove_lookup_post_msgpair()
+/* remove_lookup_setup_msgpair()
  */
-static int remove_lookup_post_msgpair(PINT_client_sm *sm_p,
+static int remove_lookup_setup_msgpair(PINT_client_sm *sm_p,
 				       job_status_s *js_p)
 {
-    int ret;
-
-    PVFS_msg_tag_t session_tag;
-    job_status_s send_status, recv_status;
-    job_id_t send_id, recv_id;
-
-    gossip_debug(CLIENT_DEBUG, "remove state: post_lookup_post_msgpair\n");
-
-    /* check and see if we have the handle for the object in
-     * our directory cache already.
-     *
-     * dcache doesn't have a concept of a lock on an entry; maybe
-     * it should though?
-     */
-    ret = PINT_dcache_lookup(sm_p->u.remove.object_name,
-			     sm_p->u.remove.parent_ref,
-			     &sm_p->u.remove.object_ref);
-    if (ret < 0 && ret != -PVFS_ENOENT) {
-	/* fatal error */
-	return -1;
-    }
-    else if (ret == 0) {
-	PINT_pinode *pinode_p;
-
-	/* match in dcache; no need for lookup */
-	gossip_debug(CLIENT_DEBUG, "remove: dcache hit\n");
-
-	/* check to see if we have attributes for the object in
-	 * our pinode cache already.
-	 */
-	/* TODO: MAKE PINT_PCACHE_LOOKUP RETURNS MORE STANDARD */
-	/* TODO: MOVE THIS DOWN INTO THE GETATTR STATE!!! */
-	ret = PINT_pcache_lookup(sm_p->u.remove.object_ref,
-				 &pinode_p);
-	if (ret == PCACHE_LOOKUP_SUCCESS) {
-	    /* got our attributes; let's get to work */
-	    gossip_debug(CLIENT_DEBUG, "remove: pcache hit\n");
-
-	    sm_p->pcache_lock = 1;
-	    sm_p->object_pinode_p = pinode_p;
-
-	    js_p->error_code = REMOVE_PCACHE_HIT;
-	    return 1;
-	}				 
-	else {
-	    /* did hit dcache, but need to get attributes */
-	    js_p->error_code = REMOVE_DCACHE_HIT;
-	    return 1;
-	}
-    }
-
-    /* otherwise we need to perform the lookup */
-
-    /* post the receive of the response, then the send of the
-     * lookup request.  pre-posting the receive can make a
-     * performance difference for some network types.
-     *
-     * We're going to end up popping into the next state twice
-     * because of these two posted operations.  We keep a counter
-     * to keep up with how many operations have completed.  We'll
-     * use the sm->comp_ct for this purpose.  We set to 2 (# of jobs)
-     * and then decrement as they complete in the next state.
-     */
-    sm_p->comp_ct = 2;
-
-    /* Steps:
-     * (1) fill in request
-     * (2) determine destination server
-     * (3) encode request
-     * (4) calculate max. size for response
-     * (5) allocate BMI memory region for response
-     * (6) get next session tag
-     * (7) call job fn. to post receive
-     * (8) call job fn. to post send
-     */
-
     /* do parameter checking */
     if ((strlen(sm_p->u.remove.object_name) + 1 >
 	 PVFS_REQ_LIMIT_PATH_NAME_BYTES) ||
@@ -339,149 +258,37 @@ static int remove_lookup_post_msgpair(PINT_client_sm *sm_p,
     }
 
     /* fill in lookup request (macro in pvfs2-req-proto.h) */
-    PINT_SERVREQ_LOOKUP_PATH_FILL(sm_p->req,
+    PINT_SERVREQ_LOOKUP_PATH_FILL(sm_p->msgpair.req,
 				  *sm_p->cred_p,
 				  sm_p->u.remove.object_name,
 				  sm_p->u.remove.parent_ref.fs_id,
 				  sm_p->u.remove.parent_ref.handle,
 				  PVFS_ATTR_COMMON_ALL);
 
-    /* This function:
-     * - maps object to server
-     * - encodes the request
-     * - calculates the max. response size
-     * - allocates memory for that response
-     * - gets a session tag
-     */
-    ret = PINT_serv_prepare_msgpair(sm_p->u.remove.parent_ref,
-				    &sm_p->req,
-				    &sm_p->encoded_req,
-				    &sm_p->encoded_resp_p,
-				    &sm_p->svr_addr,
-				    &sm_p->max_resp_sz,
-				    &session_tag);
-    if (ret != 0) {
-	assert(0);
-    }
+    /* fill in msgpair structure components */
+    sm_p->msgpair.fs_id   = sm_p->u.remove.parent_ref.fs_id;
+    sm_p->msgpair.handle  = sm_p->u.remove.parent_ref.handle;
+    sm_p->msgpair.comp_fn = remove_lookup_comp_fn;
 
-    /* post receive of response */
-    ret = job_bmi_recv(sm_p->svr_addr,
-		       sm_p->encoded_resp_p,
-		       sm_p->max_resp_sz,
-		       session_tag,
-		       BMI_PRE_ALLOC,
-		       sm_p, /* user pointer -- used to get to next state */
-		       &recv_status, /* only for immediate completion */
-		       &recv_id, /* could theoretically be used to unpost */
-		       pint_client_sm_context);
-    if (ret < 0) {
-	assert(0);
-    }
-    else if (ret == 1) {
-	assert(0);
-    }
-    assert(ret == 0); /* just to see that we don't get odd values */
+    return 1;
+}
 
-    /* post send of request */
-    ret = job_bmi_send_list(sm_p->encoded_req.dest,
-			    sm_p->encoded_req.buffer_list,
-			    sm_p->encoded_req.size_list,
-			    sm_p->encoded_req.list_count,
-			    sm_p->encoded_req.total_size,
-			    session_tag,
-			    sm_p->encoded_req.buffer_type,
-			    1,
-			    sm_p, /* user pointer, used to get to next state */
-			    &send_status, /* only for immediate completion */
-			    &send_id, /* could in theory be used to unpost */
-			    pint_client_sm_context);
-    if (ret < 0) {
-	assert(0);
-    }
-    else if (ret == 1) {
-	/* send completed immediately; decrement the completion counter */
-	gossip_debug(CLIENT_DEBUG, "remove: lookup send completed immediately.\n");
-	/* TODO: CHECK THE STATUS!!! */
-	assert(send_status.error_code == 0);
-	sm_p->comp_ct--;
-    }
+/* remove_lookup_comp_fn()
+ */
+static int remove_lookup_comp_fn(void *v_p,
+				 struct PVFS_server_resp *resp_p)
+{
+    PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
 
-    /* TODO: keep up with job ids, so we can match later. */
+    assert(resp_p->u.lookup_path.handle_count >= 1); /* sanity check */
+
+    /* pull handle out of response, also copy in fs_id from before */
+    sm_p->u.remove.object_ref.handle = resp_p->u.lookup_path.handle_array[0];
+    sm_p->u.remove.object_ref.fs_id  = sm_p->u.remove.parent_ref.fs_id;
 
     return 0;
 }
 
-/* remove_lookup_complete_msgpair()
- */
-static int remove_lookup_complete_msgpair(PINT_client_sm *sm_p,
-				   job_status_s *js_p)
-{
-    int ret;
-    struct PINT_decoded_msg decoded_resp; /* data about decoded resp */
-    struct PVFS_server_resp *resp_p; /* response structure (decoded) */
-
-    gossip_debug(CLIENT_DEBUG, "remove state: recv_lookup_resp\n");
-
-    /* we may or may not have previously completed either operation.
-     * here we check to see if there are additional operations that
-     * must complete successfully before we can continue.  if the
-     * counter hits zero, we know we've gotten our data and can
-     * continue.
-     *
-     * otherwise we return 0; we will get called again when the next
-     * bmi job completes.
-     */
-    if (--sm_p->comp_ct > 0) return 0;
-    assert(sm_p->comp_ct == 0);
-
-    /* in the success case we can assume that the last thing we received
-     * was the response.
-     */
-
-    /* decode; resp_p will point to response */
-    ret = PINT_serv_decode_resp(sm_p->encoded_resp_p,
-				&decoded_resp,
-				&sm_p->svr_addr,
-				js_p->actual_size,
-				&resp_p);
-    if (ret < 0) {
-	assert(0);
-    }
-
-    /* check status of response */
-    if (resp_p->status != 0) {
-	assert(0);
-    }
-
-    assert(resp_p->u.lookup_path.handle_count == 1);
-
-    /* pull out the data that we wanted */
-    sm_p->u.remove.object_ref.handle = resp_p->u.lookup_path.handle_array[0];
-    sm_p->u.remove.object_ref.fs_id  = sm_p->u.remove.parent_ref.fs_id;
-
-    gossip_debug(CLIENT_DEBUG, "lookup completed (handle = 0x%08Lx)\n",
-		 sm_p->u.remove.object_ref.handle);
-
-    /* free all the resources that we used to send and receive. */
-    ret = PINT_serv_free_msgpair_resources(&sm_p->encoded_req,
-					   sm_p->encoded_resp_p,
-					   &decoded_resp,
-					   &sm_p->svr_addr,
-					   sm_p->max_resp_sz);
-    if (ret != 0) {
-	assert(0);
-    }
-
-    /* check permissions */
-
-    /* Q: what do we do with directories?
-     * Q: should we check that they are empty?
-     */
-
-    /* TODO: check that we have necessary metadata from lookup */
-
-    return 1;
-}
 
 /* remove_getattr_post_msgpair()
  *

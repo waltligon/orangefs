@@ -17,6 +17,10 @@
  * - comp_fn
  *
  * When this state machine returns, ...
+ *
+ * TODO: augment this (and msgpairarray) so that they automatically have a
+ *       look at responses and update the pcache and dcache appropriately,
+ *       so we don't have to worry about them in other places.
  */
 
 #include <string.h>
