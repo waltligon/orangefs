@@ -627,20 +627,19 @@ int BMI_tcp_set_info(int option,
 int BMI_tcp_get_info(int option,
 		     void *inout_parameter)
 {
-    int ret = -1;
-
     switch (option)
     {
     case BMI_CHECK_MAXSIZE:
 	*((int *) inout_parameter) = TCP_MODE_REND_LIMIT;
-	ret = 0;
+	return(0);
+	break;
     default:
 	gossip_ldebug(BMI_DEBUG_TCP, "TCP hint %d not implemented.\n", option);
-	ret = 0;
+	return(0);
 	break;
     }
 
-    return (ret);
+    return (-ENOSYS);
 }
 
 
