@@ -28,7 +28,6 @@
 fsconfig_array server_config;
 extern struct server_configuration_s g_server_config;
 
-static char HACK_server_name[] = "tcp://localhost:3334";
 static PVFS_handle HACK_handle_mask = 0;
 static PVFS_handle HACK_bucket = 0;
 
@@ -143,6 +142,8 @@ int PINT_handle_load_mapping(void *fs)
         assert(cur_config_fs_cache);
 
         cur_config_fs_cache->fs = (struct filesystem_configuration_s *)fs;
+        cur_config_fs_cache->meta_server_cursor = NULL;
+        cur_config_fs_cache->data_server_cursor = NULL;
         cur_config_fs_cache->bmi_host_extent_tables = llist_new();
         assert(cur_config_fs_cache->bmi_host_extent_tables);
 
@@ -195,6 +196,11 @@ int PINT_handle_load_mapping(void *fs)
         */
         if (ret == 0)
         {
+            cur_config_fs_cache->meta_server_cursor =
+                cur_config_fs_cache->fs->meta_server_list;
+            cur_config_fs_cache->data_server_cursor =
+                cur_config_fs_cache->fs->data_server_list;
+
             qhash_add(s_fsid_config_cache_table,
                       &(cur_config_fs_cache->fs->coll_id),
                       &(cur_config_fs_cache->hash_link));
@@ -206,7 +212,7 @@ int PINT_handle_load_mapping(void *fs)
 
 /* PINT_bucket_get_next_meta()
  *
- * returns the address, bucket, and handle mask of the next server 
+ * returns the bmi address of the next server
  * that should be used to store a new piece of metadata.  This 
  * function is responsible for fairly distributing the metadata 
  * storage responsibility to all servers.
@@ -214,37 +220,51 @@ int PINT_handle_load_mapping(void *fs)
  * returns 0 on success, -errno on failure
  */
 int PINT_bucket_get_next_meta(
-	PVFS_fs_id fsid,
-	bmi_addr_t* meta_addr,
-	PVFS_handle* bucket,
-	PVFS_handle* handle_mask)
+    PVFS_fs_id fsid,
+    bmi_addr_t *meta_addr)
 {
-	int ret = -1;
+    int ret = -EINVAL;
+    char *meta_server_bmi_str = (char *)0;
+    struct qlist_head *hash_link = NULL;
+    struct config_fs_cache_s *cur_config_cache = NULL;
 
-#if 0
-	/* make sure that they asked for something sane */
-	if (!PINT_server_config_is_valid_collection_id(
-                &g_server_config,(TROVE_coll_id)fsid))
-	{
-		gossip_lerr("PINT_bucket_get_next_meta() called with invalid fsid.\n");
-		return(-EINVAL);
-	}
-#endif
-	ret = BMI_addr_lookup(meta_addr, HACK_server_name);
-	if(ret < 0)
-	{
-		return(ret);
-	}
+    if (meta_addr)
+    {
+        hash_link = qhash_search(s_fsid_config_cache_table,&(fsid));
+        if (hash_link)
+        {
+            cur_config_cache =
+                qlist_entry(hash_link, struct config_fs_cache_s,
+                            hash_link);
+            assert(cur_config_cache);
+            assert(cur_config_cache->fs);
+            assert(cur_config_cache->meta_server_cursor);
 
-	*handle_mask = HACK_handle_mask;
-	*bucket = HACK_bucket;
+            meta_server_bmi_str =
+                llist_head(cur_config_cache->meta_server_cursor);
+            if (!meta_server_bmi_str)
+            {
+                cur_config_cache->meta_server_cursor =
+                    cur_config_cache->fs->meta_server_list;
+                meta_server_bmi_str =
+                    llist_head(cur_config_cache->meta_server_cursor);
+                assert(meta_server_bmi_str);
+            }
+            cur_config_cache->meta_server_cursor =
+                llist_next(cur_config_cache->meta_server_cursor);
 
-	return(0);
+            meta_server_bmi_str = PINT_server_config_get_host_addr_ptr(
+                &g_server_config,meta_server_bmi_str);
+
+            ret = BMI_addr_lookup(meta_addr,meta_server_bmi_str);
+        }
+    }
+    return ret;
 }
 
 /* PINT_bucket_get_next_io()
  *
- * returns the address, bucket, and handle mask of a set of servers that
+ * returns the address of a set of servers that
  * should be used to store new pieces of file data.  This function is
  * responsible for evenly distributing the file data storage load to all
  * servers.
@@ -252,53 +272,56 @@ int PINT_bucket_get_next_meta(
  * returns 0 on success, -errno on failure
  */
 int PINT_bucket_get_next_io(
-	PVFS_fs_id fsid,
-	int num_servers,
-	bmi_addr_t* io_addr_array,
-	PVFS_handle* bucket_array,
-	PVFS_handle* handle_mask)
+    PVFS_fs_id fsid,
+    int num_servers,
+    bmi_addr_t *io_addr_array)
 {
-	int i = 0;
-	int ret = -1;
+    int ret = -EINVAL;
+    char *data_server_bmi_str = (char *)0;
+    struct qlist_head *hash_link = NULL;
+    struct config_fs_cache_s *cur_config_cache = NULL;
 
-#if 0
-	/* make sure that they asked for something sane */
-	if (!PINT_server_config_is_valid_collection_id(
-                &g_server_config,(TROVE_coll_id)fsid))
-	{
-		gossip_lerr("PINT_bucket_get_next_io() called with invalid fsid.\n");
-		return(-EINVAL);
-	}
-#endif
-	/* NOTE: for now, we assume that if the caller asks for more servers
-	 * than we have available, we should just duplicate servers in the
-	 * list.  The caller can use get_num_io to find out how many servers
-	 * there are if they want to match up.
-	 */
-	
-	ret = BMI_addr_lookup(&(io_addr_array[0]), HACK_server_name);
-	if(ret < 0)
-	{
-		return(ret);
-	}
+    if (num_servers && io_addr_array)
+    {
+        hash_link = qhash_search(s_fsid_config_cache_table,&(fsid));
+        if (hash_link)
+        {
+            cur_config_cache =
+                qlist_entry(hash_link, struct config_fs_cache_s,
+                            hash_link);
+            assert(cur_config_cache);
+            assert(cur_config_cache->fs);
 
-	/* copy the same address to every server position if the user wanted
-	 * more than one i/o server
-	 */
-	for(i=1; i<num_servers; i++)
-	{
-		io_addr_array[i] = io_addr_array[0];
-	}
+            while(num_servers)
+            {
+                assert(cur_config_cache->data_server_cursor);
 
-	/* fill in the same bucket in every slot as well */
-	for(i=0; i<num_servers; i++)
-	{
-		bucket_array[i] = HACK_bucket;
-	}
+                data_server_bmi_str =
+                    llist_head(cur_config_cache->data_server_cursor);
+                if (!data_server_bmi_str)
+                {
+                    cur_config_cache->data_server_cursor =
+                        cur_config_cache->fs->data_server_list;
+                    continue;
+                }
+                cur_config_cache->data_server_cursor =
+                    llist_next(cur_config_cache->data_server_cursor);
 
-	*handle_mask = HACK_handle_mask;
+                data_server_bmi_str = PINT_server_config_get_host_addr_ptr(
+                    &g_server_config,data_server_bmi_str);
 
-	return(0);
+                ret = BMI_addr_lookup(io_addr_array,data_server_bmi_str);
+                if (ret)
+                {
+                    break;
+                }
+                io_addr_array++;
+                num_servers--;
+            }
+            ret = ((num_servers == 0) ? 0 : ret);
+        }
+    }
+    return ret;
 }
 
 
@@ -553,6 +576,15 @@ static int hash_fsid_compare(void *key, struct qlist_head *link)
     return(0);
 }
 
+static void free_extent_list(void *ptr)
+{
+    struct llist *extent_list = (struct llist *)ptr;
+    if (extent_list)
+    {
+        PINT_release_extent_list(extent_list);
+    }
+}
+
 static void free_host_extent_table(void *ptr)
 {
     struct bmi_host_extent_table_s *cur_host_extent_table =
@@ -564,7 +596,7 @@ static void free_host_extent_table(void *ptr)
 
     free(cur_host_extent_table->bmi_address);
     llist_free(cur_host_extent_table->extent_list,
-               PINT_release_extent_list);
+               free_extent_list);
 }
 
 #endif

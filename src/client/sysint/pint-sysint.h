@@ -81,6 +81,12 @@ typedef struct config_fs_cache_s
 
     /* ptrs are type bmi_host_extent_table_s */
     struct llist *bmi_host_extent_tables;
+
+    /* index into fs->meta_server_list (see server-config.h) */
+    struct llist *meta_server_cursor;
+
+    /* index into fs->data_server_list (see server-config.h) */
+    struct llist *data_server_cursor;
 } config_fs_cache_s;
 
 
