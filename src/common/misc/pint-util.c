@@ -12,7 +12,7 @@
 #include "pint-util.h"
 #include "gen-locks.h"
 
-static int current_tag;
+static int current_tag = 1;
 static gen_mutex_t current_tag_lock = GEN_MUTEX_INITIALIZER;
 
 PVFS_msg_tag_t PINT_util_get_next_tag(void)
@@ -23,7 +23,7 @@ PVFS_msg_tag_t PINT_util_get_next_tag(void)
     ret = current_tag;
 
     /* increment the tag, don't use zero */
-    if (current_tag + 1 == 0)
+    if (current_tag + 1 == PINT_MSG_TAG_INVALID)
     {
 	current_tag = 1;
     }

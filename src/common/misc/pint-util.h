@@ -25,6 +25,9 @@ do{                                             \
     (dest)->mask = ((src)->mask & attrmask);    \
 }while(0)
 
+/* reserved tag values */
+#define PINT_MSG_TAG_INVALID 0
+
 PVFS_msg_tag_t PINT_util_get_next_tag(void);
 
 int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src);
