@@ -989,12 +989,15 @@ int BMI_tcp_testunexpected(int incount,
 
     gen_mutex_lock(&interface_mutex);
 
-    /* do some ``real work'' here */
-    ret = tcp_do_work(max_idle_time);
-    if (ret < 0)
+    if(op_list_empty(op_list_array[IND_COMPLETE_RECV_UNEXP]))
     {
-	gen_mutex_unlock(&interface_mutex);
-	return (ret);
+        /* do some ``real work'' here */
+        ret = tcp_do_work(max_idle_time);
+        if (ret < 0)
+        {
+            gen_mutex_unlock(&interface_mutex);
+            return (ret);
+        }
     }
 
     *outcount = 0;
@@ -1042,12 +1045,25 @@ int BMI_tcp_testcontext(int incount,
 
     gen_mutex_lock(&interface_mutex);
 
-    /* do some ``real work'' here */
-    ret = tcp_do_work(max_idle_time);
-    if (ret < 0)
+    if(op_list_empty(completion_array[context_id]))
     {
-	gen_mutex_unlock(&interface_mutex);
-	return (ret);
+        /* if there are unexpected ops ready to go, then short out so
+         * that the next testunexpected call can pick it up without
+         * delay
+         */
+        if(!op_list_empty(op_list_array[IND_COMPLETE_RECV_UNEXP]))
+        {
+            gen_mutex_unlock(&interface_mutex);
+            return(0);
+        }
+
+        /* do some ``real work'' here */
+        ret = tcp_do_work(max_idle_time);
+        if (ret < 0)
+        {
+            gen_mutex_unlock(&interface_mutex);
+            return (ret);
+        }
     }
 
     /* pop as many items off of the completion queue as we can */
