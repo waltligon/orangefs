@@ -1,0 +1,109 @@
+/* 
+ * (C) 2003 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+#include <string.h>
+#include <assert.h>
+
+#include "client-state-machine.h"
+#include "state-machine-fns.h"
+#include "pvfs2-debug.h"
+#include "job.h"
+#include "gossip.h"
+#include "str-utils.h"
+
+#include "pinode-helper.h"
+#include "pint-dcache.h"
+#include "pint-servreq.h"
+#include "pint-bucket.h"
+#include "pcache.h"
+#include "PINT-reqproto-encode.h"
+
+extern job_context_id pint_client_sm_context;
+
+/* state function prototypes */
+static int mgmt_setparam_all_init(PINT_client_sm *sm_p,
+		       job_status_s *js_p);
+
+static int mgmt_setparam_all_setup_msgpair(PINT_client_sm *sm_p,
+					job_status_s *js_p);
+
+static int mgmt_setparam_all_cleanup(PINT_client_sm *sm_p,
+			  job_status_s *js_p);
+
+static int mgmt_setparam_all_failure(PINT_client_sm *sm_p,
+			  job_status_s *js_p);
+
+%%
+
+machine pvfs2_client_mgmt_setparam_all_sm(init,
+			       cleanup,
+			       setup_msgpair,
+			       xfer_msgpair,
+			       failure)
+{
+    state init {
+	run mgmt_setparam_all_init;
+	default => setup_msgpair;
+    }
+
+    state setup_msgpair {
+	run mgmt_setparam_all_setup_msgpair;
+	success => xfer_msgpair;
+	default => failure;
+    }
+
+    state xfer_msgpair {
+	jump pvfs2_client_msgpair_sm;
+	success => cleanup;
+	default => failure;
+    }
+
+    state failure {
+	run mgmt_setparam_all_failure;
+	default => cleanup;
+    }
+
+    state cleanup {
+	run mgmt_setparam_all_cleanup;
+	default => init;
+    }
+}
+
+%%
+
+static int mgmt_setparam_all_init(PINT_client_sm *sm_p,
+		       job_status_s *js_p)
+{
+    assert(0);
+}
+
+static int mgmt_setparam_all_setup_msgpair(PINT_client_sm *sm_p,
+					job_status_s *js_p)
+{
+    assert(0);
+}
+
+static int mgmt_setparam_all_cleanup(PINT_client_sm *sm_p,
+			  job_status_s *js_p)
+{
+    assert(0);
+}
+
+static int mgmt_setparam_all_failure(PINT_client_sm *sm_p,
+			  job_status_s *js_p)
+{
+    assert(0);
+}
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 noexpandtab
+ */
