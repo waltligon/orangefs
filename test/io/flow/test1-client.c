@@ -17,6 +17,7 @@
 #include "flow.h"
 #include "flowproto-support.h"
 #include "pint-distribution.h"
+#include "pint-dist-utils.h"
 #include "pvfs2-request.h"
 #include "thread-mgr.h"
 
@@ -150,6 +151,7 @@ int main(
     }
 
     /* file data */
+    PINT_dist_initialize();
     flow_d->file_data.fsize = TEST_SIZE;
     flow_d->file_data.server_nr = 0;
     flow_d->file_data.server_ct = 1;

@@ -17,6 +17,7 @@
 #include "flow.h"
 #include "flowproto-support.h"
 #include "pint-distribution.h"
+#include "pint-dist-utils.h"
 #include "pvfs2-request.h"
 #include "thread-mgr.h"
 
@@ -51,6 +52,9 @@ int main(
     /* set debugging level */
     gossip_enable_stderr();
     gossip_set_debug_mask(0, GOSSIP_FLOW_PROTO_DEBUG | GOSSIP_BMI_DEBUG_TCP);
+
+    /* dist init */
+    PINT_dist_initialize();
 
     /* start up BMI */
     ret = BMI_initialize("bmi_tcp", NULL, 0);

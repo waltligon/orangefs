@@ -24,6 +24,7 @@
 
 #include <pint-request.h>
 #include <pint-distribution.h>
+#include "pint-dist-utils.h"
 #include "client.h"
 #include "mpi.h"
 #include "pts.h"
@@ -71,6 +72,7 @@ static int test_request(void){
     rs2 = PINT_New_request_state(r2);
                                                                                 
     /* set up file data for first request */
+    PINT_dist_initialize();
     rf1.server_nr = 0;
     rf1.server_ct = 1;
     rf1.fsize = 0;

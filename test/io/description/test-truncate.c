@@ -12,6 +12,7 @@
 #include "gossip.h"
 #include "pvfs2-debug.h"
 #include "pint-distribution.h"
+#include "pint-dist-utils.h"
 
 void PINT_Dist_dump(PINT_dist *dist);
 
@@ -22,6 +23,7 @@ int main(int argc, char **argv)
     PVFS_offset tmp_off = 0;
 
     /* grab a distribution */
+    PINT_dist_initialize();
     d = PINT_dist_create("simple_stripe");
     assert(d);
 

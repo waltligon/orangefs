@@ -12,6 +12,7 @@
 #include <pvfs2-debug.h>
 
 #include <pint-distribution.h>
+#include <pint-dist-utils.h>
 #include <pvfs2-request.h>
 #include <pint-request.h>
 
@@ -76,6 +77,7 @@ int main(int argc, char **argv)
 	rs1 = PINT_New_request_state(r_dec);
 
 	/* set up file data for each server */
+	PINT_dist_initialize();
 	rf1.server_nr = 0;
 	rf1.server_ct = 2;
 	rf1.fsize = 0;

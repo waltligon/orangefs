@@ -11,6 +11,7 @@
 #include <pvfs2-debug.h>
 
 #include <pint-distribution.h>
+#include <pint-dist-utils.h>
 #include <pvfs2-request.h>
 #include <pint-request.h>
 #include <assert.h>
@@ -36,6 +37,8 @@ int main(int argc, char **argv)
 
 	/* setup file datatype */
 	file_req = PVFS_BYTE;
+
+	PINT_dist_initialize();
 
 	/* setup mem datatype */
 	PVFS_Request_contiguous(2251664, PVFS_BYTE, &mem_req);

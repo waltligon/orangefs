@@ -19,6 +19,7 @@
 #include "flow.h"
 #include "flowproto-support.h"
 #include "pint-distribution.h"
+#include "pint-dist-utils.h"
 #include "pvfs2-request.h"
 
 #include "trove.h"
@@ -87,6 +88,9 @@ int main(
     gossip_enable_stderr();
     gossip_set_debug_mask(
         0, (GOSSIP_FLOW_PROTO_DEBUG | GOSSIP_BMI_DEBUG_TCP));
+
+    /* Init dists */
+    PINT_dist_initialize();
 
     /* start up BMI */
     ret = BMI_initialize("bmi_tcp", "tcp://NULL:3335", BMI_INIT_SERVER);
