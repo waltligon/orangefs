@@ -82,7 +82,7 @@ int main(int argc,char **argv)
 
 	req_readdir->pinode_refn.handle = resp_look.pinode_refn.handle;
 	req_readdir->pinode_refn.fs_id = req_look.fs_id;
-	req_readdir->token = 1;
+	req_readdir->token = PVFS2_READDIR_START;
 	req_readdir->pvfs_dirent_incount = max_dirents_returned;
 
 	req_readdir->credentials.uid = 100;

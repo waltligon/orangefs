@@ -512,7 +512,7 @@ int main(int argc,char **argv)
 
 	req_readdir->pinode_refn.handle = resp_look.pinode_refn.handle;
 	req_readdir->pinode_refn.fs_id = req_look.fs_id;
-	req_readdir->token = PVFS_TOKEN_START;
+	req_readdir->token = PVFS2_READDIR_START;
 	req_readdir->pvfs_dirent_incount = 6;
 /*
 	resp_readdir->dirent_array = (PVFS_dirent *)malloc(sizeof(PVFS_dirent) *
