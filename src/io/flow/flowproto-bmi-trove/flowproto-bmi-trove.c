@@ -235,10 +235,6 @@ static void trove_completion_bmi_to_trove(PVFS_ds_state error_code,
 					  flow_descriptor * flow_d);
 static int buffer_setup_trove_to_bmi(flow_descriptor * flow_d);
 static int buffer_setup_bmi_to_trove(flow_descriptor * flow_d);
-static int process_request_discard_regions(PINT_Request_state * req,
-					   PINT_Request_file_data * rfdata,
-					   PVFS_offset * start_offset,
-					   PVFS_size * bytemax);
 
 /****************************************************
  * public interface functions
@@ -1344,6 +1340,7 @@ static void service_bmi_to_trove(flow_descriptor * flow_d)
     PVFS_boolean eof_flag = 0;
     char *tmp_offset;
     PVFS_size actual_size = 0;
+    PVFS_count32 segmax = 0;
 
     gossip_ldebug(FLOW_PROTO_DEBUG, "service_bmi_to_trove() called.\n");
 
@@ -1415,10 +1412,16 @@ static void service_bmi_to_trove(flow_descriptor * flow_d)
 	{
 	    /* see how much more is in the pipe */
 	    flow_data->bmi_total_size = flow_data->max_buffer_size;
-	    ret = process_request_discard_regions(flow_data->dup_req_state,
-						  flow_d->file_data,
-						  &flow_data->dup_req_offset,
-						  &flow_data->bmi_total_size);
+	    eof_flag = 0;
+	    ret = PINT_Process_request(flow_data->dup_req_state,
+		flow_d->file_data,
+		&segmax,
+		NULL,
+		NULL,
+		&flow_data->dup_req_offset,
+		&flow_data->bmi_total_size,
+		&eof_flag,
+		PINT_CKSZ2);
 	    if (ret < 0)
 	    {
 		/* TODO: do something */
@@ -2144,54 +2147,6 @@ static void buffer_teardown_bmi_to_trove(flow_descriptor * flow_d)
     PINT_Free_request_state(flow_data->dup_req_state);
     return;
 }
-
-
-/* process_request_discard_regions()
- *
- * essentially does what PINT_Process_request would do, except that it
- * throws away the segments- we really just want to find out how much
- * data is left in the stream and advance the request processing offset
- * NOTE: this will be replaced with a more optimal request processing
- * API function later
- *
- * returns 0 on success, -errno on failure
- */
-static int process_request_discard_regions(PINT_Request_state * req,
-					   PINT_Request_file_data * rfdata,
-					   PVFS_offset * start_offset,
-					   PVFS_size * bytemax)
-{
-    PVFS_count32 segmax = MAX_REGIONS;
-    PVFS_offset offset_array[MAX_REGIONS];
-    PVFS_size size_array[MAX_REGIONS];
-    PVFS_size left_to_process = *bytemax;
-    PVFS_size tmp_bytemax;
-    PVFS_boolean eof_flag = 0;
-    int ret = -1;
-
-    /* loop until we have hit the stream point that we wanted or we have
-     * it the end of the stream 
-     */
-    while ((left_to_process > 0) && ((*start_offset) != -1) && !eof_flag)
-    {
-	segmax = MAX_REGIONS;
-	tmp_bytemax = left_to_process;
-	ret = PINT_Process_request(req, rfdata, &segmax, offset_array,
-				   size_array, start_offset, &tmp_bytemax,
-				   &eof_flag, PINT_SERVER);
-	if (ret < 0)
-	{
-	    return (ret);
-	}
-
-	left_to_process -= tmp_bytemax;
-    }
-
-    *bytemax = *bytemax - left_to_process;
-
-    return (0);
-}
-
 
 /* bmi_completion_bmi_to_trove()
  *
