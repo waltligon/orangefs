@@ -6,6 +6,7 @@
 
 #include <client.h>
 #include <sys/time.h>
+#include <stdio.h>
 #include "mpi.h"
 #include "pts.h"
 
