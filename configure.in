@@ -326,25 +326,33 @@ LDFLAGS="$LDFLAGS -rdynamic"
 CFLAGS="$CFLAGS -DGOSSIP_ENABLE_BACKTRACE"
 )
 
+dnl --
 dnl Check for SDL
-SDL_VERSION=1.2.0
-AM_PATH_SDL($SDL_VERSION, 
-    VISCFLAGS="$SDL_CFLAGS"
-    VISLIBS="$SDL_LIBS"
-dnl We also need SDL ttf support
-CPPFLAGS_OLD="$CPPFLAGS"
-CPPFLAGS="$CPPFLAGS $VISCFLAGS"
-    AC_CHECK_HEADERS(SDL_ttf.h,
-	BUILD_VIS="1"
-    )
-CPPFLAGS="$CPPFLAGS_OLD"
-,
-    VISCFLAGS=
-    VISLIBS=
+AC_MSG_CHECKING([for SDL])
+SDL_CONFIG=`which sdl-config`
+if test -x $SDL_CONFIG; then
+   AC_MSG_RESULT(yes)
+   SDL_VERSION=`sdl-config --version`
+   VISCFLAGS=`sdl-config --cflags`
+   VISCLIBS=`sdl-config --libs`
+
+   dnl We also need SDL ttf support
+   dnl only define BUILD_VIS if we have all required parts
+   AC_CHECK_HEADERS(SDL_ttf.h,
+       [BUILD_VIS="1"
+        AC_SUBST(BUILD_VIS)
+        CPPFLAGS="$CPPFLAGS $VISCFLAGS"],
+        [AC_CHECK_HEADERS(SDL/SDL_ttf.h,
+            [BUILD_VIS="1"
+            AC_SUBST(BUILD_VIS)
+            CPPFLAGS="$CPPFLAGS $VISCFLAGS"],)],
 )
-AC_SUBST(VISCFLAGS)
-AC_SUBST(VISLIBS)
-AC_SUBST(BUILD_VIS)
+
+   AC_SUBST(VISCFLAGS)
+   AC_SUBST(VISLIBS)
+else
+   AC_MSG_RESULT(no)
+fi
 
 dnl create any missing subdirectories that wouldn't be created
 dnl by AC_OUTPUT below (which won't create intermediate dirs).
