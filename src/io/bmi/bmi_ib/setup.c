@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: setup.c,v 1.7 2004-03-07 02:14:57 pw Exp $
+ * $Id: setup.c,v 1.8 2004-03-17 20:10:35 pw Exp $
  */
 #include <fcntl.h>
 #include <unistd.h>
@@ -527,7 +527,8 @@ BMI_ib_method_addr_lookup(const char *id)
 }
 
 /*
- * Blocking connect initiated by a post_sendunexpected{,_list}.
+ * Blocking connect initiated by a post_sendunexpected{,_list}, or
+ * post_recv*
  */
 void
 ib_tcp_client_connect(ib_method_addr_t *ibmap, struct method_addr *remote_map)
