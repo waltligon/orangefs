@@ -352,6 +352,7 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
             js_p->error_code = -PVFS_EISDIR;
             return 1;
         default:
+	    gossip_err("Error: I/O attempted on invalid object type.\n");
             js_p->error_code = -PVFS_EIO;
             return 1;
     }
@@ -852,6 +853,8 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 
             if (msg_p->op_status)
             {
+		gossip_err("Error: op_status: %d, resetting to PVFS_EIO.\n",
+		    msg_p->op_status);
                 js_p->error_code = -PVFS_EIO;
                 return 1;
             }
@@ -1100,6 +1103,7 @@ static int io_analyze_results(PINT_client_sm *sm_p,
                             js_p->error_code);
         if (js_p->error_code == 0)
         {
+	    gossip_err("Error: lost error_code; resetting to PVFS_EIO.\n");
             js_p->error_code = -PVFS_EIO;
         }
         error = js_p->error_code;
