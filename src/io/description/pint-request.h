@@ -84,4 +84,30 @@ int PINT_Request_encode(struct PINT_Request *req);
 /* decode packed request in place after receiving from wire */
 int PINT_Request_decode(struct PINT_Request *req);
 
+/********* macros for accessing key fields in a request *********/
+
+/* returns the number of bytes used by a contiguous packing of the
+ * request struct pointed to by reqp
+ */
+#define PINT_REQ_NUM_NESTED(reqp)\
+	(((reqp)->num_nested_req + 1) * sizeof(struct PINT_Request))
+
+/* returns true if the request struct pointed to by reqp is a packed
+ * struct
+ */
+#define PINT_REQ_IS_PACKED(reqp)\
+	((reqp)->committed == 1)
+
+/* returns the number of contiguous memory regions referenced by the
+ * request struct pointed to by reqp
+ */
+#define PINT_REQ_NUM_CONTIG(reqp)\
+	((reqp)->num_contig_chunks)
+
+/* returns the total number of bytes referenced by the struct pointed to
+ * by reqp - bytes might not be contiguous
+ */
+#define PINT_REQ_TOTAL_BYTES(reqp)\
+	((reqp)->aggregate_size)
+
 #endif /* __PINT_REQUEST_H */
