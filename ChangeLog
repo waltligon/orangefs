@@ -3,8 +3,8 @@ PVFS2 Release ChangeLog
 -----------------------
 
 
-pvfs2-0.0.8pre2
-===============
+pvfs2-0.0.8
+===========
 - many alpha platform improvements, including configure check passes,
   compilation fixes, and vfs fixes (alignment/overflow bugs)
 - pvfs2-genconfig quiet mode improvements
@@ -44,6 +44,7 @@ pvfs2-0.0.8pre2
 - more sanity checks in remove path (in particular for directories)
 - reorganized thread management for kernel / userspace communication used
   by pvfs2-client
+- some pvfs2-ls bug fixes
 
 
 pvfs2-0.0.7
