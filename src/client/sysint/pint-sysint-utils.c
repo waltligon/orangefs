@@ -21,9 +21,6 @@
 #include "pvfs2-util.h"
 #include "client-state-machine.h"
 
-static int g_session_tag;
-gen_mutex_t *g_session_tag_mt_lock = NULL;
-
 /*
   analogous to 'get_server_config_struct' in pvfs2-server.c -- only an
   fs_id is required since any client may know about different server
@@ -38,36 +35,6 @@ struct server_configuration_s *PINT_get_server_config_struct(
 void PINT_put_server_config_struct(struct server_configuration_s *config)
 {
     PINT_server_config_mgr_put_config(config);
-}
-
-int get_next_session_tag(void)
-{
-    int ret = -1;
-
-    if (g_session_tag_mt_lock == NULL)
-    {
-        g_session_tag_mt_lock = gen_mutex_build();
-        if (g_session_tag_mt_lock == NULL)
-        {
-            return ret;
-        }
-    }
-
-    gen_mutex_lock(g_session_tag_mt_lock);
-    ret = g_session_tag;
-
-    /* increment the tag, don't use zero */
-    if (g_session_tag + 1 == 0)
-    {
-	g_session_tag = 1;
-    }
-    else
-    {
-	g_session_tag++;
-    }
-    gen_mutex_unlock(g_session_tag_mt_lock);
-
-    return ret;
 }
 
 /* check permissions of a PVFS object against the access mode

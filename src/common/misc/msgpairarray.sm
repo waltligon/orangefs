@@ -41,6 +41,7 @@
 #include "pint-servreq.h"
 #include "PINT-reqproto-encode.h"
 #include "pvfs2-util.h"
+#include "pint-util.h"
 
 enum
 {
@@ -260,7 +261,7 @@ static int msgpairarray_post(PARENT_SM *sm_p,
             }
         }
 
-	session_tag = get_next_session_tag();
+	session_tag = PINT_util_get_next_tag();
 
         gossip_debug(GOSSIP_CLIENT_DEBUG,
                      "(%p) msgpair %d (%p): posting recv\n",

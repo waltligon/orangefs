@@ -44,11 +44,6 @@ int PVFS_sys_finalize()
     /* flush all known server configurations */
     PINT_server_config_mgr_finalize();
 
-    /* get rid of the mutex for the BMI session tag identifier */
-    gen_mutex_lock(g_session_tag_mt_lock);
-    gen_mutex_unlock(g_session_tag_mt_lock);
-    gen_mutex_destroy(g_session_tag_mt_lock);
-
     /* finalize the I/O interfaces */
     job_time_mgr_finalize();
     job_close_context(PVFS_sys_job_context);

@@ -62,7 +62,6 @@ void PINT_release_ack_array(PVFS_BMI_addr_t* addr_array,
 
 /* dunno where these belong, but here is better than nowhere. -- rob */
 void debug_print_type(void* thing, int type);
-PVFS_msg_tag_t get_next_session_tag(void);
 
 /*
  * Local variables:

@@ -31,8 +31,6 @@ job_context_id PVFS_sys_job_context = -1;
 
 PINT_client_sm *g_sm_p = NULL;
 
-extern gen_mutex_t *g_session_tag_mt_lock;
-
 typedef enum
 {
     CLIENT_NO_INIT         =      0,
@@ -117,7 +115,6 @@ int PVFS_sys_initialize(int default_debug_mask)
         gossip_lerr("BMI initialize failure\n");
         goto error_exit;
     }
-    g_session_tag_mt_lock = gen_mutex_build();
     client_status_flag |= CLIENT_BMI_INIT;
 
     /* initialize the flow interface */
