@@ -393,6 +393,7 @@ int job_bmi_send(bmi_addr_t addr,
     {
 	/* error posting */
 	out_status_p->error_code = ret;
+	out_status_p->status_user_tag = status_user_tag;
 	dealloc_job_desc(jd);
 	return (1);
     }
@@ -401,6 +402,7 @@ int job_bmi_send(bmi_addr_t addr,
     {
 	/* immediate completion */
 	out_status_p->error_code = 0;
+	out_status_p->status_user_tag = status_user_tag;
 	out_status_p->actual_size = size;
 	dealloc_job_desc(jd);
 	return (ret);
@@ -487,6 +489,7 @@ int job_bmi_send_list(bmi_addr_t addr,
     {
 	/* error posting */
 	out_status_p->error_code = ret;
+	out_status_p->status_user_tag = status_user_tag;
 	dealloc_job_desc(jd);
 	return (1);
     }
@@ -495,6 +498,7 @@ int job_bmi_send_list(bmi_addr_t addr,
     {
 	/* immediate completion */
 	out_status_p->error_code = 0;
+	out_status_p->status_user_tag = status_user_tag;
 	out_status_p->actual_size = total_size;
 	dealloc_job_desc(jd);
 	return (ret);
@@ -567,6 +571,7 @@ int job_bmi_recv(bmi_addr_t addr,
     {
 	/* error posting */
 	out_status_p->error_code = ret;
+	out_status_p->status_user_tag = status_user_tag;
 	dealloc_job_desc(jd);
 	return (1);
     }
@@ -575,6 +580,7 @@ int job_bmi_recv(bmi_addr_t addr,
     {
 	/* immediate completion */
 	out_status_p->error_code = 0;
+	out_status_p->status_user_tag = status_user_tag;
 	out_status_p->actual_size = jd->u.bmi.actual_size;
 	dealloc_job_desc(jd);
 	return (ret);
@@ -651,6 +657,7 @@ int job_bmi_recv_list(bmi_addr_t addr,
     {
 	/* error posting */
 	out_status_p->error_code = ret;
+	out_status_p->status_user_tag = status_user_tag;
 	dealloc_job_desc(jd);
 	return (1);
     }
@@ -659,6 +666,7 @@ int job_bmi_recv_list(bmi_addr_t addr,
     {
 	/* immediate completion */
 	out_status_p->error_code = 0;
+	out_status_p->status_user_tag = status_user_tag;
 	out_status_p->actual_size = jd->u.bmi.actual_size;
 	dealloc_job_desc(jd);
 	return (ret);
@@ -739,6 +747,7 @@ int job_bmi_unexp(struct BMI_unexpected_info *bmi_unexp_d,
 	{
 	    /* there was an unexpected job available */
 	    out_status_p->error_code = jd->u.bmi_unexp.info->error_code;
+	    out_status_p->status_user_tag = status_user_tag;
 	    dealloc_job_desc(jd);
 	    return (ret);
 	}
@@ -809,6 +818,7 @@ int job_dev_unexp(struct PINT_dev_unexp_info* dev_unexp_d,
     {
 	/* there was an unexpected job available */
 	out_status_p->error_code = 0;
+	out_status_p->status_user_tag = status_user_tag;
 	dealloc_job_desc(jd);
 	return (ret);
     }
@@ -856,11 +866,13 @@ int job_dev_write(void* buffer,
     {
 	/* error posting */
 	out_status_p->error_code = ret;
+	out_status_p->status_user_tag = status_user_tag;
 	return(1);
     }
 
     /* immediate completion */
     out_status_p->error_code = 0;
+    out_status_p->status_user_tag = status_user_tag;
     out_status_p->actual_size = size;
     return(1);
 }
@@ -897,11 +909,13 @@ int job_dev_write_list(void** buffer_list,
     {
 	/* error posting */
 	out_status_p->error_code = ret;
+	out_status_p->status_user_tag = status_user_tag;
 	return(1);
     }
 
     /* immediate completion */
     out_status_p->error_code = 0;
+    out_status_p->status_user_tag = status_user_tag;
     out_status_p->actual_size = total_size;
     return(1);
 }
@@ -960,6 +974,7 @@ int job_req_sched_post(struct PVFS_server_req *in_request,
     {
 	/* immediate completion */
 	out_status_p->error_code = 0;
+	out_status_p->status_user_tag = status_user_tag;
 	*id = jd->job_id;
 	/* don't delete the job desc until a matching release comes through */
 	return (1);
@@ -1027,6 +1042,7 @@ int job_req_sched_release(job_id_t in_completed_id,
     {
 	/* immediate completion */
 	out_status_p->error_code = 0;
+	out_status_p->status_user_tag = status_user_tag;
 	dealloc_job_desc(jd);
 	return (1);
     }
@@ -1076,6 +1092,7 @@ int job_flow(flow_descriptor * flow_d,
     if (ret < 0)
     {
 	out_status_p->error_code = ret;
+	out_status_p->status_user_tag = status_user_tag;
 	dealloc_job_desc(jd);
 	return (1);
     }
@@ -1083,6 +1100,7 @@ int job_flow(flow_descriptor * flow_d,
     {
 	/* immediate completion */
 	out_status_p->error_code = 0;
+	out_status_p->status_user_tag = status_user_tag;
 	out_status_p->actual_size = flow_d->total_transfered;
 	dealloc_job_desc(jd);
 	return (1);
@@ -1167,6 +1185,7 @@ int job_trove_bstream_write_at(PVFS_fs_id coll_id,
 	dealloc_job_desc(jd);
 	/* TODO: handle this correctly */
 	out_status_p->error_code = -EINVAL;
+	out_status_p->status_user_tag = status_user_tag;
 	return (1);
     }
 
@@ -1174,6 +1193,7 @@ int job_trove_bstream_write_at(PVFS_fs_id coll_id,
     {
 	/* immediate completion */
 	out_status_p->error_code = 0;
+	out_status_p->status_user_tag = status_user_tag;
 	out_status_p->actual_size = jd->u.trove.actual_size;
 	out_status_p->vtag = jd->u.trove.vtag;
 	dealloc_job_desc(jd);
@@ -1257,6 +1277,7 @@ int job_trove_bstream_read_at(PVFS_fs_id coll_id,
 	dealloc_job_desc(jd);
 	/* TODO: handle this correctly */
 	out_status_p->error_code = -EINVAL;
+	out_status_p->status_user_tag = status_user_tag;
 	return (1);
     }
 
@@ -1264,6 +1285,7 @@ int job_trove_bstream_read_at(PVFS_fs_id coll_id,
     {
 	/* immediate completion */
 	out_status_p->error_code = 0;
+	out_status_p->status_user_tag = status_user_tag;
 	out_status_p->actual_size = jd->u.trove.actual_size;
 	out_status_p->vtag = jd->u.trove.vtag;
 	dealloc_job_desc(jd);
@@ -1334,12 +1356,14 @@ int job_trove_bstream_flush(PVFS_fs_id coll_id,
 	/* error posting trove operation */
 	dealloc_job_desc(jd);
 	out_status_p->error_code = ret;
+	out_status_p->status_user_tag = status_user_tag;
 	return (1);
     }
     if (ret == 1)
     {
 	/* immediate completion */
 	out_status_p->error_code = 0;
+	out_status_p->status_user_tag = status_user_tag;
 	dealloc_job_desc(jd);
 	return (ret);
     }
@@ -1416,6 +1440,7 @@ int job_trove_keyval_read(PVFS_fs_id coll_id,
 	dealloc_job_desc(jd);
 
 	out_status_p->error_code = ret;
+	out_status_p->status_user_tag = status_user_tag;
 	return (1);
     }
 
@@ -1423,6 +1448,7 @@ int job_trove_keyval_read(PVFS_fs_id coll_id,
     {
 	/* immediate completion */
 	out_status_p->error_code = 0;
+	out_status_p->status_user_tag = status_user_tag;
 	out_status_p->vtag = jd->u.trove.vtag;
 	dealloc_job_desc(jd);
 	return (ret);
@@ -1503,6 +1529,7 @@ int job_trove_keyval_read_list(PVFS_fs_id coll_id,
 	dealloc_job_desc(jd);
 
 	out_status_p->error_code = ret;
+	out_status_p->status_user_tag = status_user_tag;
 	return (1);
     }
 
@@ -1510,6 +1537,7 @@ int job_trove_keyval_read_list(PVFS_fs_id coll_id,
     {
 	/* immediate completion */
 	out_status_p->error_code = 0;
+	out_status_p->status_user_tag = status_user_tag;
 	out_status_p->vtag = jd->u.trove.vtag;
 	dealloc_job_desc(jd);
 	return (ret);
@@ -1589,6 +1617,7 @@ int job_trove_keyval_write(PVFS_fs_id coll_id,
 	dealloc_job_desc(jd);
 
 	out_status_p->error_code = ret;
+	out_status_p->status_user_tag = status_user_tag;
 	return (1);
     }
 
@@ -1596,6 +1625,7 @@ int job_trove_keyval_write(PVFS_fs_id coll_id,
     {
 	/* immediate completion */
 	out_status_p->error_code = 0;
+	out_status_p->status_user_tag = status_user_tag;
 	out_status_p->vtag = jd->u.trove.vtag;
 	dealloc_job_desc(jd);
 	return (ret);
@@ -1664,6 +1694,7 @@ int job_trove_keyval_flush(PVFS_fs_id coll_id,
 	/* error posting trove operation */
 	dealloc_job_desc(jd);
 	out_status_p->error_code = ret;
+	out_status_p->status_user_tag = status_user_tag;
 	return (1);
     }
 
@@ -1671,6 +1702,7 @@ int job_trove_keyval_flush(PVFS_fs_id coll_id,
     {
 	/* immediate completion */
 	out_status_p->error_code = 0;
+	out_status_p->status_user_tag = status_user_tag;
 	dealloc_job_desc(jd);
 	return (ret);
     }
@@ -1748,6 +1780,7 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
 	/* error posting trove operation */
 	dealloc_job_desc(jd);
 	out_status_p->error_code = ret;
+	out_status_p->status_user_tag = status_user_tag;
 	return (1);
     }
 
@@ -1755,6 +1788,7 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
     {
 	/* immediate completion */
 	out_status_p->error_code = 0;
+	out_status_p->status_user_tag = status_user_tag;
 	out_status_p->ds_attr = jd->u.trove.attr;
 	dealloc_job_desc(jd);
 	return (ret);
@@ -1830,6 +1864,7 @@ int job_trove_dspace_setattr(PVFS_fs_id coll_id,
 	/* error posting trove operation */
 	dealloc_job_desc(jd);
 	out_status_p->error_code = ret;
+	out_status_p->status_user_tag = status_user_tag;
 	return (1);
     }
 
@@ -1837,6 +1872,7 @@ int job_trove_dspace_setattr(PVFS_fs_id coll_id,
     {
 	/* immediate completion */
 	out_status_p->error_code = 0;
+	out_status_p->status_user_tag = status_user_tag;
 	dealloc_job_desc(jd);
 	return (ret);
     }
@@ -1955,6 +1991,7 @@ int job_trove_keyval_remove(PVFS_fs_id coll_id,
 	dealloc_job_desc(jd);
 
 	out_status_p->error_code = ret;
+	out_status_p->status_user_tag = status_user_tag;
 	return (1);
     }
 
@@ -1962,6 +1999,7 @@ int job_trove_keyval_remove(PVFS_fs_id coll_id,
     {
 	/* immediate completion */
 	out_status_p->error_code = 0;
+	out_status_p->status_user_tag = status_user_tag;
 	out_status_p->vtag = jd->u.trove.vtag;
 	dealloc_job_desc(jd);
 	return (ret);
@@ -2066,6 +2104,7 @@ int job_trove_keyval_iterate(PVFS_fs_id coll_id,
 	dealloc_job_desc(jd);
 
 	out_status_p->error_code = ret;
+	out_status_p->status_user_tag = status_user_tag;
 	return (1);
     }
 
@@ -2073,6 +2112,7 @@ int job_trove_keyval_iterate(PVFS_fs_id coll_id,
     {
 	/* immediate completion */
 	out_status_p->error_code = 0;
+	out_status_p->status_user_tag = status_user_tag;
 	out_status_p->vtag = jd->u.trove.vtag;
 	out_status_p->position = jd->u.trove.position;
 	out_status_p->count = jd->u.trove.count;
@@ -2179,6 +2219,7 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
 	dealloc_job_desc(jd);
 	/* TODO: handle this correctly */
 	out_status_p->error_code = -EINVAL;
+	out_status_p->status_user_tag = status_user_tag;
 	return (1);
     }
 
@@ -2186,6 +2227,7 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
     {
 	/* immediate completion */
 	out_status_p->error_code = 0;
+	out_status_p->status_user_tag = status_user_tag;
 	out_status_p->handle = jd->u.trove.handle;
 	dealloc_job_desc(jd);
 	return (ret);
@@ -2260,6 +2302,7 @@ int job_trove_dspace_remove(PVFS_fs_id coll_id,
 	dealloc_job_desc(jd);
 	/* TODO: handle this correctly */
 	out_status_p->error_code = -EINVAL;
+	out_status_p->status_user_tag = status_user_tag;
 	return (1);
     }
 
@@ -2267,6 +2310,7 @@ int job_trove_dspace_remove(PVFS_fs_id coll_id,
     {
 	/* immediate completion */
 	out_status_p->error_code = 0;
+	out_status_p->status_user_tag = status_user_tag;
 	dealloc_job_desc(jd);
 	return (ret);
     }
@@ -2340,6 +2384,7 @@ int job_trove_dspace_verify(PVFS_fs_id coll_id,
 	dealloc_job_desc(jd);
 	/* TODO: handle this correctly */
 	out_status_p->error_code = -EINVAL;
+	out_status_p->status_user_tag = status_user_tag;
 	return (1);
     }
 
@@ -2347,6 +2392,7 @@ int job_trove_dspace_verify(PVFS_fs_id coll_id,
     {
 	/* immediate completion */
 	out_status_p->error_code = 0;
+	out_status_p->status_user_tag = status_user_tag;
 	dealloc_job_desc(jd);
 	return (ret);
     }
@@ -2418,6 +2464,7 @@ int job_trove_fs_create(char *collname,
 	dealloc_job_desc(jd);
 	/* TODO: handle this correctly */
 	out_status_p->error_code = -EINVAL;
+	out_status_p->status_user_tag = status_user_tag;
 	return (1);
     }
 
@@ -2425,6 +2472,7 @@ int job_trove_fs_create(char *collname,
     {
 	/* immediate completion */
 	out_status_p->error_code = 0;
+	out_status_p->status_user_tag = status_user_tag;
 	dealloc_job_desc(jd);
 	return (ret);
     }
@@ -2513,6 +2561,7 @@ int job_trove_fs_lookup(char *collname,
 	dealloc_job_desc(jd);
 	/* TODO: handle this correctly */
 	out_status_p->error_code = -EINVAL;
+	out_status_p->status_user_tag = status_user_tag;
 	return (1);
     }
 
@@ -2520,6 +2569,7 @@ int job_trove_fs_lookup(char *collname,
     {
 	/* immediate completion */
 	out_status_p->error_code = 0;
+	out_status_p->status_user_tag = status_user_tag;
 	out_status_p->coll_id = jd->u.trove.fsid;
 	dealloc_job_desc(jd);
 	return (ret);
@@ -2590,6 +2640,7 @@ int job_trove_fs_seteattr(PVFS_fs_id coll_id,
 	dealloc_job_desc(jd);
 	/* TODO: handle this correctly */
 	out_status_p->error_code = -EINVAL;
+	out_status_p->status_user_tag = status_user_tag;
 	return (1);
     }
 
@@ -2597,6 +2648,7 @@ int job_trove_fs_seteattr(PVFS_fs_id coll_id,
     {
 	/* immediate completion */
 	out_status_p->error_code = 0;
+	out_status_p->status_user_tag = status_user_tag;
 	dealloc_job_desc(jd);
 	return (ret);
     }
@@ -2671,6 +2723,7 @@ int job_trove_fs_geteattr(PVFS_fs_id coll_id,
 	dealloc_job_desc(jd);
 	/* TODO: handle this correctly */
 	out_status_p->error_code = -EINVAL;
+	out_status_p->status_user_tag = status_user_tag;
 	return (1);
     }
 
@@ -2678,6 +2731,7 @@ int job_trove_fs_geteattr(PVFS_fs_id coll_id,
     {
 	/* immediate completion */
 	out_status_p->error_code = 0;
+	out_status_p->status_user_tag = status_user_tag;
 	dealloc_job_desc(jd);
 	return (ret);
     }
@@ -3935,7 +3989,6 @@ static void fill_status(struct job_desc *jd,
 			void **returned_user_ptr_p,
 			job_status_s * status)
 {
-    status->id = jd->job_id;
     status->status_user_tag = jd->status_user_tag;
 
     if (returned_user_ptr_p)

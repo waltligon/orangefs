@@ -162,7 +162,7 @@ int msgpairarray_post(PINT_client_sm *sm_p,
 			   session_tag,
 			   BMI_PRE_ALLOC,
 			   sm_p,
-			   0,
+			   i,
 			   &msg_p->recv_status,
 			   &msg_p->recv_id,
 			   pint_client_sm_context);
@@ -188,7 +188,7 @@ int msgpairarray_post(PINT_client_sm *sm_p,
 				msg_p->encoded_req.buffer_type,
 				1,
 				sm_p,
-				0,
+				sm_p->msgarray_count+i,
 				&msg_p->send_status,
 				&msg_p->send_id,
 				pint_client_sm_context);
@@ -226,30 +226,32 @@ int msgpairarray_post(PINT_client_sm *sm_p,
 int msgpairarray_complete(PINT_client_sm *sm_p,
 				 job_status_s *js_p)
 {
-    int i;
     int matched_job = 0;
 
     gossip_debug(CLIENT_DEBUG, "msgpairarray state: complete\n");
 
     /* match operation with something in the msgpair array */
-    for (i=0; i < sm_p->msgarray_count; i++) {
-	PINT_client_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
+    /* the first N tags are receives, the second N are sends */
+    assert(js_p->status_user_tag < (sm_p->msgarray_count*2));
+    if(js_p->status_user_tag < sm_p->msgarray_count)
+    {
+	PINT_client_sm_msgpair_state *msg_p = 
+	    &sm_p->msgarray[js_p->status_user_tag];
+	matched_job = 1;
 
-	if (msg_p->recv_id == js_p->id) {
-	    matched_job = 1;
-
-	    msg_p->recv_id     = 0;
-	    msg_p->recv_status = *js_p;
-	    break;
-	}
-	else if (msg_p->send_id == js_p->id) {
-	    matched_job = 1;
-
-	    msg_p->send_id     = 0;
-	    msg_p->send_status = *js_p;
-	    break;
-	}
+	msg_p->recv_id     = 0;
+	msg_p->recv_status = *js_p;
     }
+    else
+    {
+	PINT_client_sm_msgpair_state *msg_p = 
+	    &sm_p->msgarray[js_p->status_user_tag - sm_p->msgarray_count];
+	matched_job = 1;
+
+	msg_p->send_id     = 0;
+	msg_p->send_status = *js_p;
+    }
+
     assert(matched_job == 1); /* sanity check */
 
     /* decrement comp_ct until all operations have completed.
