@@ -4,8 +4,10 @@
  * See COPYING in top-level directory.
  */
 
-#include <client.h>
 #include <sys/time.h>
+
+#include "client.h"
+#include "gossip.h"
 
 /*why were these commented out?*/
 

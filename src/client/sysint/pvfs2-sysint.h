@@ -13,13 +13,14 @@
 #include <stdlib.h>
 #include <malloc.h>
 #include <limits.h>
-
-#include <pvfs2-types.h>
-#include <pvfs2-attr.h>
-#include <llist.h>
-#include <gossip.h>
 #include <errno.h>
-#include <pvfs-request.h>
+
+#include "pvfs2-types.h"
+#include "pvfs2-attr.h"
+#if 0
+#include "llist.h"
+#endif
+#include "pvfs-request.h"
 
 /* TODO: note that this should be a derived value eventually.  For
  * now it is hard coded to match the definition of

@@ -4,10 +4,12 @@
  * See COPYING in top-level directory.
  */
 
-#include <client.h>
 #include <sys/time.h>
 
-/*why were these commented out?*/
+#include "client.h"
+#include "gossip.h"
+
+/*why were these commented out? -- because they shouldn't be here. -- RobR */
 
 #define ATTR_UID 1
 #define ATTR_GID 2
