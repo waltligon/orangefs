@@ -29,7 +29,6 @@ int main(int argc, char **argv)
 	PINT_Request_state *rs1;
 	PINT_Request_file_data rf1;
 	PINT_Request_result seg1;
-	int commit_index = 0;
 	int ret = -1;
 	int pack_size = 0;
 
@@ -49,8 +48,7 @@ int main(int argc, char **argv)
 	/* allocate a new request and pack the original one into it */
 	pack_size = PINT_REQUEST_PACK_SIZE(r);
 	r_enc = (PINT_Request*)malloc(pack_size);
-	commit_index = 0;
-	ret = PINT_Request_commit(r_enc, r, &commit_index);
+	ret = PINT_Request_commit(r_enc, r);
 	if(ret < 0)
 	{
 		fprintf(stderr, "PINT_Request_commit() failure.\n");
