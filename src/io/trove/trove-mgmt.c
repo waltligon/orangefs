@@ -12,12 +12,14 @@ struct TROVE_mgmt_ops    *mgmt_method_table[1];
 struct TROVE_dspace_ops  *dspace_method_table[1];
 struct TROVE_keyval_ops  *keyval_method_table[1];
 struct TROVE_bstream_ops *bstream_method_table[1];
+struct TROVE_fs_ops      *fs_method_table[1];
 
 /* Currently DBPF is our only implementation */
 extern struct TROVE_mgmt_ops    dbpf_mgmt_ops;
 extern struct TROVE_dspace_ops  dbpf_dspace_ops;
 extern struct TROVE_keyval_ops  dbpf_keyval_ops;
 extern struct TROVE_bstream_ops dbpf_bstream_ops;
+extern struct TROVE_fs_ops      dbpf_fs_ops;
 
 /* NOTE: the collection get/set info/eattr functions are automatically 
  * generated.
@@ -41,6 +43,7 @@ int trove_initialize(char *stoname,
     dspace_method_table[0]  = &dbpf_dspace_ops;
     keyval_method_table[0]  = &dbpf_keyval_ops;
     bstream_method_table[0] = &dbpf_bstream_ops;
+    fs_method_table[0]      = &dbpf_fs_ops;
 
     /* initialize can fail if storage name isn't valid, but we want those
      * ops pointers to be right either way.

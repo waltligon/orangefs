@@ -63,14 +63,42 @@ typedef struct PVFS_vtag PVFS_vtag_s;
  */
 struct PVFS_ds_attributes
 {
-    /* handle is used to get this, so shouldn't need it in here? */
+    PVFS_fs_id fs_id;
+    PVFS_handle handle;
+    PVFS_type type;
     PVFS_uid uid;
     PVFS_gid gid;
     PVFS_permissions mode;
     PVFS_time ctime;
-
+    /* NOTE: PUT NON-STORED AT THE BOTTOM!!! */
+    PVFS_size b_size; /* bstream size */
+    PVFS_size k_size; /* keyval size; # of keys */
 };
 typedef struct PVFS_ds_attributes PVFS_ds_attributes_s;
+
+struct PVFS_ds_storedattr
+{
+    PVFS_fs_id fs_id;
+    PVFS_handle handle;
+    PVFS_type type;
+    PVFS_uid uid;
+    PVFS_gid gid;
+    PVFS_permissions mode;
+    PVFS_time ctime;
+};
+typedef struct PVFS_ds_storedattr PVFS_ds_storedattr_s;
+
+#define PVFS_ds_attr_to_stored(__from, __to)	\
+do {						\
+    (__from) = (PVFS_ds_storedattr_s) (__to);	\
+} while (0);
+
+#define PVFS_ds_stored_to_attr(__from, __to, __b_size, __k_size)	\
+do {									\
+    (PVFS_ds_storedattr_s) (__to) = (__from);				\
+    (__to).b_size = (__b_size);						\
+    (__to).k_size = (__k_size);						\
+} while (0);
 
 /* key descriptors for use in key/value spaces */
 struct PVFS_ds_key

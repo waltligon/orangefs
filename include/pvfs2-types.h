@@ -23,6 +23,7 @@ typedef int64_t PVFS_count64;
 typedef uint64_t PVFS_volume_id;
 typedef uint64_t PVFS_flow_id;
 typedef int64_t PVFS_handle;
+typedef int16_t PVFS_type;
 typedef int32_t PVFS_fs_id;
 typedef int32_t PVFS_error;
 typedef int32_t PVFS_magic;
