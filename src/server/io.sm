@@ -3,8 +3,6 @@
  *
  * See COPYING in top-level directory.
  */
-
-
 #include <string.h>
 #include <assert.h>
 
@@ -35,13 +33,14 @@ extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
 %%
 
-machine pvfs2_io_sm(prelude,
-                    send_positive_ack,
-                    send_negative_ack, 
-                    start_flow,
-                    cleanup,
-                    release,
-                    send_completion_ack)
+machine pvfs2_io_sm(
+    prelude,
+    send_positive_ack,
+    send_negative_ack, 
+    start_flow,
+    cleanup,
+    release,
+    send_completion_ack)
 {
     state prelude
     {
@@ -90,7 +89,6 @@ machine pvfs2_io_sm(prelude,
 
 %%
 
-
 /*
  * Function: io_send_ack()
  *
@@ -109,11 +107,11 @@ machine pvfs2_io_sm(prelude,
  *           send either positive or negative acknowledgements.
  *           
  */
-static int io_send_ack(PINT_server_op *s_op, job_status_s* js_p)
+static int io_send_ack(PINT_server_op *s_op, job_status_s *js_p)
 {
     int err = -PVFS_EIO;
     job_id_t tmp_id;
-	
+        
     PINT_STATE_DEBUG("send_ack");
 
     /* this is where we report the file size to the client before
@@ -129,27 +127,16 @@ static int io_send_ack(PINT_server_op *s_op, job_status_s* js_p)
     {
         gossip_lerr("Server: IO SM: PINT_encode() failure.\n");
         js_p->error_code = err;
-        return(1);
+        return 1;
     }
-    else
-    {
-        err = job_bmi_send_list(
-            s_op->addr,
-            s_op->encoded.buffer_list,
-            s_op->encoded.size_list,
-            s_op->encoded.list_count,
-            s_op->encoded.total_size,
-            s_op->tag,
-            s_op->encoded.buffer_type,
-            0,
-            s_op,
-            0,
-            js_p,
-            &tmp_id,
-            server_job_context,
-	    PVFS2_SERVER_RESPONSE_TIMEOUT);
-    }
-    return(err);
+
+    err = job_bmi_send_list(
+        s_op->addr, s_op->encoded.buffer_list, s_op->encoded.size_list,
+        s_op->encoded.list_count, s_op->encoded.total_size,
+        s_op->tag, s_op->encoded.buffer_type, 0, s_op, 0, js_p,
+        &tmp_id, server_job_context, PVFS2_SERVER_RESPONSE_TIMEOUT);
+
+    return err;
 }
 
 /*
@@ -170,18 +157,18 @@ static int io_send_ack(PINT_server_op *s_op, job_status_s* js_p)
  *           carry out the data transfer
  *           
  */
-static int io_start_flow(PINT_server_op *s_op, job_status_s* js_p)
+static int io_start_flow(PINT_server_op *s_op, job_status_s *js_p)
 {
     int err = -PVFS_EIO;
     job_id_t tmp_id;
-	
+        
     PINT_STATE_DEBUG("start_flow");
 
     s_op->u.io.flow_d = PINT_flow_alloc();
     if (!s_op->u.io.flow_d)
     {
         js_p->error_code = -PVFS_ENOMEM;
-        return(1);
+        return 1;
     }
 
     /* we still have the file size stored in the response structure 
@@ -196,12 +183,14 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s* js_p)
     /* on writes, we allow the bstream to be extended at EOF */
     if (s_op->req->u.io.io_type == PVFS_IO_WRITE)
     {
-	gossip_debug(GOSSIP_IO_DEBUG, "io_start_flow() issuing flow to write data.\n");
+        gossip_debug(GOSSIP_IO_DEBUG, "io_start_flow() issuing flow to "
+                     "write data.\n");
         s_op->u.io.flow_d->file_data.extend_flag = 1;
     }
     else
     {
-	gossip_debug(GOSSIP_IO_DEBUG, "io_start_flow() issuing flow to read data.\n");
+        gossip_debug(GOSSIP_IO_DEBUG, "io_start_flow() issuing flow to "
+                     "read data.\n");
         s_op->u.io.flow_d->file_data.extend_flag = 0;
     }
 
@@ -214,16 +203,16 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s* js_p)
     s_op->u.io.flow_d->type = s_op->req->u.io.flow_type;
 
     gossip_debug(GOSSIP_IO_DEBUG, "flow: fsize: %Ld, " 
-	"server_nr: %d, server_ct: %d\n",
-	Ld(s_op->u.io.flow_d->file_data.fsize),
-	(int)s_op->u.io.flow_d->file_data.server_nr,
-	(int)s_op->u.io.flow_d->file_data.server_ct);
+        "server_nr: %d, server_ct: %d\n",
+        Ld(s_op->u.io.flow_d->file_data.fsize),
+        (int)s_op->u.io.flow_d->file_data.server_nr,
+        (int)s_op->u.io.flow_d->file_data.server_ct);
     
     gossip_debug(GOSSIP_IO_DEBUG, "      file_req_offset: %Ld, "
-	"aggregate_size: %Ld, handle: %Lu\n", 
-	Ld(s_op->u.io.flow_d->file_req_offset),
-	Ld(s_op->u.io.flow_d->aggregate_size),
-	Lu(s_op->req->u.io.handle));
+        "aggregate_size: %Ld, handle: %Lu\n", 
+        Ld(s_op->u.io.flow_d->file_req_offset),
+        Ld(s_op->u.io.flow_d->aggregate_size),
+        Lu(s_op->req->u.io.handle));
 
     /* set endpoints depending on type of io requested */
     if (s_op->req->u.io.io_type == PVFS_IO_WRITE)
@@ -246,15 +235,14 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s* js_p)
     {
         gossip_lerr("Server: IO SM: unknown IO type requested.\n");
         js_p->error_code = -PVFS_EINVAL;
-        return(1);
+        return 1;
     }
 
     err = job_flow(s_op->u.io.flow_d, s_op, 0, js_p, &tmp_id,
                    server_job_context, PVFS2_SERVER_FLOW_TIMEOUT);
 
-    return(err);
+    return err;
 }
-
 
 /*
  * Function: io_release()
@@ -271,7 +259,7 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s* js_p)
  *
  * Synopsis: releases the operation from the scheduler
  */
-static int io_release(PINT_server_op *s_op, job_status_s* js_p)
+static int io_release(PINT_server_op *s_op, job_status_s *js_p)
 {
     int ret = 0;
     job_id_t i;
@@ -280,12 +268,7 @@ static int io_release(PINT_server_op *s_op, job_status_s* js_p)
 
     /* tell the scheduler that we are done with this operation */
     ret = job_req_sched_release(
-        s_op->scheduled_id,
-        s_op,
-        0,
-        js_p,
-        &i,
-        server_job_context);
+        s_op->scheduled_id, s_op, 0, js_p, &i, server_job_context);
 
     return ret;
 }
@@ -305,7 +288,7 @@ static int io_release(PINT_server_op *s_op, job_status_s* js_p)
  * Synopsis: free up any buffers associated with the operation,
  *           including any encoded or decoded protocol structures
  */
-static int io_cleanup(PINT_server_op *s_op, job_status_s* js_p)
+static int io_cleanup(PINT_server_op *s_op, job_status_s *js_p)
 {
     PINT_STATE_DEBUG("cleanup");
 
@@ -351,11 +334,11 @@ static int io_cleanup(PINT_server_op *s_op, job_status_s* js_p)
  *           
  */
 static int io_send_completion_ack(
-    PINT_server_op *s_op, job_status_s* js_p)
+    PINT_server_op *s_op, job_status_s *js_p)
 {
     int err = -PVFS_EIO;
     job_id_t tmp_id;
-	
+        
     PINT_STATE_DEBUG("send_completion_ack");
 
     /* we only send this trailing ack if we are working on a write
@@ -364,11 +347,12 @@ static int io_send_completion_ack(
     if (s_op->req->u.io.io_type == PVFS_IO_READ)
     {
         js_p->error_code = 0;
-        return(1);
+        return 1;
     }
 
     /* release encoding of the first ack that we sent */
     PINT_encode_release(&s_op->encoded, PINT_ENCODE_RESP);
+
     /* zero size for safety */
     s_op->encoded.total_size = 0;
 
@@ -382,37 +366,23 @@ static int io_send_completion_ack(
         s_op->u.io.flow_d->total_transfered;
 
     err = PINT_encode(
-        &s_op->resp, 
-        PINT_ENCODE_RESP, 
-        &(s_op->encoded),
-        s_op->addr,
-        s_op->decoded.enc_type);
+        &s_op->resp, PINT_ENCODE_RESP, &(s_op->encoded),
+        s_op->addr, s_op->decoded.enc_type);
 
     if (err < 0)
     {
         gossip_lerr("Server: IO SM: PINT_encode() failure.\n");
         js_p->error_code = err;
-        return(1);
+        return 1;
     }
-    else
-    {
-        err = job_bmi_send_list(
-            s_op->addr,
-            s_op->encoded.buffer_list,
-            s_op->encoded.size_list,
-            s_op->encoded.list_count,
-            s_op->encoded.total_size,
-            s_op->tag,
-            s_op->encoded.buffer_type,
-            0,
-            s_op,
-            0,
-            js_p,
-            &tmp_id,
-            server_job_context,
-	    PVFS2_SERVER_RESPONSE_TIMEOUT);
-    }
-    return(err);
+
+    err = job_bmi_send_list(
+        s_op->addr, s_op->encoded.buffer_list, s_op->encoded.size_list,
+        s_op->encoded.list_count, s_op->encoded.total_size, s_op->tag,
+        s_op->encoded.buffer_type, 0, s_op, 0, js_p, &tmp_id,
+        server_job_context, PVFS2_SERVER_RESPONSE_TIMEOUT);
+
+    return err;
 }
 
 /*
