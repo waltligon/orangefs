@@ -492,11 +492,11 @@ canonname = $(patsubst $(srcdir)/%,%,$(call dirname,$(1)))
 
 # Grab any CFLAGS defined by the make stub for a particular file, and
 # for the directory in which the source resides.
-# Always add the directory in question for "local" includes.
+# Always add the source directory in question for "local" includes.
 # Similar for ldflags.
 modcflags = $(MODCFLAGS_$(call canonname,$(1))) \
             $(MODCFLAGS_$(patsubst $(srcdir)/%,%,$(1))) \
-	    -I$(call dirname,$(1))
+	    -I$(srcdir)/$(call dirname,$(1))
 modldflags = $(MODLDFLAGS_$(call canonname,$(1))) \
              $(MODLDFLAGS_$(patsubst $(srcdir)/%,%,$(1)))
 
