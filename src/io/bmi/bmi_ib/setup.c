@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: setup.c,v 1.12 2004-09-29 13:47:55 pw Exp $
+ * $Id: setup.c,v 1.13 2004-09-29 20:29:45 pw Exp $
  */
 #include <fcntl.h>
 #include <unistd.h>
@@ -198,6 +198,7 @@ ib_new_connection(int s, const char *peername, int is_server)
 
     /* done, put it on the list */
     c->remote_map = 0;
+    c->cancelled = 0;
     qlist_add(&c->list, &connection);
     return c;
 }
@@ -346,7 +347,7 @@ init_connection_modify_qp(VAPI_qp_hndl_t qp, VAPI_qp_num_t remote_qp_num,
 	error_verrno(ret, "%s: VAPI_modify_qp RTR -> RTS", __func__);
 }
 
-static void
+void
 close_connection_drain_qp(VAPI_qp_hndl_t qp)
 {
     int ret;
@@ -429,6 +430,7 @@ void
 ib_close_connection(ib_connection_t *c)
 {
     int ret;
+    ib_method_addr_t *ibmap;
 
     debug(2, "%s: closing connection to %s", __func__, c->peername);
     ret = VAPI_destroy_qp(nic_handle, c->qp_ack);
@@ -447,7 +449,10 @@ ib_close_connection(ib_connection_t *c)
     free(c->eager_recv_buf_contig);
     free(c->eager_send_buf_head_contig);
     free(c->eager_recv_buf_head_contig);
-    free(c->remote_map);
+    /* never free the remote map, for the life of the executable, just
+     * mark it unconnected since BMI will always have this structure. */
+    ibmap = c->remote_map->method_data;
+    ibmap->c = 0;
     free(c->peername);
     qlist_del(&c->list);
     free(c);

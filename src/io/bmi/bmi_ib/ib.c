@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.13 2004-09-29 13:47:55 pw Exp $
+ * $Id: ib.c,v 1.14 2004-09-29 20:29:44 pw Exp $
  */
 #include <stdio.h>  /* just for NULL for id-generator.h */
 #include <sys/time.h>
@@ -47,6 +47,7 @@ static void encourage_recv_incoming(ib_connection_t *c, buf_head_t *bh,
   u_int32_t byte_len);
 static void encourage_recv_incoming_cts_ack(ib_recv_t *rq);
 static void encourage_recv_to_send_cts(ib_recv_t *rq);
+static void maybe_free_connection(ib_connection_t *c);
 
 /*
  * Wander through single completion queue, pulling off messages and
@@ -78,8 +79,9 @@ check_cq(void)
 		if (desc.id) {
 		    ib_connection_t *c = ptr_from_int64(desc.id);
 		    if (c->cancelled)
-			debug(0, "%s: ignoring error on cancelled conn %p",
-			  __func__, c);
+			debug(0,
+			  "%s: ignoring send error on cancelled conn to %s",
+			  __func__, c->peername);
 		}
 	    }
 	}
@@ -1105,6 +1107,18 @@ test_sq(ib_send_t *sq, bmi_op_id_t *outid, bmi_error_code_t *err,
 	debug(2, "%s: sq %p %s, encouraging", __func__, sq,
 	  sq_state_name(sq->state));
 	encourage_send_waiting_buffer(sq);
+    } else if (sq->state == SQ_CANCELLED && complete) {
+	debug(2, "%s: sq %p cancelled", __func__, sq);
+	*outid = sq->mop->op_id;
+	*err = -PVFS_ETIMEDOUT;
+	if (user_ptr)
+	    *user_ptr = sq->mop->user_ptr;
+	qlist_del(&sq->list);
+	id_gen_safe_unregister(sq->mop->op_id);
+	free(sq->mop);
+	maybe_free_connection(sq->c);
+	free(sq);
+	return 1;
     } else {
 	debug(9, "%s: sq %p found, not done, state %s", __func__,
 	  sq, sq_state_name(sq->state));
@@ -1150,6 +1164,20 @@ test_rq(ib_recv_t *rq, bmi_op_id_t *outid, bmi_error_code_t *err,
 	debug(2, "%s: rq %p %s, encouraging", __func__, rq,
 	  rq_state_name(rq->state));
 	encourage_recv_to_send_cts(rq);
+    } else if (rq->state == RQ_CANCELLED && complete) {
+	debug(2, "%s: rq %p cancelled", __func__, rq);
+	*err = -PVFS_ETIMEDOUT;
+	if (rq->mop) {
+	    *outid = rq->mop->op_id;
+	    if (user_ptr)
+		*user_ptr = rq->mop->user_ptr;
+	    id_gen_safe_unregister(rq->mop->op_id);
+	    free(rq->mop);
+	}
+	qlist_del(&rq->list);
+	maybe_free_connection(rq->c);
+	free(rq);
+	return 1;
     } else {
 	debug(9, "%s: rq %p found, not done, state %s", __func__,
 	  rq, rq_state_name(rq->state));
@@ -1345,6 +1373,93 @@ BMI_ib_close_context(bmi_context_id context_id __unused)
 {
 }
 
+/*
+ * Asynchronous call to destroy an in-progress operation.
+ * Can't just call test since we don't want to reap the operation,
+ * just make sure it's done or not.
+ */
+static int
+BMI_ib_cancel(bmi_op_id_t id, bmi_context_id context_id __unused)
+{
+    struct method_op *mop;
+    ib_send_t *tsq;
+    ib_connection_t *c = 0;
+
+    gen_mutex_lock(&interface_mutex);
+    check_cq();
+    mop = id_gen_safe_lookup(id);
+    tsq = mop->method_data;
+    if (tsq->type == TYPE_SEND) {
+	/*
+	 * Cancelling completed operations is fine, they will be
+	 * tested later.  Any others trigger full shutdown of the
+	 * connection.
+	 */
+	if (tsq->state != SQ_WAITING_USER_TEST)
+	    c = tsq->c;
+    } else {
+	/* actually a recv */
+	ib_recv_t *rq = mop->method_data;
+	if (!(rq->state == RQ_EAGER_WAITING_USER_TEST 
+	   || rq->state == RQ_RTS_WAITING_USER_TEST))
+	    c = rq->c;
+    }
+
+    if (c && !c->cancelled) {
+	/*
+	 * In response to a cancel, forcibly close the connection.  Don't send
+	 * a bye message first since it may be the case that the peer is dead
+	 * anyway.  Do not close the connection until all the sq/rq on it have
+	 * gone away.
+	 */
+	list_t *l;
+
+	c->cancelled = 1;
+	close_connection_drain_qp(c->qp);
+	qlist_for_each(l, &sendq) {
+	    ib_send_t *sq = qlist_upcast(l);
+	    if (sq->c != c) continue;
+	    if (sq->state == SQ_WAITING_DATA_LOCAL_SEND_COMPLETE)
+		ib_mem_deregister(&sq->buflist);
+	    if (sq->state != SQ_WAITING_USER_TEST)
+		sq->state = SQ_CANCELLED;
+	}
+	qlist_for_each(l, &recvq) {
+	    ib_recv_t *rq = qlist_upcast(l);
+	    if (rq->c != c) continue;
+	    if (rq->state == RQ_RTS_WAITING_DATA)
+		ib_mem_deregister(&rq->buflist);
+	    if (!(rq->state == RQ_EAGER_WAITING_USER_TEST 
+	       || rq->state == RQ_RTS_WAITING_USER_TEST))
+		rq->state = RQ_CANCELLED;
+	}
+    }
+
+    gen_mutex_unlock(&interface_mutex);
+    return 0;
+}
+
+/*
+ * For connections that are being cancelled, maybe delete them if no
+ * more send or recvq entries remain.
+ */
+static void
+maybe_free_connection(ib_connection_t *c)
+{
+    list_t *l;
+
+    if (!c->cancelled)
+	return;
+    qlist_for_each(l, &sendq) {
+	ib_send_t *sq = qlist_upcast(l);
+	if (sq->c == c) return;
+    }
+    qlist_for_each(l, &recvq) {
+	ib_recv_t *rq = qlist_upcast(l);
+	if (rq->c == c) return;
+    }
+    ib_close_connection(c);
+}
 
 /* exported method interface */
 struct bmi_method_ops bmi_ib_ops = 
@@ -1360,7 +1475,7 @@ struct bmi_method_ops bmi_ib_ops =
     .BMI_meth_post_sendunexpected = BMI_ib_post_sendunexpected,
     .BMI_meth_post_recv = BMI_ib_post_recv,
     .BMI_meth_test = BMI_ib_test,
-    .BMI_meth_testsome = 0,
+    .BMI_meth_testsome = 0,  /* never used */
     .BMI_meth_testcontext = BMI_ib_testcontext,
     .BMI_meth_testunexpected = BMI_ib_testunexpected,
     .BMI_meth_method_addr_lookup = BMI_ib_method_addr_lookup,
@@ -1369,6 +1484,6 @@ struct bmi_method_ops bmi_ib_ops =
     .BMI_meth_post_sendunexpected_list = BMI_ib_post_sendunexpected_list,
     .BMI_meth_open_context = BMI_ib_open_context,
     .BMI_meth_close_context = BMI_ib_close_context,
+    .BMI_meth_cancel = BMI_ib_cancel,
 };
 
-/* vi: set tags+=/home/pw/src/infiniband/mellanox/include/tags: */

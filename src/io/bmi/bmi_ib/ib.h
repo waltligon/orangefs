@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.h,v 1.6 2004-09-29 13:47:55 pw Exp $
+ * $Id: ib.h,v 1.7 2004-09-29 20:29:45 pw Exp $
  */
 #ifndef __ib_h
 #define __ib_h
@@ -91,6 +91,7 @@ typedef enum {
     SQ_WAITING_CTS,
     SQ_WAITING_DATA_LOCAL_SEND_COMPLETE,
     SQ_WAITING_USER_TEST,
+    SQ_CANCELLED,
 } sq_state_t;
 typedef enum {
     RQ_EAGER_WAITING_USER_POST=1,
@@ -101,6 +102,7 @@ typedef enum {
     RQ_RTS_WAITING_DATA,
     RQ_RTS_WAITING_USER_TEST,
     RQ_WAITING_INCOMING,
+    RQ_CANCELLED,
 } rq_state_t;
 typedef enum {
     MSG_EAGER_SEND=1,
@@ -260,6 +262,7 @@ typedef struct {
  * Internal functions in setup.c used by ib.c
  */
 extern void ib_close_connection(ib_connection_t *c);
+extern void close_connection_drain_qp(VAPI_qp_hndl_t qp);
 extern void ib_tcp_client_connect(ib_method_addr_t *ibmap,
   struct method_addr *remote_map);
 extern int ib_tcp_server_check_new_connections(void);
