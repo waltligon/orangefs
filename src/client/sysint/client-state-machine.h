@@ -49,6 +49,12 @@ typedef struct PINT_client_sm_msgpair_state_s
     /* should be either PVFS_MSGPAIR_RETRY, or PVFS_MSGPAIR_NO_RETRY*/
     int retry_flag;
 
+    /* don't use this -- internal msgpairarray use only */
+    int retry_count;
+
+    /* don't use this -- internal msgpairarray use only */
+    int recv_serviced;
+
     /* comp_fn called after successful reception and decode of respone,
      * if the msgpair state machine is used for processing.
      */

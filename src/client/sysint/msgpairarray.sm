@@ -8,15 +8,6 @@
  *
  * The purpose of this state machine is to prepare, send, and
  * receive a collection of request/response pairs (msgpairs).
- *
- * The following elements of the PINT_client_sm_msgpair_state
- * must be valid prior to entering this state machine:
- * - req (unencoded request)
- * - fs_id
- * - handle
- * - comp_fn
- *
- * When this state machine returns, ...
  */
 
 #include <string.h>
@@ -35,10 +26,15 @@ extern job_context_id pint_client_sm_context;
 
 enum
 {
-    MSGPAIRS_COMPLETE = 1
+    MSGPAIRS_COMPLETE = 1,
+    MSGPAIRS_RETRY = 2
 };
 
+static int msgpairarray_init(
+    PINT_client_sm *sm_p, job_status_s *js_p);
 static int msgpairarray_post(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int msgpairarray_post_retry(
     PINT_client_sm *sm_p, job_status_s *js_p);
 static int msgpairarray_complete(
     PINT_client_sm *sm_p, job_status_s *js_p);
@@ -47,20 +43,35 @@ static int msgpairarray_completion_fn(
 
 %%
 
-nested machine pvfs2_client_msgpairarray_sm(post,
+nested machine pvfs2_client_msgpairarray_sm(init,
+                                            post,
+                                            post_retry,
 					    complete,
 					    completion_fn)
 {
+    state init
+    {
+        run msgpairarray_init;
+        default => post;
+    }
+
     state post
     {
         run msgpairarray_post;
         default => complete;
     }
 
+    state post_retry
+    {
+        run msgpairarray_post_retry;
+        default => post;
+    }
+
     state complete
     {
         run msgpairarray_complete;
         success => complete;
+        MSGPAIRS_RETRY => post_retry;
         MSGPAIRS_COMPLETE => completion_fn;
         default => return;
     }
@@ -73,6 +84,40 @@ nested machine pvfs2_client_msgpairarray_sm(post,
 }
 
 %%
+
+static int msgpairarray_init(PINT_client_sm *sm_p,
+                             job_status_s *js_p)
+{
+    int i = 0;
+    PINT_client_sm_msgpair_state *msg_p = NULL;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "msgpairarray state: init (%d message(s))\n",
+                 sm_p->msgarray_count);
+
+    assert(sm_p->msgarray_count > 0);
+
+    js_p->error_code = 0;
+
+    /*
+      set number of operations that must complete.  we're using the
+      comp_ct in the first msgarray entry to keep up with the count
+      for the entire array.
+    */
+    sm_p->msgarray[0].comp_ct = 2 * sm_p->msgarray_count;
+
+    for(i = 0; i < sm_p->msgarray_count; i++)
+    {
+        msg_p = &sm_p->msgarray[i];
+        assert(msg_p);
+
+        msg_p->encoded_resp_p = NULL;
+        msg_p->retry_count = 0;
+        msg_p->recv_serviced = 0;
+    }
+    return 1;
+}
+
 
 /* msgpairarray_post()
  *
@@ -98,6 +143,9 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
     int ret = -PVFS_EINVAL, i = 0, tmp = 0;
     job_status_s status;
     struct server_configuration_s *server_config = NULL;
+    PVFS_msg_tag_t session_tag;
+    PINT_client_sm_msgpair_state *msg_p = NULL;
+    struct filesystem_configuration_s *cur_fs = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "msgpairarray state: post (%d message(s))\n",
@@ -107,49 +155,45 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 
     js_p->error_code = 0;
 
-    /* set number of operations that must complete.
-     *
-     * NOTE: we're using the comp_ct in the first msgarray
-     * entry to keep up with the count for the entire array.
-     */
-    sm_p->msgarray[0].comp_ct = 2 * sm_p->msgarray_count;
-
     for (i = 0; i < sm_p->msgarray_count; i++)
     {
-	PVFS_msg_tag_t session_tag;
-	PINT_client_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
-	struct filesystem_configuration_s *cur_fs = NULL;
-
-        server_config = PINT_get_server_config_struct(msg_p->fs_id);
-	cur_fs = PINT_config_find_fs_id(server_config, msg_p->fs_id);
-        PINT_put_server_config_struct(server_config);
-	assert(cur_fs);
+        msg_p = &sm_p->msgarray[i];
+        assert(msg_p);
 
         assert((msg_p->retry_flag == PVFS_MSGPAIR_RETRY) ||
                (msg_p->retry_flag == PVFS_MSGPAIR_NO_RETRY));
 
-	ret = PINT_encode(&msg_p->req, PINT_ENCODE_REQ,
-                          &msg_p->encoded_req, msg_p->svr_addr,
-			  cur_fs->encoding);
-	if (ret != 0)
+        if (msg_p->encoded_resp_p == NULL)
         {
-	    gossip_lerr("msgpairarray_post: PINT_encode failed\n");
-            js_p->error_code = ret;
-            return 1;
-	}
+            server_config = PINT_get_server_config_struct(msg_p->fs_id);
+            cur_fs = PINT_config_find_fs_id(server_config, msg_p->fs_id);
+            PINT_put_server_config_struct(server_config);
+            assert(cur_fs);
 
-	/* calculate maximum response message size and allocate space */
-	msg_p->max_resp_sz = PINT_encode_calc_max_size(
-            PINT_ENCODE_RESP, msg_p->req.op, cur_fs->encoding);
 
-	msg_p->encoded_resp_p = BMI_memalloc(
-            msg_p->svr_addr, msg_p->max_resp_sz, BMI_RECV);
+            ret = PINT_encode(&msg_p->req, PINT_ENCODE_REQ,
+                              &msg_p->encoded_req, msg_p->svr_addr,
+                              cur_fs->encoding);
+            if (ret != 0)
+            {
+                gossip_lerr("msgpairarray_post: PINT_encode failed\n");
+                js_p->error_code = ret;
+                return 1;
+            }
 
-	if (msg_p->encoded_resp_p == NULL)
-        {
-            js_p->error_code = -PVFS_ENOMEM;
-            return 1;
-	}
+            /* calculate maximum response message size and allocate space */
+            msg_p->max_resp_sz = PINT_encode_calc_max_size(
+                PINT_ENCODE_RESP, msg_p->req.op, cur_fs->encoding);
+
+            msg_p->encoded_resp_p = BMI_memalloc(
+                msg_p->svr_addr, msg_p->max_resp_sz, BMI_RECV);
+
+            if (msg_p->encoded_resp_p == NULL)
+            {
+                js_p->error_code = -PVFS_ENOMEM;
+                return 1;
+            }
+        }
 
       post_msg_receive:
 	session_tag = get_next_session_tag();
@@ -203,11 +247,13 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
         if (ret != 0)
         {
             if ((msg_p->retry_flag == PVFS_MSGPAIR_RETRY) &&
-                (PVFS_ERROR_CLASS(status.error_code) == PVFS_ERROR_BMI))
+                (PVFS_ERROR_CLASS(-status.error_code) == PVFS_ERROR_BMI) &&
+                (msg_p->retry_count < PVFS_MSGPAIR_RETRY_LIMIT))
             {
-                gossip_debug(GOSSIP_CLIENT_DEBUG,
-                             "*** Reposting receive due to failure (%d)\n",
-                             ret);
+                gossip_debug(GOSSIP_CLIENT_DEBUG, "*** Reposting receive "
+                             "due to failure (%d)\n", ret);
+
+                msg_p->retry_count++;
                 goto post_msg_receive;
             }
         }
@@ -250,8 +296,27 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 
 	    if (msg_p->send_status.error_code != 0)
             {
-		gossip_err("msgarray send post failed; "
-                           "should cancel recv\n");
+		gossip_err("msgarray send post failed; canceling recv\n");
+                ret = job_bmi_cancel(
+                    msg_p->recv_id, pint_client_sm_context);
+                if (ret)
+                {
+                    js_p->error_code = ret;
+                    PVFS_perror_gossip("Failed to job_bmi_cancel", ret);
+                    return 1;
+                }
+
+                if ((msg_p->retry_flag == PVFS_MSGPAIR_RETRY) &&
+                    (PVFS_ERROR_CLASS(-msg_p->send_status.error_code) ==
+                     PVFS_ERROR_BMI) &&
+                    (msg_p->retry_count < PVFS_MSGPAIR_RETRY_LIMIT))
+                {
+                    gossip_debug(GOSSIP_CLIENT_DEBUG, "*** msgpair "
+                                 "restarting due to send failure\n");
+
+                    msg_p->retry_count++;
+                    goto post_msg_receive;
+                }
 	    }
 
 	    /* decrement our count, since send is already done.
@@ -264,6 +329,27 @@ static int msgpairarray_post(PINT_client_sm *sm_p,
 	assert(ret == 0 || ret == 1);
     }
     return 0;
+}
+
+static int msgpairarray_post_retry(PINT_client_sm *sm_p,
+                                   job_status_s *js_p)
+{
+    int ret = 0;
+    job_id_t tmp_id;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "msgpairarray state: post_retry\n");
+
+    /* delay here to stall before posting again */
+    ret = job_req_sched_post_timer(
+        5000,
+        sm_p,
+        0,
+        js_p,
+        &tmp_id,
+        pint_client_sm_context);
+
+    return ret;
 }
 
 static int msgpairarray_complete(PINT_client_sm *sm_p,
@@ -285,6 +371,30 @@ static int msgpairarray_complete(PINT_client_sm *sm_p,
 
 	/* save error, if any, in op_status */
 	msg_p->op_status = msg_p->recv_status.error_code;
+
+	if (msg_p->recv_status.error_code != 0)
+        {
+            if ((msg_p->retry_flag == PVFS_MSGPAIR_RETRY) &&
+                (PVFS_ERROR_CLASS(-msg_p->recv_status.error_code) ==
+                 PVFS_ERROR_BMI) &&
+                (msg_p->retry_count < PVFS_MSGPAIR_RETRY_LIMIT))
+            {
+                msg_p->retry_count++;
+
+                gossip_err("*** msgarray recv failed -- retrying msgpair "
+                           "(count = %d)\n", msg_p->retry_count);
+
+                js_p->error_code = MSGPAIRS_RETRY;
+                return 1;
+            }
+
+            js_p->error_code = msg_p->recv_status.error_code;
+            return 1;
+	}
+        else
+        {
+            msg_p->recv_serviced = 1;
+        }
     }
     else
     {
@@ -294,13 +404,35 @@ static int msgpairarray_complete(PINT_client_sm *sm_p,
 	msg_p->send_id = 0;
 	msg_p->send_status = *js_p;
 
-	if (msg_p->send_status.error_code != 0)
-        {
-	    gossip_err("msgarray bad send; should cancel recv\n");
-	}
-
 	/* save error, if any, in op_status */
 	msg_p->op_status = msg_p->send_status.error_code;
+
+	if ((msg_p->send_status.error_code == 0) &&
+            (msg_p->recv_serviced == 0))
+        {
+            sm_p->msgarray[0].comp_ct += 2;
+        }
+
+	if ((msg_p->send_status.error_code != 0) ||
+            (msg_p->recv_serviced == 0))
+        {
+            if ((msg_p->retry_flag == PVFS_MSGPAIR_RETRY) &&
+                ((PVFS_ERROR_CLASS(-msg_p->send_status.error_code) ==
+                  PVFS_ERROR_BMI) || (msg_p->recv_serviced == 0)) &&
+                (msg_p->retry_count < PVFS_MSGPAIR_RETRY_LIMIT))
+            {
+                msg_p->retry_count++;
+
+                gossip_err("*** msgarray send failed -- retrying msgpair "
+                           "(count = %d)\n", msg_p->retry_count);
+
+                js_p->error_code = MSGPAIRS_RETRY;
+                return 1;
+            }
+
+            js_p->error_code = msg_p->send_status.error_code;
+            return 1;
+	}
     }
 
     /* decrement comp_ct until all operations have completed */

@@ -161,6 +161,9 @@ int PVFS_sys_finalize(
 #define PVFS_MSGPAIR_RETRY          0xFE
 #define PVFS_MSGPAIR_NO_RETRY       0xFF
 
+/* this is the max number of times to attempt a msgpair retry */
+#define PVFS_MSGPAIR_RETRY_LIMIT     10
+
 /*
   NOTE: the following values are to be used by
   PVFS_sys(.*)_lookup as the "follow_link" argument.
