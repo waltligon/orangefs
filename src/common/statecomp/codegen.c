@@ -64,7 +64,6 @@ void gen_state_action(char *run_func, int flag)
 	    fprintf(out_file,
 		    "(union PINT_state_array_values) %d",
 		    flag);
-	    /* NOTE: ADDED "&" HERE BECAUSE I THINK THIS WAS A BUG. -- ROB */
 	    fprintf(out_file,
 		    ",\n(union PINT_state_array_values) &%s",
 		    run_func);

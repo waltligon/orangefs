@@ -90,7 +90,7 @@ static inline int PINT_state_machine_next(struct PINT_OP_STATE *s,
 	 * return address, and then sets the new current_state and calls
 	 * the new state action function */
 	while (loc->return_value != code_val &&
-		loc->return_value != DEFAULT_ERROR) 
+	       loc->return_value != DEFAULT_ERROR) 
 	{
 	    /* each entry has a return value followed by a next state
 	     * pointer, so we increment by two.
@@ -119,7 +119,7 @@ static inline int PINT_state_machine_next(struct PINT_OP_STATE *s,
      * onto a stack */
     while (s->current_state->flag == SM_JUMP)
     {
-	PINT_push_state(s, NULL);
+	PINT_push_state(s, s->current_state);
 	s->current_state += 1; /* skip state flag; now we point to the state
 				* machine */
 
@@ -170,29 +170,17 @@ static union PINT_state_array_values *PINT_state_machine_locate(struct PINT_OP_S
 
 static inline union PINT_state_array_values *PINT_pop_state(struct PINT_OP_STATE *s)
 {
-    if (s->stackptr <= 0)
-    {
-	gossip_err("State machine return on empty stack\n");
-	return NULL;
-    }
-    else
-    {
-	return s->state_stack[--s->stackptr];
-    }
+    assert(s->stackptr > 0);
+
+    return s->state_stack[--s->stackptr];
 }
 
 static inline void PINT_push_state(struct PINT_OP_STATE *s,
 				   union PINT_state_array_values *p)
 {
-    if (s->stackptr > PINT_STATE_STACK_SIZE)
-    {
-	gossip_err("State machine jump on full stack\n");
-	return;
-    }
-    else
-    {
-	s->state_stack[s->stackptr++] = p;
-    }
+    assert(s->stackptr < PINT_STATE_STACK_SIZE);
+
+    s->state_stack[s->stackptr++] = p;
 }
 
 /*
