@@ -23,12 +23,14 @@ void getconfig_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
+#if 0
 PINT_state_machine_s getconfig_req_s = 
 {
 	NULL,
 	"getconfig",
 	getconfig_init_state_machine
 };
+#endif
 
 %%
 
@@ -62,6 +64,7 @@ machine get_config(init, trove, bmi_send, cleanup)
 
 %%
 
+#if 0
 /*
  * Function: getconfig_init_state_machine
  *
@@ -74,11 +77,11 @@ machine get_config(init, trove, bmi_send, cleanup)
  *           
  */
 
-
 void getconfig_init_state_machine(void)
 {
     getconfig_req_s.state_machine = get_config;
 }
+#endif
 
 /*
  * Function: getconfig_init

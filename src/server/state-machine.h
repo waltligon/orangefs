@@ -26,6 +26,7 @@ union PINT_state_array_values
 	int (*state_action)(struct PINT_server_op *, job_status_s *);
 	int return_value;
 	int flag;
+	PINT_state_machine_s *nested_machine;
 	union PINT_state_array_values *next_state;
 };
 

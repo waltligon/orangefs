@@ -34,12 +34,14 @@ void lookup_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
+#if 0
 PINT_state_machine_s lookup_req_s = 
 {
     NULL,
     "lookup",
     lookup_init_state_machine
 };
+#endif
 
 %%
 
@@ -110,6 +112,7 @@ machine lookup(init,
 
 %%
 
+#if 0
 /*
  * Function: lookup_init_state_machine           
  */
@@ -117,6 +120,7 @@ void lookup_init_state_machine(void)
 {
     lookup_req_s.state_machine = lookup;
 }
+#endif
 
 /*
  * Function: lookup_init

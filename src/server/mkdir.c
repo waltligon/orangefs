@@ -24,16 +24,18 @@ void mkdir_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
+#if 0
 PINT_state_machine_s mkdir_req_s = 
 {
 	NULL,
 	"mkdir",
 	mkdir_init_state_machine
 };
+#endif
 
 %%
 
-machine mkdir(init, create, set_attrib, release, send, err_msg, critical_error, cleanup)
+machine mkdir_(init, create, set_attrib, release, send, err_msg, critical_error, cleanup)
 {
 	state init
 	{
@@ -90,6 +92,7 @@ machine mkdir(init, create, set_attrib, release, send, err_msg, critical_error, 
 
 %%
 
+#if 0
 /*
  * Function: mkdir_init_state_machine
  *
@@ -107,6 +110,7 @@ void mkdir_init_state_machine(void)
     mkdir_req_s.state_machine = mkdir;
 
 }
+#endif
 
 /*
  * Function: mkdir_init

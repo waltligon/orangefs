@@ -52,45 +52,45 @@ PINT_server_trove_keys_s Trove_Common_Keys[] = {
  * debugging time. dw
 */
 
-extern PINT_state_machine_s getconfig_req_s;
-extern PINT_state_machine_s getattr_req_s;
-extern PINT_state_machine_s setattr_req_s;
-extern PINT_state_machine_s create_req_s;
-extern PINT_state_machine_s crdirent_req_s;
-extern PINT_state_machine_s mkdir_req_s;
-extern PINT_state_machine_s readdir_req_s;
-extern PINT_state_machine_s lookup_req_s;
-extern PINT_state_machine_s io_req_s;
-extern PINT_state_machine_s remove_req_s;
-extern PINT_state_machine_s rmdirent_req_s;
+extern PINT_state_machine_s getconfig;
+extern PINT_state_machine_s getattr;
+extern PINT_state_machine_s setattr;
+extern PINT_state_machine_s create;
+extern PINT_state_machine_s crdirent;
+extern PINT_state_machine_s mkdir_;
+extern PINT_state_machine_s readdir_;
+extern PINT_state_machine_s lookup;
+extern PINT_state_machine_s io;
+extern PINT_state_machine_s remove_;
+extern PINT_state_machine_s rmdirent;
 
 /* DALE - fill in the rest of these please - WBL */
 PINT_state_machine_s *PINT_server_op_table[SERVER_OP_TABLE_SIZE] =
 {
     NULL,              /* invalid          */
     NULL,              /* noop             */
-    &create_req_s,     /* create           */
-    &remove_req_s,     /* remove           */
-    &io_req_s,         /* io               */
-    NULL,					 /* empty - 5        */
+    &create,           /* create           */
+    &remove_,          /* remove           */
+    &io,               /* io               */
+    NULL,              /* 5                */
     NULL,              /* batch            */ 
-    &getattr_req_s,    /* get attrib       */
-    &setattr_req_s,    /* set attrib       */
+    &getattr,          /* get attrib       */
+    &setattr,          /* set attrib       */
     NULL,              /* geteattr         */
-    NULL,					 /* seteattr - 10    */
-    &lookup_req_s,     /* lookup           */
+    NULL,              /* 10               */
+    &lookup,           /* lookup           */
     NULL,              /* getdist ????     */
-    &crdirent_req_s,   /* createdir ent    */
-    &rmdirent_req_s,   /* rmdirent         */
-    NULL,					 /* revlookup? - 15  */
+    &crdirent,         /* createdir ent    */
+    &rmdirent,         /* rmdirent         */
+    NULL,              /* 15               */
     NULL,              /* allocate         */
     NULL,              /* truncate         */
-    &mkdir_req_s,      /* mkdir            */
+    &mkdir_,           /* mkdir            */
     NULL,              /* rmdir            */
-    &readdir_req_s, 	 /* readdir - 20     */
+    &readdir_,	       /* readdir - 20     */
     NULL,              /* statfs           */
     NULL,              /* iostatfs         */
-    &getconfig_req_s,  /* get config       */
+    &getconfig,        /* get config       */
     /*                                     */
     /* NULL's continue for a while...      */
     /*                                     */
@@ -161,22 +161,20 @@ int PINT_state_machine_initialize_unexpected(PINT_server_op *s_op,
    Params: None
    Returns: True
    Synopsis: This function is used to initialize the state machine 
-				 for operation.
+	 for operation.  Calls each machine's initi function if specified.
  */
 
 int PINT_state_machine_init(void)
 {
-
     int i;
     for (i = 0 ; i < SERVER_OP_TABLE_SIZE; i++)
     {
-	if(PINT_server_op_table[i])
+	if(PINT_server_op_table[i] && PINT_server_op_table[i]->init_fun)
 	{
 	    (PINT_server_op_table[i]->init_fun)();
 	}
     }
     return(0);
-	
 }
 
 
@@ -197,51 +195,56 @@ int PINT_state_machine_halt(void)
    Returns:   return value of state action
    Synopsis:  Runs through a list of return values to find the
 	           next function to call.  Calls that function.  Once
-				  that function is called, this one exits and we go
+				  that function is called,
+				  this one exits and we go
 				  back to pvfs2-server.c's while loop.
  */
 
 int PINT_state_machine_next(PINT_server_op *s,job_status_s *r)
 {
 
-    int code_val = r->error_code; /* temp to hold the return code */
-    int retval; /* temp to hold return value of state action */
-    PINT_state_array_values *loc; /* temp pointer into state memory */
+    int code_val = r->error_code;       /* temp to hold the return code */
+    int retval;            /* temp to hold return value of state action */
+    PINT_state_array_values *loc;     /* temp pointer into state memory */
 
-    /* skip over the current state action to get to the return code list */
-    loc = s->current_state + 1;
+    do {
+	/* skip over the current state action to get to the return code list */
+	loc = s->current_state + 1;
 
-    /* for each entry in the state machine table there is a return
-     * code followed by a next state pointer to the new state.
-     * This loops through each entry, checking for a match on the
-     * return address, and then sets the new current_state and calls
-     * the new state action function */
-    while (loc->return_value != code_val && loc->return_value != DEFAULT_ERROR) 
-    {
-	/* each entry is two items long */
-	loc += 2;
-    }
+	/* for each entry in the state machine table there is a return
+	 * code followed by a next state pointer to the new state.
+	 * This loops through each entry, checking for a match on the
+	 * return address, and then sets the new current_state and calls
+	 * the new state action function */
+	while (loc->return_value != code_val &&
+		loc->return_value != DEFAULT_ERROR) 
+	{
+	    /* each entry is two items long */
+	    loc += 2;
+	}
 
-    /* skip over the return code to get to the next state */
-    loc += 1;
+	/* skip over the return code to get to the next state */
+	loc += 1;
 
-    /* Update the server_op struct to reflect the new location
-     * see if the selected return value is a STATE_RETURN */
-    if (loc->flag == SM_STATE_RETURN)
-    {
-	s->current_state = PINT_pop_state(s);
-    }
-    else
-    {
-	s->current_state = loc->next_state;
-    }
+	/* Update the server_op struct to reflect the new location
+	 * see if the selected return value is a STATE_RETURN */
+	if (loc->flag == SM_STATE_RETURN)
+	{
+	    s->current_state = PINT_pop_state(s);
+	    s->current_state += 1; /* skip state flags */
+	}
+    } while (loc->flag == SM_STATE_RETURN);
+
+    s->current_state = loc->next_state;
 
     /* To do nested states, we check to see if the next state is
      * a nested state machine, and if so we push the return state
      * onto a stack */
-    if (s->current_state->flag == SM_NESTED_STATE)
+    while (s->current_state->flag == SM_NESTED_STATE)
     {
 	PINT_push_state(s, NULL);
+	s->current_state += 1; /* skip state flag */
+	s->current_state = s->current_state->nested_machine->state_machine;
     }
 
     /* skip over the flag so we can execute the next state action */
@@ -257,28 +260,25 @@ int PINT_state_machine_next(PINT_server_op *s,job_status_s *r)
 
 /* Function: PINT_state_machine_locate(void)
    Params:  
-   Returns:  Pointer to the first return value of the initialization
-	          function of a state machine
+   Returns:  Pointer to the start of the state machine indicated by
+	          s_op->op
    Synopsis: This function is used to start a state machines execution.
-	          If the operation index is null, we have not trapped that yet
-	          TODO: Fix that
-				 We should also add in some "text" backup if necessary
  */
 
 PINT_state_array_values *PINT_state_machine_locate(PINT_server_op *s_op)
 {
-
-    /* do we need to check for s_op->op out of range?  - WBL */
+    /* check for valid inputs */
+    if (!s_op || s_op->op < 0 || s_op->op >= SERVER_OP_TABLE_SIZE)
+    {
+	gossip_err("State machine requested not valid\n");
+	return NULL;
+    }
     if(PINT_server_op_table[s_op->op] != NULL)
     {
-	/* Return the first return value possible from the init function... =) */
-
-	/* WBL - adjusted for nested state machines
-	 * return PINT_server_op_table[s_op->op]->state_machine */
 	return PINT_server_op_table[s_op->op]->state_machine + 1;
     }
     gossip_err("State machine not found for operation %d\n",s_op->op);
-    return(NULL);
+    return NULL;
 }
 
 PINT_state_array_values *PINT_pop_state(PINT_server_op *s)

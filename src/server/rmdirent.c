@@ -42,12 +42,14 @@ void rmdirent_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
+#if 0
 PINT_state_machine_s rmdirent_req_s = 
 {
 	NULL,
 	"rmdirent",
 	rmdirent_init_state_machine
 };
+#endif
 
 %%
 
@@ -114,6 +116,7 @@ machine rmdirent(init,
 
 %%
 
+#if 0
 /*
  * Function: rmdirent_init_state_machine
  *
@@ -125,6 +128,7 @@ void rmdirent_init_state_machine(void)
 {
     rmdirent_req_s.state_machine = rmdirent;
 }
+#endif
 
 /*
  * Function: rmdirent_init

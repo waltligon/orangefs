@@ -73,12 +73,14 @@ void remove_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
+#if 0
 PINT_state_machine_s remove_req_s = 
 {
 	NULL,
 	"remove",	
 	remove_init_state_machine
 };
+#endif
 
 %%
 
@@ -169,6 +171,7 @@ machine remove_(init,
 
 %%
 
+#if 0
 /*
  * Function: remove_init_state_machine
  *
@@ -176,11 +179,10 @@ machine remove_(init,
 
 void remove_init_state_machine(void)
 {
-
     /* 'remove' collides with remove(3) */
     remove_req_s.state_machine = remove_;
-
 }
+#endif
 
 /*
  * Function: remove_init

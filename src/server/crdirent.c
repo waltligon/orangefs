@@ -29,12 +29,14 @@ void crdirent_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
+#if 0
 PINT_state_machine_s crdirent_req_s = 
 {
 	NULL,
 	"crdirent_dirent",
 	crdirent_init_state_machine
 };
+#endif
 
 enum {
     ERROR_BADNAME = 4
@@ -137,6 +139,7 @@ machine crdirent(init,
 
 %%
 
+#if 0
 /*
  * Function: crdirent_init_state_machine
  *
@@ -157,6 +160,7 @@ void crdirent_init_state_machine(void)
 {
     crdirent_req_s.state_machine = crdirent;
 }
+#endif
 
 /*
  * Function: crdirent_init

@@ -47,12 +47,14 @@ void getattr_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
+#if 0
 PINT_state_machine_s getattr_req_s = 
 {
 	NULL,
 	"getattr",
 	getattr_init_state_machine
 };
+#endif
 
 %%
 
@@ -78,22 +80,23 @@ machine get_attr(init,
 	}
 
 	state verify_attribs
-	    {
+	{
 		run getattr_verify_attribs;
 		STATE_METAFILE => read_metafile_datafile_handles;
 		default => send_bmi;
-	    }
+	}
 
 	state read_metafile_datafile_handles
-	    {
+	{
 		run getattr_read_metafile_datafile_handles;
 		default => read_metafile_distribution;
-	    }
+	}
+
 	state read_metafile_distribution
-	    {
+	{
 		run getattr_read_metafile_distribution;
 		default => send_bmi;
-	    }
+	}
 
 	state send_bmi
 	{
@@ -116,6 +119,7 @@ machine get_attr(init,
 
 %%
 
+#if 0
 /*
  * Function: getattr_init_state_machine
  *
@@ -134,6 +138,7 @@ void getattr_init_state_machine(void)
     getattr_req_s.state_machine = get_attr;
 
 }
+#endif
 
 /*
  * Function: getattr_init

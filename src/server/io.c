@@ -28,12 +28,14 @@ void io_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
+#if 0
 PINT_state_machine_s io_req_s = 
 {
 	NULL,
 	"io",
 	io_init_state_machine
 };
+#endif
 
 /****************************************************************
  * This is the state machine for file system I/O operations (both
@@ -102,6 +104,7 @@ machine io(init, get_size, send_positive_ack, send_negative_ack,
 
 %%
 
+#if 0
 /*
  * Function: io_init_state_machine()
  *
@@ -121,6 +124,7 @@ void io_init_state_machine(void)
 {
 	io_req_s.state_machine = io;
 }
+#endif
 
 /*
  * Function: io_init()

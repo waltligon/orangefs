@@ -29,12 +29,14 @@ void setattr_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
+#if 0
 PINT_state_machine_s setattr_req_s = 
 {
 	NULL,
 	"setattr",
 	setattr_init_state_machine
 };
+#endif
 
 
 %%
@@ -110,6 +112,7 @@ machine set_attr(init,
 
 %%
 
+#if 0
 /*
  * Function: setattr_init_state_machine
  *
@@ -121,13 +124,11 @@ machine set_attr(init,
  *           
  */
 
-
 void setattr_init_state_machine(void)
 {
-	
 	setattr_req_s.state_machine = set_attr;
-	
 }
+#endif
 
 /*
  * Function: setattr_init

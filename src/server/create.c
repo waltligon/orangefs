@@ -37,12 +37,14 @@ static int create_release_posted_job(PINT_server_op *s_op, job_status_s *ret);
 static int create_send_bmi(PINT_server_op *s_op, job_status_s *ret);
 void create_init_state_machine(void);
 
+#if 0
 PINT_state_machine_s create_req_s = 
 {
 	NULL,
 	"create",
 	create_init_state_machine
 };
+#endif
 
 %%
 
@@ -81,6 +83,7 @@ machine create(init, create2, send, release, cleanup)
 
 %%
 
+#if 0
 /*
  * Function: create_init_state_machine
  *
@@ -102,6 +105,7 @@ void create_init_state_machine(void)
     create_req_s.state_machine = create;
 
 }
+#endif
 
 /*
  * Function: create_init

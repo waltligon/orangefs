@@ -30,16 +30,18 @@ void readdir_init_state_machine(void);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
+#if 0
 PINT_state_machine_s readdir_req_s = 
 {
 	NULL,
-	"readdir",
+	"readdir_",
 	readdir_init_state_machine
 };
+#endif
 
 %%
 
-machine readdir(init,
+machine readdir_(init,
 		iterate_on_entries,
 		read_dirdata_handle,
 		read_directory_metadata,
@@ -55,18 +57,18 @@ machine readdir(init,
 	}
 
 	state read_directory_metadata
-	    {
+	{
 		run readdir_read_directory_metadata;
 		success => verify_directory_metadata;
 		default => send;
-	    }
+	}
 
 	state verify_directory_metadata
-	    {
+	{
 		run readdir_verify_directory_metadata;
 		success => read_dirdata_handle;
 		default => send;
-	    }
+	}
 
 	state read_dirdata_handle
 	{
@@ -102,6 +104,7 @@ machine readdir(init,
 
 %%
 
+#if 0
 /*
  * Function: readdir_init_state_machine
  *
@@ -116,6 +119,7 @@ void readdir_init_state_machine(void)
     readdir_req_s.state_machine = readdir;
 
 }
+#endif
 
 /*
  * Function: readdir_init
