@@ -1158,6 +1158,7 @@ static void trove_write_callback_fn(void *user_ptr,
 	    result_tmp->result.segmax = MAX_REGIONS;
 	    result_tmp->result.segs = 0;
 	    result_tmp->buffer_offset = tmp_buffer;
+	    assert(!PINT_REQUEST_DONE(q_item->parent->file_req_state));
 	    ret = PINT_Process_request(q_item->parent->file_req_state,
 		q_item->parent->mem_req_state,
 		&q_item->parent->file_data,
