@@ -260,7 +260,7 @@ static int getattr_read_metafile_datafile_handles_if_required(
     gossip_debug(SERVER_DEBUG, "getattr state: "
                  "read_metafile_datafile_handles_if_required\n");
 
-    if (!(s_op->resp->u.getattr.attr.mask & PVFS_ATTR_META_DFILES))
+    if (!(s_op->req->u.getattr.attrmask & PVFS_ATTR_META_DFILES))
     {
         /* if we don't need to fill in the dfiles, skip them */
         ret->error_code = 0;
@@ -320,7 +320,7 @@ static int getattr_read_metafile_distribution_if_required(
     int job_post_ret;
     job_id_t i;
 
-    if (!(s_op->resp->u.getattr.attr.mask & PVFS_ATTR_META_DIST))
+    if (!(s_op->req->u.getattr.attrmask & PVFS_ATTR_META_DIST))
     {
         /* if we don't need to fill in the distribution, skip it */
         ret->error_code = 0;
