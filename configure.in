@@ -183,6 +183,29 @@ AC_ARG_ENABLE(disk-io,
 fi]
 ,)
 
+dnl optionally disable building the karma gui
+AC_ARG_ENABLE(karma,
+[  --disable-karma         Disables optional gui.  (Enabled by default)],
+,
+[dnl Check for GTK2.0; require pkg-config to find
+AC_CHECK_PROG(HAVE_PKGCONFIG, pkg-config, yes, no)
+if test x$HAVE_PKGCONFIG = xyes ; then
+   AC_MSG_CHECKING([for gtk2.0 (for karma gui)])
+   if `pkg-config --exists gtk+-2.0` ; then
+      AC_MSG_RESULT(yes)
+      GTKLIBS=`pkg-config --libs gtk+-2.0`
+      GTKCFLAGS=`pkg-config --cflags gtk+-2.0`
+
+      AC_SUBST(GTKLIBS)
+      AC_SUBST(GTKCFLAGS)
+      BUILD_KARMA="1"
+   else
+      AC_MSG_RESULT(no)
+   fi
+fi
+AC_SUBST(BUILD_KARMA)]
+)
+
 dnl enables a hack to print back traces out of segfault signal handler
 AC_ARG_ENABLE(segv-backtrace,
 [  --enable-segv-backtrace Enables back traces in segfault signal handler],
@@ -456,24 +479,6 @@ if ! test -z $SDL_CONFIG && test -x $SDL_CONFIG; then
 else
    AC_MSG_RESULT(no)
 fi
-
-dnl Check for GTK2.0; require pkg-config to find
-AC_CHECK_PROG(HAVE_PKGCONFIG, pkg-config, yes, no)
-if test x$HAVE_PKGCONFIG = xyes ; then
-   AC_MSG_CHECKING([for gtk2.0 (for karma gui)])
-   if `pkg-config --exists gtk+-2.0` ; then
-      AC_MSG_RESULT(yes)
-      GTKLIBS=`pkg-config --libs gtk+-2.0`
-      GTKCFLAGS=`pkg-config --cflags gtk+-2.0`
-
-      AC_SUBST(GTKLIBS)
-      AC_SUBST(GTKCFLAGS)
-      BUILD_KARMA="1"
-   else
-      AC_MSG_RESULT(no)
-   fi
-fi
-AC_SUBST(BUILD_KARMA)
 
 dnl create any missing subdirectories that wouldn't be created
 dnl by AC_OUTPUT below (which won't create intermediate dirs).
