@@ -202,7 +202,7 @@ static int lookup_init(state_action_struct *s_op, job_status_s *ret)
 	 *
 	 */
 	s_op->strsize = strlen(s_op->req->u.lookup_path.path);
-	if(index(s_op->req->u.lookup_path.path)-s_op->req->u.lookup_path.path == 0)
+	if(index(s_op->req->u.lookup_path.path,'/')-s_op->req->u.lookup_path.path == 0)
 	{
 		s_op->req->u.lookup_path.path++;
 		s_op->strsize--;
@@ -241,12 +241,11 @@ static int lookup_check_params(state_action_struct *s_op, job_status_s *ret)
 {
 
 	int job_post_ret = 1;
+	/*job_id_t i;*/
 
-	job_id_t i;
 	int k;
 	char *end_of_path;
 	int meta_data_flag,directory_handle_flag; //used to tell us that we have the data
-	PVFS_vtag_s vtag;
 
 	meta_data_flag=directory_handle_flag=0;
 
@@ -297,13 +296,13 @@ static int lookup_check_params(state_action_struct *s_op, job_status_s *ret)
 		if(end_of_path)
 			end_of_path[0] = '\0';
 		else
-			if(strlen(s_op->req->u.lookup_path.path)) // there is something there
+			//if(strlen(s_op->req->u.lookup_path.path)) // there is something there
 		s_op->key.buffer = s_op->req->u.lookup_path.path;
-		s_op->key.buffer_sz = strlen(s_op->key.buffer)
-		s_op->u.lookup_path.path+=strlen(s_op->key.buffer)+1;
+		s_op->key.buffer_sz = strlen(s_op->key.buffer);
+		s_op->req->u.lookup_path.path+=strlen(s_op->key.buffer)+1;
 		s_op->strsize-=strlen(s_op->key.buffer)+1;
 	}
-	printf("Looking up %s\n",(char *)s_op->key.buffer);
+	gossip_ldebug(SERVER_DEBUG,"Looking up %s\n",(char *)s_op->key.buffer);
 
 	gossip_ldebug(SERVER_DEBUG,"check returning: %d\n",job_post_ret);
 	return(job_post_ret);
@@ -331,9 +330,39 @@ static int lookup_send_bmi(state_action_struct *s_op, job_status_s *ret)
 {
 
 	int job_post_ret=-1;
-	/*job_id_t i;*/
+	job_id_t i;
 
 	gossip_ldebug(SERVER_DEBUG,"Send BMI\n");
+	if (ret->error_code == 0)
+	{
+		job_post_ret = PINT_encode(s_op->resp,
+											PINT_ENCODE_RESP,
+											&(s_op->encoded),
+											s_op->addr,
+											s_op->enc_type);
+	}
+	assert(job_post_ret == 0);
+	if(ret->error_code == 0)
+		assert(s_op->encoded.buffer_list[0] != NULL);
+	else
+	{
+		/* We have failed somewhere... However, we still need to send what we have */
+		s_op->encoded.buffer_list[0] = s_op->resp;
+		s_op->encoded.total_size = sizeof(struct PVFS_server_resp_s);
+	}
+
+	/* Post message */
+	job_post_ret = job_bmi_send(s_op->addr,
+										 s_op->encoded.buffer_list[0],
+										 s_op->encoded.total_size,
+										 s_op->tag,
+										 0,
+										 0,
+										 s_op,
+										 ret,
+										 &i);
+
+
 	return(job_post_ret);
 
 }
@@ -355,11 +384,12 @@ static int lookup_dir_space(state_action_struct *s_op, job_status_s *ret)
 {
 
 	int job_post_ret=-1;
-	/*job_id_t i;*/
+	job_id_t i;
+	PVFS_vtag_s vtag;
 
 	gossip_ldebug(SERVER_DEBUG,"Lookup Directory Space\n");
 	
-	job_post_ret = job_trove_key_val_read(
+	job_post_ret = job_trove_keyval_read(
 														s_op->req->u.lookup_path.fs_id,
 														s_op->req->u.lookup_path.starting_handle,
 														&(s_op->key),
