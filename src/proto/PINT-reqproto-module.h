@@ -47,7 +47,7 @@ typedef struct
 typedef struct
 {
     PINT_encoding_functions *op;
-    char *name;
+    const char *name;
     void (*init_fun) (void);
     char generic_header[PINT_ENC_GENERIC_HEADER_SIZE];
 } PINT_encoding_table_values;
