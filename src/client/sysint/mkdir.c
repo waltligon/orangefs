@@ -20,6 +20,7 @@
 
 #define REQ_ENC_FORMAT 0
 
+extern struct server_configuration_s g_server_config;
 
 /* PVFS_sys_mkdir()
  *
@@ -99,8 +100,8 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
     }
 
     /* Determine the initial metaserver for new file */
-    ret = PINT_bucket_get_next_meta(req->parent_refn.fs_id,&serv_addr1,
-					&new_bucket,&handle_mask);
+    ret = PINT_bucket_get_next_meta(&g_server_config,
+                                    req->parent_refn.fs_id,&serv_addr1);
     if (ret < 0)
     {
 	failure = LOOKUP_SERVER_FAILURE;

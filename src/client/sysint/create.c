@@ -20,6 +20,8 @@
 
 #define REQ_ENC_FORMAT 0
 
+extern struct server_configuration_s g_server_config;
+
 static void copy_attributes(PVFS_object_attr *new,PVFS_object_attr old,
 	int handle_count, PVFS_handle *handle_array);
 
@@ -131,8 +133,9 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	}
 
 	/* Determine the initial metaserver for new file */
-	ret = PINT_bucket_get_next_meta(req->parent_refn.fs_id,&serv_addr1,
-					&new_bkt,&handle_mask);	
+	ret = PINT_bucket_get_next_meta(&g_server_config,
+                                        req->parent_refn.fs_id,
+                                        &serv_addr1);
 	if (ret < 0)
 	{
 	    failure = LOOKUP_SERVER_FAILURE;
@@ -189,7 +192,7 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	/* Create directory entry server request to parent */
 	/* Query BTI to get initial meta server */
 	ret = PINT_bucket_map_to_server(&serv_addr2,req->parent_refn.handle,
-			req->parent_refn.fs_id);
+                                        req->parent_refn.fs_id);
 	if (ret < 0)
 	{
 	    failure = CREATE_MSG_FAILURE;
@@ -268,8 +271,10 @@ int PVFS_sys_create(PVFS_sysreq_create *req, PVFS_sysresp_create *resp)
 	    goto return_error;
 	}
 	
-	ret = PINT_bucket_get_next_io(req->parent_refn.fs_id, io_serv_count,
-			bmi_addr_list, df_handle_array, &handle_mask);
+	ret = PINT_bucket_get_next_io(&g_server_config,
+                                      req->parent_refn.fs_id,
+                                      io_serv_count,
+                                      bmi_addr_list);
 	if (ret < 0)
 	{
 	    failure = PREIO3_CREATE_FAILURE;

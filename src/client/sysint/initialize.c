@@ -173,6 +173,11 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, PVFS_sysresp_init *resp)
 	goto return_error;
     }
 
+    /*
+      iterate over each fs for two reasons:
+      1) load mappings into bucket interface
+      2) store fs ids into resp object
+    */
     cur = g_server_config.file_systems;
     while(cur && (i < num_file_systems))
     {
@@ -182,6 +187,14 @@ int PVFS_sys_initialize(pvfs_mntlist mntent_list, PVFS_sysresp_init *resp)
             break;
         }
         assert(cur_fs->coll_id);
+        if (PINT_handle_load_mapping(&g_server_config,cur_fs))
+        {
+            init_fail = GET_CONFIG_INIT_FAIL;
+            gossip_ldebug(CLIENT_DEBUG,"Failed to load fs info into the "
+                          "PINT_handle interface.\n");
+            gen_mutex_unlock(&mt_config);
+            goto return_error;
+        }
         resp->fsid_list[i++] = cur_fs->coll_id;
         cur = llist_next(cur);
     }

@@ -4,9 +4,6 @@
  * See COPYING in top-level directory.
  */
 
-#ifndef __PINT_BUCKET_H
-#define __PINT_BUCKET_H
-
 #include <errno.h>
 #include <string.h>
 #include <assert.h>
@@ -24,12 +21,12 @@
 #include "extent-utils.h"
 #include "pint-bucket.h"
 
-/* Configuration Management Data Structure */
-fsconfig_array server_config;
-extern struct server_configuration_s g_server_config;
-
-static PVFS_handle HACK_handle_mask = 0;
-static PVFS_handle HACK_bucket = 0;
+/*
+  FIXME: is there a limits.h file that defines the max length
+  of a legal bmi_server URL?  If so, replace MAX_BMI_ADDR_LEN.
+  If not, why not?
+*/
+#define MAX_BMI_ADDR_LEN  512
 
 static struct qhash_table *s_fsid_config_cache_table = NULL;
 
@@ -38,16 +35,6 @@ static int hash_fsid(void *fsid, int table_size);
 static int hash_fsid_compare(void *key, struct qlist_head *link);
 
 static void free_host_extent_table(void *ptr);
-
-/*
-  FIXME:
-  there's a header file problem that needs to be resolved...
-  for now, I'm forward declaring functions to fix warnings.
-  this is a sin.
-*/
-int PINT_bucket_get_server_name(char* server_name, int max_server_name_len,
-                                PVFS_handle bucket, PVFS_fs_id fsid);
-int PINT_handle_load_mapping(void *fs);
 
 
 /* PINT_bucket_initialize()
@@ -60,23 +47,12 @@ int PINT_bucket_initialize(void)
 {
     int ret = -EINVAL;
 
-    if (!g_server_config.file_systems)
-    {
-        return ret;
-    }
-
     s_fsid_config_cache_table = qhash_init(
         hash_fsid_compare,hash_fsid,67);
     if (!s_fsid_config_cache_table)
     {
         return (-ENOMEM);
     }
-
-    /*
-      we can do this here...reserving the load_mapping
-      call for dynamic addition.  is this a problem?
-    */
-    llist_doall(g_server_config.file_systems, PINT_handle_load_mapping);
     return(0);
 }
 
@@ -127,7 +103,8 @@ int PINT_bucket_finalize(void)
  *
  * returns 0 on success, -errno on failure
  */
-int PINT_handle_load_mapping(void *fs)
+int PINT_handle_load_mapping(struct server_configuration_s *config,
+                             struct filesystem_configuration_s *fs)
 {
     int ret = -EINVAL;
     struct llist *cur = NULL;
@@ -135,7 +112,7 @@ int PINT_handle_load_mapping(void *fs)
     struct config_fs_cache_s *cur_config_fs_cache = NULL;
     struct bmi_host_extent_table_s *cur_host_extent_table = NULL;
 
-    if (fs)
+    if (config && fs)
     {
         cur_config_fs_cache = (struct config_fs_cache_s *)malloc(
             sizeof(struct config_fs_cache_s));
@@ -167,7 +144,7 @@ int PINT_handle_load_mapping(void *fs)
             }
             cur_host_extent_table->bmi_address =
                 PINT_server_config_get_host_addr_ptr(
-                    &g_server_config,cur_mapping->host_alias);
+                    config,cur_mapping->host_alias);
             assert(cur_host_extent_table->bmi_address);
 
             cur_host_extent_table->extent_list =
@@ -220,6 +197,7 @@ int PINT_handle_load_mapping(void *fs)
  * returns 0 on success, -errno on failure
  */
 int PINT_bucket_get_next_meta(
+    struct server_configuration_s *config,
     PVFS_fs_id fsid,
     bmi_addr_t *meta_addr)
 {
@@ -228,7 +206,7 @@ int PINT_bucket_get_next_meta(
     struct qlist_head *hash_link = NULL;
     struct config_fs_cache_s *cur_config_cache = NULL;
 
-    if (meta_addr)
+    if (config && meta_addr)
     {
         hash_link = qhash_search(s_fsid_config_cache_table,&(fsid));
         if (hash_link)
@@ -254,7 +232,7 @@ int PINT_bucket_get_next_meta(
                 llist_next(cur_config_cache->meta_server_cursor);
 
             meta_server_bmi_str = PINT_server_config_get_host_addr_ptr(
-                &g_server_config,meta_server_bmi_str);
+                config,meta_server_bmi_str);
 
             ret = BMI_addr_lookup(meta_addr,meta_server_bmi_str);
         }
@@ -272,6 +250,7 @@ int PINT_bucket_get_next_meta(
  * returns 0 on success, -errno on failure
  */
 int PINT_bucket_get_next_io(
+    struct server_configuration_s *config,
     PVFS_fs_id fsid,
     int num_servers,
     bmi_addr_t *io_addr_array)
@@ -281,7 +260,7 @@ int PINT_bucket_get_next_io(
     struct qlist_head *hash_link = NULL;
     struct config_fs_cache_s *cur_config_cache = NULL;
 
-    if (num_servers && io_addr_array)
+    if (config && num_servers && io_addr_array)
     {
         hash_link = qhash_search(s_fsid_config_cache_table,&(fsid));
         if (hash_link)
@@ -308,7 +287,7 @@ int PINT_bucket_get_next_io(
                     llist_next(cur_config_cache->data_server_cursor);
 
                 data_server_bmi_str = PINT_server_config_get_host_addr_ptr(
-                    &g_server_config,data_server_bmi_str);
+                    config,data_server_bmi_str);
 
                 ret = BMI_addr_lookup(io_addr_array,data_server_bmi_str);
                 if (ret)
@@ -337,47 +316,12 @@ int PINT_bucket_map_to_server(
 	PVFS_fs_id fsid)
 {
     int ret = -EINVAL;
-    char bmi_server_addr[1024] = {0};
-    /*
-      FIXME: is there a limits.h file that defines the max length
-      of a legal bmi_server URL?  If so, replace '1024' with it
-    */
-    ret = PINT_bucket_get_server_name(bmi_server_addr,1024,handle,fsid);
-    return (((ret == 0) && bmi_server_addr) ?
-            BMI_addr_lookup(server_addr, bmi_server_addr) : ret);
-}
+    char bmi_server_addr[MAX_BMI_ADDR_LEN] = {0};
 
+    ret = PINT_bucket_get_server_name(bmi_server_addr,
+                                      MAX_BMI_ADDR_LEN,handle,fsid);
 
-/* PINT_bucket_map_from_server()
- *
- * maps from a server to an array of buckets (bounded by inout_count)
- * that it controls.
- *
- * returns 0 on success, -errno on failure
- */
-int PINT_bucket_map_from_server(
-	char* server_name,
-	int* inout_count, 
-	PVFS_handle* bucket_array,
-	PVFS_handle* handle_mask)
-{
-#if 0
-	if(strcmp(server_name, HACK_server_name) != 0)
-	{
-		return(-EINVAL);
-	}
-#endif
-
-	if(*inout_count < 1)
-	{
-		return(-EINVAL);
-	}
-
-	*inout_count = 1;
-	bucket_array[0] = HACK_bucket;
-	*handle_mask = HACK_handle_mask;
-
-	return(0);
+    return (!ret ? BMI_addr_lookup(server_addr, bmi_server_addr) : ret);
 }
 
 /* PINT_bucket_get_num_meta()
@@ -403,6 +347,7 @@ int PINT_bucket_get_num_meta(PVFS_fs_id fsid, int *num_meta)
                             hash_link);
             assert(cur_config_cache);
             assert(cur_config_cache->fs);
+            assert(cur_config_cache->fs->meta_server_list);
 
             *num_meta = llist_count(cur_config_cache->fs->meta_server_list);
             ret = 0;
@@ -433,6 +378,7 @@ int PINT_bucket_get_num_io(PVFS_fs_id fsid, int *num_io)
                             hash_link);
             assert(cur_config_cache);
             assert(cur_config_cache->fs);
+            assert(cur_config_cache->fs->data_server_list);
 
             *num_io = llist_count(cur_config_cache->fs->data_server_list);
             ret = 0;
@@ -592,7 +538,7 @@ static void free_host_extent_table(void *ptr)
 
     /*
       NOTE: cur_host_extent_table->bmi_address is a ptr
-      into a g_server_config->host_aliases object.
+      into a server_configuration_s->host_aliases object.
       it is properly freed by PINT_server_config_release
     */
     cur_host_extent_table->bmi_address = (char *)0;
@@ -600,5 +546,3 @@ static void free_host_extent_table(void *ptr)
                free_extent_list);
     free(cur_host_extent_table);
 }
-
-#endif

@@ -12,9 +12,9 @@
 /* this is a test program that exercises the bucket interface and
  * demonstrates how to use it.
  */
-
 int main(int argc, char **argv)	
 {
+#if 0
 	int ret = -1;
 	int num_meta_servers = 0;
 	int num_io_servers = 0;
@@ -200,6 +200,6 @@ int main(int argc, char **argv)
 	BMI_finalize();
 
 	gossip_disable();
-
+#endif
 	return(0);
 }
