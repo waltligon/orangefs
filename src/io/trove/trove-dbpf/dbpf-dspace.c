@@ -547,11 +547,12 @@ return_error:
 static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
 {
     int ret, fd;
-    DB *db_p;
+    DB *db_p, *kdb_p;
     DBT key, data;
     TROVE_ds_storedattr_s s_attr;
     TROVE_size b_size = 0, k_size = 0;
-    struct stat b_stat;
+    struct stat b_stat; /* for grabbing bstream size */
+    DB_BTREE_STAT *k_stat_p; /* for grabbing keyval size; assumes DB_RECNUM!!! */
 
     /* NOTE: THIS WOULD BE EASIER IF THE COLL_ID WERE IN THE OP */
     ret = dbpf_dspace_dbcache_try_get(op_p->coll_p->coll_id, 0, &db_p);
@@ -579,6 +580,26 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
 	    dbpf_bstream_fdcache_put(op_p->coll_p->coll_id, op_p->handle); /* release the fd right away */
 	    if (ret < 0) goto return_error;
 	    b_size = (TROVE_size) b_stat.st_size;
+	    /* drop through */
+    }
+
+    ret = dbpf_keyval_dbcache_try_get(op_p->coll_p->coll_id, op_p->handle, 0, &kdb_p);
+    switch (ret) {
+	case DBPF_BSTREAM_FDCACHE_ERROR:
+	    /* TODO: HOW DO WE TELL A REAL ERROR FROM A "HAVEN'T CREATED YET" ERROR? */
+	    /* b_size is already set to zero */
+	    break;
+	case DBPF_BSTREAM_FDCACHE_BUSY:
+	    dbpf_dspace_dbcache_put(op_p->coll_p->coll_id); /* release the dspace dbcache entry */
+	    return 0; /* try again later */
+	case DBPF_BSTREAM_FDCACHE_SUCCESS:
+	    ret = kdb_p->stat(kdb_p, &k_stat_p, 0);
+	    dbpf_keyval_dbcache_put(op_p->coll_p->coll_id, op_p->handle); /* release the fd right away */
+	    if (ret == 0) {
+		k_size = (TROVE_size) k_stat_p->bt_nkeys;
+		free(k_stat_p);
+	    }
+	    else goto return_error;
 	    /* drop through */
     }
 

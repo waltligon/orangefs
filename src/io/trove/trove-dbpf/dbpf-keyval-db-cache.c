@@ -182,7 +182,9 @@ int dbpf_keyval_dbcache_try_get(TROVE_coll_id coll_id,
 	if (ret != 0) assert(0);
     }
     else if (ret != 0) {
+#if 0
 	    perror("dpbf_keyval_dbcache_get");
+#endif
 	    goto return_error;
     }
 

@@ -41,7 +41,9 @@ static int path_lookup(TROVE_coll_id coll_id, char *path, TROVE_handle *out_hand
 	return -1;
     }
 
+#if 0
     printf("path_lookup: looking up %s, root handle is %d\n", path, (int) handle);
+#endif
 
     for (;;) {
 	parent_handle = handle;
@@ -82,7 +84,9 @@ static int path_lookup(TROVE_coll_id coll_id, char *path, TROVE_handle *out_hand
 	    return -1;
 	}
 
+#if 0
 	printf("  path_lookup: handle for path component %s is %d\n", dir, (int) handle);
+#endif
     }
 
     *out_handle_p = handle;
