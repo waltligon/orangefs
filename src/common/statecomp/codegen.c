@@ -4,6 +4,12 @@
  * See COPYING in top-level directory.
  */
 
+/** \file
+ *  \ingroup statecomp
+ *
+ * Code generation routines for statecomp.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -35,9 +41,7 @@ void gen_state_start(char *state_name)
     fprintf(out_file,"static union PINT_state_array_values ST_%s[] = {\n", state_name);
 }
 
-/* gen_state_action()
- *
- * generates first two lines in the state machine (I think),
+/** generates first two lines in the state machine (I think),
  * the first one indicating what kind of action it is ("run"
  * or "jump") and the second being the action itself (either a
  * function or a nested state machine).
@@ -69,8 +73,6 @@ void gen_state_action(char *run_func, int flag)
     }
 }
 
-/* gen_return_code()
- */
 void gen_return_code(char *return_code)
 {
     fprintf(out_file,
@@ -78,8 +80,6 @@ void gen_return_code(char *return_code)
 	    return_code);
 }
 
-/* gen_next_state()
- */
 void gen_next_state(int flag, char *new_state)
 {
     switch (flag) {

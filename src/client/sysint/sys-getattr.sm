@@ -3,6 +3,14 @@
  *
  * See COPYING in top-level directory.
  */
+
+/** \file
+ *  \ingroup sysint
+ *
+ *  PVFS2 system interface routines for obtaining attributes of an object
+ *  (file or directory).
+ */
+
 #include <string.h>
 #include <assert.h>
 
@@ -121,6 +129,9 @@ machine pvfs2_client_getattr_sm(
 
 %%
 
+
+/** Initiate retrieval of object attributes.
+ */
 PVFS_error PVFS_isys_getattr(
     PVFS_object_ref ref,
     uint32_t attrmask, 
@@ -165,6 +176,8 @@ PVFS_error PVFS_isys_getattr(
         sm_p, PVFS_SYS_GETATTR, op_id, user_ptr);
 }
 
+/** Retrieve object attributes.
+ */
 PVFS_error PVFS_sys_getattr(
     PVFS_object_ref ref,
     uint32_t attrmask, 

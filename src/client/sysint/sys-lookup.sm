@@ -5,6 +5,8 @@
  */
 
 /** \file
+ *  \ingroup sysint
+ *
  *  PVFS2 system interface routines for dereferencing path strings.
  */
 

@@ -4,6 +4,13 @@
  * See COPYING in top-level directory.
  */
 
+/** \file
+ *  \ingroup sysint
+ *
+ *  PVFS2 system interface routines for renaming an object (file
+ *  or directory).
+ */
+
 #include <string.h>
 #include <assert.h>
 
@@ -227,11 +234,14 @@ machine pvfs2_client_rename_sm(
 
 %%
 
-/* PVFS_isys_rename()
+/** Initiate renaming of an object.
  *
- * Renames an 'old' entry to a 'new' entry.
+ *  \param old_entry original name of object
+ *  \param old_parent_ref reference to original parent directory of object
+ *  \param new_entry new name for object
+ *  \param new_parent_ref reference to new parent directory for object
  *
- * returns 0 on success, -errno on failure
+ *  \return 0 on success, -errno on failure.
  */
 PVFS_error PVFS_isys_rename(
     char *old_entry,
@@ -309,6 +319,15 @@ PVFS_error PVFS_isys_rename(
         sm_p, PVFS_SYS_RENAME, op_id, user_ptr);
 }
 
+/** Rename an object.
+ *
+ *  \param old_entry original name of object
+ *  \param old_parent_ref reference to original parent directory of object
+ *  \param new_entry new name for object
+ *  \param new_parent_ref reference to new parent directory for object
+ *
+ *  \return 0 on success, -errno on failure.
+ */
 PVFS_error PVFS_sys_rename(
     char *old_entry,
     PVFS_object_ref old_parent_ref,

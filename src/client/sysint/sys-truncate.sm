@@ -4,6 +4,12 @@
  * See COPYING in top-level directory.
  */
 
+/** \file
+ *  \ingroup sysint
+ *
+ *  PVFS2 system interface routines for modifying the size of a file,
+ *  either growing or shrinking.
+ */
 #include <string.h>
 #include <assert.h>
 
@@ -88,6 +94,8 @@ machine pvfs2_client_truncate_sm(
 
 %%
 
+/** Initiate resizing of a file.
+ */
 PVFS_error PVFS_isys_truncate(
     PVFS_object_ref ref,
     PVFS_size size,
@@ -162,6 +170,8 @@ PVFS_error PVFS_sys_truncate(
     return error;
 }
 
+/** Resize a file.
+ */
 static int truncate_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
                                                 job_status_s *js_p)
 {

@@ -7,6 +7,12 @@
  * See COPYING in top-level directory.
  */
 
+/** \file
+ *  \ingroup statecomp
+ *
+ *  Parser for statecomp source-to-source translator.
+ */
+
 #include <stdlib.h>
 #include <stdio.h>
 

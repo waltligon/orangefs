@@ -4,9 +4,17 @@
  * See COPYING in top-level directory.
  */
 
-/*
+/** \defgroup gossip gossip logging interface
+ *
  * This is a basic application logging facility.  It uses printf style
  * formatting and provides several mechanisms for output.
+ *
+ * @{
+ */
+
+/** \file
+ *
+ *  Declarations for the gossip logging interface.
  */
 
 #ifndef __GOSSIP_H
@@ -116,6 +124,8 @@ int gossip_err(
 #endif /* __GNUC__ */
 
 #endif /* __GOSSIP_H */
+
+/* @} */
 
 /*
  * Local variables:

@@ -4,6 +4,13 @@
  * See COPYING in top-level directory.
  */
 
+/** \file
+ *  \ingroup sysint
+ *
+ *  PVFS2 system interface routines for setting the attributes of an object
+ *  (file or directory).
+ */
+
 #include <string.h>
 #include <assert.h>
 
@@ -100,6 +107,8 @@ machine pvfs2_client_setattr_sm(
 
 %%
 
+/** Initiate modification of attributes of a single object.
+ */
 PVFS_error PVFS_isys_setattr(
     PVFS_object_ref ref,
     PVFS_sys_attr attr,
@@ -150,7 +159,8 @@ PVFS_error PVFS_isys_setattr(
         sm_p, PVFS_SYS_SETATTR, op_id, user_ptr);
 }
 
-
+/**  Modify the attributes of a single object.
+ */
 PVFS_error PVFS_sys_setattr(
     PVFS_object_ref ref,
     PVFS_sys_attr attr,

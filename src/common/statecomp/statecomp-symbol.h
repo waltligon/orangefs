@@ -4,12 +4,14 @@
  * See COPYING in top-level directory.
  */
 
+/** \file
+ *  \ingroup statecomp
+ *
+ *  Defines and prototypes for statecomp symbol table.
+ */
+
 #ifndef _SYMBOL_H_
 #define _SYMBOL_H_
-
-/*
- *	symbol.h --- declarations for all the public types
- */
 
 #define TYPE_MACHINE 0x1
 #define TYPE_STATE 0x2	

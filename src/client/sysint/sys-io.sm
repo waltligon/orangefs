@@ -3,6 +3,13 @@
  *
  * See COPYING in top-level directory.
  */
+
+/** \file
+ *  \ingroup sysint
+ *
+ *  PVFS2 system interface routines for reading and writing files.
+ */
+
 #include <string.h>
 #include <assert.h>
 
@@ -233,6 +240,10 @@ machine pvfs2_client_io_sm(
 
 %%
 
+/** Initiate a read or write operation.
+ *
+ *  \param type specifies if the operation is a read or write.
+ */
 PVFS_error PVFS_isys_io(
     PVFS_object_ref ref,
     PVFS_Request file_req,
@@ -321,6 +332,10 @@ PVFS_error PVFS_isys_io(
         sm_p, PVFS_SYS_IO, op_id, user_ptr);
 }
 
+/** Perform a read or write operation.
+ *
+ *  \param type specifies if the operation is a read or write.
+ */
 PVFS_error PVFS_sys_io(
     PVFS_object_ref ref,
     PVFS_Request file_req,

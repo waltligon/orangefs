@@ -4,6 +4,12 @@
  * See COPYING in top-level directory.
  */
 
+/** \file
+ *  \ingroup sysint
+ *
+ *  PVFS2 system interface routines for reading entries from a directory.
+ */
+
 #include <string.h>
 #include <assert.h>
 
@@ -100,6 +106,13 @@ machine pvfs2_client_readdir_sm(
 
 %%
 
+/** Initiate reading of entries from a directory.
+ *
+ *  \param token opaque value used to track position in directory
+ *         when more than one read is required.
+ *  \param pvfs_dirent_incount maximum number of entries to read, if
+ *         available, starting from token.
+ */
 PVFS_error PVFS_isys_readdir(
     PVFS_object_ref ref,
     PVFS_ds_position token, 
@@ -151,6 +164,13 @@ PVFS_error PVFS_isys_readdir(
         sm_p, PVFS_SYS_READDIR, op_id, user_ptr);
 }
 
+/** Read entries from a directory.
+ *
+ *  \param token opaque value used to track position in directory
+ *         when more than one read is required.
+ *  \param pvfs_dirent_incount maximum number of entries to read, if
+ *         available, starting from token.
+ */
 PVFS_error PVFS_sys_readdir(
     PVFS_object_ref ref,
     PVFS_ds_position token, 

@@ -4,6 +4,12 @@
  * See COPYING in top-level directory.
  */
 
+/** \file
+ *  \ingroup sysint
+ *
+ *  PVFS2 system interface routines for creating a new directory.
+ */
+
 #include <string.h>
 #include <assert.h>
 
@@ -155,6 +161,8 @@ machine pvfs2_client_mkdir_sm(
 
 %%
 
+/** Initiate creation of a new directory.
+ */
 PVFS_error PVFS_isys_mkdir(
     char *object_name,
     PVFS_object_ref parent_ref,
@@ -217,6 +225,8 @@ PVFS_error PVFS_isys_mkdir(
         sm_p, PVFS_SYS_MKDIR, op_id, user_ptr);
 }
 
+/** Create a new directory.
+ */
 PVFS_error PVFS_sys_mkdir(
     char *object_name,
     PVFS_object_ref parent_ref,

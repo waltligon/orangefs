@@ -4,9 +4,12 @@
  * See COPYING in top-level directory.
  */
 
-/*
-*	symbol --- symbol table and mapping routines
-*/
+/** \file
+ *  \ingroup statecomp
+ *
+ * Symbol table and mapping routines for state machine source-to-source
+ * translator.
+ */
 
 #include <stdio.h>
 #include <string.h>
@@ -16,17 +19,13 @@ extern int line;
 
 void *emalloc(unsigned int size);
 
-/*
- *	MAXHASH --- determines the hash table width.
- *	symtab --- the symbol table structure
- */
-
+/** hash table width */
 #define MAXHASH	311
 
+/** the symbol table structure */
 static sym_ent_p symtab[MAXHASH];
 
-/*
- *	hash --- scramble a name (hopefully) uniformly to fit in a table
+/** scramble a name (hopefully) uniformly to fit in a table
  */
 static unsigned int hash(char *name)
 {
@@ -39,8 +38,7 @@ static unsigned int hash(char *name)
     return(h % MAXHASH);
 }
 
-/*
- *	symenter --- enter a name into the symbol table
+/** enter a name into the symbol table
  */
 sym_ent_p symenter(char *name)
 {
@@ -57,11 +55,8 @@ sym_ent_p symenter(char *name)
     return(p);
 }
 
-/*
- *	symlook --- lookup a symbol in the symbol table
- *
- *		symlook scans the symbol table and returns a pointer to
- *		the symbol table entry
+/** lookup a symbol in the symbol table.  scans the symbol table and returns a
+ *  pointer to the symbol table entry
  */
 sym_ent_p symlook(char *name)
 {
@@ -75,6 +70,9 @@ sym_ent_p symlook(char *name)
     return(p);
 }
 
+/** initializes data structures prior to additions into symbol table.
+ *  \note there is no matching finalize for the symbol table.
+ */
 void init_symbol_table(void)
 {
     memset(symtab, 0, MAXHASH * sizeof(sym_ent_p));

@@ -6,6 +6,12 @@
  * See COPYING in top-level directory.
  */
 
+/** \file
+ *  \ingroup statecomp
+ *
+ *  Lexical analyzer for statecomp source-to-source translator.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

@@ -4,6 +4,13 @@
  * See COPYING in top-level directory.
  */
 
+/** \file
+ *  \ingroup sysint
+ *
+ *  PVFS2 system interface routines for removing an object and its
+ *  associated directory entry.
+ */
+
 #include <string.h>
 #include <assert.h>
 
@@ -174,6 +181,8 @@ machine pvfs2_client_remove_sm(
 
 %%
 
+/** Initiate removal of an object and its directory entry.
+ */
 PVFS_error PVFS_isys_remove(
     char *object_name,
     PVFS_object_ref parent_ref, 
@@ -222,6 +231,8 @@ PVFS_error PVFS_isys_remove(
         sm_p, PVFS_SYS_REMOVE, op_id, user_ptr);
 }
 
+/** Remove an object and its directory entry.
+ */
 PVFS_error PVFS_sys_remove(
     char *object_name,
     PVFS_object_ref parent_ref, 

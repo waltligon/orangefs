@@ -4,6 +4,24 @@
  * See COPYING in top-level directory.
  */
 
+/** \defgroup statecomp statecomp source-to-source translator
+ *
+ *  statecomp is a source-to-source translator.  It takes state machine
+ *  descriptions (.sm extension) as input and creates a corresponding C
+ *  source file for compilation.  Both clients and servers rely on these
+ *  state machines for concurrent processing.  This executable is built at
+ *  compile time and used only during compilation of PVFS2.
+ *
+ * @{
+ */
+
+/** \file
+ *
+ *  Core of state machine source-to-source translator executable, statecomp,
+ *  including processing arguments, calling the parser, and producing
+ *  warning and error messages.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -186,6 +204,8 @@ void produce_listing(int line, char *listing)
     if (list_flag)
 	fprintf(list_file, "[%d]\t%s\n", line, listing);
 }
+
+/* @} */
 
 /*
  * Local variables:

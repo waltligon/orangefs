@@ -4,6 +4,12 @@
  * See COPYING in top-level directory.
  */
 
+/** \file
+ *  \ingroup gossip
+ *
+ *  Implementation of gossip interface.
+ */
+
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdint.h>
@@ -20,10 +26,10 @@
 
 #include "gossip.h"
 
-/* controls whether debugging is on or off */
+/** controls whether debugging is on or off */
 int gossip_debug_on = 0;
 
-/* controls the mask level for debugging messages */
+/** controls the mask level for debugging messages */
 uint64_t gossip_debug_mask = 0;
 
 enum
@@ -38,8 +44,9 @@ enum
     GOSSIP_BUF_SIZE = 1024
 };
 
-/* determines which logging facility to use */
-/* default to stderr to begin with */
+/** determines which logging facility to use.  Default to stderr to begin
+ *  with.
+ */
 int gossip_facility = GOSSIP_STDERR;
 
 /* file handle used for file logging */
@@ -69,13 +76,11 @@ static int gossip_disable_syslog(
  * visible functions
  */
 
-/* gossip_enable_syslog()
- * 
- * Turns on syslog logging facility.  The priority argument is a
- * combination of the facility and level to use, as seen in the
- * syslog(3) man page.
+/** Turns on syslog logging facility.  The priority argument is a
+ *  combination of the facility and level to use, as seen in the
+ *  syslog(3) man page.
  *
- * returns 0 on success, -errno on failure
+ *  \return 0 on success, -errno on failure.
  */
 int gossip_enable_syslog(
     int priority)
@@ -98,11 +103,9 @@ int gossip_enable_syslog(
     return 0;
 }
 
-/* gossip_enable_stderr()
+/** Turns on logging to stderr.
  *
- * Turns on logging to stderr.
- *
- * returns 0 on success, -errno on failure
+ *  \return 0 on success, -errno on failure.
  */
 int gossip_enable_stderr(
     void)
@@ -124,13 +127,11 @@ int gossip_enable_stderr(
     return 0;
 }
 
-/* gossip_enable_file()
- * 
- * Turns on logging to a file.  The filename argument indicates which
- * file to use for logging messages, and the mode indicates whether the
- * file should be truncated or appended (see fopen() man page).
+/** Turns on logging to a file.  The filename argument indicates which
+ *  file to use for logging messages, and the mode indicates whether the
+ *  file should be truncated or appended (see fopen() man page).
  *
- * returns 0 on success, -errno on failure
+ *  \return 0 on success, -errno on failure.
  */
 int gossip_enable_file(
     const char *filename,
@@ -159,11 +160,9 @@ int gossip_enable_file(
     return 0;
 }
 
-/* gossip_disable()
- * 
- * Turns off any active logging facility and disables debugging.
+/** Turns off any active logging facility and disables debugging.
  *
- * returns 0 on success, -errno on failure
+ *  \return 0 on success, -errno on failure.
  */
 int gossip_disable(
     void)
@@ -191,12 +190,10 @@ int gossip_disable(
     return ret;
 }
 
-/* gossip_get_debug_mask()
+/** Fills in args indicating whether debugging is on or off, and what the 
+ *  mask level is.
  *
- * fills in args indicating whether debugging is on or off, and what the 
- * mask level is
- *
- * returns 0 on success, -errno on failure
+ *  \return 0 on success, -errno on failure.
  */
 int gossip_get_debug_mask(
     int *debug_on,
@@ -207,13 +204,11 @@ int gossip_get_debug_mask(
     return 0;
 }
 
-/* gossip_set_debug_mask()
+/** Determines whether debugging messages are turned on or off.  Also
+ *  specifies the mask that determines which debugging messages are
+ *  printed.
  *
- * Determines whether debugging messages are turned on or off.  Also
- * specifies the mask that determines which debugging messages are
- * printed.
- *
- * returns 0 on success, -errno on failure
+ *  \return 0 on success, -errno on failure.
  */
 int gossip_set_debug_mask(
     int debug_on,
@@ -296,13 +291,11 @@ int __gossip_debug(
     return ret;
 }
 
-/* gossip_err()
- * 
- * Logs a critical error message.  This will print regardless of the
- * mask value and whether debugging is turned on or off, as long as some
- * logging facility has been enabled.
+/** Logs a critical error message.  This will print regardless of the
+ *  mask value and whether debugging is turned on or off, as long as some
+ *  logging facility has been enabled.
  *
- * returns 0 on success, -errno on failure
+ *  \return 0 on success, -errno on failure.
  */
 int gossip_err(
     const char *format,
@@ -343,12 +336,8 @@ int gossip_err(
     #ifndef GOSSIP_BACKTRACE_DEPTH
     #define GOSSIP_BACKTRACE_DEPTH 12
     #endif
-/* gossip_backtrace()
- *
- * prints out a dump of the current stack (excluding this function)
- * using gossip_err
- *
- * no return value
+/** Prints out a dump of the current stack (excluding this function)
+ *  using gossip_err.
  */
 void gossip_backtrace(void)
 {
