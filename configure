@@ -3354,7 +3354,8 @@ fi;
 
 RHTAG1="Red Hat Linux release 9"
 RHTAG2="Red Hat Enterprise Linux WS release 3"
-RHTAG3="Red Hat Linux Advanced Server release 2.1AS"
+RHTAG3="Red Hat Enterprise Linux AS release 3"
+RHTAG4="Red Hat Linux Advanced Server release 2.1AS"
 
 REDHAT_RELEASE=""
 if test -f /etc/redhat-release; then
@@ -3363,7 +3364,8 @@ echo $ECHO_N "checking for tagged Redhat releases (must patch)... $ECHO_C" >&6
     REDHAT_REL=`cat /etc/redhat-release`
     if test "x`echo $REDHAT_REL | cut -b 1-23`" = "x$RHTAG1" ||
        test "x`echo $REDHAT_REL | cut -b 1-37`" = "x$RHTAG2" ||
-       test "x`echo $REDHAT_REL | cut -b 1-43`" = "x$RHTAG3" ; then
+       test "x`echo $REDHAT_REL | cut -b 1-37`" = "x$RHTAG3" ||
+       test "x`echo $REDHAT_REL | cut -b 1-43`" = "x$RHTAG4" ; then
        REDHAT_RELEASE="-DREDHAT_RELEASE_9"
        echo "$as_me:$LINENO: result: yes" >&5
 echo "${ECHO_T}yes" >&6
