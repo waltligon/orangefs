@@ -24,6 +24,7 @@
 #include "thread-mgr.h"
 #include "pthread.h"
 #include "gen-locks.h"
+#include "pint-perf-counter.h"
 
 /**********************************************************
  * interface prototypes 
@@ -2032,6 +2033,8 @@ static void bmi_completion_trove_to_bmi(bmi_error_code_t error_code,
 
     flow_data->total_drained += flow_data->drain_buffer_used;
     flow_d->total_transfered = flow_data->total_drained;
+    PINT_perf_count(PINT_PERF_READ, flow_data->drain_buffer_used, 
+	PINT_PERF_ADD);
     flow_data->drain_buffer_state = BUF_READY_TO_SWAP;
     gossip_ldebug(FLOW_PROTO_DEBUG, "Total completed (trove to bmi): %ld\n",
 		  (long) flow_d->total_transfered);
@@ -2454,6 +2457,8 @@ static void trove_completion_bmi_to_trove(PVFS_error error_code,
     flow_data->total_drained += flow_data->drain_buffer_stepsize;
     flow_data->drain_buffer_offset += flow_data->drain_buffer_stepsize;
     flow_d->total_transfered += flow_data->drain_buffer_stepsize;
+    PINT_perf_count(PINT_PERF_WRITE, flow_data->drain_buffer_stepsize, 
+	PINT_PERF_ADD);
     gossip_ldebug(FLOW_PROTO_DEBUG, "Total completed (bmi to trove): %ld\n",
 		  (long) flow_d->total_transfered);
 

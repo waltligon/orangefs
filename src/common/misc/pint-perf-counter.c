@@ -72,8 +72,6 @@ void PINT_perf_count(enum PINT_perf_count_keys key,
     int64_t value,
     enum PINT_perf_ops op)
 {
-    assert(key > -1 && key <= PINT_PERF_COUNT_KEY_MAX);
-    
     switch(op)
     {
 	case PINT_PERF_ADD:

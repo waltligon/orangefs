@@ -24,6 +24,5 @@ SERVERGENSRC := \
 
 # "normal" c files
 SERVERSRC += \
-	$(SERVERGENSRC) \
-	$(DIR)/pint-perf-counter.c
+	$(SERVERGENSRC)
 
