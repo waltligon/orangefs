@@ -358,6 +358,6 @@ include/pvfs2-types.h
 if test -e $types.prev ; then
     if cmp -s $types $types.prev ; then
 	mv $types.prev $types
-	echo $as_me: $types is unchanged
+	echo $types is unchanged
     fi
 fi
