@@ -101,7 +101,7 @@ int main(int argc, char **argv)
 	/* build the request packet */
 	/* is this stuff right?  I'm not sure about the dist stuff... */
 	total_req_size = sizeof(struct wire_harness_req) +
-		((io_req->num_nested_req + 1) * sizeof(struct PINT_Request)) +
+		PINT_REQUEST_PACK_SIZE(io_req) +
 		sizeof(struct PVFS_Dist) + io_dist->name_size +
 		io_dist->param_size;
 
@@ -114,8 +114,7 @@ int main(int argc, char **argv)
 	}
 	memset(req, 0, total_req_size);
 
-	req->io_req_size = (io_req->num_nested_req + 1) * sizeof(struct
-		PINT_Request);
+	req->io_req_size = PINT_REQUEST_PACK_SIZE(io_req);
 	req->dist_size = sizeof(struct PVFS_Dist) + io_dist->name_size + 
 		io_dist->param_size;
 	
@@ -124,7 +123,7 @@ int main(int argc, char **argv)
 		(PINT_Request*)((char*)req + sizeof(struct wire_harness_req));
 	
 	commit_index = 0;
-	ret = PINT_Request_commit(io_req, encode_io_req, &commit_index);
+	ret = PINT_Request_commit(encode_io_req, io_req, &commit_index);
 	if(ret < 0)
 	{
 		fprintf(stderr, "Error: request commit failure.\n");
