@@ -16,6 +16,7 @@
 #include <stdlib.h>
 
 #include "pvfs2.h"
+#include "str-utils.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -43,6 +44,7 @@ int main(int argc, char **argv)
     PVFS_fs_id cur_fs;
     pvfs_mntlist mnt = {0,NULL};
     PVFS_sysresp_init resp_init;
+    PVFS_sysresp_lookup resp_lookup;
     PVFS_sysresp_create resp_create;
     PVFS_sysresp_io resp_io;
     struct options* user_opts = NULL;
@@ -66,7 +68,8 @@ int main(int argc, char **argv)
     user_opts = parse_args(argc, argv);
     if(!user_opts)
     {
-	fprintf(stderr, "Error: failed to parse command line arguments.\n");
+	fprintf(stderr, "Error: failed to parse "
+                "command line arguments.\n");
 	return(-1);
     }
 
@@ -106,11 +109,10 @@ int main(int argc, char **argv)
 
     if(mnt_index == -1)
     {
-	fprintf(stderr, "Error: could not find filesystem for %s in pvfstab\n", 
-	    user_opts->destfile);
+	fprintf(stderr, "Error: could not find filesystem for %s "
+                "in pvfstab\n", user_opts->destfile);
 	close(src_fd);
 	return(-1);
-
     }
 
     memset(&resp_init, 0, sizeof(resp_init));
@@ -121,21 +123,6 @@ int main(int argc, char **argv)
 	close(src_fd);
 	return(-1);
     }
-
-    /* get the absolute path on the pvfs2 file system */
-    if (PVFS_util_remove_base_dir(pvfs_path,str_buf,PVFS_NAME_MAX))
-    {
-        if (pvfs_path[0] != '/')
-        {
-            fprintf(stderr, "Error: poorly formatted path.\n");
-        }
-        fprintf(stderr, "Error: cannot retrieve entry name for creation on %s\n",
-               pvfs_path);
-	ret = -1;
-	goto main_out;
-    }
-
-    memset(&resp_create, 0, sizeof(PVFS_sysresp_create));
 
     cur_fs = resp_init.fsid_list[mnt_index];
 
@@ -153,18 +140,77 @@ int main(int argc, char **argv)
     credentials.uid = getuid();
     credentials.gid = getgid();
 
-    ret = PVFS_util_lookup_parent(pvfs_path, cur_fs, credentials, 
-	&parent_refn.handle);
-    if(ret < 0)
+    if (strcmp(pvfs_path,"/") == 0)
     {
-	PVFS_perror("PVFS_util_lookup_parent", ret);
-	ret = -1;
-	goto main_out;
-    }
-    parent_refn.fs_id = cur_fs;
+        char *segp = NULL, *prev_segp = NULL;
+        void *segstate = NULL;
 
-    ret = PVFS_sys_create(entry_name, parent_refn, attr, credentials,
-			    &resp_create);
+        ret = PVFS_sys_lookup(cur_fs, pvfs_path,
+                              credentials, &resp_lookup,
+                              PVFS2_LOOKUP_LINK_FOLLOW);
+        if (ret < 0)
+        {
+            PVFS_perror("PVFS_sys_lookup", ret);
+            ret = -1;
+            goto main_out;
+        }
+        parent_refn.handle = resp_lookup.pinode_refn.handle;
+        parent_refn.fs_id = resp_lookup.pinode_refn.fs_id;
+
+        while(!PINT_string_next_segment(
+                  user_opts->srcfile, &segp, &segstate))
+        {
+            prev_segp = segp;
+        }
+        entry_name = prev_segp;
+    }
+    else
+    {
+        /* get the absolute path on the pvfs2 file system */
+        if (PVFS_util_remove_base_dir(pvfs_path,str_buf,PVFS_NAME_MAX))
+        {
+            if (pvfs_path[0] != '/')
+            {
+                fprintf(stderr, "Error: poorly formatted path.\n");
+            }
+            fprintf(stderr, "Error: cannot retrieve entry name for "
+                    "creation on %s\n",
+                    pvfs_path);
+            ret = -1;
+            goto main_out;
+        }
+
+        ret = PVFS_util_lookup_parent(pvfs_path, cur_fs, credentials, 
+                                      &parent_refn.handle);
+        if(ret < 0)
+        {
+            PVFS_perror("PVFS_util_lookup_parent", ret);
+            ret = -1;
+            goto main_out;
+        }
+        else
+        {
+            int len = strlen(pvfs_path);
+            if (pvfs_path[len - 1] == '/')
+            {
+                char *segp = NULL, *prev_segp = NULL;
+                void *segstate = NULL;
+
+                while(!PINT_string_next_segment(
+                          user_opts->srcfile, &segp, &segstate))
+                {
+                    prev_segp = segp;
+                }
+                strncat(pvfs_path, prev_segp, PVFS_NAME_MAX);
+                entry_name = prev_segp;
+            }
+            parent_refn.fs_id = cur_fs;
+        }
+    }
+
+    memset(&resp_create, 0, sizeof(PVFS_sysresp_create));
+    ret = PVFS_sys_create(entry_name, parent_refn, attr,
+                          credentials, &resp_create);
     if (ret < 0)
     {
 	PVFS_perror("PVFS_sys_create", ret);
@@ -199,8 +245,9 @@ int main(int argc, char **argv)
 	}
 
 	/* write out the data */
-	ret = PVFS_sys_write(pinode_refn, file_req, total_written, buffer, mem_req, 
-			    credentials, &resp_io);
+	ret = PVFS_sys_write(pinode_refn, file_req,
+                             total_written, buffer, mem_req, 
+                             credentials, &resp_io);
 	if(ret < 0)
 	{
 	    PVFS_perror("PVFS_sys_write", ret);
@@ -214,7 +261,8 @@ int main(int argc, char **argv)
 	    fprintf(stderr, "Error: short write!\n");
 	    fprintf(stderr, "Tried to write %d bytes at offset %d.\n", 
 		(int)current_size, (int)total_written);
-	    fprintf(stderr, "Only got %d bytes.\n", (int)resp_io.total_completed);
+	    fprintf(stderr, "Only got %d bytes.\n",
+                    (int)resp_io.total_completed);
 	    ret = -1;
 	    goto main_out;
 	}
@@ -238,7 +286,8 @@ int main(int argc, char **argv)
     printf("Destination path (local): %s\n", user_opts->destfile);
     printf("Destination path (PVFS2 file system): %s\n", pvfs_path);
     printf("File system name: %s\n", mnt.ptab_array[mnt_index].pvfs_fs_name);
-    printf("Initial config server: %s\n", mnt.ptab_array[mnt_index].pvfs_config_server);
+    printf("Initial config server: %s\n",
+           mnt.ptab_array[mnt_index].pvfs_config_server);
     printf("********************************************************\n");
     printf("Bytes written: %Ld\n", Ld(total_written));
     printf("Elapsed time: %f seconds\n", (time2-time1));
@@ -292,7 +341,8 @@ static struct options* parse_args(int argc, char* argv[])
     tmp_opts->buf_size = 10*1024*1024;
 
     /* look at command line arguments */
-    while((one_opt = getopt(argc, argv, flags)) != EOF){
+    while((one_opt = getopt(argc, argv, flags)) != EOF)
+    {
 	switch(one_opt){
             case('v'):
                 printf("%s\n", PVFS2_VERSION);
