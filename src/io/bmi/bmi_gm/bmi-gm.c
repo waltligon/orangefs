@@ -956,6 +956,7 @@ int BMI_gm_post_send_list(bmi_op_id_t * id,
     struct ctrl_msg *new_ctrl_msg = NULL;
     bmi_size_t buffer_size = 0;
     int i;
+    int ret;
 
     gossip_ldebug(BMI_DEBUG_GM, "BMI_gm_post_send_list called.\n");
 
@@ -1058,6 +1059,7 @@ int BMI_gm_post_sendunexpected_list(bmi_op_id_t * id,
     struct ctrl_msg *new_ctrl_msg = NULL;
     bmi_size_t buffer_size = 0;
     int i;
+    int ret;
 
     gossip_ldebug(BMI_DEBUG_GM, 
 	"BMI_gm_post_sendunexpected_list called.\n");
@@ -1144,6 +1146,7 @@ int BMI_gm_post_sendunexpected(bmi_op_id_t * id,
     void *new_buffer = NULL;
     struct ctrl_msg *new_ctrl_msg = NULL;
     bmi_size_t buffer_size = 0;
+    int ret;
 
     gossip_ldebug(BMI_DEBUG_GM, "BMI_gm_post_sendunexpected called.\n");
 
