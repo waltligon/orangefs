@@ -211,6 +211,19 @@ static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p)
             }
 	    else
 	    {
+		if(s_op->attr.objtype == PVFS_TYPE_METAFILE)
+		{
+		    if(s_op->attr.u.meta.dfile_count == 0)
+		    {
+			gossip_err("Warning: prelude: dfile_count == 0"
+			    " for meta getattr.\n");
+		    }
+		    if(s_op->attr.u.meta.dist_size == 0)
+		    {
+			gossip_err("Warning: prelude: dist_size == 0"
+			    " for meta getattr.\n");
+		    }
+		}
                 /*
                   NOTE: on other file systems, getattr doesn't seem to
                   require read permissions by the user, group OR
