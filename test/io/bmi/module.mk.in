@@ -27,4 +27,9 @@ MPITESTSRC += $(LOCAL_MPITESTSRC)
 LOCALMPITESTS := $(patsubst %.c,%, $(LOCAL_MPITESTSRC))
 LOCALMPIOBJS := $(patsubst %.c,%.o, $(LOCAL_MPIMISCSRC))
 $(LOCALMPITESTS): %: %.o $(LOCALMPIOBJS) lib/libpvfs2.a
+ifdef QUIET_COMPILE
+	@echo "  MPILD		$@"
+	@$(MPICC) $^ $(LDFLAGS) $(LIBS) -lm -o $@
+else
 	$(MPICC) $^ $(LDFLAGS) $(LIBS) -lm -o $@
+endif

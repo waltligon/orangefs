@@ -1,15 +1,35 @@
 DIR := src/common/statecomp
 
+# NOTE: WE SHOULDN'T NEED THIS RULE!
 $(DIR)/scanner.o: $(DIR)/scanner.c
+ifdef QUIET_COMPILE
+	@echo "  CC		$@"
+	@$(CC) $(CFLAGS) -I src/common/statecomp -c $< -o $@
+else
 	$(CC) $(CFLAGS) -I src/common/statecomp -c $< -o $@
+endif
 
 $(DIR)/statecomp: $(DIR)/statecomp.o $(DIR)/parser.o $(DIR)/scanner.o $(DIR)/statecomp-symbol.o $(DIR)/emalloc.o $(DIR)/codegen.o $(DIR)/stringtbl.o
+ifdef QUIET_COMPILE
+	@echo "  LD		$@"
+	@$(LD) $^ $(LDFLAGS) -o $@
+else
 	$(LD) $^ $(LDFLAGS) -o $@
+endif
 
 $(DIR)/parser.c: $(DIR)/parser.y
+ifdef QUIET_COMPILE
+	@echo "  BISON		$@"
+	@$(BISON) -d $< -o $@
+else
 	$(BISON) -d $< -o $@
+endif
 
 $(DIR)/scanner.c: $(DIR)/scanner.l
-	#$(FLEX) -d -o$@ $<
+ifdef QUIET_COMPILE
+	@echo "  FLEX		$@"
+	@$(FLEX) -o$@ $<
+else
 	$(FLEX) -o$@ $<
+endif
 	

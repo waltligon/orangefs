@@ -20,5 +20,9 @@ TESTSRC += $(TEST_IO_JOB_DIR_SRC)
 LOCALLIBS := -ldb -lrt -lpthread
 LOCALTESTS := $(patsubst %.c,%, $(TEST_IO_JOB_DIR_SRC))
 $(LOCALTESTS): %: %.o $(TEST_IO_JOB_DIR)/job-help.o
+ifdef QUIET_COMPILE
+	@echo "  LD		$@"
+	@$(LD) $< $(TEST_IO_JOB_DIR)/job-help.o $(LDFLAGS) $(LIBS) $(LOCALLIBS) -o $@
+else
 	$(LD) $< $(TEST_IO_JOB_DIR)/job-help.o $(LDFLAGS) $(LIBS) $(LOCALLIBS) -o $@
-
+endif

@@ -56,6 +56,7 @@ FLEX = flex
 BUILD_GM = @BUILD_GM@
 BUILD_MPI = @BUILD_MPI@
 MPICC = @MPICC@
+QUIET_COMPILE = @QUIET_COMPILE@
 
 # Eliminate all default suffixes.  We want explicit control.
 .SUFFIXES:
@@ -275,17 +276,33 @@ endif
 
 # rule for building the pvfs2 server
 $(SERVER): $(SERVEROBJS)
+ifdef QUIET_COMPILE
+	@echo "  LD		$@"
+	@$(LD) $(LDFLAGS) $(SERVERLIBS) $^ -o $@
+else
 	$(LD) $(LDFLAGS) $(SERVERLIBS) $^ -o $@
+endif
 
 # rule for building the pvfs2 library
 lib/libpvfs2.a: $(LIBOBJS)
+ifdef QUIET_COMPILE
+	@echo "  RANLIB	$@"
+	@$(INSTALL) -d lib
+	@ar rcs $@ $(LIBOBJS)
+else
 	$(INSTALL) -d lib
 	ar rcs $@ $(LIBOBJS)
+endif
 
 # rule for building MPI objects
 $(MPITESTOBJS): %.o: %.c
 ifdef BUILD_MPI
+ifdef QUIET_COMPILE
+	@echo "  MPICC		$@"
+	@$(MPICC) $(LIBCFLAGS) $(CFLAGS) $< -c -o $@
+else
 	$(MPICC) $(LIBCFLAGS) $(CFLAGS) $< -c -o $@
+endif
 else
 	@echo Error: You must specify --with-mpi=dir at configure time 
 	@echo   in order to enable compilation of MPI programs.
@@ -295,7 +312,12 @@ endif
 # rule for building MPI misc. objects
 $(MPIMISCOBJS): %.o: %.c
 ifdef BUILD_MPI
+ifdef QUIET_COMPILE
+	@echo "  MPICC		$@"
+	@$(MPICC) $(LIBCFLAGS) $(CFLAGS) $< -c -o $@
+else
 	$(MPICC) $(LIBCFLAGS) $(CFLAGS) $< -c -o $@
+endif
 else
 	@echo Error: You must specify --with-mpi=dir at configure time 
 	@echo   in order to enable compilation of MPI programs.
@@ -308,15 +330,30 @@ endif
 
 # default rule for building executables from object files
 %: %.o $(LIBRARIES)
+ifdef QUIET_COMPILE
+	@echo "  LD		$@"
+	@$(LD) $(LDFLAGS) $< $(LIBS) -o $@
+else
 	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
+endif
 
 # rule for building server objects
 %-server.o: %.c
+ifdef QUIET_COMPILE
+	@echo "  CC		$@"
+	@$(CC) $(SERVERCFLAGS) $(CFLAGS) $< -c -o $@
+else
 	$(CC) $(SERVERCFLAGS) $(CFLAGS) $< -c -o $@
+endif
 
 # default rule for building objects 
 %.o: %.c
+ifdef QUIET_COMPILE
+	@echo "  CC		$@"
+	@$(CC) $(LIBCFLAGS) $(CFLAGS) $< -c -o $@
+else
 	$(CC) $(LIBCFLAGS) $(CFLAGS) $< -c -o $@
+endif
 
 # all test programs depend on the pvfs2 library
 $(TESTS): %: %.o $(LIBRARIES)
@@ -377,15 +414,28 @@ endif
 # note: mpi-depend.sh is automatically generated, so it is in
 #       the build directory already.
 $(MPITESTDEPENDS): %.d: %.c
+ifdef QUIET_COMPILE
+	@echo "  DEP		$@"
+else
 	@echo generating dependency file $@.
+endif
 	@sh ./maint/mpi-depend.sh `dirname $*` $(CFLAGS) $< > $@
+
 $(MPIMISCDEPENDS): %.d: %.c
+ifdef QUIET_COMPILE
+	@echo "  DEP		$@"
+else
 	@echo generating dependency file $@.
+endif
 	@sh ./maint/mpi-depend.sh `dirname $*` $(CFLAGS) $< > $@
 
 # default rule for generating dependency files
 %.d: %.c
+ifdef QUIET_COMPILE
+	@echo "  DEP		$@"
+else
 	@echo generating dependency file $@.
+endif
 	@$(srcdir)/maint/depend.sh `dirname $*` $(CFLAGS) $< > $@
 
 # default rules for building documents in .tex format:
@@ -399,4 +449,9 @@ $(MPIMISCDEPENDS): %.d: %.c
 
 # rule for automatically generated source files
 %.c: %.sm src/common/statecomp/statecomp
+ifdef QUIET_COMPILE
+	@echo "  SMC		$<"
+	@src/common/statecomp/statecomp $< $@
+else
 	src/common/statecomp/statecomp $< $@
+endif

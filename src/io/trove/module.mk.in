@@ -7,5 +7,10 @@ SERVERSRC += \
 	$(DIR)/trove-autogen.c
 
 $(DIR)/trove-autogen.c: $(DIR)/trove-proto.h maint/trove-autogen.pl
+ifdef QUIET_COMPILE
+	@echo "  GEN		$@"
+	@$(srcdir)/maint/trove-autogen.pl < $< > $@
+else
 	$(srcdir)/maint/trove-autogen.pl < $< > $@
+endif
 
