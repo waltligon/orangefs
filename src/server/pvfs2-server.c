@@ -115,7 +115,7 @@ static int initialize_interfaces(PINT_server_status_code *server_level_init)
 
     /* initialize the flow interface */
     ret =
-	PINT_flow_initialize("flowproto_bmi_trove", 0);
+	PINT_flow_initialize("flowproto_bmi_trove,flowproto_dump_offsets", 0);
     if (ret < 0)
     {
 	gossip_err("Flow_initialize Failed: %s\n", strerror(-ret));
