@@ -5,7 +5,11 @@ PVFS2 Release ChangeLog
 
 pvfs2-0.5.1pre1
 ===============
--
+- add a pidfile option to pvfs2-server for integration with init scripts
+- auto-tune BMI timeout to poll during activity, sleep a bit otherwise
+- pay attention to BMI timeouts in IB layer
+- fail quitely on unrecognized BMI method types in pvfs2tab
+- disable TCP method for IB builds
 
 
 pvfs2-0.5.0
