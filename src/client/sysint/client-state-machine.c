@@ -339,9 +339,10 @@ int PINT_serv_decode_resp(PVFS_fs_id fs_id,
                        "information.\n");
 	    if (fs_id != PVFS_FS_ID_NULL)
 	    {
+		const char *server_string;
                 creds = PVFS_util_alloc_credentials();
                 assert(creds);
-                const char *server_string = PVFS_mgmt_map_addr(
+                server_string = PVFS_mgmt_map_addr(
                     fs_id, creds, *svr_addr_p, &server_type);
                 free(creds);
 		gossip_err("   Server: %s.\n", server_string);
