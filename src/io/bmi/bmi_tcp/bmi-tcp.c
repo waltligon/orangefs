@@ -1725,17 +1725,19 @@ static int enqueue_operation(op_list_p target_list,
 
     if(tcp_addr_data->addr_error)
     {
-	/* just fail here, whether on client or server side.  This case only
-	 * occurs in race condition where tcp_cleanse_addr() function misses
-	 * operations that are not yet queued
+	/* server should always fail here, client should let receives queue
+	 * as if nothing were wrong
 	 */
-        gossip_debug(GOSSIP_BMI_DEBUG_TCP, 
-		   "Warning: BMI communication attempted on an "
-                   "address in failure mode.\n");
-        new_method_op->error_code = tcp_addr_data->addr_error;
-        op_list_add(op_list_array[new_method_op->context_id],
-                    new_method_op);
-        return(tcp_addr_data->addr_error);
+	if(tcp_addr_data->dont_reconnect || send_recv == BMI_SEND)
+	{
+	    gossip_debug(GOSSIP_BMI_DEBUG_TCP, 
+		       "Warning: BMI communication attempted on an "
+		       "address in failure mode.\n");
+	    new_method_op->error_code = tcp_addr_data->addr_error;
+	    op_list_add(op_list_array[new_method_op->context_id],
+			new_method_op);
+	    return(tcp_addr_data->addr_error);
+	}
     }
 
 #if 0
