@@ -152,6 +152,13 @@ int trove_collection_create(
 			    TROVE_op_id *out_op_id_p)
 {
     int ret;
+
+    if(new_coll_id == TROVE_COLL_ID_NULL)
+    {
+	gossip_err("Error: invalid collection ID requested.\n");
+	return(-TROVE_EINVAL);
+    }
+
     /* TODO: HOW DO I KNOW WHAT METHOD TO USE??? */
 
     ret = mgmt_method_table[0]->collection_create(collname,

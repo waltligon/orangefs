@@ -34,6 +34,7 @@ typedef PVFS_statfs		   TROVE_statfs;
 typedef PVFS_coll_getinfo_options  TROVE_coll_getinfo_options;
 
 #define TROVE_HANDLE_NULL          PVFS_HANDLE_NULL
+#define TROVE_COLL_ID_NULL         PVFS_FS_ID_NULL
 
 #define trove_ds_attr_to_stored PVFS_ds_attr_to_stored
 #define trove_ds_stored_to_attr PVFS_ds_stored_to_attr
