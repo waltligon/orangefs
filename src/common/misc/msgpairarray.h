@@ -12,7 +12,18 @@
 #include "PINT-reqproto-encode.h"
 #include "job.h"
 
+
 extern struct PINT_state_machine_s pvfs2_msgpairarray_sm;
+
+/*
+  the following values are to be used by the struct
+  PINT_sm_msgpair_state_s message's retry_flag variable
+*/
+#define PVFS_MSGPAIR_RETRY          0xFE
+#define PVFS_MSGPAIR_NO_RETRY       0xFF
+
+/* this is the max number of times to attempt a msgpair retry */
+#define PVFS_MSGPAIR_RETRY_LIMIT     10
 
 /*
  * This structure holds everything that we need for the state of a

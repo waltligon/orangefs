@@ -160,16 +160,6 @@ int PVFS_sys_finalize(
     void);
 
 /*
-  the following values are to be used by the struct
-  PINT_sm_msgpair_state_s message's retry_flag variable
-*/
-#define PVFS_MSGPAIR_RETRY          0xFE
-#define PVFS_MSGPAIR_NO_RETRY       0xFF
-
-/* this is the max number of times to attempt a msgpair retry */
-#define PVFS_MSGPAIR_RETRY_LIMIT     10
-
-/*
   NOTE: the following values are to be used by
   PVFS_sys(.*)_lookup as the "follow_link" argument.
 
