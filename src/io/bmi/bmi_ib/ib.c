@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.6 2004-03-07 02:14:57 pw Exp $
+ * $Id: ib.c,v 1.7 2004-03-17 20:10:26 pw Exp $
  */
 #include <stdio.h>  /* just for NULL for id-generator.h */
 #include <src/common/id-generator/id-generator.h>
@@ -745,6 +745,18 @@ post_sr_rdmaw(ib_send_t *sq, msg_header_cts_t *mh_cts)
 }
 
 /*
+ * Bring up the connection before posting a send or receive on it.
+ */
+static void
+ensure_connected(struct method_addr *remote_map)
+{
+    ib_method_addr_t *ibmap = remote_map->method_data;
+
+    if (!ibmap->c)
+	ib_tcp_client_connect(ibmap, remote_map);
+}
+
+/*
  * Used by both send and sendunexpected.
  */
 static int
@@ -755,11 +767,13 @@ generic_post_send(bmi_op_id_t *id, struct method_addr *remote_map,
 {
     ib_send_t *sq;
     struct method_op *mop;
-    ib_method_addr_t *ibmap = remote_map->method_data;
+    ib_method_addr_t *ibmap;
     int i;
     int ret = 0;
 
     gen_mutex_lock(&interface_mutex);
+    ensure_connected(remote_map);
+    ibmap = remote_map->method_data;
 
     /* alloc and build new sendq structure */
     sq = Malloc(sizeof(*sq));
@@ -857,13 +871,7 @@ BMI_ib_post_sendunexpected(bmi_op_id_t *id, struct method_addr *remote_map,
   enum bmi_buffer_type buffer_flag __unused,
   bmi_msg_tag_t tag, void *user_ptr, bmi_context_id context_id)
 {
-    ib_method_addr_t *ibmap = remote_map->method_data;
-
     debug(2, "%s: len %d tag %d", __func__, (int) size, tag);
-    gen_mutex_lock(&interface_mutex);
-    if (!ibmap->c)
-	ib_tcp_client_connect(ibmap, remote_map);
-    gen_mutex_unlock(&interface_mutex);
     /* references here will not be saved after this func returns */
     return generic_post_send(id, remote_map, 0, &buffer, &size, size, tag,
       user_ptr, context_id, 1);
@@ -875,15 +883,9 @@ BMI_ib_post_sendunexpected_list(bmi_op_id_t *id, struct method_addr *remote_map,
   bmi_size_t total_size, enum bmi_buffer_type buffer_flag __unused,
   bmi_msg_tag_t tag, void *user_ptr, bmi_context_id context_id)
 {
-    ib_method_addr_t *ibmap = remote_map->method_data;
-
     debug(2, "%s: listlen %d tag %d", __func__, list_count, tag);
     if (list_count < 1)
 	error("%s: list count must be positive", __func__);
-    gen_mutex_lock(&interface_mutex);
-    if (!ibmap->c)
-	ib_tcp_client_connect(ibmap, remote_map);
-    gen_mutex_unlock(&interface_mutex);
     /* references here will not be saved after this func returns */
     return generic_post_send(id, remote_map, list_count, buffers, sizes,
       total_size, tag, user_ptr, context_id, 1);
@@ -900,11 +902,14 @@ generic_post_recv(bmi_op_id_t *id, struct method_addr *remote_map,
 {
     ib_recv_t *rq;
     struct method_op *mop;
-    ib_method_addr_t *ibmap = remote_map->method_data;
-    ib_connection_t *c = ibmap->c;
+    ib_method_addr_t *ibmap;
+    ib_connection_t *c;
     int i;
     
     gen_mutex_lock(&interface_mutex);
+    ensure_connected(remote_map);
+    ibmap = remote_map->method_data;
+    c = ibmap->c;
 
     /* poll interface first to save a few steps below */
     check_cq();
@@ -1039,8 +1044,8 @@ test_sq(ib_send_t *sq, bmi_op_id_t *outid, bmi_error_code_t *err,
 
     if (sq->state == SQ_WAITING_USER_TEST) {
 	if (complete) {
-	    debug(2, "%s: completed send %Ld to %s", __func__,
-	      Ld(sq->buflist.tot_len),
+	    debug(2, "%s: sq %p completed %Ld to %s", __func__,
+	      sq, Ld(sq->buflist.tot_len),
 	      ((ib_method_addr_t *) sq->c->remote_map->method_data)
 		->hostname);
 	    *outid = sq->mop->op_id;
@@ -1060,8 +1065,8 @@ test_sq(ib_send_t *sq, bmi_op_id_t *outid, bmi_error_code_t *err,
 	  sq_state_name(sq->state));
 	encourage_send_waiting_buffer(sq);
     } else {
-	debug(9, "%s: send found, not done, state %s", __func__,
-	  sq_state_name(sq->state));
+	debug(9, "%s: sq %p found, not done, state %s", __func__,
+	  sq, sq_state_name(sq->state));
     }
     return 0;
 }
@@ -1081,8 +1086,8 @@ test_rq(ib_recv_t *rq, bmi_op_id_t *outid, bmi_error_code_t *err,
     if (rq->state == RQ_EAGER_WAITING_USER_TEST 
       || rq->state == RQ_RTS_WAITING_USER_TEST) {
 	if (complete) {
-	    debug(2, "%s: completed recv %Ld from %s", __func__,
-	      Ld(rq->actual_len),
+	    debug(2, "%s: rq %p completed %Ld from %s", __func__,
+	      rq, Ld(rq->actual_len),
 	      ((ib_method_addr_t *) rq->c->remote_map->method_data)
 		->hostname);
 	    *err = 0;
@@ -1104,8 +1109,8 @@ test_rq(ib_recv_t *rq, bmi_op_id_t *outid, bmi_error_code_t *err,
 	  rq_state_name(rq->state));
 	encourage_recv_to_send_cts(rq);
     } else {
-	debug(9, "%s: recv found, not done, state %s", __func__,
-	  rq_state_name(rq->state));
+	debug(9, "%s: rq %p found, not done, state %s", __func__,
+	  rq, rq_state_name(rq->state));
     }
     return 0;
 }
