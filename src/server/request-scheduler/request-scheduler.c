@@ -27,6 +27,7 @@
 
 #include <errno.h>
 #include <stdlib.h>
+#include <sys/time.h>
 
 #include "request-scheduler.h"
 #include "quickhash.h"
@@ -46,7 +47,9 @@ enum req_sched_states
     /* request could be processed, but caller has not asked for it
      * yet 
      */
-    REQ_READY_TO_SCHEDULE
+    REQ_READY_TO_SCHEDULE,
+    /* for timer events */
+    REQ_TIMING,
 };
 
 /* linked lists to be stored at each hash table element */
@@ -68,7 +71,9 @@ struct req_sched_element
     struct req_sched_list *list_head;	/* points to head of queue */
     enum req_sched_states state;	/* state of this element */
     PVFS_handle handle;
+    struct timeval tv;			/* used for timer events */
 };
+
 
 /* hash table */
 static struct qhash_table *req_sched_table;
@@ -78,6 +83,10 @@ static struct qhash_table *req_sched_table;
  */
 static QLIST_HEAD(
     ready_queue);
+
+/* queue of timed operations */
+static QLIST_HEAD(
+    timer_queue);
 
 static int hash_handle(
     void *handle,
@@ -380,6 +389,84 @@ int PINT_req_sched_post(
     return (ret);
 }
 
+
+/* PINT_req_sched_post_timer()
+ *
+ * posts a timer- will complete like a normal request at approximately 
+ * the interval specified
+ *
+ * return 1 on immediate completion, 0 if caller should test later,
+ * -errno on failure
+ */
+int PINT_req_sched_post_timer(
+    int msecs,
+    void *in_user_ptr,
+    req_sched_id * out_id)
+{
+    struct req_sched_element *tmp_element;
+    struct req_sched_element *next_element;
+    struct qlist_head* scratch;
+    struct qlist_head* iterator;
+    int found = 0;
+
+    if(msecs < 1)
+	return(1);
+
+    /* create a structure to store in the request queues */
+    tmp_element = (struct req_sched_element *) malloc(sizeof(struct
+							     req_sched_element));
+    if (!tmp_element)
+    {
+	return (-errno);
+    }
+
+    tmp_element->req_ptr = NULL;
+    tmp_element->user_ptr = in_user_ptr;
+    id_gen_fast_register(out_id, tmp_element);
+    tmp_element->id = *out_id;
+    tmp_element->state = REQ_TIMING;
+    tmp_element->handle = PVFS_HANDLE_NULL;
+    gettimeofday(&tmp_element->tv, NULL);
+    tmp_element->list_head = NULL;
+
+    /* set time to future, based on msecs arg */
+    tmp_element->tv.tv_sec += msecs/1000;
+    tmp_element->tv.tv_usec += (msecs%1000)*1000;
+    if(tmp_element->tv.tv_usec > 1000000)
+    {
+	tmp_element->tv.tv_sec += tmp_element->tv.tv_usec / 1000000;
+	tmp_element->tv.tv_usec = tmp_element->tv.tv_usec % 1000000;
+    }
+
+    /* put in timer queue, in order */
+    qlist_for_each_safe(iterator, scratch, &timer_queue)
+    {
+	/* look for first entry that comes after our current one */
+	next_element = qlist_entry(iterator, struct req_sched_element,
+	    list_link);
+	if((next_element->tv.tv_sec > tmp_element->tv.tv_sec)
+	    || (next_element->tv.tv_sec == tmp_element->tv.tv_sec 
+		&& next_element->tv.tv_usec > tmp_element->tv.tv_usec))
+	{
+	    found = 1;
+	    break;
+	}
+    }
+
+    /* either stick it in the middle somewhere or in the back */
+    if(found)
+    {
+	__qlist_add(&tmp_element->list_link, iterator->prev, iterator);
+    }
+    else
+    {
+	qlist_add_tail(&tmp_element->list_link, &timer_queue);
+    }
+
+    return(0);
+}
+
+
 /* PINT_req_sched_unpost()
  *
  * removes a request from the scheduler before it has even been
@@ -586,6 +673,7 @@ int PINT_req_sched_test(
     req_sched_error_code * out_status)
 {
     struct req_sched_element *tmp_element = NULL;
+    struct timeval tv;
 
     *out_count_p = 0;
 
@@ -619,6 +707,33 @@ int PINT_req_sched_test(
 		     "REQ SCHED SCHEDULING, handle: %ld, queue_element: %p\n",
 		     (long) tmp_element->handle, tmp_element);
 	return (1);
+    }
+    else if(tmp_element->state == REQ_TIMING)
+    {
+	/* timer event, see if we have hit time value yet */
+	gettimeofday(&tv, NULL);
+	if((tmp_element->tv.tv_sec < tv.tv_sec) ||
+	    (tmp_element->tv.tv_sec == tv.tv_sec 
+		&& tmp_element->tv.tv_usec < tv.tv_usec))
+	{
+	    /* time to go */
+	    qlist_del(&(tmp_element->list_link));
+	    if (returned_user_ptr_p)
+	    {
+		returned_user_ptr_p[0] = tmp_element->user_ptr;
+	    }
+	    *out_count_p = 1;
+	    *out_status = 0;
+	    gossip_debug(REQ_SCHED_DEBUG,
+			 "REQ SCHED TIMER SCHEDULING, queue_element: %p\n",
+			 tmp_element);
+	    free(tmp_element);
+	    return (1);
+	}
+	else
+	{
+	    return(0);
+	}
     }
     else
     {

@@ -47,6 +47,11 @@ int PINT_req_sched_release(
     void *in_user_ptr,
     req_sched_id * out_id);
 
+int PINT_req_sched_post_timer(
+    int msecs,
+    void *in_user_ptr,
+    req_sched_id * out_id);
+
 /* testing for completion */
 
 int PINT_req_sched_test(

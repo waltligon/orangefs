@@ -24,6 +24,7 @@ int main(int argc, char **argv)
 	req_sched_id io_id_arrayB[4];
 	int count = 0;
 	int status = 0;
+	req_sched_id timer_id_array[2];
 
 	/* setup some requests to test */
 	req_array[0].op = PVFS_SERV_GETATTR;
@@ -232,6 +233,26 @@ int main(int argc, char **argv)
 		fprintf(stderr, "Error: release didn't immediately complete.\n");
 		return(-1);
 	}
+
+	/* try a simple timer case */
+	ret = PINT_req_sched_post_timer(1000, NULL, &(timer_id_array[0]));
+	if(ret != 0)
+	{
+		fprintf(stderr, "Error: post timer weirdness.\n");
+		return(-1);
+	}
+
+	count = 0;
+	do{
+	    ret = PINT_req_sched_test(timer_id_array[0], &count, NULL, &status);
+	}while(ret == 0 && count == 0);
+
+	if(ret < 0 || status != 0)
+	{
+		fprintf(stderr, "Error: test failure.\n");
+	}
+	printf("Done.\n");
+
 
 	/* shut down scheduler */
 	ret = PINT_req_sched_finalize();
