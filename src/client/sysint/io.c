@@ -243,6 +243,15 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 		flow_array[i]->dest.u.mem.buffer = req->buffer;
 	    }
 	}
+#if 0
+	ret = job_flow(
+	    flow_array[i], 
+	    NULL,
+	    &(status_array[i]),
+	    &(id_array[i]));
+	if(ret < 0)
+	{
+#endif	    
     }
 
     /* TODO: finish this up */
