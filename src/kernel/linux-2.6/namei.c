@@ -270,14 +270,11 @@ static int pvfs2_rmdir(
     int ret = -ENOTEMPTY;
     struct inode *inode = dentry->d_inode;
 
-    if (pvfs2_empty_dir(dentry))
+    ret = pvfs2_unlink(dir, dentry);
+    if (ret == 0)
     {
-        ret = pvfs2_unlink(dir, dentry);
-        if (ret == 0)
-        {
-            inode->i_size = 0;
-            dir->i_nlink--;
-        }
+        inode->i_size = 0;
+        dir->i_nlink--;
     }
     return ret;
 }

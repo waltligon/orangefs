@@ -169,7 +169,8 @@ static int pvfs2_readdir(
     return 0;
 }
 
-struct file_operations pvfs2_dir_operations = {
+struct file_operations pvfs2_dir_operations =
+{
     .read = generic_read_dir,
     .readdir = pvfs2_readdir,
     .llseek = generic_file_llseek,
