@@ -2625,6 +2625,13 @@ static int receive_cycle(int timeout)
 		handled_events++;
 		ret = recv_event_handler(poll_event, 0);
 		break;
+            case _GM_SLEEP_EVENT:
+		handled_events++;
+                gen_mutex_unlock(&interface_mutex);
+                gm_unknown(local_port, poll_event);
+                gen_mutex_lock(&interface_mutex);
+		ret = 0;
+                break;
 	    default:
 		handled_events++;
 		gm_unknown(local_port, poll_event);
