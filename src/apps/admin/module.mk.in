@@ -13,6 +13,7 @@ ADMINSRC := \
         $(DIR)/pvfs2-statfs.c \
 	$(DIR)/pvfs2-perf-mon-example.c \
 	$(DIR)/pvfs2-event-mon-example.c \
+	$(DIR)/pvfs2-mkdir.c \
 	$(DIR)/pvfs2-fs-dump.c
 
 ADMINSRC_SERVER := \
