@@ -144,6 +144,197 @@ int PINT_server_send_req(bmi_addr_t addr,
     return ret;
 }
 
+
+/* PINT_send_req()
+ *
+ * TODO: prepost recv
+ * TODO: use a non-infinite timeout
+ *
+ * sends a request and receives an acknowledgement, all in one
+ * blocking fuction.  It does encoding, decoding, and error
+ * checking along the way.  NOTE: PINT_release_req() should be
+ * called to clean up after the ack buffer is no longer needed.
+ *
+ * returns 0 on success, -errno on failure
+ */
+int PINT_send_req(bmi_addr_t addr,
+    struct PVFS_server_req_s *req_p,
+    bmi_size_t max_resp_size,
+    struct PINT_decoded_msg *decoded_resp,
+    void** encoded_resp,
+    PVFS_msg_tag_t op_tag)
+{
+    int ret;
+    struct PINT_encoded_msg encoded_req;
+    job_status_s tmp_status;
+    job_id_t tmp_id;
+    int count = 0;
+
+    *encoded_resp = NULL;
+
+    /* encode the request */
+    ret = PINT_encode(
+	req_p, 
+	PINT_ENCODE_REQ, 
+	&encoded_req, 
+	addr, 
+	REQ_ENC_FORMAT);
+    if(ret < 0)
+    {
+	return(ret);
+    }
+
+    /* send the encoded request */
+    ret = job_bmi_send_list(
+	encoded_req.dest,
+	encoded_req.buffer_list,
+	encoded_req.size_list,
+	encoded_req.list_count,
+	encoded_req.total_size,
+	op_tag,
+	encoded_req.buffer_flag,
+	1,
+	NULL,
+	&tmp_status,
+	&tmp_id);
+    if(ret < 0)
+    {
+	goto send_req_out;
+    }
+    else if(ret == 1)
+    {
+	/* immediate completion; continue on unless an immediate
+	 * job error is reported
+	 */
+	if(tmp_status.error_code != 0)
+	{
+	    ret = tmp_status.error_code;
+	    goto send_req_out;
+	}
+    }
+    else
+    {
+	/* we need to test for completion */
+	ret = job_test(tmp_id, &count, NULL, &tmp_status, -1);
+	if(ret < 0)
+	{
+	    /* TODO: there is no real way cleanup from this right now */
+	    gossip_lerr("Error: PINT_send_req() critical failure.\n");
+	    exit(-1);
+	}
+	if(tmp_status.error_code != 0)
+	{
+	    ret = tmp_status.error_code;
+	    goto send_req_out;
+	}
+    }
+
+    /* allocate space for response */
+    *encoded_resp = BMI_memalloc(addr, max_resp_size, BMI_RECV_BUFFER);
+    if (encoded_resp == NULL)
+    {
+	ret = -ENOMEM;
+	goto send_req_out;
+    }
+
+    /* recv the response */
+    ret = job_bmi_recv(
+	addr, 
+	*encoded_resp,
+	max_resp_size,
+	op_tag,
+	BMI_PRE_ALLOC,
+	NULL,
+	&tmp_status,
+	&tmp_id);
+    if(ret < 0)
+    {
+	goto send_req_out;
+    }
+    else if(ret == 1)
+    {
+	/* immediate completion */
+	if(tmp_status.error_code != 0)
+	{
+	    ret = tmp_status.error_code;
+	    goto send_req_out;
+	}
+    }
+    else
+    {
+	/* we need to test for completion */
+	ret = job_test(tmp_id, &count, NULL, &tmp_status, -1);
+	if(ret < 0)
+	{
+	    /* TODO: there is no real way cleanup from this right now */
+	    gossip_lerr("Error: PINT_send_req() critical failure.\n");
+	    exit(-1);
+	}
+	if(tmp_status.error_code != 0)
+	{
+	    ret = tmp_status.error_code;
+	    goto send_req_out;
+	}
+    }
+
+    /* decode the message that we received */
+    ret = PINT_decode(encoded_resp,
+	PINT_DECODE_RESP,
+	decoded_resp,
+	addr,
+	tmp_status.actual_size,
+	NULL);
+    if (ret < 0)
+    {
+	goto send_req_out;
+    }
+
+    ret = 0;
+
+send_req_out:
+
+    PINT_encode_release(
+	&encoded_req, 
+	PINT_ENCODE_REQ,
+	REQ_ENC_FORMAT);
+
+    if(*encoded_resp)
+	BMI_memfree(addr, *encoded_resp, max_resp_size, BMI_RECV_BUFFER);
+
+    return(ret);
+}
+
+/* PINT_release_req()
+ *
+ * Companion function to PINT_send_req(); it releases any
+ * resources created earlier.  The caller should not use this
+ * buffer until it is completely done with the response buffers
+ * (decoded or encoded)
+ *
+ * no return value
+ */
+void PINT_release_req(bmi_addr_t addr,
+    struct PVFS_server_req_s *req_p,
+    bmi_size_t max_resp_size,
+    struct PINT_decoded_msg *decoded_resp,
+    void** encoded_resp,
+    PVFS_msg_tag_t op_tag)
+{
+    /* the only resources we need to get rid of are the decoded
+     * response and the encoded response.
+     */
+
+    PINT_decode_release(
+	decoded_resp,
+	PINT_DECODE_RESP,
+	REQ_ENC_FORMAT);
+
+    BMI_memfree(addr, *encoded_resp, max_resp_size,
+	BMI_RECV_BUFFER);
+
+    return;
+}
+
 /* PINT_send_req_array()
  *
  * TODO: prepost receives 

@@ -78,6 +78,20 @@ int PINT_flow_array(
     int* error_code_array,
     int array_size);
 
+int PINT_send_req(bmi_addr_t addr,
+    struct PVFS_server_req_s *req_p,
+    bmi_size_t max_resp_size,
+    struct PINT_decoded_msg *decoded_resp,
+    void** encoded_resp,
+    PVFS_msg_tag_t op_tag);
+
+void PINT_release_req(bmi_addr_t addr,
+    struct PVFS_server_req_s *req_p,
+    bmi_size_t max_resp_size,
+    struct PINT_decoded_msg *decoded_resp,
+    void** encoded_resp,
+    PVFS_msg_tag_t op_tag);
+
 /* dunno where these belong, but here is better than nowhere. -- rob */
 void debug_print_type(void* thing, int type);
 PVFS_msg_tag_t get_next_session_tag(void);
