@@ -35,6 +35,10 @@ int PINT_parse_handle_ranges(
 size_t strnlen(const char *s, size_t limit);
 #endif
 
+#ifndef HAVE_STRSTR
+char *strstr(const char *haystack, const char *needle);
+#endif
+
 #endif
 /*
  * Local variables:

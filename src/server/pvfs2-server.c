@@ -130,6 +130,11 @@ int main(int argc, char **argv)
 	goto server_shutdown;
     }
 
+    /* Reset the gossip debug mask based on configuration
+     * settings that we now have access to.
+     */
+    gossip_set_debug_mask(1, PINT_config_get_debug_mask(&server_config));
+
     /* If we were directed to create a storage space, do so and then
      * exit.
      */

@@ -340,6 +340,43 @@ size_t strnlen(const char *s, size_t limit)
 }
 #endif
 
+#ifndef HAVE_STRSTR
+/* a custom implementation of strstr for systems w/o it */
+char *strstr(const char *haystack, const char *needle)
+{
+    char *ptr = NULL;
+    int needle_len = 0;
+    int remaining_len = 0;
+
+    if (haystack && needle)
+    {
+        ptr = (char *)haystack;
+        needle_len = strlen(needle);
+        remaining_len = strlen(haystack);
+
+        while(ptr && *ptr)
+        {
+            if (*ptr == *needle)
+            {
+                if (memcmp(ptr, needle, needle_len) == 0)
+                {
+                    break;
+                }
+            }
+            ptr++;
+            remaining_len--;
+
+            if (remaining_len < needle_len)
+            {
+                ptr = NULL;
+                break;
+            }
+        }
+    }
+    return ptr;
+}
+#endif
+
 /*
  * Local variables:
  *  c-indent-level: 4

@@ -13,6 +13,9 @@
 /* Define if you have the C99 conformant strtoull function.  */
 #undef HAVE_STRTOULL
 
+/* Define if you have the ISO 9899 conformant strstr function */
+#undef HAVE_STRSTR
+
 /* Define if you have the <malloc.h> header file.  */
 #undef HAVE_MALLOC_H
 

@@ -109,6 +109,9 @@ int PINT_config_has_fs_config_info(
 int PINT_config_pvfs2_mkspace(
     struct server_configuration_s *config);
 
+int PINT_config_get_debug_mask(
+    struct server_configuration_s *config);
+
 /*
  * Local variables:
  *  c-indent-level: 4
