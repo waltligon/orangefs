@@ -1968,28 +1968,27 @@ int job_test_HACK(
 	 * to eat up the timeout until the job that we want hits the
 	 * completion queue
 	 */
-
-#ifdef __PVFS2_JOB_THREADED__
 	do
 	{
 		ret = gettimeofday(&start, NULL);
 		if(ret < 0)
 			return(ret);
 
-		/* TODO: clean up this silly timing math */
-		pthread_timeout.tv_sec = start.tv_sec;
-		if(timeout_ms / 1000)
-		{
-			pthread_timeout.tv_sec += timeout_remaining/1000;
-			timeout_ms = timeout_remaining % 1000;
-		}
-		pthread_timeout.tv_nsec = start.tv_usec * 1000 + timeout_remaining * 1000000;
+#ifdef __PVFS2_JOB_THREADED__
+		/* figure out how long to wait */
+		pthread_timeout.tv_sec = start.tv_sec +
+			timeout_remaining/1000;
+		pthread_timeout.tv_nsec = start.tv_usec * 1000 +
+			((timeout_remaining%1000)*1000000);
 		if(pthread_timeout.tv_nsec > 1000000000)
 		{
 			pthread_timeout.tv_nsec = pthread_timeout.tv_nsec - 1000000000;
 			pthread_timeout.tv_sec++;
 		}
 		
+		/* wait to see if anything completes before the timeout
+		 * expires 
+		 */
 		gen_mutex_lock(&completion_mutex);
 		ret = pthread_cond_timedwait(&completion_cond, &completion_mutex,
 			&pthread_timeout);
@@ -2001,11 +2000,7 @@ int job_test_HACK(
 			 */
 			return(0);
 		}	
-		else if(ret == EINTR)
-		{
-			/* fall through */
-		}
-		else if(ret != 0)
+		else if(ret != 0 && ret != EINTR)
 		{
 			/* error */
 			return(-ret);
@@ -2020,29 +2015,7 @@ int job_test_HACK(
 				return(ret);
 		}
 
-		/* if we fall to here, see how much time has expired and sleep
-		 * again if we need to
-		 */
-
-		ret = gettimeofday(&end, NULL);
-		if(ret < 0)
-			return(ret);
-		
-		timeout_remaining -= (end.tv_sec - start.tv_sec)*1000 +
-			(end.tv_usec - start.tv_usec)/1000;
-
-	} while(timeout_remaining > 0);
-
-	/* fall through, nothing done, time is used up */
-	return(0);
-
-#else
-	
-	do
-	{
-		ret = gettimeofday(&start, NULL);
-		if(ret < 0)
-			return(ret);
+#else /* __PVFS2_JOB_THREADED__ */
 
 		/* push on work for one round */
 		ret = do_one_work_cycle_all(&num_completed, 1);
@@ -2060,10 +2033,11 @@ int job_test_HACK(
 				return(ret);
 		}
 
-		/* if we fall to here, see how much time has expired and sleep
-		 * again if we need to 
-		 */
+#endif /* __PVFS2_JOB_THREADED__ */
 
+		/* if we fall to here, see how much time has expired and
+		 * sleep/work again if we need to
+		 */
 		ret = gettimeofday(&end, NULL);
 		if(ret < 0)
 			return(ret);
@@ -2075,8 +2049,6 @@ int job_test_HACK(
 
 	/* fall through, nothing done, time is used up */
 	return(0);
-#endif
-
 }
 
 /* job_wait()
