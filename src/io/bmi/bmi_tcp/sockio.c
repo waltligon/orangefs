@@ -4,12 +4,10 @@
  * See COPYING in top-level directory.
  */
 
-
-/* UNIX INCLUDE FILES */
 #include <unistd.h>
 #include <errno.h>
 #include <stdio.h>
-#include <string.h>	/* bzero and bcopy prototypes */
+#include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/time.h>
@@ -22,7 +20,6 @@
 
 #include "sockio.h"
 
-/* FUNCTIONS */
 int new_sock()
 {
     static int p_num = -1;	/* set to tcp protocol # on first call */
@@ -101,6 +98,7 @@ int init_sock(struct sockaddr *saddrp,
 	  hep->h_length);
     return (0);
 }
+
 
 /* blocking receive */
 /* Returns -1 if it cannot get all len bytes
@@ -392,251 +390,6 @@ int set_sockopt(int s,
     else
 	return (val);
 }
-
-int get_socktime(int s,
-		 int optname)
-{
-    struct timeval val;
-    int len = sizeof(val);
-    if (getsockopt(s, SOL_SOCKET, optname, &val, &len) == -1)
-	return (-1);
-    else
-	return (val.tv_sec * 1000000 + val.tv_usec);
-}
-
-int set_socktime(int s,
-		 int optname,
-		 int size)
-{
-    struct timeval val;
-    val.tv_sec = size / 1000000;
-    val.tv_usec = size % 1000000;
-    if (setsockopt(s, SOL_SOCKET, optname, &val, sizeof(val)) == -1)
-	return (-1);
-    else
-	return (size);
-}
-
-/* SOCKIO_DUMP_SOCKADDR() - dump info in a sockaddr structure
- *
- * Might or might not work for any given platform!
- */
-int sockio_dump_sockaddr(struct sockaddr_in *ptr,
-			 FILE * fp)
-{
-    int i;
-    unsigned long int tmp;
-    struct hostent *hp;
-    char abuf[] = "xxx.xxx.xxx.xxx\0";
-
-    fprintf(fp, "sin_family = %d\n", ptr->sin_family);
-    fprintf(fp, "sin_port = %d (%d)\n", ptr->sin_port, ntohs(ptr->sin_port));
-    /* print in_addr info */
-    tmp = ptr->sin_addr.s_addr;
-    sprintf(&abuf[0], "%d.%d.%d.%d", (int) (tmp & 0xff),
-	    (int) ((tmp >> 8) & 0xff), (int) ((tmp >> 16) & 0xff),
-	    (int) ((tmp >> 24) & 0xff));
-    hp = gethostbyaddr((char *) &ptr->sin_addr.s_addr, sizeof(ptr->sin_addr),
-		       ptr->sin_family);
-    fprintf(fp, "sin_addr = %lx (%s = %s)\n",
-	    (unsigned long) (ptr->sin_addr.s_addr), abuf, hp->h_name);
-    for (i = 0;
-	 i <
-	 sizeof(struct sockaddr) - sizeof(short int) -
-	 sizeof(unsigned short int) - sizeof(struct in_addr); i++)
-    {
-	fprintf(fp, "%x", ptr->sin_zero[i]);
-    }
-    fprintf(fp, "\n");
-    return (0);
-}	/* end of SOCKIO_DUMP_SOCKADDR() */
-
-
-/* connect_timeout()
- *
- * Attempts to do nonblocking connect() until a timeout occurs.  Useful for
- * recovering from deadlocks...
- *
- * I apologize for all the goto's, but I hate to every syscall in a while()
- * just for the EINTR case!  
- */
-int connect_timeout(int s,
-		    struct sockaddr *saddrp,
-		    int len,
-		    int time_secs)
-{
-    struct pollfd pfds;
-    int ret, oldfl, err, val, val_len;
-
-    /* set our socket to nonblocking */
-    oldfl = fcntl(s, F_GETFL, 0);
-    if (!(oldfl & O_NONBLOCK))
-	fcntl(s, F_SETFL, oldfl | O_NONBLOCK);
-
-  connect_timeout_connect_restart:
-    ret = connect(s, saddrp, len);
-    if (ret < 0)
-    {
-	if (errno == EINTR)
-	    goto connect_timeout_connect_restart;
-	if (errno != EINPROGRESS)
-	    goto connect_timeout_err;
-
-	pfds.fd = s;
-	pfds.events = POLLOUT;
-      connect_timeout_poll_restart:
-	ret = poll(&pfds, 1, time_secs * 1000);
-	if (ret < 0)
-	{
-	    if (errno == EINTR)
-		goto connect_timeout_poll_restart;
-	    else
-		goto connect_timeout_err;
-	}
-	if (ret == 0)
-	{
-	    /* timed out */
-	    err = errno;
-	    close(s);	/* don't want it to keep trying */
-	    errno = err;
-	    goto connect_timeout_err;
-	}
-    }
-
-    /* _apparent_ success -- check if connect really completed */
-    val_len = sizeof(val);
-    ret = getsockopt(s, SOL_SOCKET, SO_ERROR, &val, &len);
-    if (val != 0)
-    {
-	errno = val;
-	goto connect_timeout_err;
-    }
-
-    /* success -- make socket blocking again and return */
-    fcntl(s, F_SETFL, oldfl & (~O_NONBLOCK));
-    return 0;
-
-  connect_timeout_err:
-    /* save errno, set flags on socket back to what they were, return -1 */
-    err = errno;
-    fcntl(s, F_SETFL, oldfl);
-    errno = err;
-    return -1;
-}
-
-
-/* brecv_timeout()
- *
- * Attempts to do nonblocking recv's until a timeout occurs.  Useful for
- * recovering from deadlocks in situations where you want to give up if a
- * message does not finish arriving within a certain time frame.
- *
- * Same args as brecv, but with an additional timeout argument that is an
- * integer number of seconds.   
- * 
- * returns number of bytes received, even if it did not recv all that was
- * asked.  If any error other than timeout occurs, it returns -1 and sets
- * errno accordingly.  */
-int brecv_timeout(int s,
-		  void *buf,
-		  int len,
-		  int timeout)
-{
-
-    int recv_size = len;	/* amt we hope for each iteration */
-    int recv_total = 0;		/* total amt recv'd thus far */
-    void *recv_ptr = buf;	/* where to put the data */
-    int initial_tries = 4;	/* number of initial attempts to make */
-    int i = 0;
-    int ret = -1;
-    struct pollfd poll_conn;
-
-    /* This determines the backoff times.  It will do a few attempts with the
-     * initial backoff first, then wait and do a final one after the
-     * remainder of the time is up.  Note that the initial backoff will be
-     * zero if a small overall timeout is specified by the caller.
-     */
-    int initial_backoff = timeout / initial_tries;
-    int final_backoff = timeout - (timeout / initial_tries);
-
-    /* we don't accept -1 for infinite timeout.  That is the job of brecv. */
-    if (timeout < 0)
-    {
-	errno = EINVAL;
-	return (-1);
-    }
-
-    /* initial attempts */
-    do
-    {
-	/* nbrecv() handles EINTR on its own */
-	if ((ret = nbrecv(s, recv_ptr, recv_size)) < 0)
-	{
-	    /* bail out at any error */
-	    return (ret);
-	}
-
-	/* update our progress */
-	recv_size -= ret;
-	recv_total += ret;
-	recv_ptr += ret;
-
-	/* if we didn't finish, then poll for a while. */
-	if (recv_total < len)
-	{
-	    poll_conn.fd = s;
-	    poll_conn.events = POLLIN;
-	  brecv_timeout_poll1_restart:
-	    ret = poll(&poll_conn, 1, (initial_backoff * 1000));
-	    if (ret < 0)
-	    {
-		if (errno == EINTR)
-		    goto brecv_timeout_poll1_restart;
-		/* bail out on any "real" error */
-		return (ret);
-	    }
-	}
-	i++;
-    }
-    while ((i < initial_tries) && (recv_total < len));
-
-    /* see if we are done */
-    if (recv_total == len)
-    {
-	return (len);
-    }
-
-    /* not done yet, give it one last chance: */
-    poll_conn.fd = s;
-    poll_conn.events = POLLIN;
-  brecv_timeout_poll2_restart:
-    ret = poll(&poll_conn, 1, (final_backoff * 1000));
-    if (ret < 0)
-    {
-	if (errno == EINTR)
-	    goto brecv_timeout_poll2_restart;
-	/* bail out on any "real" error */
-	return (ret);
-    }
-
-    if ((ret = nbrecv(s, recv_ptr, recv_size)) < 0)
-    {
-	return (ret);
-    }
-
-    recv_size -= ret;
-    recv_total += ret;
-
-    return (recv_total);
-}
-
-/*
- * Local variables:
- *  c-indent-level: 3
- *  c-basic-offset: 3
- *  tab-width: 3
- * End:
- */
 
 /*
  * Local variables:

@@ -17,10 +17,6 @@
  * makes the nbsendfile function available to the application.
  * Older glibc systems do not have this functionality so we leave it to
  * be turned on manually.
- *
- * BRAINDEADSOCKS can be defined to prevent the macros that set socket
- * buffer sizes from having an effect.  On some kernels (such as Linux
- * 1.3) setting socket buffer sizes can cause problems.
  */
 
 #ifndef SOCKIO_H
@@ -64,19 +60,6 @@ int set_tcpopt(int s,
 int set_sockopt(int s,
 		int optname,
 		int size);
-int set_socktime(int s,
-		 int optname,
-		 int size);
-int sockio_dump_sockaddr(struct sockaddr_in *ptr,
-			 FILE * fp);
-int brecv_timeout(int s,
-		  void *buf,
-		  int len,
-		  int timeout);
-int connect_timeout(int s,
-		    struct sockaddr *saddrp,
-		    int len,
-		    int time_secs);
 int nbpeek(int s,
 	   void* buf,
 	   int len);
