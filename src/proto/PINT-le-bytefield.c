@@ -580,8 +580,6 @@ static void lebf_encode_rel(
 static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                             enum PINT_encode_msg_type input_type)
 {
-    int i;
-
     if (input_type == PINT_DECODE_REQ) {
 	struct PVFS_server_req *req = &msg->stub_dec.req;
 	switch (req->op) {
