@@ -80,10 +80,10 @@ int dbpf_thread_finalize(void)
 {
     int ret = 0;
 #ifdef __PVFS2_TROVE_THREADED__
-    gen_mutex_trylock(dbpf_interface_lock);
+    gen_mutex_lock(dbpf_interface_lock);
     dbpf_thread_running = 0;
-    ret = pthread_cancel(dbpf_thread);
     usleep(100);
+    ret = pthread_cancel(dbpf_thread);
     gen_mutex_unlock(dbpf_interface_lock);
     pthread_cond_destroy(&dbpf_op_completed_cond);
     pthread_cond_destroy(&dbpf_op_incoming_cond);
