@@ -84,6 +84,7 @@ int do_encode_resp(
 	    target_msg->buffer_list[0] = BMI_memalloc(target_msg->dest, 
 						      sizeof(struct PVFS_server_resp_s) + header_size,
 						      BMI_SEND_BUFFER);
+		 memcpy(target_msg->buffer_list[0], response, sizeof(struct PVFS_server_resp_s));
 				// else pack it!
 	    return(0);
 
