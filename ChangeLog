@@ -3,6 +3,11 @@ PVFS2 Release ChangeLog
 -----------------------
 
 
+pvfs2-0.8.0pre1
+===============
+- 
+
+
 pvfs2-0.7.0
 ===========
 - fsck: server handles bogus datafiles better
