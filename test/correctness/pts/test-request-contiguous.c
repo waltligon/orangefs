@@ -54,6 +54,7 @@ int test_request_cont(void){
     PINT_Request_result seg1;
     int ret = -1;
     int pack_size = 0;
+    int32_t segSize;
 
                                                                                 
     /* PVFS_Process_request arguments */
@@ -71,7 +72,7 @@ int test_request_cont(void){
     PVFS_Request_contiguous((4*1024*1024), PVFS_BYTE, &r);
 
     /* Used for calculating correct offset values */
-    int32_t segSize = 1024*1024;
+    segSize = 1024*1024;
                                                                                 
     /* allocate a new request and pack the original one into it */
     pack_size = PINT_REQUEST_PACK_SIZE(r);
