@@ -16,7 +16,7 @@ int initialize_sysint(void)
     if (ret > -1)
     {
         /* init the system interface */
-        ret = PVFS_sys_initialize(pvfs_helper.mnt, CLIENT_DEBUG,
+        ret = PVFS_sys_initialize(pvfs_helper.mnt, 0,
                                   &pvfs_helper.resp_init);
         if(ret > -1)
         {
