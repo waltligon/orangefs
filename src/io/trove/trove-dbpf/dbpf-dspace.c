@@ -1072,14 +1072,19 @@ static int dbpf_dspace_cancel(
     {
         case OP_QUEUED:
         {
-            gossip_debug(GOSSIP_TROVE_DEBUG, "op is queued: handling\n");
+            gossip_debug(GOSSIP_TROVE_DEBUG,
+                         "op %p is queued: handling\n", cur_op);
 
-            /* try to quietly dequeue the op ; fail cancel otherwise */
+            /* dequeue and complete the op in canceled state */
+            cur_op->op.state = OP_IN_SERVICE;
             dbpf_queued_op_put_and_dequeue(cur_op);
             assert(cur_op->op.state == OP_DEQUEUED);
 
             /* this is a macro defined in dbpf-thread.h */
             move_op_to_completion_queue(cur_op, 0, OP_CANCELED);
+
+            gossip_debug(
+                GOSSIP_TROVE_DEBUG, "op %p is canceled\n", cur_op);
             ret = 0;
         }
         break;
@@ -1151,7 +1156,7 @@ static int dbpf_dspace_test(
     TROVE_ds_state *state_p,
     int max_idle_time_ms)
 {
-    int ret = -1;
+    int ret = -TROVE_EINVAL;
     dbpf_queued_op_t *cur_op = NULL;
 #ifdef __PVFS2_TROVE_THREADED__
     int state = 0;
@@ -1176,7 +1181,7 @@ static int dbpf_dspace_test(
     gen_mutex_unlock(&cur_op->mutex);
 
     /* if the op is not completed, wait for up to max_idle_time_ms */
-    if (state != OP_COMPLETED)
+    if ((state != OP_COMPLETED) && (state != OP_CANCELED))
     {
         struct timeval base;
         struct timespec wait_time;
@@ -1209,7 +1214,7 @@ static int dbpf_dspace_test(
             state = cur_op->op.state;
             gen_mutex_unlock(&cur_op->mutex);
 
-            if (state == OP_COMPLETED)
+            if ((state == OP_COMPLETED) || (state == OP_CANCELED))
             {
                 goto op_completed;
             }
@@ -1510,7 +1515,7 @@ static int dbpf_dspace_testsome(
         state = cur_op->op.state;
         gen_mutex_unlock(&cur_op->mutex);
 
-        if (state == OP_COMPLETED)
+        if ((state == OP_COMPLETED) || (state == OP_CANCELED))
         {
             assert(!dbpf_op_queue_empty(
                        dbpf_completion_queue_array[context_id]));
@@ -1541,7 +1546,8 @@ static int dbpf_dspace_testsome(
 	    }
             dbpf_queued_op_free(cur_op);
         }
-        ret = ((state == OP_COMPLETED) ? 1 : 0);
+        ret = (((state == OP_COMPLETED) ||
+                (state == OP_CANCELED)) ? 1 : 0);
 #else
         int tmp_count = 0;
 

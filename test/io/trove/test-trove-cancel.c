@@ -231,7 +231,6 @@ int main(int argc, char **argv)
             TROVE_DEFAULT_TEST_TIMEOUT);
     } while (ret == 0);
 
-
     if (ret < 0)
     {
         fprintf(stderr, "listio write failed\n");
