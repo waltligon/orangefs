@@ -197,6 +197,18 @@ int job_initialize(int flags)
 	teardown_queues();
 	return (-ret);
     }
+    ret = pthread_create(&dev_thread_id, NULL, dev_thread_function, NULL);
+    if (ret != 0)
+    {
+	pthread_cancel(bmi_thread_id);
+	pthread_cancel(flow_thread_id);
+	pthread_cancel(trove_thread_id);
+	PINT_flow_close_context(global_flow_context);
+	BMI_close_context(global_bmi_context);
+	teardown_queues();
+	return (-ret);
+    }
+
 #endif /* __PVFS2_JOB_THREADED__ */
 
     return (0);
@@ -215,6 +227,7 @@ int job_finalize(void)
     pthread_cancel(bmi_thread_id);
     pthread_cancel(flow_thread_id);
     pthread_cancel(trove_thread_id);
+    pthread_cancel(dev_thread_id);
 #endif /* __PVFS2_JOB_THREADED__ */
 
     BMI_close_context(global_bmi_context);
@@ -2896,11 +2909,12 @@ static int do_one_work_cycle_all(int *num_completed,
 				 int wait_flag)
 {
     int bmi_pending_flag, bmi_unexp_pending_flag, flow_pending_flag, 
-	trove_pending_flag;
+	trove_pending_flag, dev_unexp_pending_flag;
     int bmi_completed = 0;
     int bmi_unexp_completed = 0;
     int flow_completed = 0;
     int trove_completed = 0;
+    int dev_unexp_completed = 0;
     int total_interfaces_pending = 0;
     int ret = -1;
 
@@ -2929,10 +2943,16 @@ static int do_one_work_cycle_all(int *num_completed,
 	else
 	    trove_pending_flag = 0;
     gen_mutex_unlock(&trove_mutex);
+    gen_mutex_lock(&dev_mutex);
+	if(dev_unexp_pending_count > 0)
+	    dev_unexp_pending_flag = 1;
+	else
+	    dev_unexp_pending_flag = 0;
+    gen_mutex_unlock(&dev_mutex);
 
     /* count the number of interfaces with jobs pending */
     total_interfaces_pending = bmi_pending_flag + bmi_unexp_pending_flag 
-	+ flow_pending_flag + trove_pending_flag;
+	+ flow_pending_flag + trove_pending_flag + dev_unexp_pending_flag;
 
     /* TODO: need to check return values in here! */
 
@@ -2988,8 +3008,17 @@ static int do_one_work_cycle_all(int *num_completed,
 	}
     }
 
+    /* device operations */
+    if (dev_unexp_pending_flag)
+    {
+	if ((ret = do_one_work_cycle_dev_unexp(&dev_unexp_completed)) < 0)
+	{
+	    return(ret);
+	}
+    }
+
     *num_completed = (flow_completed + trove_completed + bmi_completed +
-		      bmi_unexp_completed);
+		      bmi_unexp_completed + dev_unexp_completed);
 
     return (0);
 }
@@ -3350,6 +3379,10 @@ static void fill_status(struct job_desc *jd,
 	status->position = jd->u.trove.position;
 	status->count = jd->u.trove.count;
 	status->ds_attr = jd->u.trove.attr;
+	break;
+    case JOB_DEV_UNEXP:
+	status->error_code = 0;
+	status->actual_size = jd->u.dev_unexp.info->size;
 	break;
     default:
 	gossip_lerr("Error: Unimplemented!\n");
