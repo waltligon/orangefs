@@ -166,7 +166,6 @@ int PINT_send_req_array(bmi_addr_t* addr_array,
     int i;
     int ret = -1;
     struct PINT_encoded_msg* req_encoded_array = NULL;
-    PVFS_msg_tag_t op_tag = get_next_session_tag();
     job_id_t* id_array = NULL;
     job_status_s* status_array = NULL;
     int* index_array = NULL;
@@ -450,6 +449,102 @@ void PINT_release_req_array(bmi_addr_t* addr_array,
     }
 
     return;
+}
+
+
+/* PINT_flow_array()
+ *
+ * Posts and completes an array of flows.  Note that some of the entries
+ * in the flow array may be NULL; these will be skipped
+ *
+ * returns 0 on success, -EIO on partial failure, -errno on total
+ * failure
+ */
+int PINT_flow_array(
+    flow_descriptor** flow_array,
+    int* error_code_array,
+    int array_size)
+{
+    int ret = -1;
+    job_status_s* status_array = NULL;
+    job_id_t* id_array = NULL;
+    int* index_array = NULL;
+    job_status_s tmp_status;
+    int i;
+    int count = 0;
+
+    status_array = (job_status_s*)malloc(array_size * sizeof(job_status_s));
+    index_array = (int*)malloc(array_size * sizeof(int));
+    id_array = (job_id_t*)malloc(array_size * sizeof(job_id_t));
+
+    if(!status_array || !index_array || !id_array)
+    {
+	ret = -ENOMEM;
+	goto flow_array_out;
+    }
+
+    /* clear the error code array for safety */
+    memset(error_code_array, 0, array_size*sizeof(int));
+
+    for(i=0; i<array_size; i++)
+    {
+	if(flow_array[i])
+	{
+	    ret = job_flow(
+		flow_array[i], 
+		NULL,
+		&tmp_status,
+		&(id_array[i]));
+	    if(ret < 0)
+	    {
+		error_code_array[i] = ret;
+		id_array[i] = 0;
+	    }
+	    else if(ret == 1)
+	    {
+		error_code_array[i] = tmp_status.error_code;
+		id_array[i] = 0;
+	    }
+	    else
+	    {
+		count++;
+	    }
+	}
+    }
+
+    /* test for completion if any flows are pending */
+    if(count)
+    {
+	ret = job_testsome(id_array, &count, index_array, NULL,
+	    status_array, -1);
+	if(ret < 0)
+	{
+	    /* TODO: there is no real way cleanup from this right now */
+	    gossip_lerr(
+		"Error: PINT_flow_array() critical failure.\n");
+	    exit(-1);
+	}
+
+	/* all flows are complete now, fill in error codes */	
+	for(i=0; i<count; i++)
+	{
+	    error_code_array[index_array[i]] =
+		status_array[i].error_code;
+	}
+    }
+
+    ret = 0;
+
+flow_array_out:
+
+    if(id_array)
+	free(id_array);
+    if(index_array)
+	free(index_array);
+    if(status_array)
+	free(status_array);
+
+    return(ret);
 }
 
 /*

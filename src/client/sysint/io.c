@@ -59,6 +59,10 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
     PVFS_handle* HACK_datafile_handles = &HACK_foo;
     int HACK_num_datafiles = 1;
 
+    /* TODO: figure out which servers we really need to contact.  It may
+     * not really be all of them 
+     */
+
     if((type != PVFS_SYS_IO_READ) && (type != PVFS_SYS_IO_WRITE))
     {
 	return(-EINVAL);
@@ -122,6 +126,7 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	sizeof(int));
     file_data_array = (PINT_Request_file_data*)malloc(
 	HACK_num_datafiles*sizeof(PINT_Request_file_data));
+
     flow_array = (flow_descriptor**)malloc(HACK_num_datafiles *
 	sizeof(flow_descriptor*));
     if(flow_array)
@@ -129,7 +134,7 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	    sizeof(flow_descriptor*)));
 	
     if(!addr_array || !req_array || !resp_encoded_array ||
-	!resp_decoded_array || !error_code_array ||
+	!resp_decoded_array || !error_code_array || 
 	!file_data_array || !flow_array)
     {
 	ret = -ENOMEM;
@@ -201,7 +206,7 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 	gossip_ldebug(CLIENT_DEBUG, "Warning: one or more I/O requests failed.\n");
     }
 
-    /* run a flow with each I/O server that gave us a positive
+    /* setup a flow for each I/O server that gave us a positive
      * response
      */
     for(i=0; i<HACK_num_datafiles; i++)
@@ -243,15 +248,6 @@ int PVFS_sys_io(PVFS_sysreq_io *req, PVFS_sysresp_io *resp,
 		flow_array[i]->dest.u.mem.buffer = req->buffer;
 	    }
 	}
-#if 0
-	ret = job_flow(
-	    flow_array[i], 
-	    NULL,
-	    &(status_array[i]),
-	    &(id_array[i]));
-	if(ret < 0)
-	{
-#endif	    
     }
 
     /* TODO: finish this up */
