@@ -8,7 +8,6 @@
 /* (see flow.h) */
 
 #include <errno.h>
-#include <pthread.h>
 #include <sys/time.h>
 #include <unistd.h>
 #include <string.h>

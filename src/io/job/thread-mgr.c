@@ -4,7 +4,6 @@
  * See COPYING in top-level directory.
  */
 
-#include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>

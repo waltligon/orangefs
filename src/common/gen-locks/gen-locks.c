@@ -11,7 +11,6 @@
 
 #include <stdlib.h>
 #include <errno.h>
-#include <pthread.h>
 
 #include "gen-locks.h"
 
@@ -19,6 +18,7 @@
  * visible functions
  */
 
+#ifndef __GEN_NULL_LOCKING__
 /*
  * gen_mutex_init()
  *
@@ -121,6 +121,7 @@ int gen_posix_mutex_destroy(
 
     return (0);
 }
+#endif
 
 /*
  * Local variables:
