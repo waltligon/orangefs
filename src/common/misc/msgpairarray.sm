@@ -208,12 +208,7 @@ static int msgpairarray_post(PARENT_SM *sm_p,
                     server_config, msg_p->fs_id);
                 PINT_server_config_mgr_put_config(server_config);
                 assert(cur_fs);
-#ifdef __PVFS2_SERVER__
-                /* servers just choose default encoding for now */
-                msg_p->enc_type = ENCODING_DEFAULT;
-#else
                 msg_p->enc_type = cur_fs->encoding;
-#endif
             }
 
             if (!ENCODING_IS_VALID(msg_p->enc_type))
