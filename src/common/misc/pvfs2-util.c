@@ -233,7 +233,7 @@ int PVFS_util_parse_pvfstab(
 	    start = end + 1;
 	    for (i = start; i < linelen; i++)
 	    {
-		if ((line[i] == ' ') || (line[i] == '\t'))
+		if ((line[i] == ' ') || (line[i] == '\t') || line[i] == '\n' || line[i] == '\0')
 		{
 		    end = i;
 		    break;
