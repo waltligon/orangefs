@@ -23,6 +23,7 @@
 #include "bmi-gm-regcache.h"
 #include "bmi-gm-bufferpool.h"
 #include "pvfs2-config.h"
+#include "id-generator.h"
 
 #include<gm.h>
 
@@ -42,7 +43,7 @@ int BMI_gm_memfree(void *buffer,
 		   enum bmi_op_type send_recv);
 int BMI_gm_post_send(bmi_op_id_t * id,
 		     method_addr_p dest,
-		     void *buffer,
+		     const void *buffer,
 		     bmi_size_t size,
 		     enum bmi_buffer_type buffer_type,
 		     bmi_msg_tag_t tag,
@@ -50,8 +51,8 @@ int BMI_gm_post_send(bmi_op_id_t * id,
 		     bmi_context_id context_id);
 int BMI_gm_post_send_list(bmi_op_id_t * id,
     method_addr_p dest,
-    void **buffer_list,
-    bmi_size_t * size_list,
+    const void *const *buffer_list,
+    const bmi_size_t *size_list,
     int list_count,
     bmi_size_t total_size,
     enum bmi_buffer_type buffer_type,
@@ -60,8 +61,8 @@ int BMI_gm_post_send_list(bmi_op_id_t * id,
     bmi_context_id context_id);
 int BMI_gm_post_sendunexpected_list(bmi_op_id_t * id,
     method_addr_p dest,
-    void **buffer_list,
-    bmi_size_t * size_list,
+    const void *const *buffer_list,
+    const bmi_size_t *size_list,
     int list_count,
     bmi_size_t total_size,
     enum bmi_buffer_type buffer_type,
@@ -70,7 +71,7 @@ int BMI_gm_post_sendunexpected_list(bmi_op_id_t * id,
     bmi_context_id context_id);
 int BMI_gm_post_sendunexpected(bmi_op_id_t * id,
 			       method_addr_p dest,
-			       void *buffer,
+			       const void *buffer,
 			       bmi_size_t size,
 			       enum bmi_buffer_type buffer_type,
 			       bmi_msg_tag_t tag,
@@ -87,8 +88,8 @@ int BMI_gm_post_recv(bmi_op_id_t * id,
 		     bmi_context_id context_id);
 int BMI_gm_post_recv_list(bmi_op_id_t * id,
     method_addr_p src,
-    void **buffer_list,
-    bmi_size_t * size_list,
+    void *const *buffer_list,
+    const bmi_size_t *size_list,
     int list_count,
     bmi_size_t total_expected_size,
     bmi_size_t * total_actual_size,
@@ -304,7 +305,7 @@ static void dealloc_gm_method_addr(method_addr_p map);
 static int gm_post_send_check_resource(struct method_op* mop);
 static int gm_post_send_build_op(bmi_op_id_t * id,
     method_addr_p dest,
-    void *buffer,
+    const void *buffer,
     bmi_size_t size,
     bmi_msg_tag_t tag,
     int mode,
@@ -312,8 +313,8 @@ static int gm_post_send_build_op(bmi_op_id_t * id,
     void *user_ptr, bmi_context_id context_id);
 static int gm_post_send_build_op_list(bmi_op_id_t * id,
     method_addr_p dest,
-    void ** buffer_list,
-    bmi_size_t* size_list,
+    const void *const *buffer_list,
+    const bmi_size_t *size_list,
     int list_count,
     bmi_size_t total_size,
     bmi_msg_tag_t tag,
@@ -825,7 +826,7 @@ int BMI_gm_get_info(int option,
  */
 int BMI_gm_post_send(bmi_op_id_t * id,
 		     method_addr_p dest,
-		     void *buffer,
+		     const void *buffer,
 		     bmi_size_t size,
 		     enum bmi_buffer_type buffer_type,
 		     bmi_msg_tag_t tag,
@@ -909,8 +910,8 @@ int BMI_gm_post_send(bmi_op_id_t * id,
  */
 int BMI_gm_post_send_list(bmi_op_id_t * id,
     method_addr_p dest,
-    void **buffer_list,
-    bmi_size_t * size_list,
+    const void *const *buffer_list,
+    const bmi_size_t *size_list,
     int list_count,
     bmi_size_t total_size,
     enum bmi_buffer_type buffer_type,
@@ -1005,8 +1006,8 @@ int BMI_gm_post_send_list(bmi_op_id_t * id,
  */
 int BMI_gm_post_sendunexpected_list(bmi_op_id_t * id,
     method_addr_p dest,
-    void **buffer_list,
-    bmi_size_t * size_list,
+    const void *const *buffer_list,
+    const bmi_size_t *size_list,
     int list_count,
     bmi_size_t total_size,
     enum bmi_buffer_type buffer_type,
@@ -1091,7 +1092,7 @@ int BMI_gm_post_sendunexpected_list(bmi_op_id_t * id,
  */
 int BMI_gm_post_sendunexpected(bmi_op_id_t * id,
 			       method_addr_p dest,
-			       void *buffer,
+			       const void *buffer,
 			       bmi_size_t size,
 			       enum bmi_buffer_type buffer_type,
 			       bmi_msg_tag_t tag,
@@ -1323,8 +1324,8 @@ int BMI_gm_post_recv(bmi_op_id_t * id,
  */
 int BMI_gm_post_recv_list(bmi_op_id_t * id,
     method_addr_p src,
-    void **buffer_list,
-    bmi_size_t * size_list,
+    void *const *buffer_list,
+    const bmi_size_t *size_list,
     int list_count,
     bmi_size_t total_expected_size,
     bmi_size_t * total_actual_size,
@@ -1831,8 +1832,8 @@ void dealloc_gm_method_op(method_op_p op_p)
  */
 static int gm_post_send_build_op_list(bmi_op_id_t * id,
     method_addr_p dest,
-    void ** buffer_list,
-    bmi_size_t* size_list,
+    const void *const *buffer_list,
+    const bmi_size_t *size_list,
     int list_count,
     bmi_size_t total_size,
     bmi_msg_tag_t tag,
@@ -1864,7 +1865,7 @@ static int gm_post_send_build_op_list(bmi_op_id_t * id,
     new_method_op->mode = mode;
     new_method_op->context_id = context_id;
 
-    new_method_op->buffer_list = buffer_list;
+    new_method_op->buffer_list = (void **) buffer_list;
     new_method_op->size_list = size_list;
     new_method_op->list_count = list_count;
 
@@ -1884,7 +1885,7 @@ static int gm_post_send_build_op_list(bmi_op_id_t * id,
  */
 static int gm_post_send_build_op(bmi_op_id_t * id,
     method_addr_p dest,
-    void *buffer,
+    const void *buffer,
     bmi_size_t size,
     bmi_msg_tag_t tag,
     int mode,
@@ -1906,7 +1907,7 @@ static int gm_post_send_build_op(bmi_op_id_t * id,
     new_method_op->user_ptr = user_ptr;
     new_method_op->send_recv = BMI_SEND;
     new_method_op->addr = dest;
-    new_method_op->buffer = buffer;
+    new_method_op->buffer = (void *) buffer;
     new_method_op->actual_size = size;
     /* TODO: is this right thing to do for send side? */
     new_method_op->expected_size = 0;  

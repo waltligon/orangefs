@@ -69,7 +69,7 @@ struct bmi_method_ops
 			     enum bmi_op_type);
     int (*BMI_meth_post_send) (bmi_op_id_t *,
 			       method_addr_p,
-			       void *,
+			       const void *,
 			       bmi_size_t,
 			       enum bmi_buffer_type,
 			       bmi_msg_tag_t,
@@ -77,7 +77,7 @@ struct bmi_method_ops
 			       bmi_context_id);
     int (*BMI_meth_post_sendunexpected) (bmi_op_id_t *,
 					 method_addr_p,
-					 void *,
+					 const void *,
 					 bmi_size_t,
 					 enum bmi_buffer_type,
 					 bmi_msg_tag_t,
@@ -123,8 +123,8 @@ struct bmi_method_ops
       method_addr_p(*BMI_meth_method_addr_lookup) (const char *);
     int (*BMI_meth_post_send_list) (bmi_op_id_t *,
 				    method_addr_p,
-				    void **,
-				    bmi_size_t *,
+				    const void *const *,
+				    const bmi_size_t *,
 				    int,
 				    bmi_size_t,
 				    enum bmi_buffer_type,
@@ -133,8 +133,8 @@ struct bmi_method_ops
 				    bmi_context_id);
     int (*BMI_meth_post_recv_list) (bmi_op_id_t *,
 				    method_addr_p,
-				    void **,
-				    bmi_size_t *,
+				    void *const *,
+				    const bmi_size_t *,
 				    int,
 				    bmi_size_t,
 				    bmi_size_t *,
@@ -144,8 +144,8 @@ struct bmi_method_ops
 				    bmi_context_id);
     int (*BMI_meth_post_sendunexpected_list) (bmi_op_id_t *,
 					      method_addr_p,
-					      void **,
-					      bmi_size_t *,
+					      const void *const *,
+					      const bmi_size_t *,
 					      int,
 					      bmi_size_t,
 					      enum bmi_buffer_type,
@@ -181,8 +181,8 @@ struct method_op
 	 * following items were added for convenience of methods that 
 	 * implement send_list and recv_list 
 	 */
-    void **buffer_list;		/* list of buffers */
-    bmi_size_t *size_list;	/* list of buffer sizes */
+    void *const *buffer_list;		/* list of buffers */
+    const bmi_size_t *size_list;	/* list of buffer sizes */
     int list_count;		/* # of items in buffer list */
     int list_index;		/* index of current buffer to xfer */
     /* how much is completed in current buffer */
