@@ -107,6 +107,8 @@ static void *bmi_thread_function(void *ptr)
 	    /* execute a callback function for each completed BMI operation */
 	    tmp_callback = 
 		(struct PINT_thread_mgr_bmi_callback*)stat_bmi_user_ptr_array[i];
+	    /* sanity check */
+	    assert(tmp_callback->fn != 0);
 	    tmp_callback->fn(tmp_callback->data, stat_bmi_actual_size_array[i],
 		stat_bmi_error_code_array[i]);
 	}
@@ -211,7 +213,9 @@ int PINT_thread_mgr_bmi_getcontext(PVFS_context_id *context)
 int PINT_thread_mgr_bmi_unexp_handler(
     void (*fn)(struct BMI_unexpected_info* unexp))
 {
-    
+    /* sanity check */
+    assert(fn != 0);
+
     gen_mutex_lock(&bmi_mutex);
     if(bmi_unexp_count > 0 && fn != bmi_unexp_fn)
     {

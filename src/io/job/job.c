@@ -59,7 +59,6 @@ static gen_mutex_t dev_mutex = GEN_MUTEX_INITIALIZER;
  * work to do and waking them when work is available 
  */
 static pthread_cond_t completion_cond = PTHREAD_COND_INITIALIZER;
-static pthread_cond_t bmi_cond = PTHREAD_COND_INITIALIZER;
 static pthread_cond_t flow_cond = PTHREAD_COND_INITIALIZER;
 static pthread_cond_t trove_cond = PTHREAD_COND_INITIALIZER;
 static pthread_cond_t dev_cond = PTHREAD_COND_INITIALIZER;
@@ -68,8 +67,6 @@ static pthread_cond_t dev_cond = PTHREAD_COND_INITIALIZER;
  */
 
 /* code that the threads will run when initialized */
-static void *bmi_thread_function(void *ptr);
-static pthread_t bmi_thread_id;
 static void *flow_thread_function(void *ptr);
 static pthread_t flow_thread_id;
 #ifdef __PVFS2_TROVE_SUPPORT__
@@ -88,12 +85,6 @@ enum
 };
 
 /* static arrays to use for testing lower level interfaces */
-static bmi_op_id_t stat_bmi_id_array[job_work_metric];
-static bmi_error_code_t stat_bmi_error_code_array[job_work_metric];
-static bmi_size_t stat_bmi_actual_size_array[job_work_metric];
-static struct BMI_unexpected_info stat_bmi_unexp_array[job_work_metric];
-static void *stat_bmi_user_ptr_array[job_work_metric];
-
 static flow_descriptor *stat_flow_array[job_work_metric];
 
 #ifdef __PVFS2_TROVE_SUPPORT__
@@ -112,10 +103,6 @@ static struct PINT_dev_unexp_info stat_dev_unexp_array[job_work_metric];
 
 static int setup_queues(void);
 static void teardown_queues(void);
-static int do_one_work_cycle_bmi(int *num_completed,
-				 int wait_flag);
-static int do_one_work_cycle_bmi_unexp(int *num_completed,
-				       int wait_flag);
 static int do_one_work_cycle_flow(int *num_completed);
 static int do_one_work_cycle_dev_unexp(int *num_completed);
 #ifdef __PVFS2_TROVE_SUPPORT__
@@ -136,10 +123,26 @@ static int completion_query_context(job_id_t * out_id_array_p,
 				  job_status_s *
 				  out_status_array_p,
 				  job_context_id context_id);
-
-#ifndef __PVFS2_JOB_THREADED__
+#ifdef __PVFS2_JOB_THREADED__
+static void bmi_thread_mgr_callback(void* data, 
+    PVFS_size actual_size,
+    PVFS_error error_code);
+static void bmi_thread_mgr_unexp_handler(struct BMI_unexpected_info* unexp);
+#else /* __PVFS2_JOB_THREADED__ */
 static int do_one_work_cycle_all(int *num_completed,
 				 int wait_flag);
+static int do_one_work_cycle_bmi(int *num_completed,
+				 int wait_flag);
+static int do_one_work_cycle_bmi_unexp(int *num_completed,
+				       int wait_flag);
+
+static bmi_op_id_t stat_bmi_id_array[job_work_metric];
+static bmi_error_code_t stat_bmi_error_code_array[job_work_metric];
+static bmi_size_t stat_bmi_actual_size_array[job_work_metric];
+static struct BMI_unexpected_info stat_bmi_unexp_array[job_work_metric];
+static void *stat_bmi_user_ptr_array[job_work_metric];
+
+
 #endif /* __PVFS2_JOB_THREADED__ */
 
 /********************************************************
@@ -156,17 +159,10 @@ int job_initialize(int flags)
 {
     int ret = -1;
 
-    /* get a bmi context to work in */
-    ret = BMI_open_context(&global_bmi_context);
-    if(ret < 0)
-    {
-	return(ret);
-    }
     /* ditto for flows */
     ret = PINT_flow_open_context(&global_flow_context);
     if(ret < 0)
     {
-	BMI_close_context(global_bmi_context);
 	return(ret);
     }
 
@@ -175,7 +171,6 @@ int job_initialize(int flags)
     ret = trove_open_context(/*FIXME: HACK*/9,&global_trove_context);
     if (ret < 0)
     {
-	BMI_close_context(global_bmi_context);
 	PINT_flow_close_context(global_flow_context);
         return ret;
     }
@@ -185,7 +180,6 @@ int job_initialize(int flags)
     if (ret < 0)
     {
 	PINT_flow_close_context(global_flow_context);
-	BMI_close_context(global_bmi_context);
 #ifdef __PVFS2_TROVE_SUPPORT__
         trove_close_context(/*FIXME: HACK*/9,global_trove_context);
 #endif
@@ -194,21 +188,23 @@ int job_initialize(int flags)
 
 #ifdef __PVFS2_JOB_THREADED__
     /* startup threads */
-    ret = pthread_create(&bmi_thread_id, NULL, bmi_thread_function, NULL);
+    ret = PINT_thread_mgr_bmi_start();
     if (ret != 0)
     {
 	PINT_flow_close_context(global_flow_context);
-	BMI_close_context(global_bmi_context);
         trove_close_context(/*FIXME: HACK*/9,global_trove_context);
 	teardown_queues();
 	return (-ret);
     }
+    ret = PINT_thread_mgr_bmi_getcontext(&global_bmi_context);
+    /* this should never fail if the thread startup succeeded */
+    assert(ret == 0);
+
     ret = pthread_create(&flow_thread_id, NULL, flow_thread_function, NULL);
     if (ret != 0)
     {
-	pthread_cancel(bmi_thread_id);
+	PINT_thread_mgr_bmi_stop();
 	PINT_flow_close_context(global_flow_context);
-	BMI_close_context(global_bmi_context);
         trove_close_context(/*FIXME: HACK*/9,global_trove_context);
 	teardown_queues();
 	return (-ret);
@@ -217,10 +213,9 @@ int job_initialize(int flags)
     ret = pthread_create(&trove_thread_id, NULL, trove_thread_function, NULL);
     if (ret != 0)
     {
-	pthread_cancel(bmi_thread_id);
+	PINT_thread_mgr_bmi_stop();
 	pthread_cancel(flow_thread_id);
 	PINT_flow_close_context(global_flow_context);
-	BMI_close_context(global_bmi_context);
         trove_close_context(/*FIXME: HACK*/9,global_trove_context);
 	teardown_queues();
 	return (-ret);
@@ -229,16 +224,28 @@ int job_initialize(int flags)
     ret = pthread_create(&dev_thread_id, NULL, dev_thread_function, NULL);
     if (ret != 0)
     {
-	pthread_cancel(bmi_thread_id);
+	PINT_thread_mgr_bmi_stop();
 	pthread_cancel(flow_thread_id);
 #ifdef __PVFS2_TROVE_SUPPORT__
 	pthread_cancel(trove_thread_id);
 #endif
 	PINT_flow_close_context(global_flow_context);
-	BMI_close_context(global_bmi_context);
         trove_close_context(/*FIXME: HACK*/9,global_trove_context);
 	teardown_queues();
 	return (-ret);
+    }
+
+#else /* __PVFS2_JOB_THREADED__ */
+
+    /* get a bmi context to work in */
+    ret = BMI_open_context(&global_bmi_context);
+    if(ret < 0)
+    {
+	PINT_flow_close_context(global_flow_context);
+#ifdef __PVFS2_TROVE_SUPPORT__
+        trove_close_context(/*FIXME: HACK*/9,global_trove_context);
+#endif
+	return(ret);
     }
 
 #endif /* __PVFS2_JOB_THREADED__ */
@@ -256,16 +263,17 @@ int job_finalize(void)
 {
 
 #ifdef __PVFS2_JOB_THREADED__
-    pthread_cancel(bmi_thread_id);
+    PINT_thread_mgr_bmi_stop();
     pthread_cancel(flow_thread_id);
 #ifdef __PVFS2_TROVE_SUPPORT__
     pthread_cancel(trove_thread_id);
 #endif
     pthread_cancel(dev_thread_id);
-#endif /* __PVFS2_JOB_THREADED__ */
-
+#else /* __PVFS2_JOB_THREADED__ */
     BMI_close_context(global_bmi_context);
+#endif /* __PVFS2_JOB_THREADED__ */
     PINT_flow_close_context(global_flow_context);
+
 #ifdef __PVFS2_TROVE_SUPPORT__
     trove_close_context(/*FIXME: HACK*/9,global_trove_context);
 #endif
@@ -358,6 +366,7 @@ int job_bmi_send(bmi_addr_t addr,
 
     int ret = -1;
     struct job_desc *jd = NULL;
+    void* user_ptr_internal = NULL;
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -370,18 +379,26 @@ int job_bmi_send(bmi_addr_t addr,
     jd->job_user_ptr = user_ptr;
     jd->u.bmi.actual_size = size;
     jd->context_id = context_id;
+#if __PVFS2_JOB_THREADED__
+    jd->callback.fn = bmi_thread_mgr_callback;
+    jd->callback.data = (void*)jd;
+    user_ptr_internal = &jd->callback;
+#else
+    user_ptr_internal = jd;
+#endif
 
     /* post appropriate type of send */
     if (!send_unexpected)
     {
 	ret = BMI_post_send(&(jd->u.bmi.id), addr, buffer, size,
-			    buffer_type, tag, jd, global_bmi_context);
+			    buffer_type, tag, user_ptr_internal, 
+			    global_bmi_context);
     }
     else
     {
 	ret = BMI_post_sendunexpected(&(jd->u.bmi.id), addr,
 				      buffer, size, buffer_type, tag,
-				      jd, global_bmi_context);
+				      user_ptr_internal, global_bmi_context);
     }
 
     if (ret < 0)
@@ -407,9 +424,6 @@ int job_bmi_send(bmi_addr_t addr,
     gen_mutex_lock(&bmi_mutex);
     *id = jd->job_id;
     bmi_pending_count++;
-#ifdef __PVFS2_JOB_THREADED__
-    pthread_cond_signal(&bmi_cond);
-#endif /* __PVFS2_JOB_THREADED__ */
     gen_mutex_unlock(&bmi_mutex);
 
     return (0);
@@ -443,6 +457,7 @@ int job_bmi_send_list(bmi_addr_t addr,
 
     int ret = -1;
     struct job_desc *jd = NULL;
+    void* user_ptr_internal = NULL;
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -455,20 +470,27 @@ int job_bmi_send_list(bmi_addr_t addr,
     jd->job_user_ptr = user_ptr;
     jd->u.bmi.actual_size = total_size;
     jd->context_id = context_id;
+#if __PVFS2_JOB_THREADED__
+    jd->callback.fn = bmi_thread_mgr_callback;
+    jd->callback.data = (void*)jd;
+    user_ptr_internal = &jd->callback;
+#else
+    user_ptr_internal = jd;
+#endif
 
     /* post appropriate type of send */
     if (!send_unexpected)
     {
 	ret = BMI_post_send_list(&(jd->u.bmi.id), addr, buffer_list, size_list,
 				 list_count, total_size, buffer_type,
-				 tag, jd, global_bmi_context);
+				 tag, user_ptr_internal, global_bmi_context);
     }
     else
     {
 	ret = BMI_post_sendunexpected_list(&(jd->u.bmi.id), addr,
 					   buffer_list, size_list, list_count,
 					   total_size, buffer_type, tag,
-					   jd, global_bmi_context);
+					   user_ptr_internal, global_bmi_context);
     }
 
     if (ret < 0)
@@ -494,9 +516,6 @@ int job_bmi_send_list(bmi_addr_t addr,
     gen_mutex_lock(&bmi_mutex);
     *id = jd->job_id;
     bmi_pending_count++;
-#ifdef __PVFS2_JOB_THREADED__
-    pthread_cond_signal(&bmi_cond);
-#endif /* __PVFS2_JOB_THREADED__ */
     gen_mutex_unlock(&bmi_mutex);
 
     return (0);
@@ -527,6 +546,7 @@ int job_bmi_recv(bmi_addr_t addr,
 
     int ret = -1;
     struct job_desc *jd = NULL;
+    void* user_ptr_internal = NULL;
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -538,9 +558,17 @@ int job_bmi_recv(bmi_addr_t addr,
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
+#if __PVFS2_JOB_THREADED__
+    jd->callback.fn = bmi_thread_mgr_callback;
+    jd->callback.data = (void*)jd;
+    user_ptr_internal = &jd->callback;
+#else
+    user_ptr_internal = jd;
+#endif
 
     ret = BMI_post_recv(&(jd->u.bmi.id), addr, buffer, size,
-			&(jd->u.bmi.actual_size), buffer_type, tag, jd,
+			&(jd->u.bmi.actual_size), buffer_type, tag, 
+			user_ptr_internal, 
 			global_bmi_context);
 
     if (ret < 0)
@@ -566,9 +594,6 @@ int job_bmi_recv(bmi_addr_t addr,
     gen_mutex_lock(&bmi_mutex);
     *id = jd->job_id;
     bmi_pending_count++;
-#ifdef __PVFS2_JOB_THREADED__
-    pthread_cond_signal(&bmi_cond);
-#endif /* __PVFS2_JOB_THREADED__ */
     gen_mutex_unlock(&bmi_mutex);
 
     return (0);
@@ -603,6 +628,7 @@ int job_bmi_recv_list(bmi_addr_t addr,
 
     int ret = -1;
     struct job_desc *jd = NULL;
+    void* user_ptr_internal = NULL;
 
     /* create the job desc first, even though we may not use it.  This
      * gives us somewhere to store the BMI id and user ptr
@@ -614,11 +640,18 @@ int job_bmi_recv_list(bmi_addr_t addr,
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
+#if __PVFS2_JOB_THREADED__
+    jd->callback.fn = bmi_thread_mgr_callback;
+    jd->callback.data = (void*)jd;
+    user_ptr_internal = &jd->callback;
+#else
+    user_ptr_internal = jd;
+#endif
 
     ret = BMI_post_recv_list(&(jd->u.bmi.id), addr, buffer_list,
 			     size_list, list_count, total_expected_size,
 			     &(jd->u.bmi.actual_size), buffer_type, tag,
-			     jd, global_bmi_context);
+			     user_ptr_internal, global_bmi_context);
 
     if (ret < 0)
     {
@@ -643,9 +676,6 @@ int job_bmi_recv_list(bmi_addr_t addr,
     gen_mutex_lock(&bmi_mutex);
     *id = jd->job_id;
     bmi_pending_count++;
-#ifdef __PVFS2_JOB_THREADED__
-    pthread_cond_signal(&bmi_cond);
-#endif /* __PVFS2_JOB_THREADED__ */
     gen_mutex_unlock(&bmi_mutex);
 
     return (0);
@@ -725,10 +755,11 @@ int job_bmi_unexp(struct BMI_unexpected_info *bmi_unexp_d,
     *id = jd->job_id;
     job_desc_q_add(bmi_unexp_queue, jd);
     bmi_unexp_pending_count++;
-#ifdef __PVFS2_JOB_THREADED__
-    pthread_cond_signal(&bmi_cond);
-#endif /* __PVFS2_JOB_THREADED__ */
     gen_mutex_unlock(&bmi_mutex);
+
+#ifdef __PVFS2_JOB_THREADED__
+    PINT_thread_mgr_bmi_unexp_handler(bmi_thread_mgr_unexp_handler);
+#endif /* __PVFS2_JOB_THREADED__ */
 
     return (0);
 }
@@ -3436,7 +3467,71 @@ static int do_one_work_cycle_all(int *num_completed,
 
     return (0);
 }
-#endif /* __PVFS2_JOB_THREADED__ */
+
+/* do_one_work_cycle_bmi_unexp()
+ *
+ * performs one job work cycle, just on pending BMI unexpected operations 
+ * (checks to see which jobs are pending, tests those that need it, etc)
+ *
+ * returns 0 on success, -errno on failure
+ */
+static int do_one_work_cycle_bmi_unexp(int *num_completed,
+				       int wait_flag)
+{
+    int incount, outcount;
+    struct job_desc *tmp_desc;
+    int ret = -1;
+    int i = 0;
+
+    /* the first thing to do is to find out how many unexpected
+     * operations we are allowed to look for right now
+     */
+    gen_mutex_lock(&bmi_mutex);
+    if(bmi_unexp_pending_count > job_work_metric)
+	incount = job_work_metric;
+    else
+	incount = bmi_unexp_pending_count;
+    gen_mutex_unlock(&bmi_mutex);
+
+    if (wait_flag)
+    {
+	ret = BMI_testunexpected(incount, &outcount, stat_bmi_unexp_array, 10);
+    }
+    else
+    {
+	ret = BMI_testunexpected(incount, &outcount, stat_bmi_unexp_array, 0);
+    }
+
+    if (ret < 0)
+    {
+	/* critical failure */
+	/* TODO: can I clean up anything else here? */
+	gossip_lerr("Error: critical BMI failure.\n");
+	return (ret);
+    }
+
+    for (i = 0; i < outcount; i++)
+    {
+	/* remove the operation from the pending bmi_unexp queue */
+	gen_mutex_lock(&bmi_mutex);
+	tmp_desc = job_desc_q_shownext(bmi_unexp_queue);
+	job_desc_q_remove(tmp_desc);
+	bmi_unexp_pending_count--;
+	gen_mutex_unlock(&bmi_mutex);
+	/* set appropriate fields and store incompleted queue */
+	*(tmp_desc->u.bmi_unexp.info) = stat_bmi_unexp_array[i];
+	gen_mutex_lock(&completion_mutex);
+	/* set completed flag while holding queue lock */
+	tmp_desc->completed_flag = 1;
+	job_desc_q_add(completion_queue_array[tmp_desc->context_id], 
+	    tmp_desc);
+	gen_mutex_unlock(&completion_mutex);
+    }
+
+    *num_completed = outcount;
+
+    return (0);
+}
 
 
 /* do_one_work_cycle_bmi()
@@ -3504,71 +3599,72 @@ static int do_one_work_cycle_bmi(int *num_completed,
     return (0);
 }
 
+#endif /* __PVFS2_JOB_THREADED__ */
 
-/* do_one_work_cycle_bmi_unexp()
+#ifdef __PVFS2_JOB_THREADED__
+/* bmi_thread_mgr_callback()
  *
- * performs one job work cycle, just on pending BMI unexpected operations 
- * (checks to see which jobs are pending, tests those that need it, etc)
+ * callback function executed by the thread manager for BMI when a BMI
+ * job completes
  *
- * returns 0 on success, -errno on failure
+ * no return value
  */
-static int do_one_work_cycle_bmi_unexp(int *num_completed,
-				       int wait_flag)
+static void bmi_thread_mgr_callback(void* data, 
+    PVFS_size actual_size,
+    PVFS_error error_code)
 {
-    int incount, outcount;
-    struct job_desc *tmp_desc;
-    int ret = -1;
-    int i = 0;
+    struct job_desc* tmp_desc = (struct job_desc*)data; 
 
-    /* the first thing to do is to find out how many unexpected
-     * operations we are allowed to look for right now
-     */
-    gen_mutex_lock(&bmi_mutex);
-    if(bmi_unexp_pending_count > job_work_metric)
-	incount = job_work_metric;
-    else
-	incount = bmi_unexp_pending_count;
-    gen_mutex_unlock(&bmi_mutex);
+    /* set job descriptor fields and put into completion queue */
+    tmp_desc->u.bmi.error_code = error_code;
+    tmp_desc->u.bmi.actual_size = actual_size;
+    gen_mutex_lock(&completion_mutex);
+    job_desc_q_add(completion_queue_array[tmp_desc->context_id], 
+	tmp_desc);
+    /* set completed flag while holding queue lock */
+    tmp_desc->completed_flag = 1;
+    gen_mutex_unlock(&completion_mutex);
 
-    if (wait_flag)
-    {
-	ret = BMI_testunexpected(incount, &outcount, stat_bmi_unexp_array, 10);
-    }
-    else
-    {
-	ret = BMI_testunexpected(incount, &outcount, stat_bmi_unexp_array, 0);
-    }
+    bmi_pending_count--;
 
-    if (ret < 0)
-    {
-	/* critical failure */
-	/* TODO: can I clean up anything else here? */
-	gossip_lerr("Error: critical BMI failure.\n");
-	return (ret);
-    }
-
-    for (i = 0; i < outcount; i++)
-    {
-	/* remove the operation from the pending bmi_unexp queue */
-	gen_mutex_lock(&bmi_mutex);
-	tmp_desc = job_desc_q_shownext(bmi_unexp_queue);
-	job_desc_q_remove(tmp_desc);
-	bmi_unexp_pending_count--;
-	gen_mutex_unlock(&bmi_mutex);
-	/* set appropriate fields and store incompleted queue */
-	*(tmp_desc->u.bmi_unexp.info) = stat_bmi_unexp_array[i];
-	gen_mutex_lock(&completion_mutex);
-	/* set completed flag while holding queue lock */
-	tmp_desc->completed_flag = 1;
-	job_desc_q_add(completion_queue_array[tmp_desc->context_id], 
-	    tmp_desc);
-	gen_mutex_unlock(&completion_mutex);
-    }
-
-    *num_completed = outcount;
-
-    return (0);
+    /* wake up anyone waiting for completion */
+    pthread_cond_signal(&completion_cond);
+;
+    return;
 }
+
+/* bmi_thread_mgr_unexp_handler()
+ *
+ * callback function executed by the thread manager for BMI when an unexpected 
+ * BMI message arrives
+ *
+ * no return value
+ */
+static void bmi_thread_mgr_unexp_handler(struct BMI_unexpected_info* unexp)
+{
+    struct job_desc* tmp_desc = NULL; 
+
+    /* remove the operation from the pending bmi_unexp queue */
+    gen_mutex_lock(&bmi_mutex);
+    tmp_desc = job_desc_q_shownext(bmi_unexp_queue);
+    job_desc_q_remove(tmp_desc);
+    bmi_unexp_pending_count--;
+    gen_mutex_unlock(&bmi_mutex);
+    /* set appropriate fields and store in completed queue */
+    *(tmp_desc->u.bmi_unexp.info) = *unexp;
+    gen_mutex_lock(&completion_mutex);
+    /* set completed flag while holding queue lock */
+    tmp_desc->completed_flag = 1;
+    job_desc_q_add(completion_queue_array[tmp_desc->context_id], 
+	tmp_desc);
+    gen_mutex_unlock(&completion_mutex);
+
+    /* wake up anyone waiting for completion */
+    pthread_cond_signal(&completion_cond);
+;
+    return;
+}
+#endif /* __PVFS2_JOB_THREADED__ */
 
 /* do_one_work_cycle_dev_unexp()
  *
@@ -3813,97 +3909,6 @@ static void fill_status(struct job_desc *jd,
 }
 
 #ifdef __PVFS2_JOB_THREADED__
-/* bmi_thread_function()
- *
- * function executed by the thread in charge of BMI
- */
-static void *bmi_thread_function(void *ptr)
-{
-    int bmi_pending_flag, bmi_unexp_pending_flag;
-    int num_bmi_completed, num_bmi_unexp_completed;
-    int ret = -1;
-
-    while (1)
-    {
-	/* figure out what types of bmi jobs are pending */
-	gen_mutex_lock(&bmi_mutex);
-	if(bmi_pending_count > 0)
-	    bmi_pending_flag = 1;
-	else
-	    bmi_pending_flag = 0;
-	if(bmi_unexp_pending_count > 0)
-	    bmi_unexp_pending_flag = 1;
-	else
-	    bmi_unexp_pending_flag = 0;
-	gen_mutex_unlock(&bmi_mutex);
-
-	num_bmi_completed = 0;
-	num_bmi_unexp_completed = 0;
-	if (bmi_pending_flag && bmi_unexp_pending_flag)
-	{
-	    ret = do_one_work_cycle_bmi(&num_bmi_completed, 0);
-	    if (ret < 0)
-	    {
-		/* set an error flag to get propigated out later */
-		gen_mutex_lock(&completion_mutex);
-		completion_error = ret;
-		gen_mutex_unlock(&completion_mutex);
-	    }
-	    ret = do_one_work_cycle_bmi_unexp(&num_bmi_unexp_completed, 0);
-	    if (ret < 0)
-	    {
-		/* set an error flag to get propigated out later */
-		gen_mutex_lock(&completion_mutex);
-		completion_error = ret;
-		gen_mutex_unlock(&completion_mutex);
-	    }
-	}
-	else if (bmi_pending_flag)
-	{
-	    ret = do_one_work_cycle_bmi(&num_bmi_completed, 1);
-	    if (ret < 0)
-	    {
-		/* set an error flag to get propigated out later */
-		gen_mutex_lock(&completion_mutex);
-		completion_error = ret;
-		gen_mutex_unlock(&completion_mutex);
-	    }
-	}
-	else if (bmi_unexp_pending_flag)
-	{
-	    ret = do_one_work_cycle_bmi_unexp(&num_bmi_unexp_completed, 1);
-	    if (ret < 0)
-	    {
-		/* set an error flag to get propigated out later */
-		gen_mutex_lock(&completion_mutex);
-		completion_error = ret;
-		gen_mutex_unlock(&completion_mutex);
-	    }
-	}
-	else
-	{
-	    /* nothing to do; block on condition semaphore */
-	    gen_mutex_lock(&bmi_mutex);
-	    ret = pthread_cond_wait(&bmi_cond, &bmi_mutex);
-	    gen_mutex_unlock(&bmi_mutex);
-	    if (ret != ETIMEDOUT && ret != EINTR && ret != 0)
-	    {
-		/* set an error flag to get propigated out later */
-		gen_mutex_lock(&completion_mutex);
-		completion_error = -ret;
-		gen_mutex_unlock(&completion_mutex);
-	    }
-	}
-
-	if ((num_bmi_completed + num_bmi_unexp_completed) > 0)
-	{
-	    /* signal anyone blocking on completion queue */
-	    pthread_cond_signal(&completion_cond);
-	}
-    }
-
-    return (NULL);
-}
 
 /* flow_thread_function()
  *

@@ -16,6 +16,7 @@
 #include "pvfs2-types.h"
 #include "trove-types.h"
 #include "request-scheduler.h"
+#include "thread-mgr.h"
 
 /* describes BMI operations */
 struct bmi_desc
@@ -84,6 +85,7 @@ struct job_desc
     void *job_user_ptr;		/* user pointer */
     int completed_flag;		/* has the job finished? */
     job_context_id context_id;  /* context */
+    struct PINT_thread_mgr_bmi_callback callback;  /* callback information */
 
     /* union of information for lower level interfaces */
     union
