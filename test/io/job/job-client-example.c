@@ -92,7 +92,7 @@ int main(int argc, char **argv)
 
 	/* send a message */
 	ret = job_bmi_send(server_addr, req, sizeof(struct request_foo),
-		0, BMI_PRE_ALLOC, 1, NULL, &status1, &tmp_id, context);
+		0, BMI_PRE_ALLOC, 1, NULL, 0, &status1, &tmp_id, context);
 	if(ret < 0)
 	{
 		fprintf(stderr, "job_bmi_send() failure.\n");
@@ -118,7 +118,7 @@ int main(int argc, char **argv)
 
 	/* receive a message */
 	ret = job_bmi_recv(server_addr, ack, sizeof(struct ack_foo),
-		0, BMI_PRE_ALLOC, NULL, &status1, &tmp_id, context);
+		0, BMI_PRE_ALLOC, NULL, 0, &status1, &tmp_id, context);
 	if(ret < 0)
 	{
 		fprintf(stderr, "job_bmi_recv() failure.\n");

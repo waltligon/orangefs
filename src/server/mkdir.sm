@@ -95,6 +95,7 @@ static int mkdir_create(PINT_server_op *s_op, job_status_s* js_p)
 	    PVFS_TYPE_DIRECTORY,
 	    NULL,
 	    s_op,
+	    0,
 	    js_p,
 	    &i,
 	    server_job_context);
@@ -155,6 +156,7 @@ static int mkdir_setattrib(PINT_server_op *s_op, job_status_s* js_p)
 					  TROVE_SYNC,
 					  NULL,
 					  s_op,
+					  0,
 					  js_p,
 					  &i,
 					  server_job_context);

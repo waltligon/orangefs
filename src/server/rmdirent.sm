@@ -139,6 +139,7 @@ static int rmdirent_verify_parent_metadata_and_read_directory_entry_handle(PINT_
 					 0,
 					 NULL,
 					 s_op,
+					 0,
 					 js_p,
 					 &i,
 					 server_job_context);
@@ -181,6 +182,7 @@ static int rmdirent_read_directory_entry(PINT_server_op *s_op,
 					 0,
 					 NULL,
 					 s_op,
+					 0,
 					 js_p,
 					 &j_id,
 					 server_job_context);
@@ -245,6 +247,7 @@ static int rmdirent_remove_directory_entry(PINT_server_op *s_op, job_status_s* j
 					   TROVE_SYNC,
 					   NULL,
 					   s_op,
+					   0,
 					   js_p,
 					   &j_id,
 					   server_job_context);

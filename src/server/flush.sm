@@ -96,6 +96,7 @@ static int flush_keyval_flush(PINT_server_op *s_op, job_status_s * js_p)
 	    s_op->req->u.flush.handle,
 	    s_op->req->u.flush.flags,
 	    s_op,
+	    0,
 	    js_p,
 	    &i,
 	    server_job_context);
@@ -144,6 +145,7 @@ static int flush_bstream_flush(PINT_server_op *s_op, job_status_s * js_p)
 	    s_op->req->u.flush.handle,
 	    s_op->req->u.flush.flags,
 	    s_op,
+	    0,
 	    js_p,
 	    &i,
 	    server_job_context);

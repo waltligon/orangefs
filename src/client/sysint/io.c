@@ -598,6 +598,7 @@ static int io_req_ack_flow_array(bmi_addr_t* addr_array,
 		req_encoded_array[i].buffer_type,
 		1,
 		NULL,
+		0,
 		&(status_array[i]),
 		&(id_array[i]),
 		PVFS_sys_job_context);
@@ -686,6 +687,7 @@ static int io_req_ack_flow_array(bmi_addr_t* addr_array,
 		op_tag_array[i],
 		BMI_PRE_ALLOC,
 		NULL, 
+		0,
 		&(status_array[i]), 
 		&(id_array[i]),
 		PVFS_sys_job_context);
@@ -793,6 +795,7 @@ static int io_req_ack_flow_array(bmi_addr_t* addr_array,
 		ret = job_flow(
 		    flow_array[i],
 		    NULL,
+		    0,
 		    &(status_array[0]),
 		    &(id_array[i+array_size]),
 		    PVFS_sys_job_context);

@@ -83,7 +83,7 @@ int main(int argc, char **argv)
 
 
     /* try to look up collection used to store file system */
-	ret = job_trove_fs_lookup(file_system, NULL, &job_stat, &foo_id,
+	ret = job_trove_fs_lookup(file_system, NULL, 0, &job_stat, &foo_id,
 	context);
 	if(ret < 0)
 	{
@@ -135,7 +135,7 @@ int main(int argc, char **argv)
     while ( num_processed == chunk ) 
 	{
 		ret = job_trove_keyval_iterate(coll_id, handle, pos, key, val, chunk,
-			0, NULL, NULL, &job_stat, &foo_id, context);
+			0, NULL, NULL, 0, &job_stat, &foo_id, context);
 		if(ret < 0)
 		{
 			fprintf(stderr, "keyval iterate failed.\n");

@@ -79,7 +79,7 @@ int main(int argc, char **argv)
 
 
 	/* post a job for unexpected receive */
-	ret = job_bmi_unexp(&req_info, NULL, &status1, &job_id, 0, context);
+	ret = job_bmi_unexp(&req_info, NULL, 0, &status1, &job_id, 0, context);
 	if(ret < 0)
 	{
 		fprintf(stderr, "job_bmi_unexp() failure.\n");
@@ -136,7 +136,7 @@ int main(int argc, char **argv)
 
 	/* send a message */
 	ret = job_bmi_send(req_info.addr, ack, sizeof(struct ack_foo),
-		0, BMI_PRE_ALLOC, 0, NULL, &status1, &tmp_id, context);
+		0, BMI_PRE_ALLOC, 0, NULL, 0, &status1, &tmp_id, context);
 	if(ret < 0)
 	{
 		fprintf(stderr, "job_bmi_send() failure.\n");

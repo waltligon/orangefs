@@ -766,6 +766,7 @@ static int server_post_unexpected_recv(job_status_s *temp_stat)
      */
     ret = job_bmi_unexp(&(s_op->unexp_bmi_buff),
 			s_op, /* user ptr */
+			0,
 			temp_stat,
 			&j_id,
 			JOB_NO_IMMED_COMPLETE,

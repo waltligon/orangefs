@@ -65,7 +65,7 @@ int main(int argc, char **argv)
     }
 	
     /* post job for unexpected device messages */
-    ret = job_dev_unexp(&info, NULL, &jstat, &tmp_id, context);
+    ret = job_dev_unexp(&info, NULL, 0, &jstat, &tmp_id, context);
     if(ret < 0)
     {
 	PVFS_perror("job_dev_unexp()", ret);
@@ -104,7 +104,7 @@ int main(int argc, char **argv)
     size_list[1] = strlen(buf1) + 1;
 
     ret = job_dev_write_list(buffer_list, size_list, 2, (strlen(buf1) +
-	strlen(buf2) + 1), 7, PINT_DEV_EXT_ALLOC, NULL, &jstat, &tmp_id,
+	strlen(buf2) + 1), 7, PINT_DEV_EXT_ALLOC, NULL, 0, &jstat, &tmp_id,
 	context);
     if(ret < 0)
     {

@@ -57,7 +57,7 @@ int main(int argc, char **argv)
 
 
 	/* try to schedule first request- it should proceed */
-	ret = job_req_sched_post(&(req_array[0]), NULL, &stat,
+	ret = job_req_sched_post(&(req_array[0]), NULL, 0, &stat,
 	&(id_array[0]), context);
 	if(ret != 1)
 	{
@@ -66,7 +66,7 @@ int main(int argc, char **argv)
 	}
 
 	/* try to schedule second request- it should queue up */
-	ret = job_req_sched_post(&(req_array[1]), NULL, &stat,
+	ret = job_req_sched_post(&(req_array[1]), NULL, 0, &stat,
 	&(id_array[1]), context);
 	if(ret != 0)
 	{
@@ -75,7 +75,7 @@ int main(int argc, char **argv)
 	}
 
 	/* try to schedule third request- it should proceed */
-	ret = job_req_sched_post(&(req_array[2]), NULL, &stat,
+	ret = job_req_sched_post(&(req_array[2]), NULL, 0, &stat,
 	&(id_array[2]), context);
 	if(ret != 1)
 	{
@@ -94,7 +94,7 @@ int main(int argc, char **argv)
 	}
 
 	/* complete the first request */
-	ret = job_req_sched_release(id_array[0], NULL,
+	ret = job_req_sched_release(id_array[0], NULL, 0,
 		&stat, &(id_arrayB[0]), context);
 	if(ret != 1)
 	{
@@ -111,7 +111,7 @@ int main(int argc, char **argv)
 	}
 
 	/* complete the 3rd request */
-	ret = job_req_sched_release(id_array[2], NULL,
+	ret = job_req_sched_release(id_array[2], NULL, 0,
 		&stat, &(id_arrayB[2]), context);
 	if(ret != 1)
 	{

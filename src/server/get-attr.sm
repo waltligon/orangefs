@@ -219,6 +219,7 @@ static int getattr_read_datafile_size(PINT_server_op *s_op, job_status_s* js_p)
     ret = job_trove_dspace_getattr(s_op->req->u.getattr.fs_id,
                                    s_op->req->u.getattr.handle,
                                    s_op,
+				   0,
                                    js_p,
                                    &tmp_id,
                                    server_job_context);
@@ -266,6 +267,7 @@ static int getattr_read_symlink_target(PINT_server_op *s_op, job_status_s* js_p)
                                 0,
                                 NULL,
                                 s_op,
+				0,
                                 js_p,
                                 &i,
                                 server_job_context);
@@ -344,6 +346,7 @@ static int getattr_read_metafile_datafile_handles_if_required(
 					 0,
 					 NULL,
 					 s_op,
+					 0,
 					 js_p,
 					 &i,
 					 server_job_context);
@@ -397,6 +400,7 @@ static int getattr_read_metafile_distribution_if_required(
 					 0,
 					 NULL,
 					 s_op,
+					 0,
 					 js_p,
 					 &i,
 					 server_job_context);

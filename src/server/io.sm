@@ -119,6 +119,7 @@ static int io_get_size(PINT_server_op *s_op, job_status_s* js_p)
 		s_op->req->u.io.fs_id,
 		s_op->req->u.io.handle,
 		s_op,
+		0, 
 		js_p,
 		&tmp_id,
 		server_job_context);
@@ -188,6 +189,7 @@ static int io_send_ack(PINT_server_op *s_op, job_status_s* js_p)
 			s_op->encoded.buffer_type,
 			0,
 			s_op,
+			0,
 			js_p,
 			&tmp_id,
 			server_job_context);
@@ -282,6 +284,7 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s* js_p)
 	err = job_flow(
 		s_op->u.io.flow_d,
 		s_op,
+		0,
 		js_p,
 		&tmp_id,
 		server_job_context);
@@ -316,6 +319,7 @@ static int io_release(PINT_server_op *s_op, job_status_s* js_p)
 	/* tell the scheduler that we are done with this operation */
 	ret = job_req_sched_release(s_op->scheduled_id,
 													  s_op,
+													  0,
 													  js_p,
 													  &i,
 													  server_job_context);
@@ -430,6 +434,7 @@ static int io_send_completion_ack(PINT_server_op *s_op,
 			s_op->encoded.buffer_type,
 			0,
 			s_op,
+			0,
 			js_p,
 			&tmp_id,
 			server_job_context);

@@ -95,6 +95,7 @@ static int final_response_release(PINT_server_op *s_op, job_status_s *js_p)
 
     ret = job_req_sched_release(s_op->scheduled_id,
 	s_op,
+	0,
 	js_p,
 	&tmp_id,
 	server_job_context);
@@ -147,6 +148,7 @@ static int final_response_send_resp(PINT_server_op *s_op, job_status_s *js_p)
 	s_op->encoded.buffer_type,
 	0,
 	s_op,
+	0,
 	js_p,
 	&tmp_id,
 	server_job_context);

@@ -79,7 +79,7 @@ int main(int argc, char **argv)
 
 
     /* try to look up collection used to store file system */
-	ret = job_trove_fs_lookup(file_system, NULL, &job_stat, &foo_id,
+	ret = job_trove_fs_lookup(file_system, NULL, 0, &job_stat, &foo_id,
 	context);
 	if(ret < 0)
 	{
@@ -131,6 +131,7 @@ int main(int argc, char **argv)
 		TROVE_TEST_FILE,
 		NULL,
 		NULL,
+		0,
 		&job_stat,
 		&foo_id,
 		context);
@@ -165,7 +166,7 @@ int main(int argc, char **argv)
     val.buffer_sz = sizeof(file_handle);
 
 	ret = job_trove_keyval_write(coll_id, parent_handle, &key,
-		&val, 0, NULL, NULL, &job_stat, &foo_id, context);
+		&val, 0, NULL, NULL, 0, &job_stat, &foo_id, context);
 	if(ret < 0)
 	{
 		fprintf(stderr, "job_trove_keyval_write() failure.\n");

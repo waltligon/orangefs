@@ -93,7 +93,7 @@ int main(int argc, char **argv)
     }
 
 	/* try to look up collection used to store file system */
-	ret = job_trove_fs_lookup(file_system, NULL, &job_stat, &foo_id,
+	ret = job_trove_fs_lookup(file_system, NULL, 0, &job_stat, &foo_id,
 	context);
 	if(ret == 1 && job_stat.error_code == 0)
 	{
@@ -111,7 +111,7 @@ int main(int argc, char **argv)
 	}
 
 	/* create the collection */
-	ret = job_trove_fs_create(file_system, FS_COLL_ID, NULL,
+	ret = job_trove_fs_create(file_system, FS_COLL_ID, NULL, 0,
 		&job_stat, &foo_id, context);
 	if(ret < 0)
 	{
@@ -136,7 +136,7 @@ int main(int argc, char **argv)
     /* lookup collection.  this is redundant because we just gave it a coll. id to use,
      * but it's a good test i guess...
      */
-	ret = job_trove_fs_lookup(file_system, NULL, &job_stat, &foo_id,
+	ret = job_trove_fs_lookup(file_system, NULL, 0, &job_stat, &foo_id,
 	context);
 	if(ret < 0)
 	{
@@ -172,6 +172,7 @@ int main(int argc, char **argv)
 		TROVE_TEST_DIR,
 		NULL,
 		NULL,
+		0,
 		&job_stat,
 		&foo_id,
 		context);
@@ -205,7 +206,7 @@ int main(int argc, char **argv)
     val.buffer = &root_handle;
     val.buffer_sz = sizeof(root_handle);
 
-	ret = job_trove_fs_seteattr(coll_id, &key, &val, 0, NULL,
+	ret = job_trove_fs_seteattr(coll_id, &key, &val, 0, NULL, 0,
 		&job_stat, &foo_id, context);
 	if(ret < 0)
 	{

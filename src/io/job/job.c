@@ -341,6 +341,7 @@ int job_bmi_send(bmi_addr_t addr,
 		 enum bmi_buffer_type buffer_type,
 		 int send_unexpected,
 		 void *user_ptr,
+		 PVFS_aint status_user_tag,
 		 job_status_s * out_status_p,
 		 job_id_t * id,
 		 job_context_id context_id)
@@ -365,6 +366,7 @@ int job_bmi_send(bmi_addr_t addr,
     jd->job_user_ptr = user_ptr;
     jd->u.bmi.actual_size = size;
     jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
 #if __PVFS2_JOB_THREADED__
     jd->bmi_callback.fn = bmi_thread_mgr_callback;
     jd->bmi_callback.data = (void*)jd;
@@ -432,6 +434,7 @@ int job_bmi_send_list(bmi_addr_t addr,
 		      enum bmi_buffer_type buffer_type,
 		      int send_unexpected,
 		      void *user_ptr,
+		      PVFS_aint status_user_tag,
 		      job_status_s * out_status_p,
 		      job_id_t * id,
 		      job_context_id context_id)
@@ -456,6 +459,7 @@ int job_bmi_send_list(bmi_addr_t addr,
     jd->job_user_ptr = user_ptr;
     jd->u.bmi.actual_size = total_size;
     jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
 #if __PVFS2_JOB_THREADED__
     jd->bmi_callback.fn = bmi_thread_mgr_callback;
     jd->bmi_callback.data = (void*)jd;
@@ -520,6 +524,7 @@ int job_bmi_recv(bmi_addr_t addr,
 		 bmi_msg_tag_t tag,
 		 enum bmi_buffer_type buffer_type,
 		 void *user_ptr,
+		 PVFS_aint status_user_tag,
 		 job_status_s * out_status_p,
 		 job_id_t * id,
 		 job_context_id context_id)
@@ -544,6 +549,7 @@ int job_bmi_recv(bmi_addr_t addr,
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
 #if __PVFS2_JOB_THREADED__
     jd->bmi_callback.fn = bmi_thread_mgr_callback;
     jd->bmi_callback.data = (void*)jd;
@@ -602,6 +608,7 @@ int job_bmi_recv_list(bmi_addr_t addr,
 		      bmi_msg_tag_t tag,
 		      enum bmi_buffer_type buffer_type,
 		      void *user_ptr,
+		      PVFS_aint status_user_tag,
 		      job_status_s * out_status_p,
 		      job_id_t * id,
 		      job_context_id context_id)
@@ -626,6 +633,7 @@ int job_bmi_recv_list(bmi_addr_t addr,
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
 #if __PVFS2_JOB_THREADED__
     jd->bmi_callback.fn = bmi_thread_mgr_callback;
     jd->bmi_callback.data = (void*)jd;
@@ -677,6 +685,7 @@ int job_bmi_recv_list(bmi_addr_t addr,
  */
 int job_bmi_unexp(struct BMI_unexpected_info *bmi_unexp_d,
 		  void *user_ptr,
+		  PVFS_aint status_user_tag,
 		  job_status_s * out_status_p,
 		  job_id_t * id,
 		  enum job_flags flags,
@@ -702,6 +711,7 @@ int job_bmi_unexp(struct BMI_unexpected_info *bmi_unexp_d,
     jd->job_user_ptr = user_ptr;
     jd->u.bmi_unexp.info = bmi_unexp_d;
     jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
 
    /*********************************************************
 	 * TODO: consider optimizations later, so that we avoid
@@ -759,6 +769,7 @@ int job_bmi_unexp(struct BMI_unexpected_info *bmi_unexp_d,
  */
 int job_dev_unexp(struct PINT_dev_unexp_info* dev_unexp_d,
     void* user_ptr,
+    PVFS_aint status_user_tag,
     job_status_s * out_status_p,
     job_id_t* id,
     job_context_id context_id)
@@ -783,6 +794,7 @@ int job_dev_unexp(struct PINT_dev_unexp_info* dev_unexp_d,
     jd->job_user_ptr = user_ptr;
     jd->u.dev_unexp.info = dev_unexp_d;
     jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
 
     ret = PINT_dev_test_unexpected(1, &outcount, jd->u.dev_unexp.info, 0);
 
@@ -827,6 +839,7 @@ int job_dev_write(void* buffer,
     PVFS_id_gen_t tag,
     enum PINT_dev_buffer_type buffer_type,
     void* user_ptr,
+    PVFS_aint status_user_tag,
     job_status_s * out_status_p,
     job_id_t * id,
     job_context_id context_id)
@@ -866,6 +879,7 @@ int job_dev_write_list(void** buffer_list,
     PVFS_id_gen_t tag,
     enum PINT_dev_buffer_type buffer_type,
     void* user_ptr,
+    PVFS_aint status_user_tag,
     job_status_s* out_status_p,
     job_id_t* id,
     job_context_id context_id)
@@ -902,6 +916,7 @@ int job_dev_write_list(void** buffer_list,
  */
 int job_req_sched_post(struct PVFS_server_req *in_request,
 		       void *user_ptr,
+		       PVFS_aint status_user_tag,
 		       job_status_s * out_status_p,
 		       job_id_t * id,
 		       job_context_id context_id)
@@ -927,6 +942,7 @@ int job_req_sched_post(struct PVFS_server_req *in_request,
     jd->job_user_ptr = user_ptr;
     jd->u.req_sched.post_flag = 1;
     jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
 
     ret = PINT_req_sched_post(in_request, jd, &(jd->u.req_sched.id));
 
@@ -966,6 +982,7 @@ int job_req_sched_post(struct PVFS_server_req *in_request,
  */
 int job_req_sched_release(job_id_t in_completed_id,
 			  void *user_ptr,
+			  PVFS_aint status_user_tag,
 			  job_status_s * out_status_p,
 			  job_id_t * out_id,
 			  job_context_id context_id)
@@ -986,6 +1003,7 @@ int job_req_sched_release(job_id_t in_completed_id,
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
 
     match_jd = id_gen_fast_lookup(in_completed_id);
 
@@ -1033,6 +1051,7 @@ int job_req_sched_release(job_id_t in_completed_id,
  */
 int job_flow(flow_descriptor * flow_d,
 	     void *user_ptr,
+	     PVFS_aint status_user_tag,
 	     job_status_s * out_status_p,
 	     job_id_t * id,
 	     job_context_id context_id)
@@ -1049,6 +1068,7 @@ int job_flow(flow_descriptor * flow_d,
     jd->job_user_ptr = user_ptr;
     jd->u.flow.flow_d = flow_d;
     jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
     flow_d->user_ptr = jd;
 
     /* post the flow */
@@ -1096,6 +1116,7 @@ int job_trove_bstream_write_at(PVFS_fs_id coll_id,
 			       PVFS_ds_flags flags,
 			       PVFS_vtag * vtag,
 			       void *user_ptr,
+			       PVFS_aint status_user_tag,
 			       job_status_s * out_status_p,
 			       job_id_t * id,
 			       job_context_id context_id)
@@ -1120,6 +1141,7 @@ int job_trove_bstream_write_at(PVFS_fs_id coll_id,
     jd->u.trove.actual_size = size;
     jd->u.trove.vtag = vtag;
     jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
 #if __PVFS2_JOB_THREADED__
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
@@ -1184,6 +1206,7 @@ int job_trove_bstream_read_at(PVFS_fs_id coll_id,
 			      PVFS_ds_flags flags,
 			      PVFS_vtag * vtag,
 			      void *user_ptr,
+			      PVFS_aint status_user_tag,
 			      job_status_s * out_status_p,
 			      job_id_t * id,
 			      job_context_id context_id)
@@ -1208,6 +1231,7 @@ int job_trove_bstream_read_at(PVFS_fs_id coll_id,
     jd->u.trove.actual_size = size;
     jd->u.trove.vtag = vtag;
     jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
 #if __PVFS2_JOB_THREADED__
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
@@ -1268,6 +1292,7 @@ int job_trove_bstream_flush(PVFS_fs_id coll_id,
 			    PVFS_handle handle,
 			    PVFS_ds_flags flags,
 			    void *user_ptr,
+			    PVFS_aint status_user_tag,
 			    job_status_s * out_status_p,
 			    job_id_t * id,
 			    job_context_id context_id)
@@ -1287,6 +1312,7 @@ int job_trove_bstream_flush(PVFS_fs_id coll_id,
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
 #if __PVFS2_JOB_THREADED__
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
@@ -1342,6 +1368,7 @@ int job_trove_keyval_read(PVFS_fs_id coll_id,
 			  PVFS_ds_flags flags,
 			  PVFS_vtag * vtag,
 			  void *user_ptr,
+			  PVFS_aint status_user_tag,
 			  job_status_s * out_status_p,
 			  job_id_t * id,
 			  job_context_id context_id)
@@ -1365,6 +1392,7 @@ int job_trove_keyval_read(PVFS_fs_id coll_id,
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
     jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
 #if __PVFS2_JOB_THREADED__
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
@@ -1426,6 +1454,7 @@ int job_trove_keyval_read_list(PVFS_fs_id coll_id,
 			       PVFS_ds_flags flags,
 			       PVFS_vtag * vtag,
 			       void *user_ptr,
+			       PVFS_aint status_user_tag,
 			       job_status_s * out_status_p,
 			       job_id_t * id,
 			       job_context_id context_id)
@@ -1449,6 +1478,7 @@ int job_trove_keyval_read_list(PVFS_fs_id coll_id,
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
     jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
 #if __PVFS2_JOB_THREADED__
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
@@ -1510,6 +1540,7 @@ int job_trove_keyval_write(PVFS_fs_id coll_id,
 			   PVFS_ds_flags flags,
 			   PVFS_vtag * vtag,
 			   void *user_ptr,
+			   PVFS_aint status_user_tag,
 			   job_status_s * out_status_p,
 			   job_id_t * id,
 			   job_context_id context_id)
@@ -1533,6 +1564,7 @@ int job_trove_keyval_write(PVFS_fs_id coll_id,
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
     jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
 #if __PVFS2_JOB_THREADED__
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
@@ -1591,6 +1623,7 @@ int job_trove_keyval_flush(PVFS_fs_id coll_id,
 			    PVFS_handle handle,
 			    PVFS_ds_flags flags,
 			    void * user_ptr,
+			    PVFS_aint status_user_tag,
 			    job_status_s * out_status_p,
 			    job_id_t * id,
 			    job_context_id context_id)
@@ -1609,6 +1642,7 @@ int job_trove_keyval_flush(PVFS_fs_id coll_id,
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
 #if __PVFS2_JOB_THREADED__
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
@@ -1663,6 +1697,7 @@ int job_trove_keyval_flush(PVFS_fs_id coll_id,
 int job_trove_dspace_getattr(PVFS_fs_id coll_id,
 			     PVFS_handle handle,
 			     void *user_ptr,
+			     PVFS_aint status_user_tag,
 			     job_status_s * out_status_p,
 			     job_id_t * id,
 			     job_context_id context_id)
@@ -1687,6 +1722,7 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
 #if __PVFS2_JOB_THREADED__
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
@@ -1746,6 +1782,7 @@ int job_trove_dspace_setattr(PVFS_fs_id coll_id,
 			     PVFS_handle handle,
 			     PVFS_ds_attributes * ds_attr_p,
 			     void *user_ptr,
+			     PVFS_aint status_user_tag,
 			     job_status_s * out_status_p,
 			     job_id_t * id,
 			     job_context_id context_id)
@@ -1770,6 +1807,7 @@ int job_trove_dspace_setattr(PVFS_fs_id coll_id,
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
 #if __PVFS2_JOB_THREADED__
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
@@ -1827,6 +1865,7 @@ int job_trove_bstream_resize(PVFS_fs_id coll_id,
 			     PVFS_ds_flags flags,
 			     PVFS_vtag * vtag,
 			     void *user_ptr,
+			     PVFS_aint status_user_tag,
 			     job_status_s * out_status_p,
 			     job_id_t * id,
 			     job_context_id context_id)
@@ -1846,6 +1885,7 @@ int job_trove_bstream_validate(PVFS_fs_id coll_id,
 			       PVFS_handle handle,
 			       PVFS_vtag * vtag,
 			       void *user_ptr,
+			       PVFS_aint status_user_tag,
 			       job_status_s * out_status_p,
 			       job_id_t * id,
 			       job_context_id context_id)
@@ -1867,6 +1907,7 @@ int job_trove_keyval_remove(PVFS_fs_id coll_id,
 			    PVFS_ds_flags flags,
 			    PVFS_vtag * vtag,
 			    void *user_ptr,
+			    PVFS_aint status_user_tag,
 			    job_status_s * out_status_p,
 			    job_id_t * id,
 			    job_context_id context_id)
@@ -1890,6 +1931,7 @@ int job_trove_keyval_remove(PVFS_fs_id coll_id,
     jd->job_user_ptr = user_ptr;
     jd->u.trove.vtag = vtag;
     jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
 #if __PVFS2_JOB_THREADED__
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
@@ -1947,6 +1989,7 @@ int job_trove_keyval_validate(PVFS_fs_id coll_id,
 			      PVFS_handle handle,
 			      PVFS_vtag * vtag,
 			      void *user_ptr,
+			      PVFS_aint status_user_tag,
 			      job_status_s * out_status_p,
 			      job_id_t * id,
 			      job_context_id context_id)
@@ -1971,6 +2014,7 @@ int job_trove_keyval_iterate(PVFS_fs_id coll_id,
 			     PVFS_ds_flags flags,
 			     PVFS_vtag * vtag,
 			     void *user_ptr,
+			     PVFS_aint status_user_tag,
 			     job_status_s * out_status_p,
 			     job_id_t * id,
 			     job_context_id context_id)
@@ -1996,6 +2040,7 @@ int job_trove_keyval_iterate(PVFS_fs_id coll_id,
     jd->u.trove.position = position;
     jd->u.trove.count = count;
     jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
 #if __PVFS2_JOB_THREADED__
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
@@ -2061,6 +2106,7 @@ int job_trove_keyval_iterate_keys(PVFS_fs_id coll_id,
 				  PVFS_ds_flags flags,
 				  PVFS_vtag * vtag,
 				  void *user_ptr,
+				  PVFS_aint status_user_tag,
 				  job_status_s * out_status_p,
 				  job_id_t * id,
 				  job_context_id context_id)
@@ -2081,6 +2127,7 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
 			    PVFS_ds_type type,
 			    void *hint,
 			    void *user_ptr,
+			    PVFS_aint status_user_tag,
 			    job_status_s * out_status_p,
 			    job_id_t * id,
 			    job_context_id context_id)
@@ -2104,6 +2151,7 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
     jd->job_user_ptr = user_ptr;
     jd->u.trove.handle = 0;
     jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
 #if __PVFS2_JOB_THREADED__
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
@@ -2164,6 +2212,7 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
 int job_trove_dspace_remove(PVFS_fs_id coll_id,
 			    PVFS_handle handle,
 			    void *user_ptr,
+			    PVFS_aint status_user_tag,
 			    job_status_s * out_status_p,
 			    job_id_t * id,
 			    job_context_id context_id)
@@ -2186,6 +2235,7 @@ int job_trove_dspace_remove(PVFS_fs_id coll_id,
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
 #if __PVFS2_JOB_THREADED__
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
@@ -2242,6 +2292,7 @@ int job_trove_dspace_remove(PVFS_fs_id coll_id,
 int job_trove_dspace_verify(PVFS_fs_id coll_id,
 			    PVFS_handle handle,
 			    void *user_ptr,
+			    PVFS_aint status_user_tag,
 			    job_status_s * out_status_p,
 			    job_id_t * id,
 			    job_context_id context_id)
@@ -2264,6 +2315,7 @@ int job_trove_dspace_verify(PVFS_fs_id coll_id,
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
 #if __PVFS2_JOB_THREADED__
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
@@ -2320,6 +2372,7 @@ int job_trove_dspace_verify(PVFS_fs_id coll_id,
 int job_trove_fs_create(char *collname,
 			PVFS_fs_id new_coll_id,
 			void *user_ptr,
+			PVFS_aint status_user_tag,
 			job_status_s * out_status_p,
 			job_id_t * id,
 			job_context_id context_id)
@@ -2342,6 +2395,7 @@ int job_trove_fs_create(char *collname,
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
 #if __PVFS2_JOB_THREADED__
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
@@ -2395,6 +2449,7 @@ int job_trove_fs_create(char *collname,
  */
 int job_trove_fs_remove(char *collname,
 			void *user_ptr,
+			PVFS_aint status_user_tag,
 			job_status_s * out_status_p,
 			job_id_t * id,
 			job_context_id context_id)
@@ -2412,6 +2467,7 @@ int job_trove_fs_remove(char *collname,
  */
 int job_trove_fs_lookup(char *collname,
 			void *user_ptr,
+			PVFS_aint status_user_tag,
 			job_status_s * out_status_p,
 			job_id_t * id,
 			job_context_id context_id)
@@ -2434,6 +2490,7 @@ int job_trove_fs_lookup(char *collname,
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
 #if __PVFS2_JOB_THREADED__
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
@@ -2486,6 +2543,7 @@ int job_trove_fs_seteattr(PVFS_fs_id coll_id,
 			  PVFS_ds_keyval * val_p,
 			  PVFS_ds_flags flags,
 			  void *user_ptr,
+			  PVFS_aint status_user_tag,
 			  job_status_s * out_status_p,
 			  job_id_t * id,
 			  job_context_id context_id)
@@ -2508,6 +2566,7 @@ int job_trove_fs_seteattr(PVFS_fs_id coll_id,
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
 #if __PVFS2_JOB_THREADED__
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
@@ -2565,6 +2624,7 @@ int job_trove_fs_geteattr(PVFS_fs_id coll_id,
 			  PVFS_ds_keyval * val_p,
 			  PVFS_ds_flags flags,
 			  void *user_ptr,
+			  PVFS_aint status_user_tag,
 			  job_status_s * out_status_p,
 			  job_id_t * id,
 			  job_context_id context_id)
@@ -2587,6 +2647,7 @@ int job_trove_fs_geteattr(PVFS_fs_id coll_id,
     }
     jd->job_user_ptr = user_ptr;
     jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
 #if __PVFS2_JOB_THREADED__
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;

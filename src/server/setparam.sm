@@ -79,6 +79,7 @@ static int setparam_work(PINT_server_op *s_op, job_status_s* js_p)
 	    ret = job_trove_dspace_verify(s_op->req->u.mgmt_setparam.fs_id,
 		(PVFS_handle)s_op->req->u.mgmt_setparam.value,
 		s_op,
+		0,
 		js_p,
 		&tmp_id,
 		server_job_context);

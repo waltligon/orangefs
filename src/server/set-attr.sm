@@ -334,6 +334,7 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s* js_p)
 					  TROVE_SYNC /* flags */,
 					  NULL,
 					  s_op,
+					  0,
 					  js_p,
 					  &j_id,
 					  server_job_context);
@@ -402,6 +403,7 @@ static int setattr_write_metafile_datafile_handles_if_required(
                                  TROVE_SYNC /* flags */,
                                  NULL,
                                  s_op,
+				 0,
                                  js_p,
                                  &j_id,
                                  server_job_context);
@@ -462,6 +464,7 @@ static int setattr_write_metafile_distribution_if_required(
 					  TROVE_SYNC /* flags */,
 					  NULL,
 					  s_op,
+					  0,
 					  js_p,
 					  &j_id,
 					  server_job_context);
@@ -515,6 +518,7 @@ static int setattr_write_symlink_target_if_required(
                                  TROVE_SYNC /* flags */,
                                  NULL,
                                  s_op,
+				 0,
                                  js_p,
                                  &j_id,
                                  server_job_context);

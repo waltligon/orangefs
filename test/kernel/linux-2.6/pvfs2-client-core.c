@@ -472,7 +472,7 @@ int write_device_response(
     {
         ret = job_dev_write_list(buffer_list, size_list, list_size,
                                  total_size, tag, PINT_DEV_EXT_ALLOC,
-                                 NULL, jstat, job_id, context);
+                                 NULL, 0, jstat, job_id, context);
         if (ret < 0)
         {
             PVFS_perror("job_dev_write_list()", ret);
@@ -566,7 +566,7 @@ int main(int argc, char **argv)
     {
         int outcount = 0;
 
-	ret = job_dev_unexp(&info, NULL, &jstat, &job_id, context);
+	ret = job_dev_unexp(&info, NULL, 0, &jstat, &job_id, context);
 	if(ret == 0)
 	{
 	    ret = job_test(job_id, &outcount, NULL, &jstat, -1, context);

@@ -209,7 +209,7 @@ static int block_on_flow(flow_descriptor* flow_d, job_context_id
 	job_status_s tmp_stat;
 	job_id_t tmp_id;
 
-	ret = job_flow(flow_d, NULL, &tmp_stat, &tmp_id, context);
+	ret = job_flow(flow_d, NULL, 0, &tmp_stat, &tmp_id, context);
 	if(ret == 1)
 	{
 		return(0);

@@ -602,6 +602,7 @@ static int io_datafile_post_msgpairs(PINT_client_sm *sm_p,
 			   session_tag,
 			   BMI_PRE_ALLOC,
 			   sm_p,
+			   0,
 			   &msg_p->recv_status,
 			   &msg_p->recv_id,
 			   pint_client_sm_context);
@@ -627,6 +628,7 @@ static int io_datafile_post_msgpairs(PINT_client_sm *sm_p,
 				msg_p->encoded_req.buffer_type,
 				1,
 				sm_p,
+				0,
 				&msg_p->send_status,
 				&msg_p->send_id,
 				pint_client_sm_context);
@@ -877,6 +879,7 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 				   iosm_p->session_tag_array[recv_match],
 				   BMI_PRE_ALLOC,
 				   sm_p,
+				   0,
 				   &iosm_p->ackarray[recv_match].recv_status,
 				   &iosm_p->ackarray[recv_match].recv_id,
 				   pint_client_sm_context);
@@ -901,6 +904,7 @@ static int io_datafile_complete_msgpairs(PINT_client_sm *sm_p,
 	     */
 	    ret = job_flow(fl_p,
 			   sm_p, /* user pointer */
+			   0,
 			   &iosm_p->flow_status_array[recv_match],
 			   &iosm_p->flow_id_array[recv_match],
 			   pint_client_sm_context);
