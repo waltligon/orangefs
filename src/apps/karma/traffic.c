@@ -42,11 +42,14 @@ static struct gui_traffic_graph_state {
     GdkGC *green_gc, *blue_gc, *yellow_gc, *orange_gc, *purple_gc;
 
     /* data for graph */
-    int nr_triplets;
+    int svr_ct;
     float *read;
     float *write;
     float *rmeta;
     float *wmeta;
+
+    /* history data */
+    float io_max, meta_max;
 } gui_traffic_graph;
 
 static void gui_traffic_graph_draw(void);
@@ -87,7 +90,7 @@ GtkWidget *gui_traffic_setup(void)
     gui_traffic_graph.yellow_gc    = NULL;
     gui_traffic_graph.orange_gc    = NULL;
     gui_traffic_graph.purple_gc    = NULL;
-    gui_traffic_graph.nr_triplets  = 0;
+    gui_traffic_graph.svr_ct  = 0;
 
     vbox = gtk_vbox_new(FALSE, 0);
     gtk_container_set_border_width(GTK_CONTAINER(vbox), 5);
@@ -137,6 +140,10 @@ GtkWidget *gui_traffic_setup(void)
 		       gui_traffic_graph.meta_label,
 		       FALSE, TRUE, 0);
 
+    /* zero axis history values */
+    gui_traffic_graph.io_max   = 0.0;
+    gui_traffic_graph.meta_max = 0.0;
+
     /* configure event, at startup, will do first drawing of drawing area */
     g_signal_connect(G_OBJECT(gui_traffic_graph.drawing_area),
 		     "configure_event",
@@ -164,8 +171,8 @@ void gui_traffic_graph_update(struct gui_traffic_graph_data *data)
 {
     int i, svr_ct = data->svr_ct;
 
-    if (gui_traffic_graph.nr_triplets != svr_ct) {
-	if (gui_traffic_graph.nr_triplets != 0) {
+    if (gui_traffic_graph.svr_ct != svr_ct) {
+	if (gui_traffic_graph.svr_ct != 0) {
 	    free(gui_traffic_graph.read);
 	    free(gui_traffic_graph.write);
 	    free(gui_traffic_graph.rmeta);
@@ -175,6 +182,9 @@ void gui_traffic_graph_update(struct gui_traffic_graph_data *data)
 	gui_traffic_graph.write = (float *)malloc(svr_ct * sizeof(float));
 	gui_traffic_graph.rmeta = (float *)malloc(svr_ct * sizeof(float));
 	gui_traffic_graph.wmeta = (float *)malloc(svr_ct * sizeof(float));
+
+	gui_traffic_graph.io_max   = 0.0;
+	gui_traffic_graph.meta_max = 0.0;
     }
     
     for (i=0; i < svr_ct; i++) {
@@ -184,7 +194,7 @@ void gui_traffic_graph_update(struct gui_traffic_graph_data *data)
 	gui_traffic_graph.wmeta[i] = data->svr_data[i].meta_write;
     }
 
-    gui_traffic_graph.nr_triplets = svr_ct;
+    gui_traffic_graph.svr_ct = svr_ct;
 
     /* set main labels here rather than storing text */
     gtk_label_set_text(GTK_LABEL(gui_traffic_graph.io_label),
@@ -205,7 +215,7 @@ static void gui_traffic_graph_draw(void)
 	topspace = 20, bottomspace = 20;
     char *io_string, *meta_string;
     gint width, height;
-    float max_r, max_w, max_rm, max_wm, max_m, max_bw;
+    float tmp, max_magnitude, max_r, max_w, max_rm, max_wm, max_m, max_bw;
     GdkRectangle update_rect;
 
     /* grab width, height */
@@ -224,14 +234,14 @@ static void gui_traffic_graph_draw(void)
 		       height);
 
     /* drop out early if no data */
-    if (gui_traffic_graph.nr_triplets == 0) return;
+    if (gui_traffic_graph.svr_ct == 0) return;
 
     /* aesthetics: getting the graphwidth just right to match labels */
     graphwidth = (int) (0.91 * (float) width);
     graphoffset = (width - graphwidth) / 2;
 
     svrspace = (int) ((float) ((height - topspace - bottomspace) /
-				   gui_traffic_graph.nr_triplets));
+				   gui_traffic_graph.svr_ct));
 
     /* aesthetics: limit maximum svrspace */
     if (svrspace > (height - topspace - bottomspace) / 6) {
@@ -246,7 +256,7 @@ static void gui_traffic_graph_draw(void)
     max_w  = gui_traffic_graph.write[0];
     max_rm = gui_traffic_graph.rmeta[0];
     max_wm = gui_traffic_graph.wmeta[0];
-    for (i=1; i < gui_traffic_graph.nr_triplets; i++) {
+    for (i=1; i < gui_traffic_graph.svr_ct; i++) {
 	if (max_r < gui_traffic_graph.read[i])
 	    max_r = gui_traffic_graph.read[i];
 	if (max_w < gui_traffic_graph.write[i])
@@ -259,9 +269,58 @@ static void gui_traffic_graph_draw(void)
     max_bw = (max_r < max_w) ? max_w : max_r;
     max_m  = (max_rm < max_wm) ? max_wm : max_rm;
 
-    /* aesthetics: if max_bw is ~0.0, make it 1.0 (same for metadata) */
-    if (max_bw < 0.001) max_bw = 1.0;
-    if (max_m < 0.001) max_m = 1.0;
+    /* aesthetics: keep axis values at consistent points.
+     *
+     * we do this by:
+     * - saving previous maximums and using a weighted average to
+     *   keep from decreasing axis maximum too quickly
+     * - forcing the axis maximum to be a power of 10
+     *
+     * Note: this works in conjunction with prep.c code that
+     *       keeps the divisor fixed for a longer period so our
+     *       units aren't changing all the time too.
+     */
+    if (gui_traffic_graph.io_max < max_bw) {
+	gui_traffic_graph.io_max = max_bw;
+    }
+    else {
+	gui_traffic_graph.io_max = 0.8 * gui_traffic_graph.io_max +
+	    0.2 * max_bw;
+	max_bw = gui_traffic_graph.io_max;
+    }
+    if (max_bw < 1.0) {
+	max_magnitude = 1.0;
+    }
+    else {
+	tmp = max_bw * 1.1;
+	max_magnitude = 10.0;
+	while (tmp / 10.0 > 1.0) {
+	    tmp = tmp / 10.0;
+	    max_magnitude = max_magnitude * 10.0;
+	}
+    }
+    max_bw = max_magnitude;
+
+    if (gui_traffic_graph.meta_max < max_m) {
+	gui_traffic_graph.meta_max = max_m;
+    }
+    else {
+	gui_traffic_graph.meta_max = 0.8 * gui_traffic_graph.meta_max +
+	    0.2 * max_m;
+	max_m = gui_traffic_graph.meta_max;
+    }
+    if (max_m < 1.0) {
+	max_magnitude = 1.0;
+    }
+    else {
+	tmp = max_m * 1.1;
+	max_magnitude = 10.0;
+	while (tmp / 10.0 > 1.0) {
+	    tmp = tmp / 10.0;
+	    max_magnitude = max_magnitude * 10.0;
+	}
+    }
+    max_m = max_magnitude;
 
     /* update labels on x-axis (top and bottom) */
     io_string = malloc(64);
@@ -304,7 +363,7 @@ static void gui_traffic_graph_draw(void)
     }
 
     /* redraw rectangles that are the bars themselves */
-    for (i=0; i < gui_traffic_graph.nr_triplets; i++) {
+    for (i=0; i < gui_traffic_graph.svr_ct; i++) {
 	int rlen = (int) (((float) graphwidth) *
 			  (gui_traffic_graph.read[i] / max_bw));
 	int wlen = (int) (((float) graphwidth) *

@@ -242,6 +242,7 @@ void gui_traffic_data_prepare(struct gui_traffic_raw_data *raw,
     uint64_t max_rate = 0;
     char *units;
     float divisor;
+    static float hist_max_io = 0.0, hist_max_meta = 0.0;
 
     /* find max. I/O value, get units, format data */
     for (i=0; i < svr_ct; i++) {
@@ -259,9 +260,12 @@ void gui_traffic_data_prepare(struct gui_traffic_raw_data *raw,
 
 	if (write_rate > max_rate) max_rate = write_rate;
 	if (read_rate > max_rate)  max_rate = read_rate;
+
+	if (hist_max_io < max_rate) hist_max_io = max_rate;
+	else hist_max_io = 0.8 * hist_max_io + 0.2 * max_rate;
     }
 
-    units = gui_units_size(max_rate, &divisor);
+    units = gui_units_size(hist_max_io, &divisor);
 
     snprintf(graph->io_label,
 	     64,
@@ -290,9 +294,12 @@ void gui_traffic_data_prepare(struct gui_traffic_raw_data *raw,
 
 	if (write_rate > max_rate) max_rate = write_rate;
 	if (read_rate > max_rate) max_rate  = read_rate;
+
+	if (hist_max_meta < max_rate) hist_max_meta = max_rate;
+	else hist_max_meta = 0.8 * hist_max_meta + 0.2 * max_rate;
     }
 
-    units = gui_units_ops(max_rate, &divisor);
+    units = gui_units_ops(hist_max_meta, &divisor);
 
     snprintf(graph->meta_label,
 	     64,

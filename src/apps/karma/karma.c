@@ -124,10 +124,6 @@ gint timer_callback(gpointer data)
 
     static struct gui_traffic_graph_data *traffic_graph = NULL;
 
-    float r[] = { 1.3, 1.4, 1.0, 4.3, 5.5, 0.3 };
-    float w[] = { 0.3, 4.4, 0.0, 1.3, 3.5, 7.3 };
-    float m[] = { 2.3, 2.4, 2.0, 2.3, 2.5, 2.3 };
-
     ret = gui_comm_stats_retrieve(&svr_stat, &svr_stat_ct);
     if (ret != 0) {
 	return -1;
