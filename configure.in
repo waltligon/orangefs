@@ -456,20 +456,44 @@ dnl try: http://www.sleepycat.com/download/index.shtml
 dnl or: /parl/pcarns/rpms/db4-4.0.14-1mdk.src.rpm (to build rpm))
 dnl       )
 
-dnl Test to check for unknown third parameter to DB stat (four parameters total)
-AC_MSG_CHECKING(for four-parameter DB stat)
+dnl Test to check for txnid parameter to DB stat (DB 4.3.xx+)
+AC_MSG_CHECKING(for txnid parameter to DB stat function)
 AC_TRY_COMPILE([
 #include <db.h>
 ], [
 int ret;
 DB *db;
+DB_TXN *txnid;
 u_int32_t flags;
 
-ret = db->stat(db, NULL, NULL, flags);
+ret = db->stat(db, txnid, NULL, flags);
 ], AC_MSG_RESULT(yes)
-AC_DEFINE(HAVE_UNKNOWN_PARAMETER_TO_DB_STAT, 1,
-Define if DB stat function takes extra parameter),
-AC_MSG_RESULT(no))
+AC_DEFINE(HAVE_TXNID_PARAMETER_TO_DB_STAT, 1, 
+Define if DB stat function takes txnid parameter)
+have_txnid_param_to_stat=yes,
+AC_MSG_RESULT(no)
+have_txnid_param_to_stat=no)
+
+if test "x$have_txnid_param_to_stat" = "xno" ; then
+    dnl Test to check for unknown third param to DB stat (four params total)
+    dnl Note: this is a holdover from relatively old DB implementations,
+    dnl while the txnid parameter is new.  So we don't test for the old
+    dnl unknown parameter if we found the new one.
+
+    AC_MSG_CHECKING(for four-parameter DB stat)
+    AC_TRY_COMPILE([
+    #include <db.h>
+    ], [
+    int ret;
+    DB *db;
+    u_int32_t flags;
+    
+    ret = db->stat(db, NULL, NULL, flags);
+    ], AC_MSG_RESULT(yes)
+    AC_DEFINE(HAVE_UNKNOWN_PARAMETER_TO_DB_STAT, 1,
+    Define if DB stat function takes extra parameter),
+    AC_MSG_RESULT(no))
+fi
 
 dnl Test to check for txnid parameter to DB open (DB4.1+)
 AC_MSG_CHECKING(for txnid parameter to DB open function)
