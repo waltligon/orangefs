@@ -205,7 +205,7 @@ typedef struct PVFS_servreq_setattr_s PVFS_servreq_setattr;
 /* Lookup_Path */
 struct PVFS_servreq_lookup_path_s
 {
-    PVFS_string path;		/* full path to be traversed */
+    char* path;		/* full path to be traversed */
     PVFS_fs_id fs_id;		/* filesystem ID */
     PVFS_handle starting_handle;	/* handle of starting directory for path */
     PVFS_bitfield attrmask;	/* mask to restrict the attributes to be 
@@ -241,7 +241,7 @@ typedef struct PVFS_servresp_mkdir_s PVFS_servresp_mkdir;
 /* Createdirent */
 struct PVFS_servreq_createdirent_s
 {
-    PVFS_string name;		/* name of entry to create */
+    char* name;		/* name of entry to create */
     PVFS_handle new_handle;	/* handle of new entry */
     PVFS_handle parent_handle;	/* handle of directory object to add entry to */
     PVFS_fs_id fs_id;		/* fs id of file system containing the directory */
@@ -253,7 +253,7 @@ typedef struct PVFS_servreq_createdirent_s PVFS_servreq_createdirent;
 /* Rmdirent */
 struct PVFS_servreq_rmdirent_s
 {
-    PVFS_string entry;		/* entry to remove */
+    char* entry;		/* entry to remove */
     PVFS_handle parent_handle;	/* handle of directory to remove entry from */
     PVFS_fs_id fs_id;		/* fs id of file system containing directory */
 };
@@ -301,9 +301,9 @@ typedef struct PVFS_servreq_getconfig_s PVFS_servreq_getconfig;
 struct PVFS_servresp_getconfig_s
 {
     PVFS_count32 fs_config_buflen;	/* length of fs configuration file contents */
-    PVFS_string fs_config_buf;	/* fs configuration file contents */
+    char* fs_config_buf;	/* fs configuration file contents */
     PVFS_count32 server_config_buflen;	/* length of fs configuration file contents */
-    PVFS_string server_config_buf;	/* fs configuration file contents */
+    char* server_config_buf;	/* fs configuration file contents */
 };
 typedef struct PVFS_servresp_getconfig_s PVFS_servresp_getconfig;
 

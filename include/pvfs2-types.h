@@ -10,7 +10,6 @@
 #include <stdint.h>
 #include <time.h>
 
-typedef char *PVFS_string;
 typedef uint8_t PVFS_boolean;
 typedef int64_t PVFS_offset;
 typedef int64_t PVFS_size;

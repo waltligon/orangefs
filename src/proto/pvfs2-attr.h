@@ -94,7 +94,7 @@ typedef struct PVFS_directory_attr_s PVFS_directory_attr;
  */
 struct PVFS_symlink_attr_s
 {
-    /*PVFS_string target; */
+    /*char* target; */
 };
 typedef struct PVFS_symlink_attr_s PVFS_symlink_attr;
 

@@ -101,11 +101,11 @@ static int getconfig_init(PINT_server_op *s_op, job_status_s *ret)
     s_op->resp->u.getconfig.fs_config_buflen =
         (PVFS_count32)user_opts->fs_config_buflen;
     s_op->resp->u.getconfig.fs_config_buf =
-        (PVFS_string)user_opts->fs_config_buf;
+        (char*)user_opts->fs_config_buf;
     s_op->resp->u.getconfig.server_config_buflen =
         (PVFS_count32)user_opts->server_config_buflen;
     s_op->resp->u.getconfig.server_config_buf =
-        (PVFS_string)user_opts->server_config_buf;
+        (char*)user_opts->server_config_buf;
 
     return(job_post_ret);
 }

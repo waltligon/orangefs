@@ -116,12 +116,12 @@ enum {
 
 /* PVFStab parameters */
 struct pvfs_mntent_s {
-   PVFS_string meta_addr; /* metaserver address */
-   PVFS_string service_name; /* Service name for the remote pvfs filesystem */
-   PVFS_string local_mnt_dir;/* Local mount point */
-   PVFS_string fs_type;    /* Type of filesystem - pvfs */
-   PVFS_string opt1;    /* Mount Option */
-   PVFS_string opt2;    /* Mount Option */
+   char* meta_addr; /* metaserver address */
+   char* service_name; /* Service name for the remote pvfs filesystem */
+   char* local_mnt_dir;/* Local mount point */
+   char* fs_type;    /* Type of filesystem - pvfs */
+   char* opt1;    /* Mount Option */
+   char* opt2;    /* Mount Option */
 };
 typedef struct pvfs_mntent_s pvfs_mntent;
 
@@ -140,7 +140,7 @@ typedef struct PVFS_sysresp_init_s PVFS_sysresp_init;
 
 /* lookup (request and response) */
 struct PVFS_sysreq_lookup_s {
-	PVFS_string name;
+	char* name;
 	PVFS_fs_id fs_id;
 	PVFS_credentials credentials;
 };
@@ -178,7 +178,7 @@ typedef struct PVFS_sysreq_setattr_s PVFS_sysreq_setattr;
 
 /* mkdir */
 struct PVFS_sysreq_mkdir_s {
-	PVFS_string entry_name; /* single segment */
+	char* entry_name; /* single segment */
 	pinode_reference parent_refn;
 	PVFS_object_attr attr;
 	PVFS_bitfield attrmask;
@@ -193,7 +193,7 @@ typedef struct PVFS_sysresp_mkdir_s PVFS_sysresp_mkdir;
 
 /* create */
 struct PVFS_sysreq_create_s {
-	PVFS_string entry_name; /* single path segment */
+	char* entry_name; /* single path segment */
 	pinode_reference parent_refn;
 	PVFS_object_attr attr;
 	PVFS_bitfield attrmask;
@@ -208,7 +208,7 @@ typedef struct PVFS_sysresp_create_s PVFS_sysresp_create;
 
 /* remove */
 struct PVFS_sysreq_remove_s {
-	PVFS_string entry_name; /* single path segment */
+	char* entry_name; /* single path segment */
 	pinode_reference parent_refn;
 	PVFS_credentials credentials;
 };
@@ -218,9 +218,9 @@ typedef struct PVFS_sysreq_remove_s PVFS_sysreq_remove;
 
 /* rename */
 struct PVFS_sysreq_rename_s {
-	PVFS_string old_entry; /* single path segment */
+	char* old_entry; /* single path segment */
 	pinode_reference old_parent_refn;
-	PVFS_string new_entry;
+	char* new_entry;
 	pinode_reference new_parent_refn;
 	PVFS_credentials credentials;
 };
@@ -230,9 +230,9 @@ typedef struct PVFS_sysreq_rename_s PVFS_sysreq_rename;
 
 /* symlink */
 struct PVFS_sysreq_symlink_s {
-	PVFS_string name;
+	char* name;
 	PVFS_fs_id fs_id;	
-	PVFS_string target;
+	char* target;
 	PVFS_object_attr attr;
 	/* Q: should these bitmasks be part of the attr structure? */
 	PVFS_bitfield attrmask;
@@ -253,7 +253,7 @@ struct PVFS_sysreq_readlink_s {
 typedef struct PVFS_sysreq_readlink_s PVFS_sysreq_readlink;
 
 struct PVFS_sysresp_readlink_s {
-	PVFS_string target;
+	char* target;
 };
 typedef struct PVFS_sysresp_readlink_s PVFS_sysresp_readlink;
 
@@ -285,7 +285,7 @@ typedef struct PVFS_sysreq_allocate_s PVFS_sysreq_allocate;
 /* Duplicate (only on a file) */
 struct PVFS_sysreq_duplicate_s {
 	pinode_reference old_reference;
-	PVFS_string new_entry; /* single path segment */
+	char* new_entry; /* single path segment */
 	pinode_reference new_parent_reference;
 	PVFS_fs_id fs_id;
 	/* Q: copies attributes as well? */
