@@ -147,6 +147,7 @@ return_error:
             PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
         case MAP_SERVER_FAILURE:
         case NONE_FAILURE:
+	    break;
     }
     return (ret);
 }

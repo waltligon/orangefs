@@ -253,7 +253,7 @@ return_error:
 			if (size_array)
 				free(size_array);
 		case NONE_FAILURE:
-		/**/
+			break;
 	}
 
 	return(ret);

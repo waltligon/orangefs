@@ -279,6 +279,7 @@ int PVFS_sys_mkdir(PVFS_sysreq_mkdir *req, PVFS_sysresp_mkdir *resp)
 	    gossip_ldebug(CLIENT_DEBUG,"DCACHE_LOOKUP_FAILURE\n");
 
 	case NONE_FAILURE:
+	    break;
     }
 
 return_error:

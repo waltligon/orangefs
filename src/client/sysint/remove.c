@@ -237,6 +237,7 @@ return_error:
 	case GET_PINODE_FAILURE:
 	case REMOVE_CACHE_FAILURE:
 	case NONE_FAILURE:
+	    break;
     }
     return(ret);
 }
