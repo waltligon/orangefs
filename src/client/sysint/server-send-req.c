@@ -278,7 +278,7 @@ int PINT_send_req(bmi_addr_t addr,
     }
 
     /* decode the message that we received */
-    ret = PINT_decode(encoded_resp,
+    ret = PINT_decode(*encoded_resp,
 	PINT_DECODE_RESP,
 	decoded_resp,
 	addr,
@@ -298,7 +298,11 @@ send_req_out:
 	PINT_ENCODE_REQ,
 	REQ_ENC_FORMAT);
 
-    if(*encoded_resp)
+    /* cleanup the encoded buffer if we are returning error;
+     * otherwise the caller is responsible for doing it with
+     * PINT_release_req()
+     */
+    if(*encoded_resp && (ret != 0))
 	BMI_memfree(addr, *encoded_resp, max_resp_size, BMI_RECV_BUFFER);
 
     return(ret);
