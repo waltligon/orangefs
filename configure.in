@@ -58,6 +58,7 @@ test/io/flow/module.mk
 test/io/job/module.mk
 test/client/sysint/module.mk
 test/proto/module.mk
+test/server/module.mk
 doc/coding/module.mk
 )
 

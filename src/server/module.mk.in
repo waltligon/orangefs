@@ -1,5 +1,6 @@
 DIR := src/server
 
+# automatically generated c files
 SERVERGENSRC := \
 	$(DIR)/lookup.src.c \
 	$(DIR)/create.src.c \
@@ -9,6 +10,7 @@ SERVERGENSRC := \
 	$(DIR)/get-attr.src.c \
 	$(DIR)/get-config.src.c 
 
+# "normal" c files
 SERVERSRC += \
 	$(DIR)/pack.c \
 	$(DIR)/job-consist.c \
@@ -17,7 +19,16 @@ SERVERSRC += \
 	$(DIR)/state-machine.c \
 	$(SERVERGENSRC)
 
+# added to the library so that test programs will work
+LIBSRC += \
+	$(DIR)/pack.c \
+	$(DIR)/print-struct.c
+
+# add the automatically generated files to the overall list of files
+# that must be generated at the top level before we calculate
+# dependencies
 $(SRCFILES) += $(SERVERGENSRC)
 
+# rule for automatically generated source files
 $(SERVERGENSRC): %.src.c: %.c src/common/statecomp/statecomp
 	src/common/statecomp/statecomp -o $@ < $<
