@@ -396,6 +396,9 @@ static void bmi_recv_callback_fn(void *user_ptr,
 	assert(0);
     }
 
+    /* TODO: define semantics for short recv's here */
+    assert(actual_size == q_item->result.bytes);
+
     /* remove from current queue */
     gen_mutex_lock(&flow_data->src_mutex);
     qlist_del(&q_item->list_link);
@@ -407,22 +410,6 @@ static void bmi_recv_callback_fn(void *user_ptr,
     gen_mutex_unlock(&flow_data->dest_mutex);
 
     flow_data->bytes_from_src += actual_size;
-
-    /* process request */
-    q_item->result.bytemax = actual_size;
-    q_item->result.bytes = 0;
-    q_item->result.segmax = MAX_REGIONS;
-    q_item->result.segs = 0;
-    ret = PINT_Process_request(q_item->parent->file_req_state,
-	q_item->parent->mem_req_state,
-	&q_item->parent->file_data,
-	&q_item->result,
-	PINT_SERVER);
-    /* TODO: error handling */ 
-    assert(ret >= 0);
-    
-     /* TODO: implement handling of > MAX_REGIONS discontig parts */
-    assert(q_item->result.bytes == actual_size);
 
     ret = trove_bstream_write_list(q_item->parent->dest.u.trove.coll_id,
 	q_item->parent->dest.u.trove.handle,
@@ -475,10 +462,27 @@ static void bmi_recv_callback_fn(void *user_ptr,
 	    q_item->trove_callback.fn = trove_write_callback_fn;
 	}
 
+	/* process request */
+	q_item->result.bytemax = BUFFER_SIZE;
+	q_item->result.bytes = 0;
+	q_item->result.segmax = MAX_REGIONS;
+	q_item->result.segs = 0;
+	ret = PINT_Process_request(q_item->parent->file_req_state,
+	    q_item->parent->mem_req_state,
+	    &q_item->parent->file_data,
+	    &q_item->result,
+	    PINT_SERVER);
+	/* TODO: error handling */ 
+	assert(ret >= 0);
+	
+	 /* TODO: implement handling of > MAX_REGIONS discontig parts */
+	assert(q_item->result.bytes == BUFFER_SIZE || 
+	    PINT_REQUEST_DONE(q_item->parent->file_req_state));
+
 	ret = BMI_post_recv(&tmp_id,
 	    q_item->parent->src.u.bmi.address,
 	    q_item->buffer,
-	    BUFFER_SIZE,
+	    q_item->result.bytes,
 	    &tmp_actual_size,
 	    BMI_PRE_ALLOC,
 	    q_item->parent->tag,
@@ -604,10 +608,27 @@ static void trove_write_callback_fn(void *user_ptr,
 	qlist_add_tail(&q_item->list_link, &flow_data->src_list);
 	gen_mutex_unlock(&(flow_data->src_mutex));
 
+	/* process request */
+	q_item->result.bytemax = BUFFER_SIZE;
+	q_item->result.bytes = 0;
+	q_item->result.segmax = MAX_REGIONS;
+	q_item->result.segs = 0;
+	ret = PINT_Process_request(q_item->parent->file_req_state,
+	    q_item->parent->mem_req_state,
+	    &q_item->parent->file_data,
+	    &q_item->result,
+	    PINT_SERVER);
+	/* TODO: error handling */ 
+	assert(ret >= 0);
+	
+	 /* TODO: implement handling of > MAX_REGIONS discontig parts */
+	assert(q_item->result.bytes == BUFFER_SIZE || 
+	    PINT_REQUEST_DONE(q_item->parent->file_req_state));
+
 	ret = BMI_post_recv(&tmp_id,
 	    q_item->parent->src.u.bmi.address,
 	    q_item->buffer,
-	    BUFFER_SIZE,
+	    q_item->result.bytes,
 	    &tmp_actual_size,
 	    BMI_PRE_ALLOC,
 	    q_item->parent->tag,
