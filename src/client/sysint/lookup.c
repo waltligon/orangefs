@@ -202,7 +202,7 @@ int PVFS_sys_lookup(PVFS_sysreq_lookup *req, PVFS_sysresp_lookup *resp)
 		entry.fs_id = req->fs_id;
 
 				/* Add entry to dcache */
-		ret = PINT_dcache_insert(segment,entry,parent);
+		ret = PINT_dcache_insert(segment, entry, parent);
 		if (ret < 0)
 		{
 		    goto lookup_path_failure;

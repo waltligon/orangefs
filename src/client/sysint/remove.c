@@ -29,42 +29,83 @@ extern pcache pvfs_pcache;
  */
 int PVFS_sys_remove(PVFS_sysreq_remove *req, PVFS_sysresp_remove *resp)
 {
-	struct PVFS_server_req_s *req_job = NULL;		/* server request */
+	struct PVFS_server_req_s *req_job = NULL;	/* server request */
 	struct PVFS_server_resp_s *ack_job = NULL;	/* server response */
 	int ret = -1,req_size = 0,ack_size = 0, ioserv_cnt = 0;
 	pinode *pinode_ptr = NULL, *item_ptr = NULL;
 	bmi_addr_t serv_addr1,serv_addr2;	/* PVFS address type structure */
 	char *server1 = NULL,*server2 = NULL;
-	int cflags = 0,name_sz = 0;
+	int cflags = 0,name_sz = 0, attr_mask = 0;
 	PVFS_bitfield mask;
 	bmi_addr_t *io_addr_array = NULL;
 	struct timeval cur_time;
-	pinode_reference entry,parent_reference;
+	pinode_reference entry;
 	PVFS_servreq_remove req_remove;
 	PVFS_servreq_createdirent req_crdirent;
 	int item_found;
 
 	/* lookup meta file */
 	req->entry_name
-	/* refresh parent pinode */
+
 	attr_mask = ATTR_BASIC | ATTR_META;
-	ret = phelper_get_pinode(req->parent_refn,&pinode_ptr,
+
+	ret = PINT_do_lookup(req->entry_name, req->parent_refn, attr_mask,
+				req->credentials, &entry)
+	if (ret < 0)
+	{
+		failure = LOOKUP_FAILURE;
+		goto return_error;
+	}
+
+	/* get the pinode for the thing we're deleting */
+	ret = phelper_get_pinode(entry, &pinode_ptr,
 			attr_mask, req->credentials );
 	if (ret < 0)
 	{
-		goto pinode_get_failure;
+		failure = LOOKUP_FAILURE;
+		goto return_error;
 	}
 
-	/* check permsission on parent */
-	
-	req->credentials
-	/* getattr the meta file */
+	/* are we allowed to delete this file? */
+	ret = check_perms(pinode_ptr->attr, req->credentials.perms,
+				req->credentials.uid, req->credentials.gid);
+	if (ret < 0)
+	{
+		failure = LOOKUP_FAILURE;
+		goto return_error;
+	}
+
+	ret = PINT_bucket_map_to_server(&serv_addr, entry.handle, entry.fs_id);
+	if (ret < 0)
+	{
+		failure = LOOKUP_FAILURE;
+		goto return_error;
+	}
+
 	/* send remove message to the meta file */
+
+	req_p.op = PVFS_SERV_REMOVE;
+	req_p.rsize = sizeof(struct PVFS_server_req_s);
+	req_p.credentials = credentials;
+	req_p.u.remove.handle = req->handle;
+	req_p.u.remove.fs_id = req->fs_id;
+
+	/* dead man walking */
+	ret = PINT_server_send_req(serv_addr, &req_p, max_msg_sz, &decoded);
+	if (ret < 0)
+	{
+		failure = LOOKUP_FAILURE;
+		goto return_error;
+	}
+
 	/* rmdirent the dir entry */
 	/* send remove messages to each of the data file servers */
 	
 
 
+	return(0);
+return_error:
+	return(ret);
 }
 #if 0
 

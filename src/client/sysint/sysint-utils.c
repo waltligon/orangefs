@@ -11,6 +11,7 @@
 #include "pint-sysint.h"
 #include "pint-bucket.h"
 #include "pcache.h"
+#include "pinode-helper.h"
 #include "PINT-reqproto-encode.h"
 
 #define REQ_ENC_FORMAT 0
@@ -26,18 +27,15 @@ gen_mutex_t *g_session_tag_mt_lock;
  */
 
 int PINT_do_lookup (PVFS_string name,pinode_reference parent,
-		PVFS_bitfield mask,PVFS_credentials cred,pinode_reference *entry);
-#if 0
-int PINT_do_lookup (PVFS_string name,pinode_reference parent,
 		PVFS_bitfield mask,PVFS_credentials cred,pinode_reference *entry)
 {
 	struct PVFS_server_req_s req_p;             /* server request */
         struct PVFS_server_resp_s *ack_p = NULL;    /* server response */
-        int ret = -1, i = 0, tflags = 0;
-        int max_msg_sz, name_sz;
+        int ret = -1, name_sz = 0;
         struct PINT_decoded_msg decoded;
         bmi_addr_t serv_addr;
         pinode *pinode_ptr = NULL;
+        bmi_size_t max_msg_sz = 0;
 
         /*Q: should I combine these into one since there's not much
          * cleanup going on for each case?
@@ -54,12 +52,12 @@ int PINT_do_lookup (PVFS_string name,pinode_reference parent,
         name_sz = strlen(name) + 1; /*include the null terminator*/
 
         req_p.op = PVFS_SERV_LOOKUP_PATH;
-        req_p.credentials = credentials;
-        req_p.rsize = name_sz + sizeof(PVFS_server_req_s);
+        req_p.credentials = cred;
+        req_p.rsize = name_sz + sizeof(struct PVFS_server_req_s);
         req_p.u.lookup_path.path = name;
-        req_p.u.lookup_path.fs_id = parent.fsid;
+        req_p.u.lookup_path.fs_id = parent.fs_id;
         req_p.u.lookup_path.starting_handle = parent.handle;
-        req_p.u.lookup_path.attrmask = mask
+        req_p.u.lookup_path.attrmask = mask;
 
         ret = PINT_bucket_map_to_server(&serv_addr, parent.handle, parent.fs_id);
         if (ret < 0)
@@ -72,7 +70,7 @@ int PINT_do_lookup (PVFS_string name,pinode_reference parent,
          * attributes
          */
 
-        ret = PINT_server_send_req(serv_addr, req_p, max_msg_sz, &decoded);
+        ret = PINT_server_send_req(serv_addr, &req_p, max_msg_sz, &decoded);
 	if (ret < 0)
         {
             failure = SEND_REQ_FAILURE;
@@ -113,22 +111,22 @@ int PINT_do_lookup (PVFS_string name,pinode_reference parent,
         ret = phelper_fill_timestamps(pinode_ptr);
         if (ret < 0)
         {
-            failure = PCACHE_ADD_FAILURE;
+            failure = ADD_PCACHE_FAILURE;
             goto return_error;
         }
 
         /* Set the size timestamp - size was not fetched */
         pinode_ptr->size_flag = SIZE_INVALID;
         pinode_ptr->pinode_ref.handle = ack_p->u.lookup_path.handle_array[0];
-        pinode_ptr->pinode_ref.fs_id = entry.fs_id;
+        pinode_ptr->pinode_ref.fs_id = parent.fs_id;
         pinode_ptr->attr = ack_p->u.lookup_path.attr_array[0];
-	pinode_ptr->mask = req_p->u.lookup_path.attrmask;
+	pinode_ptr->mask = req_p.u.lookup_path.attrmask;
 
         /* Add to the pinode list */
         ret = PINT_pcache_insert(pinode_ptr);
         if (ret < 0)
         {
-            failure = PCACHE_ADD_FAILURE;
+            failure = ADD_PCACHE_FAILURE;
             goto return_error;
         }
 
@@ -140,7 +138,7 @@ return_error:
     switch(failure)
     {
         case ADD_PCACHE_FAILURE:
-            PINT_pcache_pinode_dealloc(&pinode_ptr);
+            PINT_pcache_pinode_dealloc(pinode_ptr);
         case INVAL_LOOKUP_FAILURE:
         case SEND_REQ_FAILURE:
             PINT_decode_release(&decoded, PINT_DECODE_RESP, REQ_ENC_FORMAT);
@@ -149,7 +147,6 @@ return_error:
     }
     return (ret);
 }
-#endif
 
 /*
  * type: if 0 for requests, 1 for reponses.
