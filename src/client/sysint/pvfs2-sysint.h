@@ -266,6 +266,8 @@ struct PVFS_sysreq_io_s {
 	pinode_reference pinode_refn;
 	PVFS_credentials credentials;
 	PVFS_Request io_req;
+	void* buffer;
+	PVFS_handle HACK_datafile_handle;
 };
 typedef struct PVFS_sysreq_io_s PVFS_sysreq_io;
 
