@@ -56,6 +56,46 @@ typedef struct PINT_Request {
 	struct PINT_Request *ereq;  /* element type */
 	struct PINT_Request *sreq;  /* sequence type */
 } PINT_Request;
+#ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
+/* encode a linearized array of the above things, assumes space exists */
+#define encode_PVFS_Request(pptr,rp) do { int i; \
+    for (i=0; i<=(rp)->num_nested_req; i++) { \
+	encode_PVFS_offset(pptr, &(rp+i)->offset); \
+	encode_int32_t(pptr, &(rp+i)->num_ereqs); \
+	encode_int32_t(pptr, &(rp+i)->num_blocks); \
+	encode_PVFS_size(pptr, &(rp+i)->stride); \
+	encode_PVFS_offset(pptr, &(rp+i)->ub); \
+	encode_PVFS_offset(pptr, &(rp+i)->lb); \
+	encode_PVFS_size(pptr, &(rp+i)->aggregate_size); \
+	encode_int32_t(pptr, &(rp+i)->num_contig_chunks); \
+	encode_int32_t(pptr, &(rp+i)->depth); \
+	encode_int32_t(pptr, &(rp+i)->num_nested_req); \
+	encode_int32_t(pptr, &(rp+i)->committed); \
+	encode_int32_t(pptr, &(rp+i)->refcount); \
+	/* XXX: this is not pretty, later will changes structures */ \
+	encode_uint32_t(pptr, (u_int32_t*)&(rp+i)->ereq); \
+	encode_uint32_t(pptr, (u_int32_t*)&(rp+i)->sreq); \
+    } \
+} while (0);
+#define decode_PVFS_Request(pptr,rp) do { int i; \
+    for (i=0; i == 0 || i<=(rp)->num_nested_req; i++) { \
+	decode_PVFS_offset(pptr, &(rp+i)->offset); \
+	decode_int32_t(pptr, &(rp+i)->num_ereqs); \
+	decode_int32_t(pptr, &(rp+i)->num_blocks); \
+	decode_PVFS_size(pptr, &(rp+i)->stride); \
+	decode_PVFS_offset(pptr, &(rp+i)->ub); \
+	decode_PVFS_offset(pptr, &(rp+i)->lb); \
+	decode_PVFS_size(pptr, &(rp+i)->aggregate_size); \
+	decode_int32_t(pptr, &(rp+i)->num_contig_chunks); \
+	decode_int32_t(pptr, &(rp+i)->depth); \
+	decode_int32_t(pptr, &(rp+i)->num_nested_req); \
+	decode_int32_t(pptr, &(rp+i)->committed); \
+	decode_int32_t(pptr, &(rp+i)->refcount); \
+	decode_uint32_t(pptr, (u_int32_t*)&(rp+i)->ereq); \
+	decode_uint32_t(pptr, (u_int32_t*)&(rp+i)->sreq); \
+    } \
+} while (0);
+#endif
 
 typedef struct PINT_reqstack {
 	int32_t      el;           /* number of element being processed */
