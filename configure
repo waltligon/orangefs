@@ -14,11 +14,11 @@ ac_default_prefix=/usr/local
 ac_help="$ac_help
   --with-mtrace                  Use mtrace for detecting memory leaks (must setenv MALLOC_TRACE to output file name)."
 ac_help="$ac_help
-  --enable-fast                   Disable optional debugging, enable optimizations."
+  --enable-fast                  Disable optional debugging, enable optimizations."
 ac_help="$ac_help
-  --enable-profiling              Enable profiling (using gprof)."
+  --enable-profiling             Enable profiling (using gprof).                     *** not yet working ***"
 ac_help="$ac_help
-  --enable-coverage               Enable coverage analysis (disables optimizations)."
+  --enable-coverage              Enable coverage analysis (disables optimizations).  *** not yet working ***"
 ac_help="$ac_help
   --with-efence                  Use electric fence for malloc debugging."
 
