@@ -25,4 +25,4 @@ MPITESTSRC += $(LOCAL_MPITESTSRC)
 LOCALMPITESTS := $(patsubst %.c,%, $(LOCAL_MPITESTSRC))
 LOCALMPIOBJS := $(patsubst %.c,%.o, $(LOCAL_MPIMISCSRC))
 $(LOCALMPITESTS): %: %.o $(LOCALMPIOBJS) lib/libpvfs2.a
-	$(MPICC) $^ $(LDFLAGS) $(LIBS) -o $@
+	$(MPICC) $^ $(LDFLAGS) $(LIBS) -lm -o $@
