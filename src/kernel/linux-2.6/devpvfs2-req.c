@@ -20,7 +20,6 @@ extern kmem_cache_t *dev_req_cache;
 extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
 extern struct qhash_table *htable_ops_in_progress;
-extern struct qhash_table *htable_ops_invalidated;
 
 static int open_access_count = 0;
 
@@ -79,6 +78,8 @@ static ssize_t pvfs2_devreq_read(
 
     if (cur_op)
     {
+        set_current_state(TASK_RUNNING);
+
 	spin_lock(&cur_op->lock);
 
 	/* FIXME: this is a sanity check and should be removed */
@@ -114,11 +115,12 @@ static ssize_t pvfs2_devreq_read(
     }
     else if (!(file->f_flags & O_NONBLOCK))
     {
+        set_current_state(TASK_INTERRUPTIBLE);
 	/*
 	   keep checking if a req is pending since
 	   we're in a blocking mode
 	 */
-	schedule_timeout(MSECS_TO_JIFFIES(25));
+	schedule_timeout(MSECS_TO_JIFFIES(10));
 
 	/* unless we got a signal */
 	if (!signal_pending(current))
@@ -205,17 +207,8 @@ static ssize_t pvfs2_devreq_writev(
     }
     else
     {
-	pvfs2_error("ERROR: No one's waiting for the tag %lu\n", tag);
-
-	/*
-	   we should discard the op here as we just received
-	   either garbage, or a response to a request that we
-	   no longer care about
-	 */
-
-	/* MAKE SURE THIS OP IS IN THE INVALIDATED QUEUE */
-	/* if it's not, it's garbage */
-
+        /* ignore downcalls that we're not interested in */
+	pvfs2_print("WARNING: No one's waiting for the tag %lu\n", tag);
     }
 
     kmem_cache_free(dev_req_cache, buffer);

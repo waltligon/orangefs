@@ -14,12 +14,11 @@
 extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
 extern struct qhash_table *htable_ops_in_progress;
-extern struct qhash_table *htable_ops_invalidated;
 
 #ifdef PVFS2_KERNEL_DEBUG
-#define MAX_SERVICE_WAIT_IN_SECONDS       60
+#define MAX_SERVICE_WAIT_IN_SECONDS       10
 #else
-#define MAX_SERVICE_WAIT_IN_SECONDS      300
+#define MAX_SERVICE_WAIT_IN_SECONDS       30
 #endif
 
 static inline void clean_up_interrupted_operation(
@@ -39,9 +38,6 @@ static inline void clean_up_interrupted_operation(
     spin_lock(&op->lock);
     switch (op->op_state)
     {
-	case PVFS2_VFS_STATE_INVALID:
-	    panic("pvfs2 op has invalid state; kernel panic");
-	    break;
 	case PVFS2_VFS_STATE_WAITING:
 	    /*
               upcall hasn't been read; remove
@@ -49,17 +45,14 @@ static inline void clean_up_interrupted_operation(
             */
 	    remove_op_from_request_list(op);
 	    pvfs2_print("Interrupted: Removed op from request_list\n");
-/*             invalidate_op(op, 0); */
 	    break;
 	case PVFS2_VFS_STATE_INPROGR:
 	    /*
               op must be removed from the in progress htable
-              and inserted into the invalidated op htable.
             */
 	    remove_op_from_htable_ops_in_progress(op);
 	    pvfs2_print("Interrupted: Removed op from "
 			"htable_ops_in_progress\n");
-/*             invalidate_op(op, 0); */
 	    break;
 	case PVFS2_VFS_STATE_SERVICED:
 	    /*
@@ -75,16 +68,20 @@ static inline void clean_up_interrupted_operation(
   sleeps on waitqueue waiting for matching downcall
   for some amount of time and then wakes up.
 
+  NOTE: when this call returns to the caller, the specified
+  op will no longer be on any list or htable.
+
   return values and op status changes:
 
-  -1 - an error occurred
-  ??? - op is moved to htable_ops_invalidated
-   0 - success; everything ok
-     - the passed in op will no longer be on any list or htable
+  -1 - an error occurred; op status unknown
+   0 - success; everything ok.
+       the op state will be marked as serviced
    1 - timeout reached (before downcall recv'd)
-   ??? - op is moved to htable_ops_invalidated
+       the caller has the choice of either requeueing the op
+       or failing the operation when this occurs.
+       the op observes no state change.
    2 - sleep interrupted (signal recv'd)
-   ??? - op is moved to htable_ops_invalidted
+       the op observes no state change.
 */
 int wait_for_matching_downcall(
     pvfs2_kernel_op_t * op)
@@ -114,7 +111,7 @@ int wait_for_matching_downcall(
 	    if (!schedule_timeout
 		(MSECS_TO_JIFFIES(1000 * MAX_SERVICE_WAIT_IN_SECONDS)))
 	    {
-                pvfs2_print("OPERATION TIMED OUT\n");
+                pvfs2_print("*** operation timed out\n");
                 clean_up_interrupted_operation(op);
 		ret = 1;
 		break;
@@ -122,7 +119,7 @@ int wait_for_matching_downcall(
 	    continue;
 	}
 
-        pvfs2_print("OPERATION INTERRUPTED BY SIGNAL\n");
+        pvfs2_print("*** operation interrupted by signal\n");
         clean_up_interrupted_operation(op);
 	ret = 2;
 	break;

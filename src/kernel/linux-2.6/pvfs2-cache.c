@@ -43,6 +43,7 @@ static void op_cache_ctor(
 
 	op->upcall.type = PVFS2_VFS_OP_INVALID;
 	op->downcall.type = PVFS2_VFS_OP_INVALID;
+        op->downcall.status = -1;
 
 	op->op_state = PVFS2_VFS_STATE_UNKNOWN;
 	op->tag = (unsigned long) atomic_read(&next_tag_value);

@@ -40,7 +40,7 @@ static int pvfs2_readdir(
     void *dirent,
     filldir_t filldir)
 {
-    int pos = 0, ret = 0;
+    int pos = 0, ret = 0, retries = PVFS2_OP_RETRY_COUNT;
     ino_t ino = 0;
     struct dentry *dentry = file->f_dentry;
     pvfs2_kernel_op_t *new_op = NULL;
@@ -120,20 +120,8 @@ static int pvfs2_readdir(
 	new_op->upcall.req.readdir.token =
 	    (pos == 2 ? PVFS2_READDIR_START : (PVFS_ds_position) (pos - 2));
 
-	/* post req and wait for request to be serviced here */
-	add_op_to_request_list(new_op);
-	if ((ret = wait_for_matching_downcall(new_op)) != 0)
-	{
-	    /*
-	       NOTE: we can't free the op here unless we're SURE
-	       it wasn't put on the invalidated list.
-	       For now, wait_for_matching_downcall just doesn't
-	       put anything on the invalidated list.
-	     */
-	    pvfs2_error("pvfs2: pvfs2_readdir -- wait failed (%x).  "
-			"op invalidated (not really)\n", ret);
-	    goto error_exit;
-	}
+        service_operation_with_timeout_retry(
+            new_op, "pvfs2_readdir", retries);
 
 	/* need to check downcall.status value */
 	pvfs2_print("Readdir downcall status is %d (dirent_count "

@@ -39,7 +39,7 @@ static struct dentry *pvfs2_lookup(
     struct dentry *dentry,
     struct nameidata *nd)
 {
-    int ret = -1;
+    int ret = -1, retries = PVFS2_OP_RETRY_COUNT;
     struct inode *inode = NULL;
     pvfs2_kernel_op_t *new_op = (pvfs2_kernel_op_t *) 0;
     pvfs2_inode_t *parent = PVFS2_I(dir);
@@ -93,27 +93,8 @@ static struct dentry *pvfs2_lookup(
     strncpy(new_op->upcall.req.lookup.d_name,
 	    dentry->d_name.name, PVFS2_NAME_LEN);
 
-    /* post req and wait for request to be serviced here */
-    add_op_to_request_list(new_op);
-    if ((ret = wait_for_matching_downcall(new_op)) != 0)
-    {
-	/*
-	   NOTE: we can't free the op here unless we're SURE
-	   it wasn't put on the invalidated list.
-	   For now, wait_for_matching_downcall just doesn't
-	   put anything on the invalidated list.
-	 */
-	printk("pvfs2: pvfs2_lookup -- wait failed (%x).  "
-	       "op invalidated (not really)\n", ret);
-
-	/*
-	   on lookup failure, don't add a negative dentry, even
-	   though most filesystems will do something like that.
-	   we don't want to cache the fact that a file doesn't
-	   exist, as it might the next time a lookup is done.
-	 */
-	goto error_exit;
-    }
+    service_operation_with_timeout_retry(
+        new_op, "pvfs2_lookup", retries);
 
     /* check what kind of goodies we got */
     printk("Lookup Got PVFS2 handle %Ld on fsid %d\n",
@@ -123,9 +104,8 @@ static struct dentry *pvfs2_lookup(
     /* lookup inode matching name (or add if not there) */
     if (new_op->downcall.status > -1)
     {
-	inode =
-	    iget(dir->i_sb,
-		 pvfs2_handle_to_ino(new_op->downcall.resp.lookup.refn.handle));
+	inode = iget(dir->i_sb, pvfs2_handle_to_ino(
+                         new_op->downcall.resp.lookup.refn.handle));
 	if (inode)
 	{
 	    found_pvfs2_inode = PVFS2_I(inode);

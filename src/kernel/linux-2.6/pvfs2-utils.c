@@ -254,7 +254,7 @@ static inline int copy_attributes_from_inode(
 int pvfs2_inode_getattr(
     struct inode *inode)
 {
-    int ret = -1;
+    int ret = -1, retries = PVFS2_OP_RETRY_COUNT;
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
 
@@ -306,20 +306,8 @@ int pvfs2_inode_getattr(
 	pvfs2_print("Trying Getattr on handle %Ld on fsid %d\n",
                     pvfs2_inode->refn.handle, pvfs2_inode->refn.fs_id);
 
-	/* post req and wait for request to be serviced here */
-	add_op_to_request_list(new_op);
-	if ((ret = wait_for_matching_downcall(new_op)) != 0)
-	{
-	    /*
-	       NOTE: we can't free the op here unless we're SURE
-	       it wasn't put on the invalidated list.
-	       For now, wait_for_matching_downcall just doesn't
-	       put anything on the invalidated list.
-	     */
-	    pvfs2_error("pvfs2: pvfs2_inode_getattr -- wait failed (%x). "
-                        "op invalidated (not really)\n", ret);
-	    goto error_exit;
-	}
+        service_operation_with_timeout_retry(
+            new_op, "pvfs2_inode_getattr", retries);
 
 	/* check what kind of goodies we got */
 	if (new_op->downcall.status > -1)
@@ -356,7 +344,7 @@ int pvfs2_inode_setattr(
     struct inode *inode,
     struct iattr *iattr)
 {
-    int ret = -1;
+    int ret = -1, retries = PVFS2_OP_RETRY_COUNT;
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
 
@@ -375,23 +363,13 @@ int pvfs2_inode_setattr(
         copy_attributes_from_inode(
             inode, &new_op->upcall.req.setattr.attributes, iattr);
 
-	/* post req and wait for request to be serviced here */
-	add_op_to_request_list(new_op);
-	if (wait_for_matching_downcall(new_op) != 0)
-	{
-	    /*
-	       NOTE: we can't free the op here unless we're SURE
-	       it wasn't put on the invalidated list.
-	       For now, wait_for_matching_downcall just doesn't
-	       put anything on the invalidated list.
-	     */
-	    pvfs2_error("pvfs2: pvfs2_inode_setattr -- wait failed. "
-                        "op invalidated (not really)\n");
-	}
+        service_operation_with_timeout_retry(
+            new_op, "pvfs2_inode_setattr", retries);
 
         pvfs2_print("Setattr Got PVFS2 status value of %d\n",
                     new_op->downcall.status);
 
+      error_exit:
         ret = new_op->downcall.status;
 
 	/* when request is serviced properly, free req op struct */
@@ -405,6 +383,7 @@ static inline struct inode *pvfs2_create_file(
     struct dentry *dentry,
     int mode)
 {
+    int ret = -1, retries = PVFS2_OP_RETRY_COUNT;
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *parent = PVFS2_I(dir);
     pvfs2_inode_t *pvfs2_inode = NULL;
@@ -435,20 +414,8 @@ static inline struct inode *pvfs2_create_file(
 	strncpy(new_op->upcall.req.create.d_name,
 		dentry->d_name.name, PVFS2_NAME_LEN);
 
-	/* post req and wait for request to be serviced here */
-	add_op_to_request_list(new_op);
-	if (wait_for_matching_downcall(new_op) != 0)
-	{
-	    /*
-	       NOTE: we can't free the op here unless we're SURE
-	       it wasn't put on the invalidated list.
-	       For now, wait_for_matching_downcall just doesn't
-	       put anything on the invalidated list.
-	     */
-	    pvfs2_error("pvfs2: pvfs2_create_file -- wait failed. "
-                        "op invalidated (not really)\n");
-	    goto cleanup_inode;
-	}
+        service_operation_with_timeout_retry(
+            new_op, "pvfs2_create_file", retries);
 
 	pvfs2_print("Create Got PVFS2 handle %Ld on fsid %d\n",
                     new_op->downcall.resp.create.refn.handle,
@@ -486,7 +453,7 @@ static inline struct inode *pvfs2_create_file(
 	}
 	else
 	{
-	  cleanup_inode:
+	  error_exit:
 	    pvfs2_error("pvfs2_create_file: An error occurred; "
                         "removing created inode\n");
 	    iput(inode);
@@ -504,6 +471,7 @@ static inline struct inode *pvfs2_create_dir(
     struct dentry *dentry,
     int mode)
 {
+    int ret = -1, retries = PVFS2_OP_RETRY_COUNT;
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *parent = PVFS2_I(dir);
     pvfs2_inode_t *pvfs2_inode = NULL;
@@ -539,24 +507,10 @@ static inline struct inode *pvfs2_create_dir(
 	pvfs2_print("pvfs2: pvfs2_create_dir op initialized "
                     "with type %d\n", new_op->upcall.type);
 
-	/* post req and wait for request to be serviced here */
-	add_op_to_request_list(new_op);
-	if (wait_for_matching_downcall(new_op) != 0)
-	{
-	    /*
-	       NOTE: we can't free the op here unless we're SURE
-	       it wasn't put on the invalidated list.
-	       For now, wait_for_matching_downcall just doesn't
-	       put anything on the invalidated list.
-	     */
-	    pvfs2_error("pvfs2: pvfs2_create_dir -- wait failed. "
-                        "op invalidated (not really)\n");
-
-	    goto cleanup_inode;
-	}
+        service_operation_with_timeout_retry(
+            new_op, "pvfs2_create_dir", retries);
 
 	/* check what kind of goodies we got */
-	/* need to check downcall.status value */
 	pvfs2_print("Mkdir Got PVFS2 handle %Ld on fsid %d\n",
                     new_op->downcall.resp.mkdir.refn.handle,
                     new_op->downcall.resp.mkdir.refn.fs_id);
@@ -592,7 +546,7 @@ static inline struct inode *pvfs2_create_dir(
 	}
 	else
 	{
-	  cleanup_inode:
+          error_exit:
 	    pvfs2_error("pvfs2_create_dir: An error occurred; "
                         "removing created inode\n");
 	    iput(inode);
@@ -643,7 +597,7 @@ int pvfs2_remove_entry(
     struct inode *dir,
     struct dentry *dentry)
 {
-    int ret = -EINVAL;
+    int ret = -EINVAL, retries = PVFS2_OP_RETRY_COUNT;
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *parent = PVFS2_I(dir);
     struct inode *inode = dentry->d_inode;
@@ -675,20 +629,8 @@ int pvfs2_remove_entry(
 	strncpy(new_op->upcall.req.remove.d_name,
 		dentry->d_name.name, PVFS2_NAME_LEN);
 
-	/* post req and wait for request to be serviced here */
-	add_op_to_request_list(new_op);
-	if ((ret = wait_for_matching_downcall(new_op)) != 0)
-	{
-	    /*
-	       NOTE: we can't free the op here unless we're SURE
-	       it wasn't put on the invalidated list.
-	       For now, wait_for_matching_downcall just doesn't
-	       put anything on the invalidated list.
-	     */
-	    pvfs2_error("pvfs2: pvfs2_unlink -- wait failed (%x).  "
-                        "op invalidated (not really)\n", ret);
-	    goto error_exit;
-	}
+        service_operation_with_timeout_retry(
+            new_op, "pvfs2_remove_entry", retries);
 
 	/*
 	   the remove has no downcall members to retrieve, but

@@ -31,6 +31,8 @@ MODULE_DESCRIPTION("The Linux Kernel VFS interface to PVFS2");
 #define PVFS2_DEVFLOW_MAGIC            0x2003052A
 #define PVFS2_ROOT_INODE_NUMBER        0x00100000
 #define PVFS2_LINK_MAX                 0x000000FF
+#define PVFS2_OP_RETRY_COUNT           0x00000005
+
 
 #define MAX_DEV_REQ_UPSIZE (sizeof(int32_t) +   \
 sizeof(int64_t) + sizeof(pvfs2_upcall_t))
@@ -61,13 +63,11 @@ sizeof(int64_t) + sizeof(pvfs2_downcall_t))
  * waiting  - op is on request_list (upward bound)
  * inprogr  - op is in progress (waiting for downcall)
  * serviced - op has matching downcall; ok
- * invalid  - op was cancelled and is now on the invalidated htable
  ************************************/
 #define PVFS2_VFS_STATE_UNKNOWN        0x00FF0000
 #define PVFS2_VFS_STATE_WAITING        0x00FF0001
 #define PVFS2_VFS_STATE_INPROGR        0x00FF0002
 #define PVFS2_VFS_STATE_SERVICED       0x00FF0003
-#define PVFS2_VFS_STATE_INVALID        0x00FF0004
 
 
 /************************************
@@ -148,28 +148,42 @@ do {                                                          \
     spin_unlock(&pvfs2_request_list_lock);                    \
 } while(0)
 
-#define invalidate_op(op, get_lock)                           \
-do {                                                          \
-    if (get_lock) spin_lock(&op->lock);                       \
-    op->op_state = PVFS2_VFS_STATE_INVALID;                   \
-    if (get_lock) spin_unlock(&op->lock);                     \
-    qhash_add(htable_ops_invalidated,                         \
-              (void *)&(op->tag),&op->list);                  \
-    printk("invalidate_op: adding op %p (NOW INVALID)\n",op); \
-} while(0)
-
 #define remove_op_from_htable_ops_in_progress(op)             \
 do {                                                          \
     qhash_search_and_remove(htable_ops_in_progress,           \
                             &(op->tag));                      \
 } while(0)
 
-#define remove_op_from_htable_ops_invalidated(op)             \
-do {                                                          \
-    qhash_search_and_remove(htable_ops_invalidated,           \
-                            &(op->tag));                      \
-} while(0)
+#define service_operation(op, method)                         \
+add_op_to_request_list(op);                                   \
+if ((ret = wait_for_matching_downcall(new_op)) != 0)          \
+{                                                             \
+    pvfs2_error("pvfs2: %s -- wait failed (%x).",method,ret); \
+    goto error_exit;                                          \
+}
 
+/*
+  tries to service the operation and will retry on timeout
+  failure up to num times (num MUST be a numeric lvalue).
+*/
+#define service_operation_with_timeout_retry(op, method, num) \
+wait_for_op:                                                  \
+ add_op_to_request_list(op);                                  \
+ if ((ret = wait_for_matching_downcall(op)) != 0)             \
+ {                                                            \
+     if ((ret == 1) && (--num))                               \
+     {                                                        \
+         pvfs2_print("pvfs2: %s -- timeout; requeing op\n",   \
+                     method);                                 \
+         goto wait_for_op;                                    \
+     }                                                        \
+     else                                                     \
+     {                                                        \
+         pvfs2_error("pvfs2: %s -- wait failed (%x).",        \
+                     method,ret);                             \
+         goto error_exit;                                     \
+     }                                                        \
+ }
 
 /****************************
  * defined in pvfs2-cache.c

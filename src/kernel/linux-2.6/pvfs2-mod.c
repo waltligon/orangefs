@@ -65,16 +65,12 @@ kmem_cache_t *op_cache = NULL;
 kmem_cache_t *dev_req_cache = NULL;
 kmem_cache_t *pvfs2_inode_cache = NULL;
 
-/* the size of the hash tables for ops in progress and ops invalidated */
+/* the size of the hash tables for ops in progress */
 static int hash_table_size = 509;
-module_param(hash_table_size, int,
-	     0);
+module_param(hash_table_size, int, 0);
 
 /* hash table for storing operations waiting for matching downcall */
 struct qhash_table *htable_ops_in_progress = NULL;
-
-/* hash table for storing invalidated operations */
-struct qhash_table *htable_ops_invalidated = NULL;
 
 /* list for queueing upcall operations */
 LIST_HEAD(pvfs2_request_list);
@@ -115,12 +111,9 @@ static int __init pvfs2_init(
 
     htable_ops_in_progress =
 	qhash_init(hash_compare, hash_func, hash_table_size);
-    htable_ops_invalidated =
-	qhash_init(hash_compare, hash_func, hash_table_size);
-
-    if (!htable_ops_in_progress || !htable_ops_invalidated)
+    if (!htable_ops_in_progress)
     {
-	panic("Failed to initialize op hashtables");
+	panic("Failed to initialize op hashtable");
     }
     return register_filesystem(&pvfs2_fs_type);
 }
@@ -164,12 +157,6 @@ static void __exit pvfs2_exit(
        of the same size.  since we're only doing this on unload only,
        there shouldn't be a significant performance penalty.
      */
-    if (htable_ops_in_progress->table_size !=
-	htable_ops_invalidated->table_size)
-    {
-	panic("hashtable sizes do not match; fix this");
-    }
-
     for (i = 0; i < htable_ops_in_progress->table_size; i++)
     {
 	do
@@ -181,19 +168,8 @@ static void __exit pvfs2_exit(
 		op_release(cur_op);
 	    }
 	} while (hash_link);
-
-	do
-	{
-	    hash_link = qhash_search_and_remove(htable_ops_invalidated, &(i));
-	    if (hash_link)
-	    {
-		cur_op = qhash_entry(hash_link, pvfs2_kernel_op_t, list);
-		op_release(cur_op);
-	    }
-	} while (hash_link);
     }
     qhash_finalize(htable_ops_in_progress);
-    qhash_finalize(htable_ops_invalidated);
 
     op_cache_finalize();
     dev_req_cache_finalize();

@@ -45,7 +45,7 @@ static ssize_t pvfs2_file_read(
     size_t total_count = 0;
     pvfs2_kernel_op_t *new_op = NULL;
     struct pvfs_bufmap_desc* desc;
-    int ret = -1;
+    int ret = -1, retries = PVFS2_OP_RETRY_COUNT;
     char* current_buf = buf;
     loff_t original_offset = *offset;
     struct inode *inode = file->f_dentry->d_inode;
@@ -94,25 +94,12 @@ static ssize_t pvfs2_file_read(
 	new_op->upcall.req.io.count = each_count;
 	new_op->upcall.req.io.offset = *offset;
 
-	/* post req and wait for response */
-	add_op_to_request_list(new_op);
-	if((ret = wait_for_matching_downcall(new_op)) != 0)
-	{
-	    /* TODO: I don't know what to do here... */
-	    printk("pvfs2: pvfs2_file_read -- wait failed (%x).  "
-		   "op invalidated (not really)\n", ret);
-	    pvfs_bufmap_put(desc);
-	    op_release(new_op);
-	    /* TODO: return error, or how much we read so far?  what
-	     * does error returned from wait_for_matching_downcall()
-	     * mean?
-	     */
-	    *offset = original_offset;
-	    return(ret);
-	}
+        service_operation_with_timeout_retry(
+            new_op, "pvfs2_file_read", retries);
 
 	if(new_op->downcall.status != 0)
 	{
+          error_exit:
 	    pvfs_bufmap_put(desc);
 	    ret = new_op->downcall.status;
 	    op_release(new_op);
@@ -159,7 +146,7 @@ static ssize_t pvfs2_file_write(
     size_t total_count = 0;
     pvfs2_kernel_op_t *new_op = NULL;
     struct pvfs_bufmap_desc* desc;
-    int ret = -1;
+    int ret = -1, retries = PVFS2_OP_RETRY_COUNT;
     char* current_buf = (char*)buf;
     loff_t original_offset = *offset;
     struct inode *inode = file->f_dentry->d_inode;
@@ -212,25 +199,12 @@ static ssize_t pvfs2_file_write(
 	pvfs_bufmap_copy_from_user(desc, current_buf,
 	    each_count);
 
-	/* post req and wait for response */
-	add_op_to_request_list(new_op);
-	if((ret = wait_for_matching_downcall(new_op)) != 0)
-	{
-	    /* TODO: I don't know what to do here... */
-	    printk("pvfs2: pvfs2_file_write -- wait failed (%x).  "
-		   "op invalidated (not really)\n", ret);
-	    pvfs_bufmap_put(desc);
-	    op_release(new_op);
-	    /* TODO: return error, or how much we read so far?  what
-	     * does error returned from wait_for_matching_downcall()
-	     * mean?
-	     */
-	    *offset = original_offset;
-	    return(ret);
-	}
-	
+        service_operation_with_timeout_retry(
+            new_op, "pvfs2_file_write", retries);
+
 	if(new_op->downcall.status != 0)
 	{
+          error_exit:
 	    pvfs_bufmap_put(desc);
 	    ret = new_op->downcall.status;
 	    op_release(new_op);
