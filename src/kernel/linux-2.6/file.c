@@ -46,9 +46,27 @@ int pvfs2_file_open(
     {
 	return dcache_dir_open(inode, file);
     }
+
     /*
-      fs/open.c: returns 0 after enforcing large file support
-      if running on a 32 bit system w/o O_LARGFILE flag
+      if the file's being opened for append mode, set the file pos to
+      the end of the file when we retrieve the size (which we must
+      forcefully do here in this case, afaict atm)
+    */
+    if (file->f_flags & O_APPEND)
+    {
+        int ret = -EINVAL;
+
+        ret = pvfs2_inode_getattr(inode);
+        if (ret)
+        {
+            return ret;
+        }
+        file->f_pos = inode->i_size;
+    }
+
+    /*
+      fs/open.c: returns 0 after enforcing large file support if
+      running on a 32 bit system w/o O_LARGFILE flag
     */
     return generic_file_open(inode, file);
 }
