@@ -96,7 +96,7 @@ int main(int argc, char **argv)	{
 	my_req->credentials.gid = 0;
 	my_req->credentials.perms = U_WRITE | U_READ;  
 	my_req->u.setattr.handle = user_opts->bucket;
-	my_req->u.setattr.fs_id = 7;
+	my_req->u.setattr.fs_id = 9;
 	my_req->u.setattr.attr.owner = 100;
 	my_req->u.setattr.attr.group = 100;
 	my_req->u.setattr.attr.perms = 0x755;
