@@ -194,6 +194,8 @@ MPIMISCSRC :=
 MPIIOTESTSRC :=
 # files generated as part of the build that should be deleted on "make clean"
 CLEANFILES :=
+# files created by trove-autogen.pl
+TROVE_AUTOGEN_FILES :=
 
 ################################################################
 # Top level (default) targets
@@ -209,10 +211,9 @@ all: $(SERVER) $(LIBRARIES) tests admintools
 # Makefile includes
 
 # this is how we pull build information from all of the project
-#    subdirectories
-include $(patsubst %, %/module.mk, $(MODULES))
-# make sure to catch top level module.mk as well
+#    subdirectories, make sure to catch top level module.mk as well
 include module.mk
+include $(patsubst %, %/module.mk, $(MODULES))
 
 ################################################################
 # Derived file lists
@@ -521,6 +522,7 @@ distclean: cleaner
 	find . -name "module.mk" -exec rm \{\} \;
 	rm -f $(SERVERGENSRC)
 	rm -f $(SMCGEN)
+	rm -f $(TROVE_AUTOGEN_FILES)
 	rm -f Makefile pvfs2-config.h
 
 # this is where we include all of our automatic dependencies.

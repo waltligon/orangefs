@@ -4,6 +4,8 @@ SERVERSRC += \
 	$(DIR)/trove-error.c \
 	$(DIR)/trove-autogen.c
 
+#disable the rule below if this is a release snapshot
+ifndef DIST_RELEASE
 $(DIR)/trove-autogen.c: $(DIR)/trove-proto.h maint/trove-autogen.pl
 ifdef QUIET_COMPILE
 	@echo "  GEN		$@"
@@ -11,5 +13,6 @@ ifdef QUIET_COMPILE
 else
 	$(srcdir)/maint/trove-autogen.pl < $< > $@
 endif
+endif
 
-CLEANFILES += $(DIR)/trove-autogen.c
+TROVE_AUTOGEN_FILES += $(DIR)/trove-autogen.c
