@@ -206,6 +206,7 @@ int main(int argc, char **argv)	{
 		(my_req->size/2)), BMI_RECV_BUFFER);
 	BMI_memfree(client_addr, my_ack, sizeof(struct server_ack), 
 		BMI_SEND_BUFFER);
+	free(my_req);
 
 	/* shutdown the local interface */
 	ret = BMI_finalize();
