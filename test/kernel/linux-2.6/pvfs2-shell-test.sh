@@ -380,6 +380,128 @@ directory_test3()
     return 0
 }
 
+# create 100 nested subdirectories
+# ls -alR the top-level dir
+# rm -rf the dir
+directory_test4()
+{
+    echo ""
+    echo "******************************************"
+    echo "* RUNNING DIRECTORY TEST 4"
+    echo "******************************************"
+
+    setup_testdir $PVFS2_TESTDIR
+
+    old_dir=`pwd`
+    cd $PVFS2_TESTDIR
+    mkdir $PVFS2_TESTDIR/100
+
+    DATE=`date`
+    echo "$DATE: Creating 100 nested subdirectories"
+
+    # no error checking inside the loop as we're playing
+    # a shell trick in there to get the nesting right
+    echo "100" ;
+    for f in `seq 1 100`; do
+        mkdir $_/$f
+    done
+
+    # now make sure all dirs exist
+    NUMDIRS=`find . | grep -c .`
+    if test $NUMDIRS -ne 102 ; then
+        echo ""
+        echo "******************************************"
+        echo "* FAILED DIRECTORY TEST 5 [stage 1]"
+        echo "******************************************"
+        return 1
+    fi
+
+    DATE=`date`
+    echo "$DATE: Finished"
+
+    CMD="ls -alR $PVFS2_TESTDIR/100"
+    timestamp "Running ls -alR $PVFS2_TESTDIR/100" "$CMD" /dev/null
+
+    cd $old_dir
+
+    remove_testdir $PVFS2_TESTDIR
+
+    echo ""
+    echo "******************************************"
+    echo "* PASSED DIRECTORY TEST 4"
+    echo "******************************************"
+    return 0
+}
+
+# create 50 nested subdirectories
+# touch 1 file in each of the directories
+# ls -alR the top-level dir
+# rm -rf the dir
+directory_test5()
+{
+    echo ""
+    echo "******************************************"
+    echo "* RUNNING DIRECTORY TEST 5"
+    echo "******************************************"
+
+    setup_testdir $PVFS2_TESTDIR
+
+    old_dir=`pwd`
+    cd $PVFS2_TESTDIR
+    mkdir $PVFS2_TESTDIR/100
+
+    DATE=`date`
+    echo "$DATE: Creating 50 nested subdirectories"
+
+    # no error checking inside the loop as we're playing
+    # a shell trick in there to get the nesting right
+    echo "100" ;
+    for f in `seq 1 50`; do
+        mkdir $_/$f
+    done
+
+    # now make sure all dirs exist
+    NUMDIRS=`find . | grep -c .`
+    if test $NUMDIRS -ne 52 ; then
+        echo ""
+        echo "******************************************"
+        echo "* FAILED DIRECTORY TEST 5 [stage 1]"
+        echo "******************************************"
+        return 1
+    fi
+
+    DATE=`date`
+    echo "$DATE: Creating files in all nested subdirectories"
+    for f in `find .`; do
+        touch $f/TESTFILE
+
+        if test $? -ne 0 ; then
+            echo ""
+            echo "******************************************"
+            echo "* FAILED DIRECTORY TEST 5 [stage 2]"
+            echo "******************************************"
+            return 1
+        fi
+    done
+
+    DATE=`date`
+    echo "$DATE: Finished"
+
+    CMD="ls -alR $PVFS2_TESTDIR/100"
+    timestamp "Running ls -alR $PVFS2_TESTDIR/100" "$CMD" /dev/null
+
+    cd $old_dir
+
+    remove_testdir $PVFS2_TESTDIR
+
+    echo ""
+    echo "******************************************"
+    echo "* PASSED DIRECTORY TEST 5"
+    echo "******************************************"
+    return 0
+}
+
+
 #####################################
 # simple permission test functions
 #####################################
@@ -980,6 +1102,10 @@ if ! test -z "$ENABLE_DIRECTORY_TESTS"; then
     directory_test2
 
     directory_test3
+
+    directory_test4
+
+    directory_test5
 
 fi
 

@@ -61,6 +61,13 @@ static int remove_rmdirent_comp_fn(
 static int remove_crdirent_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int i);
 
+#define PRINT_REMOVE_WARNING()                                        \
+do {                                                                  \
+    gossip_err("WARNING: PVFS_sys_remove() encountered an error "     \
+               "which may lead to inconsistent state.\n");            \
+    gossip_err("WARNING: PVFS2 fsck (if available) may be needed.\n");\
+} while(0)
+
 %%
 
 machine pvfs2_client_remove_sm(
@@ -112,13 +119,6 @@ machine pvfs2_client_remove_sm(
         default => crdirent_setup_msgpair;
     }
 
-    state crdirent_retry_or_fail
-    {
-        run remove_crdirent_retry_or_fail;
-	CRDIRENT_RETRY => crdirent_timer;
-        default => cleanup;
-    }
-
     state crdirent_timer
     {
         run remove_generic_timer;
@@ -144,6 +144,13 @@ machine pvfs2_client_remove_sm(
         success => cleanup;
         MSGPAIR_RETURN_SUCCESS => cleanup;
         default => crdirent_retry_or_fail;
+    }
+
+    state crdirent_retry_or_fail
+    {
+        run remove_crdirent_retry_or_fail;
+        CRDIRENT_RETRY => crdirent_timer;
+        default => cleanup;
     }
 
     state cleanup
@@ -435,7 +442,7 @@ static int remove_crdirent_retry_or_fail(PINT_client_sm *sm_p,
 
     /* try again (up to a point) if we get a comm. failure. */
     if ((PVFS_ERROR_CLASS(-js_p->error_code) == PVFS_ERROR_BMI) &&
-	(sm_p->u.remove.retry_count < PVFS2_CLIENT_RETRY_LIMIT))
+        (sm_p->u.remove.retry_count < PVFS2_CLIENT_RETRY_LIMIT))
     {
 	sm_p->u.remove.retry_count++;
 	js_p->error_code = CRDIRENT_RETRY;
@@ -454,11 +461,11 @@ static int remove_crdirent_retry_or_fail(PINT_client_sm *sm_p,
     }
 
     sm_p->u.remove.stored_error_code = js_p->error_code;
-    PVFS_perror_gossip("Error: could not replace directory entry!",
+
+    PVFS_perror_gossip("Failed to replace directory entry!",
                        js_p->error_code);
-    gossip_err("WARNING: PVFS_sys_remove() encountered an error which "
-               "may lead to inconsistent state.\n");
-    gossip_err("WARNING: PVFS2 fsck (if available) may be needed.\n");
+
+    PRINT_REMOVE_WARNING();
     return 1;
 }
 
@@ -489,14 +496,12 @@ static int remove_rmdirent_retry_or_fail(PINT_client_sm *sm_p,
 	 * strand objects, or remove non-empty directories, for
 	 * example.
 	 */
-	 gossip_err("WARNING: PVFS_sys_remove() encountered an error "
-                    "which may lead to inconsistent state.\n");
-	 gossip_err("WARNING: PVFS2 fsck (if available) may be needed.\n");
-	 js_p->error_code = 0;
-	 return 1;
+        PRINT_REMOVE_WARNING();
+        js_p->error_code = 0;
+        return 1;
     }
 
-    /* any other errors we just preserve and pass along to the next state */
+    /* other errors are preserved and passed along to the next state */
     return 1;
 }
 
