@@ -224,10 +224,11 @@ struct PVFS_servreq_mgmt_remove_dirent
     PVFS_fs_id fs_id;
     char *entry;
 };
-endecode_fields_3_struct(
+endecode_fields_4_struct(
     PVFS_servreq_mgmt_remove_dirent,
     PVFS_handle, handle,
     PVFS_fs_id, fs_id,
+    skip4,,
     string, entry)
 #define extra_size_PVFS_servreq_mgmt_remove_dirent \
   roundup8(PVFS_REQ_LIMIT_SEGMENT_BYTES+1)
@@ -391,10 +392,11 @@ struct PVFS_servreq_lookup_path
     /* mask of attribs to return with lookup results */
     uint32_t attrmask;
 };
-endecode_fields_4_struct(
+endecode_fields_5_struct(
     PVFS_servreq_lookup_path,
     string, path,
     PVFS_fs_id, fs_id,
+    skip4,,
     PVFS_handle, starting_handle,
     uint32_t, attrmask)
 #define extra_size_PVFS_servreq_lookup_path \
@@ -425,10 +427,12 @@ struct PVFS_servresp_lookup_path
     uint32_t handle_count; /* # of handles returned */
     uint32_t attr_count;   /* # of attributes returned */
 };
-endecode_fields_0aa_struct(
+endecode_fields_1a_1a_struct(
     PVFS_servresp_lookup_path,
+    skip4,,
     uint32_t, handle_count,
     PVFS_handle, handle_array,
+    skip4,,
     uint32_t, attr_count,
     PVFS_object_attr, attr_array)
 /* this is a big thing that could be either a full path,
@@ -452,9 +456,10 @@ struct PVFS_servreq_mkdir
     */
     PVFS_handle_extent_array handle_extent_array;
 };
-endecode_fields_3_struct(
+endecode_fields_4_struct(
     PVFS_servreq_mkdir,
     PVFS_fs_id, fs_id,
+    skip4,,
     PVFS_object_attr, attr,
     PVFS_handle_extent_array, handle_extent_array)
 #define extra_size_PVFS_servreq_mkdir \
@@ -503,12 +508,13 @@ struct PVFS_servreq_crdirent
     PVFS_time parent_mtime;
     PVFS_time parent_ctime;
 };
-endecode_fields_7_struct(
+endecode_fields_8_struct(
     PVFS_servreq_crdirent,
     string, name,
     PVFS_handle, new_handle,
     PVFS_handle, parent_handle,
     PVFS_fs_id, fs_id,
+    skip4,,
     PVFS_time, parent_atime,
     PVFS_time, parent_mtime,
     PVFS_time, parent_ctime)
@@ -553,11 +559,12 @@ struct PVFS_servreq_rmdirent
     PVFS_time parent_mtime;
     PVFS_time parent_ctime;
 };
-endecode_fields_6_struct(
+endecode_fields_7_struct(
     PVFS_servreq_rmdirent,
     string, entry,
     PVFS_handle, parent_handle,
     PVFS_fs_id, fs_id,
+    skip4,,
     PVFS_time, parent_atime,
     PVFS_time, parent_mtime,
     PVFS_time, parent_ctime)
@@ -608,12 +615,13 @@ struct PVFS_servreq_chdirent
     PVFS_time parent_mtime;
     PVFS_time parent_ctime;
 };
-endecode_fields_7_struct(
+endecode_fields_8_struct(
     PVFS_servreq_chdirent,
     string, entry,
     PVFS_handle, new_dirent_handle,
     PVFS_handle, parent_handle,
     PVFS_fs_id, fs_id,
+    skip4,,
     PVFS_time, parent_atime,
     PVFS_time, parent_mtime,
     PVFS_time, parent_ctime)
@@ -696,11 +704,13 @@ struct PVFS_servresp_readdir
     uint32_t dirent_count;   /* # of entries retrieved */
     uint64_t directory_version;
 };
-endecode_fields_2a_struct(
+endecode_fields_4a_struct(
     PVFS_servresp_readdir,
     PVFS_ds_position, token,
-    uint32_t, dirent_count,
+    skip4,,
     uint64_t, directory_version,
+    skip4,,
+    uint32_t, dirent_count,
     PVFS_dirent, dirent_array)
 #define extra_size_PVFS_servresp_readdir \
   roundup8(PVFS_REQ_LIMIT_DIRENT_COUNT * (PVFS_NAME_MAX + 1 + 8))
@@ -724,10 +734,10 @@ struct PVFS_servresp_getconfig
 };
 endecode_fields_4_struct(
     PVFS_servresp_getconfig,
-    string, fs_config_buf,
     uint32_t, fs_config_buf_size,
-    string, server_config_buf,
-    uint32_t, server_config_buf_size)
+    uint32_t, server_config_buf_size,
+    string, fs_config_buf,
+    string, server_config_buf)
 #define extra_size_PVFS_servresp_getconfig \
     (2 * PVFS_REQ_LIMIT_CONFIG_FILE_BYTES)
 
@@ -742,10 +752,11 @@ struct PVFS_servreq_truncate
     int32_t flags;      /* future use */
 
 };
-endecode_fields_4_struct(
+endecode_fields_5_struct(
     PVFS_servreq_truncate,
     PVFS_handle, handle,
     PVFS_fs_id, fs_id,
+    skip4,,
     PVFS_size, size,
     int32_t, flags)
 #define PINT_SERVREQ_TRUNCATE_FILL(__req,  \
@@ -820,6 +831,7 @@ struct PVFS_servreq_io
 #define encode_PVFS_servreq_io(pptr,x) do { \
     encode_PVFS_handle(pptr, &(x)->handle); \
     encode_PVFS_fs_id(pptr, &(x)->fs_id); \
+    encode_skip4(pptr,); \
     encode_enum(pptr, &(x)->io_type); \
     encode_enum(pptr, &(x)->flow_type); \
     encode_uint32_t(pptr, &(x)->server_nr); \
@@ -848,6 +860,7 @@ struct PVFS_servreq_io
 #define decode_PVFS_servreq_io(pptr,x) do { int numreq; \
     decode_PVFS_handle(pptr, &(x)->handle); \
     decode_PVFS_fs_id(pptr, &(x)->fs_id); \
+    decode_skip4(pptr,); \
     decode_enum(pptr, &(x)->io_type); \
     decode_enum(pptr, &(x)->flow_type); \
     decode_uint32_t(pptr, &(x)->server_nr); \
@@ -996,11 +1009,13 @@ struct PVFS_servresp_mgmt_perf_mon
     uint64_t end_time_ms;  /* end time for final array entry */
     uint64_t cur_time_ms;  /* current time according to svr */
 };
-endecode_fields_3a_struct(
+endecode_fields_5a_struct(
     PVFS_servresp_mgmt_perf_mon,
     uint32_t, suggested_next_id,
+    skip4,,
     uint64_t, end_time_ms,
     uint64_t, cur_time_ms,
+    skip4,,
     uint32_t, perf_array_count,
     PVFS_mgmt_perf_stat, perf_array)
 #define extra_size_PVFS_servresp_mgmt_perf_mon \
@@ -1085,8 +1100,9 @@ struct PVFS_servresp_mgmt_dspace_info_list
     struct PVFS_mgmt_dspace_info *dspace_info_array;
     int32_t dspace_info_count;
 };
-endecode_fields_0a_struct(
+endecode_fields_1a_struct(
     PVFS_servresp_mgmt_dspace_info_list,
+    skip4,,
     int32_t, dspace_info_count,
     PVFS_mgmt_dspace_info, dspace_info_array)
 #define extra_size_PVFS_servresp_mgmt_dspace_info_list \
@@ -1117,8 +1133,9 @@ struct PVFS_servresp_mgmt_event_mon
     struct PVFS_mgmt_event* event_array;
     uint32_t event_count;
 };
-endecode_fields_0a_struct(
+endecode_fields_1a_struct(
     PVFS_servresp_mgmt_event_mon,
+    skip4,,
     uint32_t, event_count,
     PVFS_mgmt_event, event_array)
 #define extra_size_PVFS_servresp_mgmt_event_mon \

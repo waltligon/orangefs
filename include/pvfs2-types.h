@@ -134,8 +134,9 @@ typedef struct
     uint32_t extent_count;
     PVFS_handle_extent *extent_array;
 } PVFS_handle_extent_array;
-endecode_fields_0a(
+endecode_fields_1a(
     PVFS_handle_extent_array,
+    skip4,,
     uint32_t, extent_count,
     PVFS_handle_extent, extent_array);
 
@@ -235,8 +236,9 @@ typedef struct
     uint64_t handles_available_count;
     uint64_t handles_total_count;
 } PVFS_statfs;
-endecode_fields_11(
+endecode_fields_12(
     PVFS_statfs,
+    skip4,,
     PVFS_fs_id, fs_id,
     PVFS_size, bytes_available,
     PVFS_size, bytes_total,

@@ -75,10 +75,13 @@ struct PVFS_mgmt_dspace_info
     PVFS_size k_size;		/* number of keyvals (if applicable) */
     PVFS_handle dirdata_handle; /* directory data handle (if applicable) */
 };
-endecode_fields_6_struct(PVFS_mgmt_dspace_info,
+endecode_fields_8_struct(
+  PVFS_mgmt_dspace_info,
   PVFS_error, error_code,
+  skip4,,
   PVFS_handle, handle,
   PVFS_ds_type, type,
+  skip4,,
   PVFS_size, b_size,
   PVFS_size, k_size,
   PVFS_handle, dirdata_handle)
@@ -94,14 +97,16 @@ struct PVFS_mgmt_event
     int32_t tv_sec;
     int32_t tv_usec;
 };
-endecode_fields_7_struct(PVFS_mgmt_event,
+endecode_fields_8_struct(
+    PVFS_mgmt_event,
     int32_t, api,
     int32_t, operation,
     int64_t, value,
     PVFS_id_gen_t, id,
     int32_t, flags,
     int32_t, tv_sec,
-    int32_t, tv_usec)
+    int32_t, tv_usec,
+    skip4,)
 
 /* values which may be or'd together in the flags field above */
 enum
