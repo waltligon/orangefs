@@ -141,7 +141,7 @@ int phelper_refresh_pinode(int flags,PVFS_bitfield mask,pinode *pinode_ptr,\
 {
 	struct PVFS_server_req_s *req_job;
 	struct PVFS_server_resp_s *ack_job;
-	/*PVFS_servreq_getattr req_gattr;*/
+	PVFS_servreq_getattr req_gattr;
 	int ret = 0,tflags = 0;
 	bmi_addr_t serv_addr;
 	char *server = NULL;
@@ -163,7 +163,7 @@ int phelper_refresh_pinode(int flags,PVFS_bitfield mask,pinode *pinode_ptr,\
 	/*req_gattr->attrmask = ATTR_UID + ATTR_GID + ATTR_PERM + ATTR_ATIME +\
 		ATTR_CTIME + ATTR_MTIME + ATTR_META + ATTR_DATA + ATTR_DIR +\
 		ATTR_SYM + ATTR_TYPE;*/
-	req_gattr.attrmask = mask;	
+//	req_gattr.attrmask = mask;	
 	
 	/* Setup getattr request to server */
 	ret = pint_serv_getattr(&req_job,&ack_job,&req_gattr,credentials,&serv_addr);
