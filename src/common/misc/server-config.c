@@ -340,6 +340,9 @@ DOTCONF_CB(enter_filesystem_context)
     assert(fs_conf);
     memset(fs_conf,0,sizeof(struct filesystem_configuration_s));
 
+    /* fill any fs defaults here */
+    fs_conf->flowproto = FLOWPROTO_DEFAULT;
+
     if (!config_s->file_systems)
     {
         config_s->file_systems = PINT_llist_new();
@@ -1716,7 +1719,8 @@ int PINT_config_is_valid_configuration(
     PINT_llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs = NULL;
     
-    if (config_s && config_s->logfile && config_s->event_logging && config_s->bmi_modules)
+    if (config_s && config_s->logfile && config_s->event_logging &&
+        config_s->bmi_modules)
     {
         cur = config_s->file_systems;
         while(cur)

@@ -121,42 +121,40 @@ int PVFS_sys_io(PVFS_pinode_reference pinode_ref,
     PVFS_error error;
     struct filesystem_configuration_s* cur_fs = NULL;
 
-    if (resp_p == NULL) {
+    if (resp_p == NULL)
+    {
 	gossip_lerr("NULL resp pointer\n");
 	return -PVFS_EINVAL;
     }
 
-    if (io_type != PVFS_IO_READ && io_type != PVFS_IO_WRITE) {
+    if ((io_type != PVFS_IO_READ) && (io_type != PVFS_IO_WRITE))
+    {
 	return -PVFS_EINVAL;
     }
 
-    /* find file system configuration */
     cur_fs = PINT_config_find_fs_id(PINT_get_server_config_struct(),
-      pinode_ref.fs_id);
-    if(!cur_fs)
+                                    pinode_ref.fs_id);
+    if (!cur_fs)
     {
 	gossip_lerr("Error: invalid fs_id.\n");
 	return(-PVFS_EINVAL);
     }
 
     /* look for zero byte operations */
-    if(PINT_REQUEST_TOTAL_BYTES(mem_req) == 0)
+    if ((PINT_REQUEST_TOTAL_BYTES(mem_req) == 0) ||
+        (PINT_REQUEST_TOTAL_BYTES(file_req) == 0))
     {
-	gossip_ldebug(CLIENT_DEBUG, "Warning: 0 byte I/O operation attempted.\n");
+	gossip_ldebug(CLIENT_DEBUG, "Warning: 0 byte I/O operation "
+                      "attempted.\n");
 	resp_p->total_completed = 0;
 	return(0);
     }
-    if(PINT_REQUEST_TOTAL_BYTES(file_req) == 0)
-    {
-	gossip_ldebug(CLIENT_DEBUG, "Warning: 0 byte I/O operation attempted.\n");
-	resp_p->total_completed = 0;
-	return(0);
-    }
-	
 
-    /* allocate and build PINT_client_sm structure */
-    sm_p = (PINT_client_sm *) malloc(sizeof(*sm_p));
-    if (sm_p == NULL) return -PVFS_ENOMEM;
+    sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));
+    if (sm_p == NULL)
+    {
+        return -PVFS_ENOMEM;
+    }
 
     memset(sm_p, 0, sizeof(*sm_p));
 

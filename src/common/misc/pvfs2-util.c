@@ -14,9 +14,9 @@
 #include "pvfs2-config.h"
 #include "pvfs2-sysint.h"
 #include "pvfs2-util.h"
-#include "str-utils.h"
 #include "pvfs2-debug.h"
 #include "gossip.h"
+#include "str-utils.h"
 
 /* TODO: add replacement functions for systems without getmntent() */
 #ifndef HAVE_GETMNTENT
@@ -27,9 +27,11 @@
 #include <mntent.h>
 #endif
 
-static int parse_flowproto_string(const char* input, enum PVFS_flowproto_type* 
-    flowproto);
-static int parse_encoding_string(const char *cp, enum PVFS_encoding_type *et);
+static int parse_flowproto_string(
+    const char *input, enum PVFS_flowproto_type *flowproto);
+
+static int parse_encoding_string(
+    const char *cp, enum PVFS_encoding_type *et);
 
 /* PVFS_util_parse_pvfstab()
  *
@@ -165,10 +167,11 @@ int PVFS_util_parse_pvfstab(pvfs_mntlist* pvfstab_p)
 		tmp_ent->mnt_opts);
 
 	    /* find out if a particular flow protocol was specified */
-	    if((hasmntopt(tmp_ent, "flowproto")))
+	    if ((hasmntopt(tmp_ent, "flowproto")))
 	    {
-		ret = parse_flowproto_string(tmp_ent->mnt_opts,
-		    &(pvfstab_p->ptab_array[i].flowproto));
+		ret = parse_flowproto_string(
+                    tmp_ent->mnt_opts,
+                    &(pvfstab_p->ptab_array[i].flowproto));
 		if(ret < 0)
 		{
 		    /* TODO: clean up mallocs */
@@ -505,8 +508,8 @@ void PVFS_util_make_size_human_readable(
  *
  * returns 0 on success, -PVFS_error on failure
  */
-static int parse_flowproto_string(const char* input, enum PVFS_flowproto_type* 
-    flowproto)
+static int parse_flowproto_string(
+    const char *input, enum PVFS_flowproto_type *flowproto)
 {
     int ret = 0;
     char* start = NULL;
