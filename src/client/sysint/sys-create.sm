@@ -443,7 +443,7 @@ static int create_datafiles_comp_fn(void *v_p,
 
     if (resp_p->status != 0)
     {
-        gossip_err("Failed to create data handle %d\n",index);
+        gossip_err("%s: Failed to create data handle %d\n", __func__, index);
         PVFS_perror_gossip("Creation failure", resp_p->status);
 	return resp_p->status;
     }
