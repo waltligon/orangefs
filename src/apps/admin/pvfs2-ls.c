@@ -103,116 +103,14 @@ do {                                                        \
     }                                                       \
 } while(0)
 
-
-int main(int argc, char **argv)
-{
-    int ret = -1, i = 0;
-    char pvfs_path[MAX_NUM_PATHS][PVFS_NAME_MAX];
-    PVFS_fs_id fs_id_array[MAX_NUM_PATHS] = {0};
-    const PVFS_util_tab* tab;
-    struct options* user_opts = NULL;
-    char current_dir[PVFS_NAME_MAX] = {0};
-    int found_one = 0;
-
-    process_name = argv[0];
-
-    user_opts = parse_args(argc, argv);
-    if (!user_opts)
-    {
-	fprintf(stderr, "Error: failed to parse command line arguments.\n");
-	usage(argc, argv);
-	return(-1);
-    }
-
-    tab = PVFS_util_parse_pvfstab(NULL);
-    if (!tab)
-    {
-        fprintf(stderr, "Error: failed to parse pvfstab.\n");
-        return(-1);
-    }
-
-    for(i = 0; i < MAX_NUM_PATHS; i++)
-    {
-        memset(pvfs_path[i],0,PVFS_NAME_MAX);
-    }
-
-    ret = PVFS_sys_initialize(GOSSIP_NO_DEBUG);
-    if (ret < 0)
-    {
-	PVFS_perror("PVFS_sys_initialize", ret);
-	return(-1);
-    }
-
-    /* initialize each file system that we found in the tab file */
-    for(i=0; i<tab->mntent_count; i++)
-    {
-	ret = PVFS_sys_fs_add(&tab->mntent_array[i]);
-	if(ret == 0)
-	    found_one = 1;
-    }
-    if(!found_one)
-    {
-	fprintf(stderr, "Error: could not initialize any file systems from %s\n", tab->tabfile_name);
-	PVFS_sys_finalize();
-	return(-1);
-    }
-
-    if (user_opts->num_starts == 0)
-    {
-	snprintf(current_dir,PVFS_NAME_MAX,"%s/",
-		 tab->mntent_array[0].mnt_dir);
-	user_opts->start[0] = current_dir;
-	user_opts->num_starts = 1;
-    }
-
-    for(i = 0; i < user_opts->num_starts; i++)
-    {
-	ret = PVFS_util_resolve(user_opts->start[i],
-	    &fs_id_array[i], pvfs_path[i], PVFS_NAME_MAX);
-	if(ret == 0 && pvfs_path[i][0] == '\0')
-	{
-	    strcpy(pvfs_path[i], "/");
-	}
-
-	if(ret < 0)
-	{
-	    fprintf(stderr, "Error: could not find file system for %s in "
-	    "pvfstab\n", user_opts->start[i]);
-	    return(-1);
-	}
-    }
-
-    for(i = 0; i < user_opts->num_starts; i++)
-    {
-        if (user_opts->num_starts > 1)
-        {
-            printf("%s:\n", pvfs_path[i]);
-        }
-
-        do_list(pvfs_path[i], fs_id_array[i], user_opts);
-
-        if (user_opts->num_starts > 1)
-        {
-            printf("\n");
-        }
-    }
-
-    PVFS_sys_finalize();
-
-    return(ret);
-}
-
-
 /*
   build a string of a specified length that's either
   left or right justified based on the src string;
   caller must free ptr passed out as *out_str_p
 */
-static inline void format_size_string(char *src_str,
-                                      int num_spaces_total,
-                                      char **out_str_p,
-                                      int right_justified,
-				      int hard_limit)
+static inline void format_size_string(
+    char *src_str, int num_spaces_total, char **out_str_p,
+    int right_justified, int hard_limit)
 {
     int len = 0;
     int spaces_size_allowed = 0;
@@ -221,15 +119,17 @@ static inline void format_size_string(char *src_str,
     assert(src_str);
     len = strlen(src_str);
 
-    if(hard_limit)
+    if (hard_limit)
     {
 	spaces_size_allowed = (num_spaces_total ? num_spaces_total : len);
     }
     else
     {
 	spaces_size_allowed = len;
-	if(len < num_spaces_total)
+	if (len < num_spaces_total)
+        {
 	    spaces_size_allowed = num_spaces_total;
+        }
     }
 	
     buf = (char *)malloc(spaces_size_allowed+1);
@@ -258,15 +158,14 @@ static inline void format_size_string(char *src_str,
         }
         *out_str_p = strdup(buf);
     }
-    else if(len > 0)
+    else if (len > 0)
     {
-	/* string won't fit; don't worry about nicely alinging and 
-	 * shove it in there */
+        /* if the string is too long, don't format it */
 	*out_str_p = strdup(src_str);
     }
     else if (len == 0)
     {
-        *out_str_p = strdup(buf);
+        *out_str_p = strdup("");
     }
     free(buf);
 }
@@ -339,6 +238,7 @@ void print_entry_attr(
     {
         group = scratch_group;
     }
+
     if (!opts->list_numeric_uid_gid)
     {
         if (!opts->list_no_owner)
@@ -355,8 +255,8 @@ void print_entry_attr(
     }
 
     /* for owner and group allow the fields to grow larger than 8 if
-     * necessary (set hard_limit to 0), but pad anything smaller to take up
-     * 8 spaces.
+     * necessary (set hard_limit to 0), but pad anything smaller to
+     * take up 8 spaces.
      */
     format_size_string(owner,8,&formatted_owner,0,0);
     format_size_string(group,8,&formatted_group,0,0);
@@ -520,8 +420,8 @@ int do_list(
 
             if (getattr_response.attr.objtype == PVFS_TYPE_DIRECTORY)
             {
-                if (PVFS_sys_getparent(ref.fs_id, name,
-                                       &credentials, &getparent_resp) == 0)
+                if (PVFS_sys_getparent(ref.fs_id, name, &credentials,
+                                       &getparent_resp) == 0)
                 {
                     print_dot_and_dot_dot_info_if_required(
                         getparent_resp.parent_ref);
@@ -535,8 +435,7 @@ int do_list(
             }
             else
             {
-                print_entry(segment, ref.handle,
-                            ref.fs_id, opts);
+                print_entry(segment, ref.handle, ref.fs_id, opts);
             }
             return 0;
         }
@@ -545,10 +444,10 @@ int do_list(
     token = 0;
     do
     {
-        memset(&rd_response,0,sizeof(PVFS_sysresp_readdir));
-        if (PVFS_sys_readdir(ref,
-                             (!token ? PVFS_READDIR_START : token),
-                             pvfs_dirent_incount, &credentials, &rd_response))
+        memset(&rd_response, 0, sizeof(PVFS_sysresp_readdir));
+        if (PVFS_sys_readdir(
+                ref, (!token ? PVFS_READDIR_START : token),
+                pvfs_dirent_incount, &credentials, &rd_response))
         {
             fprintf(stderr,"readdir failed\n");
             return -1;
@@ -574,7 +473,10 @@ int do_list(
         token += rd_response.pvfs_dirent_outcount;
 
         if (rd_response.pvfs_dirent_outcount)
+        {
             free(rd_response.dirent_array);
+            rd_response.dirent_array = NULL;
+        }
 
     } while(rd_response.pvfs_dirent_outcount != 0);
 
@@ -767,6 +669,109 @@ static void usage(int argc, char** argv)
     fprintf(stderr,"      --version              output version "
             "information and exit\n");
     return;
+}
+
+int main(int argc, char **argv)
+{
+    int ret = -1, i = 0;
+    char pvfs_path[MAX_NUM_PATHS][PVFS_NAME_MAX];
+    PVFS_fs_id fs_id_array[MAX_NUM_PATHS] = {0};
+    const PVFS_util_tab* tab;
+    struct options* user_opts = NULL;
+    char current_dir[PVFS_NAME_MAX] = {0};
+    int found_one = 0;
+
+    process_name = argv[0];
+
+    user_opts = parse_args(argc, argv);
+    if (!user_opts)
+    {
+	fprintf(stderr, "Error: failed to parse command line "
+                "arguments.\n");
+ 	usage(argc, argv);
+	return(-1);
+    }
+
+    tab = PVFS_util_parse_pvfstab(NULL);
+    if (!tab)
+    {
+        fprintf(stderr, "Error: failed to parse pvfstab.\n");
+        return(-1);
+    }
+
+    for(i = 0; i < MAX_NUM_PATHS; i++)
+    {
+        memset(pvfs_path[i],0,PVFS_NAME_MAX);
+    }
+
+    ret = PVFS_sys_initialize(GOSSIP_NO_DEBUG);
+    if (ret < 0)
+    {
+	PVFS_perror("PVFS_sys_initialize", ret);
+	return(-1);
+    }
+
+    /* initialize each file system that we found in the tab file */
+    for(i = 0; i < tab->mntent_count; i++)
+    {
+	ret = PVFS_sys_fs_add(&tab->mntent_array[i]);
+	if (ret == 0)
+        {
+	    found_one = 1;
+        }
+    }
+
+    if (!found_one)
+    {
+	fprintf(stderr, "Error: could not initialize any file systems "
+                "from %s\n", tab->tabfile_name);
+	PVFS_sys_finalize();
+	return(-1);
+    }
+
+    if (user_opts->num_starts == 0)
+    {
+	snprintf(current_dir,PVFS_NAME_MAX,"%s/",
+		 tab->mntent_array[0].mnt_dir);
+	user_opts->start[0] = current_dir;
+	user_opts->num_starts = 1;
+    }
+
+    for(i = 0; i < user_opts->num_starts; i++)
+    {
+	ret = PVFS_util_resolve(user_opts->start[i],
+	    &fs_id_array[i], pvfs_path[i], PVFS_NAME_MAX);
+	if ((ret == 0) && (pvfs_path[i][0] == '\0'))
+	{
+            strcpy(pvfs_path[i], "/");
+	}
+
+	if (ret < 0)
+	{
+	    fprintf(stderr, "Error: could not find file system "
+                    "for %s in pvfstab\n", user_opts->start[i]);
+	    return(-1);
+	}
+    }
+
+    for(i = 0; i < user_opts->num_starts; i++)
+    {
+        if (user_opts->num_starts > 1)
+        {
+            printf("%s:\n", pvfs_path[i]);
+        }
+
+        do_list(pvfs_path[i], fs_id_array[i], user_opts);
+
+        if (user_opts->num_starts > 1)
+        {
+            printf("\n");
+        }
+    }
+
+    PVFS_sys_finalize();
+
+    return(ret);
 }
 
 /*
