@@ -19,29 +19,51 @@
 #define HISTORY 5
 #define FREQUENCY 1
 
+struct poll_thread_args{
+    PVFS_fs_id fs;
+    PVFS_credentials credentials;
+    PVFS_id_gen_t* addr_array;
+    struct PVFS_mgmt_perf_stat** tmp_matrix;
+    uint32_t* next_id_array;
+    uint64_t* end_time_ms_array;
+    int server_count;
+    int history_count;
+};
+
 struct pvfs2_vis_buffer pint_vis_shared;
 pthread_mutex_t pint_vis_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t pint_vis_cond = PTHREAD_COND_INITIALIZER;
+int pint_vis_error = 0;
 
-static int poll_for_updates(
-    PVFS_fs_id fs,
-    PVFS_credentials credentials,
-    PVFS_id_gen_t* addr_array,
-    struct PVFS_mgmt_perf_stat** tmp_matrix,
-    uint32_t* next_id_array,
-    uint64_t* end_time_ms_array,
-    int server_count,
-    int history_count);
+static void* poll_for_updates(void* args);
+static pthread_t poll_thread_id = -1;
 
-/* pvfs2_vis_start()
+/* pvfs2_vis_stop()
  *
- * gathers statistics from the servers associated with given path,
- * and launches concurrent thread with provided function pointer to 
- * draw visualization
+ * shuts down currently running pvfs2 vis thread
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int pvfs2_vis_start(char* path, void* (*vis_fn)(void*))
+int pvfs_vis_stop(void)
+{
+    if(poll_thread_id > 0)
+    {
+	pthread_cancel(poll_thread_id);
+    }
+
+    PVFS_sys_finalize();
+
+    return(0);
+}
+
+/* pvfs2_vis_start()
+ *
+ * gathers statistics from the servers associated with given path (using
+ * a thread in the background)
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
+int pvfs2_vis_start(char* path)
 {
     PVFS_fs_id cur_fs;
     pvfs_mntlist mnt = {0,NULL};
@@ -57,13 +79,20 @@ int pvfs2_vis_start(char* path, void* (*vis_fn)(void*))
     uint64_t* end_time_ms_array;
     PVFS_id_gen_t* addr_array;
     int done = 0;
-    pthread_t vis_id;
+    struct poll_thread_args* args;
+
+    /* allocate storage to convey information to thread */
+    args = (struct poll_thread_args*)malloc(sizeof(struct poll_thread_args));
+    if(!args)
+    {
+	return(-PVFS_ENOMEM);
+    }
 
     /* look at pvfstab */
-    if(PVFS_util_parse_pvfstab(&mnt))
+    ret = PVFS_util_parse_pvfstab(&mnt);
+    if(ret < 0)
     {
-        fprintf(stderr, "Error: failed to parse pvfstab.\n");
-        return(-1);
+        return(ret);
     }
 
     /* see if the destination resides on any of the file systems
@@ -82,17 +111,14 @@ int pvfs2_vis_start(char* path, void* (*vis_fn)(void*))
 
     if(mnt_index == -1)
     {
-	fprintf(stderr, "Error: could not find filesystem for %s in pvfstab\n", 
-	    path);
-	return(-1);
+	return(-PVFS_ENOENT);
     }
 
     memset(&resp_init, 0, sizeof(resp_init));
     ret = PVFS_sys_initialize(mnt, 0, &resp_init);
     if(ret < 0)
     {
-	PVFS_perror("PVFS_sys_initialize", ret);
-	return(-1);
+	return(ret);
     }
 
     cur_fs = resp_init.fsid_list[mnt_index];
@@ -105,8 +131,7 @@ int pvfs2_vis_start(char* path, void* (*vis_fn)(void*))
 	&io_server_count);
     if(ret < 0)
     {
-	PVFS_perror("PVFS_mgmt_count_servers", ret);
-	return(-1);
+	return(ret);
     }
 
     /* allocate a 2 dimensional array for statistics */
@@ -114,8 +139,7 @@ int pvfs2_vis_start(char* path, void* (*vis_fn)(void*))
 	io_server_count*sizeof(struct PVFS_mgmt_perf_stat*));
     if(!perf_matrix)
     {
-	perror("malloc");
-	return(-1);
+	return(-PVFS_ENOMEM);
     }
     for(i=0; i<io_server_count; i++)
     {
@@ -123,8 +147,7 @@ int pvfs2_vis_start(char* path, void* (*vis_fn)(void*))
 	    HISTORY*sizeof(struct PVFS_mgmt_perf_stat));
 	if(!perf_matrix[i])
 	{
-	    perror("malloc");
-	    return(-1);
+	    return(-PVFS_ENOMEM);
 	}
     }
 
@@ -134,30 +157,26 @@ int pvfs2_vis_start(char* path, void* (*vis_fn)(void*))
     next_id_array = (uint32_t*)malloc(io_server_count*sizeof(uint32_t));
     if(!next_id_array)
     {
-	perror("malloc");
-	return(-1);
+	return(-PVFS_ENOMEM);
     }
     memset(next_id_array, 0, io_server_count*sizeof(uint32_t));
     end_time_ms_array = (uint64_t*)malloc(io_server_count*sizeof(uint64_t));
     if(!end_time_ms_array)
     {
-	perror("malloc");
-	return(-1);
+	return(-PVFS_ENOMEM);
     }
 
     /* build a list of servers to talk to */
     addr_array = (PVFS_id_gen_t*)malloc(io_server_count*sizeof(PVFS_id_gen_t));
     if(!addr_array)
     {
-	perror("malloc");
-	return(-1);
+	return(-PVFS_ENOMEM);
     }
     ret = PVFS_mgmt_get_server_array(cur_fs, creds, PVFS_MGMT_IO_SERVER,
 	addr_array, &io_server_count);
     if(ret < 0)
     {
-	PVFS_perror("PVFS_mgmt_get_server_array", ret);
-	return(-1);
+	return(ret);
     }
 
     /* loop for a little bit, until we have 5 measurements queued up from each
@@ -171,8 +190,7 @@ int pvfs2_vis_start(char* path, void* (*vis_fn)(void*))
 	    HISTORY);
 	if(ret < 0)
 	{
-	    PVFS_perror("PVFS_mgmt_perf_mon_list", ret);
-	    return(-1);
+	    return(ret);
 	}
 
 	done = 1;
@@ -196,8 +214,7 @@ int pvfs2_vis_start(char* path, void* (*vis_fn)(void*))
 	io_server_count*sizeof(struct PVFS_mgmt_perf_stat*));
     if(!pint_vis_shared.io_perf_matrix)
     {
-	perror("malloc");
-	return(-1);
+	return(-PVFS_ENOMEM);
     }
     for(i=0; i<io_server_count; i++)
     {
@@ -205,8 +222,7 @@ int pvfs2_vis_start(char* path, void* (*vis_fn)(void*))
 	    HISTORY*sizeof(struct PVFS_mgmt_perf_stat));
 	if(!pint_vis_shared.io_perf_matrix[i])
 	{
-	    perror("malloc");
-	    return(-1);
+	    return(-PVFS_ENOMEM);
 	}
     }
     pint_vis_shared.io_end_time_ms_array = (uint64_t*)malloc(
@@ -221,24 +237,22 @@ int pvfs2_vis_start(char* path, void* (*vis_fn)(void*))
     memcpy(pint_vis_shared.io_end_time_ms_array, end_time_ms_array,
 	io_server_count*sizeof(uint64_t));
 
-    /* launch vis thread */
-    ret = pthread_create(&vis_id, NULL, vis_fn, NULL);
+    /* setup arguments to pass to monitoring thread */
+    args->fs = cur_fs;
+    args->credentials = creds;
+    args->addr_array = addr_array;
+    args->tmp_matrix = perf_matrix;
+    args->next_id_array = next_id_array;
+    args->end_time_ms_array = end_time_ms_array;
+    args->server_count = io_server_count;
+    args->history_count = HISTORY;
+
+    /* launch thread */
+    ret = pthread_create(&poll_thread_id, NULL, poll_for_updates, args);
     if(ret != 0)
     {
-	fprintf(stderr, "pthread_create: %s\n", strerror(ret));
-	return(-1);
+	return(ret);
     }
-
-    /* now we just sit here gathering statistics */
-    ret = poll_for_updates(cur_fs, creds, addr_array, perf_matrix, 
-	next_id_array, end_time_ms_array, io_server_count, HISTORY);
-    if(ret < 0)
-    {
-	PVFS_perror("poll_for_updates", ret);
-	return(-1);
-    }
-
-    PVFS_sys_finalize();
 
     return(0);
 }
@@ -251,22 +265,23 @@ int pvfs2_vis_start(char* path, void* (*vis_fn)(void*))
  * NOTE: we only pass in the tmp_matrix for convenience to avoid having
  * to allocate another matrix; the caller already has some buffers we can use
  *
- * returns 0 on success, -PVFS_error on failure
+ * returns NULL, setting pint_vis_error if an error occurred
  */
-static int poll_for_updates(
-    PVFS_fs_id fs,
-    PVFS_credentials credentials,
-    PVFS_id_gen_t* addr_array,
-    struct PVFS_mgmt_perf_stat** tmp_matrix,
-    uint32_t* next_id_array,
-    uint64_t* end_time_ms_array,
-    int server_count,
-    int history_count)
+static void* poll_for_updates(void* args)
 {
+    struct poll_thread_args* tmp_args = (struct poll_thread_args*)args;
     int ret;
     int i, j, k;
     int new_count;
     int new_flag = 0;
+    PVFS_fs_id fs = tmp_args->fs;
+    PVFS_credentials credentials = tmp_args->credentials;
+    PVFS_id_gen_t* addr_array = tmp_args->addr_array;
+    struct PVFS_mgmt_perf_stat** tmp_matrix = tmp_args->tmp_matrix;
+    uint32_t* next_id_array = tmp_args->next_id_array;
+    uint64_t* end_time_ms_array = tmp_args->end_time_ms_array;
+    int server_count = tmp_args->server_count;
+    int history_count = tmp_args->history_count;
 
     while(1)
     {
@@ -275,7 +290,12 @@ static int poll_for_updates(
 	    history_count);
 	if(ret < 0)
 	{
-	    return(ret);
+	    pint_vis_error = ret;
+	    poll_thread_id = -1;
+	    PVFS_perror_gossip("PVFS_mgmt_perf_mon_list", ret);
+	    pthread_cond_signal(&pint_vis_cond);
+	    pthread_mutex_unlock(&pint_vis_mutex);
+	    return(NULL);
 	}
 
 	new_flag = 0;
@@ -326,7 +346,7 @@ static int poll_for_updates(
 	sleep(FREQUENCY);
     }
 
-    return(-PVFS_ENOSYS);
+    return(NULL);
 }
 
 

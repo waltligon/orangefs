@@ -28,7 +28,7 @@ struct options
     int width_set;
 };
 
-static void* thread_fn(void* foo);
+static int draw(void);
 static struct options* parse_args(int argc, char* argv[]);
 static void usage(int argc, char** argv);
 static struct options* user_opts = NULL;
@@ -62,10 +62,17 @@ int main(int argc, char **argv)
 	return(-1);
     }
 
-    ret = pvfs2_vis_start(user_opts->mnt_point, thread_fn);
+    ret = pvfs2_vis_start(user_opts->mnt_point);
     if(ret < 0)
     {
 	PVFS_perror("pvfs2_vis_start", ret);
+	return(-1);
+    }
+
+    ret = draw();
+    if(ret < 0)
+    {
+	fprintf(stderr, "Error: failed to draw visualization screen.\n");
 	return(-1);
     }
 
@@ -150,13 +157,13 @@ static struct options* parse_args(int argc, char* argv[])
 }
 
 
-/* thread_fn()
+/* draw()
  *
  * function that does the actual visualization work
  *
  * always returns NULL
  */
-static void* thread_fn(void* foo)
+static int draw(void)
 {
     int i;
     int ret = -1;
@@ -181,7 +188,7 @@ static void* thread_fn(void* foo)
     if(ret < 0)
     {
 	fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
-	return(NULL);
+	return(-1);
     }
 	
     screen = SDL_SetVideoMode(user_opts->width, ((user_opts->width * 3)/4), 
@@ -189,7 +196,7 @@ static void* thread_fn(void* foo)
     if(!screen)
     {
 	fprintf(stderr, "SDL_SetVideoMode: %s\n", SDL_GetError());
-	return(NULL);
+	return(-1);
     }
 
     SDL_WM_SetCaption("PVFS2 Server Bandwidth", "PVFS2");
@@ -202,7 +209,7 @@ static void* thread_fn(void* foo)
     if(!read_bws)
     {
 	perror("malloc");
-	return(NULL);
+	return(-1);
     }
     write_bws = &read_bws[pint_vis_shared.io_count];
 
@@ -276,7 +283,7 @@ static void* thread_fn(void* foo)
 	SDL_Flip(screen);
     }
 
-    return(NULL);
+    return(0);
 }
 
 static void usage(int argc, char** argv)
