@@ -6,8 +6,10 @@ pvfs2-0.0.4pre1
 ===============
 - improved truncate support
 - kernel truncate support
+- removed several run-time verbose (expected) warnings
+- fixed a handle rollover bug in extentlist handler
+- fixed bit-rotted non-threaded trove/job compilation
 
-	
 pvfs2-0.0.3
 ===========
 - more pts tests for pvfs2 datatypes
