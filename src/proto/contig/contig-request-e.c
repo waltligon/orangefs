@@ -39,47 +39,6 @@ int do_encode_req(
     switch( request->op )
     {
 	case PVFS_SERV_GETCONFIG:
-#if 0
-	    /* OLD VERSION */
-	    if (!request->u.getconfig.fs_name)
-	    {
-				/*printf("invalid string passed\n");*/
-		return -EINVAL;
-	    }
-	    /*printf("geting string len\n");*/
-	    name_sz = strlen( request->u.getconfig.fs_name );
-	    size = sizeof( struct PVFS_server_req_s ) + name_sz + 1;
-	    /*printf("total space: %d str len: %d header: %d struct: %d\n", size, name_sz, header_size, sizeof(struct PVFS_server_req_s));*/
-	    enc_msg = BMI_memalloc( target_msg->dest, (bmi_size_t) (size + header_size), BMI_SEND_BUFFER );
-	    if (!enc_msg)
-	    {
-				/*printf("unable to malloc = %d bytes\n", size);*/
-		return -ENOMEM;
-	    }
-	    target_msg->buffer_list = (void*) malloc(sizeof(void *));
-	    target_msg->buffer_list[0] = enc_msg;
-	    target_msg->size_list[0] = size;
-	    target_msg->total_size = size;
-	    memcpy( enc_msg, request, sizeof( struct PVFS_server_req_s ) );
-
-	    /*printf("copying strings now\n");*/
-	    /* copy a null terminated string to another */
-	    strncpy((char *)enc_msg + sizeof( struct PVFS_server_req_s ), request->u.getconfig.fs_name, (size_t) name_sz);
-	    /*printf("copying terminator\n");*/
-	    strncpy((char *)enc_msg + sizeof( struct PVFS_server_req_s ) + name_sz , "\0", 1 );
-
-	    /* make pointer since we're sending it over the wire and don't want 
-	     * random memory referenced on the other side */
-
-	    /*printf("updating pointer\n");*/
-	    ((struct PVFS_server_req_s *)enc_msg)->u.getconfig.fs_name = NULL;
-	    /*printf("done\n");*/
-	    return 0;
-
-	    /* END OLD VERSION */
-#endif
-
-	    /* NEW VERSION */
 
 	    /* just assert on the fs_name being non-NULL; returning EINVAL is
 	     * the right thing to do for cases where the user could have given
@@ -236,14 +195,14 @@ int do_encode_req(
 	case PVFS_SERV_SETATTR:
 	    size = sizeof( struct PVFS_server_req_s ) + sizeof( struct PVFS_object_attr );
 
-	    /* if we're mkdir'ing a meta file, we need to alloc space for the attributes */
 	    if(request->u.setattr.attr.objtype == ATTR_META)
 	    {
-				/* negative datafiles? wtf ... */
-		assert(request->u.setattr.attr.u.meta.nr_datafiles >= 0);
-		assert(request->u.setattr.attr.u.meta.dfh != NULL);
-		printf("%d more bytes needed for handles\n", request->u.setattr.attr.u.meta.nr_datafiles * sizeof(PVFS_handle));
-		size += request->u.setattr.attr.u.meta.nr_datafiles * sizeof( PVFS_handle );
+		/* negative datafiles? wtf ... */
+		if(request->u.setattr.attr.u.meta.nr_datafiles >= 0)
+		{
+		    assert(request->u.setattr.attr.u.meta.dfh != NULL);
+		    size += request->u.setattr.attr.u.meta.nr_datafiles * sizeof( PVFS_handle );
+		}
 	    }
 
 	    /* TODO: come back and alloc the right spaces for 
