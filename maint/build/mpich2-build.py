@@ -47,7 +47,14 @@ def get_build_MPICH2():
 	os.mkdir(mpichdir)
 
 	os.chdir(mpichsrc)
-	if os.system('./configure --enable-romio --with-file-system=pvfs2+nfs+ufs --disable-f77 --prefix='+mpichdir+' --exec-prefix='+mpichdir+' >../mpich-configure.log 2>&1'):
+	os.chdir("src/mpi/romio")
+	if os.system('autoconf > ../mpich-romio-autoconf.log 2>&1'):
+		print "MPICH2 autoconf failed; Exiting..."
+		print "See " + rootdir + "mpich-romio-autoconf.log for deatils."
+		sys.exit(1)
+	os.chdir("../../../")
+
+	if os.system('./configure -enable-romio --with-file-system=ufs+nfs++pvfs2 --disable-f77 --prefix='+mpichdir+' --exec-prefix='+mpichdir+' >../mpich-configure.log 2>&1'):
 		print "MPICH2 configure failed; Exiting..."
 		print "See " + rootdir + "mpich-configure.log for details."
 		print "Perhaps you forgot to run pvfs2-build first?"
