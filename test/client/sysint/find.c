@@ -62,7 +62,8 @@ int directory_walk(PVFS_sysresp_init *init_response,
     PVFS_ds_position token;
     int pvfs_dirent_incount;
 
-    printf("DIRECTORY WALK CALLED WITH base %s | %s\n",base_dir,start_dir);
+    gossip_debug(CLIENT_DEBUG, "DIRECTORY WALK CALLED WITH "
+                 "base %s | %s\n",base_dir,start_dir);
 
     memset(&lk_response,0,sizeof(PVFS_sysresp_lookup));
 
@@ -111,17 +112,18 @@ int directory_walk(PVFS_sysresp_init *init_response,
 
     if (!rd_response.pvfs_dirent_outcount)
     {
-        printf("No files found.\n");
+        gossip_debug(CLIENT_DEBUG,"No files found.\n");
         return 0;
     }
 
-    printf("%d files found.\n",rd_response.pvfs_dirent_outcount);
+    gossip_debug(CLIENT_DEBUG, "%d files found.\n",
+                 rd_response.pvfs_dirent_outcount);
     for(i = 0; i < rd_response.pvfs_dirent_outcount; i++)
     {
         cur_file = rd_response.dirent_array[i].d_name;
         cur_handle = rd_response.dirent_array[i].handle;
 
-        fprintf(stderr,"Got handle 0x%08Lx\n",cur_handle);
+        gossip_debug(CLIENT_DEBUG,"Got handle 0x%08Lx\n",cur_handle);
 
         is_dir = is_directory(cur_handle,
                               init_response->fsid_list[0]);
@@ -129,7 +131,7 @@ int directory_walk(PVFS_sysresp_init *init_response,
         {
             case -1:
                 /* if we had an error, warn */
-                printf("Failed to get attributes.  Skipping file %s\n",
+                gossip_err("Failed to get attributes.  Skipping file %s\n",
                        cur_file);
                 break;
             case 0:
@@ -176,7 +178,7 @@ int main(int argc, char **argv)
     }
 
     memset(&init_response,0,sizeof(PVFS_sysresp_init));
-    if (PVFS_sys_initialize(mnt, CLIENT_DEBUG, &init_response))
+    if (PVFS_sys_initialize(mnt, 0, &init_response))
     {
         fprintf(stderr,"Cannot initialize system interface\n");
         return 1;

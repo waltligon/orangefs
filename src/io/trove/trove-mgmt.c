@@ -257,8 +257,9 @@ int trove_open_context(TROVE_context_id *context_id)
     }
     else
     {
-        gossip_err("KLUDGE:  faking trove open context\n");
-        gossip_err("* trove_open_context called before trove_initialize()\n");
+        gossip_debug(TROVE_DEBUG, "KLUDGE:  faking trove open context\n");
+        gossip_debug(TROVE_DEBUG, "* trove_open_context called "
+                     "before trove_initialize()\n");
     }
     return ret;
 }
@@ -279,8 +280,9 @@ int trove_close_context(TROVE_context_id context_id)
     }
     else
     {
-        gossip_err("KLUDGE:  faking trove close context\n");
-        gossip_err("* trove_close_context called before trove_initialize()\n");
+        gossip_debug(TROVE_DEBUG, "KLUDGE:  faking trove close context\n");
+        gossip_debug(TROVE_DEBUG, "* trove_close_context called "
+                     "before trove_initialize()\n");
     }
     return ret;
 }
