@@ -304,6 +304,7 @@ int PINT_req_sched_target_handle(
 	break;
     case PVFS_SERV_WRITE_COMPLETION:
     case PVFS_SERV_PERF_UPDATE:
+    case PVFS_SERV_JOB_TIMER:
 	/* these should never show up here */
 	return (-EINVAL);
 	break;

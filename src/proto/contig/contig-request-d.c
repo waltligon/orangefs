@@ -171,6 +171,7 @@ int do_decode_req(
     /* invalid request types */
     case PVFS_SERV_WRITE_COMPLETION:
     case PVFS_SERV_PERF_UPDATE:
+    case PVFS_SERV_JOB_TIMER:
     case PVFS_SERV_INVALID:
 	assert(0);
 	gossip_lerr("Error: request type %d is invalid.\n", 

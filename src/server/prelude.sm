@@ -262,6 +262,7 @@ static int prelude_perm_check(PINT_server_op *s_op, job_status_s *js_p)
 	case PVFS_SERV_INVALID: 
 	case PVFS_SERV_WRITE_COMPLETION:
 	case PVFS_SERV_PERF_UPDATE:
+	case PVFS_SERV_JOB_TIMER:
 	    js_p->error_code = -PVFS_EINVAL;
 	    break;
     }
