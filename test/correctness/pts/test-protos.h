@@ -17,6 +17,7 @@
 #include <test-null-params.h>
 #include <pvfs-restart-server.h>
 #include <pvfs-stop-server.h>
+#include <null_params.h>
 
 enum test_types { 
    TEST_CREATE,
@@ -62,6 +63,7 @@ void setup_ptstests(config *myconfig) {
    myconfig->testpool[TEST_LOOKUP_BENCH].test_func = (void *)test_lookup_bench;
    myconfig->testpool[TEST_LOOKUP_BENCH].test_name = str_malloc("test_lookup_bench");
    myconfig->testpool[TEST_NULL_PARAMS].test_func = (void *)test_null_params;
+   myconfig->testpool[TEST_NULL_PARAMS].test_param_init = (void *)null_params_parser;
    myconfig->testpool[TEST_NULL_PARAMS].test_name = str_malloc("test_null_params");
    myconfig->testpool[PVFS_RESTART_SERVER].test_func = (void *)pvfs_restart_server;
    myconfig->testpool[PVFS_RESTART_SERVER].test_name = str_malloc("pvfs_restart_server");

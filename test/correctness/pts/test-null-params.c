@@ -17,7 +17,7 @@
 #include "mpi.h"
 #include "pts.h"
 #include "pvfs-helper.h"
-#include "null-params.h"
+#include "null_params.h"
 
 extern pvfs_helper_t pvfs_helper;
 
@@ -650,6 +650,7 @@ static int test_write(int nullCase){
 			return PVFS_sys_write(resp_lk.pinode_refn, req_io, io_buffer, 100, credentials, &resp_io);
 			break;
 		case 8:
+			fprintf(stderr,"last test case oh my\n");
 			return PVFS_sys_write(resp_lk.pinode_refn, req_io, io_buffer, 100, credentials, NULL);
 			break;
 	}
@@ -670,42 +671,55 @@ int test_null_params(MPI_Comm *comm, int rank, char *buf, void *rawparams){
 		if(params->p1 >= 0 && params->p2 >= 0){
 			switch(params->p1){
 				case 0:
+					fprintf(stderr,"[test_null_params] test_system_init %d\n",params->p2);
 					return test_system_init(params->p2);
 					break;
 				case 1:
+					fprintf(stderr,"[test_null_params] test_lookup %d\n",params->p2);
 					return test_lookup(params->p2);
 					break;
 				case 2:
+					fprintf(stderr,"[test_null_params] test_getattr %d\n",params->p2);
 					return test_getattr(params->p2);
 					break;
 				case 3:
+					fprintf(stderr,"[test_null_params] test_setattr %d\n",params->p2);
 					return test_setattr(params->p2);
 					break;
 				case 4:
+					fprintf(stderr,"[test_null_params] test_mkdir %d\n",params->p2);
 					return test_mkdir(params->p2);
 					break;
 				case 5:
+					fprintf(stderr,"[test_null_params] test_readdir %d\n",params->p2);
 					return test_readdir(params->p2);
 					break;
 				case 6:
+					fprintf(stderr,"[test_null_params] test_create %d\n",params->p2);
 					return test_create(params->p2);
 					break;
 				case 7:
+					fprintf(stderr,"[test_null_params] test_remove %d\n",params->p2);
 					return test_remove(params->p2);
 					break;
 				case 8:
+					fprintf(stderr,"[test_null_params] test_rename %d\n",params->p2);
 					return test_rename(params->p2);
 					break;
 				case 9:
+					fprintf(stderr,"[test_null_params] test_symlink %d\n",params->p2);
 					return test_symlink(params->p2);
 					break;
 				case 10:
+					fprintf(stderr,"[test_null_params] test_readlink %d\n",params->p2);
 					return test_readlink(params->p2);
 					break;
 				case 11:
+					fprintf(stderr,"[test_null_params] test_read %d\n",params->p2);
 					return test_read(params->p2);
 					break;
 				case 12:
+					fprintf(stderr,"[test_null_params] test_write %d\n",params->p2);
 					return test_write(params->p2);
 					break;
 				default:

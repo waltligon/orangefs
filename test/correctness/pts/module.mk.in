@@ -15,7 +15,8 @@ TEST_PTS_MISC := \
 	$(DIR)/test-dir-torture.c \
 	$(DIR)/test-null-params.c \
 	$(DIR)/pvfs-restart-server.c \
-	$(DIR)/pvfs-stop-server.c 
+	$(DIR)/pvfs-stop-server.c \
+	$(DIR)/null-params-parser.c
 
 MPIMISCSRC += $(TEST_PTS_MISC)
 

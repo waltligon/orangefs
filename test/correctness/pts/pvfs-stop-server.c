@@ -21,5 +21,5 @@
  *  * Parameters: comm - special pts communicator, rank - the rank of the process, buf -  * (not used), rawparams - configuration information to specify which function to test * Postconditions: 0 if no errors and nonzero otherwise
  *   */
 int pvfs_stop_server(MPI_Comm *comm, int rank, char *buf, void *rawparams){
-	system("./run-server stop");
+	system("./run-server stop >& server_stop.log");
 }
