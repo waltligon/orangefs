@@ -5,35 +5,42 @@ void print_pinode(pinode *toprint);
 
 int main(int argc,char* argv[])
 {
-	pcache test_pcache;
 	pinode *pinode1, *pinode2, *pinode3, *test_pinode = NULL;
 	int ret;
 
-	ret = pcache_initialize( &test_pcache );
+	ret = PINT_pcache_initialize( );
 	if (ret < 0)
 	{
 		printf("pcache init failed with errcode %d\n", ret);
 		return(-1);
 	}
+	printf("pcache initialized\n");
 
-	pinode1 = (pinode *)malloc(sizeof(pinode));
+	PINT_pcache_pinode_alloc(&pinode1);
 	if (pinode1 == NULL)
 	{
 		printf("malloc pinode 1 failed\n");
 		return(-1);
 	}
 
-	pinode2 = (pinode *)malloc(sizeof(pinode));
+	PINT_pcache_pinode_alloc(&pinode2);
 	if (pinode2 == NULL)
 	{
 		printf("malloc pinode 2 failed\n");
 		return(-1);
 	}
 
-	pinode3 = (pinode *)malloc(sizeof(pinode));
+	PINT_pcache_pinode_alloc(&pinode3);
 	if (pinode3 == NULL)
 	{
 		printf("malloc pinode 3 failed\n");
+		return(-1);
+	}
+
+	PINT_pcache_pinode_alloc(&test_pinode);
+	if (pinode1 == NULL)
+	{
+		printf("malloc test_pinode failed\n");
 		return(-1);
 	}
 
@@ -99,47 +106,54 @@ int main(int argc,char* argv[])
 	pinode3->tstamp_size.tv_sec = 333333333;
 	pinode3->tstamp_size.tv_usec = 333333333;
 
-	ret = pcache_insert(&test_pcache, pinode1);
+	ret = PINT_pcache_insert(pinode1);
 	if (ret < 0)
 	{
 		printf("pcache insert failed (#1) with errcode %d\n", ret);
 		return(-1);
 	}
+	printf("pinode 1 inserted\n");
 
-	ret = pcache_insert(&test_pcache, pinode2);
+	ret = PINT_pcache_insert(pinode2);
 	if (ret < 0)
 	{
 		printf("pcache insert failed (#2) with errcode %d\n", ret);
 		return(-1);
 	}
+	printf("pinode 2 inserted\n");
 
-	ret = pcache_insert(&test_pcache, pinode3);
+	ret = PINT_pcache_insert(pinode3);
 	if (ret < 0)
 	{
 		printf("pcache insert failed (#3) with errcode %d\n", ret);
 		return(-1);
 	}
+	printf("pinode 3 inserted\n");
 
 	/* lookup element that was inserted */
 
-	ret = pcache_lookup(&test_pcache, pinode2->pinode_ref, test_pinode);
+	ret = PINT_pcache_lookup(pinode2->pinode_ref, test_pinode);
 	if (ret < 0)
 	{
 		printf("pcache lookup failed (#2) with errcode %d\n", ret);
 		return(-1);
 	}
+	printf("pinode 2 looked up\n");
 
+#if 0
 	print_pinode( test_pinode );
 
 	/* remove an element */
 	/* lookup element that was removed */
+#endif
 
-	ret = pcache_finalize( test_pcache );
+	ret = PINT_pcache_finalize( );
 	if (ret < 0)
 	{
 		printf("pcache finalize failed with errcode %d\n", ret);
 		return(-1);
 	}
+	printf("pcache finalized\n");
 
 	return(0);
 }
