@@ -4,8 +4,8 @@
  * See COPYING in top-level directory.
  */
 
-#ifndef __PINT_BUCKET_H
-#define __PINT_BUCKET_H
+#ifndef __PINT_CACHED_CONFIG_H
+#define __PINT_CACHED_CONFIG_H
 
 #include "pvfs2-types.h"
 #include "pvfs2-storage.h"
@@ -121,4 +121,4 @@ do { cur = hrange_list;                                          \
  } } while(0)
 
 
-#endif /* __PINT_BUCKET_H */
+#endif /* __PINT_CACHED_CONFIG_H */

@@ -11,7 +11,7 @@
 #include "acache.h"
 #include "ncache.h"
 #include "gen-locks.h"
-#include "pint-bucket.h"
+#include "pint-cached-config.h"
 #include "pint-dist-utils.h"
 #include "dotconf.h"
 #include "trove.h"

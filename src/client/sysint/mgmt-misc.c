@@ -15,7 +15,7 @@
 #include "pvfs2-mgmt.h"
 #include "bmi.h"
 #include "pint-sysint-utils.h"
-#include "pint-bucket.h"
+#include "pint-cached-config.h"
 #include "server-config.h"
 #include "client-state-machine.h"
 

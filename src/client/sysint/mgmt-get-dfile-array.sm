@@ -15,7 +15,7 @@
 #include "gossip.h"
 #include "str-utils.h"
 #include "pint-servreq.h"
-#include "pint-bucket.h"
+#include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
 
 extern job_context_id pint_client_sm_context;

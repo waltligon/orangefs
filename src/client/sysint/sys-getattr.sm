@@ -15,7 +15,7 @@
 #include "str-utils.h"
 #include "pvfs2-util.h"
 #include "pint-servreq.h"
-#include "pint-bucket.h"
+#include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
 
 /* pvfs2_client_getattr_sm

@@ -6,7 +6,6 @@ CSRC := \
 	$(DIR)/acache.c \
 	$(DIR)/ncache.c \
 	$(DIR)/pint-sysint-utils.c \
-	$(DIR)/pint-bucket.c \
 	$(DIR)/getparent.c \
 	$(DIR)/client-state-machine.c \
 	$(DIR)/shared-state-methods.c \

@@ -22,7 +22,7 @@
 #include "bmi.h"
 #include "pvfs2-sysint.h"
 #include "gen-locks.h"
-#include "pint-bucket.h"
+#include "pint-cached-config.h"
 #include "pvfs2-sysint.h"
 
 #include "dotconf.h"

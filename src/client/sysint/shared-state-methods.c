@@ -15,7 +15,7 @@
 #include "str-utils.h"
 
 #include "pint-servreq.h"
-#include "pint-bucket.h"
+#include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
 #include "shared-state-methods.h"
 

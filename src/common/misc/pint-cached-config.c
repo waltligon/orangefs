@@ -20,7 +20,7 @@
 #include "llist.h"
 #include "quickhash.h"
 #include "extent-utils.h"
-#include "pint-bucket.h"
+#include "pint-cached-config.h"
 
 struct qhash_table *PINT_fsid_config_cache_table = NULL;
 
@@ -192,7 +192,7 @@ int PINT_handle_load_mapping(
         /*
           map all meta and data handle ranges to the extent list, if any.
           map_handle_range_to_extent_list is a macro defined in
-          pint-bucket.h for convenience only.
+          pint-cached-config.h for convenience only.
         */
         assert(cur_config_fs_cache->fs->meta_handle_ranges);
         map_handle_range_to_extent_list(

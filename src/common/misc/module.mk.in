@@ -8,7 +8,8 @@ LIBSRC += $(DIR)/server-config.c \
 	  $(DIR)/pvfs2-util.c \
           $(DIR)/pvfs2-debug.c \
 	  $(DIR)/pint-perf-counter.c \
-	  $(DIR)/pint-event.c
+	  $(DIR)/pint-event.c \
+	  $(DIR)/pint-cached-config.c
 SERVERSRC += $(DIR)/server-config.c \
              $(DIR)/server-config-mgr.c \
              $(DIR)/str-utils.c \

@@ -22,7 +22,7 @@
 #include "pint-dev-shared.h"
 #include "pvfs2-dev-proto.h"
 #include "pvfs2-util.h"
-#include "pint-bucket.h"
+#include "pint-cached-config.h"
 #include "pvfs2-sysint.h"
 #include "client-state-machine.h"
 

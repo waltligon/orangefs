@@ -19,7 +19,7 @@
 #include "quickhash.h"
 #include "gen-locks.h"
 #include "gossip.h"
-#include "pint-bucket.h"
+#include "pint-cached-config.h"
 
 /*
   this is an internal structure and shouldn't be used by anyone except

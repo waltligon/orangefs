@@ -12,7 +12,7 @@
 #include "trove.h"
 #include "server-config.h"
 #include "PINT-reqproto-encode.h"
-#include "pint-bucket.h"
+#include "pint-cached-config.h"
 #include "pvfs2-util.h"
 
 #define MAX_NUM_FS                   67

@@ -13,7 +13,7 @@
 
 #include "acache.h"
 #include "ncache.h"
-#include "pint-bucket.h"
+#include "pint-cached-config.h"
 #include "pvfs2-sysint.h"
 #include "pint-dist-utils.h"
 #include "pint-sysint-utils.h"
