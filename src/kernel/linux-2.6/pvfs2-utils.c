@@ -80,7 +80,13 @@ static inline int copy_attributes_to_inode(
                 (inode_size + (4096 - (inode_size % 4096)));
 
             pvfs2_lock_inode(inode);
+#ifdef PVFS2_LINUX_KERNEL_2_4
+#if (PVFS2_LINUX_KERNEL_2_4_MINOR_VER > 21)
             inode->i_bytes = inode_size;
+#endif
+#else /* always ok for 2.6.x */
+            inode->i_bytes = inode_size;
+#endif
             inode->i_blocks = (unsigned long)(rounded_up_size / 512);
             pvfs2_unlock_inode(inode);
 
@@ -99,7 +105,13 @@ static inline int copy_attributes_to_inode(
         else
         {
             pvfs2_lock_inode(inode);
+#ifdef PVFS2_LINUX_KERNEL_2_4
+#if (PVFS2_LINUX_KERNEL_2_4_MINOR_VER > 21)
             inode->i_bytes = PAGE_CACHE_SIZE;
+#endif
+#else /* always ok for 2.6.x */
+            inode->i_bytes = PAGE_CACHE_SIZE;
+#endif
             inode->i_blocks = (unsigned long)(PAGE_CACHE_SIZE / 512);
             pvfs2_unlock_inode(inode);
 

@@ -49,6 +49,15 @@ typedef unsigned long sector_t;
 #include <linux/dcache.h>
 #include <linux/pagemap.h>
 
+/* taken from include/linux/fs.h from 2.4.19 or later kernels */
+#ifndef MAX_LFS_FILESIZE
+#if BITS_PER_LONG == 32
+#define MAX_LFS_FILESIZE     (((u64)PAGE_CACHE_SIZE << (BITS_PER_LONG))-1)
+#elif BITS_PER_LONG == 64
+#define MAX_LFS_FILESIZE     0x7fffffffffffffff
+#endif
+#endif /* MAX_LFS_FILESIZE */
+
 #include "pint-dev-shared.h"
 #include "pvfs2-dev-proto.h"
 
@@ -753,7 +762,7 @@ out:
 }
 
 #if (PVFS2_LINUX_KERNEL_2_4_MINOR_VER < 19)
-int dcache_dir_open(struct inode *inode, struct file *file)
+static inline int dcache_dir_open(struct inode *inode, struct file *file)
 {
     static struct qstr cursor_name = {.len = 1, .name = "."};
 
@@ -762,7 +771,7 @@ int dcache_dir_open(struct inode *inode, struct file *file)
     return file->private_data ? 0 : -ENOMEM;
 }
 
-int dcache_dir_close(struct inode *inode, struct file *file)
+static inline int dcache_dir_close(struct inode *inode, struct file *file)
 {
     dput(file->private_data);
     return 0;
