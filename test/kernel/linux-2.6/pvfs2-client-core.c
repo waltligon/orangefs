@@ -155,29 +155,22 @@ static int service_io_request(
 {
     int ret = 1;
     PVFS_sysresp_io response;
-    PVFS_Request io_req;
+    PVFS_Request file_req;
     PVFS_Request mem_req;
-    PVFS_size displacement = 0;
-    int32_t blocklength = 0;
 
     if(init_response && in_upcall && out_downcall)
     {
         memset(&response,0,sizeof(PVFS_sysresp_io));
         memset(out_downcall,0,sizeof(pvfs2_downcall_t));
 
-	displacement = in_upcall->req.io.offset;
-	blocklength = in_upcall->req.io.count;
-
-	/* TODO: use simpler datatype when tiling is working */
-	ret = PVFS_Request_indexed(1, &blocklength, &displacement,
-                                   PVFS_BYTE, &io_req);
-	assert(ret == 0);
+	file_req = PVFS_BYTE;
+	
 	ret = PVFS_Request_contiguous(in_upcall->req.io.count, PVFS_BYTE,
 	    &mem_req);
 	assert(ret == 0);
 
 	ret = PVFS_sys_io(
-            in_upcall->req.io.refn, io_req, 0, 
+            in_upcall->req.io.refn, file_req, in_upcall->req.io.offset, 
 	    in_upcall->req.io.buf, mem_req,
             in_upcall->credentials, &response, in_upcall->req.io.io_type);
 	if(ret < 0)
