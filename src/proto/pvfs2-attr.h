@@ -69,7 +69,8 @@ struct PVFS_symlink_attr_s
     char *target_path;
 };
 typedef struct PVFS_symlink_attr_s PVFS_symlink_attr;
-endecode_fields_3(PVFS_symlink_attr,
+endecode_fields_3(
+  PVFS_symlink_attr,
   uint32_t, target_path_len,
   skip4,,
   string, target_path)
