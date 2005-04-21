@@ -307,8 +307,8 @@ static int check_mode(
      */
     assert((attr->mask & perm_mask) == perm_mask);
 
-    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - check_mode called --- "
-                 "(uid=%d,gid=%d,mode=%d)\n", uid, gid, mode);
+    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "%s: uid %d gid %d mode %d\n",
+      __func__, uid, gid, mode);
 
     /*
       give root permissions, no matter what.
@@ -319,43 +319,46 @@ static int check_mode(
       options to either honor the credentials of the request (like
       no_root_squash, etc) in the future
     */
-    gossip_debug(GOSSIP_PERMISSIONS_DEBUG,
-                 " - checking if owner (%d) is root ... ", attr->owner);
     if (attr->owner == 0)
     {
-        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "yes\n");
+        gossip_debug(GOSSIP_PERMISSIONS_DEBUG,
+                     " - owner (%d) is root\n", attr->owner);
         return 0;
     }
-    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "no\n");
+    gossip_debug(GOSSIP_PERMISSIONS_DEBUG,
+                 " - owner (%d) is not root\n", attr->owner);
 
-    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - checking if owner (%d) "
-                 "is uid (%d)\n\tand perms (%d) matches mode (%d) ... ",
-                 attr->owner, uid, ((attr->perms >> 6) & mode), mode);
     if ((attr->owner == uid) && (((attr->perms >> 6) & mode) == mode))
     {
-        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "yes\n");
+        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - owner (%d) "
+                     "is uid and perms (%d) match mode (%d)\n",
+                     attr->owner, ((attr->perms >> 6) & mode), mode);
         return 0;
     }
-    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "no\n");
+    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - owner (%d) "
+                 "is not uid (%d) and/or perms (%d) do not match mode (%d)\n",
+                 attr->owner, uid, ((attr->perms >> 6) & mode), mode);
 
-    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - checking if group (%d) "
-                 "is gid (%d)\n\tand perms (%d) matches mode (%d) ... ",
-                 attr->group, gid, ((attr->perms >> 3) & mode), mode);
     if ((attr->group == gid) && (((attr->perms >> 3) & mode) == mode))
     {
+        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - group (%d) "
+                     "is gid and perms (%d) match mode (%d)\n",
+                     attr->group, ((attr->perms >> 3) & mode), mode);
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "yes\n");
         return 0;
     }
-    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "no\n");
+    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - group (%d) "
+                 "is not gid (%d) and/or perms (%d) do not match mode (%d)\n",
+                 attr->group, gid, ((attr->perms >> 3) & mode), mode);
 
-    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - checking if perms (%d) "
-                 "matches mode (%d) ... ", (attr->perms & mode), mode);
     if ((attr->perms & mode) == mode)
     {
-        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "yes\n");
+        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - perms (%d) "
+                     "match mode (%d)\n", (attr->perms & mode), mode);
         return 0;
     }
-    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "no\n");
+    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - perms (%d) "
+                 "do not match mode (%d)\n", (attr->perms & mode), mode);
 
     /* access denied */
     return -PVFS_EPERM;
