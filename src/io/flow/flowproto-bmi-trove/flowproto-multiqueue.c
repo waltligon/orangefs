@@ -900,7 +900,8 @@ static void trove_read_callback_fn(void *user_ptr,
             if(q_item->last)
                 flow_data->dest_last_posted = 1;
             gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-                "(post send time) ini posts: %d, pending: %d, last: %d\n",
+                "%s: (post send time) ini posts: %d, pending: %d, last: %d\n",
+                __func__,
                 flow_data->initial_posts, flow_data->dest_pending,
                 flow_data->dest_last_posted);
         }
@@ -1446,6 +1447,10 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
         return;
     }
 
+    /* remove from current queue, empty or earlier send; add bmi active dest */
+    qlist_del(&q_item->list_link);
+    qlist_add_tail(&q_item->list_link, &flow_data->dest_list);
+
     flow_data->parent->total_transfered += actual_size;
 
     /* are we done? */
@@ -1561,6 +1566,7 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
     }
 
     assert(q_item->result_chain.result.bytes);
+
     ret = BMI_post_send_list(&q_item->posted_id,
         q_item->parent->dest.u.bmi.address,
         (const void**)flow_data->tmp_buffer_list,
@@ -1621,7 +1627,11 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
         handle_io_error(error_code, q_item, flow_data);
         return;
     }
-  
+
+    /* remove from current queue, empty or earlier send; add bmi active src */
+    qlist_del(&q_item->list_link);
+    qlist_add_tail(&q_item->list_link, &flow_data->src_list);
+
     flow_data->parent->total_transfered += actual_size;
 
     /* if this is the result of a receive into an intermediate buffer,
@@ -1800,6 +1810,8 @@ static void handle_io_error(
     /* is this the first error registered for this particular flow? */
     if(flow_data->parent->error_code == 0)
     {
+        enum flow_endpoint_type src, dest;
+
         gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
             "flowproto-multiqueue first failure.\n");
         flow_data->parent->error_code = error_code;
@@ -1809,45 +1821,44 @@ static void handle_io_error(
         }
         flow_data->cleanup_pending_count = 0;
 
+        src = flow_data->parent->src.endpoint_id;
+        dest = flow_data->parent->dest.endpoint_id;
+
         /* cleanup depending on what endpoints are in use */
-        if(flow_data->parent->src.endpoint_id == BMI_ENDPOINT &&
-            flow_data->parent->dest.endpoint_id == MEM_ENDPOINT)
+        if (src == BMI_ENDPOINT && dest == MEM_ENDPOINT)
         {
             ret = cancel_pending_bmi(&flow_data->src_list);
             gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-                "flowproto-multiqueue canceling %d BMI ops.\n", ret);
+                "flowproto-multiqueue canceling %d BMI-mem BMI ops.\n", ret);
             flow_data->cleanup_pending_count += ret;
         }
-        else if(flow_data->parent->src.endpoint_id == MEM_ENDPOINT &&
-            flow_data->parent->dest.endpoint_id == BMI_ENDPOINT)
+        else if (src == MEM_ENDPOINT && dest == BMI_ENDPOINT)
         {
             ret = cancel_pending_bmi(&flow_data->dest_list);
             gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-                "flowproto-multiqueue canceling %d BMI ops.\n", ret);
+                "flowproto-multiqueue canceling %d mem-BMI BMI ops.\n", ret);
             flow_data->cleanup_pending_count += ret;
         }
-        else if(flow_data->parent->src.endpoint_id == TROVE_ENDPOINT &&
-            flow_data->parent->dest.endpoint_id == BMI_ENDPOINT)
+        else if (src == TROVE_ENDPOINT && dest == BMI_ENDPOINT)
         {
             ret = cancel_pending_trove(&flow_data->src_list);
             flow_data->cleanup_pending_count += ret;
             gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-                "flowproto-multiqueue canceling %d Trove ops.\n", ret);
+                "flowproto-multiqueue canceling %d trove-bmi Trove ops.\n", ret);
             ret = cancel_pending_bmi(&flow_data->dest_list);
             gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-                "flowproto-multiqueue canceling %d BMI ops.\n", ret);
+                "flowproto-multiqueue canceling %d trove-bmi BMI ops.\n", ret);
             flow_data->cleanup_pending_count += ret;
         }
-        else if(flow_data->parent->src.endpoint_id == BMI_ENDPOINT &&
-            flow_data->parent->dest.endpoint_id == TROVE_ENDPOINT)
+        else if (src == BMI_ENDPOINT && dest == TROVE_ENDPOINT)
         {
             ret = cancel_pending_bmi(&flow_data->src_list);
             gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-                "flowproto-multiqueue canceling %d BMI ops.\n", ret);
+                "flowproto-multiqueue canceling %d bmi-trove BMI ops.\n", ret);
             flow_data->cleanup_pending_count += ret;
             ret = cancel_pending_trove(&flow_data->dest_list);
             gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-                "flowproto-multiqueue canceling %d Trove ops.\n", ret);
+                "flowproto-multiqueue canceling %d bmi-trove Trove ops.\n", ret);
             flow_data->cleanup_pending_count += ret;
         }
         else
@@ -1862,8 +1873,8 @@ static void handle_io_error(
         flow_data->cleanup_pending_count--;
     }
     
-    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, "cleanup_pending_count: %d\n",
-        flow_data->cleanup_pending_count);
+    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, "%s: cleanup_pending_count: %d\n",
+        __func__, flow_data->cleanup_pending_count);
 
     if(flow_data->cleanup_pending_count == 0)
     {
