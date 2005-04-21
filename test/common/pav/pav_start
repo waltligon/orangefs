@@ -22,8 +22,9 @@ $retry = 0;
 my $prog_root = $config{"PROGROOT"};
 my $working_dir = $config{"WORKINGDIR"};
 my $ionodecount = $config{"IONCOUNT"};
+my $metacount = $config{"METACOUNT"};
 
-@commands = ("$prog_root/pav_create -c $config_file -n $ionodecount",
+@commands = ("$prog_root/pav_create -c $config_file -n $ionodecount -e $metacount",
 	"$prog_root/pav_check -ping -one-all -sd $working_dir", 
 	"$prog_root/pav_dist -sd $working_dir", 
 	"$prog_root/pav_init -sd $working_dir");
@@ -77,6 +78,7 @@ Usage: $prog_name [option]
 -r -root          path to program root (default ./)
 -m -machinefile   file with list of available nodes
 -n -ionodecount   number of nodes to use for IO
+-e -metanodecount number of nodes to use as metadata servers
 -h -help          display this message
 EOF
 }
@@ -87,6 +89,7 @@ sub init {
 	       'r|root:s',
 	       'm|machinefile:s',
 	       'n|ionodecount:i',
+	       'e|metanodecount:i',
 	       'h|help'
 	       );
 
@@ -108,6 +111,7 @@ sub init {
     %config = ('PVFSPORT' => 3334,
 	       'WORKINGDIR' => "/tmp",
 	       'IONCOUNT' => 4,
+	       'METACOUNT' => 1,
 	       'NODEFILE' => "machine_file",
 	       'PROTOCOL' => 0,
 	       'UNIQUEMETA' => 0,
@@ -141,6 +145,7 @@ sub init {
     $config{'PROGROOT'} = $args{'r'} || $config{'PROGROOT'};
     $config{'NODEFILE'} = $args{'m'} || $config{'NODEFILE'};
     $config{'IONCOUNT'} = $args{'n'} || $config{'IONCOUNT'};
+    $config{'METACOUNT'} = $args{'e'} || $config{'METACOUNT'};
     
     return(0);
 }

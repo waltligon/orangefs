@@ -221,6 +221,7 @@ sub init {
 	       'r|root:s',
 	       'm|machinefile:s',
 	       'n|ionodecount:i',
+	       'e|metacount:i',
 	       'h|help'
 	       );
 
@@ -237,6 +238,7 @@ sub init {
                'PVFSIBPORT' => 3334,
 	       'WORKINGDIR' => "/tmp",
 	       'IONCOUNT' => 4,
+	       'METACOUNT' => 1,
 	       'NODEFILE' => machine_file,
 	       'PROTOCOL' => 0,
 	       'UNIQUEMETA' => 0,
@@ -297,6 +299,7 @@ sub init {
 
 	# override with command line options
 	$config{'IONCOUNT'} = $args{'n'} || $config{'IONCOUNT'};
+	$config{'METACOUNT'} = $args{'e'} || $config{'METACOUNT'};
 
 	$rc = split_machines(\%config);
 	if ($rc) {

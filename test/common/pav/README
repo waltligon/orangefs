@@ -96,6 +96,16 @@ COMPUTENODES_LAST=<1 = default.  Choose compute nodes from end of host list,
 3.) execute pav_start -c <configfile>.  You will see the pav system
 setting up a PVFS volume for you.
 
+The following command line arguments can be passed to pav_start:
+
+	-c -config        configuration file for PAV to use
+	-r -root          path to program root (default ./)
+	-m -machinefile   file with list of available nodes
+	-n -ionodecount   number of nodes to use for IO
+	-e -mEtanodecount number of nodes to use as metadata servers
+			  (wanted to use -m but it was taken by machinefile)
+	-h -help          display this message
+
 4.) execute pav_info -c <configfile>.  This command will give you lots
 of information about your newly created PVFS volume, including the
 PVFS2TAB_FILE.
