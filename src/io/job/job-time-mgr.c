@@ -253,7 +253,8 @@ int job_time_mgr_expire(void)
 	    switch(jd->type)
 	    {
 	    case JOB_BMI:
-		gossip_debug(GOSSIP_CANCEL_DEBUG, "job_timer: cancelling bmi.\n");
+		gossip_debug(GOSSIP_CANCEL_DEBUG, "%s: cancelling bmi.\n",
+                  __func__);
 		ret = job_bmi_cancel(jd->job_id, jd->context_id);
 		break;
 	    case JOB_FLOW:
@@ -271,13 +272,13 @@ int job_time_mgr_expire(void)
 		{
 		    /* otherwise kill the flow */
 		    gossip_debug(GOSSIP_CANCEL_DEBUG,
-                                 "job_timer: cancelling flow.\n");
+                                 "%s: cancelling flow.\n", __func__);
 		    ret = job_flow_cancel(jd->job_id, jd->context_id);
 		}
 		break;
 	    case JOB_TROVE:
 		gossip_debug(GOSSIP_CANCEL_DEBUG,
-                             "job_timer: cancelling trove.\n");
+                             "%s: cancelling trove.\n", __func__);
 		ret = job_trove_dspace_cancel(
                     jd->u.trove.fsid, jd->job_id, jd->context_id);
                 break;
