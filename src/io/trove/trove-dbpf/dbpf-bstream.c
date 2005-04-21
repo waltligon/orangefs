@@ -114,8 +114,9 @@ static void aio_progress_notification(sigval_t sig)
             /* aio_return gets the return value of the individual op */
             ret = aio_return(&aiocb_p[i]);
 
-            gossip_debug(GOSSIP_TROVE_DEBUG, "  %s complete: "
+            gossip_debug(GOSSIP_TROVE_DEBUG, "%s: %s complete: "
                          "aio_return() says %d [fd = %d]\n",
+                         __func__,
                          ((op_p->type == BSTREAM_WRITE_LIST) ||
                           (op_p->type == BSTREAM_WRITE_AT) ?
                           "WRITE" : "READ"), ret, op_p->u.b_rw_list.fd);
@@ -290,8 +291,8 @@ static void start_delayed_ops_if_any(int dec_first)
         }
         s_dbpf_ios_in_progress++;
 
-        gossip_debug(GOSSIP_TROVE_DEBUG, " +++ lio_listio posted %p "
-                     "(handle %Lu, ret %d))\n", cur_op,
+        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: lio_listio posted %p "
+                     "(handle %Lu, ret %d))\n", __func__, cur_op,
                      Lu(cur_op->op.handle), ret);
 
 #ifndef __PVFS2_TROVE_AIO_THREADED__
@@ -362,8 +363,8 @@ static int issue_or_delay_io_operation(
             dbpf_open_cache_put(&cur_op->op.u.b_rw_list.open_ref);
             return -trove_errno_to_trove_error(errno);
         }
-        gossip_debug(GOSSIP_TROVE_DEBUG, " +++ lio_listio posted %p "
-                     "(handle %Lu, ret %d))\n", cur_op,
+        gossip_debug(GOSSIP_TROVE_DEBUG, "%s: lio_listio posted %p "
+                     "(handle %Lu, ret %d)\n", __func__, cur_op,
                      Lu(cur_op->op.handle), ret);
     }
     return 0;
@@ -1048,15 +1049,13 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
           first call; need to allocate aiocb array and ptr array;
           this array is freed in dbpf-op.c:dbpf_queued_op_free
         */
-        aiocb_p = (struct aiocb *)malloc(
-            (AIOCB_ARRAY_SZ * sizeof(struct aiocb)));
-
+        aiocb_p = malloc(AIOCB_ARRAY_SZ * sizeof(struct aiocb));
         if (aiocb_p == NULL)
         {
             return -TROVE_ENOMEM;
         }
 
-        memset(aiocb_p, 0, AIOCB_ARRAY_SZ*sizeof(struct aiocb));
+        memset(aiocb_p, 0, AIOCB_ARRAY_SZ * sizeof(struct aiocb));
         for(i = 0; i < AIOCB_ARRAY_SZ; i++)
         {
             aiocb_p[i].aio_lio_opcode = LIO_NOP;
@@ -1091,8 +1090,9 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
                 */
                 ret = aio_return(&aiocb_p[i]);
 
-                gossip_debug(GOSSIP_TROVE_DEBUG, "  %s complete: "
-                             "aio_return() says %d [fd = %d]\n",
+                gossip_debug(GOSSIP_TROVE_DEBUG, "%s: %s complete: "
+                             "aio_return() ret %d (fd %d)\n",
+                             __func__,
                              ((op_p->type == BSTREAM_WRITE_LIST) ||
                               (op_p->type == BSTREAM_WRITE_AT) ?
                               "WRITE" : "READ"), ret,
