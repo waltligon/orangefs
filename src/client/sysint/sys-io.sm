@@ -874,6 +874,8 @@ io_datafile_post_msgpairs_retry(PINT_client_sm *sm_p, job_status_s *js_p)
     /* give up if beyond retry limit */
     ++sm_p->u.io.retry_count;
     if (sm_p->u.io.retry_count > PVFS2_CLIENT_RETRY_LIMIT) {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: retry %d exceeds limit %d\n",
+          __func__, sm_p->u.io.retry_count, PVFS2_CLIENT_RETRY_DELAY);
         js_p->error_code = IO_DATAFILE_TRANSFERS_COMPLETE;
         return 1;
     }
@@ -1067,7 +1069,7 @@ static int io_datafile_complete_operations(PINT_client_sm *sm_p,
      || sm_p->u.io.write_ack_completion_count) {
         if (sm_p->op_cancelled)
             gossip_debug(GOSSIP_IO_DEBUG, "detected I/O cancellation with "
-                         "%d flow(s) and %d write ack(s) pending\n",
+                         "%d flows and %d write acks pending\n",
                          sm_p->u.io.flow_completion_count,
                          sm_p->u.io.write_ack_completion_count);
         else
