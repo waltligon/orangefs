@@ -33,7 +33,7 @@ static gen_mutex_t s_dbpf_io_mutex = GEN_MUTEX_INITIALIZER;
 
 static int issue_or_delay_io_operation(
     dbpf_queued_op_t *cur_op, struct aiocb **aiocb_ptr_array,
-    int aiocb_inuse_count, struct sigevent *sig);
+    int aiocb_inuse_count, struct sigevent *sig, int dec_first);
 static void start_delayed_ops_if_any(int dec_first);
 
 static inline int dbpf_bstream_rw_list(
@@ -155,6 +155,9 @@ static void aio_progress_notification(sigval_t sig)
             cur_op, ret,
             ((ret == -TROVE_ECANCEL) ? OP_CANCELED : OP_COMPLETED));
 
+        gossip_debug(GOSSIP_TROVE_DEBUG, "*** starting delayed ops if any "
+                     "(state is %d)\n",op_p->u.b_rw_list.list_proc_state);
+
         start_delayed_ops_if_any(1);
     }
     else
@@ -214,7 +217,7 @@ static void aio_progress_notification(sigval_t sig)
 
         ret = issue_or_delay_io_operation(
             cur_op, aiocb_ptr_array, aiocb_inuse_count,
-            &op_p->u.b_rw_list.sigev);
+            &op_p->u.b_rw_list.sigev, 1);
 
         if (ret)
         {
@@ -311,12 +314,16 @@ static void start_delayed_ops_if_any(int dec_first)
 
 static int issue_or_delay_io_operation(
     dbpf_queued_op_t *cur_op, struct aiocb **aiocb_ptr_array,
-    int aiocb_inuse_count, struct sigevent *sig)
+    int aiocb_inuse_count, struct sigevent *sig, int dec_first)
 {
     int ret = -TROVE_EINVAL, op_delayed = 0;
     assert(cur_op);
 
     gen_mutex_lock(&s_dbpf_io_mutex);
+    if (dec_first)
+    {
+        s_dbpf_ios_in_progress--;
+    }
     if (s_dbpf_ios_in_progress < DBPF_MAX_IOS_IN_PROGRESS)
     {
         s_dbpf_ios_in_progress++;
@@ -989,7 +996,7 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
 
     ret = issue_or_delay_io_operation(
         q_op_p, aiocb_ptr_array, aiocb_inuse_count,
-        &op_p->u.b_rw_list.sigev);
+        &op_p->u.b_rw_list.sigev, 0);
 
     if (ret)
     {
@@ -1188,7 +1195,8 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
 
         ret = issue_or_delay_io_operation(
             (dbpf_queued_op_t *)op_p->u.b_rw_list.queued_op_ptr,
-            aiocb_ptr_array, aiocb_inuse_count, &op_p->u.b_rw_list.sigev);
+            aiocb_ptr_array, aiocb_inuse_count,
+            &op_p->u.b_rw_list.sigev, 1);
 
         if (ret)
         {
