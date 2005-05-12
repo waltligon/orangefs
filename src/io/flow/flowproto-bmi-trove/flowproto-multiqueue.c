@@ -1058,8 +1058,6 @@ static int bmi_send_callback_fn(void *user_ptr,
         result_tmp->result.segmax = MAX_REGIONS;
         result_tmp->result.segs = 0;
         result_tmp->buffer_offset = tmp_buffer;
-        q_item->seq = flow_data->next_seq;
-        flow_data->next_seq++;
         ret = PINT_Process_request(q_item->parent->file_req_state,
             q_item->parent->mem_req_state,
             &q_item->parent->file_data,
@@ -1076,6 +1074,10 @@ static int bmi_send_callback_fn(void *user_ptr,
         q_item->buffer_used += old_result_tmp->result.bytes;
     }while(bytes_processed < BUFFER_SIZE && 
         !PINT_REQUEST_DONE(q_item->parent->file_req_state));
+
+    /* important to update the sequence /after/ request processed */
+    q_item->seq = flow_data->next_seq;
+    flow_data->next_seq++;
 
     flow_data->total_bytes_processed += bytes_processed;
     if(PINT_REQUEST_DONE(q_item->parent->file_req_state))
