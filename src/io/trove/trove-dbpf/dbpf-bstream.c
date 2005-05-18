@@ -24,7 +24,7 @@
 #include "pint-event.h"
 #include "dbpf-open-cache.h"
 
-#define AIOCB_ARRAY_SZ 8
+#define AIOCB_ARRAY_SZ 64
 
 #define DBPF_MAX_IOS_IN_PROGRESS  16
 static int s_dbpf_ios_in_progress = 0;

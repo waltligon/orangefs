@@ -23,7 +23,7 @@
 
 #define BUFFERS_PER_FLOW 8
 #define BUFFER_SIZE (256*1024)
-#define MAX_REGIONS 16
+#define MAX_REGIONS 64
 
 #define FLOW_CLEANUP(__flow_data)                                     \
 do {                                                                  \
