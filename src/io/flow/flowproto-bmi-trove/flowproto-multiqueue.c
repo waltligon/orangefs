@@ -752,7 +752,7 @@ static void bmi_recv_callback_fn(void *user_ptr,
                 result_tmp->offset_list;
             result_tmp->result.size_array = 
                 result_tmp->size_list;
-            result_tmp->result.bytemax = BUFFER_SIZE;
+            result_tmp->result.bytemax = BUFFER_SIZE - bytes_processed;
             result_tmp->result.bytes = 0;
             result_tmp->result.segmax = MAX_REGIONS;
             result_tmp->result.segs = 0;
@@ -784,6 +784,7 @@ static void bmi_recv_callback_fn(void *user_ptr,
         }while(bytes_processed < BUFFER_SIZE && 
             !PINT_REQUEST_DONE(q_item->parent->file_req_state));
 
+        assert(bytes_processed <= BUFFER_SIZE);
         if(bytes_processed == 0)
         {        
             qlist_del(&q_item->list_link);
@@ -1053,7 +1054,7 @@ static int bmi_send_callback_fn(void *user_ptr,
             result_tmp->offset_list;
         result_tmp->result.size_array = 
             result_tmp->size_list;
-        result_tmp->result.bytemax = BUFFER_SIZE;
+        result_tmp->result.bytemax = BUFFER_SIZE - bytes_processed;
         result_tmp->result.bytes = 0;
         result_tmp->result.segmax = MAX_REGIONS;
         result_tmp->result.segs = 0;
@@ -1074,6 +1075,8 @@ static int bmi_send_callback_fn(void *user_ptr,
         q_item->buffer_used += old_result_tmp->result.bytes;
     }while(bytes_processed < BUFFER_SIZE && 
         !PINT_REQUEST_DONE(q_item->parent->file_req_state));
+
+    assert(bytes_processed <= BUFFER_SIZE);
 
     /* important to update the sequence /after/ request processed */
     q_item->seq = flow_data->next_seq;
@@ -1259,7 +1262,7 @@ static void trove_write_callback_fn(void *user_ptr,
                 result_tmp->offset_list;
             result_tmp->result.size_array = 
                 result_tmp->size_list;
-            result_tmp->result.bytemax = BUFFER_SIZE;
+            result_tmp->result.bytemax = BUFFER_SIZE - bytes_processed;
             result_tmp->result.bytes = 0;
             result_tmp->result.segmax = MAX_REGIONS;
             result_tmp->result.segs = 0;
@@ -1293,6 +1296,8 @@ static void trove_write_callback_fn(void *user_ptr,
         }while(bytes_processed < BUFFER_SIZE && 
             !PINT_REQUEST_DONE(q_item->parent->file_req_state));
 
+        assert(bytes_processed <= BUFFER_SIZE);
+ 
         flow_data->total_bytes_processed += bytes_processed;
 
         if(bytes_processed == 0)
@@ -1538,6 +1543,8 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
         }while(bytes_processed < BUFFER_SIZE &&
             !PINT_REQUEST_DONE(q_item->parent->file_req_state));
 
+        assert (bytes_processed <= BUFFER_SIZE);
+
         /* setup for BMI operation */
         flow_data->tmp_buffer_list[0] = flow_data->intermediate;
         q_item->result_chain.result.size_array[0] = bytes_processed;
@@ -1682,6 +1689,8 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
             }
         }while(bytes_processed < BUFFER_SIZE &&
             !PINT_REQUEST_DONE(q_item->parent->file_req_state));
+
+        assert(bytes_processed <= BUFFER_SIZE);
     }
 
     /* are we done? */
