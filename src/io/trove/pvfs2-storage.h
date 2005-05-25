@@ -131,10 +131,6 @@ do {                                                           \
         dest->ctime = src->ctime;                              \
     if (src->mask & PVFS_ATTR_COMMON_MTIME)                    \
         dest->mtime = src->mtime;                              \
-                                                               \
-    dest->u.meta.dfile_count = 0;                              \
-    dest->u.meta.dist_size = 0;                                \
-                                                               \
     if (src->mask & PVFS_ATTR_COMMON_TYPE)                     \
     {                                                          \
         dest->objtype = src->objtype;                          \
