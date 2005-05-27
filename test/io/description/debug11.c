@@ -15,10 +15,32 @@
 #include <pvfs2-request.h>
 #include <pint-request.h>
 
+#include "debug.h"
+
 #define SEGMAX 16
 #define BYTEMAX (4*1024*1024)
 
-int main(int argc, char **argv)
+PVFS_offset exp1_offset[] =
+{
+	0
+};
+
+PVFS_size exp1_size[] =
+{
+	4076
+};
+
+PINT_Request_result exp[] =
+{{
+	offset_array : &exp1_offset[0],
+	size_array : &exp1_size[0],
+	segmax : SEGMAX,
+	segs : 1,
+	bytes : 4076
+}};
+
+
+int request_debug()
 {
 	int i;
 	PINT_Request *r1;
@@ -58,18 +80,27 @@ int main(int argc, char **argv)
 	seg1.bytes = 0;
 	seg1.segs = 0;
 	
+   /* Turn on debugging */
+	if (gossipflag)
+	{
+		gossip_enable_stderr();
+		gossip_set_debug_mask(1,GOSSIP_REQUEST_DEBUG); 
+	}
+
+	i = 0;
+
 	/* skip into the file datatype */
 	PINT_REQUEST_STATE_SET_TARGET(rs1, 20);
-
-   /* Turn on debugging */
-	 gossip_enable_stderr();
-	 gossip_set_debug_mask(1,GOSSIP_REQUEST_DEBUG); 
 
 	/* skipping logical bytes */
 	// PINT_REQUEST_STATE_SET_TARGET(rs1,(3 * 1024) + 512);
 	// PINT_REQUEST_STATE_SET_FINAL(rs1,(6 * 1024) + 512);
 	
 	printf("\n************************************\n");
+	printf("1 request in CLIENT mode, server 0 of 4\n");
+	printf("request size 4096 contig, mem size 4076 contig\n");
+	printf("skip first 20 bytes of request\n");
+	printf("************************************\n");
 	do
 	{
 		seg1.bytes = 0;
@@ -80,14 +111,12 @@ int main(int argc, char **argv)
 
 		if(retval >= 0)
 		{
-			printf("results of PINT_Process_request():\n");
-			printf("%d segments with %lld bytes\n", seg1.segs, Ld(seg1.bytes));
-			for(i=0; i<seg1.segs; i++)
-			{
-				printf("  segment %d: offset: %d size: %d\n",
-					i, (int)seg1.offset_array[i], (int)seg1.size_array[i]);
-			}
+			prtseg(&seg1,"Results obtained");
+			prtseg(&exp[i],"Results expected");
+			cmpseg(&seg1,&exp[i]);
 		}
+
+		i++;
 
 	} while(!PINT_REQUEST_DONE(rs1) && retval >= 0);
 	
