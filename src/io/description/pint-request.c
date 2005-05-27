@@ -13,6 +13,8 @@
 #include <pint-request.h>
 #include <pint-distribution.h>
 
+static int PINT_Request_disp(PINT_Request *request);
+
 /* this macro is only used in this file to add a segment to the
  * result list.
  */
@@ -208,7 +210,8 @@ int PINT_Process_request(PINT_Request_state *req,
 		}
 		/* basic data type or contiguous data - handle directly */
 		/* NULL ereq indicates current type is packed bytes */
-		/* current type is contiguous because its size equals ub minus lb */
+		/* current type is contiguous because its size equals extent */
+		/* AND the num_contig_chunks is 1 */
 		else if ((req->cur[req->lvl].rq->ereq == NULL ||
 				(req->cur[req->lvl].rq->aggregate_size ==
 				(req->cur[req->lvl].rqbase->ub -
@@ -218,12 +221,14 @@ int PINT_Process_request(PINT_Request_state *req,
 		{
 			gossip_debug(GOSSIP_REQUEST_DEBUG,"\tbasic type or contiguous data\n");
 			contig_offset = req->cur[req->lvl].rq->offset +
-					req->cur[req->lvl].chunk_offset + req->bytes;
+					req->cur[req->lvl].chunk_offset + req->bytes +
+					PINT_Request_disp(req->cur[req->lvl].rq);
 			contig_size = (req->cur[req->lvl].maxel *
 					req->cur[req->lvl].rq->aggregate_size) - req->bytes;
 			lvl_flag = 1;
 		}
-		/* subtype is contiguous because its size equals its ub minus lb */
+		/* subtype is contiguous because its size equals its extent */
+		/* AND the num_contig_chunks is 1 */
 		else if (req->cur[req->lvl].rq->ereq->aggregate_size ==
 				(req->cur[req->lvl].rq->ereq->ub -
 				req->cur[req->lvl].rq->ereq->lb) &&
@@ -234,7 +239,8 @@ int PINT_Process_request(PINT_Request_state *req,
 				(req->cur[req->lvl].el * (req->cur[req->lvl].rqbase->ub -
 												  req->cur[req->lvl].rqbase->lb)) +
 				req->cur[req->lvl].rq->offset + (req->cur[req->lvl].rq->stride *
-						req->cur[req->lvl].blk) + req->bytes;
+						req->cur[req->lvl].blk) + req->bytes +
+				PINT_Request_disp(req->cur[req->lvl].rq);
 			contig_size = (req->cur[req->lvl].rq->ereq->aggregate_size *
 					req->cur[req->lvl].rq->num_ereqs) - req->bytes;
 			lvl_flag = 0;
@@ -466,6 +472,20 @@ int PINT_Process_request(PINT_Request_state *req,
 	return result->bytes;
 }
 
+/* this function runs down the ereq list and adds up the offsets */
+/* present in the request records */
+static int PINT_Request_disp(PINT_Request *request)
+{
+	int disp = 0;
+	PINT_Request *r;
+	gossip_debug(GOSSIP_REQUEST_DEBUG,"\tRequest disp\n");
+	for (r = request->ereq; r; r = r->ereq)
+	{
+		disp += r->offset;
+	}
+	return disp;
+}
+
 /* This function creates a request state and sets it up to begin */
 /* processing a request */
 struct PINT_Request_state *PINT_New_request_state (PINT_Request *request)
@@ -560,11 +580,27 @@ PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
 	orig_offset = offset;
 	orig_size = size;
 	*eof_flag = 0;
+	/* check if we have maxed out result */
 	if ((!PINT_IS_CKSIZE(mode) && (result->segs >= result->segmax)) ||
 			result->bytes >= result->bytemax || size == 0)
 	{
 		/* not an error, but we didn't process any bytes */
 		gossip_debug(GOSSIP_REQUEST_DEBUG,"\t\trequested zero segs or zero bytes\n");
+		return 0;
+	}
+	/* verify some critical pointers */
+	if (!rfdata || !rfdata->dist || !rfdata->dist->methods ||
+			!rfdata->dist->params)
+	{
+		if (!rfdata)
+			gossip_debug(GOSSIP_REQUEST_DEBUG,"rfdata is NULL\n");
+		else if (!rfdata->dist)
+			gossip_debug(GOSSIP_REQUEST_DEBUG,"rfdata->dist is NULL\n");
+		else if (!rfdata->dist->methods)
+			gossip_debug(GOSSIP_REQUEST_DEBUG,"rfdata->dist->methods is NULL\n");
+		else if (!rfdata->dist->params)
+			gossip_debug(GOSSIP_REQUEST_DEBUG,"rfdata->dist->params is NULL\n");
+		gossip_lerr("Bad Distribution! Bailing out!\n");
 		return 0;
 	}
 	/* find next logical offset on this server */
