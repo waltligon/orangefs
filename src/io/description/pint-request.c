@@ -580,11 +580,27 @@ PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
 	orig_offset = offset;
 	orig_size = size;
 	*eof_flag = 0;
+	/* check if we have maxed out result */
 	if ((!PINT_IS_CKSIZE(mode) && (result->segs >= result->segmax)) ||
 			result->bytes >= result->bytemax || size == 0)
 	{
 		/* not an error, but we didn't process any bytes */
 		gossip_debug(GOSSIP_REQUEST_DEBUG,"\t\trequested zero segs or zero bytes\n");
+		return 0;
+	}
+	/* verify some critical pointers */
+	if (!rfdata || !rfdata->dist || !rfdata->dist->methods ||
+			!rfdata->dist->params)
+	{
+		if (!rfdata)
+			gossip_debug(GOSSIP_REQUEST_DEBUG,"rfdata is NULL\n");
+		else if (!rfdata->dist)
+			gossip_debug(GOSSIP_REQUEST_DEBUG,"rfdata->dist is NULL\n");
+		else if (!rfdata->dist->methods)
+			gossip_debug(GOSSIP_REQUEST_DEBUG,"rfdata->dist->methods is NULL\n");
+		else if (!rfdata->dist->params)
+			gossip_debug(GOSSIP_REQUEST_DEBUG,"rfdata->dist->params is NULL\n");
+		gossip_lerr("Bad Distribution! Bailing out!\n");
 		return 0;
 	}
 	/* find next logical offset on this server */
