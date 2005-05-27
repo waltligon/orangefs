@@ -15,94 +15,126 @@
 #include <pvfs2-request.h>
 #include <pint-request.h>
 
+#include <debug.h>
+
 #define SEGMAX 16
 #define BYTEMAX (4*1024*1024)
 
-int result1 [] = {
-	0 , 128,
-	384 , 128,
-	768 , 128,
-	1152 , 128,
-	1536 , 128,
-	1920 , 128,
-	2304 , 128,
-	2688 , 128,
-	3072 , 128,
-	3456 , 128,
-	3840 , 128,
-	4224 , 128,
-	4608 , 128,
-	4992 , 128,
-	5376 , 128,
-	5760 , 128,
-   -1
+PVFS_offset exp1_offset [] = {
+	0 ,
+	384 ,
+	768 ,
+	1152 ,
+	1536 ,
+	1920 ,
+	2304 ,
+	2688 ,
+	3072 ,
+	3456 ,
+	3840 ,
+	4224 ,
+	4608 ,
+	4992 ,
+	5376 ,
+	5760 
 };
 
-int result2 [] = {
-	6144 , 128,
-	6528 , 128,
-	6912 , 128,
-	7296 , 128,
-	7680 , 128,
-	8064 , 128,
-	8448 , 128,
-	8832 , 128,
-	9216 , 128,
-	9600 , 128,
-	9984 , 128,
-	10368 , 128,
-	10752 , 128,
-	11136 , 128,
-	11520 , 128,
-	11904 , 128,
-   -1
+PVFS_offset exp2_offset [] = {
+	6144 ,
+	6528 ,
+	6912 ,
+	7296 ,
+	7680 ,
+	8064 ,
+	8448 ,
+	8832 ,
+	9216 ,
+	9600 ,
+	9984 ,
+	10368 ,
+	10752 ,
+	11136 ,
+	11520 ,
+	11904 
 };
 
-int result3 [] = {
-	12288 , 128,
-	12672 , 128,
-	13056 , 128,
-	13440 , 128,
-	13824 , 128,
-	14208 , 128,
-	14592 , 128,
-	14976 , 128,
-	15360 , 128,
-	15744 , 128,
-	16128 , 128,
-	16512 , 128,
-	16896 , 128,
-	17280 , 128,
-	17664 , 128,
-	18048 , 128,
-   -1
+PVFS_offset exp3_offset [] = {
+	12288 ,
+	12672 ,
+	13056 ,
+	13440 ,
+	13824 ,
+	14208 ,
+	14592 ,
+	14976 ,
+	15360 ,
+	15744 ,
+	16128 ,
+	16512 ,
+	16896 ,
+	17280 ,
+	17664 ,
+	18048 
 };
 
-int result4 [] = {
-	18432 , 128,
-	18816 , 128,
-	19200 , 128,
-	19584 , 128,
-	19968 , 128,
-	20352 , 128,
-	20736 , 128,
-	21120 , 128,
-   -1
+PVFS_offset exp4_offset [] = {
+	18432 ,
+	18816 ,
+	19200 ,
+	19584 ,
+	19968 ,
+	20352 ,
+	20736 ,
+	21120 
 };
 
-void prtres(int *result)
-{
-   int *p = result;
-   printf("Result should be:\n");
-   while (*p != -1)
-   {
-      printf("\t%d\t%d\n",*p, *(p+1));
-      p+=2;
-   }
-}
+PVFS_size exp1_size [] = {
+	128,
+	128,
+	128,
+	128,
+	128,
+	128,
+	128,
+	128,
+	128,
+	128,
+	128,
+	128,
+	128,
+	128,
+	128,
+	128
+};
 
+PINT_Request_result exp[] =
+{{
+   offset_array : &exp1_offset[0],
+   size_array : &exp1_size[0],
+   segmax : SEGMAX,
+   segs : 16,
+   bytes : 16*128
+}, {
+   offset_array : &exp2_offset[0],
+   size_array : &exp1_size[0],
+   segmax : SEGMAX,
+   segs : 16,
+   bytes : 16*128
+}, {
+   offset_array : &exp3_offset[0],
+   size_array : &exp1_size[0],
+   segmax : SEGMAX,
+   segs : 16,
+   bytes : 16*128
+}, {
+   offset_array : &exp4_offset[0],
+   size_array : &exp1_size[0],
+   segmax : SEGMAX,
+   segs : 8,
+   bytes : 8*128
+}};
 
-int main(int argc, char **argv)
+int request_debug()
 {
 	int i;
 	PINT_Request *r1;
@@ -143,8 +175,13 @@ int main(int argc, char **argv)
 	seg1.segs = 0;
 
    /* Turn on debugging */
-	/* gossip_enable_stderr();
-	 gossip_set_debug_mask(1,REQUEST_DEBUG); */
+	if (gossipflag)
+	{
+		gossip_enable_stderr();
+		gossip_set_debug_mask(1,GOSSIP_REQUEST_DEBUG);
+	}
+
+	i = 0;
 
 	/* skipping logical bytes */
 	// PINT_REQUEST_STATE_SET_TARGET(rs1,(3 * 1024) + 512);
@@ -166,14 +203,12 @@ int main(int argc, char **argv)
 
 		if(retval >= 0)
 		{
-			printf("results of PINT_Process_request():\n");
-			printf("%d segments with %lld bytes\n", seg1.segs, Ld(seg1.bytes));
-			for(i=0; i<seg1.segs; i++)
-			{
-				printf("  segment %d: offset: %d size: %d\n",
-					i, (int)seg1.offset_array[i], (int)seg1.size_array[i]);
-			}
+			prtseg(&seg1,"Results obtained");
+			prtseg(&exp[i],"Results expected");
+			cmpseg(&seg1,&exp[i]);
 		}
+
+		i++;
 
 	} while(!PINT_REQUEST_DONE(rs1) && retval >= 0);
 	
@@ -185,10 +220,6 @@ int main(int argc, char **argv)
 	if(PINT_REQUEST_DONE(rs1))
 	{
 		printf("**** request done.\n");
-		prtres(result1);
-		prtres(result2);
-		prtres(result3);
-		prtres(result4);
 	}
 
 	return 0;

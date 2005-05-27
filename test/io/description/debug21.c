@@ -15,61 +15,36 @@
 #include <pvfs2-request.h>
 #include <pint-request.h>
 
-#include "debug.h"
-
 #define SEGMAX 16
 #define BYTEMAX (4*1024*1024)
 
-PVFS_offset exp1_offset[] =
-{
-	0,
-	720,
-	970
-};
-
-PVFS_size exp1_size[] =
-{
-	220,
-	180,
-	40
-};
-
-PINT_Request_result exp[] =
-{{
-	offset_array : &exp1_offset[0],
-	size_array : &exp1_size[0],
-	segmax : SEGMAX,
-	segs : 1,
-	bytes : 220
-}, {
-	offset_array : &exp1_offset[1],
-	size_array : &exp1_size[1],
-	segmax : SEGMAX,
-	segs : 2,
-	bytes : 220
-}};
-
-int request_debug()
+int main(int argc, char **argv)
 {
 	int i;
+	PINT_Request *r1a;
 	PINT_Request *r1;
 	PINT_Request *r2;
 	PINT_Request_state *rs1;
 	PINT_Request_state *rs2;
 	PINT_Request_file_data rf1;
 	PINT_Request_result seg1;
-	static int32_t blen[2] = {20, 200};
-	static PVFS_offset disp[2] = {10, 100};
 
 	/* PVFS_Process_request arguments */
 	int retval;
+	int32_t blksz[] = {1};
+	PVFS_size disps1[] = {8};
+	PVFS_size disps2[] = {4};
+	PVFS_Request oldrs1[1] = {PVFS_INT};
+	PVFS_Request oldrs2[1];
 
-	/* set up request state */
-	PVFS_Request_hindexed(2, blen, disp, PVFS_BYTE, &r1);
+	/* set up file type request */
+	PVFS_Request_struct(1, blksz, disps1, oldrs1, &r1a);
+	oldrs2[0] = r1a;
+	PVFS_Request_struct(1, blksz, disps2, oldrs2, &r1);
 	rs1 = PINT_New_request_state(r1);
 
 	/* set up memory request */
-	PVFS_Request_contiguous(220, PVFS_BYTE, &r2);
+	PVFS_Request_contiguous(8, PVFS_BYTE, &r2);
 	rs2 = PINT_New_request_state(r2);
 
 	/* set up file data for request */
@@ -90,31 +65,24 @@ int request_debug()
 	seg1.segs = 0;
 	
 	/* skip into the file datatype */
-	PINT_REQUEST_STATE_SET_TARGET(rs1, 500);
-	PINT_REQUEST_STATE_SET_FINAL(rs1,720);
+	/*PINT_REQUEST_STATE_SET_TARGET(rs1, 500);*/
+	PINT_REQUEST_STATE_SET_FINAL(rs1, 8);
 
    /* Turn on debugging */
-	if (gossipflag)
-	{
-		gossip_enable_stderr();
-		gossip_set_debug_mask(1,GOSSIP_REQUEST_DEBUG); 
-	}
+	 gossip_enable_stderr();
+	 gossip_set_debug_mask(1,GOSSIP_REQUEST_DEBUG); 
 
-	i = 0;
-
-	/* skipping logical bytes */
-	// PINT_REQUEST_STATE_SET_TARGET(rs1,(3 * 1024) + 512);
-	// PINT_REQUEST_STATE_SET_FINAL(rs1,(6 * 1024) + 512);
-	
 	printf("\n************************************\n");
-	printf("1 request in CLIENT mode server 0 of 4\n");
-	printf("indexed request type, contig memory type\n");
-	printf("offset 500 size 220\n");
-	printf("************************************\n");
+	printf("One request in CLIENT mode server 0 of 4\n");
+	printf("Simple stripe, default stripe size (64K)\n");
+	printf("Offset 0, file size 6000, no extend flag\n");
+	printf("MemReq size 8 contiguous\n");
+	printf("\n************************************\n");
+	PINT_REQUEST_STATE_RESET(rs1);
+	PINT_REQUEST_STATE_RESET(rs2);
 	do
 	{
-		PINT_REQUEST_STATE_RESET(rs1);
-		PINT_REQUEST_STATE_RESET(rs2);
+		int r = 0;
 		seg1.bytes = 0;
 		seg1.segs = 0;
 
@@ -123,12 +91,14 @@ int request_debug()
 
 		if(retval >= 0)
 		{
-			prtseg(&seg1,"Results obtained");
-			prtseg(&exp[i],"Results expected");
-			cmpseg(&seg1,&exp[i]);
+			printf("results of PINT_Process_request():\n");
+			printf("%d segments with %lld bytes\n", seg1.segs, Ld(seg1.bytes));
+			for(i=0; i<seg1.segs; i++, r++)
+			{
+				printf("  segment %d: offset: %d size: %d\n",
+					i, (int)seg1.offset_array[i], (int)seg1.size_array[i]);
+			}
 		}
-
-		i++;
 
 	} while(!PINT_REQUEST_DONE(rs1) && retval >= 0);
 	
@@ -143,9 +113,15 @@ int request_debug()
 	}
 	
 	printf("\n************************************\n");
+	printf("One request in SERVER mode server 0 of 4\n");
+	printf("Simple stripe, default stripe size (64K)\n");
+	printf("Offset 32, file size 6000, no extend flag\n");
+	printf("MemReq size 8 contiguous\n");
+	printf("\n************************************\n");
+	PINT_REQUEST_STATE_RESET(rs1);
 	do
 	{
-		PINT_REQUEST_STATE_RESET(rs1);
+		int r = 0;
 		seg1.bytes = 0;
 		seg1.segs = 0;
 
@@ -154,12 +130,14 @@ int request_debug()
 
 		if(retval >= 0)
 		{
-			prtseg(&seg1,"Results obtained");
-			prtseg(&exp[i],"Results expected");
-			cmpseg(&seg1,&exp[i]);
+			printf("results of PINT_Process_request():\n");
+			printf("%d segments with %lld bytes\n", seg1.segs, Ld(seg1.bytes));
+			for(i=0; i<seg1.segs; i++, r++)
+			{
+				printf("  segment %d: offset: %d size: %d\n",
+					i, (int)seg1.offset_array[i], (int)seg1.size_array[i]);
+			}
 		}
-
-		i++;
 
 	} while(!PINT_REQUEST_DONE(rs1) && retval >= 0);
 	
