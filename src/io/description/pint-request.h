@@ -94,6 +94,8 @@ typedef struct PINT_Request {
 	decode_int32_t(pptr, &(rp+i)->refcount); \
 	decode_skip4(pptr,); \
 	/* put integer offsets into pointers, let PINT_Request_decode fix */ \
+	(rp+i)->ereq = 0; \
+	(rp+i)->sreq = 0; \
 	decode_uint32_t(pptr, (u_int32_t*) &(rp+i)->ereq); \
 	decode_uint32_t(pptr, (u_int32_t*) &(rp+i)->sreq); \
     } \
