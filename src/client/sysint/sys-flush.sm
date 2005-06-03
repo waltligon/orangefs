@@ -173,9 +173,6 @@ static int flush_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
     PVFS_object_attr *attr = NULL;
     PINT_sm_msgpair_state *msg_p = NULL;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) flush state: "
-                 "datafile_setup_msgpairarray\n", sm_p);
-
     js_p->error_code = 0;
 
     attr = (sm_p->acache_hit ?
@@ -252,18 +249,12 @@ static int flush_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
 static int flush_datafile_flush_failure(PINT_client_sm *sm_p,
                                         job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "(%p) flush state: datafile_flush_failure\n",
-                 sm_p);
     return 1;
 }
 
 static int flush_cleanup(PINT_client_sm *sm_p,
                          job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "(%p) flush state: flush_cleanup\n", sm_p);
-
     sm_p->error_code = js_p->error_code;
 
     if (sm_p->msgarray)

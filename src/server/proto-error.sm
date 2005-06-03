@@ -43,7 +43,7 @@ static int proto_error_init(PINT_server_op *s_op, job_status_s* js_p)
     int ret;
     job_id_t tmp_id;
 
-    PINT_STATE_DEBUG("init");
+    
 
     BMI_set_info(s_op->addr, BMI_INC_ADDR_REF, NULL);
 
@@ -92,7 +92,7 @@ static int proto_error_init(PINT_server_op *s_op, job_status_s* js_p)
  */
 static int proto_error_cleanup(PINT_server_op *s_op, job_status_s* js_p)
 {
-    PINT_STATE_DEBUG("cleanup");
+    
     return(server_state_machine_complete(s_op));
 }
 

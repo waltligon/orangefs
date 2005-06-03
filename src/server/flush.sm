@@ -104,7 +104,7 @@ machine pvfs2_flush_sm(
 
 static int flush_check_type(PINT_server_op *s_op, job_status_s *js_p)
 {
-    PINT_STATE_DEBUG("flush_check_type");
+    
 
     js_p->error_code = 0;
 
@@ -137,7 +137,7 @@ static int flush_keyval_flush(PINT_server_op *s_op, job_status_s *js_p)
     int ret = -1;
     job_id_t tmp_id;
 
-    PINT_STATE_DEBUG("kflush");
+    
 
     gossip_debug(GOSSIP_SERVER_DEBUG, " doing keyval flush on %Lu,%d\n",
                  Lu(s_op->req->u.flush.handle), s_op->req->u.flush.fs_id);
@@ -158,7 +158,7 @@ static int flush_keyval_flush(PINT_server_op *s_op, job_status_s *js_p)
 static int flush_check_error(PINT_server_op *s_op, job_status_s *js_p)
 {
     char buf[64] = {0};
-    PINT_STATE_DEBUG("{k,b}check_error");
+    
 
     if (js_p->error_code != 0)
     {
@@ -188,7 +188,7 @@ static int flush_bstream_flush(PINT_server_op *s_op, job_status_s *js_p)
     int ret = -1;
     job_id_t i;
 
-    PINT_STATE_DEBUG("bflush");
+    
 
     gossip_debug(GOSSIP_SERVER_DEBUG, " doing bstream flush on %Lu,%d\n",
                  Lu(s_op->req->u.flush.handle), s_op->req->u.flush.fs_id);
@@ -208,7 +208,7 @@ static int flush_bstream_flush(PINT_server_op *s_op, job_status_s *js_p)
 	    
 static int flush_cleanup(PINT_server_op *s_op, job_status_s *js_p)
 {
-    PINT_STATE_DEBUG("cleanup");
+    
 
     return(server_state_machine_complete(s_op));
 }

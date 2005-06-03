@@ -178,7 +178,7 @@ static int crdirent_validate(PINT_server_op *s_op,
 {
     char *ptr = NULL;
 
-    PINT_STATE_DEBUG("validate");
+    
 
     if ((s_op->u.crdirent.name == NULL) ||
         (s_op->u.crdirent.parent_handle == PVFS_HANDLE_NULL))
@@ -262,7 +262,7 @@ static int crdirent_read_directory_entry_handle(
     int ret = -PVFS_EINVAL;
     job_id_t i;
 
-    PINT_STATE_DEBUG("read_directory_entry_handle");
+    
 
     /* get the key and key size out of our list of common keys */
     s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
@@ -324,7 +324,7 @@ static int crdirent_create_dirdata_dspace(PINT_server_op *s_op,
     PVFS_handle_extent_array extent_array;
     struct server_configuration_s *user_opts = get_server_config_struct();
 
-    PINT_STATE_DEBUG("create_dirdata_dspace");
+    
 
     gossip_debug(
         GOSSIP_SERVER_DEBUG, "  creating dspace (coll_id = %d)\n",
@@ -384,7 +384,7 @@ static int crdirent_write_dirdata_handle(PINT_server_op *s_op,
     job_id_t i;
     struct server_configuration_s *user_opts = get_server_config_struct();
 
-    PINT_STATE_DEBUG("write_dirdata_handle");
+    
 
     if (js_p->error_code)
     {
@@ -453,7 +453,7 @@ static int crdirent_write_directory_entry(PINT_server_op *s_op,
     struct server_configuration_s *user_opts =
         get_server_config_struct();
 
-    PINT_STATE_DEBUG("write_directory_entry");
+    
 
     js_p->error_code = 0;
 
@@ -514,7 +514,7 @@ static int crdirent_update_directory_attr(
     PVFS_ds_attributes *ds_attr = NULL;
     struct server_configuration_s *user_opts = get_server_config_struct();
 
-    PINT_STATE_DEBUG("update_directory_entry");
+    
 
     if (js_p->error_code != UPDATE_DIR_ATTR_REQUIRED)
     {
@@ -593,7 +593,7 @@ static int crdirent_check_exist_directory_entry(PINT_server_op *s_op,
     int ret = -PVFS_EINVAL;
     job_id_t i = 0;
 
-    PINT_STATE_DEBUG("check_exist_directory_entry");
+    
 
     /* This buffer came from one of two places, either phase two of
      * creating the directory space when we wrote the value back to
@@ -624,7 +624,7 @@ static int crdirent_check_exist_directory_entry(PINT_server_op *s_op,
 static int crdirent_cleanup(PINT_server_op *s_op,
                             job_status_s *js_p)
 {
-    PINT_STATE_DEBUG("cleanup");
+    
     return(server_state_machine_complete(s_op));
 }
 
@@ -662,7 +662,7 @@ static int crdirent_set_error_code(
 static int crdirent_setup_op(
     PINT_server_op *s_op, job_status_s *js_p)
 {
-    PINT_STATE_DEBUG("setup_op");
+    
 
     s_op->u.crdirent.name = s_op->req->u.crdirent.name;
     s_op->u.crdirent.new_handle = s_op->req->u.crdirent.new_handle;

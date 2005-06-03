@@ -60,15 +60,32 @@ extern "C" {
 (((__id << ((sizeof(__id) - 1) * 8)) | __handle) %                       \
    DBPF_BSTREAM_MAX_NUM_BUCKETS)
 
-#define DBPF_EVENT_START(__op, __id)                                     \
- PINT_event_timestamp(PVFS_EVENT_API_TROVE, __op, 0, __id,               \
- PVFS_EVENT_FLAG_START)
+enum __nullenum { __null = 1 };
+#define DBPF_EVENT_REQID(__ptr) \
+    ((void *)((__ptr + (sizeof(void *))) \
+              + (sizeof(enum __nullenum)) + (sizeof(uint64_t))))
 
-#define DBPF_EVENT_END(__op, __id)                                       \
- PINT_event_timestamp(PVFS_EVENT_API_TROVE, __op, 0, __id,               \
- PVFS_EVENT_FLAG_END)
+#define DBPF_EVENT_START(__op, __ptr, __id)                            \
+do                                                                     \
+{                                                                      \
+    PVFS_id_gen_t __reqid = 0;                                         \
+    if(__ptr)                                                          \
+        id_gen_fast_register(&__reqid, DBPF_EVENT_REQID(__ptr));       \
+    PINT_event_timestamp(PVFS_EVENT_API_TROVE, __op, 0, __id,          \
+                         PVFS_EVENT_FLAG_START, 0, __reqid);           \
+} while(0)
 
-#define DBPF_GET_STORAGE_DIRNAME(__buf, __path_max, __stoname)                 \
+#define DBPF_EVENT_END(__op, __ptr, __id)                              \
+do                                                                     \
+{                                                                      \
+    PVFS_id_gen_t __reqid = 0;                                         \
+    if(__ptr)                                                          \
+        id_gen_fast_register(&__reqid, DBPF_EVENT_REQID(__ptr));       \
+    PINT_event_timestamp(PVFS_EVENT_API_TROVE, __op, 0, __id,          \
+                         PVFS_EVENT_FLAG_END, 0, __reqid);             \
+} while(0)
+
+#define DBPF_GET_STORAGE_DIRNAME(__buf, __path_max, __stoname)         \
 do { snprintf(__buf, __path_max, "/%s", __stoname); } while (0)
 
 #define STO_ATTRIB_DBNAME "storage_attributes.db"

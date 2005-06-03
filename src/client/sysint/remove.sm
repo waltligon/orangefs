@@ -148,9 +148,6 @@ static int remove_getattr_setup_msgpair(PINT_client_sm *sm_p,
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "remove state: getattr_setup_msgpair\n");
-
     js_p->error_code = 0;
 
     assert(sm_p->object_ref.fs_id != PVFS_FS_ID_NULL);
@@ -266,9 +263,6 @@ static int remove_datafile_remove_setup_msgpair(PINT_client_sm *sm_p,
     */
     js_p->error_code = 0;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "remove state: datafile_remove_setup_msgpair\n");
-
     attr = (sm_p->acache_hit ? &sm_p->pinode->attr : &sm_p->acache_attr);
     assert(attr);
 
@@ -320,9 +314,6 @@ static int remove_object_remove_setup_msgpair(PINT_client_sm *sm_p,
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "remove state: object_remove_setup_msgpair\n");
-
     js_p->error_code = 0;
 
     PINT_init_msgpair(sm_p, msg_p);
@@ -366,9 +357,7 @@ static int remove_datafile_remove_failure(PINT_client_sm *sm_p,
 static int remove_object_remove_failure(PINT_client_sm *sm_p,
 					job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: "
-                 "object_remove_failure\n");
-    /*
+   /*
       catch and return acceptable errors here to avoid generic
       post-remove-failure cleanup
     */
@@ -387,8 +376,6 @@ static int remove_object_remove_failure(PINT_client_sm *sm_p,
 static int remove_helper_cleanup(PINT_client_sm *sm_p,
                                  job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: helper cleanup\n");
-
     if (sm_p->acache_hit)
     {
 	PINT_acache_release(sm_p->pinode);

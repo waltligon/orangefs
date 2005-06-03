@@ -141,7 +141,7 @@ PVFS_error PVFS_mgmt_perf_mon_list(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PVFS_mgmt_perf_mon_list entered\n");
-
+    
     ret = PVFS_imgmt_perf_mon_list(
         fs_id, credentials, perf_matrix, end_time_ms_array,
         addr_array, next_id_array, server_count, history_count,
@@ -161,7 +161,7 @@ PVFS_error PVFS_mgmt_perf_mon_list(
             error = ret;
         }
     }
-
+    
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PVFS_mgmt_perf_mon_list completed\n");
 
@@ -174,9 +174,6 @@ static int mgmt_perf_mon_list_setup_msgpair(PINT_client_sm *sm_p,
 {
     int i = 0;
     PINT_sm_msgpair_state *msg_p = NULL;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "perf_mon_list state: "
-                 "mgmt_perf_mon_list_setup_msgpair\n");
 
     /* setup msgpair array */
     for (i=0; i < sm_p->msgarray_count; i++)

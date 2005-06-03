@@ -235,103 +235,103 @@ PVFS_error PINT_client_state_machine_post(
     {
 	case PVFS_SYS_REMOVE:
 	    sm_p->current_state =
-                (pvfs2_client_remove_sm.state_machine + 1);
+                (pvfs2_client_remove_sm.state_machine + 2);
 	    break;
 	case PVFS_SYS_CREATE:
 	    sm_p->current_state =
-                (pvfs2_client_create_sm.state_machine + 1);
+                (pvfs2_client_create_sm.state_machine + 2);
 	    break;
 	case PVFS_SYS_MKDIR:
 	    sm_p->current_state =
-                (pvfs2_client_mkdir_sm.state_machine + 1);
+                (pvfs2_client_mkdir_sm.state_machine + 2);
 	    break;
 	case PVFS_SYS_SYMLINK:
 	    sm_p->current_state =
-                (pvfs2_client_symlink_sm.state_machine + 1);
+                (pvfs2_client_symlink_sm.state_machine + 2);
 	    break;
 	case PVFS_SYS_READDIR:
 	    sm_p->current_state =
-                (pvfs2_client_readdir_sm.state_machine + 1);
+                (pvfs2_client_readdir_sm.state_machine + 2);
 	    break;
 	case PVFS_SYS_LOOKUP:
 	    sm_p->current_state =
-                (pvfs2_client_lookup_sm.state_machine + 1);
+                (pvfs2_client_lookup_sm.state_machine + 2);
 	    break;
 	case PVFS_SYS_RENAME:
 	    sm_p->current_state =
-                (pvfs2_client_rename_sm.state_machine + 1);
+                (pvfs2_client_rename_sm.state_machine + 2);
 	    break;
 	case PVFS_SYS_GETATTR:
 	    sm_p->current_state =
-                (pvfs2_client_getattr_sm.state_machine + 1);
+                (pvfs2_client_getattr_sm.state_machine + 2);
 	    break;
 	case PVFS_SYS_SETATTR:
 	    sm_p->current_state =
-                (pvfs2_client_setattr_sm.state_machine + 1);
+                (pvfs2_client_setattr_sm.state_machine + 2);
 	    break;
 	case PVFS_SYS_IO:
 	    sm_p->current_state =
-                (pvfs2_client_io_sm.state_machine + 1);
+                (pvfs2_client_io_sm.state_machine + 2);
 	    break;
 	case PVFS_SYS_FLUSH:
 	    sm_p->current_state =
-                (pvfs2_client_flush_sm.state_machine + 1);
+                (pvfs2_client_flush_sm.state_machine + 2);
 	    break;
 	case PVFS_MGMT_SETPARAM_LIST:
 	    sm_p->current_state =
-                (pvfs2_client_mgmt_setparam_list_sm.state_machine + 1);
+                (pvfs2_client_mgmt_setparam_list_sm.state_machine + 2);
 	    break;
 	case PVFS_MGMT_NOOP:
 	    sm_p->current_state =
-                (pvfs2_client_mgmt_noop_sm.state_machine + 1);
+                (pvfs2_client_mgmt_noop_sm.state_machine + 2);
 	    break;
 	case PVFS_SYS_TRUNCATE:
 	    sm_p->current_state =
-                (pvfs2_client_truncate_sm.state_machine + 1);
+                (pvfs2_client_truncate_sm.state_machine + 2);
 	    break;
 	case PVFS_MGMT_STATFS_LIST:
 	    sm_p->current_state =
-                (pvfs2_client_mgmt_statfs_list_sm.state_machine + 1);
+                (pvfs2_client_mgmt_statfs_list_sm.state_machine + 2);
 	    break;
 	case PVFS_MGMT_PERF_MON_LIST:
 	    sm_p->current_state =
-                (pvfs2_client_mgmt_perf_mon_list_sm.state_machine + 1);
+                (pvfs2_client_mgmt_perf_mon_list_sm.state_machine + 2);
 	    break;
 	case PVFS_MGMT_EVENT_MON_LIST:
 	    sm_p->current_state =
-                (pvfs2_client_mgmt_event_mon_list_sm.state_machine + 1);
+                (pvfs2_client_mgmt_event_mon_list_sm.state_machine + 2);
 	    break;
 	case PVFS_MGMT_ITERATE_HANDLES_LIST:
 	    sm_p->current_state = 
-                (pvfs2_client_mgmt_iterate_handles_list_sm.state_machine + 1);
+                (pvfs2_client_mgmt_iterate_handles_list_sm.state_machine + 2);
 	    break;
 	case PVFS_MGMT_GET_DFILE_ARRAY:
 	    sm_p->current_state =
-                (pvfs2_client_mgmt_get_dfile_array_sm.state_machine + 1);
+                (pvfs2_client_mgmt_get_dfile_array_sm.state_machine + 2);
 	    break;
         case PVFS_MGMT_REMOVE_OBJECT:
             sm_p->current_state =
-                (pvfs2_client_mgmt_remove_object_sm.state_machine + 1);
+                (pvfs2_client_mgmt_remove_object_sm.state_machine + 2);
             break;
         case PVFS_MGMT_REMOVE_DIRENT:
             sm_p->current_state =
-                (pvfs2_client_mgmt_remove_dirent_sm.state_machine + 1);
+                (pvfs2_client_mgmt_remove_dirent_sm.state_machine + 2);
             break;
         case PVFS_MGMT_CREATE_DIRENT:
             sm_p->current_state =
-                (pvfs2_client_mgmt_create_dirent_sm.state_machine + 1);
+                (pvfs2_client_mgmt_create_dirent_sm.state_machine + 2);
             break;
         case PVFS_MGMT_GET_DIRDATA_HANDLE:
             sm_p->current_state =
-                (pvfs2_client_mgmt_get_dirdata_handle_sm.state_machine + 1);
+                (pvfs2_client_mgmt_get_dirdata_handle_sm.state_machine + 2);
             break;
 	case PVFS_SERVER_GET_CONFIG:
 	    sm_p->current_state =
-                (pvfs2_server_get_config_sm.state_machine + 1);
+                (pvfs2_server_get_config_sm.state_machine + 2);
 	    break;
 	case PVFS_CLIENT_JOB_TIMER:
 	    sm_p->current_state =
-                (pvfs2_client_job_timer_sm.state_machine + 1);
+                (pvfs2_client_job_timer_sm.state_machine + 2);
 	    break;
         case PVFS_DEV_UNEXPECTED:
             gossip_err("You should be using PINT_sys_dev_unexp for "
@@ -352,7 +352,7 @@ PVFS_error PINT_client_state_machine_post(
       start state machine and continue advancing while we're getting
       immediate completions
     */
-    ret = sm_p->current_state->state_action(sm_p, &js);
+    ret = PINT_state_machine_invoke(sm_p, &js);
     while(ret == 1)
     {
         ret = PINT_state_machine_next(sm_p, &js);

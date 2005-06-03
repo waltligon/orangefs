@@ -107,7 +107,7 @@ static int setattr_verify_attribs(
 {
     PVFS_object_attr *a_p = NULL, *req_a_p = NULL;
 
-    PINT_STATE_DEBUG("verify_attribs");
+    
 
     a_p = &s_op->attr;
     req_a_p = &s_op->req->u.setattr.attr;
@@ -251,7 +251,7 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s *js_p)
     PVFS_ds_attributes *ds_attr = NULL;
     struct server_configuration_s *user_opts = get_server_config_struct();
 
-    PINT_STATE_DEBUG("setobj_attribs");
+    
 
     dspace_a_p = &s_op->attr;
     a_p = &s_op->req->u.setattr.attr;
@@ -306,7 +306,7 @@ static int setattr_write_metafile_datafile_handles_if_required(
     job_id_t j_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
 
-    PINT_STATE_DEBUG("write_metafile_datafile_handles_if_needed");
+    
 
     /* if we don't need to write the dfiles, skip them */
     if (!(s_op->req->u.setattr.attr.mask & PVFS_ATTR_META_DFILES))
@@ -365,7 +365,7 @@ static int setattr_write_metafile_distribution_if_required(
     job_id_t j_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
 
-    PINT_STATE_DEBUG("write_metafile_distribution_if_required");
+    
 
     /* if we don't need to fill in the distribution, skip it */
     if (!(s_op->req->u.setattr.attr.mask & PVFS_ATTR_META_DIST))
@@ -415,7 +415,7 @@ static int setattr_write_symlink_target_if_required(
     job_id_t j_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
 
-    PINT_STATE_DEBUG("write_symlink_target_if_required");
+    
 
     /* if we don't need to fill in the symlink target, skip it */
     if (!(s_op->req->u.setattr.attr.mask & PVFS_ATTR_SYMLNK_TARGET))
@@ -469,7 +469,7 @@ static int setattr_write_symlink_target_if_required(
  */
 static int setattr_cleanup(PINT_server_op *s_op, job_status_s *js_p)
 {
-    PINT_STATE_DEBUG("setattr_cleanup");
+    
     return(server_state_machine_complete(s_op));
 }
 

@@ -49,8 +49,6 @@ machine pvfs2_client_job_timer_sm(do_work, error)
  */
 static int job_timer_error(PINT_client_sm *sm_p, job_status_s* js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "job timer state: job_timer_error\n");
     gossip_err("Error: stopping client job timer.\n");
 
     sm_p->op_complete = 1;
@@ -66,11 +64,6 @@ static int job_timer_do_work(PINT_client_sm *sm_p, job_status_s* js_p)
 {
     int ret = -1;
     job_id_t tmp_id;
-
-#if 0
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "job timer state: job_timer_do_work\n");
-#endif
 
     /* look for expired jobs */
     ret = job_time_mgr_expire();

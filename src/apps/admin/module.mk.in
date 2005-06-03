@@ -17,7 +17,8 @@ ADMINSRC := \
 	$(DIR)/pvfs2-fs-dump.c\
 	$(DIR)/pvfs2-fsck.c\
 	$(DIR)/pvfs2-cp.c \
-	$(DIR)/pvfs2-remove-object.c
+	$(DIR)/pvfs2-remove-object.c \
+	$(DIR)/pvfs2-setparam-all.c
 
 ADMINSRC_SERVER := \
 	$(DIR)/pvfs2-mkspace.c \

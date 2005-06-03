@@ -196,8 +196,6 @@ PVFS_error PVFS_sys_setattr(
 static int setattr_init(PINT_client_sm *sm_p,
                         job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "setattr state: init\n");
-
     assert(js_p->error_code == 0);
     return 1;
 }
@@ -219,9 +217,6 @@ static int setattr_msg_setup_msgpair(PINT_client_sm *sm_p,
     PVFS_object_attr *attr = NULL;
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_time orig_mtime = sm_p->u.setattr.sys_attr.mtime;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "setattr state: "
-                 "setattr_msg_setup_msgpair\n");
 
     js_p->error_code = 0;
 
@@ -291,9 +286,6 @@ static int setattr_msg_setup_msgpair(PINT_client_sm *sm_p,
 static int setattr_msg_failure(PINT_client_sm *sm_p,
                                job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "setattr state: setattr_msg_failure\n");
-
     assert(js_p->error_code != 0);
     if (sm_p->acache_hit)
     {
@@ -311,8 +303,6 @@ static int setattr_msg_failure(PINT_client_sm *sm_p,
 static int setattr_cleanup(PINT_client_sm *sm_p,
                            job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "setattr state: cleanup\n");
-
     sm_p->error_code = js_p->error_code;
 
     if (sm_p->acache_hit)

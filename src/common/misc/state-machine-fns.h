@@ -10,6 +10,8 @@
 #include <assert.h>
 
 #include "gossip.h"
+#include "pvfs2-event.h"
+#include "pint-event.h"
 
 /* STATE-MACHINE-FNS.H
  *
@@ -23,11 +25,6 @@
  * includes state-machine.h, because state-machine.h needs a key #define
  * before it can be included.
  *
- * The structure holding the table of PINT_OP_STATE structures also needs to
- * be declared; its name should be #defined as PINT_OP_STATE_TABLE.  If you
- * don't define this, you don't get the extern or the _locate function
- * (currently client might not need them?).
- *
  * A good example of this is the pvfs2-server.h in the src/server directory,
  * which includes state-machine.h at the bottom, and server-state-machine.c,
  * which includes first pvfs2-server.h and then state-machine-fns.h.
@@ -40,6 +37,7 @@
 /* Prototypes for functions defined in here */
 static inline int PINT_state_machine_halt(void);
 static inline int PINT_state_machine_next(struct PINT_OP_STATE *,job_status_s *r);
+static inline int PINT_state_machine_invoke(struct PINT_OP_STATE *,job_status_s *r);
 #ifdef PINT_OP_STATE_TABLE
 static union PINT_state_array_values *PINT_state_machine_locate(struct PINT_OP_STATE *);
 #endif
@@ -54,6 +52,34 @@ static inline void PINT_push_state(struct PINT_OP_STATE *s, union PINT_state_arr
 static inline int PINT_state_machine_halt(void)
 {
     return 0;
+}
+
+#ifndef __PINT_STATE_DEBUG
+#error PINT_STATE_DEBUG must be defined before state-machine-fns.h is included
+#endif
+
+#ifndef __PINT_STATE_EVENT
+#error PINT_STATE_EVENT_START and PINT_STATE_EVENT_STOP must be defined before stat-machine-fns.h is included
+#endif
+
+/* Function: PINT_state_machine_invoke()
+ * Params:
+ * Returns:  return value of state action
+ *
+ * Synopsis: Invokes the current state action.  This is useful where
+ * the state action isn't invoked from PINT_state_machine_next()
+ */
+static inline int PINT_state_machine_invoke(struct PINT_OP_STATE *s,
+                                            job_status_s *r)
+{
+    int ret;
+    PINT_STATE_EVENT_INIT();
+    
+    PINT_STATE_DEBUG(s);
+    PINT_STATE_EVENT_START(s);
+    ret = s->current_state->state_action(s, r);
+    PINT_STATE_EVENT_END(s, r);
+    return ret;
 }
 
 /* Function: PINT_state_machine_next()
@@ -72,6 +98,7 @@ static inline int PINT_state_machine_next(struct PINT_OP_STATE *s,
     int code_val = r->error_code;       /* temp to hold the return code */
     int retval;            /* temp to hold return value of state action */
     union PINT_state_array_values *loc; /* temp pointer into state memory */
+    PINT_STATE_EVENT_INIT();
 
     do {
 	/* skip over the current state action to get to the return code list */
@@ -114,9 +141,12 @@ static inline int PINT_state_machine_next(struct PINT_OP_STATE *s,
 	}
     } while (loc->flag == SM_RETURN);
 
+    /* mark the current state's id before transitioning */
     s->current_state = loc->next_state;
-
-
+    
+    /* skip over the state name -- slang */
+    s->current_state += 1;
+    
     /* To do nested states, we check to see if the next state is
      * a nested state machine, and if so we push the return state
      * onto a stack */
@@ -130,20 +160,25 @@ static inline int PINT_state_machine_next(struct PINT_OP_STATE *s,
 	 * cross-structure dependency that I couldn't handle any more.  -- Rob
 	 */
 	s->current_state = ((struct PINT_state_machine_s *) s->current_state->nested_machine)->state_machine;
+
+        /* skip over the state name -- slang */
+        s->current_state += 1;
     }
 
     /* skip over the flag so that we point to the function for the next
      * state.  then call it.
      */
     s->current_state += 1;
-
+       
+    PINT_STATE_DEBUG(s);
+    PINT_STATE_EVENT_START(s);
     retval = (s->current_state->state_action)(s,r);
+    PINT_STATE_EVENT_END(s, r);
 
     /* return to the while loop in pvfs2-server.c */
     return retval;
 }
 
-#ifdef PINT_OP_STATE_TABLE
 /* Function: PINT_state_machine_locate(void)
    Params:  
    Returns:  Pointer to the start of the state machine indicated by
@@ -151,33 +186,48 @@ static inline int PINT_state_machine_next(struct PINT_OP_STATE *s,
    Synopsis: This function is used to start a state machines execution.
  */
 
+#ifdef PINT_OP_STATE_TABLE
 static union PINT_state_array_values *PINT_state_machine_locate(struct PINT_OP_STATE *s_op)
 {
     union PINT_state_array_values *current_tmp;
 
     /* check for valid inputs */
-    if (!s_op || s_op->op < 0 || s_op->op > PVFS_MAX_SERVER_OP)
+    if (!s_op || s_op->op < 0 
+        || s_op->op > PVFS_MAX_SERVER_OP)
     {
 	gossip_err("State machine requested not valid\n");
 	return NULL;
     }
-    if (PINT_OP_STATE_TABLE[s_op->op].sm != NULL)
+    if (PINT_OP_STATE_TABLE[s_op->op].sm->state_machine != NULL)
     {
-	current_tmp = PINT_OP_STATE_TABLE[s_op->op].sm->state_machine;
-	/* handle the case in which the first state points to a nested
-	 * machine, rather than a simple function
-	 */
-	while(current_tmp->flag == SM_JUMP)
+	current_tmp = PINT_OP_STATE_TABLE[s_op->op].sm->state_machine;        
+        /* added the state name string as the first entry in the
+         * state's array values.  Skip past it to get to the type
+         * of action. --slang
+         */
+        current_tmp += 1;
+        
+        /* handle the case in which the first state points to a nested
+         * machine, rather than a simple function
+         */
+        while(current_tmp->flag == SM_JUMP)
 	{
 	    PINT_push_state(s_op, current_tmp);
 	    current_tmp += 1;
 	    current_tmp = ((struct PINT_state_machine_s *)current_tmp->nested_machine)->state_machine;
-	}
+           
+
+
+            
+            /* skip over state name string.  see above comment. --slang */
+            current_tmp += 1;
+        }
 
 	/* this returns a pointer to a "PINT_state_array_values"
 	 * structure, whose state_action member is the function to call.
 	 */
-	return current_tmp + 1;
+        current_tmp += 1;
+	return current_tmp;
     }
 
     gossip_err("State machine not found for operation %d\n",s_op->op);
@@ -188,7 +238,6 @@ static union PINT_state_array_values *PINT_state_machine_locate(struct PINT_OP_S
 static inline union PINT_state_array_values *PINT_pop_state(struct PINT_OP_STATE *s)
 {
     assert(s->stackptr > 0);
-
     return s->state_stack[--s->stackptr];
 }
 
@@ -196,7 +245,6 @@ static inline void PINT_push_state(struct PINT_OP_STATE *s,
 				   union PINT_state_array_values *p)
 {
     assert(s->stackptr < PINT_STATE_STACK_SIZE);
-
     s->state_stack[s->stackptr++] = p;
 }
 

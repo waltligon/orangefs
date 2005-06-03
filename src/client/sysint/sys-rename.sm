@@ -366,8 +366,6 @@ PVFS_error PVFS_sys_rename(
 static int rename_init(PINT_client_sm *sm_p,
 		       job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: init\n");
-
     assert(js_p->error_code == 0);
 
     return 1;
@@ -502,9 +500,6 @@ static int rename_lookups_setup_msgpair_array(PINT_client_sm *sm_p,
 {
     int ret = -PVFS_EINVAL, i = 0;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: "
-                 "rename_lookups_setup_msgpair_array\n");
-
     js_p->error_code = 0;
 
     sm_p->msgarray_count = 2;
@@ -556,9 +551,6 @@ static int rename_lookups_setup_msgpair_array(PINT_client_sm *sm_p,
 static int rename_lookups_failure(PINT_client_sm *sm_p,
                                   job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "rename state: rename_lookups_failure\n");
-
     if (sm_p->msgarray)
     {
         free(sm_p->msgarray);
@@ -572,9 +564,6 @@ static int rename_crdirent_setup_msgpair(PINT_client_sm *sm_p,
 {
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: "
-                 "rename_crdirent_setup_msgpair\n");
 
     js_p->error_code = 0;
 
@@ -620,9 +609,6 @@ static int rename_rmdirent_setup_msgpair(PINT_client_sm *sm_p,
 {
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: "
-                 "rename_rmdirent_setup_msgpair\n");
 
     js_p->error_code = 0;
 
@@ -673,8 +659,6 @@ static int rename_rmdirent_setup_msgpair(PINT_client_sm *sm_p,
 static int rename_rmdirent_failure(PINT_client_sm *sm_p,
 				   job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: rmdirent_failure\n");
-
     /*
       in the normal case of failure (i.e. rmdirent_index == 0), we
       need to rmdirent the previously created new dirent we've just
@@ -705,9 +689,6 @@ static int rename_chdirent_setup_msgpair(PINT_client_sm *sm_p,
 {
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: "
-                 "rename_chdirent_setup_msgpair\n");
 
     js_p->error_code = 0;
 
@@ -750,17 +731,12 @@ static int rename_chdirent_setup_msgpair(PINT_client_sm *sm_p,
 static int rename_chdirent_failure(PINT_client_sm *sm_p,
 				   job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "rename state: chdirent_failure\n");
     return 1;
 }
 
 static int rename_check_for_remove(PINT_client_sm *sm_p,
 				   job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "rename state: check for remove\n");
-
     js_p->error_code = 0;
 
     if (sm_p->u.rename.target_dirent_exists)
@@ -778,9 +754,6 @@ static int rename_check_for_remove(PINT_client_sm *sm_p,
 static int rename_warn_user_to_run_fsck(
     PINT_client_sm *sm_p, job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "rename state: warn user to run fsck\n");
-
     gossip_err("WARNING: PVFS_sys_rename() encountered an error which "
                "may lead to inconsistent state.\n");
     gossip_err("WARNING: PVFS2 fsck (if available) may be needed.\n");
@@ -791,8 +764,6 @@ static int rename_warn_user_to_run_fsck(
 static int rename_cleanup(PINT_client_sm *sm_p,
                           job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: cleanup\n");
-
     sm_p->error_code = js_p->error_code;
 
     sm_p->op_complete = 1;
@@ -811,8 +782,6 @@ static int rename_generic_timer(PINT_client_sm *sm_p,
     int ret = -PVFS_EINVAL;
     job_id_t tmp_id;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: generic_timer\n");
-
     ret = job_req_sched_post_timer(
 	PVFS2_CLIENT_RETRY_DELAY, sm_p, 0, js_p, &tmp_id,
         pint_client_sm_context);
@@ -823,9 +792,6 @@ static int rename_generic_timer(PINT_client_sm *sm_p,
 static int rename_crdirent_retry_or_fail(PINT_client_sm *sm_p,
                                          job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "rename state: crdirent_retry_or_fail\n");
-
     /* try again (up to a point) if we get a comm. failure. */
     if ((PVFS_ERROR_CLASS(-js_p->error_code) == PVFS_ERROR_BMI) &&
 	(sm_p->u.rename.retry_count < PVFS2_CLIENT_RETRY_LIMIT))
@@ -853,9 +819,6 @@ static int rename_crdirent_retry_or_fail(PINT_client_sm *sm_p,
 static int rename_rmdirent_retry_or_fail(PINT_client_sm *sm_p,
                                          job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "rename state: rmdirent_retry_or_fail\n");
-
     /* try again (up to a point) if we get a comm. failure. */
     if ((PVFS_ERROR_CLASS(-js_p->error_code) == PVFS_ERROR_BMI) &&
 	(sm_p->u.rename.retry_count < PVFS2_CLIENT_RETRY_LIMIT))

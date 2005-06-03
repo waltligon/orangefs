@@ -60,7 +60,7 @@ machine pvfs2_iterate_handles_sm(prelude, do_work, fill_resp, final_response, cl
  */
 static int iterate_handles_cleanup(PINT_server_op *s_op, job_status_s* js_p)
 {
-    PINT_STATE_DEBUG("cleanup");
+    
 
     if(s_op->resp.u.mgmt_iterate_handles.handle_array)
 	free(s_op->resp.u.mgmt_iterate_handles.handle_array);
@@ -77,7 +77,7 @@ static int iterate_handles_do_work(PINT_server_op *s_op, job_status_s* js_p)
 {
     job_id_t tmp_id;
 
-    PINT_STATE_DEBUG("do_work");
+    
 
     /* allocate memory to hold handles */
     s_op->resp.u.mgmt_iterate_handles.handle_array

@@ -45,7 +45,7 @@ machine pvfs2_perf_update_sm(do_work, error)
  */
 static int perf_update_error(PINT_server_op *s_op, job_status_s* js_p)
 {
-    PINT_STATE_DEBUG("error");
+    
     gossip_err("Error: stopping server performance monitoring.\n");
 
     PINT_perf_finalize();
@@ -64,7 +64,7 @@ static int perf_update_do_work(PINT_server_op *s_op, job_status_s* js_p)
     struct server_configuration_s *user_opts = get_server_config_struct();
 
 #if 0
-    PINT_STATE_DEBUG("do_work");
+    
 #endif
 
     /* roll over to next set of statistics */

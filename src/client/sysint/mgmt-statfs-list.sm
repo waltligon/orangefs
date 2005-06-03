@@ -166,9 +166,6 @@ static int mgmt_statfs_list_setup_msgpair(PINT_client_sm *sm_p,
     int i = 0;
     PINT_sm_msgpair_state *msg_p = NULL;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "statfs_list state: mgmt_statfs_list_setup_msgpair\n");
-
     js_p->error_code = 0;
 
     for(i = 0; i<sm_p->msgarray_count; i++)

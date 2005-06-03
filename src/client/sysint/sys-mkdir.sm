@@ -267,8 +267,6 @@ static int mkdir_init(PINT_client_sm *sm_p,
 {
     job_id_t tmp_id;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: init\n");
-
     assert((js_p->error_code == 0) ||
            (js_p->error_code == MKDIR_RETRY));
 
@@ -337,9 +335,6 @@ static int mkdir_msg_setup_msgpair(PINT_client_sm *sm_p,
     struct server_configuration_s *server_config = NULL;
     PVFS_time orig_mtime = sm_p->u.mkdir.sys_attr.mtime;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "mkdir state: mkdir_msg_setup_msgpair\n");
-
     js_p->error_code = 0;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG," mkdir: posting mkdir req\n");
@@ -391,7 +386,6 @@ static int mkdir_msg_failure(PINT_client_sm *sm_p,
 {
     sm_p->u.mkdir.stored_error_code = js_p->error_code;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: mkdir_msg_failure\n");
     return 1;
 }
 
@@ -400,9 +394,6 @@ static int mkdir_crdirent_setup_msgpair(PINT_client_sm *sm_p,
 {
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "mkdir state: crdirent_setup_msgpair\n");
 
     js_p->error_code = 0;
 
@@ -448,8 +439,6 @@ static int mkdir_crdirent_failure(PINT_client_sm *sm_p,
 {
     sm_p->u.mkdir.stored_error_code = js_p->error_code;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: crdirent_failure\n");
-
     PVFS_perror_gossip("mkdir crdirent failed", js_p->error_code);
     return 1;
 }
@@ -460,9 +449,6 @@ static int mkdir_delete_handle_setup_msgpair(PINT_client_sm *sm_p,
     int ret = -PVFS_EINVAL;
     PVFS_BMI_addr_t metafile_server_addr;
     PINT_sm_msgpair_state *msg_p = NULL;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: "
-                 "delete_handle_setup_msgpair_array\n");
 
     js_p->error_code = 0;
 
@@ -499,8 +485,6 @@ static int mkdir_delete_handle_setup_msgpair(PINT_client_sm *sm_p,
 static int mkdir_cleanup(PINT_client_sm *sm_p,
                          job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: cleanup\n");
-
     PVFS_util_release_sys_attr(&sm_p->u.mkdir.sys_attr);
 
     sm_p->error_code = (sm_p->u.mkdir.stored_error_code ?

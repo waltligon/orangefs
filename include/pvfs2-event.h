@@ -16,14 +16,15 @@
 /* different API levels where we can log events */
 enum PVFS_event_api
 {
-    PVFS_EVENT_API_JOB =   (1 << 0),
-    PVFS_EVENT_API_BMI =   (1 << 1),
-    PVFS_EVENT_API_TROVE = (1 << 2),
-    PVFS_EVENT_API_ENCODE_REQ = (1 << 3),  /* protocol request encode */
+    PVFS_EVENT_API_JOB =         (1 << 0),
+    PVFS_EVENT_API_BMI =         (1 << 1),
+    PVFS_EVENT_API_TROVE =       (1 << 2),
+    PVFS_EVENT_API_ENCODE_REQ =  (1 << 3), /* protocol request encode */
     PVFS_EVENT_API_ENCODE_RESP = (1 << 4), /* protocol response encode */
-    PVFS_EVENT_API_DECODE_REQ = (1 << 5),  /* protocol request decode */
+    PVFS_EVENT_API_DECODE_REQ =  (1 << 5), /* protocol request decode */
     PVFS_EVENT_API_DECODE_RESP = (1 << 6), /* protocol response decode */
-    PVFS_EVENT_API_SM =	   (1 << 7)        /* state machines */
+    PVFS_EVENT_API_SM =	         (1 << 7), /* state machines */
+    PVFS_EVENT_API_STATES =      (1 << 8)  /* transition states of a SM */
 };
 
 /* what kind of event */

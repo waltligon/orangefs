@@ -169,9 +169,6 @@ static int mgmt_iterate_handles_list_setup_msgpair(PINT_client_sm * sm_p,
     int i = 0, j = 0;
     PINT_sm_msgpair_state *msg_p;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "iterate_handles_list state: "
-                 "mgmt_iterate_handles_list_setup_msgpair\n");
-
     /* setup msgpair array */
     j=0;
     for(i=0; i < sm_p->u.iterate_handles_list.server_count; i++)

@@ -857,8 +857,7 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
                         user_ptr,
                         flags,
                         context_id);
-
-    DBPF_EVENT_START(event_type, q_op_p->op.id);
+    DBPF_EVENT_START(event_type, user_ptr, q_op_p->op.id);
 
     /* initialize op-specific members */
     q_op_p->op.u.b_rw_list.fd = -1;

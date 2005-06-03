@@ -209,8 +209,6 @@ PVFS_error PVFS_sys_readdir(
 static int readdir_init(PINT_client_sm *sm_p,
                         job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "readdir state: init\n");
-
     assert(js_p->error_code == 0);
 
     return 1;
@@ -221,9 +219,6 @@ static int readdir_msg_setup_msgpair(PINT_client_sm *sm_p,
 {
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "readdir state: "
-                 "readdir_msg_setup_msgpair\n");
 
     if (js_p->error_code)
     {
@@ -340,8 +335,6 @@ static int readdir_msg_failure(PINT_client_sm *sm_p,
 static int readdir_cleanup(PINT_client_sm *sm_p,
                            job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "readdir state: cleanup\n");
-
     sm_p->error_code = js_p->error_code;
 
     gossip_debug(GOSSIP_READDIR_DEBUG, " final return code is %d\n",

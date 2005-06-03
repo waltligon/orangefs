@@ -216,8 +216,6 @@ static int initialize_context(
     PINT_client_lookup_sm_ctx *ctx = NULL;
     PINT_client_lookup_sm_ctx *prev_ctx = NULL;
 
-    gossip_debug(GOSSIP_LOOKUP_DEBUG, "initialize_context called\n");
-
     if (ctx_array && pathname && (current_ctx_index > -1))
     {
         ctx = &ctx_array[current_ctx_index];
@@ -609,8 +607,6 @@ PVFS_error PVFS_sys_lookup(
 static int lookup_init(PINT_client_sm *sm_p,
 		       job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup state: lookup_init\n");
-
     assert(js_p->error_code == 0);
 
     /* check the ncache to see if we can bypass this entire lookup */
@@ -631,9 +627,6 @@ static int lookup_segment_lookup_setup_msgpair(PINT_client_sm *sm_p,
     PINT_sm_msgpair_state *msg_p = NULL;
     PINT_client_lookup_sm_segment *cur_seg = NULL;
     char *seg_to_lookup = NULL;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "lookup state: lookup_segment_lookup_setup_msgpair\n");
 
     js_p->error_code = 0;
 
@@ -689,8 +682,6 @@ static int lookup_segment_lookup_setup_msgpair(PINT_client_sm *sm_p,
 static int lookup_segment_lookup_failure(PINT_client_sm *sm_p,
                                          job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "lookup state: lookup_segment_lookup_failure\n");
     return 1;
 }
 
@@ -698,9 +689,6 @@ static int lookup_segment_verify_attr_present(PINT_client_sm *sm_p,
                                               job_status_s *js_p)
 {
     PINT_client_lookup_sm_segment *cur_seg = NULL;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "lookup state: lookup_segment_verify_attr_present\n");
 
     cur_seg = GET_CURRENT_SEGMENT();
     assert(cur_seg);
@@ -747,9 +735,6 @@ static int lookup_segment_getattr_setup_msgpair(PINT_client_sm *sm_p,
     PINT_sm_msgpair_state *msg_p = NULL;
     PINT_client_lookup_sm_segment *cur_seg = NULL;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup state: "
-                 "lookup_segment_getattr_setup_msgpair\n");
-
     js_p->error_code = 0;
 
     /*
@@ -793,9 +778,6 @@ static int lookup_segment_getattr_failure(PINT_client_sm *sm_p,
 {
     char buf[64] = {0};
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "lookup state: lookup_segment_getattr_failure\n");
-
     PVFS_strerror_r(js_p->error_code, buf, 64);
     gossip_debug(GOSSIP_LOOKUP_DEBUG,
                  "lookup_segment_getattr_failure %s\n", buf);
@@ -807,9 +789,6 @@ static int lookup_segment_check_attr_type(PINT_client_sm *sm_p,
 {
     PINT_client_lookup_sm_ctx *cur_ctx = NULL;
     PINT_client_lookup_sm_segment *cur_seg = NULL;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "lookup state: lookup_segment_check_attr_type\n");
 
     cur_seg = GET_CURRENT_SEGMENT();
     assert(cur_seg);
@@ -881,8 +860,6 @@ static int lookup_segment_handle_relative_link(PINT_client_sm *sm_p,
       case.  the reason this is tricker is because the relative link
       may contain '.' and '..' characters (i.e. foo -> ../oldfoo)
     */
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "lookup state: lookup_segment_handle_relative_link\n");
 
     js_p->error_code = 0;
 
@@ -932,8 +909,6 @@ static int lookup_segment_handle_absolute_link(PINT_client_sm *sm_p,
       new context and continuing along our completely linear state
       machine.
     */
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "lookup state: lookup_segment_handle_absolute_link\n");
 
     js_p->error_code = 0;
 
@@ -979,9 +954,6 @@ static int lookup_context_check_completion(PINT_client_sm *sm_p,
     PVFS_object_ref last_resolved_refn;
     PINT_client_lookup_sm_ctx *cur_ctx = NULL;
     PINT_client_lookup_sm_segment *cur_seg = NULL;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "lookup state: lookup_context_check_completion\n");
 
     cur_ctx = GET_CURRENT_CONTEXT();
     assert(cur_ctx);
@@ -1071,8 +1043,6 @@ static int lookup_cleanup(PINT_client_sm *sm_p,
                           job_status_s *js_p)
 {
     int i = 0;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup state: lookup_cleanup\n");
 
     if (js_p->error_code == LOOKUP_NCACHE_HIT_FASTPATH)
     {

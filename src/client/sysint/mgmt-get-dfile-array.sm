@@ -153,9 +153,6 @@ static int mgmt_get_dfile_array_cleanup(
 {
     PVFS_object_attr *attr = NULL;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-        "mgmt_get_dfile_array state: cleanup\n");
-
     sm_p->error_code = js_p->error_code;
 
     if (sm_p->error_code == 0)

@@ -283,9 +283,6 @@ static int server_get_config_setup_msgpair(PINT_client_sm *sm_p,
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_BMI_addr_t serv_addr;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-		"get_config state: server_get_config_setup_msgpair\n");
-
     msg_p = &sm_p->msgarray[0];
 
     ret = BMI_addr_lookup(&serv_addr,

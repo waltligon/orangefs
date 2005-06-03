@@ -261,6 +261,7 @@ int main(int argc, char **argv)
         &(tmp_op));
     if (ret == 0)
     {
+        tmp_op->log_events = 0;
         ret = server_state_machine_start_noreq(tmp_op);
     }
     if (ret < 0)
@@ -276,6 +277,7 @@ int main(int argc, char **argv)
         PVFS_SERV_JOB_TIMER, &(tmp_op));
     if (ret == 0)
     {
+        tmp_op->log_events = 0;
         ret = server_state_machine_start_noreq(tmp_op);
     }
     if (ret < 0)
@@ -349,7 +351,7 @@ int main(int argc, char **argv)
                  */
                 ret = PINT_state_machine_next(
                     s_op, &server_job_status_array[i]);
-            }
+           }
 
             /* Either of the above might have completed immediately
              * (ret == 1).  While the job continues to complete
@@ -491,6 +493,7 @@ static int server_initialize(
             exit(3);
         }
     }
+
     return ret;
 }
 
@@ -1251,7 +1254,7 @@ static int server_post_unexpected_recv(job_status_s *js_p)
         }
         memset(s_op, 0, sizeof(PINT_server_op));
         s_op->op = BMI_UNEXPECTED_OP;
-
+        s_op->log_events = 1; 
         /*
           TODO: Consider the optimization of enabling immediate
           completion in this part of the code (see the mailing list
@@ -1315,10 +1318,11 @@ static int server_state_machine_start(
     /* set timestamp on the beginning of this state machine */
     id_gen_fast_register(&tmp_id, s_op);
     PINT_event_timestamp(PVFS_EVENT_API_SM, (int32_t)s_op->req->op,
-                         0, tmp_id, PVFS_EVENT_FLAG_START);
+                         0, tmp_id, PVFS_EVENT_FLAG_START, 0, tmp_id);
 
     s_op->addr = s_op->unexp_bmi_buff.addr;
     s_op->tag  = s_op->unexp_bmi_buff.tag;
+
     s_op->current_state = PINT_state_machine_locate(s_op);
 
     if (!s_op->current_state)
@@ -1330,7 +1334,9 @@ static int server_state_machine_start(
     }
 
     s_op->resp.op = s_op->op;
-    return ((s_op->current_state->state_action))(s_op,js_p);
+   
+    ret = PINT_state_machine_invoke(s_op, js_p);
+    return ret;
 }
 
 /* server_state_machine_alloc_noreq()
@@ -1355,9 +1361,10 @@ int server_state_machine_alloc_noreq(
         }
         memset(*new_op, 0, sizeof(PINT_server_op));
         (*new_op)->op = op;
+        (*new_op)->log_events = 1;
 
         /* find the state machine for this op type */
-        (*new_op)->current_state = PINT_state_machine_locate(*new_op);
+        (*new_op)->current_state = PINT_state_machine_locate((*new_op));
 
         if (!((*new_op)->current_state))
         {
@@ -1392,7 +1399,8 @@ int server_state_machine_start_noreq(PINT_server_op *new_op)
     if (new_op)
     {
         /* execute first state */
-        ret = new_op->current_state->state_action(new_op, &tmp_status);
+
+        ret = PINT_state_machine_invoke(new_op, &tmp_status);
         if (ret < 0)
         {
             gossip_lerr("Error: failed to start state machine.\n");
@@ -1430,7 +1438,7 @@ int server_state_machine_complete(PINT_server_op *s_op)
     /* set a timestamp on the completion of the state machine */
     id_gen_fast_register(&tmp_id, s_op);
     PINT_event_timestamp(PVFS_EVENT_API_SM, (int32_t)s_op->req->op,
-                         0, tmp_id, PVFS_EVENT_FLAG_END);
+                         0, tmp_id, PVFS_EVENT_FLAG_END, 0, tmp_id);
 
     /* release the decoding of the unexpected request */
     if (ENCODING_IS_VALID(s_op->decoded.enc_type))
@@ -1470,10 +1478,10 @@ static void init_req_table(void)
       generate a warning if someone forgets to update this table when
       they add a new server operation
     */
-    #define OP_CASE(_type,_string,_perm,_attrib_flags,_sm)        \
+    #define OP_CASE(_type,_name,_perm,_attrib_flags,_sm)          \
         case _type:                                               \
             PINT_server_req_table[i].op_type = _type;             \
-            PINT_server_req_table[i].string_name = _string;       \
+            PINT_server_req_table[i].string_name = _name;         \
             PINT_server_req_table[i].perm = _perm;                \
             PINT_server_req_table[i].sm = _sm;                    \
             PINT_server_req_table[i].attrib_flags = _attrib_flags;\

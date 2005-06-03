@@ -32,13 +32,26 @@
 #include "pint-event.h"
 #include "gen-locks.h"
 
-#define BMI_EVENT_START(__op, __id) \
- PINT_event_timestamp(PVFS_EVENT_API_BMI, __op, 0, __id, \
- PVFS_EVENT_FLAG_START)
+enum __nullenum { __nullval = 1 };
+#define BMI_EVENT_REQID(__ptr) \
+    ((void *)((__ptr + (sizeof(void (*)(void)))) + \
+              (sizeof(enum __nullenum)) + (sizeof(uint64_t))))
 
-#define BMI_EVENT_END(__op, __size, __id) \
- PINT_event_timestamp(PVFS_EVENT_API_BMI, __op, __size, __id, \
- PVFS_EVENT_FLAG_END)
+#define BMI_EVENT_START(__op, __reqid, __id) \
+do { \
+    PVFS_id_gen_t _tmp_id; \
+    id_gen_fast_register(&_tmp_id, BMI_EVENT_REQID(__reqid)); \
+    PINT_event_timestamp(PVFS_EVENT_API_BMI, __op, 0, __id, \
+                         PVFS_EVENT_FLAG_START, 0, _tmp_id); \
+} while(0)
+
+#define BMI_EVENT_END(__op, __size, __reqid, __id) \
+do { \
+    PVFS_id_gen_t _tmp_id; \
+    id_gen_fast_register(&_tmp_id, BMI_EVENT_REQID(__reqid)); \
+    PINT_event_timestamp(PVFS_EVENT_API_BMI, __op, __size, __id, \
+                         PVFS_EVENT_FLAG_END, 0, _tmp_id); \
+} while(0)
 
 static gen_mutex_t interface_mutex = GEN_MUTEX_INITIALIZER;
 
@@ -750,10 +763,11 @@ int BMI_tcp_post_send(bmi_op_id_t * id,
     ret = BMI_tcp_post_send_generic(id, dest, &buffer,
 				      &size, 1, buffer_type, my_header,
 				      user_ptr, context_id);
+    
     if(ret >= 0)
-	BMI_EVENT_START(PVFS_EVENT_BMI_SEND, *id);
+	BMI_EVENT_START(PVFS_EVENT_BMI_SEND, user_ptr, *id);
     if(ret == 1)
-	BMI_EVENT_END(PVFS_EVENT_BMI_SEND, size, *id);
+	BMI_EVENT_END(PVFS_EVENT_BMI_SEND, size, user_ptr, *id);
 
     gen_mutex_unlock(&interface_mutex);
     return(ret);
@@ -798,9 +812,9 @@ int BMI_tcp_post_sendunexpected(bmi_op_id_t * id,
 				      &size, 1, buffer_type, my_header,
 				      user_ptr, context_id);
     if(ret >= 0)
-	BMI_EVENT_START(PVFS_EVENT_BMI_SEND, *id);
+	BMI_EVENT_START(PVFS_EVENT_BMI_SEND, user_ptr, *id);
     if(ret == 1)
-	BMI_EVENT_END(PVFS_EVENT_BMI_SEND, size, *id);
+	BMI_EVENT_END(PVFS_EVENT_BMI_SEND, size, user_ptr, *id);
 
     gen_mutex_unlock(&interface_mutex);
     return(ret);
@@ -850,9 +864,9 @@ int BMI_tcp_post_recv(bmi_op_id_t * id,
 				user_ptr, context_id);
 
     if(ret >= 0)
-	BMI_EVENT_START(PVFS_EVENT_BMI_RECV, *id);
+	BMI_EVENT_START(PVFS_EVENT_BMI_RECV, user_ptr, *id);
     if(ret == 1)
-	BMI_EVENT_END(PVFS_EVENT_BMI_RECV, *actual_size, *id);
+	BMI_EVENT_END(PVFS_EVENT_BMI_RECV, *actual_size, user_ptr, *id);
 
     gen_mutex_unlock(&interface_mutex);
     return (ret);
@@ -900,9 +914,11 @@ int BMI_tcp_test(bmi_op_id_t id,
 	(*error_code) = query_op->error_code;
 	(*actual_size) = query_op->actual_size;
 	if(query_op->send_recv == BMI_SEND)
-	    BMI_EVENT_END(PVFS_EVENT_BMI_SEND, *actual_size, id);
+	    BMI_EVENT_END(PVFS_EVENT_BMI_SEND, *actual_size, 
+                          query_op->user_ptr, id);
 	else
-	    BMI_EVENT_END(PVFS_EVENT_BMI_RECV, *actual_size, id);
+	    BMI_EVENT_END(PVFS_EVENT_BMI_RECV, *actual_size, 
+                          query_op->user_ptr, id);
 	dealloc_tcp_method_op(query_op);
 	(*outcount)++;
     }
@@ -963,9 +979,11 @@ int BMI_tcp_testsome(int incount,
 		    user_ptr_array[*outcount] = query_op->user_ptr;
 		}
 		if(query_op->send_recv == BMI_SEND)
-		    BMI_EVENT_END(PVFS_EVENT_BMI_SEND, query_op->actual_size, id_array[i]);
+		    BMI_EVENT_END(PVFS_EVENT_BMI_SEND, query_op->actual_size, 
+                                  query_op->user_ptr, id_array[i]);
 		else
-		    BMI_EVENT_END(PVFS_EVENT_BMI_RECV, query_op->actual_size, id_array[i]);
+		    BMI_EVENT_END(PVFS_EVENT_BMI_RECV, query_op->actual_size, 
+                                  query_op->user_ptr, id_array[i]);
 		dealloc_tcp_method_op(query_op);
 		(*outcount)++;
 	    }
@@ -1087,9 +1105,11 @@ int BMI_tcp_testcontext(int incount,
 	    user_ptr_array[*outcount] = query_op->user_ptr;
 	}
 	if(query_op->send_recv == BMI_SEND)
-	    BMI_EVENT_END(PVFS_EVENT_BMI_SEND, query_op->actual_size, query_op->op_id);
+	    BMI_EVENT_END(PVFS_EVENT_BMI_SEND, query_op->actual_size, 
+                          query_op->user_ptr, query_op->op_id);
 	else
-	    BMI_EVENT_END(PVFS_EVENT_BMI_RECV, query_op->actual_size, query_op->op_id);
+	    BMI_EVENT_END(PVFS_EVENT_BMI_RECV, query_op->actual_size, 
+                          query_op->user_ptr, query_op->op_id);
 
 	dealloc_tcp_method_op(query_op);
         query_op = NULL;
@@ -1151,10 +1171,11 @@ int BMI_tcp_post_send_list(bmi_op_id_t * id,
     ret = BMI_tcp_post_send_generic(id, dest, buffer_list,
 				      size_list, list_count, buffer_type,
 				      my_header, user_ptr, context_id);
+    
     if(ret >= 0)
-	BMI_EVENT_START(PVFS_EVENT_BMI_SEND, *id);
+	BMI_EVENT_START(PVFS_EVENT_BMI_SEND, user_ptr, *id);
     if(ret == 1)
-	BMI_EVENT_END(PVFS_EVENT_BMI_SEND, total_size, *id);
+	BMI_EVENT_END(PVFS_EVENT_BMI_SEND, total_size, user_ptr, *id);
 
     gen_mutex_unlock(&interface_mutex);
     return(ret);
@@ -1195,9 +1216,9 @@ int BMI_tcp_post_recv_list(bmi_op_id_t * id,
 				context_id);
 
     if(ret >= 0)
-	BMI_EVENT_START(PVFS_EVENT_BMI_RECV, *id);
+	BMI_EVENT_START(PVFS_EVENT_BMI_RECV, user_ptr, *id);
     if(ret == 1)
-	BMI_EVENT_END(PVFS_EVENT_BMI_RECV, *total_actual_size, *id);
+	BMI_EVENT_END(PVFS_EVENT_BMI_RECV, *total_actual_size, user_ptr, *id);
 
     gen_mutex_unlock(&interface_mutex);
     return (ret);
@@ -1245,9 +1266,9 @@ int BMI_tcp_post_sendunexpected_list(bmi_op_id_t * id,
 				      size_list, list_count, buffer_type,
 				      my_header, user_ptr, context_id);
     if(ret >= 0)
-	BMI_EVENT_START(PVFS_EVENT_BMI_SEND, *id);
+	BMI_EVENT_START(PVFS_EVENT_BMI_SEND, user_ptr, *id);
     if(ret == 1)
-	BMI_EVENT_END(PVFS_EVENT_BMI_SEND, total_size, *id);
+	BMI_EVENT_END(PVFS_EVENT_BMI_SEND, total_size, user_ptr, *id);
 
     gen_mutex_unlock(&interface_mutex);
     return(ret);

@@ -72,7 +72,7 @@ static int mgmt_remove_dirent_get_dirdata_handle_from_parent(
     int ret = -PVFS_EINVAL;
     job_id_t i;
 
-    PINT_STATE_DEBUG("mgmt_remove_dirent_get_dirdata_handle_from_parent");
+    
 
     s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
@@ -105,7 +105,7 @@ static int mgmt_remove_dirent(
     job_id_t j_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
 
-    PINT_STATE_DEBUG("mgmt_remove_dirent");
+    
 
     s_op->key.buffer = s_op->req->u.mgmt_remove_dirent.entry;
     s_op->key.buffer_sz = strlen(
@@ -135,7 +135,7 @@ static int mgmt_remove_dirent(
 static int mgmt_remove_dirent_cleanup(
     PINT_server_op *s_op, job_status_s *js_p)
 {
-    PINT_STATE_DEBUG("mgmt_remove_dirent_cleanup");
+    
     return(server_state_machine_complete(s_op));
 }
 

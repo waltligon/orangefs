@@ -191,7 +191,7 @@ machine pvfs2_remove_sm(
 static int remove_check_object_type(PINT_server_op *s_op,
                                     job_status_s *js_p)
 {
-    PINT_STATE_DEBUG("check_object_type");
+    
 
     if(s_op->attr.mask == 0)
     {
@@ -223,7 +223,7 @@ static int remove_verify_object_metadata(PINT_server_op *s_op,
 {
     PVFS_object_attr *a_p;
 
-    PINT_STATE_DEBUG("verify_object_metadata");
+    
 
     a_p = &s_op->attr;
 
@@ -254,7 +254,7 @@ static int remove_read_dirdata_handle(PINT_server_op *s_op,
     int ret;
     job_id_t j_id;
 
-    PINT_STATE_DEBUG("read_dirdata_handle");
+    
 
     /* set up key and value structures for reading the dirdata handle */
     s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
@@ -284,7 +284,7 @@ static int remove_getattr_of_dirdata_handle(
     int ret;
     job_id_t tmp_id;
 
-    PINT_STATE_DEBUG("read_dirdata_handle");
+    
 
     if (js_p->error_code)
     {
@@ -332,7 +332,7 @@ static int remove_remove_dirdata_dspace(PINT_server_op *s_op,
     job_id_t j_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
 
-    PINT_STATE_DEBUG("remove_dirdata_dspace");
+    
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
 		 "  removing dirdata dspace %Lu\n",
@@ -365,7 +365,7 @@ static int remove_remove_dspace(PINT_server_op *s_op,
     job_id_t j_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
 
-    PINT_STATE_DEBUG("remove_dspace");
+    
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "(%p) remove: removing dspace "
                  "object %Lu,%d\n", s_op, Lu(s_op->u.remove.handle),
@@ -390,7 +390,7 @@ static int remove_remove_dspace(PINT_server_op *s_op,
 static int remove_cleanup(PINT_server_op *s_op,
 			  job_status_s *js_p)
 {
-    PINT_STATE_DEBUG("cleanup");
+    
 
     return(server_state_machine_complete(s_op));
 }
@@ -398,7 +398,7 @@ static int remove_cleanup(PINT_server_op *s_op,
 static int remove_setup_work(
     PINT_server_op *s_op, job_status_s *js_p)
 {
-    PINT_STATE_DEBUG("setup_work");
+    
 
     s_op->u.remove.handle = s_op->req->u.remove.handle;
     s_op->u.remove.fs_id = s_op->req->u.remove.fs_id;

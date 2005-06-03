@@ -9,11 +9,15 @@
 #include <sys/time.h>
 
 #include <stdio.h>
-
+#include <stdarg.h>
 #include "pint-event.h"
+#include "pint-textlog.h"
 #include "pvfs2-types.h"
 #include "pvfs2-mgmt.h"
 #include "gossip.h"
+#include "id-generator.h"
+
+#define PINT_EVENT_DEFAULT_TEXTLOG_FILENAME "/tmp/pvfs2-events-log.txt"
 
 /* variables that provide runtime control over which events are recorded */
 int PINT_event_on = 0;
@@ -34,30 +38,6 @@ int PINT_event_trove_rd_stop, PINT_event_trove_wr_stop;
 int PINT_event_bmi_start, PINT_event_bmi_stop;
 int PINT_event_flow_start, PINT_event_flow_stop;
 #endif
-
-
-/* PINT_event_initialize()
- *
- * starts up the event logging interface
- *
- * returns 0 on success, -PVFS_error on failure
- */
-int PINT_event_initialize(int ring_size)
-{
-    gen_mutex_lock(&event_mutex);
-
-#if defined(HAVE_PABLO)
-    PINT_event_pablo_init();
-#endif
-#if defined(HAVE_MPE)
-    PINT_event_mpe_init();
-#endif
-
-    PINT_event_default_init(ring_size);
-
-    gen_mutex_unlock(&event_mutex);
-    return(0);
-}
 
 #if defined(HAVE_MPE)
 /*
@@ -123,7 +103,6 @@ void PINT_event_pablo_finalize(void)
 
 #endif
 
-
 int PINT_event_default_init(int ring_size)
 {
     if(ts_ring != NULL)
@@ -172,6 +151,29 @@ void PINT_event_default_finalize(void)
 }
 
 
+/* PINT_event_initialize()
+ *
+ * starts up the event logging interface
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
+int PINT_event_initialize(int ring_size)
+{
+    gen_mutex_lock(&event_mutex);
+
+#if defined(HAVE_PABLO)
+    PINT_event_pablo_init();
+#endif
+#if defined(HAVE_MPE)
+    PINT_event_mpe_init();
+#endif
+   
+    PINT_event_default_init(ring_size);
+
+    gen_mutex_unlock(&event_mutex);
+    return(0);
+}
+
 
 /* PINT_event_finalize()
  *
@@ -189,6 +191,7 @@ void PINT_event_finalize(void)
 #if defined(HAVE_MPE)
     PINT_event_mpe_finalize();
 #endif
+
     PINT_event_default_finalize();
 
     gen_mutex_unlock(&event_mutex);
@@ -234,41 +237,15 @@ void PINT_event_get_masks(int* event_on, int32_t* api_mask, int32_t* op_mask)
     return;
 }
 
-/* PINT_event_timestamp()
- *
- * records a timestamp in the ring buffer
- *
- * returns 0 on success, -PVFS_error on failure
- */
-void __PINT_event_timestamp(enum PVFS_event_api api,
-			    int32_t operation,
-			    int64_t value,
-			    PVFS_id_gen_t id,
-			    int8_t flags)
-{
-    gen_mutex_lock(&event_mutex);
-
-#if defined(HAVE_PABLO)
-    __PINT_event_pablo(api, operation, value, id, flags);
-#endif
-
-#if defined (HAVE_MPE)
-    __PINT_event_mpe(api, operation, value, id, flags);
-#endif
-
-    __PINT_event_default(api, operation, value, id, flags);
-
-    gen_mutex_unlock(&event_mutex);
-
-    return;
-}
-
 void __PINT_event_default(enum PVFS_event_api api,
 			  int32_t operation,
 			  int64_t value,
 			  PVFS_id_gen_t id,
-			  int8_t flags)
+			  int8_t flags,
+                          const char * state_name,
+                          PVFS_id_gen_t req_id)
 {
+    PVFS_id_gen_t state_id;
     struct timeval tv;
 
     /* immediately grab timestamp */
@@ -282,7 +259,10 @@ void __PINT_event_default(enum PVFS_event_api api,
     ts_ring[ts_head].flags = flags;
     ts_ring[ts_head].tv_sec = tv.tv_sec;
     ts_ring[ts_head].tv_usec = tv.tv_usec;
-
+    id_gen_fast_register(&state_id, (void *)state_name);
+    ts_ring[ts_head].state_id = state_id;
+    ts_ring[ts_head].req_id = req_id;
+    
     /* update ring buffer positions */
     ts_head = (ts_head+1)%ts_ring_size;
     if(ts_head == ts_tail)
@@ -297,7 +277,9 @@ void __PINT_event_pablo(enum PVFS_event_api api,
 			int32_t operation,
 			int64_t value,
 			PVFS_id_gen_t id,
-			int8_t flags)
+			int8_t flags,
+                        const char * sn,
+                        PVFS_id_gen_t req_id)
 {
     /* TODO: this can all go once there is a nice "enum to string" function */
     char description[100];
@@ -339,7 +321,9 @@ void __PINT_event_mpe(enum PVFS_event_api api,
 		      int32_t operation,
 		      int64_t value,
 		      PVFS_id_gen_t id,
-		      int8_t flags)
+		      int8_t flags,
+                      const char * sn,
+                      PVFS_id_gen_t req_id)
 {
     switch(api) {
 	case PVFS_EVENT_API_BMI:
@@ -352,18 +336,49 @@ void __PINT_event_mpe(enum PVFS_event_api api,
 	    if (flags & PVFS_EVENT_FLAG_START) {
 		MPE_Log_event(PINT_event_job_start, 0, NULL);
 	    } else if (flags & PVFS_EVENT_FLAG_END) {
-		MPE_Log_event(PINT_event_bmi_stop, value, NULL);
+		MPE_Log_event(PINT_event_job_stop, value, NULL);
 	    }
 	case PVFS_EVENT_API_TROVE:
 	    if (flags & PVFS_EVENT_FLAG_START) {
-		MPE_Log_event(PINT_event_job_start, 0, NULL);
+		MPE_Log_event(PINT_event_trove_start, 0, NULL);
 	    } else if (flags & PVFS_EVENT_FLAG_END) {
-		MPE_Log_event(PINT_event_bmi_stop, value, NULL);
+		MPE_Log_event(PINT_event_trove_stop, value, NULL);
 	    }
     }
 
 }
 #endif
+
+/* PINT_event_timestamp()
+ *
+ * records a timestamp in the ring buffer
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
+void __PINT_event_timestamp(enum PVFS_event_api api,
+			    int32_t operation,
+			    int64_t value,
+			    PVFS_id_gen_t id,
+			    int8_t flags,
+                            const char * state_name,
+                            PVFS_id_gen_t req_id)
+{
+    gen_mutex_lock(&event_mutex);
+
+#if defined(HAVE_PABLO)
+    __PINT_event_pablo(api, operation, value, id, flags, state_name, req_id);
+#endif
+
+#if defined (HAVE_MPE)
+    __PINT_event_mpe(api, operation, value, id, flags, state_name, req_id);
+#endif
+
+    __PINT_event_default(api, operation, value, id, flags, state_name, req_id);
+
+    gen_mutex_unlock(&event_mutex);
+
+    return;
+}
 
 /* PINT_event_retrieve()
  *
@@ -398,6 +413,36 @@ void PINT_event_retrieve(struct PVFS_mgmt_event* event_array,
 
     return;
 }
+
+void PINT_event_log_events(
+    struct PVFS_mgmt_event * events, 
+    int count,
+    const char * filename)
+{
+    struct PVFS_mgmt_event * event_array = events;
+    int array_size = count;
+    const char * out_filename = filename;
+   
+    if(!PINT_event_on)
+    {
+        return;
+    }
+    
+    if(!events)
+    {
+        /* assume we want to log server's events locally */
+        event_array = (struct PVFS_mgmt_event*)malloc(
+            ts_ring_size*sizeof(struct PVFS_mgmt_event));
+        PINT_event_retrieve(event_array, ts_ring_size);
+        array_size = ts_ring_size;
+        out_filename = PINT_EVENT_DEFAULT_TEXTLOG_FILENAME;
+    }
+
+    gen_mutex_lock(&event_mutex);
+    PINT_textlog_generate(event_array, array_size, out_filename);
+    gen_mutex_unlock(&event_mutex);
+}
+
 
 /*
  * Local variables:

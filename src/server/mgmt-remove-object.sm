@@ -63,7 +63,7 @@ static int mgmt_remove_dspace(
     job_id_t j_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
 
-    PINT_STATE_DEBUG("mgmt_remove_dspace");
+    
 
     gossip_debug(
         GOSSIP_SERVER_DEBUG, "Trying to mgmt_remove object %Lu,%d\n",
@@ -87,7 +87,7 @@ static int mgmt_remove_dspace(
 static int mgmt_remove_cleanup(
     PINT_server_op *s_op, job_status_s *js_p)
 {
-    PINT_STATE_DEBUG("cleanup");
+    
     return(server_state_machine_complete(s_op));
 }
 

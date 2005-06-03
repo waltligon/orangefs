@@ -180,9 +180,6 @@ static int truncate_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_size new_dfile_size = 0;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-            "(%p) truncate state: datafile_setup_msgpairarray\n", sm_p);
-
     js_p->error_code = 0;
 
     attr = (sm_p->acache_hit ?
@@ -255,17 +252,12 @@ static int truncate_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
 static int truncate_datafile_failure(PINT_client_sm *sm_p,
                                      job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-            "(%p) truncate state: datafile_failure\n", sm_p);
     return 1;
 }
 
 static int truncate_cleanup(PINT_client_sm *sm_p,
                             job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) truncate state: "
-                 "truncate_cleanup\n", sm_p);
-
     sm_p->error_code = js_p->error_code;
 
     if (sm_p->msgarray && (sm_p->msgarray != &sm_p->msgpair))

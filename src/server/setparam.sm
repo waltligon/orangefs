@@ -70,7 +70,7 @@ static int setparam_work(PINT_server_op *s_op, job_status_s *js_p)
     int32_t old_api_mask = 0, old_op_mask = 0;
     PVFS_handle tmp_handle = PVFS_HANDLE_NULL;
 
-    PINT_STATE_DEBUG("work");
+    
 
     switch(s_op->req->u.mgmt_setparam.param)
     {
@@ -121,6 +121,13 @@ static int setparam_work(PINT_server_op *s_op, job_status_s *js_p)
                 ((int64_t)old_op_mask << 32);
             js_p->error_code = 0;
             return(1);
+        case PVFS_SERV_PARAM_LOG_EVENTS:
+            /* we want to log the server's events to a default local file
+             * so values are set to NULL and defaults are used */
+            PINT_event_log_events(NULL, -1, NULL);
+            s_op->resp.u.mgmt_setparam.old_value = 0;
+            js_p->error_code = 0;
+            return(1);
         case PVFS_SERV_PARAM_MODE:
             /* no work to do here; request scheduler has already handled */
             js_p->error_code = 0;
@@ -141,7 +148,7 @@ static int setparam_work(PINT_server_op *s_op, job_status_s *js_p)
  */
 static int setparam_cleanup(PINT_server_op *s_op, job_status_s* js_p)
 {
-    PINT_STATE_DEBUG("cleanup");
+    
 
     gossip_debug(GOSSIP_SERVER_DEBUG, " - setparam returning %d\n",
                  js_p->error_code);

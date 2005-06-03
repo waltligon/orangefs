@@ -96,8 +96,10 @@ struct PVFS_mgmt_event
     int32_t flags;
     int32_t tv_sec;
     int32_t tv_usec;
+    uint32_t state_id;
+    PVFS_id_gen_t req_id;
 };
-endecode_fields_8_struct(
+endecode_fields_9_struct(
     PVFS_mgmt_event,
     int32_t, api,
     int32_t, operation,
@@ -106,7 +108,8 @@ endecode_fields_8_struct(
     int32_t, flags,
     int32_t, tv_sec,
     int32_t, tv_usec,
-    skip4,)
+    uint32_t, state_id,
+    PVFS_id_gen_t, req_id)
 
 /* values which may be or'd together in the flags field above */
 enum

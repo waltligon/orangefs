@@ -79,7 +79,7 @@ PVFS_error PVFS_imgmt_event_mon_list(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PVFS_imgmt_event_mon_list entered\n");
-
+    
     if ((server_count < 1) || (event_count < 1) ||
         !event_matrix || !addr_array)
     {
@@ -129,7 +129,7 @@ PVFS_error PVFS_mgmt_event_mon_list(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PVFS_mgmt_event_mon_list entered\n");
-
+    
     ret = PVFS_imgmt_event_mon_list(
         fs_id, credentials, event_matrix, addr_array, server_count,
         event_count, details, &op_id, NULL);
@@ -161,9 +161,6 @@ static int mgmt_event_mon_list_setup_msgpair(PINT_client_sm *sm_p,
 {
     int i = 0;
     PINT_sm_msgpair_state *msg_p = NULL;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "event_mon_list state: "
-                 "mgmt_event_mon_list_setup_msgpair\n");
 
     js_p->error_code = 0;
 

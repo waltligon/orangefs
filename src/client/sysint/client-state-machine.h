@@ -26,6 +26,21 @@
 #include "id-generator.h"
 #include "msgpairarray.h"
 
+#define PINT_STATE_STACK_SIZE 3
+
+#define PINT_STATE_DEBUG(s) \
+    gossip_debug(GOSSIP_CLIENT_DEBUG, \
+                 "(%p) %s state: %s\n", \
+                 s, \
+                 PINT_client_get_name_str(s->op), \
+                 (s->current_state - 2)->name)
+
+#define __PINT_STATE_DEBUG
+#define PINT_STATE_EVENT_INIT()
+#define PINT_STATE_EVENT_START(s) do {} while(0)
+#define PINT_STATE_EVENT_END(s, r) do {} while(0)
+#define __PINT_STATE_EVENT
+    
 /* skip everything except #includes if __SM_CHECK_DEP is already defined; this
  * allows us to get the dependencies right for msgpairarray.sm which relies
  * on conflicting headers for dependency information

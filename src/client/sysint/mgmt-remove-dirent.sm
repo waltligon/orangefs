@@ -156,8 +156,6 @@ PVFS_error PVFS_mgmt_remove_dirent(
 static int mgmt_remove_dirent_init(
     PINT_client_sm *sm_p, job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "mgmt_remove_dirent_init called\n");
-
     assert(js_p->error_code == 0);
     return 1;
 }
@@ -220,9 +218,6 @@ static int mgmt_remove_dirent_comp_fn(
 static int mgmt_remove_dirent_cleanup(
     PINT_client_sm *sm_p, job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "mgmt_remove_dirent_cleanup called\n");
-
     sm_p->error_code = js_p->error_code;
 
     sm_p->op_complete = 1;

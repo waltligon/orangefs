@@ -55,7 +55,7 @@ machine pvfs2_event_mon_sm(prelude, do_work, final_response, cleanup)
  */
 static int event_mon_cleanup(PINT_server_op *s_op, job_status_s* js_p)
 {
-    PINT_STATE_DEBUG("cleanup");
+    
 
     if(s_op->resp.u.mgmt_event_mon.event_array)
 	free(s_op->resp.u.mgmt_event_mon.event_array);
@@ -69,8 +69,6 @@ static int event_mon_cleanup(PINT_server_op *s_op, job_status_s* js_p)
  */
 static int event_mon_do_work(PINT_server_op *s_op, job_status_s* js_p)
 {
-    PINT_STATE_DEBUG("do_work");
-
     /* allocate memory to hold events */
     s_op->resp.u.mgmt_event_mon.event_array
 	= (struct PVFS_mgmt_event*)malloc(s_op->req->u.mgmt_event_mon.event_count

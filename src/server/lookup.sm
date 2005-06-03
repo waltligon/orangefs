@@ -135,7 +135,7 @@ static int lookup_init(PINT_server_op *s_op, job_status_s* js_p)
 {
     char *ptr = NULL;
 
-    PINT_STATE_DEBUG("init");
+    
 
     /* fill in the lookup portion of the PINT_server_op */
     s_op->u.lookup.segp = NULL;
@@ -203,7 +203,7 @@ static int lookup_read_object_metadata(
     PVFS_handle handle = PVFS_HANDLE_NULL;
     PVFS_ds_attributes *ds_attr = NULL;
 
-    PINT_STATE_DEBUG("read_object_metadata");
+    
 
     assert(s_op->u.lookup.seg_nr <= s_op->u.lookup.seg_ct);
 
@@ -254,7 +254,7 @@ static int lookup_verify_object_metadata(
     PVFS_object_attr *a_p = NULL;
     PVFS_ds_attributes *ds_attr = NULL;
 
-    PINT_STATE_DEBUG("verify_object_metadata");
+    
 
     if (s_op->u.lookup.seg_nr == 0)
     {
@@ -353,7 +353,7 @@ static int lookup_read_directory_entry_handle(
     PVFS_handle handle = PVFS_HANDLE_NULL;
     job_id_t j_id;
 
-    PINT_STATE_DEBUG("read_directory_entry_handle");
+    
 
     /* use the base handle if we haven't looked up a segment yet */
     if (s_op->u.lookup.seg_nr == 0)
@@ -394,7 +394,7 @@ static int lookup_read_directory_entry(
     int ret = -PVFS_EINVAL;
     job_id_t j_id;
 
-    PINT_STATE_DEBUG("read_directory_entry");
+    
 
     gossip_debug(
         GOSSIP_SERVER_DEBUG, "  reading from dirent handle = "
@@ -424,7 +424,7 @@ static int lookup_read_directory_entry(
 
 static int lookup_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
 {
-    PINT_STATE_DEBUG("setup_resp");
+    
 
     /*
       NOTE: we may have handle_count N with attr_count N-1 in the case
@@ -472,7 +472,7 @@ static int lookup_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
  */
 static int lookup_cleanup(PINT_server_op *s_op, job_status_s* js_p)
 {
-    PINT_STATE_DEBUG("cleanup");
+    
     
     if (s_op->resp.u.lookup_path.handle_array)
     {

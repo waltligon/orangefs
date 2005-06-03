@@ -86,8 +86,6 @@ static int lookup_ncache_lookup(PINT_client_sm *sm_p,
     int ret = -PVFS_EINVAL;
     PVFS_object_ref parent_ref, object_ref;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup_ncache state: lookup\n");
-
     assert(js_p->error_code == 0);
 
     parent_ref.fs_id = sm_p->msgpair.fs_id;

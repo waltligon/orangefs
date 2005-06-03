@@ -42,6 +42,7 @@
 #define endecode_fields_5_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5)
 #define endecode_fields_7_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7)
 #define endecode_fields_8_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8)
+#define endecode_fields_9_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8,t9,x9)
 #define endecode_fields_12(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8,t9,x9,t10,x10,t11,x11,t12,x12)
 
 #define endecode_fields_1a(n,t1,x1,tn1,n1,ta1,a1)

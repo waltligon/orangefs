@@ -391,8 +391,6 @@ static int io_init(PINT_client_sm *sm_p,
 {
     job_id_t tmp_id;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: io_init\n", sm_p);
-
     assert((js_p->error_code == 0) ||
            (js_p->error_code == IO_RETRY));
 
@@ -418,9 +416,6 @@ static int io_init(PINT_client_sm *sm_p,
 static int io_object_getattr_failure(PINT_client_sm *sm_p,
                                      job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: "
-                 "io_object_getattr_failure\n", sm_p);
-
     if (sm_p->op_cancelled)
     {
         js_p->error_code = -PVFS_ECANCEL;
@@ -445,9 +440,6 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
     int ret = -PVFS_EINVAL, i = 0;
     PVFS_object_attr *attr = NULL;
     int target_datafile_count = 0;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: "
-                 "io_datafile_setup_msgpairs\n", sm_p);
 
     if (sm_p->op_cancelled)
     {
@@ -903,10 +895,6 @@ static int io_datafile_complete_operations(PINT_client_sm *sm_p,
     PINT_client_io_ctx *cur_ctx = NULL;
     int matched_send_or_recv = 0;
 
-    gossip_debug(
-        GOSSIP_CLIENT_DEBUG, "(%p) io_datafile_complete_operations "
-        "(tag %lu)\n", sm_p, status_user_tag);
-
     assert(sm_p->msgarray_count == sm_p->u.io.datafile_count);
     assert(sm_p->u.io.msgpair_completion_count > -1);
     assert(sm_p->u.io.flow_completion_count > -1);
@@ -1305,8 +1293,6 @@ static int io_datafile_size_setup_msgpairs(
     int ret = -PVFS_EINVAL, i = 0;
     PVFS_object_attr *attr = NULL;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: io_datafile_"
-                 "size_setup_msgpairs\n", sm_p);
 
     js_p->error_code = 0;
 
@@ -1373,9 +1359,6 @@ static int io_datafile_size_setup_msgpairs(
 static int io_datafile_size_failure(
     PINT_client_sm *sm_p, job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: io_datafile_"
-                 "size_failure\n", sm_p);
-
     return 0;
 }
 
@@ -1389,9 +1372,6 @@ static int io_analyze_size_results(
                               &sm_p->pinode->attr :
                               &sm_p->acache_attr);
     PVFS_size zero_fill_size = 0;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: io_analyze"
-                 "size_results\n", sm_p);
 
     assert(attr && attr->u.meta.dist);
 
@@ -1444,9 +1424,6 @@ static int io_analyze_size_results(
 static int io_cleanup(PINT_client_sm *sm_p,
                       job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "(%p) io state: io_cleanup\n", sm_p);
-
     CLEAN_PRIVATE_MEMBERS(sm_p);
 
     if (sm_p->acache_hit)

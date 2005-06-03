@@ -64,16 +64,16 @@ static inline void organize_post_op_statistics(
             UPDATE_PERF_METADATA_READ();
             break;
         case BSTREAM_READ_LIST:
-            DBPF_EVENT_END(PVFS_EVENT_TROVE_READ_LIST, op_id); 
+            DBPF_EVENT_END(PVFS_EVENT_TROVE_READ_LIST, NULL, op_id); 
             break;
         case BSTREAM_WRITE_LIST:
-            DBPF_EVENT_END(PVFS_EVENT_TROVE_WRITE_LIST, op_id); 
+            DBPF_EVENT_END(PVFS_EVENT_TROVE_WRITE_LIST, NULL, op_id); 
             break;
         default:
             break;
         case DSPACE_CREATE:
             UPDATE_PERF_METADATA_WRITE();
-            DBPF_EVENT_END(PVFS_EVENT_TROVE_DSPACE_CREATE, op_id); 
+            DBPF_EVENT_END(PVFS_EVENT_TROVE_DSPACE_CREATE, NULL, op_id); 
             break;
     }
 }
@@ -125,7 +125,7 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
                         flags,
                         context_id);
 
-    DBPF_EVENT_START(PVFS_EVENT_TROVE_DSPACE_CREATE, q_op_p->op.id);
+    DBPF_EVENT_START(PVFS_EVENT_TROVE_DSPACE_CREATE, user_ptr, q_op_p->op.id);
 
     /* this array is freed in dbpf-op.c:dbpf_queued_op_free */
     q_op_p->op.u.d_create.extent_array.extent_count =

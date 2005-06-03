@@ -389,8 +389,6 @@ static int create_init(PINT_client_sm *sm_p,
 {
     job_id_t tmp_id;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: init\n");
-
     assert((js_p->error_code == 0) ||
            (js_p->error_code == CREATE_RETRY));
 
@@ -515,9 +513,6 @@ static int create_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
     PINT_sm_msgpair_state *msg_p = NULL;
     struct server_configuration_s *server_config = NULL;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: "
-                 "dspace_create_setup_msgpair\n");
-
     js_p->error_code = 0;
 
     if (sm_p->u.create.num_data_files > PVFS_REQ_LIMIT_DFILE_COUNT)
@@ -570,8 +565,6 @@ static int create_dspace_create_failure(PINT_client_sm *sm_p,
 {
     sm_p->u.create.stored_error_code = js_p->error_code;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "create state: dspace_create_failure\n");
     return 1;
 }
 
@@ -580,9 +573,6 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
 {
     int ret = -PVFS_EINVAL, i = 0;
     struct server_configuration_s *server_config = NULL;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: "
-                 "datafiles_setup_msgpair_array\n");
 
     js_p->error_code = 0;
 
@@ -684,8 +674,6 @@ static int create_datafiles_failure(PINT_client_sm *sm_p,
 {
     sm_p->u.create.stored_error_code = js_p->error_code;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "create state: datafiles_failure\n");
     return 1;
 }
 
@@ -695,9 +683,6 @@ static int create_setattr_setup_msgpair(PINT_client_sm *sm_p,
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_time orig_mtime = sm_p->u.create.sys_attr.mtime;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "create state: setattr_setup_msgpair\n");
 
     js_p->error_code = 0;
 
@@ -750,8 +735,6 @@ static int create_setattr_failure(PINT_client_sm *sm_p,
 {
     sm_p->u.create.stored_error_code = js_p->error_code;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "create state: setattr_failure\n");
     return 1;
 }
 
@@ -760,9 +743,6 @@ static int create_crdirent_setup_msgpair(PINT_client_sm *sm_p,
 {
     int ret = -1;
     PINT_sm_msgpair_state *msg_p = NULL;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "create state: crdirent_setup_msgpair\n");
 
     js_p->error_code = 0;
 
@@ -801,8 +781,6 @@ static int create_crdirent_setup_msgpair(PINT_client_sm *sm_p,
 static int create_crdirent_failure(PINT_client_sm *sm_p,
 				   job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: crdirent_failure\n");
-
     sm_p->u.create.stored_error_code = js_p->error_code;
 
     if (sm_p->u.create.stored_error_code == -PVFS_EEXIST)
@@ -819,9 +797,6 @@ static int create_delete_handles_setup_msgpair_array(
 {
     int ret = -PVFS_EINVAL, i = 0, actual_count = 0;
     PVFS_BMI_addr_t metafile_server_addr;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: "
-                 "delete_handles_setup_msgpair_array\n");
 
     js_p->error_code = 0;
 
@@ -927,8 +902,6 @@ static int create_cleanup(PINT_client_sm *sm_p,
     PVFS_object_ref metafile_ref;
 
     PVFS_util_release_sys_attr(&sm_p->u.create.sys_attr);
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: cleanup\n");
 
     sm_p->error_code = (sm_p->u.create.stored_error_code ?
                         sm_p->u.create.stored_error_code :

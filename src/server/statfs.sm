@@ -69,7 +69,7 @@ static int statfs_do_statfs(PINT_server_op *s_op, job_status_s* js_p)
     TROVE_context_id tmp_context;
     struct server_configuration_s *user_opts = get_server_config_struct();
 
-    PINT_STATE_DEBUG("do_statfs");
+    
 
     /* first try to gather handle statistics */
     ret = trove_handle_get_statistics(
@@ -151,7 +151,7 @@ static int statfs_do_statfs(PINT_server_op *s_op, job_status_s* js_p)
  */
 static int statfs_cleanup(PINT_server_op *s_op, job_status_s* js_p)
 {
-    PINT_STATE_DEBUG("cleanup");
+    
     return(server_state_machine_complete(s_op));
 }
 

@@ -112,7 +112,7 @@ static int io_send_ack(PINT_server_op *s_op, job_status_s *js_p)
     int err = -PVFS_EIO;
     job_id_t tmp_id;
         
-    PINT_STATE_DEBUG("send_ack");
+    
 
     /* this is where we report the file size to the client before
      * starting the I/O transfer, or else report an error if we
@@ -162,7 +162,7 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s *js_p)
     int err = -PVFS_EIO;
     job_id_t tmp_id;
         
-    PINT_STATE_DEBUG("start_flow");
+    
 
     s_op->u.io.flow_d = PINT_flow_alloc();
     if (!s_op->u.io.flow_d)
@@ -264,7 +264,7 @@ static int io_release(PINT_server_op *s_op, job_status_s *js_p)
     int ret = 0;
     job_id_t i;
 
-    PINT_STATE_DEBUG("release");
+    
 
     /*
       tell the scheduler that we are done with this operation (if it
@@ -295,7 +295,7 @@ static int io_release(PINT_server_op *s_op, job_status_s *js_p)
  */
 static int io_cleanup(PINT_server_op *s_op, job_status_s *js_p)
 {
-    PINT_STATE_DEBUG("cleanup");
+    
 
     if (s_op->u.io.flow_d)
     {
@@ -344,7 +344,7 @@ static int io_send_completion_ack(
     int err = -PVFS_EIO;
     job_id_t tmp_id;
         
-    PINT_STATE_DEBUG("send_completion_ack");
+    
 
     /* we only send this trailing ack if we are working on a write
      * operation; otherwise just cut out early

@@ -38,7 +38,9 @@ void gen_machine(char *machine_name,
 
 void gen_state_start(char *state_name)
 {
-    fprintf(out_file,"static union PINT_state_array_values ST_%s[] = {\n", state_name);
+    fprintf(out_file,"static union PINT_state_array_values ST_%s[] = {\n"
+                     "(union PINT_state_array_values) \"%s\",\n", 
+                     state_name, state_name);
 }
 
 /** generates first two lines in the state machine (I think),

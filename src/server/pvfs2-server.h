@@ -24,6 +24,46 @@
 #include "PINT-reqproto-encode.h"
 #include "msgpairarray.h"
 #include "pvfs2-req-proto.h"
+#include "id-generator.h"
+#include "pint-event.h"
+
+#define PINT_STATE_STACK_SIZE 8
+
+#define PINT_STATE_EVENT_INIT() \
+    PVFS_id_gen_t _event_id; \
+    enum PVFS_server_op _event_op; \
+    int _log_events; \
+    char * _state_name
+
+#define PINT_STATE_EVENT_START(s_op) \
+do \
+{ \
+    _event_op = s_op->op; \
+    _log_events = s_op->log_events; \
+    _state_name = (s_op->current_state - 2)->name; \
+    if(_log_events) \
+    { \
+        id_gen_fast_register(&_event_id, (void *)s_op); \
+            PINT_event_timestamp(PVFS_EVENT_API_STATES, \
+                                 _event_op, \
+                                 0, 0, PVFS_EVENT_FLAG_START, \
+                                 _state_name, _event_id); \
+    } \
+} while(0)
+
+#define PINT_STATE_EVENT_END(s_op, status) \
+do \
+{ \
+    if(_log_events) \
+    { \
+        PINT_event_timestamp(PVFS_EVENT_API_STATES, \
+                             _event_op, \
+                             0, 0, PVFS_EVENT_FLAG_END, \
+                             _state_name, _event_id); \
+    } \
+} while(0)
+
+#define __PINT_STATE_EVENT
 
 /* skip everything except #includes if __SM_CHECK_DEP is already
  * defined; this allows us to get the dependencies right for
@@ -329,6 +369,7 @@ typedef struct PINT_server_op
         struct PINT_server_mgmt_get_dirdata_op mgmt_get_dirdata_handle;
     } u;
 
+    int log_events;
 } PINT_server_op;
 
 /* PINT_STATE_DEBUG()
@@ -338,9 +379,10 @@ typedef struct PINT_server_op
  *
  * no return value
  */
-#define PINT_STATE_DEBUG(fn_name)				  \
+#define PINT_STATE_DEBUG(s_op)				  \
     gossip_debug(GOSSIP_SERVER_DEBUG, "(%p) %s state: %s\n", s_op,\
-    PINT_map_server_op_to_string(s_op->op), fn_name);
+    PINT_map_server_op_to_string(s_op->op), ((s_op->current_state - 2)->name));
+#define __PINT_STATE_DEBUG
 
 /* server operation state machines */
 extern struct PINT_state_machine_s pvfs2_get_config_sm;

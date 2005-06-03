@@ -25,13 +25,13 @@
 #include "pint-event.h"
 #include "job-time-mgr.h"
 
-#define JOB_EVENT_START(__op, __id) \
+#define JOB_EVENT_START(__op, __req_id, __id) \
  PINT_event_timestamp(PVFS_EVENT_API_JOB, __op, 0, __id, \
- PVFS_EVENT_FLAG_START)
+ PVFS_EVENT_FLAG_START, 0, __req_id)
 
-#define JOB_EVENT_END(__op, __size, __id) \
+#define JOB_EVENT_END(__op, __size, __req_id, __id) \
  PINT_event_timestamp(PVFS_EVENT_API_JOB, __op, __size, __id, \
- PVFS_EVENT_FLAG_END)
+ PVFS_EVENT_FLAG_END, 0, __req_id)
 
 /* contexts for use within the job interface */
 static bmi_context_id global_bmi_context = -1;
@@ -325,7 +325,7 @@ int job_bmi_send(PVFS_BMI_addr_t addr,
     jd->bmi_callback.fn = bmi_thread_mgr_callback;
     jd->bmi_callback.data = (void*)jd;
     user_ptr_internal = &jd->bmi_callback;
-    JOB_EVENT_START(PVFS_EVENT_BMI_SEND, jd->job_id);
+    JOB_EVENT_START(PVFS_EVENT_BMI_SEND, user_ptr, jd->job_id);
 
     /* post appropriate type of send */
     if (!send_unexpected)
@@ -346,7 +346,7 @@ int job_bmi_send(PVFS_BMI_addr_t addr,
         /* error posting */
         out_status_p->error_code = ret;
         out_status_p->status_user_tag = status_user_tag;
-        JOB_EVENT_END(PVFS_EVENT_BMI_SEND, 0, jd->job_id);
+        JOB_EVENT_END(PVFS_EVENT_BMI_SEND, 0, user_ptr, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (1);
@@ -358,7 +358,7 @@ int job_bmi_send(PVFS_BMI_addr_t addr,
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
         out_status_p->actual_size = size;
-        JOB_EVENT_END(PVFS_EVENT_BMI_SEND, size, jd->job_id);
+        JOB_EVENT_END(PVFS_EVENT_BMI_SEND, size, user_ptr, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
@@ -421,7 +421,7 @@ int job_bmi_send_list(PVFS_BMI_addr_t addr,
     jd->bmi_callback.fn = bmi_thread_mgr_callback;
     jd->bmi_callback.data = (void*)jd;
     user_ptr_internal = &jd->bmi_callback;
-    JOB_EVENT_START(PVFS_EVENT_BMI_SEND, jd->job_id);
+    JOB_EVENT_START(PVFS_EVENT_BMI_SEND, user_ptr, jd->job_id);
 
     /* post appropriate type of send */
     if (!send_unexpected)
@@ -445,7 +445,7 @@ int job_bmi_send_list(PVFS_BMI_addr_t addr,
         /* error posting */
         out_status_p->error_code = ret;
         out_status_p->status_user_tag = status_user_tag;
-        JOB_EVENT_END(PVFS_EVENT_BMI_SEND, 0, jd->job_id);
+        JOB_EVENT_END(PVFS_EVENT_BMI_SEND, 0, user_ptr, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (1);
@@ -457,7 +457,7 @@ int job_bmi_send_list(PVFS_BMI_addr_t addr,
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
         out_status_p->actual_size = total_size;
-        JOB_EVENT_END(PVFS_EVENT_BMI_SEND, total_size, jd->job_id);
+        JOB_EVENT_END(PVFS_EVENT_BMI_SEND, total_size, user_ptr, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
@@ -513,7 +513,7 @@ int job_bmi_recv(PVFS_BMI_addr_t addr,
     jd->bmi_callback.fn = bmi_thread_mgr_callback;
     jd->bmi_callback.data = (void*)jd;
     user_ptr_internal = &jd->bmi_callback;
-    JOB_EVENT_START(PVFS_EVENT_BMI_RECV, jd->job_id);
+    JOB_EVENT_START(PVFS_EVENT_BMI_RECV, user_ptr, jd->job_id);
 
     ret = BMI_post_recv(&(jd->u.bmi.id), addr, buffer, size,
                         &(jd->u.bmi.actual_size), buffer_type, tag, 
@@ -524,7 +524,7 @@ int job_bmi_recv(PVFS_BMI_addr_t addr,
         /* error posting */
         out_status_p->error_code = ret;
         out_status_p->status_user_tag = status_user_tag;
-        JOB_EVENT_END(PVFS_EVENT_BMI_RECV, 0, jd->job_id);
+        JOB_EVENT_END(PVFS_EVENT_BMI_RECV, 0, user_ptr, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (1);
@@ -536,7 +536,7 @@ int job_bmi_recv(PVFS_BMI_addr_t addr,
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
         out_status_p->actual_size = jd->u.bmi.actual_size;
-        JOB_EVENT_END(PVFS_EVENT_BMI_RECV, out_status_p->actual_size, 
+        JOB_EVENT_END(PVFS_EVENT_BMI_RECV, out_status_p->actual_size, user_ptr,
             jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
@@ -599,7 +599,7 @@ int job_bmi_recv_list(PVFS_BMI_addr_t addr,
     jd->bmi_callback.fn = bmi_thread_mgr_callback;
     jd->bmi_callback.data = (void*)jd;
     user_ptr_internal = &jd->bmi_callback;
-    JOB_EVENT_START(PVFS_EVENT_BMI_RECV, jd->job_id);
+    JOB_EVENT_START(PVFS_EVENT_BMI_RECV, user_ptr, jd->job_id);
 
     ret = BMI_post_recv_list(&(jd->u.bmi.id), addr, buffer_list,
                              size_list, list_count, total_expected_size,
@@ -611,7 +611,7 @@ int job_bmi_recv_list(PVFS_BMI_addr_t addr,
         /* error posting */
         out_status_p->error_code = ret;
         out_status_p->status_user_tag = status_user_tag;
-        JOB_EVENT_END(PVFS_EVENT_BMI_RECV, 0, jd->job_id);
+        JOB_EVENT_END(PVFS_EVENT_BMI_RECV, 0, user_ptr, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (1);
@@ -623,7 +623,7 @@ int job_bmi_recv_list(PVFS_BMI_addr_t addr,
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
         out_status_p->actual_size = jd->u.bmi.actual_size;
-        JOB_EVENT_END(PVFS_EVENT_BMI_RECV, out_status_p->actual_size, 
+        JOB_EVENT_END(PVFS_EVENT_BMI_RECV, out_status_p->actual_size, user_ptr,
             jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
@@ -1171,7 +1171,7 @@ int job_flow(flow_descriptor * flow_d,
     flow_d->user_ptr = jd;
     flow_d->callback = flow_callback;
 
-    JOB_EVENT_START(PVFS_EVENT_FLOW, jd->job_id);
+    JOB_EVENT_START(PVFS_EVENT_FLOW, user_ptr, jd->job_id);
 
     /* post the flow */
     ret = PINT_flow_post(flow_d);
@@ -1179,7 +1179,7 @@ int job_flow(flow_descriptor * flow_d,
     {
         out_status_p->error_code = ret;
         out_status_p->status_user_tag = status_user_tag;
-        JOB_EVENT_END(PVFS_EVENT_FLOW, 0, jd->job_id);
+        JOB_EVENT_END(PVFS_EVENT_FLOW, 0, user_ptr, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (1);
@@ -1190,7 +1190,8 @@ int job_flow(flow_descriptor * flow_d,
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
         out_status_p->actual_size = flow_d->total_transfered;
-        JOB_EVENT_END(PVFS_EVENT_FLOW, flow_d->total_transfered, jd->job_id);
+        JOB_EVENT_END(PVFS_EVENT_FLOW, flow_d->total_transfered, 
+                      user_ptr, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (1);
@@ -1284,7 +1285,7 @@ int job_trove_bstream_write_at(PVFS_fs_id coll_id,
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_WRITE_AT, jd->job_id);
+    JOB_EVENT_START(PVFS_EVENT_TROVE_WRITE_AT, user_ptr, jd->job_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_bstream_write_at(coll_id, handle, buffer,
@@ -1300,7 +1301,7 @@ int job_trove_bstream_write_at(PVFS_fs_id coll_id,
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_WRITE_AT, 0, jd->job_id);
+        JOB_EVENT_END(PVFS_EVENT_TROVE_WRITE_AT, 0, user_ptr, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         /* TODO: handle this correctly */
@@ -1316,8 +1317,10 @@ int job_trove_bstream_write_at(PVFS_fs_id coll_id,
         out_status_p->status_user_tag = status_user_tag;
         out_status_p->actual_size = jd->u.trove.actual_size;
         out_status_p->vtag = jd->u.trove.vtag;
-        JOB_EVENT_END(PVFS_EVENT_TROVE_WRITE_AT, out_status_p->actual_size, 
-            jd->job_id);
+        JOB_EVENT_END(PVFS_EVENT_TROVE_WRITE_AT, 
+                      out_status_p->actual_size, 
+                      user_ptr,
+                      jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
@@ -1377,7 +1380,7 @@ int job_trove_bstream_read_at(PVFS_fs_id coll_id,
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_READ_AT, jd->job_id);
+    JOB_EVENT_START(PVFS_EVENT_TROVE_READ_AT, user_ptr, jd->job_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_bstream_read_at(coll_id, handle, buffer,
@@ -1393,7 +1396,7 @@ int job_trove_bstream_read_at(PVFS_fs_id coll_id,
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_READ_AT, 0, jd->job_id);
+        JOB_EVENT_END(PVFS_EVENT_TROVE_READ_AT, 0, user_ptr, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         /* TODO: handle this correctly */
@@ -1410,7 +1413,7 @@ int job_trove_bstream_read_at(PVFS_fs_id coll_id,
         out_status_p->actual_size = jd->u.trove.actual_size;
         out_status_p->vtag = jd->u.trove.vtag;
         JOB_EVENT_END(PVFS_EVENT_TROVE_READ_AT, out_status_p->actual_size, 
-            jd->job_id);
+            user_ptr, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
@@ -1461,7 +1464,7 @@ int job_trove_bstream_flush(PVFS_fs_id coll_id,
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_BSTREAM_FLUSH, jd->job_id);
+    JOB_EVENT_START(PVFS_EVENT_TROVE_BSTREAM_FLUSH, user_ptr, jd->job_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_bstream_flush(coll_id, handle, flags, user_ptr_internal,
@@ -1474,7 +1477,7 @@ int job_trove_bstream_flush(PVFS_fs_id coll_id,
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_BSTREAM_FLUSH, 0, jd->job_id);
+        JOB_EVENT_END(PVFS_EVENT_TROVE_BSTREAM_FLUSH, 0, user_ptr, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         out_status_p->error_code = ret;
@@ -1486,7 +1489,7 @@ int job_trove_bstream_flush(PVFS_fs_id coll_id,
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
-        JOB_EVENT_END(PVFS_EVENT_TROVE_BSTREAM_FLUSH, 0, jd->job_id);
+        JOB_EVENT_END(PVFS_EVENT_TROVE_BSTREAM_FLUSH, 0, user_ptr, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
@@ -1543,7 +1546,7 @@ int job_trove_keyval_read(PVFS_fs_id coll_id,
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_KEYVAL_READ, jd->job_id);
+    JOB_EVENT_START(PVFS_EVENT_TROVE_KEYVAL_READ, user_ptr, jd->job_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_read(coll_id, handle, key_p, val_p, flags,
@@ -1557,7 +1560,7 @@ int job_trove_keyval_read(PVFS_fs_id coll_id,
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_READ, 0, jd->job_id);
+        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_READ, 0, user_ptr, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         out_status_p->error_code = ret;
@@ -1571,7 +1574,7 @@ int job_trove_keyval_read(PVFS_fs_id coll_id,
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
         out_status_p->vtag = jd->u.trove.vtag;
-        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_READ, 0, jd->job_id);
+        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_READ, 0, user_ptr, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
@@ -1630,7 +1633,7 @@ int job_trove_keyval_read_list(PVFS_fs_id coll_id,
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_KEYVAL_READ_LIST, jd->job_id);
+    JOB_EVENT_START(PVFS_EVENT_TROVE_KEYVAL_READ_LIST, user_ptr, jd->job_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_read_list(coll_id, handle, key_array,
@@ -1645,7 +1648,8 @@ int job_trove_keyval_read_list(PVFS_fs_id coll_id,
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_READ_LIST, 0, jd->job_id);
+        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_READ_LIST, 0, 
+                      user_ptr, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         out_status_p->error_code = ret;
@@ -1659,7 +1663,8 @@ int job_trove_keyval_read_list(PVFS_fs_id coll_id,
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
         out_status_p->vtag = jd->u.trove.vtag;
-        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_READ_LIST, 0, jd->job_id);
+        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_READ_LIST, 0, 
+                      user_ptr, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
@@ -1717,7 +1722,7 @@ int job_trove_keyval_write(PVFS_fs_id coll_id,
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_KEYVAL_WRITE, jd->job_id);
+    JOB_EVENT_START(PVFS_EVENT_TROVE_KEYVAL_WRITE, user_ptr, jd->job_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_write(coll_id, handle, key_p, val_p, flags,
@@ -1732,7 +1737,7 @@ int job_trove_keyval_write(PVFS_fs_id coll_id,
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_WRITE, 0, jd->job_id);
+        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_WRITE, 0, user_ptr, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         out_status_p->error_code = ret;
@@ -1746,7 +1751,7 @@ int job_trove_keyval_write(PVFS_fs_id coll_id,
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
         out_status_p->vtag = jd->u.trove.vtag;
-        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_WRITE, 0, jd->job_id);
+        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_WRITE, 0, user_ptr, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
@@ -1796,7 +1801,7 @@ int job_trove_keyval_flush(PVFS_fs_id coll_id,
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_KEYVAL_FLUSH, jd->job_id);
+    JOB_EVENT_START(PVFS_EVENT_TROVE_KEYVAL_FLUSH, user_ptr, jd->job_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_flush(coll_id, handle, flags, user_ptr_internal,
@@ -1809,7 +1814,7 @@ int job_trove_keyval_flush(PVFS_fs_id coll_id,
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_FLUSH, 0, jd->job_id);
+        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_FLUSH, 0, user_ptr, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         out_status_p->error_code = ret;
@@ -1822,7 +1827,7 @@ int job_trove_keyval_flush(PVFS_fs_id coll_id,
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
-        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_FLUSH, 0, jd->job_id);
+        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_FLUSH, 0, user_ptr, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
@@ -1879,7 +1884,7 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_DSPACE_GETATTR, jd->job_id);
+    JOB_EVENT_START(PVFS_EVENT_TROVE_DSPACE_GETATTR, user_ptr, jd->job_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_getattr(coll_id,
@@ -1894,7 +1899,7 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_GETATTR, 0, jd->job_id);
+        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_GETATTR, 0, user_ptr, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         out_status_p->error_code = ret;
@@ -1907,7 +1912,7 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
-        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_GETATTR, 0, jd->job_id);
+        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_GETATTR, 0, user_ptr, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
@@ -1964,7 +1969,7 @@ int job_trove_dspace_setattr(PVFS_fs_id coll_id,
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_DSPACE_SETATTR, jd->job_id);
+    JOB_EVENT_START(PVFS_EVENT_TROVE_DSPACE_SETATTR, user_ptr, jd->job_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_setattr(coll_id, handle, ds_attr_p,
@@ -1979,7 +1984,7 @@ int job_trove_dspace_setattr(PVFS_fs_id coll_id,
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_SETATTR, 0, jd->job_id);
+        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_SETATTR, 0, user_ptr, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         out_status_p->error_code = ret;
@@ -1992,7 +1997,7 @@ int job_trove_dspace_setattr(PVFS_fs_id coll_id,
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
-        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_SETATTR, 0, jd->job_id);
+        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_SETATTR, 0, user_ptr, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
@@ -2050,7 +2055,7 @@ int job_trove_bstream_resize(PVFS_fs_id coll_id,
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_BSTREAM_RESIZE, jd->job_id);
+    JOB_EVENT_START(PVFS_EVENT_TROVE_BSTREAM_RESIZE, user_ptr, jd->job_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_bstream_resize(coll_id, handle, &size,
@@ -2065,7 +2070,7 @@ int job_trove_bstream_resize(PVFS_fs_id coll_id,
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_BSTREAM_RESIZE, 0, jd->job_id);
+        JOB_EVENT_END(PVFS_EVENT_TROVE_BSTREAM_RESIZE, 0, user_ptr, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         out_status_p->error_code = ret;
@@ -2078,7 +2083,7 @@ int job_trove_bstream_resize(PVFS_fs_id coll_id,
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
-        JOB_EVENT_END(PVFS_EVENT_TROVE_BSTREAM_RESIZE, 0, jd->job_id);
+        JOB_EVENT_END(PVFS_EVENT_TROVE_BSTREAM_RESIZE, 0, user_ptr, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
@@ -2155,7 +2160,7 @@ int job_trove_keyval_remove(PVFS_fs_id coll_id,
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_KEYVAL_REMOVE, jd->job_id);
+    JOB_EVENT_START(PVFS_EVENT_TROVE_KEYVAL_REMOVE, user_ptr, jd->job_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_remove(coll_id, handle, key_p, flags,
@@ -2169,7 +2174,7 @@ int job_trove_keyval_remove(PVFS_fs_id coll_id,
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_REMOVE, 0, jd->job_id);
+        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_REMOVE, 0, user_ptr, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         out_status_p->error_code = ret;
@@ -2183,7 +2188,7 @@ int job_trove_keyval_remove(PVFS_fs_id coll_id,
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
         out_status_p->vtag = jd->u.trove.vtag;
-        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_REMOVE, 0, jd->job_id);
+        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_REMOVE, 0, user_ptr, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
@@ -2265,7 +2270,7 @@ int job_trove_keyval_iterate(PVFS_fs_id coll_id,
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_KEYVAL_ITERATE, jd->job_id);
+    JOB_EVENT_START(PVFS_EVENT_TROVE_KEYVAL_ITERATE, user_ptr, jd->job_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_iterate(coll_id, handle,
@@ -2281,7 +2286,7 @@ int job_trove_keyval_iterate(PVFS_fs_id coll_id,
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_ITERATE, 0, jd->job_id);
+        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_ITERATE, 0, user_ptr, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         out_status_p->error_code = ret;
@@ -2297,7 +2302,7 @@ int job_trove_keyval_iterate(PVFS_fs_id coll_id,
         out_status_p->vtag = jd->u.trove.vtag;
         out_status_p->position = jd->u.trove.position;
         out_status_p->count = jd->u.trove.count;
-        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_ITERATE, 0, jd->job_id);
+        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_ITERATE, 0, user_ptr, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
@@ -2356,7 +2361,8 @@ int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_DSPACE_ITERATE_HANDLES, jd->job_id);
+    JOB_EVENT_START(PVFS_EVENT_TROVE_DSPACE_ITERATE_HANDLES, 
+                    user_ptr, jd->job_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_iterate_handles(coll_id,
@@ -2372,7 +2378,8 @@ int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_ITERATE_HANDLES, 0, jd->job_id);
+        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_ITERATE_HANDLES, 0, 
+                      user_ptr, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         out_status_p->error_code = ret;
@@ -2388,7 +2395,8 @@ int job_trove_dspace_iterate_handles(PVFS_fs_id coll_id,
         out_status_p->vtag = jd->u.trove.vtag;
         out_status_p->position = jd->u.trove.position;
         out_status_p->count = jd->u.trove.count;
-        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_ITERATE_HANDLES, 0, jd->job_id);
+        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_ITERATE_HANDLES, 0, 
+                      user_ptr, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
@@ -2470,7 +2478,7 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_DSPACE_CREATE, jd->job_id);
+    JOB_EVENT_START(PVFS_EVENT_TROVE_DSPACE_CREATE, user_ptr, jd->job_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_create(coll_id,
@@ -2488,7 +2496,7 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_CREATE, 0, jd->job_id);
+        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_CREATE, 0, user_ptr, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         /* TODO: handle this correctly */
@@ -2503,7 +2511,7 @@ int job_trove_dspace_create(PVFS_fs_id coll_id,
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
         out_status_p->handle = jd->u.trove.handle;
-        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_CREATE, 0, jd->job_id);
+        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_CREATE, 0, user_ptr, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
@@ -2557,7 +2565,7 @@ int job_trove_dspace_remove(PVFS_fs_id coll_id,
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_DSPACE_REMOVE, jd->job_id);
+    JOB_EVENT_START(PVFS_EVENT_TROVE_DSPACE_REMOVE, user_ptr, jd->job_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_remove(coll_id,
@@ -2572,7 +2580,7 @@ int job_trove_dspace_remove(PVFS_fs_id coll_id,
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_REMOVE, 0, jd->job_id);
+        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_REMOVE, 0, user_ptr, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         /* TODO: handle this correctly */
@@ -2586,7 +2594,7 @@ int job_trove_dspace_remove(PVFS_fs_id coll_id,
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
-        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_REMOVE, 0, jd->job_id);
+        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_REMOVE, 0, user_ptr, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
@@ -2640,7 +2648,7 @@ int job_trove_dspace_verify(PVFS_fs_id coll_id,
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_DSPACE_VERIFY, jd->job_id);
+    JOB_EVENT_START(PVFS_EVENT_TROVE_DSPACE_VERIFY, user_ptr, jd->job_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_verify(coll_id,
@@ -2655,7 +2663,7 @@ int job_trove_dspace_verify(PVFS_fs_id coll_id,
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_VERIFY, 0, jd->job_id);
+        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_VERIFY, 0, user_ptr, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         /* TODO: handle this correctly */
@@ -2669,7 +2677,7 @@ int job_trove_dspace_verify(PVFS_fs_id coll_id,
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
-        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_VERIFY, 0, jd->job_id);
+        JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_VERIFY, 0, user_ptr, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);
@@ -3861,7 +3869,8 @@ static void fill_status(struct job_desc *jd,
     }
 
     if(jd->event_type)
-        JOB_EVENT_END(jd->event_type, status->actual_size, jd->job_id);
+        JOB_EVENT_END(jd->event_type, status->actual_size, 
+                      jd->job_user_ptr, jd->job_id);
 
     return;
 }

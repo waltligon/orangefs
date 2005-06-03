@@ -18,18 +18,11 @@
  * - easy access to the state data for the implementation
  * - reuse across client and server (different state data)
  *
- * The important thing to note about this file is that it requires that
- * PINT_OP_STATE be defined.  This must be a typedef to the structure
- * that holds the necessary state information for a given state machine.
- * There are four fields that must exist and are used by the state machine
- * implementation:
- * - int op;
- * - int stackptr;
- * - PINT_state_array_values *current_state;
- * - PINT_state_array_values *state_stack[PINT_STATE_STACK_SIZE];
- *
- * Also, PINT_STATE_STACK_SIZE must be defined or enum'd before that
- * declaration.
+ * PINT_OP_STATE structure handling changed (5/31/05) to be a base
+ * struct instead of a #define and have that struct be included as the
+ * first field (this is required!) of the derived struct, allowing us
+ * to cast to the PINT_OP_STATE struct when it is passed into the 
+ * generic state machine functions.
  *
  * The file state-machine-fns.h defines a set of functions for use in
  * interacting with the state machine.  There are also a couple of other
@@ -38,10 +31,8 @@
  */
 
 #include "job.h"
+#include "msgpairarray.h"
 
-#ifndef PINT_OP_STATE
-#error "PINT_OP_STATE must be defined before state-machine.h is included."
-#endif
 
 union PINT_state_array_values
 {
@@ -50,6 +41,7 @@ union PINT_state_array_values
     int flag;
     struct PINT_state_machine_s *nested_machine; /* NOTE: this is really a PINT_state_machine * (void *)*/
     union PINT_state_array_values *next_state;
+    char * name;
 };
 
 struct PINT_state_machine_s
@@ -66,10 +58,6 @@ enum {
 #define ENCODE_TYPE 0
 #define SM_STATE_RETURN -1
 #define SM_NESTED_STATE 1
-
-/* Prototypes for functions provided by user */
-int PINT_state_machine_start(struct PINT_OP_STATE *, job_status_s *ret);
-int PINT_state_machine_complete(struct PINT_OP_STATE *);
 
 /* NOTE: All other function prototypes are defined in state-machine-fns.h */
 

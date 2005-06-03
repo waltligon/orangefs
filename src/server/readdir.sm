@@ -95,7 +95,7 @@ static int readdir_verify_directory_metadata(
 {
     PVFS_object_attr *attr = &s_op->attr;
 
-    PINT_STATE_DEBUG("verify_directory_metadata");
+    
 
     js_p->error_code = 0;
 
@@ -122,7 +122,7 @@ static int readdir_read_dirdata_handle(
     int ret = -PVFS_EINVAL;
     job_id_t i;
 
-    PINT_STATE_DEBUG("read_dirdata_handle");
+    
 
     s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
@@ -153,7 +153,7 @@ static int readdir_iterate_on_entries(
     char *memory_buffer = NULL;
     job_id_t j_id;
 
-    PINT_STATE_DEBUG("iterate_on_entries");
+    
 
     /*
       if a client issues a readdir but asks for no entries, we can
@@ -228,7 +228,7 @@ static int readdir_setup_resp(
     PINT_server_op *s_op, job_status_s *js_p)
 {
 
-    PINT_STATE_DEBUG("setup_resp");
+    
 
     if (js_p->error_code == STATE_ENOTDIR)
     {
@@ -259,7 +259,7 @@ static int readdir_setup_resp(
 static int readdir_cleanup(
     PINT_server_op *s_op, job_status_s *js_p)
 {
-    PINT_STATE_DEBUG("cleanup");
+    
 
     if (s_op->key_a)
     {

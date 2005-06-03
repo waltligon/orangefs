@@ -70,7 +70,7 @@ static int truncate_resize(
     int ret = -PVFS_EINVAL;
     job_id_t i;
 
-    PINT_STATE_DEBUG("resize");
+    
 
     ret = job_trove_bstream_resize(
         s_op->req->u.truncate.fs_id, s_op->req->u.truncate.handle,
@@ -83,14 +83,14 @@ static int truncate_resize(
 static int truncate_check_error(
     PINT_server_op *s_op, job_status_s *js_p)
 {
-    PINT_STATE_DEBUG("check_error");
+    
     return 1;
 }
 
 static int truncate_cleanup(
     PINT_server_op *s_op, job_status_s *js_p)
 {
-    PINT_STATE_DEBUG("cleanup");
+    
     return (server_state_machine_complete(s_op));
 }
 
