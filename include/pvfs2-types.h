@@ -304,11 +304,19 @@ enum PVFS_server_param
     PVFS_SERV_PARAM_LOG_EVENTS = 7   /* log events currently in ring buffer */
 };
 
+#define PVFS_SERVER_PARAM_COUNT 8
+
+const char * PVFS_server_param_names[PVFS_SERVER_PARAM_COUNT];
+
 enum PVFS_server_mode
 {
     PVFS_SERVER_NORMAL_MODE = 1,      /* default server operating mode */
     PVFS_SERVER_ADMIN_MODE = 2        /* administrative mode */
 };
+
+#define PVFS_SERVER_MODE_COUNT 2 
+
+const char * PVFS_server_mode_names[PVFS_SERVER_MODE_COUNT];
 
 /* PVFS2 errors
  *

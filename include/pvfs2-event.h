@@ -27,6 +27,10 @@ enum PVFS_event_api
     PVFS_EVENT_API_STATES =      (1 << 8)  /* transition states of a SM */
 };
 
+#define PVFS_EVENT_API_COUNT 9
+
+const char * PVFS_event_api_names[PVFS_EVENT_API_COUNT];
+
 /* what kind of event */
 enum PVFS_event_flag
 {
@@ -35,6 +39,8 @@ enum PVFS_event_flag
     PVFS_EVENT_FLAG_END =   (1 << 1),
     PVFS_EVENT_FLAG_INVALID = (1 << 2)
 };
+
+#define PVFS_EVENT_FLAG_COUNT 4
 
 /* kind of operation, may exist in multiple APIs */
 enum PVFS_event_op
@@ -64,6 +70,10 @@ enum PVFS_event_op
      PVFS_EVENT_TROVE_BSTREAM_VALIDATE = 23,
      PVFS_EVENT_TROVE_KEYVAL_VALIDATE = 24
 };
+
+#define PVFS_EVENT_OP_COUNT 24
+
+const char * PVFS_event_op_names[PVFS_EVENT_OP_COUNT];
 
 #endif /* __PVFS2_EVENT_H */
 
