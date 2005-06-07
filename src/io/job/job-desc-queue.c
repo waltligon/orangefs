@@ -94,6 +94,8 @@ job_desc_q_p job_desc_q_new(void)
  */
 void job_desc_q_cleanup(job_desc_q_p jdqp)
 {
+    job_desc_q_p iterator = NULL;
+    job_desc_q_p scratch = NULL;
     struct job_desc *tmp_job_desc = NULL;
 
     if (s_job_desc_q_mutex)
@@ -101,15 +103,14 @@ void job_desc_q_cleanup(job_desc_q_p jdqp)
         gen_mutex_lock(s_job_desc_q_mutex);
         if (jdqp)
         {
-            do
+            qlist_for_each_safe(iterator, scratch, jdqp)
             {
-                tmp_job_desc = job_desc_q_shownext(jdqp);
-                if (tmp_job_desc)
-                {
-                    job_desc_q_remove(tmp_job_desc);
-                    free(tmp_job_desc);
-                }
-            } while (tmp_job_desc);
+                tmp_job_desc = qlist_entry(iterator, struct job_desc,
+                        job_desc_q_lin); 
+                /* qlist_for_each_safe lets us iterate and remove nodes.  no
+                 * need to adjust pointers as we are freeing everything */
+                free(tmp_job_desc);
+            }
 
             free(jdqp);
             jdqp = NULL;
