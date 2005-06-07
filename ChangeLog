@@ -22,7 +22,21 @@ pvfs2-1.1.0pre1
 - kernel: export superblock magic number for romio autodetection
 - 64-bit: change some protocol encodings to avoid unaligned accesses, fix
   server crash
-
+- documentation updates
+- Phil Carns and David Beilloin reported various memory leaks and memory
+  misuse throughout the code
+- configure-time options to select behavior needed on redhat-like environments
+- can disable server support at configure time
+- various tweaks to make cross compiling easier
+- Phil Carns contributed a new config file option (LogStamp) to select
+  timestamp format
+- By default we sync metadata (TroveSyncMeta yes) and not data (TroveSyncData
+  no).  This configuration is a good compromise between reliability and
+  performance for most workloads.
+- Joachim Worringen's noncontig benchmark turned up several bugs now addressed
+  in this release
+- bugfix where pvfs2-chmod would cause all future operations to fail
+- bugfix for 64 bit servers.  pvfs2 on opteron now passes the bonnie benchmark
 
 pvfs2-1.0.1
 ===========
