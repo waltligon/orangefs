@@ -189,6 +189,7 @@ int job_open_context(job_context_id* context_id)
     int context_index;
 
     /* find an unused context id */
+    gen_mutex_lock(&completion_mutex);
     for(context_index=0; context_index<JOB_MAX_CONTEXTS; context_index++)
     {
         if(completion_queue_array[context_index] == NULL)
@@ -200,6 +201,7 @@ int job_open_context(job_context_id* context_id)
     if(context_index >= JOB_MAX_CONTEXTS)
     {
         /* we don't have any more available! */
+        gen_mutex_unlock(&completion_mutex);
         return(-EBUSY);
     }
 
@@ -207,8 +209,10 @@ int job_open_context(job_context_id* context_id)
     completion_queue_array[context_index] = job_desc_q_new();
     if(!completion_queue_array[context_index])
     {
+        gen_mutex_unlock(&completion_mutex);
         return(-ENOMEM);
     }
+    gen_mutex_unlock(&completion_mutex);
 
     *context_id = context_index;
     return(0);
@@ -223,8 +227,10 @@ int job_open_context(job_context_id* context_id)
  */
 void job_close_context(job_context_id context_id)
 {
+    gen_mutex_lock(&completion_mutex);
     if(!completion_queue_array[context_id])
     {
+        gen_mutex_unlock(&completion_mutex);
         return;
     }
 
@@ -232,6 +238,7 @@ void job_close_context(job_context_id context_id)
 
     completion_queue_array[context_id] = NULL;
 
+    gen_mutex_unlock(&completion_mutex);
     return;
 }
 
@@ -3608,8 +3615,13 @@ int job_testcontext(job_id_t * out_id_array_p,
 static int setup_queues(void)
 {
 
+    gen_mutex_lock(&bmi_unexp_mutex);
     bmi_unexp_queue = job_desc_q_new();
+    gen_mutex_unlock(&bmi_unexp_mutex);
+
+    gen_mutex_lock(&dev_unexp_mutex);
     dev_unexp_queue = job_desc_q_new();
+    gen_mutex_unlock(&dev_unexp_mutex);
 
     if (!bmi_unexp_queue || !dev_unexp_queue)
     {
@@ -3629,15 +3641,21 @@ static int setup_queues(void)
 static void teardown_queues(void)
 {
 
+    gen_mutex_lock(&bmi_unexp_mutex);
     if (bmi_unexp_queue)
     {
         job_desc_q_cleanup(bmi_unexp_queue);
     }
+    gen_mutex_unlock(&bmi_unexp_mutex);
 
+    gen_mutex_lock(&dev_unexp_mutex);
     if (dev_unexp_queue)
     {
         job_desc_q_cleanup(dev_unexp_queue);
     }
+    gen_mutex_unlock(&dev_unexp_mutex);
+
+    return;
 }
 
 /* trove_thread_mgr_callback()
