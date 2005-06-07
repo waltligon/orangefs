@@ -510,14 +510,31 @@ QUIET_COMPILE=1)
 
 AC_SUBST(QUIET_COMPILE)
 
+dnl
+dnl a function to check for epoll capabilities
+dnl
+test_for_epoll()
+{
+  AC_CHECK_HEADERS(sys/epoll.h)
+  AC_MSG_CHECKING(for epoll functions)
+  AC_TRY_LINK([#include <sys/epoll.h>], [
+	int fd;
+	fd = epoll_create(1);
+	close(fd);
+  ], AC_MSG_RESULT(yes)
+     CFLAGS="$CFLAGS -D__PVFS2_USE_EPOLL__"
+     BUILD_EPOLL=1
+     AC_SUBST(BUILD_EPOLL),
+  AC_MSG_RESULT(no))
+}
+
 dnl optionally enable use of epoll() on Linux instead of poll()
 AC_ARG_ENABLE(epoll,
 [  --enable-epoll          Enables use of epoll for TCP/IP polling],
-CFLAGS="$CFLAGS -D__PVFS2_USE_EPOLL__"
-BUILD_EPOLL="1"
-,)
-
-AC_SUBST(BUILD_EPOLL)
+[ if test "x$enableval" = "xyes" ; then
+      test_for_epoll
+  fi
+],)
 
 dnl enables a hack to print back traces out of segfault signal handler
 AC_ARG_ENABLE(segv-backtrace,
@@ -729,7 +746,7 @@ if test "x$NEED_BERKELEY_DB" = "xyes" ; then
     AC_DEFINE(HAVE_DB_DIRTY_READ, 1, [Define if db library has DB_DIRTY_READ flag]),
     AC_MSG_RESULT(no))
 fi
-# end of NEED_BERKELEY_DB section
+dnl end of NEED_BERKELEY_DB section
 
 AC_CHECK_HEADERS(netdb.h)
 AC_CHECK_HEADERS(arpa/inet.h)
@@ -910,6 +927,12 @@ if test "x$BUILD_KARMA" = "x1" ; then
    AC_MSG_RESULT([PVFS2 configured to build karma gui               : yes])
 else
    AC_MSG_RESULT([PVFS2 configured to build karma gui               :  no])
+fi
+
+if test "x$BUILD_EPOLL" = "x1" ; then
+   AC_MSG_RESULT([PVFS2 configured to use epoll                     : yes])
+else
+   AC_MSG_RESULT([PVFS2 configured to use epoll                     :  no])
 fi
 
 if test "x$ENABLE_COVERAGE" = "x1" ; then
