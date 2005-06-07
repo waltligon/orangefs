@@ -76,6 +76,8 @@ case "$1" in
 	;;
   restart)
 	$0 stop
+	# give server time to die cleanly
+	sleep 2
 	$0 start
 	;;
   *)
