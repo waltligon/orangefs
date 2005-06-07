@@ -202,6 +202,7 @@ main_out:
     generic_cleanup(&src, &dest, &credentials);
     PVFS_sys_finalize();
     free(user_opts);
+    free(buffer);
     return(ret);
 }
 
@@ -334,6 +335,7 @@ static size_t generic_read(file_object *src, char *buffer,
 		buffer, mem_req, credentials, &resp_io);
 	if (ret == 0)
 	{
+            PVFS_Request_free(&mem_req);
 	    return (resp_io.total_completed);
 	} 
 	else 
@@ -363,8 +365,11 @@ static size_t generic_write(file_object *dest, char *buffer,
 	}
 	ret = PVFS_sys_write(dest->pvfs2.ref, file_req, offset,
 		buffer, mem_req, credentials, &resp_io);
-	if (ret == 0)
+	if (ret == 0) 
+        {
+            PVFS_Request_free(&mem_req);
 	    return(resp_io.total_completed);
+        }
 	else
 	    PVFS_perror("PVFS_sys_write", ret);
     }
