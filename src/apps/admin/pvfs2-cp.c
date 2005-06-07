@@ -27,7 +27,7 @@
 /* optional parameters, filled in by parse_args() */
 struct options
 {
-    int strip_size;
+    PVFS_size strip_size;
     int num_datafiles;
     int buf_size;
     char* srcfile;
@@ -75,7 +75,7 @@ static double Wtime(void);
 static void print_timings( double time, int64_t total);
 static int resolve_filename(file_object *obj, char *filename);
 static int generic_open(file_object *obj, PVFS_credentials *credentials, 
-	int nr_datafiles, int strip_size, char *srcname, int open_type);
+	int nr_datafiles, PVFS_size strip_size, char *srcname, int open_type);
 static size_t generic_read(file_object *src, char *buffer, 
 	int64_t offset, size_t count, PVFS_credentials *credentials);
 static size_t generic_write(file_object *dest, char *buffer, 
@@ -245,7 +245,7 @@ static struct options* parse_args(int argc, char* argv[])
 		tmp_opts->show_timings = 1;
 		break;
 	    case('s'):
-		ret = sscanf(optarg, "%d", &tmp_opts->strip_size);
+		ret = sscanf(optarg, "%Ld", &tmp_opts->strip_size);
 		if(ret < 1){
 		    free(tmp_opts);
 		    return(NULL);
@@ -405,7 +405,8 @@ static int resolve_filename(file_object *obj, char *filename)
  */
 
 static int generic_open(file_object *obj, PVFS_credentials *credentials,
-                        int nr_datafiles, int strip_size, char *srcname, int open_type)
+                        int nr_datafiles, PVFS_size strip_size, 
+                        char *srcname, int open_type)
 {
     struct stat stat_buf;
     PVFS_sysresp_lookup resp_lookup;
