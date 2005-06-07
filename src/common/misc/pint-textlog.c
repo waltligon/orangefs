@@ -31,7 +31,7 @@
 
 #define STATE_TABLE_SIZE 503
 
-static char * PINT_event_operation_names[29] =
+static char * PINT_event_server_operation_names[29] =
 {
 	"INVALID",
 	"CREATE",
@@ -64,19 +64,6 @@ static char * PINT_event_operation_names[29] =
 	"PROTO_ERROR",
 };
 
-static char * PINT_event_api_names[10] =
-{
-    "JOB",
-    "BMI",
-    "TROVE",
-    "ENCODE_REQ",
-    "ENCODE_RESP",
-    "DECODE_REQ",
-    "DECODE_RESP",
-    "SM",
-    "STATES"
-};
-
 static int PINT_event_log2(int _val)
 {
     int res = 0;
@@ -87,38 +74,9 @@ static int PINT_event_log2(int _val)
     return res;
 }
 
-#define PINT_event_api_get_name(_api) PINT_event_api_names[PINT_event_log2(_api)]
+#define PINT_event_api_get_name(_api) PVFS_event_api_names[PINT_event_log2(_api)]
 
-static char * PINT_event_op_names[25] =
-{
-     "INVALID",
-     "BMI_SEND",
-     "BMI_RECV",
-     "FLOW",
-     "TROVE_READ_AT",
-     "TROVE_WRITE_AT",
-     "TROVE_BSTREAM_FLUSH",
-     "TROVE_KEYVAL_FLUSH",
-     "TROVE_READ_LIST",
-     "TROVE_WRITE_LIST",
-     "TROVE_KEYVAL_READ",
-     "TROVE_KEYVAL_READ_LIST",
-     "TROVE_KEYVAL_WRITE",
-     "TROVE_DSPACE_GETATTR",
-     "TROVE_DSPACE_SETATTR",
-     "TROVE_BSTREAM_RESIZE",
-     "TROVE_KEYVAL_REMOVE",
-     "TROVE_KEYVAL_ITERATE",
-     "TROVE_KEYVAL_ITERATE_KEYS",
-     "TROVE_DSPACE_ITERATE_HANDLES",
-     "TROVE_DSPACE_CREATE",
-     "TROVE_DSPACE_REMOVE",
-     "TROVE_DSPACE_VERIFY",
-     "TROVE_BSTREAM_VALIDATE",
-     "TROVE_KEYVAL_VALIDATE"
-};  
-
-#define PINT_event_op_get_name(_op) PINT_event_op_names[_op]
+#define PINT_event_op_get_name(_op) PVFS_event_op_names[_op - 1]
 
 /* We need to keep track of the start events
  * so that we can match them up with the end events
@@ -172,12 +130,12 @@ static inline int PINT_textlog_id_hash(
 }
 
 #define PINT_textlog_make_state_key(_event) \
-    ((0xFFFF0000 & ((uint32_t)_event->operation)) | \
-     (0x0000FFFF & (((uint32_t)_event->state_id) << 4)))
+    ((0xFF000000 & (((uint32_t)_event->operation) << 24)) | \
+     (0x00FFFFFF & ((uint32_t)_event->state_id)))
 
 #define PINT_textlog_make_apiop_key(_event) \
-    ((0x0000FFFF & ((uint32_t)_event->api)) | \
-     (0xFFFF0000 & ((uint32_t)_event->operation)))
+    ((0x00FFFFFF & ((uint32_t)_event->api)) | \
+     (0xFF000000 & (((uint32_t)_event->operation) << 24)))
 
 #define PINT_textlog_make_key(_event) \
     ((_event->api & PVFS_EVENT_API_STATES) ? \
@@ -268,7 +226,7 @@ static inline int PINT_textlog_write_statename(
     
         res = fprintf(fp, "%s:%s", 
                       (event->operation < 26) ?
-                      PINT_event_operation_names[event->operation] :
+                      PINT_event_server_operation_names[event->operation] :
                       "NULL",
                       (char *)id_gen_fast_lookup(event->state_id));
         if(res < 0)

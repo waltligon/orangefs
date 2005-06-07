@@ -60,17 +60,12 @@ extern "C" {
 (((__id << ((sizeof(__id) - 1) * 8)) | __handle) %                       \
    DBPF_BSTREAM_MAX_NUM_BUCKETS)
 
-enum __nullenum { __null = 1 };
-#define DBPF_EVENT_REQID(__ptr) \
-    ((void *)((__ptr + (sizeof(void *))) \
-              + (sizeof(enum __nullenum)) + (sizeof(uint64_t))))
-
 #define DBPF_EVENT_START(__op, __ptr, __id)                            \
 do                                                                     \
 {                                                                      \
     PVFS_id_gen_t __reqid = 0;                                         \
     if(__ptr)                                                          \
-        id_gen_fast_register(&__reqid, DBPF_EVENT_REQID(__ptr));       \
+        id_gen_fast_register(&__reqid, __ptr);                         \
     PINT_event_timestamp(PVFS_EVENT_API_TROVE, __op, 0, __id,          \
                          PVFS_EVENT_FLAG_START, 0, __reqid);           \
 } while(0)
@@ -80,7 +75,7 @@ do                                                                     \
 {                                                                      \
     PVFS_id_gen_t __reqid = 0;                                         \
     if(__ptr)                                                          \
-        id_gen_fast_register(&__reqid, DBPF_EVENT_REQID(__ptr));       \
+        id_gen_fast_register(&__reqid, __ptr);                         \
     PINT_event_timestamp(PVFS_EVENT_API_TROVE, __op, 0, __id,          \
                          PVFS_EVENT_FLAG_END, 0, __reqid);             \
 } while(0)

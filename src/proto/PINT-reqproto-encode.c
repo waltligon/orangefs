@@ -26,7 +26,7 @@ do { \
     id_gen_fast_register(&__tmp_id, (__ptr)); \
     PINT_event_timestamp(__enctype, \
     (int32_t)(__reqtype), 0, __tmp_id, \
-    PVFS_EVENT_FLAG_START, 0, 0); \
+    PVFS_EVENT_FLAG_START, 0, __tmp_id); \
 } while(0)
 #define ENCODE_EVENT_STOP(__enctype, __reqtype, __ptr, __size) \
 do { \
@@ -34,7 +34,7 @@ do { \
     id_gen_fast_register(&__tmp_id, (__ptr)); \
     PINT_event_timestamp(__enctype, \
     (int32_t)(__reqtype), (__size), __tmp_id, \
-    PVFS_EVENT_FLAG_END, 0, 0); \
+    PVFS_EVENT_FLAG_END, 0, __tmp_id); \
 } while(0)
 
 extern PINT_encoding_table_values le_bytefield_table;

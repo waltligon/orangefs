@@ -216,9 +216,6 @@ static union PINT_state_array_values *PINT_state_machine_locate(struct PINT_OP_S
 	    current_tmp += 1;
 	    current_tmp = ((struct PINT_state_machine_s *)current_tmp->nested_machine)->state_machine;
            
-
-
-            
             /* skip over state name string.  see above comment. --slang */
             current_tmp += 1;
         }

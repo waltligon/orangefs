@@ -17,6 +17,7 @@
 
 #include "pvfs2.h"
 #include "pvfs2-mgmt.h"
+#include "pvfs2-event.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -33,6 +34,7 @@ struct options
 };
 
 static struct options* parse_args(int argc, char* argv[]);
+static int get_api_mask(const char * apistr);
 static void usage(int argc, char** argv);
 
 int main(int argc, char **argv)
@@ -163,21 +165,62 @@ static struct options* parse_args(int argc, char* argv[])
 		tmp_opts->mnt_point_set = 1;
 		break;
 	    case('a'):
-		sscanf(optarg, "%x", &tmp_opts->api_mask);
-		if(ret < 1){
-		    if(tmp_opts->mnt_point) free(tmp_opts->mnt_point);
-		    free(tmp_opts);
-		    return(NULL);
-		}
-		tmp_opts->api_mask_set = 1;
+                ret = -1;
+                if(optarg[0] == '0' && optarg[1] == 'x')
+                {
+                    ret = sscanf(optarg, "%x", &tmp_opts->api_mask);
+                }
+                
+                if(ret < 1){
+                    /* attempt to convert a string to the right mask
+                     * value
+                     */
+                    tmp_opts->api_mask = get_api_mask(optarg);
+                    if(tmp_opts->api_mask < 0)
+                    {
+                        if(tmp_opts->mnt_point) free(tmp_opts->mnt_point);
+                        free(tmp_opts);
+                        return(NULL);
+                    }
+                }
+                fprintf(stderr, "API MASK: 0x%X\n", tmp_opts->api_mask);
+                tmp_opts->api_mask_set = 1;
 		break;
 	    case('o'):
-		sscanf(optarg, "%x", &tmp_opts->op_mask);
-		if(ret < 1){
-		    if(tmp_opts->mnt_point) free(tmp_opts->mnt_point);
-		    free(tmp_opts);
-		    return(NULL);
+                ret = -1;
+                if(optarg[0] == '0' && optarg[1] == 'x')
+                {
+                    ret = sscanf(optarg, "%x", &tmp_opts->op_mask);
+                }
+                
+                if(ret < 1){
+                    int ind = 1;
+
+                    if(!strcmp(optarg, "ALL"))
+                    {
+                        tmp_opts->op_mask = 0xFFFF;
+                        tmp_opts->op_mask_set = 1;
+                        fprintf(stdout, "OP MASK: 0x%X\n", tmp_opts->op_mask);
+                        break;
+                    }
+
+                    while(ind <= PVFS_EVENT_OP_COUNT)
+                    {
+                        if(!strcmp(optarg, PVFS_event_op_names[ind - 1]))
+                        {
+                            tmp_opts->op_mask = ind;
+                        }
+                        ++ind;
+                    }
+
+                    if(ind > PVFS_EVENT_OP_COUNT)
+                    {
+                        if(tmp_opts->mnt_point) free(tmp_opts->mnt_point);
+                        free(tmp_opts);
+                        return(NULL);
+                    }
 		}
+                fprintf(stdout, "OP MASK: 0x%X\n", tmp_opts->op_mask);
 		tmp_opts->op_mask_set = 1;
 		break;
 	    case('?'):
@@ -197,13 +240,109 @@ static struct options* parse_args(int argc, char* argv[])
     return(tmp_opts);
 }
 
+static int find_api_mask_value(const char * name)
+{
+    int ind = 0;
+    while(ind < PVFS_EVENT_API_COUNT)
+    {
+        if(!strcasecmp(name, PVFS_event_api_names[ind]))
+        {
+            return (1 << ind);
+        }
+        ++ind;
+    }
+ 
+    return -1;
+}
+
+static int get_api_mask(const char * apistr)
+{
+    char * tmpstr;
+    int val = 0;
+    int mask = 0;
+    
+    if(!apistr)
+    {
+        return -1;
+    }
+    
+    tmpstr = strdup(apistr);
+
+    if(!strncasecmp(tmpstr, "all", 3))
+    {
+        free(tmpstr);
+        return 0xFFFF;
+    }
+    else
+    {
+        char * loc = tmpstr;
+        char * pipe = index(tmpstr, '|');
+        if(!pipe)
+        {
+            mask = find_api_mask_value(tmpstr);
+            free(tmpstr);
+            return mask;
+        }
+
+        do
+        {
+            pipe = loc ? strchr(loc, '|') : NULL;
+            if(pipe) *pipe = 0;
+            
+            val = find_api_mask_value(loc);
+            if(val < 0)
+            {
+                free(tmpstr);
+                return -1;
+            }
+
+            mask |= val;
+            loc = pipe + 1;
+        } while(pipe);
+
+        free(tmpstr);
+        return mask;
+    }
+}
 
 static void usage(int argc, char** argv)
 {
+    int i = 0;
     fprintf(stderr, "\n");
-    fprintf(stderr, "Usage  : %s [-m fs_mount_point] "
-            "[-a hex_api_mask] [-o hex_operation_mask]\n", argv[0]);
-    fprintf(stderr, "Example: %s -m /mnt/pvfs2 -a 0xFFFF -o 0xFFFF\n",
+    fprintf(stderr, "Usage  : %s [-m fs_mount_point]\n"
+            "\t[-a <api_mask>] [-o <operation_mask>]\n\n"
+            "<api_mask> -\tthis can be either the appropriate "
+            "hex value or one of:", argv[0]);
+    while(i < PVFS_EVENT_API_COUNT)
+    {
+        fprintf(stderr, "\n\t");
+        do
+        {
+            fprintf(stderr, "%s, ", PVFS_event_api_names[i]);
+            ++i;
+        } while((i < PVFS_EVENT_API_COUNT) && ((i % 8) != 0));
+    }
+
+    fprintf(stderr, 
+            "ALL\n\tor a '|' separated "
+            "string of those mask names.\n\n");
+    
+    fprintf(stderr,
+            "<operation_mask> -\tthis can be either the appropriate\n"
+            "\thex value or the string name of the operation.\n"
+            "\tPossible string names are:");
+    i = 0;
+    while(i < PVFS_EVENT_OP_COUNT)
+    {
+        fprintf(stderr, "\n\t");
+        do
+        {
+            fprintf(stderr, "%s, ", PVFS_event_op_names[i]);
+            ++i;
+        } while((i < PVFS_EVENT_OP_COUNT) && ((i % 3) != 0));
+    }
+    fprintf(stderr,
+            "ALL\n\nExample: %s -m /mnt/pvfs2 -a ALL -o FLOW\n\n",
             argv[0]);
     return;
 }

@@ -443,6 +443,47 @@ void PINT_event_log_events(
     gen_mutex_unlock(&event_mutex);
 }
 
+const char * PVFS_event_api_names[PVFS_EVENT_API_COUNT] =
+{
+    "JOB",
+    "BMI",
+    "TROVE",
+    "ENCODE_REQ",
+    "ENCODE_RESP",
+    "DECODE_REQ",
+    "DECODE_RESP",
+    "SM",
+    "STATES"
+};
+
+const char * PVFS_event_op_names[PVFS_EVENT_OP_COUNT] =
+{
+     "BMI_SEND",
+     "BMI_RECV",
+     "FLOW",
+     "TROVE_READ_AT",
+     "TROVE_WRITE_AT",
+     "TROVE_BSTREAM_FLUSH",
+     "TROVE_KEYVAL_FLUSH",
+     "TROVE_READ_LIST",
+     "TROVE_WRITE_LIST",
+     "TROVE_KEYVAL_READ",
+     "TROVE_KEYVAL_READ_LIST",
+     "TROVE_KEYVAL_WRITE",
+     "TROVE_DSPACE_GETATTR",
+     "TROVE_DSPACE_SETATTR",
+     "TROVE_BSTREAM_RESIZE",
+     "TROVE_KEYVAL_REMOVE",
+     "TROVE_KEYVAL_ITERATE",
+     "TROVE_KEYVAL_ITERATE_KEYS",
+     "TROVE_DSPACE_ITERATE_HANDLES",
+     "TROVE_DSPACE_CREATE",
+     "TROVE_DSPACE_REMOVE",
+     "TROVE_DSPACE_VERIFY",
+     "TROVE_BSTREAM_VALIDATE",
+     "TROVE_KEYVAL_VALIDATE"
+};  
+
 
 /*
  * Local variables:

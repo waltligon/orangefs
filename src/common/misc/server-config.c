@@ -44,6 +44,7 @@ static DOTCONF_CB(get_root_handle);
 static DOTCONF_CB(get_filesystem_name);
 static DOTCONF_CB(get_logfile);
 static DOTCONF_CB(get_event_logging_list);
+static DOTCONF_CB(get_event_log_size);
 static DOTCONF_CB(get_filesystem_collid);
 static DOTCONF_CB(get_alias_list);
 static DOTCONF_CB(get_range_list);
@@ -120,6 +121,7 @@ static const configoption_t options[] =
     {"ID",ARG_INT, get_filesystem_collid,NULL,CTX_ALL},
     {"LogFile",ARG_STR, get_logfile,NULL,CTX_ALL},
     {"EventLogging",ARG_LIST, get_event_logging_list,NULL,CTX_ALL},
+    {"EventLogSize",ARG_INT, get_event_log_size,NULL,CTX_ALL},
     {"UnexpectedRequests",ARG_INT, get_unexp_req,NULL,CTX_ALL},
     {"PerfUpdateInterval",ARG_INT, get_perf_update_interval,NULL,CTX_ALL},
     {"BMIModules",ARG_LIST, get_bmi_module_list,NULL,CTX_ALL},
@@ -592,6 +594,27 @@ DOTCONF_CB(get_event_logging_list)
     }
     config_s->event_logging = strdup(buf);
     return NULL;
+}
+
+DOTCONF_CB(get_event_log_size)
+{
+    int res;
+    
+    if ((config_s->configuration_context != DEFAULTS_CONFIG) &&
+        (config_s->configuration_context != GLOBAL_CONFIG))
+    {
+        gossip_err("EventLogSize Tag can only be in a "
+                   "Defaults or Global block");
+        return NULL;
+    }
+
+    if(cmd->data.value < 0)
+    {
+        gossip_err("EventLogSize value of %d "
+                   "is not a valid non-negative integer", cmd->data.value);
+        return NULL;
+    }
+    config_s->event_log_size = (ssize_t)cmd->data.value;
 }
 
 DOTCONF_CB(get_flow_module_list)
@@ -2442,6 +2465,24 @@ int PINT_config_get_trove_sync_data(
 }
 
 #endif
+
+const char * PVFS_server_param_names[PVFS_SERVER_PARAM_COUNT] =
+{
+    "INVALID",
+    "GOSSIP",
+    "FSIDCHECK",
+    "ROOTCHECK",
+    "MODE",
+    "EVENTON",
+    "EVENTMASK",
+    "LOGEVENTS"
+};
+
+const char * PVFS_server_mode_names[PVFS_SERVER_MODE_COUNT] =
+{
+    "NORMAL",
+    "ADMIN"
+};
 
 /*
  * Local variables:

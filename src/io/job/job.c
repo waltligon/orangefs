@@ -27,11 +27,11 @@
 
 #define JOB_EVENT_START(__op, __req_id, __id) \
  PINT_event_timestamp(PVFS_EVENT_API_JOB, __op, 0, __id, \
- PVFS_EVENT_FLAG_START, 0, __req_id)
+ PVFS_EVENT_FLAG_START, 0, (uint32_t)__req_id)
 
 #define JOB_EVENT_END(__op, __size, __req_id, __id) \
  PINT_event_timestamp(PVFS_EVENT_API_JOB, __op, __size, __id, \
- PVFS_EVENT_FLAG_END, 0, __req_id)
+ PVFS_EVENT_FLAG_END, 0, (uint32_t)__req_id)
 
 /* contexts for use within the job interface */
 static bmi_context_id global_bmi_context = -1;
@@ -102,9 +102,16 @@ static void do_one_work_cycle_all(int idle_time_ms);
  * public interface 
  */
 
-/* job_initialize()
- *
- * start up the job interface
+/**
+ * @ingroup job
+ * @{
+ */
+
+/**
+ * Start up the job interface.
+ * This function sets up the job queues and starts
+ * the threads associated with each job component
+ * (bmi, trove, dev).
  * 
  * returns 0 on success, -errno on failure
  */

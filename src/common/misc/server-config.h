@@ -97,6 +97,7 @@ typedef struct server_configuration_s
     char *logfile;
     enum gossip_logstamp logstamp_type; /* how to timestamp logs */
     char *event_logging;
+    ssize_t event_log_size;         /* how many events should get queued */
     char *bmi_modules;              /* BMI modules                      */
     char *flow_modules;             /* Flow modules                     */
     int  configuration_context;

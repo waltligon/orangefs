@@ -32,25 +32,22 @@
 #include "pint-event.h"
 #include "gen-locks.h"
 
-enum __nullenum { __nullval = 1 };
-#define BMI_EVENT_REQID(__ptr) \
-    ((void *)((__ptr + (sizeof(void (*)(void)))) + \
-              (sizeof(enum __nullenum)) + (sizeof(uint64_t))))
-
 #define BMI_EVENT_START(__op, __reqid, __id) \
-do { \
-    PVFS_id_gen_t _tmp_id; \
-    id_gen_fast_register(&_tmp_id, BMI_EVENT_REQID(__reqid)); \
+do \
+{ \
+    PVFS_id_gen_t __tmpid; \
+    id_gen_fast_register(&__tmpid, __reqid); \
     PINT_event_timestamp(PVFS_EVENT_API_BMI, __op, 0, __id, \
-                         PVFS_EVENT_FLAG_START, 0, _tmp_id); \
+                         PVFS_EVENT_FLAG_START, 0, __tmpid); \
 } while(0)
 
 #define BMI_EVENT_END(__op, __size, __reqid, __id) \
-do { \
-    PVFS_id_gen_t _tmp_id; \
-    id_gen_fast_register(&_tmp_id, BMI_EVENT_REQID(__reqid)); \
+do \
+{ \
+    PVFS_id_gen_t __tmpid; \
+    id_gen_fast_register(&__tmpid, __reqid); \
     PINT_event_timestamp(PVFS_EVENT_API_BMI, __op, __size, __id, \
-                         PVFS_EVENT_FLAG_END, 0, _tmp_id); \
+                         PVFS_EVENT_FLAG_END, 0, __tmpid);  \
 } while(0)
 
 static gen_mutex_t interface_mutex = GEN_MUTEX_INITIALIZER;
