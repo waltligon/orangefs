@@ -5279,8 +5279,7 @@ fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
     fi
 
-    CFLAGS=$oldcflags
-
+    CFLAGS="$CFLAGS -Wall"
         echo "$as_me:$LINENO: checking for txnid parameter to DB stat function" >&5
 echo $ECHO_N "checking for txnid parameter to DB stat function... $ECHO_C" >&6
     cat >conftest.$ac_ext <<_ACEOF
@@ -5296,10 +5295,10 @@ int
 main ()
 {
 
-    int ret;
-    DB *db;
-    DB_TXN *txnid;
-    u_int32_t flags;
+    int ret = 0;
+    DB *db = db;
+    DB_TXN *txnid = txnid;
+    u_int32_t flags = 0;
 
     ret = db->stat(db, txnid, NULL, flags);
 
@@ -5345,6 +5344,8 @@ echo "${ECHO_T}no" >&6
     have_txnid_param_to_stat=no
 fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+
+    CFLAGS=$oldcflags
 
     if test "x$have_txnid_param_to_stat" = "xno" ; then
 
