@@ -13,6 +13,7 @@
 #include "pvfs2-attr.h"
 #include "src/server/request-scheduler/request-scheduler.h"
 #include "trove.h"
+#include "pint-util.h"
 
 /* prelude state machine:
  * This is a nested state machine that performs initial setup 
@@ -26,9 +27,6 @@ static int prelude_perm_check(
     PINT_server_op *s_op, job_status_s *js_p);
 static int prelude_getattr_if_needed(
     PINT_server_op *s_op, job_status_s *js_p);
-static int check_mode(
-    PVFS_object_attr* attr, PVFS_uid uid,
-    PVFS_gid gid, PVFS_permissions mode);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
@@ -70,9 +68,9 @@ static int prelude_req_sched(
 {
     int ret = -PVFS_EINVAL;
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, 
-                 "(%p) %s (prelude sm) state: req_sched\n", s_op,
-                 PINT_map_server_op_to_string(s_op->req->op));
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+        "(%p) %s (prelude sm) state: req_sched\n", s_op,
+        PINT_map_server_op_to_string(s_op->req->op));
 
     /* this is the first state for every normal pvfs2 server state
      * machine, so we get to do some housekeeping here.  In
@@ -211,22 +209,26 @@ static int prelude_perm_check(
     switch(PINT_server_req_table[s_op->req->op].perm)
     {
         case PINT_SERVER_CHECK_WRITE:
-            /* TODO: figure out something cleaner looking than using
-             * PVFS_U_WRITE here to indicate we need write access; its
-             * misleading
-             */
-            js_p->error_code = check_mode(
+            js_p->error_code = PINT_check_mode(
                 &(s_op->attr), s_op->req->credentials.uid,
-                s_op->req->credentials.gid, PVFS_U_WRITE);
+                s_op->req->credentials.gid, PINT_ACCESS_WRITABLE);
             break;
         case PINT_SERVER_CHECK_READ:
-            /* TODO: figure out something cleaner looking than using 
-             * PVFS_U_READ here to indicate we need read access; its 
-             * misleading
-             */
-            js_p->error_code = check_mode(
+            js_p->error_code = PINT_check_mode(
                 &(s_op->attr), s_op->req->credentials.uid,
-                s_op->req->credentials.gid, PVFS_U_READ);
+                s_op->req->credentials.gid, PINT_ACCESS_READABLE);
+            break;
+        case PINT_SERVER_CHECK_CRDIRENT:
+            /* must also check executable after writable */
+            js_p->error_code = PINT_check_mode(
+                &(s_op->attr), s_op->req->credentials.uid,
+                s_op->req->credentials.gid, PINT_ACCESS_WRITABLE);
+            if(js_p->error_code == 0)
+            {
+                js_p->error_code = PINT_check_mode(
+                    &(s_op->attr), s_op->req->credentials.uid,
+                    s_op->req->credentials.gid, PINT_ACCESS_EXECUTABLE);
+            }
             break;
         case PINT_SERVER_CHECK_ATTR:
             /* a datafile will have a 0 mask value here */
@@ -284,84 +286,6 @@ static int prelude_perm_check(
         PINT_map_server_op_to_string(s_op->req->op),
 	js_p->error_code);
     return 1;
-}
-
-
-/* check_mode()
- *
- * checks permissions based on desired mode
- *
- * returns 0 on success, -PVFS_EPERM on failure
- */
-static int check_mode(
-    PVFS_object_attr *attr,
-    PVFS_uid uid, PVFS_gid gid,
-    PVFS_permissions mode)
-{
-    uint32_t perm_mask = (PVFS_ATTR_COMMON_UID |
-                          PVFS_ATTR_COMMON_GID |
-                          PVFS_ATTR_COMMON_PERM);
-
-    /* if we don't have masks for the permission information that we
-     * need, then the system is broken
-     */
-    assert((attr->mask & perm_mask) == perm_mask);
-
-    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "%s: uid %d gid %d mode %d\n",
-      __func__, uid, gid, mode);
-
-    /*
-      give root permissions, no matter what.
-
-      NOTE: this is odd because it's only checking if the file owner
-      is root (as dictated by the owner on disk), not the credentials
-      of the request (i.e. uid).  we may need to make different
-      options to either honor the credentials of the request (like
-      no_root_squash, etc) in the future
-    */
-    if (attr->owner == 0)
-    {
-        gossip_debug(GOSSIP_PERMISSIONS_DEBUG,
-                     " - owner (%d) is root\n", attr->owner);
-        return 0;
-    }
-    gossip_debug(GOSSIP_PERMISSIONS_DEBUG,
-                 " - owner (%d) is not root\n", attr->owner);
-
-    if ((attr->owner == uid) && (((attr->perms >> 6) & mode) == mode))
-    {
-        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - owner (%d) "
-                     "is uid and perms (%d) match mode (%d)\n",
-                     attr->owner, ((attr->perms >> 6) & mode), mode);
-        return 0;
-    }
-    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - owner (%d) "
-                 "is not uid (%d) and/or perms (%d) do not match mode (%d)\n",
-                 attr->owner, uid, ((attr->perms >> 6) & mode), mode);
-
-    if ((attr->group == gid) && (((attr->perms >> 3) & mode) == mode))
-    {
-        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - group (%d) "
-                     "is gid and perms (%d) match mode (%d)\n",
-                     attr->group, ((attr->perms >> 3) & mode), mode);
-        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, "yes\n");
-        return 0;
-    }
-    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - group (%d) "
-                 "is not gid (%d) and/or perms (%d) do not match mode (%d)\n",
-                 attr->group, gid, ((attr->perms >> 3) & mode), mode);
-
-    if ((attr->perms & mode) == mode)
-    {
-        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - perms (%d) "
-                     "match mode (%d)\n", (attr->perms & mode), mode);
-        return 0;
-    }
-    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - perms (%d) "
-                 "do not match mode (%d)\n", (attr->perms & mode), mode);
-
-    /* access denied */
-    return -PVFS_EPERM;
 }
 
 /*

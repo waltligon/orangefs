@@ -60,8 +60,10 @@ enum PINT_server_req_permissions
     PINT_SERVER_CHECK_WRITE = 1,   /* needs write permission */
     PINT_SERVER_CHECK_READ = 2,    /* needs read permission */
     PINT_SERVER_CHECK_NONE = 3,    /* needs no permission */
-    PINT_SERVER_CHECK_ATTR = 4     /* special case for attribute operations; 
+    PINT_SERVER_CHECK_ATTR = 4,    /* special case for attribute operations; 
                                       needs ownership */
+    PINT_SERVER_CHECK_CRDIRENT = 5 /* special case for crdirent operations;
+                                      needs write and execute */
 };
 
 /* indicates if the attributes for the target object must exist for

@@ -375,6 +375,7 @@ int do_list(
     struct options *opts)
 {
     int i = 0, printed_dot_info = 0;
+    int ret = -1;
     int pvfs_dirent_incount;
     char *name = NULL, *cur_file = NULL;
     PVFS_handle cur_handle;
@@ -391,9 +392,11 @@ int do_list(
     memset(&lk_response,0,sizeof(PVFS_sysresp_lookup));
     PVFS_util_gen_credentials(&credentials);
 
-    if (PVFS_sys_lookup(fs_id, name, &credentials,
-                        &lk_response, PVFS2_LOOKUP_LINK_NO_FOLLOW))
+    ret = PVFS_sys_lookup(fs_id, name, &credentials,
+                        &lk_response, PVFS2_LOOKUP_LINK_NO_FOLLOW);
+    if(ret < 0)
     {
+        PVFS_perror("PVFS_sys_lookup", ret);
         fprintf(stderr, "%s: %s: No such file or directory\n",
                 process_name, name);
         return -1;
@@ -447,11 +450,12 @@ int do_list(
     do
     {
         memset(&rd_response, 0, sizeof(PVFS_sysresp_readdir));
-        if (PVFS_sys_readdir(
+        ret = PVFS_sys_readdir(
                 ref, (!token ? PVFS_READDIR_START : token),
-                pvfs_dirent_incount, &credentials, &rd_response))
+                pvfs_dirent_incount, &credentials, &rd_response);
+        if(ret < 0)
         {
-            fprintf(stderr,"readdir failed\n");
+            PVFS_perror("PVFS_sys_readdir", ret);
             return -1;
         }
 

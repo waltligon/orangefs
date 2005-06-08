@@ -214,21 +214,8 @@ static inline void convert_attribute_mode_to_pvfs_sys_attr(
     pvfs2_print("mode is %d | translated perms is %d\n", mode,
                 attrs->perms);
 
-    switch(mode & S_IFMT)
-    {
-        case S_IFREG:
-            attrs->objtype = PVFS_TYPE_METAFILE;
-            attrs->mask |= PVFS_ATTR_SYS_TYPE;
-            break;
-        case S_IFDIR:
-            attrs->objtype = PVFS_TYPE_DIRECTORY;
-            attrs->mask |= PVFS_ATTR_SYS_TYPE;
-            break;
-        case S_IFLNK:
-            attrs->objtype = PVFS_TYPE_SYMLINK;
-            attrs->mask |= PVFS_ATTR_SYS_TYPE;
-            break;
-    }
+    /* NOTE: this function only called during setattr.  Setattr must not mess
+     * with object type */
 }
 
 /*
@@ -275,9 +262,9 @@ static inline int copy_attributes_from_inode(
              pvfs2_convert_time_field((void *)&inode->i_ctime));
         attrs->mask |= PVFS_ATTR_SYS_CTIME;
 
-        attrs->size = ((iattr && (iattr->ia_valid & ATTR_SIZE)) ?
-                       iattr->ia_size : inode->i_size);
-        attrs->mask |= PVFS_ATTR_SYS_SIZE;
+        /* PVFS2 cannot set size with a setattr operation.  Probably not likely
+         * to be requested through the VFS, but just in case, don't worry about
+         * ATTR_SIZE */
 
         if (iattr && (iattr->ia_valid & ATTR_MODE))
         {
@@ -291,7 +278,10 @@ static inline int copy_attributes_from_inode(
             convert_attribute_mode_to_pvfs_sys_attr(
                 inode->i_mode, attrs);
         }
-        attrs->mask = PVFS_ATTR_SYS_ALL_SETABLE;
+
+        /* we carefully selected which bits to set in attrs->mask above, so
+         * don't undo all that work by setting attrs->mask to
+         * PVFS_ATTR_SYS_ALL_SETABLE */
 
         ret = 0;
     }

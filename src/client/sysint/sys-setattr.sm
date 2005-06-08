@@ -251,31 +251,19 @@ static int setattr_msg_setup_msgpair(PINT_client_sm *sm_p,
         sm_p->u.setattr.sys_attr,
         PVFS_ATTR_COMMON_TYPE);
 
-    if (attr->objtype == PVFS_TYPE_METAFILE)
-    {
-        if (attr->mask & PVFS_ATTR_META_DFILES)
-        {
-            msg_p->req.u.setattr.attr.u.meta.dfile_array =
-                attr->u.meta.dfile_array;
-            msg_p->req.u.setattr.attr.u.meta.dfile_count =
-                attr->u.meta.dfile_count;
-            msg_p->req.u.setattr.attr.mask |= PVFS_ATTR_META_DFILES;
-        }
-
-        if (attr->mask & PVFS_ATTR_META_DIST)
-        {
-            msg_p->req.u.setattr.attr.u.meta.dist =
-                attr->u.meta.dist;
-            msg_p->req.u.setattr.attr.u.meta.dist_size =
-                attr->u.meta.dist_size;
-            msg_p->req.u.setattr.attr.mask |= PVFS_ATTR_META_DIST;
-        }
-    }
+    /* clients should not be able to mess with dfile and distribution
+     * information here.  Those parameters should only be set at create time.
+     * Maybe at some point we'll have a utility to adjust those attributes.  At
+     * this time if they somehow get changed we'll have garbage on disk */
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = sm_p->object_ref.handle;
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = setattr_msg_comp_fn;
+
+    gossip_debug(
+            GOSSIP_CLIENT_DEBUG, "setattr attr mask sent to server: 0x%x\n",
+            (int)sm_p->u.setattr.sys_attr.mask);
 
     ret = PINT_cached_config_map_to_server(
         &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);

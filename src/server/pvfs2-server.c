@@ -1518,7 +1518,7 @@ static void init_req_table(void)
                     PINT_SERVER_CHECK_NONE,
                     PINT_SERVER_ATTRIBS_REQUIRED, &pvfs2_lookup_sm);
             OP_CASE(PVFS_SERV_CRDIRENT, "crdirent",
-                    PINT_SERVER_CHECK_WRITE,
+                    PINT_SERVER_CHECK_CRDIRENT,
                     PINT_SERVER_ATTRIBS_REQUIRED, &pvfs2_crdirent_sm);
             OP_CASE(PVFS_SERV_RMDIRENT, "rmdirent",
                     PINT_SERVER_CHECK_WRITE,
