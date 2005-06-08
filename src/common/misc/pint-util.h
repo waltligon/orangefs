@@ -47,6 +47,18 @@ void PINT_time_diff(PINT_time_marker mark1,
     double* out_utime_sec,
     double* out_stime_sec);
 
+enum PINT_access_type
+{
+    PINT_ACCESS_WRITABLE = 1,
+    PINT_ACCESS_READABLE = 2,
+};
+
+int PINT_check_mode(
+    PVFS_object_attr *attr,
+    PVFS_uid uid, PVFS_gid gid,
+    enum PINT_access_type access_type);
+
+
 #endif /* __PINT_UTIL_H */
 
 /*
