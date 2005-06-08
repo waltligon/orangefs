@@ -25,6 +25,8 @@ pvfs2-1.1.0pre1
 - documentation updates
 - Phil Carns and David Beilloin reported various memory leaks and memory
   misuse throughout the code
+- Phil Carns and David Metheny contributed their improvment to the
+  permissions-checking routines.  Secondary groups work much better now.
 - configure-time options to select behavior needed on redhat-like environments
 - can disable server support at configure time
 - various tweaks to make cross compiling easier
