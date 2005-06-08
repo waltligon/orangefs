@@ -49,8 +49,9 @@ void PINT_time_diff(PINT_time_marker mark1,
 
 enum PINT_access_type
 {
-    PINT_ACCESS_WRITABLE = 1,
-    PINT_ACCESS_READABLE = 2,
+    PINT_ACCESS_EXECUTABLE = 1,
+    PINT_ACCESS_WRITABLE = 2,
+    PINT_ACCESS_READABLE = 4,
 };
 
 int PINT_check_mode(

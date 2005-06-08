@@ -310,6 +310,12 @@ int PINT_check_mode(
             gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
             return(0);
         }
+        if(access_type == PINT_ACCESS_EXECUTABLE && (attr->perms &
+            PVFS_U_EXECUTE))
+        {
+            gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
+            return(0);
+        }
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - no\n");
     }
     else
@@ -328,6 +334,12 @@ int PINT_check_mode(
     }
     if(access_type == PINT_ACCESS_WRITABLE && (attr->perms &
         PVFS_O_WRITE))
+    {
+        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
+        return(0);
+    }
+    if(access_type == PINT_ACCESS_EXECUTABLE && (attr->perms &
+        PVFS_O_EXECUTE))
     {
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
         return(0);
@@ -383,11 +395,15 @@ int PINT_check_mode(
             gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
             return(0);
         }
+        if(access_type == PINT_ACCESS_EXECUTABLE && (attr->perms &
+            PVFS_G_EXECUTE))
+        {
+            gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
+            return(0);
+        }
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - no\n");
     }
-   
-    /* TODO: what about execute permissions on directories? */
-
+  
     /* default case: access denied */
     return -PVFS_EPERM;
 }

@@ -218,6 +218,18 @@ static int prelude_perm_check(
                 &(s_op->attr), s_op->req->credentials.uid,
                 s_op->req->credentials.gid, PINT_ACCESS_READABLE);
             break;
+        case PINT_SERVER_CHECK_CRDIRENT:
+            /* must also check executable after writable */
+            js_p->error_code = PINT_check_mode(
+                &(s_op->attr), s_op->req->credentials.uid,
+                s_op->req->credentials.gid, PINT_ACCESS_WRITABLE);
+            if(js_p->error_code == 0)
+            {
+                js_p->error_code = PINT_check_mode(
+                    &(s_op->attr), s_op->req->credentials.uid,
+                    s_op->req->credentials.gid, PINT_ACCESS_EXECUTABLE);
+            }
+            break;
         case PINT_SERVER_CHECK_ATTR:
             /* a datafile will have a 0 mask value here */
             if (s_op->attr.mask == 0)
