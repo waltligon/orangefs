@@ -2,7 +2,8 @@
  * (C) 2001 Clemson University and The University of Chicago
  *
  * Changes by Acxiom Corporation to add PINT_check_mode() helper function
- * as a replacement for check_mode() in permission checking 
+ * as a replacement for check_mode() in permission checking, also added
+ * PINT_check_group() for supplimental group support 
  * Copyright © Acxiom Corporation, 2005.
  *
  * See COPYING in top-level directory.
@@ -15,6 +16,9 @@
 #include <sys/resource.h>
 #include <unistd.h>
 #include <assert.h>
+#include <grp.h>
+#include <pwd.h>
+#include <sys/types.h>
 
 #include "pvfs2-types.h"
 #include "pint-util.h"
@@ -24,6 +28,13 @@
 
 static int current_tag = 1;
 static gen_mutex_t current_tag_lock = GEN_MUTEX_INITIALIZER;
+
+static gen_mutex_t check_group_mutex = GEN_MUTEX_INITIALIZER;
+static char* check_group_pw_buffer = NULL;
+static long check_group_pw_buffer_size = 0;
+static char* check_group_gr_buffer = NULL;
+static long check_group_gr_buffer_size = 0;
+static int PINT_check_group(uid_t uid, gid_t gid);
 
 void PINT_time_mark(PINT_time_marker *out_marker)
 {
@@ -251,6 +262,8 @@ int PINT_check_mode(
     PVFS_uid uid, PVFS_gid gid,
     enum PINT_access_type access_type)
 {
+    int in_group_flag = 0;
+    int ret = 0;
     uint32_t perm_mask = (PVFS_ATTR_COMMON_UID |
                           PVFS_ATTR_COMMON_GID |
                           PVFS_ATTR_COMMON_PERM);
@@ -276,12 +289,9 @@ int PINT_check_mode(
     }
     gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - no\n");
 
-    /* TODO: what about root group? */
-
     /* see if uid matches object owner */
     gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - checking if owner (%d) "
-        "matches uid (%d)...\n",
-        attr->owner, uid);
+        "matches uid (%d)...\n", attr->owner, uid);
     if(attr->owner == uid)
     {
         /* see if object user permissions match access type */
@@ -307,37 +317,6 @@ int PINT_check_mode(
         gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - no\n");
     }
 
-    /* see if gid matches object group */
-    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - checking if group (%d) "
-        "matches gid (%d)...\n",
-        attr->group, gid);
-    if(attr->group == gid)
-    {
-        /* see if object user permissions match access type */
-        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
-        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - checking if permissions "
-            "(%d) allows access type (%d) for group...\n", attr->perms, access_type);
-        if(access_type == PINT_ACCESS_READABLE && (attr->perms &
-            PVFS_G_READ))
-        {
-            gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
-            return(0);
-        }
-        if(access_type == PINT_ACCESS_WRITABLE && (attr->perms &
-            PVFS_G_WRITE))
-        {
-            gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
-            return(0);
-        }
-        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - no\n");
-    }
-    else
-    {
-        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - no\n");
-    }
-
-    /* TODO: what about supplimentary groups? */
-
     /* see if other bits allow access */
     gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - checking if permissions "
         "(%d) allows access type (%d) by others...\n", attr->perms, access_type);
@@ -354,12 +333,166 @@ int PINT_check_mode(
         return(0);
     }
     gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - no\n");
+
+    /* see if gid matches object group */
+    gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - checking if group (%d) "
+        "matches gid (%d)...\n", attr->group, gid);
+    if(attr->group == gid)
+    {
+        /* default group match */
+        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
+        in_group_flag = 1;
+    }
+    else
+    {
+        /* no default group match, check supplementary groups */
+        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - no\n");
+        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - checking for"
+            " supplementary group match...\n");
+        ret = PINT_check_group(uid, attr->group);
+        if(ret == 0)
+        {
+            gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
+            in_group_flag = 1;
+        }
+        else
+        {
+            gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - no\n");
+            if(ret != -PVFS_ENOENT)
+            {
+                /* system error; not just failed match */
+                return(ret);
+            }
+        }
+    }
+
+    if(in_group_flag)
+    {
+        /* see if object group permissions match access type */
+        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - checking if permissions "
+            "(%d) allows access type (%d) for group...\n", attr->perms, access_type);
+        if(access_type == PINT_ACCESS_READABLE && (attr->perms &
+            PVFS_G_READ))
+        {
+            gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
+            return(0);
+        }
+        if(access_type == PINT_ACCESS_WRITABLE && (attr->perms &
+            PVFS_G_WRITE))
+        {
+            gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - yes\n");
+            return(0);
+        }
+        gossip_debug(GOSSIP_PERMISSIONS_DEBUG, " - no\n");
+    }
    
     /* TODO: what about execute permissions on directories? */
 
     /* default case: access denied */
     return -PVFS_EPERM;
 }
+
+/* PINT_check_group()
+ *
+ * checks to see if uid is a member of gid
+ * 
+ * returns 0 on success, -PVFS_ENOENT if not a member, other PVFS error codes
+ * on system failure
+ */
+static int PINT_check_group(uid_t uid, gid_t gid)
+{
+    struct passwd pwd;
+    struct passwd* pwd_p = NULL;
+    struct group grp;
+    struct group* grp_p = NULL;
+    int i = 0;
+    int ret = -1;
+
+    /* Explanation: 
+     *
+     * We use the _r variants of getpwuid and getgrgid in order to insure
+     * thread safety; particularly if this function ever gets called in a
+     * client side situation in which we can't prevent the application from
+     * making conflicting calls.
+     *
+     * These _r functions require that a buffer be supplied for the user and
+     * group information, however.  These buffers may be unconfortably large
+     * for the stack, so we malloc them on a static pointer and then mutex
+     * lock this function so that it can still be reentrant.
+     */
+
+    gen_mutex_lock(&check_group_mutex);
+
+    if(!check_group_pw_buffer)
+    {
+        /* need to create a buffer for pw and grp entries */
+#if defined(_SC_GETGR_R_SIZE_MAX) && defined(_SC_GETPW_R_SIZE_MAX)
+        /* newish posix systems can tell us what the max buffer size is */
+        check_group_gr_buffer_size = sysconf(_SC_GETGR_R_SIZE_MAX);
+        check_group_pw_buffer_size = sysconf(_SC_GETPW_R_SIZE_MAX);
+#else
+        /* fall back for older systems */
+        check_group_pw_buffer_size = 1024;
+        check_group_gr_buffer_size = 1024;
+#endif
+        check_group_pw_buffer = (char*)malloc(check_group_pw_buffer_size);
+        check_group_gr_buffer = (char*)malloc(check_group_gr_buffer_size);
+        if(!check_group_pw_buffer || !check_group_gr_buffer)
+        {
+            if(check_group_pw_buffer)
+            {
+                free(check_group_pw_buffer);
+                check_group_pw_buffer = NULL;
+            }
+            if(check_group_gr_buffer)
+            {
+                free(check_group_gr_buffer);
+                check_group_gr_buffer = NULL;
+            }
+            gen_mutex_unlock(&check_group_mutex);
+            return(-PVFS_ENOMEM);
+        }
+    }
+
+    /* get user information */
+    ret = getpwuid_r(uid, &pwd, check_group_pw_buffer,
+        check_group_pw_buffer_size,
+        &pwd_p);
+    if(ret != 0)
+    {
+        gen_mutex_unlock(&check_group_mutex);
+        return(-PVFS_ENOENT);
+    }
+
+    /* check primary group */
+    if(pwd.pw_gid == gid) return 0;
+
+    /* get other group information */
+    ret = getgrgid_r(gid, &grp, check_group_gr_buffer,
+        check_group_gr_buffer_size,
+        &grp_p);
+    if(ret != 0)
+    {
+        gen_mutex_unlock(&check_group_mutex);
+        return(-PVFS_ENOENT);
+    }
+
+    gen_mutex_unlock(&check_group_mutex);
+
+
+    for(i = 0; grp.gr_mem[i] != NULL; i++)
+    {
+        if(0 == strcmp(pwd.pw_name, grp.gr_mem[i]) )
+        {
+            gen_mutex_unlock(&check_group_mutex);
+            return 0;
+        } 
+    }
+
+    gen_mutex_unlock(&check_group_mutex);
+    return(-PVFS_ENOENT);
+}
+
 
 /*
  * Local variables:
