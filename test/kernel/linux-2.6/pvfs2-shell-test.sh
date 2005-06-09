@@ -30,7 +30,7 @@ ENABLE_RENAME_TESTS=1
 # test constants here
 #####################################
 
-TEST_PERMISSIONS="0777 0767 0666 0644 0600 0500 0400 0000"
+TEST_PERMISSIONS="0777 0767 0666 0644 0600 0500 0400 0000 0755"
 
 #####################################
 # misc functions here
@@ -596,6 +596,7 @@ permission_test2()
 
     echo "Removing testdir"
     rm -rf $TESTDIR
+
 
     remove_testdir $PVFS2_TESTDIR
 
