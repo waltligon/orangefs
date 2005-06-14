@@ -32,7 +32,8 @@
 static PVFS_handle test_handles[NUM_TEST_HANDLES] = {0};
 static int test_handle_index = 0;
 
-extern job_context_id PVFS_sys_job_context;
+/* allocated in client-state-machine.c */
+extern job_context_id pint_client_sm_context;
 
 /* this is a test program that exercises the cached_config interface and
  * demonstrates how to use it.
@@ -78,7 +79,7 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    if (job_open_context(&PVFS_sys_job_context))
+    if (job_open_context(&pint_client_sm_context))
     {
         fprintf(stderr, "job_open_context failure.\n");
         return(-1);
