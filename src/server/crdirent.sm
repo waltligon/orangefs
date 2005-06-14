@@ -195,25 +195,21 @@ static int crdirent_validate(PINT_server_op *s_op,
 
     /* check for invalid characters in name */
     ptr = s_op->u.crdirent.name;
-    while (*ptr != '\0' && *ptr != '/' && isprint(*ptr)) ptr++;
+    while (*ptr != '\0' && *ptr != '/' ) ptr++;
 
     if (*ptr != '\0')
     {
         /* found an invalid character -- report it and send error response */
-        if (*ptr == '/')
-        {
-            gossip_lerr("crdirent: error: invalid '/' character "
-                        "in name (%s); sending error response.\n",
-                        s_op->u.crdirent.name);
-        }
-        else
-        {
-            gossip_lerr("crdirent: error: invalid unprintable "
-                        "character (value = 0x%x) in name; sending "
-                        "error response.\n", (int) *ptr);
-        }
-        js_p->error_code = -PVFS_ENOENT;
-        s_op->scheduled_id = 0;
+        gossip_lerr("crdirent: error: invalid character (%s)"
+                "in name (%s); sending error response.\n",
+                ptr, s_op->u.crdirent.name);
+        /* for parity with linux VFS, allow any character except / in 
+         * filenames.   */
+        
+        js_p->error_code = -PVFS_EINVAL;
+
+         /* Do not zero the scheduled_id, as this operation was
+          * scheduled before we checked the filename */
         return 1;
     }
 
