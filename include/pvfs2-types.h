@@ -587,9 +587,11 @@ enum PVFS_io_type
 #if (__WORDSIZE == 32)
 #  define Lu(x) (x)
 #  define Ld(x) (x)
+#  define SCANF_Ld "%Ld"
 #elif (__WORDSIZE == 64)
 #  define Lu(x) (unsigned long long)(x)
 #  define Ld(x) (long long)(x)
+#  define SCANF_Ld "%ld"
 #else
 /* If you see this, you can change the #if tests above to work around it. */
 #  error Unknown wordsize, perhaps your system headers are not POSIX
