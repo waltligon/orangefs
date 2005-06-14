@@ -785,6 +785,7 @@ KMOD_DIR ?= $(kmod_prefix)/lib/modules/$(KERNEL_VERS)/kernel/fs
 
 .PHONY: kmod_install
 kmod_install: kmod kernapps
+	install -d $(prefix)/sbin
 	install -m 755 $(KERNAPPS) $(prefix)/sbin
 	install -d $(KMOD_DIR)
 	install -m 755 src/kernel/linux-2.6/pvfs2.ko $(KMOD_DIR)
@@ -802,6 +803,7 @@ KMOD_DIR := $(kmod_prefix)/lib/modules/$(KERNEL_VERS)/kernel/fs
 
 .PHONY: kmod24_install
 kmod24_install: kmod24 kernapps
+	install -d $(prefix)/sbin
 	install -m 755 $(KERNAPPS) $(prefix)/sbin
 	install -d $(KMOD_DIR)
 	install -m 755 src/kernel/linux-2.4/pvfs2.o $(KMOD_DIR)
