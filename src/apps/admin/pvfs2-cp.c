@@ -246,7 +246,7 @@ static struct options* parse_args(int argc, char* argv[])
 		tmp_opts->show_timings = 1;
 		break;
 	    case('s'):
-		ret = sscanf(optarg, "%Ld", &tmp_opts->strip_size);
+		ret = sscanf(optarg, SCANF_Ld, &tmp_opts->strip_size);
 		if(ret < 1){
 		    free(tmp_opts);
 		    return(NULL);
