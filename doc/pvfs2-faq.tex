@@ -398,7 +398,17 @@ glibc-2.3.2-95.20 package.  We have also seen this behavior on ppc64
 systems running glibc-2.3.3-18.ydl.4 .  If you encounter this problem
 and your distribution does not have an updated glibc package, you can
 configure pvfs2 with \texttt{--disable-aio-threaded-callbacks}, though
-this will result in a performance hit. 
+this will result in a performance hit.  An alternate workaround is to
+set \texttt{LD\_ASSUME\_KERNEL} to 2.4.1 before running pvfs2-server.
+pvfs2-server will then use an older (and not as optimized) thread
+library that does not have this bug.
+
+At this time we do not know which of the two suggested workarounds is
+better from a performance standpoint.  The \texttt{LD\_ASSUME\_KERNEL}
+method might make more sense:  when/if the system's glibc is
+upgraded, you will only have to restart pvfs2-server with the
+environment variable unset.  You would not have to rebuild pvfs2 to take
+advantage of the fix.
 
 \subsection{I get ``error while loading sharel libraries'' when starting PVFS2 programs}
 
