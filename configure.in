@@ -676,49 +676,54 @@ if test "x$NEED_BERKELEY_DB" = "xyes" ; then
     fi
     
     CFLAGS="$CFLAGS -Wall"    
-    dnl Test to check for txnid parameter to DB stat (DB 4.3.xx+)
-    AC_MSG_CHECKING(for txnid parameter to DB stat function)
+    dnl Test to check for unknown third param to DB stat (four params 
+    dnl total).  The unknown parameter is a function ptr so that the
+    dnl the user can pass in a replcaement for malloc.
+    dnl Note: this is a holdover from relatively old DB implementations,
+    dnl while the txnid parameter is new.  So we don't test for the old
+    dnl unknown parameter if we found the new one.
+    AC_MSG_CHECKING(for DB stat with malloc function ptr)
     AC_TRY_COMPILE([
-    #include <db.h>
-    ], [
-    int ret = 0;
-    DB *db = db;
-    DB_TXN *txnid = txnid;
-    u_int32_t flags = 0;
-    
-    ret = db->stat(db, txnid, NULL, flags);
-    ], AC_MSG_RESULT(yes)
-    AC_DEFINE(HAVE_TXNID_PARAMETER_TO_DB_STAT, 1, 
-    Define if DB stat function takes txnid parameter)
-    have_txnid_param_to_stat=yes,
+      #include <db.h>
+      #include <stdlib.h>
+      ], [
+      int ret = 0;
+      DB *db = db;
+      int dummy = 0;
+      u_int32_t flags = 0;
+        
+      ret = db->stat(db, &dummy, malloc, flags);
+      ], AC_MSG_RESULT(yes)
+    AC_DEFINE(HAVE_UNKNOWN_PARAMETER_TO_DB_STAT, 1,
+    Define if DB stat function takes malloc function ptr)
+    have_db_stat_malloc=yes,
     AC_MSG_RESULT(no)
-    have_txnid_param_to_stat=no)
+    have_db_stat_malloc=no)
+
+    dnl Test to check for txnid parameter to DB stat (DB 4.3.xx+)
+    if test "x$have_db_stat_malloc" = "xno" ; then
+
+       AC_MSG_CHECKING(for txnid parameter to DB stat function)
+       AC_TRY_COMPILE([
+       #include <db.h>
+       ], [
+       int ret = 0;
+       DB *db = db;
+       DB_TXN *txnid = txnid;
+       u_int32_t flags = 0;
+    
+        ret = db->stat(db, txnid, NULL, flags);
+        ], AC_MSG_RESULT(yes)
+        AC_DEFINE(HAVE_TXNID_PARAMETER_TO_DB_STAT, 1, 
+        Define if DB stat function takes txnid parameter)
+        have_txnid_param_to_stat=yes,
+        AC_MSG_RESULT(no)
+        have_txnid_param_to_stat=no)
+    
+    fi
     
     CFLAGS=$oldcflags
 
-    if test "x$have_txnid_param_to_stat" = "xno" ; then
-        dnl Test to check for unknown third param to DB stat (four params 
-        dnl total).  The unknown parameter is a function ptr so that the
-        dnl the user can pass in a replcaement for malloc.
-        dnl Note: this is a holdover from relatively old DB implementations,
-        dnl while the txnid parameter is new.  So we don't test for the old
-        dnl unknown parameter if we found the new one.
-    
-        AC_MSG_CHECKING(for four-parameter DB stat)
-        AC_TRY_COMPILE([
-        #include <db.h>
-        ], [
-        int ret;
-        DB *db;
-        u_int32_t flags;
-        
-        ret = db->stat(db, NULL, NULL, flags);
-        ], AC_MSG_RESULT(yes)
-        AC_DEFINE(HAVE_UNKNOWN_PARAMETER_TO_DB_STAT, 1,
-        Define if DB stat function takes extra parameter),
-        AC_MSG_RESULT(no))
-    fi
-    
     dnl Test to check for txnid parameter to DB open (DB4.1+)
     AC_MSG_CHECKING(for txnid parameter to DB open function)
     AC_TRY_COMPILE([
