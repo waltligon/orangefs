@@ -258,9 +258,14 @@ static int pvfs2_releasepage(struct page *page, int foo)
 struct backing_dev_info pvfs2_backing_dev_info =
 {
     .ra_pages = 1024,
+#ifdef HAVE_BDI_MEMORY_BACKED
+    /* old interface, up through 2.6.11 */
     .memory_backed = 1 /* does not contribute to dirty memory */
+#else
+    .capabilities = BDI_CAP_NO_ACCT_DIRTY | BDI_CAP_NO_WRITEBACK,
+#endif
 };
-#endif /* PVFS2_LINUX_KERNEL_2_4 */
+#endif /* !PVFS2_LINUX_KERNEL_2_4 */
 
 /** PVFS2 implementation of address space operations */
 struct address_space_operations pvfs2_address_operations =
