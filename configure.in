@@ -590,16 +590,32 @@ if test "x$NEED_BERKELEY_DB" = "xyes" ; then
            [  --with-db=<dir>         Location of installed DB package (default=/usr)],
            LDFLAGS="${LDFLAGS} -L$withval/lib" CFLAGS="${CFLAGS} -I$withval/include")
     
+    dnl 
+    dnl if the db is specified, try to link with -ldb
+    dnl otherwise try -ldb4, then -ldb3, then -ldb
+    dnl $lib set to notfound on link failure
+    dnl    
     AC_MSG_CHECKING([for db library])
     oldlibs=$LIBS
-    for lib in db4  db3  db  notfound; do
+    lib=notfound
+    if test "x$with_db_set" == "xyes" ; then
+        LIBS="${oldlibs} -ldb"
+        DB_LIB="-ldb"
+        AC_TRY_LINK(
+              [#include <db.h>],
+              [DB *dbp; db_create(&dbp, NULL, 0);],
+              lib=db)
+    else
+        for lib in db4  db3  db  notfound; do
            LIBS="${oldlibs} -l$lib"
            DB_LIB="-l$lib"
            AC_TRY_LINK(
                   [#include <db.h>],
                   [DB *dbp; db_create(&dbp, NULL, 0);],
                   [break])
-    done
+        done
+    fi
+
     dnl reset LIBS value and just report through DB_LIB
     LIBS=$oldlibs 
     if test "x$lib" == "xnotfound" ; then
