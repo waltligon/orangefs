@@ -506,6 +506,12 @@ Core 3 ships with linux-2.6.9-1.667.  When configuring PVFS2, you would
 pass \texttt{--with-kernel=/lib/modules/2.6.9-1.667/build} to the
 configure script.
 
+In Fedora Core 4 things changed a little bit.  In order to build the pvfs2
+kernel module, make sure you have both a \texttt{kernel} and
+\texttt{kernel-devel} package installed.   After both packages are installed,
+/lib/modules/`uname -r`/build will once again contain a correctly configured
+kernel source tree.
+
 %
 % PERFORMANCE
 %
