@@ -256,6 +256,12 @@ struct PINT_server_getattr_op
     PVFS_fs_id fs_id;
     uint32_t attrmask;
 };
+
+/* this is used in both set_eattr_list and get_eattr_list */
+struct PINT_server_eattr_list_op
+{
+    void *buffer;
+};
     
 /* This structure is passed into the void *ptr 
  * within the job interface.  Used to tell us where
@@ -313,6 +319,7 @@ typedef struct PINT_server_op
     union
     {
 	/* request-specific scratch spaces for use during processing */
+        struct PINT_server_eattr_list_op eattr_list;
         struct PINT_server_getattr_op getattr;
 	struct PINT_server_getconfig_op getconfig;
 	struct PINT_server_lookup_op lookup;
@@ -369,6 +376,10 @@ extern struct PINT_state_machine_s pvfs2_proto_error_sm;
 extern struct PINT_state_machine_s pvfs2_perf_mon_sm;
 extern struct PINT_state_machine_s pvfs2_event_mon_sm;
 extern struct PINT_state_machine_s pvfs2_iterate_handles_sm;
+extern struct PINT_state_machine_s pvfs2_get_eattr_sm;
+extern struct PINT_state_machine_s pvfs2_get_eattr_list_sm;
+extern struct PINT_state_machine_s pvfs2_set_eattr_sm;
+extern struct PINT_state_machine_s pvfs2_set_eattr_list_sm;
 
 /* nested state machines */
 extern struct PINT_state_machine_s pvfs2_get_attr_work_sm;

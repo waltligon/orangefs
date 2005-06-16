@@ -19,6 +19,8 @@ enum PVFS_coll_getinfo_options_e
 };
 typedef enum PVFS_coll_getinfo_options_e PVFS_coll_getinfo_options;
 
+/* key/value descriptor definition moved to include/pvfs2-types.h */
+#if 0
 /* key/value descriptors */
 struct PVFS_ds_keyval_s
 {
@@ -30,6 +32,7 @@ struct PVFS_ds_keyval_s
 };
 
 typedef struct PVFS_ds_keyval_s PVFS_ds_keyval;
+#endif
 
 /* vtag; contents not yet defined */
 struct PVFS_vtag_s

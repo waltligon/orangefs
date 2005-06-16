@@ -1570,6 +1570,18 @@ static void init_req_table(void)
             OP_CASE(PVFS_SERV_MGMT_EVENT_MON, "mgmt_event_mon", 
                     PINT_SERVER_CHECK_NONE,
                     PINT_SERVER_ATTRIBS_REQUIRED, &pvfs2_event_mon_sm);
+            OP_CASE(PVFS_SERV_GETEATTR, "geteattr",
+                    PINT_SERVER_CHECK_ATTR,
+                    PINT_SERVER_ATTRIBS_NOT_REQUIRED, &pvfs2_get_eattr_sm);
+            OP_CASE(PVFS_SERV_GETEATTR_LIST, "geteattr_list",
+                    PINT_SERVER_CHECK_ATTR,
+                    PINT_SERVER_ATTRIBS_NOT_REQUIRED, &pvfs2_get_eattr_list_sm);
+            OP_CASE(PVFS_SERV_SETEATTR, "seteattr",
+                    PINT_SERVER_CHECK_ATTR,
+                    PINT_SERVER_ATTRIBS_NOT_REQUIRED, &pvfs2_set_eattr_sm);
+            OP_CASE(PVFS_SERV_SETEATTR_LIST, "seteattr_list",
+                    PINT_SERVER_CHECK_ATTR,
+                    PINT_SERVER_ATTRIBS_NOT_REQUIRED, &pvfs2_set_eattr_list_sm);
             OP_CASE(PVFS_SERV_JOB_TIMER, "job_timer",
                     PINT_SERVER_CHECK_INVALID,
                     PINT_SERVER_ATTRIBS_REQUIRED, &pvfs2_job_timer_sm);

@@ -202,8 +202,8 @@ struct dbpf_dspace_getattr_op
 
 struct dbpf_keyval_read_op
 {
-    TROVE_keyval_s key;
-    TROVE_keyval_s val;
+    TROVE_keyval_s *key;
+    TROVE_keyval_s *val;
     /* vtag? */
 };
 

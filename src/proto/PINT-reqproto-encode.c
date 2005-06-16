@@ -53,6 +53,7 @@ int PINT_encode_initialize(void)
 {
     int ret = -PVFS_EINVAL;
 
+    gossip_debug(GOSSIP_ENDECODE_DEBUG,"PINT_encode_initialize\n");
     if (ENCODING_IS_SUPPORTED(ENCODING_LE_BFIELD))
     {
         /* setup little endian bytefield encoding */
@@ -78,6 +79,7 @@ int PINT_encode_initialize(void)
  */
 void PINT_encode_finalize(void)
 {
+    gossip_debug(GOSSIP_ENDECODE_DEBUG,"PINT_encode_finalize\n");
     return;
 }
 
@@ -99,6 +101,7 @@ int PINT_encode(void* input_buffer,
     target_msg->dest = target_addr;
     target_msg->enc_type = enc_type;
 
+    gossip_debug(GOSSIP_ENDECODE_DEBUG,"PINT_encode\n");
     switch(enc_type)
     {
 	case ENCODING_LE_BFIELD:
@@ -163,6 +166,7 @@ int PINT_decode(void* input_buffer,
     int ret;
     int32_t enc_type_recved, proto_ver_recved;
 
+    gossip_debug(GOSSIP_ENDECODE_DEBUG,"PINT_decode\n");
     /* compare the header of the incoming buffer against the precalculated
      * header associated with each module
      */
@@ -249,6 +253,7 @@ int PINT_decode(void* input_buffer,
 void PINT_encode_release(struct PINT_encoded_msg* input_buffer,
 			 enum PINT_encode_msg_type input_type)
 { 
+    gossip_debug(GOSSIP_ENDECODE_DEBUG,"PINT_encode_release\n");
     if (ENCODING_IS_SUPPORTED(input_buffer->enc_type))
     {
         PINT_encoding_table[input_buffer->enc_type]->op->encode_release(
@@ -271,6 +276,7 @@ void PINT_encode_release(struct PINT_encoded_msg* input_buffer,
 void PINT_decode_release(struct PINT_decoded_msg* input_buffer,
 			 enum PINT_encode_msg_type input_type)
 {
+    gossip_debug(GOSSIP_ENDECODE_DEBUG,"PINT_decode_release\n");
     if (ENCODING_IS_SUPPORTED(input_buffer->enc_type))
     {
         PINT_encoding_table[input_buffer->enc_type]->op->decode_release(
@@ -297,6 +303,7 @@ int PINT_encode_calc_max_size(
 {    
     int ret = -PVFS_EINVAL;
 
+    gossip_debug(GOSSIP_ENDECODE_DEBUG,"PINT_encode_calc_max_size\n");
     switch(enc_type)
     {
 	case ENCODING_LE_BFIELD:

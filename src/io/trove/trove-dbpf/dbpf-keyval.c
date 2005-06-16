@@ -4,6 +4,17 @@
  * See COPYING in top-level directory.
  */
 
+/*
+ * dbpf_keyval_write semantics:
+ *
+ * Value buffer is supplied by user with size of buffer
+ * If size is too small DB returns an error (Cannot allocated memory)
+ * and return the size of the buffer needed in val_p->read_sz
+ *
+ * WBL 6/05
+ *
+ */
+
 #include <unistd.h>
 #include <errno.h>
 #include <sys/types.h>
@@ -87,8 +98,8 @@ static int dbpf_keyval_read(TROVE_coll_id coll_id,
                         context_id);
 
     /* initialize the op-specific members */
-    q_op_p->op.u.k_read.key = *key_p;
-    q_op_p->op.u.k_read.val = *val_p;
+    q_op_p->op.u.k_read.key = key_p;
+    q_op_p->op.u.k_read.val = val_p;
 
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
 
@@ -114,12 +125,12 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
     }
 
     memset(&key, 0, sizeof(key));
-    key.data = op_p->u.k_read.key.buffer;
-    key.size = op_p->u.k_read.key.buffer_sz;
+    key.data = op_p->u.k_read.key->buffer;
+    key.size = op_p->u.k_read.key->buffer_sz;
 
     memset(&data, 0, sizeof(data));
-    data.data = op_p->u.k_read.val.buffer;
-    data.ulen = op_p->u.k_read.val.buffer_sz;
+    data.data = op_p->u.k_read.val->buffer;
+    data.ulen = op_p->u.k_read.val->buffer_sz;
     data.flags = DB_DBT_USERMEM;
 
     ret = tmp_ref.db_p->get(tmp_ref.db_p, NULL, &key, &data, 0);
@@ -130,15 +141,25 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
                      "key=%s (%s)\n", Lu(op_p->handle),
                      (char *)key.data, db_strerror(ret));
 
+        /* if data buffer is too small returns a memory error */
+        if (data.ulen < data.size)
+        {
+            gossip_debug(GOSSIP_TROVE_DEBUG,
+                    "warning: Value buffer too small %d < %d\n",
+                    data.ulen, data.size);
+            /* let the user know */
+            op_p->u.k_read.val->read_sz = data.size;
+        }
+
         ret = -dbpf_db_error_to_trove_error(ret);
         goto return_error;
     }
-    op_p->u.k_read.val.read_sz = data.size;
+    op_p->u.k_read.val->read_sz = data.size;
 
     /* cache this data in the attr cache if we can */
     if (dbpf_attr_cache_elem_set_data_based_on_key(
-            ref, op_p->u.k_read.key.buffer,
-            op_p->u.k_read.val.buffer, data.size))
+            ref, op_p->u.k_read.key->buffer,
+            op_p->u.k_read.val->buffer, data.size))
     {
         /*
           NOTE: this can happen if the keyword isn't registered, or if
@@ -146,14 +167,14 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
         */
         gossip_debug(
             GOSSIP_DBPF_ATTRCACHE_DEBUG,"** CANNOT cache data retrieved "
-            "(key is %s)\n", (char *)op_p->u.k_read.key.buffer);
+            "(key is %s)\n", (char *)op_p->u.k_read.key->buffer);
     }
     else
     {
         gossip_debug(
             GOSSIP_DBPF_ATTRCACHE_DEBUG,"*** cached keyval data "
             "retrieved (key is %s)\n",
-            (char *)op_p->u.k_read.key.buffer);
+            (char *)op_p->u.k_read.key->buffer);
     }
 
     dbpf_open_cache_put(&tmp_ref);

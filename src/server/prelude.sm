@@ -234,14 +234,19 @@ static int prelude_perm_check(
             {
                 js_p->error_code = 0;
             }
-	    else if (s_op->req->op == PVFS_SERV_GETATTR)
+            /* for now we'll assume extended attribs are treated
+             * the same as regular attribs as far as permissions
+             */
+	    else if (s_op->req->op == PVFS_SERV_GETATTR ||
+                    s_op->req->op == PVFS_SERV_GETEATTR ||
+                    s_op->req->op == PVFS_SERV_GETEATTR_LIST)
 	    {
 		/* getting attributes is always ok -- permission
 		 * is checked on the parent directory at read time
 		 */
 		js_p->error_code = 0;
 	    }
-            else /* setattr */
+            else /* setattr, seteattr, seteattr_list */
             {
                 /*
                   NOTE: on other file systems, setattr doesn't

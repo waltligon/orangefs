@@ -276,6 +276,13 @@ int trove_keyval_read(
 {
     int method_id;
 
+	 /* Check arguments */
+	 if (key_p->buffer_sz < 2)
+		 return -TROVE_EINVAL;
+	 if (((char *)key_p->buffer)[key_p->buffer_sz-1] != 0)
+		 return -TROVE_EINVAL;
+
+	 /* Look up collection id */
     method_id = map_coll_id_to_method(coll_id);
     if (method_id < 0) {
         return -1; /* NEED STATUS TYPE FOR THIS */
@@ -293,6 +300,11 @@ int trove_keyval_read(
 }
 
 /** Initiate write of a single keyword/value pair.
+ *
+ *  Expects val_p->buffer to be user allocated and val_p->buffer_sz to
+ *  be size of buffer allocated.
+ *  If data is too large for buffer, returns error (Cannot allocate
+ *  Memory) and returns needed size in val_p->read_sz
  */
 int trove_keyval_write(
     TROVE_coll_id coll_id,
@@ -307,6 +319,13 @@ int trove_keyval_write(
 {
     int method_id;
 
+	 /* Check arguments */
+	 if (key_p->buffer_sz < 2)
+		 return -TROVE_EINVAL;
+	 if (((char *)key_p->buffer)[key_p->buffer_sz-1] != 0)
+		 return -TROVE_EINVAL;
+
+	 /* Look up collection id */
     method_id = map_coll_id_to_method(coll_id);
     if (method_id < 0) {
         return -1; /* NEED STATUS TYPE FOR THIS */
@@ -457,7 +476,18 @@ int trove_keyval_read_list(
     TROVE_op_id* out_op_id_p)
 {
     int method_id;
+	 int i;
 
+	 /* Check arguments */
+	 for (i = 0; i < count; i++)
+	 {
+	 	if (key_array[i].buffer_sz < 2)
+		 	return -TROVE_EINVAL;
+	 	if (((char *)key_array[i].buffer)[key_array[i].buffer_sz-1] != 0)
+		 	return -TROVE_EINVAL;
+	 }
+
+	 /* Look up collection id */
     method_id = map_coll_id_to_method(coll_id);
     if (method_id < 0) {
         return -1; /* NEED STATUS TYPE FOR THIS */
@@ -491,7 +521,18 @@ int trove_keyval_write_list(
     TROVE_op_id* out_op_id_p)
 {
     int method_id;
+	 int i;
 
+	 /* Check arguments */
+	 for (i = 0; i < count; i++)
+	 {
+	 	if (key_array[i].buffer_sz < 2)
+		 	return -TROVE_EINVAL;
+	 	if (((char *)key_array[i].buffer)[key_array[i].buffer_sz-1] != 0)
+		 	return -TROVE_EINVAL;
+	 }
+
+	 /* Look up collection id */
     method_id = map_coll_id_to_method(coll_id);
     if (method_id < 0) {
         return -1; /* NEED STATUS TYPE FOR THIS */

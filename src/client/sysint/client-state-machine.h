@@ -357,6 +357,33 @@ struct PINT_server_get_config_sm
     int persist_config_buffers;
 };
 
+struct PINT_client_geteattr_sm
+{
+    PVFS_ds_keyval *key_p;
+    PVFS_sysresp_geteattr *resp_p;
+};
+
+struct PINT_client_geteattr_list_sm
+{
+    int32_t nkey;
+    PVFS_ds_keyval *key_array;
+    PVFS_size *size_array;
+    PVFS_sysresp_geteattr_list *resp_p;
+};
+
+struct PINT_client_seteattr_sm
+{
+    PVFS_ds_keyval *key_p;
+    PVFS_ds_keyval *val_p;
+};
+
+struct PINT_client_seteattr_list_sm
+{
+    int32_t nkey;
+    PVFS_ds_keyval *key_array;
+    PVFS_ds_keyval *val_array;
+};
+
 typedef struct PINT_client_sm
 {
     /*
@@ -398,7 +425,9 @@ typedef struct PINT_client_sm
     */
     PVFS_object_attr acache_attr;
 
-    /* generic msgpair used with msgpair substate */
+    /* msgpair scratch space used within msgpairarray substatemachine */
+    /* if you have only a single msg pair you may point sm_p->msgarray */
+    /* at this.  Otherwise leave it alone */
     PINT_sm_msgpair_state msgpair;
 
     /* msgpair array ptr used when operations can be performed
@@ -450,6 +479,10 @@ typedef struct PINT_client_sm
         struct PINT_client_mgmt_create_dirent_sm mgmt_create_dirent;
         struct PINT_client_mgmt_get_dirdata_handle_sm mgmt_get_dirdata_handle;
 	struct PINT_server_get_config_sm get_config;
+	struct PINT_client_geteattr_sm geteattr;
+	struct PINT_client_geteattr_list_sm geteattr_list;
+	struct PINT_client_seteattr_sm seteattr;
+	struct PINT_client_seteattr_list_sm seteattr_list;
     } u;
 } PINT_client_sm;
 
@@ -530,6 +563,10 @@ enum
     PVFS_SYS_SETATTR               = 10,
     PVFS_SYS_LOOKUP                = 11,
     PVFS_SYS_RENAME                = 12,
+    PVFS_SYS_GETEATTR              = 13,
+    PVFS_SYS_GETEATTR_LIST         = 14,
+    PVFS_SYS_SETEATTR              = 15,
+    PVFS_SYS_SETEATTR_LIST         = 16,
     PVFS_MGMT_SETPARAM_LIST        = 70,
     PVFS_MGMT_NOOP                 = 71,
     PVFS_MGMT_STATFS_LIST          = 72,
@@ -643,6 +680,10 @@ extern struct PINT_state_machine_s pvfs2_client_mgmt_remove_object_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_remove_dirent_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_create_dirent_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_get_dirdata_handle_sm;
+extern struct PINT_state_machine_s pvfs2_client_get_eattr_sm;
+extern struct PINT_state_machine_s pvfs2_client_get_eattr_list_sm;
+extern struct PINT_state_machine_s pvfs2_client_set_eattr_sm;
+extern struct PINT_state_machine_s pvfs2_client_set_eattr_list_sm;
 
 
 /* nested state machines (helpers) */
