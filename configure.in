@@ -588,7 +588,9 @@ if test "x$NEED_BERKELEY_DB" = "xyes" ; then
     dnl
     AC_ARG_WITH(db,
            [  --with-db=<dir>         Location of installed DB package (default=/usr)],
-           LDFLAGS="${LDFLAGS} -L$withval/lib" CFLAGS="${CFLAGS} -I$withval/include")
+           LDFLAGS="${LDFLAGS} -L$withval/lib" 
+           CFLAGS="${CFLAGS} -I$withval/include"
+           with_db_set=yes)
     
     dnl 
     dnl if the db is specified, try to link with -ldb

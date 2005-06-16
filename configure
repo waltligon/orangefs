@@ -5073,7 +5073,9 @@ if test "x$NEED_BERKELEY_DB" = "xyes" ; then
 # Check whether --with-db or --without-db was given.
 if test "${with_db+set}" = set; then
   withval="$with_db"
-  LDFLAGS="${LDFLAGS} -L$withval/lib" CFLAGS="${CFLAGS} -I$withval/include"
+  LDFLAGS="${LDFLAGS} -L$withval/lib"
+           CFLAGS="${CFLAGS} -I$withval/include"
+           with_db_set=yes
 fi;
 
                         echo "$as_me:$LINENO: checking for db library" >&5
