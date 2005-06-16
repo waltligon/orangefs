@@ -22,8 +22,6 @@ PVFS2_SUB=0
 dnl PVFS2_PRE=""
 PVFS2_PRE="pre1-$CONFIGURE_TIME"
 
-AM_INIT_AUTOMAKE(pvfs2, $PVFS2_MAJOR.$PVFS2_MINOR.$PVFS2_SUB$PVFS2_PRE)
-
 PVFS2_VERSION=$PVFS2_MAJOR.$PVFS2_MINOR.$PVFS2_SUB$PVFS2_PRE
 AC_SUBST(PVFS2_VERSION)
 AC_DEFINE_UNQUOTED(PVFS2_VERSION_MAJOR, $PVFS2_MAJOR, major version number)
@@ -460,6 +458,24 @@ AC_TRY_COMPILE([
 	AC_MSG_RESULT(yes)
 	AC_DEFINE(HAVE_PARENT_INO, 1, Define if kernel has parent_ino),
 )
+
+dnl The name of this field changed from memory_backed to capabilities in 2.6.12.
+
+AC_MSG_CHECKING(for memory_backed in struct backing_dev_info in kernel)
+CFLAGS="$CFLAGS -Werror -I$LINUX_KERNEL_SRC/include"
+AC_TRY_COMPILE([
+	#define __KERNEL__
+	#include <linux/mm.h>
+	#include <linux/backing-dev.h>
+	static struct backing_dev_info bdi = {
+	    .memory_backed = 0
+	};
+], [],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_BDI_MEMORY_BACKED, 1, Define if struct backing_dev_info in kernel has memory_backed),
+	AC_MSG_RESULT(no)
+)
+
 CFLAGS=$oldcflags
 
 dnl PAV configuration needs absolute location of source and build.
