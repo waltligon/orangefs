@@ -1667,6 +1667,7 @@ static inline PVFS_error handle_unexp_vfs_request(
     vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
+    int posted_op = 0;             
 
     assert(vfs_request);
 
@@ -1737,33 +1738,43 @@ static inline PVFS_error handle_unexp_vfs_request(
     switch(vfs_request->in_upcall.type)
     {
         case PVFS2_VFS_OP_LOOKUP:
+            posted_op = 1;
             ret = post_lookup_request(vfs_request);
             break;
         case PVFS2_VFS_OP_CREATE:
+            posted_op = 1;
             ret = post_create_request(vfs_request);
             break;
         case PVFS2_VFS_OP_SYMLINK:
+            posted_op = 1;
             ret = post_symlink_request(vfs_request);
             break;
         case PVFS2_VFS_OP_GETATTR:
+            posted_op = 1;
             ret = post_getattr_request(vfs_request);
             break;
         case PVFS2_VFS_OP_SETATTR:
+            posted_op = 1;
             ret = post_setattr_request(vfs_request);
             break;
         case PVFS2_VFS_OP_REMOVE:
+            posted_op = 1;
             ret = post_remove_request(vfs_request);
             break;
         case PVFS2_VFS_OP_MKDIR:
+            posted_op = 1;
             ret = post_mkdir_request(vfs_request);
             break;
         case PVFS2_VFS_OP_READDIR:
+            posted_op = 1;
             ret = post_readdir_request(vfs_request);
             break;
         case PVFS2_VFS_OP_RENAME:
+            posted_op = 1;
             ret = post_rename_request(vfs_request);
             break;
         case PVFS2_VFS_OP_TRUNCATE:
+            posted_op = 1;
             ret = post_truncate_request(vfs_request);
             break;
             /*
@@ -1785,6 +1796,7 @@ static inline PVFS_error handle_unexp_vfs_request(
               blocking and handled inline
             */
         case PVFS2_VFS_OP_FILE_IO:
+            posted_op = 1;
             ret = post_io_request(vfs_request);
             break;
 #ifdef USE_MMAP_RA_CACHE
@@ -1800,6 +1812,7 @@ static inline PVFS_error handle_unexp_vfs_request(
             ret = service_operation_cancellation(vfs_request);
             break;
         case PVFS2_VFS_OP_FSYNC:
+            posted_op = 1;
             ret = post_fsync_request(vfs_request);
             break;
         case PVFS2_VFS_OP_INVALID:
@@ -1810,10 +1823,21 @@ static inline PVFS_error handle_unexp_vfs_request(
             break;
     }
 
+    /* if we failed to post the operation, then we should go ahead and write
+     * a generic response down with the error code filled in 
+     */
+    if(posted_op == 1 && ret < 0)
+    {
+        vfs_request->out_downcall.status = ret;
+        /* this will treat the operation as if it were inlined in the logic
+         * to follow, which is what we want -- report a general error and
+         * immediately release the request */
+        write_inlined_device_response(vfs_request);
+    }
   repost_op:
     /*
       check if we need to repost the operation (in case of failure or
-      inlined handling/completion
+      inlined handling/completion)
     */
     switch(ret)
     {
