@@ -289,7 +289,7 @@ struct PINT_client_mgmt_setparam_list_sm
     int64_t value;
     PVFS_id_gen_t *addr_array;
     int count;
-    int64_t *old_value_array;
+    uint64_t *old_value_array;
     int *root_check_status_array;
     PVFS_error_details *details;
 };
