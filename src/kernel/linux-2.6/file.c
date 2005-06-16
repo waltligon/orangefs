@@ -102,6 +102,7 @@ ssize_t pvfs2_inode_read(
     loff_t original_offset = *offset;
     int retries = PVFS2_OP_RETRY_COUNT;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
+    int dc_status;
 
     while(total_count < count)
     {
@@ -134,13 +135,14 @@ ssize_t pvfs2_inode_read(
         new_op->upcall.req.io.count = each_count;
         new_op->upcall.req.io.offset = *offset;
 
+        dc_status = 0;  /* macro may jump to error_exit below */
         service_error_exit_op_with_timeout_retry(
             new_op, "pvfs2_inode_read", retries, error_exit,
             get_interruptible_flag(inode));
 
         if (new_op->downcall.status != 0)
         {
-            int dc_status = new_op->downcall.status;
+            dc_status = new_op->downcall.status;
 
           error_exit:
             /* this macro is defined in pvfs2-kernel.h */
@@ -256,6 +258,7 @@ static ssize_t pvfs2_file_write(
     struct inode *inode = file->f_dentry->d_inode;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
     size_t amt_complete = 0;
+    int dc_status;
 
     pvfs2_print("pvfs2_file_write: called on %s\n",
                 (file && file->f_dentry && file->f_dentry->d_name.name ?
@@ -305,13 +308,14 @@ static ssize_t pvfs2_file_write(
             return -EIO;
         }
 
+        dc_status = 0;
         service_error_exit_op_with_timeout_retry(
             new_op, "pvfs2_file_write", retries, error_exit,
             get_interruptible_flag(inode));
 
         if (new_op->downcall.status != 0)
         {
-            int dc_status = new_op->downcall.status;
+            dc_status = new_op->downcall.status;
 
           error_exit:
             /* this macro is defined in pvfs2-kernel.h */
