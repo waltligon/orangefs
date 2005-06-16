@@ -389,7 +389,9 @@ int BMI_sockio_nbsendfile(int s,
 int BMI_sockio_get_sockopt(int s,
 		int optname)
 {
-    int val, len = sizeof(val);
+    int val;
+    socklen_t len = sizeof(val);
+
     if (getsockopt(s, SOL_SOCKET, optname, &val, &len) == -1)
 	return (-1);
     else
