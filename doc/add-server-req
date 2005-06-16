@@ -1,0 +1,83 @@
+
+
+Steps in adding a request to the server:
+
+1) select a request name and number
+		src/proto/pvfs2-req-proto.h
+
+2) add a request and response struct
+		src/proto/pvfs2-req-proto.h
+
+2a) add endecode functions if needed
+		src/proto/endecode-funcs.h
+			for each of these you add or modify you must also
+			add a stub in include/pvfs2-encode-stubs.h
+
+3) add entries to decode/encode functions
+		src/proto/PINT-le-bytefield.c
+			lebf_initialize() - need code here to set up a request so it
+				can be encoded and expression for extra message size if any
+			lebf_encode_req()
+			lebf_encode_resp()
+			lebf_decode_req()
+			lebf_decode_resp()
+			lebf_decode_rel() (2 places)
+				In this last entry, we free any resources allocated during
+				decode - specifically array items
+				This does not free resources allocated by SM code
+
+4) add request specific scratch space to PINT_server_op
+		src/server/pvfs2-server.h
+			PINT_server_op  -- only if required
+
+5) write state machine -- se details below
+		src/server/<reqname>.sm
+			each state machine added must have a delcaration in
+				src/server/pvfs2-server.h
+
+6) update request scheduler
+		src/server/request-scheduler/request-scheduler.c
+			PINT_req_sched_target_handle()
+
+7) add entry to server operation parameters table
+		src/server/pvfs2-server.c
+			init_req_table -- see src/server/prelude.sm
+			prelude_perm_check()
+
+8) add entry in final response state machine
+		src/server/final-response.sm
+			s_req_resp_type_map
+
+
+
+Writing State Machines
+
+Every state machine passes a PINT_server_op in to each state function.
+	state machine initialized in src/server/pvfs2-server.c
+		server_state_machine_start
+			gets the s_op set up
+			decodes request message
+			sets s_op->req, s_op->resp
+
+Each state machine must first run the pvfs2_prelude_sm
+	reads the attribs of the target object, if appropriate to s_op->attr
+	does basic permission checking
+	posts request to the scheduler
+
+State machines typically submit jobs, defined in
+	src/io/job/job.h
+
+Each state machine must run the pvfs2_final_response_sm
+	releases request from the scheduler
+	sends response to the client
+		s_op->resp must be filled in
+		return status in js_p->error_code
+
+Cleanup must free any memory allocated by SM code
+
+State functions return 0 or 1 on error-free completion,
+	0 indicates an asynchronous call has been made and must be waited for
+	1 indicates no async call was made and should proceed to next state
+	<0 indicates an error - use PVFS_EXXX codes defined in
+		include/pvfs2-types.h
+
