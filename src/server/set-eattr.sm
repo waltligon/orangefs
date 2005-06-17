@@ -191,9 +191,11 @@ static int seteattr_setobj_eattribs(PINT_server_op *s_op, job_status_s *js_p)
         s_op->req->u.seteattr.fs_id,
         s_op->val.buffer_sz);
 
-    printf("keybuf %x keylex %d valbuf %x vallen %d\n",
-            s_op->key.buffer, s_op->key.buffer_sz,
-            s_op->val.buffer, s_op->val.buffer_sz);
+    gossip_debug(
+        GOSSIP_SETATTR_DEBUG,
+        "keybuf %p keylen %d valbuf %p vallen %d\n",
+        s_op->req->u.seteattr.key.buffer, s_op->req->u.seteattr.key.buffer_sz,
+        s_op->req->u.seteattr.val.buffer, s_op->req->u.seteattr.val.buffer_sz);
 
     ret = job_trove_keyval_write(
         s_op->req->u.seteattr.fs_id,
@@ -227,9 +229,11 @@ static int seteattr_cleanup(PINT_server_op *s_op, job_status_s *js_p)
 {
     PINT_STATE_DEBUG("seteattr_cleanup");
 
-    printf("keybuf %x keylex %d valbuf %x vallen %d\n",
-            s_op->key.buffer, s_op->key.buffer_sz,
-            s_op->val.buffer, s_op->val.buffer_sz);
+    gossip_debug(
+        GOSSIP_SETATTR_DEBUG,
+        "keybuf %p keylen %d valbuf %p vallen %d\n",
+        s_op->req->u.seteattr.key.buffer, s_op->req->u.seteattr.key.buffer_sz,
+        s_op->req->u.seteattr.val.buffer, s_op->req->u.seteattr.val.buffer_sz);
 
     return(server_state_machine_complete(s_op));
 }
