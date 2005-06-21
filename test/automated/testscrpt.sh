@@ -12,7 +12,7 @@
 
 PVFS2_SRC=${HOME}/src/pvfs2
 PVFS2_DEST=/tmp/pvfs2-nightly
-PVFS2_MOUNTPOINT=/pvfs2
+PVFS2_MOUNTPOINT=/pvfs2-nightly
 TESTS=${HOME}/src/benchmarks
 STARTTIME=`date +%s`
 TINDERSCRIPT=$(cd `dirname $0`; pwd)/tinder-pvfs2-status
@@ -43,7 +43,7 @@ setup_pvfs2() {
 	pushd .
 	cd $PVFS2_DEST
 	INSTALL-pvfs2/bin/pvfs2-genconfig fs.conf server.conf \
-		--protocol tcp --port 3334 \
+		--protocol tcp --port 3399 \
 		--ioservers `hostname -s` --metaservers `hostname -s` \
 		--storage ${PVFS2_DEST}/STORAGE-pvfs2 \
 		--logfile=${PVFS2_DEST}/pvfs2-server.log --quiet
@@ -141,7 +141,7 @@ test_iozone() {
 ${TINDERSCRIPT} ${TESTNAME} building $STARTTIME </dev/null
 
 # compile and install
-#pull_and_build_pvfs2  || buildfail
+pull_and_build_pvfs2  || buildfail
 
 teardown_vfs && teardown_pvfs2
 
@@ -161,8 +161,8 @@ nr_passed=0
 nr_failed=0
 failure_logs=""   # a space-delimited list of logs that failed
 
-for t in test_ping test_cp test_failure ; do
-#for t in test_ping test_cp test_failure test_bonnie test_iozone; do
+for t in test_ping test_cp test_failure test_shelltest; do
+#for t in test_ping test_cp test_shelltest test_bonnie test_iozone; do
 	$t > $t.log 2>&1
 	if [ $? == 0 ] ; then 
 		nr_passed=$((nr_passed + 1))
