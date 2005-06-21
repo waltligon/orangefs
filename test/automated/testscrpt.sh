@@ -50,12 +50,16 @@ setup_pvfs2() {
 	sudo rm -rf ${PVFS2_DEST}/STORAGE-pvfs2
 	sudo INSTALL-pvfs2/sbin/pvfs2-server -p pvfs2-server.pid -f fs.conf server.conf-`hostname -s`
 	sudo INSTALL-pvfs2/sbin/pvfs2-server -p pvfs2-server.pid  fs.conf server.conf-`hostname -s`
+	sudo chmod 644 ${PVFS2_DEST}/pvfs2-server.log
+	popd
 }
 
 teardown_pvfs2() {
-	sudo killall pvfs2-server
-	sleep 3
-	sudo killall -9 pvfs2-server
+	if [ -f ${PVFS2_DEST}/pvfs2-server.pid ] ; then
+		sudo kill `cat ${PVFS2_DEST}/pvfs2-server.pid`
+		sleep 3
+		sudo kill -9 `cat ${PVFS2_DEST}/pvfs2-server.pid`
+	fi
 }
 
 buidfail() {
