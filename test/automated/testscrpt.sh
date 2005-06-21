@@ -15,7 +15,7 @@ PVFS2_DEST=/tmp/pvfs2-nightly
 PVFS2_MOUNTPOINT=/pvfs2
 TESTS=${HOME}/src/benchmarks
 STARTTIME=`date +%s`
-TINDERSCRIPT=`dirname $0`/tinder-pvfs2-status
+TINDERSCRIPT=$(cd `dirname $0`; pwd)/tinder-pvfs2-status
 TESTNAME="`hostname -s`-nightly"
 
 
@@ -161,7 +161,8 @@ nr_passed=0
 nr_failed=0
 failure_logs=""   # a space-delimited list of logs that failed
 
-for t in test_ping test_cp test_failure test_bonnie test_iozone; do
+for t in test_ping test_cp test_failure ; do
+#for t in test_ping test_cp test_failure test_bonnie test_iozone; do
 	$t > $t.log 2>&1
 	if [ $? == 0 ] ; then 
 		nr_passed=$((nr_passed + 1))
