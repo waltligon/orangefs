@@ -15,7 +15,7 @@ PVFS2_DEST=/tmp/pvfs2-nightly
 PVFS2_MOUNTPOINT=/pvfs2
 TESTS=${HOME}/src/benchmarks
 STARTTIME=`date +%s`
-TINDERSCRIPT=${HOME}/tinder-pvfs2-status
+TINDERSCRIPT=`dirname $0`/tinder-pvfs2-status
 TESTNAME="`hostname -s`-nightly"
 
 
@@ -113,15 +113,16 @@ test_failure() {
 
 test_bonnie() {
 	pushd .
-	cd ${HOME}/src/benchmarks/bonnie++-1.03a
+	cd ${TESTS}/bonnie++-1.03a
 	./configure -q && make && cd ${PVFS2_MOUNTPOINT} || return 1
-	${HOME}/src/benchmarks/bonnie++-1.03a/bonnie++ -n 1:0:0 -s :$((1024*128))
+	cd ${PVFS2_MOUNTPOINT} && \
+		${TESTS}/bonnie++-1.03a/bonnie++ -n 1:0:0 -s :$((1024*128))
 	popd
 }
 
 test_iozone() {
 	pushd .
-	cd ${HOME}/src/benchmarks/iozone3_239/src/current  || return 1
+	cd ${TESTS}/iozone3_239/src/current  || return 1
 	make linux  || return 1
 	# -y min record size
 	# -q max record size
