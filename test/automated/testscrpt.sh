@@ -41,7 +41,10 @@ teardown_vfs() {
 	sudo umount $PVFS2_MOUNTPOINT
 	sudo killall pvfs2-client
 	sleep 1
-	sudo /sbin/modprobe -r pvfs2
+	sudo /sbin/rmmod  pvfs2
+	# let teardown alway ssucceed.  pvfs2-client might already be killed
+	# and pvfs2 kernel module might not be loaded yet 
+	return 0
 }
 
 setup_vfs() {
