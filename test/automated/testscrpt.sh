@@ -123,7 +123,7 @@ for s in $(echo VFS_HOSTS); do
 done
 
 # compile and install
-#pull_and_build_pvfs2  || buildfail
+pull_and_build_pvfs2  || buildfail
 
 teardown_pvfs2 && setup_pvfs2 
 
