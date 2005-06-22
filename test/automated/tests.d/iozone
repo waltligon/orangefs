@@ -1,4 +1,9 @@
 #!/bin/sh
+
+if [ ! $do_vfs ] ; then
+	return 0
+fi
+
 pushd .
 cd ${EXTRA_TESTS}/iozone3_239/src/current  || return 1
 make linux  || return 1

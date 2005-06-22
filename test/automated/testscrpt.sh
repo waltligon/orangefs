@@ -11,7 +11,7 @@
 
 # modify these variables
 PVFS2_DEST=/tmp/pvfs2-nightly
-PVFS2_MOUNTPOINT=/pvfs2-nighly
+PVFS2_MOUNTPOINT=/pvfs2-nightly
 EXTRA_TESTS=${HOME}/src/benchmarks
 
 # no need to modify these. they make their own gravy
@@ -20,6 +20,10 @@ TINDERSCRIPT=$(cd `dirname $0`; pwd)/tinder-pvfs2-status
 SCRIPTSDIR=$(cd `dirname $0`; pwd)/tests.d
 
 TESTNAME="`hostname -s`-nightly"
+
+
+# we only have a few hosts that meet all the earlier stated prereqs
+VFS_HOSTS="gil lain"
 
 
 pull_and_build_pvfs2 () {
@@ -67,6 +71,8 @@ teardown_pvfs2() {
 		sleep 3
 		sudo kill -9 `cat ${PVFS2_DEST}/pvfs2-server.pid`
 	fi
+	# let teardown always succeed.  pvfs2-server.pid could be stale
+	return 0
 }
 
 buidfail() {
@@ -78,9 +84,9 @@ buidfail() {
 
 setupfail() {
 	echo "Failure in setup"
-	dmesg > ${PVFS2_DEST}/dmesg
+	dmesg | tail -20 > ${PVFS2_DEST}/dmesg
 	cat ${PVFS2_DEST}/dmesg ${PVFS2_DEST}/pvfs2-server.log | \
-		${TINDERSCRIPT}  ${TESTNAME} test_fail $STARTTIME 
+		${TINDERSCRIPT}  ${TESTNAME} test_failed $STARTTIME 
 	exit 1
 }
 
@@ -107,20 +113,37 @@ testfail() {
 # show that we're doing something
 ${TINDERSCRIPT} ${TESTNAME} building $STARTTIME </dev/null
 
+# will we be able to do VFS-related tests?
+do_vfs=0
+for s in $(echo VFS_HOSTS); do
+	if [ `hostname -s` = $s ] ; then
+		do_vfs=1
+		break
+	fi
+done
+
 # compile and install
-pull_and_build_pvfs2  || buildfail
+#pull_and_build_pvfs2  || buildfail
 
-teardown_vfs && teardown_pvfs2
-
-setup_pvfs2 && setup_vfs
+teardown_pvfs2 && setup_pvfs2 
 
 if [ $? != 0 ] ; then
 	echo "setup failed"
 	setupfail
 fi
 
+if [ $do_vfs ] ; then 
+	teardown_vfs && setup_vfs
+
+	if [ $? != 0 ] ; then
+		echo "setup failed"
+		setupfail
+	fi
+fi
+
 # at this point we've got 
 # - pvfs2 servers running
+# on hosts in our whitelist
 # - an entry in /etc/fstab (that was a prerequisite for this script after all)
 # - the VFS mounted at $PVFS2_MOUNTPOINT
 

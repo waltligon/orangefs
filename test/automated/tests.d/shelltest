@@ -1,3 +1,7 @@
 #!/bin/sh
 
+if [ ! $do_vfs ] ; then
+        return 0
+fi
+
 sh ${PVFS2_DEST}/pvfs2/test/kernel/linux-2.6/pvfs2-shell-test.sh ${PVFS2_MOUNTPOINT}
