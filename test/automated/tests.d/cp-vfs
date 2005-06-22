@@ -1,0 +1,7 @@
+#!/bin/sh
+
+if [ ! $do_vfs ] ; then
+	return 0
+fi
+
+cp ${PVFS2_DEST}/INSTALL-pvfs2/bin/pvfs2-cp ${PVFS2_MOUNTPOINT}
