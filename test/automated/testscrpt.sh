@@ -9,11 +9,12 @@
 #   - an entry in /etc/fstab for pvfs2.  a bit of a stretch for clusters but
 #     not for red machines like gil and lain.
 
-
-PVFS2_SRC=${HOME}/src/pvfs2
+# modify these variables
 PVFS2_DEST=/tmp/pvfs2-nightly
 PVFS2_MOUNTPOINT=/pvfs2-nighly
 EXTRA_TESTS=${HOME}/src/benchmarks
+
+# no need to modify these. they make their own gravy
 STARTTIME=`date +%s`
 TINDERSCRIPT=$(cd `dirname $0`; pwd)/tinder-pvfs2-status
 SCRIPTSDIR=$(cd `dirname $0`; pwd)/tests.d
@@ -24,7 +25,11 @@ TESTNAME="`hostname -s`-nightly"
 pull_and_build_pvfs2 () {
 	mkdir -p $PVFS2_DEST
 	echo "Start time: $STARTTIME"
-	${PVFS2_SRC}/maint/build/pvfs2-build.sh  -k /lib/modules/`uname -r`/build -r $PVFS2_DEST
+	# a bit of gross shell hackery, but cuts down on the number of
+	# variables we have to set.  Assumes we ran this script out of a
+	# checked out pvfs2 tree
+	$(cd `dirname $0`;pwd)/../../maint/build/pvfs2-build.sh \
+		-k /lib/modules/`uname -r`/build -r $PVFS2_DEST
 	
 }
 

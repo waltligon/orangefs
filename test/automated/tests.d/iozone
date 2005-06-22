@@ -1,6 +1,6 @@
 #!/bin/sh
 pushd .
-cd ${TESTS}/iozone3_239/src/current  || return 1
+cd ${EXTRA_TESTS}/iozone3_239/src/current  || return 1
 make linux  || return 1
 # -y min record size
 # -q max record size
