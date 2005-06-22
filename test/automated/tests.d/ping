@@ -1,0 +1,3 @@
+#!/bin/sh
+
+${PVFS2_DEST}/INSTALL-pvfs2/bin/pvfs2-ping -m $PVFS2_MOUNTPOINT

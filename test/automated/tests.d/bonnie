@@ -1,0 +1,8 @@
+#!/bin/sh
+
+pushd .
+cd ${TESTS}/bonnie++-1.03a
+./configure -q && make && cd ${PVFS2_MOUNTPOINT} || return 1
+cd ${PVFS2_MOUNTPOINT} && \
+	${TESTS}/bonnie++-1.03a/bonnie++ -n 1:0:0 -s :$((1024*128))
+popd

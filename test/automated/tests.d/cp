@@ -1,0 +1,4 @@
+#!/bin/sh
+
+${PVFS2_DEST}/INSTALL-pvfs2/bin/pvfs2-cp \
+                ${PVFS2_DEST}/pvfs2/configure ${PVFS2_MOUNTPOINT}/configure

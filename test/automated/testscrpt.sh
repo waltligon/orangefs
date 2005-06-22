@@ -12,10 +12,12 @@
 
 PVFS2_SRC=${HOME}/src/pvfs2
 PVFS2_DEST=/tmp/pvfs2-nightly
-PVFS2_MOUNTPOINT=/pvfs2-nightly
-TESTS=${HOME}/src/benchmarks
+PVFS2_MOUNTPOINT=/pvfs2-nighly
+EXTRA_TESTS=${HOME}/src/benchmarks
 STARTTIME=`date +%s`
 TINDERSCRIPT=$(cd `dirname $0`; pwd)/tinder-pvfs2-status
+SCRIPTSDIR=$(cd `dirname $0`; pwd)/tests.d
+
 TESTNAME="`hostname -s`-nightly"
 
 
@@ -93,50 +95,6 @@ testfail() {
 	exit 1
 }
 
-#
-# shell functions for testing pvfs2, one per test
-# 
-
-test_ping() {
-	${PVFS2_DEST}/INSTALL-pvfs2/bin/pvfs2-ping -m $PVFS2_MOUNTPOINT
-}
-
-test_cp() {
-	${PVFS2_DEST}/INSTALL-pvfs2/bin/pvfs2-cp \
-		${PVFS2_DEST}/pvfs2/configure ${PVFS2_MOUNTPOINT}/configure
-}
-
-test_shelltest() {
-	sh ${PVFS2_DEST}/pvfs2/test/kernel/linux-2.6/pvfs2-shell-test.sh ${PVFS2_MOUNTPOINT} 
-}
-
-test_failure() {
-	echo "this test is gauranteed to fail"
-	false
-}
-
-test_bonnie() {
-	pushd .
-	cd ${TESTS}/bonnie++-1.03a
-	./configure -q && make && cd ${PVFS2_MOUNTPOINT} || return 1
-	cd ${PVFS2_MOUNTPOINT} && \
-		${TESTS}/bonnie++-1.03a/bonnie++ -n 1:0:0 -s :$((1024*128))
-	popd
-}
-
-test_iozone() {
-	pushd .
-	cd ${TESTS}/iozone3_239/src/current  || return 1
-	make linux  || return 1
-	# -y min record size
-	# -q max record size
-	# -n min file size
-	# -g max file size
-	./iozone -a -y 4096 -q $((1024*16)) -n 4096 -g $((1024*16*2)) \
-		-f ${PVFS2_MOUNTPOINT}/test_iozone_file
-	popd
-}
-
 ###
 ### entry point for script
 ###
@@ -165,15 +123,22 @@ nr_passed=0
 nr_failed=0
 failure_logs=""   # a space-delimited list of logs that failed
 
-for t in test_ping test_cp test_failure test_shelltest; do
-#for t in test_ping test_cp test_shelltest test_bonnie test_iozone; do
-	$t > $t.log 2>&1
-	if [ $? == 0 ] ; then 
-		nr_passed=$((nr_passed + 1))
-	else
-		nr_failed=$((nr_failed + 1))
-		failure_logs="$failure_logs $t.log"
+cd ${SCRIPTSDIR}
+for f in *; do
+	if [ -f $f -a -x $f ] ; then 
+		. ./$f > ${PVFS2_DEST}/${f}.log 2>&1
+		if [ $? == 0 ] ; then 
+			nr_passed=$((nr_passed + 1))
+		else
+			nr_failed=$((nr_failed + 1))
+			failure_logs="$failure_logs ${PVFS2_DEST}/${f}.log"
+		fi
 	fi
 done
+cd -
 
-tinder_report success
+if [ $nr_failed -gt 0 ]; then
+	tinder_report test_failed
+else
+	tinder_report success
+fi
