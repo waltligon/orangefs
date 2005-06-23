@@ -1,9 +1,5 @@
 #!/bin/sh
 
-if [ ! $do_vfs ] ; then 
-	return 1
-fi
-
 pushd .
 cd ${EXTRA_TESTS}/bonnie++-1.03a
 ./configure -q && make && cd ${PVFS2_MOUNTPOINT} || return 1
