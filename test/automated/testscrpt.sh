@@ -20,11 +20,12 @@ TINDERSCRIPT=$(cd `dirname $0`; pwd)/tinder-pvfs2-status
 SYSINT_SCRIPTS=${PVFS2_DEST}/pvfs2/test/automated/sysint-tests.d
 VFS_SCRIPTS=${PVFS2_DEST}/pvfs2/test/automated/vfs-tests.d
 MPIIO_SCRIPTS=${PVFS2_DEST}/pvfs2/test/automated/mpiio-tests.d
+
 # for debugging and testing, you might need to set the above to your working
 # direcory.. .unless you like checking in broken scripts
-SYSINT_SCRIPTS=$(cd `dirname $0`; pwd)/sysint-tests.d
-VFS_SCRIPTS=$(cd `dirname $0`; pwd)/vfs-tests.d
-MPIIO_SCRIPTS=$(cd `dirname $0`; pwd)/mpiio-tests.d
+#SYSINT_SCRIPTS=$(cd `dirname $0`; pwd)/sysint-tests.d
+#VFS_SCRIPTS=$(cd `dirname $0`; pwd)/vfs-tests.d
+#MPIIO_SCRIPTS=$(cd `dirname $0`; pwd)/mpiio-tests.d
 
 TESTNAME="`hostname -s`-nightly"
 
