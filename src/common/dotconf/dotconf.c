@@ -239,7 +239,7 @@ void PINT_dotconf_register_options(
 	if (!(num % GROW_BY))
 	    configfile->config_options = realloc(configfile->config_options,
 						 sizeof(void *) * (num +
-								   GROW_BY));
+								   GROW_BY + 1));
     }
 
 #undef GROW_BY
