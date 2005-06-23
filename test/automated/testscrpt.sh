@@ -16,8 +16,8 @@ EXTRA_TESTS=${HOME}/src/benchmarks
 
 # no need to modify these. they make their own gravy
 STARTTIME=`date +%s`
+SCRIPTSDIR=${PVFS2_DEST}/pvfs2/test/automated/tests.d
 TINDERSCRIPT=$(cd `dirname $0`; pwd)/tinder-pvfs2-status
-SCRIPTSDIR=$(cd `dirname $0`; pwd)/tests.d
 
 TESTNAME="`hostname -s`-nightly"
 
