@@ -37,6 +37,27 @@ pull_and_build_pvfs2 () {
 	
 }
 
+pull_and_build_mpich2 () {
+	[ -d ${PVFS2_DEST} ] || mkdir ${PVFS2_DEST}
+	cd ${PVFS2_DEST}
+	wget 'http://www.mcs.anl.gov/~robl/mpich2/mpich2-latest.tar.gz'
+	rm -rf mpich2-snap-*
+	tar xzf mpich2-latest.tar.gz
+	cd mpich2-snap-*
+	mkdir build
+	cd build
+	CFLAGS="-I${PVFS2_DEST}/INSTALL-pvfs2/include"
+	LDFLAGS="-L${PVFS2_DEST}/INSTALL-pvfs2/lib"
+	LIBS="-lpvfs2 -lpthread"
+	export CFLAGS LDFLAGS LIBS
+
+	../configure -q --prefix=${PVFS2_DEST}/soft/mpich2 \
+		--enable-romio --with-file-system=ufs+nfs+testfs+pvfs2 \
+		--without-mpe --disable-cxx --disable-f77 &&\
+	make && make install
+}
+
+
 teardown_vfs() {
 	sudo umount $PVFS2_MOUNTPOINT
 	sudo killall pvfs2-client
@@ -129,6 +150,8 @@ done
 pull_and_build_pvfs2  || buildfail
 
 teardown_pvfs2 && setup_pvfs2 
+
+pull_and_build_mpich2 
 
 if [ $? != 0 ] ; then
 	echo "setup failed"
