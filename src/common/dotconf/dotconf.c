@@ -533,6 +533,7 @@ void PINT_dotconf_set_command(
     command_t * cmd)
 {
     char *eob = 0;
+    int ret = -1;
 
     eob = args + strlen(args);
 
@@ -543,6 +544,7 @@ void PINT_dotconf_set_command(
     cmd->configfile = configfile;
     cmd->data.list = (char **) calloc(CFG_VALUES, sizeof(char *));
     cmd->data.str = 0;
+    cmd->error = 0;
 
     if (option->type == ARG_RAW)
     {
@@ -609,7 +611,8 @@ void PINT_dotconf_set_command(
 		{
 		    PINT_dotconf_warning(configfile, DCLOG_WARNING,
 				    ERR_WRONG_ARG_COUNT,
-				    "Missing argument to option '%s'", name);
+				    "Missing argument to option '%s'\n", name);
+                    cmd->error = 1;
 		    return;
 		}
 
@@ -620,18 +623,27 @@ void PINT_dotconf_set_command(
 		{
 		    PINT_dotconf_warning(configfile, DCLOG_WARNING,
 				    ERR_WRONG_ARG_COUNT,
-				    "Missing argument to option '%s'", name);
+				    "Missing argument to option '%s'\n", name);
+                    cmd->error = 1;
 		    return;
 		}
 
-		sscanf(cmd->data.list[0], "%li", &cmd->data.value);
+		ret = sscanf(cmd->data.list[0], "%li", &cmd->data.value);
+                if(ret != 1)
+                {
+		    PINT_dotconf_warning(configfile, DCLOG_WARNING,
+				    ERR_PARSE_ERROR,
+				    "Non-integer argument to option '%s'\n", name);
+                    cmd->error = 1;
+                }
 		break;
 	    case ARG_STR:
 		if (cmd->arg_count < 1)
 		{
 		    PINT_dotconf_warning(configfile, DCLOG_WARNING,
 				    ERR_WRONG_ARG_COUNT,
-				    "Missing argument to option '%s'", name);
+				    "Missing argument to option '%s'\n", name);
+                    cmd->error = 1;
 		    return;
 		}
 
@@ -735,6 +747,12 @@ const char *PINT_dotconf_handle_command(
 
 	/* set up the command structure (contextchecker wants this) */
 	PINT_dotconf_set_command(configfile, option, cp1, &command);
+        if(command.error)
+        {
+            error = "Parse error.\n";
+	    PINT_dotconf_free_command(&command);
+            break;
+        }
 
 	if (configfile->contextchecker)
 	    context_error =

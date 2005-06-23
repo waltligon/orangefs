@@ -193,6 +193,7 @@ extern "C"
 	    char **list;	/* ARG_LIST */
 	} data;
 	int arg_count;		/* number of arguments (in data.list) */
+        int error;              /* set to non-zero if parsing error */
 
 	/* ------ misc context information ---------------------------------------------------------- */
 	configfile_t *configfile;

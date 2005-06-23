@@ -180,9 +180,8 @@ int main(int argc, char **argv)
 
     if (PINT_parse_config(&server_config, fs_conf, server_conf))
     {
-        gossip_err("Fatal Error: This server requires a valid "
-                   "configuration for operation.\nPlease check your "
-                   "configuration setting.  Server aborting.\n");
+        gossip_err("Error: Please check your config files.\n");  
+        gossip_err("Error: Server aborting.\n");
         goto server_shutdown;
     }
 
@@ -968,7 +967,7 @@ static int server_shutdown(
     }
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "*** normal server shutdown in progress ***\n");
+                 "*** server shutdown in progress ***\n");
 
     if (status & SERVER_STATE_MACHINE_INIT)
     {
