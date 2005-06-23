@@ -37,7 +37,7 @@ VFS_HOSTS="gil lain"
 pull_and_build_pvfs2 () {
 	# debugging aide... when we run this script repeatedly, we don't 
 	# really need to build everything again 
-	[ -n "$SKIP_BUILDING" ] && return 0
+	[ -n "$SKIP_BUILDING_PVFS2" ] && return 0
 
 	mkdir -p $PVFS2_DEST
 	echo "Start time: $STARTTIME"
@@ -51,7 +51,7 @@ pull_and_build_pvfs2 () {
 
 pull_and_build_mpich2 () {
 	# just to make debugging less painful
-	[ -n "${SKIP_BUILDING}" ] && return 0
+	[ -n "${SKIP_BUILDING_MPICH2}" ] && return 0
 	[ -d ${PVFS2_DEST} ] || mkdir ${PVFS2_DEST}
 	cd ${PVFS2_DEST}
 	wget 'http://www.mcs.anl.gov/~robl/mpich2/mpich2-latest.tar.gz'
