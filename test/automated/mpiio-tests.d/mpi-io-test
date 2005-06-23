@@ -1,0 +1,4 @@
+#!/bin/sh
+
+${PVFS2_DEST}/soft/mpich2/bin/mpicc ${PVFS2_DEST}/test/client/mpi-io/mpi-io-test.c -o mpi-io-test &&\
+	./mpi-io-test -fname pvfs2:/pvfs2-nightly/iotest
