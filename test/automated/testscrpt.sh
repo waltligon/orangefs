@@ -16,8 +16,15 @@ EXTRA_TESTS=${HOME}/src/benchmarks
 
 # no need to modify these. they make their own gravy
 STARTTIME=`date +%s`
-SCRIPTSDIR=${PVFS2_DEST}/pvfs2/test/automated/tests.d
 TINDERSCRIPT=$(cd `dirname $0`; pwd)/tinder-pvfs2-status
+SYSINT_SCRIPTS=${PVFS2_DEST}/pvfs2/test/automated/sysint-tests.d
+VFS_SCRIPTS=${PVFS2_DEST}/pvfs2/test/automated/vfs-tests.d
+MPIIO_SCRIPTS=${PVFS2_DEST}/pvfs2/test/automated/mpiio-tests.d
+# for debugging and testing, you might need to set the above to your working
+# direcory.. .unless you like checking in broken scripts
+SYSINT_SCRIPTS=$(cd `dirname $0`; pwd)/sysint-tests.d
+VFS_SCRIPTS=$(cd `dirname $0`; pwd)/vfs-tests.d
+MPIIO_SCRIPTS=$(cd `dirname $0`; pwd)/mpiio-tests.d
 
 TESTNAME="`hostname -s`-nightly"
 
@@ -27,6 +34,10 @@ VFS_HOSTS="gil lain"
 
 
 pull_and_build_pvfs2 () {
+	# debugging aide... when we run this script repeatedly, we don't 
+	# really need to build everything again 
+	[ -n "$SKIP_BUILDING" ] && return 0
+
 	mkdir -p $PVFS2_DEST
 	echo "Start time: $STARTTIME"
 	# a bit of gross shell hackery, but cuts down on the number of
@@ -38,6 +49,8 @@ pull_and_build_pvfs2 () {
 }
 
 pull_and_build_mpich2 () {
+	# just to make debugging less painful
+	[ -n "${SKIP_BUILDING}" ] && return 0
 	[ -d ${PVFS2_DEST} ] || mkdir ${PVFS2_DEST}
 	cd ${PVFS2_DEST}
 	wget 'http://www.mcs.anl.gov/~robl/mpich2/mpich2-latest.tar.gz'
@@ -130,6 +143,22 @@ testfail() {
 	exit 1
 }
 
+# idea stolen from debian: for a given directory, run every executable file
+run_parts() {
+	cd $1
+	for f in *; do
+		if [ -f $f -a -x $f ] ; then 
+			. ./$f > ${PVFS2_DEST}/${f}.log 2>&1
+			if [ $? == 0 ] ; then 
+				nr_passed=$((nr_passed + 1))
+			else
+				nr_failed=$((nr_failed + 1))
+				failure_logs="$failure_logs ${PVFS2_DEST}/${f}.log"
+			fi
+		fi
+	done
+}
+
 ###
 ### entry point for script
 ###
@@ -177,19 +206,14 @@ nr_passed=0
 nr_failed=0
 failure_logs=""   # a space-delimited list of logs that failed
 
-cd ${SCRIPTSDIR}
-for f in *; do
-	if [ -f $f -a -x $f ] ; then 
-		. ./$f > ${PVFS2_DEST}/${f}.log 2>&1
-		if [ $? == 0 ] ; then 
-			nr_passed=$((nr_passed + 1))
-		else
-			nr_failed=$((nr_failed + 1))
-			failure_logs="$failure_logs ${PVFS2_DEST}/${f}.log"
-		fi
-	fi
-done
-cd -
+run_parts ${SYSINT_SCRIPTS}
+
+if [ $do_vfs ] ; then
+	run_parts ${VFS_SCRIPTS}
+fi
+
+run_parts ${MPIIO_SCRIPTS}
+	
 
 if [ $nr_failed -gt 0 ]; then
 	tinder_report test_failed
