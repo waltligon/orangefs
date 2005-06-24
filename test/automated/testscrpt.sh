@@ -149,6 +149,7 @@ run_parts() {
 	cd $1
 	for f in *; do
 		if [ -f $f -a -x $f ] ; then 
+			echo "====== running $f ====== "
 			. ./$f > ${PVFS2_DEST}/${f}.log 2>&1
 			if [ $? == 0 ] ; then 
 				nr_passed=$((nr_passed + 1))
