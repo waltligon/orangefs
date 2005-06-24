@@ -68,7 +68,7 @@ pull_and_build_mpich2 () {
 	../configure -q --prefix=${PVFS2_DEST}/soft/mpich2 \
 		--enable-romio --with-file-system=ufs+nfs+testfs+pvfs2 \
 		--without-mpe --disable-cxx --disable-f77 &&\
-	make && make install
+	make >/dev/null && make install >/dev/null 
 }
 
 
@@ -113,7 +113,7 @@ teardown_pvfs2() {
 	return 0
 }
 
-buidfail() {
+buildfail() {
 	echo "Failure in build process"
 	cat ${PVFS2_DEST}/configure.log ${PVFS2_DEST}/make-extracted.log ${PVFS2_DEST}/make-install.log | \
 		${TINDERSCRIPT} ${TESTNAME} build_failed $STARTTIME 
@@ -181,7 +181,7 @@ pull_and_build_pvfs2  || buildfail
 
 teardown_pvfs2 && setup_pvfs2 
 
-pull_and_build_mpich2 
+pull_and_build_mpich2 || buildfail
 
 if [ $? != 0 ] ; then
 	echo "setup failed"
