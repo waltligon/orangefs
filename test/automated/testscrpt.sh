@@ -40,7 +40,6 @@ pull_and_build_pvfs2 () {
 	[ -n "$SKIP_BUILDING_PVFS2" ] && return 0
 
 	mkdir -p $PVFS2_DEST
-	echo "Start time: $STARTTIME"
 	# a bit of gross shell hackery, but cuts down on the number of
 	# variables we have to set.  Assumes we ran this script out of a
 	# checked out pvfs2 tree
