@@ -5159,7 +5159,7 @@ fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
     fi
 
-    CFLAGS="$USR_CFLAGS -Wall"
+    CFLAGS="$USR_CFLAGS -Werror"
                             echo "$as_me:$LINENO: checking for DB stat with malloc function ptr" >&5
 echo $ECHO_N "checking for DB stat with malloc function ptr... $ECHO_C" >&6
     cat >conftest.$ac_ext <<_ACEOF

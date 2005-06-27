@@ -739,7 +739,7 @@ if test "x$NEED_BERKELEY_DB" = "xyes" ; then
         Define if third param (message) to DB error callback function is const))
     fi
     
-    CFLAGS="$USR_CFLAGS -Wall"    
+    CFLAGS="$USR_CFLAGS -Werror"    
     dnl Test to check for unknown third param to DB stat (four params 
     dnl total).  The unknown parameter is a function ptr so that the
     dnl the user can pass in a replcaement for malloc.
