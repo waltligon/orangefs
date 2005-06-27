@@ -58,7 +58,7 @@ pull_and_build_mpich2 () {
 	[ -d ${PVFS2_DEST} ] || mkdir ${PVFS2_DEST}
 	cd ${PVFS2_DEST}
 	rm -rf mpich2-latest.tar.gz
-	wget --quiet 'http://www.mcs.anl.gov/~robl/mpich2/mpich2-latest.tar.gz' -o mpich2-latest.tar.gz
+	wget --quiet 'http://www.mcs.anl.gov/~robl/mpich2/mpich2-latest.tar.gz' -O mpich2-latest.tar.gz
 	rm -rf mpich2-snap-*
 	tar xzf mpich2-latest.tar.gz
 	cd mpich2-snap-*
