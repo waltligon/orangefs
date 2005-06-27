@@ -40,11 +40,15 @@ pull_and_build_pvfs2 () {
 	[ -n "$SKIP_BUILDING_PVFS2" ] && return 0
 
 	mkdir -p $PVFS2_DEST
+	with_kernel=""
+	if  [ $do_vfs -eq 1 ] ; then
+		with_kernel="-k /lib/modules/`uname -r`/build"
+	fi
 	# a bit of gross shell hackery, but cuts down on the number of
 	# variables we have to set.  Assumes we ran this script out of a
 	# checked out pvfs2 tree
 	$(cd `dirname $0`;pwd)/../../maint/build/pvfs2-build.sh \
-		-k /lib/modules/`uname -r`/build -r $PVFS2_DEST
+		$with_kernel -r $PVFS2_DEST
 	
 }
 
@@ -53,7 +57,8 @@ pull_and_build_mpich2 () {
 	[ -n "${SKIP_BUILDING_MPICH2}" ] && return 0
 	[ -d ${PVFS2_DEST} ] || mkdir ${PVFS2_DEST}
 	cd ${PVFS2_DEST}
-	wget --quiet 'http://www.mcs.anl.gov/~robl/mpich2/mpich2-latest.tar.gz'
+	rm -rf mpich2-latest.tar.gz
+	wget --quiet 'http://www.mcs.anl.gov/~robl/mpich2/mpich2-latest.tar.gz' -o mpich2-latest.tar.gz
 	rm -rf mpich2-snap-*
 	tar xzf mpich2-latest.tar.gz
 	cd mpich2-snap-*
@@ -169,7 +174,7 @@ ${TINDERSCRIPT} ${TESTNAME} building $STARTTIME </dev/null
 
 # will we be able to do VFS-related tests?
 do_vfs=0
-for s in $(echo VFS_HOSTS); do
+for s in $(echo $VFS_HOSTS); do
 	if [ `hostname -s` = $s ] ; then
 		do_vfs=1
 		break
