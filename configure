@@ -1429,6 +1429,11 @@ host_os=`echo $ac_cv_host | sed 's/^\([^-]*\)-\([^-]*\)-\(.*\)$/\3/'`
 
 
 
+USR_CFLAGS=$CFLAGS
+if test "x$USR_CFLAGS" = "x"; then
+	USR_CFLAGS_SET=no
+fi
+
 # Find a good install program.  We prefer a C program (faster),
 # so one script is as good as another.  But avoid the broken or
 # incompatible versions:
@@ -2431,6 +2436,17 @@ ac_cpp='$CPP $CPPFLAGS'
 ac_compile='$CC -c $CFLAGS $CPPFLAGS conftest.$ac_ext >&5'
 ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $LIBS >&5'
 ac_compiler_gnu=$ac_cv_c_compiler_gnu
+
+
+echo "$as_me:$LINENO: checking for required gcc" >&5
+echo $ECHO_N "checking for required gcc... $ECHO_C" >&6
+if test "x$GCC" = "x"; then
+	{ { echo "$as_me:$LINENO: error: no" >&5
+echo "$as_me: error: no" >&2;}
+   { (exit 1); exit 1; }; }
+fi
+
+CFLAGS=$USR_CFLAGS
 
 ac_ext=c
 ac_cpp='$CPP $CPPFLAGS'
@@ -4189,7 +4205,7 @@ fi;
 oldcflags=$CFLAGS
 echo "$as_me:$LINENO: checking for i_size_write in kernel" >&5
 echo $ECHO_N "checking for i_size_write in kernel... $ECHO_C" >&6
-CFLAGS="$CFLAGS -Werror -I$LINUX24_KERNEL_SRC/include -I${LINUX_KERNEL_SRC}/include"
+CFLAGS="$USR_CFLAGS -Werror -I$LINUX24_KERNEL_SRC/include -I${LINUX_KERNEL_SRC}/include"
 cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
@@ -4252,7 +4268,7 @@ rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 
 echo "$as_me:$LINENO: checking for i_size_read in kernel" >&5
 echo $ECHO_N "checking for i_size_read in kernel... $ECHO_C" >&6
-CFLAGS="$CFLAGS -Werror -I$LINUX24_KERNEL_SRC/include -I${LINUX_KERNEL_SRC}/include"
+CFLAGS="$USR_CFLAGS -Werror -I$LINUX24_KERNEL_SRC/include -I${LINUX_KERNEL_SRC}/include"
 cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
@@ -4314,7 +4330,7 @@ rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 
 echo "$as_me:$LINENO: checking for parent_ino in kernel" >&5
 echo $ECHO_N "checking for parent_ino in kernel... $ECHO_C" >&6
-CFLAGS="$CFLAGS -Werror -I$LINUX24_KERNEL_SRC/include -I${LINUX_KERNEL_SRC}/include"
+CFLAGS="$USR_CFLAGS -Werror -I$LINUX24_KERNEL_SRC/include -I${LINUX_KERNEL_SRC}/include"
 cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
@@ -4377,7 +4393,7 @@ rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 
 echo "$as_me:$LINENO: checking for memory_backed in struct backing_dev_info in kernel" >&5
 echo $ECHO_N "checking for memory_backed in struct backing_dev_info in kernel... $ECHO_C" >&6
-CFLAGS="$CFLAGS -Werror -I$LINUX_KERNEL_SRC/include -I$LINUX_KERNEL_SRC/include/asm-i386/mach-generic"
+CFLAGS="$USR_CFLAGS -Werror -I$LINUX_KERNEL_SRC/include -I$LINUX_KERNEL_SRC/include/asm-i386/mach-generic"
 cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
@@ -4454,9 +4470,17 @@ SRC_ABSOLUTE_TOP=`cd $srcdir ; pwd`
 # Check whether --enable-fast or --disable-fast was given.
 if test "${enable_fast+set}" = set; then
   enableval="$enable_fast"
-  CFLAGS="$CFLAGS -DNDEBUG -O3 -DGOSSIP_DISABLE_DEBUG"
+
+if test "x$USR_CFLAGS_SET" = "xno"; then
+    CFLAGS="$CFLAGS -DNDEBUG -O3 -DGOSSIP_DISABLE_DEBUG"
+fi
+
 else
-  FLAGS=${CFLAGS:-"-g"}
+
+if test "x$USR_CFLAGS_SET" = "xno"; then
+    CFLAGS="$CFLAGS -g"
+fi
+
 
 fi;
 
@@ -4466,7 +4490,17 @@ fi;
 # Check whether --enable-strict or --disable-strict was given.
 if test "${enable_strict+set}" = set; then
   enableval="$enable_strict"
-  CFLAGS="$CFLAGS -Wall -O2 -Wstrict-prototypes -Wmissing-prototypes -Wundef -Wpointer-arith -Wbad-function-cast"
+
+if test "x$USR_CFLAGS_SET" = "xno"; then
+    CFLAGS="$CFLAGS -Wall -Wstrict-prototypes -Wmissing-prototypes -Wundef -Wpointer-arith -Wbad-function-cast"
+fi
+
+else
+
+if test "x$USR_CFLAGS_SET" = "xno" && test "x$enable_fast" != "xyes"; then
+    CFLAGS="$CFLAGS -O2"
+fi
+
 fi;
 
 # Check whether --enable-verbose-build or --disable-verbose-build was given.
@@ -4988,7 +5022,7 @@ echo "${ECHO_T}$lib" >&6
                 echo "$as_me:$LINENO: checking for dbenv parameter to DB error callback function" >&5
 echo $ECHO_N "checking for dbenv parameter to DB error callback function... $ECHO_C" >&6
     oldcflags=$CFLAGS
-    CFLAGS="$CFLAGS -Werror"
+    CFLAGS="$USR_CFLAGS -Werror"
     cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
@@ -5125,7 +5159,7 @@ fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
     fi
 
-    CFLAGS="$CFLAGS -Wall"
+    CFLAGS="$USR_CFLAGS -Wall"
                             echo "$as_me:$LINENO: checking for DB stat with malloc function ptr" >&5
 echo $ECHO_N "checking for DB stat with malloc function ptr... $ECHO_C" >&6
     cat >conftest.$ac_ext <<_ACEOF
@@ -5261,8 +5295,6 @@ rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 
     fi
 
-    CFLAGS=$oldcflags
-
         echo "$as_me:$LINENO: checking for txnid parameter to DB open function" >&5
 echo $ECHO_N "checking for txnid parameter to DB open function... $ECHO_C" >&6
     cat >conftest.$ac_ext <<_ACEOF
@@ -5387,6 +5419,7 @@ echo "$as_me:$LINENO: result: no" >&5
 echo "${ECHO_T}no" >&6
 fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+    CFLAGS="$oldcflags"
 fi
 
 
@@ -5689,6 +5722,8 @@ done
 
 echo "$as_me:$LINENO: checking for gethostbyname" >&5
 echo $ECHO_N "checking for gethostbyname... $ECHO_C" >&6
+oldcflags="$CFLAGS"
+CFLAGS="$USR_CFLAGS"
 cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
@@ -5745,6 +5780,7 @@ echo "${ECHO_T}no" >&6
 WARN_ABOUT_HOSTNAMES="yes"
 fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+CFLAGS="$oldcflags"
 
 GM_HOME=
 

@@ -421,7 +421,7 @@ dnl 2.6 into 2.4
 
 oldcflags=$CFLAGS
 AC_MSG_CHECKING(for i_size_write in kernel)
-CFLAGS="$CFLAGS -Werror -I$LINUX24_KERNEL_SRC/include -I${LINUX_KERNEL_SRC}/include"
+CFLAGS="$USR_CFLAGS -Werror -I$LINUX24_KERNEL_SRC/include -I${LINUX_KERNEL_SRC}/include"
 dnl if this test passes, the kernel does not have it
 dnl if this test fails, the kernel already defined it
 AC_TRY_COMPILE([
@@ -439,7 +439,7 @@ AC_TRY_COMPILE([
 )
 
 AC_MSG_CHECKING(for i_size_read in kernel)
-CFLAGS="$CFLAGS -Werror -I$LINUX24_KERNEL_SRC/include -I${LINUX_KERNEL_SRC}/include"
+CFLAGS="$USR_CFLAGS -Werror -I$LINUX24_KERNEL_SRC/include -I${LINUX_KERNEL_SRC}/include"
 dnl if this test passes, the kernel does not have it
 dnl if this test fails, the kernel already defined it
 AC_TRY_COMPILE([
@@ -456,7 +456,7 @@ AC_TRY_COMPILE([
 )
 
 AC_MSG_CHECKING(for parent_ino in kernel)
-CFLAGS="$CFLAGS -Werror -I$LINUX24_KERNEL_SRC/include -I${LINUX_KERNEL_SRC}/include"
+CFLAGS="$USR_CFLAGS -Werror -I$LINUX24_KERNEL_SRC/include -I${LINUX_KERNEL_SRC}/include"
 dnl if this test passes, the kernel does not have it
 dnl if this test fails, the kernel already defined it
 AC_TRY_COMPILE([
@@ -475,7 +475,7 @@ AC_TRY_COMPILE([
 dnl The name of this field changed from memory_backed to capabilities in 2.6.12.
 
 AC_MSG_CHECKING(for memory_backed in struct backing_dev_info in kernel)
-CFLAGS="$CFLAGS -Werror -I$LINUX_KERNEL_SRC/include -I$LINUX_KERNEL_SRC/include/asm-i386/mach-generic"
+CFLAGS="$USR_CFLAGS -Werror -I$LINUX_KERNEL_SRC/include -I$LINUX_KERNEL_SRC/include/asm-i386/mach-generic"
 AC_TRY_COMPILE([
 	#define __KERNEL__
 	#include <linux/mm.h>
@@ -694,7 +694,7 @@ if test "x$NEED_BERKELEY_DB" = "xyes" ; then
     dnl exactly the same).
     AC_MSG_CHECKING(for dbenv parameter to DB error callback function)
     oldcflags=$CFLAGS
-    CFLAGS="$CFLAGS -Werror"
+    CFLAGS="$USR_CFLAGS -Werror"
     AC_TRY_COMPILE([
     #include <db.h>
     
@@ -739,7 +739,7 @@ if test "x$NEED_BERKELEY_DB" = "xyes" ; then
         Define if third param (message) to DB error callback function is const))
     fi
     
-    CFLAGS="$CFLAGS -Wall"    
+    CFLAGS="$USR_CFLAGS -Wall"    
     dnl Test to check for unknown third param to DB stat (four params 
     dnl total).  The unknown parameter is a function ptr so that the
     dnl the user can pass in a replcaement for malloc.
@@ -766,7 +766,7 @@ if test "x$NEED_BERKELEY_DB" = "xyes" ; then
 
     dnl Test to check for txnid parameter to DB stat (DB 4.3.xx+)
     if test "x$have_db_stat_malloc" = "xno" ; then
-
+    
        AC_MSG_CHECKING(for txnid parameter to DB stat function)
        AC_TRY_COMPILE([
        #include <db.h>
@@ -786,8 +786,6 @@ if test "x$NEED_BERKELEY_DB" = "xyes" ; then
     
     fi
     
-    CFLAGS=$oldcflags
-
     dnl Test to check for txnid parameter to DB open (DB4.1+)
     AC_MSG_CHECKING(for txnid parameter to DB open function)
     AC_TRY_COMPILE([
@@ -817,6 +815,7 @@ if test "x$NEED_BERKELEY_DB" = "xyes" ; then
     ], AC_MSG_RESULT(yes)
     AC_DEFINE(HAVE_DB_DIRTY_READ, 1, [Define if db library has DB_DIRTY_READ flag]),
     AC_MSG_RESULT(no))
+    CFLAGS="$oldcflags"
 fi
 dnl end of NEED_BERKELEY_DB section
 
@@ -824,6 +823,8 @@ AC_CHECK_HEADERS(netdb.h)
 AC_CHECK_HEADERS(arpa/inet.h)
 dnl check for gethostbyname function
 AC_MSG_CHECKING(for gethostbyname)
+oldcflags="$CFLAGS"
+CFLAGS="$USR_CFLAGS"
 AC_TRY_COMPILE([
 #include <netdb.h>
 ], [
@@ -833,6 +834,7 @@ AC_MSG_RESULT(yes)
 AC_DEFINE(HAVE_GETHOSTBYNAME, 1, Define if gethostbyname function exists),
 AC_MSG_RESULT(no)
 WARN_ABOUT_HOSTNAMES="yes")
+CFLAGS="$oldcflags"
 
 dnl configure options for GM install path
 GM_HOME=
