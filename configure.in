@@ -462,7 +462,7 @@ AC_TRY_COMPILE([
 dnl The name of this field changed from memory_backed to capabilities in 2.6.12.
 
 AC_MSG_CHECKING(for memory_backed in struct backing_dev_info in kernel)
-CFLAGS="$CFLAGS -Werror -I$LINUX_KERNEL_SRC/include"
+CFLAGS="$CFLAGS -Werror -I$LINUX_KERNEL_SRC/include -I$LINUX_KERNEL_SRC/include/asm-i386/mach-generic"
 AC_TRY_COMPILE([
 	#define __KERNEL__
 	#include <linux/mm.h>
