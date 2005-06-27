@@ -100,18 +100,18 @@ setup_pvfs2() {
 		--ioservers `hostname -s` --metaservers `hostname -s` \
 		--storage ${PVFS2_DEST}/STORAGE-pvfs2 \
 		--logfile=${PVFS2_DEST}/pvfs2-server.log --quiet
-	sudo rm -rf ${PVFS2_DEST}/STORAGE-pvfs2
-	sudo INSTALL-pvfs2/sbin/pvfs2-server -p pvfs2-server.pid -f fs.conf server.conf-`hostname -s`
-	sudo INSTALL-pvfs2/sbin/pvfs2-server -p pvfs2-server.pid  fs.conf server.conf-`hostname -s`
-	sudo chmod 644 ${PVFS2_DEST}/pvfs2-server.log
+	rm -rf ${PVFS2_DEST}/STORAGE-pvfs2
+	INSTALL-pvfs2/sbin/pvfs2-server -p pvfs2-server.pid -f fs.conf server.conf-`hostname -s`
+	INSTALL-pvfs2/sbin/pvfs2-server -p pvfs2-server.pid  fs.conf server.conf-`hostname -s`
+	chmod 644 ${PVFS2_DEST}/pvfs2-server.log
 	popd
 }
 
 teardown_pvfs2() {
 	if [ -f ${PVFS2_DEST}/pvfs2-server.pid ] ; then
-		sudo kill `cat ${PVFS2_DEST}/pvfs2-server.pid`
+		kill `cat ${PVFS2_DEST}/pvfs2-server.pid`
 		sleep 3
-		sudo kill -9 `cat ${PVFS2_DEST}/pvfs2-server.pid`
+		kill -9 `cat ${PVFS2_DEST}/pvfs2-server.pid`
 	fi
 	# let teardown always succeed.  pvfs2-server.pid could be stale
 	return 0
@@ -193,7 +193,7 @@ if [ $? != 0 ] ; then
 	setupfail
 fi
 
-if [ $do_vfs ] ; then 
+if [ $do_vfs -eq 0 ] ; then 
 	teardown_vfs && setup_vfs
 
 	if [ $? != 0 ] ; then
