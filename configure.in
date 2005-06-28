@@ -634,8 +634,10 @@ if test "x$NEED_BERKELEY_DB" = "xyes" ; then
     dnl
     AC_ARG_WITH(db,
            [  --with-db=<dir>         Location of installed DB package (default=/usr)],
-           LDFLAGS="${LDFLAGS} -L$withval/lib" 
-           CFLAGS="${CFLAGS} -I$withval/include"
+	   DB_LDFLAGS="-L${withval}/lib"
+	   DB_CFLAGS="-I${withval}/include"
+           LDFLAGS="${LDFLAGS} $DB_LDFLAGS"
+           CFLAGS="${CFLAGS} $DB_CFLAGS"
            with_db_set=yes)
     
     dnl 
@@ -694,7 +696,7 @@ if test "x$NEED_BERKELEY_DB" = "xyes" ; then
     dnl exactly the same).
     AC_MSG_CHECKING(for dbenv parameter to DB error callback function)
     oldcflags=$CFLAGS
-    CFLAGS="$USR_CFLAGS -Werror"
+    CFLAGS="$USR_CFLAGS $DB_CFLAGS -Werror"
     AC_TRY_COMPILE([
     #include <db.h>
     
@@ -739,7 +741,7 @@ if test "x$NEED_BERKELEY_DB" = "xyes" ; then
         Define if third param (message) to DB error callback function is const))
     fi
     
-    CFLAGS="$USR_CFLAGS -Werror"    
+    CFLAGS="$USR_CFLAGS $DB_CFLAGS -Werror"    
     dnl Test to check for unknown third param to DB stat (four params 
     dnl total).  The unknown parameter is a function ptr so that the
     dnl the user can pass in a replcaement for malloc.
