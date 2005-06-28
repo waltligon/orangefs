@@ -193,7 +193,7 @@ if [ $? != 0 ] ; then
 	setupfail
 fi
 
-if [ $do_vfs -eq 0 ] ; then 
+if [ $do_vfs -eq 1 ] ; then 
 	teardown_vfs && setup_vfs
 
 	if [ $? != 0 ] ; then
@@ -214,7 +214,7 @@ failure_logs=""   # a space-delimited list of logs that failed
 
 run_parts ${SYSINT_SCRIPTS}
 
-if [ $do_vfs ] ; then
+if [ $do_vfs -eq 1 ] ; then
 	run_parts ${VFS_SCRIPTS}
 fi
 
