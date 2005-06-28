@@ -226,3 +226,6 @@ if [ $nr_failed -gt 0 ]; then
 else
 	tinder_report success
 fi
+
+teardown_pvfs2
+[ $do_vfs ] && teardown_vfs
