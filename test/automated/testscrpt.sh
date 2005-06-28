@@ -77,9 +77,6 @@ pull_and_build_mpich2 () {
 
 
 teardown_vfs() {
-	if [ -n "${PVFS2_MOUNTPOINT}" ]; then
-		rm -rf ${PVFS2_MOUNTPOINT}/*
-	fi
 	sudo umount $PVFS2_MOUNTPOINT
 	sudo killall pvfs2-client
 	sleep 1
