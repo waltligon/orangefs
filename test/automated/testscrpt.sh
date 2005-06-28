@@ -71,7 +71,7 @@ pull_and_build_mpich2 () {
 
 	../configure -q --prefix=${PVFS2_DEST}/soft/mpich2 \
 		--enable-romio --with-file-system=ufs+nfs+testfs+pvfs2 \
-		--without-mpe --disable-cxx --disable-f77 &&\
+		--without-mpe --disable-cxx --disable-f77 >mpich2config.log &&\
 	make >/dev/null && make install >/dev/null 
 }
 
