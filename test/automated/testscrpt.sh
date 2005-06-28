@@ -93,7 +93,6 @@ setup_vfs() {
 }
 
 setup_pvfs2() {
-	pushd .
 	cd $PVFS2_DEST
 	INSTALL-pvfs2/bin/pvfs2-genconfig fs.conf server.conf \
 		--protocol tcp --port 3399 \
@@ -103,8 +102,13 @@ setup_pvfs2() {
 	rm -rf ${PVFS2_DEST}/STORAGE-pvfs2
 	INSTALL-pvfs2/sbin/pvfs2-server -p pvfs2-server.pid -f fs.conf server.conf-`hostname -s`
 	INSTALL-pvfs2/sbin/pvfs2-server -p pvfs2-server.pid  fs.conf server.conf-`hostname -s`
-	chmod 644 ${PVFS2_DEST}/pvfs2-server.log
-	popd
+
+	echo "tcp://`hostname -s`:3399/pvfs2-fs /pvfs2-nightly pvfs2 defaults 0 0" > ${PVFS2_DEST}/pvfs2tab
+	# use our pvfs2tab file only if /etc/fstab isn't set up for us
+	grep -q 'pvfs2-nightly' /etc/fstab
+	if [ $? -ne 0 ] ; then
+		export PVFS2TAB_FILE=${PVFS2_DEST}/pvfs2tab
+	fi	
 }
 
 teardown_pvfs2() {
@@ -228,4 +232,4 @@ else
 fi
 
 teardown_pvfs2
-[ $do_vfs ] && teardown_vfs
+[ $do_vfs -eq 1 ] && teardown_vfs
