@@ -317,19 +317,32 @@ PVFS_error PVFS_isys_create(
         }
     }
     
-    /* determine the number of datafile objects to use */
+    /* If an application hint has been provided, use that to request dfile
+       else, if a tabfile hint has been provided, use that instead*/
+    num_dfiles_req = 0;
     if (attr.mask & PVFS_ATTR_SYS_DFILE_COUNT)
     {
         num_dfiles_req = attr.dfile_count;
     }
     else
     {
-        num_dfiles_req = 0;
+        /* Check the mount options */
+        int rc;
+        struct PVFS_sys_mntent* mntent;
+
+        rc = PVFS_util_get_mntent(sm_p->parent_ref.fs_id, &mntent);
+        if (0 == rc)
+        {
+            num_dfiles_req = mntent->default_num_dfiles;
+        }
     }
 
-    ret = PINT_cached_config_get_num_dfiles(
-        sm_p->parent_ref.fs_id, sm_p->u.create.dist,
-        num_dfiles_req, &sm_p->u.create.num_data_files);
+    /* Determine the number of dfiles, passing in client hints to
+       override any server hints */
+    ret = PINT_cached_config_get_num_dfiles(sm_p->parent_ref.fs_id,
+                                            sm_p->u.create.dist,
+                                            num_dfiles_req,
+                                            &sm_p->u.create.num_data_files);
 
     if (ret < 0)
     {

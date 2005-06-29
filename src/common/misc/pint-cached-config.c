@@ -630,10 +630,10 @@ int PINT_cached_config_map_to_server(
  *
  * Returns 0 if the number of dfiles has been successfully set
  *
- * Sets num_dfiles to the server configuration value if possible.  If no
- * server configuration value has been specified, the distribution will
- * set the number of dfiles.  The default distribution sets num_dfiles
- * to be the number of I/O servers available.
+ * Sets the number of dfiles to a distribution approved the value.  Clients
+ * may pass in num_dfiles_requested as a hint, if no hint is given, the server
+ * configuration is checked to find a hint there.  The distribution will
+ * choose a correct number of dfiles even if no hint is set.
  */
 int PINT_cached_config_get_num_dfiles(
     PVFS_fs_id fsid,
@@ -642,38 +642,40 @@ int PINT_cached_config_get_num_dfiles(
     int *num_dfiles)
 {
     int ret = -PVFS_EINVAL;
-    struct qlist_head *hash_link = NULL;
-    struct config_fs_cache_s *cur_config_cache = NULL;
-    int num_servers_requested = 0;
-    int fs_default_num_dfiles = 0;
-
-    /* Locate the filesystem configuration for this fs id */
-    hash_link = qhash_search(PINT_fsid_config_cache_table,&(fsid));
-    if (hash_link)
+    int rc;
+    int num_io_servers;
+    
+    /* If the dfile request is zero, check to see if the config has that
+       setting */
+    if (0 == num_dfiles_requested)
     {
-        cur_config_cache = qlist_entry(
+        struct qlist_head *hash_link = NULL;
+        struct config_fs_cache_s *cur_config_cache = NULL;
+        
+        /* Locate the filesystem configuration for this fs id */
+        hash_link = qhash_search(PINT_fsid_config_cache_table,&(fsid));
+        if (hash_link)
+        {
+            cur_config_cache = qlist_entry(
                 hash_link, struct config_fs_cache_s, hash_link);
-        assert(cur_config_cache);
-        assert(cur_config_cache->fs);
-        fs_default_num_dfiles = cur_config_cache->fs->default_num_dfiles;
+            assert(cur_config_cache);
+            assert(cur_config_cache->fs);
+            num_dfiles_requested = cur_config_cache->fs->default_num_dfiles;
+        }
     }
 
-    /* If a filesystem dfile number has been set use that,
-       else let the distribution set the number of dfiles */
-    if (0 != fs_default_num_dfiles)
+    /* Determine the number of I/O servers available */
+    rc = PINT_cached_config_get_num_io(fsid, &num_io_servers);
+    
+    if (0 == rc)
     {
-        *num_dfiles = fs_default_num_dfiles;
+        /* Allow the distribution to apply its hint to the number of
+           dfiles requested and the number of I/O servers available */
+        *num_dfiles = dist->methods->get_num_dfiles(dist->params,
+                                                    num_io_servers,
+                                                    num_dfiles_requested);
         ret = 0;
     }
-    else if (0 == PINT_cached_config_get_num_io(fsid, &num_servers_requested))
-    {
-        /* Let the distribution determine the number of dfiles to use */
-        *num_dfiles = dist->methods->get_num_dfiles(
-            dist->params, num_servers_requested, num_dfiles_requested);
-
-        ret = 0;
-    }
-
     return ret;
 }
 

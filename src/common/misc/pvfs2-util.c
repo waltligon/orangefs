@@ -53,6 +53,8 @@ static int parse_encoding_string(
     const char *cp,
     enum PVFS_encoding_type *et);
 
+static int parse_num_dfiles_string(const char* cp, int* num_dfiles);
+
 void PVFS_util_gen_credentials(
     PVFS_credentials *credentials)
 {
@@ -393,6 +395,23 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
                     goto error_exit;
                 }
             }
+
+            /* find out if a particular flow protocol was specified */
+            current_tab->mntent_array[i].default_num_dfiles = 0;
+            cp = hasmntopt(tmp_ent, "num_dfiles");
+            if (cp)
+            {
+                ret = parse_num_dfiles_string(
+                    cp,
+                    &(current_tab->mntent_array[i].default_num_dfiles));
+
+                if (ret < 0)
+                {
+                    goto error_exit;
+                }
+            }
+
+            /* Loop counter increment */
             i++;
         }
     }
@@ -733,6 +752,38 @@ int PVFS_util_remove_internal_mntent(
         gen_mutex_unlock(&s_stat_tab_mutex);
     }
     return ret;
+}
+
+/*
+ * PVFS_util_remove_internal_mntent()
+ *
+ * dynamically remove mount information from our internally managed
+ * mount tables.
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
+int PVFS_util_get_mntent(PVFS_fs_id fs_id,
+                         struct PVFS_sys_mntent** out_mntent)
+{
+    int i = 0;
+
+    /* Search for mntent by fsid */
+    for(i = 0; i < s_stat_tab_count; i++)
+    {
+        int j;
+        for(j = 0; j < s_stat_tab_array[i].mntent_count; j++)
+        {
+            struct PVFS_sys_mntent* mnt_iter;
+            mnt_iter = &(s_stat_tab_array[i].mntent_array[j]);
+
+            if (mnt_iter->fs_id == fs_id)
+            {
+                *out_mntent = mnt_iter;
+                return 0;
+            }
+        }
+    }
+    return -PVFS_EINVAL;
 }
 
 /* PVFS_util_resolve()
@@ -1286,6 +1337,55 @@ void PINT_release_pvfstab(void)
     }
 
     gen_mutex_unlock(&s_stat_tab_mutex);
+}
+
+/*
+ * Pull out the wire encoding specified as a mount option in the tab
+ * file.
+ *
+ * Input string is not modified; result goes into et.
+ *
+ * Returns 0 if all okay.
+ */
+static int parse_num_dfiles_string(const char* cp, int* num_dfiles)
+{
+    int parsed_value = 0;
+    char* end_ptr = NULL;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: input is %s\n",
+                 __func__, cp);
+    
+    cp += strlen("num_dfiles");
+
+    /* Skip optional spacing */
+    for (; isspace(*cp); cp++);
+    
+    if (*cp != '=')
+    {
+        gossip_err("Error: %s: malformed num_dfiles option in tab file.\n",
+                   __func__);
+        return -PVFS_EINVAL;
+    }
+    
+    /* Skip optional spacing */
+    for (++cp; isspace(*cp); cp++);
+
+    parsed_value = strtol(cp, &end_ptr, 10);
+
+    /* If a numerica value was found, continue
+       else, report an error */
+    if (end_ptr != cp)
+    {
+        *num_dfiles = parsed_value;
+    }
+    else
+    {
+        gossip_err("Error: %s: malformed num_dfiles option in tab file.\n",
+                   __func__);
+        return -PVFS_EINVAL;
+    }
+
+    return 0;
 }
 
 /*

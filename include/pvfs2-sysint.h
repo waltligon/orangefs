@@ -57,7 +57,10 @@ struct PVFS_sys_mntent
     enum PVFS_flowproto_type flowproto;	/* flow protocol */
     enum PVFS_encoding_type encoding;   /* wire data encoding */
     /* fs id, filled in by system interface when it looks up the fs */
-    PVFS_fs_id fs_id;           
+    PVFS_fs_id fs_id;
+
+    /* Default number of dfiles mount option value */
+    int default_num_dfiles;
 
     /* the following fields are included for convenience;
      * useful if the file system is "mounted" */
