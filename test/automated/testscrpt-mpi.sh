@@ -15,8 +15,7 @@ if [ -z "$PVFS2_DEST" ] ; then
 	exit 1
 fi
 
-#MPIIO_SCRIPTS=${PVFS2_DEST}/pvfs2/test/automated/mpiio-tests.d
-MPIIO_SCRIPTS=/sandbox/robl/build/pvfs2/test/automated/mpiio-tests.d
+MPIIO_SCRIPTS=${PVFS2_DEST}/pvfs2/test/automated/mpiio-tests.d
 
 
 # we will only do multi processor tests if there's a pav config file 
@@ -26,12 +25,13 @@ MPIIO_SCRIPTS=/sandbox/robl/build/pvfs2/test/automated/mpiio-tests.d
 PAV_CONFIG=${HOME}/pav-config-testing
 
 # cluster environments need a few things available on a cluster-wide file
-# system (pav, the mpi program, mpich2 -- specifically mpd and tools )
+# system: pav (which needs some pvfs2 programs), the mpi program, mpich2
+# (specifically mpd and tools )
 
 export CLUSTER_DIR=${HOME}/nightly
 [ -d ${CLUSTER_DIR} ] ||  mkdir -p ${CLUSTER_DIR}
 cp -ar ${PVFS2_DEST}/pvfs2/test/common/pav ${CLUSTER_DIR}/pav/
 cp -ar ${PVFS2_DEST}/soft/mpich2 ${CLUSTER_DIR}/mpich2
-
+cp -ar ${PVFS2_DEST}/INSTALL-pvfs2 ${CLUSTER_DIR}/pvfs2
 
 run_parts ${MPIIO_SCRIPTS}
