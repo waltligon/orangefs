@@ -53,15 +53,17 @@ static PINT_dist_param_offset* PINT_get_param_offset(const char* dist_name,
 }
 
 /* PINT_dist_initialize implementation */
-int PINT_dist_initialize(void)
+int PINT_dist_initialize(server_configuration_s* server_config)
 {
+    int ret = 0;
+    
     /* Register the basic distribution */
     PINT_register_distribution(&basic_dist);    
     
     /* Register the simple stripe distribution */
     PINT_register_distribution(&simple_stripe_dist);    
-    
-    return 0;
+
+    return ret;
 }
 
 /* PINT_dist_finalize implementation */

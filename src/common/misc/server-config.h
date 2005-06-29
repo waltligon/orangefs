@@ -23,7 +23,8 @@ enum
     ALIASES_CONFIG = 4,
     META_HANDLERANGES_CONFIG = 5,
     DATA_HANDLERANGES_CONFIG = 6,
-    STORAGEHINTS_CONFIG = 7
+    STORAGEHINTS_CONFIG = 7,
+    DISTRIBUTION_CONFIG = 8,
 };
 
 typedef struct phys_server_desc
@@ -58,6 +59,7 @@ typedef struct filesystem_configuration_s
     char *file_system_name;
     PVFS_fs_id coll_id;
     PVFS_handle  root_handle;
+    int default_num_dfiles;
 
     /* ptrs are type host_handle_mapping_s* */
     PINT_llist *meta_handle_ranges;
@@ -81,6 +83,15 @@ typedef struct filesystem_configuration_s
 
 } filesystem_configuration_s;
 
+/* Config struct to hold overloaded distribution defaults */
+typedef struct distribution_configuration_s
+{
+    char* name;
+    char* param_name;
+    PVFS_size param_value;  /* Temporarily hard code to 64bit type */
+
+} distribution_configuration;
+
 typedef struct server_configuration_s
 {
     char *host_id;
@@ -103,6 +114,7 @@ typedef struct server_configuration_s
     PINT_llist *host_aliases;       /* ptrs are type host_alias_s       */
     PINT_llist *file_systems;       /* ptrs are type
                                        filesystem_configuration_s       */
+    distribution_configuration dist_conf;  /* distribution conf */
 } server_configuration_s;
 
 int PINT_parse_config(

@@ -21,6 +21,7 @@
 #include "gossip.h"
 #include "extent-utils.h"
 #include "mkspace.h"
+#include "pint-distribution.h"
 #include "pvfs2-config.h"
 
 static DOTCONF_CB(get_pvfs_server_id);
@@ -38,10 +39,12 @@ static DOTCONF_CB(enter_mhranges_context);
 static DOTCONF_CB(exit_mhranges_context);
 static DOTCONF_CB(enter_dhranges_context);
 static DOTCONF_CB(exit_dhranges_context);
+static DOTCONF_CB(enter_distribution_context);
+static DOTCONF_CB(exit_distribution_context);
 static DOTCONF_CB(get_unexp_req);
 static DOTCONF_CB(get_perf_update_interval);
 static DOTCONF_CB(get_root_handle);
-static DOTCONF_CB(get_filesystem_name);
+static DOTCONF_CB(get_name);
 static DOTCONF_CB(get_logfile);
 static DOTCONF_CB(get_event_logging_list);
 static DOTCONF_CB(get_filesystem_collid);
@@ -55,6 +58,9 @@ static DOTCONF_CB(get_attr_cache_size);
 static DOTCONF_CB(get_attr_cache_max_num_elems);
 static DOTCONF_CB(get_trove_sync_meta);
 static DOTCONF_CB(get_trove_sync_data);
+static DOTCONF_CB(get_param);
+static DOTCONF_CB(get_value);
+static DOTCONF_CB(get_default_num_dfiles);
 static FUNC_ERRORHANDLER(errorhandler);
 
 /* internal helper functions */
@@ -90,6 +96,7 @@ static struct host_handle_mapping_s *get_or_add_handle_mapping(
 static int build_extent_array(
     char *handle_range_str,
     PVFS_handle_extent_array *handle_extent_array);
+
 #ifdef __PVFS2_TROVE_SUPPORT__
 static int is_root_handle_in_my_range(
     struct server_configuration_s *config_s,
@@ -115,9 +122,11 @@ static const configoption_t options[] =
     {"</MetaHandleRanges>",ARG_NONE, exit_mhranges_context,NULL,CTX_ALL},
     {"<DataHandleRanges>",ARG_NONE, enter_dhranges_context,NULL,CTX_ALL},
     {"</DataHandleRanges>",ARG_NONE, exit_dhranges_context,NULL,CTX_ALL},
+    {"<Distribution>",ARG_NONE, enter_distribution_context,NULL,CTX_ALL},
+    {"</Distribution>",ARG_NONE, exit_distribution_context,NULL,CTX_ALL},
     {"Range",ARG_LIST, get_range_list,NULL,CTX_ALL},
     {"RootHandle",ARG_STR, get_root_handle,NULL,CTX_ALL},
-    {"Name",ARG_STR, get_filesystem_name,NULL,CTX_ALL},
+    {"Name",ARG_STR, get_name,NULL,CTX_ALL},
     {"ID",ARG_INT, get_filesystem_collid,NULL,CTX_ALL},
     {"LogFile",ARG_STR, get_logfile,NULL,CTX_ALL},
     {"EventLogging",ARG_LIST, get_event_logging_list,NULL,CTX_ALL},
@@ -133,6 +142,9 @@ static const configoption_t options[] =
     {"TroveSyncMeta",ARG_STR, get_trove_sync_meta, NULL, CTX_ALL},
     {"TroveSyncData",ARG_STR, get_trove_sync_data, NULL, CTX_ALL},
     {"LogStamp",ARG_STR, get_logstamp,NULL,CTX_ALL},
+    {"Param", ARG_STR, get_param, NULL, CTX_ALL},
+    {"Value", ARG_INT, get_value, NULL, CTX_ALL},
+    {"DefaultNumDFiles", ARG_INT, get_default_num_dfiles, NULL,CTX_ALL},
     LAST_OPTION
 };
 
@@ -513,6 +525,29 @@ DOTCONF_CB(exit_dhranges_context)
     return NULL;
 }
 
+DOTCONF_CB(enter_distribution_context)
+{
+    if (config_s->configuration_context != GLOBAL_CONFIG)
+    {
+        return("Error in context.  Cannot have "
+                   "Distribution tag here.\n");
+    }
+    config_s->configuration_context = DISTRIBUTION_CONFIG;
+    return NULL;
+}
+
+DOTCONF_CB(exit_distribution_context)
+{
+    if (config_s->configuration_context != DISTRIBUTION_CONFIG)
+    {
+        return("Error in context.  Cannot have "
+                   "/Distribution tag here.\n");
+    }
+
+    config_s->configuration_context = GLOBAL_CONFIG;
+    return NULL;
+}
+
 DOTCONF_CB(get_unexp_req)
 {
     if ((config_s->configuration_context != DEFAULTS_CONFIG) &&
@@ -841,23 +876,31 @@ DOTCONF_CB(get_root_handle)
     return NULL;
 }
 
-DOTCONF_CB(get_filesystem_name)
+DOTCONF_CB(get_name)
 {
-    struct filesystem_configuration_s *fs_conf = NULL;
+    if (config_s->configuration_context == FILESYSTEM_CONFIG)
+    {
+        struct filesystem_configuration_s *fs_conf = NULL;
 
-    if (config_s->configuration_context != FILESYSTEM_CONFIG)
-    {
-        return("Name Tags can only be within Filesystem tags.\n");
+        fs_conf = (struct filesystem_configuration_s *)
+            PINT_llist_head(config_s->file_systems);
+        if (fs_conf->file_system_name)
+        {
+            gossip_err("WARNING: Overwriting %s with %s\n",
+                       fs_conf->file_system_name,cmd->data.str);
+        }
+        fs_conf->file_system_name =
+            (cmd->data.str ? strdup(cmd->data.str) : NULL);
     }
-    fs_conf = (struct filesystem_configuration_s *)
-        PINT_llist_head(config_s->file_systems);
-    if (fs_conf->file_system_name)
+    else if (config_s->configuration_context == DISTRIBUTION_CONFIG)
     {
-        gossip_err("WARNING: Overwriting %s with %s\n",
-                   fs_conf->file_system_name,cmd->data.str);
+        config_s->dist_conf.name =
+            (cmd->data.str ? strdup(cmd->data.str) : NULL);
     }
-    fs_conf->file_system_name =
-        (cmd->data.str ? strdup(cmd->data.str) : NULL);
+    else
+    {
+        return "Name Tags may not appear in this context.\n";
+    }
     return NULL;
 }
 
@@ -1001,6 +1044,54 @@ DOTCONF_CB(get_range_list)
             return("Unrecognized alias.\n");
         }
     }
+    return NULL;
+}
+
+DOTCONF_CB(get_param)
+{
+    if (config_s->configuration_context == DISTRIBUTION_CONFIG)
+    {
+        config_s->dist_conf.param_name =
+            (cmd->data.str ? strdup(cmd->data.str) : NULL);
+    }
+    else
+    {
+        return("Param Tag can only be in the Distribution context.\n");
+    }
+    return NULL;
+}
+
+DOTCONF_CB(get_value)
+{
+    if (config_s->configuration_context == DISTRIBUTION_CONFIG)
+    {
+        config_s->dist_conf.param_value = (PVFS_size)cmd->data.value;
+    }
+    else
+    {
+        return("Value Tag can only be in the Distribution context.\n");
+    }
+    return NULL;
+}
+
+DOTCONF_CB(get_default_num_dfiles)
+{
+    struct filesystem_configuration_s *fs_conf = NULL;
+
+    if (config_s->configuration_context != FILESYSTEM_CONFIG)
+    {
+        return("DefaultNumDFiles Tags can only be within Filesystem tags.\n");
+    }
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+
+    if (fs_conf->default_num_dfiles)
+    {
+        gossip_err("WARNING: Overwriting %d with %d\n",
+                   (int)fs_conf->default_num_dfiles,(int)cmd->data.value);
+    }
+
+    fs_conf->default_num_dfiles = (int)cmd->data.value;
     return NULL;
 }
 
@@ -1310,6 +1401,7 @@ static void copy_filesystem(
 
         dest_fs->coll_id = src_fs->coll_id;
         dest_fs->root_handle = src_fs->root_handle;
+        dest_fs->default_num_dfiles = src_fs->default_num_dfiles;
 
         dest_fs->flowproto = src_fs->flowproto;
         dest_fs->encoding = src_fs->encoding;
@@ -1533,7 +1625,6 @@ static int build_extent_array(
     }
     return 0;
 }
-
 
 /*
  * Function: PINT_config_get_host_addr_ptr

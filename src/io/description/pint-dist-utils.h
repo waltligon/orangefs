@@ -8,12 +8,13 @@
 #define __PINT_DIST_UTILS_H
 
 #include "pint-distribution.h"
+#include "server-config.h"
 
 /**
  * Perform initialization tasks for distributions
  *   - register the default distributions
  */
-int PINT_dist_initialize(void);
+int PINT_dist_initialize(server_configuration_s* server_config);
 
 /**
  * Perform cleanup actions before exiting

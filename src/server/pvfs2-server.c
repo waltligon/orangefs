@@ -582,7 +582,7 @@ static int server_initialize_subsystems(
     char buf[16] = {0};
 
     /* Initialize distributions */
-    ret = PINT_dist_initialize();
+    ret = PINT_dist_initialize(0);
     if (ret < 0)
     {
         gossip_err("Error initializing distribution interface.\n");
