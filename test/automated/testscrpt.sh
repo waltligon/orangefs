@@ -19,13 +19,13 @@ STARTTIME=`date +%s`
 TINDERSCRIPT=$(cd `dirname $0`; pwd)/tinder-pvfs2-status
 SYSINT_SCRIPTS=${PVFS2_DEST}/pvfs2/test/automated/sysint-tests.d
 VFS_SCRIPTS=${PVFS2_DEST}/pvfs2/test/automated/vfs-tests.d
-MPIIO_SCRIPTS=${PVFS2_DEST}/pvfs2/test/automated/mpiio-tests.d
+MPIIO_DRIVER=${PVFS2_DEST}/pvfs2/test/automated/testscrpt-mpi.sh
 
 # for debugging and testing, you might need to set the above to your working
 # direcory.. .unless you like checking in broken scripts
 #SYSINT_SCRIPTS=$(cd `dirname $0`; pwd)/sysint-tests.d
 #VFS_SCRIPTS=$(cd `dirname $0`; pwd)/vfs-tests.d
-#MPIIO_SCRIPTS=$(cd `dirname $0`; pwd)/mpiio-tests.d
+#MPIIO_DRIVER=$(cd `dirname $0`; pwd)/testscrpt-mpi.sh
 
 TESTNAME="`hostname -s`-nightly"
 
@@ -222,8 +222,12 @@ if [ $do_vfs -eq 1 ] ; then
 	run_parts ${VFS_SCRIPTS}
 fi
 
-run_parts ${MPIIO_SCRIPTS}
-	
+# down the road (as we get our hands on more clusters) we'll need a more
+# generic way of submitting jobs. for now assume all the world has pbs
+which qsub >/dev/null 2>&1
+if [ $? -eq 0 ] ; then 
+	. $MPIIO_DRIVER
+fi
 
 if [ $nr_failed -gt 0 ]; then
 	tinder_report test_failed
