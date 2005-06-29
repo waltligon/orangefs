@@ -7,6 +7,7 @@ pvfs2-1.2.0pre1
 ===============
 - build: avoid some warnings from gcc4
 - kernel: understand new backing_dev_info format in 2.6.12
+- Added DefaultNumDFiles as filesystem config option.
 
 pvfs2-1.1.0
 ===============
