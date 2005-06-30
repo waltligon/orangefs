@@ -1,6 +1,5 @@
 #!/bin/sh
 
-set -xv
 # parent script already built and deployed pvfs2 and mpich2.  All we need to do
 # now is set up PAV and kick off some scripts
 # At this point we have:
