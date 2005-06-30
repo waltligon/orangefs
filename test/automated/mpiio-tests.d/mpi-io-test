@@ -72,5 +72,5 @@ if [ -f $PAV_CONFIG ] ; then
 	block_until_done $job_id
 
 	# need to know if we failed or not
-	grep -q 'bandwitdh' mpiiotest.$job_id
+	grep -q 'bandwitdh' mpiiotest.o$job_id
 fi
