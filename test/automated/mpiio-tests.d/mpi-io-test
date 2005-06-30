@@ -71,6 +71,9 @@ if [ -f $PAV_CONFIG ] ; then
 	# wait patently for it to complete
 	block_until_done $job_id
 
+	# need to get results into per-test log files
+	cat mpiiotest.o$job_id
+
 	# need to know if we failed or not
 	grep -q 'bandwitdh' mpiiotest.o$job_id
 fi
