@@ -75,5 +75,5 @@ if [ -f $PAV_CONFIG ] ; then
 	cat mpiiotest.o$job_id
 
 	# need to know if we failed or not
-	grep -q 'bandwitdh' mpiiotest.o$job_id
+	grep -q 'bandwidth' mpiiotest.o$job_id
 fi
