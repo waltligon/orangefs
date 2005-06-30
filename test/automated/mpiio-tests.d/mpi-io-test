@@ -52,7 +52,7 @@ MPI_IO_TEST=${CLUSTER_DIR}/mpi-io-test
 ${CLUSTER_DIR}/mpich2/bin/mpicc ${PVFS2_DEST}/pvfs2/test/client/mpi-io/mpi-io-test.c -o $MPI_IO_TEST
 
 if [ $? -eq 1 ] ; then
-	return 1
+	exit 1
 fi
 
 # like the other mpiio tests we can only do multi processor tests if there's a
