@@ -10,9 +10,9 @@
 #     not for red machines like gil and lain.
 
 # modify these variables
-PVFS2_DEST=/tmp/pvfs2-nightly
-PVFS2_MOUNTPOINT=/pvfs2-nightly
-EXTRA_TESTS=${HOME}/src/benchmarks
+export PVFS2_DEST=/tmp/pvfs2-nightly
+export PVFS2_MOUNTPOINT=/pvfs2-nightly
+export EXTRA_TESTS=${HOME}/src/benchmarks
 
 # no need to modify these. they make their own gravy
 STARTTIME=`date +%s`
