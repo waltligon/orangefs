@@ -21,7 +21,7 @@ MPIIO_SCRIPTS=${PVFS2_DEST}/pvfs2/test/automated/mpiio-tests.d
 # we can use.   several tests can fall back to single processor, and 
 # still do something reasonable. 
 
-PAV_CONFIG=${HOME}/pav-config-testing
+export PAV_CONFIG=${HOME}/pav-config-testing
 
 # cluster environments need a few things available on a cluster-wide file
 # system: pav (which needs some pvfs2 programs), the mpi program, mpich2
