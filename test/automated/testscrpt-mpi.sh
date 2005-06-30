@@ -29,8 +29,9 @@ export PAV_CONFIG=${HOME}/pav-config-testing
 
 export CLUSTER_DIR=${HOME}/nightly
 [ -d ${CLUSTER_DIR} ] ||  mkdir -p ${CLUSTER_DIR}
-cp -ar ${PVFS2_DEST}/pvfs2/test/common/pav ${CLUSTER_DIR}/pav/
-cp -ar ${PVFS2_DEST}/soft/mpich2 ${CLUSTER_DIR}/mpich2
+rm -rf ${CLUSTER_DIR}/pav ${CLUSTER_DIR}/mpich2 ${CLUSTER_DIR}/pvfs2
+cp -ar ${PVFS2_DEST}/pvfs2/test/common/pav ${CLUSTER_DIR}
+cp -ar ${PVFS2_DEST}/soft/mpich2 ${CLUSTER_DIR}
 cp -ar ${PVFS2_DEST}/INSTALL-pvfs2 ${CLUSTER_DIR}/pvfs2
 
 run_parts ${MPIIO_SCRIPTS}
