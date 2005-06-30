@@ -20,6 +20,7 @@ TINDERSCRIPT=$(cd `dirname $0`; pwd)/tinder-pvfs2-status
 SYSINT_SCRIPTS=${PVFS2_DEST}/pvfs2/test/automated/sysint-tests.d
 VFS_SCRIPTS=${PVFS2_DEST}/pvfs2/test/automated/vfs-tests.d
 MPIIO_DRIVER=${PVFS2_DEST}/pvfs2/test/automated/testscrpt-mpi.sh
+REPORT_LOG=${PVFS2_DEST}/alltests.log
 
 # for debugging and testing, you might need to set the above to your working
 # direcory.. .unless you like checking in broken scripts
@@ -137,11 +138,7 @@ setupfail() {
 }
 
 tinder_report() {
-	if [ "x$failure_logs" == "x" ] ; then
-		failure_logs=/dev/null
-	fi
-
-	eval cat $failure_logs  |\
+	eval cat $REPORT_LOG $failure_logs |\
 		${TINDERSCRIPT} ${TESTNAME} $1 $STARTTIME \
 		"$nr_failed of $(( $nr_failed + $nr_passed)) failed"
 }
@@ -159,13 +156,15 @@ run_parts() {
 		# skip CVS
 		[ -d $f ] && continue
 		if [ -x $f ] ; then 
-			echo "====== running $f ====== "
-			./$f > ${PVFS2_DEST}/${f}.log 2>&1
+			echo -n "====== running $f ..."
+			./$f > ${PVFS2_DEST}/${f}.log
 			if [ $? == 0 ] ; then 
 				nr_passed=$((nr_passed + 1))
+				echo "OK"
 			else
 				nr_failed=$((nr_failed + 1))
 				failure_logs="$failure_logs ${PVFS2_DEST}/${f}.log"
+				echo "FAILED"
 			fi
 		fi
 	done
@@ -218,6 +217,12 @@ nr_passed=0
 nr_failed=0
 failure_logs=""   # a space-delimited list of logs that failed
 
+# save file descriptors for later
+exec 6<&1
+exec 7<&2
+
+exec 1> ${REPORT_LOG}
+exec 2>&1
 run_parts ${SYSINT_SCRIPTS}
 
 if [ $do_vfs -eq 1 ] ; then
@@ -230,6 +235,10 @@ which qsub >/dev/null 2>&1
 if [ $? -eq 0 ] ; then 
 	. $MPIIO_DRIVER
 fi
+
+# restore file descriptors and close temporary fds
+exec 1<&6 6<&-
+exec 2<&7 7<&-
 
 if [ $nr_failed -gt 0 ]; then
 	tinder_report test_failed
