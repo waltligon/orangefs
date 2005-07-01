@@ -328,12 +328,12 @@ PVFS_error PVFS_isys_create(
     {
         /* Check the mount options */
         int rc;
-        struct PVFS_sys_mntent* mntent;
+        struct PVFS_sys_mntent mntent;
 
-        rc = PVFS_util_get_mntent(sm_p->parent_ref.fs_id, &mntent);
+        rc = PVFS_util_get_mntent_copy(sm_p->parent_ref.fs_id, &mntent);
         if (0 == rc)
         {
-            num_dfiles_req = mntent->default_num_dfiles;
+            num_dfiles_req = mntent.default_num_dfiles;
         }
     }
 

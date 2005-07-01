@@ -755,19 +755,20 @@ int PVFS_util_remove_internal_mntent(
 }
 
 /*
- * PVFS_util_remove_internal_mntent()
+ * PVFS_util_get_mntent_copy()
  *
- * dynamically remove mount information from our internally managed
- * mount tables.
+ * Given a pointer to a valid mount entry, out_mntent, copy the contents of
+ * the mount entry  for fs_id into out_mntent.
  *
  * returns 0 on success, -PVFS_error on failure
  */
-int PVFS_util_get_mntent(PVFS_fs_id fs_id,
-                         struct PVFS_sys_mntent** out_mntent)
+int PVFS_util_get_mntent_copy(PVFS_fs_id fs_id,
+                              struct PVFS_sys_mntent* out_mntent)
 {
     int i = 0;
 
     /* Search for mntent by fsid */
+    gen_mutex_lock(&s_stat_tab_mutex);
     for(i = 0; i < s_stat_tab_count; i++)
     {
         int j;
@@ -778,11 +779,13 @@ int PVFS_util_get_mntent(PVFS_fs_id fs_id,
 
             if (mnt_iter->fs_id == fs_id)
             {
-                *out_mntent = mnt_iter;
+                PVFS_util_copy_mntent(out_mntent, mnt_iter);
+                gen_mutex_unlock(&s_stat_tab_mutex);
                 return 0;
             }
         }
     }
+    gen_mutex_unlock(&s_stat_tab_mutex);
     return -PVFS_EINVAL;
 }
 
@@ -1193,6 +1196,7 @@ int PVFS_util_copy_mntent(
         dest_mntent->flowproto = src_mntent->flowproto;
         dest_mntent->encoding = src_mntent->encoding;
         dest_mntent->fs_id = src_mntent->fs_id;
+        dest_mntent->default_num_dfiles = src_mntent->default_num_dfiles;
     }
     return 0;
 

@@ -69,9 +69,9 @@ int PVFS_util_add_dynamic_mntent(
 int PVFS_util_remove_internal_mntent(
     struct PVFS_sys_mntent *mntent);
 
-int PVFS_util_get_mntent(
+int PVFS_util_get_mntent_copy(
     PVFS_fs_id fs_id,
-    struct PVFS_sys_mntent **out_mntent);
+    struct PVFS_sys_mntent *out_mntent);
 int PVFS_util_copy_mntent(
     struct PVFS_sys_mntent *dest_mntent,
     struct PVFS_sys_mntent *src_mntent);
