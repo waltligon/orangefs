@@ -1,0 +1,90 @@
+#!/bin/sh
+
+# can't really be common since tests might want more/less time or nodes
+
+# i'm terribly sorry for how confusing this is... I want to generate a pbs
+# script that itself uses some environment variables.  Thus we escape some
+# dollar signs before things like $PATH, but not others like $PAV_CONFIG.  
+
+make_pbs_script() {
+
+	echo "#!/bin/sh
+#PBS -l walltime=0:10:0
+#PBS -l nodes=8
+#PBS -j oe
+
+nprocs=4
+
+$CLUSTER_DIR/pav/pav_start -c $PAV_CONFIG -n \$nprocs >/dev/null
+
+eval \$( $CLUSTER_DIR/pav/pav_info -c $PAV_CONFIG)
+export PVFS2TAB_FILE
+
+PATH=${CLUSTER_DIR}/mpich2/bin:\${PATH}
+mpdboot --file=\${WORKINGDIR}/compnodes --totalnum=\$nprocs
+
+mpiexec -np \$nprocs ${NONCONTIG} -fname pvfs2:\${MOUNTPOINT}/ncfile1 -v -veclen \$(( 8 * \$nprocs )) -elmtcount $((1024*1024*8)) -veccount 1 -timing -all -loops 1
+
+mpdallexit
+$CLUSTER_DIR/pav/pav_stop -c $PAV_CONFIG >/dev/null" 
+}
+
+# this could be common among tests...
+
+block_until_done() {
+	while true ; do 
+		qstat -i $job_id >/dev/null 2>&1 
+		if [ $? -eq 0 ] ; then
+			sleep 60
+			continue
+		else
+			break
+		fi	
+	done
+}
+
+
+##
+## entry point for script
+##
+
+NONCONTIG=${CLUSTER_DIR}/noncontig
+
+(cd ${EXTRA_TESTS}/noncontig-test/noncontig && \
+${CLUSTER_DIR}/mpich2/bin/mpicc noncontig.c parse_cmdline.c -o ${NONCONTIG} )
+
+if [ $? -ne 0 ] ; then
+	exit 1
+fi
+
+
+# like the other mpiio tests we can only do multi processor tests if there's a
+# pav config file we can use
+# If we have to we can fall back to single processor, and still do something
+# reasonable. 
+
+if [ -f $PAV_CONFIG ] ; then 
+	# write out a pbs script
+	pbs_script=${CLUSTER_DIR}/noncontig.sh
+	make_pbs_script > $pbs_script
+
+	# submit it
+	job_id=$(qsub -N noncontig -q shared $pbs_script | cut -d . -f1)
+
+	if [ $? -ne 0 ] ; then
+		exit 1
+	fi	
+
+	if [ -z "$job_id" ] ; then
+		exit 1
+	fi	
+
+	# wait patently for it to complete
+	block_until_done $job_id
+
+	# need to get results into per-test log files
+	cat noncontig.o$job_id
+
+	# need to know if we failed or not
+	grep -q 'bandwidth' noncontig.o$job_id
+fi
