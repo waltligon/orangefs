@@ -1,4 +1,24 @@
 #!/bin/sh
 
+# run through a bunch of possible command line arguments for pvfs2-cp:
+
 ${PVFS2_DEST}/INSTALL-pvfs2/bin/pvfs2-cp \
+                ${PVFS2_DEST}/pvfs2/configure ${PVFS2_MOUNTPOINT}/configure
+
+${PVFS2_DEST}/INSTALL-pvfs2/bin/pvfs2-cp -s 128 \
+                ${PVFS2_DEST}/pvfs2/configure ${PVFS2_MOUNTPOINT}/configure
+
+${PVFS2_DEST}/INSTALL-pvfs2/bin/pvfs2-cp -s $((1024*1024))
+                ${PVFS2_DEST}/pvfs2/configure ${PVFS2_MOUNTPOINT}/configure
+
+${PVFS2_DEST}/INSTALL-pvfs2/bin/pvfs2-cp -n 1
+                ${PVFS2_DEST}/pvfs2/configure ${PVFS2_MOUNTPOINT}/configure
+
+${PVFS2_DEST}/INSTALL-pvfs2/bin/pvfs2-cp -n 10
+                ${PVFS2_DEST}/pvfs2/configure ${PVFS2_MOUNTPOINT}/configure
+
+${PVFS2_DEST}/INSTALL-pvfs2/bin/pvfs2-cp -b 128
+                ${PVFS2_DEST}/pvfs2/configure ${PVFS2_MOUNTPOINT}/configure
+
+${PVFS2_DEST}/INSTALL-pvfs2/bin/pvfs2-cp -b $((1024*1024))
                 ${PVFS2_DEST}/pvfs2/configure ${PVFS2_MOUNTPOINT}/configure
