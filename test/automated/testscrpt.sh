@@ -88,7 +88,7 @@ teardown_vfs() {
 }
 
 setup_vfs() {
-	sudo /sbin/insmod ${PVFS2_DEST}/INSTALL-pvfs2/lib/modules/`uname -r`/kernel/fs/pvfs2.ko
+	sudo /sbin/insmod ${PVFS2_DEST}/INSTALL-pvfs2/lib/modules/`uname -r`/kernel/fs/pvfs2/pvfs2.ko
 	sudo ${PVFS2_DEST}/INSTALL-pvfs2/sbin/pvfs2-client -p ${PVFS2_DEST}/INSTALL-pvfs2/sbin/pvfs2-client-core
 	sudo mount ${PVFS2_MOUNTPOINT}
 }

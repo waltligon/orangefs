@@ -781,7 +781,7 @@ ifeq ($(NUM_UTS_LINES),1)
 else
     KERNEL_VERS := $(shell uname -r)
 endif
-KMOD_DIR ?= $(kmod_prefix)/lib/modules/$(KERNEL_VERS)/kernel/fs
+KMOD_DIR ?= $(kmod_prefix)/lib/modules/$(KERNEL_VERS)/kernel/fs/pvfs2
 
 .PHONY: kmod_install
 kmod_install: kmod kernapps
@@ -799,7 +799,7 @@ ifeq ($(NUM_UTS_LINES),1)
 else
     KERNEL_VERS := $(shell uname -r)
 endif
-KMOD_DIR := $(kmod_prefix)/lib/modules/$(KERNEL_VERS)/kernel/fs
+KMOD_DIR := $(kmod_prefix)/lib/modules/$(KERNEL_VERS)/kernel/fs/pvfs2
 
 .PHONY: kmod24_install
 kmod24_install: kmod24 kernapps
