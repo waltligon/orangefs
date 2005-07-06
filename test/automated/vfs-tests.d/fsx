@@ -1,0 +1,5 @@
+#!/bin/sh
+[ -d ${EXTRA_TESTS}/fsx ] || exit 1
+
+cd ${EXTRA_TESTS}/fsx
+gcc fsx.c -o fsx && ./fsx ${PVFS2_MOUNTPOINT}/fsx_testfile
