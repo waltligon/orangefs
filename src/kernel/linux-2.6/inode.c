@@ -26,6 +26,7 @@ extern struct file_operations pvfs2_file_operations;
 extern struct inode_operations pvfs2_symlink_inode_operations;
 extern struct inode_operations pvfs2_dir_inode_operations;
 extern struct file_operations pvfs2_dir_operations;
+extern int debug;
 
 
 /** Read page-sized blocks from file.  This code is only used in the mmap

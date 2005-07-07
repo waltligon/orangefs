@@ -21,6 +21,7 @@ extern struct inode_operations pvfs2_symlink_inode_operations;
 extern struct inode_operations pvfs2_dir_inode_operations;
 extern struct file_operations pvfs2_dir_operations;
 extern struct dentry_operations pvfs2_dentry_operations;
+extern int debug;
 
 
 int pvfs2_gen_credentials(

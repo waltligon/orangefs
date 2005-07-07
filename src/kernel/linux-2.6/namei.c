@@ -15,6 +15,7 @@
 extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
 extern wait_queue_head_t pvfs2_request_list_waitq;
+extern int debug;
 
 extern struct dentry_operations pvfs2_dentry_operations;
 

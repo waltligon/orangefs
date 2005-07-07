@@ -16,6 +16,7 @@
 extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
 extern wait_queue_head_t pvfs2_request_list_waitq;
+extern int debug;
 
 extern struct address_space_operations pvfs2_address_operations;
 extern struct backing_dev_info pvfs2_backing_dev_info;
@@ -471,9 +472,6 @@ int pvfs2_fsync(
     int ret = -EINVAL;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(file->f_dentry->d_inode);
     pvfs2_kernel_op_t *new_op = NULL;
-
-    pvfs2_print("pvfs2_fsync called on %s (must block? %s\n",
-                pvfs2_inode->refn.handle, pvfs2_inode->refn.fs_id);
 
     new_op = op_alloc();
     if (!new_op)

@@ -6,13 +6,15 @@
 
 #include "pvfs2-kernel.h"
 
-extern struct file_operations pvfs2_devreq_file_operations;
+#ifndef PVFS2_VERSION
+#define PVFS2_VERSION "Unknown"
+#endif
 
+extern struct file_operations pvfs2_devreq_file_operations;
 extern void pvfs2_kill_sb(struct super_block *sb);
 
 static int hash_func(void *key, int table_size);
 static int hash_compare(void *key, struct qhash_head *link);
-
 
 /*************************************
  * global variables declared here
@@ -20,10 +22,32 @@ static int hash_compare(void *key, struct qhash_head *link);
 
 /* the size of the hash tables for ops in progress */
 static int hash_table_size = 509;
+int debug = 0;
+
+#ifdef CONFIG_SYSCTL
+/* setup information for proc/sys/pvfs2 entries */
+#include <linux/sysctl.h>
+static struct ctl_table_header *fs_table_header = NULL;
+#define FS_PVFS2 1    /* pvfs2 file system */
+#define PVFS2_DEBUG 1 /* ctl debugging level */
+static int min_debug[] = {0}, max_debug[] = {1};
+static ctl_table pvfs2_table[] = {
+    {PVFS2_DEBUG, "debug", &debug, sizeof(int), 0644, NULL,
+        &proc_dointvec_minmax, &sysctl_intvec,
+        NULL, &min_debug, &max_debug},
+    {0}
+};
+static ctl_table fs_table[] = {
+    {FS_PVFS2, "pvfs2", NULL, 0, 0555, pvfs2_table},
+    {0}
+};
+#endif
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("PVFS2 Development Team");
 MODULE_DESCRIPTION("The Linux Kernel VFS interface to PVFS2");
+MODULE_PARM_DESC(debug, "debugging level (0 for none, 1 for verbose)");
+MODULE_PARM_DESC(hash_table_size, "size of hash table for operations in progress");
 
 #ifdef PVFS2_LINUX_KERNEL_2_4
 /*
@@ -33,6 +57,7 @@ MODULE_DESCRIPTION("The Linux Kernel VFS interface to PVFS2");
 DECLARE_FSTYPE(pvfs2_fs_type, "pvfs2", pvfs2_get_sb, 0);
 
 MODULE_PARM(hash_table_size, "i");
+MODULE_PARM(debug, "i");
 
 #else /* !PVFS2_LINUX_KERNEL_2_4 */
 
@@ -52,6 +77,7 @@ struct file_system_type pvfs2_fs_type =
 };
 
 module_param(hash_table_size, int, 0);
+module_param(debug, bool, 0);
 
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
 
@@ -88,7 +114,14 @@ DECLARE_WAIT_QUEUE_HEAD(pvfs2_request_list_waitq);
 
 static int __init pvfs2_init(void)
 {
+    int ret = -1;
     pvfs2_print("pvfs2: pvfs2_init called\n");
+
+    if(debug)
+    {
+        debug=1; /* normalize any non-zero value to 1 */
+        pvfs2_error("pvfs2: verbose debug mode\n");
+    }
 
     /* register pvfs2-req device  */
     pvfs2_dev_major = register_chrdev(0, PVFS2_REQDEVICE_NAME,
@@ -118,7 +151,18 @@ static int __init pvfs2_init(void)
     {
 	panic("Failed to initialize op hashtable");
     }
-    return register_filesystem(&pvfs2_fs_type);
+    ret = register_filesystem(&pvfs2_fs_type);
+
+#ifdef CONFIG_SYSCTL
+    if (!fs_table_header)
+        fs_table_header = register_sysctl_table(fs_table, 0);
+#endif
+
+    if(ret == 0)
+    {
+        printk("pvfs2: module version %s loaded\n", PVFS2_VERSION);
+    }
+    return(ret);
 }
 
 static void __exit pvfs2_exit(void)
@@ -128,6 +172,13 @@ static void __exit pvfs2_exit(void)
     struct qhash_head *hash_link = NULL;
 
     pvfs2_print("pvfs2: pvfs2_exit called\n");
+
+#ifdef CONFIG_SYSCTL
+    if ( fs_table_header ) {
+        unregister_sysctl_table(fs_table_header);
+        fs_table_header = NULL;
+    }
+#endif
 
     /* clear out all pending upcall op requests */
     spin_lock(&pvfs2_request_list_lock);
@@ -170,6 +221,8 @@ static void __exit pvfs2_exit(void)
                 PVFS2_REQDEVICE_NAME);
 
     unregister_filesystem(&pvfs2_fs_type);
+
+    printk("pvfs2: module version %s unloaded\n", PVFS2_VERSION);
 }
 
 static int hash_func(void *key, int table_size)

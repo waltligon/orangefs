@@ -16,6 +16,7 @@ extern spinlock_t pvfs2_request_list_lock;
 extern wait_queue_head_t pvfs2_request_list_waitq;
 
 extern void pvfs2_kill_sb(struct super_block *sb);
+extern int debug;
 
 /* list for storing pvfs2 specific superblocks in use */
 LIST_HEAD(pvfs2_superblocks);

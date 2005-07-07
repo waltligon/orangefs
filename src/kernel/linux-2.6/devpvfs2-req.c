@@ -19,6 +19,7 @@ extern struct qhash_table *htable_ops_in_progress;
 extern struct file_system_type pvfs2_fs_type;
 extern struct semaphore devreq_semaphore;
 extern struct semaphore request_semaphore;
+extern int debug;
 
 /* defined in super.c */
 extern struct list_head pvfs2_superblocks;

@@ -10,6 +10,7 @@
 #define BUFMAP_PAGE_COUNT (PVFS2_BUFMAP_TOTAL_SIZE/PAGE_SIZE)
 #define PAGES_PER_DESC (PVFS2_BUFMAP_DEFAULT_DESC_SIZE/PAGE_SIZE)
 
+extern int debug;
 static int bufmap_init = 0;
 
 static struct page **bufmap_page_array = NULL;

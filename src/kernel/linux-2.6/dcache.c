@@ -11,6 +11,8 @@
  */
 
 #include "pvfs2-kernel.h"
+
+extern int debug;
 extern kmem_cache_t *pvfs2_inode_cache;
 extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;

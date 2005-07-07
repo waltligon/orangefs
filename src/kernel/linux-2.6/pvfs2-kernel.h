@@ -86,7 +86,9 @@ do {                                                           \
     panic(msg);                                                \
 } while(0)
 #else
-#define pvfs2_print(...)
+#define pvfs2_print(format...) do{                             \
+    if(debug) printk(format);                                  \
+}while(0)
 #define pvfs2_panic(msg)                                       \
 do {                                                           \
     pvfs2_error("BUG! Please contact pvfs2-developers@beowulf-"\

@@ -67,6 +67,7 @@ EXTRA_CFLAGS = \
     -I$(absolute_src_dir)/src/common/quickhash
 
 EXTRA_CFLAGS += @MMAP_RA_CACHE@
+EXTRA_CFLAGS += -DPVFS2_VERSION="\"@PVFS2_VERSION@\""
 
 # uncomment the following line for kernel specific
 # debugging output or features
