@@ -1487,7 +1487,7 @@ static int tcp_server_init(void)
     if ((tcp_addr_data->socket = BMI_sockio_new_sock()) < 0)
     {
 	tmp_errno = errno;
-	gossip_lerr("Error: BMI_sockio_new_sock: %s\n", strerror(tmp_errno));
+	gossip_err("Error: BMI_sockio_new_sock: %s\n", strerror(tmp_errno));
 	return (bmi_tcp_errno_to_pvfs(-tmp_errno));
     }
 
@@ -1673,8 +1673,9 @@ static int tcp_sock_init(method_addr_p my_method_addr)
 	}
 	else
 	{
-	    gossip_lerr("Error: BMI_sockio_connect_sock: %s\n", strerror(errno));
-	    return (bmi_tcp_errno_to_pvfs(-errno));
+            tmp_errno = errno;
+	    gossip_err("Error: BMI_sockio_connect_sock: %s\n", strerror(tmp_errno));
+	    return (bmi_tcp_errno_to_pvfs(-tmp_errno));
 	}
     }
 
@@ -1886,8 +1887,8 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
 	/* make sure it isn't too big */
 	if (query_op->actual_size > expected_size)
 	{
-	    gossip_lerr("Error: message ordering violation;\n");
-	    gossip_lerr("Error: message too large for next buffer.\n");
+	    gossip_err("Error: message ordering violation;\n");
+	    gossip_err("Error: message too large for next buffer.\n");
 	    return (bmi_tcp_errno_to_pvfs(-EPROTO));
 	}
 
@@ -1930,8 +1931,8 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
 	/* make sure it isn't too big */
 	if (query_op->actual_size > expected_size)
 	{
-	    gossip_lerr("Error: message ordering violation;\n");
-	    gossip_lerr("Error: message too large for next buffer.\n");
+	    gossip_err("Error: message ordering violation;\n");
+	    gossip_err("Error: message too large for next buffer.\n");
 	    return (bmi_tcp_errno_to_pvfs(-EPROTO));
 	}
 
@@ -2013,7 +2014,7 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
 		0);
 	    if (ret < 0)
 	    {
-		gossip_lerr("Error: payload_progress: %s\n", strerror(-ret));
+                PVFS_perror_gossip("Error: payload_progress", ret);
 		tcp_forget_addr(query_op->addr, 0, ret);
 		return (ret);
 	    }
@@ -2567,9 +2568,9 @@ static int tcp_do_work_recv(method_addr_p map, int* stall_flag)
 	/* make sure it isn't too big */
 	if (new_header.size > active_method_op->expected_size)
 	{
-	    gossip_lerr("Error: message ordering violation;\n");
-	    gossip_lerr("Error: message too large for next buffer.\n");
-	    gossip_lerr("Error: incoming size: %ld, expected size: %ld\n",
+	    gossip_err("Error: message ordering violation;\n");
+	    gossip_err("Error: message too large for next buffer.\n");
+	    gossip_err("Error: incoming size: %ld, expected size: %ld\n",
 			(long) new_header.size,
 			(long) active_method_op->expected_size);
 	    /* TODO: return error here or do something else? */
@@ -2687,7 +2688,7 @@ static int work_on_send_op(method_op_p my_method_op,
 	&my_method_op->env_amt_complete);
     if (ret < 0)
     {
-	gossip_err("Error: payload_progress: %s\n", strerror(-ret));
+        PVFS_perror_gossip("Error: payload_progress", ret);
 	tcp_forget_addr(my_method_op->addr, 0, ret);
 	return (0);
     }
@@ -2754,7 +2755,7 @@ static int work_on_recv_op(method_op_p my_method_op, int* stall_flag)
 	    0);
 	if (ret < 0)
 	{
-	    gossip_lerr("Error: payload_progress: %s\n", strerror(-ret));
+            PVFS_perror_gossip("Error: payload_progress", ret);
 	    tcp_forget_addr(my_method_op->addr, 0, ret);
 	    return (0);
 	}
@@ -2887,7 +2888,7 @@ static int tcp_accept_init(int *socket)
 	}
 	else
 	{
-	    gossip_lerr("Error: accept: %s\n", strerror(errno));
+	    gossip_err("Error: accept: %s\n", strerror(errno));
 	    return (bmi_tcp_errno_to_pvfs(-errno));
 	}
     }
@@ -3015,7 +3016,7 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 #endif
 	if (ret < 0)
 	{
-	    gossip_lerr("Error: enqueue_operation() or tcp_do_work() returned: %d\n", ret);
+	    gossip_err("Error: enqueue_operation() or tcp_do_work() returned: %d\n", ret);
 	}
 	return (ret);
     }
@@ -3053,7 +3054,7 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 				context_id);
 	if(ret < 0)
 	{
-	    gossip_lerr("Error: enqueue_operation() returned: %d\n", ret);
+	    gossip_err("Error: enqueue_operation() returned: %d\n", ret);
 	}
 	return (ret);
     }
@@ -3066,9 +3067,7 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 	&cur_index_complete, BMI_SEND, my_header.enc_hdr, &env_amt_complete);
     if (ret < 0)
     {
-        char buf[64] = {0};
-        PVFS_strerror_r(-ret, buf, 64);
-	gossip_lerr("Error: payload_progress: %s\n", buf);
+        PVFS_perror_gossip("Error: payload_progress", ret);
 	tcp_forget_addr(dest, 0, ret);
 	return (ret);
     }
@@ -3092,7 +3091,7 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 
     if(ret < 0)
     {
-	gossip_lerr("Error: enqueue_operation() returned: %d\n", ret);
+	gossip_err("Error: enqueue_operation() returned: %d\n", ret);
     }
     return (ret);
 }
