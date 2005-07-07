@@ -1,0 +1,7 @@
+#!/bin/sh
+
+cd ${EXTRA_DIRS}/dbench-3.03
+./configure -q
+make 2>&1
+cp client.txt ${PVFS2_MOUNTPOINT}
+cd ${PVFS2_MOUNTPOINT} &&  ${EXTRA_DIRS}/dbench-3.03/dbench -c client.txt 10 -t 300  2>&1
