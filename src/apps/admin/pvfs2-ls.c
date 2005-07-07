@@ -397,8 +397,6 @@ int do_list(
     if(ret < 0)
     {
         PVFS_perror("PVFS_sys_lookup", ret);
-        fprintf(stderr, "%s: %s: No such file or directory\n",
-                process_name, name);
         return -1;
     }
 

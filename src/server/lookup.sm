@@ -338,8 +338,8 @@ static int lookup_verify_object_metadata(
 
     assert(ret == 0);
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, "  object is a datafile; will be "
-                 "looking for handle for segment %s in a bit\n",
+    gossip_debug(GOSSIP_SERVER_DEBUG, "  object is a directory; will be "
+                 "looking for handle for segment \"%s\" in a bit\n",
 		 s_op->u.lookup.segp);
 
 
