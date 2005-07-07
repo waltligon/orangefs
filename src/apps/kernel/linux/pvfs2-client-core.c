@@ -524,6 +524,9 @@ static PVFS_error post_setattr_request(vfs_request_t *vfs_request)
         "got a setattr request for fsid %d | handle %Lu\n",
         vfs_request->in_upcall.req.setattr.refn.fs_id,
         Lu(vfs_request->in_upcall.req.setattr.refn.handle));
+    gossip_debug(
+        GOSSIP_CLIENTCORE_DEBUG,
+        "perms: %d\n", (int)vfs_request->in_upcall.req.setattr.attributes.perms);
 
     ret = PVFS_isys_setattr(
         vfs_request->in_upcall.req.setattr.refn,

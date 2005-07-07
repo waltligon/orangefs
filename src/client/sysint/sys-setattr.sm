@@ -139,6 +139,14 @@ PVFS_error PVFS_isys_setattr(
         return ret;
     }
 
+    /* make sure that the permission bits are acceptable */
+    if ((attr.perms & ~PVFS_PERM_VALID) != 0)
+    {
+        gossip_lerr("PVFS_isys_setattr() failure: invalid or unsupported" 
+                    "permission bits\n");
+        return(-PVFS_EINVAL);
+    }
+
     sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));
     if (sm_p == NULL)
     {

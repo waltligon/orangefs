@@ -190,6 +190,7 @@ void print_entry_attr(
     char scratch_owner[16] = {0}, scratch_group[16] = {0};
     char scratch_size[16] = {0}, scratch_inode[16] = {0};
     char f_type = '-';
+    char group_x_char = '-';
 
     if (!opts->list_all && (entry_name[0] == '.'))
     {
@@ -271,6 +272,16 @@ void print_entry_attr(
         f_type =  'l';
     }
 
+    /* special case to set setgid display for groups if needed */
+    if(attr->perms & PVFS_G_SGID)
+    {
+        group_x_char = ((attr->perms & PVFS_G_EXECUTE) ? 's' : 'S');
+    }
+    else
+    {
+        group_x_char = ((attr->perms & PVFS_G_EXECUTE) ? 'x' : '-');
+    }
+
     snprintf(buf,128,"%s%c%c%c%c%c%c%c%c%c%c    1 %s %s %s "
              "%.4d-%.2d-%.2d %.2d:%.2d %s",
              inode,
@@ -280,7 +291,7 @@ void print_entry_attr(
              ((attr->perms & PVFS_U_EXECUTE) ? 'x' : '-'),
              ((attr->perms & PVFS_G_READ) ? 'r' : '-'),
              ((attr->perms & PVFS_G_WRITE) ? 'w' : '-'),
-             ((attr->perms & PVFS_G_EXECUTE) ? 'x' : '-'),
+             group_x_char,
              ((attr->perms & PVFS_O_READ) ? 'r' : '-'),
              ((attr->perms & PVFS_O_WRITE) ? 'w' : '-'),
              ((attr->perms & PVFS_O_EXECUTE) ? 'x' : '-'),

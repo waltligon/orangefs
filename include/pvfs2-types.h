@@ -158,6 +158,15 @@ endecode_fields_1a(
 #define PVFS_U_EXECUTE (1 << 6)
 #define PVFS_U_WRITE   (1 << 7)
 #define PVFS_U_READ    (1 << 8)
+/* no PVFS_U_VTX (sticky bit) */
+#define PVFS_G_SGID    (1 << 10)
+/* no PVFS_U_SGID */
+
+/* valid permission mask */
+#define PVFS_PERM_VALID \
+(PVFS_O_EXECUTE | PVFS_O_WRITE | PVFS_O_READ | PVFS_G_EXECUTE | \
+ PVFS_G_WRITE | PVFS_G_READ | PVFS_U_EXECUTE | PVFS_U_WRITE | \
+ PVFS_U_READ | PVFS_G_SGID)
 
 /** Object and attribute types. */
 typedef enum

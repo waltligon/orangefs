@@ -157,6 +157,9 @@ static inline int copy_attributes_to_inode(
         if (attrs->perms & PVFS_U_READ)
             perm_mode |= S_IRUSR;
 
+        if (attrs->perms & PVFS_G_SGID)
+            perm_mode |= S_ISGID;
+
         inode->i_mode |= perm_mode;
 
         switch (attrs->objtype)
@@ -270,12 +273,24 @@ static inline int copy_attributes_from_inode(
         if (iattr && (iattr->ia_valid & ATTR_MODE))
         {
             pvfs2_print("[1] converting attr mode %d\n", iattr->ia_mode);
+            if((iattr->ia_mode & (S_ISUID|S_ISVTX)) != 0)
+            {
+                pvfs2_print("User attempted to set setuid or sticky bit; "
+                    "returning EINVAL.\n");
+                return(-EINVAL);
+            }
             convert_attribute_mode_to_pvfs_sys_attr(
                 iattr->ia_mode, attrs);
         }
         else
         {
-            pvfs2_print("[2] converting attr mode %d\n", inode->i_mode);
+            pvfs2_print("[2] converting attr mode %d\n", inode->i_mode); 
+            if((inode->i_mode & (S_ISUID|S_ISVTX)) != 0)
+            {
+                pvfs2_print("User attempted to set setuid or sticky bit; "
+                    "returning EINVAL.\n");
+                return(-EINVAL);
+            }
             convert_attribute_mode_to_pvfs_sys_attr(
                 inode->i_mode, attrs);
         }
@@ -410,8 +425,13 @@ int pvfs2_inode_setattr(
             new_op->upcall.req.lookup.parent_refn.fs_id =
                 PVFS2_SB(sb)->fs_id;
         }
-        copy_attributes_from_inode(
+        ret = copy_attributes_from_inode(
             inode, &new_op->upcall.req.setattr.attributes, iattr);
+        if(ret < 0)
+        {
+            op_release(new_op);
+            return(ret);
+        }
 
         service_error_exit_op_with_timeout_retry(
             new_op, "pvfs2_inode_setattr", retries, error_exit,
