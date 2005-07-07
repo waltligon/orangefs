@@ -7,10 +7,12 @@
 #ifndef __PINT_REQUEST_H
 #define __PINT_REQUEST_H
 
-#include "pint-distribution.h"
-#include <pvfs2-types.h>
+#include "pvfs2-types.h"
 
-/* modes for PINT_Process_request  and PINT_Distribute */
+/* Forward declarations */
+struct PINT_dist_s;
+
+/* modes for PINT_Process_request  and PINT_distribute */
 #define PINT_SERVER                000001
 #define PINT_CLIENT                000002
 #define PINT_CKSIZE                000004
@@ -139,56 +141,56 @@ typedef struct PINT_Request_state {
  */
 
 typedef struct PINT_Request_result {
-	PVFS_offset  *offset_array;/* array of offsets for each segment output */
-	PVFS_size    *size_array;  /* array of sizes for each segment output */
-	int32_t      segmax;       /* maximum number of segments to output */
-	int32_t      segs;         /* number of segments output */
-	PVFS_size    bytemax;      /* maximum number of bytes to output */
-	PVFS_size    bytes;        /* number of bytes output */
+    PVFS_offset  *offset_array;/* array of offsets for each segment output */
+    PVFS_size    *size_array;  /* array of sizes for each segment output */
+    int32_t      segmax;       /* maximum number of segments to output */
+    int32_t      segs;         /* number of segments output */
+    PVFS_size    bytemax;      /* maximum number of bytes to output */
+    PVFS_size    bytes;        /* number of bytes output */
 } PINT_Request_result;
 
-typedef struct PINT_Request_file_data {
-	PVFS_size    fsize;			/* actual size of local storage object */
-	uint32_t     server_nr;		/* ordinal number of THIS server for this file */
-	uint32_t     server_ct;		/* number of servers for this file */
-	PINT_dist    *dist;			/* dist struct for the file */
-	PVFS_boolean extend_flag;	/* if zero, file will not be extended */
-} PINT_Request_file_data;
+typedef struct PINT_request_file_data_s {
+    PVFS_size    fsize;         /* actual size of local storage object */
+    uint32_t     server_nr;     /* ordinal number of THIS server for this file */
+    uint32_t     server_ct;     /* number of servers for this file */
+    struct PINT_dist_s *dist;   /* dist struct for the file */
+    PVFS_boolean extend_flag;   /* if zero, file will not be extended */
+} PINT_request_file_data;
 
-struct PINT_Request_state *PINT_New_request_state (PINT_Request *request);
+struct PINT_Request_state *PINT_new_request_state (PINT_Request *request);
 
-void PINT_Free_request_state (PINT_Request_state *req);
+void PINT_free_request_state (PINT_Request_state *req);
 
 /* generate offset length pairs from request and dist */
-int PINT_Process_request(PINT_Request_state *req,
+int PINT_process_request(PINT_Request_state *req,
 		PINT_Request_state *mem,
-		PINT_Request_file_data *rfdata,
+		PINT_request_file_data *rfdata,
 		PINT_Request_result *result,
 		int mode);
 
 /* internal function */
-PVFS_size PINT_Distribute(PVFS_offset offset,
-		PVFS_size size,
-		PINT_Request_file_data *rfdata,
-		PINT_Request_state *mem,
-		PINT_Request_result *result,
-		PVFS_boolean *eof_flag,
-		int mode);
+PVFS_size PINT_distribute(PVFS_offset offset,
+                          PVFS_size size,
+                          PINT_request_file_data *rfdata,
+                          PINT_Request_state *mem,
+                          PINT_Request_result *result,
+                          PVFS_boolean *eof_flag,
+                          int mode);
 
 /* pack request from node into a contiguous buffer pointed to by region */
-int PINT_Request_commit(PINT_Request *region, PINT_Request *node);
-PINT_Request *PINT_Do_Request_commit(PINT_Request *region, PINT_Request *node,
+int PINT_request_commit(PINT_Request *region, PINT_Request *node);
+PINT_Request *PINT_do_request_commit(PINT_Request *region, PINT_Request *node,
 		int32_t *index, int32_t depth);
-int PINT_Do_clear_commit(PINT_Request *node, int32_t depth);
+int PINT_do_clear_commit(PINT_Request *node, int32_t depth);
 
 /* encode packed request in place for sending over wire */
-int PINT_Request_encode(struct PINT_Request *req);
+int PINT_request_encode(struct PINT_Request *req);
 
 /* decode packed request in place after receiving from wire */
-int PINT_Request_decode(struct PINT_Request *req);
+int PINT_request_decode(struct PINT_Request *req);
 
-void PINT_Dump_packed_request(struct PINT_Request *req);
-void PINT_Dump_request(struct PINT_Request *req);
+void PINT_dump_packed_request(struct PINT_Request *req);
+void PINT_dump_request(struct PINT_Request *req);
 
 /********* macros for accessing key fields in a request *********/
 
@@ -298,3 +300,14 @@ void PINT_Dump_request(struct PINT_Request *req);
 	} while(0)
 
 #endif /* __PINT_REQUEST_H */
+
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */

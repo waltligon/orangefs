@@ -413,7 +413,7 @@ int PVFS_Request_commit(PVFS_Request * reqp)
             return PVFS_ERR_REQ;
         }
         /* pack the request */
-        PINT_Request_commit(region, req);
+        PINT_request_commit(region, req);
     }
     /* return the pointer to the memory region */
     *reqp = region;

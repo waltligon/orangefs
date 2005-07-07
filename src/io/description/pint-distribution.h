@@ -7,47 +7,44 @@
 #ifndef __PINT_DISTRIBUTION_H
 #define __PINT_DISTRIBUTION_H
 
+#include "pint-request.h"
 #include "pvfs2-types.h"
 
 /* Distribution table size limits */
 #define PINT_DIST_NAME_SZ 32
 
 /* Distribution functions that must be supplied by each dist implmentation */
-typedef struct PINT_dist_methods_s {
-
+typedef struct PINT_dist_methods_s
+{
     /* Returns the physical storage offset for a logical file offset */
     PVFS_offset (*logical_to_physical_offset)(void* params,
-                                              uint32_t server_nr,
-                                              uint32_t server_ct,
+                                              PINT_request_file_data* rf_data,
                                               PVFS_offset logical_offset);
     
     /* Returns the logical file offset for a given physical storage offset */
     PVFS_offset (*physical_to_logical_offset)(void* params,
-                                              uint32_t server_nr,
-                                              uint32_t server_ct,
+                                              PINT_request_file_data* rf_data,
                                               PVFS_offset physical_offset);
 
     /* Returns the next physical offset for the file on server_nr given an
      * arbitraty logical offset (i.e. an offset anywhere in the file) */
     PVFS_offset (*next_mapped_offset)(void* params,
-                                      uint32_t server_nr,
-                                      uint32_t server_ct,
+                                      PINT_request_file_data* rf_data,
                                       PVFS_offset logical_offset);
 
     /* Returns the contiguous length of file data starting at physical_offset*/
     PVFS_size (*contiguous_length)(void* params,
-                                   uint32_t server_nr,
-                                   uint32_t server_ct,
+                                   PINT_request_file_data* rf_data,
                                    PVFS_offset physical_offset);
 
     /* Returns the logical file size */
     PVFS_size (*logical_file_size)(void* params,
-                                   uint32_t server_ct,
+                                   uint32_t num_handles,
                                    PVFS_size *psizes);
 
     /* Returns the number of data file objects to use for a file */
     int (*get_num_dfiles)(void* params,
-                          uint32_t num_servers_requested,
+                          uint32_t num_servers_available,
                           uint32_t num_dfiles_requested);
 
     /* Sets the parameter designated by name to the given value */
