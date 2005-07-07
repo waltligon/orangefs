@@ -11,16 +11,16 @@ int main(int argc, char **argv)
 
 	/* build a request */
 	PVFS_Request_vector(16, 4, 64, PVFS_DOUBLE, &r);
-	PINT_Dump_request(r);
+	PINT_dump_request(r);
 
 	/* pack the request */
 	r_size = PINT_REQUEST_PACK_SIZE(r);
 	r_packed = (struct PINT_Request *)malloc(r_size);
-	PINT_Request_commit(r_packed, r);
-	PINT_Dump_request(r_packed);
+	PINT_request_commit(r_packed, r);
+	PINT_dump_request(r_packed);
 
 	/* now prepare for sending on wire */
-	PINT_Request_encode(r_packed);
+	PINT_request_encode(r_packed);
 
 	{
 		struct PINT_Request *r2;
@@ -28,10 +28,10 @@ int main(int argc, char **argv)
 		memcpy(r2, r_packed, r_size); /* simulates sending on wire */
 
 		/* now we'll unencode and see what we have */
-		PINT_Request_decode(r2);
+		PINT_request_decode(r2);
 
 		/* for now we'll just dump the request */
-		PINT_Dump_request(r2);
+		PINT_dump_request(r2);
 
 		/* we're done */
 		free(r2);

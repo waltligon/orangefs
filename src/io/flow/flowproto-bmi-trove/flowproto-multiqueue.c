@@ -757,7 +757,7 @@ static void bmi_recv_callback_fn(void *user_ptr,
             result_tmp->result.segmax = MAX_REGIONS;
             result_tmp->result.segs = 0;
             result_tmp->buffer_offset = tmp_buffer;
-            ret = PINT_Process_request(q_item->parent->file_req_state,
+            ret = PINT_process_request(q_item->parent->file_req_state,
                 q_item->parent->mem_req_state,
                 &q_item->parent->file_data,
                 &result_tmp->result,
@@ -1059,7 +1059,7 @@ static int bmi_send_callback_fn(void *user_ptr,
         result_tmp->result.segmax = MAX_REGIONS;
         result_tmp->result.segs = 0;
         result_tmp->buffer_offset = tmp_buffer;
-        ret = PINT_Process_request(q_item->parent->file_req_state,
+        ret = PINT_process_request(q_item->parent->file_req_state,
             q_item->parent->mem_req_state,
             &q_item->parent->file_data,
             &result_tmp->result,
@@ -1268,7 +1268,7 @@ static void trove_write_callback_fn(void *user_ptr,
             result_tmp->result.segs = 0;
             result_tmp->buffer_offset = tmp_buffer;
             assert(!PINT_REQUEST_DONE(q_item->parent->file_req_state));
-            ret = PINT_Process_request(q_item->parent->file_req_state,
+            ret = PINT_process_request(q_item->parent->file_req_state,
                 q_item->parent->mem_req_state,
                 &q_item->parent->file_data,
                 &result_tmp->result,
@@ -1481,7 +1481,7 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
     q_item->result_chain.result.segmax = MAX_REGIONS;
     q_item->result_chain.result.segs = 0;
     q_item->result_chain.buffer_offset = NULL;
-    ret = PINT_Process_request(q_item->parent->file_req_state,
+    ret = PINT_process_request(q_item->parent->file_req_state,
         q_item->parent->mem_req_state,
         &q_item->parent->file_data,
         &q_item->result_chain.result,
@@ -1523,7 +1523,7 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
             q_item->result_chain.result.segs = 0;
             q_item->result_chain.buffer_offset = NULL;
             /* process ahead */
-            ret = PINT_Process_request(q_item->parent->file_req_state,
+            ret = PINT_process_request(q_item->parent->file_req_state,
                 q_item->parent->mem_req_state,
                 &q_item->parent->file_data,
                 &q_item->result_chain.result,
@@ -1669,7 +1669,7 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
             q_item->result_chain.result.segs = 0;
             q_item->result_chain.buffer_offset = NULL;
             /* process ahead */
-            ret = PINT_Process_request(q_item->parent->file_req_state,
+            ret = PINT_process_request(q_item->parent->file_req_state,
                 q_item->parent->mem_req_state,
                 &q_item->parent->file_data,
                 &q_item->result_chain.result,
@@ -1714,7 +1714,7 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
     q_item->result_chain.result.segmax = MAX_REGIONS;
     q_item->result_chain.result.segs = 0;
     q_item->result_chain.buffer_offset = NULL;
-    ret = PINT_Process_request(q_item->parent->file_req_state,
+    ret = PINT_process_request(q_item->parent->file_req_state,
         q_item->parent->mem_req_state,
         &q_item->parent->file_data,
         &q_item->result_chain.result,

@@ -78,7 +78,7 @@ main(int argc, char **argv)
 	req1.ereq = &req3;
 	req1.sreq = NULL;
 
-	reqs = PINT_New_request_state(&req1);
+	reqs = PINT_new_request_state(&req1);
 	rfdata.server_nr = 0;
 	rfdata.server_ct = 2;
 	rfdata.fsize = 10000000;
@@ -92,7 +92,7 @@ main(int argc, char **argv)
 	offset = 0;
 	segmax = 1;
 	bytemax = BYTEMAX;
-	retval = PINT_Process_request(reqs, &rfdata, &segmax, NULL, NULL,
+	retval = PINT_process_request(reqs, &rfdata, &segmax, NULL, NULL,
 			&offset, &bytemax, &eof_flag, PINT_CKSIZE);
 	printf("\nreturn %d, %d segments: offset=%lld bytemax=%lld\n",
 			retval, segmax, offset, bytemax);
@@ -100,7 +100,7 @@ main(int argc, char **argv)
 	do {
 		segmax = SEGMAX;
 		bytemax = BYTEMAX;
-		PINT_Process_request(reqs, &rfdata, &segmax, offset_array,
+		PINT_process_request(reqs, &rfdata, &segmax, offset_array,
 				size_array, &offset, &bytemax, &eof_flag, PINT_CLIENT);
 		printf("processed %lld bytes in %d segments\n", bytemax, segmax);
 		for (i = 0; i < segmax; i++)
@@ -112,14 +112,14 @@ main(int argc, char **argv)
 	printf("finished processing request\n");
 	segmax = 1;
 	bytemax = BYTEMAX;
-	retval = PINT_Process_request(reqs, &rfdata, &segmax, NULL, NULL,
+	retval = PINT_process_request(reqs, &rfdata, &segmax, NULL, NULL,
 			&offset, &bytemax, &eof_flag, PINT_CKSIZE);
 	printf("\nreturn %d, %d segments: offset=%lld bytemax=%lld\n",
 			retval, segmax, offset, bytemax);
 	offset = 0;
 	segmax = 1;
 	bytemax = BYTEMAX;
-	retval = PINT_Process_request(reqs, &rfdata, &segmax, NULL, NULL,
+	retval = PINT_process_request(reqs, &rfdata, &segmax, NULL, NULL,
 			&offset, &bytemax, &eof_flag, PINT_CKSIZE);
 	printf("\nreturn %d, %d segments: offset=%lld bytemax=%lld\n",
 			retval, segmax, offset, bytemax);
@@ -127,7 +127,7 @@ main(int argc, char **argv)
 	do {
 		segmax = SEGMAX;
 		bytemax = BYTEMAX;
-		PINT_Process_request(reqs, &rfdata, &segmax, offset_array,
+		PINT_process_request(reqs, &rfdata, &segmax, offset_array,
 				size_array, &offset, &bytemax, &eof_flag, PINT_SERVER);
 		printf("processed %lld bytes in %d segments\n", bytemax, segmax);
 		for (i = 0; i < segmax; i++)

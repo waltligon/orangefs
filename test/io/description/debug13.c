@@ -6,6 +6,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <pvfs2-types.h>
 #include <gossip.h>
 #include <pvfs2-debug.h>
@@ -80,7 +81,7 @@ PVFS_size exp2_size[] =
 	32
 };
 
-PINT_Request_result exp[] =
+PINT_Request_result expected[] =
 {{
 	offset_array : &exp1_offset[0],
 	size_array : &exp1_size[0],
@@ -119,7 +120,7 @@ PINT_Request_result exp[] =
 	bytes : 160
 }};
 
-int request_debug()
+int request_debug(void)
 {
 	int i, r_size;
 	PINT_Request *r1, *r1a, *r1b, *r_packed;
@@ -127,7 +128,7 @@ int request_debug()
 	PINT_Request_state *rs1;
 	PINT_Request_state *rs1p;
 	PINT_Request_state *rs2;
-	PINT_Request_file_data rf1;
+	PINT_request_file_data rf1;
 	PINT_Request_result seg1;
 
 	/* PVFS_Process_request arguments */
@@ -136,28 +137,28 @@ int request_debug()
 	/* set up request state */
 	PVFS_Request_vector(4, 4, 16, PVFS_DOUBLE, &r1a);
 	PVFS_Request_vector(3, 3, 9, r1a, &r1b);
-	rs1 = PINT_New_request_state(r1b);
+	rs1 = PINT_new_request_state(r1b);
 
 	/* set up memory request */
 	PVFS_Request_contiguous(4076, PVFS_BYTE, &r2);
-	rs2 = PINT_New_request_state(r2);
+	rs2 = PINT_new_request_state(r2);
 
 	/* pack the request */
 	r_size = PINT_REQUEST_PACK_SIZE(r1b);
 	r_packed = (struct PINT_Request *)malloc(r_size);
-	PINT_Request_commit(r_packed, r1b);
+	PINT_request_commit(r_packed, r1b);
 
-	PINT_Request_encode(r_packed);
+	PINT_request_encode(r_packed);
 
 	r_size = PINT_REQUEST_PACK_SIZE(r_packed);
 	r1 = (struct PINT_Request *)malloc(r_size);
 	memcpy(r1, r_packed, r_size);
-	PINT_Request_decode(r1);
+	PINT_request_decode(r1);
 
-	rs1p = PINT_New_request_state(r1);
+	rs1p = PINT_new_request_state(r1);
 
 	/* set up file data for request */
-	PINT_dist_initialize();
+	PINT_dist_initialize(NULL);
 	rf1.server_nr = 0;
 	rf1.server_ct = 2;
 	rf1.fsize = 6000;
@@ -186,7 +187,7 @@ int request_debug()
 
 	i = 0;
 
-	PINT_Dump_packed_request(r_packed);
+	PINT_dump_packed_request(r_packed);
 
 	/* skipping logical bytes */
 	// PINT_REQUEST_STATE_SET_TARGET(rs1,(3 * 1024) + 512);
@@ -204,13 +205,13 @@ int request_debug()
 		seg1.segs = 0;
 
 		/* process request */
-		retval = PINT_Process_request(rs1, rs2, &rf1, &seg1, PINT_CLIENT);
+		retval = PINT_process_request(rs1, rs2, &rf1, &seg1, PINT_CLIENT);
 
 		if(retval >= 0)
 		{
 			prtseg(&seg1,"Results obtained");
-			prtseg(&exp[i],"Results expected");
-			cmpseg(&seg1,&exp[i]);
+			prtseg(&expected[i],"Results expected");
+			cmpseg(&seg1,&expected[i]);
 		}
 
 		i++;
@@ -219,7 +220,7 @@ int request_debug()
 	
 	if(retval < 0)
 	{
-		fprintf(stderr, "Error: PINT_Process_request() failure.\n");
+		fprintf(stderr, "Error: PINT_process_request() failure.\n");
 		return(-1);
 	}
 	if(PINT_REQUEST_DONE(rs1))
@@ -241,13 +242,13 @@ int request_debug()
 		seg1.segs = 0;
 
 		/* process request */
-		retval = PINT_Process_request(rs1p, rs2, &rf1, &seg1, PINT_CLIENT);
+		retval = PINT_process_request(rs1p, rs2, &rf1, &seg1, PINT_CLIENT);
 
 		if(retval >= 0)
 		{
 			prtseg(&seg1,"Results obtained");
-			prtseg(&exp[i],"Results expected");
-			cmpseg(&seg1,&exp[i]);
+			prtseg(&expected[i],"Results expected");
+			cmpseg(&seg1,&expected[i]);
 		}
 
 		i++;
@@ -256,7 +257,7 @@ int request_debug()
 	
 	if(retval < 0)
 	{
-		fprintf(stderr, "Error: PINT_Process_request() failure.\n");
+		fprintf(stderr, "Error: PINT_process_request() failure.\n");
 		return(-1);
 	}
 	if(PINT_REQUEST_DONE(rs1p))
@@ -279,13 +280,13 @@ int request_debug()
 		seg1.segs = 0;
 
 		/* process request */
-		retval = PINT_Process_request(rs1, rs2, &rf1, &seg1, PINT_SERVER);
+		retval = PINT_process_request(rs1, rs2, &rf1, &seg1, PINT_SERVER);
 
 		if(retval >= 0)
 		{
 			prtseg(&seg1,"Results obtained");
-			prtseg(&exp[i],"Results expected");
-			cmpseg(&seg1,&exp[i]);
+			prtseg(&expected[i],"Results expected");
+			cmpseg(&seg1,&expected[i]);
 		}
 
 		i++;
@@ -294,7 +295,7 @@ int request_debug()
 	
 	if(retval < 0)
 	{
-		fprintf(stderr, "Error: PINT_Process_request() failure.\n");
+		fprintf(stderr, "Error: PINT_process_request() failure.\n");
 		return(-1);
 	}
 	if(PINT_REQUEST_DONE(rs1))
@@ -317,13 +318,13 @@ int request_debug()
 		seg1.segs = 0;
 
 		/* process request */
-		retval = PINT_Process_request(rs1p, rs2, &rf1, &seg1, PINT_SERVER);
+		retval = PINT_process_request(rs1p, rs2, &rf1, &seg1, PINT_SERVER);
 
 		if(retval >= 0)
 		{
 			prtseg(&seg1,"Results obtained");
-			prtseg(&exp[i],"Results expected");
-			cmpseg(&seg1,&exp[i]);
+			prtseg(&expected[i],"Results expected");
+			cmpseg(&seg1,&expected[i]);
 		}
 
 		i++;
@@ -332,7 +333,7 @@ int request_debug()
 	
 	if(retval < 0)
 	{
-		fprintf(stderr, "Error: PINT_Process_request() failure.\n");
+		fprintf(stderr, "Error: PINT_process_request() failure.\n");
 		return(-1);
 	}
 	if(PINT_REQUEST_DONE(rs1p))

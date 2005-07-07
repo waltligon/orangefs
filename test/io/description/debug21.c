@@ -26,7 +26,7 @@ int main(int argc, char **argv)
 	PINT_Request *r2;
 	PINT_Request_state *rs1;
 	PINT_Request_state *rs2;
-	PINT_Request_file_data rf1;
+	PINT_request_file_data rf1;
 	PINT_Request_result seg1;
 
 	/* PVFS_Process_request arguments */
@@ -41,14 +41,14 @@ int main(int argc, char **argv)
 	PVFS_Request_struct(1, blksz, disps1, oldrs1, &r1a);
 	oldrs2[0] = r1a;
 	PVFS_Request_struct(1, blksz, disps2, oldrs2, &r1);
-	rs1 = PINT_New_request_state(r1);
+	rs1 = PINT_new_request_state(r1);
 
 	/* set up memory request */
 	PVFS_Request_contiguous(8, PVFS_BYTE, &r2);
-	rs2 = PINT_New_request_state(r2);
+	rs2 = PINT_new_request_state(r2);
 
 	/* set up file data for request */
-	PINT_dist_initialize();
+	PINT_dist_initialize(NULL);
 	rf1.server_nr = 0;
 	rf1.server_ct = 4;
 	rf1.fsize = 6000;
@@ -87,11 +87,11 @@ int main(int argc, char **argv)
 		seg1.segs = 0;
 
 		/* process request */
-		retval = PINT_Process_request(rs1, rs2, &rf1, &seg1, PINT_CLIENT);
+		retval = PINT_process_request(rs1, rs2, &rf1, &seg1, PINT_CLIENT);
 
 		if(retval >= 0)
 		{
-			printf("results of PINT_Process_request():\n");
+			printf("results of PINT_process_request():\n");
 			printf("%d segments with %lld bytes\n", seg1.segs, Ld(seg1.bytes));
 			for(i=0; i<seg1.segs; i++, r++)
 			{
@@ -104,7 +104,7 @@ int main(int argc, char **argv)
 	
 	if(retval < 0)
 	{
-		fprintf(stderr, "Error: PINT_Process_request() failure.\n");
+		fprintf(stderr, "Error: PINT_process_request() failure.\n");
 		return(-1);
 	}
 	if(PINT_REQUEST_DONE(rs1))
@@ -126,11 +126,11 @@ int main(int argc, char **argv)
 		seg1.segs = 0;
 
 		/* process request */
-		retval = PINT_Process_request(rs1, NULL, &rf1, &seg1, PINT_SERVER);
+		retval = PINT_process_request(rs1, NULL, &rf1, &seg1, PINT_SERVER);
 
 		if(retval >= 0)
 		{
-			printf("results of PINT_Process_request():\n");
+			printf("results of PINT_process_request():\n");
 			printf("%d segments with %lld bytes\n", seg1.segs, Ld(seg1.bytes));
 			for(i=0; i<seg1.segs; i++, r++)
 			{
@@ -143,7 +143,7 @@ int main(int argc, char **argv)
 	
 	if(retval < 0)
 	{
-		fprintf(stderr, "Error: PINT_Process_request() failure.\n");
+		fprintf(stderr, "Error: PINT_process_request() failure.\n");
 		return(-1);
 	}
 	if(PINT_REQUEST_DONE(rs1))

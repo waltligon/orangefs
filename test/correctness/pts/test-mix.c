@@ -40,7 +40,7 @@ static int test_mx(void){
    PINT_Request_state *rs1;
    PINT_Request_state *rs1p;
    PINT_Request_state *rs2;
-   PINT_Request_file_data rf1;
+   PINT_request_file_data rf1;
    PINT_Request_result seg1;
                                                                                                                                                        
    /* PVFS_Process_request arguments */
@@ -49,25 +49,25 @@ static int test_mx(void){
    /* set up request state */
    PVFS_Request_vector(4, 4, 16, PVFS_DOUBLE, &r1a);
    PVFS_Request_vector(3, 3, 9, r1a, &r1b);
-   rs1 = PINT_New_request_state(r1b);
+   rs1 = PINT_new_request_state(r1b);
                                                                                                                                                        
    /* set up memory request */
    PVFS_Request_contiguous(4076, PVFS_BYTE, &r2);
-   rs2 = PINT_New_request_state(r2);
+   rs2 = PINT_new_request_state(r2);
                                                                                                                                                        
    /* pack the request */
    r_size = PINT_REQUEST_PACK_SIZE(r1b);
    r_packed = (struct PINT_Request *)malloc(r_size);
-   PINT_Request_commit(r_packed, r1b);
+   PINT_request_commit(r_packed, r1b);
                                                                                                                                                        
-   PINT_Request_encode(r_packed);
+   PINT_request_encode(r_packed);
                                                                                                                                                        
    r_size = PINT_REQUEST_PACK_SIZE(r_packed);
    r1 = (struct PINT_Request *)malloc(r_size);
    memcpy(r1, r_packed, r_size);
-   PINT_Request_decode(r1);
+   PINT_request_decode(r1);
                                                                                                                                                        
-   rs1p = PINT_New_request_state(r1);
+   rs1p = PINT_new_request_state(r1);
                                                                                                                                                        
    /* set up file data for request */
    rf1.server_nr = 0;
@@ -88,7 +88,7 @@ static int test_mx(void){
    /* skip into the file datatype */
    PINT_REQUEST_STATE_SET_TARGET(rs1, 20);
    PINT_REQUEST_STATE_SET_TARGET(rs1p, 20);
-   PINT_Dump_packed_request(r_packed);
+   PINT_dump_packed_request(r_packed);
                                                                                                                                                        
    /* skipping logical bytes */
    // PINT_REQUEST_STATE_SET_TARGET(rs1,(3 * 1024) + 512);
@@ -102,7 +102,7 @@ static int test_mx(void){
       seg1.segs = 0;
  
       /* process request */
-      retval = PINT_Process_request(rs1, rs2, &rf1, &seg1, PINT_CLIENT);
+      retval = PINT_process_request(rs1, rs2, &rf1, &seg1, PINT_CLIENT);
                                                                                                                                                        
       if(retval >= 0)
       {
@@ -136,7 +136,7 @@ static int test_mx(void){
       seg1.segs = 0;
                                                                                                                                                        
       /* process request */
-      retval = PINT_Process_request(rs1p, rs2, &rf1, &seg1, PINT_CLIENT);
+      retval = PINT_process_request(rs1p, rs2, &rf1, &seg1, PINT_CLIENT);
                                                                                                                                                        
       if(retval >= 0)
       {
@@ -171,7 +171,7 @@ static int test_mx(void){
       seg1.segs = 0;
                                                                                                                                                        
       /* process request */
-      retval = PINT_Process_request(rs1, rs2, &rf1, &seg1, PINT_SERVER);
+      retval = PINT_process_request(rs1, rs2, &rf1, &seg1, PINT_SERVER);
                                                                                                                                                        
       if(retval >= 0)
       {
@@ -206,7 +206,7 @@ static int test_mx(void){
       seg1.segs = 0;
                                                                                                                                                        
       /* process request */
-      retval = PINT_Process_request(rs1p, rs2, &rf1, &seg1, PINT_SERVER);
+      retval = PINT_process_request(rs1p, rs2, &rf1, &seg1, PINT_SERVER);
                                                                                                                                                        
       if(retval >= 0)
       {

@@ -847,8 +847,8 @@ struct PVFS_servreq_io
           " more than maximum %d\n", __func__, \
           (x)->file_req->num_nested_req, PVFS_REQ_LIMIT_PINT_REQUEST_NUM); \
     lin = decode_malloc(((x)->file_req->num_nested_req + 1) * sizeof(*lin)); \
-    (void) PINT_Request_commit(lin, (x)->file_req); \
-    PINT_Request_encode(lin); /* packs the pointers */ \
+    (void) PINT_request_commit(lin, (x)->file_req); \
+    PINT_request_encode(lin); /* packs the pointers */ \
     encode_int32_t(pptr, &(x)->file_req->num_nested_req); \
     encode_skip4(pptr,); \
     encode_PVFS_Request(pptr, lin); \
@@ -871,7 +871,7 @@ struct PVFS_servreq_io
     (x)->file_req = decode_malloc((numreq + 1) * sizeof(*(x)->file_req)); \
     (x)->file_req->num_nested_req = numreq; \
     decode_PVFS_Request(pptr, (x)->file_req); \
-    PINT_Request_decode((x)->file_req); /* unpacks the pointers */ \
+    PINT_request_decode((x)->file_req); /* unpacks the pointers */ \
     decode_PVFS_offset(pptr, &(x)->file_req_offset); \
     decode_PVFS_size(pptr, &(x)->aggregate_size); \
 } while (0)

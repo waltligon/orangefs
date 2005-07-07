@@ -21,6 +21,7 @@
 #include "gossip.h"
 #include "str-utils.h"
 #include "pint-util.h"
+#include "pint-request.h"
 #include "pint-servreq.h"
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
@@ -179,7 +180,8 @@ static int truncate_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
     PVFS_object_attr *attr = NULL;
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_size new_dfile_size = 0;
-
+    PINT_request_file_data file_data;
+    
     gossip_debug(GOSSIP_CLIENT_DEBUG,
             "(%p) truncate state: datafile_setup_msgpairarray\n", sm_p);
 
@@ -207,6 +209,13 @@ static int truncate_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
         return 1;
     }
 
+    /* Initialize the file data struct */
+    memset(&file_data, 0, sizeof(file_data));
+    file_data.dist = attr->u.meta.dist;
+    file_data.server_ct = attr->u.meta.dfile_count;
+    file_data.extend_flag = 1;
+
+    /* Construct truncate messages */
     for (i = 0; i < attr->u.meta.dfile_count; i++)
     {
         msg_p = &sm_p->msgarray[i];
@@ -217,9 +226,11 @@ static int truncate_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
             Ld(sm_p->u.truncate.size),
             Lu(attr->u.meta.dfile_array[i]));
 
+        file_data.server_nr = i;
         new_dfile_size = 
             attr->u.meta.dist->methods->logical_to_physical_offset(
-                attr->u.meta.dist->params, i, attr->u.meta.dfile_count,
+                attr->u.meta.dist->params,
+                &file_data,
                 sm_p->u.truncate.size);
 
         gossip_debug(GOSSIP_CLIENT_DEBUG,

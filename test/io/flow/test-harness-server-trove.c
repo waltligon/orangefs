@@ -90,7 +90,7 @@ int main(
         0, (GOSSIP_FLOW_PROTO_DEBUG | GOSSIP_BMI_DEBUG_TCP));
 
     /* Init dists */
-    PINT_dist_initialize();
+    PINT_dist_initialize(NULL);
 
     /* start up BMI */
     ret = BMI_initialize("bmi_tcp", "tcp://NULL:3335", BMI_INIT_SERVER);

@@ -237,7 +237,7 @@ int main(
     }
 
     /* file data */
-    PINT_dist_initialize();
+    PINT_dist_initialize(NULL);
     flow_d->file_data.fsize = TEST_SIZE;
     flow_d->file_data.server_nr = 0;
     flow_d->file_data.server_ct = 1;

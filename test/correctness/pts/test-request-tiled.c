@@ -38,18 +38,18 @@ static int test_req_tiled(void){
    PINT_Request *r2;
    PINT_Request_state *rs1;
    PINT_Request_state *rs2;
-   PINT_Request_file_data rf1;
+   PINT_request_file_data rf1;
    PINT_Request_result seg1;
                                                                                 
    /* PVFS_Process_request arguments */
    int retval;
                                                                                 
    /* set up request state */
-   rs1 = PINT_New_request_state(PVFS_BYTE);
+   rs1 = PINT_new_request_state(PVFS_BYTE);
                                                                                 
    /* set up memory request */
    PVFS_Request_contiguous(4076, PVFS_BYTE, &r2);
-   rs2 = PINT_New_request_state(r2);
+   rs2 = PINT_new_request_state(r2);
                                                                                 
    /* set up file data for request */
    rf1.server_nr = 0;
@@ -89,7 +89,7 @@ static int test_req_tiled(void){
       seg1.segs = 0;
                                                                                 
       /* process request */
-      retval = PINT_Process_request(rs1, rs2, &rf1, &seg1, PINT_CLIENT);
+      retval = PINT_process_request(rs1, rs2, &rf1, &seg1, PINT_CLIENT);
                                                                                 
       if(retval >= 0)
       {

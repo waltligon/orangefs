@@ -45,15 +45,15 @@ static int test_request(void){
     PINT_Request *r2;
     PINT_Request_state *rs1;
     PINT_Request_state *rs2;
-    PINT_Request_file_data rf1;
-    PINT_Request_file_data rf2;
+    PINT_request_file_data rf1;
+    PINT_request_file_data rf2;
     PINT_Request_result seg1;
     PINT_Request_result seg2;
-                                                                                
-                                                                                
+
+
     /* PVFS_Process_request arguments */
     int retval;
-                                                                                
+
     int32_t blocklength = 10*1024*1024; /* 10M */
 
     /* Used for calculating correct offset values */
@@ -68,11 +68,11 @@ static int test_request(void){
                                                                                 
     PVFS_Request_indexed(1, &blocklength, &displacement2, PVFS_BYTE, &r2);
     /* set up two request states */
-    rs1 = PINT_New_request_state(r1);
-    rs2 = PINT_New_request_state(r2);
+    rs1 = PINT_new_request_state(r1);
+    rs2 = PINT_new_request_state(r2);
                                                                                 
     /* set up file data for first request */
-    PINT_dist_initialize();
+    PINT_dist_initialize(NULL);
     rf1.server_nr = 0;
     rf1.server_ct = 1;
     rf1.fsize = 0;
@@ -118,7 +118,7 @@ static int test_request(void){
 	seg1.bytes = 0;
 	seg1.segs = 0;
 	/* process request */
-	retval = PINT_Process_request(rs1, NULL, &rf1, &seg1, PINT_SERVER);
+	retval = PINT_process_request(rs1, NULL, &rf1, &seg1, PINT_SERVER);
                                                                                 
 	if(retval >= 0)
 	{
@@ -161,7 +161,7 @@ static int test_request(void){
       seg2.bytes = 0;
       seg2.segs = 0;
       /* process request */
-      retval = PINT_Process_request(rs2, NULL, &rf2, &seg2, PINT_SERVER);
+      retval = PINT_process_request(rs2, NULL, &rf2, &seg2, PINT_SERVER);
                                                                                 
       if(retval >= 0)
       {

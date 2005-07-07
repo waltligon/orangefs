@@ -40,7 +40,7 @@ static int test_cont_datatype(void){
    PINT_Request *r2;
    PINT_Request_state *rs1;
    PINT_Request_state *rs2;
-   PINT_Request_file_data rf1;
+   PINT_request_file_data rf1;
    PINT_Request_result seg1;
                                                                                 
    /* PVFS_Process_request arguments */
@@ -50,14 +50,14 @@ static int test_cont_datatype(void){
    PVFS_Request_contiguous(266240, PVFS_BYTE, &r1);
                                                                                 
    /* set up request state */
-   rs1 = PINT_New_request_state(r1);
+   rs1 = PINT_new_request_state(r1);
                                                                                 
    /* set up memory request */
    PVFS_Request_contiguous(266240, PVFS_BYTE, &r2);
-   rs2 = PINT_New_request_state(r2);
+   rs2 = PINT_new_request_state(r2);
                                                                                 
    /* set up file data for request */
-   PINT_dist_initialize();
+   PINT_dist_initialize(NULL);
    rf1.server_nr = 0;
    rf1.server_ct = 4;
    rf1.fsize = 0;
@@ -91,7 +91,7 @@ static int test_cont_datatype(void){
       seg1.segs = 0;
                                                                                 
       /* process request */
-      retval = PINT_Process_request(rs1, rs2, &rf1, &seg1, PINT_CLIENT);
+      retval = PINT_process_request(rs1, rs2, &rf1, &seg1, PINT_CLIENT);
                                                                                 
       if(retval >= 0)
       {

@@ -38,7 +38,7 @@ int main(int argc, char **argv)
 	r_enc = (PINT_Request*)malloc(pack_size);
 	assert(r_enc != NULL);
 
-	ret = PINT_Request_commit(r_enc, r);
+	ret = PINT_request_commit(r_enc, r);
 	if(ret < 0)
 	{
 		fprintf(stderr, "PINT_Request_commit() failure.\n");
@@ -46,7 +46,7 @@ int main(int argc, char **argv)
 	}
 	fprintf(stderr, "commit returns %d\n", ret);
 	Dump_request(r_enc);
-	ret = PINT_Request_encode(r_enc);
+	ret = PINT_request_encode(r_enc);
 	if(ret < 0)
 	{
 		fprintf(stderr, "PINT_Request_encode() failure.\n");
@@ -63,10 +63,10 @@ int main(int argc, char **argv)
 	memcpy(r_dec, r_enc, pack_size);
 	free(r_enc);
 	// free(r);
-	ret = PINT_Request_decode(r_dec);
+	ret = PINT_request_decode(r_dec);
 	if(ret < 0)
 	{
-		fprintf(stderr, "PINT_Request_decode() failure.\n");
+		fprintf(stderr, "PINT_request_decode() failure.\n");
 		return(-1);
 	}
 	fprintf(stderr, "decode returns %d\n", ret);

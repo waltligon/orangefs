@@ -380,7 +380,7 @@ int PINT_flow_post(flow_descriptor * flow_d)
     }
 
     /* setup the request processing states */
-    flow_d->file_req_state = PINT_New_request_state(flow_d->file_req);
+    flow_d->file_req_state = PINT_new_request_state(flow_d->file_req);
     if (!flow_d->file_req_state)
     {
 	gen_mutex_unlock(&interface_mutex);
@@ -390,7 +390,7 @@ int PINT_flow_post(flow_descriptor * flow_d)
     /* only setup a memory datatype state if caller provided a memory datatype */
     if(flow_d->mem_req)
     {
-	flow_d->mem_req_state = PINT_New_request_state(flow_d->mem_req);
+	flow_d->mem_req_state = PINT_new_request_state(flow_d->mem_req);
 	if (!flow_d->mem_req_state)
 	{
 	    gen_mutex_unlock(&interface_mutex);
@@ -516,12 +516,12 @@ static void flow_release(flow_descriptor *flow_d)
     /* let go of the request processing states */
     if (flow_d->file_req_state)
     {
-	PINT_Free_request_state(flow_d->file_req_state);
+	PINT_free_request_state(flow_d->file_req_state);
     }
 
     if (flow_d->mem_req_state)
     {
-	PINT_Free_request_state(flow_d->mem_req_state);
+	PINT_free_request_state(flow_d->mem_req_state);
     }
 }
 

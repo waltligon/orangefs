@@ -28,7 +28,7 @@ PVFS_size exp1_size [] = {
 	4194304
 };
 
-PINT_Request_result exp[] =
+PINT_Request_result expected[] =
 {{
    offset_array : &exp1_offset[0],
    size_array : &exp1_size[0],
@@ -37,12 +37,12 @@ PINT_Request_result exp[] =
    bytes : 4194304
 }};
 
-int request_debug()
+int request_debug(void)
 {
 	int i;
 	PINT_Request *r1;
 	PINT_Request_state *rs1;
-	PINT_Request_file_data rf1;
+	PINT_request_file_data rf1;
 	PINT_Request_result seg1;
 
 	int retval;
@@ -52,9 +52,9 @@ int request_debug()
 
 	PVFS_Request_indexed(1, &blocklength, &displacement, PVFS_BYTE, &r1);
 
-	rs1 = PINT_New_request_state(r1);
+	rs1 = PINT_new_request_state(r1);
 
-	PINT_dist_initialize();
+	PINT_dist_initialize(NULL);
 	rf1.server_nr = 0;
 	rf1.server_ct = 1;
 	rf1.fsize = 0;
@@ -90,20 +90,20 @@ int request_debug()
 	printf("\n************************************\n");
 
 	/* process request */
-	retval = PINT_Process_request(rs1, NULL, &rf1, &seg1, PINT_CLIENT);
+	retval = PINT_process_request(rs1, NULL, &rf1, &seg1, PINT_CLIENT);
 
 	if(retval >= 0)
 	{
 		prtseg(&seg1,"Results obtained");
-		prtseg(&exp[i],"Results expected");
-		cmpseg(&seg1,&exp[i]);
+		prtseg(&expected[i],"Results expected");
+		cmpseg(&seg1,&expected[i]);
 	}
 
 	i++;
 
 	if(retval < 0)
 	{
-		fprintf(stderr, "Error: PINT_Process_request() failure.\n");
+		fprintf(stderr, "Error: PINT_process_request() failure.\n");
 		return(-1);
 	}
 	if(PINT_REQUEST_DONE(rs1))

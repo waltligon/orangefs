@@ -1942,14 +1942,14 @@ static inline int check_for_zero_fill_on_read(PINT_client_sm *sm_p)
     int i = 0, val = 0;
     PINT_Request_state *mrs = NULL, *frs = NULL;
     PINT_Request_result seg_result;
-    PINT_Request_file_data *file_data = NULL;
+    PINT_request_file_data *file_data = NULL;
     int64_t offset_array[16] = {0}, size_array[16] = {0};
     PVFS_size total_ctx_size = 0;
 
     assert(sm_p->u.io.io_type == PVFS_IO_READ);
 
-    mrs = PINT_New_request_state(sm_p->u.io.mem_req);
-    frs = PINT_New_request_state(sm_p->u.io.file_req);
+    mrs = PINT_new_request_state(sm_p->u.io.mem_req);
+    frs = PINT_new_request_state(sm_p->u.io.file_req);
     assert(mrs && frs);
 
     memset(&seg_result, 0, sizeof(PINT_Request_result));
@@ -1990,8 +1990,8 @@ static inline int check_for_zero_fill_on_read(PINT_client_sm *sm_p)
                          "(size=%Ld, total_size=%Ld)\n",
                          Ld(sm_p->u.io.size), Ld(sm_p->u.io.total_size));
 
-            PINT_Free_request_state(mrs);
-            PINT_Free_request_state(frs);
+            PINT_free_request_state(mrs);
+            PINT_free_request_state(frs);
 
             return IO_GET_DATAFILE_SIZE;
         }
@@ -2008,7 +2008,7 @@ static inline int check_for_zero_fill_on_read(PINT_client_sm *sm_p)
             memset(offset_array, 0, (16 * sizeof(int64_t)));
             memset(size_array, 0, (16 * sizeof(int64_t)));
 
-            val = PINT_Process_request(
+            val = PINT_process_request(
                 frs, mrs, file_data, &seg_result, PINT_CLIENT);
 
             if (val < 0)
@@ -2092,8 +2092,8 @@ static inline int check_for_zero_fill_on_read(PINT_client_sm *sm_p)
                 "(size=%Ld, total_size=%Ld)\n",
                 Ld(sm_p->u.io.size), Ld(sm_p->u.io.total_size));
 
-            PINT_Free_request_state(mrs);
-            PINT_Free_request_state(frs);
+            PINT_free_request_state(mrs);
+            PINT_free_request_state(frs);
 
             return IO_GET_DATAFILE_SIZE;
         }
@@ -2101,8 +2101,8 @@ static inline int check_for_zero_fill_on_read(PINT_client_sm *sm_p)
 
   request_process_failure:
 
-    PINT_Free_request_state(mrs);
-    PINT_Free_request_state(frs);
+    PINT_free_request_state(mrs);
+    PINT_free_request_state(frs);
     return 0;
 }
 #endif
@@ -2125,7 +2125,7 @@ static int io_find_target_datafiles(
     int ret = -PVFS_EINVAL, i = 0;
     struct PINT_Request_state *req_state = NULL;
     struct PINT_Request_state *mem_req_state = NULL;
-    PINT_Request_file_data tmp_file_data;
+    PINT_request_file_data tmp_file_data;
     PINT_Request_result tmp_result;
 
     gossip_debug(GOSSIP_IO_DEBUG, "- io_find_target_datafiles called\n");
@@ -2136,15 +2136,15 @@ static int io_find_target_datafiles(
     }
     *handle_index_out_count = 0;
 
-    req_state = PINT_New_request_state(file_req);
+    req_state = PINT_new_request_state(file_req);
     if (!req_state)
     {
         return -PVFS_ENOMEM;
     }
-    mem_req_state = PINT_New_request_state(mem_req);
+    mem_req_state = PINT_new_request_state(mem_req);
     if (!mem_req_state)
     {
-        PINT_Free_request_state(req_state);
+        PINT_free_request_state(req_state);
         return -PVFS_ENOMEM;
     }
 
@@ -2179,14 +2179,14 @@ static int io_find_target_datafiles(
         tmp_result.bytemax = 1;
         tmp_result.segmax = 1;
 
-        /* PINT_Process_request() returns number of bytes processed */
-        ret = PINT_Process_request(
+        /* PINT_process_request() returns number of bytes processed */
+        ret = PINT_process_request(
             req_state, mem_req_state, &tmp_file_data,
             &tmp_result, PINT_CKSIZE);
         if (ret < 0)
         {
-            PINT_Free_request_state(mem_req_state);
-            PINT_Free_request_state(req_state);
+            PINT_free_request_state(mem_req_state);
+            PINT_free_request_state(req_state);
             return ret;
         }
 
@@ -2202,8 +2202,8 @@ static int io_find_target_datafiles(
                          __func__, i, *handle_index_out_count);
         }
     }
-    PINT_Free_request_state(req_state);
-    PINT_Free_request_state(mem_req_state);
+    PINT_free_request_state(req_state);
+    PINT_free_request_state(mem_req_state);
 
     return 0;
 }

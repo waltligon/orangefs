@@ -118,7 +118,7 @@ struct flow_descriptor
     PVFS_size aggregate_size;
 
     /* information about the datafile that this flow will access */
-    PINT_Request_file_data file_data;
+    PINT_request_file_data file_data;
 
 	/***********************************************************/
     /* fields that can be read publicly upon completion */
