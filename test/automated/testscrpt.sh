@@ -191,8 +191,6 @@ pull_and_build_pvfs2  || buildfail
 
 teardown_pvfs2 && setup_pvfs2 
 
-pull_and_build_mpich2 || buildfail
-
 if [ $? != 0 ] ; then
 	echo "setup failed"
 	setupfail
@@ -233,6 +231,9 @@ fi
 # generic way of submitting jobs. for now assume all the world has pbs
 which qsub >/dev/null 2>&1
 if [ $? -eq 0 ] ; then 
+	# go through the hassle of downloading/building mpich2 only if we are
+	# actually going to use it
+	pull_and_build_mpich2 || buildfail
 	. $MPIIO_DRIVER
 fi
 
