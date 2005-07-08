@@ -352,13 +352,13 @@ void __PINT_event_mpe(enum PVFS_event_api api,
 	    if (flags & PVFS_EVENT_FLAG_START) {
 		MPE_Log_event(PINT_event_job_start, 0, NULL);
 	    } else if (flags & PVFS_EVENT_FLAG_END) {
-		MPE_Log_event(PINT_event_bmi_stop, value, NULL);
+		MPE_Log_event(PINT_event_job_stop, value, NULL);
 	    }
 	case PVFS_EVENT_API_TROVE:
 	    if (flags & PVFS_EVENT_FLAG_START) {
-		MPE_Log_event(PINT_event_job_start, 0, NULL);
+		MPE_Log_event(PINT_event_trove_start, 0, NULL);
 	    } else if (flags & PVFS_EVENT_FLAG_END) {
-		MPE_Log_event(PINT_event_bmi_stop, value, NULL);
+		MPE_Log_event(PINT_event_trove_stop, value, NULL);
 	    }
     }
 
