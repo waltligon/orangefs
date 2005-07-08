@@ -1,7 +1,0 @@
-/* pvfs2-test-config.h.in.  Generated automatically from configure.in by autoheader.  */
-
-/* Define if you have the efence library (-lefence).  */
-#undef HAVE_LIBEFENCE
-
-/* Define if you have the pvfs2 library (-lpvfs2).  */
-#undef HAVE_LIBPVFS2
