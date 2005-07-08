@@ -9,6 +9,7 @@ LIBSRC += $(DIR)/server-config.c \
           $(DIR)/pvfs2-debug.c \
 	  $(DIR)/pint-perf-counter.c \
 	  $(DIR)/pint-event.c \
+	  $(DIR)/pint-textlog.c \
 	  $(DIR)/pint-cached-config.c \
 	  $(DIR)/msgpairarray.c \
 	  $(DIR)/pint-util.c
@@ -21,6 +22,7 @@ SERVERSRC += $(DIR)/server-config.c \
              $(DIR)/pvfs2-debug.c \
 	     $(DIR)/pint-perf-counter.c \
 	     $(DIR)/pint-event.c \
+	     $(DIR)/pint-textlog.c \
 	     $(DIR)/pint-cached-config.c \
 	     $(DIR)/msgpairarray.c \
 	     $(DIR)/pint-util.c
