@@ -10,10 +10,10 @@ make_pbs_script() {
 
 	echo "#!/bin/sh
 #PBS -l walltime=0:30:0
-#PBS -l nodes=16
+#PBS -l nodes=8
 #PBS -j oe
 
-nprocs=8
+nprocs=4
 
 $CLUSTER_DIR/pav/pav_start -c $PAV_CONFIG -n \$nprocs >/dev/null
 
@@ -66,7 +66,7 @@ if [ -f $PAV_CONFIG ] ; then
 	make_pbs_script > $pbs_script
 
 	# submit it
-	job_id=$(qsub -N mpiiotest $pbs_script | cut -d . -f1)
+	job_id=$(qsub -N mpiiotest -q shared $pbs_script | cut -d . -f1)
 
 	# wait patently for it to complete
 	block_until_done $job_id
