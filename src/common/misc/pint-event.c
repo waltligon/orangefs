@@ -311,8 +311,11 @@ void __PINT_event_pablo(enum PVFS_event_api api,
 	case PVFS_EVENT_API_TROVE:
 	    sprintf(description, "trove operation");
 	    break;
-	default:
-	    /* TODO: someone fed us a bad api */
+        case PVFS_EVENT_API_ENCODE_REQ:
+        case PVFS_EVENT_API_ENCODE_RESP:
+        case PVFS_EVENT_API_DECODE_REQ:
+        case PVFS_EVENT_API_DECODE_RESP:
+        case PVFS_EVENT_API_SM:
     }
 
     /* PVFS_EVENT_API_BMI, operation(SEND|RECV), value, id, FLAG (start|end) */
@@ -356,10 +359,16 @@ void __PINT_event_mpe(enum PVFS_event_api api,
 	    }
 	case PVFS_EVENT_API_TROVE:
 	    if (flags & PVFS_EVENT_FLAG_START) {
-		MPE_Log_event(PINT_event_trove_start, 0, NULL);
+		MPE_Log_event(PINT_event_trove_wr_start, 0, NULL);
 	    } else if (flags & PVFS_EVENT_FLAG_END) {
-		MPE_Log_event(PINT_event_trove_stop, value, NULL);
+		MPE_Log_event(PINT_event_trove_wr_stop, value, NULL);
 	    }
+        case PVFS_EVENT_API_ENCODE_REQ:
+        case PVFS_EVENT_API_ENCODE_RESP:
+        case PVFS_EVENT_API_DECODE_REQ:
+        case PVFS_EVENT_API_DECODE_RESP:
+        case PVFS_EVENT_API_SM:
+            ; /* XXX: NEEDS SOMETHING */
     }
 
 }
