@@ -23,7 +23,7 @@ export PVFS2TAB_FILE
 PATH=${CLUSTER_DIR}/mpich2/bin:\${PATH}
 mpdboot --file=\${WORKINGDIR}/compnodes --totalnum=\$nprocs
 
-mpiexec -np \$nprocs ${NONCONTIG} -fname pvfs2:\${MOUNTPOINT}/ncfile1 -v -veclen \$(( 8 * \$nprocs )) -elmtcount $((1024*1024*8)) -veccount 1 -timing -all -loops 1
+mpiexec -np \$nprocs ${NONCONTIG} -fname pvfs2:\${MOUNTPOINT}/ncfile1 -v -veclen \$(( 8 * \$nprocs )) -elmtcount $((1024*2)) -veccount 1 -timing -all -loops 1
 
 mpdallexit
 $CLUSTER_DIR/pav/pav_stop -c $PAV_CONFIG >/dev/null" 
