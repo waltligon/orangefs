@@ -121,6 +121,7 @@ generate_mmap_read_code()
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/mman.h>
+#include <string.h>
 int main(int argc, char **argv) {
     int ret = -1, fd = -1; void *start = NULL;
     struct stat statbuf; char *ptr = NULL, *end = NULL;
