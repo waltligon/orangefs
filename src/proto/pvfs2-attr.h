@@ -141,10 +141,14 @@ typedef struct PVFS_object_attr PVFS_object_attr;
 	decode_PVFS_directory_attr(pptr, &(x)->u.dir); \
 } while (0)
 #endif
-/* could have one each of PVFS_Dist, dfile_array, symlink_target */
-#define extra_size_PVFS_object_attr (PVFS_REQ_LIMIT_DIST_BYTES + \
-  PVFS_REQ_LIMIT_DFILE_COUNT * sizeof(PVFS_handle) + \
-  PVFS_REQ_LIMIT_PATH_NAME_BYTES)
+/* attr buffer needs room for larger of symlink path or meta fields: an attrib
+ * structure can never hold information for both a symlink and a metafile  */
+#define extra_size_PVFS_object_attr_meta (PVFS_REQ_LIMIT_DIST_BYTES + \
+  PVFS_REQ_LIMIT_DFILE_COUNT * sizeof(PVFS_handle))
+#define extra_size_PVFS_object_attr_symlink (PVFS_REQ_LIMIT_PATH_NAME_BYTES)
+#define extra_size_PVFS_object_attr ((extra_size_PVFS_object_attr_meta > \
+ extra_size_PVFS_object_attr_symlink) ? extra_size_PVFS_object_attr_meta : \
+ extra_size_PVFS_object_attr_symlink)
 
 #endif /* __PVFS2_ATTR_H */
 
