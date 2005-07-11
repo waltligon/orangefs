@@ -21,6 +21,10 @@ extern int debug;
 extern struct address_space_operations pvfs2_address_operations;
 extern struct backing_dev_info pvfs2_backing_dev_info;
 
+#ifdef PVFS2_LINUX_KERNEL_2_4
+static int pvfs2_precheck_file_write(struct file *file, struct inode *inode,
+    size_t *count, loff_t *ppos);
+#endif
 
 #define wake_up_device_for_return(op)             \
 do {                                              \
@@ -104,6 +108,9 @@ ssize_t pvfs2_inode_read(
     int retries = PVFS2_OP_RETRY_COUNT;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
     int dc_status;
+
+    if (!access_ok(VERIFY_WRITE, buf, count))
+        return -EFAULT;
 
     while(total_count < count)
     {
@@ -189,8 +196,11 @@ ssize_t pvfs2_inode_read(
 
             if (ret)
             {
-                pvfs2_error("Failed to copy user buffer.  Please make "
-                            "sure that the pvfs2-client is running.\n");
+                pvfs2_print("Failed to copy user buffer.\n");
+                /* put error code in downcall so that handle_io_error()
+                 * preserves properly
+                 */
+                new_op->downcall.status = -PVFS_EFAULT;
                 goto error_exit;
             }
         }
@@ -265,6 +275,22 @@ static ssize_t pvfs2_file_write(
                 (file && file->f_dentry && file->f_dentry->d_name.name ?
                  (char *)file->f_dentry->d_name.name : "UNKNOWN"));
 
+    if (!access_ok(VERIFY_READ, buf, count))
+        return -EFAULT;
+
+    /* perform generic linux kernel tests for sanity of write arguments */
+    /* NOTE: this is particularly helpful in handling fsize rlimit properly */
+#ifdef PVFS2_LINUX_KERNEL_2_4
+    ret = pvfs2_precheck_file_write(file, inode, &count, offset);
+#else
+    ret = generic_write_checks(file, offset, &count, S_ISBLK(inode->i_mode));
+#endif
+    if (ret != 0 || count == 0)
+    {
+        pvfs2_print("pvfs2_file_write: failed generic argument checks.\n");
+        return(ret);
+    }
+
     while(total_count < count)
     {
         new_op = op_alloc();
@@ -298,15 +324,15 @@ static ssize_t pvfs2_file_write(
         new_op->upcall.req.io.offset = *offset;
 
         /* copy data from application */
-        if (pvfs_bufmap_copy_from_user(
-                buffer_index, current_buf, each_count))
+        ret = pvfs_bufmap_copy_from_user(
+            buffer_index, current_buf, each_count);
+        if(ret < 0)
         {
-            pvfs2_error("Failed to copy user buffer.  Please make sure "
-                        "that the pvfs2-client is running.\n");
+            pvfs2_print("Failed to copy user buffer.\n");
             op_release(new_op);
             pvfs_bufmap_put(buffer_index);
             *offset = original_offset;
-            return -EIO;
+            return ret;
         }
 
         dc_status = 0;
@@ -552,6 +578,113 @@ struct file_operations pvfs2_file_operations =
     .fsync = pvfs2_fsync
 #endif
 };
+
+#ifdef PVFS2_LINUX_KERNEL_2_4
+/*
+ * pvfs2_precheck_file_write():
+ * Check the conditions on a file descriptor prior to beginning a write
+ * on it.  Contains the common precheck code for both buffered and direct
+ * IO.
+ *
+ * NOTE: this function is a modified version of precheck_file_write() from
+ * 2.4.x.  precheck_file_write() is not exported so we are forced to
+ * duplicate it here.
+ */
+static int pvfs2_precheck_file_write(struct file *file, struct inode *inode,
+    size_t *count, loff_t *ppos)
+{
+    ssize_t       err;
+    unsigned long limit = current->rlim[RLIMIT_FSIZE].rlim_cur;
+    loff_t        pos = *ppos;
+    
+    err = -EINVAL;
+    if (pos < 0)
+        goto out;
+
+    err = file->f_error;
+    if (err) {
+        file->f_error = 0;
+        goto out;
+    }
+
+    /* FIXME: this is for backwards compatibility with 2.4 */
+    if (!S_ISBLK(inode->i_mode) && (file->f_flags & O_APPEND))
+        *ppos = pos = inode->i_size;
+
+    /*
+     * Check whether we've reached the file size limit.
+     */
+    err = -EFBIG;
+    
+    if (!S_ISBLK(inode->i_mode) && limit != RLIM_INFINITY) {
+        if (pos >= limit) {
+            send_sig(SIGXFSZ, current, 0);
+            goto out;
+        }
+        if (pos > 0xFFFFFFFFULL || *count > limit - (u32)pos) {
+            /* send_sig(SIGXFSZ, current, 0); */
+            *count = limit - (u32)pos;
+        }
+    }
+
+    /*
+     *    LFS rule 
+     */
+    if ( pos + *count > MAX_NON_LFS && !(file->f_flags&O_LARGEFILE)) {
+        if (pos >= MAX_NON_LFS) {
+            send_sig(SIGXFSZ, current, 0);
+            goto out;
+        }
+        if (*count > MAX_NON_LFS - (u32)pos) {
+            /* send_sig(SIGXFSZ, current, 0); */
+            *count = MAX_NON_LFS - (u32)pos;
+        }
+    }
+
+    /*
+     *    Are we about to exceed the fs block limit ?
+     *
+     *    If we have written data it becomes a short write
+     *    If we have exceeded without writing data we send
+     *    a signal and give them an EFBIG.
+     *
+     *    Linus frestrict idea will clean these up nicely..
+     */
+     
+    if (!S_ISBLK(inode->i_mode)) {
+        if (pos >= inode->i_sb->s_maxbytes)
+        {
+            if (*count || pos > inode->i_sb->s_maxbytes) {
+                send_sig(SIGXFSZ, current, 0);
+                err = -EFBIG;
+                goto out;
+            }
+            /* zero-length writes at ->s_maxbytes are OK */
+        }
+
+        if (pos + *count > inode->i_sb->s_maxbytes)
+            *count = inode->i_sb->s_maxbytes - pos;
+    } else {
+        if (is_read_only(inode->i_rdev)) {
+            err = -EPERM;
+            goto out;
+        }
+        if (pos >= inode->i_size) {
+            if (*count || pos > inode->i_size) {
+                err = -ENOSPC;
+                goto out;
+            }
+        }
+
+        if (pos + *count > inode->i_size)
+            *count = inode->i_size - pos;
+    }
+
+    err = 0;
+out:
+    return err;
+}
+#endif
 
 /*
  * Local variables:

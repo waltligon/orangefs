@@ -290,9 +290,10 @@ int pvfs_bufmap_copy_to_user(void __user *to, int buffer_index, int size)
 
     if (bufmap_init == 0)
     {
-        pvfs2_print("pvfs2_bufmap_copy_to_user: not yet "
-                    "initialized; returning\n");
-        return 1;
+        pvfs2_error("pvfs2_bufmap_copy_to_user: not yet "
+                    "initialized.\n");
+        pvfs2_error("pvfs2: please confirm that pvfs2-client daemon is running.\n");
+        return -EIO;
     }
 
     while(amt_copied < size)
@@ -307,8 +308,8 @@ int pvfs_bufmap_copy_to_user(void __user *to, int buffer_index, int size)
 
         if (ret)
         {
-            pvfs2_error("Failed to copy data to user space\n");
-            return -EIO;
+            pvfs2_print("Failed to copy data to user space\n");
+            return -EFAULT;
         }
 
         offset += cur_copy_size;
@@ -331,9 +332,10 @@ int pvfs_bufmap_copy_to_kernel(
 
     if (bufmap_init == 0)
     {
-        pvfs2_print("pvfs2_bufmap_copy_to_kernel: not yet "
-                    "initialized; returning\n");
-        return 1;
+        pvfs2_error("pvfs2_bufmap_copy_to_kernel: not yet "
+                    "initialized.\n");
+        pvfs2_error("pvfs2: please confirm that pvfs2-client daemon is running.\n");
+        return -EIO;
     }
 
     while(amt_copied < size)
@@ -373,9 +375,10 @@ int pvfs_bufmap_copy_from_user(
 
     if (bufmap_init == 0)
     {
-        pvfs2_print("pvfs2_bufmap_copy_from_user: not yet "
-                    "initialized; returning\n");
-        return 1;
+        pvfs2_error("pvfs2_bufmap_copy_from_user: not yet "
+                    "initialized.\n");
+        pvfs2_error("pvfs2: please confirm that pvfs2-client daemon is running.\n");
+        return -EIO;
     }
 
     while(amt_copied < size)
@@ -390,8 +393,8 @@ int pvfs_bufmap_copy_from_user(
 
         if (ret)
         {
-            pvfs2_error("Failed to copy data from user space\n");
-            return -EIO;
+            pvfs2_print("Failed to copy data from user space\n");
+            return -EFAULT;
         }
 
         offset += cur_copy_size;
