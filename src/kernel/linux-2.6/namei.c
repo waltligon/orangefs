@@ -237,6 +237,39 @@ static int pvfs2_unlink(
     return ret;
 }
 
+/* pvfs2_link() is only implemented here to make sure that we return a
+ * reasonable error code (the kernel will return a misleading EPERM
+ * otherwise).  PVFS2 does not support hard links.
+ */
+static int pvfs2_link(
+    struct dentry * old_dentry, 
+    struct inode * dir,
+    struct dentry *dentry)
+{
+    return(-EOPNOTSUPP);
+}
+
+/* pvfs2_mknod() is only implemented here to make sure that we return a
+ * reasonable error code (the kernel will return a misleading EPERM
+ * otherwise).  PVFS2 does not support special files such as fifos or devices.
+ */
+#ifdef PVFS2_LINUX_KERNEL_2_4
+static int pvfs2_mknod(
+    struct inode *dir,
+    struct dentry *dentry,
+    int mode,
+    int rdev)
+#else
+static int pvfs2_mknod(
+    struct inode *dir,
+    struct dentry *dentry,
+    int mode,
+    dev_t rdev)
+#endif
+{
+    return(-EOPNOTSUPP);
+}
+
 static int pvfs2_symlink(
     struct inode *dir,
     struct dentry *dentry,
@@ -409,20 +442,24 @@ struct inode_operations pvfs2_dir_inode_operations =
 #ifdef PVFS2_LINUX_KERNEL_2_4
     create : pvfs2_create,
     lookup : pvfs2_lookup,
+    link : pvfs2_link,
     unlink : pvfs2_unlink,
     symlink : pvfs2_symlink,
     mkdir : pvfs2_mkdir,
     rmdir : pvfs2_rmdir,
+    mknod : pvfs2_mknod,
     rename : pvfs2_rename,
     setattr : pvfs2_setattr,
     revalidate : pvfs2_revalidate
 #else
     .create = pvfs2_create,
     .lookup = pvfs2_lookup,
+    .link = pvfs2_link,
     .unlink = pvfs2_unlink,
     .symlink = pvfs2_symlink,
     .mkdir = pvfs2_mkdir,
     .rmdir = pvfs2_rmdir,
+    .mknod = pvfs2_mknod,
     .rename = pvfs2_rename,
     .setattr = pvfs2_setattr,
     .getattr = pvfs2_getattr
