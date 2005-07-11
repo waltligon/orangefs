@@ -58,9 +58,10 @@ endecode_fields_1(PVFS_datafile_attr, PVFS_size, size)
 /* attributes specific to directory objects */
 struct PVFS_directory_attr_s
 {
-    /* undefined */
+    PVFS_size dirent_count;
 };
 typedef struct PVFS_directory_attr_s PVFS_directory_attr;
+endecode_fields_1(PVFS_directory_attr, PVFS_size, dirent_count)
 
 /* attributes specific to symlinks */
 struct PVFS_symlink_attr_s
@@ -115,6 +116,8 @@ typedef struct PVFS_object_attr PVFS_object_attr;
 	encode_PVFS_datafile_attr(pptr, &(x)->u.data); \
     if ((x)->mask & PVFS_ATTR_SYMLNK_TARGET) \
 	encode_PVFS_symlink_attr(pptr, &(x)->u.sym); \
+    if ((x)->mask & PVFS_ATTR_DIR_DIRENT_COUNT) \
+	encode_PVFS_directory_attr(pptr, &(x)->u.dir); \
 } while (0)
 #define decode_PVFS_object_attr(pptr,x) do { \
     decode_PVFS_uid(pptr, &(x)->owner); \
@@ -134,6 +137,8 @@ typedef struct PVFS_object_attr PVFS_object_attr;
 	decode_PVFS_datafile_attr(pptr, &(x)->u.data); \
     if ((x)->mask & PVFS_ATTR_SYMLNK_TARGET) \
 	decode_PVFS_symlink_attr(pptr, &(x)->u.sym); \
+    if ((x)->mask & PVFS_ATTR_DIR_DIRENT_COUNT) \
+	decode_PVFS_directory_attr(pptr, &(x)->u.dir); \
 } while (0)
 #endif
 /* could have one each of PVFS_Dist, dfile_array, symlink_target */

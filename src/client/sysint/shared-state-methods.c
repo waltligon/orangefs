@@ -43,7 +43,7 @@ int PINT_sm_common_parent_getattr_setup_msgpair(PINT_client_sm *sm_p,
         *sm_p->cred_p,
         sm_p->parent_ref.fs_id,
         sm_p->parent_ref.handle,
-        PVFS_ATTR_COMMON_ALL);
+        PVFS_ATTR_COMMON_ALL | PVFS_ATTR_DIR_ALL);
 
     sm_p->msgpair.fs_id = sm_p->parent_ref.fs_id;
     sm_p->msgpair.handle = sm_p->parent_ref.handle;
@@ -96,7 +96,7 @@ int PINT_sm_common_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
         *sm_p->cred_p,
         sm_p->object_ref.fs_id,
         sm_p->object_ref.handle,
-        (PVFS_ATTR_COMMON_ALL | PVFS_ATTR_META_ALL));
+        (PVFS_ATTR_COMMON_ALL | PVFS_ATTR_META_ALL | PVFS_ATTR_DIR_ALL));
 
     sm_p->msgpair.fs_id = sm_p->object_ref.fs_id;
     sm_p->msgpair.handle = sm_p->object_ref.handle;

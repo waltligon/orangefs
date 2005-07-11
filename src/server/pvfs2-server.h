@@ -255,7 +255,9 @@ struct PINT_server_mkdir_op
 struct PINT_server_getattr_op
 {
     PVFS_handle handle;
+    PVFS_handle dirdata_handle;
     PVFS_fs_id fs_id;
+    PVFS_ds_attributes dirdata_ds_attr;
     uint32_t attrmask;
 };
     

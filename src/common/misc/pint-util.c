@@ -127,6 +127,12 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
             dest->objtype = src->objtype;
         }
 
+        if (src->mask & PVFS_ATTR_DIR_DIRENT_COUNT)
+        {
+            dest->u.dir.dirent_count = 
+                src->u.dir.dirent_count;
+        }
+
         /*
           NOTE:
           we only copy the size out if we're actually a

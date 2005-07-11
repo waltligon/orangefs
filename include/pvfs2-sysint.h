@@ -42,6 +42,7 @@ struct PVFS_sys_attr_s
     PVFS_size size;
     char *link_target; /* NOTE: caller must free if valid */
     int dfile_count;
+    PVFS_size dirent_count;
     PVFS_ds_type objtype;
     uint32_t mask;
 };

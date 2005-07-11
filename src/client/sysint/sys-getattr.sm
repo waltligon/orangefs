@@ -253,6 +253,13 @@ static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
         attrmask |= PVFS_ATTR_SYMLNK_TARGET;
     }
 
+    if (attrmask & PVFS_ATTR_SYS_DIRENT_COUNT)
+    {
+        attrmask &= ~PVFS_ATTR_SYS_DIRENT_COUNT;
+        attrmask |= PVFS_ATTR_DIR_DIRENT_COUNT;
+    }
+
+
     gossip_debug(GOSSIP_GETATTR_DEBUG,
                  "attrmask being passed to server: ");
     PINT_attrmask_print(GOSSIP_GETATTR_DEBUG, attrmask);
@@ -359,6 +366,14 @@ static int getattr_object_getattr_comp_fn(
     {
         sm_p->u.getattr.getattr_resp_p->attr.dfile_count = 
             attr->u.meta.dfile_count;
+    }
+
+    /* special case for when users ask for dirent count */
+    if ((attr->objtype == PVFS_TYPE_DIRECTORY) &&
+        (sm_p->u.getattr.attrmask & PVFS_ATTR_DIR_DIRENT_COUNT))
+    {
+        sm_p->u.getattr.getattr_resp_p->attr.dirent_count = 
+            attr->u.dir.dirent_count;
     }
 
     /* copy outgoing sys_attr fields from returned object_attr */
