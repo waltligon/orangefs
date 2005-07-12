@@ -1,48 +1,6 @@
-#!/bin/sh
+#!/bin/sh 
 
-# can't really be common since tests might want more/less time or nodes
-
-# i'm terribly sorry for how confusing this is... I want to generate a pbs
-# script that itself uses some environment variables.  Thus we escape some
-# dollar signs before things like $PATH, but not others like $PAV_CONFIG.  
-
-make_pbs_script() {
-
-	echo "#!/bin/sh
-#PBS -l walltime=0:10:0
-#PBS -l nodes=8
-#PBS -j oe
-
-nprocs=4
-
-$CLUSTER_DIR/pav/pav_start -c $PAV_CONFIG -n \$nprocs >/dev/null
-
-eval \$( $CLUSTER_DIR/pav/pav_info -c $PAV_CONFIG)
-export PVFS2TAB_FILE
-
-PATH=${CLUSTER_DIR}/mpich2/bin:\${PATH}
-mpdboot --file=\${WORKINGDIR}/compnodes --totalnum=\$nprocs
-
-mpiexec -np \$nprocs ${NONCONTIG} -fname pvfs2:\${MOUNTPOINT}/ncfile1 -v -veclen \$(( 8 * \$nprocs )) -elmtcount $((1024*2)) -veccount 1 -timing -all -loops 1
-
-mpdallexit
-$CLUSTER_DIR/pav/pav_stop -c $PAV_CONFIG >/dev/null" 
-}
-
-# this could be common among tests...
-
-block_until_done() {
-	while true ; do 
-		qstat -i $job_id >/dev/null 2>&1 
-		if [ $? -eq 0 ] ; then
-			sleep 60
-			continue
-		else
-			break
-		fi	
-	done
-}
-
+. functions
 
 ##
 ## entry point for script
@@ -66,7 +24,9 @@ fi
 if [ -f $PAV_CONFIG ] ; then 
 	# write out a pbs script
 	pbs_script=${CLUSTER_DIR}/noncontig.sh
-	make_pbs_script > $pbs_script
+	make_pbs_script ${NONCONTIG} -fname pvfs2:\${MOUNTPOINT}/ncfile1 \
+		-v -veclen 32 -elmtcount $((1024*2)) \
+		-veccount 1 -timing -all -loops 1 > $pbs_script
 
 	# submit it
 	job_id=$(qsub -N noncontig -q shared $pbs_script | cut -d . -f1)
