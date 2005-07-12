@@ -12,6 +12,8 @@ pvfs2-1.2.0pre1
   The number of dfiles is set by searching for the first given hint in this
   order:  application hints, tabfile, server config.  The selected 
   distribution may modify the hint if neccesary.
+- Phil Carns contributed general improvements and bug fixes for the dotconf
+  parser.
 
 pvfs2-1.1.0
 ===============
