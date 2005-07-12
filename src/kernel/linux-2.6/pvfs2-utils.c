@@ -174,6 +174,11 @@ static inline int copy_attributes_to_inode(
                 inode->i_mode |= S_IFDIR;
                 inode->i_op = &pvfs2_dir_inode_operations;
                 inode->i_fop = &pvfs2_dir_operations;
+                /* NOTE: we have no good way to keep nlink consistent for 
+                 * directories across clients; keep constant at 1.  Why 1?  If
+                 * we go with 2, then find(1) gets confused and won't work
+                 * properly withouth the -noleaf option */
+                inode->i_nlink = 1;
                 ret = 0;
                 break;
             case PVFS_TYPE_SYMLINK:

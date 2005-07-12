@@ -304,7 +304,12 @@ static int pvfs2_mkdir(
 
     if (inode)
     {
+#if 0
+        /* NOTE: we have no good way to keep nlink consistent for directories
+         * across clients; keep constant at 1  -Phil
+         */
 	dir->i_nlink++;
+#endif
         pvfs2_update_inode_time(dir);
 	ret = 0;
     }
@@ -321,8 +326,13 @@ static int pvfs2_rmdir(
     ret = pvfs2_unlink(dir, dentry);
     if (ret == 0)
     {
-        inode->i_nlink--;
+        inode->i_nlink--; 
+#if 0
+        /* NOTE: we have no good way to keep nlink consistent for directories
+         * across clients; keep constant at 1  -Phil
+         */
 	dir->i_nlink--;
+#endif
         pvfs2_update_inode_time(dir);
     }
     return ret;
@@ -346,6 +356,10 @@ static int pvfs2_rename(
                 atomic_read(&new_dentry->d_count));
 
     are_directories = S_ISDIR(old_dentry->d_inode->i_mode);
+#if 0
+    /* NOTE: we have no good way to keep nlink consistent for directories
+     * across clients; keep constant at 1  -Phil
+     */
     if (are_directories && (new_dir->i_nlink >= PVFS2_LINK_MAX))
     {
         pvfs2_error("pvfs2_rename: directory %s surpassed "
@@ -353,6 +367,7 @@ static int pvfs2_rename(
                     new_dentry->d_name.name);
         return -EMLINK;
     }
+#endif
 
     new_op = op_alloc();
     if (!new_op)
@@ -412,16 +427,26 @@ static int pvfs2_rename(
     if (new_dentry->d_inode)
     {
         new_dentry->d_inode->i_ctime = CURRENT_TIME;
+#if 0
+        /* NOTE: we have no good way to keep nlink consistent for directories
+         * across clients; keep constant at 1  -Phil
+         */
         if (are_directories)
         {
             new_dentry->d_inode->i_nlink--;
         }
+#endif
     }
+#if 0
+    /* NOTE: we have no good way to keep nlink consistent for directories
+     * across clients; keep constant at 1  -Phil
+     */
     else if (are_directories)
     {
         new_dir->i_nlink++;
         old_dir->i_nlink--;
     }
+#endif
 
   error_exit:
     translate_error_if_wait_failed(ret, 0, 0);
