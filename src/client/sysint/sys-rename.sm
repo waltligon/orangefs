@@ -1,6 +1,9 @@
 /* 
  * (C) 2003 Clemson University and The University of Chicago 
  *
+ * Changes by Acxiom Corporation to add extra safety checks via getattr
+ * Copyright © Acxiom Corporation, 2005.
+ *
  * See COPYING in top-level directory.
  */
 
@@ -63,6 +66,8 @@ static int rename_crdirent_retry_or_fail(
     PINT_client_sm *sm_p, job_status_s *js_p);
 static int rename_rmdirent_retry_or_fail(
     PINT_client_sm *sm_p, job_status_s *js_p);
+static int rename_getattr_src_interpret(
+    PINT_client_sm *sm_p, job_status_s *js_p);
 
 static int rename_lookups_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
@@ -80,6 +85,13 @@ machine pvfs2_client_rename_sm(
     rename_lookups_setup_msgpair_array,
     rename_lookups_xfer_msgpair_array,
     rename_lookups_failure,
+    rename_getattr_src_setup,
+    rename_getattr_src_xfer,
+    rename_getattr_src_interpret,
+    rename_getattr_dest_setup,
+    rename_getattr_dest_xfer,
+    rename_getattr_dest_interpret,
+    rename_getattr_cleanup,
     rename_crdirent_setup_msgpair,
     rename_crdirent_xfer_msgpair,
     rename_crdirent_retry_or_fail,
@@ -114,8 +126,48 @@ machine pvfs2_client_rename_sm(
     {
         jump pvfs2_msgpairarray_sm;
         success => rename_crdirent_setup_msgpair;
-        RENAME_CHDIRENT => rename_chdirent_setup_msgpair;
+        RENAME_CHDIRENT => rename_getattr_src_setup;
         default => rename_lookups_failure;
+    }
+
+    state rename_getattr_src_setup
+    {
+        run PINT_sm_common_object_getattr_setup_msgpair;
+        success => rename_getattr_src_xfer;
+        default => rename_getattr_cleanup;
+    }
+
+    state rename_getattr_src_xfer
+    {
+        jump pvfs2_client_getattr_acache_sm;
+        success => rename_getattr_src_interpret;
+        default => rename_getattr_cleanup;
+    }
+
+    state rename_getattr_src_interpret
+    {
+        run rename_getattr_src_interpret;
+        default => rename_getattr_dest_setup;
+    }
+
+    state rename_getattr_dest_setup
+    {
+        run PINT_sm_common_object_getattr_setup_msgpair;
+        success => rename_getattr_dest_xfer;
+        default => rename_getattr_cleanup;
+    }
+
+    state rename_getattr_dest_xfer
+    {
+        jump pvfs2_client_getattr_acache_sm;
+        success => rename_chdirent_setup_msgpair;
+        default => rename_getattr_cleanup;
+    }
+
+    state rename_getattr_cleanup
+    {
+        run PINT_sm_common_object_getattr_failure;
+        default => cleanup;
     }
 
     state rename_lookups_failure
@@ -430,7 +482,19 @@ static int rename_lookups_comp_fn(
           properly verified before changing anything
         */
         sm_p->u.rename.target_dirent_exists = 1;
-        return RENAME_CHDIRENT;
+        /* set fs_id and handle for getattr nested sm */
+        sm_p->object_ref = sm_p->u.rename.refns[0];
+
+        if(sm_p->msgarray[0].op_status == 0)
+        {
+            /* if both lookups succeeded, then we need chdirent */
+            return RENAME_CHDIRENT;
+        }
+        else
+        {
+            /* if the first one failed, maintain its error code */
+            return(sm_p->msgarray[0].op_status);
+        }
     }
     return 0;
 }
@@ -705,9 +769,62 @@ static int rename_chdirent_setup_msgpair(PINT_client_sm *sm_p,
 {
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
+    PVFS_object_attr *attr = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: "
                  "rename_chdirent_setup_msgpair\n");
+
+    /* look at the result of the dest getattr and make sure everything looks
+     * ok before we continue
+     */
+    attr = (sm_p->acache_hit ?
+            &sm_p->pinode->attr :
+            &sm_p->acache_attr);
+    assert(attr);
+    sm_p->u.rename.types[1] = attr->objtype;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "rename dest type: %d\n", attr->objtype);
+    if(attr->objtype == PVFS_TYPE_DIRECTORY)
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "rename dest dirent_count: %Ld\n",
+                 Ld(attr->u.dir.dirent_count));
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "rename dest attr mask: %d\n", (int)attr->mask);
+    }
+
+    /* if the destination is a directory, is it empty? */
+    if(attr->objtype == PVFS_TYPE_DIRECTORY && attr->u.dir.dirent_count != 0)
+    {
+        js_p->error_code = -PVFS_ENOTEMPTY;
+        return(1);
+    }
+    
+    /* do the types match? */
+    if(sm_p->u.rename.types[0] != sm_p->u.rename.types[1])
+    {
+        if(sm_p->u.rename.types[1] == PVFS_TYPE_DIRECTORY)
+        {
+            js_p->error_code = -PVFS_EISDIR;
+            return(1);
+        }
+        if(sm_p->u.rename.types[1] == PVFS_TYPE_DIRECTORY)
+        {
+            js_p->error_code = -PVFS_ENOTDIR;
+            return(1);
+        }
+        /* TODO: what about other cases? */
+        js_p->error_code = -PVFS_EINVAL;
+        return(1);
+    }
+
+    /* do the fsid's match? */
+    if(sm_p->u.rename.refns[0].fs_id != sm_p->u.rename.refns[1].fs_id)
+    {
+        js_p->error_code = -PVFS_ENODEV;
+        return(1);
+    }
 
     js_p->error_code = 0;
 
@@ -880,6 +997,31 @@ static int rename_rmdirent_retry_or_fail(PINT_client_sm *sm_p,
 
     /* let other errors fall through to next state */
     return 1;
+}
+
+static int rename_getattr_src_interpret(
+    PINT_client_sm *sm_p, job_status_s *js_p)
+{
+    PVFS_object_attr *attr = NULL;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "rename state: getattr_src_interpret\n");
+
+    attr = (sm_p->acache_hit ?
+            &sm_p->pinode->attr :
+            &sm_p->acache_attr);
+
+    assert(attr);
+
+    sm_p->u.rename.types[0] = attr->objtype;
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "rename src type: %d\n", attr->objtype);
+
+    /* setup for destination getattr */
+    sm_p->object_ref = sm_p->u.rename.refns[1];
+
+    js_p->error_code = 0;
+    return(1);
 }
 
 /*
