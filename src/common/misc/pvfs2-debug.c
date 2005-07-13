@@ -40,6 +40,7 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "network", GOSSIP_BMI_DEBUG_ALL },
     { "server", GOSSIP_SERVER_DEBUG },
     { "client", GOSSIP_CLIENT_DEBUG },
+    { "varstrip", GOSSIP_VARSTRIP_DEBUG },
     { "job", GOSSIP_JOB_DEBUG },
     { "request", GOSSIP_REQUEST_DEBUG },
     { "reqsched", GOSSIP_REQ_SCHED_DEBUG },
