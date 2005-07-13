@@ -1798,6 +1798,7 @@ case err: bmi_errno = BMI_##err; break
         __CASE(EHOSTDOWN);
         __CASE(EHOSTUNREACH);
         __CASE(EALREADY);
+        __CASE(EACCES);
 #undef __CASE
     }
     return bmi_errno;

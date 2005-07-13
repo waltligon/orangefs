@@ -65,20 +65,38 @@ int BMI_sockio_connect_sock(int sockd,
 		 int service)
 {
     struct sockaddr saddr;
+    int ret;
 
-    if (BMI_sockio_init_sock(&saddr, name, service) != 0)
-	return (-1);
+    if ((ret = BMI_sockio_init_sock(&saddr, name, service)) != 0)
+	return (ret); /* converted to PVFS error code below */
   connect_sock_restart:
     if (connect(sockd, (struct sockaddr *) &saddr, sizeof(saddr)) < 0)
     {
 	if (errno == EINTR)
 	    goto connect_sock_restart;
-	return (-1);
+        return (-PVFS_ERROR_CODE(errno));
     }
     return (sockd);
 }
 
 #ifdef HAVE_GETHOSTBYNAME
+static int conv_h_errno(int herr)
+{   
+    switch (herr)
+    {
+    case HOST_NOT_FOUND :
+        return BMI_EHOSTNTFD;
+    case NO_ADDRESS :
+        return BMI_EADDRNTFD;
+    case NO_RECOVERY :
+        return BMI_ENORECVR;
+    case TRY_AGAIN :
+        return BMI_ETRYAGAIN;
+    default :
+        return herr;
+    }
+}
+
 /* gethostbyname version */
 int BMI_sockio_init_sock(struct sockaddr *saddrp,
 			 const char *name,
@@ -91,12 +109,12 @@ int BMI_sockio_init_sock(struct sockaddr *saddrp,
     {
 	if ((hep = gethostbyname("localhost")) == NULL)
 	{
-	    return (-1);
+	    return (-conv_h_errno(h_errno));
 	}
     }
     else if ((hep = gethostbyname(name)) == NULL)
     {
-	return (-1);
+	return (-conv_h_errno(h_errno));
     }
     ((struct sockaddr_in *) saddrp)->sin_family = AF_INET;
     ((struct sockaddr_in *) saddrp)->sin_port = htons((u_short) service);

@@ -1640,7 +1640,7 @@ static int tcp_sock_init(method_addr_p my_method_addr)
 	fcntl(tcp_addr_data->socket, F_SETFL, oldfl | O_NONBLOCK);
     }
 
-    /* turn of Nagle's algorithm */
+    /* turn off Nagle's algorithm */
     if (BMI_sockio_set_tcpopt(tcp_addr_data->socket, TCP_NODELAY, 1) < 0)
     {
 	tmp_errno = errno;
@@ -1655,9 +1655,9 @@ static int tcp_sock_init(method_addr_p my_method_addr)
 		      "Connect: socket=%d, hostname=%s, port=%d\n",
 		      tcp_addr_data->socket, tcp_addr_data->hostname,
 		      tcp_addr_data->port);
-	ret =
-	    BMI_sockio_connect_sock(tcp_addr_data->socket, tcp_addr_data->hostname,
-			 tcp_addr_data->port);
+	ret = BMI_sockio_connect_sock(tcp_addr_data->socket,
+                      tcp_addr_data->hostname,
+		      tcp_addr_data->port);
     }
     else
     {
@@ -1673,9 +1673,9 @@ static int tcp_sock_init(method_addr_p my_method_addr)
 	}
 	else
 	{
-            tmp_errno = errno;
-	    gossip_err("Error: BMI_sockio_connect_sock: %s\n", strerror(tmp_errno));
-	    return (bmi_tcp_errno_to_pvfs(-tmp_errno));
+            /* BMI_sockio_connect_sock returns a PVFS error */
+            PVFS_perror_gossip("Error: BMI_sockio_connect_sock", ret);
+	    return (ret);
 	}
     }
 
@@ -2665,6 +2665,7 @@ static int work_on_send_op(method_op_p my_method_op,
 	ret = tcp_sock_init(my_method_op->addr);
 	if (ret < 0)
 	{
+            PVFS_perror_gossip("Error: socket failed to init", ret);
 	    tcp_forget_addr(my_method_op->addr, 0, ret);
 	    return (0);
 	}

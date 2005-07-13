@@ -431,6 +431,10 @@ PVFS_error PVFS_get_errno_mapping(PVFS_error error);
 #define PVFS_ECANCEL    (1|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
 #define PVFS_EDEVINIT   (2|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
 #define PVFS_EDETAIL    (3|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
+#define PVFS_EHOSTNTFD  (4|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
+#define PVFS_EADDRNTFD  (5|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
+#define PVFS_ENORECVR   (6|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
+#define PVFS_ETRYAGAIN  (7|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
 
 /* NOTE: PLEASE DO NOT ARBITRARILY ADD NEW ERRNO ERROR CODES!
  *
@@ -508,13 +512,21 @@ char *PINT_non_errno_strerror_mapping[] = {           \
     "Success", /* 0 */                                \
     "Operation cancelled (possibly due to timeout)",  \
     "Device initialization failed",                   \
-    "Detailed per-server errors are available"        \
+    "Detailed per-server errors are available",       \
+    "Host not found",                                 \
+    "Valid host name but no IP address found",        \
+    "Non recoverable error",                          \
+    "Try Again"                                       \
 };                                                    \
 PVFS_error PINT_non_errno_mapping[] = {               \
     0,     /* leave this one empty */                 \
     PVFS_ECANCEL,   /* 1 */                           \
     PVFS_EDEVINIT,  /* 2 */                           \
-    PVFS_EDETAIL    /* 3 */                           \
+    PVFS_EDETAIL,   /* 3 */                           \
+    PVFS_EHOSTNTFD, /* 4 */                           \
+    PVFS_EADDRNTFD, /* 5 */                           \
+    PVFS_ENORECVR,  /* 6 */                           \
+    PVFS_ETRYAGAIN  /* 7 */                           \
 }
 
 /*

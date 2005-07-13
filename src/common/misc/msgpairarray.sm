@@ -361,7 +361,7 @@ static int msgpairarray_post(PARENT_SM *sm_p,
             else
             {
                 PVFS_perror_gossip("Send immediately failed",
-                    msg_p->recv_status.error_code);
+                    msg_p->send_status.error_code);
             }
 
             gossip_err("Send error: cancelling recv.\n");
