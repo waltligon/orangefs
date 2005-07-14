@@ -9,40 +9,27 @@
 
 #include "pvfs2-types.h"
 
-struct Strips_s
+struct PINT_dist_strips_s
 {
-    unsigned int servernr;
+    unsigned int server_nr;
     PVFS_offset offset;
     PVFS_size size;
 };
 
-typedef struct Strips_s Strips;
+typedef struct PINT_dist_strips_s PINT_dist_strips;
 
-void strips_FreeMem(Strips **strip);
-int strips_Parse(const char *input, Strips **strip, unsigned *count);
+void PINT_dist_strips_free_mem(PINT_dist_strips **strip);
+int PINT_dist_strips_parse(
+    const char *input, PINT_dist_strips **strip, unsigned *count);
 
 #endif
+
 /*
- * (C) 2005 Frederik Grüll <frederik.gruell@web.de>
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
  *
- * See COPYING in top-level directory.
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
  */
-
-#ifndef PVFS_DIST_VARSTRIP_PARSER_H
-#define PVFS_DIST_VARSTRIP_PARSER_H
-
-#include "pvfs2-types.h"
-
-struct Strips_s
-{
-    unsigned int servernr;
-    PVFS_offset offset;
-    PVFS_size size;
-};
-
-typedef struct Strips_s Strips;
-
-void strips_FreeMem(Strips **strip);
-int strips_Parse(const char *input, Strips **strip, unsigned *count);
-
-#endif
