@@ -121,18 +121,24 @@ static int geteattr_list_setup_resp(PINT_server_op *s_op, job_status_s *js_p)
 {
     int i, tsz;
     PINT_STATE_DEBUG("setup_resp");
+    gossip_debug(GOSSIP_GETEATTR_DEBUG,"geteattr_list requesting %d keys\n",
+            s_op->req->u.geteattr_list.nkey);
     s_op->resp.u.geteattr_list.val =
         malloc(s_op->req->u.geteattr_list.nkey*sizeof(PVFS_ds_keyval));
     if (!s_op->resp.u.geteattr_list.val)
         return -PVFS_ENOMEM;
+    s_op->resp.u.geteattr_list.nkey = s_op->req->u.geteattr_list.nkey;
     for (i = 0, tsz = 0; i < s_op->req->u.geteattr_list.nkey; i++)
         tsz += s_op->req->u.geteattr_list.valsz[i];
     s_op->u.eattr_list.buffer = malloc(tsz);
     if (!s_op->u.eattr_list.buffer)
     {
+        s_op->resp.u.geteattr_list.nkey = 0;
         free (s_op->resp.u.geteattr_list.val);
         return -PVFS_ENOMEM;
     }
+    gossip_debug(GOSSIP_GETEATTR_DEBUG,"geteattr_list buffer size %d bytes\n",
+            tsz);
     for (i = 0, tsz = 0; i < s_op->req->u.geteattr_list.nkey; i++)
     {
         s_op->resp.u.geteattr_list.val[i].buffer_sz =
@@ -182,6 +188,8 @@ static int geteattr_list_read_eattrib(
 static int geteattr_list_check_resp(PINT_server_op *s_op, job_status_s *js_p)
 {
     PINT_STATE_DEBUG("check_resp");
+    gossip_debug(GOSSIP_GETEATTR_DEBUG,"geteattr_list returning %d values\n",
+            s_op->resp.u.geteattr_list.nkey);
     return 1;
 }
 

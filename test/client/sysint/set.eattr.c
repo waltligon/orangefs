@@ -224,8 +224,11 @@ static struct options* parse_args(int argc, char* argv[])
     }
     else
     {
-        *((char *)tmp_opts->val.buffer) = '\0';
-        ((char *)tmp_opts->val.buffer)++;
+        char *valbuf; /* this is to avoid a lhs cast */
+        valbuf = tmp_opts->val.buffer;
+        *valbuf = '\0';
+        valbuf++;
+        tmp_opts->val.buffer = valbuf;
         tmp_opts->key.buffer_sz =
             ((char *)tmp_opts->val.buffer) -
             ((char *)tmp_opts->key.buffer);

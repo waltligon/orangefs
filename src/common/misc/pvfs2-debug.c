@@ -29,7 +29,8 @@ GOSSIP_REMOVE_DEBUG | GOSSIP_GETATTR_DEBUG | GOSSIP_READDIR_DEBUG|\
 GOSSIP_IO_DEBUG | GOSSIP_DBPF_OPEN_CACHE_DEBUG |                  \
 GOSSIP_PERMISSIONS_DEBUG | GOSSIP_CANCEL_DEBUG |                  \
 GOSSIP_MSGPAIR_DEBUG | GOSSIP_CLIENTCORE_DEBUG |                  \
-GOSSIP_SETATTR_DEBUG | GOSSIP_MKDIR_DEBUG)
+GOSSIP_SETATTR_DEBUG | GOSSIP_MKDIR_DEBUG |                       \
+GOSSIP_SETEATTR_DEBUG | GOSSIP_GETEATTR_DEBUG)
 
 /* map all config keywords to pvfs2 debug masks here */
 static __keyword_mask_t s_keyword_mask_map[] =
@@ -54,6 +55,8 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "remove", GOSSIP_REMOVE_DEBUG },
     { "getattr", GOSSIP_GETATTR_DEBUG },
     { "setattr", GOSSIP_SETATTR_DEBUG },
+    { "geteattr", GOSSIP_GETEATTR_DEBUG },
+    { "seteattr", GOSSIP_SETEATTR_DEBUG },
     { "readdir", GOSSIP_READDIR_DEBUG },
     { "mkdir", GOSSIP_MKDIR_DEBUG },
     { "io", GOSSIP_IO_DEBUG },

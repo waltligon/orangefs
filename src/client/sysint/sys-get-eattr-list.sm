@@ -216,7 +216,18 @@ static int get_eattr_list_comp_fn(
 
     if (sm_p->msgarray[i].op_status == 0)
     {
-        int k;
+        int k, mink;
+        mink = sm_p->u.geteattr_list.nkey;
+        if (resp_p->u.geteattr_list.nkey < mink)
+        {
+            mink = resp_p->u.geteattr_list.nkey;
+            gossip_err("Successful call returned fewer values than requested\n");
+        }
+        if (!resp_p->u.geteattr_list.val)
+        {
+            gossip_err("Successful call returned NULL value list\n");
+            return -1;
+        }
         for (k = 0; k < sm_p->u.geteattr_list.nkey; k++)
         {
             sm_p->u.geteattr_list.resp_p->val_array[k].read_sz =

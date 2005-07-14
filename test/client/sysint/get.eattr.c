@@ -22,6 +22,8 @@
 #define PVFS2_VERSION "Unknown"
 #endif
 
+#define VALBUFSZ 1024
+
 /* optional parameters, filled in by parse_args() */
 struct options
 {
@@ -32,7 +34,7 @@ struct options
 };
 
 static struct options* parse_args(int argc, char* argv[]);
-int pvfs2_seteattr (PVFS_ds_keyval key, PVFS_ds_keyval val, char *destfile);
+int pvfs2_geteattr (PVFS_ds_keyval key, PVFS_ds_keyval *val, char *destfile);
 static void usage(int argc, char** argv);
 int check_perm(char c);
 
@@ -66,17 +68,19 @@ int main(int argc, char **argv)
     ret = pvfs2_geteattr(user_opts->key, &user_opts->val,
             user_opts->destfiles[i]);
     if (ret != 0) {
-      break;
-
-    printf("%s\n",user_opts->val.buffer);
+        printf("geteattr returned error code - exiting\n");
+        break;
     }
+    printf("key:%s Value:\n%s\n",
+            (char *)user_opts->key.buffer,
+            (char *)user_opts->val.buffer);
     /* TODO: need to free the request descriptions */
   }
   PVFS_sys_finalize();
   return(ret);
 }
 
-/* pvfs2_seteattr()
+/* pvfs2_geteattr()
  *
  * changes the mode of the given file to the given permissions
  *
@@ -162,7 +166,7 @@ int pvfs2_geteattr (PVFS_ds_keyval key, PVFS_ds_keyval *val, char *destfile) {
           &credentials, &key, &resp_geteattr);
   if (ret < 0)
   {
-      PVFS_perror("seteattr failed with errcode", ret);
+      PVFS_perror("geteattr failed with errcode", ret);
       return(-1);
   }
   val->read_sz = resp_geteattr.val.read_sz;
@@ -222,10 +226,11 @@ static struct options* parse_args(int argc, char* argv[])
 	}
     }
     /* parse key and value from argv[optind] */
-    tmp_opts->key.buffer = argv[optind];
-    tmp_opts->key.buffer_sz = strlen(argv[optind]);
-    tmp_opts->val.buffer = malloc(VALBUFSZ);
+    tmp_opts->key.buffer_sz = strlen(argv[optind]) + 1;
+    tmp_opts->key.buffer = (char *)malloc(sizeof(char)*tmp_opts->key.buffer_sz);
+    strncpy(tmp_opts->key.buffer,argv[optind],tmp_opts->key.buffer_sz);
     tmp_opts->val.buffer_sz = VALBUFSZ;
+    tmp_opts->val.buffer = malloc(VALBUFSZ);
 
     /* finished up argument processing */
     optind = optind + 1;

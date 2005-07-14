@@ -58,6 +58,11 @@
 #define GOSSIP_SETEATTR_DEBUG          ((uint64_t)1 << 36)
 #define GOSSIP_ENDECODE_DEBUG          ((uint64_t)1 << 37)
 
+/* NOTE: if you want your gossip flag to be controlable from 
+ * pvfs2-set-debugmask you have to add it in
+ * src/common/misc/pvfs-debug.c
+ */
+
 #define GOSSIP_BMI_DEBUG_ALL (uint64_t)                               \
 (GOSSIP_BMI_DEBUG_TCP + GOSSIP_BMI_DEBUG_CONTROL +                    \
  GOSSIP_BMI_DEBUG_GM + GOSSIP_BMI_DEBUG_OFFSETS + GOSSIP_BMI_DEBUG_IB)

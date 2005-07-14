@@ -734,9 +734,13 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	    case PVFS_SERV_MGMT_ITERATE_HANDLES:
 	    case PVFS_SERV_MGMT_PERF_MON:
 	    case PVFS_SERV_MGMT_EVENT_MON:
+	    case PVFS_SERV_GETEATTR:
+	    case PVFS_SERV_GETEATTR_LIST:
+	    case PVFS_SERV_SETEATTR:
+	    case PVFS_SERV_SETEATTR_LIST:
 		/* nothing to free */
 		break;
-
+#if 0
 	    case PVFS_SERV_GETEATTR:
                 if (req->u.geteattr.key.buffer)
                     decode_free(req->u.geteattr.key.buffer);
@@ -760,7 +764,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                 if (req->u.seteattr.val.buffer)
                     decode_free(req->u.seteattr_list.val);
 		break;
-
+#endif
 	    case PVFS_SERV_INVALID:
 	    case PVFS_SERV_WRITE_COMPLETION:
 	    case PVFS_SERV_PERF_UPDATE:
