@@ -35,6 +35,7 @@
 static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p);
 static int dbpf_keyval_read_list_op_svc(struct dbpf_op *op_p);
 static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p);
+static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p);
 static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p);
 static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p);
 static int dbpf_keyval_flush_op_svc(struct dbpf_op *op_p);
@@ -837,7 +838,148 @@ static int dbpf_keyval_write_list(TROVE_coll_id coll_id,
                                   TROVE_context_id context_id,
                                   TROVE_op_id *out_op_id_p)
 {
-    return -TROVE_ENOSYS;
+    dbpf_queued_op_t *q_op_p = NULL;
+    struct dbpf_collection *coll_p = NULL;
+
+    coll_p = dbpf_collection_find_registered(coll_id);
+    if (coll_p == NULL)
+    {
+        return -TROVE_EINVAL;
+    }
+    q_op_p = dbpf_queued_op_alloc();
+    if (q_op_p == NULL)
+    {
+        return -TROVE_ENOMEM;
+    }
+
+    /* initialize all the common members */
+    dbpf_queued_op_init(q_op_p,
+                        KEYVAL_WRITE_LIST,
+                        handle,
+                        coll_p,
+                        dbpf_keyval_write_list_op_svc,
+                        user_ptr,
+                        flags,
+                        context_id);
+
+    /* initialize the op-specific members */
+    q_op_p->op.u.k_write_list.key_array = key_array;
+    q_op_p->op.u.k_write_list.val_array = val_array;
+    q_op_p->op.u.k_write_list.count = count;
+
+    *out_op_id_p = dbpf_queued_op_queue(q_op_p);
+
+    return 0;
+}
+
+static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
+{
+    int ret = -TROVE_EINVAL, got_db = 0;
+    struct open_cache_ref tmp_ref;
+    DBT key, data;
+    dbpf_attr_cache_elem_t *cache_elem = NULL;
+    TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
+    TROVE_size k_size;
+    DB_BTREE_STAT *k_stat_p = NULL;
+    int k;
+
+    ret = dbpf_open_cache_get(
+        op_p->coll_p->coll_id, op_p->handle, 1, DBPF_OPEN_DB, &tmp_ref);
+    if (ret < 0)
+    {
+        goto return_error;
+    }
+    else
+    {
+        got_db = 1;
+    }
+
+    for (k = 0; k < op_p->u.k_write_list.count; k++)
+    {
+        memset(&key, 0, sizeof(key));
+        memset(&data, 0, sizeof(data));
+        key.data = op_p->u.k_write_list.key_array[k].buffer;
+        key.size = op_p->u.k_write_list.key_array[k].buffer_sz;
+        data.data = op_p->u.k_write_list.val_array[k].buffer;
+        data.size = op_p->u.k_write_list.val_array[k].buffer_sz;
+
+        ret = tmp_ref.db_p->put(tmp_ref.db_p, NULL, &key, &data, 0);
+        if (ret != 0)
+        {
+            tmp_ref.db_p->err(tmp_ref.db_p, ret, "DB->put");
+            ret = -dbpf_db_error_to_trove_error(ret);
+            goto return_error;
+        }
+
+        gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "*** Trove KeyVal Write "
+                 "of %s\n", (char *)op_p->u.k_write_list.key_array[k].buffer);
+
+        /*
+         now that the data is written to disk, update the cache if it's
+         an attr keyval we manage.
+        */
+        cache_elem = dbpf_attr_cache_elem_lookup(ref);
+        if (cache_elem)
+        {
+            if (dbpf_attr_cache_elem_set_data_based_on_key(
+                    ref, op_p->u.k_write_list.key_array[k].buffer,
+                    op_p->u.k_write_list.val_array[k].buffer, data.size))
+            {
+                /*
+                NOTE: this can happen if the keyword isn't registered,
+                or if there is no associated cache_elem for this key
+                */
+                gossip_debug(
+                    GOSSIP_DBPF_ATTRCACHE_DEBUG,"** CANNOT cache data written "
+                    "(key is %s)\n", (char *)op_p->u.k_write_list.key_array[k].buffer);
+            }
+            else
+            {
+                gossip_debug(
+                    GOSSIP_DBPF_ATTRCACHE_DEBUG,"*** cached keyval data "
+                    "written (key is %s)\n",
+                    (char *)op_p->u.k_write_list.key_array[k].buffer);
+            }
+        }
+    }
+
+    /* this may have increased the number of keyvals stored in this
+     * object; update the k_size in the cache
+     */
+    ret = tmp_ref.db_p->stat(tmp_ref.db_p,
+#ifdef HAVE_TXNID_PARAMETER_TO_DB_STAT
+		        (DB_TXN *) NULL,
+#endif
+                         &k_stat_p,
+#ifdef HAVE_UNKNOWN_PARAMETER_TO_DB_STAT
+                          NULL,
+#endif 
+                           0);
+    if (ret == 0)
+    {
+        k_size = (TROVE_size)k_stat_p->bt_ndata;
+        free(k_stat_p);
+
+        dbpf_attr_cache_ds_attr_update_cached_data_ksize(ref, k_size);
+    }
+    else
+    {
+        tmp_ref.db_p->err(tmp_ref.db_p, ret, "DB->stat");
+        ret = -dbpf_db_error_to_trove_error(ret);
+        goto return_error;
+    }
+
+    DBPF_DB_SYNC_IF_NECESSARY(op_p, tmp_ref.db_p);
+
+    dbpf_open_cache_put(&tmp_ref);
+    return 1;
+
+ return_error:
+    if (got_db)
+    {
+        dbpf_open_cache_put(&tmp_ref);
+    }
+    return ret;
 }
 
 static int dbpf_keyval_flush(TROVE_coll_id coll_id,

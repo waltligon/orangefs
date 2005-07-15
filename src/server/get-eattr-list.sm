@@ -187,9 +187,17 @@ static int geteattr_list_read_eattrib(
  */
 static int geteattr_list_check_resp(PINT_server_op *s_op, job_status_s *js_p)
 {
+    int k;
     PINT_STATE_DEBUG("check_resp");
     gossip_debug(GOSSIP_GETEATTR_DEBUG,"geteattr_list returning %d values\n",
             s_op->resp.u.geteattr_list.nkey);
+    /* put the returned read buffer size in buffer_sz */
+    /* it is the only thing returned across the wire */
+    for (k = 0; k < s_op->resp.u.geteattr_list.nkey; k++)
+    {
+        s_op->resp.u.geteattr_list.val[k].buffer_sz =
+            s_op->resp.u.geteattr_list.val[k].read_sz;
+    }
     return 1;
 }
 

@@ -214,6 +214,12 @@ static int get_eattr_list_comp_fn(
     /* if this particular request was successful, then store the server
      * response and let the caller sort it out */
 
+    /* recall that the returned val only has buffer and buffer_sz
+     * encoded across the wire ... so the buffer_sz is actually the
+     * read_sz ... the original buffer_sz is still in the original
+     * val struct the user passed in
+     */
+
     if (sm_p->msgarray[i].op_status == 0)
     {
         int k, mink;
@@ -228,19 +234,33 @@ static int get_eattr_list_comp_fn(
             gossip_err("Successful call returned NULL value list\n");
             return -1;
         }
+        gossip_debug(GOSSIP_GETEATTR_DEBUG,"returned %d values\n",
+                sm_p->u.geteattr_list.nkey);
         for (k = 0; k < sm_p->u.geteattr_list.nkey; k++)
         {
+            gossip_debug(GOSSIP_GETEATTR_DEBUG,"resp_read_sz = %d\n",
+                    resp_p->u.geteattr_list.val[k].read_sz);
+            gossip_debug(GOSSIP_GETEATTR_DEBUG,"resp_buff_sz = %d\n",
+                    resp_p->u.geteattr_list.val[k].buffer_sz);
+            gossip_debug(GOSSIP_GETEATTR_DEBUG,"sm_buff_sz = %d\n",
+                    sm_p->u.geteattr_list.resp_p->val_array[k].buffer_sz);
+            gossip_debug(GOSSIP_GETEATTR_DEBUG,"resp_buff_ = %s\n",
+                    (char *)resp_p->u.geteattr_list.val[k].buffer);
+            /* out the actual read_sz in its place */
             sm_p->u.geteattr_list.resp_p->val_array[k].read_sz =
-                    resp_p->u.geteattr_list.val[k].read_sz;
-            if (resp_p->u.geteattr_list.val[k].read_sz <=
+                    resp_p->u.geteattr_list.val[k].buffer_sz;
+            /* check for too big a return message */
+            if (sm_p->u.geteattr_list.resp_p->val_array[k].read_sz <=
                     sm_p->u.geteattr_list.resp_p->val_array[k].buffer_sz)
             {
+                gossip_debug(GOSSIP_GETEATTR_DEBUG,"copying\n");
                 memcpy(sm_p->u.geteattr_list.resp_p->val_array[k].buffer,
                         resp_p->u.geteattr_list.val[k].buffer,
-                        resp_p->u.geteattr_list.val[k].read_sz);
+                        sm_p->u.geteattr_list.resp_p->val_array[k].read_sz);
             }
             else /* oops, error! returned too much data */
             {
+                gossip_debug(GOSSIP_GETEATTR_DEBUG,"clearing on error\n");
                 memset(sm_p->u.geteattr_list.resp_p->val_array[k].buffer,0,
                         sm_p->u.geteattr_list.resp_p->val_array[k].buffer_sz);
                 /* record an error, but keep going */
