@@ -109,7 +109,7 @@ ssize_t pvfs2_inode_read(
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
     int dc_status;
 
-    if (!access_ok(VERIFY_WRITE, buf, count))
+    if (copy_to_user && (!access_ok(VERIFY_WRITE, buf, count)))
         return -EFAULT;
 
     while(total_count < count)
