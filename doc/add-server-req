@@ -7,6 +7,7 @@ Steps in adding a request to the server:
 
 2) add a request and response struct
 		src/proto/pvfs2-req-proto.h
+		add entry to unions: PVFS_server_req and PVFS_server_resp:w
 
 2a) add endecode functions if needed
 		src/proto/endecode-funcs.h

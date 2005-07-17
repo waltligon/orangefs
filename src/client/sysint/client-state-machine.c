@@ -341,6 +341,10 @@ PVFS_error PINT_client_state_machine_post(
 	    sm_p->current_state =
                 (pvfs2_client_set_eattr_list_sm.state_machine + 1);
 	    break;
+	case PVFS_SYS_DELEATTR:
+	    sm_p->current_state =
+                (pvfs2_client_del_eattr_sm.state_machine + 1);
+	    break;
 	case PVFS_SERVER_GET_CONFIG:
 	    sm_p->current_state =
                 (pvfs2_server_get_config_sm.state_machine + 1);
@@ -870,6 +874,7 @@ char *PINT_client_get_name_str(int op_type)
         { PVFS_SYS_GETEATTR_LIST, "PVFS_SYS_GETEATTR_LIST" },
         { PVFS_SYS_SETEATTR, "PVFS_SYS_SETEATTR" },
         { PVFS_SYS_SETEATTR_LIST, "PVFS_SYS_SETEATTR_LIST" },
+        { PVFS_SYS_DELEATTR, "PVFS_SYS_DELEATTR" },
         { PVFS_SERVER_GET_CONFIG, "PVFS_SERVER_GET_CONFIG" },
         { PVFS_CLIENT_JOB_TIMER, "PVFS_CLIENT_JOB_TIMER" },
         { PVFS_DEV_UNEXPECTED, "PVFS_DEV_UNEXPECTED" },

@@ -1582,6 +1582,9 @@ static void init_req_table(void)
             OP_CASE(PVFS_SERV_SETEATTR_LIST, "seteattr_list",
                     PINT_SERVER_CHECK_ATTR,
                     PINT_SERVER_ATTRIBS_NOT_REQUIRED, &pvfs2_set_eattr_list_sm);
+            OP_CASE(PVFS_SERV_DELEATTR, "deleattr",
+                    PINT_SERVER_CHECK_ATTR,
+                    PINT_SERVER_ATTRIBS_NOT_REQUIRED, &pvfs2_del_eattr_sm);
             OP_CASE(PVFS_SERV_JOB_TIMER, "job_timer",
                     PINT_SERVER_CHECK_INVALID,
                     PINT_SERVER_ATTRIBS_REQUIRED, &pvfs2_job_timer_sm);

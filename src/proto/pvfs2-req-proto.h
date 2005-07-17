@@ -55,12 +55,13 @@ enum PVFS_server_op
     PVFS_SERV_GETEATTR = 29,
     PVFS_SERV_GETEATTR_LIST = 30,
     PVFS_SERV_SETEATTR = 31,
-    PVFS_SERV_SETEATTR_LIST = 32
+    PVFS_SERV_SETEATTR_LIST = 32,
+    PVFS_SERV_DELEATTR = 33
     /* IMPORTANT: please remember to modify PVFS_MAX_SERVER_OP define
      * (below) if you add a new operation to this list
      */
 };
-#define PVFS_MAX_SERVER_OP 32
+#define PVFS_MAX_SERVER_OP 33
 
 /*
  * These ops must always work, even if the server is in admin mode.
@@ -1330,6 +1331,38 @@ do {                                             \
     (__req).u.seteattr_list.val = (__val_array); \
 } while (0)
 
+/* deleattr ****************************************************/
+/* - deletes extended attributes */
+
+struct PVFS_servreq_deleattr
+{
+    PVFS_handle handle; /* handle of target object */
+    PVFS_fs_id fs_id;   /* file system */
+    PVFS_ds_keyval key; /* key to read */
+};
+endecode_fields_3_struct(
+    PVFS_servreq_deleattr,
+    PVFS_handle, handle,
+    PVFS_fs_id, fs_id,
+    PVFS_ds_keyval, key);
+#define extra_size_PVFS_servreq_deleattr \
+    PVFS_REQ_LIMIT_KEY_LEN
+
+#define PINT_SERVREQ_DELEATTR_FILL(__req,   \
+                                  __creds, \
+                                  __fsid,  \
+                                  __handle,\
+                                  __key) \
+do {                                       \
+    memset(&(__req), 0, sizeof(__req));    \
+    (__req).op = PVFS_SERV_DELEATTR;        \
+    (__req).credentials = (__creds);       \
+    (__req).u.deleattr.fs_id = (__fsid);    \
+    (__req).u.deleattr.handle = (__handle); \
+    (__req).u.deleattr.key.buffer_sz = (__key).buffer_sz;\
+    (__req).u.deleattr.key.buffer = (__key).buffer;\
+} while (0)
+
 /* server request *********************************************/
 /* - generic request with union of all op specific structs */
 
@@ -1365,6 +1398,7 @@ struct PVFS_server_req
         struct PVFS_servreq_geteattr_list geteattr_list;
         struct PVFS_servreq_seteattr seteattr;
         struct PVFS_servreq_seteattr_list seteattr_list;
+        struct PVFS_servreq_deleattr deleattr;
     } u;
 };
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C

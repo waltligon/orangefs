@@ -207,6 +207,10 @@ static void lebf_initialize(void)
                 req.u.seteattr_list.nkey = 0;
 		reqsize = extra_size_PVFS_servreq_seteattr_list;
 		break;
+	    case PVFS_SERV_DELEATTR:
+                req.u.deleattr.key.buffer_sz = 0;
+		reqsize = extra_size_PVFS_servreq_deleattr;
+		break;
 	}
 	/* since these take the max size when mallocing in the encode,
 	 * give them a huge number, then later fix it. */
@@ -347,6 +351,7 @@ static int lebf_encode_req(
 	CASE(PVFS_SERV_GETEATTR_LIST, geteattr_list);
 	CASE(PVFS_SERV_SETEATTR, seteattr);
 	CASE(PVFS_SERV_SETEATTR_LIST, seteattr_list);
+	CASE(PVFS_SERV_DELEATTR, deleattr);
 
 	case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
@@ -444,6 +449,7 @@ static int lebf_encode_resp(
             case PVFS_SERV_SETATTR:
             case PVFS_SERV_SETEATTR:
             case PVFS_SERV_SETEATTR_LIST:
+            case PVFS_SERV_DELEATTR:
             case PVFS_SERV_CRDIRENT:
             case PVFS_SERV_TRUNCATE:
             case PVFS_SERV_FLUSH:
@@ -537,6 +543,7 @@ static int lebf_decode_req(
 	CASE(PVFS_SERV_GETEATTR_LIST, geteattr_list);
 	CASE(PVFS_SERV_SETEATTR, seteattr);
 	CASE(PVFS_SERV_SETEATTR_LIST, seteattr_list);
+	CASE(PVFS_SERV_DELEATTR, deleattr);
 
 	case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
@@ -623,6 +630,7 @@ static int lebf_decode_resp(
         case PVFS_SERV_SETATTR:
         case PVFS_SERV_SETEATTR:
         case PVFS_SERV_SETEATTR_LIST:
+        case PVFS_SERV_DELEATTR:
         case PVFS_SERV_CRDIRENT:
         case PVFS_SERV_TRUNCATE:
         case PVFS_SERV_FLUSH:
@@ -738,6 +746,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	    case PVFS_SERV_GETEATTR_LIST:
 	    case PVFS_SERV_SETEATTR:
 	    case PVFS_SERV_SETEATTR_LIST:
+	    case PVFS_SERV_DELEATTR:
 		/* nothing to free */
 		break;
 #if 0
@@ -831,6 +840,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	    case PVFS_SERV_GETEATTR:
 	    case PVFS_SERV_SETEATTR:
 	    case PVFS_SERV_SETEATTR_LIST:
+	    case PVFS_SERV_DELEATTR:
 	    case PVFS_SERV_CRDIRENT:
 	    case PVFS_SERV_RMDIRENT:
 	    case PVFS_SERV_CHDIRENT:

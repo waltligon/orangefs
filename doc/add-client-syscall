@@ -4,7 +4,7 @@ Step in adding a syscall to the client:
 1) write a state machine
 		src/clent/sysint/...
 		state machines should include the PVFS syscall and
-		and internal PVFS syscall
+		and internal PVFS isyscall
 		Most SMs will utilize a message pair - a request to the server
 			and a response from the server.  A reusable SM can process
 			multiple concurrent message pairs: pvfs2_msgpairarray_sm

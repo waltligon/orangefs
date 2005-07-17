@@ -17,6 +17,7 @@
 #include "pvfs2.h"
 #include "str-utils.h"
 #include "pint-sysint-utils.h"
+#include "../../../src/common/gossip/gossip.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -25,16 +26,13 @@
 /* optional parameters, filled in by parse_args() */
 struct options
 {
-    int nkey;
-    PVFS_ds_keyval *key;
-    PVFS_ds_keyval *val;
+    PVFS_ds_keyval key;
     int target_count;
     char** destfiles;
 };
 
 static struct options* parse_args(int argc, char* argv[]);
-int pvfs2_seteattr_list (int nkey, PVFS_ds_keyval *key, PVFS_ds_keyval *val,
-        char *destfile);
+int pvfs2_deleattr (PVFS_ds_keyval key, char *destfile);
 static void usage(int argc, char** argv);
 int check_perm(char c);
 
@@ -65,10 +63,8 @@ int main(int argc, char **argv)
    * for each file the user specified
    */
   for (i = 0; i < user_opts->target_count; i++) {
-    ret = pvfs2_seteattr_list(user_opts->nkey, user_opts->key, user_opts->val,
-            user_opts->destfiles[i]);
+    ret = pvfs2_deleattr(user_opts->key,user_opts->destfiles[i]);
     if (ret != 0) {
-      PVFS_perror("pvfs2_seteattr_list", ret);
       break;
     }
     /* TODO: need to free the request descriptions */
@@ -77,14 +73,13 @@ int main(int argc, char **argv)
   return(ret);
 }
 
-/* pvfs2_seteattr()
+/* pvfs2_deleattr()
  *
  * changes the mode of the given file to the given permissions
  *
  * returns zero on success and negative one on failure
  */
-int pvfs2_seteattr_list (int nkey, PVFS_ds_keyval *key, PVFS_ds_keyval *val,
-        char *destfile) {
+int pvfs2_deleattr (PVFS_ds_keyval key, char *destfile) {
   int ret = -1;
   char str_buf[PVFS_NAME_MAX] = {0};
   char pvfs_path[PVFS_NAME_MAX] = {0};
@@ -156,19 +151,14 @@ int pvfs2_seteattr_list (int nkey, PVFS_ds_keyval *key, PVFS_ds_keyval *val,
     return -1;
   }
 
-  /* set extended attribute */
-  { int k;
-      printf("nkey = %d\n",nkey);
-      for(k=0; k<nkey; k++)
-      {
-          printf("key = %s val = %s\n", (char *)key[k].buffer,
-                  (char *)val[k].buffer);
-      }
-  }
-  ret = PVFS_sys_seteattr_list(resp_lookup.ref, &credentials, nkey, key, val);
+  /* del extended attribute */
+  /* gossip_set_debug_mask(1,0xffffffffffffffff);
+   * gossip_enable_stderr();
+   */
+  ret = PVFS_sys_deleattr(resp_lookup.ref, &credentials, &key);
   if (ret < 0)
   {
-      PVFS_perror("seteattr_list failed with errcode", ret);
+      PVFS_perror("deleattr failed with errcode", ret);
       return(-1);
   }
 
@@ -189,8 +179,7 @@ static struct options* parse_args(int argc, char* argv[])
     extern int optind, opterr, optopt;
     char flags[] = "v";
     int one_opt = 0;
-    int i, k;
-    char *cptr, *cptr2;
+    int i;
 
     struct options* tmp_opts = NULL;
 
@@ -202,9 +191,8 @@ static struct options* parse_args(int argc, char* argv[])
     memset(tmp_opts, 0, sizeof(struct options));
 
     /* fill in defaults */
-    tmp_opts->nkey = 0;
-    tmp_opts->key = NULL;
-    tmp_opts->val = NULL;
+    tmp_opts->key.buffer = NULL;
+    tmp_opts->key.buffer_sz = 0;
     tmp_opts->target_count = 0;
     tmp_opts->destfiles = NULL;
 
@@ -226,71 +214,9 @@ static struct options* parse_args(int argc, char* argv[])
 		exit(EXIT_FAILURE);
 	}
     }
-    /* parse key and value from argv[optind] */
-    /* first count the keys */
-    /* since argv[optind] exists, there must be at least one */
-    tmp_opts->nkey = 0;
-    cptr = argv[optind];
-    while(cptr)
-    {
-        /* must be something after a comma */
-        if ((tmp_opts->nkey == 0 && *cptr != ',') || *(cptr+1) != '\0')
-            tmp_opts->nkey++;
-        else
-        {
-            usage(argc,argv);
-            exit(EXIT_FAILURE);
-        }
-        /* a comma separates and indicates another key */
-        cptr++;
-        cptr = strchr(cptr, ',');
-    }
-    /* now malloc space for the keys and values */
-    tmp_opts->key = (PVFS_ds_keyval *)
-            malloc(sizeof(PVFS_ds_keyval) * tmp_opts->nkey);
-    tmp_opts->val = (PVFS_ds_keyval *)
-            malloc(sizeof(PVFS_ds_keyval) * tmp_opts->nkey);
-    /* now re-run the list to set up the key strings */
-    cptr = argv[optind];
-    for (k = 0; k < tmp_opts->nkey; k++)
-    {
-        if (k > 0)
-        {
-            /* zero out the comma */
-            *cptr = '\0';
-            /* point to the first char of the next key */
-            cptr++;
-        }
-        tmp_opts->key[k].buffer = cptr;
-        cptr = strchr(cptr, ',');
-    }
-    /* now re-run the list and copy them in */
-    for (k = 0; k < tmp_opts->nkey; k++)
-    {
-        cptr = tmp_opts->key[k].buffer;
-        cptr2 = strchr(cptr, ':');
-        if (cptr2)
-        {
-            *cptr2 = '\0';
-            cptr2++;
-            tmp_opts->val[k].buffer_sz = strlen(cptr2) + 1;
-            tmp_opts->val[k].buffer =
-                (char *)malloc(sizeof(char)*tmp_opts->val[k].buffer_sz);
-            strncpy(tmp_opts->val[k].buffer, cptr2,
-                    tmp_opts->val[k].buffer_sz);
-        }
-        else
-        {
-            /* colon not found */
-	    usage(argc, argv);
-	    exit(EXIT_FAILURE);
-        }
-        tmp_opts->key[k].buffer_sz = strlen(cptr) + 1;
-        tmp_opts->key[k].buffer =
-            (char *)malloc(sizeof(char)*tmp_opts->key[k].buffer_sz);
-        strncpy(tmp_opts->key[k].buffer, cptr,
-                tmp_opts->key[k].buffer_sz);
-    }
+    /* parse key from argv[optind] */
+    tmp_opts->key.buffer = argv[optind];
+    tmp_opts->key.buffer_sz = strlen(((char *)tmp_opts->key.buffer)) + 1;
 
     /* finished up argument processing */
     optind = optind + 1;
@@ -309,11 +235,10 @@ static struct options* parse_args(int argc, char* argv[])
 
 static void usage(int argc, char** argv)
 {
-    fprintf(stderr,"Usage: %s [-v] key:value[,key:value] filename(s)\n",argv[0]);
+    fprintf(stderr,"Usage: %s [-v] key filename(s)\n",argv[0]);
     fprintf(stderr,"    -v - print program version and terminate.\n");
     return;
 }
-
 int check_perm(char c) {
     switch (c) {
       case '0': return 0;

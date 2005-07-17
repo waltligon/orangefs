@@ -314,6 +314,11 @@ int PINT_req_sched_target_handle(
 	*handle = req->u.seteattr_list.handle;
 	*fs_id = req->u.seteattr_list.fs_id;
 	return (0);
+    case PVFS_SERV_DELEATTR:
+	*readonly_flag = 0;
+	*handle = req->u.deleattr.handle;
+	*fs_id = req->u.deleattr.fs_id;
+	return (0);
     case PVFS_SERV_STATFS:
 	*fs_id = req->u.statfs.fs_id;
 	return (0);

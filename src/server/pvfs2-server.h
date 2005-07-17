@@ -380,6 +380,7 @@ extern struct PINT_state_machine_s pvfs2_get_eattr_sm;
 extern struct PINT_state_machine_s pvfs2_get_eattr_list_sm;
 extern struct PINT_state_machine_s pvfs2_set_eattr_sm;
 extern struct PINT_state_machine_s pvfs2_set_eattr_list_sm;
+extern struct PINT_state_machine_s pvfs2_del_eattr_sm;
 
 /* nested state machines */
 extern struct PINT_state_machine_s pvfs2_get_attr_work_sm;

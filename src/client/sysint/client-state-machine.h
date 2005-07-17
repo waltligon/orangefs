@@ -384,6 +384,11 @@ struct PINT_client_seteattr_list_sm
     PVFS_ds_keyval *val_array;
 };
 
+struct PINT_client_deleattr_sm
+{
+    PVFS_ds_keyval *key_p;
+};
+
 typedef struct PINT_client_sm
 {
     /*
@@ -483,6 +488,7 @@ typedef struct PINT_client_sm
 	struct PINT_client_geteattr_list_sm geteattr_list;
 	struct PINT_client_seteattr_sm seteattr;
 	struct PINT_client_seteattr_list_sm seteattr_list;
+	struct PINT_client_deleattr_sm deleattr;
     } u;
 } PINT_client_sm;
 
@@ -567,6 +573,7 @@ enum
     PVFS_SYS_GETEATTR_LIST         = 14,
     PVFS_SYS_SETEATTR              = 15,
     PVFS_SYS_SETEATTR_LIST         = 16,
+    PVFS_SYS_DELEATTR              = 17,
     PVFS_MGMT_SETPARAM_LIST        = 70,
     PVFS_MGMT_NOOP                 = 71,
     PVFS_MGMT_STATFS_LIST          = 72,
@@ -684,6 +691,7 @@ extern struct PINT_state_machine_s pvfs2_client_get_eattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_get_eattr_list_sm;
 extern struct PINT_state_machine_s pvfs2_client_set_eattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_set_eattr_list_sm;
+extern struct PINT_state_machine_s pvfs2_client_del_eattr_sm;
 
 
 /* nested state machines (helpers) */
