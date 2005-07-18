@@ -353,9 +353,23 @@ AC_ARG_WITH(mpe,
            AC_MSG_ERROR(--with-mpe must be given a pathname)
     else
         CFLAGS="$CFLAGS -I$withval/include"
-       LDFLAGS="$LDFLAGS -L$withval/lib"
-       LIBS="$LIBS -lmpe -lmpich"
-       AC_DEFINE(HAVE_MPE, 1, [Use the MPE profiling library])
+        LDFLAGS="$LDFLAGS -L$withval/lib"
+        LIBS="$LIBS -lmpe -lmpich"
+        AC_MSG_CHECKING(for valid mpe install)
+	AC_TRY_LINK(
+              [#include <mpe.h>],
+	      [
+	      int eventID_begin, eventID_end;
+	      eventID_begin = MPE_Log_get_event_number();
+	      eventID_end   = MPE_Log_get_event_number();
+	      MPE_Describe_state( eventID_begin, eventID_end, "Amult", "bluegreen" );
+	      MPE_Log_event( eventID_begin, 0, (char *)0 );
+	      MPE_Log_event( eventID_end, 0, (char *)0 );
+	      ],
+	      [
+	      AC_DEFINE(HAVE_MPE, 1, [Use the MPE profiling library])
+	      AC_MSG_RESULT(ok)],
+	      AC_MSG_ERROR(Invalid path to mpe install))
     fi
 )
 
