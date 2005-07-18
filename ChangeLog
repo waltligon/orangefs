@@ -14,6 +14,9 @@ pvfs2-1.2.0pre1
   distribution may modify the hint if neccesary.
 - Phil Carns contributed general improvements and bug fixes for the dotconf
   parser.
+- Added DefaultDistribution section support for server config file.  Section
+  is optional and accepts Name, Param, and Value (Param and Value may be
+  repeated multiple times in the section).
 
 pvfs2-1.1.0
 ===============

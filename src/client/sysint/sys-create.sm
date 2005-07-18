@@ -19,6 +19,7 @@
 #include "client-state-machine.h"
 #include "state-machine-fns.h"
 #include "pvfs2-debug.h"
+#include "pvfs2-dist-simple-stripe.h"
 #include "job.h"
 #include "gossip.h"
 #include "str-utils.h"
@@ -74,6 +75,9 @@ static int create_crdirent_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
 static int create_delete_handles_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
+
+/* misc helper functions */
+static PINT_dist* get_default_distribution(PVFS_fs_id fs_id);
 
 %%
 
@@ -304,6 +308,8 @@ PVFS_error PVFS_isys_create(
     /* set sm_p->object_ref for getattr/acache lookup */
     sm_p->object_ref = parent_ref;
 
+    /* If the user specifies a distribution use that
+       else, use the default distribution */
     if (dist)
     {
         if (!dist->name)
@@ -322,7 +328,8 @@ PVFS_error PVFS_isys_create(
     }
     else
     {
-        sm_p->u.create.dist = PINT_dist_create("simple_stripe");
+        /* Get the default distribution */
+        sm_p->u.create.dist = get_default_distribution(sm_p->parent_ref.fs_id);
         if (!sm_p->u.create.dist)
         {
             free(sm_p);
@@ -1067,6 +1074,78 @@ static int create_parent_getattr_inspect(
     }
 
     return(1);
+}
+
+/**
+ * Returns the default distribution, or NULL if the distribution could not
+ * be created.  The default distribution is read from the server
+ * configuration if possible.  If the server config does not specify a
+ * default distribution, simple_stripe will be used.
+ */
+static PINT_dist* get_default_distribution(PVFS_fs_id fs_id)
+{
+    server_configuration_s* server_config = NULL;
+    PINT_dist* dist = NULL;
+
+    /* Retrieve the server configuration (with mutex) */
+    server_config = PINT_get_server_config_struct(fs_id);
+
+    /* If a default dist is specified in the config, use that
+       else just create a simple_stripe distribution */
+    if (NULL != server_config->default_dist_config.name)
+    {
+        dist = PINT_dist_create(server_config->default_dist_config.name);
+        
+        if (dist)
+        {
+            PINT_llist_p iter = server_config->default_dist_config.param_list;
+
+            /* Set supplied the distribution parameters */
+            while (iter)
+            {
+                int rc;
+                distribution_param_configuration* param =PINT_llist_head(iter);
+
+                /* If we are at the list end, break
+                   else, set the distribution parameter to the given value */
+                if (NULL == param)
+                {
+                    break;
+                }
+                else
+                {
+                    rc = dist->methods->set_param(dist->dist_name,
+                                                  dist->params,
+                                                  param->name,
+                                                  &param->value);
+
+                    if (0 != rc)
+                    {
+                        gossip_err("Error setting distribution parameter\n"
+                                   "  dist: %s\n"
+                                   "  param name: %s\n"
+                                   "  param value: %lld\n",
+                                   dist->dist_name, param->name, param->value);
+                    }
+                }
+                iter = PINT_llist_next(iter);
+            }                
+        }
+        else
+        {
+            gossip_err("Error creating default distribution: %s\n",
+                       server_config->default_dist_config.name);
+        }
+    }
+    else
+    {
+        dist = PINT_dist_create(PVFS_DIST_SIMPLE_STRIPE_NAME);
+    }
+
+    /* Release the server config mutex */
+    PINT_put_server_config_struct(server_config);
+
+    return dist;
 }
 
 /*

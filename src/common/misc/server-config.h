@@ -83,12 +83,18 @@ typedef struct filesystem_configuration_s
 
 } filesystem_configuration_s;
 
+typedef struct distribution_param_configuration_s
+{
+    char* name;
+    int64_t value;  /* Temporarily hard code to 64bit type */
+
+} distribution_param_configuration;
+
 /* Config struct to hold overloaded distribution defaults */
 typedef struct distribution_configuration_s
 {
     char* name;
-    char* param_name;
-    PVFS_size param_value;  /* Temporarily hard code to 64bit type */
+    PINT_llist* param_list;
 
 } distribution_configuration;
 
@@ -114,7 +120,8 @@ typedef struct server_configuration_s
     PINT_llist *host_aliases;       /* ptrs are type host_alias_s       */
     PINT_llist *file_systems;       /* ptrs are type
                                        filesystem_configuration_s       */
-    distribution_configuration dist_conf;  /* distribution conf */
+    distribution_configuration default_dist_config;  /* distribution conf */
+
 } server_configuration_s;
 
 int PINT_parse_config(

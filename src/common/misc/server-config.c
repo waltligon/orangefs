@@ -122,8 +122,8 @@ static const configoption_t options[] =
     {"</MetaHandleRanges>",ARG_NONE, exit_mhranges_context,NULL,CTX_ALL},
     {"<DataHandleRanges>",ARG_NONE, enter_dhranges_context,NULL,CTX_ALL},
     {"</DataHandleRanges>",ARG_NONE, exit_dhranges_context,NULL,CTX_ALL},
-    {"<Distribution>",ARG_NONE, enter_distribution_context,NULL,CTX_ALL},
-    {"</Distribution>",ARG_NONE, exit_distribution_context,NULL,CTX_ALL},
+    {"<DefaultDistribution>",ARG_NONE,enter_distribution_context,NULL,CTX_ALL},
+    {"</DefaultDistribution>",ARG_NONE,exit_distribution_context,NULL,CTX_ALL},
     {"Range",ARG_LIST, get_range_list,NULL,CTX_ALL},
     {"RootHandle",ARG_STR, get_root_handle,NULL,CTX_ALL},
     {"Name",ARG_STR, get_name,NULL,CTX_ALL},
@@ -894,8 +894,16 @@ DOTCONF_CB(get_name)
     }
     else if (config_s->configuration_context == DISTRIBUTION_CONFIG)
     {
-        config_s->dist_conf.name =
-            (cmd->data.str ? strdup(cmd->data.str) : NULL);
+        if (0 == config_s->default_dist_config.name)
+        {
+            config_s->default_dist_config.name =
+                (cmd->data.str ? strdup(cmd->data.str) : NULL);
+            config_s->default_dist_config.param_list = PINT_llist_new();
+        }
+        else
+        {
+            return "Only one distribution configuration is allowed.\n";
+        }
     }
     else
     {
@@ -1051,12 +1059,24 @@ DOTCONF_CB(get_param)
 {
     if (config_s->configuration_context == DISTRIBUTION_CONFIG)
     {
-        config_s->dist_conf.param_name =
-            (cmd->data.str ? strdup(cmd->data.str) : NULL);
+        distribution_param_configuration* param =
+            malloc(sizeof(distribution_param_configuration));
+
+        if (NULL != param)
+        {
+            memset(param, 0, sizeof(param));
+            param->name = (cmd->data.str ? strdup(cmd->data.str) : NULL);
+            PINT_llist_add_to_tail(config_s->default_dist_config.param_list,
+                                   param);
+        }
+        else
+        {
+            return "Error allocating memory for Param Tag.\n";
+        }
     }
     else
     {
-        return("Param Tag can only be in the Distribution context.\n");
+        return("Param Tag can only be in the DefaultDistribution context.\n");
     }
     return NULL;
 }
@@ -1065,11 +1085,21 @@ DOTCONF_CB(get_value)
 {
     if (config_s->configuration_context == DISTRIBUTION_CONFIG)
     {
-        config_s->dist_conf.param_value = (PVFS_size)cmd->data.value;
+        distribution_param_configuration* param;
+        param = (distribution_param_configuration*)PINT_llist_tail(
+            config_s->default_dist_config.param_list);
+        if (NULL != param)
+        {
+            param->value = (PVFS_size)cmd->data.value;
+        }
+        else
+        {
+            return "Value cannot appear without a parameter name.\n";
+        }
     }
     else
     {
-        return("Value Tag can only be in the Distribution context.\n");
+        return("Value Tag can only be in the DefaultDistribution context.\n");
     }
     return NULL;
 }
