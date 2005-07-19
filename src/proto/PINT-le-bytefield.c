@@ -187,25 +187,14 @@ static void lebf_initialize(void)
 		/* nothing special */
 		break;
 	    case PVFS_SERV_GETEATTR:
-                req.u.geteattr.key.buffer_sz = 0;
-                resp.u.geteattr.val.buffer_sz = 0;
+                req.u.geteattr.nkey = 0;
+                resp.u.geteattr.nkey = 0;
 		reqsize = extra_size_PVFS_servreq_geteattr;
 		respsize = extra_size_PVFS_servresp_geteattr;
 		break;
-	    case PVFS_SERV_GETEATTR_LIST:
-                req.u.geteattr_list.nkey = 0;
-                resp.u.geteattr_list.nkey = 0;
-		reqsize = extra_size_PVFS_servreq_geteattr_list;
-		respsize = extra_size_PVFS_servresp_geteattr_list;
-		break;
 	    case PVFS_SERV_SETEATTR:
-                req.u.seteattr.key.buffer_sz = 0;
-                req.u.seteattr.val.buffer_sz = 0;
+                req.u.seteattr.nkey = 0;
 		reqsize = extra_size_PVFS_servreq_seteattr;
-		break;
-	    case PVFS_SERV_SETEATTR_LIST:
-                req.u.seteattr_list.nkey = 0;
-		reqsize = extra_size_PVFS_servreq_seteattr_list;
 		break;
 	    case PVFS_SERV_DELEATTR:
                 req.u.deleattr.key.buffer_sz = 0;
@@ -348,9 +337,7 @@ static int lebf_encode_req(
 	CASE(PVFS_SERV_MGMT_DSPACE_INFO_LIST, mgmt_dspace_info_list);
 	CASE(PVFS_SERV_MGMT_EVENT_MON, mgmt_event_mon);
 	CASE(PVFS_SERV_GETEATTR, geteattr);
-	CASE(PVFS_SERV_GETEATTR_LIST, geteattr_list);
 	CASE(PVFS_SERV_SETEATTR, seteattr);
-	CASE(PVFS_SERV_SETEATTR_LIST, seteattr_list);
 	CASE(PVFS_SERV_DELEATTR, deleattr);
 
 	case PVFS_SERV_GETCONFIG:
@@ -441,14 +428,12 @@ static int lebf_encode_resp(
         CASE(PVFS_SERV_WRITE_COMPLETION, write_completion);
         CASE(PVFS_SERV_MGMT_GET_DIRDATA_HANDLE, mgmt_get_dirdata_handle);
         CASE(PVFS_SERV_GETEATTR, geteattr);
-        CASE(PVFS_SERV_GETEATTR_LIST, geteattr_list);
 
             case PVFS_SERV_REMOVE:
             case PVFS_SERV_MGMT_REMOVE_OBJECT:
             case PVFS_SERV_MGMT_REMOVE_DIRENT:
             case PVFS_SERV_SETATTR:
             case PVFS_SERV_SETEATTR:
-            case PVFS_SERV_SETEATTR_LIST:
             case PVFS_SERV_DELEATTR:
             case PVFS_SERV_CRDIRENT:
             case PVFS_SERV_TRUNCATE:
@@ -540,9 +525,7 @@ static int lebf_decode_req(
 	CASE(PVFS_SERV_MGMT_DSPACE_INFO_LIST, mgmt_dspace_info_list);
 	CASE(PVFS_SERV_MGMT_EVENT_MON, mgmt_event_mon);
 	CASE(PVFS_SERV_GETEATTR, geteattr);
-	CASE(PVFS_SERV_GETEATTR_LIST, geteattr_list);
 	CASE(PVFS_SERV_SETEATTR, seteattr);
-	CASE(PVFS_SERV_SETEATTR_LIST, seteattr_list);
 	CASE(PVFS_SERV_DELEATTR, deleattr);
 
 	case PVFS_SERV_GETCONFIG:
@@ -622,14 +605,12 @@ static int lebf_decode_resp(
 	CASE(PVFS_SERV_MGMT_GET_DIRDATA_HANDLE, mgmt_get_dirdata_handle);
         CASE(PVFS_SERV_WRITE_COMPLETION, write_completion);
 	CASE(PVFS_SERV_GETEATTR, geteattr);
-	CASE(PVFS_SERV_GETEATTR_LIST, geteattr_list);
 
         case PVFS_SERV_REMOVE:
         case PVFS_SERV_MGMT_REMOVE_OBJECT:
         case PVFS_SERV_MGMT_REMOVE_DIRENT:
         case PVFS_SERV_SETATTR:
         case PVFS_SERV_SETEATTR:
-        case PVFS_SERV_SETEATTR_LIST:
         case PVFS_SERV_DELEATTR:
         case PVFS_SERV_CRDIRENT:
         case PVFS_SERV_TRUNCATE:
@@ -743,37 +724,10 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	    case PVFS_SERV_MGMT_PERF_MON:
 	    case PVFS_SERV_MGMT_EVENT_MON:
 	    case PVFS_SERV_GETEATTR:
-	    case PVFS_SERV_GETEATTR_LIST:
 	    case PVFS_SERV_SETEATTR:
-	    case PVFS_SERV_SETEATTR_LIST:
 	    case PVFS_SERV_DELEATTR:
 		/* nothing to free */
 		break;
-#if 0
-	    case PVFS_SERV_GETEATTR:
-                if (req->u.geteattr.key.buffer)
-                    decode_free(req->u.geteattr.key.buffer);
-		break;
-
-	    case PVFS_SERV_GETEATTR_LIST:
-                if (req->u.geteattr_list.key)
-                    decode_free(req->u.geteattr_list.key);
-		break;
-
-	    case PVFS_SERV_SETEATTR:
-                if (req->u.seteattr.key.buffer)
-                    decode_free(req->u.seteattr.key.buffer);
-                if (req->u.seteattr.val.buffer)
-                    decode_free(req->u.seteattr.val.buffer);
-		break;
-
-	    case PVFS_SERV_SETEATTR_LIST:
-                if (req->u.seteattr.key.buffer)
-                    decode_free(req->u.seteattr_list.key);
-                if (req->u.seteattr.val.buffer)
-                    decode_free(req->u.seteattr_list.val);
-		break;
-#endif
 	    case PVFS_SERV_INVALID:
 	    case PVFS_SERV_WRITE_COMPLETION:
 	    case PVFS_SERV_PERF_UPDATE:
@@ -823,10 +777,10 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 		decode_free(resp->u.mgmt_event_mon.event_array);
 		break;
 
-	    case PVFS_SERV_GETEATTR_LIST:
+	    case PVFS_SERV_GETEATTR:
                 /* need a loop here?  WBL */
-		if (resp->u.geteattr_list.val)
-		    decode_free(resp->u.geteattr_list.val);
+		if (resp->u.geteattr.val)
+		    decode_free(resp->u.geteattr.val);
 		break;
 
 	    case PVFS_SERV_GETCONFIG:
@@ -837,9 +791,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	    case PVFS_SERV_MGMT_GET_DIRDATA_HANDLE:
 	    case PVFS_SERV_IO:
 	    case PVFS_SERV_SETATTR:
-	    case PVFS_SERV_GETEATTR:
 	    case PVFS_SERV_SETEATTR:
-	    case PVFS_SERV_SETEATTR_LIST:
 	    case PVFS_SERV_DELEATTR:
 	    case PVFS_SERV_CRDIRENT:
 	    case PVFS_SERV_RMDIRENT:

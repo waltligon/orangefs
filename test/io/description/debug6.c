@@ -28,7 +28,7 @@ PVFS_size exp1_size [] = {
 	4194304
 };
 
-PINT_Request_result exp[] =
+PINT_Request_result exptd[] =
 {{
    offset_array : &exp1_offset[0],
    size_array : &exp1_size[0],
@@ -37,7 +37,7 @@ PINT_Request_result exp[] =
    bytes : 4194304
 }};
 
-int request_debug()
+int request_debug(void)
 {
 	int i;
 	PINT_Request *r1;
@@ -95,8 +95,8 @@ int request_debug()
 	if(retval >= 0)
 	{
 		prtseg(&seg1,"Results obtained");
-		prtseg(&exp[i],"Results expected");
-		cmpseg(&seg1,&exp[i]);
+		prtseg(&exptd[i],"Results expected");
+		cmpseg(&seg1,&exptd[i]);
 	}
 
 	i++;

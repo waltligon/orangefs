@@ -32,9 +32,7 @@ TESTSRC += \
 	$(DIR)/test-create-scale.c \
 	$(DIR)/io-hole.c \
 	$(DIR)/create.set.get.eattr.c \
-	$(DIR)/set.eattr.c \
-	$(DIR)/get.eattr.c \
-	$(DIR)/set.eattr.list.c \
-	$(DIR)/get.eattr.list.c \
-	$(DIR)/del.eattr.c
+	$(DIR)/set-eattr.c \
+	$(DIR)/get-eattr.c \
+	$(DIR)/del-eattr.c
 

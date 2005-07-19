@@ -257,8 +257,8 @@ struct PINT_server_getattr_op
     uint32_t attrmask;
 };
 
-/* this is used in both set_eattr_list and get_eattr_list */
-struct PINT_server_eattr_list_op
+/* this is used in both set_eattr and get_eattr */
+struct PINT_server_eattr_op
 {
     void *buffer;
 };
@@ -319,7 +319,7 @@ typedef struct PINT_server_op
     union
     {
 	/* request-specific scratch spaces for use during processing */
-        struct PINT_server_eattr_list_op eattr_list;
+        struct PINT_server_eattr_op eattr;
         struct PINT_server_getattr_op getattr;
 	struct PINT_server_getconfig_op getconfig;
 	struct PINT_server_lookup_op lookup;

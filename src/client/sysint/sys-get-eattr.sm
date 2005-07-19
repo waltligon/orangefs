@@ -26,8 +26,6 @@ static int get_eattr_setup_msgpair(
     PINT_client_sm *sm_p, job_status_s *js_p);
 static int get_eattr_cleanup(
     PINT_client_sm *sm_p, job_status_s *js_p);
-static int get_eattr_cleanup(
-    PINT_client_sm *sm_p, job_status_s *js_p);
 static int get_eattr_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int i);
 
@@ -60,10 +58,11 @@ machine pvfs2_client_get_eattr_sm(
 
 %%
 
-PVFS_error PVFS_isys_geteattr(
+PVFS_error PVFS_isys_geteattr_list(
         PVFS_object_ref ref,
         PVFS_credentials *credentials,
-        PVFS_ds_keyval *key_p,
+        int32_t nkey,
+        PVFS_ds_keyval *key_array,
         PVFS_sysresp_geteattr *resp_p,
         PVFS_sys_op_id *op_id,
         void *user_ptr)
@@ -72,7 +71,7 @@ PVFS_error PVFS_isys_geteattr(
     PINT_client_sm *sm_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "PINT_isys_get_eattr entered\n");
+                 "PINT_isys_geteattr entered\n");
 
     if ((ref.handle == PVFS_HANDLE_NULL) ||
        (ref.fs_id == PVFS_FS_ID_NULL) || (resp_p == NULL))
@@ -90,7 +89,8 @@ PVFS_error PVFS_isys_geteattr(
 
     PINT_init_msgarray_params(&sm_p->msgarray_params);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
-    sm_p->u.geteattr.key_p = key_p;
+    sm_p->u.geteattr.nkey = nkey;
+    sm_p->u.geteattr.key_array = key_array;
     sm_p->u.geteattr.resp_p = resp_p;
     sm_p->error_code = 0;
     sm_p->object_ref = ref;
@@ -99,10 +99,11 @@ PVFS_error PVFS_isys_geteattr(
             sm_p, PVFS_SYS_GETEATTR, op_id, user_ptr);
 }
 
-PVFS_error PVFS_sys_geteattr(
+PVFS_error PVFS_sys_geteattr_list(
         PVFS_object_ref ref,
         PVFS_credentials *credentials,
-        PVFS_ds_keyval *key_p,
+        int32_t nkey,
+        PVFS_ds_keyval *key_array,
         PVFS_sysresp_geteattr *resp_p)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
@@ -110,8 +111,8 @@ PVFS_error PVFS_sys_geteattr(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_geteattr entered\n");
 
-    ret = PVFS_isys_geteattr(ref, credentials,
-            key_p, resp_p, &op_id, NULL);
+    ret = PVFS_isys_geteattr_list(ref, credentials,
+            nkey, key_array, resp_p, &op_id, NULL);
 
     if (ret)
     {
@@ -132,21 +133,45 @@ PVFS_error PVFS_sys_geteattr(
     return error;
 }
 
+PVFS_error PVFS_sys_geteattr(
+        PVFS_object_ref ref,
+        PVFS_credentials *credentials,
+        PVFS_ds_keyval *key_p,
+        PVFS_ds_keyval *val_p)
+{
+    PVFS_sysresp_geteattr resp_p;
+    resp_p.val_array = val_p;
+    return PVFS_sys_geteattr_list(ref, credentials, 1, key_p, &resp_p);
+}
+
 static int get_eattr_setup_msgpair(PINT_client_sm *sm_p,
                                            job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL;
+    int i;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
 		"get_eattr state: get_eattr_setup_msgpair\n");
+
+    /* this will be the array of value buffer sizes */
+    sm_p->u.geteattr.size_array =
+             (PVFS_size *)malloc(sm_p->u.geteattr.nkey *
+                                 sizeof (PVFS_size));
+
+    /* fill the array pulling out of the value array */
+    /* we don't want to send the unused fields in this array */
+    for (i = 0; i < sm_p->u.geteattr.nkey; i++)
+        sm_p->u.geteattr.size_array[i] =
+            sm_p->u.geteattr.resp_p->val_array[i].buffer_sz;
 
     PINT_SERVREQ_GETEATTR_FILL(
             sm_p->msgpair.req,
             (*sm_p->cred_p),
             sm_p->object_ref.fs_id,
             sm_p->object_ref.handle,
-            (*sm_p->u.geteattr.key_p),
-            sm_p->u.geteattr.resp_p->val.buffer_sz
+            sm_p->u.geteattr.nkey,
+            sm_p->u.geteattr.key_array,
+            sm_p->u.geteattr.size_array
             );
 
     sm_p->msgarray = &(sm_p->msgpair);
@@ -174,6 +199,8 @@ static int get_eattr_cleanup(PINT_client_sm *sm_p,
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG,
 		"get_eattr state: get_eattr_cleanup\n");
+    /* free the array malloc'd above */
+    free(sm_p->u.geteattr.size_array);
     sm_p->error_code  = js_p->error_code;
     sm_p->op_complete = 1;
 
@@ -206,27 +233,54 @@ static int get_eattr_comp_fn(
 
     if (sm_p->msgarray[i].op_status == 0)
     {
-        /* out the actual read_sz in its place */
-        sm_p->u.geteattr.resp_p->val.read_sz =
-                resp_p->u.geteattr.val.buffer_sz;
-        /* check for too big a return message */
-        if (sm_p->u.geteattr.resp_p->val.read_sz <=
-                sm_p->u.geteattr.resp_p->val.buffer_sz)
+        int k, mink;
+        mink = sm_p->u.geteattr.nkey;
+        if (resp_p->u.geteattr.nkey < mink)
         {
-            memcpy(sm_p->u.geteattr.resp_p->val.buffer,
-                    resp_p->u.geteattr.val.buffer,
-                    sm_p->u.geteattr.resp_p->val.read_sz);
+            mink = resp_p->u.geteattr.nkey;
+            gossip_err("Successful call returned fewer values than requested\n");
         }
-        else /* oops, error! returned too much data */
+        if (!resp_p->u.geteattr.val)
         {
-            memset(sm_p->u.geteattr.resp_p->val.buffer,0,
-                    sm_p->u.geteattr.resp_p->val.buffer_sz);
-            ret = -PVFS_EMSGSIZE;
+            gossip_err("Successful call returned NULL value list\n");
+            return -1;
+        }
+        gossip_debug(GOSSIP_GETEATTR_DEBUG,"returned %d values\n",
+                sm_p->u.geteattr.nkey);
+        for (k = 0; k < sm_p->u.geteattr.nkey; k++)
+        {
+            gossip_debug(GOSSIP_GETEATTR_DEBUG,"resp_read_sz = %d\n",
+                    resp_p->u.geteattr.val[k].read_sz);
+            gossip_debug(GOSSIP_GETEATTR_DEBUG,"resp_buff_sz = %d\n",
+                    resp_p->u.geteattr.val[k].buffer_sz);
+            gossip_debug(GOSSIP_GETEATTR_DEBUG,"sm_buff_sz = %d\n",
+                    sm_p->u.geteattr.resp_p->val_array[k].buffer_sz);
+            gossip_debug(GOSSIP_GETEATTR_DEBUG,"resp_buff_ = %s\n",
+                    (char *)resp_p->u.geteattr.val[k].buffer);
+            /* out the actual read_sz in its place */
+            sm_p->u.geteattr.resp_p->val_array[k].read_sz =
+                    resp_p->u.geteattr.val[k].buffer_sz;
+            /* check for too big a return message */
+            if (sm_p->u.geteattr.resp_p->val_array[k].read_sz <=
+                    sm_p->u.geteattr.resp_p->val_array[k].buffer_sz)
+            {
+                gossip_debug(GOSSIP_GETEATTR_DEBUG,"copying\n");
+                memcpy(sm_p->u.geteattr.resp_p->val_array[k].buffer,
+                        resp_p->u.geteattr.val[k].buffer,
+                        sm_p->u.geteattr.resp_p->val_array[k].read_sz);
+            }
+            else /* oops, error! returned too much data */
+            {
+                gossip_debug(GOSSIP_GETEATTR_DEBUG,"clearing on error\n");
+                memset(sm_p->u.geteattr.resp_p->val_array[k].buffer,0,
+                        sm_p->u.geteattr.resp_p->val_array[k].buffer_sz);
+                /* record an error, but keep going */
+                ret = -PVFS_EMSGSIZE;
+            }
         }
     }
     else
     {
-        /* server returned an error */
         ret = sm_p->msgarray[i].op_status;
     }
 

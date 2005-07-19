@@ -164,25 +164,15 @@ struct PVFS_sysresp_getparent_s
 };
 typedef struct PVFS_sysresp_getparent_s PVFS_sysresp_getparent;
 
-/** Holds results of a geteattr operation (attributes of object). */
-struct PVFS_sysresp_geteattr_s
-{
-    PVFS_ds_keyval val;
-};
-typedef struct PVFS_sysresp_geteattr_s PVFS_sysresp_geteattr;
-
 /** Holds results of a geteattr_list operation (attributes of object). */
-struct PVFS_sysresp_geteattr_list_s
+struct PVFS_sysresp_geteattr_s
 {
     PVFS_ds_keyval *val_array;
 };
-typedef struct PVFS_sysresp_geteattr_list_s PVFS_sysresp_geteattr_list;
+typedef struct PVFS_sysresp_geteattr_s PVFS_sysresp_geteattr;
 
 /* seteattr */
 /* no data returned in seteattr response */
-
-/* seteattr_list */
-/* no data returned in seteattr_list response */
 
 /* deleattr */
 /* no data returned in deleattr response */
@@ -449,14 +439,14 @@ PVFS_error PVFS_sys_geteattr(
     PVFS_object_ref ref,
     PVFS_credentials *credentials,
     PVFS_ds_keyval *key_p,
-    PVFS_sysresp_geteattr *resp);
+    PVFS_ds_keyval *val_p);
 
 PVFS_error PVFS_isys_geteattr_list(
     PVFS_object_ref ref,
     PVFS_credentials *credentials,
     int32_t nkey,
     PVFS_ds_keyval *key_p,
-    PVFS_sysresp_geteattr_list *resp,
+    PVFS_sysresp_geteattr *resp,
     PVFS_sys_op_id *op_id,
     void *user_ptr);
 
@@ -465,7 +455,7 @@ PVFS_error PVFS_sys_geteattr_list(
     PVFS_credentials *credentials,
     int32_t nkey,
     PVFS_ds_keyval *key_p,
-    PVFS_sysresp_geteattr_list *resp);
+    PVFS_sysresp_geteattr *resp);
 
 PVFS_error PVFS_isys_seteattr(
     PVFS_object_ref ref,

@@ -36,32 +36,32 @@ static inline char *get_object_type(int objtype)
     return obj_types[6];
 }
 
-static int seteattr_cleanup(
+extern PINT_server_trove_keys_s Trove_Common_Keys[];
+
+static int seteattr_verify_eattribs(
     PINT_server_op *s_op, job_status_s *js_p);
 static int seteattr_setobj_eattribs(
     PINT_server_op *s_op, job_status_s *js_p);
-static int seteattr_verify_eattribs(
+static int seteattr_cleanup(
     PINT_server_op *s_op, job_status_s *js_p);
-
-extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
 %%
 
 machine pvfs2_set_eattr_sm(
     prelude,
-    cleanup,
-    verify_eattribs,
+    verify_eattrib,
     setobj_eattrib,
+    cleanup,
     final_response)
 {
     state prelude
     {
         jump pvfs2_prelude_sm;
-        success => verify_eattribs;
+        success => verify_eattrib;
         default => final_response;
     }
 
-    state verify_eattribs
+    state verify_eattrib
     {
         run seteattr_verify_eattribs;
         success => setobj_eattrib;
@@ -100,6 +100,7 @@ static int seteattr_verify_eattribs(
     PINT_server_op *s_op, job_status_s *js_p)
 {
     PVFS_object_attr *a_p = NULL;
+    int i;
 
     PINT_STATE_DEBUG("verify_eattribs");
 
@@ -108,57 +109,61 @@ static int seteattr_verify_eattribs(
     js_p->error_code = 0;
 
     gossip_debug(GOSSIP_SETEATTR_DEBUG,
-                 "  ext attr read from handle %Lu refers to a %s\n\t"
+                 "  ext attr list write to handle %Lu refers to a %s\n\t"
                  "[owner = %d, group = %d, perms = %o, type = %d]\n",
                  Lu(s_op->req->u.seteattr.handle),
                  get_object_type(a_p->objtype),
                  a_p->owner, a_p->group, a_p->perms, a_p->objtype);
 
-    switch (a_p->objtype)
+    /* if any key is bad, we reject the whole list */
+    for (i = 0; i < s_op->req->u.seteattr.nkey; i++)
     {
-    case PVFS_TYPE_METAFILE :
-        if (!strncmp(s_op->req->u.seteattr.key.buffer,
-                    Trove_Common_Keys[METAFILE_HANDLES_KEY].key,
-                    s_op->req->u.seteattr.key.buffer_sz) ||
-            !strncmp(s_op->req->u.seteattr.key.buffer,
-                    Trove_Common_Keys[METAFILE_DIST_KEY].key,
-                    s_op->req->u.seteattr.key.buffer_sz))
+        switch (a_p->objtype)
         {
-            /* can't set these keys with this request */
-            js_p->error_code = -PVFS_EINVAL;
-            return -PVFS_EINVAL;
+        case PVFS_TYPE_METAFILE :
+            if (!strncmp(s_op->req->u.seteattr.key[i].buffer,
+                        Trove_Common_Keys[METAFILE_HANDLES_KEY].key,
+                        s_op->req->u.seteattr.key[i].buffer_sz) ||
+                !strncmp(s_op->req->u.seteattr.key[i].buffer,
+                        Trove_Common_Keys[METAFILE_DIST_KEY].key,
+                        s_op->req->u.seteattr.key[i].buffer_sz))
+            {
+                /* can't set these keys with this request */
+                js_p->error_code = -PVFS_EINVAL;
+                return -PVFS_EINVAL;
+            }
+        case PVFS_TYPE_SYMLINK :
+            if (!strncmp(s_op->req->u.seteattr.key[i].buffer,
+                        Trove_Common_Keys[SYMLINK_TARGET_KEY].key,
+                        s_op->req->u.seteattr.key[i].buffer_sz))
+            {
+                /* can't set these keys with this request */
+                js_p->error_code = -PVFS_EINVAL;
+                return -PVFS_EINVAL;
+            }
+        case PVFS_TYPE_DIRECTORY :
+            if (!strncmp(s_op->req->u.seteattr.key[i].buffer,
+                        Trove_Common_Keys[DIR_ENT_KEY].key,
+                        s_op->req->u.seteattr.key[i].buffer_sz))
+            {
+                /* can't set these keys with this request */
+                js_p->error_code = -PVFS_EINVAL;
+                return -PVFS_EINVAL;
+            }
+        default :
+            /* no holds barred for other types */
+            ;
         }
-    case PVFS_TYPE_SYMLINK :
-        if (!strncmp(s_op->req->u.seteattr.key.buffer,
-                    Trove_Common_Keys[SYMLINK_TARGET_KEY].key,
-                    s_op->req->u.seteattr.key.buffer_sz))
-        {
-            /* can't set these keys with this request */
-            js_p->error_code = -PVFS_EINVAL;
-            return -PVFS_EINVAL;
-        }
-    case PVFS_TYPE_DIRECTORY :
-        if (!strncmp(s_op->req->u.seteattr.key.buffer,
-                    Trove_Common_Keys[DIR_ENT_KEY].key,
-                    s_op->req->u.seteattr.key.buffer_sz))
-        {
-            /* can't set these keys with this request */
-            js_p->error_code = -PVFS_EINVAL;
-            return -PVFS_EINVAL;
-        }
-    default :
-        /* no holds barred for other types */
-        ;
-    }
 
-    /* no one is allowed to set standard attribs with this op */
-    if (!strncmp((void *)s_op->req->u.seteattr.key.buffer,
-                (void *)&s_op->req->u.seteattr.handle,
-                sizeof(s_op->req->u.seteattr.handle)))
-    {
-        /* can't set these keys with this request */
-        js_p->error_code = -PVFS_EINVAL;
-        return -PVFS_EINVAL;
+        /* no one is allowed to set standard attribs with this op */
+        if (!strncmp((void *)s_op->req->u.seteattr.key[i].buffer,
+                    (void *)&s_op->req->u.seteattr.handle,
+                    sizeof(s_op->req->u.seteattr.handle)))
+        {
+            /* can't set these keys with this request */
+            js_p->error_code = -PVFS_EINVAL;
+            return -PVFS_EINVAL;
+        }
     }
 
     return 1;
@@ -168,7 +173,8 @@ static int seteattr_verify_eattribs(
  * This is where the actual extended attrib gets written.
  * Not much to this, its pretty straight-forward.
  */
-static int seteattr_setobj_eattribs(PINT_server_op *s_op, job_status_s *js_p)
+static int seteattr_setobj_eattribs(
+        PINT_server_op *s_op, job_status_s *js_p)
 {
     int ret = 0;
     job_id_t j_id;
@@ -176,32 +182,19 @@ static int seteattr_setobj_eattribs(PINT_server_op *s_op, job_status_s *js_p)
 
     PINT_STATE_DEBUG("seteattr_setobj_eattribs");
 
-    /* set up key and value structure for keyval write */
-    s_op->key.buffer = s_op->req->u.seteattr.key.buffer;
-    s_op->key.buffer_sz = s_op->req->u.seteattr.key.buffer_sz;
-
-    s_op->val.buffer = s_op->req->u.seteattr.val.buffer;
-    s_op->val.buffer_sz = s_op->req->u.seteattr.val.buffer_sz;
-
     gossip_debug(
-        GOSSIP_SETATTR_DEBUG,
-        "  writing %s [%Lu,%d,len %d]\n",
-        (char *)s_op->key.buffer,
+        GOSSIP_SETEATTR_DEBUG,
+        "  writing keylist [%Lu,%d,len %d]\n",
         Lu(s_op->req->u.seteattr.handle),
         s_op->req->u.seteattr.fs_id,
-        s_op->val.buffer_sz);
+        s_op->req->u.seteattr.nkey);
 
-    gossip_debug(
-        GOSSIP_SETATTR_DEBUG,
-        "keybuf %p keylen %d valbuf %p vallen %d\n",
-        s_op->req->u.seteattr.key.buffer, s_op->req->u.seteattr.key.buffer_sz,
-        s_op->req->u.seteattr.val.buffer, s_op->req->u.seteattr.val.buffer_sz);
-
-    ret = job_trove_keyval_write(
+    ret = job_trove_keyval_write_list(
         s_op->req->u.seteattr.fs_id,
         s_op->req->u.seteattr.handle,
-        &(s_op->key),
-        &(s_op->val),
+        s_op->req->u.seteattr.key,
+        s_op->req->u.seteattr.val,
+        s_op->req->u.seteattr.nkey,
         PINT_config_get_trove_sync_meta(
             user_opts, s_op->req->u.seteattr.fs_id),
         NULL,
@@ -228,13 +221,7 @@ static int seteattr_setobj_eattribs(PINT_server_op *s_op, job_status_s *js_p)
 static int seteattr_cleanup(PINT_server_op *s_op, job_status_s *js_p)
 {
     PINT_STATE_DEBUG("seteattr_cleanup");
-
-    gossip_debug(
-        GOSSIP_SETATTR_DEBUG,
-        "keybuf %p keylen %d valbuf %p vallen %d\n",
-        s_op->req->u.seteattr.key.buffer, s_op->req->u.seteattr.key.buffer_sz,
-        s_op->req->u.seteattr.val.buffer, s_op->req->u.seteattr.val.buffer_sz);
-
+    /* do I need to free memory from decoding key and val?*/
     return(server_state_machine_complete(s_op));
 }
 

@@ -53,15 +53,13 @@ enum PVFS_server_op
     PVFS_SERV_JOB_TIMER = 27,    /* not a real protocol request */
     PVFS_SERV_PROTO_ERROR = 28,
     PVFS_SERV_GETEATTR = 29,
-    PVFS_SERV_GETEATTR_LIST = 30,
-    PVFS_SERV_SETEATTR = 31,
-    PVFS_SERV_SETEATTR_LIST = 32,
-    PVFS_SERV_DELEATTR = 33
+    PVFS_SERV_SETEATTR = 30,
+    PVFS_SERV_DELEATTR = 31
     /* IMPORTANT: please remember to modify PVFS_MAX_SERVER_OP define
      * (below) if you add a new operation to this list
      */
 };
-#define PVFS_MAX_SERVER_OP 33
+#define PVFS_MAX_SERVER_OP 31
 
 /*
  * These ops must always work, even if the server is in admin mode.
@@ -1153,6 +1151,7 @@ endecode_fields_1a_struct(
   (PVFS_REQ_LIMIT_MGMT_EVENT_MON_COUNT * \
    roundup8(sizeof(struct PVFS_mgmt_event)))
 
+#if 0
 /* geteattr ****************************************************/
 /* - retreives extended attributes */
 
@@ -1199,11 +1198,12 @@ endecode_fields_2_struct(
     PVFS_ds_keyval, val)
 #define extra_size_PVFS_servresp_geteattr \
     PVFS_REQ_LIMIT_VAL_LEN
+#endif
 
-/* geteattr_list ****************************************************/
+/* geteattr ****************************************************/
 /* - retreives list of extended attributes */
 
-struct PVFS_servreq_geteattr_list
+struct PVFS_servreq_geteattr
 {
     PVFS_handle handle;  /* handle of target object */
     PVFS_fs_id fs_id;    /* file system */
@@ -1212,17 +1212,17 @@ struct PVFS_servreq_geteattr_list
     PVFS_size *valsz;    /* array of value buffer sizes */
 };
 endecode_fields_3aa_struct(
-    PVFS_servreq_geteattr_list,
+    PVFS_servreq_geteattr,
     PVFS_handle, handle,
     PVFS_fs_id, fs_id,
     skip4,,
     int32_t, nkey,
     PVFS_ds_keyval, key,
     PVFS_size, valsz);
-#define extra_size_PVFS_servreq_geteattr_list \
+#define extra_size_PVFS_servreq_geteattr \
     (PVFS_REQ_LIMIT_KEY_LEN * PVFS_REQ_LIMIT_KEYVAL_LIST)
 
-#define PINT_SERVREQ_GETEATTR_LIST_FILL(__req,   \
+#define PINT_SERVREQ_GETEATTR_FILL(__req,   \
                                   __creds, \
                                   __fsid,  \
                                   __handle,\
@@ -1231,28 +1231,29 @@ endecode_fields_3aa_struct(
                                   __size_array) \
 do {                                       \
     memset(&(__req), 0, sizeof(__req));    \
-    (__req).op = PVFS_SERV_GETEATTR_LIST;        \
+    (__req).op = PVFS_SERV_GETEATTR;        \
     (__req).credentials = (__creds);       \
-    (__req).u.geteattr_list.fs_id = (__fsid);    \
-    (__req).u.geteattr_list.handle = (__handle); \
-    (__req).u.geteattr_list.nkey = (__nkey); \
-    (__req).u.geteattr_list.key = (__key_array);\
-    (__req).u.geteattr_list.valsz = (__size_array);\
+    (__req).u.geteattr.fs_id = (__fsid);    \
+    (__req).u.geteattr.handle = (__handle); \
+    (__req).u.geteattr.nkey = (__nkey); \
+    (__req).u.geteattr.key = (__key_array);\
+    (__req).u.geteattr.valsz = (__size_array);\
 } while (0)
 
-struct PVFS_servresp_geteattr_list
+struct PVFS_servresp_geteattr
 {
     int32_t nkey;           /* number of values returned */
     PVFS_ds_keyval *val;    /* array of values returned */
 };
 endecode_fields_1a_struct(
-    PVFS_servresp_geteattr_list,
+    PVFS_servresp_geteattr,
     skip4,,
     int32_t, nkey,
     PVFS_ds_keyval, val)
-#define extra_size_PVFS_servresp_geteattr_list \
+#define extra_size_PVFS_servresp_geteattr \
     (PVFS_REQ_LIMIT_VAL_LEN * PVFS_REQ_LIMIT_KEYVAL_LIST)
 
+#if 0
 /* seteattr ****************************************************/
 /* - sets extended attributes */
 
@@ -1289,11 +1290,12 @@ do {                                             \
     (__req).u.seteattr.val.buffer_sz = (__val).buffer_sz;    \
     (__req).u.seteattr.val.buffer = (__val).buffer;          \
 } while (0)
+#endif
 
-/* seteattr_list ****************************************************/
+/* seteattr ****************************************************/
 /* - sets list of extended attributes */
 
-struct PVFS_servreq_seteattr_list
+struct PVFS_servreq_seteattr
 {
     PVFS_handle handle;    /* handle of target object */
     PVFS_fs_id fs_id;      /* file system */
@@ -1302,18 +1304,18 @@ struct PVFS_servreq_seteattr_list
     PVFS_ds_keyval *val;    /* attribute value */
 };
 endecode_fields_3aa_struct(
-    PVFS_servreq_seteattr_list,
+    PVFS_servreq_seteattr,
     PVFS_handle, handle,
     PVFS_fs_id, fs_id,
     skip4,,
     int32_t, nkey,
     PVFS_ds_keyval, key,
     PVFS_ds_keyval, val)
-#define extra_size_PVFS_servreq_seteattr_list \
+#define extra_size_PVFS_servreq_seteattr \
     ((PVFS_REQ_LIMIT_KEY_LEN + PVFS_REQ_LIMIT_VAL_LEN) \
         * PVFS_REQ_LIMIT_KEYVAL_LIST)
 
-#define PINT_SERVREQ_SETEATTR_LIST_FILL(__req,   \
+#define PINT_SERVREQ_SETEATTR_FILL(__req,   \
                                   __creds,       \
                                   __fsid,        \
                                   __handle,      \
@@ -1322,13 +1324,13 @@ endecode_fields_3aa_struct(
                                   __val_array)   \
 do {                                             \
     memset(&(__req), 0, sizeof(__req));          \
-    (__req).op = PVFS_SERV_SETEATTR_LIST;        \
+    (__req).op = PVFS_SERV_SETEATTR;        \
     (__req).credentials = (__creds);             \
-    (__req).u.seteattr_list.fs_id = (__fsid);    \
-    (__req).u.seteattr_list.handle = (__handle); \
-    (__req).u.seteattr_list.nkey = (__nkey);     \
-    (__req).u.seteattr_list.key = (__key_array); \
-    (__req).u.seteattr_list.val = (__val_array); \
+    (__req).u.seteattr.fs_id = (__fsid);    \
+    (__req).u.seteattr.handle = (__handle); \
+    (__req).u.seteattr.nkey = (__nkey);     \
+    (__req).u.seteattr.key = (__key_array); \
+    (__req).u.seteattr.val = (__val_array); \
 } while (0)
 
 /* deleattr ****************************************************/
@@ -1395,9 +1397,7 @@ struct PVFS_server_req
         struct PVFS_servreq_mgmt_remove_dirent mgmt_remove_dirent;
         struct PVFS_servreq_mgmt_get_dirdata_handle mgmt_get_dirdata_handle;
         struct PVFS_servreq_geteattr geteattr;
-        struct PVFS_servreq_geteattr_list geteattr_list;
         struct PVFS_servreq_seteattr seteattr;
-        struct PVFS_servreq_seteattr_list seteattr_list;
         struct PVFS_servreq_deleattr deleattr;
     } u;
 };
@@ -1443,7 +1443,6 @@ struct PVFS_server_resp
         struct PVFS_servresp_mgmt_event_mon mgmt_event_mon;
         struct PVFS_servresp_mgmt_get_dirdata_handle mgmt_get_dirdata_handle;
         struct PVFS_servresp_geteattr geteattr;
-        struct PVFS_servresp_geteattr_list geteattr_list;
     } u;
 };
 endecode_fields_2_struct(

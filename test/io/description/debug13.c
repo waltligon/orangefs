@@ -6,6 +6,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <pvfs2-types.h>
 #include <gossip.h>
 #include <pvfs2-debug.h>
@@ -80,7 +81,7 @@ PVFS_size exp2_size[] =
 	32
 };
 
-PINT_Request_result exp[] =
+PINT_Request_result exptd[] =
 {{
 	offset_array : &exp1_offset[0],
 	size_array : &exp1_size[0],
@@ -119,7 +120,7 @@ PINT_Request_result exp[] =
 	bytes : 160
 }};
 
-int request_debug()
+int request_debug(void)
 {
 	int i, r_size;
 	PINT_Request *r1, *r1a, *r1b, *r_packed;
@@ -209,8 +210,8 @@ int request_debug()
 		if(retval >= 0)
 		{
 			prtseg(&seg1,"Results obtained");
-			prtseg(&exp[i],"Results expected");
-			cmpseg(&seg1,&exp[i]);
+			prtseg(&exptd[i],"Results expected");
+			cmpseg(&seg1,&exptd[i]);
 		}
 
 		i++;
@@ -246,8 +247,8 @@ int request_debug()
 		if(retval >= 0)
 		{
 			prtseg(&seg1,"Results obtained");
-			prtseg(&exp[i],"Results expected");
-			cmpseg(&seg1,&exp[i]);
+			prtseg(&exptd[i],"Results expected");
+			cmpseg(&seg1,&exptd[i]);
 		}
 
 		i++;
@@ -284,8 +285,8 @@ int request_debug()
 		if(retval >= 0)
 		{
 			prtseg(&seg1,"Results obtained");
-			prtseg(&exp[i],"Results expected");
-			cmpseg(&seg1,&exp[i]);
+			prtseg(&exptd[i],"Results expected");
+			cmpseg(&seg1,&exptd[i]);
 		}
 
 		i++;
@@ -322,8 +323,8 @@ int request_debug()
 		if(retval >= 0)
 		{
 			prtseg(&seg1,"Results obtained");
-			prtseg(&exp[i],"Results expected");
-			cmpseg(&seg1,&exp[i]);
+			prtseg(&exptd[i],"Results expected");
+			cmpseg(&seg1,&exptd[i]);
 		}
 
 		i++;

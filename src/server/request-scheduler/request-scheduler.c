@@ -300,19 +300,10 @@ int PINT_req_sched_target_handle(
 	*handle = req->u.geteattr.handle;
 	*fs_id = req->u.geteattr.fs_id;
 	return (0);
-    case PVFS_SERV_GETEATTR_LIST:
-	*handle = req->u.geteattr_list.handle;
-	*fs_id = req->u.geteattr_list.fs_id;
-	return (0);
     case PVFS_SERV_SETEATTR:
 	*readonly_flag = 0;
 	*handle = req->u.seteattr.handle;
 	*fs_id = req->u.seteattr.fs_id;
-	return (0);
-    case PVFS_SERV_SETEATTR_LIST:
-	*readonly_flag = 0;
-	*handle = req->u.seteattr_list.handle;
-	*fs_id = req->u.seteattr_list.fs_id;
 	return (0);
     case PVFS_SERV_DELEATTR:
 	*readonly_flag = 0;
