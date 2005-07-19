@@ -23,6 +23,7 @@
 #include "mkspace.h"
 #include "pint-distribution.h"
 #include "pvfs2-config.h"
+#include "pvfs2-server.h"
 
 static DOTCONF_CB(get_pvfs_server_id);
 static DOTCONF_CB(get_logstamp);
@@ -61,6 +62,12 @@ static DOTCONF_CB(get_trove_sync_data);
 static DOTCONF_CB(get_param);
 static DOTCONF_CB(get_value);
 static DOTCONF_CB(get_default_num_dfiles);
+static DOTCONF_CB(get_server_job_bmi_timeout);
+static DOTCONF_CB(get_server_job_flow_timeout);
+static DOTCONF_CB(get_client_job_bmi_timeout);
+static DOTCONF_CB(get_client_job_flow_timeout);
+static DOTCONF_CB(get_client_retry_limit);
+static DOTCONF_CB(get_client_retry_delay);
 static FUNC_ERRORHANDLER(errorhandler);
 
 /* internal helper functions */
@@ -131,6 +138,12 @@ static const configoption_t options[] =
     {"LogFile",ARG_STR, get_logfile,NULL,CTX_ALL},
     {"EventLogging",ARG_LIST, get_event_logging_list,NULL,CTX_ALL},
     {"UnexpectedRequests",ARG_INT, get_unexp_req,NULL,CTX_ALL},
+    {"ServerJobBMITimeoutSecs",ARG_INT, get_server_job_bmi_timeout,NULL,CTX_ALL},
+    {"ServerJobFlowTimeoutSecs",ARG_INT, get_server_job_flow_timeout,NULL,CTX_ALL},
+    {"ClientJobBMITimeoutSecs",ARG_INT, get_client_job_bmi_timeout,NULL,CTX_ALL},
+    {"ClientJobFlowTimeoutSecs",ARG_INT, get_client_job_flow_timeout,NULL,CTX_ALL},
+    {"ClientRetryLimit",ARG_INT, get_client_retry_limit,NULL,CTX_ALL},
+    {"ClientRetryDelayMilliSecs",ARG_INT, get_client_retry_delay,NULL,CTX_ALL},
     {"PerfUpdateInterval",ARG_INT, get_perf_update_interval,NULL,CTX_ALL},
     {"BMIModules",ARG_LIST, get_bmi_module_list,NULL,CTX_ALL},
     {"FlowModules",ARG_LIST, get_flow_module_list,NULL,CTX_ALL},
@@ -179,6 +192,12 @@ int PINT_parse_config(
 
     /* set some global defaults for optional parameters */
     config_s->logstamp_type = GOSSIP_LOGSTAMP_DEFAULT;
+    config_s->server_job_bmi_timeout = PVFS2_SERVER_JOB_BMI_TIMEOUT_DEFAULT;
+    config_s->server_job_flow_timeout = PVFS2_SERVER_JOB_FLOW_TIMEOUT_DEFAULT;
+    config_s->client_job_bmi_timeout = PVFS2_CLIENT_JOB_BMI_TIMEOUT_DEFAULT;
+    config_s->client_job_flow_timeout = PVFS2_CLIENT_JOB_FLOW_TIMEOUT_DEFAULT;
+    config_s->client_retry_limit = PVFS2_CLIENT_RETRY_LIMIT_DEFAULT;
+    config_s->client_retry_delay_ms = PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT;
 
     if (cache_config_files(global_config_filename, server_config_filename))
     {
@@ -557,6 +576,78 @@ DOTCONF_CB(get_unexp_req)
                    "Defaults or Global block.\n");
     }
     config_s->initial_unexpected_requests = cmd->data.value;
+    return NULL;
+}
+
+DOTCONF_CB(get_server_job_bmi_timeout)
+{
+    if ((config_s->configuration_context != DEFAULTS_CONFIG) &&
+        (config_s->configuration_context != GLOBAL_CONFIG))
+    {
+        return("ServerJobBMITimeoutSecs Tag can only be in a "
+                   "Defaults or Global block.\n");
+    }
+    config_s->server_job_bmi_timeout = cmd->data.value;
+    return NULL;
+}
+
+DOTCONF_CB(get_server_job_flow_timeout)
+{
+    if ((config_s->configuration_context != DEFAULTS_CONFIG) &&
+        (config_s->configuration_context != GLOBAL_CONFIG))
+    {
+        return("ServerJobFlowTimeoutSecs Tag can only be in a "
+                   "Defaults or Global block.\n");
+    }
+    config_s->server_job_flow_timeout = cmd->data.value;
+    return NULL;
+}
+
+DOTCONF_CB(get_client_job_bmi_timeout)
+{
+    if ((config_s->configuration_context != DEFAULTS_CONFIG) &&
+        (config_s->configuration_context != GLOBAL_CONFIG))
+    {
+        return("ServerJobBMITimeoutSecs Tag can only be in a "
+                   "Defaults or Global block.\n");
+    }
+    config_s->client_job_bmi_timeout = cmd->data.value;
+    return NULL;
+}
+
+DOTCONF_CB(get_client_job_flow_timeout)
+{
+    if ((config_s->configuration_context != DEFAULTS_CONFIG) &&
+        (config_s->configuration_context != GLOBAL_CONFIG))
+    {
+        return("ServerJobFlowTimeoutSecs Tag can only be in a "
+                   "Defaults or Global block.\n");
+    }
+    config_s->client_job_flow_timeout = cmd->data.value;
+    return NULL;
+}
+
+DOTCONF_CB(get_client_retry_limit)
+{
+    if ((config_s->configuration_context != DEFAULTS_CONFIG) &&
+        (config_s->configuration_context != GLOBAL_CONFIG))
+    {
+        return("ClientRetryLimit Tag can only be in a "
+                   "Defaults or Global block.\n");
+    }
+    config_s->client_retry_limit = cmd->data.value;
+    return NULL;
+}
+
+DOTCONF_CB(get_client_retry_delay)
+{
+    if ((config_s->configuration_context != DEFAULTS_CONFIG) &&
+        (config_s->configuration_context != GLOBAL_CONFIG))
+    {
+        return("ClientRetryDelayMilliSecs Tag can only be in a "
+                   "Defaults or Global block.\n");
+    }
+    config_s->client_retry_delay_ms = cmd->data.value;
     return NULL;
 }
 

@@ -25,6 +25,7 @@
 #include "acache.h"
 #include "id-generator.h"
 #include "msgpairarray.h"
+#include "pint-sysint-utils.h"
 
 /* skip everything except #includes if __SM_CHECK_DEP is already defined; this
  * allows us to get the dependencies right for msgpairarray.sm which relies
@@ -36,25 +37,6 @@
 
 #define MAX_LOOKUP_SEGMENTS PVFS_REQ_LIMIT_PATH_SEGMENT_COUNT
 #define MAX_LOOKUP_CONTEXTS PVFS_REQ_LIMIT_MAX_SYMLINK_RESOLUTION_COUNT
-
-/*
-  TODO: the following constants should be run-time configurable
-  eventually
-*/
-
-/* jobs that send or receive request messages will timeout if they do
- * not complete within PVFS2_CLIENT_JOB_TIMEOUT seconds; flows will
- * timeout if they go for more than PVFS2_CLIENT_JOB_TIMEOUT seconds
- * without moving any data.
- */
-#define PVFS2_CLIENT_JOB_TIMEOUT 30
-
-/* the maximum number of times to retry restartable client operations,
- * or INT_MAX to try forever (well, 187 years if retry_delay = 2 sec). */
-#define PVFS2_CLIENT_RETRY_LIMIT  (5)
-
-/* the number of milliseconds to delay before retries */
-#define PVFS2_CLIENT_RETRY_DELAY  2000
 
 /* PINT_client_sm_recv_state_s
  *
@@ -585,13 +567,16 @@ do {                                                          \
     }                                                         \
 } while(0)
 
-#define PINT_init_msgarray_params(msgarray_params_ptr)\
+#define PINT_init_msgarray_params(msgarray_params_ptr, __fsid)\
 do {                                                  \
+    struct server_configuration_s *server_config =    \
+        PINT_get_server_config_struct(__fsid);        \
     PINT_sm_msgpair_params *mpp = msgarray_params_ptr;\
     mpp->job_context = pint_client_sm_context;        \
-    mpp->job_timeout = PVFS2_CLIENT_JOB_TIMEOUT;      \
-    mpp->retry_delay = PVFS2_CLIENT_RETRY_DELAY;      \
-    mpp->retry_limit = PVFS2_CLIENT_RETRY_LIMIT;      \
+    mpp->job_timeout = server_config->client_job_bmi_timeout;  \
+    mpp->retry_limit = server_config->client_retry_limit;      \
+    mpp->retry_delay = server_config->client_retry_delay_ms;   \
+    PINT_put_server_config_struct(server_config);     \
 } while(0)
 
 #define PINT_init_msgpair(sm_p, msg_p)                         \

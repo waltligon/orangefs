@@ -105,7 +105,14 @@ int PINT_server_get_config(
     }
     memset(sm_p, 0, sizeof(*sm_p));
 
-    PINT_init_msgarray_params(&sm_p->msgarray_params);
+    /* NOTE: we set these fields manually here rather than use
+     * PINT_init_msgarray_params(), because we don't yet have a server
+     * configuration file to override default parameters.
+     */
+    sm_p->msgarray_params.job_context = pint_client_sm_context;
+    sm_p->msgarray_params.job_timeout = 30;   /* 30 second job timeout */
+    sm_p->msgarray_params.retry_delay = 2000; /* 2 second retry delay */
+    sm_p->msgarray_params.retry_limit = 5;    /* retry up to 5 times */
     PINT_init_sysint_credentials(sm_p->cred_p, &creds);
     sm_p->u.get_config.mntent = mntent_p;
 

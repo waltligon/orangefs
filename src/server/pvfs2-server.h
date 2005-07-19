@@ -38,18 +38,23 @@ extern job_context_id server_job_context;
 #define PVFS2_SERVER_DEFAULT_TIMEOUT_MS      100
 #define BMI_UNEXPECTED_OP                    999
 
-/* the server will give up on sending a response if the send does not
- * complete in PVFS2_SERVER_RESPONSE_TIMEOUT seconds
+/* BMI operation timeout if not specified in config file */
+#define PVFS2_SERVER_JOB_BMI_TIMEOUT_DEFAULT         30
+/* Flow operation timeout if not specified in config file */
+#define PVFS2_SERVER_JOB_FLOW_TIMEOUT_DEFAULT        30
+/* BMI client side operation timeout if not specified in config file */
+/* NOTE: the default for this timeout is set higher to allow the client to
+ * overcome syncing and queueing delays on the server
  */
-/* TODO: this should be read from a config file */
-#define PVFS2_SERVER_RESPONSE_TIMEOUT         30
-
-/* the server will give up on a flow if more than
- * PVFS2_SERVER_FLOW_TIMEOUT seconds pass without any progress being
- * made on it
+#define PVFS2_CLIENT_JOB_BMI_TIMEOUT_DEFAULT         300
+/* Flow client side operation timeout if not specified in config file */
+#define PVFS2_CLIENT_JOB_FLOW_TIMEOUT_DEFAULT        300
+/* maximum number of times for client to retry restartable operations;
+ * use INT_MAX to approximate infinity (187 years with 2 sec delay)
  */
-/* TODO: this should be read from a config file */
-#define PVFS2_SERVER_FLOW_TIMEOUT             30
+#define PVFS2_CLIENT_RETRY_LIMIT_DEFAULT     (5)
+/* number of milliseconds that clients will delay between retries */
+#define PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT  2000
 
 /* types of permission checking that a server may need to perform for
  * incoming requests

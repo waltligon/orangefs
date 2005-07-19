@@ -109,6 +109,12 @@ typedef struct server_configuration_s
     ssize_t server_config_buflen;   /* the server.conf file length      */
     char *server_config_buf;        /* the server.conf file contents    */
     int  initial_unexpected_requests;
+    int  server_job_bmi_timeout;    /* job timeout values in seconds    */
+    int  server_job_flow_timeout;
+    int  client_job_bmi_timeout; 
+    int  client_job_flow_timeout;
+    int  client_retry_limit;        /* how many times to retry client operations */
+    int  client_retry_delay_ms;     /* delay between retries */
     int  perf_update_interval;      /* how quickly (in msecs) to
                                        update perf monitor              */
     char *logfile;

@@ -23,6 +23,8 @@ my $opt_trovesync = '1';
 my $opt_quiet = '';
 my $opt_logging = '';
 my $opt_logstamp = '';
+my $opt_server_job_timeout = '';
+my $opt_client_job_timeout = '';
 
 sub get_user_input
 {
@@ -163,6 +165,13 @@ sub emit_defaults
     print $target "\tBMIModules $bmi_module\n";
     print $target "\tFlowModules flowproto_multiqueue\n";
     print $target "\tPerfUpdateInterval 1000\n";
+    print $target "\tServerJobBMITimeoutSecs $server_job_timeout\n";
+    print $target "\tServerJobFlowTimeoutSecs $server_job_timeout\n";
+    print $target "\tClientJobBMITimeoutSecs $client_job_timeout\n";
+    print $target "\tClientJobFlowTimeoutSecs $client_job_timeout\n";
+    print $target "\tClientRetryLimit 5\n";
+    print $target "\tClientRetryDelayMilliSecs 2000\n";
+
     print $target "</Defaults>\n";
 }
 
@@ -288,6 +297,8 @@ sub usage
     print "     --logstamp    <STRING>            timestamp type for log messages (none,usec,datetime).\n";
     print "     --storage     <STRING>            storage space location\n";
     print "     --notrovesync                     sync metadata only upon request\n";
+    print "     --server-job-timeout <NUM>        server job timeout value (seconds)\n";
+    print "     --client-job-timeout <NUM>        server job timeout value (seconds)\n";
     print "     --quiet                           run silently\n\n";
 
     print "The two arguments specify the names of the configuration files\n";
@@ -354,6 +365,26 @@ sub get_logstamp
 		$logstamp = "usec";
 	}
 	return $logstamp;
+}
+
+sub get_server_job_timeout
+{
+	if ($opt_server_job_timeout) {
+		$server_job_timeout = $opt_server_job_timeout;
+	} else {
+		$server_job_timeout = 30;
+	}
+	return $server_job_timeout;
+}
+
+sub get_client_job_timeout
+{
+	if ($opt_client_job_timeout) {
+		$client_job_timeout = $opt_client_job_timeout;
+	} else {
+		$client_job_timeout = 300;
+	}
+	return $client_job_timeout;
 }
 
 sub get_logfile
@@ -521,6 +552,8 @@ GetOptions('protocol=s'    => \$opt_protocol,
 	   'logfile=s'     => \$opt_logfile,
 	   'logging=s'     => \$opt_logging,
 	   'logstamp=s'    => \$opt_logstamp,
+	   'server-job-timeout=i' => \$opt_server_job_timeout,
+	   'client-job-timeout=i' => \$opt_client_job_timeout,
 	   'storage=s'     => \$opt_storage,
 	   'help'          => \$show_help,
 	   'quiet!'        => \$opt_quiet,
@@ -622,6 +655,8 @@ $logfile = get_logfile();
 $storage = get_storage();
 $logging = get_logging();
 $logstamp = get_logstamp();
+$server_job_timeout = get_server_job_timeout();
+$client_job_timeout = get_client_job_timeout();
 
 # could prompt for handle recycle time, but it is probably best if we pick a
 # reasonable value w/o prompting
