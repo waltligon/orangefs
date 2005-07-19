@@ -1092,7 +1092,8 @@ static PINT_dist* get_default_distribution(PVFS_fs_id fs_id)
 
     /* If a default dist is specified in the config, use that
        else just create a simple_stripe distribution */
-    if (NULL != server_config->default_dist_config.name)
+    if (NULL != server_config &&
+        NULL != server_config->default_dist_config.name)
     {
         dist = PINT_dist_create(server_config->default_dist_config.name);
         
