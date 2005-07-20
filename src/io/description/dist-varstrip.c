@@ -262,7 +262,7 @@ static PVFS_size contiguous_length(void* params,
         strips[ui_count - 1].size;
     ui_stripe_nr = logical_offset / ui_stripe_size;
     /* get offset in stripe */
-    ui_count = logical_offset - (ui_stripe_nr * ui_stripe_size);
+    ui_offset_in_stripe = logical_offset - (ui_stripe_nr * ui_stripe_size);
     /* get Strips */
     for(ii = 0; ii < ui_count; ii++)
     {
