@@ -38,6 +38,18 @@
 #define MAX_LOOKUP_SEGMENTS PVFS_REQ_LIMIT_PATH_SEGMENT_COUNT
 #define MAX_LOOKUP_CONTEXTS PVFS_REQ_LIMIT_MAX_SYMLINK_RESOLUTION_COUNT
 
+/* Default client timeout in seconds used to set the timeout for jobs that
+ * send or receive request messages.
+ */
+#define PVFS2_CLIENT_JOB_BMI_TIMEOUT_DEFAULT 30
+
+/* Default number of times to retry restartable client operations. */
+#define PVFS2_CLIENT_RETRY_LIMIT_DEFAULT  (5)
+
+/* Default number of milliseconds to delay before retries */
+#define PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT  2000
+
+
 /* PINT_client_sm_recv_state_s
  *
  * This is used for extra receives, such as acknowledgements from
@@ -567,16 +579,25 @@ do {                                                          \
     }                                                         \
 } while(0)
 
-#define PINT_init_msgarray_params(msgarray_params_ptr, __fsid)\
-do {                                                  \
-    struct server_configuration_s *server_config =    \
-        PINT_get_server_config_struct(__fsid);        \
-    PINT_sm_msgpair_params *mpp = msgarray_params_ptr;\
-    mpp->job_context = pint_client_sm_context;        \
-    mpp->job_timeout = server_config->client_job_bmi_timeout;  \
-    mpp->retry_limit = server_config->client_retry_limit;      \
-    mpp->retry_delay = server_config->client_retry_delay_ms;   \
-    PINT_put_server_config_struct(server_config);     \
+#define PINT_init_msgarray_params(msgarray_params_ptr, __fsid)     \
+do {                                                               \
+    PINT_sm_msgpair_params *mpp = msgarray_params_ptr;             \
+    struct server_configuration_s *server_config =                 \
+        PINT_get_server_config_struct(__fsid);                     \
+    mpp->job_context = pint_client_sm_context;                     \
+    if (server_config)                                             \
+    {                                                              \
+        mpp->job_timeout = server_config->client_job_bmi_timeout;  \
+        mpp->retry_limit = server_config->client_retry_limit;      \
+        mpp->retry_delay = server_config->client_retry_delay_ms;   \
+    }                                                              \
+    else                                                           \
+    {                                                              \
+        mpp->job_timeout = PVFS2_CLIENT_JOB_BMI_TIMEOUT_DEFAULT;   \
+        mpp->retry_limit = PVFS2_CLIENT_RETRY_LIMIT_DEFAULT;       \
+        mpp->retry_delay = PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT;    \
+    }                                                              \
+    PINT_put_server_config_struct(server_config);                  \
 } while(0)
 
 #define PINT_init_msgpair(sm_p, msg_p)                         \
