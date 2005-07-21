@@ -77,6 +77,10 @@ struct PVFS_sys_dist_s
 };
 typedef struct PVFS_sys_dist_s PVFS_sys_dist;
 
+/**********************************************************************/
+/* Structures that Hold the results of various system interface calls */
+/**********************************************************************/
+
 /** Holds results of a lookup operation (reference to object). */
 struct PVFS_sysresp_lookup_s
 {
@@ -164,7 +168,23 @@ struct PVFS_sysresp_getparent_s
 };
 typedef struct PVFS_sysresp_getparent_s PVFS_sysresp_getparent;
 
-/* system interface functions */
+/** Holds results of a geteattr_list operation (attributes of object). */
+struct PVFS_sysresp_geteattr_s
+{
+    PVFS_ds_keyval *val_array;
+};
+typedef struct PVFS_sysresp_geteattr_s PVFS_sysresp_geteattr;
+
+/* seteattr */
+/* no data returned in seteattr response */
+
+/* deleattr */
+/* no data returned in deleattr response */
+
+
+/****************************************/
+/* system interface function prototypes */
+/****************************************/
 
 int PVFS_sys_initialize(
     uint64_t default_debug_mask);
@@ -410,6 +430,78 @@ PVFS_error PVFS_sys_dist_setparam(
     PVFS_sys_dist* dist,
     const char* param,
     void* value);
+
+PVFS_error PVFS_isys_geteattr(
+    PVFS_object_ref ref,
+    PVFS_credentials *credentials,
+    PVFS_ds_keyval *key_p,
+    PVFS_sysresp_geteattr *resp,
+    PVFS_sys_op_id *op_id,
+    void *user_ptr);
+
+PVFS_error PVFS_sys_geteattr(
+    PVFS_object_ref ref,
+    PVFS_credentials *credentials,
+    PVFS_ds_keyval *key_p,
+    PVFS_ds_keyval *val_p);
+
+PVFS_error PVFS_isys_geteattr_list(
+    PVFS_object_ref ref,
+    PVFS_credentials *credentials,
+    int32_t nkey,
+    PVFS_ds_keyval *key_p,
+    PVFS_sysresp_geteattr *resp,
+    PVFS_sys_op_id *op_id,
+    void *user_ptr);
+
+PVFS_error PVFS_sys_geteattr_list(
+    PVFS_object_ref ref,
+    PVFS_credentials *credentials,
+    int32_t nkey,
+    PVFS_ds_keyval *key_p,
+    PVFS_sysresp_geteattr *resp);
+
+PVFS_error PVFS_isys_seteattr(
+    PVFS_object_ref ref,
+    PVFS_credentials *credentials,
+    PVFS_ds_keyval *key_p,
+    PVFS_ds_keyval *val_p,
+    PVFS_sys_op_id *op_id,
+    void *user_ptr);
+
+PVFS_error PVFS_sys_seteattr(
+    PVFS_object_ref ref,
+    PVFS_credentials *credentials,
+    PVFS_ds_keyval *key_p,
+    PVFS_ds_keyval *val_p);
+
+PVFS_error PVFS_isys_seteattr_list(
+    PVFS_object_ref ref,
+    PVFS_credentials *credentials,
+    int32_t nkey,
+    PVFS_ds_keyval *key_array,
+    PVFS_ds_keyval *val_array,
+    PVFS_sys_op_id *op_id,
+    void *user_ptr);
+
+PVFS_error PVFS_sys_seteattr_list(
+    PVFS_object_ref ref,
+    PVFS_credentials *credentials,
+    int32_t nkey,
+    PVFS_ds_keyval *key_array,
+    PVFS_ds_keyval *val_array);
+
+PVFS_error PVFS_isys_deleattr(
+    PVFS_object_ref ref,
+    PVFS_credentials *credentials,
+    PVFS_ds_keyval *key_p,
+    PVFS_sys_op_id *op_id,
+    void *user_ptr);
+
+PVFS_error PVFS_sys_deleattr(
+    PVFS_object_ref ref,
+    PVFS_credentials *credentials,
+    PVFS_ds_keyval *key_p);
 
 #endif
 

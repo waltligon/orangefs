@@ -25,14 +25,16 @@
 /* optional parameters, filled in by parse_args() */
 struct options
 {
-    PVFS_ds_keyval key;
-    PVFS_ds_keyval val;
+    int nkey;
+    PVFS_ds_keyval *key;
+    PVFS_ds_keyval *val;
     int target_count;
     char** destfiles;
 };
 
 static struct options* parse_args(int argc, char* argv[]);
-int pvfs2_seteattr (PVFS_ds_keyval key, PVFS_ds_keyval val, char *destfile);
+int pvfs2_seteattr (int nkey, PVFS_ds_keyval *key, PVFS_ds_keyval *val,
+        char *destfile);
 static void usage(int argc, char** argv);
 int check_perm(char c);
 
@@ -63,12 +65,11 @@ int main(int argc, char **argv)
    * for each file the user specified
    */
   for (i = 0; i < user_opts->target_count; i++) {
-    ret = pvfs2_geteattr(user_opts->key, &user_opts->val,
+    ret = pvfs2_seteattr(user_opts->nkey, user_opts->key, user_opts->val,
             user_opts->destfiles[i]);
     if (ret != 0) {
+      PVFS_perror("pvfs2_seteattr", ret);
       break;
-
-    printf("%s\n",user_opts->val.buffer);
     }
     /* TODO: need to free the request descriptions */
   }
@@ -82,13 +83,13 @@ int main(int argc, char **argv)
  *
  * returns zero on success and negative one on failure
  */
-int pvfs2_geteattr (PVFS_ds_keyval key, PVFS_ds_keyval *val, char *destfile) {
+int pvfs2_seteattr (int nkey, PVFS_ds_keyval *key, PVFS_ds_keyval *val,
+        char *destfile) {
   int ret = -1;
   char str_buf[PVFS_NAME_MAX] = {0};
   char pvfs_path[PVFS_NAME_MAX] = {0};
   PVFS_fs_id cur_fs;
   PVFS_sysresp_lookup resp_lookup;
-  PVFS_sysresp_geteattr resp_geteattr;
   PVFS_object_ref parent_ref;
   PVFS_credentials credentials;
   /* translate local path into pvfs2 relative path */
@@ -155,17 +156,21 @@ int pvfs2_geteattr (PVFS_ds_keyval key, PVFS_ds_keyval *val, char *destfile) {
     return -1;
   }
 
-  /* get extended attribute */
-  resp_geteattr.val.buffer = val->buffer;
-  resp_geteattr.val.buffer_sz = val->buffer_sz;
-  ret = PVFS_sys_geteattr(resp_lookup.ref,
-          &credentials, &key, &resp_geteattr);
+  /* set extended attribute */
+  { int k;
+      printf("nkey = %d\n",nkey);
+      for(k=0; k<nkey; k++)
+      {
+          printf("key = %s val = %s\n", (char *)key[k].buffer,
+                  (char *)val[k].buffer);
+      }
+  }
+  ret = PVFS_sys_seteattr_list(resp_lookup.ref, &credentials, nkey, key, val);
   if (ret < 0)
   {
-      PVFS_perror("seteattr failed with errcode", ret);
+      PVFS_perror("seteattr_list failed with errcode", ret);
       return(-1);
   }
-  val->read_sz = resp_geteattr.val.read_sz;
 
   return 0;
 }
@@ -184,7 +189,8 @@ static struct options* parse_args(int argc, char* argv[])
     extern int optind, opterr, optopt;
     char flags[] = "v";
     int one_opt = 0;
-    int i;
+    int i, k;
+    char *cptr, *cptr2;
 
     struct options* tmp_opts = NULL;
 
@@ -196,10 +202,9 @@ static struct options* parse_args(int argc, char* argv[])
     memset(tmp_opts, 0, sizeof(struct options));
 
     /* fill in defaults */
-    tmp_opts->key.buffer = NULL;
-    tmp_opts->key.buffer_sz = 0;
-    tmp_opts->val.buffer = NULL;
-    tmp_opts->val.buffer_sz = 0;
+    tmp_opts->nkey = 0;
+    tmp_opts->key = NULL;
+    tmp_opts->val = NULL;
     tmp_opts->target_count = 0;
     tmp_opts->destfiles = NULL;
 
@@ -222,10 +227,70 @@ static struct options* parse_args(int argc, char* argv[])
 	}
     }
     /* parse key and value from argv[optind] */
-    tmp_opts->key.buffer = argv[optind];
-    tmp_opts->key.buffer_sz = strlen(argv[optind]);
-    tmp_opts->val.buffer = malloc(VALBUFSZ);
-    tmp_opts->val.buffer_sz = VALBUFSZ;
+    /* first count the keys */
+    /* since argv[optind] exists, there must be at least one */
+    tmp_opts->nkey = 0;
+    cptr = argv[optind];
+    while(cptr)
+    {
+        /* must be something after a comma */
+        if ((tmp_opts->nkey == 0 && *cptr != ',') || *(cptr+1) != '\0')
+            tmp_opts->nkey++;
+        else
+        {
+            usage(argc,argv);
+            exit(EXIT_FAILURE);
+        }
+        /* a comma separates and indicates another key */
+        cptr++;
+        cptr = strchr(cptr, ',');
+    }
+    /* now malloc space for the keys and values */
+    tmp_opts->key = (PVFS_ds_keyval *)
+            malloc(sizeof(PVFS_ds_keyval) * tmp_opts->nkey);
+    tmp_opts->val = (PVFS_ds_keyval *)
+            malloc(sizeof(PVFS_ds_keyval) * tmp_opts->nkey);
+    /* now re-run the list to set up the key strings */
+    cptr = argv[optind];
+    for (k = 0; k < tmp_opts->nkey; k++)
+    {
+        if (k > 0)
+        {
+            /* zero out the comma */
+            *cptr = '\0';
+            /* point to the first char of the next key */
+            cptr++;
+        }
+        tmp_opts->key[k].buffer = cptr;
+        cptr = strchr(cptr, ',');
+    }
+    /* now re-run the list and copy them in */
+    for (k = 0; k < tmp_opts->nkey; k++)
+    {
+        cptr = tmp_opts->key[k].buffer;
+        cptr2 = strchr(cptr, ':');
+        if (cptr2)
+        {
+            *cptr2 = '\0';
+            cptr2++;
+            tmp_opts->val[k].buffer_sz = strlen(cptr2) + 1;
+            tmp_opts->val[k].buffer =
+                (char *)malloc(sizeof(char)*tmp_opts->val[k].buffer_sz);
+            strncpy(tmp_opts->val[k].buffer, cptr2,
+                    tmp_opts->val[k].buffer_sz);
+        }
+        else
+        {
+            /* colon not found */
+	    usage(argc, argv);
+	    exit(EXIT_FAILURE);
+        }
+        tmp_opts->key[k].buffer_sz = strlen(cptr) + 1;
+        tmp_opts->key[k].buffer =
+            (char *)malloc(sizeof(char)*tmp_opts->key[k].buffer_sz);
+        strncpy(tmp_opts->key[k].buffer, cptr,
+                tmp_opts->key[k].buffer_sz);
+    }
 
     /* finished up argument processing */
     optind = optind + 1;
@@ -244,9 +309,23 @@ static struct options* parse_args(int argc, char* argv[])
 
 static void usage(int argc, char** argv)
 {
-    fprintf(stderr,"Usage: %s [-v] key filename(s)\n",argv[0]);
+    fprintf(stderr,"Usage: %s [-v] key:value[,key:value] filename(s)\n",argv[0]);
     fprintf(stderr,"    -v - print program version and terminate.\n");
     return;
+}
+
+int check_perm(char c) {
+    switch (c) {
+      case '0': return 0;
+      case '1': return 1;
+      case '2': return 2;
+      case '3': return 3;
+      case '4': return 4;
+      case '5': return 5;
+      case '6': return 6;
+      case '7': return 7;
+      default: return -1;
+   }
 }
 
 /*

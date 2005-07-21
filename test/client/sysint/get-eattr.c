@@ -22,17 +22,21 @@
 #define PVFS2_VERSION "Unknown"
 #endif
 
+#define VALBUFSZ 1024
+
 /* optional parameters, filled in by parse_args() */
 struct options
 {
-    PVFS_ds_keyval key;
-    PVFS_ds_keyval val;
+    int nkey;
+    PVFS_ds_keyval *key;
+    PVFS_ds_keyval *val;
     int target_count;
     char** destfiles;
 };
 
 static struct options* parse_args(int argc, char* argv[]);
-int pvfs2_seteattr (PVFS_ds_keyval key, PVFS_ds_keyval val, char *destfile);
+int pvfs2_geteattr (int nkey, PVFS_ds_keyval *key_p,
+        PVFS_ds_keyval *val_p, char *destfile);
 static void usage(int argc, char** argv);
 int check_perm(char c);
 
@@ -40,7 +44,7 @@ int main(int argc, char **argv)
 {
   int ret = 0;
   struct options* user_opts = NULL;
-  int i;
+  int i, k;
 
   /* look at command line arguments */
   user_opts = parse_args(argc, argv);
@@ -63,9 +67,16 @@ int main(int argc, char **argv)
    * for each file the user specified
    */
   for (i = 0; i < user_opts->target_count; i++) {
-    ret = pvfs2_seteattr(user_opts->key,user_opts->val,user_opts->destfiles[i]);
+    ret = pvfs2_geteattr(user_opts->nkey, user_opts->key, user_opts->val,
+            user_opts->destfiles[i]);
     if (ret != 0) {
-      break;
+        printf("geteattr returned error code - exiting\n");
+        break;
+    }
+    for (k = 0; k < user_opts->nkey; k++) {
+        printf("key[%d]:%s Value:\n%s\n",k,
+                (char *)user_opts->key[k].buffer,
+                (char *)user_opts->val[k].buffer);
     }
     /* TODO: need to free the request descriptions */
   }
@@ -73,18 +84,20 @@ int main(int argc, char **argv)
   return(ret);
 }
 
-/* pvfs2_seteattr()
+/* pvfs2_geteattr()
  *
  * changes the mode of the given file to the given permissions
  *
  * returns zero on success and negative one on failure
  */
-int pvfs2_seteattr (PVFS_ds_keyval key, PVFS_ds_keyval val, char *destfile) {
+int pvfs2_geteattr(int nkey, PVFS_ds_keyval *key_p,
+        PVFS_ds_keyval *val_p, char *destfile) {
   int ret = -1;
   char str_buf[PVFS_NAME_MAX] = {0};
   char pvfs_path[PVFS_NAME_MAX] = {0};
   PVFS_fs_id cur_fs;
   PVFS_sysresp_lookup resp_lookup;
+  PVFS_sysresp_geteattr resp_geteattr;
   PVFS_object_ref parent_ref;
   PVFS_credentials credentials;
   /* translate local path into pvfs2 relative path */
@@ -151,11 +164,13 @@ int pvfs2_seteattr (PVFS_ds_keyval key, PVFS_ds_keyval val, char *destfile) {
     return -1;
   }
 
-  /* set extended attribute */
-  ret = PVFS_sys_seteattr(resp_lookup.ref, &credentials, &key, &val);
+  /* get extended attribute */
+  resp_geteattr.val_array = val_p;
+  ret = PVFS_sys_geteattr_list(resp_lookup.ref,
+          &credentials, nkey, key_p, &resp_geteattr);
   if (ret < 0)
   {
-      PVFS_perror("seteattr failed with errcode", ret);
+      PVFS_perror("PVFS_sys_geteattr failed with errcode", ret);
       return(-1);
   }
 
@@ -176,7 +191,8 @@ static struct options* parse_args(int argc, char* argv[])
     extern int optind, opterr, optopt;
     char flags[] = "v";
     int one_opt = 0;
-    int i;
+    int i, k;
+    char *cptr;
 
     struct options* tmp_opts = NULL;
 
@@ -188,10 +204,9 @@ static struct options* parse_args(int argc, char* argv[])
     memset(tmp_opts, 0, sizeof(struct options));
 
     /* fill in defaults */
-    tmp_opts->key.buffer = NULL;
-    tmp_opts->key.buffer_sz = 0;
-    tmp_opts->val.buffer = NULL;
-    tmp_opts->val.buffer_sz = 0;
+    tmp_opts->key = NULL;
+    tmp_opts->val = NULL;
+    tmp_opts->nkey = 0;
     tmp_opts->target_count = 0;
     tmp_opts->destfiles = NULL;
 
@@ -213,24 +228,55 @@ static struct options* parse_args(int argc, char* argv[])
 		exit(EXIT_FAILURE);
 	}
     }
-    /* parse key and value from argv[optind] */
-    tmp_opts->key.buffer = argv[optind];
-    tmp_opts->val.buffer = strchr(argv[optind], ':');
-    if (!tmp_opts->val.buffer)
+    /* parse keys from argv[optind] */
+    /* first count the keys */
+    /* since argv[optind] exists, there must be at least one */
+    tmp_opts->nkey = 0;
+    cptr = argv[optind];
+    while(cptr)
     {
-        /* colon not found */
-	usage(argc, argv);
-	exit(EXIT_FAILURE);
+        /* must be something after a comma */
+        if ((tmp_opts->nkey == 0 && *cptr != ',') || *(cptr+1) != '\0')
+            tmp_opts->nkey++;
+        else
+        {
+            usage(argc,argv);
+            exit(EXIT_FAILURE);
+        }
+        /* a comma separates and indicates another key */
+        cptr++;
+        cptr = strchr(cptr, ',');
     }
-    else
+    /* now malloc space for the keys and values */
+    tmp_opts->key = (PVFS_ds_keyval *)
+            malloc(sizeof(PVFS_ds_keyval) * tmp_opts->nkey);
+    tmp_opts->val = (PVFS_ds_keyval *)
+            malloc(sizeof(PVFS_ds_keyval) * tmp_opts->nkey);
+    /* now re-run the list to set up the key strings */
+    cptr = argv[optind];
+    for (k = 0; k < tmp_opts->nkey; k++)
     {
-        *((char *)tmp_opts->val.buffer) = '\0';
-        ((char *)tmp_opts->val.buffer)++;
-        tmp_opts->key.buffer_sz =
-            ((char *)tmp_opts->val.buffer) -
-            ((char *)tmp_opts->key.buffer);
-        tmp_opts->val.buffer_sz =
-            strlen(((char *)tmp_opts->val.buffer)) + 1;
+        if (k > 0)
+        {
+            /* zero out the comma */
+            *cptr = '\0';
+            /* point to the first char of the next key */
+            cptr++;
+        }
+        tmp_opts->key[k].buffer = cptr;
+        cptr = strchr(cptr, ',');
+    }
+    /* now re-run the list and copy them in */
+    for (k = 0; k < tmp_opts->nkey; k++)
+    {
+        cptr = tmp_opts->key[k].buffer;
+        tmp_opts->key[k].buffer_sz = strlen(cptr) + 1;
+        tmp_opts->key[k].buffer =
+            (char *)malloc(sizeof(char)*tmp_opts->key[k].buffer_sz);
+        strncpy(tmp_opts->key[k].buffer, cptr,
+                tmp_opts->key[k].buffer_sz);
+        tmp_opts->val[k].buffer_sz = VALBUFSZ;
+        tmp_opts->val[k].buffer = malloc(VALBUFSZ);
     }
 
     /* finished up argument processing */
@@ -250,22 +296,9 @@ static struct options* parse_args(int argc, char* argv[])
 
 static void usage(int argc, char** argv)
 {
-    fprintf(stderr,"Usage: %s [-v] key:value filename(s)\n",argv[0]);
+    fprintf(stderr,"Usage: %s [-v] key[,key] filename(s)\n",argv[0]);
     fprintf(stderr,"    -v - print program version and terminate.\n");
     return;
-}
-int check_perm(char c) {
-    switch (c) {
-      case '0': return 0;
-      case '1': return 1;
-      case '2': return 2;
-      case '3': return 3;
-      case '4': return 4;
-      case '5': return 5;
-      case '6': return 6;
-      case '7': return 7;
-      default: return -1;
-   }
 }
 
 /*

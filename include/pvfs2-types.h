@@ -182,6 +182,26 @@ typedef enum
 #define decode_PVFS_ds_type decode_enum
 #define encode_PVFS_ds_type encode_enum
 
+/* Key/Value Pairs */
+/* Extended attributes are stored on objects with */
+/* a Key/Value pair.  A key or a value is simply */
+/* a byte string of some length.  Keys are normally */
+/* strings, and thus are printable ASCII and NULL */
+/* terminated.  Values are any sequence of bytes */
+/* and are user interpreted.  This struct represents */
+/* EITHER a key or a value.  This struct is IDENTICAL */
+/* to a TROVE_keyval_s defined in src/io/trove/trove-types.h */
+/* but is duplicated here to maintain separation between */
+/* the Rrove implementation and PVFS2.  This struct should */
+/* be used everywhere but within Trove. WBL 6/2005*/
+typedef struct PVFS_ds_keyval_s
+{
+        void *buffer;      /* points to actual key or value */
+        int32_t buffer_sz; /* the size of the area pointed to by buffer */
+        int32_t read_sz;   /* when reading, the actual number of bytes read */
+                           /* only valid after a read */
+} PVFS_ds_keyval;
+
 /* internal attribute masks, common to all obj types */
 #define PVFS_ATTR_COMMON_UID   (1 << 0)
 #define PVFS_ATTR_COMMON_GID   (1 << 1)
