@@ -345,7 +345,16 @@ substitute your host name in place of ``testhost'':
 tcp://testhost:3334/pvfs2-fs /mnt/pvfs2 pvfs2 default,noauto 0 0 
 \end{verbatim}
 
-Alternatively one could put this entry in \texttt{/etc/fstab} instead.
+There are a few alternatives to using an /etc/pvfs2tab which may be useful
+in production environments:
+\begin{itemize}
+\item One could put this entry in \texttt{/etc/fstab} file instead of
+\texttt{/etc/pvfs2tab}. 
+\item One could avoid static tab file entries entirely and let the pvfs2 tools
+detect file systems that have been mounted using the Linux kernel
+driver.  This approach only works if you use the 2.6 Linux kernel or
+install the mount.pvfs2 utility on 2.4 Linux kernel systems.
+\end{itemize}
 
 \subsection{Testing your installation}
 \label{subsec:testing}

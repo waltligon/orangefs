@@ -72,23 +72,30 @@ int main(int argc, char **argv)
         PVFS_object_ref parent_ref;
 
         /* Translate path into pvfs2 relative path */
-        rc = PINT_get_base_dir(working_file, directory, PVFS_NAME_MAX);
-        num_segs = PINT_string_count_segments(working_file);
-        rc = PINT_get_path_element(working_file, num_segs - 1,
-                                   filename, PVFS_SEGMENT_MAX);
-
-        if (rc)
+        rc = PVFS_util_resolve(working_file, &cur_fs, pvfs_path,
+            PVFS_NAME_MAX);
+        if(rc < 0)
         {
-            fprintf(stderr, "Unknown path format: %s\n", working_file);
+            PVFS_perror("PVFS_util_resolve", rc);
             ret = -1;
             break;
         }
 
-        rc = PVFS_util_resolve(directory, &cur_fs,
-                               pvfs_path, PVFS_NAME_MAX);
+        /* break into file and directory */
+        rc = PINT_get_base_dir(pvfs_path, directory, PVFS_NAME_MAX);
+        if(rc < 0)
+        {
+            PVFS_perror("PINT_get_base_dir", rc);
+            ret = -1;
+            break;
+        }
+        num_segs = PINT_string_count_segments(pvfs_path);
+        rc = PINT_get_path_element(pvfs_path, num_segs - 1,
+                                   filename, PVFS_SEGMENT_MAX);
+
         if (rc)
         {
-            PVFS_perror("PVFS_util_resolve", rc);
+            PVFS_perror("PINT_get_path_element", rc);
             ret = -1;
             break;
         }
@@ -97,7 +104,7 @@ int main(int argc, char **argv)
         credentials.gid = getuid();
 
         memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
-        rc = PVFS_sys_lookup(cur_fs, pvfs_path, &credentials,
+        rc = PVFS_sys_lookup(cur_fs, directory, &credentials,
                              &resp_lookup, PVFS2_LOOKUP_LINK_NO_FOLLOW);
         if (rc)
         {

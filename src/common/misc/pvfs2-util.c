@@ -1,6 +1,10 @@
 /*
  * (C) 2001 Clemson University and The University of Chicago
  *
+ * Changes by Acxiom Corporation to add relative path support to
+ * PVFS_util_resolve(),
+ * Copyright © Acxiom Corporation, 2005
+ *
  * See COPYING in top-level directory.
  */
 
@@ -13,6 +17,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/time.h>
+#include <libgen.h>
 
 #include "pvfs2-config.h"
 #include "pvfs2-sysint.h"
@@ -21,6 +26,7 @@
 #include "gossip.h"
 #include "str-utils.h"
 #include "gen-locks.h"
+#include "realpath.h"
 
 /* TODO: add replacement functions for systems without getmntent() */
 #ifndef HAVE_GETMNTENT
@@ -54,6 +60,12 @@ static int parse_encoding_string(
     enum PVFS_encoding_type *et);
 
 static int parse_num_dfiles_string(const char* cp, int* num_dfiles);
+
+static int PINT_util_resolve_absolute(
+    const char* local_path,
+    PVFS_fs_id* out_fs_id,
+    char* out_fs_path,
+    int out_fs_path_max);
 
 void PVFS_util_gen_credentials(
     PVFS_credentials *credentials)
@@ -168,9 +180,10 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
     const char *tabfile)
 {
     FILE *mnt_fp = NULL;
-    int file_count = 4;
-    const char *file_list[4] =
-        { NULL, "/etc/fstab", "/etc/pvfs2tab", "pvfs2tab" };
+    int file_count = 5;
+    /* NOTE: mtab should be last for clean error logic below */
+    const char *file_list[5] =
+        { NULL, "/etc/fstab", "/etc/pvfs2tab", "pvfs2tab", "/etc/mtab" };
     const char *targetfile = NULL;
     struct mntent *tmp_ent;
     int i, j;
@@ -194,7 +207,6 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
           first check for environment variable override
         */
         file_list[0] = getenv("PVFS2TAB_FILE");
-        file_count = 4;
     }
 
     gen_mutex_lock(&s_stat_tab_mutex);
@@ -324,9 +336,29 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
                 }
                 if (slashcount != 3)
                 {
-                    gossip_lerr("Error: invalid tab file entry: %s\n",
-                                tmp_ent->mnt_fsname);
-                    goto error_exit;
+                    /* if we are looking at the mtab, then just silently
+                     * treat this error as if we didn't find an entry at
+                     * all; they may have mounted using an odd syntax on a
+                     * 2.4 kernel system
+                     */
+                    if(!strcmp(targetfile, "/etc/mtab"))
+                    {
+                        gossip_err("Error: could not find any pvfs2 tabfile entries.\n");
+                        gossip_err("Error: tried the following tabfiles:\n");
+                        for (j = 0; j < file_count; j++)
+                        {
+                            gossip_err("       %s\n", file_list[j]);
+                        }
+                        goto error_exit;
+                    }
+                    else
+                    {
+                        gossip_err("Error: invalid tab file entry: %s\n",
+                                    tmp_ent->mnt_fsname);
+                        gossip_err("Error: offending tab file: %s\n",
+                                    targetfile);
+                        goto error_exit;
+                    }
                 }
 
                 /* find a reference point in the string */
@@ -792,7 +824,7 @@ int PVFS_util_get_mntent_copy(PVFS_fs_id fs_id,
 /* PVFS_util_resolve()
  *
  * given a local path of a file that resides on a pvfs2 volume,
- * determine what the fsid and fs relative path is
+ * determine what the fsid and fs relative path is.  
  *
  * returns 0 on succees, -PVFS_error on failure
  */
@@ -802,64 +834,82 @@ int PVFS_util_resolve(
     char* out_fs_path,
     int out_fs_path_max)
 {
-    int i = 0, j = 0;
-    int ret = -PVFS_EINVAL;
+    int ret = -1;
+    char* tmp_path = NULL;
+    char* parent_path = NULL;
+    int base_len = 0;
 
-    gen_mutex_lock(&s_stat_tab_mutex);
-
-    for(i=0; i < s_stat_tab_count; i++)
+    /* the most common case first; just try to resolve the path that we
+     * were given
+     */
+    ret = PINT_util_resolve_absolute(local_path, out_fs_id, out_fs_path,
+        out_fs_path_max);
+    if(ret == 0)
     {
-        for(j=0; j<s_stat_tab_array[i].mntent_count; j++)
+        /* done */
+        return(0);
+    }
+    if(ret == -PVFS_ENOENT)
+    {
+        /* if the path wasn't found, try canonicalizing the path in case it
+         * refers to a relative path on a mounted volume or contains symlinks
+         */
+        tmp_path = (char*)malloc(PVFS_NAME_MAX*sizeof(char));
+        if(!tmp_path)
         {
-            ret = PINT_remove_dir_prefix(
-                local_path, s_stat_tab_array[i].mntent_array[j].mnt_dir,
-                out_fs_path, out_fs_path_max);
-            if(ret == 0)
-            {
-                *out_fs_id = s_stat_tab_array[i].mntent_array[j].fs_id;
-                if(*out_fs_id == PVFS_FS_ID_NULL)
-                {
-                    gossip_err("Error: %s resides on a PVFS2 file system "
-                    "that has not yet been initialized.\n", local_path);
-
-                    gen_mutex_unlock(&s_stat_tab_mutex);
-                    return(-PVFS_ENXIO);
-                }
-                gen_mutex_unlock(&s_stat_tab_mutex);
-                return(0);
-            }
+            return(-PVFS_ENOMEM);
         }
+        memset(tmp_path, 0, PVFS_NAME_MAX*sizeof(char));
+        ret = PINT_realpath(local_path, tmp_path, (PVFS_NAME_MAX-1));
+        if(ret == -PVFS_EINVAL)
+        {
+            /* one more try; canonicalize the parent in case this function
+             * is called before object creation; the basename
+             * doesn't yet exist but we still need to find the PVFS volume
+             */
+            parent_path = (char*)malloc(PVFS_NAME_MAX*sizeof(char));
+            if(!parent_path)
+            {
+                free(tmp_path);
+                return(-PVFS_ENOMEM);
+            }
+            /* find size of basename so we can reserve space for it */
+            /* note: basename() and dirname() modifiy args, thus the strcpy */
+            strcpy(parent_path, local_path);
+            base_len = strlen(basename(parent_path));
+            strcpy(parent_path, local_path);
+            ret = PINT_realpath(dirname(parent_path), tmp_path,
+                (PVFS_NAME_MAX-base_len-2));
+            if(ret < 0)
+            {
+                free(tmp_path);
+                free(parent_path);
+                /* last chance failed; this is not a valid pvfs2 path */
+                return(-PVFS_ENOENT);
+            }
+            /* glue the basename back on */
+            strcpy(parent_path, local_path);
+            strcat(tmp_path, "/");
+            strcat(tmp_path, basename(parent_path));
+            free(parent_path);
+        }
+        else if(ret < 0)
+        {
+            /* first canonicalize failed; this is not a valid pvfs2 path */
+            free(tmp_path);
+            return(-PVFS_ENOENT);
+        }
+
+        ret = PINT_util_resolve_absolute(tmp_path, out_fs_id, out_fs_path,
+            out_fs_path_max);
+        free(tmp_path);
+
+        /* fall through and preserve "ret" to be returned */
     }
 
-    /* check the dynamic tab area if we haven't resolved anything yet */
-    for(j = 0; j < s_stat_tab_array[
-            PVFS2_DYNAMIC_TAB_INDEX].mntent_count; j++)
-    {
-        ret = PINT_remove_dir_prefix(
-            local_path, s_stat_tab_array[
-                PVFS2_DYNAMIC_TAB_INDEX].mntent_array[j].mnt_dir,
-            out_fs_path, out_fs_path_max);
-        if (ret == 0)
-        {
-            *out_fs_id = s_stat_tab_array[
-                PVFS2_DYNAMIC_TAB_INDEX].mntent_array[j].fs_id;
-            if(*out_fs_id == PVFS_FS_ID_NULL)
-            {
-                gossip_err("Error: %s resides on a PVFS2 file system "
-                           "that has not yet been initialized.\n",
-                           local_path);
-
-                gen_mutex_unlock(&s_stat_tab_mutex);
-                return(-PVFS_ENXIO);
-            }
-            gen_mutex_unlock(&s_stat_tab_mutex);
-            return(0);
-        }
-    }
-
-    gen_mutex_unlock(&s_stat_tab_mutex);
-    return(-PVFS_ENOENT);
+    return(ret);
 }
+
 
 /* PVFS_util_init_defaults()
  *
@@ -1392,6 +1442,78 @@ static int parse_num_dfiles_string(const char* cp, int* num_dfiles)
     return 0;
 }
 
+/* PINT_util_resolve_absolute()
+ *
+ * given a local path of a file that may reside on a pvfs2 volume,
+ * determine what the fsid and fs relative path is. Makes no attempt
+ * to canonicalize the path.
+ *
+ * returns 0 on succees, -PVFS_error on failure
+ */
+static int PINT_util_resolve_absolute(
+    const char* local_path,
+    PVFS_fs_id* out_fs_id,
+    char* out_fs_path,
+    int out_fs_path_max)
+{
+    int i = 0, j = 0;
+    int ret = -PVFS_EINVAL;
+
+    gen_mutex_lock(&s_stat_tab_mutex);
+
+    for(i=0; i < s_stat_tab_count; i++)
+    {
+        for(j=0; j<s_stat_tab_array[i].mntent_count; j++)
+        {
+            ret = PINT_remove_dir_prefix(
+                local_path, s_stat_tab_array[i].mntent_array[j].mnt_dir,
+                out_fs_path, out_fs_path_max);
+            if(ret == 0)
+            {
+                *out_fs_id = s_stat_tab_array[i].mntent_array[j].fs_id;
+                if(*out_fs_id == PVFS_FS_ID_NULL)
+                {
+                    gossip_err("Error: %s resides on a PVFS2 file system "
+                    "that has not yet been initialized.\n", local_path);
+
+                    gen_mutex_unlock(&s_stat_tab_mutex);
+                    return(-PVFS_ENXIO);
+                }
+                gen_mutex_unlock(&s_stat_tab_mutex);
+                return(0);
+            }
+        }
+    }
+
+    /* check the dynamic tab area if we haven't resolved anything yet */
+    for(j = 0; j < s_stat_tab_array[
+            PVFS2_DYNAMIC_TAB_INDEX].mntent_count; j++)
+    {
+        ret = PINT_remove_dir_prefix(
+            local_path, s_stat_tab_array[
+                PVFS2_DYNAMIC_TAB_INDEX].mntent_array[j].mnt_dir,
+            out_fs_path, out_fs_path_max);
+        if (ret == 0)
+        {
+            *out_fs_id = s_stat_tab_array[
+                PVFS2_DYNAMIC_TAB_INDEX].mntent_array[j].fs_id;
+            if(*out_fs_id == PVFS_FS_ID_NULL)
+            {
+                gossip_err("Error: %s resides on a PVFS2 file system "
+                           "that has not yet been initialized.\n",
+                           local_path);
+
+                gen_mutex_unlock(&s_stat_tab_mutex);
+                return(-PVFS_ENXIO);
+            }
+            gen_mutex_unlock(&s_stat_tab_mutex);
+            return(0);
+        }
+    }
+
+    gen_mutex_unlock(&s_stat_tab_mutex);
+    return(-PVFS_ENOENT);
+}
 /*
  * Local variables:
  *  c-indent-level: 4
