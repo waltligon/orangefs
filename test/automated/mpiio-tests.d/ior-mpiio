@@ -8,7 +8,7 @@
 
 IOR=${CLUSTER_DIR}/IOR
 
-(cd ${EXTRA_TESTS}/IOR-2.8.4 && make mpiio && cp src/C/IOR ${IOR} )
+(cd ${EXTRA_TESTS}/IOR-2.8.6 && make mpiio && cp src/C/IOR ${IOR} )
 
 if [ $? -eq 1 ] ; then
 	exit 1
@@ -22,7 +22,7 @@ fi
 if [ -f $PAV_CONFIG ] ; then 
 	# write out a pbs script
 	pbs_script=${CLUSTER_DIR}/ior.sh
-	make_pbs_script ${IOR} -a MPIIO -o testfs:\${MOUNTPOINT}/iortest > $pbs_script
+	make_pbs_script ${IOR} -a MPIIO -o pvfs2:\${MOUNTPOINT}/iortest > $pbs_script
 
 	# submit it
 	job_id=$(qsub -N ior -q shared $pbs_script | cut -d . -f1)
