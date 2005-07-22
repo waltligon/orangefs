@@ -241,6 +241,7 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
     TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
     TROVE_size k_size;
     DB_BTREE_STAT *k_stat_p = NULL;
+    u_int32_t dbflags = 0;
 
     ret = dbpf_open_cache_get(
         op_p->coll_p->coll_id, op_p->handle, 1, DBPF_OPEN_DB, &tmp_ref);
@@ -260,7 +261,10 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
     data.data = op_p->u.k_write.val.buffer;
     data.size = op_p->u.k_write.val.buffer_sz;
 
-    ret = tmp_ref.db_p->put(tmp_ref.db_p, NULL, &key, &data, 0);
+    if (op_p->flags & TROVE_NOOVERWRITE)
+        dbflags |= DB_NOOVERWRITE;
+
+    ret = tmp_ref.db_p->put(tmp_ref.db_p, NULL, &key, &data, dbflags);
     if (ret != 0)
     {
         tmp_ref.db_p->err(tmp_ref.db_p, ret, "DB->put");
@@ -892,6 +896,33 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
     else
     {
         got_db = 1;
+    }
+
+    if (op_p->flags & TROVE_NOOVERWRITE)
+    {
+        /* read each key to see if it is present */
+        for (k = 0; k < op_p->u.k_write_list.count; k++)
+        {
+            memset(&key, 0, sizeof(key));
+            memset(&data, 0, sizeof(data));
+            key.data = op_p->u.k_write_list.key_array[k].buffer;
+            key.size = op_p->u.k_write_list.key_array[k].buffer_sz;
+
+            ret = tmp_ref.db_p->get(tmp_ref.db_p, NULL, &key, &data, 0);
+            if (ret != 0)
+            {
+                if (ret == DB_NOTFOUND)
+                {
+                    /* this means key is not in DB, which is what we
+                     * want - so go to the next key
+                     */
+                    continue;
+                }
+                tmp_ref.db_p->err(tmp_ref.db_p, ret, "DB->get");
+                ret = -dbpf_db_error_to_trove_error(ret);
+                goto return_error;
+            }
+        }
     }
 
     for (k = 0; k < op_p->u.k_write_list.count; k++)
