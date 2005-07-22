@@ -25,7 +25,7 @@ if [ -f $PAV_CONFIG ] ; then
 	make_pbs_script ${IOR} -a MPIIO -o pvfs2:\${MOUNTPOINT}/iortest > $pbs_script
 
 	# submit it
-	job_id=$(qsub -N ior -q shared $pbs_script | cut -d . -f1)
+	job_id=$(qsub -N ior $pbs_script | cut -d . -f1)
 
 	# wait patently for it to complete
 	block_until_done $job_id
