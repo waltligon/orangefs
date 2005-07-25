@@ -6,11 +6,10 @@
 #   - $user needs to be in the sudoers file
 #   - $user needs to be able to sudo w/o prompting
 #   - please don't cheat and run this as root: will not catch permissions bugs
-#   - an entry in /etc/fstab for pvfs2.  a bit of a stretch for clusters but
-#     not for red machines like gil and lain.
 
 # modify these variables
-export PVFS2_DEST=/tmp/pvfs2-nightly
+#export PVFS2_DEST=/tmp/pvfs2-nightly
+export PVFS2_DEST=${HOME}/pvfs2-nightly
 export PVFS2_MOUNTPOINT=/pvfs2-nightly
 export EXTRA_TESTS=${HOME}/src/benchmarks
 
