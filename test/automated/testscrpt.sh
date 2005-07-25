@@ -105,9 +105,10 @@ setup_pvfs2() {
 	INSTALL-pvfs2/sbin/pvfs2-server -p pvfs2-server.pid  fs.conf server.conf-`hostname -s`
 
 	echo "tcp://`hostname -s`:3399/pvfs2-fs /pvfs2-nightly pvfs2 defaults 0 0" > ${PVFS2_DEST}/pvfs2tab
-	# use our pvfs2tab file only if /etc/fstab isn't set up for us
+	# do we need to use our own pvfs2tab file?  If we will mount pvfs2, we
+	# can fall back to /etc/fstab
 	grep -q 'pvfs2-nightly' /etc/fstab
-	if [ $? -ne 0 ] ; then
+	if [ ( $? -ne 0 ) && ( $do_vfs -eq 0 ) ] ; then
 		export PVFS2TAB_FILE=${PVFS2_DEST}/pvfs2tab
 	fi	
 }
