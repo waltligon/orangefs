@@ -5,6 +5,20 @@ PVFS2 Release ChangeLog
 
 pvfs2-1.2.0pre1
 ===============
+- make server better able to handle bogus file names (David Metheny)
+- better casts for ppc64
+- even better configure tests for various berkely db features
+- documentation updates for Fedora 4 changes
+- extended attribute support (not available through VFS yet)
+- nightly build infrastructure now mostly in place
+- --enable-strict now works again
+- new utilities: pvfs2-touch, pvfs2-stat, pvfs2-ln
+- add additional write() checks to kernel module
+- hold st_nlink field at 1: keeping a true count is quite hard to do
+  correctly in a distributed environment
+- new distribution: "varstrip"j
+- better pvfs2 kernel module debugging interface (/proc/sys/pvfs2/debug)
+- pvfs2 now supports setgid 
 - build: avoid some warnings from gcc4
 - kernel: understand new backing_dev_info format in 2.6.12
 - Added DefaultNumDFiles as filesystem config option.
@@ -17,6 +31,8 @@ pvfs2-1.2.0pre1
 - Added DefaultDistribution section support for server config file.  Section
   is optional and accepts Name, Param, and Value (Param and Value may be
   repeated multiple times in the section).
+- added 'retry' and 'timeout' config file options
+- will consult /etc/mtab as an additional source for pvfs2 tabfile entries
 
 pvfs2-1.1.0
 ===============
