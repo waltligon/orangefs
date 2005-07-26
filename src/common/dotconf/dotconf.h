@@ -178,6 +178,7 @@ extern "C"
 	dotconf_callback_t callback;	/* callback function */
 	info_t *info;		/* additional info for multi-option callbacks */
 	unsigned long context;	/* context sensitivity flags */
+        const char *default_value;
     };
 
     struct command_t
@@ -244,6 +245,10 @@ extern "C"
     configoption_t *PINT_dotconf_find_command(
     configfile_t * configfile,
     const char *command);
+
+    const char *PINT_dotconf_set_default(
+    configfile_t * configfile,
+    unsigned long context);
 
 /* ------ PINT_dotconf_read_arg() - read one argument from the line handling quoting and escaping ---- */
 /*

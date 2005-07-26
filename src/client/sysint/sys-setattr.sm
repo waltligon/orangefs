@@ -44,9 +44,6 @@ static int setattr_msg_comp_fn(
 
 machine pvfs2_client_setattr_sm(
     init,
-    setattr_getattr_setup_msgpair,
-    setattr_getattr_xfer_msgpair,
-    setattr_getattr_failure,
     setattr_msg_setup_msgpair,
     setattr_msg_xfer_msgpair,
     setattr_msg_failure,
@@ -55,27 +52,7 @@ machine pvfs2_client_setattr_sm(
     state init
     {
         run setattr_init;
-        default => setattr_getattr_setup_msgpair;
-    }
-
-    state setattr_getattr_setup_msgpair
-    {
-        run PINT_sm_common_object_getattr_setup_msgpair;
-        success => setattr_getattr_xfer_msgpair;
-        default => setattr_getattr_failure;
-    }
-
-    state setattr_getattr_xfer_msgpair
-    {
-        jump pvfs2_client_getattr_acache_sm;
-        success => setattr_msg_setup_msgpair;
-        default => setattr_getattr_failure;
-    }
-
-    state setattr_getattr_failure
-    {
-        run PINT_sm_common_object_getattr_failure;
-        default => cleanup;
+        default => setattr_msg_setup_msgpair;
     }
 
     state setattr_msg_setup_msgpair
@@ -129,9 +106,9 @@ PVFS_error PVFS_isys_setattr(
     }
 
     /*
-      make sure the caller didn't set invalid mask bits; in
-      particular, note that you can't set size here
-    */
+     * make sure the caller didn't set invalid mask bits.
+     * only common attributes can be set.
+     */
     if ((attr.mask & ~PVFS_ATTR_SYS_ALL_SETABLE) != 0)
     {
         gossip_lerr("PVFS_isys_setattr() failure: invalid attributes "
@@ -157,7 +134,14 @@ PVFS_error PVFS_isys_setattr(
     PINT_init_msgarray_params(&sm_p->msgarray_params);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->object_ref = ref;
-    PVFS_util_copy_sys_attr(&sm_p->u.setattr.sys_attr, &attr);
+    
+    ret = PVFS_util_copy_sys_attr(&sm_p->u.setattr.sys_attr, &attr);
+    if(ret < 0)
+    {
+        gossip_lerr("PVFS_isys_setattr() failure: %s\n",
+                    strerror(PVFS_get_errno_mapping(-ret)));
+        return ret;
+    } 
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "Doing setattr on handle %Lu "
                  "on fs %d\n", Lu(ref.handle),
@@ -235,11 +219,6 @@ static int setattr_msg_setup_msgpair(PINT_client_sm *sm_p,
 
     gossip_debug(GOSSIP_CLIENT_DEBUG," setattr: posting setattr req\n");
 
-    attr = (sm_p->acache_hit ?
-            &sm_p->pinode->attr :
-            &sm_p->acache_attr);
-    assert(attr);
-
     PINT_init_msgpair(sm_p, msg_p);
 
     /* encode the mtime as a directory version */
@@ -255,7 +234,8 @@ static int setattr_msg_setup_msgpair(PINT_client_sm *sm_p,
         *sm_p->cred_p,
         sm_p->object_ref.fs_id,
         sm_p->object_ref.handle,
-        attr->objtype,
+        ((sm_p->u.setattr.sys_attr.mask & PVFS_ATTR_SYS_TYPE) ? 
+         sm_p->u.setattr.sys_attr.objtype : PVFS_TYPE_NONE),
         sm_p->u.setattr.sys_attr,
         PVFS_ATTR_COMMON_TYPE);
 
@@ -291,48 +271,79 @@ static int setattr_msg_failure(PINT_client_sm *sm_p,
                  "setattr state: setattr_msg_failure\n");
 
     assert(js_p->error_code != 0);
-    if (sm_p->acache_hit)
-    {
-        PINT_acache_invalidate(sm_p->object_ref);
-        sm_p->acache_hit = 0;
-        sm_p->pinode = NULL;
-    }
-    else
-    {
-        PINT_free_object_attr(&sm_p->acache_attr);
-    }
     return 1;
 }
 
 static int setattr_cleanup(PINT_client_sm *sm_p,
                            job_status_s *js_p)
 {
+    int status;
+    PINT_pinode pinode = NULL;
     gossip_debug(GOSSIP_CLIENT_DEBUG, "setattr state: cleanup\n");
 
     sm_p->error_code = js_p->error_code;
 
-    if (sm_p->acache_hit)
+    pinode = PINT_acache_lookup(sm_p->object_ref, &status);
+    if(pinode)
     {
-        /* overwrite all attribute fields that might have changed */
-        sm_p->pinode->attr.owner = sm_p->u.setattr.sys_attr.owner;
-        sm_p->pinode->attr.group = sm_p->u.setattr.sys_attr.group;
-        sm_p->pinode->attr.perms = sm_p->u.setattr.sys_attr.perms;
-        sm_p->pinode->attr.atime = sm_p->u.setattr.sys_attr.atime;
-        sm_p->pinode->attr.mtime = sm_p->u.setattr.sys_attr.mtime;
-        sm_p->pinode->attr.ctime = sm_p->u.setattr.sys_attr.ctime;
+        if(sm_p->u.setattr.sys_attr.mask & PVFS_ATTR_SYS_UID)
+        {
+            pinode->attr.owner = sm_p->u.setattr.sys_attr.owner;
+        }
 
-        PINT_acache_set_valid(sm_p->pinode);
-        sm_p->acache_hit = 0;
-        sm_p->pinode = NULL;
+        if(sm_p->u.setattr.sys_attr.mask & PVFS_ATTR_SYS_GID)
+        {
+            pinode->attr.group = sm_p->u.setattr.sys_attr.group;
+        }
+
+        if(sm_p->u.setattr.sys_attr.mask & PVFS_ATTR_SYS_PERM)
+        {
+            pinode->attr.perms = sm_p->u.setattr.sys_attr.perms;
+        }
+
+        if(sm_p->u.setattr.sys_attr.mask & PVFS_ATTR_SYS_ATIME)
+        {
+            pinode->attr.atime = sm_p->u.setattr.sys_attr.atime;
+        }
+
+        if(sm_p->u.setattr.sys_attr.mask & PVFS_ATTR_SYS_MTIME)
+        {
+            pinode->attr.mtime = sm_p->u.setattr.sys_attr.mtime;
+        }
+
+        if(sm_p->u.setattr.sys_attr.mask & PVFS_ATTR_SYS_CTIME)
+        {
+            pinode->attr.ctime = sm_p->u.setattr.sys_attr.ctime;
+        }
+        
+        if(sm_p->u.setattr.sys_attr.mask & PVFS_ATTR_SYS_LNK_TARGET)
+        {
+            if(!(pinode->attr.mask & PVFS_ATTR_SYMLNK_TARGET))
+            {
+                js_p->error_code = -PVFS_EINVAL;
+                return 0;
+            }
+            
+            assert(pinode->attr.u.sym.target_path);
+            free(pinode->attr.u.sym.target_path);
+            
+            pinode->attr.u.sym.target_path = 
+                strdup(sm_p->u.setattr.sys_attr.link_target); 
+            if(!pinode->attr.u.sym.target_path)
+            {
+                js_p->error_code = -PVFS_ENOMEM;
+                return 0;
+            }
+
+            pinode->attr.u.sym.target_path_len = 
+                strlen(pinode->attr.u.sym.target_path);
+        }
+
+        pinode->attr.mask |= PVFS_util_sys_to_object_attr_mask(
+            sm_p->u.setattr.sys_attr.mask);
+        PINT_acache_set_valid(pinode);
     }
-    else if (js_p->error_code == 0)
-    {
-        /*
-          this has been freed already in the failure handler; only
-          free on success
-        */
-        PINT_free_object_attr(&sm_p->acache_attr);
-    }
+
     PVFS_util_release_sys_attr(&sm_p->u.setattr.sys_attr);
 
     sm_p->op_complete = 1;

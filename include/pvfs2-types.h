@@ -182,59 +182,33 @@ typedef enum
 #define decode_PVFS_ds_type decode_enum
 #define encode_PVFS_ds_type encode_enum
 
-/* internal attribute masks, common to all obj types */
-#define PVFS_ATTR_COMMON_UID   (1 << 0)
-#define PVFS_ATTR_COMMON_GID   (1 << 1)
-#define PVFS_ATTR_COMMON_PERM  (1 << 2)
-#define PVFS_ATTR_COMMON_ATIME (1 << 3)
-#define PVFS_ATTR_COMMON_CTIME (1 << 4)
-#define PVFS_ATTR_COMMON_MTIME (1 << 5)
-#define PVFS_ATTR_COMMON_TYPE  (1 << 6)
-#define PVFS_ATTR_COMMON_ALL                       \
-(PVFS_ATTR_COMMON_UID   | PVFS_ATTR_COMMON_GID   | \
- PVFS_ATTR_COMMON_PERM  | PVFS_ATTR_COMMON_ATIME | \
- PVFS_ATTR_COMMON_CTIME | PVFS_ATTR_COMMON_MTIME | \
- PVFS_ATTR_COMMON_TYPE)
-
-/* internal attribute masks for metadata objects */
-#define PVFS_ATTR_META_DIST    (1 << 10)
-#define PVFS_ATTR_META_DFILES  (1 << 11)
-#define PVFS_ATTR_META_ALL \
-(PVFS_ATTR_META_DIST | PVFS_ATTR_META_DFILES)
-
-/* internal attribute masks for datafile objects */
-#define PVFS_ATTR_DATA_SIZE            (1 << 15)
-#define PVFS_ATTR_DATA_ALL   PVFS_ATTR_DATA_SIZE
-
-/* internal attribute masks for symlink objects */
-#define PVFS_ATTR_SYMLNK_TARGET            (1 << 18)
-#define PVFS_ATTR_SYMLNK_ALL PVFS_ATTR_SYMLNK_TARGET
-
-/* internal attribute masks for directory objects */
-#define PVFS_ATTR_DIR_DIRENT_COUNT         (1 << 19)
-#define PVFS_ATTR_DIR_ALL PVFS_ATTR_DIR_DIRENT_COUNT
-
 /* attribute masks used by system interface callers */
 #define PVFS_ATTR_SYS_SIZE                  (1 << 20)
 #define PVFS_ATTR_SYS_LNK_TARGET            (1 << 24)
 #define PVFS_ATTR_SYS_DFILE_COUNT           (1 << 25)
 #define PVFS_ATTR_SYS_DIRENT_COUNT          (1 << 26)
-#define PVFS_ATTR_SYS_UID        PVFS_ATTR_COMMON_UID
-#define PVFS_ATTR_SYS_GID        PVFS_ATTR_COMMON_GID
-#define PVFS_ATTR_SYS_PERM       PVFS_ATTR_COMMON_PERM
-#define PVFS_ATTR_SYS_ATIME      PVFS_ATTR_COMMON_ATIME
-#define PVFS_ATTR_SYS_CTIME      PVFS_ATTR_COMMON_CTIME
-#define PVFS_ATTR_SYS_MTIME      PVFS_ATTR_COMMON_MTIME
-#define PVFS_ATTR_SYS_TYPE       PVFS_ATTR_COMMON_TYPE
+#define PVFS_ATTR_SYS_UID                   (1 << 0)
+#define PVFS_ATTR_SYS_GID                   (1 << 1)
+#define PVFS_ATTR_SYS_PERM                  (1 << 2)
+#define PVFS_ATTR_SYS_ATIME                 (1 << 3)
+#define PVFS_ATTR_SYS_CTIME                 (1 << 4)
+#define PVFS_ATTR_SYS_MTIME                 (1 << 5)
+#define PVFS_ATTR_SYS_TYPE                  (1 << 6)
+#define PVFS_ATTR_SYS_COMMON_ALL \
+(PVFS_ATTR_SYS_UID   | PVFS_ATTR_SYS_GID   | \
+ PVFS_ATTR_SYS_PERM  | PVFS_ATTR_SYS_ATIME | \
+ PVFS_ATTR_SYS_CTIME | PVFS_ATTR_SYS_MTIME | \
+ PVFS_ATTR_SYS_TYPE)
+
 #define PVFS_ATTR_SYS_ALL                    \
-(PVFS_ATTR_COMMON_ALL | PVFS_ATTR_SYS_SIZE | \
+(PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_SIZE | \
  PVFS_ATTR_SYS_LNK_TARGET | PVFS_ATTR_SYS_DFILE_COUNT | \
  PVFS_ATTR_SYS_DIRENT_COUNT)
 #define PVFS_ATTR_SYS_ALL_NOSIZE                   \
-(PVFS_ATTR_COMMON_ALL | PVFS_ATTR_SYS_LNK_TARGET | \
+(PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_LNK_TARGET | \
  PVFS_ATTR_SYS_DFILE_COUNT | PVFS_ATTR_SYS_DIRENT_COUNT)
 #define PVFS_ATTR_SYS_ALL_SETABLE \
-(PVFS_ATTR_COMMON_ALL-PVFS_ATTR_COMMON_TYPE)
+(PVFS_ATTR_SYS_COMMON_ALL-PVFS_ATTR_SYS_TYPE)
 
 /** statfs and misc. server statistic information. */
 typedef struct

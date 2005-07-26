@@ -34,7 +34,8 @@ TEST_PTS_MISC := \
 	$(DIR)/test-explicit-offset.c \
 	$(DIR)/test-request-tiled.c\
 	$(DIR)/test-mix.c \
-	$(DIR)/test-romio-noncontig-pattern2.c
+	$(DIR)/test-romio-noncontig-pattern2.c \
+	$(DIR)/test-acache.c 
 
 MPIMISCSRC += $(TEST_PTS_MISC)
 

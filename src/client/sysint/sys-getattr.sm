@@ -46,11 +46,13 @@ extern job_context_id pint_client_sm_context;
 
 enum
 {
-    GETATTR_NEED_SIZE = 1,
+    GETATTR_ACACHE_MISS = 1,
     GETATTR_NEED_DATAFILE_SIZES = 2
 };
 
-/* state function prototypes */
+/* state function prototypes for getattr nested machine */
+static int getattr_acache_lookup(
+    PINT_client_sm *sm_p, job_status_s *js_p);
 static int getattr_object_getattr_setup_msgpair(
     PINT_client_sm *sm_p, job_status_s *js_p);
 static int getattr_object_getattr_failure(
@@ -62,6 +64,10 @@ static int getattr_datafile_getattr_failure(
 static int getattr_cleanup(
     PINT_client_sm *sm_p, job_status_s *js_p);
 
+/* state function prototypes for the system interface getattr state machine */
+static int getattr_set_sys_response(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+
 /* completion function prototypes */
 static int getattr_object_getattr_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
@@ -70,15 +76,25 @@ static int getattr_datafile_getattr_comp_fn(
 
 %%
 
-machine pvfs2_client_getattr_sm(
+nested machine pvfs2_client_getattr_sm(
+    acache_lookup,
     object_getattr_setup_msgpair,
     object_getattr_xfer_msgpair,
     object_getattr_failure,
     datafile_getattr_setup_msgpairarray,
     datafile_getattr_xfer_msgpairarray,
     datafile_getattr_failure,
+    acache_insert,
     cleanup)
 {
+    state acache_lookup
+    {
+        run getattr_acache_lookup;
+        GETATTR_ACACHE_MISS => object_getattr_setup_msgpair;
+        GETATTR_NEED_DATAFILE_SIZES => datafile_getattr_setup_msgpairarray;
+        default => cleanup;
+    }
+
     state object_getattr_setup_msgpair
     {
         run getattr_object_getattr_setup_msgpair;
@@ -88,10 +104,16 @@ machine pvfs2_client_getattr_sm(
 
     state object_getattr_xfer_msgpair
     {
-        jump pvfs2_client_getattr_acache_sm;
-        success => cleanup;
+        jump pvfs2_msgpairarray_sm;
+        success => acache_insert;
         GETATTR_NEED_DATAFILE_SIZES => datafile_getattr_setup_msgpairarray;
         default => object_getattr_failure;
+    }
+
+    state acache_insert
+    {
+        run getattr_acache_insert;
+        default => cleanup;
     }
 
     state object_getattr_failure
@@ -106,11 +128,11 @@ machine pvfs2_client_getattr_sm(
         success => datafile_getattr_xfer_msgpairarray;
         default => cleanup;
     }
-
+    
     state datafile_getattr_xfer_msgpairarray
     {
         jump pvfs2_msgpairarray_sm;
-        success => cleanup;
+        success => acache_insert;
         default => datafile_getattr_failure;
     }
 
@@ -123,10 +145,28 @@ machine pvfs2_client_getattr_sm(
     state cleanup
     {
         run getattr_cleanup;
-        default => terminate;
+        default => return;
     }
 }
 
+machine pvfs2_client_sysint_getattr_sm(
+    dowork,
+    set_sys_response)
+{
+    state dowork
+    {
+        jump pvfs2_client_getattr_sm;
+        success => set_sys_response;
+        default => terminate; 
+    }
+
+    state set_sys_response
+    {
+        run getattr_set_sys_response;
+        default => terminate;
+    }
+}
+    
 %%
 
 
@@ -169,9 +209,12 @@ PVFS_error PVFS_isys_getattr(
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->error_code = 0;
     sm_p->object_ref = ref;
-    sm_p->u.getattr.attrmask = attrmask;
     sm_p->u.getattr.getattr_resp_p = resp_p;
-
+    
+    PINT_SM_GETATTR_STATE_FILL(
+        sm_p->getattr,
+        attrmask);
+        
     return PINT_client_state_machine_post(
         sm_p, PVFS_SYS_GETATTR, op_id, user_ptr);
 }
@@ -211,7 +254,181 @@ PVFS_error PVFS_sys_getattr(
 }
 
 
-/*******************************************************************/
+/**
+ * getattr_acache_lookup
+ * @ingroup client_sm_getattr
+ * 
+ * This function is invoked as the first state action of the
+ * getattr-dowork state machine.  It performs a lookup into the
+ * attribute cache for the attribute in question, and returns
+ * result codes for a hit or a miss.  
+ * 
+ * @param sm_p This must be a valid client state machine handle, with
+ * the @ref getattr field containing valid values for the
+ * fsid/handle of the desired attribute (in object_ref), as well as the 
+ * requested attribute mask (req_sys_attrmask).
+ *
+ * @param js_p Contains the return code to be set by this function in the
+ * @ref error_code field.  This determines the next state action to jump
+ * to in the getattr-dowork state machine.  Possible values for js_p->error_code
+ * are:
+ * <ul>
+ * <li><b>GETATTR_ACACHE_MISS</b> - The requested attribute was not found
+ * in the attribute cache, or the attribute was found, but the attribute's
+ * mask did not include values required by the requested mask (req_sys_attrmask).
+ * </li>
+ * <li><b>GETATTR_NEED_DATAFILE_SIZES</b> - The requested attribute was found
+ * in the attribute cache and the mask was sufficient, but the data file size
+ * was requested for this handle, so we need to get that next.
+ * </li>
+ * <li><b>default</b> - The requested attribute was found in the attribute
+ * cache and its mask values were sufficient.
+ * </li>
+ *
+ * @return This function should always return 1 unless an error occurred
+ * within the internals of the state machine.
+ */
+static int getattr_acache_lookup(PINT_client_sm *sm_p,
+				 job_status_s *js_p)
+{
+    uint32_t trimmed_mask = 0;
+    int status = 0;
+    PVFS_object_ref object_ref;
+    PINT_pinode * pinode;
+
+    js_p->error_code = 0;
+
+    object_ref = sm_p->getattr.object_ref;
+
+    assert(object_ref.handle != PVFS_HANDLE_NULL);
+    assert(object_ref.fs_id != PVFS_FS_ID_NULL);
+
+    gossip_debug(GOSSIP_ACACHE_DEBUG, "%s: handle %Lu fsid %d\n",
+      __func__, Lu(object_ref.handle), object_ref.fs_id);
+
+    pinode = PINT_acache_lookup(object_ref, &status, &unexpired_masks);
+    if (pinode)
+    {
+        /*
+          make sure pinode is not expired, and that it has all
+          attribute info fields requested;
+        */
+        if (status == PINODE_STATUS_VALID)
+        {
+            /*
+             * The sys attr mask request is converted to object
+             * attr mask values for comparison with the cached
+             * entry
+             */
+            trimmed_mask = PVFS_util_sys_to_object_attr_mask(
+                sm_p->getattr.req_sys_attrmask);
+            
+            /*
+               the trimmed mask is used for making sure that we're only
+               checking attr bits that make sense for the object type
+               since the caller may have requested all attributes in
+               the case where it doesn't know what type of object we're
+               doing the getattr against.
+               */
+
+            if (pinode->attr.objtype == PVFS_TYPE_METAFILE)
+            {
+                trimmed_mask &= (PVFS_ATTR_META_ALL |
+                                 PVFS_ATTR_DATA_SIZE |
+                                 PVFS_ATTR_COMMON_ALL);
+            }
+            else if (pinode->attr.objtype == PVFS_TYPE_SYMLINK)
+            {
+                trimmed_mask &= (PVFS_ATTR_SYMLNK_ALL | PVFS_ATTR_COMMON_ALL);
+            }
+            else if (pinode->attr.objtype == PVFS_TYPE_DIRECTORY)
+            {
+                trimmed_mask &= (PVFS_ATTR_COMMON_ALL)
+            }
+
+            /* trimmed_mask contains the list of attributes
+             * requested for a particular object, 
+             * while sm_p->pinode->attr.mask contains
+             * the list of attributes cached for that object.
+             * The cached attributes can be used if requested
+             * is less than cached, i.e. all the attributes
+             * we need are already cached.  So we need to do
+             * a bitwise comparison of requested <= cached.
+             *
+             * xor of the two masks gives us the bits that are different,
+             * and-ing that result with the requested mask gives us the
+             * bits in the requested mask but not in the cached mask.
+             */
+            missing_attrs = ((trimmed_mask ^ unexpired_masks) &
+                             trimmed_mask);
+            if (missing_attrs == 0)
+            {
+                /* nothing's missing, a hit! */
+                goto cache_hit;
+            }
+
+            /* check if the only thing missing is the file size, then
+             * we don't need to do the object getattr operation, we only
+             * need to do the datafile getattr operation, so we return
+             * the GETATTR_NEED_DATAFILE_SIZES error code which will make
+             * the getattr-dowork state machine jump to the datafile getattr
+             * operation state. 
+             */
+            if(missing_attrs == PVFS_ATTR_DATA_SIZE)
+            {
+                js_p->error_code = GETATTR_NEED_DATAFILE_SIZES;
+                goto cache_hit;
+            }
+                
+            /*
+              normally, if we get here, we've got a cache miss.
+              setattr is an exception as it now does write-through
+              acache updates.  (i.e. it's a hit in invalid cases
+              because it'll be updated properly on success; flushed on
+              failure)
+            */
+            if (sm_p->op != PVFS_SYS_SETATTR)
+            {
+                gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: sm_p->op is: %d "
+                        "[%Lu]\n", sm_p->op, Lu(object_ref.handle));
+
+                goto cache_miss;
+            }
+
+          cache_hit:
+      
+            PINT_copy_object_attr(&sm_p->getattr.attr, &pinode->attr);
+            
+            if(trimmed_mask & PVFS_ATTR_DATA_SIZE)
+            {
+                sm_p->getattr.size = pinode->size;
+            }
+
+            gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: acache hit "
+                         "[%Lu]\n", Lu(object_ref.handle));
+            return 1;
+        }
+      cache_miss:
+        /*
+          to avoid having an entry in the cache that doesn't exactly
+          match what the caller asked for, in this case invalidate the
+          entry; note invalidate implies an internal acache release.
+          The entry gets added back into the cache with
+        */
+        gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: invalid acache "
+                     "miss [%Lu]\n", 
+                     Lu(object_ref.handle));
+
+        PINT_acache_invalidate(pinode);
+    }
+    gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: clean acache miss: "
+                " [%Lu]\n",
+                  Lu(object_ref.handle));
+
+    js_p->error_code = GETATTR_ACACHE_MISS;
+    return 1;
+}
+
 
 static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
                                                 job_status_s *js_p)
@@ -224,52 +441,19 @@ static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
 
     js_p->error_code = 0;
 
-    /*
-      adjust parameters as necessary; what's happening here
-      is that we're converting sys_attr masks to obj_attr masks
-      before passing the getattr request to the server.
-    */
-    attrmask = sm_p->u.getattr.attrmask;
-    if (attrmask & PVFS_ATTR_SYS_SIZE)
-    {
-        /* need datafile handles and distribution in order to get 
-         * datafile handles and know what function to call to get
-         * the file size.
-         */
-        attrmask &= ~PVFS_ATTR_SYS_SIZE;
+    memset(&sm_p->msgpair, 0, sizeof(PINT_sm_msgpair_state));
 
-        attrmask |= (PVFS_ATTR_META_DFILES | PVFS_ATTR_META_DIST);
-        attrmask |= PVFS_ATTR_DATA_SIZE;
-    }
+    assert(sm_p->object_ref.fs_id != PVFS_FS_ID_NULL);
+    assert(sm_p->object_ref.handle != PVFS_HANDLE_NULL);
 
-    if (attrmask & PVFS_ATTR_SYS_DFILE_COUNT)
-    {
-        attrmask |= PVFS_ATTR_META_DFILES;
-    }
-
-    if (attrmask & PVFS_ATTR_SYS_LNK_TARGET)
-    {
-        attrmask &= ~PVFS_ATTR_SYS_LNK_TARGET;
-        attrmask |= PVFS_ATTR_SYMLNK_TARGET;
-    }
-
-    if (attrmask & PVFS_ATTR_SYS_DIRENT_COUNT)
-    {
-        attrmask &= ~PVFS_ATTR_SYS_DIRENT_COUNT;
-        attrmask |= PVFS_ATTR_DIR_DIRENT_COUNT;
-    }
-
-
-    gossip_debug(GOSSIP_GETATTR_DEBUG,
-                 "attrmask being passed to server: ");
-    PINT_attrmask_print(GOSSIP_GETATTR_DEBUG, attrmask);
-
+    /* setup the msgpair to do a getattr operation */
     PINT_SERVREQ_GETATTR_FILL(
         sm_p->msgpair.req,
         *sm_p->cred_p,
         sm_p->object_ref.fs_id,
         sm_p->object_ref.handle,
-        attrmask);
+        PVFS_util_sys_to_object_attr_mask(
+            sm_p->getattr.req_sys_attrmask));
 
     sm_p->msgpair.fs_id = sm_p->object_ref.fs_id;
     sm_p->msgpair.handle = sm_p->object_ref.handle;
@@ -279,12 +463,19 @@ static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
     ret = PINT_cached_config_map_to_server(
         &sm_p->msgpair.svr_addr, sm_p->msgpair.handle,
         sm_p->msgpair.fs_id);
-
     if (ret)
     {
         gossip_err("Failed to map meta server address\n");
         js_p->error_code = ret;
     }
+
+    /* point msgarray to the statically allocated msgpair */
+    if (sm_p->msgarray != &(sm_p->msgpair))
+    {
+	    free(sm_p->msgarray);
+    }
+    sm_p->msgarray = &(sm_p->msgpair);
+    sm_p->msgarray_count = 1;
     return 1;
 }
 
@@ -298,7 +489,6 @@ static int getattr_object_getattr_comp_fn(
     struct PVFS_server_resp *resp_p,
     int index)
 {
-    int need_datafiles = 0;
     PVFS_object_attr *attr = NULL;
     PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
 
@@ -313,91 +503,57 @@ static int getattr_object_getattr_comp_fn(
     }
 
     /*
-      if we got a metafile that didn't get a cache hit *and* we need
-      the size, that should be the only time we're going to have to do
-      a full data file fetch.  (that's expensive)
-    */
-    if ((resp_p->u.getattr.attr.objtype == PVFS_TYPE_METAFILE) &&
-        (!sm_p->acache_hit) &&
-        (sm_p->u.getattr.attrmask & PVFS_ATTR_SYS_SIZE))
-    {
-        need_datafiles = 1;
-    }
+     * If we've reached the callback for the getattr msgpair tranfer,
+     * then we can make a copy of the retrieved attribute for later
+     * caching.
+     */
+    PINT_copy_object_attr(&sm_p->getattr.attr,
+                          &resp_p->u.getattr.attr);
 
-    /*
-      if we didn't get a cache hit, we're making a copy of the
-      attributes here so that we can add a acache entry later in
-      cleanup.
-    */
-    if (!sm_p->acache_hit)
-    {
-        PINT_copy_object_attr(&sm_p->acache_attr,
-                              &resp_p->u.getattr.attr);
-    }
-
-    attr = (sm_p->acache_hit ? &sm_p->pinode->attr :
-            &resp_p->u.getattr.attr);
+    attr =  &sm_p->getattr.attr;
     assert(attr);
 
-    /*
-      if we got a symlink target, copy it for caller; this target
-      path will be handed all the way back up to the caller via
-      the PVFS_sys_attr object.  caller must free it.
-    */
-    if (attr->objtype == PVFS_TYPE_SYMLINK)
+    /* if the ref_type mask is set to a non-zero value (!PVFS_TYPE_NONE)
+     * a -PVFS_error will be triggered if the
+     * attributes received are not one of the the types specified.
+     * This is useful so that the client can know (in some cases) that it
+     * can avoid issuing an operation to the server since the server will 
+     * just pass an error back anyway.
+     */
+    if(sm_p->getattr.ref_type &&
+       sm_p->getattr.ref_type != attr->objtype)
     {
-        if (attr->mask & PVFS_ATTR_SYMLNK_TARGET)
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "*** "
+                     "getattr_comp_fn: Object type mismatch.\n Possibly "
+                     "saving network roundtrip by returning an error\n");
+
+        if (sm_p->getattr.ref_type == PVFS_TYPE_DIRECTORY)
         {
-            assert(attr->u.sym.target_path_len > 0);
-            assert(attr->u.sym.target_path);
-
-            sm_p->u.getattr.getattr_resp_p->attr.link_target =
-                strdup(attr->u.sym.target_path);
-            if (!sm_p->u.getattr.getattr_resp_p->attr.link_target)
-            {
-                return -PVFS_ENOMEM;
-            }
+            ret = -PVFS_ENOTDIR;
         }
+        else
+        {
+            assert(sm_p->getattr.ref_type == PVFS_TYPE_METAFILE);
+            ret = ((attr->objtype == PVFS_TYPE_DIRECTORY) ?
+                   -PVFS_EISDIR : -PVFS_EBADF);
+        }
+        PVFS_perror_gossip("Object Type mismatch error", ret);
+        return ret;
     }
 
-    /* special case for when users ask for dfile count */
-    if ((attr->objtype == PVFS_TYPE_METAFILE) &&
-        (sm_p->u.getattr.attrmask & PVFS_ATTR_SYS_DFILE_COUNT))
-    {
-        sm_p->u.getattr.getattr_resp_p->attr.dfile_count = 
-            attr->u.meta.dfile_count;
-    }
-
-    /* special case for when users ask for dirent count */
-    if ((attr->objtype == PVFS_TYPE_DIRECTORY) &&
-        (sm_p->u.getattr.attrmask & PVFS_ATTR_DIR_DIRENT_COUNT))
-    {
-        sm_p->u.getattr.getattr_resp_p->attr.dirent_count = 
-            attr->u.dir.dirent_count;
-    }
-
-    /* copy outgoing sys_attr fields from returned object_attr */
-    sm_p->u.getattr.getattr_resp_p->attr.owner = attr->owner;
-    sm_p->u.getattr.getattr_resp_p->attr.group = attr->group;
-    sm_p->u.getattr.getattr_resp_p->attr.perms = attr->perms;
-    sm_p->u.getattr.getattr_resp_p->attr.atime = attr->atime;
-    sm_p->u.getattr.getattr_resp_p->attr.mtime = attr->mtime;
-    sm_p->u.getattr.getattr_resp_p->attr.ctime = attr->ctime;
-    sm_p->u.getattr.getattr_resp_p->attr.mask  = attr->mask;
-    sm_p->u.getattr.getattr_resp_p->attr.size  = 0;
-    sm_p->u.getattr.getattr_resp_p->attr.objtype = attr->objtype;
-
-    if (sm_p->acache_hit)
-    {
-        return 0;
-    }
-
+    /* do assertion checking of getattr response values, and
+     * check if file sizes are needed.  With NDEBUG defined, this block
+     * only checks if file sizes are needed.
+     */
     switch (attr->objtype)
     {
         case PVFS_TYPE_METAFILE:
             if (sm_p->msgpair.req.u.getattr.attrmask &
                 PVFS_ATTR_META_DIST)
             {
+                /* if we requested distribution attrs, did the distribution 
+                 * get set and is the size valid?
+                 */
                 assert(attr->mask & PVFS_ATTR_META_DIST);
                 assert(attr->u.meta.dist && (attr->u.meta.dist_size > 0));
             }
@@ -405,27 +561,25 @@ static int getattr_object_getattr_comp_fn(
             if (sm_p->msgpair.req.u.getattr.attrmask &
                 PVFS_ATTR_META_DFILES)
             {
-                assert(attr->mask & PVFS_ATTR_META_DFILES);
+                /* if we requested the datafile handles for the file, did
+                 * the datafile array get populated?
+                 */
                 assert(attr->u.meta.dfile_array &&
                        (attr->u.meta.dfile_count > 0));
 
                 gossip_debug(GOSSIP_GETATTR_DEBUG,
                              "getattr_object_getattr_comp_fn: "
                              "%d datafiles.\n", attr->u.meta.dfile_count);
-
-                if (need_datafiles == 0)
+                
+                /* if we need the size, that should be the only time we're 
+                 * going to have to do a full data file fetch. 
+                 * (that's expensive)
+                 */
+                if (sm_p->getattr.sys_req_attrmask & PVFS_ATTR_SYS_SIZE)
                 {
-                    /*
-                      if we've retrieved all attributes for the datafile
-                      handles from cache, skip the expensive retrieval
-                    */
-                    return 0;
-                }
-                else if (sm_p->u.getattr.attrmask & PVFS_ATTR_SYS_SIZE)
-                {
-                    /* if caller asked for the size, AND we couldn't
-                     * retrieve them from the acache, then we need to
-                     * retrieve the datafile sizes
+                    /* if caller asked for the size, then we need
+                     * to jump to the datafile_getattr state, which
+                     * will retrieve the datafile sizes for us.
                      */
                     return GETATTR_NEED_DATAFILE_SIZES;
                 }
@@ -460,6 +614,7 @@ static int getattr_object_getattr_failure(PINT_client_sm *sm_p,
         PVFS_perror_gossip("getattr_object_getattr_failure ",
                            js_p->error_code);
     }
+
     return 1;
 }
 
@@ -469,12 +624,9 @@ static int getattr_datafile_getattr_setup_msgpairarray(
     int ret = -PVFS_EINVAL, i = 0;
     PVFS_object_attr *attr = NULL;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) getattr_datafile_"
-                 "getattr_setup_msgpairarray\n", sm_p);
-
     js_p->error_code = 0;
 
-    attr = (sm_p->acache_hit ? &sm_p->pinode->attr : &sm_p->acache_attr);
+    attr = &sm_p->getattr.attr;
     assert(attr);
 
     sm_p->msgarray = (PINT_sm_msgpair_state *)malloc(
@@ -485,9 +637,9 @@ static int getattr_datafile_getattr_setup_msgpairarray(
         return 1;
     }
 
-    sm_p->u.getattr.size_array = (PVFS_size *)malloc(
+    sm_p->getattr.size_array = (PVFS_size *)malloc(
         attr->u.meta.dfile_count * sizeof(PVFS_size));
-    if (!sm_p->u.getattr.size_array)
+    if (!sm_p->getattr.size_array)
     {
         free(sm_p->msgarray);
         sm_p->msgarray = NULL;
@@ -547,7 +699,7 @@ static int getattr_datafile_getattr_comp_fn(
                  "datafile_getattr: size of datafile %d is %Ld\n",
                  index, Ld(resp_p->u.getattr.attr.u.data.size));
 
-    sm_p->u.getattr.size_array[index] =
+    sm_p->getattr.size_array[index] =
         resp_p->u.getattr.attr.u.data.size;
 
     return 0;
@@ -561,77 +713,90 @@ static int getattr_datafile_getattr_failure(PINT_client_sm *sm_p,
     return 1;
 }
 
+static int getattr_acache_insert(PINT_client_sm *sm_p,
+                                 job_status_s *js_p)
+{
+    PVFS_object_attr *attr = NULL;
+    int release_required = 1;
+    PINT_pinode *pinode = PINT_acache_lookup(
+        sm_p->object_ref, NULL);
+    if (!pinode)
+    {
+        pinode = PINT_acache_pinode_alloc();
+        if(!pinode)
+        {
+            js_p->error_code = -PVFS_ENOMEM;
+            return 1;
+        }
+
+        release_required = 0;
+    }
+
+    attr = sm_p->getattr.attr;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "trying to add object "
+                 "reference to acache (%s present)\n",
+                 (release_required ? "already" : "not"));
+    pinode->refn = sm_p->getattr.object_ref;
+
+    if (sm_p->getattr.req_sys_attrmask & PVFS_ATTR_SYS_SIZE)
+    {
+        /* compute size as requested */
+        PINT_dist *dist = NULL;
+        assert(attr->u.meta.dist);
+        dist = attr->u.meta.dist;
+
+        /* XXX - decode_PINT_dist calls PINT_dist_lookup, so there's
+         * no need to do it again.  -slang
+         *
+         * ret = PINT_dist_lookup(attr->u.meta.dist);
+         */
+        assert(dist->methods &&
+               dist->methods->logical_file_size);
+        
+        sm_p->getattr.size = (dist->methods->logical_file_size)(
+            dist->params, attr->u.meta.dfile_count,
+            sm_p->getattr.size_array);
+
+        pinode->size = sm_p->getattr.size;
+
+        /*
+           update the attr mask in the src object so that
+           we properly copy out all required fields in the
+           deep copy below to the pinode object
+           */
+        sm_p->attr.mask |= PVFS_ATTR_DATA_SIZE;
+    }
+
+    PINT_copy_object_attr(&pinode->attr, &sm_p->getattr.attr);
+
+    PINT_acache_set_valid(pinode);
+
+    if (release_required)
+    {
+        PINT_acache_release(pinode);
+    }
+
+    return 1;
+}
+
 static int getattr_cleanup(PINT_client_sm *sm_p,
                            job_status_s *js_p)
 {
     int ret = 0;
     uint32_t amask;
-    PVFS_sys_attr *s_attr_p = &sm_p->u.getattr.getattr_resp_p->attr;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "(%p) getattr state: getattr_cleanup\n", sm_p);
 
     sm_p->error_code = js_p->error_code;
 
-    if (js_p->error_code == 0)
+    if(js_p->error_code == 0)
     {
-        /* calculate size of file if necessary */
-        assert(s_attr_p->size == 0);
-
-        amask = s_attr_p->mask; /* from object getattr */
-
-        if (amask & PVFS_ATTR_META_DIST)
+        if (sm_p->getattr.size_array)
         {
-            /*
-              recompute size if it's not a acache hit, or if it is a
-              acache hit on an entry that no longer has a valid size
-            */
-            if (!sm_p->acache_hit ||
-                (sm_p->acache_hit &&
-                 !(sm_p->pinode->attr.mask & PVFS_ATTR_DATA_SIZE)))
-            {
-                PINT_dist *dist = NULL;
-                PVFS_object_attr *attr = (sm_p->acache_hit ?
-                                          &sm_p->pinode->attr :
-                                          &sm_p->acache_attr);
-                assert(attr && attr->u.meta.dist);
-
-                dist = attr->u.meta.dist;
-                assert(dist->methods);
-
-                ret = PINT_dist_lookup(dist);
-                assert(ret == 0);
-
-                s_attr_p->size = (dist->methods->logical_file_size)(
-                    dist->params, attr->u.meta.dfile_count,
-                    sm_p->u.getattr.size_array);
-            }
-            else
-            {
-                s_attr_p->size = sm_p->pinode->size;
-            }
-        }
-
-        /* convert outgoing attribute mask based on what we got */
-        s_attr_p->mask = PVFS_util_object_to_sys_attr_mask(
-            s_attr_p->mask);
-
-        /* and add the size if they asked for it */
-        if (sm_p->u.getattr.attrmask & PVFS_ATTR_SYS_SIZE)
-        {
-            s_attr_p->mask |= PVFS_ATTR_SYS_SIZE;
-        }
-
-        /* if this is a symlink, add the link target */
-        if (sm_p->u.getattr.attrmask & PVFS_ATTR_SYS_LNK_TARGET)
-        {
-            s_attr_p->mask |= PVFS_ATTR_SYS_LNK_TARGET;
-        }
-
-        if (sm_p->u.getattr.size_array)
-        {
-            free(sm_p->u.getattr.size_array);
-            sm_p->u.getattr.size_array = NULL;
+            free(sm_p->getattr.size_array);
+            sm_p->getattr.size_array = NULL;
         }
 
         if (sm_p->msgarray && (sm_p->msgarray != &(sm_p->msgpair)))
@@ -639,75 +804,90 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
             free(sm_p->msgarray);
         }
         sm_p->msgarray = NULL;
+    }
 
-        /* add entry to acache if not already present */
-        if (!sm_p->acache_hit)
+    return 1;
+}
+
+static int set_sys_response(PINT_client_sm *sm_p,
+                            job_status_s *js_p)
+{
+    PVFS_sysresp_getattr * sysresp = NULL: 
+    PVFS_object_attr *attr = NULL;
+
+    if(js_p->error_code != 0)
+    {
+        sm_p->op_complete = 1;
+        return 0;
+    }
+
+    attr = &sm_p->getattr.attr;
+    assert(attr);
+    
+    /* If we get to this state action, 
+     * the getattr state machine was invoked, so
+     * we can assume that one of the PVFS_[i]sys_getattr functions
+     * was called, and the response field must be filled in for the
+     * user.
+     */
+
+    sysresp = sm_p->u.getattr.getattr_resp_p;
+    
+    /*
+     * if we retrieved a symlink target, copy it for the caller; this
+     * target path will be handed all the way back up to the caller via
+     * the PVFS_sys_attr object.  The caller of PVFS_[i]sys_getattr
+     * must free it.
+     */
+    if(attr->objtype == PVFS_TYPE_SYMLINK &&
+       attr->mask & PVFS_ATTR_SYMLINK_TARGET)
+    {
+        assert(attr->u.sym.target_path_len > 0);
+        assert(attr->u.sym.target_path);
+
+        sysresp->attr.link_target = strdup(attr.u.sym.target_path);
+        if(!sysresp->attr.link_target)
         {
-            int release_required = 1;
-            PINT_pinode *pinode = PINT_acache_lookup(
-                sm_p->object_ref, NULL);
-            if (!pinode)
-            {
-                pinode = PINT_acache_pinode_alloc();
-                assert(pinode);
-                release_required = 0;
-            }
+           js_p->error_code = -PVFS_ENOMEM;
+           return 0;
+        }
+    }
 
-            gossip_debug(GOSSIP_CLIENT_DEBUG, "trying to add object "
-                         "reference to acache (%s present)\n",
-                         (release_required ? "already" : "not"));
-            pinode->refn = sm_p->object_ref;
+    /* special case for when users ask for dfile count */
+    if(attr->objtype == PVFS_TYPE_METAFILE &&
+       sm_p->getattr.req_sys_mask & PVFS_ATTR_SYS_DFILE_COUNT)
+    {
+        sysresp->attr.dfile_count = attr->u.meta.dfile_count;
+    }
 
-            sm_p->acache_attr.mask |= PVFS_ATTR_COMMON_ALL;
+    /* copy outgoing sys_attr fields from returned object_attr */
+    sysresp->attr.owner = attr->owner;
+    sysresp->attr.group = attr->group;
+    sysresp->attr.perms = attr->perms;
+    sysresp->attr.atime = attr->atime;
+    sysresp->attr.mtime = attr->mtime;
+    sysresp->attr.ctime = attr->ctime;
+    sysresp->attr.mask  = PVFS_util_object_to_sys_attr_mask(attr->mask);
+    sysresp->attr.size  = 0;
+    sysresp->attr.objtype = attr->objtype;
 
-            if (sm_p->acache_attr.objtype == PVFS_TYPE_METAFILE)
-            {
-                if (sm_p->u.getattr.attrmask & PVFS_ATTR_META_DIST)
-                {
-                    sm_p->acache_attr.mask |= PVFS_ATTR_META_DIST;
-                }
-                if (sm_p->u.getattr.attrmask & PVFS_ATTR_META_DFILES)
-                {
-                    sm_p->acache_attr.mask |= PVFS_ATTR_META_DFILES;
-                }
-            }
+    if (js_p->error_code == 0)
+    {
+ 
+        /* convert outgoing attribute mask based on what we got */
+        sysresp->attr.mask = PVFS_util_object_to_sys_attr_mask(
+            sm_p->getattr.attr.mask);
 
-            if (sm_p->acache_attr.objtype == PVFS_TYPE_SYMLINK)
-            {
-                sm_p->acache_attr.mask &=
-                    (PVFS_ATTR_SYMLNK_ALL | PVFS_ATTR_COMMON_ALL);
-            }
-            else if (sm_p->u.getattr.attrmask & PVFS_ATTR_SYS_SIZE)
-            {
-                /*
-                  this special case size caching in metafiles does
-                  not apply at all to symlinks, so special case
-                  symlinks above
-                */
-                pinode->size = s_attr_p->size;
-                /*
-                  update the attr mask in the src object so that
-                  we properly copy out all required fields in the
-                  deep copy below to the pinode object
-                */
-                sm_p->acache_attr.mask |= PVFS_ATTR_DATA_SIZE;
-                /*
-                  if we have the size, be sure to set the
-                  META_ALL related bits since we also have
-                  that information at this point
-                */
-                sm_p->acache_attr.mask |= PVFS_ATTR_META_ALL;
-            }
+       if (sm_p->getattr.req_sys_attrmask & PVFS_ATTR_SYS_SIZE)
+        {
+            sysresp->attr.size = sm_p->getattr.size;
+            sysresp->attr.mask |= PVFS_ATTR_SYS_SIZE;
+        }
 
-            PINT_copy_object_attr(&pinode->attr, &sm_p->acache_attr);
-            PINT_free_object_attr(&sm_p->acache_attr);
-
-            PINT_acache_set_valid(pinode);
-
-            if (release_required)
-            {
-                PINT_acache_release(pinode);
-            }
+        /* if this is a symlink, add the link target */
+        if (sm_p->u.getattr.req_sys_attrmask & PVFS_ATTR_SYS_LNK_TARGET)
+        {
+            sysresp->attr.mask |= PVFS_ATTR_SYS_LNK_TARGET;
         }
     }
     else
@@ -717,7 +897,8 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
                0, sizeof(PVFS_sysresp_getattr));
     }
 
-    sm_p->op_complete = 1;
+    PINT_free_object_attr(attr);
+
     return 0;
 }
 

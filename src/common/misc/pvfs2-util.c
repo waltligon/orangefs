@@ -120,8 +120,7 @@ int PVFS_util_copy_sys_attr(
         dest_attr->objtype = src_attr->objtype;
         dest_attr->mask = src_attr->mask;
 
-        if ((src_attr->mask & PVFS_ATTR_COMMON_TYPE) &&
-            (src_attr->objtype == PVFS_TYPE_SYMLINK) &&
+        if((src_attr->mask & PVFS_ATTR_SYS_LNK_TARGET) &&
             src_attr->link_target)
         {
             dest_attr->link_target = strdup(src_attr->link_target);
@@ -139,7 +138,7 @@ void PVFS_util_release_sys_attr(PVFS_sys_attr *attr)
 {
     if (attr)
     {
-        if ((attr->mask & PVFS_ATTR_COMMON_TYPE) &&
+        if ((attr->mask & PVFS_ATTR_SYS_TYPE) &&
             (attr->objtype == PVFS_TYPE_SYMLINK) && attr->link_target)
         {
             free(attr->link_target);
@@ -1342,6 +1341,139 @@ void PINT_release_pvfstab(void)
 
     gen_mutex_unlock(&s_stat_tab_mutex);
 }
+
+inline uint32_t PVFS_util_sys_to_object_attr_mask(
+    uint32_t sys_attrmask)
+{
+
+    /*
+      adjust parameters as necessary; what's happening here
+      is that we're converting sys_attr masks to obj_attr masks
+      before passing the getattr request to the server.
+    */
+    uint32_t attrmask = 0;
+    if (sys_attrmask & PVFS_ATTR_SYS_SIZE)
+    {
+        /* need datafile handles and distribution in order to get 
+         * datafile handles and know what function to call to get
+         * the file size.
+         */
+        attrmask |= (PVFS_ATTR_META_ALL | PVFS_ATTR_DATA_SIZE);
+    }
+
+    if (sys_attrmask & PVFS_ATTR_SYS_DFILE_COUNT)
+    {
+        attrmask |= PVFS_ATTR_META_DFILES;
+    }
+
+    if (sys_attrmask & PVFS_ATTR_SYS_LNK_TARGET)
+    {
+        attrmask |= PVFS_ATTR_SYMLNK_TARGET;
+    }
+
+    gossip_debug(GOSSIP_GETATTR_DEBUG,
+                 "attrmask being passed to server: ");
+    PINT_attrmask_print(GOSSIP_GETATTR_DEBUG, attrmask);
+
+    return attrmask;
+}
+
+inline uint32_t PVFS_util_object_to_sys_attr_mask( 
+    uint32_t obj_mask)
+{
+    int sys_mask = 0;
+
+    if (obj_mask & PVFS_ATTR_COMMON_UID)
+    {
+        sys_mask |= PVFS_ATTR_SYS_UID;
+    }
+    if (obj_mask & PVFS_ATTR_COMMON_GID)
+    {
+        sys_mask |= PVFS_ATTR_SYS_GID;
+    }
+    if (obj_mask & PVFS_ATTR_COMMON_PERM)
+    {
+        sys_mask |= PVFS_ATTR_SYS_PERM;
+    }
+    if (obj_mask & PVFS_ATTR_COMMON_ATIME)
+    {
+        sys_mask |= PVFS_ATTR_SYS_ATIME;
+    }
+    if (obj_mask & PVFS_ATTR_COMMON_CTIME)
+    {
+        sys_mask |= PVFS_ATTR_SYS_CTIME;
+    }
+    if (obj_mask & PVFS_ATTR_COMMON_MTIME)
+    {
+        sys_mask |= PVFS_ATTR_SYS_MTIME;
+    }
+    if (obj_mask & PVFS_ATTR_COMMON_TYPE)
+    {
+        sys_mask |= PVFS_ATTR_SYS_TYPE;
+    }
+    if (obj_mask & PVFS_ATTR_DATA_SIZE)
+    {
+        sys_mask |= PVFS_ATTR_DATA_SIZE;
+    }
+    if (obj_mask & PVFS_ATTR_SYMLNK_TARGET)
+    {
+        sys_mask |= PVFS_ATTR_SYS_LNK_TARGET;
+    }
+    return sys_mask;
+}
+
+inline int PVFS2_translate_mode(int mode)
+{
+    int ret = 0, i = 0;
+    static int modes[9] =
+    {
+        S_IXOTH, S_IWOTH, S_IROTH,
+        S_IXGRP, S_IWGRP, S_IRGRP,
+        S_IXUSR, S_IWUSR, S_IRUSR
+    };
+    static int pvfs2_modes[9] =
+    {
+        PVFS_O_EXECUTE, PVFS_O_WRITE, PVFS_O_READ,
+        PVFS_G_EXECUTE, PVFS_G_WRITE, PVFS_G_READ,
+        PVFS_U_EXECUTE, PVFS_U_WRITE, PVFS_U_READ,
+    };
+
+    for(i = 0; i < 9; i++)
+    {
+        if (mode & modes[i])
+        {
+            ret |= pvfs2_modes[i];
+        }
+    }
+    return ret;
+}
+
+#ifndef __KERNEL__
+inline PVFS_time PVFS_util_get_current_time(void)
+{
+    struct timeval t = {0,0};
+    PVFS_time current_time = 0;
+
+    gettimeofday(&t, NULL);
+    current_time = (PVFS_time)t.tv_sec;
+    return current_time;
+}
+
+inline PVFS_time PVFS_util_mktime_version(PVFS_time time)
+{
+    struct timeval t = {0,0};
+    PVFS_time version = (time << 32);
+
+    gettimeofday(&t, NULL);
+    version |= (PVFS_time)t.tv_usec;
+    return version;
+}
+
+inline PVFS_time PVFS_util_mkversion_time(PVFS_time version)
+{
+    return (PVFS_time)(version >> 32);
+}
+#endif /* __KERNEL__ */
 
 /*
  * Pull out the wire encoding specified as a mount option in the tab

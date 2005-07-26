@@ -396,6 +396,52 @@ const char *PINT_dotconf_invoke_command(
     return error;
 }
 
+const char *PINT_dotconf_set_defaults(
+    configfile_t * configfile,
+    unsigned long context)
+{
+    command_t * cmd;
+    const char *error = 0;
+    const configoption_t *option;
+    int done = 0;
+    int opt_idx = 0;
+    int mod = 0;
+
+    for (option = 0; configfile->config_options[mod] && !done; mod++)
+    {
+        for (opt_idx = 0;
+             configfile->config_options[mod][opt_idx].name[0]; opt_idx++)
+        {
+            option =
+                (configoption_t *) & configfile->config_options[mod][opt_idx];
+            if(option && (context & option->context) && option->default_value)
+            {
+                /* set up the command structure (contextchecker wants this) */
+                PINT_dotconf_set_command(configfile, option, 
+                                         option->default_value, &command);
+                if(command.error)
+                {
+                    error = "Parse error.\n";
+                    PINT_dotconf_free_command(&command);
+                    return error;
+                }
+
+                error = PINT_dotconf_invoke_command(configfile, &command);
+                PINT_dotconf_free_command(&command);
+                if(error)
+                {
+                    return error;
+                }
+            }
+        }
+    }
+
+    return error;
+}
+
+
+}
+
 char *PINT_dotconf_read_arg(
     configfile_t * configfile,
     char **line)

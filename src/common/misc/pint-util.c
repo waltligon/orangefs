@@ -156,53 +156,53 @@ int PINT_copy_object_attr(PVFS_object_attr *dest, PVFS_object_attr *src)
         }
 
 	if ((src->mask & PVFS_ATTR_COMMON_TYPE) &&
-            (src->objtype == PVFS_TYPE_METAFILE) &&
-            (src->mask & PVFS_ATTR_META_DFILES))
-	{
-	    PVFS_size df_array_size = src->u.meta.dfile_count *
-                sizeof(PVFS_handle);
-
-            if (df_array_size)
+            (src->objtype == PVFS_TYPE_METAFILE))
+        {      
+            if(src->mask & PVFS_ATTR_META_DFILES)
             {
-		if ((dest->mask & PVFS_ATTR_META_DFILES) &&
-		    dest->u.meta.dfile_count > 0)
+                PVFS_size df_array_size = src->u.meta.dfile_count *
+                    sizeof(PVFS_handle);
+
+                if (df_array_size)
                 {
-                    if (dest->u.meta.dfile_array)
+                    if ((dest->mask & PVFS_ATTR_META_DFILES) &&
+                        dest->u.meta.dfile_count > 0)
                     {
-                        free(dest->u.meta.dfile_array);
+                        if (dest->u.meta.dfile_array)
+                        {
+                            free(dest->u.meta.dfile_array);
+                        }
                     }
+                    dest->u.meta.dfile_array = malloc(df_array_size);
+                    if (!dest->u.meta.dfile_array)
+                    {
+                        return ret;
+                    }
+                    memcpy(dest->u.meta.dfile_array,
+                           src->u.meta.dfile_array, df_array_size);
                 }
-		dest->u.meta.dfile_array = malloc(df_array_size);
-		if (!dest->u.meta.dfile_array)
-		{
+                else
+                {
+                    dest->u.meta.dfile_array = NULL;
+                }
+                dest->u.meta.dfile_count = src->u.meta.dfile_count;
+            }
+
+            if(src->mask & PVFS_ATTR_META_DIST)
+            {
+                assert(src->u.meta.dist_size > 0);
+
+                if ((dest->mask & PVFS_ATTR_META_DIST))
+                {
+                    PINT_dist_free(dest->u.meta.dist);
+                }
+                dest->u.meta.dist = PINT_dist_copy(src->u.meta.dist);
+                if (dest->u.meta.dist == NULL)
+                {
                     return ret;
-		}
-		memcpy(dest->u.meta.dfile_array,
-                       src->u.meta.dfile_array, df_array_size);
-	    }
-            else
-            {
-		dest->u.meta.dfile_array = NULL;
-	    }
-	    dest->u.meta.dfile_count = src->u.meta.dfile_count;
-	}
-
-	if ((src->mask & PVFS_ATTR_COMMON_TYPE) &&
-            (src->objtype == PVFS_TYPE_METAFILE) &&
-            (src->mask & PVFS_ATTR_META_DIST))
-	{
-            assert(src->u.meta.dist_size > 0);
-
-	    if ((dest->mask & PVFS_ATTR_META_DIST))
-            {
-                PINT_dist_free(dest->u.meta.dist);
+                }
+                dest->u.meta.dist_size = src->u.meta.dist_size;
             }
-            dest->u.meta.dist = PINT_dist_copy(src->u.meta.dist);
-            if (dest->u.meta.dist == NULL)
-            {
-                return ret;
-            }
-            dest->u.meta.dist_size = src->u.meta.dist_size;
         }
 
         if (src->mask & PVFS_ATTR_SYMLNK_TARGET)

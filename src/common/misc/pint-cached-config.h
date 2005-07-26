@@ -99,6 +99,10 @@ int PINT_cached_config_get_root_handle(
     PVFS_fs_id fsid,
     PVFS_handle *fh_root);
 
+int PINT_cached_config_get_handle_timeout(
+    PVFS_fs_id fsid,
+    struct timeval *timeout);
+
 #define map_handle_range_to_extent_list(hrange_list)             \
 do { cur = hrange_list;                                          \
  while(cur) {                                                    \

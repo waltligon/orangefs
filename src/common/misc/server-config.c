@@ -103,48 +103,408 @@ static int is_root_handle_in_my_range(
     struct filesystem_configuration_s *fs);
 #endif
 
-static struct server_configuration_s *config_s = NULL;
 
+enum
+{
+    CTX_GLOBAL           = (1 << 1),
+    CXT_DEFAULT          = (1 << 2),
+    CTX_ALIASES          = (1 << 3),
+    CXT_FILESYSTEM       = (1 << 4),
+    CTX_METAHANDLERANGES = (1 << 5),
+    CTX_DATAHANDLERANGES = (1 << 6),
+    CTX_STORAGEHINTS     = (1 << 7),
+    CTX_DISTRIBUTION     = (1 << 8)
+};
+
+/* 
+ * NOTE: The documentation for the server config format is generated
+ * from the following static array.  The documentation for an option
+ * is taken from the comments found before the beginning of each sub-structure
+ * as shown.
+ */
 static const configoption_t options[] =
 {
-    {"HostID",ARG_STR, get_pvfs_server_id,NULL,CTX_ALL},
-    {"StorageSpace",ARG_STR, get_storage_space,NULL,CTX_ALL},
-    {"<Defaults>",ARG_NONE, enter_defaults_context,NULL,CTX_ALL},
-    {"</Defaults>",ARG_NONE, exit_defaults_context,NULL,CTX_ALL},
-    {"<Aliases>",ARG_NONE, enter_aliases_context,NULL,CTX_ALL},
-    {"</Aliases>",ARG_NONE, exit_aliases_context,NULL,CTX_ALL},
-    {"Alias",ARG_LIST, get_alias_list,NULL,CTX_ALL},
-    {"<FileSystem>",ARG_NONE, enter_filesystem_context,NULL,CTX_ALL},
-    {"</FileSystem>",ARG_NONE, exit_filesystem_context,NULL,CTX_ALL},
-    {"<StorageHints>",ARG_NONE, enter_storage_hints_context,NULL,CTX_ALL},
-    {"</StorageHints>",ARG_NONE, exit_storage_hints_context,NULL,CTX_ALL},
-    {"<MetaHandleRanges>",ARG_NONE, enter_mhranges_context,NULL,CTX_ALL},
-    {"</MetaHandleRanges>",ARG_NONE, exit_mhranges_context,NULL,CTX_ALL},
-    {"<DataHandleRanges>",ARG_NONE, enter_dhranges_context,NULL,CTX_ALL},
-    {"</DataHandleRanges>",ARG_NONE, exit_dhranges_context,NULL,CTX_ALL},
-    {"<Distribution>",ARG_NONE, enter_distribution_context,NULL,CTX_ALL},
-    {"</Distribution>",ARG_NONE, exit_distribution_context,NULL,CTX_ALL},
-    {"Range",ARG_LIST, get_range_list,NULL,CTX_ALL},
-    {"RootHandle",ARG_STR, get_root_handle,NULL,CTX_ALL},
-    {"Name",ARG_STR, get_name,NULL,CTX_ALL},
-    {"ID",ARG_INT, get_filesystem_collid,NULL,CTX_ALL},
-    {"LogFile",ARG_STR, get_logfile,NULL,CTX_ALL},
-    {"EventLogging",ARG_LIST, get_event_logging_list,NULL,CTX_ALL},
-    {"UnexpectedRequests",ARG_INT, get_unexp_req,NULL,CTX_ALL},
-    {"PerfUpdateInterval",ARG_INT, get_perf_update_interval,NULL,CTX_ALL},
-    {"BMIModules",ARG_LIST, get_bmi_module_list,NULL,CTX_ALL},
-    {"FlowModules",ARG_LIST, get_flow_module_list,NULL,CTX_ALL},
+    /* 
+     * Specifies a string identifier for the pvfs2 server that is to be
+     * run on this host.  The format of this string is:
+     *
+     * {transport}://{hostname}:{port}
+     *
+     * Where {transport} is one of the possible BMI transport modules
+     * (tcp, ib, gm).  Example:
+     *
+     * tcp://myhost.mydn:12345
+     *
+     */
+    {"HostID",ARG_STR, get_pvfs_server_id,NULL,CTX_GLOBAL,NULL},
+    
+    /* Specifies the local path for the pvfs2 server to use as storage space.
+     * Example:
+     *
+     * /tmp/pvfs.storage
+     */
+    {"StorageSpace",ARG_STR, get_storage_space,NULL,CTX_GLOBAL,NULL},
+
+    /* Specifies the beginning of the Defaults context.  Options specified
+     * within the Defaults context are used as default values over all the
+     * pvfs2 server specific config files.
+     */
+    {"<Defaults>",ARG_NONE, enter_defaults_context,NULL,CTX_GLOBAL,NULL},
+
+    /* Specifies the end-tag for the Defaults context.
+     */
+    {"</Defaults>",ARG_NONE, exit_defaults_context,NULL,CTX_DEFAULTS,NULL},
+
+    /* Specifies the beginning of the Aliases context.  This groups 
+     * the Alias mapping options.
+     *
+     * The Aliases context should be defined before any FileSystem contexts
+     * are defined, as options in the FileSystem context usually need to
+     * reference the aliases defined in this context.
+     */
+    {"<Aliases>",ARG_NONE, enter_aliases_context,NULL,CTX_GLOBAL,NULL},
+
+    /* Specifies the end-tag for the Aliases context.
+     */
+    {"</Aliases>",ARG_NONE, exit_aliases_context,NULL,CTX_ALIASES,NULL},
+
+    /* Specifies an alias in the form of a non-whitespace string that
+     * can be used to reference a BMI server address (a HostID).  This
+     * allows us to reference individual servers by an alias instead of their
+     * full HostID.  The format of the Alias option is:
+     *
+     * Alias {alias string} {bmi address}
+     *
+     * As an example:
+     *
+     * Alias mynode1 tcp://hostname1.clustername1.domainname:12345
+     */
+    {"Alias",ARG_LIST, get_alias_list,NULL,CTX_ALIASES,NULL},
+
+    /* Specifies the beginning of a Filesystem context.  This groups
+     * options specific to a filesystem.  A pvfs2 server may manage
+     * more than one filesystem, so a config file may have more than
+     * one Filesystem context, each defining the parameters of a different
+     * Filesystem.
+     */
+    {"<FileSystem>",ARG_NONE, enter_filesystem_context,NULL,CTX_GLOBAL,NULL},
+
+    /* Specifies the end-tag of a Filesystem context.
+     */
+    {"</FileSystem>",ARG_NONE, exit_filesystem_context,NULL,CTX_FILESYSTEM,NULL},
+
+    /* Specifies the beginning of a StorageHints context.  This groups
+     * options specific to a filesystem and related to the behavior of the
+     * storage system.  Mostly these options are passed directly to the
+     * TROVE storage module which may or may not support them.  The
+     * DBPF module (the only TROVE module implemented at present) supports
+     * all of them.
+     */
+    {"<StorageHints>",ARG_NONE, enter_storage_hints_context,NULL,
+        CTX_FILESYSTEM,NULL},
+
+    /* Specifies the end-tag of the StorageHints context.
+     */
+    {"</StorageHints>",ARG_NONE, exit_storage_hints_context,NULL,
+        CTX_STORAGEHINTS,NULL},
+
+    /* This context groups together the Range options that define valid values
+     * for meta handles on a per-host basis for this filesystem.
+     *
+     * The MetaHandleRanges context is required to be present in a
+     * Filesystem context.
+     */
+    {"<MetaHandleRanges>",ARG_NONE, enter_mhranges_context,NULL,
+        CTX_FILESYSTEM,NULL},
+
+    /* Specifies the end-tag for the MetaHandleRanges context.
+     */
+    {"</MetaHandleRanges>",ARG_NONE, exit_mhranges_context,NULL,
+        CTX_METAHANDLERANGES,NULL},
+
+    /* This context groups together the Range options that define valid values
+     * for the data handles on a per-host basis for this filesystem.
+     *
+     * A DataHandleRanges context is required to be present in a
+     * Filesystem context.
+     */
+    {"<DataHandleRanges>",ARG_NONE, enter_dhranges_context,NULL,
+        CTX_FILESYSTEM,NULL},
+
+    /* Specifies the end-tag for the DataHandleRanges context.
+     */
+    {"</DataHandleRanges>",ARG_NONE, exit_dhranges_context,NULL,
+        CTX_DATAHANDLERANGES,NULL},
+    
+    /* Provides a context for defining the filesystem's default
+     * distribution to use and the parameters to be set for that distribution.
+     *
+     * Valid options within the Distribution context are Name, Param, and Value.
+     *
+     * This context is an optional context within the Filesystem context.  If
+     * not specified, the filesystem defaults to the simple-stripe distribution.
+     */
+    {"<Distribution>",ARG_NONE, enter_distribution_context,NULL,
+        CTX_FILESYSTEM,NULL},
+
+    /* Specifies the end-tag for the Distribution context.
+     */
+    {"</Distribution>",ARG_NONE, exit_distribution_context,NULL,
+        CTX_DISTRIBUTION,NULL},
+
+    /* As logical files are created in pvfs2, the data files and meta files
+     * that represent them are given filesystem unique handle values.  The
+     * user can specify a range of values (or set of ranges) 
+     * to be allocated to data files and meta files for a particular server,
+     * using the Range option in the DataHandleRanges and MetaHandleRanges
+     * contexts.  Note that in most cases, its easier to let the 
+     * pvfs2-genconfig script determine the best ranges to specify.
+     *
+     * This option specifies a range of handle values that can be used for 
+     * a particular pvfs2 server in a particular context (meta handles
+     * or data handles).  The DataHandleRanges and MetaHandleRanges contexts
+     * should contain one or more Range options.  The format is:
+     *
+     * Range {alias} {min value1}-{max value1}[, {min value2}-{max value2},...]
+     *
+     * Where {alias} is one of the alias strings already specified in the
+     * Aliases context.
+     *
+     * {min value} and {max value} are positive integer values that specify
+     * the range of possible handles that can be given out for that particular
+     * host.  {max value} must be less than 18446744073709551615 (UINT64_MAX).
+     *
+     * As shown in the specified format, multiple ranges can be specified for
+     * the same alias.  The format requires that max value of a given range
+     * is less than the min value of the next one, 
+     * i.e. {max value1}<{min value2}
+     * 
+     * Example of a Range option for data handles:
+     *
+     * Range mynode1 2147483651-4294967297
+     */
+    {"Range",ARG_LIST, get_range_list,NULL,
+        CTX_FILESYSTEM,NULL},
+
+    /* Specifies the handle value for the root of the Filesystem.  This
+     * is a required option in the Filesystem context.  The format is:
+     *
+     * RootHandle {handle value}
+     *
+     * Where {handle value} is a positive integer no greater than 
+     * 18446744073709551615 (UIN64_MAX).
+     *
+     * In general its best to let the pvfs2-genconfig script specify a
+     * RootHandle value for the filesystem.
+     */
+    {"RootHandle",ARG_STR, get_root_handle,NULL,
+        CTX_FILESYSTEM,NULL},
+
+    /* This option specifies the name of the particular filesystem or
+     * distribution that its defined in.  It is a required option in
+     * Filesystem and Distribution contexts.
+     */
+    {"Name",ARG_STR, get_name,NULL,
+        CTX_FILESYSTEM|CTX_DISTRIBUTION,NULL},
+
+    /* A pvfs2 server may manage more than one filesystem, and so a
+     * unique identifier is used to represent each one.  
+     * This option specifies such an ID (sometimes called a 'collection
+     * id') for the filesystem it is defined in.  
+     *
+     * The ID value can be any positive integer, no greater than
+     * 2147483647 (INT32_MAX).  It is a required option in the Filesystem
+     * context.
+     */
+    {"ID",ARG_INT, get_filesystem_collid,NULL,
+        CTX_FILESYSTEM,NULL},
+
+    /* The gossip interface in pvfs2 allows users to specify different
+     * levels of logging for the pvfs2 server.  The output of these
+     * different log levels is written to a file, which is specified in
+     * this option.  The value of the option must be the path pointing to a 
+     * file with valid write permissions.  The Logfile option can be
+     * specified for all the pvfs2 servers in the Defaults context or for
+     * a particular server in the Global context.
+     */
+    {"LogFile",ARG_STR, get_logfile,NULL,
+        CTX_DEFAULT|CTX_GLOBAL,"/tmp/pvfs2-server.log"},
+
+    /* The gossip interface in pvfs2 allows users to specify different
+     * levels of logging for the pvfs2 server.  This option sets that level for
+     * either all servers (by being defined in the Defaults context) or for
+     * a particular server by defining it in the Global context.  Possible
+     * values for event logging are:
+     *
+     * __EVENTLOGGING__
+     *
+     * The value of the EventLogging option can be a comma separated list
+     * of the above values.  Individual values can also be negated with
+     * a '-'.  Examples of possible values are:
+     *
+     * EventLogging flow,msgpair,io
+     * EventLogging -storage
+     * EventLogging -flow,-flowproto
+     */
+    {"EventLogging",ARG_LIST, get_event_logging_list,NULL,
+        CTX_DEFAULT|CTX_GLOBAL,"none"},
+
+    /* At startup each pvfs2 server allocates space for a set number
+     * of incoming requests to prevent the allocation delay at the beginning
+     * of each unexpected request.  This parameter specifies the number
+     * of requests for which to allocate space.
+     *
+     * If set in the Defaults context, its value will be used for all servers.
+     * The default value can also be overwritten by setting a separate value
+     * in the Global context.
+     */
+     {"UnexpectedRequests",ARG_INT, get_unexp_req,NULL,
+         CTX_DEFAULT|CTX_GLOBAL,"50"},
+
+     /* This specifies the frequency (in milliseconds) 
+      * that performance monitor should be updated
+      * when the pvfs2 server is running in admin mode.
+      *
+      * Can be set in either Default or Global contexts.
+      */
+    {"PerfUpdateInterval",ARG_INT, get_perf_update_interval,NULL,
+        CTX_DEFAULT|CTX_GLOBAL,"1000"},
+
+    /* List the BMI modules to load when the server is started.  At present,
+     * only tcp, infiniband, and myrinet are valid BMI modules.  
+     * The format of the list is a comma separated list of one of:
+     *
+     * bmi_tcp
+     * bmi_ib
+     * bmi_gm
+     *
+     * For example:
+     *
+     * BMIModules bmi_tcp,bmi_ib
+     *
+     * Note that only the bmi modules compiled into pvfs2 should be
+     * specified in this list.  The BMIModules option can be specified
+     * in either the Defaults or Global contexts.
+     */
+    {"BMIModules",ARG_LIST, get_bmi_module_list,NULL,
+        CTX_DEFAULT|CTX_GLOBAL,NULL},
+    
+    /* List the flow modules to load when the server is started.  At present,
+     * only the flowproto_multiqueue module is supported.
+     *
+     * This option can be specified in either the Defaults or Global contexts.
+     */
+    {"FlowModules",ARG_LIST, get_flow_module_list,NULL,
+        CTX_DEFAULT|CTX_GLOBAL,"flowproto_multiqueue"},
+
+    /* The TROVE storage layer has a management component that deals with
+     * allocating handle values for new metafiles and datafiles.  The underlying
+     * trove module can be given a hint to tell it how long to wait before
+     * reusing handle values that have become freed up (only deleting files will
+     * free up a handle).  The HandleRecycleTimeoutSecs option specifies
+     * the number of seconds to wait for each filesystem.  This is an
+     * optional parameter that can be specified in the StorageHints context.
+     */
     {"HandleRecycleTimeoutSecs", ARG_INT,
-     get_handle_recycle_timeout_seconds, NULL, CTX_ALL},
-    {"AttrCacheKeywords",ARG_LIST, get_attr_cache_keywords_list,NULL,CTX_ALL},
-    {"AttrCacheSize",ARG_INT, get_attr_cache_size, NULL,CTX_ALL},
-    {"AttrCacheMaxNumElems",ARG_INT,get_attr_cache_max_num_elems,NULL,CTX_ALL},
-    {"TroveSyncMeta",ARG_STR, get_trove_sync_meta, NULL, CTX_ALL},
-    {"TroveSyncData",ARG_STR, get_trove_sync_data, NULL, CTX_ALL},
-    {"LogStamp",ARG_STR, get_logstamp,NULL,CTX_ALL},
-    {"Param", ARG_STR, get_param, NULL, CTX_ALL},
-    {"Value", ARG_INT, get_value, NULL, CTX_ALL},
-    {"DefaultNumDFiles", ARG_INT, get_default_num_dfiles, NULL,CTX_ALL},
+         get_handle_recycle_timeout_seconds, NULL, 
+         CTX_STORAGEHINTS,"360"},
+    
+    /* The TROVE layer has an attribute caching component that handles
+     * caching of stored attributes.  This is used to improve the performance of
+     * metadata accesses.  The AttrCacheKeywords option is a list of which
+     * object types should get cached attributes.  The possible values for
+     * this option are:
+     *
+     * datafile_handles - This will cache the array of datafile handles for
+     *                    each logical file in this filesystem
+     * 
+     * metafile_dist - This will cache the types of distributions used to manage
+     *                 the datafiles in this filesystem
+     *
+     * dir_ent - This will cache the handles of the directory entries in this
+     *           filesystem
+     *
+     * symlink_target - This will cache the target path for the symbolic links
+     *                  in this filesystem
+     *
+     * The format of this option is a comma-separated list of one or more
+     * of the above values.  For example:
+     *
+     * AttrCacheKeywords datafile_handles,metafile_dist,dir_ent
+     */
+    {"AttrCacheKeywords",ARG_LIST, get_attr_cache_keywords_list,NULL,
+        CTX_STORAGEHINTS,
+        "datafile_handles,metafile_dist,dir_ent,symlink_target"},
+    
+    /* The attribute cache in the TROVE layer mentioned in the documentation
+     * for the AttrCacheKeywords option is managed as a hashtable.  The
+     * AttrCacheSize adjusts the number of buckets that this hashtable contains.
+     * This value can be adjusted for better performance.  A good hashtable
+     * size should always be a prime number.
+     */
+    {"AttrCacheSize",ARG_INT, get_attr_cache_size, NULL,
+        CTX_STORAGEHINTS,"511"},
+
+    /* This option specifies the max cache size of the attribute cache 
+     * in the TROVE layer mentioned in the documentation
+     * for the AttrCacheKeywords option.  This value can be adjusted for
+     * better performance.
+     */
+    {"AttrCacheMaxNumElems",ARG_INT,get_attr_cache_max_num_elems,NULL,
+        CTX_STORAGEHINTS,"1024"},
+    
+    /* The TroveSyncMeta option allows users to turn off metadata
+     * synchronization with every metadata write.  This can greatly improve
+     * performance.  In general, this value should probably be set to yes,
+     * otherwise metadata transaction could be lost in the event of server
+     * failover.
+     */
+    {"TroveSyncMeta",ARG_STR, get_trove_sync_meta, NULL, 
+        CTX_STORAGEHINTS,"yes"},
+
+    /* The TroveSyncData option allows users to turn off datafile
+     * synchronization with every write operation.  This can greatly improve
+     * performance, but may cause lost data in the event of server failover.
+     */
+    {"TroveSyncData",ARG_STR, get_trove_sync_data, NULL, 
+        CTX_STORAGEHINTS,"yes"},
+
+    /* Specifies the format of the date/timestamp that events will have
+     * in the event log.  Possible values are:
+     *
+     * usec: [%H:%M:%S
+     *
+     * datetime: [%m/%d %H:%M]
+     *
+     * none
+     *
+     * The format of the option is one of the above values.  For example,
+     *
+     * LogStamp datetime
+     */
+    {"LogStamp",ARG_STR, get_logstamp,NULL,
+        CTX_DEFAULT|CTX_GLOBAL,"usec"},
+    
+    /* This option specifies a parameter name to be passed to the 
+     * distribution to be used.  This option should be immediately
+     * followed by a Value option.
+     */
+    {"Param", ARG_STR, get_param, NULL, 
+        CTX_DISTRIBUTION,NULL},
+    
+    /* This option specifies the value of the parameter who's name
+     * was specified in the previous option.
+     */
+    {"Value", ARG_INT, get_value, NULL, 
+        CTX_DISTRIBUTION,NULL},
+    
+    /* This option specifies the default number of datafiles to use
+     * when a new file is created.  The value is passed to the distribution
+     * and it determines whether to use that value or not.
+     */
+    {"DefaultNumDFiles", ARG_INT, get_default_num_dfiles, NULL,
+        CTX_FILESYSTEM,"0"},
+
     LAST_OPTION
 };
 
@@ -165,6 +525,8 @@ int PINT_parse_config(
     char *global_config_filename,
     char *server_config_filename)
 {
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
     configfile_t *configfile = (configfile_t *)0;
 
     if (!config_obj)
@@ -190,7 +552,8 @@ int PINT_parse_config(
     /* first read in the fs.conf defaults config file */
     config_s->configuration_context = GLOBAL_CONFIG;
     configfile = PINT_dotconf_create(config_s->fs_config_filename,
-                                     options, NULL, CASE_INSENSITIVE);
+                                     options, (void *)config_s, 
+                                     CASE_INSENSITIVE);
     if (!configfile)
     {
         gossip_err("Error opening config file %s\n",
@@ -198,7 +561,8 @@ int PINT_parse_config(
         return 1;
     }
     configfile->errorhandler = (dotconf_errorhandler_t)errorhandler;
-
+    configfile->contextchecker = (dotconf_contextchecker_t)contextchecker;
+    
     if(PINT_dotconf_command_loop(configfile) == 0)
     {
         /* NOTE: dotconf error handler will log message */
@@ -209,7 +573,7 @@ int PINT_parse_config(
     /* then read in the server.conf (host specific) config file */
     config_s->configuration_context = GLOBAL_CONFIG;
     configfile = PINT_dotconf_create(config_s->server_config_filename,
-                                options, NULL, CASE_INSENSITIVE);
+                                options, (void *)config_s, CASE_INSENSITIVE);
     if (!configfile)
     {
         gossip_err("Error opening config file: %s\n",
@@ -217,6 +581,7 @@ int PINT_parse_config(
         return 1;
     }
     configfile->errorhandler = (dotconf_errorhandler_t)errorhandler;
+    configfile->contextchecker = (dotconf_contextchecker_t)contextchecker;
 
     if (PINT_dotconf_command_loop(configfile) == 0)
     {
@@ -246,23 +611,50 @@ int PINT_parse_config(
 	return 1;
     }
 
+    /* We set to the default flow module since there's only one.
+    */
     if (!config_s->flow_modules)
     {
-	gossip_err("Configuration file error. "
-                   "No Flow modules specified.\n");
+        const char * err_msg = PINT_dotconf_set_default(
+            configfile,
+            "FlowModules");
+
+        if(err_msg)
+        {
+            gossip_err("Configuration file error: %s\n", err_msg);
+        }
 	return 1;
     }
-
+    
+    /* Users don't need to learn about this unless they want to
+    */
     if (!config_s->perf_update_interval)
     {
-	gossip_err("Configuration file error.  "
-                   "No PerfUpdateInterval specified.\n");
-	return 1;
-    }
+        const char * err_msg = PINT_dotconf_set_default(
+            configfile,
+            "PerfUpdateInterval");
 
+        if(err_msg)
+        {
+            gossip_err("Configuration file error.  "
+                       "No PerfUpdateInterval specified.\n");
+            return 1;
+        }
+    }
+    
     return 0;
 }
 
+const char *contextchecker(command_t *cmd, unsigned long mask)
+{
+    struct server_configuration_s *config_s = cmd->context;
+
+    if(!(mask & config_s->configuration_context))
+    {
+        return "Option can't be defined in that context";
+    }
+}
+    
 FUNC_ERRORHANDLER(errorhandler)
 {
     gossip_err("Error: %s line %ld: %s", configfile->filename,
@@ -272,10 +664,8 @@ FUNC_ERRORHANDLER(errorhandler)
 
 DOTCONF_CB(get_pvfs_server_id)
 {
-    if (config_s->configuration_context != GLOBAL_CONFIG)
-    {
-        return("HostID Tag can only be in the Global context.\n");
-    }
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
     if (config_s->host_id)
     {
         gossip_err("WARNING: HostID value being overwritten (from "
@@ -288,12 +678,8 @@ DOTCONF_CB(get_pvfs_server_id)
 
 DOTCONF_CB(get_logstamp)
 {
-    if ((config_s->configuration_context != DEFAULTS_CONFIG) &&
-        (config_s->configuration_context != GLOBAL_CONFIG))
-    {
-        return("LogStamp tag can only be in a "
-                   "Defaults or Global block.\n");
-    }
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
 
     if(!strcmp(cmd->data.str, "none"))
     {
@@ -318,10 +704,8 @@ DOTCONF_CB(get_logstamp)
 
 DOTCONF_CB(get_storage_space)
 {
-    if (config_s->configuration_context != GLOBAL_CONFIG)
-    {
-        return("StorageSpace Tag can only be in the Global context.\n");
-    }
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
     if (config_s->storage_path)
     {
         gossip_err("WARNING: StorageSpace value being overwritten.\n");
@@ -334,57 +718,48 @@ DOTCONF_CB(get_storage_space)
 
 DOTCONF_CB(enter_defaults_context)
 {
-    if (config_s->configuration_context != GLOBAL_CONFIG)
-    {
-        return("Error in context.  Cannot have Defaults tag here.\n");
-    }
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
     config_s->configuration_context = DEFAULTS_CONFIG;
-    return NULL;
+
+    return PINT_dotconf_set_defaults(
+        cmd->configfile, DEFAULTS_CONFIG);
 }
 
 DOTCONF_CB(exit_defaults_context)
 {
-    if (config_s->configuration_context != DEFAULTS_CONFIG)
-    {
-        return("Error in context.  Cannot have /Defaults tag here.\n");
-    }
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
     config_s->configuration_context = GLOBAL_CONFIG;
     return NULL;
 }
 
 DOTCONF_CB(enter_aliases_context)
 {
-    if (config_s->configuration_context != GLOBAL_CONFIG)
-    {
-        return("Error in context.  Cannot have Aliases tag here.\n");
-    }
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
     config_s->configuration_context = ALIASES_CONFIG;
     return NULL;
 }
 
 DOTCONF_CB(exit_aliases_context)
 {
-    if (config_s->configuration_context != ALIASES_CONFIG)
-    {
-        return("Error in context.  Cannot have /Aliases tag here.\n");
-    }
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
     config_s->configuration_context = GLOBAL_CONFIG;
     return NULL;
 }
 
 DOTCONF_CB(enter_filesystem_context)
 {
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
     struct filesystem_configuration_s *fs_conf = NULL;
 
     if (config_s->host_aliases == NULL)
     {
         return("Error in context.  Filesystem tag cannot "
                    "be declared before an Aliases tag.\n");
-    }
-
-    if (config_s->configuration_context != GLOBAL_CONFIG)
-    {
-        return("Error in context.  Cannot have Filesystem tag here.\n");
     }
 
     fs_conf = (struct filesystem_configuration_s *)
@@ -405,17 +780,17 @@ DOTCONF_CB(enter_filesystem_context)
     PINT_llist_add_to_head(config_s->file_systems,(void *)fs_conf);
     assert(PINT_llist_head(config_s->file_systems) == (void *)fs_conf);
     config_s->configuration_context = FILESYSTEM_CONFIG;
-    return NULL;
+
+    return PINT_dotconf_set_defaults(
+        cmd->configfile,
+        FILESYSTEM_CONFIG);
 }
 
 DOTCONF_CB(exit_filesystem_context)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
-
-    if (config_s->configuration_context != FILESYSTEM_CONFIG)
-    {
-        return("Error in context.  Cannot have /Filesystem tag here.\n");
-    }
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
 
     fs_conf = (struct filesystem_configuration_s *)
         PINT_llist_head(config_s->file_systems);
@@ -438,22 +813,18 @@ DOTCONF_CB(exit_filesystem_context)
 
 DOTCONF_CB(enter_storage_hints_context)
 {
-    if (config_s->configuration_context != FILESYSTEM_CONFIG)
-    {
-        return("Error in context.  Cannot "
-                   "have StorageHints tag here.\n");
-    }
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
     config_s->configuration_context = STORAGEHINTS_CONFIG;
-    return NULL;
+
+    return PINT_dotconf_set_defaults(
+        cmd->configfile, STORAGEHINTS_CONFIG);
 }
 
 DOTCONF_CB(exit_storage_hints_context)
 {
-    if (config_s->configuration_context != STORAGEHINTS_CONFIG)
-    {
-        return("Error in context.  Cannot "
-                   "have /StorageHints tag here.\n");
-    }
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
     config_s->configuration_context = FILESYSTEM_CONFIG;
     return NULL;
 }
@@ -461,24 +832,17 @@ DOTCONF_CB(exit_storage_hints_context)
 
 DOTCONF_CB(enter_mhranges_context)
 {
-    if (config_s->configuration_context != FILESYSTEM_CONFIG)
-    {
-        return("Error in context.  Cannot have "
-                   "MetaHandleRanges tag here.\n");
-    }
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
     config_s->configuration_context = META_HANDLERANGES_CONFIG;
     return NULL;
 }
 
 DOTCONF_CB(exit_mhranges_context)
 {
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
     struct filesystem_configuration_s *fs_conf = NULL;
-
-    if (config_s->configuration_context != META_HANDLERANGES_CONFIG)
-    {
-        return("Error in context.  Cannot have "
-                   "/MetaHandleRanges tag here.\n");
-    }
 
     fs_conf = (struct filesystem_configuration_s *)
         PINT_llist_head(config_s->file_systems);
@@ -494,24 +858,17 @@ DOTCONF_CB(exit_mhranges_context)
 
 DOTCONF_CB(enter_dhranges_context)
 {
-    if (config_s->configuration_context != FILESYSTEM_CONFIG)
-    {
-        return("Error in context.  Cannot have "
-                   "DataHandleRanges tag here.\n");
-    }
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
     config_s->configuration_context = DATA_HANDLERANGES_CONFIG;
     return NULL;
 }
 
 DOTCONF_CB(exit_dhranges_context)
 {
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
     struct filesystem_configuration_s *fs_conf = NULL;
-
-    if (config_s->configuration_context != DATA_HANDLERANGES_CONFIG)
-    {
-        return("Error in context.  Cannot have "
-                   "/DataHandleRanges tag here.\n");
-    }
 
     fs_conf = (struct filesystem_configuration_s *)
         PINT_llist_head(config_s->file_systems);
@@ -527,75 +884,51 @@ DOTCONF_CB(exit_dhranges_context)
 
 DOTCONF_CB(enter_distribution_context)
 {
-    if (config_s->configuration_context != GLOBAL_CONFIG)
-    {
-        return("Error in context.  Cannot have "
-                   "Distribution tag here.\n");
-    }
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
     config_s->configuration_context = DISTRIBUTION_CONFIG;
     return NULL;
 }
 
 DOTCONF_CB(exit_distribution_context)
 {
-    if (config_s->configuration_context != DISTRIBUTION_CONFIG)
-    {
-        return("Error in context.  Cannot have "
-                   "/Distribution tag here.\n");
-    }
-
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
     config_s->configuration_context = GLOBAL_CONFIG;
     return NULL;
 }
 
 DOTCONF_CB(get_unexp_req)
 {
-    if ((config_s->configuration_context != DEFAULTS_CONFIG) &&
-        (config_s->configuration_context != GLOBAL_CONFIG))
-    {
-        return("UnexpectedRequests Tag can only be in a "
-                   "Defaults or Global block.\n");
-    }
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
     config_s->initial_unexpected_requests = cmd->data.value;
     return NULL;
 }
 
 DOTCONF_CB(get_perf_update_interval)
 {
-    if ((config_s->configuration_context != DEFAULTS_CONFIG) &&
-        (config_s->configuration_context != GLOBAL_CONFIG))
-    {
-        return("PerfUpdateInterval Tag can only be in a "
-                   "Defaults or Global block.\n");
-    }
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
     config_s->perf_update_interval = cmd->data.value;
     return NULL;
 }
 
 DOTCONF_CB(get_logfile)
 {
-    if ((config_s->configuration_context != DEFAULTS_CONFIG) &&
-        (config_s->configuration_context != GLOBAL_CONFIG))
-    {
-        return("LogFile Tag can only be in a Defaults "
-                   "or Global block.\n");
-    }
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
     config_s->logfile = (cmd->data.str ? strdup(cmd->data.str) : NULL);
     return NULL;
 }
 
 DOTCONF_CB(get_event_logging_list)
 {
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
     int i = 0, len = 0;
     char buf[512] = {0};
     char *ptr = buf;
-
-    if ((config_s->configuration_context != DEFAULTS_CONFIG) &&
-        (config_s->configuration_context != GLOBAL_CONFIG))
-    {
-        return("EventLogging Tag can only be in a "
-                   "Defaults or Global block.\n");
-    }
 
     if (config_s->event_logging != NULL)
     {
@@ -619,12 +952,8 @@ DOTCONF_CB(get_flow_module_list)
     char buf[512] = {0};
     char *ptr = buf;
 
-    if ((config_s->configuration_context != DEFAULTS_CONFIG) &&
-        (config_s->configuration_context != GLOBAL_CONFIG))
-    {
-        return("FlowModules Tag can only be in a "
-                   "Defaults or Global block.\n");
-    }
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
 
     if (config_s->flow_modules != NULL)
     {
@@ -649,12 +978,8 @@ DOTCONF_CB(get_bmi_module_list)
     char buf[512] = {0};
     char *ptr = buf;
 
-    if ((config_s->configuration_context != DEFAULTS_CONFIG) &&
-        (config_s->configuration_context != GLOBAL_CONFIG))
-    {
-        return("BMIModules Tag can only be in a "
-                   "Defaults or Global block.\n");
-    }
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
 
     if (config_s->bmi_modules != NULL)
     {
@@ -675,12 +1000,8 @@ DOTCONF_CB(get_bmi_module_list)
 DOTCONF_CB(get_handle_recycle_timeout_seconds)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
-
-    if (config_s->configuration_context != STORAGEHINTS_CONFIG)
-    {
-        return("HandleRecycleTimeoutSecs Tag can only be in a "
-                   "StorageHints block.\n");
-    }
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
 
     fs_conf = (struct filesystem_configuration_s *)
         PINT_llist_head(config_s->file_systems);
@@ -705,11 +1026,8 @@ DOTCONF_CB(get_attr_cache_keywords_list)
     char *ptr = buf;
     struct filesystem_configuration_s *fs_conf = NULL;
 
-    if (config_s->configuration_context != STORAGEHINTS_CONFIG)
-    {
-        return("AttrCacheKeywords Tag can only be in a "
-                   "Filesystem block.\n");
-    }
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
 
     fs_conf = (struct filesystem_configuration_s *)
         PINT_llist_head(config_s->file_systems);
@@ -740,11 +1058,8 @@ DOTCONF_CB(get_attr_cache_size)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
 
-    if (config_s->configuration_context != STORAGEHINTS_CONFIG)
-    {
-        return("AttrCacheSize Tag can only be in a "
-                   "StorageHints block.\n");
-    }
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
 
     fs_conf = (struct filesystem_configuration_s *)
         PINT_llist_head(config_s->file_systems);
@@ -763,12 +1078,8 @@ DOTCONF_CB(get_attr_cache_size)
 DOTCONF_CB(get_attr_cache_max_num_elems)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
-
-    if (config_s->configuration_context != STORAGEHINTS_CONFIG)
-    {
-        return("AttrCacheMaxNumElems Tag can only be in a "
-                   "StorageHints block.\n");
-    }
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
 
     fs_conf = (struct filesystem_configuration_s *)
         PINT_llist_head(config_s->file_systems);
@@ -787,12 +1098,8 @@ DOTCONF_CB(get_attr_cache_max_num_elems)
 DOTCONF_CB(get_trove_sync_meta)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
-
-    if (config_s->configuration_context != STORAGEHINTS_CONFIG)
-    {
-        return("TroveSyncMeta Tag can only be in a "
-                   "StorageHints block.\n");
-    }
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
 
     fs_conf = (struct filesystem_configuration_s *)
         PINT_llist_head(config_s->file_systems);
@@ -827,12 +1134,8 @@ DOTCONF_CB(get_trove_sync_meta)
 DOTCONF_CB(get_trove_sync_data)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
-
-    if (config_s->configuration_context != STORAGEHINTS_CONFIG)
-    {
-        return("TroveSyncData Tag can only be in a "
-                   "StorageHints block.\n");
-    }
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
 
     fs_conf = (struct filesystem_configuration_s *)
         PINT_llist_head(config_s->file_systems);
@@ -859,11 +1162,9 @@ DOTCONF_CB(get_root_handle)
     struct filesystem_configuration_s *fs_conf = NULL;
     unsigned long long int tmp_var;
     int ret = -1;
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
 
-    if (config_s->configuration_context != FILESYSTEM_CONFIG)
-    {
-        return("RootHandle Tag can only be in a Filesystem block.\n");
-    }
     fs_conf = (struct filesystem_configuration_s *)
         PINT_llist_head(config_s->file_systems);
     assert(fs_conf);
@@ -878,6 +1179,8 @@ DOTCONF_CB(get_root_handle)
 
 DOTCONF_CB(get_name)
 {
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
     if (config_s->configuration_context == FILESYSTEM_CONFIG)
     {
         struct filesystem_configuration_s *fs_conf = NULL;
@@ -897,21 +1200,15 @@ DOTCONF_CB(get_name)
         config_s->dist_conf.name =
             (cmd->data.str ? strdup(cmd->data.str) : NULL);
     }
-    else
-    {
-        return "Name Tags may not appear in this context.\n";
-    }
     return NULL;
 }
 
 DOTCONF_CB(get_filesystem_collid)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
 
-    if (config_s->configuration_context != FILESYSTEM_CONFIG)
-    {
-        return("ID Tags can only be within Filesystem tags.\n");
-    }
     fs_conf = (struct filesystem_configuration_s *)
         PINT_llist_head(config_s->file_systems);
     if (fs_conf->coll_id)
@@ -925,13 +1222,10 @@ DOTCONF_CB(get_filesystem_collid)
 
 DOTCONF_CB(get_alias_list)
 {
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
     struct host_alias_s *cur_alias = NULL;
 
-    if (config_s->configuration_context != ALIASES_CONFIG)
-    {
-        return("Error in context.  Cannot have Alias "
-                   "outside of Aliases context.\n");
-    }
     assert(cmd->arg_count == 2);
 
     cur_alias = (host_alias_s *)
@@ -953,13 +1247,8 @@ DOTCONF_CB(get_range_list)
     struct filesystem_configuration_s *fs_conf = NULL;
     struct host_handle_mapping_s *handle_mapping = NULL;
     PINT_llist **handle_range_list = NULL;
-
-    if ((config_s->configuration_context != META_HANDLERANGES_CONFIG) &&
-        (config_s->configuration_context != DATA_HANDLERANGES_CONFIG))
-    {
-        return("Error in context.  Cannot have Range keyword "
-                   "outside of [Meta|Data]HandleRanges context.\n");
-    }
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
 
     fs_conf = (struct filesystem_configuration_s *)
         PINT_llist_head(config_s->file_systems);
@@ -1049,39 +1338,27 @@ DOTCONF_CB(get_range_list)
 
 DOTCONF_CB(get_param)
 {
-    if (config_s->configuration_context == DISTRIBUTION_CONFIG)
-    {
-        config_s->dist_conf.param_name =
-            (cmd->data.str ? strdup(cmd->data.str) : NULL);
-    }
-    else
-    {
-        return("Param Tag can only be in the Distribution context.\n");
-    }
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    config_s->dist_conf.param_name =
+        (cmd->data.str ? strdup(cmd->data.str) : NULL);
     return NULL;
 }
 
 DOTCONF_CB(get_value)
 {
-    if (config_s->configuration_context == DISTRIBUTION_CONFIG)
-    {
-        config_s->dist_conf.param_value = (PVFS_size)cmd->data.value;
-    }
-    else
-    {
-        return("Value Tag can only be in the Distribution context.\n");
-    }
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    config_s->dist_conf.param_value = (PVFS_size)cmd->data.value;
     return NULL;
 }
 
 DOTCONF_CB(get_default_num_dfiles)
 {
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
     struct filesystem_configuration_s *fs_conf = NULL;
 
-    if (config_s->configuration_context != FILESYSTEM_CONFIG)
-    {
-        return("DefaultNumDFiles Tags can only be within Filesystem tags.\n");
-    }
     fs_conf = (struct filesystem_configuration_s *)
         PINT_llist_head(config_s->file_systems);
 
@@ -1246,6 +1523,17 @@ static int is_populated_filesystem_configuration(
              fs->root_handle) ? 1 : 0);
 }
 
+/* For options that didn't get set in the config file, we set
+ * their default values here.
+ */
+static void set_filesystem_configuration_defaults(
+    struct filesystem_configuration_s *fs)
+{
+    assert(fs);
+
+    if(PINT_dotconf_set_defaults(
+}
+    
 static int is_root_handle_in_a_meta_range(
     struct server_configuration_s *config,
     struct filesystem_configuration_s *fs)
@@ -2080,9 +2368,35 @@ int PINT_config_is_valid_configuration(
     PINT_llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs = NULL;
     
-    if (config_s && config_s->logfile && config_s->event_logging &&
-        config_s->bmi_modules)
+    if (config_s)
     {
+        if(!config_s->bmi_modules)
+        {
+            return ret;
+        }
+
+        if(!config_s->event_logging)
+        {
+           const char * err_msg = PINT_dotconf_set_default(
+               configfile,
+               "EventLogging");
+           if(err_msg)
+           {
+               return ret;
+           }
+        }
+
+        if(!config_s->logfile)
+        {
+            const char * err_msg = PINT_dotconf_set_default(
+                configfile,
+                "Logfile");
+            if(err_msg)
+            {
+                return ret;
+            }
+        }
+           
         cur = config_s->file_systems;
         while(cur)
         {
@@ -2098,8 +2412,8 @@ int PINT_config_is_valid_configuration(
             cur = PINT_llist_next(cur);
         }
         ret = ((ret == fs_count) ? 1 : 0);
-    }
-    return ret;
+
+        return ret;
 }
 
 

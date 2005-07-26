@@ -140,7 +140,7 @@ int main(int argc, char **argv)
         tmp.handle = (PVFS_handle)i;
         tmp.fs_id = (PVFS_fs_id)(i + 1000);
 
-        PINT_acache_release_refn(tmp);
+        PINT_acache_invalidate(tmp);
     }
 
     PINT_acache_finalize();

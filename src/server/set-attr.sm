@@ -126,8 +126,8 @@ static int setattr_verify_attribs(
       value.  (zero is not a valid object type meaning that it hasn't
       been assigned yet)
     */
-    if (a_p->objtype &&
-        (a_p->objtype != s_op->req->u.setattr.attr.objtype))
+    if (a_p->objtype && req_a_p->objtype &&
+        (a_p->objtype != req_a_p->objtype))
     {
         gossip_debug(GOSSIP_SETATTR_DEBUG, "  handle %Lu is of type %d "
                      "and cannot be changed to type %d\n",
@@ -137,6 +137,14 @@ static int setattr_verify_attribs(
         /* set an error to bail out of set-attr processing */
         js_p->error_code = -PVFS_EACCES;
         return 1;
+    }
+    else if(!req_a_p->objtype)
+    {
+        /* if the requested object type is PVFS_TYPE_NONE, then the
+         * setattr is only on the common attributes, so we use the
+         * actual object type
+         */
+        req_a_p->objtype = a_p->objtype;
     }
 
     js_p->error_code = 0;
@@ -164,6 +172,7 @@ static int setattr_verify_attribs(
                 GOSSIP_SETATTR_DEBUG," *** using dfile_count of %d\n",
                 req_a_p->u.meta.dfile_count);
             a_p->u.meta.dfile_count = req_a_p->u.meta.dfile_count;
+            js_p->error_code = STATE_METAFILE;
         }
         else
         {
@@ -179,6 +188,7 @@ static int setattr_verify_attribs(
                          " *** using dist_size of %d\n",
                          req_a_p->u.meta.dist_size);
             a_p->u.meta.dist_size = req_a_p->u.meta.dist_size;
+            js_p->error_code = STATE_METAFILE;
         }
         else
         {
@@ -186,7 +196,6 @@ static int setattr_verify_attribs(
                          " *** ignoring dist_size of %d\n",
                          req_a_p->u.meta.dist_size);
         }
-        js_p->error_code = STATE_METAFILE;
     }
     else if ((req_a_p->objtype == PVFS_TYPE_DATAFILE) ||
              (a_p->objtype == PVFS_TYPE_DATAFILE))
@@ -307,14 +316,6 @@ static int setattr_write_metafile_datafile_handles_if_required(
     struct server_configuration_s *user_opts = get_server_config_struct();
 
     PINT_STATE_DEBUG("write_metafile_datafile_handles_if_needed");
-
-    /* if we don't need to write the dfiles, skip them */
-    if (!(s_op->req->u.setattr.attr.mask & PVFS_ATTR_META_DFILES))
-    {
-        gossip_debug(GOSSIP_SETATTR_DEBUG, "skipping data handle write\n");
-        js_p->error_code = 0;
-        return 1;
-    }
 
     gossip_debug(GOSSIP_SETATTR_DEBUG,
                  " request has dfile_count of %d | dspace has %d\n",
