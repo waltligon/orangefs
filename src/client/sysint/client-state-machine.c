@@ -263,7 +263,7 @@ PVFS_error PINT_client_state_machine_post(
 	    break;
 	case PVFS_SYS_GETATTR:
 	    sm_p->current_state =
-                (pvfs2_client_getattr_sm.state_machine + 1);
+                (pvfs2_client_sysint_getattr_sm.state_machine + 1);
 	    break;
 	case PVFS_SYS_SETATTR:
 	    sm_p->current_state =

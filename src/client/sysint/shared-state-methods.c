@@ -158,11 +158,7 @@ int PINT_sm_common_object_getattr_comp_fn(
 
     /*
       check if we are supposed to make sure this object is of a
-      particular type and return an error if it doesn't match.  this
-      is useful so that the client can know (in some cases) that it
-      can avoid issuing an operation to the server since it will pass
-      an error back anyway
-    */
+      particular type and return an error if it doesn't match.      */
     if (sm_p->ref_type &&
         (!(sm_p->ref_type == attr->objtype)))
     {

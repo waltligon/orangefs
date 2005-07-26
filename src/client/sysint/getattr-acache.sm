@@ -155,7 +155,20 @@ static int getattr_acache_lookup(PINT_client_sm *sm_p,
                                      PVFS_ATTR_COMMON_ALL);
                 }
 
-                if (trimmed_mask == sm_p->pinode->attr.mask)
+                /* trimmed_mask contains the list of attributes
+                 * requested for a particular object, 
+                 * while sm_p->pinode->attr.mask contains
+                 * the list of attributes cached for that object.
+                 * The cached attributes can be used if requested
+                 * is less than cached, i.e. all the attributes
+                 * we need are already cached.  So we need to do
+                 * a bitwise comparison of requested <= cached.
+                 *
+                 * xor of the two masks gives us the bits that are different,
+                 * anding that result with the requested mask gives us the
+                 * bits in the requested mask but not in the cached mask.
+                 */
+                if (!((trimmed_mask ^ sm_p->pinode->attr.mask) & trimmed_mask))
                 {
                     goto cache_hit;
                 }
@@ -182,6 +195,9 @@ static int getattr_acache_lookup(PINT_client_sm *sm_p,
             */
             if (sm_p->op != PVFS_SYS_SETATTR)
             {
+                gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: sm_p->op is: %d "
+                        "[%Lu]\n", sm_p->op, Lu(object_ref.handle));
+
                 goto cache_miss;
             }
 
@@ -212,12 +228,15 @@ static int getattr_acache_lookup(PINT_client_sm *sm_p,
           entry; note invalidate implies an internal acache release
         */
         gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: invalid acache "
-                     "miss [%Lu]\n",Lu(object_ref.handle));
+                     "miss [%Lu]\n", 
+                     Lu(object_ref.handle));
+
         sm_p->acache_hit = 0;
         PINT_acache_invalidate(object_ref);
     }
-    gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: clean acache miss [%Lu] "
-                 "\n", Lu(object_ref.handle));
+    gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: clean acache miss: "
+                " [%Lu]\n",
+                  Lu(object_ref.handle));
 
     js_p->error_code = GETATTR_ACACHE_MISS;
     return 1;

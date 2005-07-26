@@ -14,16 +14,21 @@
 #include "quicklist.h"
 #include "quickhash.h"
 
-/*
-  Using the acache 2.0 for dummies
-  ================================
-
-  PINT_acache_initialize must be the first called method, and
-  PINT_acache_finalize must be the last.  The default lifespan of a
-  valid acache entry is PINT_ACACHE_TIMEOUT_MS seconds, but you can
-  set the timeout (at millisecond granularity) at runtime by called
-  PINT_acache_set_timeout. You can also retrieve the acache timeout at
-  any time by calling PINT_acache_get_timeout.
+/**
+ * The acache API manages client side caching of attributes for handles 
+ * (datafile, metafile, symlink, directory, etc.).  Using the acache
+ * requires first calling PINT_acache_initialize.  This will initialize
+ * the cache hashtable and setup mutexes.  The associated PINT_acache_finalize
+ * function must be called for cleanup once all acache operations are done.
+ * 
+ * The default lifespan of a
+ * valid acache entry is PINT_ACACHE_TIMEOUT_MS seconds, but you can
+ * set the timeout (at millisecond granularity) at runtime by calling
+ * PINT_acache_set_timeout. 
+ * You can also retrieve the acache timeout at any time by calling 
+ * PINT_acache_get_timeout.
+ *
+ * 
 
   How to use the acache in 5 steps of less:
   -----------------------------------------
@@ -91,6 +96,8 @@ enum
     PINODE_INTERNAL_FLAG_EMPTY_LOOKUP = 8
 };
 
+char * PINT_acache_status_strings[6];
+
 typedef struct
 {
     int status;
@@ -113,12 +120,12 @@ int PINT_acache_get_timeout(void);
 void PINT_acache_set_timeout(int max_timeout_ms);
 int PINT_acache_get_size(void);
 
-PINT_pinode *PINT_acache_lookup(PVFS_object_ref refn, int *status);
+PINT_pinode *PINT_acache_lookup(
+    PVFS_object_ref refn, int *status, int *unexpired_masks);
 int PINT_acache_pinode_status(PINT_pinode *pinode);
 void PINT_acache_set_valid(PINT_pinode *pinode);
 void PINT_acache_invalidate(PVFS_object_ref refn);
 PINT_pinode *PINT_acache_pinode_alloc(void);
-void PINT_acache_release_refn(PVFS_object_ref refn);
 void PINT_acache_release(PINT_pinode *pinode);
 
 /*

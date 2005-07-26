@@ -119,9 +119,6 @@ struct PINT_client_symlink_sm
 
 struct PINT_client_getattr_sm
 {
-    uint32_t attrmask;                    /* input parameter */
-
-    PVFS_size *size_array;                /* from datafile attribs */
     PVFS_sysresp_getattr *getattr_resp_p; /* destination for output */
 };
 
@@ -222,8 +219,6 @@ struct PINT_client_io_sm
       only used when we need to zero fill beyond the end of the
       physical file size
     */
-    PVFS_size size;
-    PVFS_size *size_array;
     int continue_analysis;
     PVFS_error saved_ret;
     PVFS_error saved_error_code;
@@ -358,6 +353,44 @@ struct PINT_server_get_config_sm
     int persist_config_buffers;
 };
 
+typedef struct PINT_sm_getattr_state
+{
+    PVFS_object_ref object_ref;
+
+   /* request sys attrmask.  Some combination of
+     * PVFS_ATTR_SYS_*
+     */
+    uint32_t req_sys_attrmask;
+    
+    /*
+      Either from the acache or full getattr op, this is the resuling
+      attribute that can be used by calling state machines
+    */
+    PVFS_object_attr attr;
+
+    PVFS_ds_type ref_type;
+
+    PVFS_size *size_array;                /* from datafile attribs */
+    PVFS_size size;
+    
+} PINT_sm_getattr_state;
+
+#define PINT_SM_GETATTR_STATE_FILL(_state, _mask) \
+    do { \
+        memset(&(_state), 0, sizeof(PINT_sm_getattr_state)); \
+        (_state).req_sys_attrmask = _mask; \
+    } while(0)
+
+#define PINT_SM_GETATTR_STATE_CLEAR(_state) \
+    do { \
+        PINT_free_object_attr(&(_state).attr); \
+        if((_state).size_array) \
+        { \
+            free((_state).size_array); \
+        } \
+        memset(&(_state), 0, sizeof(PINT_sm_getattr_state)); \
+    } while(0)
+
 typedef struct PINT_client_sm
 {
     /*
@@ -387,17 +420,8 @@ typedef struct PINT_client_sm
     /* indicates that an ncache hit has been made */ 
     int ncache_hit;
 
-    /* indicates that an acache hit has been made */ 
-    int acache_hit;
-
-    /* on acache hit, the attribute here can be used */
-    PINT_pinode *pinode;
-
-    /*
-      on acache miss, an attribute is typically stored here for later
-      insertion into the acache (if possible)
-    */
-    PVFS_object_attr acache_attr;
+    /* generic getattr used with getattr sub state machines */
+    PINT_sm_getattr_state getattr;
 
     /* generic msgpair used with msgpair substate */
     PINT_sm_msgpair_state msgpair;
@@ -409,18 +433,6 @@ typedef struct PINT_client_sm
     int msgarray_count;
     PINT_sm_msgpair_state *msgarray;
     PINT_sm_msgpair_params msgarray_params;
-
-    /*
-      internal pvfs_object references; used in conjunction with the
-      sm_common state machine routines, or otherwise as scratch object
-      references during sm processing.  if the ref_type_mask is set to
-      a non-zero value when the PINT_sm_common_*_getattr_setup_msgpair
-      method is called, a -PVFS_error will be triggered if the
-      attributes received are not of one of the the types specified
-    */
-    PVFS_object_ref object_ref;
-    PVFS_object_ref parent_ref;
-    PVFS_ds_type ref_type;
 
     /* used internally by client-state-machine.c */
     PVFS_sys_op_id sys_op_id;

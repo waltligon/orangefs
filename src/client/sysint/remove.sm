@@ -60,8 +60,6 @@ do {                                                                   \
 
 nested machine pvfs2_client_remove_helper_sm(
     getattr_setup_msgpair,
-    getattr_xfer_msgpair,
-    getattr_failure,
     datafile_remove_setup_msgpair,
     datafile_remove_xfer_msgpair,
     datafile_remove_failure,
@@ -72,23 +70,16 @@ nested machine pvfs2_client_remove_helper_sm(
 {
     state getattr_setup_msgpair
     {
-        run remove_getattr_setup_msgpair;
-        success => getattr_xfer_msgpair;
-        default => getattr_failure;
+        jump pvfs2_client_getattr_sm;
+        success => getattr_analyze_results;
+        default => remove_helper_cleanup;
     }
 
-    state getattr_xfer_msgpair
+    state getattr_analyze_results
     {
-        jump pvfs2_client_getattr_acache_sm;
+        run remove_getattr_analyze_results;
         success => object_remove_setup_msgpair;
-        MSGPAIR_RETURN_SUCCESS => object_remove_setup_msgpair;
-        REMOVE_MUST_REMOVE_DATAFILES => datafile_remove_setup_msgpair;
-        default => getattr_failure;
-    }
-
-    state getattr_failure
-    {
-        run remove_getattr_failure;
+        REMOVE_MUST_REMOVE_DATAFILES => dadtafile_remove_setup_msgpair;
         default => remove_helper_cleanup;
     }
 
@@ -142,79 +133,11 @@ nested machine pvfs2_client_remove_helper_sm(
 
 %%
 
-static int remove_getattr_setup_msgpair(PINT_client_sm *sm_p,
-					job_status_s *js_p)
-{
-    int ret = -PVFS_EINVAL;
-    PINT_sm_msgpair_state *msg_p = NULL;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "remove state: getattr_setup_msgpair\n");
-
-    js_p->error_code = 0;
-
-    assert(sm_p->object_ref.fs_id != PVFS_FS_ID_NULL);
-    assert(sm_p->object_ref.handle != PVFS_HANDLE_NULL);
-
-    gossip_debug(GOSSIP_REMOVE_DEBUG, "- doing GETATTR on %Lu,%d\n",
-                 Lu(sm_p->object_ref.handle),
-                 sm_p->object_ref.fs_id);
-
-    PINT_init_msgpair(sm_p, msg_p);
-
-    PINT_SERVREQ_GETATTR_FILL(
-        msg_p->req,
-        *sm_p->cred_p,
-        sm_p->object_ref.fs_id,
-        sm_p->object_ref.handle,
-        PVFS_ATTR_COMMON_ALL|PVFS_ATTR_META_DFILES);
-
-    msg_p->fs_id = sm_p->object_ref.fs_id;
-    msg_p->handle = sm_p->object_ref.handle;
-    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
-    msg_p->comp_fn = remove_getattr_comp_fn;
-
-    ret = PINT_cached_config_map_to_server(
-        &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
-
-    if (ret)
-    {
-        gossip_err("Failed to map meta server address\n");
-        js_p->error_code = ret;
-    }
-    return 1;
-}
-
-/* remove_getattr_comp_fn()
- *
- * Called to copy data from getattr response into the remove-specific
- * portion of the PINT_client_sm structure, so we can use the data
- * after returning to this state machine.
- *
- * Return value is returned in job status, so it affects the resulting
- * state coming back from the nested state machine.
- *
- * Returns 0 for directory, REMOVE_MUST_REMOVE_DATAFILES for a
- * metafile.
- */
-static int remove_getattr_comp_fn(
-    void *v_p,
-    struct PVFS_server_resp *resp_p,
-    int index)
+static int remove_getattr_analyze_results(PINT_client_sm *sm_p,
+                                          job_status_s *js_p)
 {
     PVFS_object_attr *attr = NULL;
-    PINT_client_sm *sm_p = (PINT_client_sm *)v_p;
-    
-    assert(resp_p->op == PVFS_SERV_GETATTR);
-
-    if (resp_p->status != 0)
-    {
-        return resp_p->status;
-    }
-
-    attr = (sm_p->acache_hit ?
-            &sm_p->pinode->attr :
-            &resp_p->u.getattr.attr);
+    attr = sm_p->getattr.attr;
     assert(attr);
 
     gossip_debug(GOSSIP_REMOVE_DEBUG, "Getattr remove response "
@@ -227,21 +150,17 @@ static int remove_getattr_comp_fn(
 	    assert(attr->mask & PVFS_ATTR_META_DFILES);
 	    assert(attr->u.meta.dfile_count > 0);
 
-            if (!sm_p->acache_hit)
-            {
-                PINT_copy_object_attr(&sm_p->acache_attr,
-                                      &resp_p->u.getattr.attr);
-            }
 	    gossip_debug(
                 GOSSIP_CLIENT_DEBUG,
                 "remove_getattr_comp_fn: must remove %d datafiles\n",
                 attr->u.meta.dfile_count);
 
-	    return REMOVE_MUST_REMOVE_DATAFILES;
+	    js_p->error_code = REMOVE_MUST_REMOVE_DATAFILES;
+            break;
 	case PVFS_TYPE_DIRECTORY:
-            return 0;
 	case PVFS_TYPE_SYMLINK:
-            return 0;
+            js_p->error_code = 0;
+            break;
 	case PVFS_TYPE_DATAFILE:
 	case PVFS_TYPE_DIRDATA:
 	default:
@@ -249,7 +168,7 @@ static int remove_getattr_comp_fn(
                        "object type (%x)\n",
                        attr->objtype);
     }
-    return -PVFS_EINVAL;
+    return 1;
 }
 
 static int remove_datafile_remove_setup_msgpair(PINT_client_sm *sm_p,
@@ -269,7 +188,7 @@ static int remove_datafile_remove_setup_msgpair(PINT_client_sm *sm_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "remove state: datafile_remove_setup_msgpair\n");
 
-    attr = (sm_p->acache_hit ? &sm_p->pinode->attr : &sm_p->acache_attr);
+    attr = sm_p->getattr.attr;
     assert(attr);
 
     sm_p->msgarray = (PINT_sm_msgpair_state *)malloc(
@@ -349,13 +268,6 @@ static int remove_object_remove_setup_msgpair(PINT_client_sm *sm_p,
     return 1;    
 }
 
-static int remove_getattr_failure(PINT_client_sm *sm_p,
-				  job_status_s *js_p)
-{
-    HANDLE_REMOVE_ERROR("remove_getattr_failure");
-    return 1;
-}
-
 static int remove_datafile_remove_failure(PINT_client_sm *sm_p,
 					  job_status_s *js_p)
 {
@@ -389,16 +301,7 @@ static int remove_helper_cleanup(PINT_client_sm *sm_p,
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: helper cleanup\n");
 
-    if (sm_p->acache_hit)
-    {
-	PINT_acache_release(sm_p->pinode);
-        sm_p->acache_hit = 0;
-        sm_p->pinode = NULL;
-    }
-    else
-    {
-        PINT_free_object_attr(&sm_p->acache_attr);
-    }
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
     if (sm_p->msgarray && (sm_p->msgarray != &sm_p->msgpair))
     {
