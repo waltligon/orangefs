@@ -46,6 +46,11 @@ char * PINT_acache_status_strings[6] =
     "PINODE_INTERNAL_FLAG_EMPTY_LOOKUP"
 };
 
+#define ACACHE_TIMEVAL_IS_EXPIRED(_nowstamp, _expirestamp) \
+    (((_nowstamp.tv_sec == _expirestamp.tv_sec) && \
+      (_nowstamp.tv_usec > _expirestamp.tv_usec)) ? 1 : \
+     ((_nowstamp.tv_sec > _expirestamp.tv_sec) ? 1 : 0))
+
 static struct qhash_table *s_acache_htable = NULL;
 static gen_mutex_t *s_acache_htable_mutex = NULL;
 
@@ -63,7 +68,8 @@ static PINT_pinode *pinode_alloc(void);
 static void pinode_free(
     PINT_pinode *pinode);
 static int pinode_status(
-    PINT_pinode *pinode);
+    PINT_pinode *pinode,
+    int *unexpired_masks);
 static void pinode_update_timestamp(
     PINT_pinode **pinode);
 static void pinode_invalidate(
@@ -73,7 +79,7 @@ static inline void acache_internal_release(
 static inline PINT_pinode *acache_internal_lookup(
     PVFS_object_ref refn);
 static inline int acache_internal_status(
-    PINT_pinode *pinode);
+    PINT_pinode *pinode, int *unexpired_masks);
 #ifdef PINT_ACACHE_AUTO_CLEANUP
 static void reclaim_pinode_entries(void);
 #endif
@@ -298,11 +304,11 @@ void PINT_acache_free_pinode(PINT_pinode *pinode)
     pinode_free(pinode);
 }
 
-int PINT_acache_pinode_status(PINT_pinode *pinode)
+int PINT_acache_pinode_status(PINT_pinode *pinode, int *unexpired_masks)
 {
     assert(s_acache_initialized);
     acache_debug("PINT_acache_status called\n");
-    return pinode_status(pinode);
+    return pinode_status(pinode, unexpired_masks);
 }
 
 void PINT_acache_set_valid(PINT_pinode *pinode)
@@ -364,6 +370,27 @@ void PINT_acache_invalidate(PVFS_object_ref refn)
         PINT_acache_release(pinode);
     }
     acache_debug("PINT_acache_invalidate exiting\n");
+}
+
+int PINT_acache_insert(PVFS_object_ref refn,
+                       PVFS_object_attr *attr)
+{
+    PINT_pinode *pinode;
+    
+    pinode = PINT_acache_pinode_alloc();
+    if(!pinode)
+    {
+        return -PVFS_ENOMEM;
+    }
+
+    pinode->refn.fs_id = refn.fs_id;
+    pinode->refn.handle = refn.handle;
+    
+    PINT_copy_object_attr(&pinode->attr, attr);
+
+    PINT_acache_set_valid(pinode);
+
+    return 0;
 }
 
 /*
@@ -578,13 +605,20 @@ static inline int acache_internal_status(
                 /* all masks are expired if the handle recycle timeout
                  * is expired
                  */
-                *unexpired_masks = 0;
+                if(unexpired_masks)
+                {
+                    *unexpired_masks = 0;
+                }
                 ret = PINODE_STATUS_EXPIRED;
             }
             else
             {
-                *unexpired_masks = 
-                    (PVFS_ATTR_META_ALL & pinode->attr.mask);
+                if(unexpired_masks)
+                {
+                    *unexpired_masks = 
+                        ((PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE) 
+                         & pinode->attr.mask);
+                }
                 ret = PINODE_STATUS_VALID;
 
                 attr_expire.tv_sec =
@@ -642,7 +676,7 @@ static void reclaim_pinode_entries()
                 pinode = qlist_entry(link, PINT_pinode, link);
                 assert(pinode);
 
-                if (pinode_status(pinode) != PINODE_STATUS_VALID)
+                if (pinode_status(pinode, NULL) != PINODE_STATUS_VALID)
                 {
                     gen_mutex_unlock(s_acache_htable_mutex);
                     pinode_invalidate(pinode);

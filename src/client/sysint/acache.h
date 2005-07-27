@@ -122,11 +122,13 @@ int PINT_acache_get_size(void);
 
 PINT_pinode *PINT_acache_lookup(
     PVFS_object_ref refn, int *status, int *unexpired_masks);
-int PINT_acache_pinode_status(PINT_pinode *pinode);
+int PINT_acache_pinode_status(PINT_pinode *pinode, int *unexpired_masks);
 void PINT_acache_set_valid(PINT_pinode *pinode);
 void PINT_acache_invalidate(PVFS_object_ref refn);
 PINT_pinode *PINT_acache_pinode_alloc(void);
 void PINT_acache_release(PINT_pinode *pinode);
+int PINT_acache_insert(PVFS_object_ref refn, PVFS_object_attr *attr);
+void PINT_acache_free_pinode(PINT_pinode *pinode);
 
 /*
  * Local variables:

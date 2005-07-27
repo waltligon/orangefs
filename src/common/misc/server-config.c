@@ -62,9 +62,10 @@ static DOTCONF_CB(get_param);
 static DOTCONF_CB(get_value);
 static DOTCONF_CB(get_default_num_dfiles);
 static FUNC_ERRORHANDLER(errorhandler);
+const char *contextchecker(command_t *cmd, unsigned long mask);
 
 /* internal helper functions */
-static int is_valid_alias(char *str);
+static int is_valid_alias(PINT_llist * host_aliases, char *str);
 static int is_valid_handle_range_description(char *h_range);
 static void free_host_handle_mapping(void *ptr);
 static void free_host_alias(void *ptr);
@@ -73,6 +74,7 @@ static void copy_filesystem(
     struct filesystem_configuration_s *dest_fs,
     struct filesystem_configuration_s *src_fs);
 static int cache_config_files(
+    struct server_configuration_s *config_s,
     char *global_config_filename,
     char *server_config_filename);
 static int is_populated_filesystem_configuration(
@@ -107,9 +109,9 @@ static int is_root_handle_in_my_range(
 enum
 {
     CTX_GLOBAL           = (1 << 1),
-    CXT_DEFAULT          = (1 << 2),
+    CTX_DEFAULTS         = (1 << 2),
     CTX_ALIASES          = (1 << 3),
-    CXT_FILESYSTEM       = (1 << 4),
+    CTX_FILESYSTEM       = (1 << 4),
     CTX_METAHANDLERANGES = (1 << 5),
     CTX_DATAHANDLERANGES = (1 << 6),
     CTX_STORAGEHINTS     = (1 << 7),
@@ -328,7 +330,7 @@ static const configoption_t options[] =
      * a particular server in the Global context.
      */
     {"LogFile",ARG_STR, get_logfile,NULL,
-        CTX_DEFAULT|CTX_GLOBAL,"/tmp/pvfs2-server.log"},
+        CTX_DEFAULTS|CTX_GLOBAL,"/tmp/pvfs2-server.log"},
 
     /* The gossip interface in pvfs2 allows users to specify different
      * levels of logging for the pvfs2 server.  This option sets that level for
@@ -347,7 +349,7 @@ static const configoption_t options[] =
      * EventLogging -flow,-flowproto
      */
     {"EventLogging",ARG_LIST, get_event_logging_list,NULL,
-        CTX_DEFAULT|CTX_GLOBAL,"none"},
+        CTX_DEFAULTS|CTX_GLOBAL,"none"},
 
     /* At startup each pvfs2 server allocates space for a set number
      * of incoming requests to prevent the allocation delay at the beginning
@@ -359,7 +361,7 @@ static const configoption_t options[] =
      * in the Global context.
      */
      {"UnexpectedRequests",ARG_INT, get_unexp_req,NULL,
-         CTX_DEFAULT|CTX_GLOBAL,"50"},
+         CTX_DEFAULTS|CTX_GLOBAL,"50"},
 
      /* This specifies the frequency (in milliseconds) 
       * that performance monitor should be updated
@@ -368,7 +370,7 @@ static const configoption_t options[] =
       * Can be set in either Default or Global contexts.
       */
     {"PerfUpdateInterval",ARG_INT, get_perf_update_interval,NULL,
-        CTX_DEFAULT|CTX_GLOBAL,"1000"},
+        CTX_DEFAULTS|CTX_GLOBAL,"1000"},
 
     /* List the BMI modules to load when the server is started.  At present,
      * only tcp, infiniband, and myrinet are valid BMI modules.  
@@ -387,7 +389,7 @@ static const configoption_t options[] =
      * in either the Defaults or Global contexts.
      */
     {"BMIModules",ARG_LIST, get_bmi_module_list,NULL,
-        CTX_DEFAULT|CTX_GLOBAL,NULL},
+        CTX_DEFAULTS|CTX_GLOBAL,NULL},
     
     /* List the flow modules to load when the server is started.  At present,
      * only the flowproto_multiqueue module is supported.
@@ -395,7 +397,7 @@ static const configoption_t options[] =
      * This option can be specified in either the Defaults or Global contexts.
      */
     {"FlowModules",ARG_LIST, get_flow_module_list,NULL,
-        CTX_DEFAULT|CTX_GLOBAL,"flowproto_multiqueue"},
+        CTX_DEFAULTS|CTX_GLOBAL,"flowproto_multiqueue"},
 
     /* The TROVE storage layer has a management component that deals with
      * allocating handle values for new metafiles and datafiles.  The underlying
@@ -483,7 +485,7 @@ static const configoption_t options[] =
      * LogStamp datetime
      */
     {"LogStamp",ARG_STR, get_logstamp,NULL,
-        CTX_DEFAULT|CTX_GLOBAL,"usec"},
+        CTX_DEFAULTS|CTX_GLOBAL,"usec"},
     
     /* This option specifies a parameter name to be passed to the 
      * distribution to be used.  This option should be immediately
@@ -525,8 +527,7 @@ int PINT_parse_config(
     char *global_config_filename,
     char *server_config_filename)
 {
-    struct server_configuration_s *config_s = 
-        (struct server_configuration_s *)cmd->context;
+    struct server_configuration_s *config_s;
     configfile_t *configfile = (configfile_t *)0;
 
     if (!config_obj)
@@ -542,7 +543,8 @@ int PINT_parse_config(
     /* set some global defaults for optional parameters */
     config_s->logstamp_type = GOSSIP_LOGSTAMP_DEFAULT;
 
-    if (cache_config_files(global_config_filename, server_config_filename))
+    if (cache_config_files(
+            config_s, global_config_filename, server_config_filename))
     {
         return 1;
     }
@@ -550,7 +552,7 @@ int PINT_parse_config(
     assert(config_s->server_config_buflen && config_s->server_config_buf);
 
     /* first read in the fs.conf defaults config file */
-    config_s->configuration_context = GLOBAL_CONFIG;
+    config_s->configuration_context = CTX_GLOBAL;
     configfile = PINT_dotconf_create(config_s->fs_config_filename,
                                      options, (void *)config_s, 
                                      CASE_INSENSITIVE);
@@ -571,7 +573,7 @@ int PINT_parse_config(
     PINT_dotconf_cleanup(configfile);
 
     /* then read in the server.conf (host specific) config file */
-    config_s->configuration_context = GLOBAL_CONFIG;
+    config_s->configuration_context = CTX_GLOBAL;
     configfile = PINT_dotconf_create(config_s->server_config_filename,
                                 options, (void *)config_s, CASE_INSENSITIVE);
     if (!configfile)
@@ -615,14 +617,7 @@ int PINT_parse_config(
     */
     if (!config_s->flow_modules)
     {
-        const char * err_msg = PINT_dotconf_set_default(
-            configfile,
-            "FlowModules");
-
-        if(err_msg)
-        {
-            gossip_err("Configuration file error: %s\n", err_msg);
-        }
+        gossip_err("Configuration file error. No flow module specified\n");
 	return 1;
     }
     
@@ -630,16 +625,9 @@ int PINT_parse_config(
     */
     if (!config_s->perf_update_interval)
     {
-        const char * err_msg = PINT_dotconf_set_default(
-            configfile,
-            "PerfUpdateInterval");
-
-        if(err_msg)
-        {
-            gossip_err("Configuration file error.  "
-                       "No PerfUpdateInterval specified.\n");
-            return 1;
-        }
+        gossip_err("Configuration file error.  "
+                   "No PerfUpdateInterval specified.\n");
+        return 1;
     }
     
     return 0;
@@ -653,6 +641,7 @@ const char *contextchecker(command_t *cmd, unsigned long mask)
     {
         return "Option can't be defined in that context";
     }
+    return NULL;
 }
     
 FUNC_ERRORHANDLER(errorhandler)
@@ -720,7 +709,7 @@ DOTCONF_CB(enter_defaults_context)
 {
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
-    config_s->configuration_context = DEFAULTS_CONFIG;
+    config_s->configuration_context = CTX_DEFAULTS;
 
     return PINT_dotconf_set_defaults(
         cmd->configfile, DEFAULTS_CONFIG);
@@ -1266,7 +1255,7 @@ DOTCONF_CB(get_range_list)
 
     for(i = 0; i < cmd->arg_count; i += 2)
     {
-        if (is_valid_alias(cmd->data.list[i]))
+        if (is_valid_alias(config_s->host_aliases, cmd->data.list[i]))
         {
             i++;
             assert(cmd->data.list[i]);
@@ -1457,7 +1446,7 @@ void PINT_config_release(struct server_configuration_s *config_s)
     }
 }
 
-static int is_valid_alias(char *str)
+static int is_valid_alias(PINT_llist * host_aliases, char *str)
 {
     int ret = 0;
     PINT_llist *cur = NULL;
@@ -1465,7 +1454,7 @@ static int is_valid_alias(char *str)
 
     if (str)
     {
-        cur = config_s->host_aliases;
+        cur = host_aliases;
         while(cur)
         {
             cur_alias = PINT_llist_head(cur);
@@ -1521,17 +1510,6 @@ static int is_populated_filesystem_configuration(
     return ((fs && fs->coll_id && fs->file_system_name &&
              fs->meta_handle_ranges && fs->data_handle_ranges &&
              fs->root_handle) ? 1 : 0);
-}
-
-/* For options that didn't get set in the config file, we set
- * their default values here.
- */
-static void set_filesystem_configuration_defaults(
-    struct filesystem_configuration_s *fs)
-{
-    assert(fs);
-
-    if(PINT_dotconf_set_defaults(
 }
     
 static int is_root_handle_in_a_meta_range(
@@ -2160,6 +2138,7 @@ char *PINT_config_get_merged_handle_range_str(
   call should properly de-alloc all consumed memory.
 */
 static int cache_config_files(
+    struct server_configuration_s *config_s,
     char *global_config_filename,
     char *server_config_filename)
 {
@@ -2368,35 +2347,9 @@ int PINT_config_is_valid_configuration(
     PINT_llist *cur = NULL;
     struct filesystem_configuration_s *cur_fs = NULL;
     
-    if (config_s)
+    if (config_s && config_s->bmi_modules && config_s->event_logging &&
+        config_s->logfile)
     {
-        if(!config_s->bmi_modules)
-        {
-            return ret;
-        }
-
-        if(!config_s->event_logging)
-        {
-           const char * err_msg = PINT_dotconf_set_default(
-               configfile,
-               "EventLogging");
-           if(err_msg)
-           {
-               return ret;
-           }
-        }
-
-        if(!config_s->logfile)
-        {
-            const char * err_msg = PINT_dotconf_set_default(
-                configfile,
-                "Logfile");
-            if(err_msg)
-            {
-                return ret;
-            }
-        }
-           
         cur = config_s->file_systems;
         while(cur)
         {
@@ -2412,8 +2365,8 @@ int PINT_config_is_valid_configuration(
             cur = PINT_llist_next(cur);
         }
         ret = ((ret == fs_count) ? 1 : 0);
-
-        return ret;
+    }
+    return ret;
 }
 
 
@@ -2811,7 +2764,7 @@ int PINT_config_get_trove_sync_meta(
 
     if (config)
     {
-        fs_conf = PINT_config_find_fs_id(config_s, fs_id);
+        fs_conf = PINT_config_find_fs_id(config, fs_id);
     }
     return (fs_conf ? fs_conf->trove_sync_meta : TROVE_SYNC);
 }
@@ -2828,7 +2781,7 @@ int PINT_config_get_trove_sync_data(
 
     if (config)
     {
-        fs_conf = PINT_config_find_fs_id(config_s, fs_id);
+        fs_conf = PINT_config_find_fs_id(config, fs_id);
     }
     return (fs_conf ? fs_conf->trove_sync_data : TROVE_SYNC);
 }

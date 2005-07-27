@@ -807,10 +807,6 @@ void PINT_sys_release(PVFS_sys_op_id op_id)
             sm_p->cred_p = NULL;
         }
 
-        if (sm_p->acache_hit && sm_p->pinode)
-        {
-            PINT_acache_release(sm_p->pinode);
-        }
         free(sm_p);
     }
 }

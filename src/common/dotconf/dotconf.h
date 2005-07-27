@@ -241,14 +241,14 @@ extern "C"
     configfile_t * configfile,
     command_t * cmd);
 
+    const char *PINT_dotconf_set_defaults(
+    configfile_t * configfile,
+    unsigned long context);
+
 /* ------ PINT_dotconf_find_command() - iterate through all registered options trying to match ------- */
     configoption_t *PINT_dotconf_find_command(
     configfile_t * configfile,
     const char *command);
-
-    const char *PINT_dotconf_set_default(
-    configfile_t * configfile,
-    unsigned long context);
 
 /* ------ PINT_dotconf_read_arg() - read one argument from the line handling quoting and escaping ---- */
 /*

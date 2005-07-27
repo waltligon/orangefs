@@ -25,6 +25,7 @@
 #include "acache.h"
 #include "id-generator.h"
 #include "msgpairarray.h"
+#include "pint-util.h"
 
 /* skip everything except #includes if __SM_CHECK_DEP is already defined; this
  * allows us to get the dependencies right for msgpairarray.sm which relies
@@ -360,7 +361,7 @@ typedef struct PINT_sm_getattr_state
    /* request sys attrmask.  Some combination of
      * PVFS_ATTR_SYS_*
      */
-    uint32_t req_sys_attrmask;
+    uint32_t req_attrmask;
     
     /*
       Either from the acache or full getattr op, this is the resuling
@@ -375,10 +376,13 @@ typedef struct PINT_sm_getattr_state
     
 } PINT_sm_getattr_state;
 
-#define PINT_SM_GETATTR_STATE_FILL(_state, _mask) \
+#define PINT_SM_GETATTR_STATE_FILL(_state, _objref, _mask, _reftype) \
     do { \
         memset(&(_state), 0, sizeof(PINT_sm_getattr_state)); \
-        (_state).req_sys_attrmask = _mask; \
+        (_state).object_ref.fs_id = (_objref).fs_id; \
+        (_state).object_ref.handle = (_objref).handle; \
+        (_state).req_attrmask = _mask; \
+        (_state).ref_type = _reftype; \
     } while(0)
 
 #define PINT_SM_GETATTR_STATE_CLEAR(_state) \
@@ -433,6 +437,9 @@ typedef struct PINT_client_sm
     int msgarray_count;
     PINT_sm_msgpair_state *msgarray;
     PINT_sm_msgpair_params msgarray_params;
+
+    PVFS_object_ref object_ref;
+    PVFS_object_ref parent_ref;
 
     /* used internally by client-state-machine.c */
     PVFS_sys_op_id sys_op_id;
@@ -635,6 +642,7 @@ extern struct PINT_state_machine_s pvfs2_client_remove_sm;
 extern struct PINT_state_machine_s pvfs2_client_create_sm;
 extern struct PINT_state_machine_s pvfs2_client_mkdir_sm;
 extern struct PINT_state_machine_s pvfs2_client_symlink_sm;
+extern struct PINT_state_machine_s pvfs2_client_sysint_getattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_getattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_setattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_io_sm;

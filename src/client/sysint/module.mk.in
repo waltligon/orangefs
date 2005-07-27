@@ -8,7 +8,6 @@ CSRC := \
 	$(DIR)/pint-sysint-utils.c \
 	$(DIR)/getparent.c \
 	$(DIR)/client-state-machine.c \
-	$(DIR)/shared-state-methods.c \
 	$(DIR)/mgmt-misc.c \
 	$(DIR)/sys-dist.c \
 	$(DIR)/sys-statfs.c \
@@ -16,7 +15,6 @@ CSRC := \
 	$(DIR)/fs-add.c
 
 CLIENT_SMCGEN := \
-	$(DIR)/getattr-acache.c \
         $(DIR)/remove.c \
 	$(DIR)/lookup-ncache.c \
 	$(DIR)/sys-getattr.c \

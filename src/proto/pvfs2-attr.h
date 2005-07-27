@@ -39,6 +39,10 @@
 #define PVFS_ATTR_SYMLNK_TARGET            (1 << 18)
 #define PVFS_ATTR_SYMLNK_ALL PVFS_ATTR_SYMLNK_TARGET
 
+/* internal attribute masks for directory objects */
+#define PVFS_ATTR_DIR_DIRENT_COUNT         (1 << 19)
+#define PVFS_ATTR_DIR_ALL PVFS_ATTR_DIR_DIRENT_COUNT
+
 /* attributes specific to metadata objects */
 struct PVFS_metafile_attr_s
 {

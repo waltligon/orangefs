@@ -24,7 +24,6 @@
 #include "pint-servreq.h"
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
-#include "shared-state-methods.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -57,10 +56,6 @@ static int lookup_segment_lookup_failure(
     PINT_client_sm *sm_p, job_status_s *js_p);
 static int lookup_segment_verify_attr_present(
     PINT_client_sm *sm_p, job_status_s *js_p);
-static int lookup_segment_getattr_setup_msgpair(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int lookup_segment_getattr_failure(
-    PINT_client_sm *sm_p, job_status_s *js_p);
 static int lookup_segment_check_attr_type(
     PINT_client_sm *sm_p, job_status_s *js_p);
 static int lookup_segment_handle_relative_link(
@@ -73,8 +68,6 @@ static int lookup_cleanup(
     PINT_client_sm *sm_p, job_status_s *js_p);
 
 static int lookup_segment_lookup_comp_fn(
-    void *v_p, struct PVFS_server_resp *resp_p, int index);
-static int lookup_segment_getattr_comp_fn(
     void *v_p, struct PVFS_server_resp *resp_p, int index);
 
 /* helper function prototypes */
@@ -95,9 +88,7 @@ machine pvfs2_client_lookup_sm(
     lookup_segment_lookup_xfer_msgpair,
     lookup_segment_lookup_failure,
     lookup_segment_verify_attr_present,
-    lookup_segment_getattr_setup_msgpair,
-    lookup_segment_getattr_xfer_msgpair,
-    lookup_segment_getattr_failure,
+    lookup_segment_getattr,
     lookup_segment_check_attr_type,
     lookup_segment_handle_relative_link,
     lookup_segment_handle_absolute_link,
@@ -136,26 +127,13 @@ machine pvfs2_client_lookup_sm(
     {
 	run lookup_segment_verify_attr_present;
         success => lookup_segment_check_attr_type;
-        default => lookup_segment_getattr_setup_msgpair;
+        default => lookup_segment_getattr;
     }
 
-    state lookup_segment_getattr_setup_msgpair
+    state lookup_segment_getattr
     {
-        run lookup_segment_getattr_setup_msgpair;
-        success => lookup_segment_getattr_xfer_msgpair;
-        default => lookup_segment_getattr_failure;
-    }
-
-    state lookup_segment_getattr_xfer_msgpair
-    {
-	jump pvfs2_client_getattr_acache_sm;
+        jump pvfs2_client_getattr_sm;
         success => lookup_segment_check_attr_type;
-        default => lookup_segment_getattr_failure;
-    }
-
-    state lookup_segment_getattr_failure
-    {
-        run lookup_segment_getattr_failure;
         default => lookup_cleanup;
     }
 
@@ -727,6 +705,12 @@ static int lookup_segment_verify_attr_present(PINT_client_sm *sm_p,
         gossip_debug(GOSSIP_LOOKUP_DEBUG, " -- NO attrs for %s\n",
                      cur_seg->seg_name);
 
+        PINT_SM_GETATTR_STATE_FILL(
+            sm_p->getattr,  
+            cur_seg->seg_resolved_refn,
+            (PVFS_ATTR_COMMON_ALL | PVFS_ATTR_SYMLNK_ALL),
+            PVFS_TYPE_NONE);
+
         js_p->error_code = 1;
     }
     else
@@ -737,68 +721,6 @@ static int lookup_segment_verify_attr_present(PINT_client_sm *sm_p,
         /* otherwise, continue to next state */
         js_p->error_code = 0;
     }
-    return 1;
-}
-
-static int lookup_segment_getattr_setup_msgpair(PINT_client_sm *sm_p,
-                                                job_status_s *js_p)
-{
-    int ret = -PVFS_EINVAL;
-    PINT_sm_msgpair_state *msg_p = NULL;
-    PINT_client_lookup_sm_segment *cur_seg = NULL;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup state: "
-                 "lookup_segment_getattr_setup_msgpair\n");
-
-    js_p->error_code = 0;
-
-    /*
-      do a getattr on the resolved handle of the current segment in
-      the current context
-    */
-    cur_seg = GET_CURRENT_SEGMENT();
-    assert(cur_seg);
-
-    PINT_init_msgpair(sm_p, msg_p);
-
-    PINT_SERVREQ_GETATTR_FILL(
-        msg_p->req,
-        *sm_p->cred_p,
-        cur_seg->seg_resolved_refn.fs_id,
-        cur_seg->seg_resolved_refn.handle,
-        (PVFS_ATTR_COMMON_ALL | PVFS_ATTR_SYMLNK_ALL));
-
-    gossip_debug(
-        GOSSIP_LOOKUP_DEBUG, "Doing GETATTR on resolved handle %Lu\n",
-        Lu(cur_seg->seg_resolved_refn.handle));
-
-    msg_p->fs_id = cur_seg->seg_resolved_refn.fs_id;
-    msg_p->handle = cur_seg->seg_resolved_refn.handle;
-    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
-    msg_p->comp_fn = lookup_segment_getattr_comp_fn;
-
-    ret = PINT_cached_config_map_to_server(
-        &msg_p->svr_addr, msg_p->handle, msg_p->fs_id);
-
-    if (ret)
-    {
-        gossip_err("Failed to map meta server address\n");
-        js_p->error_code = ret;
-    }
-    return 1;
-}
-
-static int lookup_segment_getattr_failure(PINT_client_sm *sm_p,
-                                          job_status_s *js_p)
-{
-    char buf[64] = {0};
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "lookup state: lookup_segment_getattr_failure\n");
-
-    PVFS_strerror_r(js_p->error_code, buf, 64);
-    gossip_debug(GOSSIP_LOOKUP_DEBUG,
-                 "lookup_segment_getattr_failure %s\n", buf);
     return 1;
 }
 
@@ -813,6 +735,10 @@ static int lookup_segment_check_attr_type(PINT_client_sm *sm_p,
 
     cur_seg = GET_CURRENT_SEGMENT();
     assert(cur_seg);
+
+    PINT_free_object_attr(&(cur_seg->seg_attr));
+    PINT_copy_object_attr(&(cur_seg->seg_attr),
+                          &(sm_p->getattr.attr));
 
     cur_ctx = GET_CURRENT_CONTEXT();
     assert(cur_ctx);
@@ -1074,6 +1000,8 @@ static int lookup_cleanup(PINT_client_sm *sm_p,
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup state: lookup_cleanup\n");
 
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+
     if (js_p->error_code == LOOKUP_NCACHE_HIT_FASTPATH)
     {
         gossip_debug(GOSSIP_LOOKUP_DEBUG, "Lookup fast path exiting\n");
@@ -1198,39 +1126,6 @@ static int lookup_segment_lookup_comp_fn(
         sm_p->u.lookup.current_context].current_segment =
         current_seg_index + (i - 1);
 
-    return 0;
-}
-
-static int lookup_segment_getattr_comp_fn(
-    void *v_p,
-    struct PVFS_server_resp *resp_p,
-    int index)
-{
-    PINT_client_sm *sm_p = (PINT_client_sm *)v_p;
-    PINT_client_lookup_sm_segment *cur_seg = NULL;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup_segment_getattr_comp_fn\n");
-
-    assert(resp_p->op == PVFS_SERV_GETATTR);
-
-    if (resp_p->status != 0)
-    {
-        gossip_debug(GOSSIP_LOOKUP_DEBUG, " getattr failed with "
-                     "code %d\n", resp_p->status);
-        return resp_p->status;
-    }
-
-    cur_seg = GET_CURRENT_SEGMENT();
-    assert(cur_seg);
-
-    assert(index == 0);
-
-    gossip_debug(GOSSIP_LOOKUP_DEBUG, " getattr ok on %s\n",
-                 cur_seg->seg_name);
-
-    PINT_free_object_attr(&(cur_seg->seg_attr));
-    PINT_copy_object_attr(&(cur_seg->seg_attr),
-                          &(resp_p->u.getattr.attr));
     return 0;
 }
 

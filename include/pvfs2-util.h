@@ -93,11 +93,30 @@ inline uint32_t PVFS_util_object_to_sys_attr_mask(
 inline int PVFS2_translate_mode(int mode);
 
 #ifndef __KERNEL__
-inline PVFS_time PVFS_util_get_current_time(void);
+inline static PVFS_time PVFS_util_get_current_time(void)
+{
+    struct timeval t = {0,0};
+    PVFS_time current_time = 0;
 
-inline PVFS_time PVFS_util_mktime_version(PVFS_time time);
+    gettimeofday(&t, NULL);
+    current_time = (PVFS_time)t.tv_sec;
+    return current_time;
+}
 
-inline PVFS_time PVFS_util_mkversion_time(PVFS_time version);
+inline static PVFS_time PVFS_util_mktime_version(PVFS_time time)
+{
+    struct timeval t = {0,0};
+    PVFS_time version = (time << 32);
+
+    gettimeofday(&t, NULL);
+    version |= (PVFS_time)t.tv_usec;
+    return version;
+}
+
+inline static PVFS_time PVFS_util_mkversion_time(PVFS_time version)
+{
+    return (PVFS_time)(version >> 32);
+}
 #endif /* __KERNEL__ */
 
 #endif /* __PVFS2_UTIL_H */

@@ -19,6 +19,8 @@
 #include "pvfs2-util.h"
 #include "pvfs2-debug.h"
 #include "gossip.h"
+#include "pvfs2-attr.h"
+#include "pvfs2-types-debug.h"
 #include "str-utils.h"
 #include "gen-locks.h"
 
@@ -1447,33 +1449,6 @@ inline int PVFS2_translate_mode(int mode)
     }
     return ret;
 }
-
-#ifndef __KERNEL__
-inline PVFS_time PVFS_util_get_current_time(void)
-{
-    struct timeval t = {0,0};
-    PVFS_time current_time = 0;
-
-    gettimeofday(&t, NULL);
-    current_time = (PVFS_time)t.tv_sec;
-    return current_time;
-}
-
-inline PVFS_time PVFS_util_mktime_version(PVFS_time time)
-{
-    struct timeval t = {0,0};
-    PVFS_time version = (time << 32);
-
-    gettimeofday(&t, NULL);
-    version |= (PVFS_time)t.tv_usec;
-    return version;
-}
-
-inline PVFS_time PVFS_util_mkversion_time(PVFS_time version)
-{
-    return (PVFS_time)(version >> 32);
-}
-#endif /* __KERNEL__ */
 
 /*
  * Pull out the wire encoding specified as a mount option in the tab

@@ -22,8 +22,8 @@
 #include "pint-servreq.h"
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
-#include "shared-state-methods.h"
 #include "ncache.h"
+#include "pint-util.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -43,9 +43,7 @@ static int readdir_msg_comp_fn(
 
 machine pvfs2_client_readdir_sm(
     init,
-    readdir_getattr_setup_msgpair,
-    readdir_getattr_xfer_msgpair,
-    readdir_getattr_failure,
+    readdir_getattr,
     readdir_msg_setup_msgpair,
     readdir_msg_xfer_msgpair,
     readdir_msg_failure,
@@ -54,26 +52,13 @@ machine pvfs2_client_readdir_sm(
     state init
     {
         run readdir_init;
-        default => readdir_getattr_setup_msgpair;
+        default => readdir_getattr;
     }
 
-    state readdir_getattr_setup_msgpair
+    state readdir_getattr
     {
-        run PINT_sm_common_object_getattr_setup_msgpair;
-        success => readdir_getattr_xfer_msgpair;
-        default => readdir_getattr_failure;
-    }
-
-    state readdir_getattr_xfer_msgpair
-    {
-        jump pvfs2_client_getattr_acache_sm;
+        jump pvfs2_client_getattr_sm;
         success => readdir_msg_setup_msgpair;
-        default => readdir_getattr_failure;
-    }
-
-    state readdir_getattr_failure
-    {
-        run PINT_sm_common_object_getattr_failure;
         default => cleanup;
     }
 
@@ -155,7 +140,6 @@ PVFS_error PVFS_isys_readdir(
     sm_p->u.readdir.dirent_limit = pvfs_dirent_incount;
     sm_p->u.readdir.readdir_resp = resp;
     sm_p->object_ref = ref;
-    sm_p->ref_type = PVFS_TYPE_DIRECTORY;
 
     gossip_debug(GOSSIP_READDIR_DEBUG, "Doing readdir on handle "
                  "%Lu on fs %d\n", Lu(ref.handle), ref.fs_id);
@@ -211,6 +195,12 @@ static int readdir_init(PINT_client_sm *sm_p,
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG, "readdir state: init\n");
 
+    PINT_SM_GETATTR_STATE_FILL(
+        sm_p->getattr,
+        sm_p->object_ref,
+        PVFS_ATTR_DIR_ALL,
+        PVFS_TYPE_DIRECTORY);
+    
     assert(js_p->error_code == 0);
 
     return 1;
@@ -341,6 +331,8 @@ static int readdir_cleanup(PINT_client_sm *sm_p,
                            job_status_s *js_p)
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG, "readdir state: cleanup\n");
+
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
     sm_p->error_code = js_p->error_code;
 

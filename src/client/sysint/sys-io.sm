@@ -15,7 +15,6 @@
 
 #include "client-state-machine.h"
 #include "state-machine-fns.h"
-#include "shared-state-methods.h"
 #include "pvfs2-types-debug.h"
 #include "pvfs2-debug.h"
 #include "job.h"
@@ -302,7 +301,6 @@ PVFS_error PVFS_isys_io(
     sm_p->u.io.saved_ret = 0;
     sm_p->u.io.saved_error_code = 0;
     sm_p->object_ref = ref;
-    sm_p->ref_type = PVFS_TYPE_METAFILE;
 
     return PINT_client_state_machine_post(
         sm_p, PVFS_SYS_IO, op_id, user_ptr);
@@ -362,7 +360,9 @@ static int io_init(PINT_client_sm *sm_p,
 
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
-        PVFS_ATTR_META_ALL);
+        sm_p->object_ref,
+        PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE, 
+        PVFS_TYPE_METAFILE);
        
     if (js_p->error_code == IO_RETRY)
     {
@@ -401,7 +401,7 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
 
     js_p->error_code = 0;
 
-    attr = sm_p->getattr.attr;
+    attr = &sm_p->getattr.attr;
     assert(attr);
 
     switch(attr->objtype)
@@ -1040,11 +1040,23 @@ static int io_datafile_complete_operations(PINT_client_sm *sm_p,
 static int io_analyze_results(PINT_client_sm *sm_p,
                               job_status_s *js_p)
 {
+    PINT_pinode *pinode;
     int ret = -PVFS_EINVAL, i = 0, may_need_zero_fill = 0;
     PVFS_size tmp_size = 0;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: "
                  "io_analyze_results\n", sm_p);
+
+    /* FIXME: right now we invalidate size from attribute in acache.  
+     * When zero-fill stuff gets figured out we should remove this
+     * and update the pinode->size
+     */
+    pinode = PINT_acache_lookup(sm_p->object_ref, NULL, NULL);
+    if(pinode)
+    {
+        pinode->attr.mask &= ~PVFS_ATTR_DATA_SIZE;
+        PINT_acache_release(pinode);
+    }
 
 #ifdef ZERO_HOLE_STUBS
     if (sm_p->u.io.continue_analysis)
@@ -1165,7 +1177,10 @@ static int io_analyze_results(PINT_client_sm *sm_p,
                  * the getattr sm with the SYS_SIZE mask
                  */
                 PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
-                PINT_SM_GETATTR_STATE_FILL(sm_p->getattr, PVFS_ATTR_SYS_SIZE); 
+                PINT_SM_GETATTR_STATE_FILL(sm_p->getattr, 
+                                           sm_p->object_ref,
+                                           PVFS_ATTR_DATA_SIZE,
+                                           PVFS_TYPE_NONE); 
 
                 js_p->error_code = IO_GET_DATAFILE_SIZE;
                 return 1;
@@ -1237,7 +1252,6 @@ static int io_analyze_size_results(
     PINT_client_sm *sm_p, job_status_s *js_p)
 {
 #ifdef ZERO_HOLE_STUBS
-    int ret = -PVFS_EINVAL;
     PVFS_size zero_fill_size = 0;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: io_analyze"
@@ -1539,7 +1553,7 @@ static inline int process_context_recv_and_post_flow(
         return ret;
     }
 
-    attr = sm_p->getattr.attr;
+    attr = &sm_p->getattr.attr;
     assert(attr);
 
     ret = build_context_flow(sm_p, cur_ctx, attr, resp);
@@ -1791,7 +1805,7 @@ static inline int check_for_zero_fill_on_read(PINT_client_sm *sm_p)
         {        
             gossip_debug(GOSSIP_IO_DEBUG, "[1] Checking for read past EOF "
                          "(size=%Ld, total_size=%Ld)\n",
-                         Ld(sm_p->u.io.size), Ld(sm_p->u.io.total_size));
+                         Ld(sm_p->getattr.size), Ld(sm_p->u.io.total_size));
 
             PINT_free_request_state(mrs);
             PINT_free_request_state(frs);
@@ -1851,11 +1865,11 @@ static inline int check_for_zero_fill_on_read(PINT_client_sm *sm_p)
                 zero_fill_size = PINT_REQUEST_TOTAL_BYTES(
                     sm_p->u.io.mem_req) - sm_p->u.io.total_size;
             }
-            else if (sm_p->u.io.size &&
+            else if (sm_p->getattr.size &&
                      (cur_ctx->flow_desc.file_req_offset +
-                      zero_fill_size) > sm_p->u.io.size)
+                      zero_fill_size) > sm_p->getattr.size)
             {
-                zero_fill_size = sm_p->u.io.size -
+                zero_fill_size = sm_p->getattr.size -
                     cur_ctx->flow_desc.file_req_offset;
             }
             else if (total_ctx_size !=
@@ -1865,7 +1879,7 @@ static inline int check_for_zero_fill_on_read(PINT_client_sm *sm_p)
             }
             gossip_debug(GOSSIP_IO_DEBUG, "zero_fill_size is %Ld | "
                          "sm_p->u.io.size is %Ld\n", Ld(zero_fill_size),
-                         Ld(sm_p->u.io.size));
+                         Ld(sm_p->getattr.size));
 
             if (zero_fill_size > -1)
             {
@@ -1893,7 +1907,7 @@ static inline int check_for_zero_fill_on_read(PINT_client_sm *sm_p)
             gossip_debug(
                 GOSSIP_IO_DEBUG, "[2] Checking for read past EOF "
                 "(size=%Ld, total_size=%Ld)\n",
-                Ld(sm_p->u.io.size), Ld(sm_p->u.io.total_size));
+                Ld(sm_p->getattr.size), Ld(sm_p->u.io.total_size));
 
             PINT_free_request_state(mrs);
             PINT_free_request_state(frs);

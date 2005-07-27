@@ -53,6 +53,8 @@ enum
 /* state function prototypes for getattr nested machine */
 static int getattr_acache_lookup(
     PINT_client_sm *sm_p, job_status_s *js_p);
+static int getattr_acache_insert(PINT_client_sm *sm_p,
+                                 job_status_s *js_p);
 static int getattr_object_getattr_setup_msgpair(
     PINT_client_sm *sm_p, job_status_s *js_p);
 static int getattr_object_getattr_failure(
@@ -213,8 +215,11 @@ PVFS_error PVFS_isys_getattr(
     
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
-        attrmask);
-        
+        ref,
+        PVFS_util_sys_to_object_attr_mask(
+            attrmask), 
+        PVFS_TYPE_NONE);
+
     return PINT_client_state_machine_post(
         sm_p, PVFS_SYS_GETATTR, op_id, user_ptr);
 }
@@ -266,7 +271,7 @@ PVFS_error PVFS_sys_getattr(
  * @param sm_p This must be a valid client state machine handle, with
  * the @ref getattr field containing valid values for the
  * fsid/handle of the desired attribute (in object_ref), as well as the 
- * requested attribute mask (req_sys_attrmask).
+ * requested attribute mask (req_attrmask).
  *
  * @param js_p Contains the return code to be set by this function in the
  * @ref error_code field.  This determines the next state action to jump
@@ -275,7 +280,7 @@ PVFS_error PVFS_sys_getattr(
  * <ul>
  * <li><b>GETATTR_ACACHE_MISS</b> - The requested attribute was not found
  * in the attribute cache, or the attribute was found, but the attribute's
- * mask did not include values required by the requested mask (req_sys_attrmask).
+ * mask did not include values required by the requested mask (req_attrmask).
  * </li>
  * <li><b>GETATTR_NEED_DATAFILE_SIZES</b> - The requested attribute was found
  * in the attribute cache and the mask was sufficient, but the data file size
@@ -293,6 +298,7 @@ static int getattr_acache_lookup(PINT_client_sm *sm_p,
 {
     uint32_t trimmed_mask = 0;
     int status = 0;
+    int unexpired_masks, missing_attrs;
     PVFS_object_ref object_ref;
     PINT_pinode * pinode;
 
@@ -320,8 +326,7 @@ static int getattr_acache_lookup(PINT_client_sm *sm_p,
              * attr mask values for comparison with the cached
              * entry
              */
-            trimmed_mask = PVFS_util_sys_to_object_attr_mask(
-                sm_p->getattr.req_sys_attrmask);
+            trimmed_mask = sm_p->getattr.req_attrmask;
             
             /*
                the trimmed mask is used for making sure that we're only
@@ -343,7 +348,7 @@ static int getattr_acache_lookup(PINT_client_sm *sm_p,
             }
             else if (pinode->attr.objtype == PVFS_TYPE_DIRECTORY)
             {
-                trimmed_mask &= (PVFS_ATTR_COMMON_ALL)
+                trimmed_mask &= (PVFS_ATTR_COMMON_ALL | PVFS_ATTR_DIR_ALL);
             }
 
             /* trimmed_mask contains the list of attributes
@@ -404,6 +409,8 @@ static int getattr_acache_lookup(PINT_client_sm *sm_p,
                 sm_p->getattr.size = pinode->size;
             }
 
+            PINT_acache_release(pinode);
+
             gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: acache hit "
                          "[%Lu]\n", Lu(object_ref.handle));
             return 1;
@@ -419,7 +426,7 @@ static int getattr_acache_lookup(PINT_client_sm *sm_p,
                      "miss [%Lu]\n", 
                      Lu(object_ref.handle));
 
-        PINT_acache_invalidate(pinode);
+        PINT_acache_release(pinode);
     }
     gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: clean acache miss: "
                 " [%Lu]\n",
@@ -434,7 +441,6 @@ static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
                                                 job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL;
-    uint32_t attrmask;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) "
                  "getattr_setup_msgpair\n", sm_p);
@@ -452,9 +458,8 @@ static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
         *sm_p->cred_p,
         sm_p->object_ref.fs_id,
         sm_p->object_ref.handle,
-        PVFS_util_sys_to_object_attr_mask(
-            sm_p->getattr.req_sys_attrmask));
-
+        sm_p->getattr.req_attrmask);
+    
     sm_p->msgpair.fs_id = sm_p->object_ref.fs_id;
     sm_p->msgpair.handle = sm_p->object_ref.handle;
     sm_p->msgpair.retry_flag = PVFS_MSGPAIR_RETRY;
@@ -523,6 +528,7 @@ static int getattr_object_getattr_comp_fn(
     if(sm_p->getattr.ref_type &&
        sm_p->getattr.ref_type != attr->objtype)
     {
+        int ret;
         gossip_debug(GOSSIP_CLIENT_DEBUG, "*** "
                      "getattr_comp_fn: Object type mismatch.\n Possibly "
                      "saving network roundtrip by returning an error\n");
@@ -575,7 +581,7 @@ static int getattr_object_getattr_comp_fn(
                  * going to have to do a full data file fetch. 
                  * (that's expensive)
                  */
-                if (sm_p->getattr.sys_req_attrmask & PVFS_ATTR_SYS_SIZE)
+                if (sm_p->getattr.req_attrmask & PVFS_ATTR_DATA_SIZE)
                 {
                     /* if caller asked for the size, then we need
                      * to jump to the datafile_getattr state, which
@@ -719,7 +725,7 @@ static int getattr_acache_insert(PINT_client_sm *sm_p,
     PVFS_object_attr *attr = NULL;
     int release_required = 1;
     PINT_pinode *pinode = PINT_acache_lookup(
-        sm_p->object_ref, NULL);
+        sm_p->object_ref, NULL, NULL);
     if (!pinode)
     {
         pinode = PINT_acache_pinode_alloc();
@@ -732,14 +738,14 @@ static int getattr_acache_insert(PINT_client_sm *sm_p,
         release_required = 0;
     }
 
-    attr = sm_p->getattr.attr;
+    attr = &sm_p->getattr.attr;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "trying to add object "
                  "reference to acache (%s present)\n",
                  (release_required ? "already" : "not"));
     pinode->refn = sm_p->getattr.object_ref;
 
-    if (sm_p->getattr.req_sys_attrmask & PVFS_ATTR_SYS_SIZE)
+    if (sm_p->getattr.req_attrmask & PVFS_ATTR_DATA_SIZE)
     {
         /* compute size as requested */
         PINT_dist *dist = NULL;
@@ -765,7 +771,7 @@ static int getattr_acache_insert(PINT_client_sm *sm_p,
            we properly copy out all required fields in the
            deep copy below to the pinode object
            */
-        sm_p->attr.mask |= PVFS_ATTR_DATA_SIZE;
+        sm_p->getattr.attr.mask |= PVFS_ATTR_DATA_SIZE;
     }
 
     PINT_copy_object_attr(&pinode->attr, &sm_p->getattr.attr);
@@ -783,9 +789,6 @@ static int getattr_acache_insert(PINT_client_sm *sm_p,
 static int getattr_cleanup(PINT_client_sm *sm_p,
                            job_status_s *js_p)
 {
-    int ret = 0;
-    uint32_t amask;
-
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "(%p) getattr state: getattr_cleanup\n", sm_p);
 
@@ -809,10 +812,10 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
     return 1;
 }
 
-static int set_sys_response(PINT_client_sm *sm_p,
-                            job_status_s *js_p)
+static int getattr_set_sys_response(PINT_client_sm *sm_p,
+                                    job_status_s *js_p)
 {
-    PVFS_sysresp_getattr * sysresp = NULL: 
+    PVFS_sysresp_getattr * sysresp = NULL;
     PVFS_object_attr *attr = NULL;
 
     if(js_p->error_code != 0)
@@ -840,12 +843,12 @@ static int set_sys_response(PINT_client_sm *sm_p,
      * must free it.
      */
     if(attr->objtype == PVFS_TYPE_SYMLINK &&
-       attr->mask & PVFS_ATTR_SYMLINK_TARGET)
+       attr->mask & PVFS_ATTR_SYMLNK_TARGET)
     {
         assert(attr->u.sym.target_path_len > 0);
         assert(attr->u.sym.target_path);
 
-        sysresp->attr.link_target = strdup(attr.u.sym.target_path);
+        sysresp->attr.link_target = strdup(attr->u.sym.target_path);
         if(!sysresp->attr.link_target)
         {
            js_p->error_code = -PVFS_ENOMEM;
@@ -855,7 +858,7 @@ static int set_sys_response(PINT_client_sm *sm_p,
 
     /* special case for when users ask for dfile count */
     if(attr->objtype == PVFS_TYPE_METAFILE &&
-       sm_p->getattr.req_sys_mask & PVFS_ATTR_SYS_DFILE_COUNT)
+       sm_p->getattr.req_attrmask & PVFS_ATTR_SYS_DFILE_COUNT)
     {
         sysresp->attr.dfile_count = attr->u.meta.dfile_count;
     }
@@ -878,14 +881,14 @@ static int set_sys_response(PINT_client_sm *sm_p,
         sysresp->attr.mask = PVFS_util_object_to_sys_attr_mask(
             sm_p->getattr.attr.mask);
 
-       if (sm_p->getattr.req_sys_attrmask & PVFS_ATTR_SYS_SIZE)
+       if (sm_p->getattr.req_attrmask & PVFS_ATTR_DATA_SIZE)
         {
             sysresp->attr.size = sm_p->getattr.size;
             sysresp->attr.mask |= PVFS_ATTR_SYS_SIZE;
         }
 
         /* if this is a symlink, add the link target */
-        if (sm_p->u.getattr.req_sys_attrmask & PVFS_ATTR_SYS_LNK_TARGET)
+        if (sm_p->getattr.req_attrmask & PVFS_ATTR_SYMLNK_TARGET)
         {
             sysresp->attr.mask |= PVFS_ATTR_SYS_LNK_TARGET;
         }
@@ -897,8 +900,7 @@ static int set_sys_response(PINT_client_sm *sm_p,
                0, sizeof(PVFS_sysresp_getattr));
     }
 
-    PINT_free_object_attr(attr);
-
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
     return 0;
 }
 

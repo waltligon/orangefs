@@ -23,7 +23,6 @@
 #include "pint-servreq.h"
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
-#include "shared-state-methods.h"
 #include "pint-util.h"
 
 extern job_context_id pint_client_sm_context;
@@ -208,7 +207,6 @@ static int setattr_msg_setup_msgpair(PINT_client_sm *sm_p,
                                      job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL;
-    PVFS_object_attr *attr = NULL;
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_time orig_mtime = sm_p->u.setattr.sys_attr.mtime;
 
@@ -278,12 +276,12 @@ static int setattr_cleanup(PINT_client_sm *sm_p,
                            job_status_s *js_p)
 {
     int status;
-    PINT_pinode pinode = NULL;
+    PINT_pinode *pinode = NULL;
     gossip_debug(GOSSIP_CLIENT_DEBUG, "setattr state: cleanup\n");
 
     sm_p->error_code = js_p->error_code;
 
-    pinode = PINT_acache_lookup(sm_p->object_ref, &status);
+    pinode = PINT_acache_lookup(sm_p->object_ref, &status, NULL);
     if(pinode)
     {
         if(sm_p->u.setattr.sys_attr.mask & PVFS_ATTR_SYS_UID)

@@ -76,10 +76,19 @@ static DOTCONF_CB(
     dotconf_cb_includepath);	/* internal 'IncludePath' */
 
 static configoption_t dotconf_options[] = {
-    {"Include", ARG_STR, dotconf_cb_include, NULL, CTX_ALL},
-    {"IncludePath", ARG_STR, dotconf_cb_includepath, NULL, CTX_ALL},
+    {"Include", ARG_STR, dotconf_cb_include, NULL, CTX_ALL, NULL},
+    {"IncludePath", ARG_STR, dotconf_cb_includepath, NULL, CTX_ALL, NULL},
     LAST_CONTEXT_OPTION
 };
+
+static void PINT_dotconf_set_command(
+    configfile_t * configfile,
+    const configoption_t * option,
+    char *args,
+    command_t * cmd);
+
+static void PINT_dotconf_free_command(
+    command_t * command);
 
 static void skip_whitespace(
     char **cp,
@@ -400,9 +409,9 @@ const char *PINT_dotconf_set_defaults(
     configfile_t * configfile,
     unsigned long context)
 {
-    command_t * cmd;
     const char *error = 0;
     const configoption_t *option;
+    command_t command;
     int done = 0;
     int opt_idx = 0;
     int mod = 0;
@@ -418,7 +427,8 @@ const char *PINT_dotconf_set_defaults(
             {
                 /* set up the command structure (contextchecker wants this) */
                 PINT_dotconf_set_command(configfile, option, 
-                                         option->default_value, &command);
+                                         (char *)option->default_value, 
+                                         &command);
                 if(command.error)
                 {
                     error = "Parse error.\n";
@@ -437,9 +447,6 @@ const char *PINT_dotconf_set_defaults(
     }
 
     return error;
-}
-
-
 }
 
 char *PINT_dotconf_read_arg(
@@ -572,7 +579,7 @@ configoption_t *PINT_dotconf_find_command(
     return option;
 }
 
-void PINT_dotconf_set_command(
+static void PINT_dotconf_set_command(
     configfile_t * configfile,
     const configoption_t * option,
     char *args,
@@ -706,7 +713,7 @@ void PINT_dotconf_set_command(
     }
 }
 
-void PINT_dotconf_free_command(
+static void PINT_dotconf_free_command(
     command_t * command)
 {
     int i;
