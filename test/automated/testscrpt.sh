@@ -106,7 +106,7 @@ setup_pvfs2() {
 	# do we need to use our own pvfs2tab file?  If we will mount pvfs2, we
 	# can fall back to /etc/fstab
 	grep -q 'pvfs2-nightly' /etc/fstab
-	if [ ( $? -ne 0 ) && ( $do_vfs -eq 0 ) ] ; then
+	if [ $? -ne 0 && $do_vfs -eq 0 ] ; then
 		export PVFS2TAB_FILE=${PVFS2_DEST}/pvfs2tab
 	fi	
 }
