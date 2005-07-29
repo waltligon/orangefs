@@ -2,8 +2,7 @@
 PVFS2 Release ChangeLog
 -----------------------
 
-
-pvfs2-1.2.0pre1
+pvfs2-1.2.0
 ===============
 - make server better able to handle bogus file names (David Metheny)
 - better casts for ppc64
