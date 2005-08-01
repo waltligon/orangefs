@@ -1572,7 +1572,7 @@ int BMI_cancel(bmi_op_id_t id,
     int ret = -1;
 
     gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
-                 "%s: cancel context_id %Lu\n", __func__, Lu(id));
+                 "%s: cancel id %Lu\n", __func__, Lu(id));
 
     target_op = id_gen_safe_lookup(id);
     assert(target_op->op_id == id);
