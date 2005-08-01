@@ -237,7 +237,7 @@ int PINT_decode(void* input_buffer,
 	    "expecting version %d.\n", (int)proto_ver_recved,
 	    PVFS_RELEASE_NR);
 	gossip_err("   Please verify your PVFS2 installation and make sure "
-	"that the version is\n   consistent.\n");
+	"that the version is consistent.\n");
     }
 
     return(-PVFS_EPROTONOSUPPORT);
