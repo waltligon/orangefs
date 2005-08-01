@@ -619,8 +619,8 @@ do {                                                               \
  *  this allows us to know if we've reached the error_exit code path
  *  from here or elsewhere
  *
- *  \note used in namei.c:lookup(), file.c:pvfs2_inode_read(), and
- *  file.c:pvfs2_file_write()
+ *  \note used in namei.c:lookup(), file.c:pvfs2_inode_read[v](), and
+ *  file.c:pvfs2_file_write[v]()
  */
 #define service_error_exit_op_with_timeout_retry(op,meth,num,e,intr)\
 do {                                                                \

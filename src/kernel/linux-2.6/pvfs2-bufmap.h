@@ -37,9 +37,21 @@ int pvfs_bufmap_copy_from_user(
     void __user *from,
     int size);
 
+int pvfs_bufmap_copy_iovec_from_user(
+    int buffer_index,
+    const struct iovec *iov,
+    unsigned long nr_segs,
+    int size);
+
 int pvfs_bufmap_copy_to_user(
     void __user *to,
     int buffer_index,
+    int size);
+
+int pvfs_bufmap_copy_to_user_iovec(
+    int buffer_index,
+    const struct iovec *iov,
+    unsigned long nr_segs,
     int size);
 
 int pvfs_bufmap_copy_to_kernel(
