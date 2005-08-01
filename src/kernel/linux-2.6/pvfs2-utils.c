@@ -389,7 +389,7 @@ int pvfs2_inode_getattr(struct inode *inode)
       copy_attr_failure:
         pvfs2_print("Getattr on handle %Lu, fsid %d\n  (inode ct = %d) "
                     "returned %d (error_exit = %d)\n",
-                    pvfs2_inode->refn.handle, pvfs2_inode->refn.fs_id,
+                    Lu(pvfs2_inode->refn.handle), pvfs2_inode->refn.fs_id,
                     (int)atomic_read(&inode->i_count), ret, error_exit);
 
         op_release(new_op);
@@ -500,7 +500,7 @@ static inline struct inode *pvfs2_create_file(
     ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
 
     pvfs2_print("Create Got PVFS2 handle %Lu on fsid %d (ret=%d)\n",
-                new_op->downcall.resp.create.refn.handle,
+                Lu(new_op->downcall.resp.create.refn.handle),
                 new_op->downcall.resp.create.refn.fs_id, ret);
 
     if (ret > -1)
@@ -589,7 +589,7 @@ static inline struct inode *pvfs2_create_dir(
         get_interruptible_flag(dir));
 
     pvfs2_print("Mkdir Got PVFS2 handle %Lu on fsid %d\n",
-                new_op->downcall.resp.mkdir.refn.handle,
+                Lu(new_op->downcall.resp.mkdir.refn.handle),
                 new_op->downcall.resp.mkdir.refn.fs_id);
 
     if (new_op->downcall.status > -1)
@@ -682,7 +682,7 @@ static inline struct inode *pvfs2_create_symlink(
     ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
 
     pvfs2_print("Symlink Got PVFS2 handle %Lu on fsid %d (ret=%d)\n",
-                new_op->downcall.resp.sym.refn.handle,
+                Lu(new_op->downcall.resp.sym.refn.handle),
                 new_op->downcall.resp.sym.refn.fs_id, ret);
 
     if (ret > -1)
@@ -785,7 +785,7 @@ int pvfs2_remove_entry(
     {
         pvfs2_print("pvfs2_remove_entry: called on %s\n  (inode %d): "
                     "Parent is %Lu | fs_id %d\n", dentry->d_name.name,
-                    (int)inode->i_ino, parent->refn.handle,
+                    (int)inode->i_ino, Lu(parent->refn.handle),
                     parent->refn.fs_id);
 
         new_op = op_alloc();
@@ -846,7 +846,7 @@ int pvfs2_truncate_inode(
 
     pvfs2_print("pvfs2: pvfs2_truncate_inode %d: "
                 "Handle is %Lu | fs_id %d | size is %lu\n",
-                (int)inode->i_ino, pvfs2_inode->refn.handle,
+                (int)inode->i_ino, Lu(pvfs2_inode->refn.handle),
                 pvfs2_inode->refn.fs_id, (unsigned long)size);
 
     new_op = op_alloc();

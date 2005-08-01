@@ -61,7 +61,7 @@ static int pvfs2_readdir(
                 "retry=%d, v=%Lu)\n", dentry->d_name.name, (int)pos,
                 (int)pvfs2_inode->readdir_token_adjustment,
                 (int)pvfs2_inode->num_readdir_retries,
-                pvfs2_inode->directory_version);
+                Lu(pvfs2_inode->directory_version));
 
     switch (pos)
     {

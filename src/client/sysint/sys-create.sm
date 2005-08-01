@@ -1125,8 +1125,9 @@ static PINT_dist* get_default_distribution(PVFS_fs_id fs_id)
                         gossip_err("Error setting distribution parameter\n"
                                    "  dist: %s\n"
                                    "  param name: %s\n"
-                                   "  param value: %lld\n",
-                                   dist->dist_name, param->name, param->value);
+                                   "  param value: %Ld\n",
+                                   dist->dist_name, param->name,
+                                   Ld(param->value));
                     }
                 }
                 iter = PINT_llist_next(iter);
