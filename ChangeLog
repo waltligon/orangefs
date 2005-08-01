@@ -4,6 +4,7 @@ PVFS2 Release ChangeLog
 
 pvfs2-1.2.1-pre1
 ===============
+- Murali Vilayannur contributed extened attribute support to the VFS interface
 
 pvfs2-1.2.0
 ===============
