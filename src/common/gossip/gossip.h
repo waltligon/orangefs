@@ -91,19 +91,19 @@ do {                                                      \
 /* do file and line number printouts w/ the GNU preprocessor */
 #define gossip_ldebug(mask, format, f...)                  \
 do {                                                       \
-    gossip_debug(mask, "%s: " format, __func__, ##f); \
+    gossip_debug(mask, "%s: " format, __func__ , ##f); \
 } while(0)
 
 #ifdef GOSSIP_ENABLE_BACKTRACE
 #define gossip_lerr(format, f...)                  \
 do {                                               \
-    gossip_err("%s line %d: " format, __FILE__, __LINE__, ##f); \
+    gossip_err("%s line %d: " format, __FILE__ , __LINE__ , ##f); \
     gossip_backtrace();                            \
 } while(0)
 #else
 #define gossip_lerr(format, f...)                  \
 do {                                               \
-    gossip_err("%s line %d: " format, __FILE__, __LINE__, ##f); \
+    gossip_err("%s line %d: " format, __FILE__ , __LINE__ , ##f); \
 } while(0)
 #endif
 #else /* ! __GNUC__ */

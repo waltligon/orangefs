@@ -180,9 +180,10 @@ static int del_eattr_comp_fn(
 {
     int j = 0;
     int ret = 0;
+    PINT_client_sm *sm_p = (PINT_client_sm *)v_p;
+
     gossip_debug(GOSSIP_CLIENT_DEBUG,
 		"del_eattr completion fn: del_eattr_comp_fn\n");
-    PINT_client_sm *sm_p = (PINT_client_sm *)v_p;
 
     /* only posted one msgpair */
     assert(i==0);
