@@ -45,6 +45,7 @@ csrc = \
     pvfs2-mod.c \
     pvfs2-bufmap.c \
     symlink.c \
+    xattr.c \
     waitqueue.c
 
 hsrc = \

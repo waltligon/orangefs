@@ -466,6 +466,7 @@ PVFS_error PVFS_isys_seteattr(
     PVFS_credentials *credentials,
     PVFS_ds_keyval *key_p,
     PVFS_ds_keyval *val_p,
+    int32_t flags,
     PVFS_sys_op_id *op_id,
     void *user_ptr);
 
@@ -473,7 +474,8 @@ PVFS_error PVFS_sys_seteattr(
     PVFS_object_ref ref,
     PVFS_credentials *credentials,
     PVFS_ds_keyval *key_p,
-    PVFS_ds_keyval *val_p);
+    PVFS_ds_keyval *val_p,
+    int32_t flags);
 
 PVFS_error PVFS_isys_seteattr_list(
     PVFS_object_ref ref,
@@ -481,6 +483,7 @@ PVFS_error PVFS_isys_seteattr_list(
     int32_t nkey,
     PVFS_ds_keyval *key_array,
     PVFS_ds_keyval *val_array,
+    int32_t flags,
     PVFS_sys_op_id *op_id,
     void *user_ptr);
 
@@ -489,7 +492,8 @@ PVFS_error PVFS_sys_seteattr_list(
     PVFS_credentials *credentials,
     int32_t nkey,
     PVFS_ds_keyval *key_array,
-    PVFS_ds_keyval *val_array);
+    PVFS_ds_keyval *val_array,
+    int32_t flags);
 
 PVFS_error PVFS_isys_deleattr(
     PVFS_object_ref ref,

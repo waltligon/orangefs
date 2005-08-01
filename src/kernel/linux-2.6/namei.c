@@ -475,7 +475,11 @@ struct inode_operations pvfs2_dir_inode_operations =
     mknod : pvfs2_mknod,
     rename : pvfs2_rename,
     setattr : pvfs2_setattr,
-    revalidate : pvfs2_revalidate
+    revalidate : pvfs2_revalidate,
+    getxattr: pvfs2_getxattr,
+    setxattr: pvfs2_setxattr,
+/*    listxattr: pvfs2_listxattr,*/
+    removexattr: pvfs2_removexattr,
 #else
     .create = pvfs2_create,
     .lookup = pvfs2_lookup,
@@ -487,7 +491,11 @@ struct inode_operations pvfs2_dir_inode_operations =
     .mknod = pvfs2_mknod,
     .rename = pvfs2_rename,
     .setattr = pvfs2_setattr,
-    .getattr = pvfs2_getattr
+    .getattr = pvfs2_getattr,
+    .getxattr = pvfs2_getxattr,
+    .setxattr = pvfs2_setxattr,
+/*    .listxattr = pvfs2_listxattr,*/
+    .removexattr = pvfs2_removexattr,
 #endif
 };
 

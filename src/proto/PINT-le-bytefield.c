@@ -396,7 +396,7 @@ static int lebf_encode_resp(
     /* every response has these fields */
     p = &target_msg->ptr_current;
     encode_PVFS_server_resp(p, resp);
-    
+
 #define CASE(tag,var) \
     case tag: encode_PVFS_servresp_##var(p,&resp->u.var); break
 

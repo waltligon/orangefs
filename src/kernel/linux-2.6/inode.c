@@ -366,11 +366,19 @@ struct inode_operations pvfs2_file_inode_operations =
 #ifdef PVFS2_LINUX_KERNEL_2_4
     truncate : pvfs2_truncate,
     setattr : pvfs2_setattr,
-    revalidate : pvfs2_revalidate
+    revalidate : pvfs2_revalidate,
+    setxattr : pvfs2_setxattr, 
+    getxattr : pvfs2_getxattr,
+/*    listxattr : pvfs2_listxattr, */
+    removexattr: pvfs2_removexattr, 
 #else
     .truncate = pvfs2_truncate,
     .setattr = pvfs2_setattr,
-    .getattr = pvfs2_getattr
+    .getattr = pvfs2_getattr,
+    .setxattr = pvfs2_setxattr,
+    .getxattr = pvfs2_getxattr,
+/*    .listxattr = pvfs2_listxattr,*/
+    .removexattr = pvfs2_removexattr,
 #endif
 };
 

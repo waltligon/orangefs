@@ -192,11 +192,20 @@ static int geteattr_check_resp(PINT_server_op *s_op, job_status_s *js_p)
     gossip_debug(GOSSIP_GETEATTR_DEBUG,"geteattr returning %d values\n",
             s_op->resp.u.geteattr.nkey);
     /* put the returned read buffer size in buffer_sz */
+    gossip_debug(GOSSIP_GETEATTR_DEBUG,"status %d error_code %d nkeys %d\n",
+            s_op->resp.status, js_p->error_code, s_op->resp.u.geteattr.nkey);
     /* it is the only thing returned across the wire */
     for (k = 0; k < s_op->resp.u.geteattr.nkey; k++)
     {
-        s_op->resp.u.geteattr.val[k].buffer_sz =
-            s_op->resp.u.geteattr.val[k].read_sz;
+        if (js_p->error_code == 0)
+        {
+            s_op->resp.u.geteattr.val[k].buffer_sz =
+                s_op->resp.u.geteattr.val[k].read_sz;
+        }
+        /* in case of any errors, we initialize it to 0 */
+        else {
+            s_op->resp.u.geteattr.val[k].buffer_sz = 0;
+        }
     }
     return 1;
 }

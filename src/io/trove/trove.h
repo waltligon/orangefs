@@ -52,7 +52,8 @@ enum
     TROVE_SYNC = 1,
     TROVE_ATOMIC = 2,
     TROVE_FORCE_REQUESTED_HANDLE = 4,
-    TROVE_NOOVERWRITE = 8 /* keyval_write and keyval_write_list */
+    TROVE_NOOVERWRITE = 8, /* keyval_write and keyval_write_list */
+    TROVE_ONLYOVERWRITE = 16, /* keyval_write and keyval_write_list */
 };
 
 /* get/setinfo option flags */

@@ -363,6 +363,8 @@ struct PINT_client_geteattr_sm
 struct PINT_client_seteattr_sm
 {
     int32_t nkey;
+    int32_t flags; /* flags specify if attrs should not exist (XATTR_CREATE) or
+                      if they should exist (XATTR_REPLACE) or neither */
     PVFS_ds_keyval *key_array;
     PVFS_ds_keyval *val_array;
 };

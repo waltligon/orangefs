@@ -165,7 +165,7 @@ int pvfs2_seteattr (int nkey, PVFS_ds_keyval *key, PVFS_ds_keyval *val,
                   (char *)val[k].buffer);
       }
   }
-  ret = PVFS_sys_seteattr_list(resp_lookup.ref, &credentials, nkey, key, val);
+  ret = PVFS_sys_seteattr_list(resp_lookup.ref, &credentials, nkey, key, val, 0);
   if (ret < 0)
   {
       PVFS_perror("seteattr_list failed with errcode", ret);

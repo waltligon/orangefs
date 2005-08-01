@@ -261,10 +261,47 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
     data.data = op_p->u.k_write.val.buffer;
     data.size = op_p->u.k_write.val.buffer_sz;
 
-    if (op_p->flags & TROVE_NOOVERWRITE)
+    /* If TROVE_NOOVERWRITE flag was set, make sure that we don't create the
+     * key if it exists */
+    if ((op_p->flags & TROVE_NOOVERWRITE))
+    {
         dbflags |= DB_NOOVERWRITE;
+    }
+    /* if TROVE_ONLYOVERWRITE flag was set, make sure that the key exists
+     * before overwriting it */
+    else if ((op_p->flags & TROVE_ONLYOVERWRITE))
+    {
+        DBT tmpdata;
+
+        memset(&tmpdata, 0, sizeof(tmpdata));
+        tmpdata.ulen = op_p->u.k_write.val.buffer_sz;
+        tmpdata.data = (void *) malloc(tmpdata.ulen);
+        tmpdata.flags = DB_DBT_USERMEM;
+        ret = tmp_ref.db_p->get(tmp_ref.db_p, NULL, &key, &tmpdata, 0);
+        /* A failed get implies that keys possibly did not exist */
+        if (ret != 0)
+        {
+            /* The only case where we are ok is val buffer
+            *  is too small */
+            if (tmpdata.ulen < tmpdata.size)
+            {
+                ret = 0;
+            }
+            else
+            {
+                ret = -dbpf_db_error_to_trove_error(ret);
+            }
+        }
+        free(tmpdata.data);
+        /* If there was an error, we need to return right here */
+        if (ret != 0)
+        {
+            goto return_error;
+        }
+    }
 
     ret = tmp_ref.db_p->put(tmp_ref.db_p, NULL, &key, &data, dbflags);
+    /* Either a put error or key already exists */
     if (ret != 0)
     {
         tmp_ref.db_p->err(tmp_ref.db_p, ret, "DB->put");
@@ -898,7 +935,8 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
         got_db = 1;
     }
 
-    if (op_p->flags & TROVE_NOOVERWRITE)
+    if ((op_p->flags & TROVE_NOOVERWRITE) 
+            || (op_p->flags & TROVE_ONLYOVERWRITE))
     {
         /* read each key to see if it is present */
         for (k = 0; k < op_p->u.k_write_list.count; k++)
@@ -911,10 +949,10 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
             ret = tmp_ref.db_p->get(tmp_ref.db_p, NULL, &key, &data, 0);
             if (ret != 0)
             {
-                if (ret == DB_NOTFOUND)
+                if ((op_p->flags & TROVE_NOOVERWRITE) &&  (ret == DB_NOTFOUND))
                 {
                     /* this means key is not in DB, which is what we
-                     * want - so go to the next key
+                     * want for the no-overwrite case - so go to the next key
                      */
                     continue;
                 }

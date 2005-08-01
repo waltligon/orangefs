@@ -256,6 +256,10 @@ typedef struct PVFS_ds_keyval_s
 #define PVFS_ATTR_SYS_ALL_SETABLE \
 (PVFS_ATTR_COMMON_ALL-PVFS_ATTR_COMMON_TYPE)
 
+/* Extended attribute flags */
+#define PVFS_XATTR_CREATE  0x1
+#define PVFS_XATTR_REPLACE 0x2
+
 /** statfs and misc. server statistic information. */
 typedef struct
 {
@@ -312,6 +316,23 @@ endecode_fields_2(
 #define PVFS_NAME_MAX            256
 /* max len of individual path element */
 #define PVFS_SEGMENT_MAX         128
+
+/* max extended attribute name len as imposed by the VFS and exploited for the
+ * upcall request types */
+#define PVFS_MAX_XATTR_NAMELEN   256 /* Not the same as XATTR_NAME_MAX defined
+                                        by <linux/xattr.h> */
+#define PVFS_MAX_XATTR_VALUELEN  256 /* Not the same as XATTR_SIZE_MAX defined
+                                        by <linux/xattr.h> */ 
+#define PVFS_MAX_XATTR_LISTLEN   10    /* Not the same as XATTR_LIST_MAX
+                                          defined by <linux/xattr.h> */
+
+/* This structure is used by the VFS-client interaction alone */
+typedef struct {
+    char key[PVFS_MAX_XATTR_NAMELEN];
+    int  key_sz;
+    char val[PVFS_MAX_XATTR_VALUELEN];
+    int  val_sz;
+} PVFS_keyval_pair;
 
 /** Directory entry contents. */
 typedef struct

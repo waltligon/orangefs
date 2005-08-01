@@ -1211,18 +1211,20 @@ struct PVFS_servreq_seteattr
 {
     PVFS_handle handle;    /* handle of target object */
     PVFS_fs_id fs_id;      /* file system */
-    PVFS_fs_id nkey;       /* number of keys and vals */
+    int32_t    flags;      /* flags */
+    int32_t    nkey;       /* number of keys and vals */
     PVFS_ds_keyval *key;    /* attribute key */
     PVFS_ds_keyval *val;    /* attribute value */
 };
-endecode_fields_3aa_struct(
+endecode_fields_4aa_struct(
     PVFS_servreq_seteattr,
     PVFS_handle, handle,
     PVFS_fs_id, fs_id,
+    int32_t, flags,
     skip4,,
     int32_t, nkey,
     PVFS_ds_keyval, key,
-    PVFS_ds_keyval, val)
+    PVFS_ds_keyval, val);
 #define extra_size_PVFS_servreq_seteattr \
     ((PVFS_REQ_LIMIT_KEY_LEN + PVFS_REQ_LIMIT_VAL_LEN) \
         * PVFS_REQ_LIMIT_KEYVAL_LIST)
@@ -1231,6 +1233,7 @@ endecode_fields_3aa_struct(
                                   __creds,       \
                                   __fsid,        \
                                   __handle,      \
+                                  __flags,       \
                                   __nkey,        \
                                   __key_array,   \
                                   __val_array)   \
@@ -1240,6 +1243,7 @@ do {                                             \
     (__req).credentials = (__creds);             \
     (__req).u.seteattr.fs_id = (__fsid);    \
     (__req).u.seteattr.handle = (__handle); \
+    (__req).u.seteattr.flags = (__flags);   \
     (__req).u.seteattr.nkey = (__nkey);     \
     (__req).u.seteattr.key = (__key_array); \
     (__req).u.seteattr.val = (__val_array); \
