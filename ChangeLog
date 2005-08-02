@@ -7,6 +7,7 @@ pvfs2-1.2.1-pre1
 - Murali Vilayannur contributed extened attribute support to the VFS interface
 - Murali and Dean Hildebrand also worked on implementing readv and writev in
   the VFS interface
+- Phil Carns contributed logging improvements to pvfs2-client
 
 pvfs2-1.2.0
 ===============

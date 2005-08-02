@@ -76,10 +76,13 @@
 #include "pint-util.h"
 #endif
 
+#define DEFAULT_LOGFILE "/tmp/pvfs2-client.log"
+
 typedef struct
 {
     /* client side attribute cache timeout; 0 is effectively disabled */
     int acache_timeout;
+    char* logfile;
 } options_t;
 
 /*
@@ -2265,6 +2268,13 @@ int main(int argc, char **argv)
         return ret;
     }
 
+    ret = gossip_enable_file(s_opts.logfile, "w");
+    if(ret < 0)
+    {
+        fprintf(stderr, "Error opening logfile: %s\n", s_opts.logfile);
+        return(ret);
+    }
+
     start_time = time(NULL);
     local_time = localtime(&start_time);
 
@@ -2391,12 +2401,13 @@ static void parse_args(int argc, char **argv, options_t *opts)
     {
         {"help",0,0,0},
         {"acache-timeout",1,0,0},
+        {"logfile",1,0,0},
         {0,0,0,0}
     };
 
     assert(opts);
 
-    while((ret = getopt_long(argc, argv, "ha:",
+    while((ret = getopt_long(argc, argv, "ha:L:",
                              long_opts, &option_index)) != -1)
     {
         switch(ret)
@@ -2412,11 +2423,19 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 {
                     goto do_acache;
                 }
+                else if (strcmp("logfile", cur_option) == 0)
+                {
+                    goto do_logfile;
+                }
                 break;
             case 'h':
           do_help:
                 print_help(argv[0]);
                 exit(0);
+            case 'L':
+          do_logfile:
+                opts->logfile = optarg;
+                break;
             case 'a':
           do_acache:
                 opts->acache_timeout = atoi(optarg);
@@ -2433,6 +2452,10 @@ static void parse_args(int argc, char **argv, options_t *opts)
                         "Try --help for information.\n");
                 exit(1);
         }
+    }
+    if (!opts->logfile)
+    {
+        opts->logfile = DEFAULT_LOGFILE;
     }
 }
 
