@@ -1399,7 +1399,7 @@ const char* BMI_tcp_addr_rev_lookup_unexpected(method_addr_p map)
  
     return(peerent->h_name);
 #else
-    return ("UNKNOWN")
+    return ("UNKNOWN");
 #endif
 }
 
