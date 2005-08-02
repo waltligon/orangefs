@@ -16,9 +16,14 @@
  */
 
 #include <stdint.h>
+#include <sys/types.h>
+#include <pwd.h>
+#include <grp.h>
 #include "pvfs2-debug.h"
 #include "pvfs2-storage.h"
 #include "job.h"
+#include "bmi.h"
+#include "src/server/request-scheduler/request-scheduler.h"
 #include "trove.h"
 #include "gossip.h"
 #include "PINT-reqproto-encode.h"
@@ -357,6 +362,42 @@ typedef struct PINT_server_op
 #define PINT_STATE_DEBUG(fn_name)				  \
     gossip_debug(GOSSIP_SERVER_DEBUG, "(%p) %s state: %s\n", s_op,\
     PINT_map_server_op_to_string(s_op->op), fn_name);
+
+/* PINT_ACCESS_DEBUG()
+ *
+ * macro for consistent printing of access records
+ *
+ * no return value
+ */
+#define PINT_ACCESS_DEBUG(__s_op, __mask, format, f...)                     \
+do {                                                                        \
+    PVFS_handle __handle;                                                   \
+    PVFS_fs_id __fsid;                                                      \
+    int __flag;                                                             \
+    static char __pint_access_buffer[GOSSIP_BUF_SIZE];                      \
+    struct passwd* __pw;                                                    \
+    struct group* __gr;                                                     \
+                                                                            \
+    if ((gossip_debug_on) &&                                                \
+        (gossip_debug_mask & __mask) &&                                     \
+        (gossip_facility))                                                  \
+    {                                                                       \
+        PINT_req_sched_target_handle(__s_op->req, 0, &__handle,             \
+            &__fsid, &__flag);                                              \
+        __pw = getpwuid(__s_op->req->credentials.uid);                      \
+        __gr = getgrgid(__s_op->req->credentials.gid);                      \
+        snprintf(__pint_access_buffer, GOSSIP_BUF_SIZE,                     \
+            "%s.%s@%s H=%Lu S=%p: %s: %s",                                  \
+            ((__pw) ? __pw->pw_name : "UNKNOWN"),                           \
+            ((__gr) ? __gr->gr_name : "UNKNOWN"),                           \
+            BMI_addr_rev_lookup_unexpected(__s_op->addr),                   \
+            Lu(__handle),                                                   \
+            __s_op,                                                         \
+            PINT_map_server_op_to_string(__s_op->req->op),                  \
+            format);                                                        \
+        __gossip_debug(__mask, 'A', __pint_access_buffer, ##f);             \
+    }                                                                       \
+} while(0);
 
 /* server operation state machines */
 extern struct PINT_state_machine_s pvfs2_get_config_sm;

@@ -153,9 +153,14 @@ static int final_response_send_resp(
  */
 static int final_response_cleanup(PINT_server_op *s_op, job_status_s *js_p)
 {
+    char status_string[64] = {0};
+
     gossip_debug(GOSSIP_SERVER_DEBUG, 
                  "(%p) %s (FR sm) state: cleanup\n",
                  s_op, PINT_map_server_op_to_string(s_op->req->op));
+
+    PVFS_strerror_r(s_op->resp.status, status_string, 64);
+    PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "finish (%s)\n", status_string);
 
     PINT_encode_release(&s_op->encoded, PINT_ENCODE_RESP);
 

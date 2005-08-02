@@ -39,11 +39,6 @@ enum
     GOSSIP_SYSLOG = 4
 };
 
-enum
-{
-    GOSSIP_BUF_SIZE = 1024
-};
-
 /** determines which logging facility to use.  Default to stderr to begin
  *  with.
  */
@@ -64,10 +59,10 @@ static enum gossip_logstamp internal_logstamp = GOSSIP_LOGSTAMP_DEFAULT;
 static int gossip_disable_stderr(void);
 static int gossip_disable_file(void);
 
-static int gossip_debug_fp(FILE *fp, const char prefix, const char *format, va_list ap, enum
+static int gossip_debug_fp(FILE *fp, char prefix, const char *format, va_list ap, enum
 gossip_logstamp ts);
 static int gossip_debug_syslog(
-    const char prefix,
+    char prefix,
     const char *format,
     va_list ap);
 static int gossip_err_syslog(
@@ -251,6 +246,7 @@ int gossip_set_logstamp(
  */
 int __gossip_debug_stub(
     uint64_t mask,
+    char prefix,
     const char *format,
     ...)
 {
@@ -268,6 +264,7 @@ int __gossip_debug_stub(
  */
 int __gossip_debug(
     uint64_t mask,
+    char prefix,
     const char *format,
     ...)
 {
@@ -286,19 +283,25 @@ int __gossip_debug(
     }
 #endif
 
+    if(prefix == '?')
+    {
+        /* automatic prefix assignment */
+        prefix = 'D';
+    }
+
     /* rip out the variable arguments */
     va_start(ap, format);
 
     switch (gossip_facility)
     {
     case GOSSIP_STDERR:
-        ret = gossip_debug_fp(stderr, 'D', format, ap, internal_logstamp);
+        ret = gossip_debug_fp(stderr, prefix, format, ap, internal_logstamp);
         break;
     case GOSSIP_FILE:
-        ret = gossip_debug_fp(internal_log_file, 'D', format, ap, internal_logstamp);
+        ret = gossip_debug_fp(internal_log_file, prefix, format, ap, internal_logstamp);
         break;
     case GOSSIP_SYSLOG:
-        ret = gossip_debug_syslog('D', format, ap);
+        ret = gossip_debug_syslog(prefix, format, ap);
         break;
     default:
         break;
@@ -385,7 +388,7 @@ void gossip_backtrace(void)
  * returns 0 on success, -errno on failure
  */
 static int gossip_debug_syslog(
-    const char prefix,
+    char prefix,
     const char *format,
     va_list ap)
 {
@@ -416,7 +419,7 @@ static int gossip_debug_syslog(
  *
  * returns 0 on success, -errno on failure
  */
-static int gossip_debug_fp(FILE *fp, const char prefix, 
+static int gossip_debug_fp(FILE *fp, char prefix, 
     const char *format, va_list ap, enum gossip_logstamp ts)
 {
     char buffer[GOSSIP_BUF_SIZE], *bptr = buffer;

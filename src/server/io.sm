@@ -297,7 +297,12 @@ static int io_release(PINT_server_op *s_op, job_status_s *js_p)
  */
 static int io_cleanup(PINT_server_op *s_op, job_status_s *js_p)
 {
+    char status_string[64] = {0};
+
     PINT_STATE_DEBUG("cleanup");
+
+    PVFS_strerror_r(s_op->resp.status, status_string, 64);
+    PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "finish (%s)\n", status_string);
 
     if (s_op->u.io.flow_d)
     {

@@ -72,6 +72,8 @@ static int prelude_req_sched(
         "(%p) %s (prelude sm) state: req_sched\n", s_op,
         PINT_map_server_op_to_string(s_op->req->op));
 
+    PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DETAIL_DEBUG, "request\n");
+
     /* this is the first state for every normal pvfs2 server state
      * machine, so we get to do some housekeeping here.  In
      * particular, bump up the reference count on the bmi address that
@@ -105,6 +107,8 @@ static int prelude_getattr_if_needed(
     PVFS_handle target_handle = PVFS_HANDLE_NULL;
     PVFS_fs_id target_fs_id = PVFS_FS_ID_NULL;
     job_id_t tmp_id;
+
+    PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DETAIL_DEBUG, "start\n");
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "(%p) %s (prelude sm) state: getattr_if_needed\n", s_op,

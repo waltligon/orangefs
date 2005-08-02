@@ -28,6 +28,8 @@
  * Visible interface
  */
 
+#define GOSSIP_BUF_SIZE 1024
+
 /* what type of timestamp to place in msgs */
 enum gossip_logstamp
 {
@@ -64,8 +66,9 @@ void gossip_backtrace(void);
 /* do printf style type checking if built with gcc */
 int __gossip_debug(
     uint64_t mask,
+    char prefix,
     const char *format,
-    ...) __attribute__ ((format(printf, 2, 3)));
+    ...) __attribute__ ((format(printf, 3, 4)));
 int gossip_err(
     const char *format,
     ...) __attribute__ ((format(printf, 1, 2)));
@@ -83,7 +86,7 @@ do {                                                      \
     if ((gossip_debug_on) && (gossip_debug_mask & mask) &&\
         (gossip_facility))                                \
     {                                                     \
-        __gossip_debug(mask, format, ##f);                \
+        __gossip_debug(mask, '?', format, ##f);           \
     }                                                     \
 } while(0)
 #endif /* GOSSIP_DISABLE_DEBUG */
@@ -110,10 +113,12 @@ do {                                               \
 
 int __gossip_debug(
     uint64_t mask,
+    char prefix,
     const char *format,
     ...);
 int __gossip_debug_stub(
     uint64_t mask,
+    char prefix,
     const char *format,
     ...);
 int gossip_err(
@@ -121,11 +126,11 @@ int gossip_err(
     ...);
 
 #ifdef GOSSIP_DISABLE_DEBUG
-#define gossip_debug __gossip_debug_stub
-#define gossip_ldebug __gossip_debug_stub
+#define gossip_debug(__m, __f, f...) __gossip_debug_stub(__m, '?', __f, ##f);
+#define gossip_ldebug(__m, __f, f...) __gossip_debug_stub(__m, '?', __f, ##f);
 #else
-#define gossip_debug __gossip_debug
-#define gossip_ldebug __gossip_debug
+#define gossip_debug(__m, __f, f...) __gossip_debug(__m, '?', __f, ##f);
+#define gossip_ldebug(__m, __f, f...) __gossip_debug(__m, '?', __f, ##f);
 #endif /* GOSSIP_DISABLE_DEBUG */
 
 #define gossip_lerr gossip_err
