@@ -114,9 +114,15 @@ setup_pvfs2() {
 teardown_pvfs2() {
 	if [ -f ${PVFS2_DEST}/pvfs2-server.pid ] ; then
 		kill `cat ${PVFS2_DEST}/pvfs2-server.pid`
-		sleep 3
+	fi
+
+	# occasionally the server ends up in a hard-to-kill state.  server has
+	# atexit(3) remove .pid file
+	sleep 3
+	if [ -f ${PVFS2_DEST}/pvfs2-server.pid ] ; then
 		kill -9 `cat ${PVFS2_DEST}/pvfs2-server.pid`
 	fi
+
 	# let teardown always succeed.  pvfs2-server.pid could be stale
 	return 0
 }
