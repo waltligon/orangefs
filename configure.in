@@ -837,6 +837,7 @@ dnl end of NEED_BERKELEY_DB section
 
 AC_CHECK_HEADERS(netdb.h)
 AC_CHECK_HEADERS(arpa/inet.h)
+AC_CHECK_HEADERS(sys/socket.h)
 dnl check for gethostbyname function
 AC_MSG_CHECKING(for gethostbyname)
 oldcflags="$CFLAGS"
@@ -850,6 +851,18 @@ AC_MSG_RESULT(yes)
 AC_DEFINE(HAVE_GETHOSTBYNAME, 1, Define if gethostbyname function exists),
 AC_MSG_RESULT(no)
 WARN_ABOUT_HOSTNAMES="yes")
+
+AC_MSG_CHECKING(for gethostbyaddr)
+AC_TRY_COMPILE([
+#include <netdb.h>
+], [
+struct sockaddr_in peer;
+gethostbyaddr((void *)&peer.sin_addr.s_addr, sizeof(struct in_addr), AF_INET);
+],
+AC_MSG_RESULT(yes)
+AC_DEFINE(HAVE_GETHOSTBYADDR, 1, Define if gethostbyaddr function exists),
+AC_MSG_RESULT(no)  )
+
 CFLAGS="$oldcflags"
 
 dnl configure options for GM install path

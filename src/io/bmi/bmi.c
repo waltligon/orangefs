@@ -1011,6 +1011,39 @@ const char* BMI_addr_rev_lookup(PVFS_BMI_addr_t addr)
     return(tmp_str);
 }
 
+/** Performs a reverse lookup, returning a string
+ *  address for a given opaque address.  Works on any address, even those
+ *  generated unexpectedly, but only gives hostname instead of full
+ *  BMI URL style address
+ *
+ *  NOTE: caller must not free or modify returned string
+ *
+ *  \return Pointer to string on success, NULL on failure.
+ */
+const char* BMI_addr_rev_lookup_unexpected(PVFS_BMI_addr_t addr)
+{
+    ref_st_p tmp_ref = NULL;
+
+    /* find a reference that matches this address */
+    gen_mutex_lock(&ref_mutex);
+    tmp_ref = ref_list_search_addr(cur_ref_list, addr);
+    if (!tmp_ref)
+    {
+	gen_mutex_unlock(&ref_mutex);
+	return ("UNKNOWN");
+    }
+    gen_mutex_unlock(&ref_mutex);
+    
+    if(!tmp_ref->interface->BMI_meth_rev_lookup_unexpected)
+    {
+        return("UNKNOWN");
+    }
+
+    return(tmp_ref->interface->BMI_meth_rev_lookup_unexpected(
+        tmp_ref->method_addr));
+}
+
+
 /** Allocates memory that can be used in native mode by the BMI layer.
  *
  *  \return Pointer to buffer on success, NULL on failure.

@@ -16,6 +16,11 @@
 #include <sys/uio.h>
 #include <time.h>
 
+#include "pvfs2-config.h"
+#ifdef HAVE_NETDB_H
+#include <netdb.h>
+#endif
+
 #include "bmi-method-support.h"
 #include "bmi-method-callback.h"
 #include "bmi-tcp-addressing.h"
@@ -31,6 +36,7 @@
 #include "id-generator.h"
 #include "pint-event.h"
 #include "gen-locks.h"
+
 
 #define BMI_EVENT_START(__op, __id) \
  PINT_event_timestamp(PVFS_EVENT_API_BMI, __op, 0, __id, \
@@ -110,6 +116,7 @@ int BMI_tcp_testcontext(int incount,
 		     int max_idle_time_ms,
 		     bmi_context_id context_id);
 method_addr_p BMI_tcp_method_addr_lookup(const char *id_string);
+const char* BMI_tcp_addr_rev_lookup_unexpected(method_addr_p map);
 int BMI_tcp_post_send_list(bmi_op_id_t * id,
 			   method_addr_p dest,
 			   const void *const *buffer_list,
@@ -285,6 +292,7 @@ struct bmi_method_ops bmi_tcp_ops = {
     BMI_tcp_open_context,
     BMI_tcp_close_context,
     BMI_tcp_cancel,
+    BMI_tcp_addr_rev_lookup_unexpected,
 };
 
 /* module parameters */
@@ -1356,6 +1364,43 @@ int BMI_tcp_cancel(bmi_op_id_t id, bmi_context_id context_id)
     op_list_add(completion_array[query_op->context_id], query_op);
     gen_mutex_unlock(&interface_mutex);
     return(0);
+}
+
+/* BMI_tcp_addr_rev_lookup_unexpected()
+ *
+ * looks up an address that was initialized unexpectedly and returns a string
+ * hostname
+ *
+ * returns string on success, "UNKNOWN" on failure
+ */
+const char* BMI_tcp_addr_rev_lookup_unexpected(method_addr_p map)
+{
+    struct tcp_addr *tcp_addr_data = map->method_data;
+    socklen_t peerlen = sizeof(struct sockaddr_in);
+    struct sockaddr_in peer;
+    int ret;
+    struct hostent *peerent;
+
+
+    ret = getpeername(tcp_addr_data->socket, (struct sockaddr*)&(peer), &peerlen);
+    if(ret < 0)
+    {
+        return("UNKNOWN");
+    }
+
+#ifdef HAVE_GETHOSTBYADDR
+    
+    peerent = gethostbyaddr((void*)&peer.sin_addr.s_addr, 
+        sizeof(struct in_addr), AF_INET);
+    if(peerent == NULL)
+    {
+        return("UNKNOWN");
+    }
+ 
+    return(peerent->h_name);
+#else
+    return ("UNKNOWN")
+#endif
 }
 
 /* tcp_forget_addr()

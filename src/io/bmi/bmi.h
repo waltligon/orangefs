@@ -124,6 +124,8 @@ int BMI_addr_lookup(PVFS_BMI_addr_t * new_addr,
 
 const char* BMI_addr_rev_lookup(PVFS_BMI_addr_t addr);
 
+const char* BMI_addr_rev_lookup_unexpected(PVFS_BMI_addr_t addr);
+
 int BMI_post_send_list(bmi_op_id_t * id,
 		       PVFS_BMI_addr_t dest,
 		       const void *const *buffer_list,
