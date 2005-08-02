@@ -503,6 +503,11 @@ static int server_initialize(
                         server_config.logfile);
             return ret;
         }
+        /* log starting message again so it appears in log file, not just
+         * console
+         */
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+           "PVFS2 Server version %s starting.\n", PVFS2_VERSION);
     }
     return ret;
 }
