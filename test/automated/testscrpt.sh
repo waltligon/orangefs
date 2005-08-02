@@ -99,8 +99,8 @@ setup_pvfs2() {
 		--storage ${PVFS2_DEST}/STORAGE-pvfs2 \
 		--logfile=${PVFS2_DEST}/pvfs2-server.log --quiet
 	rm -rf ${PVFS2_DEST}/STORAGE-pvfs2
-	INSTALL-pvfs2/sbin/pvfs2-server -p pvfs2-server.pid -f fs.conf server.conf-`hostname -s`
-	INSTALL-pvfs2/sbin/pvfs2-server -p pvfs2-server.pid  fs.conf server.conf-`hostname -s`
+	INSTALL-pvfs2/sbin/pvfs2-server -p `pwd`/pvfs2-server.pid -f fs.conf server.conf-`hostname -s`
+	INSTALL-pvfs2/sbin/pvfs2-server -p `pwd`/pvfs2-server.pid  fs.conf server.conf-`hostname -s`
 
 	echo "tcp://`hostname -s`:3399/pvfs2-fs /pvfs2-nightly pvfs2 defaults 0 0" > ${PVFS2_DEST}/pvfs2tab
 	# do we need to use our own pvfs2tab file?  If we will mount pvfs2, we
