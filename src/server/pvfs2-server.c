@@ -1237,6 +1237,11 @@ static int server_parse_cmd_line_args(int argc, char **argv)
             case 'p':
           do_pidfile:
                 s_server_options.pidfile = optarg;
+                if(optarg[0] != '/')
+                {
+                    gossip_err("Error: pidfile must be specified with an absolute path.\n");
+                    goto parse_cmd_line_args_failure;
+                }
                 break;
             case '?':
             case 'h':
