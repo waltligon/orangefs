@@ -36,7 +36,6 @@
 #include "test-mix.h"
 #include "test-romio-noncontig-pattern2.h"
 #include "test-path-lookup.h"
-#include "test-acache.h"
 
 enum test_types
 {
@@ -152,8 +151,6 @@ static void setup_ptstests(config *myconfig) {
    myconfig->testpool[TEST_PATH_LOOKUP].test_func = test_path_lookup;
    myconfig->testpool[TEST_PATH_LOOKUP].test_name =
        strdup("test_path_lookup");
-   myconfig->testpool[TEST_ACACHE].test_func = test_acache;
-   myconfig->testpool[TEST_ACACHE].test_name = strdup("test_acache");
 }
 
 #endif

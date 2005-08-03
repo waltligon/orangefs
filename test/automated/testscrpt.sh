@@ -10,8 +10,8 @@
 #     not for red machines like gil and lain.
 
 # modify these variables
-export PVFS2_DEST=/tmp/pvfs2-nightly
-export PVFS2_MOUNTPOINT=/pvfs2-nightly
+export PVFS2_DEST=/tmp/pvfs2-slangtest
+export PVFS2_MOUNTPOINT=/pvfs2-slangtest
 export EXTRA_TESTS=${HOME}/src/benchmarks
 
 # no need to modify these. they make their own gravy

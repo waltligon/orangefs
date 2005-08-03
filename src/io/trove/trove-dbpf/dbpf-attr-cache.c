@@ -9,6 +9,7 @@
 #include "gossip.h"
 #include "dbpf-attr-cache.h"
 #include "gen-locks.h"
+#include "str-utils.h"
 
 /* these are based on code from src/server/request-scheduler.c */
 static int hash_key(void *key, int table_size);
@@ -19,9 +20,7 @@ static int s_cache_size = DBPF_ATTR_CACHE_DEFAULT_SIZE;
 static int s_max_num_cache_elems = 
 DBPF_ATTR_CACHE_DEFAULT_MAX_NUM_CACHE_ELEMS;
 static struct qhash_table *s_key_to_attr_table = NULL;
-static char *s_cacheable_keywords = NULL;
-static char *s_cacheable_keyword_array[
-    DBPF_ATTR_CACHE_MAX_NUM_KEYVALS] = {0};
+static char **s_cacheable_keyword_array = NULL;
 static int s_cacheable_keyword_array_size = 0;
 static int s_current_num_cache_elems = 0;
 
@@ -48,12 +47,9 @@ int dbpf_attr_cache_set_keywords(char *keywords)
     gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "Setting dbpf_attr_cache "
                  "keywords to:\n%s\n", keywords);
 
-    if (s_cacheable_keywords)
-    {
-        free(s_cacheable_keywords);
-    }
-    s_cacheable_keywords = strdup(keywords);
-    return (s_cacheable_keywords ? 0 : -1);
+    s_cacheable_keyword_array_size = PINT_split_string_list(
+        &s_cacheable_keyword_array, keywords);
+    return (s_cacheable_keyword_array ? 0 : -1);
 }
 
 int dbpf_attr_cache_set_size(int cache_size)
@@ -76,47 +72,12 @@ int dbpf_attr_cache_set_max_num_elems(int max_num_elems)
 */
 int dbpf_attr_cache_do_initialize(void)
 {
-    int ret = -1, num_keywords = 0;
-    char *ptr = NULL, *start = NULL, *end = NULL;
-    char *limit  = NULL, *tmp = NULL;
-
-    if (s_cacheable_keywords)
-    {
-        /* freed in finalize */
-        tmp = strdup(s_cacheable_keywords);
-        limit = (char *)(tmp + strlen(tmp));
-
-        /* break up keywords into an array here */
-        ptr = start = tmp;
-        for(; (ptr && (start != limit)); ptr++)
-        {
-            if ((*ptr == '\0') || (*ptr == ' ') || (*ptr == ','))
-            {
-                end = ptr;
-            }
-            if (start && end)
-            {
-                *end = '\0';
-                s_cacheable_keyword_array[num_keywords++] = start;
-
-                gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "Got cacheable "
-                             "attribute keyword %s\n",start);
-
-                start = ++end;
-                if (start >= limit)
-                {
-                    break;
-                }
-                end = NULL;
-            }
-        }
-    }
-
+    int ret = -1;
     gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "There are %d cacheable "
-                 "keywords registered\n", num_keywords);
+                 "keywords registered\n", s_cacheable_keyword_array_size);
     ret = dbpf_attr_cache_initialize(
         s_cache_size, s_max_num_cache_elems,
-        s_cacheable_keyword_array, num_keywords);
+        s_cacheable_keyword_array, s_cacheable_keyword_array_size);
 
     return ret;
 }
@@ -150,7 +111,6 @@ int dbpf_attr_cache_initialize(
                 goto return_error;
             }
 
-            s_cacheable_keyword_array_size = num_cacheable_keywords;
             /*
               NOTE: our keyword array must have already
               been built by the do_initialize call.
@@ -235,20 +195,10 @@ int dbpf_attr_cache_finalize(void)
                      "dbpf_attr_cache_finalized\n");
     }
 
-    if (s_cacheable_keywords)
+    if (s_cacheable_keyword_array_size)
     {
-        free(s_cacheable_keywords);
-        s_cacheable_keywords = NULL;
-
-        /*
-          NOTE: this array was not allocated; it pointed
-          into s_cacheable_keywords string above
-        */
-        for(i = 0; i < s_cacheable_keyword_array_size; i++)
-        {
-            s_cacheable_keyword_array[i] = NULL;
-        }
-        s_cacheable_keyword_array_size = 0;
+        PINT_free_string_list(s_cacheable_keyword_array,
+                              s_cacheable_keyword_array_size);
     }
     return ret;
 }
@@ -564,7 +514,7 @@ int dbpf_attr_cache_insert(
                 memset(cache_elem, 0, sizeof(dbpf_attr_cache_elem_t));
             }
 
-            if (s_cacheable_keywords)
+            if (s_cacheable_keyword_array)
             {
                 /* initialize all of the keyvals we're able to cache */
                 for(i = 0; i < s_cacheable_keyword_array_size; i++)
@@ -622,7 +572,7 @@ int dbpf_attr_cache_remove(TROVE_object_ref key)
                 "removing %Lu\n", Lu(key.handle));
 
             /* free any keyval data cached as well */
-            if (s_cacheable_keywords)
+            if (s_cacheable_keyword_array)
             {
                 /* free all of the keyvals we've cached */
                 assert(s_cacheable_keyword_array_size ==

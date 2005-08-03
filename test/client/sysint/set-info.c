@@ -89,12 +89,12 @@ int main(int argc, char **argv)
 
     /* take the retrieved attributes and update the modification time */
     resp_getattr.attr.mtime = time(NULL);
-    resp_getattr.attr.mask &= ~PVFS_ATTR_COMMON_TYPE;
+    resp_getattr.attr.mask &= ~PVFS_ATTR_SYS_TYPE;
     /*
       explicitly set the PVFS_ATTR_COMMON_ATIME, since we
       want to update the atime field in particular
     */
-    resp_getattr.attr.mask |= PVFS_ATTR_COMMON_ATIME;
+    resp_getattr.attr.mask |= PVFS_ATTR_SYS_ATIME;
 
     /* use stored credentials here */
     credentials.uid = resp_getattr.attr.owner;

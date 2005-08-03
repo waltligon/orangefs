@@ -151,8 +151,6 @@ NPTL_WORKAROUND = @NPTL_WORKAROUND@
 CFLAGS += -D__STATIC_METHOD_BMI_TCP__
   # enable Flow debugging protocol
 #CFLAGS += -D__STATIC_FLOWPROTO_DUMP_OFFSETS__
-  # enable Flow BMI/Trove protocol
-#CFLAGS += -D__STATIC_FLOWPROTO_BMI_TROVE__
   # enable new style Flow BMI/Trove protocol
 CFLAGS += -D__STATIC_FLOWPROTO_MULTIQUEUE__
   # turn on large file support by default

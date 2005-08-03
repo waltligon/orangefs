@@ -1070,11 +1070,7 @@ static int parse_flowproto_string(
         comma[0] = '\0';
     }
 
-    if (!strcmp(flow, "bmi_trove"))
-    {
-        *flowproto = FLOWPROTO_BMI_TROVE;
-    }
-    else if (!strcmp(flow, "dump_offsets"))
+    if (!strcmp(flow, "dump_offsets"))
     {
         *flowproto = FLOWPROTO_DUMP_OFFSETS;
     }

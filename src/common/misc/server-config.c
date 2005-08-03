@@ -105,19 +105,6 @@ static int is_root_handle_in_my_range(
     struct filesystem_configuration_s *fs);
 #endif
 
-
-enum
-{
-    CTX_GLOBAL           = (1 << 1),
-    CTX_DEFAULTS         = (1 << 2),
-    CTX_ALIASES          = (1 << 3),
-    CTX_FILESYSTEM       = (1 << 4),
-    CTX_METAHANDLERANGES = (1 << 5),
-    CTX_DATAHANDLERANGES = (1 << 6),
-    CTX_STORAGEHINTS     = (1 << 7),
-    CTX_DISTRIBUTION     = (1 << 8)
-};
-
 /* 
  * NOTE: The documentation for the server config format is generated
  * from the following static array.  The documentation for an option
@@ -286,7 +273,7 @@ static const configoption_t options[] =
      * Range mynode1 2147483651-4294967297
      */
     {"Range",ARG_LIST, get_range_list,NULL,
-        CTX_FILESYSTEM,NULL},
+        CTX_METAHANDLERANGES|CTX_DATAHANDLERANGES,NULL},
 
     /* Specifies the handle value for the root of the Filesystem.  This
      * is a required option in the Filesystem context.  The format is:
@@ -349,7 +336,7 @@ static const configoption_t options[] =
      * EventLogging -flow,-flowproto
      */
     {"EventLogging",ARG_LIST, get_event_logging_list,NULL,
-        CTX_DEFAULTS|CTX_GLOBAL,"none"},
+        CTX_DEFAULTS|CTX_GLOBAL,"none,"},
 
     /* At startup each pvfs2 server allocates space for a set number
      * of incoming requests to prevent the allocation delay at the beginning
@@ -391,13 +378,26 @@ static const configoption_t options[] =
     {"BMIModules",ARG_LIST, get_bmi_module_list,NULL,
         CTX_DEFAULTS|CTX_GLOBAL,NULL},
     
-    /* List the flow modules to load when the server is started.  At present,
-     * only the flowproto_multiqueue module is supported.
+    /* List the flow modules to load when the server is started.  The modules
+     * available for loading currently are:
      *
-     * This option can be specified in either the Defaults or Global contexts.
+     * flowproto_multiqueue - A flow module that handles all the possible flows,
+     * bmi->trove, trove->bmi, mem->bmi, bmi->mem.  At present, this is the
+     * default and only available flow for production use.
+     *
+     * flowproto_bmi_cache - A flow module that enables the use of the NCAC
+     * (network-centric adaptive cache) in the pvfs2 server.  Since the NCAC
+     * is currently disable and unsupported, this module exists as a proof
+     * of concept only.
+     *
+     * flowproto_dump_offsets - Used for debugging, this module allows the
+     * developer to see what/when flows are being posted, without making
+     * any actual BMI or TROVE requests.  This should only be used if you
+     * know what you're doing.
+     *
      */
     {"FlowModules",ARG_LIST, get_flow_module_list,NULL,
-        CTX_DEFAULTS|CTX_GLOBAL,"flowproto_multiqueue"},
+        CTX_DEFAULTS|CTX_GLOBAL,"flowproto_multiqueue,"},
 
     /* The TROVE storage layer has a management component that deals with
      * allocating handle values for new metafiles and datafiles.  The underlying
@@ -413,15 +413,16 @@ static const configoption_t options[] =
     
     /* The TROVE layer has an attribute caching component that handles
      * caching of stored attributes.  This is used to improve the performance of
-     * metadata accesses.  The AttrCacheKeywords option is a list of which
-     * object types should get cached attributes.  The possible values for
-     * this option are:
+     * metadata accesses.  The AttrCacheKeywords option is a list of the
+     * object types that should get cached in the attribute cache.  
+     * The possible values for this option are:
      *
      * datafile_handles - This will cache the array of datafile handles for
      *                    each logical file in this filesystem
      * 
-     * metafile_dist - This will cache the types of distributions used to manage
-     *                 the datafiles in this filesystem
+     * metafile_dist - This will cache (for each logical file)
+     *                 the file distribution information used to create/manage
+     *                 the datafiles.  
      *
      * dir_ent - This will cache the handles of the directory entries in this
      *           filesystem
@@ -436,7 +437,7 @@ static const configoption_t options[] =
      */
     {"AttrCacheKeywords",ARG_LIST, get_attr_cache_keywords_list,NULL,
         CTX_STORAGEHINTS,
-        "datafile_handles,metafile_dist,dir_ent,symlink_target"},
+        "datafile_handles,metafile_dist,dir_ent,symlink_target,"},
     
     /* The attribute cache in the TROVE layer mentioned in the documentation
      * for the AttrCacheKeywords option is managed as a hashtable.  The
@@ -712,14 +713,14 @@ DOTCONF_CB(enter_defaults_context)
     config_s->configuration_context = CTX_DEFAULTS;
 
     return PINT_dotconf_set_defaults(
-        cmd->configfile, DEFAULTS_CONFIG);
+        cmd->configfile, CTX_DEFAULTS);
 }
 
 DOTCONF_CB(exit_defaults_context)
 {
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
-    config_s->configuration_context = GLOBAL_CONFIG;
+    config_s->configuration_context = CTX_GLOBAL;
     return NULL;
 }
 
@@ -727,7 +728,7 @@ DOTCONF_CB(enter_aliases_context)
 {
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
-    config_s->configuration_context = ALIASES_CONFIG;
+    config_s->configuration_context = CTX_ALIASES;
     return NULL;
 }
 
@@ -735,7 +736,7 @@ DOTCONF_CB(exit_aliases_context)
 {
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
-    config_s->configuration_context = GLOBAL_CONFIG;
+    config_s->configuration_context = CTX_GLOBAL;
     return NULL;
 }
 
@@ -768,11 +769,11 @@ DOTCONF_CB(enter_filesystem_context)
     }
     PINT_llist_add_to_head(config_s->file_systems,(void *)fs_conf);
     assert(PINT_llist_head(config_s->file_systems) == (void *)fs_conf);
-    config_s->configuration_context = FILESYSTEM_CONFIG;
+    config_s->configuration_context = CTX_FILESYSTEM;
 
     return PINT_dotconf_set_defaults(
         cmd->configfile,
-        FILESYSTEM_CONFIG);
+        CTX_FILESYSTEM);
 }
 
 DOTCONF_CB(exit_filesystem_context)
@@ -796,7 +797,7 @@ DOTCONF_CB(exit_filesystem_context)
                    "tag before all filesystem attributes are declared.\n");
     }
 
-    config_s->configuration_context = GLOBAL_CONFIG;
+    config_s->configuration_context = CTX_GLOBAL;
     return NULL;
 }
 
@@ -804,17 +805,17 @@ DOTCONF_CB(enter_storage_hints_context)
 {
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
-    config_s->configuration_context = STORAGEHINTS_CONFIG;
+    config_s->configuration_context = CTX_STORAGEHINTS;
 
     return PINT_dotconf_set_defaults(
-        cmd->configfile, STORAGEHINTS_CONFIG);
+        cmd->configfile, CTX_STORAGEHINTS);
 }
 
 DOTCONF_CB(exit_storage_hints_context)
 {
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
-    config_s->configuration_context = FILESYSTEM_CONFIG;
+    config_s->configuration_context = CTX_FILESYSTEM;
     return NULL;
 }
 
@@ -823,7 +824,7 @@ DOTCONF_CB(enter_mhranges_context)
 {
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
-    config_s->configuration_context = META_HANDLERANGES_CONFIG;
+    config_s->configuration_context = CTX_METAHANDLERANGES;
     return NULL;
 }
 
@@ -841,7 +842,7 @@ DOTCONF_CB(exit_mhranges_context)
     {
         return("No valid mhandle ranges added to file system.\n");
     }
-    config_s->configuration_context = FILESYSTEM_CONFIG;
+    config_s->configuration_context = CTX_FILESYSTEM;
     return NULL;
 }
 
@@ -849,7 +850,7 @@ DOTCONF_CB(enter_dhranges_context)
 {
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
-    config_s->configuration_context = DATA_HANDLERANGES_CONFIG;
+    config_s->configuration_context = CTX_DATAHANDLERANGES;
     return NULL;
 }
 
@@ -867,7 +868,7 @@ DOTCONF_CB(exit_dhranges_context)
     {
         return("No valid dhandle ranges added to file system.\n");
     }
-    config_s->configuration_context = FILESYSTEM_CONFIG;
+    config_s->configuration_context = CTX_FILESYSTEM;
     return NULL;
 }
 
@@ -875,7 +876,7 @@ DOTCONF_CB(enter_distribution_context)
 {
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
-    config_s->configuration_context = DISTRIBUTION_CONFIG;
+    config_s->configuration_context = CTX_DISTRIBUTION;
     return NULL;
 }
 
@@ -883,7 +884,7 @@ DOTCONF_CB(exit_distribution_context)
 {
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
-    config_s->configuration_context = GLOBAL_CONFIG;
+    config_s->configuration_context = CTX_GLOBAL;
     return NULL;
 }
 
@@ -996,12 +997,6 @@ DOTCONF_CB(get_handle_recycle_timeout_seconds)
         PINT_llist_head(config_s->file_systems);
     assert(fs_conf);
 
-    if (fs_conf->handle_recycle_timeout_sec.tv_sec)
-    {
-        gossip_err("WARNING: Overwriting %d with %d\n",
-                   (int)fs_conf->handle_recycle_timeout_sec.tv_sec,
-                   (int)cmd->data.value);
-    }
     fs_conf->handle_recycle_timeout_sec.tv_sec = (int)cmd->data.value;
     fs_conf->handle_recycle_timeout_sec.tv_usec = 0;
 
@@ -1054,12 +1049,6 @@ DOTCONF_CB(get_attr_cache_size)
         PINT_llist_head(config_s->file_systems);
     assert(fs_conf);
 
-    if (fs_conf->attr_cache_size)
-    {
-        gossip_err("WARNING: Overwriting %d with %d\n",
-                   fs_conf->attr_cache_size,
-                   (int)cmd->data.value);
-    }
     fs_conf->attr_cache_size = (int)cmd->data.value;
     return NULL;
 }
@@ -1074,12 +1063,6 @@ DOTCONF_CB(get_attr_cache_max_num_elems)
         PINT_llist_head(config_s->file_systems);
     assert(fs_conf);
 
-    if (fs_conf->attr_cache_max_num_elems)
-    {
-        gossip_err("WARNING: Overwriting %d with %d\n",
-                   fs_conf->attr_cache_max_num_elems,
-                   (int)cmd->data.value);
-    }
     fs_conf->attr_cache_max_num_elems = (int)cmd->data.value;
     return NULL;
 }
@@ -1170,7 +1153,7 @@ DOTCONF_CB(get_name)
 {
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
-    if (config_s->configuration_context == FILESYSTEM_CONFIG)
+    if (config_s->configuration_context == CTX_FILESYSTEM)
     {
         struct filesystem_configuration_s *fs_conf = NULL;
 
@@ -1184,7 +1167,7 @@ DOTCONF_CB(get_name)
         fs_conf->file_system_name =
             (cmd->data.str ? strdup(cmd->data.str) : NULL);
     }
-    else if (config_s->configuration_context == DISTRIBUTION_CONFIG)
+    else if (config_s->configuration_context == CTX_DISTRIBUTION)
     {
         config_s->dist_conf.name =
             (cmd->data.str ? strdup(cmd->data.str) : NULL);
@@ -1209,6 +1192,15 @@ DOTCONF_CB(get_filesystem_collid)
     return NULL;
 }
 
+static int compare_aliases(void * valias1,
+                           void * valias2)
+{
+    host_alias_s * alias1 = (host_alias_s *)valias1;
+    host_alias_s * alias2 = (host_alias_s *)valias2;
+    
+    return strcmp(alias1->host_alias, alias2->host_alias);
+}
+
 DOTCONF_CB(get_alias_list)
 {
     struct server_configuration_s *config_s = 
@@ -1216,6 +1208,15 @@ DOTCONF_CB(get_alias_list)
     struct host_alias_s *cur_alias = NULL;
 
     assert(cmd->arg_count == 2);
+
+    /* prevent users from adding the same alias twice */
+    if(config_s->host_aliases &&
+       PINT_llist_search(config_s->host_aliases, 
+                      (void *)cmd->data.list[0],
+                      compare_aliases))
+    {
+        return "Error: alias already defined";
+    }
 
     cur_alias = (host_alias_s *)
         malloc(sizeof(host_alias_s));
@@ -1226,6 +1227,7 @@ DOTCONF_CB(get_alias_list)
     {
         config_s->host_aliases = PINT_llist_new();
     }
+    
     PINT_llist_add_to_tail(config_s->host_aliases,(void *)cur_alias);
     return NULL;
 }
@@ -1244,7 +1246,7 @@ DOTCONF_CB(get_range_list)
     assert(fs_conf);
 
     handle_range_list = ((config_s->configuration_context ==
-                          META_HANDLERANGES_CONFIG) ?
+                          CTX_METAHANDLERANGES) ?
                          &fs_conf->meta_handle_ranges :
                          &fs_conf->data_handle_ranges);
 
@@ -1350,12 +1352,6 @@ DOTCONF_CB(get_default_num_dfiles)
 
     fs_conf = (struct filesystem_configuration_s *)
         PINT_llist_head(config_s->file_systems);
-
-    if (fs_conf->default_num_dfiles)
-    {
-        gossip_err("WARNING: Overwriting %d with %d\n",
-                   (int)fs_conf->default_num_dfiles,(int)cmd->data.value);
-    }
 
     fs_conf->default_num_dfiles = (int)cmd->data.value;
     return NULL;

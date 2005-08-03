@@ -1031,7 +1031,6 @@ static int create_cleanup(PINT_client_sm *sm_p,
 static int create_parent_getattr_inspect(
     PINT_client_sm *sm_p, job_status_s *js_p)
 {
-    int res = 0;
     PVFS_object_attr *attr = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: parent_getattr_inspect\n");
