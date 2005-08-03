@@ -105,7 +105,7 @@ int main(int argc, char **argv)
 	 key.buffer_sz = strlen(key_s) + 1;
 	 val.buffer = val_s;
 	 val.buffer_sz = strlen(val_s) + 1;
-	 ret = PVFS_sys_seteattr(resp_create.ref, &credentials, &key, &val);
+	 ret = PVFS_sys_seteattr(resp_create.ref, &credentials, &key, &val, 0);
     if (ret < 0)
     {
         PVFS_perror("seteattr failed with errcode", ret);

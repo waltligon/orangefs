@@ -356,7 +356,9 @@ enum PVFS_server_param
     PVFS_SERV_PARAM_ROOT_CHECK = 3,  /* verify existance of root handle */
     PVFS_SERV_PARAM_MODE = 4,        /* change the current server mode */
     PVFS_SERV_PARAM_EVENT_ON = 5,    /* event logging on or off */
-    PVFS_SERV_PARAM_EVENT_MASKS = 6  /* API masks for event logging */
+    PVFS_SERV_PARAM_EVENT_MASKS = 6, /* API masks for event logging */
+    PVFS_SERV_PARAM_SYNC_META = 7,   /* metadata sync flags */
+    PVFS_SERV_PARAM_SYNC_DATA = 8,   /* file data sync flags */
 };
 
 enum PVFS_server_mode
