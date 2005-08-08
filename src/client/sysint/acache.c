@@ -36,13 +36,13 @@
 #define acache_debug(...)
 #endif
 
-char * PINT_acache_status_strings[6] =
+const char * PINT_acache_status_strings[6] =
 {
-    "PINODE_STATUS_VALID"
-    "PINODE_STATUS_INVALID"
-    "PINODE_STATUS_EXPIRED"
-    "PINODE_INTERNAL_FLAG_HASHED"
-    "PINODE_INTERNAL_FLAG_UNHASHED"
+    "PINODE_STATUS_VALID",
+    "PINODE_STATUS_INVALID",
+    "PINODE_STATUS_EXPIRED",
+    "PINODE_INTERNAL_FLAG_HASHED",
+    "PINODE_INTERNAL_FLAG_UNHASHED",
     "PINODE_INTERNAL_FLAG_EMPTY_LOOKUP"
 };
 
@@ -84,26 +84,9 @@ static inline int acache_internal_status(
 static void reclaim_pinode_entries(void);
 #endif
 
-static inline char *get_status_str(int status)
+const char *PINT_acache_get_status(int status)
 {
-    typedef struct
-    {
-        int status;
-        char *status_str;
-    } acache_status_t;
-
-    static acache_status_t ast[4] =
-    {
-        { PINODE_STATUS_VALID, "PINODE_STATUS_VALID" },
-        { PINODE_STATUS_INVALID, "PINODE_STATUS_INVALID" },
-        { PINODE_STATUS_EXPIRED, "PINODE_STATUS_EXPIRED" },
-        { 0, "PINODE_STATUS_UNKNOWN" },
-    };
-
-    return (((ast[0].status == status) ? ast[0].status_str :
-             (ast[1].status == status) ? ast[1].status_str :
-             (ast[2].status == status) ? ast[2].status_str :
-             ast[3].status_str));
+    return PINT_acache_status_strings[status - 3];
 }
 
 /*
@@ -117,6 +100,12 @@ int PINT_acache_initialize()
     int ret = -1;
 
     acache_debug("PINT_acache_initialize entered\n");
+
+    ret = PINT_cached_config_initialize();
+    if(ret < 0)
+    {
+        return ret;
+    }
 
     gen_mutex_lock(&s_acache_interface_mutex);
 
@@ -192,6 +181,8 @@ void PINT_acache_finalize()
 
     gen_mutex_unlock(&s_acache_interface_mutex);
     acache_debug("PINT_acache_finalize exiting\n");
+
+    PINT_cached_config_finalize();
 }
 
 int PINT_acache_reinitialize(void)
@@ -630,14 +621,14 @@ static inline int acache_internal_status(
 
                 if(!ACACHE_TIMEVAL_IS_EXPIRED(now, attr_expire))
                 {
-                    *unexpired_masks &= pinode->attr.mask;
+                    *unexpired_masks |= pinode->attr.mask;
                 }
             }
         }
     }
 
     gossip_debug(GOSSIP_ACACHE_DEBUG, "pinode [%Lu] entry status: %s\n",
-                 Lu(pinode->refn.handle), get_status_str(ret));
+                 Lu(pinode->refn.handle), PINT_acache_get_status(ret));
 
     if (ret == PINODE_STATUS_EXPIRED)
     {

@@ -755,6 +755,8 @@ static int create_setattr_setup_msgpair(PINT_client_sm *sm_p,
         sm_p->u.create.num_data_files;
     msg_p->req.u.setattr.attr.u.meta.dist =
         sm_p->u.create.dist;
+    msg_p->req.u.setattr.attr.u.meta.dist_size =
+        PINT_DIST_PACK_SIZE(sm_p->u.create.dist);
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = sm_p->u.create.metafile_handle;

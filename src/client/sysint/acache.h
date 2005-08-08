@@ -96,7 +96,7 @@ enum
     PINODE_INTERNAL_FLAG_EMPTY_LOOKUP = 8
 };
 
-char * PINT_acache_status_strings[6];
+const char *PINT_acache_get_status(int status);
 
 typedef struct
 {
