@@ -345,7 +345,16 @@ substitute your host name in place of ``testhost'':
 tcp://testhost:3334/pvfs2-fs /mnt/pvfs2 pvfs2 default,noauto 0 0 
 \end{verbatim}
 
-Alternatively one could put this entry in \texttt{/etc/fstab} instead.
+There are a few alternatives to using an /etc/pvfs2tab which may be useful
+in production environments:
+\begin{itemize}
+\item One could put this entry in \texttt{/etc/fstab} file instead of
+\texttt{/etc/pvfs2tab}. 
+\item One could avoid static tab file entries entirely and let the pvfs2 tools
+detect file systems that have been mounted using the Linux kernel
+driver.  This approach only works if you use the 2.6 Linux kernel or
+install the mount.pvfs2 utility on 2.4 Linux kernel systems.
+\end{itemize}
 
 \subsection{Testing your installation}
 \label{subsec:testing}
@@ -790,22 +799,10 @@ Now that the module is loaded, and the pvfs2-server and pvfs2-client
 programs are running, we can mount our PVFS2 file system (and verify
 that it's properly mounted) as follows:
 
-\subsubsection{Mounting a PVFS2 volume under 2.6.x}
-For 2.6.x kernels ONLY:
-
 \begin{verbatim}
 lain pvfs2 # mount -t pvfs2 tcp://testhost:3334/pvfs2-fs /mnt/pvfs2
 lain pvfs2 # mount | grep pvfs2
 tcp://lain.mcs.anl.gov:3334/pvfs2-fs on /tmp/mnt type pvfs2 (rw)
-\end{verbatim}
-
-\subsubsection{Mounting a PVFS2 volume under 2.4.x}
-For 2.4.x kernels ONLY:
-
-\begin{verbatim}
-gil:~# mount -t pvfs2 pvfs2 /mnt/pvfs2 -o tcp://testhost:3334/pvfs2-fs
-gil:~# mount | grep pvfs2
-pvfs2 on /mnt/pvfs2 type pvfs2 (rw)
 \end{verbatim}
 
 NOTE: The device of the format tcp://testhost:3334/pvfs2-fs MUST be
@@ -831,6 +828,24 @@ drwxr-xr-x    2 root     root            0 Aug 15 13:29 .
 drwxr-xr-x    3 root     root            0 Aug 15 13:21 ..
 -rw-r--r--    1 root     root       330526 Aug 15 13:30 foo
 \end{verbatim}
+
+\subsubsection{Special Note for 2.4 kernels}
+
+We need a small helper application \texttt{/sbin/mount.pvfs2} to mount pvfs2
+under 2.4 kernels.   It must be installed under \texttt{/sbin}.  Note that
+``make install'' will not touch \texttt{/sbin}, so you will have to install it
+by hand.  With the helper application installed, the 2.6 mount commands and
+fstab entries are the same.  
+
+If you do not have \texttt{/sbin/mount.pvfs2} available, you can still use the
+old appraoch:
+
+\begin{verbatim}
+gil:~# mount -t pvfs2 pvfs2 /mnt/pvfs2 -o tcp://testhost:3334/pvfs2-fs
+gil:~# mount | grep pvfs2
+pvfs2 on /mnt/pvfs2 type pvfs2 (rw)
+\end{verbatim}
+
 
 \subsection{Unmounting and stopping PVFS2 on a client}
 

@@ -141,7 +141,7 @@ struct dentry *pvfs2_lookup(
 
     pvfs2_print("pvfs2_lookup: doing lookup on %s\n  under %Lu,%d "
                 "(follow=%s)\n", new_op->upcall.req.lookup.d_name,
-                new_op->upcall.req.lookup.parent_refn.handle,
+                Lu(new_op->upcall.req.lookup.parent_refn.handle),
                 new_op->upcall.req.lookup.parent_refn.fs_id,
                 ((new_op->upcall.req.lookup.sym_follow ==
                   PVFS2_LOOKUP_LINK_FOLLOW) ? "yes" : "no"));
@@ -153,7 +153,7 @@ struct dentry *pvfs2_lookup(
     ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
 
     pvfs2_print("Lookup Got %Lu, fsid %d (ret=%d)\n",
-                new_op->downcall.resp.lookup.refn.handle,
+                Lu(new_op->downcall.resp.lookup.refn.handle),
                 new_op->downcall.resp.lookup.refn.fs_id, ret);
 
     /* lookup inode matching name (or add if not there) */
@@ -475,7 +475,11 @@ struct inode_operations pvfs2_dir_inode_operations =
     mknod : pvfs2_mknod,
     rename : pvfs2_rename,
     setattr : pvfs2_setattr,
-    revalidate : pvfs2_revalidate
+    revalidate : pvfs2_revalidate,
+    getxattr: pvfs2_getxattr,
+    setxattr: pvfs2_setxattr,
+/*    listxattr: pvfs2_listxattr,*/
+    removexattr: pvfs2_removexattr,
 #else
     .create = pvfs2_create,
     .lookup = pvfs2_lookup,
@@ -487,7 +491,11 @@ struct inode_operations pvfs2_dir_inode_operations =
     .mknod = pvfs2_mknod,
     .rename = pvfs2_rename,
     .setattr = pvfs2_setattr,
-    .getattr = pvfs2_getattr
+    .getattr = pvfs2_getattr,
+    .getxattr = pvfs2_getxattr,
+    .setxattr = pvfs2_setxattr,
+/*    .listxattr = pvfs2_listxattr,*/
+    .removexattr = pvfs2_removexattr,
 #endif
 };
 

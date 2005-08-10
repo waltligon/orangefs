@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.15 2004-11-19 18:06:07 pw Exp $
+ * $Id: ib.c,v 1.15.14.1 2005-08-10 19:37:57 slang Exp $
  */
 #include <stdio.h>  /* just for NULL for id-generator.h */
 #include <sys/time.h>
@@ -1492,5 +1492,6 @@ struct bmi_method_ops bmi_ib_ops =
     .BMI_meth_open_context = BMI_ib_open_context,
     .BMI_meth_close_context = BMI_ib_close_context,
     .BMI_meth_cancel = BMI_ib_cancel,
+    .BMI_meth_rev_lookup_unexpected = 0, /* unimplemented */
 };
 

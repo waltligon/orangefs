@@ -69,7 +69,10 @@ static int setparam_work(PINT_server_op *s_op, job_status_s *js_p)
     uint64_t tmp_mask = 0;
     int32_t old_api_mask = 0, old_op_mask = 0;
     PVFS_handle tmp_handle = PVFS_HANDLE_NULL;
-
+    struct server_configuration_s *user_opts;
+    struct filesystem_configuration_s *fs_conf;
+    char buf[16] = {0};
+ 
     PINT_STATE_DEBUG("work");
 
     switch(s_op->req->u.mgmt_setparam.param)
@@ -119,6 +122,42 @@ static int setparam_work(PINT_server_op *s_op, job_status_s *js_p)
                 (int32_t)(s_op->req->u.mgmt_setparam.value >> 32));
             s_op->resp.u.mgmt_setparam.old_value = old_api_mask +
                 ((int64_t)old_op_mask << 32);
+            js_p->error_code = 0;
+            return(1);
+        case PVFS_SERV_PARAM_SYNC_META:
+            user_opts = get_server_config_struct();
+            fs_conf = PINT_config_find_fs_id(user_opts, 
+                s_op->req->u.mgmt_setparam.fs_id);
+            if(fs_conf)
+            {
+                if(s_op->req->u.mgmt_setparam.value)
+                    fs_conf->trove_sync_meta = TROVE_SYNC;
+                else
+                    fs_conf->trove_sync_meta = 0;
+            }
+            js_p->error_code = 0;
+            return(1);
+        case PVFS_SERV_PARAM_SYNC_DATA:
+            user_opts = get_server_config_struct();
+            fs_conf = PINT_config_find_fs_id(user_opts, 
+                s_op->req->u.mgmt_setparam.fs_id);
+            if(fs_conf)
+            {
+                if(s_op->req->u.mgmt_setparam.value)
+                {
+                    snprintf(buf, 16, "%d,%d", s_op->req->u.mgmt_setparam.fs_id,
+                             TROVE_SYNC);
+                    PINT_flow_setinfo(NULL, FLOWPROTO_DATA_SYNC_MODE, buf);
+                    fs_conf->trove_sync_data = TROVE_SYNC;
+                }
+                else
+                {
+                    snprintf(buf, 16, "%d,%d", s_op->req->u.mgmt_setparam.fs_id,
+                             0);
+                    PINT_flow_setinfo(NULL, FLOWPROTO_DATA_SYNC_MODE, buf);
+                    fs_conf->trove_sync_data = 0;
+                }
+            }
             js_p->error_code = 0;
             return(1);
         case PVFS_SERV_PARAM_MODE:

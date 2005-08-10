@@ -14,6 +14,7 @@ make_pbs_script() {
 #PBS -l walltime=0:30:0
 #PBS -l nodes=8
 #PBS -j oe
+#PBS -q shared
 
 nprocs=4
 

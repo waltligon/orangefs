@@ -26,7 +26,6 @@ int main(int argc, char **argv)
     char *val_s = (char *)0;
     PVFS_fs_id cur_fs;
     PVFS_sysresp_create resp_create;
-    PVFS_sysresp_geteattr resp_geteattr;
     char* entry_name;
     PVFS_object_ref parent_refn;
     PVFS_sys_attr attr;
@@ -106,7 +105,7 @@ int main(int argc, char **argv)
 	 key.buffer_sz = strlen(key_s) + 1;
 	 val.buffer = val_s;
 	 val.buffer_sz = strlen(val_s) + 1;
-	 ret = PVFS_sys_seteattr(resp_create.ref, &credentials, &key, &val);
+	 ret = PVFS_sys_seteattr(resp_create.ref, &credentials, &key, &val, 0);
     if (ret < 0)
     {
         PVFS_perror("seteattr failed with errcode", ret);
@@ -118,24 +117,23 @@ int main(int argc, char **argv)
 
 	 // get extended attribute
 	 printf("--geteattr--\n");
-	 resp_geteattr.val.buffer_sz = strlen(val_s) + 10;
-	 resp_geteattr.val.buffer = malloc(val.buffer_sz);
-	 ret = PVFS_sys_geteattr(resp_create.ref, &credentials, &key,
-			 &resp_geteattr);
+	 val.buffer_sz = strlen(val_s) + 10;
+	 val.buffer = malloc(val.buffer_sz);
+	 ret = PVFS_sys_geteattr(resp_create.ref, &credentials, &key, &val);
     if (ret < 0)
     {
         PVFS_perror("geteattr failed with errcode", ret);
     }
 
 	 // safety valve!
-	 ((char *)resp_geteattr.val.buffer)[resp_geteattr.val.buffer_sz-1] = 0;
+	 ((char *)val.buffer)[val.buffer_sz-1] = 0;
 
 	 // print result if we got any
-    printf("Returned %d bytes in value: %s\n", resp_geteattr.val.read_sz,
-		  (char *)resp_geteattr.val.buffer);
+    printf("Returned %d bytes in value: %s\n", val.read_sz,
+		  (char *)val.buffer);
 
-	 if (!strncmp(resp_geteattr.val.buffer, key_s, resp_geteattr.val.read_sz) &&
-              resp_geteattr.val.read_sz == strlen(key_s))
+	 if (!strncmp(val.buffer, key_s, val.read_sz) &&
+              val.read_sz == strlen(key_s))
 			 printf("Success!\n");
 	 else
 			 printf("Failure!\n");

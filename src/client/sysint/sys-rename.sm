@@ -315,7 +315,7 @@ PVFS_error PVFS_isys_rename(
     }
     memset(sm_p, 0, sizeof(*sm_p));
 
-    PINT_init_msgarray_params(&sm_p->msgarray_params);
+    PINT_init_msgarray_params(&sm_p->msgarray_params, old_parent_ref.fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     /*
       this state machine has several hardcoded 2's around because
@@ -913,7 +913,7 @@ static int rename_generic_timer(PINT_client_sm *sm_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: generic_timer\n");
 
     ret = job_req_sched_post_timer(
-	PVFS2_CLIENT_RETRY_DELAY, sm_p, 0, js_p, &tmp_id,
+	sm_p->msgarray_params.retry_delay, sm_p, 0, js_p, &tmp_id,
         pint_client_sm_context);
 
     return ret;
@@ -927,7 +927,7 @@ static int rename_crdirent_retry_or_fail(PINT_client_sm *sm_p,
 
     /* try again (up to a point) if we get a comm. failure. */
     if ((PVFS_ERROR_CLASS(-js_p->error_code) == PVFS_ERROR_BMI) &&
-	(sm_p->u.rename.retry_count < PVFS2_CLIENT_RETRY_LIMIT))
+	(sm_p->u.rename.retry_count < sm_p->msgarray_params.retry_limit))
     {
 	sm_p->u.rename.retry_count++;
 	js_p->error_code = RENAME_CRDIRENT_RETRY;
@@ -957,7 +957,7 @@ static int rename_rmdirent_retry_or_fail(PINT_client_sm *sm_p,
 
     /* try again (up to a point) if we get a comm. failure. */
     if ((PVFS_ERROR_CLASS(-js_p->error_code) == PVFS_ERROR_BMI) &&
-	(sm_p->u.rename.retry_count < PVFS2_CLIENT_RETRY_LIMIT))
+	(sm_p->u.rename.retry_count < sm_p->msgarray_params.retry_limit))
     {
 	sm_p->u.rename.retry_count++;
 	js_p->error_code = RENAME_RMDIRENT_RETRY;

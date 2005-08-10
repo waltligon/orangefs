@@ -90,7 +90,31 @@ inline uint32_t PVFS_util_sys_to_object_attr_mask(
 inline uint32_t PVFS_util_object_to_sys_attr_mask( 
     uint32_t obj_mask);
 
-inline int PVFS2_translate_mode(int mode);
+static inline int PVFS2_translate_mode(int mode)
+{
+    int ret = 0, i = 0;
+    static int modes[9] =
+    {
+        S_IXOTH, S_IWOTH, S_IROTH,
+        S_IXGRP, S_IWGRP, S_IRGRP,
+        S_IXUSR, S_IWUSR, S_IRUSR
+    };
+    static int pvfs2_modes[9] =
+    {
+        PVFS_O_EXECUTE, PVFS_O_WRITE, PVFS_O_READ,
+        PVFS_G_EXECUTE, PVFS_G_WRITE, PVFS_G_READ,
+        PVFS_U_EXECUTE, PVFS_U_WRITE, PVFS_U_READ,
+    };
+
+    for(i = 0; i < 9; i++)
+    {
+        if (mode & modes[i])
+        {
+            ret |= pvfs2_modes[i];
+        }
+    }
+    return ret;
+}
 
 #ifndef __KERNEL__
 inline static PVFS_time PVFS_util_get_current_time(void)

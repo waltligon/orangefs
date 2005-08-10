@@ -202,7 +202,7 @@ PVFS_error PVFS_isys_mkdir(
     }
     memset(sm_p, 0, sizeof(*sm_p));
 
-    PINT_init_msgarray_params(&sm_p->msgarray_params);
+    PINT_init_msgarray_params(&sm_p->msgarray_params, parent_ref.fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->u.mkdir.object_name = object_name;
     PVFS_util_copy_sys_attr(&sm_p->u.mkdir.sys_attr, &attr);
@@ -270,7 +270,7 @@ static int mkdir_init(PINT_client_sm *sm_p,
         js_p->error_code = 0;
 
         return job_req_sched_post_timer(
-            PVFS2_CLIENT_RETRY_DELAY, sm_p, 0, js_p, &tmp_id,
+            sm_p->msgarray_params.retry_delay, sm_p, 0, js_p, &tmp_id,
             pint_client_sm_context);
     }
 
@@ -525,7 +525,7 @@ static int mkdir_cleanup(PINT_client_sm *sm_p,
                            directory_ref, sm_p->object_ref);
     }
     else if ((PVFS_ERROR_CLASS(-sm_p->error_code) == PVFS_ERROR_BMI) &&
-             (sm_p->u.mkdir.retry_count < PVFS2_CLIENT_RETRY_LIMIT))
+             (sm_p->u.mkdir.retry_count < sm_p->msgarray_params.retry_limit))
     {
         PINT_acache_invalidate(sm_p->object_ref);
 

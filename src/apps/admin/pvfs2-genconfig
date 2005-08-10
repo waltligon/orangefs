@@ -23,6 +23,12 @@ my $opt_trovesync = '1';
 my $opt_quiet = '';
 my $opt_logging = '';
 my $opt_logstamp = '';
+my $opt_server_job_timeout = '';
+my $opt_client_job_timeout = '';
+my $opt_first_handle = '';
+my $opt_last_handle = '';
+my $opt_root_handle = '';
+my $opt_fsid = '';
 
 sub get_user_input
 {
@@ -100,43 +106,43 @@ sub parse_hostlist
     # while there is still text left
     while($_)
     {
-	# strip out the first matching word (delimited by comma or white sp)
-	s/^[\s,]*[^\s,]+//;
-	# save the matching string that was stripped out
-	$foo = "$&";
-	# pull leading and trailing white sp off
-	$foo =~ s/[\s,]+//g;
-	# stick it in the array
-	$parse[$i] = $foo;
-	# increment array index
-	$i++;
-	# loop around and continue on next word
+    # strip out the first matching word (delimited by comma or white sp)
+    s/^[\s,]*[^\s,]+//;
+    # save the matching string that was stripped out
+    $foo = "$&";
+    # pull leading and trailing white sp off
+    $foo =~ s/[\s,]+//g;
+    # stick it in the array
+    $parse[$i] = $foo;
+    # increment array index
+    $i++;
+    # loop around and continue on next word
     }
 
     $numinodes = 0;
     for($i=0; defined($parse[$i]) && $parse[$i] !~ /^$/;$i++) {
-	# expand parsed input that contains brackets
-	if ($parse[$i] =~ /{/) {
-	    @arrayline = split(/[{}, ]+/, $parse[$i]);
-	    $prefix = $arrayline[0];
-	    $count = @arrayline - 1;
-	    for ($j = 1; $j <= $count; $j++) { 
-		if ($arrayline[$j] =~ /-/) {
-		    @temparray = split(/-/, $arrayline[$j]);
-		    for ($k = $temparray[0]; $k <= $temparray[1]; $k++) {
-			$inodes[$numinodes] = $arrayline[0].$k;
-			$numinodes++;
-		    }	
-		} else { 
-		    $inodes[$numinodes] = $arrayline[0].$arrayline[$j];
-		    $numinodes++;
-		}	
-	    }
-	}
-	else {
-	    $inodes[$numinodes] = $parse[$i];
-	    $numinodes++;
-	}
+    # expand parsed input that contains brackets
+    if ($parse[$i] =~ /{/) {
+        @arrayline = split(/[{}, ]+/, $parse[$i]);
+        $prefix = $arrayline[0];
+        $count = @arrayline - 1;
+        for ($j = 1; $j <= $count; $j++) { 
+        if ($arrayline[$j] =~ /-/) {
+            @temparray = split(/-/, $arrayline[$j]);
+            for ($k = $temparray[0]; $k <= $temparray[1]; $k++) {
+            $inodes[$numinodes] = $arrayline[0].$k;
+            $numinodes++;
+            }    
+        } else { 
+            $inodes[$numinodes] = $arrayline[0].$arrayline[$j];
+            $numinodes++;
+        }    
+        }
+    }
+    else {
+        $inodes[$numinodes] = $parse[$i];
+        $numinodes++;
+    }
     }
     return @inodes;
 }
@@ -163,6 +169,13 @@ sub emit_defaults
     print $target "\tBMIModules $bmi_module\n";
     print $target "\tFlowModules flowproto_multiqueue\n";
     print $target "\tPerfUpdateInterval 1000\n";
+    print $target "\tServerJobBMITimeoutSecs $server_job_timeout\n";
+    print $target "\tServerJobFlowTimeoutSecs $server_job_timeout\n";
+    print $target "\tClientJobBMITimeoutSecs $client_job_timeout\n";
+    print $target "\tClientJobFlowTimeoutSecs $client_job_timeout\n";
+    print $target "\tClientRetryLimit 5\n";
+    print $target "\tClientRetryDelayMilliSecs 2000\n";
+
     print $target "</Defaults>\n";
 }
 
@@ -190,7 +203,7 @@ sub emit_filesystem
     # divide handle range space equally among servers ((2^32)-1 for now)
     my($total_num_handles_available, $start, $end, $i, $step, $num_ranges);
     $num_ranges = $#meta_bmi + $#io_bmi + 2;
-    $total_num_handles_available = 4294967295;
+    $total_num_handles_available = $last_handle - $first_handle + 1;
 
     # since meta and data handle ranges must be split, increment
     # num nodes for calculation purposes below
@@ -202,13 +215,13 @@ sub emit_filesystem
     print $target "\tRootHandle $root_handle\n";
     print $target "\t<MetaHandleRanges>\n";
 
-    $start = $end = 2^1;
+    $start = $end = $first_handle - 1;
 
     foreach(@meta_aliases)
     {
         $start = $end + 1;
-	$end += $step;
-	print $target "\t\tRange $_ $start-$end\n";
+    $end += $step;
+    print $target "\t\tRange $_ $start-$end\n";
     }
 
     print $target "\t</MetaHandleRanges>\n";
@@ -227,11 +240,11 @@ sub emit_filesystem
     # only in special cases would someone want to sync data (failover comes to
     # mind)  The default thus should be to sync metadata but not sync data.  
     if ($opt_trovesync == 1) {
-	    print $target "\t\tTroveSyncMeta yes\n";
-	    print $target "\t\tTroveSyncData no\n";
+        print $target "\t\tTroveSyncMeta yes\n";
+        print $target "\t\tTroveSyncData no\n";
     } else {
-	    print $target "\t\tTroveSyncMeta no\n";
-	    print $target "\t\tTroveSyncData no\n";
+        print $target "\t\tTroveSyncMeta no\n";
+        print $target "\t\tTroveSyncData no\n";
     }
 
     print $target "\t\tAttrCacheKeywords datafile_handles,metafile_dist\n";
@@ -273,234 +286,318 @@ sub confirm
 
 sub usage
 {
-    print "\nUsage: pvfs2-genconfig [OPTIONS] <fs.conf> <server.conf>\n\n";
     
-    print "OPTIONS can be one or all of\n";
-    print "     --protocol    <PROTO>[,<PROTO>..] protocol(s) to use (tcp,gm,ib)\n";
-    print "     --port        <NUM>               port to use (single protocol)\n";
-    print "     --tcpport     <NUM>               TCP port to use\n";
-    print "     --gmport      <NUM>               GM port to use\n";
-    print "     --ibport      <NUM>               IB port to use\n";
-    print "     --ioservers   <STRING>            hostnames of data servers\n";
-    print "     --metaservers <STRING>            hostnames of meta servers\n";
-    print "     --logfile     <STRING>            logfile location\n";
-    print "     --logging     <STRING>            debugging mask for log messages.\n";
-    print "     --logstamp    <STRING>            timestamp type for log messages (none,usec,datetime).\n";
-    print "     --storage     <STRING>            storage space location\n";
-    print "     --notrovesync                     sync metadata only upon request\n";
-    print "     --quiet                           run silently\n\n";
+# dump usage with a single HERE document rather than seperate print
+# statements
+print <<"THIS";    
+Usage: pvfs2-genconfig [OPTIONS] <fs.conf> <server.conf>
 
-    print "The two arguments specify the names of the configuration files\n";
-    print " that will be written.  This utility will create one fs.conf file.\n";
-    print " It will also create a seperate server.conf file for each server\n";
-    print " in the file system.  Each server.conf file will be appended\n";
-    print " with the host name of the server to which it belongs.\n";
-   
-    print "\nExample: 'pvfs2-genconfig /tmp/fs.conf /tmp/server.conf'\n";
-    print " will generate a file called /tmp/fs.conf and server specific\n";
-    print " files called /tmp/server.conf-host1, /tmp/server.conf-host2, etc.\n";
-    print "\nNOTE: If pvfs2-genconfig is executed with a single argument of\n";
-    print " \"-\", then all output is directed to stdout and no files are\n";
-    print " written.\n";
-    exit;
+  The pvfs2-genconfig utility creates configuration files for the
+  PVFS2 file system.  The <fs.conf> and <server.conf> arguments are
+  manditory and specify the names of the configuration files that will
+  be written.  This utility will create one fs.conf file.  It will also
+  create a seperate server.conf file for each server in the file system.
+  Each server.conf file will be appended with the host name of the server
+  to which it belongs.
+
+  EXAMPLE: 'pvfs2-genconfig /tmp/fs.conf /tmp/server.conf' will
+  generate a file called /tmp/fs.conf and server specific files
+  called /tmp/server.conf-host1, /tmp/server.conf-host2, etc.  
+  NOTE: If pvfs2-genconfig is executed with a single argument of "-", 
+  then all output is directed to stdout and no files are written.
+
+  All other arguments are optional.  If run without any optional
+  arguments, then pvfs2-genconfig will prompt interactively for required
+  parameters.
+
+  pvfs2-genconfig can also be executed non-interactively by providing,
+  at a minimum, all of the following arguments:
+
+     --protocol    <PROTO>[,<PROTO>..] protocol(s) to use (tcp,gm,ib)
+     --port        <NUM>               port to use (any single protocol)
+     --ioservers   <STRING>            hostnames of data servers
+     --metaservers <STRING>            hostnames of meta servers
+     --logfile     <STRING>            logfile location
+     --storage     <STRING>            storage space location
+     --quiet                           run silently
+
+  The following arguments are entirely optional, whether your intention is
+  to run pvfs2-genconfig in interactive or non-interactive mode:
+
+     --tcpport     <NUM>               TCP port to use
+     --gmport      <NUM>               GM port to use
+     --ibport      <NUM>               IB port to use
+     --logging     <STRING>            debugging mask for log messages
+     --logstamp    <STRING>            timestamp type for log messages 
+                                       ('none','usec', or 'datetime' are valid)
+     --notrovesync                     sync metadata only upon request
+     --server-job-timeout <NUM>        server job timeout value (seconds)
+     --client-job-timeout <NUM>        server job timeout value (seconds)
+     --first-handle <NUM>              first handle value to reserve
+     --last-handle  <NUM>              last handle value to reserve
+     --root-handle  <NUM>              handle value to reserve for root object
+     --fsid         <NUM>              fs identifier value
+THIS
+
 }
 
 sub print_welcome
 {
-	if (!$opt_quiet) {
-		print "**********************************************************************\n";
-		print "\tWelcome to the PVFS2 Configuration Generator:\n\n";
-		print "This interactive script will generate configuration files suitable\n";
-		print "for use with a new PVFS2 file system.  Please see the PVFS2 quickstart\n";
-		print "guide for details.\n\n";
-		print "**********************************************************************\n";
-	}
+    if (!$opt_quiet) {
+        print "**********************************************************************\n";
+        print "\tWelcome to the PVFS2 Configuration Generator:\n\n";
+        print "This interactive script will generate configuration files suitable\n";
+        print "for use with a new PVFS2 file system.  Please see the PVFS2 quickstart\n";
+        print "guide for details.\n\n";
+        print "**********************************************************************\n";
+    }
 }
 
 sub get_protocol
 {
-	my $type;
+    my $type;
 
-	if (!$opt_quiet) {
-		# get network type
-		print "\n";
-		print "You must first select the network protocol that your file system will use.\n";
-		print "The only currently supported options are \"tcp\", \"gm\", and \"ib\".\n";
-		print "(For multi-homed configurations, use e.g. \"ib,tcp\".)\n";
-	}
-	if ($opt_protocol) {
-		$type = $opt_protocol;
-	} else {
-		$type = prompt_word("Enter protocol type [Default is tcp]: ","tcp");
-	}
-	return $type;
+    if (!$opt_quiet) {
+        # get network type
+        print "\n";
+        print "You must first select the network protocol that your file system will use.\n";
+        print "The only currently supported options are \"tcp\", \"gm\", and \"ib\".\n";
+        print "(For multi-homed configurations, use e.g. \"ib,tcp\".)\n";
+    }
+    if ($opt_protocol) {
+        $type = $opt_protocol;
+    } else {
+        $type = prompt_word("Enter protocol type [Default is tcp]: ","tcp");
+    }
+    return $type;
 }
 
 sub get_logging
 {
-	if ($opt_logging) {
-		$logging = $opt_logging;
-	} else {
-		$logging = "none";
-	}
-	return $logging;
+    if ($opt_logging) {
+        $logging = $opt_logging;
+    } else {
+        $logging = "none";
+    }
+    return $logging;
 }
 
 sub get_logstamp
 {
-	if ($opt_logstamp) {
-		$logstamp = $opt_logstamp;
-	} else {
-		$logstamp = "usec";
-	}
-	return $logstamp;
+    if ($opt_logstamp) {
+        $logstamp = $opt_logstamp;
+    } else {
+        $logstamp = "usec";
+    }
+    return $logstamp;
+}
+
+sub get_root_handle
+{
+    if ($opt_root_handle) {
+        $root_handle = $opt_root_handle;
+    } else {
+        $root_handle = 1048576;
+    }
+    return $root_handle;
+}
+
+sub get_fsid
+{
+    if ($opt_fsid) {
+        $fsid = $opt_fsid;
+    } else {
+        # compute a psuedo-random 32 bit file system ID
+        $fsid = int((rand() * 2147483647));
+    }
+    return $fsid;
+}
+
+sub get_last_handle
+{
+    if ($opt_last_handle) {
+        $last_handle = $opt_last_handle;
+    } else {
+        $last_handle = 4294967297;
+    }
+    return $last_handle;
+}
+
+sub get_first_handle
+{
+    if ($opt_first_handle) {
+        $first_handle = $opt_first_handle;
+    } else {
+        $first_handle = 4;
+    }
+    return $first_handle;
+}
+
+sub get_server_job_timeout
+{
+    if ($opt_server_job_timeout) {
+        $server_job_timeout = $opt_server_job_timeout;
+    } else {
+        $server_job_timeout = 30;
+    }
+    return $server_job_timeout;
+}
+
+sub get_client_job_timeout
+{
+    if ($opt_client_job_timeout) {
+        $client_job_timeout = $opt_client_job_timeout;
+    } else {
+        $client_job_timeout = 300;
+    }
+    return $client_job_timeout;
 }
 
 sub get_logfile
 {
-	if (!$opt_quiet) {
-		print "Choose a file for each server to write log messages to.\n";
-	}
-	if ($opt_logfile) {
-		$logfile = $opt_logfile;
-	} else {
-		$logfile = prompt_word("Enter log file location [Default is /tmp/pvfs2-server.log]: ","/tmp/pvfs2-server.log");
-	}
-	return $logfile;
+    if (!$opt_quiet) {
+        print "Choose a file for each server to write log messages to.\n";
+    }
+    if ($opt_logfile) {
+        $logfile = $opt_logfile;
+    } else {
+        $logfile = prompt_word("Enter log file location [Default is /tmp/pvfs2-server.log]: ","/tmp/pvfs2-server.log");
+    }
+    return $logfile;
 }
 
 sub get_storage
 {
-	if (!$opt_quiet) {
-		print "Choose a directory for each server to store data in.\n";
-	}
-	if ($opt_storage) {
-		$storage = $opt_storage;
-	} else {
-		$storage = prompt_word("Enter directory name: [Default is /pvfs2-storage-space]: ","/pvfs2-storage-space");
-	}
-	return $storage;
+    if (!$opt_quiet) {
+        print "Choose a directory for each server to store data in.\n";
+    }
+    if ($opt_storage) {
+        $storage = $opt_storage;
+    } else {
+        $storage = prompt_word("Enter directory name: [Default is /pvfs2-storage-space]: ","/pvfs2-storage-space");
+    }
+    return $storage;
 }
-		
+        
 
 
 # get host port
 sub tcp_get_port
 {
-	my $port;
-	if (!$opt_quiet) { 
-		print "Choose a TCP/IP port for the servers to listen on.  Note that this\n";
-		print "script assumes that all servers will use the same port number.\n";
-	}
-	if ($opt_tcpport) {
-		$port = $opt_tcpport;
-	} elsif ($opt_port) {
-		$port = $opt_port;
-		$opt_port = '';
-	} else {
-		$port = prompt_num("Enter port number [Default is 3334]: ","3334");
-	}
-	return  $port;
+    my $port;
+    if (!$opt_quiet) { 
+        print "Choose a TCP/IP port for the servers to listen on.  Note that this\n";
+        print "script assumes that all servers will use the same port number.\n";
+    }
+    if ($opt_tcpport) {
+        $port = $opt_tcpport;
+    } elsif ($opt_port) {
+        $port = $opt_port;
+        $opt_port = '';
+    } else {
+        $port = prompt_num("Enter port number [Default is 3334]: ","3334");
+    }
+    return  $port;
 }
 sub gm_get_port
 {
-	my $port;
-	if (!$opt_quiet) { 
-		print "Choose a GM port (in the range of 0 to 7) for the servers to listen on. \n";
-		print "This script assumes that all servers will use the same port number.\n";
-	}
-	if ($opt_gmport) {
-		$port = $opt_gmport;
-	} elsif ($opt_port) {
-		$port = $opt_port;
-		$opt_port = '';
-	} else {
-		$port = prompt_num("Enter port number [Default is 6]: ","6");
-	}
-	# every myrinet card i've seen has 8 ports.  If myricom makes a card
-	# with more than that, we'll have to adapt
-	($port < 8) or die "GM ports must be in the range 0 to 7";
+    my $port;
+    if (!$opt_quiet) { 
+        print "Choose a GM port (in the range of 0 to 7) for the servers to listen on. \n";
+        print "This script assumes that all servers will use the same port number.\n";
+    }
+    if ($opt_gmport) {
+        $port = $opt_gmport;
+    } elsif ($opt_port) {
+        $port = $opt_port;
+        $opt_port = '';
+    } else {
+        $port = prompt_num("Enter port number [Default is 6]: ","6");
+    }
+    # every myrinet card i've seen has 8 ports.  If myricom makes a card
+    # with more than that, we'll have to adapt
+    ($port < 8) or die "GM ports must be in the range 0 to 7";
 
-	return  $port;
+    return  $port;
 }
 sub ib_get_port
 {
-	my $port;
-	if (!$opt_quiet) { 
-		print "Choose a TCP/IP port for the servers to listen on for IB communications.  Note that this\n";
-		print "script assumes that all servers will use the same port number.\n";
-	}
-	if ($opt_ibport) {
-		$port = $opt_ibport;
-	} elsif ($opt_port) {
-		$port = $opt_port;
-		$opt_port = '';
-	} else {
-		$port = prompt_num("Enter port number [Default is 3335]: ","3335");
-	}
-	return  $port;
+    my $port;
+    if (!$opt_quiet) { 
+        print "Choose a TCP/IP port for the servers to listen on for IB communications.  Note that this\n";
+        print "script assumes that all servers will use the same port number.\n";
+    }
+    if ($opt_ibport) {
+        $port = $opt_ibport;
+    } elsif ($opt_port) {
+        $port = $opt_port;
+        $opt_port = '';
+    } else {
+        $port = prompt_num("Enter port number [Default is 3335]: ","3335");
+    }
+    return  $port;
 }
 sub get_ionames
 {
-	my($ioline);
-	$ioline ='';
-	if (!$opt_quiet) {
-		print "Next you must list the hostnames of the machines that will act as\n";
-		print "I/O servers.  Acceptable syntax is \"node1, node2, ...\" or \"node{#-#,#,#}\".\n";
-	}
-	if (@opt_ioservers) {
-		foreach $server (@opt_ioservers) {
-			$ioline = $ioline . ' ' .  $server;
-		}
-	} else {
-		$ioline = prompt_word("Enter hostnames [Default is localhost]: ","localhost");
-	}
+    my($ioline);
+    $ioline ='';
+    if (!$opt_quiet) {
+        print "Next you must list the hostnames of the machines that will act as\n";
+        print "I/O servers.  Acceptable syntax is \"node1, node2, ...\" or \"node{#-#,#,#}\".\n";
+    }
+    if (@opt_ioservers) {
+        foreach $server (@opt_ioservers) {
+            $ioline = $ioline . ' ' .  $server;
+        }
+    } else {
+        $ioline = prompt_word("Enter hostnames [Default is localhost]: ","localhost");
+    }
 
-	@io_aliases = parse_hostlist($ioline, $port);
-	@io_aliases = sort @io_aliases;
-	return @io_aliases;
+    @io_aliases = parse_hostlist($ioline, $port);
+    @io_aliases = sort @io_aliases;
+    return @io_aliases;
 }
 
 sub get_metanames
 {
-	my($metaline);
-	$metaline = '';
-	if (!$opt_quiet) {
-		print "Now list the hostnames of the machines that will act as Metadata\n";
-		print "servers.  This list may or may not overlap with the I/O server list.\n";
-	}
-	if (@opt_metaservers) {
-		foreach $server (@opt_metaservers) {
-			$metaline = $metaline . ' ' . $server;
-		}
-	} else {
-		$metaline = prompt_word("Enter hostnames [Default is localhost]: ","localhost");
-	}
-	@meta_aliases = parse_hostlist($metaline, $port);
-	@meta_aliases = sort @meta_aliases;
+    my($metaline);
+    $metaline = '';
+    if (!$opt_quiet) {
+        print "Now list the hostnames of the machines that will act as Metadata\n";
+        print "servers.  This list may or may not overlap with the I/O server list.\n";
+    }
+    if (@opt_metaservers) {
+        foreach $server (@opt_metaservers) {
+            $metaline = $metaline . ' ' . $server;
+        }
+    } else {
+        $metaline = prompt_word("Enter hostnames [Default is localhost]: ","localhost");
+    }
+    @meta_aliases = parse_hostlist($metaline, $port);
+    @meta_aliases = sort @meta_aliases;
 
-	return @meta_aliases;
+    return @meta_aliases;
 }
 
 # bmi_prot_mung(): makes bmi strings of the form protocol//host:port
 sub bmi_prot_mung
 {
-	my (@bmi_array);
-	my (@hosts) = @_;
-	my $num;
+    my (@bmi_array);
+    my (@hosts) = @_;
+    my $num;
 
-	for ($i=0; $i <= $#hosts; $i++) {
-	    $bmi_array[$i] = "";
-	    $num = 0;
-	    foreach (split(',', $type)) {
-		++$num;
-		if ($num > 1) {
-		    $bmi_array[$i] .= ",";
-		}
-		$bmi_array[$i] .= "$_://$hosts[$i]:" . $port{$_};
-	    }
-	}
-	return @bmi_array;
+    for ($i=0; $i <= $#hosts; $i++) {
+        $bmi_array[$i] = "";
+        $num = 0;
+        foreach (split(',', $type)) {
+        ++$num;
+        if ($num > 1) {
+            $bmi_array[$i] .= ",";
+        }
+        $bmi_array[$i] .= "$_://$hosts[$i]:" . $port{$_};
+        }
+    }
+    return @bmi_array;
 }
 
 # ---------------------
@@ -512,39 +609,46 @@ my $show_help = '';
 
 $opt_quiet = 0;
 GetOptions('protocol=s'    => \$opt_protocol,
-	   'port=i'        => \$opt_port,
-	   'tcpport=i'     => \$opt_tcpport,
-	   'gmport=i'      => \$opt_gmport,
-	   'ibport=i'      => \$opt_ibport,
-	   'ioservers=s'   => \@opt_ioservers,
-	   'metaservers=s' => \@opt_metaservers,
-	   'logfile=s'     => \$opt_logfile,
-	   'logging=s'     => \$opt_logging,
-	   'logstamp=s'    => \$opt_logstamp,
-	   'storage=s'     => \$opt_storage,
-	   'help'          => \$show_help,
-	   'quiet!'        => \$opt_quiet,
-	   'trovesync!'   => \$opt_trovesync,
-	   '-'		   => \$using_stdout);
+       'port=i'        => \$opt_port,
+       'tcpport=i'     => \$opt_tcpport,
+       'gmport=i'      => \$opt_gmport,
+       'ibport=i'      => \$opt_ibport,
+       'ioservers=s'   => \@opt_ioservers,
+       'metaservers=s' => \@opt_metaservers,
+       'logfile=s'     => \$opt_logfile,
+       'logging=s'     => \$opt_logging,
+       'logstamp=s'    => \$opt_logstamp,
+       'first-handle=i' => \$opt_first_handle,
+       'last-handle=i' => \$opt_last_handle,
+       'root-handle=i' => \$opt_root_handle,
+       'fsid=i'        => \$opt_fsid,
+       'server-job-timeout=i' => \$opt_server_job_timeout,
+       'client-job-timeout=i' => \$opt_client_job_timeout,
+       'storage=s'     => \$opt_storage,
+       'help'          => \$show_help,
+       'quiet!'        => \$opt_quiet,
+       'trovesync!'    => \$opt_trovesync,
+       '-'           => \$using_stdout)
+    or die "Could not parse arguments.  See -h for help.\n";
 
 if($show_help) {
-	usage();
+    usage();
+    exit;
 }
 
 if ($using_stdout) {
-	$output_target = STDOUT
+    $output_target = STDOUT
 }
 elsif (@ARGV != 2)
 {
-	usage();
+    die "Bad arguments.  See -h for help.\n";
 }
 else
 {
     $output_target = FILEOUT;
     unless (open($output_target, ">", $ARGV[0]))
     {
-        print STDERR "Can't open specified file $ARGV[0]: $!\n";
-        return;
+        die "Can't open specified file $ARGV[0]: $!\n";
     }
 }
 
@@ -556,15 +660,13 @@ print_welcome();
 $type = get_protocol();
 foreach (split(',', $type)) {
     if ($_ eq "tcp") {
-	$port{'tcp'} = tcp_get_port();
+        $port{'tcp'} = tcp_get_port();
     } elsif ($_ eq "gm") {
-	$port{'gm'} = gm_get_port();
+        $port{'gm'} = gm_get_port();
     } elsif ($_ eq "ib") {
-	$port{'ib'} = ib_get_port();
+        $port{'ib'} = ib_get_port();
     } else {
-	print "Sorry.  At this time, only the tcp,gm, and ib protocols are available\n";
-	print "for use with this configuration utility.\n";
-	exit 1;
+        die "Sorry.  At this time, only the tcp,gm, and ib protocols are available\nfor use with this configuration utility.\n";
     }
 }
 $bmi_module = join(',', map("bmi_" . $_, split(',', $type)));
@@ -587,34 +689,33 @@ foreach(@io_aliases,@meta_aliases){
 
 
 if (!$opt_quiet) {
-	print "Configured a total of ", ($#union_bmi + 1), " servers:\n";
-	print "", ($#io_bmi + 1), " of them are I/O servers.\n";
-	print "", ($#meta_bmi + 1), " of them are Metadata servers.\n";
+    print "Configured a total of ", ($#union_bmi + 1), " servers:\n";
+    print "", ($#io_bmi + 1), " of them are I/O servers.\n";
+    print "", ($#meta_bmi + 1), " of them are Metadata servers.\n";
 }
 
 if (!$opt_quiet) {
 
-	$verify_svr_flag = prompt_word("Would you like to verify server list (y/n) [Default is n]? ","n");
+    $verify_svr_flag = prompt_word("Would you like to verify server list (y/n) [Default is n]? ","n");
 
-	if($verify_svr_flag eq "y" or $verify_svr_flag eq "yes")
-	{
-	    print "****** I/O servers:\n";
-	    foreach(@io_bmi)
-	    {
-		print "$_\n";
-	    }
-	    print "\n****** Metadata servers:\n";
-	    foreach(@meta_bmi)
-	    {
-		print "$_\n";
-	    }
-	    my $ok_flag = prompt_word("Does this look ok (y/n) [Default is y]? ","y");
-	    if(!($ok_flag eq "y" or $ok_flag eq "yes"))
-	    {
-		print "Aborting...\n";
-		exit 1;
-	    }
-	}
+    if($verify_svr_flag eq "y" or $verify_svr_flag eq "yes")
+    {
+        print "****** I/O servers:\n";
+        foreach(@io_bmi)
+        {
+            print "$_\n";
+        }
+        print "\n****** Metadata servers:\n";
+        foreach(@meta_bmi)
+        {
+            print "$_\n";
+        }
+        my $ok_flag = prompt_word("Does this look ok (y/n) [Default is y]? ","y");
+        if(!($ok_flag eq "y" or $ok_flag eq "yes"))
+        {
+            die "Aborting...\n";
+        }
+    }
 }
 
 
@@ -622,6 +723,12 @@ $logfile = get_logfile();
 $storage = get_storage();
 $logging = get_logging();
 $logstamp = get_logstamp();
+$first_handle = get_first_handle();
+$last_handle = get_last_handle();
+$root_handle = get_root_handle();
+$fsid = get_fsid();
+$server_job_timeout = get_server_job_timeout();
+$client_job_timeout = get_client_job_timeout();
 
 # could prompt for handle recycle time, but it is probably best if we pick a
 # reasonable value w/o prompting
@@ -638,17 +745,14 @@ if (!$opt_quiet) {
     print "Writing fs config file... ";
     if ($using_stdout == 1)
     {
-	print "\n";
+        print "\n";
     }
 }
-
-# compute a psuedo-random 32 bit file system ID
-$rand_fs_id = int((rand() * 2147483647));
 
 emit_defaults($output_target, $num_unexp_reqs,
               $bmi_module, $handle_recycle_timeout_seconds);
 emit_aliases($output_target);
-emit_filesystem($output_target, "pvfs2-fs", $rand_fs_id, 1048576);
+emit_filesystem($output_target, "pvfs2-fs", $fsid, $root_handle);
 
 # close fs.conf
 if ($using_stdout == 0)
@@ -662,7 +766,7 @@ if (!$opt_quiet) {
     print "Writing ", ($#union_aliases + 1), " server config file(s)... ";
     if ($using_stdout == 1)
     {
-	print "\n";
+        print "\n";
     }
 }
 for($i = 0; $i <= $#union_aliases; $i++)
@@ -675,8 +779,7 @@ for($i = 0; $i <= $#union_aliases; $i++)
         $filename = "$ARGV[1]-$union_aliases[$i]";
         unless (open(FILEOUT, ">", $filename))
         {
-            print STDERR "Can't open specified file $ARGV[1]: $!\n";
-            return;
+            die "Can't open specified file $ARGV[1]: $!\n";
         }
     }
     emit_server_conf($output_target, $union_bmi[$i], $storage);
@@ -689,4 +792,12 @@ for($i = 0; $i <= $#union_aliases; $i++)
 if (!$opt_quiet) {
     print "Done.\n";
 }
+
+# Local variables:
+#  c-indent-level: 4
+#  c-basic-offset: 4
+# End:
+#  
+# vim: ts=8 sts=4 sw=4 expandtab
+
 

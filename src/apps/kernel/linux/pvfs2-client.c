@@ -27,12 +27,15 @@
 
 #define DEFAULT_ACACHE_TIMEOUT_STR "5"
 
+#define DEFAULT_LOGFILE "/tmp/pvfs2-client.log"
+
 typedef struct
 {
     int verbose;
     int foreground;
     char *acache_timeout;
     char *path;
+    char *logfile;
 } options_t;
 
 static void client_sig_handler(int signum);
@@ -90,6 +93,10 @@ int main(int argc, char **argv)
         {
             exit(1);
         }
+        /* get rid of stdout/stderr/stdin */
+        freopen("/dev/null", "r", stdin);
+        freopen("/dev/null", "w", stdout);
+        freopen("/dev/null", "w", stderr);
     }
     return monitor_pvfs2_client(&opts);
 }
@@ -131,7 +138,7 @@ static int verify_pvfs2_client_path(options_t *opts)
 
 static int monitor_pvfs2_client(options_t *opts)
 {
-    int ret = 1, fd = 0;
+    int ret = 1;
     pid_t new_pid = 0, wpid = 0;
     int dev_init_failures = 0;
 
@@ -151,11 +158,6 @@ static int monitor_pvfs2_client(options_t *opts)
             if (opts->verbose)
             {
                 printf("Waiting on child with pid %d\n", (int)new_pid);
-            }
-
-            for(fd = getdtablesize(); fd > -1; fd--)
-            {
-                close(fd);
             }
 
             wpid = waitpid(new_pid, &ret, 0);
@@ -225,13 +227,9 @@ static int monitor_pvfs2_client(options_t *opts)
                 printf("About to exec %s\n",opts->path);
             }
 
-            for(fd = getdtablesize(); fd > -1; fd--)
-            {
-                close(fd);
-            }
+            ret = execlp(opts->path, PVFS2_CLIENT_CORE_NAME, 
+                    "-a", opts->acache_timeout, "-L", opts->logfile, NULL);
 
-            ret = execlp(opts->path, PVFS2_CLIENT_CORE_NAME, "-a",
-                         opts->acache_timeout, NULL);
             fprintf(stderr, "Could not exec %s, errno is %d\n",
                     opts->path, errno);
             exit(1);
@@ -249,6 +247,8 @@ static void print_help(char *progname)
     printf("-v, --version                 display version and exit\n");
     printf("-V, --verbose                 run in verbose output mode\n");
     printf("-f, --foreground              run in foreground mode\n");
+    printf("-L  --logfile                 specify log file to write to\n"
+            "   (defaults to /tmp/pvfs2-client.log)\n");
     printf("-a MS, --acache-timeout=MS    acache timeout in ms "
            "(default is 0 ms)\n");
     printf("-p PATH, --path PATH          execute pvfs2-client at "
@@ -266,6 +266,7 @@ static void parse_args(int argc, char **argv, options_t *opts)
         {"version",0,0,0},
         {"verbose",0,0,0},
         {"foreground",0,0,0},
+        {"logfile",1,0,0},
         {"acache-timeout",1,0,0},
         {"path",1,0,0},
         {0,0,0,0}
@@ -273,7 +274,7 @@ static void parse_args(int argc, char **argv, options_t *opts)
 
     assert(opts);
 
-    while((ret = getopt_long(argc, argv, "hvVfa:p:",
+    while((ret = getopt_long(argc, argv, "hvVfa:p:L:",
                              long_opts, &option_index)) != -1)
     {
         switch(ret)
@@ -305,6 +306,10 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 {
                     goto do_path;
                 }
+                else if (strcmp("logfile", cur_option) == 0)
+                {
+                    goto do_logfile;
+                }
                 break;
             case 'h':
           do_help:
@@ -328,6 +333,10 @@ static void parse_args(int argc, char **argv, options_t *opts)
           do_acache:
                 opts->acache_timeout = optarg;
                 break;
+            case 'L':
+          do_logfile:
+                opts->logfile = optarg;
+                break;
             case 'p':
           do_path:
                 opts->path = optarg;
@@ -344,6 +353,19 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 exit(1);
         }
     }
+
+    if (!opts->logfile)
+    {
+        opts->logfile = DEFAULT_LOGFILE;
+    }
+    /* make sure that log file location is writable before proceeding */
+    ret = open(opts->logfile, O_CREAT|O_WRONLY, S_IRUSR|S_IWUSR);
+    if(ret < 0)
+    {
+        fprintf(stderr, "Error: logfile (%s) isn't writable.\n",
+                opts->logfile);
+        exit(1);
+    } 
 
     if (!opts->path)
     {

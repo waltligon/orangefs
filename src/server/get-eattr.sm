@@ -119,10 +119,34 @@ machine pvfs2_get_eattr_sm(
  */
 static int geteattr_setup_resp(PINT_server_op *s_op, job_status_s *js_p)
 {
+    int i, tsz;
     PINT_STATE_DEBUG("setup_resp");
-    s_op->resp.u.geteattr.val.buffer = malloc(s_op->req->u.geteattr.valsz);
-    if (!s_op->resp.u.geteattr.val.buffer)
+    gossip_debug(GOSSIP_GETEATTR_DEBUG,"geteattr requesting %d keys\n",
+            s_op->req->u.geteattr.nkey);
+    s_op->resp.u.geteattr.val =
+        malloc(s_op->req->u.geteattr.nkey*sizeof(PVFS_ds_keyval));
+    if (!s_op->resp.u.geteattr.val)
         return -PVFS_ENOMEM;
+    s_op->resp.u.geteattr.nkey = s_op->req->u.geteattr.nkey;
+    for (i = 0, tsz = 0; i < s_op->req->u.geteattr.nkey; i++)
+        tsz += s_op->req->u.geteattr.valsz[i];
+    s_op->u.eattr.buffer = malloc(tsz);
+    if (!s_op->u.eattr.buffer)
+    {
+        s_op->resp.u.geteattr.nkey = 0;
+        free (s_op->resp.u.geteattr.val);
+        return -PVFS_ENOMEM;
+    }
+    gossip_debug(GOSSIP_GETEATTR_DEBUG,"geteattr buffer size %d bytes\n",
+            tsz);
+    for (i = 0, tsz = 0; i < s_op->req->u.geteattr.nkey; i++)
+    {
+        s_op->resp.u.geteattr.val[i].buffer_sz =
+            s_op->req->u.geteattr.valsz[i];
+        s_op->resp.u.geteattr.val[i].buffer =
+            s_op->u.eattr.buffer + tsz;
+        tsz += s_op->req->u.geteattr.valsz[i];
+    }
     return 1;
 }
 
@@ -140,13 +164,12 @@ static int geteattr_read_eattrib(
 
     js_p->error_code = 0;
 
-    s_op->resp.u.geteattr.val.buffer_sz = s_op->req->u.geteattr.valsz;
-
-    ret = job_trove_keyval_read(
+    ret = job_trove_keyval_read_list(
         s_op->req->u.geteattr.fs_id,
         s_op->req->u.geteattr.handle,
-        &(s_op->req->u.geteattr.key),
-        &(s_op->resp.u.geteattr.val),
+        s_op->req->u.geteattr.key,
+        s_op->resp.u.geteattr.val,
+        s_op->req->u.geteattr.nkey,
         0,
         NULL,
         s_op,
@@ -164,10 +187,26 @@ static int geteattr_read_eattrib(
  */
 static int geteattr_check_resp(PINT_server_op *s_op, job_status_s *js_p)
 {
+    int k;
     PINT_STATE_DEBUG("check_resp");
+    gossip_debug(GOSSIP_GETEATTR_DEBUG,"geteattr returning %d values\n",
+            s_op->resp.u.geteattr.nkey);
     /* put the returned read buffer size in buffer_sz */
+    gossip_debug(GOSSIP_GETEATTR_DEBUG,"status %d error_code %d nkeys %d\n",
+            s_op->resp.status, js_p->error_code, s_op->resp.u.geteattr.nkey);
     /* it is the only thing returned across the wire */
-    s_op->resp.u.geteattr.val.buffer_sz = s_op->resp.u.geteattr.val.read_sz;
+    for (k = 0; k < s_op->resp.u.geteattr.nkey; k++)
+    {
+        if (js_p->error_code == 0)
+        {
+            s_op->resp.u.geteattr.val[k].buffer_sz =
+                s_op->resp.u.geteattr.val[k].read_sz;
+        }
+        /* in case of any errors, we initialize it to 0 */
+        else {
+            s_op->resp.u.geteattr.val[k].buffer_sz = 0;
+        }
+    }
     return 1;
 }
 
@@ -177,8 +216,10 @@ static int geteattr_check_resp(PINT_server_op *s_op, job_status_s *js_p)
 static int geteattr_cleanup(PINT_server_op *s_op, job_status_s *js_p)
 {
     PINT_STATE_DEBUG("geteattr_cleanup");
-    if (s_op->resp.u.geteattr.val.buffer)
-        free(s_op->resp.u.geteattr.val.buffer);
+    if (s_op->resp.u.geteattr.val)
+        free(s_op->resp.u.geteattr.val);
+    if (s_op->u.eattr.buffer)
+        free(s_op->u.eattr.buffer);
     return(server_state_machine_complete(s_op));
 }
 

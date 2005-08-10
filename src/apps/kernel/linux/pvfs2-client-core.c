@@ -76,10 +76,13 @@
 #include "pint-util.h"
 #endif
 
+#define DEFAULT_LOGFILE "/tmp/pvfs2-client.log"
+
 typedef struct
 {
     /* client side attribute cache timeout; 0 is effectively disabled */
     int acache_timeout;
+    char* logfile;
 } options_t;
 
 /*
@@ -115,6 +118,8 @@ typedef struct
 #endif
     PVFS_Request file_req;
     PVFS_Request mem_req;
+    PVFS_ds_keyval  key;/* used only by geteattr, seteattr */
+    PVFS_ds_keyval  val;
     void *io_kernel_mapped_buf;
 
     int was_handled_inline;
@@ -132,6 +137,7 @@ typedef struct
         PVFS_sysresp_readdir readdir;
         PVFS_sysresp_statfs statfs;
         PVFS_sysresp_io io;
+        PVFS_sysresp_geteattr geteattr;
     } response;
 
 #ifdef CLIENT_CORE_OP_TIMING
@@ -666,6 +672,127 @@ static PVFS_error post_truncate_request(vfs_request_t *vfs_request)
     if (ret < 0)
     {
         PVFS_perror_gossip("Posting truncate failed", ret);
+    }
+    return ret;
+}
+
+static PVFS_error post_getxattr_request(vfs_request_t *vfs_request)
+{
+    PVFS_error ret = -PVFS_EINVAL;
+
+    gossip_debug(
+        GOSSIP_CLIENTCORE_DEBUG,
+        "got a getxattr request for fsid %d | handle %Lu\n",
+        vfs_request->in_upcall.req.getxattr.refn.fs_id,
+        Lu(vfs_request->in_upcall.req.getxattr.refn.handle));
+
+    /* We need to fill in the vfs_request->key field here */
+    vfs_request->key.buffer = vfs_request->in_upcall.req.getxattr.key;
+    vfs_request->key.buffer_sz = vfs_request->in_upcall.req.getxattr.key_sz;
+    gossip_debug( GOSSIP_CLIENTCORE_DEBUG, 
+            "getxattr key %s keysz %d\n", 
+            (char *) vfs_request->key.buffer, vfs_request->key.buffer_sz);
+
+    /* We also need to allocate memory for the vfs_request->response.geteattr */
+
+    vfs_request->response.geteattr.val_array = 
+        (PVFS_ds_keyval *) malloc(sizeof(PVFS_ds_keyval));
+    if (vfs_request->response.geteattr.val_array == NULL)
+    {
+        return -PVFS_ENOMEM;
+    }
+    vfs_request->response.geteattr.val_array[0].buffer = 
+        (void *) malloc(PVFS_REQ_LIMIT_VAL_LEN);
+    if (vfs_request->response.geteattr.val_array[0].buffer == NULL)
+    {
+        free(vfs_request->response.geteattr.val_array);
+        return -PVFS_ENOMEM;
+    }
+    vfs_request->response.geteattr.val_array[0].buffer_sz = 
+        PVFS_REQ_LIMIT_VAL_LEN;
+    /* Remember to free these up */
+    ret = PVFS_isys_geteattr_list(
+        vfs_request->in_upcall.req.getxattr.refn,
+        &vfs_request->in_upcall.credentials,
+        1,
+        &vfs_request->key,
+        &vfs_request->response.geteattr,
+        &vfs_request->op_id, 
+        (void *)vfs_request);
+
+    if (ret < 0)
+    {
+        PVFS_perror_gossip("Posting getxattr failed", ret);
+    }
+    return ret;
+}
+
+static PVFS_error post_setxattr_request(vfs_request_t *vfs_request)
+{
+    PVFS_error ret = -PVFS_EINVAL;
+
+    gossip_debug(
+        GOSSIP_CLIENTCORE_DEBUG,
+        "got a setxattr request for fsid %d | handle %Lu\n",
+        vfs_request->in_upcall.req.setxattr.refn.fs_id,
+        Lu(vfs_request->in_upcall.req.setxattr.refn.handle));
+
+    /* We need to fill in the vfs_request->key field here */
+    vfs_request->key.buffer = vfs_request->in_upcall.req.setxattr.keyval.key;
+    vfs_request->key.buffer_sz = 
+        vfs_request->in_upcall.req.setxattr.keyval.key_sz;
+    gossip_debug(
+        GOSSIP_CLIENTCORE_DEBUG,
+        "setxattr key %s\n", (char *) vfs_request->key.buffer);
+    /* We need to fill in the vfs_request->val field here */
+    vfs_request->val.buffer = vfs_request->in_upcall.req.setxattr.keyval.val;
+    vfs_request->val.buffer_sz = 
+        vfs_request->in_upcall.req.setxattr.keyval.val_sz;
+
+    ret = PVFS_isys_seteattr_list(
+        vfs_request->in_upcall.req.setxattr.refn,
+        &vfs_request->in_upcall.credentials,
+        1,
+        &vfs_request->key,
+        &vfs_request->val,
+        vfs_request->in_upcall.req.setxattr.flags,
+        &vfs_request->op_id, 
+        (void *)vfs_request);
+
+    if (ret < 0)
+    {
+        PVFS_perror_gossip("Posting setattr failed", ret);
+    }
+    return ret;
+}
+
+static PVFS_error post_removexattr_request(vfs_request_t *vfs_request)
+{
+    PVFS_error ret = -PVFS_EINVAL;
+
+    gossip_debug(
+        GOSSIP_CLIENTCORE_DEBUG,
+        "got a removexattr request for fsid %d | handle %Lu\n",
+        vfs_request->in_upcall.req.removexattr.refn.fs_id,
+        Lu(vfs_request->in_upcall.req.removexattr.refn.handle));
+
+    /* We need to fill in the vfs_request->key field here */
+    vfs_request->key.buffer = vfs_request->in_upcall.req.removexattr.key;
+    vfs_request->key.buffer_sz = vfs_request->in_upcall.req.removexattr.key_sz;
+    gossip_debug(
+        GOSSIP_CLIENTCORE_DEBUG,
+        "removexattr key %s\n", (char *) vfs_request->key.buffer);
+
+    ret = PVFS_isys_deleattr(
+        vfs_request->in_upcall.req.setxattr.refn,
+        &vfs_request->in_upcall.credentials,
+        &vfs_request->key,
+        &vfs_request->op_id, 
+        (void *)vfs_request);
+
+    if (ret < 0)
+    {
+        PVFS_perror_gossip("Posting deleattr failed", ret);
     }
     return ret;
 }
@@ -1628,6 +1755,39 @@ static inline void package_downcall_members(
                 *error_code = -PVFS_EINTR;
             }
             break;
+        case PVFS2_VFS_OP_GETXATTR:
+            if (*error_code == 0)
+            {
+                int val_sz = 
+                    vfs_request->response.geteattr.val_array[0].read_sz;
+                gossip_debug(GOSSIP_CLIENTCORE_DEBUG, 
+                        "getxattr: val_sz %d, val %s\n",
+                        val_sz, 
+                        (char *) vfs_request->response.geteattr.val_array[0].buffer);
+                /* copy the requested key's value out to the downcall */
+                if (val_sz > PVFS_MAX_XATTR_VALUELEN)
+                {
+                    /* This is really bad. Can it happen? */
+                    *error_code = -PVFS_EINVAL;
+                }
+                else
+                {
+                    vfs_request->out_downcall.resp.getxattr.val_sz = val_sz;
+                    memcpy(vfs_request->out_downcall.resp.getxattr.val,
+                            vfs_request->response.geteattr.val_array[0].buffer,
+                            val_sz);
+                }
+            }
+            /* free up the memory allocate to response.geteattr */
+            free(vfs_request->response.geteattr.val_array[0].buffer);
+            vfs_request->response.geteattr.val_array[0].buffer = NULL;
+            free(vfs_request->response.geteattr.val_array);
+            vfs_request->response.geteattr.val_array = NULL;
+            break;
+        case PVFS2_VFS_OP_SETXATTR:
+            break;
+        case PVFS2_VFS_OP_REMOVEXATTR:
+            break;
         default:
             gossip_err("Completed upcall of unknown type %x!\n",
                        vfs_request->in_upcall.type);
@@ -1780,6 +1940,18 @@ static inline PVFS_error handle_unexp_vfs_request(
             posted_op = 1;
             ret = post_truncate_request(vfs_request);
             break;
+        case PVFS2_VFS_OP_GETXATTR:
+            posted_op = 1;
+            ret = post_getxattr_request(vfs_request);
+            break;
+        case PVFS2_VFS_OP_SETXATTR:
+            posted_op = 1;
+            ret = post_setxattr_request(vfs_request);
+            break;
+        case PVFS2_VFS_OP_REMOVEXATTR:
+            posted_op = 1;
+            ret = post_removexattr_request(vfs_request);
+            break;
             /*
               NOTE: mount, umount and statfs are blocking
               calls that are serviced inline.
@@ -1818,10 +1990,11 @@ static inline PVFS_error handle_unexp_vfs_request(
             posted_op = 1;
             ret = post_fsync_request(vfs_request);
             break;
+        case PVFS2_VFS_OP_LISTXATTR:
         case PVFS2_VFS_OP_INVALID:
         default:
             gossip_err(
-                "Got an unrecognized vfs operation of "
+                "Got an unrecognized/unimplemented vfs operation of "
                 "type %x.\n", vfs_request->in_upcall.type);
             break;
     }
@@ -2095,6 +2268,13 @@ int main(int argc, char **argv)
         return ret;
     }
 
+    ret = gossip_enable_file(s_opts.logfile, "w");
+    if(ret < 0)
+    {
+        fprintf(stderr, "Error opening logfile: %s\n", s_opts.logfile);
+        return(ret);
+    }
+
     start_time = time(NULL);
     local_time = localtime(&start_time);
 
@@ -2221,12 +2401,13 @@ static void parse_args(int argc, char **argv, options_t *opts)
     {
         {"help",0,0,0},
         {"acache-timeout",1,0,0},
+        {"logfile",1,0,0},
         {0,0,0,0}
     };
 
     assert(opts);
 
-    while((ret = getopt_long(argc, argv, "ha:",
+    while((ret = getopt_long(argc, argv, "ha:L:",
                              long_opts, &option_index)) != -1)
     {
         switch(ret)
@@ -2242,11 +2423,19 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 {
                     goto do_acache;
                 }
+                else if (strcmp("logfile", cur_option) == 0)
+                {
+                    goto do_logfile;
+                }
                 break;
             case 'h':
           do_help:
                 print_help(argv[0]);
                 exit(0);
+            case 'L':
+          do_logfile:
+                opts->logfile = optarg;
+                break;
             case 'a':
           do_acache:
                 opts->acache_timeout = atoi(optarg);
@@ -2263,6 +2452,10 @@ static void parse_args(int argc, char **argv, options_t *opts)
                         "Try --help for information.\n");
                 exit(1);
         }
+    }
+    if (!opts->logfile)
+    {
+        opts->logfile = DEFAULT_LOGFILE;
     }
 }
 
@@ -2333,7 +2526,12 @@ static char *get_vfs_op_name_str(int op_type)
         { PVFS2_VFS_OP_MMAP_RA_FLUSH, "PVFS2_VFS_OP_MMAP_RA_FLUSH" },
         { PVFS2_VFS_OP_FS_MOUNT, "PVFS2_VFS_OP_FS_MOUNT" },
         { PVFS2_VFS_OP_FS_UMOUNT, "PVFS2_VFS_OP_FS_UMOUNT" },
+        { PVFS2_VFS_OP_GETXATTR,  "PVFS2_VFS_OP_GETXATTR" },
+        { PVFS2_VFS_OP_SETXATTR,  "PVFS2_VFS_OP_SETXATTR" },
+        { PVFS2_VFS_OP_LISTXATTR, "PVFS2_VFS_OP_LISTXATTR" },
+        { PVFS2_VFS_OP_REMOVEXATTR, "PVFS2_VFS_OP_REMOVEXATTR" },
         { PVFS2_VFS_OP_CANCEL, "PVFS2_VFS_OP_CANCEL" },
+        { PVFS2_VFS_OP_FSYNC,  "PVFS2_VFS_OP_FSYNC" },
         { 0, "UNKNOWN" }
     };
 

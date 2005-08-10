@@ -110,6 +110,7 @@ static int final_response_send_resp(
 {
     int ret = -1;
     job_id_t tmp_id;
+    struct server_configuration_s *user_opts = get_server_config_struct();
     
     gossip_debug(
         GOSSIP_SERVER_DEBUG, 
@@ -139,7 +140,7 @@ static int final_response_send_resp(
         s_op->addr, s_op->encoded.buffer_list, s_op->encoded.size_list,
         s_op->encoded.list_count, s_op->encoded.total_size, s_op->tag,
         s_op->encoded.buffer_type, 0, s_op, 0, js_p, &tmp_id,
-        server_job_context, PVFS2_SERVER_RESPONSE_TIMEOUT);
+        server_job_context, user_opts->server_job_bmi_timeout);
 
     return ret;
 }
@@ -152,9 +153,14 @@ static int final_response_send_resp(
  */
 static int final_response_cleanup(PINT_server_op *s_op, job_status_s *js_p)
 {
+    char status_string[64] = {0};
+
     gossip_debug(GOSSIP_SERVER_DEBUG, 
                  "(%p) %s (FR sm) state: cleanup\n",
                  s_op, PINT_map_server_op_to_string(s_op->req->op));
+
+    PVFS_strerror_r(s_op->resp.status, status_string, 64);
+    PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "finish (%s)\n", status_string);
 
     PINT_encode_release(&s_op->encoded, PINT_ENCODE_RESP);
 
@@ -199,6 +205,9 @@ static __req_resp_type_desc_t s_req_resp_type_map[
       "PVFS_SERV_MGMT_GET_DIRDATA_HANDLE" },
     { PVFS_SERV_JOB_TIMER, "PVFS_SERV_JOB_TIMER" },
     { PVFS_SERV_PROTO_ERROR, "PVFS_SERV_PROTO_ERROR" },
+    { PVFS_SERV_GETEATTR, "PVFS_SERV_GETEATTR" },
+    { PVFS_SERV_SETEATTR, "PVFS_SERV_SETEATTR" },
+    { PVFS_SERV_DELEATTR, "PVFS_SERV_DELEATTR" },
 };
 
 static void PINT_gossip_err_server_resp(

@@ -207,7 +207,7 @@ PVFS_error PVFS_isys_getattr(
     }
     memset(sm_p, 0, sizeof(*sm_p));
 
-    PINT_init_msgarray_params(&sm_p->msgarray_params);
+    PINT_init_msgarray_params(&sm_p->msgarray_params, ref.fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->error_code = 0;
     sm_p->object_ref = ref;

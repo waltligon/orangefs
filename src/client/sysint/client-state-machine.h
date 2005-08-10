@@ -25,7 +25,7 @@
 #include "acache.h"
 #include "id-generator.h"
 #include "msgpairarray.h"
-#include "pint-util.h"
+#include "pint-sysint-utils.h"
 
 /* skip everything except #includes if __SM_CHECK_DEP is already defined; this
  * allows us to get the dependencies right for msgpairarray.sm which relies
@@ -38,24 +38,17 @@
 #define MAX_LOOKUP_SEGMENTS PVFS_REQ_LIMIT_PATH_SEGMENT_COUNT
 #define MAX_LOOKUP_CONTEXTS PVFS_REQ_LIMIT_MAX_SYMLINK_RESOLUTION_COUNT
 
-/*
-  TODO: the following constants should be run-time configurable
-  eventually
-*/
-
-/* jobs that send or receive request messages will timeout if they do
- * not complete within PVFS2_CLIENT_JOB_TIMEOUT seconds; flows will
- * timeout if they go for more than PVFS2_CLIENT_JOB_TIMEOUT seconds
- * without moving any data.
+/* Default client timeout in seconds used to set the timeout for jobs that
+ * send or receive request messages.
  */
-#define PVFS2_CLIENT_JOB_TIMEOUT 30
+#define PVFS2_CLIENT_JOB_BMI_TIMEOUT_DEFAULT 30
 
-/* the maximum number of times to retry restartable client operations,
- * or INT_MAX to try forever (well, 187 years if retry_delay = 2 sec). */
-#define PVFS2_CLIENT_RETRY_LIMIT  (5)
+/* Default number of times to retry restartable client operations. */
+#define PVFS2_CLIENT_RETRY_LIMIT_DEFAULT  (5)
 
-/* the number of milliseconds to delay before retries */
-#define PVFS2_CLIENT_RETRY_DELAY  2000
+/* Default number of milliseconds to delay before retries */
+#define PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT  2000
+
 
 /* PINT_client_sm_recv_state_s
  *
@@ -395,6 +388,28 @@ typedef struct PINT_sm_getattr_state
         memset(&(_state), 0, sizeof(PINT_sm_getattr_state)); \
     } while(0)
 
+struct PINT_client_geteattr_sm
+{
+    int32_t nkey;
+    PVFS_ds_keyval *key_array;
+    PVFS_size *size_array;
+    PVFS_sysresp_geteattr *resp_p;
+};
+
+struct PINT_client_seteattr_sm
+{
+    int32_t nkey;
+    int32_t flags; /* flags specify if attrs should not exist (XATTR_CREATE) or
+                      if they should exist (XATTR_REPLACE) or neither */
+    PVFS_ds_keyval *key_array;
+    PVFS_ds_keyval *val_array;
+};
+
+struct PINT_client_deleattr_sm
+{
+    PVFS_ds_keyval *key_p;
+};
+
 typedef struct PINT_client_sm
 {
     /*
@@ -427,7 +442,9 @@ typedef struct PINT_client_sm
     /* generic getattr used with getattr sub state machines */
     PINT_sm_getattr_state getattr;
 
-    /* generic msgpair used with msgpair substate */
+    /* msgpair scratch space used within msgpairarray substatemachine */
+    /* if you have only a single msg pair you may point sm_p->msgarray */
+    /* at this.  Otherwise leave it alone */
     PINT_sm_msgpair_state msgpair;
 
     /* msgpair array ptr used when operations can be performed
@@ -470,6 +487,9 @@ typedef struct PINT_client_sm
         struct PINT_client_mgmt_create_dirent_sm mgmt_create_dirent;
         struct PINT_client_mgmt_get_dirdata_handle_sm mgmt_get_dirdata_handle;
 	struct PINT_server_get_config_sm get_config;
+	struct PINT_client_geteattr_sm geteattr;
+	struct PINT_client_seteattr_sm seteattr;
+	struct PINT_client_deleattr_sm deleattr;
     } u;
 } PINT_client_sm;
 
@@ -550,6 +570,9 @@ enum
     PVFS_SYS_SETATTR               = 10,
     PVFS_SYS_LOOKUP                = 11,
     PVFS_SYS_RENAME                = 12,
+    PVFS_SYS_GETEATTR              = 13,
+    PVFS_SYS_SETEATTR              = 14,
+    PVFS_SYS_DELEATTR              = 15,
     PVFS_MGMT_SETPARAM_LIST        = 70,
     PVFS_MGMT_NOOP                 = 71,
     PVFS_MGMT_STATFS_LIST          = 72,
@@ -604,13 +627,25 @@ do {                                                          \
     }                                                         \
 } while(0)
 
-#define PINT_init_msgarray_params(msgarray_params_ptr)\
-do {                                                  \
-    PINT_sm_msgpair_params *mpp = msgarray_params_ptr;\
-    mpp->job_context = pint_client_sm_context;        \
-    mpp->job_timeout = PVFS2_CLIENT_JOB_TIMEOUT;      \
-    mpp->retry_delay = PVFS2_CLIENT_RETRY_DELAY;      \
-    mpp->retry_limit = PVFS2_CLIENT_RETRY_LIMIT;      \
+#define PINT_init_msgarray_params(msgarray_params_ptr, __fsid)     \
+do {                                                               \
+    PINT_sm_msgpair_params *mpp = msgarray_params_ptr;             \
+    struct server_configuration_s *server_config =                 \
+        PINT_get_server_config_struct(__fsid);                     \
+    mpp->job_context = pint_client_sm_context;                     \
+    if (server_config)                                             \
+    {                                                              \
+        mpp->job_timeout = server_config->client_job_bmi_timeout;  \
+        mpp->retry_limit = server_config->client_retry_limit;      \
+        mpp->retry_delay = server_config->client_retry_delay_ms;   \
+    }                                                              \
+    else                                                           \
+    {                                                              \
+        mpp->job_timeout = PVFS2_CLIENT_JOB_BMI_TIMEOUT_DEFAULT;   \
+        mpp->retry_limit = PVFS2_CLIENT_RETRY_LIMIT_DEFAULT;       \
+        mpp->retry_delay = PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT;    \
+    }                                                              \
+    PINT_put_server_config_struct(server_config);                  \
 } while(0)
 
 #define PINT_init_msgpair(sm_p, msg_p)                         \
@@ -664,6 +699,9 @@ extern struct PINT_state_machine_s pvfs2_client_mgmt_remove_object_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_remove_dirent_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_create_dirent_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_get_dirdata_handle_sm;
+extern struct PINT_state_machine_s pvfs2_client_get_eattr_sm;
+extern struct PINT_state_machine_s pvfs2_client_set_eattr_sm;
+extern struct PINT_state_machine_s pvfs2_client_del_eattr_sm;
 
 
 /* nested state machines (helpers) */

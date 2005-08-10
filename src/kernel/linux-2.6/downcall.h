@@ -98,6 +98,30 @@ typedef struct
 {
 } pvfs2_fs_umount_response_t;
 
+/* the getxattr response is the attribute value */
+
+typedef struct {
+    size_t val_sz;
+    char val[PVFS_MAX_XATTR_VALUELEN];
+} pvfs2_getxattr_response_t;
+
+/* the setxattr response is a blank downcall */
+
+typedef struct {
+} pvfs2_setxattr_response_t;
+
+/* the listxattr response is an array of attribute names, values */
+
+typedef struct {
+    PVFS_keyval_pair keyvals[PVFS_MAX_XATTR_LISTLEN];
+} pvfs2_listxattr_response_t;
+
+/* the removexattr response is a blank downcall */
+
+typedef struct {
+} pvfs2_removexattr_response_t;
+
+
 /* the cancel response is a blank downcall */
 typedef struct
 {
@@ -129,6 +153,10 @@ typedef struct
 /* 	pvfs2_truncate_response_t truncate; */
         pvfs2_fs_mount_response_t fs_mount;
 /* 	pvfs2_fs_umount_response_t fs_umount; */
+        pvfs2_getxattr_response_t getxattr;
+/*      pvfs2_setxattr_response_t setxattr */
+/*        pvfs2_listxattr_response_t listxattr; */ /* NOT IMPLEMENTED YET */
+/*      pvfs2_removexattr_response_t removexattr; */
 /* 	pvfs2_cancel_response_t cancel; */
 /* 	pvfs2_fsync_response_t fsync; */
     } resp;

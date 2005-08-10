@@ -189,6 +189,26 @@ typedef enum
 #define decode_PVFS_ds_type decode_enum
 #define encode_PVFS_ds_type encode_enum
 
+/* Key/Value Pairs */
+/* Extended attributes are stored on objects with */
+/* a Key/Value pair.  A key or a value is simply */
+/* a byte string of some length.  Keys are normally */
+/* strings, and thus are printable ASCII and NULL */
+/* terminated.  Values are any sequence of bytes */
+/* and are user interpreted.  This struct represents */
+/* EITHER a key or a value.  This struct is IDENTICAL */
+/* to a TROVE_keyval_s defined in src/io/trove/trove-types.h */
+/* but is duplicated here to maintain separation between */
+/* the Rrove implementation and PVFS2.  This struct should */
+/* be used everywhere but within Trove. WBL 6/2005*/
+typedef struct PVFS_ds_keyval_s
+{
+        void *buffer;      /* points to actual key or value */
+        int32_t buffer_sz; /* the size of the area pointed to by buffer */
+        int32_t read_sz;   /* when reading, the actual number of bytes read */
+                           /* only valid after a read */
+} PVFS_ds_keyval;
+
 /* attribute masks used by system interface callers */
 #define PVFS_ATTR_SYS_SIZE                  (1 << 20)
 #define PVFS_ATTR_SYS_LNK_TARGET            (1 << 24)
@@ -216,6 +236,10 @@ typedef enum
  PVFS_ATTR_SYS_DFILE_COUNT | PVFS_ATTR_SYS_DIRENT_COUNT)
 #define PVFS_ATTR_SYS_ALL_SETABLE \
 (PVFS_ATTR_SYS_COMMON_ALL-PVFS_ATTR_SYS_TYPE)
+
+/* Extended attribute flags */
+#define PVFS_XATTR_CREATE  0x1
+#define PVFS_XATTR_REPLACE 0x2
 
 /** statfs and misc. server statistic information. */
 typedef struct
@@ -274,6 +298,23 @@ endecode_fields_2(
 /* max len of individual path element */
 #define PVFS_SEGMENT_MAX         128
 
+/* max extended attribute name len as imposed by the VFS and exploited for the
+ * upcall request types */
+#define PVFS_MAX_XATTR_NAMELEN   256 /* Not the same as XATTR_NAME_MAX defined
+                                        by <linux/xattr.h> */
+#define PVFS_MAX_XATTR_VALUELEN  256 /* Not the same as XATTR_SIZE_MAX defined
+                                        by <linux/xattr.h> */ 
+#define PVFS_MAX_XATTR_LISTLEN   10    /* Not the same as XATTR_LIST_MAX
+                                          defined by <linux/xattr.h> */
+
+/* This structure is used by the VFS-client interaction alone */
+typedef struct {
+    char key[PVFS_MAX_XATTR_NAMELEN];
+    int  key_sz;
+    char val[PVFS_MAX_XATTR_VALUELEN];
+    int  val_sz;
+} PVFS_keyval_pair;
+
 /** Directory entry contents. */
 typedef struct
 {
@@ -296,7 +337,9 @@ enum PVFS_server_param
     PVFS_SERV_PARAM_ROOT_CHECK = 3,  /* verify existance of root handle */
     PVFS_SERV_PARAM_MODE = 4,        /* change the current server mode */
     PVFS_SERV_PARAM_EVENT_ON = 5,    /* event logging on or off */
-    PVFS_SERV_PARAM_EVENT_MASKS = 6  /* API masks for event logging */
+    PVFS_SERV_PARAM_EVENT_MASKS = 6, /* API masks for event logging */
+    PVFS_SERV_PARAM_SYNC_META = 7,   /* metadata sync flags */
+    PVFS_SERV_PARAM_SYNC_DATA = 8,   /* file data sync flags */
 };
 
 enum PVFS_server_mode

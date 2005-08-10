@@ -664,7 +664,8 @@ static void PINT_dotconf_set_command(
 		{
 		    PINT_dotconf_warning(configfile, DCLOG_WARNING,
 				    ERR_WRONG_ARG_COUNT,
-				    "Missing argument to option '%s'\n", name);
+				    "Missing argument to option '%s'\n", 
+                                    option->name);
                     cmd->error = 1;
 		    return;
 		}
@@ -676,7 +677,8 @@ static void PINT_dotconf_set_command(
 		{
 		    PINT_dotconf_warning(configfile, DCLOG_WARNING,
 				    ERR_WRONG_ARG_COUNT,
-				    "Missing argument to option '%s'\n", name);
+				    "Missing argument to option '%s'\n", 
+                                    option->name);
                     cmd->error = 1;
 		    return;
 		}
@@ -686,7 +688,8 @@ static void PINT_dotconf_set_command(
                 {
 		    PINT_dotconf_warning(configfile, DCLOG_WARNING,
 				    ERR_PARSE_ERROR,
-				    "Non-integer argument to option '%s'\n", name);
+				    "Non-integer argument to option '%s'\n",
+                                    option->name);
                     cmd->error = 1;
                 }
 		break;
@@ -695,7 +698,8 @@ static void PINT_dotconf_set_command(
 		{
 		    PINT_dotconf_warning(configfile, DCLOG_WARNING,
 				    ERR_WRONG_ARG_COUNT,
-				    "Missing argument to option '%s'\n", name);
+				    "Missing argument to option '%s'\n", 
+                                    option->name);
                     cmd->error = 1;
 		    return;
 		}

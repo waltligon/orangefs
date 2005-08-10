@@ -274,6 +274,7 @@ static int getattr_verify_attribs(
     */
     if (resp_attr->objtype == PVFS_TYPE_METAFILE)
     {
+        PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: metafile\n");
         gossip_debug(GOSSIP_GETATTR_DEBUG,
                      "  Req handle %Lu refers to a metafile\n",
                      Lu(s_op->u.getattr.handle));
@@ -323,6 +324,7 @@ static int getattr_verify_attribs(
     }
     else if (resp_attr->objtype == PVFS_TYPE_DATAFILE)
     {
+        PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: datafile\n");
         /*
           note: the prelude already retrieved the size for us, so
           there's no special action that needs to be taken if we have
@@ -340,6 +342,7 @@ static int getattr_verify_attribs(
     }
     else if (resp_attr->objtype == PVFS_TYPE_DIRECTORY)
     {
+        PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: directory\n");
         if (s_op->u.getattr.attrmask & PVFS_ATTR_DIR_DIRENT_COUNT)
         {
             gossip_debug(GOSSIP_GETATTR_DEBUG,
@@ -358,6 +361,7 @@ static int getattr_verify_attribs(
     }
     else if (resp_attr->objtype == PVFS_TYPE_DIRDATA)
     {
+        PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: dirdata\n");
 	gossip_debug(
             GOSSIP_GETATTR_DEBUG, "  handle %Lu refers to "
             "a dirdata object. doing nothing special\n",
@@ -366,6 +370,7 @@ static int getattr_verify_attribs(
     }
     else if (resp_attr->objtype == PVFS_TYPE_SYMLINK)
     {
+        PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: symlink\n");
 	gossip_debug(
             GOSSIP_GETATTR_DEBUG, "  handle %Lu refers to a symlink.\n",
             Lu(s_op->u.getattr.handle));

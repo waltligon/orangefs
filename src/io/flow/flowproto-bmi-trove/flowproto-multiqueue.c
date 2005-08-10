@@ -112,6 +112,7 @@ typedef struct
 } id_sync_mode_t;
 
 static QLIST_HEAD(s_id_sync_mode_list);
+static gen_mutex_t id_sync_mode_mutex = GEN_MUTEX_INITIALIZER;
 static TROVE_context_id global_trove_context = -1;
 
 static int get_data_sync_mode(TROVE_coll_id coll_id);
@@ -339,6 +340,7 @@ int fp_multiqueue_finalize(void)
 
         PINT_thread_mgr_trove_stop();
 
+        gen_mutex_lock(&id_sync_mode_mutex);
         qlist_for_each_safe(tmp_link, scratch_link, &s_id_sync_mode_list)
         {
             cur_info = qlist_entry(tmp_link, id_sync_mode_t, link);
@@ -346,6 +348,7 @@ int fp_multiqueue_finalize(void)
             free(cur_info);
             cur_info = NULL;
         }
+        gen_mutex_unlock(&id_sync_mode_mutex);
     }
 #endif
     return (0);
@@ -396,6 +399,9 @@ int fp_multiqueue_setinfo(flow_descriptor *flow_d,
         {
             TROVE_coll_id coll_id = 0, sync_mode = 0;
             id_sync_mode_t *new_id_mode = NULL;
+            struct qlist_head* iterator = NULL;
+            struct qlist_head* scratch = NULL;
+            id_sync_mode_t *tmp_mode = NULL;
 
             assert(parameter && strlen(parameter));
             sscanf((const char *)parameter, "%d,%d",
@@ -407,10 +413,24 @@ int fp_multiqueue_setinfo(flow_descriptor *flow_d,
                 sizeof(id_sync_mode_t));
             if (new_id_mode)
             {
+                gen_mutex_lock(&id_sync_mode_mutex);
+                /* remove any old instances of this fs id */
+                qlist_for_each_safe(iterator, scratch, &s_id_sync_mode_list)
+                {
+                    tmp_mode = qlist_entry(iterator, id_sync_mode_t, link);
+                    assert(tmp_mode);
+                    if(tmp_mode->coll_id == coll_id)
+                    {
+                        qlist_del(&tmp_mode->link);
+                    }
+                }
+
+                /* add new instance */
                 new_id_mode->coll_id = coll_id;
                 new_id_mode->sync_mode = sync_mode;
 
                 qlist_add_tail(&new_id_mode->link, &s_id_sync_mode_list);
+                gen_mutex_unlock(&id_sync_mode_mutex);
 
                 gossip_debug(
                     GOSSIP_FLOW_PROTO_DEBUG, "fp_multiqueue_setinfo: "
@@ -1987,6 +2007,7 @@ static int get_data_sync_mode(TROVE_coll_id coll_id)
     id_sync_mode_t *cur_info = NULL;
     struct qlist_head *tmp_link = NULL;
 
+    gen_mutex_lock(&id_sync_mode_mutex);
     qlist_for_each(tmp_link, &s_id_sync_mode_list)
     {
         cur_info = qlist_entry(tmp_link, id_sync_mode_t, link);
@@ -1996,6 +2017,7 @@ static int get_data_sync_mode(TROVE_coll_id coll_id)
             break;
         }
     }
+    gen_mutex_unlock(&id_sync_mode_mutex);
     gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, "get_data_sync_mode "
                  "returning %d\n", mode);
     return mode;

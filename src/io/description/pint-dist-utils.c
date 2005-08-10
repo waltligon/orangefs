@@ -8,11 +8,13 @@
 #include <stdio.h>
 #include <string.h>
 #include "pvfs2-dist-simple-stripe.h"
+#include "pvfs2-dist-varstrip.h"
 #include "pint-dist-utils.h"
 
 /* Default distributions */
 extern PINT_dist basic_dist;
 extern PINT_dist simple_stripe_dist;
+extern PINT_dist varstrip_dist;
 
 /* Struct for determining how to set a distribution parameter by name */
 typedef struct PINT_dist_param_offset_s
@@ -59,6 +61,9 @@ int PINT_dist_initialize(server_configuration_s* server_config)
     
     /* Register the basic distribution */
     PINT_register_distribution(&basic_dist);    
+    
+    /* Register the varstrip distribution */
+    PINT_register_distribution(&varstrip_dist);
     
     /* Register the simple stripe distribution */
     PINT_register_distribution(&simple_stripe_dist);    

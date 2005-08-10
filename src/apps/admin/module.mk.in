@@ -5,6 +5,7 @@ ADMINSRC := \
 	$(DIR)/pvfs2-set-debugmask.c \
 	$(DIR)/pvfs2-set-mode.c \
 	$(DIR)/pvfs2-set-eventmask.c \
+	$(DIR)/pvfs2-set-sync.c \
 	$(DIR)/pvfs2-ls.c \
 	$(DIR)/pvfs2-ping.c \
 	$(DIR)/pvfs2-rm.c \

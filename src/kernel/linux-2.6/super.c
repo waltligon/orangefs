@@ -130,7 +130,7 @@ static int parse_mount_options(
                 }
                 else
                 {
-                    pvfs2_error("pvfs2: multiple device names specified: "
+                    pvfs2_print("pvfs2: multiple device names specified: "
                                 "ignoring %s\n", options[i]);
                 }
             }

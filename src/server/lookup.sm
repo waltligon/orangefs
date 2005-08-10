@@ -472,6 +472,18 @@ static int lookup_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
                  s_op->resp.u.lookup_path.handle_count,
                  s_op->resp.u.lookup_path.attr_count);
 
+    if(js_p->error_code == 0)
+    {
+        PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "path: %s, handle: %Lu\n",
+            s_op->req->u.lookup_path.path,
+            Lu(s_op->resp.u.lookup_path.handle_array[s_op->resp.u.lookup_path.handle_count-1]));
+    }
+    else
+    {
+        PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "path: %s, lookup failed\n",
+            s_op->req->u.lookup_path.path);
+    }
+
     return 1;
 }
 

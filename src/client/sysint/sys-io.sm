@@ -281,7 +281,7 @@ PVFS_error PVFS_isys_io(
     }
     memset(sm_p, 0, sizeof(*sm_p));
 
-    PINT_init_msgarray_params(&sm_p->msgarray_params);
+    PINT_init_msgarray_params(&sm_p->msgarray_params, ref.fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->u.io.io_type = io_type;
     sm_p->u.io.file_req = file_req;
@@ -377,7 +377,7 @@ static int io_init(PINT_client_sm *sm_p,
         }
 
         return job_req_sched_post_timer(
-            PVFS2_CLIENT_RETRY_DELAY, sm_p, 0, js_p, &tmp_id,
+            sm_p->msgarray_params.retry_delay, sm_p, 0, js_p, &tmp_id,
             pint_client_sm_context);
     }
     return 1;
@@ -559,6 +559,7 @@ static int io_datafile_post_msgpairs(PINT_client_sm *sm_p,
     int ret = -PVFS_EINVAL, i = 0;
     unsigned long status_user_tag = 0;
     int must_loop_encodings = 0;
+    struct server_configuration_s *server_config = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "io_datafile_post_msgpairs "
                  "state: post (%d message(s))\n", sm_p->msgarray_count);
@@ -663,11 +664,13 @@ static int io_datafile_post_msgpairs(PINT_client_sm *sm_p,
         cur_ctx->msg_recv_has_been_posted = 0;
         cur_ctx->msg_recv_in_progress = 0;
 
+        server_config = PINT_get_server_config_struct(sm_p->object_ref.fs_id);
         ret = job_bmi_recv(
             msg->svr_addr, msg->encoded_resp_p, msg->max_resp_sz,
             cur_ctx->session_tag, BMI_PRE_ALLOC, sm_p, status_user_tag,
             &msg->recv_status, &msg->recv_id, pint_client_sm_context,
-            PVFS2_CLIENT_JOB_TIMEOUT);
+            server_config->client_job_bmi_timeout);
+        PINT_put_server_config_struct(server_config);
 
         /* ret -1: problem, do not look at msg recv_status */
         /* ret 1: immediate completion, see status */
@@ -733,13 +736,15 @@ static int io_datafile_post_msgpairs(PINT_client_sm *sm_p,
         gossip_debug(GOSSIP_IO_DEBUG," posting send with "
                      "status_user_tag=%lu\n", status_user_tag);
 
+        server_config = PINT_get_server_config_struct(sm_p->object_ref.fs_id);
         ret = job_bmi_send_list(
             msg->encoded_req.dest, msg->encoded_req.buffer_list,
             msg->encoded_req.size_list, msg->encoded_req.list_count,
             msg->encoded_req.total_size, cur_ctx->session_tag,
             msg->encoded_req.buffer_type, 1, sm_p, status_user_tag,
             &msg->send_status, &msg->send_id, pint_client_sm_context,
-            PVFS2_CLIENT_JOB_TIMEOUT);
+            server_config->client_job_bmi_timeout);
+        PINT_put_server_config_struct(server_config);
 
         if (ret < 0) {
             PVFS_perror_gossip("Post of send failed, cancelling recv", ret);
@@ -806,17 +811,17 @@ io_datafile_post_msgpairs_retry(PINT_client_sm *sm_p, job_status_s *js_p)
 {
     /* give up if beyond retry limit */
     ++sm_p->u.io.retry_count;
-    if (sm_p->u.io.retry_count > PVFS2_CLIENT_RETRY_LIMIT) {
+    if (sm_p->u.io.retry_count > sm_p->msgarray_params.retry_limit) {
         gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: retry %d exceeds limit %d\n",
-          __func__, sm_p->u.io.retry_count, PVFS2_CLIENT_RETRY_DELAY);
+          __func__, sm_p->u.io.retry_count, sm_p->msgarray_params.retry_delay);
         js_p->error_code = IO_DATAFILE_TRANSFERS_COMPLETE;
         return 1;
     }
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: retry %d, wait %d ms\n", __func__,
-      sm_p->u.io.retry_count, PVFS2_CLIENT_RETRY_DELAY);
+      sm_p->u.io.retry_count, sm_p->msgarray_params.retry_delay);
 
-    return job_req_sched_post_timer(PVFS2_CLIENT_RETRY_DELAY,
+    return job_req_sched_post_timer(sm_p->msgarray_params.retry_delay,
         sm_p, 0, js_p, NULL, pint_client_sm_context);
 }
 
@@ -835,6 +840,7 @@ static int io_datafile_complete_operations(PINT_client_sm *sm_p,
         js_p->status_user_tag;
     PINT_client_io_ctx *cur_ctx = NULL;
     int matched_send_or_recv = 0;
+    struct server_configuration_s *server_config = NULL;
 
     gossip_debug(
         GOSSIP_CLIENT_DEBUG, "(%p) io_datafile_complete_operations "
@@ -934,8 +940,10 @@ static int io_datafile_complete_operations(PINT_client_sm *sm_p,
             int ret = 0;
 
             assert(sm_p->u.io.write_ack_completion_count);
+            server_config = PINT_get_server_config_struct(sm_p->object_ref.fs_id);
             ret = job_reset_timeout(cur_ctx->write_ack.recv_id,
-                                    PVFS2_CLIENT_JOB_TIMEOUT);
+                server_config->client_job_bmi_timeout);
+            PINT_put_server_config_struct(server_config);
 
             /*
               allow -PVFS_EINVAL errors in case the recv has already
@@ -1222,7 +1230,7 @@ static int io_analyze_results(PINT_client_sm *sm_p,
     if (((PVFS_ERROR_CLASS(-ret) == PVFS_ERROR_BMI) ||
          (PVFS_ERROR_CLASS(-ret) == PVFS_ERROR_FLOW) ||
          (ret == -ECONNRESET) || (ret == -PVFS_EPROTO)) &&
-        (sm_p->u.io.retry_count < PVFS2_CLIENT_RETRY_LIMIT))
+        (sm_p->u.io.retry_count < sm_p->msgarray_params.retry_limit))
     {
         PINT_acache_invalidate(sm_p->object_ref);
 
@@ -1512,6 +1520,7 @@ static inline int process_context_recv_and_post_flow(
     struct PVFS_server_resp *resp = NULL;
     PVFS_object_attr *attr = NULL;
     PINT_client_io_ctx *cur_ctx = NULL;
+    struct server_configuration_s *server_config = NULL;
 
     gossip_debug(GOSSIP_IO_DEBUG,
                  "- process_context_recv_and_post_flow called\n");
@@ -1628,10 +1637,13 @@ static inline int process_context_recv_and_post_flow(
 
     status_user_tag = ((4 * cur_ctx->index) + IO_SM_PHASE_FLOW);
 
+    server_config = PINT_get_server_config_struct(sm_p->object_ref.fs_id);
     ret = job_flow(
         &cur_ctx->flow_desc, sm_p, status_user_tag,
         &cur_ctx->flow_status, &cur_ctx->flow_job_id,
-        pint_client_sm_context, PVFS2_CLIENT_JOB_TIMEOUT);
+        pint_client_sm_context,
+        server_config->client_job_flow_timeout);
+    PINT_put_server_config_struct(server_config);
 
     if (ret < 0)
     {

@@ -148,7 +148,7 @@ static int pvfs2_get_blocks(
 
         if (bytes_read < 0)
         {
-            pvfs2_print("pvfs_get_blocks: failed to read page block %d\n",
+            pvfs2_print("pvfs2_get_blocks: failed to read page block %d\n",
                         (int)page->index);
             pvfs2_inode->last_failed_block_index_read = page->index;
         }
@@ -366,11 +366,19 @@ struct inode_operations pvfs2_file_inode_operations =
 #ifdef PVFS2_LINUX_KERNEL_2_4
     truncate : pvfs2_truncate,
     setattr : pvfs2_setattr,
-    revalidate : pvfs2_revalidate
+    revalidate : pvfs2_revalidate,
+    setxattr : pvfs2_setxattr, 
+    getxattr : pvfs2_getxattr,
+/*    listxattr : pvfs2_listxattr, */
+    removexattr: pvfs2_removexattr, 
 #else
     .truncate = pvfs2_truncate,
     .setattr = pvfs2_setattr,
-    .getattr = pvfs2_getattr
+    .getattr = pvfs2_getattr,
+    .setxattr = pvfs2_setxattr,
+    .getxattr = pvfs2_getxattr,
+/*    .listxattr = pvfs2_listxattr,*/
+    .removexattr = pvfs2_removexattr,
 #endif
 };
 

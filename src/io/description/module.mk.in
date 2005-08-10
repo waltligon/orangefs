@@ -5,7 +5,9 @@ LIBSRC += \
 	$(DIR)/pint-distribution.c \
 	$(DIR)/pint-dist-utils.c \
 	$(DIR)/dist-basic.c \
-	$(DIR)/dist-simple-stripe.c
+	$(DIR)/dist-simple-stripe.c \
+	$(DIR)/dist-varstrip-parser.c \
+	$(DIR)/dist-varstrip.c
 
 SERVERSRC += \
 	$(DIR)/pvfs-request.c \
@@ -13,5 +15,7 @@ SERVERSRC += \
 	$(DIR)/pint-distribution.c \
 	$(DIR)/pint-dist-utils.c \
 	$(DIR)/dist-basic.c \
-	$(DIR)/dist-simple-stripe.c
+	$(DIR)/dist-simple-stripe.c \
+	$(DIR)/dist-varstrip-parser.c \
+	$(DIR)/dist-varstrip.c
 

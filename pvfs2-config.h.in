@@ -28,6 +28,9 @@
 /* Define to 1 if you have the <execinfo.h> header file. */
 #undef HAVE_EXECINFO_H
 
+/* Define if gethostbyaddr function exists */
+#undef HAVE_GETHOSTBYADDR
+
 /* Define if gethostbyname function exists */
 #undef HAVE_GETHOSTBYNAME
 
@@ -102,6 +105,9 @@
 
 /* Define to 1 if you have the <sys/epoll.h> header file. */
 #undef HAVE_SYS_EPOLL_H
+
+/* Define to 1 if you have the <sys/socket.h> header file. */
+#undef HAVE_SYS_SOCKET_H
 
 /* Define to 1 if you have the <sys/stat.h> header file. */
 #undef HAVE_SYS_STAT_H

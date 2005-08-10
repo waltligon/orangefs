@@ -202,8 +202,8 @@ struct dbpf_dspace_getattr_op
 
 struct dbpf_keyval_read_op
 {
-    TROVE_keyval_s key;
-    TROVE_keyval_s val;
+    TROVE_keyval_s *key;
+    TROVE_keyval_s *val;
     /* vtag? */
 };
 
@@ -219,6 +219,13 @@ struct dbpf_keyval_write_op
     TROVE_keyval_s key;
     TROVE_keyval_s val;
     /* vtag? */
+};
+
+struct dbpf_keyval_write_list_op
+{
+    TROVE_keyval_s *key_array;
+    TROVE_keyval_s *val_array;
+    int count; /* TODO: MAKE INOUT? */
 };
 
 struct dbpf_keyval_remove_op
@@ -373,6 +380,7 @@ struct dbpf_op
         struct dbpf_keyval_remove_op k_remove;
         struct dbpf_keyval_iterate_op k_iterate;
         struct dbpf_keyval_read_list_op k_read_list;
+        struct dbpf_keyval_read_list_op k_write_list;
     } u;
 };
 

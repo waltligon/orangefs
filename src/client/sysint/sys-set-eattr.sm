@@ -58,18 +58,21 @@ machine pvfs2_client_set_eattr_sm(
 
 %%
 
-PVFS_error PVFS_isys_seteattr(
+PVFS_error PVFS_isys_seteattr_list(
         PVFS_object_ref ref,
         PVFS_credentials *credentials,
-        PVFS_ds_keyval *key_p,
-        PVFS_ds_keyval *val_p,
+        int32_t nkey,
+        PVFS_ds_keyval *key_array,
+        PVFS_ds_keyval *val_array,
+        int32_t flags,
         PVFS_sys_op_id *op_id,
         void *user_ptr)
 {
     int ret = -PVFS_EINVAL;
     PINT_client_sm *sm_p = NULL;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "PINT_isys_set_eattr entered\n");
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "PINT_isys_set_eattr entered\n");
 
     if ((ref.handle == PVFS_HANDLE_NULL) ||
        (ref.fs_id == PVFS_FS_ID_NULL))
@@ -85,10 +88,12 @@ PVFS_error PVFS_isys_seteattr(
     }
     memset(sm_p, 0, sizeof(*sm_p));
 
-    PINT_init_msgarray_params(&sm_p->msgarray_params);
+    PINT_init_msgarray_params(&sm_p->msgarray_params, ref.fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
-    sm_p->u.seteattr.key_p = key_p;
-    sm_p->u.seteattr.val_p = val_p;
+    sm_p->u.seteattr.nkey = nkey;
+    sm_p->u.seteattr.key_array = key_array;
+    sm_p->u.seteattr.val_array = val_array;
+    sm_p->u.seteattr.flags = flags;
     sm_p->error_code = 0;
     sm_p->object_ref = ref;
 
@@ -96,19 +101,21 @@ PVFS_error PVFS_isys_seteattr(
             sm_p, PVFS_SYS_SETEATTR, op_id, user_ptr);
 }
 
-PVFS_error PVFS_sys_seteattr(
+PVFS_error PVFS_sys_seteattr_list(
         PVFS_object_ref ref,
         PVFS_credentials *credentials,
-        PVFS_ds_keyval *key_p,
-        PVFS_ds_keyval *val_p)
+        int32_t nkey,
+        PVFS_ds_keyval *key_array,
+        PVFS_ds_keyval *val_array,
+        int32_t flags)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_seteattr entered\n");
 
-    ret = PVFS_isys_seteattr(ref, credentials,
-            key_p, val_p, &op_id, NULL);
+    ret = PVFS_isys_seteattr_list(ref, credentials,
+            nkey, key_array, val_array, flags, &op_id, NULL);
 
     if (ret)
     {
@@ -129,6 +136,17 @@ PVFS_error PVFS_sys_seteattr(
     return error;
 }
 
+PVFS_error PVFS_sys_seteattr(
+        PVFS_object_ref ref,
+        PVFS_credentials *credentials,
+        PVFS_ds_keyval *key_p,
+        PVFS_ds_keyval *val_p,
+        int32_t flags)
+{
+    return PVFS_sys_seteattr_list(ref, credentials, 1, key_p, val_p, flags);
+}
+
+
 static int set_eattr_setup_msgpair(PINT_client_sm *sm_p,
                                            job_status_s *js_p)
 {
@@ -142,8 +160,10 @@ static int set_eattr_setup_msgpair(PINT_client_sm *sm_p,
             (*sm_p->cred_p),
             sm_p->object_ref.fs_id,
             sm_p->object_ref.handle,
-            (*sm_p->u.seteattr.key_p),
-            (*sm_p->u.seteattr.val_p)
+            sm_p->u.seteattr.flags,
+            sm_p->u.seteattr.nkey,
+            sm_p->u.seteattr.key_array,
+            sm_p->u.seteattr.val_array
             );
 
     sm_p->msgarray = &(sm_p->msgpair);
@@ -184,9 +204,10 @@ static int set_eattr_comp_fn(
 {
     int j = 0;
     int ret = 0;
-    gossip_debug(GOSSIP_CLIENT_DEBUG,
-		"set_eattr completion fn: set_eattr_comp_fn\n");
     PINT_client_sm *sm_p = (PINT_client_sm *)v_p;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+		"get_eattr completion fn: set_eattr_comp_fn\n");
 
     /* only posted one msgpair */
     assert(i==0);

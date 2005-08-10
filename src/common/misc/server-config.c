@@ -23,6 +23,7 @@
 #include "mkspace.h"
 #include "pint-distribution.h"
 #include "pvfs2-config.h"
+#include "pvfs2-server.h"
 
 static DOTCONF_CB(get_pvfs_server_id);
 static DOTCONF_CB(get_logstamp);
@@ -61,6 +62,12 @@ static DOTCONF_CB(get_trove_sync_data);
 static DOTCONF_CB(get_param);
 static DOTCONF_CB(get_value);
 static DOTCONF_CB(get_default_num_dfiles);
+static DOTCONF_CB(get_server_job_bmi_timeout);
+static DOTCONF_CB(get_server_job_flow_timeout);
+static DOTCONF_CB(get_client_job_bmi_timeout);
+static DOTCONF_CB(get_client_job_flow_timeout);
+static DOTCONF_CB(get_client_retry_limit);
+static DOTCONF_CB(get_client_retry_delay);
 static FUNC_ERRORHANDLER(errorhandler);
 const char *contextchecker(command_t *cmd, unsigned long mask);
 
@@ -180,7 +187,8 @@ static const configoption_t options[] =
 
     /* Specifies the end-tag of a Filesystem context.
      */
-    {"</FileSystem>",ARG_NONE, exit_filesystem_context,NULL,CTX_FILESYSTEM,NULL},
+    {"</FileSystem>",ARG_NONE, exit_filesystem_context,NULL,CTX_FILESYSTEM,
+        NULL},
 
     /* Specifies the beginning of a StorageHints context.  This groups
      * options specific to a filesystem and related to the behavior of the
@@ -349,6 +357,36 @@ static const configoption_t options[] =
      */
      {"UnexpectedRequests",ARG_INT, get_unexp_req,NULL,
          CTX_DEFAULTS|CTX_GLOBAL,"50"},
+
+     /* Specifies the timeout value in seconds for BMI jobs on the server.
+      */
+     {"ServerJobBMITimeoutSecs",ARG_INT, get_server_job_bmi_timeout,NULL,
+         CTX_DEFAULTS|CTX_GLOBAL, "30"},
+     
+     /* Specifies the timeout value in seconds for TROVE jobs on the server.
+      */
+     {"ServerJobFlowTimeoutSecs",ARG_INT, get_server_job_flow_timeout,NULL,
+         CTX_DEFAULTS|CTX_GLOBAL, "30"},
+     
+     /* Specifies the timeout value in seconds for BMI jobs on the client.
+      */
+     {"ClientJobBMITimeoutSecs",ARG_INT, get_client_job_bmi_timeout,NULL,
+         CTX_DEFAULTS|CTX_GLOBAL, "300"},
+
+     /* Specifies the timeout value in seconds for FLOW jobs on the client.
+      */
+     {"ClientJobFlowTimeoutSecs",ARG_INT, get_client_job_flow_timeout,NULL,
+         CTX_DEFAULTS|CTX_GLOBAL, "300"},
+
+     /* Specifies the number of retry attempts for operations (when possible)
+      */
+     {"ClientRetryLimit",ARG_INT, get_client_retry_limit,NULL,
+         CTX_DEFAULTS|CTX_GLOBAL, "5"},
+
+     /* Specifies the delay in milliseconds to wait between retries.
+      */
+     {"ClientRetryDelayMilliSecs",ARG_INT, get_client_retry_delay,NULL,
+         CTX_DEFAULTS|CTX_GLOBAL, "2000"},
 
      /* This specifies the frequency (in milliseconds) 
       * that performance monitor should be updated
@@ -543,6 +581,12 @@ int PINT_parse_config(
 
     /* set some global defaults for optional parameters */
     config_s->logstamp_type = GOSSIP_LOGSTAMP_DEFAULT;
+    config_s->server_job_bmi_timeout = PVFS2_SERVER_JOB_BMI_TIMEOUT_DEFAULT;
+    config_s->server_job_flow_timeout = PVFS2_SERVER_JOB_FLOW_TIMEOUT_DEFAULT;
+    config_s->client_job_bmi_timeout = PVFS2_CLIENT_JOB_BMI_TIMEOUT_DEFAULT;
+    config_s->client_job_flow_timeout = PVFS2_CLIENT_JOB_FLOW_TIMEOUT_DEFAULT;
+    config_s->client_retry_limit = PVFS2_CLIENT_RETRY_LIMIT_DEFAULT;
+    config_s->client_retry_delay_ms = PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT;
 
     if (cache_config_files(
             config_s, global_config_filename, server_config_filename))
@@ -896,6 +940,54 @@ DOTCONF_CB(get_unexp_req)
     return NULL;
 }
 
+DOTCONF_CB(get_server_job_bmi_timeout)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    config_s->server_job_bmi_timeout = cmd->data.value;
+    return NULL;
+}
+
+DOTCONF_CB(get_server_job_flow_timeout)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    config_s->server_job_flow_timeout = cmd->data.value;
+    return NULL;
+}
+
+DOTCONF_CB(get_client_job_bmi_timeout)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    config_s->client_job_bmi_timeout = cmd->data.value;
+    return NULL;
+}
+
+DOTCONF_CB(get_client_job_flow_timeout)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    config_s->client_job_flow_timeout = cmd->data.value;
+    return NULL;
+}
+
+DOTCONF_CB(get_client_retry_limit)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    config_s->client_retry_limit = cmd->data.value;
+    return NULL;
+}
+
+DOTCONF_CB(get_client_retry_delay)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    config_s->client_retry_delay_ms = cmd->data.value;
+    return NULL;
+}
+
 DOTCONF_CB(get_perf_update_interval)
 {
     struct server_configuration_s *config_s = 
@@ -1169,8 +1261,16 @@ DOTCONF_CB(get_name)
     }
     else if (config_s->configuration_context == CTX_DISTRIBUTION)
     {
-        config_s->dist_conf.name =
-            (cmd->data.str ? strdup(cmd->data.str) : NULL);
+        if (0 == config_s->default_dist_config.name)
+        {
+            config_s->default_dist_config.name =
+                (cmd->data.str ? strdup(cmd->data.str) : NULL);
+            config_s->default_dist_config.param_list = PINT_llist_new();
+        }
+        else
+        {
+            return "Only one distribution configuration is allowed.\n";
+        }
     }
     return NULL;
 }
@@ -1331,8 +1431,16 @@ DOTCONF_CB(get_param)
 {
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
-    config_s->dist_conf.param_name =
-        (cmd->data.str ? strdup(cmd->data.str) : NULL);
+    distribution_param_configuration* param =
+        malloc(sizeof(distribution_param_configuration));
+
+    if (NULL != param)
+    {
+        memset(param, 0, sizeof(param));
+        param->name = (cmd->data.str ? strdup(cmd->data.str) : NULL);
+        PINT_llist_add_to_tail(config_s->default_dist_config.param_list,
+                               param);
+    }
     return NULL;
 }
 
@@ -1340,7 +1448,13 @@ DOTCONF_CB(get_value)
 {
     struct server_configuration_s *config_s = 
         (struct server_configuration_s *)cmd->context;
-    config_s->dist_conf.param_value = (PVFS_size)cmd->data.value;
+    distribution_param_configuration* param;
+    param = (distribution_param_configuration*)PINT_llist_tail(
+        config_s->default_dist_config.param_list);
+    if (NULL != param)
+    {
+        param->value = (PVFS_size)cmd->data.value;
+    }
     return NULL;
 }
 

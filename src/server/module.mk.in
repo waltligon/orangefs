@@ -32,7 +32,10 @@ ifdef BUILD_SERVER
 		$(DIR)/proto-error.c \
 		$(DIR)/mgmt-remove-object.c \
 		$(DIR)/mgmt-remove-dirent.c \
-		$(DIR)/mgmt-get-dirdata-handle.c
+		$(DIR)/mgmt-get-dirdata-handle.c \
+		$(DIR)/get-eattr.c \
+		$(DIR)/set-eattr.c \
+		$(DIR)/del-eattr.c
 
 	# c files that should be added to server library
 	SERVERSRC += \

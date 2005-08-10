@@ -83,12 +83,18 @@ typedef struct filesystem_configuration_s
 
 } filesystem_configuration_s;
 
+typedef struct distribution_param_configuration_s
+{
+    char* name;
+    int64_t value;  /* Temporarily hard code to 64bit type */
+
+} distribution_param_configuration;
+
 /* Config struct to hold overloaded distribution defaults */
 typedef struct distribution_configuration_s
 {
     char* name;
-    char* param_name;
-    PVFS_size param_value;  /* Temporarily hard code to 64bit type */
+    PINT_llist* param_list;
 
 } distribution_configuration;
 
@@ -103,6 +109,12 @@ typedef struct server_configuration_s
     ssize_t server_config_buflen;   /* the server.conf file length      */
     char *server_config_buf;        /* the server.conf file contents    */
     int  initial_unexpected_requests;
+    int  server_job_bmi_timeout;    /* job timeout values in seconds    */
+    int  server_job_flow_timeout;
+    int  client_job_bmi_timeout; 
+    int  client_job_flow_timeout;
+    int  client_retry_limit;        /* how many times to retry client operations */
+    int  client_retry_delay_ms;     /* delay between retries */
     int  perf_update_interval;      /* how quickly (in msecs) to
                                        update perf monitor              */
     char *logfile;
@@ -114,7 +126,8 @@ typedef struct server_configuration_s
     PINT_llist *host_aliases;       /* ptrs are type host_alias_s       */
     PINT_llist *file_systems;       /* ptrs are type
                                        filesystem_configuration_s       */
-    distribution_configuration dist_conf;  /* distribution conf */
+    distribution_configuration default_dist_config;  /* distribution conf */
+
 } server_configuration_s;
 
 int PINT_parse_config(

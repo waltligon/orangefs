@@ -72,6 +72,8 @@ static int prelude_req_sched(
         "(%p) %s (prelude sm) state: req_sched\n", s_op,
         PINT_map_server_op_to_string(s_op->req->op));
 
+    PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DETAIL_DEBUG, "request\n");
+
     /* this is the first state for every normal pvfs2 server state
      * machine, so we get to do some housekeeping here.  In
      * particular, bump up the reference count on the bmi address that
@@ -105,6 +107,8 @@ static int prelude_getattr_if_needed(
     PVFS_handle target_handle = PVFS_HANDLE_NULL;
     PVFS_fs_id target_fs_id = PVFS_FS_ID_NULL;
     job_id_t tmp_id;
+
+    PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DETAIL_DEBUG, "start\n");
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "(%p) %s (prelude sm) state: getattr_if_needed\n", s_op,
@@ -236,14 +240,18 @@ static int prelude_perm_check(
             {
                 js_p->error_code = 0;
             }
-	    else if (s_op->req->op == PVFS_SERV_GETATTR)
+            /* for now we'll assume extended attribs are treated
+             * the same as regular attribs as far as permissions
+             */
+	    else if (s_op->req->op == PVFS_SERV_GETATTR ||
+                    s_op->req->op == PVFS_SERV_GETEATTR)
 	    {
 		/* getting attributes is always ok -- permission
 		 * is checked on the parent directory at read time
 		 */
 		js_p->error_code = 0;
 	    }
-            else /* setattr */
+            else /* setattr, seteattr, seteattr_list */
             {
                 /*
                   NOTE: on other file systems, setattr doesn't

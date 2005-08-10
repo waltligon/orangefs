@@ -6,8 +6,6 @@
 #   - $user needs to be in the sudoers file
 #   - $user needs to be able to sudo w/o prompting
 #   - please don't cheat and run this as root: will not catch permissions bugs
-#   - an entry in /etc/fstab for pvfs2.  a bit of a stretch for clusters but
-#     not for red machines like gil and lain.
 
 # modify these variables
 export PVFS2_DEST=/tmp/pvfs2-slangtest
@@ -90,7 +88,7 @@ teardown_vfs() {
 setup_vfs() {
 	sudo /sbin/insmod ${PVFS2_DEST}/INSTALL-pvfs2/lib/modules/`uname -r`/kernel/fs/pvfs2/pvfs2.ko
 	sudo ${PVFS2_DEST}/INSTALL-pvfs2/sbin/pvfs2-client -p ${PVFS2_DEST}/INSTALL-pvfs2/sbin/pvfs2-client-core
-	sudo mount ${PVFS2_MOUNTPOINT}
+	sudo mount -t pvfs2 tcp://`hostname -s`:3399/pvfs2-fs ${PVFS2_MOUNTPOINT}
 }
 
 setup_pvfs2() {
@@ -101,13 +99,14 @@ setup_pvfs2() {
 		--storage ${PVFS2_DEST}/STORAGE-pvfs2 \
 		--logfile=${PVFS2_DEST}/pvfs2-server.log --quiet
 	rm -rf ${PVFS2_DEST}/STORAGE-pvfs2
-	INSTALL-pvfs2/sbin/pvfs2-server -p pvfs2-server.pid -f fs.conf server.conf-`hostname -s`
-	INSTALL-pvfs2/sbin/pvfs2-server -p pvfs2-server.pid  fs.conf server.conf-`hostname -s`
+	INSTALL-pvfs2/sbin/pvfs2-server -p `pwd`/pvfs2-server.pid -f fs.conf server.conf-`hostname -s`
+	INSTALL-pvfs2/sbin/pvfs2-server -p `pwd`/pvfs2-server.pid  fs.conf server.conf-`hostname -s`
 
 	echo "tcp://`hostname -s`:3399/pvfs2-fs /pvfs2-nightly pvfs2 defaults 0 0" > ${PVFS2_DEST}/pvfs2tab
-	# use our pvfs2tab file only if /etc/fstab isn't set up for us
+	# do we need to use our own pvfs2tab file?  If we will mount pvfs2, we
+	# can fall back to /etc/fstab
 	grep -q 'pvfs2-nightly' /etc/fstab
-	if [ $? -ne 0 ] ; then
+	if [ $? -ne 0 -a $do_vfs -eq 0 ] ; then
 		export PVFS2TAB_FILE=${PVFS2_DEST}/pvfs2tab
 	fi	
 }
@@ -115,9 +114,15 @@ setup_pvfs2() {
 teardown_pvfs2() {
 	if [ -f ${PVFS2_DEST}/pvfs2-server.pid ] ; then
 		kill `cat ${PVFS2_DEST}/pvfs2-server.pid`
-		sleep 3
+	fi
+
+	# occasionally the server ends up in a hard-to-kill state.  server has
+	# atexit(3) remove .pid file
+	sleep 3
+	if [ -f ${PVFS2_DEST}/pvfs2-server.pid ] ; then
 		kill -9 `cat ${PVFS2_DEST}/pvfs2-server.pid`
 	fi
+
 	# let teardown always succeed.  pvfs2-server.pid could be stale
 	return 0
 }

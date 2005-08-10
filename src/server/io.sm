@@ -111,6 +111,7 @@ static int io_send_ack(PINT_server_op *s_op, job_status_s *js_p)
 {
     int err = -PVFS_EIO;
     job_id_t tmp_id;
+    struct server_configuration_s *user_opts = get_server_config_struct();
         
     PINT_STATE_DEBUG("send_ack");
 
@@ -134,7 +135,7 @@ static int io_send_ack(PINT_server_op *s_op, job_status_s *js_p)
         s_op->addr, s_op->encoded.buffer_list, s_op->encoded.size_list,
         s_op->encoded.list_count, s_op->encoded.total_size,
         s_op->tag, s_op->encoded.buffer_type, 0, s_op, 0, js_p,
-        &tmp_id, server_job_context, PVFS2_SERVER_RESPONSE_TIMEOUT);
+        &tmp_id, server_job_context, user_opts->server_job_bmi_timeout);
 
     return err;
 }
@@ -161,6 +162,7 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s *js_p)
 {
     int err = -PVFS_EIO;
     job_id_t tmp_id;
+    struct server_configuration_s *user_opts = get_server_config_struct();
         
     PINT_STATE_DEBUG("start_flow");
 
@@ -239,7 +241,7 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s *js_p)
     }
 
     err = job_flow(s_op->u.io.flow_d, s_op, 0, js_p, &tmp_id,
-                   server_job_context, PVFS2_SERVER_FLOW_TIMEOUT);
+                   server_job_context, user_opts->server_job_flow_timeout);
 
     return err;
 }
@@ -295,7 +297,12 @@ static int io_release(PINT_server_op *s_op, job_status_s *js_p)
  */
 static int io_cleanup(PINT_server_op *s_op, job_status_s *js_p)
 {
+    char status_string[64] = {0};
+
     PINT_STATE_DEBUG("cleanup");
+
+    PVFS_strerror_r(s_op->resp.status, status_string, 64);
+    PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "finish (%s)\n", status_string);
 
     if (s_op->u.io.flow_d)
     {
@@ -343,6 +350,7 @@ static int io_send_completion_ack(
 {
     int err = -PVFS_EIO;
     job_id_t tmp_id;
+    struct server_configuration_s *user_opts = get_server_config_struct();
         
     PINT_STATE_DEBUG("send_completion_ack");
 
@@ -385,7 +393,7 @@ static int io_send_completion_ack(
         s_op->addr, s_op->encoded.buffer_list, s_op->encoded.size_list,
         s_op->encoded.list_count, s_op->encoded.total_size, s_op->tag,
         s_op->encoded.buffer_type, 0, s_op, 0, js_p, &tmp_id,
-        server_job_context, PVFS2_SERVER_RESPONSE_TIMEOUT);
+        server_job_context, user_opts->server_job_bmi_timeout);
 
     return err;
 }

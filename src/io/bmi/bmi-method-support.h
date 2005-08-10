@@ -155,6 +155,7 @@ struct bmi_method_ops
     int (*BMI_meth_open_context)(bmi_context_id);
     void (*BMI_meth_close_context)(bmi_context_id);
     int (*BMI_meth_cancel)(bmi_op_id_t, bmi_context_id);
+    const char* (*BMI_meth_rev_lookup_unexpected)(method_addr_p);
 };
 
 

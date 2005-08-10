@@ -57,6 +57,7 @@ static void lebf_initialize(void)
     char *tmp_name = strdup("foo");
     const int init_big_size = 1024 * 1024;
 
+    gossip_debug(GOSSIP_ENDECODE_DEBUG,"lebf_initialize\n");
     /*
      * Some messages have extra structures, and even indeterminate sizes
      * which are hand-calculated here.  Also some fields must be initialized
@@ -185,6 +186,20 @@ static void lebf_initialize(void)
 	    case PVFS_SERV_PROTO_ERROR:
 		/* nothing special */
 		break;
+	    case PVFS_SERV_GETEATTR:
+                req.u.geteattr.nkey = 0;
+                resp.u.geteattr.nkey = 0;
+		reqsize = extra_size_PVFS_servreq_geteattr;
+		respsize = extra_size_PVFS_servresp_geteattr;
+		break;
+	    case PVFS_SERV_SETEATTR:
+                req.u.seteattr.nkey = 0;
+		reqsize = extra_size_PVFS_servreq_seteattr;
+		break;
+	    case PVFS_SERV_DELEATTR:
+                req.u.deleattr.key.buffer_sz = 0;
+		reqsize = extra_size_PVFS_servreq_deleattr;
+		break;
 	}
 	/* since these take the max size when mallocing in the encode,
 	 * give them a huge number, then later fix it. */
@@ -241,6 +256,7 @@ encode_common(struct PINT_encoded_msg *target_msg, int maxsize)
     int ret = 0;
     void *buf = NULL;
 
+    gossip_debug(GOSSIP_ENDECODE_DEBUG,"encode_common\n");
     /* this encoder always uses just one buffer */
     target_msg->buffer_list = &target_msg->buffer_stub;
     target_msg->size_list = &target_msg->size_stub;
@@ -286,6 +302,7 @@ static int lebf_encode_req(
     ret = encode_common(target_msg, max_size_array[req->op].req);
     if (ret)
 	goto out;
+    gossip_debug(GOSSIP_ENDECODE_DEBUG,"lebf_encode_req\n");
 
     /* every request has these fields */
     p = &target_msg->ptr_current;
@@ -319,6 +336,9 @@ static int lebf_encode_req(
 	CASE(PVFS_SERV_MGMT_ITERATE_HANDLES, mgmt_iterate_handles);
 	CASE(PVFS_SERV_MGMT_DSPACE_INFO_LIST, mgmt_dspace_info_list);
 	CASE(PVFS_SERV_MGMT_EVENT_MON, mgmt_event_mon);
+	CASE(PVFS_SERV_GETEATTR, geteattr);
+	CASE(PVFS_SERV_SETEATTR, seteattr);
+	CASE(PVFS_SERV_DELEATTR, deleattr);
 
 	case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
@@ -371,11 +391,12 @@ static int lebf_encode_resp(
     ret = encode_common(target_msg, max_size_array[resp->op].resp);
     if (ret)
 	goto out;
+    gossip_debug(GOSSIP_ENDECODE_DEBUG,"lebf_encode_resp\n");
 
     /* every response has these fields */
     p = &target_msg->ptr_current;
     encode_PVFS_server_resp(p, resp);
-    
+
 #define CASE(tag,var) \
     case tag: encode_PVFS_servresp_##var(p,&resp->u.var); break
 
@@ -404,13 +425,16 @@ static int lebf_encode_resp(
         CASE(PVFS_SERV_MGMT_ITERATE_HANDLES, mgmt_iterate_handles);
         CASE(PVFS_SERV_MGMT_DSPACE_INFO_LIST, mgmt_dspace_info_list);
         CASE(PVFS_SERV_MGMT_EVENT_MON, mgmt_event_mon);
-            CASE(PVFS_SERV_WRITE_COMPLETION, write_completion);
+        CASE(PVFS_SERV_WRITE_COMPLETION, write_completion);
         CASE(PVFS_SERV_MGMT_GET_DIRDATA_HANDLE, mgmt_get_dirdata_handle);
+        CASE(PVFS_SERV_GETEATTR, geteattr);
 
             case PVFS_SERV_REMOVE:
             case PVFS_SERV_MGMT_REMOVE_OBJECT:
             case PVFS_SERV_MGMT_REMOVE_DIRENT:
             case PVFS_SERV_SETATTR:
+            case PVFS_SERV_SETEATTR:
+            case PVFS_SERV_DELEATTR:
             case PVFS_SERV_CRDIRENT:
             case PVFS_SERV_TRUNCATE:
             case PVFS_SERV_FLUSH:
@@ -470,6 +494,7 @@ static int lebf_decode_req(
 
     /* decode generic part of request (enough to get op number) */
     decode_PVFS_server_req(p, req);
+    gossip_debug(GOSSIP_ENDECODE_DEBUG,"lebf_decode_req\n");
 
 #define CASE(tag,var) \
     case tag: decode_PVFS_servreq_##var(p, &req->u.var); break
@@ -499,6 +524,9 @@ static int lebf_decode_req(
 	CASE(PVFS_SERV_MGMT_ITERATE_HANDLES, mgmt_iterate_handles);
 	CASE(PVFS_SERV_MGMT_DSPACE_INFO_LIST, mgmt_dspace_info_list);
 	CASE(PVFS_SERV_MGMT_EVENT_MON, mgmt_event_mon);
+	CASE(PVFS_SERV_GETEATTR, geteattr);
+	CASE(PVFS_SERV_SETEATTR, seteattr);
+	CASE(PVFS_SERV_DELEATTR, deleattr);
 
 	case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
@@ -548,6 +576,7 @@ static int lebf_decode_resp(
 
     /* decode generic part of response (including op number) */
     decode_PVFS_server_resp(p, resp);
+    gossip_debug(GOSSIP_ENDECODE_DEBUG,"lebf_decode_resp\n");
 
     if (resp->status == -PVFS_EIO) 
         goto out;
@@ -575,11 +604,14 @@ static int lebf_decode_resp(
 	CASE(PVFS_SERV_MGMT_EVENT_MON, mgmt_event_mon);
 	CASE(PVFS_SERV_MGMT_GET_DIRDATA_HANDLE, mgmt_get_dirdata_handle);
         CASE(PVFS_SERV_WRITE_COMPLETION, write_completion);
+	CASE(PVFS_SERV_GETEATTR, geteattr);
 
         case PVFS_SERV_REMOVE:
         case PVFS_SERV_MGMT_REMOVE_OBJECT:
         case PVFS_SERV_MGMT_REMOVE_DIRENT:
         case PVFS_SERV_SETATTR:
+        case PVFS_SERV_SETEATTR:
+        case PVFS_SERV_DELEATTR:
         case PVFS_SERV_CRDIRENT:
         case PVFS_SERV_TRUNCATE:
         case PVFS_SERV_FLUSH:
@@ -617,6 +649,7 @@ static void lebf_encode_rel(
     struct PINT_encoded_msg *msg,
     enum PINT_encode_msg_type input_type)
 {
+    gossip_debug(GOSSIP_ENDECODE_DEBUG,"lebf_encode_rel\n");
     /* just a single buffer to free */
     if (initializing_sizes)
     {
@@ -638,6 +671,7 @@ static void lebf_encode_rel(
 static void lebf_decode_rel(struct PINT_decoded_msg *msg,
                             enum PINT_encode_msg_type input_type)
 {
+    gossip_debug(GOSSIP_ENDECODE_DEBUG,"lebf_decode_rel\n");
     if (input_type == PINT_DECODE_REQ) {
 	struct PVFS_server_req *req = &msg->stub_dec.req;
 	switch (req->op) {
@@ -689,9 +723,11 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	    case PVFS_SERV_MGMT_ITERATE_HANDLES:
 	    case PVFS_SERV_MGMT_PERF_MON:
 	    case PVFS_SERV_MGMT_EVENT_MON:
+	    case PVFS_SERV_GETEATTR:
+	    case PVFS_SERV_SETEATTR:
+	    case PVFS_SERV_DELEATTR:
 		/* nothing to free */
 		break;
-
 	    case PVFS_SERV_INVALID:
 	    case PVFS_SERV_WRITE_COMPLETION:
 	    case PVFS_SERV_PERF_UPDATE:
@@ -741,6 +777,12 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 		decode_free(resp->u.mgmt_event_mon.event_array);
 		break;
 
+	    case PVFS_SERV_GETEATTR:
+                /* need a loop here?  WBL */
+		if (resp->u.geteattr.val)
+		    decode_free(resp->u.geteattr.val);
+		break;
+
 	    case PVFS_SERV_GETCONFIG:
 	    case PVFS_SERV_CREATE:
 	    case PVFS_SERV_REMOVE:
@@ -749,6 +791,8 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	    case PVFS_SERV_MGMT_GET_DIRDATA_HANDLE:
 	    case PVFS_SERV_IO:
 	    case PVFS_SERV_SETATTR:
+	    case PVFS_SERV_SETEATTR:
+	    case PVFS_SERV_DELEATTR:
 	    case PVFS_SERV_CRDIRENT:
 	    case PVFS_SERV_RMDIRENT:
 	    case PVFS_SERV_CHDIRENT:
@@ -778,6 +822,7 @@ static int check_req_size(struct PVFS_server_req *req)
     struct PINT_encoded_msg msg;
     int size;
 
+    gossip_debug(GOSSIP_ENDECODE_DEBUG,"check_req_size\n");
     lebf_encode_req(req, &msg);
     size = msg.total_size;
     lebf_encode_rel(&msg, 0);
@@ -789,6 +834,7 @@ static int check_resp_size(struct PVFS_server_resp *resp)
     struct PINT_encoded_msg msg;
     int size;
 
+    gossip_debug(GOSSIP_ENDECODE_DEBUG,"check_resp_size\n");
     lebf_encode_resp(resp, &msg);
     size = msg.total_size;
     lebf_encode_rel(&msg, 0);
