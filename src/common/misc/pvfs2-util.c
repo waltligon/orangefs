@@ -581,6 +581,7 @@ int PVFS_util_add_dynamic_mntent(struct PVFS_sys_mntent *mntent)
             }
         }
 
+#if 0
         /* check the dynamic region if we haven't found a match yet */
         for(j = 0; j < s_stat_tab_array[
                 PVFS2_DYNAMIC_TAB_INDEX].mntent_count; j++)
@@ -588,17 +589,20 @@ int PVFS_util_add_dynamic_mntent(struct PVFS_sys_mntent *mntent)
             current_mnt = &(s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].
                             mntent_array[j]);
 
-            if (current_mnt->fs_id == mntent->fs_id)
+            if ((current_mnt->fs_id == mntent->fs_id) &&
+                (strcmp(current_mnt->pvfs_config_servers[0],
+                        mntent->pvfs_config_servers[0]) != 0))
             {
-                gossip_debug(
-                    GOSSIP_CLIENT_DEBUG, "* File system %d already "
-                    "mounted on %s already exists [dynamic]\n",
-                    mntent->fs_id, current_mnt->mnt_dir);
-
+                gossip_err("Error: FS with id %d is already mounted using"
+                           " a different config server.\n", (int)mntent->fs_id); 
+                gossip_err("Error: This could indicate that a duplicate fsid"
+                           " is being used.\n");
+                gossip_err("Error: Please check your server configuration.\n");
                 gen_mutex_unlock(&s_stat_tab_mutex);
-                return -PVFS_EEXIST;
+                return -PVFS_ENXIO;
             }
         }
+#endif
 
         /* copy the mntent to our table in the dynamic tab area */
         new_index = s_stat_tab_array[
@@ -690,7 +694,8 @@ int PVFS_util_remove_internal_mntent(
             for(j = 0; j < s_stat_tab_array[i].mntent_count; j++)
             {
                 current_mnt = &(s_stat_tab_array[i].mntent_array[j]);
-                if (current_mnt->fs_id == mntent->fs_id)
+                if ((current_mnt->fs_id == mntent->fs_id)
+                    && (strcmp(current_mnt->mnt_dir, mntent->mnt_dir) == 0))
                 {
                     found_index = i;
                     found = 1;
@@ -751,7 +756,8 @@ int PVFS_util_remove_internal_mntent(
             {
                 current_mnt = &s_stat_tab_array[found_index].mntent_array[i];
 
-                if (current_mnt->fs_id == mntent->fs_id)
+                if ((current_mnt->fs_id == mntent->fs_id)
+                    && (strcmp(current_mnt->mnt_dir, mntent->mnt_dir) == 0))
                 {
                     PVFS_util_free_mntent(current_mnt);
                     continue;

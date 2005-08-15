@@ -24,6 +24,12 @@
 
 #ifdef PVFS2_LINUX_KERNEL_2_4
 
+/* the 2.4 kernel requires us to manually set up modversions if needed */
+#if CONFIG_MODVERSIONS==1
+#define MODVERSIONS
+#include <linux/modversions.h>
+#endif 
+
 #define __NO_VERSION__
 #include <linux/version.h>
 #include <linux/module.h>
