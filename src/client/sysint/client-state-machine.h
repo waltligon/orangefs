@@ -589,6 +589,9 @@ enum
     PVFS_DEV_UNEXPECTED            = 400
 };
 
+#define PVFS_OP_SYS_MAXVAL 69
+#define PVFS_OP_MGMT_MAXVAL 199
+
 int PINT_client_io_cancel(job_id_t id);
 
 /* internal non-blocking helper methods */
@@ -669,8 +672,20 @@ struct server_configuration_s *PINT_get_server_config_struct(
  * state-machine.h included here
  ************************************/
 #define PINT_OP_STATE       PINT_client_sm
+#define PINT_OP_STATE_GET_MACHINE(_op) \
+    ((_op <= PVFS_OP_SYS_MAXVAL) ? (PINT_client_sm_sys_table[_op - 1].sm) : \
+     ((_op <= PVFS_OP_MGMT_MAXVAL) ?  \
+      (PINT_client_sm_mgmt_table[_op - PVFS_OP_MGMT_MAXVAL - 1].sm) : \
+      ((_op == PVFS_SERVER_GET_CONFIG) ? (&pvfs2_server_get_config_sm) : \
+       ((_op == PVFS_CLIENT_JOB_TIMER) ? (&pvfs2_client_job_timer_sm) : NULL))))
 
-#include "state-machine.h"
+struct PINT_client_op_entry_s
+{
+    struct PINT_state_machine_s * sm;
+};
+                                                                    
+extern struct PINT_client_op_entry_s PINT_client_sm_sys_table[];
+extern struct PINT_client_op_entry_s PINT_client_sm_mgmt_table[];
 
 /* system interface function state machines */
 extern struct PINT_state_machine_s pvfs2_client_remove_sm;
@@ -705,9 +720,10 @@ extern struct PINT_state_machine_s pvfs2_client_del_eattr_sm;
 
 
 /* nested state machines (helpers) */
-extern struct PINT_state_machine_s pvfs2_client_getattr_acache_sm;
 extern struct PINT_state_machine_s pvfs2_client_lookup_ncache_sm;
 extern struct PINT_state_machine_s pvfs2_client_remove_helper_sm;
+
+#include "state-machine.h"
 
 #endif /* __SM_CHECK_DEP */
 #endif /* __PVFS2_CLIENT_STATE_MACHINE_H */
