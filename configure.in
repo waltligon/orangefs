@@ -434,8 +434,14 @@ dnl currently it's a few functions that SuSE-8 backports from
 dnl 2.6 into 2.4
 
 oldcflags=$CFLAGS
+if test -z "${LINUX_KERNEL_SRC}"  ; then
+	lk_src=${LINUX24_KERNEL_SRC}
+elif test -z "${LINUX24_KERNEL_SRC}"  ; then
+	lk_src=${LINUX_KERNEL_SRC}
+fi
+
 AC_MSG_CHECKING(for i_size_write in kernel)
-CFLAGS="$USR_CFLAGS -Werror -I$LINUX24_KERNEL_SRC/include -I${LINUX_KERNEL_SRC}/include"
+CFLAGS="$USR_CFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default" 
 dnl if this test passes, the kernel does not have it
 dnl if this test fails, the kernel already defined it
 AC_TRY_COMPILE([
@@ -453,7 +459,7 @@ AC_TRY_COMPILE([
 )
 
 AC_MSG_CHECKING(for i_size_read in kernel)
-CFLAGS="$USR_CFLAGS -Werror -I$LINUX24_KERNEL_SRC/include -I${LINUX_KERNEL_SRC}/include"
+CFLAGS="$USR_CFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default" 
 dnl if this test passes, the kernel does not have it
 dnl if this test fails, the kernel already defined it
 AC_TRY_COMPILE([
@@ -470,7 +476,7 @@ AC_TRY_COMPILE([
 )
 
 AC_MSG_CHECKING(for parent_ino in kernel)
-CFLAGS="$USR_CFLAGS -Werror -I$LINUX24_KERNEL_SRC/include -I${LINUX_KERNEL_SRC}/include"
+CFLAGS="$USR_CFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default" 
 dnl if this test passes, the kernel does not have it
 dnl if this test fails, the kernel already defined it
 AC_TRY_COMPILE([
@@ -489,7 +495,7 @@ AC_TRY_COMPILE([
 dnl The name of this field changed from memory_backed to capabilities in 2.6.12.
 
 AC_MSG_CHECKING(for memory_backed in struct backing_dev_info in kernel)
-CFLAGS="$USR_CFLAGS -Werror -I$LINUX_KERNEL_SRC/include -I$LINUX_KERNEL_SRC/include/asm-i386/mach-generic"
+CFLAGS="$USR_CFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default" 
 AC_TRY_COMPILE([
 	#define __KERNEL__
 	#include <linux/mm.h>

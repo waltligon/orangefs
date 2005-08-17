@@ -4261,9 +4261,15 @@ fi;
 
 
 oldcflags=$CFLAGS
+if test -z "${LINUX_KERNEL_SRC}"  ; then
+	lk_src=${LINUX24_KERNEL_SRC}
+elif test -z "${LINUX24_KERNEL_SRC}"  ; then
+	lk_src=${LINUX_KERNEL_SRC}
+fi
+
 echo "$as_me:$LINENO: checking for i_size_write in kernel" >&5
 echo $ECHO_N "checking for i_size_write in kernel... $ECHO_C" >&6
-CFLAGS="$USR_CFLAGS -Werror -I$LINUX24_KERNEL_SRC/include -I${LINUX_KERNEL_SRC}/include"
+CFLAGS="$USR_CFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default"
 cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
@@ -4326,7 +4332,7 @@ rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 
 echo "$as_me:$LINENO: checking for i_size_read in kernel" >&5
 echo $ECHO_N "checking for i_size_read in kernel... $ECHO_C" >&6
-CFLAGS="$USR_CFLAGS -Werror -I$LINUX24_KERNEL_SRC/include -I${LINUX_KERNEL_SRC}/include"
+CFLAGS="$USR_CFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default"
 cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
@@ -4388,7 +4394,7 @@ rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 
 echo "$as_me:$LINENO: checking for parent_ino in kernel" >&5
 echo $ECHO_N "checking for parent_ino in kernel... $ECHO_C" >&6
-CFLAGS="$USR_CFLAGS -Werror -I$LINUX24_KERNEL_SRC/include -I${LINUX_KERNEL_SRC}/include"
+CFLAGS="$USR_CFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default"
 cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
@@ -4451,7 +4457,7 @@ rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 
 echo "$as_me:$LINENO: checking for memory_backed in struct backing_dev_info in kernel" >&5
 echo $ECHO_N "checking for memory_backed in struct backing_dev_info in kernel... $ECHO_C" >&6
-CFLAGS="$USR_CFLAGS -Werror -I$LINUX_KERNEL_SRC/include -I$LINUX_KERNEL_SRC/include/asm-i386/mach-generic"
+CFLAGS="$USR_CFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default"
 cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
