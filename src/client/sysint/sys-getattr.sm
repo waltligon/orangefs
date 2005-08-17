@@ -381,6 +381,10 @@ static int getattr_acache_lookup(PINT_client_sm *sm_p,
              */
             if(missing_attrs == PVFS_ATTR_DATA_SIZE)
             {
+                /* if the file size is requested but the distribution info
+                 * isn't and it hasn't been cached, then we need to
+                 * get that first.
+                 */
                 js_p->error_code = GETATTR_NEED_DATAFILE_SIZES;
                 goto cache_hit;
             }
@@ -745,8 +749,10 @@ static int getattr_acache_insert(PINT_client_sm *sm_p,
                  (release_required ? "already" : "not"));
     pinode->refn = sm_p->getattr.object_ref;
 
-    if (sm_p->getattr.req_attrmask & PVFS_ATTR_DATA_SIZE)
+    if (attr->objtype == PVFS_TYPE_METAFILE &&
+        sm_p->getattr.req_attrmask & PVFS_ATTR_DATA_SIZE)
     {
+        ;
         /* compute size as requested */
         PINT_dist *dist = NULL;
         assert(attr->u.meta.dist);

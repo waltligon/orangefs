@@ -141,9 +141,10 @@ int PVFS_util_copy_sys_attr(
             if (!dest_attr->link_target)
             {
                 ret = -PVFS_ENOMEM;
+                return ret;
             }
-            ret = 0;
         }
+        ret = 0;
     }
     return ret;
 }

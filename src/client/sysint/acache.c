@@ -101,12 +101,6 @@ int PINT_acache_initialize()
 
     acache_debug("PINT_acache_initialize entered\n");
 
-    ret = PINT_cached_config_initialize();
-    if(ret < 0)
-    {
-        return ret;
-    }
-
     gen_mutex_lock(&s_acache_interface_mutex);
 
     s_acache_htable_mutex = gen_mutex_build();
@@ -181,8 +175,6 @@ void PINT_acache_finalize()
 
     gen_mutex_unlock(&s_acache_interface_mutex);
     acache_debug("PINT_acache_finalize exiting\n");
-
-    PINT_cached_config_finalize();
 }
 
 int PINT_acache_reinitialize(void)
@@ -619,7 +611,8 @@ static inline int acache_internal_status(
                     pinode->time_stamp.tv_usec + 
                     (int)((s_acache_timeout_ms % 1000) * 1000);
 
-                if(!ACACHE_TIMEVAL_IS_EXPIRED(now, attr_expire))
+                if(unexpired_masks &&
+                   !ACACHE_TIMEVAL_IS_EXPIRED(now, attr_expire))
                 {
                     *unexpired_masks |= pinode->attr.mask;
                 }

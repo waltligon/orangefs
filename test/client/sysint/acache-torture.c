@@ -35,6 +35,13 @@ int main(int argc, char **argv)
     gossip_enable_stderr();
     gossip_set_debug_mask(1, GOSSIP_ACACHE_DEBUG);
 
+    ret = PINT_cached_config_initialize();
+    if(ret < 0)
+    {
+	gossip_err("cached_config_initialize() failure.\n");
+	return -1;
+    }
+
     /* initialize the cache */
     ret = PINT_acache_initialize();
     if(ret < 0)
