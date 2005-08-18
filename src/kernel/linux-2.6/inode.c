@@ -367,10 +367,12 @@ struct inode_operations pvfs2_file_inode_operations =
     truncate : pvfs2_truncate,
     setattr : pvfs2_setattr,
     revalidate : pvfs2_revalidate,
+#ifdef HAVE_XATTR
     setxattr : pvfs2_setxattr, 
     getxattr : pvfs2_getxattr,
 /*    listxattr : pvfs2_listxattr, */
     removexattr: pvfs2_removexattr, 
+#endif
 #else
     .truncate = pvfs2_truncate,
     .setattr = pvfs2_setattr,

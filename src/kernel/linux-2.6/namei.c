@@ -476,10 +476,12 @@ struct inode_operations pvfs2_dir_inode_operations =
     rename : pvfs2_rename,
     setattr : pvfs2_setattr,
     revalidate : pvfs2_revalidate,
+#ifdef HAVE_XATTR
     getxattr: pvfs2_getxattr,
     setxattr: pvfs2_setxattr,
 /*    listxattr: pvfs2_listxattr,*/
     removexattr: pvfs2_removexattr,
+#endif
 #else
     .create = pvfs2_create,
     .lookup = pvfs2_lookup,

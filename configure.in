@@ -495,7 +495,7 @@ AC_TRY_COMPILE([
 dnl The name of this field changed from memory_backed to capabilities in 2.6.12.
 
 AC_MSG_CHECKING(for memory_backed in struct backing_dev_info in kernel)
-CFLAGS="$USR_CFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default" 
+CFLAGS="$USR_CFLAGS -Wall -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default" 
 AC_TRY_COMPILE([
 	#define __KERNEL__
 	#include <linux/mm.h>
@@ -506,6 +506,22 @@ AC_TRY_COMPILE([
 ], [],
 	AC_MSG_RESULT(yes)
 	AC_DEFINE(HAVE_BDI_MEMORY_BACKED, 1, Define if struct backing_dev_info in kernel has memory_backed),
+	AC_MSG_RESULT(no)
+)
+
+AC_MSG_CHECKING(for xattr support in kernel)
+CFLAGS="$USR_CFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default" 
+dnl if this test passes, the kernel has it
+dnl if this test fails, the kernel does not have it
+AC_TRY_COMPILE([
+	#define __KERNEL__
+        #include <linux/fs.h>
+		  static struct inode_operations in_op = {
+			  .getxattr = NULL
+		  };
+], [],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_XATTR, 1, Define if kernel has xattr support),
 	AC_MSG_RESULT(no)
 )
 
