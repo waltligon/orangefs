@@ -366,7 +366,7 @@ int PINT_split_string_list(char ***tokens, const char *comma_list)
     }
 
     /* allocate pointers for each */
-    *tokens = (char **) malloc(sizeof(char **));
+    *tokens = (char **) malloc(sizeof(char *) * tokencount);
     if (!(*tokens))
     {
 	return 0;
