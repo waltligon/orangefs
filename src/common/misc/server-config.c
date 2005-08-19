@@ -1295,10 +1295,10 @@ DOTCONF_CB(get_filesystem_collid)
 static int compare_aliases(void * valias1,
                            void * valias2)
 {
-    host_alias_s * alias1 = (host_alias_s *)valias1;
+    char * alias1 = (char *)valias1;
     host_alias_s * alias2 = (host_alias_s *)valias2;
     
-    return strcmp(alias1->host_alias, alias2->host_alias);
+    return strcmp(alias1, alias2->host_alias);
 }
 
 DOTCONF_CB(get_alias_list)
