@@ -10,9 +10,10 @@
  *  Linux VFS extended attribute operations.
  */
 
-#ifdef HAVE_XATTR
 #include "pvfs2-kernel.h"
 #include "pvfs2-bufmap.h"
+
+#ifdef HAVE_XATTR
 #include <linux/xattr.h>
 
 /* All pointers are in kernel-space */
