@@ -236,7 +236,7 @@ sub emit_filesystem
     print $target "\t</DataHandleRanges>\n";
 
     print $target "\t<StorageHints>\n";
-    print $target "\t\tHandleRecycleTimeoutSecs $handle_recycle_timeout_seconds\n";
+#    print $target "\t\tHandleRecycleTimeoutSecs $handle_recycle_timeout_seconds\n";
     # only in special cases would someone want to sync data (failover comes to
     # mind)  The default thus should be to sync metadata but not sync data.  
     if ($opt_trovesync == 1) {

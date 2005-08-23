@@ -178,6 +178,7 @@ extern "C"
 	dotconf_callback_t callback;	/* callback function */
 	info_t *info;		/* additional info for multi-option callbacks */
 	unsigned long context;	/* context sensitivity flags */
+        const char *default_value;
     };
 
     struct command_t
@@ -239,6 +240,10 @@ extern "C"
     const char *PINT_dotconf_invoke_command(
     configfile_t * configfile,
     command_t * cmd);
+
+    const char *PINT_dotconf_set_defaults(
+    configfile_t * configfile,
+    unsigned long context);
 
 /* ------ PINT_dotconf_find_command() - iterate through all registered options trying to match ------- */
     configoption_t *PINT_dotconf_find_command(

@@ -11,6 +11,38 @@
 #include "pvfs2-storage.h"
 #include "pint-distribution.h"
 
+/* internal attribute masks, common to all obj types */
+#define PVFS_ATTR_COMMON_UID   (1 << 0)
+#define PVFS_ATTR_COMMON_GID   (1 << 1)
+#define PVFS_ATTR_COMMON_PERM  (1 << 2)
+#define PVFS_ATTR_COMMON_ATIME (1 << 3)
+#define PVFS_ATTR_COMMON_CTIME (1 << 4)
+#define PVFS_ATTR_COMMON_MTIME (1 << 5)
+#define PVFS_ATTR_COMMON_TYPE  (1 << 6)
+#define PVFS_ATTR_COMMON_ALL                       \
+(PVFS_ATTR_COMMON_UID   | PVFS_ATTR_COMMON_GID   | \
+ PVFS_ATTR_COMMON_PERM  | PVFS_ATTR_COMMON_ATIME | \
+ PVFS_ATTR_COMMON_CTIME | PVFS_ATTR_COMMON_MTIME | \
+ PVFS_ATTR_COMMON_TYPE)
+
+/* internal attribute masks for metadata objects */
+#define PVFS_ATTR_META_DIST    (1 << 10)
+#define PVFS_ATTR_META_DFILES  (1 << 11)
+#define PVFS_ATTR_META_ALL \
+(PVFS_ATTR_META_DIST | PVFS_ATTR_META_DFILES)
+
+/* internal attribute masks for datafile objects */
+#define PVFS_ATTR_DATA_SIZE            (1 << 15)
+#define PVFS_ATTR_DATA_ALL   PVFS_ATTR_DATA_SIZE
+
+/* internal attribute masks for symlink objects */
+#define PVFS_ATTR_SYMLNK_TARGET            (1 << 18)
+#define PVFS_ATTR_SYMLNK_ALL PVFS_ATTR_SYMLNK_TARGET
+
+/* internal attribute masks for directory objects */
+#define PVFS_ATTR_DIR_DIRENT_COUNT         (1 << 19)
+#define PVFS_ATTR_DIR_ALL PVFS_ATTR_DIR_DIRENT_COUNT
+
 /* attributes specific to metadata objects */
 struct PVFS_metafile_attr_s
 {

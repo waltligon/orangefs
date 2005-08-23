@@ -36,6 +36,9 @@ int PINT_get_next_path(
 int PINT_split_string_list(
     char ***tokens,
     const char *comma_list);
+void PINT_free_string_list(
+    char ** list, 
+    int len);
 int PINT_remove_base_dir(
     char *pathname,
     char *out_dir,

@@ -84,69 +84,29 @@ void PVFS_util_make_size_human_readable(
     int max_out_len,
     int use_si_units);
 
-static inline int PVFS_util_object_to_sys_attr_mask(
-    int obj_mask)
-{
-    int sys_mask = 0;
+inline uint32_t PVFS_util_sys_to_object_attr_mask(
+    uint32_t sys_attrmask);
 
-    if (obj_mask & PVFS_ATTR_COMMON_UID)
-    {
-        sys_mask |= PVFS_ATTR_SYS_UID;
-    }
-    if (obj_mask & PVFS_ATTR_COMMON_GID)
-    {
-        sys_mask |= PVFS_ATTR_SYS_GID;
-    }
-    if (obj_mask & PVFS_ATTR_COMMON_PERM)
-    {
-        sys_mask |= PVFS_ATTR_SYS_PERM;
-    }
-    if (obj_mask & PVFS_ATTR_COMMON_ATIME)
-    {
-        sys_mask |= PVFS_ATTR_SYS_ATIME;
-    }
-    if (obj_mask & PVFS_ATTR_COMMON_CTIME)
-    {
-        sys_mask |= PVFS_ATTR_SYS_CTIME;
-    }
-    if (obj_mask & PVFS_ATTR_COMMON_MTIME)
-    {
-        sys_mask |= PVFS_ATTR_SYS_MTIME;
-    }
-    if (obj_mask & PVFS_ATTR_COMMON_TYPE)
-    {
-        sys_mask |= PVFS_ATTR_SYS_TYPE;
-    }
-    if (obj_mask & PVFS_ATTR_DATA_SIZE)
-    {
-        sys_mask |= PVFS_ATTR_DATA_SIZE;
-    }
-    if (obj_mask & PVFS_ATTR_SYMLNK_TARGET)
-    {
-        sys_mask |= PVFS_ATTR_SYS_LNK_TARGET;
-    }
-    return sys_mask;
-}
+inline uint32_t PVFS_util_object_to_sys_attr_mask( 
+    uint32_t obj_mask);
 
 static inline int PVFS2_translate_mode(int mode)
 {
     int ret = 0, i = 0;
-    static int modes[10] =
+    static int modes[9] =
     {
         S_IXOTH, S_IWOTH, S_IROTH,
         S_IXGRP, S_IWGRP, S_IRGRP,
-        S_IXUSR, S_IWUSR, S_IRUSR,
-        S_ISGID
+        S_IXUSR, S_IWUSR, S_IRUSR
     };
-    static int pvfs2_modes[10] =
+    static int pvfs2_modes[9] =
     {
         PVFS_O_EXECUTE, PVFS_O_WRITE, PVFS_O_READ,
         PVFS_G_EXECUTE, PVFS_G_WRITE, PVFS_G_READ,
         PVFS_U_EXECUTE, PVFS_U_WRITE, PVFS_U_READ,
-        PVFS_G_SGID
     };
 
-    for(i = 0; i < 10; i++)
+    for(i = 0; i < 9; i++)
     {
         if (mode & modes[i])
         {
@@ -157,7 +117,7 @@ static inline int PVFS2_translate_mode(int mode)
 }
 
 #ifndef __KERNEL__
-static inline PVFS_time PVFS_util_get_current_time(void)
+inline static PVFS_time PVFS_util_get_current_time(void)
 {
     struct timeval t = {0,0};
     PVFS_time current_time = 0;
@@ -167,7 +127,7 @@ static inline PVFS_time PVFS_util_get_current_time(void)
     return current_time;
 }
 
-static inline PVFS_time PVFS_util_mktime_version(PVFS_time time)
+inline static PVFS_time PVFS_util_mktime_version(PVFS_time time)
 {
     struct timeval t = {0,0};
     PVFS_time version = (time << 32);
@@ -177,7 +137,7 @@ static inline PVFS_time PVFS_util_mktime_version(PVFS_time time)
     return version;
 }
 
-static inline PVFS_time PVFS_util_mkversion_time(PVFS_time version)
+inline static PVFS_time PVFS_util_mkversion_time(PVFS_time version)
 {
     return (PVFS_time)(version >> 32);
 }

@@ -124,9 +124,6 @@ void print_filesystem_configuration(struct filesystem_configuration_s *fs)
         fprintf(stderr,"Flow Protocol         : ");
         switch(fs->flowproto)
         {
-            case FLOWPROTO_BMI_TROVE:
-                fprintf(stderr,"flowproto_bmi_trove\n");
-                        break;
             case FLOWPROTO_DUMP_OFFSETS:
                 fprintf(stderr,"flowproto_dump_offsets\n");
                         break;

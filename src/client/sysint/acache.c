@@ -36,6 +36,21 @@
 #define acache_debug(...)
 #endif
 
+const char * PINT_acache_status_strings[6] =
+{
+    "PINODE_STATUS_VALID",
+    "PINODE_STATUS_INVALID",
+    "PINODE_STATUS_EXPIRED",
+    "PINODE_INTERNAL_FLAG_HASHED",
+    "PINODE_INTERNAL_FLAG_UNHASHED",
+    "PINODE_INTERNAL_FLAG_EMPTY_LOOKUP"
+};
+
+#define ACACHE_TIMEVAL_IS_EXPIRED(_nowstamp, _expirestamp) \
+    (((_nowstamp.tv_sec == _expirestamp.tv_sec) && \
+      (_nowstamp.tv_usec > _expirestamp.tv_usec)) ? 1 : \
+     ((_nowstamp.tv_sec > _expirestamp.tv_sec) ? 1 : 0))
+
 static struct qhash_table *s_acache_htable = NULL;
 static gen_mutex_t *s_acache_htable_mutex = NULL;
 
@@ -53,7 +68,8 @@ static PINT_pinode *pinode_alloc(void);
 static void pinode_free(
     PINT_pinode *pinode);
 static int pinode_status(
-    PINT_pinode *pinode);
+    PINT_pinode *pinode,
+    int *unexpired_masks);
 static void pinode_update_timestamp(
     PINT_pinode **pinode);
 static void pinode_invalidate(
@@ -63,31 +79,14 @@ static inline void acache_internal_release(
 static inline PINT_pinode *acache_internal_lookup(
     PVFS_object_ref refn);
 static inline int acache_internal_status(
-    PINT_pinode *pinode);
+    PINT_pinode *pinode, int *unexpired_masks);
 #ifdef PINT_ACACHE_AUTO_CLEANUP
 static void reclaim_pinode_entries(void);
 #endif
 
-static inline char *get_status_str(int status)
+const char *PINT_acache_get_status(int status)
 {
-    typedef struct
-    {
-        int status;
-        char *status_str;
-    } acache_status_t;
-
-    static acache_status_t ast[4] =
-    {
-        { PINODE_STATUS_VALID, "PINODE_STATUS_VALID" },
-        { PINODE_STATUS_INVALID, "PINODE_STATUS_INVALID" },
-        { PINODE_STATUS_EXPIRED, "PINODE_STATUS_EXPIRED" },
-        { 0, "PINODE_STATUS_UNKNOWN" },
-    };
-
-    return (((ast[0].status == status) ? ast[0].status_str :
-             (ast[1].status == status) ? ast[1].status_str :
-             (ast[2].status == status) ? ast[2].status_str :
-             ast[3].status_str));
+    return PINT_acache_status_strings[status - 3];
 }
 
 /*
@@ -225,7 +224,8 @@ static inline PINT_pinode *acache_internal_lookup(PVFS_object_ref refn)
   release, or set_valid).  if status is specified, the pinode status
   will be filled to avoid calling the status method after this call
 */
-PINT_pinode *PINT_acache_lookup(PVFS_object_ref refn, int *status)
+PINT_pinode *PINT_acache_lookup(
+    PVFS_object_ref refn, int *status, int *unexpired_masks)
 {
     PINT_pinode *pinode = NULL;
     struct qhash_head *link = NULL;
@@ -253,7 +253,7 @@ PINT_pinode *PINT_acache_lookup(PVFS_object_ref refn, int *status)
         pinode->ref_cnt++;
         if (status)
         {
-            *status = acache_internal_status(pinode);
+            *status = acache_internal_status(pinode, unexpired_masks);
         }
     }
     gen_mutex_unlock(&s_acache_interface_mutex);
@@ -287,11 +287,11 @@ void PINT_acache_free_pinode(PINT_pinode *pinode)
     pinode_free(pinode);
 }
 
-int PINT_acache_pinode_status(PINT_pinode *pinode)
+int PINT_acache_pinode_status(PINT_pinode *pinode, int *unexpired_masks)
 {
     assert(s_acache_initialized);
     acache_debug("PINT_acache_status called\n");
-    return pinode_status(pinode);
+    return pinode_status(pinode, unexpired_masks);
 }
 
 void PINT_acache_set_valid(PINT_pinode *pinode)
@@ -355,19 +355,25 @@ void PINT_acache_invalidate(PVFS_object_ref refn)
     acache_debug("PINT_acache_invalidate exiting\n");
 }
 
-void PINT_acache_release_refn(PVFS_object_ref refn)
+int PINT_acache_insert(PVFS_object_ref refn,
+                       PVFS_object_attr *attr)
 {
-    PINT_pinode *pinode = NULL;
-
-    acache_debug("PINT_acache_release_refn entered\n");
-    gen_mutex_lock(&s_acache_interface_mutex);
-    pinode = acache_internal_lookup(refn);
-    if (pinode)
+    PINT_pinode *pinode;
+    
+    pinode = PINT_acache_pinode_alloc();
+    if(!pinode)
     {
-        acache_internal_release(pinode);
+        return -PVFS_ENOMEM;
     }
-    gen_mutex_unlock(&s_acache_interface_mutex);
-    acache_debug("PINT_acache_release_refn exited\n");
+
+    pinode->refn.fs_id = refn.fs_id;
+    pinode->refn.handle = refn.handle;
+    
+    PINT_copy_object_attr(&pinode->attr, attr);
+
+    PINT_acache_set_valid(pinode);
+
+    return 0;
 }
 
 /*
@@ -530,23 +536,30 @@ static void pinode_invalidate(PINT_pinode *pinode)
     acache_debug("pinode_invalidate exited\n");
 }
 
-static int pinode_status(PINT_pinode *pinode)
+static int pinode_status(PINT_pinode *pinode, int *unexpired_masks)
 {
     int ret = PINODE_STATUS_INVALID;
 
     acache_debug("pinode_status entered\n");
 
     gen_mutex_trylock(pinode->mutex);
-    ret = acache_internal_status(pinode);
+    ret = acache_internal_status(pinode, unexpired_masks);
     gen_mutex_unlock(pinode->mutex);
 
     acache_debug("pinode_status exited\n");
     return ret;
 }
 
-static inline int acache_internal_status(PINT_pinode *pinode)
+/*
+ * unexpired_masks variable allows us to extend the acache
+ * interface to allow for different timeouts for different masks
+ * in the attribute, besides the attr cache timeout and the
+ * handle recycle timeout.
+ */
+static inline int acache_internal_status(
+    PINT_pinode *pinode, int *unexpired_masks)
 {
-    struct timeval now;
+    struct timeval now, handle_timeout, handle_expire, attr_expire;
     int ret = PINODE_STATUS_INVALID;
 
     acache_debug("acache_internal_status entered\n");
@@ -557,18 +570,58 @@ static inline int acache_internal_status(PINT_pinode *pinode)
         ret = PINODE_STATUS_INVALID;
         if (pinode->ref_cnt > 0)
         {
-            if (gettimeofday(&now, NULL) == 0)
+            assert(gettimeofday(&now, NULL) == 0);
+
+            if(PINT_cached_config_get_handle_timeout(
+                    pinode->refn.fs_id, &handle_timeout) != 0)
             {
-                ret = (((pinode->time_stamp.tv_sec < now.tv_sec) ||
-                        ((pinode->time_stamp.tv_sec == now.tv_sec) &&
-                         (pinode->time_stamp.tv_usec < now.tv_usec))) ?
-                       PINODE_STATUS_EXPIRED : PINODE_STATUS_VALID);
+                return ret; 
+            }
+            
+            handle_expire.tv_sec = 
+                pinode->time_stamp.tv_sec + handle_timeout.tv_sec;
+            handle_expire.tv_usec =
+                pinode->time_stamp.tv_usec + handle_timeout.tv_usec;
+            
+            if(ACACHE_TIMEVAL_IS_EXPIRED(now, handle_expire))
+            {
+                /* all masks are expired if the handle recycle timeout
+                 * is expired
+                 */
+                if(unexpired_masks)
+                {
+                    *unexpired_masks = 0;
+                }
+                ret = PINODE_STATUS_EXPIRED;
+            }
+            else
+            {
+                if(unexpired_masks)
+                {
+                    *unexpired_masks = 
+                        ((PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE) 
+                         & pinode->attr.mask);
+                }
+                ret = PINODE_STATUS_VALID;
+
+                attr_expire.tv_sec =
+                    pinode->time_stamp.tv_sec 
+                    + (int)(s_acache_timeout_ms / 1000);
+                attr_expire.tv_usec =
+                    pinode->time_stamp.tv_usec + 
+                    (int)((s_acache_timeout_ms % 1000) * 1000);
+
+                if(unexpired_masks &&
+                   !ACACHE_TIMEVAL_IS_EXPIRED(now, attr_expire))
+                {
+                    *unexpired_masks |= pinode->attr.mask;
+                }
             }
         }
     }
 
     gossip_debug(GOSSIP_ACACHE_DEBUG, "pinode [%Lu] entry status: %s\n",
-                 Lu(pinode->refn.handle), get_status_str(ret));
+                 Lu(pinode->refn.handle), PINT_acache_get_status(ret));
 
     if (ret == PINODE_STATUS_EXPIRED)
     {
@@ -581,17 +634,8 @@ static inline int acache_internal_status(PINT_pinode *pinode)
 /* NOTE: called with the pinode mutex lock held */
 static void pinode_update_timestamp(PINT_pinode **pinode)
 {
-    if (gettimeofday(&((*pinode)->time_stamp), NULL) == 0)
-    {
-        (*pinode)->time_stamp.tv_sec += (int)(s_acache_timeout_ms / 1000);
-        (*pinode)->time_stamp.tv_usec +=
-            (int)((s_acache_timeout_ms % 1000) * 1000);
-        (*pinode)->ref_cnt++;
-    }
-    else
-    {
-        assert(0);
-    }
+    assert(gettimeofday(&((*pinode)->time_stamp), NULL) == 0);
+    (*pinode)->ref_cnt++;
 }
 
 #ifdef PINT_ACACHE_AUTO_CLEANUP
@@ -616,7 +660,7 @@ static void reclaim_pinode_entries()
                 pinode = qlist_entry(link, PINT_pinode, link);
                 assert(pinode);
 
-                if (pinode_status(pinode) != PINODE_STATUS_VALID)
+                if (pinode_status(pinode, NULL) != PINODE_STATUS_VALID)
                 {
                     gen_mutex_unlock(s_acache_htable_mutex);
                     pinode_invalidate(pinode);

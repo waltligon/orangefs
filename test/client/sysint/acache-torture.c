@@ -35,6 +35,13 @@ int main(int argc, char **argv)
     gossip_enable_stderr();
     gossip_set_debug_mask(1, GOSSIP_ACACHE_DEBUG);
 
+    ret = PINT_cached_config_initialize();
+    if(ret < 0)
+    {
+	gossip_err("cached_config_initialize() failure.\n");
+	return -1;
+    }
+
     /* initialize the cache */
     ret = PINT_acache_initialize();
     if(ret < 0)
@@ -50,7 +57,7 @@ int main(int argc, char **argv)
         tmp.handle = (PVFS_handle)i;
         tmp.fs_id = (PVFS_fs_id)(i + 1000);
 
-        pinode1 = PINT_acache_lookup(tmp, NULL);
+        pinode1 = PINT_acache_lookup(tmp, NULL, NULL);
         assert(pinode1 == NULL);
 
         pinode1 = PINT_acache_pinode_alloc();
@@ -71,10 +78,10 @@ int main(int argc, char **argv)
         tmp.handle = (PVFS_handle)i;
         tmp.fs_id = (PVFS_fs_id)(i + 1000);
 
-        pinode2 = PINT_acache_lookup(tmp, NULL);
+        pinode2 = PINT_acache_lookup(tmp, NULL, NULL);
         assert(pinode2);
 
-        if (PINT_acache_pinode_status(pinode2) != PINODE_STATUS_VALID)
+        if (PINT_acache_pinode_status(pinode2, NULL) != PINODE_STATUS_VALID)
         {
             gossip_err("(1) Failure: lookup returned %Lu when it "
                        "should've returned %Lu.\n",
@@ -91,10 +98,10 @@ int main(int argc, char **argv)
         tmp.handle = (PVFS_handle)i;
         tmp.fs_id = (PVFS_fs_id)(i + 1000);
 
-        pinode2 = PINT_acache_lookup(tmp, NULL);
+        pinode2 = PINT_acache_lookup(tmp, NULL, NULL);
         assert(pinode2);
 
-        if (PINT_acache_pinode_status(pinode2) == PINODE_STATUS_VALID)
+        if (PINT_acache_pinode_status(pinode2, NULL) == PINODE_STATUS_VALID)
         {
             gossip_err("(2) Failure: lookup returned %Lu when it "
                        "should've been expired.\n",
@@ -112,10 +119,10 @@ int main(int argc, char **argv)
         tmp.handle = (PVFS_handle)i;
         tmp.fs_id = (PVFS_fs_id)(i + 1000);
 
-        pinode2 = PINT_acache_lookup(tmp, NULL);
+        pinode2 = PINT_acache_lookup(tmp, NULL, NULL);
         assert(pinode2);
 
-        if (PINT_acache_pinode_status(pinode2) != PINODE_STATUS_VALID)
+        if (PINT_acache_pinode_status(pinode2, NULL) != PINODE_STATUS_VALID)
         {
             gossip_err("(3) Failure: lookup returned %Lu when it "
                        "should've returned %Lu.\n",
@@ -140,7 +147,7 @@ int main(int argc, char **argv)
         tmp.handle = (PVFS_handle)i;
         tmp.fs_id = (PVFS_fs_id)(i + 1000);
 
-        PINT_acache_release_refn(tmp);
+        PINT_acache_invalidate(tmp);
     }
 
     PINT_acache_finalize();

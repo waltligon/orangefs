@@ -113,9 +113,6 @@ struct PINT_client_symlink_sm
 
 struct PINT_client_getattr_sm
 {
-    uint32_t attrmask;                    /* input parameter */
-
-    PVFS_size *size_array;                /* from datafile attribs */
     PVFS_sysresp_getattr *getattr_resp_p; /* destination for output */
 };
 
@@ -216,8 +213,6 @@ struct PINT_client_io_sm
       only used when we need to zero fill beyond the end of the
       physical file size
     */
-    PVFS_size size;
-    PVFS_size *size_array;
     int continue_analysis;
     PVFS_error saved_ret;
     PVFS_error saved_error_code;
@@ -352,6 +347,47 @@ struct PINT_server_get_config_sm
     int persist_config_buffers;
 };
 
+typedef struct PINT_sm_getattr_state
+{
+    PVFS_object_ref object_ref;
+
+   /* request sys attrmask.  Some combination of
+     * PVFS_ATTR_SYS_*
+     */
+    uint32_t req_attrmask;
+    
+    /*
+      Either from the acache or full getattr op, this is the resuling
+      attribute that can be used by calling state machines
+    */
+    PVFS_object_attr attr;
+
+    PVFS_ds_type ref_type;
+
+    PVFS_size *size_array;                /* from datafile attribs */
+    PVFS_size size;
+    
+} PINT_sm_getattr_state;
+
+#define PINT_SM_GETATTR_STATE_FILL(_state, _objref, _mask, _reftype) \
+    do { \
+        memset(&(_state), 0, sizeof(PINT_sm_getattr_state)); \
+        (_state).object_ref.fs_id = (_objref).fs_id; \
+        (_state).object_ref.handle = (_objref).handle; \
+        (_state).req_attrmask = _mask; \
+        (_state).ref_type = _reftype; \
+    } while(0)
+
+#define PINT_SM_GETATTR_STATE_CLEAR(_state) \
+    do { \
+        PINT_free_object_attr(&(_state).attr); \
+        if((_state).size_array) \
+        { \
+            free((_state).size_array); \
+        } \
+        memset(&(_state), 0, sizeof(PINT_sm_getattr_state)); \
+    } while(0)
+
 struct PINT_client_geteattr_sm
 {
     int32_t nkey;
@@ -403,17 +439,8 @@ typedef struct PINT_client_sm
     /* indicates that an ncache hit has been made */ 
     int ncache_hit;
 
-    /* indicates that an acache hit has been made */ 
-    int acache_hit;
-
-    /* on acache hit, the attribute here can be used */
-    PINT_pinode *pinode;
-
-    /*
-      on acache miss, an attribute is typically stored here for later
-      insertion into the acache (if possible)
-    */
-    PVFS_object_attr acache_attr;
+    /* generic getattr used with getattr sub state machines */
+    PINT_sm_getattr_state getattr;
 
     /* msgpair scratch space used within msgpairarray substatemachine */
     /* if you have only a single msg pair you may point sm_p->msgarray */
@@ -428,17 +455,8 @@ typedef struct PINT_client_sm
     PINT_sm_msgpair_state *msgarray;
     PINT_sm_msgpair_params msgarray_params;
 
-    /*
-      internal pvfs_object references; used in conjunction with the
-      sm_common state machine routines, or otherwise as scratch object
-      references during sm processing.  if the ref_type_mask is set to
-      a non-zero value when the PINT_sm_common_*_getattr_setup_msgpair
-      method is called, a -PVFS_error will be triggered if the
-      attributes received are not of one of the the types specified
-    */
     PVFS_object_ref object_ref;
     PVFS_object_ref parent_ref;
-    PVFS_ds_type ref_type;
 
     /* used internally by client-state-machine.c */
     PVFS_sys_op_id sys_op_id;
@@ -571,6 +589,9 @@ enum
     PVFS_DEV_UNEXPECTED            = 400
 };
 
+#define PVFS_OP_SYS_MAXVAL 69
+#define PVFS_OP_MGMT_MAXVAL 199
+
 int PINT_client_io_cancel(job_id_t id);
 
 /* internal non-blocking helper methods */
@@ -651,14 +672,27 @@ struct server_configuration_s *PINT_get_server_config_struct(
  * state-machine.h included here
  ************************************/
 #define PINT_OP_STATE       PINT_client_sm
+#define PINT_OP_STATE_GET_MACHINE(_op) \
+    ((_op <= PVFS_OP_SYS_MAXVAL) ? (PINT_client_sm_sys_table[_op - 1].sm) : \
+     ((_op <= PVFS_OP_MGMT_MAXVAL) ?  \
+      (PINT_client_sm_mgmt_table[_op - PVFS_OP_MGMT_MAXVAL - 1].sm) : \
+      ((_op == PVFS_SERVER_GET_CONFIG) ? (&pvfs2_server_get_config_sm) : \
+       ((_op == PVFS_CLIENT_JOB_TIMER) ? (&pvfs2_client_job_timer_sm) : NULL))))
 
-#include "state-machine.h"
+struct PINT_client_op_entry_s
+{
+    struct PINT_state_machine_s * sm;
+};
+                                                                    
+extern struct PINT_client_op_entry_s PINT_client_sm_sys_table[];
+extern struct PINT_client_op_entry_s PINT_client_sm_mgmt_table[];
 
 /* system interface function state machines */
 extern struct PINT_state_machine_s pvfs2_client_remove_sm;
 extern struct PINT_state_machine_s pvfs2_client_create_sm;
 extern struct PINT_state_machine_s pvfs2_client_mkdir_sm;
 extern struct PINT_state_machine_s pvfs2_client_symlink_sm;
+extern struct PINT_state_machine_s pvfs2_client_sysint_getattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_getattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_setattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_io_sm;
@@ -686,9 +720,10 @@ extern struct PINT_state_machine_s pvfs2_client_del_eattr_sm;
 
 
 /* nested state machines (helpers) */
-extern struct PINT_state_machine_s pvfs2_client_getattr_acache_sm;
 extern struct PINT_state_machine_s pvfs2_client_lookup_ncache_sm;
 extern struct PINT_state_machine_s pvfs2_client_remove_helper_sm;
+
+#include "state-machine.h"
 
 #endif /* __SM_CHECK_DEP */
 #endif /* __PVFS2_CLIENT_STATE_MACHINE_H */

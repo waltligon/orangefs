@@ -23,10 +23,9 @@
  * includes state-machine.h, because state-machine.h needs a key #define
  * before it can be included.
  *
- * The structure holding the table of PINT_OP_STATE structures also needs to
- * be declared; its name should be #defined as PINT_OP_STATE_TABLE.  If you
- * don't define this, you don't get the extern or the _locate function
- * (currently client might not need them?).
+ * The PINT_OP_STATE_TABLE has been replaced with a macro that must be #defined
+ * instead: PINT_OP_STATE_GET_MACHINE.  
+ * This allows the _locate function to be used in the client as well.
  *
  * A good example of this is the pvfs2-server.h in the src/server directory,
  * which includes state-machine.h at the bottom, and server-state-machine.c,
@@ -40,9 +39,7 @@
 /* Prototypes for functions defined in here */
 static inline int PINT_state_machine_halt(void);
 static inline int PINT_state_machine_next(struct PINT_OP_STATE *,job_status_s *r);
-#ifdef PINT_OP_STATE_TABLE
 static union PINT_state_array_values *PINT_state_machine_locate(struct PINT_OP_STATE *);
-#endif
 static inline union PINT_state_array_values *PINT_pop_state(struct PINT_OP_STATE *s);
 static inline void PINT_push_state(struct PINT_OP_STATE *s, union PINT_state_array_values *p);
 
@@ -143,7 +140,6 @@ static inline int PINT_state_machine_next(struct PINT_OP_STATE *s,
     return retval;
 }
 
-#ifdef PINT_OP_STATE_TABLE
 /* Function: PINT_state_machine_locate(void)
    Params:  
    Returns:  Pointer to the start of the state machine indicated by
@@ -156,14 +152,14 @@ static union PINT_state_array_values *PINT_state_machine_locate(struct PINT_OP_S
     union PINT_state_array_values *current_tmp;
 
     /* check for valid inputs */
-    if (!s_op || s_op->op < 0 || s_op->op > PVFS_MAX_SERVER_OP)
+    if (!s_op || s_op->op < 0)
     {
 	gossip_err("State machine requested not valid\n");
 	return NULL;
     }
-    if (PINT_OP_STATE_TABLE[s_op->op].sm != NULL)
+    if (PINT_OP_STATE_GET_MACHINE(s_op->op) != NULL)
     {
-	current_tmp = PINT_OP_STATE_TABLE[s_op->op].sm->state_machine;
+	current_tmp = PINT_OP_STATE_GET_MACHINE(s_op->op)->state_machine;
 	/* handle the case in which the first state points to a nested
 	 * machine, rather than a simple function
 	 */
@@ -183,7 +179,6 @@ static union PINT_state_array_values *PINT_state_machine_locate(struct PINT_OP_S
     gossip_err("State machine not found for operation %d\n",s_op->op);
     return NULL;
 }
-#endif
 
 static inline union PINT_state_array_values *PINT_pop_state(struct PINT_OP_STATE *s)
 {

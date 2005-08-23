@@ -454,7 +454,8 @@ int server_state_machine_start_noreq(
 
 /* INCLUDE STATE-MACHINE.H DOWN HERE */
 #define PINT_OP_STATE       PINT_server_op
-#define PINT_OP_STATE_TABLE PINT_server_req_table
+#define PINT_OP_STATE_GET_MACHINE(_op) \
+    ((_op <= PVFS_MAX_SERVER_OP) ? (PINT_server_req_table[_op].sm) : NULL)
 
 #include "state-machine.h"
 

@@ -15,16 +15,16 @@
 #include "trove.h"
 #endif
 
-enum 
+enum
 {
-    GLOBAL_CONFIG = 1,
-    FILESYSTEM_CONFIG = 2,
-    DEFAULTS_CONFIG = 3,
-    ALIASES_CONFIG = 4,
-    META_HANDLERANGES_CONFIG = 5,
-    DATA_HANDLERANGES_CONFIG = 6,
-    STORAGEHINTS_CONFIG = 7,
-    DISTRIBUTION_CONFIG = 8,
+    CTX_GLOBAL           = (1 << 1),
+    CTX_DEFAULTS         = (1 << 2),
+    CTX_ALIASES          = (1 << 3),
+    CTX_FILESYSTEM       = (1 << 4),
+    CTX_METAHANDLERANGES = (1 << 5),
+    CTX_DATAHANDLERANGES = (1 << 6),
+    CTX_STORAGEHINTS     = (1 << 7),
+    CTX_DISTRIBUTION     = (1 << 8)
 };
 
 typedef struct phys_server_desc

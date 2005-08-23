@@ -899,6 +899,32 @@ int PINT_cached_config_get_root_handle(
     return ret;
 }
 
+int PINT_cached_config_get_handle_timeout(
+    PVFS_fs_id fsid,
+    struct timeval *timeout)
+{
+    int ret = -PVFS_EINVAL;
+    struct qlist_head *hash_link = NULL;
+    struct config_fs_cache_s *cur_config_cache = NULL;
+
+    hash_link = qhash_search(PINT_fsid_config_cache_table, &(fsid));
+    if(hash_link)
+    {
+        cur_config_cache = qlist_entry(
+            hash_link, struct config_fs_cache_s, hash_link);
+
+        assert(cur_config_cache);
+        assert(cur_config_cache->fs);
+
+        timeout->tv_sec = 
+            cur_config_cache->fs->handle_recycle_timeout_sec.tv_sec;
+        timeout->tv_usec =
+            cur_config_cache->fs->handle_recycle_timeout_sec.tv_usec;
+        ret = 0;
+    }
+    return ret;
+}
+
 /* cache_server_array()
  *
  * verifies that the arrays of physical server addresses have been

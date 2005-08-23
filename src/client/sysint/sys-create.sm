@@ -27,7 +27,6 @@
 #include "pint-cached-config.h"
 #include "pint-distribution.h"
 #include "PINT-reqproto-encode.h"
-#include "shared-state-methods.h"
 #include "pint-util.h"
 #include "ncache.h"
 
@@ -83,9 +82,7 @@ static PINT_dist* get_default_distribution(PVFS_fs_id fs_id);
 
 machine pvfs2_client_create_sm(
     init,
-    create_parent_getattr_setup_msgpair,
-    create_parent_getattr_xfer_msgpair,
-    create_parent_getattr_failure,
+    parent_getattr,
     parent_getattr_inspect,
     dspace_create_setup_msgpair,
     dspace_create_xfer_msgpair,
@@ -106,33 +103,20 @@ machine pvfs2_client_create_sm(
     state init
     {
         run create_init;
-        default => create_parent_getattr_setup_msgpair;
+        default => parent_getattr;
     }
 
-    state create_parent_getattr_setup_msgpair
+    state parent_getattr
     {
-        run PINT_sm_common_parent_getattr_setup_msgpair;
-        success => create_parent_getattr_xfer_msgpair;
-        default => create_parent_getattr_failure;
-    }
-
-    state create_parent_getattr_xfer_msgpair
-    {
-        jump pvfs2_client_getattr_acache_sm;
+        jump pvfs2_client_getattr_sm;
         success => parent_getattr_inspect;
-        default => create_parent_getattr_failure;
+        default => cleanup;
     }
 
     state parent_getattr_inspect
     {
         run create_parent_getattr_inspect;
         success => dspace_create_setup_msgpair;
-        default => create_parent_getattr_failure;
-    }
-
-    state create_parent_getattr_failure
-    {
-        run PINT_sm_common_parent_getattr_failure;
         default => cleanup;
     }
 
@@ -302,10 +286,7 @@ PVFS_error PVFS_isys_create(
     PVFS_util_copy_sys_attr(&sm_p->u.create.sys_attr, &attr);
     sm_p->u.create.stored_error_code = 0;
     sm_p->u.create.retry_count = 0;
-    sm_p->parent_ref = parent_ref;
-    sm_p->ref_type = PVFS_TYPE_DIRECTORY;
 
-    /* set sm_p->object_ref for getattr/acache lookup */
     sm_p->object_ref = parent_ref;
 
     /* If the user specifies a distribution use that
@@ -350,7 +331,7 @@ PVFS_error PVFS_isys_create(
         int rc;
         struct PVFS_sys_mntent mntent;
 
-        rc = PVFS_util_get_mntent_copy(sm_p->parent_ref.fs_id, &mntent);
+        rc = PVFS_util_get_mntent_copy(sm_p->object_ref.fs_id, &mntent);
         if (0 == rc)
         {
             num_dfiles_req = mntent.default_num_dfiles;
@@ -359,7 +340,7 @@ PVFS_error PVFS_isys_create(
 
     /* Determine the number of dfiles, passing in client hints to
        override any server hints */
-    ret = PINT_cached_config_get_num_dfiles(sm_p->parent_ref.fs_id,
+    ret = PINT_cached_config_get_num_dfiles(sm_p->object_ref.fs_id,
                                             sm_p->u.create.dist,
                                             num_dfiles_req,
                                             &sm_p->u.create.num_data_files);
@@ -374,7 +355,7 @@ PVFS_error PVFS_isys_create(
     gossip_debug(
         GOSSIP_CLIENT_DEBUG, "Creating file %s under %Lu, %d\n",
         object_name, Lu(parent_ref.handle), parent_ref.fs_id);
-
+          
     return PINT_client_state_machine_post(
         sm_p, PVFS_SYS_CREATE, op_id, user_ptr);
 }
@@ -435,7 +416,14 @@ static int create_init(PINT_client_sm *sm_p,
             sm_p->msgarray_params.retry_delay, sm_p, 0, js_p, &tmp_id,
             pint_client_sm_context);
     }
-    return 1;
+
+    PINT_SM_GETATTR_STATE_FILL(
+        sm_p->getattr,
+        sm_p->object_ref,
+        PVFS_ATTR_COMMON_ALL, 
+        PVFS_TYPE_DIRECTORY);
+
+   return 1;
 }
 
 static int create_create_comp_fn(void *v_p,
@@ -508,9 +496,22 @@ static int create_setattr_comp_fn(void *v_p,
                                   struct PVFS_server_resp *resp_p,
                                   int index)
 {
+    int res;
+    PVFS_object_ref refn;
+    PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create_setattr_comp_fn\n");
 
     assert(resp_p->op == PVFS_SERV_SETATTR);
+
+    refn.fs_id = sm_p->msgpair.fs_id;
+    refn.handle = sm_p->msgpair.handle;
+
+    res = PINT_acache_insert(refn, &sm_p->msgpair.req.u.setattr.attr);
+    if(res != 0)
+    {
+        return res;
+    }
+
     return resp_p->status;
 }
 
@@ -568,10 +569,10 @@ static int create_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
     PINT_init_msgpair(sm_p, msg_p);
 
     server_config = PINT_get_server_config_struct(
-        sm_p->parent_ref.fs_id);
+        sm_p->object_ref.fs_id);
 
     ret = PINT_cached_config_get_next_meta(
-        server_config, sm_p->parent_ref.fs_id,
+        server_config, sm_p->object_ref.fs_id,
         &msg_p->svr_addr, &meta_handle_extent_array);
 
     PINT_put_server_config_struct(server_config);
@@ -586,11 +587,11 @@ static int create_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
     PINT_SERVREQ_CREATE_FILL(
         msg_p->req,
         *sm_p->cred_p,
-        sm_p->parent_ref.fs_id,
+        sm_p->object_ref.fs_id,
         PVFS_TYPE_METAFILE,
         meta_handle_extent_array);
 
-    msg_p->fs_id = sm_p->parent_ref.fs_id;
+    msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = meta_handle_extent_array.extent_array[0].first;
     msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
     msg_p->comp_fn = create_create_comp_fn;
@@ -666,11 +667,11 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
     }
 
     server_config = PINT_get_server_config_struct(
-        sm_p->parent_ref.fs_id);
+        sm_p->object_ref.fs_id);
 
     ret = PINT_cached_config_get_next_io(
         server_config,
-        sm_p->parent_ref.fs_id,
+        sm_p->object_ref.fs_id,
         sm_p->u.create.num_data_files,
         sm_p->u.create.data_server_addrs,
         sm_p->u.create.io_handle_extent_array);
@@ -692,7 +693,7 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
         PINT_SERVREQ_CREATE_FILL(
             msg_p->req,
             *sm_p->cred_p,
-            sm_p->parent_ref.fs_id,
+            sm_p->object_ref.fs_id,
             PVFS_TYPE_DATAFILE,
             sm_p->u.create.io_handle_extent_array[i]);
 
@@ -703,7 +704,7 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
                      Lu(sm_p->u.create.io_handle_extent_array[i].
                         extent_array[0].last));
 
-        msg_p->fs_id = sm_p->parent_ref.fs_id;
+        msg_p->fs_id = sm_p->object_ref.fs_id;
         msg_p->handle = sm_p->u.create.io_handle_extent_array[i].
             extent_array[0].first;
         msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
@@ -755,7 +756,7 @@ static int create_setattr_setup_msgpair(PINT_client_sm *sm_p,
     PINT_SERVREQ_SETATTR_FILL(
         msg_p->req,
         *sm_p->cred_p,
-        sm_p->parent_ref.fs_id,
+        sm_p->object_ref.fs_id,
         sm_p->u.create.metafile_handle,
         PVFS_TYPE_METAFILE,
         sm_p->u.create.sys_attr,
@@ -767,8 +768,10 @@ static int create_setattr_setup_msgpair(PINT_client_sm *sm_p,
         sm_p->u.create.num_data_files;
     msg_p->req.u.setattr.attr.u.meta.dist =
         sm_p->u.create.dist;
+    msg_p->req.u.setattr.attr.u.meta.dist_size =
+        PINT_DIST_PACK_SIZE(sm_p->u.create.dist);
 
-    msg_p->fs_id = sm_p->parent_ref.fs_id;
+    msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = sm_p->u.create.metafile_handle;
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = create_setattr_comp_fn;
@@ -814,20 +817,20 @@ static int create_crdirent_setup_msgpair(PINT_client_sm *sm_p,
         *sm_p->cred_p,
         sm_p->u.create.object_name,
         sm_p->u.create.metafile_handle,
-        sm_p->parent_ref.handle,
-        sm_p->parent_ref.fs_id,
+        sm_p->object_ref.handle,
+        sm_p->object_ref.fs_id,
         sm_p->u.create.sys_attr.atime,
         sm_p->u.create.sys_attr.mtime,
         sm_p->u.create.sys_attr.ctime);
 
-    msg_p->fs_id = sm_p->parent_ref.fs_id;
-    msg_p->handle = sm_p->parent_ref.handle;
+    msg_p->fs_id = sm_p->object_ref.fs_id;
+    msg_p->handle = sm_p->object_ref.handle;
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = create_crdirent_comp_fn;
 
     ret = PINT_cached_config_map_to_server(
-        &msg_p->svr_addr, sm_p->parent_ref.handle,
-        sm_p->parent_ref.fs_id);
+        &msg_p->svr_addr, sm_p->object_ref.handle,
+        sm_p->object_ref.fs_id);
 
     if (ret)
     {
@@ -868,7 +871,7 @@ static int create_delete_handles_setup_msgpair_array(
 
     ret = PINT_cached_config_map_to_server(
         &metafile_server_addr, sm_p->u.create.metafile_handle,
-        sm_p->parent_ref.fs_id);
+        sm_p->object_ref.fs_id);
 
     if (ret)
     {
@@ -927,10 +930,10 @@ static int create_delete_handles_setup_msgpair_array(
             PINT_SERVREQ_REMOVE_FILL(
                 msg_p->req,
                 *sm_p->cred_p,
-                sm_p->parent_ref.fs_id,
+                sm_p->object_ref.fs_id,
                 sm_p->u.create.metafile_handle);
 
-            msg_p->fs_id = sm_p->parent_ref.fs_id;
+            msg_p->fs_id = sm_p->object_ref.fs_id;
             msg_p->handle = sm_p->u.create.metafile_handle;
             msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
             msg_p->comp_fn = create_delete_handles_comp_fn;
@@ -944,10 +947,10 @@ static int create_delete_handles_setup_msgpair_array(
             PINT_SERVREQ_REMOVE_FILL(
                 msg_p->req,
                 *sm_p->cred_p,
-                sm_p->parent_ref.fs_id,
+                sm_p->object_ref.fs_id,
                 sm_p->u.create.datafile_handles[i]);
 
-            msg_p->fs_id = sm_p->parent_ref.fs_id;
+            msg_p->fs_id = sm_p->object_ref.fs_id;
             msg_p->handle = sm_p->u.create.datafile_handles[i];
             msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
             msg_p->comp_fn = create_delete_handles_comp_fn;
@@ -969,6 +972,8 @@ static int create_cleanup(PINT_client_sm *sm_p,
 
     PVFS_util_release_sys_attr(&sm_p->u.create.sys_attr);
 
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+
     sm_p->error_code = (sm_p->u.create.stored_error_code ?
                         sm_p->u.create.stored_error_code :
                         js_p->error_code);
@@ -976,7 +981,7 @@ static int create_cleanup(PINT_client_sm *sm_p,
     if (sm_p->error_code == 0)
     {
         metafile_ref.handle = sm_p->u.create.metafile_handle;
-        metafile_ref.fs_id = sm_p->parent_ref.fs_id;
+        metafile_ref.fs_id = sm_p->object_ref.fs_id;
 
         /* fill in outgoing response fields */
         sm_p->u.create.create_resp->ref = metafile_ref;
@@ -984,17 +989,12 @@ static int create_cleanup(PINT_client_sm *sm_p,
         /* insert newly created metafile into the ncache */
         PINT_ncache_insert(sm_p->u.create.object_name,
                            0 /* PVFS2_LOOKUP_LINK_NO_FOLLOW */,
-                           metafile_ref, sm_p->parent_ref);
+                           metafile_ref, sm_p->object_ref);
     }
     else if ((PVFS_ERROR_CLASS(-sm_p->error_code) == PVFS_ERROR_BMI) &&
              (sm_p->u.create.retry_count < sm_p->msgarray_params.retry_limit))
     {
-        if (sm_p->acache_hit || (sm_p->pinode != NULL))
-        {
-            PINT_acache_release(sm_p->pinode);
-            sm_p->acache_hit = 0;
-            sm_p->pinode = NULL;
-        }
+        PINT_acache_invalidate(sm_p->object_ref);
 
         sm_p->u.create.stored_error_code = 0;
         sm_p->u.create.retry_count++;
@@ -1050,15 +1050,7 @@ static int create_parent_getattr_inspect(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create state: parent_getattr_inspect\n");
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "parent acache_hit: %d\n", sm_p->acache_hit);
-    if(sm_p->acache_hit)
-    {
-        attr = &sm_p->pinode->attr;
-    }
-    else
-    {
-        attr = &sm_p->acache_attr;
-    }
+    attr = &sm_p->getattr.attr;
     assert(attr);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "parent owner: %d, group: %d, perms: %d\n",
@@ -1068,7 +1060,8 @@ static int create_parent_getattr_inspect(
     if(attr->perms & PVFS_G_SGID)
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG, "parent has setgid bit set.\n");
-        gossip_debug(GOSSIP_CLIENT_DEBUG, " - modifying requested attr for new file.\n");
+        gossip_debug(GOSSIP_CLIENT_DEBUG, " - modifying requested attr "
+                                          "for new file.\n");
         sm_p->u.create.sys_attr.group = attr->group;
         /* note that permission checking is left to server even in this case */
     }

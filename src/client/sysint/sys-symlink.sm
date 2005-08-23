@@ -22,7 +22,6 @@
 #include "pint-servreq.h"
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
-#include "shared-state-methods.h"
 #include "pint-util.h"
 #include "ncache.h"
 
@@ -65,9 +64,7 @@ static int symlink_delete_handle_comp_fn(
 
 machine pvfs2_client_symlink_sm(
     init,
-    symlink_parent_getattr_setup_msgpair,
-    symlink_parent_getattr_xfer_msgpair,
-    symlink_parent_getattr_failure,
+    symlink_parent_getattr,
     dspace_create_setup_msgpair,
     dspace_create_xfer_msgpair,
     dspace_create_failure,
@@ -84,26 +81,13 @@ machine pvfs2_client_symlink_sm(
     state init
     {
         run symlink_init;
-        default => symlink_parent_getattr_setup_msgpair;
+        default => symlink_parent_getattr;
     }
 
-    state symlink_parent_getattr_setup_msgpair
+    state symlink_parent_getattr
     {
-        run PINT_sm_common_parent_getattr_setup_msgpair;
-        success => symlink_parent_getattr_xfer_msgpair;
-        default => symlink_parent_getattr_failure;
-    }
-
-    state symlink_parent_getattr_xfer_msgpair
-    {
-        jump pvfs2_client_getattr_acache_sm;
+        jump pvfs2_client_getattr_sm;
         success => dspace_create_setup_msgpair;
-        default => symlink_parent_getattr_failure;
-    }
-
-    state symlink_parent_getattr_failure
-    {
-        run PINT_sm_common_parent_getattr_failure;
         default => cleanup;
     }
 
@@ -244,10 +228,6 @@ PVFS_error PVFS_isys_symlink(
     PVFS_util_copy_sys_attr(&sm_p->u.sym.sys_attr, &attr);
     sm_p->u.sym.stored_error_code = 0;
     sm_p->u.sym.retry_count = 0;
-    sm_p->parent_ref = parent_ref;
-    sm_p->ref_type = PVFS_TYPE_DIRECTORY;
-
-    /* set sm_p->object_ref for getattr/acache lookup */
     sm_p->object_ref = parent_ref;
 
     gossip_debug(
@@ -316,6 +296,13 @@ static int symlink_init(PINT_client_sm *sm_p,
             sm_p->msgarray_params.retry_delay, sm_p, 0, js_p, &tmp_id,
             pint_client_sm_context);
     }
+
+    PINT_SM_GETATTR_STATE_FILL(
+        sm_p->getattr,
+        sm_p->object_ref,
+        PVFS_ATTR_COMMON_ALL,
+        PVFS_TYPE_DIRECTORY);
+        
     return ret;
 }
 
@@ -390,10 +377,10 @@ static int symlink_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
     PINT_init_msgpair(sm_p, msg_p);
 
     server_config = PINT_get_server_config_struct(
-        sm_p->parent_ref.fs_id);
+        sm_p->object_ref.fs_id);
 
     ret = PINT_cached_config_get_next_meta(
-        server_config, sm_p->parent_ref.fs_id,
+        server_config, sm_p->object_ref.fs_id,
         &msg_p->svr_addr, &meta_handle_extent_array);
 
     PINT_put_server_config_struct(server_config);
@@ -408,11 +395,11 @@ static int symlink_dspace_create_setup_msgpair(PINT_client_sm *sm_p,
     PINT_SERVREQ_CREATE_FILL(
         msg_p->req,
         *sm_p->cred_p,
-        sm_p->parent_ref.fs_id,
+        sm_p->object_ref.fs_id,
         PVFS_TYPE_SYMLINK,
         meta_handle_extent_array);
 
-    msg_p->fs_id = sm_p->parent_ref.fs_id;
+    msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = meta_handle_extent_array.extent_array[0].first;
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = symlink_create_comp_fn;
@@ -450,20 +437,20 @@ static int symlink_crdirent_setup_msgpair(PINT_client_sm *sm_p,
         *sm_p->cred_p,
         sm_p->u.sym.link_name,
         sm_p->u.sym.symlink_handle,
-        sm_p->parent_ref.handle,
-        sm_p->parent_ref.fs_id,
+        sm_p->object_ref.handle,
+        sm_p->object_ref.fs_id,
         sm_p->u.sym.sys_attr.atime,
         sm_p->u.sym.sys_attr.mtime,
         sm_p->u.sym.sys_attr.ctime);
 
-    msg_p->fs_id = sm_p->parent_ref.fs_id;
-    msg_p->handle = sm_p->parent_ref.handle;
+    msg_p->fs_id = sm_p->object_ref.fs_id;
+    msg_p->handle = sm_p->object_ref.handle;
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = symlink_crdirent_comp_fn;
 
     ret = PINT_cached_config_map_to_server(
-        &msg_p->svr_addr, sm_p->parent_ref.handle,
-        sm_p->parent_ref.fs_id);
+        &msg_p->svr_addr, sm_p->object_ref.handle,
+        sm_p->object_ref.fs_id);
 
     if (ret)
     {
@@ -512,7 +499,7 @@ static int symlink_setattr_setup_msgpair(PINT_client_sm *sm_p,
     PINT_SERVREQ_SETATTR_FILL(
         msg_p->req,
         *sm_p->cred_p,
-        sm_p->parent_ref.fs_id,
+        sm_p->object_ref.fs_id,
         sm_p->u.sym.symlink_handle,
         PVFS_TYPE_SYMLINK,
         sm_p->u.sym.sys_attr,
@@ -526,7 +513,7 @@ static int symlink_setattr_setup_msgpair(PINT_client_sm *sm_p,
     msg_p->req.u.setattr.attr.u.sym.target_path_len =
         strlen(sm_p->u.sym.link_target) + 1;
 
-    msg_p->fs_id = sm_p->parent_ref.fs_id;
+    msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = sm_p->u.sym.symlink_handle;
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = symlink_setattr_comp_fn;
@@ -571,17 +558,17 @@ static int symlink_delete_handle_setup_msgpair(PINT_client_sm *sm_p,
     PINT_SERVREQ_REMOVE_FILL(
         msg_p->req,
         *sm_p->cred_p,
-        sm_p->parent_ref.fs_id,
+        sm_p->object_ref.fs_id,
         sm_p->u.sym.symlink_handle);
 
-    msg_p->fs_id = sm_p->parent_ref.fs_id;
+    msg_p->fs_id = sm_p->object_ref.fs_id;
     msg_p->handle = sm_p->u.sym.symlink_handle;
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = symlink_delete_handle_comp_fn;
 
     ret = PINT_cached_config_map_to_server(
         &msg_p->svr_addr, sm_p->u.sym.symlink_handle,
-        sm_p->parent_ref.fs_id);
+        sm_p->object_ref.fs_id);
 
     if (ret)
     {
@@ -607,7 +594,7 @@ static int symlink_cleanup(PINT_client_sm *sm_p,
     if (sm_p->error_code == 0)
     {
         symlink_ref.handle = sm_p->u.sym.symlink_handle;
-        symlink_ref.fs_id = sm_p->parent_ref.fs_id;
+        symlink_ref.fs_id = sm_p->object_ref.fs_id;
 
         /* fill in outgoing response fields */
         sm_p->u.sym.sym_resp->ref = symlink_ref;
@@ -615,17 +602,12 @@ static int symlink_cleanup(PINT_client_sm *sm_p,
         /* insert newly created symlink into the ncache */
         PINT_ncache_insert(sm_p->u.sym.link_name,
                            0 /* PVFS2_LOOKUP_LINK_NO_FOLLOW */,
-                           symlink_ref, sm_p->parent_ref);
+                           symlink_ref, sm_p->object_ref);
     }
     else if ((PVFS_ERROR_CLASS(-sm_p->error_code) == PVFS_ERROR_BMI) &&
              (sm_p->u.sym.retry_count < sm_p->msgarray_params.retry_limit))
     {
-        if ((sm_p->acache_hit != 0) || (sm_p->pinode != NULL))
-        {
-            PINT_acache_release(sm_p->pinode);
-            sm_p->acache_hit = 0;
-            sm_p->pinode = NULL;
-        }
+        PINT_acache_invalidate(sm_p->object_ref);
 
         sm_p->u.sym.stored_error_code = 0;
         sm_p->u.sym.retry_count++;
