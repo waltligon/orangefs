@@ -672,10 +672,17 @@ struct server_configuration_s *PINT_get_server_config_struct(
  * state-machine.h included here
  ************************************/
 #define PINT_OP_STATE       PINT_client_sm
+
+/* This macro allows the generic state-machine-fns.h locate function
+ * to access the appropriate sm struct based on the client operation index
+ * from the above enum.  Because the enum starts management operations at
+ * 70, the management table was separated out from the sys table and the
+ * necessary checks and subtractions are made in this macro.
+ */
 #define PINT_OP_STATE_GET_MACHINE(_op) \
     ((_op <= PVFS_OP_SYS_MAXVAL) ? (PINT_client_sm_sys_table[_op - 1].sm) : \
      ((_op <= PVFS_OP_MGMT_MAXVAL) ?  \
-      (PINT_client_sm_mgmt_table[_op - PVFS_OP_MGMT_MAXVAL - 1].sm) : \
+      (PINT_client_sm_mgmt_table[_op - PVFS_OP_SYS_MAXVAL - 1].sm) : \
       ((_op == PVFS_SERVER_GET_CONFIG) ? (&pvfs2_server_get_config_sm) : \
        ((_op == PVFS_CLIENT_JOB_TIMER) ? (&pvfs2_client_job_timer_sm) : NULL))))
 
