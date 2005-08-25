@@ -386,12 +386,29 @@ Finally, be sure there are no typos in your command line, as this is
 commonly the case!
 
 \subsection{PVFS2 server consumes 100\% of the CPU}
+\label{sec:server_100pct_cpu}
 
-On some systems, the pvfs2-server will start consuming 100\% of the
-CPU after you try to read or write a file to PVFS2.  Please check to
-see if your distribution has an updated glibc package.  RHEL3, for
-example, will exhibit this behavior with glibc-2.3.2-95.6, but not
-with the updated glibc-2.3.2-95.20 package.
+On some systems, the pvfs2-server will start consuming 100\% of the CPU
+after you try to read or write a file to PVFS2.  gdb indicates that the
+server is spending a lot of time in the glibc routine
+\texttt{'.handle\_kernel\_aio'}.  Please check to see if your
+distribution has an updated glibc package.  RHEL3, for example, will
+exhibit this behavior with glibc-2.3.2-95.6, but not with the updated
+glibc-2.3.2-95.20 package.  We have also seen this behavior on ppc64
+systems running glibc-2.3.3-18.ydl.4 .  If you encounter this problem
+and your distribution does not have an updated glibc package, you can
+configure pvfs2 with \texttt{--disable-aio-threaded-callbacks}, though
+this will result in a performance hit.  An alternate workaround is to
+set \texttt{LD\_ASSUME\_KERNEL} to 2.4.1 before running pvfs2-server.
+pvfs2-server will then use an older (and not as optimized) thread
+library that does not have this bug.
+
+At this time we do not know which of the two suggested workarounds is
+better from a performance standpoint.  The \texttt{LD\_ASSUME\_KERNEL}
+method might make more sense:  when/if the system's glibc is
+upgraded, you will only have to restart pvfs2-server with the
+environment variable unset.  You would not have to rebuild pvfs2 to take
+advantage of the fix.
 
 \subsection{I get ``error while loading sharel libraries'' when starting PVFS2 programs}
 
@@ -488,6 +505,14 @@ kernel module is in /lib/modules/`uname -r`/build.  For example, Fedora
 Core 3 ships with linux-2.6.9-1.667.  When configuring PVFS2, you would
 pass \texttt{--with-kernel=/lib/modules/2.6.9-1.667/build} to the
 configure script.
+
+In Fedora Core 4 things changed a little bit.  In order to build the pvfs2
+kernel module, make sure you have both a \texttt{kernel} and
+\texttt{kernel-devel} package installed.  If you have an SMP box, then you'll
+need to install the -smp versions of both -- i.e. \texttt{kernel-smp} and
+\texttt{kernel-smp-devel}.   After both packages are installed,
+/lib/modules/`uname -r`/build will once again contain a correctly configured
+kernel source tree.
 
 %
 % PERFORMANCE

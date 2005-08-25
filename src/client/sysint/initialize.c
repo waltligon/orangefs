@@ -27,7 +27,7 @@
 #include "src/server/request-scheduler/request-scheduler.h"
 #include "job-time-mgr.h"
 
-job_context_id PVFS_sys_job_context = -1;
+extern job_context_id pint_client_sm_context;
 
 PINT_client_sm *g_sm_p = NULL;
 
@@ -93,7 +93,7 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     }
 
     /* Initialize the distribution subsystem */
-    ret = PINT_dist_initialize();
+    ret = PINT_dist_initialize(NULL);
     if (ret < 0)
     {
         gossip_lerr("Error initializing distributions.\n");
@@ -155,7 +155,7 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
     }
     client_status_flag |= CLIENT_JOB_INIT;
 
-    ret = job_open_context(&PVFS_sys_job_context);
+    ret = job_open_context(&pint_client_sm_context);
     if (ret < 0)
     {
         gossip_lerr("job_open_context() failure.\n");
@@ -234,7 +234,7 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
 
     if (client_status_flag & CLIENT_JOB_CTX_INIT)
     {
-        job_close_context(PVFS_sys_job_context);
+        job_close_context(pint_client_sm_context);
     }
 
     if (client_status_flag & CLIENT_JOB_INIT)

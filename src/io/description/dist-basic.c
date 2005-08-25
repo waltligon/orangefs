@@ -17,32 +17,28 @@
 /* in this distribution all data is stored on a single server */
 
 static PVFS_offset logical_to_physical_offset(void* params,
-                                              uint32_t server_nr,
-                                              uint32_t server_ct,
+                                              PINT_request_file_data* fd,
                                               PVFS_offset logical_offset)
 {
     return logical_offset;
 }
 
 static PVFS_offset physical_to_logical_offset(void* params,
-                                              uint32_t server_nr,
-                                              uint32_t server_ct,
+                                              PINT_request_file_data* fd,
                                               PVFS_offset physical_offset)
 {
     return physical_offset;
 }
 
 static PVFS_offset next_mapped_offset(void* params,
-                                      uint32_t server_nr,
-                                      uint32_t server_ct,
+                                      PINT_request_file_data* fd,
                                       PVFS_offset logical_offset)
 {
     return logical_offset;
 }
 
 static PVFS_size contiguous_length(void* params,
-                                   uint32_t server_nr,
-                                   uint32_t server_ct,
+                                   PINT_request_file_data* fd,
                                    PVFS_offset physical_offset)
 {
     return CONTIGBLOCKSZ;

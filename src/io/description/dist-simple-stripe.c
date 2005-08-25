@@ -14,14 +14,15 @@
 #include "pvfs2-dist-simple-stripe.h"
 
 static PVFS_offset logical_to_physical_offset (void* params,
-                                               uint32_t server_nr,
-                                               uint32_t server_ct,
+                                               PINT_request_file_data* fd,
                                                PVFS_offset logical_offset)
 {
     PVFS_offset ret_offset = 0;
     int full_stripes = 0;
     PVFS_size leftover = 0;
     PVFS_simple_stripe_params* dparam = (PVFS_simple_stripe_params*)params;
+    uint32_t server_nr = fd->server_nr;
+    uint32_t server_ct = fd->server_ct;
     
     /* how many complete stripes are in there? */
     full_stripes = logical_offset / (dparam->strip_size*server_ct);
@@ -41,11 +42,12 @@ static PVFS_offset logical_to_physical_offset (void* params,
 }
 
 static PVFS_offset physical_to_logical_offset (void* params,
-                                               uint32_t server_nr,
-                                               uint32_t server_ct,
+                                               PINT_request_file_data* fd,
                                                PVFS_offset physical_offset)
 {
     PVFS_simple_stripe_params* dparam = (PVFS_simple_stripe_params*)params;
+    uint32_t server_nr = fd->server_nr;
+    uint32_t server_ct = fd->server_ct;
     PVFS_size strips_div = physical_offset / dparam->strip_size;
     PVFS_size strips_mod = physical_offset % dparam->strip_size;
     PVFS_offset acc = 0;
@@ -65,14 +67,15 @@ static PVFS_offset physical_to_logical_offset (void* params,
 }
 
 static PVFS_offset next_mapped_offset (void* params,
-                                       uint32_t server_nr,
-                                       uint32_t server_ct,
+                                       PINT_request_file_data* fd,
                                        PVFS_offset logical_offset)
 {
     PVFS_offset diff; /* distance of loff from beginning of strip in this stripe */
     PVFS_size   stripe_size; /* not to be confused with strip size */
     PVFS_offset server_starting_offset; /* offset of strip from start of stripe */
     PVFS_simple_stripe_params* dparam = (PVFS_simple_stripe_params*)params;
+    uint32_t server_nr = fd->server_nr;
+    uint32_t server_ct = fd->server_ct;
 
     server_starting_offset = server_nr * dparam->strip_size;
     stripe_size = server_ct * dparam->strip_size;
@@ -90,8 +93,7 @@ static PVFS_offset next_mapped_offset (void* params,
 }
 
 static PVFS_size contiguous_length(void* params,
-                                   uint32_t server_nr,
-                                   uint32_t server_ct,
+                                   PINT_request_file_data* fd,
                                    PVFS_offset physical_offset)
 {
     PVFS_simple_stripe_params* dparam = (PVFS_simple_stripe_params*)params;
@@ -107,13 +109,19 @@ static PVFS_size logical_file_size(void* params,
     PVFS_size tmp_max = 0;
     int s = 0;
     PVFS_simple_stripe_params* dparam = (PVFS_simple_stripe_params*)params;
+    PINT_request_file_data file_data;
 
     if (!psizes)
         return -1;
+
+    /* Initialize file data struct */
+    memset(&file_data, 0, sizeof(file_data));
+    file_data.server_ct = server_ct;
+    
     for (s = 0; s < server_ct; s++)
     {
-        tmp_max = physical_to_logical_offset(dparam,
-                                             s, server_ct, psizes[s]);
+        file_data.server_nr = s;
+        tmp_max = physical_to_logical_offset(dparam, &file_data, psizes[s]);
         if(tmp_max > max)
             max = tmp_max;
     }
@@ -134,14 +142,14 @@ static void decode_lebf(char **pptr, void* params)
 
 static void registration_init(void* params)
 {
-    PINT_dist_register_param("simple_stripe", "strip_size",
+    PINT_dist_register_param(PVFS_DIST_SIMPLE_STRIPE_NAME, "strip_size",
                              PVFS_simple_stripe_params, strip_size);
 
 }
     
 
 static PVFS_simple_stripe_params simple_stripe_params = {
-	65536 /* strip size */
+    PVFS_DIST_SIMPLE_STRIPE_DEFAULT_STRIP_SIZE /* strip size */
 };
 
 static PINT_dist_methods simple_stripe_methods = {
@@ -159,7 +167,7 @@ static PINT_dist_methods simple_stripe_methods = {
 
 PINT_dist simple_stripe_dist = {
     PVFS_DIST_SIMPLE_STRIPE_NAME,
-    roundup8(PVFS_DIST_SIMPLE_STRIPE_NAME_SIZE),   /* name size */
+    roundup8(PVFS_DIST_SIMPLE_STRIPE_NAME_SIZE), /* name size */
     roundup8(sizeof(PVFS_simple_stripe_params)), /* param size */
     &simple_stripe_params,
     &simple_stripe_methods

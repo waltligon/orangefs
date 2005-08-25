@@ -54,7 +54,7 @@ int main(
     gossip_set_debug_mask(0, GOSSIP_FLOW_PROTO_DEBUG | GOSSIP_BMI_DEBUG_TCP);
 
     /* dist init */
-    PINT_dist_initialize();
+    PINT_dist_initialize(NULL);
 
     /* start up BMI */
     ret = BMI_initialize("bmi_tcp", NULL, 0);

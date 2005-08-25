@@ -3,9 +3,9 @@
 # run this from a projects working directory
 # assumes release tags are "pvfs2-X-Y-Z
 
-if [ $# -ne 1]; then
-	echo "usage: $@ VERSION"
-	echo "example: $@ 1.0.0"
+if [ $# -ne 1 ] ; then
+	echo "usage: $0 VERSION"
+	echo "example: $0 1.0.0"
 	exit -1
 fi
 

@@ -132,7 +132,12 @@ static int rmdirent_verify_parent_metadata_and_read_directory_entry_handle(
 {
     int ret = -PVFS_EINVAL;
     job_id_t i;
-    
+
+    PINT_STATE_DEBUG("verify_parent_metadata_and_"
+                     "read_directory_entry_handle");
+    PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "rmdirent entry: %s\n",
+        s_op->req->u.rmdirent.entry);
+
     /* set up key and value structures to read directory entry */
     s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;

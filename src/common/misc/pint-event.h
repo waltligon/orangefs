@@ -7,6 +7,7 @@
 #ifndef __PINT_EVENT_H
 #define __PINT_EVENT_H
 
+#include "pvfs2-config.h"
 #include "pvfs2-types.h"
 #include "pvfs2-mgmt.h"
 #include "gen-locks.h"
@@ -19,6 +20,9 @@
 extern int PINT_event_on;
 extern int32_t PINT_event_api_mask;
 extern int32_t PINT_event_op_mask;
+
+const char * PINT_event_api_get_keyword(uint64_t mask);
+const char * PINT_event_op_get_keyword(uint64_t mask);
 
 int PINT_event_initialize(int ring_size);
 void PINT_event_finalize(void);

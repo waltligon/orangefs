@@ -210,7 +210,7 @@ PVFS_error PVFS_isys_remove(
     }
     memset(sm_p, 0, sizeof(*sm_p));
 
-    PINT_init_msgarray_params(&sm_p->msgarray_params);
+    PINT_init_msgarray_params(&sm_p->msgarray_params, parent_ref.fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->u.remove.object_name = object_name;
     sm_p->parent_ref  = parent_ref;
@@ -220,13 +220,12 @@ PVFS_error PVFS_isys_remove(
         GOSSIP_CLIENT_DEBUG, "Trying to remove entry %s under %Lu,%d\n",
         object_name, Lu(parent_ref.handle), parent_ref.fs_id);
 
-    /*
-      override the default job timeout on the internal msgarray for a
-      delete since this will force a big sync before the delete that
-      can easily take longer than most other operations
-    */
-    sm_p->msgarray_params.job_timeout = (5 * PVFS2_CLIENT_JOB_TIMEOUT);
-
+    /* NOTE: This state machine previously multiplied the default job timeout
+     * by five to allow for potentially long sync delays.  We instead now set
+     * the default client BMI timeout higher for all operations: if a sync can 
+     * go slow then so can any other arbitrary operation queued behind it. -PHC
+     */
+    
     return PINT_client_state_machine_post(
         sm_p, PVFS_SYS_REMOVE, op_id, user_ptr);
 }
@@ -440,12 +439,7 @@ static int remove_cleanup(PINT_client_sm *sm_p, job_status_s *js_p)
                         sm_p->u.remove.stored_error_code :
                         js_p->error_code);
 
-    if (sm_p->acache_hit)
-    {
-        PINT_acache_release(sm_p->pinode);
-        sm_p->acache_hit = 0;
-        sm_p->pinode = NULL;
-    }
+    PINT_acache_invalidate(sm_p->object_ref);
 
     PINT_ncache_remove(sm_p->u.remove.object_name,
                        0 /* PVFS2_LOOKUP_LINK_NO_FOLLOW */,
@@ -468,7 +462,7 @@ static int remove_generic_timer(PINT_client_sm *sm_p,
     job_id_t tmp_id;
 
     ret = job_req_sched_post_timer(
-	PVFS2_CLIENT_RETRY_DELAY, sm_p, 0, js_p, &tmp_id,
+	sm_p->msgarray_params.retry_delay, sm_p, 0, js_p, &tmp_id,
 	pint_client_sm_context);
 
     return ret;
@@ -479,7 +473,7 @@ static int remove_crdirent_retry_or_fail(PINT_client_sm *sm_p,
 {
     /* try again (up to a point) if we get a comm. failure. */
     if ((PVFS_ERROR_CLASS(-js_p->error_code) == PVFS_ERROR_BMI) &&
-        (sm_p->u.remove.retry_count < PVFS2_CLIENT_RETRY_LIMIT))
+        (sm_p->u.remove.retry_count < sm_p->msgarray_params.retry_limit))
     {
 	sm_p->u.remove.retry_count++;
 	js_p->error_code = CRDIRENT_RETRY;
@@ -512,7 +506,7 @@ static int remove_rmdirent_retry_or_fail(PINT_client_sm *sm_p,
 {
     /* try again (up to a point) if we get a comm. failure. */
     if ((PVFS_ERROR_CLASS(-js_p->error_code) == PVFS_ERROR_BMI) &&
-	(sm_p->u.remove.retry_count < PVFS2_CLIENT_RETRY_LIMIT))
+	(sm_p->u.remove.retry_count < sm_p->msgarray_params.retry_limit))
     {
 	sm_p->u.remove.retry_count++;
 	js_p->error_code = RMDIRENT_RETRY;

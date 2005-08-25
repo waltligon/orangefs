@@ -32,7 +32,7 @@ int main(int argc, char **argv)
 	int ret = -1;
 	int fd = -1;
 	PINT_Request_state *rs1;
-	PINT_Request_file_data rf1;
+	PINT_request_file_data rf1;
 	PINT_Request_result seg1;
 	int retval;
 	int i;
@@ -55,19 +55,19 @@ int main(int argc, char **argv)
 	    return(-1);
 	}
 	
-	ret = PINT_Request_decode(r_dec);
+	ret = PINT_request_decode(r_dec);
 	if(ret < 0)
 	{
-		fprintf(stderr, "PINT_Request_decode() failure.\n");
+		fprintf(stderr, "PINT_request_decode() failure.\n");
 		return(-1);
 	}
 	fprintf(stderr, "decode returns %d\n", ret);
 
 	/* set up request state */
-	rs1 = PINT_New_request_state(r_dec);
+	rs1 = PINT_new_request_state(r_dec);
 
 	/* set up file data for request */
-	PINT_dist_initialize();
+	PINT_dist_initialize(NULL);
 	rf1.server_nr = 0;
 	rf1.server_ct = 4;
 	rf1.fsize = 6000;
@@ -90,11 +90,11 @@ int main(int argc, char **argv)
 		seg1.segs = 0;
 
 		/* process request */
-		retval = PINT_Process_request(rs1, NULL, &rf1, &seg1, PINT_CLIENT);
+		retval = PINT_process_request(rs1, NULL, &rf1, &seg1, PINT_CLIENT);
 
 		if(retval >= 0)
 		{
-			printf("results of PINT_Process_request():\n");
+			printf("results of PINT_process_request():\n");
 			printf("%d segments with %lld bytes\n", seg1.segs, Ld(seg1.bytes));
 			for(i=0; i<seg1.segs; i++)
 			{
@@ -107,16 +107,13 @@ int main(int argc, char **argv)
 	
 	if(retval < 0)
 	{
-		fprintf(stderr, "Error: PINT_Process_request() failure.\n");
+		fprintf(stderr, "Error: PINT_process_request() failure.\n");
 		return(-1);
 	}
 	if(PINT_REQUEST_DONE(rs1))
 	{
 		printf("**** request done.\n");
 	}
-
-
-	
 
 	close(fd);
 

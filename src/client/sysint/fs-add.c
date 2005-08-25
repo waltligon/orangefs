@@ -48,6 +48,12 @@ int PVFS_sys_fs_add(struct PVFS_sys_mntent *mntent)
 
     gen_mutex_lock(&mt_config);
 
+    /* Normally the fs_id value has not been resolved yet at this point, and
+     * will be zero.  If it is a non-zero value (and this get_config call
+     * succeeds) then it indicates someone has already added this mntent
+     * instance.  It is ok to add the same _file system_ twice, but not the
+     * same mntent instance.
+     */
     new_server_config = PINT_server_config_mgr_get_config(mntent->fs_id);
     if (new_server_config)
     {

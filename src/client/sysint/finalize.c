@@ -21,7 +21,7 @@
 #include "src/server/request-scheduler/request-scheduler.h"
 #include "job-time-mgr.h"
 
-extern job_context_id PVFS_sys_job_context;
+extern job_context_id pint_client_sm_context;
 
 extern PINT_client_sm *g_sm_p;
 
@@ -42,7 +42,7 @@ int PVFS_sys_finalize()
 
     /* finalize the I/O interfaces */
     job_time_mgr_finalize();
-    job_close_context(PVFS_sys_job_context);
+    job_close_context(pint_client_sm_context);
     job_finalize();
 
     PINT_flow_finalize();

@@ -21,6 +21,7 @@ extern struct inode_operations pvfs2_symlink_inode_operations;
 extern struct inode_operations pvfs2_dir_inode_operations;
 extern struct file_operations pvfs2_dir_operations;
 extern struct dentry_operations pvfs2_dentry_operations;
+extern int debug;
 
 
 int pvfs2_gen_credentials(
@@ -156,6 +157,9 @@ static inline int copy_attributes_to_inode(
         if (attrs->perms & PVFS_U_READ)
             perm_mode |= S_IRUSR;
 
+        if (attrs->perms & PVFS_G_SGID)
+            perm_mode |= S_ISGID;
+
         inode->i_mode |= perm_mode;
 
         switch (attrs->objtype)
@@ -170,6 +174,11 @@ static inline int copy_attributes_to_inode(
                 inode->i_mode |= S_IFDIR;
                 inode->i_op = &pvfs2_dir_inode_operations;
                 inode->i_fop = &pvfs2_dir_operations;
+                /* NOTE: we have no good way to keep nlink consistent for 
+                 * directories across clients; keep constant at 1.  Why 1?  If
+                 * we go with 2, then find(1) gets confused and won't work
+                 * properly withouth the -noleaf option */
+                inode->i_nlink = 1;
                 ret = 0;
                 break;
             case PVFS_TYPE_SYMLINK:
@@ -214,21 +223,8 @@ static inline void convert_attribute_mode_to_pvfs_sys_attr(
     pvfs2_print("mode is %d | translated perms is %d\n", mode,
                 attrs->perms);
 
-    switch(mode & S_IFMT)
-    {
-        case S_IFREG:
-            attrs->objtype = PVFS_TYPE_METAFILE;
-            attrs->mask |= PVFS_ATTR_SYS_TYPE;
-            break;
-        case S_IFDIR:
-            attrs->objtype = PVFS_TYPE_DIRECTORY;
-            attrs->mask |= PVFS_ATTR_SYS_TYPE;
-            break;
-        case S_IFLNK:
-            attrs->objtype = PVFS_TYPE_SYMLINK;
-            attrs->mask |= PVFS_ATTR_SYS_TYPE;
-            break;
-    }
+    /* NOTE: this function only called during setattr.  Setattr must not mess
+     * with object type */
 }
 
 /*
@@ -275,23 +271,38 @@ static inline int copy_attributes_from_inode(
              pvfs2_convert_time_field((void *)&inode->i_ctime));
         attrs->mask |= PVFS_ATTR_SYS_CTIME;
 
-        attrs->size = ((iattr && (iattr->ia_valid & ATTR_SIZE)) ?
-                       iattr->ia_size : inode->i_size);
-        attrs->mask |= PVFS_ATTR_SYS_SIZE;
+        /* PVFS2 cannot set size with a setattr operation.  Probably not likely
+         * to be requested through the VFS, but just in case, don't worry about
+         * ATTR_SIZE */
 
         if (iattr && (iattr->ia_valid & ATTR_MODE))
         {
             pvfs2_print("[1] converting attr mode %d\n", iattr->ia_mode);
+            if((iattr->ia_mode & (S_ISUID|S_ISVTX)) != 0)
+            {
+                pvfs2_print("User attempted to set setuid or sticky bit; "
+                    "returning EINVAL.\n");
+                return(-EINVAL);
+            }
             convert_attribute_mode_to_pvfs_sys_attr(
                 iattr->ia_mode, attrs);
         }
         else
         {
-            pvfs2_print("[2] converting attr mode %d\n", inode->i_mode);
+            pvfs2_print("[2] converting attr mode %d\n", inode->i_mode); 
+            if((inode->i_mode & (S_ISUID|S_ISVTX)) != 0)
+            {
+                pvfs2_print("User attempted to set setuid or sticky bit; "
+                    "returning EINVAL.\n");
+                return(-EINVAL);
+            }
             convert_attribute_mode_to_pvfs_sys_attr(
                 inode->i_mode, attrs);
         }
-        attrs->mask = PVFS_ATTR_SYS_ALL_SETABLE;
+
+        /* we carefully selected which bits to set in attrs->mask above, so
+         * don't undo all that work by setting attrs->mask to
+         * PVFS_ATTR_SYS_ALL_SETABLE */
 
         ret = 0;
     }
@@ -378,7 +389,7 @@ int pvfs2_inode_getattr(struct inode *inode)
       copy_attr_failure:
         pvfs2_print("Getattr on handle %Lu, fsid %d\n  (inode ct = %d) "
                     "returned %d (error_exit = %d)\n",
-                    pvfs2_inode->refn.handle, pvfs2_inode->refn.fs_id,
+                    Lu(pvfs2_inode->refn.handle), pvfs2_inode->refn.fs_id,
                     (int)atomic_read(&inode->i_count), ret, error_exit);
 
         op_release(new_op);
@@ -419,8 +430,13 @@ int pvfs2_inode_setattr(
             new_op->upcall.req.lookup.parent_refn.fs_id =
                 PVFS2_SB(sb)->fs_id;
         }
-        copy_attributes_from_inode(
+        ret = copy_attributes_from_inode(
             inode, &new_op->upcall.req.setattr.attributes, iattr);
+        if(ret < 0)
+        {
+            op_release(new_op);
+            return(ret);
+        }
 
         service_error_exit_op_with_timeout_retry(
             new_op, "pvfs2_inode_setattr", retries, error_exit,
@@ -437,6 +453,234 @@ int pvfs2_inode_setattr(
     }
     return ret;
 }
+
+
+/* Extended attributes helper functions */
+/*
+ * Tries to get a specified key's attributes of a given
+ * file into a user-specified buffer. Note that the getxattr
+ * interface allows for the users to probe the size of an
+ * extended attribute by passing in a value of 0 to size.
+ * Thus our return value is always the size of the attribute
+ * unless the key does not exist for the file and/or if
+ * there were errors in fetching the attribute value.
+ */
+ssize_t pvfs2_inode_getxattr(struct inode *inode, const char *name, 
+        void *buffer, size_t size)
+{
+    ssize_t ret = -ENOMEM;
+    int retries = PVFS2_OP_RETRY_COUNT, error_exit = 0;
+    pvfs2_kernel_op_t *new_op = NULL;
+    pvfs2_inode_t *pvfs2_inode = NULL;
+    ssize_t length = 0;
+
+    if (size < 0 || strlen(name) >= PVFS_MAX_XATTR_NAMELEN)
+    {
+        pvfs2_error("Invalid size (%d) or key length (%d)\n", 
+                size, strlen(name));
+        return -EINVAL;
+    }
+    if (inode)
+    {
+        pvfs2_inode = PVFS2_I(inode);
+
+        new_op = op_alloc();
+        if (!new_op)
+        {
+            return ret;
+        }
+
+        new_op->upcall.type = PVFS2_VFS_OP_GETXATTR;
+        new_op->upcall.req.getxattr.refn = pvfs2_inode->refn;
+        strncpy(new_op->upcall.req.getxattr.key, name, PVFS_MAX_XATTR_NAMELEN);
+        /* 
+         * NOTE: Although keys are meant to be NULL terminated textual strings,
+         * I am going to explicitly pass the length just in case we change this
+         * later on...
+         */
+        new_op->upcall.req.getxattr.key_sz = 
+            strlen(new_op->upcall.req.getxattr.key) + 1;
+        pvfs2_print("pvfs2_inode_getxattr: key %s, key_sz %d\n", 
+                name, new_op->upcall.req.getxattr.key_sz);
+
+        service_error_exit_op_with_timeout_retry(
+            new_op, "pvfs2_inode_getxattr", retries, error_exit,
+            get_interruptible_flag(inode));
+
+      error_exit:
+        ret = (error_exit ? -EINTR :
+               pvfs2_kernel_error_code_convert(new_op->downcall.status));
+        /* Upon success, we need to get the value length
+         * from downcall and return that.
+         * and also copy the value out to the requester
+         */
+        if (ret == 0)
+        {
+            length = new_op->downcall.resp.getxattr.val_sz;
+            /* Just return the length of the queried attribute after
+             * subtracting the \0 thingie */
+            if (size == 0)
+            {
+                ret = length - 1;
+            }
+            else
+            {
+                /* check to see if key length is > provided buffer size */
+                if (length - 1 > size)
+                {
+                    ret = -ERANGE;
+                }
+                else
+                {
+                    /* No size problems. At present using strncpy means that
+                     * val is also textual not binary */
+                    memset(buffer, 0, size);
+                    strncpy(buffer, new_op->downcall.resp.getxattr.val, 
+                            length - 1);
+                    ret = length - 1;
+                    pvfs2_print("pvfs2_getxattr: key: %s, val_length: %d, val: %s\n",
+                            name, ret, (char *) buffer);
+                }
+            }
+        }
+        else if (ret == -ENOENT)
+        {
+            ret = -ENODATA; /* if no such keys exists we set this to be errno */
+        }
+        pvfs2_print("pvfs2_inode_getxattr: returning %d\n", ret);
+
+        /* when request is serviced properly, free req op struct */
+        op_release(new_op);
+    }
+    return ret;
+}
+
+/*
+ * tries to set an attribute for a given key on a file.
+ * Returns a -ve number on error and 0 on success.
+ * Note that value is treated like text and not like binary!
+ */
+int pvfs2_inode_setxattr(struct inode *inode, const char *name,
+        const void *value, size_t size, int flags)
+{
+    int ret = -ENOMEM, retries = PVFS2_OP_RETRY_COUNT, error_exit = 0;
+    pvfs2_kernel_op_t *new_op = NULL;
+    pvfs2_inode_t *pvfs2_inode = NULL;
+
+    if (size <= 0 || size >= PVFS_MAX_XATTR_VALUELEN || flags < 0)
+    {
+        pvfs2_error("pvfs2_inode_setxattr: bogus values of size(%d), flags(%d)\n", 
+                size, flags);
+        return -EINVAL;
+    }
+    if (strlen(name) >= PVFS_MAX_XATTR_NAMELEN)
+    {
+        pvfs2_error("pvfs2_inode_setxattr: bogus key size (%d)\n", 
+                strlen(name));
+        return -EINVAL;
+    }
+    if (inode)
+    {
+        pvfs2_inode = PVFS2_I(inode);
+
+        new_op = op_alloc();
+        if (!new_op)
+        {
+            return ret;
+        }
+
+        new_op->upcall.type = PVFS2_VFS_OP_SETXATTR;
+        new_op->upcall.req.setxattr.refn = pvfs2_inode->refn;
+        new_op->upcall.req.setxattr.flags = flags;
+        /* 
+         * NOTE: Although keys are meant to be NULL terminated textual strings,
+         * I am going to explicitly pass the length just in case we change this
+         * later on...
+         */
+        strncpy(new_op->upcall.req.setxattr.keyval.key, 
+                name, PVFS_MAX_XATTR_NAMELEN);
+        new_op->upcall.req.setxattr.keyval.key_sz = 
+            strlen(new_op->upcall.req.setxattr.keyval.key) + 1;
+        strncpy(new_op->upcall.req.setxattr.keyval.val, value, size);
+        /* For some reason, val_sz should include the \0 at the end as well */
+        new_op->upcall.req.setxattr.keyval.val_sz = size + 1;
+
+        service_error_exit_op_with_timeout_retry(
+            new_op, "pvfs2_inode_setxattr", retries, error_exit,
+            get_interruptible_flag(inode));
+
+      error_exit:
+        ret = (error_exit ? -EINTR :
+               pvfs2_kernel_error_code_convert(new_op->downcall.status));
+
+        pvfs2_print("pvfs2_inode_setxattr: returning %d\n", ret);
+
+        /* when request is serviced properly, free req op struct */
+        op_release(new_op);
+    }
+    return ret;
+}
+
+int pvfs2_inode_removexattr(struct inode *inode, const char *name)
+{
+    int ret = -ENOMEM, retries = PVFS2_OP_RETRY_COUNT, error_exit = 0;
+    pvfs2_kernel_op_t *new_op = NULL;
+    pvfs2_inode_t *pvfs2_inode = NULL;
+
+    if (strlen(name) >= PVFS_MAX_XATTR_NAMELEN)
+    {
+        pvfs2_error("pvfs2_inode_removexattr: Invalid key length(%d)\n", 
+                strlen(name));
+        return -EINVAL;
+    }
+    if (inode)
+    {
+        pvfs2_inode = PVFS2_I(inode);
+
+        new_op = op_alloc();
+        if (!new_op)
+        {
+            return ret;
+        }
+
+        new_op->upcall.type = PVFS2_VFS_OP_REMOVEXATTR;
+        new_op->upcall.req.removexattr.refn = pvfs2_inode->refn;
+        /* 
+         * NOTE: Although keys are meant to be NULL terminated textual strings,
+         * I am going to explicitly pass the length just in case we change this
+         * later on...
+         */
+        strncpy(new_op->upcall.req.removexattr.key, name, 
+                PVFS_MAX_XATTR_NAMELEN);
+        new_op->upcall.req.removexattr.key_sz = 
+            strlen(new_op->upcall.req.removexattr.key) + 1;
+
+        service_error_exit_op_with_timeout_retry(
+            new_op, "pvfs2_inode_removexattr", retries, error_exit,
+            get_interruptible_flag(inode));
+
+      error_exit:
+        ret = (error_exit ? -EINTR :
+               pvfs2_kernel_error_code_convert(new_op->downcall.status));
+
+        if (ret == -ENOENT)
+        {
+            ret = -ENODATA;
+        }
+        pvfs2_print("pvfs2_inode_removexattr: returning %d\n", ret);
+
+        /* when request is serviced properly, free req op struct */
+        op_release(new_op);
+    }
+    return ret;
+}
+
+/*
+ * FIXME: NOT IMPLEMENTED YET!
+int pvfs2_inode_listxattr(struct inode *inode, char *buffer, size_t size)
+{
+}
+*/
 
 static inline struct inode *pvfs2_create_file(
     struct inode *dir,
@@ -484,7 +728,7 @@ static inline struct inode *pvfs2_create_file(
     ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
 
     pvfs2_print("Create Got PVFS2 handle %Lu on fsid %d (ret=%d)\n",
-                new_op->downcall.resp.create.refn.handle,
+                Lu(new_op->downcall.resp.create.refn.handle),
                 new_op->downcall.resp.create.refn.fs_id, ret);
 
     if (ret > -1)
@@ -573,7 +817,7 @@ static inline struct inode *pvfs2_create_dir(
         get_interruptible_flag(dir));
 
     pvfs2_print("Mkdir Got PVFS2 handle %Lu on fsid %d\n",
-                new_op->downcall.resp.mkdir.refn.handle,
+                Lu(new_op->downcall.resp.mkdir.refn.handle),
                 new_op->downcall.resp.mkdir.refn.fs_id);
 
     if (new_op->downcall.status > -1)
@@ -666,7 +910,7 @@ static inline struct inode *pvfs2_create_symlink(
     ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
 
     pvfs2_print("Symlink Got PVFS2 handle %Lu on fsid %d (ret=%d)\n",
-                new_op->downcall.resp.sym.refn.handle,
+                Lu(new_op->downcall.resp.sym.refn.handle),
                 new_op->downcall.resp.sym.refn.fs_id, ret);
 
     if (ret > -1)
@@ -769,7 +1013,7 @@ int pvfs2_remove_entry(
     {
         pvfs2_print("pvfs2_remove_entry: called on %s\n  (inode %d): "
                     "Parent is %Lu | fs_id %d\n", dentry->d_name.name,
-                    (int)inode->i_ino, parent->refn.handle,
+                    (int)inode->i_ino, Lu(parent->refn.handle),
                     parent->refn.fs_id);
 
         new_op = op_alloc();
@@ -830,7 +1074,7 @@ int pvfs2_truncate_inode(
 
     pvfs2_print("pvfs2: pvfs2_truncate_inode %d: "
                 "Handle is %Lu | fs_id %d | size is %lu\n",
-                (int)inode->i_ino, pvfs2_inode->refn.handle,
+                (int)inode->i_ino, Lu(pvfs2_inode->refn.handle),
                 pvfs2_inode->refn.fs_id, (unsigned long)size);
 
     new_op = op_alloc();

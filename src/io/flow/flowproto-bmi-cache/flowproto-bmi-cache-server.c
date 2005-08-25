@@ -532,7 +532,7 @@ int  bmi_cache_request_init(struct fp_private_data *flow_data, int direction)
 		pint_req->result.segmax = MAX_REGIONS;
 		pint_req->result.segs = 0;
 
-		ret = PINT_Process_request( flow_d->file_req_state,
+		ret = PINT_process_request( flow_d->file_req_state,
 					flow_d->mem_req_state,
 					&flow_d->file_data,
 					&pint_req->result,

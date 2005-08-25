@@ -40,7 +40,7 @@ static int test_romio_noncontig2(void){
    PINT_Request_state *mem_state;
    PINT_Request_state *file_state;
    PINT_Request_state *file_state_server;
-   PINT_Request_file_data rf1;
+   PINT_request_file_data rf1;
    PINT_Request_result seg1;
    int32_t* len_array = NULL;
    PVFS_offset* off_array = NULL;
@@ -70,9 +70,9 @@ static int test_romio_noncontig2(void){
    }
    PVFS_Request_hindexed(64, len_array, off_array, PVFS_BYTE, &mem_req);
                                                                                                                                                        
-   mem_state = PINT_New_request_state(mem_req);
-   file_state = PINT_New_request_state(file_req);
-   file_state_server = PINT_New_request_state(file_req);
+   mem_state = PINT_new_request_state(mem_req);
+   file_state = PINT_new_request_state(file_req);
+   file_state_server = PINT_new_request_state(file_req);
                                                                                                                                                        
    /* set up file data for request */
    rf1.server_nr = 0;
@@ -108,7 +108,7 @@ static int test_romio_noncontig2(void){
       seg1.segs = 0;
                                                                                                                                                        
       /* process request */
-      retval = PINT_Process_request(file_state, mem_state, &rf1, &seg1, PINT_CLIENT);
+      retval = PINT_process_request(file_state, mem_state, &rf1, &seg1, PINT_CLIENT);
                                                                                                                                                        
       if(retval >= 0)
       {
@@ -146,7 +146,7 @@ static int test_romio_noncontig2(void){
       seg1.segs = 0;
                                                                                                                                                        
       /* process request */
-      retval = PINT_Process_request(file_state_server, NULL, &rf1, &seg1, PINT_SERVER);
+      retval = PINT_process_request(file_state_server, NULL, &rf1, &seg1, PINT_SERVER);
                                                                                                                                                        
       if(retval >= 0)
       {

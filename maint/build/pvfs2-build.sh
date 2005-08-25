@@ -57,7 +57,7 @@ get_cvs() {
 
 tarball=`basename $tarballurl`
 tarballdir=`echo $tarball | sed -e "s/.tar.gz//" | sed -e "s/.tgz//"`
-old_wd=`pwd`
+old_wd=$( cd `dirname $0`; pwd)
 build_kernel="false"
 build_tests="false"
 kerneldir=""
@@ -167,9 +167,8 @@ if [ $? != 0 ] ; then
 	exit 1
 fi
 
-# not sure where to put this; just go with sbin for now?
 if [ $build_kernel == "true" ] ; then
-	cp $builddir/src/kernel/linux-2.6/pvfs2.ko $installdir/sbin/
+	make kmod_prefix=${installdir} kmod_install
 fi
 
 # build tests if needed 

@@ -15,7 +15,6 @@
 
 #include "client-state-machine.h"
 #include "state-machine-fns.h"
-#include "shared-state-methods.h"
 #include "pvfs2-debug.h"
 #include "job.h"
 #include "gossip.h"
@@ -23,6 +22,7 @@
 #include "pint-servreq.h"
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
+#include "pint-util.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -36,31 +36,16 @@ static int flush_cleanup(
 %%
 
 machine pvfs2_client_flush_sm(
-    flush_getattr_setup_msgpair,
-    flush_getattr_xfer_msgpair,
-    flush_getattr_failure,
+    flush_getattr,
     flush_datafile_setup_msgpairarray,
     flush_datafile_xfer_msgpairarray,
     flush_datafile_flush_failure,
     cleanup)
 {
-    state flush_getattr_setup_msgpair
+    state flush_getattr
     {
-        run PINT_sm_common_object_getattr_setup_msgpair;
-        success => flush_getattr_xfer_msgpair;
-        default => flush_getattr_failure;
-    }
-
-    state flush_getattr_xfer_msgpair
-    {
-        jump pvfs2_client_getattr_acache_sm;
+        jump pvfs2_client_getattr_sm;
         success => flush_datafile_setup_msgpairarray;
-        default => flush_getattr_failure;
-    }
-
-    state flush_getattr_failure
-    {
-        run PINT_sm_common_object_getattr_failure;
         default => cleanup;
     }
 
@@ -120,16 +105,21 @@ PVFS_error PVFS_isys_flush(
     }
     memset(sm_p, 0, sizeof(*sm_p));
 
-    PINT_init_msgarray_params(&sm_p->msgarray_params);
+    PINT_init_msgarray_params(&sm_p->msgarray_params, ref.fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->object_ref = ref;
 
-    /*
-      override the default job timeout on the internal msgarray for a
-      flush since a large sync operation can easily take longer than
-      most other operations
-    */
-    sm_p->msgarray_params.job_timeout = (5 * PVFS2_CLIENT_JOB_TIMEOUT);
+    /* NOTE: This state machine previously multiplied the default job timeout
+     * by five to allow for potentially long sync delays.  We instead now set
+     * the default client BMI timeout higher for all operations: if a sync can 
+     * go slow then so can any other arbitrary operation queued behind it. -PHC
+     */
+
+    PINT_SM_GETATTR_STATE_FILL(
+        sm_p->getattr,
+        ref,
+        PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE, 
+        PVFS_TYPE_METAFILE);
 
     return PINT_client_state_machine_post(
         sm_p, PVFS_SYS_FLUSH, op_id, user_ptr);
@@ -175,12 +165,8 @@ static int flush_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
 
     js_p->error_code = 0;
 
-    attr = (sm_p->acache_hit ?
-            &sm_p->pinode->attr :
-            &sm_p->acache_attr);
-
+    attr = &sm_p->getattr.attr;
     assert(attr);
-    assert(attr->objtype == PVFS_TYPE_METAFILE);
     assert(attr->mask & PVFS_ATTR_META_DFILES);
     assert(attr->u.meta.dfile_count > 0);
 
@@ -256,6 +242,8 @@ static int flush_cleanup(PINT_client_sm *sm_p,
                          job_status_s *js_p)
 {
     sm_p->error_code = js_p->error_code;
+
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
     if (sm_p->msgarray)
     {

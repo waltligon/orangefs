@@ -14,6 +14,7 @@
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
 #include "str-utils.h"
+#include "pint-util.h"
 
 enum 
 {
@@ -317,6 +318,19 @@ static int lookup_verify_object_metadata(
 	return 1;
     }
 
+    /* if we reach this point, the object is a directory.  Verify that we
+     * have execute permission on the directory before continuing traversal
+     */
+    js_p->error_code = PINT_check_mode(a_p, s_op->req->credentials.uid,
+        s_op->req->credentials.gid, PINT_ACCESS_EXECUTABLE);
+    if(js_p->error_code != 0)
+    {
+        /* doesn't look like we have permission to traverse directory; bail
+         * out
+         */
+        return(1);
+    }
+
     /* find the segment that we should look up in the directory */
     ret = PINT_string_next_segment(
         s_op->req->u.lookup_path.path, &s_op->u.lookup.segp,
@@ -324,9 +338,11 @@ static int lookup_verify_object_metadata(
 
     assert(ret == 0);
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, "  object is a datafile; will be "
-                 "looking for handle for segment %s in a bit\n",
+    gossip_debug(GOSSIP_SERVER_DEBUG, "  object is a directory; will be "
+                 "looking for handle for segment \"%s\" in a bit\n",
 		 s_op->u.lookup.segp);
+
+
     return 1;
 }
 
@@ -441,6 +457,10 @@ static int lookup_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
     {
         js_p->error_code = 0;
     }
+    else if(js_p->error_code < 0)
+    {
+        /* preserve error code in this case and fall through */
+    }
     else
     {
         js_p->error_code = -PVFS_ENOENT;
@@ -451,6 +471,18 @@ static int lookup_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
                  (js_p->error_code ? "error" : "success"),
                  s_op->resp.u.lookup_path.handle_count,
                  s_op->resp.u.lookup_path.attr_count);
+
+    if(js_p->error_code == 0)
+    {
+        PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "path: %s, handle: %Lu\n",
+            s_op->req->u.lookup_path.path,
+            Lu(s_op->resp.u.lookup_path.handle_array[s_op->resp.u.lookup_path.handle_count-1]));
+    }
+    else
+    {
+        PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "path: %s, lookup failed\n",
+            s_op->req->u.lookup_path.path);
+    }
 
     return 1;
 }

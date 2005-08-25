@@ -6,11 +6,13 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <assert.h>
 
 #include "pvfs2-types.h"
 #include "gossip.h"
 #include "pvfs2-debug.h"
+#include "pint-request.h"
 #include "pint-distribution.h"
 #include "pint-dist-utils.h"
 
@@ -21,9 +23,10 @@ int main(int argc, char **argv)
     PINT_dist *d;
     int ret = -1;
     PVFS_offset tmp_off = 0;
+    PINT_request_file_data file_data;
 
     /* grab a distribution */
-    PINT_dist_initialize();
+    PINT_dist_initialize(NULL);
     d = PINT_dist_create("simple_stripe");
     assert(d);
 
@@ -32,33 +35,51 @@ int main(int argc, char **argv)
 
     PINT_dist_dump(d);
 
+    /* Initialize the file data */
+    memset(&file_data, 0, sizeof(file_data));
+    file_data.server_ct = 4;
+    file_data.server_nr = 0;
+    
     /* easy case */
-    tmp_off = d->methods->logical_to_physical_offset(d->params, 0, 4, 100);
+    tmp_off = d->methods->logical_to_physical_offset(d->params,&file_data,100);
     printf("offset: %Ld\n", (long long)tmp_off);
 
 
     /* just before strip */
-    tmp_off = d->methods->logical_to_physical_offset(d->params, 0, 4, (64*1024-1));
+    tmp_off = d->methods->logical_to_physical_offset(d->params,
+                                                     &file_data,
+                                                     (64*1024-1));
     printf("offset: %Ld\n", (long long)tmp_off);
 
     /* at strip */
-    tmp_off = d->methods->logical_to_physical_offset(d->params, 0, 4, (64*1024));
+    tmp_off = d->methods->logical_to_physical_offset(d->params,
+                                                     &file_data,
+                                                     (64*1024));
     printf("offset: %Ld\n", (long long)tmp_off);
 
     /* just after strip */
-    tmp_off = d->methods->logical_to_physical_offset(d->params, 0, 4, (64*1024+1));
+    tmp_off = d->methods->logical_to_physical_offset(d->params,
+                                                     &file_data,
+                                                     (64*1024+1));
     printf("offset: %Ld\n", (long long)tmp_off);
 
     /* wrap around tests */
-    tmp_off = d->methods->logical_to_physical_offset(d->params, 0, 4, (64*1024*4+1));
+    tmp_off = d->methods->logical_to_physical_offset(d->params,
+                                                     &file_data,
+                                                     (64*1024*4+1));
     printf("offset: %Ld\n", (long long)tmp_off);
 
     /* try a different io server */
-    tmp_off = d->methods->logical_to_physical_offset(d->params, 3, 4, (64*1024-1));
+    file_data.server_nr = 3;
+    tmp_off = d->methods->logical_to_physical_offset(d->params,
+                                                     &file_data,
+                                                     (64*1024-1));
     printf("offset: %Ld\n", (long long)tmp_off);
 
     /* same as above, but in his region w/ wrap around */
-    tmp_off = d->methods->logical_to_physical_offset(d->params, 3, 4, (64*1024*7+15));
+    tmp_off = d->methods->logical_to_physical_offset(d->params,
+                                                     &file_data,
+                                                     (64*1024*7+15));
     printf("offset: %Ld\n", (long long)tmp_off);
 
 

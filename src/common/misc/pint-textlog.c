@@ -28,6 +28,7 @@
 #include "gossip.h"
 #include "quickhash.h"
 #include "pint-event.h"
+#include "pint-textlog.h"
 
 #define STATE_TABLE_SIZE 503
 
@@ -64,19 +65,6 @@ static char * PINT_event_server_operation_names[29] =
 	"PROTO_ERROR",
 };
 
-static int PINT_event_log2(int _val)
-{
-    int res = 0;
-    while(!(_val & (1 << res)))
-    {
-        ++res;
-    }
-    return res;
-}
-
-#define PINT_event_api_get_name(_api) PVFS_event_api_names[PINT_event_log2(_api)]
-
-#define PINT_event_op_get_name(_op) PVFS_event_op_names[_op - 1]
 
 /* We need to keep track of the start events
  * so that we can match them up with the end events
@@ -250,8 +238,8 @@ static inline int PINT_textlog_write_statename(
         res = fprintf(fp,
                       "%s:%s topo=State "
                       "color=(%d,%d,%d,127,true) width=1 ]\n",
-                      PINT_event_api_get_name(event->api),
-                      PINT_event_op_get_name(event->operation),
+                      PINT_event_api_get_keyword(event->api),
+                      PINT_event_op_get_keyword(event->operation),
                       rand() % 255,
                       rand() % 255,
                       rand() % 255);
@@ -278,8 +266,15 @@ static int PINT_textlog_write_event(
     float starttime, endtime;
     int req_index;
     
-    req_index = (int)id_gen_fast_lookup(estart->req_id);
-    
+    /*
+     * req_index = (int)id_gen_fast_lookup(estart->req_id);
+     */
+   
+    /* instead of using the request handle, we give each event
+     * a specific horizontal index based on the operation
+     */
+    req_index = estart->operation;
+
     starttime = PINT_textlog_timeval_to_secs(epoc, estart);
     endtime = PINT_textlog_timeval_to_secs(epoc, eend);
    
@@ -371,26 +366,26 @@ void PINT_textlog_generate(
     FILE * outfp;
     struct timeval epoc;
     int tr_index; 
-    struct qhash_table * id_map;
     QLIST_HEAD(start_events_list);
     int textlog_state_index = 0;
-    
+    struct qhash_table * id_map;
+
+    id_map = qhash_init(PINT_textlog_id_compare, 
+                        PINT_textlog_id_hash, 
+                        STATE_TABLE_SIZE);
+    if(!id_map)
+    {
+        gossip_err("PINT_generate_textlog: qhash_init failed for state map "
+                   "with table size of %d\n", STATE_TABLE_SIZE);
+        goto close_fp;
+    }
+
     outfp = fopen(filename, "w");
     if(!outfp)
     {
         gossip_err("PINT_generate_textlog: Failed to open file %s: %s\n",
                    filename, strerror(errno));
         return;
-    }
-
-    id_map = qhash_init(PINT_textlog_id_compare, 
-			PINT_textlog_id_hash, 
-			STATE_TABLE_SIZE);
-    if(!id_map)
-    {
-	gossip_err("PINT_generate_textlog: qhash_init failed for state map "
-		   "with table size of %d\n", STATE_TABLE_SIZE);
-	goto close_fp;
     }
 
     for(tr_index = 0; tr_index < count; ++tr_index)

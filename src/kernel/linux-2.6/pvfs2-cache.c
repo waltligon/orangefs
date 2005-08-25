@@ -18,6 +18,7 @@ extern kmem_cache_t *dev_req_cache;
 /* a cache for pvfs2-inode objects (i.e. pvfs2 inode private data) */
 extern kmem_cache_t *pvfs2_inode_cache;
 
+extern int debug;
 extern int pvfs2_gen_credentials(
     PVFS_credentials *credentials);
 

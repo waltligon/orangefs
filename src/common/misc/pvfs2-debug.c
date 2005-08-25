@@ -10,13 +10,7 @@
 #include <stdlib.h>
 
 #include "pvfs2-debug.h"
-
-/* a private internal type */
-typedef struct 
-{
-    char *keyword;
-    uint64_t mask_val;
-} __keyword_mask_t;
+#include "pint-util.h"
 
 #define __DEBUG_ALL                                               \
 (GOSSIP_TROVE_DEBUG | GOSSIP_BMI_DEBUG_ALL | GOSSIP_SERVER_DEBUG |\
@@ -29,10 +23,12 @@ GOSSIP_REMOVE_DEBUG | GOSSIP_GETATTR_DEBUG | GOSSIP_READDIR_DEBUG|\
 GOSSIP_IO_DEBUG | GOSSIP_DBPF_OPEN_CACHE_DEBUG |                  \
 GOSSIP_PERMISSIONS_DEBUG | GOSSIP_CANCEL_DEBUG |                  \
 GOSSIP_MSGPAIR_DEBUG | GOSSIP_CLIENTCORE_DEBUG |                  \
-GOSSIP_SETATTR_DEBUG | GOSSIP_MKDIR_DEBUG)
+GOSSIP_SETATTR_DEBUG | GOSSIP_MKDIR_DEBUG |                       \
+GOSSIP_SETEATTR_DEBUG | GOSSIP_GETEATTR_DEBUG |                   \
+GOSSIP_ACCESS_DEBUG | GOSSIP_ACCESS_DETAIL_DEBUG)
 
 /* map all config keywords to pvfs2 debug masks here */
-static __keyword_mask_t s_keyword_mask_map[] =
+static PINT_keyword_mask_t s_keyword_mask_map[] =
 {
     { "storage", GOSSIP_TROVE_DEBUG },
     { "trove", GOSSIP_TROVE_DEBUG },
@@ -40,6 +36,7 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "network", GOSSIP_BMI_DEBUG_ALL },
     { "server", GOSSIP_SERVER_DEBUG },
     { "client", GOSSIP_CLIENT_DEBUG },
+    { "varstrip", GOSSIP_VARSTRIP_DEBUG },
     { "job", GOSSIP_JOB_DEBUG },
     { "request", GOSSIP_REQUEST_DEBUG },
     { "reqsched", GOSSIP_REQ_SCHED_DEBUG },
@@ -54,6 +51,8 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "remove", GOSSIP_REMOVE_DEBUG },
     { "getattr", GOSSIP_GETATTR_DEBUG },
     { "setattr", GOSSIP_SETATTR_DEBUG },
+    { "geteattr", GOSSIP_GETEATTR_DEBUG },
+    { "seteattr", GOSSIP_SETEATTR_DEBUG },
     { "readdir", GOSSIP_READDIR_DEBUG },
     { "mkdir", GOSSIP_MKDIR_DEBUG },
     { "io", GOSSIP_IO_DEBUG },
@@ -63,6 +62,8 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "msgpair", GOSSIP_MSGPAIR_DEBUG },
     { "clientcore", GOSSIP_CLIENTCORE_DEBUG },
     { "clientcore_timing", GOSSIP_CLIENTCORE_TIMING_DEBUG },
+    { "access", GOSSIP_ACCESS_DEBUG },
+    { "access_detail", GOSSIP_ACCESS_DETAIL_DEBUG },
     { "verbose",  (__DEBUG_ALL & ~GOSSIP_REQ_SCHED_DEBUG)},
     { "none", GOSSIP_NO_DEBUG },
     { "all",  __DEBUG_ALL }
@@ -70,7 +71,7 @@ static __keyword_mask_t s_keyword_mask_map[] =
 #undef __DEBUG_ALL
 
 static const int num_keyword_mask_map = (int)           \
-(sizeof(s_keyword_mask_map) / sizeof(__keyword_mask_t));
+(sizeof(s_keyword_mask_map) / sizeof(PINT_keyword_mask_t));
 
 /*
  * Based on human readable keywords, translate them into
@@ -83,44 +84,8 @@ static const int num_keyword_mask_map = (int)           \
  */
 uint64_t PVFS_debug_eventlog_to_mask(const char *event_logging)
 {
-    uint64_t mask = 0;
-    char *s = NULL, *t = NULL;
-    const char *toks = ", ";
-    int i = 0, negate = 0;
-
-    if (event_logging)
-    {
-        s = strdup(event_logging);
-        t = strtok(s, toks);
-
-        while(t)
-        {
-            if (*t == '-')
-            {
-                negate = 1;
-                ++t;
-            }
-
-            for(i = 0; i < num_keyword_mask_map; i++)
-            {
-                if (!strcmp(t, s_keyword_mask_map[i].keyword))
-                {
-                    if (negate)
-                    {
-                        mask &= ~s_keyword_mask_map[i].mask_val;
-                    }
-                    else
-                    {
-                        mask |= s_keyword_mask_map[i].mask_val;
-                    }
-                    break;
-                }
-            }
-            t = strtok(NULL, toks);
-        }
-        free(s);
-    }
-    return mask;
+    return PINT_keyword_to_mask(
+        s_keyword_mask_map, num_keyword_mask_map, event_logging);
 }
 
 /*
@@ -133,7 +98,7 @@ uint64_t PVFS_debug_eventlog_to_mask(const char *event_logging)
 char *PVFS_debug_get_next_debug_keyword(int position)
 {
     int num_entries = (int)(sizeof(s_keyword_mask_map) /
-                            sizeof(__keyword_mask_t));
+                            sizeof(PINT_keyword_mask_t));
 
     return (((position > -1) && (position < num_entries)) ?
             s_keyword_mask_map[position].keyword : NULL);

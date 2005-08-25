@@ -16,6 +16,7 @@
 extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
 extern wait_queue_head_t pvfs2_request_list_waitq;
+extern int debug;
 
 /* shared file/dir operations defined in file.c */
 extern int pvfs2_file_open(
@@ -60,7 +61,7 @@ static int pvfs2_readdir(
                 "retry=%d, v=%Lu)\n", dentry->d_name.name, (int)pos,
                 (int)pvfs2_inode->readdir_token_adjustment,
                 (int)pvfs2_inode->num_readdir_retries,
-                pvfs2_inode->directory_version);
+                Lu(pvfs2_inode->directory_version));
 
     switch (pos)
     {

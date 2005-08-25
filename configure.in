@@ -17,12 +17,10 @@ dnl PVFS2 versioning information.
 dnl An @ in the date string can confuse e.g. scp and 'make kmod'
 CONFIGURE_TIME=`date -u +"%Y-%m-%d-%H%M%S"`
 PVFS2_MAJOR=1
-PVFS2_MINOR=1
-PVFS2_SUB=0
+PVFS2_MINOR=2
+PVFS2_SUB=1
 dnl PVFS2_PRE=""
 PVFS2_PRE="pre1-$CONFIGURE_TIME"
-
-AM_INIT_AUTOMAKE(pvfs2, $PVFS2_MAJOR.$PVFS2_MINOR.$PVFS2_SUB$PVFS2_PRE)
 
 PVFS2_VERSION=$PVFS2_MAJOR.$PVFS2_MINOR.$PVFS2_SUB$PVFS2_PRE
 AC_SUBST(PVFS2_VERSION)
@@ -34,9 +32,22 @@ dnl Checks for host type
 dnl Ensures we can compile on this OS
 AC_CANONICAL_HOST
 
+USR_CFLAGS=$CFLAGS
+if test "x$USR_CFLAGS" = "x"; then
+	USR_CFLAGS_SET=no
+fi
+
 dnl Check for utilities that we need during the build process
 AC_PROG_INSTALL
 AC_PROG_CC
+
+AC_MSG_CHECKING([for required gcc])
+if test "x$GCC" = "x"; then
+	AC_MSG_ERROR(no)
+fi
+
+CFLAGS=$USR_CFLAGS
+
 AC_PROG_CPP
 AC_CHECK_PROG(HAVE_PERL, perl, yes, no)
 AC_CHECK_PROG(HAVE_FIND, find, yes, no)
@@ -342,9 +353,23 @@ AC_ARG_WITH(mpe,
            AC_MSG_ERROR(--with-mpe must be given a pathname)
     else
         CFLAGS="$CFLAGS -I$withval/include"
-       LDFLAGS="$LDFLAGS -L$withval/lib"
-       LIBS="$LIBS -lmpe -lmpich"
-       AC_DEFINE(HAVE_MPE, 1, [Use the MPE profiling library])
+        LDFLAGS="$LDFLAGS -L$withval/lib"
+        LIBS="$LIBS -lmpe -lmpich"
+        AC_MSG_CHECKING(for valid mpe install)
+	AC_TRY_LINK(
+              [#include <mpe.h>],
+	      [
+	      int eventID_begin, eventID_end;
+	      eventID_begin = MPE_Log_get_event_number();
+	      eventID_end   = MPE_Log_get_event_number();
+	      MPE_Describe_state( eventID_begin, eventID_end, "Amult", "bluegreen" );
+	      MPE_Log_event( eventID_begin, 0, (char *)0 );
+	      MPE_Log_event( eventID_end, 0, (char *)0 );
+	      ],
+	      [
+	      AC_DEFINE(HAVE_MPE, 1, [Use the MPE profiling library])
+	      AC_MSG_RESULT(ok)],
+	      AC_MSG_ERROR(Invalid path to mpe install))
     fi
 )
 
@@ -409,8 +434,14 @@ dnl currently it's a few functions that SuSE-8 backports from
 dnl 2.6 into 2.4
 
 oldcflags=$CFLAGS
+if test -z "${LINUX_KERNEL_SRC}"  ; then
+	lk_src=${LINUX24_KERNEL_SRC}
+elif test -z "${LINUX24_KERNEL_SRC}"  ; then
+	lk_src=${LINUX_KERNEL_SRC}
+fi
+
 AC_MSG_CHECKING(for i_size_write in kernel)
-CFLAGS="$CFLAGS -Werror -I$LINUX24_KERNEL_SRC/include -I${LINUX_KERNEL_SRC}/include"
+CFLAGS="$USR_CFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default" 
 dnl if this test passes, the kernel does not have it
 dnl if this test fails, the kernel already defined it
 AC_TRY_COMPILE([
@@ -428,7 +459,7 @@ AC_TRY_COMPILE([
 )
 
 AC_MSG_CHECKING(for i_size_read in kernel)
-CFLAGS="$CFLAGS -Werror -I$LINUX24_KERNEL_SRC/include -I${LINUX_KERNEL_SRC}/include"
+CFLAGS="$USR_CFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default" 
 dnl if this test passes, the kernel does not have it
 dnl if this test fails, the kernel already defined it
 AC_TRY_COMPILE([
@@ -445,7 +476,7 @@ AC_TRY_COMPILE([
 )
 
 AC_MSG_CHECKING(for parent_ino in kernel)
-CFLAGS="$CFLAGS -Werror -I$LINUX24_KERNEL_SRC/include -I${LINUX_KERNEL_SRC}/include"
+CFLAGS="$USR_CFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default" 
 dnl if this test passes, the kernel does not have it
 dnl if this test fails, the kernel already defined it
 AC_TRY_COMPILE([
@@ -460,6 +491,40 @@ AC_TRY_COMPILE([
 	AC_MSG_RESULT(yes)
 	AC_DEFINE(HAVE_PARENT_INO, 1, Define if kernel has parent_ino),
 )
+
+dnl The name of this field changed from memory_backed to capabilities in 2.6.12.
+
+AC_MSG_CHECKING(for memory_backed in struct backing_dev_info in kernel)
+CFLAGS="$USR_CFLAGS -Wall -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default" 
+AC_TRY_COMPILE([
+	#define __KERNEL__
+	#include <linux/mm.h>
+	#include <linux/backing-dev.h>
+	static struct backing_dev_info bdi = {
+	    .memory_backed = 0
+	};
+], [],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_BDI_MEMORY_BACKED, 1, Define if struct backing_dev_info in kernel has memory_backed),
+	AC_MSG_RESULT(no)
+)
+
+AC_MSG_CHECKING(for xattr support in kernel)
+CFLAGS="$USR_CFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default" 
+dnl if this test passes, the kernel has it
+dnl if this test fails, the kernel does not have it
+AC_TRY_COMPILE([
+	#define __KERNEL__
+        #include <linux/fs.h>
+		  static struct inode_operations in_op = {
+			  .getxattr = NULL
+		  };
+], [],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_XATTR, 1, Define if kernel has xattr support),
+	AC_MSG_RESULT(no)
+)
+
 CFLAGS=$oldcflags
 
 dnl PAV configuration needs absolute location of source and build.
@@ -479,8 +544,16 @@ AC_SUBST(SRC_ABSOLUTE_TOP)
 dnl More options
 AC_ARG_ENABLE(fast,
 [  --enable-fast           Disable optional debugging, enable optimizations.],
-CFLAGS="$CFLAGS -DNDEBUG -O3 -DGOSSIP_DISABLE_DEBUG",
-FLAGS=${CFLAGS:-"-g"}
+[
+if test "x$USR_CFLAGS_SET" = "xno"; then
+    CFLAGS="$CFLAGS -DNDEBUG -O3 -DGOSSIP_DISABLE_DEBUG"
+fi
+],
+[
+if test "x$USR_CFLAGS_SET" = "xno"; then
+    CFLAGS="$CFLAGS -g"
+fi
+]
 )
 
 dnl Options that are not yet working
@@ -500,7 +573,16 @@ AC_SUBST(ENABLE_COVERAGE)
 
 AC_ARG_ENABLE(strict,
 [  --enable-strict         Turn on strict debugging with gcc],
-CFLAGS="$CFLAGS -Wall -O2 -Wstrict-prototypes -Wmissing-prototypes -Wundef -Wpointer-arith -Wbad-function-cast")
+[
+if test "x$USR_CFLAGS_SET" = "xno"; then
+    CFLAGS="$CFLAGS -Wall -Wstrict-prototypes -Wmissing-prototypes -Wundef -Wpointer-arith -Wbad-function-cast"
+fi
+],
+[
+if test "x$USR_CFLAGS_SET" = "xno" && test "x$enable_fast" != "xyes"; then
+    CFLAGS="$CFLAGS -O2"
+fi
+])
 
 dnl Check if user actually wants to see all our build output (compiles, links, etc.).
 AC_ARG_ENABLE(verbose-build,
@@ -510,14 +592,31 @@ QUIET_COMPILE=1)
 
 AC_SUBST(QUIET_COMPILE)
 
+dnl
+dnl a function to check for epoll capabilities
+dnl
+test_for_epoll()
+{
+  AC_CHECK_HEADERS(sys/epoll.h)
+  AC_MSG_CHECKING(for epoll functions)
+  AC_TRY_LINK([#include <sys/epoll.h>], [
+	int fd;
+	fd = epoll_create(1);
+	close(fd);
+  ], AC_MSG_RESULT(yes)
+     CFLAGS="$CFLAGS -D__PVFS2_USE_EPOLL__"
+     BUILD_EPOLL=1
+     AC_SUBST(BUILD_EPOLL),
+  AC_MSG_RESULT(no))
+}
+
 dnl optionally enable use of epoll() on Linux instead of poll()
 AC_ARG_ENABLE(epoll,
 [  --enable-epoll          Enables use of epoll for TCP/IP polling],
-CFLAGS="$CFLAGS -D__PVFS2_USE_EPOLL__"
-BUILD_EPOLL="1"
-,)
-
-AC_SUBST(BUILD_EPOLL)
+[ if test "x$enableval" = "xyes" ; then
+      test_for_epoll
+  fi
+],)
 
 dnl enables a hack to print back traces out of segfault signal handler
 AC_ARG_ENABLE(segv-backtrace,
@@ -571,18 +670,38 @@ if test "x$NEED_BERKELEY_DB" = "xyes" ; then
     dnl
     AC_ARG_WITH(db,
            [  --with-db=<dir>         Location of installed DB package (default=/usr)],
-           LDFLAGS="${LDFLAGS} -L$withval/lib" CFLAGS="${CFLAGS} -I$withval/include")
+	   DB_LDFLAGS="-L${withval}/lib"
+	   DB_CFLAGS="-I${withval}/include"
+           LDFLAGS="${LDFLAGS} $DB_LDFLAGS"
+           CFLAGS="${CFLAGS} $DB_CFLAGS"
+           with_db_set=yes)
     
+    dnl 
+    dnl if the db is specified, try to link with -ldb
+    dnl otherwise try -ldb4, then -ldb3, then -ldb
+    dnl $lib set to notfound on link failure
+    dnl    
     AC_MSG_CHECKING([for db library])
     oldlibs=$LIBS
-    for lib in db4  db3  db  notfound; do
+    lib=notfound
+    if test "x$with_db_set" == "xyes" ; then
+        LIBS="${oldlibs} -ldb"
+        DB_LIB="-ldb"
+        AC_TRY_LINK(
+              [#include <db.h>],
+              [DB *dbp; db_create(&dbp, NULL, 0);],
+              lib=db)
+    else
+        for lib in db4  db3  db  notfound; do
            LIBS="${oldlibs} -l$lib"
            DB_LIB="-l$lib"
            AC_TRY_LINK(
                   [#include <db.h>],
                   [DB *dbp; db_create(&dbp, NULL, 0);],
                   [break])
-    done
+        done
+    fi
+
     dnl reset LIBS value and just report through DB_LIB
     LIBS=$oldlibs 
     if test "x$lib" == "xnotfound" ; then
@@ -613,7 +732,7 @@ if test "x$NEED_BERKELEY_DB" = "xyes" ; then
     dnl exactly the same).
     AC_MSG_CHECKING(for dbenv parameter to DB error callback function)
     oldcflags=$CFLAGS
-    CFLAGS="$CFLAGS -Werror"
+    CFLAGS="$USR_CFLAGS $DB_CFLAGS -Werror"
     AC_TRY_COMPILE([
     #include <db.h>
     
@@ -658,45 +777,51 @@ if test "x$NEED_BERKELEY_DB" = "xyes" ; then
         Define if third param (message) to DB error callback function is const))
     fi
     
-    CFLAGS=$oldcflags
-    
-    dnl Test to check for txnid parameter to DB stat (DB 4.3.xx+)
-    AC_MSG_CHECKING(for txnid parameter to DB stat function)
+    CFLAGS="$USR_CFLAGS $DB_CFLAGS -Werror"    
+    dnl Test to check for unknown third param to DB stat (four params 
+    dnl total).  The unknown parameter is a function ptr so that the
+    dnl the user can pass in a replcaement for malloc.
+    dnl Note: this is a holdover from relatively old DB implementations,
+    dnl while the txnid parameter is new.  So we don't test for the old
+    dnl unknown parameter if we found the new one.
+    AC_MSG_CHECKING(for DB stat with malloc function ptr)
     AC_TRY_COMPILE([
-    #include <db.h>
-    ], [
-    int ret;
-    DB *db;
-    DB_TXN *txnid;
-    u_int32_t flags;
-    
-    ret = db->stat(db, txnid, NULL, flags);
-    ], AC_MSG_RESULT(yes)
-    AC_DEFINE(HAVE_TXNID_PARAMETER_TO_DB_STAT, 1, 
-    Define if DB stat function takes txnid parameter)
-    have_txnid_param_to_stat=yes,
-    AC_MSG_RESULT(no)
-    have_txnid_param_to_stat=no)
-    
-    if test "x$have_txnid_param_to_stat" = "xno" ; then
-        dnl Test to check for unknown third param to DB stat (four params total)
-        dnl Note: this is a holdover from relatively old DB implementations,
-        dnl while the txnid parameter is new.  So we don't test for the old
-        dnl unknown parameter if we found the new one.
-    
-        AC_MSG_CHECKING(for four-parameter DB stat)
-        AC_TRY_COMPILE([
-        #include <db.h>
-        ], [
-        int ret;
-        DB *db;
-        u_int32_t flags;
+      #include <db.h>
+      #include <stdlib.h>
+      ], [
+      int ret = 0;
+      DB *db = db;
+      int dummy = 0;
+      u_int32_t flags = 0;
         
-        ret = db->stat(db, NULL, NULL, flags);
+      ret = db->stat(db, &dummy, malloc, flags);
+      ], AC_MSG_RESULT(yes)
+    AC_DEFINE(HAVE_UNKNOWN_PARAMETER_TO_DB_STAT, 1,
+    Define if DB stat function takes malloc function ptr)
+    have_db_stat_malloc=yes,
+    AC_MSG_RESULT(no)
+    have_db_stat_malloc=no)
+
+    dnl Test to check for txnid parameter to DB stat (DB 4.3.xx+)
+    if test "x$have_db_stat_malloc" = "xno" ; then
+    
+       AC_MSG_CHECKING(for txnid parameter to DB stat function)
+       AC_TRY_COMPILE([
+       #include <db.h>
+       ], [
+       int ret = 0;
+       DB *db = db;
+       DB_TXN *txnid = txnid;
+       u_int32_t flags = 0;
+    
+        ret = db->stat(db, txnid, NULL, flags);
         ], AC_MSG_RESULT(yes)
-        AC_DEFINE(HAVE_UNKNOWN_PARAMETER_TO_DB_STAT, 1,
-        Define if DB stat function takes extra parameter),
-        AC_MSG_RESULT(no))
+        AC_DEFINE(HAVE_TXNID_PARAMETER_TO_DB_STAT, 1, 
+        Define if DB stat function takes txnid parameter)
+        have_txnid_param_to_stat=yes,
+        AC_MSG_RESULT(no)
+        have_txnid_param_to_stat=no)
+    
     fi
     
     dnl Test to check for txnid parameter to DB open (DB4.1+)
@@ -728,13 +853,17 @@ if test "x$NEED_BERKELEY_DB" = "xyes" ; then
     ], AC_MSG_RESULT(yes)
     AC_DEFINE(HAVE_DB_DIRTY_READ, 1, [Define if db library has DB_DIRTY_READ flag]),
     AC_MSG_RESULT(no))
+    CFLAGS="$oldcflags"
 fi
-# end of NEED_BERKELEY_DB section
+dnl end of NEED_BERKELEY_DB section
 
 AC_CHECK_HEADERS(netdb.h)
 AC_CHECK_HEADERS(arpa/inet.h)
+AC_CHECK_HEADERS(sys/socket.h)
 dnl check for gethostbyname function
 AC_MSG_CHECKING(for gethostbyname)
+oldcflags="$CFLAGS"
+CFLAGS="$USR_CFLAGS"
 AC_TRY_COMPILE([
 #include <netdb.h>
 ], [
@@ -744,6 +873,19 @@ AC_MSG_RESULT(yes)
 AC_DEFINE(HAVE_GETHOSTBYNAME, 1, Define if gethostbyname function exists),
 AC_MSG_RESULT(no)
 WARN_ABOUT_HOSTNAMES="yes")
+
+AC_MSG_CHECKING(for gethostbyaddr)
+AC_TRY_COMPILE([
+#include <netdb.h>
+], [
+struct sockaddr_in peer;
+gethostbyaddr((void *)&peer.sin_addr.s_addr, sizeof(struct in_addr), AF_INET);
+],
+AC_MSG_RESULT(yes)
+AC_DEFINE(HAVE_GETHOSTBYADDR, 1, Define if gethostbyaddr function exists),
+AC_MSG_RESULT(no)  )
+
+CFLAGS="$oldcflags"
 
 dnl configure options for GM install path
 GM_HOME=
@@ -910,6 +1052,12 @@ if test "x$BUILD_KARMA" = "x1" ; then
    AC_MSG_RESULT([PVFS2 configured to build karma gui               : yes])
 else
    AC_MSG_RESULT([PVFS2 configured to build karma gui               :  no])
+fi
+
+if test "x$BUILD_EPOLL" = "x1" ; then
+   AC_MSG_RESULT([PVFS2 configured to use epoll                     : yes])
+else
+   AC_MSG_RESULT([PVFS2 configured to use epoll                     :  no])
 fi
 
 if test "x$ENABLE_COVERAGE" = "x1" ; then

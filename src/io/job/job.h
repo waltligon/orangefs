@@ -256,7 +256,7 @@ int job_trove_keyval_read(PVFS_fs_id coll_id,
 			  job_id_t * id,
 			  job_context_id context_id);
 
-/* storage key/value read */
+/* storage key/value read list */
 int job_trove_keyval_read_list(PVFS_fs_id coll_id,
 			       PVFS_handle handle,
 			       PVFS_ds_keyval * key_array,
@@ -282,6 +282,20 @@ int job_trove_keyval_write(PVFS_fs_id coll_id,
 			   job_status_s * out_status_p,
 			   job_id_t * id,
 			   job_context_id context_id);
+
+/* storage key/value write list */
+int job_trove_keyval_write_list(PVFS_fs_id coll_id,
+			        PVFS_handle handle,
+			        PVFS_ds_keyval * key_array,
+			        PVFS_ds_keyval * val_array,
+			        int count,
+			        PVFS_ds_flags flags,
+			        PVFS_vtag * vtag,
+			        void *user_ptr,
+			        job_aint status_user_tag,
+			        job_status_s * out_status_p,
+			        job_id_t * id,
+			        job_context_id context_id);
 
 /* flush keyval data to storage */
 int job_trove_keyval_flush(PVFS_fs_id coll_id,

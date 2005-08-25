@@ -15,15 +15,16 @@
 
 #include "client-state-machine.h"
 #include "state-machine-fns.h"
-#include "shared-state-methods.h"
 #include "pvfs2-debug.h"
 #include "job.h"
 #include "gossip.h"
 #include "str-utils.h"
 #include "pint-util.h"
+#include "pint-request.h"
 #include "pint-servreq.h"
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
+#include "acache.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -37,31 +38,16 @@ static int truncate_cleanup(
 %% 
 
 machine pvfs2_client_truncate_sm(
-    truncate_getattr_setup_msgpair,
-    truncate_getattr_xfer_msgpair,
-    truncate_getattr_failure,
+    truncate_getattr,
     truncate_datafile_setup_msgpairarray,
     truncate_datafile_xfer_msgpairarray,
     truncate_datafile_failure,
     cleanup)
 {
-    state truncate_getattr_setup_msgpair
+    state truncate_getattr
     {
-        run PINT_sm_common_object_getattr_setup_msgpair;
-        success => truncate_getattr_xfer_msgpair;
-        default => truncate_getattr_failure;
-    }
-
-    state truncate_getattr_xfer_msgpair
-    {
-        jump pvfs2_client_getattr_acache_sm;
+        jump pvfs2_client_getattr_sm;
         success => truncate_datafile_setup_msgpairarray;
-        default => truncate_getattr_failure;
-    }
-
-    state truncate_getattr_failure
-    {
-        run PINT_sm_common_object_getattr_failure;
         default => cleanup;
     }
 
@@ -129,11 +115,16 @@ PVFS_error PVFS_isys_truncate(
     }
     memset(sm_p, 0, sizeof(*sm_p));
 
-    PINT_init_msgarray_params(&sm_p->msgarray_params);
+    PINT_init_msgarray_params(&sm_p->msgarray_params, ref.fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->u.truncate.size = size;
     sm_p->object_ref = ref;
-    sm_p->ref_type = PVFS_TYPE_METAFILE;
+
+    PINT_SM_GETATTR_STATE_FILL(
+        sm_p->getattr,
+        sm_p->object_ref,
+        PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE,
+        PVFS_TYPE_METAFILE);
 
     return PINT_client_state_machine_post(
         sm_p, PVFS_SYS_TRUNCATE, op_id, user_ptr);
@@ -179,16 +170,16 @@ static int truncate_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
     PVFS_object_attr *attr = NULL;
     PINT_sm_msgpair_state *msg_p = NULL;
     PVFS_size new_dfile_size = 0;
+    PINT_request_file_data file_data;
+    
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+            "(%p) truncate state: datafile_setup_msgpairarray\n", sm_p);
 
     js_p->error_code = 0;
 
-    attr = (sm_p->acache_hit ?
-            &sm_p->pinode->attr :
-            &sm_p->acache_attr);
-
+    attr = &sm_p->getattr.attr;
     assert(attr);
 
-    assert(attr->objtype == PVFS_TYPE_METAFILE);
     assert(attr->mask & PVFS_ATTR_META_DFILES);
     assert(attr->mask & PVFS_ATTR_META_DIST);
     assert(attr->u.meta.dfile_count > 0);
@@ -204,6 +195,13 @@ static int truncate_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
         return 1;
     }
 
+    /* Initialize the file data struct */
+    memset(&file_data, 0, sizeof(file_data));
+    file_data.dist = attr->u.meta.dist;
+    file_data.server_ct = attr->u.meta.dfile_count;
+    file_data.extend_flag = 1;
+
+    /* Construct truncate messages */
     for (i = 0; i < attr->u.meta.dfile_count; i++)
     {
         msg_p = &sm_p->msgarray[i];
@@ -214,11 +212,14 @@ static int truncate_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
             Ld(sm_p->u.truncate.size),
             Lu(attr->u.meta.dfile_array[i]));
 
+        file_data.server_nr = i;
         new_dfile_size = 
             attr->u.meta.dist->methods->logical_to_physical_offset(
-                attr->u.meta.dist->params, i, attr->u.meta.dfile_count,
+                attr->u.meta.dist->params,
+                &file_data,
                 sm_p->u.truncate.size);
-
+        sm_p->getattr.size = new_dfile_size;
+        
         gossip_debug(GOSSIP_CLIENT_DEBUG,
                 " to %Ld bytes\n", Ld(new_dfile_size));
 
@@ -258,6 +259,11 @@ static int truncate_datafile_failure(PINT_client_sm *sm_p,
 static int truncate_cleanup(PINT_client_sm *sm_p,
                             job_status_s *js_p)
 {
+    PINT_pinode *pinode;
+    int status, unexpired_masks;
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) truncate state: "
+                 "truncate_cleanup\n", sm_p);
+
     sm_p->error_code = js_p->error_code;
 
     if (sm_p->msgarray && (sm_p->msgarray != &sm_p->msgpair))
@@ -266,45 +272,18 @@ static int truncate_cleanup(PINT_client_sm *sm_p,
         sm_p->msgarray = NULL;
     }
 
-    /* add entry to acache if not already present */
-    if (!sm_p->acache_hit)
+    pinode = PINT_acache_lookup(sm_p->object_ref, &status, &unexpired_masks);
+    if(pinode &&
+       status == PINODE_STATUS_VALID && 
+       !(unexpired_masks == PVFS_ATTR_META_ALL))
     {
-        int release_required = 1;
-        PINT_pinode *pinode = PINT_acache_lookup(
-            sm_p->object_ref, NULL);
-        if (!pinode)
-        {
-            pinode = PINT_acache_pinode_alloc();
-            assert(pinode);
-            release_required = 0;
-        }
-        pinode->size = sm_p->u.truncate.size;
-        pinode->refn = sm_p->object_ref;
-
-        PINT_copy_object_attr(&pinode->attr, &sm_p->acache_attr);
-        PINT_free_object_attr(&sm_p->acache_attr);
-
+        pinode->size = sm_p->getattr.size;
+        pinode->attr.mask |= PVFS_ATTR_DATA_SIZE;
         PINT_acache_set_valid(pinode);
-
-        if (release_required)
-        {
-            PINT_acache_release(pinode);
-        }
-        sm_p->acache_hit = 0;
+        PINT_acache_release(pinode);
     }
-    else
-    {
-        gossip_debug(GOSSIP_CLIENT_DEBUG, "sys-truncate.sm: "
-                     "Invalidating cached attribute size\n");
 
-        sm_p->pinode->attr.mask &=
-            ~(PVFS_ATTR_DATA_SIZE | PVFS_ATTR_DATA_ALL);
-        PINT_acache_set_valid(sm_p->pinode);
-
-        PINT_acache_release(sm_p->pinode);
-        sm_p->acache_hit = 0;
-        sm_p->pinode = NULL;
-    }
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
     sm_p->op_complete = 1;
     return 0;

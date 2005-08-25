@@ -16,6 +16,11 @@
 #include <sys/uio.h>
 #include <time.h>
 
+#include "pvfs2-config.h"
+#ifdef HAVE_NETDB_H
+#include <netdb.h>
+#endif
+
 #include "bmi-method-support.h"
 #include "bmi-method-callback.h"
 #include "bmi-tcp-addressing.h"
@@ -50,6 +55,7 @@ do \
                          PVFS_EVENT_FLAG_END, 0, __tmpid);  \
 } while(0)
 
+    
 static gen_mutex_t interface_mutex = GEN_MUTEX_INITIALIZER;
 
 /* function prototypes */
@@ -120,6 +126,7 @@ int BMI_tcp_testcontext(int incount,
 		     int max_idle_time_ms,
 		     bmi_context_id context_id);
 method_addr_p BMI_tcp_method_addr_lookup(const char *id_string);
+const char* BMI_tcp_addr_rev_lookup_unexpected(method_addr_p map);
 int BMI_tcp_post_send_list(bmi_op_id_t * id,
 			   method_addr_p dest,
 			   const void *const *buffer_list,
@@ -295,6 +302,7 @@ struct bmi_method_ops bmi_tcp_ops = {
     BMI_tcp_open_context,
     BMI_tcp_close_context,
     BMI_tcp_cancel,
+    BMI_tcp_addr_rev_lookup_unexpected,
 };
 
 /* module parameters */
@@ -1376,6 +1384,43 @@ int BMI_tcp_cancel(bmi_op_id_t id, bmi_context_id context_id)
     return(0);
 }
 
+/* BMI_tcp_addr_rev_lookup_unexpected()
+ *
+ * looks up an address that was initialized unexpectedly and returns a string
+ * hostname
+ *
+ * returns string on success, "UNKNOWN" on failure
+ */
+const char* BMI_tcp_addr_rev_lookup_unexpected(method_addr_p map)
+{
+    struct tcp_addr *tcp_addr_data = map->method_data;
+    socklen_t peerlen = sizeof(struct sockaddr_in);
+    struct sockaddr_in peer;
+    int ret;
+    struct hostent *peerent;
+
+
+    ret = getpeername(tcp_addr_data->socket, (struct sockaddr*)&(peer), &peerlen);
+    if(ret < 0)
+    {
+        return("UNKNOWN");
+    }
+
+#ifdef HAVE_GETHOSTBYADDR
+    
+    peerent = gethostbyaddr((void*)&peer.sin_addr.s_addr, 
+        sizeof(struct in_addr), AF_INET);
+    if(peerent == NULL)
+    {
+        return("UNKNOWN");
+    }
+ 
+    return(peerent->h_name);
+#else
+    return ("UNKNOWN");
+#endif
+}
+
 /* tcp_forget_addr()
  *
  * completely removes a tcp method address from use, and aborts any
@@ -1505,7 +1550,7 @@ static int tcp_server_init(void)
     if ((tcp_addr_data->socket = BMI_sockio_new_sock()) < 0)
     {
 	tmp_errno = errno;
-	gossip_lerr("Error: BMI_sockio_new_sock: %s\n", strerror(tmp_errno));
+	gossip_err("Error: BMI_sockio_new_sock: %s\n", strerror(tmp_errno));
 	return (bmi_tcp_errno_to_pvfs(-tmp_errno));
     }
 
@@ -1658,7 +1703,7 @@ static int tcp_sock_init(method_addr_p my_method_addr)
 	fcntl(tcp_addr_data->socket, F_SETFL, oldfl | O_NONBLOCK);
     }
 
-    /* turn of Nagle's algorithm */
+    /* turn off Nagle's algorithm */
     if (BMI_sockio_set_tcpopt(tcp_addr_data->socket, TCP_NODELAY, 1) < 0)
     {
 	tmp_errno = errno;
@@ -1673,9 +1718,9 @@ static int tcp_sock_init(method_addr_p my_method_addr)
 		      "Connect: socket=%d, hostname=%s, port=%d\n",
 		      tcp_addr_data->socket, tcp_addr_data->hostname,
 		      tcp_addr_data->port);
-	ret =
-	    BMI_sockio_connect_sock(tcp_addr_data->socket, tcp_addr_data->hostname,
-			 tcp_addr_data->port);
+	ret = BMI_sockio_connect_sock(tcp_addr_data->socket,
+                      tcp_addr_data->hostname,
+		      tcp_addr_data->port);
     }
     else
     {
@@ -1691,8 +1736,9 @@ static int tcp_sock_init(method_addr_p my_method_addr)
 	}
 	else
 	{
-	    gossip_lerr("Error: BMI_sockio_connect_sock: %s\n", strerror(errno));
-	    return (bmi_tcp_errno_to_pvfs(-errno));
+            /* BMI_sockio_connect_sock returns a PVFS error */
+            PVFS_perror_gossip("Error: BMI_sockio_connect_sock", ret);
+	    return (ret);
 	}
     }
 
@@ -1904,8 +1950,8 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
 	/* make sure it isn't too big */
 	if (query_op->actual_size > expected_size)
 	{
-	    gossip_lerr("Error: message ordering violation;\n");
-	    gossip_lerr("Error: message too large for next buffer.\n");
+	    gossip_err("Error: message ordering violation;\n");
+	    gossip_err("Error: message too large for next buffer.\n");
 	    return (bmi_tcp_errno_to_pvfs(-EPROTO));
 	}
 
@@ -1948,8 +1994,8 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
 	/* make sure it isn't too big */
 	if (query_op->actual_size > expected_size)
 	{
-	    gossip_lerr("Error: message ordering violation;\n");
-	    gossip_lerr("Error: message too large for next buffer.\n");
+	    gossip_err("Error: message ordering violation;\n");
+	    gossip_err("Error: message too large for next buffer.\n");
 	    return (bmi_tcp_errno_to_pvfs(-EPROTO));
 	}
 
@@ -2031,7 +2077,7 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
 		0);
 	    if (ret < 0)
 	    {
-		gossip_lerr("Error: payload_progress: %s\n", strerror(-ret));
+                PVFS_perror_gossip("Error: payload_progress", ret);
 		tcp_forget_addr(query_op->addr, 0, ret);
 		return (ret);
 	    }
@@ -2585,9 +2631,9 @@ static int tcp_do_work_recv(method_addr_p map, int* stall_flag)
 	/* make sure it isn't too big */
 	if (new_header.size > active_method_op->expected_size)
 	{
-	    gossip_lerr("Error: message ordering violation;\n");
-	    gossip_lerr("Error: message too large for next buffer.\n");
-	    gossip_lerr("Error: incoming size: %ld, expected size: %ld\n",
+	    gossip_err("Error: message ordering violation;\n");
+	    gossip_err("Error: message too large for next buffer.\n");
+	    gossip_err("Error: incoming size: %ld, expected size: %ld\n",
 			(long) new_header.size,
 			(long) active_method_op->expected_size);
 	    /* TODO: return error here or do something else? */
@@ -2682,6 +2728,7 @@ static int work_on_send_op(method_op_p my_method_op,
 	ret = tcp_sock_init(my_method_op->addr);
 	if (ret < 0)
 	{
+            PVFS_perror_gossip("Error: socket failed to init", ret);
 	    tcp_forget_addr(my_method_op->addr, 0, ret);
 	    return (0);
 	}
@@ -2705,7 +2752,7 @@ static int work_on_send_op(method_op_p my_method_op,
 	&my_method_op->env_amt_complete);
     if (ret < 0)
     {
-	gossip_err("Error: payload_progress: %s\n", strerror(-ret));
+        PVFS_perror_gossip("Error: payload_progress", ret);
 	tcp_forget_addr(my_method_op->addr, 0, ret);
 	return (0);
     }
@@ -2772,7 +2819,7 @@ static int work_on_recv_op(method_op_p my_method_op, int* stall_flag)
 	    0);
 	if (ret < 0)
 	{
-	    gossip_lerr("Error: payload_progress: %s\n", strerror(-ret));
+            PVFS_perror_gossip("Error: payload_progress", ret);
 	    tcp_forget_addr(my_method_op->addr, 0, ret);
 	    return (0);
 	}
@@ -2905,7 +2952,7 @@ static int tcp_accept_init(int *socket)
 	}
 	else
 	{
-	    gossip_lerr("Error: accept: %s\n", strerror(errno));
+	    gossip_err("Error: accept: %s\n", strerror(errno));
 	    return (bmi_tcp_errno_to_pvfs(-errno));
 	}
     }
@@ -3033,7 +3080,7 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 #endif
 	if (ret < 0)
 	{
-	    gossip_lerr("Error: enqueue_operation() or tcp_do_work() returned: %d\n", ret);
+	    gossip_err("Error: enqueue_operation() or tcp_do_work() returned: %d\n", ret);
 	}
 	return (ret);
     }
@@ -3071,7 +3118,7 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 				context_id);
 	if(ret < 0)
 	{
-	    gossip_lerr("Error: enqueue_operation() returned: %d\n", ret);
+	    gossip_err("Error: enqueue_operation() returned: %d\n", ret);
 	}
 	return (ret);
     }
@@ -3084,9 +3131,7 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 	&cur_index_complete, BMI_SEND, my_header.enc_hdr, &env_amt_complete);
     if (ret < 0)
     {
-        char buf[64] = {0};
-        PVFS_strerror_r(-ret, buf, 64);
-	gossip_lerr("Error: payload_progress: %s\n", buf);
+        PVFS_perror_gossip("Error: payload_progress", ret);
 	tcp_forget_addr(dest, 0, ret);
 	return (ret);
     }
@@ -3110,7 +3155,7 @@ static int BMI_tcp_post_send_generic(bmi_op_id_t * id,
 
     if(ret < 0)
     {
-	gossip_lerr("Error: enqueue_operation() returned: %d\n", ret);
+	gossip_err("Error: enqueue_operation() returned: %d\n", ret);
     }
     return (ret);
 }

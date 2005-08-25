@@ -40,8 +40,8 @@ static int test_write(void){
    PINT_Request *r2;
    PINT_Request_state *rs1;
    PINT_Request_state *rs2;
-   PINT_Request_file_data rf1;
-   PINT_Request_file_data rf2;
+   PINT_request_file_data rf1;
+   PINT_request_file_data rf2;
    PINT_Request_result seg1;
                                                                                 
    /* PVFS_Process_request arguments */
@@ -59,8 +59,8 @@ static int test_write(void){
    PVFS_Request_indexed(1, &blocklength, &displacement, PVFS_BYTE, &r2);
                                                                                 
    /* set up two request states */
-   rs1 = PINT_New_request_state(r1);
-   rs2 = PINT_New_request_state(r2);
+   rs1 = PINT_new_request_state(r1);
+   rs2 = PINT_new_request_state(r2);
    /* set up file data for first request */
    rf1.server_nr = 0;
    rf1.server_ct = 3;
@@ -98,7 +98,7 @@ static int test_write(void){
       seg1.segs = 0;
                                                                                 
       /* process request */
-      retval = PINT_Process_request(rs1, NULL, &rf1, &seg1, PINT_SERVER);
+      retval = PINT_process_request(rs1, NULL, &rf1, &seg1, PINT_SERVER);
                                                                                 
       if(retval >= 0)
       {
@@ -136,7 +136,7 @@ static int test_write(void){
 	seg1.segs = 0;
                                                                                 
 	/* process request */
-	retval = PINT_Process_request(rs2, NULL, &rf2, &seg1, PINT_CLIENT);
+	retval = PINT_process_request(rs2, NULL, &rf2, &seg1, PINT_CLIENT);
                                                                                 
 	if(retval >= 0)
 	{

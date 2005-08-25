@@ -16,9 +16,14 @@
  */
 
 #include <stdint.h>
+#include <sys/types.h>
+#include <pwd.h>
+#include <grp.h>
 #include "pvfs2-debug.h"
 #include "pvfs2-storage.h"
 #include "job.h"
+#include "bmi.h"
+#include "src/server/request-scheduler/request-scheduler.h"
 #include "trove.h"
 #include "gossip.h"
 #include "PINT-reqproto-encode.h"
@@ -78,18 +83,23 @@ extern job_context_id server_job_context;
 #define PVFS2_SERVER_DEFAULT_TIMEOUT_MS      100
 #define BMI_UNEXPECTED_OP                    999
 
-/* the server will give up on sending a response if the send does not
- * complete in PVFS2_SERVER_RESPONSE_TIMEOUT seconds
+/* BMI operation timeout if not specified in config file */
+#define PVFS2_SERVER_JOB_BMI_TIMEOUT_DEFAULT         30
+/* Flow operation timeout if not specified in config file */
+#define PVFS2_SERVER_JOB_FLOW_TIMEOUT_DEFAULT        30
+/* BMI client side operation timeout if not specified in config file */
+/* NOTE: the default for this timeout is set higher to allow the client to
+ * overcome syncing and queueing delays on the server
  */
-/* TODO: this should be read from a config file */
-#define PVFS2_SERVER_RESPONSE_TIMEOUT         30
-
-/* the server will give up on a flow if more than
- * PVFS2_SERVER_FLOW_TIMEOUT seconds pass without any progress being
- * made on it
+#define PVFS2_CLIENT_JOB_BMI_TIMEOUT_DEFAULT         300
+/* Flow client side operation timeout if not specified in config file */
+#define PVFS2_CLIENT_JOB_FLOW_TIMEOUT_DEFAULT        300
+/* maximum number of times for client to retry restartable operations;
+ * use INT_MAX to approximate infinity (187 years with 2 sec delay)
  */
-/* TODO: this should be read from a config file */
-#define PVFS2_SERVER_FLOW_TIMEOUT             30
+#define PVFS2_CLIENT_RETRY_LIMIT_DEFAULT     (5)
+/* number of milliseconds that clients will delay between retries */
+#define PVFS2_CLIENT_RETRY_DELAY_MS_DEFAULT  2000
 
 /* types of permission checking that a server may need to perform for
  * incoming requests
@@ -100,8 +110,10 @@ enum PINT_server_req_permissions
     PINT_SERVER_CHECK_WRITE = 1,   /* needs write permission */
     PINT_SERVER_CHECK_READ = 2,    /* needs read permission */
     PINT_SERVER_CHECK_NONE = 3,    /* needs no permission */
-    PINT_SERVER_CHECK_ATTR = 4     /* special case for attribute operations; 
+    PINT_SERVER_CHECK_ATTR = 4,    /* special case for attribute operations; 
                                       needs ownership */
+    PINT_SERVER_CHECK_CRDIRENT = 5 /* special case for crdirent operations;
+                                      needs write and execute */
 };
 
 /* indicates if the attributes for the target object must exist for
@@ -293,8 +305,16 @@ struct PINT_server_mkdir_op
 struct PINT_server_getattr_op
 {
     PVFS_handle handle;
+    PVFS_handle dirdata_handle;
     PVFS_fs_id fs_id;
+    PVFS_ds_attributes dirdata_ds_attr;
     uint32_t attrmask;
+};
+
+/* this is used in both set_eattr and get_eattr */
+struct PINT_server_eattr_op
+{
+    void *buffer;
 };
     
 /* This structure is passed into the void *ptr 
@@ -353,6 +373,7 @@ typedef struct PINT_server_op
     union
     {
 	/* request-specific scratch spaces for use during processing */
+        struct PINT_server_eattr_op eattr;
         struct PINT_server_getattr_op getattr;
 	struct PINT_server_getconfig_op getconfig;
 	struct PINT_server_lookup_op lookup;
@@ -384,6 +405,42 @@ typedef struct PINT_server_op
     PINT_map_server_op_to_string(s_op->op), ((s_op->current_state - 2)->name));
 #define __PINT_STATE_DEBUG
 
+/* PINT_ACCESS_DEBUG()
+ *
+ * macro for consistent printing of access records
+ *
+ * no return value
+ */
+#define PINT_ACCESS_DEBUG(__s_op, __mask, format, f...)                     \
+do {                                                                        \
+    PVFS_handle __handle;                                                   \
+    PVFS_fs_id __fsid;                                                      \
+    int __flag;                                                             \
+    static char __pint_access_buffer[GOSSIP_BUF_SIZE];                      \
+    struct passwd* __pw;                                                    \
+    struct group* __gr;                                                     \
+                                                                            \
+    if ((gossip_debug_on) &&                                                \
+        (gossip_debug_mask & __mask) &&                                     \
+        (gossip_facility))                                                  \
+    {                                                                       \
+        PINT_req_sched_target_handle(__s_op->req, 0, &__handle,             \
+            &__fsid, &__flag);                                              \
+        __pw = getpwuid(__s_op->req->credentials.uid);                      \
+        __gr = getgrgid(__s_op->req->credentials.gid);                      \
+        snprintf(__pint_access_buffer, GOSSIP_BUF_SIZE,                     \
+            "%s.%s@%s H=%Lu S=%p: %s: %s",                                  \
+            ((__pw) ? __pw->pw_name : "UNKNOWN"),                           \
+            ((__gr) ? __gr->gr_name : "UNKNOWN"),                           \
+            BMI_addr_rev_lookup_unexpected(__s_op->addr),                   \
+            Lu(__handle),                                                   \
+            __s_op,                                                         \
+            PINT_map_server_op_to_string(__s_op->req->op),                  \
+            format);                                                        \
+        __gossip_debug(__mask, 'A', __pint_access_buffer, ##f);             \
+    }                                                                       \
+} while(0);
+
 /* server operation state machines */
 extern struct PINT_state_machine_s pvfs2_get_config_sm;
 extern struct PINT_state_machine_s pvfs2_get_attr_sm;
@@ -411,6 +468,11 @@ extern struct PINT_state_machine_s pvfs2_proto_error_sm;
 extern struct PINT_state_machine_s pvfs2_perf_mon_sm;
 extern struct PINT_state_machine_s pvfs2_event_mon_sm;
 extern struct PINT_state_machine_s pvfs2_iterate_handles_sm;
+extern struct PINT_state_machine_s pvfs2_get_eattr_sm;
+extern struct PINT_state_machine_s pvfs2_get_eattr_list_sm;
+extern struct PINT_state_machine_s pvfs2_set_eattr_sm;
+extern struct PINT_state_machine_s pvfs2_set_eattr_list_sm;
+extern struct PINT_state_machine_s pvfs2_del_eattr_sm;
 
 /* nested state machines */
 extern struct PINT_state_machine_s pvfs2_get_attr_work_sm;
@@ -434,7 +496,8 @@ int server_state_machine_start_noreq(
 
 /* INCLUDE STATE-MACHINE.H DOWN HERE */
 #define PINT_OP_STATE       PINT_server_op
-#define PINT_OP_STATE_TABLE PINT_server_req_table
+#define PINT_OP_STATE_GET_MACHINE(_op) \
+    ((_op <= PVFS_MAX_SERVER_OP) ? (PINT_server_req_table[_op].sm) : NULL)
 
 #include "state-machine.h"
 

@@ -194,6 +194,7 @@ static struct options* parse_args(int argc, char* argv[])
     int user_perms = 0;
     int group_perms = 0;
     int other_perms = 0;
+    int special_perms = 0;
     int i;
 
     struct options* tmp_opts = NULL;
@@ -228,19 +229,33 @@ static struct options* parse_args(int argc, char* argv[])
 		exit(EXIT_FAILURE);
 	}
     }
-    if (strlen(argv[optind]) != 3) {
+    if (strlen(argv[optind]) == 3) 
+    {
+        user_perms = check_perm(argv[optind][0]);
+        group_perms = check_perm(argv[optind][1]);
+        other_perms = check_perm(argv[optind][2]);
+    }
+    else if(strlen(argv[optind]) == 4)
+    {
+        special_perms = check_perm(argv[optind][0]);
+        user_perms = check_perm(argv[optind][1]);
+        group_perms = check_perm(argv[optind][2]);
+        other_perms = check_perm(argv[optind][3]);
+    }
+    else
+    {
         usage (argc, argv);
         exit(EXIT_FAILURE);
     }
-    user_perms = check_perm(argv[optind][0]);
-    group_perms = check_perm(argv[optind][1]);
-    other_perms = check_perm(argv[optind][2]);
 
-    if (user_perms == -1 || group_perms == -1 || other_perms == -1) {
+    if (user_perms == -1 || group_perms == -1 || other_perms == -1 ||
+        special_perms == -1) 
+    {
         usage(argc,argv);
         exit(EXIT_FAILURE);
     }
-    tmp_opts->perms=(user_perms << 6) | (group_perms << 3) | (other_perms << 0);
+    tmp_opts->perms=(user_perms << 6) | (group_perms << 3) | 
+        (other_perms << 0) | (special_perms << 9);
 
     optind = optind + 1;
     tmp_opts->target_count = argc-optind;
@@ -259,7 +274,8 @@ static struct options* parse_args(int argc, char* argv[])
 static void usage(int argc, char** argv)
 {
     fprintf(stderr,"Usage: %s [-v] mode filename(s)\n",argv[0]);
-    fprintf(stderr,"    mode - of the form UGO in octal notation\n");
+    fprintf(stderr,"    mode - of the form UGO or SUGO in octal notation\n");
+    fprintf(stderr,"       S - the special permissions (setgid, etc.) for the file(s)\n");
     fprintf(stderr,"       U - the user permissions for the file(s)\n");
     fprintf(stderr,"       G - the group permissions for the file(s)\n");
     fprintf(stderr,"       O - the other permissions for the file(s)\n");

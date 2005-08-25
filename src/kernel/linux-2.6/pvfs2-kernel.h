@@ -24,6 +24,12 @@
 
 #ifdef PVFS2_LINUX_KERNEL_2_4
 
+/* the 2.4 kernel requires us to manually set up modversions if needed */
+#if CONFIG_MODVERSIONS==1
+#define MODVERSIONS
+#include <linux/modversions.h>
+#endif 
+
 #define __NO_VERSION__
 #include <linux/version.h>
 #include <linux/module.h>
@@ -86,7 +92,9 @@ do {                                                           \
     panic(msg);                                                \
 } while(0)
 #else
-#define pvfs2_print(...)
+#define pvfs2_print(format...) do{                             \
+    if(debug) printk(format);                                  \
+}while(0)
 #define pvfs2_panic(msg)                                       \
 do {                                                           \
     pvfs2_error("BUG! Please contact pvfs2-developers@beowulf-"\
@@ -362,6 +370,16 @@ int pvfs2_getattr(
 #endif
 
 /****************************
+ * defined in xattr.c
+ ****************************/
+int pvfs2_setxattr(struct dentry *dentry, const char *name,
+		const void *value, size_t size, int flags);
+ssize_t pvfs2_getxattr(struct dentry *dentry, const char *name,
+		         void *buffer, size_t size);
+ssize_t pvfs2_listxattr(struct dentry *dentry, char *buffer, size_t size);
+int pvfs2_removexattr(struct dentry *dentry, const char *name);
+
+/****************************
  * defined in namei.c
  ****************************/
 #ifdef PVFS2_LINUX_KERNEL_2_4
@@ -380,6 +398,14 @@ struct dentry *pvfs2_lookup(
  ****************************/
 int pvfs2_gen_credentials(
     PVFS_credentials *credentials);
+
+ssize_t pvfs2_inode_getxattr(
+        struct inode *inode, const char *name, void *buffer, size_t size);
+int pvfs2_inode_setxattr(struct inode *inode, const char *name,
+        const void *value, size_t size, int flags);
+int pvfs2_inode_removexattr(struct inode *inode, const char *name);
+/*int pvfs2_inode_listxattr(
+        struct inode *inode); */
 
 int pvfs2_inode_getattr(
     struct inode *inode);
@@ -599,8 +625,8 @@ do {                                                               \
  *  this allows us to know if we've reached the error_exit code path
  *  from here or elsewhere
  *
- *  \note used in namei.c:lookup(), file.c:pvfs2_inode_read(), and
- *  file.c:pvfs2_file_write()
+ *  \note used in namei.c:lookup(), file.c:pvfs2_inode_read[v](), and
+ *  file.c:pvfs2_file_write[v]()
  */
 #define service_error_exit_op_with_timeout_retry(op,meth,num,e,intr)\
 do {                                                                \

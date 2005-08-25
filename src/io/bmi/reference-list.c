@@ -174,7 +174,7 @@ void ref_list_cleanup(ref_list_p rlp)
     {
 	tmp_entry = qlist_entry(tmp_link, struct ref_st,
 				list_link);
-	free(tmp_entry);
+        dealloc_ref_st(tmp_entry);
     }
 
     free(rlp);

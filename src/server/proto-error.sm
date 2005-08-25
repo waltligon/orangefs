@@ -11,6 +11,7 @@
 #include <fcntl.h>
 
 #include "pvfs2-server.h"
+#include "server-config.h"
 
 static int proto_error_cleanup(PINT_server_op *s_op, job_status_s* js_p);
 static int proto_error_init(PINT_server_op *s_op, job_status_s* js_p);
@@ -42,6 +43,7 @@ static int proto_error_init(PINT_server_op *s_op, job_status_s* js_p)
 {
     int ret;
     job_id_t tmp_id;
+    struct server_configuration_s *user_opts = get_server_config_struct();
 
     
 
@@ -80,7 +82,7 @@ static int proto_error_init(PINT_server_op *s_op, job_status_s* js_p)
 			    js_p,
 			    &tmp_id,
 			    server_job_context,
-			    PVFS2_SERVER_RESPONSE_TIMEOUT);
+			    user_opts->server_job_bmi_timeout);
 
     return ret;
 }

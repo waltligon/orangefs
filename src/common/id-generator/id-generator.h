@@ -26,22 +26,17 @@
  * registers a piece of data (a pointer of some sort) and
  * returns an opaque id for it.  
  *
- * returns 0 on success, -errno on failure
+ * *new_id will be 0 if item is NULL
  */
-static inline int id_gen_fast_register(PVFS_id_gen_t * new_id,
+static inline void id_gen_fast_register(PVFS_id_gen_t * new_id,
 				       void *item)
 {
-    if (!item)
-	return -PVFS_EINVAL;
-
 #if SIZEOF_VOID_P == 8
     *new_id = (int64_t) item;
 #else
     *new_id = 0;
     *new_id += (int32_t) item;
 #endif
-
-    return (0);
 }
 
 /* id_gen_fast_lookup()
@@ -54,9 +49,6 @@ static inline int id_gen_fast_register(PVFS_id_gen_t * new_id,
  */
 static inline void *id_gen_fast_lookup(PVFS_id_gen_t id)
 {
-    if (!id)
-	return NULL;
-
 #if SIZEOF_VOID_P == 8
     return (void *) id;
 #else

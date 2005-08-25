@@ -39,7 +39,7 @@ int main(int argc, char **argv)
 	PVFS_Request_vector(16, 4, 64, PVFS_DOUBLE, &r1);
 
 	/* set up a request state */
-	rs = PINT_New_request_state(r1);
+	rs = PINT_new_request_state(r1);
 
 	/* set up file data */
 	rf.server_nr = 0;
@@ -64,7 +64,7 @@ int main(int argc, char **argv)
 	bytemax = BYTEMAX;
 
 	/* process request */
-	retval = PINT_Process_request(rs, &rf, &segmax, NULL, NULL,
+	retval = PINT_process_request(rs, &rf, &segmax, NULL, NULL,
 			&offset, &bytemax, &eof_flag, PINT_CKSIZE);
 
 	/* print return value */
@@ -75,7 +75,7 @@ int main(int argc, char **argv)
 		segmax = SEGMAX;
 		bytemax = BYTEMAX;
 		/* process request */
-		PINT_Process_request(rs, &rf, &segmax, offset_array,
+		PINT_process_request(rs, &rf, &segmax, offset_array,
 				size_array, &offset, &bytemax, &eof_flag, PINT_CLIENT);
 		printf("processed %lld bytes in %d segments\n", bytemax, segmax);
 		for (i = 0; i < segmax; i++)
@@ -88,7 +88,7 @@ int main(int argc, char **argv)
 	segmax = 1;
 	bytemax = BYTEMAX;
 	/* process request */
-	retval = PINT_Process_request(rs, &rf, &segmax, NULL, NULL,
+	retval = PINT_process_request(rs, &rf, &segmax, NULL, NULL,
 			&offset, &bytemax, &eof_flag, PINT_CKSIZE);
 	printf("\nreturn %d, %d segments: offset=%lld bytemax=%lld\n",
 			retval, segmax, offset, bytemax);
@@ -96,7 +96,7 @@ int main(int argc, char **argv)
 	segmax = 1;
 	bytemax = BYTEMAX;
 	/* process request */
-	retval = PINT_Process_request(rs, &rf, &segmax, NULL, NULL,
+	retval = PINT_process_request(rs, &rf, &segmax, NULL, NULL,
 			&offset, &bytemax, &eof_flag, PINT_CKSIZE);
 	printf("\nreturn %d, %d segments: offset=%lld bytemax=%lld\n",
 			retval, segmax, offset, bytemax);
@@ -105,7 +105,7 @@ int main(int argc, char **argv)
 		segmax = SEGMAX;
 		bytemax = BYTEMAX;
 		/* process request */
-		PINT_Process_request(rs, &rf, &segmax, offset_array,
+		PINT_process_request(rs, &rf, &segmax, offset_array,
 				size_array, &offset, &bytemax, &eof_flag, PINT_SERVER);
 		printf("processed %lld bytes in %d segments\n", bytemax, segmax);
 		for (i = 0; i < segmax; i++)

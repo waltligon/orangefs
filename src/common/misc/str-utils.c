@@ -366,7 +366,7 @@ int PINT_split_string_list(char ***tokens, const char *comma_list)
     }
 
     /* allocate pointers for each */
-    *tokens = (char **) malloc(sizeof(char **));
+    *tokens = (char **) malloc(sizeof(char *) * tokencount);
     if (!(*tokens))
     {
 	return 0;
@@ -375,7 +375,7 @@ int PINT_split_string_list(char ***tokens, const char *comma_list)
     /* copy out all of the tokenized strings */
     holder = comma_list;
     end = comma_list + strlen(comma_list);
-    for (i = 0; i < tokencount; i++)
+    for (i = 0; i < tokencount && holder; i++)
     {
 	holder2 = index(holder, ',');
 	if (!holder2)
@@ -410,6 +410,27 @@ int PINT_split_string_list(char ***tokens, const char *comma_list)
 	free(*tokens);
     }
     return (0);
+}
+
+/* PINT_free_string_list()
+ * 
+ * Free the string list allocated by PINT_split_string_list()
+ */
+void PINT_free_string_list(char ** list, int len)
+{
+    int i = 0;
+
+    if(list)
+    {
+        for(; i < len; ++i)
+        {
+            if(list[i])
+            {
+                free(list[i]);
+            }
+        }
+        free(list);
+    }
 }
 
 /* PINT_remove_base_dir()

@@ -1,6 +1,10 @@
 /*
  * (C) 2001 Clemson University and The University of Chicago
  *
+ * Changes by Acxiom Corporation to add relative path support to
+ * PVFS_util_resolve(),
+ * Copyright © Acxiom Corporation, 2005
+ *
  * See COPYING in top-level directory.
  */
 
@@ -13,14 +17,18 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/time.h>
+#include <libgen.h>
 
 #include "pvfs2-config.h"
 #include "pvfs2-sysint.h"
 #include "pvfs2-util.h"
 #include "pvfs2-debug.h"
 #include "gossip.h"
+#include "pvfs2-attr.h"
+#include "pvfs2-types-debug.h"
 #include "str-utils.h"
 #include "gen-locks.h"
+#include "realpath.h"
 
 /* TODO: add replacement functions for systems without getmntent() */
 #ifndef HAVE_GETMNTENT
@@ -52,6 +60,14 @@ static int parse_flowproto_string(
 static int parse_encoding_string(
     const char *cp,
     enum PVFS_encoding_type *et);
+
+static int parse_num_dfiles_string(const char* cp, int* num_dfiles);
+
+static int PINT_util_resolve_absolute(
+    const char* local_path,
+    PVFS_fs_id* out_fs_id,
+    char* out_fs_path,
+    int out_fs_path_max);
 
 void PVFS_util_gen_credentials(
     PVFS_credentials *credentials)
@@ -118,17 +134,17 @@ int PVFS_util_copy_sys_attr(
         dest_attr->objtype = src_attr->objtype;
         dest_attr->mask = src_attr->mask;
 
-        if ((src_attr->mask & PVFS_ATTR_COMMON_TYPE) &&
-            (src_attr->objtype == PVFS_TYPE_SYMLINK) &&
+        if((src_attr->mask & PVFS_ATTR_SYS_LNK_TARGET) &&
             src_attr->link_target)
         {
             dest_attr->link_target = strdup(src_attr->link_target);
             if (!dest_attr->link_target)
             {
                 ret = -PVFS_ENOMEM;
+                return ret;
             }
-            ret = 0;
         }
+        ret = 0;
     }
     return ret;
 }
@@ -137,7 +153,7 @@ void PVFS_util_release_sys_attr(PVFS_sys_attr *attr)
 {
     if (attr)
     {
-        if ((attr->mask & PVFS_ATTR_COMMON_TYPE) &&
+        if ((attr->mask & PVFS_ATTR_SYS_TYPE) &&
             (attr->objtype == PVFS_TYPE_SYMLINK) && attr->link_target)
         {
             free(attr->link_target);
@@ -166,9 +182,10 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
     const char *tabfile)
 {
     FILE *mnt_fp = NULL;
-    int file_count = 4;
-    const char *file_list[4] =
-        { NULL, "/etc/fstab", "/etc/pvfs2tab", "pvfs2tab" };
+    int file_count = 5;
+    /* NOTE: mtab should be last for clean error logic below */
+    const char *file_list[5] =
+        { NULL, "/etc/fstab", "/etc/pvfs2tab", "pvfs2tab", "/etc/mtab" };
     const char *targetfile = NULL;
     struct mntent *tmp_ent;
     int i, j;
@@ -192,7 +209,6 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
           first check for environment variable override
         */
         file_list[0] = getenv("PVFS2TAB_FILE");
-        file_count = 4;
     }
 
     gen_mutex_lock(&s_stat_tab_mutex);
@@ -322,9 +338,29 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
                 }
                 if (slashcount != 3)
                 {
-                    gossip_lerr("Error: invalid tab file entry: %s\n",
-                                tmp_ent->mnt_fsname);
-                    goto error_exit;
+                    /* if we are looking at the mtab, then just silently
+                     * treat this error as if we didn't find an entry at
+                     * all; they may have mounted using an odd syntax on a
+                     * 2.4 kernel system
+                     */
+                    if(!strcmp(targetfile, "/etc/mtab"))
+                    {
+                        gossip_err("Error: could not find any pvfs2 tabfile entries.\n");
+                        gossip_err("Error: tried the following tabfiles:\n");
+                        for (j = 0; j < file_count; j++)
+                        {
+                            gossip_err("       %s\n", file_list[j]);
+                        }
+                        goto error_exit;
+                    }
+                    else
+                    {
+                        gossip_err("Error: invalid tab file entry: %s\n",
+                                    tmp_ent->mnt_fsname);
+                        gossip_err("Error: offending tab file: %s\n",
+                                    targetfile);
+                        goto error_exit;
+                    }
                 }
 
                 /* find a reference point in the string */
@@ -393,6 +429,23 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
                     goto error_exit;
                 }
             }
+
+            /* find out if a particular flow protocol was specified */
+            current_tab->mntent_array[i].default_num_dfiles = 0;
+            cp = hasmntopt(tmp_ent, "num_dfiles");
+            if (cp)
+            {
+                ret = parse_num_dfiles_string(
+                    cp,
+                    &(current_tab->mntent_array[i].default_num_dfiles));
+
+                if (ret < 0)
+                {
+                    goto error_exit;
+                }
+            }
+
+            /* Loop counter increment */
             i++;
         }
     }
@@ -530,6 +583,7 @@ int PVFS_util_add_dynamic_mntent(struct PVFS_sys_mntent *mntent)
             }
         }
 
+#if 0
         /* check the dynamic region if we haven't found a match yet */
         for(j = 0; j < s_stat_tab_array[
                 PVFS2_DYNAMIC_TAB_INDEX].mntent_count; j++)
@@ -537,17 +591,20 @@ int PVFS_util_add_dynamic_mntent(struct PVFS_sys_mntent *mntent)
             current_mnt = &(s_stat_tab_array[PVFS2_DYNAMIC_TAB_INDEX].
                             mntent_array[j]);
 
-            if (current_mnt->fs_id == mntent->fs_id)
+            if ((current_mnt->fs_id == mntent->fs_id) &&
+                (strcmp(current_mnt->pvfs_config_servers[0],
+                        mntent->pvfs_config_servers[0]) != 0))
             {
-                gossip_debug(
-                    GOSSIP_CLIENT_DEBUG, "* File system %d already "
-                    "mounted on %s already exists [dynamic]\n",
-                    mntent->fs_id, current_mnt->mnt_dir);
-
+                gossip_err("Error: FS with id %d is already mounted using"
+                           " a different config server.\n", (int)mntent->fs_id); 
+                gossip_err("Error: This could indicate that a duplicate fsid"
+                           " is being used.\n");
+                gossip_err("Error: Please check your server configuration.\n");
                 gen_mutex_unlock(&s_stat_tab_mutex);
-                return -PVFS_EEXIST;
+                return -PVFS_ENXIO;
             }
         }
+#endif
 
         /* copy the mntent to our table in the dynamic tab area */
         new_index = s_stat_tab_array[
@@ -639,7 +696,8 @@ int PVFS_util_remove_internal_mntent(
             for(j = 0; j < s_stat_tab_array[i].mntent_count; j++)
             {
                 current_mnt = &(s_stat_tab_array[i].mntent_array[j]);
-                if (current_mnt->fs_id == mntent->fs_id)
+                if ((current_mnt->fs_id == mntent->fs_id)
+                    && (strcmp(current_mnt->mnt_dir, mntent->mnt_dir) == 0))
                 {
                     found_index = i;
                     found = 1;
@@ -700,7 +758,8 @@ int PVFS_util_remove_internal_mntent(
             {
                 current_mnt = &s_stat_tab_array[found_index].mntent_array[i];
 
-                if (current_mnt->fs_id == mntent->fs_id)
+                if ((current_mnt->fs_id == mntent->fs_id)
+                    && (strcmp(current_mnt->mnt_dir, mntent->mnt_dir) == 0))
                 {
                     PVFS_util_free_mntent(current_mnt);
                     continue;
@@ -735,10 +794,45 @@ int PVFS_util_remove_internal_mntent(
     return ret;
 }
 
+/*
+ * PVFS_util_get_mntent_copy()
+ *
+ * Given a pointer to a valid mount entry, out_mntent, copy the contents of
+ * the mount entry  for fs_id into out_mntent.
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
+int PVFS_util_get_mntent_copy(PVFS_fs_id fs_id,
+                              struct PVFS_sys_mntent* out_mntent)
+{
+    int i = 0;
+
+    /* Search for mntent by fsid */
+    gen_mutex_lock(&s_stat_tab_mutex);
+    for(i = 0; i < s_stat_tab_count; i++)
+    {
+        int j;
+        for(j = 0; j < s_stat_tab_array[i].mntent_count; j++)
+        {
+            struct PVFS_sys_mntent* mnt_iter;
+            mnt_iter = &(s_stat_tab_array[i].mntent_array[j]);
+
+            if (mnt_iter->fs_id == fs_id)
+            {
+                PVFS_util_copy_mntent(out_mntent, mnt_iter);
+                gen_mutex_unlock(&s_stat_tab_mutex);
+                return 0;
+            }
+        }
+    }
+    gen_mutex_unlock(&s_stat_tab_mutex);
+    return -PVFS_EINVAL;
+}
+
 /* PVFS_util_resolve()
  *
  * given a local path of a file that resides on a pvfs2 volume,
- * determine what the fsid and fs relative path is
+ * determine what the fsid and fs relative path is.  
  *
  * returns 0 on succees, -PVFS_error on failure
  */
@@ -748,64 +842,82 @@ int PVFS_util_resolve(
     char* out_fs_path,
     int out_fs_path_max)
 {
-    int i = 0, j = 0;
-    int ret = -PVFS_EINVAL;
+    int ret = -1;
+    char* tmp_path = NULL;
+    char* parent_path = NULL;
+    int base_len = 0;
 
-    gen_mutex_lock(&s_stat_tab_mutex);
-
-    for(i=0; i < s_stat_tab_count; i++)
+    /* the most common case first; just try to resolve the path that we
+     * were given
+     */
+    ret = PINT_util_resolve_absolute(local_path, out_fs_id, out_fs_path,
+        out_fs_path_max);
+    if(ret == 0)
     {
-        for(j=0; j<s_stat_tab_array[i].mntent_count; j++)
+        /* done */
+        return(0);
+    }
+    if(ret == -PVFS_ENOENT)
+    {
+        /* if the path wasn't found, try canonicalizing the path in case it
+         * refers to a relative path on a mounted volume or contains symlinks
+         */
+        tmp_path = (char*)malloc(PVFS_NAME_MAX*sizeof(char));
+        if(!tmp_path)
         {
-            ret = PINT_remove_dir_prefix(
-                local_path, s_stat_tab_array[i].mntent_array[j].mnt_dir,
-                out_fs_path, out_fs_path_max);
-            if(ret == 0)
-            {
-                *out_fs_id = s_stat_tab_array[i].mntent_array[j].fs_id;
-                if(*out_fs_id == PVFS_FS_ID_NULL)
-                {
-                    gossip_err("Error: %s resides on a PVFS2 file system "
-                    "that has not yet been initialized.\n", local_path);
-
-                    gen_mutex_unlock(&s_stat_tab_mutex);
-                    return(-PVFS_ENXIO);
-                }
-                gen_mutex_unlock(&s_stat_tab_mutex);
-                return(0);
-            }
+            return(-PVFS_ENOMEM);
         }
+        memset(tmp_path, 0, PVFS_NAME_MAX*sizeof(char));
+        ret = PINT_realpath(local_path, tmp_path, (PVFS_NAME_MAX-1));
+        if(ret == -PVFS_EINVAL)
+        {
+            /* one more try; canonicalize the parent in case this function
+             * is called before object creation; the basename
+             * doesn't yet exist but we still need to find the PVFS volume
+             */
+            parent_path = (char*)malloc(PVFS_NAME_MAX*sizeof(char));
+            if(!parent_path)
+            {
+                free(tmp_path);
+                return(-PVFS_ENOMEM);
+            }
+            /* find size of basename so we can reserve space for it */
+            /* note: basename() and dirname() modifiy args, thus the strcpy */
+            strcpy(parent_path, local_path);
+            base_len = strlen(basename(parent_path));
+            strcpy(parent_path, local_path);
+            ret = PINT_realpath(dirname(parent_path), tmp_path,
+                (PVFS_NAME_MAX-base_len-2));
+            if(ret < 0)
+            {
+                free(tmp_path);
+                free(parent_path);
+                /* last chance failed; this is not a valid pvfs2 path */
+                return(-PVFS_ENOENT);
+            }
+            /* glue the basename back on */
+            strcpy(parent_path, local_path);
+            strcat(tmp_path, "/");
+            strcat(tmp_path, basename(parent_path));
+            free(parent_path);
+        }
+        else if(ret < 0)
+        {
+            /* first canonicalize failed; this is not a valid pvfs2 path */
+            free(tmp_path);
+            return(-PVFS_ENOENT);
+        }
+
+        ret = PINT_util_resolve_absolute(tmp_path, out_fs_id, out_fs_path,
+            out_fs_path_max);
+        free(tmp_path);
+
+        /* fall through and preserve "ret" to be returned */
     }
 
-    /* check the dynamic tab area if we haven't resolved anything yet */
-    for(j = 0; j < s_stat_tab_array[
-            PVFS2_DYNAMIC_TAB_INDEX].mntent_count; j++)
-    {
-        ret = PINT_remove_dir_prefix(
-            local_path, s_stat_tab_array[
-                PVFS2_DYNAMIC_TAB_INDEX].mntent_array[j].mnt_dir,
-            out_fs_path, out_fs_path_max);
-        if (ret == 0)
-        {
-            *out_fs_id = s_stat_tab_array[
-                PVFS2_DYNAMIC_TAB_INDEX].mntent_array[j].fs_id;
-            if(*out_fs_id == PVFS_FS_ID_NULL)
-            {
-                gossip_err("Error: %s resides on a PVFS2 file system "
-                           "that has not yet been initialized.\n",
-                           local_path);
-
-                gen_mutex_unlock(&s_stat_tab_mutex);
-                return(-PVFS_ENXIO);
-            }
-            gen_mutex_unlock(&s_stat_tab_mutex);
-            return(0);
-        }
-    }
-
-    gen_mutex_unlock(&s_stat_tab_mutex);
-    return(-PVFS_ENOENT);
+    return(ret);
 }
+
 
 /* PVFS_util_init_defaults()
  *
@@ -1015,11 +1127,7 @@ static int parse_flowproto_string(
         comma[0] = '\0';
     }
 
-    if (!strcmp(flow, "bmi_trove"))
-    {
-        *flowproto = FLOWPROTO_BMI_TROVE;
-    }
-    else if (!strcmp(flow, "dump_offsets"))
+    if (!strcmp(flow, "dump_offsets"))
     {
         *flowproto = FLOWPROTO_DUMP_OFFSETS;
     }
@@ -1142,6 +1250,7 @@ int PVFS_util_copy_mntent(
         dest_mntent->flowproto = src_mntent->flowproto;
         dest_mntent->encoding = src_mntent->encoding;
         dest_mntent->fs_id = src_mntent->fs_id;
+        dest_mntent->default_num_dfiles = src_mntent->default_num_dfiles;
     }
     return 0;
 
@@ -1288,6 +1397,207 @@ void PINT_release_pvfstab(void)
     gen_mutex_unlock(&s_stat_tab_mutex);
 }
 
+inline uint32_t PVFS_util_sys_to_object_attr_mask(
+    uint32_t sys_attrmask)
+{
+
+    /*
+      adjust parameters as necessary; what's happening here
+      is that we're converting sys_attr masks to obj_attr masks
+      before passing the getattr request to the server.
+    */
+    uint32_t attrmask = 0;
+    if (sys_attrmask & PVFS_ATTR_SYS_SIZE)
+    {
+        /* need datafile handles and distribution in order to get 
+         * datafile handles and know what function to call to get
+         * the file size.
+         */
+        attrmask |= (PVFS_ATTR_META_ALL | PVFS_ATTR_DATA_SIZE);
+    }
+
+    if (sys_attrmask & PVFS_ATTR_SYS_DFILE_COUNT)
+    {
+        attrmask |= PVFS_ATTR_META_DFILES;
+    }
+
+    if (sys_attrmask & PVFS_ATTR_SYS_LNK_TARGET)
+    {
+        attrmask |= PVFS_ATTR_SYMLNK_TARGET;
+    }
+
+    gossip_debug(GOSSIP_GETATTR_DEBUG,
+                 "attrmask being passed to server: ");
+    PINT_attrmask_print(GOSSIP_GETATTR_DEBUG, attrmask);
+
+    return attrmask;
+}
+
+inline uint32_t PVFS_util_object_to_sys_attr_mask( 
+    uint32_t obj_mask)
+{
+    int sys_mask = 0;
+
+    if (obj_mask & PVFS_ATTR_COMMON_UID)
+    {
+        sys_mask |= PVFS_ATTR_SYS_UID;
+    }
+    if (obj_mask & PVFS_ATTR_COMMON_GID)
+    {
+        sys_mask |= PVFS_ATTR_SYS_GID;
+    }
+    if (obj_mask & PVFS_ATTR_COMMON_PERM)
+    {
+        sys_mask |= PVFS_ATTR_SYS_PERM;
+    }
+    if (obj_mask & PVFS_ATTR_COMMON_ATIME)
+    {
+        sys_mask |= PVFS_ATTR_SYS_ATIME;
+    }
+    if (obj_mask & PVFS_ATTR_COMMON_CTIME)
+    {
+        sys_mask |= PVFS_ATTR_SYS_CTIME;
+    }
+    if (obj_mask & PVFS_ATTR_COMMON_MTIME)
+    {
+        sys_mask |= PVFS_ATTR_SYS_MTIME;
+    }
+    if (obj_mask & PVFS_ATTR_COMMON_TYPE)
+    {
+        sys_mask |= PVFS_ATTR_SYS_TYPE;
+    }
+    if (obj_mask & PVFS_ATTR_DATA_SIZE)
+    {
+        sys_mask |= PVFS_ATTR_DATA_SIZE;
+    }
+    if (obj_mask & PVFS_ATTR_SYMLNK_TARGET)
+    {
+        sys_mask |= PVFS_ATTR_SYS_LNK_TARGET;
+    }
+    return sys_mask;
+}
+
+/*
+ * Pull out the wire encoding specified as a mount option in the tab
+ * file.
+ *
+ * Input string is not modified; result goes into et.
+ *
+ * Returns 0 if all okay.
+ */
+static int parse_num_dfiles_string(const char* cp, int* num_dfiles)
+{
+    int parsed_value = 0;
+    char* end_ptr = NULL;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: input is %s\n",
+                 __func__, cp);
+    
+    cp += strlen("num_dfiles");
+
+    /* Skip optional spacing */
+    for (; isspace(*cp); cp++);
+    
+    if (*cp != '=')
+    {
+        gossip_err("Error: %s: malformed num_dfiles option in tab file.\n",
+                   __func__);
+        return -PVFS_EINVAL;
+    }
+    
+    /* Skip optional spacing */
+    for (++cp; isspace(*cp); cp++);
+
+    parsed_value = strtol(cp, &end_ptr, 10);
+
+    /* If a numerica value was found, continue
+       else, report an error */
+    if (end_ptr != cp)
+    {
+        *num_dfiles = parsed_value;
+    }
+    else
+    {
+        gossip_err("Error: %s: malformed num_dfiles option in tab file.\n",
+                   __func__);
+        return -PVFS_EINVAL;
+    }
+
+    return 0;
+}
+
+/* PINT_util_resolve_absolute()
+ *
+ * given a local path of a file that may reside on a pvfs2 volume,
+ * determine what the fsid and fs relative path is. Makes no attempt
+ * to canonicalize the path.
+ *
+ * returns 0 on succees, -PVFS_error on failure
+ */
+static int PINT_util_resolve_absolute(
+    const char* local_path,
+    PVFS_fs_id* out_fs_id,
+    char* out_fs_path,
+    int out_fs_path_max)
+{
+    int i = 0, j = 0;
+    int ret = -PVFS_EINVAL;
+
+    gen_mutex_lock(&s_stat_tab_mutex);
+
+    for(i=0; i < s_stat_tab_count; i++)
+    {
+        for(j=0; j<s_stat_tab_array[i].mntent_count; j++)
+        {
+            ret = PINT_remove_dir_prefix(
+                local_path, s_stat_tab_array[i].mntent_array[j].mnt_dir,
+                out_fs_path, out_fs_path_max);
+            if(ret == 0)
+            {
+                *out_fs_id = s_stat_tab_array[i].mntent_array[j].fs_id;
+                if(*out_fs_id == PVFS_FS_ID_NULL)
+                {
+                    gossip_err("Error: %s resides on a PVFS2 file system "
+                    "that has not yet been initialized.\n", local_path);
+
+                    gen_mutex_unlock(&s_stat_tab_mutex);
+                    return(-PVFS_ENXIO);
+                }
+                gen_mutex_unlock(&s_stat_tab_mutex);
+                return(0);
+            }
+        }
+    }
+
+    /* check the dynamic tab area if we haven't resolved anything yet */
+    for(j = 0; j < s_stat_tab_array[
+            PVFS2_DYNAMIC_TAB_INDEX].mntent_count; j++)
+    {
+        ret = PINT_remove_dir_prefix(
+            local_path, s_stat_tab_array[
+                PVFS2_DYNAMIC_TAB_INDEX].mntent_array[j].mnt_dir,
+            out_fs_path, out_fs_path_max);
+        if (ret == 0)
+        {
+            *out_fs_id = s_stat_tab_array[
+                PVFS2_DYNAMIC_TAB_INDEX].mntent_array[j].fs_id;
+            if(*out_fs_id == PVFS_FS_ID_NULL)
+            {
+                gossip_err("Error: %s resides on a PVFS2 file system "
+                           "that has not yet been initialized.\n",
+                           local_path);
+
+                gen_mutex_unlock(&s_stat_tab_mutex);
+                return(-PVFS_ENXIO);
+            }
+            gen_mutex_unlock(&s_stat_tab_mutex);
+            return(0);
+        }
+    }
+
+    gen_mutex_unlock(&s_stat_tab_mutex);
+    return(-PVFS_ENOENT);
+}
 /*
  * Local variables:
  *  c-indent-level: 4

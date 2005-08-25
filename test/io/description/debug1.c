@@ -42,7 +42,7 @@ PVFS_size exp2_offset[] =
 	18874368
 };
 
-PINT_Request_result exp[] =
+PINT_Request_result expected[] =
 {{
 	offset_array : &exp1_offset[0],
 	size_array : &exp1_size[0],
@@ -81,15 +81,15 @@ PINT_Request_result exp[] =
 	bytes : 2097152
 }};
 
-int request_debug()
+int request_debug(void)
 {
 	int i;
 	PINT_Request *r1;
 	PINT_Request *r2;
 	PINT_Request_state *rs1;
 	PINT_Request_state *rs2;
-	PINT_Request_file_data rf1;
-	PINT_Request_file_data rf2;
+	PINT_request_file_data rf1;
+	PINT_request_file_data rf2;
 	PINT_Request_result seg1;
 	PINT_Request_result seg2;
 
@@ -106,11 +106,11 @@ int request_debug()
 	PVFS_Request_indexed(1, &blocklength, &displacement, PVFS_BYTE, &r2);
 
 	/* set up two request states */
-	rs1 = PINT_New_request_state(r1);
-	rs2 = PINT_New_request_state(r2);
+	rs1 = PINT_new_request_state(r1);
+	rs2 = PINT_new_request_state(r2);
 
 	/* set up file data for first request */
-	PINT_dist_initialize();
+	PINT_dist_initialize(NULL);
 	rf1.server_nr = 0;
 	rf1.server_ct = 1;
 	rf1.fsize = 0;
@@ -164,13 +164,13 @@ int request_debug()
 		seg1.bytes = 0;
 		seg1.segs = 0;
 		/* process request */
-		retval = PINT_Process_request(rs1, NULL, &rf1, &seg1, PINT_SERVER);
+		retval = PINT_process_request(rs1, NULL, &rf1, &seg1, PINT_SERVER);
 
 		if(retval >= 0)
 		{
 			prtseg(&seg1,"Results obtained");
-			prtseg(&exp[i],"Results expected");
-			cmpseg(&seg1,&exp[i]);
+			prtseg(&expected[i],"Results expected");
+			cmpseg(&seg1,&expected[i]);
 		}
 
 		i++;
@@ -178,7 +178,7 @@ int request_debug()
 	} while(!PINT_REQUEST_DONE(rs1) && retval >= 0);
 	if(retval < 0)
 	{
-		fprintf(stderr, "Error: PINT_Process_request() failure.\n");
+		fprintf(stderr, "Error: PINT_process_request() failure.\n");
 		return(-1);
 	}
 	prtval(Ld(rf1.fsize),"final file size obtained");
@@ -196,13 +196,13 @@ int request_debug()
 		seg2.bytes = 0;
 		seg2.segs = 0;
 		/* process request */
-		retval = PINT_Process_request(rs2, NULL, &rf2, &seg2, PINT_SERVER);
+		retval = PINT_process_request(rs2, NULL, &rf2, &seg2, PINT_SERVER);
 
 		if(retval >= 0)
 		{
 			prtseg(&seg2,"Results obtained");
-			prtseg(&exp[i],"Results expected");
-			cmpseg(&seg2,&exp[i]);
+			prtseg(&expected[i],"Results expected");
+			cmpseg(&seg2,&expected[i]);
 		}
 
 		i++;
@@ -211,7 +211,7 @@ int request_debug()
 	
 	if(retval < 0)
 	{
-		fprintf(stderr, "Error: PINT_Process_request() failure.\n");
+		fprintf(stderr, "Error: PINT_process_request() failure.\n");
 		return(-1);
 	}
 	prtval(Ld(rf2.fsize),"final file size obtained");

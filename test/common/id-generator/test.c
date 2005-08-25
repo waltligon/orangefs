@@ -51,8 +51,8 @@ int main(int argc, char **argv)	{
 	my_example.y = 2;
 	my_example.z = 3;
 	
-	ret = id_gen_fast_register(&my_handle, &my_example);
-	if(ret < 0)
+	id_gen_fast_register(&my_handle, &my_example);
+	if(my_handle == 0)
 	{
 		printf("register failed.\n");
 		exit(0);

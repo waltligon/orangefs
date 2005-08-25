@@ -11,6 +11,38 @@
 #include "pvfs2-storage.h"
 #include "pint-distribution.h"
 
+/* internal attribute masks, common to all obj types */
+#define PVFS_ATTR_COMMON_UID   (1 << 0)
+#define PVFS_ATTR_COMMON_GID   (1 << 1)
+#define PVFS_ATTR_COMMON_PERM  (1 << 2)
+#define PVFS_ATTR_COMMON_ATIME (1 << 3)
+#define PVFS_ATTR_COMMON_CTIME (1 << 4)
+#define PVFS_ATTR_COMMON_MTIME (1 << 5)
+#define PVFS_ATTR_COMMON_TYPE  (1 << 6)
+#define PVFS_ATTR_COMMON_ALL                       \
+(PVFS_ATTR_COMMON_UID   | PVFS_ATTR_COMMON_GID   | \
+ PVFS_ATTR_COMMON_PERM  | PVFS_ATTR_COMMON_ATIME | \
+ PVFS_ATTR_COMMON_CTIME | PVFS_ATTR_COMMON_MTIME | \
+ PVFS_ATTR_COMMON_TYPE)
+
+/* internal attribute masks for metadata objects */
+#define PVFS_ATTR_META_DIST    (1 << 10)
+#define PVFS_ATTR_META_DFILES  (1 << 11)
+#define PVFS_ATTR_META_ALL \
+(PVFS_ATTR_META_DIST | PVFS_ATTR_META_DFILES)
+
+/* internal attribute masks for datafile objects */
+#define PVFS_ATTR_DATA_SIZE            (1 << 15)
+#define PVFS_ATTR_DATA_ALL   PVFS_ATTR_DATA_SIZE
+
+/* internal attribute masks for symlink objects */
+#define PVFS_ATTR_SYMLNK_TARGET            (1 << 18)
+#define PVFS_ATTR_SYMLNK_ALL PVFS_ATTR_SYMLNK_TARGET
+
+/* internal attribute masks for directory objects */
+#define PVFS_ATTR_DIR_DIRENT_COUNT         (1 << 19)
+#define PVFS_ATTR_DIR_ALL PVFS_ATTR_DIR_DIRENT_COUNT
+
 /* attributes specific to metadata objects */
 struct PVFS_metafile_attr_s
 {
@@ -58,9 +90,10 @@ endecode_fields_1(PVFS_datafile_attr, PVFS_size, size)
 /* attributes specific to directory objects */
 struct PVFS_directory_attr_s
 {
-    /* undefined */
+    PVFS_size dirent_count;
 };
 typedef struct PVFS_directory_attr_s PVFS_directory_attr;
+endecode_fields_1(PVFS_directory_attr, PVFS_size, dirent_count)
 
 /* attributes specific to symlinks */
 struct PVFS_symlink_attr_s
@@ -115,6 +148,8 @@ typedef struct PVFS_object_attr PVFS_object_attr;
 	encode_PVFS_datafile_attr(pptr, &(x)->u.data); \
     if ((x)->mask & PVFS_ATTR_SYMLNK_TARGET) \
 	encode_PVFS_symlink_attr(pptr, &(x)->u.sym); \
+    if ((x)->mask & PVFS_ATTR_DIR_DIRENT_COUNT) \
+	encode_PVFS_directory_attr(pptr, &(x)->u.dir); \
 } while (0)
 #define decode_PVFS_object_attr(pptr,x) do { \
     decode_PVFS_uid(pptr, &(x)->owner); \
@@ -134,12 +169,18 @@ typedef struct PVFS_object_attr PVFS_object_attr;
 	decode_PVFS_datafile_attr(pptr, &(x)->u.data); \
     if ((x)->mask & PVFS_ATTR_SYMLNK_TARGET) \
 	decode_PVFS_symlink_attr(pptr, &(x)->u.sym); \
+    if ((x)->mask & PVFS_ATTR_DIR_DIRENT_COUNT) \
+	decode_PVFS_directory_attr(pptr, &(x)->u.dir); \
 } while (0)
 #endif
-/* could have one each of PVFS_Dist, dfile_array, symlink_target */
-#define extra_size_PVFS_object_attr (PVFS_REQ_LIMIT_DIST_BYTES + \
-  PVFS_REQ_LIMIT_DFILE_COUNT * sizeof(PVFS_handle) + \
-  PVFS_REQ_LIMIT_PATH_NAME_BYTES)
+/* attr buffer needs room for larger of symlink path or meta fields: an attrib
+ * structure can never hold information for both a symlink and a metafile  */
+#define extra_size_PVFS_object_attr_meta (PVFS_REQ_LIMIT_DIST_BYTES + \
+  PVFS_REQ_LIMIT_DFILE_COUNT * sizeof(PVFS_handle))
+#define extra_size_PVFS_object_attr_symlink (PVFS_REQ_LIMIT_PATH_NAME_BYTES)
+#define extra_size_PVFS_object_attr ((extra_size_PVFS_object_attr_meta > \
+ extra_size_PVFS_object_attr_symlink) ? extra_size_PVFS_object_attr_meta : \
+ extra_size_PVFS_object_attr_symlink)
 
 #endif /* __PVFS2_ATTR_H */
 

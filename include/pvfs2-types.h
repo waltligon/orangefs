@@ -57,10 +57,9 @@ typedef int32_t PVFS_context_id;
 
 enum PVFS_flowproto_type
 {
-    FLOWPROTO_BMI_TROVE = 1,
-    FLOWPROTO_DUMP_OFFSETS = 2,
-    FLOWPROTO_BMI_CACHE = 3,
-    FLOWPROTO_MULTIQUEUE = 4
+    FLOWPROTO_DUMP_OFFSETS = 1,
+    FLOWPROTO_BMI_CACHE = 2,
+    FLOWPROTO_MULTIQUEUE = 3
 };
 #define FLOWPROTO_DEFAULT FLOWPROTO_MULTIQUEUE
 
@@ -158,6 +157,23 @@ endecode_fields_1a(
 #define PVFS_U_EXECUTE (1 << 6)
 #define PVFS_U_WRITE   (1 << 7)
 #define PVFS_U_READ    (1 << 8)
+/* no PVFS_U_VTX (sticky bit) */
+#define PVFS_G_SGID    (1 << 10)
+/* no PVFS_U_SGID */
+
+/* valid permission mask */
+#define PVFS_PERM_VALID \
+(PVFS_O_EXECUTE | PVFS_O_WRITE | PVFS_O_READ | PVFS_G_EXECUTE | \
+ PVFS_G_WRITE | PVFS_G_READ | PVFS_U_EXECUTE | PVFS_U_WRITE | \
+ PVFS_U_READ | PVFS_G_SGID)
+
+#define PVFS_USER_ALL  (PVFS_U_EXECUTE|PVFS_U_WRITE|PVFS_U_READ)
+#define PVFS_GROUP_ALL (PVFS_G_EXECUTE|PVFS_G_WRITE|PVFS_G_READ)
+#define PVFS_OTHER_ALL (PVFS_O_EXECUTE|PVFS_O_WRITE|PVFS_O_READ)
+
+#define PVFS_ALL_EXECUTE (PVFS_U_EXECUTE|PVFS_G_EXECUTE|PVFS_O_EXECUTE)
+#define PVFS_ALL_WRITE   (PVFS_U_WRITE|PVFS_G_WRITE|PVFS_O_WRITE)
+#define PVFS_ALL_READ    (PVFS_U_READ|PVFS_G_READ|PVFS_O_READ)
 
 /** Object and attribute types. */
 typedef enum
@@ -173,53 +189,61 @@ typedef enum
 #define decode_PVFS_ds_type decode_enum
 #define encode_PVFS_ds_type encode_enum
 
-/* internal attribute masks, common to all obj types */
-#define PVFS_ATTR_COMMON_UID   (1 << 0)
-#define PVFS_ATTR_COMMON_GID   (1 << 1)
-#define PVFS_ATTR_COMMON_PERM  (1 << 2)
-#define PVFS_ATTR_COMMON_ATIME (1 << 3)
-#define PVFS_ATTR_COMMON_CTIME (1 << 4)
-#define PVFS_ATTR_COMMON_MTIME (1 << 5)
-#define PVFS_ATTR_COMMON_TYPE  (1 << 6)
-#define PVFS_ATTR_COMMON_ALL                       \
-(PVFS_ATTR_COMMON_UID   | PVFS_ATTR_COMMON_GID   | \
- PVFS_ATTR_COMMON_PERM  | PVFS_ATTR_COMMON_ATIME | \
- PVFS_ATTR_COMMON_CTIME | PVFS_ATTR_COMMON_MTIME | \
- PVFS_ATTR_COMMON_TYPE)
-
-/* internal attribute masks for metadata objects */
-#define PVFS_ATTR_META_DIST    (1 << 10)
-#define PVFS_ATTR_META_DFILES  (1 << 11)
-#define PVFS_ATTR_META_ALL \
-(PVFS_ATTR_META_DIST | PVFS_ATTR_META_DFILES)
-
-/* internal attribute masks for datafile objects */
-#define PVFS_ATTR_DATA_SIZE            (1 << 15)
-#define PVFS_ATTR_DATA_ALL   PVFS_ATTR_DATA_SIZE
-
-/* internal attribute masks for symlink objects */
-#define PVFS_ATTR_SYMLNK_TARGET            (1 << 18)
-#define PVFS_ATTR_SYMLNK_ALL PVFS_ATTR_SYMLNK_TARGET
+/* Key/Value Pairs */
+/* Extended attributes are stored on objects with */
+/* a Key/Value pair.  A key or a value is simply */
+/* a byte string of some length.  Keys are normally */
+/* strings, and thus are printable ASCII and NULL */
+/* terminated.  Values are any sequence of bytes */
+/* and are user interpreted.  This struct represents */
+/* EITHER a key or a value.  This struct is IDENTICAL */
+/* to a TROVE_keyval_s defined in src/io/trove/trove-types.h */
+/* but is duplicated here to maintain separation between */
+/* the Rrove implementation and PVFS2.  This struct should */
+/* be used everywhere but within Trove. WBL 6/2005*/
+typedef struct PVFS_ds_keyval_s
+{
+        void *buffer;      /* points to actual key or value */
+        int32_t buffer_sz; /* the size of the area pointed to by buffer */
+        int32_t read_sz;   /* when reading, the actual number of bytes read */
+                           /* only valid after a read */
+} PVFS_ds_keyval;
 
 /* attribute masks used by system interface callers */
 #define PVFS_ATTR_SYS_SIZE                  (1 << 20)
 #define PVFS_ATTR_SYS_LNK_TARGET            (1 << 24)
 #define PVFS_ATTR_SYS_DFILE_COUNT           (1 << 25)
-#define PVFS_ATTR_SYS_UID        PVFS_ATTR_COMMON_UID
-#define PVFS_ATTR_SYS_GID        PVFS_ATTR_COMMON_GID
-#define PVFS_ATTR_SYS_PERM       PVFS_ATTR_COMMON_PERM
-#define PVFS_ATTR_SYS_ATIME      PVFS_ATTR_COMMON_ATIME
-#define PVFS_ATTR_SYS_CTIME      PVFS_ATTR_COMMON_CTIME
-#define PVFS_ATTR_SYS_MTIME      PVFS_ATTR_COMMON_MTIME
-#define PVFS_ATTR_SYS_TYPE       PVFS_ATTR_COMMON_TYPE
+#define PVFS_ATTR_SYS_DIRENT_COUNT          (1 << 26)
+#define PVFS_ATTR_SYS_UID                   (1 << 0)
+#define PVFS_ATTR_SYS_GID                   (1 << 1)
+#define PVFS_ATTR_SYS_PERM                  (1 << 2)
+#define PVFS_ATTR_SYS_ATIME                 (1 << 3)
+#define PVFS_ATTR_SYS_CTIME                 (1 << 4)
+#define PVFS_ATTR_SYS_MTIME                 (1 << 5)
+#define PVFS_ATTR_SYS_TYPE                  (1 << 6)
+#define PVFS_ATTR_SYS_COMMON_ALL \
+(PVFS_ATTR_SYS_UID   | PVFS_ATTR_SYS_GID   | \
+ PVFS_ATTR_SYS_PERM  | PVFS_ATTR_SYS_ATIME | \
+ PVFS_ATTR_SYS_CTIME | PVFS_ATTR_SYS_MTIME | \
+ PVFS_ATTR_SYS_TYPE)
+
 #define PVFS_ATTR_SYS_ALL                    \
-(PVFS_ATTR_COMMON_ALL | PVFS_ATTR_SYS_SIZE | \
- PVFS_ATTR_SYS_LNK_TARGET | PVFS_ATTR_SYS_DFILE_COUNT)
+(PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_SIZE | \
+ PVFS_ATTR_SYS_LNK_TARGET | PVFS_ATTR_SYS_DFILE_COUNT | \
+ PVFS_ATTR_SYS_DIRENT_COUNT)
 #define PVFS_ATTR_SYS_ALL_NOSIZE                   \
-(PVFS_ATTR_COMMON_ALL | PVFS_ATTR_SYS_LNK_TARGET | \
- PVFS_ATTR_SYS_DFILE_COUNT)
+(PVFS_ATTR_SYS_COMMON_ALL | PVFS_ATTR_SYS_LNK_TARGET | \
+ PVFS_ATTR_SYS_DFILE_COUNT | PVFS_ATTR_SYS_DIRENT_COUNT)
 #define PVFS_ATTR_SYS_ALL_SETABLE \
-(PVFS_ATTR_COMMON_ALL-PVFS_ATTR_COMMON_TYPE)
+(PVFS_ATTR_SYS_COMMON_ALL-PVFS_ATTR_SYS_TYPE)
+
+/* Extended attribute flags */
+#define PVFS_XATTR_CREATE  0x1
+#define PVFS_XATTR_REPLACE 0x2
+
+/* Extended attribute flags */
+#define PVFS_XATTR_CREATE  0x1
+#define PVFS_XATTR_REPLACE 0x2
 
 /** statfs and misc. server statistic information. */
 typedef struct
@@ -278,6 +302,23 @@ endecode_fields_2(
 /* max len of individual path element */
 #define PVFS_SEGMENT_MAX         128
 
+/* max extended attribute name len as imposed by the VFS and exploited for the
+ * upcall request types */
+#define PVFS_MAX_XATTR_NAMELEN   256 /* Not the same as XATTR_NAME_MAX defined
+                                        by <linux/xattr.h> */
+#define PVFS_MAX_XATTR_VALUELEN  256 /* Not the same as XATTR_SIZE_MAX defined
+                                        by <linux/xattr.h> */ 
+#define PVFS_MAX_XATTR_LISTLEN   10    /* Not the same as XATTR_LIST_MAX
+                                          defined by <linux/xattr.h> */
+
+/* This structure is used by the VFS-client interaction alone */
+typedef struct {
+    char key[PVFS_MAX_XATTR_NAMELEN];
+    int  key_sz;
+    char val[PVFS_MAX_XATTR_VALUELEN];
+    int  val_sz;
+} PVFS_keyval_pair;
+
 /** Directory entry contents. */
 typedef struct
 {
@@ -301,7 +342,9 @@ enum PVFS_server_param
     PVFS_SERV_PARAM_MODE = 4,        /* change the current server mode */
     PVFS_SERV_PARAM_EVENT_ON = 5,    /* event logging on or off */
     PVFS_SERV_PARAM_EVENT_MASKS = 6, /* API masks for event logging */
-    PVFS_SERV_PARAM_LOG_EVENTS = 7   /* log events currently in ring buffer */
+    PVFS_SERV_PARAM_SYNC_META = 7,   /* metadata sync flags */
+    PVFS_SERV_PARAM_SYNC_DATA = 8,   /* file data sync flags */
+    PVFS_SERV_PARAM_LOG_EVENTS = 9   /* log events currently in ring buffer */
 };
 
 #define PVFS_SERVER_PARAM_COUNT 8
@@ -425,6 +468,10 @@ PVFS_error PVFS_get_errno_mapping(PVFS_error error);
 #define PVFS_ECANCEL    (1|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
 #define PVFS_EDEVINIT   (2|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
 #define PVFS_EDETAIL    (3|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
+#define PVFS_EHOSTNTFD  (4|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
+#define PVFS_EADDRNTFD  (5|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
+#define PVFS_ENORECVR   (6|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
+#define PVFS_ETRYAGAIN  (7|(PVFS_NON_ERRNO_ERROR_BIT|PVFS_ERROR_BIT))
 
 /* NOTE: PLEASE DO NOT ARBITRARILY ADD NEW ERRNO ERROR CODES!
  *
@@ -502,13 +549,21 @@ char *PINT_non_errno_strerror_mapping[] = {           \
     "Success", /* 0 */                                \
     "Operation cancelled (possibly due to timeout)",  \
     "Device initialization failed",                   \
-    "Detailed per-server errors are available"        \
+    "Detailed per-server errors are available",       \
+    "Host not found",                                 \
+    "Valid host name but no IP address found",        \
+    "Non recoverable error",                          \
+    "Try Again"                                       \
 };                                                    \
 PVFS_error PINT_non_errno_mapping[] = {               \
     0,     /* leave this one empty */                 \
     PVFS_ECANCEL,   /* 1 */                           \
     PVFS_EDEVINIT,  /* 2 */                           \
-    PVFS_EDETAIL    /* 3 */                           \
+    PVFS_EDETAIL,   /* 3 */                           \
+    PVFS_EHOSTNTFD, /* 4 */                           \
+    PVFS_EADDRNTFD, /* 5 */                           \
+    PVFS_ENORECVR,  /* 6 */                           \
+    PVFS_ETRYAGAIN  /* 7 */                           \
 }
 
 /*
@@ -596,9 +651,11 @@ enum PVFS_io_type
 #if (__WORDSIZE == 32)
 #  define Lu(x) (x)
 #  define Ld(x) (x)
+#  define SCANF_Ld "%Ld"
 #elif (__WORDSIZE == 64)
 #  define Lu(x) (unsigned long long)(x)
 #  define Ld(x) (long long)(x)
+#  define SCANF_Ld "%ld"
 #else
 /* If you see this, you can change the #if tests above to work around it. */
 #  error Unknown wordsize, perhaps your system headers are not POSIX

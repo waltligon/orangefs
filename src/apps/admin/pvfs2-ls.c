@@ -190,6 +190,7 @@ void print_entry_attr(
     char scratch_owner[16] = {0}, scratch_group[16] = {0};
     char scratch_size[16] = {0}, scratch_inode[16] = {0};
     char f_type = '-';
+    char group_x_char = '-';
 
     if (!opts->list_all && (entry_name[0] == '.'))
     {
@@ -271,6 +272,16 @@ void print_entry_attr(
         f_type =  'l';
     }
 
+    /* special case to set setgid display for groups if needed */
+    if(attr->perms & PVFS_G_SGID)
+    {
+        group_x_char = ((attr->perms & PVFS_G_EXECUTE) ? 's' : 'S');
+    }
+    else
+    {
+        group_x_char = ((attr->perms & PVFS_G_EXECUTE) ? 'x' : '-');
+    }
+
     snprintf(buf,128,"%s%c%c%c%c%c%c%c%c%c%c    1 %s %s %s "
              "%.4d-%.2d-%.2d %.2d:%.2d %s",
              inode,
@@ -280,7 +291,7 @@ void print_entry_attr(
              ((attr->perms & PVFS_U_EXECUTE) ? 'x' : '-'),
              ((attr->perms & PVFS_G_READ) ? 'r' : '-'),
              ((attr->perms & PVFS_G_WRITE) ? 'w' : '-'),
-             ((attr->perms & PVFS_G_EXECUTE) ? 'x' : '-'),
+             group_x_char,
              ((attr->perms & PVFS_O_READ) ? 'r' : '-'),
              ((attr->perms & PVFS_O_WRITE) ? 'w' : '-'),
              ((attr->perms & PVFS_O_EXECUTE) ? 'x' : '-'),
@@ -375,6 +386,7 @@ int do_list(
     struct options *opts)
 {
     int i = 0, printed_dot_info = 0;
+    int ret = -1;
     int pvfs_dirent_incount;
     char *name = NULL, *cur_file = NULL;
     PVFS_handle cur_handle;
@@ -391,11 +403,11 @@ int do_list(
     memset(&lk_response,0,sizeof(PVFS_sysresp_lookup));
     PVFS_util_gen_credentials(&credentials);
 
-    if (PVFS_sys_lookup(fs_id, name, &credentials,
-                        &lk_response, PVFS2_LOOKUP_LINK_NO_FOLLOW))
+    ret = PVFS_sys_lookup(fs_id, name, &credentials,
+                        &lk_response, PVFS2_LOOKUP_LINK_NO_FOLLOW);
+    if(ret < 0)
     {
-        fprintf(stderr, "%s: %s: No such file or directory\n",
-                process_name, name);
+        PVFS_perror("PVFS_sys_lookup", ret);
         return -1;
     }
 
@@ -447,11 +459,12 @@ int do_list(
     do
     {
         memset(&rd_response, 0, sizeof(PVFS_sysresp_readdir));
-        if (PVFS_sys_readdir(
+        ret = PVFS_sys_readdir(
                 ref, (!token ? PVFS_READDIR_START : token),
-                pvfs_dirent_incount, &credentials, &rd_response))
+                pvfs_dirent_incount, &credentials, &rd_response);
+        if(ret < 0)
         {
-            fprintf(stderr,"readdir failed\n");
+            PVFS_perror("PVFS_sys_readdir", ret);
             return -1;
         }
 

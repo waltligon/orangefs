@@ -124,7 +124,6 @@ static int server_post_unexpected_recv(job_status_s * js_p);
 static int server_parse_cmd_line_args(int argc, char **argv);
 static int server_state_machine_start(
     PINT_server_op *s_op, job_status_s *js_p);
-static void init_req_table(void);
 #ifdef __PVFS2_SEGV_BACKTRACE__
 static void bt_sighandler(int sig, siginfo_t *info, void *secret);
 #endif
@@ -133,7 +132,200 @@ static void write_pidfile(int fd);
 static void remove_pidfile(void);
 
 /* table of incoming request types and associated parameters */
-struct PINT_server_req_params PINT_server_req_table[PVFS_MAX_SERVER_OP+1];
+struct PINT_server_req_params PINT_server_req_table[] =
+{
+    {PVFS_SERV_INVALID,
+        "invalid",
+        PINT_SERVER_CHECK_INVALID,
+        PINT_SERVER_ATTRIBS_REQUIRED,
+        NULL},
+
+    {PVFS_SERV_CREATE,
+        "create",
+        PINT_SERVER_CHECK_NONE,
+        PINT_SERVER_ATTRIBS_REQUIRED,
+        &pvfs2_create_sm},
+
+    {PVFS_SERV_REMOVE,
+        "remove",
+        PINT_SERVER_CHECK_NONE,
+        PINT_SERVER_ATTRIBS_NOT_REQUIRED,
+        &pvfs2_remove_sm},
+
+    {PVFS_SERV_IO,
+        "io",
+        PINT_SERVER_CHECK_NONE,
+        PINT_SERVER_ATTRIBS_NOT_REQUIRED,
+        &pvfs2_io_sm},
+
+    {PVFS_SERV_GETATTR,
+        "getattr",
+        PINT_SERVER_CHECK_ATTR,
+        PINT_SERVER_ATTRIBS_NOT_REQUIRED,
+        &pvfs2_get_attr_sm},
+
+    {PVFS_SERV_SETATTR,
+        "setattr",
+        PINT_SERVER_CHECK_ATTR,
+        PINT_SERVER_ATTRIBS_NOT_REQUIRED,
+        &pvfs2_set_attr_sm},
+
+    {PVFS_SERV_LOOKUP_PATH,
+        "lookup_path",
+        PINT_SERVER_CHECK_NONE,
+        PINT_SERVER_ATTRIBS_REQUIRED,
+        &pvfs2_lookup_sm},
+
+    {PVFS_SERV_CRDIRENT,
+        "crdirent",
+        PINT_SERVER_CHECK_CRDIRENT,
+        PINT_SERVER_ATTRIBS_REQUIRED,
+        &pvfs2_crdirent_sm},
+
+    {PVFS_SERV_RMDIRENT,
+        "rmdirent",
+        PINT_SERVER_CHECK_WRITE,
+        PINT_SERVER_ATTRIBS_REQUIRED,
+        &pvfs2_rmdirent_sm},
+
+    {PVFS_SERV_CHDIRENT,
+        "chdirent",
+        PINT_SERVER_CHECK_WRITE,
+        PINT_SERVER_ATTRIBS_REQUIRED,
+        &pvfs2_chdirent_sm},
+
+    {PVFS_SERV_TRUNCATE,
+        "truncate",
+        PINT_SERVER_CHECK_NONE,
+        PINT_SERVER_ATTRIBS_NOT_REQUIRED,
+        &pvfs2_truncate_sm},
+
+    {PVFS_SERV_MKDIR,
+        "mkdir",
+        PINT_SERVER_CHECK_NONE,
+        PINT_SERVER_ATTRIBS_REQUIRED,
+        &pvfs2_mkdir_sm},
+
+    {PVFS_SERV_READDIR,
+        "readdir",
+        PINT_SERVER_CHECK_READ,
+        PINT_SERVER_ATTRIBS_REQUIRED,
+        &pvfs2_readdir_sm},
+
+    {PVFS_SERV_GETCONFIG,
+        "getconfig",
+        PINT_SERVER_CHECK_NONE,
+        PINT_SERVER_ATTRIBS_REQUIRED,
+        &pvfs2_get_config_sm},
+
+    {PVFS_SERV_WRITE_COMPLETION,
+        "write_completion",
+        PINT_SERVER_CHECK_INVALID,
+        PINT_SERVER_ATTRIBS_REQUIRED,
+        NULL},
+
+    {PVFS_SERV_FLUSH,
+        "flush",
+        PINT_SERVER_CHECK_NONE,
+        PINT_SERVER_ATTRIBS_NOT_REQUIRED,
+        &pvfs2_flush_sm},
+
+    {PVFS_SERV_MGMT_SETPARAM,
+        "mgmt_setparam",
+        PINT_SERVER_CHECK_NONE,
+        PINT_SERVER_ATTRIBS_REQUIRED,
+        &pvfs2_setparam_sm},
+
+    {PVFS_SERV_MGMT_NOOP,
+        "mgmt_noop",
+        PINT_SERVER_CHECK_NONE,
+        PINT_SERVER_ATTRIBS_REQUIRED,
+        &pvfs2_noop_sm},
+
+    {PVFS_SERV_STATFS,
+        "statfs",
+        PINT_SERVER_CHECK_NONE,
+        PINT_SERVER_ATTRIBS_REQUIRED,
+        &pvfs2_statfs_sm},
+
+    {PVFS_SERV_PERF_UPDATE,
+        "perf_update",
+        PINT_SERVER_CHECK_INVALID,
+        PINT_SERVER_ATTRIBS_REQUIRED,
+        &pvfs2_perf_update_sm},
+
+    {PVFS_SERV_MGMT_PERF_MON,
+        "mgmt_perf_mon",
+        PINT_SERVER_CHECK_NONE,
+        PINT_SERVER_ATTRIBS_REQUIRED,
+        &pvfs2_perf_mon_sm},
+
+    {PVFS_SERV_MGMT_ITERATE_HANDLES,
+        "mgmt_iterate_handles",
+        PINT_SERVER_CHECK_NONE,
+        PINT_SERVER_ATTRIBS_REQUIRED,
+        &pvfs2_iterate_handles_sm},
+
+    {PVFS_SERV_MGMT_DSPACE_INFO_LIST,
+        "mgmt_dspace_info_list",
+        PINT_SERVER_CHECK_NONE,
+        PINT_SERVER_ATTRIBS_REQUIRED,
+        NULL},
+
+    {PVFS_SERV_MGMT_EVENT_MON,
+        "mgmt_event_mon",
+        PINT_SERVER_CHECK_NONE,
+        PINT_SERVER_ATTRIBS_REQUIRED,
+        &pvfs2_event_mon_sm},
+
+    {PVFS_SERV_MGMT_REMOVE_OBJECT,
+        "mgmt-remove-object",
+        PINT_SERVER_CHECK_NONE,
+        PINT_SERVER_ATTRIBS_NOT_REQUIRED,
+        &pvfs2_mgmt_remove_object_sm},
+
+    {PVFS_SERV_MGMT_REMOVE_DIRENT,
+        "mgmt-remove-dirent",
+        PINT_SERVER_CHECK_NONE,
+        PINT_SERVER_ATTRIBS_NOT_REQUIRED,
+        &pvfs2_mgmt_remove_dirent_sm},
+
+    {PVFS_SERV_MGMT_GET_DIRDATA_HANDLE,
+        "mgmt-get-dirdata-handle",
+        PINT_SERVER_CHECK_NONE,
+        PINT_SERVER_ATTRIBS_NOT_REQUIRED,
+        &pvfs2_mgmt_get_dirdata_handle_sm},
+
+    {PVFS_SERV_JOB_TIMER,
+        "job_timer",
+        PINT_SERVER_CHECK_INVALID,
+        PINT_SERVER_ATTRIBS_REQUIRED,
+        &pvfs2_job_timer_sm},
+
+    {PVFS_SERV_PROTO_ERROR,
+        "proto_error",
+        PINT_SERVER_CHECK_INVALID,
+        PINT_SERVER_ATTRIBS_REQUIRED,
+        &pvfs2_proto_error_sm},
+
+    {PVFS_SERV_GETEATTR,
+        "geteattr",
+        PINT_SERVER_CHECK_ATTR,
+        PINT_SERVER_ATTRIBS_NOT_REQUIRED,
+        &pvfs2_get_eattr_sm},
+
+    {PVFS_SERV_SETEATTR,
+        "seteattr",
+        PINT_SERVER_CHECK_ATTR,
+        PINT_SERVER_ATTRIBS_NOT_REQUIRED,
+        &pvfs2_set_eattr_sm},
+
+    {PVFS_SERV_DELEATTR,
+        "deleattr",
+        PINT_SERVER_CHECK_ATTR,
+        PINT_SERVER_ATTRIBS_NOT_REQUIRED,
+        &pvfs2_del_eattr_sm}
+};
 
 int main(int argc, char **argv)
 {
@@ -141,8 +333,6 @@ int main(int argc, char **argv)
     char *fs_conf = NULL, *server_conf = NULL;
     PINT_server_op *tmp_op = NULL;
     uint64_t debug_mask = 0;
-
-    init_req_table();
 
 #ifdef WITH_MTRACE
     mtrace();
@@ -178,11 +368,11 @@ int main(int argc, char **argv)
     fs_conf = ((argc >= optind) ? argv[optind] : NULL);
     server_conf = ((argc >= (optind + 1)) ? argv[optind + 1] : NULL);
 
-    if (PINT_parse_config(&server_config, fs_conf, server_conf))
+    ret = PINT_parse_config(&server_config, fs_conf, server_conf);
+    if (ret < 0)
     {
-        gossip_err("Fatal Error: This server requires a valid "
-                   "configuration for operation.\nPlease check your "
-                   "configuration setting.  Server aborting.\n");
+        gossip_err("Error: Please check your config files.\n");  
+        gossip_err("Error: Server aborting.\n");
         goto server_shutdown;
     }
 
@@ -191,6 +381,7 @@ int main(int argc, char **argv)
     if (!PINT_config_is_valid_configuration(&server_config))
     {
         gossip_err("Error: Invalid configuration; aborting.\n");
+        ret = -PVFS_EINVAL;
         goto server_shutdown;
     }
 
@@ -205,14 +396,22 @@ int main(int argc, char **argv)
     if (s_server_options.server_remove_storage_space)
     {
         ret = PINT_config_pvfs2_rmspace(&server_config);
-        exit(ret);
+        if(ret < 0)
+        {
+            goto server_shutdown;
+        }
+        return(0);
     }
 
     /* create storage space and exit if requested */
     if (s_server_options.server_create_storage_space)
     {
         ret = PINT_config_pvfs2_mkspace(&server_config);
-        exit(ret);
+        if(ret < 0)
+        {
+            goto server_shutdown;
+        }
+        return(0);
     }
 
     server_job_id_array = (job_id_t *)
@@ -308,7 +507,7 @@ int main(int argc, char **argv)
         if (ret < 0)
         {
             gossip_lerr("pvfs2-server panic; main loop aborting\n");
-            exit(-1);
+            goto server_shutdown;
         }
 
         /*
@@ -384,8 +583,8 @@ int main(int argc, char **argv)
                      * put something here to make it exit for the
                      * moment.  -Phil
                      */
-                    gossip_lerr("Error: NOT HANDLED.\n");
-                    exit(1);
+                    gossip_lerr("Error: post unexpected failure not handled.\n");
+                    goto server_shutdown;
                 }
             }
         }
@@ -393,6 +592,9 @@ int main(int argc, char **argv)
 
   server_shutdown:
     server_shutdown(server_status_flag, ret, siglevel);
+    /* NOTE: the server_shutdown() function does not return; it always ends
+     * by calling exit.  This point in the code should never be reached.
+     */
     return -1;
 }
 
@@ -486,17 +688,30 @@ static int server_initialize(
         freopen("/dev/null", "w", stderr);
 
         assert(server_config.logfile != NULL);
-        if (gossip_enable_file(server_config.logfile, "w") < 0)
+        ret = gossip_enable_file(server_config.logfile, "w");
+        if (ret < 0)
         {
             gossip_lerr("error opening log file %s\n",
                         server_config.logfile);
-            exit(3);
+            return ret;
         }
+        /* log starting message again so it appears in log file, not just
+         * console
+         */
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+           "PVFS2 Server version %s starting.\n", PVFS2_VERSION);
     }
 
     return ret;
 }
 
+/* server_setup_process_environment()
+ *
+ * performs normal daemon initialization steps
+ *
+ * returns 0 on success, -PVFS_EINVAL on failure (details will be logged to
+ * gossip)
+ */
 static int server_setup_process_environment(int background)
 {
     pid_t new_pid = 0;
@@ -514,6 +729,7 @@ static int server_setup_process_environment(int background)
         {
             gossip_err("Failed to create pid file %s: %s\n",
                        s_server_options.pidfile, strerror(errno));
+            return(-PVFS_EINVAL);
         }
     }
 
@@ -521,7 +737,7 @@ static int server_setup_process_environment(int background)
     {
         gossip_lerr("cannot change working directory to \"/\" "
                     "(errno = %x). aborting.\n", errno);
-        exit(1);
+        return(-PVFS_EINVAL);
     }
 
     umask(0077);
@@ -533,7 +749,7 @@ static int server_setup_process_environment(int background)
         {
             gossip_lerr("error in fork() system call (errno = %x). "
                         "aborting.\n", errno);
-            exit(1);
+            return(-PVFS_EINVAL);
         }
         else if (new_pid > 0)
         {
@@ -545,7 +761,7 @@ static int server_setup_process_environment(int background)
         if (new_pid < 0)
         {
             gossip_lerr("error in setsid() system call.  aborting.\n");
-            exit(2);
+            return(-PVFS_EINVAL);
         }
     }
     if (pid_fd >= 0)
@@ -586,7 +802,7 @@ static int server_initialize_subsystems(
     char buf[16] = {0};
 
     /* Initialize distributions */
-    ret = PINT_dist_initialize();
+    ret = PINT_dist_initialize(0);
     if (ret < 0)
     {
         gossip_err("Error initializing distribution interface.\n");
@@ -967,11 +1183,11 @@ static int server_shutdown(
     if (siglevel == SIGSEGV)
     {
         gossip_err("SIGSEGV: skipping cleanup; exit now!\n");
-        exit(-1);
+        exit(EXIT_FAILURE);
     }
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "*** normal server shutdown in progress ***\n");
+                 "*** server shutdown in progress ***\n");
 
     if (status & SERVER_STATE_MACHINE_INIT)
     {
@@ -1096,7 +1312,11 @@ static int server_shutdown(
         free(server_job_status_array);
     }
 
-    exit((siglevel == 0) ? -ret : 0);
+    if(siglevel == 0 && ret != 0)
+    {
+        exit(EXIT_FAILURE);
+    }
+    exit(EXIT_SUCCESS);
 }
 
 static void server_sig_handler(int sig)
@@ -1215,6 +1435,11 @@ static int server_parse_cmd_line_args(int argc, char **argv)
             case 'p':
           do_pidfile:
                 s_server_options.pidfile = optarg;
+                if(optarg[0] != '/')
+                {
+                    gossip_err("Error: pidfile must be specified with an absolute path.\n");
+                    goto parse_cmd_line_args_failure;
+                }
                 break;
             case '?':
             case 'h':
@@ -1456,137 +1681,6 @@ int server_state_machine_complete(PINT_server_op *s_op)
     free(s_op);
 
     return 0;
-}
-
-/* init_req_table()
- *
- * used to initialize static table of server request types
- *
- * no return value
- */
-static void init_req_table(void)
-{
-    enum PVFS_server_op i;
-
-    memset(PINT_server_req_table, 0,
-           ((PVFS_MAX_SERVER_OP + 1) *
-            sizeof(struct PINT_server_req_params)));
-
-    /*
-      initialize the table of server operation parameters.  this is
-      done in a case loop specifically so that the compiler will
-      generate a warning if someone forgets to update this table when
-      they add a new server operation
-    */
-    #define OP_CASE(_type,_name,_perm,_attrib_flags,_sm)          \
-        case _type:                                               \
-            PINT_server_req_table[i].op_type = _type;             \
-            PINT_server_req_table[i].string_name = _name;         \
-            PINT_server_req_table[i].perm = _perm;                \
-            PINT_server_req_table[i].sm = _sm;                    \
-            PINT_server_req_table[i].attrib_flags = _attrib_flags;\
-            break;
-
-    for(i = 0; i < (PVFS_MAX_SERVER_OP + 1); i++)
-    {
-        switch(i)
-        {
-            OP_CASE(PVFS_SERV_INVALID, "invalid",
-                    PINT_SERVER_CHECK_INVALID,
-                    PINT_SERVER_ATTRIBS_REQUIRED, NULL);
-            OP_CASE(PVFS_SERV_CREATE, "create",
-                    PINT_SERVER_CHECK_NONE,
-                    PINT_SERVER_ATTRIBS_REQUIRED, &pvfs2_create_sm);
-            OP_CASE(PVFS_SERV_REMOVE, "remove",
-                    PINT_SERVER_CHECK_NONE,
-                    PINT_SERVER_ATTRIBS_NOT_REQUIRED, &pvfs2_remove_sm);
-            OP_CASE(PVFS_SERV_MGMT_REMOVE_OBJECT, "mgmt-remove-object",
-                    PINT_SERVER_CHECK_NONE,
-                    PINT_SERVER_ATTRIBS_NOT_REQUIRED,
-                    &pvfs2_mgmt_remove_object_sm);
-            OP_CASE(PVFS_SERV_MGMT_REMOVE_DIRENT, "mgmt-remove-dirent",
-                    PINT_SERVER_CHECK_NONE,
-                    PINT_SERVER_ATTRIBS_NOT_REQUIRED,
-                    &pvfs2_mgmt_remove_dirent_sm);
-            OP_CASE(PVFS_SERV_MGMT_GET_DIRDATA_HANDLE,
-                    "mgmt-get-dirdata-handle",
-                    PINT_SERVER_CHECK_NONE,
-                    PINT_SERVER_ATTRIBS_NOT_REQUIRED,
-                    &pvfs2_mgmt_get_dirdata_handle_sm);
-            OP_CASE(PVFS_SERV_IO, "io",
-                    PINT_SERVER_CHECK_NONE,
-                    PINT_SERVER_ATTRIBS_NOT_REQUIRED, &pvfs2_io_sm);
-            OP_CASE(PVFS_SERV_GETATTR, "getattr",
-                    PINT_SERVER_CHECK_ATTR,
-                    PINT_SERVER_ATTRIBS_NOT_REQUIRED, &pvfs2_get_attr_sm);
-            OP_CASE(PVFS_SERV_SETATTR, "setattr",
-                    PINT_SERVER_CHECK_ATTR,
-                    PINT_SERVER_ATTRIBS_NOT_REQUIRED, &pvfs2_set_attr_sm);
-            OP_CASE(PVFS_SERV_LOOKUP_PATH, "lookup_path",
-                    PINT_SERVER_CHECK_NONE,
-                    PINT_SERVER_ATTRIBS_REQUIRED, &pvfs2_lookup_sm);
-            OP_CASE(PVFS_SERV_CRDIRENT, "crdirent",
-                    PINT_SERVER_CHECK_WRITE,
-                    PINT_SERVER_ATTRIBS_REQUIRED, &pvfs2_crdirent_sm);
-            OP_CASE(PVFS_SERV_RMDIRENT, "rmdirent",
-                    PINT_SERVER_CHECK_WRITE,
-                    PINT_SERVER_ATTRIBS_REQUIRED, &pvfs2_rmdirent_sm);
-            OP_CASE(PVFS_SERV_CHDIRENT, "chdirent",
-                    PINT_SERVER_CHECK_WRITE,
-                    PINT_SERVER_ATTRIBS_REQUIRED, &pvfs2_chdirent_sm);
-            OP_CASE(PVFS_SERV_TRUNCATE, "truncate",
-                    PINT_SERVER_CHECK_NONE,
-                    PINT_SERVER_ATTRIBS_NOT_REQUIRED, &pvfs2_truncate_sm);
-            OP_CASE(PVFS_SERV_MKDIR, "mkdir",
-                    PINT_SERVER_CHECK_NONE,
-                    PINT_SERVER_ATTRIBS_REQUIRED, &pvfs2_mkdir_sm);
-            OP_CASE(PVFS_SERV_READDIR, "readdir",
-                    PINT_SERVER_CHECK_READ,
-                    PINT_SERVER_ATTRIBS_REQUIRED, &pvfs2_readdir_sm);
-            OP_CASE(PVFS_SERV_GETCONFIG, "getconfig",
-                    PINT_SERVER_CHECK_NONE,
-                    PINT_SERVER_ATTRIBS_REQUIRED, &pvfs2_get_config_sm);
-            OP_CASE(PVFS_SERV_WRITE_COMPLETION, "write_completion", 
-                    PINT_SERVER_CHECK_INVALID, 
-                    PINT_SERVER_ATTRIBS_REQUIRED, NULL);
-            OP_CASE(PVFS_SERV_FLUSH, "flush",
-                    PINT_SERVER_CHECK_NONE,
-                    PINT_SERVER_ATTRIBS_NOT_REQUIRED, &pvfs2_flush_sm);
-            OP_CASE(PVFS_SERV_MGMT_SETPARAM, "mgmt_setparam",
-                    PINT_SERVER_CHECK_NONE,
-                    PINT_SERVER_ATTRIBS_REQUIRED, &pvfs2_setparam_sm);
-            OP_CASE(PVFS_SERV_MGMT_NOOP, "mgmt_noop",
-                    PINT_SERVER_CHECK_NONE,
-                    PINT_SERVER_ATTRIBS_REQUIRED, &pvfs2_noop_sm);
-            OP_CASE(PVFS_SERV_STATFS, "statfs",
-                    PINT_SERVER_CHECK_NONE,
-                    PINT_SERVER_ATTRIBS_REQUIRED, &pvfs2_statfs_sm);
-            OP_CASE(PVFS_SERV_PERF_UPDATE, "perf_update",
-                    PINT_SERVER_CHECK_INVALID, 
-                    PINT_SERVER_ATTRIBS_REQUIRED, &pvfs2_perf_update_sm);
-            OP_CASE(PVFS_SERV_MGMT_PERF_MON, "mgmt_perf_mon",
-                    PINT_SERVER_CHECK_NONE,
-                    PINT_SERVER_ATTRIBS_REQUIRED, &pvfs2_perf_mon_sm);
-            OP_CASE(PVFS_SERV_MGMT_ITERATE_HANDLES,
-                    "mgmt_iterate_handles", PINT_SERVER_CHECK_NONE, 
-                    PINT_SERVER_ATTRIBS_REQUIRED,
-                    &pvfs2_iterate_handles_sm);
-            OP_CASE(PVFS_SERV_MGMT_DSPACE_INFO_LIST,
-                    "mgmt_dspace_info_list", 
-                    PINT_SERVER_CHECK_NONE,
-                    PINT_SERVER_ATTRIBS_REQUIRED, NULL);
-            OP_CASE(PVFS_SERV_MGMT_EVENT_MON, "mgmt_event_mon", 
-                    PINT_SERVER_CHECK_NONE,
-                    PINT_SERVER_ATTRIBS_REQUIRED, &pvfs2_event_mon_sm);
-            OP_CASE(PVFS_SERV_JOB_TIMER, "job_timer",
-                    PINT_SERVER_CHECK_INVALID,
-                    PINT_SERVER_ATTRIBS_REQUIRED, &pvfs2_job_timer_sm);
-            OP_CASE(PVFS_SERV_PROTO_ERROR, "proto_error",
-                    PINT_SERVER_CHECK_INVALID,
-                    PINT_SERVER_ATTRIBS_REQUIRED, &pvfs2_proto_error_sm);
-        }
-    }
-    #undef OP_CASE
 }
 
 struct server_configuration_s *get_server_config_struct(void)

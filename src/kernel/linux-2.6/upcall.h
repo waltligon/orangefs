@@ -108,6 +108,32 @@ typedef struct
     PVFS_fs_id fs_id;
 } pvfs2_fs_umount_request_t;
 
+typedef struct 
+{
+    PVFS_object_ref refn;
+    char key[PVFS_MAX_XATTR_NAMELEN];
+    int key_sz;
+} pvfs2_getxattr_request_t;
+
+typedef struct
+{
+    PVFS_object_ref refn;
+    int   flags;
+    PVFS_keyval_pair keyval;
+} pvfs2_setxattr_request_t;
+
+typedef struct 
+{
+    PVFS_object_ref refn;
+} pvfs2_listxattr_request_t;
+
+typedef struct 
+{
+    PVFS_object_ref refn;
+    char key[PVFS_MAX_XATTR_NAMELEN];
+    int key_sz;
+} pvfs2_removexattr_request_t;
+
 typedef struct
 {
     uint64_t op_tag;
@@ -140,6 +166,10 @@ typedef struct
         pvfs2_mmap_ra_cache_flush_request_t ra_cache_flush;
         pvfs2_fs_mount_request_t fs_mount;
         pvfs2_fs_umount_request_t fs_umount;
+        pvfs2_getxattr_request_t getxattr;
+        pvfs2_setxattr_request_t setxattr;
+/*        pvfs2_listxattr_request_t listxattr; */ /* NOT IMPLEMENTED YET */
+        pvfs2_removexattr_request_t removexattr;
         pvfs2_op_cancel_t cancel;
         pvfs2_fsync_request_t fsync;
     } req;

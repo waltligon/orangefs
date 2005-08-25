@@ -15,7 +15,6 @@
 
 #include "client-state-machine.h"
 #include "state-machine-fns.h"
-#include "shared-state-methods.h"
 #include "pvfs2-types-debug.h"
 #include "pvfs2-debug.h"
 #include "job.h"
@@ -48,8 +47,6 @@ enum
 
 static int io_init(
     PINT_client_sm *sm_p, job_status_s *js_p);
-static int io_object_getattr_failure(
-    PINT_client_sm *sm_p, job_status_s *js_p);
 static int io_datafile_setup_msgpairs(
     PINT_client_sm *sm_p, job_status_s *js_p);
 static int io_datafile_post_msgpairs(
@@ -59,10 +56,6 @@ static int io_datafile_post_msgpairs_retry(
 static int io_datafile_complete_operations(
     PINT_client_sm *sm_p, job_status_s *js_p);
 static int io_analyze_results(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int io_datafile_size_setup_msgpairs(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int io_datafile_size_failure(
     PINT_client_sm *sm_p, job_status_s *js_p);
 static int io_analyze_size_results(
     PINT_client_sm *sm_p, job_status_s *js_p);
@@ -93,8 +86,6 @@ static int io_find_target_datafiles(
     PVFS_offset file_req_offset, PINT_dist *dist_p,
     PVFS_handle *input_handle_array, int input_handle_count,
     int *handle_index_array, int *handle_index_out_count);
-static int io_datafile_size_comp_fn(
-    void *v_p, struct PVFS_server_resp *resp_p, int index);
 
 /* misc constants and helper macros */
 #define IO_RECV_COMPLETED                                    1
@@ -116,6 +107,7 @@ static int io_datafile_size_comp_fn(
 
 #define CLEAN_PRIVATE_MEMBERS(sm_p)                          \
 do {                                                         \
+    int i;                                                   \
     if (sm_p->u.io.datafile_index_array)                     \
     {                                                        \
         free(sm_p->u.io.datafile_index_array);               \
@@ -128,6 +120,9 @@ do {                                                         \
         sm_p->msgarray = NULL;                               \
         sm_p->msgarray_count = 0;                            \
     }                                                        \
+    for (i=0;i<sm_p->msgarray_count; i++) {                  \
+        PINT_flow_free(&(sm_p->u.io.contexts[i].flow_desc)); \
+    }                                                        \
     if (sm_p->u.io.contexts)                                 \
     {                                                        \
         free(sm_p->u.io.contexts);                           \
@@ -139,43 +134,26 @@ do {                                                         \
 
 machine pvfs2_client_io_sm(
     init,
-    io_getattr_setup_msgpair,
-    io_getattr_xfer_msgpair,
-    io_getattr_failure,
+    io_getattr,
     io_datafile_setup_msgpairs,
     io_datafile_post_msgpairs,
     io_datafile_post_msgpairs_retry,
     io_datafile_complete_operations,
     io_analyze_results,
-    io_datafile_size_setup_msgpairs,
-    io_datafile_size_xfer_msgpairs,
-    io_datafile_size_failure,
+    io_datafile_size,
     io_analyze_size_results,
     io_cleanup)
 {
     state init
     {
         run io_init;
-        default => io_getattr_setup_msgpair;
+        default => io_getattr;
     }
 
-    state io_getattr_setup_msgpair
+    state io_getattr
     {
-        run PINT_sm_common_object_getattr_setup_msgpair;
-        success => io_getattr_xfer_msgpair;
-        default => io_getattr_failure;
-    }
-
-    state io_getattr_xfer_msgpair
-    {
-        jump pvfs2_client_getattr_acache_sm;
+        jump pvfs2_client_getattr_sm;
         success => io_datafile_setup_msgpairs;
-        default => io_getattr_failure;
-    }
-
-    state io_getattr_failure
-    {
-        run io_object_getattr_failure;
         default => io_cleanup;
     }
 
@@ -213,27 +191,14 @@ machine pvfs2_client_io_sm(
     {
         run io_analyze_results;
         IO_RETRY => init;
-        IO_GET_DATAFILE_SIZE => io_datafile_size_setup_msgpairs;
+        IO_GET_DATAFILE_SIZE => io_datafile_size;
         default => io_cleanup;
     }
 
-    state io_datafile_size_setup_msgpairs
+    state io_datafile_size
     {
-        run io_datafile_size_setup_msgpairs;
-        success => io_datafile_size_xfer_msgpairs;
-        default => io_datafile_size_failure;
-    }
-
-    state io_datafile_size_xfer_msgpairs
-    {
-        jump pvfs2_msgpairarray_sm;
+        jump pvfs2_client_getattr_sm;
         success => io_analyze_size_results;
-        default => io_datafile_size_failure;
-    }
-
-    state io_datafile_size_failure
-    {
-        run io_datafile_size_failure;
         default => io_cleanup;
     }
 
@@ -316,7 +281,7 @@ PVFS_error PVFS_isys_io(
     }
     memset(sm_p, 0, sizeof(*sm_p));
 
-    PINT_init_msgarray_params(&sm_p->msgarray_params);
+    PINT_init_msgarray_params(&sm_p->msgarray_params, ref.fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->u.io.io_type = io_type;
     sm_p->u.io.file_req = file_req;
@@ -332,13 +297,10 @@ PVFS_error PVFS_isys_io(
     sm_p->u.io.datafile_index_array = NULL;
     sm_p->u.io.datafile_count = 0;
     sm_p->u.io.total_size = 0;
-    sm_p->u.io.size = 0;
-    sm_p->u.io.size_array = NULL;
     sm_p->u.io.continue_analysis = 0;
     sm_p->u.io.saved_ret = 0;
     sm_p->u.io.saved_error_code = 0;
     sm_p->object_ref = ref;
-    sm_p->ref_type = PVFS_TYPE_METAFILE;
 
     return PINT_client_state_machine_post(
         sm_p, PVFS_SYS_IO, op_id, user_ptr);
@@ -394,6 +356,12 @@ static int io_init(PINT_client_sm *sm_p,
     assert((js_p->error_code == 0) ||
            (js_p->error_code == IO_RETRY));
 
+    PINT_SM_GETATTR_STATE_FILL(
+        sm_p->getattr,
+        sm_p->object_ref,
+        PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE, 
+        PVFS_TYPE_METAFILE);
+       
     if (js_p->error_code == IO_RETRY)
     {
         js_p->error_code = 0;
@@ -407,30 +375,9 @@ static int io_init(PINT_client_sm *sm_p,
         }
 
         return job_req_sched_post_timer(
-            PVFS2_CLIENT_RETRY_DELAY, sm_p, 0, js_p, &tmp_id,
+            sm_p->msgarray_params.retry_delay, sm_p, 0, js_p, &tmp_id,
             pint_client_sm_context);
     }
-    return 1;
-}
-
-static int io_object_getattr_failure(PINT_client_sm *sm_p,
-                                     job_status_s *js_p)
-{
-    if (sm_p->op_cancelled)
-    {
-        js_p->error_code = -PVFS_ECANCEL;
-    }
-
-    /*
-      NOTE: this can happen if we're doing I/O on a file that was
-      removed by another process
-    */
-    if (js_p->error_code == 0)
-    {
-        js_p->error_code = -PVFS_ENOENT;
-    }
-
-    sm_p->u.io.stored_error_code = js_p->error_code;
     return 1;
 }
 
@@ -449,15 +396,12 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
 
     js_p->error_code = 0;
 
-    attr = (sm_p->acache_hit ?
-            &sm_p->pinode->attr :
-            &sm_p->acache_attr);
+    attr = &sm_p->getattr.attr;
     assert(attr);
 
     switch(attr->objtype)
     {
         case PVFS_TYPE_METAFILE:
-            assert(attr->objtype == PVFS_TYPE_METAFILE);
             assert(attr->mask & PVFS_ATTR_META_DFILES);
             assert(attr->mask & PVFS_ATTR_META_DIST);
             assert(attr->u.meta.dist_size > 0);
@@ -470,14 +414,6 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
         default:
             js_p->error_code = -PVFS_EBADF;
             return 1;
-    }
-
-    ret = PINT_dist_lookup(attr->u.meta.dist);
-    if (ret)
-    {
-        PVFS_perror_gossip("PINT_dist_lookup failed; aborting I/O", ret);
-        js_p->error_code = -PVFS_EBADF;
-        return 1;
     }
 
     sm_p->u.io.datafile_index_array = (int *)malloc(
@@ -618,6 +554,7 @@ static int io_datafile_post_msgpairs(PINT_client_sm *sm_p,
     int ret = -PVFS_EINVAL, i = 0;
     unsigned long status_user_tag = 0;
     int must_loop_encodings = 0;
+    struct server_configuration_s *server_config = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "io_datafile_post_msgpairs "
                  "state: post (%d message(s))\n", sm_p->msgarray_count);
@@ -722,11 +659,13 @@ static int io_datafile_post_msgpairs(PINT_client_sm *sm_p,
         cur_ctx->msg_recv_has_been_posted = 0;
         cur_ctx->msg_recv_in_progress = 0;
 
+        server_config = PINT_get_server_config_struct(sm_p->object_ref.fs_id);
         ret = job_bmi_recv(
             msg->svr_addr, msg->encoded_resp_p, msg->max_resp_sz,
             cur_ctx->session_tag, BMI_PRE_ALLOC, sm_p, status_user_tag,
             &msg->recv_status, &msg->recv_id, pint_client_sm_context,
-            PVFS2_CLIENT_JOB_TIMEOUT);
+            server_config->client_job_bmi_timeout);
+        PINT_put_server_config_struct(server_config);
 
         /* ret -1: problem, do not look at msg recv_status */
         /* ret 1: immediate completion, see status */
@@ -792,13 +731,15 @@ static int io_datafile_post_msgpairs(PINT_client_sm *sm_p,
         gossip_debug(GOSSIP_IO_DEBUG," posting send with "
                      "status_user_tag=%lu\n", status_user_tag);
 
+        server_config = PINT_get_server_config_struct(sm_p->object_ref.fs_id);
         ret = job_bmi_send_list(
             msg->encoded_req.dest, msg->encoded_req.buffer_list,
             msg->encoded_req.size_list, msg->encoded_req.list_count,
             msg->encoded_req.total_size, cur_ctx->session_tag,
             msg->encoded_req.buffer_type, 1, sm_p, status_user_tag,
             &msg->send_status, &msg->send_id, pint_client_sm_context,
-            PVFS2_CLIENT_JOB_TIMEOUT);
+            server_config->client_job_bmi_timeout);
+        PINT_put_server_config_struct(server_config);
 
         if (ret < 0) {
             PVFS_perror_gossip("Post of send failed, cancelling recv", ret);
@@ -865,17 +806,17 @@ io_datafile_post_msgpairs_retry(PINT_client_sm *sm_p, job_status_s *js_p)
 {
     /* give up if beyond retry limit */
     ++sm_p->u.io.retry_count;
-    if (sm_p->u.io.retry_count > PVFS2_CLIENT_RETRY_LIMIT) {
+    if (sm_p->u.io.retry_count > sm_p->msgarray_params.retry_limit) {
         gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: retry %d exceeds limit %d\n",
-          __func__, sm_p->u.io.retry_count, PVFS2_CLIENT_RETRY_DELAY);
+          __func__, sm_p->u.io.retry_count, sm_p->msgarray_params.retry_delay);
         js_p->error_code = IO_DATAFILE_TRANSFERS_COMPLETE;
         return 1;
     }
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: retry %d, wait %d ms\n", __func__,
-      sm_p->u.io.retry_count, PVFS2_CLIENT_RETRY_DELAY);
+      sm_p->u.io.retry_count, sm_p->msgarray_params.retry_delay);
 
-    return job_req_sched_post_timer(PVFS2_CLIENT_RETRY_DELAY,
+    return job_req_sched_post_timer(sm_p->msgarray_params.retry_delay,
         sm_p, 0, js_p, NULL, pint_client_sm_context);
 }
 
@@ -894,6 +835,7 @@ static int io_datafile_complete_operations(PINT_client_sm *sm_p,
         js_p->status_user_tag;
     PINT_client_io_ctx *cur_ctx = NULL;
     int matched_send_or_recv = 0;
+    struct server_configuration_s *server_config = NULL;
 
     assert(sm_p->msgarray_count == sm_p->u.io.datafile_count);
     assert(sm_p->u.io.msgpair_completion_count > -1);
@@ -989,8 +931,10 @@ static int io_datafile_complete_operations(PINT_client_sm *sm_p,
             int ret = 0;
 
             assert(sm_p->u.io.write_ack_completion_count);
+            server_config = PINT_get_server_config_struct(sm_p->object_ref.fs_id);
             ret = job_reset_timeout(cur_ctx->write_ack.recv_id,
-                                    PVFS2_CLIENT_JOB_TIMEOUT);
+                server_config->client_job_bmi_timeout);
+            PINT_put_server_config_struct(server_config);
 
             /*
               allow -PVFS_EINVAL errors in case the recv has already
@@ -1095,11 +1039,23 @@ static int io_datafile_complete_operations(PINT_client_sm *sm_p,
 static int io_analyze_results(PINT_client_sm *sm_p,
                               job_status_s *js_p)
 {
+    PINT_pinode *pinode;
     int ret = -PVFS_EINVAL, i = 0, may_need_zero_fill = 0;
     PVFS_size tmp_size = 0;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: "
                  "io_analyze_results\n", sm_p);
+
+    /* FIXME: right now we invalidate size from attribute in acache.  
+     * When zero-fill stuff gets figured out we should remove this
+     * and update the pinode->size
+     */
+    pinode = PINT_acache_lookup(sm_p->object_ref, NULL, NULL);
+    if(pinode)
+    {
+        pinode->attr.mask &= ~PVFS_ATTR_DATA_SIZE;
+        PINT_acache_release(pinode);
+    }
 
 #ifdef ZERO_HOLE_STUBS
     if (sm_p->u.io.continue_analysis)
@@ -1216,6 +1172,15 @@ static int io_analyze_results(PINT_client_sm *sm_p,
                 sm_p->u.io.saved_ret = ret;
                 sm_p->u.io.saved_error_code = js_p->error_code;
 
+                /* we need to get the size so we're going to jump to
+                 * the getattr sm with the SYS_SIZE mask
+                 */
+                PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+                PINT_SM_GETATTR_STATE_FILL(sm_p->getattr, 
+                                           sm_p->object_ref,
+                                           PVFS_ATTR_DATA_SIZE,
+                                           PVFS_TYPE_NONE); 
+
                 js_p->error_code = IO_GET_DATAFILE_SIZE;
                 return 1;
             }
@@ -1256,14 +1221,9 @@ static int io_analyze_results(PINT_client_sm *sm_p,
     if (((PVFS_ERROR_CLASS(-ret) == PVFS_ERROR_BMI) ||
          (PVFS_ERROR_CLASS(-ret) == PVFS_ERROR_FLOW) ||
          (ret == -ECONNRESET) || (ret == -PVFS_EPROTO)) &&
-        (sm_p->u.io.retry_count < PVFS2_CLIENT_RETRY_LIMIT))
+        (sm_p->u.io.retry_count < sm_p->msgarray_params.retry_limit))
     {
-        if (sm_p->acache_hit)
-        {
-            PINT_acache_release(sm_p->pinode);
-            sm_p->acache_hit = 0;
-            sm_p->pinode = NULL;
-        }
+        PINT_acache_invalidate(sm_p->object_ref);
 
         assert(!sm_p->op_cancelled);
 
@@ -1287,121 +1247,24 @@ static int io_analyze_results(PINT_client_sm *sm_p,
     return 1;
 }
 
-static int io_datafile_size_setup_msgpairs(
-    PINT_client_sm *sm_p, job_status_s *js_p)
-{
-    int ret = -PVFS_EINVAL, i = 0;
-    PVFS_object_attr *attr = NULL;
-
-
-    js_p->error_code = 0;
-
-    attr = (sm_p->acache_hit ? &sm_p->pinode->attr : &sm_p->acache_attr);
-    assert(attr);
-
-    if (sm_p->msgarray && (sm_p->msgarray != &sm_p->msgpair))
-    {
-        free(sm_p->msgarray);
-    }
-    sm_p->msgarray = (PINT_sm_msgpair_state *)malloc(
-        attr->u.meta.dfile_count * sizeof(PINT_sm_msgpair_state));
-    if (!sm_p->msgarray)
-    {
-        js_p->error_code = -PVFS_ENOMEM;
-        return 1;
-    }
-
-    sm_p->u.io.size_array = (PVFS_size *)malloc(
-        attr->u.meta.dfile_count * sizeof(PVFS_size));
-    if (!sm_p->u.io.size_array)
-    {
-        free(sm_p->msgarray);
-        sm_p->msgarray = NULL;
-
-        js_p->error_code = -PVFS_ENOMEM;
-        return 1;
-    }
-
-    sm_p->msgarray_count = attr->u.meta.dfile_count;
-
-    for(i = 0; i < sm_p->msgarray_count; i++)
-    {
-        PINT_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
-        assert(msg_p);
-
-        gossip_debug(GOSSIP_IO_DEBUG,
-                     "  getting size for handle %Lu\n",
-                     Lu(attr->u.meta.dfile_array[i]));
-
-        PINT_SERVREQ_GETATTR_FILL(
-            msg_p->req,
-            *sm_p->cred_p,
-            sm_p->object_ref.fs_id,
-            attr->u.meta.dfile_array[i],
-            PVFS_ATTR_DATA_SIZE);
-
-        msg_p->fs_id = sm_p->object_ref.fs_id;
-        msg_p->handle = attr->u.meta.dfile_array[i];
-        msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
-        msg_p->comp_fn = io_datafile_size_comp_fn;
-    }
-
-    ret = PINT_serv_msgpairarray_resolve_addrs(
-        sm_p->msgarray_count, sm_p->msgarray);
-    if (ret < 0)
-    {
-        gossip_lerr("Error: failed to resolve meta server addresses.\n");
-        js_p->error_code = ret;
-    }
-    return 1;
-}
-
-static int io_datafile_size_failure(
-    PINT_client_sm *sm_p, job_status_s *js_p)
-{
-    return 0;
-}
-
 static int io_analyze_size_results(
     PINT_client_sm *sm_p, job_status_s *js_p)
 {
 #ifdef ZERO_HOLE_STUBS
-    int ret = -PVFS_EINVAL;
-    PINT_dist *dist = NULL;
-    PVFS_object_attr *attr = (sm_p->acache_hit ?
-                              &sm_p->pinode->attr :
-                              &sm_p->acache_attr);
     PVFS_size zero_fill_size = 0;
 
-    assert(attr && attr->u.meta.dist);
-
-    dist = attr->u.meta.dist;
-    assert(dist->methods);
-
-    ret = PINT_dist_lookup(dist);
-    assert(ret == 0);
-
-    assert(sm_p->u.io.size_array);
-
-    sm_p->u.io.size = (dist->methods->logical_file_size)(
-        dist->params, attr->u.meta.dfile_count,
-        sm_p->u.io.size_array);
-
-    free(sm_p->u.io.size_array);
-    sm_p->u.io.size_array = NULL;
-
-    gossip_debug(GOSSIP_IO_DEBUG, " *** computed logical size of %Ld\n",
-                 Ld(sm_p->u.io.size));
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: io_analyze"
+                 "size_results\n", sm_p);
 
     zero_fill_size = PVFS_util_min(
-        (sm_p->u.io.size - sm_p->u.io.file_req_offset -
+        (sm_p->getattr.size - sm_p->u.io.file_req_offset -
          sm_p->u.io.total_size),
         (PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req) -
          sm_p->u.io.total_size));
 
-    if ((sm_p->u.io.file_req_offset + zero_fill_size) > sm_p->u.io.size)
+    if ((sm_p->u.io.file_req_offset + zero_fill_size) > sm_p->getattr.size)
     {
-        zero_fill_size = (sm_p->u.io.size - sm_p->u.io.file_req_offset);
+        zero_fill_size = (sm_p->getattr.size - sm_p->u.io.file_req_offset);
     }
 
     if (zero_fill_size > -1)
@@ -1426,31 +1289,8 @@ static int io_cleanup(PINT_client_sm *sm_p,
 {
     CLEAN_PRIVATE_MEMBERS(sm_p);
 
-    if (sm_p->acache_hit)
-    {
-        if (!sm_p->u.io.size)
-        {
-            gossip_debug(GOSSIP_CLIENT_DEBUG, "sys-io.sm Invalidating "
-                         "cached attribute size\n");
-
-            sm_p->pinode->attr.mask &=
-                ~(PVFS_ATTR_DATA_SIZE | PVFS_ATTR_DATA_ALL);
-        }
-        else
-        {
-            sm_p->pinode->size = sm_p->u.io.size;
-        }
-        PINT_acache_set_valid(sm_p->pinode);
-
-        PINT_acache_release(sm_p->pinode);
-        sm_p->acache_hit = 0;
-        sm_p->pinode = NULL;
-    }
-    else
-    {
-        PINT_free_object_attr(&sm_p->acache_attr);
-    }
-
+    PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr); 
+    
     sm_p->error_code = js_p->error_code;
 
     if (sm_p->error_code)
@@ -1668,6 +1508,7 @@ static inline int process_context_recv_and_post_flow(
     struct PVFS_server_resp *resp = NULL;
     PVFS_object_attr *attr = NULL;
     PINT_client_io_ctx *cur_ctx = NULL;
+    struct server_configuration_s *server_config = NULL;
 
     gossip_debug(GOSSIP_IO_DEBUG,
                  "- process_context_recv_and_post_flow called\n");
@@ -1709,7 +1550,7 @@ static inline int process_context_recv_and_post_flow(
         return ret;
     }
 
-    attr = (sm_p->acache_hit ? &sm_p->pinode->attr : &sm_p->acache_attr);
+    attr = &sm_p->getattr.attr;
     assert(attr);
 
     ret = build_context_flow(sm_p, cur_ctx, attr, resp);
@@ -1784,10 +1625,13 @@ static inline int process_context_recv_and_post_flow(
 
     status_user_tag = ((4 * cur_ctx->index) + IO_SM_PHASE_FLOW);
 
+    server_config = PINT_get_server_config_struct(sm_p->object_ref.fs_id);
     ret = job_flow(
         &cur_ctx->flow_desc, sm_p, status_user_tag,
         &cur_ctx->flow_status, &cur_ctx->flow_job_id,
-        pint_client_sm_context, PVFS2_CLIENT_JOB_TIMEOUT);
+        pint_client_sm_context,
+        server_config->client_job_flow_timeout);
+    PINT_put_server_config_struct(server_config);
 
     if (ret < 0)
     {
@@ -1915,14 +1759,14 @@ static inline int check_for_zero_fill_on_read(PINT_client_sm *sm_p)
     int i = 0, val = 0;
     PINT_Request_state *mrs = NULL, *frs = NULL;
     PINT_Request_result seg_result;
-    PINT_Request_file_data *file_data = NULL;
+    PINT_request_file_data *file_data = NULL;
     int64_t offset_array[16] = {0}, size_array[16] = {0};
     PVFS_size total_ctx_size = 0;
 
     assert(sm_p->u.io.io_type == PVFS_IO_READ);
 
-    mrs = PINT_New_request_state(sm_p->u.io.mem_req);
-    frs = PINT_New_request_state(sm_p->u.io.file_req);
+    mrs = PINT_new_request_state(sm_p->u.io.mem_req);
+    frs = PINT_new_request_state(sm_p->u.io.file_req);
     assert(mrs && frs);
 
     memset(&seg_result, 0, sizeof(PINT_Request_result));
@@ -1961,10 +1805,10 @@ static inline int check_for_zero_fill_on_read(PINT_client_sm *sm_p)
         {        
             gossip_debug(GOSSIP_IO_DEBUG, "[1] Checking for read past EOF "
                          "(size=%Ld, total_size=%Ld)\n",
-                         Ld(sm_p->u.io.size), Ld(sm_p->u.io.total_size));
+                         Ld(sm_p->getattr.size), Ld(sm_p->u.io.total_size));
 
-            PINT_Free_request_state(mrs);
-            PINT_Free_request_state(frs);
+            PINT_free_request_state(mrs);
+            PINT_free_request_state(frs);
 
             return IO_GET_DATAFILE_SIZE;
         }
@@ -1981,7 +1825,7 @@ static inline int check_for_zero_fill_on_read(PINT_client_sm *sm_p)
             memset(offset_array, 0, (16 * sizeof(int64_t)));
             memset(size_array, 0, (16 * sizeof(int64_t)));
 
-            val = PINT_Process_request(
+            val = PINT_process_request(
                 frs, mrs, file_data, &seg_result, PINT_CLIENT);
 
             if (val < 0)
@@ -2021,11 +1865,11 @@ static inline int check_for_zero_fill_on_read(PINT_client_sm *sm_p)
                 zero_fill_size = PINT_REQUEST_TOTAL_BYTES(
                     sm_p->u.io.mem_req) - sm_p->u.io.total_size;
             }
-            else if (sm_p->u.io.size &&
+            else if (sm_p->getattr.size &&
                      (cur_ctx->flow_desc.file_req_offset +
-                      zero_fill_size) > sm_p->u.io.size)
+                      zero_fill_size) > sm_p->getattr.size)
             {
-                zero_fill_size = sm_p->u.io.size -
+                zero_fill_size = sm_p->getattr.size -
                     cur_ctx->flow_desc.file_req_offset;
             }
             else if (total_ctx_size !=
@@ -2035,7 +1879,7 @@ static inline int check_for_zero_fill_on_read(PINT_client_sm *sm_p)
             }
             gossip_debug(GOSSIP_IO_DEBUG, "zero_fill_size is %Ld | "
                          "sm_p->u.io.size is %Ld\n", Ld(zero_fill_size),
-                         Ld(sm_p->u.io.size));
+                         Ld(sm_p->getattr.size));
 
             if (zero_fill_size > -1)
             {
@@ -2063,10 +1907,10 @@ static inline int check_for_zero_fill_on_read(PINT_client_sm *sm_p)
             gossip_debug(
                 GOSSIP_IO_DEBUG, "[2] Checking for read past EOF "
                 "(size=%Ld, total_size=%Ld)\n",
-                Ld(sm_p->u.io.size), Ld(sm_p->u.io.total_size));
+                Ld(sm_p->getattr.size), Ld(sm_p->u.io.total_size));
 
-            PINT_Free_request_state(mrs);
-            PINT_Free_request_state(frs);
+            PINT_free_request_state(mrs);
+            PINT_free_request_state(frs);
 
             return IO_GET_DATAFILE_SIZE;
         }
@@ -2074,8 +1918,8 @@ static inline int check_for_zero_fill_on_read(PINT_client_sm *sm_p)
 
   request_process_failure:
 
-    PINT_Free_request_state(mrs);
-    PINT_Free_request_state(frs);
+    PINT_free_request_state(mrs);
+    PINT_free_request_state(frs);
     return 0;
 }
 #endif
@@ -2098,7 +1942,7 @@ static int io_find_target_datafiles(
     int ret = -PVFS_EINVAL, i = 0;
     struct PINT_Request_state *req_state = NULL;
     struct PINT_Request_state *mem_req_state = NULL;
-    PINT_Request_file_data tmp_file_data;
+    PINT_request_file_data tmp_file_data;
     PINT_Request_result tmp_result;
 
     gossip_debug(GOSSIP_IO_DEBUG, "- io_find_target_datafiles called\n");
@@ -2109,15 +1953,15 @@ static int io_find_target_datafiles(
     }
     *handle_index_out_count = 0;
 
-    req_state = PINT_New_request_state(file_req);
+    req_state = PINT_new_request_state(file_req);
     if (!req_state)
     {
         return -PVFS_ENOMEM;
     }
-    mem_req_state = PINT_New_request_state(mem_req);
+    mem_req_state = PINT_new_request_state(mem_req);
     if (!mem_req_state)
     {
-        PINT_Free_request_state(req_state);
+        PINT_free_request_state(req_state);
         return -PVFS_ENOMEM;
     }
 
@@ -2152,14 +1996,14 @@ static int io_find_target_datafiles(
         tmp_result.bytemax = 1;
         tmp_result.segmax = 1;
 
-        /* PINT_Process_request() returns number of bytes processed */
-        ret = PINT_Process_request(
+        /* PINT_process_request() returns number of bytes processed */
+        ret = PINT_process_request(
             req_state, mem_req_state, &tmp_file_data,
             &tmp_result, PINT_CKSIZE);
         if (ret < 0)
         {
-            PINT_Free_request_state(mem_req_state);
-            PINT_Free_request_state(req_state);
+            PINT_free_request_state(mem_req_state);
+            PINT_free_request_state(req_state);
             return ret;
         }
 
@@ -2175,30 +2019,8 @@ static int io_find_target_datafiles(
                          __func__, i, *handle_index_out_count);
         }
     }
-    PINT_Free_request_state(req_state);
-    PINT_Free_request_state(mem_req_state);
-
-    return 0;
-}
-
-static int io_datafile_size_comp_fn(
-    void *v_p, struct PVFS_server_resp *resp_p, int index)
-{
-    PINT_client_sm *sm_p = (PINT_client_sm *)v_p;
-
-    if (resp_p->status != 0)
-    {
-        return resp_p->status;
-    }
-
-    assert(resp_p->op == PVFS_SERV_GETATTR);
-
-    gossip_debug(GOSSIP_IO_DEBUG,
-                 "  size of datafile %d is %Ld\n",
-                 index, Ld(resp_p->u.getattr.attr.u.data.size));
-
-    sm_p->u.io.size_array[index] =
-        resp_p->u.getattr.attr.u.data.size;
+    PINT_free_request_state(req_state);
+    PINT_free_request_state(mem_req_state);
 
     return 0;
 }

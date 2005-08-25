@@ -210,7 +210,7 @@ static inline struct extent *allocate_extent(NCAC_req_t *ncac_req, int flag)
 {
     struct extent *new = NULL;
 	struct cache_stack *cache;
-    int shrinked;
+    unsigned int shrinked;
 
     char *buf;
     int ret;

@@ -15,6 +15,7 @@
 extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
 extern wait_queue_head_t pvfs2_request_list_waitq;
+extern int debug;
 
 extern struct dentry_operations pvfs2_dentry_operations;
 
@@ -140,7 +141,7 @@ struct dentry *pvfs2_lookup(
 
     pvfs2_print("pvfs2_lookup: doing lookup on %s\n  under %Lu,%d "
                 "(follow=%s)\n", new_op->upcall.req.lookup.d_name,
-                new_op->upcall.req.lookup.parent_refn.handle,
+                Lu(new_op->upcall.req.lookup.parent_refn.handle),
                 new_op->upcall.req.lookup.parent_refn.fs_id,
                 ((new_op->upcall.req.lookup.sym_follow ==
                   PVFS2_LOOKUP_LINK_FOLLOW) ? "yes" : "no"));
@@ -152,7 +153,7 @@ struct dentry *pvfs2_lookup(
     ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
 
     pvfs2_print("Lookup Got %Lu, fsid %d (ret=%d)\n",
-                new_op->downcall.resp.lookup.refn.handle,
+                Lu(new_op->downcall.resp.lookup.refn.handle),
                 new_op->downcall.resp.lookup.refn.fs_id, ret);
 
     /* lookup inode matching name (or add if not there) */
@@ -236,6 +237,39 @@ static int pvfs2_unlink(
     return ret;
 }
 
+/* pvfs2_link() is only implemented here to make sure that we return a
+ * reasonable error code (the kernel will return a misleading EPERM
+ * otherwise).  PVFS2 does not support hard links.
+ */
+static int pvfs2_link(
+    struct dentry * old_dentry, 
+    struct inode * dir,
+    struct dentry *dentry)
+{
+    return(-EOPNOTSUPP);
+}
+
+/* pvfs2_mknod() is only implemented here to make sure that we return a
+ * reasonable error code (the kernel will return a misleading EPERM
+ * otherwise).  PVFS2 does not support special files such as fifos or devices.
+ */
+#ifdef PVFS2_LINUX_KERNEL_2_4
+static int pvfs2_mknod(
+    struct inode *dir,
+    struct dentry *dentry,
+    int mode,
+    int rdev)
+#else
+static int pvfs2_mknod(
+    struct inode *dir,
+    struct dentry *dentry,
+    int mode,
+    dev_t rdev)
+#endif
+{
+    return(-EOPNOTSUPP);
+}
+
 static int pvfs2_symlink(
     struct inode *dir,
     struct dentry *dentry,
@@ -270,7 +304,12 @@ static int pvfs2_mkdir(
 
     if (inode)
     {
+#if 0
+        /* NOTE: we have no good way to keep nlink consistent for directories
+         * across clients; keep constant at 1  -Phil
+         */
 	dir->i_nlink++;
+#endif
         pvfs2_update_inode_time(dir);
 	ret = 0;
     }
@@ -287,8 +326,13 @@ static int pvfs2_rmdir(
     ret = pvfs2_unlink(dir, dentry);
     if (ret == 0)
     {
-        inode->i_nlink--;
+        inode->i_nlink--; 
+#if 0
+        /* NOTE: we have no good way to keep nlink consistent for directories
+         * across clients; keep constant at 1  -Phil
+         */
 	dir->i_nlink--;
+#endif
         pvfs2_update_inode_time(dir);
     }
     return ret;
@@ -312,6 +356,10 @@ static int pvfs2_rename(
                 atomic_read(&new_dentry->d_count));
 
     are_directories = S_ISDIR(old_dentry->d_inode->i_mode);
+#if 0
+    /* NOTE: we have no good way to keep nlink consistent for directories
+     * across clients; keep constant at 1  -Phil
+     */
     if (are_directories && (new_dir->i_nlink >= PVFS2_LINK_MAX))
     {
         pvfs2_error("pvfs2_rename: directory %s surpassed "
@@ -319,6 +367,7 @@ static int pvfs2_rename(
                     new_dentry->d_name.name);
         return -EMLINK;
     }
+#endif
 
     new_op = op_alloc();
     if (!new_op)
@@ -378,16 +427,26 @@ static int pvfs2_rename(
     if (new_dentry->d_inode)
     {
         new_dentry->d_inode->i_ctime = CURRENT_TIME;
+#if 0
+        /* NOTE: we have no good way to keep nlink consistent for directories
+         * across clients; keep constant at 1  -Phil
+         */
         if (are_directories)
         {
             new_dentry->d_inode->i_nlink--;
         }
+#endif
     }
+#if 0
+    /* NOTE: we have no good way to keep nlink consistent for directories
+     * across clients; keep constant at 1  -Phil
+     */
     else if (are_directories)
     {
         new_dir->i_nlink++;
         old_dir->i_nlink--;
     }
+#endif
 
   error_exit:
     translate_error_if_wait_failed(ret, 0, 0);
@@ -408,23 +467,37 @@ struct inode_operations pvfs2_dir_inode_operations =
 #ifdef PVFS2_LINUX_KERNEL_2_4
     create : pvfs2_create,
     lookup : pvfs2_lookup,
+    link : pvfs2_link,
     unlink : pvfs2_unlink,
     symlink : pvfs2_symlink,
     mkdir : pvfs2_mkdir,
     rmdir : pvfs2_rmdir,
+    mknod : pvfs2_mknod,
     rename : pvfs2_rename,
     setattr : pvfs2_setattr,
-    revalidate : pvfs2_revalidate
+    revalidate : pvfs2_revalidate,
+#ifdef HAVE_XATTR
+    getxattr: pvfs2_getxattr,
+    setxattr: pvfs2_setxattr,
+/*    listxattr: pvfs2_listxattr,*/
+    removexattr: pvfs2_removexattr,
+#endif
 #else
     .create = pvfs2_create,
     .lookup = pvfs2_lookup,
+    .link = pvfs2_link,
     .unlink = pvfs2_unlink,
     .symlink = pvfs2_symlink,
     .mkdir = pvfs2_mkdir,
     .rmdir = pvfs2_rmdir,
+    .mknod = pvfs2_mknod,
     .rename = pvfs2_rename,
     .setattr = pvfs2_setattr,
-    .getattr = pvfs2_getattr
+    .getattr = pvfs2_getattr,
+    .getxattr = pvfs2_getxattr,
+    .setxattr = pvfs2_setxattr,
+/*    .listxattr = pvfs2_listxattr,*/
+    .removexattr = pvfs2_removexattr,
 #endif
 };
 

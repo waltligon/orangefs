@@ -13,6 +13,9 @@
 /* Define to 1 if you have the <arpa/inet.h> header file. */
 #undef HAVE_ARPA_INET_H
 
+/* Define if struct backing_dev_info in kernel has memory_backed */
+#undef HAVE_BDI_MEMORY_BACKED
+
 /* Define if third param (message) to DB error callback function is const */
 #undef HAVE_CONST_THIRD_PARAMETER_TO_DB_ERROR_CALLBACK
 
@@ -24,6 +27,9 @@
 
 /* Define to 1 if you have the <execinfo.h> header file. */
 #undef HAVE_EXECINFO_H
+
+/* Define if gethostbyaddr function exists */
+#undef HAVE_GETHOSTBYADDR
 
 /* Define if gethostbyname function exists */
 #undef HAVE_GETHOSTBYNAME
@@ -97,6 +103,12 @@
 /* Define if sysinfo.h is present */
 #undef HAVE_SYSINFO
 
+/* Define to 1 if you have the <sys/epoll.h> header file. */
+#undef HAVE_SYS_EPOLL_H
+
+/* Define to 1 if you have the <sys/socket.h> header file. */
+#undef HAVE_SYS_SOCKET_H
+
 /* Define to 1 if you have the <sys/stat.h> header file. */
 #undef HAVE_SYS_STAT_H
 
@@ -115,11 +127,11 @@
 /* Define to 1 if you have the <unistd.h> header file. */
 #undef HAVE_UNISTD_H
 
-/* Define if DB stat function takes extra parameter */
+/* Define if DB stat function takes malloc function ptr */
 #undef HAVE_UNKNOWN_PARAMETER_TO_DB_STAT
 
-/* Name of package */
-#undef PACKAGE
+/* Define if kernel has xattr support */
+#undef HAVE_XATTR
 
 /* Define to the address where bug reports for this package should be sent. */
 #undef PACKAGE_BUGREPORT
@@ -150,9 +162,6 @@
 
 /* Define to 1 if you have the ANSI C header files. */
 #undef STDC_HEADERS
-
-/* Version number of package */
-#undef VERSION
 
 /* Define if mtrace memory leak detection was enabled */
 #undef WITH_MTRACE

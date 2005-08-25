@@ -5,9 +5,11 @@ ADMINSRC := \
 	$(DIR)/pvfs2-set-debugmask.c \
 	$(DIR)/pvfs2-set-mode.c \
 	$(DIR)/pvfs2-set-eventmask.c \
+	$(DIR)/pvfs2-set-sync.c \
 	$(DIR)/pvfs2-ls.c \
 	$(DIR)/pvfs2-ping.c \
 	$(DIR)/pvfs2-rm.c \
+	$(DIR)/pvfs2-stat.c \
 	$(DIR)/pvfs2-statfs.c \
 	$(DIR)/pvfs2-perf-mon-example.c \
 	$(DIR)/pvfs2-event-mon-example.c \
@@ -19,6 +21,8 @@ ADMINSRC := \
 	$(DIR)/pvfs2-cp.c \
 	$(DIR)/pvfs2-remove-object.c \
 	$(DIR)/pvfs2-setparam-all.c
+	$(DIR)/pvfs2-touch.c \
+	$(DIR)/pvfs2-ln.c
 
 ADMINSRC_SERVER := \
 	$(DIR)/pvfs2-mkspace.c \

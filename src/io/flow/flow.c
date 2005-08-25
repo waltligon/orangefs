@@ -52,7 +52,8 @@ int PINT_flow_initialize(
     int flags)
 {
     int ret = -1;
-    int i = 0;
+    int i = 0, j = 0, already_exists = 0, active_flow_index = 0, 
+        requested_flowproto_count = 0;
     char **requested_flowprotos = NULL;
     struct flowproto_ops **tmp_flowproto_ops = NULL;
 
@@ -60,9 +61,6 @@ int PINT_flow_initialize(
 #ifdef __STATIC_FLOWPROTO_TEMPLATE__
     extern struct flowproto_ops flowproto_template_ops;
 #endif /* __STATIC_FLOWPROTO_TEMPLATE__ */
-#ifdef __STATIC_FLOWPROTO_BMI_TROVE__
-    extern struct flowproto_ops flowproto_bmi_trove_ops;
-#endif /* __STATIC_FLOWPROTO_BMI_TROVE__ */
 #ifdef __STATIC_FLOWPROTO_DUMP_OFFSETS__
     extern struct flowproto_ops flowproto_dump_offsets_ops;
 #endif /* __STATIC_FLOWPROTO_DUMP_OFFSETS__ */
@@ -77,9 +75,6 @@ int PINT_flow_initialize(
 #ifdef __STATIC_FLOWPROTO_TEMPLATE__
 	&flowproto_template_ops,
 #endif				/* __STATIC_FLOWPROTO_TEMPLATE__ */
-#ifdef __STATIC_FLOWPROTO_BMI_TROVE__
-	&flowproto_bmi_trove_ops,
-#endif				/* __STATIC_FLOWPROTO_BMI_TROVE__ */
 #ifdef __STATIC_FLOWPROTO_DUMP_OFFSETS__
 	&flowproto_dump_offsets_ops,
 #endif				/* __STATIC_FLOWPROTO_DUMP_OFFSETS__ */
@@ -105,6 +100,7 @@ int PINT_flow_initialize(
 	    ret = -EINVAL;
 	    goto PINT_flow_initialize_failure;
 	}
+        requested_flowproto_count = active_flowproto_count;
     }
     else
     {
@@ -116,6 +112,7 @@ int PINT_flow_initialize(
 	    tmp_flowproto_ops++;
 	    active_flowproto_count++;
 	}
+        requested_flowproto_count = active_flowproto_count;
     }
 
     /* create table to keep up with active flow protocols */
@@ -134,7 +131,7 @@ int PINT_flow_initialize(
      */
     if(flowproto_list)
     {
-	for (i = 0; i < active_flowproto_count; i++)
+	for (i = 0; i < requested_flowproto_count; i++)
 	{
 	    tmp_flowproto_ops = static_flowprotos;
 	    while ((*tmp_flowproto_ops) != NULL &&
@@ -150,7 +147,26 @@ int PINT_flow_initialize(
 		ret = -ENOPROTOOPT;
 		goto PINT_flow_initialize_failure;
 	    }
-	    active_flowproto_table[i] = (*tmp_flowproto_ops);
+
+            /* check that flowproto hasn't already been added to table */
+            already_exists = 0;
+            for(j = 0; j < active_flow_index; ++j)
+            {
+                if(active_flowproto_table[j] == (*tmp_flowproto_ops))
+                {
+                    already_exists = 1;
+                }
+            }
+            
+            if(!already_exists)
+            {
+                active_flowproto_table[active_flow_index++] = 
+                    (*tmp_flowproto_ops);
+            }
+            else
+            {
+                active_flowproto_count--;
+            }
 	}
     }
     else
@@ -184,17 +200,7 @@ int PINT_flow_initialize(
     }
 
     /* get rid of method string list */
-    if (requested_flowprotos)
-    {
-	for (i = 0; i < active_flowproto_count; i++)
-	{
-	    if (requested_flowprotos[i])
-	    {
-		free(requested_flowprotos[i]);
-	    }
-	}
-	free(requested_flowprotos);
-    }
+    PINT_free_string_list(requested_flowprotos, requested_flowproto_count);
 
     gen_mutex_unlock(&interface_mutex);
     return (0);
@@ -215,18 +221,7 @@ int PINT_flow_initialize(
     }
 
     /* get rid of method string list */
-    if (requested_flowprotos)
-    {
-	for (i = 0; i < active_flowproto_count; i++)
-	{
-	    if (requested_flowprotos[i])
-	    {
-		free(requested_flowprotos[i]);
-	    }
-	}
-	free(requested_flowprotos);
-    }
-
+    PINT_free_string_list(requested_flowprotos, requested_flowproto_count);
     active_flowproto_count = 0;
 
     if (flow_mapping)
@@ -380,7 +375,7 @@ int PINT_flow_post(flow_descriptor * flow_d)
     }
 
     /* setup the request processing states */
-    flow_d->file_req_state = PINT_New_request_state(flow_d->file_req);
+    flow_d->file_req_state = PINT_new_request_state(flow_d->file_req);
     if (!flow_d->file_req_state)
     {
 	gen_mutex_unlock(&interface_mutex);
@@ -390,7 +385,7 @@ int PINT_flow_post(flow_descriptor * flow_d)
     /* only setup a memory datatype state if caller provided a memory datatype */
     if(flow_d->mem_req)
     {
-	flow_d->mem_req_state = PINT_New_request_state(flow_d->mem_req);
+	flow_d->mem_req_state = PINT_new_request_state(flow_d->mem_req);
 	if (!flow_d->mem_req_state)
 	{
 	    gen_mutex_unlock(&interface_mutex);
@@ -516,12 +511,12 @@ static void flow_release(flow_descriptor *flow_d)
     /* let go of the request processing states */
     if (flow_d->file_req_state)
     {
-	PINT_Free_request_state(flow_d->file_req_state);
+	PINT_free_request_state(flow_d->file_req_state);
     }
 
     if (flow_d->mem_req_state)
     {
-	PINT_Free_request_state(flow_d->mem_req_state);
+	PINT_free_request_state(flow_d->mem_req_state);
     }
 }
 

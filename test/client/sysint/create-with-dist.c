@@ -27,7 +27,7 @@ int main(int argc, char **argv)
     PVFS_sys_attr attr;
     PVFS_credentials credentials;
     PVFS_sys_dist *dist = NULL;
-    int new_strip_size = 8192;
+    PVFS_size new_strip_size = 8192;
     
     if (argc != 2)
     {

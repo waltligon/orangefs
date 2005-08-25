@@ -27,6 +27,8 @@
 #include <netinet/in.h>
 #include <stdio.h>
 
+#include "bmi-types.h"
+
 int BMI_sockio_new_sock(void);
 int BMI_sockio_bind_sock(int,
 			 int);

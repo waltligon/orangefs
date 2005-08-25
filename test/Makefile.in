@@ -367,9 +367,9 @@ $(KARMADEPENDS): %.d: %.c
 	$(E)$(pvfs2_srcdir)/maint/depend.sh $(call dirname,$*) $(CFLAGS) $(call modcflags,$<) $< > $@
 
 install:: 
-	install -d @PVFS2_TOP_PREFIX@/bin
-	install -m 755 $(TESTS) @PVFS2_TOP_PREFIX@/bin
+	install -d @PVFS2_TOP_PREFIX@/test
+	install -m 755 $(TESTS) @PVFS2_TOP_PREFIX@/test
 ifdef BUILD_MPI
-	install -m 755 $(MPITESTS) @PVFS2_TOP_PREFIX@/bin
-	install -m 755 $(MPIIOTESTS) @PVFS2_TOP_PREFIX@/bin
+	install -m 755 $(MPITESTS) @PVFS2_TOP_PREFIX@/test
+	install -m 755 $(MPIIOTESTS) @PVFS2_TOP_PREFIX@/test
 endif

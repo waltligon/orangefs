@@ -55,7 +55,7 @@ int main(
         0, (GOSSIP_FLOW_PROTO_DEBUG | GOSSIP_BMI_DEBUG_TCP));
 
     /* Dist init */
-    PINT_dist_initialize();
+    PINT_dist_initialize(NULL);
 
     /* start up BMI */
     ret = BMI_initialize("bmi_tcp", NULL, 0);

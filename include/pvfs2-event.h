@@ -27,9 +27,9 @@ enum PVFS_event_api
     PVFS_EVENT_API_STATES =      (1 << 8)  /* transition states of a SM */
 };
 
-#define PVFS_EVENT_API_COUNT 9
+uint64_t PVFS_event_api_keyword_to_mask(const char *value);
+char * PINT_event_api_print_keywords(int columns, const char * sep);
 
-const char * PVFS_event_api_names[PVFS_EVENT_API_COUNT];
 
 /* what kind of event */
 enum PVFS_event_flag
@@ -37,10 +37,11 @@ enum PVFS_event_flag
     PVFS_EVENT_FLAG_NONE =  0,
     PVFS_EVENT_FLAG_START = (1 << 0),
     PVFS_EVENT_FLAG_END =   (1 << 1),
-    PVFS_EVENT_FLAG_INVALID = (1 << 2)
+    PVFS_EVENT_FLAG_INVALID = (1 << 2),
+    PVFS_EVENT_FLAG_OP_POST = (1 << 3),
+    PVFS_EVENT_FLAG_OP_SERVICE = (1 << 4),
+    PVFS_EVENT_FLAG_OP_DONE = (1 << 5)
 };
-
-#define PVFS_EVENT_FLAG_COUNT 4
 
 /* kind of operation, may exist in multiple APIs */
 enum PVFS_event_op
@@ -68,12 +69,12 @@ enum PVFS_event_op
      PVFS_EVENT_TROVE_DSPACE_REMOVE = 21,
      PVFS_EVENT_TROVE_DSPACE_VERIFY = 22,
      PVFS_EVENT_TROVE_BSTREAM_VALIDATE = 23,
-     PVFS_EVENT_TROVE_KEYVAL_VALIDATE = 24
+     PVFS_EVENT_TROVE_KEYVAL_VALIDATE = 24,
+     PVFS_EVENT_TROVE_KEYVAL_WRITE_LIST = 25
 };
 
-#define PVFS_EVENT_OP_COUNT 24
-
-const char * PVFS_event_op_names[PVFS_EVENT_OP_COUNT];
+uint64_t PVFS_event_op_keyword_to_mask(const char *value);
+char * PINT_event_op_print_keywords(int columns, const char * sep);
 
 #endif /* __PVFS2_EVENT_H */
 

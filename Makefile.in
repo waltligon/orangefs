@@ -76,6 +76,8 @@ QUIET_COMPILE = @QUIET_COMPILE@
 ifdef V
     QUIET_COMPILE = 0
 endif
+LINUX_KERNEL_SRC = @LINUX_KERNEL_SRC@
+LINUX24_KERNEL_SRC = @LINUX24_KERNEL_SRC@
 
 ifeq ($(QUIET_COMPILE),1)
   # say a one-line description of the action, do not echo the command
@@ -151,8 +153,6 @@ NPTL_WORKAROUND = @NPTL_WORKAROUND@
 CFLAGS += -D__STATIC_METHOD_BMI_TCP__
   # enable Flow debugging protocol
 #CFLAGS += -D__STATIC_FLOWPROTO_DUMP_OFFSETS__
-  # enable Flow BMI/Trove protocol
-#CFLAGS += -D__STATIC_FLOWPROTO_BMI_TROVE__
   # enable new style Flow BMI/Trove protocol
 CFLAGS += -D__STATIC_FLOWPROTO_MULTIQUEUE__
   # turn on large file support by default
@@ -443,18 +443,18 @@ kernapps: $(KERNAPPS)
 # Build linux-2.6 kernel module if requested.
 # Can't use the actual file target since we don't know how to figure out
 # dependencies---only the kernel source tree can do that.
-LINUX_KERNEL_SRC = @LINUX_KERNEL_SRC@
 ifneq (,$(LINUX_KERNEL_SRC))
 .PHONY: kmod
-kmod: kernapps
+kmod: just_kmod kernapps
+just_kmod:
 	@$(MAKE) --no-print-directory -C src/kernel/linux-2.6
 endif
 
 # Build linux-2.4 kernel module if requested.
-LINUX24_KERNEL_SRC = @LINUX24_KERNEL_SRC@
 ifneq (,$(LINUX24_KERNEL_SRC))
 .PHONY: kmod24
-kmod24: kernapps
+kmod24: just_kmod24 kernapps
+just_kmod24: 
 	@$(MAKE) --no-print-directory -C src/kernel/linux-2.4
 endif
 
@@ -781,10 +781,11 @@ ifeq ($(NUM_UTS_LINES),1)
 else
     KERNEL_VERS := $(shell uname -r)
 endif
-KMOD_DIR ?= /lib/modules/$(KERNEL_VERS)/kernel/fs
+KMOD_DIR ?= $(kmod_prefix)/lib/modules/$(KERNEL_VERS)/kernel/fs/pvfs2
 
 .PHONY: kmod_install
-kmod_install:
+kmod_install: kmod kernapps
+	install -d $(prefix)/sbin
 	install -m 755 $(KERNAPPS) $(prefix)/sbin
 	install -d $(KMOD_DIR)
 	install -m 755 src/kernel/linux-2.6/pvfs2.ko $(KMOD_DIR)
@@ -798,11 +799,17 @@ ifeq ($(NUM_UTS_LINES),1)
 else
     KERNEL_VERS := $(shell uname -r)
 endif
-KMOD_DIR := /lib/modules/$(KERNEL_VERS)/kernel/fs
+KMOD_DIR := $(kmod_prefix)/lib/modules/$(KERNEL_VERS)/kernel/fs/pvfs2
 
 .PHONY: kmod24_install
-kmod24_install:
+kmod24_install: kmod24 kernapps
+	install -d $(prefix)/sbin
 	install -m 755 $(KERNAPPS) $(prefix)/sbin
 	install -d $(KMOD_DIR)
 	install -m 755 src/kernel/linux-2.4/pvfs2.o $(KMOD_DIR)
+	install -m 755 src/apps/kernel/linux/mount.pvfs2 $(prefix)/sbin
+	@echo ""
+	@echo "For improved linux-2.4 support,"
+	@echo "install $(prefix)/sbin/mount.pvfs2 to /sbin/mount.pvfs2"
+	@echo ""
 endif

@@ -43,6 +43,16 @@ David Beilloin <dbeilloi@mc.com>
 -- contributed resource reclamation on some failure cases
 -- contributed strip size to pvfs2-cp
 
+Phil Carns and David Metheny
+- lots of cleanups to the VFS and system interfaces
+- contributed pvfs2-stat, pvfs2-ln, cleanups to pvfs2-mkdir and pvfs2-rm
+- cleanups to pvfs2-genconfig
+- config file enhancements
+- /sbin/mount.pvfs2 helper tool for 2.4 kernels
+- contributed support for /etc/mtab as an additional source for a pvfs2 tabfile
+  entry
+
+
 
 Other contributors
 ==================

@@ -174,6 +174,41 @@ static inline int cancelled_io_jobs_are_pending(PINT_client_sm *sm_p)
     return (sm_p->u.io.total_cancellations_remaining != 0);
 }
 
+/* this array must be ordered to match the enum in client-state-machine.h */ 
+struct PINT_client_op_entry_s PINT_client_sm_sys_table[] =
+{
+    {&pvfs2_client_remove_sm},
+    {&pvfs2_client_create_sm},
+    {&pvfs2_client_mkdir_sm},
+    {&pvfs2_client_symlink_sm},
+    {&pvfs2_client_sysint_getattr_sm},
+    {&pvfs2_client_io_sm},
+    {&pvfs2_client_flush_sm},
+    {&pvfs2_client_truncate_sm},
+    {&pvfs2_client_readdir_sm},
+    {&pvfs2_client_setattr_sm},
+    {&pvfs2_client_lookup_sm},
+    {&pvfs2_client_rename_sm},
+    {&pvfs2_client_get_eattr_sm},
+    {&pvfs2_client_set_eattr_sm},
+    {&pvfs2_client_del_eattr_sm}
+};
+
+struct PINT_client_op_entry_s PINT_client_sm_mgmt_table[] =
+{
+    {&pvfs2_client_mgmt_setparam_list_sm},
+    {&pvfs2_client_mgmt_noop_sm},
+    {&pvfs2_client_mgmt_statfs_list_sm},
+    {&pvfs2_client_mgmt_perf_mon_list_sm},
+    {&pvfs2_client_mgmt_iterate_handles_list_sm},
+    {&pvfs2_client_mgmt_get_dfile_array_sm},
+    {&pvfs2_client_mgmt_event_mon_list_sm},
+    {&pvfs2_client_mgmt_remove_object_sm},
+    {&pvfs2_client_mgmt_remove_dirent_sm},
+    {&pvfs2_client_mgmt_create_dirent_sm},
+    {&pvfs2_client_mgmt_get_dirdata_handle_sm}
+};
+
 /*
   NOTE: important usage notes regarding post(), test(), and testsome()
 
@@ -231,115 +266,18 @@ PVFS_error PINT_client_state_machine_post(
     sm_p->op = pvfs_sys_op;
     sm_p->op_complete = 0;
 
-    switch (pvfs_sys_op)
+    if(sm_p->op == PVFS_DEV_UNEXPECTED)
     {
-	case PVFS_SYS_REMOVE:
-	    sm_p->current_state =
-                (pvfs2_client_remove_sm.state_machine + 2);
-	    break;
-	case PVFS_SYS_CREATE:
-	    sm_p->current_state =
-                (pvfs2_client_create_sm.state_machine + 2);
-	    break;
-	case PVFS_SYS_MKDIR:
-	    sm_p->current_state =
-                (pvfs2_client_mkdir_sm.state_machine + 2);
-	    break;
-	case PVFS_SYS_SYMLINK:
-	    sm_p->current_state =
-                (pvfs2_client_symlink_sm.state_machine + 2);
-	    break;
-	case PVFS_SYS_READDIR:
-	    sm_p->current_state =
-                (pvfs2_client_readdir_sm.state_machine + 2);
-	    break;
-	case PVFS_SYS_LOOKUP:
-	    sm_p->current_state =
-                (pvfs2_client_lookup_sm.state_machine + 2);
-	    break;
-	case PVFS_SYS_RENAME:
-	    sm_p->current_state =
-                (pvfs2_client_rename_sm.state_machine + 2);
-	    break;
-	case PVFS_SYS_GETATTR:
-	    sm_p->current_state =
-                (pvfs2_client_getattr_sm.state_machine + 2);
-	    break;
-	case PVFS_SYS_SETATTR:
-	    sm_p->current_state =
-                (pvfs2_client_setattr_sm.state_machine + 2);
-	    break;
-	case PVFS_SYS_IO:
-	    sm_p->current_state =
-                (pvfs2_client_io_sm.state_machine + 2);
-	    break;
-	case PVFS_SYS_FLUSH:
-	    sm_p->current_state =
-                (pvfs2_client_flush_sm.state_machine + 2);
-	    break;
-	case PVFS_MGMT_SETPARAM_LIST:
-	    sm_p->current_state =
-                (pvfs2_client_mgmt_setparam_list_sm.state_machine + 2);
-	    break;
-	case PVFS_MGMT_NOOP:
-	    sm_p->current_state =
-                (pvfs2_client_mgmt_noop_sm.state_machine + 2);
-	    break;
-	case PVFS_SYS_TRUNCATE:
-	    sm_p->current_state =
-                (pvfs2_client_truncate_sm.state_machine + 2);
-	    break;
-	case PVFS_MGMT_STATFS_LIST:
-	    sm_p->current_state =
-                (pvfs2_client_mgmt_statfs_list_sm.state_machine + 2);
-	    break;
-	case PVFS_MGMT_PERF_MON_LIST:
-	    sm_p->current_state =
-                (pvfs2_client_mgmt_perf_mon_list_sm.state_machine + 2);
-	    break;
-	case PVFS_MGMT_EVENT_MON_LIST:
-	    sm_p->current_state =
-                (pvfs2_client_mgmt_event_mon_list_sm.state_machine + 2);
-	    break;
-	case PVFS_MGMT_ITERATE_HANDLES_LIST:
-	    sm_p->current_state = 
-                (pvfs2_client_mgmt_iterate_handles_list_sm.state_machine + 2);
-	    break;
-	case PVFS_MGMT_GET_DFILE_ARRAY:
-	    sm_p->current_state =
-                (pvfs2_client_mgmt_get_dfile_array_sm.state_machine + 2);
-	    break;
-        case PVFS_MGMT_REMOVE_OBJECT:
-            sm_p->current_state =
-                (pvfs2_client_mgmt_remove_object_sm.state_machine + 2);
-            break;
-        case PVFS_MGMT_REMOVE_DIRENT:
-            sm_p->current_state =
-                (pvfs2_client_mgmt_remove_dirent_sm.state_machine + 2);
-            break;
-        case PVFS_MGMT_CREATE_DIRENT:
-            sm_p->current_state =
-                (pvfs2_client_mgmt_create_dirent_sm.state_machine + 2);
-            break;
-        case PVFS_MGMT_GET_DIRDATA_HANDLE:
-            sm_p->current_state =
-                (pvfs2_client_mgmt_get_dirdata_handle_sm.state_machine + 2);
-            break;
-	case PVFS_SERVER_GET_CONFIG:
-	    sm_p->current_state =
-                (pvfs2_server_get_config_sm.state_machine + 2);
-	    break;
-	case PVFS_CLIENT_JOB_TIMER:
-	    sm_p->current_state =
-                (pvfs2_client_job_timer_sm.state_machine + 2);
-	    break;
-        case PVFS_DEV_UNEXPECTED:
-            gossip_err("You should be using PINT_sys_dev_unexp for "
-                       "posting this type of operation!  Failing.\n");
-            return ret;
-	default:
-            gossip_lerr("FIXME: Unrecognized sysint operation!\n");
-            return ret;
+        gossip_err("FAILURE: You should be using PINT_sys_dev_unexp for "
+                   "posting this type of operation!\n");
+        return ret;
+    }
+
+    sm_p->current_state = PINT_state_machine_locate(sm_p);
+    if(!sm_p->current_state)
+    {
+       gossip_lerr("ERROR: Unrecognized sysint operation!\n");
+       return  ret;
     }
 
     if (op_id)
@@ -807,10 +745,6 @@ void PINT_sys_release(PVFS_sys_op_id op_id)
             sm_p->cred_p = NULL;
         }
 
-        if (sm_p->acache_hit && sm_p->pinode)
-        {
-            PINT_acache_release(sm_p->pinode);
-        }
         free(sm_p);
     }
 }
@@ -850,6 +784,9 @@ char *PINT_client_get_name_str(int op_type)
         { PVFS_MGMT_CREATE_DIRENT, "PVFS_MGMT_CREATE_DIRENT" },
         { PVFS_MGMT_GET_DIRDATA_HANDLE,
           "PVFS_MGMT_GET_DIRDATA_HANDLE" },
+        { PVFS_SYS_GETEATTR, "PVFS_SYS_GETEATTR" },
+        { PVFS_SYS_SETEATTR, "PVFS_SYS_SETEATTR" },
+        { PVFS_SYS_DELEATTR, "PVFS_SYS_DELEATTR" },
         { PVFS_SERVER_GET_CONFIG, "PVFS_SERVER_GET_CONFIG" },
         { PVFS_CLIENT_JOB_TIMER, "PVFS_CLIENT_JOB_TIMER" },
         { PVFS_DEV_UNEXPECTED, "PVFS_DEV_UNEXPECTED" },

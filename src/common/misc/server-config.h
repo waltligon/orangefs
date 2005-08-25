@@ -15,15 +15,16 @@
 #include "trove.h"
 #endif
 
-enum 
+enum
 {
-    GLOBAL_CONFIG = 1,
-    FILESYSTEM_CONFIG = 2,
-    DEFAULTS_CONFIG = 3,
-    ALIASES_CONFIG = 4,
-    META_HANDLERANGES_CONFIG = 5,
-    DATA_HANDLERANGES_CONFIG = 6,
-    STORAGEHINTS_CONFIG = 7
+    CTX_GLOBAL           = (1 << 1),
+    CTX_DEFAULTS         = (1 << 2),
+    CTX_ALIASES          = (1 << 3),
+    CTX_FILESYSTEM       = (1 << 4),
+    CTX_METAHANDLERANGES = (1 << 5),
+    CTX_DATAHANDLERANGES = (1 << 6),
+    CTX_STORAGEHINTS     = (1 << 7),
+    CTX_DISTRIBUTION     = (1 << 8)
 };
 
 typedef struct phys_server_desc
@@ -58,6 +59,7 @@ typedef struct filesystem_configuration_s
     char *file_system_name;
     PVFS_fs_id coll_id;
     PVFS_handle  root_handle;
+    int default_num_dfiles;
 
     /* ptrs are type host_handle_mapping_s* */
     PINT_llist *meta_handle_ranges;
@@ -81,6 +83,21 @@ typedef struct filesystem_configuration_s
 
 } filesystem_configuration_s;
 
+typedef struct distribution_param_configuration_s
+{
+    char* name;
+    int64_t value;  /* Temporarily hard code to 64bit type */
+
+} distribution_param_configuration;
+
+/* Config struct to hold overloaded distribution defaults */
+typedef struct distribution_configuration_s
+{
+    char* name;
+    PINT_llist* param_list;
+
+} distribution_configuration;
+
 typedef struct server_configuration_s
 {
     char *host_id;
@@ -92,6 +109,12 @@ typedef struct server_configuration_s
     ssize_t server_config_buflen;   /* the server.conf file length      */
     char *server_config_buf;        /* the server.conf file contents    */
     int  initial_unexpected_requests;
+    int  server_job_bmi_timeout;    /* job timeout values in seconds    */
+    int  server_job_flow_timeout;
+    int  client_job_bmi_timeout; 
+    int  client_job_flow_timeout;
+    int  client_retry_limit;        /* how many times to retry client operations */
+    int  client_retry_delay_ms;     /* delay between retries */
     int  perf_update_interval;      /* how quickly (in msecs) to
                                        update perf monitor              */
     char *logfile;
@@ -104,6 +127,8 @@ typedef struct server_configuration_s
     PINT_llist *host_aliases;       /* ptrs are type host_alias_s       */
     PINT_llist *file_systems;       /* ptrs are type
                                        filesystem_configuration_s       */
+    distribution_configuration default_dist_config;  /* distribution conf */
+
 } server_configuration_s;
 
 int PINT_parse_config(

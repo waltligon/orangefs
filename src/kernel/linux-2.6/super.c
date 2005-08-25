@@ -16,6 +16,7 @@ extern spinlock_t pvfs2_request_list_lock;
 extern wait_queue_head_t pvfs2_request_list_waitq;
 
 extern void pvfs2_kill_sb(struct super_block *sb);
+extern int debug;
 
 /* list for storing pvfs2 specific superblocks in use */
 LIST_HEAD(pvfs2_superblocks);
@@ -129,7 +130,7 @@ static int parse_mount_options(
                 }
                 else
                 {
-                    pvfs2_error("pvfs2: multiple device names specified: "
+                    pvfs2_print("pvfs2: multiple device names specified: "
                                 "ignoring %s\n", options[i]);
                 }
             }
@@ -542,7 +543,7 @@ struct super_block* pvfs2_get_sb(
     service_operation(new_op, "pvfs2_get_sb", 0);
     ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
 
-    pvfs2_print("pvfs2_remount: mount got return value of %d\n", ret);
+    pvfs2_print("%s: mount got return value of %d\n", __func__, ret);
     if (ret)
     {
         goto error_exit;

@@ -168,6 +168,7 @@ struct bmi_method_ops bmi_gm_ops = {
     BMI_gm_open_context,
     BMI_gm_close_context,
     BMI_gm_cancel,
+    NULL,
 };
 
 /* module parameters */

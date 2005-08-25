@@ -14,6 +14,7 @@
 #include "quicklist.h"
 #include "gen-locks.h"
 #include "gossip.h"
+#include "job-time-mgr.h"
 
 static QLIST_HEAD(bucket_queue);
 static gen_mutex_t bucket_mutex = GEN_MUTEX_INITIALIZER;

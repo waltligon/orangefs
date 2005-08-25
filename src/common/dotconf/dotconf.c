@@ -76,10 +76,19 @@ static DOTCONF_CB(
     dotconf_cb_includepath);	/* internal 'IncludePath' */
 
 static configoption_t dotconf_options[] = {
-    {"Include", ARG_STR, dotconf_cb_include, NULL, CTX_ALL},
-    {"IncludePath", ARG_STR, dotconf_cb_includepath, NULL, CTX_ALL},
+    {"Include", ARG_STR, dotconf_cb_include, NULL, CTX_ALL, NULL},
+    {"IncludePath", ARG_STR, dotconf_cb_includepath, NULL, CTX_ALL, NULL},
     LAST_CONTEXT_OPTION
 };
+
+static void PINT_dotconf_set_command(
+    configfile_t * configfile,
+    const configoption_t * option,
+    char *args,
+    command_t * cmd);
+
+static void PINT_dotconf_free_command(
+    command_t * command);
 
 static void skip_whitespace(
     char **cp,
@@ -239,7 +248,7 @@ void PINT_dotconf_register_options(
 	if (!(num % GROW_BY))
 	    configfile->config_options = realloc(configfile->config_options,
 						 sizeof(void *) * (num +
-								   GROW_BY));
+								   GROW_BY + 1));
     }
 
 #undef GROW_BY
@@ -396,6 +405,50 @@ const char *PINT_dotconf_invoke_command(
     return error;
 }
 
+const char *PINT_dotconf_set_defaults(
+    configfile_t * configfile,
+    unsigned long context)
+{
+    const char *error = 0;
+    const configoption_t *option;
+    command_t command;
+    int done = 0;
+    int opt_idx = 0;
+    int mod = 0;
+
+    for (option = 0; configfile->config_options[mod] && !done; mod++)
+    {
+        for (opt_idx = 0;
+             configfile->config_options[mod][opt_idx].name[0]; opt_idx++)
+        {
+            option =
+                (configoption_t *) & configfile->config_options[mod][opt_idx];
+            if(option && (context & option->context) && option->default_value)
+            {
+                /* set up the command structure (contextchecker wants this) */
+                PINT_dotconf_set_command(configfile, option, 
+                                         (char *)option->default_value, 
+                                         &command);
+                if(command.error)
+                {
+                    error = "Parse error.\n";
+                    PINT_dotconf_free_command(&command);
+                    return error;
+                }
+
+                error = PINT_dotconf_invoke_command(configfile, &command);
+                PINT_dotconf_free_command(&command);
+                if(error)
+                {
+                    return error;
+                }
+            }
+        }
+    }
+
+    return error;
+}
+
 char *PINT_dotconf_read_arg(
     configfile_t * configfile,
     char **line)
@@ -526,13 +579,14 @@ configoption_t *PINT_dotconf_find_command(
     return option;
 }
 
-void PINT_dotconf_set_command(
+static void PINT_dotconf_set_command(
     configfile_t * configfile,
     const configoption_t * option,
     char *args,
     command_t * cmd)
 {
     char *eob = 0;
+    int ret = -1;
 
     eob = args + strlen(args);
 
@@ -543,6 +597,7 @@ void PINT_dotconf_set_command(
     cmd->configfile = configfile;
     cmd->data.list = (char **) calloc(CFG_VALUES, sizeof(char *));
     cmd->data.str = 0;
+    cmd->error = 0;
 
     if (option->type == ARG_RAW)
     {
@@ -609,7 +664,9 @@ void PINT_dotconf_set_command(
 		{
 		    PINT_dotconf_warning(configfile, DCLOG_WARNING,
 				    ERR_WRONG_ARG_COUNT,
-				    "Missing argument to option '%s'", name);
+				    "Missing argument to option '%s'\n", 
+                                    option->name);
+                    cmd->error = 1;
 		    return;
 		}
 
@@ -620,18 +677,30 @@ void PINT_dotconf_set_command(
 		{
 		    PINT_dotconf_warning(configfile, DCLOG_WARNING,
 				    ERR_WRONG_ARG_COUNT,
-				    "Missing argument to option '%s'", name);
+				    "Missing argument to option '%s'\n", 
+                                    option->name);
+                    cmd->error = 1;
 		    return;
 		}
 
-		sscanf(cmd->data.list[0], "%li", &cmd->data.value);
+		ret = sscanf(cmd->data.list[0], "%li", &cmd->data.value);
+                if(ret != 1)
+                {
+		    PINT_dotconf_warning(configfile, DCLOG_WARNING,
+				    ERR_PARSE_ERROR,
+				    "Non-integer argument to option '%s'\n",
+                                    option->name);
+                    cmd->error = 1;
+                }
 		break;
 	    case ARG_STR:
 		if (cmd->arg_count < 1)
 		{
 		    PINT_dotconf_warning(configfile, DCLOG_WARNING,
 				    ERR_WRONG_ARG_COUNT,
-				    "Missing argument to option '%s'", name);
+				    "Missing argument to option '%s'\n", 
+                                    option->name);
+                    cmd->error = 1;
 		    return;
 		}
 
@@ -648,7 +717,7 @@ void PINT_dotconf_set_command(
     }
 }
 
-void PINT_dotconf_free_command(
+static void PINT_dotconf_free_command(
     command_t * command)
 {
     int i;
@@ -735,6 +804,12 @@ const char *PINT_dotconf_handle_command(
 
 	/* set up the command structure (contextchecker wants this) */
 	PINT_dotconf_set_command(configfile, option, cp1, &command);
+        if(command.error)
+        {
+            error = "Parse error.\n";
+	    PINT_dotconf_free_command(&command);
+            break;
+        }
 
 	if (configfile->contextchecker)
 	    context_error =

@@ -37,7 +37,7 @@ static int test_vec_start_final(void){
     int i;
     PINT_Request *r1;
     PINT_Request_state *rs1;
-    PINT_Request_file_data rf1;
+    PINT_request_file_data rf1;
     PINT_Request_result seg1;
                                                                                 
     /* PVFS_Process_request arguments */
@@ -51,7 +51,7 @@ static int test_vec_start_final(void){
 
 
     /* set up request state */
-    rs1 = PINT_New_request_state(r1);
+    rs1 = PINT_new_request_state(r1);
                                                                                 
     /* set up file data for request */
     rf1.server_nr = 0;
@@ -88,7 +88,7 @@ static int test_vec_start_final(void){
        seg1.segs = 0;
                                                                                 
        /* process request */
-       retval = PINT_Process_request(rs1, NULL, &rf1, &seg1, PINT_SERVER);
+       retval = PINT_process_request(rs1, NULL, &rf1, &seg1, PINT_SERVER);
                                                                                  
 	if(retval >= 0)
 	{

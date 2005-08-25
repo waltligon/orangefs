@@ -13,6 +13,8 @@
 #define PVFS_DIST_SIMPLE_STRIPE_NAME "simple_stripe"
 #define PVFS_DIST_SIMPLE_STRIPE_NAME_SIZE 14
 
+#define PVFS_DIST_SIMPLE_STRIPE_DEFAULT_STRIP_SIZE 65536
+
 /* simple stripe distribution parameters */
 struct PVFS_simple_stripe_params_s {
 	PVFS_size strip_size;

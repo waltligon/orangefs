@@ -25,7 +25,7 @@ void gen_init(void)
 
 void gen_state_decl(char *state_name)
 {
-    fprintf(out_file,"extern union PINT_state_array_values ST_%s[];\n", state_name);
+    fprintf(out_file,"static union PINT_state_array_values ST_%s[];\n", state_name);
 }
 
 void gen_machine(char *machine_name,

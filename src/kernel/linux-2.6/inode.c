@@ -26,6 +26,7 @@ extern struct file_operations pvfs2_file_operations;
 extern struct inode_operations pvfs2_symlink_inode_operations;
 extern struct inode_operations pvfs2_dir_inode_operations;
 extern struct file_operations pvfs2_dir_operations;
+extern int debug;
 
 
 /** Read page-sized blocks from file.  This code is only used in the mmap
@@ -147,7 +148,7 @@ static int pvfs2_get_blocks(
 
         if (bytes_read < 0)
         {
-            pvfs2_print("pvfs_get_blocks: failed to read page block %d\n",
+            pvfs2_print("pvfs2_get_blocks: failed to read page block %d\n",
                         (int)page->index);
             pvfs2_inode->last_failed_block_index_read = page->index;
         }
@@ -258,9 +259,14 @@ static int pvfs2_releasepage(struct page *page, int foo)
 struct backing_dev_info pvfs2_backing_dev_info =
 {
     .ra_pages = 1024,
+#ifdef HAVE_BDI_MEMORY_BACKED
+    /* old interface, up through 2.6.11 */
     .memory_backed = 1 /* does not contribute to dirty memory */
+#else
+    .capabilities = BDI_CAP_NO_ACCT_DIRTY | BDI_CAP_NO_WRITEBACK,
+#endif
 };
-#endif /* PVFS2_LINUX_KERNEL_2_4 */
+#endif /* !PVFS2_LINUX_KERNEL_2_4 */
 
 /** PVFS2 implementation of address space operations */
 struct address_space_operations pvfs2_address_operations =
@@ -360,11 +366,21 @@ struct inode_operations pvfs2_file_inode_operations =
 #ifdef PVFS2_LINUX_KERNEL_2_4
     truncate : pvfs2_truncate,
     setattr : pvfs2_setattr,
-    revalidate : pvfs2_revalidate
+    revalidate : pvfs2_revalidate,
+#ifdef HAVE_XATTR
+    setxattr : pvfs2_setxattr, 
+    getxattr : pvfs2_getxattr,
+/*    listxattr : pvfs2_listxattr, */
+    removexattr: pvfs2_removexattr, 
+#endif
 #else
     .truncate = pvfs2_truncate,
     .setattr = pvfs2_setattr,
-    .getattr = pvfs2_getattr
+    .getattr = pvfs2_getattr,
+    .setxattr = pvfs2_setxattr,
+    .getxattr = pvfs2_getxattr,
+/*    .listxattr = pvfs2_listxattr,*/
+    .removexattr = pvfs2_removexattr,
 #endif
 };
 

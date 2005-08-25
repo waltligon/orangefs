@@ -39,7 +39,7 @@ static GtkItemFactoryEntry menu_items[] = {
     "<Item>" },
 };
 
-static GtkWidget *main_window = NULL;
+GtkWidget *main_window = NULL;
 
 /* gui_menu_setup(window)
  *

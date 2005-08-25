@@ -27,7 +27,7 @@ int main(int argc, char **argv)
 	PINT_Request_state *mem_state;
 	PINT_Request_state *file_state;
 	PINT_Request_state *file_state_server;
-	PINT_Request_file_data rf1;
+	PINT_request_file_data rf1;
 	PINT_Request_result seg1;
 	PVFS_size total_bytes_client = 0;
 	PVFS_size total_bytes_server = 0;
@@ -38,16 +38,16 @@ int main(int argc, char **argv)
 	/* setup file datatype */
 	file_req = PVFS_BYTE;
 
-	PINT_dist_initialize();
+	PINT_dist_initialize(NULL);
 
 	/* setup mem datatype */
 	PVFS_Request_contiguous(2251664, PVFS_BYTE, &mem_req);
 
 	for(j=0; j<67; j++)
 	{
-	    mem_state = PINT_New_request_state(mem_req);
-	    file_state = PINT_New_request_state(file_req);
-	    file_state_server = PINT_New_request_state(file_req);
+	    mem_state = PINT_new_request_state(mem_req);
+	    file_state = PINT_new_request_state(file_req);
+	    file_state_server = PINT_new_request_state(file_req);
 
 	    /* set up file data for request */
 	    rf1.server_nr = j;
@@ -85,11 +85,11 @@ int main(int argc, char **argv)
 		    total_bytes_server = 0;
 
 		    /* process request */
-		    retval = PINT_Process_request(file_state, mem_state, &rf1, &seg1, PINT_CLIENT);
+		    retval = PINT_process_request(file_state, mem_state, &rf1, &seg1, PINT_CLIENT);
 
 		    if(retval >= 0)
 		    {
-			    printf("results of PINT_Process_request():\n");
+			    printf("results of PINT_process_request():\n");
 			    printf("%d segments with %lld bytes\n", seg1.segs, Ld(seg1.bytes));
 			    total_bytes_client += seg1.bytes;
 			    for(i=0; i<seg1.segs; i++)
@@ -103,7 +103,7 @@ int main(int argc, char **argv)
 	    
 	    if(retval < 0)
 	    {
-		    fprintf(stderr, "Error: PINT_Process_request() failure.\n");
+		    fprintf(stderr, "Error: PINT_process_request() failure.\n");
 		    return(-1);
 	    }
 	    if(PINT_REQUEST_DONE(file_state))
@@ -118,11 +118,11 @@ int main(int argc, char **argv)
 		    seg1.segs = 0;
 
 		    /* process request */
-		    retval = PINT_Process_request(file_state_server, NULL, &rf1, &seg1, PINT_SERVER);
+		    retval = PINT_process_request(file_state_server, NULL, &rf1, &seg1, PINT_SERVER);
 
 		    if(retval >= 0)
 		    {
-			    printf("results of PINT_Process_request():\n");
+			    printf("results of PINT_process_request():\n");
 			    printf("%d segments with %lld bytes\n", seg1.segs, Ld(seg1.bytes));
 			    total_bytes_server += seg1.bytes;
 			    for(i=0; i<seg1.segs; i++)
@@ -136,7 +136,7 @@ int main(int argc, char **argv)
 
 	    if(retval < 0)
 	    {
-		    fprintf(stderr, "Error: PINT_Process_request() failure.\n");
+		    fprintf(stderr, "Error: PINT_process_request() failure.\n");
 		    return(-1);
 	    }
 	    if(PINT_REQUEST_DONE(file_state_server))

@@ -45,10 +45,10 @@ static int test_request_cont(void){
     PINT_Request_state *rs2;
     PINT_Request_state *rs3;
     PINT_Request_state *rs4;
-    PINT_Request_file_data rf1;
-    PINT_Request_file_data rf2;
-    PINT_Request_file_data rf3;
-    PINT_Request_file_data rf4;
+    PINT_request_file_data rf1;
+    PINT_request_file_data rf2;
+    PINT_request_file_data rf3;
+    PINT_request_file_data rf4;
     PINT_Request_result seg1;
     int ret = -1;
     int pack_size = 0;
@@ -75,13 +75,13 @@ static int test_request_cont(void){
     /* allocate a new request and pack the original one into it */
     pack_size = PINT_REQUEST_PACK_SIZE(r);
     r_enc = (PINT_Request*)malloc(pack_size);
-    ret = PINT_Request_commit(r_enc, r);
+    ret = PINT_request_commit(r_enc, r);
     if(ret < 0)
     {
 	fprintf(stderr, "PINT_Request_commit() failure.\n");
 	return(-1);
     }
-    ret = PINT_Request_encode(r_enc);
+    ret = PINT_request_encode(r_enc);
     if(ret < 0)
     {
 	fprintf(stderr, "PINT_Request_encode() failure.\n");
@@ -96,7 +96,7 @@ static int test_request_cont(void){
     memcpy(r_dec, r_enc, pack_size);
     free(r_enc);
     free(r);
-    ret = PINT_Request_decode(r_dec);
+    ret = PINT_request_decode(r_dec);
     if(ret < 0)
     {
        fprintf(stderr, "PINT_Request_decode() failure.\n");
@@ -104,10 +104,10 @@ static int test_request_cont(void){
     }
                                                                                  
     /* set up four request states */
-    rs1 = PINT_New_request_state(r_dec);
-    rs2 = PINT_New_request_state(r_dec);
-    rs3 = PINT_New_request_state(r_dec);
-    rs4 = PINT_New_request_state(r_dec);
+    rs1 = PINT_new_request_state(r_dec);
+    rs2 = PINT_new_request_state(r_dec);
+    rs3 = PINT_new_request_state(r_dec);
+    rs4 = PINT_new_request_state(r_dec);
                                                                                  
     /* set up file data for each server */
     rf1.server_nr = 0;
@@ -159,7 +159,7 @@ static int test_request_cont(void){
 	/* note that bytemax is exactly large enough to hold all of the
 	 * data that I should find here
          */
-	retval = PINT_Process_request(rs1, NULL, &rf1, &seg1, PINT_SERVER);
+	retval = PINT_process_request(rs1, NULL, &rf1, &seg1, PINT_SERVER);
 	                                                                                 
 	if(!PINT_REQUEST_DONE(rs1))
 	{
@@ -205,7 +205,7 @@ static int test_request_cont(void){
 	/* note that bytemax is exactly large enough to hold all of the
 	 * data that I should find here
 	 */
-	retval = PINT_Process_request(rs2, NULL, &rf2, &seg1, PINT_SERVER);
+	retval = PINT_process_request(rs2, NULL, &rf2, &seg1, PINT_SERVER);
                                                                                 
 	if(!PINT_REQUEST_DONE(rs2))
 	{
@@ -252,7 +252,7 @@ static int test_request_cont(void){
 	/* note that bytemax is exactly large enough to hold all of the
 	* data that I should find here
 	*/
-	retval = PINT_Process_request(rs3, NULL, &rf3, &seg1, PINT_SERVER);
+	retval = PINT_process_request(rs3, NULL, &rf3, &seg1, PINT_SERVER);
                                                                                 
 	if(!PINT_REQUEST_DONE(rs3))
 	{
@@ -298,7 +298,7 @@ static int test_request_cont(void){
 	/* note that bytemax is exactly large enough to hold all of the
 	 * data that I should find here
 	 */
-	retval = PINT_Process_request(rs4, NULL, &rf4, &seg1, PINT_SERVER);
+	retval = PINT_process_request(rs4, NULL, &rf4, &seg1, PINT_SERVER);
                                                                                 
 	if(!PINT_REQUEST_DONE(rs4))
 	{

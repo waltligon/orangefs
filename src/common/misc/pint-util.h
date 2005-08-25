@@ -47,6 +47,39 @@ void PINT_time_diff(PINT_time_marker mark1,
     double* out_utime_sec,
     double* out_stime_sec);
 
+/* allows us to define arrays that map human readable keywords to mask values */
+typedef struct 
+{
+    char *keyword;
+    uint64_t mask_val;
+} PINT_keyword_mask_t;
+
+uint64_t PINT_keyword_to_mask(const PINT_keyword_mask_t * keyword_array, 
+                              size_t length, 
+                              const char *value);
+
+const char * PINT_mask_to_keyword(const PINT_keyword_mask_t * mask_map,
+                                  size_t length,
+                                  uint64_t mask);
+
+char * PINT_print_keywords(const PINT_keyword_mask_t * keyword_array,
+                           size_t arraylen,
+                           int columns, 
+                           const char * sep);
+
+enum PINT_access_type
+{
+    PINT_ACCESS_EXECUTABLE = 1,
+    PINT_ACCESS_WRITABLE = 2,
+    PINT_ACCESS_READABLE = 4,
+};
+
+int PINT_check_mode(
+    PVFS_object_attr *attr,
+    PVFS_uid uid, PVFS_gid gid,
+    enum PINT_access_type access_type);
+
+
 #endif /* __PINT_UTIL_H */
 
 /*

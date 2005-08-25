@@ -16,6 +16,7 @@
 #include "pvfs2-mgmt.h"
 #include "gossip.h"
 #include "id-generator.h"
+#include "pint-util.h"
 
 #define PINT_EVENT_DEFAULT_TEXTLOG_FILENAME "/tmp/pvfs2-events-log.txt"
 
@@ -293,8 +294,11 @@ void __PINT_event_pablo(enum PVFS_event_api api,
 	case PVFS_EVENT_API_TROVE:
 	    sprintf(description, "trove operation");
 	    break;
-	default:
-	    /* TODO: someone fed us a bad api */
+        case PVFS_EVENT_API_ENCODE_REQ:
+        case PVFS_EVENT_API_ENCODE_RESP:
+        case PVFS_EVENT_API_DECODE_REQ:
+        case PVFS_EVENT_API_DECODE_RESP:
+        case PVFS_EVENT_API_SM:
     }
 
     /* PVFS_EVENT_API_BMI, operation(SEND|RECV), value, id, FLAG (start|end) */
@@ -340,10 +344,16 @@ void __PINT_event_mpe(enum PVFS_event_api api,
 	    }
 	case PVFS_EVENT_API_TROVE:
 	    if (flags & PVFS_EVENT_FLAG_START) {
-		MPE_Log_event(PINT_event_trove_start, 0, NULL);
+		MPE_Log_event(PINT_event_trove_wr_start, 0, NULL);
 	    } else if (flags & PVFS_EVENT_FLAG_END) {
-		MPE_Log_event(PINT_event_trove_stop, value, NULL);
+		MPE_Log_event(PINT_event_trove_wr_stop, value, NULL);
 	    }
+        case PVFS_EVENT_API_ENCODE_REQ:
+        case PVFS_EVENT_API_ENCODE_RESP:
+        case PVFS_EVENT_API_DECODE_REQ:
+        case PVFS_EVENT_API_DECODE_RESP:
+        case PVFS_EVENT_API_SM:
+            ; /* XXX: NEEDS SOMETHING */
     }
 
 }
@@ -443,47 +453,98 @@ void PINT_event_log_events(
     gen_mutex_unlock(&event_mutex);
 }
 
-const char * PVFS_event_api_names[PVFS_EVENT_API_COUNT] =
+#define API_KEYWORD_ENTRY(__kw) {#__kw, PVFS_EVENT_API_##__kw}
+
+const PINT_keyword_mask_t PINT_event_api_names[] =
 {
-    "JOB",
-    "BMI",
-    "TROVE",
-    "ENCODE_REQ",
-    "ENCODE_RESP",
-    "DECODE_REQ",
-    "DECODE_RESP",
-    "SM",
-    "STATES"
+    API_KEYWORD_ENTRY(JOB),
+    API_KEYWORD_ENTRY(BMI),
+    API_KEYWORD_ENTRY(TROVE),
+    API_KEYWORD_ENTRY(ENCODE_REQ),
+    API_KEYWORD_ENTRY(ENCODE_RESP),
+    API_KEYWORD_ENTRY(DECODE_REQ),
+    API_KEYWORD_ENTRY(DECODE_RESP),
+    API_KEYWORD_ENTRY(SM),
+    API_KEYWORD_ENTRY(STATES)
 };
 
-const char * PVFS_event_op_names[PVFS_EVENT_OP_COUNT] =
+uint64_t PVFS_event_api_keyword_to_mask(const char *value)
 {
-     "BMI_SEND",
-     "BMI_RECV",
-     "FLOW",
-     "TROVE_READ_AT",
-     "TROVE_WRITE_AT",
-     "TROVE_BSTREAM_FLUSH",
-     "TROVE_KEYVAL_FLUSH",
-     "TROVE_READ_LIST",
-     "TROVE_WRITE_LIST",
-     "TROVE_KEYVAL_READ",
-     "TROVE_KEYVAL_READ_LIST",
-     "TROVE_KEYVAL_WRITE",
-     "TROVE_DSPACE_GETATTR",
-     "TROVE_DSPACE_SETATTR",
-     "TROVE_BSTREAM_RESIZE",
-     "TROVE_KEYVAL_REMOVE",
-     "TROVE_KEYVAL_ITERATE",
-     "TROVE_KEYVAL_ITERATE_KEYS",
-     "TROVE_DSPACE_ITERATE_HANDLES",
-     "TROVE_DSPACE_CREATE",
-     "TROVE_DSPACE_REMOVE",
-     "TROVE_DSPACE_VERIFY",
-     "TROVE_BSTREAM_VALIDATE",
-     "TROVE_KEYVAL_VALIDATE"
+    return PINT_keyword_to_mask(PINT_event_api_names, 
+                                (sizeof(PINT_event_api_names) /
+                                sizeof(PINT_keyword_mask_t)),
+                                value);
+}
+
+const char * PINT_event_api_get_keyword(uint64_t mask)
+{
+    return PINT_mask_to_keyword(PINT_event_api_names,
+                                (sizeof(PINT_event_api_names) /
+                                 sizeof(PINT_keyword_mask_t)),
+                                mask);
+}
+
+char * PINT_event_api_print_keywords(int columns, const char * sep)
+{
+    return PINT_print_keywords(PINT_event_api_names,
+                               sizeof(PINT_event_api_names) /
+                               sizeof(PINT_keyword_mask_t),
+                               columns, sep);
+}
+
+#define OP_KEYWORD_ENTRY(__kw) {#__kw, PVFS_EVENT_##__kw}
+
+const PINT_keyword_mask_t PINT_event_op_names[] =
+{
+    OP_KEYWORD_ENTRY(BMI_SEND),
+    OP_KEYWORD_ENTRY(BMI_RECV),
+    OP_KEYWORD_ENTRY(FLOW),
+    OP_KEYWORD_ENTRY(TROVE_READ_AT),
+    OP_KEYWORD_ENTRY(TROVE_WRITE_AT),
+    OP_KEYWORD_ENTRY(TROVE_BSTREAM_FLUSH),
+    OP_KEYWORD_ENTRY(TROVE_KEYVAL_FLUSH),
+    OP_KEYWORD_ENTRY(TROVE_READ_LIST),
+    OP_KEYWORD_ENTRY(TROVE_WRITE_LIST),
+    OP_KEYWORD_ENTRY(TROVE_KEYVAL_READ),
+    OP_KEYWORD_ENTRY(TROVE_KEYVAL_READ_LIST),
+    OP_KEYWORD_ENTRY(TROVE_KEYVAL_WRITE),
+    OP_KEYWORD_ENTRY(TROVE_DSPACE_GETATTR),
+    OP_KEYWORD_ENTRY(TROVE_DSPACE_SETATTR),
+    OP_KEYWORD_ENTRY(TROVE_BSTREAM_RESIZE),
+    OP_KEYWORD_ENTRY(TROVE_KEYVAL_REMOVE),
+    OP_KEYWORD_ENTRY(TROVE_KEYVAL_ITERATE),
+    OP_KEYWORD_ENTRY(TROVE_KEYVAL_ITERATE_KEYS),
+    OP_KEYWORD_ENTRY(TROVE_DSPACE_ITERATE_HANDLES),
+    OP_KEYWORD_ENTRY(TROVE_DSPACE_CREATE),
+    OP_KEYWORD_ENTRY(TROVE_DSPACE_REMOVE),
+    OP_KEYWORD_ENTRY(TROVE_DSPACE_VERIFY),
+    OP_KEYWORD_ENTRY(TROVE_BSTREAM_VALIDATE),
+    OP_KEYWORD_ENTRY(TROVE_KEYVAL_VALIDATE)
 };  
 
+uint64_t PVFS_event_op_keyword_to_mask(const char *value)
+{
+    return PINT_keyword_to_mask(PINT_event_op_names, 
+                                sizeof(PINT_event_op_names) /
+                                sizeof(PINT_keyword_mask_t),
+                                value);
+}
+
+const char * PINT_event_op_get_keyword(uint64_t mask)
+{
+    return PINT_mask_to_keyword(PINT_event_op_names,
+                                sizeof(PINT_event_op_names) /
+                                sizeof(PINT_keyword_mask_t),
+                                mask);
+}
+
+char * PINT_event_op_print_keywords(int columns, const char * sep)
+{
+    return PINT_print_keywords(PINT_event_op_names,
+                               sizeof(PINT_event_op_names) /
+                               sizeof(PINT_keyword_mask_t),
+                               columns, sep);
+}
 
 /*
  * Local variables:

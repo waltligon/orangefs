@@ -33,6 +33,7 @@ typedef struct
 
     gen_mutex_t *server_config_mutex;
     struct server_configuration_s *server_config;
+    int ref_count; /* allows same config to be added multiple times */
 } server_config_t;
 
 static struct qhash_table *s_fsid_to_config_table = NULL;
@@ -167,9 +168,7 @@ int PINT_server_config_mgr_reload_cached_config_interface(void)
 
         for (i = 0; i < s_fsid_to_config_table->table_size; i++)
         {
-            hash_link = qhash_search_at_index(
-                s_fsid_to_config_table, i);
-            if (hash_link)
+            qhash_for_each(hash_link, &s_fsid_to_config_table->array[i])
             {
                 config = qlist_entry(
                     hash_link, server_config_t, hash_link);
@@ -238,8 +237,15 @@ int PINT_server_config_mgr_add_config(
         hash_link = qhash_search(s_fsid_to_config_table, &fs_id);
         if (hash_link)
         {
-            ret = -PVFS_EEXIST;
-            goto add_failure;
+            gossip_debug(GOSSIP_CLIENT_DEBUG, "PINT_server_config_mgr_add_"
+                         "config: increasing reference count.\n");
+            /* config is already stored here, increase reference count */
+            config = qlist_entry(hash_link, server_config_t, hash_link);
+            assert(config);
+            assert(config->server_config);
+            config->ref_count++;
+            gen_mutex_unlock(s_server_config_mgr_mutex);
+            return(0);
         }
 
         config = (server_config_t *)malloc(sizeof(server_config_t));
@@ -259,6 +265,7 @@ int PINT_server_config_mgr_add_config(
 
         config->server_config = config_s;
         config->fs_id = fs_id;
+        config->ref_count = 1;
 
         qhash_add(s_fsid_to_config_table, &fs_id,
                   &config->hash_link);
@@ -305,7 +312,7 @@ int PINT_server_config_mgr_remove_config(
         gen_mutex_lock(s_server_config_mgr_mutex);
         SC_MGR_ASSERT_OK(ret);
 
-        hash_link = qhash_search_and_remove(
+        hash_link = qhash_search(
             s_fsid_to_config_table, &fs_id);
         if (hash_link)
         {
@@ -314,26 +321,38 @@ int PINT_server_config_mgr_remove_config(
             assert(config->server_config);
             assert(config->fs_id == fs_id);
 
-            gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: "
-                         "Removed config object %p with fs_id %d\n",
-                         __func__, config, fs_id);
+            config->ref_count--;
 
-            /*
-              config objects are allocated by fs-add.c:PVFS_sys_fs_add
-              but we free them here
-            */
-            PINT_config_release(config->server_config);
-            free(config->server_config);
-
-            if (gen_mutex_trylock(config->server_config_mutex) == EBUSY)
+            if(config->ref_count == 0)
             {
-                gossip_err("FIXME: Destroying mutex that is in use!\n");
-            }
-            gen_mutex_unlock(config->server_config_mutex);
-            gen_mutex_destroy(config->server_config_mutex);
+                gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: "
+                             "Removed config object %p with fs_id %d\n",
+                             __func__, config, fs_id);
+                qhash_del(&config->hash_link);
 
-            free(config);
-            config = NULL;
+                /*
+                 * config objects are allocated by fs-add.c:PVFS_sys_fs_add
+                 * but we free them here
+                 */
+                PINT_config_release(config->server_config);
+                free(config->server_config);
+
+                if(gen_mutex_trylock(config->server_config_mutex) == EBUSY)
+                {
+                    gossip_err("FIXME: Destroying mutex that is in use!\n");
+                }
+                gen_mutex_unlock(config->server_config_mutex);
+                gen_mutex_destroy(config->server_config_mutex);
+
+                free(config);
+                config = NULL;
+            }
+            else
+            {
+                gossip_debug(GOSSIP_CLIENT_DEBUG, "%s: "
+                             "Config object %p with fs_id %d still in use.\n",
+                             __func__, config, fs_id);
+            }
 
             ret = 0;
         }

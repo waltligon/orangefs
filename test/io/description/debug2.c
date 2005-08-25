@@ -29,7 +29,7 @@ PVFS_offset exp1_size[] =
 {
 		1048576
 };
-PINT_Request_result exp[] =
+PINT_Request_result expected[] =
 {{
 	   offset_array : &exp1_offset[0],
 	   size_array : &exp1_size[0],
@@ -57,7 +57,7 @@ PINT_Request_result exp[] =
 }};
 
 
-int request_debug()
+int request_debug(void)
 {
 	int i;
 	PINT_Request *r;
@@ -67,10 +67,10 @@ int request_debug()
 	PINT_Request_state *rs2;
 	PINT_Request_state *rs3;
 	PINT_Request_state *rs4;
-	PINT_Request_file_data rf1;
-	PINT_Request_file_data rf2;
-	PINT_Request_file_data rf3;
-	PINT_Request_file_data rf4;
+	PINT_request_file_data rf1;
+	PINT_request_file_data rf2;
+	PINT_request_file_data rf3;
+	PINT_request_file_data rf4;
 	PINT_Request_result seg1;
 	int ret = -1;
 	int pack_size = 0;
@@ -91,13 +91,13 @@ int request_debug()
 	/* allocate a new request and pack the original one into it */
 	pack_size = PINT_REQUEST_PACK_SIZE(r);
 	r_enc = (PINT_Request*)malloc(pack_size);
-	ret = PINT_Request_commit(r_enc, r);
+	ret = PINT_request_commit(r_enc, r);
 	if(ret < 0)
 	{
 		fprintf(stderr, "PINT_Request_commit() failure.\n");
 		return(-1);
 	}
-	ret = PINT_Request_encode(r_enc);
+	ret = PINT_request_encode(r_enc);
 	if(ret < 0)
 	{
 		fprintf(stderr, "PINT_Request_encode() failure.\n");
@@ -112,21 +112,21 @@ int request_debug()
 	memcpy(r_dec, r_enc, pack_size);
 	free(r_enc);
 	free(r);
-	ret = PINT_Request_decode(r_dec);
+	ret = PINT_request_decode(r_dec);
 	if(ret < 0)
 	{
-		fprintf(stderr, "PINT_Request_decode() failure.\n");
+		fprintf(stderr, "PINT_request_decode() failure.\n");
 		return(-1);
 	}
 
 	/* set up four request states */
-	rs1 = PINT_New_request_state(r_dec);
-	rs2 = PINT_New_request_state(r_dec);
-	rs3 = PINT_New_request_state(r_dec);
-	rs4 = PINT_New_request_state(r_dec);
+	rs1 = PINT_new_request_state(r_dec);
+	rs2 = PINT_new_request_state(r_dec);
+	rs3 = PINT_new_request_state(r_dec);
+	rs4 = PINT_new_request_state(r_dec);
 
 	/* set up file data for each server */
-	PINT_dist_initialize();
+	PINT_dist_initialize(NULL);
 	rf1.server_nr = 0;
 	rf1.server_ct = 4;
 	rf1.fsize = 0;
@@ -187,7 +187,7 @@ int request_debug()
 		/* note that bytemax is exactly large enough to hold all of the
 		 * data that I should find here
 		 */
-		retval = PINT_Process_request(rs1, NULL, &rf1, &seg1, PINT_SERVER);
+		retval = PINT_process_request(rs1, NULL, &rf1, &seg1, PINT_SERVER);
 
 		if(!PINT_REQUEST_DONE(rs1))
 		{
@@ -197,8 +197,8 @@ int request_debug()
 		if(retval >= 0)
 		{
 			prtseg(&seg1,"Results obtained");
-			prtseg(&exp[i],"Results expected");
-			cmpseg(&seg1,&exp[i]);
+			prtseg(&expected[i],"Results expected");
+			cmpseg(&seg1,&expected[i]);
 		}
 
 		i++;
@@ -207,7 +207,7 @@ int request_debug()
 	
 	if(retval < 0)
 	{
-		fprintf(stderr, "Error: PINT_Process_request() failure.\n");
+		fprintf(stderr, "Error: PINT_process_request() failure.\n");
 		return(-1);
 	}
 	if(PINT_REQUEST_DONE(rs1))
@@ -227,7 +227,7 @@ int request_debug()
 		/* note that bytemax is exactly large enough to hold all of the
 		 * data that I should find here
 		 */
-		retval = PINT_Process_request(rs2, NULL, &rf2, &seg1, PINT_SERVER);
+		retval = PINT_process_request(rs2, NULL, &rf2, &seg1, PINT_SERVER);
 
 		if(!PINT_REQUEST_DONE(rs2))
 		{
@@ -237,8 +237,8 @@ int request_debug()
 		if(retval >= 0)
 		{
 			prtseg(&seg1,"Results obtained");
-			prtseg(&exp[i],"Results expected");
-			cmpseg(&seg1,&exp[i]);
+			prtseg(&expected[i],"Results expected");
+			cmpseg(&seg1,&expected[i]);
 		}
 
 		i++;
@@ -247,7 +247,7 @@ int request_debug()
 	
 	if(retval < 0)
 	{
-		fprintf(stderr, "Error: PINT_Process_request() failure.\n");
+		fprintf(stderr, "Error: PINT_process_request() failure.\n");
 		return(-1);
 	}
 	if(PINT_REQUEST_DONE(rs2))
@@ -267,7 +267,7 @@ int request_debug()
 		/* note that bytemax is exactly large enough to hold all of the
 		 * data that I should find here
 		 */
-		retval = PINT_Process_request(rs3, NULL, &rf3, &seg1, PINT_SERVER);
+		retval = PINT_process_request(rs3, NULL, &rf3, &seg1, PINT_SERVER);
 
 		if(!PINT_REQUEST_DONE(rs3))
 		{
@@ -277,8 +277,8 @@ int request_debug()
 		if(retval >= 0)
 		{
 			prtseg(&seg1,"Results obtained");
-			prtseg(&exp[i],"Results expected");
-			cmpseg(&seg1,&exp[i]);
+			prtseg(&expected[i],"Results expected");
+			cmpseg(&seg1,&expected[i]);
 		}
 
 		i++;
@@ -287,7 +287,7 @@ int request_debug()
 	
 	if(retval < 0)
 	{
-		fprintf(stderr, "Error: PINT_Process_request() failure.\n");
+		fprintf(stderr, "Error: PINT_process_request() failure.\n");
 		return(-1);
 	}
 	if(PINT_REQUEST_DONE(rs3))
@@ -308,7 +308,7 @@ int request_debug()
 		/* note that bytemax is exactly large enough to hold all of the
 		 * data that I should find here
 		 */
-		retval = PINT_Process_request(rs4, NULL, &rf4, &seg1, PINT_SERVER);
+		retval = PINT_process_request(rs4, NULL, &rf4, &seg1, PINT_SERVER);
 
 		if(!PINT_REQUEST_DONE(rs4))
 		{
@@ -318,8 +318,8 @@ int request_debug()
 		if(retval >= 0)
 		{
 			prtseg(&seg1,"Results obtained");
-			prtseg(&exp[i],"Results expected");
-			cmpseg(&seg1,&exp[i]);
+			prtseg(&expected[i],"Results expected");
+			cmpseg(&seg1,&expected[i]);
 		}
 
 		i++;
@@ -328,7 +328,7 @@ int request_debug()
 	
 	if(retval < 0)
 	{
-		fprintf(stderr, "Error: PINT_Process_request() failure.\n");
+		fprintf(stderr, "Error: PINT_process_request() failure.\n");
 		return(-1);
 	}
 	if(PINT_REQUEST_DONE(rs4))

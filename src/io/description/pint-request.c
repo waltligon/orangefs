@@ -4,6 +4,7 @@
  * See COPYING in top-level directory.
  */       
 
+#include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -13,7 +14,7 @@
 #include <pint-request.h>
 #include <pint-distribution.h>
 
-static int PINT_Request_disp(PINT_Request *request);
+static int PINT_request_disp(PINT_Request *request);
 
 /* this macro is only used in this file to add a segment to the
  * result list.
@@ -58,10 +59,9 @@ do { \
 /* chunks are done.  Returns the number of bytes processed.  It */
 /* is assumed caller we retry if this is less than the total bytes */
 /* in the request */
-
-int PINT_Process_request(PINT_Request_state *req,
+int PINT_process_request(PINT_Request_state *req,
 	PINT_Request_state *mem,
-	PINT_Request_file_data *rfdata,
+	PINT_request_file_data *rfdata,
 	PINT_Request_result *result,
 	int mode)
 {
@@ -70,26 +70,26 @@ int PINT_Process_request(PINT_Request_state *req,
 	PVFS_offset  contig_offset; /* temp for offset of a contig region */
 	PVFS_size    contig_size;   /* temp for size of a contig region */
 	PVFS_size    retval;        /* return value from calls to distribute */
-	gossip_debug(GOSSIP_REQUEST_DEBUG,"PINT_Process_request\n");
+	gossip_debug(GOSSIP_REQUEST_DEBUG,"PINT_process_request\n");
 	/* do very basic error checking here */
 	if (!req)
 	{
-		gossip_lerr("PINT_Process_request: Bad PINT_Request_state!\n");
+		gossip_lerr("PINT_process_request: Bad PINT_Request_state!\n");
 		return -1;
 	}
 	if (!result || !result->segmax || !result->bytemax)
 	{
-		gossip_lerr("PINT_Process_request: NULL segmax or bytemax!\n");
+		gossip_lerr("PINT_process_request: NULL segmax or bytemax!\n");
 		return -1;
 	}
 	if (result->segs >= result->segmax || result->bytes >= result->bytemax)
 	{
-		gossip_lerr("PINT_Process_request: no segments or bytes requested!\n");
+		gossip_lerr("PINT_process_request: no segments or bytes requested!\n");
 		return -1;
 	}
 	if (!PINT_IS_CKSIZE(mode) && (!result->offset_array || !result->size_array))
 	{
-		gossip_lerr("PINT_Process_request: NULL offset or size array!\n");
+		gossip_lerr("PINT_process_request: NULL offset or size array!\n");
 		return -1;
 	}
 	/* initialize some variables */
@@ -98,7 +98,7 @@ int PINT_Process_request(PINT_Request_state *req,
 	if (req->start_offset == -1)
 	{
 		/* this indicates we already finished the request */
-		gossip_lerr("PINT_Process_request: start offset -1!\n");
+		gossip_lerr("PINT_process_request: start offset -1!\n");
 		return 0;
 	}
 #endif
@@ -222,7 +222,7 @@ int PINT_Process_request(PINT_Request_state *req,
 			gossip_debug(GOSSIP_REQUEST_DEBUG,"\tbasic type or contiguous data\n");
 			contig_offset = req->cur[req->lvl].rq->offset +
 					req->cur[req->lvl].chunk_offset + req->bytes +
-					PINT_Request_disp(req->cur[req->lvl].rq);
+					PINT_request_disp(req->cur[req->lvl].rq);
 			contig_size = (req->cur[req->lvl].maxel *
 					req->cur[req->lvl].rq->aggregate_size) - req->bytes;
 			lvl_flag = 1;
@@ -240,7 +240,7 @@ int PINT_Process_request(PINT_Request_state *req,
 												  req->cur[req->lvl].rqbase->lb)) +
 				req->cur[req->lvl].rq->offset + (req->cur[req->lvl].rq->stride *
 						req->cur[req->lvl].blk) + req->bytes +
-				PINT_Request_disp(req->cur[req->lvl].rq);
+				PINT_request_disp(req->cur[req->lvl].rq);
 			contig_size = (req->cur[req->lvl].rq->ereq->aggregate_size *
 					req->cur[req->lvl].rq->num_ereqs) - req->bytes;
 			lvl_flag = 0;
@@ -252,7 +252,7 @@ int PINT_Process_request(PINT_Request_state *req,
 			if (!req->cur[req->lvl].rq->ereq ||
 					req->lvl+1 >= req->cur[0].rqbase->depth)
 			{
-				gossip_lerr("PINT_Process_request exceeded request depth - possibly corrupted request or request state\n");
+				gossip_lerr("PINT_process_request exceeded request depth - possibly corrupted request or request state\n");
 				return -1;
 			}
 			req->cur[req->lvl+1].el = 0;
@@ -350,9 +350,21 @@ int PINT_Process_request(PINT_Request_state *req,
 			else
 			{
 				/* we process the whole thing at once */
-				gossip_debug(GOSSIP_REQUEST_DEBUG,"\tcalling distribute\n");
-				retval = PINT_Distribute(contig_offset, sz,
-						rfdata, mem, result, &req->eof_flag, mode);
+				gossip_debug(GOSSIP_REQUEST_DEBUG,
+                                             "\tcalling distribute\n");
+				retval = PINT_distribute(contig_offset, sz,
+                                                         rfdata, mem, result,
+                                                         &req->eof_flag, mode);
+
+                                if (-1 == retval)
+                                {
+                                    gossip_debug(GOSSIP_REQUEST_DEBUG,
+                                                 "\tDistribute returned -1\n");
+                                    req->type_offset = req->final_offset;
+                                    result->segs = 0;
+                                    result->bytes = 0;
+                                    return 0;
+                                }
 			}
 		}
 		/*** AFTER CALLING DISTRIBUTE ***/
@@ -474,7 +486,7 @@ int PINT_Process_request(PINT_Request_state *req,
 
 /* this function runs down the ereq list and adds up the offsets */
 /* present in the request records */
-static int PINT_Request_disp(PINT_Request *request)
+static int PINT_request_disp(PINT_Request *request)
 {
 	int disp = 0;
 	PINT_Request *r;
@@ -488,7 +500,7 @@ static int PINT_Request_disp(PINT_Request *request)
 
 /* This function creates a request state and sets it up to begin */
 /* processing a request */
-struct PINT_Request_state *PINT_New_request_state (PINT_Request *request)
+struct PINT_Request_state *PINT_new_request_state(PINT_Request *request)
 {
 	struct PINT_Request_state *req;
 	int32_t rqdepth;
@@ -531,15 +543,19 @@ struct PINT_Request_state *PINT_New_request_state (PINT_Request *request)
 }
 
 /* This function frees request state structures */
-void PINT_Free_request_state (PINT_Request_state *req)
+void PINT_free_request_state (PINT_Request_state *req)
 {
 	free(req->cur);
 	free(req);
 }
 
-/* This function should return the byte displacement from the input argument
- * offset to the last byte in the segment processed regardless of
- * whether that byte is in the current distribution or not.
+/**
+ * Returns:
+ *     - If the distribute finds file data on the server, then the byte
+ *       displacement from the input argument offset to the last byte
+ *       in the segment processed regardless of whether that byte is in
+ *       the current distribution or not
+ *     - -1 if there is no distribution data available on the server
  * Inputs:
  * 	- offset and size are the contiguous region in logical file
  * 	space we are to process
@@ -558,187 +574,230 @@ void PINT_Free_request_state (PINT_Request_state *req)
  * 	segment offsets are computed based on buffer offset in
  * 	offset_array[*segs]
  */
-PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
-		PINT_Request_file_data *rfdata, PINT_Request_state *mem,
-		PINT_Request_result *result, PVFS_boolean *eof_flag, int mode)
+PVFS_size PINT_distribute(PVFS_offset offset,
+                          PVFS_size size,
+                          PINT_request_file_data *rfdata,
+                          PINT_Request_state *mem,
+                          PINT_Request_result *result,
+                          PVFS_boolean *eof_flag,
+                          int mode)
 {
-	PVFS_offset orig_offset;
-	PVFS_size   orig_size;
-   PVFS_offset loff;    /* next logical offset within requested region */
-   PVFS_offset diff;    /* difference between loff and offset of region */
-   PVFS_offset poff;    /* physical offste corresponding to loff */
-   PVFS_size   sz;      /* number of bytes in requested region after loff */
-   PVFS_size   fraglen; /* length of physical strip contiguous on server */
+    PVFS_offset orig_offset;
+    PVFS_size   orig_size;
+    PVFS_offset loff;    /* next logical offset within requested region */
+    PVFS_offset diff;    /* difference between loff and offset of region */
+    PVFS_offset poff;    /* physical offste corresponding to loff */
+    PVFS_size   sz;      /* number of bytes in requested region after loff */
+    PVFS_size   fraglen; /* length of physical strip contiguous on server */
 
-	gossip_debug(GOSSIP_REQUEST_DEBUG,"\tPINT_Distribute\n");
-	gossip_debug(GOSSIP_REQUEST_DEBUG,
-			"\t\tof %lld sz %lld ix %d sm %d by %lld bm %lld "
-			"fsz %lld exfl %d\n",
-			Ld(offset), Ld(size), result->segs, result->segmax, Ld(result->bytes),
-			Ld(result->bytemax),
-			Ld(rfdata->fsize), rfdata->extend_flag);
-	orig_offset = offset;
-	orig_size = size;
-	*eof_flag = 0;
-	/* check if we have maxed out result */
-	if ((!PINT_IS_CKSIZE(mode) && (result->segs >= result->segmax)) ||
-			result->bytes >= result->bytemax || size == 0)
-	{
-		/* not an error, but we didn't process any bytes */
-		gossip_debug(GOSSIP_REQUEST_DEBUG,"\t\trequested zero segs or zero bytes\n");
-		return 0;
-	}
-	/* verify some critical pointers */
-	if (!rfdata || !rfdata->dist || !rfdata->dist->methods ||
-			!rfdata->dist->params)
-	{
-		if (!rfdata)
-			gossip_debug(GOSSIP_REQUEST_DEBUG,"rfdata is NULL\n");
-		else if (!rfdata->dist)
-			gossip_debug(GOSSIP_REQUEST_DEBUG,"rfdata->dist is NULL\n");
-		else if (!rfdata->dist->methods)
-			gossip_debug(GOSSIP_REQUEST_DEBUG,"rfdata->dist->methods is NULL\n");
-		else if (!rfdata->dist->params)
-			gossip_debug(GOSSIP_REQUEST_DEBUG,"rfdata->dist->params is NULL\n");
-		gossip_lerr("Bad Distribution! Bailing out!\n");
-		return 0;
-	}
-	/* find next logical offset on this server */
-   loff = (*rfdata->dist->methods->next_mapped_offset)
-			(rfdata->dist->params, rfdata->server_nr, rfdata->server_ct, offset);
-	/* make sure loff is still within requested region */
-   while ((diff = loff - offset) < size)
-   {
-		gossip_debug(GOSSIP_REQUEST_DEBUG,"\t\tbegin iteration loff: %lld\n", Ld(loff));
-		/* find physical offset for this loff */
-      poff = (*rfdata->dist->methods->logical_to_physical_offset)
-				(rfdata->dist->params, rfdata->server_nr, rfdata->server_ct, loff);
-		/* find how much of requested region remains after loff */
-      sz = size - diff;
-		/* find how much data after loff/poff is on this server */
-      fraglen = (*rfdata->dist->methods->contiguous_length)
-				(rfdata->dist->params, rfdata->server_nr, rfdata->server_ct, poff);
-		/* compare that amount to amount of data in requested region */
-      if (sz > fraglen && rfdata->server_ct != 1)
-		{
-			/* frag extends beyond this strip */
-			gossip_debug(GOSSIP_REQUEST_DEBUG,"\t\tfrag extends beyond strip\n");
-			sz = fraglen;
-		}
-		/* check to see if exceeds bytemax */
-		if (result->bytes + sz > result->bytemax)
-		{
-			/* contiguous segment extends beyond byte limit */
-			gossip_debug(GOSSIP_REQUEST_DEBUG,"\t\tsegment exceeds byte limit\n");
-			sz = result->bytemax - result->bytes;
-		}
-		/* check to se if exceeds end of file */
-		if (poff+sz > rfdata->fsize)
-		{
-			/* check for append */
-			if (rfdata->extend_flag)
-			{
+    gossip_debug(GOSSIP_REQUEST_DEBUG,"\tPINT_distribute\n");
+    gossip_debug(GOSSIP_REQUEST_DEBUG,
+                 "\t\tof %lld sz %lld ix %d sm %d by %lld bm %lld "
+                 "fsz %lld exfl %d\n",
+                 Ld(offset), Ld(size), result->segs, result->segmax,
+                 Ld(result->bytes),
+                 Ld(result->bytemax),
+                 Ld(rfdata->fsize), rfdata->extend_flag);
+    orig_offset = offset;
+    orig_size = size;
+    *eof_flag = 0;
+    
+    /* check if we have maxed out result */
+    if ((!PINT_IS_CKSIZE(mode) && (result->segs >= result->segmax)) ||
+        result->bytes >= result->bytemax || size == 0)
+    {
+        /* not an error, but we didn't process any bytes */
+        gossip_debug(GOSSIP_REQUEST_DEBUG,
+                     "\t\trequested zero segs or zero bytes\n");
+        return 0;
+    }
+    
+    /* verify some critical pointers */
+    if (!rfdata || !rfdata->dist || !rfdata->dist->methods ||
+        !rfdata->dist->params)
+    {
+        if (!rfdata)
+            gossip_debug(GOSSIP_REQUEST_DEBUG,"rfdata is NULL\n");
+        else if (!rfdata->dist)
+            gossip_debug(GOSSIP_REQUEST_DEBUG,"rfdata->dist is NULL\n");
+        else if (!rfdata->dist->methods)
+            gossip_debug(GOSSIP_REQUEST_DEBUG,"rfdata->dist->methods is NULL\n");
+        else if (!rfdata->dist->params)
+            gossip_debug(GOSSIP_REQUEST_DEBUG,"rfdata->dist->params is NULL\n");
+        gossip_lerr("Bad Distribution! Bailing out!\n");
+        return 0;
+    }
+    
+    /* find next logical offset on this server */
+    loff = (*rfdata->dist->methods->next_mapped_offset)(rfdata->dist->params,
+                                                        rfdata,
+                                                        offset);
+
+    /* If there is no data on this server, immediately return */
+    if (-1 == loff)
+    {
+        return -1;
+    }
+    
+    /* make sure loff is still within requested region */
+    while ((diff = loff - offset) < size)
+    {
+        gossip_debug(GOSSIP_REQUEST_DEBUG,"\t\tbegin iteration loff: %lld\n",
+                     Ld(loff));
+        
+        /* find physical offset for this loff */
+        poff = (*rfdata->dist->methods->logical_to_physical_offset)
+            (rfdata->dist->params,
+             rfdata,
+             loff);
+        
+        /* find how much of requested region remains after loff */
+        sz = size - diff;
+        
+        /* find how much data after loff/poff is on this server */
+        fraglen = (*rfdata->dist->methods->contiguous_length)
+            (rfdata->dist->params,
+             rfdata,
+             poff);
+        
+        /* compare that amount to amount of data in requested region */
+        if (sz > fraglen && rfdata->server_ct != 1)
+        {
+            /* frag extends beyond this strip */
+            gossip_debug(GOSSIP_REQUEST_DEBUG,"\t\tfrag extends beyond strip\n");
+            sz = fraglen;
+        }
+        /* check to see if exceeds bytemax */
+        if (result->bytes + sz > result->bytemax)
+        {
+            /* contiguous segment extends beyond byte limit */
+            gossip_debug(GOSSIP_REQUEST_DEBUG,"\t\tsegment exceeds byte limit\n");
+            sz = result->bytemax - result->bytes;
+        }
+        /* check to se if exceeds end of file */
+        if (poff+sz > rfdata->fsize)
+        {
+            /* check for append */
+            if (rfdata->extend_flag)
+            {
          	/* update the file size info */
-				gossip_debug(GOSSIP_REQUEST_DEBUG,"\t\tfile being extended\n");
-				rfdata->fsize = poff + sz;
-			}
-			else
-			{
-				/* hit end of file */
-				gossip_debug(GOSSIP_REQUEST_DEBUG,
-						"\t\thit end of file: po %lld sz %lld fsz %lld\n",
-						Ld(poff), Ld(sz), Ld(rfdata->fsize));
-				*eof_flag = 1;
-				sz = rfdata->fsize - poff;
-				if (sz <= 0)
-				{
-					/* not even any more bytes before EOF */
-					gossip_debug(GOSSIP_REQUEST_DEBUG,
-							"\t\tend of file and no more bytes\n");
-					break;
-				}
-			}
-		}
-		/* process a segment */
-		if (PINT_IS_CLIENT(mode))
-		{
-			poff = result->offset_array[result->segs] + diff;
-			gossip_debug(GOSSIP_REQUEST_DEBUG,"\tclient lstof %lld diff %lld sgof %lld\n",
-					Ld(result->offset_array[result->segs]), Ld(diff), Ld(poff));
-		}
-		/* else poff is the offset of the segment */
-		if (PINT_IS_CLIENT(mode) && mem)
-		{
-			/* call request processor to decode request type */
-			/* sequential offset is offset_array[*segs] */
-			/* size is sz */
-			gossip_debug(GOSSIP_REQUEST_DEBUG,"**********CALL***PROCESS*********\n");
-			gossip_debug(GOSSIP_REQUEST_DEBUG,"\t\tsegment of %lld sz %lld\n", Ld(poff), Ld(sz));
-			PINT_REQUEST_STATE_SET_TARGET(mem, poff);
-			PINT_REQUEST_STATE_SET_FINAL(mem, poff + sz);
-			PINT_Process_request (mem, NULL, rfdata, result, mode|PINT_MEMREQ);
-			sz = mem->type_offset - poff;
-			gossip_debug(GOSSIP_REQUEST_DEBUG,"*****RETURN***FROM***PROCESS*****\n");
-		}
-		else
-		{
-			PINT_ADD_SEGMENT(result, poff, sz, mode);
-		}
-		/* this is used by client code */
-		if (PINT_IS_CLIENT(mode) && result->segs < result->segmax)
-		{
-			result->offset_array[result->segs] =
-				result->offset_array[result->segs - 1] + 
-				result->size_array[result->segs - 1];
-		}
-      /* prepare for next iteration */
-      loff  += sz;
-      size  -= loff - offset;
-      offset = loff;
-		/* find next logical offset on this server */
-      loff = (*rfdata->dist->methods->next_mapped_offset)
-				(rfdata->dist->params, rfdata->server_nr, rfdata->server_ct, offset);
-		gossip_debug(GOSSIP_REQUEST_DEBUG,"\t\tend iteration\n");
-		/* see if we are finished */
-		if (result->bytes >= result->bytemax ||
-				(!PINT_IS_CKSIZE(mode) && (result->segs >= result->segmax)))
-		{
-			gossip_debug(GOSSIP_REQUEST_DEBUG,"\t\tdone with segments or bytes\n");
-			break;
-		}
-   }
-	gossip_debug(GOSSIP_REQUEST_DEBUG,"\t\tfinished\n");
-	gossip_debug(GOSSIP_REQUEST_DEBUG,
-			"\t\t\tof %lld sz %lld sg %d sm %d by %lld bm %lld\n",
-			Ld(offset), Ld(size), result->segs, result->segmax, Ld(result->bytes),
-			Ld(result->bytemax));
-	/* find physical offset for this loff */
-   poff = (*rfdata->dist->methods->logical_to_physical_offset)
-			(rfdata->dist->params, rfdata->server_nr, rfdata->server_ct, loff);
-	gossip_debug(GOSSIP_REQUEST_DEBUG,
-	  "\t\t\tnext loff: %lld next poff: %lld\n", Ld(loff), Ld(poff));
+                gossip_debug(GOSSIP_REQUEST_DEBUG,"\t\tfile being extended\n");
+                rfdata->fsize = poff + sz;
+            }
+            else
+            {
+                /* hit end of file */
+                gossip_debug(GOSSIP_REQUEST_DEBUG,
+                             "\t\thit end of file: po %lld sz %lld fsz %lld\n",
+                             Ld(poff), Ld(sz), Ld(rfdata->fsize));
+                *eof_flag = 1;
+                sz = rfdata->fsize - poff;
+                if (sz <= 0)
+                {
+                    /* not even any more bytes before EOF */
+                    gossip_debug(GOSSIP_REQUEST_DEBUG,
+                                 "\t\tend of file and no more bytes\n");
+                    break;
+                }
+            }
+        }
+        /* process a segment */
+        if (PINT_IS_CLIENT(mode))
+        {
+            poff = result->offset_array[result->segs] + diff;
+            gossip_debug(GOSSIP_REQUEST_DEBUG,
+                         "\tclient lstof %lld diff %lld sgof %lld\n",
+                         Ld(result->offset_array[result->segs]), Ld(diff),
+                         Ld(poff));
+        }
+        /* else poff is the offset of the segment */
+        if (PINT_IS_CLIENT(mode) && mem)
+        {
+            gossip_debug(GOSSIP_REQUEST_DEBUG,
+                         "**********CALL***PROCESS*********\n");
+            gossip_debug(GOSSIP_REQUEST_DEBUG,"\t\tsegment of %lld sz %lld\n",
+                         Ld(poff), Ld(sz));
 
-	if (poff >= rfdata->fsize && !rfdata->extend_flag)
-	{
-		/* end of file - thus end of request */
-		*eof_flag = 1;
-		gossip_debug(GOSSIP_REQUEST_DEBUG,"\t\t\t[return value] %lld (EOF)\n",
-				Ld(orig_size));
-		return orig_size;
-	}
-	if (loff >= orig_offset + orig_size)
-	{
-		gossip_debug(GOSSIP_REQUEST_DEBUG,
-		  "\t\t\t(return value) %lld%s\n", Ld(orig_size),
-		  *eof_flag ? " (EOF)" : "");
-		return orig_size;
-	}
-	else
-	{
-		gossip_debug(GOSSIP_REQUEST_DEBUG,"\t\t\treturn value %lld%s\n",
-			Ld(offset - orig_offset), *eof_flag ? " (EOF)" : "");
-		return (offset - orig_offset);
-	}
+            /* call request processor to decode request type */
+            /* sequential offset is offset_array[*segs] */
+            /* size is sz */
+            PINT_REQUEST_STATE_SET_TARGET(mem, poff);
+            PINT_REQUEST_STATE_SET_FINAL(mem, poff + sz);
+            PINT_process_request(mem, NULL, rfdata, result, mode|PINT_MEMREQ);
+            sz = mem->type_offset - poff;
+            
+            gossip_debug(GOSSIP_REQUEST_DEBUG,
+                         "*****RETURN***FROM***PROCESS*****\n");
+        }
+        else
+        {
+            PINT_ADD_SEGMENT(result, poff, sz, mode);
+        }
+        /* this is used by client code */
+        if (PINT_IS_CLIENT(mode) && result->segs < result->segmax)
+        {
+            result->offset_array[result->segs] =
+                result->offset_array[result->segs - 1] + 
+                result->size_array[result->segs - 1];
+        }
+        /* prepare for next iteration */
+        loff  += sz;
+        size  -= loff - offset;
+        offset = loff;
+        /* find next logical offset on this server */
+        loff = (*rfdata->dist->methods->next_mapped_offset)
+            (rfdata->dist->params,
+             rfdata,
+             offset);
+        assert(-1 != loff);
+        
+        gossip_debug(GOSSIP_REQUEST_DEBUG,"\t\tend iteration\n");
+        /* see if we are finished */
+        if (result->bytes >= result->bytemax ||
+            (!PINT_IS_CKSIZE(mode) && (result->segs >= result->segmax)))
+        {
+            gossip_debug(GOSSIP_REQUEST_DEBUG,
+                         "\t\tdone with segments or bytes\n");
+            break;
+        }
+    }
+    
+    gossip_debug(GOSSIP_REQUEST_DEBUG,"\t\tfinished\n");
+    gossip_debug(GOSSIP_REQUEST_DEBUG,
+                 "\t\t\tof %lld sz %lld sg %d sm %d by %lld bm %lld\n",
+                 Ld(offset), Ld(size), result->segs, result->segmax,
+                 Ld(result->bytes),
+                 Ld(result->bytemax));
+    
+    /* find physical offset for this loff */
+    poff = (*rfdata->dist->methods->logical_to_physical_offset)
+        (rfdata->dist->params, rfdata, loff);
+    
+    gossip_debug(GOSSIP_REQUEST_DEBUG,
+                 "\t\t\tnext loff: %lld next poff: %lld\n",
+                 Ld(loff), Ld(poff));
+    
+    if (poff >= rfdata->fsize && !rfdata->extend_flag)
+    {
+        /* end of file - thus end of request */
+        *eof_flag = 1;
+        gossip_debug(GOSSIP_REQUEST_DEBUG,"\t\t\t[return value] %lld (EOF)\n",
+                     Ld(orig_size));
+        return orig_size;
+    }
+    if (loff >= orig_offset + orig_size)
+    {
+        gossip_debug(GOSSIP_REQUEST_DEBUG,
+                     "\t\t\t(return value) %lld%s\n", Ld(orig_size),
+                     *eof_flag ? " (EOF)" : "");
+        return orig_size;
+    }
+    else
+    {
+        gossip_debug(GOSSIP_REQUEST_DEBUG,"\t\t\treturn value %lld%s\n",
+                     Ld(offset - orig_offset), *eof_flag ? " (EOF)" : "");
+        return (offset - orig_offset);
+    }
 }
 
 /* Function: PINT_Request_commit
@@ -750,14 +809,14 @@ PVFS_size PINT_Distribute(PVFS_offset offset, PVFS_size size,
  * offsets must reflect the current offsets and then write each struct 
  * to the contiguous memory region
  */
-int PINT_Request_commit(PINT_Request *region, PINT_Request *node)
+int PINT_request_commit(PINT_Request *region, PINT_Request *node)
 {
-	int32_t index = 0;
-	PINT_Do_Request_commit(region, node, &index, 0);
-	return 0;
+    int32_t index = 0;
+    PINT_do_request_commit(region, node, &index, 0);
+    return 0;
 }
 
-int PINT_Do_clear_commit(PINT_Request *node, int32_t depth)
+int PINT_do_clear_commit(PINT_Request *node, int32_t depth)
 {
 	if (node == NULL)
 		return -1;
@@ -769,16 +828,16 @@ int PINT_Do_clear_commit(PINT_Request *node, int32_t depth)
 
 	if (node->ereq)
 	{
-		PINT_Do_clear_commit(node->ereq, depth+1);
+		PINT_do_clear_commit(node->ereq, depth+1);
 	}
 	if (node->sreq)
 	{
-		PINT_Do_clear_commit(node->sreq, depth+1);
+		PINT_do_clear_commit(node->sreq, depth+1);
 	}
 	return 0;
 }
 
-PINT_Request *PINT_Do_Request_commit(PINT_Request *region, PINT_Request *node,
+PINT_Request *PINT_do_request_commit(PINT_Request *region, PINT_Request *node,
 		int32_t *index, int32_t depth)
 {
 	int node_was_committed = 0;
@@ -813,7 +872,7 @@ PINT_Request *PINT_Do_Request_commit(PINT_Request *region, PINT_Request *node,
 	if (node->ereq)
 	{
 		region[node->committed].ereq =
-				PINT_Do_Request_commit(region, node->ereq, index, depth+1);
+				PINT_do_request_commit(region, node->ereq, index, depth+1);
 	}
 	else
 	{
@@ -824,7 +883,7 @@ PINT_Request *PINT_Do_Request_commit(PINT_Request *region, PINT_Request *node,
 	if (node->sreq)
 	{
 		region[node->committed].sreq =
-				PINT_Do_Request_commit(region, node->sreq, index, depth+1);
+				PINT_do_request_commit(region, node->sreq, index, depth+1);
 	}
 	else
 	{
@@ -834,7 +893,7 @@ PINT_Request *PINT_Do_Request_commit(PINT_Request *region, PINT_Request *node,
 	if (depth == 0)
 	{
 		gossip_debug(GOSSIP_REQUEST_DEBUG,"clearing tree\n");
-		PINT_Do_clear_commit(node, 0);
+		PINT_do_clear_commit(node, 0);
 		/* this indicates the region is packed */
 		region->committed = -1;
 		/* if the original request was committed, this restores that */
@@ -851,7 +910,7 @@ PINT_Request *PINT_Do_Request_commit(PINT_Request *region, PINT_Request *node,
 /* This function converts pointers to array indexes for transport
  * The input Request MUST be committed
  */
-int PINT_Request_encode(struct PINT_Request *req)
+int PINT_request_encode(struct PINT_Request *req)
 {
 	int r;
 	if (!PINT_REQUEST_IS_PACKED(req))
@@ -873,7 +932,7 @@ int PINT_Request_encode(struct PINT_Request *req)
 /* This function coverts array indexes back to pointers after transport
  * The input Request MUST be committed
  */
-int PINT_Request_decode(struct PINT_Request *req)
+int PINT_request_decode(struct PINT_Request *req)
 {
 	int r;
 	if (!PINT_REQUEST_IS_PACKED(req))
@@ -894,18 +953,18 @@ int PINT_Request_decode(struct PINT_Request *req)
 }
     
 
-void PINT_Dump_packed_request(PINT_Request *req)
+void PINT_dump_packed_request(PINT_Request *req)
 {
 	int i;
 	if (!PINT_REQUEST_IS_PACKED(req))
 		return;
 	for (i = 0; i < PINT_REQUEST_NEST_SIZE(req)+1; i++)
 	{
-		PINT_Dump_request(req+i);
+		PINT_dump_request(req+i);
 	}
 }
 
-void PINT_Dump_request(PINT_Request *req)
+void PINT_dump_request(PINT_Request *req)
 {
 	gossip_debug(GOSSIP_REQUEST_DEBUG,"**********************\n");
 	gossip_debug(GOSSIP_REQUEST_DEBUG,"address:\t%p\n",req);
@@ -925,3 +984,14 @@ void PINT_Dump_request(PINT_Request *req)
 	gossip_debug(GOSSIP_REQUEST_DEBUG,"sreq:\t\t%p\n",req->sreq);
 	gossip_debug(GOSSIP_REQUEST_DEBUG,"**********************\n");
 }
+
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */
