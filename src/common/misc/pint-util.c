@@ -261,7 +261,7 @@ uint64_t PINT_keyword_to_mask(const PINT_keyword_mask_t * keyword_map,
                               size_t length, 
                               const char *value)
 {
-    uint64_t mask = -1;
+    uint64_t mask = 0;
     char *s = NULL, *t = NULL;
     const char *toks = ", ";
     int i = 0, negate = 0;

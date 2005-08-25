@@ -101,8 +101,6 @@ static int deleattr_verify_eattribs(
 {
     PVFS_object_attr *a_p = NULL;
 
-    PINT_STATE_DEBUG("verify_eattribs");
-
     a_p = &s_op->attr;
 
     js_p->error_code = 0;
@@ -174,8 +172,6 @@ static int deleattr_delobj_eattribs(PINT_server_op *s_op, job_status_s *js_p)
     job_id_t j_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
 
-    PINT_STATE_DEBUG("seteattr_setobj_eattribs");
-
     /* set up key and value structure for keyval write */
     s_op->key.buffer = s_op->req->u.deleattr.key.buffer;
     s_op->key.buffer_sz = s_op->req->u.deleattr.key.buffer_sz;
@@ -222,8 +218,6 @@ static int deleattr_delobj_eattribs(PINT_server_op *s_op, job_status_s *js_p)
  */
 static int deleattr_cleanup(PINT_server_op *s_op, job_status_s *js_p)
 {
-    PINT_STATE_DEBUG("deleattr_cleanup");
-
     gossip_debug(
         GOSSIP_DELEATTR_DEBUG,
         "keybuf %p keylen %d\n",

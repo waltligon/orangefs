@@ -1824,7 +1824,7 @@ int job_trove_keyval_write_list(PVFS_fs_id coll_id,
     jd->trove_callback.fn = trove_thread_mgr_callback;
     jd->trove_callback.data = (void*)jd;
     user_ptr_internal = &jd->trove_callback;
-    JOB_EVENT_START(PVFS_EVENT_TROVE_KEYVAL_WRITE_LIST, jd->job_id);
+    JOB_EVENT_START(PVFS_EVENT_TROVE_KEYVAL_WRITE_LIST, user_ptr, jd->job_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_keyval_write_list(coll_id, handle,
@@ -1841,7 +1841,7 @@ int job_trove_keyval_write_list(PVFS_fs_id coll_id,
     if (ret < 0)
     {
         /* error posting trove operation */
-        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_WRITE_LIST, 0, jd->job_id);
+        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_WRITE_LIST, count, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         out_status_p->error_code = ret;
@@ -1855,7 +1855,7 @@ int job_trove_keyval_write_list(PVFS_fs_id coll_id,
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
         out_status_p->vtag = jd->u.trove.vtag;
-        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_WRITE_LIST, 0, jd->job_id);
+        JOB_EVENT_END(PVFS_EVENT_TROVE_KEYVAL_WRITE_LIST, count, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (ret);

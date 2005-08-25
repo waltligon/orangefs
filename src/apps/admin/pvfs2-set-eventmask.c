@@ -183,13 +183,6 @@ static struct options* parse_args(int argc, char* argv[])
                         tmp_opts->api_mask = PVFS_event_api_keyword_to_mask(
                             optarg);
                     }
-
-                    if(tmp_opts->api_mask < 0)
-                    {
-                        if(tmp_opts->mnt_point) free(tmp_opts->mnt_point);
-                        free(tmp_opts);
-                        return(NULL);
-                    }
                 }
                 fprintf(stderr, "API MASK: 0x%X\n", tmp_opts->api_mask);
                 tmp_opts->api_mask_set = 1;
@@ -211,13 +204,6 @@ static struct options* parse_args(int argc, char* argv[])
                     {
                         tmp_opts->op_mask = PVFS_event_op_keyword_to_mask(
                             optarg);
-                    }
-
-                    if(tmp_opts->op_mask < 0)
-                    {
-                        if(tmp_opts->mnt_point) free(tmp_opts->mnt_point);
-                        free(tmp_opts);
-                        return(NULL);
                     }
 		}
                 fprintf(stdout, "OP MASK: 0x%X\n", tmp_opts->op_mask);

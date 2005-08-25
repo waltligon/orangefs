@@ -120,7 +120,6 @@ machine pvfs2_get_eattr_sm(
 static int geteattr_setup_resp(PINT_server_op *s_op, job_status_s *js_p)
 {
     int i, tsz;
-    PINT_STATE_DEBUG("setup_resp");
     gossip_debug(GOSSIP_GETEATTR_DEBUG,"geteattr requesting %d keys\n",
             s_op->req->u.geteattr.nkey);
     s_op->resp.u.geteattr.val =
@@ -160,8 +159,6 @@ static int geteattr_read_eattrib(
     int ret = -PVFS_EINVAL;
     job_id_t i;
 
-    PINT_STATE_DEBUG("read_eattrib");
-
     js_p->error_code = 0;
 
     ret = job_trove_keyval_read_list(
@@ -188,7 +185,6 @@ static int geteattr_read_eattrib(
 static int geteattr_check_resp(PINT_server_op *s_op, job_status_s *js_p)
 {
     int k;
-    PINT_STATE_DEBUG("check_resp");
     gossip_debug(GOSSIP_GETEATTR_DEBUG,"geteattr returning %d values\n",
             s_op->resp.u.geteattr.nkey);
     /* put the returned read buffer size in buffer_sz */
@@ -215,7 +211,6 @@ static int geteattr_check_resp(PINT_server_op *s_op, job_status_s *js_p)
  */
 static int geteattr_cleanup(PINT_server_op *s_op, job_status_s *js_p)
 {
-    PINT_STATE_DEBUG("geteattr_cleanup");
     if (s_op->resp.u.geteattr.val)
         free(s_op->resp.u.geteattr.val);
     if (s_op->u.eattr.buffer)

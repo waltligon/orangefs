@@ -658,7 +658,6 @@ static int crdirent_set_error_code(
 static int crdirent_setup_op(
     PINT_server_op *s_op, job_status_s *js_p)
 {
-    PINT_STATE_DEBUG("setup_op");
     PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "crdirent entry: %s points to %Lu\n",
         s_op->req->u.crdirent.name, Lu(s_op->req->u.crdirent.new_handle));
 

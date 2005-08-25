@@ -133,8 +133,6 @@ static int rmdirent_verify_parent_metadata_and_read_directory_entry_handle(
     int ret = -PVFS_EINVAL;
     job_id_t i;
 
-    PINT_STATE_DEBUG("verify_parent_metadata_and_"
-                     "read_directory_entry_handle");
     PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "rmdirent entry: %s\n",
         s_op->req->u.rmdirent.entry);
 

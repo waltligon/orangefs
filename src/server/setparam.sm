@@ -73,8 +73,6 @@ static int setparam_work(PINT_server_op *s_op, job_status_s *js_p)
     struct filesystem_configuration_s *fs_conf;
     char buf[16] = {0};
  
-    PINT_STATE_DEBUG("work");
-
     switch(s_op->req->u.mgmt_setparam.param)
     {
         case PVFS_SERV_PARAM_GOSSIP_MASK:

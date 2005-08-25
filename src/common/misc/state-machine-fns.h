@@ -187,7 +187,6 @@ static inline int PINT_state_machine_next(struct PINT_OP_STATE *s,
    Synopsis: This function is used to start a state machines execution.
  */
 
-#ifdef PINT_OP_STATE_TABLE
 static union PINT_state_array_values *PINT_state_machine_locate(struct PINT_OP_STATE *s_op)
 {
     union PINT_state_array_values *current_tmp;

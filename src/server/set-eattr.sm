@@ -103,8 +103,6 @@ static int seteattr_verify_eattribs(
     PVFS_object_attr *a_p = NULL;
     int i;
 
-    PINT_STATE_DEBUG("verify_eattribs");
-
     a_p = &s_op->attr;
 
     js_p->error_code = 0;
@@ -193,8 +191,6 @@ static int seteattr_setobj_eattribs(
     job_id_t j_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
 
-    PINT_STATE_DEBUG("seteattr_setobj_eattribs");
-
     gossip_debug(
         GOSSIP_SETEATTR_DEBUG,
         "  writing keylist [%Lu,%d,len %d flags %d]\n",
@@ -242,7 +238,6 @@ static int seteattr_setobj_eattribs(
  */
 static int seteattr_cleanup(PINT_server_op *s_op, job_status_s *js_p)
 {
-    PINT_STATE_DEBUG("seteattr_cleanup");
     /* do I need to free memory from decoding key and val?*/
     return(server_state_machine_complete(s_op));
 }
