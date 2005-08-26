@@ -15,7 +15,6 @@
 #include <assert.h>
 
 #include "client-state-machine.h"
-#include "state-machine-fns.h"
 #include "pvfs2-types-debug.h"
 #include "pvfs2-debug.h"
 #include "job.h"
@@ -445,6 +444,7 @@ static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
                                                 job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL;
+    PVFS_object_ref object_ref;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) "
                  "getattr_setup_msgpair\n", sm_p);
@@ -453,19 +453,21 @@ static int getattr_object_getattr_setup_msgpair(PINT_client_sm *sm_p,
 
     memset(&sm_p->msgpair, 0, sizeof(PINT_sm_msgpair_state));
 
-    assert(sm_p->object_ref.fs_id != PVFS_FS_ID_NULL);
-    assert(sm_p->object_ref.handle != PVFS_HANDLE_NULL);
+    object_ref = sm_p->getattr.object_ref;
+
+    assert(object_ref.fs_id != PVFS_FS_ID_NULL);
+    assert(object_ref.handle != PVFS_HANDLE_NULL);
 
     /* setup the msgpair to do a getattr operation */
     PINT_SERVREQ_GETATTR_FILL(
         sm_p->msgpair.req,
         *sm_p->cred_p,
-        sm_p->object_ref.fs_id,
-        sm_p->object_ref.handle,
+        object_ref.fs_id,
+        object_ref.handle,
         sm_p->getattr.req_attrmask);
     
-    sm_p->msgpair.fs_id = sm_p->object_ref.fs_id;
-    sm_p->msgpair.handle = sm_p->object_ref.handle;
+    sm_p->msgpair.fs_id = object_ref.fs_id;
+    sm_p->msgpair.handle = object_ref.handle;
     sm_p->msgpair.retry_flag = PVFS_MSGPAIR_RETRY;
     sm_p->msgpair.comp_fn = getattr_object_getattr_comp_fn;
 
@@ -673,11 +675,11 @@ static int getattr_datafile_getattr_setup_msgpairarray(
         PINT_SERVREQ_GETATTR_FILL(
             msg_p->req,
             *sm_p->cred_p,
-            sm_p->object_ref.fs_id,
+            sm_p->getattr.object_ref.fs_id,
             attr->u.meta.dfile_array[i],
             PVFS_ATTR_DATA_SIZE);
 
-        msg_p->fs_id = sm_p->object_ref.fs_id;
+        msg_p->fs_id = sm_p->getattr.object_ref.fs_id;
         msg_p->handle = attr->u.meta.dfile_array[i];
         msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
         msg_p->comp_fn = getattr_datafile_getattr_comp_fn;
@@ -729,7 +731,7 @@ static int getattr_acache_insert(PINT_client_sm *sm_p,
     PVFS_object_attr *attr = NULL;
     int release_required = 1;
     PINT_pinode *pinode = PINT_acache_lookup(
-        sm_p->object_ref, NULL, NULL);
+        sm_p->getattr.object_ref, NULL, NULL);
     if (!pinode)
     {
         pinode = PINT_acache_pinode_alloc();

@@ -18,7 +18,6 @@
 #include <assert.h>
 
 #include "client-state-machine.h"
-#include "state-machine-fns.h"
 #include "pvfs2-debug.h"
 #include "job.h"
 #include "gossip.h"
@@ -26,6 +25,7 @@
 #include "pint-servreq.h"
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
+#include "pint-util.h"
 
 extern job_context_id pint_client_sm_context;
 

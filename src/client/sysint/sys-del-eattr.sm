@@ -9,7 +9,6 @@
 #include <unistd.h>
 
 #include "client-state-machine.h"
-#include "state-machine-fns.h"
 #include "pvfs2-debug.h"
 #include "pvfs2-util.h"
 #include "job.h"

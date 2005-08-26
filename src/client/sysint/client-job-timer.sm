@@ -12,7 +12,6 @@
 #include <sys/time.h>
 
 #include "client-state-machine.h"
-#include "state-machine-fns.h"
 #include "job-time-mgr.h"
 
 extern job_context_id pint_client_sm_context;

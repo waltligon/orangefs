@@ -20,7 +20,6 @@
 #include "pvfs2.h"
 #include "pvfs2-mgmt.h"
 #include "server-config.h"
-#include "state-machine-fns.h"
 
 
 /**
