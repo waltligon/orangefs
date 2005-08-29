@@ -112,15 +112,15 @@ do {                                                         \
         free(sm_p->u.io.datafile_index_array);               \
         sm_p->u.io.datafile_index_array = NULL;              \
     }                                                        \
+    for (i=0;i<sm_p->msgarray_count; i++) {                  \
+        PINT_flow_clear(&(sm_p->u.io.contexts[i].flow_desc)); \
+    }                                                        \
     if (sm_p->msgarray &&                                    \
         (sm_p->msgarray != &sm_p->msgpair))                  \
     {                                                        \
         free(sm_p->msgarray);                                \
         sm_p->msgarray = NULL;                               \
         sm_p->msgarray_count = 0;                            \
-    }                                                        \
-    for (i=0;i<sm_p->msgarray_count; i++) {                  \
-        PINT_flow_free(&(sm_p->u.io.contexts[i].flow_desc)); \
     }                                                        \
     if (sm_p->u.io.contexts)                                 \
     {                                                        \

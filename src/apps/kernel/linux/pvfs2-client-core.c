@@ -369,7 +369,7 @@ static void finalize_ops_in_progress_table(void)
     }
 }
 
-void *exec_remount(void *ptr)
+static void *exec_remount(void *ptr)
 {
     pthread_mutex_lock(&remount_mutex);
     /*

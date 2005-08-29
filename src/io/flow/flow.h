@@ -157,6 +157,9 @@ flow_descriptor *PINT_flow_alloc(void);
 void PINT_flow_reset(
     flow_descriptor *flow_d);
 
+void PINT_flow_clear(
+    flow_descriptor *flow_d);
+
 void PINT_flow_free(
     flow_descriptor *flow_d);
 

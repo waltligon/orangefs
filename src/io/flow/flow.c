@@ -326,6 +326,21 @@ void PINT_flow_free(flow_descriptor *flow_d)
     free(flow_d);
 }
 
+/* PINT_flow_clear()
+ * 
+ * clears the flow descriptor but doesn't destroy it
+ *
+ * no return value
+ */
+void PINT_flow_clear(flow_descriptor *flow_d)
+{
+    assert(flow_d);
+    assert(flow_d->flow_mutex);
+
+    gen_mutex_destroy(flow_d->flow_mutex);
+
+    memset(flow_d, 0, sizeof(flow_descriptor));
+}
 
 /* PINT_flow_post()
  * 
