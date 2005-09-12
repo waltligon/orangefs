@@ -299,7 +299,7 @@ void print_entry_attr(
              formatted_group,
              formatted_size,
              (time->tm_year + 1900),
-             (time->tm_mon),
+             (time->tm_mon + 1),
              time->tm_mday,
              (time->tm_hour),
              (time->tm_min),
