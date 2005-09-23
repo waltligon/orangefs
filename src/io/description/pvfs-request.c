@@ -155,6 +155,7 @@ static int PINT_subreq(PVFS_offset offset,
     (*newreq)->committed = 0;
     (*newreq)->refcount = 0;
     (*newreq)->ereq = oldreq;
+    PINT_REQUEST_REFINC(oldreq);
     return PVFS_SUCCESS;
 }
 
@@ -168,7 +169,7 @@ int PVFS_Request_hvector(int32_t count,
     if (oldreq == NULL)
         return PVFS_ERR_REQ;
     PVFS_Request_extent(oldreq, &oldext);
-    PINT_REQUEST_REFINC(oldreq);
+    // PINT_REQUEST_REFINC(oldreq);
     *newreq = (PINT_Request *) malloc(sizeof(struct PINT_Request));
     (*newreq)->sreq = NULL;
     PINT_subreq(0, blocklength, stride, count, oldreq, oldext, newreq);
@@ -223,7 +224,7 @@ int PVFS_Request_indexed(int32_t count,
     if (oldreq == NULL)
         return PVFS_ERR_REQ;
     PVFS_Request_extent(oldreq, &oldext);
-    PINT_REQUEST_REFINC(oldreq);
+    // PINT_REQUEST_REFINC(oldreq);
     while (count--)
     {
         dt = *newreq;
@@ -265,7 +266,7 @@ int PVFS_Request_hindexed(int32_t count,
     if (oldreq == NULL)
         return PVFS_ERR_REQ;
     PVFS_Request_extent(oldreq, &oldext);
-    PINT_REQUEST_REFINC(oldreq);
+    // PINT_REQUEST_REFINC(oldreq);
     while (count--)
     {
         dt = *newreq;
@@ -300,7 +301,7 @@ int PVFS_Request_struct(int32_t count,
         (*newreq)->sreq = dt;
         PINT_subreq(displacements[count], blocklengths[count],
                     0, 1, oldreqs[count], oldext, newreq);
-        PINT_REQUEST_REFINC(oldreqs[count]);
+        // PINT_REQUEST_REFINC(oldreqs[count]);
         PINT_reqstats(newreq);
     }
     PINT_REQUEST_REFSET(*newreq);
@@ -438,6 +439,7 @@ int PVFS_Request_free(PVFS_Request * req)
         /* if refcount is 0 then it has already been freed */
         /* if less than 0 it should not be freed */
         /* can't be sure if this is users's variable or not */
+        gossip_debug(GOSSIP_REQUEST_DEBUG, "don't free special request\n");
         return PVFS_SUCCESS;
     }
     PINT_REQUEST_REFDEC(*req);
@@ -445,6 +447,7 @@ int PVFS_Request_free(PVFS_Request * req)
     {
         /* not ready to free this yet */
         *req = NULL;
+        gossip_debug(GOSSIP_REQUEST_DEBUG, "don't free referenced request\n");
         return PVFS_SUCCESS;
     }
     if (PINT_REQUEST_IS_PACKED(*req))
