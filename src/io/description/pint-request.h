@@ -128,10 +128,6 @@ typedef struct PINT_Request_state {
 	PVFS_offset  type_offset;  /* logical offset within request type */
 	PVFS_offset  target_offset;/* first type offset to process */
 	PVFS_offset  final_offset; /* last type offset to process */
-#if 0
-	PVFS_offset  file_offset;	/* last file offset in previous call to process*/
-	PVFS_offset  start_offset;
-#endif
 	PVFS_boolean eof_flag;     /* is file at end of flile */
 } PINT_Request_state;           
 /* NOTE - I think buf_offset is superceded by type_offset
@@ -221,16 +217,6 @@ void PINT_dump_request(struct PINT_Request *req);
 #define PINT_REQUEST_TOTAL_BYTES(reqp)\
 	((reqp)->aggregate_size)
 
-#if 0
-/* returns the start_offset */
-#define PINT_REQUEST_STATE_OFFSET(reqp)\
- 	((reqp)->start_offset)
-
-/* sets the start_offset to the given value */
-#define PINT_REQUEST_STATE_SET_OFFSET(reqp,val)\
- 	((reqp)->start_offset) = (val)
-#endif
-
 /* sets the target_offset to the given value */
 #define PINT_REQUEST_STATE_SET_TARGET(reqp,val)\
 	((reqp)->target_offset) = (val)
@@ -246,7 +232,6 @@ void PINT_dump_request(struct PINT_Request *req);
 	((reqp)->lvl) = 0;\
 	((reqp)->bytes) = 0;\
 	((reqp)->type_offset) = 0;\
-/*	((reqp)->file_offset) = 0;*/\
 	((reqp)->eof_flag) = 0;\
 	((reqp)->cur[0].el) = 0;\
 	((reqp)->cur[0].rq) = ((reqp)->cur[0].rqbase);\
@@ -259,7 +244,6 @@ void PINT_dump_request(struct PINT_Request *req);
 #define PINT_REQUEST_STATE_RESET(reqp)\
 	do {\
 	PINT_REQUEST_STATE_RST(reqp);\
-/*	PINT_REQUEST_STATE_SET_OFFSET((reqp),0);*/\
 	}while(0)
 
 /* checks to see if you have run out of request */

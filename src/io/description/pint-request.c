@@ -157,7 +157,8 @@ int PINT_process_request(PINT_Request_state *req,
 	{
 		/* do we allow external setting of LOGICAL_SKIP */
 		/* what about backwards skipping, as in seeking? */
-	}
+    }
+	
 	/* we should be ready to begin */
 	/* zero retval indicates everything flowing successfully */
 	/* positive retval indicates a partial chunk was processed - so we */
@@ -180,6 +181,12 @@ int PINT_process_request(PINT_Request_state *req,
 		gossip_debug(GOSSIP_REQUEST_DEBUG,"\t\tto %lld ta %lld fi %lld\n",
 				Ld(req->type_offset), Ld(req->target_offset),
 				Ld(req->final_offset));
+            if (mem) /* if a mem type is specified print its state */
+            {
+                gossip_debug(GOSSIP_REQUEST_DEBUG,"\t\tmto %lld mta %lld mfi %lld\n",
+                       Ld(mem->type_offset), Ld(mem->target_offset),
+                       Ld(mem->final_offset));
+            }
 		}
 		/* NULL type indicates packed data - handle directly */
 		if (req->cur[req->lvl].rq == NULL)
@@ -248,6 +255,9 @@ int PINT_process_request(PINT_Request_state *req,
 			req->lvl++;
 			continue;
 		}
+        gossip_debug(GOSSIP_REQUEST_DEBUG,
+                "\tcontig_offset = %lld contig_size = %lld lvl_flag = %d\n",
+                Ld(contig_offset), Ld(contig_size), lvl_flag);
 		/* set this up for client processing */
 		if (PINT_IS_CLIENT(mode))
 		{
@@ -257,7 +267,7 @@ int PINT_process_request(PINT_Request_state *req,
              * in the distribute routine, so we set it here to the type_offset of
              * the req - WBL
              */
-			result->offset_array[result->segs] = req->type_offset;
+			result->offset_array[result->segs] = req->type_offset - req->target_offset;
 		}
 		/*** BEFORE CALLING DISTRIBUTE ***/
 		if (PINT_IS_LOGICAL_SKIP(mode))
@@ -318,6 +328,7 @@ int PINT_process_request(PINT_Request_state *req,
 			}
 		}
 		/*** AFTER CALLING DISTRIBUTE ***/
+		gossip_debug(GOSSIP_REQUEST_DEBUG,"\tretval = %lld\n", Ld(retval));
 		req->type_offset += retval;
 		/* see if we processed all of the bytes expected */
 		if (retval != contig_size)
@@ -667,6 +678,12 @@ PVFS_size PINT_distribute(PVFS_offset offset,
             result->offset_array[result->segs] =
                 result->offset_array[result->segs - 1] + 
                 result->size_array[result->segs - 1];
+        }
+        /* sz should never be zero or negative */
+        if (sz < 1)
+        {
+            gossip_lerr("Error in distribution processing!\n");
+            break;
         }
         /* prepare for next iteration */
         loff  += sz;
