@@ -23,26 +23,14 @@
 
 PVFS_offset exp1_offset[] =
 {
-		1024
-};
-PVFS_offset exp2_offset[] =
-{
-		49152
-};
-PVFS_offset exp3_offset[] =
-{
-		98304
-};
-PVFS_offset exp4_offset[] =
-{
-		147456
+		0,
+		48128,
+		97280,
+		146432
 };
 PVFS_offset exp1_size[] =
 {
-		48128
-};
-PVFS_offset exp2_size[] =
-{
+		48128,
 		49152
 };
 PINT_Request_result expected[] =
@@ -53,20 +41,20 @@ PINT_Request_result expected[] =
 	   segs : 1,
 	   bytes : 48128
 }, {
-	   offset_array : &exp2_offset[0],
-	   size_array : &exp2_size[0],
+	   offset_array : &exp1_offset[1],
+	   size_array : &exp1_size[1],
 	   segmax : SEGMAX,
 	   segs : 1,
 	   bytes : 49152
 }, {
-	   offset_array : &exp3_offset[0],
-	   size_array : &exp2_size[0],
+	   offset_array : &exp1_offset[2],
+	   size_array : &exp1_size[1],
 	   segmax : SEGMAX,
 	   segs : 1,
 	   bytes : 49152
 }, {
-	   offset_array : &exp4_offset[0],
-	   size_array : &exp2_size[0],
+	   offset_array : &exp1_offset[3],
+	   size_array : &exp1_size[1],
 	   segmax : SEGMAX,
 	   segs : 1,
 	   bytes : 49152

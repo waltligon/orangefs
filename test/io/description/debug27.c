@@ -23,19 +23,25 @@
 
 PVFS_offset exp1_offset[] =
 {
-		100, 25100
+		0, 133120, 266240, 399360,
+		532480, 665600, 798720, 931840,
+		1082368, 1215488, 1348608, 1481728,
+		1614848, 1747968, 1881088, 2014208
 };
 PVFS_offset exp1_size[] =
 {
-		24578, 24574
+		33792, 33792, 33792, 33792,
+		33792, 33792, 33792, 33792,
+		32768, 32768, 32768, 32768,
+		32768, 32768, 32768, 1024
 };
 PINT_Request_result expected[] =
 {{
 	   offset_array : &exp1_offset[0],
 	   size_array : &exp1_size[0],
 	   segmax : SEGMAX,
-	   segs : 2,
-	   bytes : 49152
+	   segs : 16,
+	   bytes : 500736
 }};
 
 
@@ -93,10 +99,10 @@ int request_debug(void)
 	i = 0;
 
 	printf("\n************************************\n");
-	printf("Four requests in CLIENT mode 4 each contiguous servers 0-3 of 4\n");
+	printf("one request in CLIENT mode\n");
 	printf("Simple stripe, default stripe size (64K)\n");
-	printf("Hindexed request, 3K block 4K stride, 64 blocks\n");
-	printf("Memtype 8 blocks 24576 each, 25000 stride\n");
+	printf("Vector of vectors request, 32 blocks of 32x32blocks of 32 bytes\n");
+	printf("NULL Memtype\n");
 	printf("Each from offset 0, file size 0, extend flag\n");
 	printf("Server 0\n");
 	printf("\n************************************\n");
@@ -110,11 +116,6 @@ int request_debug(void)
 		 * data that I should find here
 		 */
 		retval = PINT_process_request(rs1, NULL, &rf1, &seg1, PINT_CLIENT);
-
-		if(!PINT_REQUEST_DONE(rs1))
-		{
-			fprintf(stderr, "IEEE! reporting more work to do when I should really be done...\n");
-		}
 
 		if(retval >= 0)
 		{
