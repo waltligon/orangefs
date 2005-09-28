@@ -228,7 +228,7 @@ typedef struct
     PVFS_ds_position readdir_token_adjustment;
     int num_readdir_retries;
     int last_version_changed; 
-   uint64_t directory_version;
+    uint64_t directory_version;
     char *link_target;
 #ifdef PVFS2_LINUX_KERNEL_2_4
     struct inode *vfs_inode;
@@ -236,6 +236,7 @@ typedef struct
     struct inode vfs_inode;
 #endif
     sector_t last_failed_block_index_read;
+    int error_code;
 } pvfs2_inode_t;
 
 /** mount options.  only accepted mount options are listed.

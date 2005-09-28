@@ -176,12 +176,23 @@ struct dentry *pvfs2_lookup(
             pvfs2_print("Lookup success (inode ct = %d)\n",
                         (int)atomic_read(&inode->i_count));
 	}
+        else if (inode && is_bad_inode(inode))
+        {
+            ret = -EACCES;
+	    found_pvfs2_inode = PVFS2_I(inode);
+            /* look for an error code, possibly set by pvfs2_read_inode(),
+             * otherwise we have to guess EACCES 
+             */
+            if(found_pvfs2_inode->error_code)
+            {
+                ret = found_pvfs2_inode->error_code;
+            }
+            iput(inode);
+            op_release(new_op);
+            return ERR_PTR(ret);
+        }
 	else
 	{
-            if (inode)
-            {
-                iput(inode);
-            }
             op_release(new_op);
             return ERR_PTR(-EACCES);
 	}

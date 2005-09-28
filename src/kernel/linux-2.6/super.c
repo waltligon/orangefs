@@ -278,6 +278,20 @@ static void pvfs2_put_inode(
     {
         /* kill dentries associated with this inode */
         d_prune_aliases(inode);
+#ifdef PVFS2_LINUX_KERNEL_2_4
+        /* if the inode has entered the "bad" state, go ahead and force a
+         * delete.  This will allow us a chance to retry access to it later
+         * rather than caching the bad state indefinitely
+         */
+        /* NOTE: 2.6 kernels don't seem to have this problem.  The analogous
+         * function if it were needed would be generic_delete_inode() rather
+         * than force_delete(), however.
+         */
+        if(is_bad_inode(inode))
+        {
+            force_delete(inode);
+        }
+#endif
     }
 }
 

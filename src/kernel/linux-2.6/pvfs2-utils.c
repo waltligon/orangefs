@@ -391,6 +391,13 @@ int pvfs2_inode_getattr(struct inode *inode)
                     "returned %d (error_exit = %d)\n",
                     Lu(pvfs2_inode->refn.handle), pvfs2_inode->refn.fs_id,
                     (int)atomic_read(&inode->i_count), ret, error_exit);
+        /* store error code in the inode so that we can retrieve it later if
+         * needed
+         */
+        if(ret < 0)
+        {
+            pvfs2_inode->error_code = ret;
+        }
 
         op_release(new_op);
     }
@@ -1251,6 +1258,7 @@ void pvfs2_inode_initialize(pvfs2_inode_t *pvfs2_inode)
     pvfs2_inode->last_version_changed = 0;
     pvfs2_inode->num_readdir_retries = PVFS2_NUM_READDIR_RETRIES;
     pvfs2_inode->directory_version = 0;
+    pvfs2_inode->error_code = 0;
 }
 
 /*
@@ -1266,6 +1274,7 @@ void pvfs2_inode_finalize(pvfs2_inode_t *pvfs2_inode)
     pvfs2_inode->last_version_changed = 0;
     pvfs2_inode->num_readdir_retries = PVFS2_NUM_READDIR_RETRIES;
     pvfs2_inode->directory_version = 0;
+    pvfs2_inode->error_code = 0;
 }
 
 void pvfs2_op_initialize(pvfs2_kernel_op_t *op)
