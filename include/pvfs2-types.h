@@ -541,10 +541,10 @@ char *PINT_non_errno_strerror_mapping[] = {           \
     "Operation cancelled (possibly due to timeout)",  \
     "Device initialization failed",                   \
     "Detailed per-server errors are available",       \
-    "Host not found",                                 \
-    "Valid host name but no IP address found",        \
-    "Non recoverable error",                          \
-    "Try Again"                                       \
+    "Unknown host",                                   \
+    "No address associated with name",                \
+    "Unknown server error",                           \
+    "Host name lookup failure"                        \
 };                                                    \
 PVFS_error PINT_non_errno_mapping[] = {               \
     0,     /* leave this one empty */                 \
