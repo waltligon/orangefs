@@ -93,8 +93,7 @@ int main(int argc, char **argv)
             break;
         }
 
-        credentials.uid = getuid();
-        credentials.gid = getuid();
+        PVFS_util_gen_credentials(&credentials);
 
         memset(&resp_lookup, 0, sizeof(PVFS_sysresp_lookup));
         rc = PVFS_sys_lookup(cur_fs, pvfs_path, &credentials,

@@ -75,8 +75,8 @@ void PVFS_util_gen_credentials(
     assert(credentials);
 
     memset(credentials, 0, sizeof(PVFS_credentials));
-    credentials->uid = getuid();
-    credentials->gid = getgid();
+    credentials->uid = geteuid();
+    credentials->gid = getegid();
 }
 
 int PVFS_util_get_umask(void)
