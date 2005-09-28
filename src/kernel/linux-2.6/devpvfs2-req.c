@@ -244,7 +244,9 @@ static ssize_t pvfs2_devreq_writev(
     magic = *((int32_t *)ptr);
     ptr += sizeof(int32_t);
 
-    tag = *((uint64_t *)ptr);
+    /* used to be an assignment, but that would trigger an unaligned memory
+     * access on ia64. fill in tag 1 byte at a time */
+    memcpy((char *)&tag, ptr, (sizeof(uint64_t)));
     ptr += sizeof(uint64_t);
 
     /* lookup (and remove) the op based on the tag */
