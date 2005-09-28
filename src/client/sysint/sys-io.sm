@@ -1068,8 +1068,15 @@ static int io_analyze_results(PINT_client_sm *sm_p,
     if (sm_p->u.io.continue_analysis)
     {
         sm_p->u.io.continue_analysis = 0;
+        /*
+         * Restore values that were saved across the getattr.  Also
+         * put msgarray_count back to whatever it was for the IO (not
+         * the getattr) as this is used later in io_cleanup to decide
+         * which flows are valid and should be freed.
+         */
         ret = sm_p->u.io.saved_ret;
         js_p->error_code = sm_p->u.io.saved_error_code;
+        sm_p->msgarray_count = sm_p->u.io.datafile_count;
         goto post_size_retrieval_continue_analysis;
     }
 #endif
