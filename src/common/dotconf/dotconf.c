@@ -880,12 +880,6 @@ configfile_t *PINT_dotconf_create(
     configfile_t *new = 0;
     char *dc_env;
 
-    if (access(fname, R_OK))
-    {
-	fprintf(stderr, "Error opening configuration file '%s'\n", fname);
-	return NULL;
-    }
-
     new = calloc(1, sizeof(configfile_t));
     if (!(new->stream = fopen(fname, "r")))
     {
