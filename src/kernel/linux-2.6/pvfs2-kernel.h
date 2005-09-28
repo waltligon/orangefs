@@ -372,8 +372,13 @@ int pvfs2_getattr(
 /****************************
  * defined in xattr.c
  ****************************/
+#ifdef PVFS2_LINUX_KERNEL_2_4
+int pvfs2_setxattr(struct dentry *dentry, const char *name,
+		void *value, size_t size, int flags);
+#else
 int pvfs2_setxattr(struct dentry *dentry, const char *name,
 		const void *value, size_t size, int flags);
+#endif
 ssize_t pvfs2_getxattr(struct dentry *dentry, const char *name,
 		         void *buffer, size_t size);
 ssize_t pvfs2_listxattr(struct dentry *dentry, char *buffer, size_t size);
