@@ -232,6 +232,7 @@ static ssize_t pvfs2_devreq_writev(
         if (ret)
         {
             pvfs2_error("Failed to copy data from user space\n");
+	    kmem_cache_free(dev_req_cache, buffer);
             return -EIO;
         }
 	num_remaining -= iov[i].iov_len;
