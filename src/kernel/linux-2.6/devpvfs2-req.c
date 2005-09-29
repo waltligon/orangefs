@@ -1,6 +1,9 @@
 /*
  * (C) 2001 Clemson University and The University of Chicago
  *
+ * Changes by Acxiom Corporation to add protocol version to kernel
+ * communication, Copyright © Acxiom Corporation, 2005.
+ *
  * See COPYING in top-level directory.
  */
 
@@ -90,6 +93,7 @@ static ssize_t pvfs2_devreq_read(
     int ret = 0, len = 0;
     pvfs2_kernel_op_t *cur_op = NULL;
     static int32_t magic = PVFS2_DEVREQ_MAGIC;
+    int32_t proto_ver = PVFS_KERNEL_PROTO_VERSION;
 
     if (!(file->f_flags & O_NONBLOCK))
     {
@@ -159,16 +163,20 @@ static ssize_t pvfs2_devreq_read(
         len = MAX_ALIGNED_DEV_REQ_UPSIZE;
         if ((size_t) len <= count)
         {
-            ret = copy_to_user(buf, &magic, sizeof(int32_t));
-            if (ret == 0)
+            ret = copy_to_user(buf, &proto_ver, sizeof(int32_t));
+            if(ret == 0)
             {
-                ret = copy_to_user(buf + sizeof(int32_t),
-                                   &cur_op->tag, sizeof(uint64_t));
+                ret = copy_to_user(buf + sizeof(int32_t), &magic, sizeof(int32_t));
                 if (ret == 0)
                 {
-                    ret = copy_to_user(
-                        buf + sizeof(int32_t) + sizeof(uint64_t),
-                        &cur_op->upcall, sizeof(pvfs2_upcall_t));
+                    ret = copy_to_user(buf + 2*sizeof(int32_t),
+                                       &cur_op->tag, sizeof(uint64_t));
+                    if (ret == 0)
+                    {
+                        ret = copy_to_user(
+                            buf + 2*sizeof(int32_t) + sizeof(uint64_t),
+                            &cur_op->upcall, sizeof(pvfs2_upcall_t));
+                    }
                 }
             }
 
@@ -211,6 +219,7 @@ static ssize_t pvfs2_devreq_writev(
     int ret = 0, num_remaining = max_downsize;
     int payload_size = 0;
     int32_t magic = 0;
+    int32_t proto_ver = 0;
     uint64_t tag = 0;
 
     buffer = kmem_cache_alloc(dev_req_cache, PVFS2_CACHE_ALLOC_FLAGS);
@@ -240,14 +249,33 @@ static ssize_t pvfs2_devreq_writev(
 	payload_size += iov[i].iov_len;
     }
 
+    /* these elements are currently 8 byte aligned (8 bytes for (version +  
+     * magic) 8 bytes for tag).  If you add another element, either make it 8
+     * bytes big, or use get_unaligned when asigning  */
     ptr = buffer;
+    proto_ver = *((int32_t *)ptr);
+    ptr += sizeof(int32_t);
+
     magic = *((int32_t *)ptr);
     ptr += sizeof(int32_t);
 
-    /* used to be an assignment, but that would trigger an unaligned memory
-     * access on ia64 */
-    tag = get_unaligned((uint64_t*)ptr);
+    tag = *((uint64_t *)ptr);
     ptr += sizeof(uint64_t);
+
+    if (magic != PVFS2_DEVREQ_MAGIC)
+    {
+        pvfs2_error("Error: Device magic number does not match.\n");
+        kmem_cache_free(dev_req_cache, buffer);
+        return -EPROTO;
+    }
+    if (proto_ver != PVFS_KERNEL_PROTO_VERSION)
+    {
+        pvfs2_error("Error: Device protocol version numbers do not match.\n");
+        pvfs2_error("Please check that your pvfs2 module and pvfs2-client versions are consistent.\n");
+        kmem_cache_free(dev_req_cache, buffer);
+        return -EPROTO;
+    }
+
 
     /* lookup (and remove) the op based on the tag */
     hash_link = qhash_search_and_remove(htable_ops_in_progress, &(tag));
@@ -257,7 +285,7 @@ static ssize_t pvfs2_devreq_writev(
 	if (op)
 	{
 	    /* cut off magic and tag from payload size */
-	    payload_size -= (sizeof(int32_t) + sizeof(uint64_t));
+	    payload_size -= (2*sizeof(int32_t) + sizeof(uint64_t));
 	    if (payload_size <= sizeof(pvfs2_downcall_t))
 	    {
 		/* copy the passed in downcall into the op */

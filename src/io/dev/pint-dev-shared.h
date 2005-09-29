@@ -18,6 +18,12 @@
 #define PVFS_DEV_MAP                (unsigned int)4
 #define PVFS_DEV_REMOUNT_ALL        (unsigned int)5
 
+/* version number for use in communicating between kernel space and user
+ * space
+ */
+#define PVFS_KERNEL_PROTO_VERSION ((PVFS2_VERSION_MAJOR * 10000) + \
+  (PVFS2_VERSION_MINOR * 100) + PVFS2_VERSION_SUB)
+
 /* This is the number of discrete buffers we will break the mapped I/O
  * region into.  In some sense it governs the number of concurrent I/O
  * operations that we will allow

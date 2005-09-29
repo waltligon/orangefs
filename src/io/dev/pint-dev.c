@@ -1,6 +1,9 @@
 /*
  * (C) 2001 Clemson University and The University of Chicago
  *
+ * Changes by Acxiom Corporation to add protocol version to kernel
+ * communication, Copyright © Acxiom Corporation, 2005.
+ *
  * See COPYING in top-level directory.
  */
 
@@ -209,6 +212,7 @@ int PINT_dev_test_unexpected(
     int ret = -1, avail = -1, i = 0;
     struct pollfd pfd;
     int32_t *magic = NULL;
+    int32_t *proto_ver = NULL;
     uint64_t *tag = NULL;
     void *buffer = NULL;
 
@@ -315,17 +319,30 @@ int PINT_dev_test_unexpected(
             goto dev_test_unexp_error;
         }
 
-        magic = (int32_t*)buffer;
-        tag = (uint64_t*)((unsigned long)buffer + sizeof(int32_t));
+        proto_ver = (int32_t*)buffer;
+        magic = (int32_t*)((unsigned long)buffer + sizeof(int32_t));
+        tag = (uint64_t*)((unsigned long)buffer + 2*sizeof(int32_t));
 
-        assert(*magic == pdev_magic);
+        if(*magic != pdev_magic)
+        {
+            gossip_err("Error: magic numbers do not match.\n");
+            ret = -(PVFS_EPROTO|PVFS_ERROR_DEV);
+            goto dev_test_unexp_error;
+        }
+        if(*proto_ver != PVFS_KERNEL_PROTO_VERSION)
+        {
+            gossip_err("Error: protocol versions do not match.\n");
+            gossip_err("Please check that your pvfs2 module and pvfs2-client versions are consistent.\n");
+            ret = -(PVFS_EPROTO|PVFS_ERROR_DEV);
+            goto dev_test_unexp_error;
+        }
 
         info_array[*outcount].size =
-            (ret - sizeof(int32_t) - sizeof(uint64_t));
+            (ret - 2*sizeof(int32_t) - sizeof(uint64_t));
 
         /* shift buffer up so caller doesn't see header info */
         info_array[*outcount].buffer = (void*)
-            ((unsigned long)buffer + sizeof(int32_t) + sizeof(uint64_t));
+            ((unsigned long)buffer + 2*sizeof(int32_t) + sizeof(uint64_t));
         info_array[*outcount].tag = *tag;
 
         (*outcount)++;
@@ -369,7 +386,7 @@ int PINT_dev_release_unexpected(
     if (info && info->buffer)
     {
         /* index backwards header size off of the buffer before freeing */
-        buffer = (void*)((unsigned long)info->buffer - sizeof(int32_t) - 
+        buffer = (void*)((unsigned long)info->buffer - 2*sizeof(int32_t) - 
                          sizeof(uint64_t));
         free(buffer);
 
@@ -395,9 +412,10 @@ int PINT_dev_write_list(
     PVFS_id_gen_t tag)
 {
     struct iovec io_array[8];
-    int io_count = 2;
+    int io_count = 3;
     int i;
     int ret = -1;
+    int32_t proto_ver = PVFS_KERNEL_PROTO_VERSION;
     
     /* lets be reasonable about list size :) */
     /* two vecs are taken up by magic nr and tag */
@@ -414,15 +432,17 @@ int PINT_dev_write_list(
         return(-(PVFS_EMSGSIZE|PVFS_ERROR_DEV));
     }
 
-    io_array[0].iov_base = &pdev_magic;
+    io_array[0].iov_base = &proto_ver;
     io_array[0].iov_len = sizeof(int32_t);
-    io_array[1].iov_base = &tag;
-    io_array[1].iov_len = sizeof(uint64_t);
+    io_array[1].iov_base = &pdev_magic;
+    io_array[1].iov_len = sizeof(int32_t);
+    io_array[2].iov_base = &tag;
+    io_array[2].iov_len = sizeof(uint64_t);
 
     for (i=0; i<list_count; i++)
     {
-        io_array[i+2].iov_base = buffer_list[i];
-        io_array[i+2].iov_len = size_list[i];
+        io_array[i+3].iov_base = buffer_list[i];
+        io_array[i+3].iov_len = size_list[i];
         io_count++;
     }
 

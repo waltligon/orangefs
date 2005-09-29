@@ -296,6 +296,12 @@ static void *dev_thread_function(void *ptr)
 	if (ret < 0)
 	{
             PVFS_perror_gossip("critical device failure", ret);
+            gossip_err("Exiting...\n");
+            /* exit with a particular code so that the pvfs2-client wrapper
+             * knows that it should not attempt a restart of the
+             * pvfs2-client-core
+             */
+            exit(-PVFS_ENODEV);
 #ifdef __PVFS2_JOB_THREADED__
             gossip_err("dev_thread_function thread terminating\n");
             break;

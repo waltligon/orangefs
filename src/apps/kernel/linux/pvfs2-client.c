@@ -195,6 +195,16 @@ static int monitor_pvfs2_client(options_t *opts)
                     continue;
                 }
 
+                /* catch special case of exiting due to device error */
+                if (WEXITSTATUS(ret) == (unsigned char)-PVFS_ENODEV)
+                {
+                    /* the pvfs2-client.log should log specifics from
+                     * pvfs2-client-core
+                     */
+                    fprintf(stderr, "Device error caught, exiting now...\n");
+                    exit(1);        
+                }
+
                 if ((opts->path[0] != '/') && (opts->path [0] != '.'))
                 {
                     printf("*** The pvfs2-client-core has exited ***\n");

@@ -139,9 +139,9 @@ do {                                                           \
 #define PVFS2_MAX_MOUNT_OPT_LEN        0x00000080
 #define PVFS2_NUM_READDIR_RETRIES      0x0000000A
 
-#define MAX_DEV_REQ_UPSIZE (sizeof(int32_t) +   \
+#define MAX_DEV_REQ_UPSIZE (2*sizeof(int32_t) +   \
 sizeof(uint64_t) + sizeof(pvfs2_upcall_t))
-#define MAX_DEV_REQ_DOWNSIZE (sizeof(int32_t) + \
+#define MAX_DEV_REQ_DOWNSIZE (2*sizeof(int32_t) + \
 sizeof(uint64_t) + sizeof(pvfs2_downcall_t))
 
 #define BITS_PER_LONG_DIV_8 (BITS_PER_LONG >> 3)
