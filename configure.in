@@ -525,6 +525,16 @@ AC_TRY_COMPILE([
 	AC_MSG_RESULT(no)
 )
 
+dnl linux-2.6.11 had xattr_acl.h, but 2.6.12 did not!
+dnl cflags should be ok from above
+AC_CHECK_HEADERS([linux/xattr_acl.h], [], [], 
+	[#define __KERNEL__
+	 #include <linux/fs.h>
+	 #ifdef HAVE_XATTR 
+	 #include <linux/xattr.h> 
+	 #endif
+	 ] )
+
 AC_MSG_CHECKING(for generic_permission api in kernel)
 CFLAGS="$USR_CFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default" 
 dnl if this test passes, the kernel does not have it
