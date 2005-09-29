@@ -28,6 +28,12 @@
 /* Define to 1 if you have the <execinfo.h> header file. */
 #undef HAVE_EXECINFO_H
 
+/* Define if kernel has generic_getxattr */
+#undef HAVE_GENERIC_GETXATTR
+
+/* Define if kernel has generic_permission */
+#undef HAVE_GENERIC_PERMISSION
+
 /* Define if gethostbyaddr function exists */
 #undef HAVE_GETHOSTBYADDR
 

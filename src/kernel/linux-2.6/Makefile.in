@@ -44,7 +44,9 @@ csrc = \
     pvfs2-mod.c \
     pvfs2-bufmap.c \
     symlink.c \
-	 xattr.c \
+    xattr.c \
+    acl.c \
+    xattr_default.c \
     waitqueue.c
 hsrc = \
     pvfs2-kernel.h \
@@ -65,6 +67,7 @@ EXTRA_CFLAGS = \
     -I$(absolute_build_dir)/ \
     -I$(absolute_src_dir)/include \
     -I$(absolute_src_dir)/src/io/dev \
+    -I$(absolute_src_dir)/src/io/bmi \
     -I$(absolute_src_dir)/src/common/quickhash
 
 EXTRA_CFLAGS += @MMAP_RA_CACHE@

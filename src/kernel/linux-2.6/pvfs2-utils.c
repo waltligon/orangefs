@@ -481,6 +481,11 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char *name,
     pvfs2_inode_t *pvfs2_inode = NULL;
     ssize_t length = 0;
 
+    if (name == NULL || (size > 0 && buffer == NULL))
+    {
+        pvfs2_error("pvfs2_inode_getxattr: bogus NULL pointers\n");
+        return -EINVAL;
+    }
     if (size < 0 || strlen(name) >= PVFS_MAX_XATTR_NAMELEN)
     {
         pvfs2_error("Invalid size (%d) or key length (%d)\n", 
@@ -490,10 +495,13 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char *name,
     if (inode)
     {
         pvfs2_inode = PVFS2_I(inode);
+        /* obtain the xattr semaphore */
+        down_read(&pvfs2_inode->xattr_sem);
 
         new_op = op_alloc();
         if (!new_op)
         {
+            up_read(&pvfs2_inode->xattr_sem);
             return ret;
         }
 
@@ -539,14 +547,13 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char *name,
                 }
                 else
                 {
-                    /* No size problems. At present using strncpy means that
-                     * val is also textual not binary */
+                    /* No size problems */
                     memset(buffer, 0, size);
-                    strncpy(buffer, new_op->downcall.resp.getxattr.val, 
+                    memcpy(buffer, new_op->downcall.resp.getxattr.val, 
                             length - 1);
                     ret = length - 1;
-                    pvfs2_print("pvfs2_getxattr: key: %s, val_length: %d, val: %s\n",
-                            name, ret, (char *) buffer);
+                    pvfs2_print("pvfs2_getxattr: key: %s, val_length: %d\n",
+                            name, ret);
                 }
             }
         }
@@ -558,6 +565,7 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char *name,
 
         /* when request is serviced properly, free req op struct */
         op_release(new_op);
+        up_read(&pvfs2_inode->xattr_sem);
     }
     return ret;
 }
@@ -565,7 +573,7 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char *name,
 /*
  * tries to set an attribute for a given key on a file.
  * Returns a -ve number on error and 0 on success.
- * Note that value is treated like text and not like binary!
+ * Key is text, but value can be binary!
  */
 int pvfs2_inode_setxattr(struct inode *inode, const char *name,
         const void *value, size_t size, int flags)
@@ -574,10 +582,15 @@ int pvfs2_inode_setxattr(struct inode *inode, const char *name,
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
 
-    if (size <= 0 || size >= PVFS_MAX_XATTR_VALUELEN || flags < 0)
+    if (size < 0 || size >= PVFS_MAX_XATTR_VALUELEN || flags < 0)
     {
         pvfs2_error("pvfs2_inode_setxattr: bogus values of size(%d), flags(%d)\n", 
                 size, flags);
+        return -EINVAL;
+    }
+    if (name == NULL || (size > 0 && value == NULL))
+    {
+        pvfs2_error("pvfs2_inode_setxattr: bogus NULL pointers!\n");
         return -EINVAL;
     }
     if (strlen(name) >= PVFS_MAX_XATTR_NAMELEN)
@@ -586,13 +599,24 @@ int pvfs2_inode_setxattr(struct inode *inode, const char *name,
                 strlen(name));
         return -EINVAL;
     }
+    /* This is equivalent to a removexattr */
+    if (size == 0 && value == NULL)
+    {
+        return pvfs2_inode_removexattr(inode, name);
+    }
     if (inode)
     {
+        if (IS_RDONLY(inode))
+            return -EROFS;
+        if (IS_IMMUTABLE(inode) || IS_APPEND(inode))
+            return -EPERM;
         pvfs2_inode = PVFS2_I(inode);
 
+        down_write(&pvfs2_inode->xattr_sem);
         new_op = op_alloc();
         if (!new_op)
         {
+            up_write(&pvfs2_inode->xattr_sem);
             return ret;
         }
 
@@ -608,7 +632,8 @@ int pvfs2_inode_setxattr(struct inode *inode, const char *name,
                 name, PVFS_MAX_XATTR_NAMELEN);
         new_op->upcall.req.setxattr.keyval.key_sz = 
             strlen(new_op->upcall.req.setxattr.keyval.key) + 1;
-        strncpy(new_op->upcall.req.setxattr.keyval.val, value, size);
+        memcpy(new_op->upcall.req.setxattr.keyval.val, value, size);
+        new_op->upcall.req.setxattr.keyval.val[size] = '\0';
         /* For some reason, val_sz should include the \0 at the end as well */
         new_op->upcall.req.setxattr.keyval.val_sz = size + 1;
 
@@ -624,6 +649,7 @@ int pvfs2_inode_setxattr(struct inode *inode, const char *name,
 
         /* when request is serviced properly, free req op struct */
         op_release(new_op);
+        up_write(&pvfs2_inode->xattr_sem);
     }
     return ret;
 }
@@ -644,9 +670,11 @@ int pvfs2_inode_removexattr(struct inode *inode, const char *name)
     {
         pvfs2_inode = PVFS2_I(inode);
 
+        down_write(&pvfs2_inode->xattr_sem);
         new_op = op_alloc();
         if (!new_op)
         {
+            up_write(&pvfs2_inode->xattr_sem);
             return ret;
         }
 
@@ -678,6 +706,7 @@ int pvfs2_inode_removexattr(struct inode *inode, const char *name)
 
         /* when request is serviced properly, free req op struct */
         op_release(new_op);
+        up_write(&pvfs2_inode->xattr_sem);
     }
     return ret;
 }
@@ -741,7 +770,7 @@ static inline struct inode *pvfs2_create_file(
     if (ret > -1)
     {
         inode = pvfs2_get_custom_inode(
-            dir->i_sb, (S_IFREG | mode), 0, pvfs2_handle_to_ino(
+            dir->i_sb, dir, (S_IFREG | mode), 0, pvfs2_handle_to_ino(
                 new_op->downcall.resp.create.refn.handle));
         if (!inode)
         {
@@ -830,7 +859,7 @@ static inline struct inode *pvfs2_create_dir(
     if (new_op->downcall.status > -1)
     {
         inode = pvfs2_get_custom_inode(
-            dir->i_sb, (S_IFDIR | mode), 0, pvfs2_handle_to_ino(
+            dir->i_sb, dir, (S_IFDIR | mode), 0, pvfs2_handle_to_ino(
                 new_op->downcall.resp.mkdir.refn.handle));
         if (!inode)
         {
@@ -923,7 +952,7 @@ static inline struct inode *pvfs2_create_symlink(
     if (ret > -1)
     {
         inode = pvfs2_get_custom_inode(
-            dir->i_sb, (S_IFLNK | mode), 0, pvfs2_handle_to_ino(
+            dir->i_sb, dir, (S_IFLNK | mode), 0, pvfs2_handle_to_ino(
                 new_op->downcall.resp.sym.refn.handle));
         if (!inode)
         {

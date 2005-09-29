@@ -14,7 +14,40 @@
 #include "pvfs2-bufmap.h"
 
 #ifdef HAVE_XATTR
+
 #include <linux/xattr.h>
+
+#if !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_GENERIC_GETXATTR)
+
+/*
+ * NOTES from fs/xattr.c
+ * In order to implement different sets of xattr operations for each xattr
+ * prefix with the generic xattr API, a filesystem should create a
+ * null-terminated array of struct xattr_handler (one for each prefix) and
+ * hang a pointer to it off of the s_xattr field of the superblock.
+ */
+struct xattr_handler *pvfs2_xattr_handlers[] = {
+    /*
+     * ACL xattrs have special prefixes that I am handling separately
+     * so that we get control when the acl's are set or listed or queried!
+     */
+    &pvfs2_xattr_acl_access_handler,
+    &pvfs2_xattr_acl_default_handler,
+    /* 
+     * NOTE: Please add prefix-based xattrs before this comment. 
+     * Don't forget to change the handler map above and the associated
+     * defines in pvfs2-kernel.h!
+     * The pvfs2_xattr_default_handler handles all xattrs with "" (the empty)
+     * prefix string! No one seemed to have any strong opinions on whether
+     * this will hurt us/help us in the long run.
+     */
+    &pvfs2_xattr_default_handler,
+    NULL
+};
+
+#else 
+
+/* These routines are used only for the 2.4 kernel xattr callbacks or for early 2.6 kernels */
 
 /* All pointers are in kernel-space */
 #ifdef PVFS2_LINUX_KERNEL_2_4
@@ -28,24 +61,7 @@ int pvfs2_setxattr(struct dentry *dentry, const char *name,
     struct inode *inode = dentry->d_inode;
     int internal_flag = 0;
 
-    /* VFS does a whole bunch of checks, but we still do
-    *  some here */
-    if (name == NULL || value == NULL ||
-            size < 0 || size >= PVFS_MAX_XATTR_VALUELEN)
-    {
-        pvfs2_error("pvfs2_setxattr: invalid parameters\n");
-        return -EINVAL;
-    }
-    /* Attribute must exist! */
-    if (flags & XATTR_REPLACE)
-    {
-        internal_flag = PVFS_XATTR_REPLACE;
-    }
-    /* Attribute must not exist */
-    else if (flags & XATTR_CREATE)
-    {
-        internal_flag = PVFS_XATTR_CREATE;
-    }
+    internal_flag = convert_to_internal_xattr_flags(flags);
     return pvfs2_inode_setxattr(inode, name, value, size, internal_flag);
 }
 
@@ -55,6 +71,8 @@ ssize_t pvfs2_getxattr(struct dentry *dentry, const char *name,
     struct inode *inode = dentry->d_inode;
     return pvfs2_inode_getxattr(inode, name, buffer, size);
 }
+
+#endif
 
 ssize_t pvfs2_listxattr(struct dentry *dentry, char *buffer, size_t size)
 {

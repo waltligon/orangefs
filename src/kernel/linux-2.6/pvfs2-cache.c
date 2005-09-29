@@ -149,6 +149,8 @@ static void pvfs2_inode_cache_ctor(
         inode_init_once(&pvfs2_inode->vfs_inode);
         pvfs2_inode->vfs_inode.i_version = 1;
 #endif
+        /* Initialize the reader/writer semaphore */
+        init_rwsem(&pvfs2_inode->xattr_sem);
     }
     else
     {

@@ -525,6 +525,42 @@ AC_TRY_COMPILE([
 	AC_MSG_RESULT(no)
 )
 
+AC_MSG_CHECKING(for generic_permission api in kernel)
+CFLAGS="$USR_CFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default" 
+dnl if this test passes, the kernel does not have it
+dnl if this test fails, the kernel has it defined with a different signature!
+dnl deliberately, the signature for this method has been changed for it to give a compiler error.
+AC_TRY_COMPILE([
+	#define __KERNEL__
+        #include <linux/fs.h>
+	int generic_permission(struct inode *inode)
+        {
+		return 0;
+	}
+], [],
+	AC_MSG_RESULT(no),
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_GENERIC_PERMISSION, 1, Define if kernel has generic_permission),
+)
+
+AC_MSG_CHECKING(for generic_getxattr api in kernel)
+CFLAGS="$USR_CFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default" 
+dnl if this test passes, the kernel does not have it
+dnl if this test fails, the kernel has it defined
+AC_TRY_COMPILE([
+	#define __KERNEL__
+        #include <linux/fs.h>
+			#include <linux/xattr.h>
+	int generic_getxattr(struct inode *inode)
+        {
+		return 0;
+	}
+], [],
+	AC_MSG_RESULT(no),
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_GENERIC_GETXATTR, 1, Define if kernel has generic_getxattr),
+)
+
 CFLAGS=$oldcflags
 
 dnl PAV configuration needs absolute location of source and build.

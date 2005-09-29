@@ -31,8 +31,8 @@ static int parse_mount_options(
     pvfs2_sb_info_t *pvfs2_sb = NULL;
     int i = 0, j = 0, num_keywords = 0, got_device = 0;
 
-    static char *keywords[] = {"intr"};
-    static int num_possible_keywords = 1;
+    static char *keywords[] = {"intr", "acl"};
+    static int num_possible_keywords = 2;
     static char options[PVFS2_MAX_NUM_OPTIONS][PVFS2_MAX_MOUNT_OPT_LEN];
 
     if (!silent)
@@ -107,6 +107,16 @@ static int parse_mount_options(
                                         "intr specified\n");
                         }
                         pvfs2_sb->mnt_options.intr = 1;
+                        break;
+                    }
+                    else if (strncmp(options[i], "acl", 3) == 0)
+                    {
+                        if (!silent)
+                        {
+                            pvfs2_print("pvfs2: mount option "
+                                        "acl specified\n");
+                        }
+                        pvfs2_sb->mnt_options.acl = 1;
                         break;
                     }
                 }
@@ -436,6 +446,16 @@ int pvfs2_remount(
             {
                 return ret;
             }
+            /* mark the superblock as whether it supports acl's or not */
+            sb->s_flags = ((sb->s_flags & ~MS_POSIXACL) | 
+                ((PVFS2_SB(sb)->mnt_options.acl == 1) ? MS_POSIXACL : 0));
+#ifdef  PVFS2_LINUX_KERNEL_2_4
+            /* mark the s_xattr_flags */
+            sb->s_xattr_flags = ((sb->s_xattr_flags & ~XATTR_MNT_FLAG_POSIX_ACL) |
+                ((PVFS2_SB(sb)->mnt_options.acl == 1) ? XATTR_MNT_FLAG_POSIX_ACL : 0));
+#elif !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_GENERIC_GETXATTR)
+            sb->s_xattr = pvfs2_xattr_handlers;
+#endif
         }
 
         new_op = op_alloc();
@@ -539,6 +559,12 @@ struct super_block* pvfs2_get_sb(
             goto error_exit;
         }
         dev_name = PVFS2_SB(sb)->devname;
+        /* mark the superblock as whether it supports acl's or not */
+        sb->s_flags = ((sb->s_flags & ~MS_POSIXACL) | 
+            ((PVFS2_SB(sb)->mnt_options.acl == 1) ? MS_POSIXACL : 0));
+        /* mark the s_xattr_flags */
+        sb->s_xattr_flags = ((sb->s_xattr_flags & ~XATTR_MNT_FLAG_POSIX_ACL) |
+            ((PVFS2_SB(sb)->mnt_options.acl == 1) ? XATTR_MNT_FLAG_POSIX_ACL : 0));
     }
 
     new_op = op_alloc();
@@ -587,7 +613,7 @@ struct super_block* pvfs2_get_sb(
 
     /* alloc and initialize our root directory inode */
     root = pvfs2_get_custom_inode(
-        sb, (S_IFDIR | 0755), 0, PVFS2_SB(sb)->root_handle);
+        sb, NULL, (S_IFDIR | 0755), 0, PVFS2_SB(sb)->root_handle);
     if (!root)
     {
         ret = -ENOMEM;
@@ -672,8 +698,18 @@ int pvfs2_fill_sb(
         {
             return ret;
         }
+        /* mark the superblock as whether it supports acl's or not */
+        sb->s_flags = ((sb->s_flags & ~MS_POSIXACL) | 
+            ((PVFS2_SB(sb)->mnt_options.acl == 1) ? MS_POSIXACL : 0));
+    }
+    else {
+        sb->s_flags = (sb->s_flags & ~MS_POSIXACL);
     }
 
+#ifdef HAVE_GENERIC_GETXATTR
+    /* Hang the xattr handlers off the superblock */
+    sb->s_xattr = pvfs2_xattr_handlers;
+#endif
     sb->s_magic = PVFS2_SUPER_MAGIC;
     sb->s_op = &pvfs2_s_ops;
     sb->s_type = &pvfs2_fs_type;
@@ -683,7 +719,7 @@ int pvfs2_fill_sb(
     sb->s_maxbytes = MAX_LFS_FILESIZE;
 
     /* alloc and initialize our root directory inode */
-    root = pvfs2_get_custom_inode(sb, (S_IFDIR | 0755),
+    root = pvfs2_get_custom_inode(sb, NULL, (S_IFDIR | 0755),
                                   0, PVFS2_SB(sb)->root_handle);
     if (!root)
     {

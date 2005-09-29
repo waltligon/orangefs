@@ -56,6 +56,7 @@ typedef unsigned long sector_t;
 #include <linux/slab.h>
 #include <linux/types.h>
 #include <linux/fs.h>
+#include <linux/posix_acl.h>
 #include <asm/uaccess.h>
 #include <linux/uio.h>
 #include <linux/sched.h>
@@ -66,8 +67,14 @@ typedef unsigned long sector_t;
 #include <linux/dcache.h>
 #include <linux/pagemap.h>
 #include <linux/poll.h>
+#include <linux/rwsem.h>
 
 #include "pvfs2-config.h"
+
+#ifdef HAVE_XATTR
+#include <linux/xattr.h>
+#include <linux/xattr_acl.h>
+#endif
 
 /* taken from include/linux/fs.h from 2.4.19 or later kernels */
 #ifndef MAX_LFS_FILESIZE
@@ -201,6 +208,51 @@ sizeof(uint64_t) + sizeof(pvfs2_downcall_t))
 #define pvfs2_kunmap(page) do {} while(0)
 #endif /* CONFIG_HIGHMEM */
 
+/* pvfs2 xattr and acl related defines */
+#ifdef HAVE_XATTR
+#define PVFS2_XATTR_INDEX_POSIX_ACL_ACCESS  1
+#define PVFS2_XATTR_INDEX_POSIX_ACL_DEFAULT 2
+#define PVFS2_XATTR_INDEX_DEFAULT           3
+
+#define PVFS2_XATTR_NAME_ACL_ACCESS  XATTR_NAME_ACL_ACCESS
+#define PVFS2_XATTR_NAME_ACL_DEFAULT XATTR_NAME_ACL_DEFAULT
+#define PVFS2_XATTR_NAME_DEFAULT     ""
+
+#if !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_GENERIC_GETXATTR)
+
+extern int pvfs2_acl_chmod(struct inode *inode);
+extern int pvfs2_init_acl(struct inode *inode, struct inode *dir);
+
+extern struct xattr_handler *pvfs2_xattr_handlers[];
+extern struct xattr_handler pvfs2_xattr_acl_default_handler, pvfs2_xattr_acl_access_handler;
+extern struct xattr_handler pvfs2_xattr_default_handler;
+
+typedef struct {
+    int32_t p_tag;
+    uint32_t p_perm;
+    uint32_t p_id;
+} pvfs2_acl_entry;
+
+#endif
+
+static inline int convert_to_internal_xattr_flags(int setxattr_flags)
+{
+    int internal_flag = 0;
+
+    /* Attribute must exist! */
+    if (setxattr_flags & XATTR_REPLACE)
+    {
+        internal_flag = PVFS_XATTR_REPLACE;
+    }
+    /* Attribute must not exist */
+    else if (setxattr_flags & XATTR_CREATE)
+    {
+        internal_flag = PVFS_XATTR_CREATE;
+    }
+    return internal_flag;
+}
+#endif
+
 /************************************
  * pvfs2 data structures
  ************************************/
@@ -230,6 +282,12 @@ typedef struct
     int last_version_changed; 
     uint64_t directory_version;
     char *link_target;
+    /*
+     * Reading/Writing Extended attributes need to acquire the appropriate
+     * reader/writer semaphore on the pvfs2_inode_t structure.
+     */
+    struct rw_semaphore xattr_sem;
+
 #ifdef PVFS2_LINUX_KERNEL_2_4
     struct inode *vfs_inode;
 #else
@@ -248,6 +306,10 @@ typedef struct
      *  and ignores the signal otherwise (if not set).
      */
     int intr;
+    /** acl option (if set) is inspired by the ext2 acl option that
+     * requires the file system to honor acl's 
+     */
+    int acl;
 } pvfs2_mount_options_t;
 
 /** per superblock private pvfs2 info */
@@ -352,6 +414,7 @@ int pvfs2_remount(
  ****************************/
 struct inode *pvfs2_get_custom_inode(
     struct super_block *sb,
+    struct inode *dir,
     int mode,
     dev_t dev,
     unsigned long ino);
@@ -392,11 +455,14 @@ int pvfs2_removexattr(struct dentry *dentry, const char *name);
 struct dentry *pvfs2_lookup(
     struct inode *dir,
     struct dentry *dentry);
+int pvfs2_permission(struct inode *, int);
 #else
 struct dentry *pvfs2_lookup(
     struct inode *dir,
     struct dentry *dentry,
     struct nameidata *nd);
+int pvfs2_permission(struct inode *inode, 
+        int mask, struct nameidata *nd);
 #endif
 
 /****************************
@@ -704,6 +770,9 @@ do {                                                      \
 
 #define get_interruptible_flag(inode)                     \
 (PVFS2_SB(inode->i_sb)->mnt_options.intr)
+
+#define get_acl_flag(inode)                               \
+(PVFS2_SB(inode->i_sb)->mnt_options.acl)
 
 #ifdef USE_MMAP_RA_CACHE
 #define clear_inode_mmap_ra_cache(inode)                  \

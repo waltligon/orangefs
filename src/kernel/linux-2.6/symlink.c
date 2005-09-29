@@ -44,12 +44,13 @@ struct inode_operations pvfs2_symlink_inode_operations =
     readlink : pvfs2_readlink,
     follow_link : pvfs2_follow_link,
     setattr : pvfs2_setattr,
-    revalidate : pvfs2_revalidate
+    revalidate : pvfs2_revalidate,
 #else
     .readlink = pvfs2_readlink,
     .follow_link = pvfs2_follow_link,
     .setattr = pvfs2_setattr,
-    .getattr = pvfs2_getattr
+    .getattr = pvfs2_getattr,
+    .permission = pvfs2_permission,
 #endif
 };
 
