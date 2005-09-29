@@ -20,7 +20,10 @@
 #if !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_GENERIC_GETXATTR)
 
 #include <linux/posix_acl.h>
+#include <linux/xattr.h>
+#ifdef HAVE_LINUX_XATTR_ACL_H
 #include <linux/xattr_acl.h>
+#endif
 #include "bmi-byteswap.h"
 
 extern int debug;

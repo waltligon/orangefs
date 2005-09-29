@@ -57,6 +57,7 @@ typedef unsigned long sector_t;
 #include <linux/types.h>
 #include <linux/fs.h>
 #include <linux/posix_acl.h>
+#include <linux/posix_acl_xattr.h>
 #include <asm/uaccess.h>
 #include <linux/uio.h>
 #include <linux/sched.h>
@@ -216,8 +217,8 @@ sizeof(uint64_t) + sizeof(pvfs2_downcall_t))
 #define PVFS2_XATTR_INDEX_POSIX_ACL_DEFAULT 2
 #define PVFS2_XATTR_INDEX_DEFAULT           3
 
-#define PVFS2_XATTR_NAME_ACL_ACCESS  XATTR_NAME_ACL_ACCESS
-#define PVFS2_XATTR_NAME_ACL_DEFAULT XATTR_NAME_ACL_DEFAULT
+#define PVFS2_XATTR_NAME_ACL_ACCESS  POSIX_ACL_XATTR_ACCESS
+#define PVFS2_XATTR_NAME_ACL_DEFAULT POSIX_ACL_XATTR_DEFAULT
 #define PVFS2_XATTR_NAME_DEFAULT     ""
 
 #if !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_GENERIC_GETXATTR)
