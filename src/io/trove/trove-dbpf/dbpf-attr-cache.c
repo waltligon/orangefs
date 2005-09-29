@@ -11,11 +11,13 @@
 #include "gen-locks.h"
 #include "str-utils.h"
 
+/* public mutex lock */
+gen_mutex_t dbpf_attr_cache_mutex = GEN_MUTEX_INITIALIZER;
+
 /* these are based on code from src/server/request-scheduler.c */
 static int hash_key(void *key, int table_size);
 static int hash_key_compare(void *key, struct qlist_head *link);
 
-static gen_mutex_t *s_dbpf_attr_mutex = NULL;
 static int s_cache_size = DBPF_ATTR_CACHE_DEFAULT_SIZE;
 static int s_max_num_cache_elems = 
 DBPF_ATTR_CACHE_DEFAULT_MAX_NUM_CACHE_ELEMS;
@@ -25,21 +27,7 @@ static int s_cacheable_keyword_array_size = 0;
 static int s_current_num_cache_elems = 0;
 
 #define DBPF_ATTR_CACHE_INITIALIZED() \
-(s_key_to_attr_table && s_dbpf_attr_mutex)
-
-/*
-  this is a check that needs to be made each
-  time the s_dbpf_attr_mutex is acquired.  it handles
-  the odd case of a caller waiting on a mutex and
-  acquiring it after a different caller finalized
-  the interface
-*/
-#define DBPF_ATTR_CACHE_ASSERT_OK(err)   \
-do {                                     \
-    if (!DBPF_ATTR_CACHE_INITIALIZED()) {\
-        return err;                      \
-    }                                    \
-} while(0)
+(s_key_to_attr_table)
 
 int dbpf_attr_cache_set_keywords(char *keywords)
 {
@@ -131,14 +119,6 @@ int dbpf_attr_cache_initialize(
             goto return_error;
         }
 
-        s_dbpf_attr_mutex = gen_mutex_build();
-        if (!s_dbpf_attr_mutex)
-        {
-            qhash_finalize(s_key_to_attr_table);
-            s_key_to_attr_table = NULL;
-            goto return_error;
-        }
-
         srand((unsigned int)time(NULL));
 
         gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG,
@@ -164,9 +144,6 @@ int dbpf_attr_cache_finalize(void)
 
     if (DBPF_ATTR_CACHE_INITIALIZED())
     {
-        gen_mutex_lock(s_dbpf_attr_mutex);
-        DBPF_ATTR_CACHE_ASSERT_OK(ret);
-
         for(i = 0; i < s_key_to_attr_table->table_size; i++)
         {
             do
@@ -188,9 +165,6 @@ int dbpf_attr_cache_finalize(void)
         qhash_finalize(s_key_to_attr_table);
         s_key_to_attr_table = NULL;
 
-        gen_mutex_unlock(s_dbpf_attr_mutex);
-        gen_mutex_destroy(s_dbpf_attr_mutex);
-        s_dbpf_attr_mutex = NULL;
         gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG,
                      "dbpf_attr_cache_finalized\n");
     }
@@ -212,9 +186,6 @@ dbpf_attr_cache_elem_t *dbpf_attr_cache_elem_lookup(TROVE_object_ref key)
 
     if (DBPF_ATTR_CACHE_INITIALIZED())
     {
-        gen_mutex_lock(s_dbpf_attr_mutex);
-        DBPF_ATTR_CACHE_ASSERT_OK(NULL);
-
         hash_link = qhash_search(s_key_to_attr_table,&(key));
         if (hash_link)
         {
@@ -227,7 +198,6 @@ dbpf_attr_cache_elem_t *dbpf_attr_cache_elem_lookup(TROVE_object_ref key)
                 "elem matching %Lu returned (num_elems=%d)\n",
                 Lu(key.handle), s_current_num_cache_elems);
         }
-        gen_mutex_unlock(s_dbpf_attr_mutex);
     }
     return cache_elem;
 }
@@ -241,9 +211,6 @@ int dbpf_attr_cache_ds_attr_update_cached_data(
     cache_elem = dbpf_attr_cache_elem_lookup(key);
     if (cache_elem && src_ds_attr)
     {
-        gen_mutex_lock(s_dbpf_attr_mutex);
-        DBPF_ATTR_CACHE_ASSERT_OK(ret);
-
         if (cache_elem && src_ds_attr)
         {
             memcpy(&cache_elem->attr, src_ds_attr,
@@ -253,7 +220,6 @@ int dbpf_attr_cache_ds_attr_update_cached_data(
                          Lu(key.handle));
             ret = 0;
         }
-        gen_mutex_unlock(s_dbpf_attr_mutex);
     }
     return ret;
 }
@@ -267,9 +233,6 @@ int dbpf_attr_cache_ds_attr_update_cached_data_ksize(
     cache_elem = dbpf_attr_cache_elem_lookup(key);
     if (cache_elem)
     {
-        gen_mutex_lock(s_dbpf_attr_mutex);
-        DBPF_ATTR_CACHE_ASSERT_OK(ret);
-
         if (cache_elem)
         {
             cache_elem->attr.k_size = k_size;
@@ -278,7 +241,6 @@ int dbpf_attr_cache_ds_attr_update_cached_data_ksize(
                          Lu(key.handle));
             ret = 0;
         }
-        gen_mutex_unlock(s_dbpf_attr_mutex);
     }
     return ret;
 }
@@ -292,9 +254,6 @@ int dbpf_attr_cache_ds_attr_update_cached_data_bsize(
     cache_elem = dbpf_attr_cache_elem_lookup(key);
     if (cache_elem)
     {
-        gen_mutex_lock(s_dbpf_attr_mutex);
-        DBPF_ATTR_CACHE_ASSERT_OK(ret);
-
         if (cache_elem)
         {
             cache_elem->attr.b_size = b_size;
@@ -303,7 +262,6 @@ int dbpf_attr_cache_ds_attr_update_cached_data_bsize(
                          Lu(key.handle));
             ret = 0;
         }
-        gen_mutex_unlock(s_dbpf_attr_mutex);
     }
     return ret;
 }
@@ -317,9 +275,6 @@ int dbpf_attr_cache_ds_attr_fetch_cached_data(
 
     if (DBPF_ATTR_CACHE_INITIALIZED() && target_ds_attr)
     {
-        gen_mutex_lock(s_dbpf_attr_mutex);
-        DBPF_ATTR_CACHE_ASSERT_OK(ret);
-
         hash_link = qhash_search(s_key_to_attr_table,&(key));
         if (hash_link)
         {
@@ -330,7 +285,6 @@ int dbpf_attr_cache_ds_attr_fetch_cached_data(
                    sizeof(TROVE_ds_attributes));
             ret = 0;
         }
-        gen_mutex_unlock(s_dbpf_attr_mutex);
     }
     return ret;
 }
@@ -343,9 +297,6 @@ dbpf_keyval_pair_cache_elem_t *dbpf_attr_cache_elem_get_data_based_on_key(
     if (DBPF_ATTR_CACHE_INITIALIZED() &&
         (cache_elem && key && cache_elem->num_keyval_pairs))
     {
-        gen_mutex_lock(s_dbpf_attr_mutex);
-        DBPF_ATTR_CACHE_ASSERT_OK(NULL);
-
         for(i = 0; i < cache_elem->num_keyval_pairs; i++)
         {
             if ((strcmp(cache_elem->keyval_pairs[i].key, key) == 0) &&
@@ -357,11 +308,9 @@ dbpf_keyval_pair_cache_elem_t *dbpf_attr_cache_elem_get_data_based_on_key(
                     cache_elem->keyval_pairs[i].data,
                     Lu(cache_elem->key.handle), key,
                     cache_elem->keyval_pairs[i].data_sz);
-                gen_mutex_unlock(s_dbpf_attr_mutex);
                 return &cache_elem->keyval_pairs[i];
             }
         }
-        gen_mutex_unlock(s_dbpf_attr_mutex);
     }
     return NULL;
 }
@@ -375,12 +324,8 @@ int dbpf_attr_cache_elem_set_data_based_on_key(
     cache_elem = dbpf_attr_cache_elem_lookup(key);
     if (cache_elem && key_str && cache_elem->num_keyval_pairs)
     {
-        gen_mutex_lock(s_dbpf_attr_mutex);
-        DBPF_ATTR_CACHE_ASSERT_OK(ret);
-
         if (!cache_elem || !cache_elem->num_keyval_pairs)
         {
-            gen_mutex_unlock(s_dbpf_attr_mutex);
             return ret;
         }
         for(i = 0; i < cache_elem->num_keyval_pairs; i++)
@@ -405,7 +350,6 @@ int dbpf_attr_cache_elem_set_data_based_on_key(
                 break;
             }
         }
-        gen_mutex_unlock(s_dbpf_attr_mutex);
     }
     return ret;
 }
@@ -420,16 +364,12 @@ int dbpf_attr_cache_keyval_pair_fetch_cached_data(
     if (DBPF_ATTR_CACHE_INITIALIZED() &&
         (keyval_pair && target_data && target_data_sz))
     {
-        gen_mutex_lock(s_dbpf_attr_mutex);
-        DBPF_ATTR_CACHE_ASSERT_OK(ret);
-
         if (cache_elem && keyval_pair)
         {
             memcpy(target_data, keyval_pair->data, keyval_pair->data_sz);
             *target_data_sz = keyval_pair->data_sz;
             ret = 0;
         }
-        gen_mutex_unlock(s_dbpf_attr_mutex);
     }
     return ret;
 }
@@ -444,9 +384,6 @@ int dbpf_attr_cache_insert(
 
     if (DBPF_ATTR_CACHE_INITIALIZED())
     {
-        gen_mutex_lock(s_dbpf_attr_mutex);
-        DBPF_ATTR_CACHE_ASSERT_OK(ret);
-
         if ((s_current_num_cache_elems + 1) > s_max_num_cache_elems)
         {
             TROVE_object_ref sacrificial_lamb_key =
@@ -486,14 +423,11 @@ int dbpf_attr_cache_insert(
                 goto hashtable_linear_scan;
             }
             assert(sacrificial_lamb_key.handle != TROVE_HANDLE_NULL);
-            gen_mutex_unlock(s_dbpf_attr_mutex);
             gossip_debug(
                 GOSSIP_DBPF_ATTRCACHE_DEBUG, "*** Cache is full -- "
                 "removing key %Lu to insert key %Lu\n",
                 Lu(sacrificial_lamb_key.handle), Lu(key.handle));
             dbpf_attr_cache_remove(sacrificial_lamb_key);
-            gen_mutex_lock(s_dbpf_attr_mutex);
-            DBPF_ATTR_CACHE_ASSERT_OK(ret);
         }
 
         hash_link = qhash_search(s_key_to_attr_table,&(key));
@@ -546,7 +480,6 @@ int dbpf_attr_cache_insert(
             }
             ret = 0;
         }
-        gen_mutex_unlock(s_dbpf_attr_mutex);
     }
     return ret;
 }
@@ -559,9 +492,6 @@ int dbpf_attr_cache_remove(TROVE_object_ref key)
 
     if (DBPF_ATTR_CACHE_INITIALIZED())
     {
-        gen_mutex_lock(s_dbpf_attr_mutex);
-        DBPF_ATTR_CACHE_ASSERT_OK(ret);
-
         hash_link = qhash_search_and_remove(s_key_to_attr_table,&(key));
         if (hash_link)
         {
@@ -593,7 +523,6 @@ int dbpf_attr_cache_remove(TROVE_object_ref key)
             s_current_num_cache_elems--;
             ret = 0;
         }
-        gen_mutex_unlock(s_dbpf_attr_mutex);
     }
     return ret;
 }

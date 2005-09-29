@@ -24,6 +24,8 @@
 #include "pint-event.h"
 #include "dbpf-open-cache.h"
 
+extern gen_mutex_t dbpf_attr_cache_mutex;
+
 #define AIOCB_ARRAY_SZ 64
 
 #define DBPF_MAX_IOS_IN_PROGRESS  16
@@ -545,7 +547,9 @@ static int dbpf_bstream_write_at_op_svc(struct dbpf_op *op_p)
     }
 
     /* remove cached attribute for this handle if it's present */
+    gen_mutex_lock(&dbpf_attr_cache_mutex);
     dbpf_attr_cache_remove(ref);
+    gen_mutex_unlock(&dbpf_attr_cache_mutex);
 
     DBPF_ERROR_SYNC_IF_NECESSARY(op_p, tmp_ref.fd);
 
@@ -700,8 +704,10 @@ static int dbpf_bstream_resize_op_svc(struct dbpf_op *op_p)
     dbpf_open_cache_put(&tmp_ref);
 
     /* adjust size in cached attribute element, if present */
+    gen_mutex_lock(&dbpf_attr_cache_mutex);
     dbpf_attr_cache_ds_attr_update_cached_data_bsize(
         ref,  op_p->u.b_resize.size);
+    gen_mutex_unlock(&dbpf_attr_cache_mutex);
 
     return 1;
 
@@ -906,7 +912,9 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     if (opcode == LIO_WRITE)
     {
         TROVE_object_ref ref = {handle, coll_id};
+        gen_mutex_lock(&dbpf_attr_cache_mutex);
         dbpf_attr_cache_remove(ref);
+        gen_mutex_unlock(&dbpf_attr_cache_mutex);
     }
 
 #ifndef __PVFS2_TROVE_AIO_THREADED__

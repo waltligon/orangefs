@@ -32,6 +32,8 @@
 #include "dbpf-attr-cache.h"
 #include "gossip.h"
 
+extern gen_mutex_t dbpf_attr_cache_mutex;
+
 static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p);
 static int dbpf_keyval_read_list_op_svc(struct dbpf_op *op_p);
 static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p);
@@ -59,6 +61,7 @@ static int dbpf_keyval_read(TROVE_coll_id coll_id,
     gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "*** Trove KeyVal Read "
                  "of %s\n", (char *)key_p->buffer);
 
+    gen_mutex_lock(&dbpf_attr_cache_mutex);
     cache_elem = dbpf_attr_cache_elem_lookup(ref);
     if (cache_elem)
     {
@@ -71,9 +74,11 @@ static int dbpf_keyval_read(TROVE_coll_id coll_id,
                 cache_elem, keyval_pair, val_p->buffer,
                 &val_p->buffer_sz);
             val_p->read_sz = val_p->buffer_sz;
+            gen_mutex_unlock(&dbpf_attr_cache_mutex);
             return 1;
         }
     }
+    gen_mutex_unlock(&dbpf_attr_cache_mutex);
 
     coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL)
@@ -158,6 +163,7 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
     op_p->u.k_read.val->read_sz = data.size;
 
     /* cache this data in the attr cache if we can */
+    gen_mutex_lock(&dbpf_attr_cache_mutex);
     if (dbpf_attr_cache_elem_set_data_based_on_key(
             ref, op_p->u.k_read.key->buffer,
             op_p->u.k_read.val->buffer, data.size))
@@ -177,6 +183,7 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
             "retrieved (key is %s)\n",
             (char *)op_p->u.k_read.key->buffer);
     }
+    gen_mutex_unlock(&dbpf_attr_cache_mutex);
 
     dbpf_open_cache_put(&tmp_ref);
     return 1;
@@ -316,6 +323,7 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
       now that the data is written to disk, update the cache if it's
       an attr keyval we manage.
     */
+    gen_mutex_lock(&dbpf_attr_cache_mutex);
     cache_elem = dbpf_attr_cache_elem_lookup(ref);
     if (cache_elem)
     {
@@ -339,6 +347,7 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
                 (char *)op_p->u.k_write.key.buffer);
         }
     }
+    gen_mutex_unlock(&dbpf_attr_cache_mutex);
 
     /* this may have increased the number of keyvals stored in this
      * object; update the k_size in the cache
@@ -357,7 +366,9 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
         k_size = (TROVE_size)k_stat_p->bt_ndata;
         free(k_stat_p);
 
+        gen_mutex_lock(&dbpf_attr_cache_mutex);
         dbpf_attr_cache_ds_attr_update_cached_data_ksize(ref, k_size);
+        gen_mutex_unlock(&dbpf_attr_cache_mutex);
     }
     else
     {
@@ -469,7 +480,9 @@ static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p)
         k_size = (TROVE_size)k_stat_p->bt_ndata;
         free(k_stat_p);
 
+        gen_mutex_lock(&dbpf_attr_cache_mutex);
         dbpf_attr_cache_ds_attr_update_cached_data_ksize(ref, k_size);
+        gen_mutex_unlock(&dbpf_attr_cache_mutex);
     }
     else
     {
@@ -987,6 +1000,7 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
          now that the data is written to disk, update the cache if it's
          an attr keyval we manage.
         */
+        gen_mutex_lock(&dbpf_attr_cache_mutex);
         cache_elem = dbpf_attr_cache_elem_lookup(ref);
         if (cache_elem)
         {
@@ -1010,6 +1024,7 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
                     (char *)op_p->u.k_write_list.key_array[k].buffer);
             }
         }
+        gen_mutex_unlock(&dbpf_attr_cache_mutex);
     }
 
     /* this may have increased the number of keyvals stored in this
@@ -1029,7 +1044,9 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
         k_size = (TROVE_size)k_stat_p->bt_ndata;
         free(k_stat_p);
 
+        gen_mutex_lock(&dbpf_attr_cache_mutex);
         dbpf_attr_cache_ds_attr_update_cached_data_ksize(ref, k_size);
+        gen_mutex_unlock(&dbpf_attr_cache_mutex);
     }
     else
     {

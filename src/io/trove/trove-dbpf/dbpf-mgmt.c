@@ -33,6 +33,8 @@
 #include "gossip.h"
 #include "dbpf-open-cache.h"
 
+extern gen_mutex_t dbpf_attr_cache_mutex;
+
 int dbpf_method_id = -1;
 char dbpf_method_name[] = "dbpf";
 
@@ -142,16 +144,24 @@ static int dbpf_collection_setinfo(TROVE_coll_id coll_id,
                 coll_id, context_id, (struct timeval *)parameter);
             break;
         case TROVE_COLLECTION_ATTR_CACHE_KEYWORDS:
+            gen_mutex_lock(&dbpf_attr_cache_mutex);
             ret = dbpf_attr_cache_set_keywords((char *)parameter);
+            gen_mutex_unlock(&dbpf_attr_cache_mutex);
             break;
         case TROVE_COLLECTION_ATTR_CACHE_SIZE:
+            gen_mutex_lock(&dbpf_attr_cache_mutex);
             ret = dbpf_attr_cache_set_size(*((int *)parameter));
+            gen_mutex_unlock(&dbpf_attr_cache_mutex);
             break;
         case TROVE_COLLECTION_ATTR_CACHE_MAX_NUM_ELEMS:
+            gen_mutex_lock(&dbpf_attr_cache_mutex);
             ret = dbpf_attr_cache_set_max_num_elems(*((int *)parameter));
+            gen_mutex_unlock(&dbpf_attr_cache_mutex);
             break;
         case TROVE_COLLECTION_ATTR_CACHE_INITIALIZE:
+            gen_mutex_lock(&dbpf_attr_cache_mutex);
             ret = dbpf_attr_cache_do_initialize();
+            gen_mutex_unlock(&dbpf_attr_cache_mutex);
              break;
     }
     return ret;
@@ -303,7 +313,9 @@ static int dbpf_finalize(void)
 
     dbpf_thread_finalize();
     dbpf_open_cache_finalize();
+    gen_mutex_lock(&dbpf_attr_cache_mutex);
     dbpf_attr_cache_finalize();
+    gen_mutex_unlock(&dbpf_attr_cache_mutex);
 
     dbpf_collection_clear_registered();
 

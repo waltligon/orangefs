@@ -30,6 +30,7 @@
 #include <pthread.h>
 #include "dbpf-thread.h"
 
+extern gen_mutex_t dbpf_attr_cache_mutex;
 extern pthread_cond_t dbpf_op_completed_cond;
 extern dbpf_op_queue_p dbpf_completion_queue_array[TROVE_MAX_CONTEXTS];
 extern gen_mutex_t *dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
@@ -270,7 +271,9 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
 
     /* add retrieved ds_attr to dbpf_attr cache here */
     ref.handle = new_handle;
+    gen_mutex_lock(&dbpf_attr_cache_mutex);
     dbpf_attr_cache_insert(ref, &attr);
+    gen_mutex_unlock(&dbpf_attr_cache_mutex);
 
     DBPF_DB_SYNC_IF_NECESSARY(op_p, tmp_ref.db_p);
 
@@ -359,7 +362,9 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
     }
 
     /* if this attr is in the dbpf attr cache, remove it */
+    gen_mutex_lock(&dbpf_attr_cache_mutex);
     dbpf_attr_cache_remove(ref);
+    gen_mutex_unlock(&dbpf_attr_cache_mutex);
 
     /* remove both bstream and keyval db if they exist.  Not a fatal
      * error if this fails (may not have ever been created)
@@ -704,6 +709,7 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
     TROVE_object_ref ref = {handle, coll_id};
 
     /* fast path cache hit; skips queueing */
+    gen_mutex_lock(&dbpf_attr_cache_mutex);
     if (dbpf_attr_cache_ds_attr_fetch_cached_data(ref, ds_attr_p) == 0)
     {
 #if 0
@@ -722,8 +728,10 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
                      Ld(ds_attr_p->b_size));
 
         UPDATE_PERF_METADATA_READ();
+        gen_mutex_unlock(&dbpf_attr_cache_mutex);
         return 1;
     }
+    gen_mutex_unlock(&dbpf_attr_cache_mutex);
 
     coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL)
@@ -838,8 +846,10 @@ static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p)
     }
 
     /* now that the disk is updated, update the cache if necessary */
+    gen_mutex_lock(&dbpf_attr_cache_mutex);
     dbpf_attr_cache_ds_attr_update_cached_data(
         ref, op_p->u.d_setattr.attr_p);
+    gen_mutex_unlock(&dbpf_attr_cache_mutex);
 
     DBPF_DB_SYNC_IF_NECESSARY(op_p, tmp_ref.db_p);
 
@@ -965,7 +975,9 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
     trove_ds_stored_to_attr(s_attr, *attr, b_size, k_size);
 
     /* add retrieved ds_attr to dbpf_attr cache here */
+    gen_mutex_lock(&dbpf_attr_cache_mutex);
     dbpf_attr_cache_insert(ref, attr);
+    gen_mutex_unlock(&dbpf_attr_cache_mutex);
 
     if (got_db)
     {
