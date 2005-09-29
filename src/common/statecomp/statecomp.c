@@ -46,6 +46,8 @@ void gen_init(void);
 void yywrap(void);
 void yyerror(char *s);
 
+void produce_listing(int line, char *listing);
+
 int terminate_path_flag = 0;
 
 /*
