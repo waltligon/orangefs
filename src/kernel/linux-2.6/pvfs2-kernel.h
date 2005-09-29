@@ -73,7 +73,9 @@ typedef unsigned long sector_t;
 
 #ifdef HAVE_XATTR
 #include <linux/xattr.h>
+#ifdef HAVE_LINUX_XATTR_ACL_H
 #include <linux/xattr_acl.h>
+#endif
 #endif
 
 /* taken from include/linux/fs.h from 2.4.19 or later kernels */
