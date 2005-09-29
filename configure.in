@@ -664,6 +664,12 @@ AC_ARG_ENABLE(epoll,
   fi
 ],)
 
+dnl enable resolving addresses all the way to hostnames in bmi reverse lookup
+AC_ARG_ENABLE(rev-hostname,
+[  --enable-rev-hostname   Enables hostname resolution in BMI reverse lookups],
+CFLAGS="$CFLAGS -D__PVFS2_BMI_REV_LOOKUP_HOSTNAME__"
+,)
+
 dnl enables a hack to print back traces out of segfault signal handler
 AC_ARG_ENABLE(segv-backtrace,
 [  --enable-segv-backtrace Enables back traces in segfault signal handler],

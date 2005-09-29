@@ -23,6 +23,10 @@
 */
 #define BMI_TCP_ZERO_READ_LIMIT  10
 
+/* peer name types */
+#define BMI_TCP_PEER_IP 1
+#define BMI_TCP_PEER_HOSTNAME 2
+
 /* this contains TCP/IP addressing information- it is filled in as
  * connections are made */
 struct tcp_addr
@@ -47,6 +51,8 @@ struct tcp_addr
     int zero_read_limit;
     /* flag used to determine if we can reconnect this address after failure */
     int dont_reconnect;
+    char* peer;
+    int peer_type;
 };
 
 /*****************************************************************

@@ -15,6 +15,9 @@
 #include <assert.h>
 #include <sys/uio.h>
 #include <time.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #include "pvfs2-config.h"
 #ifdef HAVE_NETDB_H
@@ -240,7 +243,7 @@ static int work_on_recv_op(method_op_p my_method_op,
 			   int *stall_flag);
 static int work_on_send_op(method_op_p my_method_op,
 			   int *blocked_flag, int* stall_flag);
-static int tcp_accept_init(int *socket);
+static int tcp_accept_init(int *socket, char** peer);
 static method_op_p alloc_tcp_method_op(void);
 static void dealloc_tcp_method_op(method_op_p old_op);
 static int handle_new_connection(method_addr_p map);
@@ -1376,31 +1379,56 @@ int BMI_tcp_cancel(bmi_op_id_t id, bmi_context_id context_id)
 const char* BMI_tcp_addr_rev_lookup_unexpected(method_addr_p map)
 {
     struct tcp_addr *tcp_addr_data = map->method_data;
+
+#if !defined(__PVFS2_BMI_REV_LOOKUP_HOSTNAME__) || !defined(HAVE_GETHOSTBYADDR)
+    return(tcp_addr_data->peer);
+
+#else 
     socklen_t peerlen = sizeof(struct sockaddr_in);
     struct sockaddr_in peer;
     int ret;
     struct hostent *peerent;
+    char* tmp_peer;
 
+    if(tcp_addr_data->peer_type == BMI_TCP_PEER_HOSTNAME)
+    {
+        /* full hostname already cached; return now */
+        return(tcp_addr_data->peer);
+    }
 
+    /* if we hit this point, we need to resolve hostname */
     ret = getpeername(tcp_addr_data->socket, (struct sockaddr*)&(peer), &peerlen);
     if(ret < 0)
     {
-        return("UNKNOWN");
+        /* default to use IP address */
+        return(tcp_addr_data->peer);
     }
 
-#ifdef HAVE_GETHOSTBYADDR
-    
     peerent = gethostbyaddr((void*)&peer.sin_addr.s_addr, 
         sizeof(struct in_addr), AF_INET);
     if(peerent == NULL)
     {
-        return("UNKNOWN");
+        /* default to use IP address */
+        return(tcp_addr_data->peer);
     }
  
-    return(peerent->h_name);
-#else
-    return ("UNKNOWN");
+    tmp_peer = (char*)malloc(strlen(peerent->h_name) + 1);
+    if(!tmp_peer)
+    {
+        /* default to use IP address */
+        return(tcp_addr_data->peer);
+    }
+    strcpy(tmp_peer, peerent->h_name);
+    if(tcp_addr_data->peer)
+    {
+        free(tcp_addr_data->peer);
+    }
+    tcp_addr_data->peer = tmp_peer;
+    tcp_addr_data->peer_type = BMI_TCP_PEER_HOSTNAME;
+    return(tcp_addr_data->peer);
+
 #endif
+
 }
 
 /* tcp_forget_addr()
@@ -1471,6 +1499,8 @@ static void dealloc_tcp_method_addr(method_addr_p map)
 
     if (tcp_addr_data->hostname)
 	free(tcp_addr_data->hostname);
+    if (tcp_addr_data->peer)
+        free(tcp_addr_data->peer);
 
     dealloc_method_addr(map);
 
@@ -2355,8 +2385,9 @@ static int handle_new_connection(method_addr_p map)
     int accepted_socket = -1;
     method_addr_p new_addr = NULL;
     int ret = -1;
+    char* tmp_peer;
 
-    ret = tcp_accept_init(&accepted_socket);
+    ret = tcp_accept_init(&accepted_socket, &tmp_peer);
     if (ret < 0)
     {
 	return (ret);
@@ -2381,6 +2412,9 @@ static int handle_new_connection(method_addr_p map)
 		  accepted_socket);
     tcp_addr_data = new_addr->method_data;
     tcp_addr_data->socket = accepted_socket;
+    tcp_addr_data->peer = tmp_peer;
+    tcp_addr_data->peer_type = BMI_TCP_PEER_IP;
+
     /* set a flag to make sure that we never try to reconnect this address
      * in the future
      */
@@ -2898,12 +2932,15 @@ static int tcp_do_work_error(method_addr_p map)
  *
  * returns 0 on success, -errno on failure.
  */
-static int tcp_accept_init(int *socket)
+static int tcp_accept_init(int *socket, char** peer)
 {
 
     int ret = -1;
     int tmp_errno = 0;
     struct tcp_addr *tcp_addr_data = tcp_method_params.listen_addr->method_data;
+    struct sockaddr_in peer_sockaddr;
+    int peer_sockaddr_size = sizeof(struct sockaddr_in);
+    char* tmp_peer;
 
     /* do we have a socket on this end yet? */
     if (tcp_addr_data->socket < 0)
@@ -2915,7 +2952,8 @@ static int tcp_accept_init(int *socket)
 	}
     }
 
-    *socket = accept(tcp_addr_data->socket, NULL, 0);
+    *socket = accept(tcp_addr_data->socket, (struct sockaddr*)&peer_sockaddr,
+              &peer_sockaddr_size);
 
     if (*socket < 0)
     {
@@ -2947,6 +2985,17 @@ static int tcp_accept_init(int *socket)
 	close(*socket);
 	return (bmi_tcp_errno_to_pvfs(-tmp_errno));
     }
+
+    /* allocate ip address string */
+    tmp_peer = inet_ntoa(peer_sockaddr.sin_addr);
+    *peer = (char*)malloc(strlen(tmp_peer)+1);
+    if(!(*peer))
+    {
+        close(*socket);
+        return(-BMI_ENOMEM);
+    }
+    strcpy(*peer, tmp_peer);
+
     return (0);
 }
 
