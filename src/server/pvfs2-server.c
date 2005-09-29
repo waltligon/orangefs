@@ -638,6 +638,28 @@ static int server_initialize(
 {
     int ret = 0, i = 0;
 
+    /* redirect gossip to specified target if backgrounded */
+    if (s_server_options.server_background)
+    {
+        freopen("/dev/null", "r", stdin);
+        freopen("/dev/null", "w", stdout);
+        freopen("/dev/null", "w", stderr);
+
+        assert(server_config.logfile != NULL);
+        ret = gossip_enable_file(server_config.logfile, "w");
+        if (ret < 0)
+        {
+            gossip_lerr("error opening log file %s\n",
+                        server_config.logfile);
+            return ret;
+        }
+        /* log starting message again so it appears in log file, not just
+         * console
+         */
+        gossip_debug(GOSSIP_SERVER_DEBUG,
+           "PVFS2 Server version %s starting.\n", PVFS2_VERSION);
+    }
+
     /* handle backgrounding, setting up working directory, and so on. */
     ret = server_setup_process_environment(
         s_server_options.server_background);
@@ -678,27 +700,14 @@ static int server_initialize(
     gossip_debug(GOSSIP_SERVER_DEBUG,
                  "Initialization completed successfully.\n");
 
-    /* finally, redirect gossip to specified target if backgrounded */
+    /* make sure that stdin/stdout/stderr are disconnected */
     if (s_server_options.server_background)
     {
         freopen("/dev/null", "r", stdin);
         freopen("/dev/null", "w", stdout);
         freopen("/dev/null", "w", stderr);
-
-        assert(server_config.logfile != NULL);
-        ret = gossip_enable_file(server_config.logfile, "w");
-        if (ret < 0)
-        {
-            gossip_lerr("error opening log file %s\n",
-                        server_config.logfile);
-            return ret;
-        }
-        /* log starting message again so it appears in log file, not just
-         * console
-         */
-        gossip_debug(GOSSIP_SERVER_DEBUG,
-           "PVFS2 Server version %s starting.\n", PVFS2_VERSION);
     }
+
     return ret;
 }
 
