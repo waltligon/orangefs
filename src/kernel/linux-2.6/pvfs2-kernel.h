@@ -69,6 +69,7 @@ typedef unsigned long sector_t;
 #include <linux/pagemap.h>
 #include <linux/poll.h>
 #include <linux/rwsem.h>
+#include <asm/unaligned.h>
 
 #include "pvfs2-config.h"
 
