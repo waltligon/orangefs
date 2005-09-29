@@ -1,6 +1,10 @@
 /*
  * (C) 2001 Clemson University and The University of Chicago
  *
+ * Changes by Acxiom Corporation to allow concurrency on operations that are
+ * either read-only or do not modify specific objects
+ * Copyright © Acxiom Corporation, 2005.
+ *
  * See COPYING in top-level directory.
  */
 
@@ -17,7 +21,6 @@
 /* LONG TERM
  * TODO: come up with a more sophisticated scheduling and
  *  consistency model
- * TODO: implement without using so many mallocs
  */
 
 #include <errno.h>
@@ -68,6 +71,7 @@ struct req_sched_element
     enum req_sched_states state;	/* state of this element */
     PVFS_handle handle;
     struct timeval tv;			/* used for timer events */
+    int readonly_flag;                  /* indicates a read only operation */
 };
 
 
@@ -203,10 +207,10 @@ int PINT_req_sched_target_handle(
     case PVFS_SERV_INVALID:
 	return (-EINVAL);
     case PVFS_SERV_MGMT_SETPARAM:
-	return (0);
+	return (1);
     case PVFS_SERV_CREATE:
 	*readonly_flag = 0;
-	return (0);
+	return (1);
     case PVFS_SERV_REMOVE:
 	*readonly_flag = 0;
 	*handle = req->u.remove.handle;
@@ -263,13 +267,13 @@ int PINT_req_sched_target_handle(
 	return (0);
     case PVFS_SERV_MKDIR:
 	*readonly_flag = 0;
-	return (0);
+	return (1);
     case PVFS_SERV_READDIR:
 	*handle = req->u.readdir.handle;
 	*fs_id = req->u.readdir.fs_id;
 	return (0);
     case PVFS_SERV_GETCONFIG:
-	return (0);
+	return (1);
     case PVFS_SERV_FLUSH:
 	*readonly_flag = 0;
 	*handle = req->u.flush.handle;
@@ -278,12 +282,12 @@ int PINT_req_sched_target_handle(
     case PVFS_SERV_MGMT_NOOP:
 	return (1);
     case PVFS_SERV_MGMT_PERF_MON:
-	return (0);
+	return (1);
     case PVFS_SERV_MGMT_EVENT_MON:
-	return (0);
+	return (1);
     case PVFS_SERV_MGMT_ITERATE_HANDLES:
 	*fs_id = req->u.mgmt_iterate_handles.fs_id;
-	return (0);
+	return (1);
     case PVFS_SERV_MGMT_DSPACE_INFO_LIST:
 	if(req_index >= req->u.mgmt_dspace_info_list.handle_count)
         {
@@ -312,7 +316,7 @@ int PINT_req_sched_target_handle(
 	return (0);
     case PVFS_SERV_STATFS:
 	*fs_id = req->u.statfs.fs_id;
-	return (0);
+	return (1);
     case PVFS_SERV_WRITE_COMPLETION:
     case PVFS_SERV_PERF_UPDATE:
     case PVFS_SERV_JOB_TIMER:
@@ -340,6 +344,7 @@ int PINT_req_sched_post(
     PVFS_handle handle;
     int ret = -1;
     struct req_sched_element *tmp_element;
+    struct req_sched_element *tmp_element2;
     struct req_sched_list *tmp_list;
     struct req_sched_element *next_element;
     struct req_sched_element *last_element;
@@ -348,6 +353,8 @@ int PINT_req_sched_post(
     enum PVFS_server_mode target_mode;
     int mode_change_ready = 0;
     int readonly_flag = 0;
+    struct qlist_head *iterator;
+    int tmp_flag;
 
     /* find the handle */
     ret = PINT_req_sched_target_handle(in_request, req_index, &handle, &fs_id, 
@@ -358,6 +365,22 @@ int PINT_req_sched_post(
     }
     if(ret == 1)
     {
+        if(!readonly_flag && !PVFS_SERV_IS_MGMT_OP(in_request->op))
+        {
+            /* if this requests modifies the file system, we have to check
+             * to see if we are in admin mode or about to enter admin mode
+             */
+            if(!qlist_empty(&mode_queue))
+                mode_element = qlist_entry(mode_queue.next, struct req_sched_element,
+                    list_link);
+            if(current_mode == PVFS_SERVER_ADMIN_MODE || (mode_element 
+                && mode_element->req_ptr->u.mgmt_setparam.value == PVFS_SERVER_ADMIN_MODE))
+            {
+                return(-PVFS_EAGAIN);
+            }
+        }
+
+        /* no special mode; allow request to proceed immediately */
         *out_id = 0;
         return(1);
     }
@@ -382,6 +405,7 @@ int PINT_req_sched_post(
     tmp_element->state = REQ_QUEUED;
     tmp_element->handle = handle;
     tmp_element->list_head = NULL;
+    tmp_element->readonly_flag = readonly_flag;
 
     /* is this a request to change the server's operating mode? */
     if(in_request->op == PVFS_SERV_MGMT_SETPARAM
@@ -483,14 +507,11 @@ int PINT_req_sched_post(
 	tmp_element->state = REQ_SCHEDULED;
     else
     {
-	/* ok, can we immediately return to allow concurrent I/O?
-	 * only when the following conditions are met:
-	 * - the current request is for I/O
-	 * - head of queue is a scheduled I/O operation
-	 * - tail of queue is a scheduled I/O operation
-	 * (the above indicates that the only pending ops on this handle
-	 *  are I/O operations)
-	 */
+        /* check queue to see if we can apply any optimizations */
+        /* first check: are all current queued operations already scheduled
+         * (ie, is the first and last scheduled?).  We can never bypass a
+         * queued operation 
+         */
 	next_element = qlist_entry((tmp_list->req_list.next),
 				   struct req_sched_element,
 				   list_link);
@@ -499,15 +520,70 @@ int PINT_req_sched_post(
 				   list_link);
 	if (in_request->op == PVFS_SERV_IO &&
 	    next_element->state == REQ_SCHEDULED &&
-	    next_element->req_ptr->op == PVFS_SERV_IO &&
-	    last_element->state == REQ_SCHEDULED &&
-	    last_element->req_ptr->op == PVFS_SERV_IO)
+	    last_element->state == REQ_SCHEDULED)
 	{
-	    tmp_element->state = REQ_SCHEDULED;
-	    ret = 1;
-	    gossip_debug(GOSSIP_REQ_SCHED_DEBUG, "REQ SCHED allowing "
-                         "concurrent I/O, handle: %Lu\n", Lu(handle));
+            /* possible I/O optimization: see if all scheduled ops for this
+             * handle are for I/O.  If so, we can allow another concurrent
+             * I/O request to proceed 
+             */
+            tmp_flag = 0;
+            qlist_for_each(iterator, &tmp_list->req_list)
+            {
+                tmp_element2 = qlist_entry(iterator, struct req_sched_element,
+                    list_link);
+                if(tmp_element2->req_ptr->op != PVFS_SERV_IO)
+                {
+                    tmp_flag = 1;
+                    break;
+                }
+            }
+
+            if(!tmp_flag)
+            {
+                tmp_element->state = REQ_SCHEDULED;
+                ret = 1;
+                gossip_debug(GOSSIP_REQ_SCHED_DEBUG, "REQ SCHED allowing "
+                             "concurrent I/O, handle: %Lu\n", Lu(handle));
+            }
+            else
+            {
+                tmp_element->state = REQ_QUEUED;
+                ret = 0;
+            }
 	}
+	else if (readonly_flag &&
+	    next_element->state == REQ_SCHEDULED &&
+	    last_element->state == REQ_SCHEDULED)
+        {
+            /* possible read only optimization: see if all scheduled ops 
+             * for this handle are read only.  If so, we can allow another 
+             * concurrent read only request to proceed 
+             */
+            tmp_flag = 0;
+            qlist_for_each(iterator, &tmp_list->req_list)
+            {
+                tmp_element2 = qlist_entry(iterator, struct req_sched_element,
+                    list_link);
+                if(!tmp_element2->readonly_flag)
+                {
+                    tmp_flag = 1;
+                    break;
+                }
+            }
+
+            if(!tmp_flag)
+            {
+                tmp_element->state = REQ_SCHEDULED;
+                ret = 1;
+                gossip_debug(GOSSIP_REQ_SCHED_DEBUG, "REQ SCHED allowing "
+                             "concurrent read only, handle: %Lu\n", Lu(handle));
+            }
+            else
+            {
+                tmp_element->state = REQ_QUEUED;
+                ret = 0;
+            }
+        }
 	else
 	{
 	    tmp_element->state = REQ_QUEUED;
@@ -605,9 +681,11 @@ int PINT_req_sched_post_timer(
 	qlist_add_tail(&tmp_element->list_link, &timer_queue);
     }
 
+#if 0
     gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
 		 "REQ SCHED POSTING, queue_element: %p\n",
 		 tmp_element);
+#endif
     return(0);
 }
 
@@ -793,30 +871,61 @@ int PINT_req_sched_release(
 	    {
 		next_element->state = REQ_READY_TO_SCHEDULE;
 		qlist_add_tail(&(next_element->ready_link), &ready_queue);
-		/* keep going as long as the operations are I/O requests;
-		 * we let these all go concurrently
-		 */
-		while (next_element &&
-                       (next_element->req_ptr->op == PVFS_SERV_IO) &&
-                       (next_element->list_link.next != &(tmp_list->req_list)))
-		{
-		    next_element =
-			qlist_entry(next_element->list_link.next,
-				    struct req_sched_element,
-				    list_link);
-		    if (next_element &&
-                        (next_element->req_ptr->op == PVFS_SERV_IO))
-		    {
-			gossip_debug(
-                            GOSSIP_REQ_SCHED_DEBUG,
-                            "REQ SCHED allowing concurrent I/O, "
-                            "handle: %Lu\n", Lu(next_element->handle));
-			assert(next_element->state == REQ_QUEUED);
-			next_element->state = REQ_READY_TO_SCHEDULE;
-			qlist_add_tail(
-                            &(next_element->ready_link), &ready_queue);
-		    }
-		}
+
+                if(next_element->req_ptr->op == PVFS_SERV_IO)
+                {
+                    /* keep going as long as the operations are I/O requests;
+                     * we let these all go concurrently
+                     */
+                    while (next_element &&
+                           (next_element->req_ptr->op == PVFS_SERV_IO) &&
+                           (next_element->list_link.next != &(tmp_list->req_list)))
+                    {
+                        next_element =
+                            qlist_entry(next_element->list_link.next,
+                                        struct req_sched_element,
+                                        list_link);
+                        if (next_element &&
+                            (next_element->req_ptr->op == PVFS_SERV_IO))
+                        {
+                            gossip_debug(
+                                GOSSIP_REQ_SCHED_DEBUG,
+                                "REQ SCHED allowing concurrent I/O (release time), "
+                                "handle: %Lu\n", Lu(next_element->handle));
+                            assert(next_element->state == REQ_QUEUED);
+                            next_element->state = REQ_READY_TO_SCHEDULE;
+                            qlist_add_tail(
+                                &(next_element->ready_link), &ready_queue);
+                        }
+                    }
+                }
+                else if(next_element->readonly_flag)
+                {
+                    /* keep going as long as the operations are read only;
+                     * we let these all go concurrently
+                     */
+                    while (next_element &&
+                           (next_element->readonly_flag) &&
+                           (next_element->list_link.next != &(tmp_list->req_list)))
+                    {
+                        next_element =
+                            qlist_entry(next_element->list_link.next,
+                                        struct req_sched_element,
+                                        list_link);
+                        if (next_element &&
+                            (next_element->readonly_flag))
+                        {
+                            gossip_debug(
+                                GOSSIP_REQ_SCHED_DEBUG,
+                                "REQ SCHED allowing concurrent read only (release time), "
+                                "handle: %Lu\n", Lu(next_element->handle));
+                            assert(next_element->state == REQ_QUEUED);
+                            next_element->state = REQ_READY_TO_SCHEDULE;
+                            qlist_add_tail(
+                                &(next_element->ready_link), &ready_queue);
+                        }
+                    }
+                }
 	    }
 	}
 	sched_count--;
@@ -1074,9 +1183,11 @@ int PINT_req_sched_testworld(
 		}
 		out_status_array[*inout_count_p] = 0;
 		(*inout_count_p)++;
+#if 0
 		gossip_debug(GOSSIP_REQ_SCHED_DEBUG,
 			     "REQ SCHED SCHEDULING, queue_element: %p\n",
 			     tmp_element);
+#endif
 		free(tmp_element);
 		if(*inout_count_p == incount)
 		    break;
