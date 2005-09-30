@@ -637,14 +637,16 @@ static int server_initialize(
     job_status_s *job_status_structs)
 {
     int ret = 0, i = 0; 
+    FILE *dummy;
     
     assert(server_config.logfile != NULL);
-    ret = access(server_config.logfile, W_OK);
-    if (ret < 0 )
+    dummy = fopen(server_config.logfile, "w");
+    if (dummy == NULL)
     {
         gossip_err("error opening log file %s\n",
                 server_config.logfile);
     }
+    fclose(dummy);
 
     /* redirect gossip to specified target if backgrounded */
     if (s_server_options.server_background)
