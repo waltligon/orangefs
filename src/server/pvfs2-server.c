@@ -636,7 +636,15 @@ static int server_initialize(
     PINT_server_status_flag *server_status_flag,
     job_status_s *job_status_structs)
 {
-    int ret = 0, i = 0;
+    int ret = 0, i = 0; 
+    
+    assert(server_config.logfile != NULL);
+    ret = access(server_config.logfile, W_OK);
+    if (ret < 0 )
+    {
+        gossip_err("error opening log file %s\n",
+                server_config.logfile);
+    }
 
     /* redirect gossip to specified target if backgrounded */
     if (s_server_options.server_background)
@@ -645,7 +653,6 @@ static int server_initialize(
         freopen("/dev/null", "w", stdout);
         freopen("/dev/null", "w", stderr);
 
-        assert(server_config.logfile != NULL);
         ret = gossip_enable_file(server_config.logfile, "w");
         if (ret < 0)
         {
