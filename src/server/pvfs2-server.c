@@ -643,8 +643,10 @@ static int server_initialize(
     dummy = fopen(server_config.logfile, "w");
     if (dummy == NULL)
     {
+        int tmp_errno = errno;
         gossip_err("error opening log file %s\n",
                 server_config.logfile);
+        return -tmp_errno;
     }
     fclose(dummy);
 
@@ -658,9 +660,10 @@ static int server_initialize(
         ret = gossip_enable_file(server_config.logfile, "w");
         if (ret < 0)
         {
+            int tmp_errno = errno;
             gossip_lerr("error opening log file %s\n",
                         server_config.logfile);
-            return ret;
+            return -tmp_errno;
         }
         /* log starting message again so it appears in log file, not just
          * console
