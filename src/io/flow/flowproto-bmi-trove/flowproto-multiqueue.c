@@ -699,7 +699,7 @@ static void bmi_recv_callback_fn(void *user_ptr,
         result_tmp->q_item = q_item;
         result_tmp->trove_callback.data = result_tmp;
         result_tmp->trove_callback.fn = trove_write_callback_wrapper;
-        tmp_user_ptr = &result_tmp->trove_callback;
+        tmp_user_ptr = result_tmp;
         assert(result_tmp->result.bytes);
 
         ret = trove_bstream_write_list(
@@ -1129,7 +1129,7 @@ static int bmi_send_callback_fn(void *user_ptr,
         result_tmp->q_item = q_item;
         result_tmp->trove_callback.data = result_tmp;
         result_tmp->trove_callback.fn = trove_read_callback_wrapper;
-        tmp_user_ptr = &result_tmp->trove_callback;
+        tmp_user_ptr = result_tmp;
         assert(result_tmp->result.bytes);
 
         ret = trove_bstream_read_list(
