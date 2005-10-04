@@ -204,7 +204,8 @@ static int check_fs_id(PVFS_fs_id fs_id)
     name.buffer = malloc(PVFS_NAME_MAX);
     if (!name.buffer)
     {
-        return -PVFS_ENOMEM;
+        ret = -PVFS_ENOMEM;
+        goto check_failed;
     }
     name.buffer_sz = PVFS_NAME_MAX;
 
@@ -217,12 +218,12 @@ static int check_fs_id(PVFS_fs_id fs_id)
         {
             gossip_lerr("Error: unexpected trove behavior.\n");
             ret = -PVFS_EINVAL;
-            goto check_failed;
+            goto free_name_buffer;
         }
         
         if (ret < 0)
         {
-            goto check_failed;
+            goto free_name_buffer;
         }
 
         gossip_debug(GOSSIP_SERVER_DEBUG, "looking for fs_id: %d, "
@@ -231,14 +232,14 @@ static int check_fs_id(PVFS_fs_id fs_id)
         if ((count > 0) && (tmp_coll == fs_id))
         {
             /* we found a matching collection */
-            free(name.buffer);
-            return 0;
+            ret = 0;;
         }
     }
 
-  check_failed:
-
+free_name_buffer:
     free(name.buffer);
+check_failed:
+
     return ret;
 }
 

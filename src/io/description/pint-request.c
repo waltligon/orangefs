@@ -70,7 +70,7 @@ int PINT_process_request(PINT_Request_state *req,
 {
 	void *temp_space = NULL;    /* temp copy of req state for size call */
 	PVFS_boolean lvl_flag;      /* indicates level should be decremented */
-	PVFS_offset  contig_offset; /* temp for offset of a contig region */
+	PVFS_offset  contig_offset = 0; /* temp for offset of a contig region */
 	PVFS_size    contig_size;   /* temp for size of a contig region */
 	PVFS_size    retval;        /* return value from calls to distribute */
 
@@ -931,7 +931,6 @@ void PINT_dump_request(PINT_Request *req)
 	gossip_debug(GOSSIP_REQUEST_DEBUG,"sreq:\t\t%p\n",req->sreq);
 	gossip_debug(GOSSIP_REQUEST_DEBUG,"**********************\n");
 }
-
 
 /*
  * Local variables:

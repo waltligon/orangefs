@@ -48,6 +48,8 @@ int main(int argc, char **argv)
     char pvfs_path[PVFS_NAME_MAX] = {0};
     PVFS_credentials creds;
     PVFS_sysresp_lookup resp_lookup;
+    PVFS_error_details * error_details;
+    int count;
 
     /* look at command line arguments */
     user_opts = parse_args(argc, argv);
@@ -106,7 +108,7 @@ int main(int argc, char **argv)
         &cur_fs, pvfs_path, PVFS_NAME_MAX);
     if(ret < 0)
     {
-	fprintf(stderr, "Failure: could not find filesystem for %s "
+        fprintf(stderr, "Failure: could not find filesystem for %s "
                 "in pvfstab\n", user_opts->fs_path_real);
 	return(-1);
     }
@@ -139,22 +141,48 @@ int main(int argc, char **argv)
     printf("\n(6) Verifying that fsid %ld is acceptable "
            "to all servers...\n",(long)cur_fs);
 
+    ret = PVFS_mgmt_count_servers(
+        cur_fs, &creds, PVFS_MGMT_IO_SERVER|PVFS_MGMT_META_SERVER, &count);
+    if (ret < 0)
+    {
+	PVFS_perror("PVFS_mgmt_count_servers()", ret);
+	return ret;
+    }
+
+    error_details = PVFS_error_details_new(count);
+    if(!error_details)
+    {
+        PVFS_perror("PVFS_error_details_new", -ENOMEM);
+        fprintf(stderr, "Failure: could not create error details\n");
+        return(-1);
+    }
+            
     /* check that the fsid exists on all of the servers */
     /* TODO: we need a way to get information out about which server fails
      * in error cases here 
      */
     ret = PVFS_mgmt_setparam_all(
         cur_fs, &creds, PVFS_SERV_PARAM_FSID_CHECK,
-        (uint64_t)cur_fs, NULL, NULL);
+        (uint64_t)cur_fs, NULL, error_details);
     if(ret < 0)
     {
+        int i = 0;
 	PVFS_perror("PVFS_mgmt_setparam_all", ret);
 	fprintf(stderr, "Failure: not all servers accepted fsid %ld\n", 
 	    (long)cur_fs);
-	fprintf(stderr, "TODO: need a way to tell which "
-                "servers couldn't find the fs_id...\n");
+        for(i = 0; i < error_details->count_used; ++i)
+        {
+            char perrorstr[100];
+            PVFS_strerror_r(error_details->error[i].error, perrorstr, 100);
+            fprintf(stderr, "\tHost: %s: %s\n",
+                    BMI_addr_rev_lookup(error_details->error[i].addr),
+                    perrorstr);
+        }
+        PVFS_error_details_free(error_details);
 	return(-1);
     }
+    PVFS_error_details_free(error_details);
+
     printf("\n   Ok; all servers understand fs_id %ld\n", (long)cur_fs);
 
     printf("\n(7) Verifying that root handle is owned by one server...\n");    

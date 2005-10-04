@@ -19,6 +19,10 @@
 #define PVFS_util_min(x1,x2) ((x1) > (x2))? (x2):(x1)
 #endif
 
+#ifndef PVFS_util_max
+#define PVFS_util_max(x1,x2) ((x1) > (x2)) ? (x1) : (x2)
+#endif
+
 /* results of parsing a pvfs2 tabfile, may contain more than one entry */
 struct PVFS_util_tab_s
 {

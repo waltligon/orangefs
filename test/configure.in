@@ -13,6 +13,11 @@ dnl Checks for host type
 dnl Ensures we can compile on this OS
 AC_CANONICAL_HOST
 
+USR_CFLAGS=$CFLAGS
+if test "x$USR_CFLAGS" = "x"; then
+	USR_CFLAGS_SET=no
+fi
+
 dnl PAV configuration needs absolute location of source and build.
 dnl Linux-2.6 module needs absolute location of source, and uses the
 dnl relative location for soft links for out-of-tree builds.
@@ -34,8 +39,6 @@ AC_SUBST(QUIET_COMPILE)
 
 dnl Check for utilities that we need during the build process
 AC_PROG_INSTALL
-
-USR_CFLAGS=$CFLAGS
 AC_PROG_CC
 
 AC_MSG_CHECKING(whether cc is gcc)
@@ -43,12 +46,6 @@ if test "x$GCC" = "x"; then
 	AC_MSG_ERROR(pvfs2 currently requires gcc as the compiler)
 fi
 CFLAGS=$USR_CFLAGS
-
-if test "x$USR_CFLAGS" = "x"; then
-	USR_CFLAGS_SET=no
-else
-	USR_CFLAGS_SET=yes
-fi		
 
 AC_PROG_CPP
 AC_CHECK_PROG(HAVE_PERL, perl, yes, no)
@@ -126,16 +123,20 @@ AC_ARG_WITH(pvfs2-build,
 AC_SUBST(PVFS2_SRC_RELATIVE_TOP)
 AC_SUBST(PVFS2_BUILD_RELATIVE_TOP)
 
+if test "x$USR_CFLAGS_SET" = "xno"; then
+	CFLAGS="$CFLAGS -g"
+fi
+
 AC_ARG_ENABLE(strict,
 [  --enable-strict         Turn on strict debugging with gcc],
 [
 if test "x$USR_CFLAGS_SET" = "xno"; then
-    CFLAGS="$CFLAGS -g -Wall -Wstrict-prototypes -Wmissing-prototypes -Wundef -Wpointer-arith -Wbad-function-cast"
+    CFLAGS="$CFLAGS -Wall -Wstrict-prototypes -Wmissing-prototypes -Wundef -Wpointer-arith -Wbad-function-cast"
 fi
 ],
 [
 if test "x$USR_CFLAGS_SET" = "xno"; then
-    CFLAGS="$CFLAGS -g -O2"
+    CFLAGS="$CFLAGS -O2"
 fi
 ])
 

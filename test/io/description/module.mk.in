@@ -39,7 +39,8 @@ TEST_IO_DESC_DIR_SRC := \
 	$(DIR)/test-romio-noncontig-pattern2.c\
 	$(DIR)/test-romio-noncontig-pattern3.c\
 	$(DIR)/test-truncate.c \
-	$(DIR)/test-many-datafiles-import.c
+	$(DIR)/test-many-datafiles-import.c \
+	$(DIR)/test-zero-fill.c
 # disabled, broken:
 #	$(DIR)/test-req1.c\
 

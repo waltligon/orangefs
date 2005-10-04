@@ -76,8 +76,9 @@ static int final_response_release(
     job_id_t tmp_id;
 
     gossip_debug(GOSSIP_SERVER_DEBUG, 
-                 "(%p) %s (FR sm) state: release\n", s_op,
-                 PINT_map_server_op_to_string(s_op->req->op));
+                 "(%p) %s (FR sm) state: release: (error_code = %d)\n", s_op,
+                 PINT_map_server_op_to_string(s_op->req->op),
+                 js_p->error_code);
 
     /* this seems a little odd, but since this is the first state of the
      * nested machine, now is the time to grab the error code if we

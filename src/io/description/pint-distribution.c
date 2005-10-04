@@ -128,6 +128,9 @@ PINT_dist* PINT_dist_copy(const PINT_dist *dist)
 		  = (char *) new_dist + roundup8(sizeof(*new_dist));
 		new_dist->params
 		  = (void *)(new_dist->dist_name + roundup8(new_dist->name_size));
+                memcpy(new_dist->dist_name, dist->dist_name,
+                       dist->name_size);
+                memcpy(new_dist->params, dist->params, dist->param_size);
 	}
 	return (new_dist);
 }
