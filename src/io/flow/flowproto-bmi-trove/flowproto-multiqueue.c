@@ -699,6 +699,8 @@ static void bmi_recv_callback_fn(void *user_ptr,
         result_tmp->q_item = q_item;
         result_tmp->trove_callback.data = result_tmp;
         result_tmp->trove_callback.fn = trove_write_callback_wrapper;
+        /* XXX: can someone confirm this avoids a segfault in the immediate
+         * completion case? */
         tmp_user_ptr = result_tmp;
         assert(result_tmp->result.bytes);
 
@@ -1129,6 +1131,8 @@ static int bmi_send_callback_fn(void *user_ptr,
         result_tmp->q_item = q_item;
         result_tmp->trove_callback.data = result_tmp;
         result_tmp->trove_callback.fn = trove_read_callback_wrapper;
+        /* XXX: can someone confirm this avoids a segfault in the immediate
+         * completion case? */
         tmp_user_ptr = result_tmp;
         assert(result_tmp->result.bytes);
 
