@@ -22,7 +22,7 @@ fi
 if [ -f $PAV_CONFIG ] ; then 
 	# write out a pbs script
 	pbs_script=${CLUSTER_DIR}/mpiiotest.sh
-	make_pbs_script ${MPI_IO_TEST} -f pvfs2:\${MOUNTPOINT}/file1 -b $((1024*1024*32)) -y > $pbs_script
+	make_pbs_script ${MPI_IO_TEST} -f pvfs2:\${MOUNTPOINT}/file1 -b $((1024*1024*32)) -y -c> $pbs_script
 
 	# submit it
 	job_id=$(qsub -N mpiiotest $pbs_script | cut -d . -f1)
