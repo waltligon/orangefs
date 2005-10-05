@@ -430,12 +430,16 @@ void print_stats(const PVFS_object_ref * ref,
    if(attr->mask & PVFS_ATTR_SYS_UID)
    {
       user  = getpwuid(attr->owner);
-      fprintf(stdout, "  Owner         : %d (%s)\n",  attr->owner, user->pw_name);
+      fprintf(stdout, "  Owner         : %d (%s)\n",  
+              attr->owner, 
+              (user ? user->pw_name : "UNKNOWN"));
    }      
    if(attr->mask & PVFS_ATTR_SYS_GID)
    {
       group = getgrgid(attr->group);
-      fprintf(stdout, "  Group         : %d (%s)\n",  attr->group, group->gr_name);
+      fprintf(stdout, "  Group         : %d (%s)\n",  
+              attr->group, 
+              (group ? group->gr_name : "UNKNOWN"));
    }
    if(attr->mask & PVFS_ATTR_SYS_ATIME)
    {
