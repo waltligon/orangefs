@@ -1088,13 +1088,26 @@ static int bmi_send_callback_fn(void *user_ptr,
             PINT_SERVER);
         /* TODO: error handling */ 
         assert(ret >= 0);
-        
-        old_result_tmp = result_tmp;
-        result_tmp = result_tmp->next;
-        tmp_buffer = (void*)
-            ((char*)tmp_buffer + old_result_tmp->result.bytes);
-        bytes_processed += old_result_tmp->result.bytes;
-        q_item->buffer_used += old_result_tmp->result.bytes;
+
+        if(result_tmp->result.bytes == 0)
+        {
+            if(result_tmp != &q_item->result_chain)
+            {
+                free(result_tmp);
+                old_result_tmp->next = NULL;
+            }
+            q_item->result_chain_count--;
+        }
+        else
+        {
+            old_result_tmp = result_tmp;
+            result_tmp = result_tmp->next;
+            tmp_buffer = (void*)
+                ((char*)tmp_buffer + old_result_tmp->result.bytes);
+            bytes_processed += old_result_tmp->result.bytes;
+            q_item->buffer_used += old_result_tmp->result.bytes;
+        }
+
     }while(bytes_processed < BUFFER_SIZE && 
         !PINT_REQUEST_DONE(q_item->parent->file_req_state));
 
