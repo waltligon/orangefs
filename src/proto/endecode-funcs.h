@@ -6,6 +6,9 @@
  * Defines for macros related to wire encoding and decoding.  Only included
  * by include/pvfs2-encode-stubs.h by core encoding users.
  */
+/* NOTE: if you make any changes to the code contained in this file, please
+ * update the PVFS2_PROTO_VERSION in pvfs2-req-proto.h accordingly
+ */
 #ifndef __SRC_PROTO_ENDECODE_FUNCS_H
 #define __SRC_PROTO_ENDECODE_FUNCS_H
 

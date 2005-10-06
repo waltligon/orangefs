@@ -3,6 +3,9 @@
  *
  * See COPYING in top-level directory.
  */
+/* NOTE: if you make any changes to the code contained in this file, please
+ * update the PVFS2_PROTO_VERSION accordingly
+ */
 
 #ifndef __PVFS2_REQ_PROTO_H
 #define __PVFS2_REQ_PROTO_H
@@ -14,12 +17,16 @@
 #include "pvfs2-request.h"
 #include "pvfs2-mgmt.h"
 
-/* release number: This is a base-10, 5 digit number, with one digit
- * for the most significant version number and two for the last two
- * (e.g. 1.5.6 => 10506)
+/* update PVFS2_PROTO_MAJOR on wire protocol changes that break backwards
+ * compatibility (such as changing the semantics or protocol fields for an
+ * existing request type)
  */
-#define PVFS_RELEASE_NR ((PVFS2_VERSION_MAJOR * 10000) + \
-  (PVFS2_VERSION_MINOR * 100) + PVFS2_VERSION_SUB)
+#define PVFS2_PROTO_MAJOR 1
+/* update PVFS2_PROTO_MINOR on wire protocol changes that preserve backwards
+ * compatibility (such as adding a new request type)
+ */
+#define PVFS2_PROTO_MINOR 1
+#define PVFS2_PROTO_VERSION ((PVFS2_PROTO_MAJOR*1000)+(PVFS2_PROTO_MINOR))
 
 enum PVFS_server_op
 {

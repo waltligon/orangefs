@@ -50,6 +50,7 @@ typedef struct
     const char *name;
     void (*init_fun) (void);
     char generic_header[PINT_ENC_GENERIC_HEADER_SIZE];
+    int enc_type;
 } PINT_encoding_table_values;
 
 #endif /* PINT_ENCODING_MODULE_H */

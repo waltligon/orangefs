@@ -62,10 +62,11 @@ int PINT_encode_initialize(void)
 
         /* header prepended to all messages of this type */
         *((int32_t*)&(le_bytefield_table.generic_header[0])) = 
-            htobmi32(PVFS_RELEASE_NR);
+            htobmi32(PVFS2_PROTO_VERSION);
         *((int32_t*)&(le_bytefield_table.generic_header[4])) = 
             htobmi32(ENCODING_LE_BFIELD);
 
+        le_bytefield_table.enc_type = ENCODING_LE_BFIELD;
         ret = 0;
     }
     return ret;
@@ -165,20 +166,81 @@ int PINT_decode(void* input_buffer,
     char* enc_type_ptr = (char*)input_buffer + 4;
     int ret;
     int32_t enc_type_recved, proto_ver_recved;
+    int proto_major_recved, proto_minor_recved;
 
     gossip_debug(GOSSIP_ENDECODE_DEBUG,"PINT_decode\n");
-    /* compare the header of the incoming buffer against the precalculated
-     * header associated with each module
-     */
+
+    /* sanity check size */
+    if(size < PINT_ENC_GENERIC_HEADER_SIZE)
+    {
+        gossip_err("Error: poorly formatted protocol message received.\n");
+	gossip_err("   Too small: message only %Ld bytes.\n",
+	    Ld(size));
+	return(-PVFS_EPROTO);
+    }
+    
+    /* pull the encoding type and protocol version out */
+    proto_ver_recved = (int)bmitoh32(*((int32_t*)input_buffer));
+    enc_type_recved = bmitoh32(*((int32_t*)enc_type_ptr));
+    proto_major_recved = proto_ver_recved / 1000;
+    proto_minor_recved = proto_ver_recved - (proto_major_recved*1000);
+
+    /* check encoding type */
+    if(enc_type_recved != ENCODING_LE_BFIELD)
+    {
+        gossip_err("Error: poorly formatted protocol message received.\n");
+	gossip_err("   Encoding type mismatch: received type %d when "
+	    "expecting %d.\n", (int)enc_type_recved, 
+	    ENCODING_LE_BFIELD);
+        return(-PVFS_EPROTONOSUPPORT);
+    }
+
+    /* check various protocol version possibilities */
+    if(proto_major_recved != PVFS2_PROTO_MAJOR)
+    {
+        gossip_err("Error: poorly formatted protocol message received.\n");
+	gossip_err("   Protocol version mismatch: received major version %d when "
+	    "expecting %d.\n", (int)proto_major_recved,
+	    PVFS2_PROTO_MAJOR);
+	gossip_err("   Please verify your PVFS2 installation and make sure "
+	"that the version is\n   consistent.\n");
+        return(-PVFS_EPROTONOSUPPORT);
+    }
+
+    if((input_type == PINT_DECODE_REQ) && 
+        (proto_minor_recved > PVFS2_PROTO_MINOR))
+    {
+        gossip_err("Error: poorly formatted protocol message received.\n");
+	gossip_err("   Protocol version mismatch: request has minor version %d when "
+	    "expecting %d or lower.\n", (int)proto_minor_recved,
+	    PVFS2_PROTO_MINOR);
+        gossip_err("   Client is too new for server.\n");
+	gossip_err("   Please verify your PVFS2 installation and make sure "
+	"that the version is\n   consistent.\n");
+        return(-PVFS_EPROTONOSUPPORT);
+    }
+
+    if((input_type == PINT_DECODE_RESP) && 
+        (proto_minor_recved < PVFS2_PROTO_MINOR))
+    {
+        gossip_err("Error: poorly formatted protocol message received.\n");
+	gossip_err("   Protocol version mismatch: request has minor version %d when "
+	    "expecting %d or higher.\n", (int)proto_minor_recved,
+	    PVFS2_PROTO_MINOR);
+        gossip_err("   Server is too old for client.\n");
+	gossip_err("   Please verify your PVFS2 installation and make sure "
+	"that the version is\n   consistent.\n");
+        return(-PVFS_EPROTONOSUPPORT);
+    }
+
     for(i=0; i<ENCODING_TABLE_SIZE; i++)
     {
-	if(PINT_encoding_table[i] && !(memcmp(input_buffer, 
-	    PINT_encoding_table[i]->generic_header, 
-	    PINT_ENC_GENERIC_HEADER_SIZE)))
-	{
+	if(PINT_encoding_table[i] && (PINT_encoding_table[i]->enc_type
+            == enc_type_recved))
+       	{
 	    struct PVFS_server_req* tmp_req;
 	    struct PVFS_server_req* tmp_resp;
-	    target_msg->enc_type = bmitoh32(*((int32_t*)enc_type_ptr));
+	    target_msg->enc_type = enc_type_recved;
 	    if(input_type == PINT_DECODE_REQ)
 	    {
 		ENCODE_EVENT_START(PVFS_EVENT_API_DECODE_REQ,
@@ -213,32 +275,6 @@ int PINT_decode(void* input_buffer,
     }
 
     gossip_err("Error: poorly formatted protocol message received.\n");
-
-    enc_type_recved = bmitoh32(*((int32_t*)enc_type_ptr));
-    proto_ver_recved = (int)bmitoh32(*((int32_t*)input_buffer));
-
-    if(size < PINT_ENC_GENERIC_HEADER_SIZE)
-    {
-	gossip_err("   Too small: message only %Ld bytes.\n",
-	    Ld(size));
-	return(-PVFS_EPROTO);
-    }
-
-    if(enc_type_recved != ENCODING_LE_BFIELD)
-    {
-	gossip_err("   Encoding type mismatch: received type %d when "
-	    "expecting %d.\n", (int)enc_type_recved, 
-	    ENCODING_LE_BFIELD);
-    }
-
-    if(proto_ver_recved != PVFS_RELEASE_NR)
-    {
-	gossip_err("   Protocol version mismatch: received version %d when "
-	    "expecting version %d.\n", (int)proto_ver_recved,
-	    PVFS_RELEASE_NR);
-	gossip_err("   Please verify your PVFS2 installation and make sure "
-	"that the version is consistent.\n");
-    }
 
     return(-PVFS_EPROTONOSUPPORT);
 }

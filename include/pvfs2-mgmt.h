@@ -3,6 +3,9 @@
  *
  * See COPYING in top-level directory.
  */
+/* NOTE: if you make any changes to the encoding definitions in this file,
+ * please update the PVFS2_PROTO_VERSION in pvfs2-req-proto.h accordingly
+ */
 
 /** \defgroup mgmtint PVFS2 management interface
  *

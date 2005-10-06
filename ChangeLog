@@ -2,7 +2,7 @@
 PVFS2 Release ChangeLog
 -----------------------
 
-pvfs2-1.2.1-pre1
+pvfs2-1.3.0-pre1
 ===============
 - Murali Vilayannur contributed extened attribute support to the VFS interface
 - Murali and Dean Hildebrand also worked on implementing readv and writev in
@@ -10,6 +10,9 @@ pvfs2-1.2.1-pre1
 - Phil Carns contributed logging improvements to pvfs2-client and pvfs2-server
 - Phil also contributed improvements to the request processor which should
   help speed up some concurrent workloads.
+- Phil further contributed protocol versioning to PVFS2.  Major version
+  changes are incompatible up or down.  New clients can't talk to old servers,
+  but new servers can talk to old clients. 
 
 pvfs2-1.2.0
 ===============

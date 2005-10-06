@@ -14,6 +14,12 @@ Steps in adding a request to the server:
 			for each of these you add or modify you must also
 			add a stub in include/pvfs2-encode-stubs.h
 
+2b) update the protocol version number
+		src/proto/pvfs2-req-proto.h
+			increment PVFS2_PROTO_MINOR, assuming that the
+			addition of this new request does not break backwards
+			compatibility for other request types
+       
 3) add entries to decode/encode functions
 		src/proto/PINT-le-bytefield.c
 			lebf_initialize() - need code here to set up a request so it
