@@ -446,14 +446,10 @@ int pvfs2_remount(
             {
                 return ret;
             }
+#if !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_GENERIC_GETXATTR)
             /* mark the superblock as whether it supports acl's or not */
             sb->s_flags = ((sb->s_flags & ~MS_POSIXACL) | 
                 ((PVFS2_SB(sb)->mnt_options.acl == 1) ? MS_POSIXACL : 0));
-#ifdef  PVFS2_LINUX_KERNEL_2_4
-            /* mark the s_xattr_flags */
-            sb->s_xattr_flags = ((sb->s_xattr_flags & ~XATTR_MNT_FLAG_POSIX_ACL) |
-                ((PVFS2_SB(sb)->mnt_options.acl == 1) ? XATTR_MNT_FLAG_POSIX_ACL : 0));
-#elif !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_GENERIC_GETXATTR)
             sb->s_xattr = pvfs2_xattr_handlers;
 #endif
         }
@@ -559,12 +555,6 @@ struct super_block* pvfs2_get_sb(
             goto error_exit;
         }
         dev_name = PVFS2_SB(sb)->devname;
-        /* mark the superblock as whether it supports acl's or not */
-        sb->s_flags = ((sb->s_flags & ~MS_POSIXACL) | 
-            ((PVFS2_SB(sb)->mnt_options.acl == 1) ? MS_POSIXACL : 0));
-        /* mark the s_xattr_flags */
-        sb->s_xattr_flags = ((sb->s_xattr_flags & ~XATTR_MNT_FLAG_POSIX_ACL) |
-            ((PVFS2_SB(sb)->mnt_options.acl == 1) ? XATTR_MNT_FLAG_POSIX_ACL : 0));
     }
 
     new_op = op_alloc();

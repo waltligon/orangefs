@@ -56,8 +56,14 @@ typedef unsigned long sector_t;
 #include <linux/slab.h>
 #include <linux/types.h>
 #include <linux/fs.h>
+
+#include "pvfs2-config.h"
+#ifdef HAVE_POSIX_ACL_H
 #include <linux/posix_acl.h>
+#endif
+#ifdef HAVE_POSIX_ACL_XATTR_H
 #include <linux/posix_acl_xattr.h>
+#endif
 #include <asm/uaccess.h>
 #include <linux/uio.h>
 #include <linux/sched.h>
@@ -71,7 +77,6 @@ typedef unsigned long sector_t;
 #include <linux/rwsem.h>
 #include <asm/unaligned.h>
 
-#include "pvfs2-config.h"
 
 #ifdef HAVE_XATTR
 #include <linux/xattr.h>

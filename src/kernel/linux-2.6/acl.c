@@ -19,7 +19,12 @@
 
 #if !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_GENERIC_GETXATTR)
 
+#ifdef HAVE_POSIX_ACL_H
 #include <linux/posix_acl.h>
+#endif
+#ifdef HAVE_LINUX_POSIX_ACL_XATTR_H
+#include <linux/posix_acl_xattr.h>
+#endif
 #include <linux/xattr.h>
 #ifdef HAVE_LINUX_XATTR_ACL_H
 #include <linux/xattr_acl.h>

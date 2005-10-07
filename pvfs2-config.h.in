@@ -58,6 +58,12 @@
 /* Define to 1 if you have the `efence' library (-lefence). */
 #undef HAVE_LIBEFENCE
 
+/* Define to 1 if you have the <linux/posix_acl.h> header file. */
+#undef HAVE_LINUX_POSIX_ACL_H
+
+/* Define to 1 if you have the <linux/posix_acl_xattr.h> header file. */
+#undef HAVE_LINUX_POSIX_ACL_XATTR_H
+
 /* Define to 1 if you have the <linux/xattr_acl.h> header file. */
 #undef HAVE_LINUX_XATTR_ACL_H
 
