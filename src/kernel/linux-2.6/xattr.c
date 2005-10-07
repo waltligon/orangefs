@@ -50,12 +50,12 @@ struct xattr_handler *pvfs2_xattr_handlers[] = {
 /* These routines are used only for the 2.4 kernel xattr callbacks or for early 2.6 kernels */
 
 /* All pointers are in kernel-space */
-#ifdef PVFS2_LINUX_KERNEL_2_4
-int pvfs2_setxattr(struct dentry *dentry, const char *name,
-		void *value, size_t size, int flags)
-#else
+#ifdef HAVE_SETXATTR_CONST_ARG
 int pvfs2_setxattr(struct dentry *dentry, const char *name,
 		const void *value, size_t size, int flags)
+#else
+int pvfs2_setxattr(struct dentry *dentry, const char *name,
+		void *value, size_t size, int flags)
 #endif
 {
     struct inode *inode = dentry->d_inode;

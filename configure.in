@@ -527,9 +527,33 @@ AC_TRY_COMPILE([
 		  };
 ], [],
 	AC_MSG_RESULT(yes)
-	AC_DEFINE(HAVE_XATTR, 1, Define if kernel has xattr support),
+	AC_DEFINE(HAVE_XATTR, 1, Define if kernel has xattr support)
+	have_xattr=yes,
 	AC_MSG_RESULT(no)
+	have_xattr=no
 )
+
+if test "x$have_xattr" = "xyes"; then
+   dnl Test to check if setxattr function has a const void * argument
+   AC_MSG_CHECKING(for const argument to setxattr function)
+   tmp_cflags=$CFLAGS
+   dnl if this test passes, there is a const void* argument
+   CFLAGS="CFLAGS -Werror"
+   AC_TRY_COMPILE([
+   	#define __KERNEL__
+	#include <linux/fs.h>
+	int pvfs2_setxattr(struct dentry *dentry, const char *name,
+	const void *value, size_t size, int flags) { return (0);};
+	static struct inode_operations in_op = {
+		.setxattr = pvfs2_setxattr
+	};
+	], [],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_SETXATTR_CONST_ARG, 1, Define if kernel setxattr has const void* argument),
+		AC_MSG_RESULT(no)
+	)
+	CFLAGS=$tmp_cflags
+fi
 
 AC_CHECK_HEADERS([linux/posix_acl.h], [], [], 
 	[#define __KERNEL__

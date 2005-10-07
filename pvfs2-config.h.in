@@ -94,6 +94,9 @@
 /* Define to 1 if you have the <SDL_ttf.h> header file. */
 #undef HAVE_SDL_TTF_H
 
+/* Define if kernel setxattr has const void* argument */
+#undef HAVE_SETXATTR_CONST_ARG
+
 /* Define to 1 if you have the <stdint.h> header file. */
 #undef HAVE_STDINT_H
 
