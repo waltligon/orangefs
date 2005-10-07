@@ -440,8 +440,19 @@ elif test -z "${LINUX24_KERNEL_SRC}"  ; then
 	lk_src=${LINUX_KERNEL_SRC}
 fi
 
+dnl 
+dnl kernel feature tests.  Set CFLAGS once here and use it for all kernel
+dnl features.  reset to the old value at the end
+dnl 
+
+dnl on some systems, there is a /usr/include/linux/xattr_acl.h , so the check
+dnl for xattr_acl.h down below will always pass, even if it should fail.  this
+dnl hack will bring in just enough system headers for kernel compilation
+NOSTDINCFLAGS="-nostdinc -isystem `$CC -print-file-name=include`"
+
+CFLAGS="$USR_CFLAGS $NOSTDINCFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default" 
+
 AC_MSG_CHECKING(for i_size_write in kernel)
-CFLAGS="$USR_CFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default" 
 dnl if this test passes, the kernel does not have it
 dnl if this test fails, the kernel already defined it
 AC_TRY_COMPILE([
@@ -459,7 +470,6 @@ AC_TRY_COMPILE([
 )
 
 AC_MSG_CHECKING(for i_size_read in kernel)
-CFLAGS="$USR_CFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default" 
 dnl if this test passes, the kernel does not have it
 dnl if this test fails, the kernel already defined it
 AC_TRY_COMPILE([
@@ -476,7 +486,6 @@ AC_TRY_COMPILE([
 )
 
 AC_MSG_CHECKING(for parent_ino in kernel)
-CFLAGS="$USR_CFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default" 
 dnl if this test passes, the kernel does not have it
 dnl if this test fails, the kernel already defined it
 AC_TRY_COMPILE([
@@ -493,9 +502,7 @@ AC_TRY_COMPILE([
 )
 
 dnl The name of this field changed from memory_backed to capabilities in 2.6.12.
-
 AC_MSG_CHECKING(for memory_backed in struct backing_dev_info in kernel)
-CFLAGS="$USR_CFLAGS -Wall -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default" 
 AC_TRY_COMPILE([
 	#define __KERNEL__
 	#include <linux/mm.h>
@@ -510,7 +517,6 @@ AC_TRY_COMPILE([
 )
 
 AC_MSG_CHECKING(for xattr support in kernel)
-CFLAGS="$USR_CFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default" 
 dnl if this test passes, the kernel has it
 dnl if this test fails, the kernel does not have it
 AC_TRY_COMPILE([
@@ -525,9 +531,7 @@ AC_TRY_COMPILE([
 	AC_MSG_RESULT(no)
 )
 
-dnl linux-2.6.11 had xattr_acl.h, but 2.6.12 did not!
-dnl cflags should be ok from above
-AC_CHECK_HEADERS([linux/xattr_acl.h], [], [], 
+AC_CHECK_HEADERS([linux/posix_acl.h], [], [], 
 	[#define __KERNEL__
 	 #include <linux/fs.h>
 	 #ifdef HAVE_XATTR 
@@ -535,11 +539,29 @@ AC_CHECK_HEADERS([linux/xattr_acl.h], [], [],
 	 #endif
 	 ] )
 
+AC_CHECK_HEADERS([linux/posix_acl_xattr.h], [], [], 
+	[#define __KERNEL__
+	 #include <linux/fs.h>
+	 #ifdef HAVE_XATTR 
+	 #include <linux/xattr.h> 
+	 #endif
+	 ] )
+
+dnl linux-2.6.11 had xattr_acl.h, but 2.6.12 did not!
+AC_CHECK_HEADERS([linux/xattr_acl.h], [], [], 
+	[#define __KERNEL__
+	 #include <linux/fs.h>
+	 #ifdef HAVE_XATTR
+	 #include <linux/xattr.h>
+	 #endif
+	 ] )
+
 AC_MSG_CHECKING(for generic_permission api in kernel)
-CFLAGS="$USR_CFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default" 
 dnl if this test passes, the kernel does not have it
 dnl if this test fails, the kernel has it defined with a different signature!
-dnl deliberately, the signature for this method has been changed for it to give a compiler error.
+dnl   deliberately, the signature for this method has been changed for it to
+dnl   give a compiler error.
+
 AC_TRY_COMPILE([
 	#define __KERNEL__
         #include <linux/fs.h>
@@ -554,7 +576,6 @@ AC_TRY_COMPILE([
 )
 
 AC_MSG_CHECKING(for generic_getxattr api in kernel)
-CFLAGS="$USR_CFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default" 
 dnl if this test passes, the kernel does not have it
 dnl if this test fails, the kernel has it defined
 AC_TRY_COMPILE([
@@ -571,6 +592,7 @@ AC_TRY_COMPILE([
 	AC_DEFINE(HAVE_GENERIC_GETXATTR, 1, Define if kernel has generic_getxattr),
 )
 
+dnl end of kernel feature tests
 CFLAGS=$oldcflags
 
 dnl PAV configuration needs absolute location of source and build.

@@ -858,6 +858,7 @@ Optional Features:
   --enable-strict         Turn on strict debugging with gcc
   --enable-verbose-build  Enables full output during build process
   --enable-epoll          Enables use of epoll for TCP/IP polling
+  --enable-rev-hostname   Enables hostname resolution in BMI reverse lookups
   --enable-segv-backtrace Enables back traces in segfault signal handler
   --enable-shared         Build shared client library
 
@@ -4267,9 +4268,13 @@ elif test -z "${LINUX24_KERNEL_SRC}"  ; then
 	lk_src=${LINUX_KERNEL_SRC}
 fi
 
+
+NOSTDINCFLAGS="-nostdinc -isystem `$CC -print-file-name=include`"
+
+CFLAGS="$USR_CFLAGS $NOSTDINCFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default"
+
 echo "$as_me:$LINENO: checking for i_size_write in kernel" >&5
 echo $ECHO_N "checking for i_size_write in kernel... $ECHO_C" >&6
-CFLAGS="$USR_CFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default"
 cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
@@ -4332,7 +4337,6 @@ rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 
 echo "$as_me:$LINENO: checking for i_size_read in kernel" >&5
 echo $ECHO_N "checking for i_size_read in kernel... $ECHO_C" >&6
-CFLAGS="$USR_CFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default"
 cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
@@ -4394,7 +4398,6 @@ rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 
 echo "$as_me:$LINENO: checking for parent_ino in kernel" >&5
 echo $ECHO_N "checking for parent_ino in kernel... $ECHO_C" >&6
-CFLAGS="$USR_CFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default"
 cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
@@ -4454,10 +4457,8 @@ _ACEOF
 fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 
-
 echo "$as_me:$LINENO: checking for memory_backed in struct backing_dev_info in kernel" >&5
 echo $ECHO_N "checking for memory_backed in struct backing_dev_info in kernel... $ECHO_C" >&6
-CFLAGS="$USR_CFLAGS -Wall -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default"
 cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
@@ -4520,7 +4521,6 @@ rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 
 echo "$as_me:$LINENO: checking for xattr support in kernel" >&5
 echo $ECHO_N "checking for xattr support in kernel... $ECHO_C" >&6
-CFLAGS="$USR_CFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default"
 cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
@@ -4579,6 +4579,138 @@ echo "${ECHO_T}no" >&6
 
 fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+
+
+for ac_header in linux/posix_acl.h
+do
+as_ac_Header=`echo "ac_cv_header_$ac_header" | $as_tr_sh`
+echo "$as_me:$LINENO: checking for $ac_header" >&5
+echo $ECHO_N "checking for $ac_header... $ECHO_C" >&6
+if eval "test \"\${$as_ac_Header+set}\" = set"; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+#define __KERNEL__
+	 #include <linux/fs.h>
+	 #ifdef HAVE_XATTR
+	 #include <linux/xattr.h>
+	 #endif
+
+
+#include <$ac_header>
+_ACEOF
+rm -f conftest.$ac_objext
+if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
+  (eval $ac_compile) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest.$ac_objext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  eval "$as_ac_Header=yes"
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+eval "$as_ac_Header=no"
+fi
+rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+fi
+echo "$as_me:$LINENO: result: `eval echo '${'$as_ac_Header'}'`" >&5
+echo "${ECHO_T}`eval echo '${'$as_ac_Header'}'`" >&6
+if test `eval echo '${'$as_ac_Header'}'` = yes; then
+  cat >>confdefs.h <<_ACEOF
+#define `echo "HAVE_$ac_header" | $as_tr_cpp` 1
+_ACEOF
+
+fi
+
+done
+
+
+
+for ac_header in linux/posix_acl_xattr.h
+do
+as_ac_Header=`echo "ac_cv_header_$ac_header" | $as_tr_sh`
+echo "$as_me:$LINENO: checking for $ac_header" >&5
+echo $ECHO_N "checking for $ac_header... $ECHO_C" >&6
+if eval "test \"\${$as_ac_Header+set}\" = set"; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+#define __KERNEL__
+	 #include <linux/fs.h>
+	 #ifdef HAVE_XATTR
+	 #include <linux/xattr.h>
+	 #endif
+
+
+#include <$ac_header>
+_ACEOF
+rm -f conftest.$ac_objext
+if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
+  (eval $ac_compile) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest.$ac_objext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  eval "$as_ac_Header=yes"
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+eval "$as_ac_Header=no"
+fi
+rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+fi
+echo "$as_me:$LINENO: result: `eval echo '${'$as_ac_Header'}'`" >&5
+echo "${ECHO_T}`eval echo '${'$as_ac_Header'}'`" >&6
+if test `eval echo '${'$as_ac_Header'}'` = yes; then
+  cat >>confdefs.h <<_ACEOF
+#define `echo "HAVE_$ac_header" | $as_tr_cpp` 1
+_ACEOF
+
+fi
+
+done
+
 
 
 for ac_header in linux/xattr_acl.h
@@ -4648,7 +4780,7 @@ done
 
 echo "$as_me:$LINENO: checking for generic_permission api in kernel" >&5
 echo $ECHO_N "checking for generic_permission api in kernel... $ECHO_C" >&6
-CFLAGS="$USR_CFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default"
+
 cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
@@ -4710,7 +4842,6 @@ rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 
 echo "$as_me:$LINENO: checking for generic_getxattr api in kernel" >&5
 echo $ECHO_N "checking for generic_getxattr api in kernel... $ECHO_C" >&6
-CFLAGS="$USR_CFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default"
 cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
@@ -5045,6 +5176,13 @@ if test "${enable_epoll+set}" = set; then
    if test "x$enableval" = "xyes" ; then
       test_for_epoll
   fi
+
+fi;
+
+# Check whether --enable-rev-hostname or --disable-rev-hostname was given.
+if test "${enable_rev_hostname+set}" = set; then
+  enableval="$enable_rev_hostname"
+  CFLAGS="$CFLAGS -D__PVFS2_BMI_REV_LOOKUP_HOSTNAME__"
 
 fi;
 
