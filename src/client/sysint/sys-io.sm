@@ -31,7 +31,8 @@ enum
     IO_NO_DATA = 132,
     IO_DATAFILE_TRANSFERS_COMPLETE,
     IO_RETRY,
-    IO_GET_DATAFILE_SIZE
+    IO_GET_DATAFILE_SIZE,
+    IO_ANALYZE_SIZE_RESULTS
 };
 
 static int io_init(
@@ -176,6 +177,7 @@ machine pvfs2_client_io_sm(
     {
         run io_analyze_results;
         IO_RETRY => init;
+        IO_ANALYZE_SIZE_RESULTS => io_analyze_size_results;
         IO_GET_DATAFILE_SIZE => io_datafile_size;
         default => io_cleanup;
     }
@@ -1259,10 +1261,7 @@ static int io_analyze_results(PINT_client_sm *sm_p,
      */
     if(sm_p->u.io.total_size == PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req))
     {
-        /* make sure the memory request is large enough for the total */
-        sm_p->u.io.io_resp_p->total_completed = 
-            PVFS_util_min(sm_p->u.io.total_size, 
-                          PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req));
+        sm_p->u.io.io_resp_p->total_completed = sm_p->u.io.total_size;
     }
     else
     {
@@ -1270,7 +1269,7 @@ static int io_analyze_results(PINT_client_sm *sm_p,
         PINT_request_file_data file_data;
         PVFS_size memreq_ub_offset;
         
-        /* compute the upper bound of the file request.  This is the
+        /* compute the upper bound of the memory request.  This is the
          * logical offset used to compare against all the datafile
          * logical offsets
          */
@@ -1306,21 +1305,48 @@ static int io_analyze_results(PINT_client_sm *sm_p,
             }
         }
 
-        /* if the above loop fails to find a datafile that matches, we
-         * need to get the rest of them.  At some point we should fix
+        /* if the above loop fails to find a datafile that matches, and
+         * the target datafile count equals the total datafile count, we
+         * can go straight to analyze_size_results.  Otherwise, we
+         * need to get the rest of the datafiles.  At some point we should fix
          * this and the getattr state machine to allow us to only get
          * the remaining datafile sizes that we need, instead of 
          * getting all of them.  Right now the getattr state machine
-         * just getes them all.
+         * just gets them all.
          */
         if(i == sm_p->u.io.datafile_count)
         {
             PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+            PINT_SM_DATAFILE_SIZE_ARRAY_INIT(
+                &sm_p->u.io.dfile_size_array, 
+                pinode->attr.u.meta.dfile_count);
+
+            if(sm_p->u.io.datafile_count == pinode->attr.u.meta.dfile_count)
+            {
+                for(i = 0; i < pinode->attr.u.meta.dfile_count; ++i)
+                {
+                    sm_p->u.io.dfile_size_array[i] = 
+                        sm_p->u.io.contexts[i].flow_desc.file_data.fsize;
+                }
+
+                /* we skip getting all the datafile sizes (since we already
+                 * have them) and go straight to analyzing the sizes state.
+                 */
+                js_p->error_code = IO_ANALYZE_SIZE_RESULTS;
+                goto analyze_results_exit;
+            }
+
             PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
                                        sm_p->object_ref,
                                        PVFS_ATTR_DATA_SIZE,
                                        PVFS_TYPE_NONE);
+            sm_p->getattr.size_array = sm_p->u.io.dfile_size_array;
 
+            /* setting this state result will cause the state machine to
+             * jump to getattr and get all the datafile sizes from all the
+             * servers.  Once complete, we will then jump back into the
+             * io state machine at the analyze_size_results state.
+             */
             js_p->error_code = IO_GET_DATAFILE_SIZE;
             goto analyze_results_exit;
         }
@@ -1387,7 +1413,7 @@ static int io_analyze_size_results(
             pinode->attr.u.meta.dist->methods->physical_to_logical_offset(
                 pinode->attr.u.meta.dist->params,
                 &file_data,
-                sm_p->getattr.size_array[i]);
+                sm_p->u.io.dfile_size_array[i]);
 
         if(datafile_logical_offset >= memreq_ub_offset)
         {
@@ -1409,13 +1435,14 @@ static int io_analyze_size_results(
          * offset past the upper bound of the file request, so we know that
          * the request is beyond the EOF of the file.  We compute
          * the return value for bytes read by finding the upper bound of the
-         * file request *within* the logical file (before EOF).  This is
+         * memory request *within* the logical file (before EOF).  This is
          * the end of the contiguous segment in the file request < EOF.
          * The number of bytes read is then the length of the file request
          * from start to this point.
          */
 
-        PINT_Request_state * req_state;
+        PINT_Request_state * filereq_state;
+        PINT_Request_state * memreq_state;
         PINT_request_file_data rfdata;
         PINT_Request_result result;
         int res;
@@ -1423,7 +1450,8 @@ static int io_analyze_size_results(
         PVFS_size size;
         PVFS_size total_size = 0;
 
-        req_state = PINT_new_request_state(sm_p->u.io.file_req);
+        filereq_state = PINT_new_request_state(sm_p->u.io.file_req);
+        memreq_state = PINT_new_request_state(sm_p->u.io.mem_req);
 
         rfdata.server_ct = 1;
         rfdata.fsize = max_datafile_logical_offset;
@@ -1435,14 +1463,18 @@ static int io_analyze_size_results(
         result.segmax = 1;
         result.bytemax = PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req); 
 
+        PINT_REQUEST_STATE_SET_TARGET(filereq_state, memreq_lb_offset);
+        PINT_REQUEST_STATE_SET_FINAL(
+            filereq_state, max_datafile_logical_offset);
+
         do
         {
             PVFS_offset total_offset;
             result.segs = 0;
             result.bytes = 0;
             
-            res = PINT_process_request(req_state, NULL,
-                                       &rfdata, &result, PINT_MEMREQ);
+            res = PINT_process_request(filereq_state, memreq_state,
+                                       &rfdata, &result, PINT_CLIENT);
             if(res < 0)
             {
                 js_p->error_code = res;
@@ -1469,7 +1501,7 @@ static int io_analyze_size_results(
                     total_size += size;
                 }
             }
-        } while(!PINT_REQUEST_DONE(req_state) && result.segs);
+        } while(!PINT_REQUEST_DONE(filereq_state) && result.segs);
 
         sm_p->u.io.io_resp_p->total_completed =
             PVFS_util_min(PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req),
@@ -1494,6 +1526,11 @@ static int io_cleanup(PINT_client_sm *sm_p,
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr); 
     
+    if(sm_p->u.io.dfile_size_array)
+    {
+        PINT_SM_DATAFILE_SIZE_ARRAY_DESTROY(&sm_p->u.io.dfile_size_array);
+    }
+
     sm_p->error_code = js_p->error_code;
 
     if (sm_p->error_code)
