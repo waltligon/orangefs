@@ -209,6 +209,7 @@ struct PINT_client_io_sm
 
     PVFS_size total_size;
 
+    PVFS_size * dfile_size_array;
     /*
       only used when we need to zero fill beyond the end of the
       physical file size
@@ -364,7 +365,8 @@ typedef struct PINT_sm_getattr_state
 
     PVFS_ds_type ref_type;
 
-    PVFS_size *size_array;                /* from datafile attribs */
+    PVFS_size * size_array;
+    int destroy_size_array;
     PVFS_size size;
     
 } PINT_sm_getattr_state;
@@ -381,11 +383,18 @@ typedef struct PINT_sm_getattr_state
 #define PINT_SM_GETATTR_STATE_CLEAR(_state) \
     do { \
         PINT_free_object_attr(&(_state).attr); \
-        if((_state).size_array) \
-        { \
-            free((_state).size_array); \
-        } \
         memset(&(_state), 0, sizeof(PINT_sm_getattr_state)); \
+    } while(0)
+
+#define PINT_SM_DATAFILE_SIZE_ARRAY_INIT(_array, _count) \
+    do { \
+        (*(_array)) = malloc(sizeof(PVFS_size) * (_count)); \
+    } while(0)
+
+#define PINT_SM_DATAFILE_SIZE_ARRAY_DESTROY(_array) \
+    do { \
+        free(*(_array)); \
+        *(_array) = NULL; \
     } while(0)
 
 struct PINT_client_geteattr_sm
