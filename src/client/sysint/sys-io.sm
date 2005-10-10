@@ -1214,11 +1214,22 @@ static int io_analyze_results(PINT_client_sm *sm_p,
     gossip_debug(GOSSIP_IO_DEBUG, "total bytes transferred is %Ld\n",
                  Ld(sm_p->u.io.total_size));
 
+    if(sm_p->u.io.io_type == PVFS_IO_WRITE)
+    {
+        js_p->error_code = 0;
+        sm_p->u.io.io_resp_p->total_completed = sm_p->u.io.total_size;
+
+        /* we can skip the check for holes since its only needed in the
+         * case of reads
+         */
+        goto analyze_results_exit;
+    }
+
     /* In order to give the sysint caller the correct value for length
      * of bytes read, we have to check for holes in the logical file.  
      * The algorithm is as follows:
      *
-     * 1. If the size of the file request is equivalent to the number of
+     * 1. If the size of the memory request is equivalent to the number of
      * bytes read, we know there are no holes and the total size
      * is the correct value to return back to the caller.
      *
@@ -1229,9 +1240,9 @@ static int io_analyze_results(PINT_client_sm *sm_p,
      * request is not past EOF, we iterate through the target datafiles,
      * calculate the logical file offsets of each based on the their physical
      * bstream size, looking for a logical offset that is >= the upper bound
-     * of the file request.  If we find a target datafile that matches this
+     * of the memory request.  If we find a target datafile that matches this
      * criteria, we know that the request is not past EOF, and that
-     * returned bytes read is equivalent to the size of the file request.
+     * returned bytes read is equivalent to the size of the memory request.
      *
      * 3. If none of the target datafile logical offsets are >= the upper
      * bound of the file request, we still must check all the datafiles
@@ -1246,7 +1257,7 @@ static int io_analyze_results(PINT_client_sm *sm_p,
      * bytes read value is the size of the file request minus the last offset
      * of the datafiles (where the EOF occurs).
      */
-    if(sm_p->u.io.total_size == PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.file_req))
+    if(sm_p->u.io.total_size == PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req))
     {
         /* make sure the memory request is large enough for the total */
         sm_p->u.io.io_resp_p->total_completed = 
@@ -1257,14 +1268,14 @@ static int io_analyze_results(PINT_client_sm *sm_p,
     {
         int i = 0;
         PINT_request_file_data file_data;
-        PVFS_size filereq_ub_offset;
+        PVFS_size memreq_ub_offset;
         
         /* compute the upper bound of the file request.  This is the
          * logical offset used to compare against all the datafile
          * logical offsets
          */
-        PVFS_Request_ub(sm_p->u.io.file_req, &filereq_ub_offset);
-        filereq_ub_offset += sm_p->u.io.file_req_offset;
+        PVFS_Request_ub(sm_p->u.io.mem_req, &memreq_ub_offset);
+        memreq_ub_offset += sm_p->u.io.file_req_offset;
 
         memset(&file_data, 0, sizeof(file_data));
         file_data.dist = pinode->attr.u.meta.dist;
@@ -1283,16 +1294,14 @@ static int io_analyze_results(PINT_client_sm *sm_p,
                     &file_data,
                     sm_p->u.io.contexts[i].flow_desc.file_data.fsize);
 
-            if(datafile_logical_offset >= filereq_ub_offset)
+            if(datafile_logical_offset >= memreq_ub_offset)
             {
                 /* we found a logical offset that is past the end of the
                  * request, so we know the request is not past EOF
                  */
                 sm_p->u.io.io_resp_p->total_completed = 
-                    PVFS_util_min(PINT_REQUEST_TOTAL_BYTES(
-                                      sm_p->u.io.file_req),
-                                  PINT_REQUEST_TOTAL_BYTES(
-                                      sm_p->u.io.mem_req));
+                    PINT_REQUEST_TOTAL_BYTES(
+                        sm_p->u.io.mem_req);
                 break;
             }
         }
@@ -1354,16 +1363,16 @@ static int io_analyze_size_results(
     int i = 0;
     PVFS_offset max_datafile_logical_offset = 0;
     PVFS_offset datafile_logical_offset;
-    PVFS_offset filereq_ub_offset;
-    PVFS_offset filereq_lb_offset;
+    PVFS_offset memreq_ub_offset;
+    PVFS_offset memreq_lb_offset;
     PINT_request_file_data file_data;
     PINT_pinode * pinode = PINT_acache_lookup(sm_p->object_ref, NULL, NULL); 
 
-    PVFS_Request_ub(sm_p->u.io.file_req, &filereq_ub_offset);
-    filereq_ub_offset += sm_p->u.io.file_req_offset;
+    PVFS_Request_ub(sm_p->u.io.mem_req, &memreq_ub_offset);
+    memreq_ub_offset += sm_p->u.io.file_req_offset;
 
-    PVFS_Request_lb(sm_p->u.io.file_req, &filereq_lb_offset);
-    filereq_lb_offset += sm_p->u.io.file_req_offset;
+    PVFS_Request_lb(sm_p->u.io.file_req, &memreq_lb_offset);
+    memreq_lb_offset += sm_p->u.io.file_req_offset;
 
     memset(&file_data, 0, sizeof(file_data));
     file_data.dist = pinode->attr.u.meta.dist;
@@ -1380,15 +1389,13 @@ static int io_analyze_size_results(
                 &file_data,
                 sm_p->getattr.size_array[i]);
 
-        if(datafile_logical_offset >= filereq_ub_offset)
+        if(datafile_logical_offset >= memreq_ub_offset)
         {
             /* we found a logical offset that is past the end of the
              * request, so we know the request is not past EOF
              */
             sm_p->u.io.io_resp_p->total_completed = 
-                PVFS_util_min(
-                    PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.file_req),
-                    PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req));
+                    PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req);
             break;
         }
 
@@ -1426,7 +1433,7 @@ static int io_analyze_size_results(
         result.offset_array = &offset;
         result.size_array = &size;
         result.segmax = 1;
-        result.bytemax = PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.file_req); 
+        result.bytemax = PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req); 
 
         do
         {
@@ -1462,7 +1469,7 @@ static int io_analyze_size_results(
                     total_size += size;
                 }
             }
-        } while(result.segs != 0);
+        } while(!PINT_REQUEST_DONE(req_state) && result.segs);
 
         sm_p->u.io.io_resp_p->total_completed =
             PVFS_util_min(PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req),
