@@ -513,7 +513,9 @@ struct inode_operations pvfs2_dir_inode_operations =
     .getxattr = pvfs2_getxattr,
     .removexattr = pvfs2_removexattr,
 #endif
+#ifdef HAVE_GENERIC_GETXATTR
     .permission = pvfs2_permission,
+#endif
 #endif
 };
 

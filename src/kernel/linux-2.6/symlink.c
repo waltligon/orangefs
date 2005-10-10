@@ -50,7 +50,9 @@ struct inode_operations pvfs2_symlink_inode_operations =
     .follow_link = pvfs2_follow_link,
     .setattr = pvfs2_setattr,
     .getattr = pvfs2_getattr,
+#ifdef HAVE_GENERIC_GETXATTR
     .permission = pvfs2_permission,
+#endif
 #endif
 };
 
