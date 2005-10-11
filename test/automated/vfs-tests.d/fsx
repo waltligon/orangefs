@@ -2,6 +2,10 @@
 [ -d ${EXTRA_TESTS}/fsx ] || exit 1
 
 cd ${EXTRA_TESTS}/fsx
-# fsx options: -W disables mapped writes (which pvfs2 does not support)
+# fsx options: 
+# -W disables mapped writes (which pvfs2 does not support)
+# -R disables mapped reads.  In FSX, mmap reads are MAP_SHARED, which pvfs2
+#    does not support.
 # good catch, sam!
+
 gcc fsx.c -o fsx && ./fsx -N 1000 -W ${PVFS2_MOUNTPOINT}/fsx_testfile
