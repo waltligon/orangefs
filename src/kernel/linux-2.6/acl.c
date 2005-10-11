@@ -58,8 +58,8 @@ pvfs2_acl_decode(const void *value, size_t size)
     /* even more badness */
     if (size < 0 || (size  % sizeof(pvfs2_acl_entry)) != 0)
     {
-        pvfs2_error("pvfs2_acl_decode: Invalid value of size %d [should be a multiple of %d]\n",
-                size, sizeof(pvfs2_acl_entry));
+        pvfs2_error("pvfs2_acl_decode: Invalid value of size %Ld [should be a multiple of %Ld]\n",
+                Ld(size), Ld(sizeof(pvfs2_acl_entry)));
         return ERR_PTR(-EINVAL);
     }
     count = size / sizeof(pvfs2_acl_entry);
@@ -128,8 +128,8 @@ pvfs2_acl_encode(const struct posix_acl *acl, size_t *size)
     e = (char *)kmalloc(*size, GFP_KERNEL);
     if (!e) 
     {
-        pvfs2_error("pvfs2_acl_encode: Could not allocate %d bytes for acl encode\n", 
-                *size);
+        pvfs2_error("pvfs2_acl_encode: Could not allocate %Ld bytes for acl encode\n", 
+                Ld(*size));
         return ERR_PTR(-ENOMEM);
     }
     ptr = e;

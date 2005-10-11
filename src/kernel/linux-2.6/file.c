@@ -627,15 +627,15 @@ static ssize_t pvfs2_file_readv(
         to_free = 0;
     }
     ptr = iovecptr;
-    pvfs2_print("pvfs2_file_readv reading %d@%Lu\n", count, *offset);
+    pvfs2_print("pvfs2_file_readv reading %Ld@%Lu\n", Ld(count), *offset);
     pvfs2_print("pvfs2_file_readv: new_nr_segs: %lu, seg_count: %u\n", 
             new_nr_segs, seg_count);
     for (seg = 0; seg < new_nr_segs; seg++)
     {
-        pvfs2_print("pvfs2_file_readv: %d) %p to %p [%d bytes]\n", 
+        pvfs2_print("pvfs2_file_readv: %d) %p to %p [%Ld bytes]\n", 
                 seg + 1, iovecptr[seg].iov_base, 
                 iovecptr[seg].iov_base + iovecptr[seg].iov_len, 
-                iovecptr[seg].iov_len);
+                Ld(iovecptr[seg].iov_len));
     }
     for (seg = 0; seg < seg_count; seg++)
     {
@@ -724,8 +724,8 @@ static ssize_t pvfs2_file_readv(
               }
               return ret;
         }
-        pvfs2_print("pvfs2_file_readv nr_segs %u, offset: %Lu each_count:%d\n",
-                seg_array[seg], *offset, each_count);
+        pvfs2_print("pvfs2_file_readv nr_segs %u, offset: %Lu each_count:%Ld\n",
+                seg_array[seg], *offset, Ld(each_count));
         /*
          * copy data to application by pushing it out to the iovec.
          * Number of segments to copy so that we don't
@@ -880,15 +880,15 @@ static ssize_t pvfs2_file_writev(
         to_free = 0;
     }
     ptr = iovecptr;
-    pvfs2_print("pvfs2_file_writev writing %d@%Lu\n", count, *offset);
+    pvfs2_print("pvfs2_file_writev writing %Ld@%Lu\n", Ld(count), *offset);
     pvfs2_print("pvfs2_file_writev: new_nr_segs: %lu, seg_count: %u\n", 
             new_nr_segs, seg_count);
     for (seg = 0; seg < new_nr_segs; seg++)
     {
-        pvfs2_print("pvfs2_file_writev: %d) %p to %p [%d bytes]\n", 
+        pvfs2_print("pvfs2_file_writev: %d) %p to %p [%Ld bytes]\n", 
                 seg + 1, iovecptr[seg].iov_base, 
                 iovecptr[seg].iov_base + iovecptr[seg].iov_len, 
-                iovecptr[seg].iov_len);
+                Ld(iovecptr[seg].iov_len));
     }
     for (seg = 0; seg < seg_count; seg++)
     {
@@ -933,8 +933,8 @@ static ssize_t pvfs2_file_writev(
         new_op->upcall.req.io.buf_index = buffer_index;
         new_op->upcall.req.io.count = each_count;
         new_op->upcall.req.io.offset = *offset;
-        pvfs2_print("pvfs2_file_writev nr_segs %u, offset: %Lu each_count: %d\n",
-                seg_array[seg], *offset, each_count);
+        pvfs2_print("pvfs2_file_writev nr_segs %u, offset: %Lu each_count: %Ld\n",
+                seg_array[seg], *offset, Ld(each_count));
 
         /* 
          * copy data from application by pulling it out  of the iovec.
