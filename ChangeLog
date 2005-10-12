@@ -2,7 +2,7 @@
 PVFS2 Release ChangeLog
 -----------------------
 
-pvfs2-1.3.0-pre1
+pvfs2-1.3.0
 ===============
 - Murali Vilayannur contributed extened attribute support to the VFS interface
 - Murali and Dean Hildebrand also worked on implementing readv and writev in
@@ -13,6 +13,16 @@ pvfs2-1.3.0-pre1
 - Phil further contributed protocol versioning to PVFS2.  Major version
   changes are incompatible up or down.  New clients can't talk to old servers,
   but new servers can talk to old clients. 
+- clean up some warnings on 64 bit platforms
+- Phil contributed a pvfs2-set-sync tool 
+- lots of configure tests for various kernel versions
+- rework acache
+- memory leak in flow descriptors
+- bugfixes for noncontig requests
+- improvements to the req scheduler: more operations can occur concurently now
+- improved handling of "zero-fill" case: sparse files now treated correctly
+- further improvements to nightly testsuite
+
 
 pvfs2-1.2.0
 ===============
