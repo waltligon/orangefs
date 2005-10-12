@@ -126,7 +126,7 @@ IA-64, AMD64, PowerPC (ppc), and Alpha based GNU/Linux distributions.
 \subsection{Does the PVFS2 client require a patched Linux kernel?}
 
 No.  The kernel module source included with PVFS2 is generally
-targetted toward the official ``Linus'' kernels (found at kernel.org).
+targeted toward the official ``Linus'' kernels (found at kernel.org).
 Patches for the PVFS2 kernel module code may be provided for major
 distributions that have modified their kernel to be incompatible with
 the officially released kernels.  The best place to find out more
@@ -228,7 +228,7 @@ metadata servers, so you could see a load balancing effect.
 A good rule of thumb is you should run as many data servers as possible.
 One common configuration is to have some nodes with very
 high-performance disks acting as servers to the larger cluster.  As you
-use more servers in this configuraiton, the theoretical peak performance
+use more servers in this configuration, the theoretical peak performance
 of PVFS2 increases.  The clients, however, have to make very large
 requests in order to stripe the I/O across all the servers.  If your
 clients will never write large files, use a smaller number of servers.
@@ -410,7 +410,7 @@ upgraded, you will only have to restart pvfs2-server with the
 environment variable unset.  You would not have to rebuild pvfs2 to take
 advantage of the fix.
 
-\subsection{I get ``error while loading sharel libraries'' when starting PVFS2 programs}
+\subsection{I get ``error while loading shared libraries'' when starting PVFS2 programs}
 
 PVFS2 needs several libraries.  If those libraries aren't in the default
 locations, you might need to add flags when running PVFS2's configure script.
@@ -455,8 +455,33 @@ Redhat, and derived distributions, have a linux-2.4 based kernel with many
 linux-2.6 features backported.  These backported features change the
 interface to the kernel fairly significantly.  PVFS2 versions newer than
 1.0.1 have a new configure option \texttt{--enable-redhat24}.  With this
-option, we will be able to accomodate the backported features (and the
+option, we will be able to accommodate the backported features (and the
 associated interface changes).
+
+\subsection{When i try to mount a pvfs2 file system, something goes wrong.}
+
+\begin{itemize}
+\item First, are all the userspace components running?  If \texttt{pvfs2-ping}
+doesn't work, the VFS interface won't, either.
+\item Make sure the pvfs2 kernel module is loaded
+\item Make sure pvfs2-client and pvfs2-client core are running
+\item Take a look at dmesg.  \texttt{pvfs2\_get\_sb -- wait timed out} could
+      indicate a problem with \texttt{pvfs2-client-core}.  See the next
+      question.
+\end{itemize}
+
+\subsection{I did all three of the above steps and I still can't mount pvfs2}
+\label{sec:nptl_and_mounting}
+
+There's one last thing to check.  Are you you are using a Redhat or Fedora
+distribution, but running with a stock kernel.org 2.4 kernel?  If so, you need
+to set the environment variable \texttt{LD\_ASSUME\_KERNEL} to 2.4.1 or
+\texttt{pvfs2-client-core} will try to use the NPTL thread library.  NPTL
+requires a 2.6 kernel (or a heavily backported 2.4 kernel, which Redhat
+provides).  Redhat systems expect to have such a kernel, so running a stock
+kernel.org 2.4 kernel can cause issues with any multi-threaded application.  In
+this particular case, the \texttt{pvfs2-client-core} failure is hidden and can
+be tricky to diagnose. 
 
 \subsection{I'm running Redhat and the pvfs2-server can't be killed! What's wrong?}
 
@@ -490,7 +515,7 @@ file.
 
 In addition, some Redhat versions ship with an NPTL (threading
 library) implementation that PVFS2 is not compatible with.  We cannot
-explain why the errors we're seeing are occuring, as they appear to be
+explain why the errors we're seeing are occurring, as they appear to be
 in glibc and the threading library itself.  In short, we disable the
 use of the NPTL on these few Redhat systems.  It should be noted that
 we are fully compatible with other distributions that ship NPTL
@@ -702,7 +727,7 @@ commodity ``heartbeat'' software to provide means for failover.
 
 Software redundancy offers a less expensive solution to redundancy,
 but usually at a non-trivial cost to performance.  We are studying how
-to implement software reduncancy with lower overhead, but at this time
+to implement software redundancy with lower overhead, but at this time
 we provide no software-only server failover solution.
 
 %
