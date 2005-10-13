@@ -206,6 +206,12 @@ do {                                                          \
     vfs_request->was_handled_inline = 1;                      \
 } while(0)
 
+static void client_segfault_handler(int signum)
+{
+    gossip_err("pvfs2-client-core: caught signal %d\n", signum);
+    abort();
+}
+
 #ifdef STANDALONE_RUN_MODE
 static void client_core_sig_handler(int signum)
 {
@@ -2244,6 +2250,10 @@ int main(int argc, char **argv)
 #else
     signal(SIGINT, client_core_sig_handler);
 #endif
+
+    /* if pvfs2-client-core segfaults, at least log the occurence so
+     * pvfs2-client won't repeatedly respawn pvfs2-client-core */
+    signal(SIGSEGV, client_segfault_handler);
 
     memset(&s_opts, 0, sizeof(options_t));
     parse_args(argc, argv, &s_opts);
