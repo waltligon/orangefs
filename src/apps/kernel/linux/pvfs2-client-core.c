@@ -2278,7 +2278,7 @@ int main(int argc, char **argv)
         return ret;
     }
 
-    ret = gossip_enable_file(s_opts.logfile, "w");
+    ret = gossip_enable_file(s_opts.logfile, "a");
     if(ret < 0)
     {
         fprintf(stderr, "Error opening logfile: %s\n", s_opts.logfile);
