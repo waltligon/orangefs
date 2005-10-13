@@ -369,6 +369,9 @@ typedef struct PINT_server_op
  *
  * no return value
  */
+#ifdef GOSSIP_DISABLE_DEBUG
+#define PINT_ACCESS_DEBUG(__s_op, __mask, format, f...) do {} while (0)
+#else
 #define PINT_ACCESS_DEBUG(__s_op, __mask, format, f...)                     \
 do {                                                                        \
     PVFS_handle __handle;                                                   \
@@ -398,6 +401,7 @@ do {                                                                        \
         __gossip_debug(__mask, 'A', __pint_access_buffer, ##f);             \
     }                                                                       \
 } while(0);
+#endif
 
 /* server operation state machines */
 extern struct PINT_state_machine_s pvfs2_get_config_sm;
