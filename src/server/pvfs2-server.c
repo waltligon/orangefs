@@ -657,7 +657,7 @@ static int server_initialize(
         freopen("/dev/null", "w", stdout);
         freopen("/dev/null", "w", stderr);
 
-        ret = gossip_enable_file(server_config.logfile, "w");
+        ret = gossip_enable_file(server_config.logfile, "a");
         if (ret < 0)
         {
             int tmp_errno = errno;
