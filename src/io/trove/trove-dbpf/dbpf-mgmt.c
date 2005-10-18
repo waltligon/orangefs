@@ -1069,6 +1069,7 @@ static int dbpf_collection_lookup(char *collname,
     coll_p->name = strdup(collname);
     if (!coll_p->name)
     {
+        free(coll_p);
         return -TROVE_ENOMEM;
     }
 

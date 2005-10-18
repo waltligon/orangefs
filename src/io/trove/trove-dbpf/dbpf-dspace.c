@@ -281,8 +281,11 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
     dbpf_open_cache_attr_put(&tmp_ref);
     return 1;
 
-  return_error:
-    trove_handle_free(op_p->coll_p->coll_id, new_handle);
+return_error:
+    if (new_handle != TROVE_HANDLE_NULL)
+    {
+        trove_handle_free(op_p->coll_p->coll_id, new_handle);
+    }
     if (got_db)
     {
         dbpf_open_cache_attr_put(&tmp_ref);

@@ -145,7 +145,6 @@ static int trove_map_handle_ranges( PINT_llist *extent_list,
             {
                 break;
             }
-            assert(cur_extent);
 
 	    ret = trove_handle_ledger_addextent(ledger, cur_extent);
 	    if (ret != 0)
@@ -266,7 +265,7 @@ int trove_set_handle_ranges(TROVE_coll_id coll_id,
                             TROVE_context_id context_id,
                             char *handle_range_str)
 {
-    int ret = -1;
+    int ret = -TROVE_EINVAL;
     PINT_llist *extent_list = NULL;
     handle_ledger_t *ledger = NULL;
 
