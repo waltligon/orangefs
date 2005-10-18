@@ -538,12 +538,13 @@ int pvfs2_permission(struct inode *inode, int mask, struct nameidata *nd)
 #else
     /* We sort of duplicate the code below from generic_permission */
     int mode = inode->i_mode;
+    int error;
     /* No write access on a rdonly FS */
     if ((mask & MAY_WRITE) && IS_RDONLY(inode) &&
             (S_ISREG(mode) || S_ISDIR(mode) || S_ISLNK(mode)))
         return -EROFS;
     /* No write access to any immutable files */
-    if ((mask & MAY_WRITE) && IS_IMMMUTABLE(inode))
+    if ((mask & MAY_WRITE) && IS_IMMUTABLE(inode))
         return -EACCES;
     if (current->fsuid == inode->i_uid) {
         mode >>= 6;
