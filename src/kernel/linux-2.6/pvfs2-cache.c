@@ -22,7 +22,7 @@ extern int debug;
 extern int pvfs2_gen_credentials(
     PVFS_credentials *credentials);
 
-#ifndef PVFS2_LINUX_KERNEL_2_4
+#ifdef HAVE_AIO_VFS_SUPPORT
 /* a cache for pvfs2_kiocb objects (i.e pvfs2 iocb structures ) */
 static kmem_cache_t *pvfs2_kiocb_cache;
 #endif
@@ -199,7 +199,7 @@ void pvfs2_inode_cache_finalize(void)
     }
 }
 
-#ifndef PVFS2_LINUX_KERNEL_2_4
+#ifdef HAVE_AIO_VFS_SUPPORT
 
 static void kiocb_ctor(
     void *req,
@@ -236,6 +236,7 @@ void kiocb_cache_finalize(void)
         pvfs2_panic("Failed to destroy pvfs2_devreqcache\n");
     }
 }
+
 pvfs2_kiocb* kiocb_alloc(void)
 {
     pvfs2_kiocb *x = NULL;

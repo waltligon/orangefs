@@ -374,7 +374,7 @@ static ssize_t pvfs2_devreq_writev(
                     op_release(op);
                 }
             }
-#ifndef PVFS2_LINUX_KERNEL_2_4
+#ifdef HAVE_AIO_VFS_SUPPORT
             else if (op->upcall.type == PVFS2_VFS_OP_FILE_IO
                     && op->upcall.req.io.async_vfs_io == PVFS_VFS_ASYNC_IO)
             {

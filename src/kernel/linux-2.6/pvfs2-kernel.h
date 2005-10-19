@@ -47,7 +47,6 @@ typedef unsigned long sector_t;
 #include <linux/backing-dev.h>
 #include <linux/mpage.h>
 #include <linux/namei.h>
-#include <linux/aio.h>
 #include <linux/errno.h>
 
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
@@ -60,6 +59,9 @@ typedef unsigned long sector_t;
 #include <linux/fs.h>
 
 #include "pvfs2-config.h"
+#ifdef HAVE_AIO
+#include <linux/aio.h>
+#endif
 #ifdef HAVE_POSIX_ACL_H
 #include <linux/posix_acl.h>
 #endif
@@ -199,7 +201,7 @@ sizeof(uint64_t) + sizeof(pvfs2_downcall_t))
 #define PVFS2_WAIT_SIGNAL_RECVD        0x00EC0002
 
 /* Defines for incrementing aio_ref_count */
-#ifdef PVFS2_LINUX_KERNEL_2_4
+#ifndef HAVE_AIO_VFS_SUPPORT
 #define get_op(op)
 #define put_op(op) op_release(op)
 #define op_wait(op)
@@ -380,7 +382,7 @@ typedef struct
     int id;
 } pvfs2_mount_sb_info_t;
 
-#ifndef PVFS2_LINUX_KERNEL_2_4
+#ifdef HAVE_AIO_VFS_SUPPORT
 
 /** structure that holds the state of any async I/O operation issued 
  *  through the VFS. Needed especially to handle cancellation requests
@@ -447,7 +449,7 @@ void pvfs2_inode_cache_initialize(
 void pvfs2_inode_cache_finalize(
     void);
 
-#ifdef PVFS2_LINUX_KERNEL_2_4
+#ifndef HAVE_AIO_VFS_SUPPORT
 #define kiocb_cache_initialize()
 #define kiocb_cache_finalize()
 #else
@@ -858,7 +860,7 @@ do {                                                      \
     *offset = original_offset;                            \
 } while(0)
 
-#ifndef PVFS2_LINUX_KERNEL_2_4
+#ifdef HAVE_AIO_VFS_SUPPORT
 /* 
  * This macro differs from the above only in that it does not
  * manipulate the offsets.
@@ -892,6 +894,7 @@ do {                                                      \
     add_op_to_request_list(op);                           \
     up(&request_semaphore);                               \
 } while(0)
+
 #endif
 
 

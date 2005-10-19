@@ -516,6 +516,40 @@ AC_TRY_COMPILE([
 	AC_MSG_RESULT(no)
 )
 
+AC_MSG_CHECKING(for aio support in kernel)
+dnl if this test passes, the kernel has it
+dnl if this test fails, the kernel does not have it
+AC_TRY_COMPILE([
+	#define __KERNEL__
+#include <linux/wait.h>
+        #include <linux/aio.h>
+		  static struct kiocb iocb;
+], [],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_AIO, 1, Define if kernel has aio support)
+	have_aio=yes,
+	AC_MSG_RESULT(no)
+	have_aio=no
+)
+
+if test "x$have_aio" = "xyes"; then
+	AC_MSG_CHECKING(for ki_dtor in kiocb structure of kernel)
+	dnl if this test passes, the kernel does have it and we enable support for AIO
+	dnl if this test fails, the kernel does not have this member and we disable support for AIO
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+#include <linux/wait.h>
+			  #include <linux/aio.h>
+				  static struct kiocb io_cb = {
+					  .ki_dtor = NULL,
+				  };
+	], [],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_AIO_VFS_SUPPORT, 1, Define if we are enabling VFS AIO support in kernel),
+		AC_MSG_RESULT(no)
+	)
+fi
+
 AC_MSG_CHECKING(for xattr support in kernel)
 dnl if this test passes, the kernel has it
 dnl if this test fails, the kernel does not have it

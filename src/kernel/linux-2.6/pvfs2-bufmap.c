@@ -652,7 +652,7 @@ int pvfs_bufmap_copy_to_user_iovec(
     return 0;
 }
 
-#ifndef PVFS2_LINUX_KERNEL_2_4
+#ifdef HAVE_AIO_VFS_SUPPORT
 
 /* pvfs_bufmap_copy_to_user_task()
  *

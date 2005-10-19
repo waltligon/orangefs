@@ -10,6 +10,12 @@
 /* Define if berkeley db error reporting was enabled */
 #undef BERKDB_ERROR_REPORTING
 
+/* Define if kernel has aio support */
+#undef HAVE_AIO
+
+/* Define if we are enabling VFS AIO support in kernel */
+#undef HAVE_AIO_VFS_SUPPORT
+
 /* Define to 1 if you have the <arpa/inet.h> header file. */
 #undef HAVE_ARPA_INET_H
 

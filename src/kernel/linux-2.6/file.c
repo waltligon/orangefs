@@ -1042,7 +1042,7 @@ static ssize_t pvfs2_file_writev(
     return total_count;
 }
 
-#ifndef PVFS2_LINUX_KERNEL_2_4
+#ifdef HAVE_AIO_VFS_SUPPORT
 /*
  * NOTES on the aio implementation.
  * Conceivably, we could just make use of the
@@ -1180,7 +1180,7 @@ pvfs2_aio_cancel(struct kiocb *iocb, struct io_event *event)
                 " %p, %p!\n", iocb, event);
         return -EINVAL;
     }
-    x = iocb->private;
+    x = (pvfs2_kiocb *) iocb->private;
     if (x == NULL)
     {
         pvfs2_error("pvfs2_aio_cancel: cannot retrieve "
@@ -2059,8 +2059,10 @@ struct file_operations pvfs2_file_operations =
     .write = pvfs2_file_write,
     .readv = pvfs2_file_readv,
     .writev = pvfs2_file_writev,
+#ifdef HAVE_AIO_VFS_SUPPORT
     .aio_read = pvfs2_file_aio_read,
     .aio_write = pvfs2_file_aio_write,
+#endif
     .ioctl = pvfs2_ioctl,
     .mmap = pvfs2_file_mmap,
     .open = pvfs2_file_open,
