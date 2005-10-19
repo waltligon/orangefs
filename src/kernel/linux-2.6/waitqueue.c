@@ -17,7 +17,7 @@ extern spinlock_t pvfs2_request_list_lock;
 extern struct qhash_table *htable_ops_in_progress;
 extern int debug;
 
-static inline void clean_up_interrupted_operation(
+void clean_up_interrupted_operation(
     pvfs2_kernel_op_t * op)
 {
     /*

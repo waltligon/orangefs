@@ -308,7 +308,7 @@ int pvfs_bufmap_copy_to_user(void __user *to, int buffer_index, int size)
 
         if (ret)
         {
-            pvfs2_print("Failed to copy data to user space\n");
+            pvfs2_print("Failed to copy data to user space %d\n", ret);
             return -EFAULT;
         }
 
@@ -651,6 +651,123 @@ int pvfs_bufmap_copy_to_user_iovec(
     kfree(copied_iovec);
     return 0;
 }
+
+#ifndef PVFS2_LINUX_KERNEL_2_4
+
+/* pvfs_bufmap_copy_to_user_task()
+ *
+ * copies data out of a mapped buffer to a user space address
+ * of a given task specified by the task structure argument (tsk)
+ * This is used by the client-daemon for completing an aio
+ * operation that was issued by an arbitrary user program.
+ * Unfortunately, we cannot use a copy_to_user
+ * in that case and need to map in the user pages before
+ * attempting the copy!
+ * returns number of bytes copied on success,
+ * -errno on failure
+ */
+int pvfs_bufmap_copy_to_user_task(
+        struct task_struct *tsk,
+        void __user *to, 
+        int buffer_index,
+        int size)
+{
+    int ret = 0, amt_copied = 0, amt_remaining = 0;
+    int cur_copy_size = 0, index = 0;
+    void *from_kaddr = NULL;
+    struct pvfs_bufmap_desc *from = &desc_array[buffer_index];
+
+    struct mm_struct *mm = NULL;
+    struct vm_area_struct *vma = NULL;
+    struct page *page = NULL;
+    unsigned long to_addr = (unsigned long) to;
+    void *maddr = NULL;
+    int to_offset = 0, from_offset = 0;
+    int inc_index = 0;
+
+    pvfs2_print("pvfs_bufmap_copy_to_user_task: "
+            " PID: %d, to %p, from %p, index %d, "
+            " size %d\n", tsk->pid, to, from, buffer_index, size);
+
+    if (bufmap_init == 0)
+    {
+        pvfs2_error("pvfs2_bufmap_copy_to_user: not yet "
+                    "initialized.\n");
+        pvfs2_error("pvfs2: please confirm that pvfs2-client "
+                "daemon is running.\n");
+        return -EIO;
+    }
+    mm = get_task_mm(tsk);
+    if (!mm) 
+    {
+        return -EIO;
+    }
+    /* 
+     * Go through each of the page in the specified process
+     * address space and copy from the mapped
+     * buffer, and make sure to do this one page at a time!
+     */
+    down_read(&mm->mmap_sem);
+    while(amt_copied < size)
+    {
+        int bytes = 0;
+
+        ret = get_user_pages(tsk, mm, to_addr, 
+                1,/* count */
+                1,/* write */
+                1,/* force */
+                &page, &vma);
+        if (ret <= 0)
+            break;
+        to_offset = to_addr & (PAGE_SIZE - 1);
+        amt_remaining = (size - amt_copied);
+        if ((PAGE_SIZE - to_offset) < (PAGE_SIZE - from_offset))
+        {
+            bytes = PAGE_SIZE - to_offset;
+            inc_index = 0;
+        }
+        else if ((PAGE_SIZE - to_offset) == (PAGE_SIZE - from_offset))
+        {
+            bytes = (PAGE_SIZE - to_offset);
+            inc_index = 1;
+        }
+        else 
+        {
+            bytes = (PAGE_SIZE - from_offset);
+            inc_index = 1;
+        }
+        cur_copy_size =
+            amt_remaining > bytes 
+                  ? bytes : amt_remaining;
+        maddr = pvfs2_kmap(page);
+        from_kaddr = pvfs2_kmap(from->page_array[index]);
+        copy_to_user_page(vma, page, to_addr,
+             maddr + to_offset /* dst */, 
+             from_kaddr + from_offset, /* src */
+             cur_copy_size /* len */);
+        set_page_dirty_lock(page);
+        pvfs2_kunmap(from->page_array[index]);
+        pvfs2_kunmap(page);
+        page_cache_release(page);
+
+        amt_copied += cur_copy_size;
+        to_addr += cur_copy_size;
+        if (inc_index)
+        {
+            from_offset = 0;
+            index++;
+        }
+        else 
+        {
+            from_offset += cur_copy_size;
+        }
+    }
+    up_read(&mm->mmap_sem);
+    mmput(mm);
+    return (amt_copied < size) ? -EFAULT: amt_copied;
+}
+
+#endif
 
 /*
  * Local variables:

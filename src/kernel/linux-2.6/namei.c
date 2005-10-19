@@ -194,6 +194,7 @@ struct dentry *pvfs2_lookup(
 	else
 	{
             op_release(new_op);
+            pvfs2_print("Returning -EACCES\n");
             return ERR_PTR(-EACCES);
 	}
     }
@@ -211,6 +212,7 @@ struct dentry *pvfs2_lookup(
       already exists that was interrupted during this lookup -- no
       need to add another negative dentry for an existing file)
     */
+    pvfs2_print("error_exit = %d\n", error_exit);
     if (!inode && !error_exit)
     {
         /*

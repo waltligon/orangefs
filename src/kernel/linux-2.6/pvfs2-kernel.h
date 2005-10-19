@@ -47,6 +47,8 @@ typedef unsigned long sector_t;
 #include <linux/backing-dev.h>
 #include <linux/mpage.h>
 #include <linux/namei.h>
+#include <linux/aio.h>
+#include <linux/errno.h>
 
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
 
@@ -65,6 +67,7 @@ typedef unsigned long sector_t;
 #include <linux/posix_acl_xattr.h>
 #endif
 #include <asm/uaccess.h>
+#include <asm/atomic.h>
 #include <linux/uio.h>
 #include <linux/sched.h>
 #include <linux/mm.h>
@@ -195,6 +198,34 @@ sizeof(uint64_t) + sizeof(pvfs2_downcall_t))
 #define PVFS2_WAIT_TIMEOUT_REACHED     0x00EC0001
 #define PVFS2_WAIT_SIGNAL_RECVD        0x00EC0002
 
+/* Defines for incrementing aio_ref_count */
+#ifdef PVFS2_LINUX_KERNEL_2_4
+#define get_op(op)
+#define put_op(op) op_release(op)
+#define op_wait(op)
+#else
+#define get_op(op) \
+    do {\
+        atomic_inc(&(op)->aio_ref_count);\
+        pvfs2_print("Alloced OP (%p:%ld)\n", op, (unsigned long)(op)->tag);\
+    } while(0)
+#define put_op(op) \
+    do {\
+        if (atomic_sub_and_test(1, &(op)->aio_ref_count) == 1) {\
+            pvfs2_print("Releasing OP (%p:%ld)\n", op, (unsigned long)(op)->tag);\
+            op_release(op);\
+        }\
+    } while(0)
+#define op_wait(op) (atomic_read(&(op)->aio_ref_count) <= 2 ? 0 : 1)
+#endif
+
+/* Defines for controlling whether I/O upcalls are for async or sync operations */
+enum PVFS_async_io_type 
+{
+     PVFS_VFS_SYNC_IO = 0,
+    PVFS_VFS_ASYNC_IO = 1,
+};
+
 /************************************
  * pvfs2 kernel memory related flags
  ************************************/
@@ -278,6 +309,8 @@ typedef struct
 
     int io_completed;
     wait_queue_head_t io_completion_waitq;
+    void *priv;/* used by the async I/O code to stash the pvfs2_kiocb structure */
+    atomic_t aio_ref_count; /* used again for the async I/O code for deallocation */
 
     struct list_head list;
 } pvfs2_kernel_op_t;
@@ -347,6 +380,29 @@ typedef struct
     int id;
 } pvfs2_mount_sb_info_t;
 
+#ifndef PVFS2_LINUX_KERNEL_2_4
+
+/** structure that holds the state of any async I/O operation issued 
+ *  through the VFS. Needed especially to handle cancellation requests
+ *  or even completion notification so that the VFS client-side daemon
+ *  can free up its vfs_request slots.
+ */
+typedef struct
+{
+    struct task_struct *tsk;/* the pointer to the task that initiated the AIO */
+    struct kiocb *kiocb; /* pointer to the kiocb that kicked this operation */
+    int buffer_index; /* buffer index that was used for the I/O */
+    pvfs2_kernel_op_t *op; /* pvfs2 kernel operation type */
+    char __user *buffer; /* The user space buffer to which I/O is being staged */
+    int   rw; /* set to indicate the type of the operation */
+    loff_t offset; /* file offset */
+    size_t bytes_to_be_copied; /* and the count in bytes */
+    ssize_t bytes_copied;
+    int needs_cleanup;
+} pvfs2_kiocb;
+
+#endif
+
 /*
   NOTE: See Documentation/filesystems/porting for information
   on implementing FOO_I and properly accessing fs private data
@@ -391,12 +447,24 @@ void pvfs2_inode_cache_initialize(
 void pvfs2_inode_cache_finalize(
     void);
 
+#ifdef PVFS2_LINUX_KERNEL_2_4
+#define kiocb_cache_initialize()
+#define kiocb_cache_finalize()
+#else
+void kiocb_cache_initialize(void);
+void kiocb_cache_finalize(void);
+pvfs2_kiocb* kiocb_alloc(void);
+void kiocb_release(pvfs2_kiocb *ptr);
+#endif
+
 /****************************
  * defined in waitqueue.c
  ****************************/
 int wait_for_matching_downcall(
     pvfs2_kernel_op_t * op);
 int wait_for_cancellation_downcall(
+    pvfs2_kernel_op_t * op);
+void clean_up_interrupted_operation(
     pvfs2_kernel_op_t * op);
 
 /****************************
@@ -708,6 +776,12 @@ do {                                                               \
  *
  *  \note used in namei.c:lookup(), file.c:pvfs2_inode_read[v](), and
  *  file.c:pvfs2_file_write[v]()
+ *
+ *  POSSIBLE OPTIMIZATION:
+ *  if we realize that on a timeout after several attempts, we still
+ *  have not been picked off the queue, we will attempt to not send in
+ *  the cancellation upcall since there is no point.
+ *  See the NOTES above handle_error() macro as well.
  */
 #define service_error_exit_op_with_timeout_retry(op,meth,num,e,intr)\
 do {                                                                \
@@ -750,6 +824,13 @@ do {                                                                \
  *  avoid having the device start writing application data to our shared
  *  bufmap pages without us expecting it.
  *
+ *  FIXME: POSSIBLE OPTIMIZATION:
+ *  However, if we timed out or if we got a signal AND our upcall was never
+ *  picked off the queue (i.e. we were in PVFS2_VFS_STATE_WAITING), then we don't
+ *  need to send a cancellation upcall. The way we can handle this is set error_exit
+ *  to 2 in such cases and 1 whenever cancellation has to be sent and have handle_error
+ *  take care of this situation as well..
+ *
  *  if a pvfs2 sysint level error occured and i/o has been completed,
  *  there is no need to cancel the operation, as the user has finished
  *  using the bufmap page and so there is no danger in this case.  in
@@ -776,6 +857,43 @@ do {                                                      \
     pvfs_bufmap_put(buffer_index);                        \
     *offset = original_offset;                            \
 } while(0)
+
+#ifndef PVFS2_LINUX_KERNEL_2_4
+/* 
+ * This macro differs from the above only in that it does not
+ * manipulate the offsets.
+ */
+#define handle_sync_aio_error()                           \
+do {                                                      \
+    if (error_exit)                                       \
+    {                                                     \
+        ret = pvfs2_cancel_op_in_progress(new_op->tag);   \
+        op_release(new_op);                               \
+    }                                                     \
+    else                                                  \
+    {                                                     \
+        ret = pvfs2_kernel_error_code_convert(            \
+                 new_op->downcall.status);                \
+        translate_error_if_wait_failed(ret, -EIO, 0);     \
+        wake_up_device_for_return(new_op);                \
+    }                                                     \
+    pvfs_bufmap_put(buffer_index);                        \
+} while(0)
+
+
+/** All this function does is that it tries to issue the operation and return
+ * by queuing it up in the device queue.
+ *  \note used in pvfs_file_aio_read/pvfs_file_aio_write functions
+ *  alone
+ */
+#define service_async_vfs_op(op)                          \
+do {                                                      \
+    down_interruptible(&request_semaphore);               \
+    add_op_to_request_list(op);                           \
+    up(&request_semaphore);                               \
+} while(0)
+#endif
+
 
 #define get_interruptible_flag(inode)                     \
 (PVFS2_SB(inode->i_sb)->mnt_options.intr)

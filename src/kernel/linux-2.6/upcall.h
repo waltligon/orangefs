@@ -11,6 +11,7 @@
 
 typedef struct
 {
+    int async_vfs_io;
     int buf_index;
     size_t count;
     loff_t offset;

@@ -59,6 +59,14 @@ int pvfs_bufmap_copy_to_kernel(
     int buffer_index,
     int size);
 
+#ifndef PVFS2_LINUX_KERNEL_2_4
+int pvfs_bufmap_copy_to_user_task(
+        struct task_struct *tsk,
+        void __user *to,
+        int buffer_index, 
+        int size);
+#endif
+
 #endif /* __PVFS2_BUFMAP_H */
 
 /*

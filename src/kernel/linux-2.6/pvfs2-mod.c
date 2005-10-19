@@ -142,6 +142,7 @@ static int __init pvfs2_init(void)
     op_cache_initialize();
     dev_req_cache_initialize();
     pvfs2_inode_cache_initialize();
+    kiocb_cache_initialize();
     sema_init(&devreq_semaphore, 1);
     sema_init(&request_semaphore, 1);
 
@@ -211,6 +212,7 @@ static void __exit pvfs2_exit(void)
     op_cache_finalize();
     dev_req_cache_finalize();
     pvfs2_inode_cache_finalize();
+    kiocb_cache_finalize();
 
     if (unregister_chrdev(pvfs2_dev_major, PVFS2_REQDEVICE_NAME) < 0)
     {

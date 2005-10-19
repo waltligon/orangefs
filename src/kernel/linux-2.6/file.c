@@ -121,6 +121,7 @@ ssize_t pvfs2_inode_read(
         }
 
         new_op->upcall.type = PVFS2_VFS_OP_FILE_IO;
+        new_op->upcall.req.io.async_vfs_io = PVFS_VFS_SYNC_IO; /* synchronous I/O */
         new_op->upcall.req.io.readahead_size = readahead_size;
         new_op->upcall.req.io.io_type = PVFS_IO_READ;
         new_op->upcall.req.io.refn = pvfs2_inode->refn;
@@ -161,7 +162,7 @@ ssize_t pvfs2_inode_read(
               termination unless we've got debugging turned on, as
               this can happen regularly (i.e. ctrl-c)
             */
-            if ((error_exit == 1) && (ret == -EINTR))
+            if ((error_exit != 0) && (ret == -EINTR))
             {
                 pvfs2_print("pvfs2_inode_read: returning error %d "
                             "(error_exit=%d)\n", ret, error_exit);
@@ -301,6 +302,7 @@ static ssize_t pvfs2_file_write(
         }
 
         new_op->upcall.type = PVFS2_VFS_OP_FILE_IO;
+        new_op->upcall.req.io.async_vfs_io = PVFS_VFS_SYNC_IO; /* synchronous I/O */
         new_op->upcall.req.io.io_type = PVFS_IO_WRITE;
         new_op->upcall.req.io.refn = pvfs2_inode->refn;
 
@@ -354,7 +356,7 @@ static ssize_t pvfs2_file_write(
               termination unless we've got debugging turned on, as
               this can happen regularly (i.e. ctrl-c)
             */
-            if ((error_exit == 1) && (ret == -EINTR))
+            if ((error_exit != 0) && (ret == -EINTR))
             {
                 pvfs2_print("pvfs2_file_write: returning error %d "
                             "(error_exit=%d)\n", ret, error_exit);
@@ -656,6 +658,7 @@ static ssize_t pvfs2_file_readv(
         }
 
         new_op->upcall.type = PVFS2_VFS_OP_FILE_IO;
+        new_op->upcall.req.io.async_vfs_io = PVFS_VFS_SYNC_IO; /* synchronous I/O */
         /* disable read-ahead */
         new_op->upcall.req.io.readahead_size = 0;
         new_op->upcall.req.io.io_type = PVFS_IO_READ;
@@ -690,7 +693,8 @@ static ssize_t pvfs2_file_readv(
 
         if (new_op->downcall.status != 0)
         {
-            int dc_status = new_op->downcall.status;
+            int dc_status = 0;
+            dc_status = new_op->downcall.status;
 
             error_exit:
               /* this macro is defined in pvfs2-kernel.h */
@@ -701,7 +705,7 @@ static ssize_t pvfs2_file_readv(
                 termination unless we've got debugging turned on, as
                 this can happen regularly (i.e. ctrl-c)
               */
-              if ((error_exit == 1) && (ret == -EINTR))
+              if ((error_exit != 0) && (ret == -EINTR))
               {
                   pvfs2_print("pvfs2_file_readv: returning error %d "
                               "(error_exit=%d)\n", ret, error_exit);
@@ -909,6 +913,7 @@ static ssize_t pvfs2_file_writev(
         }
 
         new_op->upcall.type = PVFS2_VFS_OP_FILE_IO;
+        new_op->upcall.req.io.async_vfs_io = PVFS_VFS_SYNC_IO; /* synchronous I/O */
         new_op->upcall.req.io.io_type = PVFS_IO_WRITE;
         new_op->upcall.req.io.refn = pvfs2_inode->refn;
 
@@ -965,7 +970,8 @@ static ssize_t pvfs2_file_writev(
 
         if (new_op->downcall.status != 0)
         {
-            int dc_status = new_op->downcall.status;
+            int dc_status = 0;
+            dc_status = new_op->downcall.status;
 
             error_exit:
               /* this macro is defined in pvfs2-kernel.h */
@@ -976,7 +982,7 @@ static ssize_t pvfs2_file_writev(
                 termination unless we've got debugging turned on, as
                 this can happen regularly (i.e. ctrl-c)
               */
-              if ((error_exit == 1) && (ret == -EINTR))
+              if ((error_exit != 0) && (ret == -EINTR))
               {
                   pvfs2_print("pvfs2_file_writev: returning error %d "
                               "(error_exit=%d)\n", ret, error_exit);
@@ -1035,6 +1041,851 @@ static ssize_t pvfs2_file_writev(
     }
     return total_count;
 }
+
+#ifndef PVFS2_LINUX_KERNEL_2_4
+/*
+ * NOTES on the aio implementation.
+ * Conceivably, we could just make use of the
+ * generic_aio_file_read/generic_aio_file_write
+ * functions that stages the read/write through 
+ * the page-cache. But given that we are not
+ * interested in staging anything thru the page-cache, 
+ * we are going to resort to another
+ * design.
+ * 
+ * The aio callbacks to be implemented at the f.s. level
+ * are fairly straightforward. All we see at this level 
+ * are individual
+ * contiguous file block reads/writes. This means that 
+ * we can just make use
+ * of the current set of I/O upcalls without too much 
+ * modifications. (All we need is an extra flag for sync/async)
+ *
+ * However, we do need to handle cancellations properly. 
+ * What this means
+ * is that the "ki_cancel" callback function must be set so 
+ * that the kernel calls
+ * us back with the kiocb structure for proper cancellation.
+ * This way we can send appropriate upcalls
+ * to cancel I/O operations if need be and copy status/results
+ * back to user-space.
+ */
+
+/*
+ * This is the retry routine called by the AIO core to 
+ * try and see if the 
+ * I/O operation submitted earlier can be completed 
+ * atleast now :)
+ * We can use copy_*() functions here because the kaio
+ * threads do a use_mm() and assume the memory context of
+ * the user-program that initiated the aio(). whew,
+ * that's a big relief.
+ */
+static ssize_t pvfs2_aio_retry(struct kiocb *iocb)
+{
+    pvfs2_kiocb *x = NULL;
+    pvfs2_kernel_op_t *op = NULL;
+    ssize_t error = 0;
+
+    if ((x = (pvfs2_kiocb *) iocb->private) == NULL)
+    {
+        pvfs2_error("pvfs2_aio_retry: could not "
+                " retrieve pvfs2_kiocb!\n");
+        return -EINVAL;
+    }
+    /* highly unlikely, but somehow paranoid need for checking */
+    if (((op = x->op) == NULL) 
+            || x->kiocb != iocb 
+            || x->buffer_index < 0)
+    {
+        /*
+         * Well, if this happens, we are toast!
+         * What should we cleanup if such a thing happens? 
+         */
+        pvfs2_error("pvfs2_aio_retry: critical error "
+                " x->op = %p, iocb = %p, buffer_index = %d\n",
+                x->op, x->kiocb, x->buffer_index);
+        return -EINVAL;
+    }
+    /* lock up the op */
+    spin_lock(&op->lock);
+    /* check the state of the op */
+    if (op->op_state == PVFS2_VFS_STATE_WAITING 
+            || op->op_state == PVFS2_VFS_STATE_INPROGR)
+    {
+        spin_unlock(&op->lock);
+        return -EIOCBQUEUED;
+    }
+    else 
+    {
+        /*
+         * the daemon has finished servicing this 
+         * operation. It has also staged
+         * the I/O to the data servers on a write
+         * (if possible) and put the return value
+         * of the operation in bytes_copied. 
+         * Similarly, on a read the value stored in 
+         * bytes_copied is the error code or the amount
+         * of data that was copied to user buffers.
+         */
+        error = x->bytes_copied;
+        op->priv = NULL;
+        spin_unlock(&op->lock);
+        pvfs2_print("pvfs2_aio_retry: buffer %p,"
+                " size %d return %d bytes\n",
+                    x->buffer, x->bytes_to_be_copied, error);
+        if ((x->rw == PVFS_IO_WRITE) && error > 0)
+        {
+            struct inode *inode = iocb->ki_filp->f_mapping->host;
+            /* update atime if need be */
+            update_atime(inode);
+        }
+        /* 
+         * Now we can happily free up the op,
+         * and put buffer_index also away 
+         */
+        if (x->buffer_index >= 0)
+        {
+            pvfs2_print("pvfs2_aio_retry: put bufmap_index "
+                    " %d\n", x->buffer_index);
+            pvfs_bufmap_put(x->buffer_index);
+            x->buffer_index = -1;
+        }
+        /* drop refcount of op and deallocate if possible */
+        put_op(op);
+        x->needs_cleanup = 0;
+        /* x is itself deallocated when the destructor is called */
+        return error;
+    }
+}
+
+/*
+ * Using the iocb->private->op->tag field, 
+ * we should try and cancel the I/O
+ * operation, and also update res->obj
+ * and res->data to the values
+ * at the time of cancellation.
+ * This is called not only by the io_cancel() 
+ * system call, but also by the exit_mm()/aio_cancel_all()
+ * functions when the process that issued
+ * the aio operation is about to exit.
+ */
+static int
+pvfs2_aio_cancel(struct kiocb *iocb, struct io_event *event)
+{
+    pvfs2_kiocb *x = NULL;
+    if (iocb == NULL || event == NULL)
+    {
+        pvfs2_error("pvfs2_aio_cancel: Invalid parameters "
+                " %p, %p!\n", iocb, event);
+        return -EINVAL;
+    }
+    x = iocb->private;
+    if (x == NULL)
+    {
+        pvfs2_error("pvfs2_aio_cancel: cannot retrieve "
+                " pvfs2_kiocb structure!\n");
+        return -EINVAL;
+    }
+    else
+    {
+        pvfs2_kernel_op_t *op = NULL;
+        int ret;
+        /*
+         * Do some sanity checks
+         */
+        if (x->kiocb != iocb)
+        {
+            pvfs2_error("pvfs2_aio_cancel: kiocb structures "
+                    "don't match %p %p!\n", x->kiocb, iocb);
+            return -EINVAL;
+        }
+        if ((op = x->op) == NULL)
+        {
+            pvfs2_error("pvfs2_aio_cancel: cannot retreive "
+                    "pvfs2_kernel_op structure!\n");
+            return -EINVAL;
+        }
+        kiocbSetCancelled(iocb);
+        get_op(op);
+        /*
+         * This will essentially remove it from 
+         * htable_in_progress or from the req list
+         * as the case may be.
+         */
+        clean_up_interrupted_operation(op);
+        /* 
+         * However, we need to make sure that 
+         * the client daemon is not transferring data
+         * as we speak! Thus we look at the reference
+         * counter to determine if that is indeed the case.
+         */
+        do 
+        {
+            int timed_out_or_signal = 0;
+
+            DECLARE_WAITQUEUE(wait_entry, current);
+            /* add yourself to the wait queue */
+            add_wait_queue_exclusive(
+                    &op->io_completion_waitq, &wait_entry);
+
+            spin_lock(&op->lock);
+            while (op->io_completed == 0)
+            {
+                set_current_state(TASK_INTERRUPTIBLE);
+                /* We don't need to wait if client-daemon did not get a reference to op */
+                if (!op_wait(op))
+                    break;
+                /*
+                 * There may be a window if the client-daemon has acquired a reference
+                 * to op, but not a spin-lock on it yet before which the async
+                 * canceller (i.e. this piece of code) acquires the same. 
+                 * Consequently we may end up with a
+                 * race. To prevent that we use the aio_ref_cnt counter. 
+                 */
+                spin_unlock(&op->lock);
+                if (!signal_pending(current))
+                {
+                    int timeout = MSECS_TO_JIFFIES(1000 * MAX_SERVICE_WAIT_IN_SECONDS);
+                    if (!schedule_timeout(timeout))
+                    {
+                        pvfs2_print("Timed out on I/O cancellation - aborting\n");
+                        timed_out_or_signal = 1;
+                        spin_lock(&op->lock);
+                        break;
+                    }
+                    spin_lock(&op->lock);
+                    continue;
+                }
+                pvfs2_print("signal on Async I/O cancellation - aborting\n");
+                timed_out_or_signal = 1;
+                spin_lock(&op->lock);
+                break;
+            }
+            set_current_state(TASK_RUNNING);
+            remove_wait_queue(&op->io_completion_waitq, &wait_entry);
+
+        } while (0);
+
+        /* We need to fill up event->res and event->res2 if at all */
+        if (op->op_state == PVFS2_VFS_STATE_SERVICED)
+        {
+            op->priv = NULL;
+            spin_unlock(&op->lock);
+            event->res = x->bytes_copied;
+            event->res2 = 0;
+        }
+        else if (op->op_state == PVFS2_VFS_STATE_INPROGR)
+        {
+            op->priv = NULL;
+            spin_unlock(&op->lock);
+            pvfs2_print("Trying to cancel operation in "
+                    " progress %ld\n", (unsigned long) op->tag);
+            /* 
+             * if operation is in progress we need to send 
+             * a cancellation upcall for this tag 
+             * The return value of that is the cancellation
+             * event return value.
+             */
+            event->res = pvfs2_cancel_op_in_progress(op->tag);
+            event->res2 = 0;
+        }
+        else 
+        {
+            op->priv = NULL;
+            spin_unlock(&op->lock);
+            event->res = -EINTR;
+            event->res2 = 0;
+        }
+        /*
+         * Drop the buffer pool index
+         */
+        if (x->buffer_index >= 0)
+        {
+            pvfs2_print("pvfs2_aio_cancel: put bufmap_index "
+                    " %d\n", x->buffer_index);
+            pvfs_bufmap_put(x->buffer_index);
+            x->buffer_index = -1;
+        }
+        /* 
+         * Put reference to op twice,
+         * once for the reader/writer that initiated 
+         * the op and 
+         * once for the cancel 
+         */
+        put_op(op);
+        put_op(op);
+        x->needs_cleanup = 0;
+        /*
+         * This seems to be a weird undocumented 
+         * thing, where the cancel routine is expected
+         * to manually decrement ki_users field!
+         * before calling aio_put_req().
+         */
+        iocb->ki_users--;
+        ret = aio_put_req(iocb);
+        /* x is itself deallocated by the destructor */
+        return 0;
+    }
+}
+
+/* 
+ * Destructor is called when the kiocb structure is 
+ * about to be deallocated by the AIO core.
+ *
+ * Conceivably, this could be moved onto pvfs2-cache.c
+ * as the kiocb_dtor() function that can be associated
+ * with the pvfs2_kiocb object. 
+ */
+static void pvfs2_aio_dtor(struct kiocb *iocb)
+{
+    pvfs2_kiocb *x = iocb->private;
+    if (x && x->needs_cleanup == 1)
+    {
+        /* do a cleanup of the buffers and possibly op */
+        if (x->buffer_index >= 0)
+        {
+            pvfs2_print("pvfs2_aio_dtor: put bufmap_index "
+                    " %d\n", x->buffer_index);
+            pvfs_bufmap_put(x->buffer_index);
+            x->buffer_index = -1;
+        }
+        if (x->op) 
+        {
+            x->op->priv = NULL;
+            put_op(x->op);
+        }
+        x->needs_cleanup = 0;
+    }
+    pvfs2_print("pvfs2_aio_dtor: kiocb_release %p\n", x);
+    kiocb_release(x);
+    iocb->private = NULL;
+    return;
+}
+
+static inline void 
+fill_default_kiocb(pvfs2_kiocb *x,
+        struct task_struct *tsk,
+        struct kiocb *iocb, int rw,
+        int buffer_index, pvfs2_kernel_op_t *op, 
+        void __user *buffer,
+        loff_t offset, size_t count,
+        int (*aio_cancel)(struct kiocb *, struct io_event *))
+{
+    x->tsk = tsk;
+    x->kiocb = iocb;
+    x->buffer_index = buffer_index;
+    x->op = op;
+    x->rw = rw;
+    x->buffer = buffer;
+    x->bytes_to_be_copied = count;
+    x->offset = offset;
+    x->bytes_copied = 0;
+    x->needs_cleanup = 1;
+    iocb->ki_cancel = aio_cancel;
+    return;
+}
+/*
+ * This function will do the following,
+ * On an error, it returns a -ve error number.
+ * For a synchronous iocb, we copy the data into the 
+ * user buffer's before returning and
+ * the count of how much was actually read.
+ * For a first-time asynchronous iocb, we submit the 
+ * I/O to the client-daemon and do not wait
+ * for the matching downcall to be written and we 
+ * return a special -EIOCBQUEUED
+ * to indicate that we have queued the request.
+ * NOTE: Unlike typical aio requests
+ * that get completion notification from interrupt
+ * context, we get completion notification from a process
+ * context (i.e. the client daemon).
+ */
+static ssize_t 
+pvfs2_file_aio_read(struct kiocb *iocb, char __user *buffer,
+        size_t count, loff_t offset)
+{
+    struct file *filp = NULL;
+    struct inode *inode = NULL;
+    ssize_t error = -EINVAL;
+
+    if (count == 0)
+    {
+        return 0;
+    }
+    if (iocb->ki_pos != offset)
+    {
+        return -EINVAL;
+    }
+    if (unlikely(((ssize_t)count)) < 0)
+    {
+        return -EINVAL;
+    }
+    if (access_ok(VERIFY_WRITE, buffer, count) == 0)
+    {
+        return -EFAULT;
+    }
+    /* Each I/O operation is not allowed to be greater than our block size */
+    if (count > pvfs_bufmap_size_query())
+    {
+        pvfs2_error("aio_read: cannot transfer (%d) bytes"
+                " (larger than block size %d)\n",
+                count, pvfs_bufmap_size_query());
+        return -EINVAL;
+    }
+    filp = iocb->ki_filp;
+    error = -EINVAL;
+    if (filp && filp->f_mapping 
+             && (inode = filp->f_mapping->host))
+    {
+        int dc_status = 0;
+        ssize_t ret = 0;
+        pvfs2_kiocb *x = NULL;
+
+        /* First time submission */
+        if ((x = (pvfs2_kiocb *) iocb->private) == NULL)
+        {
+            int buffer_index = -1, error_exit = 0;
+            int retries = PVFS2_OP_RETRY_COUNT;
+            pvfs2_kernel_op_t *new_op = NULL;
+            pvfs2_kiocb pvfs_kiocb;
+            char __user *current_buf = buffer;
+            pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
+            
+            new_op = op_alloc();
+            if (!new_op)
+            {
+                error = -ENOMEM;
+                goto out_error;
+            }
+            /* Increase ref count */
+            get_op(new_op);
+            new_op->upcall.type = PVFS2_VFS_OP_FILE_IO;
+            /* (A)synchronous I/O */
+            new_op->upcall.req.io.async_vfs_io = 
+                is_sync_kiocb(iocb) ? PVFS_VFS_SYNC_IO 
+                                    : PVFS_VFS_ASYNC_IO;
+            new_op->upcall.req.io.readahead_size = 0;
+            new_op->upcall.req.io.io_type = PVFS_IO_READ;
+            new_op->upcall.req.io.refn = pvfs2_inode->refn;
+            error = pvfs_bufmap_get(&buffer_index);
+            if (error < 0)
+            {
+                pvfs2_error("pvfs2_file_aio_read: pvfs_bufmap_get() "
+                        " failure %d\n", ret);
+                /* drop ref count and possibly de-allocate */
+                put_op(new_op);
+                goto out_error;
+            }
+            pvfs2_print("pvfs2_file_aio_read: pvfs_bufmap_get %d\n",
+                    buffer_index);
+            new_op->upcall.req.io.buf_index = buffer_index;
+            new_op->upcall.req.io.count = count;
+            new_op->upcall.req.io.offset = offset;
+            dc_status = 0;
+            /*
+             * if it is a synchronous operation, we
+             * don't allocate anything here
+             */
+            if (is_sync_kiocb(iocb))
+            {
+                x = &pvfs_kiocb;
+            }
+            else /* asynchronous iocb */
+            {
+                x = kiocb_alloc();
+                if (x == NULL)
+                {
+                    error = -ENOMEM;
+                    /* drop the buffer index */
+                    pvfs_bufmap_put(buffer_index);
+                    pvfs2_print("pvfs2_file_aio_read: pvfs_bufmap_put %d\n",
+                            buffer_index);
+                    /* drop the reference count and deallocate */
+                    put_op(new_op);
+                    goto out_error;
+                }
+                pvfs2_print("kiocb_alloc: %p\n", x);
+                /* 
+                 * destructor function to make sure that we free
+                 * up this allocated piece of memory 
+                 */
+                iocb->ki_dtor = pvfs2_aio_dtor;
+            }
+            /* If user requested synchronous type of operation */
+            if (is_sync_kiocb(iocb))
+            {
+                /* 
+                 * Stage the operation!
+                 * On an error, macro jumps to error_exit 
+                 */
+                service_error_exit_op_with_timeout_retry(
+                        new_op, "pvfs2_file_aio_read", retries, error_exit, 
+                        get_interruptible_flag(inode));
+                if (new_op->downcall.status != 0)
+                {
+                    dc_status = new_op->downcall.status;
+            error_exit:
+                    handle_sync_aio_error();
+                    /*
+                      don't write an error to syslog on signaled operation
+                      termination unless we've got debugging turned on, as
+                      this can happen regularly (i.e. ctrl-c)
+                    */
+                    if ((error_exit != 0) && (ret == -EINTR))
+                    {
+                        pvfs2_print("pvfs2_file_aio_read: returning error %d " 
+                                "(error_exit=%d)\n", ret, error_exit);
+                    }
+                    else
+                    {
+                        pvfs2_error(
+                            "pvfs2_file_aio_read: error reading from "
+                            " handle %Lu, "
+                            "\n  -- downcall status is %d, returning %d "
+                            "(error_exit=%d)\n",
+                            Lu(pvfs2_ino_to_handle(inode->i_ino)),
+                            dc_status, ret, error_exit);
+                    }
+                    error = ret;
+                    goto out_error;
+                }
+                /* copy data out to destination */
+                if (new_op->downcall.resp.io.amt_complete)
+                {
+                    ret = pvfs_bufmap_copy_to_user(
+                            current_buf, buffer_index, 
+                            new_op->downcall.resp.io.amt_complete);
+                }
+                if (ret)
+                {
+                    pvfs2_print("Failed to copy user buffer %d\n", ret);
+                    new_op->downcall.status = -PVFS_EFAULT;
+                    /* error is set in the goto target */
+                    goto error_exit;
+                }
+                error = new_op->downcall.resp.io.amt_complete;
+                wake_up_device_for_return(new_op);
+                pvfs_bufmap_put(buffer_index);
+                pvfs2_print("pvfs2_file_aio_read: pvfs_bufmap_put %d\n",
+                        buffer_index);
+                /* new_op is freed by the client-daemon */
+                goto out_error;
+            }
+            else
+            {
+                /* 
+                 * We need to set the cancellation callbacks + 
+                 * other state information
+                 * here if the asynchronous request is going to
+                 * be successfully submitted 
+                 */
+                fill_default_kiocb(x, current, iocb, PVFS_IO_READ,
+                        buffer_index, new_op, current_buf,
+                        offset, count,
+                        &pvfs2_aio_cancel);
+                /*
+                 * We need to be able to retrieve this structure from
+                 * the op structure as well, since the client-daemon
+                 * needs to send notifications upon aio_completion.
+                 */
+                new_op->priv = x;
+                /* and stash it away in the kiocb structure as well */
+                iocb->private = x;
+                /*
+                 * Add it to the list of ops to be serviced
+                 * but don't wait for it to be serviced. 
+                 * Return immediately 
+                 */
+                service_async_vfs_op(new_op);
+                pvfs2_print("pvfs2_file_aio_read: queued "
+                        " read operation [%ld for %d]\n",
+                            (unsigned long) offset, count);
+                error = -EIOCBQUEUED;
+                /*
+                 * All cleanups done upon completion
+                 * (OR) cancellation!
+                 */
+            }
+        }
+        /* I don't think this path will ever be taken */
+        else { /* retry and see what is the status! */
+            error = pvfs2_aio_retry(iocb);
+        }
+    }
+out_error:
+    return error;
+}
+
+/*
+ * This function will do the following,
+ * On an error, it returns a -ve error number.
+ * For a synchronous iocb, we copy the user's data into the 
+ * buffers before returning and
+ * the count of how much was actually written.
+ * For a first-time asynchronous iocb, we copy the user's
+ * data into the buffers before submitting the 
+ * I/O to the client-daemon and do not wait
+ * for the matching downcall to be written and we 
+ * return a special -EIOCBQUEUED
+ * to indicate that we have queued the request.
+ * NOTE: Unlike typical aio requests
+ * that get completion notification from interrupt
+ * context, we get completion notification from a process
+ * context (i.e. the client daemon). 
+ */
+static ssize_t 
+pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
+        size_t count, loff_t offset)
+{
+    struct file *filp = NULL;
+    struct inode *inode = NULL;
+    ssize_t error = -EINVAL;
+
+    if (count == 0)
+    {
+        return 0;
+    }
+    if (iocb->ki_pos != offset)
+    {
+        return -EINVAL;
+    }
+    if (unlikely(((ssize_t)count)) < 0)
+    {
+        return -EINVAL;
+    }
+    if (access_ok(VERIFY_READ, buffer, count) == 0)
+    {
+        return -EFAULT;
+    }
+    filp = iocb->ki_filp;
+    if (filp && filp->f_mapping 
+             && (inode = filp->f_mapping->host))
+    {
+        int ret;
+        /* perform generic linux kernel tests for 
+         * sanity of write arguments 
+         * NOTE: this is particularly helpful in 
+         * handling fsize rlimit properly 
+         */
+#ifdef PVFS2_LINUX_KERNEL_2_4
+        ret = pvfs2_precheck_file_write(filp, inode, &count, offset);
+#else
+        ret = generic_write_checks(filp, &offset, &count,
+                S_ISBLK(inode->i_mode));
+#endif
+        if (ret != 0 || count == 0)
+        {
+            pvfs2_error("pvfs2_file_aio_write: failed generic "
+                    " argument checks.\n");
+            return(ret);
+        }
+    }
+    /* Each I/O operation is not allowed to be greater than our block size */
+    if (count > pvfs_bufmap_size_query())
+    {
+        pvfs2_error("aio_write: cannot transfer (%d) bytes"
+                " (larger than block size %d)\n",
+                count, pvfs_bufmap_size_query());
+        return -EINVAL;
+    }
+    error = -EINVAL;
+    if (filp && inode)
+    {
+        int dc_status = 0;
+        ssize_t ret = 0;
+        pvfs2_kiocb *x = NULL;
+
+        /* First time submission */
+        if ((x = (pvfs2_kiocb *) iocb->private) == NULL)
+        {
+            int buffer_index = -1;
+            int retries = PVFS2_OP_RETRY_COUNT, error_exit = 0;
+            pvfs2_kernel_op_t *new_op = NULL;
+            pvfs2_kiocb pvfs_kiocb;
+            char __user *current_buf = (char *) buffer;
+            pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
+            
+            new_op = op_alloc();
+            if (!new_op)
+            {
+                error = -ENOMEM;
+                goto out_error;
+            }
+            /* Increase ref count */
+            get_op(new_op);
+            new_op->upcall.type = PVFS2_VFS_OP_FILE_IO;
+            /* (A)synchronous I/O */
+            new_op->upcall.req.io.async_vfs_io = 
+                is_sync_kiocb(iocb) ? PVFS_VFS_SYNC_IO 
+                                    : PVFS_VFS_ASYNC_IO;
+            new_op->upcall.req.io.io_type = PVFS_IO_WRITE;
+            new_op->upcall.req.io.refn = pvfs2_inode->refn;
+            error = pvfs_bufmap_get(&buffer_index);
+            if (error < 0)
+            {
+                pvfs2_error("pvfs2_file_aio_write: pvfs_bufmap_get()"
+                        " failure %d\n", ret);
+                /* drop ref count and possibly de-allocate */
+                put_op(new_op);
+                goto out_error;
+            }
+            pvfs2_print("pvfs2_file_aio_write: pvfs_bufmap_put %d\n",
+                    buffer_index);
+            new_op->upcall.req.io.buf_index = buffer_index;
+            new_op->upcall.req.io.count = count;
+            new_op->upcall.req.io.offset = offset;
+            /* 
+             * copy the data from the application. 
+             * Should this be done here even for async I/O? 
+             * We could return -EIOCBRETRY here and have 
+             * the data copied in the pvfs2_aio_retry routine,
+             * I think. But I dont see the point in doing that...
+             */
+            error = pvfs_bufmap_copy_from_user(
+                    buffer_index, current_buf, count);
+            if (error < 0)
+            {
+                pvfs2_print("Failed to copy user buffer %d\n", ret);
+                /* drop the buffer index */
+                pvfs_bufmap_put(buffer_index);
+                pvfs2_print("pvfs2_file_aio_read: pvfs_bufmap_put %d\n",
+                        buffer_index);
+                /* drop the reference count and deallocate */
+                put_op(new_op);
+                goto out_error;
+            }
+
+            dc_status = 0;
+            /* 
+             * if it is a synchronous operation, we
+             * don't allocate anything here 
+             */
+            if (is_sync_kiocb(iocb))
+            {
+                x = &pvfs_kiocb;
+            }
+            else /* asynchronous iocb */
+            {
+                x = kiocb_alloc();
+                if (x == NULL)
+                {
+                    error = -ENOMEM;
+                    /* drop the buffer index */
+                    pvfs_bufmap_put(buffer_index);
+                    pvfs2_print("pvfs2_file_aio_read: pvfs_bufmap_put %d\n",
+                            buffer_index);
+                    /* drop the reference count and deallocate */
+                    put_op(new_op);
+                    goto out_error;
+                }
+                pvfs2_print("kiocb_alloc: %p\n", x);
+                /* 
+                 * destructor function to make sure that we free 
+                 * up this allocated piece of memory 
+                 */
+                iocb->ki_dtor = pvfs2_aio_dtor;
+            }
+            /* If user requested synchronous type of operation */
+            if (is_sync_kiocb(iocb))
+            {
+                /*
+                 * Stage the operation!
+                 * On an error, macro jumps to error_exit 
+                 */
+                service_error_exit_op_with_timeout_retry(
+                        new_op, "pvfs2_file_aio_write", retries, error_exit, 
+                        get_interruptible_flag(inode));
+                if (new_op->downcall.status != 0)
+                {
+                    dc_status = new_op->downcall.status;
+            error_exit:
+                    handle_sync_aio_error();
+                    /*
+                      don't write an error to syslog on signaled operation
+                      termination unless we've got debugging turned on, as
+                      this can happen regularly (i.e. ctrl-c)
+                    */
+                    if ((error_exit != 0) && (ret == -EINTR))
+                    {
+                        pvfs2_print("pvfs2_file_aio_write: returning error %d " 
+                                "(error_exit=%d)\n", ret, error_exit);
+                    }
+                    else
+                    {
+                        pvfs2_error(
+                            "pvfs2_file_aio_write: error writing to "
+                            " handle %Lu, "
+                            "FILE: %s\n  -- "
+                            "downcall status is %d, returning %d "
+                            "(error_exit=%d)\n",
+                            Lu(pvfs2_ino_to_handle(inode->i_ino)),
+                            (filp && filp->f_dentry 
+                             && filp->f_dentry->d_name.name ?
+                             (char *)filp->f_dentry->d_name.name : "UNKNOWN"),
+                            dc_status, ret, error_exit);
+                    }
+                    error = ret;
+                    goto out_error;
+                }
+                error = new_op->downcall.resp.io.amt_complete;
+                wake_up_device_for_return(new_op);
+                pvfs_bufmap_put(buffer_index);
+                pvfs2_print("pvfs2_file_aio_read: pvfs_bufmap_put %d\n",
+                        buffer_index);
+                if (error > 0)
+                {
+                    update_atime(inode);
+                }
+                /* new_op is freed by the client-daemon */
+                goto out_error;
+            }
+            else
+            {
+                /* 
+                 * We need to set the cancellation callbacks + 
+                 * other state information
+                 * here if the asynchronous request is going to
+                 * be successfully submitted 
+                 */
+                fill_default_kiocb(x, current, iocb, PVFS_IO_WRITE,
+                        buffer_index, new_op, current_buf,
+                        offset, count,
+                        &pvfs2_aio_cancel);
+                /*
+                 * We need to be able to retrieve this structure from
+                 * the op structure as well, since the client-daemon
+                 * needs to send notifications upon aio_completion.
+                 */
+                new_op->priv = x;
+                /* and stash it away in the kiocb structure as well */
+                iocb->private = x;
+                /*
+                 * Add it to the list of ops to be serviced
+                 * but don't wait for it to be serviced. 
+                 * Return immediately 
+                 */
+                service_async_vfs_op(new_op);
+                pvfs2_print("pvfs2_file_aio_write: queued "
+                        " write operation [%ld for %d]\n",
+                            (unsigned long) offset, count);
+                error = -EIOCBQUEUED;
+                /*
+                 * All cleanups done upon completion
+                 * (OR) cancellation!
+                 */
+            }
+        }
+        /* I don't think this path is ever taken */
+        else { /* retry and see what is the status! */
+            error = pvfs2_aio_retry(iocb);
+        }
+    }
+out_error:
+    return error;
+}
+
+#endif
 
 /** Perform a miscellaneous operation on a file.
  */
@@ -1208,6 +2059,8 @@ struct file_operations pvfs2_file_operations =
     .write = pvfs2_file_write,
     .readv = pvfs2_file_readv,
     .writev = pvfs2_file_writev,
+    .aio_read = pvfs2_file_aio_read,
+    .aio_write = pvfs2_file_aio_write,
     .ioctl = pvfs2_ioctl,
     .mmap = pvfs2_file_mmap,
     .open = pvfs2_file_open,

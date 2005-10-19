@@ -284,6 +284,8 @@ static ssize_t pvfs2_devreq_writev(
 	op = qhash_entry(hash_link, pvfs2_kernel_op_t, list);
 	if (op)
 	{
+            /* Increase ref count! */
+            get_op(op);
 	    /* cut off magic and tag from payload size */
 	    payload_size -= (2*sizeof(int32_t) + sizeof(uint64_t));
 	    if (payload_size <= sizeof(pvfs2_downcall_t))
@@ -296,13 +298,11 @@ static ssize_t pvfs2_devreq_writev(
 		pvfs2_print("writev: Ignoring %d bytes\n", payload_size);
 	    }
 
-	    /* tell the vfs op waiting on a waitqueue that this op is done */
-	    spin_lock(&op->lock);
-	    op->op_state = PVFS2_VFS_STATE_SERVICED;
-	    spin_unlock(&op->lock);
 
             /*
-              if this operation is an I/O operation, we need to wait
+              if this operation is an I/O operation and if it was
+              initiated on behalf of a *synchronous* VFS I/O operation,
+              only then we need to wait
               for all data to be copied before we can return to avoid
               buffer corruption and races that can pull the buffers
               out from under us.
@@ -312,10 +312,19 @@ static ssize_t pvfs2_devreq_writev(
               application reading/writing this device to return until
               the buffers are done being used.
             */
-            if (op->upcall.type == PVFS2_VFS_OP_FILE_IO)
+            if (op->upcall.type == PVFS2_VFS_OP_FILE_IO 
+                    && op->upcall.req.io.async_vfs_io == PVFS_VFS_SYNC_IO)
             {
                 int timed_out = 0;
                 DECLARE_WAITQUEUE(wait_entry, current);
+                
+                /*
+                 * tell the vfs op waiting on a waitqueue 
+                 * that this op is done 
+                 */
+                spin_lock(&op->lock);
+                op->op_state = PVFS2_VFS_STATE_SERVICED;
+                spin_unlock(&op->lock);
 
                 add_wait_queue_exclusive(
                     &op->io_completion_waitq, &wait_entry);
@@ -365,8 +374,76 @@ static ssize_t pvfs2_devreq_writev(
                     op_release(op);
                 }
             }
+#ifndef PVFS2_LINUX_KERNEL_2_4
+            else if (op->upcall.type == PVFS2_VFS_OP_FILE_IO
+                    && op->upcall.req.io.async_vfs_io == PVFS_VFS_ASYNC_IO)
+            {
+                pvfs2_kiocb *x = (pvfs2_kiocb *) op->priv;
+                if (x == NULL || x->buffer == NULL 
+                        || x->op != op 
+                        || x->bytes_to_be_copied <= 0)
+                {
+                    if (x)
+                    {
+                        pvfs2_print("WARNING: pvfs2_iocb from op"
+                                "has invalid fields! %p, %p(%p), %d\n",
+                                x->buffer, x->op, op, x->bytes_to_be_copied);
+                    }
+                    else
+                    {
+                        pvfs2_print("WARNING: cannot retrieve the "
+                                "pvfs2_iocb pointer from op!\n");
+                    }
+                    /* Most likely means that it was cancelled! */
+                }
+                else
+                {
+                    int bytes_copied;
+
+                    if (op->downcall.status != 0)
+                    {
+                        ret = pvfs2_kernel_error_code_convert(
+                                op->downcall.status);
+                        bytes_copied = 
+                            (ret == PVFS2_WAIT_TIMEOUT_REACHED) ? -EIO : 
+                            (ret == PVFS2_WAIT_SIGNAL_RECVD) ? -EINTR: ret;
+                    }
+                    else {
+                        bytes_copied = op->downcall.resp.io.amt_complete;
+                    }
+                    pvfs2_print("[AIO] status of transfer: %d\n", bytes_copied);
+                    if (x->rw == PVFS_IO_READ
+                            && bytes_copied > 0)
+                    {
+                        /* try and copy it out to user-space */
+                        bytes_copied = pvfs_bufmap_copy_to_user_task(
+                                x->tsk,
+                                x->buffer,
+                                x->buffer_index,
+                                bytes_copied);
+                    }
+                    spin_lock(&op->lock);
+                    /* we tell VFS that the op is now serviced! */
+                    op->op_state = PVFS2_VFS_STATE_SERVICED;
+                    pvfs2_print("Setting state of %p to %d [SERVICED]\n",
+                            op, op->op_state);
+                    x->bytes_copied = bytes_copied;
+                    /* call aio_complete to finish the operation to wake up regular aio waiters */
+                    aio_complete(x->kiocb, x->bytes_copied, 0);
+                    op->io_completed = 1;
+                    /* also wake up any aio cancellers that may be waiting for us to finish the op */
+                    wake_up_interruptible(&op->io_completion_waitq);
+                    spin_unlock(&op->lock);
+                }
+                put_op(op);
+            }
+#endif
             else
             {
+                /* tell the vfs op waiting on a waitqueue that this op is done */
+                spin_lock(&op->lock);
+                op->op_state = PVFS2_VFS_STATE_SERVICED;
+                spin_unlock(&op->lock);
                 /*
                   for every other operation (i.e. non-I/O), we need to
                   wake up the callers for downcall completion

@@ -22,6 +22,11 @@ extern int debug;
 extern int pvfs2_gen_credentials(
     PVFS_credentials *credentials);
 
+#ifndef PVFS2_LINUX_KERNEL_2_4
+/* a cache for pvfs2_kiocb objects (i.e pvfs2 iocb structures ) */
+static kmem_cache_t *pvfs2_kiocb_cache;
+#endif
+
 void op_cache_initialize(void)
 {
     op_cache = kmem_cache_create(
@@ -61,6 +66,7 @@ pvfs2_kernel_op_t *op_alloc(void)
         init_waitqueue_head(&new_op->waitq);
 
         init_waitqueue_head(&new_op->io_completion_waitq);
+        atomic_set(&new_op->aio_ref_count, 0);
 
         pvfs2_op_initialize(new_op);
 
@@ -192,6 +198,67 @@ void pvfs2_inode_cache_finalize(void)
         pvfs2_panic("Failed to destroy pvfs2_inode_cache\n");
     }
 }
+static void kiocb_ctor(
+    void *req,
+    kmem_cache_t * cachep,
+    unsigned long flags)
+{
+    if (flags & SLAB_CTOR_CONSTRUCTOR)
+    {
+        memset(req, 0, sizeof(pvfs2_kiocb));
+    }
+    else
+    {
+        pvfs2_error("WARNING!! kiocb_ctor called without ctor flag\n");
+    }
+}
+
+#ifndef PVFS2_LINUX_KERNEL_2_4
+
+void kiocb_cache_initialize(void)
+{
+    pvfs2_kiocb_cache = kmem_cache_create(
+        "pvfs2_kiocbcache", sizeof(pvfs2_kiocb), 0,
+        PVFS2_CACHE_CREATE_FLAGS, kiocb_ctor, NULL);
+
+    if (!pvfs2_kiocb_cache)
+    {
+        pvfs2_panic("Cannot create pvfs2_kiocb_cache!\n");
+    }
+}
+
+void kiocb_cache_finalize(void)
+{
+    if (kmem_cache_destroy(pvfs2_kiocb_cache) != 0)
+    {
+        pvfs2_panic("Failed to destroy pvfs2_devreqcache\n");
+    }
+}
+pvfs2_kiocb* kiocb_alloc(void)
+{
+    pvfs2_kiocb *x = NULL;
+
+    x = kmem_cache_alloc(pvfs2_kiocb_cache, PVFS2_CACHE_ALLOC_FLAGS);
+    if (x == NULL)
+    {
+        pvfs2_panic("kiocb_alloc: kmem_cache_alloc failed!\n");
+    }
+    return x;
+}
+
+void kiocb_release(pvfs2_kiocb *x)
+{
+    if (x)
+    {
+        kmem_cache_free(pvfs2_kiocb_cache, x);
+    }
+    else 
+    {
+        pvfs2_panic("kiocb_release: kmem_cache_free NULL pointer!\n");
+    }
+}
+
+#endif
 
 /*
  * Local variables:
