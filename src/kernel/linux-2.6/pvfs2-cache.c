@@ -198,6 +198,9 @@ void pvfs2_inode_cache_finalize(void)
         pvfs2_panic("Failed to destroy pvfs2_inode_cache\n");
     }
 }
+
+#ifndef PVFS2_LINUX_KERNEL_2_4
+
 static void kiocb_ctor(
     void *req,
     kmem_cache_t * cachep,
@@ -213,7 +216,6 @@ static void kiocb_ctor(
     }
 }
 
-#ifndef PVFS2_LINUX_KERNEL_2_4
 
 void kiocb_cache_initialize(void)
 {
