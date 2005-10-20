@@ -51,7 +51,7 @@ BODYEOF
 ;
 
 my $req = HTTP::Request->new( 
-    "POST" => "http://lain.mcs.anl.gov/bin/tinderbox2/process_build" );
+    "POST" => "http://www.pvfs.org/cgi-bin/pvfs2/tinderbox2/process_build" );
 $req->content( $msg );
 
 my $ua = LWP::UserAgent->new;
