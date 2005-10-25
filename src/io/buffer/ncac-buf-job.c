@@ -13,7 +13,7 @@
 #include <stdlib.h>
 #include "internal.h"
 #include "state.h"
-
+#include "ncac-job.h"
 
 int NCAC_do_a_bufread_job(struct NCAC_req *ncac_req)
 {

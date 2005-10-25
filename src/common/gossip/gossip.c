@@ -237,6 +237,7 @@ int gossip_set_logstamp(
     return(0);
 }
 
+#ifndef __GNUC__
 /* __gossip_debug_stub()
  * 
  * stub for gossip_debug that doesn't do anything; used when debugging
@@ -252,6 +253,7 @@ int __gossip_debug_stub(
 {
     return 0;
 }
+#endif
 
 
 /* __gossip_debug()

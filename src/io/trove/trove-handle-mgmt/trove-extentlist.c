@@ -87,7 +87,7 @@ int extentlist_init(struct TROVE_handle_extentlist *elist)
 /*
  * helper function to free memory in the index 
  */
-void extentlist_node_free(struct avlnode *n,
+static void extentlist_node_free(struct avlnode *n,
                           int p,
                           int d)
 {

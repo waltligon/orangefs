@@ -98,6 +98,12 @@ int PVFS_sys_fs_add(struct PVFS_sys_mntent *mntent)
         goto error_exit;
     }
 
+#ifdef USE_TRUSTED
+    /* once we know about the server configuration, we need to tell BMI */
+    BMI_set_info(0, BMI_TRUSTED_CONNECTION, (void *) new_server_config);
+    gossip_debug(GOSSIP_SERVER_DEBUG, "Enabling trusted connections!\n");
+#endif
+
     /*
       clear out all configuration information about file systems that
       aren't matching the one being added now.  this ensures no

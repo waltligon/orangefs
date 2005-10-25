@@ -17,6 +17,7 @@
 
 #include "bmi.h"
 #include "bmi-method-support.h"
+#include "bmi-method-callback.h"
 #include "gossip.h"
 #include "reference-list.h"
 #include "op-list.h"

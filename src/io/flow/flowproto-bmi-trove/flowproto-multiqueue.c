@@ -1606,8 +1606,8 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
         for(i=0; i<q_item->result_chain.result.segs; i++)
         {
             flow_data->tmp_buffer_list[i] = 
-                (void*)(q_item->result_chain.result.offset_array[i] +
-                q_item->buffer);
+                (char*)(q_item->result_chain.result.offset_array[i] +
+                (char *)q_item->buffer);
         }
     }
 
@@ -1689,10 +1689,10 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
         for(i=0; i<q_item->result_chain.result.segs; i++)
         {
             region_size = q_item->result_chain.size_list[i];
-            src_ptr = (char*)(flow_data->intermediate + 
+            src_ptr = (char*)((char *)flow_data->intermediate + 
                 bytes_processed);
             dest_ptr = (char*)(q_item->result_chain.offset_list[i]
-                + q_item->parent->dest.u.mem.buffer);
+                + (char *)q_item->parent->dest.u.mem.buffer);
             memcpy(dest_ptr, src_ptr, region_size);
             bytes_processed += region_size;
         }
@@ -1717,10 +1717,10 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
             for(i=0; i<q_item->result_chain.result.segs; i++)
             {
                 region_size = q_item->result_chain.size_list[i];
-                src_ptr = (char*)(flow_data->intermediate + 
+                src_ptr = (char*)((char *)flow_data->intermediate + 
                     bytes_processed);
                 dest_ptr = (char*)(q_item->result_chain.offset_list[i]
-                    + q_item->parent->dest.u.mem.buffer);
+                    + (char *)q_item->parent->dest.u.mem.buffer);
                 memcpy(dest_ptr, src_ptr, region_size);
                 bytes_processed += region_size;
             }
@@ -1793,7 +1793,7 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
         {
             flow_data->tmp_buffer_list[i] = 
                 (void*)(q_item->result_chain.result.offset_array[i] +
-                q_item->buffer);
+                (char *)q_item->buffer);
         }
 
         /* go ahead and return if there is nothing to do */

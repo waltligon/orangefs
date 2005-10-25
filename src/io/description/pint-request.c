@@ -111,9 +111,9 @@ int PINT_process_request(PINT_Request_state *req,
 				(sizeof(PINT_reqstack)*req->cur->rqbase->depth));
 		memcpy(temp_space,req,sizeof(PINT_Request_state));
 		req = (PINT_Request_state *)temp_space;
-		memcpy(temp_space + sizeof(PINT_Request_state),
+		memcpy((char *)temp_space + sizeof(PINT_Request_state),
 				req->cur,(sizeof(PINT_reqstack)*req->cur->rqbase->depth));
-		req->cur = (PINT_reqstack *)(temp_space + sizeof(PINT_Request_state));
+		req->cur = (PINT_reqstack *)((char *)temp_space + sizeof(PINT_Request_state));
 	}
 	/* check to see if we are picking up where we left off */
 	if (req->lvl < 0)

@@ -10,6 +10,7 @@
 #include "cache.h"
 
 #include "ncac-trove.h"
+#include "ncac-job.h"
 
 /* internal functions */
 static inline struct extent *find_extent(NCAC_req_t *ncac_req,

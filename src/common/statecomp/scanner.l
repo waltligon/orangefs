@@ -34,6 +34,8 @@ extern YYSTYPE yylval;
 extern FILE *out_file;
 extern char *in_file_name;
 void produce_listing(int line, char *listing);
+extern int yylex(void);
+extern void yyerror(char *);
 
 /* int      atoi();
  * double   atof();

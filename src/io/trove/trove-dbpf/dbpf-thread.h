@@ -16,7 +16,7 @@ extern "C" {
 
 #define DBPF_OPS_PER_WORK_CYCLE 5
 
-int dbpf_thread_intialize(void);
+int dbpf_thread_initialize(void);
 
 int dbpf_thread_finalize(void);
 

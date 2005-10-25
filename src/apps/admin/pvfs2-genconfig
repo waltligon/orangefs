@@ -30,6 +30,11 @@ my $opt_last_handle = '';
 my $opt_root_handle = '';
 my $opt_fsid = '';
 
+my $opt_security = '0';
+my $opt_trusted_port = '';
+my $opt_trusted_network = '';
+my $opt_trusted_netmask = '';
+
 sub get_user_input
 {
     my($term,$OUT,$prompt,$res);
@@ -177,6 +182,20 @@ sub emit_defaults
     print $target "\tClientRetryDelayMilliSecs 2000\n";
 
     print $target "</Defaults>\n";
+}
+
+sub emit_security
+{
+    my($portlist,$network,$netmask);
+    $target = $_[0];
+    $portlist = $_[1];
+    $network = $_[2];
+    $netmask = $_[3];
+
+    print $target "<Security>\n";
+    print $target "\tTrustedPorts $portlist\n";
+    print $target "\tTrustedNetwork $network $netmask\n";
+    print $target "</Security>\n";
 }
 
 sub emit_aliases
@@ -337,6 +356,7 @@ Usage: pvfs2-genconfig [OPTIONS] <fs.conf> <server.conf>
      --last-handle  <NUM>              last handle value to reserve
      --root-handle  <NUM>              handle value to reserve for root object
      --fsid         <NUM>              fs identifier value
+     --trusted      <0|1>              indicate whether trusted connection options need to be emitted
 THIS
 
 }
@@ -351,6 +371,32 @@ sub print_welcome
         print "guide for details.\n\n";
         print "**********************************************************************\n";
     }
+}
+
+sub get_portlist
+{
+    my $type;
+
+    if (!$opt_quiet) {
+        print "\n";
+        print "You must enter the trusted port ranges that your file system will accept\n";
+        print "This must be of the form <port1 - port2>\n";
+    }
+    $type = prompt_word("Enter port list [Default is 0-65535]: ","0-65535");
+    return $type;
+}
+
+sub get_network
+{
+    my $type;
+
+    if (!$opt_quiet) {
+        print "\n";
+        print "You must enter the network address and network mask to identify list of trusted hosts\n";
+        print "This must be of the form <network>, <netmask>\n";
+    }
+    $type = prompt_word("Enter network address, network mask [Default is 0.0.0.0, 0.0.0.0]: ", "0.0.0.0, 0.0.0.0");
+    return $type;
 }
 
 sub get_protocol
@@ -622,6 +668,7 @@ GetOptions('protocol=s'    => \$opt_protocol,
        'last-handle=i' => \$opt_last_handle,
        'root-handle=i' => \$opt_root_handle,
        'fsid=i'        => \$opt_fsid,
+       'trusted=i'        => \$opt_security,
        'server-job-timeout=i' => \$opt_server_job_timeout,
        'client-job-timeout=i' => \$opt_client_job_timeout,
        'storage=s'     => \$opt_storage,
@@ -661,6 +708,27 @@ $type = get_protocol();
 foreach (split(',', $type)) {
     if ($_ eq "tcp") {
         $port{'tcp'} = tcp_get_port();
+        if ($opt_security == 1)
+        {
+            $opt_trusted_port = get_portlist();
+            $str = get_network();
+            $cnt = 0;
+            foreach (split(',', $str)) {
+                $_ =~ s/\s/ /g; 
+                $_ =~ s/ +/ /g;
+                $_ =~ s/^ +//;
+                $_ =~ s/ +$//;
+                if ($cnt == 0)
+                {
+                    $opt_trusted_network = "tcp://" . $_;
+                }
+                else 
+                {
+                    $opt_trusted_netmask = "tcp://" . $_;
+                }
+                $cnt = $cnt + 1;
+            }
+        }
     } elsif ($_ eq "gm") {
         $port{'gm'} = gm_get_port();
     } elsif ($_ eq "ib") {
@@ -692,6 +760,12 @@ if (!$opt_quiet) {
     print "Configured a total of ", ($#union_bmi + 1), " servers:\n";
     print "", ($#io_bmi + 1), " of them are I/O servers.\n";
     print "", ($#meta_bmi + 1), " of them are Metadata servers.\n";
+    if ($opt_security == 1)
+    {
+        print "Configured trusted connection settings\n";
+        print "Trusted port list : ", $opt_trusted_port, "\n";
+        print "Trusted network,netmask : ", $opt_trusted_network, ",", $opt_trusted_netmask, "\n";
+    }
 }
 
 if (!$opt_quiet) {
@@ -751,6 +825,10 @@ if (!$opt_quiet) {
 
 emit_defaults($output_target, $num_unexp_reqs,
               $bmi_module, $handle_recycle_timeout_seconds);
+if ($opt_security == 1) 
+{
+    emit_security($output_target, $opt_trusted_port, $opt_trusted_network, $opt_trusted_netmask);
+}
 emit_aliases($output_target);
 emit_filesystem($output_target, "pvfs2-fs", $fsid, $root_handle);
 

@@ -29,6 +29,7 @@
 #include "str-utils.h"
 #include "gen-locks.h"
 #include "realpath.h"
+#include "pint-sysint-utils.h"
 
 /* TODO: add replacement functions for systems without getmntent() */
 #ifndef HAVE_GETMNTENT

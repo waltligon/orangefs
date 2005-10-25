@@ -390,7 +390,7 @@ return_error:
     return ret;
 }
 
-int dbpf_dspace_iterate_handles(TROVE_coll_id coll_id,
+static int dbpf_dspace_iterate_handles(TROVE_coll_id coll_id,
                                 TROVE_ds_position *position_p,
                                 TROVE_handle *handle_array,
                                 int *inout_count_p,
@@ -1262,7 +1262,7 @@ static int dbpf_dspace_test(
 #endif
 }
 
-int dbpf_dspace_testcontext(
+static int dbpf_dspace_testcontext(
     TROVE_coll_id coll_id,
     TROVE_op_id *ds_id_array,
     int *inout_count_p,

@@ -39,7 +39,7 @@
 /* Prototypes for functions defined in here */
 static inline int PINT_state_machine_halt(void);
 static inline int PINT_state_machine_next(struct PINT_OP_STATE *,job_status_s *r);
-static union PINT_state_array_values *PINT_state_machine_locate(struct PINT_OP_STATE *);
+static union PINT_state_array_values *PINT_state_machine_locate(struct PINT_OP_STATE *) __attribute__((used));
 static inline union PINT_state_array_values *PINT_pop_state(struct PINT_OP_STATE *s);
 static inline void PINT_push_state(struct PINT_OP_STATE *s, union PINT_state_array_values *p);
 

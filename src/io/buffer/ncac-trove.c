@@ -4,6 +4,8 @@
 #include "internal.h"
 #include "trove.h"
 #include "aiovec.h"
+#include "ncac-trove.h"
+#include "state.h"
 
 static inline void  offset_shorten( int s_cnt, 
 					  PVFS_offset *stream_offset_array,

@@ -848,7 +848,14 @@ static int server_initialize_subsystems(
         PVFS_perror_gossip("Error: BMI_initialize", ret);
         return ret;
     }
-
+#ifdef USE_TRUSTED
+    /* Pass the server_config file pointer to the lower
+     * levels for the trusted connections related functions to be
+     * called
+     */
+    BMI_set_info(0, BMI_TRUSTED_CONNECTION, (void *) &server_config);
+    gossip_debug(GOSSIP_SERVER_DEBUG, "Enabling trusted connections!\n");
+#endif
     *server_status_flag |= SERVER_BMI_INIT;
 
     ret = trove_initialize(server_config.storage_path,

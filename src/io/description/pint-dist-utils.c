@@ -109,7 +109,7 @@ int PINT_dist_default_set_param(const char* dist_name, void* params,
     offset_data = PINT_get_param_offset(dist_name, param_name);
     if (0 != offset_data)
     {
-        memcpy(params + offset_data->offset, value, offset_data->size);
+        memcpy((char *) params + offset_data->offset, value, offset_data->size);
     }
     else
     {

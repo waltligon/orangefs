@@ -189,7 +189,8 @@ void *rst_find(rst_t *t, unsigned long index)
  * the item pointed to by `key_item'.  Returns a pointer to the item found, or
  * NULL if no item was found.
  */
-void *rst_find_min(rst_t *t)
+static void *rst_find_min(rst_t *t) __attribute__((unused));
+static void *rst_find_min(rst_t *t)
 {
     unsigned int j;
     rst_node_t *p;
@@ -317,7 +318,9 @@ void rst_init(rst_t *t, unsigned long (* get_value)(const void *), int max_b)
     return;
 }
 
-void rst_finalize(rst_t *t) {
+static void rst_finalize(rst_t *t) __attribute__((unused));
+static void rst_finalize(rst_t *t) 
+{
     rst_free_dfs(t->root);
 }
 

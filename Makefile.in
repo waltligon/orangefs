@@ -144,6 +144,7 @@ PICFLAGS = -fPIC
 LDFLAGS += -L lib 
 LIBS += -lpvfs2 @LIBS@ 
 MMAP_RA_CACHE = @MMAP_RA_CACHE@
+TRUSTED_CONNECTIONS = @TRUSTED_CONNECTIONS@
 REDHAT_RELEASE = @REDHAT_RELEASE@
 NPTL_WORKAROUND = @NPTL_WORKAROUND@
 # for Solaris:
@@ -254,6 +255,11 @@ endif
 # enable mmap-readahead cache (unless disabled by configure)
 ifdef MMAP_RA_CACHE
 CFLAGS += @MMAP_RA_CACHE@
+endif
+
+# enable trusted connections (unless disabled by configure)
+ifdef TRUSTED_CONNECTIONS
+CFLAGS += @TRUSTED_CONNECTIONS@
 endif
 
 # enable redhat-release patches (if detected and if any)

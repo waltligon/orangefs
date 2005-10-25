@@ -144,7 +144,7 @@ static int geteattr_setup_resp(PINT_server_op *s_op, job_status_s *js_p)
         s_op->resp.u.geteattr.val[i].buffer_sz =
             s_op->req->u.geteattr.valsz[i];
         s_op->resp.u.geteattr.val[i].buffer =
-            s_op->u.eattr.buffer + tsz;
+            (char *) s_op->u.eattr.buffer + tsz;
         tsz += s_op->req->u.geteattr.valsz[i];
     }
     return 1;

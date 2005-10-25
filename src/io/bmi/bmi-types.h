@@ -68,6 +68,9 @@ enum
     BMI_DROP_ADDR_QUERY = 7,   /**< ask a module if it thinks an address
                                 *   should be discarded */
     BMI_FORCEFUL_CANCEL_MODE = 8, /**< enables a more forceful cancel mode */
+#ifdef USE_TRUSTED
+    BMI_TRUSTED_CONNECTION = 9, /**< allows setting the TrustedPorts and Network options */
+#endif
 };
 
 /* mappings from PVFS errors to BMI errors */

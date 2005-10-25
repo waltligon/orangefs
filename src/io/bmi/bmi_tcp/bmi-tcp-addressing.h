@@ -12,6 +12,7 @@
 #define __BMI_TCP_ADDRESSING_H
 
 #include "bmi-types.h"
+#include <netinet/in.h>
 
 /*****************************************************************
  * Information specific to tcp/ip
@@ -26,6 +27,19 @@
 /* peer name types */
 #define BMI_TCP_PEER_IP 1
 #define BMI_TCP_PEER_HOSTNAME 2
+
+#ifdef USE_TRUSTED
+
+struct tcp_allowed_connection_s {
+    int                 port_enforce;
+    unsigned long       ports[2];
+    int                 network_enforce;
+    struct in_addr      network;
+    struct in_addr      netmask;
+};
+
+#endif
+
 
 /* this contains TCP/IP addressing information- it is filled in as
  * connections are made */
@@ -54,6 +68,7 @@ struct tcp_addr
     char* peer;
     int peer_type;
 };
+
 
 /*****************************************************************
  * function prototypes

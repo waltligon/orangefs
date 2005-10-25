@@ -238,8 +238,13 @@ int PVFS_Request_indexed(int32_t count,
     return PVFS_SUCCESS;
 }
 
+static int PVFS_Request_indexed_block(int32_t count,
+                               int32_t blocklength,
+                               PVFS_size * displacements,
+                               PVFS_Request oldreq,
+                               PVFS_Request * newreq) __attribute__((unused));
 /* this is a stupid first approach, fix it later - WBL */
-int PVFS_Request_indexed_block(int32_t count,
+static int PVFS_Request_indexed_block(int32_t count,
                                int32_t blocklength,
                                PVFS_size * displacements,
                                PVFS_Request oldreq,

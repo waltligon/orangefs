@@ -10,6 +10,7 @@
 #include "trove.h"
 #include "trove-internal.h"
 #include "gossip.h"
+#include "dbpf.h"
 
 PVFS_error dbpf_db_error_to_trove_error(int db_error_value)
 {

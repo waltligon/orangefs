@@ -11,6 +11,11 @@
 #include "ncac-job.h"
 
 extern struct NCAC_dev  NCAC_dev;
+void cache_dump_active_list(void);
+void cache_dump_inactive_list(void);
+static void NCAC_list_add_tail_lock(struct list_head *new, struct list_head *head, NCAC_lock *lock);
+static void NCAC_list_del_lock(struct list_head *entry, NCAC_lock *lock);
+static void NCAC_read_request_from_list_lock(struct list_head *head, NCAC_lock *lock, NCAC_req_t ** ncac_req_ptr);
 
 /* This file contains NCAC internal functions. */
 
@@ -52,7 +57,7 @@ static inline struct NCAC_req * get_internal_req_lock( PVFS_fs_id fsid, PVFS_han
 
 
 /* add a request into the tail of a list exclusively. */
-void NCAC_list_add_tail_lock(struct list_head *new, struct list_head *head, NCAC_lock *lock)
+static void NCAC_list_add_tail_lock(struct list_head *new, struct list_head *head, NCAC_lock *lock)
 {
     list_lock(lock);
 
@@ -63,7 +68,7 @@ void NCAC_list_add_tail_lock(struct list_head *new, struct list_head *head, NCAC
 }
 
 /* delete an entry from its list */
-void NCAC_list_del_lock(struct list_head *entry, NCAC_lock *lock)
+static void NCAC_list_del_lock(struct list_head *entry, NCAC_lock *lock)
 {
     list_lock(lock);
 
@@ -73,7 +78,7 @@ void NCAC_list_del_lock(struct list_head *entry, NCAC_lock *lock)
 }
 
 /* read an entry without mark from a list and mark the entry. */
-void NCAC_read_request_from_list_lock(struct list_head *head, NCAC_lock *lock, NCAC_req_t ** ncac_req_ptr)
+static void NCAC_read_request_from_list_lock(struct list_head *head, NCAC_lock *lock, NCAC_req_t ** ncac_req_ptr)
 {
     struct list_head *pos;
     NCAC_req_t *req = NULL;
@@ -348,7 +353,7 @@ struct freg_tuple
     PVFS_size   size;
 };
 
-int comp_pos(const PVFS_offset *num1, const PVFS_offset *num2)
+static int comp_pos(const PVFS_offset *num1, const PVFS_offset *num2)
 {
     if (*num1 <  *num2) return -1;
     if (*num1 == *num2) return  0;
@@ -834,6 +839,7 @@ void cache_dump_active_list(void)
    fprintf(stderr, "active_list:\n");
    list_dump(&cache->active_list);
 }
+
 void cache_dump_inactive_list(void)
 {
    struct cache_stack *cache = get_cache_stack();
@@ -860,13 +866,15 @@ static inline void req_list_dump(struct list_head *head)
     fprintf(stderr, "\n"); 
 }
 
-void cmp_list_dump(void)
+static void cmp_list_dump(void) __attribute__((unused));
+static void cmp_list_dump(void)
 {
    fprintf(stderr, "cmp list:	");
    req_list_dump(&NCAC_dev.comp_list);
 }
 
-void job_list_dump(void)
+static void job_list_dump(void) __attribute__((unused));
+static void job_list_dump(void)
 {
    fprintf(stderr, "job list:	");
    req_list_dump(&NCAC_dev.prepare_list);
@@ -889,7 +897,8 @@ static inline void list_dump_list(struct list_head *head)
 	}	
 }
 
-void dirty_list_dump(int handle)
+static void dirty_list_dump(int handle) __attribute__((unused));
+static void dirty_list_dump(int handle)
 {
 	struct inode *inode;
 

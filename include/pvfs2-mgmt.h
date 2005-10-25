@@ -238,6 +238,17 @@ PVFS_error PVFS_mgmt_perf_mon_list(
     int history_count,
     PVFS_error_details *details);
 
+PVFS_error PVFS_imgmt_event_mon_list(
+    PVFS_fs_id fs_id,
+    PVFS_credentials *credentials,
+    struct PVFS_mgmt_event** event_matrix,
+    PVFS_BMI_addr_t *addr_array,
+    int server_count,
+    int event_count,
+    PVFS_error_details *details,
+    PVFS_mgmt_op_id *op_id,
+    void *user_ptr);
+
 PVFS_error PVFS_mgmt_event_mon_list(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,

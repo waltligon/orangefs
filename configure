@@ -309,7 +309,7 @@ ac_includes_default="\
 # include <unistd.h>
 #endif"
 
-ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS PVFS2_VERSION build build_cpu build_vendor build_os host host_cpu host_vendor host_os INSTALL_PROGRAM INSTALL_SCRIPT INSTALL_DATA CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT CPP HAVE_PERL HAVE_FIND HAVE_BISON HAVE_FLEX BUILD_CC LIBCFLAGS THREAD_LIB BUILD_SERVER MMAP_RA_CACHE HAVE_PKGCONFIG GTKLIBS GTKCFLAGS BUILD_KARMA build_static REDHAT_RELEASE NPTL_WORKAROUND MISC_TROVE_FLAGS EGREP LINUX_KERNEL_SRC LINUX24_KERNEL_SRC LINUX24_KERNEL_MINOR_VER BUILD_ABSOLUTE_TOP SRC_RELATIVE_TOP SRC_ABSOLUTE_TOP ENABLE_COVERAGE QUIET_COMPILE BUILD_EPOLL build_shared INTELC GNUC DB_LIB GM_HOME BUILD_GM IB_HOME BUILD_IB BUILD_VIS VISCFLAGS VISLIBS LIBOBJS LTLIBOBJS'
+ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS PVFS2_VERSION build build_cpu build_vendor build_os host host_cpu host_vendor host_os INSTALL_PROGRAM INSTALL_SCRIPT INSTALL_DATA CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT CPP HAVE_PERL HAVE_FIND HAVE_BISON HAVE_FLEX BUILD_CC LIBCFLAGS THREAD_LIB BUILD_SERVER MMAP_RA_CACHE TRUSTED_CONNECTIONS HAVE_PKGCONFIG GTKLIBS GTKCFLAGS BUILD_KARMA build_static REDHAT_RELEASE NPTL_WORKAROUND MISC_TROVE_FLAGS EGREP LINUX_KERNEL_SRC LINUX24_KERNEL_SRC LINUX24_KERNEL_MINOR_VER BUILD_ABSOLUTE_TOP SRC_RELATIVE_TOP SRC_ABSOLUTE_TOP ENABLE_COVERAGE QUIET_COMPILE BUILD_EPOLL build_shared INTELC GNUC DB_LIB GM_HOME BUILD_GM IB_HOME BUILD_IB BUILD_VIS VISCFLAGS VISLIBS LIBOBJS LTLIBOBJS'
 ac_subst_files=''
 
 # Initialize some variables set by options.
@@ -849,6 +849,7 @@ Optional Features:
   --disable-perf-counters Disables pvfs2-server performance counters
   --disable-disk-io       Disables pvfs2-server disk I/O (for testing)
   --enable-mmap-racache   Enables mmap-readahead in kernel interface
+  --enable-trusted-connections  Enable connects only from trusted hosts/ports (experimental, off by default)
   --disable-karma         Disables optional gui.  (Enabled by default)
   --disable-static        Do not build static client library
   --enable-redhat24       Enable workaround for RedHat 2.4 kernel
@@ -2944,6 +2945,16 @@ MMAP_RA_CACHE="-DUSE_MMAP_RA_CACHE"
 fi
 
 fi;
+
+
+# Check whether --enable-trusted-connections or --disable-trusted-connections was given.
+if test "${enable_trusted_connections+set}" = set; then
+  enableval="$enable_trusted_connections"
+  if test "x$enableval" = "xyes"; then
+TRUSTED_CONNECTIONS="-DUSE_TRUSTED"
+fi
+fi;
+
 
 
 test_for_karma()
@@ -9326,6 +9337,7 @@ s,@LIBCFLAGS@,$LIBCFLAGS,;t t
 s,@THREAD_LIB@,$THREAD_LIB,;t t
 s,@BUILD_SERVER@,$BUILD_SERVER,;t t
 s,@MMAP_RA_CACHE@,$MMAP_RA_CACHE,;t t
+s,@TRUSTED_CONNECTIONS@,$TRUSTED_CONNECTIONS,;t t
 s,@HAVE_PKGCONFIG@,$HAVE_PKGCONFIG,;t t
 s,@GTKLIBS@,$GTKLIBS,;t t
 s,@GTKCFLAGS@,$GTKCFLAGS,;t t
@@ -9911,6 +9923,14 @@ echo "${ECHO_T}PVFS2 configured for using the mmap-ra-cache      :  no" >&6
 else
    echo "$as_me:$LINENO: result: PVFS2 configured for using the mmap-ra-cache      : yes" >&5
 echo "${ECHO_T}PVFS2 configured for using the mmap-ra-cache      : yes" >&6
+fi
+
+if test "x$TRUSTED_CONNECTIONS" = "x" ; then
+	echo "$as_me:$LINENO: result: PVFS2 configured for using trusted connections    :  no" >&5
+echo "${ECHO_T}PVFS2 configured for using trusted connections    :  no" >&6
+else
+	echo "$as_me:$LINENO: result: PVFS2 configured for using trusted connections    : yes" >&5
+echo "${ECHO_T}PVFS2 configured for using trusted connections    : yes" >&6
 fi
 
 if test "x$THREAD_LIB" = "x" ; then

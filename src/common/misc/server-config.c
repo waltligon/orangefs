@@ -30,6 +30,10 @@ static DOTCONF_CB(get_logstamp);
 static DOTCONF_CB(get_storage_space);
 static DOTCONF_CB(enter_defaults_context);
 static DOTCONF_CB(exit_defaults_context);
+#ifdef USE_TRUSTED
+static DOTCONF_CB(enter_security_context);
+static DOTCONF_CB(exit_security_context);
+#endif
 static DOTCONF_CB(enter_aliases_context);
 static DOTCONF_CB(exit_aliases_context);
 static DOTCONF_CB(enter_filesystem_context);
@@ -50,6 +54,10 @@ static DOTCONF_CB(get_logfile);
 static DOTCONF_CB(get_event_logging_list);
 static DOTCONF_CB(get_filesystem_collid);
 static DOTCONF_CB(get_alias_list);
+#ifdef USE_TRUSTED
+static DOTCONF_CB(get_trusted_portlist);
+static DOTCONF_CB(get_trusted_network);
+#endif
 static DOTCONF_CB(get_range_list);
 static DOTCONF_CB(get_bmi_module_list);
 static DOTCONF_CB(get_flow_module_list);
@@ -150,6 +158,45 @@ static const configoption_t options[] =
     /* Specifies the end-tag for the Defaults context.
      */
     {"</Defaults>",ARG_NONE, exit_defaults_context,NULL,CTX_DEFAULTS,NULL},
+
+#ifdef USE_TRUSTED
+    /* Specifies the beginning of the Security context. Options specified 
+     * within the Security context are used to dictate whether the pvfs2
+     * servers will accept or handle file-system requests.
+     * This section is optional and does not need to be specified.
+     */
+    {"<Security>",ARG_NONE, enter_security_context,NULL,CTX_GLOBAL,NULL},
+
+    /* Specifies the end-tag for the Security context.
+     */
+    {"</Security>",ARG_NONE, exit_security_context,NULL,CTX_SECURITY,NULL},
+    
+    /* Specifies the range of ports in the form of a range of 2 integers
+     * from which the connections are going to be accepted and serviced.
+     * The format of the TrustedPorts option is:
+     *
+     * TrustedPorts StartPort-EndPort
+     *
+     * As an example:
+     *
+     * TrustedPorts 0-65535
+     */
+    {"TrustedPorts",ARG_STR, get_trusted_portlist,NULL,
+        CTX_SECURITY,NULL},
+    
+    /* Specifies the IP network and netmask in the form of 2 BMI addresses from
+     * which the connections are going to be accepted and serviced.
+     * The format of the TrustedNetwork option is:
+     *
+     * TrustedNetwork bmi-network-address bmi-network-mask
+     *
+     * As an example:
+     *
+     * TrustedNetwork tcp://192.168.4.0 tcp://255.255.255.0
+     */
+    {"TrustedNetwork",ARG_LIST, get_trusted_network,NULL,
+        CTX_SECURITY,NULL},
+#endif
 
     /* Specifies the beginning of the Aliases context.  This groups 
      * the Alias mapping options.
@@ -768,6 +815,22 @@ DOTCONF_CB(exit_defaults_context)
     return NULL;
 }
 
+DOTCONF_CB(enter_security_context)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    config_s->configuration_context = CTX_SECURITY;
+    return NULL;
+}
+
+DOTCONF_CB(exit_security_context)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    config_s->configuration_context = CTX_GLOBAL;
+    return NULL;
+}
+
 DOTCONF_CB(enter_aliases_context)
 {
     struct server_configuration_s *config_s = 
@@ -1078,6 +1141,79 @@ DOTCONF_CB(get_bmi_module_list)
     config_s->bmi_modules = strdup(buf);
     return NULL;
 }
+
+#ifdef USE_TRUSTED
+
+DOTCONF_CB(get_trusted_portlist)
+{
+    long port1, port2;
+    char *separator = NULL, *option = NULL, *endptr = NULL;
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    option = strdup(cmd->data.str);
+    if (option == NULL)
+    {
+        return("Could not allocate memory\n");
+    }
+    separator = strchr(option, '-');
+    if (separator == NULL)
+    {
+        free(option);
+        return("Portlist should be of the form <Port1-Port2>\n");
+    }
+    *separator = '\0';
+    port1 = strtol(option, &endptr, 10);
+    if (port1 < 0 || *endptr != '\0')
+    {
+        free(option);
+        return("Portlist should be of the form <Port1-Port2>\n");
+    }
+    endptr = NULL;
+    port2 = strtol(separator + 1, &endptr, 10);
+    if (port2 < 0 || *endptr != '\0')
+    {
+        free(option);
+        return("Portlist should be of the form <Port1-Port2>\n");
+    }
+    free(option);
+    if (port2 < port1)
+    {
+        return("Portlist should be of the form <Port1-Port2> (Port1 <= Port2)\n");
+    }
+    config_s->allowed_ports[0] = port1;
+    config_s->allowed_ports[1] = port2;
+    /* okay, we enable trusted ports */
+    config_s->ports_enabled = 1; 
+    return NULL;
+}
+
+DOTCONF_CB(get_trusted_network)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+
+    if (cmd->arg_count != 2)
+    {
+        return("TrustedNetwork must be of the form <Network> <Mask>\n");
+    }
+    config_s->allowed_network = strdup(cmd->data.list[0]);
+    if (config_s->allowed_network == NULL)
+    {
+        return("Could not allocate memory for network\n");
+    }
+    config_s->allowed_network_mask = strdup(cmd->data.list[1]);
+    if (config_s->allowed_network_mask == NULL)
+    {
+        free(config_s->allowed_network);
+        return("Could not allocate memory for network mask\n");
+    }
+    /* okay, we enable trusted network as well */
+    config_s->network_enabled = 1;
+    return NULL;
+}
+
+#endif
 
 DOTCONF_CB(get_handle_recycle_timeout_seconds)
 {
@@ -1539,7 +1675,23 @@ void PINT_config_release(struct server_configuration_s *config_s)
             free(config_s->bmi_modules);
             config_s->bmi_modules = NULL;
         }
-
+#ifdef USE_TRUSTED
+        if (config_s->allowed_network)
+        {
+            free(config_s->allowed_network);
+            config_s->allowed_network = NULL;
+        }
+        if (config_s->allowed_network_mask)
+        {
+            free(config_s->allowed_network_mask);
+            config_s->allowed_network_mask = NULL;
+        }
+        if (config_s->security)
+        {
+            free(config_s->security);
+            config_s->security = NULL;
+        }
+#endif
         /* free all filesystem objects */
         if (config_s->file_systems)
         {
@@ -2001,6 +2153,76 @@ static int build_extent_array(
     }
     return 0;
 }
+
+#ifdef USE_TRUSTED
+/*
+ * Function: PINT_config_get_allowed_ports
+ *
+ * Params:   struct server_configuration_s          *server_config
+ *           int           *enabled
+ *           unsigned long *ports (OUT)
+ *
+ * Returns:  by filling up *ports from the allowed_ports array
+ *           0 on success and -1 on failure
+ *
+ * Synopsis: Retrieve the list of allowed ports (i.e. range)
+ */
+int PINT_config_get_allowed_ports(
+    struct server_configuration_s *config_s,
+    int *enabled,
+    unsigned long *allowed_ports)
+{
+    int ret = -1;
+
+    if (config_s)
+    {
+        *enabled = config_s->ports_enabled;
+        if (*enabled == 1)
+        {
+            allowed_ports[0] = config_s->allowed_ports[0];
+            allowed_ports[1] = config_s->allowed_ports[1];
+        }
+        ret = 0;
+    }
+    return ret;
+}
+
+/*
+ * Function: PINT_config_get_allowed_network
+ *
+ * Params:   struct server_configuration_s *server_config
+ *           int  *enabled
+ *           char **allowed_network (OUT)
+ *           char **allowed_netmask (OUT)
+ *
+ * Returns:  Fills up *allowed_network and *allowed_netmask
+ *           and returns 0 on success and -1 on failure
+ *
+ * Synopsis: Retrieve the allowed network address and netmask.
+ */
+
+int PINT_config_get_allowed_network(
+    struct server_configuration_s *config_s,
+    int  *enabled,
+    char **allowed_network,
+    char **allowed_mask)
+{
+    int ret = -1;
+
+    if (config_s)
+    {
+        *enabled = config_s->network_enabled;
+        if (*enabled == 1)
+        {
+            *allowed_network = config_s->allowed_network;
+            *allowed_mask    = config_s->allowed_network_mask;
+        }
+        ret = 0;
+    }
+    return ret;
+}
+
+#endif
 
 /*
  * Function: PINT_config_get_host_addr_ptr

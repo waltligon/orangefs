@@ -24,7 +24,8 @@ enum
     CTX_METAHANDLERANGES = (1 << 5),
     CTX_DATAHANDLERANGES = (1 << 6),
     CTX_STORAGEHINTS     = (1 << 7),
-    CTX_DISTRIBUTION     = (1 << 8)
+    CTX_DISTRIBUTION     = (1 << 8),
+    CTX_SECURITY         = (1 << 9)
 };
 
 typedef struct phys_server_desc
@@ -122,6 +123,14 @@ typedef struct server_configuration_s
     char *event_logging;
     char *bmi_modules;              /* BMI modules                      */
     char *flow_modules;             /* Flow modules                     */
+#ifdef USE_TRUSTED
+    int           ports_enabled;    /* Should we enable trusted port connections at all? */
+    unsigned long allowed_ports[2]; /* {Min, Max} value of ports from which connections will be allowed */
+    int          network_enabled;   /* Should we enable trusted network connections at all? */
+    char  *allowed_network;         /* BMI address of the trusted network */
+    char  *allowed_network_mask;    /* BMI address of the trusted network mask */
+    void  *security;                /* BMI module specific information */
+#endif
     int  configuration_context;
     PINT_llist *host_aliases;       /* ptrs are type host_alias_s       */
     PINT_llist *file_systems;       /* ptrs are type
@@ -137,6 +146,21 @@ int PINT_parse_config(
 
 void PINT_config_release(
     struct server_configuration_s *config_s);
+
+#ifdef USE_TRUSTED
+
+int PINT_config_get_allowed_ports(
+    struct server_configuration_s *config,
+    int  *enabled,
+    unsigned long *allowed_ports);
+
+int PINT_config_get_allowed_network(
+    struct server_configuration_s *config,
+    int  *enabled,
+    char **allowed_network,
+    char **allowed_mask);
+
+#endif
 
 char *PINT_config_get_host_addr_ptr(
     struct server_configuration_s *config_s,

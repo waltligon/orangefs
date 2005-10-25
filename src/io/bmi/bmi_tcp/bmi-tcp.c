@@ -38,8 +38,10 @@
 #include "bmi-byteswap.h"
 #include "id-generator.h"
 #include "pint-event.h"
+#ifdef USE_TRUSTED
+#include "server-config.h"
+#endif
 #include "gen-locks.h"
-
 
 #define BMI_EVENT_START(__op, __id) \
  PINT_event_timestamp(PVFS_EVENT_API_BMI, __op, 0, __id, \
@@ -272,6 +274,13 @@ static int payload_progress(int s, void *const *buffer_list, const bmi_size_t*
     bmi_size_t* current_index_complete, enum bmi_op_type send_recv, 
     char* enc_hdr, bmi_size_t* env_amt_complete);
 
+#if defined(USE_TRUSTED) && defined(__PVFS2_CLIENT__)
+static int tcp_enable_trusted(struct tcp_addr *tcp_addr_data);
+#endif
+#if defined(USE_TRUSTED) && defined(__PVFS2_SERVER__)
+static int tcp_allow_trusted(struct sockaddr_in *peer_sockaddr);
+#endif
+
 /* exported method interface */
 struct bmi_method_ops bmi_tcp_ops = {
     BMI_tcp_method_name,
@@ -300,6 +309,10 @@ struct bmi_method_ops bmi_tcp_ops = {
 
 /* module parameters */
 static method_params_st tcp_method_params;
+
+#if defined(USE_TRUSTED) && defined(__PVFS2_SERVER__)
+static struct tcp_allowed_connection_s *gtcp_allowed_connection = NULL;
+#endif
 
 /* op_list_array indices */
 enum
@@ -653,6 +666,97 @@ int BMI_tcp_set_info(int option,
 	    ret = 0;
 	}
 	break;
+#ifdef USE_TRUSTED
+    case BMI_TRUSTED_CONNECTION:
+    {
+        struct tcp_allowed_connection_s *tcp_allowed_connection = NULL;
+        if (inout_parameter == NULL)
+        {
+            ret = -EINVAL;
+            break;
+        }
+        else 
+        {
+            char *bmi_network = NULL, *bmi_netmask = NULL;
+            struct server_configuration_s *svc_config = (struct server_configuration_s *) inout_parameter;
+            tcp_allowed_connection = 
+                (struct tcp_allowed_connection_s *) calloc(1, sizeof(struct tcp_allowed_connection_s));
+            if (tcp_allowed_connection == NULL)
+            {
+                ret = -ENOMEM;
+                break;
+            }
+#ifdef      __PVFS2_SERVER__
+            gtcp_allowed_connection = tcp_allowed_connection;
+#endif
+            /* Stash this in the server_configuration_s structure. freed later on */
+            svc_config->security = tcp_allowed_connection;
+            ret = 0;
+            /* Fill up the list of allowed ports */
+            PINT_config_get_allowed_ports(svc_config, 
+                    &tcp_allowed_connection->port_enforce, 
+                    tcp_allowed_connection->ports);
+
+            /* if it was enabled, make sure that we know how to deal with it */
+            if (tcp_allowed_connection->port_enforce == 1)
+            {
+                /* illegal ports */
+                if (tcp_allowed_connection->ports[0] > 65535 
+                        || tcp_allowed_connection->ports[1] > 65535
+                        || tcp_allowed_connection->ports[1] < tcp_allowed_connection->ports[0])
+                {
+                    gossip_lerr("Error: illegal trusted port values\n");
+                    ret = bmi_tcp_errno_to_pvfs(-EINVAL);
+                    /* don't enforce anything! */
+                    tcp_allowed_connection->port_enforce = 0;
+                }
+            }
+            ret = 0;
+            /* Retrieve the BMI network address and port */
+            PINT_config_get_allowed_network(svc_config,
+                    &tcp_allowed_connection->network_enforce,
+                    &bmi_network, &bmi_netmask);
+
+            /* if it was enabled, make sure that we know how to deal with it */
+            if (tcp_allowed_connection->network_enforce == 1)
+            {
+                char *tcp_string = NULL;
+                /* Convert the network string into an in_addr_t structure */
+                tcp_string = string_key("tcp", bmi_network);
+                if (!tcp_string)
+                {
+                    /* the string doesn't even have our info */
+                    gossip_lerr("Error: malformed tcp network address\n");
+                    ret = bmi_tcp_errno_to_pvfs(-EINVAL);
+                }
+                else {
+                    /* convert this into an in_addr_t */
+                    inet_aton(tcp_string, &tcp_allowed_connection->network);
+                    free(tcp_string);
+                    /* Do the same for the netmask as well */
+                    tcp_string = string_key("tcp", bmi_netmask);
+                    if (!tcp_string)
+                    {
+                        /* the string doesn't even have our info */
+                        gossip_lerr("Error: malformed tcp netmask\n");
+                        ret = bmi_tcp_errno_to_pvfs(-EINVAL);
+                    }
+                    else {
+                        /* convert this into an in_addr_t */
+                        inet_aton(tcp_string, &tcp_allowed_connection->netmask);
+                        free(tcp_string);
+                    }
+                }
+                /* don't enforce anything if there were any errors */
+                if (ret != 0)
+                {
+                    tcp_allowed_connection->network_enforce = 0;
+                }
+            }
+        }
+        break;
+    }
+#endif
     default:
 	gossip_ldebug(GOSSIP_BMI_DEBUG_TCP,
                       "TCP hint %d not implemented.\n", option);
@@ -675,6 +779,7 @@ int BMI_tcp_get_info(int option,
 {
     struct method_drop_addr_query* query;
     struct tcp_addr* tcp_addr_data;
+    int ret = 0;
 
     gen_mutex_lock(&interface_mutex);
 
@@ -682,8 +787,7 @@ int BMI_tcp_get_info(int option,
     {
     case BMI_CHECK_MAXSIZE:
 	*((int *) inout_parameter) = TCP_MODE_REND_LIMIT;
-	gen_mutex_unlock(&interface_mutex);
-	return(0);
+        ret = 0;
 	break;
     case BMI_DROP_ADDR_QUERY:
 	query = (struct method_drop_addr_query*)inout_parameter;
@@ -700,19 +804,17 @@ int BMI_tcp_get_info(int option,
 	{
 	    query->response = 0;
 	}
-	gen_mutex_unlock(&interface_mutex);
-	return(0);
+        ret = 0;
 	break;
     default:
 	gossip_ldebug(GOSSIP_BMI_DEBUG_TCP,
                       "TCP hint %d not implemented.\n", option);
-	gen_mutex_unlock(&interface_mutex);
-	return(0);
+        ret = -ENOSYS;
 	break;
     }
 
     gen_mutex_unlock(&interface_mutex);
-    return (bmi_tcp_errno_to_pvfs(-ENOSYS));
+    return (ret < 0) ? bmi_tcp_errno_to_pvfs(ret) : ret;
 }
 
 
@@ -1714,6 +1816,11 @@ static int tcp_sock_init(method_addr_p my_method_addr)
     {
 	fcntl(tcp_addr_data->socket, F_SETFL, oldfl | O_NONBLOCK);
     }
+
+#if defined(USE_TRUSTED) && defined(__PVFS2_CLIENT__)
+    /* make sure if we need to bind or not to some local port ranges */
+    tcp_enable_trusted(tcp_addr_data);
+#endif
 
     /* turn off Nagle's algorithm */
     if (BMI_sockio_set_tcpopt(tcp_addr_data->socket, TCP_NODELAY, 1) < 0)
@@ -2924,6 +3031,126 @@ static int tcp_do_work_error(method_addr_p map)
     return (0);
 }
 
+#if defined(USE_TRUSTED) && defined(__PVFS2_CLIENT__)
+/*
+ * tcp_enable_trusted()
+ * Ideally, this function should look up the security configuration of
+ * the server and determines
+ * if it needs to bind to any specific port locally or not..
+ * For now look at the FIXME below.
+ */
+static int tcp_enable_trusted(struct tcp_addr *tcp_addr_data)
+{
+    /*
+     * FIXME:
+     * For now, there is no way for us to check if a given
+     * server is actually using port protection or not.
+     * For now we unconditionally use a trusted port range
+     * as long as USE_TRUSTED is #defined.
+     *
+     * Although most of the time we expect users
+     * to be using a range of 0-1024, it is hard to keep probing
+     * until one gets a port in the range specified.
+     * Hence this is a temporary fix. we will see if this
+     * requirement even needs to be met at all.
+     */
+    static unsigned short my_requested_port = 1023;
+    unsigned short my_local_port = 0;
+    struct sockaddr_in my_local_sockaddr;
+    int len = sizeof(struct sockaddr_in);
+    memset(&my_local_sockaddr, 0, sizeof(struct sockaddr_in));
+
+    if (BMI_sockio_bind_sock(tcp_addr_data->socket, my_requested_port) < 0)
+    {
+        gossip_lerr("Could not bind to local port %hd: %s\n", 
+                my_requested_port, strerror(errno));
+    }
+    else {
+        my_requested_port--;
+    }
+    my_local_sockaddr.sin_family = AF_INET;
+    if (getsockname(tcp_addr_data->socket, 
+                (struct sockaddr *)&my_local_sockaddr, &len) == 0)
+    {
+        my_local_port = ntohs(my_local_sockaddr.sin_port);
+    }
+    gossip_debug(GOSSIP_BMI_DEBUG_TCP, "Bound locally to port: %hd\n", my_local_port);
+    /* setup for a fast restart to avoid bind addr in use errors */
+    if (BMI_sockio_set_sockopt(tcp_addr_data->socket, SO_REUSEADDR, 1) < 0)
+    {
+        gossip_lerr("Could not set SO_REUSEADDR on local socket (port %hd)\n", my_local_port);
+    }
+    return 0;
+}
+
+#endif
+
+#if defined(USE_TRUSTED) && defined(__PVFS2_SERVER__)
+
+static char *bad_errors[] = {
+    "invalid network address",
+    "invalid port",
+    "invalid network address and port"
+};
+
+/*
+ * tcp_allow_trusted()
+ * if trusted ports was enabled make sure
+ * that we can accept a particular connection from a given
+ * client
+ */
+static int tcp_allow_trusted(struct sockaddr_in *peer_sockaddr)
+{
+    char *peer_hostname = inet_ntoa(peer_sockaddr->sin_addr);
+    unsigned short peer_port = ntohs(peer_sockaddr->sin_port);
+    int   what_failed   = -1;
+
+    /* Don't refuse connects if there were any
+     * parse errors or if it is not enabled in the config file
+     */
+    if (gtcp_allowed_connection->port_enforce == 0
+            && gtcp_allowed_connection->network_enforce == 0)
+    {
+        return 0;
+    }
+    /* make sure that the client is within the allowed network */
+    if (gtcp_allowed_connection->network_enforce == 1)
+    {
+        /* Always allow localhost to connect */
+        if (ntohl(peer_sockaddr->sin_addr.s_addr) == INADDR_LOOPBACK)
+        {
+            goto port_check;
+        }
+        /* check the masks */
+        if ((peer_sockaddr->sin_addr.s_addr & gtcp_allowed_connection->netmask.s_addr)
+                != gtcp_allowed_connection->network.s_addr)
+        {
+            what_failed = 0;
+        }
+    }
+port_check:
+    /* make sure that the client port numbers are within specified limits */
+    if (gtcp_allowed_connection->port_enforce == 1)
+    {
+        if (peer_port < gtcp_allowed_connection->ports[0]
+                || peer_port > gtcp_allowed_connection->ports[1])
+        {
+            what_failed = (what_failed < 0) ? 1 : 2;
+        }
+    }
+    /* okay, we are good to go */
+    if (what_failed < 0)
+    {
+        return 0;
+    }
+    /* no good */
+    gossip_lerr("Rejecting client %s on port %d: %s\n",
+           peer_hostname, peer_port, bad_errors[what_failed]);
+    return -1;
+}
+
+#endif
+
 /* 
  * tcp_accept_init()
  * 
@@ -2976,6 +3203,25 @@ static int tcp_accept_init(int *socket, char** peer)
 	    return (bmi_tcp_errno_to_pvfs(-errno));
 	}
     }
+
+#if defined(USE_TRUSTED) && defined(__PVFS2_SERVER__)
+
+    /* make sure that we are allowed to accept this connection */
+    if (tcp_allow_trusted(&peer_sockaddr) < 0)
+    {
+        /* Force closure of the connection */
+        close(*socket);
+        errno = EACCES;
+        /* FIXME: 
+         * BIG KLUDGE
+         * if we return an error, pvfs2-server's bmi thread simply terminates. 
+         * hence I am returning 0 here. Need to ask Phil or RobR about this...
+         */
+        *socket = -1;
+        return 0;
+    }
+
+#endif
 
     /* we accepted a new connection.  turn off Nagle's algorithm. */
     if (BMI_sockio_set_tcpopt(*socket, TCP_NODELAY, 1) < 0)

@@ -9,6 +9,7 @@
 #include "dbpf.h"
 #include "dbpf-op-queue.h"
 #include "gossip.h"
+#include "dbpf-context.h"
 
 static gen_mutex_t dbpf_context_mutex = GEN_MUTEX_INITIALIZER;
 dbpf_op_queue_p dbpf_completion_queue_array[TROVE_MAX_CONTEXTS] = {NULL};

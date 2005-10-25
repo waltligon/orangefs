@@ -135,7 +135,7 @@ int pvfs2_mmap_ra_cache_get_block(
                              "offset %Lu, len %Lu\n",  Lu(offset),
                              Lu(len));
 
-                ptr = (void *)((char *)(cache_elem->data + offset));
+                ptr = (void *)(((char *)cache_elem->data + offset));
                 memcpy(dest, ptr, len);
 
                 if (amt_returned)
@@ -162,7 +162,7 @@ int pvfs2_mmap_ra_cache_get_block(
                         "bytes)\n", Lu(cache_elem->data_sz), Lu(offset),
                         Lu(len), actual_len);
 
-                    ptr = (void *)((char *)(cache_elem->data + offset));
+                    ptr = (void *)(((char *)cache_elem->data + offset));
                     memcpy(dest, ptr, actual_len);
 
                     if (amt_returned)

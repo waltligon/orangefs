@@ -45,7 +45,7 @@ typedef struct
 /* uncomment to enable ncache */
 /* #define ENABLE_NCACHE 1 */
 
-#if ENABLE_NCACHE
+#ifdef ENABLE_NCACHE
 static void ncache_remove_dentry(int item);
 static void ncache_rotate_dentry(int item);
 static int ncache_get_lru(void);
@@ -128,7 +128,7 @@ int PINT_ncache_lookup(
     PVFS_object_ref parent,
     PVFS_object_ref *entry)
 {
-#if ENABLE_NCACHE
+#ifdef ENABLE_NCACHE
     int ret = -PVFS_EINVAL, i = 0;
 
     if (!name || !entry)
@@ -202,7 +202,7 @@ int PINT_ncache_lookup(
  *
  * no return value
  */
-#if ENABLE_NCACHE
+#ifdef ENABLE_NCACHE
 static void ncache_rotate_dentry(int item)
 {
     int prev = 0, next = 0, new_bottom;
@@ -254,7 +254,7 @@ int PINT_ncache_insert(
     PVFS_object_ref entry,
     PVFS_object_ref parent)
 {
-#if ENABLE_NCACHE
+#ifdef ENABLE_NCACHE
     int i = 0, index = 0, ret = 0;
     unsigned char entry_found = 0;
         
@@ -314,7 +314,7 @@ int PINT_ncache_remove(
     PVFS_object_ref parent,
     int *item_found)
 {
-#if ENABLE_NCACHE
+#ifdef ENABLE_NCACHE
     int i = 0;
 
     if (!name)
@@ -365,7 +365,7 @@ int PINT_ncache_flush(void)
  */
 int PINT_ncache_initialize(void)
 {
-#if ENABLE_NCACHE
+#ifdef ENABLE_NCACHE
     int ret = 0, i = 0;
 
     if (cache == NULL)
@@ -404,7 +404,7 @@ int PINT_ncache_initialize(void)
  */
 int PINT_ncache_finalize(void)
 {
-#if ENABLE_NCACHE
+#ifdef ENABLE_NCACHE
 
     if (cache)
     {
@@ -435,7 +435,7 @@ void PINT_ncache_set_timeout(int max_timeout_ms)
  *
  * returns 0 on success, -PVFS_errno on failure
  */
-#if ENABLE_NCACHE
+#ifdef ENABLE_NCACHE
 static int ncache_add_dentry(
     char *name,
     int abs_resolved,

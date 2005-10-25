@@ -15,7 +15,7 @@
  *
  *    n           Address of a pointer to a node
  */
-void
+static void
 avlrotleft(struct avlnode **n)
 {
 	struct avlnode *tmp = *n;
@@ -32,7 +32,7 @@ avlrotleft(struct avlnode **n)
  *
  *    n           Address of a pointer to a node
  */
-void
+static void
 avlrotright(struct avlnode **n)
 {
 	struct avlnode *tmp = *n;	 
@@ -63,7 +63,7 @@ avlrotright(struct avlnode **n)
  *    BALANCE     The local tree was balanced, but has grown in height.
  *                Do not assume the entire tree is valid.
  */
-enum AVLRES
+static enum AVLRES
 avlleftgrown(struct avlnode **n)
 {
 	switch ((*n)->skew) {
@@ -109,7 +109,7 @@ avlleftgrown(struct avlnode **n)
  *
  *  See avlleftgrown for details.
  */
-enum AVLRES
+static enum AVLRES
 avlrightgrown(struct avlnode **n)
 {
 	switch ((*n)->skew) {
@@ -228,7 +228,7 @@ avlinsert(struct avlnode **n, AVLDATUM d)
  *
  *    BALANCE     Do not assume the entire tree is valid.
  */                
-enum AVLRES
+static enum AVLRES
 avlleftshrunk(struct avlnode **n)
 {
 	switch ((*n)->skew) {
@@ -281,7 +281,7 @@ avlleftshrunk(struct avlnode **n)
  *
  *  See avlleftshrunk for details.
  */
-enum AVLRES
+static enum AVLRES
 avlrightshrunk(struct avlnode **n)
 {
 	switch ((*n)->skew) {
@@ -350,7 +350,7 @@ avlrightshrunk(struct avlnode **n)
  *                the subtree provided was empty.
  *
  */
-int
+static int
 avlfindhighest(struct avlnode *target, struct avlnode **n, enum AVLRES *res)
 {
 	struct avlnode *tmp;
@@ -381,7 +381,7 @@ avlfindhighest(struct avlnode *target, struct avlnode **n, enum AVLRES *res)
  *
  *  See avlfindhighest for the details.
  */
-int
+static int
 avlfindlowest(struct avlnode *target, struct avlnode **n, enum AVLRES *res)
 {
 	struct avlnode *tmp;
