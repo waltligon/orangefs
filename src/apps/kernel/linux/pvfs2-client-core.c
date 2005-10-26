@@ -2066,7 +2066,7 @@ static inline PVFS_error handle_unexp_vfs_request(
     return ret;
 }
 
-PVFS_error process_vfs_requests(void)
+static PVFS_error process_vfs_requests(void)
 {
     PVFS_error ret = 0; 
     int op_count = 0, i = 0;

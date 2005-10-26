@@ -674,12 +674,12 @@ do {                                                         \
     if (ret == PVFS2_WAIT_TIMEOUT_REACHED)                   \
     {                                                        \
         ret = (etime ? etime : -EINVAL);                     \
-        pvfs2_print("OP timed out.  Returning %d\n", ret);   \
+        pvfs2_print("OP timed out.  Returning %d\n", (int)ret);   \
     }                                                        \
     else if (ret == PVFS2_WAIT_SIGNAL_RECVD)                 \
     {                                                        \
         ret = (esig ? esig : -EINTR);                        \
-        pvfs2_print("OP interrupted.  Returning %d\n", ret); \
+        pvfs2_print("OP interrupted.  Returning %d\n", (int)ret); \
     }                                                        \
 } while(0)
 
@@ -697,7 +697,7 @@ do {                                                         \
         if (ret == PVFS2_WAIT_TIMEOUT_REACHED)               \
         {                                                    \
             pvfs2_error("%s -- wait timed out (%x).  "       \
-                        "aborting attempt.\n", method, ret); \
+                        "aborting attempt.\n", method, (int)ret); \
         }                                                    \
         goto error_exit;                                     \
     }                                                        \
@@ -714,7 +714,7 @@ do {                                                         \
         if (ret == PVFS2_WAIT_TIMEOUT_REACHED)               \
         {                                                    \
             pvfs2_error("pvfs2_op_cancel: wait timed out  "  \
-                        "(%x). aborting attempt.\n", ret);   \
+                        "(%x). aborting attempt.\n", (int)ret);   \
         }                                                    \
         goto error_exit;                                     \
     }                                                        \
@@ -732,7 +732,7 @@ do {                                                         \
         if (ret == PVFS2_WAIT_TIMEOUT_REACHED)               \
         {                                                    \
             pvfs2_error("%s -- wait timed out (%x).  "       \
-                        "aborting attempt.\n", method,ret);  \
+                        "aborting attempt.\n", method,(int)ret);  \
         }                                                    \
         goto error_exit;                                     \
     }                                                        \
@@ -763,7 +763,7 @@ do {                                                               \
             if (ret == PVFS2_WAIT_TIMEOUT_REACHED)                 \
             {                                                      \
                 pvfs2_error("%s -- wait timed out (%x).  aborting "\
-                            "retry attempts.\n", method, ret);     \
+                            "retry attempts.\n", method, (int) ret);     \
             }                                                      \
             goto error_exit;                                       \
          }                                                         \
@@ -807,7 +807,7 @@ do {                                                                \
             if (ret == PVFS2_WAIT_TIMEOUT_REACHED)                  \
             {                                                       \
                 pvfs2_error("%s -- wait timed out (%x). aborting "  \
-                            " retry attempts.\n", meth, ret);       \
+                            " retry attempts.\n", meth, (int)ret);       \
             }                                                       \
             e = 1;                                                  \
             goto error_exit;                                        \

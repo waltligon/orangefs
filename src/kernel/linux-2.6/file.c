@@ -629,7 +629,7 @@ static ssize_t pvfs2_file_readv(
         to_free = 0;
     }
     ptr = iovecptr;
-    pvfs2_print("pvfs2_file_readv reading %d@%Lu\n", count, *offset);
+    pvfs2_print("pvfs2_file_readv reading %d@%Lu\n", (int) count, Ld(*offset));
     pvfs2_print("pvfs2_file_readv: new_nr_segs: %lu, seg_count: %u\n", 
             new_nr_segs, seg_count);
     for (seg = 0; seg < new_nr_segs; seg++)
@@ -637,7 +637,7 @@ static ssize_t pvfs2_file_readv(
         pvfs2_print("pvfs2_file_readv: %d) %p to %p [%d bytes]\n", 
                 seg + 1, iovecptr[seg].iov_base, 
                 iovecptr[seg].iov_base + iovecptr[seg].iov_len, 
-                iovecptr[seg].iov_len);
+                (int) iovecptr[seg].iov_len);
     }
     for (seg = 0; seg < seg_count; seg++)
     {
@@ -729,7 +729,7 @@ static ssize_t pvfs2_file_readv(
               return ret;
         }
         pvfs2_print("pvfs2_file_readv nr_segs %u, offset: %Lu each_count:%d\n",
-                seg_array[seg], *offset, each_count);
+                (int) seg_array[seg], *offset, (int) each_count);
         /*
          * copy data to application by pushing it out to the iovec.
          * Number of segments to copy so that we don't
@@ -884,7 +884,7 @@ static ssize_t pvfs2_file_writev(
         to_free = 0;
     }
     ptr = iovecptr;
-    pvfs2_print("pvfs2_file_writev writing %d@%Lu\n", count, *offset);
+    pvfs2_print("pvfs2_file_writev writing %d@%Lu\n", (int) count, *offset);
     pvfs2_print("pvfs2_file_writev: new_nr_segs: %lu, seg_count: %u\n", 
             new_nr_segs, seg_count);
     for (seg = 0; seg < new_nr_segs; seg++)
@@ -892,7 +892,7 @@ static ssize_t pvfs2_file_writev(
         pvfs2_print("pvfs2_file_writev: %d) %p to %p [%d bytes]\n", 
                 seg + 1, iovecptr[seg].iov_base, 
                 iovecptr[seg].iov_base + iovecptr[seg].iov_len, 
-                iovecptr[seg].iov_len);
+                (int) iovecptr[seg].iov_len);
     }
     for (seg = 0; seg < seg_count; seg++)
     {
@@ -939,7 +939,7 @@ static ssize_t pvfs2_file_writev(
         new_op->upcall.req.io.count = each_count;
         new_op->upcall.req.io.offset = *offset;
         pvfs2_print("pvfs2_file_writev nr_segs %u, offset: %Lu each_count: %d\n",
-                seg_array[seg], *offset, each_count);
+                seg_array[seg], *offset, (int) each_count);
 
         /* 
          * copy data from application by pulling it out  of the iovec.
@@ -1133,7 +1133,7 @@ static ssize_t pvfs2_aio_retry(struct kiocb *iocb)
         spin_unlock(&op->lock);
         pvfs2_print("pvfs2_aio_retry: buffer %p,"
                 " size %d return %d bytes\n",
-                    x->buffer, x->bytes_to_be_copied, error);
+                    x->buffer, (int) x->bytes_to_be_copied, (int) error);
         if ((x->rw == PVFS_IO_WRITE) && error > 0)
         {
             struct inode *inode = iocb->ki_filp->f_mapping->host;
@@ -1430,7 +1430,7 @@ pvfs2_file_aio_read(struct kiocb *iocb, char __user *buffer,
     {
         pvfs2_error("aio_read: cannot transfer (%d) bytes"
                 " (larger than block size %d)\n",
-                count, pvfs_bufmap_size_query());
+                (int) count, pvfs_bufmap_size_query());
         return -EINVAL;
     }
     filp = iocb->ki_filp;
@@ -1472,7 +1472,7 @@ pvfs2_file_aio_read(struct kiocb *iocb, char __user *buffer,
             if (error < 0)
             {
                 pvfs2_error("pvfs2_file_aio_read: pvfs_bufmap_get() "
-                        " failure %d\n", ret);
+                        " failure %d\n", (int) ret);
                 /* drop ref count and possibly de-allocate */
                 put_op(new_op);
                 goto out_error;
@@ -1535,7 +1535,7 @@ pvfs2_file_aio_read(struct kiocb *iocb, char __user *buffer,
                     if ((error_exit != 0) && (ret == -EINTR))
                     {
                         pvfs2_print("pvfs2_file_aio_read: returning error %d " 
-                                "(error_exit=%d)\n", ret, error_exit);
+                                "(error_exit=%d)\n", (int) ret, error_exit);
                     }
                     else
                     {
@@ -1545,7 +1545,7 @@ pvfs2_file_aio_read(struct kiocb *iocb, char __user *buffer,
                             "\n  -- downcall status is %d, returning %d "
                             "(error_exit=%d)\n",
                             Lu(pvfs2_ino_to_handle(inode->i_ino)),
-                            dc_status, ret, error_exit);
+                            dc_status, (int) ret, error_exit);
                     }
                     error = ret;
                     goto out_error;
@@ -1559,7 +1559,7 @@ pvfs2_file_aio_read(struct kiocb *iocb, char __user *buffer,
                 }
                 if (ret)
                 {
-                    pvfs2_print("Failed to copy user buffer %d\n", ret);
+                    pvfs2_print("Failed to copy user buffer %d\n", (int) ret);
                     new_op->downcall.status = -PVFS_EFAULT;
                     /* error is set in the goto target */
                     goto error_exit;
@@ -1600,7 +1600,7 @@ pvfs2_file_aio_read(struct kiocb *iocb, char __user *buffer,
                 service_async_vfs_op(new_op);
                 pvfs2_print("pvfs2_file_aio_read: queued "
                         " read operation [%ld for %d]\n",
-                            (unsigned long) offset, count);
+                            (unsigned long) offset, (int) count);
                 error = -EIOCBQUEUED;
                 /*
                  * All cleanups done upon completion
@@ -1686,7 +1686,7 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
     {
         pvfs2_error("aio_write: cannot transfer (%d) bytes"
                 " (larger than block size %d)\n",
-                count, pvfs_bufmap_size_query());
+                (int) count, pvfs_bufmap_size_query());
         return -EINVAL;
     }
     error = -EINVAL;
@@ -1725,7 +1725,7 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
             if (error < 0)
             {
                 pvfs2_error("pvfs2_file_aio_write: pvfs_bufmap_get()"
-                        " failure %d\n", ret);
+                        " failure %d\n", (int) ret);
                 /* drop ref count and possibly de-allocate */
                 put_op(new_op);
                 goto out_error;
@@ -1746,7 +1746,7 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
                     buffer_index, current_buf, count);
             if (error < 0)
             {
-                pvfs2_print("Failed to copy user buffer %d\n", ret);
+                pvfs2_print("Failed to copy user buffer %d\n", (int) ret);
                 /* drop the buffer index */
                 pvfs_bufmap_put(buffer_index);
                 pvfs2_print("pvfs2_file_aio_read: pvfs_bufmap_put %d\n",
@@ -1809,7 +1809,7 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
                     if ((error_exit != 0) && (ret == -EINTR))
                     {
                         pvfs2_print("pvfs2_file_aio_write: returning error %d " 
-                                "(error_exit=%d)\n", ret, error_exit);
+                                "(error_exit=%d)\n", (int) ret, error_exit);
                     }
                     else
                     {
@@ -1823,7 +1823,7 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
                             (filp && filp->f_dentry 
                              && filp->f_dentry->d_name.name ?
                              (char *)filp->f_dentry->d_name.name : "UNKNOWN"),
-                            dc_status, ret, error_exit);
+                            dc_status, (int) ret, error_exit);
                     }
                     error = ret;
                     goto out_error;
@@ -1832,7 +1832,7 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
                 wake_up_device_for_return(new_op);
                 pvfs_bufmap_put(buffer_index);
                 pvfs2_print("pvfs2_file_aio_read: pvfs_bufmap_put %d\n",
-                        buffer_index);
+                        (int) buffer_index);
                 if (error > 0)
                 {
                     update_atime(inode);
@@ -1868,7 +1868,7 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
                 service_async_vfs_op(new_op);
                 pvfs2_print("pvfs2_file_aio_write: queued "
                         " write operation [%ld for %d]\n",
-                            (unsigned long) offset, count);
+                            (unsigned long) offset, (int) count);
                 error = -EIOCBQUEUED;
                 /*
                  * All cleanups done upon completion

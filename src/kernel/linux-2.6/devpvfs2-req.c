@@ -387,7 +387,7 @@ static ssize_t pvfs2_devreq_writev(
                     {
                         pvfs2_print("WARNING: pvfs2_iocb from op"
                                 "has invalid fields! %p, %p(%p), %d\n",
-                                x->buffer, x->op, op, x->bytes_to_be_copied);
+                                x->buffer, x->op, op, (int) x->bytes_to_be_copied);
                     }
                     else
                     {

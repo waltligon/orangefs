@@ -6,6 +6,7 @@
 #include "state.h"
 #include "flags.h"
 #include "cache.h"
+#include "ncac-lru.h"
 
 
 /* add an extent into a lru cache list. The caller should hold the lock 

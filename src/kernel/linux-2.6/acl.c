@@ -59,7 +59,7 @@ pvfs2_acl_decode(const void *value, size_t size)
     if (size < 0 || (size  % sizeof(pvfs2_acl_entry)) != 0)
     {
         pvfs2_error("pvfs2_acl_decode: Invalid value of size %d [should be a multiple of %d]\n",
-                size, sizeof(pvfs2_acl_entry));
+                (int) size, (int) sizeof(pvfs2_acl_entry));
         return ERR_PTR(-EINVAL);
     }
     count = size / sizeof(pvfs2_acl_entry);
@@ -129,7 +129,7 @@ pvfs2_acl_encode(const struct posix_acl *acl, size_t *size)
     if (!e) 
     {
         pvfs2_error("pvfs2_acl_encode: Could not allocate %d bytes for acl encode\n", 
-                *size);
+                (int) *size);
         return ERR_PTR(-ENOMEM);
     }
     ptr = e;
@@ -536,39 +536,67 @@ int pvfs2_permission(struct inode *inode, int mask, struct nameidata *nd)
 #ifdef HAVE_GENERIC_PERMISSION
     return generic_permission(inode, mask, pvfs2_check_acl);
 #else
-    /* We sort of duplicate the code below from generic_permission */
+    /* We sort of duplicate the code below from generic_permission. */
     int mode = inode->i_mode;
     int error;
+
+    pvfs2_print("pvfs2_permission: mask = %x mode = %x current->fsuid = %x, inode->i_uid = %x\n",
+            mask, mode, current->fsuid, inode->i_uid);
+
     /* No write access on a rdonly FS */
     if ((mask & MAY_WRITE) && IS_RDONLY(inode) &&
             (S_ISREG(mode) || S_ISDIR(mode) || S_ISLNK(mode)))
+    {
+        pvfs2_print("pvfs2_permission: cannot write to a read-only-file-system!\n");
         return -EROFS;
+    }
     /* No write access to any immutable files */
-    if ((mask & MAY_WRITE) && IS_IMMUTABLE(inode))
+    if ((mask & MAY_WRITE) && IS_IMMUTABLE(inode)) 
+    {
+        pvfs2_error("pvfs2_permission: cannot write to an immutable file!\n");
         return -EACCES;
-    if (current->fsuid == inode->i_uid) {
+    }
+    /* Do permission checks only for lookups and opens */
+    if (!nd || !(nd->flags & (LOOKUP_OPEN | LOOKUP_ACCESS)))
+    {
+        return 0;
+    }
+    if (current->fsuid == inode->i_uid) 
+    {
         mode >>= 6;
     }
-    else if (get_acl_flag(inode) == 1) {
-        /*
-         * Access ACL won't work if we don't have group permission bits
-         * set on the file!
-         */
-        if (((mode >> 3) & mask & S_IRWXO) != mask)
-            goto check_groups;
-        error = pvfs2_check_acl(inode, mask);
-        /* ACL disallows access */
-        if (error == -EACCES)
-            goto check_capabilities;
-        /* No ACLs present? */
-        else if (error == -EAGAIN)
-            goto check_groups;
-        /* Any other error */
-        return error;
-    }
+    else 
+    {
+        if (get_acl_flag(inode) == 1) 
+        {
+            /*
+             * Access ACL won't work if we don't have group permission bits
+             * set on the file!
+             */
+            if (((mode >> 3) & mask & S_IRWXO) != mask)
+            {
+                goto check_groups;
+            }
+            error = pvfs2_check_acl(inode, mask);
+            /* ACL disallows access */
+            if (error == -EACCES) 
+            {
+                pvfs2_print("pvfs2_permission: acl disallowing access to file\n");
+                goto check_capabilities;
+            }
+            /* No ACLs present? */
+            else if (error == -EAGAIN) 
+            {
+                goto check_groups;
+            }
+            /* Any other error */
+            return error;
+        }
 check_groups:
-    if (in_group_p(inode->i_gid))
-        mode >>= 3;
+        if (in_group_p(inode->i_gid))
+            mode >>= 3;
+    }
+    pvfs2_print("pvfs2_permission: mode & mask & S_IRWXO = %d, mask = %d\n", mode & mask & S_IRWXO, mask);
     if ((mode & mask & S_IRWXO) == mask)
         return 0;
 check_capabilities:
@@ -584,6 +612,7 @@ check_capabilities:
     {
         return 0;
     }
+    pvfs2_print("pvfs2_permission: disallowing access\n");
     return -EACCES;
 #endif
 }

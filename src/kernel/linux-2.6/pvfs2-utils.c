@@ -489,7 +489,7 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char *name,
     if (size < 0 || strlen(name) >= PVFS_MAX_XATTR_NAMELEN)
     {
         pvfs2_error("Invalid size (%d) or key length (%d)\n", 
-                size, strlen(name));
+                (int) size, (int) strlen(name));
         return -EINVAL;
     }
     if (inode)
@@ -516,7 +516,7 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char *name,
         new_op->upcall.req.getxattr.key_sz = 
             strlen(new_op->upcall.req.getxattr.key) + 1;
         pvfs2_print("pvfs2_inode_getxattr: key %s, key_sz %d\n", 
-                name, new_op->upcall.req.getxattr.key_sz);
+                name, (int) new_op->upcall.req.getxattr.key_sz);
 
         service_error_exit_op_with_timeout_retry(
             new_op, "pvfs2_inode_getxattr", retries, error_exit,
@@ -553,7 +553,7 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char *name,
                             length - 1);
                     ret = length - 1;
                     pvfs2_print("pvfs2_getxattr: key: %s, val_length: %d\n",
-                            name, ret);
+                            name, (int) ret);
                 }
             }
         }
@@ -561,7 +561,7 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char *name,
         {
             ret = -ENODATA; /* if no such keys exists we set this to be errno */
         }
-        pvfs2_print("pvfs2_inode_getxattr: returning %d\n", ret);
+        pvfs2_print("pvfs2_inode_getxattr: returning %d\n", (int) ret);
 
         /* when request is serviced properly, free req op struct */
         op_release(new_op);
@@ -585,7 +585,7 @@ int pvfs2_inode_setxattr(struct inode *inode, const char *name,
     if (size < 0 || size >= PVFS_MAX_XATTR_VALUELEN || flags < 0)
     {
         pvfs2_error("pvfs2_inode_setxattr: bogus values of size(%d), flags(%d)\n", 
-                size, flags);
+                (int) size, flags);
         return -EINVAL;
     }
     if (name == NULL || (size > 0 && value == NULL))
@@ -596,7 +596,7 @@ int pvfs2_inode_setxattr(struct inode *inode, const char *name,
     if (strlen(name) >= PVFS_MAX_XATTR_NAMELEN)
     {
         pvfs2_error("pvfs2_inode_setxattr: bogus key size (%d)\n", 
-                strlen(name));
+                (int) strlen(name));
         return -EINVAL;
     }
     /* This is equivalent to a removexattr */
@@ -663,7 +663,7 @@ int pvfs2_inode_removexattr(struct inode *inode, const char *name)
     if (strlen(name) >= PVFS_MAX_XATTR_NAMELEN)
     {
         pvfs2_error("pvfs2_inode_removexattr: Invalid key length(%d)\n", 
-                strlen(name));
+                (int) strlen(name));
         return -EINVAL;
     }
     if (inode)

@@ -815,6 +815,7 @@ DOTCONF_CB(exit_defaults_context)
     return NULL;
 }
 
+#ifdef USE_TRUSTED
 DOTCONF_CB(enter_security_context)
 {
     struct server_configuration_s *config_s = 
@@ -830,6 +831,7 @@ DOTCONF_CB(exit_security_context)
     config_s->configuration_context = CTX_GLOBAL;
     return NULL;
 }
+#endif
 
 DOTCONF_CB(enter_aliases_context)
 {
