@@ -825,9 +825,14 @@ int BMI_gm_memfree(void *buffer,
 int BMI_gm_set_info(int option,
 		    void *inout_parameter)
 {
+#ifndef USE_TRUSTED
+    return (bmi_gm_errno_to_pvfs(-ENOSYS));
+#else
+
     if (option == BMI_TRUSTED_CONNECTION)
         return 0;
     return (bmi_gm_errno_to_pvfs(-ENOSYS));
+#endif
 }
 
 /* BMI_gm_get_info()
