@@ -1309,7 +1309,7 @@ endecode_fields_4a_struct(
     uint32_t, nkey,
     PVFS_size, keysz);
 #define extra_size_PVFS_servreq_listeattr \
-    (PVFS_REQ_LIMIT_KEYVAL_LIST * roundup8(sizeof(PVFS_size)))
+    (PVFS_REQ_LIMIT_KEYVAL_LIST * sizeof(PVFS_size))
 
 #define PINT_SERVREQ_LISTEATTR_FILL(__req,            \
                                   __creds,            \
@@ -1335,10 +1335,9 @@ struct PVFS_servresp_listeattr
     uint32_t nkey;   /* # of keys retrieved */
     PVFS_ds_keyval *key; /* array of keys returned */
 };
-endecode_fields_2a_struct(
+endecode_fields_1a_struct(
     PVFS_servresp_listeattr,
     PVFS_ds_position, token,
-    skip4,,
     uint32_t, nkey,
     PVFS_ds_keyval, key)
 #define extra_size_PVFS_servresp_listeattr \
