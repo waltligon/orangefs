@@ -334,7 +334,6 @@ static int mkdir_msg_setup_msgpair(PINT_client_sm *sm_p,
     PVFS_handle_extent_array meta_handle_extent_array;
     PINT_sm_msgpair_state *msg_p = NULL;
     struct server_configuration_s *server_config = NULL;
-    PVFS_time orig_mtime = sm_p->u.mkdir.sys_attr.mtime;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "mkdir state: mkdir_msg_setup_msgpair\n");
@@ -360,14 +359,6 @@ static int mkdir_msg_setup_msgpair(PINT_client_sm *sm_p,
         js_p->error_code = ret;
         return 1;
     }
-
-    /* encode the mtime as a directory version */
-    sm_p->u.mkdir.sys_attr.mtime =
-        PVFS_util_mktime_version(sm_p->u.mkdir.sys_attr.mtime);
-
-    gossip_debug(
-        GOSSIP_CLIENT_DEBUG, "using mtime %Lu and version %Lu\n",
-        Lu(orig_mtime), Lu(sm_p->u.mkdir.sys_attr.mtime));
 
     PINT_SERVREQ_MKDIR_FILL(
         msg_p->req,

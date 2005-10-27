@@ -10,6 +10,7 @@
 #include "server-config.h"
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
+#include "pvfs2-util.h"
 
 enum
 {
@@ -275,6 +276,19 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s *js_p)
         gossip_debug(GOSSIP_SETATTR_DEBUG, " writing count of %d to "
                      "disk\n", dspace_a_p->u.meta.dfile_count);
     }
+    /* 
+     * Remember that mtime is versioned on disk! so convert it here..
+     * It is better to do it here than change the PVFS_object_attr_overwrite_setable
+     * macro, since there are many more users of it, I think.
+     */
+     if (a_p->mask & PVFS_ATTR_COMMON_MTIME)
+     {
+         PVFS_time orig_mtime = a_p->mtime;
+         a_p->mtime = PVFS_util_mktime_version(orig_mtime);
+         gossip_debug(GOSSIP_SETATTR_DEBUG, "setting version "
+                 "to %Lu\n\tmtime is %Lu\n",
+                 Lu(a_p->mtime), Lu(orig_mtime));
+     }
 
     /*
       we have the attribs stored in the dspace, as well as the
@@ -291,7 +305,7 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s *js_p)
         "ctime = %Lu | dfile_count = %d | dist_size = %d]\n",
         dspace_a_p->owner, dspace_a_p->group, dspace_a_p->perms,
         dspace_a_p->objtype, Lu(dspace_a_p->atime),
-        Lu(dspace_a_p->mtime), Lu(dspace_a_p->ctime),
+        Lu(PVFS_util_mkversion_time(dspace_a_p->mtime)), Lu(dspace_a_p->ctime),
         (int)dspace_a_p->u.meta.dfile_count,
         (int)dspace_a_p->u.meta.dist_size);
 

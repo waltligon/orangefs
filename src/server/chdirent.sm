@@ -11,6 +11,7 @@
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
 #include "gossip.h"
+#include "pvfs2-util.h"
 
 enum
 {
@@ -312,7 +313,18 @@ static int chdirent_update_directory_attr(
     }
     if (s_op->req->u.chdirent.parent_mtime)
     {
-        tmp_attr_ptr->mtime = s_op->req->u.chdirent.parent_mtime;
+        /*
+         * directory mtime is always stored as a version, but converted
+         * to a normal mtime on a getattr;
+         */
+        gossip_debug(
+            GOSSIP_SERVER_DEBUG, "updating parent dir version "
+            "to %Lu\n\tmtime is %Lu\n",
+            Lu(PVFS_util_mktime_version(s_op->req->u.chdirent.parent_mtime)),
+            Lu(s_op->req->u.chdirent.parent_mtime));
+
+        tmp_attr_ptr->mtime = PVFS_util_mktime_version(
+                    s_op->req->u.chdirent.parent_mtime);
     }
     if (s_op->req->u.chdirent.parent_ctime)
     {

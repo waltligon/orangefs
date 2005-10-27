@@ -207,7 +207,6 @@ static int setattr_msg_setup_msgpair(PINT_client_sm *sm_p,
 {
     int ret = -PVFS_EINVAL;
     PINT_sm_msgpair_state *msg_p = NULL;
-    PVFS_time orig_mtime = sm_p->u.setattr.sys_attr.mtime;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "setattr state: "
                  "setattr_msg_setup_msgpair\n");
@@ -217,14 +216,6 @@ static int setattr_msg_setup_msgpair(PINT_client_sm *sm_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG," setattr: posting setattr req\n");
 
     PINT_init_msgpair(sm_p, msg_p);
-
-    /* encode the mtime as a directory version */
-    sm_p->u.setattr.sys_attr.mtime =
-        PVFS_util_mktime_version(sm_p->u.setattr.sys_attr.mtime);
-
-    gossip_debug(
-        GOSSIP_CLIENT_DEBUG, "using mtime %Lu and version %Lu\n",
-        Lu(orig_mtime), Lu(sm_p->u.setattr.sys_attr.mtime));
 
     PINT_SERVREQ_SETATTR_FILL(
         msg_p->req,

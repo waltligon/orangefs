@@ -541,11 +541,11 @@ static int crdirent_update_directory_attr(
         gossip_debug(
             GOSSIP_SERVER_DEBUG, "updating parent dir version "
             "to %Lu\n\tmtime is %Lu\n",
-            Lu(s_op->req->u.crdirent.parent_mtime),
-            Lu(PVFS_util_mkversion_time(
-                   s_op->req->u.crdirent.parent_mtime)));
+            Lu(PVFS_util_mktime_version(s_op->req->u.crdirent.parent_mtime)),
+            Lu(s_op->req->u.crdirent.parent_mtime));
 
-        tmp_attr_ptr->mtime = s_op->req->u.crdirent.parent_mtime;
+        tmp_attr_ptr->mtime = PVFS_util_mktime_version(
+                    s_op->req->u.crdirent.parent_mtime);
     }
 
     if (s_op->req->u.crdirent.parent_ctime)
