@@ -493,6 +493,7 @@ struct inode_operations pvfs2_dir_inode_operations =
     getxattr: pvfs2_getxattr,
     setxattr: pvfs2_setxattr,
     removexattr: pvfs2_removexattr,
+    listxattr: pvfs2_listxattr,
 #endif
 #else
     .create = pvfs2_create,
@@ -515,6 +516,7 @@ struct inode_operations pvfs2_dir_inode_operations =
     .getxattr = pvfs2_getxattr,
     .removexattr = pvfs2_removexattr,
 #endif
+    .listxattr = pvfs2_listxattr,
 #ifdef HAVE_GENERIC_GETXATTR
     .permission = pvfs2_permission,
 #endif

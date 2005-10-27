@@ -25,7 +25,7 @@
 /* update PVFS2_PROTO_MINOR on wire protocol changes that preserve backwards
  * compatibility (such as adding a new request type)
  */
-#define PVFS2_PROTO_MINOR 1
+#define PVFS2_PROTO_MINOR 2
 #define PVFS2_PROTO_VERSION ((PVFS2_PROTO_MAJOR*1000)+(PVFS2_PROTO_MINOR))
 
 enum PVFS_server_op
@@ -61,12 +61,13 @@ enum PVFS_server_op
     PVFS_SERV_PROTO_ERROR = 28,
     PVFS_SERV_GETEATTR = 29,
     PVFS_SERV_SETEATTR = 30,
-    PVFS_SERV_DELEATTR = 31
+    PVFS_SERV_DELEATTR = 31,
+    PVFS_SERV_LISTEATTR = 32,
     /* IMPORTANT: please remember to modify PVFS_MAX_SERVER_OP define
      * (below) if you add a new operation to this list
      */
 };
-#define PVFS_MAX_SERVER_OP 31
+#define PVFS_MAX_SERVER_OP 32
 
 /*
  * These ops must always work, even if the server is in admin mode.
@@ -129,7 +130,7 @@ typedef struct
 #define PVFS_REQ_LIMIT_KEY_LEN 128
 /* max number of bytes in a value of a key/value/pair */
 #define PVFS_REQ_LIMIT_VAL_LEN 4096
-/* man number of key/value pairs to set or get in a list operation */
+/* max number of key/value pairs to set or get in a list operation */
 #define PVFS_REQ_LIMIT_KEYVAL_LIST 32
 
 /* create *********************************************************/
@@ -1288,6 +1289,62 @@ do {                                       \
     (__req).u.deleattr.key.buffer = (__key).buffer;\
 } while (0)
 
+/* listeattr **************************************************/
+/* - list extended attributes */
+
+struct PVFS_servreq_listeattr
+{
+    PVFS_handle handle;     /* handle of dir object */
+    PVFS_fs_id  fs_id;      /* file system */
+    PVFS_ds_position token; /* offset */
+    uint32_t     nkey;      /* desired number of keys to read */
+    PVFS_size   *keysz;     /* array of key buffer sizes */
+};
+endecode_fields_4a_struct(
+    PVFS_servreq_listeattr,
+    PVFS_handle, handle,
+    PVFS_fs_id, fs_id,
+    PVFS_ds_position, token,
+    skip4,,
+    uint32_t, nkey,
+    PVFS_size, keysz);
+#define extra_size_PVFS_servreq_listeattr \
+    (PVFS_REQ_LIMIT_KEYVAL_LIST * roundup8(sizeof(PVFS_size)))
+
+#define PINT_SERVREQ_LISTEATTR_FILL(__req,            \
+                                  __creds,            \
+                                  __fsid,             \
+                                  __handle,           \
+                                  __token,            \
+                                  __nkey,             \
+                                  __size_array)       \
+do {                                                  \
+    memset(&(__req), 0, sizeof(__req));               \
+    (__req).op = PVFS_SERV_LISTEATTR;                 \
+    (__req).credentials = (__creds);                  \
+    (__req).u.listeattr.fs_id = (__fsid);             \
+    (__req).u.listeattr.handle = (__handle);          \
+    (__req).u.listeattr.token = (__token);            \
+    (__req).u.listeattr.nkey = (__nkey);              \
+    (__req).u.listeattr.keysz = (__size_array);       \
+} while (0);
+
+struct PVFS_servresp_listeattr
+{
+    PVFS_ds_position token;  /* new dir offset */
+    uint32_t nkey;   /* # of keys retrieved */
+    PVFS_ds_keyval *key; /* array of keys returned */
+};
+endecode_fields_2a_struct(
+    PVFS_servresp_listeattr,
+    PVFS_ds_position, token,
+    skip4,,
+    uint32_t, nkey,
+    PVFS_ds_keyval, key)
+#define extra_size_PVFS_servresp_listeattr \
+    (PVFS_REQ_LIMIT_KEY_LEN * PVFS_REQ_LIMIT_KEYVAL_LIST)
+
+
 /* server request *********************************************/
 /* - generic request with union of all op specific structs */
 
@@ -1322,6 +1379,7 @@ struct PVFS_server_req
         struct PVFS_servreq_geteattr geteattr;
         struct PVFS_servreq_seteattr seteattr;
         struct PVFS_servreq_deleattr deleattr;
+        struct PVFS_servreq_listeattr listeattr;
     } u;
 };
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
@@ -1366,6 +1424,7 @@ struct PVFS_server_resp
         struct PVFS_servresp_mgmt_event_mon mgmt_event_mon;
         struct PVFS_servresp_mgmt_get_dirdata_handle mgmt_get_dirdata_handle;
         struct PVFS_servresp_geteattr geteattr;
+        struct PVFS_servresp_listeattr listeattr;
     } u;
 };
 endecode_fields_2_struct(

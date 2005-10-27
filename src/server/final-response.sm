@@ -209,6 +209,7 @@ static __req_resp_type_desc_t s_req_resp_type_map[
     { PVFS_SERV_GETEATTR, "PVFS_SERV_GETEATTR" },
     { PVFS_SERV_SETEATTR, "PVFS_SERV_SETEATTR" },
     { PVFS_SERV_DELEATTR, "PVFS_SERV_DELEATTR" },
+    { PVFS_SERV_LISTEATTR, "PVFS_SERV_LISTEATTR" }
 };
 
 static void PINT_gossip_err_server_resp(

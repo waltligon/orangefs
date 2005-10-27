@@ -539,6 +539,55 @@ need to install the -smp versions of both -- i.e. \texttt{kernel-smp} and
 /lib/modules/`uname -r`/build will once again contain a correctly configured
 kernel source tree.
 
+\subsection{What are extended attributes? How do I use them with PVFS2?}
+Extended attributes are name:value pairs associated with objects (files and directories
+in the case of PVFS2). They are extensions to the
+normal attributes which are associated with all objects in the system (i.e. the stat data).
+A complete overview of the extended attributes concepts can be found in man pages section 5 for attr.
+On supported 2.4 kernels and all 2.6 kernels, PVFS2 allows users to store extended attributes
+on file-system objects through the VFS as well as through the system interface. Example
+usage scenarios are shown below,
+To set an extended attribute ("key1", "val1") on a PVFS2 file foo,
+\begin{verbatim}
+prompt# setfattr -n key1 -v val1 /path/to/mounted/pvfs2/foo
+\end{verbatim}
+To retrieve an extended attribute for a given key ("key1") on a PVFS2 file foo,
+\begin{verbatim}
+prompt# getfattr -n key1 /path/to/mounted/pvfs2/foo
+\end{verbatim}
+To retrieve all attributes of a given PVFS2 file foo,
+\begin{verbatim}
+prompt# getfattr -m "" /path/to/mounted/pvfs2/foo
+\end{verbatim}
+Note that PVFS2 uses a few standard names for its internal use that prohibit users
+from reusing the same names. A list of such keys are as follows at the time
+of writing of this document ("dir\_ent", "root\_handle",
+"datafile\_handles", "metafile\_dist", "symlink\_target"}. Further, Linux also uses
+a set of reserved keys to hold extended attributes that begin with the prefix "system.",
+thus making them unavailable for regular usage.
+
+\subsection{What are Access Control Lists? How do I enable Access Control Lists on PVFS2?}
+Recent versions of PVFS2 support POSIX Access Control Lists (ACL), which are used to define fine-grained 
+discretionary access rights for files and directories. Every object can be thought of as having 
+associated with it an ACL that governs the discretionary access to that object; this ACL
+is referred to as an access ACL. In addition, a directory may have an associated ACL that 
+governs the initial access ACL for objects created within that directory; this ACL 
+is referred to as a default ACL. Each ACL consists of a set of ACL entries. An ACL entry 
+specifies the access permissions on the associated object for an individual user or a group 
+of users as a combination of read, write and search/execute permissions.
+
+PVFS2 supports POSIX ACLs by storing them as extended attributes. However, support
+for access control based permission checking does not exist on 2.4 Linux kernels and is hence disabled on them.
+Most recent version of the Linux 2.6 kernels do allow for such permission checks, and PVFS2 enables
+ACLs on such kernels.
+However, in order to use and enforce access control lists on 2.6 kernels, one must mount
+the PVFS2 file system by specifying the "acl" option in the mount command line. For example,
+\begin{verbatim}
+prompt# mount -t pvfs2 tcp://testhost:3334/pvfs2-fs /mnt/pvfs2 -o acl
+\end{verbatim}
+Please refer to the man pages of "setfacl", "getfacl" or section 5 acl for detailed usage
+information.
+
 %
 % PERFORMANCE
 %

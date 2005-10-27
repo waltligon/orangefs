@@ -252,6 +252,13 @@ static int readdir_setup_resp(
         s_op->u.readdir.directory_version;
     s_op->resp.u.readdir.dirent_count = js_p->count;
 
+    /*
+     * Although, this is not as important to get ls
+     * to work through the VFS readdir, it is important
+     * to fill this and send it back because the system
+     * interface users could break because of this...
+     */
+    s_op->resp.u.readdir.token = js_p->position;
     js_p->error_code = 0;
     return 1;
 }

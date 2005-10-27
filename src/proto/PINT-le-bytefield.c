@@ -200,6 +200,12 @@ static void lebf_initialize(void)
                 req.u.deleattr.key.buffer_sz = 0;
 		reqsize = extra_size_PVFS_servreq_deleattr;
 		break;
+	    case PVFS_SERV_LISTEATTR:
+		resp.u.listeattr.nkey = 0;
+		req.u.listeattr.nkey = 0;
+                reqsize = extra_size_PVFS_servreq_listeattr;
+		respsize = extra_size_PVFS_servresp_listeattr;
+                break;
 	}
 	/* since these take the max size when mallocing in the encode,
 	 * give them a huge number, then later fix it. */
@@ -339,6 +345,7 @@ static int lebf_encode_req(
 	CASE(PVFS_SERV_GETEATTR, geteattr);
 	CASE(PVFS_SERV_SETEATTR, seteattr);
 	CASE(PVFS_SERV_DELEATTR, deleattr);
+	CASE(PVFS_SERV_LISTEATTR, listeattr);
 
 	case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
@@ -428,6 +435,7 @@ static int lebf_encode_resp(
         CASE(PVFS_SERV_WRITE_COMPLETION, write_completion);
         CASE(PVFS_SERV_MGMT_GET_DIRDATA_HANDLE, mgmt_get_dirdata_handle);
         CASE(PVFS_SERV_GETEATTR, geteattr);
+        CASE(PVFS_SERV_LISTEATTR, listeattr);
 
             case PVFS_SERV_REMOVE:
             case PVFS_SERV_MGMT_REMOVE_OBJECT:
@@ -527,6 +535,7 @@ static int lebf_decode_req(
 	CASE(PVFS_SERV_GETEATTR, geteattr);
 	CASE(PVFS_SERV_SETEATTR, seteattr);
 	CASE(PVFS_SERV_DELEATTR, deleattr);
+        CASE(PVFS_SERV_LISTEATTR, listeattr);
 
 	case PVFS_SERV_GETCONFIG:
         case PVFS_SERV_MGMT_NOOP:
@@ -605,6 +614,7 @@ static int lebf_decode_resp(
 	CASE(PVFS_SERV_MGMT_GET_DIRDATA_HANDLE, mgmt_get_dirdata_handle);
         CASE(PVFS_SERV_WRITE_COMPLETION, write_completion);
 	CASE(PVFS_SERV_GETEATTR, geteattr);
+        CASE(PVFS_SERV_LISTEATTR, listeattr);
 
         case PVFS_SERV_REMOVE:
         case PVFS_SERV_MGMT_REMOVE_OBJECT:
@@ -726,6 +736,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	    case PVFS_SERV_GETEATTR:
 	    case PVFS_SERV_SETEATTR:
 	    case PVFS_SERV_DELEATTR:
+            case PVFS_SERV_LISTEATTR:
 		/* nothing to free */
 		break;
 	    case PVFS_SERV_INVALID:
@@ -782,6 +793,10 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 		if (resp->u.geteattr.val)
 		    decode_free(resp->u.geteattr.val);
 		break;
+            case PVFS_SERV_LISTEATTR:
+                if (resp->u.listeattr.key)
+                    decode_free(resp->u.listeattr.key);
+                break;
 
 	    case PVFS_SERV_GETCONFIG:
 	    case PVFS_SERV_CREATE:

@@ -89,7 +89,8 @@ int main(int argc,char **argv)
                    Lu(resp_readdir.dirent_array[i].handle),
                    resp_readdir.dirent_array[i].d_name);
         }
-        token += resp_readdir.pvfs_dirent_outcount;
+        //token += resp_readdir.pvfs_dirent_outcount;
+		  token = resp_readdir.token;
 
         /*allocated by the system interface*/
         if (resp_readdir.pvfs_dirent_outcount)

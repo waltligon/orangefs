@@ -712,11 +712,119 @@ int pvfs2_inode_removexattr(struct inode *inode, const char *name)
 }
 
 /*
- * FIXME: NOT IMPLEMENTED YET!
+ * Tries to get a specified object's keys into a user-specified
+ * buffer of a given size.
+ * Note that like the previous instances of xattr routines,
+ * this also allows you to pass in a NULL pointer and 0 size
+ * to probe the size for subsequent memory allocations.
+ * Thus our return value is always the size of all the keys
+ * unless there were errors in fetching the keys!
+ */
 int pvfs2_inode_listxattr(struct inode *inode, char *buffer, size_t size)
 {
+    ssize_t ret = -ENOMEM, total = 0;
+    int i, retries = PVFS2_OP_RETRY_COUNT, error_exit = 0;
+    pvfs2_kernel_op_t *new_op = NULL;
+    pvfs2_inode_t *pvfs2_inode = NULL;
+    ssize_t length = 0;
+
+    if (size > 0 && buffer == NULL)
+    {
+        pvfs2_error("pvfs2_inode_listxattr: bogus NULL pointers\n");
+        return -EINVAL;
+    }
+    if (size < 0)
+    {
+        pvfs2_error("Invalid size (%d)\n", size);
+        return -EINVAL;
+    }
+    if (inode)
+    {
+        PVFS_ds_position token = PVFS_ITERATE_START;
+
+        pvfs2_inode = PVFS2_I(inode);
+        /* obtain the xattr semaphore */
+        down_read(&pvfs2_inode->xattr_sem);
+
+        new_op = op_alloc();
+        if (!new_op)
+        {
+            up_read(&pvfs2_inode->xattr_sem);
+            return ret;
+        }
+        if (buffer && size > 0)
+        {
+            memset(buffer, 0, size);
+        }
+    try_again:
+        new_op->upcall.type = PVFS2_VFS_OP_LISTXATTR;
+        new_op->upcall.req.listxattr.refn = pvfs2_inode->refn;
+        new_op->upcall.req.listxattr.token = token;
+        new_op->upcall.req.listxattr.requested_count = (size == 0) ? 0 : PVFS_MAX_XATTR_LISTLEN;
+        service_error_exit_op_with_timeout_retry(
+                new_op, "pvfs2_inode_listxattr", retries,
+                error_exit, get_interruptible_flag(inode));
+    error_exit:
+        ret = (error_exit ? -EINTR :
+                pvfs2_kernel_error_code_convert(new_op->downcall.status));
+        if (ret == 0)
+        {
+            if (size == 0)
+            {
+                /*
+                 * This is a bit of a big upper limit, but I did not want to spend too 
+                 * much time getting this correct, since users end up allocating memory
+                 * rather than us...
+                 */
+                total = new_op->downcall.resp.listxattr.returned_count * PVFS_MAX_XATTR_NAMELEN;
+                goto done;
+            }
+            length = new_op->downcall.resp.listxattr.keylen;
+            if (length == 0)
+            {
+                goto done;
+            }
+            else 
+            {
+                int key_size = 0;
+                /* check to see how much can be fit in the buffer. fit only whole keys */
+                for (i = 0; i < new_op->downcall.resp.listxattr.returned_count; i++)
+                {
+                    if (total + new_op->downcall.resp.listxattr.lengths[i] <= size)
+                    {
+                        memcpy(buffer + total, new_op->downcall.resp.listxattr.key + key_size,
+                                new_op->downcall.resp.listxattr.lengths[i]);
+                        key_size += new_op->downcall.resp.listxattr.lengths[i];
+                        total += new_op->downcall.resp.listxattr.lengths[i];
+                    }
+                    else {
+                        goto done;
+                    }
+                }
+                /* Since the buffer was large enough, we might have to continue fetching more keys! */
+                token = new_op->downcall.resp.listxattr.token;
+                if (token != PVFS_ITERATE_END)
+                    goto try_again;
+            }
+        }
+    done:
+        if (ret == 0 && buffer != NULL)
+        {
+            for (i = 0; i < total; i++)
+            {
+                printk("%c", buffer[i]);
+            }
+            printk("\n");
+        }
+        pvfs2_print("pvfs2_inode_listxattr: returning %d\n", ret ? ret : total);
+        /* when request is serviced properly, free req op struct */
+        op_release(new_op);
+        up_read(&pvfs2_inode->xattr_sem);
+        if (ret == 0)
+            ret = total;
+    }
+    return ret;
 }
-*/
 
 static inline struct inode *pvfs2_create_file(
     struct inode *dir,

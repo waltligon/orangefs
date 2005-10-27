@@ -324,7 +324,13 @@ struct PINT_server_req_params PINT_server_req_table[] =
         "deleattr",
         PINT_SERVER_CHECK_ATTR,
         PINT_SERVER_ATTRIBS_NOT_REQUIRED,
-        &pvfs2_del_eattr_sm}
+        &pvfs2_del_eattr_sm},
+
+    {PVFS_SERV_LISTEATTR,
+        "listeattr",
+        PINT_SERVER_CHECK_ATTR,
+        PINT_SERVER_ATTRIBS_NOT_REQUIRED,
+        &pvfs2_list_eattr_sm}
 };
 
 int main(int argc, char **argv)

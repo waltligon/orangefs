@@ -76,14 +76,8 @@ ssize_t pvfs2_getxattr(struct dentry *dentry, const char *name,
 
 ssize_t pvfs2_listxattr(struct dentry *dentry, char *buffer, size_t size)
 {
-    /* 
-     * FIXME: The reason I am returning this value here is because 
-     * we need server-side support for this, and I need to talk
-     * to Walt and RobR about this...
-     * Should not be too hard, but nonetheless a pain to get this
-     * right.
-     */
-    return -EOPNOTSUPP;
+    struct inode *inode = dentry->d_inode;
+    return pvfs2_inode_listxattr(inode, buffer, size);
 }
 
 int pvfs2_removexattr(struct dentry *dentry, const char *name)

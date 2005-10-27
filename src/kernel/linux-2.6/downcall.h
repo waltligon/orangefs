@@ -110,10 +110,14 @@ typedef struct {
 typedef struct {
 } pvfs2_setxattr_response_t;
 
-/* the listxattr response is an array of attribute names, values */
+/* the listxattr response is an array of attribute names */
 
 typedef struct {
-    PVFS_keyval_pair keyvals[PVFS_MAX_XATTR_LISTLEN];
+    int  returned_count;
+    PVFS_ds_position token;
+    char key[PVFS_MAX_XATTR_LISTLEN*PVFS_MAX_XATTR_NAMELEN];
+    int  keylen;
+    int  lengths[PVFS_MAX_XATTR_LISTLEN];
 } pvfs2_listxattr_response_t;
 
 /* the removexattr response is a blank downcall */
@@ -155,7 +159,7 @@ typedef struct
 /* 	pvfs2_fs_umount_response_t fs_umount; */
         pvfs2_getxattr_response_t getxattr;
 /*      pvfs2_setxattr_response_t setxattr */
-/*        pvfs2_listxattr_response_t listxattr; */ /* NOT IMPLEMENTED YET */
+        pvfs2_listxattr_response_t listxattr;
 /*      pvfs2_removexattr_response_t removexattr; */
 /* 	pvfs2_cancel_response_t cancel; */
 /* 	pvfs2_fsync_response_t fsync; */

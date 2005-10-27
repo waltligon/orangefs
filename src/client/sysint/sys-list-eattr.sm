@@ -1,0 +1,288 @@
+/* 
+ * (C) 2003 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+
+#include <string.h>
+#include <assert.h>
+#include <unistd.h>
+
+#include "client-state-machine.h"
+#include "pvfs2-debug.h"
+#include "pvfs2-util.h"
+#include "job.h"
+#include "gossip.h"
+#include "str-utils.h"
+#include "pint-servreq.h"
+#include "pint-cached-config.h"
+#include "PINT-reqproto-encode.h"
+
+extern job_context_id pint_client_sm_context;
+
+/* state function prototypes */
+static int list_eattr_setup_msgpair(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int list_eattr_cleanup(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int list_eattr_comp_fn(
+    void *v_p, struct PVFS_server_resp *resp_p, int i);
+
+%%
+
+machine pvfs2_client_list_eattr_sm(
+    setup_msgpair,
+    xfer_msgpair,
+    cleanup)
+{
+    state setup_msgpair
+    {
+        run list_eattr_setup_msgpair;
+        success => xfer_msgpair;
+        default => cleanup;
+    }
+
+    state xfer_msgpair
+    {
+        jump pvfs2_msgpairarray_sm;
+        default => cleanup;
+    }
+
+    state cleanup
+    {
+        run list_eattr_cleanup;
+        default => terminate;
+    }
+}
+
+%%
+
+PVFS_error PVFS_isys_listeattr(
+        PVFS_object_ref ref,
+        PVFS_ds_position token,
+        int32_t nkey,
+        PVFS_credentials *credentials,
+        PVFS_sysresp_listeattr *resp_p,
+        PVFS_sys_op_id *op_id,
+        void *user_ptr)
+{
+    int ret = -PVFS_EINVAL;
+    PINT_client_sm *sm_p = NULL;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "PINT_isys_listeattr entered\n");
+
+    if ((ref.handle == PVFS_HANDLE_NULL) ||
+       (ref.fs_id == PVFS_FS_ID_NULL) || (resp_p == NULL))
+    {
+        gossip_err("invalid (NULL) required argument\n");
+	return ret;
+    }
+
+    sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));
+    if (sm_p == NULL)
+    {
+        return -PVFS_ENOMEM;
+    }
+    memset(sm_p, 0, sizeof(*sm_p));
+
+    PINT_init_msgarray_params(&sm_p->msgarray_params, ref.fs_id);
+    PINT_init_sysint_credentials(sm_p->cred_p, credentials);
+    sm_p->u.listeattr.nkey = nkey;
+    sm_p->u.listeattr.resp_p = resp_p;
+    sm_p->u.listeattr.pos_token = token;
+    sm_p->error_code = 0;
+    sm_p->object_ref = ref;
+
+    return PINT_client_state_machine_post(
+            sm_p, PVFS_SYS_LISTEATTR, op_id, user_ptr);
+}
+
+PVFS_error PVFS_sys_listeattr(
+        PVFS_object_ref ref,
+        PVFS_ds_position token,
+        int32_t nkey,
+        PVFS_credentials *credentials,
+        PVFS_sysresp_listeattr *resp_p)
+{
+    PVFS_error ret = -PVFS_EINVAL, error = 0;
+    PVFS_sys_op_id op_id;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_listeattr entered\n");
+
+    ret = PVFS_isys_listeattr(ref, token, nkey, credentials,
+            resp_p, &op_id, NULL);
+
+    if (ret)
+    {
+        PVFS_perror_gossip("PVFS_isys_listeattr call", ret);
+        error = ret;
+    }
+    else
+    {
+        ret = PINT_sys_wait(op_id, "listeattr", &error);
+        if (ret)
+        {
+             PVFS_perror_gossip("PVFS_sys_wait call", ret);
+             error = ret;
+        }
+    }
+
+    PINT_sys_release(op_id);
+    return error;
+}
+
+static int list_eattr_setup_msgpair(PINT_client_sm *sm_p,
+                                           job_status_s *js_p)
+{
+    int ret = -PVFS_EINVAL;
+    int i;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+		"list_eattr state: list_eattr_setup_msgpair\n");
+
+    /* this will be the array of key buffer sizes */
+    sm_p->u.listeattr.size_array =
+             (PVFS_size *)malloc(sm_p->u.listeattr.nkey *
+                                 sizeof (PVFS_size));
+
+    for (i = 0; i < sm_p->u.listeattr.nkey; i++)
+        sm_p->u.listeattr.size_array[i] =
+            sm_p->u.listeattr.resp_p->key_array[i].buffer_sz;
+
+    PINT_SERVREQ_LISTEATTR_FILL(
+            sm_p->msgpair.req,
+            (*sm_p->cred_p),
+            sm_p->object_ref.fs_id,
+            sm_p->object_ref.handle,
+            sm_p->u.listeattr.pos_token,
+            sm_p->u.listeattr.nkey,
+            sm_p->u.listeattr.size_array
+            );
+
+    sm_p->msgarray = &(sm_p->msgpair);
+    sm_p->msgarray_count = 1;
+    sm_p->msgpair.fs_id = sm_p->object_ref.fs_id;
+    sm_p->msgpair.handle = sm_p->object_ref.handle;
+    sm_p->msgpair.retry_flag = PVFS_MSGPAIR_RETRY;
+    sm_p->msgpair.comp_fn = list_eattr_comp_fn;
+
+    ret = PINT_cached_config_map_to_server(
+            &sm_p->msgpair.svr_addr,
+            sm_p->msgpair.handle,
+            sm_p->msgpair.fs_id);
+
+    if (ret)
+    {
+        gossip_err("Failed to map meta server address\n");
+        js_p->error_code = 0;
+    }
+    return 1;
+}
+
+static int list_eattr_cleanup(PINT_client_sm *sm_p,
+                                    job_status_s *js_p)
+{
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+		"list_eattr state: list_eattr_cleanup\n");
+    /* free the array malloc'd above */
+    free(sm_p->u.listeattr.size_array);
+    sm_p->error_code  = js_p->error_code;
+    sm_p->op_complete = 1;
+
+    return 0;
+}
+
+static int list_eattr_comp_fn(
+    void *v_p,
+    struct PVFS_server_resp *resp_p,
+    int i)
+{
+    int ret = 0;
+    PINT_client_sm *sm_p = (PINT_client_sm *)v_p;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG,
+		"list_eattr completion fn: list_eattr_comp_fn\n");
+
+    /* only posted one msgpair */
+    assert(i==0);
+
+    if (resp_p->status != 0)
+    {
+        return resp_p->status;
+    }
+    if (sm_p->msgarray[i].op_status != 0)
+    {
+        return sm_p->msgarray[i].op_status;
+    }
+    sm_p->u.listeattr.resp_p->token = resp_p->u.listeattr.token;
+    sm_p->u.listeattr.resp_p->nkey  = resp_p->u.listeattr.nkey;
+
+    /* If we requested more than 0 keys */
+    if (sm_p->u.listeattr.nkey)
+    {
+        gossip_debug(GOSSIP_LISTEATTR_DEBUG,"listeattr returned %d instead of %d keys\n",
+                sm_p->u.listeattr.resp_p->nkey, sm_p->u.listeattr.nkey);
+    }
+    /* Else we use the token value as the total number of keys */
+    else
+    {
+        gossip_debug(GOSSIP_LISTEATTR_DEBUG,"listeattr returned %d keys\n",
+                sm_p->u.listeattr.resp_p->token);
+        /* Copy the token and reset it */
+        sm_p->u.listeattr.resp_p->nkey = sm_p->u.listeattr.resp_p->token;
+        sm_p->u.listeattr.resp_p->token = PVFS_ITERATE_START;
+        return 0;
+    }
+    if (sm_p->u.listeattr.resp_p->nkey > 0)
+    {
+        int k;
+        if (!resp_p->u.listeattr.key)
+        {
+            gossip_err("Successful call returned NULL value list\n");
+            return -1;
+        }
+        for (k = 0; k < sm_p->u.listeattr.resp_p->nkey; k++)
+        {
+            gossip_debug(GOSSIP_LISTEATTR_DEBUG,"resp_read_sz = %d\n",
+                    resp_p->u.listeattr.key[k].read_sz);
+            gossip_debug(GOSSIP_LISTEATTR_DEBUG,"resp_buff_sz = %d\n",
+                    resp_p->u.listeattr.key[k].buffer_sz);
+            gossip_debug(GOSSIP_LISTEATTR_DEBUG,"sm_buff_sz = %d\n",
+                    sm_p->u.listeattr.resp_p->key_array[k].buffer_sz);
+            gossip_debug(GOSSIP_LISTEATTR_DEBUG,"resp_buff_ = %s\n",
+                    (char *)resp_p->u.listeattr.key[k].buffer);
+            /* put the actual read_sz in its place */
+            sm_p->u.listeattr.resp_p->key_array[k].read_sz =
+                    resp_p->u.listeattr.key[k].buffer_sz;
+            /* check for too big a return message */
+            if (sm_p->u.listeattr.resp_p->key_array[k].read_sz <=
+                    sm_p->u.listeattr.resp_p->key_array[k].buffer_sz)
+            {
+                gossip_debug(GOSSIP_LISTEATTR_DEBUG,"copying\n");
+                memcpy(sm_p->u.listeattr.resp_p->key_array[k].buffer,
+                        resp_p->u.listeattr.key[k].buffer,
+                        sm_p->u.listeattr.resp_p->key_array[k].read_sz);
+            }
+            else /* oops, error! returned too much data */
+            {
+                gossip_debug(GOSSIP_LISTEATTR_DEBUG,"clearing on error\n");
+                memset(sm_p->u.listeattr.resp_p->key_array[k].buffer,0,
+                        sm_p->u.listeattr.resp_p->key_array[k].buffer_sz);
+                /* record an error, but keep going */
+                ret = -PVFS_EMSGSIZE;
+            }
+        }
+    }
+    return 0;
+}
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */

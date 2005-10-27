@@ -40,6 +40,7 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p);
 static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p);
 static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p);
 static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p);
+static int dbpf_keyval_iterate_keys_op_svc(struct dbpf_op *op_p);
 static int dbpf_keyval_flush_op_svc(struct dbpf_op *op_p);
 
 
@@ -783,7 +784,254 @@ static int dbpf_keyval_iterate_keys(TROVE_coll_id coll_id,
                                     TROVE_context_id context_id,
                                     TROVE_op_id *out_op_id_p)
 {
-    return -TROVE_ENOSYS;
+    dbpf_queued_op_t *q_op_p = NULL;
+    struct dbpf_collection *coll_p = NULL;
+
+    coll_p = dbpf_collection_find_registered(coll_id);
+    if (coll_p == NULL)
+    {
+        return -TROVE_EINVAL;
+    }
+    q_op_p = dbpf_queued_op_alloc();
+    if (q_op_p == NULL)
+    {
+        return -TROVE_ENOMEM;
+    }
+
+    /* initialize all the common members */
+    dbpf_queued_op_init(q_op_p,
+                        KEYVAL_ITERATE_KEYS,
+                        handle,
+                        coll_p,
+                        dbpf_keyval_iterate_keys_op_svc,
+                        user_ptr,
+                        flags,
+                        context_id);
+
+    /* initialize op-specific members */
+    q_op_p->op.u.k_iterate_keys.key_array = key_array;
+    q_op_p->op.u.k_iterate_keys.position_p = position_p;
+    q_op_p->op.u.k_iterate_keys.count_p = inout_count_p;
+
+    *out_op_id_p = dbpf_queued_op_queue(q_op_p);
+
+    return 0;
+}
+
+/* dbpf_keyval_iterate_keys_op_svc()
+ *
+ * Operation:
+ *
+ * If position is TROVE_ITERATE_START, we set the position to the
+ * start of the database (keyval space) and read, returning the
+ * position of the last read keyval.
+ *
+ * If position is TROVE_ITERATE_END, then we hit the end previously,
+ * so we just return that we are done and that there are 0 things
+ * read.
+ *
+ * Otherwise we read and return the position of the last read keyval.
+ *
+ * In all cases we read using DB_NEXT.  This is ok because it behaves
+ * like DB_FIRST (read the first record) when called with an
+ * uninitialized cursor (so we just don't initialize the cursor in the
+ * TROVE_ITERATE_START case).
+ *
+ */
+static int dbpf_keyval_iterate_keys_op_svc(struct dbpf_op *op_p)
+{
+    int ret = -TROVE_EINVAL, i=0, got_db = 0, get_key_count = 0;
+    struct open_cache_ref tmp_ref;
+    DBC *dbc_p = NULL;
+    DBT key, data;
+
+    /* if they passed in that they are at the end, return 0.
+     *
+     * this seems silly maybe, but it makes while (count) loops
+     * work right.
+     */
+    if (*op_p->u.k_iterate_keys.position_p == TROVE_ITERATE_END)
+    {
+        *op_p->u.k_iterate_keys.count_p = 0;
+        return 1;
+    }
+    /*
+      create keyval space if it doesn't exist -- assume it's empty,
+      but note that we can't distinguish from some other kind of error
+      at this point
+    */
+    ret = dbpf_open_cache_get(
+        op_p->coll_p->coll_id, op_p->handle, 1, DBPF_OPEN_DB, &tmp_ref);
+    if (ret < 0)
+    {
+        gossip_lerr("dbpf_open_cache_get failed\n");
+        goto return_error;
+    }
+    else
+    {
+        got_db = 1;
+    }
+
+    ret = tmp_ref.db_p->cursor(tmp_ref.db_p, NULL, &dbc_p, 0);
+    if (ret != 0)
+    {
+        gossip_lerr("db_p->cursor failed\n");
+        ret = -dbpf_db_error_to_trove_error(ret);
+        goto return_error;
+    }
+
+    if (*op_p->u.k_iterate_keys.position_p != TROVE_ITERATE_START)
+    {
+        char buf[16];
+        memset(&key, 0, sizeof(key));
+        /* Hold a large enough key record value */
+        key.data = buf;
+        key.size = key.ulen = 16;
+        key.flags |= DB_DBT_USERMEM;
+        *(TROVE_ds_position *)key.data = *op_p->u.k_iterate_keys.position_p;
+
+        memset(&data, 0, sizeof(data));
+        data.data = op_p->u.k_iterate_keys.key_array[0].buffer;
+        data.size = data.ulen = op_p->u.k_iterate_keys.key_array[0].buffer_sz;
+        data.flags |= DB_DBT_USERMEM;
+
+        /* position the cursor */
+        ret = dbc_p->c_get(dbc_p, &key, &data, DB_SET_RECNO);
+        if (ret == DB_NOTFOUND)
+        {
+            memset(&key, 0, sizeof(key));
+            memset(&data, 0, sizeof(data));
+            goto return_ok;
+        }
+        else if (ret != 0)
+        {
+            memset(&key, 0, sizeof(key));
+            memset(&data, 0, sizeof(data));
+            gossip_lerr("dbc_p->c_get (DB_SET_RECNO) failed\n");
+            ret = -dbpf_db_error_to_trove_error(ret);
+            goto return_error;
+        }
+        memset(&key, 0, sizeof(key));
+        memset(&data, 0, sizeof(data));
+    }
+
+    if (*op_p->u.k_iterate_keys.count_p == 0)
+    {
+        get_key_count = 1;
+    }
+    i = 0;
+    for (;;)
+    {
+        memset(&key, 0, sizeof(key));
+        if (get_key_count == 0)
+        {
+            key.data = op_p->u.k_iterate_keys.key_array[i].buffer;
+            key.size = key.ulen = op_p->u.k_iterate_keys.key_array[i].buffer_sz;
+            key.flags |= DB_DBT_USERMEM;
+        }
+        else if (get_key_count == 1) {
+            key.flags |= DB_DBT_MALLOC;
+        }
+        memset(&data, 0, sizeof(data));
+        data.flags |= DB_DBT_MALLOC;
+
+        ret = dbc_p->c_get(dbc_p, &key, &data, DB_NEXT);
+        if (ret == DB_NOTFOUND)
+        {
+            goto return_ok;
+        }
+        else if (ret != 0)
+        {
+            gossip_lerr("dbc_p->c_get (DB_NEXT) failed?\n");
+            ret = -dbpf_db_error_to_trove_error(ret);
+            goto return_error;
+        }
+        if (data.data) 
+            free(data.data);
+        /* Were we asked for a specified number of keys? */
+        if (get_key_count == 0)
+        {
+            op_p->u.k_iterate_keys.key_array[i].read_sz = key.size;
+            i++;
+            /* Okay, are we done? */
+            if (i >= *op_p->u.k_iterate_keys.count_p)
+                break;
+        }
+        /* okay, keep going */
+        else if (get_key_count == 1) {
+            i++;
+            if (key.data)
+                free(key.data);
+        }
+    }
+    
+return_ok:
+    if (ret == DB_NOTFOUND)
+    {
+        *op_p->u.k_iterate_keys.position_p = TROVE_ITERATE_END;
+    }
+    else {
+        char buf[64];
+        db_recno_t recno;
+
+        /* Fetch the record number to return to caller */
+        memset(&key, 0, sizeof(key));
+        key.data  = buf;
+        key.size  = key.ulen = 64;
+        key.dlen  = 64;
+        key.doff  = 0;
+        key.flags |= DB_DBT_USERMEM | DB_DBT_PARTIAL;
+
+        memset(&data, 0, sizeof(data));
+        data.data = &recno;
+        data.size = data.ulen = sizeof(recno);
+        data.flags |= DB_DBT_USERMEM;
+
+        ret = dbc_p->c_get(dbc_p, &key, &data, DB_GET_RECNO);
+        if (ret == DB_NOTFOUND)
+        {
+            gossip_debug(GOSSIP_TROVE_DEBUG, "warning: keyval "
+                         "iterate_keys -- notfound\n");
+        }
+        else if (ret != 0)
+        {
+            gossip_debug(GOSSIP_TROVE_DEBUG, "warning: keyval iterate_keys "
+                         "-- some other failure @ recno\n");
+        }
+        assert(recno != TROVE_ITERATE_START && recno != TROVE_ITERATE_END);
+        *op_p->u.k_iterate_keys.position_p = recno;
+    }
+    /* 'position' points us to record we just read, or is set to END */
+
+    *op_p->u.k_iterate_keys.count_p = i;
+
+    /* free the cursor */
+    ret = dbc_p->c_close(dbc_p);
+    if (ret != 0)
+    {
+        gossip_lerr("dbc_p->c_close failed\n");
+        ret = -dbpf_db_error_to_trove_error(ret);
+        goto return_error;
+    }
+
+    /* give up the db reference */
+    dbpf_open_cache_put(&tmp_ref);
+    return 1;
+    
+return_error:
+    gossip_lerr("dbpf_keyval_iterate_keys_op_svc: %s\n", db_strerror(ret));
+    *op_p->u.k_iterate_keys.count_p = i;
+
+    if(dbc_p)
+    {
+        dbc_p->c_close(dbc_p);
+    }
+
+    if (got_db)
+    {
+        dbpf_open_cache_put(&tmp_ref);
+    }
+    return ret;
 }
 
 static int dbpf_keyval_read_list(TROVE_coll_id coll_id,

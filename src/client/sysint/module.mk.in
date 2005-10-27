@@ -22,6 +22,7 @@ CLIENT_SMCGEN := \
 	$(DIR)/sys-get-eattr.c \
 	$(DIR)/sys-set-eattr.c \
 	$(DIR)/sys-del-eattr.c \
+	$(DIR)/sys-list-eattr.c \
 	$(DIR)/sys-lookup.c \
 	$(DIR)/sys-truncate.c \
 	$(DIR)/sys-io.c \

@@ -181,6 +181,15 @@ typedef struct PVFS_sysresp_geteattr_s PVFS_sysresp_geteattr;
 /* deleattr */
 /* no data returned in deleattr response */
 
+/** Holds results of a listeattr_list operation (keys of object). */
+struct PVFS_sysresp_listeattr_s
+{
+    PVFS_ds_position token;
+    int32_t         nkey;
+    PVFS_ds_keyval *key_array;
+};
+typedef struct PVFS_sysresp_listeattr_s PVFS_sysresp_listeattr;
+
 
 /****************************************/
 /* system interface function prototypes */
@@ -506,6 +515,22 @@ PVFS_error PVFS_sys_deleattr(
     PVFS_object_ref ref,
     PVFS_credentials *credentials,
     PVFS_ds_keyval *key_p);
+
+PVFS_error PVFS_isys_listeattr(
+    PVFS_object_ref ref,
+    PVFS_ds_position token,
+    int32_t nkey,
+    PVFS_credentials *credentials,
+    PVFS_sysresp_listeattr *resp,
+    PVFS_sys_op_id *op_id,
+    void *user_ptr);
+
+PVFS_error PVFS_sys_listeattr(
+    PVFS_object_ref ref,
+    PVFS_ds_position token,
+    int32_t nkey,
+    PVFS_credentials *credentials,
+    PVFS_sysresp_listeattr *resp);
 
 #endif
 

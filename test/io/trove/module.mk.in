@@ -6,6 +6,7 @@ LOCALTESTSRC := \
 	$(DIR)/trove-mkdir.c \
 	$(DIR)/trove-mkfs.c \
 	$(DIR)/trove-rm.c \
+	$(DIR)/trove-rmdir.c \
 	$(DIR)/test-listio.c \
 	$(DIR)/test-listio2.c \
 	$(DIR)/test-listio3.c \
@@ -16,6 +17,8 @@ LOCALTESTSRC := \
 	$(DIR)/trove-export.c \
 	$(DIR)/trove-touch.c \
 	$(DIR)/trove-create-stress.c \
+	$(DIR)/trove-key-iterate.c \
+	$(DIR)/db-hack.c \
 	$(DIR)/test-listio-aio-convert.c
 	
 

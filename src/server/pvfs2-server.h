@@ -271,7 +271,7 @@ struct PINT_server_getattr_op
     uint32_t attrmask;
 };
 
-/* this is used in both set_eattr and get_eattr */
+/* this is used in both set_eattr, get_eattr and list_eattr */
 struct PINT_server_eattr_op
 {
     void *buffer;
@@ -435,6 +435,8 @@ extern struct PINT_state_machine_s pvfs2_get_eattr_list_sm;
 extern struct PINT_state_machine_s pvfs2_set_eattr_sm;
 extern struct PINT_state_machine_s pvfs2_set_eattr_list_sm;
 extern struct PINT_state_machine_s pvfs2_del_eattr_sm;
+extern struct PINT_state_machine_s pvfs2_list_eattr_sm;
+extern struct PINT_state_machine_s pvfs2_list_eattr_list_sm;
 
 /* nested state machines */
 extern struct PINT_state_machine_s pvfs2_get_attr_work_sm;

@@ -35,7 +35,8 @@ ifdef BUILD_SERVER
 		$(DIR)/mgmt-get-dirdata-handle.c \
 		$(DIR)/get-eattr.c \
 		$(DIR)/set-eattr.c \
-		$(DIR)/del-eattr.c
+		$(DIR)/del-eattr.c \
+		$(DIR)/list-eattr.c
 
 	# c files that should be added to server library
 	SERVERSRC += \

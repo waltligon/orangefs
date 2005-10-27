@@ -126,6 +126,8 @@ typedef struct
 typedef struct 
 {
     PVFS_object_ref refn;
+    int  requested_count;
+    PVFS_ds_position token;
 } pvfs2_listxattr_request_t;
 
 typedef struct 
@@ -169,7 +171,7 @@ typedef struct
         pvfs2_fs_umount_request_t fs_umount;
         pvfs2_getxattr_request_t getxattr;
         pvfs2_setxattr_request_t setxattr;
-/*        pvfs2_listxattr_request_t listxattr; */ /* NOT IMPLEMENTED YET */
+        pvfs2_listxattr_request_t listxattr;
         pvfs2_removexattr_request_t removexattr;
         pvfs2_op_cancel_t cancel;
         pvfs2_fsync_request_t fsync;

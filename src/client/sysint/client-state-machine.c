@@ -191,7 +191,8 @@ struct PINT_client_op_entry_s PINT_client_sm_sys_table[] =
     {&pvfs2_client_rename_sm},
     {&pvfs2_client_get_eattr_sm},
     {&pvfs2_client_set_eattr_sm},
-    {&pvfs2_client_del_eattr_sm}
+    {&pvfs2_client_del_eattr_sm},
+    {&pvfs2_client_list_eattr_sm}
 };
 
 struct PINT_client_op_entry_s PINT_client_sm_mgmt_table[] =
@@ -787,6 +788,7 @@ char *PINT_client_get_name_str(int op_type)
         { PVFS_SYS_GETEATTR, "PVFS_SYS_GETEATTR" },
         { PVFS_SYS_SETEATTR, "PVFS_SYS_SETEATTR" },
         { PVFS_SYS_DELEATTR, "PVFS_SYS_DELEATTR" },
+        { PVFS_SYS_LISTEATTR, "PVFS_SYS_LISTEATTR" },
         { PVFS_SERVER_GET_CONFIG, "PVFS_SERVER_GET_CONFIG" },
         { PVFS_CLIENT_JOB_TIMER, "PVFS_CLIENT_JOB_TIMER" },
         { PVFS_DEV_UNEXPECTED, "PVFS_DEV_UNEXPECTED" },

@@ -6,8 +6,8 @@
 
 /* pvfs2_get_eattr_sm
  *
- * This state machine handles incoming server getattr operations.  These
- * are the operations sent by PVFS_sys_getattr() among others.
+ * This state machine handles incoming server geteattr operations.  These
+ * are the operations sent by PVFS_sys_geteattr() among others.
  *
  * The pvfs2_prelude_sm is responsible for reading the actual metadata
  * to begin with, because it does this as part of the permission checking

@@ -138,6 +138,7 @@ typedef struct
         PVFS_sysresp_statfs statfs;
         PVFS_sysresp_io io;
         PVFS_sysresp_geteattr geteattr;
+        PVFS_sysresp_listeattr listeattr;
     } response;
 
 #ifdef CLIENT_CORE_OP_TIMING
@@ -802,6 +803,69 @@ static PVFS_error post_removexattr_request(vfs_request_t *vfs_request)
     }
     return ret;
 }
+
+static PVFS_error post_listxattr_request(vfs_request_t *vfs_request)
+{
+    PVFS_error ret = -PVFS_EINVAL;
+    int i = 0, j = 0;
+
+    gossip_debug(
+        GOSSIP_CLIENTCORE_DEBUG,
+        "got a listxattr request for fsid %d | handle %Lu\n",
+        vfs_request->in_upcall.req.listxattr.refn.fs_id,
+        Lu(vfs_request->in_upcall.req.listxattr.refn.handle));
+
+    if (vfs_request->in_upcall.req.listxattr.requested_count < 0
+            || vfs_request->in_upcall.req.listxattr.requested_count > PVFS_MAX_XATTR_LISTLEN)
+    {
+        gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "listxattr invalid requested count %d\n",
+                vfs_request->in_upcall.req.listxattr.requested_count);
+        return ret;
+    }
+
+    /* We also need to allocate memory for the vfs_request->response.listeattr if the user requested */
+    vfs_request->response.listeattr.key_array = 
+        (PVFS_ds_keyval *) malloc(sizeof(PVFS_ds_keyval) 
+                                  * vfs_request->in_upcall.req.listxattr.requested_count);
+    if (vfs_request->response.listeattr.key_array == NULL)
+    {
+        return -PVFS_ENOMEM;
+    }
+    for (i = 0; i < vfs_request->in_upcall.req.listxattr.requested_count; i++)
+    {
+        vfs_request->response.listeattr.key_array[i].buffer_sz = PVFS_MAX_XATTR_NAMELEN;
+        vfs_request->response.listeattr.key_array[i].buffer =
+                    (char *) malloc(sizeof(char) * vfs_request->response.listeattr.key_array[i].buffer_sz);
+        if (vfs_request->response.listeattr.key_array[i].buffer == NULL)
+        {
+            break;
+        }
+    }
+    if (i != vfs_request->in_upcall.req.listxattr.requested_count)
+    {
+        for (j = 0; j < i; j++)
+        {
+            free(vfs_request->response.listeattr.key_array[j].buffer);
+        }
+        free(vfs_request->response.listeattr.key_array);
+        return -PVFS_ENOMEM;
+    }
+    ret = PVFS_isys_listeattr(
+        vfs_request->in_upcall.req.listxattr.refn,
+        vfs_request->in_upcall.req.listxattr.token,
+        vfs_request->in_upcall.req.listxattr.requested_count,
+        &vfs_request->in_upcall.credentials,
+        &vfs_request->response.listeattr,
+        &vfs_request->op_id, 
+        (void *)vfs_request);
+
+    if (ret < 0)
+    {
+        PVFS_perror_gossip("Posting listxattr failed", ret);
+    }
+    return ret;
+}
+
 
 #define generate_upcall_mntent(mntent, in_upcall, mount)              \
 do {                                                                  \
@@ -1794,6 +1858,55 @@ static inline void package_downcall_members(
             break;
         case PVFS2_VFS_OP_REMOVEXATTR:
             break;
+        case PVFS2_VFS_OP_LISTXATTR:
+        {
+            int i;
+            if (*error_code == 0)
+            {
+                vfs_request->out_downcall.resp.listxattr.returned_count =
+                    vfs_request->response.listeattr.nkey;
+                if (vfs_request->in_upcall.req.listxattr.requested_count == 0)
+                {
+                    vfs_request->out_downcall.resp.listxattr.token = 
+                        PVFS_ITERATE_START;
+                }
+                else 
+                {
+                    vfs_request->out_downcall.resp.listxattr.token = 
+                        vfs_request->response.listeattr.token;
+                    vfs_request->out_downcall.resp.listxattr.keylen = 0;
+                    for (i = 0; i < vfs_request->response.listeattr.nkey; i++)
+                    {
+                        memcpy(vfs_request->out_downcall.resp.listxattr.key
+                                + vfs_request->out_downcall.resp.listxattr.keylen,
+                                vfs_request->response.listeattr.key_array[i].buffer,
+                                vfs_request->response.listeattr.key_array[i].read_sz);
+                        vfs_request->out_downcall.resp.listxattr.lengths[i] = 
+                                vfs_request->response.listeattr.key_array[i].read_sz;
+                        vfs_request->out_downcall.resp.listxattr.keylen +=
+                                vfs_request->response.listeattr.key_array[i].read_sz;
+                    }
+                }
+                printf("Listxattr obtained: %d ", vfs_request->out_downcall.resp.listxattr.keylen);
+                for (i = 0; i < vfs_request->out_downcall.resp.listxattr.keylen; i++)
+                {
+                    printf("%c", *(char *)((char *)vfs_request->out_downcall.resp.listxattr.key + i));
+                }
+                printf("\n");
+            }
+            /* free up the memory allocate to response.listteattr */
+            for (i = 0; i < vfs_request->in_upcall.req.listxattr.requested_count; i++)
+            {
+                free(vfs_request->response.listeattr.key_array[i].buffer);
+                vfs_request->response.listeattr.key_array[i].buffer = NULL;
+            }
+            if (vfs_request->response.listeattr.key_array)
+            {
+                free(vfs_request->response.listeattr.key_array);
+                vfs_request->response.listeattr.key_array = NULL;
+            }
+            break;
+        }
         default:
             gossip_err("Completed upcall of unknown type %x!\n",
                        vfs_request->in_upcall.type);
@@ -1958,6 +2071,10 @@ static inline PVFS_error handle_unexp_vfs_request(
             posted_op = 1;
             ret = post_removexattr_request(vfs_request);
             break;
+        case PVFS2_VFS_OP_LISTXATTR:
+            posted_op = 1;
+            ret = post_listxattr_request(vfs_request);
+            break;
             /*
               NOTE: mount, umount and statfs are blocking
               calls that are serviced inline.
@@ -1996,7 +2113,6 @@ static inline PVFS_error handle_unexp_vfs_request(
             posted_op = 1;
             ret = post_fsync_request(vfs_request);
             break;
-        case PVFS2_VFS_OP_LISTXATTR:
         case PVFS2_VFS_OP_INVALID:
         default:
             gossip_err(

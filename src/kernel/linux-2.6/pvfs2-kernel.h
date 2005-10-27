@@ -555,8 +555,7 @@ ssize_t pvfs2_inode_getxattr(
 int pvfs2_inode_setxattr(struct inode *inode, const char *name,
         const void *value, size_t size, int flags);
 int pvfs2_inode_removexattr(struct inode *inode, const char *name);
-/*int pvfs2_inode_listxattr(
-        struct inode *inode); */
+int pvfs2_inode_listxattr(struct inode *inode, char *, size_t);
 
 int pvfs2_inode_getattr(
     struct inode *inode);

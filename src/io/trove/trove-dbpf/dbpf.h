@@ -244,6 +244,14 @@ struct dbpf_keyval_iterate_op
     /* vtag? */
 };
 
+struct dbpf_keyval_iterate_keys_op
+{
+    TROVE_keyval_s *key_array;
+    TROVE_ds_position *position_p;
+    int *count_p;
+    /* vtag? */
+};
+
 /* used for both read and write at */
 struct dbpf_bstream_rw_at_op
 {
@@ -379,6 +387,7 @@ struct dbpf_op
         struct dbpf_keyval_write_op k_write;
         struct dbpf_keyval_remove_op k_remove;
         struct dbpf_keyval_iterate_op k_iterate;
+        struct dbpf_keyval_iterate_keys_op k_iterate_keys;
         struct dbpf_keyval_read_list_op k_read_list;
         struct dbpf_keyval_read_list_op k_write_list;
     } u;
