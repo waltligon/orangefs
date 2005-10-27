@@ -735,7 +735,7 @@ int pvfs2_inode_listxattr(struct inode *inode, char *buffer, size_t size)
     }
     if (size < 0)
     {
-        pvfs2_error("Invalid size (%d)\n", size);
+        pvfs2_error("Invalid size (%d)\n", (int) size);
         return -EINVAL;
     }
     if (inode)
@@ -816,7 +816,7 @@ int pvfs2_inode_listxattr(struct inode *inode, char *buffer, size_t size)
             }
             printk("\n");
         }
-        pvfs2_print("pvfs2_inode_listxattr: returning %d\n", ret ? ret : total);
+        pvfs2_print("pvfs2_inode_listxattr: returning %d\n", ret ? (int) ret : (int) total);
         /* when request is serviced properly, free req op struct */
         op_release(new_op);
         up_read(&pvfs2_inode->xattr_sem);
