@@ -184,7 +184,7 @@ machine pvfs2_client_io_sm(
 
     state io_datafile_size
     {
-        jump pvfs2_client_getattr_sm;
+        jump pvfs2_client_datafile_getattr_sizes_sm;
         success => io_analyze_size_results;
         default => io_cleanup;
     }
@@ -1093,6 +1093,7 @@ static int io_analyze_results(PINT_client_sm *sm_p,
     PINT_pinode *pinode;
     int ret = -PVFS_EINVAL, i = 0;
     PVFS_size tmp_size = 0;
+    PVFS_object_attr *attr;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: "
                  "io_analyze_results\n", sm_p);
@@ -1105,10 +1106,12 @@ static int io_analyze_results(PINT_client_sm *sm_p,
      * the distribution info from the getattr.
      */
     pinode = PINT_acache_lookup(sm_p->object_ref, NULL, NULL);
+    if(pinode)
+    {
+	pinode->attr.mask &= ~PVFS_ATTR_DATA_SIZE;
+    }
 
-    /* we assume pinode has to be cached from previous getattr */
-    assert(pinode);
-    pinode->attr.mask &= ~PVFS_ATTR_DATA_SIZE;
+    attr = &sm_p->getattr.attr;
 
     if (js_p->error_code != IO_DATAFILE_TRANSFERS_COMPLETE)
     {
@@ -1288,8 +1291,8 @@ static int io_analyze_results(PINT_client_sm *sm_p,
             file_data.server_nr = sm_p->u.io.datafile_index_array[i];
 
             datafile_logical_offset = 
-                pinode->attr.u.meta.dist->methods->physical_to_logical_offset(
-                    pinode->attr.u.meta.dist->params,
+                attr->u.meta.dist->methods->physical_to_logical_offset(
+                    attr->u.meta.dist->params,
                     &file_data,
                     sm_p->u.io.contexts[i].flow_desc.file_data.fsize);
 
@@ -1316,14 +1319,13 @@ static int io_analyze_results(PINT_client_sm *sm_p,
          */
         if(i == sm_p->u.io.datafile_count)
         {
-            PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
             PINT_SM_DATAFILE_SIZE_ARRAY_INIT(
                 &sm_p->u.io.dfile_size_array, 
-                pinode->attr.u.meta.dfile_count);
+                attr->u.meta.dfile_count);
 
-            if(sm_p->u.io.datafile_count == pinode->attr.u.meta.dfile_count)
+            if(sm_p->u.io.datafile_count == attr->u.meta.dfile_count)
             {
-                for(i = 0; i < pinode->attr.u.meta.dfile_count; ++i)
+                for(i = 0; i < attr->u.meta.dfile_count; ++i)
                 {
                     sm_p->u.io.dfile_size_array[i] = 
                         sm_p->u.io.contexts[i].flow_desc.file_data.fsize;
@@ -1336,10 +1338,6 @@ static int io_analyze_results(PINT_client_sm *sm_p,
                 goto analyze_results_exit;
             }
 
-            PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
-                                       sm_p->object_ref,
-                                       PVFS_ATTR_DATA_SIZE,
-                                       PVFS_TYPE_NONE);
             sm_p->getattr.size_array = sm_p->u.io.dfile_size_array;
 
             /* setting this state result will cause the state machine to
@@ -1397,7 +1395,7 @@ static int io_analyze_size_results(
     PVFS_Request_ub(sm_p->u.io.mem_req, &memreq_ub_offset);
     memreq_ub_offset += sm_p->u.io.file_req_offset;
 
-    PVFS_Request_lb(sm_p->u.io.file_req, &memreq_lb_offset);
+    PVFS_Request_lb(sm_p->u.io.mem_req, &memreq_lb_offset);
     memreq_lb_offset += sm_p->u.io.file_req_offset;
 
     memset(&file_data, 0, sizeof(file_data));
@@ -1449,11 +1447,14 @@ static int io_analyze_size_results(
         PVFS_offset offset;
         PVFS_size size;
         PVFS_size total_size = 0;
+        int total_segs = 0;
 
         filereq_state = PINT_new_request_state(sm_p->u.io.file_req);
         memreq_state = PINT_new_request_state(sm_p->u.io.mem_req);
 
+	rfdata.server_nr = 1;
         rfdata.server_ct = 1;
+	rfdata.server_nr = 1;
         rfdata.fsize = max_datafile_logical_offset;
         rfdata.dist = pinode->attr.u.meta.dist;
         rfdata.extend_flag = 0;
@@ -1499,9 +1500,23 @@ static int io_analyze_size_results(
                 else
                 {
                     total_size += size;
+            
+            total_segs += result.segs;
                 }
+
+	if(total_segs == 0)
+        {
+            total_size = max_datafile_logical_offset - memreq_lb_offset;
+        }
             }
+            
+            total_segs += result.segs;
         } while(!PINT_REQUEST_DONE(filereq_state) && result.segs);
+
+	if(total_segs == 0)
+        {
+            total_size = max_datafile_logical_offset - memreq_lb_offset;
+        }
 
         sm_p->u.io.io_resp_p->total_completed =
             PVFS_util_min(PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req),

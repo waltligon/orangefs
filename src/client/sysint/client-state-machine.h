@@ -366,7 +366,6 @@ typedef struct PINT_sm_getattr_state
     PVFS_ds_type ref_type;
 
     PVFS_size * size_array;
-    int destroy_size_array;
     PVFS_size size;
     
 } PINT_sm_getattr_state;
@@ -720,6 +719,7 @@ extern struct PINT_state_machine_s pvfs2_client_mkdir_sm;
 extern struct PINT_state_machine_s pvfs2_client_symlink_sm;
 extern struct PINT_state_machine_s pvfs2_client_sysint_getattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_getattr_sm;
+extern struct PINT_state_machine_s pvfs2_client_datafile_getattr_sizes_sm;
 extern struct PINT_state_machine_s pvfs2_client_setattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_io_sm;
 extern struct PINT_state_machine_s pvfs2_client_flush_sm;

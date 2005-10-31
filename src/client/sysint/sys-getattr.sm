@@ -62,6 +62,8 @@ static int getattr_datafile_getattr_setup_msgpairarray(
     PINT_client_sm *sm_p, job_status_s *js_p);
 static int getattr_datafile_getattr_failure(
     PINT_client_sm *sm_p, job_status_s *js_p);
+static int getattr_datafile_getattr_cleanup(
+    PINT_client_sm *sm_p, job_status_s *js_p);
 static int getattr_cleanup(
     PINT_client_sm *sm_p, job_status_s *js_p);
 
@@ -77,14 +79,46 @@ static int getattr_datafile_getattr_comp_fn(
 
 %%
 
+nested machine pvfs2_client_datafile_getattr_sizes_sm(
+    datafile_getattr_setup_msgpairarray,
+    datafile_getattr_xfer_msgpairarray,
+    datafile_getattr_failure,
+    datafile_getattr_cleanup)
+{
+    state datafile_getattr_setup_msgpairarray
+    {
+        run getattr_datafile_getattr_setup_msgpairarray;
+        success => datafile_getattr_xfer_msgpairarray;
+        default => datafile_getattr_failure;
+    }
+    
+    state datafile_getattr_xfer_msgpairarray
+    {
+        jump pvfs2_msgpairarray_sm;
+        success => datafile_getattr_cleanup;
+        default => datafile_getattr_failure;
+    }
+
+    state datafile_getattr_failure
+    {
+        run getattr_datafile_getattr_failure;
+        default => datafile_getattr_cleanup;
+    }
+
+    state datafile_getattr_cleanup
+    {
+	run getattr_datafile_getattr_cleanup;
+        default => return;
+    }
+}
+
+
 nested machine pvfs2_client_getattr_sm(
     acache_lookup,
     object_getattr_setup_msgpair,
     object_getattr_xfer_msgpair,
     object_getattr_failure,
-    datafile_getattr_setup_msgpairarray,
-    datafile_getattr_xfer_msgpairarray,
-    datafile_getattr_failure,
+    datafile_get_sizes,
     acache_insert,
     cleanup)
 {
@@ -92,7 +126,7 @@ nested machine pvfs2_client_getattr_sm(
     {
         run getattr_acache_lookup;
         GETATTR_ACACHE_MISS => object_getattr_setup_msgpair;
-        GETATTR_NEED_DATAFILE_SIZES => datafile_getattr_setup_msgpairarray;
+        GETATTR_NEED_DATAFILE_SIZES => datafile_get_sizes;
         default => cleanup;
     }
 
@@ -107,7 +141,7 @@ nested machine pvfs2_client_getattr_sm(
     {
         jump pvfs2_msgpairarray_sm;
         success => acache_insert;
-        GETATTR_NEED_DATAFILE_SIZES => datafile_getattr_setup_msgpairarray;
+        GETATTR_NEED_DATAFILE_SIZES => datafile_get_sizes;
         default => object_getattr_failure;
     }
 
@@ -123,24 +157,11 @@ nested machine pvfs2_client_getattr_sm(
         default => cleanup;
     }
 
-    state datafile_getattr_setup_msgpairarray
+    state datafile_get_sizes
     {
-        run getattr_datafile_getattr_setup_msgpairarray;
-        success => datafile_getattr_xfer_msgpairarray;
-        default => cleanup;
-    }
-    
-    state datafile_getattr_xfer_msgpairarray
-    {
-        jump pvfs2_msgpairarray_sm;
-        success => acache_insert;
+	jump pvfs2_client_datafile_getattr_sizes_sm;
+	success => acache_insert;
         default => datafile_getattr_failure;
-    }
-
-    state datafile_getattr_failure
-    {
-        run getattr_datafile_getattr_failure;
-        default => cleanup;
     }
 
     state cleanup
@@ -311,6 +332,15 @@ static int getattr_acache_lookup(PINT_client_sm *sm_p,
     gossip_debug(GOSSIP_ACACHE_DEBUG, "%s: handle %Lu fsid %d\n",
       __func__, Lu(object_ref.handle), object_ref.fs_id);
 
+   
+    /* The sys attr mask request is converted to object
+     * attr mask values for comparison with the cached
+     */
+    if(sm_p->getattr.req_attrmask & PVFS_ATTR_DATA_SIZE)
+    {
+	sm_p->getattr.req_attrmask |= PVFS_ATTR_META_ALL;
+    }
+
     pinode = PINT_acache_lookup(object_ref, &status, &unexpired_masks);
     if (pinode)
     {
@@ -340,6 +370,14 @@ static int getattr_acache_lookup(PINT_client_sm *sm_p,
                 trimmed_mask &= (PVFS_ATTR_META_ALL |
                                  PVFS_ATTR_DATA_SIZE |
                                  PVFS_ATTR_COMMON_ALL);
+
+                /* if the DATA_SIZE is requested but not META_ALL, we need to
+                 * add META_ALL since we can't compute DATA_SIZE without it
+                 */
+                if(trimmed_mask & PVFS_ATTR_DATA_SIZE)
+                {
+                    trimmed_mask |= PVFS_ATTR_META_ALL;
+                }
             }
             else if (pinode->attr.objtype == PVFS_TYPE_SYMLINK)
             {
@@ -384,6 +422,10 @@ static int getattr_acache_lookup(PINT_client_sm *sm_p,
                  * isn't and it hasn't been cached, then we need to
                  * get that first.
                  */
+                PINT_SM_DATAFILE_SIZE_ARRAY_INIT(
+                    &sm_p->getattr.size_array,
+                    pinode->attr.u.meta.dfile_count);
+
                 js_p->error_code = GETATTR_NEED_DATAFILE_SIZES;
                 goto cache_hit;
             }
@@ -593,6 +635,9 @@ static int getattr_object_getattr_comp_fn(
                      * to jump to the datafile_getattr state, which
                      * will retrieve the datafile sizes for us.
                      */
+                    PINT_SM_DATAFILE_SIZE_ARRAY_INIT(
+                        &sm_p->getattr.size_array,
+                        attr->u.meta.dfile_count);
                     return GETATTR_NEED_DATAFILE_SIZES;
                 }
             }
@@ -647,17 +692,6 @@ static int getattr_datafile_getattr_setup_msgpairarray(
     {
         js_p->error_code = -PVFS_ENOMEM;
         return 1;
-    }
-
-    /* if the size array isn't initialized yet, we assume that its only
-     * going to be used internally
-     */
-    if(!sm_p->getattr.size_array)
-    {
-        sm_p->getattr.destroy_size_array = 1;
-        PINT_SM_DATAFILE_SIZE_ARRAY_INIT(
-            &sm_p->getattr.size_array,
-            attr->u.meta.dfile_count);
     }
 
     sm_p->msgarray_count = attr->u.meta.dfile_count;
@@ -722,6 +756,21 @@ static int getattr_datafile_getattr_failure(PINT_client_sm *sm_p,
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) getattr state: "
                  "getattr_datafile_getattr_failure\n", sm_p);
+    return 1;
+}
+
+static int getattr_datafile_getattr_cleanup(PINT_client_sm *sm_p,
+                                            job_status_s *js_p)
+{
+    if(js_p->error_code == 0)
+    {
+        if (sm_p->msgarray)
+        {
+            free(sm_p->msgarray);
+        }
+        sm_p->msgarray = NULL;
+    }
+
     return 1;
 }
 
@@ -802,19 +851,7 @@ static int getattr_cleanup(PINT_client_sm *sm_p,
 
     sm_p->error_code = js_p->error_code;
 
-    if(js_p->error_code == 0)
-    {
-        if (sm_p->msgarray && (sm_p->msgarray != &(sm_p->msgpair)))
-        {
-            free(sm_p->msgarray);
-        }
-        sm_p->msgarray = NULL;
-    }
-
-    if(sm_p->getattr.destroy_size_array)
-    {
-        PINT_SM_DATAFILE_SIZE_ARRAY_DESTROY(&sm_p->getattr.size_array);
-    }
+    PINT_SM_DATAFILE_SIZE_ARRAY_DESTROY(&sm_p->getattr.size_array);
 
     return 1;
 }
