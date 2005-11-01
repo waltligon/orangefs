@@ -582,7 +582,7 @@ if test "x$have_xattr" = "xyes"; then
    AC_MSG_CHECKING(for const argument to setxattr function)
    tmp_cflags=$CFLAGS
    dnl if this test passes, there is a const void* argument
-   CFLAGS="CFLAGS -Werror"
+   CFLAGS="$CFLAGS -Werror"
    AC_TRY_COMPILE([
    	#define __KERNEL__
 	#include <linux/fs.h>

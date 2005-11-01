@@ -4750,7 +4750,7 @@ if test "x$have_xattr" = "xyes"; then
       echo "$as_me:$LINENO: checking for const argument to setxattr function" >&5
 echo $ECHO_N "checking for const argument to setxattr function... $ECHO_C" >&6
    tmp_cflags=$CFLAGS
-      CFLAGS="CFLAGS -Werror"
+      CFLAGS="$CFLAGS -Werror"
    cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
