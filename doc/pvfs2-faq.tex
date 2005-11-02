@@ -562,7 +562,7 @@ prompt# getfattr -m "" /path/to/mounted/pvfs2/foo
 Note that PVFS2 uses a few standard names for its internal use that prohibit users
 from reusing the same names. A list of such keys are as follows at the time
 of writing of this document ("dir\_ent", "root\_handle",
-"datafile\_handles", "metafile\_dist", "symlink\_target"}. Further, Linux also uses
+"datafile\_handles", "metafile\_dist", "symlink\_target"). Further, Linux also uses
 a set of reserved keys to hold extended attributes that begin with the prefix "system.",
 thus making them unavailable for regular usage.
 
