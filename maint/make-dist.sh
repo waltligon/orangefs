@@ -50,6 +50,7 @@ fi
 ##################
 make clean
 make docs
+make statecomp
 
 if test -d $TARGETDIR; then
     rm -rf $TARGETDIR
@@ -72,6 +73,7 @@ for f in `find . -name "*.log"`; do rm -rf $f; done
 for f in `find . -name "*.toc"`; do rm -rf $f; done
 for f in `find . -name "*.aux"`; do rm -rf $f; done
 rm Makefile pvfs2-config.h PVFS2-GLOBAL-TODO.txt
+rm src/common/statecomp/statecomp
 rm -rf test
 
 # dump some special options into the top level module.mk.in

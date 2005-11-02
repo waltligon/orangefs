@@ -636,9 +636,12 @@ clean::
 		$(KERNAPPOBJS) $(KERNAPPS) \
 		$(VISS) $(VISMISCOBJS) $(VISOBJS) $(VISDEPENDS)\
 		$(VISMISCDEPENDS) $(KARMAOBJS) $(LIBPICOBJS) \
-		$(STATECOMP) $(STATECOMPOBJS) $(STATECOMPGEN) \
+		$(STATECOMP) $(STATECOMPOBJS) \
 		src/server/pvfs2-server-server.o \
-		src/apps/karma/karma
+		src/apps/karma/karma 
+ifndef DIST_RELEASE
+	$(E)rm -f $(STATECOMPGEN) 
+endif
 
 ifneq (,$(LINUX_KERNEL_SRC))
 clean::
@@ -707,13 +710,11 @@ nodep:; @:
 	$(srcdir)/maint/pvfs2latexwrapper.pl -html -i $(basename $<).tex -o $@
 	$(srcdir)/maint/pvfs2htmlfixup.sh $(@D)/*/$(@F)
 
-ifndef DIST_RELEASE
 # rule for automatically generated source files
 # NOTE: this rule is disabled in release snapshots
 %.c: %.sm src/common/statecomp/statecomp
 	$(Q) "  SMC		$@"
 	$(E)src/common/statecomp/statecomp $< $@
-endif
 
 # if this is not a distribution tarball, then drop some example
 # config files in the server build directory with good defaults for
