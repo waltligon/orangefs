@@ -284,9 +284,6 @@ PVFS_error PVFS_isys_io(
     sm_p->u.io.datafile_index_array = NULL;
     sm_p->u.io.datafile_count = 0;
     sm_p->u.io.total_size = 0;
-    sm_p->u.io.continue_analysis = 0;
-    sm_p->u.io.saved_ret = 0;
-    sm_p->u.io.saved_error_code = 0;
     sm_p->object_ref = ref;
 
     return PINT_client_state_machine_post(

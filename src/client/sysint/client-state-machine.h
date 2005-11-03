@@ -210,13 +210,6 @@ struct PINT_client_io_sm
     PVFS_size total_size;
 
     PVFS_size * dfile_size_array;
-    /*
-      only used when we need to zero fill beyond the end of the
-      physical file size
-    */
-    int continue_analysis;
-    PVFS_error saved_ret;
-    PVFS_error saved_error_code;
 };
 
 struct PINT_client_flush_sm
