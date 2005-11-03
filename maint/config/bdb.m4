@@ -13,7 +13,7 @@ AC_DEFUN([AX_BERKELEY_DB],
     oldlibs=$LIBS
     lib=notfound
     if test "x$dbpath" != "x" ; then
-        DB_LDFALGS="-L${dbpath}/lib"
+        DB_LDFLAGS="-L${dbpath}/lib"
 	DB_CFLAGS="-I${dbpath}/include"
 	LDFLAGS="${LDFLAGS} $DB_LDFLAGS"
 	CFLAGS="${CFLAGS} $DB_CFLAGS"
