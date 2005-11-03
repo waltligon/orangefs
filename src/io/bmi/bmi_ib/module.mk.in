@@ -1,82 +1,55 @@
 #
 # Makefile stub for bmi_ib.
 #
-# Copyright (C) 2003-4 Pete Wyckoff <pw@osc.edu>
+# Copyright (C) 2003-5 Pete Wyckoff <pw@osc.edu>
 #
 # See COPYING in top-level directory.
 #
-# $Id: module.mk.in,v 1.5 2004-03-07 02:14:57 pw Exp $
+# $Id: module.mk.in,v 1.6 2005-11-03 21:23:19 pw Exp $
 #
 
 # only do any of this if configure decided to use IB
 ifdef BUILD_IB
 
-# local definitions
-bmi_ib_subdir := src/io/bmi/bmi_ib
-bmi_ib_src := $(patsubst %,$(bmi_ib_subdir)/%,ib.c setup.c util.c)
-bmi_ib_obj := $(bmi_ib_src:.c=.o)
-bmi_ib_picobj := $(bmi_ib_src:.c=.po)
-bmi_ib_server_obj := $(bmi_ib_src:.c=-server.o)
-bmi_ib_dep := $(bmi_ib_src:.c=.d)
+#
+# Local definitions.
+#
+DIR := src/io/bmi/bmi_ib
+cfiles := ib.c setup.c util.c mem.c
+src := $(patsubst %,$(DIR)/%,$(cfiles))
+cflags :=
 
-# export these to the top Makefile to tell it what to build
-LIBSRC    += $(bmi_ib_src)
-SERVERSRC += $(bmi_ib_src)
-
-# minimal cflags, removing the million include paths auto-generated from MODULES
-bmi_ib_bad_mod_inc := $(patsubst %, -I $(srcdir)/%, $(MODULES))
-bmi_ib_cflags := $(patsubst $(bmi_ib_bad_mod_inc),,$(CFLAGS))
-# Now add back include directories required by included files which include
-# other files without explicit paths.
-bmi_ib_cflags += -I$(srcdir)/src/common/quicklist
-# And finally the IB_HOME defined from configure and some flags.
-bmi_ib_cflags += -I@IB_HOME@/include
-bmi_ib_cflags += -fno-common
-bmi_ib_cflags += -Werror -Wall -W -Wpointer-arith
-bmi_ib_cflags += -Wcast-align -Wcast-qual -Wbad-function-cast
-bmi_ib_cflags += -Wmissing-prototypes -Wmissing-declarations
-bmi_ib_cflags += -Wnested-externs
-bmi_ib_cflags += -Wshadow -Wstrict-prototypes -Wredundant-decls
-# Do not use these, because mellanox writes bad code:
-#   -Wundef -Wwrite-strings
-# This one gives too many false positives:
-#   -Wconversion
+#
+# Export these to the top Makefile to tell it what to build.
+#
+LIBSRC    += $(src)
+SERVERSRC += $(src)
 
 #
 # Add extra include paths and warnings just for these IB files.
 # No need to expose the rest of the tree to the mess of IB include
 # dirs and warnings used here.
 #
-$(bmi_ib_obj): %.o: %.c
-ifdef QUIET_COMPILE
-	@echo "  IBCC		$@"
-	@$(CC) $(IBCFLAGS) $(LIBCFLAGS) $(bmi_ib_cflags) $< -c -o $@
-else
-	$(CC) $(IBCFLAGS) $(LIBCFLAGS) $(bmi_ib_cflags) $< -c -o $@
-endif
+cflags += -I@IB_HOME@/include
+cflags += -fno-common
+cflags += -Werror -Wall -W -Wpointer-arith
+cflags += -Wcast-align -Wcast-qual -Wbad-function-cast
+cflags += -Wmissing-prototypes -Wmissing-declarations
+cflags += -Wnested-externs
+cflags += -Wshadow -Wstrict-prototypes -Wredundant-decls
+cflags += -Wundef -Wwrite-strings
+# these are not otherwise defined and cause warnings
+cflags += -DMAX_TRACE=0 -DMAX_ERROR=0 -DMAX_DEBUG=0
 
-$(bmi_ib_picobj): %.po: %.c
-ifdef QUIET_COMPILE
-	@echo "  IBCCPIC	$@"
-	@$(CC) $(IBCFLAGS) $(LIBCFLAGS) $(PICFLAGS) $(bmi_ib_cflags) $< -c -o $@
-else
-	$(CC) $(IBCFLAGS) $(LIBCFLAGS) $(PICFLAGS) $(bmi_ib_cflags) $< -c -o $@
-endif
+#
+# One prototype in the mellanox includes specifies passing a u8 but that's
+# not possible so this always throws a warning:
+#   -Wconversion
+#
 
-$(bmi_ib_server_obj): %-server.o: %.c
-ifdef QUIET_COMPILE
-	@echo "  IBCC		$@"
-	@$(CC) $(IBCFLAGS) $(SERVERCFLAGS) $(bmi_ib_cflags) $< -c -o $@
-else
-	$(CC) $(IBCFLAGS) $(SERVERCFLAGS) $(bmi_ib_cflags) $< -c -o $@
-endif
-
-$(bmi_ib_dep): %.d: %.c
-ifdef QUIET_COMPILE
-	@echo "  IBDEP		$@"
-	@$(srcdir)/maint/depend.sh $(bmi_ib_subdir) $(bmi_ib_cflags) $< > $@
-else
-	$(srcdir)/maint/depend.sh $(bmi_ib_subdir) $(bmi_ib_cflags) $< > $@
-endif
+#
+# Tell the toplevel make about the extra cflags.
+#
+MODCFLAGS_$(DIR) := $(cflags)
 
 endif  # BUILD_IB

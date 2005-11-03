@@ -1,8 +1,8 @@
 Notes on the BMI InfiniBand implementation
 
-Copyright (C) 2003 Pete Wyckoff <pw@osc.edu>
+Copyright (C) 2003-5 Pete Wyckoff <pw@osc.edu>
 
-$Id: README,v 1.2 2004-09-29 13:47:55 pw Exp $
+$Id: README,v 1.3 2005-11-03 21:23:19 pw Exp $
 
 Connection management
 ---------------------
@@ -121,21 +121,28 @@ RTS send
 --------
     SQ_WAITING_BUFFER
 	alloc bh
-	post_ack_recv_slot
+    #	post_ack_recv_slot
 	post_sr mh + mh_rts
-    SQ_WAITING_RTS_ACK
-	(wait recv cq event)
-	free bh from rts
+    ### 24 nov 04, removed this state:  problem happened when
+    # receiver sent RTS_ACK then CTS very close together.  They
+    # go on different QPs but wired to the same CQ.  Sender polled
+    # and found the CTS before the RTS_ACK and got unhappy.  Not convinced
+    # there was any good reason for the RTS_ACK anyway, as it is a bug
+    # if the receiver doesn't reply to the CTS before other messages; these
+    # things are supposed to be in order.
+    #SQ_WAITING_RTS_ACK
+    #	(wait recv cq event)
+    #	free bh from rts
     SQ_WAITING_CTS
 	(wait recv cq event)
-	re-post_rr
-	pin memory
-	RDMA big message to given address
+	free bh used for rts
+	post RDMA to address given in CTS
     SQ_WAITING_DATA_LOCAL_SEND_COMPLETE
 	(wait local send cq event for rdma write)
-	unpin
+	repost rr used to receive cts
 	ack cts  # could probably do this in previous state since IB
 	           guarantees order, but need this state to unpin anyway
+	unpin
     SQ_WAITING_USER_TEST
 	wait test
 	release sendq
@@ -148,16 +155,13 @@ RTS recv, pre-post recv
 	(wait recv cq event)
 	match existing rq entry
 	re-post_rr from rts
-	ack rts for simplicitly, else must carry this number until cts
+	# ack rts for simplicitly, else must carry this number until cts
     RQ_RTS_WAITING_CTS_BUFFER
 	alloc bh local for cts
 	    -> if failure state = RQ_RTS_WAITING_CTS_BUFFER
 	pin recv buffer
 	post_ack_recv_slot
 	send cts
-    RQ_RTS_WAITING_CTS_LOCAL_SEND_COMPLETE
-	(wait send cq event)
-	ignore
     RQ_RTS_WAITING_DATA
 	(wait recv cq event ack)
 	free bh local from cts
@@ -171,14 +175,14 @@ RTS recv, non-pre post
     (rts arrives on network)
 	build recvq
 	re-post_rr from rts
-	ack rts for simplicitly, else must carry this number until post
+	# ack rts for simplicitly, else must carry this number until post
     RQ_RTS_WAITING_USER_POST
 	(wait user post that matches)
 	alloc bh local for cts
 	pin recv buffer
 	post_ack_recv_slot
 	send cts -> if failure state = RQ_RTS_WAITING_CTS_BUFFER
-    RQ_RTS_WAITING_CTS_LOCAL_SEND_COMPLETE ... continue above
+    RQ_RTS_WAITING_DATA ... continue above
 
 
 Other

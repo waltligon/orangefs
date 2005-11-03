@@ -1,20 +1,17 @@
 /*
  * InfiniBand BMI method.
  *
- * Copyright (C) 2003-4 Pete Wyckoff <pw@osc.edu>
+ * Copyright (C) 2003-5 Pete Wyckoff <pw@osc.edu>
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.16 2005-08-02 17:56:12 robl Exp $
+ * $Id: ib.c,v 1.17 2005-11-03 21:23:19 pw Exp $
  */
 #include <stdio.h>  /* just for NULL for id-generator.h */
-#include <sys/time.h>
 #include <src/common/id-generator/id-generator.h>
-#include <src/common/quicklist/quicklist.h>
-#include <src/io/bmi/bmi-method-support.h>
-#include <src/common/gen-locks/gen-locks.h>
-#include <vapi.h>
-#include <vapi_common.h>
+#include <src/io/bmi/bmi-method-support.h>   /* bmi_method_ops ... */
+#include <src/common/gen-locks/gen-locks.h>  /* gen_mutex_t ... */
+#include <vapi_common.h>  /* VAPI_cqe_opcode_sym ... */
 #include "ib.h"
 
 static gen_mutex_t interface_mutex = GEN_MUTEX_INITIALIZER;
@@ -28,25 +25,41 @@ list_t connection __hidden;
 list_t sendq __hidden;
 list_t recvq __hidden;
 VAPI_sg_lst_entry_t *sg_tmp_array __hidden;
-int sg_max_len __hidden;
-int max_outstanding_wr __hidden;
+unsigned int sg_max_len __hidden;
+unsigned int max_outstanding_wr __hidden;
+
+#define MEMCACHE_BOUNCEBUF 0
+#define MEMCACHE_EARLY_REG 1
+
+#if MEMCACHE_EARLY_REG
+#if MEMCACHE_BOUNCEBUF
+#error Not sensible to use bouncebuf with early reg.  First use of bouncebuf \
+  will register it, thus no effect whether early reg or not.
+#endif
+#endif
+
+#if MEMCACHE_BOUNCEBUF
+static ib_buflist_t reg_send_buflist = { .num = 0 };
+static ib_buflist_t reg_recv_buflist = { .num = 0 };
+static void *reg_send_buflist_buf;
+static void *reg_recv_buflist_buf;
+static const bmi_size_t reg_send_buflist_len = 256 * 1024;
+static const bmi_size_t reg_recv_buflist_len = 256 * 1024;
+#endif
 
 static int send_cts(ib_recv_t *rq);
 static void post_sr(const buf_head_t *bh, u_int32_t len);
 /* post_rr declared externally */
-static void post_sr_ack(const ib_connection_t *c, const buf_head_t *bh);
+static void post_sr_ack(ib_connection_t *c, const buf_head_t *bh);
 static void post_rr_ack(const ib_connection_t *c, const buf_head_t *bh);
 static void post_sr_rdmaw(ib_send_t *sq, msg_header_cts_t *mh_cts);
 
 static void encourage_send_waiting_buffer(ib_send_t *sq);
-static void encourage_send_incoming_ack(ib_send_t *sq);
-static void encourage_send_send_completed(ib_send_t *sq);
 static void encourage_send_incoming_cts(buf_head_t *bh, u_int32_t byte_len);
 
 static void encourage_recv_incoming(ib_connection_t *c, buf_head_t *bh,
   u_int32_t byte_len);
 static void encourage_recv_incoming_cts_ack(ib_recv_t *rq);
-static void encourage_recv_to_send_cts(ib_recv_t *rq);
 static void maybe_free_connection(ib_connection_t *c);
 
 /*
@@ -72,17 +85,21 @@ check_cq(void)
 	debug(2, "%s: found something", __func__);
 	++ret;
 	if (desc.status != VAPI_SUCCESS) {
-	    warning("%s: entry id 0x%Lx opcode %s error %s", __func__,
-	      desc.id, VAPI_cqe_opcode_sym(desc.opcode),
-	      VAPI_wc_status_sym(desc.status));
 	    if (desc.opcode == VAPI_CQE_SQ_SEND_DATA) {
+		debug(0, "%s: entry id 0x%Lx SQ_SEND_DATA error %s", __func__,
+		  desc.id, VAPI_wc_status_sym(desc.status));
 		if (desc.id) {
 		    ib_connection_t *c = ptr_from_int64(desc.id);
-		    if (c->cancelled)
+		    if (c->cancelled) {
 			debug(0,
 			  "%s: ignoring send error on cancelled conn to %s",
 			  __func__, c->peername);
+		    }
 		}
+	    } else {
+		error("%s: entry id 0x%Lx opcode %s error %s", __func__,
+		  desc.id, VAPI_cqe_opcode_sym(desc.opcode),
+		  VAPI_wc_status_sym(desc.status));
 	    }
 	}
 
@@ -105,21 +122,31 @@ check_cq(void)
 		  __func__);
 		debug(2, "%s: acknowledgment message %s buf %d",
 		  __func__, bh->c->peername, bufnum);
-		/* maybe this is okay?  --pw, 6 mar 04 */
-		assert(bufnum == bh->num, "%s: ack out of sequence, got %d"
-		  " in descriptor for buffer %d", __func__, bufnum, bh->num);
+
 		/*
-		 * Do not get the sq from the bh that posted this, just in case
-		 * it ever becomes okay to do out-of-order.  Instead look up
-		 * the bufnum in the static send array.  This sq will actually
-		 * be an rq if the ack is of a CTS.
+		 * Do not get the sq from the bh that posted this because
+		 * these do not necessarily come in order, in particular
+		 * there is no explicit ACK for an RTS instead the CTS serves
+		 * as the ACK.  Instead look up the bufnum in the static
+		 * send array.  This sq will actually be an rq if the ack
+		 * is of a CTS.
 		 */
 		sq = bh->c->eager_send_buf_head_contig[bufnum].sq;
-		if (unlikely(sq->type == TYPE_RECV))
-		    /* ack of a CTS send by the receiver */
+		if (unlikely(sq->type == BMI_RECV))
+		    /* ack of a CTS sent by the receiver */
 		    encourage_recv_incoming_cts_ack((ib_recv_t *)sq);
-		else
-		    encourage_send_incoming_ack(sq);
+		else {
+		    assert(sq->state == SQ_WAITING_EAGER_ACK,
+		      "%s: unknown send state %s", __func__,
+		      sq_state_name(sq->state));
+
+		    sq->state = SQ_WAITING_USER_TEST;
+		    qlist_add_tail(&sq->bh->list, &sq->c->eager_send_buf_free);
+
+		    debug(2, "%s: sq %p"
+		      " SQ_WAITING_EAGER_ACK -> SQ_WAITING_USER_TEST",
+		      __func__, sq);
+		}
 
 	    } else {
 		/*
@@ -127,16 +154,14 @@ check_cq(void)
 		 */
 		msg_header_t *mh = bh->buf;
 
-		debug(2, "%s: found len %d at %s bufnum %d type %s",
+		debug(1, "%s: found len %d at %s bufnum %d type %s",
 		  __func__, byte_len, bh->c->peername, bh->num,
 		  msg_type_name(mh->type));
 		if (mh->type == MSG_CTS) {
 		    /* incoming CTS messages go to the send engine */
-		    debug(2, "%s: found cts message", __func__);
 		    encourage_send_incoming_cts(bh, byte_len);
 		} else {
 		    /* something for the recv side, no known rq yet */
-		    debug(2, "%s: found message for receive engine", __func__);
 		    encourage_recv_incoming(bh->c, bh, byte_len);
 		}
 	    }
@@ -146,14 +171,29 @@ check_cq(void)
 	    /* completion event for the rdma write we initiated, used
 	     * to signal memory unpin etc. */
 	    ib_send_t *sq = ptr_from_int64(desc.id);
-	    encourage_send_send_completed(sq);
+
+	    debug(2, "%s: sq %p %s", __func__, sq, sq_state_name(sq->state));
+
+	    assert(sq->state == SQ_WAITING_DATA_LOCAL_SEND_COMPLETE,
+	      "%s: wrong send state %s", __func__, sq_state_name(sq->state));
+
+	    /* re-post and ack cts saved earlier, signals rdma completed */
+	    post_rr(sq->c, sq->bh);
+	    post_sr_ack(sq->c, sq->bh);
+
+#if !MEMCACHE_BOUNCEBUF
+	    memcache_deregister(&sq->buflist);
+#endif
+	    sq->state = SQ_WAITING_USER_TEST;
+
+	    debug(2, "%s: sq %p now %s", __func__, sq,
+	      sq_state_name(sq->state));
 
 	} else if (desc.opcode == VAPI_CQE_SQ_SEND_DATA) {
 
 	    /* periodic send queue flush, qp or qp_ack */
-	    ib_connection_t *c = ptr_from_int64(desc.id);
-	    debug(2, "%s: sr (ack) to %s send completed", __func__,
-	      c->peername);
+	    debug(2, "%s: sr (ack?) to %s send completed", __func__,
+	      ((ib_connection_t *) ptr_from_int64(desc.id))->peername);
 
 	} else {
 	    const char *ops = VAPI_cqe_opcode_sym(desc.opcode);
@@ -207,7 +247,7 @@ encourage_send_waiting_buffer(ib_send_t *sq)
 	post_rr_ack(sq->c, bh);
 
 	/* send the message */
-	post_sr(bh, sizeof(*mh) + sq->buflist.tot_len);
+	post_sr(bh, (u_int32_t) (sizeof(*mh) + sq->buflist.tot_len));
 
 	/* wait for ack saying remote has received and recycled his buf */
 	sq->state = SQ_WAITING_EAGER_ACK;
@@ -228,55 +268,20 @@ encourage_send_waiting_buffer(ib_send_t *sq)
 	mh_rts->mop_id = sq->mop->op_id;
 	mh_rts->tot_len = sq->buflist.tot_len;
 
-	/* get ready to receive the ack */
-	post_rr_ack(sq->c, bh);
-
+	/* do not expect an ack back from this */
 	post_sr(bh, sizeof(*mh) + sizeof(*mh_rts));
 
-	sq->state = SQ_WAITING_RTS_ACK;
+#if MEMCACHE_EARLY_REG
+	/* XXX: need to lock against receiver thread?  Could poll return
+	 * the CTS and start the data send before this completes? */
+	memcache_register(&sq->buflist);
+#endif
+
+	sq->state = SQ_WAITING_CTS;
 	debug(2, "%s: sq %p sent RTS now %s", __func__, sq,
 	  sq_state_name(sq->state));
     }
 }
-
-/*
- * Push a send message along its next step.  Called in response to an
- * incoming message (including local acks of messages we sent).
- *
- * bh_in and byte_len only needed for CTS reply to check length
- */
-static void
-encourage_send_incoming_ack(ib_send_t *sq)
-{
-    debug(2, "%s: sq %p %s", __func__, sq, sq_state_name(sq->state));
-
-    if (sq->state == SQ_WAITING_EAGER_ACK)
-	sq->state = SQ_WAITING_USER_TEST;
-    else if (sq->state == SQ_WAITING_RTS_ACK)
-	sq->state = SQ_WAITING_CTS;
-    else
-	error("%s: unknown send state %s", __func__, sq_state_name(sq->state));
-
-    qlist_add_tail(&sq->bh->list, &sq->c->eager_send_buf_free);
-    debug(2, "%s: sq %p now %s", __func__, sq, sq_state_name(sq->state));
-}
-
-static void
-encourage_send_send_completed(ib_send_t *sq)
-{
-    debug(2, "%s: sq %p %s", __func__, sq, sq_state_name(sq->state));
-    assert(sq->state == SQ_WAITING_DATA_LOCAL_SEND_COMPLETE,
-      "%s: wrong send state %s", __func__, sq_state_name(sq->state));
-
-    /* re-post and ack cts saved above, signals rdma completed */
-    post_rr(sq->c, sq->bh);
-    post_sr_ack(sq->c, sq->bh);
-
-    ib_mem_deregister(&sq->buflist);
-    sq->state = SQ_WAITING_USER_TEST;
-    debug(2, "%s: sq %p now %s", __func__, sq, sq_state_name(sq->state));
-}
-
 
 /*
  * Look at the incoming message which is a response to an earlier RTS
@@ -317,12 +322,15 @@ encourage_send_incoming_cts(buf_head_t *bh, u_int32_t byte_len)
     assert(sq->state == SQ_WAITING_CTS,
       "%s: wrong send state %s", __func__, sq_state_name(sq->state));
 
+    /* the cts serves as an implicit ack of our rts, free that send buf */
+    qlist_add_tail(&sq->bh->list, &sq->c->eager_send_buf_free);
+
     /* message; cts content; list of buffers, lengths, and keys */
     want = sizeof(*mh) + sizeof(*mh_cts)
       + mh_cts->buflist_num * MSG_HEADER_CTS_BUFLIST_ENTRY_SIZE;
-    assert(byte_len == want,
-      "%s: wrong message size for CTS, got %u, want %u", __func__,
-      byte_len, want);
+    if (unlikely(byte_len != want))
+	error("%s: wrong message size for CTS, got %u, want %u", __func__,
+          byte_len, want);
 
     /* save the bh which received the CTS for later acking */
     sq->bh = bh;
@@ -359,7 +367,7 @@ static ib_recv_t *
 alloc_new_recv(ib_connection_t *c, buf_head_t *bh)
 {
     ib_recv_t *rq = Malloc(sizeof(*rq));
-    rq->type = TYPE_RECV;
+    rq->type = BMI_RECV;
     rq->c = c;
     rq->bh = bh;
     rq->mop = 0;  /* until user posts for it */
@@ -379,17 +387,16 @@ encourage_recv_incoming(ib_connection_t *c, buf_head_t *bh, u_int32_t byte_len)
     msg_header_t *mh = bh->buf;
     ib_recv_t *rq;
 
-    debug(2, "%s: incoming msg type %s", __func__, msg_type_name(mh->type));
+    debug(4, "%s: incoming msg type %s", __func__, msg_type_name(mh->type));
 
     if (mh->type == MSG_EAGER_SEND) {
 
 	rq = find_matching_recv(RQ_WAITING_INCOMING, c, mh->bmi_tag);
 	if (rq) {
-	    int len = byte_len - sizeof(*mh);
+	    bmi_size_t len = byte_len - sizeof(*mh);
 	    if (len > rq->buflist.tot_len)
-		error("%s: EAGER received %d too small for buffer "
-		  FORMAT_BMI_SIZE_T,
-		  __func__, len, rq->buflist.tot_len);
+		error("%s: EAGER received %Ld too small for buffer %Ld",
+		  __func__, Ld(len), Ld(rq->buflist.tot_len));
 
 	    memcpy_to_buflist(&rq->buflist,
 	      (char *) bh->buf + sizeof(*mh), len);
@@ -401,6 +408,15 @@ encourage_recv_incoming(ib_connection_t *c, buf_head_t *bh, u_int32_t byte_len)
 	    rq->state = RQ_EAGER_WAITING_USER_TEST;
 	    debug(2, "%s: matched rq %p now %s", __func__, rq,
 	      rq_state_name(rq->state));
+#if MEMCACHE_EARLY_REG
+	    /* if a big receive was posted but only a small message came
+	     * through, unregister it now */
+	    if (rq->buflist.tot_len > EAGER_BUF_PAYLOAD) {
+		debug(2, "%s: early registration not needed, dereg after eager",
+		  __func__);
+		memcache_deregister(&rq->buflist);
+	    }
+#endif
 
 	} else {
 	    rq = alloc_new_recv(c, bh);
@@ -434,9 +450,8 @@ encourage_recv_incoming(ib_connection_t *c, buf_head_t *bh, u_int32_t byte_len)
 	rq = find_matching_recv(RQ_WAITING_INCOMING, c, mh->bmi_tag);
 	if (rq) {
 	    if ((int)mh_rts->tot_len > rq->buflist.tot_len) {
-		error("%s: RTS received " FORMAT_U_INT64_T
-		  " too small for buffer " FORMAT_U_INT64_T,
-		  __func__, mh_rts->tot_len, rq->buflist.tot_len);
+		error("%s: RTS received %Lu too small for buffer %Lu",
+		  __func__, Lu(mh_rts->tot_len), Lu(rq->buflist.tot_len));
 	    }
 	    rq->state = RQ_RTS_WAITING_CTS_BUFFER;
 	    debug(2, "%s: matched rq %p MSG_RTS now %s", __func__, rq,
@@ -452,14 +467,23 @@ encourage_recv_incoming(ib_connection_t *c, buf_head_t *bh, u_int32_t byte_len)
 	rq->actual_len = mh_rts->tot_len;
 	rq->rts_mop_id = mh_rts->mop_id;
 
-	/* ack his rts for simplicity */
-	debug(2, "%s: rq %p ack RTS from %s opid 0x%Lx", __func__,
-	  rq, c->peername, rq->rts_mop_id);
+#if 0
+	/* do NOT ack his rts, send CTS later implicitly acks */
+	debug(1, "%s: rq %p %s ack RTS from %s opid 0x%Lx", __func__,
+	  rq, rq_state_name(rq->state), c->peername, rq->rts_mop_id);
 	post_rr(c, bh);
 	post_sr_ack(c, bh);
+#else
+	post_rr(c, bh);
+#endif
 
-	if (rq->state == RQ_RTS_WAITING_CTS_BUFFER)
-	    encourage_recv_to_send_cts(rq);
+	if (rq->state == RQ_RTS_WAITING_CTS_BUFFER) {
+	    int ret;
+	    ret = send_cts(rq);
+	    if (ret == 0)
+		rq->state = RQ_RTS_WAITING_DATA;
+	    /* else keep waiting until we can send that cts */
+	}
 
     } else if (mh->type == MSG_BYE) {
 	/*
@@ -470,31 +494,6 @@ encourage_recv_incoming(ib_connection_t *c, buf_head_t *bh, u_int32_t byte_len)
     } else {
 	error("%s: unknown message header type %d", __func__, mh->type);
     }
-}
-
-/*
- * Called internally when we notice that we should send a CTS for a
- * message, either just after receiving an RTS, or when the user gets
- * around to posting a receive that matchies an earlier received RTS.
- *
- * Also at test time if this state is found, since sending a CTS requires
- * a local buffer, and we might run out of that.
- */
-static void
-encourage_recv_to_send_cts(ib_recv_t *rq)
-{
-    int ret;
-
-    debug(2, "%s: rq %p %s", __func__, rq, rq_state_name(rq->state));
-    assert(rq->state == RQ_RTS_WAITING_CTS_BUFFER,
-      "%s: wrong state %s", __func__, rq_state_name(rq->state));
-
-    ret = send_cts(rq);
-    if (ret == 0)
-	rq->state = RQ_RTS_WAITING_DATA;
-    /* else keep waiting until we can send that cts */
-
-    debug(2, "%s: rq %p now %s", __func__, rq, rq_state_name(rq->state));
 }
 
 /*
@@ -510,7 +509,11 @@ encourage_recv_incoming_cts_ack(ib_recv_t *rq)
 
     /* XXX: should be head for cache, but use tail for debugging */
     qlist_add_tail(&rq->bh->list, &rq->c->eager_send_buf_free);
-    ib_mem_deregister(&rq->buflist);
+#if MEMCACHE_BOUNCEBUF
+    memcpy_to_buflist(&rq->buflist, reg_recv_buflist_buf, rq->buflist.tot_len);
+#else
+    memcache_deregister(&rq->buflist);
+#endif
     rq->state = RQ_RTS_WAITING_USER_TEST;
 
     debug(2, "%s: rq %p now %s", __func__, rq, rq_state_name(rq->state));
@@ -533,7 +536,7 @@ send_cts(ib_recv_t *rq)
     u_int32_t post_len;
     int i;
 
-    debug(2, "%s: rq %p, offering to recv %s opid 0x%Lx len %Ld",
+    debug(2, "%s: rq %p from %s opid 0x%Lx len %Ld",
       __func__, rq, rq->c->peername, rq->rts_mop_id, Ld(rq->buflist.tot_len));
 
     bh = qlist_try_del_head(&rq->c->eager_send_buf_free);
@@ -544,10 +547,26 @@ send_cts(ib_recv_t *rq)
     rq->bh = bh;
     bh->sq = (ib_send_t *) rq;  /* uplink for completion */
 
-    ib_mem_register(&rq->buflist, TYPE_RECV);
+#if MEMCACHE_BOUNCEBUF
+    if (reg_recv_buflist.num == 0) {
+	reg_recv_buflist.num = 1;
+	reg_recv_buflist.buf.recv = &reg_recv_buflist_buf;
+	reg_recv_buflist.len = &reg_recv_buflist_len;
+	reg_recv_buflist.tot_len = reg_recv_buflist_len;
+	reg_recv_buflist_buf = Malloc(reg_recv_buflist_len);
+	memcache_register(&reg_recv_buflist, BMI_RECV);
+    }
+    if (rq->buflist.tot_len > reg_recv_buflist_len)
+	error("%s: recv prereg buflist too small, need %Ld", __func__,
+	  Ld(rq->buflist.tot_len));
 
-    /* expect an ack for this cts */
-    post_rr_ack(rq->c, bh);
+    ib_buflist_t save_buflist = rq->buflist;
+    rq->buflist = reg_recv_buflist;
+#else
+#  if !MEMCACHE_EARLY_REG
+    memcache_register(&rq->buflist, BMI_RECV);
+#  endif
+#endif
 
     mh = bh->buf;
     mh->type = MSG_CTS;
@@ -567,10 +586,18 @@ send_cts(ib_recv_t *rq)
     for (i=0; i<rq->buflist.num; i++) {
 	bufp[i] = int64_from_ptr(rq->buflist.buf.recv[i]);
 	lenp[i] = rq->buflist.len[i];
-	keyp[i] = rq->buflist.rkey[i];
+	keyp[i] = rq->buflist.memcache[i]->memkeys.rkey;
     }
 
+    /* expect an ack for this cts; will come after he does the big RDMA write */
+    post_rr_ack(rq->c, bh);
+    /* send the cts */
     post_sr(bh, post_len);
+
+#if MEMCACHE_BOUNCEBUF
+    rq->buflist = save_buflist;
+#endif
+
     return 0;
 }
 
@@ -587,11 +614,10 @@ post_sr(const buf_head_t *bh, u_int32_t len)
     VAPI_sg_lst_entry_t sg;
     VAPI_sr_desc_t sr;
     int ret;
-    const ib_connection_t *c = bh->c;
-    static int num_sr = 0;
+    ib_connection_t *c = bh->c;
 
     debug(2, "%s: %s bh %d len %u wr %d/%d", __func__, c->peername, bh->num,
-      len, num_sr, max_outstanding_wr);
+      len, c->num_unsignaled_wr, max_outstanding_wr);
     sg.addr = int64_from_ptr(bh->buf);
     sg.len = len;
     sg.lkey = c->eager_send_lkey;
@@ -599,8 +625,8 @@ post_sr(const buf_head_t *bh, u_int32_t len)
     memset(&sr, 0, sizeof(sr));
     sr.opcode = VAPI_SEND;
     sr.id = int64_from_ptr(c);  /* for error checking if send fails */
-    if (++num_sr + 100 == max_outstanding_wr) {
-	num_sr = 0;
+    if (++c->num_unsignaled_wr + 100 == max_outstanding_wr) {
+	c->num_unsignaled_wr = 0;
 	sr.comp_type = VAPI_SIGNALED;
     } else
 	sr.comp_type = VAPI_UNSIGNALED;  /* == 1 */
@@ -647,19 +673,18 @@ post_rr(const ib_connection_t *c, buf_head_t *bh)
  * at QP build time.
  */
 static void
-post_sr_ack(const ib_connection_t *c, const buf_head_t *bh)
+post_sr_ack(ib_connection_t *c, const buf_head_t *bh)
 {
     VAPI_sr_desc_t sr;
     int ret;
-    static int num_sr_ack = 0;
 
     debug(2, "%s: %s bh %d wr %d/%d", __func__, c->peername, bh->num,
-      num_sr_ack, max_outstanding_wr);
+      c->num_unsignaled_wr_ack, max_outstanding_wr);
     memset(&sr, 0, sizeof(sr));
     sr.opcode = VAPI_SEND_WITH_IMM;
     sr.id = int64_from_ptr(c);  /* for error checking if send fails */
-    if (++num_sr_ack + 100 == max_outstanding_wr) {
-	num_sr_ack = 0;
+    if (++c->num_unsignaled_wr_ack + 100 == max_outstanding_wr) {
+	c->num_unsignaled_wr_ack = 0;
 	sr.comp_type = VAPI_SIGNALED;
     } else
 	sr.comp_type = VAPI_UNSIGNALED;  /* == 1 */
@@ -719,7 +744,28 @@ post_sr_rdmaw(ib_send_t *sq, msg_header_cts_t *mh_cts)
 
     debug(2, "%s: sq %p totlen %d", __func__, sq, (int) sq->buflist.tot_len);
 
-    ib_mem_register(&sq->buflist, TYPE_SEND);
+#if MEMCACHE_BOUNCEBUF
+    if (reg_send_buflist.num == 0) {
+	reg_send_buflist.num = 1;
+	reg_send_buflist.buf.recv = &reg_send_buflist_buf;
+	reg_send_buflist.len = &reg_send_buflist_len;
+	reg_send_buflist.tot_len = reg_send_buflist_len;
+	reg_send_buflist_buf = Malloc(reg_send_buflist_len);
+	memcache_register(&reg_send_buflist, BMI_SEND);
+    }
+    if (sq->buflist.tot_len > reg_send_buflist_len)
+	error("%s: send prereg buflist too small, need %Ld", __func__,
+	  Ld(sq->buflist.tot_len));
+    memcpy_from_buflist(&sq->buflist, reg_send_buflist_buf);
+
+    ib_buflist_t save_buflist = sq->buflist;
+    sq->buflist = reg_send_buflist;
+
+#else
+#if !MEMCACHE_EARLY_REG
+    memcache_register(&sq->buflist, BMI_SEND);
+#endif
+#endif
 
     /* constant things for every send */
     memset(&sr, 0, sizeof(sr));
@@ -754,7 +800,8 @@ post_sr_rdmaw(ib_send_t *sq, msg_header_cts_t *mh_cts)
 	      int64_from_ptr(sq->buflist.buf.send[send_index])
 	      + send_offset;
 	    sg_tmp_array[sr.sg_lst_len].len = this_bytes;
-	    sg_tmp_array[sr.sg_lst_len].lkey = sq->buflist.lkey[send_index];
+	    sg_tmp_array[sr.sg_lst_len].lkey =
+	      sq->buflist.memcache[send_index]->memkeys.lkey;
 
 	    debug(4, "%s: chunk %d local addr %Lx len %d lkey %x",
 	      __func__, sr.sg_lst_len,
@@ -763,7 +810,7 @@ post_sr_rdmaw(ib_send_t *sq, msg_header_cts_t *mh_cts)
 	      sg_tmp_array[sr.sg_lst_len].lkey);
 
 	    ++sr.sg_lst_len;
-	    if ((int)sr.sg_lst_len > sg_max_len)
+	    if (sr.sg_lst_len > sg_max_len)
 		error("%s: send buflist len %d bigger than max %d", __func__,
 		  sr.sg_lst_len, sg_max_len);
 
@@ -793,6 +840,9 @@ post_sr_rdmaw(ib_send_t *sq, msg_header_cts_t *mh_cts)
 	if (ret < 0)
 	    error_verrno(ret, "%s: VAPI_post_sr", __func__);
     }
+#if MEMCACHE_BOUNCEBUF
+    sq->buflist = save_buflist;
+#endif
 }
 
 /*
@@ -828,7 +878,7 @@ generic_post_send(bmi_op_id_t *id, struct method_addr *remote_map,
 
     /* alloc and build new sendq structure */
     sq = Malloc(sizeof(*sq));
-    sq->type = TYPE_SEND;
+    sq->type = BMI_SEND;
     sq->state = SQ_WAITING_BUFFER;
 
     /*
@@ -857,9 +907,9 @@ generic_post_send(bmi_op_id_t *id, struct method_addr *remote_map,
      * to me, but I'll at least check it for accuracy.
      */
     if (sq->buflist.tot_len != total_size)
-	error("%s: user-provided tot len " FORMAT_BMI_SIZE_T
-	  " does not match buffer list tot len " FORMAT_BMI_SIZE_T,
-	  __func__, total_size, sq->buflist.tot_len);
+	error("%s: user-provided tot len %Ld"
+	  " does not match buffer list tot len %Ld",
+	  __func__, Ld(total_size), Ld(sq->buflist.tot_len));
 
     /* unexpected messages must fit inside an eager message */
     if (is_unexpected && sq->buflist.tot_len > EAGER_BUF_PAYLOAD) {
@@ -974,7 +1024,7 @@ generic_post_recv(bmi_op_id_t *id, struct method_addr *remote_map,
     } else {
 	/* alloc and build new recvq structure */
 	rq = Malloc(sizeof(*rq));
-	rq->type = TYPE_RECV;
+	rq->type = BMI_RECV;
 	rq->state = RQ_WAITING_INCOMING;
 	rq->bmi_tag = tag;
 	rq->c = c;
@@ -1002,9 +1052,9 @@ generic_post_recv(bmi_op_id_t *id, struct method_addr *remote_map,
      * to me, but I'll at least check it for accuracy.
      */
     if (rq->buflist.tot_len != tot_expected_len)
-	error("%s: user-provided tot len " FORMAT_BMI_SIZE_T
-	  " does not match buffer list tot len " FORMAT_BMI_SIZE_T,
-	  __func__, tot_expected_len, rq->buflist.tot_len);
+	error("%s: user-provided tot len %Ld"
+	  " does not match buffer list tot len %Ld",
+	  __func__, Ld(tot_expected_len), Ld(rq->buflist.tot_len));
 
     /* generate identifier used by caller to test for message later */
     mop = Malloc(sizeof(*mop));
@@ -1022,9 +1072,8 @@ generic_post_recv(bmi_op_id_t *id, struct method_addr *remote_map,
 	debug(2, "%s: rq %p state %s finish eager directly", __func__,
 	  rq, rq_state_name(rq->state));
 	if (rq->actual_len > tot_expected_len) {
-	    error("%s: received " FORMAT_BMI_SIZE_T
-	      " matches too-small buffer " FORMAT_BMI_SIZE_T,
-	      __func__, rq->actual_len, rq->buflist.tot_len);
+	    error("%s: received %Ld matches too-small buffer %Ld",
+	      __func__, Ld(rq->actual_len), Ld(rq->buflist.tot_len));
 	}
 
 	memcpy_to_buflist(&rq->buflist,
@@ -1038,17 +1087,31 @@ generic_post_recv(bmi_op_id_t *id, struct method_addr *remote_map,
 
 	/* now just wait for user to test, never do "immediate completion" */
 	rq->state = RQ_EAGER_WAITING_USER_TEST;
+	goto out;
 
     } else if (rq->state == RQ_RTS_WAITING_USER_POST) {
 	int ret;
 	debug(2, "%s: rq %p %s send cts", __func__, rq,
 	  rq_state_name(rq->state));
+	/* try to send, or wait for send buffer space */
+	rq->state = RQ_RTS_WAITING_CTS_BUFFER;
+#if MEMCACHE_EARLY_REG
+	memcache_register(&rq->buflist);
+#endif
 	ret = send_cts(rq);
 	if (ret == 0)
 	    rq->state = RQ_RTS_WAITING_DATA;
-	else
-	    rq->state = RQ_RTS_WAITING_CTS_BUFFER;
+	goto out;
     }
+
+#if MEMCACHE_EARLY_REG
+    /* but remember that this might not be used if the other side sends
+     * less than we posted for receive; that's legal */
+    if (rq->buflist.tot_len > EAGER_BUF_PAYLOAD)
+	memcache_register(&rq->buflist);
+#endif
+
+  out:
     gen_mutex_unlock(&interface_mutex);
 }
 
@@ -1168,9 +1231,14 @@ test_rq(ib_recv_t *rq, bmi_op_id_t *outid, bmi_error_code_t *err,
     /* this state needs help, push it (ideally would be triggered
      * when the resource is freed... XXX */
     } else if (rq->state == RQ_RTS_WAITING_CTS_BUFFER) {
+	int ret;
 	debug(2, "%s: rq %p %s, encouraging", __func__, rq,
 	  rq_state_name(rq->state));
-	encourage_recv_to_send_cts(rq);
+	ret = send_cts(rq);
+	if (ret == 0)
+	    rq->state = RQ_RTS_WAITING_DATA;
+	/* else keep waiting until we can send that cts */
+	debug(2, "%s: rq %p now %s", __func__, rq, rq_state_name(rq->state));
     } else if (rq->state == RQ_CANCELLED && complete) {
 	debug(2, "%s: rq %p cancelled", __func__, rq);
 	*err = -PVFS_ETIMEDOUT;
@@ -1211,7 +1279,7 @@ BMI_ib_test(bmi_op_id_t id, int *outcount, bmi_error_code_t *err,
     mop = id_gen_safe_lookup(id);
     sq = mop->method_data;
     n = 0;
-    if (sq->type == TYPE_SEND) {
+    if (sq->type == BMI_SEND) {
 	if (test_sq(sq, &id, err, size, user_ptr, 1))
 	    n = 1;
     } else {
@@ -1277,21 +1345,23 @@ BMI_ib_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
 	gettimeofday(&last_action, 0);
     } else if (max_idle_time > 0) {
 	/*
-	 * Block for up to max_idle_time to avoid spinning from BMI.  Instead
-	 * of sleeping, watch the accept socket for something new.  No way
-	 * to blockingly poll in standard VAPI.
+	 * Block for up to max_idle_time to avoid spinning from BMI.  In the
+	 * server, instead of sleeping, watch the accept socket for something
+	 * new.  No way to blockingly poll in standard VAPI.
 	 */
-	struct timeval now;
-	gettimeofday(&now, 0);
-	now.tv_sec -= last_action.tv_sec;
-	if (now.tv_sec == 1) {
-	    now.tv_usec -= last_action.tv_usec;
-	    if (now.tv_usec < 0)
-		--now.tv_sec;
+	if (listen_sock >= 0) {
+	    struct timeval now;
+	    gettimeofday(&now, 0);
+	    now.tv_sec -= last_action.tv_sec;
+	    if (now.tv_sec == 1) {
+		now.tv_usec -= last_action.tv_usec;
+		if (now.tv_usec < 0)
+		    --now.tv_sec;
+	    }
+	    if (now.tv_sec > 0)  /* spin for 1 sec following any activity */
+		if (ib_tcp_server_block_new_connections(max_idle_time))
+		    gettimeofday(&last_action, 0);
 	}
-	if (now.tv_sec > 0)  /* spin for 1 sec following any activity */
-	    if (ib_tcp_server_block_new_connections(max_idle_time))
-		gettimeofday(&last_action, 0);
     }
     gen_mutex_unlock(&interface_mutex);
     return 0;
@@ -1322,10 +1392,10 @@ BMI_ib_testunexpected(int incount __unused, int *outcount,
 	    debug(2, "%s: found waiting testunexpected", __func__);
 	    ui->error_code = 0;
 	    ui->addr = rq->c->remote_map;  /* hand back permanent method_addr */
-	    ui->buffer = Malloc(rq->actual_len);
+	    ui->buffer = Malloc((unsigned long) rq->actual_len);
 	    ui->size = rq->actual_len;
 	    memcpy(ui->buffer, (char *) rq->bh->buf + sizeof(msg_header_t),
-	      ui->size);
+	      (size_t) ui->size);
 	    ui->tag = rq->bmi_tag;
 	    /* re-post the buffer in which it was sitting, just unexpecteds */
 	    post_rr(rq->c, rq->bh);
@@ -1344,25 +1414,6 @@ BMI_ib_testunexpected(int incount __unused, int *outcount,
 
   out:
     gen_mutex_unlock(&interface_mutex);
-    return 0;
-}
-
-/*
- * Do not care about memory allocation.  Send/recv functions will pin as
- * necessary.
- */
-static void *
-BMI_ib_memalloc(bmi_size_t size,
-  enum bmi_op_type send_recv __unused)
-{
-    return malloc((size_t) size);
-}
-
-static int
-BMI_ib_memfree(void *buf, bmi_size_t size __unused,
-  enum bmi_op_type send_recv __unused)
-{
-    free(buf);
     return 0;
 }
 
@@ -1396,7 +1447,7 @@ BMI_ib_cancel(bmi_op_id_t id, bmi_context_id context_id __unused)
     check_cq();
     mop = id_gen_safe_lookup(id);
     tsq = mop->method_data;
-    if (tsq->type == TYPE_SEND) {
+    if (tsq->type == BMI_SEND) {
 	/*
 	 * Cancelling completed operations is fine, they will be
 	 * tested later.  Any others trigger full shutdown of the
@@ -1426,16 +1477,33 @@ BMI_ib_cancel(bmi_op_id_t id, bmi_context_id context_id __unused)
 	qlist_for_each(l, &sendq) {
 	    ib_send_t *sq = qlist_upcast(l);
 	    if (sq->c != c) continue;
+#if !MEMCACHE_BOUNCEBUF
 	    if (sq->state == SQ_WAITING_DATA_LOCAL_SEND_COMPLETE)
-		ib_mem_deregister(&sq->buflist);
+		memcache_deregister(&sq->buflist);
+#  if MEMCACHE_EARLY_REG
+	    /* pin when sending rts, so also must dereg in this state */
+	    if (sq->state == SQ_WAITING_CTS)
+		memcache_deregister(&sq->buflist);
+#  endif
+#endif
 	    if (sq->state != SQ_WAITING_USER_TEST)
 		sq->state = SQ_CANCELLED;
 	}
 	qlist_for_each(l, &recvq) {
 	    ib_recv_t *rq = qlist_upcast(l);
 	    if (rq->c != c) continue;
+#if !MEMCACHE_BOUNCEBUF
 	    if (rq->state == RQ_RTS_WAITING_DATA)
-		ib_mem_deregister(&rq->buflist);
+		memcache_deregister(&rq->buflist);
+#  if MEMCACHE_EARLY_REG
+	    /* pin on post, dereg all these */
+	    if (rq->state == RQ_RTS_WAITING_CTS_BUFFER)
+		memcache_deregister(&rq->buflist);
+	    if (rq->state == RQ_WAITING_INCOMING
+	      && rq->buflist.tot_len > EAGER_BUF_PAYLOAD)
+		memcache_deregister(&rq->buflist);
+#  endif
+#endif
 	    if (!(rq->state == RQ_EAGER_WAITING_USER_TEST 
 	       || rq->state == RQ_RTS_WAITING_USER_TEST))
 		rq->state = RQ_CANCELLED;
@@ -1468,12 +1536,41 @@ maybe_free_connection(ib_connection_t *c)
     ib_close_connection(c);
 }
 
+#if MEMCACHE_BOUNCEBUF
+static int
+del_bouncebuf_then_BMI_ib_finalize(void)
+{
+    if (reg_send_buflist.num > 0) {
+	memcache_deregister(&reg_send_buflist);
+	reg_send_buflist.num = 0;
+	free(reg_send_buflist_buf);
+    }
+    if (reg_recv_buflist.num > 0) {
+	memcache_deregister(&reg_recv_buflist);
+	reg_recv_buflist.num = 0;
+	free(reg_recv_buflist_buf);
+    }
+    return BMI_ib_finalize();
+}
+#endif
+
+static const char *
+BMI_ib_rev_lookup(struct method_addr *meth)
+{
+    ib_method_addr_t *ibmap = meth->method_data;
+    return ibmap->c->peername;
+}
+
 /* exported method interface */
 struct bmi_method_ops bmi_ib_ops = 
 {
     .method_name = "bmi_ib",
     .BMI_meth_initialize = BMI_ib_initialize,
+#if MEMCACHE_BOUNCEBUF
+    .BMI_meth_finalize = del_bouncebuf_then_BMI_ib_finalize,
+#else
     .BMI_meth_finalize = BMI_ib_finalize,
+#endif
     .BMI_meth_set_info = BMI_ib_set_info,
     .BMI_meth_get_info = BMI_ib_get_info,
     .BMI_meth_memalloc = BMI_ib_memalloc,
@@ -1492,6 +1589,6 @@ struct bmi_method_ops bmi_ib_ops =
     .BMI_meth_open_context = BMI_ib_open_context,
     .BMI_meth_close_context = BMI_ib_close_context,
     .BMI_meth_cancel = BMI_ib_cancel,
-    .BMI_meth_rev_lookup_unexpected = 0, /* unimplemented */
+    .BMI_meth_rev_lookup_unexpected = BMI_ib_rev_lookup,
 };
 

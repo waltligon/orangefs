@@ -2,27 +2,22 @@
  * InfiniBand BMI method initialization and other out-of-line
  * boring stuff.
  *
- * Copyright (C) 2003-4 Pete Wyckoff <pw@osc.edu>
+ * Copyright (C) 2003-5 Pete Wyckoff <pw@osc.edu>
  *
  * See COPYING in top-level directory.
  *
- * $Id: setup.c,v 1.15 2004-11-19 18:06:07 pw Exp $
+ * $Id: setup.c,v 1.16 2005-11-03 21:23:19 pw Exp $
  */
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdio.h>
-#include <sys/socket.h>
+#include <malloc.h>
 #include <sys/poll.h>
 #include <netinet/in.h>  /* ntohs et al */
 #include <arpa/inet.h>   /* inet_ntoa */
 #include <netdb.h>       /* gethostbyname */
-#include <src/common/quicklist/quicklist.h>
-#include <src/io/bmi/bmi-method-support.h>
 #include <src/io/bmi/bmi-method-callback.h>
-/* ib includes */
-#include <vapi.h>
 #include <vapi_common.h>  /* VAPI_event_(record|syndrome)_sym */
-#include <evapi.h>
 #ifdef HAVE_IB_WRAP_COMMON_H
 #include <wrap_common.h>  /* reinit_mosal externs */
 #endif
@@ -54,9 +49,10 @@ static VAPI_pd_hndl_t nic_pd;  /* single protection domain for all memory/QP */
 static EVAPI_async_handler_hndl_t nic_async_event_handler;
 static int async_event_handler_waiting_drain = 0;
 
-static void exchange_connection_data(ib_connection_t *c, int s, int is_server);
+static void verify_prop_caps(VAPI_qp_cap_t *cap);
+static int exchange_connection_data(ib_connection_t *c, int s, int is_server);
 static void init_connection_modify_qp(VAPI_qp_hndl_t qp,
-  VAPI_qp_num_t remote_qp_num, IB_lid_t remote_lid, int s, int is_server);
+  VAPI_qp_num_t remote_qp_num, int remote_lid);
 
 /*
  * Build new conneciton.
@@ -119,7 +115,7 @@ ib_new_connection(int s, const char *peername, int is_server)
 	error_verrno(ret, "%s: register_mr bounce", __func__);
     c->eager_send_lkey = mr_out.l_key;
 
-    /* build qp */
+    /* common qp properites */
     qp_init_attr.cap.max_oust_wr_sq = 5000;  /* outstanding WQEs */
     qp_init_attr.cap.max_oust_wr_rq = 5000;
     qp_init_attr.cap.max_sg_size_sq = 40;  /* scatter/gather entries */
@@ -133,51 +129,43 @@ ib_new_connection(int s, const char *peername, int is_server)
     qp_init_attr.sq_sig_type        = VAPI_SIGNAL_REQ_WR;
     qp_init_attr.rq_sig_type        = VAPI_SIGNAL_REQ_WR;
     qp_init_attr.ts_type            = VAPI_TS_RC;
+
+    /* build main qp */
     ret = VAPI_create_qp(nic_handle, &qp_init_attr, &c->qp, &prop);
     if (ret < 0)
 	error_verrno(ret, "%s: create QP", __func__);
     c->qp_num = prop.qp_num;
-
-    if (sg_max_len == 0) {
-	sg_max_len = prop.cap.max_sg_size_sq;
-	if ((int)prop.cap.max_sg_size_rq < sg_max_len)
-	    sg_max_len = prop.cap.max_sg_size_rq;
-	sg_tmp_array = Malloc(sg_max_len * sizeof(*sg_tmp_array));
-    } else {
-	if ((int)prop.cap.max_sg_size_sq < sg_max_len)
-	    error(
-	      "%s: new connection has smaller send scatter/gather array size,"
-	      " %d vs %d", __func__, prop.cap.max_sg_size_sq, sg_max_len);
-	if ((int)prop.cap.max_sg_size_rq < sg_max_len)
-	    error(
-	      "%s: new connection has smaller recv scatter/gather array size,"
-	      " %d vs %d", __func__, prop.cap.max_sg_size_rq, sg_max_len);
-    }
+    verify_prop_caps(&prop.cap);
 
     /* and qp ack */
     ret = VAPI_create_qp(nic_handle, &qp_init_attr, &c->qp_ack, &prop);
     if (ret < 0)
 	error_verrno(ret, "%s: create QP ack", __func__);
     c->qp_ack_num = prop.qp_num;
-    if ((int)prop.cap.max_sg_size_sq < sg_max_len)
-	error(
-	  "%s: new ack connection has smaller send scatter/gather array size,"
-	  " %d vs %d", __func__, prop.cap.max_sg_size_sq, sg_max_len);
-    if ((int)prop.cap.max_sg_size_rq < sg_max_len)
-	error(
-	  "%s: new ack connection has smaller recv scatter/gather array size,"
-	  " %d vs %d", __func__, prop.cap.max_sg_size_rq, sg_max_len);
+    verify_prop_caps(&prop.cap);
 
-    /* remember this for post_sr_ack */
-    max_outstanding_wr = prop.cap.max_oust_wr_sq;
+    /* initialize for post_sr and post_sr_ack */
+    c->num_unsignaled_wr = 0;
+    c->num_unsignaled_wr_ack = 0;
 
-    exchange_connection_data(c, s, is_server);
+    /* put it on the list */
+    qlist_add(&c->list, &connection);
 
-    init_connection_modify_qp(c->qp, c->remote_qp_num,
-      c->remote_lid, s, is_server);
-    init_connection_modify_qp(c->qp_ack, c->remote_qp_ack_num,
-      c->remote_lid, s, is_server);
+    /* other vars */
+    c->remote_map = 0;
+    c->cancelled = 0;
 
+    /* talk with the peer to get his lid and QP nums */
+    if (exchange_connection_data(c, s, is_server) != 0) {
+	ret = 1;
+	goto out;
+    }
+
+    /* bring the two QPs up to RTR */
+    init_connection_modify_qp(c->qp, c->remote_qp_num, c->remote_lid);
+    init_connection_modify_qp(c->qp_ack, c->remote_qp_ack_num, c->remote_lid);
+
+    /* post initial RRs */
     for (i=0; i<EAGER_BUF_NUM; i++)
 	post_rr(c, &c->eager_recv_buf_head_contig[i]);
 
@@ -186,30 +174,77 @@ ib_new_connection(int s, const char *peername, int is_server)
 	int x;
 	if (i ^ is_server) {
 	    ret = read_full(s, &x, sizeof(x));
-	    if (ret < 0)
-		error_errno("%s: read rr post synch", __func__);
-	    if (ret != sizeof(x))
-		error("%s: partial read of rr post synch, %d / %d", __func__,
+	    if (ret < 0) {
+		ret = 1;
+		warning_errno("%s: read rr post synch", __func__);
+		goto out;
+	    }
+	    if (ret != sizeof(x)) {
+		ret = 1;
+		warning("%s: partial read of rr post synch, %d / %d", __func__,
 		  ret, sizeof(x));
+		goto out;
+	    }
 	} else {
 	    ret = write_full(s, &x, sizeof(x));
-	    if (ret < 0)
-		error_errno("%s: write rr post synch", __func__);
+	    if (ret < 0) {
+		ret = 1;
+		warning_errno("%s: write rr post synch", __func__);
+		goto out;
+	    }
 	}
     }
 
-    /* done, put it on the list */
-    c->remote_map = 0;
-    c->cancelled = 0;
-    qlist_add(&c->list, &connection);
+    ret = 0;
+
+  out:
+    if (ret != 0) {
+	/* XXX: any way to unpost the RRs first? */
+	ib_close_connection(c);
+	c = 0;
+    }
+
     return c;
+}
+
+/*
+ * If not set, set them.  Otherwise verify that none of our assumed global
+ * limits are different for this new connection.
+ */
+static void
+verify_prop_caps(VAPI_qp_cap_t *cap)
+{
+    if (sg_max_len == 0) {
+	sg_max_len = cap->max_sg_size_sq;
+	if (cap->max_sg_size_rq < sg_max_len)
+	    sg_max_len = cap->max_sg_size_rq;
+	sg_tmp_array = Malloc(sg_max_len * sizeof(*sg_tmp_array));
+    } else {
+	if (cap->max_sg_size_sq < sg_max_len)
+	    error(
+	      "%s: new connection has smaller send scatter/gather array size,"
+	      " %d vs %d", __func__, cap->max_sg_size_sq, sg_max_len);
+	if (cap->max_sg_size_rq < sg_max_len)
+	    error(
+	      "%s: new connection has smaller recv scatter/gather array size,"
+	      " %d vs %d", __func__, cap->max_sg_size_rq, sg_max_len);
+    }
+
+    if (max_outstanding_wr == 0) {
+	max_outstanding_wr = cap->max_oust_wr_sq;
+    } else {
+	if (cap->max_oust_wr_sq < max_outstanding_wr)
+	    error(
+	      "%s: new connection has smaller max_oust_wr_sq size, %d vs %d",
+	      __func__, cap->max_oust_wr_sq, max_outstanding_wr);
+    }
 }
 
 /*
  * Over TCP, share information about the connection needed to transition
  * the IB link to active.
  */
-static void
+static int
 exchange_connection_data(ib_connection_t *c, int s, int is_server)
 {
     /*
@@ -237,11 +272,17 @@ exchange_connection_data(ib_connection_t *c, int s, int is_server)
 	if (i ^ is_server) {
 	    ret = read_full(s, &connection_handshake,
 	      sizeof(connection_handshake));
-	    if (ret < 0)
-		error_errno("%s: read", __func__);
-	    if (ret != sizeof(connection_handshake))
-		error("%s: partial read, %d / %d", __func__, ret,
+	    if (ret < 0) {
+		ret = 1;
+		warning_errno("%s: read", __func__);
+		goto out;
+	    }
+	    if (ret != sizeof(connection_handshake)) {
+		ret = 1;
+		warning("%s: partial read, %d / %d", __func__, ret,
 		  sizeof(connection_handshake));
+		goto out;
+	    }
 	    c->remote_lid = ntohs(connection_handshake.lid);
 	    c->remote_qp_num = ntohl(connection_handshake.qp_num);
 	    c->remote_qp_ack_num = ntohl(connection_handshake.qp_ack_num);
@@ -251,10 +292,17 @@ exchange_connection_data(ib_connection_t *c, int s, int is_server)
 	    connection_handshake.qp_ack_num = htonl(c->qp_ack_num);
 	    ret = write_full(s, &connection_handshake,
 	      sizeof(connection_handshake));
-	    if (ret < 0)
-		error_errno("%s: write", __func__);
+	    if (ret < 0) {
+		ret = 1;
+		warning_errno("%s: write", __func__);
+		goto out;
+	    }
 	}
     }
+
+    ret = 0;
+  out:
+    return ret;
 }
 
 
@@ -263,9 +311,9 @@ exchange_connection_data(ib_connection_t *c, int s, int is_server)
  */
 static void
 init_connection_modify_qp(VAPI_qp_hndl_t qp, VAPI_qp_num_t remote_qp_num,
-  IB_lid_t remote_lid, int s, int is_server)
+  int remote_lid)
 {
-    int i, ret;
+    int ret;
     VAPI_qp_attr_t attr;
     VAPI_qp_attr_mask_t mask;
     VAPI_qp_cap_t cap;
@@ -307,26 +355,6 @@ init_connection_modify_qp(VAPI_qp_hndl_t qp, VAPI_qp_num_t remote_qp_num,
     ret = VAPI_modify_qp(nic_handle, qp, &attr, &mask, &cap);
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_modify_qp INIT -> RTR", __func__);
-
-    /* syncronize both in RTR before going RTS */
-    for (i=0; i<2; i++) {
-	int x;
-	if (i ^ is_server) {
-	    ret = read(s, &x, sizeof(x));
-	    if (ret < 0)
-		error_errno("%s: read rtr synch", __func__);
-	    if (ret != sizeof(x))
-		error("%s: partial read of rtr synch, %d / %d", __func__,
-		  ret, sizeof(x));
-	} else {
-	    ret = write(s, &x, sizeof(x));
-	    if (ret < 0)
-		error_errno("%s: write rtr synch", __func__);
-	    if (ret != sizeof(x))
-		error("%s: partial write of rtr synch, %d / %d", __func__,
-		  ret, sizeof(x));
-	}
-    }
 
     /* transition qp to ready-to-send */
     QP_ATTR_MASK_CLR_ALL(mask);
@@ -393,6 +421,10 @@ static void
 ib_drain_connection(ib_connection_t *c)
 {
     buf_head_t *bh;
+
+    /* already drained */
+    if (c->cancelled)
+	return;
 
     bh = qlist_try_del_head(&c->eager_send_buf_free);
     if (bh) {
@@ -469,7 +501,7 @@ ib_alloc_method_addr(ib_connection_t *c, const char *hostname, int port)
     struct method_addr *map;
     ib_method_addr_t *ibmap;
 
-    map = alloc_method_addr(bmi_ib_method_id, sizeof(*ibmap));
+    map = alloc_method_addr(bmi_ib_method_id, (bmi_size_t) sizeof(*ibmap));
     ibmap = map->method_data;
     ibmap->c = c;
     ibmap->hostname = hostname;
@@ -502,8 +534,8 @@ BMI_ib_method_addr_lookup(const char *id)
 	error("%s: no ':' found", __func__);
 
     /* copy to permanent storage */
-    hostname = Malloc(cp - s + 1);
-    strncpy(hostname, s, cp-s);
+    hostname = Malloc((unsigned long) (cp - s + 1));
+    strncpy(hostname, s, (size_t) (cp-s));
     hostname[cp-s] = '\0';
 
     /* strip /filesystem  */
@@ -560,7 +592,7 @@ ib_tcp_client_connect(ib_method_addr_t *ibmap, struct method_addr *remote_map)
 	error_errno("%s: cannot resolve server %s", __func__, ibmap->hostname);
     memset(&skin, 0, sizeof(skin));
     skin.sin_family = hp->h_addrtype;
-    memcpy(&skin.sin_addr, hp->h_addr_list[0], hp->h_length);
+    memcpy(&skin.sin_addr, hp->h_addr_list[0], (size_t) hp->h_length);
     skin.sin_port = htons(ibmap->port);
     sprintf(peername, "%s:%d", ibmap->hostname, ibmap->port);
   retry:
@@ -571,6 +603,8 @@ ib_tcp_client_connect(ib_method_addr_t *ibmap, struct method_addr *remote_map)
 	    error_errno("%s: connect to server %s", __func__, peername);
     }
     ibmap->c = ib_new_connection(s, peername, 0);
+    if (!ibmap->c)
+	error("%s: ib_new_connection failed", __func__);
     ibmap->c->remote_map = remote_map;
 
     if (close(s) < 0)
@@ -638,6 +672,12 @@ ib_tcp_server_check_new_connections(void)
 	sprintf(peername, "%s:%d", hostname, port);
 
 	c = ib_new_connection(s, peername, 1);
+	if (!c) {
+	    free(hostname);
+	    close(s);
+	    return 0;
+	}
+
 	c->remote_map = ib_alloc_method_addr(c, hostname, port);
 	/* register this address with the method control layer */
 	ret = bmi_method_addr_reg_callback(c->remote_map);
@@ -842,6 +882,7 @@ BMI_ib_initialize(struct method_addr *listen_addr, int method_id,
 	error_verrno(ret, "%s: EVAPI_set_async_event_handler", __func__);
 
     /* get my lid */
+    /* ignore different-width-prototype warning here, cannot pass u8 */
     ret = VAPI_query_hca_port_prop(nic_handle, VAPI_PORT, &nic_port_props);
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_query_hca_port_prop", __func__);
@@ -891,14 +932,26 @@ BMI_ib_initialize(struct method_addr *listen_addr, int method_id,
     INIT_QLIST_HEAD(&connection);
     INIT_QLIST_HEAD(&sendq);
     INIT_QLIST_HEAD(&recvq);
+    INIT_QLIST_HEAD(&memcache);
 
     EAGER_BUF_PAYLOAD = EAGER_BUF_SIZE - sizeof(msg_header_t);
 
     /* will be set on first connection */
     sg_tmp_array = 0;
     sg_max_len = 0;
+    max_outstanding_wr = 0;
 
     bmi_ib_initialized = 1;  /* okay to play with state variables now */
+
+#if 0
+    /*
+     * XXX: temporary while using registration cache.  Perhaps switch to
+     * malloc/free hooks, or better yet, use dreg kernel module.
+     * Think about how this fights with mpich's malloc hooks.
+     */
+    mallopt(M_TRIM_THRESHOLD, -1);
+    mallopt(M_MMAP_MAX, 0);
+#endif
 
     debug(0, "%s: done", __func__);
     return 0;
@@ -935,6 +988,7 @@ BMI_ib_finalize(void)
     ret = VAPI_destroy_cq(nic_handle, nic_cq);
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_destroy_cq", __func__);
+    memcache_shutdown();
     ret = VAPI_dealloc_pd(nic_handle, nic_pd);
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_dealloc_pd", __func__);
@@ -961,63 +1015,33 @@ BMI_ib_finalize(void)
  * wuj's clever discontig allocation stuff.
  */
 void
-ib_mem_register(ib_buflist_t *buflist, int send_or_recv_type)
+ib_mem_register(memcache_entry_t *c)
 {
-    int i;
-    VAPI_mrw_t mrw;
+    VAPI_mrw_t mrw, mrw_out;
+    int ret;
 
-    if (send_or_recv_type == TYPE_SEND) {
-	buflist->lkey = Malloc(buflist->num * sizeof(*buflist->lkey));
-	buflist->rkey = 0;
-	mrw.acl = 0;  /* just local read for sender */
-    } else {
-	buflist->lkey = 0;
-	buflist->rkey = Malloc(buflist->num * sizeof(*buflist->rkey));
-	/* must turn on local write if want remote write */
-	mrw.acl = VAPI_EN_LOCAL_WRITE | VAPI_EN_REMOTE_WRITE;
-    }
-    buflist->mr_handle = Malloc(buflist->num * sizeof(*buflist->mr_handle));
-
-    /* constant across loop */
+    /* always turn on local write and write even if just BMI_SEND */
+    mrw.acl = VAPI_EN_LOCAL_WRITE | VAPI_EN_REMOTE_WRITE;
     mrw.type = VAPI_MR;
     mrw.pd_hndl = nic_pd;
-
-    for (i=0; i<buflist->num; i++) {
-	VAPI_mrw_t mrw_out;
-	int ret;
-	mrw.start = int64_from_ptr(buflist->buf.send[i]);  /* union */
-	mrw.size = buflist->len[i];
-	ret = VAPI_register_mr(nic_handle, &mrw, &buflist->mr_handle[i],
-	  &mrw_out);
-	if (ret < 0)
-	    error_verrno(ret, "%s: VAPI_register_mr %d", __func__, i);
-	if (send_or_recv_type == TYPE_SEND)
-	    buflist->lkey[i] = mrw_out.l_key;
-	else
-	    buflist->rkey[i] = mrw_out.r_key;
-	debug(4, "%s: %d addr %Lx size %Ld %s %x", __func__, i, mrw.start,
-	  mrw.size, send_or_recv_type == TYPE_SEND ? "lkey" : "rkey",
-	  send_or_recv_type == TYPE_SEND ? mrw_out.l_key : mrw_out.r_key);
-    }
+    mrw.start = int64_from_ptr(c->buf);
+    mrw.size = c->len;
+    ret = VAPI_register_mr(nic_handle, &mrw, &c->memkeys.mrh, &mrw_out);
+    if (ret < 0)
+	error_verrno(ret, "%s: VAPI_register_mr", __func__);
+    c->memkeys.lkey = mrw_out.l_key;
+    c->memkeys.rkey = mrw_out.r_key;
+    debug(4, "%s: buf %p len %Ld", __func__, c->buf, c->len);
 }
 
 void
-ib_mem_deregister(ib_buflist_t *buflist)
+ib_mem_deregister(memcache_entry_t *c)
 {
-    int i;
-
-    for (i=0; i<buflist->num; i++) {
-	int ret = VAPI_deregister_mr(nic_handle, buflist->mr_handle[i]);
-	if (ret < 0)
-	    error_verrno(ret, "%s: VAPI_deregister_mr %d", __func__, i);
-	debug(4, "%s: %d addr %Lx size %Ld lkey %x rkey %x", __func__, i,
-	  int64_from_ptr(buflist->buf.send[i]), buflist->len[i],
-	  buflist->lkey ? buflist->lkey[i] : 0,
-	  buflist->rkey ? buflist->rkey[i] : 0);
-    }
-    free(buflist->mr_handle);
-    if (buflist->lkey)
-	free(buflist->lkey);
-    if (buflist->rkey)
-	free(buflist->rkey);
+    int ret;
+    
+    ret = VAPI_deregister_mr(nic_handle, c->memkeys.mrh);
+    if (ret < 0)
+	error_verrno(ret, "%s: VAPI_deregister_mr", __func__);
+    debug(4, "%s: buf %p len %Ld lkey %x rkey %x", __func__,
+      c->buf, c->len, c->memkeys.lkey, c->memkeys.rkey);
 }

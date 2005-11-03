@@ -1,14 +1,18 @@
 /*
  * Private header shared by BMI InfiniBand implementation files.
  *
- * Copyright (C) 2003-4 Pete Wyckoff <pw@osc.edu>
+ * Copyright (C) 2003-5 Pete Wyckoff <pw@osc.edu>
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.h,v 1.8 2004-11-19 18:06:07 pw Exp $
+ * $Id: ib.h,v 1.9 2005-11-03 21:23:19 pw Exp $
  */
 #ifndef __ib_h
 #define __ib_h
+
+#include <src/io/bmi/bmi-types.h>
+#include <src/common/quicklist/quicklist.h>
+#include <vapi.h>
 
 #ifdef __GNUC__
 /* #  define __hidden __attribute__((visibility("hidden"))) */
@@ -42,6 +46,8 @@ typedef struct {
     VAPI_mr_hndl_t eager_recv_mr;
     VAPI_lkey_t eager_send_lkey;  /* for post_sr */
     VAPI_lkey_t eager_recv_lkey;  /* for post_rr */
+    unsigned int num_unsignaled_wr;  /* keep track of outstanding WRs */
+    unsigned int num_unsignaled_wr_ack;
     /* ib remote params */
     IB_lid_t remote_lid;
     VAPI_qp_num_t remote_qp_num;
@@ -87,7 +93,6 @@ typedef struct {
 typedef enum {
     SQ_WAITING_BUFFER=1,
     SQ_WAITING_EAGER_ACK,
-    SQ_WAITING_RTS_ACK,
     SQ_WAITING_CTS,
     SQ_WAITING_DATA_LOCAL_SEND_COMPLETE,
     SQ_WAITING_USER_TEST,
@@ -121,10 +126,10 @@ typedef struct {
 static name_t sq_state_names[] = {
     entry(SQ_WAITING_BUFFER),
     entry(SQ_WAITING_EAGER_ACK),
-    entry(SQ_WAITING_RTS_ACK),
     entry(SQ_WAITING_CTS),
     entry(SQ_WAITING_DATA_LOCAL_SEND_COMPLETE),
     entry(SQ_WAITING_USER_TEST),
+    entry(SQ_CANCELLED),
     { 0, 0 }
 };
 static name_t rq_state_names[] = {
@@ -136,6 +141,7 @@ static name_t rq_state_names[] = {
     entry(RQ_RTS_WAITING_DATA),
     entry(RQ_RTS_WAITING_USER_TEST),
     entry(RQ_WAITING_INCOMING),
+    entry(RQ_CANCELLED),
     { 0, 0 }
 };
 static name_t msg_type_names[] = {
@@ -150,9 +156,36 @@ static name_t msg_type_names[] = {
 #endif  /* __ib_c */
 
 /*
- * This could be generically useful.  Instead of passing around three
- * values, use this struct.  Must use a union to handle the cast differences
- * between send and receive usage, though.
+ * Fields for memory registration.  Both lkey and rkey are always valid,
+ * even if only being used for a BMI_SEND.  Permissions managed at app level
+ * not at mem reg level.
+ */
+typedef struct {
+    VAPI_mr_hndl_t mrh;
+    VAPI_lkey_t lkey;
+    VAPI_rkey_t rkey;
+} memkeys_t;
+
+/*
+ * Pin and cache explicitly allocated things to avoid registration
+ * overheads.  Two sources of entries here:  first, when BMI_memalloc
+ * is used to allocate big enough chunks, the malloced regions are
+ * entered into this list.  Second, when a bmi/ib routine needs to pin
+ * memory, it is cached here too.  Note that the second case really
+ * needs a dreg-style consistency check against userspace freeing, though.
+ */
+typedef struct {
+    list_t list;
+    void *buf;
+    bmi_size_t len;
+    int count;  /* refcount, usage of this entry */
+    memkeys_t memkeys;
+} memcache_entry_t;
+
+/*
+ * This struct describes multiple memory ranges, used in the list send and
+ * recv routines.  The memkeys array here will be filled from the individual
+ * memcache_entry memkeys above.
  */
 typedef struct {
     int num;
@@ -161,11 +194,8 @@ typedef struct {
 	void *const *recv;
     } buf;
     const bmi_size_t *len;  /* this type chosen to match BMI API */
-    bmi_size_t tot_len;     /* sum_{i=1..num} len[i] */
-    /* fields for memory registration */
-    VAPI_mr_hndl_t *mr_handle;
-    VAPI_lkey_t *lkey;
-    VAPI_rkey_t *rkey;
+    bmi_size_t tot_len;     /* sum_{i=0..num-1} len[i] */
+    memcache_entry_t **memcache; /* storage managed by memcache_register etc. */
 } ib_buflist_t;
 
 /*
@@ -173,11 +203,9 @@ typedef struct {
  * ensures reliability, so the message is marked complete immediately
  * and removed from the queue.
  */
-#define TYPE_SEND 0
-#define TYPE_RECV 1
 typedef struct S_ib_send {
     list_t list;
-    int type;  /* TYPE_SEND */
+    int type;  /* BMI_SEND */
     /* pointer back to owning method_op (BMI interface) */
     struct method_op *mop;
     sq_state_t state;
@@ -202,7 +230,7 @@ typedef struct S_ib_send {
  */
 typedef struct {
     list_t list;
-    int type;  /* TYPE_RECV */
+    int type;  /* BMI_RECV */
     /* pointer back to owning method_op (BMI interface) */
     struct method_op *mop;
     rq_state_t state;
@@ -259,7 +287,7 @@ typedef struct {
 #define MSG_HEADER_CTS_BUFLIST_ENTRY_SIZE (8 + 4 + 4)
 
 /*
- * Internal functions in setup.c used by ib.c
+ * Internal functions in setup.c used by ib.c.
  */
 extern void ib_close_connection(ib_connection_t *c);
 extern void close_connection_drain_qp(VAPI_qp_hndl_t qp);
@@ -267,11 +295,11 @@ extern void ib_tcp_client_connect(ib_method_addr_t *ibmap,
   struct method_addr *remote_map);
 extern int ib_tcp_server_check_new_connections(void);
 extern int ib_tcp_server_block_new_connections(int timeout_ms);
-extern void ib_mem_register(ib_buflist_t *buflist, int send_or_recv_type);
-extern void ib_mem_deregister(ib_buflist_t *buflist);
+extern void ib_mem_register(memcache_entry_t *c);
+extern void ib_mem_deregister(memcache_entry_t *c);
 
 /*
- * Method functions in setup.c
+ * Method functions in setup.c.
  */
 extern int BMI_ib_initialize(struct method_addr *listen_addr, int method_id,
   int init_flags);
@@ -283,12 +311,12 @@ extern int BMI_ib_get_info(int option, void *param);
 extern int BMI_ib_set_info(int option, void *param);
 
 /*
- * Internal functions in ib.c used by setup.c
+ * Internal functions in ib.c used by setup.c.
  */
 extern void post_rr(const ib_connection_t *c, buf_head_t *bh);
 
 /*
- * Internal functions in util.c
+ * Internal functions in util.c.
  */
 void error(const char *fmt, ...) __attribute__((noreturn,format(printf,1,2)));
 void error_errno(const char *fmt, ...)
@@ -298,21 +326,32 @@ void error_xerrno(int errnum, const char *fmt, ...)
 void error_verrno(int ecode, const char *fmt, ...)
   __attribute__((noreturn,format(printf,2,3)));
 void warning(const char *fmt, ...) __attribute__((format(printf,1,2)));
+void warning_errno(const char *fmt, ...) __attribute__((format(printf,1,2)));
 void info(const char *fmt, ...) __attribute__((format(printf,1,2)));
-extern void *Malloc(unsigned int n) __attribute__((malloc));
+extern void *Malloc(unsigned long n) __attribute__((malloc));
 extern u_int64_t swab64(u_int64_t x);
 extern void *qlist_del_head(struct qlist_head *list);
 extern void *qlist_try_del_head(struct qlist_head *list);
 /* convenient to assign this to the owning type */
 #define qlist_upcast(l) ((void *)(l))
-extern const char *sq_state_name(int num);
-extern const char *rq_state_name(int num);
-extern const char *msg_type_name(int num);
+extern const char *sq_state_name(sq_state_t num);
+extern const char *rq_state_name(rq_state_t num);
+extern const char *msg_type_name(msg_type_t num);
 extern void memcpy_to_buflist(ib_buflist_t *buflist, const void *buf,
   bmi_size_t len);
 extern void memcpy_from_buflist(ib_buflist_t *buflist, void *buf);
 extern int read_full(int fd, void *buf, size_t num);
 extern int write_full(int fd, const void *buf, size_t count);
+
+/*
+ * Memory allocation and caching internal functions, in mem.c.
+ */
+extern void *BMI_ib_memalloc(bmi_size_t size, enum bmi_op_type send_recv);
+extern int BMI_ib_memfree(void *buf, bmi_size_t size,
+  enum bmi_op_type send_recv);
+extern void memcache_register(ib_buflist_t *buflist);
+extern void memcache_deregister(ib_buflist_t *buflist);
+extern void memcache_shutdown(void);
 
 /*
  * Shared variables, space allocated in ib.c.
@@ -323,12 +362,19 @@ extern int listen_sock;  /* TCP sock on whih to listen for new connections */
 extern list_t connection; /* list of current connections */
 extern list_t sendq;
 extern list_t recvq;
+extern list_t memcache;
 /*
  * Temp array for filling scatter/gather lists to pass to IB functions,
  * allocated once at start to max size defined as reported by the qp.
  */
 extern VAPI_sg_lst_entry_t *sg_tmp_array;
-extern int sg_max_len;
+extern unsigned int sg_max_len;
+/*
+ * Maximum number of outstanding work requests in the NIC, same for both
+ * SQ and RQ, though we only care about SQ on the QP and ack QP.  Used to
+ * decide when to use a SIGNALED completion on a send to avoid WQE buildup.
+ */
+extern unsigned int max_outstanding_wr;
 /*
  * Both eager and bounce buffers are the same size, and same number, since
  * there is a symmetry of how many can be in use at the same time.
@@ -337,18 +383,9 @@ extern int sg_max_len;
  * sits in the buffer where it was received until the user posts or tests
  * for it.
  */
-static const bmi_size_t EAGER_BUF_NUM = 20;
-static const bmi_size_t EAGER_BUF_SIZE = 8 << 10;  /* 8 kB */
+static const int EAGER_BUF_NUM = 20;
+static const unsigned long EAGER_BUF_SIZE = 8 << 10;  /* 8 kB */
 extern bmi_size_t EAGER_BUF_PAYLOAD;
-/*
- * Maximum number of outstanding work requests in the NIC, same for both
- * SQ and RQ, though we only care about SQ on the ack QP.  Used to decide
- * when to use a SIGNALED completion on a send to avoid WQE buildup.
- */
-extern int max_outstanding_wr;
-
-#define htonq(x) swab64(x)
-#define ntohq(x) swab64(x)
 
 /*
  * Handle pointer to 64-bit integer conversions.  On 32-bit architectures
@@ -359,33 +396,6 @@ extern int max_outstanding_wr;
 #define int64_from_ptr(p) (u_int64_t)(unsigned long)(p)
 
 /*
- * Debugging macros.
- */
-#if 1
-#define DEBUG_LEVEL 2
-#define debug(lvl,fmt,args...) \
-    do { \
-	if (lvl <= DEBUG_LEVEL) \
-	    info(fmt,##args); \
-    } while (0)
-#define assert(cond,fmt,args...) \
-    do { \
-	if (__builtin_expect(!(cond),0)) \
-	    error(fmt,##args); \
-    } while (0)
-#else  /* no debug version */
-#  define debug(lvl,cond,fmt,...)
-#  define assert(cond,fmt,...)
-#endif
-
-/*
- * Formats for printing.  Should be somewhere more generic, and also
- * architecture-specific.
- */
-#define FORMAT_BMI_SIZE_T "%Ld"
-#define FORMAT_U_INT64_T  "%Ld"
-
-/*
  * Tell the compiler we really do not expect this to happen.
  */
 #if defined(__GNUC_MINOR__) && (__GNUC_MINOR__ < 96)
@@ -393,5 +403,29 @@ extern int max_outstanding_wr;
 #endif
 #define likely(x)       __builtin_expect(!!(x), 1)
 #define unlikely(x)     __builtin_expect(!!(x), 0)
+
+/*
+ * Debugging macros.
+ */
+#if 0
+#define DEBUG_LEVEL 4
+#define debug(lvl,fmt,args...) \
+    do { \
+	if (lvl <= DEBUG_LEVEL) \
+	    info(fmt,##args); \
+    } while (0)
+#else
+#  define debug(lvl,fmt,...) do { } while (0)
+#endif
+
+#if 0
+#define assert(cond,fmt,args...) \
+    do { \
+	if (unlikely(!(cond))) \
+	    error(fmt,##args); \
+    } while (0)
+#else
+#  define assert(cond,fmt,...) do { } while (0)
+#endif
 
 #endif  /* __ib_h */

@@ -1,21 +1,18 @@
 /*
  * InfiniBand BMI handy utilities that are not really core functions.
  *
- * Copyright (C) 2003 Pete Wyckoff <pw@osc.edu>
+ * Copyright (C) 2003-5 Pete Wyckoff <pw@osc.edu>
  *
  * See COPYING in top-level directory.
  *
- * $Id: util.c,v 1.3 2004-01-30 20:12:12 neill Exp $
+ * $Id: util.c,v 1.4 2005-11-03 21:23:19 pw Exp $
  */
 #include <stdio.h>
 #include <stdarg.h>
 #include <errno.h>
 #include <unistd.h>
-#include <src/common/quicklist/quicklist.h>
 #include <src/common/gossip/gossip.h>
-#include <src/io/bmi/bmi-method-support.h>
-#include <vapi.h>
-#include <vapi_common.h>
+#include <vapi_common.h>  /* VAPI_strerror */
 #define __util_c
 #include "ib.h"
 
@@ -32,6 +29,9 @@ error(const char *fmt, ...)
     vsprintf(s, fmt, ap);
     va_end(ap);
     gossip_err("Error: %s.\n", s);
+#ifdef GOSSIP_ENABLE_BACKTRACE
+    gossip_backtrace();
+#endif
     exit(1);
 }
 
@@ -87,6 +87,18 @@ warning(const char *fmt, ...)
 }
 
 void __attribute__((format(printf,1,2))) __hidden
+warning_errno(const char *fmt, ...)
+{
+    char s[2048];
+    va_list ap;
+
+    va_start(ap, fmt);
+    vsprintf(s, fmt, ap);
+    va_end(ap);
+    gossip_err("Warning: %s: %s.\n", s, strerror(errno));
+}
+
+void __attribute__((format(printf,1,2))) __hidden
 info(const char *fmt, ...)
 {
     char s[2048];
@@ -99,7 +111,7 @@ info(const char *fmt, ...)
 }
 
 void * __attribute__((malloc)) __hidden
-Malloc(unsigned int n)
+Malloc(unsigned long n)
 {
     char *x;
 
@@ -107,25 +119,8 @@ Malloc(unsigned int n)
 	error("%s: alloc 0 bytes", __func__);
     x = malloc(n);
     if (!x)
-	error("%s: malloc %d bytes failed", __func__, n);
+	error("%s: malloc %ld bytes failed", __func__, n);
     return x;
-}
-
-/*
- * Next step in ntoh[sl].
- */
-u_int64_t __hidden
-swab64(u_int64_t x)
-{
-    return (u_int64_t)
-       ((u_int64_t)((x & (u_int64_t)0x00000000000000ffULL) << 56)
-      | (u_int64_t)((x & (u_int64_t)0x000000000000ff00ULL) << 40)
-      | (u_int64_t)((x & (u_int64_t)0x0000000000ff0000ULL) << 24)
-      | (u_int64_t)((x & (u_int64_t)0x00000000ff000000ULL) <<  8)
-      | (u_int64_t)((x & (u_int64_t)0x000000ff00000000ULL) >>  8)
-      | (u_int64_t)((x & (u_int64_t)0x0000ff0000000000ULL) >> 24)
-      | (u_int64_t)((x & (u_int64_t)0x00ff000000000000ULL) >> 40)
-      | (u_int64_t)((x & (u_int64_t)0xff00000000000000ULL) >> 56));
 }
 
 /*
@@ -166,19 +161,19 @@ name_lookup(name_t *a, int num)
 }
 
 const char *
-sq_state_name(int num)
+sq_state_name(sq_state_t num)
 {
-    return name_lookup(sq_state_names, num);
+    return name_lookup(sq_state_names, (int) num);
 }
 const char *
-rq_state_name(int num)
+rq_state_name(rq_state_t num)
 {
-    return name_lookup(rq_state_names, num);
+    return name_lookup(rq_state_names, (int) num);
 }
 const char *
-msg_type_name(int num)
+msg_type_name(msg_type_t num)
 {
-    return name_lookup(msg_type_names, num);
+    return name_lookup(msg_type_names, (int) num);
 }
 
 /*
@@ -192,7 +187,7 @@ memcpy_to_buflist(ib_buflist_t *buflist, const void *buf, bmi_size_t len)
     const char *cp = buf;
 
     for (i=0; i<buflist->num && len > 0; i++) {
-	int bytes = buflist->len[i];
+	size_t bytes = buflist->len[i];
 	if (bytes > len)
 	    bytes = len;
 	memcpy(buflist->buf.recv[i], cp, bytes);
@@ -208,7 +203,7 @@ memcpy_from_buflist(ib_buflist_t *buflist, void *buf)
     char *cp = buf;
 
     for (i=0; i<buflist->num; i++) {
-	memcpy(cp, buflist->buf.send[i], buflist->len[i]);
+	memcpy(cp, buflist->buf.send[i], (size_t) buflist->len[i]);
 	cp += buflist->len[i];
     }
 }
