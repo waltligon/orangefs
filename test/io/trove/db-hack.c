@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <stdio.h>
+#include "pvfs2-test-config.h"
 
 int main(int argc, char *argv[])
 {
@@ -38,8 +39,11 @@ int main(int argc, char *argv[])
 	db->set_errpfx(db, "pvfs2");
 	/* open the database */
 	if ((ret = db->open(db, 
-					NULL, fname, NULL, 
-					DB_UNKNOWN, DB_DIRTY_READ | DB_THREAD, 0)) != 0)
+			    NULL, fname, NULL, DB_UNKNOWN,  
+#ifdef HAVE_DB_DIRTY_READ
+			    DB_DIRTY_READ | 
+#endif
+			    DB_THREAD, 0)) != 0)
 	{
 		fprintf(stderr, "db->open: %s\n", db_strerror(ret));
 		exit(1);

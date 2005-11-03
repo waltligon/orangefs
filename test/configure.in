@@ -206,6 +206,10 @@ fi
 AC_SUBST(MPI_INTELC)
 AC_SUBST(MPI_GNUC)
 
+AC_ARG_WITH(db,
+	[  --with-db=<dir>         Location of installed DB package (default=/usr)])
+AX_BERKELEY_DB(${withval})
+
 dnl create any missing subdirectories that wouldn't be created
 dnl by AC_OUTPUT below (which won't create intermediate dirs).
 for d in common io client correctness/pts kernel ; do

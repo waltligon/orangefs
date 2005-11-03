@@ -5,3 +5,7 @@
 
 /* Define if you have the pvfs2 library (-lpvfs2).  */
 #undef HAVE_LIBPVFS2
+
+/* Define if DB_DIRTY_READ is defined in the libdb version */
+#undef HAVE_DB_DIRTY_READ
+
