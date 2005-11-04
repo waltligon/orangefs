@@ -42,6 +42,10 @@ struct PINT_dist_s;
 
 /* PVFS Request Processing Stuff */
 
+/**
+ * NOTE: The encoding/decoding functions must be updated
+ * with changes to this struct.  See pint-request-encode.h.
+ */
 typedef struct PINT_Request {
 	PVFS_offset  offset;        /* offset from start of last set of elements */
 	int32_t      num_ereqs;     /* number of ereqs in a block */

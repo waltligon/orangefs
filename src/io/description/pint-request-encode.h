@@ -77,24 +77,24 @@ encode_PVFS_Request_fields(
 {
     u_int32_t encti;
     encode_PVFS_offset(pptr, &(rp)->offset);
-	encode_int32_t(pptr, &(rp)->num_ereqs);
-	encode_int32_t(pptr, &(rp)->num_blocks);
-	encode_PVFS_size(pptr, &(rp)->stride);
-	encode_PVFS_offset(pptr, &(rp)->ub);
-	encode_PVFS_offset(pptr, &(rp)->lb);
-	encode_PVFS_size(pptr, &(rp)->aggregate_size);
-	encode_int32_t(pptr, &(rp)->num_contig_chunks);
-	encode_int32_t(pptr, &(rp)->depth);
-	encode_int32_t(pptr, &(rp)->num_nested_req);
-	encode_int32_t(pptr, &(rp)->committed);
-	encode_int32_t(pptr, &(rp)->refcount);
-	encode_skip4(pptr,);
+    encode_int32_t(pptr, &(rp)->num_ereqs);
+    encode_int32_t(pptr, &(rp)->num_blocks);
+    encode_PVFS_size(pptr, &(rp)->stride);
+    encode_PVFS_offset(pptr, &(rp)->ub);
+    encode_PVFS_offset(pptr, &(rp)->lb);
+    encode_PVFS_size(pptr, &(rp)->aggregate_size);
+    encode_int32_t(pptr, &(rp)->num_contig_chunks);
+    encode_int32_t(pptr, &(rp)->depth);
+    encode_int32_t(pptr, &(rp)->num_nested_req);
+    encode_int32_t(pptr, &(rp)->committed);
+    encode_int32_t(pptr, &(rp)->refcount);
+    encode_skip4(pptr,);
 
-	/* These pointers have been encoded already, just write as ints */
-	encti = (u_int32_t)(uintptr_t) (rp)->ereq;
+    /* These pointers have been encoded already, just write as ints */
+    encti = (u_int32_t)(uintptr_t) (rp)->ereq;
     encode_uint32_t(pptr, &encti);
 
-	encti = (u_int32_t)(uintptr_t) (rp)->sreq;
+    encti = (u_int32_t)(uintptr_t) (rp)->sreq;
     encode_uint32_t(pptr, &encti);
 
     return 0;
@@ -176,17 +176,17 @@ int decode_PINT_Request(char ** pptr,
         decode_int32_t(pptr, &(rp+i)->refcount);
         decode_skip4(pptr,);
 
-        /* put integer offsets into pointers, let PINT_Request_decode fix */
-		decode_uint32_t(pptr, &encti);
-		(rp+i)->ereq = (PINT_Request *)(uintptr_t) encti;
-        
-		decode_uint32_t(pptr, &encti);
-		(rp+i)->sreq = (PINT_Request *)(uintptr_t) encti;
+	/* put integer offsets into pointers, let PINT_Request_decode fix */
+	decode_uint32_t(pptr, &encti);
+	(rp+i)->ereq = (PINT_Request *)(uintptr_t) encti;
+
+	decode_uint32_t(pptr, &encti);
+	(rp+i)->sreq = (PINT_Request *)(uintptr_t) encti;
     }
 
     *req = rp;
     return 0;
 }
 
-#endif
-#endif
+#endif /* __PINT_REQPROTO_ENCODE_FUNCS_C */
+#endif /* _PINT_REQUEST_ENCODE_H_ */
