@@ -18,6 +18,7 @@ ifdef BUILD_SERVER
 		$(DIR)/rmdirent.c \
 		$(DIR)/chdirent.c \
 		$(DIR)/io.c \
+		$(DIR)/small-io.c \
 		$(DIR)/flush.c \
 		$(DIR)/truncate.c\
 		$(DIR)/noop.c \

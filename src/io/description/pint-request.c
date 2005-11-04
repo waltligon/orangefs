@@ -9,7 +9,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <gossip.h>
-#include <pvfs2-types.h>
 #include <pvfs2-debug.h>
 #include <pint-request.h>
 #include <pint-distribution.h>
@@ -109,11 +108,17 @@ int PINT_process_request(PINT_Request_state *req,
 				req->cur->rqbase->depth);
 		temp_space = (void *)malloc(sizeof(PINT_Request_state)+
 				(sizeof(PINT_reqstack)*req->cur->rqbase->depth));
+        if(!temp_space)
+        {
+            return -PVFS_ENOMEM;
+        }
+
 		memcpy(temp_space,req,sizeof(PINT_Request_state));
 		req = (PINT_Request_state *)temp_space;
-		memcpy((char *)temp_space + sizeof(PINT_Request_state),
+		memcpy(((char *)temp_space) + sizeof(PINT_Request_state),
 				req->cur,(sizeof(PINT_reqstack)*req->cur->rqbase->depth));
-		req->cur = (PINT_reqstack *)((char *)temp_space + sizeof(PINT_Request_state));
+		req->cur = (PINT_reqstack *)
+            (((char *)temp_space) + sizeof(PINT_Request_state));
 	}
 	/* check to see if we are picking up where we left off */
 	if (req->lvl < 0)

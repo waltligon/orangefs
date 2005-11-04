@@ -71,6 +71,7 @@ enum
 #ifdef USE_TRUSTED
     BMI_TRUSTED_CONNECTION = 9, /**< allows setting the TrustedPorts and Network options */
 #endif
+    BMI_GET_UNEXP_SIZE = 10     /**< get the maximum unexpected payload */
 };
 
 /* mappings from PVFS errors to BMI errors */

@@ -149,7 +149,7 @@ typedef struct
     PVFS_handle data_handle;
 
     /* a reference to the msgpair we're using for communication */
-    PINT_sm_msgpair_state *msg;
+    PINT_sm_msgpair_state msg;
 
     job_id_t flow_job_id;
     job_status_s flow_status;
@@ -193,14 +193,15 @@ struct PINT_client_io_sm
     enum PVFS_flowproto_type flowproto_type;
     enum PVFS_encoding_type encoding;
 
-    int datafile_count;
     int *datafile_index_array;
+    int datafile_count;
 
     int msgpair_completion_count;
     int flow_completion_count;
     int write_ack_completion_count;
 
     PINT_client_io_ctx *contexts;
+    int context_count;
 
     int total_cancellations_remaining;
 
@@ -210,6 +211,7 @@ struct PINT_client_io_sm
     PVFS_size total_size;
 
     PVFS_size * dfile_size_array;
+    int small_io;
 };
 
 struct PINT_client_flush_sm
@@ -381,6 +383,7 @@ typedef struct PINT_sm_getattr_state
 #define PINT_SM_DATAFILE_SIZE_ARRAY_INIT(_array, _count) \
     do { \
         (*(_array)) = malloc(sizeof(PVFS_size) * (_count)); \
+        memset(*(_array), 0, (sizeof(PVFS_size) * (_count))); \
     } while(0)
 
 #define PINT_SM_DATAFILE_SIZE_ARRAY_DESTROY(_array) \
@@ -584,6 +587,7 @@ enum
     PVFS_SYS_SETEATTR              = 14,
     PVFS_SYS_DELEATTR              = 15,
     PVFS_SYS_LISTEATTR             = 16,
+    PVFS_SYS_SMALL_IO              = 17,
     PVFS_MGMT_SETPARAM_LIST        = 70,
     PVFS_MGMT_NOOP                 = 71,
     PVFS_MGMT_STATFS_LIST          = 72,
@@ -715,6 +719,7 @@ extern struct PINT_state_machine_s pvfs2_client_getattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_datafile_getattr_sizes_sm;
 extern struct PINT_state_machine_s pvfs2_client_setattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_io_sm;
+extern struct PINT_state_machine_s pvfs2_client_small_io_sm;
 extern struct PINT_state_machine_s pvfs2_client_flush_sm;
 extern struct PINT_state_machine_s pvfs2_client_readdir_sm;
 extern struct PINT_state_machine_s pvfs2_client_lookup_sm;

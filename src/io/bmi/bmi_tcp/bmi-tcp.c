@@ -156,6 +156,7 @@ int BMI_tcp_post_sendunexpected_list(bmi_op_id_t * id,
 int BMI_tcp_open_context(bmi_context_id context_id);
 void BMI_tcp_close_context(bmi_context_id context_id);
 int BMI_tcp_cancel(bmi_op_id_t id, bmi_context_id context_id);
+int BMI_tcp_get_unexp_maxsize(void);
 
 char BMI_tcp_method_name[] = "bmi_tcp";
 
@@ -304,7 +305,7 @@ struct bmi_method_ops bmi_tcp_ops = {
     BMI_tcp_open_context,
     BMI_tcp_close_context,
     BMI_tcp_cancel,
-    BMI_tcp_addr_rev_lookup_unexpected,
+    BMI_tcp_addr_rev_lookup_unexpected
 };
 
 /* module parameters */
@@ -806,6 +807,11 @@ int BMI_tcp_get_info(int option,
 	}
         ret = 0;
 	break;
+    case BMI_GET_UNEXP_SIZE:
+        *((int *) inout_parameter) = TCP_MODE_EAGER_LIMIT;
+        ret = 0;
+        break;
+
     default:
 	gossip_ldebug(GOSSIP_BMI_DEBUG_TCP,
                       "TCP hint %d not implemented.\n", option);

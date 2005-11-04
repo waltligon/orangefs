@@ -10,6 +10,7 @@
 #include <assert.h>
 
 #include "gossip.h"
+#include "pvfs2-debug.h"
 
 /* STATE-MACHINE-FNS.H
  *
@@ -112,6 +113,7 @@ static inline int PINT_state_machine_next(struct PINT_OP_STATE *s,
     } while (loc->flag == SM_RETURN);
 
     s->current_state = loc->next_state;
+    s->current_state += 2;
 
 
     /* To do nested states, we check to see if the next state is
@@ -127,6 +129,7 @@ static inline int PINT_state_machine_next(struct PINT_OP_STATE *s,
 	 * cross-structure dependency that I couldn't handle any more.  -- Rob
 	 */
 	s->current_state = ((struct PINT_state_machine_s *) s->current_state->nested_machine)->state_machine;
+        s->current_state += 2;
     }
 
     /* skip over the flag so that we point to the function for the next
@@ -134,9 +137,37 @@ static inline int PINT_state_machine_next(struct PINT_OP_STATE *s,
      */
     s->current_state += 1;
 
+    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, "[SM Entering]: %s:%s\n",
+                 /* skip pvfs2_ */
+                 ((s->current_state - 2)->parent_machine->name + 6),
+                 (s->current_state - 3)->state_name);
+                 
     retval = (s->current_state->state_action)(s,r);
 
+    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, "[SM Exiting]: %s:%s\n",
+                 /* skip pvfs2_ */
+                 ((s->current_state - 2)->parent_machine->name + 6),
+                 (s->current_state - 3)->state_name);
+
     /* return to the while loop in pvfs2-server.c */
+    return retval;
+}
+
+static inline int PINT_state_machine_invoke(
+    struct PINT_OP_STATE *s, job_status_s *r)
+{
+    int retval;
+    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, "[SM Entering]: %s:%s\n",
+                 /* skip pvfs2_ */
+                 ((s->current_state - 2)->parent_machine->name + 6), 
+                 (s->current_state - 3)->state_name);
+                 
+    retval = (s->current_state->state_action)(s,r);
+
+    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, "[SM Exiting]: %s:%s\n",
+                 /* skip pvfs2_ */
+                 ((s->current_state - 2)->parent_machine->name + 6),
+                 (s->current_state - 3)->state_name);
     return retval;
 }
 
@@ -160,6 +191,7 @@ static union PINT_state_array_values *PINT_state_machine_locate(struct PINT_OP_S
     if (PINT_OP_STATE_GET_MACHINE(s_op->op) != NULL)
     {
 	current_tmp = PINT_OP_STATE_GET_MACHINE(s_op->op)->state_machine;
+        current_tmp += 2;
 	/* handle the case in which the first state points to a nested
 	 * machine, rather than a simple function
 	 */
@@ -167,7 +199,9 @@ static union PINT_state_array_values *PINT_state_machine_locate(struct PINT_OP_S
 	{
 	    PINT_push_state(s_op, current_tmp);
 	    current_tmp += 1;
-	    current_tmp = ((struct PINT_state_machine_s *)current_tmp->nested_machine)->state_machine;
+	    current_tmp = ((struct PINT_state_machine_s *)
+                           current_tmp->nested_machine)->state_machine;
+            current_tmp += 2;
 	}
 
 	/* this returns a pointer to a "PINT_state_array_values"

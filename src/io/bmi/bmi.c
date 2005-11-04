@@ -79,6 +79,7 @@ static struct bmi_method_ops **known_method_table = 0;
  */
 static int active_method_count = 0;
 static gen_mutex_t active_method_count_mutex = GEN_MUTEX_INITIALIZER;
+
 static struct bmi_method_ops **active_method_table = NULL;
 static struct {
     struct timeval active;
@@ -1258,6 +1259,23 @@ int BMI_get_info(PVFS_BMI_addr_t addr,
 	gen_mutex_unlock(&ref_mutex);
 	*((void**) inout_parameter) = tmp_ref->method_addr;
 	break;
+    case BMI_GET_UNEXP_SIZE:
+        gen_mutex_lock(&ref_mutex);
+        tmp_ref = ref_list_search_addr(cur_ref_list, addr);
+        if(!tmp_ref)
+        {
+            gen_mutex_unlock(&ref_mutex);
+            return (bmi_errno_to_pvfs(-EINVAL));
+        }
+        gen_mutex_unlock(&ref_mutex);
+        ret = tmp_ref->interface->BMI_meth_get_info(
+            option, inout_parameter);
+        if(ret < 0)
+        {
+            return ret;
+        }
+        break;
+
     default:
 	return (bmi_errno_to_pvfs(-ENOSYS));
 	break;

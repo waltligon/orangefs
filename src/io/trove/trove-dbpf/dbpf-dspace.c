@@ -391,14 +391,14 @@ return_error:
 }
 
 static int dbpf_dspace_iterate_handles(TROVE_coll_id coll_id,
-                                TROVE_ds_position *position_p,
-                                TROVE_handle *handle_array,
-                                int *inout_count_p,
-                                TROVE_ds_flags flags,
-                                TROVE_vtag_s *vtag,
-                                void *user_ptr,
-                                TROVE_context_id context_id,
-                                TROVE_op_id *out_op_id_p)
+                                       TROVE_ds_position *position_p,
+                                       TROVE_handle *handle_array,
+                                       int *inout_count_p,
+                                       TROVE_ds_flags flags,
+                                       TROVE_vtag_s *vtag,
+                                       void *user_ptr,
+                                       TROVE_context_id context_id,
+                                       TROVE_op_id *out_op_id_p)
 {
     dbpf_queued_op_t *q_op_p = NULL;
     struct dbpf_collection *coll_p = NULL;

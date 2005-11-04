@@ -1340,6 +1340,102 @@ int job_trove_bstream_write_at(PVFS_fs_id coll_id,
     return (0);
 }
 
+int job_trove_bstream_write_list(TROVE_coll_id coll_id,
+                                 TROVE_handle handle,
+                                 char **mem_offset_array, 
+                                 TROVE_size *mem_size_array,
+                                 int mem_count,
+                                 TROVE_offset *stream_offset_array, 
+                                 TROVE_size *stream_size_array,
+                                 int stream_count,
+                                 TROVE_size *out_size_p,
+                                 TROVE_ds_flags flags, 
+                                 TROVE_vtag_s *vtag,
+                                 void * user_ptr,
+                                 job_aint status_user_tag,
+                                 job_status_s *out_status_p,
+                                 job_id_t *id,
+                                 job_context_id context_id)
+{
+    /* post a trove write.  If it completes (or fails) immediately, then
+     * return and fill in the status structure.  If it needs to be tested
+     * for completion later, then queue up a job_desc structure.
+     */
+    int ret = -1;
+    struct job_desc *jd = NULL;
+    void* user_ptr_internal;
+
+    /* create the job desc first, even though we may not use it.  This
+     * gives us somewhere to store the BMI id and user ptr
+     */
+    jd = alloc_job_desc(JOB_TROVE);
+    if (!jd)
+    {
+        return (-errno);
+    }
+    jd->job_user_ptr = user_ptr;
+    jd->u.trove.vtag = vtag;
+    jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
+    jd->trove_callback.fn = trove_thread_mgr_callback;
+    jd->trove_callback.data = (void*)jd;
+    user_ptr_internal = &jd->trove_callback;
+    JOB_EVENT_START(PVFS_EVENT_TROVE_WRITE_LIST, jd->job_id);
+
+#ifdef __PVFS2_TROVE_SUPPORT__
+    ret = trove_bstream_write_list(coll_id, handle, 
+                                   mem_offset_array, mem_size_array,
+                                   mem_count,
+                                   stream_offset_array, stream_size_array,
+                                   stream_count,
+                                   out_size_p,
+                                   flags,
+                                   vtag,
+                                   user_ptr_internal,
+                                   global_trove_context,
+                                   &(jd->u.trove.id));
+#else
+    gossip_err("Error: Trove support not enabled.\n");
+    ret = -ENOSYS;
+#endif
+
+    if (ret < 0)
+    {
+        /* error posting trove operation */
+        JOB_EVENT_END(PVFS_EVENT_TROVE_WRITE_LIST, 0, jd->job_id);
+        dealloc_job_desc(jd);
+        jd = NULL;
+        /* TODO: handle this correctly */
+        out_status_p->error_code = -EINVAL;
+        out_status_p->status_user_tag = status_user_tag;
+        return (1);
+    }
+
+    if (ret == 1)
+    {
+        /* immediate completion */
+        out_status_p->error_code = 0;
+        out_status_p->status_user_tag = status_user_tag;
+        out_status_p->actual_size = jd->u.trove.actual_size;
+        out_status_p->vtag = jd->u.trove.vtag;
+        JOB_EVENT_END(PVFS_EVENT_TROVE_WRITE_LIST, out_status_p->actual_size, 
+            jd->job_id);
+        dealloc_job_desc(jd);
+        jd = NULL;
+        return (ret);
+    }
+
+    /* if we fall through to this point, the job did not
+     * immediately complete and we must queue up to test later
+     */
+    *id = jd->job_id;
+    trove_pending_count++;
+    jd->event_type = PVFS_EVENT_TROVE_WRITE_LIST;
+
+    return (0);
+} 
+
+
 /* job_trove_bstream_read_at()
  *
  * storage byte stream read 
@@ -1429,6 +1525,99 @@ int job_trove_bstream_read_at(PVFS_fs_id coll_id,
     *id = jd->job_id;
     trove_pending_count++;
     jd->event_type = PVFS_EVENT_TROVE_READ_AT;
+
+    return (0);
+}
+
+int job_trove_bstream_read_list(PVFS_fs_id coll_id,
+                                PVFS_handle handle,
+                                char **mem_offset_array,
+                                PVFS_size *mem_size_array,
+                                int mem_count,
+                                PVFS_offset *stream_offset_array,
+                                PVFS_size *stream_size_array,
+                                int stream_count,
+                                PVFS_size *out_size_p,
+                                PVFS_ds_flags flags,
+                                PVFS_vtag *vtag,
+                                void * user_ptr,
+                                job_aint status_user_tag,
+                                job_status_s * out_status_p,
+                                job_id_t * id,
+                                job_context_id context_id)
+{
+    /* post a trove read.  If it completes (or fails) immediately, then
+     * return and fill in the status structure.  If it needs to be tested
+     * for completion later, then queue up a job_desc structure.
+     */
+    int ret = -1;
+    struct job_desc *jd = NULL;
+    void* user_ptr_internal;
+
+    /* create the job desc first, even though we may not use it.  This
+     * gives us somewhere to store the BMI id and user ptr
+     */
+    jd = alloc_job_desc(JOB_TROVE);
+    if (!jd)
+    {
+        return (-errno);
+    }
+    jd->job_user_ptr = user_ptr;
+    jd->u.trove.vtag = vtag;
+    jd->context_id = context_id;
+    jd->status_user_tag = status_user_tag;
+    jd->trove_callback.fn = trove_thread_mgr_callback;
+    jd->trove_callback.data = (void*)jd;
+    user_ptr_internal = &jd->trove_callback;
+    JOB_EVENT_START(PVFS_EVENT_TROVE_READ_LIST, jd->job_id);
+
+#ifdef __PVFS2_TROVE_SUPPORT__
+    ret = trove_bstream_read_list(coll_id, handle, 
+                                  mem_offset_array, mem_size_array,
+                                  mem_count,
+                                  stream_offset_array, stream_size_array,
+                                  stream_count,
+                                  out_size_p, flags,
+                                  jd->u.trove.vtag, user_ptr_internal,
+                                  global_trove_context,
+                                  &(jd->u.trove.id));
+#else
+    gossip_err("Error: Trove support not enabled.\n");
+    ret = -ENOSYS;
+#endif
+
+    if (ret < 0)
+    {
+        /* error posting trove operation */
+        JOB_EVENT_END(PVFS_EVENT_TROVE_READ_LIST, 0, jd->job_id);
+        dealloc_job_desc(jd);
+        jd = NULL;
+        /* TODO: handle this correctly */
+        out_status_p->error_code = -EINVAL;
+        out_status_p->status_user_tag = status_user_tag;
+        return (1);
+    }
+
+    if (ret == 1)
+    {
+        /* immediate completion */
+        out_status_p->error_code = 0;
+        out_status_p->status_user_tag = status_user_tag;
+        out_status_p->actual_size = jd->u.trove.actual_size;
+        out_status_p->vtag = jd->u.trove.vtag;
+        JOB_EVENT_END(PVFS_EVENT_TROVE_READ_LIST, out_status_p->actual_size, 
+            jd->job_id);
+        dealloc_job_desc(jd);
+        jd = NULL;
+        return (ret);
+    }
+
+    /* if we fall through to this point, the job did not
+     * immediately complete and we must queue up to test later
+     */
+    *id = jd->job_id;
+    trove_pending_count++;
+    jd->event_type = PVFS_EVENT_TROVE_READ_LIST;
 
     return (0);
 }

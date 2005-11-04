@@ -227,6 +227,7 @@ int PINT_req_sched_target_handle(
 	*fs_id = req->u.mgmt_remove_dirent.fs_id;
 	return (0);
     case PVFS_SERV_IO:
+    case PVFS_SERV_SMALL_IO:
 	if(req->u.io.io_type == PVFS_IO_WRITE)
 	    *readonly_flag = 0;
 	*handle = req->u.io.handle;

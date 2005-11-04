@@ -304,6 +304,7 @@ struct dbpf_bstream_rw_list_op
     TROVE_size *mem_size_array;
     TROVE_offset *stream_offset_array;
     TROVE_size *stream_size_array;
+    TROVE_size *out_size_p;
     struct aiocb *aiocb_array;
     struct sigevent sigev;
     struct bstream_listio_state lio_state;

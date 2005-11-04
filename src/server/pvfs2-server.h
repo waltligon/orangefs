@@ -413,6 +413,7 @@ extern struct PINT_state_machine_s pvfs2_mkdir_sm;
 extern struct PINT_state_machine_s pvfs2_readdir_sm;
 extern struct PINT_state_machine_s pvfs2_lookup_sm;
 extern struct PINT_state_machine_s pvfs2_io_sm;
+extern struct PINT_state_machine_s pvfs2_small_io_sm;
 extern struct PINT_state_machine_s pvfs2_remove_sm;
 extern struct PINT_state_machine_s pvfs2_mgmt_remove_object_sm;
 extern struct PINT_state_machine_s pvfs2_mgmt_remove_dirent_sm;

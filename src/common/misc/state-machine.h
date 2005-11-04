@@ -45,6 +45,8 @@
 
 union PINT_state_array_values
 {
+    char *state_name;
+    struct PINT_state_machine_s *parent_machine;
     int (*state_action)(struct PINT_OP_STATE *, job_status_s *);
     int return_value;
     int flag;

@@ -70,7 +70,7 @@ enum PVFS_flowproto_type
 enum PVFS_encoding_type
 {
     ENCODING_DIRECT = 1,
-    ENCODING_LE_BFIELD = 2,
+    ENCODING_LE_BFIELD = 1,
     ENCODING_XDR = 3,
 };
 /* these values must correspond to the defined encoding types above */

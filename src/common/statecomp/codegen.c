@@ -17,6 +17,7 @@
 
 extern FILE *out_file;
 extern int terminate_path_flag;
+static char * current_machine;
 
 void gen_init(void);
 void gen_state_decl(char *state_name);
@@ -40,6 +41,7 @@ void gen_state_decl(char *state_name)
 void gen_machine(char *machine_name,
 		 char *first_state_name)
 {
+    current_machine = machine_name;
     fprintf(out_file, "\nstruct PINT_state_machine_s %s =\n{\n\t", machine_name);
     fprintf(out_file, "ST_%s,\n\t\"%s\"\n", first_state_name, machine_name);
     fprintf(out_file, "};\n");
@@ -47,7 +49,11 @@ void gen_machine(char *machine_name,
 
 void gen_state_start(char *state_name)
 {
-    fprintf(out_file,"static union PINT_state_array_values ST_%s[] = {\n", state_name);
+    fprintf(out_file,
+            "static union PINT_state_array_values ST_%s[] = {\n"
+            "(union PINT_state_array_values) \"%s\",\n"
+            "(union PINT_state_array_values) &%s,\n", 
+            state_name, state_name, current_machine);
 }
 
 /** generates first two lines in the state machine (I think),
