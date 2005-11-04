@@ -227,12 +227,17 @@ int PINT_req_sched_target_handle(
 	*fs_id = req->u.mgmt_remove_dirent.fs_id;
 	return (0);
     case PVFS_SERV_IO:
-    case PVFS_SERV_SMALL_IO:
 	if(req->u.io.io_type == PVFS_IO_WRITE)
 	    *readonly_flag = 0;
 	*handle = req->u.io.handle;
 	*fs_id = req->u.io.fs_id;
 	return (0);
+    case PVFS_SERV_SMALL_IO:
+        if(req->u.small_io.io_type == PVFS_IO_WRITE)
+            *readonly_flag = 0;
+        *handle = req->u.small_io.handle;
+        *fs_id = req->u.small_io.fs_id;
+        return (0);
     case PVFS_SERV_GETATTR:
 	*handle = req->u.getattr.handle;
 	*fs_id = req->u.getattr.fs_id;

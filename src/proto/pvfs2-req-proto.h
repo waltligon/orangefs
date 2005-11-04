@@ -35,7 +35,7 @@
  * BMI module.  All max unexpected message sizes for BMI modules have to be less
  * than this value
  */
-#define PINT_SMALL_IO_MAXSIZE (64*1024)
+#define PINT_SMALL_IO_MAXSIZE (16*1024)
 
 enum PVFS_server_op
 {
