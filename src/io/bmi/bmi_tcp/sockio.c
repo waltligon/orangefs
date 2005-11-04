@@ -190,8 +190,7 @@ int BMI_sockio_brecv(int s,
 	    return (-1);
 	}
 	comp -= ret;
-	buf = ((char *)buf) + ret;
-	buf = (char *) buf + ret;
+	buf = (char *)buf + ret;
     }
     fcntl(s, F_SETFL, oldfl|O_NONBLOCK);
     return (len - comp);
@@ -226,7 +225,7 @@ int BMI_sockio_nbrecv(int s,
 	    return (-1);
 	}
 	comp -= ret;
-	buf = ((char *)buf) + ret;
+	buf = (char *)buf + ret;
     }
     return (len - comp);
 }
@@ -294,7 +293,7 @@ int BMI_sockio_bsend(int s,
 	    return (-1);
 	}
 	comp -= ret;
-	buf = ((char *)buf) + ret;
+	buf = (char *)buf + ret;
     }
     fcntl(s, F_SETFL, oldfl | O_NONBLOCK);
     return (len - comp);
@@ -322,7 +321,7 @@ int BMI_sockio_nbsend(int s,
 	else if (ret == -1)
 	    return (-1);
 	comp -= ret;
-	buf = ((char *)buf) + ret;
+	buf = (char *)buf + ret;
     }
     return (len - comp);
 }
