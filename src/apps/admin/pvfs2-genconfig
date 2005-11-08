@@ -29,6 +29,7 @@ my $opt_first_handle = '';
 my $opt_last_handle = '';
 my $opt_root_handle = '';
 my $opt_fsid = '';
+my $opt_default_num_dfiles = '';
 
 my $opt_security = '0';
 my $opt_trusted_port = '';
@@ -232,6 +233,10 @@ sub emit_filesystem
     print $target "\tName $name\n";
     print $target "\tID $fs_id\n";
     print $target "\tRootHandle $root_handle\n";
+    if($default_num_dfiles > 0)
+    {
+        print $target "\tDefaultNumDFiles $default_num_dfiles\n";
+    }
     print $target "\t<MetaHandleRanges>\n";
 
     $start = $end = $first_handle - 1;
@@ -356,6 +361,8 @@ Usage: pvfs2-genconfig [OPTIONS] <fs.conf> <server.conf>
      --last-handle  <NUM>              last handle value to reserve
      --root-handle  <NUM>              handle value to reserve for root object
      --fsid         <NUM>              fs identifier value
+     --default-num-dfiles <NUM>        number of datafiles to use per file
+                                       (defaults to number of I/O servers)
      --trusted      <0|1>              indicate whether trusted connection options need to be emitted
 THIS
 
@@ -467,6 +474,16 @@ sub get_last_handle
         $last_handle = 4294967297;
     }
     return $last_handle;
+}
+
+sub get_default_num_dfiles
+{
+    if ($opt_default_num_dfiles) {
+        $default_num_dfiles = $opt_default_num_dfiles;
+    } else {
+        $default_num_dfiles = -1;
+    }
+    return $default_num_dfiles;
 }
 
 sub get_first_handle
@@ -666,6 +683,7 @@ GetOptions('protocol=s'    => \$opt_protocol,
        'logstamp=s'    => \$opt_logstamp,
        'first-handle=i' => \$opt_first_handle,
        'last-handle=i' => \$opt_last_handle,
+       'default-num-dfiles=i' => \$opt_default_num_dfiles,
        'root-handle=i' => \$opt_root_handle,
        'fsid=i'        => \$opt_fsid,
        'trusted=i'        => \$opt_security,
@@ -799,6 +817,7 @@ $logging = get_logging();
 $logstamp = get_logstamp();
 $first_handle = get_first_handle();
 $last_handle = get_last_handle();
+$default_num_dfiles = get_default_num_dfiles();
 $root_handle = get_root_handle();
 $fsid = get_fsid();
 $server_job_timeout = get_server_job_timeout();
