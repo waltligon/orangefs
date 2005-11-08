@@ -290,6 +290,18 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s *js_p)
                  Lu(a_p->mtime), Lu(orig_mtime));
      }
 
+    /* if the object is a symbolic link, check to make sure that the request
+     * is not attempting to change the permissions 
+     */
+    if(dspace_a_p->objtype == PVFS_TYPE_SYMLINK)
+    {
+        if(dspace_a_p->perms != 0 && dspace_a_p->perms != a_p->perms)
+        {
+            js_p->error_code = -PVFS_EPERM;
+            return(1);
+        }
+    }
+
     /*
       we have the attribs stored in the dspace, as well as the
       requested attribs to store.  overwrite the ones that are setable
