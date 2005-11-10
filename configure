@@ -8747,6 +8747,7 @@ rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 fi;
 fi
 
+if test "x$BUILD_SERVER" = "x1"; then
 
 
 echo "$as_me:$LINENO: checking if server lib needs -lrt" >&5
@@ -8858,6 +8859,7 @@ rm -f conftest.err conftest.$ac_objext \
 
 LDFLAGS=$oldldflags
 
+fi
 
 case "$host_os" in
 
