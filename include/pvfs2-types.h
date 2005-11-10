@@ -15,9 +15,13 @@
 #ifndef __PVFS2_TYPES_H
 #define __PVFS2_TYPES_H
 
+#ifdef __KERNEL__
+#include <linux/types.h>
+#else
 #include <stdint.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+#endif /* __KERNEL__ */
 
 #ifndef INT32_MAX
 /* definition taken from stdint.h */
