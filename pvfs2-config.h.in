@@ -190,16 +190,19 @@
 /* sub version number */
 #undef PVFS2_VERSION_SUB
 
+/* The size of a `long int', as computed by sizeof. */
+#undef SIZEOF_LONG_INT
+
 /* The size of a `void *', as computed by sizeof. */
 #undef SIZEOF_VOID_P
 
 /* Define to 1 if you have the ANSI C header files. */
 #undef STDC_HEADERS
 
-/* "Define if on darwin" */
+/* Define if on darwin */
 #undef TARGET_OS_DARWIN
 
-/* "Define if on linux" */
+/* Define if on linux */
 #undef TARGET_OS_LINUX
 
 /* Define if mtrace memory leak detection was enabled */

@@ -23,6 +23,8 @@
 #include <sys/time.h>
 #endif /* __KERNEL__ */
 
+#include "pvfs2-config.h"
+
 #ifndef INT32_MAX
 /* definition taken from stdint.h */
 #define INT32_MAX (2147483647)
@@ -666,14 +668,16 @@ enum PVFS_io_type
  * specifier and a parameter are mismatched, that machine will issue
  * a warning, while 64-bit machines will silently perform the cast.
  */
-#ifndef __LP64__
+#if SIZEOF_LONG_INT == 4 
 #  define llu(x) (x)
 #  define lld(x) (x)
 #  define SCANF_lld "%lld"
-#else
+#elif SIZEOF_LONG_INT == 8
 #  define llu(x) (unsigned long long)(x)
 #  define lld(x) (long long)(x)
 #  define SCANF_lld "%ld"
+#else
+#  error Unexpected sizeof(long int)
 #endif
 
 /*
