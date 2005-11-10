@@ -823,8 +823,10 @@ if test "x$NEED_BERKELEY_DB" = "xyes" ; then
 fi
 dnl end of NEED_BERKELEY_DB section
 
-dnl check if -lrt is required
-AX_CHECK_NEEDS_LIBRT
+if test "x$BUILD_SERVER" = "x1"; then
+	dnl check if -lrt is required
+	AX_CHECK_NEEDS_LIBRT
+fi
 
 case "$host_os" in
 
