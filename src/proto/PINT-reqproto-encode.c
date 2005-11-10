@@ -174,8 +174,8 @@ int PINT_decode(void* input_buffer,
     if(size < PINT_ENC_GENERIC_HEADER_SIZE)
     {
         gossip_err("Error: poorly formatted protocol message received.\n");
-	gossip_err("   Too small: message only %Ld bytes.\n",
-	    Ld(size));
+	gossip_err("   Too small: message only %lld bytes.\n",
+	    lld(size));
 	return(-PVFS_EPROTO);
     }
     

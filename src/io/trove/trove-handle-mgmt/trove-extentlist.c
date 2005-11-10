@@ -235,7 +235,7 @@ static int extentlist_coalesce_extent(
         e->first = (*lesser)->first;
         if (avlremove(n, (*lesser)->first) == 0)
         {
-            gossip_err("error removing key %Lu\n", Lu((*lesser)->first));
+            gossip_err("error removing key %llu\n", llu((*lesser)->first));
             return COALESCE_ERROR;
         }
         merge_lesser = 1;
@@ -246,7 +246,7 @@ static int extentlist_coalesce_extent(
         e->last = (*greater)->last;
         if (avlremove(n, (*greater)->first) == 0)
         {
-            gossip_err("error removing key %Lu\n", Lu((*greater)->first));
+            gossip_err("error removing key %llu\n", llu((*greater)->first));
             return COALESCE_ERROR;
         }
         merge_greater = 1;
@@ -256,7 +256,7 @@ static int extentlist_coalesce_extent(
     {
         if (avlinsert(n, e) == 0)
         {
-            gossip_lerr("error inserting key %Lu\n", Lu(e->first));
+            gossip_lerr("error inserting key %llu\n", llu(e->first));
             return COALESCE_ERROR;
         }
         else
@@ -392,7 +392,7 @@ int extentlist_peek_handles(
     do
     {
         gossip_debug(GOSSIP_TROVE_DEBUG, "extentlist_peek_handles: "
-                     "providing handle %Lu\n", Lu(handle));
+                     "providing handle %llu\n", llu(handle));
 
         out_handle_array[(*returned_handle_count)++] = handle;
 
@@ -440,8 +440,8 @@ int extentlist_peek_handles_from_extent(
 
         gossip_debug(
             GOSSIP_TROVE_DEBUG, "extentlist_peek_handles_from_range: "
-            "got %Lu [%Lu-%Lu]\n", Lu(handle), 
-            Lu(tmp_extent.first), Lu(tmp_extent.last));
+            "got %llu [%llu-%llu]\n", llu(handle), 
+            llu(tmp_extent.first), llu(tmp_extent.last));
 
         out_handle_array[(*returned_handle_count)++] = handle;
 
@@ -484,8 +484,8 @@ static void extent_show(struct avlnode *n, int param, int depth)
     struct TROVE_handle_extent *e =
         (struct TROVE_handle_extent *)(n->d);
 
-    gossip_debug(GOSSIP_TROVE_DEBUG, "lb: %Lu ub: %Lu\n",
-                 Lu(e->first), Lu(e->last));
+    gossip_debug(GOSSIP_TROVE_DEBUG, "lb: %llu ub: %llu\n",
+                 llu(e->first), llu(e->last));
 }
 
 static void extent_count(struct avlnode *n, int param, int depth)

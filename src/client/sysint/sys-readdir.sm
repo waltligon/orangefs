@@ -141,7 +141,7 @@ PVFS_error PVFS_isys_readdir(
     sm_p->object_ref = ref;
 
     gossip_debug(GOSSIP_READDIR_DEBUG, "Doing readdir on handle "
-                 "%Lu on fs %d\n", Lu(ref.handle), ref.fs_id);
+                 "%llu on fs %d\n", llu(ref.handle), ref.fs_id);
 
     return PINT_client_state_machine_post(
         sm_p, PVFS_SYS_READDIR, op_id, user_ptr);
@@ -223,8 +223,8 @@ static int readdir_msg_setup_msgpair(PINT_client_sm *sm_p,
     gossip_debug(GOSSIP_READDIR_DEBUG," readdir: posting readdir req\n");
 
     gossip_debug(
-        GOSSIP_READDIR_DEBUG, "%Lu|%d | token is %d | limit is %d\n",
-        Lu(sm_p->object_ref.handle),
+        GOSSIP_READDIR_DEBUG, "%llu|%d | token is %d | limit is %d\n",
+        llu(sm_p->object_ref.handle),
         sm_p->object_ref.fs_id,
         sm_p->u.readdir.pos_token,
         sm_p->u.readdir.dirent_limit);
@@ -311,9 +311,9 @@ static int readdir_msg_comp_fn(void *v_p,
     }
 
     gossip_debug(GOSSIP_READDIR_DEBUG, "*** Got %d directory entries "
-                 "[version %Ld]\n",
+                 "[version %lld]\n",
                  sm_p->u.readdir.readdir_resp->pvfs_dirent_outcount,
-                 Ld(sm_p->u.readdir.readdir_resp->directory_version));
+                 lld(sm_p->u.readdir.readdir_resp->directory_version));
 
     return 0;
 }

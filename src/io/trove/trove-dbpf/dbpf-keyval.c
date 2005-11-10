@@ -23,7 +23,10 @@
 #include <string.h>
 #include <db.h>
 #include <time.h>
+#include <stdlib.h>
+#ifdef HAVE_MALLOC_H
 #include <malloc.h>
+#endif
 
 #include "trove.h"
 #include "trove-internal.h"
@@ -144,8 +147,8 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
     if (ret != 0)
     {
         gossip_debug(GOSSIP_TROVE_DEBUG,
-                     "warning: keyval read error on handle %Lu and "
-                     "key=%s (%s)\n", Lu(op_p->handle),
+                     "warning: keyval read error on handle %llu and "
+                     "key=%s (%s)\n", llu(op_p->handle),
                      (char *)key.data, db_strerror(ret));
 
         /* if data buffer is too small returns a memory error */

@@ -119,17 +119,17 @@ do {                                                                     \
 /* arguments are: buf, path_max, stoname, collid, handle */
 #define DBPF_GET_BSTREAM_FILENAME(__b, __pm, __stoname, __cid, __handle) \
 do {                                                                     \
-  snprintf(__b, __pm, "/%s/%08x/%s/%.8Lu/%08Lx.bstream",                 \
+  snprintf(__b, __pm, "/%s/%08x/%s/%.8llu/%08llx.bstream",                 \
            __stoname, __cid, BSTREAM_DIRNAME,                            \
-           Lu(DBPF_BSTREAM_GET_BUCKET(__handle, __cid)), Lu(__handle));  \
+           llu(DBPF_BSTREAM_GET_BUCKET(__handle, __cid)), llu(__handle));  \
 } while (0)
 
 /* arguments are: buf, path_max, stoname, collid, handle */
 #define DBPF_GET_KEYVAL_DBNAME(__b, __pm, __stoname, __cid, __handle)    \
 do {                                                                     \
-  snprintf(__b, __pm, "/%s/%08x/%s/%.8Lu/%08Lx.keyval", __stoname,       \
+  snprintf(__b, __pm, "/%s/%08x/%s/%.8llu/%08llx.keyval", __stoname,       \
            __cid, KEYVAL_DIRNAME,                                        \
-           Lu(DBPF_KEYVAL_GET_BUCKET(__handle, __cid)), Lu(__handle));   \
+           llu(DBPF_KEYVAL_GET_BUCKET(__handle, __cid)), llu(__handle));   \
 } while (0)
 
 extern struct TROVE_bstream_ops dbpf_bstream_ops;

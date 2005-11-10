@@ -105,8 +105,8 @@ PVFS_error PVFS_imgmt_remove_object(
     sm_p->object_ref = object_ref;
 
     gossip_debug(
-        GOSSIP_CLIENT_DEBUG, "Trying to remove handle %Lu,%d\n",
-        Lu(object_ref.handle), object_ref.fs_id);
+        GOSSIP_CLIENT_DEBUG, "Trying to remove handle %llu,%d\n",
+        llu(object_ref.handle), object_ref.fs_id);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_imgmt_remove_object calling "
                  "PINT_client_state_machine_post()\n");
@@ -175,7 +175,7 @@ static int mgmt_remove_object_setup_msgpair(
         sm_p->object_ref.handle);
 
     gossip_debug(GOSSIP_REMOVE_DEBUG, "- doing MGMT_REMOVE_OBJECT on "
-                 "%Lu,%d\n", Lu(sm_p->object_ref.handle),
+                 "%llu,%d\n", llu(sm_p->object_ref.handle),
                  sm_p->object_ref.fs_id);
 
     msg_p->fs_id = sm_p->object_ref.fs_id;
@@ -205,8 +205,8 @@ static int mgmt_remove_object_comp_fn(
     {
         gossip_debug(
             GOSSIP_CLIENT_DEBUG,
-            "  mgmt_remove_object_comp_fn: object %Lu,%d removed\n",
-            Lu(sm_p->object_ref.handle), sm_p->object_ref.fs_id);
+            "  mgmt_remove_object_comp_fn: object %llu,%d removed\n",
+            llu(sm_p->object_ref.handle), sm_p->object_ref.fs_id);
     }
     return resp_p->status;
 }

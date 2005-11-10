@@ -173,11 +173,11 @@ int main(int argc, char **argv)
     else {
 	fprintf(stdout,
 		"Storage space %s, collection %s (coll_id = %d, "
-                "root_handle = 0x%08Lx):\n",
+                "root_handle = 0x%08llx):\n",
 		storage_space,
 		collection,
 		coll_id,
-		Lu(root_handle));
+		llu(root_handle));
     }
 
     if (got_dspace_handle)
@@ -304,11 +304,11 @@ static int print_dspace(TROVE_coll_id coll_id,
     if (ret != 1) return -1;
 		
     fprintf(stdout,
-	    "\t0x%08Lx (dspace_getattr output: type = %s, b_size = %Ld, k_size = %Ld)\n",
-	    Lu(handle),
+	    "\t0x%08llx (dspace_getattr output: type = %s, b_size = %lld, k_size = %lld)\n",
+	    llu(handle),
 	    type_to_string(ds_attr.type),
-	    Ld(ds_attr.b_size),
-	    Ld(ds_attr.k_size));
+	    lld(ds_attr.b_size),
+	    lld(ds_attr.k_size));
 
     if (print_keyvals) {
 	ret = print_dspace_keyvals(coll_id, handle,
@@ -406,7 +406,7 @@ static void print_datafile_handles(PVFS_handle *h_p,
 {
     int i;
 
-    for (i = 0; i < count && i < 10; i++) fprintf(stdout, "0x%08Lx ", Lu(h_p[i]));
+    for (i = 0; i < count && i < 10; i++) fprintf(stdout, "0x%08llx ", llu(h_p[i]));
 
     if (i == 10) fprintf(stdout, "...\n");
     else fprintf(stdout, "\n");
@@ -442,21 +442,21 @@ static int print_keyval_pair(TROVE_keyval_s *key_p,
     }
     else if (type == PVFS_TYPE_DIRECTORY && !strncmp(key_p->buffer, "dir_ent", 8)) {
 	fprintf(stdout,
-		"\t\t'%s' (%d): '%s' (%d) as a handle = 0x%08Lx\n",
+		"\t\t'%s' (%d): '%s' (%d) as a handle = 0x%08llx\n",
 		(char *) key_p->buffer,
 		key_p->read_sz,
 		(char *) val_p->buffer,
 		val_p->read_sz,
-		Lu(*(TROVE_handle *) val_p->buffer));
+		llu(*(TROVE_handle *) val_p->buffer));
     }
     else if (type == PVFS_TYPE_DIRDATA && val_p->read_sz == 8) {
 	fprintf(stdout,
-		"\t\t'%s' (%d): '%s' (%d) as a handle = 0x%08Lx\n",
+		"\t\t'%s' (%d): '%s' (%d) as a handle = 0x%08llx\n",
 		(char *) key_p->buffer,
 		key_p->read_sz,
 		(char *) val_p->buffer,
 		val_p->read_sz,
-		Lu(*(TROVE_handle *) val_p->buffer));
+		llu(*(TROVE_handle *) val_p->buffer));
     }
     else if (key_printable && val_printable) {
 	fprintf(stdout,

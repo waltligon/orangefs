@@ -93,8 +93,8 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
         }
 
         /* now perform revalidation */
-        pvfs2_print(" (inode %Lu)\n",
-                    Lu(pvfs2_ino_to_handle(inode->i_ino)));
+        pvfs2_print(" (inode %llu)\n",
+                    llu(pvfs2_ino_to_handle(inode->i_ino)));
         pvfs2_print("pvfs2_d_revalidate: calling pvfs2_internal_revalidate().\n");
         ret = pvfs2_internal_revalidate(inode);
     }

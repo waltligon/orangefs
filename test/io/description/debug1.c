@@ -181,9 +181,9 @@ int request_debug(void)
 		fprintf(stderr, "Error: PINT_process_request() failure.\n");
 		return(-1);
 	}
-	prtval(Ld(rf1.fsize),"final file size obtained");
+	prtval(lld(rf1.fsize),"final file size obtained");
 	prtval(10485760,"final file size expected");
-	cmpval(Ld(rf1.fsize),Ld(10485760));
+	cmpval(lld(rf1.fsize),lld(10485760));
 	if(PINT_REQUEST_DONE(rs1))
 	{
 		printf("**** first request done.\n");
@@ -214,9 +214,9 @@ int request_debug(void)
 		fprintf(stderr, "Error: PINT_process_request() failure.\n");
 		return(-1);
 	}
-	prtval(Ld(rf2.fsize),"final file size obtained");
+	prtval(lld(rf2.fsize),"final file size obtained");
 	prtval(20971520,"final file size expected");
-	cmpval(Ld(rf2.fsize),Ld(20971520));
+	cmpval(lld(rf2.fsize),lld(20971520));
 	if(PINT_REQUEST_DONE(rs2))
 	{
 		printf("**** second request done.\n");

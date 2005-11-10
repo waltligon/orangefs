@@ -143,7 +143,7 @@ int main(int argc, char **argv)
 	{
 	    if ((event_matrix[i][j].flags & PVFS_EVENT_FLAG_INVALID) == 0)
 	    {
-		printf("%d %d %d %Ld %Ld %d %d %d\n", 
+		printf("%d %d %d %lld %lld %d %d %d\n", 
 		       i, 
 		       (int)event_matrix[i][j].api,
 		       (int)event_matrix[i][j].operation,

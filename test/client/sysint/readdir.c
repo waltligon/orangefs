@@ -62,9 +62,9 @@ int main(int argc,char **argv)
         return -1;
     }
 
-    printf("LOOKUP_RESPONSE===>\n\tresp_look.ref.handle = %Ld\n"
+    printf("LOOKUP_RESPONSE===>\n\tresp_look.ref.handle = %lld\n"
            "\tresp_look.ref.fs_id = %d\n",
-           Ld(resp_look.ref.handle), resp_look.ref.fs_id);
+           lld(resp_look.ref.handle), resp_look.ref.fs_id);
 
     pinode_refn.handle = resp_look.ref.handle;
     pinode_refn.fs_id = fs_id;
@@ -85,8 +85,8 @@ int main(int argc,char **argv)
 
         for(i = 0; i < resp_readdir.pvfs_dirent_outcount; i++)
         {
-            printf("[%.8Lu]: %s\n",
-                   Lu(resp_readdir.dirent_array[i].handle),
+            printf("[%.8llu]: %s\n",
+                   llu(resp_readdir.dirent_array[i].handle),
                    resp_readdir.dirent_array[i].d_name);
         }
         //token += resp_readdir.pvfs_dirent_outcount;

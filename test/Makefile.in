@@ -20,6 +20,9 @@ GNUC = @GNUC@
 INTELC = @INTELC@
 MPI_GNUC = @MPI_GNUC@
 MPI_INTELC = @MPI_INTELC@
+TARGET_OS_DARWIN = @TARGET_OS_DARWIN@
+TARGET_OS_LINUX = @TARGET_OS_LINUX@
+TARGET_OS_BSD = @TARGET_OS_BSD@
 # override default quiet mode with "make V=1"
 QUIET_COMPILE = @QUIET_COMPILE@
 ifdef V
@@ -92,7 +95,7 @@ LIBS = @LIBS@
 LD = gcc
 LDSHARED = $(CC) -shared
 PICFLAGS = -fPIC
-LDFLAGS += -L lib 
+LDFLAGS += -Llib 
 
   # turn on large file support by default
 CFLAGS += -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE

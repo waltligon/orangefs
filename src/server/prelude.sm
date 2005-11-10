@@ -123,8 +123,8 @@ static int prelude_getattr_if_needed(
     if (ret < 0)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "PINT_req_sched_target_handle "
-                     "returned %d ret, skipping getattr on handle %Lu\n",
-                     ret, Lu(target_handle));
+                     "returned %d ret, skipping getattr on handle %llu\n",
+                     ret, llu(target_handle));
 
         js_p->error_code = ret;
         return 1;
@@ -146,7 +146,7 @@ static int prelude_getattr_if_needed(
     memset(&(s_op->ds_attr), 0, sizeof(PVFS_ds_attributes));
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "About to retrieve attributes "
-                 "for handle %Lu\n", Lu(target_handle));
+                 "for handle %llu\n", llu(target_handle));
 
     ret = job_trove_dspace_getattr(
         target_fs_id, target_handle, s_op, &(s_op->ds_attr),

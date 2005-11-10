@@ -739,8 +739,8 @@ int PINT_serv_msgpairarray_resolve_addrs(
             }
 
             gossip_debug(GOSSIP_MSGPAIR_DEBUG,
-                         " mapped handle %Lu to server %Ld\n",
-                         Lu(msg_p->handle), Ld(msg_p->svr_addr));
+                         " mapped handle %llu to server %lld\n",
+                         llu(msg_p->handle), lld(msg_p->svr_addr));
         }
     }
     return ret;

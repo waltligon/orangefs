@@ -234,7 +234,7 @@ int main(int argc, char **argv)
                 {
 		    break;
                 }
-		printf("\t%Lu", Lu(perf_matrix[i][j].metadata_read));
+		printf("\t%llu", llu(perf_matrix[i][j].metadata_read));
 	    }
 
             printf("\nwrite:  %-30s ",
@@ -246,7 +246,7 @@ int main(int argc, char **argv)
                 {
 		    break;
                 }
-		printf("\t%Lu", Lu(perf_matrix[i][j].metadata_write));
+		printf("\t%llu", llu(perf_matrix[i][j].metadata_write));
 	    }
 
 	    printf("\ntimestep:\t\t\t");

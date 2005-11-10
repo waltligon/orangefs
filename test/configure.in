@@ -9,10 +9,6 @@ AC_INIT(correctness/pts/pts.h)
 AC_CONFIG_HEADER(pvfs2-test-config.h)
 AC_CONFIG_AUX_DIR(maint)
 
-dnl Checks for host type
-dnl Ensures we can compile on this OS
-AC_CANONICAL_HOST
-
 USR_CFLAGS=$CFLAGS
 if test "x$USR_CFLAGS" = "x"; then
 	USR_CFLAGS_SET=no
@@ -123,15 +119,11 @@ AC_ARG_WITH(pvfs2-build,
 AC_SUBST(PVFS2_SRC_RELATIVE_TOP)
 AC_SUBST(PVFS2_BUILD_RELATIVE_TOP)
 
-if test "x$USR_CFLAGS_SET" = "xno"; then
-	CFLAGS="$CFLAGS -g"
-fi
-
 AC_ARG_ENABLE(strict,
 [  --enable-strict         Turn on strict debugging with gcc],
 [
 if test "x$USR_CFLAGS_SET" = "xno"; then
-    CFLAGS="$CFLAGS -Wall -Wstrict-prototypes -Wmissing-prototypes -Wundef -Wpointer-arith -Wbad-function-cast"
+    CFLAGS="$CFLAGS -g -Wall -Wstrict-prototypes -Wmissing-prototypes -Wundef -Wpointer-arith -Wbad-function-cast"
 fi
 ],
 [
@@ -207,8 +199,9 @@ AC_SUBST(MPI_INTELC)
 AC_SUBST(MPI_GNUC)
 
 AC_ARG_WITH(db,
-	[  --with-db=<dir>         Location of installed DB package (default=/usr)])
-AX_BERKELEY_DB(${withval})
+	[  --with-db=<dir>         Location of installed DB package (default=/usr)],
+	[AX_BERKELEY_DB(${withval})],
+	[AX_BERKELEY_DB("")])
 
 dnl create any missing subdirectories that wouldn't be created
 dnl by AC_OUTPUT below (which won't create intermediate dirs).

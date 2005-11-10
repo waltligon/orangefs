@@ -138,9 +138,9 @@ static int mkdir_create(PINT_server_op *s_op, job_status_s *js_p)
 
     gossip_debug(
         GOSSIP_MKDIR_DEBUG, " directory handle will "
-        "be in starting hrange[0] %Lu-%Lu\n",
-        Lu(s_op->u.mkdir.handle_extent_array.extent_array[0].first),
-        Lu(s_op->u.mkdir.handle_extent_array.extent_array[0].last));
+        "be in starting hrange[0] %llu-%llu\n",
+        llu(s_op->u.mkdir.handle_extent_array.extent_array[0].first),
+        llu(s_op->u.mkdir.handle_extent_array.extent_array[0].last));
 
     ret = job_trove_dspace_create(
         s_op->u.mkdir.fs_id, &s_op->u.mkdir.handle_extent_array,
@@ -175,14 +175,14 @@ static int mkdir_setattrib(PINT_server_op *s_op, job_status_s *js_p)
     /* save the handle from the mkdir in the response */
     s_op->resp.u.mkdir.handle = js_p->handle;
 
-    gossip_debug(GOSSIP_MKDIR_DEBUG, " *** new directory has handle %Lu\n",
-                 Lu(js_p->handle));
+    gossip_debug(GOSSIP_MKDIR_DEBUG, " *** new directory has handle %llu\n",
+                 llu(js_p->handle));
 
     ds_attr = (&s_op->ds_attr);
 
     gossip_debug(GOSSIP_MKDIR_DEBUG, " setting directory version to "
-                 "%Lu\n\tmtime is %Lu\n", Lu(ds_attr->mtime),
-                 Lu(PVFS_util_mkversion_time(ds_attr->mtime)));
+                 "%llu\n\tmtime is %llu\n", llu(ds_attr->mtime),
+                 llu(PVFS_util_mkversion_time(ds_attr->mtime)));
 
     ret = job_trove_dspace_setattr(
         s_op->u.mkdir.fs_id, s_op->resp.u.mkdir.handle,
@@ -213,9 +213,9 @@ static int mkdir_create_dirdata_dspace(
     assert(extent_array.extent_count > 0);
 
     gossip_debug(GOSSIP_MKDIR_DEBUG, " dirdata handle will "
-                 "be in starting hrange[0] %Lu-%Lu\n",
-                 Lu(extent_array.extent_array[0].first),
-                 Lu(extent_array.extent_array[0].last));
+                 "be in starting hrange[0] %llu-%llu\n",
+                 llu(extent_array.extent_array[0].first),
+                 llu(extent_array.extent_array[0].last));
 
     ret = job_trove_dspace_create(
         s_op->u.mkdir.fs_id, &extent_array, PVFS_TYPE_DIRDATA, NULL,
@@ -247,8 +247,8 @@ static int mkdir_write_dirdata_handle(
 
     s_op->u.mkdir.dirent_handle = js_p->handle;
 
-    gossip_debug(GOSSIP_MKDIR_DEBUG, " *** new dirdata has handle %Lu\n",
-                 Lu(s_op->u.mkdir.dirent_handle));
+    gossip_debug(GOSSIP_MKDIR_DEBUG, " *** new dirdata has handle %llu\n",
+                 llu(s_op->u.mkdir.dirent_handle));
 
     s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
@@ -257,9 +257,9 @@ static int mkdir_write_dirdata_handle(
     s_op->val.buffer_sz = sizeof(PVFS_handle);
 
     gossip_debug(
-        GOSSIP_MKDIR_DEBUG, "  writing dirdata handle (%Lu) "
-        "into parent dir (%Lu)\n", Lu(s_op->u.mkdir.dirent_handle),
-        Lu(s_op->resp.u.mkdir.handle));
+        GOSSIP_MKDIR_DEBUG, "  writing dirdata handle (%llu) "
+        "into parent dir (%llu)\n", llu(s_op->u.mkdir.dirent_handle),
+        llu(s_op->resp.u.mkdir.handle));
 
     ret = job_trove_keyval_write(
         s_op->u.mkdir.fs_id, s_op->resp.u.mkdir.handle,

@@ -88,8 +88,8 @@ do {                                                        \
           on base dirs, but I'm not sure it's worth it      \
         */                                                  \
         if (opts->list_inode && !opts->list_long) {         \
-            printf("%Lu .\n",Lu(refn.handle));              \
-            printf("%Lu .. (faked)\n",Lu(refn.handle));     \
+            printf("%llu .\n",llu(refn.handle));              \
+            printf("%llu .. (faked)\n",llu(refn.handle));     \
         }                                                   \
         else if (opts->list_long) {                         \
             print_entry(".", refn.handle,                   \
@@ -202,7 +202,7 @@ void print_entry_attr(
 
     if (opts->list_inode)
     {
-        snprintf(scratch_inode,16,"%Lu ",Lu(handle));
+        snprintf(scratch_inode,16,"%llu ",llu(handle));
         inode = scratch_inode;
     }
 
@@ -228,7 +228,7 @@ void print_entry_attr(
     }
     else
     {
-        snprintf(scratch_size,16, "%Ld", Ld(size));
+        snprintf(scratch_size,16, "%lld", lld(size));
     }
     format_size_string(scratch_size,11,&formatted_size,1,1);
 
@@ -353,7 +353,7 @@ void print_entry(
     {
         if (opts->list_inode)
         {
-            printf("%Lu %s\n", Lu(handle), entry_name);
+            printf("%llu %s\n", llu(handle), entry_name);
         }
         else
         {
@@ -372,8 +372,8 @@ void print_entry(
                            &credentials, &getattr_response);
     if (ret)
     {
-        fprintf(stderr,"Failed to get attributes on handle %Lu,%d\n",
-                Lu(handle),fs_id);
+        fprintf(stderr,"Failed to get attributes on handle %llu,%d\n",
+                llu(handle),fs_id);
         PVFS_perror("Getattr failure", ret);
         return;
     }

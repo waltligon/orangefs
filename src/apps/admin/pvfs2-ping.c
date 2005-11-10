@@ -195,7 +195,7 @@ int main(int argc, char **argv)
 	fprintf(stderr, "Failure: could not lookup root handle.\n");
 	return(-1);
     }
-    printf("\n   Root handle: %Lu\n", Lu(resp_lookup.ref.handle));
+    printf("\n   Root handle: %llu\n", llu(resp_lookup.ref.handle));
 
     /* check that only one server controls root handle */
     /* TODO: we need a way to get information out about which server

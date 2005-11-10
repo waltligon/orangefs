@@ -12,11 +12,33 @@ AC_DEFUN([AX_BERKELEY_DB],
     AC_MSG_CHECKING([for db library])
     oldlibs=$LIBS
     lib=notfound
+
     if test "x$dbpath" != "x" ; then
         DB_LDFLAGS="-L${dbpath}/lib"
-	DB_CFLAGS="-I${dbpath}/include"
 	LDFLAGS="${LDFLAGS} $DB_LDFLAGS"
-	CFLAGS="${CFLAGS} $DB_CFLAGS"
+
+	oldcflags=$CFLAGS
+	for dbheader in db4 db3 notfound; do
+		DB_CFLAGS="-I${dbpath}/include/$dbheader"
+		CFLAGS="${oldcflags} $DB_CFLAGS"
+		AC_COMPILE_IFELSE(
+			[#include <db.h>],
+			[break])
+	done
+
+	if test "x$dbheader" != "xnotfound"; then
+		LIBS="${oldlibs} -ldb"
+		DB_LIB="-ldb"
+		AC_TRY_LINK(
+			[#include <db.h>],
+			[DB *dbp; db_create(&dbp, NULL, 0);],
+			lib=db)
+	fi
+
+	if test "x$lib" = "xnotfound"; then
+		DB_CFLAGS="-I${dbpath}/include"
+		CFLAGS="${oldcflags} $DB_CFLAGS"
+	fi
 
         LIBS="${oldlibs} -ldb"
         DB_LIB="-ldb"
@@ -37,7 +59,7 @@ AC_DEFUN([AX_BERKELEY_DB],
 
     dnl reset LIBS value and just report through DB_LIB
     LIBS=$oldlibs 
-    if test "x$lib" == "xnotfound" ; then
+    if test "x$lib" = "xnotfound" ; then
            AC_MSG_ERROR(could not find DB libraries)
     else
            AC_MSG_RESULT($lib)

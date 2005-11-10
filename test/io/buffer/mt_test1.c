@@ -120,9 +120,9 @@ void do_io_read(int *result)
                 if (flag){
                     fprintf(stderr, "cache_req_test ok: flag=%d, status: %d, cbufcnt=%d\n", flag, request[0].status, reply[0].count);
 					for ( ncnt=0; ncnt < reply[0].count; ncnt ++ ) {
-						fprintf(stderr, "[%d] %p len:%Ld\n", ncnt,
+						fprintf(stderr, "[%d] %p len:%lld\n", ncnt,
 									reply[0].cbuf_offset_array[ncnt], 
-									Ld(reply[0].cbuf_size_array[ncnt]));
+									lld(reply[0].cbuf_size_array[ncnt]));
 					}	
 		    		break;		
                 }

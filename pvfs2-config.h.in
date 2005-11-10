@@ -34,6 +34,9 @@
 /* Define to 1 if you have the <execinfo.h> header file. */
 #undef HAVE_EXECINFO_H
 
+/* Define to 1 if you have the <fstab.h> header file. */
+#undef HAVE_FSTAB_H
+
 /* Define if kernel has generic_getxattr */
 #undef HAVE_GENERIC_GETXATTR
 
@@ -103,6 +106,9 @@
 /* Define if kernel setxattr has const void* argument */
 #undef HAVE_SETXATTR_CONST_ARG
 
+/* Define to 1 if you have the <stdarg.h> header file. */
+#undef HAVE_STDARG_H
+
 /* Define to 1 if you have the <stdint.h> header file. */
 #undef HAVE_STDINT_H
 
@@ -130,6 +136,9 @@
 /* Define to 1 if you have the <sys/epoll.h> header file. */
 #undef HAVE_SYS_EPOLL_H
 
+/* Define if sys/mount.h exists */
+#undef HAVE_SYS_MOUNT_H
+
 /* Define to 1 if you have the <sys/socket.h> header file. */
 #undef HAVE_SYS_SOCKET_H
 
@@ -138,6 +147,9 @@
 
 /* Define to 1 if you have the <sys/types.h> header file. */
 #undef HAVE_SYS_TYPES_H
+
+/* Define if sys/vfs.h exists */
+#undef HAVE_SYS_VFS_H
 
 /* Define if DB open function takes a txnid parameter */
 #undef HAVE_TXNID_PARAMETER_TO_DB_OPEN
@@ -183,6 +195,12 @@
 
 /* Define to 1 if you have the ANSI C header files. */
 #undef STDC_HEADERS
+
+/* "Define if on darwin" */
+#undef TARGET_OS_DARWIN
+
+/* "Define if on linux" */
+#undef TARGET_OS_LINUX
 
 /* Define if mtrace memory leak detection was enabled */
 #undef WITH_MTRACE

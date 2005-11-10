@@ -87,7 +87,7 @@ int main(int argc,char **argv)
     }
     // print the handle 
     printf("--mkdir--\n"); 
-    printf("Handle:%Lu\n",Lu(resp_mkdir.ref.handle));
+    printf("Handle:%llu\n",llu(resp_mkdir.ref.handle));
     printf("FSID:%d\n",parent_refn.fs_id);
 
     //close it down

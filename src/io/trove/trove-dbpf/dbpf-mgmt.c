@@ -15,10 +15,44 @@
 #include <string.h>
 #include <db.h>
 #include <time.h>
+#include <stdlib.h>
+#include "trove.h"
+
+#ifdef HAVE_MALLOC_H
 #include <malloc.h>
+#endif
+
+#ifdef HAVE_SYS_VFS_H
+
+#include <sys/vfs.h>
+#define PINT_statfs_t struct statfs
+#define PINT_statfs_lookup(_path, _statfs) statfs(_path, (_statfs))
+#define PINT_statfs_bsize(_statfs) (_statfs)->f_bsize
+#define PINT_statfs_bavail(_statfs) (_statfs)->f_bavail
+#define PINT_statfs_bfree(_statfs) (_statfs)->f_bfree
+#define PINT_statfs_blocks(_statfs) (_statfs)->f_blocks
+
+#elif HAVE_SYS_MOUNT_H
+
+#include <sys/param.h>
+#include <sys/mount.h>
+
+#define PINT_statfs_t struct statfs
+#define PINT_statfs_lookup(_path, _statfs) statfs(_path, (_statfs))
+#define PINT_statfs_bsize(_statfs) (_statfs)->f_iosize
+#define PINT_statfs_bavail(_statfs) (_statfs)->f_bavail
+#define PINT_statfs_bfree(_statfs) (_statfs)->f_bfree
+#define PINT_statfs_blocks(_statfs) (_statfs)->f_blocks
+
+#else
+
+#error OS does not have sys/vfs.h or sys/mount.h.  
+#error Cant stat mounted filesystems
+
+#endif
+
 #include <errno.h>
 #include <limits.h>
-#include <sys/vfs.h>
 #include <dirent.h>
 
 #include "trove.h"
@@ -95,11 +129,11 @@ static int dbpf_collection_getinfo(TROVE_coll_id coll_id,
         case PVFS_COLLECTION_STATFS:
         {
             char path_name[PATH_MAX] = {0};
-            struct statfs tmp_statfs;
+            PINT_statfs_t tmp_statfs;
             TROVE_statfs *tmp_trove_statfs = (TROVE_statfs *)parameter;
 
             DBPF_GET_STORAGE_DIRNAME(path_name, PATH_MAX, sto_p->name);
-            ret = statfs(path_name, &tmp_statfs);
+            ret = PINT_statfs_lookup(path_name, &tmp_statfs);
             if (ret < 0)
             {
                 ret = -trove_errno_to_trove_error(errno);
@@ -113,11 +147,13 @@ static int dbpf_collection_getinfo(TROVE_coll_id coll_id,
               both so that the client can properly compute all values.
             */
             tmp_trove_statfs->bytes_available = 
-                (tmp_statfs.f_bsize * tmp_statfs.f_bavail);
+                (PINT_statfs_bsize(&tmp_statfs) * 
+                 PINT_statfs_bavail(&tmp_statfs));
             tmp_trove_statfs->bytes_total =
-                (tmp_statfs.f_bsize *
-                 (tmp_statfs.f_blocks -
-                  (tmp_statfs.f_bfree - tmp_statfs.f_bavail)));
+                (PINT_statfs_bsize(&tmp_statfs) *
+                 (PINT_statfs_blocks(&tmp_statfs) -
+                  PINT_statfs_bfree(&tmp_statfs) -
+                  PINT_statfs_bavail(&tmp_statfs)));
 
             return 1;
         }

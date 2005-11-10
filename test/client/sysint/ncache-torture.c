@@ -110,8 +110,8 @@ int main(int argc, char **argv)
 	    /*should have a valid handle*/
 	    else if (test_ref.handle != (PVFS_handle)i)
 	    {
-		gossip_err("Failure: lookup returned %Lu when it should "
-                           "have returned %d.\n", Lu(test_ref.handle), i);
+		gossip_err("Failure: lookup returned %llu when it should "
+                           "have returned %d.\n", llu(test_ref.handle), i);
                 break;
 	    }
 	}
@@ -120,9 +120,9 @@ int main(int argc, char **argv)
 	    /*these should be cache misses*/
 	    if (ret == 0)
 	    {
-		gossip_err("Failure: lookup returned %Lu when it "
+		gossip_err("Failure: lookup returned %llu when it "
                            "shouldn't have returned a handle.\n",
-                           Lu(test_ref.handle));
+                           llu(test_ref.handle));
                 break;
 	    }
 	}

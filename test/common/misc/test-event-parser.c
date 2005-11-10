@@ -88,7 +88,7 @@ int main(int argc, char **argv)
 	}
 
 	/* read in data line */
-	ret = sscanf(tmp_buf, "%d %d %d %Ld %Ld %d %ld %ld\n",
+	ret = sscanf(tmp_buf, "%d %d %d %lld %lld %d %ld %ld\n",
 	    &data_array[cur_index].server,
 	    &data_array[cur_index].api,
 	    &data_array[cur_index].op,
@@ -142,9 +142,9 @@ int main(int argc, char **argv)
 		    data_array[cur_index].api,
 		    data_array[cur_index].op);
 		if(data_array[cur_index].value > 0)
-		    printf("%Ld\t", data_array[cur_index].value);
+		    printf("%lld\t", data_array[cur_index].value);
 		else
-		    printf("%Ld\t", data_array[run_index].value);
+		    printf("%lld\t", data_array[run_index].value);
 		tmp_time = (double)data_array[cur_index].sec + 
 		    (double)data_array[cur_index].usec / 1000000;
 		tmp_time = tmp_time - first_time;
@@ -201,7 +201,7 @@ int main(int argc, char **argv)
 	{
 	    if((event_matrix[i][j].flags & PVFS_EVENT_FLAG_INVALID) == 0)
 	    {
-		printf("%d %d %d %Ld %Ld %d %d %d\n", 
+		printf("%d %d %d %lld %lld %d %d %d\n", 
 		    i, 
 		    (int)event_matrix[i][j].api,
 		    (int)event_matrix[i][j].operation,

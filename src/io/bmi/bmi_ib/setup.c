@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: setup.c,v 1.16 2005-11-03 21:23:19 pw Exp $
+ * $Id: setup.c,v 1.17 2005-11-10 01:27:03 slang Exp $
  */
 #include <fcntl.h>
 #include <unistd.h>
@@ -1031,7 +1031,7 @@ ib_mem_register(memcache_entry_t *c)
 	error_verrno(ret, "%s: VAPI_register_mr", __func__);
     c->memkeys.lkey = mrw_out.l_key;
     c->memkeys.rkey = mrw_out.r_key;
-    debug(4, "%s: buf %p len %Ld", __func__, c->buf, c->len);
+    debug(4, "%s: buf %p len %lld", __func__, c->buf, c->len);
 }
 
 void
@@ -1042,6 +1042,6 @@ ib_mem_deregister(memcache_entry_t *c)
     ret = VAPI_deregister_mr(nic_handle, c->memkeys.mrh);
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_deregister_mr", __func__);
-    debug(4, "%s: buf %p len %Ld lkey %x rkey %x", __func__,
+    debug(4, "%s: buf %p len %lld lkey %x rkey %x", __func__,
       c->buf, c->len, c->memkeys.lkey, c->memkeys.rkey);
 }

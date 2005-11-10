@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.17 2005-11-03 21:23:19 pw Exp $
+ * $Id: ib.c,v 1.18 2005-11-10 01:27:03 slang Exp $
  */
 #include <stdio.h>  /* just for NULL for id-generator.h */
 #include <src/common/id-generator/id-generator.h>
@@ -86,7 +86,7 @@ check_cq(void)
 	++ret;
 	if (desc.status != VAPI_SUCCESS) {
 	    if (desc.opcode == VAPI_CQE_SQ_SEND_DATA) {
-		debug(0, "%s: entry id 0x%Lx SQ_SEND_DATA error %s", __func__,
+		debug(0, "%s: entry id 0x%llx SQ_SEND_DATA error %s", __func__,
 		  desc.id, VAPI_wc_status_sym(desc.status));
 		if (desc.id) {
 		    ib_connection_t *c = ptr_from_int64(desc.id);
@@ -97,7 +97,7 @@ check_cq(void)
 		    }
 		}
 	    } else {
-		error("%s: entry id 0x%Lx opcode %s error %s", __func__,
+		error("%s: entry id 0x%llx opcode %s error %s", __func__,
 		  desc.id, VAPI_cqe_opcode_sym(desc.opcode),
 		  VAPI_wc_status_sym(desc.status));
 	    }
@@ -199,7 +199,7 @@ check_cq(void)
 	    const char *ops = VAPI_cqe_opcode_sym(desc.opcode);
 	    if (!ops)
 		ops = "(null)";
-	    error("%s: cq entry id 0x%Lx opcode %s (%d) unexpected", __func__,
+	    error("%s: cq entry id 0x%llx opcode %s (%d) unexpected", __func__,
 	      desc.id, ops, desc.opcode);
 	}
     }
@@ -306,7 +306,7 @@ encourage_send_incoming_cts(buf_head_t *bh, u_int32_t byte_len)
     sq = 0;
     qlist_for_each(l, &sendq) {
 	ib_send_t *sqt = (ib_send_t *) l;
-	debug(8, "%s: looking for op_id 0x%Lx, consider 0x%Lx", __func__,
+	debug(8, "%s: looking for op_id 0x%llx, consider 0x%llx", __func__,
 	  mh_cts->rts_mop_id, sqt->mop->op_id);
 	if (sqt->mop->op_id == (bmi_op_id_t) mh_cts->rts_mop_id) {
 	    sq = sqt;
@@ -314,7 +314,7 @@ encourage_send_incoming_cts(buf_head_t *bh, u_int32_t byte_len)
 	}
     }
     if (!sq)
-	error("%s: mop_id %Lx in CTS message not found", __func__,
+	error("%s: mop_id %llx in CTS message not found", __func__,
 	  mh_cts->rts_mop_id);
 
     debug(2, "%s: sq %p %s bh %p len %u", __func__,
@@ -395,8 +395,8 @@ encourage_recv_incoming(ib_connection_t *c, buf_head_t *bh, u_int32_t byte_len)
 	if (rq) {
 	    bmi_size_t len = byte_len - sizeof(*mh);
 	    if (len > rq->buflist.tot_len)
-		error("%s: EAGER received %Ld too small for buffer %Ld",
-		  __func__, Ld(len), Ld(rq->buflist.tot_len));
+		error("%s: EAGER received %lld too small for buffer %lld",
+		  __func__, lld(len), lld(rq->buflist.tot_len));
 
 	    memcpy_to_buflist(&rq->buflist,
 	      (char *) bh->buf + sizeof(*mh), len);
@@ -450,8 +450,8 @@ encourage_recv_incoming(ib_connection_t *c, buf_head_t *bh, u_int32_t byte_len)
 	rq = find_matching_recv(RQ_WAITING_INCOMING, c, mh->bmi_tag);
 	if (rq) {
 	    if ((int)mh_rts->tot_len > rq->buflist.tot_len) {
-		error("%s: RTS received %Lu too small for buffer %Lu",
-		  __func__, Lu(mh_rts->tot_len), Lu(rq->buflist.tot_len));
+		error("%s: RTS received %llu too small for buffer %llu",
+		  __func__, llu(mh_rts->tot_len), llu(rq->buflist.tot_len));
 	    }
 	    rq->state = RQ_RTS_WAITING_CTS_BUFFER;
 	    debug(2, "%s: matched rq %p MSG_RTS now %s", __func__, rq,
@@ -469,7 +469,7 @@ encourage_recv_incoming(ib_connection_t *c, buf_head_t *bh, u_int32_t byte_len)
 
 #if 0
 	/* do NOT ack his rts, send CTS later implicitly acks */
-	debug(1, "%s: rq %p %s ack RTS from %s opid 0x%Lx", __func__,
+	debug(1, "%s: rq %p %s ack RTS from %s opid 0x%llx", __func__,
 	  rq, rq_state_name(rq->state), c->peername, rq->rts_mop_id);
 	post_rr(c, bh);
 	post_sr_ack(c, bh);
@@ -536,8 +536,8 @@ send_cts(ib_recv_t *rq)
     u_int32_t post_len;
     int i;
 
-    debug(2, "%s: rq %p from %s opid 0x%Lx len %Ld",
-      __func__, rq, rq->c->peername, rq->rts_mop_id, Ld(rq->buflist.tot_len));
+    debug(2, "%s: rq %p from %s opid 0x%llx len %lld",
+      __func__, rq, rq->c->peername, rq->rts_mop_id, lld(rq->buflist.tot_len));
 
     bh = qlist_try_del_head(&rq->c->eager_send_buf_free);
     if (!bh) {
@@ -557,8 +557,8 @@ send_cts(ib_recv_t *rq)
 	memcache_register(&reg_recv_buflist, BMI_RECV);
     }
     if (rq->buflist.tot_len > reg_recv_buflist_len)
-	error("%s: recv prereg buflist too small, need %Ld", __func__,
-	  Ld(rq->buflist.tot_len));
+	error("%s: recv prereg buflist too small, need %lld", __func__,
+	  lld(rq->buflist.tot_len));
 
     ib_buflist_t save_buflist = rq->buflist;
     rq->buflist = reg_recv_buflist;
@@ -754,8 +754,8 @@ post_sr_rdmaw(ib_send_t *sq, msg_header_cts_t *mh_cts)
 	memcache_register(&reg_send_buflist, BMI_SEND);
     }
     if (sq->buflist.tot_len > reg_send_buflist_len)
-	error("%s: send prereg buflist too small, need %Ld", __func__,
-	  Ld(sq->buflist.tot_len));
+	error("%s: send prereg buflist too small, need %lld", __func__,
+	  lld(sq->buflist.tot_len));
     memcpy_from_buflist(&sq->buflist, reg_send_buflist_buf);
 
     ib_buflist_t save_buflist = sq->buflist;
@@ -786,7 +786,7 @@ post_sr_rdmaw(ib_send_t *sq, msg_header_cts_t *mh_cts)
 	sr.r_key = recv_rkey[recv_index];
 	sr.sg_lst_len = 0;
 	recv_bytes_needed = recv_lenp[recv_index];
-	debug(4, "%s: chunk to %s remote addr %Lx rkey %x",
+	debug(4, "%s: chunk to %s remote addr %llx rkey %x",
 	  __func__, sq->c->peername, sr.remote_addr, sr.r_key);
 	while (recv_bytes_needed > 0) {
 	    /* consume from send buflist to fill this one receive */
@@ -803,7 +803,7 @@ post_sr_rdmaw(ib_send_t *sq, msg_header_cts_t *mh_cts)
 	    sg_tmp_array[sr.sg_lst_len].lkey =
 	      sq->buflist.memcache[send_index]->memkeys.lkey;
 
-	    debug(4, "%s: chunk %d local addr %Lx len %d lkey %x",
+	    debug(4, "%s: chunk %d local addr %llx len %d lkey %x",
 	      __func__, sr.sg_lst_len,
 	      sg_tmp_array[sr.sg_lst_len].addr,
 	      sg_tmp_array[sr.sg_lst_len].len,
@@ -907,9 +907,9 @@ generic_post_send(bmi_op_id_t *id, struct method_addr *remote_map,
      * to me, but I'll at least check it for accuracy.
      */
     if (sq->buflist.tot_len != total_size)
-	error("%s: user-provided tot len %Ld"
-	  " does not match buffer list tot len %Ld",
-	  __func__, Ld(total_size), Ld(sq->buflist.tot_len));
+	error("%s: user-provided tot len %lld"
+	  " does not match buffer list tot len %lld",
+	  __func__, lld(total_size), lld(sq->buflist.tot_len));
 
     /* unexpected messages must fit inside an eager message */
     if (is_unexpected && sq->buflist.tot_len > EAGER_BUF_PAYLOAD) {
@@ -1052,9 +1052,9 @@ generic_post_recv(bmi_op_id_t *id, struct method_addr *remote_map,
      * to me, but I'll at least check it for accuracy.
      */
     if (rq->buflist.tot_len != tot_expected_len)
-	error("%s: user-provided tot len %Ld"
-	  " does not match buffer list tot len %Ld",
-	  __func__, Ld(tot_expected_len), Ld(rq->buflist.tot_len));
+	error("%s: user-provided tot len %lld"
+	  " does not match buffer list tot len %lld",
+	  __func__, lld(tot_expected_len), lld(rq->buflist.tot_len));
 
     /* generate identifier used by caller to test for message later */
     mop = Malloc(sizeof(*mop));
@@ -1072,8 +1072,8 @@ generic_post_recv(bmi_op_id_t *id, struct method_addr *remote_map,
 	debug(2, "%s: rq %p state %s finish eager directly", __func__,
 	  rq, rq_state_name(rq->state));
 	if (rq->actual_len > tot_expected_len) {
-	    error("%s: received %Ld matches too-small buffer %Ld",
-	      __func__, Ld(rq->actual_len), Ld(rq->buflist.tot_len));
+	    error("%s: received %lld matches too-small buffer %lld",
+	      __func__, lld(rq->actual_len), lld(rq->buflist.tot_len));
 	}
 
 	memcpy_to_buflist(&rq->buflist,
@@ -1156,8 +1156,8 @@ test_sq(ib_send_t *sq, bmi_op_id_t *outid, bmi_error_code_t *err,
 
     if (sq->state == SQ_WAITING_USER_TEST) {
 	if (complete) {
-	    debug(2, "%s: sq %p completed %Ld to %s", __func__,
-	      sq, Ld(sq->buflist.tot_len),
+	    debug(2, "%s: sq %p completed %lld to %s", __func__,
+	      sq, lld(sq->buflist.tot_len),
 	      ((ib_method_addr_t *) sq->c->remote_map->method_data)
 		->hostname);
 	    *outid = sq->mop->op_id;
@@ -1211,8 +1211,8 @@ test_rq(ib_recv_t *rq, bmi_op_id_t *outid, bmi_error_code_t *err,
     if (rq->state == RQ_EAGER_WAITING_USER_TEST 
       || rq->state == RQ_RTS_WAITING_USER_TEST) {
 	if (complete) {
-	    debug(2, "%s: rq %p completed %Ld from %s", __func__,
-	      rq, Ld(rq->actual_len),
+	    debug(2, "%s: rq %p completed %lld from %s", __func__,
+	      rq, lld(rq->actual_len),
 	      ((ib_method_addr_t *) rq->c->remote_map->method_data)
 		->hostname);
 	    *err = 0;

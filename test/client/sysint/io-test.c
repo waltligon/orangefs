@@ -234,7 +234,7 @@ int main(int argc, char **argv)
     }
     for (i = 0; i < resp_getattr.attr.dfile_count; i++)
     {
-	printf("%Lu\n", Lu(dfile_array[i]));
+	printf("%llu\n", llu(dfile_array[i]));
     }
 
 	/**************************************************************

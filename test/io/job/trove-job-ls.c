@@ -160,8 +160,8 @@ int main(int argc, char **argv)
 		num_processed = job_stat.count;
 		for(i=0; i<job_stat.count; i++)
 		{
-			printf("%s (%Ld)\n", (char *) key[i].buffer, 
-				Ld(*(TROVE_handle *) val[i].buffer));
+			printf("%s (%lld)\n", (char *) key[i].buffer, 
+				lld(*(TROVE_handle *) val[i].buffer));
 		}
 	}
 

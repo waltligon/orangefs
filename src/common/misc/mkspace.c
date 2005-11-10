@@ -137,7 +137,7 @@ int pvfs2_mkspace(
     mkspace_print(verbose,"Storage space: %s\n",storage_space);
     mkspace_print(verbose,"Collection   : %s\n",collection);
     mkspace_print(verbose,"ID           : %d\n",coll_id);
-    mkspace_print(verbose,"Root Handle  : %Lu\n",Lu(root_handle));
+    mkspace_print(verbose,"Root Handle  : %llu\n",llu(root_handle));
     mkspace_print(verbose,"Meta Handles : %s\n",
                   (meta_handle_ranges && strlen(meta_handle_ranges) ?
                    meta_handle_ranges : "NONE"));
@@ -297,7 +297,7 @@ int pvfs2_mkspace(
         }
 
         mkspace_print(verbose,"info: created root directory "
-                      "with handle %Lu.\n", Lu(new_root_handle));
+                      "with handle %llu.\n", llu(new_root_handle));
         s_used_handles[0] = new_root_handle;
 
         /* set collection attribute for root handle */
@@ -372,9 +372,9 @@ int pvfs2_mkspace(
             else
             {
                 mkspace_print(
-                    verbose, "info: using meta handle range %Lu-%Lu for "
-                    "root dirent dspace\n", Lu(cur_extent.first),
-                    Lu(cur_extent.last));
+                    verbose, "info: using meta handle range %llu-%llu for "
+                    "root dirent dspace\n", llu(cur_extent.first),
+                    llu(cur_extent.last));
             }
         }
 
@@ -400,7 +400,7 @@ int pvfs2_mkspace(
         }
 
         mkspace_print(verbose, "info: created dspace for dirents "
-                      "with handle %Lu\n", Lu(root_dirdata_handle));
+                      "with handle %llu\n", llu(root_dirdata_handle));
         s_used_handles[1] = root_dirdata_handle;
 
         key.buffer = dir_ent_string;
@@ -448,9 +448,9 @@ int pvfs2_mkspace(
             else
             {
                 mkspace_print(
-                    verbose, "info: using meta handle range %Lu-%Lu for "
-                    "lost+found directory dspace\n", Lu(cur_extent.first),
-                    Lu(cur_extent.last));
+                    verbose, "info: using meta handle range %llu-%llu for "
+                    "lost+found directory dspace\n", llu(cur_extent.first),
+                    llu(cur_extent.last));
             }
         }
         extent_array.extent_count = 1;
@@ -476,7 +476,7 @@ int pvfs2_mkspace(
         }
 
         mkspace_print(verbose,"info: created lost+found directory "
-                      "with handle %Lu.\n", Lu(lost_and_found_handle));
+                      "with handle %llu.\n", llu(lost_and_found_handle));
         s_used_handles[2] = lost_and_found_handle;
 
         /* set lost+found directory dspace attributes */
@@ -522,9 +522,9 @@ int pvfs2_mkspace(
             else
             {
                 mkspace_print(
-                    verbose, "info: using meta handle range %Lu-%Lu for "
-                    "lost+found dirent dspace\n", Lu(cur_extent.first),
-                    Lu(cur_extent.last));
+                    verbose, "info: using meta handle range %llu-%llu for "
+                    "lost+found dirent dspace\n", llu(cur_extent.first),
+                    llu(cur_extent.last));
             }
         }
         extent_array.extent_count = 1;
@@ -550,7 +550,7 @@ int pvfs2_mkspace(
 
         mkspace_print(
             verbose, "info: created dspace for dirents "
-            "with handle %Lu\n", Lu(lost_and_found_dirdata_handle));
+            "with handle %llu\n", llu(lost_and_found_dirdata_handle));
         s_used_handles[3] = lost_and_found_dirdata_handle;
 
         key.buffer = dir_ent_string;
@@ -618,9 +618,9 @@ int pvfs2_mkspace(
     trove_finalize();
 
     mkspace_print(verbose, "collection created:\n"
-                  "\troot handle = %Lu, coll id = %d, "
+                  "\troot handle = %llu, coll id = %d, "
                   "root string = \"%s\"\n",
-                  Lu(root_handle), coll_id, root_handle_string);
+                  llu(root_handle), coll_id, root_handle_string);
     return 0;
 }
 

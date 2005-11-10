@@ -390,11 +390,11 @@ do {                                                                        \
         __pw = getpwuid(__s_op->req->credentials.uid);                      \
         __gr = getgrgid(__s_op->req->credentials.gid);                      \
         snprintf(__pint_access_buffer, GOSSIP_BUF_SIZE,                     \
-            "%s.%s@%s H=%Lu S=%p: %s: %s",                                  \
+            "%s.%s@%s H=%llu S=%p: %s: %s",                                  \
             ((__pw) ? __pw->pw_name : "UNKNOWN"),                           \
             ((__gr) ? __gr->gr_name : "UNKNOWN"),                           \
             BMI_addr_rev_lookup_unexpected(__s_op->addr),                   \
-            Lu(__handle),                                                   \
+            llu(__handle),                                                   \
             __s_op,                                                         \
             PINT_map_server_op_to_string(__s_op->req->op),                  \
             format);                                                        \

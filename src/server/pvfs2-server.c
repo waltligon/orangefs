@@ -395,8 +395,8 @@ int main(int argc, char **argv)
     debug_mask = PVFS_debug_eventlog_to_mask(server_config.event_logging);
     gossip_set_debug_mask(1, debug_mask);
     gossip_set_logstamp(server_config.logstamp_type);
-    gossip_debug(GOSSIP_SERVER_DEBUG,"Logging %s (mask %Lu)\n",
-                 server_config.event_logging, Lu(debug_mask));
+    gossip_debug(GOSSIP_SERVER_DEBUG,"Logging %s (mask %llu)\n",
+                 server_config.event_logging, llu(debug_mask));
 
     /* remove storage space and exit if requested */
     if (s_server_options.server_remove_storage_space)

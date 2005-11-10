@@ -66,8 +66,8 @@ static int mgmt_remove_dspace(
     PINT_STATE_DEBUG("mgmt_remove_dspace");
 
     gossip_debug(
-        GOSSIP_SERVER_DEBUG, "Trying to mgmt_remove object %Lu,%d\n",
-        Lu(s_op->req->u.mgmt_remove_object.handle),
+        GOSSIP_SERVER_DEBUG, "Trying to mgmt_remove object %llu,%d\n",
+        llu(s_op->req->u.mgmt_remove_object.handle),
         s_op->req->u.mgmt_remove_object.fs_id);
 
     ret = job_trove_dspace_remove(

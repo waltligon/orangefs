@@ -205,8 +205,8 @@ static int test_noncontig(void){
    }
                                                                                
 /*
-   printf("total bytes processed on client side: %Ld\n", (long long)total_bytes_client);
-   printf("total bytes processed on server side: %Ld\n", (long long)total_bytes_server);
+   printf("total bytes processed on client side: %lld\n", (long long)total_bytes_client);
+   printf("total bytes processed on server side: %lld\n", (long long)total_bytes_server);
 */
                                                                                
    if(total_bytes_client == total_bytes_server)

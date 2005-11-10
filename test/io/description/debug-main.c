@@ -64,11 +64,11 @@ void prtseg(PINT_Request_result *seg, char *s)
 	if (!longflag)
 		return;
 	printf("%s\n",s);
-	printf("%d segments with %lld bytes\n", seg->segs, Ld(seg->bytes));
+	printf("%d segments with %lld bytes\n", seg->segs, lld(seg->bytes));
 	for(i=0; i<seg->segs && i<seg->segmax; i++)
 	{
 		printf("  segment %d: offset: %lld size: %lld\n",
-				i, Ld(seg->offset_array[i]), Ld(seg->size_array[i]));
+				i, lld(seg->offset_array[i]), lld(seg->size_array[i]));
 	}
 }
 

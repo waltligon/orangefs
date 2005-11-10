@@ -150,10 +150,10 @@ static int rmdirent_verify_parent_metadata_and_read_directory_entry_handle(
 
     gossip_debug(
         GOSSIP_SERVER_DEBUG,
-        "  reading dirdata handle (coll_id = 0x%x, handle = %Lu, "
+        "  reading dirdata handle (coll_id = 0x%x, handle = %llu, "
         "key = %s (%d), val_buf = %p (%d))\n",
         s_op->req->u.rmdirent.fs_id,
-        Lu(s_op->req->u.rmdirent.parent_handle),
+        llu(s_op->req->u.rmdirent.parent_handle),
         (char *)s_op->key.buffer,
         s_op->key.buffer_sz,
         s_op->val.buffer,
@@ -190,8 +190,8 @@ static int rmdirent_read_directory_entry(PINT_server_op *s_op,
     PINT_STATE_DEBUG("read_directory_entry");
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
-		 "  reading from dirent handle = %Lu, name = %s\n",
-		 Lu(s_op->u.rmdirent.dirdata_handle),
+		 "  reading from dirent handle = %llu, name = %s\n",
+		 llu(s_op->u.rmdirent.dirdata_handle),
 		 s_op->req->u.rmdirent.entry);
 
     /* initialize keyval prior to read call
@@ -269,8 +269,8 @@ static int rmdirent_remove_directory_entry(PINT_server_op *s_op,
     s_op->key.buffer_sz = strlen(s_op->req->u.rmdirent.entry) + 1;
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "  removing entry %s from dirdata "
-                 "object (handle = %Lu)\n", s_op->req->u.rmdirent.entry,
-                 Lu(s_op->u.rmdirent.dirdata_handle));
+                 "object (handle = %llu)\n", s_op->req->u.rmdirent.entry,
+                 llu(s_op->u.rmdirent.dirdata_handle));
 
     ret = job_trove_keyval_remove(
         s_op->req->u.rmdirent.fs_id, s_op->u.rmdirent.dirdata_handle,
@@ -336,9 +336,9 @@ static int rmdirent_update_directory_attr(
          */
         gossip_debug(
             GOSSIP_SERVER_DEBUG, "updating parent dir version "
-            "to %Lu\n\tmtime is %Lu\n",
-            Lu(PVFS_util_mktime_version(s_op->req->u.rmdirent.parent_mtime)),
-            Lu(s_op->req->u.rmdirent.parent_mtime));
+            "to %llu\n\tmtime is %llu\n",
+            llu(PVFS_util_mktime_version(s_op->req->u.rmdirent.parent_mtime)),
+            llu(s_op->req->u.rmdirent.parent_mtime));
 
         tmp_attr_ptr->mtime = PVFS_util_mktime_version(
                     s_op->req->u.rmdirent.parent_mtime);
@@ -410,8 +410,8 @@ static int rmdirent_setup_resp(PINT_server_op *s_op,
 	s_op->resp.u.rmdirent.entry_handle =
             s_op->u.rmdirent.entry_handle;
 	gossip_debug(GOSSIP_SERVER_DEBUG,
-		     "  succeeded; returning handle %Lu in response\n",
-		     Lu(s_op->resp.u.rmdirent.entry_handle));
+		     "  succeeded; returning handle %llu in response\n",
+		     llu(s_op->resp.u.rmdirent.entry_handle));
     }
     else
     {

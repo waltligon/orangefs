@@ -9,7 +9,10 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <stdlib.h>
+#ifdef HAVE_MALLOC_H
 #include <malloc.h>
+#endif
 #include <assert.h>
 #include <errno.h>
 
@@ -86,7 +89,7 @@ static void aio_progress_notification(sigval_t sig)
 
     gossip_debug(
         GOSSIP_TROVE_DEBUG," --- aio_progress_notification called "
-        "with handle %Lu\n", Lu(op_p->handle));
+        "with handle %llu\n", llu(op_p->handle));
 
     aiocb_p = op_p->u.b_rw_list.aiocb_array;
     assert(aiocb_p);
@@ -297,8 +300,8 @@ static void start_delayed_ops_if_any(int dec_first)
         s_dbpf_ios_in_progress++;
 
         gossip_debug(GOSSIP_TROVE_DEBUG, "%s: lio_listio posted %p "
-                     "(handle %Lu, ret %d))\n", __func__, cur_op,
-                     Lu(cur_op->op.handle), ret);
+                     "(handle %llu, ret %d))\n", __func__, cur_op,
+                     llu(cur_op->op.handle), ret);
 
 #ifndef __PVFS2_TROVE_AIO_THREADED__
         /*
@@ -373,8 +376,8 @@ static int issue_or_delay_io_operation(
             return -trove_errno_to_trove_error(errno);
         }
         gossip_debug(GOSSIP_TROVE_DEBUG, "%s: lio_listio posted %p "
-                     "(handle %Lu, ret %d)\n", __func__, cur_op,
-                     Lu(cur_op->op.handle), ret);
+                     "(handle %llu, ret %d)\n", __func__, cur_op,
+                     llu(cur_op->op.handle), ret);
     }
     return 0;
 }
@@ -697,9 +700,9 @@ static int dbpf_bstream_resize_op_svc(struct dbpf_op *op_p)
         goto return_error;
     }
 
-    gossip_debug(GOSSIP_TROVE_DEBUG, "  RESIZED bstream %Lu [fd = %d] "
-                 "to %Ld \n", Lu(op_p->handle), tmp_ref.fd,
-                 Ld(op_p->u.b_resize.size));
+    gossip_debug(GOSSIP_TROVE_DEBUG, "  RESIZED bstream %llu [fd = %d] "
+                 "to %lld \n", llu(op_p->handle), tmp_ref.fd,
+                 lld(op_p->u.b_resize.size));
 
     dbpf_open_cache_put(&tmp_ref);
 

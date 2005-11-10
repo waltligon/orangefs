@@ -50,8 +50,8 @@ int main(int argc,char **argv)
                resp_getparent.basename);
         printf("resp_getparent.parent_ref.fs_id: %d\n",
                resp_getparent.parent_ref.fs_id);
-        printf("resp_getparent.parent_ref.handle: %Ld\n",
-               Ld(resp_getparent.parent_ref.handle));
+        printf("resp_getparent.parent_ref.handle: %lld\n",
+               lld(resp_getparent.parent_ref.handle));
     }
     else
     {

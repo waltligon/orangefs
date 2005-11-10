@@ -210,8 +210,8 @@ PVFS_error PVFS_isys_mkdir(
     sm_p->object_ref = parent_ref;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "Creating directory named %s "
-                 "under parent handle %Lu on fs %d\n", object_name,
-                 Lu(parent_ref.handle), parent_ref.fs_id);
+                 "under parent handle %llu on fs %d\n", object_name,
+                 llu(parent_ref.handle), parent_ref.fs_id);
 
     return PINT_client_state_machine_post(
         sm_p, PVFS_SYS_MKDIR, op_id, user_ptr);
@@ -301,8 +301,8 @@ static int mkdir_msg_comp_fn(void *v_p,
     sm_p->u.mkdir.metafile_handle = resp_p->u.mkdir.handle;
 
     gossip_debug(
-        GOSSIP_CLIENT_DEBUG, "*** Got newly created dir handle %Lu\n",
-        Lu(sm_p->u.mkdir.metafile_handle));
+        GOSSIP_CLIENT_DEBUG, "*** Got newly created dir handle %llu\n",
+        llu(sm_p->u.mkdir.metafile_handle));
 
     return 0;
 }
@@ -398,10 +398,10 @@ static int mkdir_crdirent_setup_msgpair(PINT_client_sm *sm_p,
 
     gossip_debug(GOSSIP_CLIENT_DEBUG," mkdir: posting crdirent req\n");
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "hooking dirent %s (%Lu) under "
-                 "parent handle %Lu\n", sm_p->u.mkdir.object_name,
-                 Lu(sm_p->u.mkdir.metafile_handle),
-                 Lu(sm_p->object_ref.handle));
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "hooking dirent %s (%llu) under "
+                 "parent handle %llu\n", sm_p->u.mkdir.object_name,
+                 llu(sm_p->u.mkdir.metafile_handle),
+                 llu(sm_p->object_ref.handle));
 
     PINT_init_msgpair(sm_p, msg_p);
 
@@ -482,7 +482,7 @@ static int mkdir_delete_handle_setup_msgpair(PINT_client_sm *sm_p,
     msg_p->svr_addr = metafile_server_addr;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, " Preparing to remove "
-                 "directory handle %Lu\n", Lu(msg_p->handle));
+                 "directory handle %llu\n", llu(msg_p->handle));
     return 1;
 }
 

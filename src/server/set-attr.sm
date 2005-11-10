@@ -130,9 +130,9 @@ static int setattr_verify_attribs(
     if (a_p->objtype && req_a_p->objtype &&
         (a_p->objtype != req_a_p->objtype))
     {
-        gossip_debug(GOSSIP_SETATTR_DEBUG, "  handle %Lu is of type %d "
+        gossip_debug(GOSSIP_SETATTR_DEBUG, "  handle %llu is of type %d "
                      "and cannot be changed to type %d\n",
-                     Lu(s_op->req->u.setattr.handle),
+                     llu(s_op->req->u.setattr.handle),
                      a_p->objtype, s_op->req->u.setattr.attr.objtype);
 
         /* set an error to bail out of set-attr processing */
@@ -154,8 +154,8 @@ static int setattr_verify_attribs(
         (a_p->objtype == PVFS_TYPE_METAFILE))
     {
         gossip_debug(GOSSIP_SETATTR_DEBUG,
-                     "  handle %Lu refers to a metafile\n",
-                     Lu(s_op->req->u.setattr.handle));
+                     "  handle %llu refers to a metafile\n",
+                     llu(s_op->req->u.setattr.handle));
 
         gossip_debug(
             GOSSIP_SETATTR_DEBUG, " *** dspace has dfile count %d and "
@@ -202,22 +202,22 @@ static int setattr_verify_attribs(
              (a_p->objtype == PVFS_TYPE_DATAFILE))
     {
         gossip_debug(GOSSIP_SETATTR_DEBUG,
-                     "  handle %Lu refers to a datafile\n",
-                     Lu(s_op->req->u.setattr.handle));
+                     "  handle %llu refers to a datafile\n",
+                     llu(s_op->req->u.setattr.handle));
     }
     else if ((req_a_p->objtype == PVFS_TYPE_DIRECTORY) ||
              (a_p->objtype == PVFS_TYPE_DIRECTORY))
     {
         gossip_debug(GOSSIP_SETATTR_DEBUG,
-                     "  handle %Lu refers to a directory\n",
-                     Lu(s_op->req->u.setattr.handle));
+                     "  handle %llu refers to a directory\n",
+                     llu(s_op->req->u.setattr.handle));
     }
     else if ((req_a_p->objtype == PVFS_TYPE_SYMLINK) ||
              (a_p->objtype == PVFS_TYPE_SYMLINK))
     {
         gossip_debug(GOSSIP_SETATTR_DEBUG,
-                     "  handle %Lu refers to a symlink\n",
-                     Lu(s_op->req->u.setattr.handle));
+                     "  handle %llu refers to a symlink\n",
+                     llu(s_op->req->u.setattr.handle));
 
         if (req_a_p->mask & PVFS_ATTR_SYMLNK_ALL)
         {
@@ -225,8 +225,8 @@ static int setattr_verify_attribs(
             assert(req_a_p->u.sym.target_path);
 
             gossip_debug(GOSSIP_SETATTR_DEBUG,
-                         " symlink links handle %Lu to %s\n",
-                         Lu(s_op->req->u.setattr.handle),
+                         " symlink links handle %llu to %s\n",
+                         llu(s_op->req->u.setattr.handle),
                          req_a_p->u.sym.target_path);
 
             a_p->u.sym.target_path_len = req_a_p->u.sym.target_path_len;
@@ -238,14 +238,14 @@ static int setattr_verify_attribs(
              (a_p->objtype == PVFS_TYPE_DIRDATA))
     {
         gossip_debug(GOSSIP_SETATTR_DEBUG,
-                     "  handle %Lu refers to a dirdata object\n",
-                     Lu(s_op->req->u.setattr.handle));
+                     "  handle %llu refers to a dirdata object\n",
+                     llu(s_op->req->u.setattr.handle));
     }
     else
     {
         gossip_debug(GOSSIP_SETATTR_DEBUG,
-                     "  handle %Lu refers to something unknown\n",
-                     Lu(s_op->req->u.setattr.handle));
+                     "  handle %llu refers to something unknown\n",
+                     llu(s_op->req->u.setattr.handle));
 
         js_p->error_code = -PVFS_EACCES;
     }
@@ -286,8 +286,8 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s *js_p)
          PVFS_time orig_mtime = a_p->mtime;
          a_p->mtime = PVFS_util_mktime_version(orig_mtime);
          gossip_debug(GOSSIP_SETATTR_DEBUG, "setting version "
-                 "to %Lu\n\tmtime is %Lu\n",
-                 Lu(a_p->mtime), Lu(orig_mtime));
+                 "to %llu\n\tmtime is %llu\n",
+                 llu(a_p->mtime), llu(orig_mtime));
      }
 
     /* if the object is a symbolic link, check to make sure that the request
@@ -313,11 +313,11 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s *js_p)
     gossip_debug(
         GOSSIP_SETATTR_DEBUG,
         "  WRITING attrs: [owner = %d, group = %d\n\t"
-        "perms = %o, type = %d, atime = %Lu, mtime = %Lu\n\t"
-        "ctime = %Lu | dfile_count = %d | dist_size = %d]\n",
+        "perms = %o, type = %d, atime = %llu, mtime = %llu\n\t"
+        "ctime = %llu | dfile_count = %d | dist_size = %d]\n",
         dspace_a_p->owner, dspace_a_p->group, dspace_a_p->perms,
-        dspace_a_p->objtype, Lu(dspace_a_p->atime),
-        Lu(PVFS_util_mkversion_time(dspace_a_p->mtime)), Lu(dspace_a_p->ctime),
+        dspace_a_p->objtype, llu(dspace_a_p->atime),
+        llu(PVFS_util_mkversion_time(dspace_a_p->mtime)), llu(dspace_a_p->ctime),
         (int)dspace_a_p->u.meta.dfile_count,
         (int)dspace_a_p->u.meta.dist_size);
 
@@ -370,9 +370,9 @@ static int setattr_write_metafile_datafile_handles_if_required(
     s_op->val.buffer_sz = dfile_count * sizeof(PVFS_handle);
 
     gossip_debug(
-        GOSSIP_SETATTR_DEBUG, "  writing %s [%Lu,%d,"
+        GOSSIP_SETATTR_DEBUG, "  writing %s [%llu,%d,"
         "len %d]\n", (char *)s_op->key.buffer,
-        Lu(s_op->req->u.setattr.handle), s_op->req->u.setattr.fs_id,
+        llu(s_op->req->u.setattr.handle), s_op->req->u.setattr.fs_id,
         s_op->val.buffer_sz);
 
     ret = job_trove_keyval_write(
@@ -420,9 +420,9 @@ static int setattr_write_metafile_distribution_if_required(
     PINT_dist_encode(NULL, s_op->req->u.setattr.attr.u.meta.dist);    
 
     gossip_debug(
-        GOSSIP_SERVER_DEBUG, "  writing %s [%Lu,%d,"
+        GOSSIP_SERVER_DEBUG, "  writing %s [%llu,%d,"
         "len %d]\n", (char *)s_op->key.buffer,
-        Lu(s_op->req->u.setattr.handle), s_op->req->u.setattr.fs_id,
+        llu(s_op->req->u.setattr.handle), s_op->req->u.setattr.fs_id,
         s_op->val.buffer_sz);
 
     ret = job_trove_keyval_write(
@@ -467,9 +467,9 @@ static int setattr_write_symlink_target_if_required(
     s_op->val.buffer = s_op->req->u.setattr.attr.u.sym.target_path;
     s_op->val.buffer_sz = s_op->req->u.setattr.attr.u.sym.target_path_len;
 
-    gossip_debug(GOSSIP_SETATTR_DEBUG, "  writing %s [%Lu,%d,"
+    gossip_debug(GOSSIP_SETATTR_DEBUG, "  writing %s [%llu,%d,"
                  "len %d]\n", (char *)s_op->key.buffer,
-                 Lu(s_op->req->u.setattr.handle),
+                 llu(s_op->req->u.setattr.handle),
                  s_op->req->u.setattr.fs_id,
                  s_op->val.buffer_sz);
 

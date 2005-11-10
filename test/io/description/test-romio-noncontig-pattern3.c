@@ -97,7 +97,7 @@ int main(
     assert(retval >= 0);
 
     printf("results of PINT_process_request():\n");
-    printf("%d segments with %lld bytes\n", seg1.segs, Ld(seg1.bytes));
+    printf("%d segments with %lld bytes\n", seg1.segs, lld(seg1.bytes));
     total_bytes_client += seg1.bytes;
     for (i = 0; i < seg1.segs; i++)
     {
@@ -124,7 +124,7 @@ int main(
 	assert(retval >= 0);
 
 	printf("results of PINT_process_request():\n");
-	printf("%d segments with %lld bytes\n", seg1.segs, Ld(seg1.bytes));
+	printf("%d segments with %lld bytes\n", seg1.segs, lld(seg1.bytes));
 	total_bytes_client += seg1.bytes;
 	for (i = 0; i < seg1.segs; i++)
 	{

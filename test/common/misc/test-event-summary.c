@@ -83,7 +83,7 @@ int main(int argc, char **argv)
 	    continue;
 
 	/* read in data line */
-	ret = sscanf(tmp_buf, "%d\t%d\t%d_%d\t%Ld\t%f\t%f\t%f\n",
+	ret = sscanf(tmp_buf, "%d\t%d\t%d_%d\t%lld\t%f\t%f\t%f\n",
 	    &measure_num,
 	    &server,
 	    &api,

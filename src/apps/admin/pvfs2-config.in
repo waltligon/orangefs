@@ -56,7 +56,10 @@ while test $# -gt 0; do
 	echo $libflags
 	;;
     --serverlibs|--static-serverlibs)
-	libflags="-L@libdir@ -lrt -lpthread -lpvfs2-server @LIBS@ @DB_LIB@" 
+	libflags="-L@libdir@ -lpthread -lpvfs2-server @LIBS@ @DB_LIB@" 
+	if [ x"@NEEDS_LIBRT@" = x"1" ]; then
+		libflags="$libflags -lrt"
+	fi
 	if [ x"@BUILD_GM@" = x"1" ]; then
 		libflags="$libflags -L@GM_HOME@/lib -lgm"
 	fi

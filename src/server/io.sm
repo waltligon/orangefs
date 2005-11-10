@@ -204,17 +204,17 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s *js_p)
     s_op->u.io.flow_d->user_ptr = NULL;
     s_op->u.io.flow_d->type = s_op->req->u.io.flow_type;
 
-    gossip_debug(GOSSIP_IO_DEBUG, "flow: fsize: %Ld, " 
+    gossip_debug(GOSSIP_IO_DEBUG, "flow: fsize: %lld, " 
         "server_nr: %d, server_ct: %d\n",
-        Ld(s_op->u.io.flow_d->file_data.fsize),
+        lld(s_op->u.io.flow_d->file_data.fsize),
         (int)s_op->u.io.flow_d->file_data.server_nr,
         (int)s_op->u.io.flow_d->file_data.server_ct);
 
-    gossip_debug(GOSSIP_IO_DEBUG, "      file_req_offset: %Ld, "
-        "aggregate_size: %Ld, handle: %Lu\n", 
-        Ld(s_op->u.io.flow_d->file_req_offset),
-        Ld(s_op->u.io.flow_d->aggregate_size),
-        Lu(s_op->req->u.io.handle));
+    gossip_debug(GOSSIP_IO_DEBUG, "      file_req_offset: %lld, "
+        "aggregate_size: %lld, handle: %llu\n", 
+        lld(s_op->u.io.flow_d->file_req_offset),
+        lld(s_op->u.io.flow_d->aggregate_size),
+        llu(s_op->req->u.io.handle));
 
     /* set endpoints depending on type of io requested */
     if (s_op->req->u.io.io_type == PVFS_IO_WRITE)

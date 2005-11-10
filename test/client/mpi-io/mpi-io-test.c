@@ -27,7 +27,6 @@
 #include <stdlib.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <error.h>
 #include <string.h>
 #include <sys/time.h>
 #include <mpi.h>

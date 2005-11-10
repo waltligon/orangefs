@@ -2,7 +2,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/time.h>
+#include <stdlib.h>
+#ifdef HAVE_MALLOC_H
 #include <malloc.h>
+#endif
 
 #include "trove.h"
 
@@ -95,7 +98,7 @@ int trove_init(TROVE_coll_id *coll_id_p, TROVE_handle *handle, TROVE_context_id 
     if (ret < 0) {
         return -1;
     }
-    fprintf(stderr, "%s: handle=%Ld\n", path_name, Ld(parent_handle));
+    fprintf(stderr, "%s: handle=%lld\n", path_name, lld(parent_handle));
 
     
     /* find the parent directory handle */
@@ -187,7 +190,7 @@ int trove_init(TROVE_coll_id *coll_id_p, TROVE_handle *handle, TROVE_context_id 
 	*context_p = trove_context;
 
     fprintf(stderr, "+++++++++++++++++++++++++++++++\n");
-    fprintf(stderr, "Trove init: coll_id=%d, handle=%Ld, context=%d\n", coll_id, Ld(parent_handle), trove_context);
+    fprintf(stderr, "Trove init: coll_id=%d, handle=%lld, context=%d\n", coll_id, lld(parent_handle), trove_context);
 
 	free(mybuffer);
     return 0;

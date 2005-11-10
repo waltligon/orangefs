@@ -179,9 +179,9 @@ static int make_link(PVFS_credentials     * pCredentials,
         fprintf(stdout, "\t owner [%d]\n",  attr.owner);
         fprintf(stdout, "\t group [%d]\n",  attr.group);
         fprintf(stdout, "\t perms [%o]\n",  attr.perms);
-        fprintf(stdout, "\t atime [%Lu]\n", Lu(attr.atime));
-        fprintf(stdout, "\t mtime [%Lu]\n", Lu(attr.mtime));
-        fprintf(stdout, "\t ctime [%Lu]\n", Lu(attr.ctime));
+        fprintf(stdout, "\t atime [%llu]\n", llu(attr.atime));
+        fprintf(stdout, "\t mtime [%llu]\n", llu(attr.mtime));
+        fprintf(stdout, "\t ctime [%llu]\n", llu(attr.ctime));
     }
 
     ret = PVFS_sys_symlink(szBaseName, 

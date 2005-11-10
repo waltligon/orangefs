@@ -456,7 +456,7 @@ static ssize_t pvfs2_devreq_writev(
     else
     {
         /* ignore downcalls that we're not interested in */
-	pvfs2_print("WARNING: No one's waiting for tag %Lu\n", Lu(tag));
+	pvfs2_print("WARNING: No one's waiting for tag %llu\n", llu(tag));
     }
     kmem_cache_free(dev_req_cache, buffer);
 

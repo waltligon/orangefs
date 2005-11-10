@@ -54,7 +54,7 @@ int NCAC_aio_read_ext( PVFS_fs_id coll_id, PVFS_handle handle,
     DPRINT("NCAC_aio_read_ext: info\n");
 
     for (i=0; i< m_cnt; i++ ) {
-        DPRINT( "off:%Ld, size=%Ld, buff:%p, size=%Ld\n", 
+        DPRINT( "off:%lld, size=%lld, buff:%p, size=%lld\n", 
 				stream_offset_array[i], stream_size_array[i],
 				 mem_offset_array[i], mem_size_array[i] );
     }
@@ -77,7 +77,7 @@ int NCAC_aio_read_ext( PVFS_fs_id coll_id, PVFS_handle handle,
 			mem_offset_array[i] -= off;
 		}
 
-        DPRINT( "off:%Ld, size=%Ld, buff:%p, size=%Ld\n", 
+        DPRINT( "off:%lld, size=%lld, buff:%p, size=%lld\n", 
 				stream_offset_array[i], stream_size_array[i],
 				 mem_offset_array[i], mem_size_array[i] );
 
@@ -93,13 +93,13 @@ int NCAC_aio_read_ext( PVFS_fs_id coll_id, PVFS_handle handle,
 
     DPRINT("--------------after offset_shorten: s_cnt=%d\n", s_cnt);
     for (i=0; i< s_cnt; i++ ) {
-        DPRINT( "off:%Ld, size=%Ld\n", 
+        DPRINT( "off:%lld, size=%lld\n", 
 				stream_offset_array[i], stream_size_array[i] );
     }
 
     DPRINT("--------------after offset_shorten: m_cnt=%d\n", m_cnt);
     for (i=0; i< m_cnt; i++ ) {
-        DPRINT( "buff:%p, size=%Ld\n", 
+        DPRINT( "buff:%p, size=%lld\n", 
 			    mem_offset_array[i], mem_size_array[i] );
     }
 
@@ -125,7 +125,7 @@ int NCAC_aio_read_ext( PVFS_fs_id coll_id, PVFS_handle handle,
 
     *ioreq = op_id;
 
-    DPRINT("NCAC_aio_read_ext: io request=%Ld(%d)\n", op_id, *ioreq);
+    DPRINT("NCAC_aio_read_ext: io request=%lld(%d)\n", op_id, *ioreq);
 
     return 0;
 }
@@ -169,7 +169,7 @@ int NCAC_aio_write( PVFS_fs_id coll_id,
 			mem_offset_array[i] -= off;
 		}
 
-        DPRINT( "off:%Ld, size=%Ld, buff:%p, size=%Ld\n", 
+        DPRINT( "off:%lld, size=%lld, buff:%p, size=%lld\n", 
 				stream_offset_array[i], stream_size_array[i],
 				 mem_offset_array[i], mem_size_array[i] );
 
@@ -187,13 +187,13 @@ int NCAC_aio_write( PVFS_fs_id coll_id,
 #ifdef DEBUG
     fprintf(stderr, "--------------after offset_shorten: s_cnt=%d\n", s_cnt);
     for (i=0; i< s_cnt; i++ ) {
-        fprintf(stderr, "off:%Ld, size=%Ld\n", 
+        fprintf(stderr, "off:%lld, size=%lld\n", 
 				stream_offset_array[i], stream_size_array[i] );
     }
 
     fprintf(stderr, "--------------after offset_shorten: m_cnt=%d\n", m_cnt);
     for (i=0; i< m_cnt; i++ ) {
-        fprintf(stderr, "buff:%p, size=%Ld\n", 
+        fprintf(stderr, "buff:%p, size=%lld\n", 
 			    mem_offset_array[i], mem_size_array[i] );
     }
 #endif
@@ -220,7 +220,7 @@ int NCAC_aio_write( PVFS_fs_id coll_id,
 
     *ioreq = op_id;
 
-    DPRINT("NCAC_aio_write: io request=%Ld(%d)\n", op_id, *ioreq);
+    DPRINT("NCAC_aio_write: io request=%lld(%d)\n", op_id, *ioreq);
 
     return 0;
 }
@@ -242,13 +242,13 @@ int do_read_for_rmw(PVFS_fs_id coll_id, PVFS_handle handle,
 	buf = extent->addr;
 	inout_size = NCAC_dev.extsize;
 
-    DPRINT("do_read_for_rmw; pos=%Ld, buf=%p, size=%Ld\n", pos, buf, inout_size);
+    DPRINT("do_read_for_rmw; pos=%lld, buf=%p, size=%lld\n", pos, buf, inout_size);
     ret = trove_bstream_read_at(coll_id, handle,
                                 buf, &inout_size,
                                 0, 0, NULL, NULL,
                                 context, &op_id);
 
-    DPRINT("do_read_for_rmw; req=%Ld\n", op_id);
+    DPRINT("do_read_for_rmw; req=%lld\n", op_id);
 
     *ioreq = op_id;
     return 0;
@@ -283,12 +283,12 @@ int NCAC_check_ioreq(struct extent *extent)
     coll_id = extent->mapping->coll_id;
     context_id = extent->mapping->context_id;
 
-    DPRINT("NCAC_check_ioreq: req=%Ld, coll_id=%d, context=%d, index=%ld\n", op_id, coll_id, context_id, extent->index);
+    DPRINT("NCAC_check_ioreq: req=%lld, coll_id=%d, context=%d, index=%ld\n", op_id, coll_id, context_id, extent->index);
 
     ret = trove_dspace_test(coll_id, op_id, context_id, &count, NULL, NULL, &state, TROVE_DEFAULT_TEST_TIMEOUT);
 
     if ( ret > 0 ) {
-    	fprintf(stderr, "++++++++++++NCAC_check_ioreq: finished %Ld\n", Ld(op_id));
+    	fprintf(stderr, "++++++++++++NCAC_check_ioreq: finished %lld\n", lld(op_id));
         extent->ioreq = INVAL_IOREQ;
     }
 

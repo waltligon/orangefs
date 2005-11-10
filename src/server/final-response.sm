@@ -249,15 +249,15 @@ static void PINT_gossip_err_server_resp(
                         {
                             for(i = 0; i < attr->u.meta.dfile_count; i++)
                             {
-                                gossip_err("   DATA HANDLE[%d] is %Lu\n", i,
-                                           Lu(attr->u.meta.dfile_array[i]));
+                                gossip_err("   DATA HANDLE[%d] is %llu\n", i,
+                                           llu(attr->u.meta.dfile_array[i]));
                             }
                         }
                     }
                     break;
                     case PVFS_TYPE_DATAFILE:
-                        gossip_err("DATAFILE [ size is %Ld ]\n",
-                                   Ld(attr->u.data.size));
+                        gossip_err("DATAFILE [ size is %lld ]\n",
+                                   lld(attr->u.data.size));
                         break;
                     case PVFS_TYPE_SYMLINK:
                         gossip_err(

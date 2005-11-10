@@ -88,7 +88,7 @@ int main(int argc, char **argv)
 	
     // print the handle 
     printf("--create--\n"); 
-    printf("Handle: %Ld\n",Ld(resp_create.ref.handle));
+    printf("Handle: %lld\n",lld(resp_create.ref.handle));
 
     ret = PVFS_sys_flush(resp_create.ref, &credentials);
     if (ret < 0)

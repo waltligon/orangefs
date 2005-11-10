@@ -129,8 +129,8 @@ int main(int argc, char **argv)
         PVFS_perror("PVFS_sys_write failure", ret);
 	return -1;
     }
-    printf("IO-HOLE: wrote %Ld bytes at offset 0\n",
-           Ld(resp_io.total_completed));
+    printf("IO-HOLE: wrote %lld bytes at offset 0\n",
+           lld(resp_io.total_completed));
 
     ret = PVFS_sys_write(pinode_refn, file_req, 100000, buf, mem_req,
 			 &credentials, &resp_io);
@@ -139,19 +139,19 @@ int main(int argc, char **argv)
         PVFS_perror("PVFS_sys_write failure", ret);
 	return -1;
     }
-    printf("IO-HOLE: wrote %Ld bytes at offset 100000\n",
-           Ld(resp_io.total_completed));
+    printf("IO-HOLE: wrote %lld bytes at offset 100000\n",
+           lld(resp_io.total_completed));
 
     ret = PVFS_sys_read(pinode_refn, file_req, 10, buf, mem_req,
 			&credentials, &resp_io);
     if ((ret < 0) || (resp_io.total_completed != MAX_BUF_LEN))
     {
-        fprintf(stderr, "Failed to read %d bytes at offset 10! %Ld "
-                "bytes read\n", MAX_BUF_LEN, Ld(resp_io.total_completed));
+        fprintf(stderr, "Failed to read %d bytes at offset 10! %lld "
+                "bytes read\n", MAX_BUF_LEN, lld(resp_io.total_completed));
 	return -1;
     }
-    printf("IO-HOLE: read %Ld bytes at offset 10\n",
-           Ld(resp_io.total_completed));
+    printf("IO-HOLE: read %lld bytes at offset 10\n",
+           lld(resp_io.total_completed));
 
     ret = PVFS_sys_finalize();
     if (ret < 0)

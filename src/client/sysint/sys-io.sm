@@ -225,8 +225,8 @@ PVFS_error PVFS_isys_io(
     struct filesystem_configuration_s* cur_fs = NULL;
     struct server_configuration_s *server_config = NULL;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_io entered [%Lu]\n",
-                 Lu(ref.handle));
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_isys_io entered [%llu]\n",
+                 llu(ref.handle));
 
     if ((ref.handle == PVFS_HANDLE_NULL) ||
         (ref.fs_id == PVFS_FS_ID_NULL) || (resp_p == NULL))
@@ -542,7 +542,7 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
         PINT_flow_reset(&cur_ctx->flow_desc);
 
         gossip_debug(GOSSIP_IO_DEBUG, "  filling I/O request "
-                     "for %Lu\n", Lu(cur_ctx->data_handle));
+                     "for %llu\n", llu(cur_ctx->data_handle));
 
         PINT_SERVREQ_IO_FILL(
             msg->req,
@@ -1154,9 +1154,9 @@ static int io_analyze_results(PINT_client_sm *sm_p,
             }
 
             gossip_debug(
-                GOSSIP_IO_DEBUG, "[%d/%d] running size is %Ld\n",
+                GOSSIP_IO_DEBUG, "[%d/%d] running size is %lld\n",
                 (i + 1), sm_p->u.io.datafile_count,
-                Ld(sm_p->u.io.total_size));
+                lld(sm_p->u.io.total_size));
         }
 
         /*
@@ -1213,8 +1213,8 @@ static int io_analyze_results(PINT_client_sm *sm_p,
         goto analyze_results_exit;
     }
 
-    gossip_debug(GOSSIP_IO_DEBUG, "total bytes transferred is %Ld\n",
-                 Ld(sm_p->u.io.total_size));
+    gossip_debug(GOSSIP_IO_DEBUG, "total bytes transferred is %lld\n",
+                 lld(sm_p->u.io.total_size));
 
     if(sm_p->u.io.io_type == PVFS_IO_WRITE)
     {
@@ -1475,6 +1475,9 @@ static int io_analyze_size_results(
                                        &rfdata, &result, PINT_CLIENT);
             if(res < 0)
             {
+                PINT_free_request_state(memreq_state);
+                PINT_free_request_state(filereq_state);
+                
                 js_p->error_code = res;
                 goto error_exit;
             }
@@ -1699,10 +1702,10 @@ static inline int build_context_flow(
         return -PVFS_EINVAL;
     }
 
-    gossip_debug(GOSSIP_IO_DEBUG, "* mem req size is %Ld, "
-                 "file_req size is %Ld (bytes)\n",
-                 Ld(PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req)),
-                 Ld(PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.file_req)));
+    gossip_debug(GOSSIP_IO_DEBUG, "* mem req size is %lld, "
+                 "file_req size is %lld (bytes)\n",
+                 lld(PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req)),
+                 lld(PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.file_req)));
 
     /* must reset the error_code and internal PINT_distribute fields
      * in case of a retry */
@@ -1722,12 +1725,12 @@ static inline int build_context_flow(
     cur_ctx->flow_desc.type = sm_p->u.io.flowproto_type;
     cur_ctx->flow_desc.user_ptr = NULL;
 
-    gossip_debug(GOSSIP_IO_DEBUG, "  bstream_size = %Ld, datafile "
-                 "nr=%d, ct=%d, file_req_off = %Ld\n",
-                 Ld(cur_ctx->flow_desc.file_data.fsize),
+    gossip_debug(GOSSIP_IO_DEBUG, "  bstream_size = %lld, datafile "
+                 "nr=%d, ct=%d, file_req_off = %lld\n",
+                 lld(cur_ctx->flow_desc.file_data.fsize),
                  cur_ctx->flow_desc.file_data.server_nr,
                  cur_ctx->flow_desc.file_data.server_ct,
-                 Ld(cur_ctx->flow_desc.file_req_offset));
+                 lld(cur_ctx->flow_desc.file_req_offset));
 
     if (sm_p->u.io.io_type == PVFS_IO_READ)
     {
@@ -1944,8 +1947,8 @@ static inline int check_context_status(
     else if (io_type == PVFS_IO_READ)
     {
         gossip_debug(
-            GOSSIP_IO_DEBUG, "  %Ld bytes read from context %p\n",
-            Ld(cur_ctx->flow_desc.total_transfered), cur_ctx);
+            GOSSIP_IO_DEBUG, "  %lld bytes read from context %p\n",
+            lld(cur_ctx->flow_desc.total_transfered), cur_ctx);
 
         /* size for reads are reported in the flow */
         *total_size += cur_ctx->flow_desc.total_transfered;
@@ -1983,8 +1986,8 @@ static inline int check_context_status(
             {
                 gossip_debug(
                     GOSSIP_IO_DEBUG,
-                    "  %Ld bytes written to context %p\n",
-                    Ld(resp->u.write_completion.total_completed),
+                    "  %lld bytes written to context %p\n",
+                    lld(resp->u.write_completion.total_completed),
                     cur_ctx);
 
                 *total_size += resp->u.write_completion.total_completed;

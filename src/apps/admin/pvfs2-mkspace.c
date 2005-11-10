@@ -209,7 +209,7 @@ static void print_options(options_t *opts)
                (opts->delete_storage ? "yes" : "no"));
         printf("\tverbose             : %s\n",
                (opts->verbose ? "ON" : "OFF"));
-        printf("\troot handle         : %Lu\n", Lu(opts->root_handle));
+        printf("\troot handle         : %llu\n", llu(opts->root_handle));
         printf("\tcollection-only mode: %s\n",
                (opts->collection_only ? "ON" : "OFF"));
         printf("\tcollection id       : %d\n", opts->coll_id);

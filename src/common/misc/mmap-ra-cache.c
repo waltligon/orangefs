@@ -97,10 +97,10 @@ int pvfs2_mmap_ra_cache_register(PVFS_object_ref refn,
         gen_mutex_unlock(s_mmap_ra_cache_mutex);
 
         gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG, "Inserted mmap ra cache "
-                     "element %Lu, %d of size %Lu\n",
-                     Lu(cache_elem->refn.handle),
+                     "element %llu, %d of size %llu\n",
+                     llu(cache_elem->refn.handle),
                      cache_elem->refn.fs_id,
-                     Lu(cache_elem->data_sz));
+                     llu(cache_elem->data_sz));
 
         ret = 0;
     }
@@ -132,8 +132,8 @@ int pvfs2_mmap_ra_cache_get_block(
             {
                 gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG,
                              "mmap_ra_cache_get_block got block at "
-                             "offset %Lu, len %Lu\n",  Lu(offset),
-                             Lu(len));
+                             "offset %llu, len %llu\n",  llu(offset),
+                             llu(len));
 
                 ptr = (void *)(((char *)cache_elem->data + offset));
                 memcpy(dest, ptr, len);
@@ -151,16 +151,16 @@ int pvfs2_mmap_ra_cache_get_block(
 
                 gossip_debug(
                     GOSSIP_MMAP_RCACHE_DEBUG, "mmap_ra_cache_get_block "
-                    "found invalid block [%Lu/%Lu]\n",
-                    Lu(offset), Lu(len));
+                    "found invalid block [%llu/%llu]\n",
+                    llu(offset), llu(len));
 
                 if (actual_len > 0)
                 {
                     gossip_debug(
-                        GOSSIP_MMAP_RCACHE_DEBUG, " data_sz is %Lu, "
-                        "offset is %Lu len is %Lu\n\t(filling partial %d "
-                        "bytes)\n", Lu(cache_elem->data_sz), Lu(offset),
-                        Lu(len), actual_len);
+                        GOSSIP_MMAP_RCACHE_DEBUG, " data_sz is %llu, "
+                        "offset is %llu len is %llu\n\t(filling partial %d "
+                        "bytes)\n", llu(cache_elem->data_sz), llu(offset),
+                        llu(len), actual_len);
 
                     ptr = (void *)(((char *)cache_elem->data + offset));
                     memcpy(dest, ptr, actual_len);
@@ -202,10 +202,10 @@ int pvfs2_mmap_ra_cache_flush(PVFS_object_ref refn)
             assert(cache_elem->data);
 
             gossip_debug(GOSSIP_MMAP_RCACHE_DEBUG, "Flushed mmap ra cache "
-                         "element %Lu, %d of size %Lu\n",
-                         Lu(cache_elem->refn.handle),
+                         "element %llu, %d of size %llu\n",
+                         llu(cache_elem->refn.handle),
                          cache_elem->refn.fs_id,
-                         Lu(cache_elem->data_sz));
+                         llu(cache_elem->data_sz));
 
             free(cache_elem->data);
             free(cache_elem);

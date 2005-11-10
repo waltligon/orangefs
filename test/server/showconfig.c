@@ -111,8 +111,8 @@ void print_filesystem_configuration(struct filesystem_configuration_s *fs)
         fprintf(stderr,"=========== Reporting FS \"%s\" Information "
                 "===========\n",fs->file_system_name);
         fprintf(stderr,"Collection ID         : %d\n",fs->coll_id);
-        fprintf(stderr,"Root Handle           : %Lu\n",
-                Lu(fs->root_handle));
+        fprintf(stderr,"Root Handle           : %llu\n",
+                llu(fs->root_handle));
         fprintf(stderr,"Handle Recycle Timeout: %d seconds\n",
                 (int)fs->handle_recycle_timeout_sec.tv_sec);
         fprintf(stderr,"Trove Sync Meta       : %s\n",

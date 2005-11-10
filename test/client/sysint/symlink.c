@@ -88,7 +88,7 @@ int main(int argc, char **argv)
     }
 	
     printf("--symlink--\n"); 
-    printf("Handle: %Ld\n", Ld(resp_sym.ref.handle));
+    printf("Handle: %lld\n", lld(resp_sym.ref.handle));
 
     ret = PVFS_sys_finalize();
     if (ret < 0)

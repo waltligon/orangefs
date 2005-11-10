@@ -329,8 +329,8 @@ static int getattr_acache_lookup(PINT_client_sm *sm_p,
     assert(object_ref.handle != PVFS_HANDLE_NULL);
     assert(object_ref.fs_id != PVFS_FS_ID_NULL);
 
-    gossip_debug(GOSSIP_ACACHE_DEBUG, "%s: handle %Lu fsid %d\n",
-      __func__, Lu(object_ref.handle), object_ref.fs_id);
+    gossip_debug(GOSSIP_ACACHE_DEBUG, "%s: handle %llu fsid %d\n",
+      __func__, llu(object_ref.handle), object_ref.fs_id);
 
    
     /* The sys attr mask request is converted to object
@@ -440,7 +440,7 @@ static int getattr_acache_lookup(PINT_client_sm *sm_p,
             if (sm_p->op != PVFS_SYS_SETATTR)
             {
                 gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: sm_p->op is: %d "
-                        "[%Lu]\n", sm_p->op, Lu(object_ref.handle));
+                        "[%llu]\n", sm_p->op, llu(object_ref.handle));
 
                 goto cache_miss;
             }
@@ -457,7 +457,7 @@ static int getattr_acache_lookup(PINT_client_sm *sm_p,
             PINT_acache_release(pinode);
 
             gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: acache hit "
-                         "[%Lu]\n", Lu(object_ref.handle));
+                         "[%llu]\n", llu(object_ref.handle));
             return 1;
         }
       cache_miss:
@@ -468,14 +468,14 @@ static int getattr_acache_lookup(PINT_client_sm *sm_p,
           The entry gets added back into the cache with
         */
         gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: invalid acache "
-                     "miss [%Lu]\n", 
-                     Lu(object_ref.handle));
+                     "miss [%llu]\n", 
+                     llu(object_ref.handle));
 
         PINT_acache_release(pinode);
     }
     gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: clean acache miss: "
-                " [%Lu]\n",
-                  Lu(object_ref.handle));
+                " [%llu]\n",
+                  llu(object_ref.handle));
 
     js_p->error_code = GETATTR_ACACHE_MISS;
     return 1;
@@ -703,8 +703,8 @@ static int getattr_datafile_getattr_setup_msgpairarray(
         assert(msg_p);
 
         gossip_debug(GOSSIP_GETATTR_DEBUG,
-                     "  datafile_getattr: getting size for handle %Lu\n",
-                     Lu(attr->u.meta.dfile_array[i]));
+                     "  datafile_getattr: getting size for handle %llu\n",
+                     llu(attr->u.meta.dfile_array[i]));
 
         PINT_SERVREQ_GETATTR_FILL(
             msg_p->req,
@@ -742,8 +742,8 @@ static int getattr_datafile_getattr_comp_fn(
     assert(resp_p->op == PVFS_SERV_GETATTR);
 
     gossip_debug(GOSSIP_GETATTR_DEBUG,
-                 "datafile_getattr: size of datafile %d is %Ld\n",
-                 index, Ld(resp_p->u.getattr.attr.u.data.size));
+                 "datafile_getattr: size of datafile %d is %lld\n",
+                 index, lld(resp_p->u.getattr.attr.u.data.size));
 
     sm_p->getattr.size_array[index] =
         resp_p->u.getattr.attr.u.data.size;
