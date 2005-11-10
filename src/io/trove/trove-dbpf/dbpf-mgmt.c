@@ -152,8 +152,8 @@ static int dbpf_collection_getinfo(TROVE_coll_id coll_id,
             tmp_trove_statfs->bytes_total =
                 (PINT_statfs_bsize(&tmp_statfs) *
                  (PINT_statfs_blocks(&tmp_statfs) -
-                  PINT_statfs_bfree(&tmp_statfs) -
-                  PINT_statfs_bavail(&tmp_statfs)));
+                  (PINT_statfs_bfree(&tmp_statfs) -
+                  PINT_statfs_bavail(&tmp_statfs))));
 
             return 1;
         }
