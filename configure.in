@@ -47,6 +47,8 @@ AC_CHECK_HEADERS([mntent.h, fstab.h])
 
 AC_CHECK_HEADERS(stdarg.h)
 
+AC_CHECK_SIZEOF([long int])
+
 dnl Check for utilities that we need during the build process
 AC_PROG_INSTALL
 AC_PROG_CC
@@ -827,12 +829,12 @@ AX_CHECK_NEEDS_LIBRT
 case "$host_os" in
 
     *darwin*)
-	AC_DEFINE([TARGET_OS_DARWIN], 1, "Define if on darwin")
+	AC_DEFINE([TARGET_OS_DARWIN], 1, Define if on darwin)
     	TARGET_OS_DARWIN=1
 	AC_SUBST(TARGET_OS_DARWIN)
     ;;
     *linux*)
-	AC_DEFINE([TARGET_OS_LINUX], 1, "Define if on linux")
+	AC_DEFINE([TARGET_OS_LINUX], 1, Define if on linux)
     	TARGET_OS_LINUX=1
 	AC_SUBST(TARGET_OS_LINUX)
     ;;
