@@ -27,6 +27,7 @@
 #include "pvfs2-types-debug.h"
 #include "pvfs2-util.h"
 #include "pint-util.h"
+#include "pvfs2-internal.h"
 
 enum
 {

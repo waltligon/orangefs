@@ -16,6 +16,7 @@ extern "C" {
 #include "trove.h"
 #include "gen-locks.h"
 #include "dbpf-open-cache.h"
+#include "pvfs2-internal.h"
 
 #define TROVE_DBPF_VERSION_KEY                       "trove-dbpf-version"
 #define TROVE_DBPF_VERSION_VALUE                                  "0.0.1"

@@ -17,6 +17,7 @@
 #include "trove-handle-mgmt.h"
 #include "gossip.h"
 #include "gen-locks.h"
+#include "pvfs2-internal.h"
 
 /*
   this is an internal structure and shouldn't be used

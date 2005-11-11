@@ -14,6 +14,7 @@
 #include "PINT-reqproto-encode.h"
 #include "pint-cached-config.h"
 #include "pvfs2-util.h"
+#include "pvfs2-internal.h"
 
 #define MAX_NUM_FS                   67
 

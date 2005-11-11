@@ -14,6 +14,7 @@
 
 #include "client.h"
 #include "pvfs2-util.h"
+#include "pvfs2-internal.h"
 
 void gen_rand_str(int len, char** gen_str);
 

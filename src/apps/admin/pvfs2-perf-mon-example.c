@@ -17,6 +17,7 @@
 
 #include "pvfs2.h"
 #include "pvfs2-mgmt.h"
+#include "pvfs2-internal.h"
 
 #define HISTORY 5
 #define FREQUENCY 3

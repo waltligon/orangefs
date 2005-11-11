@@ -9,6 +9,7 @@
 
 #include "client.h"
 #include "pvfs2-util.h"
+#include "pvfs2-internal.h"
 
 int main(int argc,char **argv)
 {

@@ -16,6 +16,7 @@
 #include "bmi-byteswap.h"
 #include "pint-event.h"
 #include "id-generator.h"
+#include "pvfs2-internal.h"
 
 #define ENCODING_TABLE_SIZE 5
 

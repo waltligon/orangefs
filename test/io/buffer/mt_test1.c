@@ -11,6 +11,7 @@
 #include "trove.h"
 
 #include "trove-init.c"
+#include "pvfs2-internal.h"
 
 TROVE_coll_id coll_id;
 TROVE_handle file_handle;

@@ -17,6 +17,7 @@
 #include "pvfs2-dist-simple-stripe.h"
 
 #include "debug.h"
+#include "pvfs2-internal.h"
 
 #define SEGMAX 16
 #define BYTEMAX (4*1024*1024)

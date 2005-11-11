@@ -13,6 +13,7 @@
 #include "pvfs2.h"
 #include "pvfs2-vis.h"
 #include "pvfs2-mgmt.h"
+#include "pvfs2-internal.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"

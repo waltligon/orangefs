@@ -30,6 +30,7 @@
 #include "gen-locks.h"
 #include "realpath.h"
 #include "pint-sysint-utils.h"
+#include "pvfs2-internal.h"
 
 #ifdef HAVE_MNTENT_H
 

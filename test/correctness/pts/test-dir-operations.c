@@ -13,6 +13,7 @@
 #include "pvfs2-util.h"
 #include "pvfs-helper.h"
 #include "test-dir-operations.h"
+#include "pvfs2-internal.h"
 
 /*
  * parent_refn:  pinode_refn of parent directory

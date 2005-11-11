@@ -24,6 +24,7 @@
 #include "pint-distribution.h"
 #include "pvfs2-config.h"
 #include "pvfs2-server.h"
+#include "pvfs2-internal.h"
 
 static DOTCONF_CB(get_pvfs_server_id);
 static DOTCONF_CB(get_logstamp);

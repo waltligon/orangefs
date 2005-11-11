@@ -9,6 +9,7 @@
 
 #include "gossip.h"
 #include "ncache.h"
+#include "pvfs2-internal.h"
 
 /* this is a test program that exercises the ncache interface and
  * demonstrates how to use it.

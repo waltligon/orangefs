@@ -9,6 +9,7 @@
 #include "aiovec.h"
 #include "cache.h"
 #include "ncac-job.h"
+#include "pvfs2-internal.h"
 
 extern struct NCAC_dev  NCAC_dev;
 void cache_dump_active_list(void);

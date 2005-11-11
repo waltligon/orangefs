@@ -14,6 +14,7 @@
 #include <assert.h>
 #include "pvfs2-util.h"
 #include "pvfs2-mgmt.h"
+#include "pvfs2-internal.h"
 
 #define MAX_BUF_LEN 5
 

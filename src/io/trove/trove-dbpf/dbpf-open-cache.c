@@ -27,6 +27,7 @@
 #include "gossip.h"
 #include "quicklist.h"
 #include "dbpf-open-cache.h"
+#include "pvfs2-internal.h"
 
 #define OPEN_CACHE_SIZE 64
 

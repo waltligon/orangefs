@@ -68,6 +68,7 @@ static int dbpf_bstream_resize_op_svc(struct dbpf_op *op_p);
 
 #ifdef __PVFS2_TROVE_AIO_THREADED__
 #include "dbpf-thread.h"
+#include "pvfs2-internal.h"
 
 extern pthread_cond_t dbpf_op_completed_cond;
 extern dbpf_op_queue_p dbpf_completion_queue_array[TROVE_MAX_CONTEXTS];

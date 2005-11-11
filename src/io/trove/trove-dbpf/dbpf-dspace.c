@@ -32,6 +32,7 @@
 #ifdef __PVFS2_TROVE_THREADED__
 #include <pthread.h>
 #include "dbpf-thread.h"
+#include "pvfs2-internal.h"
 
 extern gen_mutex_t dbpf_attr_cache_mutex;
 extern pthread_cond_t dbpf_op_completed_cond;

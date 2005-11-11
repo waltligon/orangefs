@@ -8,6 +8,7 @@
 #endif
 
 #include "trove.h"
+#include "pvfs2-internal.h"
 
 #define ROOT_HANDLE_STRING "root_handle"
 #define MB 1024*1024

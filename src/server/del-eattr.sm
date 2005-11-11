@@ -10,6 +10,7 @@
 #include "server-config.h"
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
+#include "pvfs2-internal.h"
 
 static inline char *get_object_type(int objtype)
 {

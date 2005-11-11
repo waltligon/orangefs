@@ -28,6 +28,7 @@
 #include "PINT-reqproto-encode.h"
 #include "pint-util.h"
 #include "ncache.h"
+#include "pvfs2-internal.h"
 
 extern job_context_id pint_client_sm_context;
 

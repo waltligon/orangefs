@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.18 2005-11-10 01:27:03 slang Exp $
+ * $Id: ib.c,v 1.19 2005-11-11 21:31:03 slang Exp $
  */
 #include <stdio.h>  /* just for NULL for id-generator.h */
 #include <src/common/id-generator/id-generator.h>
@@ -13,6 +13,7 @@
 #include <src/common/gen-locks/gen-locks.h>  /* gen_mutex_t ... */
 #include <vapi_common.h>  /* VAPI_cqe_opcode_sym ... */
 #include "ib.h"
+#include "pvfs2-internal.h"
 
 static gen_mutex_t interface_mutex = GEN_MUTEX_INITIALIZER;
 

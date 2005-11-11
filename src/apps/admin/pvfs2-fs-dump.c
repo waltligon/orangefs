@@ -18,6 +18,7 @@
 
 #include "pvfs2.h"
 #include "pvfs2-mgmt.h"
+#include "pvfs2-internal.h"
 
 #define HANDLE_BATCH 1000
 

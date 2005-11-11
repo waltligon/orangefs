@@ -13,6 +13,7 @@
 
 #include "pvfs2-util.h"
 #include "str-utils.h"
+#include "pvfs2-internal.h"
 
 #define MAX_NUM_DIRENTS    32
 

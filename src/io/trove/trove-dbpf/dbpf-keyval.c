@@ -34,6 +34,7 @@
 #include "dbpf-op-queue.h"
 #include "dbpf-attr-cache.h"
 #include "gossip.h"
+#include "pvfs2-internal.h"
 
 extern gen_mutex_t dbpf_attr_cache_mutex;
 

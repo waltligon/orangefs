@@ -18,6 +18,7 @@
 #include "acache.h"
 #include "quickhash.h"
 #include "pint-util.h"
+#include "pvfs2-internal.h"
 
 /* comment out the following for non-verbose acache debugging */
 #define VERBOSE_ACACHE_DEBUG

@@ -13,6 +13,7 @@
 
 #include "server-config.h"
 #include "pvfs2-server.h"
+#include "pvfs2-internal.h"
 
 /*
  * if given a metafile, do a keyval flush

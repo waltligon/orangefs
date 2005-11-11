@@ -23,6 +23,7 @@
 
 #include "trove.h"
 #include "dbpf-bstream.h"
+#include "pvfs2-internal.h"
 
 #define AIOCB_ARRAY_SZ 20
 

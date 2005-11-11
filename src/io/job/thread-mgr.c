@@ -14,6 +14,7 @@
 #include "gossip.h"
 #include "bmi.h"
 #include "trove.h"
+#include "pvfs2-internal.h"
 
 #define THREAD_MGR_TEST_COUNT 5
 #define THREAD_MGR_TEST_TIMEOUT 10

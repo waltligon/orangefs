@@ -11,6 +11,7 @@
 
 #include "ncac-trove.h"
 #include "ncac-job.h"
+#include "pvfs2-internal.h"
 
 /* internal functions */
 static inline struct extent *find_extent(NCAC_req_t *ncac_req,

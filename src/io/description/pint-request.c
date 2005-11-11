@@ -13,6 +13,7 @@
 #include <pvfs2-debug.h>
 #include <pint-request.h>
 #include <pint-distribution.h>
+#include "pvfs2-internal.h"
 
 static int PINT_request_disp(PINT_Request *request);
 

@@ -74,6 +74,7 @@
 
 #ifdef CLIENT_CORE_OP_TIMING
 #include "pint-util.h"
+#include "pvfs2-internal.h"
 #endif
 
 #define DEFAULT_LOGFILE "/tmp/pvfs2-client.log"
