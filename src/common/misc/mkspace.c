@@ -22,6 +22,7 @@
 #include "str-utils.h"
 #include "extent-utils.h"
 #include "pvfs2-util.h"
+#include "pvfs2-internal.h"
 
 static char *dir_ent_string = "dir_ent";
 static char *root_handle_string = "root_handle";

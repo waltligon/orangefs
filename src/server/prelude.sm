@@ -14,6 +14,7 @@
 #include "src/server/request-scheduler/request-scheduler.h"
 #include "trove.h"
 #include "pint-util.h"
+#include "pvfs2-internal.h"
 
 /* prelude state machine:
  * This is a nested state machine that performs initial setup 

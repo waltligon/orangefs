@@ -11,6 +11,7 @@
  */
 
 #include "pvfs2-kernel.h"
+#include "pvfs2-internal.h"
 
 extern int debug;
 extern kmem_cache_t *pvfs2_inode_cache;

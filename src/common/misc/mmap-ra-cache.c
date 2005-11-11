@@ -16,6 +16,7 @@
 #include "gossip.h"
 #include "gen-locks.h"
 #include "mmap-ra-cache.h"
+#include "pvfs2-internal.h"
 
 static int hash_key(void *key, int table_size);
 static int hash_key_compare(void *key, struct qlist_head *link);

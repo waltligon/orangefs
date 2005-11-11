@@ -464,6 +464,7 @@ int server_state_machine_start_noreq(
     ((_op <= PVFS_MAX_SERVER_OP) ? (PINT_server_req_table[_op].sm) : NULL)
 
 #include "state-machine.h"
+#include "pvfs2-internal.h"
 
 #endif /* __SM_CHECK_DEP */ 
 #endif /* __PVFS_SERVER_H */

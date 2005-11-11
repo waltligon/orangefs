@@ -18,6 +18,7 @@
 #include "pvfs2.h"
 #include "trove.h"
 #include "pvfs2-attr.h"
+#include "pvfs2-internal.h"
 
 /* declare the strnlen prototype */
 size_t strnlen(const char *s, size_t limit);

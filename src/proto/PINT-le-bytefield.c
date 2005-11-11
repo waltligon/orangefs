@@ -22,6 +22,7 @@
 #include "PINT-reqproto-module.h"
 #include "src/io/description/pint-request.h"  /* for PINT_Request */
 #include "src/io/description/pint-distribution.h"  /* for PINT_dist_lookup */
+#include "pvfs2-internal.h"
 
 /* defined later */
 PINT_encoding_table_values le_bytefield_table;

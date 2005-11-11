@@ -23,6 +23,7 @@
 #include "pvfs2.h"
 #include "str-utils.h"
 #include "pint-sysint-utils.h"
+#include "pvfs2-internal.h"
 
 /* optional parameters, filled in by parse_args() */
 struct options

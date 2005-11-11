@@ -10,6 +10,7 @@
 #include "trove.h"
 
 #include "trove-init.c"
+#include "pvfs2-internal.h"
 
 extern void   cache_dump_active_list(void);
 extern void   cache_dump_inactive_list(void);

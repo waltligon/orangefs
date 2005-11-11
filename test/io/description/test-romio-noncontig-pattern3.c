@@ -16,6 +16,7 @@
 #include "pint-dist-utils.h"
 #include "pvfs2-request.h"
 #include "pint-request.h"
+#include "pvfs2-internal.h"
 
 #define SEGMAX 16
 #define BYTEMAX (256*1024)

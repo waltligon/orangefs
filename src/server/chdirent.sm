@@ -12,6 +12,7 @@
 #include "pvfs2-attr.h"
 #include "gossip.h"
 #include "pvfs2-util.h"
+#include "pvfs2-internal.h"
 
 enum
 {

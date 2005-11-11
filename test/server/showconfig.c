@@ -11,6 +11,7 @@
 #include "dotconf.h"
 #include "server-config.h"
 #include "gossip.h"
+#include "pvfs2-internal.h"
 
 void print_filesystem_configuration(struct filesystem_configuration_s *fs);
 

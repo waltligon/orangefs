@@ -11,6 +11,7 @@
 
 #include "trove-extentlist.h"
 #include "gossip.h"
+#include "pvfs2-internal.h"
 
 enum extentlist_coalesce_status
 {

@@ -6,6 +6,7 @@
 #include "aiovec.h"
 #include "ncac-trove.h"
 #include "state.h"
+#include "pvfs2-internal.h"
 
 static inline void  offset_shorten( int s_cnt, 
 					  PVFS_offset *stream_offset_array,

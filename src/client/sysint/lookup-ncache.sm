@@ -48,6 +48,7 @@
 #include "pint-servreq.h"
 #include "ncache.h"
 #include "PINT-reqproto-encode.h"
+#include "pvfs2-internal.h"
 
 enum
 {

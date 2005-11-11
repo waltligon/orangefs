@@ -23,6 +23,7 @@
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
 #include "ncache.h"
+#include "pvfs2-internal.h"
 
 /*
   PVFS_{i}sys_remove takes the following steps:

@@ -11,6 +11,7 @@
 #include "server-config.h"
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
+#include "pvfs2-internal.h"
 
 /* final-response state machine:
  * This is used as a nested state machine to perform two primary tasks:

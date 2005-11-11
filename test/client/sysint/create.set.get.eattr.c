@@ -14,6 +14,7 @@
 #include "pvfs2-debug.h"
 #include "str-utils.h"
 #include "pint-sysint-utils.h"
+#include "pvfs2-internal.h"
 
 int gossip_set_debug_mask(int, uint64_t);
 

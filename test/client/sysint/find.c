@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include "pvfs2-util.h"
+#include "pvfs2-internal.h"
 
 /* TODO: this can be larger after system interface readdir logic
  * is in place to break up large readdirs into multiple operations

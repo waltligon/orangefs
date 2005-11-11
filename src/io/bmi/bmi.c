@@ -24,6 +24,7 @@
 #include "gen-locks.h"
 #include "str-utils.h"
 #include "id-generator.h"
+#include "pvfs2-internal.h"
 
 /*
  * List of BMI addrs currently managed.

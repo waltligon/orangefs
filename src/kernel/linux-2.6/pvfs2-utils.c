@@ -9,6 +9,7 @@
 #include "pint-dev-shared.h"
 #include "pvfs2-dev-proto.h"
 #include "pvfs2-bufmap.h"
+#include "pvfs2-internal.h"
 
 extern kmem_cache_t *pvfs2_inode_cache;
 extern struct list_head pvfs2_request_list;

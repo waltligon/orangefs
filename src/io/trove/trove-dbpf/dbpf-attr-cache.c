@@ -10,6 +10,7 @@
 #include "dbpf-attr-cache.h"
 #include "gen-locks.h"
 #include "str-utils.h"
+#include "pvfs2-internal.h"
 
 /* public mutex lock */
 gen_mutex_t dbpf_attr_cache_mutex = GEN_MUTEX_INITIALIZER;

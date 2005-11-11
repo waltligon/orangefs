@@ -23,6 +23,7 @@
 #include "trove.h"
 #include "ncac-interface.h"
 #include "internal.h"
+#include "pvfs2-internal.h"
     
 #define BUFFER_SIZE (256*1024)
 #define MAX_REGIONS 16

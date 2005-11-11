@@ -15,6 +15,7 @@
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
 #include "trove.h"
+#include "pvfs2-internal.h"
 
 enum
 {

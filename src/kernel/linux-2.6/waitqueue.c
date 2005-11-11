@@ -11,6 +11,7 @@
  */
 
 #include "pvfs2-kernel.h"
+#include "pvfs2-internal.h"
 
 extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;

@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include "pvfs-helper.h"
 #include "test-pvfs-datatype-init.h"
+#include "pvfs2-internal.h"
 
 /*
   initialize the sysint and create files to be used by subsequent

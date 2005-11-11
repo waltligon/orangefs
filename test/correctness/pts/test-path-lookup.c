@@ -13,6 +13,7 @@
 #include "pvfs2-util.h"
 #include "test-path-lookup.h"
 #include "pvfs2-req-proto.h"
+#include "pvfs2-internal.h"
 
 #define GENERATE_FILENAME(fname, max_len, f, i, r, slash) \
 do {                                                      \

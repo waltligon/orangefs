@@ -8,6 +8,7 @@
 
 #include <assert.h>
 #include "ncache.h"
+#include "pvfs2-internal.h"
 
 typedef struct
 {

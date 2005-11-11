@@ -19,6 +19,7 @@
 #include "pvfs2-mgmt.h"
 #include "pint-sysint-utils.h"
 #include "server-config.h"
+#include "pvfs2-internal.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"

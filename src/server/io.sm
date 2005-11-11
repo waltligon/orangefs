@@ -17,6 +17,7 @@
 #include "pvfs2-request.h"
 #include "pint-distribution.h"
 #include "pint-request.h"
+#include "pvfs2-internal.h"
 
 static int io_send_ack(
     PINT_server_op *s_op, job_status_s* js_p);

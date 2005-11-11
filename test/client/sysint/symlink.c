@@ -13,6 +13,7 @@
 #include "pvfs2-util.h"
 #include "str-utils.h"
 #include "pint-sysint-utils.h"
+#include "pvfs2-internal.h"
 
 int main(int argc, char **argv)
 {

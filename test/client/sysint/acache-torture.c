@@ -11,6 +11,7 @@
 #include "pvfs2-debug.h"
 #include "acache.h"
 #include "gossip.h"
+#include "pvfs2-internal.h"
 
 #define ENTRIES_TO_ADD           512
 #define DEFAULT_TIMEOUT_SECONDS    2

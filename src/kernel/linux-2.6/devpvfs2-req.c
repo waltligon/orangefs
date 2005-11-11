@@ -11,6 +11,7 @@
 #include "pint-dev-shared.h"
 #include "pvfs2-dev-proto.h"
 #include "pvfs2-bufmap.h"
+#include "pvfs2-internal.h"
 
 /* this file implements the /dev/pvfs2-req device node */
 extern kmem_cache_t *dev_req_cache;

@@ -11,6 +11,7 @@
 #include "pvfs2.h"
 #include "ncache.h"
 #include "gossip.h"
+#include "pvfs2-internal.h"
 
 #define ENTRIES_TO_ADD 255
 
