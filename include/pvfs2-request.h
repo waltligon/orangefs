@@ -56,6 +56,7 @@ extern PVFS_Request PVFS_INT;
 extern PVFS_Request PVFS_LONG;
 extern PVFS_Request PVFS_UNSIGNED_CHAR;
 extern PVFS_Request PVFS_UNSIGNED_SHORT;
+extern PVFS_Request PVFS_UNSIGNED;
 extern PVFS_Request PVFS_UNSIGNED_INT;
 extern PVFS_Request PVFS_UNSIGNED_LONG;
 extern PVFS_Request PVFS_FLOAT;

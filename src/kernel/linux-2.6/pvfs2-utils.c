@@ -9,6 +9,7 @@
 #include "pint-dev-shared.h"
 #include "pvfs2-dev-proto.h"
 #include "pvfs2-bufmap.h"
+#include "pvfs2-internal.h"
 
 extern kmem_cache_t *pvfs2_inode_cache;
 extern struct list_head pvfs2_request_list;
@@ -319,8 +320,8 @@ int pvfs2_inode_getattr(struct inode *inode)
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
 
-    pvfs2_print("pvfs2_inode_getattr: called on inode %Lu\n",
-                Lu(pvfs2_ino_to_handle(inode->i_ino)));
+    pvfs2_print("pvfs2_inode_getattr: called on inode %llu\n",
+                llu(pvfs2_ino_to_handle(inode->i_ino)));
 
     if (inode)
     {
@@ -387,9 +388,9 @@ int pvfs2_inode_getattr(struct inode *inode)
         translate_error_if_wait_failed(ret, 0, 0);
 
       copy_attr_failure:
-        pvfs2_print("Getattr on handle %Lu, fsid %d\n  (inode ct = %d) "
+        pvfs2_print("Getattr on handle %llu, fsid %d\n  (inode ct = %d) "
                     "returned %d (error_exit = %d)\n",
-                    Lu(pvfs2_inode->refn.handle), pvfs2_inode->refn.fs_id,
+                    llu(pvfs2_inode->refn.handle), pvfs2_inode->refn.fs_id,
                     (int)atomic_read(&inode->i_count), ret, error_exit);
         /* store error code in the inode so that we can retrieve it later if
          * needed
@@ -871,8 +872,8 @@ static inline struct inode *pvfs2_create_file(
 
     ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
 
-    pvfs2_print("Create Got PVFS2 handle %Lu on fsid %d (ret=%d)\n",
-                Lu(new_op->downcall.resp.create.refn.handle),
+    pvfs2_print("Create Got PVFS2 handle %llu on fsid %d (ret=%d)\n",
+                llu(new_op->downcall.resp.create.refn.handle),
                 new_op->downcall.resp.create.refn.fs_id, ret);
 
     if (ret > -1)
@@ -960,8 +961,8 @@ static inline struct inode *pvfs2_create_dir(
         new_op, "pvfs2_create_dir", retries, error_exit,
         get_interruptible_flag(dir));
 
-    pvfs2_print("Mkdir Got PVFS2 handle %Lu on fsid %d\n",
-                Lu(new_op->downcall.resp.mkdir.refn.handle),
+    pvfs2_print("Mkdir Got PVFS2 handle %llu on fsid %d\n",
+                llu(new_op->downcall.resp.mkdir.refn.handle),
                 new_op->downcall.resp.mkdir.refn.fs_id);
 
     if (new_op->downcall.status > -1)
@@ -1053,8 +1054,8 @@ static inline struct inode *pvfs2_create_symlink(
 
     ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
 
-    pvfs2_print("Symlink Got PVFS2 handle %Lu on fsid %d (ret=%d)\n",
-                Lu(new_op->downcall.resp.sym.refn.handle),
+    pvfs2_print("Symlink Got PVFS2 handle %llu on fsid %d (ret=%d)\n",
+                llu(new_op->downcall.resp.sym.refn.handle),
                 new_op->downcall.resp.sym.refn.fs_id, ret);
 
     if (ret > -1)
@@ -1156,8 +1157,8 @@ int pvfs2_remove_entry(
     if (inode && parent && dentry)
     {
         pvfs2_print("pvfs2_remove_entry: called on %s\n  (inode %d): "
-                    "Parent is %Lu | fs_id %d\n", dentry->d_name.name,
-                    (int)inode->i_ino, Lu(parent->refn.handle),
+                    "Parent is %llu | fs_id %d\n", dentry->d_name.name,
+                    (int)inode->i_ino, llu(parent->refn.handle),
                     parent->refn.fs_id);
 
         new_op = op_alloc();
@@ -1217,8 +1218,8 @@ int pvfs2_truncate_inode(
     pvfs2_kernel_op_t *new_op = NULL;
 
     pvfs2_print("pvfs2: pvfs2_truncate_inode %d: "
-                "Handle is %Lu | fs_id %d | size is %lu\n",
-                (int)inode->i_ino, Lu(pvfs2_inode->refn.handle),
+                "Handle is %llu | fs_id %d | size is %lu\n",
+                (int)inode->i_ino, llu(pvfs2_inode->refn.handle),
                 pvfs2_inode->refn.fs_id, (unsigned long)size);
 
     new_op = op_alloc();
@@ -1256,7 +1257,7 @@ int pvfs2_flush_mmap_racache(struct inode *inode)
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
     pvfs2_kernel_op_t *new_op = NULL;
 
-    pvfs2_print("pvfs2_flush_mmap_racache %d: Handle is %Lu "
+    pvfs2_print("pvfs2_flush_mmap_racache %d: Handle is %llu "
                 "| fs_id %d\n",(int)inode->i_ino,
                 pvfs2_inode->refn.handle, pvfs2_inode->refn.fs_id);
 
@@ -1340,8 +1341,8 @@ int pvfs2_cancel_op_in_progress(unsigned long tag)
     new_op->upcall.type = PVFS2_VFS_OP_CANCEL;
     new_op->upcall.req.cancel.op_tag = tag;
 
-    pvfs2_print("Attempting PVFS2 operation cancellation of tag %Lu\n",
-                Lu(new_op->upcall.req.cancel.op_tag));
+    pvfs2_print("Attempting PVFS2 operation cancellation of tag %llu\n",
+                llu(new_op->upcall.req.cancel.op_tag));
 
     service_cancellation_operation(new_op);
     ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);

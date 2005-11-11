@@ -104,10 +104,10 @@ typedef struct server_configuration_s
     char *host_id;
     char *storage_path;
     char *fs_config_filename;       /* the fs.conf file name            */
-    ssize_t fs_config_buflen;       /* the fs.conf file length          */
+    size_t fs_config_buflen;        /* the fs.conf file length          */
     char *fs_config_buf;            /* the fs.conf file contents        */
     char *server_config_filename;   /* the server.conf file name        */
-    ssize_t server_config_buflen;   /* the server.conf file length      */
+    size_t server_config_buflen;    /* the server.conf file length      */
     char *server_config_buf;        /* the server.conf file contents    */
     int  initial_unexpected_requests;
     int  server_job_bmi_timeout;    /* job timeout values in seconds    */

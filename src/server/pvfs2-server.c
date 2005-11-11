@@ -42,6 +42,7 @@
 #include "id-generator.h"
 #include "job-time-mgr.h"
 #include "pint-cached-config.h"
+#include "pvfs2-internal.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -435,8 +436,8 @@ int main(int argc, char **argv)
     debug_mask = PVFS_debug_eventlog_to_mask(server_config.event_logging);
     gossip_set_debug_mask(1, debug_mask);
     gossip_set_logstamp(server_config.logstamp_type);
-    gossip_debug(GOSSIP_SERVER_DEBUG,"Logging %s (mask %Lu)\n",
-                 server_config.event_logging, Lu(debug_mask));
+    gossip_debug(GOSSIP_SERVER_DEBUG,"Logging %s (mask %llu)\n",
+                 server_config.event_logging, llu(debug_mask));
 
     /* remove storage space and exit if requested */
     if (s_server_options.server_remove_storage_space)
@@ -864,6 +865,7 @@ static int server_initialize_subsystems(
     struct filesystem_configuration_s *cur_fs;
     TROVE_context_id trove_context = -1;
     char buf[16] = {0};
+    PVFS_fs_id orig_fsid;
 
     /* Initialize distributions */
     ret = PINT_dist_initialize(0);
@@ -959,6 +961,7 @@ static int server_initialize_subsystems(
             return(ret);
         }
 
+        orig_fsid = cur_fs->coll_id;
         ret = trove_collection_lookup(
             cur_fs->file_system_name, &(cur_fs->coll_id), NULL, NULL);
 
@@ -967,6 +970,17 @@ static int server_initialize_subsystems(
             gossip_lerr("Error initializing filesystem %s\n",
                         cur_fs->file_system_name);
             return ret;
+        }
+
+        if(orig_fsid != cur_fs->coll_id)
+        {
+            gossip_err("Error: configuration file does not match storage collection.\n");
+            gossip_err("   config file fs_id: %d\n", (int)orig_fsid);
+            gossip_err("   storage fs_id: %d\n", (int)cur_fs->coll_id);
+            gossip_err("Warning: This most likely means that the configuration\n");
+            gossip_err("   files have been regenerated without destroying and\n");
+            gossip_err("   recreating the corresponding storage collection.\n");
+            return(-PVFS_ENODEV);
         }
 
         /*

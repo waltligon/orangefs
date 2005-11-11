@@ -14,6 +14,7 @@
 #include "PINT-reqproto-encode.h"
 #include "pint-cached-config.h"
 #include "pvfs2-util.h"
+#include "pvfs2-internal.h"
 
 #define MAX_NUM_FS                   67
 
@@ -165,9 +166,9 @@ int main(int argc, char **argv)
                        (long)m_addr, meta_handle_extent_array.extent_count);
                 for(n = 0; n < meta_handle_extent_array.extent_count; n++)
                 {
-                    printf("Meta server %d handle range: %Lu-%Lu\n", j,
-                           Lu(meta_handle_extent_array.extent_array[n].first),
-                           Lu(meta_handle_extent_array.extent_array[n].last));
+                    printf("Meta server %d handle range: %llu-%llu\n", j,
+                           llu(meta_handle_extent_array.extent_array[n].first),
+                           llu(meta_handle_extent_array.extent_array[n].last));
                 }
             }
         }
@@ -190,9 +191,9 @@ int main(int argc, char **argv)
                        data_handle_extent_array[j].extent_count);
                 for(n = 0; n < data_handle_extent_array[j].extent_count; n++)
                 {
-                    printf("Data server %d handle range: %Lu-%Lu\n", n,
-                           Lu(data_handle_extent_array[j].extent_array[n].first),
-                           Lu(data_handle_extent_array[j].extent_array[n].last));
+                    printf("Data server %d handle range: %llu-%llu\n", n,
+                           llu(data_handle_extent_array[j].extent_array[n].first),
+                           llu(data_handle_extent_array[j].extent_array[n].last));
                     /* get some contrived test handles */
                     if (test_handle_index < NUM_TEST_HANDLES)
                     {
@@ -222,13 +223,13 @@ int main(int argc, char **argv)
             if (m != num_file_systems)
             {
                 printf("Retrieved name of server managing handle "
-                       "%Ld is %s\n",Ld(test_handles[j]),server_name);
+                       "%lld is %s\n",lld(test_handles[j]),server_name);
                 test_handles_verified[j]++;
             }
             else
             {
                 printf("Error retrieving name of server managing handle "
-                       "%Ld!\n",Ld(test_handles[j]));
+                       "%lld!\n",lld(test_handles[j]));
             }
         }
 
@@ -269,7 +270,7 @@ int main(int argc, char **argv)
                 else
                 {
                     printf("Retrieved address of server managing handle "
-                           "%Ld is %lu\n",Ld(test_handles[j]),(long)addr);
+                           "%lld is %lu\n",lld(test_handles[j]),(long)addr);
                     test_handles_verified[j]++;
                 }
             }
@@ -291,8 +292,8 @@ int main(int argc, char **argv)
         else
         {
             printf("** Failed to verify ability to map servers to handles.\n");
-            printf("** Handle value %Ld failed -- cannot be mapped.\n",
-                   Ld(j ? test_handles[j-1] : test_handles[j]));
+            printf("** Handle value %lld failed -- cannot be mapped.\n",
+                   lld(j ? test_handles[j-1] : test_handles[j]));
             return -1;
         }
     }

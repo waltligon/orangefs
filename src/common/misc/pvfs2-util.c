@@ -30,14 +30,49 @@
 #include "gen-locks.h"
 #include "realpath.h"
 #include "pint-sysint-utils.h"
-
-/* TODO: add replacement functions for systems without getmntent() */
-#ifndef HAVE_GETMNTENT
-#error HAVE_GETMNTENT undefined! needed for parse_pvfstab
-#endif
+#include "pvfs2-internal.h"
 
 #ifdef HAVE_MNTENT_H
+
 #include <mntent.h>
+#define PINT_fstab_t FILE
+#define PINT_fstab_entry_t struct mntent
+#define PINT_fstab_open(_fstab, _fname) (_fstab) = setmntent(_fname, "r")
+#define PINT_fstab_close(_tab) endmntent(_tab)
+#define PINT_fstab_next_entry(_tab) getmntent(_tab)
+#define PINT_fstab_entry_destroy(_entry) _entry = NULL
+#define PINT_fstab_entry_hasopt(_entry, _opt) hasmntopt(_entry, _opt)
+
+#define PINT_FSTAB_NAME(_entry) (_entry)->mnt_fsname
+#define PINT_FSTAB_PATH(_entry) (_entry)->mnt_dir
+#define PINT_FSTAB_TYPE(_entry) (_entry)->mnt_type
+#define PINT_FSTAB_OPTS(_entry) (_entry)->mnt_opts
+
+#elif HAVE_FSTAB_H
+
+#include <fstab.h>
+#define PINT_fstab_t FILE
+#define PINT_fstab_entry_t struct fstab
+#define PINT_fstab_open(_fstab, _fname) _fstab = fopen(_fname, "r")
+#define PINT_fstab_close(_tab) fclose(_tab)
+#define PINT_fstab_next_entry(_tab) PINT_util_my_get_next_fsent(_tab)
+#define PINT_fstab_entry_destroy(_entry) PINT_util_fsent_destroy(_entry)
+#define PINT_fstab_entry_hasopt(_entry, _opt) strstr((_entry)->fs_mntops, _opt)
+
+#define PINT_FSTAB_NAME(_entry) (_entry)->fs_spec
+#define PINT_FSTAB_PATH(_entry) (_entry)->fs_file
+#define PINT_FSTAB_TYPE(_entry) (_entry)->fs_vfstype
+#define PINT_FSTAB_OPTS(_entry) (_entry)->fs_mntops
+
+#define DEFINE_MY_GET_NEXT_FSENT
+static struct fstab * PINT_util_my_get_next_fsent(PINT_fstab_t * tab);
+static void PINT_util_fsent_destroy(PINT_fstab_entry_t * entry);
+
+#else
+
+#error OS does not have mntent.h or fstab.h.  
+#error Add your own fstab parser macros to fix.
+
 #endif
 
 /* Define min macro with pvfs2 prefix */
@@ -182,13 +217,13 @@ void PVFS_util_release_sys_attr(PVFS_sys_attr *attr)
 const PVFS_util_tab *PVFS_util_parse_pvfstab(
     const char *tabfile)
 {
-    FILE *mnt_fp = NULL;
+    PINT_fstab_t *mnt_fp = NULL;
     int file_count = 5;
     /* NOTE: mtab should be last for clean error logic below */
     const char *file_list[5] =
         { NULL, "/etc/fstab", "/etc/pvfs2tab", "pvfs2tab", "/etc/mtab" };
     const char *targetfile = NULL;
-    struct mntent *tmp_ent;
+    PINT_fstab_entry_t *tmp_ent;
     int i, j;
     int ret = -1;
     int tmp_mntent_count = 0;
@@ -236,18 +271,28 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
      */
     for (i = 0; (i < file_count && !targetfile); i++)
     {
-        mnt_fp = setmntent(file_list[i], "r");
+        PINT_fstab_open(mnt_fp, file_list[i]);
         if (mnt_fp)
         {
-            while ((tmp_ent = getmntent(mnt_fp)))
+            while ((tmp_ent = PINT_fstab_next_entry(mnt_fp)))
             {
-                if (strcmp(tmp_ent->mnt_type, "pvfs2") == 0)
+                if(!(PINT_FSTAB_NAME(tmp_ent)) || 
+                   !(strncmp(PINT_FSTAB_NAME(tmp_ent), "#", 1)))
+                {
+                    /* this entry is a comment */
+                    PINT_fstab_entry_destroy(tmp_ent);
+                    continue;
+                }
+
+                if (strcmp(PINT_FSTAB_TYPE(tmp_ent), "pvfs2") == 0)
                 {
                     targetfile = file_list[i];
                     tmp_mntent_count++;
                 }
+
+                PINT_fstab_entry_destroy(tmp_ent);
             }
-            endmntent(mnt_fp);
+            PINT_fstab_close(mnt_fp);
         }
     }
 
@@ -283,14 +328,13 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
     current_tab->mntent_count = tmp_mntent_count;
 
     /* reopen our chosen fstab file */
-    mnt_fp = setmntent(targetfile, "r");
-    assert(mnt_fp);
+    PINT_fstab_open(mnt_fp, targetfile);
 
     /* scan through looking for every pvfs2 entry */
     i = 0;
-    while ((tmp_ent = getmntent(mnt_fp)))
+    while ((tmp_ent = PINT_fstab_next_entry(mnt_fp)))
     {
-        if (strcmp(tmp_ent->mnt_type, "pvfs2") == 0)
+        if (strcmp(PINT_FSTAB_TYPE(tmp_ent), "pvfs2") == 0)
         {
             struct PVFS_sys_mntent *me = &current_tab->mntent_array[i];
             char *cp;
@@ -298,7 +342,7 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
 
             /* comma-separated list of ways to contact a config server */
             me->num_pvfs_config_servers = 1;
-            for (cp=tmp_ent->mnt_fsname; *cp; cp++)
+            for (cp=PINT_FSTAB_NAME(tmp_ent); *cp; cp++)
                 if (*cp == ',')
                     ++me->num_pvfs_config_servers;
 
@@ -309,8 +353,8 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
                 goto error_exit;
             memset(me->pvfs_config_servers, 0,
               me->num_pvfs_config_servers * sizeof(*me->pvfs_config_servers));
-            me->mnt_dir = malloc(strlen(tmp_ent->mnt_dir) + 1);
-            me->mnt_opts = malloc(strlen(tmp_ent->mnt_opts) + 1);
+            me->mnt_dir = malloc(strlen(PINT_FSTAB_PATH(tmp_ent)) + 1);
+            me->mnt_opts = malloc(strlen(PINT_FSTAB_OPTS(tmp_ent)) + 1);
 
             /* bail if any mallocs failed */
             if (!me->mnt_dir || !me->mnt_opts)
@@ -319,7 +363,7 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
             }
 
             /* parse server list and make sure fsname is same */
-            cp = tmp_ent->mnt_fsname;
+            cp = PINT_FSTAB_NAME(tmp_ent);
             cur_server = 0;
             for (;;) {
                 char *tok;
@@ -357,7 +401,7 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
                     else
                     {
                         gossip_err("Error: invalid tab file entry: %s\n",
-                                    tmp_ent->mnt_fsname);
+                                    PINT_FSTAB_NAME(tmp_ent));
                         gossip_err("Error: offending tab file: %s\n",
                                     targetfile);
                         goto error_exit;
@@ -385,7 +429,7 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
                     if (strcmp(last_slash, me->pvfs_fs_name) != 0) {
                         gossip_lerr(
                           "Error: different fs names in server addresses: %s\n",
-                          tmp_ent->mnt_fsname);
+                          PINT_FSTAB_NAME(tmp_ent));
                         goto error_exit;
                     }
                 }
@@ -395,15 +439,15 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
             /* make our own copy of parameters of interest */
             /* mnt_dir and mnt_opts are verbatim copies */
             strcpy(current_tab->mntent_array[i].mnt_dir,
-                   tmp_ent->mnt_dir);
+                   PINT_FSTAB_PATH(tmp_ent));
             strcpy(current_tab->mntent_array[i].mnt_opts,
-                   tmp_ent->mnt_opts);
+                   PINT_FSTAB_OPTS(tmp_ent));
 
             /* find out if a particular flow protocol was specified */
-            if ((hasmntopt(tmp_ent, "flowproto")))
+            if ((PINT_fstab_entry_hasopt(tmp_ent, "flowproto")))
             {
                 ret = parse_flowproto_string(
-                    tmp_ent->mnt_opts,
+                    PINT_FSTAB_OPTS(tmp_ent),
                     &(current_tab->
                       mntent_array[i].flowproto));
                 if (ret < 0)
@@ -420,7 +464,7 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
             /* pick an encoding to use with the server */
             current_tab->mntent_array[i].encoding =
                 ENCODING_DEFAULT;
-            cp = hasmntopt(tmp_ent, "encoding");
+            cp = PINT_fstab_entry_hasopt(tmp_ent, "encoding");
             if (cp)
             {
                 ret = parse_encoding_string(
@@ -433,7 +477,7 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
 
             /* find out if a particular flow protocol was specified */
             current_tab->mntent_array[i].default_num_dfiles = 0;
-            cp = hasmntopt(tmp_ent, "num_dfiles");
+            cp = PINT_fstab_entry_hasopt(tmp_ent, "num_dfiles");
             if (cp)
             {
                 ret = parse_num_dfiles_string(
@@ -448,6 +492,8 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
 
             /* Loop counter increment */
             i++;
+
+            PINT_fstab_entry_destroy(tmp_ent);
         }
     }
     s_stat_tab_count++;
@@ -489,7 +535,7 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
             me->pvfs_fs_name = NULL;
         }
     }
-    endmntent(mnt_fp);
+    PINT_fstab_close(mnt_fp);
     gen_mutex_unlock(&s_stat_tab_mutex);
     return (NULL);
 }
@@ -1083,7 +1129,7 @@ void PVFS_util_make_size_human_readable(
         }
         if (i == NUM_SIZES)
         {
-            snprintf(out_str, 16, "%Ld", Ld(size));
+            snprintf(out_str, 16, "%lld", lld(size));
         }
         else
         {
@@ -1551,7 +1597,8 @@ static int PINT_util_resolve_absolute(
         for(j=0; j<s_stat_tab_array[i].mntent_count; j++)
         {
             ret = PINT_remove_dir_prefix(
-                local_path, s_stat_tab_array[i].mntent_array[j].mnt_dir,
+                local_path, 
+                s_stat_tab_array[i].mntent_array[j].mnt_dir,
                 out_fs_path, out_fs_path_max);
             if(ret == 0)
             {
@@ -1599,6 +1646,106 @@ static int PINT_util_resolve_absolute(
     gen_mutex_unlock(&s_stat_tab_mutex);
     return(-PVFS_ENOENT);
 }
+
+#ifdef DEFINE_MY_GET_NEXT_FSENT
+
+static struct fstab * PINT_util_my_get_next_fsent(PINT_fstab_t * tab)
+{
+    char linestr[500];
+    int linelen = 0;
+    char * strtok_ctx;
+    char * nexttok; 
+    PINT_fstab_entry_t * fsentry;
+    if(!fgets(linestr, 500, tab))
+    {
+        return NULL;
+    }
+
+    fsentry = malloc(sizeof(PINT_fstab_entry_t));
+    if(!fsentry)
+    {
+        return NULL;
+    }
+    memset(fsentry, 0, sizeof(PINT_fstab_entry_t));
+
+    linelen = strlen(linestr);
+    if(linestr[linelen - 1] == '\n')
+    {
+        linestr[linelen - 1] = 0;
+    }
+
+    /* get the path string */
+    nexttok = strtok_r(linestr, " ", &strtok_ctx);
+    if(!nexttok)
+    {
+        goto exit;
+    }
+    fsentry->fs_spec = strdup(nexttok);
+
+    
+    /* get the mount point */
+
+    nexttok = strtok_r(NULL, " ", &strtok_ctx);
+    if(!nexttok)
+    {
+        goto exit;
+    }
+    fsentry->fs_file = strdup(nexttok);
+
+    /* get the fs type */
+    nexttok = strtok_r(NULL, " ", &strtok_ctx);
+    if(!nexttok)
+    {
+        goto exit;
+    }
+    fsentry->fs_vfstype = strdup(nexttok);
+
+    /* get the mount opts */
+    nexttok = strtok_r(NULL, " ", &strtok_ctx);
+    if(!nexttok)
+    {
+        goto exit;
+    }
+    fsentry->fs_mntops = strdup(nexttok);
+
+ exit:
+    return fsentry;
+}
+
+static void PINT_util_fsent_destroy(PINT_fstab_entry_t * entry)
+{
+    if(entry)
+    {
+        if(entry->fs_spec)
+        {
+            free(entry->fs_spec);
+        }
+
+        if(entry->fs_file)
+        {
+            free(entry->fs_file);
+        }
+        
+        if(entry->fs_vfstype)
+        {
+            free(entry->fs_vfstype);
+        }
+
+        if(entry->fs_mntops)
+        {
+            free(entry->fs_mntops);
+        }
+
+        if(entry->fs_type)
+        {
+            free(entry->fs_type);
+        }
+    
+        free(entry);
+    }
+}
+#endif /* DEFINE_MY_GET_NEXT_FSENT */
+
 /*
  * Local variables:
  *  c-indent-level: 4

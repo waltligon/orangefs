@@ -10,7 +10,10 @@
 #include <string.h>
 #include <db.h>
 #include <time.h>
+#include <stdlib.h>
+#ifdef HAVE_MALLOC_H
 #include <malloc.h>
+#endif
 #include <assert.h>
 
 #include "gossip.h"
@@ -29,6 +32,7 @@
 #ifdef __PVFS2_TROVE_THREADED__
 #include <pthread.h>
 #include "dbpf-thread.h"
+#include "pvfs2-internal.h"
 
 extern gen_mutex_t dbpf_attr_cache_mutex;
 extern pthread_cond_t dbpf_op_completed_cond;
@@ -190,7 +194,7 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
             new_handle = cur_extent.first;
             trove_handle_set_used(op_p->coll_p->coll_id, new_handle);
             gossip_debug(GOSSIP_TROVE_DEBUG, "new_handle was FORCED "
-                         "to be %Lu\n", Lu(new_handle));
+                         "to be %llu\n", llu(new_handle));
         }
         else if (cur_extent.first == TROVE_HANDLE_NULL)
         {
@@ -211,11 +215,11 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
             op_p->coll_p->coll_id, &op_p->u.d_create.extent_array);
     }
 
-    gossip_debug(GOSSIP_TROVE_DEBUG, "[%d extents] -- new_handle is %Lu "
-                 "(cur_extent is %Lu - %Lu)\n",
+    gossip_debug(GOSSIP_TROVE_DEBUG, "[%d extents] -- new_handle is %llu "
+                 "(cur_extent is %llu - %llu)\n",
                  op_p->u.d_create.extent_array.extent_count,
-                 Lu(new_handle), Lu(cur_extent.first),
-                 Lu(cur_extent.last));
+                 llu(new_handle), llu(cur_extent.first),
+                 llu(cur_extent.last));
     /*
       if we got a zero handle, we're either completely out of handles
       -- or else something terrible has happened
@@ -360,7 +364,7 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
             goto return_error;
         case 0:
             gossip_debug(GOSSIP_TROVE_DEBUG, "removed dataspace with "
-                         "handle %Lu\n", Lu(op_p->handle));
+                         "handle %llu\n", llu(op_p->handle));
             break;
     }
 
@@ -507,8 +511,8 @@ static int dbpf_dspace_iterate_handles_op_svc(struct dbpf_op *op_p)
         else if (ret != 0)
         {
             ret = -dbpf_db_error_to_trove_error(ret);
-            gossip_err("failed to set cursor position at %Lu\n",
-                       Lu(dummy_handle));
+            gossip_err("failed to set cursor position at %llu\n",
+                       llu(dummy_handle));
             goto return_error;
         }
     }
@@ -718,17 +722,17 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
 #if 0
         gossip_debug(
             GOSSIP_TROVE_DEBUG, "ATTRIB: retrieved "
-            "attributes from CACHE for key %Lu\n  uid = %d, mode = %d, "
+            "attributes from CACHE for key %llu\n  uid = %d, mode = %d, "
             "type = %d, dfile_count = %d, dist_size = %d\n",
-            Lu(handle), (int)ds_attr_p->uid, (int)ds_attr_p->mode,
+            llu(handle), (int)ds_attr_p->uid, (int)ds_attr_p->mode,
             (int)ds_attr_p->type, (int)ds_attr_p->dfile_count,
             (int)ds_attr_p->dist_size);
 #endif
         gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "dspace_getattr fast "
-                     "path attr cache hit on %Lu\n (dfile_count=%d | "
-                     "dist_size=%d | data_size=%Ld)\n", Lu(handle),
+                     "path attr cache hit on %llu\n (dfile_count=%d | "
+                     "dist_size=%d | data_size=%lld)\n", llu(handle),
                      ds_attr_p->dfile_count, ds_attr_p->dist_size,
-                     Ld(ds_attr_p->b_size));
+                     lld(ds_attr_p->b_size));
 
         UPDATE_PERF_METADATA_READ();
         gen_mutex_unlock(&dbpf_attr_cache_mutex);
@@ -833,9 +837,9 @@ static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p)
 
 #if 0
     gossip_debug(GOSSIP_TROVE_DEBUG, "ATTRIB: dspace_setattr storing "
-                 "attributes (2) on key %Lu\n uid = %d, mode = %d, "
+                 "attributes (2) on key %llu\n uid = %d, mode = %d, "
                  "type = %d, dfile_count = %d, dist_size = %d\n",
-                 Lu(op_p->handle), (int) s_attr.uid, (int) s_attr.mode,
+                 llu(op_p->handle), (int) s_attr.uid, (int) s_attr.mode,
                  (int) s_attr.type, (int) s_attr.dfile_count,
                  (int) s_attr.dist_size);
 #endif
@@ -934,8 +938,8 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
         }
         else
         {
-            gossip_err("Error: unable to stat handle %Lu (%Lx).\n",
-                       Lu(op_p->handle), Lu(op_p->handle));
+            gossip_err("Error: unable to stat handle %llu (%llx).\n",
+                       llu(op_p->handle), llu(op_p->handle));
             ret = -TROVE_EIO;
             goto return_error;
         }
@@ -968,11 +972,11 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
 
     gossip_debug(
         GOSSIP_TROVE_DEBUG, "ATTRIB: retrieved attributes "
-        "from DISK for key %Lu\n\tuid = %d, mode = %d, type = %d, "
-        "dfile_count = %d, dist_size = %d\n\tb_size = %Ld, k_size = %Ld\n",
-        Lu(op_p->handle), (int)s_attr.uid, (int)s_attr.mode,
+        "from DISK for key %llu\n\tuid = %d, mode = %d, type = %d, "
+        "dfile_count = %d, dist_size = %d\n\tb_size = %lld, k_size = %lld\n",
+        llu(op_p->handle), (int)s_attr.uid, (int)s_attr.mode,
         (int)s_attr.type, (int)s_attr.dfile_count, (int)s_attr.dist_size,
-        Lu(b_size), Lu(k_size));
+        llu(b_size), llu(k_size));
 
     attr = op_p->u.d_getattr.attr_p;
     trove_ds_stored_to_attr(s_attr, *attr, b_size, k_size);
@@ -1013,7 +1017,7 @@ static int dbpf_dspace_cancel(
 #endif
 
     gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_dspace_cancel called for "
-                 "id %Lu.\n", Lu(id));
+                 "id %llu.\n", llu(id));
 
 #ifdef __PVFS2_TROVE_THREADED__
 

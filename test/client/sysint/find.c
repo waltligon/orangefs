@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include "pvfs2-util.h"
+#include "pvfs2-internal.h"
 
 /* TODO: this can be larger after system interface readdir logic
  * is in place to break up large readdirs into multiple operations
@@ -48,8 +49,8 @@ int is_directory(PVFS_handle handle, PVFS_fs_id fs_id)
     if (PVFS_sys_getattr(pinode_refn, attrmask,
                          &credentials, &getattr_response))
     {
-        fprintf(stderr,"Failed to get attributes on handle 0x%08Lx "
-                "(fs_id is %d)\n",Lu(handle),fs_id);
+        fprintf(stderr,"Failed to get attributes on handle 0x%08llx "
+                "(fs_id is %d)\n",llu(handle),fs_id);
         return -1;
     }
     return ((getattr_response.attr.objtype == PVFS_TYPE_DIRECTORY) ? 1 : 0);
@@ -132,8 +133,8 @@ int directory_walk(PVFS_fs_id cur_fs,
             cur_file = rd_response.dirent_array[i].d_name;
             cur_handle = rd_response.dirent_array[i].handle;
 
-            gossip_debug(GOSSIP_CLIENT_DEBUG,"Got handle %Lu\n",
-                         Lu(cur_handle));
+            gossip_debug(GOSSIP_CLIENT_DEBUG,"Got handle %llu\n",
+                         llu(cur_handle));
 
             is_dir = is_directory(cur_handle,
                                   cur_fs);

@@ -7,6 +7,7 @@
 #include "flags.h"
 #include "cache.h"
 #include "ncac-lru.h"
+#include "pvfs2-internal.h"
 
 
 /* add an extent into a lru cache list. The caller should hold the lock 
@@ -62,8 +63,8 @@ int LRU_shrink_cache(struct cache_stack *cache, unsigned int expected,
         if (PageReadPending(victim) || PageWritePending(victim)){
             ret = NCAC_check_ioreq(victim);
             if (ret < 0){
-                NCAC_error("NCAC_check_ioreq error: index=%ld, ioreq=%Ld\n",
-                        victim->index, Ld(victim->ioreq));
+                NCAC_error("NCAC_check_ioreq error: index=%ld, ioreq=%lld\n",
+                        victim->index, lld(victim->ioreq));
                 break;
             }
 

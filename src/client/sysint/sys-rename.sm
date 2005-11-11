@@ -26,6 +26,7 @@
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
 #include "pint-util.h"
+#include "pvfs2-internal.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -338,10 +339,10 @@ PVFS_error PVFS_isys_rename(
     sm_p->u.rename.stored_error_code = 0;
 
     gossip_debug(
-        GOSSIP_CLIENT_DEBUG, "Renaming file named %s (under [%Lu,%d]\n\t"
-        "to %s (under [%Lu,%d])\n", old_entry,
-        Lu(old_parent_ref.handle), old_parent_ref.fs_id, new_entry,
-        Lu(new_parent_ref.handle), new_parent_ref.fs_id);
+        GOSSIP_CLIENT_DEBUG, "Renaming file named %s (under [%llu,%d]\n\t"
+        "to %s (under [%llu,%d])\n", old_entry,
+        llu(old_parent_ref.handle), old_parent_ref.fs_id, new_entry,
+        llu(new_parent_ref.handle), new_parent_ref.fs_id);
 
     return PINT_client_state_machine_post(
         sm_p, PVFS_SYS_RENAME, op_id, user_ptr);
@@ -444,8 +445,8 @@ static int rename_lookups_comp_fn(
     if (index == 0)
     {
         gossip_debug(
-            GOSSIP_CLIENT_DEBUG, "*** Looked up old handle %Lu\n",
-            Lu(sm_p->u.rename.refns[index].handle));
+            GOSSIP_CLIENT_DEBUG, "*** Looked up old handle %llu\n",
+            llu(sm_p->u.rename.refns[index].handle));
     }
     else
     {
@@ -537,8 +538,8 @@ static int rename_chdirent_comp_fn(
     sm_p->u.rename.old_dirent_handle =
         resp_p->u.chdirent.old_dirent_handle;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "got back old dirent handle %Lu\n",
-                 Lu(sm_p->u.rename.old_dirent_handle));
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "got back old dirent handle %llu\n",
+                 llu(sm_p->u.rename.old_dirent_handle));
 
     return 0;
 }
@@ -568,8 +569,8 @@ static int rename_lookups_setup_msgpair_array(PINT_client_sm *sm_p,
         PINT_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
 
         gossip_debug(GOSSIP_CLIENT_DEBUG,
-                     "rename: posting lookup[%d] (%Ld,%d)\n",
-                     i, Lu(sm_p->u.rename.parent_refns[i].handle),
+                     "rename: posting lookup[%d] (%lld,%d)\n",
+                     i, llu(sm_p->u.rename.parent_refns[i].handle),
                      sm_p->u.rename.parent_refns[i].fs_id);
 
         PINT_SERVREQ_LOOKUP_PATH_FILL(
@@ -768,8 +769,8 @@ static int rename_chdirent_setup_msgpair(PINT_client_sm *sm_p,
     if(attr->objtype == PVFS_TYPE_DIRECTORY)
     {
         gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "rename dest dirent_count: %Ld\n",
-                 Ld(attr->u.dir.dirent_count));
+                 "rename dest dirent_count: %lld\n",
+                 lld(attr->u.dir.dirent_count));
         gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "rename dest attr mask: %d\n", (int)attr->mask);
     }

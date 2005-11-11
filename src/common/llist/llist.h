@@ -8,9 +8,12 @@
 #ifndef LLIST_H
 #define LLIST_H
 
-#include <malloc.h>
 #include <stdio.h>
 #include <stdlib.h>
+#ifdef HAVE_MALLOC_H
+#include <malloc.h>
+#endif
+
 
 #define PINT_llist_add(__llist_p, __void_p) \
 	PINT_llist_add_to_head((__llist_p), (__void_p))

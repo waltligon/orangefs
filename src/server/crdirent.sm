@@ -12,6 +12,7 @@
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
 #include "pvfs2-util.h"
+#include "pvfs2-internal.h"
 
 enum
 {
@@ -188,10 +189,10 @@ static int crdirent_validate(PINT_server_op *s_op,
     }
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
-            "  got crdirent for %s (with handle %Lu) in %Lu\n",
+            "  got crdirent for %s (with handle %llu) in %llu\n",
             s_op->u.crdirent.name,
-            Lu(s_op->u.crdirent.new_handle),
-            Lu(s_op->u.crdirent.parent_handle));
+            llu(s_op->u.crdirent.new_handle),
+            llu(s_op->u.crdirent.parent_handle));
 
     /* check for invalid characters in name */
     ptr = s_op->u.crdirent.name;
@@ -333,9 +334,9 @@ static int crdirent_create_dirdata_dspace(PINT_server_op *s_op,
     assert(extent_array.extent_count > 0);
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "  new handle should be in range "
-                 "starting with %Lu-%Lu\n",
-                 Lu(extent_array.extent_array[0].first),
-                 Lu(extent_array.extent_array[0].last));
+                 "starting with %llu-%llu\n",
+                 llu(extent_array.extent_array[0].first),
+                 llu(extent_array.extent_array[0].last));
 
     ret = job_trove_dspace_create(
         s_op->u.crdirent.fs_id,
@@ -402,10 +403,10 @@ static int crdirent_write_dirdata_handle(PINT_server_op *s_op,
     s_op->val.buffer_sz = sizeof(PVFS_handle);
 
     gossip_debug(
-        GOSSIP_SERVER_DEBUG, "  writing dirdata handle (%Lu) "
-        "into parent directory keyval space (%Lu)\n",
-        Lu(s_op->u.crdirent.dirent_handle),
-        Lu(s_op->u.crdirent.parent_handle));
+        GOSSIP_SERVER_DEBUG, "  writing dirdata handle (%llu) "
+        "into parent directory keyval space (%llu)\n",
+        llu(s_op->u.crdirent.dirent_handle),
+        llu(s_op->u.crdirent.parent_handle));
 
     ret = job_trove_keyval_write(
         s_op->u.crdirent.fs_id,
@@ -466,9 +467,9 @@ static int crdirent_write_directory_entry(PINT_server_op *s_op,
     s_op->val.buffer_sz = sizeof(PVFS_handle);
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "  writing new directory entry "
-                 "for %s (handle = %Lu) to dirdata dspace %Lu\n",
-                 s_op->u.crdirent.name, Lu(s_op->u.crdirent.new_handle),
-                 Lu(s_op->u.crdirent.dirent_handle));
+                 "for %s (handle = %llu) to dirdata dspace %llu\n",
+                 s_op->u.crdirent.name, llu(s_op->u.crdirent.new_handle),
+                 llu(s_op->u.crdirent.dirent_handle));
 
     ret = job_trove_keyval_write(
         s_op->u.crdirent.fs_id, s_op->u.crdirent.dirent_handle,
@@ -540,9 +541,9 @@ static int crdirent_update_directory_attr(
         */
         gossip_debug(
             GOSSIP_SERVER_DEBUG, "updating parent dir version "
-            "to %Lu\n\tmtime is %Lu\n",
-            Lu(PVFS_util_mktime_version(s_op->req->u.crdirent.parent_mtime)),
-            Lu(s_op->req->u.crdirent.parent_mtime));
+            "to %llu\n\tmtime is %llu\n",
+            llu(PVFS_util_mktime_version(s_op->req->u.crdirent.parent_mtime)),
+            llu(s_op->req->u.crdirent.parent_mtime));
 
         tmp_attr_ptr->mtime = PVFS_util_mktime_version(
                     s_op->req->u.crdirent.parent_mtime);
@@ -605,9 +606,9 @@ static int crdirent_check_exist_directory_entry(PINT_server_op *s_op,
 
     gossip_debug(
         GOSSIP_SERVER_DEBUG, "  checking existence of new directory "
-        "entry for %s (handle = %Lu) to dirdata dspace %Lu\n",
-        s_op->u.crdirent.name, Lu(s_op->u.crdirent.new_handle),
-        Lu(s_op->u.crdirent.dirent_handle));
+        "entry for %s (handle = %llu) to dirdata dspace %llu\n",
+        s_op->u.crdirent.name, llu(s_op->u.crdirent.new_handle),
+        llu(s_op->u.crdirent.dirent_handle));
 
     ret = job_trove_keyval_read(
         s_op->u.crdirent.fs_id, s_op->u.crdirent.dirent_handle,
@@ -659,8 +660,8 @@ static int crdirent_setup_op(
     PINT_server_op *s_op, job_status_s *js_p)
 {
     PINT_STATE_DEBUG("setup_op");
-    PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "crdirent entry: %s points to %Lu\n",
-        s_op->req->u.crdirent.name, Lu(s_op->req->u.crdirent.new_handle));
+    PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "crdirent entry: %s points to %llu\n",
+        s_op->req->u.crdirent.name, llu(s_op->req->u.crdirent.new_handle));
 
     s_op->u.crdirent.name = s_op->req->u.crdirent.name;
     s_op->u.crdirent.new_handle = s_op->req->u.crdirent.new_handle;

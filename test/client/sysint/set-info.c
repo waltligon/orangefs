@@ -12,6 +12,7 @@
 
 #include "client.h"
 #include "pvfs2-util.h"
+#include "pvfs2-internal.h"
 
 int main(int argc, char **argv)
 {
@@ -77,7 +78,7 @@ int main(int argc, char **argv)
     r_ctime = (time_t)resp_getattr.attr.ctime;
 
     printf("Retrieved the following attributes\n");
-    printf("Handle      : %Lu\n", Lu(pinode_refn.handle));
+    printf("Handle      : %llu\n", llu(pinode_refn.handle));
     printf("FSID        : %d\n", (int)pinode_refn.fs_id);
     printf("mask        : %d\n", resp_getattr.attr.mask);
     printf("uid         : %d\n", resp_getattr.attr.owner);
@@ -117,7 +118,7 @@ int main(int argc, char **argv)
         r_ctime = (time_t)resp_getattr.attr.ctime;
 
         printf("Set the following attributes\n");
-        printf("Handle      : %Lu\n", Lu(pinode_refn.handle));
+        printf("Handle      : %llu\n", llu(pinode_refn.handle));
         printf("FSID        : %d\n", (int)pinode_refn.fs_id);
         printf("mask        : %d\n", resp_getattr.attr.mask);
         printf("uid         : %d\n", resp_getattr.attr.owner);

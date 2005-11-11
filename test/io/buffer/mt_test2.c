@@ -10,6 +10,7 @@
 #include "trove.h"
 
 #include "trove-init.c"
+#include "pvfs2-internal.h"
 
 extern void   cache_dump_active_list(void);
 extern void   cache_dump_inactive_list(void);
@@ -120,9 +121,9 @@ void do_io_write(int *result)
                 	fprintf(stderr, "cache_req_test ok: flag=%d, status: %d, cbufcnt=%d\n", flag, request[0].status, reply[0].count);
 
 					for ( ncnt=0; ncnt < reply[0].count; ncnt ++ ) {
-                        fprintf(stderr, "[%d] %p len:%Ld\n", ncnt,
+                        fprintf(stderr, "[%d] %p len:%lld\n", ncnt,
                                     reply[0].cbuf_offset_array[ncnt], 
-                                    Ld(reply[0].cbuf_size_array[ncnt]));
+                                    lld(reply[0].cbuf_size_array[ncnt]));
                     }
             	}
         	}

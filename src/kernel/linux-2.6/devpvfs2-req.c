@@ -11,6 +11,7 @@
 #include "pint-dev-shared.h"
 #include "pvfs2-dev-proto.h"
 #include "pvfs2-bufmap.h"
+#include "pvfs2-internal.h"
 
 /* this file implements the /dev/pvfs2-req device node */
 extern kmem_cache_t *dev_req_cache;
@@ -456,7 +457,7 @@ static ssize_t pvfs2_devreq_writev(
     else
     {
         /* ignore downcalls that we're not interested in */
-	pvfs2_print("WARNING: No one's waiting for tag %Lu\n", Lu(tag));
+	pvfs2_print("WARNING: No one's waiting for tag %llu\n", llu(tag));
     }
     kmem_cache_free(dev_req_cache, buffer);
 

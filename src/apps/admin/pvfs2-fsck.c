@@ -19,6 +19,7 @@
 #include "pvfs2.h"
 #include "pvfs2-mgmt.h"
 #include "pvfs2-fsck.h"
+#include "pvfs2-internal.h"
 
 #define HANDLE_BATCH 1000
 
@@ -444,8 +445,8 @@ int match_dirdata(struct handlelist *hl,
     int ret, idx;
     PVFS_handle dirdata_handle;
 
-    printf("# looking for dirdata match to %Lu.\n",
-	   Lu(dir_ref.handle));
+    printf("# looking for dirdata match to %llu.\n",
+	   llu(dir_ref.handle));
 
     ret = PVFS_mgmt_get_dirdata_handle(dir_ref,
 				       &dirdata_handle,
@@ -456,7 +457,7 @@ int match_dirdata(struct handlelist *hl,
 	return -1;
     }
 
-    printf("# mgmt_get_dirdata returned %Lu.\n", Lu(dirdata_handle));
+    printf("# mgmt_get_dirdata returned %llu.\n", llu(dirdata_handle));
 
     if (handlelist_find_handle(hl, dirdata_handle, &idx) == 0)
     {
@@ -555,9 +556,9 @@ int descend(PVFS_fs_id cur_fs,
 					 creds) < 0)
 		    {
 			/* not recoverable; remove */
-			printf("* File %s (%Lu) is not recoverable.\n",
+			printf("* File %s (%llu) is not recoverable.\n",
 			       cur_file,
-			       Lu(cur_handle));
+			       llu(cur_handle));
 
 			/* verify_datafiles() removed the datafiles */
 			ret = remove_object(entry_ref,
@@ -580,9 +581,9 @@ int descend(PVFS_fs_id cur_fs,
 					creds);
 		    if (ret != 0)
 		    {
-			printf("* Directory %s (%Lu) is missing DirData.\n",
+			printf("* Directory %s (%llu) is missing DirData.\n",
 			       cur_file,
-			       Lu(cur_handle));
+			       llu(cur_handle));
 
 			ret = remove_object(entry_ref,
 					    getattr_resp.attr.objtype,
@@ -683,8 +684,8 @@ int verify_datafiles(PVFS_fs_id cur_fs,
 
 	if ((!in_main_list) && (!in_alt_list))
 	{
-	    printf("# datafile handle %Lu missing from list\n",
-		   Lu(df_handles[i]));
+	    printf("# datafile handle %llu missing from list\n",
+		   llu(df_handles[i]));
 	    /* if possible, rebuild the datafile. */
 	    /* otherwise delete datafiles, return error to get 
 	     * handle and dirent removed.
@@ -768,7 +769,7 @@ struct handlelist *find_sub_trees(PVFS_fs_id cur_fs,
 		break;
 	    case PVFS_TYPE_DIRECTORY:
 		/* add to directory list */
-		printf("# looking for dirdata match to %Lu.\n", Lu(handle));
+		printf("# looking for dirdata match to %llu.\n", llu(handle));
 
 		descend(cur_fs,
 			hl_all,
@@ -834,17 +835,17 @@ struct handlelist *fill_lost_and_found(PVFS_fs_id cur_fs,
 			       creds,
 			       &getattr_resp);
 	if (ret) {
-	    printf("warning: problem calling getattr on %Lu; assuming datafile for now.\n",
-		   Lu(handle));
+	    printf("warning: problem calling getattr on %llu; assuming datafile for now.\n",
+		   llu(handle));
 	    getattr_resp.attr.objtype = PVFS_TYPE_DATAFILE;
 	}
 
 	switch (getattr_resp.attr.objtype)
 	{
 	    case PVFS_TYPE_METAFILE:
-		printf("# trying to salvage %s %Ld.\n",
+		printf("# trying to salvage %s %lld.\n",
 		       get_type_str(getattr_resp.attr.objtype),
-		       Lu(handle));
+		       llu(handle));
 		if (verify_datafiles(cur_fs,
 				     hl_all,
 				     alt_hl,
@@ -859,7 +860,7 @@ struct handlelist *fill_lost_and_found(PVFS_fs_id cur_fs,
 		}
 		else
 		{
-		    sprintf(filename + 9, "%Lu", Lu(handle));
+		    sprintf(filename + 9, "%llu", llu(handle));
 		    ret = create_dirent(laf_ref,
 					filename,
 					handle,
@@ -882,7 +883,7 @@ struct handlelist *fill_lost_and_found(PVFS_fs_id cur_fs,
                     assert(ret == 0);
                 }
 
-		sprintf(dirname + 8, "%Lu", Lu(handle));
+		sprintf(dirname + 8, "%llu", llu(handle));
 		ret = create_dirent(laf_ref,
 				    dirname,
 				    handle,
@@ -897,21 +898,21 @@ struct handlelist *fill_lost_and_found(PVFS_fs_id cur_fs,
 		break;
 	    case PVFS_TYPE_DATAFILE:
 #if 0
-		printf("# saving %Lu (datafile) for later.\n", Lu(handle));
+		printf("# saving %llu (datafile) for later.\n", llu(handle));
 #endif
 		handlelist_add_handle(alt_hl, handle, server_idx);
 		break;
 	    case PVFS_TYPE_DIRDATA:
 #if 0
-		printf("# saving %Lu (dirdata) for later.\n", Lu(handle));
+		printf("# saving %llu (dirdata) for later.\n", llu(handle));
 #endif
 		handlelist_add_handle(alt_hl, handle, server_idx);
 		break;
 	    case PVFS_TYPE_SYMLINK:
 	    default:
 		/* delete on handle -- unknown type */
-		printf("* delete handle %Lu (unknown type).\n",
-		       Lu(handle));
+		printf("* delete handle %llu (unknown type).\n",
+		       llu(handle));
 		break;
 	}
 
@@ -945,8 +946,8 @@ void cull_leftovers(PVFS_fs_id cur_fs,
 			       creds,
 			       &getattr_resp);
 	if (ret) {
-	    printf("warning: problem calling getattr on %Lu\n",
-		   Lu(handle));
+	    printf("warning: problem calling getattr on %llu\n",
+		   llu(handle));
 	    getattr_resp.attr.objtype = 0;
 	}
 
@@ -1030,11 +1031,11 @@ int create_dirent(PVFS_object_ref dir_ref,
 {
     int ret;
 
-    printf("* %s creating new reference to %s (%Lu) in %Lu.\n",
+    printf("* %s creating new reference to %s (%llu) in %llu.\n",
 	   fsck_opts->destructive ? "" : "not",
 	   name,
-	   Lu(handle),
-	   Lu(dir_ref.handle));
+	   llu(handle),
+	   llu(dir_ref.handle));
 
     if (fsck_opts->destructive) {
 	ret = PVFS_mgmt_create_dirent(dir_ref,
@@ -1059,11 +1060,11 @@ int remove_directory_entry(PVFS_object_ref dir_ref,
 {
     int ret;
 
-    printf("* %s deleting directory entry for missing object %s (%Lu) from dir %Lu.\n",
+    printf("* %s deleting directory entry for missing object %s (%llu) from dir %llu.\n",
 	   fsck_opts->destructive ? "" : "not",
 	   name,
-	   Lu(entry_ref.handle),
-	   Lu(dir_ref.handle));
+	   llu(entry_ref.handle),
+	   llu(dir_ref.handle));
 
     if (fsck_opts->destructive) {
 	ret = PVFS_mgmt_remove_dirent(dir_ref,
@@ -1086,10 +1087,10 @@ int remove_object(PVFS_object_ref obj_ref,
 {
     int ret;
 
-    printf("* %s removing %s %Lu.\n",
+    printf("* %s removing %s %llu.\n",
 	   fsck_opts->destructive ? "" : "not",
 	   get_type_str(obj_type),
-	   Lu(obj_ref.handle));
+	   llu(obj_ref.handle));
 
     if (fsck_opts->destructive) {
 	ret = PVFS_mgmt_remove_object(obj_ref,
@@ -1250,7 +1251,7 @@ static void handlelist_remove_handle(struct handlelist *hl,
     }
 
     if (i > hl->used_array[server_idx]) {
-	printf("! problem removing %Lu/%d.\n", Lu(handle), server_idx);
+	printf("! problem removing %llu/%d.\n", llu(handle), server_idx);
     }
 
     assert(i <= hl->used_array[server_idx]); /* <= because of decrement! */
@@ -1309,7 +1310,7 @@ static void handlelist_print(struct handlelist *hl)
 
     /* NOTE: REALLY ONLY PRINTS FOR ONE SERVER RIGHT NOW */
     for (i=0; i < hl->used_array[0]; i++) {
-	printf("%Lu ", Lu(hl->list_array[0][i]));
+	printf("%llu ", llu(hl->list_array[0][i]));
     }
     printf("\n");
 }

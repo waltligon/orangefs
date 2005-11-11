@@ -13,6 +13,7 @@
 
 #include "pvfs2-util.h"
 #include "str-utils.h"
+#include "pvfs2-internal.h"
 
 #define MAX_NUM_DIRENTS    32
 
@@ -47,7 +48,7 @@ void print_entry_attr(
         f_type =  'l';
     }
 
-    snprintf(buf,128,"%c%c%c%c%c%c%c%c%c%c    1 %d   %d\t%Ld "
+    snprintf(buf,128,"%c%c%c%c%c%c%c%c%c%c    1 %d   %d\t%lld "
              "%.4d-%.2d-%.2d %.2d:%.2d %s",
              f_type,
              ((attr->perms & PVFS_U_READ) ? 'r' : '-'),
@@ -61,7 +62,7 @@ void print_entry_attr(
              ((attr->perms & PVFS_O_EXECUTE) ? 'x' : '-'),
              attr->owner,
              attr->group,
-             Ld(computed_size),
+             lld(computed_size),
              (time->tm_year + 1900),
              (time->tm_mon + 1),
              time->tm_mday,
@@ -100,8 +101,8 @@ void print_entry(
     if (PVFS_sys_getattr(pinode_refn, PVFS_ATTR_SYS_ALL,
                          &credentials, &getattr_response))
     {
-        fprintf(stderr,"Failed to get attributes on handle 0x%08Lx "
-                "(fs_id is %d)\n",Lu(handle),fs_id);
+        fprintf(stderr,"Failed to get attributes on handle 0x%08llx "
+                "(fs_id is %d)\n",llu(handle),fs_id);
         return;
     }
     print_entry_attr(entry_name, &getattr_response.attr);

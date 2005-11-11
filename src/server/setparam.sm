@@ -14,6 +14,7 @@
 #include "server-config.h"
 #include "pvfs2-server.h"
 #include "pint-event.h"
+#include "pvfs2-internal.h"
 
 static int setparam_cleanup(
     PINT_server_op *s_op, job_status_s* js_p);
@@ -98,7 +99,7 @@ static int setparam_work(PINT_server_op *s_op, job_status_s *js_p)
             tmp_handle = (PVFS_handle)s_op->req->u.mgmt_setparam.value;
             s_op->resp.u.mgmt_setparam.old_value = 0;
             gossip_debug(GOSSIP_SERVER_DEBUG, " - ROOT_CHECK looking for"
-                         " handle %Lu, on fs_id %d\n", Lu(tmp_handle),
+                         " handle %llu, on fs_id %d\n", llu(tmp_handle),
                          s_op->req->u.mgmt_setparam.fs_id);
             ret = job_trove_dspace_verify(
                 s_op->req->u.mgmt_setparam.fs_id, tmp_handle,

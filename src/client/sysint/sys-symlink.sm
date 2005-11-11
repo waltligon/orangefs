@@ -23,6 +23,7 @@
 #include "PINT-reqproto-encode.h"
 #include "pint-util.h"
 #include "ncache.h"
+#include "pvfs2-internal.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -230,8 +231,8 @@ PVFS_error PVFS_isys_symlink(
     sm_p->object_ref = parent_ref;
 
     gossip_debug(
-        GOSSIP_CLIENT_DEBUG, "Symlinking %s under parent handle %Lu "
-        "on fs %d to %s\n", entry_name, Lu(parent_ref.handle),
+        GOSSIP_CLIENT_DEBUG, "Symlinking %s under parent handle %llu "
+        "on fs %d to %s\n", entry_name, llu(parent_ref.handle),
         parent_ref.fs_id, target);
 
     return PINT_client_state_machine_post(
@@ -324,7 +325,7 @@ static int symlink_create_comp_fn(void *v_p,
     sm_p->u.sym.symlink_handle = resp_p->u.create.handle;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "*** Got newly created symlink "
-                 "handle %Lu\n", Lu(sm_p->u.sym.symlink_handle));
+                 "handle %llu\n", llu(sm_p->u.sym.symlink_handle));
     return 0;
 }
 
@@ -486,6 +487,9 @@ static int symlink_setattr_setup_msgpair(PINT_client_sm *sm_p,
 
     PINT_init_msgpair(sm_p, msg_p);
 
+    /* force permissions to 777 for symbolic links */
+    sm_p->u.sym.sys_attr.perms = 0777;
+
     PINT_SERVREQ_SETATTR_FILL(
         msg_p->req,
         *sm_p->cred_p,
@@ -541,7 +545,7 @@ static int symlink_delete_handle_setup_msgpair(PINT_client_sm *sm_p,
     js_p->error_code = 0;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, " Preparing to remove "
-                 "metafile handle %Lu\n", Lu(msg_p->handle));
+                 "metafile handle %llu\n", llu(msg_p->handle));
 
     PINT_init_msgpair(sm_p, msg_p);
 

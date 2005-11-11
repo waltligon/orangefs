@@ -14,6 +14,7 @@
 #include "pvfs2-util.h"
 #include "str-utils.h"
 #include "pint-sysint-utils.h"
+#include "pvfs2-internal.h"
 
 int main(int argc,char **argv)
 {
@@ -93,7 +94,7 @@ int main(int argc,char **argv)
     }
     // print the handle 
     printf("--mkdir--\n"); 
-    printf("Handle:%Lu\n",Lu(resp_mkdir.ref.handle));
+    printf("Handle:%llu\n",llu(resp_mkdir.ref.handle));
     printf("FSID:%d\n",parent_refn.fs_id);
 
     ret = PVFS_sys_mkdir(str_buf2, resp_mkdir.ref, attr, 
@@ -105,7 +106,7 @@ int main(int argc,char **argv)
     }
     // print the handle 
     printf("--mkdir--\n"); 
-    printf("Handle:%Lu\n",Lu(resp_mkdir.ref.handle));
+    printf("Handle:%llu\n",llu(resp_mkdir.ref.handle));
     printf("FSID:%d\n",parent_refn.fs_id);
 
     ret = PVFS_sys_mkdir(str_buf3, resp_mkdir.ref, attr, 
@@ -117,7 +118,7 @@ int main(int argc,char **argv)
     }
     // print the handle 
     printf("--mkdir--\n"); 
-    printf("Handle:%Lu\n",Lu(resp_mkdir.ref.handle));
+    printf("Handle:%llu\n",llu(resp_mkdir.ref.handle));
     printf("FSID:%d\n",parent_refn.fs_id);
 
 

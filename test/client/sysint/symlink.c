@@ -13,6 +13,7 @@
 #include "pvfs2-util.h"
 #include "str-utils.h"
 #include "pint-sysint-utils.h"
+#include "pvfs2-internal.h"
 
 int main(int argc, char **argv)
 {
@@ -88,7 +89,7 @@ int main(int argc, char **argv)
     }
 	
     printf("--symlink--\n"); 
-    printf("Handle: %Ld\n", Ld(resp_sym.ref.handle));
+    printf("Handle: %lld\n", lld(resp_sym.ref.handle));
 
     ret = PVFS_sys_finalize();
     if (ret < 0)

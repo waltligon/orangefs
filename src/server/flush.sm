@@ -13,6 +13,7 @@
 
 #include "server-config.h"
 #include "pvfs2-server.h"
+#include "pvfs2-internal.h"
 
 /*
  * if given a metafile, do a keyval flush
@@ -139,8 +140,8 @@ static int flush_keyval_flush(PINT_server_op *s_op, job_status_s *js_p)
 
     PINT_STATE_DEBUG("kflush");
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, " doing keyval flush on %Lu,%d\n",
-                 Lu(s_op->req->u.flush.handle), s_op->req->u.flush.fs_id);
+    gossip_debug(GOSSIP_SERVER_DEBUG, " doing keyval flush on %llu,%d\n",
+                 llu(s_op->req->u.flush.handle), s_op->req->u.flush.fs_id);
 
     ret = job_trove_keyval_flush(
         s_op->req->u.flush.fs_id,
@@ -164,8 +165,8 @@ static int flush_check_error(PINT_server_op *s_op, job_status_s *js_p)
     {
         PVFS_strerror_r(js_p->error_code, buf, 64);
 
-        gossip_err("failed to flush handle %Lu: %s\n",
-                   Lu(s_op->req->u.flush.handle), buf);
+        gossip_err("failed to flush handle %llu: %s\n",
+                   llu(s_op->req->u.flush.handle), buf);
     }
     return 1;
 }
@@ -190,8 +191,8 @@ static int flush_bstream_flush(PINT_server_op *s_op, job_status_s *js_p)
 
     PINT_STATE_DEBUG("bflush");
 
-    gossip_debug(GOSSIP_SERVER_DEBUG, " doing bstream flush on %Lu,%d\n",
-                 Lu(s_op->req->u.flush.handle), s_op->req->u.flush.fs_id);
+    gossip_debug(GOSSIP_SERVER_DEBUG, " doing bstream flush on %llu,%d\n",
+                 llu(s_op->req->u.flush.handle), s_op->req->u.flush.fs_id);
 
     ret = job_trove_bstream_flush(
         s_op->req->u.flush.fs_id,

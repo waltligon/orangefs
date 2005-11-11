@@ -23,6 +23,7 @@
 #include "trove.h"
 #include "ncac-interface.h"
 #include "internal.h"
+#include "pvfs2-internal.h"
     
 #define BUFFER_SIZE (256*1024)
 #define MAX_REGIONS 16
@@ -566,7 +567,7 @@ int  bmi_cache_request_init(struct fp_private_data *flow_data, int direction)
 
 	flow_data->total_bytes_processed = bytes_processed;
 
-	fprintf(stderr, "bmi_cache_request_init: exit with return 0 (bytes_processed=%Ld)\n", Ld(bytes_processed));
+	fprintf(stderr, "bmi_cache_request_init: exit with return 0 (bytes_processed=%lld)\n", lld(bytes_processed));
 
 	return 0;
 
@@ -857,10 +858,10 @@ static void cache_write_callback_fn(void *user_ptr,
 	total_size = 0;
 	for ( i=0;  i<q_item->cache_req.mem_cnt; i++ ) {
 		total_size += q_item->cache_req.msize_list[i];
-		fprintf(stderr, "cache_write_callback_fn:recv buff [%d] len:%Ld\n", i, Ld(q_item->cache_req.msize_list[i]));
+		fprintf(stderr, "cache_write_callback_fn:recv buff [%d] len:%lld\n", i, lld(q_item->cache_req.msize_list[i]));
 		q_item->cache_req.total_size = total_size;
 	}
-	fprintf(stderr, "cache_write_callback_fn:to recv %Ld\n", Ld(q_item->cache_req.total_size));
+	fprintf(stderr, "cache_write_callback_fn:to recv %lld\n", lld(q_item->cache_req.total_size));
 
 	/* TODO: what if we recv less than expected? */
 	ret = BMI_post_recv_list(&bmi_reqid,

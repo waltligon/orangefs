@@ -24,6 +24,7 @@
 #include "pint-distribution.h"
 #include "pvfs2-config.h"
 #include "pvfs2-server.h"
+#include "pvfs2-internal.h"
 
 static DOTCONF_CB(get_pvfs_server_id);
 static DOTCONF_CB(get_logstamp);
@@ -1370,7 +1371,7 @@ DOTCONF_CB(get_root_handle)
     fs_conf = (struct filesystem_configuration_s *)
         PINT_llist_head(config_s->file_systems);
     assert(fs_conf);
-    ret = sscanf(cmd->data.str, "%Lu", &tmp_var);
+    ret = sscanf(cmd->data.str, "%llu", &tmp_var);
     if(ret != 1)
     {
         return("RootHandle does not have a long long unsigned value.\n");
@@ -1842,9 +1843,9 @@ static int is_valid_filesystem_configuration(
     int ret = is_root_handle_in_a_meta_range(config,fs);
     if (ret == 0)
     {
-        gossip_err("RootHandle (%Lu) is NOT within the meta handle "
+        gossip_err("RootHandle (%llu) is NOT within the meta handle "
                    "ranges specified for this filesystem (%s).\n",
-                   Lu(fs->root_handle),fs->file_system_name);
+                   llu(fs->root_handle),fs->file_system_name);
     }
     return ret;
 }

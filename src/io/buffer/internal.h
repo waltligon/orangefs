@@ -341,8 +341,5 @@ del_page_from_lru(struct cache_stack *cache_stack, struct extent *page)
  */
 void cache_dump_active_list(void);
 void cache_dump_inactive_list(void);
-void cmp_list_dump(void);
-void job_list_dump(void);
-void dirty_list_dump(int handle);
 
 #endif

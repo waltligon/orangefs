@@ -16,16 +16,14 @@
 #define __PVFS2_TYPES_H
 
 #ifdef __KERNEL__
-#ifndef __WORDSIZE
-#include <asm/types.h>
-#define __WORDSIZE BITS_PER_LONG
-#endif
 #include <linux/types.h>
 #else
 #include <stdint.h>
 #include <sys/stat.h>
 #include <sys/time.h>
-#endif /* __KERNEL__ */
+#endif
+
+#include "pvfs2-config.h"
 
 #ifndef INT32_MAX
 /* definition taken from stdint.h */
@@ -149,6 +147,10 @@ endecode_fields_1a(
 #define PVFS_ITERATE_START    (INT32_MAX - 1)
 #define PVFS_ITERATE_END      (INT32_MAX - 2)
 #define PVFS_READDIR_START PVFS_ITERATE_START
+
+#ifndef O_LARGEFILE
+#define O_LARGEFILE 0
+#endif
 
 /* permission bits */
 #define PVFS_O_EXECUTE (1 << 0)
@@ -476,6 +478,30 @@ PVFS_error PVFS_get_errno_mapping(PVFS_error error);
  */
 #define PVFS_ERRNO_MAX          59
 
+#ifndef EUNATCH
+#define EUNATCH -1
+#endif
+
+#ifndef EBADR
+#define EBADR -1
+#endif
+
+#ifndef EDEADLOCK
+#define EDEADLOCK -1
+#endif
+
+#ifndef ENONET
+#define ENONET -1
+#endif
+
+#ifndef ECOMM
+#define ECOMM -1
+#endif
+
+#ifndef ERESTART
+#define ERESTART -1
+#endif
+
 #define DECLARE_ERRNO_MAPPING()                       \
 PVFS_error PINT_errno_mapping[PVFS_ERRNO_MAX + 1] = { \
     0,     /* leave this one empty */                 \
@@ -625,35 +651,6 @@ enum PVFS_io_type
     PVFS_IO_READ  = 1,
     PVFS_IO_WRITE = 2
 };
-
-/* Printf wrappers for 32- and 64-bit compatibility.  Imagine trying
- * to print out a PVFS_handle, which is typedefed to a uint64_t.  On
- * a 32-bit machine, you use format "%Lu", while a 64-bit machine wants
- * the format "%lu", and each machine complains at the use of the opposite.
- * This is only a problem on primitive types that are bigger than the
- * smallest supported machine, i.e. bigger than 32 bits.
- *
- * Rather than changing the printf format string, which is the "right"
- * thing to do, we instead cast the parameters to the printf().  But only
- * on one of the architectures so the other one will complain if the format
- * string really is incorrect.
- *
- * Here we choose 32-bit machines as the dominant type.  If a format
- * specifier and a parameter are mismatched, that machine will issue
- * a warning, while 64-bit machines will silently perform the cast.
- */
-#if (__WORDSIZE == 32)
-#  define Lu(x) (x)
-#  define Ld(x) (x)
-#  define SCANF_Ld "%Ld"
-#elif (__WORDSIZE == 64)
-#  define Lu(x) (unsigned long long)(x)
-#  define Ld(x) (long long)(x)
-#  define SCANF_Ld "%ld"
-#else
-/* If you see this, you can change the #if tests above to work around it. */
-#  error Unknown wordsize, perhaps your system headers are not POSIX
-#endif
 
 /*
  * Filesystem "magic" number unique to PVFS2 kernel interface.  Used by

@@ -16,6 +16,7 @@
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
 #include "pint-util.h"
+#include "pvfs2-internal.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -217,8 +218,8 @@ static int remove_datafile_remove_setup_msgpair(PINT_client_sm *sm_p,
 	PINT_sm_msgpair_state *msg_p = &sm_p->msgarray[i];
 
 	gossip_debug(GOSSIP_CLIENT_DEBUG,
-		     "  datafile_remove: removing handle %Lu\n",
-		     Lu(attr->u.meta.dfile_array[i]));
+		     "  datafile_remove: removing handle %llu\n",
+		     llu(attr->u.meta.dfile_array[i]));
 
 	PINT_SERVREQ_REMOVE_FILL(
             msg_p->req,

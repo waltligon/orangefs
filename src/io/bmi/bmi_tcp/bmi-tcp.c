@@ -1862,7 +1862,12 @@ static int tcp_sock_init(method_addr_p my_method_addr)
 	else
 	{
             /* BMI_sockio_connect_sock returns a PVFS error */
-            PVFS_perror_gossip("Error: BMI_sockio_connect_sock", ret);
+            char buff[300];
+
+            snprintf(buff, 300, "Error: BMI_sockio_connect_sock: (%s):", 
+                     tcp_addr_data->hostname);
+
+            PVFS_perror_gossip(buff, ret);
 	    return (ret);
 	}
     }
@@ -3186,7 +3191,7 @@ static int tcp_accept_init(int *socket, char** peer)
     }
 
     *socket = accept(tcp_addr_data->socket, (struct sockaddr*)&peer_sockaddr,
-              &peer_sockaddr_size);
+              (socklen_t *)&peer_sockaddr_size);
 
     if (*socket < 0)
     {
@@ -3197,7 +3202,7 @@ static int tcp_accept_init(int *socket, char** peer)
 	    (errno == ENOPROTOOPT) ||
 	    (errno == EHOSTDOWN) ||
 	    (errno == ENONET) ||
-	    (errno == EHOSTUNREACH) ||
+            (errno == EHOSTUNREACH) ||
 	    (errno == EOPNOTSUPP) || (errno == ENETUNREACH))
 	{
 	    /* try again later */

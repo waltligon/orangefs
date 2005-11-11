@@ -18,6 +18,7 @@
 #include <getopt.h>
 
 #include "pvfs2.h"
+#include "pvfs2-internal.h"
 
 /* We need to set some limit, I suppose */
 #define MAX_NUM_FILES 100 
@@ -382,7 +383,7 @@ void print_stats(const PVFS_object_ref * ref,
    fprintf(stdout, "  File Name     : %s\n",  pszName);
    fprintf(stdout, "  Relative Name : %s\n",  pszRelativeName);
    fprintf(stdout, "  fs ID         : %d\n",  ref->fs_id);
-   fprintf(stdout, "  Handle        : %Lu\n", Lu(ref->handle));
+   fprintf(stdout, "  Handle        : %llu\n", llu(ref->handle));
    fprintf(stdout, "  Mask          : %o\n",  attr->mask);
    if(attr->mask & PVFS_ATTR_SYS_PERM)
    {
@@ -423,7 +424,7 @@ void print_stats(const PVFS_object_ref * ref,
       }
       else
       {
-         fprintf(stdout, "  Size          : %Ld\n",      Ld(attr->size));
+         fprintf(stdout, "  Size          : %lld\n",      lld(attr->size));
       }
 
    }
@@ -445,19 +446,19 @@ void print_stats(const PVFS_object_ref * ref,
    {
       sprintf(a_time, "%s", ctime((const time_t *)&(attr)->atime));
       a_time[strlen(a_time)-1] = 0;
-      fprintf(stdout, "  atime         : %Lu (%s)\n", Lu(attr->atime), a_time);
+      fprintf(stdout, "  atime         : %llu (%s)\n", llu(attr->atime), a_time);
    }
    if(attr->mask & PVFS_ATTR_SYS_MTIME)
    {
       sprintf(m_time, "%s", ctime((const time_t *)&(attr)->mtime));
       m_time[strlen(m_time)-1] = 0;
-      fprintf(stdout, "  mtime         : %Lu (%s)\n", Lu(attr->mtime), m_time);
+      fprintf(stdout, "  mtime         : %llu (%s)\n", llu(attr->mtime), m_time);
    }
    if(attr->mask & PVFS_ATTR_SYS_CTIME)
    {
       sprintf(c_time, "%s", ctime((const time_t *)&(attr)->ctime));
       c_time[strlen(c_time)-1] = 0;
-      fprintf(stdout, "  ctime         : %Lu (%s)\n", Lu(attr->ctime), c_time);
+      fprintf(stdout, "  ctime         : %llu (%s)\n", llu(attr->ctime), c_time);
    }
    
    /* dfile_count is only valid for a file. For a given file, it tells how many
@@ -472,7 +473,7 @@ void print_stats(const PVFS_object_ref * ref,
    if( (attr->mask & PVFS_ATTR_SYS_DIRENT_COUNT) &&
        (attr->mask & PVFS_TYPE_DIRECTORY))
    {
-      fprintf(stdout, "  dir entries   : %Lu\n", Lu(attr->dirent_count));
+      fprintf(stdout, "  dir entries   : %llu\n", llu(attr->dirent_count));
    }
    
 }

@@ -5,7 +5,9 @@
  */
 
 /* System Interface Finalize Implementation */
+#ifdef HAVE_MALLOC_H
 #include <malloc.h>
+#endif
 
 #include "pint-sysint-utils.h"
 #include "acache.h"

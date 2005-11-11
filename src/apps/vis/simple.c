@@ -13,6 +13,7 @@
 #include "pvfs2.h"
 #include "pvfs2-vis.h"
 #include "pvfs2-mgmt.h"
+#include "pvfs2-internal.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -57,7 +58,7 @@ int main(int argc, char **argv)
 	{
 	    return(-1);
 	}
-	printf("%Ld\n", Ld(pint_vis_shared.io_perf_matrix[0][pint_vis_shared.io_depth-1].read));
+	printf("%lld\n", lld(pint_vis_shared.io_perf_matrix[0][pint_vis_shared.io_depth-1].read));
 	pthread_mutex_unlock(&pint_vis_mutex);
     }
 

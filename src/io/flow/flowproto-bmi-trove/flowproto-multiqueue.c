@@ -20,6 +20,7 @@
 #include "trove.h"
 #include "thread-mgr.h"
 #include "pint-perf-counter.h"
+#include "pvfs2-internal.h"
 
 #define BUFFERS_PER_FLOW 8
 #define BUFFER_SIZE (256*1024)
@@ -465,9 +466,9 @@ int fp_multiqueue_cancel(flow_descriptor  *flow_d)
     if(flow_d->state != FLOW_COMPLETE)
     {
         gossip_debug(GOSSIP_CANCEL_DEBUG,
-            "PINT_flow_cancel() called on active flow, %Ld "
+            "PINT_flow_cancel() called on active flow, %lld "
                      "bytes transferred.\n",
-                     Ld(flow_d->total_transfered));
+                     lld(flow_d->total_transfered));
         assert(flow_d->state == FLOW_TRANSMITTING);
         handle_io_error(-PVFS_ECANCEL, NULL, flow_data);
     }

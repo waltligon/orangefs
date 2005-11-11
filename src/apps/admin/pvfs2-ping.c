@@ -19,6 +19,7 @@
 #include "pvfs2-mgmt.h"
 #include "pint-sysint-utils.h"
 #include "server-config.h"
+#include "pvfs2-internal.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -195,7 +196,7 @@ int main(int argc, char **argv)
 	fprintf(stderr, "Failure: could not lookup root handle.\n");
 	return(-1);
     }
-    printf("\n   Root handle: %Lu\n", Lu(resp_lookup.ref.handle));
+    printf("\n   Root handle: %llu\n", llu(resp_lookup.ref.handle));
 
     /* check that only one server controls root handle */
     /* TODO: we need a way to get information out about which server

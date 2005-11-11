@@ -11,6 +11,7 @@
 
 #include "ncac-trove.h"
 #include "ncac-job.h"
+#include "pvfs2-internal.h"
 
 /* internal functions */
 static inline struct extent *find_extent(NCAC_req_t *ncac_req,
@@ -117,7 +118,7 @@ int NCAC_do_a_read_job(struct NCAC_req *ncac_req)
         if ( cbufhash[i] ){
             ret = 1;
             if ( PageReadPending(cbufhash[i]) ){
-                fprintf(stderr, "extent:%p ioreq:%Ld\n", cbufhash[i], Ld(cbufhash[i]->ioreq));
+                fprintf(stderr, "extent:%p ioreq:%lld\n", cbufhash[i], lld(cbufhash[i]->ioreq));
                 ret = check_extent_read(ncac_req, cbufhash[i]);
                 if (ret < 0){
 				    ncac_req->error = ret;	
@@ -286,7 +287,7 @@ static inline int init_extent_read(NCAC_req_t *ncac_req,
         return ret;
     }
     extent->ioreq = ioreq;
-    fprintf(stderr, "init_extent_read: foff:%Ld, size:%Ld, extent:%p, opid:%Ld\n", Ld(foffset), Ld(size), extent, Ld(ioreq));
+    fprintf(stderr, "init_extent_read: foff:%lld, size:%lld, extent:%p, opid:%lld\n", lld(foffset), lld(size), extent, lld(ioreq));
     return 0;
 }
 

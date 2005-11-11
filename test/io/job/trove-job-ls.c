@@ -14,6 +14,7 @@
 #include <trove-test.h>
 #include <job.h>
 #include <job-help.h>
+#include "pvfs2-internal.h"
 
 char storage_space[SSPACE_SIZE] = "/tmp/trove-test-space";
 char file_system[FS_SIZE] = "fs-foo";
@@ -160,8 +161,8 @@ int main(int argc, char **argv)
 		num_processed = job_stat.count;
 		for(i=0; i<job_stat.count; i++)
 		{
-			printf("%s (%Ld)\n", (char *) key[i].buffer, 
-				Ld(*(TROVE_handle *) val[i].buffer));
+			printf("%s (%lld)\n", (char *) key[i].buffer, 
+				lld(*(TROVE_handle *) val[i].buffer));
 		}
 	}
 

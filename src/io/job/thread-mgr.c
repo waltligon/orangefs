@@ -14,6 +14,7 @@
 #include "gossip.h"
 #include "bmi.h"
 #include "trove.h"
+#include "pvfs2-internal.h"
 
 #define THREAD_MGR_TEST_COUNT 5
 #define THREAD_MGR_TEST_TIMEOUT 10
@@ -521,21 +522,21 @@ int PINT_thread_mgr_bmi_cancel(PVFS_id_gen_t id, void* user_ptr)
      * trying to cancel one of them
      */
 #if 0
-    gossip_err("THREAD MGR trying to cancel op: %Lu, ptr: %p.\n",
-	Lu(id), user_ptr);
+    gossip_err("THREAD MGR trying to cancel op: %llu, ptr: %p.\n",
+	llu(id), user_ptr);
 #endif
     for(i=0; i<bmi_test_count; i++)
     {
 #if 0
-	gossip_err("THREAD MGR bmi cancel scanning op: %Lu.\n", 
-	    Lu(stat_bmi_id_array[i]));
+	gossip_err("THREAD MGR bmi cancel scanning op: %llu.\n", 
+	    llu(stat_bmi_id_array[i]));
 #endif
 	if(stat_bmi_id_array[i] == id && stat_bmi_user_ptr_array[i] ==
 	    user_ptr)
 	{
 #if 0
-	    gossip_err("THREAD MGR bmi cancel SKIPPING op: %Lu.\n", 
-		Lu(stat_bmi_id_array[i]));
+	    gossip_err("THREAD MGR bmi cancel SKIPPING op: %llu.\n", 
+		llu(stat_bmi_id_array[i]));
 #endif
 	    /* match; no steps needed to cancel, the op is already done */
 	    gen_mutex_unlock(&bmi_test_mutex);
@@ -664,15 +665,15 @@ int PINT_thread_mgr_trove_cancel(PVFS_id_gen_t id,
     for(i=0; i<trove_test_count; i++)
     {
 #if 0
-	gossip_err("THREAD MGR trove cancel scanning op: %Lu.\n", 
-	    Lu(stat_trove_id_array[i]));
+	gossip_err("THREAD MGR trove cancel scanning op: %llu.\n", 
+	    llu(stat_trove_id_array[i]));
 #endif
 	if(stat_trove_id_array[i] == id && stat_trove_user_ptr_array[i] ==
 	    user_ptr)
 	{
 #if 0
-	    gossip_err("THREAD MGR trove cancel SKIPPING op: %Lu.\n", 
-		Lu(stat_trove_id_array[i]));
+	    gossip_err("THREAD MGR trove cancel SKIPPING op: %llu.\n", 
+		llu(stat_trove_id_array[i]));
 #endif
 	    /* match; no steps needed to cancel, the op is already done */
 	    gen_mutex_unlock(&trove_test_mutex);

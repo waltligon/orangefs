@@ -9,7 +9,10 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <stdlib.h>
+#ifdef HAVE_MALLOC_H
 #include <malloc.h>
+#endif
 #include <assert.h>
 #include <errno.h>
 
@@ -65,6 +68,7 @@ static int dbpf_bstream_resize_op_svc(struct dbpf_op *op_p);
 
 #ifdef __PVFS2_TROVE_AIO_THREADED__
 #include "dbpf-thread.h"
+#include "pvfs2-internal.h"
 
 extern pthread_cond_t dbpf_op_completed_cond;
 extern dbpf_op_queue_p dbpf_completion_queue_array[TROVE_MAX_CONTEXTS];
@@ -86,7 +90,7 @@ static void aio_progress_notification(sigval_t sig)
 
     gossip_debug(
         GOSSIP_TROVE_DEBUG," --- aio_progress_notification called "
-        "with handle %Lu\n", Lu(op_p->handle));
+        "with handle %llu\n", llu(op_p->handle));
 
     aiocb_p = op_p->u.b_rw_list.aiocb_array;
     assert(aiocb_p);
@@ -123,7 +127,7 @@ static void aio_progress_notification(sigval_t sig)
                           (op_p->type == BSTREAM_WRITE_AT) ?
                           "WRITE" : "READ"), ret, op_p->u.b_rw_list.fd);
 
-            *(op_p->u.b_rw_list.out_size_p) = ret;
+            *(op_p->u.b_rw_list.out_size_p) += ret;
 
             /* mark as a NOP so we ignore it from now on */
             aiocb_p[i].aio_lio_opcode = LIO_NOP;
@@ -299,8 +303,8 @@ static void start_delayed_ops_if_any(int dec_first)
         s_dbpf_ios_in_progress++;
 
         gossip_debug(GOSSIP_TROVE_DEBUG, "%s: lio_listio posted %p "
-                     "(handle %Lu, ret %d))\n", __func__, cur_op,
-                     Lu(cur_op->op.handle), ret);
+                     "(handle %llu, ret %d))\n", __func__, cur_op,
+                     llu(cur_op->op.handle), ret);
 
 #ifndef __PVFS2_TROVE_AIO_THREADED__
         /*
@@ -375,8 +379,8 @@ static int issue_or_delay_io_operation(
             return -trove_errno_to_trove_error(errno);
         }
         gossip_debug(GOSSIP_TROVE_DEBUG, "%s: lio_listio posted %p "
-                     "(handle %Lu, ret %d)\n", __func__, cur_op,
-                     Lu(cur_op->op.handle), ret);
+                     "(handle %llu, ret %d)\n", __func__, cur_op,
+                     llu(cur_op->op.handle), ret);
     }
     return 0;
 }
@@ -699,9 +703,9 @@ static int dbpf_bstream_resize_op_svc(struct dbpf_op *op_p)
         goto return_error;
     }
 
-    gossip_debug(GOSSIP_TROVE_DEBUG, "  RESIZED bstream %Lu [fd = %d] "
-                 "to %Ld \n", Lu(op_p->handle), tmp_ref.fd,
-                 Ld(op_p->u.b_resize.size));
+    gossip_debug(GOSSIP_TROVE_DEBUG, "  RESIZED bstream %llu [fd = %d] "
+                 "to %lld \n", llu(op_p->handle), tmp_ref.fd,
+                 lld(op_p->u.b_resize.size));
 
     dbpf_open_cache_put(&tmp_ref);
 
@@ -877,6 +881,9 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     q_op_p->op.u.b_rw_list.stream_array_count = stream_count;
     q_op_p->op.u.b_rw_list.stream_offset_array = stream_offset_array;
     q_op_p->op.u.b_rw_list.stream_size_array = stream_size_array;
+
+    /* initialize the out size to 0 */
+    *out_size_p = 0;
     q_op_p->op.u.b_rw_list.out_size_p = out_size_p;
     q_op_p->op.u.b_rw_list.aiocb_array_count = 0;
     q_op_p->op.u.b_rw_list.aiocb_array = NULL;
@@ -1119,7 +1126,7 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
                 /* we need to set the out size for the caller of write_list or
                  * read_list
                  */
-                *(op_p->u.b_rw_list.out_size_p) = ret;
+                *(op_p->u.b_rw_list.out_size_p) += ret;
 
                 /* mark as a NOP so we ignore it from now on */
                 aiocb_p[i].aio_lio_opcode = LIO_NOP;

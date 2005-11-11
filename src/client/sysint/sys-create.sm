@@ -28,6 +28,7 @@
 #include "PINT-reqproto-encode.h"
 #include "pint-util.h"
 #include "ncache.h"
+#include "pvfs2-internal.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -352,8 +353,8 @@ PVFS_error PVFS_isys_create(
     }
 
     gossip_debug(
-        GOSSIP_CLIENT_DEBUG, "Creating file %s under %Lu, %d\n",
-        object_name, Lu(parent_ref.handle), parent_ref.fs_id);
+        GOSSIP_CLIENT_DEBUG, "Creating file %s under %llu, %d\n",
+        object_name, llu(parent_ref.handle), parent_ref.fs_id);
           
     return PINT_client_state_machine_post(
         sm_p, PVFS_SYS_CREATE, op_id, user_ptr);
@@ -444,8 +445,8 @@ static int create_create_comp_fn(void *v_p,
     sm_p->u.create.metafile_handle = resp_p->u.create.handle;
 
     gossip_debug(
-        GOSSIP_CLIENT_DEBUG, "*** Got newly created handle %Lu\n",
-        Lu(sm_p->u.create.metafile_handle));
+        GOSSIP_CLIENT_DEBUG, "*** Got newly created handle %llu\n",
+        llu(sm_p->u.create.metafile_handle));
 
     return 0;
 }
@@ -486,8 +487,8 @@ static int create_datafiles_comp_fn(void *v_p,
     /* otherwise, just stash the newly created data file handle */
     sm_p->u.create.datafile_handles[index] = resp_p->u.create.handle;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "Datafile handle %d is %Lu\n",
-                 index, Lu(sm_p->u.create.datafile_handles[index]));
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "Datafile handle %d is %llu\n",
+                 index, llu(sm_p->u.create.datafile_handles[index]));
     return 0;
 }
 
@@ -697,10 +698,10 @@ static int create_datafiles_setup_msgpair_array(PINT_client_sm *sm_p,
             sm_p->u.create.io_handle_extent_array[i]);
 
         gossip_debug(GOSSIP_CLIENT_DEBUG,  "posting datafile[%d] create "
-                     "with extents %Lu-%Lu\n", i,
-                     Lu(sm_p->u.create.io_handle_extent_array[i].
+                     "with extents %llu-%llu\n", i,
+                     llu(sm_p->u.create.io_handle_extent_array[i].
                         extent_array[0].first),
-                     Lu(sm_p->u.create.io_handle_extent_array[i].
+                     llu(sm_p->u.create.io_handle_extent_array[i].
                         extent_array[0].last));
 
         msg_p->fs_id = sm_p->object_ref.fs_id;
@@ -930,7 +931,7 @@ static int create_delete_handles_setup_msgpair_array(
             msg_p->svr_addr = metafile_server_addr;
 
             gossip_debug(GOSSIP_CLIENT_DEBUG, " Preparing to remove "
-                         "metafile handle %Lu\n", Lu(msg_p->handle));
+                         "metafile handle %llu\n", llu(msg_p->handle));
         }
         else
         {
@@ -947,7 +948,7 @@ static int create_delete_handles_setup_msgpair_array(
             msg_p->svr_addr = sm_p->u.create.data_server_addrs[i];
 
             gossip_debug(GOSSIP_CLIENT_DEBUG, " Preparing to remove "
-                         "datafile handle %Lu\n", Lu(msg_p->handle));
+                         "datafile handle %llu\n", llu(msg_p->handle));
         }
     }
     return 1;
@@ -1108,9 +1109,9 @@ static PINT_dist* get_default_distribution(PVFS_fs_id fs_id)
                         gossip_err("Error setting distribution parameter\n"
                                    "  dist: %s\n"
                                    "  param name: %s\n"
-                                   "  param value: %Ld\n",
+                                   "  param value: %lld\n",
                                    dist->dist_name, param->name,
-                                   Ld(param->value));
+                                   lld(param->value));
                     }
                 }
                 iter = PINT_llist_next(iter);

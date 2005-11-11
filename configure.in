@@ -6,7 +6,6 @@ dnl You may need to use autoheader as well if changing any DEFINEs
 
 dnl sanity checks, output header, location of scripts used here
 AC_INIT(include/pvfs2-types.h)
-AC_CONFIG_HEADER(pvfs2-config.h)
 AC_CONFIG_AUX_DIR(maint/config)
 
 dnl
@@ -19,7 +18,7 @@ CONFIGURE_TIME=`date -u +"%Y-%m-%d-%H%M%S"`
 PVFS2_MAJOR=1
 PVFS2_MINOR=3
 PVFS2_SUB=1
-dnl PVFS2_PRE=""
+#PVFS2_PRE=""
 PVFS2_PRE="pre1-$CONFIGURE_TIME"
 
 PVFS2_VERSION=$PVFS2_MAJOR.$PVFS2_MINOR.$PVFS2_SUB$PVFS2_PRE
@@ -36,6 +35,19 @@ USR_CFLAGS=$CFLAGS
 if test "x$USR_CFLAGS" = "x"; then
 	USR_CFLAGS_SET=no
 fi
+
+AC_CONFIG_HEADER(pvfs2-config.h)
+
+AC_CHECK_HEADER([sys/vfs.h],
+		[AC_DEFINE(HAVE_SYS_VFS_H, 1, Define if sys/vfs.h exists)])
+AC_CHECK_HEADER([sys/mount.h],
+		[AC_DEFINE(HAVE_SYS_MOUNT_H, 1, Define if sys/mount.h exists)])
+
+AC_CHECK_HEADERS([mntent.h, fstab.h])
+
+AC_CHECK_HEADERS(stdarg.h)
+
+AC_CHECK_SIZEOF([long int])
 
 dnl Check for utilities that we need during the build process
 AC_PROG_INSTALL
@@ -684,13 +696,7 @@ AC_ARG_ENABLE(fast,
 if test "x$USR_CFLAGS_SET" = "xno"; then
     CFLAGS="$CFLAGS -DNDEBUG -O3 -DGOSSIP_DISABLE_DEBUG"
 fi
-],
-[
-if test "x$USR_CFLAGS_SET" = "xno"; then
-    CFLAGS="$CFLAGS -g"
-fi
-]
-)
+])
 
 dnl Options that are not yet working
 dnl --------------------------------
@@ -711,7 +717,7 @@ AC_ARG_ENABLE(strict,
 [  --enable-strict         Turn on strict debugging with gcc],
 [
 if test "x$USR_CFLAGS_SET" = "xno"; then
-    CFLAGS="$CFLAGS -Wall -Wstrict-prototypes -Wmissing-prototypes -Wundef -Wpointer-arith -Wbad-function-cast"
+    CFLAGS="$CFLAGS -g -Wall -Wstrict-prototypes -Wmissing-prototypes -Wundef -Wpointer-arith -Wbad-function-cast"
 fi
 ],
 [
@@ -816,6 +822,25 @@ if test "x$NEED_BERKELEY_DB" = "xyes" ; then
 	   [AX_BERKELEY_DB("")])
 fi
 dnl end of NEED_BERKELEY_DB section
+
+if test "x$BUILD_SERVER" = "x1"; then
+	dnl check if -lrt is required
+	AX_CHECK_NEEDS_LIBRT
+fi
+
+case "$host_os" in
+
+    *darwin*)
+	AC_DEFINE([TARGET_OS_DARWIN], 1, Define if on darwin)
+    	TARGET_OS_DARWIN=1
+	AC_SUBST(TARGET_OS_DARWIN)
+    ;;
+    *linux*)
+	AC_DEFINE([TARGET_OS_LINUX], 1, Define if on linux)
+    	TARGET_OS_LINUX=1
+	AC_SUBST(TARGET_OS_LINUX)
+    ;;
+esac
 
 AC_CHECK_HEADERS(netdb.h)
 AC_CHECK_HEADERS(arpa/inet.h)
@@ -926,7 +951,7 @@ dnl --
 dnl Check for SDL
 AC_MSG_CHECKING([for SDL])
 SDL_CONFIG=`which sdl-config 2> /dev/null`
-if ! test -z $SDL_CONFIG && test -x $SDL_CONFIG; then
+if ! test -z "$SDL_CONFIG" && test -x "$SDL_CONFIG"; then
    AC_MSG_RESULT(yes)
    SDL_VERSION=`sdl-config --version`
    VISCFLAGS=`sdl-config --cflags`
@@ -948,6 +973,12 @@ if ! test -z $SDL_CONFIG && test -x $SDL_CONFIG; then
 else
    AC_MSG_RESULT(no)
 fi
+
+dnl check if O_LARGEFILE needs to be used with open or if off_t is already int64
+AC_TRY_COMPILE(
+	[#include <fcntl.h>],
+	[open(NULL, O_LARGEFILE, O_RDONLY);],
+	[AC_DEFINE(USE_O_LARGEFILE, 1, Define if O_LARGEFILE is defined)])
 
 dnl create any missing subdirectories that wouldn't be created
 dnl by AC_OUTPUT below (which won't create intermediate dirs).

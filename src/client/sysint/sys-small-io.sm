@@ -220,14 +220,21 @@ static int small_io_completion_fn(void * user_args,
         fdata.server_ct = attr->u.meta.dfile_count;
         fdata.server_nr = index;
         fdata.dist = attr->u.meta.dist;
+        fdata.fsize = resp_p->u.small_io.bstream_size;
 
         result.segmax = SMALL_IO_MAX_REGIONS;
         result.bytemax = PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req);
         result.size_array = sizes;
         result.offset_array = offsets;
 
-        file_req_state = PINT_new_request_state(sm_p->u.io.mem_req);
-        mem_req_state = PINT_new_request_state(sm_p->u.io.file_req);
+        file_req_state = PINT_new_request_state(sm_p->u.io.file_req);
+        mem_req_state = PINT_new_request_state(sm_p->u.io.mem_req);
+
+        PINT_REQUEST_STATE_SET_TARGET(file_req_state, 
+                                      sm_p->u.io.file_req_offset);
+        PINT_REQUEST_STATE_SET_FINAL(file_req_state,
+                                     sm_p->u.io.file_req_offset + 
+                                     result.bytemax);
 
         do
         {

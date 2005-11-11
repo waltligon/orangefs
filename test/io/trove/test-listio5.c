@@ -12,7 +12,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/time.h>
+#include <stdlib.h>
+#ifdef HAVE_MALLOC_H
 #include <malloc.h>
+#endif
 
 #include "trove.h"
 #include "gossip.h"

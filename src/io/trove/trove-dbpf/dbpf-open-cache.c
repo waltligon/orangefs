@@ -27,6 +27,7 @@
 #include "gossip.h"
 #include "quicklist.h"
 #include "dbpf-open-cache.h"
+#include "pvfs2-internal.h"
 
 #define OPEN_CACHE_SIZE 64
 
@@ -487,7 +488,7 @@ int dbpf_open_cache_remove(
     tmp_error = 0;
 
     DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX,
-                              my_storage_p->name, coll_id, Lu(handle));
+                              my_storage_p->name, coll_id, llu(handle));
 
     ret = DBPF_UNLINK(filename);
     if ((ret != 0) && (errno != ENOENT))
@@ -529,11 +530,11 @@ static int open_fd(
     char filename[PATH_MAX] = {0};
 
     gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
-                 "dbpf_open_cache open_fd: opening fd %Lu, create: %d\n",
-                 Lu(handle), create_flag);
+                 "dbpf_open_cache open_fd: opening fd %llu, create: %d\n",
+                 llu(handle), create_flag);
 
     DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX,
-			      my_storage_p->name, coll_id, Lu(handle));
+			      my_storage_p->name, coll_id, llu(handle));
 
     *fd = DBPF_OPEN(filename, O_RDWR, 0);
 
@@ -554,8 +555,8 @@ static int open_db(
     char filename[PATH_MAX] = {0};
 
     gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
-                 "dbpf_open_cache open_db: opening db %Lu (%Lx).\n",
-                 Lu(handle), Lu(handle));
+                 "dbpf_open_cache open_db: opening db %llu (%llx).\n",
+                 llu(handle), llu(handle));
 
     /* special case; ds attrib database */
     if (handle == TROVE_HANDLE_NULL)
@@ -567,7 +568,7 @@ static int open_db(
     {
         /* normal case; keyval db */
         DBPF_GET_KEYVAL_DBNAME(filename, PATH_MAX,
-                               my_storage_p->name, coll_id, Lu(handle));
+                               my_storage_p->name, coll_id, llu(handle));
     }
 
     ret = db_create(db_pp, NULL, 0);

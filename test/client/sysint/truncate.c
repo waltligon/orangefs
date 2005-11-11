@@ -9,6 +9,7 @@
 
 #include "client.h"
 #include "pvfs2-util.h"
+#include "pvfs2-internal.h"
 
 int main(int argc,char **argv)
 {
@@ -84,7 +85,7 @@ int main(int argc,char **argv)
 
     printf("===================================\n");
     printf("file named %s has been truncated to %lld bytes.\n",
-           filename, Ld(trunc_size));
+           filename, lld(trunc_size));
 
     ret = PVFS_sys_finalize();
     if (ret < 0)

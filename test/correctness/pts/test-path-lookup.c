@@ -13,6 +13,7 @@
 #include "pvfs2-util.h"
 #include "test-path-lookup.h"
 #include "pvfs2-req-proto.h"
+#include "pvfs2-internal.h"
 
 #define GENERATE_FILENAME(fname, max_len, f, i, r, slash) \
 do {                                                      \
@@ -62,8 +63,8 @@ static int build_nested_path(
         }
 
         root_refn = lookup_resp.ref;
-        fprintf(stderr,"Got Root Handle %Lu on fs %d\n",
-                Lu(root_refn.handle), root_refn.fs_id);
+        fprintf(stderr,"Got Root Handle %llu on fs %d\n",
+                llu(root_refn.handle), root_refn.fs_id);
 
         attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
         attr.owner = credentials.uid;
@@ -72,8 +73,8 @@ static int build_nested_path(
         attr.atime = attr.ctime = attr.mtime = time(NULL);
 
         /* make the top-level base directory */
-        fprintf(stderr," Creating base directory %s under %Lu, %d\n",
-                PATH_LOOKUP_BASE_DIR, Lu(root_refn.handle),
+        fprintf(stderr," Creating base directory %s under %llu, %d\n",
+                PATH_LOOKUP_BASE_DIR, llu(root_refn.handle),
                 root_refn.fs_id);
         ret = PVFS_sys_mkdir(PATH_LOOKUP_BASE_DIR, root_refn,
                              attr, &credentials, &mkdir_resp);
@@ -102,8 +103,8 @@ static int build_nested_path(
             parent_refn = mkdir_resp.ref;
 
             GENERATE_FILENAME(cur_filename, 64, format, i, rank, 0);
-            fprintf(stderr,"  Creating directory %s under %Lu, %d\n",
-                    cur_filename, Lu(parent_refn.handle),
+            fprintf(stderr,"  Creating directory %s under %llu, %d\n",
+                    cur_filename, llu(parent_refn.handle),
                     parent_refn.fs_id);
 
             ret = PVFS_sys_mkdir(cur_filename, parent_refn, attr,
@@ -114,8 +115,8 @@ static int build_nested_path(
                         "the directory %s\n", cur_filename);
                 goto cleanup;
             }
-            fprintf(stderr, "Got handle %Lu\n",
-                    Lu(mkdir_resp.ref.handle));
+            fprintf(stderr, "Got handle %llu\n",
+                    llu(mkdir_resp.ref.handle));
 
             /* grab refn of newly created directory */
             newdir_refns[i] = mkdir_resp.ref;
@@ -145,8 +146,8 @@ static int build_nested_path(
             fprintf(stderr,"Looking up path %d [RELATIVE] \t\t... ", i);
 #if 0
             fprintf(stderr,
-                    " - Looking up relative path %s under %Lu, %d\n",
-                    cur_filename, Lu(parent_refn.handle),
+                    " - Looking up relative path %s under %llu, %d\n",
+                    cur_filename, llu(parent_refn.handle),
                     parent_refn.fs_id);
 #endif
             /* first do a relative lookup */
@@ -197,9 +198,9 @@ static int build_nested_path(
             {
                 fprintf(stderr,"! PVFS_sys_ref_lookup and "
                         "PVFS_sys_lookup returned different results\n"
-                        "\twhen they SHOULD BE THE SAME (%Lu != %Lu)!\n",
-                        Lu(lookup_refns[i].handle),
-                        Lu(lookup_resp.ref.handle));
+                        "\twhen they SHOULD BE THE SAME (%llu != %llu)!\n",
+                        llu(lookup_refns[i].handle),
+                        llu(lookup_resp.ref.handle));
                 goto cleanup;
             }
             parent_refn = lookup_resp.ref;
@@ -225,8 +226,8 @@ static int build_nested_path(
         parent_refn = ((i == 0) ? base_refn : lookup_refns[i - 1]);
         GENERATE_FILENAME(cur_filename, 64, format, i, rank, 0);
         fprintf(stderr, "Generating relative symlink %s "
-                "in %Lu,%d to point at %s\n", RELATIVE_SYMLINK_NAME,
-                Lu(parent_refn.handle),
+                "in %llu,%d to point at %s\n", RELATIVE_SYMLINK_NAME,
+                llu(parent_refn.handle),
                 parent_refn.fs_id, cur_filename);
         ret = PVFS_sys_symlink(
             RELATIVE_SYMLINK_NAME, parent_refn, cur_filename,
@@ -236,14 +237,14 @@ static int build_nested_path(
             PVFS_perror("Failed to create symlink ", ret);
             goto symlink_cleanup;
         }
-        fprintf(stderr, "Got handle %Lu\n", Lu(symlink_resp.ref.handle));
+        fprintf(stderr, "Got handle %llu\n", llu(symlink_resp.ref.handle));
 
         /* stash the newly created relative symlink references created */
         rsymlink_refns[i] = symlink_resp.ref;
 
         fprintf(stderr, "Generating absolute symlink %s "
-                "in %Lu,%d to point at %s\n", ABSOLUTE_SYMLINK_NAME,
-                Lu(parent_refn.handle),
+                "in %llu,%d to point at %s\n", ABSOLUTE_SYMLINK_NAME,
+                llu(parent_refn.handle),
                 parent_refn.fs_id, absolute_paths[i]);
         ret = PVFS_sys_symlink(
             ABSOLUTE_SYMLINK_NAME, parent_refn, absolute_paths[i],
@@ -253,7 +254,7 @@ static int build_nested_path(
             PVFS_perror("Failed to create symlink ", ret);
             goto symlink_cleanup;
         }
-        fprintf(stderr, "Got handle %Lu\n", Lu(symlink_resp.ref.handle));
+        fprintf(stderr, "Got handle %llu\n", llu(symlink_resp.ref.handle));
 
         /* stash the newly created absolute symlink references created */
         asymlink_refns[i] = symlink_resp.ref;
@@ -290,10 +291,10 @@ static int build_nested_path(
                 (lookup_resp.ref.fs_id !=
                  rsymlink_refns[i].fs_id))
             {
-                fprintf(stderr,"\nSymlink %s resolved to %Lu "
-                        "but should have resolved to %Lu\n", tmp_buf,
-                        Lu(lookup_resp.ref.handle),
-                        Lu(rsymlink_refns[i].handle));
+                fprintf(stderr,"\nSymlink %s resolved to %llu "
+                        "but should have resolved to %llu\n", tmp_buf,
+                        llu(lookup_resp.ref.handle),
+                        llu(rsymlink_refns[i].handle));
                 goto symlink_cleanup;
             }
             else
@@ -317,10 +318,10 @@ static int build_nested_path(
                 (lookup_resp.ref.fs_id !=
                  lookup_refns[i].fs_id))
             {
-                fprintf(stderr,"\nSymlink %s resolved to %Lu "
-                        "but should have resolved to %Lu\n", tmp_buf,
-                        Lu(lookup_resp.ref.handle),
-                        Lu(lookup_refns[i].handle));
+                fprintf(stderr,"\nSymlink %s resolved to %llu "
+                        "but should have resolved to %llu\n", tmp_buf,
+                        llu(lookup_resp.ref.handle),
+                        llu(lookup_refns[i].handle));
                 goto symlink_cleanup;
             }
             else
@@ -351,10 +352,10 @@ static int build_nested_path(
                 (lookup_resp.ref.fs_id !=
                  asymlink_refns[i].fs_id))
             {
-                fprintf(stderr,"\nSymlink %s resolved to %Lu "
-                        "but should have resolved to %Lu\n", tmp_buf,
-                        Lu(lookup_resp.ref.handle),
-                        Lu(asymlink_refns[i].handle));
+                fprintf(stderr,"\nSymlink %s resolved to %llu "
+                        "but should have resolved to %llu\n", tmp_buf,
+                        llu(lookup_resp.ref.handle),
+                        llu(asymlink_refns[i].handle));
                 goto symlink_cleanup;
             }
             else
@@ -378,10 +379,10 @@ static int build_nested_path(
                 (lookup_resp.ref.fs_id !=
                  lookup_refns[i].fs_id))
             {
-                fprintf(stderr,"\nSymlink %s resolved to %Lu "
-                        "but should have resolved to %Lu\n", tmp_buf,
-                        Lu(lookup_resp.ref.handle),
-                        Lu(lookup_refns[i].handle));
+                fprintf(stderr,"\nSymlink %s resolved to %llu "
+                        "but should have resolved to %llu\n", tmp_buf,
+                        llu(lookup_resp.ref.handle),
+                        llu(lookup_refns[i].handle));
                 goto symlink_cleanup;
             }
             else
@@ -416,8 +417,8 @@ static int build_nested_path(
                 break;
             }
             GENERATE_FILENAME(cur_filename, 64, format, i, rank, 0);
-            fprintf(stderr,"Removing path %s under %Lu,%d \t\t... ",
-                    cur_filename, Lu(parent_refn.handle),
+            fprintf(stderr,"Removing path %s under %llu,%d \t\t... ",
+                    cur_filename, llu(parent_refn.handle),
                     parent_refn.fs_id);
             ret = PVFS_sys_remove(cur_filename, parent_refn, &credentials);
             fprintf(stderr, "%s\n", ((ret < 0) ? "FAILED" : "DONE"));
@@ -428,8 +429,8 @@ static int build_nested_path(
 
             if (test_symlinks)
             {
-                fprintf(stderr,"Removing rlink %s under %Lu,%d \t\t... ",
-                        RELATIVE_SYMLINK_NAME, Lu(parent_refn.handle),
+                fprintf(stderr,"Removing rlink %s under %llu,%d \t\t... ",
+                        RELATIVE_SYMLINK_NAME, llu(parent_refn.handle),
                         parent_refn.fs_id);
                 ret = PVFS_sys_remove(RELATIVE_SYMLINK_NAME,
                                       parent_refn, &credentials);
@@ -439,8 +440,8 @@ static int build_nested_path(
                     PVFS_perror("\nPath removal status: ", ret);
                 }
 
-                fprintf(stderr,"Removing alink %s under %Lu,%d \t\t... ",
-                        ABSOLUTE_SYMLINK_NAME, Lu(parent_refn.handle),
+                fprintf(stderr,"Removing alink %s under %llu,%d \t\t... ",
+                        ABSOLUTE_SYMLINK_NAME, llu(parent_refn.handle),
                         parent_refn.fs_id);
                 ret = PVFS_sys_remove(ABSOLUTE_SYMLINK_NAME,
                                       parent_refn, &credentials);

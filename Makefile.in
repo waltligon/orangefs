@@ -67,6 +67,9 @@ BUILD_VIS = @BUILD_VIS@
 BUILD_KARMA = @BUILD_KARMA@
 BUILD_EPOLL = @BUILD_EPOLL@
 BUILD_SERVER = @BUILD_SERVER@
+NEEDS_LIBRT = @NEEDS_LIBRT@
+TARGET_OS_DARWIN = @TARGET_OS_DARWIN@
+TARGET_OS_LINUX = @TARGET_OS_LINUX@
 GNUC = @GNUC@
 INTELC = @INTELC@
 # configure default is silent, unless --enable-verbose-build in
@@ -141,7 +144,7 @@ CFLAGS = @CFLAGS@
 LDFLAGS = @LDFLAGS@
 LDSHARED = $(CC) -shared
 PICFLAGS = -fPIC
-LDFLAGS += -L lib 
+LDFLAGS += -Llib 
 LIBS += -lpvfs2 @LIBS@ 
 MMAP_RA_CACHE = @MMAP_RA_CACHE@
 TRUSTED_CONNECTIONS = @TRUSTED_CONNECTIONS@
@@ -217,7 +220,12 @@ SERVERCFLAGS = -D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__ \
 # server side flow protocol connecting BMI with NCAC cache
 SERVERCFLAGS += -D__STATIC_FLOWPROTO_BMI_CACHE__
 
-SERVERLIBS = -lrt -lpthread -lpvfs2-server @LIBS@ @DB_LIB@
+ifdef NEEDS_LIBRT 
+	SERVERLIBS = -lrt
+endif
+
+SERVERLIBS += -lpthread -lpvfs2-server @LIBS@ @DB_LIB@
+
 # you can optionally disable thread safety support in the client
 # though it's not recommended unless *required*.
 #
@@ -654,7 +662,7 @@ clean::
 endif
 
 # builds a tarball of the source tree suitable for distribution
-dist: $(SMCGEN) cleaner
+dist: cleaner
 	@sh $(srcdir)/maint/make-dist.sh $(srcdir) @PVFS2_VERSION@
 
 # some stuff that is cleaned in both distclean and dist targets
@@ -678,9 +686,7 @@ distclean: cleaner docsclean
 	rm -f src/server/simple.conf
 	rm -f src/server/server.conf-localhost
 	rm -f src/apps/admin/pvfs2-config
-ifndef DIST_RELEASE
 	rm -f $(SMCGEN)
-endif
 
 # this is where we include all of our automatic dependencies.
 # NOTE: we wrap this in ifneq's in order to prevent the
@@ -758,6 +764,11 @@ install:: install_doc
 
 	install -d $(prefix)/lib
 	install -m 755 $(LIBRARIES) $(prefix)/lib
+	
+ifdef TARGET_OS_DARWIN
+#       TOC needs to be regenerated in libs after they get moved
+	ranlib $(patsubst %,$(prefix)/%,$(LIBRARIES))
+endif
 
 	install -d $(prefix)/bin
 	install -m 755 $(ADMINTOOLS) $(prefix)/bin

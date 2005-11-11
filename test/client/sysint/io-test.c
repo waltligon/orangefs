@@ -14,6 +14,7 @@
 #include <assert.h>
 #include "pvfs2-util.h"
 #include "pvfs2-mgmt.h"
+#include "pvfs2-internal.h"
 
 #define DEFAULT_IO_SIZE 8*1024*1024
 
@@ -234,7 +235,7 @@ int main(int argc, char **argv)
     }
     for (i = 0; i < resp_getattr.attr.dfile_count; i++)
     {
-	printf("%Lu\n", Lu(dfile_array[i]));
+	printf("%llu\n", llu(dfile_array[i]));
     }
 
 	/**************************************************************

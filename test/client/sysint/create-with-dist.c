@@ -14,6 +14,7 @@
 #include "str-utils.h"
 #include "pint-sysint-utils.h"
 #include "pvfs2-dist-simple-stripe.h"
+#include "pvfs2-internal.h"
 
 int main(int argc, char **argv)
 {
@@ -80,8 +81,8 @@ int main(int argc, char **argv)
     }
     parent_refn.fs_id = cur_fs;
 
-    printf("File to be created is %s under parent %Lu\n",
-           str_buf, Lu(parent_refn.handle));
+    printf("File to be created is %s under parent %llu\n",
+           str_buf, llu(parent_refn.handle));
 
     /* Lookup the distribution to use */
     dist = PVFS_sys_dist_lookup("simple_stripe");
@@ -113,7 +114,7 @@ int main(int argc, char **argv)
     
     /* print the handle */ 
     printf("--create--\n"); 
-    printf("Handle: %Ld\n",Ld(resp_create.ref.handle));
+    printf("Handle: %lld\n",lld(resp_create.ref.handle));
 
     ret = PVFS_sys_finalize();
     if (ret < 0)

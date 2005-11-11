@@ -12,6 +12,7 @@
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
 #include "gossip.h"
+#include "pvfs2-internal.h"
 
 /* Implementation notes
  *
@@ -265,8 +266,8 @@ static int remove_read_dirdata_handle(PINT_server_op *s_op,
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
 		 "  trying to read dirdata handle (coll_id = %d, "
-                 "handle = %Lu, key = %s (%d), val_buf = %p (%d))\n",
-		 s_op->u.remove.fs_id, Lu(s_op->u.remove.handle),
+                 "handle = %llu, key = %s (%d), val_buf = %p (%d))\n",
+		 s_op->u.remove.fs_id, llu(s_op->u.remove.handle),
 		 (char *)s_op->key.buffer, s_op->key.buffer_sz,
 		 s_op->val.buffer, s_op->val.buffer_sz);
 
@@ -293,8 +294,8 @@ static int remove_getattr_of_dirdata_handle(
     js_p->error_code = 0;
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "  trying to getattr of "
-                 "dirdata handle (coll_id = %d, handle = %Lu\n",
-                 s_op->u.remove.fs_id, Lu(s_op->u.remove.handle));
+                 "dirdata handle (coll_id = %d, handle = %llu\n",
+                 s_op->u.remove.fs_id, llu(s_op->u.remove.handle));
 
     ret = job_trove_dspace_getattr(
         s_op->u.remove.fs_id, s_op->u.remove.dirdata_handle, s_op,
@@ -335,8 +336,8 @@ static int remove_remove_dirdata_dspace(PINT_server_op *s_op,
     PINT_STATE_DEBUG("remove_dirdata_dspace");
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
-		 "  removing dirdata dspace %Lu\n",
-		 Lu(s_op->u.remove.dirdata_handle));
+		 "  removing dirdata dspace %llu\n",
+		 llu(s_op->u.remove.dirdata_handle));
 
     ret = job_trove_dspace_remove(
         s_op->u.remove.fs_id,
@@ -368,7 +369,7 @@ static int remove_remove_dspace(PINT_server_op *s_op,
     PINT_STATE_DEBUG("remove_dspace");
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "(%p) remove: removing dspace "
-                 "object %Lu,%d\n", s_op, Lu(s_op->u.remove.handle),
+                 "object %llu,%d\n", s_op, llu(s_op->u.remove.handle),
                  s_op->u.remove.fs_id);
 
     ret = job_trove_dspace_remove(

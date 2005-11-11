@@ -23,6 +23,7 @@
 #include "pvfs2.h"
 #include "str-utils.h"
 #include "pint-sysint-utils.h"
+#include "pvfs2-internal.h"
 
 /* optional parameters, filled in by parse_args() */
 struct options
@@ -246,7 +247,7 @@ static struct options* parse_args(int argc, char* argv[])
 		tmp_opts->show_timings = 1;
 		break;
 	    case('s'):
-		ret = sscanf(optarg, SCANF_Ld, &tmp_opts->strip_size);
+		ret = sscanf(optarg, SCANF_lld, &tmp_opts->strip_size);
 		if(ret < 1){
 		    free(tmp_opts);
 		    return(NULL);
@@ -307,8 +308,8 @@ static double Wtime(void)
 
 static void print_timings( double time, int64_t total)
 {
-    printf("Wrote %Ld bytes in %f seconds. %f MB/seconds\n",
-	    Ld(total), time, (total/time)/(1024*1024));
+    printf("Wrote %lld bytes in %f seconds. %f MB/seconds\n",
+	    lld(total), time, (total/time)/(1024*1024));
 }
 
 /* read 'count' bytes from a (unix or pvfs2) file 'src', placing the result in
@@ -453,7 +454,6 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials,
 		    return(-1);
 		}
 	    }
-
 	    obj->u.ufs.fd = open(obj->u.ufs.path,
                                O_WRONLY|O_CREAT|O_LARGEFILE|O_TRUNC,0666);
 	}

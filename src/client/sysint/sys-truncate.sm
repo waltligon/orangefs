@@ -24,6 +24,7 @@
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
 #include "acache.h"
+#include "pvfs2-internal.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -100,12 +101,12 @@ PVFS_error PVFS_isys_truncate(
 
     if (size < 0)
     {
-        gossip_err("invalid size (negative) specified: %Ld\n", Ld(size));
+        gossip_err("invalid size (negative) specified: %lld\n", lld(size));
         return ret;
     }
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "PVFS_isys_truncate entered with %Ld\n", Ld(size));
+                 "PVFS_isys_truncate entered with %lld\n", lld(size));
 
     sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));
     if (sm_p == NULL)
@@ -138,7 +139,7 @@ PVFS_error PVFS_sys_truncate(
     PVFS_sys_op_id op_id;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG,
-                 "PVFS_sys_truncate entered with %Ld\n", Ld(size));
+                 "PVFS_sys_truncate entered with %lld\n", lld(size));
 
     ret = PVFS_isys_truncate(ref, size, credentials, &op_id, NULL);
     if (ret)
@@ -207,9 +208,9 @@ static int truncate_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
 
         gossip_debug(
             GOSSIP_CLIENT_DEBUG,
-            "  datafile_truncate: client requests %Ld: resizing %Ld",
-            Ld(sm_p->u.truncate.size),
-            Lu(attr->u.meta.dfile_array[i]));
+            "  datafile_truncate: client requests %lld: resizing %lld",
+            lld(sm_p->u.truncate.size),
+            llu(attr->u.meta.dfile_array[i]));
 
         file_data.server_nr = i;
         new_dfile_size = 
@@ -220,7 +221,7 @@ static int truncate_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
         sm_p->getattr.size = new_dfile_size;
         
         gossip_debug(GOSSIP_CLIENT_DEBUG,
-                " to %Ld bytes\n", Ld(new_dfile_size));
+                " to %lld bytes\n", lld(new_dfile_size));
 
         PINT_SERVREQ_TRUNCATE_FILL(
             msg_p->req,

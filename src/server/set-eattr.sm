@@ -10,6 +10,7 @@
 #include "server-config.h"
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
+#include "pvfs2-internal.h"
 
 static inline char *get_object_type(int objtype)
 {
@@ -110,9 +111,9 @@ static int seteattr_verify_eattribs(
     js_p->error_code = 0;
 
     gossip_debug(GOSSIP_SETEATTR_DEBUG,
-                 "  ext attr list write to handle %Lu refers to a %s\n\t"
+                 "  ext attr list write to handle %llu refers to a %s\n\t"
                  "[owner = %d, group = %d, perms = %o, type = %d]\n",
-                 Lu(s_op->req->u.seteattr.handle),
+                 llu(s_op->req->u.seteattr.handle),
                  get_object_type(a_p->objtype),
                  a_p->owner, a_p->group, a_p->perms, a_p->objtype);
 
@@ -197,8 +198,8 @@ static int seteattr_setobj_eattribs(
 
     gossip_debug(
         GOSSIP_SETEATTR_DEBUG,
-        "  writing keylist [%Lu,%d,len %d flags %d]\n",
-        Lu(s_op->req->u.seteattr.handle),
+        "  writing keylist [%llu,%d,len %d flags %d]\n",
+        llu(s_op->req->u.seteattr.handle),
         s_op->req->u.seteattr.fs_id,
         s_op->req->u.seteattr.nkey, s_op->req->u.seteattr.flags);
 

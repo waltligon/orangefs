@@ -4,7 +4,10 @@
  * See COPYING in top-level directory.
  */
 
+#include <stdlib.h>
+#ifdef HAVE_MALLOC_H
 #include <malloc.h>
+#endif
 #include <string.h>
 #include <assert.h>
 
@@ -12,6 +15,7 @@
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
 #include "trove.h"
+#include "pvfs2-internal.h"
 
 enum
 {
@@ -100,9 +104,9 @@ static int readdir_verify_directory_metadata(
     js_p->error_code = 0;
 
     gossip_debug(GOSSIP_READDIR_DEBUG, " - attrs: owner=%d, group=%d, "
-                 "perms=%d\n\ttype=%d, mtime=%Lu\n", attr->owner,
+                 "perms=%d\n\ttype=%d, mtime=%llu\n", attr->owner,
                  attr->group, attr->perms, attr->objtype,
-                 Lu(attr->mtime));
+                 llu(attr->mtime));
 
     if (attr->objtype != PVFS_TYPE_DIRECTORY)
     {
@@ -131,9 +135,9 @@ static int readdir_read_dirdata_handle(
     s_op->val.buffer_sz = sizeof(PVFS_handle);
 
     gossip_debug(
-        GOSSIP_READDIR_DEBUG, " - reading metadata: [%Lu,%d], "
+        GOSSIP_READDIR_DEBUG, " - reading metadata: [%llu,%d], "
         "key=%s\n\t(sz=%d) val_buf=%p (sz=%d)\n",
-        Lu(s_op->req->u.readdir.handle), s_op->req->u.readdir.fs_id,
+        llu(s_op->req->u.readdir.handle), s_op->req->u.readdir.fs_id,
         (char *)s_op->key.buffer, s_op->key.buffer_sz,
         s_op->val.buffer, s_op->val.buffer_sz);
 
@@ -210,9 +214,9 @@ static int readdir_iterate_on_entries(
     }
 
     gossip_debug(
-        GOSSIP_READDIR_DEBUG, " - iterating keyvals: [%Lu,%d], "
+        GOSSIP_READDIR_DEBUG, " - iterating keyvals: [%llu,%d], "
         "\n\ttoken=0x%x, count=%d\n",
-        Lu(s_op->u.readdir.dirent_handle), s_op->req->u.readdir.fs_id,
+        llu(s_op->u.readdir.dirent_handle), s_op->req->u.readdir.fs_id,
         s_op->req->u.readdir.token, s_op->req->u.readdir.dirent_count);
 
     ret = job_trove_keyval_iterate(

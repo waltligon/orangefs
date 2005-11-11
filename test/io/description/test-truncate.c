@@ -42,45 +42,45 @@ int main(int argc, char **argv)
     
     /* easy case */
     tmp_off = d->methods->logical_to_physical_offset(d->params,&file_data,100);
-    printf("offset: %Ld\n", (long long)tmp_off);
+    printf("offset: %lld\n", (long long)tmp_off);
 
 
     /* just before strip */
     tmp_off = d->methods->logical_to_physical_offset(d->params,
                                                      &file_data,
                                                      (64*1024-1));
-    printf("offset: %Ld\n", (long long)tmp_off);
+    printf("offset: %lld\n", (long long)tmp_off);
 
     /* at strip */
     tmp_off = d->methods->logical_to_physical_offset(d->params,
                                                      &file_data,
                                                      (64*1024));
-    printf("offset: %Ld\n", (long long)tmp_off);
+    printf("offset: %lld\n", (long long)tmp_off);
 
     /* just after strip */
     tmp_off = d->methods->logical_to_physical_offset(d->params,
                                                      &file_data,
                                                      (64*1024+1));
-    printf("offset: %Ld\n", (long long)tmp_off);
+    printf("offset: %lld\n", (long long)tmp_off);
 
     /* wrap around tests */
     tmp_off = d->methods->logical_to_physical_offset(d->params,
                                                      &file_data,
                                                      (64*1024*4+1));
-    printf("offset: %Ld\n", (long long)tmp_off);
+    printf("offset: %lld\n", (long long)tmp_off);
 
     /* try a different io server */
     file_data.server_nr = 3;
     tmp_off = d->methods->logical_to_physical_offset(d->params,
                                                      &file_data,
                                                      (64*1024-1));
-    printf("offset: %Ld\n", (long long)tmp_off);
+    printf("offset: %lld\n", (long long)tmp_off);
 
     /* same as above, but in his region w/ wrap around */
     tmp_off = d->methods->logical_to_physical_offset(d->params,
                                                      &file_data,
                                                      (64*1024*7+15));
-    printf("offset: %Ld\n", (long long)tmp_off);
+    printf("offset: %lld\n", (long long)tmp_off);
 
 
     /* free dist */

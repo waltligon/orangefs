@@ -18,6 +18,7 @@
 #include "acache.h"
 #include "quickhash.h"
 #include "pint-util.h"
+#include "pvfs2-internal.h"
 
 /* comment out the following for non-verbose acache debugging */
 #define VERBOSE_ACACHE_DEBUG
@@ -203,7 +204,7 @@ static inline PINT_pinode *acache_internal_lookup(PVFS_object_ref refn)
         pinode = qlist_entry(link, PINT_pinode, link);
         assert(pinode);
         gossip_debug(GOSSIP_ACACHE_DEBUG, "*** acache internal lookup "
-                     "found pinode [%Lu]\n", Lu(pinode->refn.handle));
+                     "found pinode [%llu]\n", llu(pinode->refn.handle));
     }
     gen_mutex_unlock(s_acache_htable_mutex);
 
@@ -242,7 +243,7 @@ PINT_pinode *PINT_acache_lookup(
         pinode = qlist_entry(link, PINT_pinode, link);
         assert(pinode);
         gossip_debug(GOSSIP_ACACHE_DEBUG, "*** acache lookup found "
-                     "pinode [%Lu]\n", Lu(pinode->refn.handle));
+                     "pinode [%llu]\n", llu(pinode->refn.handle));
     }
     gen_mutex_unlock(s_acache_htable_mutex);
 
@@ -318,8 +319,8 @@ void PINT_acache_set_valid(PINT_pinode *pinode)
 
             pinode->flag = PINODE_INTERNAL_FLAG_HASHED;
             gossip_debug(GOSSIP_ACACHE_DEBUG, "+++ added pinode "
-                         "to htable [%Lu type: %d] (%d entries)\n",
-                         Lu(pinode->refn.handle), pinode->attr.objtype,
+                         "to htable [%llu type: %d] (%d entries)\n",
+                         llu(pinode->refn.handle), pinode->attr.objtype,
                          s_acache_allocated_entries);
         }
 
@@ -348,7 +349,7 @@ void PINT_acache_invalidate(PVFS_object_ref refn)
         pinode->status = PINODE_STATUS_EXPIRED;
 
         gossip_debug(GOSSIP_ACACHE_DEBUG, "--- Invalidating pinode "
-                     "entry [%Lu]\n", Lu(pinode->refn.handle));
+                     "entry [%llu]\n", llu(pinode->refn.handle));
 
         PINT_acache_release(pinode);
     }
@@ -620,8 +621,8 @@ static inline int acache_internal_status(
         }
     }
 
-    gossip_debug(GOSSIP_ACACHE_DEBUG, "pinode [%Lu] entry status: %s\n",
-                 Lu(pinode->refn.handle), PINT_acache_get_status(ret));
+    gossip_debug(GOSSIP_ACACHE_DEBUG, "pinode [%llu] entry status: %s\n",
+                 llu(pinode->refn.handle), PINT_acache_get_status(ret));
 
     if (ret == PINODE_STATUS_EXPIRED)
     {

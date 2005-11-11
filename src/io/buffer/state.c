@@ -485,7 +485,7 @@ int data_sync_inode(struct inode *inode)
 		mem[cnt] = extent->addr;
 		memsize[cnt] = NCAC_dev.extsize;
 
-		DPRINT("to write: pos:%Ld, size=%Ld, buf=%p\n", 
+		DPRINT("to write: pos:%lld, size=%lld, buf=%p\n", 
 			 offset[cnt], offsize[cnt], mem[cnt]);
 		cnt ++;
 		tail = tail->next;

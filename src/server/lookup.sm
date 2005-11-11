@@ -8,13 +8,17 @@
 #include <stddef.h>
 #include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
+#ifdef HAVE_MALLOC_H
 #include <malloc.h>
+#endif
 
 #include "server-config.h"
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
 #include "str-utils.h"
 #include "pint-util.h"
+#include "pvfs2-internal.h"
 
 enum 
 {
@@ -383,8 +387,8 @@ static int lookup_read_directory_entry_handle(
     }
 
     gossip_debug(GOSSIP_SERVER_DEBUG,
-		 "  reading dirent handle value from handle %Lu\n",
-		 Lu(handle));
+		 "  reading dirent handle value from handle %llu\n",
+		 llu(handle));
 
     s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
@@ -414,7 +418,7 @@ static int lookup_read_directory_entry(
 
     gossip_debug(
         GOSSIP_SERVER_DEBUG, "  reading from dirent handle = "
-        "%Lu, segment = %s (len=%d)\n", Lu(s_op->u.lookup.dirent_handle),
+        "%llu, segment = %s (len=%d)\n", llu(s_op->u.lookup.dirent_handle),
         s_op->u.lookup.segp, (int) strlen(s_op->u.lookup.segp));
 
     s_op->key.buffer = s_op->u.lookup.segp;
@@ -474,9 +478,9 @@ static int lookup_setup_resp(PINT_server_op *s_op, job_status_s* js_p)
 
     if(js_p->error_code == 0)
     {
-        PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "path: %s, handle: %Lu\n",
+        PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "path: %s, handle: %llu\n",
             s_op->req->u.lookup_path.path,
-            Lu(s_op->resp.u.lookup_path.handle_array[s_op->resp.u.lookup_path.handle_count-1]));
+            llu(s_op->resp.u.lookup_path.handle_array[s_op->resp.u.lookup_path.handle_count-1]));
     }
     else
     {

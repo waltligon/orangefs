@@ -8,6 +8,7 @@
 
 #include <assert.h>
 #include "ncache.h"
+#include "pvfs2-internal.h"
 
 typedef struct
 {
@@ -137,8 +138,8 @@ int PINT_ncache_lookup(
     }
 
     gossip_debug(GOSSIP_NCACHE_DEBUG, "PINT_ncache_lookup called on "
-                 "segment %s\n\tunder %Lu,%d [%d]\n", name,
-                 Lu(parent.handle), parent.fs_id, want_resolved);
+                 "segment %s\n\tunder %llu,%d [%d]\n", name,
+                 llu(parent.handle), parent.fs_id, want_resolved);
 
     gen_mutex_lock(cache->mt_lock);
     entry->handle = PINT_NCACHE_HANDLE_INVALID;
@@ -262,8 +263,8 @@ int PINT_ncache_insert(
 
     gossip_debug(
         GOSSIP_NCACHE_DEBUG, "PINT_ncache_insert: inserting segment "
-        "%s\n\t(%Lu,%d) under parent (%Lu,%d) [%d]\n", name,
-        Lu(entry.handle), entry.fs_id, Lu(parent.handle),
+        "%s\n\t(%llu,%d) under parent (%llu,%d) [%d]\n", name,
+        llu(entry.handle), entry.fs_id, llu(parent.handle),
         parent.fs_id, abs_resolved);
 
     for (i = cache->top; i != BAD_LINK; i = cache->element[i].next)

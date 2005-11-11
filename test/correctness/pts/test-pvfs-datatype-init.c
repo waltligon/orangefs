@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include "pvfs-helper.h"
 #include "test-pvfs-datatype-init.h"
+#include "pvfs2-internal.h"
 
 /*
   initialize the sysint and create files to be used by subsequent
@@ -93,13 +94,13 @@ int test_pvfs_datatype_init(
                 break;
             }
             debug_printf("Created file %s\n",&(filename[1]));
-            debug_printf("Got handle %Ld.\n", Ld(resp_cr.ref.handle));
+            debug_printf("Got handle %lld.\n", lld(resp_cr.ref.handle));
             num_test_files_ok++;
         }
         else
         {
             debug_printf("lookup succeeded; skipping existing file.\n");
-            debug_printf("Got handle %Ld.\n", Ld(resp_lk.ref.handle));
+            debug_printf("Got handle %lld.\n", lld(resp_lk.ref.handle));
             num_test_files_ok++;
         }
     }

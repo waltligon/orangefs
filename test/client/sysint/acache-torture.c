@@ -11,6 +11,7 @@
 #include "pvfs2-debug.h"
 #include "acache.h"
 #include "gossip.h"
+#include "pvfs2-internal.h"
 
 #define ENTRIES_TO_ADD           512
 #define DEFAULT_TIMEOUT_SECONDS    2
@@ -83,9 +84,9 @@ int main(int argc, char **argv)
 
         if (PINT_acache_pinode_status(pinode2, NULL) != PINODE_STATUS_VALID)
         {
-            gossip_err("(1) Failure: lookup returned %Lu when it "
-                       "should've returned %Lu.\n",
-                       Lu(pinode2->refn.handle), Lu(tmp.handle));
+            gossip_err("(1) Failure: lookup returned %llu when it "
+                       "should've returned %llu.\n",
+                       llu(pinode2->refn.handle), llu(tmp.handle));
         }
     }
 
@@ -103,9 +104,9 @@ int main(int argc, char **argv)
 
         if (PINT_acache_pinode_status(pinode2, NULL) == PINODE_STATUS_VALID)
         {
-            gossip_err("(2) Failure: lookup returned %Lu when it "
+            gossip_err("(2) Failure: lookup returned %llu when it "
                        "should've been expired.\n",
-                       Lu(pinode2->refn.handle));
+                       llu(pinode2->refn.handle));
         }
 
         /* make them once again valid here before dropping the ref */
@@ -124,9 +125,9 @@ int main(int argc, char **argv)
 
         if (PINT_acache_pinode_status(pinode2, NULL) != PINODE_STATUS_VALID)
         {
-            gossip_err("(3) Failure: lookup returned %Lu when it "
-                       "should've returned %Lu.\n",
-                       Lu(pinode2->refn.handle), Lu(tmp.handle));
+            gossip_err("(3) Failure: lookup returned %llu when it "
+                       "should've returned %llu.\n",
+                       llu(pinode2->refn.handle), llu(tmp.handle));
         }
 
         /*

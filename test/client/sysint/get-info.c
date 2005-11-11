@@ -12,6 +12,7 @@
 
 #include "client.h"
 #include "pvfs2-util.h"
+#include "pvfs2-internal.h"
 
 int main(int argc,char **argv)
 {
@@ -83,7 +84,7 @@ int main(int argc,char **argv)
     r_mtime = (time_t)resp_gattr->attr.mtime;
     r_ctime = (time_t)resp_gattr->attr.ctime;
 
-    printf("Handle      : %Lu\n", Lu(pinode_refn.handle));
+    printf("Handle      : %llu\n", llu(pinode_refn.handle));
     printf("FSID        : %d\n", (int)pinode_refn.fs_id);
     printf("mask        : %d\n", resp_gattr->attr.mask);
     printf("uid         : %d\n", resp_gattr->attr.owner);
@@ -92,7 +93,7 @@ int main(int argc,char **argv)
     printf("atime       : %s", ctime(&r_atime));
     printf("mtime       : %s", ctime(&r_mtime));
     printf("ctime       : %s", ctime(&r_ctime));
-    printf("file size   : %Ld\n", Ld(resp_gattr->attr.size));
+    printf("file size   : %lld\n", lld(resp_gattr->attr.size));
     printf("handle type : ");
 
     switch(resp_gattr->attr.objtype)

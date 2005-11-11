@@ -243,6 +243,14 @@ struct PINT_server_io_op
     flow_descriptor* flow_d;
 };
 
+#define SMALL_IO_MAX_REGIONS 64
+
+struct PINT_server_small_io_op
+{
+    PVFS_offset offsets[SMALL_IO_MAX_REGIONS];
+    PVFS_size sizes[SMALL_IO_MAX_REGIONS];
+};
+
 struct PINT_server_flush_op
 {
     PVFS_handle handle;	    /* handle of data we want to flush to disk */
@@ -343,6 +351,7 @@ typedef struct PINT_server_op
 	struct PINT_server_chdirent_op chdirent;
 	struct PINT_server_rmdirent_op rmdirent;
 	struct PINT_server_io_op io;
+        struct PINT_server_small_io_op small_io;
 	struct PINT_server_flush_op flush;
 	struct PINT_server_truncate_op truncate;
 	struct PINT_server_mkdir_op mkdir;
@@ -390,11 +399,11 @@ do {                                                                        \
         __pw = getpwuid(__s_op->req->credentials.uid);                      \
         __gr = getgrgid(__s_op->req->credentials.gid);                      \
         snprintf(__pint_access_buffer, GOSSIP_BUF_SIZE,                     \
-            "%s.%s@%s H=%Lu S=%p: %s: %s",                                  \
+            "%s.%s@%s H=%llu S=%p: %s: %s",                                  \
             ((__pw) ? __pw->pw_name : "UNKNOWN"),                           \
             ((__gr) ? __gr->gr_name : "UNKNOWN"),                           \
             BMI_addr_rev_lookup_unexpected(__s_op->addr),                   \
-            Lu(__handle),                                                   \
+            llu(__handle),                                                   \
             __s_op,                                                         \
             PINT_map_server_op_to_string(__s_op->req->op),                  \
             format);                                                        \
@@ -465,6 +474,7 @@ int server_state_machine_start_noreq(
     ((_op <= PVFS_MAX_SERVER_OP) ? (PINT_server_req_table[_op].sm) : NULL)
 
 #include "state-machine.h"
+#include "pvfs2-internal.h"
 
 #endif /* __SM_CHECK_DEP */ 
 #endif /* __PVFS_SERVER_H */

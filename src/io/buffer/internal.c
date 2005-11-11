@@ -9,6 +9,7 @@
 #include "aiovec.h"
 #include "cache.h"
 #include "ncac-job.h"
+#include "pvfs2-internal.h"
 
 extern struct NCAC_dev  NCAC_dev;
 void cache_dump_active_list(void);
@@ -315,8 +316,8 @@ static inline int NCAC_rwjob_prepare_single(NCAC_req_t *ncac_req)
 #if 1
     fprintf(stderr, "[%s] exit %d comm buffers\n", __FUNCTION__, comcnt);
     for (i=0; i<comcnt; i++){
-        fprintf(stderr, "fpos:%Ld, buf_off:%ld, size:%Ld\n", Ld(foff[i]),
-(unsigned long)cbufoff[i], Ld(cbufsize[i]));
+        fprintf(stderr, "fpos:%lld, buf_off:%ld, size:%lld\n", lld(foff[i]),
+(unsigned long)cbufoff[i], lld(cbufsize[i]));
     }
 #endif
 
@@ -449,8 +450,8 @@ static inline int NCAC_rwjob_prepare_list(NCAC_req_t *ncac_req)
 
 #if  1
     for (i=0; i<ncac_req->offcnt; i++){
-        fprintf(stderr, "fpos:%Ld, size:%Ld\n", Ld(fregions[i].fpos),
-Ld(fregions[i].size));
+        fprintf(stderr, "fpos:%lld, size:%lld\n", lld(fregions[i].fpos),
+lld(fregions[i].size));
     }
 #endif
 
@@ -490,8 +491,8 @@ Ld(fregions[i].size));
 #if 1
     fprintf(stderr, "[%s] exit %d comm buffers\n", __FUNCTION__, comcnt);
     for (i=0; i<comcnt; i++){
-        fprintf(stderr, "fpos:%Ld, buf_off:%ld, size:%Ld\n", Ld(foff[i]),
-(unsigned long)cbufoff[i], Ld(cbufsize[i]));
+        fprintf(stderr, "fpos:%lld, buf_off:%ld, size:%lld\n", lld(foff[i]),
+(unsigned long)cbufoff[i], lld(cbufsize[i]));
     }
 #endif
 
@@ -776,7 +777,7 @@ static inline struct inode *get_inode(PVFS_fs_id coll_id,
 	/* search the inode list with the index of "inode_index" */
 	inode = search_inode_list (handle);
 
-	fprintf(stderr, "handle: %Ld, index: %d, inode:%p\n", Ld(handle), inode_index, inode);
+	fprintf(stderr, "handle: %lld, index: %d, inode:%p\n", lld(handle), inode_index, inode);
 
 	if ( NULL == inode ){
 		inode=(struct inode*)malloc(sizeof(struct inode));
@@ -811,7 +812,7 @@ static inline struct inode *get_inode(PVFS_fs_id coll_id,
 static inline void extent_dump(struct extent *extent)
 {
 	fprintf(stderr, "flags:%x\t status:%d\t	index:%d\t\n", (int)extent->flags, extent->status, (int)extent->index);
-	fprintf(stderr, "writes:%d\t reads:%d\t	ioreq:%Ld\t\n", extent->writes, extent->reads, Ld(extent->ioreq));
+	fprintf(stderr, "writes:%d\t reads:%d\t	ioreq:%lld\t\n", extent->writes, extent->reads, lld(extent->ioreq));
 
 }
 

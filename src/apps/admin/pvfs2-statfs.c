@@ -19,6 +19,7 @@
 #include "pvfs2-mgmt.h"
 #include "pint-sysint-utils.h"
 #include "server-config.h"
+#include "pvfs2-internal.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -94,10 +95,10 @@ int main(int argc, char **argv)
     printf("\tfs_id: %d\n", (int)resp_statfs.statfs_buf.fs_id);
     printf("\ttotal number of servers (meta and I/O): %d\n", 
         resp_statfs.server_count);
-    printf("\thandles available (meta and I/O):       %Lu\n",
-           Lu(resp_statfs.statfs_buf.handles_available_count));
-    printf("\thandles total (meta and I/O):           %Lu\n",
-           Lu(resp_statfs.statfs_buf.handles_total_count));
+    printf("\thandles available (meta and I/O):       %llu\n",
+           llu(resp_statfs.statfs_buf.handles_available_count));
+    printf("\thandles total (meta and I/O):           %llu\n",
+           llu(resp_statfs.statfs_buf.handles_total_count));
 
     if (user_opts->human_readable)
     {
@@ -115,10 +116,10 @@ int main(int argc, char **argv)
     }
     else
     {
-        printf("\tbytes available:                        %Lu\n",
-               Lu(resp_statfs.statfs_buf.bytes_available));
-        printf("\tbytes total:                            %Lu\n",
-               Lu(resp_statfs.statfs_buf.bytes_total));
+        printf("\tbytes available:                        %llu\n",
+               llu(resp_statfs.statfs_buf.bytes_available));
+        printf("\tbytes total:                            %llu\n",
+               llu(resp_statfs.statfs_buf.bytes_total));
     }
     printf("\nNOTE: The aggregate total and available statistics "
            "are calculated based\n");
@@ -186,22 +187,22 @@ int main(int argc, char **argv)
                 }
                 else
                 {
-                    printf("\tRAM bytes total  : %Lu\n",
-                           Lu(stat_array[i].ram_total_bytes));
-                    printf("\tRAM bytes free   : %Lu\n",
-                           Lu(stat_array[i].ram_free_bytes));
-                    printf("\tuptime (seconds) : %Lu\n",
-                           Lu(stat_array[i].uptime_seconds));
+                    printf("\tRAM bytes total  : %llu\n",
+                           llu(stat_array[i].ram_total_bytes));
+                    printf("\tRAM bytes free   : %llu\n",
+                           llu(stat_array[i].ram_free_bytes));
+                    printf("\tuptime (seconds) : %llu\n",
+                           llu(stat_array[i].uptime_seconds));
                 }
 
-                printf("\tload averages    : %Lu %Lu %Lu\n",
-                       Lu(stat_array[i].load_1),
-                       Lu(stat_array[i].load_5),
-                       Lu(stat_array[i].load_15));
-                printf("\thandles available: %Lu\n",
-                       Lu(stat_array[i].handles_available_count));
-                printf("\thandles total    : %Lu\n",
-                       Lu(stat_array[i].handles_total_count));
+                printf("\tload averages    : %llu %llu %llu\n",
+                       llu(stat_array[i].load_1),
+                       llu(stat_array[i].load_5),
+                       llu(stat_array[i].load_15));
+                printf("\thandles available: %llu\n",
+                       llu(stat_array[i].handles_available_count));
+                printf("\thandles total    : %llu\n",
+                       llu(stat_array[i].handles_total_count));
 
                 if (user_opts->human_readable)
                 {
@@ -219,10 +220,10 @@ int main(int argc, char **argv)
                 }
                 else
                 {
-                    printf("\tbytes available  : %Lu\n",
-                           Lu(stat_array[i].bytes_available));
-                    printf("\tbytes total      : %Lu\n",
-                           Lu(stat_array[i].bytes_total));
+                    printf("\tbytes available  : %llu\n",
+                           llu(stat_array[i].bytes_available));
+                    printf("\tbytes total      : %llu\n",
+                           llu(stat_array[i].bytes_total));
                 }
 
                 if ((stat_array[i].server_type & PVFS_MGMT_IO_SERVER) &&

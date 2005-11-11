@@ -27,6 +27,7 @@
 #include "pvfs2-types-debug.h"
 #include "pvfs2-util.h"
 #include "pint-util.h"
+#include "pvfs2-internal.h"
 
 enum
 {
@@ -233,13 +234,13 @@ static int getattr_verify_attribs(
         resp_attr->mtime = s_op->attr.mtime;
 
         gossip_debug(GOSSIP_GETATTR_DEBUG, " No version found!  Using "
-                     "mtime %Lu\n", Lu(resp_attr->mtime));
+                     "mtime %llu\n", llu(resp_attr->mtime));
     }
     else
     {
         gossip_debug(
-            GOSSIP_GETATTR_DEBUG, " VERSION is %Lu, mtime is %Lu\n",
-            Lu(s_op->attr.mtime), Lu(resp_attr->mtime));
+            GOSSIP_GETATTR_DEBUG, " VERSION is %llu, mtime is %llu\n",
+            llu(s_op->attr.mtime), llu(resp_attr->mtime));
     }
 
     resp_attr->ctime = s_op->attr.ctime;
@@ -252,11 +253,11 @@ static int getattr_verify_attribs(
     gossip_debug(
         GOSSIP_GETATTR_DEBUG,
         "+  _DSPACE_ retrieved attrs: [owner = %d, group = %d\n\t"
-        "perms = %o, type = %d, atime = %Lu, mtime = %Lu\n\t"
-        "ctime = %Lu, dfile_count = %d, dist_size = %d]\n",
+        "perms = %o, type = %d, atime = %llu, mtime = %llu\n\t"
+        "ctime = %llu, dfile_count = %d, dist_size = %d]\n",
         resp_attr->owner, resp_attr->group, resp_attr->perms,
-        resp_attr->objtype, Lu(resp_attr->atime),
-        Lu(resp_attr->mtime), Lu(resp_attr->ctime),
+        resp_attr->objtype, llu(resp_attr->atime),
+        llu(resp_attr->mtime), llu(resp_attr->ctime),
         (int)resp_attr->u.meta.dfile_count,
         (int)resp_attr->u.meta.dist_size);
 #endif
@@ -276,8 +277,8 @@ static int getattr_verify_attribs(
     {
         PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: metafile\n");
         gossip_debug(GOSSIP_GETATTR_DEBUG,
-                     "  Req handle %Lu refers to a metafile\n",
-                     Lu(s_op->u.getattr.handle));
+                     "  Req handle %llu refers to a metafile\n",
+                     llu(s_op->u.getattr.handle));
 
         if (s_op->u.getattr.attrmask & PVFS_ATTR_META_DFILES)
         {
@@ -335,10 +336,10 @@ static int getattr_verify_attribs(
         resp_attr->u.data.size = s_op->ds_attr.b_size;
         resp_attr->mask |= PVFS_ATTR_DATA_ALL;
 
-	gossip_debug(GOSSIP_GETATTR_DEBUG, "  handle %Lu refers to "
-                     "a datafile (size = %Ld).\n",
-                     Lu(s_op->u.getattr.handle),
-                     Ld(resp_attr->u.data.size));
+	gossip_debug(GOSSIP_GETATTR_DEBUG, "  handle %llu refers to "
+                     "a datafile (size = %lld).\n",
+                     llu(s_op->u.getattr.handle),
+                     lld(resp_attr->u.data.size));
     }
     else if (resp_attr->objtype == PVFS_TYPE_DIRECTORY)
     {
@@ -363,17 +364,17 @@ static int getattr_verify_attribs(
     {
         PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: dirdata\n");
 	gossip_debug(
-            GOSSIP_GETATTR_DEBUG, "  handle %Lu refers to "
+            GOSSIP_GETATTR_DEBUG, "  handle %llu refers to "
             "a dirdata object. doing nothing special\n",
-            Lu(s_op->u.getattr.handle));
+            llu(s_op->u.getattr.handle));
         assert(resp_attr->mask & PVFS_ATTR_COMMON_ALL);
     }
     else if (resp_attr->objtype == PVFS_TYPE_SYMLINK)
     {
         PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "type: symlink\n");
 	gossip_debug(
-            GOSSIP_GETATTR_DEBUG, "  handle %Lu refers to a symlink.\n",
-            Lu(s_op->u.getattr.handle));
+            GOSSIP_GETATTR_DEBUG, "  handle %llu refers to a symlink.\n",
+            llu(s_op->u.getattr.handle));
 
         /*
           we'll definitely have to fetch the symlink target in this
@@ -384,18 +385,18 @@ static int getattr_verify_attribs(
     else
     {
 	gossip_debug(
-            GOSSIP_GETATTR_DEBUG, "  handle %Lu refers to something "
+            GOSSIP_GETATTR_DEBUG, "  handle %llu refers to something "
             "unknown -- assuming datafile!\n",
-            Lu(s_op->u.getattr.handle));
+            llu(s_op->u.getattr.handle));
 
         resp_attr->objtype = PVFS_TYPE_DATAFILE;
         resp_attr->u.data.size = s_op->ds_attr.b_size;
         resp_attr->mask |= (PVFS_ATTR_COMMON_TYPE | PVFS_ATTR_DATA_ALL);
 
-	gossip_debug(GOSSIP_GETATTR_DEBUG, "  handle %Lu now refers to "
-                     "a datafile (size = %Ld).\n",
-                     Lu(s_op->u.getattr.handle),
-                     Ld(resp_attr->u.data.size));
+	gossip_debug(GOSSIP_GETATTR_DEBUG, "  handle %llu now refers to "
+                     "a datafile (size = %lld).\n",
+                     llu(s_op->u.getattr.handle),
+                     lld(resp_attr->u.data.size));
     }
     return 1;
 }
@@ -480,20 +481,20 @@ static int getattr_read_metafile_datafile_handles_if_required(
                    "aborting operation.\n", dfile_count);
 	gossip_err(
             "+ attrs read from dspace: (owner = %d, group = %d, "
-            "perms = %o, type = %d\n   atime = %Ld, mtime = %Ld, "
-            "ctime = %Ld |\n   dfile_count = %d | dist_size = %d)\n",
+            "perms = %o, type = %d\n   atime = %lld, mtime = %lld, "
+            "ctime = %lld |\n   dfile_count = %d | dist_size = %d)\n",
             s_op->resp.u.getattr.attr.owner,
             s_op->resp.u.getattr.attr.group, 
             s_op->resp.u.getattr.attr.perms,
             s_op->resp.u.getattr.attr.objtype, 
-            Ld(s_op->resp.u.getattr.attr.atime),
-            Ld(s_op->resp.u.getattr.attr.mtime), 
-            Ld(s_op->resp.u.getattr.attr.ctime),
+            lld(s_op->resp.u.getattr.attr.atime),
+            lld(s_op->resp.u.getattr.attr.mtime), 
+            lld(s_op->resp.u.getattr.attr.ctime),
             (int)s_op->resp.u.getattr.attr.u.meta.dfile_count,
             (int)s_op->resp.u.getattr.attr.u.meta.dist_size);
 
-	gossip_err("handle: %Lu (%Lx), fsid: %d.\n",
-	    Lu(s_op->u.getattr.handle), Lu(s_op->u.getattr.handle),
+	gossip_err("handle: %llu (%llx), fsid: %d.\n",
+	    llu(s_op->u.getattr.handle), llu(s_op->u.getattr.handle),
 	    (int)s_op->u.getattr.fs_id);
 
 	js_p->error_code = -PVFS_EOVERFLOW;
@@ -521,9 +522,9 @@ static int getattr_read_metafile_datafile_handles_if_required(
 
     gossip_debug(GOSSIP_GETATTR_DEBUG,
 		 "  reading %d datafile handles (coll_id = %d, "
-                 "handle = %Lu, key = %s (%d), val_buf = %p (%d))\n",
+                 "handle = %llu, key = %s (%d), val_buf = %p (%d))\n",
 		 dfile_count, s_op->u.getattr.fs_id,
-		 Lu(s_op->u.getattr.handle), (char *)s_op->key.buffer,
+		 llu(s_op->u.getattr.handle), (char *)s_op->key.buffer,
 		 s_op->key.buffer_sz, s_op->val.buffer,
 		 s_op->val.buffer_sz);
 
@@ -566,7 +567,7 @@ static int getattr_read_metafile_distribution_if_required(
     if (s_op->resp.u.getattr.attr.u.meta.dist_size < 1)
     {
         gossip_err("Cannot Read Dist!  Got an invalid dist size for "
-                   "handle %Lu,%d\n",Lu(s_op->u.getattr.handle),
+                   "handle %llu,%d\n",llu(s_op->u.getattr.handle),
                    s_op->u.getattr.fs_id);
         js_p->error_code = -PVFS_EINVAL;
         return 1;
@@ -606,11 +607,11 @@ static int getattr_setup_resp(PINT_server_op *s_op, job_status_s *js_p)
     gossip_debug(
         GOSSIP_GETATTR_DEBUG,
         "- RETURNING retrieved attrs: [owner = %d, group = %d\n\t"
-        "perms = %o, type = %d, atime = %Lu, mtime = %Lu\n\t"
-        "ctime = %Lu, dfile_count = %d, dist_size = %d]\n",
+        "perms = %o, type = %d, atime = %llu, mtime = %llu\n\t"
+        "ctime = %llu, dfile_count = %d, dist_size = %d]\n",
         resp_attr->owner, resp_attr->group, resp_attr->perms,
-        resp_attr->objtype, Lu(resp_attr->atime),
-        Lu(resp_attr->mtime), Lu(resp_attr->ctime),
+        resp_attr->objtype, llu(resp_attr->atime),
+        llu(resp_attr->mtime), llu(resp_attr->ctime),
         (int)resp_attr->u.meta.dfile_count,
         (int)resp_attr->u.meta.dist_size);
 
@@ -630,8 +631,8 @@ static int getattr_setup_resp(PINT_server_op *s_op, job_status_s *js_p)
         if (resp_attr->mask & PVFS_ATTR_META_DIST)
         {
             if(resp_attr->u.meta.dist == 0) {
-                gossip_err("Found dist of 0 for handle %Lu,%d\n",
-                        Lu(s_op->u.getattr.handle), s_op->u.getattr.fs_id);
+                gossip_err("Found dist of 0 for handle %llu,%d\n",
+                        llu(s_op->u.getattr.handle), s_op->u.getattr.fs_id);
                 PVFS_perror("Metafile getattr_setup_resp",js_p->error_code);
                 js_p->error_code = -PVFS_EIO;
                 return 1;
@@ -646,8 +647,8 @@ static int getattr_setup_resp(PINT_server_op *s_op, job_status_s *js_p)
              (resp_attr->mask & PVFS_ATTR_DATA_SIZE))
     {
         gossip_debug(GOSSIP_GETATTR_DEBUG,
-                     "  also returning data size of %Ld\n",
-                     Ld(resp_attr->u.data.size));
+                     "  also returning data size of %lld\n",
+                     lld(resp_attr->u.data.size));
     }
     else if ((resp_attr->objtype == PVFS_TYPE_SYMLINK) &&
              (resp_attr->mask & PVFS_ATTR_SYMLNK_TARGET))
@@ -671,7 +672,7 @@ static int getattr_setup_resp(PINT_server_op *s_op, job_status_s *js_p)
         else
         {
             gossip_err("Failed to retrieve symlink target path for "
-                       "handle %Lu,%d\n",Lu(s_op->u.getattr.handle),
+                       "handle %llu,%d\n",llu(s_op->u.getattr.handle),
                        s_op->u.getattr.fs_id);
             PVFS_perror("Symlink retrieval failure",js_p->error_code);
 
@@ -744,8 +745,8 @@ static int getattr_get_dirent_count(
     PINT_STATE_DEBUG("get_dirent_count");
 
     gossip_debug(GOSSIP_SERVER_DEBUG, "  trying to getattr of "
-                 "dirdata handle (coll_id = %d, handle = %Lu\n",
-                 s_op->u.getattr.fs_id, Lu(s_op->u.getattr.dirdata_handle));
+                 "dirdata handle (coll_id = %d, handle = %llu\n",
+                 s_op->u.getattr.fs_id, llu(s_op->u.getattr.dirdata_handle));
 
     ret = job_trove_dspace_getattr(
         s_op->u.getattr.fs_id, s_op->u.getattr.dirdata_handle, s_op,
@@ -763,8 +764,8 @@ static int getattr_interpret_dirent_count(
     s_op->resp.u.getattr.attr.u.dir.dirent_count =
         s_op->u.getattr.dirdata_ds_attr.k_size;
 
-    gossip_debug(GOSSIP_GETATTR_DEBUG, "getattr: dirent_count: %Ld\n",
-        Ld(s_op->resp.u.getattr.attr.u.dir.dirent_count));
+    gossip_debug(GOSSIP_GETATTR_DEBUG, "getattr: dirent_count: %lld\n",
+        lld(s_op->resp.u.getattr.attr.u.dir.dirent_count));
 
     js_p->error_code = 0;
     return 1;

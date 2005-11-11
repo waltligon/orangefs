@@ -19,6 +19,7 @@
 #include "pvfs2.h"
 #include "pvfs2-mgmt.h"
 #include "str-utils.h"
+#include "pvfs2-internal.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -178,7 +179,7 @@ int main(int argc, char **argv)
             (ref.fs_id == PVFS_FS_ID_NULL))
         {
             fprintf(stderr, "Invalid object reference specified: "
-                    "%Lu,%d\n", Lu(ref.handle), ref.fs_id);
+                    "%llu,%d\n", llu(ref.handle), ref.fs_id);
             return ret;
         }
     }
@@ -189,14 +190,14 @@ int main(int argc, char **argv)
             (ref.fs_id == PVFS_FS_ID_NULL))
         {
             fprintf(stderr, "Invalid parent reference specified: "
-                    "%Lu,%d\n", Lu(ref.handle), ref.fs_id);
+                    "%llu,%d\n", llu(ref.handle), ref.fs_id);
             return ret;
         }
 
         if (!user_opts->dirent_name)
         {
             fprintf(stderr, "No dirent name specified under parent "
-                    "%Lu,%d\n", Lu(ref.handle), ref.fs_id);
+                    "%llu,%d\n", llu(ref.handle), ref.fs_id);
             return ret;
         }
     }
@@ -212,8 +213,8 @@ int main(int argc, char **argv)
 
     if (user_opts->remove_object_only)
     {
-        fprintf(stderr,"Attempting to remove object %Lu,%d\n",
-                Lu(ref.handle), ref.fs_id);
+        fprintf(stderr,"Attempting to remove object %llu,%d\n",
+                llu(ref.handle), ref.fs_id);
 
         ret = PVFS_mgmt_remove_object(ref, &credentials);
         if (ret)
@@ -223,8 +224,8 @@ int main(int argc, char **argv)
     }
     else
     {
-        fprintf(stderr,"Attempting to remove dirent \"%s\" under %Lu,%d"
-                "\n", user_opts->dirent_name, Lu(ref.handle), ref.fs_id);
+        fprintf(stderr,"Attempting to remove dirent \"%s\" under %llu,%d"
+                "\n", user_opts->dirent_name, llu(ref.handle), ref.fs_id);
 
         ret = PVFS_mgmt_remove_dirent(
             ref, user_opts->dirent_name, &credentials);

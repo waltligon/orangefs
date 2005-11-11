@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: mem.c,v 1.1 2005-11-03 21:23:19 pw Exp $
+ * $Id: mem.c,v 1.1.2.1 2005-11-11 22:19:04 slang Exp $
  */
 #include <src/common/gen-locks/gen-locks.h>
 #include "ib.h"
@@ -138,8 +138,8 @@ BMI_ib_memfree(void *buf, bmi_size_t len __unused,
     gen_mutex_lock(&memcache_mutex);
     c = memcache_lookup_exact(buf, len);
     if (c) {
-	debug(6, "%s: found %p len %Ld", __func__, c->buf, c->len);
-	assert(c->count == 1, "%s: buf %p len %Ld count = %d, expected 1",
+	debug(6, "%s: found %p len %lld", __func__, c->buf, c->len);
+	assert(c->count == 1, "%s: buf %p len %lld count = %d, expected 1",
 	  __func__, c->buf, c->len, c->count);
 	ib_mem_deregister(c);
 	qlist_del(&c->list);
@@ -168,11 +168,11 @@ memcache_register(ib_buflist_t *buflist)
 	c = memcache_lookup_cover(buflist->buf.send[i], buflist->len[i]);
 	if (c) {
 	    ++c->count;
-	    debug(2, "%s: hit [%d] %p len %Ld (via %p len %Ld) refcnt now %d",
+	    debug(2, "%s: hit [%d] %p len %lld (via %p len %lld) refcnt now %d",
 	      __func__, i, buflist->buf.send[i], buflist->len[i], c->buf,
 	      c->len, c->count);
 	} else {
-	    debug(2, "%s: miss [%d] %p len %Ld", __func__, i,
+	    debug(2, "%s: miss [%d] %p len %lld", __func__, i,
 	      buflist->buf.send[i], buflist->len[i]);
 	    c = memcache_add(buflist->buf.recv[i], buflist->len[i]);
 	    if (!c)
@@ -203,7 +203,7 @@ memcache_deregister(ib_buflist_t *buflist)
 #if ENABLE_MEMCACHE
 	memcache_entry_t *c = buflist->memcache[i];
 	--c->count;
-	debug(2, "%s: dec refcount [%d] %p len %Ld count now %d", __func__, i,
+	debug(2, "%s: dec refcount [%d] %p len %lld count now %d", __func__, i,
 	  buflist->buf.send[i], buflist->len[i], c->count);
 	/* let garbage collection do ib_mem_deregister(c) for refcnt==0 */
 #else

@@ -23,6 +23,7 @@
 #include "pint-servreq.h"
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
+#include "pvfs2-internal.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -489,8 +490,8 @@ PVFS_error PVFS_isys_ref_lookup(
         return ret;
     }
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup got: %s (parent %Lu)\n",
-                 relative_pathname, Lu(parent.handle));
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup got: %s (parent %llu)\n",
+                 relative_pathname, llu(parent.handle));
 
     return PINT_client_state_machine_post(
         sm_p, PVFS_SYS_LOOKUP, op_id, user_ptr);
@@ -644,8 +645,8 @@ static int lookup_segment_lookup_setup_msgpair(PINT_client_sm *sm_p,
         PVFS_ATTR_COMMON_ALL);
 
     gossip_debug(
-        GOSSIP_LOOKUP_DEBUG, "Looking up segment %s under handle %Lu\n",
-        seg_to_lookup, Lu(cur_seg->seg_starting_refn.handle));
+        GOSSIP_LOOKUP_DEBUG, "Looking up segment %s under handle %llu\n",
+        seg_to_lookup, llu(cur_seg->seg_starting_refn.handle));
 
     msg_p->fs_id = cur_seg->seg_starting_refn.fs_id;
     msg_p->handle = cur_seg->seg_starting_refn.handle;
@@ -1042,8 +1043,8 @@ static int lookup_cleanup(PINT_client_sm *sm_p,
     else
     {
         gossip_debug(GOSSIP_LOOKUP_DEBUG, "Lookup resolved segment %s "
-                     "to %Lu\n", sm_p->u.lookup.orig_pathname,
-                     Lu(sm_p->u.lookup.lookup_resp->ref.handle));
+                     "to %llu\n", sm_p->u.lookup.orig_pathname,
+                     llu(sm_p->u.lookup.lookup_resp->ref.handle));
     }
 
     /* mark operation as complete */

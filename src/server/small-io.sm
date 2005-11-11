@@ -18,8 +18,6 @@
 #include "pint-distribution.h"
 #include "pint-request.h"
 
-#define SMALL_IO_MAX_REGIONS 64
-
 static int small_io_start_job(PINT_server_op *s_op, job_status_s *js_p);
 static int small_io_send_response(PINT_server_op *s_op, job_status_s *js_p);
 static int small_io_cleanup(PINT_server_op *s_op, job_status_s *js_p);
@@ -76,8 +74,6 @@ static int small_io_start_job(PINT_server_op *s_op, job_status_s *js_p)
     PINT_Request_state * file_req_state;
     PINT_request_file_data fdata;
     PINT_Request_result result;
-    PVFS_size sizes[SMALL_IO_MAX_REGIONS];
-    PVFS_offset offsets[SMALL_IO_MAX_REGIONS];
     struct filesystem_configuration_s * fs_config;
     struct server_configuration_s * server_config;
 
@@ -86,11 +82,17 @@ static int small_io_start_job(PINT_server_op *s_op, job_status_s *js_p)
     fdata.server_nr = s_op->req->u.small_io.server_nr;
     fdata.server_ct = s_op->req->u.small_io.server_ct;
     fdata.dist = s_op->req->u.small_io.dist;
-    result.offset_array = offsets;
-    result.size_array = sizes;
+    result.offset_array = s_op->u.small_io.offsets;
+    result.size_array = s_op->u.small_io.sizes;
     result.segmax = SMALL_IO_MAX_REGIONS;
     result.bytes = 0;
     result.segs = 0;
+
+    PINT_REQUEST_STATE_SET_TARGET(file_req_state, 
+                                  s_op->req->u.small_io.file_req_offset);
+    PINT_REQUEST_STATE_SET_FINAL(file_req_state,
+                                 s_op->req->u.small_io.file_req_offset +
+                                 s_op->req->u.small_io.aggregate_size);
 
     fdata.fsize = s_op->ds_attr.b_size;
     s_op->resp.u.small_io.bstream_size = s_op->ds_attr.b_size;
@@ -148,8 +150,8 @@ static int small_io_start_job(PINT_server_op *s_op, job_status_s *js_p)
            (char **)&s_op->req->u.small_io.buffer,
            &s_op->req->u.small_io.aggregate_size,
            1,
-           offsets,
-           sizes,
+           s_op->u.small_io.offsets,
+           s_op->u.small_io.sizes,
            result.segs,
            &s_op->resp.u.small_io.result_size,
            (fs_config->trove_sync_data ? TROVE_SYNC : 0),
@@ -181,8 +183,8 @@ static int small_io_start_job(PINT_server_op *s_op, job_status_s *js_p)
             (char **)&s_op->resp.u.small_io.buffer,
             &s_op->req->u.small_io.aggregate_size,
             1,
-            offsets,
-            sizes,
+            s_op->u.small_io.offsets,
+            s_op->u.small_io.sizes,
             result.segs,
             &s_op->resp.u.small_io.result_size,
             (fs_config->trove_sync_data ? TROVE_SYNC : 0),

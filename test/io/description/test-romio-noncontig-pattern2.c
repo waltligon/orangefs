@@ -15,6 +15,7 @@
 #include <pvfs2-request.h>
 #include <pint-request.h>
 #include <assert.h>
+#include "pvfs2-internal.h"
 
 #define SEGMAX 16
 #define BYTEMAX (4*1024*1024)
@@ -98,7 +99,7 @@ int main(int argc, char **argv)
 		if(retval >= 0)
 		{
 			printf("results of PINT_process_request():\n");
-			printf("%d segments with %lld bytes\n", seg1.segs, Ld(seg1.bytes));
+			printf("%d segments with %lld bytes\n", seg1.segs, lld(seg1.bytes));
 			total_bytes_client += seg1.bytes;
 			for(i=0; i<seg1.segs; i++)
 			{
@@ -131,7 +132,7 @@ int main(int argc, char **argv)
 		if(retval >= 0)
 		{
 			printf("results of PINT_process_request():\n");
-			printf("%d segments with %lld bytes\n", seg1.segs, Ld(seg1.bytes));
+			printf("%d segments with %lld bytes\n", seg1.segs, lld(seg1.bytes));
 			total_bytes_server += seg1.bytes;
 			for(i=0; i<seg1.segs; i++)
 			{
@@ -152,8 +153,8 @@ int main(int argc, char **argv)
 		printf("**** request done.\n");
 	}
 
-	printf("total bytes processed on client side: %Ld\n", (long long)total_bytes_client);
-	printf("total bytes processed on server side: %Ld\n", (long long)total_bytes_server);
+	printf("total bytes processed on client side: %lld\n", (long long)total_bytes_client);
+	printf("total bytes processed on server side: %lld\n", (long long)total_bytes_server);
 
 	if(total_bytes_client == total_bytes_server)
 	{

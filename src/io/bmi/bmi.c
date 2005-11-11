@@ -24,6 +24,7 @@
 #include "gen-locks.h"
 #include "str-utils.h"
 #include "id-generator.h"
+#include "pvfs2-internal.h"
 
 /*
  * List of BMI addrs currently managed.
@@ -654,7 +655,7 @@ int BMI_test(bmi_op_id_t id,
     if (ret == 0 && *outcount == 1)
     {
 	gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
-                     "BMI_test completing: %Lu\n", Lu(id));
+                     "BMI_test completing: %llu\n", llu(id));
 	return (1);
     }
     return (ret);
@@ -977,7 +978,7 @@ int BMI_testcontext(int incount,
 	for(i=0; i<*outcount; i++)
 	{
 	    gossip_debug(GOSSIP_BMI_DEBUG_CONTROL, 
-		"BMI_testcontext completing: %Lu\n", Lu(out_id_array[i]));
+		"BMI_testcontext completing: %llu\n", llu(out_id_array[i]));
 	}
 	return (1);
     }
@@ -1176,7 +1177,7 @@ int BMI_set_info(PVFS_BMI_addr_t addr,
 	    {
 		/* kill the address */
 		gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
-		    "bmi discarding address: %Lu\n", Lu(addr));
+		    "bmi discarding address: %llu\n", llu(addr));
 		ref_list_rem(cur_ref_list, addr);
 		/* NOTE: this triggers request to module to free underlying
 		 * resources if it wants to
@@ -1624,7 +1625,7 @@ int BMI_cancel(bmi_op_id_t id,
     int ret = -1;
 
     gossip_debug(GOSSIP_BMI_DEBUG_CONTROL,
-                 "%s: cancel id %Lu\n", __func__, Lu(id));
+                 "%s: cancel id %llu\n", __func__, llu(id));
 
     target_op = id_gen_safe_lookup(id);
     assert(target_op->op_id == id);
@@ -1823,17 +1824,12 @@ case err: bmi_errno = BMI_##err; break
         __CASE(ENOTEMPTY);
         __CASE(ELOOP);
         __CASE(ENOMSG);
-        __CASE(EUNATCH);
-        __CASE(EBADR);
         __CASE(ENODATA);
         __CASE(ETIME);
-        __CASE(ENONET);
         __CASE(EREMOTE);
-        __CASE(ECOMM);
         __CASE(EPROTO);
         __CASE(EBADMSG);
         __CASE(EOVERFLOW);
-        __CASE(ERESTART);
         __CASE(EMSGSIZE);
         __CASE(EPROTOTYPE);
         __CASE(ENOPROTOOPT);

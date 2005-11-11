@@ -12,6 +12,7 @@
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
 #include "gossip.h"
+#include "pvfs2-internal.h"
 
 static int mgmt_get_dirdata_handle_from_parent(
     PINT_server_op *s_op, job_status_s *js_p);
@@ -82,10 +83,10 @@ static int mgmt_get_dirdata_handle_from_parent(
 
     gossip_debug(
         GOSSIP_SERVER_DEBUG,
-        "  reading dirdata handle (coll_id = %d, handle = %Lu\n\t"
+        "  reading dirdata handle (coll_id = %d, handle = %llu\n\t"
         "key = %s (%d), val_buf = %p (%d))\n",
         s_op->req->u.mgmt_get_dirdata_handle.fs_id,
-        Lu(s_op->req->u.mgmt_get_dirdata_handle.handle),
+        llu(s_op->req->u.mgmt_get_dirdata_handle.handle),
         (char *)s_op->key.buffer, s_op->key.buffer_sz,
         s_op->val.buffer, s_op->val.buffer_sz);
 
@@ -109,17 +110,17 @@ static int mgmt_get_dirdata_handle_setup_resp(
             s_op->u.mgmt_get_dirdata_handle.dirdata_handle;
 
         gossip_debug(
-            GOSSIP_SERVER_DEBUG, "  Found dirdata handle %Lu of parent "
-            "%Lu\n", Lu(s_op->u.mgmt_get_dirdata_handle.dirdata_handle),
-            Lu(s_op->req->u.mgmt_get_dirdata_handle.handle));
+            GOSSIP_SERVER_DEBUG, "  Found dirdata handle %llu of parent "
+            "%llu\n", llu(s_op->u.mgmt_get_dirdata_handle.dirdata_handle),
+            llu(s_op->req->u.mgmt_get_dirdata_handle.handle));
     }
     else
     {
         s_op->resp.u.mgmt_get_dirdata_handle.handle = PVFS_HANDLE_NULL;
 
         gossip_debug(GOSSIP_SERVER_DEBUG, "Failed to retrieve dirdata "
-                     "handle from parent %Lu\n",
-                     Lu(s_op->req->u.mgmt_get_dirdata_handle.handle));
+                     "handle from parent %llu\n",
+                     llu(s_op->req->u.mgmt_get_dirdata_handle.handle));
     }
     return 1;
 }

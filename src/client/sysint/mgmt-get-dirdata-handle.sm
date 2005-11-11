@@ -25,6 +25,7 @@
 #include "pint-servreq.h"
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
+#include "pvfs2-internal.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -111,7 +112,7 @@ PVFS_error PVFS_imgmt_get_dirdata_handle(
 
     gossip_debug(
         GOSSIP_CLIENT_DEBUG, "Trying to get dirdata object of parent "
-        "dir %Lu,%d\n", Lu(parent_ref.handle), parent_ref.fs_id);
+        "dir %llu,%d\n", llu(parent_ref.handle), parent_ref.fs_id);
 
     return PINT_client_state_machine_post(
         sm_p, PVFS_MGMT_GET_DIRDATA_HANDLE, op_id, user_ptr);
@@ -178,7 +179,7 @@ static int mgmt_get_dirdata_handle_setup_msgpair(
         sm_p->parent_ref.handle);
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "- doing MGMT_GET_DIRDATA_HANDLE "
-                 "under %Lu,%d\n", Lu(sm_p->parent_ref.handle),
+                 "under %llu,%d\n", llu(sm_p->parent_ref.handle),
                  sm_p->parent_ref.fs_id);
 
     msg_p->fs_id = sm_p->parent_ref.fs_id;
@@ -213,9 +214,9 @@ static int mgmt_get_dirdata_handle_comp_fn(
 
         gossip_debug(
             GOSSIP_CLIENT_DEBUG, "  mgmt_get_dirdata_handle_comp_fn: "
-            "got dirdata handle %Lu under %Lu,%d removed\n",
-            Lu(*sm_p->u.mgmt_get_dirdata_handle.dirdata_handle),
-            Lu(sm_p->parent_ref.handle), sm_p->parent_ref.fs_id);
+            "got dirdata handle %llu under %llu,%d removed\n",
+            llu(*sm_p->u.mgmt_get_dirdata_handle.dirdata_handle),
+            llu(sm_p->parent_ref.handle), sm_p->parent_ref.fs_id);
     }
     return resp_p->status;
 }

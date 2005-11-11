@@ -10,6 +10,7 @@
 #include "server-config.h"
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
+#include "pvfs2-internal.h"
 
 static inline char *get_object_type(int objtype)
 {
@@ -108,9 +109,9 @@ static int deleattr_verify_eattribs(
     js_p->error_code = 0;
 
     gossip_debug(GOSSIP_DELEATTR_DEBUG,
-                 "  ext attr delete from handle %Lu refers to a %s\n\t"
+                 "  ext attr delete from handle %llu refers to a %s\n\t"
                  "[owner = %d, group = %d, perms = %o, type = %d]\n",
-                 Lu(s_op->req->u.deleattr.handle),
+                 llu(s_op->req->u.deleattr.handle),
                  get_object_type(a_p->objtype),
                  a_p->owner, a_p->group, a_p->perms, a_p->objtype);
 
@@ -182,9 +183,9 @@ static int deleattr_delobj_eattribs(PINT_server_op *s_op, job_status_s *js_p)
 
     gossip_debug(
         GOSSIP_DELEATTR_DEBUG,
-        "  writing %s [%Lu,%d,len %d]\n",
+        "  writing %s [%llu,%d,len %d]\n",
         (char *)s_op->key.buffer,
-        Lu(s_op->req->u.deleattr.handle),
+        llu(s_op->req->u.deleattr.handle),
         s_op->req->u.deleattr.fs_id,
         s_op->val.buffer_sz);
 

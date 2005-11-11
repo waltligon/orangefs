@@ -22,6 +22,7 @@
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
 #include "pint-util.h"
+#include "pvfs2-internal.h"
 
 extern job_context_id pint_client_sm_context;
 
@@ -191,8 +192,8 @@ static int flush_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
         if (i < attr->u.meta.dfile_count)
         {
             gossip_debug(GOSSIP_CLIENT_DEBUG,
-                         "  datafile_flush: flushing handle %Lu\n",
-                         Lu(attr->u.meta.dfile_array[i]));
+                         "  datafile_flush: flushing handle %llu\n",
+                         llu(attr->u.meta.dfile_array[i]));
 
             PINT_SERVREQ_FLUSH_FILL(msg_p->req,
                                     *sm_p->cred_p,
@@ -209,8 +210,8 @@ static int flush_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
             assert(i == (sm_p->msgarray_count - 1));
 
             gossip_debug(GOSSIP_CLIENT_DEBUG,
-                         "  metafile_flush: flushing handle %Lu\n",
-                         Lu(sm_p->object_ref.handle));
+                         "  metafile_flush: flushing handle %llu\n",
+                         llu(sm_p->object_ref.handle));
 
             PINT_SERVREQ_FLUSH_FILL(msg_p->req,
                                     *sm_p->cred_p,

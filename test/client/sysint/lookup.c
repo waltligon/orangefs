@@ -14,6 +14,7 @@
 
 #include "client.h"
 #include "pvfs2-util.h"
+#include "pvfs2-internal.h"
 
 void gen_rand_str(int len, char** gen_str);
 
@@ -70,7 +71,7 @@ int main(int argc,char **argv)
         return(-1);
     }
 
-    printf("Handle     : %Lu\n", Lu(resp_lk.ref.handle));
+    printf("Handle     : %llu\n", llu(resp_lk.ref.handle));
     printf("FS ID      : %d\n", resp_lk.ref.fs_id);
 
     ret = PVFS_sys_finalize();

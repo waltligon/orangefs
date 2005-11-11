@@ -20,6 +20,7 @@
 #include <pint-dist-utils.h>
 #include <pvfs2-request.h>
 #include <pint-request.h>
+#include "pvfs2-internal.h"
 
 #define SEGMAX 16
 #define BYTEMAX (1024*1024)
@@ -97,7 +98,7 @@ int main(int argc, char **argv)
 		if(retval >= 0)
 		{
 			printf("results of PINT_process_request():\n");
-			printf("%d segments with %lld bytes\n", seg1.segs, Ld(seg1.bytes));
+			printf("%d segments with %lld bytes\n", seg1.segs, lld(seg1.bytes));
 #if 0
 			for(i=0; i<seg1.segs; i++)
 			{
@@ -180,7 +181,7 @@ int main(int argc, char **argv)
 		if(retval >= 0)
 		{
 			printf("results of PINT_process_request():\n");
-			printf("%d segments with %lld bytes\n", seg1.segs, Ld(seg1.bytes));
+			printf("%d segments with %lld bytes\n", seg1.segs, lld(seg1.bytes));
 #if 0
 			for(i=0; i<seg1.segs; i++)
 			{

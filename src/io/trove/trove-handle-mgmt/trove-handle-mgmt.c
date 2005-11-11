@@ -17,6 +17,7 @@
 #include "trove-handle-mgmt.h"
 #include "gossip.h"
 #include "gen-locks.h"
+#include "pvfs2-internal.h"
 
 /*
   this is an internal structure and shouldn't be used
@@ -105,8 +106,8 @@ static int trove_check_handle_ranges(TROVE_coll_id coll_id,
                                                     handles[i]))
                     {
                         gossip_debug(
-                            GOSSIP_TROVE_DEBUG, "handle %Lu is invalid "
-                            "(out of bounds)\n", Lu(handles[i]));
+                            GOSSIP_TROVE_DEBUG, "handle %llu is invalid "
+                            "(out of bounds)\n", llu(handles[i]));
                         return -1;
                     }
 
@@ -116,7 +117,7 @@ static int trove_check_handle_ranges(TROVE_coll_id coll_id,
                     {
 			gossip_debug(
                             GOSSIP_TROVE_DEBUG, "could not remove "
-                            "handle %Lu\n", Lu(handles[i]));
+                            "handle %llu\n", llu(handles[i]));
 			break;
 		    }
                 }

@@ -9,6 +9,7 @@
 
 #include "gossip.h"
 #include "ncache.h"
+#include "pvfs2-internal.h"
 
 /* this is a test program that exercises the ncache interface and
  * demonstrates how to use it.
@@ -94,8 +95,8 @@ int main(int argc, char **argv)
     if (ret == -PVFS_ENOENT || test_ref.handle != first_ref.handle)
     {
         fprintf(stderr, "Failure: lookup didn't return correct "
-                "handle (%Lu != %Lu)\n", Lu(test_ref.handle),
-                Lu(first_ref.handle));
+                "handle (%llu != %llu)\n", llu(test_ref.handle),
+                llu(first_ref.handle));
         return(-1);
     }
 
@@ -109,8 +110,8 @@ int main(int argc, char **argv)
     if (ret == -PVFS_ENOENT || test_ref.handle != second_ref.handle)
     {
         fprintf(stderr, "Failure: lookup didn't return correct "
-                "handle (%Lu != %Lu)\n", Lu(test_ref.handle),
-                Lu(second_ref.handle));
+                "handle (%llu != %llu)\n", llu(test_ref.handle),
+                llu(second_ref.handle));
         return(-1);
     }
 
@@ -125,8 +126,8 @@ int main(int argc, char **argv)
     if ((ret == -PVFS_ENOENT) || (test_ref.handle != third_ref.handle))
     {
         fprintf(stderr, "Failure: lookup didn't return correct "
-                "handle (%Lu != %Lu)\n", Lu(test_ref.handle),
-                Lu(third_ref.handle));
+                "handle (%llu != %llu)\n", llu(test_ref.handle),
+                llu(third_ref.handle));
         return(-1);
     }
 
@@ -145,8 +146,8 @@ int main(int argc, char **argv)
     if (ret != -PVFS_ENOENT)
     {
         fprintf(stderr, "Failure: lookup didn't return correct "
-                "handle (%Lu != %Lu)\n", Lu(test_ref.handle),
-                Lu(first_ref.handle));
+                "handle (%llu != %llu)\n", llu(test_ref.handle),
+                llu(first_ref.handle));
         fprintf(stderr, "Failure: lookup didn't return correct handle.\n");
         return(-1);
     }

@@ -12,6 +12,7 @@
 
 #include "pvfs2-kernel.h"
 #include "pvfs2-bufmap.h"
+#include "pvfs2-internal.h"
 
 extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
@@ -170,10 +171,10 @@ ssize_t pvfs2_inode_read(
             else
             {
                 pvfs2_error(
-                    "pvfs2_inode_read: error reading from handle %Lu, "
+                    "pvfs2_inode_read: error reading from handle %llu, "
                     "\n  -- downcall status is %d, returning %d "
                     "(error_exit=%d)\n",
-                    Lu(pvfs2_ino_to_handle(inode->i_ino)),
+                    llu(pvfs2_ino_to_handle(inode->i_ino)),
                     dc_status, ret, error_exit);
             }
             return ret;
@@ -364,10 +365,10 @@ static ssize_t pvfs2_file_write(
             else
             {
                 pvfs2_error(
-                    "pvfs2_file_write: error writing to handle %Lu, "
+                    "pvfs2_file_write: error writing to handle %llu, "
                     "FILE: %s\n  -- downcall status is %d, returning %d "
                     "(error_exit=%d)\n",
-                    Lu(pvfs2_ino_to_handle(inode->i_ino)),
+                    llu(pvfs2_ino_to_handle(inode->i_ino)),
                     (file && file->f_dentry && file->f_dentry->d_name.name ?
                      (char *)file->f_dentry->d_name.name : "UNKNOWN"),
                     dc_status, ret, error_exit);
@@ -629,7 +630,7 @@ static ssize_t pvfs2_file_readv(
         to_free = 0;
     }
     ptr = iovecptr;
-    pvfs2_print("pvfs2_file_readv reading %d@%Lu\n", (int) count, Ld(*offset));
+    pvfs2_print("pvfs2_file_readv reading %d@%llu\n", (int) count, lld(*offset));
     pvfs2_print("pvfs2_file_readv: new_nr_segs: %lu, seg_count: %u\n", 
             new_nr_segs, seg_count);
     for (seg = 0; seg < new_nr_segs; seg++)
@@ -713,10 +714,10 @@ static ssize_t pvfs2_file_readv(
               else
               {
                   pvfs2_error(
-                        "pvfs2_file_readv: error writing to handle %Lu, "
+                        "pvfs2_file_readv: error writing to handle %llu, "
                         "FILE: %s\n  -- downcall status is %d, returning %d "
                         "(error_exit=%d)\n",
-                        Lu(pvfs2_ino_to_handle(inode->i_ino)),
+                        llu(pvfs2_ino_to_handle(inode->i_ino)),
                         (file && file->f_dentry && file->f_dentry->d_name.name ?
                          (char *)file->f_dentry->d_name.name : "UNKNOWN"),
                         dc_status, ret, error_exit);
@@ -728,7 +729,7 @@ static ssize_t pvfs2_file_readv(
               }
               return ret;
         }
-        pvfs2_print("pvfs2_file_readv nr_segs %u, offset: %Lu each_count:%d\n",
+        pvfs2_print("pvfs2_file_readv nr_segs %u, offset: %llu each_count:%d\n",
                 (int) seg_array[seg], *offset, (int) each_count);
         /*
          * copy data to application by pushing it out to the iovec.
@@ -884,7 +885,7 @@ static ssize_t pvfs2_file_writev(
         to_free = 0;
     }
     ptr = iovecptr;
-    pvfs2_print("pvfs2_file_writev writing %d@%Lu\n", (int) count, *offset);
+    pvfs2_print("pvfs2_file_writev writing %d@%llu\n", (int) count, *offset);
     pvfs2_print("pvfs2_file_writev: new_nr_segs: %lu, seg_count: %u\n", 
             new_nr_segs, seg_count);
     for (seg = 0; seg < new_nr_segs; seg++)
@@ -938,7 +939,7 @@ static ssize_t pvfs2_file_writev(
         new_op->upcall.req.io.buf_index = buffer_index;
         new_op->upcall.req.io.count = each_count;
         new_op->upcall.req.io.offset = *offset;
-        pvfs2_print("pvfs2_file_writev nr_segs %u, offset: %Lu each_count: %d\n",
+        pvfs2_print("pvfs2_file_writev nr_segs %u, offset: %llu each_count: %d\n",
                 seg_array[seg], *offset, (int) each_count);
 
         /* 
@@ -990,10 +991,10 @@ static ssize_t pvfs2_file_writev(
               else
               {
                   pvfs2_error(
-                        "pvfs2_file_writev: error writing to handle %Lu, "
+                        "pvfs2_file_writev: error writing to handle %llu, "
                         "FILE: %s\n  -- downcall status is %d, returning %d "
                         "(error_exit=%d)\n",
-                        Lu(pvfs2_ino_to_handle(inode->i_ino)),
+                        llu(pvfs2_ino_to_handle(inode->i_ino)),
                         (file && file->f_dentry && file->f_dentry->d_name.name ?
                          (char *)file->f_dentry->d_name.name : "UNKNOWN"),
                         dc_status, ret, error_exit);
@@ -1541,10 +1542,10 @@ pvfs2_file_aio_read(struct kiocb *iocb, char __user *buffer,
                     {
                         pvfs2_error(
                             "pvfs2_file_aio_read: error reading from "
-                            " handle %Lu, "
+                            " handle %llu, "
                             "\n  -- downcall status is %d, returning %d "
                             "(error_exit=%d)\n",
-                            Lu(pvfs2_ino_to_handle(inode->i_ino)),
+                            llu(pvfs2_ino_to_handle(inode->i_ino)),
                             dc_status, (int) ret, error_exit);
                     }
                     error = ret;
@@ -1815,11 +1816,11 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
                     {
                         pvfs2_error(
                             "pvfs2_file_aio_write: error writing to "
-                            " handle %Lu, "
+                            " handle %llu, "
                             "FILE: %s\n  -- "
                             "downcall status is %d, returning %d "
                             "(error_exit=%d)\n",
-                            Lu(pvfs2_ino_to_handle(inode->i_ino)),
+                            llu(pvfs2_ino_to_handle(inode->i_ino)),
                             (filp && filp->f_dentry 
                              && filp->f_dentry->d_name.name ?
                              (char *)filp->f_dentry->d_name.name : "UNKNOWN"),
