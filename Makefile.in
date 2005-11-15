@@ -662,7 +662,7 @@ clean::
 endif
 
 # builds a tarball of the source tree suitable for distribution
-dist: cleaner
+dist: $(SMCGEN) cleaner
 	@sh $(srcdir)/maint/make-dist.sh $(srcdir) @PVFS2_VERSION@
 
 # some stuff that is cleaned in both distclean and dist targets
@@ -686,7 +686,9 @@ distclean: cleaner docsclean
 	rm -f src/server/simple.conf
 	rm -f src/server/server.conf-localhost
 	rm -f src/apps/admin/pvfs2-config
+ifndef DIST_RELEASE
 	rm -f $(SMCGEN)
+endif
 
 # this is where we include all of our automatic dependencies.
 # NOTE: we wrap this in ifneq's in order to prevent the
