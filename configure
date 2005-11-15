@@ -309,7 +309,7 @@ ac_includes_default="\
 # include <unistd.h>
 #endif"
 
-ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS PVFS2_VERSION build build_cpu build_vendor build_os host host_cpu host_vendor host_os CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT CPP EGREP INSTALL_PROGRAM INSTALL_SCRIPT INSTALL_DATA HAVE_PERL HAVE_FIND HAVE_BISON HAVE_FLEX BUILD_CC LIBCFLAGS THREAD_LIB BUILD_SERVER MMAP_RA_CACHE TRUSTED_CONNECTIONS HAVE_PKGCONFIG GTKLIBS GTKCFLAGS BUILD_KARMA build_static REDHAT_RELEASE NPTL_WORKAROUND MISC_TROVE_FLAGS LINUX_KERNEL_SRC LINUX24_KERNEL_SRC LINUX24_KERNEL_MINOR_VER BUILD_ABSOLUTE_TOP SRC_RELATIVE_TOP SRC_ABSOLUTE_TOP ENABLE_COVERAGE QUIET_COMPILE BUILD_EPOLL build_shared INTELC GNUC DB_LIB NEEDS_LIBRT TARGET_OS_DARWIN TARGET_OS_LINUX GM_HOME BUILD_GM IB_HOME BUILD_IB BUILD_VIS VISCFLAGS VISLIBS LIBOBJS LTLIBOBJS'
+ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS PVFS2_VERSION build build_cpu build_vendor build_os host host_cpu host_vendor host_os CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT CPP EGREP INSTALL_PROGRAM INSTALL_SCRIPT INSTALL_DATA HAVE_PERL HAVE_FIND HAVE_BISON HAVE_FLEX BUILD_CC LIBCFLAGS THREAD_LIB BUILD_SERVER MMAP_RA_CACHE TRUSTED_CONNECTIONS HAVE_PKGCONFIG GTKLIBS GTKCFLAGS BUILD_KARMA build_static REDHAT_RELEASE NPTL_WORKAROUND MISC_TROVE_FLAGS LINUX_KERNEL_SRC LINUX24_KERNEL_SRC LINUX24_KERNEL_MINOR_VER BUILD_ABSOLUTE_TOP SRC_RELATIVE_TOP SRC_ABSOLUTE_TOP ENABLE_COVERAGE QUIET_COMPILE BUILD_EPOLL build_shared INTELC GNUC DB_CFLAGS DB_LIB NEEDS_LIBRT TARGET_OS_DARWIN TARGET_OS_LINUX GM_HOME BUILD_GM IB_HOME BUILD_IB BUILD_VIS VISCFLAGS VISLIBS LIBOBJS LTLIBOBJS'
 ac_subst_files=''
 
 # Initialize some variables set by options.
@@ -7523,9 +7523,6 @@ echo $ECHO_N "checking for db library... $ECHO_C" >&6
     lib=notfound
 
     if test "x$dbpath" != "x" ; then
-        DB_LDFLAGS="-L${dbpath}/lib"
-	LDFLAGS="${LDFLAGS} $DB_LDFLAGS"
-
 	oldcflags=$CFLAGS
 	for dbheader in db4 db3 notfound; do
 		DB_CFLAGS="-I${dbpath}/include/$dbheader"
@@ -7564,62 +7561,52 @@ rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 	done
 
 	if test "x$dbheader" != "xnotfound"; then
-		LIBS="${oldlibs} -ldb"
-		DB_LIB="-ldb"
-		cat >conftest.$ac_ext <<_ACEOF
-/* confdefs.h.  */
-_ACEOF
-cat confdefs.h >>conftest.$ac_ext
-cat >>conftest.$ac_ext <<_ACEOF
-/* end confdefs.h.  */
-#include <db.h>
-int
-main ()
-{
-DB *dbp; db_create(&dbp, NULL, 0);
-  ;
-  return 0;
-}
-_ACEOF
-rm -f conftest.$ac_objext conftest$ac_exeext
-if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
-  (eval $ac_link) 2>conftest.er1
-  ac_status=$?
-  grep -v '^ *+' conftest.er1 >conftest.err
-  rm -f conftest.er1
-  cat conftest.err >&5
-  echo "$as_me:$LINENO: \$? = $ac_status" >&5
-  (exit $ac_status); } &&
-	 { ac_try='test -z "$ac_c_werror_flag"			 || test ! -s conftest.err'
-  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
-  (eval $ac_try) 2>&5
-  ac_status=$?
-  echo "$as_me:$LINENO: \$? = $ac_status" >&5
-  (exit $ac_status); }; } &&
-	 { ac_try='test -s conftest$ac_exeext'
-  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
-  (eval $ac_try) 2>&5
-  ac_status=$?
-  echo "$as_me:$LINENO: \$? = $ac_status" >&5
-  (exit $ac_status); }; }; then
-  lib=db
-else
-  echo "$as_me: failed program was:" >&5
-sed 's/^/| /' conftest.$ac_ext >&5
-
-fi
-rm -f conftest.err conftest.$ac_objext \
-      conftest$ac_exeext conftest.$ac_ext
-	fi
-
-	if test "x$lib" = "xnotfound"; then
 		DB_CFLAGS="-I${dbpath}/include"
 		CFLAGS="${oldcflags} $DB_CFLAGS"
+		cat >conftest.$ac_ext <<_ACEOF
+#include <db.h>
+_ACEOF
+rm -f conftest.$ac_objext
+if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
+  (eval $ac_compile) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest.$ac_objext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  :
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+{ { echo "$as_me:$LINENO: error: Invalid libdb path specified. No db.h found.
+See \`config.log' for more details." >&5
+echo "$as_me: error: Invalid libdb path specified. No db.h found.
+See \`config.log' for more details." >&2;}
+   { (exit 1); exit 1; }; }
+fi
+rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 	fi
 
-        LIBS="${oldlibs} -ldb"
-        DB_LIB="-ldb"
-        cat >conftest.$ac_ext <<_ACEOF
+        DB_LDFLAGS="-L${dbpath}/lib"
+	LDFLAGS="${LDFLAGS} $DB_LDFLAGS"
+
+	LIBS="${oldlibs} -ldb"
+	DB_LIB="-ldb"
+	cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
 cat confdefs.h >>conftest.$ac_ext
@@ -7663,6 +7650,8 @@ sed 's/^/| /' conftest.$ac_ext >&5
 fi
 rm -f conftest.err conftest.$ac_objext \
       conftest$ac_exeext conftest.$ac_ext
+	CFLAGS=$oldcflags
+
     else
         for lib in db4  db3  db  notfound; do
            LIBS="${oldlibs} -l$lib"
@@ -7723,6 +7712,7 @@ echo "$as_me: error: could not find DB libraries" >&2;}
            echo "$as_me:$LINENO: result: $lib" >&5
 echo "${ECHO_T}$lib" >&6
     fi
+
 
 
 
@@ -8139,9 +8129,6 @@ echo $ECHO_N "checking for db library... $ECHO_C" >&6
     lib=notfound
 
     if test "x$dbpath" != "x" ; then
-        DB_LDFLAGS="-L${dbpath}/lib"
-	LDFLAGS="${LDFLAGS} $DB_LDFLAGS"
-
 	oldcflags=$CFLAGS
 	for dbheader in db4 db3 notfound; do
 		DB_CFLAGS="-I${dbpath}/include/$dbheader"
@@ -8180,62 +8167,52 @@ rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 	done
 
 	if test "x$dbheader" != "xnotfound"; then
-		LIBS="${oldlibs} -ldb"
-		DB_LIB="-ldb"
-		cat >conftest.$ac_ext <<_ACEOF
-/* confdefs.h.  */
-_ACEOF
-cat confdefs.h >>conftest.$ac_ext
-cat >>conftest.$ac_ext <<_ACEOF
-/* end confdefs.h.  */
-#include <db.h>
-int
-main ()
-{
-DB *dbp; db_create(&dbp, NULL, 0);
-  ;
-  return 0;
-}
-_ACEOF
-rm -f conftest.$ac_objext conftest$ac_exeext
-if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
-  (eval $ac_link) 2>conftest.er1
-  ac_status=$?
-  grep -v '^ *+' conftest.er1 >conftest.err
-  rm -f conftest.er1
-  cat conftest.err >&5
-  echo "$as_me:$LINENO: \$? = $ac_status" >&5
-  (exit $ac_status); } &&
-	 { ac_try='test -z "$ac_c_werror_flag"			 || test ! -s conftest.err'
-  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
-  (eval $ac_try) 2>&5
-  ac_status=$?
-  echo "$as_me:$LINENO: \$? = $ac_status" >&5
-  (exit $ac_status); }; } &&
-	 { ac_try='test -s conftest$ac_exeext'
-  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
-  (eval $ac_try) 2>&5
-  ac_status=$?
-  echo "$as_me:$LINENO: \$? = $ac_status" >&5
-  (exit $ac_status); }; }; then
-  lib=db
-else
-  echo "$as_me: failed program was:" >&5
-sed 's/^/| /' conftest.$ac_ext >&5
-
-fi
-rm -f conftest.err conftest.$ac_objext \
-      conftest$ac_exeext conftest.$ac_ext
-	fi
-
-	if test "x$lib" = "xnotfound"; then
 		DB_CFLAGS="-I${dbpath}/include"
 		CFLAGS="${oldcflags} $DB_CFLAGS"
+		cat >conftest.$ac_ext <<_ACEOF
+#include <db.h>
+_ACEOF
+rm -f conftest.$ac_objext
+if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
+  (eval $ac_compile) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest.$ac_objext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  :
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+{ { echo "$as_me:$LINENO: error: Invalid libdb path specified. No db.h found.
+See \`config.log' for more details." >&5
+echo "$as_me: error: Invalid libdb path specified. No db.h found.
+See \`config.log' for more details." >&2;}
+   { (exit 1); exit 1; }; }
+fi
+rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 	fi
 
-        LIBS="${oldlibs} -ldb"
-        DB_LIB="-ldb"
-        cat >conftest.$ac_ext <<_ACEOF
+        DB_LDFLAGS="-L${dbpath}/lib"
+	LDFLAGS="${LDFLAGS} $DB_LDFLAGS"
+
+	LIBS="${oldlibs} -ldb"
+	DB_LIB="-ldb"
+	cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
 cat confdefs.h >>conftest.$ac_ext
@@ -8279,6 +8256,8 @@ sed 's/^/| /' conftest.$ac_ext >&5
 fi
 rm -f conftest.err conftest.$ac_objext \
       conftest$ac_exeext conftest.$ac_ext
+	CFLAGS=$oldcflags
+
     else
         for lib in db4  db3  db  notfound; do
            LIBS="${oldlibs} -l$lib"
@@ -8339,6 +8318,7 @@ echo "$as_me: error: could not find DB libraries" >&2;}
            echo "$as_me:$LINENO: result: $lib" >&5
 echo "${ECHO_T}$lib" >&6
     fi
+
 
 
 
@@ -12090,6 +12070,7 @@ s,@BUILD_EPOLL@,$BUILD_EPOLL,;t t
 s,@build_shared@,$build_shared,;t t
 s,@INTELC@,$INTELC,;t t
 s,@GNUC@,$GNUC,;t t
+s,@DB_CFLAGS@,$DB_CFLAGS,;t t
 s,@DB_LIB@,$DB_LIB,;t t
 s,@NEEDS_LIBRT@,$NEEDS_LIBRT,;t t
 s,@TARGET_OS_DARWIN@,$TARGET_OS_DARWIN,;t t
