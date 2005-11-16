@@ -23,8 +23,6 @@
 #include <sys/time.h>
 #endif /* __KERNEL__ */
 
-#include "pvfs2-config.h"
-
 #ifndef INT32_MAX
 /* definition taken from stdint.h */
 #define INT32_MAX (2147483647)
