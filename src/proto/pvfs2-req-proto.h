@@ -924,7 +924,7 @@ endecode_fields_1_struct(
 /* write operations require a second response to announce completion */
 struct PVFS_servresp_write_completion
 {
-    PVFS_size total_completed; /* amount of data transfered */
+    PVFS_size total_completed; /* amount of data transferred */
 };
 endecode_fields_1_struct(
     PVFS_servresp_write_completion,
@@ -971,15 +971,13 @@ struct PVFS_servreq_small_io
     if ((x)->io_type == PVFS_IO_WRITE) \
     { \
         int i = 0; \
-        int total_offset = 0; \
         for(; i < (x)->segments; ++i) \
         { \
-            memcpy((*pptr) + total_offset, \
+            memcpy((*pptr), \
                    (char *)(x)->buffer + ((x)->offsets[i]), \
                    (x)->sizes[i]); \
-            total_offset = (x)->offsets[i] + (x)->sizes[i]; \
+            (*pptr) += (x)->sizes[i]; \
         } \
-        (*pptr) += total_offset; \
     } \
 } while (0)
 

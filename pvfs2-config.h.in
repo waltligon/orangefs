@@ -205,6 +205,9 @@
 /* Define if on linux */
 #undef TARGET_OS_LINUX
 
+/* Define if O_LARGEFILE is defined */
+#undef USE_O_LARGEFILE
+
 /* Define if mtrace memory leak detection was enabled */
 #undef WITH_MTRACE
 

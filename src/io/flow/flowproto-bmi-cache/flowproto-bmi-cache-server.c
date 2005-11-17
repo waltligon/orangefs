@@ -750,7 +750,7 @@ static void bmi_recv_callback_fn(void *user_ptr,
 
 	/* WRONG: Add to another list for resource reclaim */
 
-	flow_d->total_transfered += actual_size;
+	flow_d->total_transferred += actual_size;
 
 
 	/* release cache resource, since data has been received into 
@@ -1001,7 +1001,7 @@ static void bmi_send_callback_fn(void *user_ptr,
 	gen_mutex_lock(&flow_data->flow_mutex);
 
 
-	flow_d->total_transfered += actual_size;
+	flow_d->total_transferred += actual_size;
 
 	/* release cache resource */
 

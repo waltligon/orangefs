@@ -281,7 +281,7 @@ static void service_mem_to_bmi(flow_descriptor * flow_d)
     tmp_result.bytemax = DEFAULT_BUFFER_SIZE;
     tmp_result.segmax = MAX_REGIONS;
 
-    flow_d->total_transfered = 0;
+    flow_d->total_transferred = 0;
 
     gossip_err("DUMP OFFSETS %p: MEMORY to BMI.\n", flow_d);
     gossip_err("*********************************************\n");
@@ -313,7 +313,7 @@ static void service_mem_to_bmi(flow_descriptor * flow_d)
 		(long)flow_d->src.u.mem.buffer), (long)size_array[i]);
 	}
 
-	flow_d->total_transfered += tmp_result.bytes;
+	flow_d->total_transferred += tmp_result.bytes;
 
     } while (!PINT_REQUEST_DONE(flow_d->file_req_state) && ret >= 0);
 
@@ -342,7 +342,7 @@ static void service_bmi_to_mem(flow_descriptor * flow_d)
     tmp_result.bytemax = DEFAULT_BUFFER_SIZE;
     tmp_result.segmax = MAX_REGIONS;
 
-    flow_d->total_transfered = 0;
+    flow_d->total_transferred = 0;
 
     gossip_err("DUMP OFFSETS %p: BMI to MEMORY.\n", flow_d);
     gossip_err("*********************************************\n");
@@ -373,7 +373,7 @@ static void service_bmi_to_mem(flow_descriptor * flow_d)
 		(long)flow_d->src.u.mem.buffer), (long)size_array[i]);
 	}
 
-	flow_d->total_transfered += tmp_result.bytes;
+	flow_d->total_transferred += tmp_result.bytes;
 
     } while (!PINT_REQUEST_DONE(flow_d->file_req_state) && ret >= 0);
 
@@ -402,7 +402,7 @@ static void service_bmi_to_trove(flow_descriptor * flow_d)
     tmp_result.bytemax = DEFAULT_BUFFER_SIZE;
     tmp_result.segmax = MAX_REGIONS;
 
-    flow_d->total_transfered = 0;
+    flow_d->total_transferred = 0;
 
     gossip_err("DUMP OFFSETS %p: BMI to TROVE.\n", flow_d);
     gossip_err("*********************************************\n");
@@ -433,7 +433,7 @@ static void service_bmi_to_trove(flow_descriptor * flow_d)
 		flow_d, i, (long)offset_array[i], (long)size_array[i]);
 	}
 
-	flow_d->total_transfered += tmp_result.bytes;
+	flow_d->total_transferred += tmp_result.bytes;
 
     } while (!PINT_REQUEST_DONE(flow_d->file_req_state) && ret >= 0);
 
@@ -462,7 +462,7 @@ static void service_trove_to_bmi(flow_descriptor * flow_d)
     tmp_result.bytemax = DEFAULT_BUFFER_SIZE;
     tmp_result.segmax = MAX_REGIONS;
 
-    flow_d->total_transfered = 0;
+    flow_d->total_transferred = 0;
 
     gossip_err("DUMP OFFSETS %p: TROVE to BMI.\n", flow_d);
     gossip_err("*********************************************\n");
@@ -493,7 +493,7 @@ static void service_trove_to_bmi(flow_descriptor * flow_d)
 		flow_d, i, (long)offset_array[i], (long)size_array[i]);
 	}
 
-	flow_d->total_transfered += tmp_result.bytes;
+	flow_d->total_transferred += tmp_result.bytes;
 
     } while (!PINT_REQUEST_DONE(flow_d->file_req_state) && ret >= 0);
 

@@ -500,7 +500,7 @@ int PINT_flow_getinfo(flow_descriptor *flow_d,
     {
     case FLOW_AMT_COMPLETE_QUERY:
 	tmp_size = (PVFS_size*)parameter;
-	*tmp_size = flow_d->total_transfered;
+	*tmp_size = flow_d->total_transferred;
 	break;
     default:
 	break;

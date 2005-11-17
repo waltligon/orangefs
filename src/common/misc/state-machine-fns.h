@@ -37,6 +37,16 @@
 #error "state-machine.h must be included before state-machine-fns.h is included."
 #endif
 
+/* This macro returns the state machine string of the current machine.
+ * We assume the first 6 characters of every state machine name are "pvfs2_".
+ */
+#define PINT_state_machine_current_machine_name(s) \
+    ((s->current_state - 2)->parent_machine->name + 6)
+
+/* This macro returns the current state invoked */
+#define PINT_state_machine_current_state_name(s) \
+    ((s->current_state - 3)->state_name)
+
 /* Prototypes for functions defined in here */
 static inline int PINT_state_machine_halt(void);
 static inline int PINT_state_machine_next(struct PINT_OP_STATE *,job_status_s *r);
@@ -65,11 +75,11 @@ static inline int PINT_state_machine_halt(void)
 static inline int PINT_state_machine_next(struct PINT_OP_STATE *s, 
 					  job_status_s *r)
 {
-
-
     int code_val = r->error_code;       /* temp to hold the return code */
     int retval;            /* temp to hold return value of state action */
     union PINT_state_array_values *loc; /* temp pointer into state memory */
+    char * state_name;
+    char * machine_name;
 
     do {
 	/* skip over the current state action to get to the return code list */
@@ -137,17 +147,20 @@ static inline int PINT_state_machine_next(struct PINT_OP_STATE *s,
      */
     s->current_state += 1;
 
+    state_name = PINT_state_machine_current_state_name(s);
+    machine_name = PINT_state_machine_current_machine_name(s);
+
     gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, "[SM Entering]: %s:%s\n",
                  /* skip pvfs2_ */
-                 ((s->current_state - 2)->parent_machine->name + 6),
-                 (s->current_state - 3)->state_name);
+                 machine_name,
+                 state_name);
                  
     retval = (s->current_state->state_action)(s,r);
 
     gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, "[SM Exiting]: %s:%s\n",
                  /* skip pvfs2_ */
-                 ((s->current_state - 2)->parent_machine->name + 6),
-                 (s->current_state - 3)->state_name);
+                 machine_name,
+                 state_name);
 
     /* return to the while loop in pvfs2-server.c */
     return retval;
@@ -157,17 +170,23 @@ static inline int PINT_state_machine_invoke(
     struct PINT_OP_STATE *s, job_status_s *r)
 {
     int retval;
+    char * state_name;
+    char * machine_name;
+
+    state_name = PINT_state_machine_current_state_name(s);
+    machine_name = PINT_state_machine_current_machine_name(s);
+
     gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, "[SM Entering]: %s:%s\n",
                  /* skip pvfs2_ */
-                 ((s->current_state - 2)->parent_machine->name + 6), 
-                 (s->current_state - 3)->state_name);
+                 machine_name,
+                 state_name);
                  
     retval = (s->current_state->state_action)(s,r);
 
     gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, "[SM Exiting]: %s:%s\n",
                  /* skip pvfs2_ */
-                 ((s->current_state - 2)->parent_machine->name + 6),
-                 (s->current_state - 3)->state_name);
+                 machine_name,
+                 state_name);
     return retval;
 }
 

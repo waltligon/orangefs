@@ -1196,8 +1196,8 @@ int job_flow(flow_descriptor * flow_d,
         /* immediate completion */
         out_status_p->error_code = 0;
         out_status_p->status_user_tag = status_user_tag;
-        out_status_p->actual_size = flow_d->total_transfered;
-        JOB_EVENT_END(PVFS_EVENT_FLOW, flow_d->total_transfered, jd->job_id);
+        out_status_p->actual_size = flow_d->total_transferred;
+        JOB_EVENT_END(PVFS_EVENT_FLOW, flow_d->total_transferred, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
         return (1);
@@ -4196,7 +4196,7 @@ static void fill_status(struct job_desc *jd,
     case JOB_FLOW:
         job_time_mgr_rem(jd);
         status->error_code = jd->u.flow.flow_d->error_code;
-        status->actual_size = jd->u.flow.flow_d->total_transfered;
+        status->actual_size = jd->u.flow.flow_d->total_transferred;
         break;
     case JOB_REQ_SCHED:
         status->error_code = jd->u.req_sched.error_code;

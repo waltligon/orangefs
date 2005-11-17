@@ -67,6 +67,9 @@ static inline int io_decode_ack_response(
 static inline int io_post_flow(
     PINT_client_sm *sm_p, PINT_client_io_ctx *cur_ctx);
 
+static inline int io_post_write_ack_recv(
+    PINT_client_sm * sm_p, PINT_client_io_ctx * cur_ctx);
+
 static inline int io_process_context_recv(
     PINT_client_sm *sm_p, job_status_s *js_p, PINT_client_io_ctx **out_ctx);
 
@@ -834,7 +837,27 @@ static int io_datafile_post_msgpairs(PINT_client_sm *sm_p,
             ret = io_post_flow(sm_p, cur_ctx);
             if(ret < 0)
             {
+                char buf[64] = {0};
+                PVFS_strerror_r(ret, buf, 64);
+
+                gossip_debug(GOSSIP_IO_DEBUG,
+                             "%s: io_post_flow failed: "
+                             "%s (%d remaining msgpairs)\n",
+                             __func__, 
+                             buf, 
+                             sm_p->u.io.msgpair_completion_count);
+
                 PVFS_perror_gossip("Flow post failed", ret);
+                cur_ctx->msg_send_has_been_posted = 0;
+                cur_ctx->msg_recv_has_been_posted = 0;
+                js_p->error_code = ret;
+                continue;
+            }
+
+            ret = io_post_write_ack_recv(sm_p, cur_ctx);
+            if(ret < 0)
+            {
+                PVFS_perror_gossip("Post of write-ack recv failed", ret);
                 js_p->error_code = ret;
                 continue;
             }
@@ -960,11 +983,7 @@ static int io_datafile_complete_operations(PINT_client_sm *sm_p,
             cur_ctx->msg_recv_has_been_posted = 0;
             goto check_next_step;
         }
-
-        /* if the I/O operation is a read, we need to post the flow here.
-         * For writes the flow is posted immediately after the ack recv
-         * is posted
-         */
+ 
         if(sm_p->u.io.io_type == PVFS_IO_READ)
         {
             ret = io_post_flow(sm_p, cur_ctx);
@@ -980,11 +999,10 @@ static int io_datafile_complete_operations(PINT_client_sm *sm_p,
                              buf, 
                              sm_p->u.io.msgpair_completion_count);
 
-                js_p->error_code = ret;
-                /* if recv failed, probably have to do the send again too */
-
+                PVFS_perror_gossip("Flow post failed", ret);
                 cur_ctx->msg_send_has_been_posted = 0;
                 cur_ctx->msg_recv_has_been_posted = 0;
+                js_p->error_code = ret;
                 goto check_next_step;
             }
         }
@@ -1004,7 +1022,6 @@ static int io_datafile_complete_operations(PINT_client_sm *sm_p,
                 GOSSIP_IO_DEBUG, "*** %d msgpair completions "
                 "pending\n", sm_p->u.io.msgpair_completion_count);
         }
-        return 0;
     }
 
     /* at this point, we're either completing a flow or a write ack */
@@ -1676,6 +1693,64 @@ static inline int io_post_flow(
     return 0;
 }
 
+static inline int io_post_write_ack_recv(
+    PINT_client_sm * sm_p,
+    PINT_client_io_ctx * cur_ctx)
+{
+    int ret;
+    unsigned long status_user_tag;
+
+    gossip_debug(GOSSIP_IO_DEBUG, "  preposting write "
+                 "ack for context %p.\n", cur_ctx);
+
+    cur_ctx->write_ack.max_resp_sz = PINT_encode_calc_max_size(
+        PINT_ENCODE_RESP, PVFS_SERV_WRITE_COMPLETION,
+        sm_p->u.io.encoding);
+    cur_ctx->write_ack.encoded_resp_p = BMI_memalloc(
+        cur_ctx->msg.svr_addr, cur_ctx->write_ack.max_resp_sz,
+        BMI_RECV);
+
+    if (!cur_ctx->write_ack.encoded_resp_p)
+    {
+        gossip_err("BMI_memalloc (for write ack) failed\n");
+        return -PVFS_ENOMEM;
+    }
+
+    /*
+       we're pre-posting the final write ack here, even though it's
+       ahead of the flow phase; reads are at the flow phase.
+
+       the timeout used here is a scaling one that needs to be long
+       enough for the entire flow to occur
+       */
+    status_user_tag = ((4 * cur_ctx->index) + IO_SM_PHASE_FINAL_ACK);
+
+    /*
+       pre-post this recv with an infinite timeout and adjust it
+       after the flow completes since we don't know how long a flow
+       can take at this point
+       */ 
+    ret = job_bmi_recv(
+        cur_ctx->msg.svr_addr, cur_ctx->write_ack.encoded_resp_p,
+        cur_ctx->write_ack.max_resp_sz, cur_ctx->session_tag,
+        BMI_PRE_ALLOC, sm_p, status_user_tag,
+        &cur_ctx->write_ack.recv_status, &cur_ctx->write_ack.recv_id,
+        pint_client_sm_context, JOB_TIMEOUT_INF);
+
+    if (ret < 0)
+    {
+        gossip_err("job_bmi_recv (write ack) failed\n");
+        return ret;
+    }
+
+    assert(ret == 0);
+    cur_ctx->write_ack_has_been_posted = 1;
+    cur_ctx->write_ack_in_progress = 1;
+    sm_p->u.io.write_ack_completion_count++;
+
+    return 0;
+}
+
 /*
   returns 0 on send completion; IO_RECV_COMPLETED on recv completion,
   and -PVFS_error on failure
@@ -1817,57 +1892,6 @@ static inline int io_process_context_recv(
         return ret;
     }
 
-    if (sm_p->u.io.io_type == PVFS_IO_WRITE)
-    {
-        gossip_debug(GOSSIP_IO_DEBUG, "  preposting write "
-                     "ack for context %p.\n", cur_ctx);
-
-        cur_ctx->write_ack.max_resp_sz = PINT_encode_calc_max_size(
-            PINT_ENCODE_RESP, PVFS_SERV_WRITE_COMPLETION,
-            sm_p->u.io.encoding);
-        cur_ctx->write_ack.encoded_resp_p = BMI_memalloc(
-            cur_ctx->msg.svr_addr, cur_ctx->write_ack.max_resp_sz,
-            BMI_RECV);
-
-        if (!cur_ctx->write_ack.encoded_resp_p)
-        {
-            gossip_err("BMI_memalloc (for write ack) failed\n");
-            return -PVFS_ENOMEM;
-        }
-
-        /*
-          we're pre-posting the final write ack here, even though it's
-          ahead of the flow phase; reads are at the flow phase.
-
-          the timeout used here is a scaling one that needs to be long
-          enough for the entire flow to occur
-        */
-        status_user_tag = ((4 * cur_ctx->index) + IO_SM_PHASE_FINAL_ACK);
-
-        /*
-          pre-post this recv with an infinite timeout and adjust it
-          after the flow completes since we don't know how long a flow
-          can take at this point
-        */ 
-        ret = job_bmi_recv(
-            cur_ctx->msg.svr_addr, cur_ctx->write_ack.encoded_resp_p,
-            cur_ctx->write_ack.max_resp_sz, cur_ctx->session_tag,
-            BMI_PRE_ALLOC, sm_p, status_user_tag,
-            &cur_ctx->write_ack.recv_status, &cur_ctx->write_ack.recv_id,
-            pint_client_sm_context, JOB_TIMEOUT_INF);
-
-        if (ret < 0)
-        {
-            gossip_err("job_bmi_recv (write ack) failed\n");
-            return ret;
-        }
-
-        assert(ret == 0);
-        cur_ctx->write_ack_has_been_posted = 1;
-        cur_ctx->write_ack_in_progress = 1;
-        sm_p->u.io.write_ack_completion_count++;
-    }
-
     return ret;
 }
 
@@ -1908,10 +1932,10 @@ static inline int io_check_context_status(
     {
         gossip_debug(
             GOSSIP_IO_DEBUG, "  %lld bytes read from context %p\n",
-            lld(cur_ctx->flow_desc.total_transfered), cur_ctx);
+            lld(cur_ctx->flow_desc.total_transferred), cur_ctx);
 
         /* size for reads are reported in the flow */
-        *total_size += cur_ctx->flow_desc.total_transfered;
+        *total_size += cur_ctx->flow_desc.total_transferred;
 
         /*
           we can't reset the flow here in case we have to do a zero

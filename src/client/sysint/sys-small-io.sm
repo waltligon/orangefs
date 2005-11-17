@@ -71,7 +71,7 @@ nested machine pvfs2_client_small_io_sm(
 %%
 
 /**
- * Small I/O is done in cases where the size of data transfered between
+ * Small I/O is done in cases where the size of data transferred between
  * client and server is smaller than the maximum unexpected message size
  * accepted by the BMI transport interface in use.  In this case, we don't
  * need to perform initial rendezvous setup messages before sending the
@@ -104,8 +104,6 @@ static int small_io_setup_msgpairs(PINT_client_sm * sm_p,
     }
     sm_p->msgarray_count = sm_p->u.io.datafile_count;
 
-    file_req_state = PINT_new_request_state(sm_p->u.io.file_req);
-    mem_req_state = PINT_new_request_state(sm_p->u.io.mem_req);
     memset(&file_data, 0, sizeof(PINT_request_file_data));
     file_data.server_ct = attr->u.meta.dfile_count;
     file_data.fsize = 0;
@@ -121,6 +119,15 @@ static int small_io_setup_msgpairs(PINT_client_sm * sm_p,
     result.bytemax = PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req);
     for(i = 0; i < sm_p->u.io.datafile_count; ++i)
     {
+        file_req_state = PINT_new_request_state(sm_p->u.io.file_req);
+        mem_req_state = PINT_new_request_state(sm_p->u.io.mem_req);
+
+        PINT_REQUEST_STATE_SET_TARGET(file_req_state, 
+                                      sm_p->u.io.file_req_offset);
+
+        PINT_REQUEST_STATE_SET_FINAL(file_req_state, 
+                                     sm_p->u.io.file_req_offset + result.bytemax);
+
         PVFS_handle datafile_handle = attr->u.meta.dfile_array[
             sm_p->u.io.datafile_index_array[i]];
  
@@ -174,14 +181,19 @@ static int small_io_setup_msgpairs(PINT_client_sm * sm_p,
             js_p->error_code = ret;
             goto error_exit;
         }
+
+        PINT_free_request_state(file_req_state);
+        PINT_free_request_state(mem_req_state);
     }
 
     js_p->error_code = 0;
-
+    goto exit;
+        
 error_exit:
-
     PINT_free_request_state(file_req_state);
     PINT_free_request_state(mem_req_state);
+
+exit:
     return 1;
 }
 
