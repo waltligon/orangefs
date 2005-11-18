@@ -14,41 +14,37 @@ AC_DEFUN([AX_BERKELEY_DB],
     lib=notfound
 
     if test "x$dbpath" != "x" ; then
-        DB_LDFLAGS="-L${dbpath}/lib"
-	LDFLAGS="${LDFLAGS} $DB_LDFLAGS"
-
 	oldcflags=$CFLAGS
 	for dbheader in db4 db3 notfound; do
-		DB_CFLAGS="-I${dbpath}/include/$dbheader"
-		CFLAGS="${oldcflags} $DB_CFLAGS"
 		AC_COMPILE_IFELSE(
-			[#include <db.h>],
-			[break])
+			[#include "$dbpath/include/$dbheader/db.h"],
+			[DB_CFLAGS="-I$dbpath/include/$dbheader/"
+			 break])
 	done
 
 	if test "x$dbheader" != "xnotfound"; then
-		LIBS="${oldlibs} -ldb"
-		DB_LIB="-ldb"
-		AC_TRY_LINK(
-			[#include <db.h>],
-			[DB *dbp; db_create(&dbp, NULL, 0);],
-			lib=db)
+		AC_COMPILE_IFELSE(
+			[#include "$dbpath/include/db.h"],
+			[DB_CFLAGS="-I$dbpath/include/"],
+			[AC_MSG_FAILURE(
+				Invalid libdb path specified. No db.h found.)])
 	fi
 
-	if test "x$lib" = "xnotfound"; then
-		DB_CFLAGS="-I${dbpath}/include"
-		CFLAGS="${oldcflags} $DB_CFLAGS"
-	fi
+        DB_LDFLAGS="-L${dbpath}/lib"
+	LDFLAGS="${LDFLAGS} $DB_LDFLAGS"
 
-        LIBS="${oldlibs} -ldb"
-        DB_LIB="-ldb"
-        AC_TRY_LINK(
-              [#include <db.h>],
-              [DB *dbp; db_create(&dbp, NULL, 0);],
-              lib=db)
+	LIBS="${oldlibs} -ldb -lpthread"
+	DB_LIB="-ldb"
+	CFLAGS="$oldcflags $DB_CFLAGS"
+	AC_TRY_LINK(
+		[#include <db.h>],
+		[DB *dbp; db_create(&dbp, NULL, 0);],
+		lib=db)
+	CFLAGS=$oldcflags
+	
     else
         for lib in db4  db3  db  notfound; do
-           LIBS="${oldlibs} -l$lib"
+           LIBS="${oldlibs} -l$lib -lpthread"
            DB_LIB="-l$lib"
            AC_TRY_LINK(
                   [#include <db.h>],
@@ -64,6 +60,7 @@ AC_DEFUN([AX_BERKELEY_DB],
     else
            AC_MSG_RESULT($lib)
     fi
+    AC_SUBST(DB_CFLAGS)	
     AC_SUBST(DB_LIB)
     
     dnl See if we have a new enough version of Berkeley DB; needed for
