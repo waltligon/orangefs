@@ -22,7 +22,7 @@ AC_DEFUN([AX_BERKELEY_DB],
 			 break])
 	done
 
-	if test "x$dbheader" != "xnotfound"; then
+	if test "x$dbheader" == "xnotfound"; then
 		AC_COMPILE_IFELSE(
 			[#include "$dbpath/include/db.h"],
 			[DB_CFLAGS="-I$dbpath/include/"],
