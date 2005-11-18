@@ -7525,10 +7525,8 @@ echo $ECHO_N "checking for db library... $ECHO_C" >&6
     if test "x$dbpath" != "x" ; then
 	oldcflags=$CFLAGS
 	for dbheader in db4 db3 notfound; do
-		DB_CFLAGS="-I${dbpath}/include/$dbheader"
-		CFLAGS="${oldcflags} $DB_CFLAGS"
 		cat >conftest.$ac_ext <<_ACEOF
-#include <db.h>
+#include "$dbpath/include/$dbheader/db.h"
 _ACEOF
 rm -f conftest.$ac_objext
 if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
@@ -7551,7 +7549,8 @@ if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
   ac_status=$?
   echo "$as_me:$LINENO: \$? = $ac_status" >&5
   (exit $ac_status); }; }; then
-  break
+  DB_CFLAGS="-I$dbpath/include/$dbheader/"
+			 break
 else
   echo "$as_me: failed program was:" >&5
 sed 's/^/| /' conftest.$ac_ext >&5
@@ -7561,10 +7560,8 @@ rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 	done
 
 	if test "x$dbheader" != "xnotfound"; then
-		DB_CFLAGS="-I${dbpath}/include"
-		CFLAGS="${oldcflags} $DB_CFLAGS"
 		cat >conftest.$ac_ext <<_ACEOF
-#include <db.h>
+#include "$dbpath/include/db.h"
 _ACEOF
 rm -f conftest.$ac_objext
 if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
@@ -7587,7 +7584,7 @@ if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
   ac_status=$?
   echo "$as_me:$LINENO: \$? = $ac_status" >&5
   (exit $ac_status); }; }; then
-  :
+  DB_CFLAGS="-I$dbpath/include/"
 else
   echo "$as_me: failed program was:" >&5
 sed 's/^/| /' conftest.$ac_ext >&5
@@ -7604,8 +7601,9 @@ rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
         DB_LDFLAGS="-L${dbpath}/lib"
 	LDFLAGS="${LDFLAGS} $DB_LDFLAGS"
 
-	LIBS="${oldlibs} -ldb"
+	LIBS="${oldlibs} -ldb -lpthread"
 	DB_LIB="-ldb"
+	CFLAGS="$oldcflags $DB_CFLAGS"
 	cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
@@ -7654,7 +7652,7 @@ rm -f conftest.err conftest.$ac_objext \
 
     else
         for lib in db4  db3  db  notfound; do
-           LIBS="${oldlibs} -l$lib"
+           LIBS="${oldlibs} -l$lib -lpthread"
            DB_LIB="-l$lib"
            cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
@@ -8131,10 +8129,8 @@ echo $ECHO_N "checking for db library... $ECHO_C" >&6
     if test "x$dbpath" != "x" ; then
 	oldcflags=$CFLAGS
 	for dbheader in db4 db3 notfound; do
-		DB_CFLAGS="-I${dbpath}/include/$dbheader"
-		CFLAGS="${oldcflags} $DB_CFLAGS"
 		cat >conftest.$ac_ext <<_ACEOF
-#include <db.h>
+#include "$dbpath/include/$dbheader/db.h"
 _ACEOF
 rm -f conftest.$ac_objext
 if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
@@ -8157,7 +8153,8 @@ if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
   ac_status=$?
   echo "$as_me:$LINENO: \$? = $ac_status" >&5
   (exit $ac_status); }; }; then
-  break
+  DB_CFLAGS="-I$dbpath/include/$dbheader/"
+			 break
 else
   echo "$as_me: failed program was:" >&5
 sed 's/^/| /' conftest.$ac_ext >&5
@@ -8167,10 +8164,8 @@ rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 	done
 
 	if test "x$dbheader" != "xnotfound"; then
-		DB_CFLAGS="-I${dbpath}/include"
-		CFLAGS="${oldcflags} $DB_CFLAGS"
 		cat >conftest.$ac_ext <<_ACEOF
-#include <db.h>
+#include "$dbpath/include/db.h"
 _ACEOF
 rm -f conftest.$ac_objext
 if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
@@ -8193,7 +8188,7 @@ if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
   ac_status=$?
   echo "$as_me:$LINENO: \$? = $ac_status" >&5
   (exit $ac_status); }; }; then
-  :
+  DB_CFLAGS="-I$dbpath/include/"
 else
   echo "$as_me: failed program was:" >&5
 sed 's/^/| /' conftest.$ac_ext >&5
@@ -8210,8 +8205,9 @@ rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
         DB_LDFLAGS="-L${dbpath}/lib"
 	LDFLAGS="${LDFLAGS} $DB_LDFLAGS"
 
-	LIBS="${oldlibs} -ldb"
+	LIBS="${oldlibs} -ldb -lpthread"
 	DB_LIB="-ldb"
+	CFLAGS="$oldcflags $DB_CFLAGS"
 	cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
@@ -8260,7 +8256,7 @@ rm -f conftest.err conftest.$ac_objext \
 
     else
         for lib in db4  db3  db  notfound; do
-           LIBS="${oldlibs} -l$lib"
+           LIBS="${oldlibs} -l$lib -lpthread"
            DB_LIB="-l$lib"
            cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
