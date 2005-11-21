@@ -24,7 +24,7 @@ REPORT_LOG=${PVFS2_DEST}/alltests.log
 # direcory.. .unless you like checking in broken scripts
 #SYSINT_SCRIPTS=$(cd `dirname $0`; pwd)/sysint-tests.d
 #VFS_SCRIPTS=$(cd `dirname $0`; pwd)/vfs-tests.d
-#MPIIO_DRIVER=$(cd `dirname $0`; pwd)/testscrpt-mpi.sh
+MPIIO_DRIVER=$(cd `dirname $0`; pwd)/testscrpt-mpi.sh
 
 TESTNAME="`hostname -s`-nightly"
 
@@ -65,7 +65,7 @@ pull_and_build_mpich2 () {
 	cd build
 	CFLAGS="-I${PVFS2_DEST}/INSTALL-pvfs2/include"
 	LDFLAGS="-L${PVFS2_DEST}/INSTALL-pvfs2/lib"
-	LIBS="-lpvfs2 -lpthread"
+	LIBS="-lpvfs2 -lpthread -lgm"
 	export CFLAGS LDFLAGS LIBS
 
 	../configure -q --prefix=${PVFS2_DEST}/soft/mpich2 \
@@ -99,8 +99,8 @@ setup_pvfs2() {
 		--storage ${PVFS2_DEST}/STORAGE-pvfs2 \
 		--logfile=${PVFS2_DEST}/pvfs2-server.log --quiet
 	rm -rf ${PVFS2_DEST}/STORAGE-pvfs2
-	INSTALL-pvfs2/sbin/pvfs2-server -p `pwd`/pvfs2-server.pid -f fs.conf server.conf-`hostname -s`
-	INSTALL-pvfs2/sbin/pvfs2-server -p `pwd`/pvfs2-server.pid  fs.conf server.conf-`hostname -s`
+	INSTALL-pvfs2/sbin/pvfs2-server -p `pwd`/pvfs2-server.pid -f fs.conf server.conf-`hostname -s` >>${REPORT_LOG} 2>&1
+	INSTALL-pvfs2/sbin/pvfs2-server -p `pwd`/pvfs2-server.pid  fs.conf server.conf-`hostname -s` >>${REPORT_LOG} 2>&1
 
 	echo "tcp://`hostname -s`:3399/pvfs2-fs /pvfs2-nightly pvfs2 defaults 0 0" > ${PVFS2_DEST}/pvfs2tab
 	# do we need to use our own pvfs2tab file?  If we will mount pvfs2, we
