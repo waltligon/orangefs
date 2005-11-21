@@ -99,7 +99,7 @@ setup_pvfs2() {
 		--storage ${PVFS2_DEST}/STORAGE-pvfs2 \
 		--logfile=${PVFS2_DEST}/pvfs2-server.log --quiet
 	rm -rf ${PVFS2_DEST}/STORAGE-pvfs2
-	failure_logs="${PFFS2_DEST}/pvfs2-server.log $failure_logs"
+	failure_logs="${PVFS2_DEST}/pvfs2-server.log $failure_logs"
 	INSTALL-pvfs2/sbin/pvfs2-server -p `pwd`/pvfs2-server.pid -f fs.conf server.conf-`hostname -s` 
 	INSTALL-pvfs2/sbin/pvfs2-server -p `pwd`/pvfs2-server.pid  fs.conf server.conf-`hostname -s` 
 
