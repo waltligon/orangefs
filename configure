@@ -7559,7 +7559,7 @@ fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 	done
 
-	if test "x$dbheader" != "xnotfound"; then
+	if test "x$dbheader" = "xnotfound"; then
 		cat >conftest.$ac_ext <<_ACEOF
 #include "$dbpath/include/db.h"
 _ACEOF
@@ -8163,7 +8163,7 @@ fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 	done
 
-	if test "x$dbheader" != "xnotfound"; then
+	if test "x$dbheader" = "xnotfound"; then
 		cat >conftest.$ac_ext <<_ACEOF
 #include "$dbpath/include/db.h"
 _ACEOF
