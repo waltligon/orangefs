@@ -12,6 +12,7 @@
 
 #include "pvfs2-kernel.h"
 #include "pvfs2-bufmap.h"
+#include "pvfs2-types.h"
 #include "pvfs2-internal.h"
 
 extern struct list_head pvfs2_request_list;
@@ -291,6 +292,15 @@ static ssize_t pvfs2_file_write(
     {
         pvfs2_print("pvfs2_file_write: failed generic argument checks.\n");
         return(ret);
+    }
+    /* for whatever reason, count is being set to inode->i_size in
+     * generic_write_checks with O_APPEND opens.  So if we want that to work,
+     * we would have to do a getattr for the size which is ridiculous.
+     * So we work that around here...
+     */
+    if (*offset != file->f_pos)
+    {
+        *offset = file->f_pos;
     }
 
     while(total_count < count)
