@@ -1,0 +1,10 @@
+#!/bin/sh
+
+pvfs2_testfile=${PVFS2_MOUNTPOINT}/append_test
+local_reference=${PVFS2_DEST}/append_ref
+for I in `seq 1 100`; do
+	echo "line$I" >> $pvfs2_testfile
+	echo "line$I" >> $local_reference
+done
+
+cmp -b $local_reference $pvfs2_testfile
