@@ -99,8 +99,9 @@ setup_pvfs2() {
 		--storage ${PVFS2_DEST}/STORAGE-pvfs2 \
 		--logfile=${PVFS2_DEST}/pvfs2-server.log --quiet
 	rm -rf ${PVFS2_DEST}/STORAGE-pvfs2
-	INSTALL-pvfs2/sbin/pvfs2-server -p `pwd`/pvfs2-server.pid -f fs.conf server.conf-`hostname -s` >>${REPORT_LOG} 2>&1
-	INSTALL-pvfs2/sbin/pvfs2-server -p `pwd`/pvfs2-server.pid  fs.conf server.conf-`hostname -s` >>${REPORT_LOG} 2>&1
+	failure_logs="${PFFS2_DEST}/pvfs2-server.log $failure_logs"
+	INSTALL-pvfs2/sbin/pvfs2-server -p `pwd`/pvfs2-server.pid -f fs.conf server.conf-`hostname -s` 
+	INSTALL-pvfs2/sbin/pvfs2-server -p `pwd`/pvfs2-server.pid  fs.conf server.conf-`hostname -s` 
 
 	echo "tcp://`hostname -s`:3399/pvfs2-fs /pvfs2-nightly pvfs2 defaults 0 0" > ${PVFS2_DEST}/pvfs2tab
 	# do we need to use our own pvfs2tab file?  If we will mount pvfs2, we
@@ -191,6 +192,7 @@ for s in $(echo $VFS_HOSTS); do
 	fi
 done
 
+failure_logs=""   # a space-delimited list of logs that failed
 # compile and install
 pull_and_build_pvfs2  || buildfail
 
@@ -218,7 +220,6 @@ fi
 
 nr_passed=0
 nr_failed=0
-failure_logs=""   # a space-delimited list of logs that failed
 
 # save file descriptors for later
 exec 6<&1
