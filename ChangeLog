@@ -15,6 +15,8 @@ pvfs2-1.3.1
 - "trusted ports"
 - --enable-strict now compiles w/ a lot fewer warnings
 - fixed timestamp problems for pvfs2 files
+- listeattr system interface function 
+- fixed bugs in timestamps
 - fixed bugs in zero-fill handling
 - no longer ship generated .c files from .sm. instead, ship the sm parser
   (allows for easier release patching)
@@ -24,6 +26,10 @@ pvfs2-1.3.1
 - Phil Carns: proper symlink support (created as 777, no way to change them)
 - Lots of portability fixes.  PVFS2 now builds on Darwin (userspace, no
   kernel)
+- better tests for location of Berkely DB headers/libraries
+
+- Trach-Minh Tran <trach-minh.tran@epfl.ch> reported bug in append mode. fixed
+- 
 
 
 pvfs2-1.3.0
