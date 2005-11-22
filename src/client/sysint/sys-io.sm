@@ -635,9 +635,10 @@ static int io_datafile_post_msgpairs(PINT_client_sm *sm_p,
         PINT_sm_msgpair_state *msg = &cur_ctx->msg;
 
         /* do not do this one again in retry case */
-        if (cur_ctx->msg_recv_has_been_posted) {
-            if (cur_ctx->msg_recv_in_progress)
-                ++sm_p->u.io.msgpair_completion_count;
+        if (cur_ctx->msg_recv_has_been_posted &&
+            cur_ctx->msg_recv_in_progress)
+        {
+            ++sm_p->u.io.msgpair_completion_count;
             goto recv_already_posted;
         }
 
@@ -769,9 +770,10 @@ static int io_datafile_post_msgpairs(PINT_client_sm *sm_p,
 
       recv_already_posted:
 
-        if (cur_ctx->msg_send_has_been_posted) {
-            if (cur_ctx->msg_send_in_progress)
-                ++sm_p->u.io.msgpair_completion_count;
+        if (cur_ctx->msg_send_has_been_posted &&
+            cur_ctx->msg_send_in_progress)
+        {
+            ++sm_p->u.io.msgpair_completion_count;
             continue;
         }
 
@@ -1400,8 +1402,9 @@ static int io_analyze_results(PINT_client_sm *sm_p,
                 }
 
                 sm_p->u.io.io_resp_p->total_completed =
-                    PVFS_util_min(PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req),
-                                  total_size);
+                    PVFS_util_min(
+                        PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req),
+                        total_size);
                 js_p->error_code = 0;
                 goto analyze_results_exit;
             }
@@ -1772,11 +1775,6 @@ static inline int io_complete_context_send_or_recv(
 
     status_user_tag = (unsigned long)js_p->status_user_tag;
 
-    cur_ctx = &sm_p->u.io.contexts[index];
-    assert(cur_ctx);
-
-    msg = &cur_ctx->msg;
-
     if (STATUS_USER_TAG_TYPE(
             status_user_tag, IO_SM_PHASE_REQ_MSGPAIR_RECV))
     {
@@ -1785,6 +1783,11 @@ static inline int io_complete_context_send_or_recv(
 
         gossip_debug(GOSSIP_IO_DEBUG, "got a recv completion with "
                      "context index %d\n", index);
+
+        cur_ctx = &sm_p->u.io.contexts[index];
+        assert(cur_ctx);
+
+        msg = &cur_ctx->msg;
 
         msg->recv_id = 0;
         msg->recv_status = *js_p;
@@ -1805,6 +1808,11 @@ static inline int io_complete_context_send_or_recv(
 
         gossip_debug(GOSSIP_IO_DEBUG, "got a send completion with "
                      "context index %d\n", index);
+
+        cur_ctx = &sm_p->u.io.contexts[index];
+        assert(cur_ctx);
+
+        msg = &cur_ctx->msg;
 
         msg->send_id = 0;
         msg->send_status = *js_p;
@@ -2063,8 +2071,9 @@ static int io_get_max_unexp_size(
      * of the bmi max unexp payload, so we need to subtract that
      * extra here
      */
-    small_io_size -= (type == PVFS_IO_READ ? extra_size_PVFS_servreq_small_io :
-                                             extra_size_PVFS_servresp_small_io);
+    small_io_size -= (type == PVFS_IO_READ ? 
+                      extra_size_PVFS_servreq_small_io :
+                      extra_size_PVFS_servresp_small_io);
 
     *max_unexp_payload = (bmi_max_unexp_payload - small_io_size);
     return 0;
@@ -2197,12 +2206,12 @@ static int io_find_target_datafiles(
 
             total_bytes += tmp_result.bytes;
 
-        /* we limit the request processing for each datafile to only
-         * check that the size is as least as big as max_unexp_size.
-         * That way we know whether to do small I/O.  Calculating the
-         * entire size for each datafile isn't necessary (and may be
-         * expensive).
-         */
+            /* we limit the request processing for each datafile to only
+             * check that the size is as least as big as max_unexp_size.
+             * That way we know whether to do small I/O.  Calculating the
+             * entire size for each datafile isn't necessary (and may be
+             * expensive).
+             */
         } while(!PINT_REQUEST_DONE(req_state) 
                 && total_bytes <= max_unexp_payload); 
 
