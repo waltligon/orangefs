@@ -8,7 +8,7 @@
 #   - please don't cheat and run this as root: will not catch permissions bugs
 
 # modify these variables
-export PVFS2_DEST=/tmp/pvfs2-nightly
+export PVFS2_DEST=${HOME}/pvfs2-nightly
 export PVFS2_MOUNTPOINT=/pvfs2-nightly
 export EXTRA_TESTS=${HOME}/src/benchmarks
 
@@ -57,7 +57,7 @@ pull_and_build_mpich2 () {
 	[ -d ${PVFS2_DEST} ] || mkdir ${PVFS2_DEST}
 	cd ${PVFS2_DEST}
 	rm -rf mpich2-latest.tar.gz
-	wget --quiet 'http://www.mcs.anl.gov/~robl/mpich2/mpich2-latest.tar.gz' -O mpich2-latest.tar.gz
+	wget --quiet 'ftp://ftp.mcs.anl.gov/pub/mpi/misc/mpich2snap/mpich2-snap-*' -O mpich2-latest.tar.gz
 	rm -rf mpich2-snap-*
 	tar xzf mpich2-latest.tar.gz
 	cd mpich2-snap-*
