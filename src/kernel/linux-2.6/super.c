@@ -345,6 +345,9 @@ static int pvfs2_statfs(
                     new_op->downcall.resp.statfs.blocks_total);
 
         buf->f_type = sb->s_magic;
+        /* stash the fsid as well */
+        memcpy(&buf->f_fsid, &(PVFS2_SB(sb)->fs_id), 
+                sizeof(PVFS2_SB(sb)->fs_id));      
         buf->f_bsize = sb->s_blocksize;
         buf->f_namelen = PVFS2_NAME_LEN;
 
