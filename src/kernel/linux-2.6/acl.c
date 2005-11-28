@@ -436,7 +436,7 @@ int pvfs2_init_acl(struct inode *inode, struct inode *dir)
             if (IS_ERR(acl))
                 return PTR_ERR(acl);
         }
-        if (!acl)
+        if (!acl && dir != inode)
         {
             inode->i_mode &= ~current->fs->umask;
         }
@@ -534,7 +534,17 @@ static int pvfs2_check_acl(struct inode *inode, int mask)
 int pvfs2_permission(struct inode *inode, int mask, struct nameidata *nd)
 {
 #ifdef HAVE_GENERIC_PERMISSION
-    return generic_permission(inode, mask, pvfs2_check_acl);
+    int ret;
+
+    ret = generic_permission(inode, mask, pvfs2_check_acl);
+    pvfs2_print("pvfs2_permission: inode: %p mask = %x mode = %x current->fsuid = %x "
+            "inode->i_uid = %x, inode->i_gid = %x  ret = %d\n",
+            inode, mask, inode->i_mode, current->fsuid, inode->i_uid, 
+                inode->i_gid, ret);
+    pvfs2_print("pvfs2_permission: mode [%x] & mask [%x] & S_IRWXO [%x] = %d == mask [%x]?\n", 
+            inode->i_mode, mask, S_IRWXO, (inode->i_mode & mask & S_IRWXO), 
+                mask);
+    return ret;
 #else
     /* We sort of duplicate the code below from generic_permission. */
     int mode = inode->i_mode;

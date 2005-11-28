@@ -345,6 +345,9 @@ static int pvfs2_statfs(
                     new_op->downcall.resp.statfs.blocks_total);
 
         buf->f_type = sb->s_magic;
+        /* stash the fsid as well */
+        memcpy(&buf->f_fsid, &(PVFS2_SB(sb)->fs_id), 
+                sizeof(PVFS2_SB(sb)->fs_id));      
         buf->f_bsize = sb->s_blocksize;
         buf->f_namelen = PVFS2_NAME_LEN;
 
@@ -601,14 +604,16 @@ struct super_block* pvfs2_get_sb(
     sb->s_blocksize_bits = PVFS2_BUFMAP_DEFAULT_DESC_SHIFT;
     sb->s_maxbytes = MAX_LFS_FILESIZE;
 
-    /* alloc and initialize our root directory inode */
+    /* alloc and initialize our root directory inode by explicitly requesting
+     * the sticky bit to be set */
     root = pvfs2_get_custom_inode(
-        sb, NULL, (S_IFDIR | 0755), 0, PVFS2_SB(sb)->root_handle);
+        sb, NULL, (S_IFDIR | 0755 | S_ISVTX), 0, PVFS2_SB(sb)->root_handle);
     if (!root)
     {
         ret = -ENOMEM;
         goto error_exit;
     }
+    pvfs2_print("Allocated root inode [%p] with mode %x\n", root, root->i_mode);
     PVFS2_I(root)->refn.fs_id = PVFS2_SB(sb)->fs_id;
 
     /* allocates and places root dentry in dcache */
@@ -708,13 +713,15 @@ int pvfs2_fill_sb(
     sb->s_blocksize_bits = PVFS2_BUFMAP_DEFAULT_DESC_SHIFT;
     sb->s_maxbytes = MAX_LFS_FILESIZE;
 
-    /* alloc and initialize our root directory inode */
-    root = pvfs2_get_custom_inode(sb, NULL, (S_IFDIR | 0755),
+    /* alloc and initialize our root directory inode. be explicit about sticky
+     * bit */
+    root = pvfs2_get_custom_inode(sb, NULL, (S_IFDIR | 0755 | S_ISVTX),
                                   0, PVFS2_SB(sb)->root_handle);
     if (!root)
     {
         return -ENOMEM;
     }
+    pvfs2_print("Allocated root inode [%p] with mode %x\n", root, root->i_mode);
     PVFS2_I(root)->refn.handle = PVFS2_SB(sb)->root_handle;
     PVFS2_I(root)->refn.fs_id = PVFS2_SB(sb)->fs_id;
 
