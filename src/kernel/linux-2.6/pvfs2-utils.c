@@ -48,7 +48,7 @@ static inline int copy_attributes_to_inode(
     char *symname)
 {
     int ret = -1;
-    int perm_mode = 0;
+    int perm_mode = 0, old_mode = 0;
     pvfs2_inode_t *pvfs2_inode = NULL;
     loff_t inode_size = 0, rounded_up_size = 0;
 
@@ -135,6 +135,7 @@ static inline int copy_attributes_to_inode(
         inode->i_mtime.tv_nsec = 0;
         inode->i_ctime.tv_nsec = 0;
 #endif
+        old_mode = inode->i_mode;
         inode->i_mode = 0;
 
         if (attrs->perms & PVFS_O_EXECUTE)
@@ -162,6 +163,16 @@ static inline int copy_attributes_to_inode(
             perm_mode |= S_ISGID;
 
         inode->i_mode |= perm_mode;
+        /* NOTE: this will change once we move from the iget() model to the
+         * iget5() interface where i_ino will only be a hash and not the actual
+         * handle itself!
+         * Most file systems have moved to that model
+         */
+        if (inode->i_ino == PVFS2_SB(inode->i_sb)->root_handle)
+        {
+            /* special case: mark the root inode as sticky */
+            inode->i_mode |= S_ISVTX;
+        }
 
         switch (attrs->objtype)
         {
@@ -210,6 +221,8 @@ static inline int copy_attributes_to_inode(
                 pvfs2_error("pvfs2:copy_attributes_to_inode: got invalid "
                             "attribute type %d\n", attrs->objtype);
         }
+        pvfs2_print("pvfs2: copy_attributes_to_inode: setting inode->i_mode to %x from %x\n",
+                inode->i_mode, old_mode);
     }
     return ret;
 }

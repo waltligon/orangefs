@@ -430,7 +430,10 @@ struct inode *pvfs2_get_custom_inode(
             return NULL;
         }
 
-        inode->i_mode = mode;
+        if (inode->i_ino != PVFS2_SB(inode->i_sb)->root_handle)
+        {
+            inode->i_mode = mode;
+        }
         inode->i_mapping->host = inode;
         inode->i_uid = current->fsuid;
         inode->i_gid = current->fsgid;
