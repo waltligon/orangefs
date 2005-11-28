@@ -8,7 +8,7 @@
 #   - please don't cheat and run this as root: will not catch permissions bugs
 
 # modify these variables
-export PVFS2_DEST=${HOME}/pvfs2-nightly
+export PVFS2_DEST=/tmp/pvfs2-nightly
 export PVFS2_MOUNTPOINT=/pvfs2-nightly
 export EXTRA_TESTS=${HOME}/src/benchmarks
 
