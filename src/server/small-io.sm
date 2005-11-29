@@ -94,12 +94,20 @@ static int small_io_start_job(PINT_server_op *s_op, job_status_s *js_p)
                                  s_op->req->u.small_io.file_req_offset +
                                  s_op->req->u.small_io.aggregate_size);
 
-    fdata.fsize = s_op->ds_attr.b_size;
-    s_op->resp.u.small_io.bstream_size = s_op->ds_attr.b_size;
-    result.bytemax = s_op->req->u.small_io.aggregate_size;
+    if(s_op->req->u.small_io.io_type == PVFS_IO_READ)
+    {   
+        fdata.fsize = s_op->ds_attr.b_size;
+        s_op->resp.u.small_io.bstream_size = s_op->ds_attr.b_size;
+        fdata.extend_flag = 0;
+    }
+    else
+    {   
+        fdata.fsize = 0;
+        s_op->resp.u.small_io.bstream_size = 0;
+        fdata.extend_flag = 1;
+    }
 
-    fdata.extend_flag = 
-        (s_op->req->u.small_io.io_type == PVFS_IO_WRITE) ? 1 : 0;
+    result.bytemax = s_op->req->u.small_io.aggregate_size;
 
     /* set io type in response to io type in request.  This is
      * needed by the client so it konws how to decode the response

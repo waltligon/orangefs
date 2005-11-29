@@ -1345,14 +1345,14 @@ static int io_analyze_results(PINT_client_sm *sm_p,
     else
     {
         PVFS_offset max_datafile_logical_offset;
-        PVFS_offset filereq_ub_offset;
+        PVFS_offset memreq_ub_offset;
 
         /* compute the upper bound of the memory request.  This is the
          * logical offset used to compare against all the datafile
          * logical offsets
          */
-        PVFS_Request_ub(sm_p->u.io.file_req, &filereq_ub_offset);
-        filereq_ub_offset += sm_p->u.io.file_req_offset;
+        memreq_ub_offset = PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req) +
+            sm_p->u.io.file_req_offset;
 
         ret = io_find_max_datafile_offset(
             sm_p,
@@ -1360,7 +1360,7 @@ static int io_analyze_results(PINT_client_sm *sm_p,
             sm_p->u.io.datafile_count,
             sm_p->u.io.dfile_size_array,
             sm_p->u.io.datafile_index_array,
-            filereq_ub_offset,
+            memreq_ub_offset,
             &max_datafile_logical_offset);
         if(ret)
         {
@@ -1376,8 +1376,10 @@ static int io_analyze_results(PINT_client_sm *sm_p,
         }
         else
         {
-            /* if we fail to find a datafile that matches, and we've already
-             * got all the datafile sizes, we
+            /* if we fail to find a datafile that matches, we still don't
+             * know if the request is past EOF or we just don't have all
+             * the datafiles sizes.  If it turns out we already
+             * have all the datafile sizes, we
              * can go straight to analyze_size_results.  Otherwise, we
              * need to get the rest of the datafiles.  
              * At some point we should fix
@@ -1401,10 +1403,7 @@ static int io_analyze_results(PINT_client_sm *sm_p,
                     goto analyze_results_exit;
                 }
 
-                sm_p->u.io.io_resp_p->total_completed =
-                    PVFS_util_min(
-                        PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req),
-                        total_size);
+                sm_p->u.io.io_resp_p->total_completed = total_size;
                 js_p->error_code = 0;
                 goto analyze_results_exit;
             }
@@ -1454,21 +1453,21 @@ static int io_analyze_size_results(
      */
     
     PVFS_offset eof = 0;
-    PVFS_offset filereq_ub_offset;
+    PVFS_offset memreq_ub_offset;
     int ret;
     PVFS_object_attr * attr;
 
     attr = &sm_p->getattr.attr;
     assert(attr);
     
-    PVFS_Request_ub(sm_p->u.io.file_req, &filereq_ub_offset);
-    filereq_ub_offset += sm_p->u.io.file_req_offset;
+    memreq_ub_offset = sm_p->u.io.file_req_offset + 
+        PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req);
 
     ret = io_find_max_datafile_offset(
         sm_p, attr, attr->u.meta.dfile_count,
         sm_p->u.io.dfile_size_array,
         NULL,
-        filereq_ub_offset,
+        memreq_ub_offset,
         &eof);
     if(ret)
     {
@@ -1489,9 +1488,7 @@ static int io_analyze_size_results(
             goto error_exit;
         }
         
-        sm_p->u.io.io_resp_p->total_completed =
-            PVFS_util_min(PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req),
-                          total_size);
+        sm_p->u.io.io_resp_p->total_completed = total_size;
     }
 
     js_p->error_code = 0;
@@ -2311,13 +2308,9 @@ io_find_total_size(
     PVFS_offset offset;
     PVFS_size size;
     PVFS_size total_size = 0;
-    PVFS_offset memreq_lb_offset;
     PVFS_object_attr * attr;
 
     attr = &sm_p->getattr.attr;
-
-    PVFS_Request_lb(sm_p->u.io.mem_req, &memreq_lb_offset);
-    memreq_lb_offset += sm_p->u.io.file_req_offset;
 
     filereq_state = PINT_new_request_state(sm_p->u.io.file_req);
     memreq_state = PINT_new_request_state(sm_p->u.io.mem_req);
@@ -2333,13 +2326,12 @@ io_find_total_size(
     result.segmax = 1;
     result.bytemax = PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req); 
 
-    PINT_REQUEST_STATE_SET_TARGET(filereq_state, memreq_lb_offset);
+    PINT_REQUEST_STATE_SET_TARGET(filereq_state, sm_p->u.io.file_req_offset);
     PINT_REQUEST_STATE_SET_FINAL(
         filereq_state, max_datafile_logical_offset);
 
     do
     {
-        PVFS_offset total_offset;
         result.segs = 0;
         result.bytes = 0;
 
@@ -2350,18 +2342,15 @@ io_find_total_size(
             return res;
         }
 
-        total_offset = sm_p->u.io.file_req_offset +  offset;
-
         if(result.segs > 0)
         {
-            if((max_datafile_logical_offset >= total_offset) &&
-               (max_datafile_logical_offset <= total_offset + size))
+            if((max_datafile_logical_offset >= offset) &&
+               (max_datafile_logical_offset <= offset + size))
             {
-                total_size += (max_datafile_logical_offset - 
-                               total_offset);
+                total_size += (max_datafile_logical_offset - offset);
                 break;
             }
-            else if(max_datafile_logical_offset < total_offset)
+            else if(max_datafile_logical_offset < offset)
             {
                 break;
             }
