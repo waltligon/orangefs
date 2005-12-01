@@ -76,6 +76,23 @@ extern int dbpf_thread_initialize(void);
 
 struct dbpf_storage *my_storage_p = NULL;
 
+DB_ENV *dbpf_getdb_env(void)
+{
+    static DB_ENV *dbenv = NULL;
+    if (dbenv == NULL)
+    {
+        int ret;
+        ret = db_env_create(&dbenv, 0);
+        if (ret != 0)
+        {
+            gossip_lerr("dbpf_getdb_env: %s\n", db_strerror(ret));
+            return NULL;
+        }
+        dbenv->flags |= DB_ENV_DBLOCAL;
+    }
+    return dbenv;
+}
+
 void dbpf_error_report(
 #ifdef HAVE_DBENV_PARAMETER_TO_DB_ERROR_CALLBACK
 		       const DB_ENV *dbenv,
@@ -1299,8 +1316,13 @@ static int dbpf_db_create(char *dbname)
 {
     int ret = -TROVE_EINVAL;
     DB *db_p = NULL;
+    DB_ENV *envp = NULL;
 
-    if ((ret = db_create(&db_p, NULL, 0)) != 0)
+    if ((envp = dbpf_getdb_env()) == NULL)
+    {
+        return TROVE_ENOMEM;
+    }
+    if ((ret = db_create(&db_p, envp, 0)) != 0)
     {
         gossip_lerr("dbpf_storage_create: %s\n", db_strerror(ret));
         return -dbpf_db_error_to_trove_error(ret);
@@ -1348,8 +1370,14 @@ static DB *dbpf_db_open(char *dbname, int *error_p)
 {
     int ret = -TROVE_EINVAL;
     DB *db_p = NULL;
+    DB_ENV *envp = NULL;
 
-    if ((ret = db_create(&db_p, NULL, 0)) != 0)
+    if ((envp = dbpf_getdb_env()) == NULL)
+    {
+        *error_p = TROVE_ENOMEM;
+        return NULL;
+    }
+    if ((ret = db_create(&db_p, envp, 0)) != 0)
     {
         *error_p = dbpf_db_error_to_trove_error(ret);
         return NULL;

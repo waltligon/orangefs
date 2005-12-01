@@ -499,6 +499,8 @@ do {                                                         \
                     ++s_dbpf_metadata_writes, PINT_PERF_SET);\
 } while(0)
 
+extern DB_ENV *dbpf_getdb_env(void);
+
 #if defined(__cplusplus)
 }
 #endif

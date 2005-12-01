@@ -426,7 +426,12 @@ int dbpf_open_cache_remove(
     struct qlist_head* scratch;
     DB* db_p = NULL;
     int tmp_error = 0;
+    DB_ENV *envp = NULL;
 
+    if ((envp = dbpf_getdb_env()) == NULL)
+    {
+        return TROVE_ENOMEM;
+    }
     gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
                  "dbpf_open_cache_remove: called\n");
 
@@ -501,7 +506,7 @@ int dbpf_open_cache_remove(
 
     DBPF_GET_KEYVAL_DBNAME(filename, PATH_MAX, my_storage_p->name,
                            coll_id, handle);
-    ret = db_create(&db_p, NULL, 0);
+    ret = db_create(&db_p, envp, 0);
     assert(ret == 0);
 
     ret = db_p->remove(db_p, filename, NULL, 0);
@@ -553,6 +558,12 @@ static int open_db(
 {
     int ret = -TROVE_EINVAL;
     char filename[PATH_MAX] = {0};
+    DB_ENV *envp = NULL;
+
+    if ((envp = dbpf_getdb_env()) == NULL)
+    {
+        return TROVE_ENOMEM;
+    }
 
     gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
                  "dbpf_open_cache open_db: opening db %llu (%llx).\n",
@@ -571,7 +582,7 @@ static int open_db(
                                my_storage_p->name, coll_id, llu(handle));
     }
 
-    ret = db_create(db_pp, NULL, 0);
+    ret = db_create(db_pp, envp, 0);
     if (ret != 0)
     {
 	return -dbpf_db_error_to_trove_error(ret);
