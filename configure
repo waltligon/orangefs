@@ -1354,7 +1354,7 @@ ac_configure="$SHELL $ac_aux_dir/configure" # This should be Cygnus configure.
 CONFIGURE_TIME=`date -u +"%Y-%m-%d-%H%M%S"`
 PVFS2_MAJOR=1
 PVFS2_MINOR=3
-PVFS2_SUB=1
+PVFS2_SUB=2
 PVFS2_PRE=""
 #PVFS2_PRE="pre1-$CONFIGURE_TIME"
 
