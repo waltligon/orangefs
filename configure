@@ -855,6 +855,7 @@ Optional Features:
   --enable-redhat24       Enable workaround for RedHat 2.4 kernel
   --enable-nptl-workaround Enable workaround for buggy NPTL/Pthread libraries
   --disable-aio-threaded-callbacks  Disable use of AIO threaded callbacks
+  --disable-kernel-aio    Forcibly disable kernel aio
   --enable-fast           Disable optional debugging, enable optimizations.
   --enable-strict         Turn on strict debugging with gcc
   --enable-verbose-build  Enables full output during build process
@@ -6550,7 +6551,18 @@ echo "${ECHO_T}no" >&6
 fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 
-if test "x$have_aio" = "xyes"; then
+
+
+# Check whether --enable-kernel-aio or --disable-kernel-aio was given.
+if test "${enable_kernel_aio+set}" = set; then
+  enableval="$enable_kernel_aio"
+   enable_kernel_aio=$enableval
+else
+   enable_kernel_aio=yes
+
+fi;
+
+if test "x$have_aio" = "xyes" -a "x$enable_kernel_aio" = "xyes"; then
 	echo "$as_me:$LINENO: checking for ki_dtor in kiocb structure of kernel" >&5
 echo $ECHO_N "checking for ki_dtor in kiocb structure of kernel... $ECHO_C" >&6
 			cat >conftest.$ac_ext <<_ACEOF
