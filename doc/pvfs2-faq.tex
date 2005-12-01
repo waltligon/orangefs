@@ -588,6 +588,14 @@ prompt# mount -t pvfs2 tcp://testhost:3334/pvfs2-fs /mnt/pvfs2 -o acl
 Please refer to the man pages of "setfacl", "getfacl" or section 5 acl for detailed usage
 information.
 
+\subsection{On SLES 9, 'make kmod' complains about \texttt{mmgrab} and
+ \texttt{flush\_icache\_range} being undefined}
+
+SLES 9 (and possibly other kernels) makes use of internal symobls in some
+inlined kernel routines.  PVFS2-1.3.2 or newer has the configure option
+'--disable-kernel-aio'.  Passing this option to configure results in a pvfs2
+kernel module that uses only exported symbols.  
+
 %
 % PERFORMANCE
 %
