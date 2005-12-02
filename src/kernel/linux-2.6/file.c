@@ -2205,7 +2205,7 @@ static ssize_t pvfs2_sendfile(struct file *filp, loff_t *ppos,
      * Revalidate the inode so that i_size_read will 
      * return the appropriate size 
      */
-    if ((error = pvfs2_inode_getattr(filp->f_mapping->host)) < 0)
+    if ((error = pvfs2_inode_getattr(filp->f_mapping->host, PVFS_ATTR_SYS_SIZE)) < 0)
     {
         return error;
     }
