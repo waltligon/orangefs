@@ -538,6 +538,20 @@ AC_TRY_COMPILE([
 	AC_MSG_RESULT(no)
 )
 
+dnl checking if we have a sendfile callback 
+AC_MSG_CHECKING(for sendfile callback in struct file_operations in kernel)
+AC_TRY_COMPILE([
+	#define __KERNEL__
+	#include <linux/fs.h>
+	static struct file_operations fop = {
+	    .sendfile = NULL,
+	};
+], [],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_SENDFILE_VFS_SUPPORT, 1, Define if struct file_operations in kernel has sendfile callback),
+	AC_MSG_RESULT(no)
+)
+
 AC_MSG_CHECKING(for aio support in kernel)
 dnl if this test passes, the kernel has it
 dnl if this test fails, the kernel does not have it

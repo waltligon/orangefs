@@ -14,6 +14,8 @@
 #include "pvfs2-bufmap.h"
 #include "pvfs2-types.h"
 #include "pvfs2-internal.h"
+#include <linux/fs.h>
+#include <linux/pagemap.h>
 
 extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
@@ -2050,6 +2052,158 @@ loff_t pvfs2_file_llseek(struct file *file, loff_t offset, int origin)
     return generic_file_llseek(file, offset, origin);
 }
 
+/*
+ * Apache uses the sendfile system call to stuff page-sized file data to 
+ * a socket. Unfortunately, the generic_sendfile function exported by
+ * the kernel uses the page-cache and does I/O in pagesize granularities
+ * and this leads to undesirable consistency problems not to mention performance
+ * limitations.
+ * Consequently, we chose to override the default callback by bypassing the page-cache.
+ * Although, we could read larger than page-sized buffers from the file,
+ * the actor routine does not know how to handle > 1 page buffer at a time.
+ * So we still end up breaking things down. darn...
+ */
+#ifdef HAVE_SENDFILE_VFS_SUPPORT
+
+static void do_bypass_page_cache_read(struct file *filp, loff_t *ppos, 
+        read_descriptor_t *desc, read_actor_t actor)
+{
+    struct inode *inode = NULL;
+    struct address_space *mapping = NULL;
+    struct page *uncached_page = NULL;
+    unsigned long kaddr = 0;
+    unsigned long offset;
+    loff_t isize;
+    unsigned long begin_index, end_index;
+    long prev_index;
+    int to_free = 0;
+
+    mapping = filp->f_mapping;
+    inode   = mapping->host;
+    /* offset in file in terms of page_cache_size */
+    begin_index = *ppos >> PAGE_CACHE_SHIFT; 
+    offset = *ppos & ~PAGE_CACHE_MASK;
+
+    isize = i_size_read(inode);
+    if (!isize)
+    {
+        return;
+    }
+    end_index = (isize - 1) >> PAGE_CACHE_SHIFT;
+    prev_index = -1;
+    /* copy page-sized units at a time using the actor routine */
+    for (;;)
+    {
+        unsigned long nr, ret, error;
+
+        /* Are we reading beyond what exists */
+        if (begin_index > end_index)
+        {
+            break;
+        }
+        /* issue a file-system read call to fill this buffer which is in kernel space */
+        if (prev_index != begin_index)
+        {
+            loff_t file_offset;
+            file_offset = (begin_index << PAGE_CACHE_SHIFT);
+            /* Allocate a page, but don't add it to the pagecache proper */
+            kaddr = __get_free_page(mapping_gfp_mask(mapping));
+            if (kaddr == 0UL)
+            {
+                desc->error = -ENOMEM;
+                break;
+            }
+            to_free = 1;
+            uncached_page = virt_to_page(kaddr);
+            pvfs2_print("begin_index = %lu offset = %lu file_offset = %ld\n",
+                    (unsigned long) begin_index, (unsigned long) offset, (unsigned long)file_offset);
+
+            error = pvfs2_inode_read(inode, (void *) kaddr, PAGE_CACHE_SIZE, &file_offset, 0, 0);
+            prev_index = begin_index;
+        }
+        else {
+            error = 0;
+        }
+        /*
+         * In the unlikely event of an error, bail out 
+         */
+        if (unlikely(error < 0))
+        {
+            desc->error = error;
+            break;
+        }
+        /* nr is the maximum amount of bytes to be copied from this page */
+        nr = PAGE_CACHE_SIZE;
+        if (begin_index >= end_index)
+        {
+            if (begin_index > end_index)
+            {
+                break;
+            }
+            /* Adjust the number of bytes on the last page */
+            nr = ((isize - 1) & ~PAGE_CACHE_MASK) + 1;
+            /* Do we have fewer valid bytes in the file than what was requested? */
+            if (nr <= offset)
+            {
+                break;
+            }
+        }
+        nr = nr - offset;
+
+        ret = actor(desc, uncached_page, offset, nr);
+        pvfs2_print("actor with offset %lu nr %lu return %lu desc->count %lu\n", 
+                (unsigned long) offset, (unsigned long) nr, (unsigned long) ret, (unsigned long) desc->count);
+
+        offset += ret;
+        begin_index += (offset >> PAGE_CACHE_SHIFT);
+        offset &= ~PAGE_CACHE_MASK;
+        if (to_free == 1)
+        {
+            free_page(kaddr);
+            to_free = 0;
+        }
+        if (ret == nr && desc->count)
+            continue;
+        break;
+    }
+    if (to_free == 1)
+    {
+        free_page(kaddr);
+        to_free = 0;
+    }
+    *ppos = (begin_index << PAGE_CACHE_SHIFT) + offset;
+    file_accessed(filp);
+    return;
+}
+
+static ssize_t pvfs2_sendfile(struct file *filp, loff_t *ppos,
+        size_t count, read_actor_t actor, void *target)
+{
+    int error;
+    read_descriptor_t desc;
+    desc.written = 0;
+    desc.count = count;
+    desc.arg.data = target;
+    desc.error = 0;
+
+    /*
+     * Revalidate the inode so that i_size_read will 
+     * return the appropriate size 
+     */
+    if ((error = pvfs2_inode_getattr(filp->f_mapping->host)) < 0)
+    {
+        return error;
+    }
+
+    /* Do a blocking read from the file and invoke the actor appropriately */
+    do_bypass_page_cache_read(filp, ppos, &desc, actor);
+    if (desc.written)
+        return desc.written;
+    return desc.error;
+}
+
+#endif
+
 /** PVFS2 implementation of VFS file operations */
 struct file_operations pvfs2_file_operations =
 {
@@ -2078,7 +2232,10 @@ struct file_operations pvfs2_file_operations =
     .mmap = pvfs2_file_mmap,
     .open = pvfs2_file_open,
     .release = pvfs2_file_release,
-    .fsync = pvfs2_fsync
+    .fsync = pvfs2_fsync,
+#ifdef HAVE_SENDFILE_VFS_SUPPORT
+    .sendfile = pvfs2_sendfile,
+#endif
 #endif
 };
 

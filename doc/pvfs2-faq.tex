@@ -596,6 +596,17 @@ inlined kernel routines.  PVFS2-1.3.2 or newer has the configure option
 \texttt{--disable-kernel-aio}.  Passing this option to configure results in a pvfs2
 kernel module that uses only exported symbols.  
 
+\subsection{Can we run the Apache webserver to serve files off a PVFS2 volume?}
+
+Sure you can! But we recommend that unless the files that are being served are large enough
+this may not be a good idea in terms of performance. Apache 2.x+ uses the {\tt sendfile}
+system call that normally stages the file-data through the page-cache. On recent 2.6 kernels,
+this can be averted by providing a {\tt sendfile} callback routine at the file-system.
+Consequently, this ensures that we don't end up with stale or inconsistent cached data on such
+kernels. However, on older 2.4 kernels the {\tt sendfile} system call streams the data through
+the page-cache and thus there is a real possibility of the data being served stale.
+Therefore users of the {\tt sendfile} system call are warned to be wary of this detail.
+
 %
 % PERFORMANCE
 %
