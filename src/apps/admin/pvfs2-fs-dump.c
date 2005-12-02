@@ -459,7 +459,7 @@ int descend(PVFS_fs_id cur_fs,
 
     for (i = 0; i < readdir_resp.pvfs_dirent_outcount; i++)
     {
-	int server_idx;
+	int server_idx, ret;
 	char *cur_file;
 	PVFS_handle cur_handle;
 
@@ -469,10 +469,15 @@ int descend(PVFS_fs_id cur_fs,
 	entry_ref.handle = cur_handle;
 	entry_ref.fs_id  = cur_fs;
 
-	PVFS_sys_getattr(entry_ref,
+	if ((ret = PVFS_sys_getattr(entry_ref,
 			 PVFS_ATTR_SYS_ALL,
 			 creds,
-			 &getattr_resp);
+			 &getattr_resp)) != 0)
+        {
+            printf("Could not get attributes of handle %llu [%d]\n",
+                    llu(cur_handle), ret);
+            continue;
+        }
 
 
 	if (handlelist_find_handle(cur_handle, &server_idx) < 0)
@@ -530,6 +535,7 @@ void verify_datafiles(PVFS_fs_id cur_fs,
     df_handles = (PVFS_handle *) malloc(df_count * sizeof(PVFS_handle));
     if (df_handles == NULL)
     {
+        printf("invalid value of number of datafiles = %d\n", df_count);
 	assert(0);
     }
     ret = PVFS_mgmt_get_dfile_array(mf_ref, creds, df_handles, df_count);

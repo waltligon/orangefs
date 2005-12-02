@@ -902,7 +902,7 @@ static int getattr_set_sys_response(PINT_client_sm *sm_p,
 
     /* special case for when users ask for dfile count */
     if(attr->objtype == PVFS_TYPE_METAFILE &&
-       sm_p->getattr.req_attrmask & PVFS_ATTR_SYS_DFILE_COUNT)
+       sm_p->getattr.req_attrmask & PVFS_ATTR_META_DFILES)
     {
         sysresp->attr.dfile_count = attr->u.meta.dfile_count;
     }
