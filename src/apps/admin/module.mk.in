@@ -19,6 +19,7 @@ ADMINSRC := \
 	$(DIR)/pvfs2-fs-dump.c\
 	$(DIR)/pvfs2-fsck.c\
 	$(DIR)/pvfs2-cp.c \
+	$(DIR)/pvfs2-viewdist.c \
 	$(DIR)/pvfs2-touch.c \
 	$(DIR)/pvfs2-remove-object.c \
 	$(DIR)/pvfs2-ln.c

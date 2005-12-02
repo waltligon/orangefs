@@ -483,6 +483,27 @@ int pvfs2_inode_setattr(
 
 
 /* Extended attributes helper functions */
+static char *xattr_non_zero_terminated[] = {
+    "datafile_handles"
+};
+
+/*
+ * this function returns 
+ * 0 if the val corresponding to name is known to be not terminated with an explicit \0
+ * 1 if the val corresponding to name is known to be \0 terminated
+ */
+static int xattr_zero_terminated(const char *name)
+{
+    int i;
+    static int xattr_count = sizeof(xattr_non_zero_terminated)/sizeof(char *);
+    for (i = 0;i < xattr_count; i++)
+    {
+        if (strcmp(name, xattr_non_zero_terminated[i]) == 0)
+            return 0;
+    }
+    return 1;
+}
+
 /*
  * Tries to get a specified key's attributes of a given
  * file into a user-specified buffer. Note that the getxattr
@@ -551,17 +572,33 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char *name,
          */
         if (ret == 0)
         {
+            ssize_t new_length;
             length = new_op->downcall.resp.getxattr.val_sz;
+            /*
+             * if the xattr corresponding to name was not terminated with a \0
+             * then we return the entire response length
+             */
+            if (xattr_zero_terminated(name) == 0)
+            {
+                new_length = length;
+            }
+            /*
+             * if it was terminated by a \0 then we return 1 less for the getfattr
+             * programs to play nicely with displaying it
+             */
+            else {
+                new_length = length - 1;
+            }
             /* Just return the length of the queried attribute after
              * subtracting the \0 thingie */
             if (size == 0)
             {
-                ret = length - 1;
+                ret = new_length;
             }
             else
             {
                 /* check to see if key length is > provided buffer size */
-                if (length - 1 > size)
+                if (new_length > size)
                 {
                     ret = -ERANGE;
                 }
@@ -570,8 +607,8 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char *name,
                     /* No size problems */
                     memset(buffer, 0, size);
                     memcpy(buffer, new_op->downcall.resp.getxattr.val, 
-                            length - 1);
-                    ret = length - 1;
+                            new_length);
+                    ret = new_length;
                     pvfs2_print("pvfs2_getxattr: key: %s, val_length: %d\n",
                             name, (int) ret);
                 }
