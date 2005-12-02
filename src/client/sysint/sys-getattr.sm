@@ -162,7 +162,7 @@ nested machine pvfs2_client_getattr_sm(
     {
 	jump pvfs2_client_datafile_getattr_sizes_sm;
 	success => acache_insert;
-        default => datafile_getattr_failure;
+        default => cleanup;
     }
 
     state cleanup
@@ -179,8 +179,7 @@ machine pvfs2_client_sysint_getattr_sm(
     state dowork
     {
         jump pvfs2_client_getattr_sm;
-        success => set_sys_response;
-        default => terminate; 
+        default => set_sys_response; 
     }
 
     state set_sys_response

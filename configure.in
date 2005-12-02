@@ -17,7 +17,7 @@ dnl An @ in the date string can confuse e.g. scp and 'make kmod'
 CONFIGURE_TIME=`date -u +"%Y-%m-%d-%H%M%S"`
 PVFS2_MAJOR=1
 PVFS2_MINOR=3
-PVFS2_SUB=2
+PVFS2_SUB=3
 #PVFS2_PRE=""
 PVFS2_PRE="pre1-$CONFIGURE_TIME"
 
@@ -554,7 +554,22 @@ AC_TRY_COMPILE([
 	have_aio=no
 )
 
-if test "x$have_aio" = "xyes"; then
+dnl
+dnl some kernels (SLES9 2.6.5-7.191, for one) will pass the test for ki_dtor
+dnl below, but the resulting pvfs2.ko module will be built with internal
+dnl symbols (mmgrab and flush_icache_range).  
+dnl 
+dnl if option not given, carry out the test.  Only certain kernels (like SLES
+dnl 9) will need --disable-kernel-aio
+
+
+AC_ARG_ENABLE(kernel-aio,
+  [  --disable-kernel-aio    Forcibly disable kernel aio],
+  [ enable_kernel_aio=$enableval ],
+  [ enable_kernel_aio=yes ]
+  )
+
+if test "x$have_aio" = "xyes" -a "x$enable_kernel_aio" = "xyes"; then
 	AC_MSG_CHECKING(for ki_dtor in kiocb structure of kernel)
 	dnl if this test passes, the kernel does have it and we enable support for AIO
 	dnl if this test fails, the kernel does not have this member and we disable support for AIO

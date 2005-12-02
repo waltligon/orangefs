@@ -2,8 +2,15 @@
 PVFS2 Release ChangeLog
 -----------------------
 
-pvfs2-1.3.2-pre1
+pvfs2-1.3.3-pre1
 ===============
+
+pvfs2-1.3.2
+===============
+- new configure option for kernels which export internal symbols: 
+	--disable-kernel-aio
+- fix for getattr error handling
+- fix for trove printing out a resource after (sometimes) invalidating it
 
 pvfs2-1.3.1
 ===============
