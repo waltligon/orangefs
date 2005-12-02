@@ -72,6 +72,11 @@ static inline int copy_attributes_to_inode(
         */
         inode->i_blksize = pvfs_bufmap_size_query();
         inode->i_blkbits = PAGE_CACHE_SHIFT;
+        pvfs2_print("attrs->mask = %x (%d, objtype = %d), size = %ld\n", 
+                attrs->mask, attrs->mask & PVFS_ATTR_SYS_SIZE, 
+                attrs->objtype,
+                (unsigned long) attrs->size);
+                
 
         if ((attrs->objtype == PVFS_TYPE_METAFILE) &&
             (attrs->mask & PVFS_ATTR_SYS_SIZE))
@@ -327,7 +332,7 @@ static inline int copy_attributes_from_inode(
   issues a pvfs2 getattr request and fills in the appropriate inode
   attributes if successful.  returns 0 on success; -errno otherwise
 */
-int pvfs2_inode_getattr(struct inode *inode)
+int pvfs2_inode_getattr(struct inode *inode, uint32_t getattr_mask)
 {
     int ret = -EINVAL, retries = PVFS2_OP_RETRY_COUNT, error_exit = 0;
     pvfs2_kernel_op_t *new_op = NULL;
@@ -377,6 +382,7 @@ int pvfs2_inode_getattr(struct inode *inode)
         }
         new_op->upcall.type = PVFS2_VFS_OP_GETATTR;
         new_op->upcall.req.getattr.refn = pvfs2_inode->refn;
+        new_op->upcall.req.getattr.mask = getattr_mask;
 
         service_error_exit_op_with_timeout_retry(
             new_op, "pvfs2_inode_getattr", retries, error_exit,

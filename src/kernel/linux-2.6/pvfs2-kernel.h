@@ -101,6 +101,7 @@ typedef unsigned long sector_t;
 
 #include "pint-dev-shared.h"
 #include "pvfs2-dev-proto.h"
+#include "pvfs2-types.h"
 
 #define pvfs2_error printk
 
@@ -558,7 +559,7 @@ int pvfs2_inode_removexattr(struct inode *inode, const char *name);
 int pvfs2_inode_listxattr(struct inode *inode, char *, size_t);
 
 int pvfs2_inode_getattr(
-    struct inode *inode);
+    struct inode *inode, uint32_t mask);
 
 int pvfs2_inode_setattr(
     struct inode *inode,
@@ -1032,7 +1033,11 @@ static inline int pvfs2_internal_revalidate(
     int ret = -EINVAL;
     if (inode)
     {
-        ret = ((pvfs2_inode_getattr(inode) == 0) ? 1 : 0);
+        /*
+         * The dentry revalidating function expects that all fields of the inode
+         * would be refreshed, so we dont have much of a choice here too.
+         */
+        ret = ((pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_ALL) == 0) ? 1 : 0);
         if (ret == 0)
         {
             pvfs2_make_bad_inode(inode);

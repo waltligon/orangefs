@@ -45,6 +45,7 @@ typedef struct
 typedef struct
 {
     PVFS_object_ref refn;
+    uint32_t        mask;
 } pvfs2_getattr_request_t;
 
 typedef struct

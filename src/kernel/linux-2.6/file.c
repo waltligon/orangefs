@@ -69,10 +69,17 @@ int pvfs2_file_open(
         */
         if (file->f_flags & O_APPEND)
         {
-            ret = pvfs2_inode_getattr(inode);
+            /* 
+             * When we do a getattr in response to an open with O_APPEND,
+             * all we are interested in is the file size. Hence we will
+             * set the mask to only the size and nothing else
+             * Hopefully, this will help us in reducing the number of getattr's
+             */
+            ret = pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_SIZE);
             if (ret == 0)
             {
                 file->f_pos = i_size_read(inode);
+                pvfs2_print("f_pos = %ld\n", (unsigned long)file->f_pos);
             }
             else
             {
@@ -319,7 +326,8 @@ static ssize_t pvfs2_file_write(
         new_op->upcall.req.io.io_type = PVFS_IO_WRITE;
         new_op->upcall.req.io.refn = pvfs2_inode->refn;
 
-        pvfs2_print("pvfs2_file_write: writing %d bytes.\n", (int)count);
+        pvfs2_print("pvfs2_file_write: writing %d bytes at offset %lu (%lu)\n",
+                (int)count, (unsigned long)file->f_pos, (unsigned long)*offset);
 
         ret = pvfs_bufmap_get(&buffer_index);
         if (ret < 0)
@@ -390,6 +398,7 @@ static ssize_t pvfs2_file_write(
         }
 
         current_buf += new_op->downcall.resp.io.amt_complete;
+        pvfs2_print("amt_complete = %ld\n", (unsigned long) new_op->downcall.resp.io.amt_complete);
         *offset += new_op->downcall.resp.io.amt_complete;
         total_count += new_op->downcall.resp.io.amt_complete;
         amt_complete = new_op->downcall.resp.io.amt_complete;
@@ -412,7 +421,8 @@ static ssize_t pvfs2_file_write(
             break;
         }
     }
-
+    pvfs2_print("pvfs2_file_write: pos at the end was %lu(%lu)\n", 
+            (unsigned long) *offset, (unsigned long) file->f_pos);
     if (total_count)
     {
         update_atime(inode);
@@ -659,6 +669,7 @@ static ssize_t pvfs2_file_readv(
     seg = 0;
     while (total_count < count)
     {
+        int dc_status = 0;
         new_op = op_alloc();
         if (!new_op)
         {
@@ -700,13 +711,14 @@ static ssize_t pvfs2_file_readv(
         new_op->upcall.req.io.offset = *offset;
 
 
+        dc_status = 0;
+
         service_error_exit_op_with_timeout_retry(
             new_op, "pvfs2_file_readv", retries, error_exit,
             get_interruptible_flag(inode));
 
         if (new_op->downcall.status != 0)
         {
-            int dc_status = 0;
             dc_status = new_op->downcall.status;
 
             error_exit:
@@ -914,6 +926,7 @@ static ssize_t pvfs2_file_writev(
     seg = 0;
     while (total_count < count)
     {
+        int dc_status = 0;
         new_op = op_alloc();
         if (!new_op)
         {
@@ -977,13 +990,13 @@ static ssize_t pvfs2_file_writev(
             return ret;
         }
 
+        dc_status = 0;
         service_error_exit_op_with_timeout_retry(
             new_op, "pvfs2_file_writev", retries, error_exit,
             get_interruptible_flag(inode));
 
         if (new_op->downcall.status != 0)
         {
-            int dc_status = 0;
             dc_status = new_op->downcall.status;
 
             error_exit:
@@ -2036,8 +2049,10 @@ loff_t pvfs2_file_llseek(struct file *file, loff_t offset, int origin)
 
     if (origin == PVFS2_SEEK_END)
     {
-        /* revalidate the inode's file size */
-        ret = pvfs2_inode_getattr(inode);
+        /* revalidate the inode's file size. 
+         * NOTE: We are only interested in file size here, so we set mask accordingly 
+         */
+        ret = pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_SIZE);
         if (ret)
         {
             pvfs2_make_bad_inode(inode);

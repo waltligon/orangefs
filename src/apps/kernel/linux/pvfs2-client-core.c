@@ -517,7 +517,7 @@ static PVFS_error post_getattr_request(vfs_request_t *vfs_request)
 
     ret = PVFS_isys_getattr(
         vfs_request->in_upcall.req.getattr.refn,
-        PVFS_ATTR_SYS_ALL,
+        vfs_request->in_upcall.req.getattr.mask,
         &vfs_request->in_upcall.credentials,
         &vfs_request->response.getattr,
         &vfs_request->op_id, (void *)vfs_request);

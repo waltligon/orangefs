@@ -12,6 +12,7 @@
 
 #include "pvfs2-kernel.h"
 #include "pvfs2-bufmap.h"
+#include "pvfs2-types.h"
 
 /* defined in file.c */
 extern ssize_t pvfs2_inode_read(
@@ -332,7 +333,11 @@ int pvfs2_revalidate(struct dentry *dentry)
 
     pvfs2_print("pvfs2_revalidate: called on %s\n", dentry->d_name.name);
 
-    ret = pvfs2_inode_getattr(inode);
+    /*
+     * A revalidate expects that all fields of the inode would be refreshed
+     * So we have no choice but to refresh all attributes.
+     */
+    ret = pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_ALL);
     if (ret)
     {
         /* assume an I/O error and flag inode as bad */
@@ -353,7 +358,12 @@ int pvfs2_getattr(
 
     pvfs2_print("pvfs2_getattr: called on %s\n", dentry->d_name.name);
 
-    ret = pvfs2_inode_getattr(inode);
+    /*
+     * Similar to the above comment, a getattr also expects that all fields/attributes
+     * of the inode would be refreshed. So again, we dont have too much of a choice
+     * but refresh all the attributes.
+     */
+    ret = pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_ALL);
     if (ret == 0)
     {
         generic_fillattr(inode, kstat);

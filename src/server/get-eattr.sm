@@ -201,6 +201,8 @@ static int geteattr_check_resp(PINT_server_op *s_op, job_status_s *js_p)
         {
             s_op->resp.u.geteattr.val[k].buffer_sz =
                 s_op->resp.u.geteattr.val[k].read_sz;
+            gossip_debug(GOSSIP_GETEATTR_DEBUG, "key %s, read_sz = %d\n",
+                (char *) s_op->req->u.geteattr.key[k].buffer, s_op->resp.u.geteattr.val[k].buffer_sz);
         }
         /* in case of any errors, we initialize it to 0 */
         else {
