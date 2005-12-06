@@ -60,6 +60,7 @@ tarballdir=`echo $tarball | sed -e "s/.tar.gz//" | sed -e "s/.tgz//"`
 old_wd=$( cd `dirname $0`; pwd)
 build_kernel="false"
 build_tests="false"
+make_targets="all"
 kerneldir=""
 
 usage()
@@ -114,9 +115,11 @@ mkdir $builddir
 mkdir $installdir
 cd $builddir
 if [ $build_kernel == "true" ] ; then
-	$srcdir/configure $configureopts --with-kernel=$kerneldir --prefix=$installdir 2>&1 > $rootdir/configure.log
+	$srcdir/configure $configureopts --with-kernel=$kerneldir --prefix=$installdir > $rootdir/configure.log 2>&1
+	make_targets="all kmod"
 else
-	$srcdir/configure $configureopts --prefix=$installdir 2>&1 > $rootdir/configure.log
+	$srcdir/configure $configureopts --prefix=$installdir  > $rootdir/configure.log 2>&1
+	make_targets="all"
 fi
 
 if [ $? != 0 ] ; then
@@ -125,7 +128,7 @@ if [ $? != 0 ] ; then
 fi
 
 # make
-make 2>&1 > $rootdir/make.log
+make $make_targets > $rootdir/make.log 2>&1
 
 if [ $? != 0 ] ; then
 	echo "Make failed; see $rootdir/make.log.  Aborting."
@@ -142,25 +145,15 @@ if [ x$PEMM == "x" ] ; then
 		PEMM=$old_wd/pvfs2-extract-make-msgs.pl 
 	fi
 fi
-$PEMM $rootdir/make.log 2>&1 > $rootdir/make-extracted.log
+$PEMM $rootdir/make.log > $rootdir/make-extracted.log 2>&1
 
 if [ $? != 0 ] ; then
 	echo "Spurious output during make; see $rootdir/make-extracted.log.  Aborting."
 	exit 1
 fi
 
-# make kernel stuff if necessary
-if [ $build_kernel == "true" ] ; then
-	make kmod 2>&1 >> $rootdir/make.log
-fi
-
-if [ $? != 0 ] ; then
-	echo "Make kmod failed; see $rootdir/make.log.  Aborting."
-	exit 1
-fi
-
 # make install
-make install 2>&1 > $rootdir/make-install.log
+make install > $rootdir/make-install.log 2>&1
 
 if [ $? != 0 ] ; then
 	echo "Make install failed; see $rootdir/make-install.log.  Aborting."
@@ -174,17 +167,17 @@ fi
 # build tests if needed 
 if [ $build_tests == "true" ] ; then
 	cd $builddir/test
-	$srcdir/test/configure $configureopts 2>&1 > $rootdir/configure.log
+	$srcdir/test/configure $configureopts > $rootdir/configure-test.log 2>&1
 	if [ $? != 0 ] ; then
-		echo "Configure of test programs failed; see $rootdir/configure.log.  Aborting."
+		echo "Configure of test programs failed; see $rootdir/configure-test.log.  Aborting."
 		exit 1
 	fi
 
 	# make
-	make 2>&1 > $rootdir/make.log
+	make  > $rootdir/make-test.log 2>&1
 
 	if [ $? != 0 ] ; then
-		echo "Make failed; see $rootdir/make.log.  Aborting."
+		echo "Make failed; see $rootdir/make-test.log.  Aborting."
 		exit 1
 	fi
 
@@ -198,7 +191,7 @@ if [ $build_tests == "true" ] ; then
 			PEMM=$old_wd/pvfs2-extract-make-msgs.pl 
 		fi
 	fi
-	$PEMM $rootdir/make.log 2>&1 > $rootdir/make-extracted.log
+	$PEMM $rootdir/make-test.log  $rootdir/make-extracted.log 2>&1
 	if [ $? != 0 ] ; then
 		echo "Spurious output during test make; see $rootdir/make-extracted.log.  Aborting."
 		exit 1
