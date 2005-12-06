@@ -47,6 +47,8 @@ AC_CHECK_HEADERS([mntent.h, fstab.h])
 
 AC_CHECK_HEADERS(stdarg.h)
 
+AC_CHECK_HEADERS(attr/xattr.h)
+
 AC_CHECK_SIZEOF([long int])
 
 dnl Check for utilities that we need during the build process
