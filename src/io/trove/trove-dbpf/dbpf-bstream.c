@@ -158,13 +158,13 @@ static void aio_progress_notification(sigval_t sig)
         dbpf_open_cache_put(&op_p->u.b_rw_list.open_ref);
         op_p->u.b_rw_list.fd = -1;
 
+        gossip_debug(GOSSIP_TROVE_DEBUG, "*** starting delayed ops if any "
+                     "(state is %d)\n",op_p->u.b_rw_list.list_proc_state);
+
         /* this is a macro defined in dbpf-thread.h */
         move_op_to_completion_queue(
             cur_op, ret,
             ((ret == -TROVE_ECANCEL) ? OP_CANCELED : OP_COMPLETED));
-
-        gossip_debug(GOSSIP_TROVE_DEBUG, "*** starting delayed ops if any "
-                     "(state is %d)\n",op_p->u.b_rw_list.list_proc_state);
 
         start_delayed_ops_if_any(1);
     }
@@ -910,7 +910,7 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     {
         dbpf_queued_op_free(q_op_p);
         gossip_ldebug(GOSSIP_TROVE_DEBUG,
-                      "warning: useless error value\n");
+                      "warning: useless error value: %d\n", ret);
         return -trove_errno_to_trove_error(ret);
     }
     q_op_p->op.u.b_rw_list.fd = q_op_p->op.u.b_rw_list.open_ref.fd;

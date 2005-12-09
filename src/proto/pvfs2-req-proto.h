@@ -1056,7 +1056,7 @@ struct PVFS_servresp_small_io
         encode_enum(pptr, &(x)->io_type); \
         encode_PVFS_size(pptr, &(x)->bstream_size); \
         encode_PVFS_size(pptr, &(x)->result_size); \
-        if((x)->io_type == PVFS_IO_READ) \
+        if((x)->io_type == PVFS_IO_READ && (x)->buffer) \
         { \
             memcpy((*pptr), (x)->buffer, (x)->result_size); \
             (*pptr) += (x)->result_size; \

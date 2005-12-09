@@ -658,6 +658,8 @@ PVFS_size PINT_distribute(PVFS_offset offset,
         /* else poff is the offset of the segment */
         if (PINT_IS_CLIENT(mode) && mem)
         {
+            int current_segs = result->segs;
+
             gossip_debug(GOSSIP_REQUEST_DEBUG,
                          "**********CALL***PROCESS*********\n");
             gossip_debug(GOSSIP_REQUEST_DEBUG,"\t\tsegment of %lld sz %lld\n",
@@ -671,6 +673,13 @@ PVFS_size PINT_distribute(PVFS_offset offset,
             PINT_process_request(mem, NULL, rfdata, result, mode|PINT_MEMREQ);
             sz = mem->type_offset - poff;
             
+            if(result->segs == current_segs)
+            {
+                /* If there no new segments within the memory request, 
+                 * we don't need to post-process
+                 */
+                break;
+            }
             gossip_debug(GOSSIP_REQUEST_DEBUG,
                          "*****RETURN***FROM***PROCESS*****\n");
         }

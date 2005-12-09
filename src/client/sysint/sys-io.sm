@@ -25,6 +25,8 @@
 #include "pint-util.h"
 #include "pvfs2-internal.h"
 
+#define IO_MAX_SEGMENT_NUM 50 
+
 extern job_context_id pint_client_sm_context;
 
 enum
@@ -102,11 +104,13 @@ static int io_find_max_datafile_offset(
 
 static int io_find_total_size(
     PINT_client_sm * sm_p,
-    int max_datafile_logical_offset,
+    PVFS_offset final_offset,
     PVFS_size * total_return_size);
 
-static int io_zero_out_buffer(
-    PINT_client_sm *sm_p, PINT_dist *dist);
+static int io_find_offset(
+    PINT_client_sm * sm_p,
+    PVFS_size contig_size,
+    PVFS_size * total_return_offset);
 
 static int io_get_max_unexp_size(
     struct PINT_Request * file_req,
@@ -114,6 +118,13 @@ static int io_get_max_unexp_size(
     PVFS_fs_id fs_id, 
     enum PVFS_io_type type,
     int * max_unexp_payload);
+
+static int io_zero_fill_holes(
+    PINT_client_sm *sm_p,
+    PVFS_size eof,
+    int datafile_count,
+    PVFS_size * datafile_size_array,
+    int * datafile_index_array);
 
 static int io_contexts_init(PINT_client_sm *sm_p, int count,
                             PVFS_object_attr *attr);
@@ -519,24 +530,6 @@ static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
                  "  %s: %d datafiles "
                  "might have data\n", __func__, target_datafile_count);
 
-    /* if we're doing a read, we zero the entire output buffer according
-     * to the memory request.  This way we don't have to zero out the
-     * holes one at a time.  We wait to perform zeroing until we have the
-     * distribution info.  Also, the zero fill is *not* done if all the
-     * data servers are being used for the I/O operation, because in that
-     * case we know there are no holes between strips.
-     */
-    if(sm_p->u.io.io_type == PVFS_IO_READ &&
-       target_datafile_count != attr->u.meta.dfile_count)
-    {
-        ret = io_zero_out_buffer(sm_p, attr->u.meta.dist);
-        if(ret < 0)
-        {
-            js_p->error_code = ret;
-            goto error_exit;
-        }
-    }
-
     /* look at sio_array and sio_count to see if there are any
      * servers that we can do small I/O to, instead of setting up
      * flows.  For now, we're going to stick with the semantics that
@@ -919,6 +912,7 @@ static int io_datafile_complete_operations(PINT_client_sm *sm_p,
     unsigned long status_user_tag = (unsigned long)
         js_p->status_user_tag;
     PINT_client_io_ctx *cur_ctx = NULL;
+    PVFS_object_attr * attr;
     int matched_send_or_recv = 0;
     struct server_configuration_s *server_config = NULL;
 
@@ -929,6 +923,9 @@ static int io_datafile_complete_operations(PINT_client_sm *sm_p,
     assert(sm_p->u.io.msgpair_completion_count > -1);
     assert(sm_p->u.io.flow_completion_count > -1);
     assert(sm_p->u.io.write_ack_completion_count > -1);
+
+    attr = &sm_p->getattr.attr;
+    assert(attr);
 
     /* check if we're completing a send or recv msgpair */
     if (STATUS_USER_TAG_IS_SEND_OR_RECV(status_user_tag))
@@ -988,6 +985,9 @@ static int io_datafile_complete_operations(PINT_client_sm *sm_p,
  
         if(sm_p->u.io.io_type == PVFS_IO_READ)
         {
+            cur_ctx->flow_in_progress = 0;
+            sm_p->u.io.flow_completion_count--;
+
             ret = io_post_flow(sm_p, cur_ctx);
             if(ret < 0)
             {
@@ -1119,7 +1119,8 @@ static int io_datafile_complete_operations(PINT_client_sm *sm_p,
                          sm_p->u.io.write_ack_completion_count);
         else
             gossip_debug(GOSSIP_IO_DEBUG, " %d flows pending, %d write acks "
-                         "pending, %d msgpair\n", sm_p->u.io.flow_completion_count,
+                         "pending, %d msgpair\n", 
+                         sm_p->u.io.flow_completion_count,
                          sm_p->u.io.write_ack_completion_count,
                          sm_p->u.io.msgpair_completion_count);
         return 0;
@@ -1345,14 +1346,21 @@ static int io_analyze_results(PINT_client_sm *sm_p,
     else
     {
         PVFS_offset max_datafile_logical_offset;
-        PVFS_offset memreq_ub_offset;
+        PVFS_offset filereq_ub_offset;
 
-        /* compute the upper bound of the memory request.  This is the
-         * logical offset used to compare against all the datafile
-         * logical offsets
+        /* compute the upper bound of the file request (based on the
+         * memory request.  This is the logical offset used to compare 
+         * against all the datafile logical offsets
          */
-        memreq_ub_offset = PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req) +
-            sm_p->u.io.file_req_offset;
+        ret = io_find_offset(
+            sm_p, 
+            PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req), 
+            &filereq_ub_offset);
+        if(ret)
+        {
+           js_p->error_code = ret;
+           goto analyze_results_exit;
+        }
 
         ret = io_find_max_datafile_offset(
             sm_p,
@@ -1360,10 +1368,15 @@ static int io_analyze_results(PINT_client_sm *sm_p,
             sm_p->u.io.datafile_count,
             sm_p->u.io.dfile_size_array,
             sm_p->u.io.datafile_index_array,
-            memreq_ub_offset,
+            filereq_ub_offset + sm_p->u.io.file_req_offset,
             &max_datafile_logical_offset);
         if(ret)
         {
+            /* end-of-request */
+            PVFS_offset eor = PVFS_util_max(
+                filereq_ub_offset + sm_p->u.io.file_req_offset,
+                max_datafile_logical_offset);
+
             /* we found a logical offset that is past the end of the
              * request, so we know the request is not past EOF.
              *
@@ -1373,6 +1386,17 @@ static int io_analyze_results(PINT_client_sm *sm_p,
             sm_p->u.io.io_resp_p->total_completed = 
                 PINT_REQUEST_TOTAL_BYTES(
                     sm_p->u.io.mem_req);
+
+            
+            ret = io_zero_fill_holes(sm_p, eor,
+                                     sm_p->u.io.datafile_count,
+                                     sm_p->u.io.dfile_size_array,
+                                     sm_p->u.io.datafile_index_array);
+            if(ret < 0)
+            {
+                js_p->error_code = ret;
+                goto analyze_results_exit;
+            }
         }
         else
         {
@@ -1380,7 +1404,7 @@ static int io_analyze_results(PINT_client_sm *sm_p,
              * know if the request is past EOF or we just don't have all
              * the datafiles sizes.  If it turns out we already
              * have all the datafile sizes, we
-             * can go straight to analyze_size_results.  Otherwise, we
+             * can go straight to computing the total size.  Otherwise, we
              * need to get the rest of the datafiles.  
              * At some point we should fix
              * this and the getattr state machine to allow us to only get
@@ -1390,8 +1414,12 @@ static int io_analyze_results(PINT_client_sm *sm_p,
              */
             if(sm_p->u.io.datafile_count == attr->u.meta.dfile_count)
             {
+                PVFS_offset eor = PVFS_util_max(
+                    max_datafile_logical_offset,
+                    filereq_ub_offset + sm_p->u.io.file_req_offset);
+
                 /* we skip getting all the datafile sizes (since we already
-                 * have them) and go straight to analyzing the sizes state.
+                 * have them) and just compute the total size.
                  */
                 PVFS_size total_size;
                 
@@ -1404,6 +1432,17 @@ static int io_analyze_results(PINT_client_sm *sm_p,
                 }
 
                 sm_p->u.io.io_resp_p->total_completed = total_size;
+
+                ret = io_zero_fill_holes(sm_p, eor,
+                                         sm_p->u.io.datafile_count,
+                                         sm_p->u.io.dfile_size_array,
+                                         NULL);
+                if(ret < 0)
+                {
+                    js_p->error_code = ret;
+                    goto analyze_results_exit;
+                }
+
                 js_p->error_code = 0;
                 goto analyze_results_exit;
             }
@@ -1453,22 +1492,36 @@ static int io_analyze_size_results(
      */
     
     PVFS_offset eof = 0;
-    PVFS_offset memreq_ub_offset;
+    PVFS_offset eor;
+    PVFS_offset filereq_ub_offset;
     int ret;
     PVFS_object_attr * attr;
 
     attr = &sm_p->getattr.attr;
     assert(attr);
     
-    memreq_ub_offset = sm_p->u.io.file_req_offset + 
-        PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req);
+    ret = io_find_offset(
+        sm_p, 
+        PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req),
+        &filereq_ub_offset);
+    if(ret < 0)
+    {
+        js_p->error_code = ret;
+        goto error_exit;
+    }
 
     ret = io_find_max_datafile_offset(
-        sm_p, attr, attr->u.meta.dfile_count,
+        sm_p, attr, 
+        attr->u.meta.dfile_count,
         sm_p->u.io.dfile_size_array,
         NULL,
-        memreq_ub_offset,
+        filereq_ub_offset + sm_p->u.io.file_req_offset,
         &eof);
+    
+    eor = PVFS_util_max(
+        filereq_ub_offset + sm_p->u.io.file_req_offset,
+        eof);
+
     if(ret)
     {
         /* we found a logical offset that is past the end of the
@@ -1476,6 +1529,16 @@ static int io_analyze_size_results(
          */
         sm_p->u.io.io_resp_p->total_completed = 
             PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req);
+
+        ret = io_zero_fill_holes(sm_p, eor,
+                                 attr->u.meta.dfile_count,
+                                 sm_p->u.io.dfile_size_array,
+                                 NULL);
+        if(ret < 0)
+        {
+            js_p->error_code = ret;
+            goto error_exit;
+        }
     }
     else
     {
@@ -1489,7 +1552,18 @@ static int io_analyze_size_results(
         }
         
         sm_p->u.io.io_resp_p->total_completed = total_size;
+
+        ret = io_zero_fill_holes(sm_p, eof,
+                                 attr->u.meta.dfile_count,
+                                 sm_p->u.io.dfile_size_array,
+                                 NULL);
+        if(ret < 0)
+        {
+            js_p->error_code = ret;
+            goto error_exit;
+        }
     }
+
 
     js_p->error_code = 0;
 
@@ -2237,7 +2311,10 @@ static int io_find_target_datafiles(
  * return 0 if no such datafile was found
  *
  * in either case, max offset is set to the 
- * datafile logical offset < upper_bound
+ * datafile logical offset < upper_bound.
+ *
+ * This function is similar to dist->logical_file_size, but we stop
+ * looking for the max offset once we've exceeded the upper bound.
  */
 static int
 io_find_max_datafile_offset(
@@ -2263,6 +2340,12 @@ io_find_max_datafile_offset(
         PVFS_offset datafile_logical_offset;
         file_data.server_nr = 
             (datafile_index_array ? datafile_index_array[i] : i);
+
+        if(datafile_sizes[file_data.server_nr] == 0)
+        {
+            /* if the datafile is zero, skip to next one */
+            continue;
+        }
 
         datafile_logical_offset = 
             attr->u.meta.dist->methods->physical_to_logical_offset(
@@ -2297,18 +2380,20 @@ io_find_max_datafile_offset(
 static int
 io_find_total_size(
     PINT_client_sm * sm_p,
-    int max_datafile_logical_offset,
+    PVFS_offset final_offset,
     PVFS_size * total_return_size)
 {
+    int res;
+    PVFS_offset current_offset;
+    PVFS_offset offsets[IO_MAX_SEGMENT_NUM];
+    PVFS_size sizes[IO_MAX_SEGMENT_NUM];
     PINT_Request_state * filereq_state;
     PINT_Request_state * memreq_state;
     PINT_request_file_data rfdata;
     PINT_Request_result result;
-    int res;
-    PVFS_offset offset;
-    PVFS_size size;
     PVFS_size total_size = 0;
     PVFS_object_attr * attr;
+    int index = 0;
 
     attr = &sm_p->getattr.attr;
 
@@ -2317,18 +2402,17 @@ io_find_total_size(
 
     rfdata.server_nr = 0;
     rfdata.server_ct = 1;
-    rfdata.fsize = max_datafile_logical_offset;
+    rfdata.fsize = final_offset;
     rfdata.dist = attr->u.meta.dist;
     rfdata.extend_flag = 0;
 
-    result.offset_array = &offset;
-    result.size_array = &size;
-    result.segmax = 1;
-    result.bytemax = PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req); 
+    result.offset_array = offsets;
+    result.size_array = sizes;
+    result.segmax = IO_MAX_SEGMENT_NUM;
+    result.bytemax = final_offset; 
 
-    PINT_REQUEST_STATE_SET_TARGET(filereq_state, sm_p->u.io.file_req_offset);
     PINT_REQUEST_STATE_SET_FINAL(
-        filereq_state, max_datafile_logical_offset);
+        filereq_state, final_offset);
 
     do
     {
@@ -2336,27 +2420,28 @@ io_find_total_size(
         result.bytes = 0;
 
         res = PINT_process_request(filereq_state, memreq_state,
-                                   &rfdata, &result, PINT_CLIENT);
+                                   &rfdata, &result, PINT_SERVER);
         if(res < 0)
         {
             return res;
         }
 
-        if(result.segs > 0)
+        for(index = 0; index < result.segs; ++index)
         {
-            if((max_datafile_logical_offset >= offset) &&
-               (max_datafile_logical_offset <= offset + size))
+            current_offset = sm_p->u.io.file_req_offset + offsets[index];
+            if((final_offset >= current_offset) &&
+               (final_offset <= (current_offset + sizes[index])))
             {
-                total_size += (max_datafile_logical_offset - offset);
+                total_size += (final_offset - current_offset);
                 break;
             }
-            else if(max_datafile_logical_offset < offset)
+            else if(final_offset < current_offset)
             {
                 break;
             }
             else
             {
-                total_size += size;
+                total_size += sizes[index];
             }
         }
 
@@ -2366,6 +2451,204 @@ io_find_total_size(
     return 0;
 }
 
+/* computes the logical offset in the file request from the size
+ * of contiguous buffer.  This function acts only on the file request
+ * since the actual size of the file doesn't matter.
+ */
+static int
+io_find_offset(
+    PINT_client_sm * sm_p,
+    PVFS_size contig_size,
+    PVFS_offset * total_return_offset)
+{
+    PINT_Request_state * filereq_state;
+    PINT_Request_state * memreq_state;
+    PINT_request_file_data rfdata;
+    PINT_Request_result result;
+    int res;
+    PVFS_offset offsets[IO_MAX_SEGMENT_NUM];
+    PVFS_size sizes[IO_MAX_SEGMENT_NUM];
+    PVFS_offset total_offset = 0;
+    PVFS_size total_size = 0;
+    PVFS_object_attr * attr;
+    int index = 0;
+
+    attr = &sm_p->getattr.attr;
+
+    filereq_state = PINT_new_request_state(sm_p->u.io.file_req);
+    memreq_state = PINT_new_request_state(sm_p->u.io.mem_req);
+
+    rfdata.server_nr = 0;
+    rfdata.server_ct = 1;
+    rfdata.fsize = 0;
+    rfdata.dist = attr->u.meta.dist;
+    rfdata.extend_flag = 1;
+
+    result.offset_array = offsets;
+    result.size_array = sizes;
+    result.segmax = IO_MAX_SEGMENT_NUM;
+    result.bytemax = contig_size; 
+
+    PINT_REQUEST_STATE_SET_FINAL(
+        filereq_state, contig_size);
+    do
+    {
+        result.segs = 0;
+        result.bytes = 0;
+
+        res = PINT_process_request(filereq_state, memreq_state,
+                                   &rfdata, &result, PINT_SERVER);
+        if(res < 0)
+        {
+            return res;
+        }
+
+        for(index = 0; index < result.segs; ++index)
+        {
+            if(contig_size <= (total_size + sizes[index]))
+            {
+                total_offset = offsets[index] + (contig_size - total_size);
+                break;
+            }
+            else
+            {
+                total_offset = offsets[index] + sizes[index];
+                total_size += sizes[index];
+            }
+        }
+
+    } while(!PINT_REQUEST_DONE(filereq_state) && result.segs);
+
+    *total_return_offset = total_offset;
+    return 0;
+}
+
+static int io_zero_fill_holes(
+    PINT_client_sm *sm_p,
+    PVFS_size eof,
+    int datafile_count,
+    PVFS_size * datafile_size_array,
+    int * datafile_index_array)
+{
+    PVFS_object_attr * attr;
+    PINT_request_file_data fdata;
+    PINT_Request_result result;
+    PINT_Request_state * file_req_state = NULL;
+    PINT_Request_state * mem_req_state = NULL;
+    int i = 0;
+    int j = 0;
+    int ret;
+    PVFS_offset offsets[IO_MAX_SEGMENT_NUM];
+    PVFS_size sizes[IO_MAX_SEGMENT_NUM];
+   
+    attr = &sm_p->getattr.attr;
+    fdata.server_ct = attr->u.meta.dfile_count;
+    fdata.dist = attr->u.meta.dist;
+    fdata.extend_flag = 0;
+
+    result.bytemax = PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req); 
+    result.segmax = IO_MAX_SEGMENT_NUM;
+    result.offset_array = offsets;
+    result.size_array = sizes;
+
+    file_req_state = PINT_new_request_state(sm_p->u.io.file_req);
+    mem_req_state = PINT_new_request_state(sm_p->u.io.mem_req);
+
+    for(; i < datafile_count; ++i)
+    {
+        PVFS_size real_bstream_size, actual_bstream_size;
+
+        fdata.server_nr = (datafile_index_array ? datafile_index_array[i] : i);
+        actual_bstream_size = datafile_size_array[fdata.server_nr];
+
+        fdata.fsize = actual_bstream_size;
+
+        result.bytemax = PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req);
+        result.segmax = IO_MAX_SEGMENT_NUM;
+        fdata.extend_flag = 0;
+        fdata.dist = attr->u.meta.dist;
+
+        real_bstream_size = 
+            (PVFS_size) fdata.dist->methods->logical_to_physical_offset(
+                fdata.dist->params, &fdata, eof);
+
+       if(actual_bstream_size < real_bstream_size)
+       {
+           /* We've got holes! */
+
+           PVFS_offset real_logical_offset = 
+               fdata.dist->methods->physical_to_logical_offset(
+                   fdata.dist->params, &fdata, real_bstream_size);
+
+           PVFS_offset actual_logical_offset = 
+               fdata.dist->methods->physical_to_logical_offset(
+                fdata.dist->params, &fdata, actual_bstream_size);
+
+           PINT_REQUEST_STATE_SET_TARGET(
+               file_req_state,
+               sm_p->u.io.file_req_offset);
+
+           PINT_REQUEST_STATE_SET_FINAL(
+               file_req_state,
+               actual_logical_offset);
+
+           do
+           {
+               result.bytes = 0;
+               result.segs = 0;
+
+               ret = PINT_process_request(file_req_state, mem_req_state,
+                                          &fdata, &result, PINT_CLIENT);
+               if(ret < 0)
+               {
+                   PVFS_perror_gossip("PINT_process_request failed", ret);
+                   return ret;
+               }
+           } while(!PINT_REQUEST_DONE(file_req_state) && result.segs);
+               
+           PINT_REQUEST_STATE_SET_FINAL(
+               file_req_state,
+               real_logical_offset);
+
+           fdata.extend_flag = 1;
+
+           result.bytes = 0;
+           result.segs = 0;
+
+           do
+           {
+               result.bytes = 0;
+               result.segs = 0;
+               ret = PINT_process_request(file_req_state, mem_req_state,
+                                          &fdata, &result, PINT_CLIENT);
+               if(ret < 0)
+               {
+                   PVFS_perror_gossip("PINT_process_request failed", ret);
+                   return ret;
+               }
+
+               if(result.segs)
+               {
+                   for(j = 0; j < result.segs; ++j)
+                   {
+                       memset((void *)(((size_t)sm_p->u.io.buffer) + 
+                                       ((size_t)offsets[j])),
+                              0, sizes[j]);
+                   }
+               }
+           } while(!PINT_REQUEST_DONE(file_req_state) && result.segs);
+
+           PINT_REQUEST_STATE_RESET(file_req_state);
+           PINT_REQUEST_STATE_RESET(mem_req_state);
+       }
+    }
+
+    PINT_free_request_state(file_req_state);
+    PINT_free_request_state(mem_req_state);
+
+    return 0;
+}
+ 
 static int io_datafile_index_array_init(
     PINT_client_sm *sm_p,
     int datafile_count)
@@ -2456,53 +2739,6 @@ static void io_contexts_destroy(PINT_client_sm *sm_p)
     free(sm_p->u.io.contexts);
     sm_p->u.io.contexts = NULL;
     sm_p->u.io.context_count = 0;
-}
-
-static int io_zero_out_buffer(
-    PINT_client_sm *sm_p,
-    PINT_dist *dist)
-{
-    PINT_Request_state * req_state;
-    PINT_request_file_data rfdata;
-    PINT_Request_result result;
-    PVFS_offset offset;
-    PVFS_size size;
-
-    req_state = PINT_new_request_state(sm_p->u.io.mem_req);
-    rfdata.server_ct = 1;
-    rfdata.fsize = 0;
-    rfdata.dist = dist;
-    rfdata.extend_flag = 0;
-
-    result.offset_array = &offset;
-    result.size_array = &size;
-    result.segmax = 1;
-    result.bytemax = PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req);
-
-    do
-    {
-        int ret;
-        result.segs = 0;
-        result.bytes = 0;
-
-        ret = PINT_process_request(req_state, NULL, 
-                                   &rfdata, &result, PINT_MEMREQ);
-        if(ret < 0)
-        {
-            PVFS_perror_gossip("PINT_process_request failed;"
-                               "aborting I/O", ret);
-            PINT_free_request_state(req_state);
-            return -PVFS_EBADF;
-        }
-
-        if(result.segs > 0)
-        {
-            memset(((char *)sm_p->u.io.buffer) + offset, 0, size);
-        }
-    } while(req_state->lvl > -1 && result.segs > 0);
-
-    PINT_free_request_state(req_state);
-    return 0;
 }
 
 /*

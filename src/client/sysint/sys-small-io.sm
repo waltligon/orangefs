@@ -85,10 +85,8 @@ static int small_io_setup_msgpairs(PINT_client_sm * sm_p,
     PVFS_object_attr *attr = NULL;
     int i = 0;
     int ret;
-    PINT_Request_state * file_req_state;
-    PINT_Request_state * mem_req_state;
-    PINT_request_file_data file_data;
-    PINT_Request_result result;
+    PVFS_handle datafile_handle;
+    int regions = 0;
 
     js_p->error_code = 0;
 
@@ -100,59 +98,75 @@ static int small_io_setup_msgpairs(PINT_client_sm * sm_p,
     if(ret < 0)
     {
         js_p->error_code = ret;
-        goto error_exit;
+        return 1;
     }
     sm_p->msgarray_count = sm_p->u.io.datafile_count;
 
-    memset(&file_data, 0, sizeof(PINT_request_file_data));
-    file_data.server_ct = attr->u.meta.dfile_count;
-    file_data.fsize = 0;
-    file_data.dist = attr->u.meta.dist;
-    file_data.extend_flag = 1;
-
-    if(sm_p->u.io.io_type == PVFS_IO_READ)
-    {
-        file_data.extend_flag = 0;
-    }
-    
-    result.segmax = SMALL_IO_MAX_REGIONS;
-    result.bytemax = PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req);
     for(i = 0; i < sm_p->u.io.datafile_count; ++i)
     {
-        file_req_state = PINT_new_request_state(sm_p->u.io.file_req);
-        mem_req_state = PINT_new_request_state(sm_p->u.io.mem_req);
-
-        PINT_REQUEST_STATE_SET_TARGET(file_req_state, 
-                                      sm_p->u.io.file_req_offset);
-
-        PINT_REQUEST_STATE_SET_FINAL(file_req_state, 
-                                     sm_p->u.io.file_req_offset + result.bytemax);
-
-        PVFS_handle datafile_handle = attr->u.meta.dfile_array[
+        datafile_handle = attr->u.meta.dfile_array[
             sm_p->u.io.datafile_index_array[i]];
- 
+
         gossip_debug(GOSSIP_IO_DEBUG, "   small_io_setup_msgpairs: "
                      "handle: %llu\n", datafile_handle);
 
-        file_data.server_nr = sm_p->u.io.datafile_index_array[i];
-        
-        result.segs = 0;
-        result.bytes = 0;
-        result.offset_array = sm_p->msgarray[i].req.u.small_io.offsets;
-        result.size_array = sm_p->msgarray[i].req.u.small_io.sizes;
-        sm_p->msgarray[i].req.u.small_io.buffer = sm_p->u.io.buffer;
-
-        ret = PINT_process_request(
-            file_req_state, mem_req_state,
-            &file_data,
-            &result,
-            PINT_CLIENT);
-        if(ret < 0)
+        if(sm_p->u.io.io_type == PVFS_IO_WRITE)
         {
-            js_p->error_code = ret;
-            goto error_exit;
+            PINT_Request_state * file_req_state = NULL;
+            PINT_Request_state * mem_req_state = NULL;
+            PINT_request_file_data file_data;
+            PINT_Request_result result;
+
+            memset(&file_data, 0, sizeof(PINT_request_file_data));
+            file_data.server_ct = attr->u.meta.dfile_count;
+            file_data.fsize = 0;
+            file_data.dist = attr->u.meta.dist;
+            file_data.extend_flag = 1;
+
+            result.segmax = SMALL_IO_MAX_REGIONS;
+            result.bytemax = PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req);
+            file_req_state = PINT_new_request_state(sm_p->u.io.file_req);
+            mem_req_state = PINT_new_request_state(sm_p->u.io.mem_req);
+
+            PINT_REQUEST_STATE_SET_TARGET(file_req_state, 
+                                          sm_p->u.io.file_req_offset);
+
+            PINT_REQUEST_STATE_SET_FINAL(file_req_state, 
+                                         sm_p->u.io.file_req_offset + 
+                                         result.bytemax);
+
+            file_data.server_nr = sm_p->u.io.datafile_index_array[i];
+
+            result.segs = 0;
+            result.bytes = 0;
+            result.offset_array = sm_p->msgarray[i].req.u.small_io.offsets;
+            result.size_array = sm_p->msgarray[i].req.u.small_io.sizes;
+            sm_p->msgarray[i].req.u.small_io.buffer = sm_p->u.io.buffer;
+
+            ret = PINT_process_request(
+                file_req_state, mem_req_state,
+                &file_data,
+                &result,
+                PINT_CLIENT);
+            if(ret < 0)
+            {
+                js_p->error_code = ret;
+                PINT_free_request_state(file_req_state);
+                PINT_free_request_state(mem_req_state);
+                return 1;
+            }
+
+            regions = result.segs;
+
+            PINT_free_request_state(file_req_state);
+            PINT_free_request_state(mem_req_state);
         }
-            
+
+        /* if this is a write operation, the appropriate offset and size
+         * arrays will have been filled in by the request processing above.
+         * reads don't require processing of the memory request until
+         * the response.  
+         */ 
         PINT_SERVREQ_SMALL_IO_FILL(
             sm_p->msgarray[i].req,
             *sm_p->cred_p,
@@ -164,7 +178,7 @@ static int small_io_setup_msgpairs(PINT_client_sm * sm_p,
             attr->u.meta.dist,
             sm_p->u.io.file_req,
             sm_p->u.io.file_req_offset,
-            result.segs,
+            regions,
             PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req));
 
         sm_p->msgarray[i].fs_id = sm_p->object_ref.fs_id;
@@ -173,27 +187,17 @@ static int small_io_setup_msgpairs(PINT_client_sm * sm_p,
         sm_p->msgarray[i].comp_fn = small_io_completion_fn;
 
         ret = PINT_cached_config_map_to_server(
-            &sm_p->msgarray[i].svr_addr, sm_p->object_ref.handle,
+            &sm_p->msgarray[i].svr_addr, datafile_handle,
             sm_p->object_ref.fs_id);
         if(ret < 0)
         {
             gossip_err("Failed to map meta server address\n");
             js_p->error_code = ret;
-            goto error_exit;
+            return 1;
         }
-
-        PINT_free_request_state(file_req_state);
-        PINT_free_request_state(mem_req_state);
     }
 
     js_p->error_code = 0;
-    goto exit;
-        
-error_exit:
-    PINT_free_request_state(file_req_state);
-    PINT_free_request_state(mem_req_state);
-
-exit:
     return 1;
 }
 
@@ -219,8 +223,6 @@ static int small_io_completion_fn(void * user_args,
 
     if(resp_p->u.small_io.io_type == PVFS_IO_READ)
     {
-        int i = 0;
-        PVFS_size bytes_processed = 0;
         PVFS_size sizes[SMALL_IO_MAX_REGIONS];
         PVFS_offset offsets[SMALL_IO_MAX_REGIONS];
         PVFS_object_attr * attr = &sm_p->getattr.attr;
@@ -228,59 +230,82 @@ static int small_io_completion_fn(void * user_args,
         PINT_Request_result result;
         PINT_Request_state * file_req_state;
         PINT_Request_state * mem_req_state;
+        int i = 0;
+        int done = 0;
+        PVFS_size bytes_processed = 0;
 
-        fdata.server_ct = attr->u.meta.dfile_count;
-        fdata.server_nr = index;
-        fdata.dist = attr->u.meta.dist;
-        fdata.fsize = resp_p->u.small_io.bstream_size;
-
-        result.segmax = SMALL_IO_MAX_REGIONS;
-        result.bytemax = PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req);
-        result.size_array = sizes;
-        result.offset_array = offsets;
-
-        file_req_state = PINT_new_request_state(sm_p->u.io.file_req);
-        mem_req_state = PINT_new_request_state(sm_p->u.io.mem_req);
-
-        PINT_REQUEST_STATE_SET_TARGET(file_req_state, 
-                                      sm_p->u.io.file_req_offset);
-        PINT_REQUEST_STATE_SET_FINAL(file_req_state,
-                                     sm_p->u.io.file_req_offset + 
-                                     result.bytemax);
-
-        do
+        if(resp_p->u.small_io.result_size != 0)
         {
-            result.segs = 0;
-            result.bytes = 0;
+            fdata.server_ct = attr->u.meta.dfile_count;
+            fdata.server_nr = sm_p->u.io.datafile_index_array[index];
+            fdata.dist = attr->u.meta.dist;
+            fdata.fsize = resp_p->u.small_io.bstream_size;
 
-            ret = PINT_process_request(
-                file_req_state,
-                mem_req_state,
-                &fdata,
-                &result,
-                PINT_CLIENT);
-            if(ret < 0)
+            result.segmax = SMALL_IO_MAX_REGIONS;
+            result.bytemax = resp_p->u.small_io.result_size;
+            result.size_array = sizes;
+            result.offset_array = offsets;
+
+            file_req_state = PINT_new_request_state(sm_p->u.io.file_req);
+            mem_req_state = PINT_new_request_state(sm_p->u.io.mem_req);
+
+            PINT_REQUEST_STATE_SET_TARGET(file_req_state, 
+                                          sm_p->u.io.file_req_offset);
+            PINT_REQUEST_STATE_SET_FINAL(
+                file_req_state, sm_p->u.io.file_req_offset + 
+                PINT_REQUEST_TOTAL_BYTES(sm_p->u.io.mem_req));
+
+            do
             {
-                gossip_err("Failed processing request in small I/O read\n");
-                return ret;
-            }
+                result.segs = 0;
+                result.bytes = 0;
 
-            for(i = 0; i < result.segs; ++i)
+                ret = PINT_process_request(
+                    file_req_state,
+                    mem_req_state,
+                    &fdata,
+                    &result,
+                    PINT_CLIENT);
+                if(ret < 0)
+                {
+                    gossip_err("Failed processing request in small I/O read\n");
+                    return ret;
+                }
+
+                for(i = 0; i < result.segs && !done; ++i)
+                {
+                    int tmp_size;
+                    char * src_ptr;
+                    char * dest_ptr;
+
+                    dest_ptr = (char *)sm_p->u.io.buffer + offsets[i];
+                    src_ptr = (char *)resp_p->u.small_io.buffer + 
+                        bytes_processed;
+
+                    if((bytes_processed + sizes[i]) <= 
+                       resp_p->u.small_io.result_size)
+                    {
+                        tmp_size = sizes[i];
+                    }
+                    else
+                    {
+                        tmp_size = resp_p->u.small_io.result_size - 
+                            bytes_processed;
+                        done = 1;
+                    }
+
+                    memcpy(dest_ptr, src_ptr, sizes[i]);
+                    bytes_processed += tmp_size;
+                }
+            } while(!PINT_REQUEST_DONE(file_req_state) && !done);
+
+            if(resp_p->u.small_io.result_size != bytes_processed)
             {
-                char * dest_ptr = (char *)sm_p->u.io.buffer + offsets[i];
-                char * src_ptr = (char *)resp_p->u.small_io.buffer + 
-                    bytes_processed;
-
-                memcpy(dest_ptr, src_ptr, sizes[i]);
-                bytes_processed += sizes[i];
+                gossip_err("size of bytes copied to user buffer "
+                           "(%llu) do not match size of response (%llu)\n", 
+                           bytes_processed, resp_p->u.small_io.result_size);
+                return -PVFS_EINVAL;
             }
-        } while(!PINT_REQUEST_DONE(file_req_state));
-
-        if(resp_p->u.small_io.result_size != bytes_processed)
-        {
-            gossip_err("size of bytes copied to user buffer do not match "
-                       "size of response\n");
-            return -PVFS_EINVAL;
         }
     }
 

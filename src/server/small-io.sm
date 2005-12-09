@@ -77,6 +77,22 @@ static int small_io_start_job(PINT_server_op *s_op, job_status_s *js_p)
     struct filesystem_configuration_s * fs_config;
     struct server_configuration_s * server_config;
 
+    memset(&s_op->resp.u.small_io, 0, sizeof(struct PVFS_servresp_small_io));
+
+    /* set io type in response to io type in request.  This is
+     * needed by the client so it konws how to decode the response
+     * appropriately.
+     */
+    s_op->resp.u.small_io.io_type = s_op->req->u.small_io.io_type;
+
+    if(s_op->req->u.small_io.io_type == PVFS_IO_READ &&
+       s_op->ds_attr.b_size == 0)
+    {
+        /* nothing to read.  return 0 */
+        js_p->error_code = 0;
+        return 1;
+    }
+
     file_req_state = PINT_new_request_state(
         s_op->req->u.small_io.file_req);
     fdata.server_nr = s_op->req->u.small_io.server_nr;
@@ -108,12 +124,6 @@ static int small_io_start_job(PINT_server_op *s_op, job_status_s *js_p)
     }
 
     result.bytemax = s_op->req->u.small_io.aggregate_size;
-
-    /* set io type in response to io type in request.  This is
-     * needed by the client so it konws how to decode the response
-     * appropriately.
-     */
-    s_op->resp.u.small_io.io_type = s_op->req->u.small_io.io_type;
 
     /* calculate the offsets and sizes in the datafile for the read or write */
     ret = PINT_process_request(
@@ -189,7 +199,7 @@ static int small_io_start_job(PINT_server_op *s_op, job_status_s *js_p)
             s_op->req->u.small_io.fs_id,
             s_op->req->u.small_io.handle,
             (char **)&s_op->resp.u.small_io.buffer,
-            &s_op->req->u.small_io.aggregate_size,
+            &result.bytes,
             1,
             s_op->u.small_io.offsets,
             s_op->u.small_io.sizes,

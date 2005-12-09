@@ -536,6 +536,9 @@ static int open_fd(
     DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX,
 			      my_storage_p->name, coll_id, llu(handle));
 
+    gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
+                 "dbpf_open_cache open_fd: filename: %s\n", filename);
+
     *fd = DBPF_OPEN(filename, O_RDWR, 0);
 
     if ((*fd < 0) && (errno == ENOENT) && create_flag)

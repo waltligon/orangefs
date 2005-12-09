@@ -248,7 +248,7 @@ int do_write(PVFS_object_ref ref, PVFS_credentials * creds,
 
     res = PVFS_sys_write(
 	ref, filereq, 
-	offset, buff, memreq, creds, &io_resp);
+	offset + 2, buff, memreq, creds, &io_resp);
     if(res < 0)
     {
 	PVFS_perror("write failed with errcode", res);
