@@ -36,6 +36,12 @@ my $opt_trusted_port = '';
 my $opt_trusted_network = '';
 my $opt_trusted_netmask = '';
 
+my @opt_ioports = ();
+my @opt_metaports = ();
+
+my @io_hosts = ();
+my @meta_hosts = ();
+
 sub get_user_input
 {
     my($term,$OUT,$prompt,$res);
@@ -205,9 +211,9 @@ sub emit_aliases
     $target = $_[0];
 
     print $target "\n<Aliases>\n";
-    for($i = 0; $i <= $#union_aliases; $i++)
+    for($i = 0; $i <= $#union_hosts; $i++)
     {
-        print $target "\tAlias $union_aliases[$i] $union_bmi[$i]\n";
+        print $target "\tAlias $union_hosts[$i] $union_bmi[$i]\n";
     }
     print $target "</Aliases>\n";
 }
@@ -351,6 +357,8 @@ Usage: pvfs2-genconfig [OPTIONS] <fs.conf> <server.conf>
      --tcpport     <NUM>               TCP port to use
      --gmport      <NUM>               GM port to use
      --ibport      <NUM>               IB port to use
+     --ioports     <STRING>            list of ports to use in single host case
+     --metaports   <STRING>            list of ports to use in single host case
      --logging     <STRING>            debugging mask for log messages
      --logstamp    <STRING>            timestamp type for log messages 
                                        ('none','usec', or 'datetime' are valid)
@@ -600,6 +608,36 @@ sub ib_get_port
     }
     return  $port;
 }
+
+sub expand_ports
+{
+    my @hosts = @{shift @_};
+    my @ports = @{shift @_};
+
+    my @aliases = ();
+
+    for my $host (@hosts)
+    {
+        my $i = 0;
+        while($i <= $#ports)
+        {
+            if($ports[$i] =~ /-/)
+            {
+                my ($first, $last) = $ports[$i] =~ /{([0-9]+)-([0-9]+)}/;
+                splice @ports, $i, 1, ($first .. $last);
+                push @aliases, ($host . "_p" . $ports[$i]);
+            }
+            else
+            {
+                push @aliases, ($host . "_p" . $ports[$i]);
+            }
+            ++$i;
+        }
+    }
+
+    return (\@aliases, \@ports);
+}
+
 sub get_ionames
 {
     my($ioline);
@@ -616,9 +654,16 @@ sub get_ionames
         $ioline = prompt_word("Enter hostnames [Default is localhost]: ","localhost");
     }
 
-    @io_aliases = parse_hostlist($ioline, $port);
+    @io_hosts = parse_hostlist($ioline, $port);
+    if(@opt_ioports)
+    {
+        ($a, $p) = expand_ports(\@io_hosts, \@opt_ioports);
+        @io_aliases = @{$a};
+        @io_ports = @{$p};
+    }
+
     @io_aliases = sort @io_aliases;
-    return @io_aliases;
+    return (\@io_hosts, \@io_aliases, \@io_ports);
 }
 
 sub get_metanames
@@ -636,28 +681,42 @@ sub get_metanames
     } else {
         $metaline = prompt_word("Enter hostnames [Default is localhost]: ","localhost");
     }
-    @meta_aliases = parse_hostlist($metaline, $port);
+    @meta_hosts = parse_hostlist($metaline, $port);
+    if(@opt_metaports)
+    {
+        ($a, $p) = expand_ports(\@meta_hosts, \@opt_metaports);
+        @meta_aliases = @{$a};
+        @meta_ports = @{$p};
+    }
+
     @meta_aliases = sort @meta_aliases;
 
-    return @meta_aliases;
+    return (\@meta_hosts, \@meta_aliases, \@meta_ports);
 }
 
 # bmi_prot_mung(): makes bmi strings of the form protocol//host:port
 sub bmi_prot_mung
 {
-    my (@bmi_array);
-    my (@hosts) = @_;
-    my $num;
+    my @bmi_array = ();
+    my @hosts = @{shift @_};
+    my @ports = @{shift @_};
 
-    for ($i=0; $i <= $#hosts; $i++) {
-        $bmi_array[$i] = "";
-        $num = 0;
-        foreach (split(',', $type)) {
-        ++$num;
-        if ($num > 1) {
-            $bmi_array[$i] .= ",";
+    my $i = 0;
+    for my $host (@hosts)
+    {
+        if(@ports)
+        {
+            for my $port (@ports)
+            {
+                $bmi_array[$i] = "$type://$host:$port";
+                ++$i;
+            }
         }
-        $bmi_array[$i] .= "$_://$hosts[$i]:" . $port{$_};
+        else
+        {
+            @typebmis = map { "$_://$host:" . $port{$_} } split(',', $type);
+            $bmi_array[$i] = join(',', @typebmis);
+            ++$i;
         }
     }
     return @bmi_array;
@@ -693,6 +752,8 @@ GetOptions('protocol=s'    => \$opt_protocol,
        'help'          => \$show_help,
        'quiet!'        => \$opt_quiet,
        'trovesync!'    => \$opt_trovesync,
+       'ioports=s'     => \@opt_ioports,
+       'metaports=s'   => \@opt_metaports, 
        '-'           => \$using_stdout)
     or die "Could not parse arguments.  See -h for help.\n";
 
@@ -757,22 +818,63 @@ foreach (split(',', $type)) {
 }
 $bmi_module = join(',', map("bmi_" . $_, split(',', $type)));
 
-@io_aliases = get_ionames();
-@meta_aliases = get_metanames();
+($h, $a, $p) = get_ionames();
+@io_hosts = @{$h};
+@io_aliases = @{$a};
+@io_ports = @{$p};
+
+($h, $a, $p) = get_metanames();
+@meta_hosts = @{$h};
+@meta_aliases = @{$a};
+@meta_ports = @{$p};
 
 # union is the union of io and meta nodes
-my %nonunion_aliases = ();
-foreach(@io_aliases,@meta_aliases){
-    $nonunion_aliases{$_}=1;
+my %nonunion_hosts = ();
+foreach(@io_hosts)
+{
+    if(@io_ports)
+    {
+        for my $port (@io_ports)
+        {
+            $nonunion_hosts{$_ . "_p$port"}=1;
+        }
+    }
+    else
+    {
+        $nonunion_hosts{$_}=1;
+    }
 }
-@union_aliases = keys %nonunion_aliases;
-@union_aliases = sort @union_aliases;
+
+foreach(@meta_hosts)
+{
+    if(@meta_ports)
+    {
+        for my $port (@meta_ports)
+        {
+            $nonunion_hosts{$_ . "_p$port"}=1;
+        }
+    }
+    else
+    {
+        $nonunion_hosts{$_}=1;
+    }
+}
+
+@union_hosts = keys %nonunion_hosts;
+@union_hosts = sort @union_hosts;
 
 # tack on BMI style notation
-@io_bmi = bmi_prot_mung(@io_aliases);
-@meta_bmi = bmi_prot_mung(@meta_aliases);
-@union_bmi = bmi_prot_mung(@union_aliases);
+@io_bmi = bmi_prot_mung(\@io_hosts, \@io_ports);
+@meta_bmi = bmi_prot_mung(\@meta_hosts, \@meta_ports);
 
+my %nonunion_bmi = ();
+foreach(@io_bmi, @meta_bmi)
+{
+    $nonunion_bmi{$_} = 1;
+}
+
+@union_bmi = keys %nonunion_bmi;
+@union_bmi = sort @union_bmi;
 
 if (!$opt_quiet) {
     print "Configured a total of ", ($#union_bmi + 1), " servers:\n";
@@ -860,26 +962,32 @@ if ($using_stdout == 0)
 if (!$opt_quiet) {
     print "Done.\n";
 
-    print "Writing ", ($#union_aliases + 1), " server config file(s)... ";
+    print "Writing ", ($#union_bmi + 1), " server config file(s)... ";
     if ($using_stdout == 1)
     {
         print "\n";
     }
 }
-for($i = 0; $i <= $#union_aliases; $i++)
+for($i = 0; $i <= $#union_bmi; $i++)
 {
     my($filename);
 
     # and open server.conf files
     if ($using_stdout == 0)
     {
-        $filename = "$ARGV[1]-$union_aliases[$i]";
+        $filename = "$ARGV[1]-$union_hosts[$i]";
         unless (open(FILEOUT, ">", $filename))
         {
             die "Can't open specified file $ARGV[1]: $!\n";
         }
     }
-    emit_server_conf($output_target, $union_bmi[$i], $storage);
+    
+    my $pstorage = $storage;
+    if($union_hosts[$i] =~ /_(p[0-9]+)$/)
+    {
+        $pstorage .= "-" . $1;
+    }
+    emit_server_conf($output_target, $union_bmi[$i], $pstorage);
 
     if ($using_stdout == 0)
     {

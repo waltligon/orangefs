@@ -673,7 +673,7 @@ PVFS_size PINT_distribute(PVFS_offset offset,
             PINT_process_request(mem, NULL, rfdata, result, mode|PINT_MEMREQ);
             sz = mem->type_offset - poff;
             
-            if(result->segs == current_segs)
+            if(sz <= 0 && result->segs == current_segs)
             {
                 /* If there no new segments within the memory request, 
                  * we don't need to post-process
