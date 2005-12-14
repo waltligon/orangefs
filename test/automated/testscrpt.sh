@@ -130,7 +130,7 @@ teardown_pvfs2() {
 
 buildfail() {
 	echo "Failure in build process"
-	cat ${PVFS2_DEST}/configure.log ${PVFS2_DEST}/make-extracted.log ${PVFS2_DEST}/make-install.log | \
+	cat ${PVFS2_DEST}/configure.log ${PVFS2_DEST}/make-extracted.log ${PVFS2_DEST}/make-install.log ${PVFS2_DEST}/make.log | \
 		${TINDERSCRIPT} ${TESTNAME} build_failed $STARTTIME 
 	exit 1
 }
