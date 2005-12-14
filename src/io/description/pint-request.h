@@ -42,6 +42,10 @@ struct PINT_dist_s;
 
 /* PVFS Request Processing Stuff */
 
+/**
+ * NOTE: The encoding/decoding functions must be updated
+ * with changes to this struct.  See pint-request-encode.h.
+ */
 typedef struct PINT_Request {
 	PVFS_offset  offset;        /* offset from start of last set of elements */
 	int32_t      num_ereqs;     /* number of ereqs in a block */
@@ -58,59 +62,10 @@ typedef struct PINT_Request {
 	struct PINT_Request *ereq;  /* element type */
 	struct PINT_Request *sreq;  /* sequence type */
 } PINT_Request;
-#ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
-/* encode a linearized array of the above things, assumes space exists */
-#define encode_PVFS_Request(pptr,rp) do { int i; \
-    for (i=0; i<=(rp)->num_nested_req; i++) { \
-	encode_PVFS_offset(pptr, &(rp+i)->offset); \
-	encode_int32_t(pptr, &(rp+i)->num_ereqs); \
-	encode_int32_t(pptr, &(rp+i)->num_blocks); \
-	encode_PVFS_size(pptr, &(rp+i)->stride); \
-	encode_PVFS_offset(pptr, &(rp+i)->ub); \
-	encode_PVFS_offset(pptr, &(rp+i)->lb); \
-	encode_PVFS_size(pptr, &(rp+i)->aggregate_size); \
-	encode_int32_t(pptr, &(rp+i)->num_contig_chunks); \
-	encode_int32_t(pptr, &(rp+i)->depth); \
-	encode_int32_t(pptr, &(rp+i)->num_nested_req); \
-	encode_int32_t(pptr, &(rp+i)->committed); \
-	encode_int32_t(pptr, &(rp+i)->refcount); \
-	encode_skip4(pptr,); \
-	/* These pointers have been encoded already, just write as ints */ \
-	{ u_int32_t encti = (u_int32_t)(uintptr_t) (rp+i)->ereq; \
-		encode_uint32_t(pptr, &encti); \
-	}\
-	{ u_int32_t encti = (u_int32_t)(uintptr_t) (rp+i)->sreq; \
-		encode_uint32_t(pptr, &encti); \
-	}\
-    }\
-} while (0);
-#define decode_PVFS_Request(pptr,rp) do { int i; \
-    for (i=0; i == 0 || i<=(rp)->num_nested_req; i++) { \
-	decode_PVFS_offset(pptr, &(rp+i)->offset); \
-	decode_int32_t(pptr, &(rp+i)->num_ereqs); \
-	decode_int32_t(pptr, &(rp+i)->num_blocks); \
-	decode_PVFS_size(pptr, &(rp+i)->stride); \
-	decode_PVFS_offset(pptr, &(rp+i)->ub); \
-	decode_PVFS_offset(pptr, &(rp+i)->lb); \
-	decode_PVFS_size(pptr, &(rp+i)->aggregate_size); \
-	decode_int32_t(pptr, &(rp+i)->num_contig_chunks); \
-	decode_int32_t(pptr, &(rp+i)->depth); \
-	decode_int32_t(pptr, &(rp+i)->num_nested_req); \
-	decode_int32_t(pptr, &(rp+i)->committed); \
-	decode_int32_t(pptr, &(rp+i)->refcount); \
-	decode_skip4(pptr,); \
-	/* put integer offsets into pointers, let PINT_Request_decode fix */ \
-	{ u_int32_t encti; \
-		decode_uint32_t(pptr, &encti); \
-		(rp+i)->ereq = (PINT_Request *)(uintptr_t) encti; \
-	}\
-	{ u_int32_t encti; \
-		decode_uint32_t(pptr, &encti); \
-		(rp+i)->sreq = (PINT_Request *)(uintptr_t) encti; \
-	}\
-    } \
-} while (0);
-#endif
+
+#define PVFS_REQUEST_ENCODED_SIZE \
+    ((sizeof(PVFS_offset) * 3) + (sizeof(PVFS_size) * 2) + \
+     (sizeof(int32_t) * 7) + (sizeof(uint32_t) * 2) + 4)
 
 typedef struct PINT_reqstack {
 	int64_t      el;           /* number of element being processed */
@@ -187,6 +142,8 @@ int PINT_request_decode(struct PINT_Request *req);
 
 void PINT_dump_packed_request(struct PINT_Request *req);
 void PINT_dump_request(struct PINT_Request *req);
+
+#include "pint-request-encode.h"
 
 /********* macros for accessing key fields in a request *********/
 

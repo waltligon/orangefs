@@ -243,6 +243,14 @@ struct PINT_server_io_op
     flow_descriptor* flow_d;
 };
 
+#define SMALL_IO_MAX_REGIONS 64
+
+struct PINT_server_small_io_op
+{
+    PVFS_offset offsets[SMALL_IO_MAX_REGIONS];
+    PVFS_size sizes[SMALL_IO_MAX_REGIONS];
+};
+
 struct PINT_server_flush_op
 {
     PVFS_handle handle;	    /* handle of data we want to flush to disk */
@@ -343,6 +351,7 @@ typedef struct PINT_server_op
 	struct PINT_server_chdirent_op chdirent;
 	struct PINT_server_rmdirent_op rmdirent;
 	struct PINT_server_io_op io;
+        struct PINT_server_small_io_op small_io;
 	struct PINT_server_flush_op flush;
 	struct PINT_server_truncate_op truncate;
 	struct PINT_server_mkdir_op mkdir;
@@ -413,6 +422,7 @@ extern struct PINT_state_machine_s pvfs2_mkdir_sm;
 extern struct PINT_state_machine_s pvfs2_readdir_sm;
 extern struct PINT_state_machine_s pvfs2_lookup_sm;
 extern struct PINT_state_machine_s pvfs2_io_sm;
+extern struct PINT_state_machine_s pvfs2_small_io_sm;
 extern struct PINT_state_machine_s pvfs2_remove_sm;
 extern struct PINT_state_machine_s pvfs2_mgmt_remove_object_sm;
 extern struct PINT_state_machine_s pvfs2_mgmt_remove_dirent_sm;

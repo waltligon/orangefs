@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: setup.c,v 1.17 2005-11-10 01:27:03 slang Exp $
+ * $Id: setup.c,v 1.18 2005-12-14 21:50:20 slang Exp $
  */
 #include <fcntl.h>
 #include <unistd.h>
@@ -732,6 +732,9 @@ BMI_ib_get_info(int option, void *param)
 	    break;
 	case BMI_DROP_ADDR_QUERY:
 	    /* weird TCP thing, ignore */
+	    break;
+	case BMI_GET_UNEXP_SIZE:
+	    *(int *)param = EAGER_BUF_PAYLOAD;
 	    break;
 	default:
 	    warning("%s: hint %d not implemented", __func__, option);

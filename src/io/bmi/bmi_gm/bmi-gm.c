@@ -142,6 +142,7 @@ method_addr_p BMI_gm_method_addr_lookup(const char *id_string);
 int BMI_gm_open_context(bmi_context_id context_id);
 void BMI_gm_close_context(bmi_context_id context_id);
 int BMI_gm_cancel(bmi_op_id_t id, bmi_context_id context_id);
+int BMI_gm_get_unexp_maxsize();
 
 char BMI_gm_method_name[] = "bmi_gm";
 
@@ -169,6 +170,7 @@ struct bmi_method_ops bmi_gm_ops = {
     BMI_gm_close_context,
     BMI_gm_cancel,
     NULL,
+    BMI_gm_get_unexp_maxsize
 };
 
 /* module parameters */
@@ -851,6 +853,11 @@ int BMI_gm_get_info(int option,
     case BMI_CHECK_MAXSIZE:
 	*((int *) inout_parameter) = GM_MODE_REND_LIMIT;
 	ret = 0;
+        break;
+    case BMI_GET_UNEXP_SIZE:
+        *((int *) inout_parameter) = GM_MODE_UNEXP_LIMIT;
+        ret = 0;
+        break;
     default:
 	gossip_ldebug(GOSSIP_BMI_DEBUG_GM, 
 	    "BMI GM hint %d not implemented.\n", option);

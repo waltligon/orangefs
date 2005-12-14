@@ -117,6 +117,12 @@ static void lebf_initialize(void)
 		req.u.io.file_req = &tmp_req;
 		reqsize = extra_size_PVFS_servreq_io;
 		break;
+            case PVFS_SERV_SMALL_IO:
+                req.u.small_io.dist = &tmp_dist;
+                req.u.small_io.file_req = &tmp_req;
+                reqsize = extra_size_PVFS_servreq_small_io;
+                respsize = extra_size_PVFS_servresp_small_io;
+                break;
 	    case PVFS_SERV_GETATTR:
 		resp.u.getattr.attr.mask = 0;
 		respsize = extra_size_PVFS_servresp_getattr;
@@ -252,6 +258,12 @@ static int lebf_encode_calc_max_size(
 
     return -PVFS_EINVAL;
 }
+#define BF_ENCODE_TARGET_MSG_INIT(_msg) \
+    (_msg)->buffer_list = &target_msg->buffer_stub; \
+    (_msg)->size_list = &target_msg->size_stub; \
+    (_msg)->alloc_size_list = &target_msg->alloc_size_stub; \
+    (_msg)->list_count = 1; \
+    (_msg)->buffer_type = BMI_PRE_ALLOC;
 
 /*
  * Used by both encode functions, request and response, to set
@@ -265,11 +277,7 @@ encode_common(struct PINT_encoded_msg *target_msg, int maxsize)
 
     gossip_debug(GOSSIP_ENDECODE_DEBUG,"encode_common\n");
     /* this encoder always uses just one buffer */
-    target_msg->buffer_list = &target_msg->buffer_stub;
-    target_msg->size_list = &target_msg->size_stub;
-    target_msg->alloc_size_list = &target_msg->alloc_size_stub;
-    target_msg->list_count = 1;
-    target_msg->buffer_type = BMI_PRE_ALLOC;
+    BF_ENCODE_TARGET_MSG_INIT(target_msg);
 
     /* allocate the max size buffer to avoid the work of calculating it */
     buf = (initializing_sizes ? malloc(maxsize) :
@@ -307,6 +315,7 @@ static int lebf_encode_req(
     char **p;
 
     ret = encode_common(target_msg, max_size_array[req->op].req);
+
     if (ret)
 	goto out;
     gossip_debug(GOSSIP_ENDECODE_DEBUG,"lebf_encode_req\n");
@@ -328,6 +337,7 @@ static int lebf_encode_req(
 	CASE(PVFS_SERV_MGMT_REMOVE_DIRENT, mgmt_remove_dirent);
 	CASE(PVFS_SERV_MGMT_GET_DIRDATA_HANDLE, mgmt_get_dirdata_handle);
 	CASE(PVFS_SERV_IO, io);
+        CASE(PVFS_SERV_SMALL_IO, small_io);
 	CASE(PVFS_SERV_GETATTR, getattr);
 	CASE(PVFS_SERV_SETATTR, setattr);
 	CASE(PVFS_SERV_CRDIRENT, crdirent);
@@ -422,6 +432,7 @@ static int lebf_encode_resp(
         CASE(PVFS_SERV_LOOKUP_PATH, lookup_path);
         CASE(PVFS_SERV_CREATE, create);
         CASE(PVFS_SERV_IO, io);
+        CASE(PVFS_SERV_SMALL_IO, small_io);
         CASE(PVFS_SERV_GETATTR, getattr);
         CASE(PVFS_SERV_RMDIRENT, rmdirent);
         CASE(PVFS_SERV_CHDIRENT, chdirent);
@@ -518,6 +529,7 @@ static int lebf_decode_req(
 	CASE(PVFS_SERV_MGMT_REMOVE_DIRENT, mgmt_remove_dirent);
 	CASE(PVFS_SERV_MGMT_GET_DIRDATA_HANDLE, mgmt_get_dirdata_handle);
 	CASE(PVFS_SERV_IO, io);
+        CASE(PVFS_SERV_SMALL_IO, small_io);
 	CASE(PVFS_SERV_GETATTR, getattr);
 	CASE(PVFS_SERV_SETATTR, setattr);
 	CASE(PVFS_SERV_CRDIRENT, crdirent);
@@ -559,6 +571,7 @@ static int lebf_decode_req(
     {
 	gossip_lerr("%s: improper input buffer size", __func__);
 	ret = -PVFS_EPROTO;
+        assert(0);
     }
 
   out:
@@ -601,6 +614,7 @@ static int lebf_decode_resp(
 	CASE(PVFS_SERV_LOOKUP_PATH, lookup_path);
 	CASE(PVFS_SERV_CREATE, create);
 	CASE(PVFS_SERV_IO, io);
+        CASE(PVFS_SERV_SMALL_IO, small_io);
 	CASE(PVFS_SERV_GETATTR, getattr);
 	CASE(PVFS_SERV_RMDIRENT, rmdirent);
 	CASE(PVFS_SERV_CHDIRENT, chdirent);
@@ -695,6 +709,11 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 		decode_free(req->u.io.io_dist);
 		decode_free(req->u.io.file_req);
 		break;
+
+            case PVFS_SERV_SMALL_IO:
+                decode_free(req->u.small_io.dist);
+                decode_free(req->u.small_io.file_req);
+                break;
 
 	    case PVFS_SERV_MKDIR:
 		decode_free(req->u.mkdir.handle_extent_array.extent_array);
@@ -806,6 +825,7 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	    case PVFS_SERV_MGMT_REMOVE_DIRENT:
 	    case PVFS_SERV_MGMT_GET_DIRDATA_HANDLE:
 	    case PVFS_SERV_IO:
+            case PVFS_SERV_SMALL_IO:
 	    case PVFS_SERV_SETATTR:
 	    case PVFS_SERV_SETEATTR:
 	    case PVFS_SERV_DELEATTR:

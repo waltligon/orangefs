@@ -192,7 +192,8 @@ struct PINT_client_op_entry_s PINT_client_sm_sys_table[] =
     {&pvfs2_client_get_eattr_sm},
     {&pvfs2_client_set_eattr_sm},
     {&pvfs2_client_del_eattr_sm},
-    {&pvfs2_client_list_eattr_sm}
+    {&pvfs2_client_list_eattr_sm},
+    {&pvfs2_client_small_io_sm}
 };
 
 struct PINT_client_op_entry_s PINT_client_sm_mgmt_table[] =
@@ -291,7 +292,7 @@ PVFS_error PINT_client_state_machine_post(
       start state machine and continue advancing while we're getting
       immediate completions
     */
-    ret = sm_p->current_state->state_action(sm_p, &js);
+    ret = PINT_state_machine_invoke(sm_p, &js);
     while(ret == 1)
     {
         ret = PINT_state_machine_next(sm_p, &js);
@@ -401,7 +402,7 @@ PVFS_error PINT_client_io_cancel(PVFS_sys_op_id id)
     ret = 0;
 
     /* now run through and cancel the outstanding jobs */
-    for(i = 0; i < sm_p->u.io.datafile_count; i++)
+    for(i = 0; i < sm_p->u.io.context_count; i++)
     {
         PINT_client_io_ctx *cur_ctx = &sm_p->u.io.contexts[i];
         assert(cur_ctx);
@@ -412,7 +413,7 @@ PVFS_error PINT_client_io_cancel(PVFS_sys_op_id id)
                          "cancellation of type: BMI Send "
                          "(Request)\n",i);
 
-            ret = job_bmi_cancel(cur_ctx->msg->send_id,
+            ret = job_bmi_cancel(cur_ctx->msg.send_id,
                                  pint_client_sm_context);
             if (ret < 0)
             {
@@ -428,7 +429,7 @@ PVFS_error PINT_client_io_cancel(PVFS_sys_op_id id)
                          "cancellation of type: BMI Recv "
                          "(Response)\n",i);
 
-            ret = job_bmi_cancel(cur_ctx->msg->recv_id,
+            ret = job_bmi_cancel(cur_ctx->msg.recv_id,
                                  pint_client_sm_context);
             if (ret < 0)
             {

@@ -336,4 +336,10 @@ del_page_from_lru(struct cache_stack *cache_stack, struct extent *page)
 
 #define NCAC_error(fmt, args...) { fprintf(stderr, "[%s:%d]", __FILE__, __LINE__); fprintf(stderr, fmt, ## args); fprintf(stderr, "\n");}
 
+/* gets defined in internal.c.  This needs a declaration so
+ * that tests can call it without warnings.
+ */
+void cache_dump_active_list(void);
+void cache_dump_inactive_list(void);
+
 #endif

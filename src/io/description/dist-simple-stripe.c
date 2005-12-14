@@ -50,20 +50,10 @@ static PVFS_offset physical_to_logical_offset (void* params,
     uint32_t server_ct = fd->server_ct;
     PVFS_size strips_div = physical_offset / dparam->strip_size;
     PVFS_size strips_mod = physical_offset % dparam->strip_size;
-    PVFS_offset acc = 0;
 
-    acc = (strips_div - 1) * dparam->strip_size * server_ct;
-    if(strips_mod)
-    {
-        acc += dparam->strip_size * server_ct;
-        acc += dparam->strip_size * server_nr;
-        acc += strips_mod;
-    }
-    else
-    {
-        acc += dparam->strip_size * (server_nr+1);
-    }
-    return(acc);
+    return (strips_div * dparam->strip_size * server_ct) +
+           (dparam->strip_size * server_nr) +
+           strips_mod;
 }
 
 static PVFS_offset next_mapped_offset (void* params,

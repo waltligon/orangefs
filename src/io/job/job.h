@@ -219,6 +219,24 @@ int job_trove_bstream_write_at(PVFS_fs_id coll_id,
 			       job_id_t * id,
 			       job_context_id context_id);
 
+int job_trove_bstream_write_list(PVFS_fs_id coll_id,
+                                 PVFS_handle handle,
+                                 char **mem_offset_array,
+                                 PVFS_size *mem_size_array,
+                                 int mem_count,
+                                 PVFS_offset *stream_offset_array,
+                                 PVFS_size *stream_size_array,
+                                 int stream_count,
+                                 PVFS_size *out_size_p,
+                                 PVFS_ds_flags flags,
+                                 PVFS_vtag *vtag,
+                                 void * user_ptr,
+                                 job_aint status_user_tag,
+                                 job_status_s * out_status_p,
+                                 job_id_t * id,
+                                 job_context_id context_id);
+
+
 /* storage byte stream read */
 int job_trove_bstream_read_at(PVFS_fs_id coll_id,
 			      PVFS_handle handle,
@@ -232,6 +250,23 @@ int job_trove_bstream_read_at(PVFS_fs_id coll_id,
 			      job_status_s * out_status_p,
 			      job_id_t * id,
 			      job_context_id context_id);
+
+int job_trove_bstream_read_list(PVFS_fs_id coll_id,
+                                PVFS_handle handle,
+                                char **mem_offset_array,
+                                PVFS_size *mem_size_array,
+                                int mem_count,
+                                PVFS_offset *stream_offset_array,
+                                PVFS_size *stream_size_array,
+                                int stream_count,
+                                PVFS_size *out_size_p,
+                                PVFS_ds_flags flags,
+                                PVFS_vtag *vtag,
+                                void * user_ptr,
+                                job_aint status_user_tag,
+                                job_status_s * out_status_p,
+                                job_id_t * id,
+                                job_context_id context_id);
 
 /* byte stream flush to storage */
 int job_trove_bstream_flush(PVFS_fs_id coll_id,

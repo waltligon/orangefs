@@ -30,6 +30,8 @@ pthread_cond_t dbpf_op_incoming_cond = PTHREAD_COND_INITIALIZER;
 pthread_cond_t dbpf_op_completed_cond = PTHREAD_COND_INITIALIZER;
 #endif
 
+extern int dbpf_thread_initialize(void);
+
 int dbpf_thread_initialize(void)
 {
     int ret = 0;

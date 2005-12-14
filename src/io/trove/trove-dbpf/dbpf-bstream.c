@@ -127,6 +127,8 @@ static void aio_progress_notification(sigval_t sig)
                           (op_p->type == BSTREAM_WRITE_AT) ?
                           "WRITE" : "READ"), ret, op_p->u.b_rw_list.fd);
 
+            *(op_p->u.b_rw_list.out_size_p) += ret;
+
             /* mark as a NOP so we ignore it from now on */
             aiocb_p[i].aio_lio_opcode = LIO_NOP;
         }
@@ -159,11 +161,13 @@ static void aio_progress_notification(sigval_t sig)
         gossip_debug(GOSSIP_TROVE_DEBUG, "*** starting delayed ops if any "
                      "(state is %d)\n",op_p->u.b_rw_list.list_proc_state);
 
+        gossip_debug(GOSSIP_TROVE_DEBUG, "*** starting delayed ops if any "
+                     "(state is %d)\n",op_p->u.b_rw_list.list_proc_state);
+
         /* this is a macro defined in dbpf-thread.h */
         move_op_to_completion_queue(
             cur_op, ret,
             ((ret == -TROVE_ECANCEL) ? OP_CANCELED : OP_COMPLETED));
-
 
         start_delayed_ops_if_any(1);
     }
@@ -880,6 +884,10 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     q_op_p->op.u.b_rw_list.stream_array_count = stream_count;
     q_op_p->op.u.b_rw_list.stream_offset_array = stream_offset_array;
     q_op_p->op.u.b_rw_list.stream_size_array = stream_size_array;
+
+    /* initialize the out size to 0 */
+    *out_size_p = 0;
+    q_op_p->op.u.b_rw_list.out_size_p = out_size_p;
     q_op_p->op.u.b_rw_list.aiocb_array_count = 0;
     q_op_p->op.u.b_rw_list.aiocb_array = NULL;
 #ifndef __PVFS2_TROVE_AIO_THREADED__
@@ -905,7 +913,7 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     {
         dbpf_queued_op_free(q_op_p);
         gossip_ldebug(GOSSIP_TROVE_DEBUG,
-                      "warning: useless error value\n");
+                      "warning: useless error value: %d\n", ret);
         return -trove_errno_to_trove_error(ret);
     }
     q_op_p->op.u.b_rw_list.fd = q_op_p->op.u.b_rw_list.open_ref.fd;
@@ -1117,6 +1125,11 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
                               (op_p->type == BSTREAM_WRITE_AT) ?
                               "WRITE" : "READ"), ret,
                              op_p->u.b_rw_list.fd);
+
+                /* we need to set the out size for the caller of write_list or
+                 * read_list
+                 */
+                *(op_p->u.b_rw_list.out_size_p) += ret;
 
                 /* mark as a NOP so we ignore it from now on */
                 aiocb_p[i].aio_lio_opcode = LIO_NOP;

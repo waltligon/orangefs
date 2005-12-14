@@ -541,6 +541,9 @@ static int open_fd(
     DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX,
 			      my_storage_p->name, coll_id, llu(handle));
 
+    gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
+                 "dbpf_open_cache open_fd: filename: %s\n", filename);
+
     *fd = DBPF_OPEN(filename, O_RDWR, 0);
 
     if ((*fd < 0) && (errno == ENOENT) && create_flag)
@@ -580,6 +583,17 @@ static int open_db(
         /* normal case; keyval db */
         DBPF_GET_KEYVAL_DBNAME(filename, PATH_MAX,
                                my_storage_p->name, coll_id, llu(handle));
+
+        /* Adding a check for the keyval db.  This prevents
+         *          * the db_create (which turns out to be expensive) 
+         *                   * if it doesn't exist
+         *                            */
+        ret = access(filename, W_OK);
+        if(ret < 0 && errno == ENOENT && !create_flag)
+        {
+            *db_pp = NULL;
+            return -dbpf_db_error_to_trove_error(ENOENT);
+        }
     }
 
     ret = db_create(db_pp, envp, 0);

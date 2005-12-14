@@ -276,8 +276,8 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
         {
             while ((tmp_ent = PINT_fstab_next_entry(mnt_fp)))
             {
-                if (!(PINT_FSTAB_NAME(tmp_ent)) ||
-                    !(strncmp(PINT_FSTAB_NAME(tmp_ent), "#", 1)))
+                if(!(PINT_FSTAB_NAME(tmp_ent)) || 
+                   !(strncmp(PINT_FSTAB_NAME(tmp_ent), "#", 1)))
                 {
                     /* this entry is a comment */
                     PINT_fstab_entry_destroy(tmp_ent);

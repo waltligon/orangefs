@@ -21,7 +21,9 @@
 #include <stdint.h>
 #include <sys/stat.h>
 #include <sys/time.h>
-#endif /* __KERNEL__ */
+#endif
+
+#include "pvfs2-config.h"
 
 #ifndef INT32_MAX
 /* definition taken from stdint.h */

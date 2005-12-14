@@ -377,7 +377,7 @@ static int io_send_completion_ack(
     s_op->resp.op = PVFS_SERV_WRITE_COMPLETION;  /* not IO */
     s_op->resp.status = js_p->error_code;
     s_op->resp.u.write_completion.total_completed =
-        s_op->u.io.flow_d->total_transfered;
+        s_op->u.io.flow_d->total_transferred;
 
     err = PINT_encode(
         &s_op->resp, PINT_ENCODE_RESP, &(s_op->encoded),

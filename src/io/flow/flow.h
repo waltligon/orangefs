@@ -125,7 +125,7 @@ struct flow_descriptor
 
     enum flow_state state;	/* final state of flow */
     PVFS_error error_code;	/* specific errno value if failure */
-    PVFS_size total_transfered;	/* total amt. of data xfered */
+    PVFS_size total_transferred;	/* total amt. of data xferred */
 
 	/***********************************************************/
     /* fields reserved strictly for internal use */

@@ -42,9 +42,6 @@ typedef struct PINT_sm_msgpair_state_s
     /* don't use this -- internal msgpairarray use only */
     int retry_count;
 
-    /* comp_fn called after successful reception and decode of
-     * respone, if the msgpair state machine is used for processing.
-     */
     int (* comp_fn)(void *sm_p, struct PVFS_server_resp *resp_p, int i);
 
     /* server address */
@@ -94,6 +91,12 @@ typedef struct PINT_sm_msgpair_params_s
 
 
 /* helper functions */
+
+int PINT_msgpairarray_init(
+    PINT_sm_msgpair_state ** msgpairarray,
+    int count);
+
+void PINT_msgpairarray_destroy(PINT_sm_msgpair_state * msgpairarray);
 
 int PINT_serv_decode_resp(
     PVFS_fs_id fs_id,

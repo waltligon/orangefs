@@ -135,203 +135,243 @@ static void remove_pidfile(void);
 /* table of incoming request types and associated parameters */
 struct PINT_server_req_params PINT_server_req_table[] =
 {
+    /* 0 */
     {PVFS_SERV_INVALID,
         "invalid",
         PINT_SERVER_CHECK_INVALID,
         PINT_SERVER_ATTRIBS_REQUIRED,
         NULL},
 
+    /* 1 */
     {PVFS_SERV_CREATE,
         "create",
         PINT_SERVER_CHECK_NONE,
         PINT_SERVER_ATTRIBS_REQUIRED,
         &pvfs2_create_sm},
 
+    /* 2 */
     {PVFS_SERV_REMOVE,
         "remove",
         PINT_SERVER_CHECK_NONE,
         PINT_SERVER_ATTRIBS_NOT_REQUIRED,
         &pvfs2_remove_sm},
 
+    /* 3 */
     {PVFS_SERV_IO,
         "io",
         PINT_SERVER_CHECK_NONE,
         PINT_SERVER_ATTRIBS_NOT_REQUIRED,
         &pvfs2_io_sm},
 
+    /* 4 */
     {PVFS_SERV_GETATTR,
         "getattr",
         PINT_SERVER_CHECK_ATTR,
         PINT_SERVER_ATTRIBS_NOT_REQUIRED,
         &pvfs2_get_attr_sm},
 
+    /* 5 */
     {PVFS_SERV_SETATTR,
         "setattr",
         PINT_SERVER_CHECK_ATTR,
         PINT_SERVER_ATTRIBS_NOT_REQUIRED,
         &pvfs2_set_attr_sm},
 
+    /* 6 */
     {PVFS_SERV_LOOKUP_PATH,
         "lookup_path",
         PINT_SERVER_CHECK_NONE,
         PINT_SERVER_ATTRIBS_REQUIRED,
         &pvfs2_lookup_sm},
 
+    /* 7 */
     {PVFS_SERV_CRDIRENT,
         "crdirent",
         PINT_SERVER_CHECK_CRDIRENT,
         PINT_SERVER_ATTRIBS_REQUIRED,
         &pvfs2_crdirent_sm},
 
+    /* 8 */
     {PVFS_SERV_RMDIRENT,
         "rmdirent",
         PINT_SERVER_CHECK_WRITE,
         PINT_SERVER_ATTRIBS_REQUIRED,
         &pvfs2_rmdirent_sm},
 
+    /* 9 */
     {PVFS_SERV_CHDIRENT,
         "chdirent",
         PINT_SERVER_CHECK_WRITE,
         PINT_SERVER_ATTRIBS_REQUIRED,
         &pvfs2_chdirent_sm},
 
+    /* 10 */
     {PVFS_SERV_TRUNCATE,
         "truncate",
         PINT_SERVER_CHECK_NONE,
         PINT_SERVER_ATTRIBS_NOT_REQUIRED,
         &pvfs2_truncate_sm},
 
+    /* 11 */
     {PVFS_SERV_MKDIR,
         "mkdir",
         PINT_SERVER_CHECK_NONE,
         PINT_SERVER_ATTRIBS_REQUIRED,
         &pvfs2_mkdir_sm},
 
+    /* 12 */
     {PVFS_SERV_READDIR,
         "readdir",
         PINT_SERVER_CHECK_READ,
         PINT_SERVER_ATTRIBS_REQUIRED,
         &pvfs2_readdir_sm},
 
+    /* 13 */
     {PVFS_SERV_GETCONFIG,
         "getconfig",
         PINT_SERVER_CHECK_NONE,
         PINT_SERVER_ATTRIBS_REQUIRED,
         &pvfs2_get_config_sm},
 
+    /* 14 */
     {PVFS_SERV_WRITE_COMPLETION,
         "write_completion",
         PINT_SERVER_CHECK_INVALID,
         PINT_SERVER_ATTRIBS_REQUIRED,
         NULL},
 
+    /* 15 */
     {PVFS_SERV_FLUSH,
         "flush",
         PINT_SERVER_CHECK_NONE,
         PINT_SERVER_ATTRIBS_NOT_REQUIRED,
         &pvfs2_flush_sm},
 
+    /* 16 */
     {PVFS_SERV_MGMT_SETPARAM,
         "mgmt_setparam",
         PINT_SERVER_CHECK_NONE,
         PINT_SERVER_ATTRIBS_REQUIRED,
         &pvfs2_setparam_sm},
 
+    /* 17 */
     {PVFS_SERV_MGMT_NOOP,
         "mgmt_noop",
         PINT_SERVER_CHECK_NONE,
         PINT_SERVER_ATTRIBS_REQUIRED,
         &pvfs2_noop_sm},
 
+    /* 18 */
     {PVFS_SERV_STATFS,
         "statfs",
         PINT_SERVER_CHECK_NONE,
         PINT_SERVER_ATTRIBS_REQUIRED,
         &pvfs2_statfs_sm},
 
+    /* 19 */
     {PVFS_SERV_PERF_UPDATE,
         "perf_update",
         PINT_SERVER_CHECK_INVALID,
         PINT_SERVER_ATTRIBS_REQUIRED,
         &pvfs2_perf_update_sm},
 
+    /* 20 */
     {PVFS_SERV_MGMT_PERF_MON,
         "mgmt_perf_mon",
         PINT_SERVER_CHECK_NONE,
         PINT_SERVER_ATTRIBS_REQUIRED,
         &pvfs2_perf_mon_sm},
 
+    /* 21 */
     {PVFS_SERV_MGMT_ITERATE_HANDLES,
         "mgmt_iterate_handles",
         PINT_SERVER_CHECK_NONE,
         PINT_SERVER_ATTRIBS_REQUIRED,
         &pvfs2_iterate_handles_sm},
 
+    /* 22 */
     {PVFS_SERV_MGMT_DSPACE_INFO_LIST,
         "mgmt_dspace_info_list",
         PINT_SERVER_CHECK_NONE,
         PINT_SERVER_ATTRIBS_REQUIRED,
         NULL},
 
+    /* 23 */
     {PVFS_SERV_MGMT_EVENT_MON,
         "mgmt_event_mon",
         PINT_SERVER_CHECK_NONE,
         PINT_SERVER_ATTRIBS_REQUIRED,
         &pvfs2_event_mon_sm},
 
+    /* 24 */
     {PVFS_SERV_MGMT_REMOVE_OBJECT,
         "mgmt-remove-object",
         PINT_SERVER_CHECK_NONE,
         PINT_SERVER_ATTRIBS_NOT_REQUIRED,
         &pvfs2_mgmt_remove_object_sm},
 
+    /* 25 */
     {PVFS_SERV_MGMT_REMOVE_DIRENT,
         "mgmt-remove-dirent",
         PINT_SERVER_CHECK_NONE,
         PINT_SERVER_ATTRIBS_NOT_REQUIRED,
         &pvfs2_mgmt_remove_dirent_sm},
 
+    /* 26 */
     {PVFS_SERV_MGMT_GET_DIRDATA_HANDLE,
         "mgmt-get-dirdata-handle",
         PINT_SERVER_CHECK_NONE,
         PINT_SERVER_ATTRIBS_NOT_REQUIRED,
         &pvfs2_mgmt_get_dirdata_handle_sm},
 
+    /* 27 */
     {PVFS_SERV_JOB_TIMER,
         "job_timer",
         PINT_SERVER_CHECK_INVALID,
         PINT_SERVER_ATTRIBS_REQUIRED,
         &pvfs2_job_timer_sm},
 
+    /* 28 */
     {PVFS_SERV_PROTO_ERROR,
         "proto_error",
         PINT_SERVER_CHECK_INVALID,
         PINT_SERVER_ATTRIBS_REQUIRED,
         &pvfs2_proto_error_sm},
 
+    /* 29 */
     {PVFS_SERV_GETEATTR,
         "geteattr",
         PINT_SERVER_CHECK_ATTR,
         PINT_SERVER_ATTRIBS_NOT_REQUIRED,
         &pvfs2_get_eattr_sm},
 
+    /* 30 */
     {PVFS_SERV_SETEATTR,
         "seteattr",
         PINT_SERVER_CHECK_ATTR,
         PINT_SERVER_ATTRIBS_NOT_REQUIRED,
         &pvfs2_set_eattr_sm},
 
+    /* 31 */
     {PVFS_SERV_DELEATTR,
         "deleattr",
         PINT_SERVER_CHECK_ATTR,
         PINT_SERVER_ATTRIBS_NOT_REQUIRED,
         &pvfs2_del_eattr_sm},
 
+    /* 32 */
     {PVFS_SERV_LISTEATTR,
         "listeattr",
         PINT_SERVER_CHECK_ATTR,
         PINT_SERVER_ATTRIBS_NOT_REQUIRED,
-        &pvfs2_list_eattr_sm}
+        &pvfs2_list_eattr_sm},
+
+    /* 33 */
+    {PVFS_SERV_SMALL_IO,
+        "small_io",
+        PINT_SERVER_CHECK_NONE,
+        PINT_SERVER_ATTRIBS_NOT_REQUIRED,
+        &pvfs2_small_io_sm}
 };
 
 int main(int argc, char **argv)
@@ -1603,7 +1643,7 @@ static int server_state_machine_start(
     }
 
     s_op->resp.op = s_op->op;
-    return ((s_op->current_state->state_action))(s_op,js_p);
+    return PINT_state_machine_invoke(s_op,js_p);
 }
 
 /* server_state_machine_alloc_noreq()
@@ -1665,7 +1705,7 @@ int server_state_machine_start_noreq(PINT_server_op *new_op)
     if (new_op)
     {
         /* execute first state */
-        ret = new_op->current_state->state_action(new_op, &tmp_status);
+        ret = PINT_state_machine_invoke(new_op, &tmp_status);
         if (ret < 0)
         {
             gossip_lerr("Error: failed to start state machine.\n");

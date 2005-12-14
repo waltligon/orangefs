@@ -511,6 +511,8 @@ static int msgpairarray_completion_fn(PARENT_SM *sm_p,
 
         if (msg_p->op_status != 0)
         {
+            PVFS_perror_gossip("msgpair failed, will retry:", msg_p->op_status);
+                       
             ++need_retry;
             continue;
         }
@@ -643,6 +645,29 @@ static int msgpairarray_completion_fn(PARENT_SM *sm_p,
 /*********************************************************************
  * helper functions used in conjunction with state machine defined above
  */
+
+int PINT_msgpairarray_init(
+    PINT_sm_msgpair_state ** msgpairarray,
+    int count)
+{
+    *msgpairarray = (PINT_sm_msgpair_state *)malloc(
+        count * sizeof(PINT_sm_msgpair_state));
+    if(!*msgpairarray)
+    {
+        return -PVFS_ENOMEM;
+    }
+    memset(*msgpairarray, 0, (count * sizeof(PINT_sm_msgpair_state)));
+
+    return 0;
+}
+
+/* we pass in a pointer to the array so that we can set it to NULL */
+void PINT_msgpairarray_destroy(
+    PINT_sm_msgpair_state * msgpairarray)
+{
+    free(msgpairarray);
+}
+
 int PINT_serv_decode_resp(PVFS_fs_id fs_id,
                           void *encoded_resp_p,
                           struct PINT_decoded_msg *decoded_resp_p,

@@ -26,6 +26,7 @@ CLIENT_SMCGEN := \
 	$(DIR)/sys-lookup.c \
 	$(DIR)/sys-truncate.c \
 	$(DIR)/sys-io.c \
+	$(DIR)/sys-small-io.c \
 	$(DIR)/sys-create.c \
 	$(DIR)/sys-mkdir.c \
 	$(DIR)/sys-remove.c \

@@ -58,6 +58,7 @@ struct fp_queue_item
     int seq;
     void *buffer;
     PVFS_size buffer_used;
+    PVFS_size out_size;
     struct result_chain_entry result_chain;
     int result_chain_count;
     struct qlist_head list_link;
@@ -468,7 +469,7 @@ int fp_multiqueue_cancel(flow_descriptor  *flow_d)
         gossip_debug(GOSSIP_CANCEL_DEBUG,
             "PINT_flow_cancel() called on active flow, %lld "
                      "bytes transferred.\n",
-                     lld(flow_d->total_transfered));
+                     lld(flow_d->total_transferred));
         assert(flow_d->state == FLOW_TRANSMITTING);
         handle_io_error(-PVFS_ECANCEL, NULL, flow_data);
     }
@@ -714,7 +715,7 @@ static void bmi_recv_callback_fn(void *user_ptr,
             result_tmp->result.offset_array,
             result_tmp->result.size_array,
             result_tmp->result.segs,
-            &result_tmp->result.bytes,
+            &q_item->out_size,
             get_data_sync_mode(q_item->parent->dest.u.trove.coll_id),
             NULL,
             &result_tmp->trove_callback,
@@ -998,7 +999,7 @@ static int bmi_send_callback_fn(void *user_ptr,
 
     PINT_perf_count(PINT_PERF_READ, actual_size, PINT_PERF_ADD);
 
-    flow_data->parent->total_transfered += actual_size;
+    flow_data->parent->total_transferred += actual_size;
 
     if(initial_call_flag)
         flow_data->initial_posts--;
@@ -1159,7 +1160,7 @@ static int bmi_send_callback_fn(void *user_ptr,
             result_tmp->result.offset_array,
             result_tmp->result.size_array,
             result_tmp->result.segs,
-            &result_tmp->result.bytes,
+            &q_item->out_size,
             0, /* get_data_sync_mode(
                   q_item->parent->dest.u.trove.coll_id), */
             NULL,
@@ -1228,7 +1229,7 @@ static void trove_write_callback_fn(void *user_ptr,
 
     result_tmp = &q_item->result_chain;
     do{
-        q_item->parent->total_transfered += result_tmp->result.bytes;
+        q_item->parent->total_transferred += result_tmp->result.bytes;
         PINT_perf_count(PINT_PERF_WRITE, result_tmp->result.bytes, 
             PINT_PERF_ADD);
         old_result_tmp = result_tmp;
@@ -1240,7 +1241,7 @@ static void trove_write_callback_fn(void *user_ptr,
     q_item->result_chain_count = 0;
 
     /* if this was the last operation, then mark the flow as done */
-    if(flow_data->parent->total_transfered ==
+    if(flow_data->parent->total_transferred ==
         flow_data->total_bytes_processed &&
         PINT_REQUEST_DONE(flow_data->parent->file_req_state))
     {
@@ -1340,7 +1341,7 @@ static void trove_write_callback_fn(void *user_ptr,
 
         if(bytes_processed == 0)
         {        
-            if(flow_data->parent->total_transfered ==
+            if(flow_data->parent->total_transferred ==
                 flow_data->total_bytes_processed &&
                 PINT_REQUEST_DONE(flow_data->parent->file_req_state))
             {
@@ -1496,7 +1497,7 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
     qlist_del(&q_item->list_link);
     qlist_add_tail(&q_item->list_link, &flow_data->dest_list);
 
-    flow_data->parent->total_transfered += actual_size;
+    flow_data->parent->total_transferred += actual_size;
 
     /* are we done? */
     if(PINT_REQUEST_DONE(q_item->parent->file_req_state))
@@ -1679,7 +1680,7 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
     qlist_del(&q_item->list_link);
     qlist_add_tail(&q_item->list_link, &flow_data->src_list);
 
-    flow_data->parent->total_transfered += actual_size;
+    flow_data->parent->total_transferred += actual_size;
 
     /* if this is the result of a receive into an intermediate buffer,
      * then we must copy out */
