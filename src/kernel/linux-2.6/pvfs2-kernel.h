@@ -744,8 +744,8 @@ do {                                                         \
 #define service_operation_with_timeout_retry(op, method, num, intr)\
 do {                                                               \
     sigset_t orig_sigset;                                          \
-    if (!intr) mask_blocked_signals(&orig_sigset);                 \
   wait_for_op:                                                     \
+    if (!intr) mask_blocked_signals(&orig_sigset);                 \
     down_interruptible(&request_semaphore);                        \
     add_op_to_request_list(op);                                    \
     up(&request_semaphore);                                        \
@@ -788,8 +788,8 @@ do {                                                               \
 #define service_error_exit_op_with_timeout_retry(op,meth,num,e,intr)\
 do {                                                                \
     sigset_t orig_sigset;                                           \
-    if (!intr) mask_blocked_signals(&orig_sigset);                  \
   wait_for_op:                                                      \
+    if (!intr) mask_blocked_signals(&orig_sigset);                  \
     down_interruptible(&request_semaphore);                         \
     add_op_to_request_list(op);                                     \
     up(&request_semaphore);                                         \
