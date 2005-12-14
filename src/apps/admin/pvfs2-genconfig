@@ -565,7 +565,7 @@ sub tcp_get_port
     } elsif ($opt_port) {
         $port = $opt_port;
         $opt_port = '';
-    } else {
+    } elsif (!@opt_ioports) {
         $port = prompt_num("Enter port number [Default is 3334]: ","3334");
     }
     return  $port;
@@ -777,6 +777,9 @@ else
         die "Can't open specified file $ARGV[0]: $!\n";
     }
 }
+ 
+die "-ioports requires -metaports." if(@opt_ioports && !@opt_metaports);
+die "-metaports requires -ioports." if(@opt_metaports && !@opt_ioports);
 
 #$num_unexp_reqs = prompt_num("How many unexpected requests should we be prepared to receive?  ");
 $num_unexp_reqs = 50;
