@@ -2401,6 +2401,10 @@ int main(int argc, char **argv)
         fprintf(stderr, "Error opening logfile: %s\n", s_opts.logfile);
         return(ret);
     }
+    /* get rid of stdout/stderr/stdin */
+    freopen("/dev/null", "r", stdin);
+    freopen("/dev/null", "w", stdout);
+    freopen("/dev/null", "w", stderr);
 
     start_time = time(NULL);
     local_time = localtime(&start_time);

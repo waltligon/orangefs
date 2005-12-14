@@ -93,10 +93,6 @@ int main(int argc, char **argv)
         {
             exit(1);
         }
-        /* get rid of stdout/stderr/stdin */
-        freopen("/dev/null", "r", stdin);
-        freopen("/dev/null", "w", stdout);
-        freopen("/dev/null", "w", stderr);
     }
     return monitor_pvfs2_client(&opts);
 }
@@ -159,6 +155,11 @@ static int monitor_pvfs2_client(options_t *opts)
             {
                 printf("Waiting on child with pid %d\n", (int)new_pid);
             }
+
+            /* get rid of stdout/stderr/stdin */
+            freopen("/dev/null", "r", stdin);
+            freopen("/dev/null", "w", stdout);
+            freopen("/dev/null", "w", stderr);
 
             wpid = waitpid(new_pid, &ret, 0);
             assert(wpid != -1);
