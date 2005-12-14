@@ -177,7 +177,7 @@ static int truncate_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
 
     js_p->error_code = 0;
 
-    sm_p->getattr.attr.size = 0;
+    sm_p->getattr.size = 0;
     attr = &sm_p->getattr.attr;
     assert(attr);
 
