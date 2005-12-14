@@ -177,7 +177,6 @@ static int truncate_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
 
     js_p->error_code = 0;
 
-    sm_p->getattr.size = 0;
     attr = &sm_p->getattr.attr;
     assert(attr);
 
@@ -219,8 +218,7 @@ static int truncate_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
                 attr->u.meta.dist->params,
                 &file_data,
                 sm_p->u.truncate.size);
-        sm_p->getattr.size += new_dfile_size;
-        
+       
         gossip_debug(GOSSIP_CLIENT_DEBUG,
                 " to %lld bytes\n", lld(new_dfile_size));
 
@@ -240,6 +238,7 @@ static int truncate_datafile_setup_msgpairarray(PINT_client_sm *sm_p,
         msg_p->comp_fn = NULL;
     }
 
+    sm_p->getattr.size = sm_p->u.truncate.size;
     ret = PINT_serv_msgpairarray_resolve_addrs(
         sm_p->msgarray_count, sm_p->msgarray);
 
