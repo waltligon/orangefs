@@ -661,6 +661,10 @@ sub get_ionames
         @io_aliases = @{$a};
         @io_ports = @{$p};
     }
+    else
+    {
+        @io_aliases = @io_hosts;
+    }
 
     @io_aliases = sort @io_aliases;
     return (\@io_hosts, \@io_aliases, \@io_ports);
@@ -687,6 +691,10 @@ sub get_metanames
         ($a, $p) = expand_ports(\@meta_hosts, \@opt_metaports);
         @meta_aliases = @{$a};
         @meta_ports = @{$p};
+    }
+    else
+    {
+        @meta_aliases = @meta_hosts;
     }
 
     @meta_aliases = sort @meta_aliases;
