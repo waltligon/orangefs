@@ -17,7 +17,6 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <libgen.h>
-#include <sys/statfs.h>
 #ifdef HAVE_ATTR_XATTR_H
 #include <attr/xattr.h>
 #endif
@@ -30,6 +29,7 @@
 #include "pvfs2-dist-basic.h"
 #include "pvfs2-dist-simple-stripe.h"
 #include "pvfs2-dist-varstrip.h"
+#include "pint-util.h"
 
 struct options 
 {
@@ -349,7 +349,7 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials)
 
     if (obj->fs_type == UNIX_FILE)
     {
-        struct statfs statfsbuf;
+        PINT_statfs_t statfsbuf;
         memset(&stat_buf, 0, sizeof(struct stat));
 
         stat(obj->u.ufs.path, &stat_buf);
@@ -366,12 +366,13 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials)
 	    fprintf(stderr, "could not open %s\n", obj->u.ufs.path);
 	    return (-1);
 	}
-        if (fstatfs(obj->u.ufs.fd, &statfsbuf) < 0)
+        if (PINT_statfs_fd_lookup(obj->u.ufs.fd, &statfsbuf) < 0)
         {
             perror("fstatfs:");
             fprintf(stderr, "could not fstatfs %s\n", obj->u.ufs.path);
         }
-        memcpy(&obj->u.ufs.fs_id, &statfsbuf.f_fsid, sizeof(statfsbuf.f_fsid));
+        memcpy(&obj->u.ufs.fs_id, &PINT_statfs_fsid(&statfsbuf), 
+               sizeof(PINT_statfs_fsid(&statfsbuf)));
         return 0;
     }
     else

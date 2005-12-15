@@ -59,6 +59,38 @@ int PINT_check_mode(
     PVFS_uid uid, PVFS_gid gid,
     enum PINT_access_type access_type);
 
+#ifdef HAVE_SYS_VFS_H
+
+#include <sys/vfs.h>
+#define PINT_statfs_t struct statfs
+#define PINT_statfs_lookup(_path, _statfs) statfs(_path, (_statfs))
+#define PINT_statfs_fd_lookup(_fd, _statfs) fstatfs(_fd, (_statfs))
+#define PINT_statfs_bsize(_statfs) (_statfs)->f_bsize
+#define PINT_statfs_bavail(_statfs) (_statfs)->f_bavail
+#define PINT_statfs_bfree(_statfs) (_statfs)->f_bfree
+#define PINT_statfs_blocks(_statfs) (_statfs)->f_blocks
+#define PINT_statfs_fsid(_statfs) (_statfs)->f_fsid
+
+#elif HAVE_SYS_MOUNT_H
+
+#include <sys/param.h>
+#include <sys/mount.h>
+
+#define PINT_statfs_t struct statfs
+#define PINT_statfs_lookup(_path, _statfs) statfs(_path, (_statfs))
+#define PINT_statfs_fd_lookup(_fd, _statfs) fstatfs(_fd, (_statfs))
+#define PINT_statfs_bsize(_statfs) (_statfs)->f_iosize
+#define PINT_statfs_bavail(_statfs) (_statfs)->f_bavail
+#define PINT_statfs_bfree(_statfs) (_statfs)->f_bfree
+#define PINT_statfs_blocks(_statfs) (_statfs)->f_blocks
+#define PINT_statfs_fsid(_statfs) (_statfs)->f_fsid
+
+#else
+
+#error OS does not have sys/vfs.h or sys/mount.h.  
+#error Cant stat mounted filesystems
+
+#endif
 
 #endif /* __PINT_UTIL_H */
 

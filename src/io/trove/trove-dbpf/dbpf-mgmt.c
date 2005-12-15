@@ -22,35 +22,6 @@
 #include <malloc.h>
 #endif
 
-#ifdef HAVE_SYS_VFS_H
-
-#include <sys/vfs.h>
-#define PINT_statfs_t struct statfs
-#define PINT_statfs_lookup(_path, _statfs) statfs(_path, (_statfs))
-#define PINT_statfs_bsize(_statfs) (_statfs)->f_bsize
-#define PINT_statfs_bavail(_statfs) (_statfs)->f_bavail
-#define PINT_statfs_bfree(_statfs) (_statfs)->f_bfree
-#define PINT_statfs_blocks(_statfs) (_statfs)->f_blocks
-
-#elif HAVE_SYS_MOUNT_H
-
-#include <sys/param.h>
-#include <sys/mount.h>
-
-#define PINT_statfs_t struct statfs
-#define PINT_statfs_lookup(_path, _statfs) statfs(_path, (_statfs))
-#define PINT_statfs_bsize(_statfs) (_statfs)->f_iosize
-#define PINT_statfs_bavail(_statfs) (_statfs)->f_bavail
-#define PINT_statfs_bfree(_statfs) (_statfs)->f_bfree
-#define PINT_statfs_blocks(_statfs) (_statfs)->f_blocks
-
-#else
-
-#error OS does not have sys/vfs.h or sys/mount.h.  
-#error Cant stat mounted filesystems
-
-#endif
-
 #include <errno.h>
 #include <limits.h>
 #include <dirent.h>
@@ -66,6 +37,7 @@
 #include "trove-handle-mgmt.h"
 #include "gossip.h"
 #include "dbpf-open-cache.h"
+#include "pint-util.h"
 
 extern gen_mutex_t dbpf_attr_cache_mutex;
 

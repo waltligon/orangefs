@@ -100,7 +100,11 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
                               TROVE_context_id context_id,
                               TROVE_op_id *out_op_id_p)
 {
+#ifndef PVFS2_DBPF_IMMEDIATE_COMPLETION
     dbpf_queued_op_t *q_op_p = NULL;
+#else
+    struct dbpf_op op;
+#endif
     struct dbpf_collection *coll_p = NULL;
 
     coll_p = dbpf_collection_find_registered(coll_id);
@@ -109,6 +113,7 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
         return -TROVE_EINVAL;
     }
 
+#ifndef PVFS2_DBPF_IMMEDIATE_COMPLETION
     q_op_p = dbpf_queued_op_alloc();
     if (q_op_p == NULL)
     {
@@ -153,6 +158,19 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
 
     return 0;
+#else
+    DBPF_OP_INIT(op,
+                 DSPACE_CREATE,
+                 OP_QUEUED,
+                 handle,
+                 coll_p,
+                 dbpf_dspace_create_op_svc,
+                 user_ptr,
+                 flags,
+                 context_id,
+                 0);
+    return dbpf_dspace_create_op_svc(&op);
+#endif
 }
 
 static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
@@ -304,7 +322,11 @@ static int dbpf_dspace_remove(TROVE_coll_id coll_id,
                               TROVE_context_id context_id,
                               TROVE_op_id *out_op_id_p)
 {
+#ifndef PVFS2_DBPF_IMMEDIATE_COMPLETION
     dbpf_queued_op_t *q_op_p = NULL;
+#else
+    struct dbpf_op op;
+#endif
     struct dbpf_collection *coll_p = NULL;
 
     coll_p = dbpf_collection_find_registered(coll_id);
@@ -312,6 +334,8 @@ static int dbpf_dspace_remove(TROVE_coll_id coll_id,
     {
         return -TROVE_EINVAL;
     }
+
+#ifndef PVFS2_DBPF_IMMEDIATE_COMPLETION
     q_op_p = dbpf_queued_op_alloc();
     if (q_op_p == NULL)
     {
@@ -330,6 +354,19 @@ static int dbpf_dspace_remove(TROVE_coll_id coll_id,
 
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
     return 0;
+#else
+    DBPF_OP_INIT(op,
+                 DSPACE_REMOVE,
+                 OP_QUEUED,
+                 handle,
+                 coll_p,
+                 dbpf_dspace_remove_op_svc,
+                 user_ptr,
+                 flags,
+                 context_id,
+                 0);
+    return dbpf_dspace_remove_op_svc(&op);
+#endif
 }
 
 static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
@@ -614,7 +651,12 @@ static int dbpf_dspace_verify(TROVE_coll_id coll_id,
                               TROVE_context_id context_id,
                               TROVE_op_id *out_op_id_p)
 {
+#ifndef PVFS2_DBPF_IMMEDIATE_COMPLETION
     dbpf_queued_op_t *q_op_p = NULL;
+#else
+    struct dbpf_op op;
+#endif
+
     struct dbpf_collection *coll_p = NULL;
 
     coll_p = dbpf_collection_find_registered(coll_id);
@@ -622,6 +664,8 @@ static int dbpf_dspace_verify(TROVE_coll_id coll_id,
     {
         return -TROVE_EINVAL;
     }
+
+#ifndef PVFS2_DBPF_IMMEDIATE_COMPLETION
     q_op_p = dbpf_queued_op_alloc();
     if (q_op_p == NULL)
     {
@@ -644,6 +688,19 @@ static int dbpf_dspace_verify(TROVE_coll_id coll_id,
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
 
     return 0;
+#else
+    DBPF_OP_INIT(op,
+                 DSPACE_VERIFY,
+                 OP_QUEUED,
+                 handle,
+                 coll_p,
+                 dbpf_dspace_verify_op_svc,
+                 user_ptr,
+                 flags,
+                 context_id,
+                 0);
+    return dbpf_dspace_verify_op_svc(&op);
+#endif
 }
 
 static int dbpf_dspace_verify_op_svc(struct dbpf_op *op_p)
@@ -711,7 +768,11 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
                                TROVE_context_id context_id,
                                TROVE_op_id *out_op_id_p)
 {
+#ifndef PVFS2_DBPF_IMMEDIATE_COMPLETION
     dbpf_queued_op_t *q_op_p = NULL;
+#else
+    struct dbpf_op op;
+#endif
     struct dbpf_collection *coll_p = NULL;
     TROVE_object_ref ref = {handle, coll_id};
 
@@ -745,6 +806,8 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
     {
         return -TROVE_EINVAL;
     }
+
+#ifndef PVFS2_DBPF_IMMEDIATE_COMPLETION
     q_op_p = dbpf_queued_op_alloc();
     if (q_op_p == NULL)
     {
@@ -767,6 +830,19 @@ static int dbpf_dspace_getattr(TROVE_coll_id coll_id,
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
 
     return 0;
+#else
+    DBPF_OP_INIT(op,
+                 DSPACE_GETATTR,
+                 OP_QUEUED,
+                 handle,
+                 coll_p,
+                 dbpf_dspace_getattr_op_svc,
+                 user_ptr,
+                 flags,
+                 context_id,
+                 0);
+    return dbpf_dspace_getattr_op_svc(&op);
+#endif
 }
 
 static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
@@ -777,7 +853,11 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
                                TROVE_context_id context_id,
                                TROVE_op_id *out_op_id_p)
 {
+#ifndef PVFS2_DBPF_IMMEDIATE_COMPLETION
     dbpf_queued_op_t *q_op_p = NULL;
+#else
+    struct dbpf_op op;
+#endif
     struct dbpf_collection *coll_p = NULL;
 
     coll_p = dbpf_collection_find_registered(coll_id);
@@ -785,6 +865,7 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
     {
         return -TROVE_EINVAL;
     }
+#ifndef PVFS2_DBPF_IMMEDIATE_COMPLETION
     q_op_p = dbpf_queued_op_alloc();
     if (q_op_p == NULL)
     {
@@ -807,6 +888,19 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
 
     return 0;
+#else
+    DBPF_OP_INIT(op,
+                 DSPACE_SETATTR,
+                 OP_QUEUED,
+                 handle,
+                 coll_p,
+                 dbpf_dspace_setattr_op_svc,
+                 user_ptr,
+                 flags,
+                 context_id,
+                 0);
+    return dbpf_dspace_setattr_op_svc(&op);
+#endif
 }
 
 static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p)
