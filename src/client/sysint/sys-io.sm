@@ -985,9 +985,6 @@ static int io_datafile_complete_operations(PINT_client_sm *sm_p,
  
         if(sm_p->u.io.io_type == PVFS_IO_READ)
         {
-            cur_ctx->flow_in_progress = 0;
-            sm_p->u.io.flow_completion_count--;
-
             ret = io_post_flow(sm_p, cur_ctx);
             if(ret < 0)
             {
