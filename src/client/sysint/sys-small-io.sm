@@ -306,6 +306,8 @@ static int small_io_completion_fn(void * user_args,
                            bytes_processed, resp_p->u.small_io.result_size);
                 return -PVFS_EINVAL;
             }
+            PINT_free_request_state(file_req_state);
+            PINT_free_request_state(mem_req_state);
         }
     }
 
