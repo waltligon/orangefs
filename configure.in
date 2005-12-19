@@ -1057,6 +1057,7 @@ doc/coding/module.mk
 doc/design/module.mk
 doc/random/module.mk
 examples/pvfs2-server.rc
+doc/doxygen/pvfs2-doxygen.conf
 )
 
 # print a summary of the configuration information
