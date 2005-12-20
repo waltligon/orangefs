@@ -371,6 +371,7 @@ int PINT_acache_update(
     struct acache_payload* tmp_payload;
     int status;
     unsigned int removed;
+    unsigned int enabled;
 
     /* skip out immediately if the cache is disabled */
     PINT_tcache_get_info(acache, TCACHE_ENABLE, &enabled);

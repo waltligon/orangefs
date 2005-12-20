@@ -100,6 +100,9 @@
 /* Define if kernel has parent_ino */
 #undef HAVE_PARENT_INO
 
+/* Define if sysctl proc handlers have 6th argument */
+#undef HAVE_PROC_HANDLER_SIX_ARG
+
 /* Define to 1 if you have the <SDL/SDL_ttf.h> header file. */
 #undef HAVE_SDL_SDL_TTF_H
 
