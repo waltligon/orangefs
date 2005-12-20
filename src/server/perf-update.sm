@@ -17,6 +17,7 @@
 
 static int perf_update_do_work(PINT_server_op *s_op, job_status_s* js_p);
 static int perf_update_error(PINT_server_op *s_op, job_status_s* js_p);
+extern struct PINT_perf_counter* PINT_server_pc;
 
 %%
 
@@ -48,7 +49,7 @@ static int perf_update_error(PINT_server_op *s_op, job_status_s* js_p)
     PINT_STATE_DEBUG("error");
     gossip_err("Error: stopping server performance monitoring.\n");
 
-    PINT_perf_finalize();
+    PINT_perf_finalize(PINT_server_pc);
 
     return(server_state_machine_complete(s_op));
 }
@@ -61,14 +62,37 @@ static int perf_update_error(PINT_server_op *s_op, job_status_s* js_p)
 static int perf_update_do_work(PINT_server_op *s_op, job_status_s* js_p)
 {
     job_id_t tmp_id;
+    uint64_t current_mask = 0;
+    int current_debug_on = 0;
+    char* tmp_text;
+    char* ptr;
+    char* token;
+    char delim[] = "\n";
     struct server_configuration_s *user_opts = get_server_config_struct();
 
 #if 0
     PINT_STATE_DEBUG("do_work");
 #endif
-
+    
+    /* log current statistics if the gossip mask permits */
+    gossip_get_debug_mask(&current_debug_on, &current_mask);
+    if(current_mask & GOSSIP_PERFCOUNTER_DEBUG)
+    {
+        tmp_text = PINT_perf_generate_text(PINT_server_pc, 4096);
+        if(tmp_text)
+        {
+            token = strtok_r(tmp_text, delim, &ptr);
+            while(token)
+            {
+                gossip_perf_log("%s\n", token);
+                token = strtok_r(NULL, delim, &ptr);
+            }
+            free(tmp_text);
+        }
+    }
+    
     /* roll over to next set of statistics */
-    PINT_perf_rollover();
+    PINT_perf_rollover(PINT_server_pc);
 	
     /* post another timer */
     return(job_req_sched_post_timer(user_opts->perf_update_interval,

@@ -35,6 +35,7 @@ CLIENT_SMCGEN := \
 	$(DIR)/sys-readdir.c \
 	$(DIR)/sys-rename.c \
 	$(DIR)/client-job-timer.c \
+	$(DIR)/perf-count-timer.c \
 	$(DIR)/server-get-config.c \
 	$(DIR)/mgmt-noop.c \
 	$(DIR)/mgmt-setparam-list.c \

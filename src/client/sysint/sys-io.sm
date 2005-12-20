@@ -1261,8 +1261,6 @@ static int io_analyze_results(PINT_client_sm *sm_p,
          (ret == -ECONNRESET) || (ret == -PVFS_EPROTO)) &&
         (sm_p->u.io.retry_count < sm_p->msgarray_params.retry_limit))
     {
-        PINT_acache_invalidate(sm_p->object_ref);
-
         assert(!sm_p->op_cancelled);
 
         sm_p->u.io.stored_error_code = 0;
@@ -1283,8 +1281,6 @@ static int io_analyze_results(PINT_client_sm *sm_p,
 
     if(sm_p->u.io.io_type == PVFS_IO_WRITE)
     {
-        PINT_pinode *pinode;
-
         js_p->error_code = 0;
         sm_p->u.io.io_resp_p->total_completed = sm_p->u.io.total_size;
 
@@ -1295,12 +1291,7 @@ static int io_analyze_results(PINT_client_sm *sm_p,
          * previously a hole).  That's too expensive for just a cached
          * size update.
          */
-        pinode = PINT_acache_lookup(sm_p->object_ref, NULL, NULL);
-        if(pinode)
-        {
-            pinode->attr.mask &= ~PVFS_ATTR_DATA_SIZE;
-            PINT_acache_release(pinode);
-        }
+        PINT_acache_invalidate_size(sm_p->object_ref);
 
         /* we can skip the check for holes since its only needed in the
          * case of reads
@@ -1594,6 +1585,7 @@ static int io_cleanup(PINT_client_sm *sm_p,
     if (sm_p->error_code)
     {
         char buf[64] = {0};
+        PINT_acache_invalidate(sm_p->object_ref);
 
         PVFS_strerror_r(sm_p->error_code, buf, 64);
         gossip_debug(GOSSIP_IO_DEBUG,

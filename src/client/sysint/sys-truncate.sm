@@ -261,8 +261,6 @@ static int truncate_datafile_failure(PINT_client_sm *sm_p,
 static int truncate_cleanup(PINT_client_sm *sm_p,
                             job_status_s *js_p)
 {
-    PINT_pinode *pinode;
-    int status, unexpired_masks;
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) truncate state: "
                  "truncate_cleanup\n", sm_p);
 
@@ -274,15 +272,13 @@ static int truncate_cleanup(PINT_client_sm *sm_p,
         sm_p->msgarray = NULL;
     }
 
-    pinode = PINT_acache_lookup(sm_p->object_ref, &status, &unexpired_masks);
-    if(pinode &&
-       status == PINODE_STATUS_VALID && 
-       !(unexpired_masks == PVFS_ATTR_META_ALL))
+    if(sm_p->error_code == 0)
     {
-        pinode->size = sm_p->getattr.size;
-        pinode->attr.mask |= PVFS_ATTR_DATA_SIZE;
-        PINT_acache_set_valid(pinode);
-        PINT_acache_release(pinode);
+        PINT_acache_invalidate_size(sm_p->object_ref);
+    }
+    else
+    {
+        PINT_acache_invalidate(sm_p->object_ref);
     }
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);

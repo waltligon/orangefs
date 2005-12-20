@@ -288,6 +288,7 @@ static int mkdir_msg_comp_fn(void *v_p,
                              int index)
 {
     PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
+    PVFS_object_attr attr;
     
     gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir_msg_comp_fn\n");
 
@@ -300,6 +301,10 @@ static int mkdir_msg_comp_fn(void *v_p,
 
     /* otherwise, just stash the newly created meta handle */
     sm_p->u.mkdir.metafile_handle = resp_p->u.mkdir.handle;
+
+    /* also insert entry into attr cache */
+    PINT_CONVERT_ATTR(&attr, &sm_p->u.mkdir.sys_attr, PVFS_ATTR_COMMON_ALL);
+    PINT_acache_update(sm_p->object_ref, &attr, NULL);
 
     gossip_debug(
         GOSSIP_CLIENT_DEBUG, "*** Got newly created dir handle %llu\n",
@@ -518,8 +523,6 @@ static int mkdir_cleanup(PINT_client_sm *sm_p,
     else if ((PVFS_ERROR_CLASS(-sm_p->error_code) == PVFS_ERROR_BMI) &&
              (sm_p->u.mkdir.retry_count < sm_p->msgarray_params.retry_limit))
     {
-        PINT_acache_invalidate(sm_p->object_ref);
-
         sm_p->u.mkdir.stored_error_code = 0;
         sm_p->u.mkdir.retry_count++;
 
@@ -531,6 +534,7 @@ static int mkdir_cleanup(PINT_client_sm *sm_p,
     }
     else
     {
+        PINT_acache_invalidate(sm_p->object_ref);
         PVFS_perror_gossip("mkdir failed with error", sm_p->error_code);
     }
 

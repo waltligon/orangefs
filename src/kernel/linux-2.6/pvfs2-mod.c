@@ -1,10 +1,14 @@
 /*
  * (C) 2001 Clemson University and The University of Chicago
  *
+ * Changes by Acxiom Corporation to add proc file handler for pvfs2 client
+ * parameters, Copyright © Acxiom Corporation, 2005.
+ *
  * See COPYING in top-level directory.
  */
 
 #include "pvfs2-kernel.h"
+#include "pvfs2-proc.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -12,6 +16,9 @@
 
 extern struct file_operations pvfs2_devreq_file_operations;
 extern void pvfs2_kill_sb(struct super_block *sb);
+extern spinlock_t pvfs2_request_list_lock;
+extern struct list_head pvfs2_request_list;
+extern wait_queue_head_t pvfs2_request_list_waitq;
 
 static int hash_func(void *key, int table_size);
 static int hash_compare(void *key, struct qhash_head *link);
@@ -23,25 +30,6 @@ static int hash_compare(void *key, struct qhash_head *link);
 /* the size of the hash tables for ops in progress */
 static int hash_table_size = 509;
 int debug = 0;
-
-#ifdef CONFIG_SYSCTL
-/* setup information for proc/sys/pvfs2 entries */
-#include <linux/sysctl.h>
-static struct ctl_table_header *fs_table_header = NULL;
-#define FS_PVFS2 1    /* pvfs2 file system */
-#define PVFS2_DEBUG 1 /* ctl debugging level */
-static int min_debug[] = {0}, max_debug[] = {1};
-static ctl_table pvfs2_table[] = {
-    {PVFS2_DEBUG, "debug", &debug, sizeof(int), 0644, NULL,
-        &proc_dointvec_minmax, &sysctl_intvec,
-        NULL, &min_debug, &max_debug},
-    {0}
-};
-static ctl_table fs_table[] = {
-    {FS_PVFS2, "pvfs2", NULL, 0, 0555, pvfs2_table},
-    {0}
-};
-#endif
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("PVFS2 Development Team");
@@ -154,10 +142,10 @@ static int __init pvfs2_init(void)
     }
     ret = register_filesystem(&pvfs2_fs_type);
 
-#ifdef CONFIG_SYSCTL
-    if (!fs_table_header)
-        fs_table_header = register_sysctl_table(fs_table, 0);
-#endif
+    if(ret == 0)
+    {
+        ret = pvfs2_proc_initialize();
+    }
 
     if(ret == 0)
     {
@@ -174,12 +162,7 @@ static void __exit pvfs2_exit(void)
 
     pvfs2_print("pvfs2: pvfs2_exit called\n");
 
-#ifdef CONFIG_SYSCTL
-    if ( fs_table_header ) {
-        unregister_sysctl_table(fs_table_header);
-        fs_table_header = NULL;
-    }
-#endif
+    pvfs2_proc_finalize();
 
     /* clear out all pending upcall op requests */
     spin_lock(&pvfs2_request_list_lock);

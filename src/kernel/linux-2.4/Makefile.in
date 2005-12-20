@@ -46,14 +46,16 @@ csrc = \
     pvfs2-bufmap.c \
     symlink.c \
     xattr.c \
-    waitqueue.c
+    waitqueue.c \
+    pvfs2-proc.c
 
 hsrc = \
     pvfs2-kernel.h \
     pvfs2-dev-proto.h \
     pvfs2-bufmap.h \
     upcall.h \
-    downcall.h 
+    downcall.h \
+    pvfs2-proc.h 
 
 objs = $(csrc:.c=.o)
 othergen = pvfs2.o

@@ -4,7 +4,6 @@ TESTSRC += \
 	$(DIR)/client.c\
 	$(DIR)/lookup.c\
 	$(DIR)/ncache-torture.c\
-	$(DIR)/acache-torture.c\
 	$(DIR)/get-info.c\
 	$(DIR)/set-info.c\
 	$(DIR)/mkdir.c\

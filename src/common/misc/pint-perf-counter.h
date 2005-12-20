@@ -1,5 +1,5 @@
 /*
- * (C) 2001 Clemson University and The University of Chicago
+ * Copyright © Acxiom Corporation, 2005
  *
  * See COPYING in top-level directory.
  */
@@ -9,18 +9,28 @@
 
 #include "pvfs2-types.h"
 #include "pvfs2-mgmt.h"
+#include "gen-locks.h"
 
-#define PINT_PERF_HISTORY_SIZE 8
+#define PERF_DEFAULT_TIME_INTERVAL_SECS (60*5)
+#define PERF_DEFAULT_HISTORY_SIZE       6
 
-enum PINT_perf_count_keys
+/** flag that indicates that values for a particular key should be preserved
+ * across rollover rather than reset to 0
+ */
+#define PINT_PERF_PRESERVE 1
+
+/* TODO: this may be moved in the long term; it is an enumeration of keys
+ * that pvfs2-server supports (used by trove and flow counters)
+ */
+enum PINT_server_perf_keys
 {
-    PINT_PERF_WRITE = 0,
-    PINT_PERF_READ = 1,
-    PINT_PERF_METADATA_WRITE = 2,
-    PINT_PERF_METADATA_READ = 3
+    PINT_PERF_READ = 0,
+    PINT_PERF_WRITE = 1,
+    PINT_PERF_METADATA_READ = 2,
+    PINT_PERF_METADATA_WRITE = 3
 };
-#define PINT_PERF_COUNT_KEY_MAX 3
 
+/** enumeration of valid measurement operations */
 enum PINT_perf_ops
 {
     PINT_PERF_ADD = 0,
@@ -28,27 +38,82 @@ enum PINT_perf_ops
     PINT_PERF_SET = 2,
 };
 
-int PINT_perf_initialize(void);
+/** enumeration of runtime options */
+enum PINT_perf_option
+{
+    PINT_PERF_HISTORY_SIZE = 1,  /**< sets/gets the history size */
+    PINT_PERF_KEY_COUNT = 2      /**< gets the key coung (cannot be set) */
+};
 
-void PINT_perf_finalize(void);
+/** describes a single key to be stored in the perf counter interface */
+struct PINT_perf_key
+{
+    char* key_name;    /**< string name for key */
+    int key;           /**< integer representation of key */
+    int flag;          /**< flags that modify behavior of values in this key */
+};
 
-void __PINT_perf_count(enum PINT_perf_count_keys key, 
+/** struct representing a perf counter instance */
+struct PINT_perf_counter
+{
+    gen_mutex_t* mutex;
+    struct PINT_perf_key* key_array;     /**< keys (provided by initialize()) */
+    int key_count;                       /**< number of keys */
+    int history_size;                    /**< number of history intervals */
+    /** matrix of statistics, first dimension is key, second is history */
+    int64_t** value_matrix; 
+    uint64_t* start_time_array_ms;        /**< array of start times */
+    uint64_t* interval_array_ms;          /**< array of interval lengths */
+};
+
+struct PINT_perf_counter* PINT_perf_initialize(
+    struct PINT_perf_key* key_array);
+
+void PINT_perf_finalize(
+    struct PINT_perf_counter* pc);
+
+void PINT_perf_reset(
+    struct PINT_perf_counter* pc);
+
+void PINT_perf_rollover(
+    struct PINT_perf_counter* pc);
+
+void __PINT_perf_count(
+    struct PINT_perf_counter* pc,
+    int key, 
     int64_t value,
     enum PINT_perf_ops op);
 
 #ifdef __PVFS2_DISABLE_PERF_COUNTERS__
-    #define PINT_perf_count(x,y,z) do{}while(0)
+    #define PINT_perf_count(w,x,y,z) do{}while(0)
 #else
     #define PINT_perf_count __PINT_perf_count
 #endif
 
-void PINT_perf_rollover(void);
+void PINT_perf_rollover(
+    struct PINT_perf_counter* pc);
+
+int PINT_perf_set_info(
+    struct PINT_perf_counter* pc,
+    enum PINT_perf_option option,
+    unsigned int arg);
+
+int PINT_perf_get_info(
+    struct PINT_perf_counter* pc,
+    enum PINT_perf_option option,
+    unsigned int* arg);
 
 void PINT_perf_retrieve(
-    uint32_t* next_id,
-    struct PVFS_mgmt_perf_stat* perf_array,
-    int count,
-    uint64_t* end_time_ms);
+    struct PINT_perf_counter* pc,        
+    int64_t** value_matrix,
+    uint64_t* start_time_array_ms,       
+    uint64_t* interval_array_ms,         
+    int max_key,                         
+    int max_history);     
+
+char* PINT_perf_generate_text(
+    struct PINT_perf_counter* pc,
+    int max_size);
 
 #endif /* __PINT_PERF_COUNTER_H */
 

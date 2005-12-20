@@ -75,6 +75,7 @@ int gossip_err(
 
 #ifdef GOSSIP_DISABLE_DEBUG
 #define gossip_debug(mask, format, f...) do {} while(0)
+#define gossip_perf_log(format, f...) do {} while(0)
 #else
 extern int gossip_debug_on;
 extern int gossip_facility;
@@ -87,6 +88,16 @@ do {                                                      \
         (gossip_facility))                                \
     {                                                     \
         __gossip_debug(mask, '?', format, ##f);           \
+    }                                                     \
+} while(0)
+#define gossip_perf_log(format, f...)                     \
+do {                                                      \
+    if ((gossip_debug_on) &&                              \
+        (gossip_debug_mask & GOSSIP_PERFCOUNTER_DEBUG) && \
+        (gossip_facility))                                \
+    {                                                     \
+        __gossip_debug(GOSSIP_PERFCOUNTER_DEBUG, 'P',     \
+            format, ##f);                                 \
     }                                                     \
 } while(0)
 #endif /* GOSSIP_DISABLE_DEBUG */

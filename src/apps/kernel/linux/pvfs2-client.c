@@ -16,6 +16,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include "pvfs2-types.h"
+#include "acache.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -34,6 +35,12 @@ typedef struct
     int verbose;
     int foreground;
     char *acache_timeout;
+    char *acache_hard_limit;
+    char *acache_soft_limit;
+    char *acache_reclaim_percentage;
+    char *perf_time_interval_secs;
+    char *perf_history_size;
+    char *gossip_mask;
     char *path;
     char *logfile;
 } options_t;
@@ -137,6 +144,8 @@ static int monitor_pvfs2_client(options_t *opts)
     int ret = 1;
     pid_t new_pid = 0, wpid = 0;
     int dev_init_failures = 0;
+    char* arg_list[128] = {NULL};
+    int arg_index;
 
     assert(opts);
 
@@ -238,8 +247,50 @@ static int monitor_pvfs2_client(options_t *opts)
                 printf("About to exec %s\n",opts->path);
             }
 
-            ret = execlp(opts->path, PVFS2_CLIENT_CORE_NAME, 
-                    "-a", opts->acache_timeout, "-L", opts->logfile, NULL);
+            arg_list[0] = PVFS2_CLIENT_CORE_NAME;
+            arg_list[1] = "-a";
+            arg_list[2] = opts->acache_timeout;
+            arg_list[3] = "-L";
+            arg_list[4] = opts->logfile;
+            arg_index = 5;
+            if(opts->acache_hard_limit)
+            {
+                arg_list[arg_index] = "--acache-hard-limit";
+                arg_list[arg_index+1] = opts->acache_hard_limit;
+                arg_index+=2;
+            }
+            if(opts->acache_soft_limit)
+            {
+                arg_list[arg_index] = "--acache-soft-limit";
+                arg_list[arg_index+1] = opts->acache_soft_limit;
+                arg_index+=2;
+            }
+            if(opts->acache_reclaim_percentage)
+            {
+                arg_list[arg_index] = "--acache-reclaim-percentage";
+                arg_list[arg_index+1] = opts->acache_reclaim_percentage;
+                arg_index+=2;
+            }
+            if(opts->perf_time_interval_secs)
+            {
+                arg_list[arg_index] = "--perf-time-interval-secs";
+                arg_list[arg_index+1] = opts->perf_time_interval_secs;
+                arg_index+=2;
+            }
+            if(opts->perf_history_size)
+            {
+                arg_list[arg_index] = "--perf-history-size";
+                arg_list[arg_index+1] = opts->perf_history_size;
+                arg_index+=2;
+            }
+            if(opts->gossip_mask)
+            {
+                arg_list[arg_index] = "--gossip-mask";
+                arg_list[arg_index+1] = opts->gossip_mask;
+                arg_index+=2;
+            }
+
+            ret = execvp(opts->path, arg_list);
 
             fprintf(stderr, "Could not exec %s, errno is %d\n",
                     opts->path, errno);
@@ -262,6 +313,12 @@ static void print_help(char *progname)
             "   (defaults to /tmp/pvfs2-client.log)\n");
     printf("-a MS, --acache-timeout=MS    acache timeout in ms "
            "(default is 0 ms)\n");
+    printf("--acache-soft-limit=LIMIT     acache soft limit\n");
+    printf("--acache-hard-limit=LIMIT     acache hard limit\n");
+    printf("--acache-reclaim-percentage=LIMIT acache reclaim percentage\n");
+    printf("--perf-time-interval-secs=SECONDS length of perf counter intervals\n");
+    printf("--perf-history-size=VALUE     number of perf counter intervals to maintain\n");
+    printf("--gossip-mask=MASK_LIST       gossip logging mask\n");
     printf("-p PATH, --path PATH          execute pvfs2-client at "
            "PATH\n");
 }
@@ -279,6 +336,12 @@ static void parse_args(int argc, char **argv, options_t *opts)
         {"foreground",0,0,0},
         {"logfile",1,0,0},
         {"acache-timeout",1,0,0},
+        {"acache-soft-limit",1,0,0},
+        {"acache-hard-limit",1,0,0},
+        {"acache-reclaim-percentage",1,0,0},
+        {"perf-time-interval-secs",1,0,0},
+        {"perf-history-size",1,0,0},
+        {"gossip-mask",1,0,0},
         {"path",1,0,0},
         {0,0,0,0}
     };
@@ -320,6 +383,36 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 else if (strcmp("logfile", cur_option) == 0)
                 {
                     goto do_logfile;
+                }
+                else if (strcmp("acache-hard-limit", cur_option) == 0)
+                {
+                    opts->acache_hard_limit = optarg;
+                    break;
+                }
+                else if (strcmp("acache-soft-limit", cur_option) == 0)
+                {
+                    opts->acache_soft_limit = optarg;
+                    break;
+                }
+                else if (strcmp("acache-reclaim-percentage", cur_option) == 0)
+                {
+                    opts->acache_reclaim_percentage = optarg;
+                    break;
+                }
+                else if (strcmp("perf-time-interval-secs", cur_option) == 0)
+                {
+                    opts->perf_time_interval_secs = optarg;
+                    break;
+                }
+                else if (strcmp("perf-history-size", cur_option) == 0)
+                {
+                    opts->perf_history_size = optarg;
+                    break;
+                }
+                else if (strcmp("gossip-mask", cur_option) == 0)
+                {
+                    opts->gossip_mask = optarg;
+                    break;
                 }
                 break;
             case 'h':

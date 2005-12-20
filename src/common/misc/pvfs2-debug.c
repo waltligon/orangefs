@@ -32,7 +32,8 @@ GOSSIP_MSGPAIR_DEBUG | GOSSIP_CLIENTCORE_DEBUG |                  \
 GOSSIP_SETATTR_DEBUG | GOSSIP_MKDIR_DEBUG |                       \
 GOSSIP_SETEATTR_DEBUG | GOSSIP_GETEATTR_DEBUG |                   \
 GOSSIP_LISTEATTR_DEBUG |                                          \
-GOSSIP_ACCESS_DEBUG | GOSSIP_ACCESS_DETAIL_DEBUG)
+GOSSIP_ACCESS_DEBUG | GOSSIP_ACCESS_DETAIL_DEBUG |                \
+GOSSIP_PERFCOUNTER_DEBUG)
 
 /* map all config keywords to pvfs2 debug masks here */
 static __keyword_mask_t s_keyword_mask_map[] =

@@ -893,6 +893,11 @@ static int rename_cleanup(PINT_client_sm *sm_p,
 
     sm_p->error_code = js_p->error_code;
 
+    if(sm_p->error_code != 0)
+    {
+        PINT_acache_invalidate(sm_p->object_ref);
+    }
+
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
     sm_p->op_complete = 1;
