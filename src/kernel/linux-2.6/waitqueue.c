@@ -100,7 +100,7 @@ int wait_for_matching_downcall(pvfs2_kernel_op_t * op)
 	if (!signal_pending(current))
 	{
 	    if (!schedule_timeout
-		(MSECS_TO_JIFFIES(1000 * MAX_SERVICE_WAIT_IN_SECONDS)))
+		(MSECS_TO_JIFFIES(1000 * op_timeout_secs)))
 	    {
                 pvfs2_print("*** operation timed out (tag %lld)\n",
                             lld(op->tag));
@@ -158,7 +158,7 @@ int wait_for_cancellation_downcall(pvfs2_kernel_op_t * op)
 	spin_unlock(&op->lock);
 
         if (!schedule_timeout
-            (MSECS_TO_JIFFIES(1000 * MAX_SERVICE_WAIT_IN_SECONDS)))
+            (MSECS_TO_JIFFIES(1000 * op_timeout_secs)))
         {
             pvfs2_print("*** operation timed out\n");
             clean_up_interrupted_operation(op);

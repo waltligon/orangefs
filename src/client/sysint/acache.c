@@ -370,7 +370,14 @@ int PINT_acache_update(
     struct PINT_tcache_entry* tmp_entry;
     struct acache_payload* tmp_payload;
     int status;
-    int removed;
+    unsigned int removed;
+
+    /* skip out immediately if the cache is disabled */
+    PINT_tcache_get_info(acache, TCACHE_ENABLE, &enabled);
+    if(!enabled)
+    {
+        return(0);
+    }
     
     gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: update(): H=%llu\n",
                  llu(refn.handle));

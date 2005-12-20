@@ -21,6 +21,7 @@ extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
 extern wait_queue_head_t pvfs2_request_list_waitq;
 extern int debug;
+extern int op_timeout_secs;
 
 extern struct address_space_operations pvfs2_address_operations;
 extern struct backing_dev_info pvfs2_backing_dev_info;
@@ -1272,7 +1273,7 @@ pvfs2_aio_cancel(struct kiocb *iocb, struct io_event *event)
                 spin_unlock(&op->lock);
                 if (!signal_pending(current))
                 {
-                    int timeout = MSECS_TO_JIFFIES(1000 * MAX_SERVICE_WAIT_IN_SECONDS);
+                    int timeout = MSECS_TO_JIFFIES(1000 * op_timeout_secs);
                     if (!schedule_timeout(timeout))
                     {
                         pvfs2_print("Timed out on I/O cancellation - aborting\n");

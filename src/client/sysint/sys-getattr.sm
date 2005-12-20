@@ -405,7 +405,7 @@ static int getattr_acache_lookup(PINT_client_sm *sm_p,
     {
         /* nothing's missing, a hit! */
         gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: acache hit "
-                     "[%lu]\n", llu(object_ref.handle));
+                     "[%llu]\n", llu(object_ref.handle));
         js_p->error_code = 0;
         return 1;
     }
