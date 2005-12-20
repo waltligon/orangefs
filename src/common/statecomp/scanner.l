@@ -19,9 +19,6 @@
 #include "statecomp-symbol.h"
 #include "parser.h"
 
-/* avoid a warning since we do not use yyunput() */
-#define YY_NO_UNPUT
-
 /*
   we're never interactive, so avoid isatty call that sometimes
   fails due to occassional improper ioctl command mappings --
@@ -37,6 +34,17 @@ void produce_listing(int line, char *listing);
 extern int yylex(void);
 extern void yyerror(char *);
 
+int yyget_lineno  (void);
+FILE *yyget_in  (void);
+FILE *yyget_out  (void);
+int yyget_leng  (void);
+char *yyget_text  (void);
+void yyset_lineno (int  line_number );
+void yyset_in (FILE *  in_str );
+void yyset_out (FILE *  out_str );
+int yyget_debug  (void);
+void yyset_debug (int  bdebug );
+int yylex_destroy  (void);
 /* int      atoi();
  * double   atof();
  */
@@ -60,6 +68,9 @@ w           [ \t\n]*
 
 %x		CODE
 %x		COMMENT 
+
+/* avoid a warning since we do not use yyunput() */
+%option nounput
 
 %%
 
