@@ -220,6 +220,8 @@ static int small_io_start_job(PINT_server_op *s_op, job_status_s *js_p)
         }
     }
 
+    PINT_free_request_state(file_req_state);
+
     js_p->error_code = 0;
     return ret;
 }
@@ -269,6 +271,7 @@ static int small_io_cleanup(PINT_server_op *s_op, job_status_s *js_p)
     if(s_op->req->u.small_io.io_type == PVFS_IO_READ &&
        s_op->resp.u.small_io.buffer)
     {
+        PINT_encode_release(&s_op->encoded, PINT_ENCODE_REQ);
         BMI_memfree(s_op->addr, s_op->resp.u.small_io.buffer, 
                     s_op->req->u.small_io.aggregate_size, BMI_SEND);
     }
