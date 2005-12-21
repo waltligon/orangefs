@@ -257,7 +257,7 @@ int PINT_tcache_insert_entry(
     void* payload,              /**< data to store in the cache */
     int* removed)               /**< number of entries removed to make room */
 {
-    struct PINT_tcache_entry* tmp_entry;
+    struct PINT_tcache_entry* tmp_entry = NULL;
     int tmp_status = 0;
     int ret = -1;
 

@@ -2503,7 +2503,7 @@ static int handle_new_connection(method_addr_p map)
     int accepted_socket = -1;
     method_addr_p new_addr = NULL;
     int ret = -1;
-    char* tmp_peer;
+    char* tmp_peer = NULL;
 
     ret = tcp_accept_init(&accepted_socket, &tmp_peer);
     if (ret < 0)
