@@ -4,6 +4,15 @@
 
 nr_errors=0
 
+# copy_test: 
+#  the idea is we copy a file from local to pvfs2 and back again, seeing if
+#  any differences show up as a result.
+#
+#  usage:  copy_test <src> <dest> <local> 
+#   where <src> is the original local file (source of the 1st copy)
+#         <dest> is a pvfs2 file (destination of the 1st copy, src of the 2nd
+#                 copy) 
+#         <local> is a different local file (dest of the 2nd copy)
 copy_test() 
 {
 	src=$1
@@ -13,7 +22,11 @@ copy_test()
 	${PVFS2_DEST}/INSTALL-pvfs2/bin/pvfs2-cp $src $dest $@
 	${PVFS2_DEST}/INSTALL-pvfs2/bin/pvfs2-cp $dest $local $@
 
-	diff $src $local || nr_errors=$((nr_errors+1)) && echo "$local differs from $src"
+	diff $src $local 
+	if [ $? -ne 0 ] ; then
+		nr_errors=$((nr_errors+1)) 
+		echo "$local differs from $src"
+	fi
 }
 
 
