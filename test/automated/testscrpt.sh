@@ -99,12 +99,14 @@ setup_pvfs2() {
 		--ioservers `hostname -s` --metaservers `hostname -s` \
 		--storage ${PVFS2_DEST}/STORAGE-pvfs2 \
 		--logfile=${PVFS2_DEST}/pvfs2-server.log --quiet
-	rm -rf ${PVFS2_DEST}/STORAGE-pvfs2
+	rm -rf ${PVFS2_DEST}/STORAGE-pvfs2-p*
 	failure_logs="${PVFS2_DEST}/pvfs2-server.log $failure_logs"
 	for server_conf in server.conf-*_p*; do 
-		INSTALL-pvfs2/sbin/pvfs2-server -p `pwd`/pvfs2-server.pid \
+		INSTALL-pvfs2/sbin/pvfs2-server \
+			-p `pwd`/pvfs2-server-${server_conf#*_p}.pid \
 			-f fs.conf $server_conf
-		INSTALL-pvfs2/sbin/pvfs2-server -p `pwd`/pvfs2-server.pid  \
+		INSTALL-pvfs2/sbin/pvfs2-server \
+			-p `pwd`/pvfs2-server-${server_conf#*_p}.pid  \
 			fs.conf $server_conf
 	done
 
@@ -118,16 +120,17 @@ setup_pvfs2() {
 }
 
 teardown_pvfs2() {
-	if [ -f ${PVFS2_DEST}/pvfs2-server.pid ] ; then
-		kill `cat ${PVFS2_DEST}/pvfs2-server.pid`
-	fi
+	for pidfile in ${PVFS2_DEST}/pvfs2-server*.pid ; do
+		[ ! -f $pidfile ] && continue
 
-	# occasionally the server ends up in a hard-to-kill state.  server has
-	# atexit(3) remove .pid file
-	sleep 3
-	if [ -f ${PVFS2_DEST}/pvfs2-server.pid ] ; then
-		kill -9 `cat ${PVFS2_DEST}/pvfs2-server.pid`
-	fi
+		kill `cat $pidfile`
+		# occasionally the server ends up in a hard-to-kill state.
+		# server has atexit(3) remove .pid file
+		sleep 3
+		if [ -f $pidfile ] ; then 
+			kill -9 `cat $pidfile`
+		fi
+	done
 
 	# let teardown always succeed.  pvfs2-server.pid could be stale
 	return 0
