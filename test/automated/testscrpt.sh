@@ -94,14 +94,19 @@ setup_vfs() {
 setup_pvfs2() {
 	cd $PVFS2_DEST
 	INSTALL-pvfs2/bin/pvfs2-genconfig fs.conf server.conf \
-		--protocol tcp --port 3399 \
+		--protocol tcp \
+		--ioports {3396-3399} --metaports {3396-3399}  \
 		--ioservers `hostname -s` --metaservers `hostname -s` \
 		--storage ${PVFS2_DEST}/STORAGE-pvfs2 \
 		--logfile=${PVFS2_DEST}/pvfs2-server.log --quiet
 	rm -rf ${PVFS2_DEST}/STORAGE-pvfs2
 	failure_logs="${PVFS2_DEST}/pvfs2-server.log $failure_logs"
-	INSTALL-pvfs2/sbin/pvfs2-server -p `pwd`/pvfs2-server.pid -f fs.conf server.conf-`hostname -s` 
-	INSTALL-pvfs2/sbin/pvfs2-server -p `pwd`/pvfs2-server.pid  fs.conf server.conf-`hostname -s` 
+	for server_conf in server.conf-*_p*; do 
+		INSTALL-pvfs2/sbin/pvfs2-server -p `pwd`/pvfs2-server.pid \
+			-f fs.conf $server_conf
+		INSTALL-pvfs2/sbin/pvfs2-server -p `pwd`/pvfs2-server.pid  \
+			fs.conf $server_conf
+	done
 
 	echo "tcp://`hostname -s`:3399/pvfs2-fs /pvfs2-nightly pvfs2 defaults 0 0" > ${PVFS2_DEST}/pvfs2tab
 	# do we need to use our own pvfs2tab file?  If we will mount pvfs2, we
