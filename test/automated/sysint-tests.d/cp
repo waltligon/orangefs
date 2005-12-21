@@ -2,48 +2,46 @@
 
 # run through a bunch of possible command line arguments for pvfs2-cp:
 
-${PVFS2_DEST}/INSTALL-pvfs2/bin/pvfs2-cp \
-                ${PVFS2_DEST}/pvfs2/configure ${PVFS2_MOUNTPOINT}/configure1
+PVFS2_DEST=/tmp/pvfs2-nightly
+PVFS2_MOUNTPOINT=/pvfs2-nightly
 
-${PVFS2_DEST}/INSTALL-pvfs2/bin/pvfs2-cp -s 128 \
-                ${PVFS2_DEST}/pvfs2/configure ${PVFS2_MOUNTPOINT}/configure2
+nr_errors=0
 
-${PVFS2_DEST}/INSTALL-pvfs2/bin/pvfs2-cp -s $((1024*1024)) \
-                ${PVFS2_DEST}/pvfs2/configure ${PVFS2_MOUNTPOINT}/configure3
+copy_test() 
+{
+	src=$1
+	dest=$2
+	local=$3
+	shift 3 
+	${PVFS2_DEST}/INSTALL-pvfs2/bin/pvfs2-cp $src $dest $@
+	${PVFS2_DEST}/INSTALL-pvfs2/bin/pvfs2-cp $dest $local $@
 
-${PVFS2_DEST}/INSTALL-pvfs2/bin/pvfs2-cp -n 1 \
-                ${PVFS2_DEST}/pvfs2/configure ${PVFS2_MOUNTPOINT}/configure4
+	diff $src $local || nr_errors=$((nr_errors+1)) && echo "$local differs from $src"
+}
 
-${PVFS2_DEST}/INSTALL-pvfs2/bin/pvfs2-cp -n 10 \
-                ${PVFS2_DEST}/pvfs2/configure ${PVFS2_MOUNTPOINT}/configure5
 
-${PVFS2_DEST}/INSTALL-pvfs2/bin/pvfs2-cp -b 128 \
-                ${PVFS2_DEST}/pvfs2/configure ${PVFS2_MOUNTPOINT}/configure6
+copy_test ${PVFS2_DEST}/pvfs2/configure ${PVFS2_MOUNTPOINT}/configure0\
+	${PVFS2_DEST}/config0 
 
-${PVFS2_DEST}/INSTALL-pvfs2/bin/pvfs2-cp -b $((1024*1024)) \
-                ${PVFS2_DEST}/pvfs2/configure ${PVFS2_MOUNTPOINT}/configure7
+copy_test ${PVFS2_DEST}/pvfs2/configure ${PVFS2_MOUNTPOINT}/configure1\
+	${PVFS2_DEST}/config1 -s 128 
 
-# and test reading too
-${PVFS2_DEST}/INSTALL-pvfs2/bin/pvfs2-cp \
-                ${PVFS2_MOUNTPOINT}/configure1 ${PVFS2_DEST}/config1
+copy_test ${PVFS2_DEST}/pvfs2/configure ${PVFS2_MOUNTPOINT}/configure2\
+	${PVFS2_DEST}/config2 -s $((1024*1024))
 
-${PVFS2_DEST}/INSTALL-pvfs2/bin/pvfs2-cp -s 128 \
-                ${PVFS2_MOUNTPOINT}/configure2 ${PVFS2_DEST}/config2 
+copy_test ${PVFS2_DEST}/pvfs2/configure ${PVFS2_MOUNTPOINT}/configure3\
+	${PVFS2_DEST}/config3 -n 1
 
-${PVFS2_DEST}/INSTALL-pvfs2/bin/pvfs2-cp -s $((1024*1024)) \
-                ${PVFS2_MOUNTPOINT}/configure3 ${PVFS2_DEST}/config3 
+copy_test ${PVFS2_DEST}/pvfs2/configure ${PVFS2_MOUNTPOINT}/configure4\
+	${PVFS2_DEST}/config4 -n 10
 
-${PVFS2_DEST}/INSTALL-pvfs2/bin/pvfs2-cp -n 1 \
-                ${PVFS2_MOUNTPOINT}/configure4 ${PVFS2_DEST}/config4 
+copy_test ${PVFS2_DEST}/pvfs2/configure ${PVFS2_MOUNTPOINT}/configure5\
+	${PVFS2_DEST}/config5 -b 128
 
-${PVFS2_DEST}/INSTALL-pvfs2/bin/pvfs2-cp -n 10 \
-                ${PVFS2_MOUNTPOINT}/configure5 ${PVFS2_DEST}/config5 
+copy_test ${PVFS2_DEST}/pvfs2/configure ${PVFS2_MOUNTPOINT}/configure6\
+	${PVFS2_DEST}/config6 -b $((1024*1024))
 
-${PVFS2_DEST}/INSTALL-pvfs2/bin/pvfs2-cp -b 128 \
-                ${PVFS2_MOUNTPOINT}/configure6 ${PVFS2_DEST}/config6 
-
-${PVFS2_DEST}/INSTALL-pvfs2/bin/pvfs2-cp -b $((1024*1024)) \
-                ${PVFS2_MOUNTPOINT}/configure7 ${PVFS2_DEST}/config7 
-
-# TODO: cmp all the files
-cmp ${PVFS2_DEST}/pvfs2/configure ${PVFS2_DEST}/config1
+if [ $nr_errors -ne 0 ] ; then 
+	echo "$nr_errors errors found"
+	exit 1
+fi
