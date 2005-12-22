@@ -41,6 +41,21 @@ static PVFS_offset logical_to_physical_offset (void* params,
     return(ret_offset);
 }
 
+static PVFS_size physical_to_logical_size(void * params,
+                                          PINT_request_file_data * fd,
+                                          PVFS_size physical_size)
+{
+    PVFS_simple_stripe_params * dparam = (PVFS_simple_stripe_params *)params;
+    uint32_t server_nr = fd->server_nr;
+    uint32_t server_ct = fd->server_ct;
+    PVFS_size strips_div = physical_size / (dparam->strip_size + 1);
+    PVFS_size strips_mod = physical_size % (dparam->strip_size + 1);
+
+    return (strips_div * dparam->strip_size * server_ct) +
+           (dparam->strip_size * server_nr) +
+           strips_mod;
+}
+
 static PVFS_offset physical_to_logical_offset (void* params,
                                                PINT_request_file_data* fd,
                                                PVFS_offset physical_offset)
@@ -111,9 +126,12 @@ static PVFS_size logical_file_size(void* params,
     for (s = 0; s < server_ct; s++)
     {
         file_data.server_nr = s;
-        tmp_max = physical_to_logical_offset(dparam, &file_data, psizes[s]);
-        if(tmp_max > max)
-            max = tmp_max;
+        if(psizes[s])
+        {
+            tmp_max = physical_to_logical_size(dparam, &file_data, psizes[s]);
+            if(tmp_max > max)
+                max = tmp_max;
+        }
     }
     return max;
 }  

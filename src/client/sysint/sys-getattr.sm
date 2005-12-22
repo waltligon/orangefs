@@ -755,7 +755,7 @@ static int getattr_acache_insert(PINT_client_sm *sm_p,
         sm_p->getattr.size =
             (sm_p->getattr.attr.u.meta.dist->methods->logical_file_size)(
             sm_p->getattr.attr.u.meta.dist->params,
-sm_p->getattr.attr.u.meta.dfile_count,
+            sm_p->getattr.attr.u.meta.dfile_count,
             sm_p->getattr.size_array);
 
         tmp_size = &sm_p->getattr.size;
