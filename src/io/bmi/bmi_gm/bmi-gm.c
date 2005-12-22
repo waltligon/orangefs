@@ -142,7 +142,7 @@ method_addr_p BMI_gm_method_addr_lookup(const char *id_string);
 int BMI_gm_open_context(bmi_context_id context_id);
 void BMI_gm_close_context(bmi_context_id context_id);
 int BMI_gm_cancel(bmi_op_id_t id, bmi_context_id context_id);
-int BMI_gm_get_unexp_maxsize();
+int BMI_gm_get_unexp_maxsize(void);
 
 char BMI_gm_method_name[] = "bmi_gm";
 
