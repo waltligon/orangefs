@@ -93,15 +93,6 @@ static int io_find_target_datafiles(
     int *sio_handle_index_array,
     int *sio_handle_index_count);
 
-static int io_find_max_datafile_offset(
-    PINT_client_sm * sm_p,
-    PVFS_object_attr * attr,
-    int datafile_count,
-    PVFS_size * datafile_sizes,
-    int * datafile_index_array,
-    PVFS_offset upper_bound,
-    PVFS_offset * max_offset);
-
 static int io_find_total_size(
     PINT_client_sm * sm_p,
     PVFS_offset final_offset,
@@ -155,14 +146,6 @@ static int io_datafile_index_array_init(
 
 static void io_datafile_index_array_destroy(
     PINT_client_sm *sm_p);
-
-static int io_contexts_init(
-    PINT_client_sm *sm_p,
-    int context_count,
-    PVFS_object_attr *attr);
-
-static void io_contexts_destroy(PINT_client_sm *sm_p);
-
 
 %%
 
@@ -1337,6 +1320,7 @@ static int io_analyze_results(PINT_client_sm *sm_p,
     }
     else
     {
+        PVFS_offset eor; /* end-of-request */
         PVFS_offset max_datafile_logical_offset;
         PVFS_offset filereq_ub_offset;
 
@@ -1354,20 +1338,16 @@ static int io_analyze_results(PINT_client_sm *sm_p,
            goto analyze_results_exit;
         }
 
-        ret = io_find_max_datafile_offset(
-            sm_p,
-            attr,
-            sm_p->u.io.datafile_count,
-            sm_p->u.io.dfile_size_array,
-            sm_p->u.io.datafile_index_array,
-            filereq_ub_offset + sm_p->u.io.file_req_offset,
-            &max_datafile_logical_offset);
-        if(ret)
+        eor = filereq_ub_offset + sm_p->u.io.file_req_offset;
+
+        max_datafile_logical_offset = attr->u.meta.dist->methods->
+            logical_file_size(
+                attr->u.meta.dist->params,
+                attr->u.meta.dfile_count,
+                sm_p->u.io.dfile_size_array);
+        if(max_datafile_logical_offset > eor)
         {
-            /* end-of-request */
-            PVFS_offset eor = PVFS_util_max(
-                filereq_ub_offset + sm_p->u.io.file_req_offset,
-                max_datafile_logical_offset);
+            eor = max_datafile_logical_offset;
 
             /* we found a logical offset that is past the end of the
              * request, so we know the request is not past EOF.
@@ -1406,10 +1386,6 @@ static int io_analyze_results(PINT_client_sm *sm_p,
              */
             if(sm_p->u.io.datafile_count == attr->u.meta.dfile_count)
             {
-                PVFS_offset eor = PVFS_util_max(
-                    max_datafile_logical_offset,
-                    filereq_ub_offset + sm_p->u.io.file_req_offset);
-
                 /* we skip getting all the datafile sizes (since we already
                  * have them) and just compute the total size.
                  */
@@ -1502,20 +1478,17 @@ static int io_analyze_size_results(
         goto error_exit;
     }
 
-    ret = io_find_max_datafile_offset(
-        sm_p, attr, 
-        attr->u.meta.dfile_count,
-        sm_p->u.io.dfile_size_array,
-        NULL,
-        filereq_ub_offset + sm_p->u.io.file_req_offset,
-        &eof);
-    
-    eor = PVFS_util_max(
-        filereq_ub_offset + sm_p->u.io.file_req_offset,
-        eof);
+    eor = filereq_ub_offset + sm_p->u.io.file_req_offset;
 
-    if(ret)
+    eof = attr->u.meta.dist->methods->
+        logical_file_size(
+            attr->u.meta.dist->params,
+            attr->u.meta.dfile_count,
+            sm_p->u.io.dfile_size_array);
+    if(eof > eor)
     {
+        eor = eof;
+
         /* we found a logical offset that is past the end of the
          * request, so we know the request is not past EOF
          */
@@ -2295,68 +2268,6 @@ static int io_find_target_datafiles(
     }
     PINT_free_request_state(req_state);
     PINT_free_request_state(mem_req_state);
-
-    return 0;
-}
-
-/**
- * return 1 if we found a datafile logical offset >= upper_bound
- * return 0 if no such datafile was found
- *
- * in either case, max offset is set to the 
- * datafile logical offset < upper_bound.
- *
- * This function is similar to dist->logical_file_size, but we stop
- * looking for the max offset once we've exceeded the upper bound.
- */
-static int
-io_find_max_datafile_offset(
-    PINT_client_sm * sm_p,
-    PVFS_object_attr * attr,
-    int datafile_count,
-    PVFS_size * datafile_sizes,
-    int * datafile_index_array,
-    PVFS_offset upper_bound,
-    PVFS_offset * max_offset)
-{
-    PINT_request_file_data file_data;
-    int i = 0;
-        
-    memset(&file_data, 0, sizeof(file_data));
-    file_data.dist = attr->u.meta.dist;
-    file_data.server_ct = attr->u.meta.dfile_count;
-    file_data.extend_flag = 0;
-
-    /* iterate through each of the target datafiles */
-    for(i = 0; i < datafile_count; ++i)
-    {
-        PVFS_offset datafile_logical_offset;
-        file_data.server_nr = 
-            (datafile_index_array ? datafile_index_array[i] : i);
-
-        if(datafile_sizes[file_data.server_nr] == 0)
-        {
-            /* if the datafile is zero, skip to next one */
-            continue;
-        }
-
-        datafile_logical_offset = 
-            attr->u.meta.dist->methods->physical_to_logical_offset(
-                attr->u.meta.dist->params,
-                &file_data,
-                datafile_sizes[file_data.server_nr]);
-
-        if(datafile_logical_offset >= upper_bound)
-        {
-            return 1;
-        }
-
-        if(max_offset)
-        {
-            *max_offset = PVFS_util_max(
-                *max_offset, datafile_logical_offset);
-        }
-    }
 
     return 0;
 }
