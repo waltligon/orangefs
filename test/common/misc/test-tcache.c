@@ -32,7 +32,9 @@ int main(int argc, char **argv)
     int ret = 0;
     int status = 0;
     int param = 0;
-
+    int removed = 0;
+    int reclaimed = 0;
+    
     if(argc != 1)
     {
         usage(argc, argv);
@@ -128,7 +130,8 @@ int main(int argc, char **argv)
         tmp_payload->value = i;
 
         printf("Inserting %d...\n", i);
-        ret = PINT_tcache_insert_entry(test_tcache, &i, tmp_payload);
+        ret = PINT_tcache_insert_entry(test_tcache, &i, 
+                                       tmp_payload, &removed);
         if(ret < 0)
         {
             PVFS_perror("PINT_tcache_insert", ret);
@@ -234,7 +237,8 @@ int main(int argc, char **argv)
     tmp_payload->key = i;
     tmp_payload->value = i;
     printf("Inserting %d...\n", i);
-    ret = PINT_tcache_insert_entry(test_tcache, &i, tmp_payload);
+    ret = PINT_tcache_insert_entry(test_tcache, &i, 
+                                   tmp_payload, &removed);
     if(ret < 0)
     {
         PVFS_perror("PINT_tcache_insert", ret);
@@ -243,7 +247,7 @@ int main(int argc, char **argv)
     printf("Done.\n");
 
     /* reclaim */
-    ret = PINT_tcache_reclaim(test_tcache);
+    ret = PINT_tcache_reclaim(test_tcache, &reclaimed);
     if(ret < 0)
     {
         PVFS_perror("PINT_tcache_reclaim", ret);
@@ -284,7 +288,8 @@ int main(int argc, char **argv)
         tmp_payload->value = i;
 
         printf("Inserting %d...\n", i);
-        ret = PINT_tcache_insert_entry(test_tcache, &i, tmp_payload);
+        ret = PINT_tcache_insert_entry(test_tcache, &i, 
+                                       tmp_payload, &removed);
         if(ret < 0)
         {
             PVFS_perror("PINT_tcache_insert", ret);
@@ -335,7 +340,8 @@ int main(int argc, char **argv)
         tmp_payload->value = i;
 
         printf("Inserting %d...\n", i);
-        ret = PINT_tcache_insert_entry(test_tcache, &i, tmp_payload);
+        ret = PINT_tcache_insert_entry(test_tcache, &i, 
+                                       tmp_payload, &removed);
         if(ret < 0)
         {
             PVFS_perror("PINT_tcache_insert", ret);
@@ -361,7 +367,8 @@ int main(int argc, char **argv)
         tmp_payload->value = i;
 
         printf("Inserting %d...\n", i);
-        ret = PINT_tcache_insert_entry(test_tcache, &i, tmp_payload);
+        ret = PINT_tcache_insert_entry(test_tcache, &i, 
+                                       tmp_payload, &removed);
         if(ret < 0)
         {
             PVFS_perror("PINT_tcache_insert", ret);
@@ -385,7 +392,8 @@ int main(int argc, char **argv)
         tmp_payload->value = i;
 
         printf("Inserting %d...\n", i);
-        ret = PINT_tcache_insert_entry(test_tcache, &i, tmp_payload);
+        ret = PINT_tcache_insert_entry(test_tcache, &i, 
+                                       tmp_payload, &removed);
         if(ret < 0)
         {
             PVFS_perror("PINT_tcache_insert", ret);
