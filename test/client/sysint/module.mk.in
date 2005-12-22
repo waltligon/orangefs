@@ -34,5 +34,6 @@ TESTSRC += \
 	$(DIR)/set-eattr.c \
 	$(DIR)/get-eattr.c \
 	$(DIR)/del-eattr.c \
-	$(DIR)/list-eattr.c
+	$(DIR)/list-eattr.c \
+	$(DIR)/test-accesses.c
 
