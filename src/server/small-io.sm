@@ -263,6 +263,7 @@ static int small_io_release(PINT_server_op *s_op, job_status_s *js_p)
         ret = job_req_sched_release(
             s_op->scheduled_id, s_op, 0, js_p, &i, server_job_context);
     }
+    PINT_encode_release(&s_op->encoded, PINT_ENCODE_RESP);
     return ret;
 }
 
