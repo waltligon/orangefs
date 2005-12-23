@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: setup.c,v 1.18 2005-12-14 21:50:20 slang Exp $
+ * $Id: setup.c,v 1.19 2005-12-23 20:47:53 pw Exp $
  */
 #include <fcntl.h>
 #include <unistd.h>
@@ -576,7 +576,7 @@ BMI_ib_method_addr_lookup(const char *id)
  * Blocking connect initiated by a post_sendunexpected{,_list}, or
  * post_recv*
  */
-void
+int
 ib_tcp_client_connect(ib_method_addr_t *ibmap, struct method_addr *remote_map)
 {
     int s;
@@ -585,11 +585,15 @@ ib_tcp_client_connect(ib_method_addr_t *ibmap, struct method_addr *remote_map)
     struct sockaddr_in skin;
     
     s = socket(AF_INET, SOCK_STREAM, 0);
-    if (s < 0)
-	error_errno("%s: create tcp socket", __func__);
+    if (s < 0) {
+	warning("%s: create tcp socket: %m", __func__);
+	return bmi_errno_to_pvfs(errno);
+    }
     hp = gethostbyname(ibmap->hostname);
-    if (!hp)
-	error_errno("%s: cannot resolve server %s", __func__, ibmap->hostname);
+    if (!hp) {
+	warning("%s: cannot resolve server %s", __func__, ibmap->hostname);
+	return -1;
+    }
     memset(&skin, 0, sizeof(skin));
     skin.sin_family = hp->h_addrtype;
     memcpy(&skin.sin_addr, hp->h_addr_list[0], (size_t) hp->h_length);
@@ -599,16 +603,21 @@ ib_tcp_client_connect(ib_method_addr_t *ibmap, struct method_addr *remote_map)
     if (connect(s, (struct sockaddr *) &skin, sizeof(skin)) < 0) {
 	if (errno == EINTR)
 	    goto retry;
-	else
-	    error_errno("%s: connect to server %s", __func__, peername);
+	else {
+	    warning("%s: connect to server %s: %m", __func__, peername);
+	    return bmi_errno_to_pvfs(errno);
+	}
     }
     ibmap->c = ib_new_connection(s, peername, 0);
     if (!ibmap->c)
 	error("%s: ib_new_connection failed", __func__);
     ibmap->c->remote_map = remote_map;
 
-    if (close(s) < 0)
-	error_errno("%s: close sock", __func__);
+    if (close(s) < 0) {
+	warning("%s: close sock: %m", __func__);
+	return bmi_errno_to_pvfs(errno);
+    }
+    return 0;
 }
 
 /*
