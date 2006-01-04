@@ -192,7 +192,7 @@ run_parts() {
 ###
 
 # show that we're doing something
-${TINDERSCRIPT} ${TESTNAME} building $STARTTIME </dev/null
+${TINDERSCRIPT} ${TESTNAME}-${CVS_TAG} building $STARTTIME </dev/null
 
 # will we be able to do VFS-related tests?
 do_vfs=0
