@@ -32,7 +32,10 @@ TESTNAME="`hostname -s`-nightly"
 # we only have a few hosts that meet all the earlier stated prereqs
 VFS_HOSTS="gil lain"
 
+# need to make this a command line arugment:
+CVS_TAG="${CVS_TAG:-HEAD}"
 
+# takes one argument: a tag or branch in CVS
 pull_and_build_pvfs2 () {
 	# debugging aide... when we run this script repeatedly, we don't 
 	# really need to build everything again 
@@ -46,7 +49,7 @@ pull_and_build_pvfs2 () {
 	# a bit of gross shell hackery, but cuts down on the number of
 	# variables we have to set.  Assumes we ran this script out of a
 	# checked out pvfs2 tree
-	$(cd `dirname $0`;pwd)/../../maint/build/pvfs2-build.sh \
+	$(cd `dirname $0`;pwd)/../../maint/build/pvfs2-build.sh -v $1 \
 		$with_kernel -r $PVFS2_DEST
 	
 }
@@ -139,7 +142,7 @@ teardown_pvfs2() {
 buildfail() {
 	echo "Failure in build process"
 	cat ${PVFS2_DEST}/configure.log ${PVFS2_DEST}/make-extracted.log ${PVFS2_DEST}/make-install.log ${PVFS2_DEST}/make.log | \
-		${TINDERSCRIPT} ${TESTNAME} build_failed $STARTTIME 
+		${TINDERSCRIPT} ${TESTNAME}-${CVS_TAG} build_failed $STARTTIME 
 	exit 1
 }
 
@@ -147,13 +150,13 @@ setupfail() {
 	echo "Failure in setup"
 	dmesg | tail -20 > ${PVFS2_DEST}/dmesg
 	cat ${PVFS2_DEST}/dmesg ${PVFS2_DEST}/pvfs2-server.log | \
-		${TINDERSCRIPT}  ${TESTNAME} test_failed $STARTTIME 
+		${TINDERSCRIPT}  ${TESTNAME}-${CVS_TAG} test_failed $STARTTIME 
 	exit 1
 }
 
 tinder_report() {
 	eval cat $REPORT_LOG $failure_logs |\
-		${TINDERSCRIPT} ${TESTNAME} $1 $STARTTIME \
+		${TINDERSCRIPT} ${TESTNAME}-${CVS_TAG} $1 $STARTTIME \
 		"$nr_failed of $(( $nr_failed + $nr_passed)) failed"
 }
 
@@ -202,7 +205,7 @@ done
 
 failure_logs=""   # a space-delimited list of logs that failed
 # compile and install
-pull_and_build_pvfs2  || buildfail
+pull_and_build_pvfs2  $CVS_TAG || buildfail
 
 teardown_pvfs2 && setup_pvfs2 
 
