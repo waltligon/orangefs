@@ -256,9 +256,10 @@ ssize_t pvfs2_file_read(
     size_t count,
     loff_t *offset)
 {
-    pvfs2_print("pvfs2_file_read: called on %s\n",
+    pvfs2_print("pvfs2_file_read: called on %s [off %lu size %lu]\n",
                 (file && file->f_dentry && file->f_dentry->d_name.name ?
-                 (char *)file->f_dentry->d_name.name : "UNKNOWN"));
+                 (char *)file->f_dentry->d_name.name : "UNKNOWN"),
+                (unsigned long) *offset, (unsigned long) count);
 
     return pvfs2_inode_read(
         file->f_dentry->d_inode, buf, count, offset, 1, 0);
@@ -284,9 +285,11 @@ static ssize_t pvfs2_file_write(
     size_t amt_complete = 0;
     int dc_status;
 
-    pvfs2_print("pvfs2_file_write: called on %s\n",
+    pvfs2_print("pvfs2_file_write: called on %s [f_pos %ld off %ld size %ld]\n",
                 (file && file->f_dentry && file->f_dentry->d_name.name ?
-                 (char *)file->f_dentry->d_name.name : "UNKNOWN"));
+                 (char *)file->f_dentry->d_name.name : "UNKNOWN"),
+                (unsigned long) file->f_pos,
+                (unsigned long) *offset, (unsigned long) count);
 
     if (!access_ok(VERIFY_READ, buf, count))
         return -EFAULT;
@@ -308,7 +311,7 @@ static ssize_t pvfs2_file_write(
      * we would have to do a getattr for the size which is ridiculous.
      * So we work that around here...
      */
-    if (*offset != file->f_pos)
+    if ((file->f_flags & O_APPEND) && (*offset != file->f_pos))
     {
         *offset = file->f_pos;
     }

@@ -1452,6 +1452,10 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
     }
 #endif /* USE_MMAP_RA_CACHE */
 
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "%s: off %ld size %ld\n",
+            vfs_request->in_upcall.req.io.io_type == PVFS_IO_READ ? "read" : "write",
+            (unsigned long) vfs_request->in_upcall.req.io.offset,
+            (unsigned long) vfs_request->in_upcall.req.io.count);
     ret = PVFS_Request_contiguous(
         (int32_t)vfs_request->in_upcall.req.io.count,
         PVFS_BYTE, &vfs_request->mem_req);
