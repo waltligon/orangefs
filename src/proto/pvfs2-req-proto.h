@@ -1054,6 +1054,7 @@ struct PVFS_servresp_small_io
 #define encode_PVFS_servresp_small_io(pptr,x) \
     do { \
         encode_enum(pptr, &(x)->io_type); \
+        encode_skip4(pptr,); \
         encode_PVFS_size(pptr, &(x)->bstream_size); \
         encode_PVFS_size(pptr, &(x)->result_size); \
         if((x)->io_type == PVFS_IO_READ && (x)->buffer) \
@@ -1066,6 +1067,7 @@ struct PVFS_servresp_small_io
 #define decode_PVFS_servresp_small_io(pptr,x) \
     do { \
         decode_enum(pptr, &(x)->io_type); \
+        decode_skip4(pptr,); \
         decode_PVFS_size(pptr, &(x)->bstream_size); \
         decode_PVFS_size(pptr, &(x)->result_size); \
         if((x)->io_type == PVFS_IO_READ) \
@@ -1295,7 +1297,7 @@ endecode_fields_1a_struct(
    roundup8(sizeof(struct PVFS_mgmt_event)))
 
 /* geteattr ****************************************************/
-/* - retreives list of extended attributes */
+/* - retrieves list of extended attributes */
 
 struct PVFS_servreq_geteattr
 {
@@ -1305,11 +1307,10 @@ struct PVFS_servreq_geteattr
     PVFS_ds_keyval *key; /* array of keys to read */
     PVFS_size *valsz;    /* array of value buffer sizes */
 };
-endecode_fields_3aa_struct(
+endecode_fields_2aa_struct(
     PVFS_servreq_geteattr,
     PVFS_handle, handle,
     PVFS_fs_id, fs_id,
-    skip4,,
     int32_t, nkey,
     PVFS_ds_keyval, key,
     PVFS_size, valsz);
