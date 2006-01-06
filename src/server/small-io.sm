@@ -101,6 +101,7 @@ static int small_io_start_job(PINT_server_op *s_op, job_status_s *js_p)
     result.offset_array = s_op->u.small_io.offsets;
     result.size_array = s_op->u.small_io.sizes;
     result.segmax = SMALL_IO_MAX_REGIONS;
+    result.bytemax = s_op->req->u.small_io.total_bytes;
     result.bytes = 0;
     result.segs = 0;
 
@@ -108,7 +109,7 @@ static int small_io_start_job(PINT_server_op *s_op, job_status_s *js_p)
                                   s_op->req->u.small_io.file_req_offset);
     PINT_REQUEST_STATE_SET_FINAL(file_req_state,
                                  s_op->req->u.small_io.file_req_offset +
-                                 s_op->req->u.small_io.aggregate_size);
+                                 s_op->req->u.small_io.total_bytes);
 
     if(s_op->req->u.small_io.io_type == PVFS_IO_READ)
     {   
@@ -122,8 +123,6 @@ static int small_io_start_job(PINT_server_op *s_op, job_status_s *js_p)
         s_op->resp.u.small_io.bstream_size = 0;
         fdata.extend_flag = 1;
     }
-
-    result.bytemax = s_op->req->u.small_io.aggregate_size;
 
     /* calculate the offsets and sizes in the datafile for the read or write */
     ret = PINT_process_request(
@@ -166,7 +165,7 @@ static int small_io_start_job(PINT_server_op *s_op, job_status_s *js_p)
            s_op->req->u.small_io.fs_id,
            s_op->req->u.small_io.handle,
            (char **)&s_op->req->u.small_io.buffer,
-           &s_op->req->u.small_io.aggregate_size,
+           (TROVE_size *)&s_op->req->u.small_io.total_bytes,
            1,
            s_op->u.small_io.offsets,
            s_op->u.small_io.sizes,
@@ -188,7 +187,7 @@ static int small_io_start_job(PINT_server_op *s_op, job_status_s *js_p)
     {
         /* allocate space for the read in the response buffer */
         s_op->resp.u.small_io.buffer = BMI_memalloc(
-            s_op->addr, s_op->req->u.small_io.aggregate_size, BMI_SEND);
+            s_op->addr, s_op->req->u.small_io.total_bytes, BMI_SEND);
         if(!s_op->resp.u.small_io.buffer)
         {
             js_p->error_code = -PVFS_ENOMEM;
@@ -273,7 +272,7 @@ static int small_io_cleanup(PINT_server_op *s_op, job_status_s *js_p)
        s_op->resp.u.small_io.buffer)
     {
         BMI_memfree(s_op->addr, s_op->resp.u.small_io.buffer, 
-                    s_op->req->u.small_io.aggregate_size, BMI_SEND);
+                    s_op->req->u.small_io.total_bytes, BMI_SEND);
     }
 
     return server_state_machine_complete(s_op);
