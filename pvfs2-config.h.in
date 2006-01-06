@@ -16,6 +16,9 @@
 /* Define if we are enabling VFS AIO support in kernel */
 #undef HAVE_AIO_VFS_SUPPORT
 
+/* Define if read_descriptor_t has an arg member */
+#undef HAVE_ARG_IN_READ_DESCRIPTOR_T
+
 /* Define to 1 if you have the <arpa/inet.h> header file. */
 #undef HAVE_ARPA_INET_H
 

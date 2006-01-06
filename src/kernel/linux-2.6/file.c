@@ -2200,9 +2200,14 @@ static ssize_t pvfs2_sendfile(struct file *filp, loff_t *ppos,
 {
     int error;
     read_descriptor_t desc;
+
     desc.written = 0;
     desc.count = count;
+#ifdef HAVE_ARG_IN_READ_DESCRIPTOR_T
     desc.arg.data = target;
+#else
+    desc.buf = target;
+#endif
     desc.error = 0;
 
     /*

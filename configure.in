@@ -718,6 +718,21 @@ AC_TRY_COMPILE([
 	AC_DEFINE(HAVE_GENERIC_GETXATTR, 1, Define if kernel has generic_getxattr),
 )
 
+AC_MSG_CHECKING(for arg member in read_descriptor_t in kernel)
+dnl if this test passes, the kernel does not have it
+dnl if this test fails, the kernel has it defined
+AC_TRY_COMPILE([
+    #define __KERNEL__
+    #include <linux/fs.h>
+    ], [
+    read_descriptor_t x;
+    x.arg.data = NULL;
+    ],
+    AC_MSG_RESULT(yes)
+    AC_DEFINE(HAVE_ARG_IN_READ_DESCRIPTOR_T, 1, Define if read_descriptor_t has an arg member),
+    AC_MSG_RESULT(no)
+    )
+
 dnl end of kernel feature tests
 CFLAGS=$oldcflags
 
