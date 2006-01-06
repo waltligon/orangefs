@@ -220,7 +220,7 @@ pvfs2_set_acl(struct inode *inode, int type, struct posix_acl *acl)
 {
     int error;
     void *value = NULL;
-    size_t size;
+    size_t size = 0;
     const char *name = NULL;
 
     /* We dont't allow this on a symbolic link */
