@@ -384,8 +384,8 @@ static gint gui_details_float_string_compare(GtkTreeModel *model,
     gchar *string_a, *string_b;
     float a, b;
 
-    gtk_tree_model_get(model, iter_a, (gint) col_id, &string_a, -1);
-    gtk_tree_model_get(model, iter_b, (gint) col_id, &string_b, -1);
+    gtk_tree_model_get(model, iter_a, (gint)(unsigned long) col_id, &string_a, -1);
+    gtk_tree_model_get(model, iter_b, (gint)(unsigned long) col_id, &string_b, -1);
 
     a = (float) strtod(string_a, NULL);
     b = (float) strtod(string_b, NULL);
@@ -406,8 +406,8 @@ static gint gui_details_text_compare(GtkTreeModel *model,
     int ret;
     gchar *string_a, *string_b;
 
-    gtk_tree_model_get(model, iter_a, (gint) col_id, &string_a, -1);
-    gtk_tree_model_get(model, iter_b, (gint) col_id, &string_b, -1);
+    gtk_tree_model_get(model, iter_a, (gint)(unsigned long) col_id, &string_a, -1);
+    gtk_tree_model_get(model, iter_b, (gint)(unsigned long) col_id, &string_b, -1);
 
     /* TODO: use some glib function instead? */
     ret = strcmp(string_a, string_b);
