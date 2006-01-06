@@ -1232,6 +1232,15 @@ static int server_setup_signal_handlers(void)
 }
 
 #ifdef __PVFS2_SEGV_BACKTRACE__
+
+#if defined(REG_EIP)
+#  define REG_INSTRUCTION_POINTER REG_EIP
+#elif defined(REG_RIP)
+#  define REG_INSTRUCTION_POINTER REG_RIP
+#else
+#  error Unknown instruction pointer location for your architecture, configure without --enable-segv-backtrace.
+#endif
+
 /* bt_signalhandler()
  *
  * prints a stack trace from a signal handler; code taken from a Linux
@@ -1251,7 +1260,7 @@ static void bt_sighandler(int sig, siginfo_t *info, void *secret)
     {
         gossip_err("PVFS2 server: signal %d, faulty address is %p, " 
             "from %p\n", sig, info->si_addr, 
-            (void*)uc->uc_mcontext.gregs[REG_EIP]);
+            (void*)uc->uc_mcontext.gregs[REG_INSTRUCTION_POINTER]);
     }
     else
     {
@@ -1260,7 +1269,7 @@ static void bt_sighandler(int sig, siginfo_t *info, void *secret)
 
     trace_size = backtrace(trace, 16);
     /* overwrite sigaction with caller's address */
-    trace[1] = (void *) uc->uc_mcontext.gregs[REG_EIP];
+    trace[1] = (void *) uc->uc_mcontext.gregs[REG_INSTRUCTION_POINTER];
 
     messages = backtrace_symbols(trace, trace_size);
     /* skip first stack frame (points here) */
