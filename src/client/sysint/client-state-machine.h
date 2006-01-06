@@ -425,8 +425,8 @@ struct PINT_client_listeattr_sm
 
 struct PINT_client_perf_count_timer_sm
 {
-    int* interval_secs;
-    struct PINT_perf_counter* pc;
+    unsigned int *interval_secs;
+    struct PINT_perf_counter *pc;
 };
 
 typedef struct PINT_client_sm
