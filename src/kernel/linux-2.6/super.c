@@ -449,7 +449,7 @@ int pvfs2_remount(
             {
                 return ret;
             }
-#if !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_GENERIC_GETXATTR)
+#if !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
             /* mark the superblock as whether it supports acl's or not */
             sb->s_flags = ((sb->s_flags & ~MS_POSIXACL) | 
                 ((PVFS2_SB(sb)->mnt_options.acl == 1) ? MS_POSIXACL : 0));
@@ -701,7 +701,7 @@ int pvfs2_fill_sb(
         sb->s_flags = (sb->s_flags & ~MS_POSIXACL);
     }
 
-#ifdef HAVE_GENERIC_GETXATTR
+#if defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
     /* Hang the xattr handlers off the superblock */
     sb->s_xattr = pvfs2_xattr_handlers;
 #endif

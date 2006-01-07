@@ -17,7 +17,7 @@
 #include "pvfs2-kernel.h"
 #include "pvfs2-bufmap.h"
 
-#if !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_GENERIC_GETXATTR)
+#if !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
 
 #ifdef HAVE_POSIX_ACL_H
 #include <linux/posix_acl.h>

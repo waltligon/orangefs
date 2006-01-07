@@ -310,7 +310,7 @@ int pvfs2_setattr(struct dentry *dentry, struct iattr *iattr)
         if (ret == 0)
         {
             ret = pvfs2_inode_setattr(inode, iattr);
-#if !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_GENERIC_GETXATTR)
+#if !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
             if (!ret && iattr->ia_valid & ATTR_MODE)
             {
                 /* change mod on a file that has ACLs */
@@ -394,7 +394,7 @@ struct inode_operations pvfs2_file_inode_operations =
     .truncate = pvfs2_truncate,
     .setattr = pvfs2_setattr,
     .getattr = pvfs2_getattr,
-#ifdef HAVE_GENERIC_GETXATTR
+#if defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
     .setxattr = generic_setxattr,
     .getxattr = generic_getxattr,
     .removexattr = generic_removexattr,
@@ -404,7 +404,7 @@ struct inode_operations pvfs2_file_inode_operations =
     .removexattr = pvfs2_removexattr,
 #endif
     .listxattr = pvfs2_listxattr,
-#ifdef HAVE_GENERIC_GETXATTR
+#if defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
     .permission = pvfs2_permission,
 #endif
 #endif
@@ -490,7 +490,7 @@ struct inode *pvfs2_get_custom_inode(
 	    pvfs2_print("pvfs2_get_custom_inode: unsupported mode\n");
             goto error;
 	}
-#if !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_GENERIC_GETXATTR)
+#if !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
         /* Initialize the ACLs of the new inode */
         pvfs2_init_acl(inode, dir);
 #endif

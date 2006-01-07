@@ -508,7 +508,7 @@ struct inode_operations pvfs2_dir_inode_operations =
     .rename = pvfs2_rename,
     .setattr = pvfs2_setattr,
     .getattr = pvfs2_getattr,
-#ifdef HAVE_GENERIC_GETXATTR
+#if defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
     .getxattr = generic_getxattr,
     .setxattr = generic_setxattr,
     .removexattr = generic_removexattr,
@@ -518,7 +518,7 @@ struct inode_operations pvfs2_dir_inode_operations =
     .removexattr = pvfs2_removexattr,
 #endif
     .listxattr = pvfs2_listxattr,
-#ifdef HAVE_GENERIC_GETXATTR
+#if defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
     .permission = pvfs2_permission,
 #endif
 #endif
