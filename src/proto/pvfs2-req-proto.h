@@ -963,7 +963,6 @@ struct PVFS_servreq_small_io
     encode_enum(pptr, &(x)->io_type); \
     encode_uint32_t(pptr, &(x)->server_nr); \
     encode_uint32_t(pptr, &(x)->server_ct); \
-    encode_skip4(pptr,); \
     encode_PINT_dist(pptr, &(x)->dist); \
     encode_PINT_Request(pptr, &(x)->file_req); \
     encode_PVFS_offset(pptr, &(x)->file_req_offset); \
@@ -988,14 +987,13 @@ struct PVFS_servreq_small_io
     decode_enum(pptr, &(x)->io_type); \
     decode_uint32_t(pptr, &(x)->server_nr); \
     decode_uint32_t(pptr, &(x)->server_ct); \
-    decode_skip4(pptr,); \
     decode_PINT_dist(pptr, &(x)->dist); \
     decode_PINT_Request(pptr, &(x)->file_req); \
     PINT_request_decode((x)->file_req); /* unpacks the pointers */ \
     decode_PVFS_offset(pptr, &(x)->file_req_offset); \
     decode_uint32_t(pptr, &(x)->total_bytes); \
     decode_skip4(pptr,); \
-    if((x)->io_type == PVFS_IO_WRITE) \
+    if ((x)->io_type == PVFS_IO_WRITE) \
     { \
         /* instead of copying the message we just set the pointer, since \
          * we know it will not be freed unil the small io state machine \
