@@ -250,7 +250,11 @@ static int pvfs2_invalidatepage(struct page *page, unsigned long offset)
     return 0;
 }
 
+#ifdef HAVE_INT_ARG2_ADDRESS_SPACE_OPERATIONS_RELEASEPAGE
 static int pvfs2_releasepage(struct page *page, int foo)
+#else
+static int pvfs2_releasepage(struct page *page, gfp_t foo)
+#endif
 {
     pvfs2_print("pvfs2_releasepage called on page %p\n", page);
     try_to_free_buffers(page);

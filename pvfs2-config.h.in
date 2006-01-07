@@ -64,6 +64,13 @@
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
 
+/* Define if sceond argument to releasepage in address_space_operations is
+   type int */
+#undef HAVE_INT_ARG2_ADDRESS_SPACE_OPERATIONS_RELEASEPAGE
+
+/* Define if return value from follow_link in inode_operations is type int */
+#undef HAVE_INT_RETURN_INODE_OPERATIONS_FOLLOW_LINK
+
 /* Define if kernel has i_size_read */
 #undef HAVE_I_SIZE_READ
 

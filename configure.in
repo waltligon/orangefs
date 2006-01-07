@@ -719,8 +719,6 @@ AC_TRY_COMPILE([
 )
 
 AC_MSG_CHECKING(for arg member in read_descriptor_t in kernel)
-dnl if this test passes, the kernel does not have it
-dnl if this test fails, the kernel has it defined
 AC_TRY_COMPILE([
     #define __KERNEL__
     #include <linux/fs.h>
@@ -731,7 +729,43 @@ AC_TRY_COMPILE([
     AC_MSG_RESULT(yes)
     AC_DEFINE(HAVE_ARG_IN_READ_DESCRIPTOR_T, 1, Define if read_descriptor_t has an arg member),
     AC_MSG_RESULT(no)
+)
+
+AC_MSG_CHECKING(for second arg type int in address_space_operations releasepage)
+tmp_cflags=$CFLAGS
+CFLAGS="$CFLAGS -Werror"
+AC_TRY_COMPILE([
+    #define __KERNEL__
+    #include <linux/fs.h>
+    extern int rp(struct page *page, int foo);
+    ], [
+    struct address_space_operations aso = {
+	.releasepage = rp
+    };
+    ],
+    AC_MSG_RESULT(yes)
+    AC_DEFINE(HAVE_INT_ARG2_ADDRESS_SPACE_OPERATIONS_RELEASEPAGE, 1, Define if sceond argument to releasepage in address_space_operations is type int),
+    AC_MSG_RESULT(no)
     )
+CFLAGS=$tmp_cflags
+
+AC_MSG_CHECKING(for int return in inode_operations follow_link)
+tmp_cflags=$CFLAGS
+CFLAGS="$CFLAGS -Werror"
+AC_TRY_COMPILE([
+    #define __KERNEL__
+    #include <linux/fs.h>
+    extern int fl(struct dentry *d, struct nameidata *n);
+    ], [
+    struct inode_operations io = {
+	.follow_link = fl
+    };
+    ],
+    AC_MSG_RESULT(yes)
+    AC_DEFINE(HAVE_INT_RETURN_INODE_OPERATIONS_FOLLOW_LINK, 1, Define if return value from follow_link in inode_operations is type int),
+    AC_MSG_RESULT(no)
+    )
+CFLAGS=$tmp_cflags
 
 dnl end of kernel feature tests
 CFLAGS=$oldcflags
