@@ -12,6 +12,7 @@
 #include "pint-dist-utils.h"
 #include "pvfs2-types.h"
 #include "pvfs2-dist-simple-stripe.h"
+#include "pvfs2-util.h"
 
 static PVFS_offset logical_to_physical_offset (void* params,
                                                PINT_request_file_data* fd,
@@ -48,8 +49,29 @@ static PVFS_size physical_to_logical_size(void * params,
     PVFS_simple_stripe_params * dparam = (PVFS_simple_stripe_params *)params;
     uint32_t server_nr = fd->server_nr;
     uint32_t server_ct = fd->server_ct;
-    PVFS_size strips_div = physical_size / (dparam->strip_size + 1);
-    PVFS_size strips_mod = physical_size % (dparam->strip_size + 1);
+    
+    /* The algorithm for this one turns out to be kinda tricky.
+     * We basically have 3 components that are summed:
+     *
+     * 1. The size of the complete stripes (a stripe being the strip size times
+     *    the number of servers).  In most cases this value is the physical
+     *    size / strip size (times the stripe size).  
+     *    But when the physical size equals strip size
+     *    we need to subtract one (we're still in that stripe).  Also, since
+     *    we subtract one, when the physical size is zero, we need to verify
+     *    that div is a non-negative value.
+     *
+     * 2. The size of the strips in servers before the current server.  Simply
+     *    the strip size times the server number (starting from zero).
+     *
+     * 3. The remainder size within the current strip.  In most cases its 
+     *    physical size modulo strip size, but again, if the physical
+     *    size equals the strip size, we need the strip size.
+     */
+    PVFS_size physical_size_n1 = (physical_size ? (physical_size - 1) : 0);
+
+    PVFS_size strips_div = physical_size_n1 / dparam->strip_size;
+    PVFS_size strips_mod = (physical_size_n1 % dparam->strip_size ) + 1;
 
     return (strips_div * dparam->strip_size * server_ct) +
            (dparam->strip_size * server_nr) +
