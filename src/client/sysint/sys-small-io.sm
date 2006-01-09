@@ -180,7 +180,6 @@ static int small_io_setup_msgpairs(PINT_client_sm * sm_p,
             sm_p->u.io.file_req,
             sm_p->u.io.file_req_offset,
             regions);
-        assert(sm_p->msgarray[i].req.u.small_io.total_bytes);
 
         sm_p->msgarray[i].fs_id = sm_p->object_ref.fs_id;
         sm_p->msgarray[i].handle = sm_p->object_ref.handle;
