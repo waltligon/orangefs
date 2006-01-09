@@ -1018,7 +1018,8 @@ struct PVFS_servreq_small_io
                                    __dist,                               \
                                    __filereq,                            \
                                    __filereq_offset,                     \
-                                   __segments)                           \
+                                   __segments,                           \
+                                   __bytes)                              \
 do {                                                                     \
     int _sio_i;                                                          \
     (__req).op                                = PVFS_SERV_SMALL_IO;      \
@@ -1032,10 +1033,12 @@ do {                                                                     \
     (__req).u.small_io.file_req               = (__filereq);             \
     (__req).u.small_io.file_req_offset        = (__filereq_offset);      \
     (__req).u.small_io.segments               = (__segments);            \
-    (__req).u.small_io.total_bytes            = 0;                       \
+    (__req).u.small_io.total_bytes            =                          \
+        ((__io_type) == PVFS_IO_WRITE) ? 0 : (__bytes);                  \
     for(_sio_i = 0; _sio_i < (__segments); ++_sio_i)                     \
     {                                                                    \
-        (__req).u.small_io.total_bytes += (__req).u.small_io.sizes[_sio_i]; \
+        (__req).u.small_io.total_bytes +=                                \
+            (__req).u.small_io.sizes[_sio_i];                            \
     }                                                                    \
 } while(0)
 
