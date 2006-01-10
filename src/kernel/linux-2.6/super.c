@@ -367,7 +367,7 @@ static int pvfs2_statfs(
         {
             struct statfs tmp_statfs;
 
-            buf->f_frsize = 1024;
+            buf->f_frsize = sb->s_blocksize;
 
             pvfs2_print("sizeof(kstatfs)=%d\n",
                         (int)sizeof(struct kstatfs));
