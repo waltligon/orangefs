@@ -294,6 +294,11 @@ static ssize_t pvfs2_file_write(
     if (!access_ok(VERIFY_READ, buf, count))
         return -EFAULT;
 
+    if(file->f_pos > i_size_read(inode))
+    {
+        i_size_write(inode, file->f_pos);
+    }
+    
     /* perform generic linux kernel tests for sanity of write arguments */
     /* NOTE: this is particularly helpful in handling fsize rlimit properly */
 #ifdef PVFS2_LINUX_KERNEL_2_4
@@ -306,6 +311,9 @@ static ssize_t pvfs2_file_write(
         pvfs2_print("pvfs2_file_write: failed generic argument checks.\n");
         return(ret);
     }
+
+    pvfs2_print("pvfs2_file_write: proceeding with offset : %ld, size %ld\n",
+                (unsigned long) *offset, (unsigned long) count);
 
     while(total_count < count)
     {
@@ -422,12 +430,6 @@ static ssize_t pvfs2_file_write(
     {
         update_atime(inode);
     }
-
-    if(file->f_pos > inode->i_size)
-    {
-        inode->i_size = file->f_pos;
-    }
-
     return total_count;
 }
 
