@@ -1126,10 +1126,18 @@ static int dbpf_bstream_rw_list_op_svc(struct dbpf_op *op_p)
                               "WRITE" : "READ"), ret,
                              op_p->u.b_rw_list.fd);
 
-                /* we need to set the out size for the caller of write_list or
-                 * read_list
+                /* aio_return doesn't seem to return bytes read/written if 
+                 * sigev_notify == SIGEV_NONE, so we set the out size 
+                 * from what's requested.  For reads we just leave as zero,
+                 * which ends up being OK,
+                 * since the amount read (if past EOF its less than requested)
+                 * is determined from the bstream size.
                  */
-                *(op_p->u.b_rw_list.out_size_p) += ret;
+                if(op_p->type == BSTREAM_WRITE_LIST || 
+                   op_p->type == BSTREAM_WRITE_AT)
+                {
+                    *(op_p->u.b_rw_list.out_size_p) += aiocb_p[i].aio_nbytes;
+                }
 
                 /* mark as a NOP so we ignore it from now on */
                 aiocb_p[i].aio_lio_opcode = LIO_NOP;

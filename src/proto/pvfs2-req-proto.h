@@ -944,11 +944,12 @@ struct PVFS_servreq_small_io
     PINT_dist * dist;
     struct PINT_Request * file_req;
     PVFS_offset file_req_offset;
-    int segments;
+    PVFS_size aggregate_size;
 
     /* these are used for writes to map the regions of the memory buffer
      * to the contiguous encoded message.  They don't get encoded.
      */
+    int segments;
     PVFS_offset offsets[SMALL_IO_MAX_SEGMENTS];
     PVFS_size sizes[SMALL_IO_MAX_SEGMENTS];
 
@@ -966,6 +967,7 @@ struct PVFS_servreq_small_io
     encode_PINT_dist(pptr, &(x)->dist); \
     encode_PINT_Request(pptr, &(x)->file_req); \
     encode_PVFS_offset(pptr, &(x)->file_req_offset); \
+    encode_PVFS_size(pptr, &(x)->aggregate_size); \
     encode_uint32_t(pptr, &(x)->total_bytes); \
     encode_skip4(pptr,); \
     if ((x)->io_type == PVFS_IO_WRITE) \
@@ -991,6 +993,7 @@ struct PVFS_servreq_small_io
     decode_PINT_Request(pptr, &(x)->file_req); \
     PINT_request_decode((x)->file_req); /* unpacks the pointers */ \
     decode_PVFS_offset(pptr, &(x)->file_req_offset); \
+    decode_PVFS_size(pptr, &(x)->aggregate_size); \
     decode_uint32_t(pptr, &(x)->total_bytes); \
     decode_skip4(pptr,); \
     if ((x)->io_type == PVFS_IO_WRITE) \
@@ -1019,7 +1022,7 @@ struct PVFS_servreq_small_io
                                    __filereq,                            \
                                    __filereq_offset,                     \
                                    __segments,                           \
-                                   __bytes)                              \
+                                   __memreq_size)                        \
 do {                                                                     \
     int _sio_i;                                                          \
     (__req).op                                = PVFS_SERV_SMALL_IO;      \
@@ -1032,9 +1035,9 @@ do {                                                                     \
     (__req).u.small_io.dist                   = (__dist);                \
     (__req).u.small_io.file_req               = (__filereq);             \
     (__req).u.small_io.file_req_offset        = (__filereq_offset);      \
+    (__req).u.small_io.aggregate_size         = (__memreq_size);         \
     (__req).u.small_io.segments               = (__segments);            \
-    (__req).u.small_io.total_bytes            =                          \
-        ((__io_type) == PVFS_IO_WRITE) ? 0 : (__bytes);                  \
+    (__req).u.small_io.total_bytes            = 0;                       \
     for(_sio_i = 0; _sio_i < (__segments); ++_sio_i)                     \
     {                                                                    \
         (__req).u.small_io.total_bytes +=                                \
