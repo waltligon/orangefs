@@ -2299,6 +2299,13 @@ io_find_total_size(
     PVFS_object_attr * attr;
     int index = 0;
 
+    /* if the final offset is zero, then the file size is zero */
+    if(final_offset == 0)
+    {
+        *total_return_size = 0;
+        return 0;
+    }
+
     attr = &sm_p->getattr.attr;
 
     filereq_state = PINT_new_request_state(sm_p->u.io.file_req);
@@ -2327,7 +2334,7 @@ io_find_total_size(
                                    &rfdata, &result, PINT_SERVER);
         if(res < 0)
         {
-            return res;
+            goto exit;
         }
 
         for(index = 0; index < result.segs; ++index)
@@ -2352,7 +2359,12 @@ io_find_total_size(
     } while(!PINT_REQUEST_DONE(filereq_state) && result.segs);
 
     *total_return_size = total_size;
-    return 0;
+
+exit:
+
+    PINT_free_request_state(filereq_state);
+    PINT_free_request_state(memreq_state);
+    return res;
 }
 
 /* computes the logical offset in the file request from the size

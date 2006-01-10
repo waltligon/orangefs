@@ -170,7 +170,7 @@ static int small_io_start_job(PINT_server_op *s_op, job_status_s *js_p)
     {
         /* allocate space for the read in the response buffer */
         s_op->resp.u.small_io.buffer = BMI_memalloc(
-            s_op->addr, s_op->req->u.small_io.total_bytes, BMI_SEND);
+            s_op->addr, result.bytes, BMI_SEND);
         if(!s_op->resp.u.small_io.buffer)
         {
             js_p->error_code = -PVFS_ENOMEM;

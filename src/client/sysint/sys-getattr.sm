@@ -442,6 +442,7 @@ static int getattr_acache_lookup(PINT_client_sm *sm_p,
         " [%llu]\n",
           llu(object_ref.handle));
 
+    js_p->error_code = GETATTR_ACACHE_MISS;
     return 1;
 }
 

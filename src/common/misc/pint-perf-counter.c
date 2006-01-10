@@ -171,7 +171,7 @@ void PINT_perf_reset(
 
     /* set initial timestamp */
     gettimeofday(&tv, NULL);
-    pc->start_time_array_ms[0] = tv.tv_sec*1000 +
+    pc->start_time_array_ms[0] = ((uint64_t)tv.tv_sec)*1000 +
 	tv.tv_usec/1000;
 
     gen_mutex_unlock(pc->mutex);
