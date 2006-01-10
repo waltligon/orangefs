@@ -143,13 +143,6 @@ static int small_io_start_job(PINT_server_op *s_op, job_status_s *js_p)
         return 1;
     }
 
-    for(i = 0; i < result.segs; ++i)
-    {
-        printf("small io file offset: %llu, size: %llu\n", 
-               s_op->u.small_io.offsets[i], 
-               s_op->u.small_io.sizes[i]);
-    }
-
     if(s_op->req->u.small_io.io_type == PVFS_IO_WRITE)
     {
         ret = job_trove_bstream_write_list(
