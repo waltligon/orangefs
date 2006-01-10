@@ -61,7 +61,6 @@ machine pvfs2_small_io_sm(
 static int small_io_start_job(PINT_server_op *s_op, job_status_s *js_p)
 {
     int ret;
-    int i;
     job_id_t tmp_id;
     PINT_Request_state * file_req_state;
     PINT_request_file_data fdata;
