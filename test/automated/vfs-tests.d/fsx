@@ -1,5 +1,4 @@
 #!/bin/sh
-[ -d ${EXTRA_TESTS}/fsx ] || exit 1
 
 cd ${EXTRA_TESTS}/fsx
 # fsx options: 
@@ -8,4 +7,4 @@ cd ${EXTRA_TESTS}/fsx
 #    does not support.
 # good catch, sam!
 
-gcc fsx.c -o fsx && ./fsx -N 1000 -W -R ${PVFS2_MOUNTPOINT}/fsx_testfile
+gcc ${VFS_SCRIPTS}/fsx.c -o fsx && ./fsx -N 1000 -W -R ${PVFS2_MOUNTPOINT}/fsx_testfile
