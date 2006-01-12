@@ -96,6 +96,7 @@ setup_vfs() {
 
 setup_pvfs2() {
 	cd $PVFS2_DEST
+	rm -f fs.conf server.conf*
 	INSTALL-pvfs2/bin/pvfs2-genconfig fs.conf server.conf \
 		--protocol tcp \
 		--ioports {3396-3399} --metaports {3396-3399} \
