@@ -1,4 +1,6 @@
-#!/bin/sh
+#!/bin/sh 
 
-gcc ${VFS_SCRIPTS}/fstest.c -o ${PVFS2_NIGHTLY}/fstest && \
-	${PVFS2_NIGHTLY}/fstest -p ${PVFS2_MOUNTPOINT}/fstest
+mkdir ${PVFS2_MOUNTPOINT}/fstest
+
+gcc ${VFS_SCRIPTS}/fstest.c -o ${PVFS2_DEST}/fstest && \
+	${PVFS2_DEST}/fstest -p ${PVFS2_MOUNTPOINT}/fstest
