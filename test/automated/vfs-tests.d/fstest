@@ -1,0 +1,4 @@
+#!/bin/sh
+
+gcc ${VFS_SCRIPTS}/fstest.c -o ${PVFS2_NIGHTLY}/fstest && \
+	${PVFS2_NIGHTLY}/fstest -p ${PVFS2_MOUNTPOINT}/fstest
