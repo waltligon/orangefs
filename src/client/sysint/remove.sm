@@ -170,6 +170,11 @@ static int remove_getattr_analyze_results(PINT_client_sm *sm_p,
 	    js_p->error_code = REMOVE_MUST_REMOVE_DATAFILES;
             break;
 	case PVFS_TYPE_DIRECTORY:
+            if(attr->u.dir.dirent_count != 0)
+            {
+                js_p->error_code = -PVFS_ENOTEMPTY;
+                break;
+            }
 	case PVFS_TYPE_SYMLINK:
             js_p->error_code = 0;
             break;
@@ -314,6 +319,8 @@ static int remove_helper_cleanup(PINT_client_sm *sm_p,
     gossip_debug(GOSSIP_CLIENT_DEBUG, "remove state: helper cleanup\n");
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+
+    PINT_acache_invalidate(sm_p->object_ref);
 
     if (sm_p->msgarray && (sm_p->msgarray != &sm_p->msgpair))
     {

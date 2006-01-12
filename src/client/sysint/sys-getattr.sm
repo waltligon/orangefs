@@ -317,10 +317,11 @@ static int getattr_acache_lookup(PINT_client_sm *sm_p,
 				 job_status_s *js_p)
 {
     uint32_t trimmed_mask = 0;
-    int status = 0;
-    int unexpired_masks, missing_attrs;
+    int missing_attrs;
     PVFS_object_ref object_ref;
-    PINT_pinode * pinode;
+    int ret = -1;
+    int attr_status = -1;
+    int size_status = -1;
 
     js_p->error_code = 0;
 
@@ -341,141 +342,105 @@ static int getattr_acache_lookup(PINT_client_sm *sm_p,
 	sm_p->getattr.req_attrmask |= PVFS_ATTR_META_ALL;
     }
 
-    pinode = PINT_acache_lookup(object_ref, &status, &unexpired_masks);
-    if (pinode)
+    ret = PINT_acache_get_cached_entry(object_ref,
+        &sm_p->getattr.attr,
+        &attr_status,
+        &sm_p->getattr.size,
+        &size_status);
+    if(ret < 0 || attr_status < 0)
     {
-        /*
-          make sure pinode is not expired, and that it has all
-          attribute info fields requested;
-        */
-        if (status == PINODE_STATUS_VALID)
-        {
-            /*
-             * The sys attr mask request is converted to object
-             * attr mask values for comparison with the cached
-             * entry
-             */
-            trimmed_mask = sm_p->getattr.req_attrmask;
-            
-            /*
-               the trimmed mask is used for making sure that we're only
-               checking attr bits that make sense for the object type
-               since the caller may have requested all attributes in
-               the case where it doesn't know what type of object we're
-               doing the getattr against.
-               */
-
-            if (pinode->attr.objtype == PVFS_TYPE_METAFILE)
-            {
-                trimmed_mask &= (PVFS_ATTR_META_ALL |
-                                 PVFS_ATTR_DATA_SIZE |
-                                 PVFS_ATTR_COMMON_ALL);
-
-                /* if the DATA_SIZE is requested but not META_ALL, we need to
-                 * add META_ALL since we can't compute DATA_SIZE without it
-                 */
-                if(trimmed_mask & PVFS_ATTR_DATA_SIZE)
-                {
-                    trimmed_mask |= PVFS_ATTR_META_ALL;
-                }
-            }
-            else if (pinode->attr.objtype == PVFS_TYPE_SYMLINK)
-            {
-                trimmed_mask &= (PVFS_ATTR_SYMLNK_ALL | PVFS_ATTR_COMMON_ALL);
-            }
-            else if (pinode->attr.objtype == PVFS_TYPE_DIRECTORY)
-            {
-                trimmed_mask &= (PVFS_ATTR_COMMON_ALL | PVFS_ATTR_DIR_ALL);
-            }
-
-            /* trimmed_mask contains the list of attributes
-             * requested for a particular object, 
-             * while sm_p->pinode->attr.mask contains
-             * the list of attributes cached for that object.
-             * The cached attributes can be used if requested
-             * is less than cached, i.e. all the attributes
-             * we need are already cached.  So we need to do
-             * a bitwise comparison of requested <= cached.
-             *
-             * xor of the two masks gives us the bits that are different,
-             * and-ing that result with the requested mask gives us the
-             * bits in the requested mask but not in the cached mask.
-             */
-            missing_attrs = ((trimmed_mask ^ unexpired_masks) &
-                             trimmed_mask);
-            if (missing_attrs == 0)
-            {
-                /* nothing's missing, a hit! */
-                goto cache_hit;
-            }
-
-            /* check if the only thing missing is the file size, then
-             * we don't need to do the object getattr operation, we only
-             * need to do the datafile getattr operation, so we return
-             * the GETATTR_NEED_DATAFILE_SIZES error code which will make
-             * the getattr-dowork state machine jump to the datafile getattr
-             * operation state. 
-             */
-            if(missing_attrs == PVFS_ATTR_DATA_SIZE)
-            {
-                /* if the file size is requested but the distribution info
-                 * isn't and it hasn't been cached, then we need to
-                 * get that first.
-                 */
-                PINT_SM_DATAFILE_SIZE_ARRAY_INIT(
-                    &sm_p->getattr.size_array,
-                    pinode->attr.u.meta.dfile_count);
-
-                js_p->error_code = GETATTR_NEED_DATAFILE_SIZES;
-                goto cache_hit;
-            }
-                
-            /*
-              normally, if we get here, we've got a cache miss.
-              setattr is an exception as it now does write-through
-              acache updates.  (i.e. it's a hit in invalid cases
-              because it'll be updated properly on success; flushed on
-              failure)
-            */
-            if (sm_p->op != PVFS_SYS_SETATTR)
-            {
-                gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: sm_p->op is: %d "
-                        "[%llu]\n", sm_p->op, llu(object_ref.handle));
-
-                goto cache_miss;
-            }
-
-          cache_hit:
-      
-            PINT_copy_object_attr(&sm_p->getattr.attr, &pinode->attr);
-            
-            if(trimmed_mask & PVFS_ATTR_DATA_SIZE)
-            {
-                sm_p->getattr.size = pinode->size;
-            }
-
-            PINT_acache_release(pinode);
-
-            gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: acache hit "
-                         "[%llu]\n", llu(object_ref.handle));
-            return 1;
-        }
-      cache_miss:
-        /*
-          to avoid having an entry in the cache that doesn't exactly
-          match what the caller asked for, in this case invalidate the
-          entry; note invalidate implies an internal acache release.
-          The entry gets added back into the cache with
-        */
-        gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: invalid acache "
-                     "miss [%llu]\n", 
-                     llu(object_ref.handle));
-
-        PINT_acache_release(pinode);
+        gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: clean acache miss: "
+                    " [%llu]\n",
+                      llu(object_ref.handle));
+  
+        js_p->error_code = GETATTR_ACACHE_MISS;
+        return 1;
     }
-    gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: clean acache miss: "
-                " [%llu]\n",
-                  llu(object_ref.handle));
+  
+    /* acache hit, check results */
+  
+    /* The sys attr mask request is converted to object
+     * attr mask values for comparison with the cached
+     * entry
+     */
+    trimmed_mask = sm_p->getattr.req_attrmask;
+    /* the trimmed mask is used for making sure that we're only
+     * checking attr bits that make sense for the object type
+     * since the caller may have requested all attributes in
+     * the case where it doesn't know what type of object we're
+     * doing the getattr against.
+     */
+    if (sm_p->getattr.attr.objtype == PVFS_TYPE_METAFILE)
+    {
+        trimmed_mask &= (PVFS_ATTR_META_ALL |
+                         PVFS_ATTR_DATA_SIZE |
+                         PVFS_ATTR_COMMON_ALL);
+    }
+    else if (sm_p->getattr.attr.objtype == PVFS_TYPE_SYMLINK)
+    {
+        trimmed_mask &= (PVFS_ATTR_SYMLNK_ALL | PVFS_ATTR_COMMON_ALL);
+    }
+    else if (sm_p->getattr.attr.objtype == PVFS_TYPE_DIRECTORY)
+    {
+        trimmed_mask &= (PVFS_ATTR_COMMON_ALL | PVFS_ATTR_DIR_ALL);
+    }
+  
+    /* trimmed_mask contains the list of attributes
+     * requested for a particular object, 
+     * while sm_p->getattr.attr.mask contains
+     * the list of attributes cached for that object.
+     * The cached attributes can be used if requested
+     * is less than cached, i.e. all the attributes
+     * we need are already cached.  So we need to do
+     * a bitwise comparison of requested <= cached.
+     *
+     * xor of the two masks gives us the bits that are different,
+     * and-ing that result with the requested mask gives us the
+     * bits in the requested mask but not in the cached mask.
+     */
+    missing_attrs = ((trimmed_mask ^ sm_p->getattr.attr.mask) &
+                     trimmed_mask);
+    if((missing_attrs == PVFS_ATTR_DATA_SIZE && size_status == 0) ||
+        (missing_attrs == 0))
+    {
+        /* nothing's missing, a hit! */
+        gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: acache hit "
+                     "[%llu]\n", llu(object_ref.handle));
+        js_p->error_code = 0;
+        return 1;
+    }
+  
+    /* check if the only thing missing is the file size, then
+     * we don't need to do the object getattr operation, we only
+     * need to do the datafile getattr operation, so we return
+     * the GETATTR_NEED_DATAFILE_SIZES error code which will make
+     * the getattr-dowork state machine jump to the datafile getattr
+     * operation state. 
+     */
+    if(missing_attrs == PVFS_ATTR_DATA_SIZE)
+    {
+        /* if the file size is requested but the distribution info
+         * isn't and it hasn't been cached, then we need to
+         * get that first.
+         */
+        PINT_SM_DATAFILE_SIZE_ARRAY_INIT(
+            &sm_p->getattr.size_array,
+            sm_p->getattr.attr.u.meta.dfile_count);
+
+        js_p->error_code = GETATTR_NEED_DATAFILE_SIZES;
+        gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: acache hit, need sizes"
+                     "[%llu]\n", llu(object_ref.handle));
+        return 1;
+    }
+  
+    /* we missed */
+    /* clean out the attributes we got from the cache; this will be
+     * overwritten when we request updated information from the server
+     */
+    PINT_free_object_attr(&sm_p->getattr.attr);
+    gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: acache miss due to mask: "
+        " [%llu]\n",
+          llu(object_ref.handle));
 
     js_p->error_code = GETATTR_ACACHE_MISS;
     return 1;
@@ -776,69 +741,33 @@ static int getattr_datafile_getattr_cleanup(PINT_client_sm *sm_p,
 
 static int getattr_acache_insert(PINT_client_sm *sm_p,
                                  job_status_s *js_p)
-{
-    PVFS_object_attr *attr = NULL;
-    int release_required = 1;
-    PINT_pinode *pinode = PINT_acache_lookup(
-        sm_p->getattr.object_ref, NULL, NULL);
-    if (!pinode)
-    {
-        pinode = PINT_acache_pinode_alloc();
-        if(!pinode)
-        {
-            js_p->error_code = -PVFS_ENOMEM;
-            return 1;
-        }
+{   
+    PVFS_size* tmp_size = NULL;
 
-        release_required = 0;
-    }
-
-    attr = &sm_p->getattr.attr;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "trying to add object "
-                 "reference to acache (%s present)\n",
-                 (release_required ? "already" : "not"));
-    pinode->refn = sm_p->getattr.object_ref;
-
-    if (attr->objtype == PVFS_TYPE_METAFILE &&
+    /* see if we have a size value to cache */
+    if (sm_p->getattr.attr.objtype == PVFS_TYPE_METAFILE &&
         sm_p->getattr.req_attrmask & PVFS_ATTR_DATA_SIZE)
-    {
-        ;
+    {                                           
         /* compute size as requested */
-        PINT_dist *dist = NULL;
-        assert(attr->u.meta.dist);
-        dist = attr->u.meta.dist;
-
-        /* XXX - decode_PINT_dist calls PINT_dist_lookup, so there's
-         * no need to do it again.  -slang
-         *
-         * ret = PINT_dist_lookup(attr->u.meta.dist);
-         */
-        assert(dist->methods &&
-               dist->methods->logical_file_size);
+        assert(sm_p->getattr.attr.u.meta.dist);
+        assert(sm_p->getattr.attr.u.meta.dist->methods &&
+               sm_p->getattr.attr.u.meta.dist->methods->logical_file_size);
         
-        sm_p->getattr.size = (dist->methods->logical_file_size)(
-            dist->params, attr->u.meta.dfile_count,
+        sm_p->getattr.size =
+            (sm_p->getattr.attr.u.meta.dist->methods->logical_file_size)(
+            sm_p->getattr.attr.u.meta.dist->params,
+            sm_p->getattr.attr.u.meta.dfile_count,
             sm_p->getattr.size_array);
 
-        pinode->size = sm_p->getattr.size;
-
-        /*
-           update the attr mask in the src object so that
-           we properly copy out all required fields in the
-           deep copy below to the pinode object
-           */
-        sm_p->getattr.attr.mask |= PVFS_ATTR_DATA_SIZE;
+        tmp_size = &sm_p->getattr.size;
     }
 
-    PINT_copy_object_attr(&pinode->attr, &sm_p->getattr.attr);
+    PINT_acache_update(sm_p->getattr.object_ref,
+        &sm_p->getattr.attr,
+        tmp_size);
 
-    PINT_acache_set_valid(pinode);
-
-    if (release_required)
-    {
-        PINT_acache_release(pinode);
-    }
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "trying to add object "
+                 "reference to acache\n");
 
     return 1;
 }

@@ -17,7 +17,7 @@
 #include "pvfs2-kernel.h"
 #include "pvfs2-bufmap.h"
 
-#if !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_GENERIC_GETXATTR)
+#if !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
 
 #ifdef HAVE_POSIX_ACL_H
 #include <linux/posix_acl.h>
@@ -220,7 +220,7 @@ pvfs2_set_acl(struct inode *inode, int type, struct posix_acl *acl)
 {
     int error;
     void *value = NULL;
-    size_t size;
+    size_t size = 0;
     const char *name = NULL;
 
     /* We dont't allow this on a symbolic link */

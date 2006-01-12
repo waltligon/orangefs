@@ -161,6 +161,10 @@ static int mgmt_get_dfile_array_cleanup(
                attr->u.meta.dfile_array,
                (attr->u.meta.dfile_count * sizeof(PVFS_handle)));
     }
+    else
+    {
+        PINT_acache_invalidate(sm_p->object_ref);
+    }
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 

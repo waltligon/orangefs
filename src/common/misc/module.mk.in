@@ -12,7 +12,8 @@ LIBSRC += $(DIR)/server-config.c \
 	  $(DIR)/pint-cached-config.c \
 	  $(DIR)/msgpairarray.c \
 	  $(DIR)/pint-util.c \
-	  $(DIR)/realpath.c
+	  $(DIR)/realpath.c \
+	  $(DIR)/tcache.c
 SERVERSRC += $(DIR)/server-config.c \
              $(DIR)/server-config-mgr.c \
              $(DIR)/str-utils.c \

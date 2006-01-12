@@ -375,6 +375,8 @@ PVFS_error PVFS_sys_create(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_create entered\n");
 
+    gossip_debug_timing("CREATE_START\n");
+    
     ret = PVFS_isys_create(object_name, parent_ref, attr, credentials,
                            dist, resp, &op_id, NULL);
     if (ret)
@@ -391,6 +393,8 @@ PVFS_error PVFS_sys_create(
             error = ret;
         }
     }
+
+    gossip_debug_timing("CREATE_STOP\n");
 
     PINT_sys_release(op_id);
     return error;
@@ -500,13 +504,17 @@ static int create_setattr_comp_fn(void *v_p,
     PVFS_object_ref refn;
     PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
     gossip_debug(GOSSIP_CLIENT_DEBUG, "create_setattr_comp_fn\n");
+    PVFS_size tmp_size = 0;
 
     assert(resp_p->op == PVFS_SERV_SETATTR);
 
     refn.fs_id = sm_p->msgpair.fs_id;
     refn.handle = sm_p->msgpair.handle;
 
-    res = PINT_acache_insert(refn, &sm_p->msgpair.req.u.setattr.attr);
+    /* insert a cache entry, set size to 0 */
+    res = PINT_acache_update(refn, 
+        &sm_p->msgpair.req.u.setattr.attr,
+        &tmp_size);
     if(res != 0)
     {
         return res;
@@ -985,8 +993,6 @@ static int create_cleanup(PINT_client_sm *sm_p,
     else if ((PVFS_ERROR_CLASS(-sm_p->error_code) == PVFS_ERROR_BMI) &&
              (sm_p->u.create.retry_count < sm_p->msgarray_params.retry_limit))
     {
-        PINT_acache_invalidate(sm_p->object_ref);
-
         sm_p->u.create.stored_error_code = 0;
         sm_p->u.create.retry_count++;
 
@@ -995,6 +1001,10 @@ static int create_cleanup(PINT_client_sm *sm_p,
 
         js_p->error_code = CREATE_RETRY;
         return 1;
+    }
+    else
+    {
+        PINT_acache_invalidate(sm_p->object_ref);
     }
 
     if (sm_p->u.create.io_handle_extent_array)

@@ -138,6 +138,22 @@ typedef struct
 
 typedef struct
 {
+    int64_t value;
+} pvfs2_param_response_t;
+
+#define PERF_COUNT_BUF_SIZE 4096
+typedef struct
+{
+    /* NOTE: this seems large, but is in fact smaller than the readdir
+     * response structure, so the size of the union is unaffected by this
+     * particular response.  We should probably consider how to get these
+     * downcalls smaller in general so that they don't always span 2 pages
+     */
+    char buffer[PERF_COUNT_BUF_SIZE];
+} pvfs2_perf_count_response_t;
+
+typedef struct
+{
     int type;
     PVFS_error status;
 
@@ -163,6 +179,8 @@ typedef struct
 /*      pvfs2_removexattr_response_t removexattr; */
 /* 	pvfs2_cancel_response_t cancel; */
 /* 	pvfs2_fsync_response_t fsync; */
+        pvfs2_param_response_t param;
+        pvfs2_perf_count_response_t perf_count;
     } resp;
 } pvfs2_downcall_t;
 

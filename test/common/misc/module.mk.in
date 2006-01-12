@@ -2,4 +2,6 @@ DIR := common/misc
 
 TESTSRC += \
 	$(DIR)/test-event-parser.c \
-	$(DIR)/test-event-summary.c 
+	$(DIR)/test-event-summary.c \
+        $(DIR)/test-tcache.c \
+ 	$(DIR)/test-perf-counter.c

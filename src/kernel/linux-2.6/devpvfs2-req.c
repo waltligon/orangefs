@@ -24,6 +24,7 @@ extern struct file_system_type pvfs2_fs_type;
 extern struct semaphore devreq_semaphore;
 extern struct semaphore request_semaphore;
 extern int debug;
+extern int op_timeout_secs;
 
 /* defined in super.c */
 extern struct list_head pvfs2_superblocks;
@@ -346,7 +347,7 @@ static ssize_t pvfs2_devreq_writev(
                     if (!signal_pending(current))
                     {
                         int timeout = MSECS_TO_JIFFIES(
-                            1000 * MAX_SERVICE_WAIT_IN_SECONDS);
+                            1000 * op_timeout_secs);
                         if (!schedule_timeout(timeout))
                         {
                             pvfs2_print("*** I/O wait time is up\n");

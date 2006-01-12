@@ -58,11 +58,7 @@ static int dbpf_keyval_read(TROVE_coll_id coll_id,
                             TROVE_context_id context_id,
                             TROVE_op_id *out_op_id_p)
 {
-#ifndef PVFS2_DBPF_IMMEDIATE_COMPLETION
     dbpf_queued_op_t *q_op_p = NULL;
-#else
-    struct dbpf_op op; 
-#endif
     struct dbpf_collection *coll_p = NULL;
     dbpf_attr_cache_elem_t *cache_elem = NULL;
     TROVE_object_ref ref = {handle, coll_id};
@@ -95,7 +91,6 @@ static int dbpf_keyval_read(TROVE_coll_id coll_id,
         return -TROVE_EINVAL;
     }
 
-#ifndef PVFS2_DBPF_IMMEDIATE_COMPLETION
     /* grab a queued op structure */
     q_op_p = dbpf_queued_op_alloc();
     if (q_op_p == NULL)
@@ -120,19 +115,6 @@ static int dbpf_keyval_read(TROVE_coll_id coll_id,
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
 
     return 0;
-#else
-    DBPF_OP_INIT(op,
-                 KEYVAL_READ,
-                 OP_QUEUED,
-                 handle,
-                 coll_p,
-                 dbpf_keyval_read_op_svc,
-                 user_ptr,
-                 flags,
-                 context_id,
-                 0);
-    return dbpf_keyval_read_op_svc(&op);
-#endif
 }
 
 static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
@@ -229,11 +211,7 @@ static int dbpf_keyval_write(TROVE_coll_id coll_id,
                              TROVE_context_id context_id,
                              TROVE_op_id *out_op_id_p)
 {
-#ifndef PVFS2_DBPF_IMMEDIATE_COMPLETION
     dbpf_queued_op_t *q_op_p = NULL;
-#else
-    struct dbpf_op op;
-#endif;
     struct dbpf_collection *coll_p = NULL;
 
     coll_p = dbpf_collection_find_registered(coll_id);
@@ -241,8 +219,6 @@ static int dbpf_keyval_write(TROVE_coll_id coll_id,
     {
         return -TROVE_EINVAL;
     }
-
-#ifndef PVFS2_DBPF_IMMEDIATE_COMPLETION
     q_op_p = dbpf_queued_op_alloc();
     if (q_op_p == NULL)
     {
@@ -266,19 +242,6 @@ static int dbpf_keyval_write(TROVE_coll_id coll_id,
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
         
     return 0;
-#else
-    DBPF_OP_INIT(op,
-                 KEYVAL_WRITE,
-                 OP_QUEUED,
-                 handle,
-                 coll_p,
-                 dbpf_keyval_write_op_svc,
-                 user_ptr,
-                 flags,
-                 context_id,
-                 0);
-    return dbpf_keyval_write_op_svc(&op);
-#endif
 }
 
 static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
@@ -441,11 +404,7 @@ static int dbpf_keyval_remove(TROVE_coll_id coll_id,
                               TROVE_context_id context_id,
                               TROVE_op_id *out_op_id_p)
 {
-#ifndef PVFS2_DBPF_IMMEDIATE_COMPLETION
     dbpf_queued_op_t *q_op_p = NULL;
-#else
-    struct dbpf_op op;
-#endif
     struct dbpf_collection *coll_p = NULL;
 
     coll_p = dbpf_collection_find_registered(coll_id);
@@ -453,8 +412,6 @@ static int dbpf_keyval_remove(TROVE_coll_id coll_id,
     {
         return -TROVE_EINVAL;
     }
-
-#ifndef PVFS2_DBPF_IMMEDIATE_COMPLETION
     q_op_p = dbpf_queued_op_alloc();
     if (q_op_p == NULL)
     {
@@ -477,19 +434,6 @@ static int dbpf_keyval_remove(TROVE_coll_id coll_id,
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
         
     return 0;
-#else
-    DBPF_OP_INIT(op,
-                 KEYVAL_REMOVE_KEY,
-                 OP_QUEUED,
-                 handle,
-                 coll_p,
-                 svc_fn,
-                 user_ptr,
-                 flags,
-                 context_id,
-                 0);
-    return dbpf_keyval_remove_op_svc(&op);
-#endif
 }
 
 static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p)
@@ -1105,11 +1049,7 @@ static int dbpf_keyval_read_list(TROVE_coll_id coll_id,
                                  TROVE_context_id context_id,
                                  TROVE_op_id *out_op_id_p)
 {
-#ifndef PVFS2_DBPF_IMMEDIATE_COMPLETION
     dbpf_queued_op_t *q_op_p = NULL;
-#else
-    struct dbpf_op op;
-#endif
     struct dbpf_collection *coll_p = NULL;
 
     coll_p = dbpf_collection_find_registered(coll_id);
@@ -1117,8 +1057,6 @@ static int dbpf_keyval_read_list(TROVE_coll_id coll_id,
     {
         return -TROVE_EINVAL;
     }
-
-#ifndef PVFS2_DBPF_IMMEDIATE_COMPLETION
     q_op_p = dbpf_queued_op_alloc();
     if (q_op_p == NULL)
     {
@@ -1143,18 +1081,6 @@ static int dbpf_keyval_read_list(TROVE_coll_id coll_id,
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
 
     return 0;
-#else
-    DBPF_OP_INIT(op,
-                 KEYVAL_READ_LIST,
-                 handle,
-                 coll_p,
-                 dbpf_keyval_read_list_op_svc,
-                 user_ptr,
-                 flags,
-                 context_id,
-                 0);
-    return dbpf_keyval_read_list_op_svc(&op);
-#endif
 }
 
 static int dbpf_keyval_read_list_op_svc(struct dbpf_op *op_p)
@@ -1218,11 +1144,7 @@ static int dbpf_keyval_write_list(TROVE_coll_id coll_id,
                                   TROVE_context_id context_id,
                                   TROVE_op_id *out_op_id_p)
 {
-#ifndef PVFS2_DBPF_IMMEDIATE_COMPLETION
     dbpf_queued_op_t *q_op_p = NULL;
-#else
-    struct dbpf_op op;
-#endif
     struct dbpf_collection *coll_p = NULL;
 
     coll_p = dbpf_collection_find_registered(coll_id);
@@ -1230,8 +1152,6 @@ static int dbpf_keyval_write_list(TROVE_coll_id coll_id,
     {
         return -TROVE_EINVAL;
     }
-
-#ifndef PVFS2_DBPF_IMMEDIATE_COMPLETION 
     q_op_p = dbpf_queued_op_alloc();
     if (q_op_p == NULL)
     {
@@ -1256,18 +1176,6 @@ static int dbpf_keyval_write_list(TROVE_coll_id coll_id,
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
 
     return 0;
-#else
-    DBPF_OP_INIT(op,
-                 KEYVAL_WRITE_LIST,
-                 handle,
-                 coll_p,
-                 dbpf_keyval_write_list_op_svc,
-                 user_ptr,
-                 flags,
-                 context_id,
-                 0);
-    return dbpf_keyval_write_list_op_svc(&op);
-#endif
 }
 
 static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
@@ -1419,11 +1327,7 @@ static int dbpf_keyval_flush(TROVE_coll_id coll_id,
                              TROVE_context_id context_id,
                              TROVE_op_id *out_op_id_p)
 {
-#ifndef PVFS2_DBPF_IMMEDIATE_COMPLETION
     dbpf_queued_op_t *q_op_p = NULL;
-#else
-    struct dbpf_op op;
-#endif 
     struct dbpf_collection *coll_p = NULL;
     
     coll_p = dbpf_collection_find_registered(coll_id);
@@ -1431,8 +1335,6 @@ static int dbpf_keyval_flush(TROVE_coll_id coll_id,
     {
         return -TROVE_EINVAL;
     }
-
-#ifndef PVFS2_DBPF_IMMEDIATE_COMPLETION
     q_op_p = dbpf_queued_op_alloc();
     if (q_op_p == NULL)
     {
@@ -1452,18 +1354,6 @@ static int dbpf_keyval_flush(TROVE_coll_id coll_id,
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
 
     return 0;
-#else
-    DBPF_OP_INIT(op,
-                 KEYVAL_FLUSH,
-                 handle,
-                 coll_p,
-                 dbpf_keyval_flush_op_svc,
-                 user_ptr,
-                 flags,
-                 context_id,
-                 0);
-    return dbpf_keyval_flush_op_svc(&op);
-#endif
 }
 
 static int dbpf_keyval_flush_op_svc(struct dbpf_op *op_p)

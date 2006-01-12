@@ -16,6 +16,9 @@
 /* Define if we are enabling VFS AIO support in kernel */
 #undef HAVE_AIO_VFS_SUPPORT
 
+/* Define if read_descriptor_t has an arg member */
+#undef HAVE_ARG_IN_READ_DESCRIPTOR_T
+
 /* Define to 1 if you have the <arpa/inet.h> header file. */
 #undef HAVE_ARPA_INET_H
 
@@ -61,6 +64,13 @@
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
 
+/* Define if sceond argument to releasepage in address_space_operations is
+   type int */
+#undef HAVE_INT_ARG2_ADDRESS_SPACE_OPERATIONS_RELEASEPAGE
+
+/* Define if return value from follow_link in inode_operations is type int */
+#undef HAVE_INT_RETURN_INODE_OPERATIONS_FOLLOW_LINK
+
 /* Define if kernel has i_size_read */
 #undef HAVE_I_SIZE_READ
 
@@ -99,6 +109,9 @@
 
 /* Define if kernel has parent_ino */
 #undef HAVE_PARENT_INO
+
+/* Define if sysctl proc handlers have 6th argument */
+#undef HAVE_PROC_HANDLER_SIX_ARG
 
 /* Define to 1 if you have the <SDL/SDL_ttf.h> header file. */
 #undef HAVE_SDL_SDL_TTF_H

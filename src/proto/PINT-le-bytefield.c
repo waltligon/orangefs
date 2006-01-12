@@ -569,7 +569,8 @@ static int lebf_decode_req(
 
     if (ptr != ((char *)input_buffer + input_size))
     {
-	gossip_lerr("%s: improper input buffer size", __func__);
+	gossip_lerr("%s: improper input buffer size: %p != %p + %d\n",
+                    __func__, ptr, input_buffer, input_size);
 	ret = -PVFS_EPROTO;
         assert(0);
     }

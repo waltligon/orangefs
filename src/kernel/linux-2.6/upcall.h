@@ -148,6 +148,39 @@ typedef struct
     PVFS_object_ref refn;
 } pvfs2_fsync_request_t;
 
+enum pvfs2_param_request_type
+{   
+    PVFS2_PARAM_REQUEST_SET = 1,
+    PVFS2_PARAM_REQUEST_GET = 2
+};  
+    
+enum pvfs2_param_request_op
+{   
+    PVFS2_PARAM_REQUEST_OP_ACACHE_TIMEOUT_MSECS = 1,
+    PVFS2_PARAM_REQUEST_OP_ACACHE_HARD_LIMIT = 2,
+    PVFS2_PARAM_REQUEST_OP_ACACHE_SOFT_LIMIT = 3,
+    PVFS2_PARAM_REQUEST_OP_ACACHE_RECLAIM_PERCENTAGE = 4,
+    PVFS2_PARAM_REQUEST_OP_PERF_TIME_INTERVAL_SECS = 5,
+    PVFS2_PARAM_REQUEST_OP_PERF_HISTORY_SIZE = 6,
+    PVFS2_PARAM_REQUEST_OP_PERF_RESET = 7
+};  
+    
+typedef struct
+{
+    enum pvfs2_param_request_type type;
+    enum pvfs2_param_request_op op;
+    int64_t value;
+} pvfs2_param_request_t;
+
+enum pvfs2_perf_count_request_type
+{
+    PVFS2_PERF_COUNT_REQUEST_ACACHE = 1,
+};
+typedef struct
+{
+    enum pvfs2_perf_count_request_type type;
+} pvfs2_perf_count_request_t;
+
 typedef struct
 {
     int type;
@@ -176,6 +209,8 @@ typedef struct
         pvfs2_removexattr_request_t removexattr;
         pvfs2_op_cancel_t cancel;
         pvfs2_fsync_request_t fsync;
+        pvfs2_param_request_t param;
+        pvfs2_perf_count_request_t perf_count;
     } req;
 } pvfs2_upcall_t;
 

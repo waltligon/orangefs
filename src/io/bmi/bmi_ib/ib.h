@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.h,v 1.9 2005-11-03 21:23:19 pw Exp $
+ * $Id: ib.h,v 1.9.6.1 2006-01-12 19:43:13 slang Exp $
  */
 #ifndef __ib_h
 #define __ib_h
@@ -291,7 +291,7 @@ typedef struct {
  */
 extern void ib_close_connection(ib_connection_t *c);
 extern void close_connection_drain_qp(VAPI_qp_hndl_t qp);
-extern void ib_tcp_client_connect(ib_method_addr_t *ibmap,
+extern int ib_tcp_client_connect(ib_method_addr_t *ibmap,
   struct method_addr *remote_map);
 extern int ib_tcp_server_check_new_connections(void);
 extern int ib_tcp_server_block_new_connections(int timeout_ms);

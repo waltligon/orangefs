@@ -172,7 +172,6 @@ int PVFS_sys_initialize(uint64_t default_debug_mask)
         gossip_lerr("Error initializing attribute cache\n");
         goto error_exit;        
     }
-    PINT_acache_set_timeout(PINT_ACACHE_TIMEOUT_MS);
     client_status_flag |= CLIENT_ACACHE_INIT;
 
     /* initialize the name lookup cache and set the default timeout */

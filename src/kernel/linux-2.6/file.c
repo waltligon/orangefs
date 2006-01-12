@@ -21,6 +21,7 @@ extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
 extern wait_queue_head_t pvfs2_request_list_waitq;
 extern int debug;
+extern int op_timeout_secs;
 
 extern struct address_space_operations pvfs2_address_operations;
 extern struct backing_dev_info pvfs2_backing_dev_info;
@@ -255,9 +256,10 @@ ssize_t pvfs2_file_read(
     size_t count,
     loff_t *offset)
 {
-    pvfs2_print("pvfs2_file_read: called on %s\n",
+    pvfs2_print("pvfs2_file_read: called on %s [off %lu size %lu]\n",
                 (file && file->f_dentry && file->f_dentry->d_name.name ?
-                 (char *)file->f_dentry->d_name.name : "UNKNOWN"));
+                 (char *)file->f_dentry->d_name.name : "UNKNOWN"),
+                (unsigned long) *offset, (unsigned long) count);
 
     return pvfs2_inode_read(
         file->f_dentry->d_inode, buf, count, offset, 1, 0);
@@ -283,13 +285,20 @@ static ssize_t pvfs2_file_write(
     size_t amt_complete = 0;
     int dc_status;
 
-    pvfs2_print("pvfs2_file_write: called on %s\n",
+    pvfs2_print("pvfs2_file_write: called on %s [f_pos %ld off %ld size %ld]\n",
                 (file && file->f_dentry && file->f_dentry->d_name.name ?
-                 (char *)file->f_dentry->d_name.name : "UNKNOWN"));
+                 (char *)file->f_dentry->d_name.name : "UNKNOWN"),
+                (unsigned long) file->f_pos,
+                (unsigned long) *offset, (unsigned long) count);
 
     if (!access_ok(VERIFY_READ, buf, count))
         return -EFAULT;
 
+    if(file->f_pos > i_size_read(inode))
+    {
+        i_size_write(inode, file->f_pos);
+    }
+    
     /* perform generic linux kernel tests for sanity of write arguments */
     /* NOTE: this is particularly helpful in handling fsize rlimit properly */
 #ifdef PVFS2_LINUX_KERNEL_2_4
@@ -302,15 +311,9 @@ static ssize_t pvfs2_file_write(
         pvfs2_print("pvfs2_file_write: failed generic argument checks.\n");
         return(ret);
     }
-    /* for whatever reason, count is being set to inode->i_size in
-     * generic_write_checks with O_APPEND opens.  So if we want that to work,
-     * we would have to do a getattr for the size which is ridiculous.
-     * So we work that around here...
-     */
-    if (*offset != file->f_pos)
-    {
-        *offset = file->f_pos;
-    }
+
+    pvfs2_print("pvfs2_file_write: proceeding with offset : %ld, size %ld\n",
+                (unsigned long) *offset, (unsigned long) count);
 
     while(total_count < count)
     {
@@ -1272,7 +1275,7 @@ pvfs2_aio_cancel(struct kiocb *iocb, struct io_event *event)
                 spin_unlock(&op->lock);
                 if (!signal_pending(current))
                 {
-                    int timeout = MSECS_TO_JIFFIES(1000 * MAX_SERVICE_WAIT_IN_SECONDS);
+                    int timeout = MSECS_TO_JIFFIES(1000 * op_timeout_secs);
                     if (!schedule_timeout(timeout))
                     {
                         pvfs2_print("Timed out on I/O cancellation - aborting\n");
@@ -2196,9 +2199,14 @@ static ssize_t pvfs2_sendfile(struct file *filp, loff_t *ppos,
 {
     int error;
     read_descriptor_t desc;
+
     desc.written = 0;
     desc.count = count;
+#ifdef HAVE_ARG_IN_READ_DESCRIPTOR_T
     desc.arg.data = target;
+#else
+    desc.buf = target;
+#endif
     desc.error = 0;
 
     /*

@@ -9,6 +9,7 @@
 #ifndef __PINT_UTIL_H
 #define __PINT_UTIL_H
 
+#include "pvfs2-config.h"
 #include "pvfs2-types.h"
 #include "pvfs2-attr.h"
 

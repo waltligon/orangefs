@@ -26,6 +26,7 @@
 #include "pvfs2-sysint.h"
 #include "server-config-mgr.h"
 #include "client-state-machine.h"
+#include "pint-perf-counter.h"
 
 #ifdef USE_MMAP_RA_CACHE
 #include "mmap-ra-cache.h"
@@ -84,6 +85,15 @@ typedef struct
     /* client side attribute cache timeout; 0 is effectively disabled */
     int acache_timeout;
     char* logfile;
+    unsigned int acache_hard_limit;
+    int acache_hard_limit_set;
+    unsigned int acache_soft_limit;
+    int acache_soft_limit_set;
+    unsigned int acache_reclaim_percentage;
+    int acache_reclaim_percentage_set;
+    unsigned int perf_time_interval_secs;
+    unsigned int perf_history_size;
+    char* gossip_mask;
 } options_t;
 
 /*
@@ -155,6 +165,8 @@ static job_context_id s_client_dev_context;
 static int s_client_is_processing = 1;
 static struct PVFS_dev_map_desc s_io_desc;
 
+static struct PINT_perf_counter* acache_pc = NULL;
+
 /* used only for deleting all allocated vfs_request objects */
 vfs_request_t *s_vfs_request_array[MAX_NUM_OPS] = {NULL};
 
@@ -168,6 +180,7 @@ static void parse_args(int argc, char **argv, options_t *opts);
 static void print_help(char *progname);
 static void reset_acache_timeout(void);
 static char *get_vfs_op_name_str(int op_type);
+static int set_acache_parameters(options_t* s_opts);
 
 static PVFS_object_ref perform_lookup_on_create_error(
     PVFS_object_ref parent,
@@ -1101,6 +1114,151 @@ static PVFS_error service_fs_umount_request(vfs_request_t *vfs_request)
     return 0;
 }
 
+static PVFS_error service_perf_count_request(vfs_request_t *vfs_request)
+{
+    char* tmp_str;
+    PVFS_error ret = -PVFS_EINVAL;
+
+    gossip_debug(
+        GOSSIP_CLIENTCORE_DEBUG, "Got a perf count request of type %d\n",
+        vfs_request->in_upcall.req.perf_count.type);
+
+    vfs_request->out_downcall.type = vfs_request->in_upcall.type;
+
+    switch(vfs_request->in_upcall.req.perf_count.type)
+    {
+        case PVFS2_PERF_COUNT_REQUEST_ACACHE:
+            tmp_str = PINT_perf_generate_text(acache_pc,
+                PERF_COUNT_BUF_SIZE);
+            if(!tmp_str)
+            {
+                vfs_request->out_downcall.status = -PVFS_EINVAL;
+            }
+            else
+            {
+                memcpy(vfs_request->out_downcall.resp.perf_count.buffer,
+                    tmp_str, PERF_COUNT_BUF_SIZE);
+                free(tmp_str);
+                vfs_request->out_downcall.status = 0;
+            }
+            break;
+
+        default:
+            /* unsupported request, didn't match anything in case statement */
+            vfs_request->out_downcall.status = -PVFS_ENOSYS;
+            write_inlined_device_response(vfs_request);
+            return 0;
+            break;
+    }
+
+    write_inlined_device_response(vfs_request);
+    return 0;
+}
+
+
+static PVFS_error service_param_request(vfs_request_t *vfs_request)
+{
+    PVFS_error ret = -PVFS_EINVAL;
+    unsigned int val;
+    int tmp_param = -1;
+    unsigned int tmp_perf_val;
+
+    gossip_debug(
+        GOSSIP_CLIENTCORE_DEBUG, "Got a param request for op %d\n",
+        vfs_request->in_upcall.req.param.op);
+
+    vfs_request->out_downcall.type = vfs_request->in_upcall.type;
+
+    switch(vfs_request->in_upcall.req.param.op)
+    {
+        case PVFS2_PARAM_REQUEST_OP_ACACHE_TIMEOUT_MSECS:
+            tmp_param = ACACHE_TIMEOUT_MSECS;
+            break;
+        case PVFS2_PARAM_REQUEST_OP_ACACHE_HARD_LIMIT:
+            tmp_param = ACACHE_HARD_LIMIT;
+            break;
+        case PVFS2_PARAM_REQUEST_OP_ACACHE_SOFT_LIMIT:
+            tmp_param = ACACHE_SOFT_LIMIT;
+            break;
+        case PVFS2_PARAM_REQUEST_OP_ACACHE_RECLAIM_PERCENTAGE:
+            tmp_param = ACACHE_RECLAIM_PERCENTAGE;
+        case PVFS2_PARAM_REQUEST_OP_PERF_TIME_INTERVAL_SECS:
+            if(vfs_request->in_upcall.req.param.type ==
+                PVFS2_PARAM_REQUEST_GET)
+            {
+                vfs_request->out_downcall.resp.param.value =
+                    s_opts.perf_time_interval_secs;
+            }
+            else
+            {
+                s_opts.perf_time_interval_secs = 
+                    vfs_request->in_upcall.req.param.value;
+            }    
+            vfs_request->out_downcall.status = 0;
+            write_inlined_device_response(vfs_request);
+            return(0);
+            break;
+        case PVFS2_PARAM_REQUEST_OP_PERF_HISTORY_SIZE:
+            if(vfs_request->in_upcall.req.param.type ==
+                PVFS2_PARAM_REQUEST_GET)
+            {
+                ret = PINT_perf_get_info(
+                    acache_pc, PINT_PERF_HISTORY_SIZE, &tmp_perf_val);
+                vfs_request->out_downcall.resp.param.value = tmp_perf_val;
+            }
+            else
+            {
+                tmp_perf_val = vfs_request->in_upcall.req.param.value;
+                ret = PINT_perf_set_info(
+                    acache_pc, PINT_PERF_HISTORY_SIZE, tmp_perf_val);
+            }    
+            vfs_request->out_downcall.status = ret;
+            write_inlined_device_response(vfs_request);
+            return(0);
+            break;
+        case PVFS2_PARAM_REQUEST_OP_PERF_RESET:
+            if(vfs_request->in_upcall.req.param.type ==
+                PVFS2_PARAM_REQUEST_SET)
+            {
+                PINT_perf_reset(acache_pc);
+            }    
+            vfs_request->out_downcall.resp.param.value = 0;
+            vfs_request->out_downcall.status = 0;
+            write_inlined_device_response(vfs_request);
+            return(0);
+            break;
+
+    }
+
+    if(tmp_param == -1)
+    {
+        /* unsupported request, didn't match anything in case statement */
+        vfs_request->out_downcall.status = -PVFS_ENOSYS;
+        write_inlined_device_response(vfs_request);
+        return 0;
+    }
+
+    /* get or set acache parameters */
+    if(vfs_request->in_upcall.req.param.type ==
+        PVFS2_PARAM_REQUEST_GET)
+    {
+        vfs_request->out_downcall.status = 
+            PINT_acache_get_info(tmp_param, &val);
+        vfs_request->out_downcall.resp.param.value = val;
+    }
+    else
+    {
+        val = vfs_request->in_upcall.req.param.value;
+        vfs_request->out_downcall.resp.param.value = 0;
+        vfs_request->out_downcall.status = 
+            PINT_acache_set_info(tmp_param, val);
+    }
+
+    write_inlined_device_response(vfs_request);
+    return 0;
+}
+
+
 static PVFS_error service_statfs_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
@@ -1294,6 +1452,10 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
     }
 #endif /* USE_MMAP_RA_CACHE */
 
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "%s: off %ld size %ld\n",
+            vfs_request->in_upcall.req.io.io_type == PVFS_IO_READ ? "read" : "write",
+            (unsigned long) vfs_request->in_upcall.req.io.offset,
+            (unsigned long) vfs_request->in_upcall.req.io.count);
     ret = PVFS_Request_contiguous(
         (int32_t)vfs_request->in_upcall.req.io.count,
         PVFS_BYTE, &vfs_request->mem_req);
@@ -2089,6 +2251,12 @@ static inline PVFS_error handle_unexp_vfs_request(
         case PVFS2_VFS_OP_STATFS:
             ret = service_statfs_request(vfs_request);
             break;
+        case PVFS2_VFS_OP_PERF_COUNT:
+            ret = service_perf_count_request(vfs_request);
+            break;
+        case PVFS2_VFS_OP_PARAM:
+            ret = service_param_request(vfs_request);
+            break;
             /*
               if the mmap-readahead-cache is enabled and we
               get a cache hit for data, the io call is
@@ -2353,6 +2521,8 @@ int main(int argc, char **argv)
     int ret = 0, i = 0;
     time_t start_time;
     struct tm *local_time = NULL;
+    uint64_t debug_mask = GOSSIP_NO_DEBUG;
+    PINT_client_sm *acache_timer_sm_p = NULL;
 
 #ifndef STANDALONE_RUN_MODE
     struct rlimit lim = {0,0};
@@ -2375,6 +2545,12 @@ int main(int argc, char **argv)
     memset(&s_opts, 0, sizeof(options_t));
     parse_args(argc, argv, &s_opts);
 
+    /* convert gossip mask if provided on command line */
+    if(s_opts.gossip_mask)
+    {
+        debug_mask = PVFS_debug_eventlog_to_mask(s_opts.gossip_mask);
+    }
+
     /*
       initialize pvfs system interface
 
@@ -2389,7 +2565,7 @@ int main(int argc, char **argv)
       (re)configure the acache at that time since it's based on the
       dynamic server configurations)
     */
-    ret = PVFS_sys_initialize(GOSSIP_NO_DEBUG);
+    ret = PVFS_sys_initialize(debug_mask);
     if (ret < 0)
     {
         return ret;
@@ -2423,7 +2599,45 @@ int main(int argc, char **argv)
     pvfs2_mmap_ra_cache_initialize();
 #endif
 
-    PINT_acache_set_timeout(s_opts.acache_timeout);
+    ret = set_acache_parameters(&s_opts);
+    if(ret < 0)
+    {
+        PVFS_perror("set_acache_parameters", ret);
+        return(ret);
+    }
+
+    /* start performance counters for acache */
+    acache_pc = PINT_perf_initialize(acache_keys);
+    if(!acache_pc)
+    {
+        fprintf(stderr, "Error: PINT_perf_initialize failure.\n");
+        return(-PVFS_ENOMEM);
+    }
+    ret = PINT_perf_set_info(acache_pc, PINT_PERF_HISTORY_SIZE,
+        s_opts.perf_history_size);
+    if(ret < 0)
+    {
+        fprintf(stderr, "Error: PINT_perf_set_info (history_size).\n");
+        return(ret);
+    }
+    PINT_acache_enable_perf_counter(acache_pc);
+
+    /* start a timer to roll over performance counters (acache) */
+    acache_timer_sm_p = (PINT_client_sm *)malloc(sizeof(PINT_client_sm));
+    if(!acache_timer_sm_p)
+    {
+	return(-PVFS_ENOMEM);
+    }
+    memset(acache_timer_sm_p, 0, sizeof(*acache_timer_sm_p));
+    acache_timer_sm_p->u.perf_count_timer.interval_secs = 
+        &s_opts.perf_time_interval_secs;
+    acache_timer_sm_p->u.perf_count_timer.pc = acache_pc;
+    ret = PINT_client_state_machine_post(
+        acache_timer_sm_p, PVFS_CLIENT_PERF_COUNT_TIMER, NULL, NULL);
+    if (ret < 0)
+    {
+        return(ret);
+    }
 
     ret = initialize_ops_in_progress_table();
     if (ret)
@@ -2522,6 +2736,12 @@ static void print_help(char *progname)
     printf("-h, --help                    display this help and exit\n");
     printf("-a MS, --acache-timeout=MS    acache timeout in ms "
            "(default is 0 ms)\n");
+    printf("--acache-soft-limit=LIMIT     acache soft limit\n");
+    printf("--acache-hard-limit=LIMIT     acache hard limit\n");
+    printf("--acache-reclaim-percentage=LIMIT acache reclaim percentage\n");
+    printf("--perf-time-interval-secs=SECONDS length of perf counter intervals\n");
+    printf("--perf-history-size=VALUE     number of perf counter intervals to maintain\n");
+    printf("--gossip-mask=MASK_LIST       gossip logging mask\n");
  }
 
 static void parse_args(int argc, char **argv, options_t *opts)
@@ -2532,11 +2752,19 @@ static void parse_args(int argc, char **argv, options_t *opts)
     {
         {"help",0,0,0},
         {"acache-timeout",1,0,0},
+        {"acache-reclaim-percentage",1,0,0},
+        {"perf-time-interval-secs",1,0,0},
+        {"perf-history-size",1,0,0},
+        {"gossip-mask",1,0,0},
+        {"acache-hard-limit",1,0,0},
+        {"acache-soft-limit",1,0,0},
         {"logfile",1,0,0},
         {0,0,0,0}
     };
 
     assert(opts);
+    opts->perf_time_interval_secs = PERF_DEFAULT_TIME_INTERVAL_SECS;
+    opts->perf_history_size = PERF_DEFAULT_HISTORY_SIZE;
 
     while((ret = getopt_long(argc, argv, "ha:L:",
                              long_opts, &option_index)) != -1)
@@ -2558,6 +2786,60 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 {
                     goto do_logfile;
                 }
+                else if (strcmp("acache-hard-limit", cur_option) == 0)
+                {
+                    ret = sscanf(optarg, "%u", &opts->acache_hard_limit);
+                    if(ret != 1)
+                    {
+                        fprintf(stderr, "Error: invalid acache-hard-limit value.\n");
+                        exit(EXIT_FAILURE);
+                    }
+                    opts->acache_hard_limit_set = 1;
+                }
+                else if (strcmp("acache-soft-limit", cur_option) == 0)
+                {
+                    ret = sscanf(optarg, "%u", &opts->acache_soft_limit);
+                    if(ret != 1)
+                    {
+                        fprintf(stderr, "Error: invalid acache-soft-limit value.\n");
+                        exit(EXIT_FAILURE);
+                    }
+                    opts->acache_soft_limit_set = 1;
+                }
+                else if (strcmp("acache-reclaim-percentage", cur_option) == 0)
+                {
+                    ret = sscanf(optarg, "%u", &opts->acache_reclaim_percentage);
+                    if(ret != 1)
+                    {
+                        fprintf(stderr, "Error: invalid acache-reclaim-percentage value.\n");
+                        exit(EXIT_FAILURE);
+                    }
+                    opts->acache_reclaim_percentage_set = 1;
+                }
+                else if (strcmp("perf-time-interval-secs", cur_option) == 0)
+                {
+                    ret = sscanf(optarg, "%u",
+                        &opts->perf_time_interval_secs);
+                    if(ret != 1)
+                    {
+                        fprintf(stderr, "Error: invalid perf-time-interval-secs value.\n");
+                        exit(EXIT_FAILURE);
+                    }
+                }
+                else if (strcmp("perf-history-size", cur_option) == 0)
+                {
+                    ret = sscanf(optarg, "%u",
+                        &opts->perf_history_size);
+                    if(ret != 1)
+                    {
+                        fprintf(stderr, "Error: invalid perf-history-size value.\n");
+                        exit(EXIT_FAILURE);
+                    }
+                }
+                else if (strcmp("gossip-mask", cur_option) == 0)
+                {
+                    opts->gossip_mask = optarg;
+                }
                 break;
             case 'h':
           do_help:
@@ -2572,7 +2854,7 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 opts->acache_timeout = atoi(optarg);
                 if (opts->acache_timeout < 0)
                 {
-                    gossip_err("Invalid acache timeout value of %d ms,"
+                    fprintf(stderr, "Invalid acache timeout value of %d ms,"
                                "disabling the acache.\n",
                                opts->acache_timeout);
                     opts->acache_timeout = 0;
@@ -2620,8 +2902,10 @@ static void reset_acache_timeout(void)
                 " milliseconds\n (based on new dynamic configuration "
                 "handle recycle time value)\n", max_acache_timeout_ms);
 
-            PINT_acache_set_timeout(max_acache_timeout_ms);
-            PINT_acache_reinitialize();
+            PINT_acache_finalize();
+            PINT_acache_initialize();
+            s_opts.acache_timeout = max_acache_timeout_ms;
+            set_acache_parameters(&s_opts);
         }
     }
     else
@@ -2663,6 +2947,7 @@ static char *get_vfs_op_name_str(int op_type)
         { PVFS2_VFS_OP_REMOVEXATTR, "PVFS2_VFS_OP_REMOVEXATTR" },
         { PVFS2_VFS_OP_CANCEL, "PVFS2_VFS_OP_CANCEL" },
         { PVFS2_VFS_OP_FSYNC,  "PVFS2_VFS_OP_FSYNC" },
+        { PVFS2_VFS_OP_PARAM,  "PVFS2_VFS_OP_PARAM" },
         { 0, "UNKNOWN" }
     };
 
@@ -2676,6 +2961,53 @@ static char *get_vfs_op_name_str(int op_type)
         }
     }
     return vfs_op_info[limit-1].type_str;
+}
+
+static int set_acache_parameters(options_t* s_opts)
+{
+    int ret = -1;
+
+    /* pass along acache settings if they were specified on command line */
+    if(s_opts->acache_reclaim_percentage_set)
+    {
+        ret = PINT_acache_set_info(ACACHE_RECLAIM_PERCENTAGE, 
+            s_opts->acache_reclaim_percentage);
+        if(ret < 0)
+        {
+            PVFS_perror_gossip("PINT_acache_set_info (reclaim-percentage)", ret);
+            return(ret);
+        }
+    }
+    if(s_opts->acache_hard_limit_set)
+    {
+        ret = PINT_acache_set_info(ACACHE_HARD_LIMIT, 
+            s_opts->acache_hard_limit);
+        if(ret < 0)
+        {
+            PVFS_perror_gossip("PINT_acache_set_info (hard-limit)", ret);
+            return(ret);
+        }
+    }
+    if(s_opts->acache_soft_limit_set)
+    {
+        ret = PINT_acache_set_info(ACACHE_SOFT_LIMIT, 
+            s_opts->acache_soft_limit);
+        if(ret < 0)
+        {
+            PVFS_perror_gossip("PINT_acache_set_info (soft-limit)", ret);
+            return(ret);
+        }
+    }
+
+    /* for timeout we always take the command line argument value */
+    ret = PINT_acache_set_info(ACACHE_TIMEOUT_MSECS, s_opts->acache_timeout);
+    if(ret < 0)
+    {
+        PVFS_perror_gossip("PINT_acache_set_info (timout-msecs)", ret);
+        return(ret);
+    }
+
+    return(0);
 }
 
 /*

@@ -17,7 +17,7 @@
 
 #include <linux/xattr.h>
 
-#if !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_GENERIC_GETXATTR)
+#if !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
 
 /*
  * NOTES from fs/xattr.c

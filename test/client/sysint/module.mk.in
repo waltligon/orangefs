@@ -4,7 +4,6 @@ TESTSRC += \
 	$(DIR)/client.c\
 	$(DIR)/lookup.c\
 	$(DIR)/ncache-torture.c\
-	$(DIR)/acache-torture.c\
 	$(DIR)/get-info.c\
 	$(DIR)/set-info.c\
 	$(DIR)/mkdir.c\
@@ -35,5 +34,6 @@ TESTSRC += \
 	$(DIR)/set-eattr.c \
 	$(DIR)/get-eattr.c \
 	$(DIR)/del-eattr.c \
-	$(DIR)/list-eattr.c
+	$(DIR)/list-eattr.c \
+	$(DIR)/test-accesses.c
 

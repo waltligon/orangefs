@@ -11,6 +11,7 @@
 #define PAGES_PER_DESC (PVFS2_BUFMAP_DEFAULT_DESC_SIZE/PAGE_SIZE)
 
 extern int debug;
+extern int op_timeout_secs;
 static int bufmap_init = 0;
 
 static struct page **bufmap_page_array = NULL;
@@ -234,7 +235,7 @@ int pvfs_bufmap_get(int *buffer_index)
         if (!signal_pending(current))
         {
             int timeout = MSECS_TO_JIFFIES(
-                1000 * MAX_SERVICE_WAIT_IN_SECONDS);
+                1000 * op_timeout_secs);
             if (!schedule_timeout(timeout))
             {
                 pvfs2_print("*** pvfs_bufmap_get timed out\n");

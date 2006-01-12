@@ -23,6 +23,7 @@
 #include "pint-cached-config.h"
 #include "PINT-reqproto-encode.h"
 #include "pint-util.h"
+#include "pvfs2-internal.h"
 
 #define SMALL_IO_MAX_REGIONS 64
 
@@ -108,7 +109,7 @@ static int small_io_setup_msgpairs(PINT_client_sm * sm_p,
             sm_p->u.io.datafile_index_array[i]];
 
         gossip_debug(GOSSIP_IO_DEBUG, "   small_io_setup_msgpairs: "
-                     "handle: %llu\n", datafile_handle);
+                     "handle: %llu\n", llu(datafile_handle));
 
         if(sm_p->u.io.io_type == PVFS_IO_WRITE)
         {
@@ -303,9 +304,12 @@ static int small_io_completion_fn(void * user_args,
             {
                 gossip_err("size of bytes copied to user buffer "
                            "(%llu) do not match size of response (%llu)\n", 
-                           bytes_processed, resp_p->u.small_io.result_size);
+                           llu(bytes_processed),
+                           llu(resp_p->u.small_io.result_size));
                 return -PVFS_EINVAL;
             }
+            PINT_free_request_state(file_req_state);
+            PINT_free_request_state(mem_req_state);
         }
     }
 

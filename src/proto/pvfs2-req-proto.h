@@ -945,14 +945,15 @@ struct PVFS_servreq_small_io
     struct PINT_Request * file_req;
     PVFS_offset file_req_offset;
     PVFS_size aggregate_size;
-    int segments;
 
     /* these are used for writes to map the regions of the memory buffer
      * to the contiguous encoded message.  They don't get encoded.
      */
+    int segments;
     PVFS_offset offsets[SMALL_IO_MAX_SEGMENTS];
     PVFS_size sizes[SMALL_IO_MAX_SEGMENTS];
 
+    uint32_t total_bytes;
     void * buffer;
 };
 
@@ -960,7 +961,6 @@ struct PVFS_servreq_small_io
 #define encode_PVFS_servreq_small_io(pptr,x) do { \
     encode_PVFS_handle(pptr, &(x)->handle); \
     encode_PVFS_fs_id(pptr, &(x)->fs_id); \
-    encode_skip4(pptr,); \
     encode_enum(pptr, &(x)->io_type); \
     encode_uint32_t(pptr, &(x)->server_nr); \
     encode_uint32_t(pptr, &(x)->server_ct); \
@@ -968,6 +968,8 @@ struct PVFS_servreq_small_io
     encode_PINT_Request(pptr, &(x)->file_req); \
     encode_PVFS_offset(pptr, &(x)->file_req_offset); \
     encode_PVFS_size(pptr, &(x)->aggregate_size); \
+    encode_uint32_t(pptr, &(x)->total_bytes); \
+    encode_skip4(pptr,); \
     if ((x)->io_type == PVFS_IO_WRITE) \
     { \
         int i = 0; \
@@ -984,7 +986,6 @@ struct PVFS_servreq_small_io
 #define decode_PVFS_servreq_small_io(pptr,x) do { \
     decode_PVFS_handle(pptr, &(x)->handle); \
     decode_PVFS_fs_id(pptr, &(x)->fs_id); \
-    decode_skip4(pptr,); \
     decode_enum(pptr, &(x)->io_type); \
     decode_uint32_t(pptr, &(x)->server_nr); \
     decode_uint32_t(pptr, &(x)->server_ct); \
@@ -993,14 +994,16 @@ struct PVFS_servreq_small_io
     PINT_request_decode((x)->file_req); /* unpacks the pointers */ \
     decode_PVFS_offset(pptr, &(x)->file_req_offset); \
     decode_PVFS_size(pptr, &(x)->aggregate_size); \
-    if((x)->io_type == PVFS_IO_WRITE) \
+    decode_uint32_t(pptr, &(x)->total_bytes); \
+    decode_skip4(pptr,); \
+    if ((x)->io_type == PVFS_IO_WRITE) \
     { \
         /* instead of copying the message we just set the pointer, since \
          * we know it will not be freed unil the small io state machine \
          * has completed. \
          */ \
         (x)->buffer = (*pptr); \
-        (*pptr) += (x)->aggregate_size; \
+        (*pptr) += (x)->total_bytes; \
     } \
 } while (0)
 #endif
@@ -1008,19 +1011,20 @@ struct PVFS_servreq_small_io
 #define extra_size_PVFS_servreq_small_io PINT_SMALL_IO_MAXSIZE
 
 /* could be huge, limit to max ioreq size beyond struct itself */
-#define PINT_SERVREQ_SMALL_IO_FILL(__req, \
-                                   __creds, \
-                                   __fsid, \
-                                   __handle, \
-                                   __io_type, \
-                                   __dfile_nr, \
-                                   __dfile_ct, \
-                                   __dist, \
-                                   __filereq, \
-                                   __filereq_offset, \
-                                   __segments, \
-                                   __memreq_size) \
-do { \
+#define PINT_SERVREQ_SMALL_IO_FILL(__req,                                \
+                                   __creds,                              \
+                                   __fsid,                               \
+                                   __handle,                             \
+                                   __io_type,                            \
+                                   __dfile_nr,                           \
+                                   __dfile_ct,                           \
+                                   __dist,                               \
+                                   __filereq,                            \
+                                   __filereq_offset,                     \
+                                   __segments,                           \
+                                   __memreq_size)                        \
+do {                                                                     \
+    int _sio_i;                                                          \
     (__req).op                                = PVFS_SERV_SMALL_IO;      \
     (__req).credentials                       = (__creds);               \
     (__req).u.small_io.fs_id                  = (__fsid);                \
@@ -1031,8 +1035,14 @@ do { \
     (__req).u.small_io.dist                   = (__dist);                \
     (__req).u.small_io.file_req               = (__filereq);             \
     (__req).u.small_io.file_req_offset        = (__filereq_offset);      \
-    (__req).u.small_io.segments               = (__segments);            \
     (__req).u.small_io.aggregate_size         = (__memreq_size);         \
+    (__req).u.small_io.segments               = (__segments);            \
+    (__req).u.small_io.total_bytes            = 0;                       \
+    for(_sio_i = 0; _sio_i < (__segments); ++_sio_i)                     \
+    {                                                                    \
+        (__req).u.small_io.total_bytes +=                                \
+            (__req).u.small_io.sizes[_sio_i];                            \
+    }                                                                    \
 } while(0)
 
 struct PVFS_servresp_small_io
@@ -1054,6 +1064,7 @@ struct PVFS_servresp_small_io
 #define encode_PVFS_servresp_small_io(pptr,x) \
     do { \
         encode_enum(pptr, &(x)->io_type); \
+        encode_skip4(pptr,); \
         encode_PVFS_size(pptr, &(x)->bstream_size); \
         encode_PVFS_size(pptr, &(x)->result_size); \
         if((x)->io_type == PVFS_IO_READ && (x)->buffer) \
@@ -1066,6 +1077,7 @@ struct PVFS_servresp_small_io
 #define decode_PVFS_servresp_small_io(pptr,x) \
     do { \
         decode_enum(pptr, &(x)->io_type); \
+        decode_skip4(pptr,); \
         decode_PVFS_size(pptr, &(x)->bstream_size); \
         decode_PVFS_size(pptr, &(x)->result_size); \
         if((x)->io_type == PVFS_IO_READ) \
@@ -1295,7 +1307,7 @@ endecode_fields_1a_struct(
    roundup8(sizeof(struct PVFS_mgmt_event)))
 
 /* geteattr ****************************************************/
-/* - retreives list of extended attributes */
+/* - retrieves list of extended attributes */
 
 struct PVFS_servreq_geteattr
 {
@@ -1305,11 +1317,10 @@ struct PVFS_servreq_geteattr
     PVFS_ds_keyval *key; /* array of keys to read */
     PVFS_size *valsz;    /* array of value buffer sizes */
 };
-endecode_fields_3aa_struct(
+endecode_fields_2aa_struct(
     PVFS_servreq_geteattr,
     PVFS_handle, handle,
     PVFS_fs_id, fs_id,
-    skip4,,
     int32_t, nkey,
     PVFS_ds_keyval, key,
     PVFS_size, valsz);

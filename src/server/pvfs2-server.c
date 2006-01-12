@@ -67,6 +67,17 @@
  */
 #define PVFS_SERVER_TEST_COUNT 64
 
+/* track performance counters for the server */
+struct PINT_perf_key server_keys[] =
+{
+    {"bytes read", PINT_PERF_READ, 0},
+    {"bytes written", PINT_PERF_WRITE, 0},
+    {"metadata reads", PINT_PERF_METADATA_READ, 0},
+    {"metadata writes", PINT_PERF_METADATA_WRITE, 0},
+    {NULL, 0, 0},
+};
+extern struct PINT_perf_counter* PINT_server_pc;
+
 /* For the switch statement to know what interfaces to shutdown */
 static PINT_server_status_flag server_status_flag;
 
@@ -1159,8 +1170,8 @@ static int server_initialize_subsystems(
     *server_status_flag |= SERVER_REQ_SCHED_INIT;
 
 #ifndef __PVFS2_DISABLE_PERF_COUNTERS__
-    ret = PINT_perf_initialize();
-    if(ret < 0)
+    PINT_server_pc = PINT_perf_initialize(server_keys);
+    if(!PINT_server_pc)
     {
         gossip_err("Error initializing performance counters.\n");
         return(ret);
@@ -1221,6 +1232,15 @@ static int server_setup_signal_handlers(void)
 }
 
 #ifdef __PVFS2_SEGV_BACKTRACE__
+
+#if defined(REG_EIP)
+#  define REG_INSTRUCTION_POINTER REG_EIP
+#elif defined(REG_RIP)
+#  define REG_INSTRUCTION_POINTER REG_RIP
+#else
+#  error Unknown instruction pointer location for your architecture, configure without --enable-segv-backtrace.
+#endif
+
 /* bt_signalhandler()
  *
  * prints a stack trace from a signal handler; code taken from a Linux
@@ -1240,7 +1260,7 @@ static void bt_sighandler(int sig, siginfo_t *info, void *secret)
     {
         gossip_err("PVFS2 server: signal %d, faulty address is %p, " 
             "from %p\n", sig, info->si_addr, 
-            (void*)uc->uc_mcontext.gregs[REG_EIP]);
+            (void*)uc->uc_mcontext.gregs[REG_INSTRUCTION_POINTER]);
     }
     else
     {
@@ -1249,7 +1269,7 @@ static void bt_sighandler(int sig, siginfo_t *info, void *secret)
 
     trace_size = backtrace(trace, 16);
     /* overwrite sigaction with caller's address */
-    trace[1] = (void *) uc->uc_mcontext.gregs[REG_EIP];
+    trace[1] = (void *) uc->uc_mcontext.gregs[REG_INSTRUCTION_POINTER];
 
     messages = backtrace_symbols(trace, trace_size);
     /* skip first stack frame (points here) */
@@ -1305,7 +1325,7 @@ static int server_shutdown(
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting performance "
                      "interface     [   ...   ]\n");
-        PINT_perf_finalize();
+        PINT_perf_finalize(PINT_server_pc);
         gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         performance "
                      "interface     [ stopped ]\n");
     }

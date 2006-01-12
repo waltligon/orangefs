@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.19 2005-11-11 21:31:03 slang Exp $
+ * $Id: ib.c,v 1.19.2.1 2006-01-12 19:43:13 slang Exp $
  */
 #include <stdio.h>  /* just for NULL for id-generator.h */
 #include <src/common/id-generator/id-generator.h>
@@ -849,13 +849,15 @@ post_sr_rdmaw(ib_send_t *sq, msg_header_cts_t *mh_cts)
 /*
  * Bring up the connection before posting a send or receive on it.
  */
-static void
+static int
 ensure_connected(struct method_addr *remote_map)
 {
+    int ret = 0;
     ib_method_addr_t *ibmap = remote_map->method_data;
 
     if (!ibmap->c)
-	ib_tcp_client_connect(ibmap, remote_map);
+	ret = ib_tcp_client_connect(ibmap, remote_map);
+    return ret;
 }
 
 /*
@@ -874,7 +876,9 @@ generic_post_send(bmi_op_id_t *id, struct method_addr *remote_map,
     int ret = 0;
 
     gen_mutex_lock(&interface_mutex);
-    ensure_connected(remote_map);
+    ret = ensure_connected(remote_map);
+    if (ret)
+    	goto out;
     ibmap = remote_map->method_data;
 
     /* alloc and build new sendq structure */
@@ -996,7 +1000,7 @@ BMI_ib_post_sendunexpected_list(bmi_op_id_t *id, struct method_addr *remote_map,
 /*
  * Used by both recv and recv_list.
  */
-static void
+static int
 generic_post_recv(bmi_op_id_t *id, struct method_addr *remote_map,
   int numbufs, void *const *buffers, const bmi_size_t *sizes,
   bmi_size_t tot_expected_len, bmi_msg_tag_t tag,
@@ -1007,9 +1011,12 @@ generic_post_recv(bmi_op_id_t *id, struct method_addr *remote_map,
     ib_method_addr_t *ibmap;
     ib_connection_t *c;
     int i;
+    int ret = 0;
     
     gen_mutex_lock(&interface_mutex);
-    ensure_connected(remote_map);
+    ret = ensure_connected(remote_map);
+    if (ret)
+    	goto out;
     ibmap = remote_map->method_data;
     c = ibmap->c;
 
@@ -1091,7 +1098,7 @@ generic_post_recv(bmi_op_id_t *id, struct method_addr *remote_map,
 	goto out;
 
     } else if (rq->state == RQ_RTS_WAITING_USER_POST) {
-	int ret;
+	int sret;
 	debug(2, "%s: rq %p %s send cts", __func__, rq,
 	  rq_state_name(rq->state));
 	/* try to send, or wait for send buffer space */
@@ -1099,8 +1106,8 @@ generic_post_recv(bmi_op_id_t *id, struct method_addr *remote_map,
 #if MEMCACHE_EARLY_REG
 	memcache_register(&rq->buflist);
 #endif
-	ret = send_cts(rq);
-	if (ret == 0)
+	sret = send_cts(rq);
+	if (sret == 0)
 	    rq->state = RQ_RTS_WAITING_DATA;
 	goto out;
     }
@@ -1114,6 +1121,7 @@ generic_post_recv(bmi_op_id_t *id, struct method_addr *remote_map,
 
   out:
     gen_mutex_unlock(&interface_mutex);
+    return ret;
 }
 
 static int
@@ -1123,9 +1131,8 @@ BMI_ib_post_recv(bmi_op_id_t *id, struct method_addr *remote_map,
   bmi_context_id context_id)
 {
     debug(2, "%s: expected len %d tag %d", __func__, (int) expected_len, tag);
-    generic_post_recv(id, remote_map, 0, &buffer, &expected_len,
+    return generic_post_recv(id, remote_map, 0, &buffer, &expected_len,
       expected_len, tag, user_ptr, context_id);
-    return 0;
 }
 
 static int
@@ -1139,9 +1146,8 @@ BMI_ib_post_recv_list(bmi_op_id_t *id, struct method_addr *remote_map,
       (int) tot_expected_len, tag);
     if (list_count < 1)
 	error("%s: list count must be positive", __func__);
-    generic_post_recv(id, remote_map, list_count, buffers, sizes,
+    return generic_post_recv(id, remote_map, list_count, buffers, sizes,
       tot_expected_len, tag, user_ptr, context_id);
-    return 0;
 }
 
 /*

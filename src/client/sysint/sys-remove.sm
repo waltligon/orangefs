@@ -448,7 +448,7 @@ static int remove_cleanup(PINT_client_sm *sm_p, job_status_s *js_p)
                         sm_p->u.remove.stored_error_code :
                         js_p->error_code);
 
-    PINT_acache_invalidate(sm_p->object_ref);
+    /* NOTE: acache is invalidated by remove_helper now */
 
     PINT_ncache_remove(sm_p->u.remove.object_name,
                        0 /* PVFS2_LOOKUP_LINK_NO_FOLLOW */,

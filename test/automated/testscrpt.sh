@@ -32,7 +32,10 @@ TESTNAME="`hostname -s`-nightly"
 # we only have a few hosts that meet all the earlier stated prereqs
 VFS_HOSTS="gil lain"
 
+# need to make this a command line arugment:
+CVS_TAG="${CVS_TAG:-HEAD}"
 
+# takes one argument: a tag or branch in CVS
 pull_and_build_pvfs2 () {
 	# debugging aide... when we run this script repeatedly, we don't 
 	# really need to build everything again 
@@ -46,7 +49,7 @@ pull_and_build_pvfs2 () {
 	# a bit of gross shell hackery, but cuts down on the number of
 	# variables we have to set.  Assumes we ran this script out of a
 	# checked out pvfs2 tree
-	$(cd `dirname $0`;pwd)/../../maint/build/pvfs2-build.sh \
+	$(cd `dirname $0`;pwd)/../../maint/build/pvfs2-build.sh -v $1 \
 		$with_kernel -r $PVFS2_DEST
 	
 }
@@ -94,14 +97,21 @@ setup_vfs() {
 setup_pvfs2() {
 	cd $PVFS2_DEST
 	INSTALL-pvfs2/bin/pvfs2-genconfig fs.conf server.conf \
-		--protocol tcp --port 3399 \
+		--protocol tcp \
+		--ioports {3396-3399} --metaports {3396-3399} \
 		--ioservers `hostname -s` --metaservers `hostname -s` \
 		--storage ${PVFS2_DEST}/STORAGE-pvfs2 \
 		--logfile=${PVFS2_DEST}/pvfs2-server.log --quiet
-	rm -rf ${PVFS2_DEST}/STORAGE-pvfs2
+	rm -rf ${PVFS2_DEST}/STORAGE-pvfs2*
 	failure_logs="${PVFS2_DEST}/pvfs2-server.log $failure_logs"
-	INSTALL-pvfs2/sbin/pvfs2-server -p `pwd`/pvfs2-server.pid -f fs.conf server.conf-`hostname -s` 
-	INSTALL-pvfs2/sbin/pvfs2-server -p `pwd`/pvfs2-server.pid  fs.conf server.conf-`hostname -s` 
+	for server_conf in server.conf-*; do 
+		INSTALL-pvfs2/sbin/pvfs2-server \
+			-p `pwd`/pvfs2-server-${server_conf#*_p}.pid \
+			-f fs.conf $server_conf 
+		INSTALL-pvfs2/sbin/pvfs2-server \
+			-p `pwd`/pvfs2-server-${server_conf#*_p}.pid  \
+			fs.conf $server_conf
+	done
 
 	echo "tcp://`hostname -s`:3399/pvfs2-fs /pvfs2-nightly pvfs2 defaults 0 0" > ${PVFS2_DEST}/pvfs2tab
 	# do we need to use our own pvfs2tab file?  If we will mount pvfs2, we
@@ -113,16 +123,17 @@ setup_pvfs2() {
 }
 
 teardown_pvfs2() {
-	if [ -f ${PVFS2_DEST}/pvfs2-server.pid ] ; then
-		kill `cat ${PVFS2_DEST}/pvfs2-server.pid`
-	fi
+	for pidfile in ${PVFS2_DEST}/pvfs2-server*.pid ; do
+		[ ! -f $pidfile ] && continue
 
-	# occasionally the server ends up in a hard-to-kill state.  server has
-	# atexit(3) remove .pid file
-	sleep 3
-	if [ -f ${PVFS2_DEST}/pvfs2-server.pid ] ; then
-		kill -9 `cat ${PVFS2_DEST}/pvfs2-server.pid`
-	fi
+		kill `cat $pidfile`
+		# occasionally the server ends up in a hard-to-kill state.
+		# server has atexit(3) remove .pid file
+		sleep 3
+		if [ -f $pidfile ] ; then 
+			kill -9 `cat $pidfile`
+		fi
+	done
 
 	# let teardown always succeed.  pvfs2-server.pid could be stale
 	return 0
@@ -131,7 +142,7 @@ teardown_pvfs2() {
 buildfail() {
 	echo "Failure in build process"
 	cat ${PVFS2_DEST}/configure.log ${PVFS2_DEST}/make-extracted.log ${PVFS2_DEST}/make-install.log ${PVFS2_DEST}/make.log | \
-		${TINDERSCRIPT} ${TESTNAME} build_failed $STARTTIME 
+		${TINDERSCRIPT} ${TESTNAME}-${CVS_TAG} build_failed $STARTTIME 
 	exit 1
 }
 
@@ -139,13 +150,13 @@ setupfail() {
 	echo "Failure in setup"
 	dmesg | tail -20 > ${PVFS2_DEST}/dmesg
 	cat ${PVFS2_DEST}/dmesg ${PVFS2_DEST}/pvfs2-server.log | \
-		${TINDERSCRIPT}  ${TESTNAME} test_failed $STARTTIME 
+		${TINDERSCRIPT}  ${TESTNAME}-${CVS_TAG} test_failed $STARTTIME 
 	exit 1
 }
 
 tinder_report() {
 	eval cat $REPORT_LOG $failure_logs |\
-		${TINDERSCRIPT} ${TESTNAME} $1 $STARTTIME \
+		${TINDERSCRIPT} ${TESTNAME}-${CVS_TAG} $1 $STARTTIME \
 		"$nr_failed of $(( $nr_failed + $nr_passed)) failed"
 }
 
@@ -181,7 +192,7 @@ run_parts() {
 ###
 
 # show that we're doing something
-${TINDERSCRIPT} ${TESTNAME} building $STARTTIME </dev/null
+${TINDERSCRIPT} ${TESTNAME}-${CVS_TAG} building $STARTTIME </dev/null
 
 # will we be able to do VFS-related tests?
 do_vfs=0
@@ -194,7 +205,7 @@ done
 
 failure_logs=""   # a space-delimited list of logs that failed
 # compile and install
-pull_and_build_pvfs2  || buildfail
+pull_and_build_pvfs2  $CVS_TAG || buildfail
 
 teardown_pvfs2 && setup_pvfs2 
 

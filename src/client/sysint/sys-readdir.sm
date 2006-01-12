@@ -335,7 +335,10 @@ static int readdir_cleanup(PINT_client_sm *sm_p,
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
     sm_p->error_code = js_p->error_code;
-
+    if(sm_p->error_code != 0)
+    {
+        PINT_acache_invalidate(sm_p->object_ref);
+    }
     gossip_debug(GOSSIP_READDIR_DEBUG, " final return code is %d\n",
                  sm_p->error_code);
 

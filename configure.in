@@ -642,6 +642,21 @@ if test "x$have_xattr" = "xyes"; then
 	CFLAGS=$tmp_cflags
 fi
 
+dnl Test to see if sysctl proc handlers have a 6th argument
+AC_MSG_CHECKING(for 6th argument to sysctl proc handlers)
+dnl if this test passes, there is a 6th argument
+AC_TRY_COMPILE([
+    #define __KERNEL__
+    #include <linux/fs.h>
+    #include <linux/sysctl.h>
+    ], [
+    proc_dointvec_minmax(NULL, 0, NULL, NULL, NULL, NULL);
+    ],
+	    AC_MSG_RESULT(yes)
+	    AC_DEFINE(HAVE_PROC_HANDLER_SIX_ARG, 1, Define if sysctl proc handlers have 6th argument),
+	    AC_MSG_RESULT(no)
+    )
+
 AC_CHECK_HEADERS([linux/posix_acl.h], [], [], 
 	[#define __KERNEL__
 	 #include <linux/fs.h>
@@ -702,6 +717,55 @@ AC_TRY_COMPILE([
 	AC_MSG_RESULT(yes)
 	AC_DEFINE(HAVE_GENERIC_GETXATTR, 1, Define if kernel has generic_getxattr),
 )
+
+AC_MSG_CHECKING(for arg member in read_descriptor_t in kernel)
+AC_TRY_COMPILE([
+    #define __KERNEL__
+    #include <linux/fs.h>
+    ], [
+    read_descriptor_t x;
+    x.arg.data = NULL;
+    ],
+    AC_MSG_RESULT(yes)
+    AC_DEFINE(HAVE_ARG_IN_READ_DESCRIPTOR_T, 1, Define if read_descriptor_t has an arg member),
+    AC_MSG_RESULT(no)
+)
+
+AC_MSG_CHECKING(for second arg type int in address_space_operations releasepage)
+tmp_cflags=$CFLAGS
+CFLAGS="$CFLAGS -Werror"
+AC_TRY_COMPILE([
+    #define __KERNEL__
+    #include <linux/fs.h>
+    extern int rp(struct page *page, int foo);
+    ], [
+    struct address_space_operations aso = {
+	.releasepage = rp
+    };
+    ],
+    AC_MSG_RESULT(yes)
+    AC_DEFINE(HAVE_INT_ARG2_ADDRESS_SPACE_OPERATIONS_RELEASEPAGE, 1, Define if sceond argument to releasepage in address_space_operations is type int),
+    AC_MSG_RESULT(no)
+    )
+CFLAGS=$tmp_cflags
+
+AC_MSG_CHECKING(for int return in inode_operations follow_link)
+tmp_cflags=$CFLAGS
+CFLAGS="$CFLAGS -Werror"
+AC_TRY_COMPILE([
+    #define __KERNEL__
+    #include <linux/fs.h>
+    extern int fl(struct dentry *d, struct nameidata *n);
+    ], [
+    struct inode_operations io = {
+	.follow_link = fl
+    };
+    ],
+    AC_MSG_RESULT(yes)
+    AC_DEFINE(HAVE_INT_RETURN_INODE_OPERATIONS_FOLLOW_LINK, 1, Define if return value from follow_link in inode_operations is type int),
+    AC_MSG_RESULT(no)
+    )
+CFLAGS=$tmp_cflags
 
 dnl end of kernel feature tests
 CFLAGS=$oldcflags
@@ -1057,6 +1121,7 @@ doc/coding/module.mk
 doc/design/module.mk
 doc/random/module.mk
 examples/pvfs2-server.rc
+doc/doxygen/pvfs2-doxygen.conf
 )
 
 # print a summary of the configuration information

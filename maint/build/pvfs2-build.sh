@@ -42,11 +42,11 @@ get_dist() {
 }
 
 # get_cvs requires expect
-# use this method if you want to, well, test whatever is in cvs at this very
-# moment.  takes no arguments. returns nonzero on error.
+# pulls from CVS the tag or branch specified by the first argument.  returns
+# nonzero on error.
 get_cvs() {
 	expect -c "spawn -noecho cvs -Q -d $cvsroot login; send \r;"
-	cvs -Q -d $cvsroot co pvfs2
+	cvs -Q -d $cvsroot co -r $1 pvfs2 
 	if [ $? -ne 0 ] ; then
 		echo "Pulling PVFS2 from $cvsroot failed."
 		exit 1
@@ -61,6 +61,7 @@ old_wd=$( cd `dirname $0`; pwd)
 build_kernel="false"
 build_tests="false"
 make_targets="all"
+cvs_tag="HEAD"
 kerneldir=""
 
 usage()
@@ -69,16 +70,18 @@ usage()
     echo "  -k: path to kernel source (enables module build)"
     echo "  -r: path to directory to build and install in"
     echo "  -t: build test programs"
+    echo "  -v: name of tag or branch in CVS"
     return
 }
 
 # get command line arguments
-while getopts k:r:t opt
+while getopts k:r:tv: opt
 do
     case "$opt" in
 	k) build_kernel="true"; kerneldir="$OPTARG";;
 	r) rootdir="$OPTARG";;
 	t) build_tests="true";;
+	v) cvs_tag="$OPTARG";;
 	\?) usage; exit 1;; 
     esac
 done   
@@ -107,7 +110,7 @@ rm -rf $rootdir/pvfs2
 cd $rootdir
 
 # could make this some sort of command line option... 
-get_cvs || exit 1
+get_cvs $cvs_tag || exit 1
 
 
 # create build and install directories, configure

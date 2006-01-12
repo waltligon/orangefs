@@ -17,9 +17,6 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <libgen.h>
-#ifdef HAVE_ATTR_XATTR_H
-#include <attr/xattr.h>
-#endif
 
 #define __PINT_REQPROTO_ENCODE_FUNCS_C
 #include "pvfs2.h"
@@ -30,6 +27,10 @@
 #include "pvfs2-dist-simple-stripe.h"
 #include "pvfs2-dist-varstrip.h"
 #include "pint-util.h"
+
+#ifdef HAVE_ATTR_XATTR_H
+#include <attr/xattr.h>
+#endif
 
 struct options 
 {

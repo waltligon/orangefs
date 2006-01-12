@@ -257,7 +257,7 @@ int fp_bmi_cache_getinfo(flow_descriptor * flow_d,
     {
 	case FLOWPROTO_TYPE_QUERY:
 	    type = parameter;
-	    if(*type == FLOWPROTO_MULTIQUEUE)
+	    if(*type == FLOWPROTO_BMI_CACHE)
 		return(0);
 	    else
 		return(-PVFS_ENOPROTOOPT);

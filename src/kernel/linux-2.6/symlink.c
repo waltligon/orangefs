@@ -28,6 +28,7 @@ static int pvfs2_readlink(
     return vfs_readlink(dentry, buffer, buflen, pvfs2_inode->link_target);
 }
 
+#ifdef HAVE_INT_RETURN_INODE_OPERATIONS_FOLLOW_LINK
 static int pvfs2_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(dentry->d_inode);
@@ -37,6 +38,17 @@ static int pvfs2_follow_link(struct dentry *dentry, struct nameidata *nd)
 
     return vfs_follow_link(nd, pvfs2_inode->link_target);
 }
+#else
+static void *pvfs2_follow_link(struct dentry *dentry, struct nameidata *nd)
+{
+    pvfs2_inode_t *pvfs2_inode = PVFS2_I(dentry->d_inode);
+
+    pvfs2_print("pvfs2: pvfs2_follow_link called on %s (target is %p)\n",
+                (char *)dentry->d_name.name, pvfs2_inode->link_target);
+
+    return ERR_PTR(vfs_follow_link(nd, pvfs2_inode->link_target));
+}
+#endif
 
 struct inode_operations pvfs2_symlink_inode_operations =
 {
@@ -50,7 +62,7 @@ struct inode_operations pvfs2_symlink_inode_operations =
     .follow_link = pvfs2_follow_link,
     .setattr = pvfs2_setattr,
     .getattr = pvfs2_getattr,
-#ifdef HAVE_GENERIC_GETXATTR
+#if defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
     .permission = pvfs2_permission,
 #endif
 #endif
