@@ -488,6 +488,9 @@ static int msgpairarray_completion_fn(PARENT_SM *sm_p,
     int ret = -PVFS_EINVAL, i = 0;
     int need_retry = 0;
     struct PINT_decoded_msg decoded_resp;
+    const char* server_string = NULL;
+    struct server_configuration_s *server_config = NULL;
+    int server_type;
 
     /* response structure (decoded) */
     struct PVFS_server_resp *resp_p = NULL;
@@ -630,9 +633,33 @@ static int msgpairarray_completion_fn(PARENT_SM *sm_p,
 
             } else {
                 char s[1024];
+                server_config = PINT_server_config_mgr_get_config(msg_p->fs_id);
+                if(server_config)
+                {
+                    server_string = PINT_cached_config_map_addr(
+                        server_config, msg_p->fs_id, msg_p->svr_addr, &server_type);
+                    PINT_server_config_mgr_put_config(server_config);
+                }
+                else
+                {
+                    server_string = "[UNKNOWN]";
+                }
                 PVFS_strerror_r(msg_p->op_status, s, sizeof(s));
-                gossip_err("*** %s: msgpair failed, no retry: %s\n",
-                  __func__, s);
+                gossip_err("*** %s: msgpair to server %s failed: %s\n",
+                    __func__, server_string, s);
+                if(msg_p->retry_flag != PVFS_MSGPAIR_RETRY)
+                {
+                    gossip_err("*** No retries requested.\n");
+                }
+                else if(PVFS_ERROR_CLASS(-msg_p->op_status) !=
+                    PVFS_ERROR_BMI)
+                {
+                    gossip_err("*** Non-BMI failure.\n");
+                }
+                else
+                {
+                    gossip_err("*** Out of retries.\n");
+                }
                 if (js_p->error_code == 0)
                     js_p->error_code = msg_p->op_status;
             }
