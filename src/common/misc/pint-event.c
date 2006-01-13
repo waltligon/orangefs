@@ -29,8 +29,8 @@ static gen_mutex_t event_mutex = GEN_MUTEX_INITIALIZER;
 
 #ifdef HAVE_MPE
 int PINT_event_job_start, PINT_event_job_stop;
-int PINT_event_trove_rd_start, PINT_event_trove_wr_start;
-int PINT_event_trove_rd_stop, PINT_event_trove_wr_stop;
+int PINT_event_trove_rd_start, PINT_event_trove_rd_stop;
+int PINT_event_trove_wr_start, PINT_event_trove_wr_stop;
 int PINT_event_bmi_start, PINT_event_bmi_stop;
 int PINT_event_flow_start, PINT_event_flow_stop;
 #endif
@@ -72,8 +72,8 @@ int PINT_event_mpe_init(void)
     PINT_event_job_start = MPE_Log_get_event_number();
     PINT_event_job_stop = MPE_Log_get_event_number();
     PINT_event_trove_rd_start = MPE_Log_get_event_number();
-    PINT_event_trove_wr_start = MPE_Log_get_event_number();
     PINT_event_trove_rd_stop = MPE_Log_get_event_number();
+    PINT_event_trove_wr_start = MPE_Log_get_event_number();
     PINT_event_trove_wr_stop = MPE_Log_get_event_number();
     PINT_event_bmi_start = MPE_Log_get_event_number();
     PINT_event_bmi_stop = MPE_Log_get_event_number();
