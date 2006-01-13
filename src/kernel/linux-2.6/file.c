@@ -85,6 +85,8 @@ int pvfs2_file_open(
             else
             {
                 pvfs2_make_bad_inode(inode);
+                pvfs2_print("pvfs2_file_open returning error: %d\n", ret);
+                return(ret);
             }
         }
 
