@@ -265,7 +265,8 @@ int PINT_tcache_insert_entry(
 
     if(tcache->enable == 0)
     {
-        /* cache has been disabled, do nothing */
+        /* cache has been disabled, do nothing except discard payload*/
+        tcache->free_payload(payload);
         return(0);
     }
 
