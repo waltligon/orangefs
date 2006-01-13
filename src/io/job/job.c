@@ -3013,8 +3013,9 @@ int job_trove_dspace_verify(PVFS_fs_id coll_id,
         JOB_EVENT_END(PVFS_EVENT_TROVE_DSPACE_VERIFY, 0, jd->job_id);
         dealloc_job_desc(jd);
         jd = NULL;
-        /* TODO: handle this correctly */
-        out_status_p->error_code = -EINVAL;
+        /* the trove_method will determine what value is returned in immediate
+         * completion case */
+        out_status_p->error_code = ret;
         out_status_p->status_user_tag = status_user_tag;
         return (1);
     }
