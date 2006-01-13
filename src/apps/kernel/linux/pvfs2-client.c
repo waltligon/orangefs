@@ -15,6 +15,8 @@
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <signal.h>
+
 #include "pvfs2-types.h"
 #include "acache.h"
 
@@ -49,6 +51,7 @@ static void client_sig_handler(int signum);
 static void parse_args(int argc, char **argv, options_t *opts);
 static int verify_pvfs2_client_path(options_t *opts);
 static int monitor_pvfs2_client(options_t *opts);
+static pid_t core_pid = -1;
 
 
 int main(int argc, char **argv)
@@ -106,6 +109,8 @@ int main(int argc, char **argv)
 
 static void client_sig_handler(int signum)
 {
+    int ret;
+
     kill(0, signum);
     switch (signum)
     {
@@ -116,6 +121,13 @@ static void client_sig_handler(int signum)
         case SIGHUP:
         case SIGINT:
         case SIGTERM:
+            if(core_pid > 0)
+            {
+                /* wait for client core to exit before quitting (it is killed
+                 * at the begining of the signal handler)
+                 */
+                waitpid(core_pid, &ret, 0);
+            }
             exit(0);
     }
 }
@@ -142,7 +154,7 @@ static int verify_pvfs2_client_path(options_t *opts)
 static int monitor_pvfs2_client(options_t *opts)
 {
     int ret = 1;
-    pid_t new_pid = 0, wpid = 0;
+    pid_t wpid = 0;
     int dev_init_failures = 0;
     char* arg_list[128] = {NULL};
     int arg_index;
@@ -155,14 +167,14 @@ static int monitor_pvfs2_client(options_t *opts)
         {
             printf("Spawning new child process\n");
         }
-        new_pid = fork();
-        assert(new_pid != -1);
+        core_pid = fork();
+        assert(core_pid != -1);
 
-        if (new_pid != 0)
+        if (core_pid != 0)
         {
             if (opts->verbose)
             {
-                printf("Waiting on child with pid %d\n", (int)new_pid);
+                printf("Waiting on child with pid %d\n", (int)core_pid);
             }
 
             /* get rid of stdout/stderr/stdin */
@@ -170,7 +182,7 @@ static int monitor_pvfs2_client(options_t *opts)
             freopen("/dev/null", "w", stdout);
             freopen("/dev/null", "w", stderr);
 
-            wpid = waitpid(new_pid, &ret, 0);
+            wpid = waitpid(core_pid, &ret, 0);
             assert(wpid != -1);
 
             if (WIFEXITED(ret))
@@ -178,7 +190,7 @@ static int monitor_pvfs2_client(options_t *opts)
                 if (opts->verbose)
                 {
                     printf("Child process with pid %d exited with "
-                           "value %d\n", new_pid, (int)WEXITSTATUS(ret));
+                           "value %d\n", core_pid, (int)WEXITSTATUS(ret));
                 }
 
                 if (WEXITSTATUS(ret) == (unsigned char)-PVFS_EDEVINIT)
@@ -202,6 +214,7 @@ static int monitor_pvfs2_client(options_t *opts)
                     {
                         break;
                     }
+                    core_pid = -1;
                     continue;
                 }
 
@@ -232,9 +245,10 @@ static int monitor_pvfs2_client(options_t *opts)
                 if (opts->verbose)
                 {
                     printf("Child process with pid %d was killed by an "
-                           "uncaught signal %d\n", new_pid,
+                           "uncaught signal %d\n", core_pid,
                            WTERMSIG(ret));
                 }
+                core_pid = -1;
                 continue;
             }
         }
@@ -296,6 +310,7 @@ static int monitor_pvfs2_client(options_t *opts)
                     opts->path, errno);
             exit(1);
         }
+        core_pid = -1;
     }
     return ret;
 }
