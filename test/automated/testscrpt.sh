@@ -99,16 +99,16 @@ setup_pvfs2() {
 	rm -f fs.conf server.conf*
 	INSTALL-pvfs2/bin/pvfs2-genconfig fs.conf server.conf \
 		--protocol tcp \
-		--ioports {3396-3399} --metaports {3396-3399} \
+		--ioports {3396-3399} --metaports {3396-3399}  \
 		--ioservers `hostname -s` --metaservers `hostname -s` \
 		--storage ${PVFS2_DEST}/STORAGE-pvfs2 \
 		--logfile=${PVFS2_DEST}/pvfs2-server.log --quiet
 	rm -rf ${PVFS2_DEST}/STORAGE-pvfs2*
 	failure_logs="${PVFS2_DEST}/pvfs2-server.log $failure_logs"
-	for server_conf in server.conf-*; do 
+	for server_conf in server.conf*; do 
 		INSTALL-pvfs2/sbin/pvfs2-server \
 			-p `pwd`/pvfs2-server-${server_conf#*_p}.pid \
-			-f fs.conf $server_conf 
+			-f fs.conf $server_conf
 		INSTALL-pvfs2/sbin/pvfs2-server \
 			-p `pwd`/pvfs2-server-${server_conf#*_p}.pid  \
 			fs.conf $server_conf
@@ -242,6 +242,7 @@ exec 2>&1
 run_parts ${SYSINT_SCRIPTS}
 
 if [ $do_vfs -eq 1 ] ; then
+	export VFS_SCRIPTS
 	run_parts ${VFS_SCRIPTS}
 fi
 
