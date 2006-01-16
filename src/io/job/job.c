@@ -54,6 +54,9 @@ static gen_mutex_t bmi_unexp_mutex = GEN_MUTEX_INITIALIZER;
 static gen_mutex_t dev_unexp_mutex = GEN_MUTEX_INITIALIZER;
 static gen_mutex_t completion_mutex = GEN_MUTEX_INITIALIZER;
 
+static int initialized = 0;
+static gen_mutex_t initialized_mutex = GEN_MUTEX_INITIALIZER;
+
 #ifdef __PVFS2_JOB_THREADED__
 static pthread_cond_t completion_cond = PTHREAD_COND_INITIALIZER;
 #endif /* __PVFS2_JOB_THREADED__ */
@@ -155,6 +158,10 @@ int job_initialize(int flags)
     assert(ret == 0);
 #endif
 
+    gen_mutex_lock(&initialized_mutex);
+    initialized = 1;
+    gen_mutex_unlock(&initialized_mutex);
+
     return (0);
 }
 
@@ -166,6 +173,10 @@ int job_initialize(int flags)
  */
 int job_finalize(void)
 {
+    gen_mutex_lock(&initialized_mutex);
+    initialized = 0;
+    gen_mutex_unlock(&initialized_mutex);
+
     PINT_thread_mgr_bmi_stop();
 #ifdef __PVFS2_CLIENT__
     PINT_thread_mgr_dev_stop();
@@ -4021,6 +4032,15 @@ static void trove_thread_mgr_callback(
     struct job_desc* tmp_desc = (struct job_desc*)data; 
     assert(tmp_desc);
 
+    gen_mutex_lock(&initialized_mutex);
+    if(initialized == 0)
+    {
+        /* The job interface has been shutdown.  Silently ignore callback. */
+        gen_mutex_unlock(&initialized_mutex);
+        return;
+    }
+    gen_mutex_unlock(&initialized_mutex);
+
     gen_mutex_lock(&completion_mutex);
     if (tmp_desc->completed_flag == 0)
     {
@@ -4056,6 +4076,15 @@ static void bmi_thread_mgr_callback(
     struct job_desc* tmp_desc = (struct job_desc*)data;
     assert(tmp_desc);
 
+    gen_mutex_lock(&initialized_mutex);
+    if(initialized == 0)
+    {
+        /* The job interface has been shutdown.  Silently ignore callback. */
+        gen_mutex_unlock(&initialized_mutex);
+        return;
+    }
+    gen_mutex_unlock(&initialized_mutex);
+
     gen_mutex_lock(&completion_mutex);
     if (tmp_desc->completed_flag == 0)
     {
@@ -4088,6 +4117,15 @@ static void bmi_thread_mgr_unexp_handler(
     struct BMI_unexpected_info* unexp)
 {
     struct job_desc* tmp_desc = NULL; 
+
+    gen_mutex_lock(&initialized_mutex);
+    if(initialized == 0)
+    {
+        /* The job interface has been shutdown.  Silently ignore callback. */
+        gen_mutex_unlock(&initialized_mutex);
+        return;
+    }
+    gen_mutex_unlock(&initialized_mutex);
 
     gen_mutex_lock(&bmi_unexp_mutex);
     /* remove the operation from the pending bmi_unexp queue */
@@ -4486,6 +4524,15 @@ static void do_one_work_cycle_all(int idle_time_ms)
 static void flow_callback(flow_descriptor* flow_d)
 {
     struct job_desc* tmp_desc = (struct job_desc*)flow_d->user_ptr; 
+
+    gen_mutex_lock(&initialized_mutex);
+    if(initialized == 0)
+    {
+        /* The job interface has been shutdown.  Silently ignore callback. */
+        gen_mutex_unlock(&initialized_mutex);
+        return;
+    }
+    gen_mutex_unlock(&initialized_mutex);
 
     /* set job descriptor fields and put into completion queue */
     gen_mutex_lock(&completion_mutex);
