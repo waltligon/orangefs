@@ -59,7 +59,8 @@ do { \
 /* of the request.  PVFS_Distribute returns the number of bytes */
 /* processed.  If this is less than the total bytes in the chunk */
 /* this function returns otherwise it keeps processing until all */
-/* chunks are done.  Returns the number of bytes processed.  It */
+/* chunks are done.  Returns 0 on success and -PVFS_error on failure.  The */
+/* number of bytes processed is stored in result->bytes.  It */
 /* is assumed caller we retry if this is less than the total bytes */
 /* in the request */
 int PINT_process_request(PINT_Request_state *req,
@@ -82,22 +83,22 @@ int PINT_process_request(PINT_Request_state *req,
 	if (!req)
 	{
 		gossip_lerr("PINT_process_request: Bad PINT_Request_state!\n");
-		return -1;
+		return -PVFS_EINVAL;
 	}
 	if (!result || !result->segmax || !result->bytemax)
 	{
 		gossip_lerr("PINT_process_request: NULL segmax or bytemax!\n");
-		return -1;
+		return -PVFS_EINVAL;
 	}
 	if (result->segs >= result->segmax || result->bytes >= result->bytemax)
 	{
 		gossip_lerr("PINT_process_request: no segments or bytes requested!\n");
-		return -1;
+		return -PVFS_EINVAL;
 	}
 	if (!PINT_IS_CKSIZE(mode) && (!result->offset_array || !result->size_array))
 	{
 		gossip_lerr("PINT_process_request: NULL offset or size array!\n");
-		return -1;
+		return -PVFS_EINVAL;
 	}
 	/* initialize some variables */
 	retval = 0;
@@ -247,7 +248,7 @@ int PINT_process_request(PINT_Request_state *req,
 					req->lvl+1 >= req->cur[0].rqbase->depth)
 			{
 				gossip_lerr("PINT_process_request exceeded request depth - possibly corrupted request or request state\n");
-				return -1;
+				return -PVFS_EINVAL;
 			}
 			req->cur[req->lvl+1].el = 0;
 			req->cur[req->lvl+1].maxel = req->cur[req->lvl].rq->num_ereqs;
@@ -426,7 +427,7 @@ int PINT_process_request(PINT_Request_state *req,
 	if (!PINT_IS_MEMREQ(mode))
         gossip_debug(GOSSIP_REQUEST_DEBUG,
             "=========================================================\n");
-	return result->bytes;
+	return 0;
 }
 
 /* this function runs down the ereq list and adds up the offsets */

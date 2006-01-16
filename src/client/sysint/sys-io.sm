@@ -2364,7 +2364,7 @@ exit:
 
     PINT_free_request_state(filereq_state);
     PINT_free_request_state(memreq_state);
-    return res;
+    return 0;
 }
 
 /* computes the logical offset in the file request from the size
