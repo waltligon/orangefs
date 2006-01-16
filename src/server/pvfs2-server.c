@@ -1321,15 +1321,6 @@ static int server_shutdown(
                      "profiling interface [ stopped ]\n");
     }
 
-    if (status & SERVER_PERF_COUNTER_INIT)
-    {
-        gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting performance "
-                     "interface     [   ...   ]\n");
-        PINT_perf_finalize(PINT_server_pc);
-        gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         performance "
-                     "interface     [ stopped ]\n");
-    }
-
     if (status & SERVER_REQ_SCHED_INIT)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting request "
@@ -1362,15 +1353,6 @@ static int server_shutdown(
                      "mgr interface    [ stopped ]\n");
     }
 
-    if (status & SERVER_TROVE_INIT)
-    {
-        gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting storage "
-                     "interface         [   ...   ]\n");
-        trove_finalize();
-        gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         storage "
-                     "interface         [ stopped ]\n");
-    }
-
     if (status & SERVER_FLOW_INIT)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting flow "
@@ -1389,6 +1371,15 @@ static int server_shutdown(
                      "interface             [ stopped ]\n");
     }
 
+    if (status & SERVER_TROVE_INIT)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting storage "
+                     "interface         [   ...   ]\n");
+        trove_finalize();
+        gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         storage "
+                     "interface         [ stopped ]\n");
+    }
+
     if (status & SERVER_ENCODER_INIT)
     {
         gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting encoder "
@@ -1396,6 +1387,15 @@ static int server_shutdown(
         PINT_encode_finalize();
         gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         encoder "
                      "interface         [ stopped ]\n");
+    }
+
+    if (status & SERVER_PERF_COUNTER_INIT)
+    {
+        gossip_debug(GOSSIP_SERVER_DEBUG, "[+] halting performance "
+                     "interface     [   ...   ]\n");
+        PINT_perf_finalize(PINT_server_pc);
+        gossip_debug(GOSSIP_SERVER_DEBUG, "[-]         performance "
+                     "interface     [ stopped ]\n");
     }
 
     if (status & SERVER_GOSSIP_INIT)
