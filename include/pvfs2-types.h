@@ -303,7 +303,7 @@ endecode_fields_2(
 /* max length of PVFS filename */
 #define PVFS_NAME_MAX            256
 /* max len of individual path element */
-#define PVFS_SEGMENT_MAX         128
+#define PVFS_SEGMENT_MAX         PVFS_NAME_MAX
 
 /* max extended attribute name len as imposed by the VFS and exploited for the
  * upcall request types */
