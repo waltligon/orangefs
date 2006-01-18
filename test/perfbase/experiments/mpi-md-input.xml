@@ -1,0 +1,56 @@
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE input SYSTEM "../../dtd/pb_input.dtd">
+
+<input>
+ <experiment>pvfs2_mpi_md</experiment>
+
+ <named_location>
+  <name>operation</name>
+  <match>op=</match>
+ </named_location>
+
+ <named_location>
+  <name>machine</name>
+  <match>host=</match>
+ </named_location>
+
+ <named_location>
+  <name>cvs_tag</name>
+  <match>cvstag=</match>
+ </named_location>
+
+ <named_location>
+  <name>cvs_date</name>
+  <match>cvsdate=</match>
+ </named_location>
+
+ <named_location>
+  <name>meta_servers</name>
+  <match>meta=</match>
+ </named_location>
+
+ <named_location>
+  <name>io_servers</name>
+  <match>io=</match>
+ </named_location>
+
+ <named_location>
+  <name>clients</name>
+  <match>procs: </match>
+ </named_location>
+
+ <named_location>
+  <name>op_count</name>
+  <match># operations: </match>
+ </named_location>
+
+ <named_location>
+  <name>average</name>
+  <match>avg (s): </match>
+ </named_location>
+
+ <named_location>
+  <name>stddev</name>
+  <match>dev (s): </match>
+ </named_location>
+</input>

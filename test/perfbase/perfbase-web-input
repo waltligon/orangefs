@@ -1,0 +1,75 @@
+#!/usr/bin/perl -w
+
+use strict;
+
+require HTTP::Request;
+require LWP::UserAgent;
+
+if($#ARGV < 3)
+{
+    print "\nusage: perfbase-web-input <input description file> <operation> ";
+    print "<meta servers> <io servers>\n";
+    exit 1;
+}
+
+my $descfile=shift @ARGV;
+my $operation=shift @ARGV;
+my $metaservers=shift @ARGV;
+my $ioservers=shift @ARGV;
+
+# get the cvs tag and date
+open(CVSENTRIES, "CVS/Entries") || die "Failed to open CVS/Entries";
+
+my $line;
+my $cvsdate;
+my $cvstag;
+my $msg = "";
+
+while (defined($line = <CVSENTRIES>))
+{
+	if($line =~ /perfbase-web-input/)
+	{
+		my @chunks = split(/\//, $line);
+		$cvsdate = $chunks[2];
+		$cvstag = $chunks[3];
+		if($cvstag eq "")
+		{
+			$cvstag = "HEAD";
+		}
+		last;
+	}
+}
+
+close(CVSENTRIES);
+
+$msg = << "INPUTDESC"
+INPUT DESCRIPTION BEGIN
+`cat $descfile`
+INPUT DESCRIPTION END
+INPUTDESC
+;;
+
+$msg .= "cvsdate=$cvsdate\ncvstag=$cvstag\nhost=`hostname`\n";
+$msg .= "op=$operation\nmeta=$metaservers\nio=$ioservers\n";
+
+while (defined($line = <STDIN>))
+{
+    $msg .= $line;
+}
+
+my $req = HTTP::Request->new(
+    "POST" => "http://lain.mcs.anl.gov/bin/perfbase-input.cgi" );
+$req->content( $msg );
+
+my $ua = LWP::UserAgent->new;
+
+my $resp = $ua->request( $req );
+if( $resp->is_success )
+{
+	print $resp->content;
+}
+else
+{
+	die $resp->status_line;
+}
+

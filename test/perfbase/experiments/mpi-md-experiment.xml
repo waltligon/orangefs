@@ -1,0 +1,99 @@
+<?xml version="1.0" standalone="no"?>
+
+<!DOCTYPE experiment SYSTEM "../../dtd/pb_experiment.dtd">
+
+<experiment>
+ <name>pvfs2_mpi_md</name>
+
+ <info>
+  <performed_by>
+    <name>slang</name>
+  </performed_by>
+
+  <project>PVFS2</project>
+  <synopsis>Benchmark of MPI Metadata Tests with PVFS2</synopsis>
+
+  <description>
+	Track performance of pvfs2's metadata operations with different configuration and test parameters over time.
+  </description>
+ </info>
+
+ <!-- generic pvfs2 parameters -->
+
+ <parameter occurrence="once">
+  <name>cvs_tag</name>
+  <synopsis>Tagname from CVS of the PVFS2 version</synopsis>
+  <datatype>string</datatype>
+  <default>HEAD</default>
+ </parameter>
+
+ <parameter occurrence="once">
+  <name>cvs_date</name>
+  <synopsis>Date of the codebase from CVS</synopsis>
+  <datatype>date</datatype>
+ </parameter>
+
+ <parameter occurrence="once">
+  <name>machine</name>
+  <synopsis>The machine used for this experiment</synopsis>
+  <datatype>string</datatype>
+ </parameter>
+
+ <parameter occurrence="once">
+  <name>meta_servers</name>
+  <synopsis>Number of meta servers used</synopsis>
+  <datatype>integer</datatype>
+  <default>1</default>
+ </parameter>
+
+ <parameter occurrence="once">
+  <name>io_servers</name>
+  <synopsis>Number of i/o servers used</synopsis>
+  <datatype>integer</datatype>
+  <default>5</default>
+ </parameter>
+
+ <!-- parameters specific to this experiment-->
+
+ <parameter occurrence="once">
+  <name>operation</name>
+  <synopsis>PVFS2 Operation type</synopsis>
+  <datatype>string</datatype>
+  <default>CREATE</default>
+ </parameter>
+
+ <parameter>
+  <name>clients</name>
+  <synopsis>Number of clients</synopsis>
+  <datatype>integer</datatype>
+  <default>1</default>
+ </parameter>
+
+ <parameter>
+  <name>op_count</name>
+  <synopsis>Number of operations</synopsis>
+  <datatype>integer</datatype>
+  <default>100</default>
+ </parameter>
+
+ <!-- results -->
+ 
+ <result>
+  <name>average</name>
+  <synopsis>Average Seconds per Operation</synopsis>
+  <datatype>float</datatype>
+  <unit>
+   <base_unit>s</base_unit>
+  </unit>
+ </result>
+
+ <result>
+  <name>stddev</name>
+  <synopsis>Standard Deviation Seconds per Operation</synopsis>
+  <datatype>float</datatype>
+  <unit>
+   <base_unit>s</base_unit>
+  </unit>
+ </result>
+
+</experiment>
