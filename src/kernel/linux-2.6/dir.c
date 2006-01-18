@@ -43,7 +43,7 @@ static int pvfs2_readdir(
     void *dirent,
     filldir_t filldir)
 {
-    int ret = 0, retries = PVFS2_OP_RETRY_COUNT;
+    int ret = 0;
     PVFS_ds_position pos = 0;
     ino_t ino = 0;
     struct dentry *dentry = file->f_dentry;
@@ -147,8 +147,8 @@ static int pvfs2_readdir(
             }
         }
 
-        service_operation_with_timeout_retry(
-            new_op, "pvfs2_readdir", retries,
+        ret = service_operation(
+            new_op, "pvfs2_readdir", PVFS2_OP_RETRY_COUNT,
             get_interruptible_flag(dentry->d_inode));
 
 	pvfs2_print("Readdir downcall status is %d (dirent_count "
@@ -260,11 +260,8 @@ static int pvfs2_readdir(
         {
             pvfs2_print("Failed to readdir (downcall status %d)\n",
                         new_op->downcall.status);
-            ret = -EIO;
         }
 
-      error_exit:
-        translate_error_if_wait_failed(ret, -EIO, 0);
 	op_release(new_op);
 	break;
     }

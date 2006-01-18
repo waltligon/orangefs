@@ -67,7 +67,7 @@ struct dentry *pvfs2_lookup(
     struct nameidata *nd)
 #endif
 {
-    int ret = -EINVAL, retries = PVFS2_OP_RETRY_COUNT, error_exit = 0;
+    int ret = -EINVAL;
     struct inode *inode = NULL;
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *parent = NULL, *found_pvfs2_inode = NULL;
@@ -147,11 +147,9 @@ struct dentry *pvfs2_lookup(
                 ((new_op->upcall.req.lookup.sym_follow ==
                   PVFS2_LOOKUP_LINK_FOLLOW) ? "yes" : "no"));
 
-    service_error_exit_op_with_timeout_retry(
-        new_op, "pvfs2_lookup", retries, error_exit,
-        PVFS2_SB(dir->i_sb)->mnt_options.intr);
-
-    ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
+    ret = service_operation(
+        new_op, "pvfs2_lookup", PVFS2_OP_RETRY_COUNT,
+        get_interruptible_flag(dir));
 
     pvfs2_print("Lookup Got %llu, fsid %d (ret=%d)\n",
                 llu(new_op->downcall.resp.lookup.refn.handle),
@@ -200,9 +198,6 @@ struct dentry *pvfs2_lookup(
 	}
     }
 
-  error_exit:
-    op_release(new_op);
-
     /*
       if no inode was found, add a negative dentry to dcache anyway;
       if we don't, we don't hold expected lookup semantics and we most
@@ -213,8 +208,7 @@ struct dentry *pvfs2_lookup(
       already exists that was interrupted during this lookup -- no
       need to add another negative dentry for an existing file)
     */
-    pvfs2_print("error_exit = %d\n", error_exit);
-    if (!inode && !error_exit)
+    if (!inode && (new_op->op_state == PVFS2_VFS_STATE_SERVICED))
     {
         /*
           make sure to set the pvfs2 specific dentry operations for
@@ -228,6 +222,8 @@ struct dentry *pvfs2_lookup(
         dentry->d_op = &pvfs2_dentry_operations;
         d_add(dentry, inode);
     }
+
+    op_release(new_op);
     return NULL;
 }
 
@@ -358,7 +354,7 @@ static int pvfs2_rename(
     struct inode *new_dir,
     struct dentry *new_dentry)
 {
-    int ret = -EINVAL, retries = 5, are_directories = 0;
+    int ret = -EINVAL, are_directories = 0;
     pvfs2_inode_t *pvfs2_old_parent_inode = PVFS2_I(old_dir);
     pvfs2_inode_t *pvfs2_new_parent_inode = PVFS2_I(new_dir);
     pvfs2_kernel_op_t *new_op = NULL;
@@ -430,11 +426,9 @@ static int pvfs2_rename(
     strncpy(new_op->upcall.req.rename.d_new_name,
 	    new_dentry->d_name.name, PVFS2_NAME_LEN);
 
-    service_operation_with_timeout_retry(
-        new_op, "pvfs2_rename", retries,
+    ret = service_operation(
+        new_op, "pvfs2_rename", PVFS2_OP_RETRY_COUNT,
         get_interruptible_flag(old_dentry->d_inode));
-
-    ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
 
     pvfs2_print("pvfs2_rename: got downcall status %d\n", ret);
 
@@ -462,8 +456,6 @@ static int pvfs2_rename(
     }
 #endif
 
-  error_exit:
-    translate_error_if_wait_failed(ret, 0, 0);
     op_release(new_op);
 
 #ifdef PVFS2_LINUX_KERNEL_2_4

@@ -27,7 +27,6 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
     struct inode *parent_inode = NULL; 
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *parent = NULL;
-    int retries = PVFS2_OP_RETRY_COUNT, error_exit = 0;
 
     pvfs2_print("pvfs2_d_revalidate: called on dentry %p.\n", dentry);
 
@@ -73,9 +72,9 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
             strncpy(new_op->upcall.req.lookup.d_name,
                     dentry->d_name.name, PVFS2_NAME_LEN);
 
-            service_error_exit_op_with_timeout_retry(
-                new_op, "pvfs2_lookup", retries, error_exit,
-                PVFS2_SB(parent_inode->i_sb)->mnt_options.intr);
+            ret = service_operation(
+                new_op, "pvfs2_lookup", PVFS2_OP_RETRY_COUNT,
+                get_interruptible_flag(parent_inode));
 
             if((new_op->downcall.status != 0) ||
                (new_op->downcall.resp.lookup.refn.handle !=
@@ -104,11 +103,6 @@ static int pvfs2_d_revalidate_common(struct dentry* dentry)
         pvfs2_print("\n");
     }
     return ret;
-
-error_exit:
-    pvfs2_print("pvfs2_d_revalidate: error_exit path.\n");
-    op_release(new_op);
-    return 0;
 }
 
 /* should return 1 if dentry can still be trusted, else 0 */

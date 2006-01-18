@@ -319,8 +319,9 @@ static int pvfs2_statfs(
     struct kstatfs *buf)
 #endif
 {
-    int ret = -ENOMEM, retries = 5;
+    int ret = -ENOMEM;
     pvfs2_kernel_op_t *new_op = NULL;
+    int flags = 0;
 
     pvfs2_print("pvfs2_statfs: called on sb %p (fs_id is %d)\n",
                 sb, (int)(PVFS2_SB(sb)->fs_id));
@@ -333,9 +334,13 @@ static int pvfs2_statfs(
     new_op->upcall.type = PVFS2_VFS_OP_STATFS;
     new_op->upcall.req.statfs.fs_id = PVFS2_SB(sb)->fs_id;
 
-    service_operation_with_timeout_retry(
-        new_op, "pvfs2_statfs", retries,
-        PVFS2_SB(sb)->mnt_options.intr);
+    if(PVFS2_SB(sb)->mnt_options.intr)
+    {
+        flags = PVFS2_OP_INTERRUPTIBLE;
+    }
+
+    ret = service_operation(
+        new_op, "pvfs2_statfs", PVFS2_OP_RETRY_COUNT, flags);
 
     if (new_op->downcall.status > -1)
     {
@@ -408,11 +413,8 @@ static int pvfs2_statfs(
             }
         } while(0);
 #endif
-        ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
     }
 
-  error_exit:
-    translate_error_if_wait_failed(ret, -ENOENT, 0);
     op_release(new_op);
 
     pvfs2_print("pvfs2_statfs: returning %d\n", ret);
@@ -429,6 +431,7 @@ static int pvfs2_statfs(
   is waiting for servicing.  this means that the pvfs2-client won't
   fail to start several times for all other pending operations before
   the client regains all of the mount information from us.
+  NOTE: this function assumes that the request_semaphore is already acquired!
 */
 int pvfs2_remount(
     struct super_block *sb,
@@ -469,29 +472,29 @@ int pvfs2_remount(
         pvfs2_print("Attempting PVFS2 Remount via host %s\n",
                     new_op->upcall.req.fs_mount.pvfs2_config_server);
 
-        service_priority_operation(new_op, "pvfs2_remount", 0);
-        ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
+        /* we assume that the calling function has already acquire the
+         * request_semaphore to prevent other operations from bypassing this
+         * one
+         */
+        ret = service_operation(new_op, "pvfs2_remount", 0, 
+            (PVFS2_OP_PRIORITY|PVFS2_OP_NO_SEMAPHORE));
 
         pvfs2_print("pvfs2_remount: mount got return value of %d\n", ret);
-        if (ret)
+        if (ret == 0)
         {
-            goto error_exit;
+            /*
+              store the id assigned to this sb -- it's just a short-lived
+              mapping that the system interface uses to map this
+              superblock to a particular mount entry
+            */
+            PVFS2_SB(sb)->id = new_op->downcall.resp.fs_mount.id;
+
+            if (data)
+            {
+                strncpy(PVFS2_SB(sb)->data, data, PVFS2_MAX_MOUNT_OPT_LEN);
+            }
         }
 
-        /*
-          store the id assigned to this sb -- it's just a short-lived
-          mapping that the system interface uses to map this
-          superblock to a particular mount entry
-        */
-        PVFS2_SB(sb)->id = new_op->downcall.resp.fs_mount.id;
-
-        if (data)
-        {
-            strncpy(PVFS2_SB(sb)->data, data, PVFS2_MAX_MOUNT_OPT_LEN);
-        }
-
-      error_exit:
-        translate_error_if_wait_failed(ret, 0, 0);
         op_release(new_op);
     }
     return ret;
@@ -573,8 +576,7 @@ struct super_block* pvfs2_get_sb(
     pvfs2_print("Attempting PVFS2 Mount via host %s\n",
                 new_op->upcall.req.fs_mount.pvfs2_config_server);
 
-    service_operation(new_op, "pvfs2_get_sb", 0);
-    ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
+    ret = service_operation(new_op, "pvfs2_get_sb", 0, 0);
 
     pvfs2_print("%s: mount got return value of %d\n", __func__, ret);
     if (ret)
@@ -644,7 +646,6 @@ struct super_block* pvfs2_get_sb(
         }
     }
 
-    translate_error_if_wait_failed(ret, 0, 0);
     if (ret)
     {
         sb = NULL;
@@ -766,8 +767,7 @@ struct super_block *pvfs2_get_sb(
         pvfs2_print("Attempting PVFS2 Mount via host %s\n",
                     new_op->upcall.req.fs_mount.pvfs2_config_server);
 
-        service_operation(new_op, "pvfs2_get_sb", 0);
-        ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
+        ret = service_operation(new_op, "pvfs2_get_sb", 0, 0);
 
         pvfs2_print("pvfs2_get_sb: mount got return value of %d\n", ret);
         if (ret)
@@ -827,7 +827,6 @@ struct super_block *pvfs2_get_sb(
   error_exit:
     pvfs2_error("pvfs2_get_sb: mount request failed with %d\n", ret);
 
-    translate_error_if_wait_failed(ret, 0, 0);
     if (ret || IS_ERR(sb))
     {
         sb = ERR_PTR(ret);

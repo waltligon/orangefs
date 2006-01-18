@@ -112,16 +112,14 @@ ssize_t pvfs2_inode_read(
     int copy_to_user,
     loff_t readahead_size)
 {
-    int ret = -1, error_exit = 0;
+    int ret = -1;
     size_t each_count = 0, amt_complete = 0;
     size_t total_count = 0;
     pvfs2_kernel_op_t *new_op = NULL;
     int buffer_index = -1;
     char *current_buf = buf;
     loff_t original_offset = *offset;
-    int retries = PVFS2_OP_RETRY_COUNT;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
-    int dc_status;
 
     if (copy_to_user && (!access_ok(VERIFY_WRITE, buf, count)))
         return -EFAULT;
@@ -158,16 +156,12 @@ ssize_t pvfs2_inode_read(
         new_op->upcall.req.io.count = each_count;
         new_op->upcall.req.io.offset = *offset;
 
-        dc_status = 0;  /* macro may jump to error_exit below */
-        service_error_exit_op_with_timeout_retry(
-            new_op, "pvfs2_inode_read", retries, error_exit,
+        ret = service_operation(
+            new_op, "pvfs2_inode_read", PVFS2_OP_RETRY_COUNT,
             get_interruptible_flag(inode));
 
-        if (new_op->downcall.status != 0)
+        if (ret < 0)
         {
-            dc_status = new_op->downcall.status;
-
-          error_exit:
             /* this macro is defined in pvfs2-kernel.h */
             handle_io_error();
 
@@ -176,19 +170,16 @@ ssize_t pvfs2_inode_read(
               termination unless we've got debugging turned on, as
               this can happen regularly (i.e. ctrl-c)
             */
-            if ((error_exit != 0) && (ret == -EINTR))
+            if(ret == -EINTR)
             {
-                pvfs2_print("pvfs2_inode_read: returning error %d "
-                            "(error_exit=%d)\n", ret, error_exit);
+                pvfs2_print("pvfs2_inode_read: returning error %d\n", ret);
             }
             else
             {
                 pvfs2_error(
                     "pvfs2_inode_read: error reading from handle %llu, "
-                    "\n  -- downcall status is %d, returning %d "
-                    "(error_exit=%d)\n",
-                    llu(pvfs2_ino_to_handle(inode->i_ino)),
-                    dc_status, ret, error_exit);
+                    "\n  -- returning %d \n",
+                    llu(pvfs2_ino_to_handle(inode->i_ino)), ret);
             }
             return ret;
         }
@@ -215,8 +206,9 @@ ssize_t pvfs2_inode_read(
                 /* put error code in downcall so that handle_io_error()
                  * preserves properly
                  */
-                new_op->downcall.status = -PVFS_EFAULT;
-                goto error_exit;
+                new_op->downcall.status = ret;
+                handle_io_error();
+                return(ret);
             }
         }
 
@@ -276,16 +268,15 @@ static ssize_t pvfs2_file_write(
     size_t count,
     loff_t *offset)
 {
-    int ret = -1, retries = PVFS2_OP_RETRY_COUNT;
+    int ret = -1;
     pvfs2_kernel_op_t *new_op = NULL;
     char __user *current_buf = (char __user *)buf;
     loff_t original_offset = *offset;
-    int buffer_index = -1, error_exit = 0;
+    int buffer_index = -1;
     size_t each_count = 0, total_count = 0;
     struct inode *inode = file->f_dentry->d_inode;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
     size_t amt_complete = 0;
-    int dc_status;
 
     pvfs2_print("pvfs2_file_write: called on %s [f_pos %ld off %ld size %ld]\n",
                 (file && file->f_dentry && file->f_dentry->d_name.name ?
@@ -364,16 +355,12 @@ static ssize_t pvfs2_file_write(
             return ret;
         }
 
-        dc_status = 0;
-        service_error_exit_op_with_timeout_retry(
-            new_op, "pvfs2_file_write", retries, error_exit,
+        ret = service_operation(
+            new_op, "pvfs2_file_write", PVFS2_OP_RETRY_COUNT,
             get_interruptible_flag(inode));
 
-        if (new_op->downcall.status != 0)
+        if (ret < 0)
         {
-            dc_status = new_op->downcall.status;
-
-          error_exit:
             /* this macro is defined in pvfs2-kernel.h */
             handle_io_error();
 
@@ -382,21 +369,19 @@ static ssize_t pvfs2_file_write(
               termination unless we've got debugging turned on, as
               this can happen regularly (i.e. ctrl-c)
             */
-            if ((error_exit != 0) && (ret == -EINTR))
+            if (ret == -EINTR)
             {
-                pvfs2_print("pvfs2_file_write: returning error %d "
-                            "(error_exit=%d)\n", ret, error_exit);
+                pvfs2_print("pvfs2_file_write: returning error %d\n", ret);
             }
             else
             {
                 pvfs2_error(
                     "pvfs2_file_write: error writing to handle %llu, "
-                    "FILE: %s\n  -- downcall status is %d, returning %d "
-                    "(error_exit=%d)\n",
+                    "FILE: %s\n  -- returning %d\n",
                     llu(pvfs2_ino_to_handle(inode->i_ino)),
                     (file && file->f_dentry && file->f_dentry->d_name.name ?
                      (char *)file->f_dentry->d_name.name : "UNKNOWN"),
-                    dc_status, ret, error_exit);
+                    ret);
             }
             *offset = original_offset;
             return ret;
@@ -583,11 +568,11 @@ static ssize_t pvfs2_file_readv(
     unsigned long nr_segs,
     loff_t *offset)
 {
-    int ret = -1, retries = PVFS2_OP_RETRY_COUNT;
+    int ret = -1;
     pvfs2_kernel_op_t *new_op = NULL;
     struct iovec *iovecptr = NULL, *ptr = NULL;
     loff_t original_offset = *offset;
-    int buffer_index = -1, error_exit = 0;
+    int buffer_index = -1;
     struct inode *inode = file->f_dentry->d_inode;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
     size_t amt_complete = 0;
@@ -674,7 +659,6 @@ static ssize_t pvfs2_file_readv(
     seg = 0;
     while (total_count < count)
     {
-        int dc_status = 0;
         new_op = op_alloc();
         if (!new_op)
         {
@@ -715,18 +699,12 @@ static ssize_t pvfs2_file_readv(
         new_op->upcall.req.io.count = each_count;
         new_op->upcall.req.io.offset = *offset;
 
-
-        dc_status = 0;
-
-        service_error_exit_op_with_timeout_retry(
-            new_op, "pvfs2_file_readv", retries, error_exit,
+        ret = service_operation(
+            new_op, "pvfs2_file_readv", PVFS2_OP_RETRY_COUNT,
             get_interruptible_flag(inode));
 
-        if (new_op->downcall.status != 0)
+        if (ret < 0)
         {
-            dc_status = new_op->downcall.status;
-
-            error_exit:
               /* this macro is defined in pvfs2-kernel.h */
               handle_io_error();
 
@@ -735,21 +713,19 @@ static ssize_t pvfs2_file_readv(
                 termination unless we've got debugging turned on, as
                 this can happen regularly (i.e. ctrl-c)
               */
-              if ((error_exit != 0) && (ret == -EINTR))
+              if (ret == -EINTR)
               {
-                  pvfs2_print("pvfs2_file_readv: returning error %d "
-                              "(error_exit=%d)\n", ret, error_exit);
+                  pvfs2_print("pvfs2_file_readv: returning error %d\n", ret);
               }
               else
               {
                   pvfs2_error(
                         "pvfs2_file_readv: error writing to handle %llu, "
-                        "FILE: %s\n  -- downcall status is %d, returning %d "
-                        "(error_exit=%d)\n",
+                        "FILE: %s\n  -- returning %d\n",
                         llu(pvfs2_ino_to_handle(inode->i_ino)),
                         (file && file->f_dentry && file->f_dentry->d_name.name ?
                          (char *)file->f_dentry->d_name.name : "UNKNOWN"),
-                        dc_status, ret, error_exit);
+                        ret);
               }
               *offset = original_offset;
               if (to_free) {
@@ -780,8 +756,9 @@ static ssize_t pvfs2_file_readv(
                             "that the pvfs2-client is running.\n");
                 /* put error codes in downcall so that handle_io_error()
                  * preserves it properly */
-                new_op->downcall.status = -PVFS_EFAULT;
-                goto error_exit;
+                new_op->downcall.status = ret;
+                handle_io_error();
+                return(ret);
             }
         }
         /* advance the iovec pointer */
@@ -826,11 +803,11 @@ static ssize_t pvfs2_file_writev(
     unsigned long nr_segs,
     loff_t *offset)
 {
-    int ret = -1, retries = PVFS2_OP_RETRY_COUNT;
+    int ret = -1;
     pvfs2_kernel_op_t *new_op = NULL;
     struct iovec *iovecptr = NULL, *ptr = NULL;
     loff_t original_offset = *offset;
-    int buffer_index = -1, error_exit = 0;
+    int buffer_index = -1;
     struct inode *inode = file->f_dentry->d_inode;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
     size_t amt_complete = 0;
@@ -931,7 +908,6 @@ static ssize_t pvfs2_file_writev(
     seg = 0;
     while (total_count < count)
     {
-        int dc_status = 0;
         new_op = op_alloc();
         if (!new_op)
         {
@@ -995,16 +971,12 @@ static ssize_t pvfs2_file_writev(
             return ret;
         }
 
-        dc_status = 0;
-        service_error_exit_op_with_timeout_retry(
-            new_op, "pvfs2_file_writev", retries, error_exit,
+        ret = service_operation(
+            new_op, "pvfs2_file_writev", PVFS2_OP_RETRY_COUNT,
             get_interruptible_flag(inode));
 
-        if (new_op->downcall.status != 0)
+        if (ret < 0)
         {
-            dc_status = new_op->downcall.status;
-
-            error_exit:
               /* this macro is defined in pvfs2-kernel.h */
               handle_io_error();
 
@@ -1013,21 +985,19 @@ static ssize_t pvfs2_file_writev(
                 termination unless we've got debugging turned on, as
                 this can happen regularly (i.e. ctrl-c)
               */
-              if ((error_exit != 0) && (ret == -EINTR))
+              if (ret == -EINTR)
               {
-                  pvfs2_print("pvfs2_file_writev: returning error %d "
-                              "(error_exit=%d)\n", ret, error_exit);
+                  pvfs2_print("pvfs2_file_writev: returning error %d\n", ret);
               }
               else
               {
                   pvfs2_error(
                         "pvfs2_file_writev: error writing to handle %llu, "
-                        "FILE: %s\n  -- downcall status is %d, returning %d "
-                        "(error_exit=%d)\n",
+                        "FILE: %s\n  -- returning %d\n",
                         llu(pvfs2_ino_to_handle(inode->i_ino)),
                         (file && file->f_dentry && file->f_dentry->d_name.name ?
                          (char *)file->f_dentry->d_name.name : "UNKNOWN"),
-                        dc_status, ret, error_exit);
+                        ret);
               }
               *offset = original_offset;
               if (to_free) {
@@ -1469,15 +1439,13 @@ pvfs2_file_aio_read(struct kiocb *iocb, char __user *buffer,
     if (filp && filp->f_mapping 
              && (inode = filp->f_mapping->host))
     {
-        int dc_status = 0;
         ssize_t ret = 0;
         pvfs2_kiocb *x = NULL;
 
         /* First time submission */
         if ((x = (pvfs2_kiocb *) iocb->private) == NULL)
         {
-            int buffer_index = -1, error_exit = 0;
-            int retries = PVFS2_OP_RETRY_COUNT;
+            int buffer_index = -1;
             pvfs2_kernel_op_t *new_op = NULL;
             pvfs2_kiocb pvfs_kiocb;
             char __user *current_buf = buffer;
@@ -1513,7 +1481,6 @@ pvfs2_file_aio_read(struct kiocb *iocb, char __user *buffer,
             new_op->upcall.req.io.buf_index = buffer_index;
             new_op->upcall.req.io.count = count;
             new_op->upcall.req.io.offset = offset;
-            dc_status = 0;
             /*
              * if it is a synchronous operation, we
              * don't allocate anything here
@@ -1548,35 +1515,31 @@ pvfs2_file_aio_read(struct kiocb *iocb, char __user *buffer,
             {
                 /* 
                  * Stage the operation!
-                 * On an error, macro jumps to error_exit 
                  */
-                service_error_exit_op_with_timeout_retry(
-                        new_op, "pvfs2_file_aio_read", retries, error_exit, 
+                ret = service_operation(
+                        new_op, "pvfs2_file_aio_read", PVFS2_OP_RETRY_COUNT, 
                         get_interruptible_flag(inode));
-                if (new_op->downcall.status != 0)
+                if (ret < 0)
                 {
-                    dc_status = new_op->downcall.status;
-            error_exit:
                     handle_sync_aio_error();
                     /*
                       don't write an error to syslog on signaled operation
                       termination unless we've got debugging turned on, as
                       this can happen regularly (i.e. ctrl-c)
                     */
-                    if ((error_exit != 0) && (ret == -EINTR))
+                    if (ret == -EINTR)
                     {
-                        pvfs2_print("pvfs2_file_aio_read: returning error %d " 
-                                "(error_exit=%d)\n", (int) ret, error_exit);
+                        pvfs2_print("pvfs2_file_aio_read: returning error %d\n" 
+                                , (int) ret);
                     }
                     else
                     {
                         pvfs2_error(
                             "pvfs2_file_aio_read: error reading from "
                             " handle %llu, "
-                            "\n  -- downcall status is %d, returning %d "
-                            "(error_exit=%d)\n",
+                            "\n  -- returning %d\n",
                             llu(pvfs2_ino_to_handle(inode->i_ino)),
-                            dc_status, (int) ret, error_exit);
+                            (int) ret);
                     }
                     error = ret;
                     goto out_error;
@@ -1591,9 +1554,10 @@ pvfs2_file_aio_read(struct kiocb *iocb, char __user *buffer,
                 if (ret)
                 {
                     pvfs2_print("Failed to copy user buffer %d\n", (int) ret);
-                    new_op->downcall.status = -PVFS_EFAULT;
-                    /* error is set in the goto target */
-                    goto error_exit;
+                    new_op->downcall.status = ret;
+                    handle_sync_aio_error();
+                    error = ret;
+                    goto out_error;
                 }
                 error = new_op->downcall.resp.io.amt_complete;
                 wake_up_device_for_return(new_op);
@@ -1723,7 +1687,6 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
     error = -EINVAL;
     if (filp && inode)
     {
-        int dc_status = 0;
         ssize_t ret = 0;
         pvfs2_kiocb *x = NULL;
 
@@ -1731,7 +1694,6 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
         if ((x = (pvfs2_kiocb *) iocb->private) == NULL)
         {
             int buffer_index = -1;
-            int retries = PVFS2_OP_RETRY_COUNT, error_exit = 0;
             pvfs2_kernel_op_t *new_op = NULL;
             pvfs2_kiocb pvfs_kiocb;
             char __user *current_buf = (char *) buffer;
@@ -1787,7 +1749,6 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
                 goto out_error;
             }
 
-            dc_status = 0;
             /* 
              * if it is a synchronous operation, we
              * don't allocate anything here 
@@ -1822,25 +1783,22 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
             {
                 /*
                  * Stage the operation!
-                 * On an error, macro jumps to error_exit 
                  */
-                service_error_exit_op_with_timeout_retry(
-                        new_op, "pvfs2_file_aio_write", retries, error_exit, 
+                ret = service_operation(
+                        new_op, "pvfs2_file_aio_write", PVFS2_OP_RETRY_COUNT, 
                         get_interruptible_flag(inode));
-                if (new_op->downcall.status != 0)
+                if (ret < 0)
                 {
-                    dc_status = new_op->downcall.status;
-            error_exit:
                     handle_sync_aio_error();
                     /*
                       don't write an error to syslog on signaled operation
                       termination unless we've got debugging turned on, as
                       this can happen regularly (i.e. ctrl-c)
                     */
-                    if ((error_exit != 0) && (ret == -EINTR))
+                    if (ret == -EINTR)
                     {
-                        pvfs2_print("pvfs2_file_aio_write: returning error %d " 
-                                "(error_exit=%d)\n", (int) ret, error_exit);
+                        pvfs2_print("pvfs2_file_aio_write: returning error %d\n", 
+                                (int) ret);
                     }
                     else
                     {
@@ -1848,13 +1806,12 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
                             "pvfs2_file_aio_write: error writing to "
                             " handle %llu, "
                             "FILE: %s\n  -- "
-                            "downcall status is %d, returning %d "
-                            "(error_exit=%d)\n",
+                            "returning %d\n",
                             llu(pvfs2_ino_to_handle(inode->i_ino)),
                             (filp && filp->f_dentry 
                              && filp->f_dentry->d_name.name ?
                              (char *)filp->f_dentry->d_name.name : "UNKNOWN"),
-                            dc_status, (int) ret, error_exit);
+                            (int) ret);
                     }
                     error = ret;
                     goto out_error;
@@ -2022,17 +1979,12 @@ int pvfs2_fsync(
     new_op->upcall.type = PVFS2_VFS_OP_FSYNC;
     new_op->upcall.req.fsync.refn = pvfs2_inode->refn;
 
-    service_operation(new_op, "pvfs2_fsync",
+    ret = service_operation(new_op, "pvfs2_fsync", 0,
                       get_interruptible_flag(file->f_dentry->d_inode));
-
-    ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
 
     pvfs2_print("pvfs2_fsync got return value of %d\n",ret);
 
-  error_exit:
-    translate_error_if_wait_failed(ret, 0, 0);
     op_release(new_op);
-
     return ret;
 }
 

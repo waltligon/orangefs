@@ -404,11 +404,9 @@ static ssize_t pvfs2_devreq_writev(
 
                     if (op->downcall.status != 0)
                     {
-                        ret = pvfs2_kernel_error_code_convert(
+                        ret = pvfs2_normalize_to_errno(
                                 op->downcall.status);
-                        bytes_copied = 
-                            (ret == PVFS2_WAIT_TIMEOUT_REACHED) ? -EIO : 
-                            (ret == PVFS2_WAIT_SIGNAL_RECVD) ? -EINTR: ret;
+                        bytes_copied = ret;
                     }
                     else {
                         bytes_copied = op->downcall.resp.io.amt_complete;
@@ -481,7 +479,7 @@ static int pvfs2_devreq_release(
 
     pvfs2_print("pvfs2_devreq_release: trying to finalize\n");
 
-    down_interruptible(&devreq_semaphore);
+    down(&devreq_semaphore);
     pvfs_bufmap_finalize();
 
     open_access_count--;
@@ -560,7 +558,11 @@ static int pvfs2_devreq_ioctl(
               all of the remounts are serviced (to avoid ops between
               mounts to fail)
             */
-            down_interruptible(&request_semaphore);
+            ret = down_interruptible(&request_semaphore);
+            if(ret < 0)
+            {
+                return(ret);
+            }
             pvfs2_print("pvfs2_devreq_ioctl: priority remount "
                         "in progress\n");
             list_for_each(tmp, &pvfs2_superblocks) {

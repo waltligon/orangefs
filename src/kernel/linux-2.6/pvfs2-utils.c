@@ -334,7 +334,7 @@ static inline int copy_attributes_from_inode(
 */
 int pvfs2_inode_getattr(struct inode *inode, uint32_t getattr_mask)
 {
-    int ret = -EINVAL, retries = PVFS2_OP_RETRY_COUNT, error_exit = 0;
+    int ret = -EINVAL;
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
 
@@ -384,12 +384,12 @@ int pvfs2_inode_getattr(struct inode *inode, uint32_t getattr_mask)
         new_op->upcall.req.getattr.refn = pvfs2_inode->refn;
         new_op->upcall.req.getattr.mask = getattr_mask;
 
-        service_error_exit_op_with_timeout_retry(
-            new_op, "pvfs2_inode_getattr", retries, error_exit,
+        ret = service_operation(
+            new_op, "pvfs2_inode_getattr", PVFS2_OP_RETRY_COUNT, 
             get_interruptible_flag(inode));
 
         /* check what kind of goodies we got */
-        if (new_op->downcall.status > -1)
+        if (ret == 0)
         {
             if (copy_attributes_to_inode
                 (inode, &new_op->downcall.resp.getattr.attributes,
@@ -402,15 +402,11 @@ int pvfs2_inode_getattr(struct inode *inode, uint32_t getattr_mask)
             }
         }
 
-      error_exit:
-        ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
-        translate_error_if_wait_failed(ret, 0, 0);
-
       copy_attr_failure:
         pvfs2_print("Getattr on handle %llu, fsid %d\n  (inode ct = %d) "
-                    "returned %d (error_exit = %d)\n",
+                    "returned %d\n",
                     llu(pvfs2_inode->refn.handle), pvfs2_inode->refn.fs_id,
-                    (int)atomic_read(&inode->i_count), ret, error_exit);
+                    (int)atomic_read(&inode->i_count), ret);
         /* store error code in the inode so that we can retrieve it later if
          * needed
          */
@@ -432,7 +428,7 @@ int pvfs2_inode_setattr(
     struct inode *inode,
     struct iattr *iattr)
 {
-    int ret = -ENOMEM, retries = PVFS2_OP_RETRY_COUNT, error_exit = 0;
+    int ret = -ENOMEM;
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
 
@@ -465,13 +461,9 @@ int pvfs2_inode_setattr(
             return(ret);
         }
 
-        service_error_exit_op_with_timeout_retry(
-            new_op, "pvfs2_inode_setattr", retries, error_exit,
+        ret = service_operation(
+            new_op, "pvfs2_inode_setattr", PVFS2_OP_RETRY_COUNT,
             get_interruptible_flag(inode));
-
-      error_exit:
-        ret = (error_exit ? -EINTR :
-               pvfs2_kernel_error_code_convert(new_op->downcall.status));
 
         pvfs2_print("pvfs2_inode_setattr: returning %d\n", ret);
 
@@ -517,7 +509,6 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char *name,
         void *buffer, size_t size)
 {
     ssize_t ret = -ENOMEM;
-    int retries = PVFS2_OP_RETRY_COUNT, error_exit = 0;
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
     ssize_t length = 0;
@@ -559,13 +550,10 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char *name,
         pvfs2_print("pvfs2_inode_getxattr: key %s, key_sz %d\n", 
                 name, (int) new_op->upcall.req.getxattr.key_sz);
 
-        service_error_exit_op_with_timeout_retry(
-            new_op, "pvfs2_inode_getxattr", retries, error_exit,
+        ret = service_operation(
+            new_op, "pvfs2_inode_getxattr", PVFS2_OP_RETRY_COUNT, 
             get_interruptible_flag(inode));
 
-      error_exit:
-        ret = (error_exit ? -EINTR :
-               pvfs2_kernel_error_code_convert(new_op->downcall.status));
         /* Upon success, we need to get the value length
          * from downcall and return that.
          * and also copy the value out to the requester
@@ -635,7 +623,7 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char *name,
 int pvfs2_inode_setxattr(struct inode *inode, const char *name,
         const void *value, size_t size, int flags)
 {
-    int ret = -ENOMEM, retries = PVFS2_OP_RETRY_COUNT, error_exit = 0;
+    int ret = -ENOMEM;
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
 
@@ -694,13 +682,9 @@ int pvfs2_inode_setxattr(struct inode *inode, const char *name,
         /* For some reason, val_sz should include the \0 at the end as well */
         new_op->upcall.req.setxattr.keyval.val_sz = size + 1;
 
-        service_error_exit_op_with_timeout_retry(
-            new_op, "pvfs2_inode_setxattr", retries, error_exit,
+        ret = service_operation(
+            new_op, "pvfs2_inode_setxattr", PVFS2_OP_RETRY_COUNT,
             get_interruptible_flag(inode));
-
-      error_exit:
-        ret = (error_exit ? -EINTR :
-               pvfs2_kernel_error_code_convert(new_op->downcall.status));
 
         pvfs2_print("pvfs2_inode_setxattr: returning %d\n", ret);
 
@@ -713,7 +697,7 @@ int pvfs2_inode_setxattr(struct inode *inode, const char *name,
 
 int pvfs2_inode_removexattr(struct inode *inode, const char *name)
 {
-    int ret = -ENOMEM, retries = PVFS2_OP_RETRY_COUNT, error_exit = 0;
+    int ret = -ENOMEM;
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
 
@@ -747,13 +731,9 @@ int pvfs2_inode_removexattr(struct inode *inode, const char *name)
         new_op->upcall.req.removexattr.key_sz = 
             strlen(new_op->upcall.req.removexattr.key) + 1;
 
-        service_error_exit_op_with_timeout_retry(
-            new_op, "pvfs2_inode_removexattr", retries, error_exit,
+        ret = service_operation(
+            new_op, "pvfs2_inode_removexattr", PVFS2_OP_RETRY_COUNT,
             get_interruptible_flag(inode));
-
-      error_exit:
-        ret = (error_exit ? -EINTR :
-               pvfs2_kernel_error_code_convert(new_op->downcall.status));
 
         if (ret == -ENOENT)
         {
@@ -780,7 +760,7 @@ int pvfs2_inode_removexattr(struct inode *inode, const char *name)
 int pvfs2_inode_listxattr(struct inode *inode, char *buffer, size_t size)
 {
     ssize_t ret = -ENOMEM, total = 0;
-    int i, retries = PVFS2_OP_RETRY_COUNT, error_exit = 0;
+    int i;
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
     ssize_t length = 0;
@@ -818,12 +798,9 @@ int pvfs2_inode_listxattr(struct inode *inode, char *buffer, size_t size)
         new_op->upcall.req.listxattr.refn = pvfs2_inode->refn;
         new_op->upcall.req.listxattr.token = token;
         new_op->upcall.req.listxattr.requested_count = (size == 0) ? 0 : PVFS_MAX_XATTR_LISTLEN;
-        service_error_exit_op_with_timeout_retry(
-                new_op, "pvfs2_inode_listxattr", retries,
-                error_exit, get_interruptible_flag(inode));
-    error_exit:
-        ret = (error_exit ? -EINTR :
-                pvfs2_kernel_error_code_convert(new_op->downcall.status));
+        ret = service_operation(
+                new_op, "pvfs2_inode_listxattr", PVFS2_OP_RETRY_COUNT,
+                get_interruptible_flag(inode));
         if (ret == 0)
         {
             if (size == 0)
@@ -889,7 +866,7 @@ static inline struct inode *pvfs2_create_file(
     int mode,
     int *error_code)
 {
-    int ret = -1, retries = PVFS2_OP_RETRY_COUNT, error_exit = 0;
+    int ret = -1;
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *parent = PVFS2_I(dir);
     pvfs2_inode_t *pvfs2_inode = NULL;
@@ -922,11 +899,9 @@ static inline struct inode *pvfs2_create_file(
     strncpy(new_op->upcall.req.create.d_name,
             dentry->d_name.name, PVFS2_NAME_LEN);
 
-    service_error_exit_op_with_timeout_retry(
-        new_op, "pvfs2_create_file", retries, error_exit,
+    ret = service_operation(
+        new_op, "pvfs2_create_file", PVFS2_OP_RETRY_COUNT,
         get_interruptible_flag(dir));
-
-    ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
 
     pvfs2_print("Create Got PVFS2 handle %llu on fsid %d (ret=%d)\n",
                 llu(new_op->downcall.resp.create.refn.handle),
@@ -961,10 +936,7 @@ static inline struct inode *pvfs2_create_file(
     }
     else
     {
-      error_exit:
-        *error_code = (error_exit ? -EINTR :
-                       pvfs2_kernel_error_code_convert(
-                           new_op->downcall.status));
+        *error_code = ret;
 
         pvfs2_print("pvfs2_create_file: failed with error code %d\n",
                     *error_code);
@@ -980,7 +952,7 @@ static inline struct inode *pvfs2_create_dir(
     int mode,
     int *error_code)
 {
-    int ret = -1, retries = PVFS2_OP_RETRY_COUNT, error_exit = 0;
+    int ret = -1;
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *parent = PVFS2_I(dir);
     pvfs2_inode_t *pvfs2_inode = NULL;
@@ -1013,15 +985,15 @@ static inline struct inode *pvfs2_create_dir(
     strncpy(new_op->upcall.req.mkdir.d_name,
             dentry->d_name.name, PVFS2_NAME_LEN);
 
-    service_error_exit_op_with_timeout_retry(
-        new_op, "pvfs2_create_dir", retries, error_exit,
+    ret = service_operation(
+        new_op, "pvfs2_create_dir", PVFS2_OP_RETRY_COUNT,
         get_interruptible_flag(dir));
 
     pvfs2_print("Mkdir Got PVFS2 handle %llu on fsid %d\n",
                 llu(new_op->downcall.resp.mkdir.refn.handle),
                 new_op->downcall.resp.mkdir.refn.fs_id);
 
-    if (new_op->downcall.status > -1)
+    if (ret > -1)
     {
         inode = pvfs2_get_custom_inode(
             dir->i_sb, dir, (S_IFDIR | mode), 0, pvfs2_handle_to_ino(
@@ -1050,10 +1022,7 @@ static inline struct inode *pvfs2_create_dir(
     }
     else
     {
-      error_exit:
-        *error_code = (error_exit ? -EINTR :
-                       pvfs2_kernel_error_code_convert(
-                           new_op->downcall.status));
+        *error_code = ret;
 
         pvfs2_print("pvfs2_create_dir: failed with error code %d\n",
                     *error_code);
@@ -1070,7 +1039,7 @@ static inline struct inode *pvfs2_create_symlink(
     int mode,
     int *error_code)
 {
-    int ret = -1, retries = PVFS2_OP_RETRY_COUNT, error_exit = 0;
+    int ret = -1;
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *parent = PVFS2_I(dir);
     pvfs2_inode_t *pvfs2_inode = NULL;
@@ -1104,11 +1073,9 @@ static inline struct inode *pvfs2_create_symlink(
             PVFS2_NAME_LEN);
     strncpy(new_op->upcall.req.sym.target, symname, PVFS2_NAME_LEN);
 
-    service_error_exit_op_with_timeout_retry(
-        new_op, "pvfs2_symlink_file", retries, error_exit,
+    ret = service_operation(
+        new_op, "pvfs2_symlink_file", PVFS2_OP_RETRY_COUNT,
         get_interruptible_flag(dir));
-
-    ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
 
     pvfs2_print("Symlink Got PVFS2 handle %llu on fsid %d (ret=%d)\n",
                 llu(new_op->downcall.resp.sym.refn.handle),
@@ -1143,10 +1110,7 @@ static inline struct inode *pvfs2_create_symlink(
     }
     else
     {
-      error_exit:
-        *error_code = (error_exit ? -EINTR :
-                       pvfs2_kernel_error_code_convert(
-                           new_op->downcall.status));
+        *error_code = ret;
 
         pvfs2_print("pvfs2_create_symlink: failed with error code %d\n",
                     *error_code);
@@ -1205,7 +1169,7 @@ int pvfs2_remove_entry(
     struct inode *dir,
     struct dentry *dentry)
 {
-    int ret = -EINVAL, retries = PVFS2_OP_RETRY_COUNT;
+    int ret = -EINVAL;
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *parent = PVFS2_I(dir);
     struct inode *inode = dentry->d_inode;
@@ -1238,15 +1202,15 @@ int pvfs2_remove_entry(
         strncpy(new_op->upcall.req.remove.d_name,
                 dentry->d_name.name, PVFS2_NAME_LEN);
 
-        service_operation_with_timeout_retry(
-            new_op, "pvfs2_remove_entry", retries,
+        ret = service_operation(
+            new_op, "pvfs2_remove_entry", PVFS2_OP_RETRY_COUNT,
             get_interruptible_flag(inode));
 
         /*
            the remove has no downcall members to retrieve, but
            the status value tells us if it went through ok or not
          */
-        if (new_op->downcall.status == 0)
+        if (ret == 0)
         {
             /*
               adjust the readdir token if in fact we're in the middle
@@ -1256,9 +1220,7 @@ int pvfs2_remove_entry(
             pvfs2_print("token adjustment is %d\n",
                         parent->readdir_token_adjustment);
         }
-        ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
 
-      error_exit:
         /* when request is serviced properly, free req op struct */
         op_release(new_op);
     }
@@ -1269,7 +1231,7 @@ int pvfs2_truncate_inode(
     struct inode *inode,
     loff_t size)
 {
-    int ret = -EINVAL, retries = 5;
+    int ret = -EINVAL;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
     pvfs2_kernel_op_t *new_op = NULL;
 
@@ -1287,20 +1249,16 @@ int pvfs2_truncate_inode(
     new_op->upcall.req.truncate.refn = pvfs2_inode->refn;
     new_op->upcall.req.truncate.size = (PVFS_size)size;
 
-    service_operation_with_timeout_retry(
-        new_op, "pvfs2_truncate_inode", retries,
+    ret = service_operation(
+        new_op, "pvfs2_truncate_inode", PVFS2_OP_RETRY_COUNT, 
         get_interruptible_flag(inode));
 
     /*
       the truncate has no downcall members to retrieve, but
       the status value tells us if it went through ok or not
     */
-    ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
-
     pvfs2_print("pvfs2: pvfs2_truncate got return value of %d\n",ret);
 
-  error_exit:
-    translate_error_if_wait_failed(ret, 0, 0);
     op_release(new_op);
 
     return ret;
@@ -1325,18 +1283,13 @@ int pvfs2_flush_mmap_racache(struct inode *inode)
     new_op->upcall.type = PVFS2_VFS_OP_MMAP_RA_FLUSH;
     new_op->upcall.req.ra_cache_flush.refn = pvfs2_inode->refn;
 
-    service_operation(new_op, "pvfs2_flush_mmap_racache",
+    ret = service_operation(new_op, "pvfs2_flush_mmap_racache", 0,
                       get_interruptible_flag(inode));
-
-    ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
 
     pvfs2_print("pvfs2_flush_mmap_racache got return "
                 "value of %d\n",ret);
 
-  error_exit:
-    translate_error_if_wait_failed(ret, 0, 0);
     op_release(new_op);
-
     return ret;
 }
 #endif
@@ -1362,8 +1315,7 @@ int pvfs2_unmount_sb(struct super_block *sb)
     pvfs2_print("Attempting PVFS2 Unmount via host %s\n",
                 new_op->upcall.req.fs_umount.pvfs2_config_server);
 
-    service_operation(new_op, "pvfs2_fs_umount", 0);
-    ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
+    ret = service_operation(new_op, "pvfs2_fs_umount", 0, 0);
 
     pvfs2_print("pvfs2_unmount: got return value of %d\n", ret);
     if (ret)
@@ -1371,10 +1323,7 @@ int pvfs2_unmount_sb(struct super_block *sb)
         sb = ERR_PTR(ret);
     }
 
-  error_exit:
-    translate_error_if_wait_failed(ret, 0, 0);
     op_release(new_op);
-
     return ret;
 }
 
@@ -1400,46 +1349,13 @@ int pvfs2_cancel_op_in_progress(unsigned long tag)
     pvfs2_print("Attempting PVFS2 operation cancellation of tag %llu\n",
                 llu(new_op->upcall.req.cancel.op_tag));
 
-    service_cancellation_operation(new_op);
-    ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
+    ret = service_operation(new_op, "pvfs2_cancel", 0, PVFS2_OP_CANCELLATION);
 
     pvfs2_print("pvfs2_cancel_op_in_progress: got return "
                 "value of %d\n", ret);
 
-  error_exit:
-    translate_error_if_wait_failed(ret, 0, 0);
     op_release(new_op);
-
-    return -EINTR;
-}
-
-/* macro defined in include/pvfs2-types.h */
-DECLARE_ERRNO_MAPPING_AND_FN();
-
-PVFS_error pvfs2_kernel_error_code_convert(PVFS_error pvfs2_error_code)
-{
-    if ((pvfs2_error_code == PVFS2_WAIT_TIMEOUT_REACHED) ||
-        (pvfs2_error_code == PVFS2_WAIT_SIGNAL_RECVD))
-    {
-        return pvfs2_error_code;
-    }
-
-    if (IS_PVFS_NON_ERRNO_ERROR(pvfs2_error_code))
-    {
-        PVFS_error ret = -EPERM;
-        int index = PVFS_get_errno_mapping(pvfs2_error_code);
-        switch(PINT_non_errno_mapping[index])
-        {
-            case PVFS_ECANCEL:
-                ret = -EINTR;
-                break;
-            default:
-                pvfs2_error("Unhandled pvfs2 error code: %d\n",
-                            pvfs2_error_code);
-        }
-        return ret;
-    }
-    return PVFS_get_errno_mapping(pvfs2_error_code);
+    return (ret);
 }
 
 void pvfs2_inode_initialize(pvfs2_inode_t *pvfs2_inode)
@@ -1542,6 +1458,33 @@ PVFS_time pvfs2_convert_time_field(void *time_ptr)
     pvfs2_time = (PVFS_time)((time_t)tspec->tv_sec);
 #endif
     return pvfs2_time;
+}
+
+/* macro defined in include/pvfs2-types.h */
+DECLARE_ERRNO_MAPPING_AND_FN();
+
+int pvfs2_normalize_to_errno(PVFS_error error_code)
+{
+    if(error_code > 0)
+    {
+        pvfs2_error("pvfs2: error status receieved.\n");
+        pvfs2_error("pvfs2: assuming error code is inverted.\n");
+        error_code = -error_code;
+    }
+
+    /* convert any error codes that are in pvfs2 format */
+    if(IS_PVFS_NON_ERRNO_ERROR(-error_code))
+    {
+        /* assume a default error code */
+        pvfs2_error("pvfs2: warning: "
+            "got error code without errno equivalent: %d.\n", error_code);
+        error_code = -EINVAL;
+    }
+    else if(IS_PVFS_ERROR(-error_code))
+    {
+        error_code = -PVFS_ERROR_TO_ERRNO(-error_code);
+    }
+    return(error_code);
 }
 
 /*

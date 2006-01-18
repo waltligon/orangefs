@@ -58,7 +58,6 @@ static int pvfs2_param_proc_handler(
     struct pvfs2_param_extra* extra = ctl->extra1;
     int val = 0;
     int ret = 0;
-    int intr_flag = 0;
     ctl_table tmp_ctl = *ctl;
 
     /* override fields in control structure for call to generic proc handler */
@@ -89,7 +88,6 @@ static int pvfs2_param_proc_handler(
         pvfs2_print("pvfs2: proc write %d\n", val);
         new_op->upcall.req.param.value = val;
         new_op->upcall.req.param.type = PVFS2_PARAM_REQUEST_SET;
-        intr_flag = 1;
     }
     else
     {
@@ -101,12 +99,9 @@ static int pvfs2_param_proc_handler(
     new_op->upcall.req.param.op = extra->op;
 
     /* perform operation (get or set) */
-    /* TODO: change logic to use retry fn */
-    service_operation(new_op, "pvfs2_param", intr_flag);
-
-    ret = pvfs2_kernel_error_code_convert(new_op->downcall.status);
-    pvfs2_print("pvfs2_param got return value of %d\n", ret);
-
+    ret = service_operation(new_op, "pvfs2_param", PVFS2_OP_RETRY_COUNT, 
+        PVFS2_OP_INTERRUPTIBLE);
+    
     if(ret == 0 && !write)
     {
         /* use generic proc handling function to output value */
@@ -119,10 +114,7 @@ static int pvfs2_param_proc_handler(
 #endif
     }
 
-  error_exit:
-    translate_error_if_wait_failed(ret, 0, 0);
     op_release(new_op);
-
     return(ret);
 }
 
@@ -146,8 +138,6 @@ static int pvfs2_acache_pc_proc_handler(
     pvfs2_kernel_op_t *new_op = NULL;
     int ret;
     int pos = 0;
-    int error_exit = 0;
-    int retries = PVFS2_OP_RETRY_COUNT;
     int to_copy = 0;
     int* pc_type = ctl->extra1;
 #ifdef HAVE_PROC_HANDLER_SIX_ARG
@@ -173,14 +163,8 @@ static int pvfs2_acache_pc_proc_handler(
     new_op->upcall.type = PVFS2_VFS_OP_PERF_COUNT;
 
     /* retrieve performance counters */
-    service_error_exit_op_with_timeout_retry(new_op, "pvfs2_perf_count", 
-        retries, error_exit, 1);
-
-  error_exit:
-    ret = (error_exit ? -EINTR :
-           pvfs2_kernel_error_code_convert(new_op->downcall.status));
-
-    pvfs2_print("pvfs2 perf count: returned %d\n", ret);
+    ret = service_operation(new_op, "pvfs2_perf_count",
+        PVFS2_OP_RETRY_COUNT, PVFS2_OP_INTERRUPTIBLE);
 
     if(ret == 0)
     {
