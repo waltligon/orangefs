@@ -142,9 +142,11 @@ BUILD_CC = @BUILD_CC@
 BUILD_LD = @BUILD_CC@
 CFLAGS = @CFLAGS@
 LDFLAGS = @LDFLAGS@
+SERVER_LDFLAGS = @SERVER_LDFLAGS@
 LDSHARED = $(CC) -shared
 PICFLAGS = -fPIC
 LDFLAGS += -Llib 
+SERVER_LDFLAGS += -Llib
 LIBS += -lpvfs2 @LIBS@ 
 MMAP_RA_CACHE = @MMAP_RA_CACHE@
 TRUSTED_CONNECTIONS = @TRUSTED_CONNECTIONS@
@@ -244,6 +246,7 @@ ifdef BUILD_GM
 	# time
 	CFLAGS += -DENABLE_GM_BUFPOOL
 	LDFLAGS += -L @GM_HOME@/lib
+	SERVER_LDFLAGS += -L @GM_HOME@/lib
 	LIBS += -lgm
 	SERVERLIBS += -lgm
 endif
@@ -495,7 +498,7 @@ modldflags = $(MODLDFLAGS_$(call canonname,$(1))) \
 # rule for building the pvfs2 server
 $(SERVER): src/server/pvfs2-server-server.o lib/libpvfs2-server.a 
 	$(Q) "  LD		$@"
-	$(E)$(LD) $^ -o $@ $(LDFLAGS) $(SERVERLIBS)
+	$(E)$(LD) $^ -o $@ $(SERVER_LDFLAGS) $(SERVERLIBS)
 
 # special rules for admin tools which also require server components
 $(ADMINTOOLS_SERVER): %: %.o
