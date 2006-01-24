@@ -3,23 +3,30 @@
 
 import os,sys,string
 
-# default directory to download and build in 
-rootdir="/tmp/pvfs2-build-test/"
+from optparse import OptionParser
 
+parser = OptionParser()
+parser.add_option("-v", "--cvstag", dest="cvs_tag", default="HEAD",
+		  help="pvfs2 cvs tag", metavar="TAG")
+parser.add_option("-r", "--dir", dest="rootdir", 
+                  default="/tmp/pvfs2-build-test/",
+		  help="build directory", metavar="DIR")
+
+(options, args) = parser.parse_args()
 
 def get_build_MPICH2():
 
-	os.chdir(rootdir)
-	if os.path.exists('mpich2-beta.tar.gz'):
-		os.remove('mpich2-beta.tar.gz')
+	os.chdir(options.rootdir)
+	if os.path.exists('mpich2.tar.gz'):
+		os.remove('mpich2.tar.gz')
 	if os.path.exists('mpich2-src'):
 		os.remove('mpich2-src')
 
 	# get MPICH2 and extract it
-	if os.system('wget -q --passive-ftp ftp://ftp.mcs.anl.gov/pub/mpi/mpich2-beta.tar.gz'):
-		print "Failed to download mpich2; Exiting..."
+	if os.system('wget -q --passive-ftp ftp://ftp.mcs.anl.gov/pub/mpi/mpich2.tar.gz'):
+		print "Failed to download mpich2 Exiting..."
 		sys.exit(1)
-	if os.system('tar -xzvf mpich2-beta.tar.gz >tarout'):
+	if os.system('tar -xzvf mpich2.tar.gz >tarout'):
 		print "Failed to untar mpich2; Exiting..."
 		sys.exit(1)
 
@@ -29,8 +36,10 @@ def get_build_MPICH2():
 
 	# look for a patch that matches it- don't error out if this fails; 
 	# the mpich2 version we downloaded may not need a patch
-	os.system('ls pvfs2/doc/coding/romio-MPICH2-`head -n1 tarout | cut -d "-" -f 2 | cut -d "/" -f 1`-PVFS2* > target_patch')
-	os.system('patch -s -p1 -d mpich2-src/src/mpi/romio < `cat target_patch`')
+
+	# turn this off for now since it doesn't seem to be working
+	#os.system('ls pvfs2/doc/coding/romio-MPICH2-`head -n1 tarout | cut -d "-" -f 2 | cut -d "/" -f 1`-PVFS2* > target_patch')
+	#os.system('patch -s -p1 -d mpich2-src/src/mpi/romio < `cat target_patch`')
 
 	os.remove('tarout')
 
@@ -50,24 +59,24 @@ def get_build_MPICH2():
 	os.chdir("src/mpi/romio")
 	if os.system('autoconf > ../mpich-romio-autoconf.log 2>&1'):
 		print "MPICH2 autoconf failed; Exiting..."
-		print "See " + rootdir + "mpich-romio-autoconf.log for deatils."
+		print "See "+options.rootdir+"/mpich-romio-autoconf.log for deatils."
 		sys.exit(1)
 	os.chdir("../../../")
 
 	if os.system('./configure --enable-romio --with-file-system=ufs+nfs+pvfs2 --disable-f77 --prefix='+mpichdir+' --exec-prefix='+mpichdir+' >../mpich-configure.log 2>&1'):
 		print "MPICH2 configure failed; Exiting..."
-		print "See " + rootdir + "mpich-configure.log for details."
+		print "See " + options.rootdir + "/mpich-configure.log for details."
 		print "Perhaps you forgot to run pvfs2-build first?"
 		sys.exit(1)
 
 	if os.system('make > ../mpich-make.log 2>&1'):
-		print "See " + rootdir + "mpich-make.log for details."
+		print "See " + options.rootdir + "mpich-make.log for details."
 		print "MPICH2 build failed; Exiting..."
 		sys.exit(1)
 	
 	if os.system('make install > ../mpich-make-install.log 2>&1'):
 		print "MPICH2 make install failed; Exiting..."
-		print "See " + rootdir + "mpich-make-install.log for details."
+		print "See " + options.rootdir + "mpich-make-install.log for details."
 		sys.exit(1)
 	
 	# UNset variables not needed anymore
@@ -80,21 +89,18 @@ def get_build_MPICH2():
 
 	return
 
-if len(sys.argv)<2:
-	print "MPICH2 will be built in default directory (/tmp/pvfs2-build-test)."
-else:
-	rootdir=sys.argv[1]+"/"
-	print "MPICH2 will be built in " + rootdir + "."
+	print "MPICH2 will be built in "+options.rootdir+"."
 
-pvfs2_src=rootdir+'pvfs2/'
-pvfs2_build=rootdir+'BUILD-pvfs2/'
-pvfs2_install=rootdir+'INSTALL-pvfs2/'
-mpichdir=rootdir+'mpich2/'
-mpichsrc=rootdir+'mpich2-src/'
+pvfs2_src=options.rootdir+'/pvfs2-'+options.cvs_tag
+pvfs2_build=options.rootdir+'/BUILD-pvfs2'+options.cvs_tag
+pvfs2_install=options.rootdir+'/INSTALL-pvfs2'+options.cvs_tag
+mpichdir=options.rootdir+'/mpich2/'
+mpichsrc=options.rootdir+'/mpich2-src/'
 
-if not os.path.exists(rootdir):
-	os.mkdir(rootdir)
+if not os.path.exists(options.rootdir):
+	os.mkdir(options.rootdir)
+	
 
-os.chdir(rootdir)
+os.chdir(options.rootdir)
 
 get_build_MPICH2()

@@ -13,7 +13,7 @@ tarballurl=http://www.mcs.anl.gov/hpio/pvfs2-0.0.6.tar.gz
 cvsroot=:pserver:anonymous@cvs.parl.clemson.edu:/anoncvs 
 # specify extra configure options here; for now we disable karma because
 # of all the gtk warnings
-configureopts=--disable-karma
+configureopts="$PVFS2_CONFIGOPTS --disable-karma"
 
 
 #
@@ -45,12 +45,13 @@ get_dist() {
 # pulls from CVS the tag or branch specified by the first argument.  returns
 # nonzero on error.
 get_cvs() {
-	expect -c "spawn -noecho cvs -Q -d $cvsroot login; send \r;"
+#	expect -c "spawn -noecho cvs -Q -d $cvsroot login; send \r;"
 	cvs -Q -d $cvsroot co -r $1 pvfs2 
 	if [ $? -ne 0 ] ; then
 		echo "Pulling PVFS2 from $cvsroot failed."
 		exit 1
 	fi
+	mv pvfs2 pvfs2-$1
 }
 
 # end of user defines
@@ -71,6 +72,8 @@ usage()
     echo "  -r: path to directory to build and install in"
     echo "  -t: build test programs"
     echo "  -v: name of tag or branch in CVS"
+    echo ""
+    echo "set PVFS2_CONFIGOPTS to add platform specific configure options"
     return
 }
 
@@ -89,16 +92,15 @@ done
 echo "PVFS2 will be built in ${rootdir}."
 
 if [ ! -d $rootdir ] ; then
-	echo "Specified directory $rootdir does not exist.  Aborting."
-	exit 1
+	mkdir $rootdir
 fi
 
 date=`date "+%Y-%m-%d-%H-%M"`
 host=`uname -n`
 
-srcdir=$rootdir/pvfs2
-builddir=$rootdir/BUILD-pvfs2
-installdir=$rootdir/INSTALL-pvfs2
+srcdir=$rootdir/pvfs2-$cvs_tag
+builddir=$rootdir/BUILD-pvfs2-$cvs_tag
+installdir=$rootdir/INSTALL-pvfs2-$cvs_tag
 
 # clean up src, build, install directories
 # clean up misc. files in the root directory too
