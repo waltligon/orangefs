@@ -40,17 +40,17 @@
  </named_location>
 
  <named_location>
-  <name>op_count</name>
-  <match># operations: </match>
+  <name>OP_total</name>
+  <match>ops: </match>
  </named_location>
 
- <named_location>
-  <name>average</name>
-  <match>avg (s): </match>
- </named_location>
+ <tabular_location columns="2">
+  <match>====</match>
+  <skip>1</skip>
 
- <named_location>
-  <name>stddev</name>
-  <match>dev (s): </match>
- </named_location>
+  <tabular_value>
+   <name>T_max</name>
+   <pos>1</pos>
+  </tabular_value>
+ </tabular_location>
 </input>

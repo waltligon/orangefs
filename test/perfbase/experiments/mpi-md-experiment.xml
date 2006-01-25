@@ -59,18 +59,18 @@
   <name>operation</name>
   <synopsis>PVFS2 Operation type</synopsis>
   <datatype>string</datatype>
-  <default>CREATE</default>
+  <default>create</default>
  </parameter>
 
- <parameter>
+ <parameter occurrence="once">
   <name>clients</name>
   <synopsis>Number of clients</synopsis>
   <datatype>integer</datatype>
   <default>1</default>
  </parameter>
 
- <parameter>
-  <name>op_count</name>
+ <parameter occurrence="once">
+  <name>OP_total</name>
   <synopsis>Number of operations</synopsis>
   <datatype>integer</datatype>
   <default>100</default>
@@ -79,17 +79,8 @@
  <!-- results -->
  
  <result>
-  <name>average</name>
-  <synopsis>Average Seconds per Operation</synopsis>
-  <datatype>float</datatype>
-  <unit>
-   <base_unit>s</base_unit>
-  </unit>
- </result>
-
- <result>
-  <name>stddev</name>
-  <synopsis>Standard Deviation Seconds per Operation</synopsis>
+  <name>T_max</name>
+  <synopsis>Seconds per Operation</synopsis>
   <datatype>float</datatype>
   <unit>
    <base_unit>s</base_unit>
