@@ -439,9 +439,9 @@ PVFS-1, each role requires just the pvfs2-server binary.  It will consult the
 cluster-wide config file and the node-specific config file when it starts up to
 know what role pvfs2-server should perform on this machine.
 
-We currently support just one metadata server (this limit will be raised in the
-future).  There can be many I/O servers and clients. In this section we will
-discuss the components and configuration files needed to fulfill each role.
+There can be many metadata servers, I/O servers, and clients. In this section
+we will discuss the components and configuration files needed to fulfill each
+role.
 
 We will configure our example system so that the node ``cluster1'' provides
 metadata information, eight nodes (named ``cluster1'' through ``cluster8'')
