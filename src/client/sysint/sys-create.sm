@@ -499,8 +499,8 @@ static int create_setattr_comp_fn(void *v_p,
     int res;
     PVFS_object_ref refn;
     PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "create_setattr_comp_fn\n");
     PVFS_size tmp_size = 0;
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "create_setattr_comp_fn\n");
 
     assert(resp_p->op == PVFS_SERV_SETATTR);
 

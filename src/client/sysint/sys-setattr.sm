@@ -266,8 +266,8 @@ static int setattr_msg_failure(PINT_client_sm *sm_p,
 static int setattr_cleanup(PINT_client_sm *sm_p,
                            job_status_s *js_p)
 {
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "setattr state: cleanup\n");
     PVFS_object_attr attr;
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "setattr state: cleanup\n");
 
     sm_p->error_code = js_p->error_code;
 
