@@ -233,5 +233,6 @@ correctness/pts/module.mk
 common/pav/configfile.sample
 kernel/linux-2.6/module.mk
 maint/mpi-depend.sh
+perfbase/benchmarks/module.mk
 )
 

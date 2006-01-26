@@ -89,7 +89,7 @@ INCLUDES := \
 # These should all be self explanatory; they are standard flags
 # for compiling and linking unless otherwise noted
 CC = @CC@
-CFLAGS = @CFLAGS@
+CFLAGS = @CFLAGS@ @DB_CFLAGS@
 LDFLAGS = @LDFLAGS@
 LIBS = @LIBS@ 
 LD = gcc

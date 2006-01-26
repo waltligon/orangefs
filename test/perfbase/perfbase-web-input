@@ -65,7 +65,7 @@ if(!defined($cvstag))
 
 if(!defined($cvsdate))
 {
-	$cvsdate = `date`;
+	$cvsdate = `date --iso-8601=date`;
 }
 
 my $line;

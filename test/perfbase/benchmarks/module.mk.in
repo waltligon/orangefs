@@ -1,0 +1,5 @@
+DIR := perfbase/benchmarks
+
+MPIIOTESTSRC += \
+	$(DIR)/mpi-create-test.c \
+	$(DIR)/create-test.c

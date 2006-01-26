@@ -19,7 +19,7 @@ if [ $? != 0 ] ; then
     exit 1
 fi
 
-./mpich2-build.py /home/$USER/testing/$DATE/work > tmp.out 2>&1
+./mpich2-build.py -r /home/$USER/testing/$DATE/work > tmp.out 2>&1
 if [ $? != 0 ] ; then
     mail -s "PVFS2 test: FAIL (mpich2-build.py)" "$email" < tmp.out
     exit 1
