@@ -12,12 +12,15 @@ export PVFS2_DEST=/tmp/pvfs2-nightly
 export PVFS2_MOUNTPOINT=/pvfs2-nightly
 export EXTRA_TESTS=${HOME}/src/benchmarks
 
+# need to make this a command line arugment:
+export CVS_TAG="${CVS_TAG:-HEAD}"
+
 # no need to modify these. they make their own gravy
 STARTTIME=`date +%s`
 TINDERSCRIPT=$(cd `dirname $0`; pwd)/tinder-pvfs2-status
-SYSINT_SCRIPTS=${PVFS2_DEST}/pvfs2/test/automated/sysint-tests.d
-VFS_SCRIPTS=${PVFS2_DEST}/pvfs2/test/automated/vfs-tests.d
-MPIIO_DRIVER=${PVFS2_DEST}/pvfs2/test/automated/testscrpt-mpi.sh
+SYSINT_SCRIPTS=${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/sysint-tests.d
+VFS_SCRIPTS=${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/vfs-tests.d
+MPIIO_DRIVER=${PVFS2_DEST}/pvfs2-${CVS_TAG}/test/automated/testscrpt-mpi.sh
 REPORT_LOG=${PVFS2_DEST}/alltests.log
 
 # for debugging and testing, you might need to set the above to your working
@@ -32,8 +35,6 @@ TESTNAME="`hostname -s`-nightly"
 # we only have a few hosts that meet all the earlier stated prereqs
 VFS_HOSTS="gil lain"
 
-# need to make this a command line arugment:
-CVS_TAG="${CVS_TAG:-HEAD}"
 
 # takes one argument: a tag or branch in CVS
 pull_and_build_pvfs2 () {

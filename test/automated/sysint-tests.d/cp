@@ -19,8 +19,8 @@ copy_test()
 	dest=$2
 	local=$3
 	shift 3 
-	${PVFS2_DEST}/INSTALL-pvfs2/bin/pvfs2-cp $src $dest $@
-	${PVFS2_DEST}/INSTALL-pvfs2/bin/pvfs2-cp $dest $local $@
+	${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-cp $src $dest $@
+	${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-cp $dest $local $@
 
 	diff $src $local 
 	if [ $? -ne 0 ] ; then
@@ -30,25 +30,25 @@ copy_test()
 }
 
 
-copy_test ${PVFS2_DEST}/pvfs2/configure ${PVFS2_MOUNTPOINT}/configure0\
+copy_test ${PVFS2_DEST}/pvfs2-${CVS_TAG}/configure ${PVFS2_MOUNTPOINT}/configure0\
 	${PVFS2_DEST}/config0 
 
-copy_test ${PVFS2_DEST}/pvfs2/configure ${PVFS2_MOUNTPOINT}/configure1\
+copy_test ${PVFS2_DEST}/pvfs2-${CVS_TAG}/configure ${PVFS2_MOUNTPOINT}/configure1\
 	${PVFS2_DEST}/config1 -s 128 
 
-copy_test ${PVFS2_DEST}/pvfs2/configure ${PVFS2_MOUNTPOINT}/configure2\
+copy_test ${PVFS2_DEST}/pvfs2-${CVS_TAG}/configure ${PVFS2_MOUNTPOINT}/configure2\
 	${PVFS2_DEST}/config2 -s $((1024*1024))
 
-copy_test ${PVFS2_DEST}/pvfs2/configure ${PVFS2_MOUNTPOINT}/configure3\
+copy_test ${PVFS2_DEST}/pvfs2-${CVS_TAG}/configure ${PVFS2_MOUNTPOINT}/configure3\
 	${PVFS2_DEST}/config3 -n 1
 
-copy_test ${PVFS2_DEST}/pvfs2/configure ${PVFS2_MOUNTPOINT}/configure4\
+copy_test ${PVFS2_DEST}/pvfs2-${CVS_TAG}/configure ${PVFS2_MOUNTPOINT}/configure4\
 	${PVFS2_DEST}/config4 -n 10
 
-copy_test ${PVFS2_DEST}/pvfs2/configure ${PVFS2_MOUNTPOINT}/configure5\
+copy_test ${PVFS2_DEST}/pvfs2-${CVS_TAG}/configure ${PVFS2_MOUNTPOINT}/configure5\
 	${PVFS2_DEST}/config5 -b 128
 
-copy_test ${PVFS2_DEST}/pvfs2/configure ${PVFS2_MOUNTPOINT}/configure6\
+copy_test ${PVFS2_DEST}/pvfs2-${CVS_TAG}/configure ${PVFS2_MOUNTPOINT}/configure6\
 	${PVFS2_DEST}/config6 -b $((1024*1024))
 
 if [ $nr_errors -ne 0 ] ; then 
