@@ -41,7 +41,7 @@ int parse_args(int argc, char **argv)
     while ( (c = getopt(argc, argv, "d:n:")) != -1 ) {
 		  switch (c) {
 				case 'd':
-					 strncpy(opt_basedir, optarg, PATH_MAX);
+					 snprintf(opt_basedir, PATH_MAX, "pvfs2:%s", optarg);
 					 opt_dirarg = 1;
 					 break;
 				case 'n':
@@ -117,7 +117,7 @@ int main(int argc, char **argv)
 		  MPI_Allreduce(&time, &maxtime, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
 
 		  if (rank == 0) {
-				printf("%d %f\n", i, maxtime);
+				printf("%d\t%f\n", i, maxtime);
 		  }
 
   		  errcode = MPI_File_close(&fh);

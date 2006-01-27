@@ -2,6 +2,7 @@
  * usage:  -d /path/to/directory -n number_of_files
  */
 
+#include <sys/time.h>
 #include <time.h>
 #include <string.h>
 #include <stdlib.h>
@@ -84,10 +85,12 @@ int main(int argc, char **argv)
 	 PVFS_credentials credentials;
 	 PVFS_sysresp_lookup lookup_resp;
 	 PVFS_sysresp_create create_resp;
-
+	 char basepath[PATH_MAX];
+	 
     int rank, nprocs, ret;
     MPI_Info info;
-    time_t test_start, test_end, timediff;
+    struct timeval test_start, test_end;
+	 long timediff;
 
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -106,12 +109,14 @@ int main(int argc, char **argv)
 	 ret = PVFS_util_init_defaults();
 	 if(ret != 0)
 	 {
+		  PVFS_perror("PVFS_util_init_defaults", ret);
 		  return ret;
 	 }
 
-	 ret = PVFS_util_get_default_fsid(&cur_fs);
+	 ret = PVFS_util_resolve(opt_basedir, &cur_fs, basepath, PATH_MAX);
 	 if(ret != 0)
 	 {
+		  PVFS_perror("PVFS_util_resolve", ret);
 		  return ret;
 	 }
 
@@ -123,37 +128,43 @@ int main(int argc, char **argv)
 	 attr.perms = 1877;
 	 attr.atime = attr.ctime = attr.mtime = time(NULL);
 
-	 pvfs_error = PVFS_sys_lookup(cur_fs, opt_basedir, &credentials, &lookup_resp, 
+	 pvfs_error = PVFS_sys_lookup(cur_fs, basepath, &credentials, &lookup_resp,
 						  PVFS2_LOOKUP_LINK_NO_FOLLOW);
 	 if(pvfs_error != 0)
 	 {
+		  PVFS_perror("PVFS_sys_lookup", pvfs_error);
 		  return PVFS_get_errno_mapping(pvfs_error);
 	 }
 
     for(i = 0; i < opt_nfiles; ++i)
     {
 		  snprintf(test_file, PATH_MAX, "testfile.%d.%d", rank, i);
-		  test_start = time(NULL);
+		  gettimeofday(&test_start, NULL);
 
 		  pvfs_error = PVFS_sys_create(test_file, lookup_resp.ref, 
 												 attr, &credentials,
 												 NULL, &create_resp);
 		  if(pvfs_error != 0)
 		  {
+				PVFS_perror("PVFS_sys_craete", pvfs_error);
 				return PVFS_get_errno_mapping(pvfs_error);
 		  }
 
-		  test_end = time(NULL);
-		  timediff = test_end - test_start;
+		  gettimeofday(&test_end, NULL);
+		  timediff = ((test_end.tv_sec * 1e6) + test_end.tv_usec) - 
+				       ((test_start.tv_sec * 1e6) + test_start.tv_usec);
 
-		  printf("%d %d\n", (rank * opt_nfiles) + i, (int)timediff);
+		  printf("%d\t%f\n", (rank * opt_nfiles) + i, ((double)timediff)*1e-6);
 
 		  pvfs_error = PVFS_sys_remove(test_file, lookup_resp.ref, &credentials);
 		  if(pvfs_error != 0)
 		  {
+				PVFS_perror("PVFS_sys_remove", pvfs_error);
 				return PVFS_get_errno_mapping(pvfs_error);
 		  }
 	 }
+
+	 MPI_Finalize();
     return 0;
 }
 
