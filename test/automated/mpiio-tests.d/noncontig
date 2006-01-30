@@ -47,4 +47,17 @@ if [ -f $PAV_CONFIG ] ; then
 
 	# need to know if we failed or not
 	grep -q 'bandwidth' noncontig.o$job_id
+	if [ $? -ne 0 ]; then 
+		exit 1
+	fi
+
+	grep -q 'Assertion*failed' noncontig.o$job_id
+	if [ $? -eq 0 ] ; then 
+		exit 1
+	fi
+
+	grep -q 'error:' noncontig.o$job_id
+	if [ $? -eq 0 ] ; then
+		exit 1
+	fi
 fi
