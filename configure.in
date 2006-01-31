@@ -1035,11 +1035,22 @@ dnl if we use headers that might not be on every platform, add them here
 AC_CHECK_HEADERS(malloc.h)
 AC_CHECK_HEADERS(mntent.h)
 
+AC_ARG_ENABLE(static-server,
+[  --enable-static-server   Builds the server static],
+[
+	SERVER_LDFLAGS="$LDFLAGS -static"
+],
+[
+	SERVER_LDFLAGS="$LDFLAGS -rdynamic"
+])
+
+AC_SUBST(SERVER_LDFLAGS)
+
 dnl this is a special case, used to key off options controlling gossip
 dnl   backtrace capability
 AC_CHECK_HEADERS(execinfo.h,
-LDFLAGS="$LDFLAGS -rdynamic"
-CFLAGS="$CFLAGS -DGOSSIP_ENABLE_BACKTRACE"
+	LDFLAGS="$LDFLAGS -rdynamic"
+	CFLAGS="$CFLAGS -DGOSSIP_ENABLE_BACKTRACE"
 )
 
 dnl --
