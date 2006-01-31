@@ -298,7 +298,7 @@ PVFS_error PVFS_isys_io(
         gossip_ldebug(GOSSIP_IO_DEBUG, "Warning: 0 byte I/O operation "
                       "attempted.\n");
         resp_p->total_completed = 0;
-        return 0;
+        return 1; 
     }
 
     sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));
@@ -352,12 +352,14 @@ PVFS_error PVFS_sys_io(
 
     ret = PVFS_isys_io(ref, file_req, file_req_offset, buffer, mem_req,
                        credentials, resp_p, io_type, &op_id, NULL);
-    if (ret)
+    if (ret == 1)
+        return 0;
+    else if (ret < 0)
     {
         PVFS_perror_gossip("PVFS_isys_io call", ret);
         error = ret;
     }
-    else
+    else 
     {
         ret = PINT_sys_wait(op_id, "io", &error);
         if (ret)
@@ -365,9 +367,9 @@ PVFS_error PVFS_sys_io(
             PVFS_perror_gossip("PVFS_sys_wait call", ret);
             error = ret;
         }
-    }
+        PINT_sys_release(op_id);
+    } 
 
-    PINT_sys_release(op_id);
     return error;
 }
 
