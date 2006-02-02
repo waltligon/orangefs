@@ -56,7 +56,7 @@ if [ -f $PAV_CONFIG ] ; then
 	fi
 
 	grep -q 'Error' noncontig.o$job_id
-	if [ $? -ne 0 ]; then 
+	if [ $? -eq 0 ]; then 
 		exit 1
 	fi
 	exit 0
