@@ -2,7 +2,7 @@
 <!DOCTYPE input SYSTEM "../../dtd/pb_input.dtd">
 
 <input>
- <experiment>pvfs2_mpi_md</experiment>
+ <experiment>pvfs2_op</experiment>
 
  <named_location>
   <name>operation</name>

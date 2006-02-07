@@ -3,7 +3,7 @@
 <!DOCTYPE experiment SYSTEM "../../dtd/pb_experiment.dtd">
 
 <experiment>
- <name>pvfs2_mpi_md</name>
+ <name>pvfs2_op</name>
 
  <info>
   <performed_by>
@@ -11,10 +11,10 @@
   </performed_by>
 
   <project>PVFS2</project>
-  <synopsis>Benchmark of MPI Metadata Tests with PVFS2</synopsis>
+  <synopsis>Benchmark of PVFS2 tests</synopsis>
 
   <description>
-	Track performance of pvfs2's metadata operations with different configuration and test parameters over time.
+	Track performance of pvfs2's operations with different configuration and test parameters over time.
   </description>
  </info>
 
