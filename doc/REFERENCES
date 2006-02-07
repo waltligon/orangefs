@@ -105,6 +105,12 @@ Implementing MPI-IO Atomic Mode Without File System Support. Robert Ross,
 
 PVFS1:
 
+Nagavijayalakshmi Vydyanathan, Gaurav Khanna, Tahsin Kurc, Umit Catalyurek,
+    Pete Wyckoff, Joel Saltz and P. Sadayappa. "Use of PVFS for Efficient
+    Execution of Jobs iwth Pipeline-Shared I/O". Proceedings of the 5th
+    IEEE/ACM International Workshop on Grid Computing (Grid 2004). Pittsburg,
+    PA, November 2004
+
 Unifier: unifying cache management and communication buffer management for PVFS
     over InfiniBand Jiesheng Wu, Pete Wyckoff, D. K. Panda and Rob Ross
     Proceedings of CCGrid '04, Chicago, IL, April 2004
