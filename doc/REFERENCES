@@ -4,11 +4,11 @@ Weikuan Yu, Shuang Liang, Dhabaleswar K. Panda. "PVFS2 over Quadrics: Design,
 
 W. Yu and D. K. Panda, Benefits of Quadrics Scatter/Gather to PVFS2
     Noncontiguous I/O, International Workshop on Storage Network Architecture
-    and Parallel I/Os (SNAPI) 2005.  Sept. 2005.
+    and Parallel I/Os (SNAPI) 2005, Saint Louis, Missouri, USA.  Sept. 2005.
 
 W. Yu, S. Liang, and D. K. Panda, High Performance Support of Parallel Virtual
     File System (PVFS2) over Quadrics, Int'l Conference on Supercomputing (ICS
-    '05), June 2005.
+    '05), Cambridge, MA, USA. June 2005.
 
 Dean Hildebrand and Peter Honeyman, "Exporting Storage Systems in a Scalable
     Manner with pNFS," February 2005. [22nd IEEE - 13th NASA Goddard (MSST2005)
@@ -21,7 +21,7 @@ Dean Hildebrand and Peter Honeyman, "Scaling NFSv4 with Parallel File Systems,"
     Kingdom, (May 2005).]
 
 The Impact of File Systems on MPI-IO Scalability. Rob Latham, Robert Ross,
-   Rajeev Thakur; EuroPVM/MPI 2004. PS (142k)
+   Rajeev Thakur; EuroPVM/MPI, Budapest, Hungary. 2004.
 
 /* the shared file ponter, atomic mode and byte-range locking papers... do
  * those count as pvfs2 pappers if they just mention pvfs2? */
@@ -53,7 +53,7 @@ Design and Implementation of the System Interface for PVFS2
 Using Grid Computing and PVFS2 Technologies for Construction of an e-Learning
     Environment.  Chao-Tung Yang, Hsin-Chuan Ho, Chien-Tung Pan. July 2005.
     Proceedings of the Fifth IEEE International Conference on Advanced Learning
-    Technologies (ICALT'05) - Volume 00 ICALT '05 
+    Technologies (ICALT'05) - Volume 00 ICALT '05, Kaohsiung, Taiwan.
 
 "Benchmarking Parallel I/O Performance for Computational Fluid Dynamics
     Applications". Parimala D. Pakalapati, Thomas Hauser.  43rd AIAA Aerospace
@@ -84,7 +84,8 @@ Thomas Ludwig.  "Research Trends in High Performance Parallel Input/Output for
 
 "High Performance Computing Environments Without the Fuss: The Bootable Cluster
     CD", Sarah M. Diesburg, Paul A. Gray, David Joiner. 19th IEEE International
-    Parallel and Distributed Processing Symposium (IPDPS'05) - Workshop 13 
+    Parallel and Distributed Processing Symposium (IPDPS'05) - Workshop 13.
+    Denver, CO, USA, April 2005
 
 "Design and Implementation of HTSFS: High throughput & Scalable File System",
     Wenguo WEI, Shoubin DONG,  Ling ZHANG. Second International Workshop on
