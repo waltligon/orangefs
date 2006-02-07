@@ -1,3 +1,5 @@
+PVFS2:
+
 Weikuan Yu, Shuang Liang, Dhabaleswar K. Panda. "PVFS2 over Quadrics: Design,
     Implementation and Performance Evaluation". Ohio State University Tecnhical
     Report OSU-CISRC-12/04-TR6.  Date Unknown
@@ -22,18 +24,6 @@ Dean Hildebrand and Peter Honeyman, "Scaling NFSv4 with Parallel File Systems,"
 
 The Impact of File Systems on MPI-IO Scalability. Rob Latham, Robert Ross,
    Rajeev Thakur; EuroPVM/MPI, Budapest, Hungary. 2004.
-
-/* the shared file ponter, atomic mode and byte-range locking papers... do
- * those count as pvfs2 pappers if they just mention pvfs2? */
-
-Implementing MPI-IO Shared File Pointers without File System Support Robert
-    Latham, Robert Ross, Rajeev Thakur, Brian Toonen; EuroPVM/MPI 2005
-
-Implementing Byte-Range Locks Using MPI One-Sided Communication. Rajeev Thakur,
-    Robert Ross, Robert Latham. EuroPVM/MPI 2005
-
-Implementing MPI-IO Atomic Mode Without File System Support. Robert Ross,
-    Robert Latham, William Gropp, Rajeev Thakur, Brian Toonen; CCGrid 2005 
 
 A. Ching, A. Choudhary, W. Liao, R. Ross, and W. Gropp, "Efficient Structured
     Access in Parallel File Systems," Proceedings of the 2003 IEEE
@@ -101,7 +91,20 @@ Thomas Ludwig.  "Research Trends in High Performance Parallel Input/Output for
 Discovering new dynamics of core-collapse supernova shock waves. 
 John M. Blondin. Journal of Physics: Conference Series 16, pp 370-379. 2005
 
+MPI-IO and file system optimizations:
+
+Implementing MPI-IO Shared File Pointers without File System Support Robert
+    Latham, Robert Ross, Rajeev Thakur, Brian Toonen; EuroPVM/MPI 2005
+
+Implementing Byte-Range Locks Using MPI One-Sided Communication. Rajeev Thakur,
+    Robert Ross, Robert Latham. EuroPVM/MPI 2005
+
+Implementing MPI-IO Atomic Mode Without File System Support. Robert Ross,
+    Robert Latham, William Gropp, Rajeev Thakur, Brian Toonen; CCGrid 2005 
+
+
 PVFS1:
+
 Unifier: unifying cache management and communication buffer management for PVFS
     over InfiniBand Jiesheng Wu, Pete Wyckoff, D. K. Panda and Rob Ross
     Proceedings of CCGrid '04, Chicago, IL, April 2004
