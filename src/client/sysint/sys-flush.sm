@@ -119,7 +119,8 @@ PVFS_error PVFS_isys_flush(
         sm_p->getattr,
         ref,
         PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE, 
-        PVFS_TYPE_METAFILE);
+        PVFS_TYPE_METAFILE,
+        0);
 
     return PINT_client_state_machine_post(
         sm_p, PVFS_SYS_FLUSH, op_id, user_ptr);

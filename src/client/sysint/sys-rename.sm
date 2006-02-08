@@ -468,7 +468,8 @@ static int rename_lookups_comp_fn(
                 sm_p->getattr,
                 sm_p->object_ref,
                 PVFS_ATTR_COMMON_ALL,
-                PVFS_TYPE_NONE);
+                PVFS_TYPE_NONE,
+                0);
 
             /* if both lookups succeeded, then we need chdirent */
             return RENAME_CHDIRENT;
@@ -773,6 +774,8 @@ static int rename_chdirent_setup_msgpair(PINT_client_sm *sm_p,
                  lld(attr->u.dir.dirent_count));
         gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "rename dest attr mask: %d\n", (int)attr->mask);
+        gossip_debug(GOSSIP_CLIENT_DEBUG,
+                 "rename dest handle %llu\n", llu(sm_p->object_ref.handle));
     }
 
     /* if the destination is a directory, is it empty? */
@@ -1006,10 +1009,15 @@ static int rename_getattr_src_interpret(
     sm_p->object_ref = sm_p->u.rename.refns[1];
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
+    /* NOTE: we ask for the dirent count on the destination.  This is
+     * important so that we can confirm that the destination is empty if it
+     * happens to be a directory rather than a file.
+     */
     PINT_SM_GETATTR_STATE_FILL(sm_p->getattr,
                                sm_p->object_ref,
-                               PVFS_ATTR_COMMON_ALL,
-                               PVFS_TYPE_NONE);
+                               (PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_DIRENT_COUNT),
+                               PVFS_TYPE_NONE,
+                               PINT_SM_GETATTR_BYPASS_CACHE);
     js_p->error_code = 0;
     return(1);
 }

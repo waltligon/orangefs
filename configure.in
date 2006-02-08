@@ -1036,7 +1036,7 @@ AC_CHECK_HEADERS(malloc.h)
 AC_CHECK_HEADERS(mntent.h)
 
 AC_ARG_ENABLE(static-server,
-[  --enable-static-server   Builds the server static],
+[  --enable-static-server  Builds the server static],
 [
 	SERVER_LDFLAGS="$LDFLAGS -static"
 ],

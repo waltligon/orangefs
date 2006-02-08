@@ -863,7 +863,7 @@ Optional Features:
   --enable-rev-hostname   Enables hostname resolution in BMI reverse lookups
   --enable-segv-backtrace Enables back traces in segfault signal handler
   --enable-shared         Build shared client library
-  --enable-static-server   Builds the server static
+  --enable-static-server  Builds the server static
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]

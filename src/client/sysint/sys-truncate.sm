@@ -124,7 +124,8 @@ PVFS_error PVFS_isys_truncate(
         sm_p->getattr,
         sm_p->object_ref,
         PVFS_ATTR_META_ALL|PVFS_ATTR_COMMON_TYPE,
-        PVFS_TYPE_METAFILE);
+        PVFS_TYPE_METAFILE,
+        0);
 
     return PINT_client_state_machine_post(
         sm_p, PVFS_SYS_TRUNCATE, op_id, user_ptr);
