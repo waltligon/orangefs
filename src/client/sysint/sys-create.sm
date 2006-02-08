@@ -421,7 +421,8 @@ static int create_init(PINT_client_sm *sm_p,
         sm_p->getattr,
         sm_p->object_ref,
         PVFS_ATTR_COMMON_ALL, 
-        PVFS_TYPE_DIRECTORY);
+        PVFS_TYPE_DIRECTORY,
+        0);
 
    return 1;
 }

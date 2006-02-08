@@ -344,6 +344,9 @@ struct PINT_server_get_config_sm
     int persist_config_buffers;
 };
 
+/* flag to disable cached lookup during getattr nested sm */
+#define PINT_SM_GETATTR_BYPASS_CACHE 1
+
 typedef struct PINT_sm_getattr_state
 {
     PVFS_object_ref object_ref;
@@ -363,16 +366,19 @@ typedef struct PINT_sm_getattr_state
 
     PVFS_size * size_array;
     PVFS_size size;
+
+    int flags;
     
 } PINT_sm_getattr_state;
 
-#define PINT_SM_GETATTR_STATE_FILL(_state, _objref, _mask, _reftype) \
+#define PINT_SM_GETATTR_STATE_FILL(_state, _objref, _mask, _reftype, _flags) \
     do { \
         memset(&(_state), 0, sizeof(PINT_sm_getattr_state)); \
         (_state).object_ref.fs_id = (_objref).fs_id; \
         (_state).object_ref.handle = (_objref).handle; \
         (_state).req_attrmask = _mask; \
         (_state).ref_type = _reftype; \
+        (_state).flags = _flags; \
     } while(0)
 
 #define PINT_SM_GETATTR_STATE_CLEAR(_state) \
