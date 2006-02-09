@@ -229,6 +229,9 @@ int PINT_config_get_trove_sync_data(
 int PINT_config_get_trove_immediate_completion(
     struct server_configuration_s *config,
     PVFS_fs_id fs_id);
+int PINT_config_get_trove_meta_flags(
+    struct server_configuration_s *config,
+    PVFS_fs_id fs_id);
 #endif
 
 /*

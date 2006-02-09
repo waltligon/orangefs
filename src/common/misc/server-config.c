@@ -595,8 +595,12 @@ static const configoption_t options[] =
     {"DefaultNumDFiles", ARG_INT, get_default_num_dfiles, NULL,
         CTX_FILESYSTEM, "0"},
 
+    /* This option tells the underlying trove metadata component to
+     * block instead of post an operation and return.  This may improve
+     * performance in some cases.
+     */
     {"ImmediateCompletion", ARG_STR, get_immediate_completion, NULL,
-        CTX_FILESYSTEM, "yes"},
+        CTX_STORAGEHINTS, "yes"},
 
     LAST_OPTION
 };
@@ -1624,7 +1628,7 @@ DOTCONF_CB(get_immediate_completion)
         PINT_llist_head(config_s->file_systems);
 
     fs_conf->immediate_completion = 
-        (!strcmp((char *)cmd->data.value, "yes")) ? 
+        (cmd->data.str && !strcmp((char *)cmd->data.str, "yes")) ? 
         TROVE_IMMEDIATE_COMPLETE : 0;
     return NULL;
 }
