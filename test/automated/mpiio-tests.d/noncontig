@@ -45,19 +45,10 @@ if [ -f $PAV_CONFIG ] ; then
 	# need to get results into per-test log files
 	cat noncontig.o$job_id
 
-	grep -q 'Assertion*failed' noncontig.o$job_id
+	egrep -q '(Assertion*failed|error:|Error)' noncontig.o$job_id
 	if [ $? -eq 0 ] ; then 
 		exit 1
 	fi
 
-	grep -q 'error:' noncontig.o$job_id
-	if [ $? -eq 0 ] ; then
-		exit 1
-	fi
-
-	grep -q 'Error' noncontig.o$job_id
-	if [ $? -eq 0 ]; then 
-		exit 1
-	fi
 	exit 0
 fi
