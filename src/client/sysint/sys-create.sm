@@ -375,8 +375,6 @@ PVFS_error PVFS_sys_create(
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_create entered\n");
 
-    gossip_debug_timing("CREATE_START\n");
-    
     ret = PVFS_isys_create(object_name, parent_ref, attr, credentials,
                            dist, resp, &op_id, NULL);
     if (ret)
@@ -393,8 +391,6 @@ PVFS_error PVFS_sys_create(
             error = ret;
         }
     }
-
-    gossip_debug_timing("CREATE_STOP\n");
 
     PINT_sys_release(op_id);
     return error;

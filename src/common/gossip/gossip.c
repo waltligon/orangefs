@@ -355,23 +355,6 @@ int gossip_err(
     return ret;
 }
 
-int __gossip_debug_timing(
-    const char *format,
-    ...)
-{
-    int res;
-    struct timeval t;
-    va_list ap;
-    
-    gettimeofday(&t, NULL);
-    res = fprintf(stdout, "[%6d.%6d]", t.tv_sec, t.tv_usec);
-    
-    va_start(ap, format);
-    res += vfprintf(stdout, format, ap);
-    va_end(ap);
-    return res;
-}
-
 #ifdef GOSSIP_ENABLE_BACKTRACE
     #ifndef GOSSIP_BACKTRACE_DEPTH
     #define GOSSIP_BACKTRACE_DEPTH 12

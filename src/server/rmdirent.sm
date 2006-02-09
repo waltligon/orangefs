@@ -275,7 +275,7 @@ static int rmdirent_remove_directory_entry(PINT_server_op *s_op,
 
     ret = job_trove_keyval_remove(
         s_op->req->u.rmdirent.fs_id, s_op->u.rmdirent.dirdata_handle,
-        &s_op->key, PINT_config_get_trove_sync_meta(
+        &s_op->key, PINT_config_get_trove_meta_flags(
             user_opts, s_op->req->u.rmdirent.fs_id),
         NULL, s_op, 0, js_p, &j_id, server_job_context);
 
@@ -354,7 +354,7 @@ static int rmdirent_update_directory_attr(
 
     ret = job_trove_dspace_setattr(
         s_op->req->u.rmdirent.fs_id, s_op->req->u.rmdirent.parent_handle,
-        ds_attr, PINT_config_get_trove_sync_meta(
+        ds_attr, PINT_config_get_trove_meta_flags(
             user_opts, s_op->req->u.rmdirent.fs_id),
         s_op, 0, js_p, &j_id, server_job_context);
 

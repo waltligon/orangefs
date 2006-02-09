@@ -328,7 +328,7 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s *js_p)
 
     ret = job_trove_dspace_setattr(
         s_op->req->u.setattr.fs_id, s_op->req->u.setattr.handle,
-        ds_attr, PINT_config_get_trove_sync_meta(
+        ds_attr, PINT_config_get_trove_meta_flags(
             user_opts, s_op->req->u.setattr.fs_id),
         s_op, 0, js_p, &j_id, server_job_context);
 
@@ -379,7 +379,7 @@ static int setattr_write_metafile_datafile_handles_if_required(
     ret = job_trove_keyval_write(
         s_op->req->u.setattr.fs_id, s_op->req->u.setattr.handle,
         &(s_op->key), &(s_op->val),
-        PINT_config_get_trove_sync_meta(
+        PINT_config_get_trove_meta_flags(
             user_opts, s_op->req->u.setattr.fs_id),
         NULL, s_op, 0, js_p, &j_id, server_job_context);
 
@@ -429,7 +429,7 @@ static int setattr_write_metafile_distribution_if_required(
     ret = job_trove_keyval_write(
         s_op->req->u.setattr.fs_id, s_op->req->u.setattr.handle,
         &(s_op->key), &(s_op->val),
-        PINT_config_get_trove_sync_meta(
+        PINT_config_get_trove_meta_flags(
             user_opts, s_op->req->u.setattr.fs_id),
         NULL, s_op, 0, js_p, &j_id, server_job_context);
 
@@ -477,7 +477,7 @@ static int setattr_write_symlink_target_if_required(
     ret = job_trove_keyval_write(
         s_op->req->u.setattr.fs_id, s_op->req->u.setattr.handle,
         &(s_op->key), &(s_op->val),
-        PINT_config_get_trove_sync_meta(
+        PINT_config_get_trove_meta_flags(
             user_opts, s_op->req->u.setattr.fs_id),
         NULL, s_op, 0, js_p, &j_id, server_job_context);
 

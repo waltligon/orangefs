@@ -198,7 +198,7 @@ static int deleattr_delobj_eattribs(PINT_server_op *s_op, job_status_s *js_p)
         s_op->req->u.deleattr.fs_id,
         s_op->req->u.deleattr.handle,
         &(s_op->key),
-        PINT_config_get_trove_sync_meta(
+        PINT_config_get_trove_meta_flags(
             user_opts, s_op->req->u.deleattr.fs_id),
         NULL,
         s_op,

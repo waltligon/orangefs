@@ -17,6 +17,20 @@ extern "C" {
 
 #include "id-generator.h"
 
+#define DBPF_OP_INIT(_op, _type, _state, _handle, _coll_p, _svc_fn, \
+                     _user_ptr, _flags, _context_id, _id) \
+    do { \
+        _op.type = _type; \
+        _op.state = OP_NOT_QUEUED; \
+        _op.handle = _handle; \
+        _op.coll_p = _coll_p; \
+        _op.svc_fn = _svc_fn; \
+        _op.user_ptr = _user_ptr; \
+        _op.flags = _flags; \
+        _op.context_id = _context_id; \
+        id_gen_fast_register(&_op.id, _id); \
+    } while(0)
+    
 /* struct dbpf_queued_op_stats
  *
  * used to maintain any desired statistics on the queued operation;

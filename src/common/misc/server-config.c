@@ -71,6 +71,7 @@ static DOTCONF_CB(get_trove_sync_data);
 static DOTCONF_CB(get_param);
 static DOTCONF_CB(get_value);
 static DOTCONF_CB(get_default_num_dfiles);
+static DOTCONF_CB(get_immediate_completion);
 static DOTCONF_CB(get_server_job_bmi_timeout);
 static DOTCONF_CB(get_server_job_flow_timeout);
 static DOTCONF_CB(get_client_job_bmi_timeout);
@@ -592,7 +593,10 @@ static const configoption_t options[] =
      * and it determines whether to use that value or not.
      */
     {"DefaultNumDFiles", ARG_INT, get_default_num_dfiles, NULL,
-        CTX_FILESYSTEM,"0"},
+        CTX_FILESYSTEM, "0"},
+
+    {"ImmediateCompletion", ARG_STR, get_immediate_completion, NULL,
+        CTX_FILESYSTEM, "yes"},
 
     LAST_OPTION
 };
@@ -1607,6 +1611,21 @@ DOTCONF_CB(get_default_num_dfiles)
         PINT_llist_head(config_s->file_systems);
 
     fs_conf->default_num_dfiles = (int)cmd->data.value;
+    return NULL;
+}
+
+DOTCONF_CB(get_immediate_completion)
+{
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+    struct filesystem_configuration_s *fs_conf = NULL;
+
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+
+    fs_conf->immediate_completion = 
+        (!strcmp((char *)cmd->data.value, "yes")) ? 
+        TROVE_IMMEDIATE_COMPLETE : 0;
     return NULL;
 }
 
@@ -3087,6 +3106,23 @@ int PINT_config_pvfs2_rmspace(
     return ret;
 }
 
+int PINT_config_get_trove_meta_flags(
+    struct server_configuration_s *config,
+    PVFS_fs_id fs_id)
+{
+    int flags = 0;
+    struct filesystem_configuration_s *fs_conf = NULL;
+
+    if(config)
+    {
+        fs_conf = PINT_config_find_fs_id(config, fs_id);
+    }
+    
+    flags |= (fs_conf ? fs_conf->trove_sync_meta : TROVE_SYNC);
+    flags |= (fs_conf ? fs_conf->immediate_completion : 0);
+    return flags;
+}
+
 /*
   returns the metadata sync mode (storage hint) for the specified
   fs_id if valid; TROVE_SYNC otherwise
@@ -3119,6 +3155,19 @@ int PINT_config_get_trove_sync_data(
         fs_conf = PINT_config_find_fs_id(config, fs_id);
     }
     return (fs_conf ? fs_conf->trove_sync_data : TROVE_SYNC);
+}
+
+int PINT_config_get_trove_immediate_completion(
+    struct server_configuration_s *config,
+    PVFS_fs_id fs_id)
+{
+    struct filesystem_configuration_s *fs_conf = NULL;
+
+    if(config)
+    {
+        fs_conf = PINT_config_find_fs_id(config, fs_id);
+    }
+    return (fs_conf ? fs_conf->immediate_completion : 0);
 }
 
 #endif

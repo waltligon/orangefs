@@ -74,7 +74,7 @@ static int mgmt_remove_dspace(
     ret = job_trove_dspace_remove(
         s_op->req->u.mgmt_remove_object.fs_id,
         s_op->req->u.mgmt_remove_object.handle,
-        PINT_config_get_trove_sync_meta(
+        PINT_config_get_trove_meta_flags(
             user_opts, s_op->req->u.mgmt_remove_object.fs_id),
         s_op,
         0,

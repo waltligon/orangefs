@@ -54,6 +54,7 @@ enum
     TROVE_FORCE_REQUESTED_HANDLE = 4,
     TROVE_NOOVERWRITE = 8, /* keyval_write and keyval_write_list */
     TROVE_ONLYOVERWRITE = 16, /* keyval_write and keyval_write_list */
+    TROVE_IMMEDIATE_COMPLETE = 32
 };
 
 /* get/setinfo option flags */

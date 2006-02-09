@@ -211,7 +211,7 @@ static int seteattr_setobj_eattribs(
     {
         trove_flags = TROVE_ONLYOVERWRITE;
     }
-    trove_flags |= PINT_config_get_trove_sync_meta(user_opts, 
+    trove_flags |= PINT_config_get_trove_meta_flags(user_opts, 
             s_op->req->u.seteattr.fs_id);
     ret = job_trove_keyval_write_list(
         s_op->req->u.seteattr.fs_id,
