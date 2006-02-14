@@ -241,6 +241,75 @@ void dbpf_queued_op_dequeue(dbpf_queued_op_t *q_op_p)
     gen_mutex_unlock(&q_op_p->mutex);
 }
 
+int dbpf_op_init_queued_or_immediate(
+    struct dbpf_op * op_p,
+    dbpf_queued_op_t ** q_op_pp,
+    enum dbpf_op_type op_type,
+    struct dbpf_collection *coll_p,
+    TROVE_handle handle,
+    int (* dbpf_op_svc_fn) (struct dbpf_op *),
+    TROVE_ds_flags flags,
+    TROVE_vtag_s *vtag,
+    void *user_ptr,
+    TROVE_context_id context_id,
+    struct dbpf_op **op_pp)
+{
+    if(flags & TROVE_IMMEDIATE_COMPLETE)
+    {
+        DBPF_OP_INIT(*op_p,
+                     op_type,
+                     OP_QUEUED,
+                     handle,
+                     coll_p,
+                     dbpf_op_svc_fn,
+                     user_ptr,
+                     flags,
+                     context_id,
+                     0);
+        *op_pp = op_p;
+    }
+    else
+    {
+        /* grab a queued op structure */
+        *q_op_pp = dbpf_queued_op_alloc();
+        if (*q_op_pp == NULL)
+        {
+            return -TROVE_ENOMEM;
+        }
+
+        /* initialize all the common members */
+        dbpf_queued_op_init(*q_op_pp,
+                            op_type,
+                            handle,
+                            coll_p,
+                            dbpf_op_svc_fn,
+                            user_ptr,
+                            flags,
+                            context_id);
+        *op_pp = &(*q_op_pp)->op;
+    }
+    return 0;
+}
+
+int dbpf_queue_or_service(
+    struct dbpf_op *op_p,
+    dbpf_queued_op_t *q_op_p,
+    TROVE_ds_flags flags,
+    TROVE_op_id *out_op_id_p)
+{
+
+    if(flags & TROVE_IMMEDIATE_COMPLETE)
+    {
+        *out_op_id_p = 0;
+        return op_p->svc_fn(op_p);
+    }
+    else
+    {
+        *out_op_id_p = dbpf_queued_op_queue(q_op_p);
+        return 0;
+    }
+}
+
 /*
  * Local variables:
  *  c-indent-level: 4

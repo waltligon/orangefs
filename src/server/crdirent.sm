@@ -258,6 +258,7 @@ static int crdirent_read_directory_entry_handle(
 {
     int ret = -PVFS_EINVAL;
     job_id_t i;
+    struct server_configuration_s *user_opts = get_server_config_struct();
 
     PINT_STATE_DEBUG("read_directory_entry_handle");
 
@@ -274,7 +275,8 @@ static int crdirent_read_directory_entry_handle(
         s_op->u.crdirent.parent_handle,
         &s_op->key,
         &s_op->val,
-        0,
+        PINT_config_get_trove_meta_flags(
+            user_opts, s_op->req->u.crdirent.fs_id),
         NULL,
         s_op,
         0,
@@ -589,6 +591,7 @@ static int crdirent_check_exist_directory_entry(PINT_server_op *s_op,
 {
     int ret = -PVFS_EINVAL;
     job_id_t i = 0;
+    struct server_configuration_s *user_opts = get_server_config_struct();
 
     PINT_STATE_DEBUG("check_exist_directory_entry");
 
@@ -612,7 +615,9 @@ static int crdirent_check_exist_directory_entry(PINT_server_op *s_op,
 
     ret = job_trove_keyval_read(
         s_op->u.crdirent.fs_id, s_op->u.crdirent.dirent_handle,
-        &s_op->key, &s_op->val, 0, NULL, s_op, 0, js_p, &i,
+        &s_op->key, &s_op->val, 
+        PINT_config_get_trove_meta_flags(
+            user_opts, s_op->req->u.crdirent.fs_id), NULL, s_op, 0, js_p, &i,
         server_job_context);
 
     return ret;

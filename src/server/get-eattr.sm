@@ -159,6 +159,7 @@ static int geteattr_read_eattrib(
 {
     int ret = -PVFS_EINVAL;
     job_id_t i;
+    struct server_configuration_s *user_opts = get_server_config_struct();
 
     PINT_STATE_DEBUG("read_eattrib");
 
@@ -170,7 +171,8 @@ static int geteattr_read_eattrib(
         s_op->req->u.geteattr.key,
         s_op->resp.u.geteattr.val,
         s_op->req->u.geteattr.nkey,
-        0,
+        PINT_config_get_trove_meta_flags(
+            user_opts, s_op->req->u.geteattr.fs_id),
         NULL,
         s_op,
         0,

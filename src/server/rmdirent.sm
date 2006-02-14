@@ -134,6 +134,7 @@ static int rmdirent_verify_parent_metadata_and_read_directory_entry_handle(
 {
     int ret = -PVFS_EINVAL;
     job_id_t i;
+    struct server_configuration_s *user_opts = get_server_config_struct();
 
     PINT_STATE_DEBUG("verify_parent_metadata_and_"
                      "read_directory_entry_handle");
@@ -165,7 +166,8 @@ static int rmdirent_verify_parent_metadata_and_read_directory_entry_handle(
         s_op->req->u.rmdirent.parent_handle,
         &s_op->key,
         &s_op->val,
-        0,
+        PINT_config_get_trove_meta_flags(
+            user_opts, s_op->req->u.rmdirent.fs_id),
         NULL,
         s_op,
         0,
@@ -187,6 +189,7 @@ static int rmdirent_read_directory_entry(PINT_server_op *s_op,
 {
     int ret = -PVFS_EINVAL;
     job_id_t j_id;
+    struct server_configuration_s *user_opts = get_server_config_struct();
 
     PINT_STATE_DEBUG("read_directory_entry");
 
@@ -210,7 +213,8 @@ static int rmdirent_read_directory_entry(PINT_server_op *s_op,
         s_op->u.rmdirent.dirdata_handle,
         &s_op->key,
         &s_op->val,
-        0,
+        PINT_config_get_trove_meta_flags(
+            user_opts, s_op->req->u.rmdirent.fs_id),
         NULL,
         s_op,
         0,

@@ -254,6 +254,7 @@ static int remove_read_dirdata_handle(PINT_server_op *s_op,
 {
     int ret;
     job_id_t j_id;
+    struct server_configuration_s *user_opts = get_server_config_struct();
 
     PINT_STATE_DEBUG("read_dirdata_handle");
 
@@ -273,7 +274,10 @@ static int remove_read_dirdata_handle(PINT_server_op *s_op,
 
     ret = job_trove_keyval_read(
         s_op->u.remove.fs_id, s_op->u.remove.handle,
-        &s_op->key, &s_op->val, 0, NULL, s_op, 0, js_p,
+        &s_op->key, &s_op->val, 
+        PINT_config_get_trove_meta_flags(
+            user_opts, s_op->req->u.remove.fs_id), 
+        NULL, s_op, 0, js_p,
         &j_id, server_job_context);
 
     return ret;
@@ -284,6 +288,7 @@ static int remove_getattr_of_dirdata_handle(
 {
     int ret;
     job_id_t tmp_id;
+    struct server_configuration_s *user_opts = get_server_config_struct();
 
     PINT_STATE_DEBUG("read_dirdata_handle");
 
@@ -299,7 +304,10 @@ static int remove_getattr_of_dirdata_handle(
 
     ret = job_trove_dspace_getattr(
         s_op->u.remove.fs_id, s_op->u.remove.dirdata_handle, s_op,
-        &s_op->u.remove.dirdata_ds_attr, 0, js_p, &tmp_id,
+        &s_op->u.remove.dirdata_ds_attr, 
+        PINT_config_get_trove_meta_flags(
+            user_opts, s_op->u.remove.fs_id),
+        0, js_p, &tmp_id,
         server_job_context);
 
     return ret;

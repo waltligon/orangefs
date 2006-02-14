@@ -207,6 +207,7 @@ static int lookup_read_object_metadata(
     job_id_t j_id;
     PVFS_handle handle = PVFS_HANDLE_NULL;
     PVFS_ds_attributes *ds_attr = NULL;
+    struct server_configuration_s *user_opts = get_server_config_struct();
 
     PINT_STATE_DEBUG("read_object_metadata");
 
@@ -232,6 +233,8 @@ static int lookup_read_object_metadata(
     /* get the dspace attributes/metadata */
     ret = job_trove_dspace_getattr(
         s_op->req->u.lookup_path.fs_id, handle, s_op, ds_attr,
+        PINT_config_get_trove_meta_flags(
+            user_opts, s_op->req->u.lookup_path.fs_id), 
         0, js_p, &j_id, server_job_context);
 
     return ret;
@@ -372,6 +375,7 @@ static int lookup_read_directory_entry_handle(
     int ret = -PVFS_EINVAL;
     PVFS_handle handle = PVFS_HANDLE_NULL;
     job_id_t j_id;
+    struct server_configuration_s *user_opts = get_server_config_struct();
 
     PINT_STATE_DEBUG("read_directory_entry_handle");
 
@@ -397,7 +401,9 @@ static int lookup_read_directory_entry_handle(
 
     ret = job_trove_keyval_read(
         s_op->req->u.lookup_path.fs_id, handle, &s_op->key, &s_op->val,
-        0, NULL, s_op, 0, js_p, &j_id, server_job_context);
+        PINT_config_get_trove_meta_flags(
+            user_opts, s_op->req->u.lookup_path.fs_id), 
+        NULL, s_op, 0, js_p, &j_id, server_job_context);
 
     return ret;
 }
@@ -413,6 +419,7 @@ static int lookup_read_directory_entry(
 {
     int ret = -PVFS_EINVAL;
     job_id_t j_id;
+    struct server_configuration_s *user_opts = get_server_config_struct();
 
     PINT_STATE_DEBUG("read_directory_entry");
 
@@ -435,7 +442,10 @@ static int lookup_read_directory_entry(
 
     ret = job_trove_keyval_read(
         s_op->req->u.lookup_path.fs_id, s_op->u.lookup.dirent_handle,
-        &s_op->key, &s_op->val, 0, NULL, s_op, 0, js_p, &j_id,
+        &s_op->key, &s_op->val, 
+        PINT_config_get_trove_meta_flags(
+            user_opts, s_op->req->u.lookup_path.fs_id), 
+        NULL, s_op, 0, js_p, &j_id,
         server_job_context);
 
     return ret;

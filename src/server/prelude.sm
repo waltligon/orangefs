@@ -108,6 +108,7 @@ static int prelude_getattr_if_needed(
     PVFS_handle target_handle = PVFS_HANDLE_NULL;
     PVFS_fs_id target_fs_id = PVFS_FS_ID_NULL;
     job_id_t tmp_id;
+    struct server_configuration_s *user_opts = get_server_config_struct();
 
     PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DETAIL_DEBUG, "start\n");
 
@@ -151,6 +152,8 @@ static int prelude_getattr_if_needed(
 
     ret = job_trove_dspace_getattr(
         target_fs_id, target_handle, s_op, &(s_op->ds_attr),
+        PINT_config_get_trove_meta_flags(
+            user_opts, target_fs_id),
         0, js_p, &tmp_id, server_job_context);
 
     return ret;

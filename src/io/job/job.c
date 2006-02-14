@@ -2136,6 +2136,7 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
                              PVFS_handle handle,
                              void *user_ptr,
                              PVFS_ds_attributes *out_ds_attr_ptr,
+                             PVFS_ds_flags flags,
                              job_aint status_user_tag,
                              job_status_s *out_status_p,
                              job_id_t *id,
@@ -2169,7 +2170,7 @@ int job_trove_dspace_getattr(PVFS_fs_id coll_id,
 
 #ifdef __PVFS2_TROVE_SUPPORT__
     ret = trove_dspace_getattr(coll_id,
-                               handle, out_ds_attr_ptr, 0 /* flags */ ,
+                               handle, out_ds_attr_ptr,  flags,
                                user_ptr_internal, 
                                global_trove_context, &(jd->u.trove.id));
 #else
