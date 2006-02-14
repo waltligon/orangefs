@@ -817,7 +817,7 @@ fi
 ],
 [
 if test "x$USR_CFLAGS_SET" = "xno" && test "x$enable_fast" != "xyes"; then
-    CFLAGS="$CFLAGS -O2 -Wdeclaration-after-statement"
+    CFLAGS="$CFLAGS -O2"
 fi
 ])
 
