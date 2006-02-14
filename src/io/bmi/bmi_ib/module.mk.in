@@ -5,7 +5,7 @@
 #
 # See COPYING in top-level directory.
 #
-# $Id: module.mk.in,v 1.6 2005-11-03 21:23:19 pw Exp $
+# $Id: module.mk.in,v 1.7 2006-02-14 19:10:47 pw Exp $
 #
 
 # only do any of this if configure decided to use IB
@@ -30,7 +30,7 @@ SERVERSRC += $(src)
 # No need to expose the rest of the tree to the mess of IB include
 # dirs and warnings used here.
 #
-cflags += -I@IB_HOME@/include
+cflags += -I@IB_INCDIR@
 cflags += -fno-common
 cflags += -Werror -Wall -W -Wpointer-arith
 cflags += -Wcast-align -Wcast-qual -Wbad-function-cast

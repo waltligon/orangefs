@@ -257,8 +257,8 @@ endif
 ifdef BUILD_IB
     # other settings in bmi_ib/module.mk.in
     CFLAGS += -D__STATIC_METHOD_BMI_IB__
-    IBLIBS := -L@IB_HOME@/lib \
-	     -lvapi -lmtl_common -lmosal -lmpga -lpthread -ldl
+    IBLIBS := -L@IB_LIBDIR@ \
+	      -lvapi -lmtl_common -lmosal -lmpga -lpthread -ldl
     LIBS += $(IBLIBS)
     SERVERLIBS += $(IBLIBS)
 endif
