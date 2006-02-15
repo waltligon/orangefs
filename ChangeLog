@@ -2,7 +2,7 @@
 PVFS2 Release ChangeLog
 -----------------------
 
-pvfs2-1.4.0-pre1
+pvfs2-1.4.0
 ===============
 - add a simple sendfile callback stub
 - getattr through pvfs2-client-core now specifies exactly what it needs
