@@ -27,4 +27,5 @@ ADMINSRC := \
 
 ADMINSRC_SERVER := \
 	$(DIR)/pvfs2-mkspace.c \
-	$(DIR)/pvfs2-showcoll.c \
+	$(DIR)/pvfs2-migrate-collection.c \
+	$(DIR)/pvfs2-showcoll.c
