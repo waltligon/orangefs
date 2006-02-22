@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.21 2006-02-22 16:30:54 pw Exp $
+ * $Id: ib.c,v 1.22 2006-02-22 16:41:10 pw Exp $
  */
 #include <stdio.h>  /* just for NULL for id-generator.h */
 #include <src/common/id-generator/id-generator.h>
@@ -133,7 +133,7 @@ check_cq(void)
 		 * is of a CTS.
 		 */
 		sq = bh->c->eager_send_buf_head_contig[bufnum].sq;
-		if (unlikely(sq->type == BMI_RECV))
+		if (bmi_ib_unlikely(sq->type == BMI_RECV))
 		    /* ack of a CTS sent by the receiver */
 		    encourage_recv_incoming_cts_ack((ib_recv_t *)sq);
 		else {
@@ -329,7 +329,7 @@ encourage_send_incoming_cts(buf_head_t *bh, u_int32_t byte_len)
     /* message; cts content; list of buffers, lengths, and keys */
     want = sizeof(*mh) + sizeof(*mh_cts)
       + mh_cts->buflist_num * MSG_HEADER_CTS_BUFLIST_ENTRY_SIZE;
-    if (unlikely(byte_len != want))
+    if (bmi_ib_unlikely(byte_len != want))
 	error("%s: wrong message size for CTS, got %u, want %u", __func__,
           byte_len, want);
 

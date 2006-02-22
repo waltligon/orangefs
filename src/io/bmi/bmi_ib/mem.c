@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: mem.c,v 1.2 2005-11-10 01:27:03 slang Exp $
+ * $Id: mem.c,v 1.3 2006-02-22 16:41:10 pw Exp $
  */
 #include <src/common/gen-locks/gen-locks.h>
 #include "ib.h"
@@ -29,7 +29,7 @@ memcache_add(void *buf, bmi_size_t len)
     memcache_entry_t *c;
 
     c = malloc(sizeof(*c));
-    if (likely(c)) {
+    if (bmi_ib_likely(c)) {
 	c->buf = buf;
 	c->len = len;
 	c->count = 0;
@@ -101,7 +101,7 @@ BMI_ib_memalloc(bmi_size_t len, enum bmi_op_type send_recv __unused)
 
     buf = malloc(len);
 #if ENABLE_MEMCACHE
-    if (unlikely(!buf))
+    if (bmi_ib_unlikely(!buf))
 	goto out;
     if (len > EAGER_BUF_PAYLOAD) {
 	memcache_entry_t *c;
@@ -112,7 +112,7 @@ BMI_ib_memalloc(bmi_size_t len, enum bmi_op_type send_recv __unused)
 	    ++c->count;
 	else {
 	    c = memcache_add(buf, len);
-	    if (unlikely(!c)) {
+	    if (bmi_ib_unlikely(!c)) {
 		free(buf);
 		buf = 0;
 	    } else {

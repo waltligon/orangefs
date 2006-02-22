@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.h,v 1.11 2006-02-22 16:30:54 pw Exp $
+ * $Id: ib.h,v 1.12 2006-02-22 16:41:10 pw Exp $
  */
 #ifndef __ib_h
 #define __ib_h
@@ -399,13 +399,14 @@ extern bmi_size_t EAGER_BUF_PAYLOAD;
 #define list_count(list) ((int)(sizeof(list) / sizeof(list[0])))
 
 /*
- * Tell the compiler we really do not expect this to happen.
+ * Tell the compiler about situations that we truly expect to happen
+ * or not.  Funny name to avoid collision with some IB libraries.
  */
 #if defined(__GNUC_MINOR__) && (__GNUC_MINOR__ < 96)
 # define __builtin_expect(x, v) (x)
 #endif
-#define likely(x)       __builtin_expect(!!(x), 1)
-#define unlikely(x)     __builtin_expect(!!(x), 0)
+#define bmi_ib_likely(x)       __builtin_expect(!!(x), 1)
+#define bmi_ib_unlikely(x)     __builtin_expect(!!(x), 0)
 
 /*
  * Debugging macros.
@@ -424,7 +425,7 @@ extern bmi_size_t EAGER_BUF_PAYLOAD;
 #if 0
 #define assert(cond,fmt,args...) \
     do { \
-	if (unlikely(!(cond))) \
+	if (bmi_ib_unlikely(!(cond))) \
 	    error(fmt,##args); \
     } while (0)
 #else
