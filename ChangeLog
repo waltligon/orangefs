@@ -5,6 +5,7 @@ PVFS2 Release ChangeLog
 pvfs2-1.4.1-pre1
 ===============
 - ib: separate config options for includes and libraries, optionally
+- ib: support mellanox ibgd-1.8.2, compile quietly on x86_64
 
 pvfs2-1.4.0
 - add a simple sendfile callback stub
