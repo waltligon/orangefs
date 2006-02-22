@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.h,v 1.10 2005-12-23 20:47:53 pw Exp $
+ * $Id: ib.h,v 1.11 2006-02-22 16:30:54 pw Exp $
  */
 #ifndef __ib_h
 #define __ib_h
@@ -394,6 +394,9 @@ extern bmi_size_t EAGER_BUF_PAYLOAD;
  */
 #define ptr_from_int64(p) (void *)(unsigned long)(p)
 #define int64_from_ptr(p) (u_int64_t)(unsigned long)(p)
+
+/* handy define */
+#define list_count(list) ((int)(sizeof(list) / sizeof(list[0])))
 
 /*
  * Tell the compiler we really do not expect this to happen.

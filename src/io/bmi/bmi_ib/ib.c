@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.20 2005-12-23 20:47:52 pw Exp $
+ * $Id: ib.c,v 1.21 2006-02-22 16:30:54 pw Exp $
  */
 #include <stdio.h>  /* just for NULL for id-generator.h */
 #include <src/common/id-generator/id-generator.h>
@@ -99,7 +99,7 @@ check_cq(void)
 		}
 	    } else {
 		error("%s: entry id 0x%llx opcode %s error %s", __func__,
-		  desc.id, VAPI_cqe_opcode_sym(desc.opcode),
+		  llu(desc.id), VAPI_cqe_opcode_sym(desc.opcode),
 		  VAPI_wc_status_sym(desc.status));
 	    }
 	}
@@ -201,7 +201,7 @@ check_cq(void)
 	    if (!ops)
 		ops = "(null)";
 	    error("%s: cq entry id 0x%llx opcode %s (%d) unexpected", __func__,
-	      desc.id, ops, desc.opcode);
+	      llu(desc.id), ops, desc.opcode);
 	}
     }
     return ret;
@@ -316,7 +316,7 @@ encourage_send_incoming_cts(buf_head_t *bh, u_int32_t byte_len)
     }
     if (!sq)
 	error("%s: mop_id %llx in CTS message not found", __func__,
-	  mh_cts->rts_mop_id);
+	  llu(mh_cts->rts_mop_id));
 
     debug(2, "%s: sq %p %s bh %p len %u", __func__,
       sq, sq_state_name(sq->state), bh, byte_len);
