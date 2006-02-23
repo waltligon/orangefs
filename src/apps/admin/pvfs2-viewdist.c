@@ -21,6 +21,7 @@
 #define __PINT_REQPROTO_ENCODE_FUNCS_C
 #include "pvfs2.h"
 #include "str-utils.h"
+#include "xattr-utils.h"
 #include "pint-sysint-utils.h"
 #include "pint-distribution.h"
 #include "pvfs2-dist-basic.h"
@@ -73,11 +74,6 @@ static int resolve_filename(file_object *obj, char *filename);
 static int generic_open(file_object *obj, PVFS_credentials *credentials);
 static int generic_server_location(file_object *obj, PVFS_credentials *creds,
         char **servers, int *nservers);
-
-#ifndef HAVE_ATTR_XATTR_H
-/* prototype taken from fgetxattr(2) man page on a FC 4 system */
-ssize_t fgetxattr(int filedes, const char *name, void *value, size_t size);
-#endif
 
 #define DIST_KEY "metafile_dist"
 #define DFILE_KEY "datafile_handles"
