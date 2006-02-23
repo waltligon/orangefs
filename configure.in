@@ -1027,6 +1027,7 @@ AC_CHECK_FUNCS(strnlen,
 dnl for regular functions, add them to the CHECK_FUNCS
 AC_CHECK_FUNCS(strtoull)
 AC_CHECK_FUNCS(strstr)
+AC_CHECK_FUNCS(fgetxattr)
 
 dnl check for getmntent(), special test
 AC_FUNC_GETMNTENT
