@@ -50,7 +50,7 @@ pull_and_build_pvfs2 () {
 	# a bit of gross shell hackery, but cuts down on the number of
 	# variables we have to set.  Assumes we ran this script out of a
 	# checked out pvfs2 tree
-	$(cd `dirname $0`;pwd)/../../maint/build/pvfs2-build.sh -v $1 \
+	$(cd `dirname $0`;pwd)/../../maint/build/pvfs2-build.sh -t -v $1 \
 		$with_kernel -r $PVFS2_DEST
 	
 }
