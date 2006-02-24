@@ -180,7 +180,7 @@ if [ $build_tests == "true" ] ; then
 	fi
 
 	# make
-	make  > $rootdir/make-test.log 2>&1
+	make  all > $rootdir/make-test.log 2>&1
 
 	if [ $? != 0 ] ; then
 		echo "Make failed; see $rootdir/make-test.log.  Aborting."
@@ -197,9 +197,14 @@ if [ $build_tests == "true" ] ; then
 			PEMM=$old_wd/pvfs2-extract-make-msgs.pl 
 		fi
 	fi
-	$PEMM $rootdir/make-test.log  $rootdir/make-extracted.log 2>&1
+	$PEMM $rootdir/make-test.log  > $rootdir/make-test-extracted.log 2>&1
 	if [ $? != 0 ] ; then
 		echo "Spurious output during test make; see $rootdir/make-extracted.log.  Aborting."
+		exit 1
+	fi
+	make install > $rootdir/make-test-install.log 2>&1
+	if [ $? != 0 ] ; then
+		echo "Make install (tests) failed; see $rootdir/make-test-install.log.  Aborting."
 		exit 1
 	fi
 fi
