@@ -17,7 +17,7 @@ int main(int argc, char * argv[])
     int count;
     char line[255];
     int size;
-    PVFS_offset offset;
+    PVFS_offset offset=0;
     PVFS_credentials creds;
     PVFS_sysresp_create create_resp;
     PVFS_sysresp_io io_resp;

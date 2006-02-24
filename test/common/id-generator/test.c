@@ -43,7 +43,6 @@ int print_example(example_handle my_handle);
 
 int main(int argc, char **argv)	{
 
-	int ret = -1;
 	example_handle my_handle;
 	struct example_struct my_example;
 
