@@ -222,11 +222,11 @@ SERVERCFLAGS = -D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__ \
 # server side flow protocol connecting BMI with NCAC cache
 SERVERCFLAGS += -D__STATIC_FLOWPROTO_BMI_CACHE__
 
-ifdef NEEDS_LIBRT 
-	SERVERLIBS = -lrt
-endif
+SERVERLIBS = -lpvfs2-server @LIBS@ @DB_LIB@ -lpthread 
 
-SERVERLIBS += -lpthread -lpvfs2-server @LIBS@ @DB_LIB@
+ifdef NEEDS_LIBRT 
+	SERVERLIBS += -lrt
+endif
 
 # you can optionally disable thread safety support in the client
 # though it's not recommended unless *required*.
@@ -501,9 +501,10 @@ $(SERVER): src/server/pvfs2-server-server.o lib/libpvfs2-server.a
 	$(E)$(LD) $^ -o $@ $(SERVER_LDFLAGS) $(SERVERLIBS)
 
 # special rules for admin tool objects which also require server components
-$(ADMINOBJS_SERVER): %: $(patsubst %.o,%c,%)
+$(ADMINOBJS_SERVER): %.o: %.c
 	$(Q) "  CC		$@"
-	$(E) $(CC) $< $(SERVERCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
+	$(E) $(CC) $(SERVERCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
+
 # special rules for admin tools which also require server components
 $(ADMINTOOLS_SERVER): %: %.o
 	$(Q) "  LD		$@"
