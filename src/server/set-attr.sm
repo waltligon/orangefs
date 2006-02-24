@@ -379,6 +379,7 @@ static int setattr_write_metafile_datafile_handles_if_required(
     ret = job_trove_keyval_write(
         s_op->req->u.setattr.fs_id, s_op->req->u.setattr.handle,
         &(s_op->key), &(s_op->val),
+        TROVE_COMMON_NAME_KEY |
         PINT_config_get_trove_sync_meta(
             user_opts, s_op->req->u.setattr.fs_id),
         NULL, s_op, 0, js_p, &j_id, server_job_context);
@@ -429,6 +430,7 @@ static int setattr_write_metafile_distribution_if_required(
     ret = job_trove_keyval_write(
         s_op->req->u.setattr.fs_id, s_op->req->u.setattr.handle,
         &(s_op->key), &(s_op->val),
+        TROVE_COMMON_NAME_KEY |
         PINT_config_get_trove_sync_meta(
             user_opts, s_op->req->u.setattr.fs_id),
         NULL, s_op, 0, js_p, &j_id, server_job_context);
@@ -477,6 +479,7 @@ static int setattr_write_symlink_target_if_required(
     ret = job_trove_keyval_write(
         s_op->req->u.setattr.fs_id, s_op->req->u.setattr.handle,
         &(s_op->key), &(s_op->val),
+        TROVE_COMMON_NAME_KEY |
         PINT_config_get_trove_sync_meta(
             user_opts, s_op->req->u.setattr.fs_id),
         NULL, s_op, 0, js_p, &j_id, server_job_context);

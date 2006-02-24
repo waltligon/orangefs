@@ -170,7 +170,7 @@ static int geteattr_read_eattrib(
         s_op->req->u.geteattr.key,
         s_op->resp.u.geteattr.val,
         s_op->req->u.geteattr.nkey,
-        0,
+        TROVE_XATTR_NAME_KEY,
         NULL,
         s_op,
         0,

@@ -34,6 +34,10 @@ static int crdirent_create_dirdata_dspace(
     PINT_server_op *s_op, job_status_s *js_p);
 static int crdirent_write_dirdata_handle(
     PINT_server_op *s_op, job_status_s *js_p);
+static int crdirent_increment_dirent_count(
+    PINT_server_op *s_op, job_status_s *js_p);
+static int crdirent_get_dirent_count(
+    PINT_server_op *s_op, job_status_s *js_p);
 static int crdirent_check_for_req_dir_update(
     PINT_server_op *s_op, job_status_s *js_p);
 static int crdirent_update_directory_attr(
@@ -54,6 +58,8 @@ nested machine pvfs2_check_entry_not_exist_sm(
     read_directory_entry_handle, 
     create_dirdata_dspace,
     write_dirdata_handle,
+    get_dirent_count,
+    increment_dirent_count,
     check_exist_directory_entry,
     set_error_code,
     validation_object_type_failure)
@@ -101,6 +107,18 @@ nested machine pvfs2_check_entry_not_exist_sm(
     state write_dirdata_handle
     {
         run crdirent_write_dirdata_handle;
+        default => get_dirent_count;
+    }
+
+    state get_dirent_count
+    {
+        run crdirent_get_dirent_count;
+        default => increment_dirent_count;
+    }
+
+    state increment_dirent_count
+    {
+        run crdirent_increment_dirent_count;
         default => return;
     }
 }
@@ -274,7 +292,7 @@ static int crdirent_read_directory_entry_handle(
         s_op->u.crdirent.parent_handle,
         &s_op->key,
         &s_op->val,
-        0,
+        TROVE_COMMON_NAME_KEY,
         NULL,
         s_op,
         0,
@@ -413,15 +431,68 @@ static int crdirent_write_dirdata_handle(PINT_server_op *s_op,
         s_op->u.crdirent.parent_handle,
         &s_op->key,
         &s_op->val,
+        TROVE_COMPONENT_NAME_KEY |
         PINT_config_get_trove_sync_meta(
             user_opts, s_op->u.crdirent.fs_id),
         NULL,
         s_op,
-        0, 
+        0,
         js_p,
         &i,
         server_job_context);
 
+    return ret;
+}
+
+static int crdirent_get_dirent_count(PINT_server_op *s_op,
+                                     job_status_s *js_p)
+{
+    int ret = -PVFS_EINVAL;
+    job_id_t i;
+
+    s_op->key.buffer = Trove_Common_Keys[DIRDATA_SIZE_KEY].key;
+    s_op->key.buffer_sz = Trove_Common_Keys[DIRDATA_SIZE_KEY].size;
+
+    ret = job_trove_keyval_read(
+        s_op->u.crdirent.fs_id,
+        s_op->u.crdirent.parent_handle,
+        &s_op->key,
+        &s_op->val,
+        TROVE_COMMON_NAME_KEY,
+        NULL,
+        s_op,
+        0,
+        js_p,
+        &i,
+        server_job_context);
+
+    return ret;
+}
+
+static int crdirent_increment_dirent_count(PINT_server_op *s_op,
+                                           job_status_s *js_p)
+{
+    struct server_configuration_s *user_opts = get_server_config_struct();
+    int ret, i;
+
+    ((PVFS_size)s_op->val.buffer)++;
+
+    /* s_op->key should still point to Trove_Common_Keys[DIRDATA_SIZE] */
+
+    ret = job_trove_keyval_write(s_op->u.crdirent.fs_id,
+                                 s_op->u.crdirent.parent_handle,
+                                 &s_op->key,
+                                 &s_op->val,
+                                 TROVE_COMMON_NAME_KEY |
+                                 PINT_config_get_trove_sync_meta(
+                                     user_opts, s_op->u.crdirent.fs_id),
+                                 NULL,
+                                 s_op,
+                                 0,
+                                 js_p,
+                                 &i,
+                                 server_job_context);
+    
     return ret;
 }
 
@@ -473,7 +544,9 @@ static int crdirent_write_directory_entry(PINT_server_op *s_op,
 
     ret = job_trove_keyval_write(
         s_op->u.crdirent.fs_id, s_op->u.crdirent.dirent_handle,
-        &s_op->key, &s_op->val, PINT_config_get_trove_sync_meta(
+        &s_op->key, &s_op->val, 
+        TROVE_COMPONENT_NAME_KEY |
+        PINT_config_get_trove_sync_meta(
             user_opts, s_op->u.crdirent.fs_id),
         NULL, s_op, 0, js_p, &i, server_job_context);
 
@@ -500,7 +573,7 @@ static int crdirent_check_for_req_dir_update(
     }
     return 1;
 }
-
+    
 static int crdirent_update_directory_attr(
     PINT_server_op *s_op, job_status_s *js_p)
 {
@@ -612,7 +685,8 @@ static int crdirent_check_exist_directory_entry(PINT_server_op *s_op,
 
     ret = job_trove_keyval_read(
         s_op->u.crdirent.fs_id, s_op->u.crdirent.dirent_handle,
-        &s_op->key, &s_op->val, 0, NULL, s_op, 0, js_p, &i,
+        &s_op->key, &s_op->val, 
+        TROVE_COMPONENT_NAME_KEY, NULL, s_op, 0, js_p, &i,
         server_job_context);
 
     return ret;

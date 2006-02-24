@@ -165,7 +165,7 @@ static int rmdirent_verify_parent_metadata_and_read_directory_entry_handle(
         s_op->req->u.rmdirent.parent_handle,
         &s_op->key,
         &s_op->val,
-        0,
+        TROVE_COMMON_NAME_KEY,
         NULL,
         s_op,
         0,
@@ -210,7 +210,7 @@ static int rmdirent_read_directory_entry(PINT_server_op *s_op,
         s_op->u.rmdirent.dirdata_handle,
         &s_op->key,
         &s_op->val,
-        0,
+        TROVE_COMMON_NAME_KEY,
         NULL,
         s_op,
         0,
@@ -275,7 +275,9 @@ static int rmdirent_remove_directory_entry(PINT_server_op *s_op,
 
     ret = job_trove_keyval_remove(
         s_op->req->u.rmdirent.fs_id, s_op->u.rmdirent.dirdata_handle,
-        &s_op->key, PINT_config_get_trove_sync_meta(
+        &s_op->key, 
+        TROVE_COMPONENT_NAME_KEY |
+        PINT_config_get_trove_sync_meta(
             user_opts, s_op->req->u.rmdirent.fs_id),
         NULL, s_op, 0, js_p, &j_id, server_job_context);
 

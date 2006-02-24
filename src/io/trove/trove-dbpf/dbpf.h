@@ -19,7 +19,7 @@ extern "C" {
 #include "pvfs2-internal.h"
 
 #define TROVE_DBPF_VERSION_KEY                       "trove-dbpf-version"
-#define TROVE_DBPF_VERSION_VALUE                                  "0.0.1"
+#define TROVE_DBPF_VERSION_VALUE                                  "0.1.1"
 #define LAST_HANDLE_STRING                                  "last_handle"
 #define ROOT_HANDLE_STRING                                  "root_handle"
 
@@ -69,7 +69,7 @@ extern "C" {
  PINT_event_timestamp(PVFS_EVENT_API_TROVE, __op, 0, __id,               \
  PVFS_EVENT_FLAG_END)
 
-#define DBPF_GET_STORAGE_DIRNAME(__buf, __path_max, __stoname)                 \
+#define DBPF_GET_STORAGE_DIRNAME(__buf, __path_max, __stoname)           \
 do { snprintf(__buf, __path_max, "/%s", __stoname); } while (0)
 
 #define STO_ATTRIB_DBNAME "storage_attributes.db"
@@ -103,13 +103,6 @@ do {                                                                     \
            DS_ATTRIB_DBNAME);                                            \
 } while (0)
 
-#define KEYVAL_DIRNAME "keyvals"
-#define DBPF_GET_KEYVAL_DIRNAME(__buf, __path_max, __stoname, __collid)  \
-do {                                                                     \
-  snprintf(__buf, __path_max, "/%s/%08x/%s", __stoname, __collid,        \
-           KEYVAL_DIRNAME);                                              \
-} while (0)
-
 #define BSTREAM_DIRNAME "bstreams"
 #define DBPF_GET_BSTREAM_DIRNAME(__buf, __path_max, __stoname, __collid) \
 do {                                                                     \
@@ -118,19 +111,19 @@ do {                                                                     \
 } while (0)
 
 /* arguments are: buf, path_max, stoname, collid, handle */
-#define DBPF_GET_BSTREAM_FILENAME(__b, __pm, __stoname, __cid, __handle) \
-do {                                                                     \
-  snprintf(__b, __pm, "/%s/%08x/%s/%.8llu/%08llx.bstream",                 \
-           __stoname, __cid, BSTREAM_DIRNAME,                            \
-           llu(DBPF_BSTREAM_GET_BUCKET(__handle, __cid)), llu(__handle));  \
+#define DBPF_GET_BSTREAM_FILENAME(__b, __pm, __stoname, __cid, __handle)  \
+do {                                                                      \
+  snprintf(__b, __pm, "/%s/%08x/%s/%.8llu/%08llx.bstream",                \
+           __stoname, __cid, BSTREAM_DIRNAME,                             \
+           llu(DBPF_BSTREAM_GET_BUCKET(__handle, __cid)), llu(__handle)); \
 } while (0)
 
-/* arguments are: buf, path_max, stoname, collid, handle */
-#define DBPF_GET_KEYVAL_DBNAME(__b, __pm, __stoname, __cid, __handle)    \
+/* arguments are: buf, path_max, stoname, collid */
+#define KEYVAL_DBNAME "keyval.db"
+#define DBPF_GET_KEYVAL_DBNAME(__buf,__path_max,__stoname,__collid)      \
 do {                                                                     \
-  snprintf(__b, __pm, "/%s/%08x/%s/%.8llu/%08llx.keyval", __stoname,       \
-           __cid, KEYVAL_DIRNAME,                                        \
-           llu(DBPF_KEYVAL_GET_BUCKET(__handle, __cid)), llu(__handle));   \
+  snprintf(__buf, __path_max, "/%s/%08x/%s", __stoname, __collid,        \
+           KEYVAL_DBNAME);                                               \
 } while (0)
 
 extern struct TROVE_bstream_ops dbpf_bstream_ops;
@@ -152,6 +145,7 @@ struct dbpf_collection
     char *name;
     DB *coll_attr_db;
     DB *ds_db;
+    DB *keyval_db;
     TROVE_coll_id coll_id;
     TROVE_handle root_dir_handle;
     struct dbpf_storage *storage;
@@ -168,6 +162,13 @@ struct dbpf_collection_db_entry
 {
     TROVE_coll_id coll_id;
 };
+
+/* entry types */
+#define DBPF_ENTRY_TYPE_CONST      0x01
+#define DBPF_ENTRY_TYPE_COMPONENT  0x02
+
+int dbpf_keyval_compare(
+    DB * dbp, const DBT * a, const DBT * b);
 
 struct dbpf_dspace_create_op
 {

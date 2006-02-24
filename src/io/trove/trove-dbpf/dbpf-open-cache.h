@@ -21,8 +21,9 @@ struct open_cache_ref
 
 enum open_ref_type
 {
-    DBPF_OPEN_FD = 1,
-    DBPF_OPEN_DB = 2
+    DBPF_OPEN_BSTREAM   = 1,
+    DBPF_OPEN_DSPACE_DB = 2,
+    DBPF_OPEN_KEYVAL_DB = 4
 };
 
 void dbpf_open_cache_initialize(void);
@@ -45,7 +46,7 @@ int dbpf_open_cache_remove(
 
 #define dbpf_open_cache_attr_get(__coll_id, __create_flag, __out_ref)\
 dbpf_open_cache_get(__coll_id, TROVE_HANDLE_NULL, __create_flag,     \
-                    DBPF_OPEN_DB, __out_ref)
+                    DBPF_OPEN_DSPACE_DB, __out_ref)
 
 #define dbpf_open_cache_attr_put dbpf_open_cache_put
 

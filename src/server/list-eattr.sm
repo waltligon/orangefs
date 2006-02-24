@@ -169,7 +169,7 @@ static int listeattr_list_eattrib(
         s_op->req->u.listeattr.token,
         s_op->resp.u.listeattr.key,
         s_op->req->u.listeattr.nkey,
-        0,
+        TROVE_XATTR_NAME_KEY,
         NULL,
         s_op,
         0,

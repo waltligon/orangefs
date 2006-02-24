@@ -444,7 +444,7 @@ static int dbpf_bstream_read_at_op_svc(struct dbpf_op *op_p)
     struct open_cache_ref tmp_ref;
 
     ret = dbpf_open_cache_get(
-        op_p->coll_p->coll_id, op_p->handle, 0, DBPF_OPEN_FD, &tmp_ref);
+        op_p->coll_p->coll_id, op_p->handle, 0, DBPF_OPEN_BSTREAM, &tmp_ref);
     if (ret < 0)
     {
         goto return_error;
@@ -533,7 +533,7 @@ static int dbpf_bstream_write_at_op_svc(struct dbpf_op *op_p)
     TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
 
     ret = dbpf_open_cache_get(
-        op_p->coll_p->coll_id, op_p->handle, 1, DBPF_OPEN_FD, &tmp_ref);
+        op_p->coll_p->coll_id, op_p->handle, 1, DBPF_OPEN_BSTREAM, &tmp_ref);
     if (ret < 0)
     {
         goto return_error;
@@ -619,7 +619,7 @@ static int dbpf_bstream_flush_op_svc(struct dbpf_op *op_p)
     struct open_cache_ref tmp_ref;
 
     ret = dbpf_open_cache_get(
-        op_p->coll_p->coll_id, op_p->handle, 1, DBPF_OPEN_FD, &tmp_ref);
+        op_p->coll_p->coll_id, op_p->handle, 1, DBPF_OPEN_BSTREAM, &tmp_ref);
     if (ret < 0)
     {
         goto return_error;
@@ -692,7 +692,7 @@ static int dbpf_bstream_resize_op_svc(struct dbpf_op *op_p)
     TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
 
     ret = dbpf_open_cache_get(
-        op_p->coll_p->coll_id, op_p->handle, 1, DBPF_OPEN_FD, &tmp_ref);
+        op_p->coll_p->coll_id, op_p->handle, 1, DBPF_OPEN_BSTREAM, &tmp_ref);
     if (ret < 0)
     {
         goto return_error;
@@ -907,7 +907,7 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     q_op_p->op.u.b_rw_list.list_proc_state = LIST_PROC_INITIALIZED;
 
     ret = dbpf_open_cache_get(
-        coll_id, handle, (opcode == LIO_WRITE) ? 1 : 0, DBPF_OPEN_FD,
+        coll_id, handle, (opcode == LIO_WRITE) ? 1 : 0, DBPF_OPEN_BSTREAM,
         &q_op_p->op.u.b_rw_list.open_ref);
     if (ret < 0)
     {

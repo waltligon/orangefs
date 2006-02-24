@@ -895,7 +895,7 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
 
     /* get an fd for the bstream so we can check size */
     ret = dbpf_open_cache_get(
-        op_p->coll_p->coll_id, op_p->handle, 0, DBPF_OPEN_FD, &tmp_ref);
+        op_p->coll_p->coll_id, op_p->handle, 0, DBPF_OPEN_BSTREAM, &tmp_ref);
     if (ret < 0)
     {
         /*
@@ -916,7 +916,7 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
     }
 
     ret = dbpf_open_cache_get(
-        op_p->coll_p->coll_id, op_p->handle, 0, DBPF_OPEN_DB, &tmp_ref);
+        op_p->coll_p->coll_id, op_p->handle, 0, DBPF_OPEN_DSPACE_DB, &tmp_ref);
 
     if (ret == 0)
     {

@@ -273,7 +273,8 @@ static int remove_read_dirdata_handle(PINT_server_op *s_op,
 
     ret = job_trove_keyval_read(
         s_op->u.remove.fs_id, s_op->u.remove.handle,
-        &s_op->key, &s_op->val, 0, NULL, s_op, 0, js_p,
+        &s_op->key, &s_op->val, 
+        TROVE_COMMON_NAME_KEY, NULL, s_op, 0, js_p,
         &j_id, server_job_context);
 
     return ret;

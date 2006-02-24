@@ -397,7 +397,7 @@ static int lookup_read_directory_entry_handle(
 
     ret = job_trove_keyval_read(
         s_op->req->u.lookup_path.fs_id, handle, &s_op->key, &s_op->val,
-        0, NULL, s_op, 0, js_p, &j_id, server_job_context);
+        TROVE_COMMON_NAME_KEY, NULL, s_op, 0, js_p, &j_id, server_job_context);
 
     return ret;
 }
@@ -435,7 +435,8 @@ static int lookup_read_directory_entry(
 
     ret = job_trove_keyval_read(
         s_op->req->u.lookup_path.fs_id, s_op->u.lookup.dirent_handle,
-        &s_op->key, &s_op->val, 0, NULL, s_op, 0, js_p, &j_id,
+        &s_op->key, &s_op->val, 
+        TROVE_COMPONENT_NAME_KEY, NULL, s_op, 0, js_p, &j_id,
         server_job_context);
 
     return ret;

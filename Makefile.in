@@ -500,10 +500,14 @@ $(SERVER): src/server/pvfs2-server-server.o lib/libpvfs2-server.a
 	$(Q) "  LD		$@"
 	$(E)$(LD) $^ -o $@ $(SERVER_LDFLAGS) $(SERVERLIBS)
 
+# special rules for admin tool objects which also require server components
+$(ADMINOBJS_SERVER): %: $(patsubst %.o,%c,%)
+	$(Q) "  CC		$@"
+	$(E) $(CC) $< $(SERVERCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
 # special rules for admin tools which also require server components
 $(ADMINTOOLS_SERVER): %: %.o
 	$(Q) "  LD		$@"
-	$(E)$(LD) $< $(LDFLAGS) $(SERVERLIBS) -o $@
+	$(E)$(LD) $< $(LDFLAGS) $(SERVER_LDFLAGS) $(SERVERLIBS) -o $@
 
 # rule for building the pvfs2 library
 lib/libpvfs2.a: $(LIBOBJS)
@@ -769,7 +773,7 @@ install:: all install_doc
 
 	install -d $(prefix)/lib
 	install -m 755 $(LIBRARIES) $(prefix)/lib
-	
+
 ifdef TARGET_OS_DARWIN
 #       TOC needs to be regenerated in libs after they get moved
 	ranlib $(patsubst %,$(prefix)/%,$(LIBRARIES))

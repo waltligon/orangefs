@@ -109,7 +109,8 @@ PINT_server_trove_keys_s Trove_Common_Keys[] =
     {"dir_ent", 8},
     {"datafile_handles", 17},
     {"metafile_dist", 14},
-    {"symlink_target", 15}
+    {"symlink_target", 15},
+    {"dirdata_size", 13}
 };
 
 /* These three are used continuously in our wait loop.  They could be
