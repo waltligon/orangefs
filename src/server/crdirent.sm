@@ -431,7 +431,7 @@ static int crdirent_write_dirdata_handle(PINT_server_op *s_op,
         s_op->u.crdirent.parent_handle,
         &s_op->key,
         &s_op->val,
-        TROVE_COMPONENT_NAME_KEY |
+        TROVE_COMMON_NAME_KEY |
         PINT_config_get_trove_sync_meta(
             user_opts, s_op->u.crdirent.fs_id),
         NULL,
@@ -475,7 +475,7 @@ static int crdirent_increment_dirent_count(PINT_server_op *s_op,
     struct server_configuration_s *user_opts = get_server_config_struct();
     int ret, i;
 
-    ((PVFS_size)s_op->val.buffer)++;
+    (*((PVFS_size *)s_op->val.buffer))++;
 
     /* s_op->key should still point to Trove_Common_Keys[DIRDATA_SIZE] */
 
