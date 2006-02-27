@@ -129,7 +129,6 @@ enum
     METAFILE_HANDLES_KEY = 2,
     METAFILE_DIST_KEY    = 3,
     SYMLINK_TARGET_KEY   = 4,
-    KEYVAL_ARRAY_SIZE    = 5,
     DIRDATA_SIZE_KEY     = 6
 };
 

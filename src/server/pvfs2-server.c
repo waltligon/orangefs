@@ -110,7 +110,6 @@ PINT_server_trove_keys_s Trove_Common_Keys[] =
     {"datafile_handles", 17},
     {"metafile_dist", 14},
     {"symlink_target", 15},
-    {"keyval_array_size", 18},
     {"dirdata_size", 13}
 };
 
