@@ -410,7 +410,8 @@ int pvfs2_mkspace(
         val.buffer_sz = sizeof(TROVE_handle);
 
         ret = trove_keyval_write(
-            coll_id, new_root_handle, &key, &val, TROVE_SYNC, 0, NULL,
+            coll_id, new_root_handle, &key, &val, 
+            TROVE_COMMON_NAME_KEY | TROVE_SYNC, 0, NULL,
             trove_context, &op_id);
 
         while (ret == 0)
@@ -560,7 +561,8 @@ int pvfs2_mkspace(
         val.buffer_sz = sizeof(TROVE_handle);
 
         ret = trove_keyval_write(
-            coll_id, lost_and_found_handle, &key, &val, TROVE_SYNC,
+            coll_id, lost_and_found_handle, &key, &val, 
+            TROVE_COMMON_NAME_KEY | TROVE_SYNC,
             0, NULL, trove_context, &op_id);
 
         while (ret == 0)
@@ -591,7 +593,8 @@ int pvfs2_mkspace(
         val.buffer_sz = sizeof(TROVE_handle);
 
         ret = trove_keyval_write(
-            coll_id, root_dirdata_handle, &key, &val, TROVE_SYNC, 0,
+            coll_id, root_dirdata_handle, &key, &val, 
+            TROVE_COMPONENT_NAME_KEY | TROVE_SYNC, 0,
             NULL, trove_context, &op_id);
 
         while (ret == 0)
