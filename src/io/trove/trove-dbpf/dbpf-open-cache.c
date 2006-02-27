@@ -49,16 +49,15 @@ struct open_cache_entry
 };
 
 /* "used_list" is for active objects (ref_ct > 0) */
-QLIST_HEAD(used_list);
+static QLIST_HEAD(used_list);
 /* "unused_list" is for inactive objects (ref_ct == 0) that we are still
  * holding open in case someone asks for them again soon
  */
-QLIST_HEAD(unused_list);
+static QLIST_HEAD(unused_list);
 /* "free_list" is just a list of cache entries that have not been filled in,
  * can be used at any time for new cache entries
  */
-QLIST_HEAD(free_list);
-
+static QLIST_HEAD(free_list);
 static gen_mutex_t cache_mutex = GEN_MUTEX_INITIALIZER;
 static struct open_cache_entry prealloc[OPEN_CACHE_SIZE];
 
@@ -556,6 +555,11 @@ static int open_db(
 	assert(0);
     }
 
+    if (type == DBPF_OPEN_KEYVAL_DB)
+    {
+        (*db_pp)->set_bt_compare((*db_pp), dbpf_keyval_compare);
+    }
+
     ret = internal_db_open(db_pp, filename, NULL,
                            DB_UNKNOWN, TROVE_DB_OPEN_FLAGS, 0);
 
@@ -585,11 +589,6 @@ static int open_db(
 	(*db_pp)->close((*db_pp), 0);
 	*db_pp = NULL;
 	return -dbpf_db_error_to_trove_error(ret);
-    }
-
-    if (type == DBPF_OPEN_KEYVAL_DB)
-    {
-        (*db_pp)->set_bt_compare((*db_pp), dbpf_keyval_compare);
     }
 
     return 0;

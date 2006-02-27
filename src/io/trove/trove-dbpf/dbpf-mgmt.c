@@ -649,7 +649,15 @@ static int dbpf_collection_create(char *collname,
     {
         db_p->close(db_p, 0);
     }
-    
+
+    DBPF_GET_BSTREAM_DIRNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
+    ret = mkdir(path_name, 0755);
+    if(ret != 0)
+    {
+        gossip_err("mkdir failed on bstream directory %s\n", path_name);
+        return -trove_errno_to_trove_error(errno);
+    }
+
     for(i = 0; i < DBPF_BSTREAM_MAX_NUM_BUCKETS; i++)
     {
         snprintf(dir, PATH_MAX, "%s/%.8d", path_name, i);
