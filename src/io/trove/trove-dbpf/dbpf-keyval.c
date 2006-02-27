@@ -660,6 +660,16 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
         {
             goto return_ok;
         }
+#ifdef HAVE_DB_BUFFER_SMALL
+        else if(ret == DB_BUFFER_SMALL && 
+#else
+        else if(ret == ENOMEM &&
+#endif
+                key_entry.handle != op_p->handle)
+        {
+            ret = DB_NOTFOUND;
+            goto return_ok;
+        }
         else if (ret != 0)
         {
             ret = -dbpf_db_error_to_trove_error(ret);
@@ -992,6 +1002,7 @@ static int dbpf_keyval_iterate_skip_to_position(
     int ret;
     struct dbpf_keyval_db_entry key_entry;
     DBT key, data;
+    char data_array[PVFS_NAME_MAX];
 
     key_entry.handle = op_p->handle;
     key_entry.type = op_p->flags & TROVE_KEYVAL_TYPES;
@@ -1014,7 +1025,9 @@ static int dbpf_keyval_iterate_skip_to_position(
     
     memset(&data, 0, sizeof(data));
     data.flags |= DB_DBT_USERMEM;
-
+    data.data = data_array;
+    data.ulen = PVFS_NAME_MAX;
+    
     /* use Berkeley DB's DB_SET_RANGE functionality to move the cursor
      * to the first matching entry after the key with the specified handle.
      * This is done by creating a key that has a null component string.
