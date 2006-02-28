@@ -199,7 +199,7 @@ if [ $build_tests == "true" ] ; then
 	fi
 	$PEMM $rootdir/make-test.log  > $rootdir/make-test-extracted.log 2>&1
 	if [ $? != 0 ] ; then
-		echo "Spurious output during test make; see $rootdir/make-extracted.log.  Aborting."
+		echo "Spurious output during test make; see $rootdir/make-test-extracted.log.  Aborting."
 		exit 1
 	fi
 	make install > $rootdir/make-test-install.log 2>&1
