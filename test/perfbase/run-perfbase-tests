@@ -148,11 +148,11 @@ sub run_tests()
                        "-d $mountpoint -n $iterations > $datfile",
                        "Test run failed: proc: $proc, meta: $meta, io: $io\n");
 
-                my $res = open(WEBINPUT,
+                open(WEBINPUT,
                      "|./perfbase-web-input -o $operation -m $meta -i $io " .
-                     "-f ./experiments/mpi-md-input.xml -t $branch > /tmp/perfbase_input_result 2>&1");
+                     "-f ./experiments/pvfs2-op-input.xml -t $branch > /tmp/perfbase_input_result 2>&1");
                 
-                if(!$res)
+                if($? != 0)
                 {
                     print STDERR "Can't fork perfbase-web-input: $!\n" .
                                  "Failed to submit test results to perfbase " .
@@ -165,7 +165,7 @@ sub run_tests()
                 my $datresults = `cat $datfile`;
                 print WEBINPUT $datresults;
                 
-                $res = close WEBINPUT; 
+                my $res = close WEBINPUT; 
                 if(!$res)
                 {
                     print STDERR "Failed to submit results to perfbase: $! $?\n" .
