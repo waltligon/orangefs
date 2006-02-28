@@ -53,6 +53,9 @@ $branch = "HEAD" if !defined($branch);
 $cvsdate = `date --iso-8601=date` if !defined($cvsdate);
 $testpath = "." if !defined($testpath);
 $iterations = 100 if !defined($iterations);
+my $pvfs2install = "$testpath/INSTALL-pvfs2-$branch";
+my $benchmarkpath = "$testpath/BUILD-pvfs2-$branch/test/perfbase/benchmarks";
+
 
 if(!defined($mountpoint))
 {
@@ -110,7 +113,7 @@ sub run_tests()
     my @mpdprocs_list = split(/\n/, $mpdprocs);
     my $mpdcount = scalar(@mpdprocs_list);
 
-    if($mpdcount > $procs[$#procs])
+    if($mpdcount < $procs[$#procs])
     {
         print STDERR "Max clients (" . $procs[$#procs] . ") is not possible " .
             "with only $mpdcount mpd processes available\n"; 
@@ -129,7 +132,7 @@ sub run_tests()
         {
             check_exec("$hostname-restart-servers");
 
-            myexec("$hostname-restart-servers $io $meta $branch",
+            myexec("$hostname-restart-servers $pvfs2install $io $meta",
                    "Failed to restart servers with:\n" .
                    "meta servers: $meta\nio servers: $io\n" .
                    "branch: $branch\n\n");
@@ -138,7 +141,7 @@ sub run_tests()
             {
                 my $datfile = "/tmp/perftest-c$proc-m$meta-i$io-$branch.dat";
 
-                myexec("mpiexec -1 -n $proc $testpath/$operation-test " .
+                myexec("mpiexec -1 -env PVFS2TAB_FILE \$PVFS2TAB_FILE -n $proc $benchmarkpath/$operation-test " .
                        "-d pvfs2:$mountpoint -n $iterations > $datfile",
                        "Test run failed: proc: $proc, meta: $meta, io: $io\n");
 
@@ -231,7 +234,7 @@ incrementing by <inc> after each iteration.
           -d <date>      : iso-8601 valid date string to 
                            use for CVS checkout.  
                            Defaults to latest.
-          -p <test path> : path to test program.  Defaults to .
+          -p <test path> : path to pvfs2 tests base dir.  Defaults to .
           -m <dir>       : pvfs2 mount point (passed to test program)
           -n <iter>      : number of iterations (passed to test program).
                            Defaults to 100.
