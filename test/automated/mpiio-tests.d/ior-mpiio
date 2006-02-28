@@ -22,7 +22,7 @@ fi
 if [ -f $PAV_CONFIG ] ; then 
 	# write out a pbs script
 	pbs_script=${CLUSTER_DIR}/ior.sh
-	make_pbs_script ${IOR} -a MPIIO -o pvfs2:\${MOUNTPOINT}/iortest > $pbs_script
+	make_pbs_script ${IOR} -a MPIIO -i 3 -o pvfs2:\${MOUNTPOINT}/iortest > $pbs_script
 
 	# submit it
 	job_id=$(qsub -N ior $pbs_script | cut -d . -f1)
@@ -34,5 +34,9 @@ if [ -f $PAV_CONFIG ] ; then
 	cat ior.o$job_id
 
 	# need to know if we failed or not
+	egrep -q '(Abort:|Assertion.*failed|Actual file size)' ior.o$job_id
+	if [ $? -eq 0 ] ; then
+		exit 1
+	fi
 	grep -q 'Max Read' ior.o$job_id
 fi

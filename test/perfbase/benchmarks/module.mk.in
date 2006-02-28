@@ -1,5 +1,9 @@
 DIR := perfbase/benchmarks
 
-MPIIOTESTSRC += \
+MPIMISCSRC += \
+       $(DIR)/perf-counter-utils.c
+
+MPITESTSRC += \
 	$(DIR)/mpi-create-test.c \
+	$(DIR)/create-subdir-test.c \
 	$(DIR)/create-test.c
