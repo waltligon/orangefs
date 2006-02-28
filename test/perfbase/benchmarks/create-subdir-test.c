@@ -13,7 +13,6 @@
 #include <mpi.h>
 #include "pvfs2-sysint.h"
 #include "pvfs2-util.h"
-
 #include "perf-counter-utils.h"
 
 #ifndef PATH_MAX
@@ -84,21 +83,22 @@ int main(int argc, char **argv)
 	 PVFS_error pvfs_error;
     int i;
 	 char test_file[PATH_MAX];
+	 char test_dir[PATH_MAX];
 	 PVFS_sys_attr attr;
 	 PVFS_fs_id cur_fs;
 	 PVFS_credentials credentials;
 	 PVFS_sysresp_lookup lookup_resp;
 	 PVFS_sysresp_create create_resp;
+	 PVFS_sysresp_mkdir mkdir_resp;
 	 char basepath[PATH_MAX];
 	 
     int rank, nprocs, ret;
     MPI_Info info;
-    struct timeval test_start, test_end;
-	 long last_perf_fetch;
+    struct timeval test_start, test_end, last_perf_fetch;
 	 long timediff;
 	 int meta_server_count;
 
-	 MPI_Init(&argc, &argv);
+    MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
 
@@ -126,8 +126,6 @@ int main(int argc, char **argv)
 		  return ret;
 	 }
 
-	 PVFS_util_gen_credentials(&credentials);
-
 	 if(rank == 0)
 	 {
 		  ret = test_util_init_perfs(
@@ -139,6 +137,14 @@ int main(int argc, char **argv)
 		  }
 	 }
 
+	 PVFS_util_gen_credentials(&credentials);
+
+	 attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
+	 attr.owner = credentials.uid;
+	 attr.group = credentials.gid;
+	 attr.perms = 1877;
+	 attr.atime = attr.ctime = attr.mtime = time(NULL);
+
 	 pvfs_error = PVFS_sys_lookup(
 		  cur_fs, basepath, &credentials, &lookup_resp, 
 		  PVFS2_LOOKUP_LINK_NO_FOLLOW);
@@ -148,29 +154,31 @@ int main(int argc, char **argv)
 		  return PVFS_get_errno_mapping(pvfs_error);
 	 }
 
-	 attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-	 attr.owner = credentials.uid;
-	 attr.group = credentials.gid;
-	 attr.perms = 1877;
-	 attr.atime = attr.ctime = attr.mtime = time(NULL);
+	 snprintf(test_dir, PATH_MAX, "testdir.%d", rank);
+	 pvfs_error = PVFS_sys_mkdir(
+		  test_dir, lookup_resp.ref, attr, &credentials, &mkdir_resp);
+	 if(pvfs_error != 0)
+	 {
+		  PVFS_perror("PVFS_sys_lookup", pvfs_error);
+		  return PVFS_get_errno_mapping(pvfs_error);
+	 }
 
 	 /* synchronize with other clients (if any) */
 	 MPI_Barrier(MPI_COMM_WORLD);
 
 	 if(rank == 0)
 	 {
-		  gettimeofday(&test_start, NULL);
-		  last_perf_fetch = test_start.tv_sec;
+		  gettimeofday(&last_perf_fetch, NULL);
 	 }
 
-	 for(i = 0; i < opt_nfiles; ++i)
+    for(i = 0; i < opt_nfiles; ++i)
     {
 		  memset(test_file, 0, PATH_MAX);
 		  snprintf(test_file, PATH_MAX, "testfile.%d.%d", rank, i);
 
 		  gettimeofday(&test_start, NULL);
 
-		  pvfs_error = PVFS_sys_create(test_file, lookup_resp.ref,
+		  pvfs_error = PVFS_sys_create(test_file, mkdir_resp.ref,
 												 attr, &credentials,
 												 NULL, &create_resp);
 		  if(pvfs_error != 0)
@@ -185,7 +193,7 @@ int main(int argc, char **argv)
 
 		  printf("%d\t%f\n", (rank * opt_nfiles) + i, ((double)timediff)*1e-6);
 
-		  pvfs_error = PVFS_sys_remove(test_file, lookup_resp.ref, &credentials);
+		  pvfs_error = PVFS_sys_remove(test_file, mkdir_resp.ref, &credentials);
 		  if(pvfs_error != 0)
 		  {
 				PVFS_perror("PVFS_sys_remove", pvfs_error);
@@ -193,27 +201,31 @@ int main(int argc, char **argv)
 		  }
 
 		  if(rank == 0 &&
-			  (last_perf_fetch + PERF_INTERVAL) > test_end.tv_sec)
+			  (last_perf_fetch.tv_sec + PERF_INTERVAL) > test_end.tv_sec)
 		  {
 				/* time to fetch perfs again */
-				ret = test_util_get_queue_perfs(
-					 cur_fs, credentials, meta_server_count);
+				ret = test_util_get_queue_perfs(cur_fs, credentials, meta_server_count);
 				if(ret < 0)
 				{
 					 PVFS_perror("test_util_get_queue_perfs", ret);
 					 return ret;
 				}
 
-				last_perf_fetch = test_end.tv_sec;
+				last_perf_fetch = test_end;
 		  }
+	 }
 
+	 pvfs_error = PVFS_sys_remove(test_dir, lookup_resp.ref, &credentials);
+	 if(pvfs_error != 0)
+	 {
+		  PVFS_perror("PVFS_sys_remove", pvfs_error);
+		  return PVFS_get_errno_mapping(pvfs_error);
 	 }
 
 	 MPI_Finalize();
     return 0;
 }
 
- 
 /*
  * Local variables:
  *  c-indent-level: 3
