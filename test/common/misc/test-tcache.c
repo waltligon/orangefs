@@ -31,7 +31,7 @@ int main(int argc, char **argv)
     struct PINT_tcache_entry* test_entry = NULL;
     int ret = 0;
     int status = 0;
-    int param = 0;
+    unsigned int param = 0;
     int removed = 0;
     int reclaimed = 0;
     
