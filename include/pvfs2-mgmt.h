@@ -70,8 +70,8 @@ endecode_fields_11_struct(
     int64_t, read,
     int64_t, metadata_write,
     int64_t, metadata_read,
-    int32_t, metadata_dspace_ops,
-    int32_t, metadata_keyval_ops,
+    int32_t, dspace_queue,
+    int32_t, keyval_queue,
     int32_t, reqsched,
     skip4,)
 
