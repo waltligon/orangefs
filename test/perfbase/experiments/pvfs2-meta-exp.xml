@@ -21,16 +21,10 @@
  <!-- generic pvfs2 parameters -->
 
  <parameter occurrence="once">
-  <name>cvs_tag</name>
-  <synopsis>Tagname from CVS of the PVFS2 version</synopsis>
+  <name>cvs_stamp</name>
+  <synopsis>Tag/Date from CVS of the PVFS2 version</synopsis>
   <datatype>string</datatype>
-  <default>HEAD</default>
- </parameter>
-
- <parameter occurrence="once">
-  <name>cvs_date</name>
-  <synopsis>Date of the codebase from CVS</synopsis>
-  <datatype>date</datatype>
+  <default>HEAD-now</default>
  </parameter>
 
  <parameter occurrence="once">
@@ -79,8 +73,17 @@
  <!-- results -->
  
  <result>
-  <name>T_max</name>
-  <synopsis>Seconds per Operation</synopsis>
+  <name>T_avg</name>
+  <synopsis>Seconds per Operation (Average)</synopsis>
+  <datatype>float</datatype>
+  <unit>
+   <base_unit>s</base_unit>
+  </unit>
+ </result>
+
+ <result>
+  <name>T_dev</name>
+  <synopsis>Seconds per Operation (Std Dev)</synopsis>
   <datatype>float</datatype>
   <unit>
    <base_unit>s</base_unit>

@@ -1,5 +1,9 @@
 /*
- * usage:  -d /path/to/directory -n number_of_files
+ * This test is used to measure the performance of
+ * readdir esp. the skipping of directory entries
+ * to reach the desired position.
+ * 
+ * usage: -d /path/to/directory -n #_of_files
  */
 
 #include <sys/time.h>
@@ -13,11 +17,13 @@
 #include <mpi.h>
 #include "pvfs2-sysint.h"
 #include "pvfs2-util.h"
-#include "benchmark-utils.h"
+#include "perf-counter-utils.h"
 
 #ifndef PATH_MAX
 #define PATH_MAX FILENAME_MAX
 #endif
+
+#define PERF_INTERVAL 4
 
 extern char *optarg;
 int opt_nfiles = -1;
@@ -78,20 +84,22 @@ void handle_error(int errcode, char *str)
 
 int main(int argc, char **argv)
 {
-	 PVFS_error pvfs_error;
+    PVFS_error pvfs_error;
     int i;
-	 char test_file[PATH_MAX];
-	 char test_dir[PATH_MAX];
-	 PVFS_sys_attr attr;
-	 PVFS_fs_id cur_fs;
-	 PVFS_credentials credentials;
-	 PVFS_sysresp_lookup lookup_resp;
-	 PVFS_sysresp_create create_resp;
-	 PVFS_sysresp_mkdir mkdir_resp;
-	 char basepath[PATH_MAX];
-	 
+    char test_file[PATH_MAX];
+    char test_dir[PATH_MAX];
+    PVFS_sys_attr attr;
+    PVFS_fs_id cur_fs;
+    PVFS_credentials credentials;
+    PVFS_sysresp_lookup lookup_resp;
+    PVFS_sysresp_create create_resp;
+    PVFS_sysresp_mkdir mkdir_resp;
+	 PVFS_sysresp_readdir readdir_resp;
+    char basepath[PATH_MAX];
+
     int rank, nprocs, ret;
     MPI_Info info;
+	 int tok;
 
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -99,38 +107,37 @@ int main(int argc, char **argv)
 
     parse_args(argc, argv);
 
-    /* provide hints if you want  */
     info = MPI_INFO_NULL;
 
-	 if (rank == 0)
-	 {
-		  printf("\nprocs: %d\n===========\n", nprocs);
-	 }
+    if(rank == 0)
+    {
+		  printf("\nprocs: %d\n==========\n", nprocs);
+    }
 
-	 ret = PVFS_util_init_defaults();
-	 if(ret != 0)
-	 {
+    ret = PVFS_util_init_defaults();
+    if(ret != 0)
+    {
 		  PVFS_perror("PVFS_util_init_defaults", ret);
 		  return ret;
-	 }
+    }
 
-	 ret = PVFS_util_resolve(opt_basedir, &cur_fs, basepath, PATH_MAX);
-	 if(ret != 0)
-	 {
+    ret = PVFS_util_resolve(opt_basedir, &cur_fs, basepath, PATH_MAX);
+    if(ret != 0)
+    {
 		  PVFS_perror("PVFS_util_resolve", ret);
 		  return ret;
-	 }
+    }
 
-	 PVFS_util_gen_credentials(&credentials);
+    PVFS_util_gen_credentials(&credentials);
 
-	 attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
-	 attr.owner = credentials.uid;
-	 attr.group = credentials.gid;
-	 attr.perms = 1877;
-	 attr.atime = attr.ctime = attr.mtime = time(NULL);
+    attr.mask = PVFS_ATTR_SYS_ALL_SETABLE;
+    attr.owner = credentials.uid;
+    attr.group = credentials.gid;
+    attr.perms = 1877;
+    attr.atime = attr.ctime = attr.mtime = time(NULL);
 
 	 pvfs_error = PVFS_sys_lookup(
-		  cur_fs, basepath, &credentials, &lookup_resp, 
+		  cur_fs, basepath, &credentials, &lookup_resp,
 		  PVFS2_LOOKUP_LINK_NO_FOLLOW);
 	 if(pvfs_error != 0)
 	 {
@@ -147,46 +154,68 @@ int main(int argc, char **argv)
 		  return PVFS_get_errno_mapping(pvfs_error);
 	 }
 
-	 /* synchronize with other clients (if any) */
-	 MPI_Barrier(MPI_COMM_WORLD);
-
 	 for(i = 0; i < opt_nfiles; ++i)
+	 {
+		  memset(test_file, 0, PATH_MAX);
+		  snprintf(test_file, PATH_MAX, "testfile.%d.%d", rank, i);
+
+		  pvfs_error = PVFS_sys_create(test_file, mkdir_resp.ref,
+												 attr, &credentials,
+												 NULL, &create_resp);
+		  if(pvfs_error != 0)
+		  {
+				PVFS_perror("PVFS_sys_create", pvfs_error);
+				return PVFS_get_errno_mapping(pvfs_error);
+		  }
+    }
+
+  	 MPI_Barrier(MPI_COMM_WORLD);
+	 tok = PVFS_READDIR_START;
+
+    for(i = 0; i < opt_nfiles; ++i)
+    {
+		  test_util_start_timing();
+
+		  pvfs_error = PVFS_sys_readdir(
+				mkdir_resp.ref,
+				tok,
+				1,
+				&credentials,
+				&readdir_resp);
+		  if(pvfs_error != 0)
+		  {
+				PVFS_perror("PVFS_sys_readdir", pvfs_error);
+				return PVFS_get_errno_mapping(pvfs_error);
+		  }
+
+		  test_util_stop_timing();
+		  tok = readdir_resp.token;
+	 }
+
+	 test_util_print_avg_and_dev();
+
+    for(i = 0; i < opt_nfiles; ++i)
     {
 		  memset(test_file, 0, PATH_MAX);
 		  snprintf(test_file, PATH_MAX, "testfile.%d.%d", rank, i);
 
-		  test_util_start_timing();
-		  pvfs_error = PVFS_sys_create(test_file, mkdir_resp.ref,
-												 attr, &credentials,
-												 NULL, &create_resp);
-		  test_util_stop_timing();
-		  if(pvfs_error != 0)
-		  {
-				PVFS_perror("PVFS_sys_craete", pvfs_error);
-				return PVFS_get_errno_mapping(pvfs_error);
-		  }
-
-		  if(i % 10 == 9)
-		  {
-				test_util_print_avg_and_dev();
-		  }
-
-		  pvfs_error = PVFS_sys_remove(test_file, mkdir_resp.ref, &credentials);
+		  pvfs_error = PVFS_sys_remove(
+				test_file, mkdir_resp.ref, &credentials);
 		  if(pvfs_error != 0)
 		  {
 				PVFS_perror("PVFS_sys_remove", pvfs_error);
 				return PVFS_get_errno_mapping(pvfs_error);
 		  }
-	 }
+    }
 
-	 pvfs_error = PVFS_sys_remove(test_dir, lookup_resp.ref, &credentials);
-	 if(pvfs_error != 0)
-	 {
-		  PVFS_perror("PVFS_sys_remove", pvfs_error);
-		  return PVFS_get_errno_mapping(pvfs_error);
-	 }
+    pvfs_error = PVFS_sys_remove(test_dir, lookup_resp.ref, &credentials);
+    if(pvfs_error != 0)
+    {
+	PVFS_perror("PVFS_sys_remove", pvfs_error);
+	return PVFS_get_errno_mapping(pvfs_error);
+    }
 
-	 MPI_Finalize();
+    MPI_Finalize();
     return 0;
 }
 
@@ -199,5 +228,3 @@ int main(int argc, char **argv)
  * vim: ts=3
  * End:
  */ 
-
-

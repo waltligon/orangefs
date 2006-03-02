@@ -12,6 +12,9 @@
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
 #include "pvfs2-internal.h"
+#include "pint-perf-counter.h"
+
+extern struct PINT_perf_counter *PINT_server_pc;
 
 /* final-response state machine:
  * This is used as a nested state machine to perform two primary tasks:
@@ -99,6 +102,8 @@ static int final_response_release(
 
     ret = job_req_sched_release(
         s_op->scheduled_id, s_op, 0, js_p, &tmp_id, server_job_context);
+
+    PINT_perf_count(PINT_server_pc, PINT_PERF_REQSCHED, 1, PINT_PERF_SUB);
 
     return ret;
 }

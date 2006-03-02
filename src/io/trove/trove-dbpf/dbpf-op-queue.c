@@ -235,6 +235,7 @@ void dbpf_queued_op_dequeue(dbpf_queued_op_t *q_op_p)
     assert(q_op_p->op.state != OP_IN_SERVICE);
 
     dbpf_op_queue_remove(q_op_p);
+
     q_op_p->op.state = OP_DEQUEUED;
 
     gen_mutex_unlock(&dbpf_op_queue_mutex);

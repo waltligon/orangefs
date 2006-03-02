@@ -57,8 +57,11 @@ struct PVFS_mgmt_perf_stat
     int64_t read;	    /* bytes read */
     int64_t metadata_write; /* # of modifying metadata ops */
     int64_t metadata_read;  /* # of non-modifying metadata ops */
+    int32_t dspace_queue;   /* # of metadata dspace ops in the queue */
+    int32_t keyval_queue;   /* # of metadata keyval ops in the queue */
+    int32_t reqsched;       /* # of currently scheduled request posted */
 };
-endecode_fields_7_struct(
+endecode_fields_11_struct(
     PVFS_mgmt_perf_stat,
     int32_t, valid_flag,
     uint32_t, id,
@@ -66,7 +69,11 @@ endecode_fields_7_struct(
     int64_t, write,
     int64_t, read,
     int64_t, metadata_write,
-    int64_t, metadata_read)
+    int64_t, metadata_read,
+    int32_t, metadata_dspace_ops,
+    int32_t, metadata_keyval_ops,
+    int32_t, reqsched,
+    skip4,)
 
 /* low level information about individual server level objects */
 struct PVFS_mgmt_dspace_info

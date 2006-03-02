@@ -74,6 +74,9 @@ struct PINT_perf_key server_keys[] =
     {"bytes written", PINT_PERF_WRITE, 0},
     {"metadata reads", PINT_PERF_METADATA_READ, 0},
     {"metadata writes", PINT_PERF_METADATA_WRITE, 0},
+    {"metadata dspace ops", PINT_PERF_METADATA_DSPACE_OPS, PINT_PERF_PRESERVE},
+    {"metadata keyval ops", PINT_PERF_METADATA_KEYVAL_OPS, PINT_PERF_PRESERVE},
+    {"request scheduler", PINT_PERF_REQSCHED, PINT_PERF_PRESERVE},
     {NULL, 0, 0},
 };
 extern struct PINT_perf_counter* PINT_server_pc;

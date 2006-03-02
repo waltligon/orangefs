@@ -2,7 +2,7 @@
 <!DOCTYPE input SYSTEM "../../dtd/pb_input.dtd">
 
 <input>
- <experiment>pvfs2_op</experiment>
+ <experiment>pvfs2_meta_op</experiment>
 
  <named_location>
   <name>operation</name>
@@ -17,11 +17,6 @@
  <named_location>
   <name>cvs_tag</name>
   <match>cvstag=</match>
- </named_location>
-
- <named_location>
-  <name>cvs_date</name>
-  <match>cvsdate=</match>
  </named_location>
 
  <named_location>
@@ -44,13 +39,23 @@
   <match>ops: </match>
  </named_location>
 
- <tabular_location columns="2">
+ <tabular_location columns="3">
   <match>====</match>
   <skip>1</skip>
 
   <tabular_value>
-   <name>T_max</name>
+   <name>OP_total</name>
+   <pos>0</pos>
+  </tabular_value>
+  
+  <tabular_value>
+   <name>T_avg</name>
    <pos>1</pos>
+  </tabular_value>
+
+  <tabular_value>
+   <name>T_dev</name>
+   <pos>2</pos>
   </tabular_value>
  </tabular_location>
 </input>
