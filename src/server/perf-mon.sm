@@ -191,9 +191,9 @@ static int perf_mon_do_work(PINT_server_op *s_op, job_status_s* js_p)
                 static_value_matrix[PINT_PERF_METADATA_READ][i];
             s_op->resp.u.mgmt_perf_mon.perf_array[i].metadata_write = 
                 static_value_matrix[PINT_PERF_METADATA_WRITE][i];
-            s_op->resp.u.mgmt_perf_mon.perf_array[i].metadata_dspace_ops =
+            s_op->resp.u.mgmt_perf_mon.perf_array[i].dspace_queue =
                 static_value_matrix[PINT_PERF_METADATA_DSPACE_OPS][i];
-            s_op->resp.u.mgmt_perf_mon.perf_array[i].metadata_keyval_ops =
+            s_op->resp.u.mgmt_perf_mon.perf_array[i].keyval_queue =
                 static_value_matrix[PINT_PERF_METADATA_KEYVAL_OPS][i];
         }
         else
