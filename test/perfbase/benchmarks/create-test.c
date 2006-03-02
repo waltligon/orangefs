@@ -14,7 +14,7 @@
 #include "pvfs2-sysint.h"
 #include "pvfs2-util.h"
 
-#include "perf-counter-utils.h"
+#include "benchmark-utils.h"
 
 #ifndef PATH_MAX
 #define PATH_MAX FILENAME_MAX
@@ -93,10 +93,6 @@ int main(int argc, char **argv)
 	 
     int rank, nprocs, ret;
     MPI_Info info;
-    struct timeval test_start, test_end;
-	 long last_perf_fetch;
-	 long timediff;
-	 int meta_server_count;
 
 	 MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -109,7 +105,7 @@ int main(int argc, char **argv)
 
 	 if (rank == 0)
 	 {
-		  printf("\nprocs: %d\nops: %d\n===========\n", nprocs, opt_nfiles);
+		  printf("\nprocs: %d\n===========\n", nprocs);
 	 }
 
 	 ret = PVFS_util_init_defaults();
@@ -127,17 +123,6 @@ int main(int argc, char **argv)
 	 }
 
 	 PVFS_util_gen_credentials(&credentials);
-
-	 if(rank == 0)
-	 {
-		  ret = test_util_init_perfs(
-				cur_fs, credentials, PVFS_MGMT_META_SERVER, &meta_server_count);
-		  if(ret != 0)
-		  {
-				PVFS_perror("test_util_init_perfs", ret);
-				return ret;
-		  }
-	 }
 
 	 pvfs_error = PVFS_sys_lookup(
 		  cur_fs, basepath, &credentials, &lookup_resp, 
@@ -157,33 +142,26 @@ int main(int argc, char **argv)
 	 /* synchronize with other clients (if any) */
 	 MPI_Barrier(MPI_COMM_WORLD);
 
-	 if(rank == 0)
-	 {
-		  gettimeofday(&test_start, NULL);
-		  last_perf_fetch = test_start.tv_sec;
-	 }
-
 	 for(i = 0; i < opt_nfiles; ++i)
     {
 		  memset(test_file, 0, PATH_MAX);
 		  snprintf(test_file, PATH_MAX, "testfile.%d.%d", rank, i);
 
-		  gettimeofday(&test_start, NULL);
-
+		  test_util_start_timing();
 		  pvfs_error = PVFS_sys_create(test_file, lookup_resp.ref,
 												 attr, &credentials,
 												 NULL, &create_resp);
+		  test_util_stop_timing();
 		  if(pvfs_error != 0)
 		  {
 				PVFS_perror("PVFS_sys_craete", pvfs_error);
 				return PVFS_get_errno_mapping(pvfs_error);
 		  }
 
-		  gettimeofday(&test_end, NULL);
-		  timediff = ((test_end.tv_sec * 1e6) + test_end.tv_usec) - 
-				       ((test_start.tv_sec * 1e6) + test_start.tv_usec);
-
-		  printf("%d\t%f\n", (rank * opt_nfiles) + i, ((double)timediff)*1e-6);
+		  if(i % 10 == 9)
+		  {
+				test_util_print_avg_and_dev();
+		  }
 
 		  pvfs_error = PVFS_sys_remove(test_file, lookup_resp.ref, &credentials);
 		  if(pvfs_error != 0)
@@ -191,22 +169,6 @@ int main(int argc, char **argv)
 				PVFS_perror("PVFS_sys_remove", pvfs_error);
 				return PVFS_get_errno_mapping(pvfs_error);
 		  }
-
-		  if(rank == 0 &&
-			  (last_perf_fetch + PERF_INTERVAL) > test_end.tv_sec)
-		  {
-				/* time to fetch perfs again */
-				ret = test_util_get_queue_perfs(
-					 cur_fs, credentials, meta_server_count);
-				if(ret < 0)
-				{
-					 PVFS_perror("test_util_get_queue_perfs", ret);
-					 return ret;
-				}
-
-				last_perf_fetch = test_end.tv_sec;
-		  }
-
 	 }
 
 	 MPI_Finalize();

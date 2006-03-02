@@ -15,6 +15,9 @@
 #include "trove.h"
 #include "pint-util.h"
 #include "pvfs2-internal.h"
+#include "pint-perf-counter.h"
+
+extern struct PINT_perf_counter *PINT_server_pc;
 
 /* prelude state machine:
  * This is a nested state machine that performs initial setup 
@@ -93,6 +96,8 @@ static int prelude_req_sched(
     
     ret = job_req_sched_post(s_op->req, 0, s_op, 0, js_p,
                              &(s_op->scheduled_id), server_job_context);
+
+    PINT_perf_count(PINT_server_pc, PINT_PERF_REQSCHED, 1, PINT_PERF_ADD);
     return ret;
 }
 

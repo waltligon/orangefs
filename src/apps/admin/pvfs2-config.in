@@ -50,7 +50,7 @@ while test $# -gt 0; do
 		libflags="$libflags -L@GM_HOME@/lib -lgm"
 	fi
 	if [ x"@BUILD_IB@" = x"1" ]; then
-		libflags="$libflags -L@IB_HOME@/lib -lvapi -lmtl_common -lmosal -lmpga -lpthread -ldl"
+		libflags="$libflags -L@IB_LIBDIR@ -lvapi -lmtl_common -lmosal -lmpga -lpthread -ldl"
 	fi
 
 	echo $libflags
@@ -64,7 +64,7 @@ while test $# -gt 0; do
 		libflags="$libflags -L@GM_HOME@/lib -lgm"
 	fi
 	if [ x"@BUILD_IB@" = x"1" ]; then
-		libflags="$libflags -L@IB_HOME@/lib -lvapi -lmtl_common -lmosal -lmpga -lpthread -ldl"
+		libflags="$libflags -L@IB_LIBDIR@ -lvapi -lmtl_common -lmosal -lmpga -lpthread -ldl"
 	fi
 
 	echo $libflags

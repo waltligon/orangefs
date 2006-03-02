@@ -147,7 +147,7 @@ sub run_tests()
                 my $datfile = "/tmp/perftest-$operation-c$proc-m$meta-i$io-$branch.dat";
 
                 myexec("mpiexec -1 -n $proc -env PVFS2TAB_FILE \"" . 
-                       $ENV{PVFS2TAB_FILE} . "\" $testpath/$operation-test " .
+                       $ENV{PVFS2TAB_FILE} . "\" $benchmarkpath/$operation-test " .
                        "-d $mountpoint -n $iterations > $datfile",
                        "Test run failed: proc: $proc, meta: $meta, io: $io\n");
 

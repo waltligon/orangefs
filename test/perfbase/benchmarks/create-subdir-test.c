@@ -126,6 +126,7 @@ int main(int argc, char **argv)
 		  return ret;
 	 }
 
+#if 0
 	 if(rank == 0)
 	 {
 		  ret = test_util_init_perfs(
@@ -136,6 +137,7 @@ int main(int argc, char **argv)
 				return ret;
 		  }
 	 }
+#endif
 
 	 PVFS_util_gen_credentials(&credentials);
 
@@ -200,6 +202,7 @@ int main(int argc, char **argv)
 				return PVFS_get_errno_mapping(pvfs_error);
 		  }
 
+#if 0
 		  if(rank == 0 &&
 			  (last_perf_fetch.tv_sec + PERF_INTERVAL) > test_end.tv_sec)
 		  {
@@ -213,6 +216,7 @@ int main(int argc, char **argv)
 
 				last_perf_fetch = test_end;
 		  }
+#endif
 	 }
 
 	 pvfs_error = PVFS_sys_remove(test_dir, lookup_resp.ref, &credentials);

@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: util.c,v 1.4 2005-11-03 21:23:19 pw Exp $
+ * $Id: util.c,v 1.4.8.1 2006-03-02 15:53:33 slang Exp $
  */
 #include <stdio.h>
 #include <stdarg.h>
@@ -188,7 +188,7 @@ memcpy_to_buflist(ib_buflist_t *buflist, const void *buf, bmi_size_t len)
 
     for (i=0; i<buflist->num && len > 0; i++) {
 	size_t bytes = buflist->len[i];
-	if (bytes > len)
+	if (bytes > (size_t) len)
 	    bytes = len;
 	memcpy(buflist->buf.recv[i], cp, bytes);
 	cp += bytes;

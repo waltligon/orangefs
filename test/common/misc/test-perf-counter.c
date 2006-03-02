@@ -223,8 +223,8 @@ static void usage(int argc, char** argv)
 static void print_counters(struct PINT_perf_counter* pc, int* in_key_count,
     int* in_history_size)
 {
-    int key_count;
-    int history_size;
+    unsigned int key_count;
+    unsigned int history_size;
     int ret;
     int64_t** stat_matrix;
     uint64_t* start_time_array_ms;

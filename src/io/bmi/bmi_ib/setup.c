@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: setup.c,v 1.19 2005-12-23 20:47:53 pw Exp $
+ * $Id: setup.c,v 1.19.2.1 2006-03-02 15:53:33 slang Exp $
  */
 #include <fcntl.h>
 #include <unistd.h>
@@ -26,7 +26,8 @@
 #include "ib.h"
 
 /* constants used to initialize infiniband device */
-static const char *VAPI_DEVICE = "InfiniHost0";
+static const char *vapi_device_names[] =
+    { "InfiniHost0", "InfiniHost_III_Lx0" };
 static const int VAPI_PORT = 1;
 static const unsigned int VAPI_NUM_CQ_ENTRIES = 1024;
 static const int VAPI_MTU = MTU1024;  /* default mtu, 1k best here */
@@ -118,8 +119,8 @@ ib_new_connection(int s, const char *peername, int is_server)
     /* common qp properites */
     qp_init_attr.cap.max_oust_wr_sq = 5000;  /* outstanding WQEs */
     qp_init_attr.cap.max_oust_wr_rq = 5000;
-    qp_init_attr.cap.max_sg_size_sq = 40;  /* scatter/gather entries */
-    qp_init_attr.cap.max_sg_size_rq = 40;
+    qp_init_attr.cap.max_sg_size_sq = 20;  /* scatter/gather entries */
+    qp_init_attr.cap.max_sg_size_rq = 20;
     qp_init_attr.pd_hndl            = nic_pd;
     qp_init_attr.rdd_hndl           = 0;
     /* wire both send and recv to the same CQ */
@@ -182,7 +183,7 @@ ib_new_connection(int s, const char *peername, int is_server)
 	    if (ret != sizeof(x)) {
 		ret = 1;
 		warning("%s: partial read of rr post synch, %d / %d", __func__,
-		  ret, sizeof(x));
+		  ret, (int) sizeof(x));
 		goto out;
 	    }
 	} else {
@@ -280,7 +281,7 @@ exchange_connection_data(ib_connection_t *c, int s, int is_server)
 	    if (ret != sizeof(connection_handshake)) {
 		ret = 1;
 		warning("%s: partial read, %d / %d", __func__, ret,
-		  sizeof(connection_handshake));
+		  (int) sizeof(connection_handshake));
 		goto out;
 	    }
 	    c->remote_lid = ntohs(connection_handshake.lid);
@@ -665,7 +666,8 @@ int
 ib_tcp_server_check_new_connections(void)
 {
     struct sockaddr_in ssin;
-    int s, len, ret = 0;
+    socklen_t len;
+    int s, ret = 0;
 
     len = sizeof(ssin);
     s = accept(listen_sock, (struct sockaddr *) &ssin, &len);
@@ -789,18 +791,17 @@ async_event_handler(VAPI_hca_hndl_t nic_handle_in __attribute__((unused)),
  *
  * Seems to work even in the case of a non-backgrounded server too,
  * fortunately.
+ *
+ * Note that even with shared libraries you do not have protection
+ * against wandering headers.  The thca distributions have in the
+ * past been eager to change critical #defines like VAPI_CQ_EMPTY
+ * so libpvfs2.so is more or less tied to the vapi.h against which
+ * it was compiled.
  */
-#ifndef VAPI_INVAL_SRQ_HNDL
-/* already declared in 2.6, so look for a 2.6-only tag to avoid */
-extern void MOSAL_user_lib_init(void);
-#endif
-extern int mosal_fd;
-
 static void
 reinit_mosal(void)
 {
     void *dlh;
-    int (*mosal_ioctl_close)(void);
 
     dlh = dlopen("libmosal.so", RTLD_LAZY);
     if (!dlh)
@@ -830,27 +831,29 @@ reinit_mosal(void)
 	return;
     }
     }
-#endif
+#else
+    {
 
     /*
      * Recent thca distros and the 2.6 openib tree do not seem to permit
      * any way to "trick" the library as above, but there's no need for
      * the hack now that they export a "finalize" function to undo the init.
      */
+    int (*mosal_ioctl_open)(void);
+    int (*mosal_ioctl_close)(void);
+
+    mosal_ioctl_open = dlsym(dlh, "mosal_ioctl_open");
+    if (dlerror())
+	error("%s: mosal_ioctl_open not found in libmosal", __func__);
     mosal_ioctl_close = dlsym(dlh, "mosal_ioctl_close");
     if (dlerror())
-	error("%s: magic symbol not found in libmosal", __func__);
-    (*mosal_ioctl_close)();
-    mosal_fd = -1;
-    MOSAL_user_lib_init();
+	error("%s: mosal_ioctl_close not found in libmosal", __func__);
 
-    /*
-     * Note that even with shared libraries you do not have protection
-     * against wandering headers.  The thca distributions have in the
-     * past been eager to change critical #defines like VAPI_CQ_EMPTY
-     * so libpvfs2.so is more or less tied to the vapi.h against which
-     * it was compiled.
-     */
+    (*mosal_ioctl_close)();
+    (*mosal_ioctl_open)();
+
+    }
+#endif
 }
 
 /*
@@ -860,7 +863,7 @@ int
 BMI_ib_initialize(struct method_addr *listen_addr, int method_id,
   int init_flags)
 {
-    int ret;
+    int ret, i;
     VAPI_hca_port_t nic_port_props;
     VAPI_hca_vendor_t vendor_cap;
     VAPI_hca_cap_t hca_cap;
@@ -883,9 +886,14 @@ BMI_ib_initialize(struct method_addr *listen_addr, int method_id,
      * all the threads.  Discard const char* for silly mellanox prototype;
      * it really is treated as constant.
      */
-    ret = EVAPI_get_hca_hndl((char *)(unsigned long) VAPI_DEVICE, &nic_handle);
+    for (i=0; i<list_count(vapi_device_names); i++) {
+	ret = EVAPI_get_hca_hndl((char *)(unsigned long) vapi_device_names[i],
+	                         &nic_handle);
+	if (ret == 0)
+	    break;
+    }
     if (ret < 0)
-	return -ENOSYS;
+	return -ENODEV;
 
     /* connect an asynchronous event handler to look for weirdness */
     ret = EVAPI_set_async_event_handler(nic_handle, async_event_handler, 0,

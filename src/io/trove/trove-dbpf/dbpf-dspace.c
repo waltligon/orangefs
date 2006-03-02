@@ -33,6 +33,7 @@
 #include <pthread.h>
 #include "dbpf-thread.h"
 #include "pvfs2-internal.h"
+#include "pint-perf-counter.h"
 
 extern gen_mutex_t dbpf_attr_cache_mutex;
 extern pthread_cond_t dbpf_op_completed_cond;
@@ -152,6 +153,9 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
     q_op_p->op.u.d_create.type = type;
 
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
+
+    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
+                    1, PINT_PERF_ADD);
 
     return 0;
 }
@@ -282,6 +286,9 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
 
     DBPF_DB_SYNC_IF_NECESSARY(op_p, tmp_ref.db_p);
 
+    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
+                    1, PINT_PERF_SUB);
+
     *op_p->u.d_create.out_handle_p = new_handle;
     dbpf_open_cache_attr_put(&tmp_ref);
     return 1;
@@ -330,6 +337,10 @@ static int dbpf_dspace_remove(TROVE_coll_id coll_id,
                         context_id);
 
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
+
+    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
+                    1, PINT_PERF_ADD);
+
     return 0;
 }
 
@@ -382,9 +393,13 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
 
     DBPF_DB_SYNC_IF_NECESSARY(op_p, tmp_ref.db_p);
 
+    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
+                    1, PINT_PERF_SUB);
+
     /* return handle to free list */
     trove_handle_free(op_p->coll_p->coll_id,op_p->handle);
     dbpf_open_cache_attr_put(&tmp_ref);
+
     return 1;
 
 return_error:
@@ -807,6 +822,9 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
 
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
 
+    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
+                    1, PINT_PERF_ADD);
+
     return 0;
 }
 
@@ -861,6 +879,9 @@ static int dbpf_dspace_setattr_op_svc(struct dbpf_op *op_p)
 
     DBPF_DB_SYNC_IF_NECESSARY(op_p, tmp_ref.db_p);
 
+    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
+                    1, PINT_PERF_SUB);
+
     dbpf_open_cache_attr_put(&tmp_ref);
     return 1;
     
@@ -869,6 +890,7 @@ return_error:
     {
         dbpf_open_cache_attr_put(&tmp_ref);
     }
+
     return ret;
 }
 

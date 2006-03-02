@@ -41,7 +41,11 @@ foreach $file (@files)
 		    /^  BISON/ ||
 		    /^  FLEX/ ||
 		    /^  GENCONFIG/ ||
-		    /^  GEN/)
+		    /^  GEN/ ||
+		    /^  MODPOST/ ||
+		    /^make: Nothing to be done for/ ||
+		    /^  Building modules, stage 2/)
+
 		{
 			$last_cmd = $_;
 			$have_last_cmd = 1;

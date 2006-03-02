@@ -238,7 +238,8 @@ PVFS_error PVFS_isys_getattr(
         ref,
         PVFS_util_sys_to_object_attr_mask(
             attrmask), 
-        PVFS_TYPE_NONE);
+        PVFS_TYPE_NONE,
+        0);
 
     return PINT_client_state_machine_post(
         sm_p, PVFS_SYS_GETATTR, op_id, user_ptr);
@@ -340,6 +341,15 @@ static int getattr_acache_lookup(PINT_client_sm *sm_p,
     if(sm_p->getattr.req_attrmask & PVFS_ATTR_DATA_SIZE)
     {
 	sm_p->getattr.req_attrmask |= PVFS_ATTR_META_ALL;
+    }
+
+    if(sm_p->getattr.flags & PINT_SM_GETATTR_BYPASS_CACHE)
+    {
+        gossip_debug(GOSSIP_ACACHE_DEBUG, "acache: forced acache miss: "
+                    " [%llu]\n",
+                      llu(object_ref.handle));
+        js_p->error_code = GETATTR_ACACHE_MISS;
+        return 1;
     }
 
     ret = PINT_acache_get_cached_entry(object_ref,

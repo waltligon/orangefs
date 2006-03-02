@@ -27,7 +27,10 @@ enum PINT_server_perf_keys
     PINT_PERF_READ = 0,
     PINT_PERF_WRITE = 1,
     PINT_PERF_METADATA_READ = 2,
-    PINT_PERF_METADATA_WRITE = 3
+    PINT_PERF_METADATA_WRITE = 3,
+    PINT_PERF_METADATA_DSPACE_OPS = 4,
+    PINT_PERF_METADATA_KEYVAL_OPS = 5,
+    PINT_PERF_REQSCHED = 6
 };
 
 /** enumeration of valid measurement operations */

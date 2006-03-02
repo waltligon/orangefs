@@ -35,6 +35,9 @@
 #include "dbpf-attr-cache.h"
 #include "gossip.h"
 #include "pvfs2-internal.h"
+#include "pint-perf-counter.h"
+
+extern struct PINT_perf_counter *PINT_server_pc;
 
 #define DBPF_MAX_KEY_LENGTH PVFS_NAME_MAX
 
@@ -279,6 +282,9 @@ static int dbpf_keyval_write(TROVE_coll_id coll_id,
 
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
         
+    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
+                    1, PINT_PERF_ADD);
+
     return 0;
 }
 
@@ -403,6 +409,12 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
 
     DBPF_DB_SYNC_IF_NECESSARY(op_p, tmp_ref.db_p);
 
+    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
+                    1, PINT_PERF_SUB);
+
+    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
+                    1, PINT_PERF_SUB);
+
     dbpf_open_cache_put(&tmp_ref);
     return 1;
 
@@ -452,6 +464,9 @@ static int dbpf_keyval_remove(TROVE_coll_id coll_id,
 
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
         
+    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
+                    1, PINT_PERF_ADD);
+
     return 0;
 }
 
@@ -492,6 +507,12 @@ static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p)
     }
 
     DBPF_DB_SYNC_IF_NECESSARY(op_p, tmp_ref.db_p);
+
+    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
+                    1, PINT_PERF_SUB);
+
+    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
+                    1, PINT_PERF_SUB);
 
     dbpf_open_cache_put(&tmp_ref);
     return 1;
@@ -1230,6 +1251,9 @@ static int dbpf_keyval_write_list(TROVE_coll_id coll_id,
 
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
 
+    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
+                    1, PINT_PERF_ADD);
+
     return 0;
 }
 
@@ -1346,6 +1370,12 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
     }
 
     DBPF_DB_SYNC_IF_NECESSARY(op_p, tmp_ref.db_p);
+
+    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
+                    1, PINT_PERF_SUB);
+
+    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
+                    1, PINT_PERF_SUB);
 
     dbpf_open_cache_put(&tmp_ref);
     return 1;
