@@ -344,24 +344,27 @@ static int root_check_comp_fn(
     /* need to return non-zero status at the end if any of the statuses
      * are nonzero
      */
-    for(; j < sm_p->u.setparam_list.count; ++j)
+    if(i == (sm_p->u.setparam_list.count - 1))
     {
-        if(sm_p->u.setparam_list.root_check_status_array[j] != -PVFS_ENOENT)
+        for(; j < sm_p->u.setparam_list.count; ++j)
+        {
+            if(sm_p->u.setparam_list.root_check_status_array[j] == 0)
+            {
+                owners++;
+            }
+            else if(sm_p->u.setparam_list.root_check_status_array[j] != 
+                    -PVFS_ENOENT)
+            {
+                return -PVFS_EDETAIL;
+            }
+        }
+
+        if(owners != 1)
         {
             return -PVFS_EDETAIL;
         }
-
-        if(sm_p->u.setparam_list.root_check_status_array[j] == 0)
-        {
-            owners++;
-
-        }
     }
 
-    if(owners != 1)
-    {
-        return -PVFS_EDETAIL;
-    }
     return 0;
 }
 
