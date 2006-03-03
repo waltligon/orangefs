@@ -647,6 +647,7 @@ Instead try running a parallel file system benchmark like IOR
 
 
 \subsection{Why is program XXX so slow?}
+\label{sec:why_so_slow}
 See Question~\ref{sec:badperf}.  If the program uses small block sizes to
 access a PVFS2 file, performance will suffer.  
 
@@ -666,6 +667,7 @@ attribute cache (disabled by default).  This timeout is adjustable as
 a command line argument to pvfs2-client.
 
 \subsection{NFS outperforms PVFS2 for application XXX. Why?}
+\label{sec:nfs_vs_pvfs2}
 
 In an environment where there is one client accessing a file on one
 server, NFS will outperform PVFS2 in many benchmarks.  NFS has
@@ -697,6 +699,7 @@ system for you.  PVFS2 is not designed for serial workloads,
 particularly one with small accesses.
 
 \subsection{Can the underlying local file system affect PVFS2 performance?}
+\label{sec:local_fs}
 
 Yes!  However, the interaction between the PVFS2 servers and the local
 file system hosting the storage space has not been fully explored.  No

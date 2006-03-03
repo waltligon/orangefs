@@ -16,8 +16,8 @@ dnl PVFS2 versioning information.
 dnl An @ in the date string can confuse e.g. scp and 'make kmod'
 CONFIGURE_TIME=`date -u +"%Y-%m-%d-%H%M%S"`
 PVFS2_MAJOR=1
-PVFS2_MINOR=3
-PVFS2_SUB=3
+PVFS2_MINOR=4
+PVFS2_SUB=1
 #PVFS2_PRE=""
 PVFS2_PRE="pre1-$CONFIGURE_TIME"
 
@@ -986,19 +986,60 @@ fi
 AC_SUBST(GM_HOME)
 AC_SUBST(BUILD_GM)
 
-dnl configure options for IB install path
-IB_HOME=
+dnl Configure options for IB install path.
+dnl --with-ib=<dir> is shorthand for
+dnl    --with-ib-includes=<dir>/include
+dnl    --with-ib-libs=<dir>/lib  (or lib64 if that exists)
+ib_home=
 AC_ARG_WITH(ib,
 [  --with-ib=<dir>         Location of the IB installation (default no IB)],
     if test -z "$withval" -o "$withval" = yes ; then
 	AC_MSG_ERROR([Option --with-ib requires the path to your IB tree.])
     elif test "$withval" != no ; then
-	IB_HOME="$withval"
+	ib_home="$withval"
     fi
 )
-if test -n "$IB_HOME" ; then
-    CPPFLAGS="$CPPFLAGS -I ${IB_HOME}/include"
+AC_ARG_WITH(ib-includes,
+[  --with-ib-includes=<dir>  Location of the IB includes],
+    if test -z "$withval" -o "$withval" = yes ; then
+	AC_MSG_ERROR([Option --with-ib-includes requires path to IB headers.])
+    elif test "$withval" != no ; then
+	IB_INCDIR="$withval"
+    fi
+)
+AC_ARG_WITH(ib-libs,
+[  --with-ib-libs=<dir>      Location of the IB libraries],
+    if test -z "$withval" -o "$withval" = yes ; then
+	AC_MSG_ERROR([Option --with-ib-libs requires path to IB libraries.])
+    elif test "$withval" != no ; then
+	IB_LIBDIR="$withval"
+    fi
+)
+dnl If supplied the incls and libs explicitly, use them, else populate them
+dnl using guesses from the --with-ib dir.
+if test -n "$ib_home" ; then
+    if test -z "$IB_INCDIR"; then
+	IB_INCDIR=$ib_home/include
+    fi
+    if test -z "$IB_LIBDIR"; then
+	IB_LIBDIR=$ib_home/lib64
+	if test ! -d "$IB_LIBDIR" ; then
+	    IB_LIBDIR=$ib_home/lib
+	fi
+    fi
+fi
+dnl If anything IB-ish was set, go look for header.
+if test -n "$IB_INCDIR$IB_LIBDIR" ; then
+    CPPFLAGS="$CPPFLAGS -I$IB_INCDIR"
     AC_CHECK_HEADER(vapi.h,, AC_MSG_ERROR([Header vapi.h not found.]))
+    dnl Run test is not possible on a machine that does not have an IB NIC,
+    dnl and link test is hard because we need so many little libraries.   Bail
+    dnl and just check for existance; full library list is in Makefile.in.
+    if test ! -f $IB_LIBDIR/libvapi.so ; then
+	if test ! -f $IB_LIBDIR/libvapi.a ; then
+	    AC_MSG_ERROR([Infiniband library libvapi.so not found.])
+	fi
+    fi
     BUILD_IB=1
     AC_CHECK_HEADER(wrap_common.h,
 	AC_DEFINE(HAVE_IB_WRAP_COMMON_H, 1, Define if IB wrap_common.h exists.),
@@ -1006,8 +1047,9 @@ if test -n "$IB_HOME" ; then
 	[#include <vapi.h>])
     CPPFLAGS="$CPPFLAGS_OLD"
 fi
-AC_SUBST(IB_HOME)
 AC_SUBST(BUILD_IB)
+AC_SUBST(IB_INCDIR)
+AC_SUBST(IB_LIBDIR)
 
 dnl
 dnl look for sysinfo header
@@ -1027,6 +1069,7 @@ AC_CHECK_FUNCS(strnlen,
 dnl for regular functions, add them to the CHECK_FUNCS
 AC_CHECK_FUNCS(strtoull)
 AC_CHECK_FUNCS(strstr)
+AC_CHECK_FUNCS(fgetxattr)
 
 dnl check for getmntent(), special test
 AC_FUNC_GETMNTENT
@@ -1036,7 +1079,7 @@ AC_CHECK_HEADERS(malloc.h)
 AC_CHECK_HEADERS(mntent.h)
 
 AC_ARG_ENABLE(static-server,
-[  --enable-static-server   Builds the server static],
+[  --enable-static-server  Builds the server static],
 [
 	SERVER_LDFLAGS="$LDFLAGS -static"
 ],

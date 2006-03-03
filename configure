@@ -309,7 +309,7 @@ ac_includes_default="\
 # include <unistd.h>
 #endif"
 
-ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS PVFS2_VERSION build build_cpu build_vendor build_os host host_cpu host_vendor host_os CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT CPP EGREP INSTALL_PROGRAM INSTALL_SCRIPT INSTALL_DATA HAVE_PERL HAVE_FIND HAVE_BISON HAVE_FLEX BUILD_CC LIBCFLAGS THREAD_LIB BUILD_SERVER MMAP_RA_CACHE TRUSTED_CONNECTIONS HAVE_PKGCONFIG GTKLIBS GTKCFLAGS BUILD_KARMA build_static REDHAT_RELEASE NPTL_WORKAROUND MISC_TROVE_FLAGS LINUX_KERNEL_SRC LINUX24_KERNEL_SRC LINUX24_KERNEL_MINOR_VER BUILD_ABSOLUTE_TOP SRC_RELATIVE_TOP SRC_ABSOLUTE_TOP ENABLE_COVERAGE QUIET_COMPILE BUILD_EPOLL build_shared INTELC GNUC DB_CFLAGS DB_LIB NEEDS_LIBRT TARGET_OS_DARWIN TARGET_OS_LINUX GM_HOME BUILD_GM IB_HOME BUILD_IB SERVER_LDFLAGS BUILD_VIS VISCFLAGS VISLIBS LIBOBJS LTLIBOBJS'
+ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS PVFS2_VERSION build build_cpu build_vendor build_os host host_cpu host_vendor host_os CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT CPP EGREP INSTALL_PROGRAM INSTALL_SCRIPT INSTALL_DATA HAVE_PERL HAVE_FIND HAVE_BISON HAVE_FLEX BUILD_CC LIBCFLAGS THREAD_LIB BUILD_SERVER MMAP_RA_CACHE TRUSTED_CONNECTIONS HAVE_PKGCONFIG GTKLIBS GTKCFLAGS BUILD_KARMA build_static REDHAT_RELEASE NPTL_WORKAROUND MISC_TROVE_FLAGS LINUX_KERNEL_SRC LINUX24_KERNEL_SRC LINUX24_KERNEL_MINOR_VER BUILD_ABSOLUTE_TOP SRC_RELATIVE_TOP SRC_ABSOLUTE_TOP ENABLE_COVERAGE QUIET_COMPILE BUILD_EPOLL build_shared INTELC GNUC DB_CFLAGS DB_LIB NEEDS_LIBRT TARGET_OS_DARWIN TARGET_OS_LINUX GM_HOME BUILD_GM BUILD_IB IB_INCDIR IB_LIBDIR SERVER_LDFLAGS BUILD_VIS VISCFLAGS VISLIBS LIBOBJS LTLIBOBJS'
 ac_subst_files=''
 
 # Initialize some variables set by options.
@@ -863,7 +863,7 @@ Optional Features:
   --enable-rev-hostname   Enables hostname resolution in BMI reverse lookups
   --enable-segv-backtrace Enables back traces in segfault signal handler
   --enable-shared         Build shared client library
-  --enable-static-server   Builds the server static
+  --enable-static-server  Builds the server static
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -878,6 +878,8 @@ Optional Packages:
   --with-db=<dir>         Location of installed DB package (default=/usr)
   --with-gm=<dir>         Location of the GM installation (default no GM)
   --with-ib=<dir>         Location of the IB installation (default no IB)
+  --with-ib-includes=<dir>  Location of the IB includes
+  --with-ib-libs=<dir>      Location of the IB libraries
 
 Some influential environment variables:
   CC          C compiler command
@@ -1354,8 +1356,8 @@ ac_configure="$SHELL $ac_aux_dir/configure" # This should be Cygnus configure.
 
 CONFIGURE_TIME=`date -u +"%Y-%m-%d-%H%M%S"`
 PVFS2_MAJOR=1
-PVFS2_MINOR=3
-PVFS2_SUB=3
+PVFS2_MINOR=4
+PVFS2_SUB=1
 #PVFS2_PRE=""
 PVFS2_PRE="pre1-$CONFIGURE_TIME"
 
@@ -10282,7 +10284,7 @@ fi
 
 
 
-IB_HOME=
+ib_home=
 
 # Check whether --with-ib or --without-ib was given.
 if test "${with_ib+set}" = set; then
@@ -10292,12 +10294,49 @@ if test "${with_ib+set}" = set; then
 echo "$as_me: error: Option --with-ib requires the path to your IB tree." >&2;}
    { (exit 1); exit 1; }; }
     elif test "$withval" != no ; then
-	IB_HOME="$withval"
+	ib_home="$withval"
     fi
 
 fi;
-if test -n "$IB_HOME" ; then
-    CPPFLAGS="$CPPFLAGS -I ${IB_HOME}/include"
+
+# Check whether --with-ib-includes or --without-ib-includes was given.
+if test "${with_ib_includes+set}" = set; then
+  withval="$with_ib_includes"
+  if test -z "$withval" -o "$withval" = yes ; then
+	{ { echo "$as_me:$LINENO: error: Option --with-ib-includes requires path to IB headers." >&5
+echo "$as_me: error: Option --with-ib-includes requires path to IB headers." >&2;}
+   { (exit 1); exit 1; }; }
+    elif test "$withval" != no ; then
+	IB_INCDIR="$withval"
+    fi
+
+fi;
+
+# Check whether --with-ib-libs or --without-ib-libs was given.
+if test "${with_ib_libs+set}" = set; then
+  withval="$with_ib_libs"
+  if test -z "$withval" -o "$withval" = yes ; then
+	{ { echo "$as_me:$LINENO: error: Option --with-ib-libs requires path to IB libraries." >&5
+echo "$as_me: error: Option --with-ib-libs requires path to IB libraries." >&2;}
+   { (exit 1); exit 1; }; }
+    elif test "$withval" != no ; then
+	IB_LIBDIR="$withval"
+    fi
+
+fi;
+if test -n "$ib_home" ; then
+    if test -z "$IB_INCDIR"; then
+	IB_INCDIR=$ib_home/include
+    fi
+    if test -z "$IB_LIBDIR"; then
+	IB_LIBDIR=$ib_home/lib64
+	if test ! -d "$IB_LIBDIR" ; then
+	    IB_LIBDIR=$ib_home/lib
+	fi
+    fi
+fi
+if test -n "$IB_INCDIR$IB_LIBDIR" ; then
+    CPPFLAGS="$CPPFLAGS -I$IB_INCDIR"
     if test "${ac_cv_header_vapi_h+set}" = set; then
   echo "$as_me:$LINENO: checking for vapi.h" >&5
 echo $ECHO_N "checking for vapi.h... $ECHO_C" >&6
@@ -10444,6 +10483,13 @@ echo "$as_me: error: Header vapi.h not found." >&2;}
 fi
 
 
+                if test ! -f $IB_LIBDIR/libvapi.so ; then
+	if test ! -f $IB_LIBDIR/libvapi.a ; then
+	    { { echo "$as_me:$LINENO: error: Infiniband library libvapi.so not found." >&5
+echo "$as_me: error: Infiniband library libvapi.so not found." >&2;}
+   { (exit 1); exit 1; }; }
+	fi
+    fi
     BUILD_IB=1
     echo "$as_me:$LINENO: checking for wrap_common.h" >&5
 echo $ECHO_N "checking for wrap_common.h... $ECHO_C" >&6
@@ -10504,6 +10550,7 @@ fi
 
     CPPFLAGS="$CPPFLAGS_OLD"
 fi
+
 
 
 
@@ -10939,6 +10986,107 @@ if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
   (exit $ac_status); } &&
 	 { ac_try='test -z "$ac_c_werror_flag"
 			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest$ac_exeext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  eval "$as_ac_var=yes"
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+eval "$as_ac_var=no"
+fi
+rm -f conftest.err conftest.$ac_objext \
+      conftest$ac_exeext conftest.$ac_ext
+fi
+echo "$as_me:$LINENO: result: `eval echo '${'$as_ac_var'}'`" >&5
+echo "${ECHO_T}`eval echo '${'$as_ac_var'}'`" >&6
+if test `eval echo '${'$as_ac_var'}'` = yes; then
+  cat >>confdefs.h <<_ACEOF
+#define `echo "HAVE_$ac_func" | $as_tr_cpp` 1
+_ACEOF
+
+fi
+done
+
+
+for ac_func in fgetxattr
+do
+as_ac_var=`echo "ac_cv_func_$ac_func" | $as_tr_sh`
+echo "$as_me:$LINENO: checking for $ac_func" >&5
+echo $ECHO_N "checking for $ac_func... $ECHO_C" >&6
+if eval "test \"\${$as_ac_var+set}\" = set"; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+/* Define $ac_func to an innocuous variant, in case <limits.h> declares $ac_func.
+   For example, HP-UX 11i <limits.h> declares gettimeofday.  */
+#define $ac_func innocuous_$ac_func
+
+/* System header to define __stub macros and hopefully few prototypes,
+    which can conflict with char $ac_func (); below.
+    Prefer <limits.h> to <assert.h> if __STDC__ is defined, since
+    <limits.h> exists even on freestanding compilers.  */
+
+#ifdef __STDC__
+# include <limits.h>
+#else
+# include <assert.h>
+#endif
+
+#undef $ac_func
+
+/* Override any gcc2 internal prototype to avoid an error.  */
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+/* We use char because int might match the return type of a gcc2
+   builtin and then its argument prototype would still apply.  */
+char $ac_func ();
+/* The GNU C library defines this for functions which it implements
+    to always fail with ENOSYS.  Some functions are actually named
+    something starting with __ and the normal name is an alias.  */
+#if defined (__stub_$ac_func) || defined (__stub___$ac_func)
+choke me
+#else
+char (*f) () = $ac_func;
+#endif
+#ifdef __cplusplus
+}
+#endif
+
+int
+main ()
+{
+return f != $ac_func;
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (eval echo "$as_me:$LINENO: \"$ac_link\"") >&5
+  (eval $ac_link) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"			 || test ! -s conftest.err'
   { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
   (eval $ac_try) 2>&5
   ac_status=$?
@@ -12790,8 +12938,9 @@ s,@TARGET_OS_DARWIN@,$TARGET_OS_DARWIN,;t t
 s,@TARGET_OS_LINUX@,$TARGET_OS_LINUX,;t t
 s,@GM_HOME@,$GM_HOME,;t t
 s,@BUILD_GM@,$BUILD_GM,;t t
-s,@IB_HOME@,$IB_HOME,;t t
 s,@BUILD_IB@,$BUILD_IB,;t t
+s,@IB_INCDIR@,$IB_INCDIR,;t t
+s,@IB_LIBDIR@,$IB_LIBDIR,;t t
 s,@SERVER_LDFLAGS@,$SERVER_LDFLAGS,;t t
 s,@BUILD_VIS@,$BUILD_VIS,;t t
 s,@VISCFLAGS@,$VISCFLAGS,;t t

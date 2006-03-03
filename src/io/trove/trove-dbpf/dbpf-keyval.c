@@ -415,6 +415,12 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
                     1, PINT_PERF_SUB);
 
+    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
+                    1, PINT_PERF_SUB);
+
+    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
+                    1, PINT_PERF_SUB);
+
     dbpf_open_cache_put(&tmp_ref);
     return 1;
 
@@ -507,6 +513,12 @@ static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p)
     }
 
     DBPF_DB_SYNC_IF_NECESSARY(op_p, tmp_ref.db_p);
+
+    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
+                    1, PINT_PERF_SUB);
+
+    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
+                    1, PINT_PERF_SUB);
 
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
                     1, PINT_PERF_SUB);
@@ -1370,6 +1382,12 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
     }
 
     DBPF_DB_SYNC_IF_NECESSARY(op_p, tmp_ref.db_p);
+
+    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
+                    1, PINT_PERF_SUB);
+
+    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
+                    1, PINT_PERF_SUB);
 
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
                     1, PINT_PERF_SUB);

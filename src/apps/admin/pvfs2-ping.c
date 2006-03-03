@@ -38,6 +38,8 @@ static void print_mntent(
     struct PVFS_sys_mntent *entries, int num_entries);
 static int print_config(PVFS_fs_id fsid);
 static int noop_all_servers(PVFS_fs_id fsid);
+static void print_error_details(PVFS_error_details * error_details);
+static void print_root_check_error_details(PVFS_error_details * error_details);
 
 int main(int argc, char **argv)
 {
@@ -167,23 +169,13 @@ int main(int argc, char **argv)
         (uint64_t)cur_fs, NULL, error_details);
     if(ret < 0)
     {
-        int i = 0;
 	PVFS_perror("PVFS_mgmt_setparam_all", ret);
 	fprintf(stderr, "Failure: not all servers accepted fsid %ld\n", 
 	    (long)cur_fs);
-        for(i = 0; i < error_details->count_used; ++i)
-        {
-            char perrorstr[100];
-            PVFS_strerror_r(error_details->error[i].error, perrorstr, 100);
-            fprintf(stderr, "\tHost: %s: %s\n",
-                    BMI_addr_rev_lookup(error_details->error[i].addr),
-                    perrorstr);
-        }
+        if(ret == -PVFS_EDETAIL) print_error_details(error_details);
         PVFS_error_details_free(error_details);
 	return(-1);
     }
-    PVFS_error_details_free(error_details);
-
     printf("\n   Ok; all servers understand fs_id %ld\n", (long)cur_fs);
 
     printf("\n(7) Verifying that root handle is owned by one server...\n");    
@@ -204,28 +196,22 @@ int main(int argc, char **argv)
      */
     ret = PVFS_mgmt_setparam_all(
         cur_fs, &creds, PVFS_SERV_PARAM_ROOT_CHECK,
-	(uint64_t)resp_lookup.ref.handle, NULL, NULL);
+	(uint64_t)resp_lookup.ref.handle, NULL, error_details);
 
-    /* check for understood error values */
-    if (ret == -PVFS_ENOENT)
-    {
-	fprintf(stderr, "Failure: no servers claimed "
-                "ownership of root handle.\n");
-	return(-1);
-    }
-
-    if(ret == -PVFS_EALREADY)
-    {
-	fprintf(stderr, "Failure: more than one server appears "
-                "to own root handle.\n");
-	return(-1);
-    }
     if(ret < 0)
     {
-	PVFS_perror("PVFS_mgmt_setparam_all", ret);
-	fprintf(stderr, "Failure: failed to check root handle.\n");
-	return(-1);
+	PVFS_perror("Failure: check root handle failed\n"
+                    "PVFS_mgmt_setparam_all", ret);
+        if(ret == -PVFS_EDETAIL) 
+        {
+            print_root_check_error_details(error_details);
+        }
+
+        PVFS_error_details_free(error_details);
+        return(-1);
     }
+
+    PVFS_error_details_free(error_details);
 
     /* if we hit this point, then everything is ok */
     printf("   Ok; root handle is owned by exactly one server.\n");
@@ -295,7 +281,8 @@ static int noop_all_servers(PVFS_fs_id fsid)
 	}
 	else
 	{
-	    printf("Failure!\n");
+	    printf("FAILURE: PVFS_mgmt_noop failed for server: %s\n",
+                   PVFS_mgmt_map_addr(fsid, &creds, addr_array[i], &tmp));
 	    return ret;
 	}
     }
@@ -573,6 +560,70 @@ static struct options* parse_args(int argc, char* argv[])
     return(tmp_opts);
 }
 
+static void print_root_check_error_details(PVFS_error_details * error_details)
+{
+    int i = 0;
+    int owners = 0;
+    int fatal_errors = 0;
+    /* find # of servers that report ownership of root */
+    for(i = 0; i < error_details->count_used; ++i)
+    {
+        if(error_details->error[i].error == 0)
+        {
+            ++owners;
+        }
+        else if(error_details->error[i].error != -PVFS_ENOENT)
+        {
+            ++fatal_errors;
+        }
+    }
+
+    /* now figure out what error to print */
+    if(owners == 0)
+    {
+        fprintf(stderr, "\n\tExactly one server must own the root handle.\n"
+                        "\tIn this setup, no servers own the root handle.\n");
+    }
+    else if(owners > 1)
+    {
+        fprintf(stderr, "\n\tExactly one server must own the root handle.\n"
+                        "\tIn this setup, multiple servers report "
+                        "ownership of root handle.\n");
+    }
+
+    fprintf(stderr, "\nPer-server errors:\n");
+    for(i = 0; i < error_details->count_used; ++i)
+    {
+        char perrorstr[100];
+        if(error_details->error[i].error == 0)
+        {
+            fprintf(stderr, "\tServer: %s: Reports ownership of root handle\n",
+                    BMI_addr_rev_lookup(error_details->error[i].addr));
+        }
+        else if(error_details->error[i].error != -PVFS_ENOENT)
+        {
+            PVFS_strerror_r(error_details->error[i].error, perrorstr, 100);
+        }
+
+    }
+}
+
+static void print_error_details(PVFS_error_details * error_details)
+{
+    int i = 0;
+    fprintf(stderr, "\tPer-server errors:\n");
+    for(i = 0; i < error_details->count_used; ++i)
+    {
+        char perrorstr[100];
+        if(error_details->error[i].error != 0)
+        {
+            PVFS_strerror_r(error_details->error[i].error, perrorstr, 100);
+            fprintf(stderr, "\tServer: %s: %s\n",
+                    BMI_addr_rev_lookup(error_details->error[i].addr),
+                    perrorstr);
+        }
+    }
+}
 
 static void usage(int argc, char** argv)
 {

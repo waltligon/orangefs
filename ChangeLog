@@ -2,8 +2,38 @@
 PVFS2 Release ChangeLog
 -----------------------
 
-pvfs2-1.3.3-pre1
+pvfs2-1.4.1-pre1
 ===============
+- ib: separate config options for includes and libraries, optionally
+- ib: support mellanox ibgd-1.8.2, compile quietly on x86_64
+
+pvfs2-1.4.0
+- add a simple sendfile callback stub
+- getattr through pvfs2-client-core now specifies exactly what it needs
+- fix case where pvfs2-fs-dump would fall into infinite loop
+- added new pvfs2-viewdist and pvfs2-perror utility
+- many zero-fill cleanups
+- SIO (small-io) optimization: piggyback small I/O requests in initial
+  communication between server and client (like MPI eager mode, but for I/O)
+- fix a truncate bug
+- pvfs2-genconfig can create config files for running several servers on one
+  machine.  useful for testing
+- better pvfs2-client and pvfs2-client-core logging
+- better interaction between pvfs2-client and pvfs2-client-core 
+- improvements to doxygen generation
+- rework the acache into generic tcache infrastructure upon which acache is
+  built
+- timeouts for kernel operations can now be adjusted via /proc/sys/pvfs2
+- cleanups for --enable-strict and building on 64-bit systems
+- update kernel interface for 2.6.15
+- assorted improvements to tests: more coverage, better reporting
+- fix several immediate completion cases: others probably remain
+- remove an extraneous call to make_bad_inode
+- better logging when msgpairarray fails
+- clean up the pvfs2-server shutdown process
+- improvements to nightly test error checking
+- fix immediate completion error with zero-byte reads and writes
+- more robust directory renaming technique
 
 pvfs2-1.3.2
 ===============
