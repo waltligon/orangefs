@@ -33,6 +33,10 @@
 #include <attr/xattr.h>
 #endif
 
+#ifdef HAVE_SYS_XATTR_H
+#include <sys/xattr.h>
+#endif
+
 struct options 
 {
     char *srcfile;
