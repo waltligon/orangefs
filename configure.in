@@ -48,6 +48,7 @@ AC_CHECK_HEADERS([mntent.h, fstab.h])
 AC_CHECK_HEADERS(stdarg.h)
 
 AC_CHECK_HEADERS(attr/xattr.h)
+AC_CHECK_HEADERS(sys/xattr.h)
 
 AC_CHECK_SIZEOF([long int])
 
@@ -1070,6 +1071,24 @@ dnl for regular functions, add them to the CHECK_FUNCS
 AC_CHECK_FUNCS(strtoull)
 AC_CHECK_FUNCS(strstr)
 AC_CHECK_FUNCS(fgetxattr)
+
+dnl fgetxattr doesn't have a prototype on some systems
+AC_MSG_CHECKING([for fgetxattr prototype])
+AC_TRY_COMPILE([
+	#include <sys/types.h>
+	#ifdef HAVE_ATTR_XATTR_H
+	#include <attr/xattr.h>
+	#endif
+	#ifdef HAVE_SYS_XATTR_H
+	#include <sys/xattr.h>
+	#endif
+	char * fgetxattr(char *foo);
+	], [], 
+	AC_MSG_RESULT(no),
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_FGETXATTR_PROTOTYPE, 1, Define if system provides fgtxattr prototype)
+)
+
 
 dnl check for getmntent(), special test
 AC_FUNC_GETMNTENT
