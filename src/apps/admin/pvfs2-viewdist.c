@@ -29,12 +29,12 @@
 #include "pvfs2-dist-varstrip.h"
 #include "pint-util.h"
 
-#ifdef HAVE_ATTR_XATTR_H
-#include <attr/xattr.h>
-#endif
-
 #ifdef HAVE_SYS_XATTR_H
 #include <sys/xattr.h>
+#endif
+
+#ifdef HAVE_ATTR_XATTR_H
+#include <attr/xattr.h>
 #endif
 
 struct options 
