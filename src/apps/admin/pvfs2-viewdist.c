@@ -79,8 +79,8 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials);
 static int generic_server_location(file_object *obj, PVFS_credentials *creds,
         char **servers, int *nservers);
 
-#define DIST_KEY "metafile_dist"
-#define DFILE_KEY "datafile_handles"
+#define DIST_KEY "system.pvfs2.metafile_dist"
+#define DFILE_KEY "system.pvfs2.datafile_handles"
 
 static int generic_dist(file_object *obj, PVFS_credentials *creds,
         char **dist, int *size)
@@ -108,7 +108,7 @@ static int generic_dist(file_object *obj, PVFS_credentials *creds,
         if ((ret = PVFS_sys_geteattr(obj->u.pvfs2.ref, 
                 creds, &key, &val)) < 0)
         {
-            PVFS_perror("PVFS_sys_geteattr failed %d\n", ret);
+            PVFS_perror("PVFS_sys_geteattr", ret);
             return -1;
         }
         *size = val.read_sz;
@@ -150,7 +150,7 @@ static int generic_server_location(file_object *obj, PVFS_credentials *creds,
         if ((ret = PVFS_sys_geteattr(obj->u.pvfs2.ref, 
                 creds, &key, &val)) < 0)
         {
-            PVFS_perror("PVFS_sys_geteattr failed %d\n", ret);
+            PVFS_perror("PVFS_sys_geteattr", ret);
             return -1;
         }
         ret = val.read_sz;

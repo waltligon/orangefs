@@ -205,173 +205,98 @@ static void print_string(char *buffer, size_t length)
 }
 #endif
 
-/*
- * listeattr_check_resp()
- * Check the response - handle any errors
- * We also need to do filtering here to prevent TROVE_COMMON_KEYS from
- * being made visible to the users
- * Possibly others if we decide acl's should not be made visible...
+/* listeattr_check_resp()
+ *
+ * checks what attributes we found, handles errors, filters for appropriate
+ * extended attribute name spaces
+ *
+ * NOTE: all attributes should fall into one of the name spaces defined in 
+ * the PINT_eattr_namespaces array.  If we find a key that does not, then we
+ * will translate it so that it appears in the "system.pvfs2." name
+ * space on the client side.
  */
 static int listeattr_check_resp(PINT_server_op *s_op, job_status_s *js_p)
 {
-    int k, count_valid = 0, error = 0, tmp_size = 0, *tmp_valid = NULL, orig_size = 0;
-    char *tmp_buffer = NULL;
-    PVFS_object_attr *a_p = NULL;
+    int num_found = 0;
+    int i = 0;
+    char* tmp_buffer = NULL;
+    char translate_prefix[] = "system.pvfs2.";
+    int translate_prefix_len = strlen("system.pvfs2.");
+    int ret = 0;
 
-    PINT_STATE_DEBUG("check_resp");
-    if (s_op->resp.u.listeattr.nkey > 0)
-    {
-        tmp_valid = (int *) calloc(1, s_op->resp.u.listeattr.nkey * sizeof(int));
-        if (tmp_valid == NULL)
-        {
-            js_p->error_code = -PVFS_ENOMEM;
-            return(1);
-        }
-    }
-    a_p = &s_op->attr;
-    gossip_debug(GOSSIP_LISTEATTR_DEBUG,"listeattr obtained %d instead of %d keys\n",
-            js_p->count, s_op->resp.u.listeattr.nkey);
-    /* put the returned read buffer size in buffer_sz */
-    /* it is the only thing returned across the wire */
-    gossip_debug(GOSSIP_LISTEATTR_DEBUG,"status %d error_code %d nkeys %d spare_buffer %p\n",
-            s_op->resp.status, js_p->error_code, s_op->resp.u.listeattr.nkey, s_op->u.eattr.buffer);
-    for (k = 0; k < s_op->resp.u.listeattr.nkey; k++)
-    {
-        orig_size += s_op->req->u.listeattr.keysz[k];
-        if (js_p->error_code == 0)
-        {
-            gossip_debug(GOSSIP_LISTEATTR_DEBUG, "key[%d] = %p\n",
-                             k, s_op->resp.u.listeattr.key[k].buffer);
-            if (a_p->objtype == PVFS_TYPE_METAFILE)
-            {
-                /* dont even check these if they are not valid */
-                if (k >= js_p->count)
-                {
-                    continue;
-                }
-                /* We dont wish to return these keys.. */
-                if (!strncmp(s_op->resp.u.listeattr.key[k].buffer,
-                    Trove_Common_Keys[METAFILE_HANDLES_KEY].key,
-                    s_op->resp.u.listeattr.key[k].read_sz) ||
-                    !strncmp(s_op->resp.u.listeattr.key[k].buffer,
-                    Trove_Common_Keys[METAFILE_DIST_KEY].key,
-                    s_op->resp.u.listeattr.key[k].read_sz))
-                {
-                    continue;
-                }
-            }
-            else if (a_p->objtype == PVFS_TYPE_SYMLINK)
-            {
-                /* dont even check these if they are not valid */
-                if (k >= js_p->count)
-                {
-                    continue;
-                }
-                if (!strncmp(s_op->resp.u.listeattr.key[k].buffer,
-                    Trove_Common_Keys[SYMLINK_TARGET_KEY].key,
-                    s_op->resp.u.listeattr.key[k].read_sz))
-                {
-                    continue;
-                }
-            }
-            else if (a_p->objtype == PVFS_TYPE_DIRECTORY)
-            {
-                /* dont even check these if they are not valid */
-                if (k >= js_p->count)
-                {
-                    continue;
-                }
-                if (!strncmp(s_op->resp.u.listeattr.key[k].buffer,
-                    Trove_Common_Keys[DIR_ENT_KEY].key,
-                    s_op->resp.u.listeattr.key[k].read_sz))
-                {
-                    continue;
-                }
-            }
-            tmp_valid[k] = s_op->resp.u.listeattr.key[k].read_sz;
-            count_valid++;
-            tmp_size += s_op->resp.u.listeattr.key[k].read_sz;
-            s_op->resp.u.listeattr.key[k].buffer_sz =
-                s_op->resp.u.listeattr.key[k].read_sz;
-        }
-        /* in case of any errors, we initialize it to 0 */
-        else {
-            s_op->resp.u.listeattr.key[k].buffer_sz = 0;
-            s_op->resp.u.listeattr.key[k].read_sz = 0;
-            error = 1;
-        }
-    }
-    /* On any errors, return */
-    if (error) 
-    {
-        if (tmp_valid)
-            free(tmp_valid);
-        return 1;
-    }
     /* Nothing was requested? then fill token to hold the max available keys */
     if (s_op->resp.u.listeattr.nkey == 0)
     {
         s_op->resp.u.listeattr.token = js_p->count;
-        if (tmp_valid)
-            free(tmp_valid);
+        js_p->error_code = 0;
         return 1;
     }
+
+    /* how many entries did we find that we can process? */
+    num_found = js_p->count;
+    if(num_found > s_op->resp.u.listeattr.nkey)
+    {
+        num_found = s_op->resp.u.listeattr.nkey;
+    }
+
     s_op->resp.u.listeattr.token = js_p->position;
-    /* if nothing has to be filtered, then return */
-    if (count_valid == s_op->resp.u.listeattr.nkey)
+    s_op->resp.u.listeattr.nkey = num_found;
+
+    if(num_found == 0)
     {
-        if (tmp_valid)
-            free(tmp_valid);
-        return 1;
+        /* there aren't any extended attr's; go ahead and return */
+        js_p->error_code = 0;
+        return(1);
     }
-    /* Allocate something large enough to hold the filtered set of keys */
-    tmp_buffer = (char *) calloc(1, tmp_size);
-    if (tmp_buffer == NULL)
+  
+    tmp_buffer = (char*)malloc(PVFS_REQ_LIMIT_KEY_LEN);
+    if(!tmp_buffer)
     {
-        if (tmp_valid)
-            free(tmp_valid);
         js_p->error_code = -PVFS_ENOMEM;
-        for (k = 0; k < s_op->resp.u.listeattr.nkey; k++)
-        {
-            s_op->resp.u.listeattr.key[k].buffer_sz = 0;
-        }
-        return 1;
+        return(1);
     }
-    gossip_debug(GOSSIP_LISTEATTR_DEBUG, "tmp_buffer (%p,%d) spare_buffer (%p,%d)\n", 
-        tmp_buffer, tmp_size, s_op->u.eattr.buffer, orig_size);
-    tmp_size = 0;
-    count_valid = 0;
-    for (k = 0; k <  s_op->resp.u.listeattr.nkey; k++)
+
+    /* iterate through the keys that we found */
+    for(i=0; i<num_found; i++)
     {
-        if (tmp_valid[k] > 0)
+        /* check to see if it is prefixed into a supported name space */
+        if(!PINT_eattr_is_prefixed(s_op->resp.u.listeattr.key[i].buffer))
         {
-            gossip_debug(GOSSIP_LISTEATTR_DEBUG, "tmp_size = %d tmp_valid[%d] = %d buf = %s(%p)\n",
-                    tmp_size, k, tmp_valid[k], (char *)s_op->resp.u.listeattr.key[k].buffer,
-                    s_op->resp.u.listeattr.key[k].buffer);
-            memcpy(tmp_buffer + tmp_size, s_op->resp.u.listeattr.key[k].buffer, tmp_valid[k]);
-            s_op->resp.u.listeattr.key[count_valid].buffer = (char *) s_op->u.eattr.buffer + tmp_size; 
-            gossip_debug(GOSSIP_LISTEATTR_DEBUG, "buf [%d] = %p\n", 
-                    count_valid, s_op->resp.u.listeattr.key[count_valid].buffer);
-            tmp_size += tmp_valid[k];
-            s_op->resp.u.listeattr.key[count_valid].read_sz 
-                     = s_op->resp.u.listeattr.key[count_valid].buffer_sz = tmp_valid[k];
-            gossip_debug(GOSSIP_LISTEATTR_DEBUG, "k = %d read_sz: %d\n", k, tmp_valid[k]);
-            count_valid++;
+            /* we need to tack on a "system.pvfs2." prefix */
+
+            /* find out if the key size requested is large enough */
+            if((translate_prefix_len + s_op->resp.u.listeattr.key[i].read_sz) >
+                s_op->req->u.listeattr.keysz[i])
+            {
+                /* NOTE: trying to mimic the semantics of
+                 * trove_keyval_iterate_keys(): it will also report an
+                 * overall error if one of the key buffers is to small,
+                 * though the choice of error code may be different.
+                 */
+                free(tmp_buffer);
+                js_p->error_code = -PVFS_EMSGSIZE;
+                return(1);
+            }
+
+            /* add a prefix onto the key and adjust sizes accordingly */
+            /* NOTE: this will have to change if we ever permit non-string
+             * keys (which would break using them for xattrs anyway)
+             */
+            ret = sprintf(tmp_buffer,
+                "%s%s", translate_prefix,
+                (char*)s_op->resp.u.listeattr.key[i].buffer);
+            memcpy(s_op->resp.u.listeattr.key[i].buffer, tmp_buffer,
+                (ret+1));
+            s_op->resp.u.listeattr.key[i].read_sz += translate_prefix_len;
         }
-    }
-    /* Copy it to the scratch buffer */
-    memcpy(s_op->u.eattr.buffer, tmp_buffer, tmp_size);
-    for (k = 0; k < count_valid; k++)
-    {
-        gossip_debug(GOSSIP_LISTEATTR_DEBUG, "afterwards buf[%d] = %s (%p)\n", k,
-                (char *) s_op->resp.u.listeattr.key[k].buffer, s_op->resp.u.listeattr.key[k].buffer);
-    }
-    s_op->resp.u.listeattr.nkey = count_valid;
+
+        s_op->resp.u.listeattr.key[i].buffer_sz =
+            s_op->resp.u.listeattr.key[i].read_sz;
+    }    
+
     free(tmp_buffer);
-    free(tmp_valid);
-    gossip_debug(GOSSIP_LISTEATTR_DEBUG, "listeattr returning %d keys after filtering\n",
-                    count_valid);
-    return 1;
+    js_p->error_code = 0;
+    return(1);
 }
 
 /* listeattr_cleanup()
