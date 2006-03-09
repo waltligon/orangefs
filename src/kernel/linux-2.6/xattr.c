@@ -33,19 +33,26 @@ struct xattr_handler *pvfs2_xattr_handlers[] = {
      */
     &pvfs2_xattr_acl_access_handler,
     &pvfs2_xattr_acl_default_handler,
-    /* 
-     * NOTE: Please add prefix-based xattrs before this comment. 
-     * Don't forget to change the handler map above and the associated
-     * defines in pvfs2-kernel.h!
-     * The pvfs2_xattr_default_handler handles all xattrs with "" (the empty)
-     * prefix string! No one seemed to have any strong opinions on whether
-     * this will hurt us/help us in the long run.
-     */
+    &pvfs2_xattr_trusted_handler,
     &pvfs2_xattr_default_handler,
     NULL
 };
 
 #else 
+
+/* prefix comparison function; taken from RedHat patched 2.4 kernel with
+ * xattr support
+ */
+static inline const char * pvfs2_strcmp_prefix(
+    const char *a, 
+    const char *a_prefix)
+{               
+    while (*a_prefix && *a == *a_prefix) {
+        a++;    
+        a_prefix++;
+    }       
+    return *a_prefix ? NULL : a;
+}       
 
 /* These routines are used only for the 2.4 kernel xattr callbacks or for early 2.6 kernels */
 
@@ -59,17 +66,38 @@ int pvfs2_setxattr(struct dentry *dentry, const char *name,
 #endif
 {
     struct inode *inode = dentry->d_inode;
-    int internal_flag = 0;
+    const char* n;
+    int ret = -EOPNOTSUPP;
 
-    internal_flag = convert_to_internal_xattr_flags(flags);
-    return pvfs2_inode_setxattr(inode, name, value, size, internal_flag);
+    if((n = pvfs2_strcmp_prefix(name, PVFS2_XATTR_NAME_TRUSTED_PREFIX)))
+    {
+        ret = pvfs2_xattr_set_trusted(inode, n, value, size, flags);
+    }
+    else
+    {
+        ret = pvfs2_xattr_set_default(inode, name, value, size, flags);
+    }
+
+    return ret;
 }
 
 ssize_t pvfs2_getxattr(struct dentry *dentry, const char *name,
 		         void *buffer, size_t size)
 {
     struct inode *inode = dentry->d_inode;
-    return pvfs2_inode_getxattr(inode, name, buffer, size);
+    const char* n;
+    int ret = -EOPNOTSUPP;
+
+    if((n = pvfs2_strcmp_prefix(name, PVFS2_XATTR_NAME_TRUSTED_PREFIX)))
+    {
+        ret = pvfs2_xattr_get_trusted(inode, n, buffer, size);
+    }
+    else
+    {
+        ret = pvfs2_xattr_get_default(inode, name, buffer, size);
+    }
+
+    return ret;
 }
 
 #endif
@@ -83,7 +111,7 @@ ssize_t pvfs2_listxattr(struct dentry *dentry, char *buffer, size_t size)
 int pvfs2_removexattr(struct dentry *dentry, const char *name)
 {
     struct inode *inode = dentry->d_inode;
-    return pvfs2_inode_removexattr(inode, name);
+    return pvfs2_inode_removexattr(inode, NULL, name);
 }
 
 #endif

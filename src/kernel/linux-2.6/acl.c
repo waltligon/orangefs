@@ -196,7 +196,7 @@ static struct posix_acl *pvfs2_get_acl(struct inode *inode, int type)
         pvfs2_error("pvfs2_get_acl: Could not allocate value ptr\n");
         return ERR_PTR(-ENOMEM);
     }
-    ret = pvfs2_inode_getxattr(inode, key, value, PVFS_MAX_XATTR_VALUELEN);
+    ret = pvfs2_inode_getxattr(inode, "", key, value, PVFS_MAX_XATTR_VALUELEN);
     /* if the key exists, convert it to an in-memory rep */
     if (ret > 0)
     {
@@ -282,7 +282,7 @@ pvfs2_set_acl(struct inode *inode, int type, struct posix_acl *acl)
         }
     }
     /* Go ahead and set the extended attribute now */
-    error = pvfs2_inode_setxattr(inode, name, value, size, 0);
+    error = pvfs2_inode_setxattr(inode, "", name, value, size, 0);
     if (value) 
     {
         kfree(value);
