@@ -123,10 +123,16 @@ static int geteattr_setup_resp(PINT_server_op *s_op, job_status_s *js_p)
     PINT_STATE_DEBUG("setup_resp");
     gossip_debug(GOSSIP_GETEATTR_DEBUG,"geteattr requesting %d keys\n",
             s_op->req->u.geteattr.nkey);
+
+    js_p->error_code = 0;
+
     s_op->resp.u.geteattr.val =
         malloc(s_op->req->u.geteattr.nkey*sizeof(PVFS_ds_keyval));
     if (!s_op->resp.u.geteattr.val)
-        return -PVFS_ENOMEM;
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return(1);
+    }
     s_op->resp.u.geteattr.nkey = s_op->req->u.geteattr.nkey;
     for (i = 0, tsz = 0; i < s_op->req->u.geteattr.nkey; i++)
         tsz += s_op->req->u.geteattr.valsz[i];
@@ -135,7 +141,8 @@ static int geteattr_setup_resp(PINT_server_op *s_op, job_status_s *js_p)
     {
         s_op->resp.u.geteattr.nkey = 0;
         free (s_op->resp.u.geteattr.val);
-        return -PVFS_ENOMEM;
+        js_p->error_code = -PVFS_ENOMEM;
+        return(1);
     }
     gossip_debug(GOSSIP_GETEATTR_DEBUG,"geteattr buffer size %d bytes\n",
             tsz);

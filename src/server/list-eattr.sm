@@ -122,10 +122,17 @@ static int listeattr_setup_resp(PINT_server_op *s_op, job_status_s *js_p)
     PINT_STATE_DEBUG("setup_resp");
     gossip_debug(GOSSIP_LISTEATTR_DEBUG, "listeattr requesting %d keys\n",
             s_op->req->u.listeattr.nkey);
+
+    js_p->error_code = 0;
+
     s_op->resp.u.listeattr.key =
         malloc(s_op->req->u.listeattr.nkey * sizeof(PVFS_ds_keyval));
     if (!s_op->resp.u.listeattr.key)
-        return -PVFS_ENOMEM;
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return(1);
+    }
+
     s_op->resp.u.listeattr.nkey = s_op->req->u.listeattr.nkey;
     for (i = 0, tsz = 0; i < s_op->req->u.listeattr.nkey; i++)
         tsz += s_op->req->u.listeattr.keysz[i];
@@ -134,7 +141,8 @@ static int listeattr_setup_resp(PINT_server_op *s_op, job_status_s *js_p)
     {
         s_op->resp.u.listeattr.nkey = 0;
         free (s_op->resp.u.listeattr.key);
-        return -PVFS_ENOMEM;
+        js_p->error_code = -PVFS_ENOMEM;
+        return(1);
     }
     gossip_debug(GOSSIP_LISTEATTR_DEBUG,"listeattr buffer size %d bytes\n",
             tsz);
@@ -215,7 +223,10 @@ static int listeattr_check_resp(PINT_server_op *s_op, job_status_s *js_p)
     {
         tmp_valid = (int *) calloc(1, s_op->resp.u.listeattr.nkey * sizeof(int));
         if (tmp_valid == NULL)
+        {
             js_p->error_code = -PVFS_ENOMEM;
+            return(1);
+        }
     }
     a_p = &s_op->attr;
     gossip_debug(GOSSIP_LISTEATTR_DEBUG,"listeattr obtained %d instead of %d keys\n",

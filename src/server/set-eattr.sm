@@ -132,7 +132,7 @@ static int seteattr_verify_eattribs(
             {
                 /* can't set these keys with this request */
                 js_p->error_code = -PVFS_EINVAL;
-                return -PVFS_EINVAL;
+                return 1;
             }
         case PVFS_TYPE_SYMLINK :
             if (!strncmp(s_op->req->u.seteattr.key[i].buffer,
@@ -141,7 +141,7 @@ static int seteattr_verify_eattribs(
             {
                 /* can't set these keys with this request */
                 js_p->error_code = -PVFS_EINVAL;
-                return -PVFS_EINVAL;
+                return 1;
             }
         case PVFS_TYPE_DIRECTORY :
             if (!strncmp(s_op->req->u.seteattr.key[i].buffer,
@@ -150,7 +150,7 @@ static int seteattr_verify_eattribs(
             {
                 /* can't set these keys with this request */
                 js_p->error_code = -PVFS_EINVAL;
-                return -PVFS_EINVAL;
+                return 1;
             }
         default :
             /* no holds barred for other types */
@@ -164,7 +164,7 @@ static int seteattr_verify_eattribs(
         {
             /* can't set these keys with this request */
             js_p->error_code = -PVFS_EINVAL;
-            return -PVFS_EINVAL;
+            return 1;
         }
     }
 
