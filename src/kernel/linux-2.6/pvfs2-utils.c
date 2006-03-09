@@ -842,14 +842,6 @@ int pvfs2_inode_listxattr(struct inode *inode, char *buffer, size_t size)
             }
         }
     done:
-        if (ret == 0 && buffer != NULL)
-        {
-            for (i = 0; i < total; i++)
-            {
-                printk("%c", buffer[i]);
-            }
-            printk("\n");
-        }
         pvfs2_print("pvfs2_inode_listxattr: returning %d\n", ret ? (int) ret : (int) total);
         /* when request is serviced properly, free req op struct */
         op_release(new_op);
