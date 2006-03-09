@@ -45,6 +45,7 @@ typedef struct
     char *gossip_mask;
     char *path;
     char *logfile;
+    char *logstamp;
 } options_t;
 
 static void client_sig_handler(int signum);
@@ -303,6 +304,12 @@ static int monitor_pvfs2_client(options_t *opts)
                 arg_list[arg_index+1] = opts->gossip_mask;
                 arg_index+=2;
             }
+            if(opts->logstamp)
+            {
+                arg_list[arg_index] = "--logstamp";
+                arg_list[arg_index+1] = opts->logstamp;
+                arg_index+=2;
+            }
 
             ret = execvp(opts->path, arg_list);
 
@@ -358,6 +365,7 @@ static void parse_args(int argc, char **argv, options_t *opts)
         {"perf-history-size",1,0,0},
         {"gossip-mask",1,0,0},
         {"path",1,0,0},
+        {"logstamp",1,0,0},
         {0,0,0,0}
     };
 
@@ -398,6 +406,10 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 else if (strcmp("logfile", cur_option) == 0)
                 {
                     goto do_logfile;
+                }
+                else if (strcmp("logstamp", cur_option) == 0)
+                {
+                    opts->logstamp = optarg;
                 }
                 else if (strcmp("acache-hard-limit", cur_option) == 0)
                 {

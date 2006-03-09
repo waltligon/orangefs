@@ -94,6 +94,8 @@ typedef struct
     unsigned int perf_time_interval_secs;
     unsigned int perf_history_size;
     char* gossip_mask;
+    int logstamp_type;
+    int logstamp_type_set;
 } options_t;
 
 /*
@@ -2551,6 +2553,10 @@ int main(int argc, char **argv)
         debug_mask = PVFS_debug_eventlog_to_mask(s_opts.gossip_mask);
     }
 
+    if(s_opts.logstamp_type_set)
+    {
+        gossip_set_logstamp(s_opts.logstamp_type);
+    }
     /*
       initialize pvfs system interface
 
@@ -2741,6 +2747,8 @@ static void print_help(char *progname)
     printf("--acache-reclaim-percentage=LIMIT acache reclaim percentage\n");
     printf("--perf-time-interval-secs=SECONDS length of perf counter intervals\n");
     printf("--perf-history-size=VALUE     number of perf counter intervals to maintain\n");
+    printf("--logfile=VALUE               override the default log file\n");
+    printf("--logstamp=none|usec|datetime overrides the default log message's time stamp\n");
     printf("--gossip-mask=MASK_LIST       gossip logging mask\n");
  }
 
@@ -2759,6 +2767,7 @@ static void parse_args(int argc, char **argv, options_t *opts)
         {"acache-hard-limit",1,0,0},
         {"acache-soft-limit",1,0,0},
         {"logfile",1,0,0},
+        {"logstamp",1,0,0},
         {0,0,0,0}
     };
 
@@ -2785,6 +2794,28 @@ static void parse_args(int argc, char **argv, options_t *opts)
                 else if (strcmp("logfile", cur_option) == 0)
                 {
                     goto do_logfile;
+                }
+                else if (strcmp("logstamp", cur_option) == 0)
+                {
+                    if(strcmp(optarg, "none") == 0)
+                    {
+                        opts->logstamp_type = GOSSIP_LOGSTAMP_NONE;
+                    }
+                    else if(strcmp(optarg, "usec") == 0)
+                    {
+                        opts->logstamp_type = GOSSIP_LOGSTAMP_USEC;
+                    }
+                    else if(strcmp(optarg, "datetime") == 0)
+                    {
+                        opts->logstamp_type = GOSSIP_LOGSTAMP_DATETIME;
+                    }
+                    else
+                    {
+                        fprintf(stderr, "Error: invalid logstamp value. See usage below\n\n");
+                        print_help(argv[0]);
+                        exit(EXIT_FAILURE);
+                    }
+                    opts->logstamp_type_set = 1;
                 }
                 else if (strcmp("acache-hard-limit", cur_option) == 0)
                 {
