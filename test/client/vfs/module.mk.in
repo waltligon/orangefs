@@ -1,0 +1,18 @@
+TEST_CORRECTNESS_DIR := correctness
+TEST_CORRECTNESS_SRC := \
+	$(TEST_CORRECTNESS_DIR)/test-setgid.c \
+	$(TEST_CORRECTNESS_DIR)/test-symlink-perms.c \
+	$(TEST_CORRECTNESS_DIR)/test-mkdir.c 
+
+TEST_SHARED_DIR := shared
+TEST_SHARED_OBJ := $(TEST_SHARED_DIR)/test-common.o
+
+TESTSRC += $(TEST_CORRECTNESS_SRC) 
+
+MODCFLAGS_$(TEST_CORRECTNESS_DIR) = -I$(pvfs2_srcdir)/test/$(TEST_SHARED_DIR)
+
+LOCALTESTS := $(patsubst %.c,%, $(TEST_CORRECTNESS_SRC))
+$(LOCALTESTS): %: %.o $(TEST_SHARED_OBJ)
+	$(Q) "  LD              $@"
+	$(E)$(LD) $< $(TEST_SHARED_OBJ) $(LDFLAGS) $(LIBS) -o $@
+
