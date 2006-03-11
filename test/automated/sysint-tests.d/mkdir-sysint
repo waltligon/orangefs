@@ -1,0 +1,6 @@
+#!/bin/sh 
+
+PATH=${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/bin:${PATH}
+echo $PATH
+export PATH
+${PVFS2_DEST}/INSTALL-pvfs2-${CVS_TAG}/test/test-mkdir --verbose --directory ${PVFS2_MOUNTPOINT} --use-lib 
