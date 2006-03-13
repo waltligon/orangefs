@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: setup.c,v 1.20 2006-02-22 16:30:54 pw Exp $
+ * $Id: setup.c,v 1.21 2006-03-13 22:56:01 pw Exp $
  */
 #include <fcntl.h>
 #include <unistd.h>
@@ -27,7 +27,7 @@
 
 /* constants used to initialize infiniband device */
 static const char *vapi_device_names[] =
-    { "InfiniHost0", "InfiniHost_III_Lx0" };
+    { "InfiniHost0", "InfiniHost_III_Ex0", "InfiniHost_III_Lx0" };
 static const int VAPI_PORT = 1;
 static const unsigned int VAPI_NUM_CQ_ENTRIES = 1024;
 static const int VAPI_MTU = MTU1024;  /* default mtu, 1k best here */
