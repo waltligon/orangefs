@@ -1,0 +1,4 @@
+DIR := shared
+
+MISCSRC += $(DIR)/test-common.c 
+

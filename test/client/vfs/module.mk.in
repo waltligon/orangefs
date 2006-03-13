@@ -1,0 +1,18 @@
+TEST_CLIENT_VFS_DIR := client/vfs
+TEST_CLIENT_VFS_SRC := \
+	$(TEST_CLIENT_VFS_DIR)/test-setgid.c \
+	$(TEST_CLIENT_VFS_DIR)/test-symlink-perms.c \
+	$(TEST_CLIENT_VFS_DIR)/test-mkdir.c 
+
+TEST_SHARED_DIR := shared
+TEST_SHARED_OBJ := $(TEST_SHARED_DIR)/test-common.o
+
+TESTSRC += $(TEST_CLIENT_VFS_SRC) 
+
+MODCFLAGS_$(TEST_CLIENT_VFS_DIR) = -I$(pvfs2_srcdir)/test/$(TEST_SHARED_DIR)
+
+LOCALTESTS := $(patsubst %.c,%, $(TEST_CLIENT_VFS_SRC))
+$(LOCALTESTS): %: %.o $(TEST_SHARED_OBJ)
+	$(Q) "  LD              $@"
+	$(E)$(LD) $< $(TEST_SHARED_OBJ) $(LDFLAGS) $(LIBS) -o $@
+
