@@ -2,7 +2,7 @@
 <!DOCTYPE input SYSTEM "../../dtd/pb_input.dtd">
 
 <input>
- <experiment>pvfs2_meta_op</experiment>
+ <experiment>pvfs2_meta</experiment>
 
  <named_location>
   <name>operation</name>
@@ -15,8 +15,8 @@
  </named_location>
 
  <named_location>
-  <name>cvs_tag</name>
-  <match>cvstag=</match>
+  <name>cvs_stamp</name>
+  <match>cvsstamp=</match>
  </named_location>
 
  <named_location>
@@ -44,17 +44,7 @@
   <skip>1</skip>
 
   <tabular_value>
-   <name>OP_total</name>
-   <pos>0</pos>
-  </tabular_value>
-  
-  <tabular_value>
-   <name>T_avg</name>
-   <pos>1</pos>
-  </tabular_value>
-
-  <tabular_value>
-   <name>T_dev</name>
+   <name>latency</name>
    <pos>2</pos>
   </tabular_value>
  </tabular_location>

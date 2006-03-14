@@ -17,13 +17,11 @@
 #include <mpi.h>
 #include "pvfs2-sysint.h"
 #include "pvfs2-util.h"
-#include "perf-counter-utils.h"
+#include "benchmark-utils.h"
 
 #ifndef PATH_MAX
 #define PATH_MAX FILENAME_MAX
 #endif
-
-#define PERF_INTERVAL 4
 
 extern char *optarg;
 int opt_nfiles = -1;

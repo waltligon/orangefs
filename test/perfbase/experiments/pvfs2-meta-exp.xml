@@ -3,7 +3,7 @@
 <!DOCTYPE experiment SYSTEM "../../dtd/pb_experiment.dtd">
 
 <experiment>
- <name>pvfs2_op</name>
+ <name>pvfs2_meta</name>
 
  <info>
   <performed_by>

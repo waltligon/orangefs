@@ -206,32 +206,34 @@ int test_util_get_queue_perfs(
     return 0;
 }
 
-float results[10000];
+double results[10000];
 int results_count = 0;
-float result_sum = 0;
-float start;
+double result_sum = 0;
+struct timeval start;
 
 void test_util_start_timing(void)
 {
-    struct timeval start_time;
-    gettimeofday(&start_time, NULL);
-    
-    start = start_time.tv_sec * 1e6 + start_time.tv_usec;
+    gettimeofday(&start, NULL);
 }
 
 
     
 void test_util_stop_timing(void)
 {
-    float result, stop;
-    struct timeval stop_time;
-    gettimeofday(&stop_time, NULL);
+    double result;
+    struct timeval stop;
+    gettimeofday(&stop, NULL);
 
-    stop = stop_time.tv_sec * 1e6 + stop_time.tv_usec;
+    result = (stop.tv_sec + stop.tv_usec * 1e-6) - 
+	     (start.tv_sec + start.tv_usec * 1e-6);
 
-    result = (stop - start)*1e-6;
     results[results_count++] = result;
     result_sum += result;
+}
+
+void test_util_print_timing(int rank)
+{
+    printf("%d\t%d\t%f\n", rank, results_count, results[results_count-1]);
 }
 
 
@@ -240,7 +242,7 @@ void test_util_print_avg_and_dev(void)
     int i = 0;
     float avg, dev;
 
-    avg = result_sum / results_count;
+    avg = ((float)result_sum) / results_count;
 
     dev = 0;
     for(i = 0; i < results_count; ++i)

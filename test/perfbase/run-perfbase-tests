@@ -7,9 +7,9 @@ sub factor_sequence;
 sub usage;
 sub run_tests;
 
-my ($clients_range, $io_range, $meta_range, $branch, $cvsdate, $testpath,
-        $mountpoint, $iterations, $verbose) = 
-(undef, undef, undef, undef, undef, undef, undef, undef, undef);
+my ($clients_range, $io_range, $meta_range, $branch, $cvsdate, $basepath,
+        $mountpoint, $iterations, $verbose, $exp) = 
+(undef, undef, undef, undef, undef, undef, undef, undef, undef, undef);
 
 my %option_vars = (
         "c" => \$clients_range,
@@ -17,9 +17,10 @@ my %option_vars = (
         "k" => \$meta_range,
         "b" => \$branch,
         "d" => \$cvsdate,
-        "p" => \$testpath,
+        "p" => \$basepath,
         "m" => \$mountpoint,
         "n" => \$iterations,
+        "e" => \$exp,
         "v" => \$verbose);
 
 my $operation = pop @ARGV;
@@ -31,7 +32,7 @@ if(!defined($operation))
 }
 
 my %opts = ();
-getopts("c:i:k:b:p:m:n:vh", \%opts) || usage;
+getopts("c:i:k:b:p:m:n:e:vh", \%opts) || usage;
 
 for (keys %opts)
 {
@@ -51,11 +52,11 @@ $io_range = "1:5" if !defined($io_range);
 $meta_range = "1:1" if !defined($meta_range);
 $branch = "HEAD" if !defined($branch);
 $cvsdate = `date --iso-8601=date` if !defined($cvsdate);
-$testpath = "." if !defined($testpath);
+$basepath = "." if !defined($basepath);
 $iterations = 100 if !defined($iterations);
-my $pvfs2install = "$testpath/INSTALL-pvfs2-$branch";
-my $benchmarkpath = "$testpath/BUILD-pvfs2-$branch/test/perfbase/benchmarks";
+$exp = "meta" if !defined($exp);
 
+my $benchpath = $basepath . "/BUILD-pvfs2-$branch/test/perfbase/benchmarks";
 
 if(!defined($mountpoint))
 {
@@ -137,7 +138,7 @@ sub run_tests()
         {
             check_exec("$hostname-restart-servers");
 
-            myexec("$hostname-restart-servers $pvfs2install $io $meta",
+            myexec("$hostname-restart-servers $basepath/INSTALL-pvfs2-$branch $io $meta",
                    "Failed to restart servers with:\n" .
                    "meta servers: $meta\nio servers: $io\n" .
                    "branch: $branch\n\n");
@@ -147,24 +148,21 @@ sub run_tests()
                 my $datfile = "/tmp/perftest-$operation-c$proc-m$meta-i$io-$branch.dat";
 
                 myexec("mpiexec -1 -n $proc -env PVFS2TAB_FILE \"" . 
-                       $ENV{PVFS2TAB_FILE} . "\" $benchmarkpath/$operation-test " .
+                       $ENV{PVFS2TAB_FILE} . "\" $benchpath/$operation-test " .
                        "-d $mountpoint -n $iterations > $datfile",
                        "Test run failed: proc: $proc, meta: $meta, io: $io\n");
 
-                open(WEBINPUT,
-                     "|./perfbase-web-input -o $operation -m $meta -i $io " .
-                     "-f ./experiments/pvfs2-op-input.xml -t $branch > /tmp/perfbase_input_result 2>&1");
-                
-                if($? != 0)
+                if($verbose)
                 {
-                    print STDERR "Can't fork perfbase-web-input: $!\n" .
-                                 "Failed to submit test results to perfbase " .
-                                 "for run: proc: $proc, " .
-                                 "meta: $meta, io: $io\n\n" .
-                                 `cat /tmp/perfbase_input_result`;
-                    exit 1;
+                    print "RUNNING: ./perfbase-web-input -o $operation " .
+                          "-m $meta -i $io -f " .
+                          "./experiments/pvfs2-$exp-input.xml -t $branch\n";
                 }
 
+                open(WEBINPUT,
+                     "|./perfbase-web-input -o $operation -m $meta -i $io " .
+                     "-f ./experiments/pvfs2-$exp-input.xml -t $branch > /tmp/perfbase_input_result 2> /tmp/perfbase_input_error");
+                
                 my $datresults = `cat $datfile`;
                 print WEBINPUT $datresults;
                 
@@ -175,6 +173,18 @@ sub run_tests()
                                  "for run: proc: $proc, meta: $meta, io: $io\n";
                     exit 1;
                 }
+
+                my $error_bytes=`cat /tmp/perfbase_input_error | wc -c`;
+                if($? != 0 || $error_bytes != 0)
+                {
+                    print STDERR "Can't fork perfbase-web-input: $!\n" .
+                                 "Failed to submit test results to perfbase " .
+                                 "for run: proc: $proc, " .
+                                 "meta: $meta, io: $io\n\n" .
+                                 `cat /tmp/perfbase_input_result`;
+                    exit 1;
+                }
+
             }
         }
     }
@@ -242,10 +252,15 @@ incrementing by <inc> after each iteration.
           -d <date>      : iso-8601 valid date string to 
                            use for CVS checkout.  
                            Defaults to latest.
-          -p <test path> : path to pvfs2 tests base dir.  Defaults to .
+          -p <base path> : path to base pvfs2 test directory.  Defaults to \$PWD.
+                           This should contain {BUILD,INSTALL}-pvfs2-* dirs.
           -m <dir>       : pvfs2 mount point (passed to test program)
           -n <iter>      : number of iterations (passed to test program).
                            Defaults to 100.
+          -e <exp>       : perfbase experiment to submit the test results.
+                           This should only include the experiment component
+                           of the name.
+                           Defaults to 'meta'
           -v             : Verbose.  Show commands as they are being
                            executed.
 

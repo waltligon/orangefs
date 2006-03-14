@@ -19,5 +19,6 @@ int test_util_get_queue_perfs(
 void test_util_start_timing(void);
 void test_util_stop_timing(void);
 void test_util_print_avg_and_dev(void);
+void test_util_print_timing(int rank);
 
 #endif
