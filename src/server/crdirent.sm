@@ -473,7 +473,8 @@ static int crdirent_increment_dirent_count(PINT_server_op *s_op,
                                            job_status_s *js_p)
 {
     struct server_configuration_s *user_opts = get_server_config_struct();
-    int ret, i;
+    int ret;
+    job_id_t i;
 
     (*((PVFS_size *)s_op->val.buffer))++;
 
