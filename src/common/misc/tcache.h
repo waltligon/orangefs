@@ -41,7 +41,8 @@
  * .
  * Policies: 
  * - Cached items become EXPIRED after CACHE_TIMEOUT_MSECS from the
- *   time of insertion
+ *   time of insertion.  Expiration can be turned off if cache entries
+ *   don't decay by setting TCACHE_ENABLE_EXPIRATION to 0.
  * - CACHE_SOFT_LIMIT defined how many entries must exist before a
  *   RECLAIM of cached entries is attempted
  * - CACHE_RECLAIM_PERCENTAGE specifies the maximum number of
@@ -95,6 +96,7 @@ struct PINT_tcache
     int (*free_payload)(void* payload);
 
     unsigned int timeout_msecs; /**< timeout to use with each entry */
+    unsigned int expiration_enabled; /**< do cache entries expire? */
     unsigned int num_entries;   /**< current number of entries in tcache */
     unsigned int hard_limit;    /**< hard limit on number of entries */
     unsigned int soft_limit;    /**< soft limit on number of entries */
@@ -123,12 +125,14 @@ enum PINT_tcache_options
     TCACHE_REPLACE_ALGORITHM = 7,   /**< determines algorithm to use to find an 
                                       *  entry to replace
                                       */
+    TCACHE_ENABLE_EXPIRATION = 8, /**< turn on/off expiration */
 };
 
 struct PINT_tcache* PINT_tcache_initialize(
     int (*compare_key_entry) (void *key, struct qhash_head* link),
     int (*hash_key) (void *key, int table_size),
-    int (*free_payload) (void* payload));
+    int (*free_payload) (void* payload),
+    int table_size);
 
 void PINT_tcache_finalize(struct PINT_tcache* tcache);
 

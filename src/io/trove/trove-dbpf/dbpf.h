@@ -17,6 +17,7 @@ extern "C" {
 #include "gen-locks.h"
 #include "dbpf-open-cache.h"
 #include "pvfs2-internal.h"
+#include "dbpf-keyval-pcache.h"
 
 #define TROVE_DBPF_VERSION_KEY                       "trove-dbpf-version"
 #define TROVE_DBPF_VERSION_VALUE                                  "0.1.1"
@@ -150,6 +151,7 @@ struct dbpf_collection
     TROVE_handle root_dir_handle;
     struct dbpf_storage *storage;
     struct handle_ledger *free_handles;
+    PINT_dbpf_keyval_pcache * pcache; /* the position cache for iterators */
 
     /* used by dbpf_collection.c calls to maintain list of collections */
     struct dbpf_collection *next_p;
@@ -167,7 +169,7 @@ struct dbpf_collection_db_entry
 #define DBPF_ENTRY_TYPE_CONST      0x01
 #define DBPF_ENTRY_TYPE_COMPONENT  0x02
 
-int dbpf_keyval_compare(
+int PINT_trove_dbpf_keyval_compare(
     DB * dbp, const DBT * a, const DBT * b);
 
 struct dbpf_dspace_create_op

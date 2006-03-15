@@ -34,10 +34,10 @@
   <match>procs: </match>
  </named_location>
 
- <named_location>
+ <tabular_value>
   <name>OP_total</name>
   <match>ops: </match>
- </named_location>
+ </tabular_value>
 
  <tabular_location columns="3">
   <match>====</match>

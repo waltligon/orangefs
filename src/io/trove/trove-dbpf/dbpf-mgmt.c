@@ -89,7 +89,10 @@ void dbpf_error_report(
 static struct dbpf_storage *dbpf_storage_lookup(
     char *stoname, int *err_p);
 static int dbpf_db_create(char *dbname);
-static DB *dbpf_db_open(char *dbname, int *err_p);
+static DB *dbpf_db_open(char *dbname, int *err_p,
+                        int (*compare_fn) (DB *db,
+                                           const DBT *dbt1,
+                                           const DBT *dbt2));
 static int dbpf_mkpath(char *pathname, mode_t mode);
 
 
@@ -559,7 +562,7 @@ static int dbpf_collection_create(char *collname,
 
     DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX,
                                 sto_p->name, new_coll_id);
-    db_p = dbpf_db_open(path_name, &error);
+    db_p = dbpf_db_open(path_name, &error, NULL);
     if (db_p == NULL)
     {
         ret = dbpf_db_create(path_name);
@@ -569,7 +572,7 @@ static int dbpf_collection_create(char *collname,
             return ret;
         }
 
-        db_p = dbpf_db_open(path_name, &error);
+        db_p = dbpf_db_open(path_name, &error, NULL);
         if (db_p == NULL)
         {
             gossip_err("dbpf_db_open failed on attrib db %s\n", path_name);
@@ -619,7 +622,7 @@ static int dbpf_collection_create(char *collname,
     db_p->close(db_p, 0);
 
     DBPF_GET_DS_ATTRIB_DBNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
-    db_p = dbpf_db_open(path_name, &error);
+    db_p = dbpf_db_open(path_name, &error, NULL);
     if (db_p == NULL)
     {
         ret = dbpf_db_create(path_name);
@@ -635,7 +638,7 @@ static int dbpf_collection_create(char *collname,
     }
 
     DBPF_GET_KEYVAL_DBNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
-    db_p = dbpf_db_open(path_name, &error);
+    db_p = dbpf_db_open(path_name, &error, NULL);
     if (db_p == NULL)
     {
         ret = dbpf_db_create(path_name);
@@ -1058,7 +1061,7 @@ static int dbpf_collection_lookup(char *collname,
 
     DBPF_GET_DS_ATTRIB_DBNAME(path_name, PATH_MAX,
                               sto_p->name, coll_p->coll_id);
-    coll_p->ds_db = dbpf_db_open(path_name, &ret);
+    coll_p->ds_db = dbpf_db_open(path_name, &ret, NULL);
     if (coll_p->ds_db == NULL)
     {
         return ret;
@@ -1066,7 +1069,8 @@ static int dbpf_collection_lookup(char *collname,
 
     DBPF_GET_KEYVAL_DBNAME(path_name, PATH_MAX,
                            sto_p->name, coll_p->coll_id);
-    coll_p->keyval_db = dbpf_db_open(path_name, &ret);
+    coll_p->keyval_db = dbpf_db_open(path_name, &ret, 
+                                     PINT_trove_dbpf_keyval_compare);
     if(coll_p->keyval_db == NULL)
     {
         return ret;
@@ -1074,7 +1078,7 @@ static int dbpf_collection_lookup(char *collname,
 
     DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX,
                                 sto_p->name, coll_p->coll_id);
-    coll_p->coll_attr_db = dbpf_db_open(path_name, &ret);
+    coll_p->coll_attr_db = dbpf_db_open(path_name, &ret, NULL);
     if (coll_p->coll_attr_db == NULL)
     {
         return ret;
@@ -1110,6 +1114,12 @@ static int dbpf_collection_lookup(char *collname,
         gossip_err("This code understands version %s\n",
                    TROVE_DBPF_VERSION_VALUE);
         return -TROVE_EINVAL;
+    }
+
+    coll_p->pcache = PINT_dbpf_keyval_pcache_initialize();
+    if(!coll_p->pcache)
+    {
+        return -TROVE_ENOMEM;
     }
 
     dbpf_collection_register(coll_p);
@@ -1163,7 +1173,7 @@ static struct dbpf_storage *dbpf_storage_lookup(
 
     DBPF_GET_STO_ATTRIB_DBNAME(path_name, PATH_MAX, stoname);
 
-    sto_p->sto_attr_db = dbpf_db_open(path_name, error_p);
+    sto_p->sto_attr_db = dbpf_db_open(path_name, error_p, NULL);
     if (sto_p->sto_attr_db == NULL)
     {
         return NULL;
@@ -1171,7 +1181,7 @@ static struct dbpf_storage *dbpf_storage_lookup(
 
     DBPF_GET_COLLECTIONS_DBNAME(path_name, PATH_MAX, stoname);
 
-    sto_p->coll_db = dbpf_db_open(path_name, error_p);
+    sto_p->coll_db = dbpf_db_open(path_name, error_p, NULL);
     if (sto_p->coll_db == NULL)
     {
         return NULL;
@@ -1304,7 +1314,10 @@ static int dbpf_db_create(char *dbname)
  * Returns NULL on error, passing a trove error type back in the
  * integer pointed to by error_p.
  */
-static DB *dbpf_db_open(char *dbname, int *error_p)
+static DB *dbpf_db_open(char *dbname, int *error_p,
+                        int (*compare_fn) (DB *db, 
+                                           const DBT *dbt1, 
+                                           const DBT *dbt2))
 {
     int ret = -TROVE_EINVAL;
     DB *db_p = NULL;
@@ -1323,6 +1336,11 @@ static DB *dbpf_db_open(char *dbname, int *error_p)
 
     db_p->set_errfile(db_p, stderr);
     db_p->set_errpfx(db_p, "pvfs2-trove-dbpf");
+
+    if(compare_fn)
+    {
+        db_p->set_bt_compare(db_p, compare_fn);
+    }
 
     /* DB_RECNUM makes it easier to iterate through every key in chunks */
     if ((ret = db_p->set_flags(db_p, DB_RECNUM)) != 0)

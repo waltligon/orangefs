@@ -316,9 +316,7 @@ typedef struct
 typedef struct
 {
     PVFS_object_ref refn;
-    PVFS_ds_position readdir_token_adjustment;
     int num_readdir_retries;
-    int last_version_changed; 
     uint64_t directory_version;
     char *link_target;
     /*

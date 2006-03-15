@@ -53,14 +53,15 @@ static int pvfs2_readdir(
   restart_readdir:
 
     pos = (PVFS_ds_position)file->f_pos;
-    if (pos == 0)
+    /* are we done? */
+    if (pos == PVFS_READDIR_END)
     {
-        pvfs2_inode->readdir_token_adjustment = 0;
+        pvfs2_print("Skipping to graceful termination path since we are done\n");
+        return 0;
     }
 
-    pvfs2_print("pvfs2_readdir called on %s (pos=%d, tadj=%d, "
+    pvfs2_print("pvfs2_readdir called on %s (pos=%d, "
                 "retry=%d, v=%llu)\n", dentry->d_name.name, (int)pos,
-                (int)pvfs2_inode->readdir_token_adjustment,
                 (int)pvfs2_inode->num_readdir_retries,
                 llu(pvfs2_inode->directory_version));
 
@@ -74,6 +75,7 @@ static int pvfs2_readdir(
         if (pvfs2_inode->directory_version == 0)
         {
             ino = dentry->d_inode->i_ino;
+            pvfs2_print("calling filldir of . with pos = %d\n", pos);
             if (filldir(dirent, ".", 1, pos, ino, DT_DIR) < 0)
             {
                 break;
@@ -86,6 +88,7 @@ static int pvfs2_readdir(
         if (pvfs2_inode->directory_version == 0)
         {
             ino = parent_ino(dentry);
+            pvfs2_print("calling filldir of .. with pos = %d\n", pos);
             if (filldir(dirent, "..", 2, pos, ino, DT_DIR) < 0)
             {
                 break;
@@ -121,31 +124,9 @@ static int pvfs2_readdir(
 	   the position we send to the readdir upcall is out of
 	   sync with file->f_pos since pvfs2 doesn't include the
 	   "." and ".." entries that we added above.
-
-	   so the proper pvfs2 position is (pos - 2), except where
-	   pos == 0.  In that case, pos is PVFS_READDIR_START.
-
-           the token adjustment is for the case where files or
-           directories are being removed between calls to readdir.
-           while we're progressing through the directory, our issued
-           upcall offset needs to be adjusted less the number of
-           objects in this directory that were removed.  the readdir
-           retries are not fast enough on the local system, so we have
-           to use this in addition just to be closer to correct.
         */
 	new_op->upcall.req.readdir.token =
-            (pos == 2 ? PVFS_READDIR_START : (pos - 2));
-
-        if (new_op->upcall.req.readdir.token != PVFS_READDIR_START)
-        {
-            new_op->upcall.req.readdir.token -=
-                pvfs2_inode->readdir_token_adjustment;
-            if (new_op->upcall.req.readdir.token == 0)
-            {
-                new_op->upcall.req.readdir.token =
-                    PVFS_READDIR_START;
-            }
-        }
+            (pos == 2 ? PVFS_READDIR_START : pos);
 
         ret = service_operation(
             new_op, "pvfs2_readdir", PVFS2_OP_RETRY_COUNT,
@@ -177,49 +158,16 @@ static int pvfs2_readdir(
                 if (pvfs2_inode->directory_version !=
                     new_op->downcall.resp.readdir.directory_version)
                 {
-                    /*
-                      if the token adjustment is moving rapidly, do
-                      not attempt any retries
-                    */
-                    if ((pvfs2_inode->readdir_token_adjustment) &&
-                        (pvfs2_inode->readdir_token_adjustment %
-                         MAX_DIRENT_COUNT) == 0)
-                    {
-                        pvfs2_inode->last_version_changed = 1;
-                    }
-
-                    /*
-                      don't bother to restart if the directory is
-                      changing too rapidly.  either someone is
-                      creating or removing (as in the case of a
-                      typical rm -rf operation) too quickly and we
-                      have no guarantee of the listing
-                    */
-                    if (pvfs2_inode->last_version_changed)
-                    {
-                        /* once set, do not clear until finished */
-                        goto continue_listing;
-                    }
-
                     pvfs2_print("detected directory change on listing; "
                                 "starting over\n");
 
                     file->f_pos = 0;
                     pvfs2_inode->directory_version =
                         new_op->downcall.resp.readdir.directory_version;
-                    pvfs2_inode->last_version_changed = 1;
 
                     op_release(new_op);
                     pvfs2_inode->num_readdir_retries--;
                     goto restart_readdir;
-                }
-                else
-                {
-                    /*
-                      version hasn't changed between two consecutive
-                      calls; clear the flag here
-                    */
-                    pvfs2_inode->last_version_changed = 0;
                 }
             }
             else
@@ -229,7 +177,6 @@ static int pvfs2_readdir(
                             PVFS2_NUM_READDIR_RETRIES);
             }
 
-          continue_listing:
 	    for (i = 0; i < new_op->downcall.resp.readdir.dirent_count; i++)
 	    {
                 len = new_op->downcall.resp.readdir.d_name_len[i];
@@ -239,6 +186,8 @@ static int pvfs2_readdir(
                     pvfs2_handle_to_ino(
                         new_op->downcall.resp.readdir.refn[i].handle);
 
+                pvfs2_print("calling filldir for %s with len %d, pos %ld\n",
+                        current_entry, len, (unsigned long) pos);
                 if (filldir(dirent, current_entry, len, pos,
                             current_ino, DT_UNKNOWN) < 0)
                 {
@@ -247,7 +196,6 @@ static int pvfs2_readdir(
                     pvfs2_inode->directory_version = 0;
                     pvfs2_inode->num_readdir_retries =
                         PVFS2_NUM_READDIR_RETRIES;
-                    pvfs2_inode->last_version_changed = 0;
 
                     ret = 0;
                     break;
@@ -255,6 +203,9 @@ static int pvfs2_readdir(
                 file->f_pos++;
                 pos++;
             }
+            file->f_pos = new_op->downcall.resp.readdir.token;
+            pvfs2_print("pos = %d, file->f_pos should have been %ld\n", pos, 
+                    (unsigned long) file->f_pos);
 	}
         else
         {
@@ -265,6 +216,7 @@ static int pvfs2_readdir(
 	op_release(new_op);
 	break;
     }
+    pvfs2_print("pvfs2_readdir about to update_atime %p\n", dentry->d_inode);
 
     update_atime(dentry->d_inode);
 

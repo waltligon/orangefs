@@ -73,17 +73,8 @@
  <!-- results -->
  
  <result>
-  <name>T_avg</name>
-  <synopsis>Seconds per Operation (Average)</synopsis>
-  <datatype>float</datatype>
-  <unit>
-   <base_unit>s</base_unit>
-  </unit>
- </result>
-
- <result>
-  <name>T_dev</name>
-  <synopsis>Seconds per Operation (Std Dev)</synopsis>
+ <name>latency</name>
+  <synopsis>Seconds per Operation</synopsis>
   <datatype>float</datatype>
   <unit>
    <base_unit>s</base_unit>

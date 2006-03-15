@@ -95,7 +95,8 @@ int PINT_acache_initialize(void)
     /* create tcache instance */
     acache = PINT_tcache_initialize(acache_compare_key_entry,
                                     acache_hash_key,
-                                    acache_free_payload);
+                                    acache_free_payload,
+                                    -1 /* default tcache table size */);
     if(!acache)
     {
         gen_mutex_unlock(&acache_mutex);
@@ -481,7 +482,7 @@ static int acache_compare_key_entry(void* key, struct qhash_head* link)
     struct acache_payload* tmp_payload = NULL;
     struct PINT_tcache_entry* tmp_entry = NULL;
   
-    tmp_entry = qlist_entry(link, struct PINT_tcache_entry, hash_link);
+    tmp_entry = qhash_entry(link, struct PINT_tcache_entry, hash_link);
     assert(tmp_entry);
   
     tmp_payload = (struct acache_payload*)tmp_entry->payload;

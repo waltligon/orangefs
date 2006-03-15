@@ -15,6 +15,7 @@
  */
 
 #define TCACHE_DEFAULT_TIMEOUT_MSECS    4000
+#define TCACHE_DEFAULT_EXPIRATION_ENABLED  1
 #define TCACHE_DEFAULT_SOFT_LIMIT       5120
 #define TCACHE_DEFAULT_HARD_LIMIT      10240
 #define TCACHE_DEFAULT_RECLAIM_PERCENTAGE 25
@@ -22,6 +23,7 @@
 #define TCACHE_DEFAULT_REPLACE_ALGORITHM   LEAST_RECENTLY_USED
 
 static int check_expiration(
+    struct PINT_tcache* tcache,
     struct PINT_tcache_entry* entry, /**< tcached entry */
     struct timeval * tv); /**< time interval to check expiration against */
 static int tcache_lookup_oldest(
@@ -37,7 +39,8 @@ struct PINT_tcache* PINT_tcache_initialize(
     int (*compare_key_entry) (void *key, struct qhash_head* link), /**< function 
     to compare keys with payloads within entry, return 1 on match, 0 if not match */
     int (*hash_key) (void *key, int table_size), /**< function to hash keys */
-    int (*free_payload) (void* payload)) /**< function to free payload members (used during reclaim) */
+    int (*free_payload) (void* payload), /**< function to free payload members (used during reclaim) */
+    int table_size) /**< size of hash table to use */
 {
     struct PINT_tcache* tcache_tmp = NULL;
 
@@ -57,6 +60,7 @@ struct PINT_tcache* PINT_tcache_initialize(
     tcache_tmp->free_payload = free_payload;
 
     tcache_tmp->timeout_msecs = TCACHE_DEFAULT_TIMEOUT_MSECS;
+    tcache_tmp->expiration_enabled = TCACHE_DEFAULT_EXPIRATION_ENABLED;
     tcache_tmp->soft_limit = TCACHE_DEFAULT_SOFT_LIMIT;
     tcache_tmp->hard_limit = TCACHE_DEFAULT_HARD_LIMIT;
     tcache_tmp->reclaim_percentage = TCACHE_DEFAULT_RECLAIM_PERCENTAGE;
@@ -65,7 +69,7 @@ struct PINT_tcache* PINT_tcache_initialize(
     tcache_tmp->enable = 1;
 
     tcache_tmp->h_table = qhash_init(compare_key_entry, hash_key,
-        TCACHE_DEFAULT_TABLE_SIZE);
+        (table_size <= 0 ? TCACHE_DEFAULT_TABLE_SIZE : table_size));
     if(!tcache_tmp->h_table)
     {
         free(tcache_tmp);
@@ -135,6 +139,10 @@ int PINT_tcache_get_info(
             *arg = tcache->timeout_msecs;
             ret = 0;
             break;
+        case TCACHE_ENABLE_EXPIRATION:
+            *arg = tcache->expiration_enabled;
+            ret = 0;
+            break;
         case TCACHE_NUM_ENTRIES:
             *arg = tcache->num_entries;
             ret = 0;
@@ -194,6 +202,9 @@ int PINT_tcache_set_info(
                 tcache->enable = 1;
             }
             ret = 0;
+            break;
+        case TCACHE_ENABLE_EXPIRATION:
+            tcache->expiration_enabled = arg;
             break;
         case TCACHE_NUM_ENTRIES:
             /* this parameter cannot be set */
@@ -364,7 +375,7 @@ int PINT_tcache_lookup(
     *entry = qlist_entry(link, struct PINT_tcache_entry, hash_link);
 
     /* check status. Let the function determine expiration */
-    *status = check_expiration(*entry, NULL);
+    *status = check_expiration(tcache, *entry, NULL);
 
     /* put at tail of LRU */
     qlist_del(&((*entry)->lru_list_link));
@@ -401,7 +412,7 @@ int tcache_lookup_oldest(
     /* do not move it */
 
     /* check status. */
-    *status = check_expiration(*entry, NULL);
+    *status = check_expiration(tcache, *entry, NULL);
 
     return(0);
 }
@@ -441,7 +452,7 @@ int PINT_tcache_reclaim(
         assert(tmp_entry);
 
         /* check status */
-        status = check_expiration(tmp_entry, &tv);
+        status = check_expiration(tcache, tmp_entry, &tv);
         /* break if not expired */
         if(status == 0)
         {
@@ -501,6 +512,8 @@ int PINT_tcache_refresh_entry(
     struct PINT_tcache_entry* entry) /**< entry to refresh */
 {
 
+    if(!tcache->expiration_enabled) return 0;
+
     gettimeofday(&entry->expiration_date, NULL);
     entry->expiration_date.tv_sec += (tcache->timeout_msecs / 1000);
     entry->expiration_date.tv_usec += ((tcache->timeout_msecs % 1000)*1000);
@@ -520,12 +533,15 @@ int PINT_tcache_refresh_entry(
  * returns -PVFS_ETIME if expired, 0 if not
  */
 static int check_expiration(
+    struct PINT_tcache* tcache,
     struct PINT_tcache_entry* entry, /* tcached entry */
     struct timeval * tv) /* time interval to check expiration against. Pass in
                             NULL value to have function get current time */
 {
     struct timeval local_tv;
     struct timeval *tmp_tv = NULL;
+
+    if(!tcache->expiration_enabled) return 0;
 
     /* Blindly assign our variable to the passed in parameter, check for 
        validity later */

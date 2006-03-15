@@ -555,11 +555,6 @@ static int open_db(
 	assert(0);
     }
 
-    if (type == DBPF_OPEN_KEYVAL_DB)
-    {
-        (*db_pp)->set_bt_compare((*db_pp), dbpf_keyval_compare);
-    }
-
     ret = internal_db_open(db_pp, filename, NULL,
                            DB_UNKNOWN, TROVE_DB_OPEN_FLAGS, 0);
 

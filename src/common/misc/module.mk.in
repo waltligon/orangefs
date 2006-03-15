@@ -26,7 +26,8 @@ SERVERSRC += $(DIR)/server-config.c \
 	     $(DIR)/pint-event.c \
 	     $(DIR)/pint-cached-config.c \
 	     $(DIR)/msgpairarray.c \
-	     $(DIR)/pint-util.c
+	     $(DIR)/pint-util.c \
+	     $(DIR)/tcache.c
 
 MODCFLAGS_$(DIR)/server-config.c = \
    -I$(srcdir)/src/server

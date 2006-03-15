@@ -97,6 +97,9 @@ void dbpf_collection_clear_registered(void)
         }
 
 	free(free_ptr->name);
+
+        PINT_dbpf_keyval_pcache_finalize(free_ptr->pcache);
+
 	free(free_ptr);
     }
     root_coll_p = NULL;

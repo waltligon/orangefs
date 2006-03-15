@@ -121,7 +121,7 @@ int test_util_get_io_perfs(
 		break;
 	    }
 
-	    printf("%d\t%ull\t%ull\t%ull\n",
+	    printf("%d\t%llu\t%lld\t%lld\n",
 		   count,
 		   perf_matrix[i][j].start_time_ms,
 		   perf_matrix[i][j].write,
@@ -158,7 +158,7 @@ int test_util_get_metadata_perfs(
 		break;
 	    }
 
-	    printf("%d\t%ull\t%ull\t%ull\n",
+	    printf("%d\t%llu\t%lld\t%lld\n",
 		   count,
 		   perf_matrix[i][j].start_time_ms,
 		   perf_matrix[i][j].metadata_write,
@@ -194,7 +194,7 @@ int test_util_get_queue_perfs(
 		break;
 	    }
 
-	    printf("%d\t%ull\t%u\t%u\t%u\n",
+	    printf("%d\t%llu\t%u\t%u\t%u\n",
 		   count,
 		   perf_matrix[i][j].start_time_ms,
 		   perf_matrix[i][j].dspace_queue,

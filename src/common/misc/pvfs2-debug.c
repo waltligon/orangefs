@@ -74,6 +74,7 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "access_detail", GOSSIP_ACCESS_DETAIL_DEBUG },
     { "listeattr", GOSSIP_LISTEATTR_DEBUG },
     { "sm", GOSSIP_STATE_MACHINE_DEBUG },
+    { "pcache", GOSSIP_DBPF_KEYVAL_PCACHE_DEBUG },
     { "verbose",  (__DEBUG_ALL)},
     { "none", GOSSIP_NO_DEBUG },
     { "all",  __DEBUG_ALL }
