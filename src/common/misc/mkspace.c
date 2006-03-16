@@ -25,6 +25,7 @@
 #include "pvfs2-internal.h"
 
 static char *dir_ent_string = "dir_ent";
+static char *dirdata_size_string = "dirdata_size";
 static char *root_handle_string = "root_handle";
 static char *lost_and_found_string = "lost+found";
 
@@ -134,6 +135,7 @@ int pvfs2_mkspace(
     TROVE_handle root_dirdata_handle = TROVE_HANDLE_NULL;
     TROVE_handle lost_and_found_handle = TROVE_HANDLE_NULL;
     TROVE_handle lost_and_found_dirdata_handle = TROVE_HANDLE_NULL;
+    PVFS_size init_size = 0;
 
     mkspace_print(verbose,"Storage space: %s\n",storage_space);
     mkspace_print(verbose,"Collection   : %s\n",collection);
@@ -428,6 +430,33 @@ int pvfs2_mkspace(
             return -1;
         }
 
+
+	key.buffer = dirdata_size_string;
+	key.buffer_sz = strlen(dirdata_size_string) + 1;
+
+	init_size = 1; /* initialize the size to 1 because of lost+found */
+	val.buffer = &init_size;
+	val.buffer_sz = sizeof(PVFS_size);
+
+	ret = trove_keyval_write(
+	    coll_id, new_root_handle, &key, &val,
+	    TROVE_COMMON_NAME_KEY | TROVE_SYNC, 0, NULL,
+	    trove_context, &op_id);
+	
+	while(ret == 0)
+	{
+	    ret = trove_dspace_test(
+		coll_id, op_id, trove_context, &count, NULL, NULL,
+		&state, TROVE_DEFAULT_TEST_TIMEOUT);
+	}
+
+	if(ret < 0)
+	{
+	    gossip_err("error: keyval write for handle used to store "
+		       "dirents failed: aborting!\n");
+	    return -1;
+	}
+
         mkspace_print(
             verbose, "info: wrote attributes for root directory.\n");
 
@@ -559,6 +588,32 @@ int pvfs2_mkspace(
         key.buffer_sz = strlen(dir_ent_string) + 1;
         val.buffer = &lost_and_found_dirdata_handle;
         val.buffer_sz = sizeof(TROVE_handle);
+
+        ret = trove_keyval_write(
+            coll_id, lost_and_found_handle, &key, &val, 
+            TROVE_COMMON_NAME_KEY | TROVE_SYNC,
+            0, NULL, trove_context, &op_id);
+
+        while (ret == 0)
+        {
+            ret = trove_dspace_test(
+                coll_id, op_id, trove_context, &count, NULL, NULL,
+                &state, TROVE_DEFAULT_TEST_TIMEOUT);
+        }
+
+        if (ret < 0)
+        {
+            gossip_err("error: keyval write for handle used to store "
+                       "dirents failed; aborting!\n");
+            return -1;
+        }
+
+        key.buffer = dirdata_size_string;
+        key.buffer_sz = strlen(dirdata_size_string) + 1;
+
+	init_size = 0;
+        val.buffer = &init_size;
+        val.buffer_sz = sizeof(PVFS_size);
 
         ret = trove_keyval_write(
             coll_id, lost_and_found_handle, &key, &val, 

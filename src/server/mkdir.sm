@@ -290,7 +290,6 @@ static int mkdir_init_dirdata_count(PINT_server_op *s_op, job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL;
     job_id_t i;
-    PVFS_size init_count = 0;
     struct server_configuration_s *user_opts = get_server_config_struct();
 
     if (js_p->error_code)
@@ -302,7 +301,8 @@ static int mkdir_init_dirdata_count(PINT_server_op *s_op, job_status_s *js_p)
     s_op->key.buffer = Trove_Common_Keys[DIRDATA_SIZE_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[DIRDATA_SIZE_KEY].size;
     
-    s_op->val.buffer = &init_count;
+    s_op->u.mkdir.init_dirdata_size = 0;
+    s_op->val.buffer = (void *)&s_op->u.mkdir.init_dirdata_size;
     s_op->val.buffer_sz = sizeof(PVFS_size);
 
     ret = job_trove_keyval_write(

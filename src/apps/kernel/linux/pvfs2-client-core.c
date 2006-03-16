@@ -1884,7 +1884,7 @@ static inline void package_downcall_members(
         case PVFS2_VFS_OP_READDIR:
             if (*error_code)
             {
-                vfs_request->out_downcall.resp.readdir.dirent_count = 0;
+                vfs_request->out_downcall.status = *error_code;
             }
             else
             {

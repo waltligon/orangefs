@@ -607,12 +607,14 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
             op_p->u.k_iterate.val_array[0].buffer,
             op_p->u.k_iterate.val_array[0].buffer_sz,
             &op_p->u.k_iterate.val_array[0].read_sz);
-        if(ret != 0)
+        if(ret == DB_NOTFOUND)
         {
-            /* even if the error is NOTFOUND, we can't recover
-             * since that means there's not entries with the
-             * handle specified in the db.
-             */
+            /* assume no entries in db, set count = 0 and pos = ITERATE_END
+             * and return ok */
+            goto return_ok;
+        }
+        else if(ret != 0)
+        {
             goto return_error;
         }
 

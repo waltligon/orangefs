@@ -244,14 +244,10 @@ static int readdir_setup_resp(
 	js_p->error_code = -PVFS_EINVAL;
 	return 1;
     }
-    else if (js_p->error_code != 0)
+    else if(js_p->error_code != 0)
     {
-	gossip_debug(GOSSIP_READDIR_DEBUG, "  error code = %d; "
-                     "assuming empty directory\n", js_p->error_code);
-
-	s_op->resp.u.readdir.dirent_count = 0;
-	js_p->error_code = 0;
-	return 1;
+        PVFS_perror_gossip("readdir_setup_resp failed: ", js_p->error_code);
+        return 1;
     }
 
     s_op->resp.u.readdir.directory_version =

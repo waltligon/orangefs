@@ -183,6 +183,7 @@ struct PINT_server_readdir_op
     uint64_t directory_version;
     PVFS_handle dirent_handle;  /* holds handle of dirdata dspace from
                                    which entries are read */
+    PVFS_size dirdata_size;
 };
 
 struct PINT_server_crdirent_op
@@ -268,6 +269,7 @@ struct PINT_server_mkdir_op
     PVFS_fs_id fs_id;
     PVFS_handle_extent_array handle_extent_array;
     PVFS_handle dirent_handle;
+    PVFS_size init_dirdata_size;
 };
 
 struct PINT_server_getattr_op
