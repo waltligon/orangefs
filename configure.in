@@ -303,7 +303,14 @@ MISC_TROVE_FLAGS=""
 if test $use_aio_thcb = 1 ; then
     if test "x$host_os" = "xlinux-gnu" ; then
 	AC_MSG_CHECKING(glibc version for working aio callbacks)
-	libc=`echo /lib/libc.so.* | sed 1q`
+	dnl A failed glob match may not expand into the empty string.  Keep
+	dnl looking.
+	for i in /lib /lib64 /usr/lib /usr/lib64 ; do
+	    libc=`echo $i/libc.so.* | sed 1q`
+	    if test "x$libc" = "x" ; then continue ; fi
+	    if test "x$libc" != "x$i/libc.so.*" ; then break ; fi
+	    libc=
+	done
 	if test "x$libc" != "x" ; then
 	    if test -x $libc ; then
 		vers=`$libc 2> /dev/null | sed 's/.*version \(.*\),.*/\1/; q'`
