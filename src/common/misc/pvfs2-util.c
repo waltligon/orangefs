@@ -1463,6 +1463,11 @@ inline uint32_t PVFS_util_sys_to_object_attr_mask(
         attrmask |= PVFS_ATTR_META_DFILES;
     }
 
+    if (sys_attrmask & PVFS_ATTR_SYS_DIRENT_COUNT)
+    {
+        attrmask |= PVFS_ATTR_DIR_DIRENT_COUNT;
+    }
+
     if (sys_attrmask & PVFS_ATTR_SYS_LNK_TARGET)
     {
         attrmask |= PVFS_ATTR_SYMLNK_TARGET;
@@ -1515,6 +1520,14 @@ inline uint32_t PVFS_util_object_to_sys_attr_mask(
     if (obj_mask & PVFS_ATTR_SYMLNK_TARGET)
     {
         sys_mask |= PVFS_ATTR_SYS_LNK_TARGET;
+    }
+    if (obj_mask & PVFS_ATTR_DIR_DIRENT_COUNT)
+    {
+        sys_mask |= PVFS_ATTR_SYS_DIRENT_COUNT;
+    }
+    if (obj_mask & PVFS_ATTR_META_DFILES)
+    {
+        sys_mask |= PVFS_ATTR_SYS_DFILE_COUNT;
     }
     return sys_mask;
 }

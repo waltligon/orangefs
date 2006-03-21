@@ -465,13 +465,13 @@ void print_stats(const PVFS_object_ref * ref,
     *  datafiles there are
     */
    if( (attr->mask & PVFS_ATTR_SYS_DFILE_COUNT) &&
-       (attr->mask & PVFS_TYPE_METAFILE))
+       (attr->objtype == PVFS_TYPE_METAFILE))
    {
       fprintf(stdout, "  datafiles     : %d\n", attr->dfile_count);
    }
    /* dirent_count is only valid on directories */
    if( (attr->mask & PVFS_ATTR_SYS_DIRENT_COUNT) &&
-       (attr->mask & PVFS_TYPE_DIRECTORY))
+       (attr->objtype == PVFS_TYPE_DIRECTORY))
    {
       fprintf(stdout, "  dir entries   : %llu\n", llu(attr->dirent_count));
    }

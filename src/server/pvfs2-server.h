@@ -19,6 +19,7 @@
 #include <sys/types.h>
 #include <pwd.h>
 #include <grp.h>
+#include <string.h>
 #include "pvfs2-debug.h"
 #include "pvfs2-storage.h"
 #include "job.h"
@@ -113,6 +114,29 @@ static inline char* PINT_map_server_op_to_string(enum PVFS_server_op op)
 {
     return (((op < 0) || (op > PVFS_MAX_SERVER_OP)) ? NULL :
             PINT_server_req_table[op].string_name);
+}
+
+extern char*PINT_eattr_namespaces[];
+/* PINT_eattr_is_prefixed()
+ *
+ * This function will check to see if a given xattr key falls into the set of
+ * name spaces that PVFS2 supports
+ *
+ * returns 1 if the prefix is supported, 0 otherwise
+ */
+static inline int PINT_eattr_is_prefixed(char* key_name)
+{
+    int i = 0;
+    while(PINT_eattr_namespaces[i])
+    {
+        if(strncmp(PINT_eattr_namespaces[i], key_name,
+            strlen(PINT_eattr_namespaces[i])) == 0)
+        {
+            return(1);
+        }
+        i++;
+    }
+    return(0);
 }
 
 /* used to keep a random, but handy, list of keys around */

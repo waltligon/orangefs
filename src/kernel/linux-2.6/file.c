@@ -415,7 +415,11 @@ static ssize_t pvfs2_file_write(
             (unsigned long) *offset, (unsigned long) file->f_pos);
     if (total_count)
     {
+#ifdef HAVE_TOUCH_ATIME
+        touch_atime(file->f_vfsmnt, file->f_dentry);
+#else
         update_atime(inode);
+#endif
     }
     return total_count;
 }
@@ -1038,7 +1042,11 @@ static ssize_t pvfs2_file_writev(
     }
     if (total_count)
     {
+#ifdef HAVE_TOUCH_ATIME
+        touch_atime(file->f_vfsmnt, file->f_dentry);
+#else
         update_atime(inode);
+#endif
     }
     return total_count;
 }
@@ -1138,8 +1146,13 @@ static ssize_t pvfs2_aio_retry(struct kiocb *iocb)
         if ((x->rw == PVFS_IO_WRITE) && error > 0)
         {
             struct inode *inode = iocb->ki_filp->f_mapping->host;
+            struct file *filp = iocb->ki_filp;
             /* update atime if need be */
+#ifdef HAVE_TOUCH_ATIME
+            touch_atime(filp->f_vfsmnt, filp->f_dentry);
+#else
             update_atime(inode);
+#endif
         }
         /* 
          * Now we can happily free up the op,
@@ -1823,7 +1836,11 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
                         (int) buffer_index);
                 if (error > 0)
                 {
+#ifdef HAVE_TOUCH_ATIME
+                    touch_atime(filp->f_vfsmnt, filp->f_dentry);
+#else
                     update_atime(inode);
+#endif
                 }
                 /* new_op is freed by the client-daemon */
                 goto out_error;
@@ -1939,7 +1956,12 @@ int pvfs2_file_release(
     pvfs2_print("pvfs2_file_release: called on %s\n",
                 file->f_dentry->d_name.name);
 
+#ifdef HAVE_TOUCH_ATIME
+    touch_atime(file->f_vfsmnt, file->f_dentry);
+#else
     update_atime(inode);
+#endif
+
     if (S_ISDIR(inode->i_mode))
     {
         return dcache_dir_close(inode, file);

@@ -25,32 +25,6 @@
 #include "pvfs2-util.h"
 #include "pint-util.h"
 
-static inline char *get_object_type(int objtype)
-{
-    static char *obj_types[] =
-    {
-        "NONE", "METAFILE", "DATAFILE",
-        "DIRECTORY", "SYMLINK", "DIRDATA", "UNKNOWN"
-    };
-
-    switch(objtype)
-    {
-        case PVFS_TYPE_NONE:
-            return obj_types[0];
-        case PVFS_TYPE_METAFILE:
-            return obj_types[1];
-        case PVFS_TYPE_DATAFILE:
-            return obj_types[2];
-        case PVFS_TYPE_DIRECTORY:
-            return obj_types[3];
-        case PVFS_TYPE_SYMLINK:
-            return obj_types[4];
-        case PVFS_TYPE_DIRDATA:
-            return obj_types[5];
-    }
-    return obj_types[6];
-}
-
 static int geteattr_setup_resp(
     PINT_server_op *s_op, job_status_s *js_p);
 static int geteattr_read_eattrib(
@@ -120,13 +94,65 @@ machine pvfs2_get_eattr_sm(
 static int geteattr_setup_resp(PINT_server_op *s_op, job_status_s *js_p)
 {
     int i, tsz;
+    char reserved_prefix[] = "system.pvfs2.";
+    int reserved_prefix_len = strlen("system.pvfs2.");
+    char* tmp_buffer = NULL;
+    int tmp_len = 0;
+    int ret;
+
     PINT_STATE_DEBUG("setup_resp");
     gossip_debug(GOSSIP_GETEATTR_DEBUG,"geteattr requesting %d keys\n",
             s_op->req->u.geteattr.nkey);
+
+    js_p->error_code = 0;
+ 
+    tmp_buffer = (char*)malloc(PVFS_REQ_LIMIT_KEY_LEN);
+    if(!tmp_buffer)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return(1);
+    }
+
+    /* iterate through the keys and see if they fall into valid name spaces */
+    for(i=0; i<s_op->req->u.geteattr.nkey; i++)
+    {
+        if(!PINT_eattr_is_prefixed(s_op->req->u.geteattr.key[i].buffer))
+        {
+            /* not prefixed: treat this as if the key does not exist */
+            free(tmp_buffer);
+            js_p->error_code = -PVFS_ENOENT;
+            return(1);
+        }
+
+        /* look for keys in the special "system.pvfs2." prefix and strip the
+         * prefix off; they are stored as keyvals with no prefix within
+         * trove.
+         */
+        if(strncmp(s_op->req->u.geteattr.key[i].buffer, reserved_prefix,
+            reserved_prefix_len) == 0)
+        {
+            ret = sscanf(s_op->req->u.geteattr.key[i].buffer,
+                "system.pvfs2.%s", tmp_buffer);
+            if(ret != 1)
+            {
+                free(tmp_buffer);
+                js_p->error_code = -PVFS_ENOENT;
+                return(1);
+            }
+            tmp_len = strlen(tmp_buffer) + 1;
+            memcpy(s_op->req->u.geteattr.key[i].buffer, tmp_buffer, tmp_len);
+            s_op->req->u.geteattr.key[i].buffer_sz = tmp_len;
+        }
+    }
+
     s_op->resp.u.geteattr.val =
         malloc(s_op->req->u.geteattr.nkey*sizeof(PVFS_ds_keyval));
     if (!s_op->resp.u.geteattr.val)
-        return -PVFS_ENOMEM;
+    {
+        free(tmp_buffer);
+        js_p->error_code = -PVFS_ENOMEM;
+        return(1);
+    }
     s_op->resp.u.geteattr.nkey = s_op->req->u.geteattr.nkey;
     for (i = 0, tsz = 0; i < s_op->req->u.geteattr.nkey; i++)
         tsz += s_op->req->u.geteattr.valsz[i];
@@ -135,7 +161,9 @@ static int geteattr_setup_resp(PINT_server_op *s_op, job_status_s *js_p)
     {
         s_op->resp.u.geteattr.nkey = 0;
         free (s_op->resp.u.geteattr.val);
-        return -PVFS_ENOMEM;
+        free(tmp_buffer);
+        js_p->error_code = -PVFS_ENOMEM;
+        return(1);
     }
     gossip_debug(GOSSIP_GETEATTR_DEBUG,"geteattr buffer size %d bytes\n",
             tsz);
@@ -147,6 +175,7 @@ static int geteattr_setup_resp(PINT_server_op *s_op, job_status_s *js_p)
             (char *) s_op->u.eattr.buffer + tsz;
         tsz += s_op->req->u.geteattr.valsz[i];
     }
+    free(tmp_buffer);
     return 1;
 }
 

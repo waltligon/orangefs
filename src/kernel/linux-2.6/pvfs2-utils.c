@@ -505,8 +505,8 @@ static int xattr_zero_terminated(const char *name)
  * unless the key does not exist for the file and/or if
  * there were errors in fetching the attribute value.
  */
-ssize_t pvfs2_inode_getxattr(struct inode *inode, const char *name, 
-        void *buffer, size_t size)
+ssize_t pvfs2_inode_getxattr(struct inode *inode, const char* prefix,
+    const char *name, void *buffer, size_t size)
 {
     ssize_t ret = -ENOMEM;
     pvfs2_kernel_op_t *new_op = NULL;
@@ -518,10 +518,10 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char *name,
         pvfs2_error("pvfs2_inode_getxattr: bogus NULL pointers\n");
         return -EINVAL;
     }
-    if (size < 0 || strlen(name) >= PVFS_MAX_XATTR_NAMELEN)
+    if (size < 0 || (strlen(name)+strlen(prefix)) >= PVFS_MAX_XATTR_NAMELEN)
     {
         pvfs2_error("Invalid size (%d) or key length (%d)\n", 
-                (int) size, (int) strlen(name));
+                (int) size, (int)(strlen(name)+strlen(prefix)));
         return -EINVAL;
     }
     if (inode)
@@ -539,16 +539,17 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char *name,
 
         new_op->upcall.type = PVFS2_VFS_OP_GETXATTR;
         new_op->upcall.req.getxattr.refn = pvfs2_inode->refn;
-        strncpy(new_op->upcall.req.getxattr.key, name, PVFS_MAX_XATTR_NAMELEN);
+        ret = snprintf((char*)new_op->upcall.req.getxattr.key,
+            PVFS_MAX_XATTR_NAMELEN, "%s%s", prefix, name);
         /* 
          * NOTE: Although keys are meant to be NULL terminated textual strings,
          * I am going to explicitly pass the length just in case we change this
          * later on...
          */
-        new_op->upcall.req.getxattr.key_sz = 
-            strlen(new_op->upcall.req.getxattr.key) + 1;
+        new_op->upcall.req.getxattr.key_sz = ret + 1;
         pvfs2_print("pvfs2_inode_getxattr: key %s, key_sz %d\n", 
-                name, (int) new_op->upcall.req.getxattr.key_sz);
+                (char*)new_op->upcall.req.getxattr.key, 
+                (int) new_op->upcall.req.getxattr.key_sz);
 
         ret = service_operation(
             new_op, "pvfs2_inode_getxattr", PVFS2_OP_RETRY_COUNT, 
@@ -598,7 +599,7 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char *name,
                             new_length);
                     ret = new_length;
                     pvfs2_print("pvfs2_getxattr: key: %s, val_length: %d\n",
-                            name, (int) ret);
+                        (char*)new_op->upcall.req.getxattr.key, (int) ret);
                 }
             }
         }
@@ -620,8 +621,8 @@ ssize_t pvfs2_inode_getxattr(struct inode *inode, const char *name,
  * Returns a -ve number on error and 0 on success.
  * Key is text, but value can be binary!
  */
-int pvfs2_inode_setxattr(struct inode *inode, const char *name,
-        const void *value, size_t size, int flags)
+int pvfs2_inode_setxattr(struct inode *inode, const char* prefix, 
+    const char *name, const void *value, size_t size, int flags)
 {
     int ret = -ENOMEM;
     pvfs2_kernel_op_t *new_op = NULL;
@@ -638,16 +639,16 @@ int pvfs2_inode_setxattr(struct inode *inode, const char *name,
         pvfs2_error("pvfs2_inode_setxattr: bogus NULL pointers!\n");
         return -EINVAL;
     }
-    if (strlen(name) >= PVFS_MAX_XATTR_NAMELEN)
+    if ((strlen(name)+strlen(prefix)) >= PVFS_MAX_XATTR_NAMELEN)
     {
         pvfs2_error("pvfs2_inode_setxattr: bogus key size (%d)\n", 
-                (int) strlen(name));
+                (int)(strlen(name)+strlen(prefix)));
         return -EINVAL;
     }
     /* This is equivalent to a removexattr */
     if (size == 0 && value == NULL)
     {
-        return pvfs2_inode_removexattr(inode, name);
+        return pvfs2_inode_removexattr(inode, prefix, name);
     }
     if (inode)
     {
@@ -673,10 +674,10 @@ int pvfs2_inode_setxattr(struct inode *inode, const char *name,
          * I am going to explicitly pass the length just in case we change this
          * later on...
          */
-        strncpy(new_op->upcall.req.setxattr.keyval.key, 
-                name, PVFS_MAX_XATTR_NAMELEN);
+        ret = snprintf((char*)new_op->upcall.req.setxattr.keyval.key,
+            PVFS_MAX_XATTR_NAMELEN, "%s%s", prefix, name);
         new_op->upcall.req.setxattr.keyval.key_sz = 
-            strlen(new_op->upcall.req.setxattr.keyval.key) + 1;
+            ret + 1;
         memcpy(new_op->upcall.req.setxattr.keyval.val, value, size);
         new_op->upcall.req.setxattr.keyval.val[size] = '\0';
         /* For some reason, val_sz should include the \0 at the end as well */
@@ -695,16 +696,17 @@ int pvfs2_inode_setxattr(struct inode *inode, const char *name,
     return ret;
 }
 
-int pvfs2_inode_removexattr(struct inode *inode, const char *name)
+int pvfs2_inode_removexattr(struct inode *inode, const char* prefix, 
+    const char *name)
 {
     int ret = -ENOMEM;
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
 
-    if (strlen(name) >= PVFS_MAX_XATTR_NAMELEN)
+    if ((strlen(name)+strlen(prefix)) >= PVFS_MAX_XATTR_NAMELEN)
     {
         pvfs2_error("pvfs2_inode_removexattr: Invalid key length(%d)\n", 
-                (int) strlen(name));
+                (int)(strlen(name)+strlen(prefix)));
         return -EINVAL;
     }
     if (inode)
@@ -726,10 +728,9 @@ int pvfs2_inode_removexattr(struct inode *inode, const char *name)
          * I am going to explicitly pass the length just in case we change this
          * later on...
          */
-        strncpy(new_op->upcall.req.removexattr.key, name, 
-                PVFS_MAX_XATTR_NAMELEN);
-        new_op->upcall.req.removexattr.key_sz = 
-            strlen(new_op->upcall.req.removexattr.key) + 1;
+        ret = snprintf((char*)new_op->upcall.req.removexattr.key,
+            PVFS_MAX_XATTR_NAMELEN, "%s%s", prefix, name);
+        new_op->upcall.req.removexattr.key_sz = ret + 1;
 
         ret = service_operation(
             new_op, "pvfs2_inode_removexattr", PVFS2_OP_RETRY_COUNT,
@@ -842,14 +843,6 @@ int pvfs2_inode_listxattr(struct inode *inode, char *buffer, size_t size)
             }
         }
     done:
-        if (ret == 0 && buffer != NULL)
-        {
-            for (i = 0; i < total; i++)
-            {
-                printk("%c", buffer[i]);
-            }
-            printk("\n");
-        }
         pvfs2_print("pvfs2_inode_listxattr: returning %d\n", ret ? (int) ret : (int) total);
         /* when request is serviced properly, free req op struct */
         op_release(new_op);

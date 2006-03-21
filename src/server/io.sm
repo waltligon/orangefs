@@ -273,11 +273,8 @@ static int io_release(PINT_server_op *s_op, job_status_s *js_p)
       tell the scheduler that we are done with this operation (if it
       was scheduled in the first place)
     */
-    if (s_op->scheduled_id)
-    {
-        ret = job_req_sched_release(
-            s_op->scheduled_id, s_op, 0, js_p, &i, server_job_context);
-    }
+    ret = job_req_sched_release(
+        s_op->scheduled_id, s_op, 0, js_p, &i, server_job_context);
     return ret;
 }
 

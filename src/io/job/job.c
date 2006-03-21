@@ -1116,7 +1116,12 @@ int job_req_sched_release(job_id_t in_completed_id,
     if (!match_jd)
     {
         /* id has been released or was not registered */
-        return 0;
+        gossip_err("Error: job_req_sched_release() failed to locate descriptor.\n");
+        out_status_p->error_code = -PVFS_EINVAL;
+        out_status_p->status_user_tag = status_user_tag;
+        dealloc_job_desc(jd);
+        jd = NULL;
+        return 1;
     }
 
     ret = PINT_req_sched_release(match_jd->u.req_sched.id, jd,

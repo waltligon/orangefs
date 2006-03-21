@@ -4839,7 +4839,7 @@ for d in common io client correctness/pts kernel ; do
 	install -d $d;
 done
 
-                                                                                                                                                                                                                                      ac_config_files="$ac_config_files Makefile io/trove/module.mk io/buffer/module.mk common/quicklist/module.mk common/id-generator/module.mk common/gossip/module.mk common/gen-locks/module.mk common/misc/module.mk io/bmi/module.mk io/description/module.mk io/flow/module.mk io/job/module.mk io/dev/module.mk client/sysint/module.mk client/mpi-io/module.mk proto/module.mk server/module.mk server/request-scheduler/module.mk correctness/pts/module.mk common/pav/configfile.sample kernel/linux-2.6/module.mk maint/mpi-depend.sh perfbase/benchmarks/module.mk"
+                                                                                                                                                                                                                                                          ac_config_files="$ac_config_files Makefile io/trove/module.mk io/buffer/module.mk common/quicklist/module.mk common/id-generator/module.mk common/gossip/module.mk common/gen-locks/module.mk common/misc/module.mk io/bmi/module.mk io/description/module.mk io/flow/module.mk io/job/module.mk io/dev/module.mk client/sysint/module.mk client/mpi-io/module.mk client/vfs/module.mk proto/module.mk server/module.mk server/request-scheduler/module.mk correctness/pts/module.mk common/pav/configfile.sample kernel/linux-2.6/module.mk maint/mpi-depend.sh shared/module.mk perfbase/benchmarks/module.mk"
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
 # tests run on this system so they can be shared between configure
@@ -5380,6 +5380,7 @@ do
   "io/dev/module.mk" ) CONFIG_FILES="$CONFIG_FILES io/dev/module.mk" ;;
   "client/sysint/module.mk" ) CONFIG_FILES="$CONFIG_FILES client/sysint/module.mk" ;;
   "client/mpi-io/module.mk" ) CONFIG_FILES="$CONFIG_FILES client/mpi-io/module.mk" ;;
+  "client/vfs/module.mk" ) CONFIG_FILES="$CONFIG_FILES client/vfs/module.mk" ;;
   "proto/module.mk" ) CONFIG_FILES="$CONFIG_FILES proto/module.mk" ;;
   "server/module.mk" ) CONFIG_FILES="$CONFIG_FILES server/module.mk" ;;
   "server/request-scheduler/module.mk" ) CONFIG_FILES="$CONFIG_FILES server/request-scheduler/module.mk" ;;
@@ -5387,6 +5388,7 @@ do
   "common/pav/configfile.sample" ) CONFIG_FILES="$CONFIG_FILES common/pav/configfile.sample" ;;
   "kernel/linux-2.6/module.mk" ) CONFIG_FILES="$CONFIG_FILES kernel/linux-2.6/module.mk" ;;
   "maint/mpi-depend.sh" ) CONFIG_FILES="$CONFIG_FILES maint/mpi-depend.sh" ;;
+  "shared/module.mk" ) CONFIG_FILES="$CONFIG_FILES shared/module.mk" ;;
   "perfbase/benchmarks/module.mk" ) CONFIG_FILES="$CONFIG_FILES perfbase/benchmarks/module.mk" ;;
   "pvfs2-test-config.h" ) CONFIG_HEADERS="$CONFIG_HEADERS pvfs2-test-config.h" ;;
   *) { { echo "$as_me:$LINENO: error: invalid argument: $ac_config_target" >&5

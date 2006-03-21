@@ -249,11 +249,13 @@ enum PVFS_async_io_type
 #ifdef HAVE_XATTR
 #define PVFS2_XATTR_INDEX_POSIX_ACL_ACCESS  1
 #define PVFS2_XATTR_INDEX_POSIX_ACL_DEFAULT 2
-#define PVFS2_XATTR_INDEX_DEFAULT           3
+#define PVFS2_XATTR_INDEX_TRUSTED           3
+#define PVFS2_XATTR_INDEX_DEFAULT           4
 
 #define PVFS2_XATTR_NAME_ACL_ACCESS  POSIX_ACL_XATTR_ACCESS
 #define PVFS2_XATTR_NAME_ACL_DEFAULT POSIX_ACL_XATTR_DEFAULT
-#define PVFS2_XATTR_NAME_DEFAULT     ""
+#define PVFS2_XATTR_NAME_TRUSTED_PREFIX "trusted."
+#define PVFS2_XATTR_NAME_DEFAULT_PREFIX ""
 
 #if !defined(PVFS2_LINUX_KERNEL_2_4) && defined(HAVE_GENERIC_GETXATTR)
 
@@ -262,6 +264,7 @@ extern int pvfs2_init_acl(struct inode *inode, struct inode *dir);
 
 extern struct xattr_handler *pvfs2_xattr_handlers[];
 extern struct xattr_handler pvfs2_xattr_acl_default_handler, pvfs2_xattr_acl_access_handler;
+extern struct xattr_handler pvfs2_xattr_trusted_handler;
 extern struct xattr_handler pvfs2_xattr_default_handler;
 
 typedef struct {
@@ -288,6 +291,17 @@ static inline int convert_to_internal_xattr_flags(int setxattr_flags)
     }
     return internal_flag;
 }
+
+int pvfs2_xattr_set_trusted(struct inode *inode, 
+    const char *name, const void *buffer, size_t size, int flags);
+int pvfs2_xattr_get_trusted(struct inode *inode,
+    const char *name, void *buffer, size_t size);
+int pvfs2_xattr_set_default(struct inode *inode, 
+    const char *name, const void *buffer, size_t size, int flags);
+int pvfs2_xattr_get_default(struct inode *inode,
+    const char *name, void *buffer, size_t size);
+
+
 #endif
 
 /************************************
@@ -544,10 +558,12 @@ int pvfs2_gen_credentials(
     PVFS_credentials *credentials);
 
 ssize_t pvfs2_inode_getxattr(
-        struct inode *inode, const char *name, void *buffer, size_t size);
-int pvfs2_inode_setxattr(struct inode *inode, const char *name,
-        const void *value, size_t size, int flags);
-int pvfs2_inode_removexattr(struct inode *inode, const char *name);
+        struct inode *inode, const char* prefix,
+        const char *name, void *buffer, size_t size);
+int pvfs2_inode_setxattr(struct inode *inode, const char* prefix,
+        const char *name, const void *value, size_t size, int flags);
+int pvfs2_inode_removexattr(struct inode *inode, const char* prefix,
+        const char *name);
 int pvfs2_inode_listxattr(struct inode *inode, char *, size_t);
 
 int pvfs2_inode_getattr(

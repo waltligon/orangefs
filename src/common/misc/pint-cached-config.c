@@ -33,6 +33,8 @@ static void free_host_extent_table(void *ptr);
 static int cache_server_array(
     struct server_configuration_s *config, PVFS_fs_id fsid);
 
+static int meta_randomized = 0;
+static int io_randomized = 0;
 
 /* PINT_cached_config_initialize()
  *
@@ -267,7 +269,16 @@ int PINT_cached_config_get_next_meta(
             num_meta_servers = PINT_llist_count(
                 cur_config_cache->fs->meta_handle_ranges);
 
-            jitter = (rand() % num_meta_servers);
+            /* pick random starting point, then round robin */
+            if(!meta_randomized)
+            {
+                jitter = (rand() % num_meta_servers);
+                meta_randomized = 1;
+            }
+            else
+            {
+                jitter = 0;
+            }
             while(jitter-- > -1)
             {
                 cur_mapping = PINT_llist_head(
@@ -342,8 +353,16 @@ int PINT_cached_config_get_next_io(
             num_io_servers = PINT_llist_count(
                 cur_config_cache->fs->data_handle_ranges);
 
-            /* pick random starting point */
-            jitter = (rand() % num_io_servers);
+            /* pick random starting point, then round robin */
+            if(!io_randomized)
+            {
+                jitter = (rand() % num_io_servers);
+                io_randomized = 1;
+            }
+            else
+            {
+                jitter = 0;
+            }
             while(jitter-- > -1)
             {
                 cur_mapping = PINT_llist_head(

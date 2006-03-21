@@ -14,7 +14,7 @@
 #include <pint-distribution.h>
 #include "pvfs2-internal.h"
 
-static int PINT_request_disp(PINT_Request *request);
+static PVFS_offset PINT_request_disp(PINT_Request *request);
 
 /* this macro is only used in this file to add a segment to the
  * result list.
@@ -432,9 +432,9 @@ int PINT_process_request(PINT_Request_state *req,
 
 /* this function runs down the ereq list and adds up the offsets */
 /* present in the request records */
-static int PINT_request_disp(PINT_Request *request)
+static PVFS_offset PINT_request_disp(PINT_Request *request)
 {
-	int disp = 0;
+	PVFS_offset disp = 0;
 	PINT_Request *r;
 	gossip_debug(GOSSIP_REQUEST_DEBUG,"\tRequest disp\n");
 	for (r = request->ereq; r; r = r->ereq)

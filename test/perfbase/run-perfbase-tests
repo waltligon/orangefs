@@ -152,6 +152,16 @@ sub run_tests()
                        "-d $mountpoint -n $iterations > $datfile",
                        "Test run failed: proc: $proc, meta: $meta, io: $io\n");
 
+                if($? != 0)
+                {
+                    print STDERR "Can't fork perfbase-web-input: $!\n" .
+                                 "Failed to submit test results to perfbase " .
+                                 "for run: proc: $proc, " .
+                                 "meta: $meta, io: $io\n\n" .
+                                 `cat /tmp/perfbase_input_result`;
+                    exit 1;
+                }
+
                 if($verbose)
                 {
                     print "RUNNING: ./perfbase-web-input -o $operation " .

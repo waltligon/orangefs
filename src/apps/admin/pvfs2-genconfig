@@ -42,6 +42,25 @@ my @opt_metaports = ();
 my @io_hosts = ();
 my @meta_hosts = ();
 
+# sometimes people use ip addresses instead of hostnames.  perl's default sort
+# will sort the ip addresses lexically, not numerically, so we need a slightly
+# smarter sorter 
+
+sub host_sort
+{
+    if ($a =~ /(\d+)\.(\d+)\.(\d+)\.(\d+)/) {
+        my @addr1 = $a =~ /(\d+)\.(\d+)\.(\d+)\.(\d+)/ ;
+        my @addr2 = $b =~ /(\d+)\.(\d+)\.(\d+)\.(\d+)/ ;
+
+        $addr1[0] <=> $addr2[0] ||
+        $addr1[1] <=> $addr2[1] ||
+        $addr1[2] <=> $addr2[2] ||
+        $addr1[3] <=> $addr2[3] 
+    } else {
+        $a cmp $b;
+    }
+}
+
 sub get_user_input
 {
     my($term,$OUT,$prompt,$res);
@@ -666,7 +685,7 @@ sub get_ionames
         @io_aliases = @io_hosts;
     }
 
-    @io_aliases = sort @io_aliases;
+    @io_aliases = sort host_sort @io_aliases;
     return (\@io_hosts, \@io_aliases, \@io_ports);
 }
 
@@ -697,7 +716,7 @@ sub get_metanames
         @meta_aliases = @meta_hosts;
     }
 
-    @meta_aliases = sort @meta_aliases;
+    @meta_aliases = sort host_sort @meta_aliases;
 
     return (\@meta_hosts, \@meta_aliases, \@meta_ports);
 }
@@ -872,7 +891,7 @@ foreach(@meta_hosts)
 }
 
 @union_hosts = keys %nonunion_hosts;
-@union_hosts = sort @union_hosts;
+@union_hosts = sort host_sort @union_hosts;
 
 # tack on BMI style notation
 @io_bmi = bmi_prot_mung(\@io_hosts, \@io_ports);
@@ -885,7 +904,7 @@ foreach(@io_bmi, @meta_bmi)
 }
 
 @union_bmi = keys %nonunion_bmi;
-@union_bmi = sort @union_bmi;
+@union_bmi = sort host_sort @union_bmi;
 
 if (!$opt_quiet) {
     print "Configured a total of ", ($#union_bmi + 1), " servers:\n";

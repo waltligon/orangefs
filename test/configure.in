@@ -226,6 +226,7 @@ io/job/module.mk
 io/dev/module.mk
 client/sysint/module.mk
 client/mpi-io/module.mk
+client/vfs/module.mk
 proto/module.mk
 server/module.mk
 server/request-scheduler/module.mk
@@ -233,6 +234,8 @@ correctness/pts/module.mk
 common/pav/configfile.sample
 kernel/linux-2.6/module.mk
 maint/mpi-depend.sh
+shared/module.mk
 perfbase/benchmarks/module.mk
+
 )
 

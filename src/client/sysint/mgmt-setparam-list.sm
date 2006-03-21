@@ -344,7 +344,7 @@ static int root_check_comp_fn(
     /* need to return non-zero status at the end if any of the statuses
      * are nonzero
      */
-    if(i == sm_p->u.setparam_list.count - 1)
+    if(i == (sm_p->u.setparam_list.count - 1))
     {
         for(; j < sm_p->u.setparam_list.count; ++j)
         {
@@ -364,6 +364,7 @@ static int root_check_comp_fn(
             return -PVFS_EDETAIL;
         }
     }
+
     return 0;
 }
 

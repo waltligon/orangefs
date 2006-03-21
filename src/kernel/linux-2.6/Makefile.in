@@ -46,7 +46,8 @@ csrc = \
     symlink.c \
     xattr.c \
     acl.c \
-    xattr_default.c \
+    xattr-trusted.c \
+    xattr-default.c \
     waitqueue.c \
     pvfs2-proc.c
 hsrc = \

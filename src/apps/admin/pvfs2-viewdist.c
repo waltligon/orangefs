@@ -28,6 +28,11 @@
 #include "pvfs2-dist-simple-stripe.h"
 #include "pvfs2-dist-varstrip.h"
 #include "pint-util.h"
+#include "pvfs2-internal.h"
+
+#ifdef HAVE_SYS_XATTR_H
+#include <sys/xattr.h>
+#endif
 
 #ifdef HAVE_ATTR_XATTR_H
 #include <attr/xattr.h>
@@ -73,10 +78,10 @@ static void usage(int argc, char** argv);
 static int resolve_filename(file_object *obj, char *filename);
 static int generic_open(file_object *obj, PVFS_credentials *credentials);
 static int generic_server_location(file_object *obj, PVFS_credentials *creds,
-        char **servers, int *nservers);
+        char **servers, PVFS_handle *handles, int *nservers);
 
-#define DIST_KEY "metafile_dist"
-#define DFILE_KEY "datafile_handles"
+#define DIST_KEY "system.pvfs2.metafile_dist"
+#define DFILE_KEY "system.pvfs2.datafile_handles"
 
 static int generic_dist(file_object *obj, PVFS_credentials *creds,
         char **dist, int *size)
@@ -104,7 +109,7 @@ static int generic_dist(file_object *obj, PVFS_credentials *creds,
         if ((ret = PVFS_sys_geteattr(obj->u.pvfs2.ref, 
                 creds, &key, &val)) < 0)
         {
-            PVFS_perror("PVFS_sys_geteattr failed %d\n", ret);
+            PVFS_perror("PVFS_sys_geteattr", ret);
             return -1;
         }
         *size = val.read_sz;
@@ -120,7 +125,7 @@ static int generic_dist(file_object *obj, PVFS_credentials *creds,
  * callers job is to free up all the memory
  */
 static int generic_server_location(file_object *obj, PVFS_credentials *creds,
-        char **servers, int *nservers)
+        char **servers, PVFS_handle *handles, int *nservers)
 {
     char *buffer = (char *) malloc(4096);
     int ret, num_dfiles, count;
@@ -146,7 +151,7 @@ static int generic_server_location(file_object *obj, PVFS_credentials *creds,
         if ((ret = PVFS_sys_geteattr(obj->u.pvfs2.ref, 
                 creds, &key, &val)) < 0)
         {
-            PVFS_perror("PVFS_sys_geteattr failed %d\n", ret);
+            PVFS_perror("PVFS_sys_geteattr", ret);
             return -1;
         }
         ret = val.read_sz;
@@ -161,6 +166,7 @@ static int generic_server_location(file_object *obj, PVFS_credentials *creds,
     {
         PVFS_handle *ptr = (PVFS_handle *) ((char *) buffer + ret * sizeof(PVFS_handle));
         servers[ret] = (char *) calloc(1, PVFS_MAX_SERVER_ADDR_LEN);
+        handles[ret] = *ptr;
         if (servers[ret] == NULL)
         {
             break;
@@ -194,6 +200,7 @@ int main(int argc, char ** argv)
     int64_t ret;
     PVFS_credentials credentials;
     char *servers[256];
+    PVFS_handle handles[256];
     int i, nservers = 256;
 
     memset(&dist, 0, sizeof(dist));
@@ -229,7 +236,7 @@ int main(int argc, char ** argv)
         fprintf(stderr, "Could not read distribution information!\n");
         goto main_out;
     }
-    ret = generic_server_location(&src, &credentials, servers, &nservers);
+    ret = generic_server_location(&src, &credentials, servers, handles, &nservers);
     if (ret < 0)
     {
         fprintf(stderr, "Could not read server location information!\n");
@@ -247,7 +254,8 @@ int main(int argc, char ** argv)
     printf("Number of datafiles/servers = %d\n", nservers);
     for (i = 0; i < nservers; i++)
     {
-        printf("Server %d - %s\n", i, servers[i]);
+        printf("Server %d - %s, handle: %llu (%08llx.bstream)\n", i, servers[i],
+            llu(handles[i]), llu(handles[i]));
         free(servers[i]);
     }
 main_out:

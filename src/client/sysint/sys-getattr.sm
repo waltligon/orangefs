@@ -875,6 +875,12 @@ static int getattr_set_sys_response(PINT_client_sm *sm_p,
         {
             sysresp->attr.mask |= PVFS_ATTR_SYS_LNK_TARGET;
         }
+
+        if(sm_p->getattr.req_attrmask & PVFS_ATTR_DIR_DIRENT_COUNT)
+        {
+            sysresp->attr.dirent_count = attr->u.dir.dirent_count;
+            sysresp->attr.mask |= PVFS_ATTR_SYS_DIRENT_COUNT;
+        }
     }
     else
     {
