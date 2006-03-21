@@ -840,16 +840,7 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
     struct stat b_stat;
     DB_BTREE_STAT *k_stat_p = NULL;
     TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
-    struct open_cache_ref attr_ref;
     struct open_cache_ref tmp_ref;
-
-    ret = dbpf_open_cache_attr_get(
-        op_p->coll_p->coll_id, 0, &attr_ref);
-    if (ret < 0)
-    {
-        goto return_error;
-    }
-    got_db = 1;
 
     /* get an fd for the bstream so we can check size */
     ret = dbpf_open_cache_get(
@@ -905,10 +896,11 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
     data.size = data.ulen = sizeof(TROVE_ds_storedattr_s);
     data.flags |= DB_DBT_USERMEM;
 
-    ret = attr_ref.db_p->get(attr_ref.db_p, NULL, &key, &data, 0);
+    ret = op_p->coll_p->ds_db->get(op_p->coll_p->ds_db, 
+                                   NULL, &key, &data, 0);
     if (ret != 0)
     {
-        attr_ref.db_p->err(attr_ref.db_p, ret, "DB->get");
+        op_p->coll_p->ds_db->err(op_p->coll_p->ds_db, ret, "DB->get");
         ret = -TROVE_EIO;
         goto return_error;
     }
@@ -929,17 +921,9 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
     dbpf_attr_cache_insert(ref, attr);
     gen_mutex_unlock(&dbpf_attr_cache_mutex);
 
-    if (got_db)
-    {
-        dbpf_open_cache_attr_put(&attr_ref);
-    }
     return 1;
     
 return_error:
-    if (got_db)
-    {
-        dbpf_open_cache_attr_put(&attr_ref);
-    }
     return ret;
 }
 
