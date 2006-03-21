@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: setup.c,v 1.22 2006-03-21 21:00:39 pw Exp $
+ * $Id: setup.c,v 1.23 2006-03-21 21:29:24 pw Exp $
  */
 #include <fcntl.h>
 #include <unistd.h>
@@ -432,15 +432,15 @@ ib_drain_connection(ib_connection_t *c)
 	/* if no messages available, let garbage collection on server deal */
 	VAPI_sg_lst_entry_t sg;
 	VAPI_sr_desc_t sr;
-	msg_header_t *mh;
+	msg_header_common_t *mh_common;
 	int ret;
 
-	mh = bh->buf;
-	mh->type = MSG_BYE;
+	mh_common = bh->buf;
+	mh_common->type = MSG_BYE;
 
 	debug(2, "%s: sending bye", __func__);
 	sg.addr = int64_from_ptr(bh->buf);
-	sg.len = sizeof(mh);
+	sg.len = sizeof(mh_common);
 	sg.lkey = c->eager_send_lkey;
 
 	memset(&sr, 0, sizeof(sr));
@@ -515,7 +515,7 @@ ib_alloc_method_addr(ib_connection_t *c, const char *hostname, int port)
  * Break up a method string like:
  *   ib://hostname:port/filesystem
  * into its constituent fields, storing them in an opaque
- * type which is returned.
+ * type, which is then returned.
  * XXX: I'm assuming that these actually return a _const_ pointer
  * so that I can hand back an existing map.
  */
@@ -970,7 +970,7 @@ BMI_ib_initialize(struct method_addr *listen_addr, int method_id,
     INIT_QLIST_HEAD(&recvq);
     INIT_QLIST_HEAD(&memcache);
 
-    EAGER_BUF_PAYLOAD = EAGER_BUF_SIZE - sizeof(msg_header_t);
+    EAGER_BUF_PAYLOAD = EAGER_BUF_SIZE - sizeof(msg_header_eager_t);
 
     /* will be set on first connection */
     sg_tmp_array = 0;
@@ -1081,3 +1081,4 @@ ib_mem_deregister(memcache_entry_t *c)
     debug(4, "%s: buf %p len %lld lkey %x rkey %x", __func__,
       c->buf, lld(c->len), c->memkeys.lkey, c->memkeys.rkey);
 }
+

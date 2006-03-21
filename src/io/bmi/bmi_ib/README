@@ -1,8 +1,8 @@
 Notes on the BMI InfiniBand implementation
 
-Copyright (C) 2003-5 Pete Wyckoff <pw@osc.edu>
+Copyright (C) 2003-6 Pete Wyckoff <pw@osc.edu>
 
-$Id: README,v 1.3 2005-11-03 21:23:19 pw Exp $
+$Id: README,v 1.4 2006-03-21 21:29:24 pw Exp $
 
 Connection management
 ---------------------
@@ -15,8 +15,8 @@ future communication.
 
 Between each pair of hosts are two connected queue pairs (QPs).  One for
 sending data:  SEND/RECEIVE with notification and RDMA write without
-notification.  The second is only used for zero-byte acknowledgement packets
-only.  Since there is no receive-side matching at the NIC, the second ack-only
+notification.  The second is only used for zero-byte acknowledgement packets.
+Since there is no receive-side matching at the NIC, the second ack-only
 QP is used to allow posting receive descriptors with no memory to avoid having
 to flow-control acks.  Eager receive descriptors are posted immediately after
 having been emptied, before sending an acknowledgement.  Ack descriptors are
@@ -34,7 +34,9 @@ buffers dedicated to that sender.  These are matched for flow control
 so that we know how many receive buffers are available at a potential
 receiver by looking at our allocated send buffers dedicated to that receiver.
 The receiver explicitly acknowledges buffers after finishing with
-the contents.  This is a bit tied up with the protocol, described below.
+the contents.  Note that the bh->num values will get out of order although
+the overall number will match, implying we always ack _his_ bh->num, not
+ours.  This is a bit tied up with the protocol, described below.
 
 These eager buffers are shipped back and forth using basic SEND/RECEIVE since
 completion on the receiver is important for the protocol and there is no speed
@@ -121,27 +123,15 @@ RTS send
 --------
     SQ_WAITING_BUFFER
 	alloc bh
-    #	post_ack_recv_slot
 	post_sr mh + mh_rts
-    ### 24 nov 04, removed this state:  problem happened when
-    # receiver sent RTS_ACK then CTS very close together.  They
-    # go on different QPs but wired to the same CQ.  Sender polled
-    # and found the CTS before the RTS_ACK and got unhappy.  Not convinced
-    # there was any good reason for the RTS_ACK anyway, as it is a bug
-    # if the receiver doesn't reply to the CTS before other messages; these
-    # things are supposed to be in order.
-    #SQ_WAITING_RTS_ACK
-    #	(wait recv cq event)
-    #	free bh from rts
     SQ_WAITING_CTS
 	(wait recv cq event)
-	free bh used for rts
+	free bh used for rts, incoming cts implicitly acked it
 	post RDMA to address given in CTS
+	repost rr used to receive cts
     SQ_WAITING_DATA_LOCAL_SEND_COMPLETE
 	(wait local send cq event for rdma write)
-	repost rr used to receive cts
-	ack cts  # could probably do this in previous state since IB
-	           guarantees order, but need this state to unpin anyway
+	ack bufnum from his cts message
 	unpin
     SQ_WAITING_USER_TEST
 	wait test
@@ -154,17 +144,16 @@ RTS recv, pre-post recv
     RQ_WAITING_INCOMING
 	(wait recv cq event)
 	match existing rq entry
-	re-post_rr from rts
-	# ack rts for simplicitly, else must carry this number until cts
+	re-post_rr from rts, but remember his bufnum
     RQ_RTS_WAITING_CTS_BUFFER
 	alloc bh local for cts
 	    -> if failure state = RQ_RTS_WAITING_CTS_BUFFER
 	pin recv buffer
 	post_ack_recv_slot
-	send cts
+	send cts with his bufnum from his rts to ack it
     RQ_RTS_WAITING_DATA
 	(wait recv cq event ack)
-	free bh local from cts
+	free bh local used for cts
 	unpin recv buffer
     RQ_WAITING_USER_TEST
 	(wait user test)
@@ -181,7 +170,8 @@ RTS recv, non-pre post
 	alloc bh local for cts
 	pin recv buffer
 	post_ack_recv_slot
-	send cts -> if failure state = RQ_RTS_WAITING_CTS_BUFFER
+	send cts (with bufnum as above)
+	    -> if failure state = RQ_RTS_WAITING_CTS_BUFFER
     RQ_RTS_WAITING_DATA ... continue above
 
 

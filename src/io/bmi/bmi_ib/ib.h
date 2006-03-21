@@ -1,11 +1,11 @@
 /*
  * Private header shared by BMI InfiniBand implementation files.
  *
- * Copyright (C) 2003-5 Pete Wyckoff <pw@osc.edu>
+ * Copyright (C) 2003-6 Pete Wyckoff <pw@osc.edu>
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.h,v 1.12 2006-02-22 16:41:10 pw Exp $
+ * $Id: ib.h,v 1.13 2006-03-21 21:29:24 pw Exp $
  */
 #ifndef __ib_h
 #define __ib_h
@@ -220,8 +220,11 @@ typedef struct S_ib_send {
     bmi_size_t  buflist_one_len;
 
     int is_unexpected;  /* if user posted this that way */
-    /* bh represents one local and one remote buffer tied up */
+    /* bh represents our local buffer that is tied up until completed */
     buf_head_t *bh;
+    /* his_bufnum is used to tell him what his buffer was that sent to
+     * us, so he can free it up for reuse; only needed to ack a CTS */
+    int his_bufnum;
     bmi_msg_tag_t bmi_tag;
 } ib_send_t;
 
@@ -253,27 +256,38 @@ typedef struct {
 } ib_recv_t;
 
 /*
- * Header structure used on top of eager sends, and also used to request
- * rendez-vous mode sends, or to indicate eager ack.
- * Make sure these stay fully 64-bit aligned.
+ * Header structure used for various sends.  Make sure these stay fully 64-bit
+ * aligned.  All of eager, rts, and cts messages must start with ->type so
+ * we can switch on that first.
+ */
+typedef struct {
+    msg_type_t type;
+} msg_header_common_t;
+
+typedef struct {
+    msg_type_t type;
+    bmi_msg_tag_t bmi_tag;
+    u_int32_t bufnum;  /* sender's bufnum for acknowledgement messages */
+    u_int32_t __pad;
+} msg_header_eager_t;
+
+/*
+ * Follows msg_header_t only on MSG_RTS messages.  No bufnum here as
+ * the sender remembers via sq->bh and will free upon receipt of CTS.
  */
 typedef struct {
     msg_type_t type;
     bmi_msg_tag_t bmi_tag;
-} msg_header_t;
-
-/*
- * Follows msg_header_t only on MSG_RTS messages.
- */
-typedef struct {
     u_int64_t mop_id;  /* handle to ease lookup when CTS is delivered */
     u_int64_t tot_len;
 } msg_header_rts_t;
 
 /*
- * Same for MSG_CTS
+ * Ditto for MSG_CTS.
  */
 typedef struct {
+    msg_type_t type;
+    u_int32_t bufnum;  /* sender's bufnum for acknowledgment messages */
     u_int64_t rts_mop_id;  /* return id from the RTS */
     u_int64_t buflist_tot_len;
     u_int32_t buflist_num;  /* number of buffers, then lengths to follow */
@@ -363,12 +377,14 @@ extern list_t connection; /* list of current connections */
 extern list_t sendq;
 extern list_t recvq;
 extern list_t memcache;
+
 /*
  * Temp array for filling scatter/gather lists to pass to IB functions,
  * allocated once at start to max size defined as reported by the qp.
  */
 extern VAPI_sg_lst_entry_t *sg_tmp_array;
 extern unsigned int sg_max_len;
+
 /*
  * Maximum number of outstanding work requests in the NIC, same for both
  * SQ and RQ, though we only care about SQ on the QP and ack QP.  Used to
