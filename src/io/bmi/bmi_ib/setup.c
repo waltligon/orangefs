@@ -2,11 +2,11 @@
  * InfiniBand BMI method initialization and other out-of-line
  * boring stuff.
  *
- * Copyright (C) 2003-5 Pete Wyckoff <pw@osc.edu>
+ * Copyright (C) 2003-6 Pete Wyckoff <pw@osc.edu>
  *
  * See COPYING in top-level directory.
  *
- * $Id: setup.c,v 1.21 2006-03-13 22:56:01 pw Exp $
+ * $Id: setup.c,v 1.22 2006-03-21 21:00:39 pw Exp $
  */
 #include <fcntl.h>
 #include <unistd.h>
@@ -18,16 +18,16 @@
 #include <netdb.h>       /* gethostbyname */
 #include <src/io/bmi/bmi-method-callback.h>
 #include <vapi_common.h>  /* VAPI_event_(record|syndrome)_sym */
+#include "pvfs2-config.h" /* to get this configure symbol */
 #ifdef HAVE_IB_WRAP_COMMON_H
 #include <wrap_common.h>  /* reinit_mosal externs */
 #endif
 #include <dlfcn.h>        /* look in mosal for syms */
+#include "pvfs2-internal.h"
 /* bmi ib private header */
 #include "ib.h"
 
 /* constants used to initialize infiniband device */
-static const char *vapi_device_names[] =
-    { "InfiniHost0", "InfiniHost_III_Ex0", "InfiniHost_III_Lx0" };
 static const int VAPI_PORT = 1;
 static const unsigned int VAPI_NUM_CQ_ENTRIES = 1024;
 static const int VAPI_MTU = MTU1024;  /* default mtu, 1k best here */
@@ -263,10 +263,10 @@ exchange_connection_data(ib_connection_t *c, int s, int is_server)
     /* sanity check sizes of things (actually only 24 bits in qp_num) */
     assert(sizeof(connection_handshake.lid) == sizeof(u_int16_t),
       "%s: connection_handshake.lid size %d expecting %d", __func__,
-      sizeof(connection_handshake.lid), sizeof(u_int16_t));
+      (int) sizeof(connection_handshake.lid), (int) sizeof(u_int16_t));
     assert(sizeof(connection_handshake.qp_num) == sizeof(u_int32_t),
       "%s: connection_handshake.qp_num size %d expecting %d", __func__,
-      sizeof(connection_handshake.qp_num), sizeof(u_int32_t));
+      (int) sizeof(connection_handshake.qp_num), (int) sizeof(u_int32_t));
 
     /* exchange information: server reads first, then writes; client opposite */
     for (i=0; i<2; i++) {
@@ -782,6 +782,10 @@ async_event_handler(VAPI_hca_hndl_t nic_handle_in __attribute__((unused)),
 	  (unsigned long) e->modifier.qp_hndl);
 }
 
+#ifdef HAVE_IB_WRAP_COMMON_H
+extern int mosal_fd;
+#endif
+
 /*
  * Hack to work around fork in daemon mode which confuses kernel
  * state.  I wish they did not have an _init constructor function in
@@ -802,6 +806,8 @@ static void
 reinit_mosal(void)
 {
     void *dlh;
+    int (*mosal_ioctl_open)(void);
+    int (*mosal_ioctl_close)(void);
 
     dlh = dlopen("libmosal.so", RTLD_LAZY);
     if (!dlh)
@@ -813,14 +819,22 @@ reinit_mosal(void)
      * What's happening here is we probe the internals of the mosal library
      * to get it to return a structure that has the current fd and state
      * of the connection to /dev/mosal.  We close it, reset the state, and
-     * force it to reinitialize itself.  Icky, but effective.  Works only
-     * with older thca distributions that install the needed header.
+     * force it to reinitialize itself.  Icky, but effective.  Only necessary
+     * for older thca distributions that install the needed header and
+     * have this symbol in the library.
+     *
+     * Else fall through to the easier method.
      */
     call_result_t (*_dev_mosal_init_lib)(t_lib_descriptor **pp_t_lib);
+    const char *errmsg;
+
     _dev_mosal_init_lib = dlsym(dlh, "_dev_mosal_init_lib");
-    if (!dlerror()) {
+    errmsg = dlerror();
+    if (errmsg == NULL) {
 	t_lib_descriptor *desc;
-	int ret = (*_dev_mosal_init_lib)(&desc);
+	int ret;
+
+	ret = (*_dev_mosal_init_lib)(&desc);
 	debug(2, "%s: mosal init ret %d, desc %p", __func__, ret, desc);
 	debug(2, "%s: desc->fd %d", __func__, desc->os_lib_desc_st.fd);
 	close(desc->os_lib_desc_st.fd);
@@ -831,17 +845,13 @@ reinit_mosal(void)
 	return;
     }
     }
-#else
-    {
+#endif
 
     /*
      * Recent thca distros and the 2.6 openib tree do not seem to permit
      * any way to "trick" the library as above, but there's no need for
      * the hack now that they export a "finalize" function to undo the init.
      */
-    int (*mosal_ioctl_open)(void);
-    int (*mosal_ioctl_close)(void);
-
     mosal_ioctl_open = dlsym(dlh, "mosal_ioctl_open");
     if (dlerror())
 	error("%s: mosal_ioctl_open not found in libmosal", __func__);
@@ -851,9 +861,6 @@ reinit_mosal(void)
 
     (*mosal_ioctl_close)();
     (*mosal_ioctl_open)();
-
-    }
-#endif
 }
 
 /*
@@ -863,7 +870,9 @@ int
 BMI_ib_initialize(struct method_addr *listen_addr, int method_id,
   int init_flags)
 {
-    int ret, i;
+    int ret;
+    u_int32_t num_hcas;
+    VAPI_hca_id_t hca_ids[10];
     VAPI_hca_port_t nic_port_props;
     VAPI_hca_vendor_t vendor_cap;
     VAPI_hca_cap_t hca_cap;
@@ -879,21 +888,28 @@ BMI_ib_initialize(struct method_addr *listen_addr, int method_id,
 
     reinit_mosal();
 
-   /*
+    /* look for exactly one and take it */
+    ret = EVAPI_list_hcas(sizeof(hca_ids)/sizeof(hca_ids[0]), &num_hcas,
+                          hca_ids);
+    if (ret < 0)
+    	error_verrno(ret, "%s: EVAPI_list_hcas", __func__);
+    if (num_hcas == 0) {
+	warning("%s: no hcas detected", __func__);
+	return -ENODEV;
+    }
+    if (num_hcas > 1)
+	warning("%s: found %d HCAs, choosing the first", __func__, num_hcas);
+
+    /*
      * Apparently VAPI_open_hca() is a once-per-machine sort of thing, and
      * users are not expected to call it.  It returns EBUSY every time.
      * This call initializes the per-process user resources and starts up
      * all the threads.  Discard const char* for silly mellanox prototype;
      * it really is treated as constant.
      */
-    for (i=0; i<list_count(vapi_device_names); i++) {
-	ret = EVAPI_get_hca_hndl((char *)(unsigned long) vapi_device_names[i],
-	                         &nic_handle);
-	if (ret == 0)
-	    break;
-    }
+    ret = EVAPI_get_hca_hndl(hca_ids[0], &nic_handle);
     if (ret < 0)
-	return -ENODEV;
+	error("%s: could not get HCA handle", __func__);
 
     /* connect an asynchronous event handler to look for weirdness */
     ret = EVAPI_set_async_event_handler(nic_handle, async_event_handler, 0,
@@ -1051,7 +1067,7 @@ ib_mem_register(memcache_entry_t *c)
 	error_verrno(ret, "%s: VAPI_register_mr", __func__);
     c->memkeys.lkey = mrw_out.l_key;
     c->memkeys.rkey = mrw_out.r_key;
-    debug(4, "%s: buf %p len %lld", __func__, c->buf, c->len);
+    debug(4, "%s: buf %p len %lld", __func__, c->buf, lld(c->len));
 }
 
 void
@@ -1063,5 +1079,5 @@ ib_mem_deregister(memcache_entry_t *c)
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_deregister_mr", __func__);
     debug(4, "%s: buf %p len %lld lkey %x rkey %x", __func__,
-      c->buf, c->len, c->memkeys.lkey, c->memkeys.rkey);
+      c->buf, lld(c->len), c->memkeys.lkey, c->memkeys.rkey);
 }

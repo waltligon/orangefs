@@ -1,14 +1,15 @@
 /*
  * InfiniBand BMI method, memory allocation and caching.
  *
- * Copyright (C) 2004-5 Pete Wyckoff <pw@osc.edu>
+ * Copyright (C) 2004-6 Pete Wyckoff <pw@osc.edu>
  *
  * See COPYING in top-level directory.
  *
- * $Id: mem.c,v 1.3 2006-02-22 16:41:10 pw Exp $
+ * $Id: mem.c,v 1.4 2006-03-21 21:00:39 pw Exp $
  */
 #include <src/common/gen-locks/gen-locks.h>
 #include "ib.h"
+#include "pvfs2-internal.h"
 
 #ifdef __PVFS2_SERVER__
 #  define ENABLE_MEMCACHE 1
@@ -138,9 +139,9 @@ BMI_ib_memfree(void *buf, bmi_size_t len __unused,
     gen_mutex_lock(&memcache_mutex);
     c = memcache_lookup_exact(buf, len);
     if (c) {
-	debug(6, "%s: found %p len %lld", __func__, c->buf, c->len);
+	debug(6, "%s: found %p len %lld", __func__, c->buf, lld(c->len));
 	assert(c->count == 1, "%s: buf %p len %lld count = %d, expected 1",
-	  __func__, c->buf, c->len, c->count);
+	  __func__, c->buf, lld(c->len), c->count);
 	ib_mem_deregister(c);
 	qlist_del(&c->list);
 	free(c);
@@ -169,11 +170,11 @@ memcache_register(ib_buflist_t *buflist)
 	if (c) {
 	    ++c->count;
 	    debug(2, "%s: hit [%d] %p len %lld (via %p len %lld) refcnt now %d",
-	      __func__, i, buflist->buf.send[i], buflist->len[i], c->buf,
-	      c->len, c->count);
+	      __func__, i, buflist->buf.send[i], lld(buflist->len[i]), c->buf,
+	      lld(c->len), c->count);
 	} else {
 	    debug(2, "%s: miss [%d] %p len %lld", __func__, i,
-	      buflist->buf.send[i], buflist->len[i]);
+	      buflist->buf.send[i], lld(buflist->len[i]));
 	    c = memcache_add(buflist->buf.recv[i], buflist->len[i]);
 	    if (!c)
 		error("%s: no memory for cache entry", __func__);
@@ -204,7 +205,7 @@ memcache_deregister(ib_buflist_t *buflist)
 	memcache_entry_t *c = buflist->memcache[i];
 	--c->count;
 	debug(2, "%s: dec refcount [%d] %p len %lld count now %d", __func__, i,
-	  buflist->buf.send[i], buflist->len[i], c->count);
+	  buflist->buf.send[i], lld(buflist->len[i]), c->count);
 	/* let garbage collection do ib_mem_deregister(c) for refcnt==0 */
 #else
 	ib_mem_deregister(buflist->memcache[i]);

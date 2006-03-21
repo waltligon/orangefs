@@ -1,11 +1,11 @@
 /*
  * InfiniBand BMI method.
  *
- * Copyright (C) 2003-5 Pete Wyckoff <pw@osc.edu>
+ * Copyright (C) 2003-6 Pete Wyckoff <pw@osc.edu>
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.22 2006-02-22 16:41:10 pw Exp $
+ * $Id: ib.c,v 1.23 2006-03-21 21:00:39 pw Exp $
  */
 #include <stdio.h>  /* just for NULL for id-generator.h */
 #include <src/common/id-generator/id-generator.h>
@@ -88,7 +88,7 @@ check_cq(void)
 	if (desc.status != VAPI_SUCCESS) {
 	    if (desc.opcode == VAPI_CQE_SQ_SEND_DATA) {
 		debug(0, "%s: entry id 0x%llx SQ_SEND_DATA error %s", __func__,
-		  desc.id, VAPI_wc_status_sym(desc.status));
+		  llu(desc.id), VAPI_wc_status_sym(desc.status));
 		if (desc.id) {
 		    ib_connection_t *c = ptr_from_int64(desc.id);
 		    if (c->cancelled) {
@@ -308,7 +308,7 @@ encourage_send_incoming_cts(buf_head_t *bh, u_int32_t byte_len)
     qlist_for_each(l, &sendq) {
 	ib_send_t *sqt = (ib_send_t *) l;
 	debug(8, "%s: looking for op_id 0x%llx, consider 0x%llx", __func__,
-	  mh_cts->rts_mop_id, sqt->mop->op_id);
+	  llu(mh_cts->rts_mop_id), llu(sqt->mop->op_id));
 	if (sqt->mop->op_id == (bmi_op_id_t) mh_cts->rts_mop_id) {
 	    sq = sqt;
 	    break;
@@ -538,7 +538,8 @@ send_cts(ib_recv_t *rq)
     int i;
 
     debug(2, "%s: rq %p from %s opid 0x%llx len %lld",
-      __func__, rq, rq->c->peername, rq->rts_mop_id, lld(rq->buflist.tot_len));
+      __func__, rq, rq->c->peername, llu(rq->rts_mop_id),
+      lld(rq->buflist.tot_len));
 
     bh = qlist_try_del_head(&rq->c->eager_send_buf_free);
     if (!bh) {
@@ -788,7 +789,7 @@ post_sr_rdmaw(ib_send_t *sq, msg_header_cts_t *mh_cts)
 	sr.sg_lst_len = 0;
 	recv_bytes_needed = recv_lenp[recv_index];
 	debug(4, "%s: chunk to %s remote addr %llx rkey %x",
-	  __func__, sq->c->peername, sr.remote_addr, sr.r_key);
+	  __func__, sq->c->peername, llu(sr.remote_addr), sr.r_key);
 	while (recv_bytes_needed > 0) {
 	    /* consume from send buflist to fill this one receive */
 	    u_int32_t send_bytes_offered
@@ -806,7 +807,7 @@ post_sr_rdmaw(ib_send_t *sq, msg_header_cts_t *mh_cts)
 
 	    debug(4, "%s: chunk %d local addr %llx len %d lkey %x",
 	      __func__, sr.sg_lst_len,
-	      sg_tmp_array[sr.sg_lst_len].addr,
+	      llu(sg_tmp_array[sr.sg_lst_len].addr),
 	      sg_tmp_array[sr.sg_lst_len].len,
 	      sg_tmp_array[sr.sg_lst_len].lkey);
 
