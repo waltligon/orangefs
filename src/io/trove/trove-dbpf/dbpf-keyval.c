@@ -193,8 +193,10 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
     {
         gossip_debug(GOSSIP_TROVE_DEBUG,
                      "warning: keyval read error on handle %llu and "
-                     "key=%s (%s)\n", llu(op_p->handle),
-                     (char *)key.data, db_strerror(ret));
+                     "key=%*s (%s)\n", llu(op_p->handle),
+                     op_p->u.k_read.key->buffer_sz,
+                     (char *)op_p->u.k_read.key->buffer, 
+                     db_strerror(ret));
 
         /* if data buffer is too small returns a memory error */
         if (data.ulen < data.size)
@@ -746,7 +748,7 @@ return_ok:
     return 1;
 
 return_error:
-    gossip_lerr("dbpf_keyval_iterate_op_svc: %s\n", db_strerror(ret));
+    PVFS_perror_gossip("dbpf_keyval_iterate_op_svc: ", ret);
     *op_p->u.k_iterate.count_p = i;
 
     if(dbc_p)
@@ -1039,6 +1041,11 @@ static int dbpf_keyval_iterate_get_first_entry(
     ret = dbc_p->c_get(dbc_p, &key, &data, DB_SET_RANGE);
     if(ret != 0)
     {
+        if(ret == DB_NOTFOUND)
+        {
+            return ret;
+        }
+
         ret = -dbpf_db_error_to_trove_error(ret);
         return ret;
     }
