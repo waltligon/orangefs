@@ -4,6 +4,9 @@ PVFS2 Release ChangeLog
 
 pvfs2-1.4.1-pre1
 ===============
+- deal with update_atime vanishing from kernel: test for touch_atime and use
+  that if available.
+- fix configure-time kernel tests to work better with 2.6.16 kernels
 - ib: separate config options for includes and libraries, optionally
 - ib: support mellanox ibgd-1.8.2, compile quietly on x86_64
 - ib: avoid more compiler warnings
