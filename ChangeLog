@@ -6,8 +6,13 @@ pvfs2-1.4.1-pre1
 ===============
 - ib: separate config options for includes and libraries, optionally
 - ib: support mellanox ibgd-1.8.2, compile quietly on x86_64
-- ib: avoid more compiler warnings, list hcas rather than enumerating in
-  code, fix mosal startup for ancient libraries
+- ib: avoid more compiler warnings
+- ib: list hcas rather than enumerating in code
+- ib: fix mosal startup for ancient libraries
+- ib: update internals documentation
+- ib: fix CTS out-of-order problem
+- ib: separate message headers to make math and debugging easier
+- ib: avoid trying to actively connect as a server
 
 pvfs2-1.4.0
 - add a simple sendfile callback stub
