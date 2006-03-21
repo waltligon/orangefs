@@ -462,8 +462,6 @@ AC_ARG_WITH(kernel24,
 
 
 dnl now that we have the path to kernel source we can feature-test kernels. 
-dnl currently it's a few functions that SuSE-8 backports from
-dnl 2.6 into 2.4
 
 oldcflags=$CFLAGS
 if test -z "${LINUX_KERNEL_SRC}"  ; then
@@ -482,7 +480,7 @@ dnl for xattr_acl.h down below will always pass, even if it should fail.  this
 dnl hack will bring in just enough system headers for kernel compilation
 NOSTDINCFLAGS="-nostdinc -isystem `$CC -print-file-name=include`"
 
-CFLAGS="$USR_CFLAGS $NOSTDINCFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default" 
+CFLAGS="$USR_CFLAGS $NOSTDINCFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default -DKBUILD_STR(s)=#s -DKBUILD_BASENAME=KBUILD_STR(empty)  -DKBUILD_MODNAME=KBUILD_STR(empty)"
 
 AC_MSG_CHECKING(for i_size_write in kernel)
 dnl if this test passes, the kernel does not have it
@@ -577,6 +575,21 @@ AC_TRY_COMPILE([
 	AC_MSG_RESULT(no)
 	have_aio=no
 )
+
+AC_MSG_CHECKING(for touch_atime support in kernel)
+AC_TRY_COMPILE([
+	#define __KERNEL__
+	#include <linux/fs.h>
+	void touch_atime(struct vfsmount *mnt, struct dentry *dentry)
+	{
+		return;
+	}
+], [],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_TOUCH_ATIME, 1, Define if kernel has touch_atime routine),
+	AC_MSG_RESULT(no)
+)
+
 
 dnl
 dnl some kernels (SLES9 2.6.5-7.191, for one) will pass the test for ki_dtor

@@ -266,7 +266,12 @@ static int pvfs2_readdir(
 	break;
     }
 
+#ifdef HAVE_TOUCH_ATIME
+    touch_atime(file->f_vfsmnt, dentry);
+#else
     update_atime(dentry->d_inode);
+#endif
+
 
     pvfs2_print("pvfs2_readdir returning %d\n",ret);
     return ret;
