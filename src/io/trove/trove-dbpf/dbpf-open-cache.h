@@ -15,15 +15,12 @@
 struct open_cache_ref
 {
     int fd;
-    DB *db_p;
     void* internal; /* pointer to underlying data structure */
 };
 
 enum open_ref_type
 {
     DBPF_OPEN_BSTREAM   = 1,
-    DBPF_OPEN_DSPACE_DB = 2,
-    DBPF_OPEN_KEYVAL_DB = 4
 };
 
 void dbpf_open_cache_initialize(void);
@@ -43,12 +40,6 @@ void dbpf_open_cache_put(
 int dbpf_open_cache_remove(
     TROVE_coll_id coll_id,
     TROVE_handle handle);
-
-#define dbpf_open_cache_attr_get(__coll_id, __create_flag, __out_ref)\
-dbpf_open_cache_get(__coll_id, TROVE_HANDLE_NULL, __create_flag,     \
-                    DBPF_OPEN_DSPACE_DB, __out_ref)
-
-#define dbpf_open_cache_attr_put dbpf_open_cache_put
 
 #endif /* __DBPF_OPEN_CACHE_H__ */
 

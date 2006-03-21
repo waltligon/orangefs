@@ -914,7 +914,7 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
         dbpf_queued_op_free(q_op_p);
         gossip_ldebug(GOSSIP_TROVE_DEBUG,
                       "warning: useless error value: %d\n", ret);
-        return -trove_errno_to_trove_error(ret);
+        return ret;
     }
     q_op_p->op.u.b_rw_list.fd = q_op_p->op.u.b_rw_list.open_ref.fd;
 

@@ -64,7 +64,7 @@
 #define GOSSIP_LISTEATTR_DEBUG         ((uint64_t)1 << 42)
 #define GOSSIP_PERFCOUNTER_DEBUG       ((uint64_t)1 << 43)
 #define GOSSIP_STATE_MACHINE_DEBUG     ((uint64_t)1 << 44)
-#define GOSSIP_DBPF_KEYVAL_PCACHE_DEBUG ((uint64_t)1 << 45)
+#define GOSSIP_DBPF_KEYVAL_DEBUG       ((uint64_t)1 << 45)
 
 /* NOTE: if you want your gossip flag to be controlable from 
  * pvfs2-set-debugmask you have to add it in

@@ -152,14 +152,14 @@ int PINT_dbpf_keyval_pcache_lookup(
     {
         if(ret == -PVFS_ENOENT)
         {
-            gossip_debug(GOSSIP_DBPF_KEYVAL_PCACHE_DEBUG,
+            gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                          "Trove KeyVal pcache NOTFOUND: "
                          "handle: %llu, pos: %d\n",
                          llu(handle), pos);
         }
         else
         {
-            gossip_debug(GOSSIP_DBPF_KEYVAL_PCACHE_DEBUG,
+            gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                          "Trove KeyVal pcache failed: (error %d): "
                          "handle: %llu, pos: %d\n",
                          ret, llu(handle), pos);
@@ -173,7 +173,7 @@ int PINT_dbpf_keyval_pcache_lookup(
     *keyname = ((struct dbpf_keyval_pcache_entry *)entry->payload)->keyname;
     *length = ((struct dbpf_keyval_pcache_entry *)entry->payload)->keylen;
 
-    gossip_debug(GOSSIP_DBPF_KEYVAL_PCACHE_DEBUG,
+    gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                  "Trove KeyVal pcache lookup succeeded: "
                  "handle: %llu, pos: %d, key: %*s\n",
                  llu(handle), pos, *length, *keyname);
@@ -214,7 +214,7 @@ int PINT_dbpf_keyval_pcache_insert(
                                    &removed);
     if(ret != 0)
     {
-        gossip_debug(GOSSIP_DBPF_KEYVAL_PCACHE_DEBUG,
+        gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                      "Trove KeyVal pcache insert failed: (error: %d) "
                      "handle: %llu, pos: %d: key: %*s\n",
                      ret, llu(handle), pos, length, keyname);
@@ -225,7 +225,7 @@ int PINT_dbpf_keyval_pcache_insert(
     }
     gen_mutex_unlock(pcache->mutex);
 
-    gossip_debug(GOSSIP_DBPF_KEYVAL_PCACHE_DEBUG,
+    gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                  "Trove KeyVal pcache insert succeeded: "
                  "handle: %llu, pos: %d: key: %*s\n",
                  llu(handle), pos, length, keyname);

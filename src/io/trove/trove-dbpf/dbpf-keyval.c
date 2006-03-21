@@ -110,7 +110,7 @@ static int dbpf_keyval_read(TROVE_coll_id coll_id,
     dbpf_attr_cache_elem_t *cache_elem = NULL;
     TROVE_object_ref ref = {handle, coll_id};
 
-    gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "*** Trove KeyVal Read "
+    gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "*** Trove KeyVal Read "
                  "of %s\n", (char *)key_p->buffer);
 
     gen_mutex_lock(&dbpf_attr_cache_mutex);
@@ -191,7 +191,7 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
         op_p->coll_p->keyval_db, NULL, &key, &data, 0);
     if (ret != 0)
     {
-        gossip_debug(GOSSIP_TROVE_DEBUG,
+        gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                      "warning: keyval read error on handle %llu and "
                      "key=%*s (%s)\n", llu(op_p->handle),
                      op_p->u.k_read.key->buffer_sz,
@@ -201,7 +201,7 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
         /* if data buffer is too small returns a memory error */
         if (data.ulen < data.size)
         {
-            gossip_debug(GOSSIP_TROVE_DEBUG,
+            gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                          "warning: Value buffer too small %d < %d\n",
                          data.ulen, data.size);
             /* let the user know */
@@ -364,7 +364,7 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
         goto return_error;
     }
 
-    gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "*** Trove KeyVal Write "
+    gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "*** Trove KeyVal Write "
                  "of %s\n", (char *)key_entry.key);
 
     /*
@@ -741,7 +741,7 @@ return_ok:
         goto return_error;
     }
 
-    gossip_debug(GOSSIP_TROVE_DEBUG, 
+    gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, 
                  "Finished keyval iterate: position: %d, count: %d\n", 
                  *op_p->u.k_iterate.position_p, *op_p->u.k_iterate.count_p);
 
@@ -1427,7 +1427,7 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
             goto return_error;
         }
 
-        gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "*** Trove KeyVal Write "
+        gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "*** Trove KeyVal Write "
                      "of %s\n", (char *)op_p->u.k_write_list.key_array[k].buffer);
 
         /*

@@ -38,12 +38,7 @@ struct open_cache_entry
 
     TROVE_coll_id coll_id;
     TROVE_handle handle;
-
-    union
-    {
-        int fd;
-        DB * db_p;
-    } u;
+    int fd;
 
     struct qlist_head queue_link;
 };
@@ -66,18 +61,6 @@ static int open_fd(
     TROVE_coll_id coll_id,
     TROVE_handle handle,
     int create_flag);
-static int open_db(
-    DB **db, 
-    TROVE_coll_id coll_id,
-    enum open_ref_type type,
-    int create_flag);
-static int internal_db_open(
-    DB **db,
-    char *name,
-    char *subdb,
-    DBTYPE type,
-    uint32_t flags,
-    uint32_t mode);
 
 inline static struct open_cache_entry * dbpf_open_cache_find_entry(
     struct qlist_head * list, 
@@ -157,34 +140,18 @@ int dbpf_open_cache_get(
     }
 
     out_ref->fd = -1;
-    out_ref->db_p = NULL;
 
     if (tmp_entry)
     {
-	if ((type & DBPF_OPEN_BSTREAM) && (tmp_entry->u.fd < 0))
+	if ((type & DBPF_OPEN_BSTREAM) && (tmp_entry->fd < 0))
 	{
-	    ret = open_fd(&(tmp_entry->u.fd), coll_id, handle, create_flag);
+	    ret = open_fd(&(tmp_entry->fd), coll_id, handle, create_flag);
 	    if (ret < 0)
 	    {
 		gen_mutex_unlock(&cache_mutex);
 		return ret;
 	    }
-            out_ref->fd = tmp_entry->u.fd;
-	}
-
-	if ((type & DBPF_OPEN_DSPACE_DB ||
-             type & DBPF_OPEN_KEYVAL_DB) 
-            && (tmp_entry->u.db_p == NULL))
-	{
-	    ret = open_db(&(tmp_entry->u.db_p), coll_id,
-                          type, create_flag);
-	    if (ret < 0)
-	    {
-		gen_mutex_unlock(&cache_mutex);
-		return ret;
-	    }
-
-            out_ref->db_p = tmp_entry->u.db_p;
+            out_ref->fd = tmp_entry->fd;
 	}
 
 	out_ref->internal = tmp_entry;
@@ -228,17 +195,10 @@ int dbpf_open_cache_get(
 	gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
 	    "dbpf_open_cache_get: resetting entry from unused list.\n");
 
-	if (tmp_entry->type == DBPF_OPEN_BSTREAM && tmp_entry->u.fd > -1)
+	if (tmp_entry->type == DBPF_OPEN_BSTREAM && tmp_entry->fd > -1)
 	{
-	    DBPF_CLOSE(tmp_entry->u.fd);
-	    tmp_entry->u.fd = -1;
-	}
-	else if ((tmp_entry->type == DBPF_OPEN_DSPACE_DB ||
-                  tmp_entry->type == DBPF_OPEN_KEYVAL_DB) &&
-                 tmp_entry->u.db_p != NULL)
-	{
-	    tmp_entry->u.db_p->close(tmp_entry->u.db_p, 0);
-	    tmp_entry->u.db_p = NULL;
+	    DBPF_CLOSE(tmp_entry->fd);
+	    tmp_entry->fd = -1;
 	}
     }
    
@@ -251,7 +211,7 @@ int dbpf_open_cache_get(
 
 	if (type == DBPF_OPEN_BSTREAM)
 	{
-	    ret = open_fd(&(tmp_entry->u.fd), coll_id, handle, create_flag);
+	    ret = open_fd(&(tmp_entry->fd), coll_id, handle, create_flag);
 	    if (ret < 0)
 	    {
 		qlist_add(&tmp_entry->queue_link, &free_list);
@@ -262,20 +222,7 @@ int dbpf_open_cache_get(
 		gen_mutex_unlock(&cache_mutex);
 		return ret;
 	    }
-            out_ref->fd = tmp_entry->u.fd;
-	}
-        else
-        {
-	    /* need to open db */
-	    ret = open_db(&(tmp_entry->u.db_p), coll_id,
-                          type, create_flag);
-	    if (ret < 0)
-	    {
-		qlist_add(&tmp_entry->queue_link, &free_list);
-		gen_mutex_unlock(&cache_mutex);
-		return ret;
-	    }
-            out_ref->db_p = tmp_entry->u.db_p;
+            out_ref->fd = tmp_entry->fd;
 	}
 
 	out_ref->internal = tmp_entry;
@@ -293,23 +240,12 @@ int dbpf_open_cache_get(
      */
     
     out_ref->fd = -1;
-    out_ref->db_p = NULL;
 
     if (type & DBPF_OPEN_BSTREAM)
     {
 	gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
 	    "dbpf_open_cache_get: missed cache entirely.\n");
 	ret = open_fd(&(out_ref->fd), coll_id, handle, create_flag);
-	if (ret < 0)
-	{
-	    gen_mutex_unlock(&cache_mutex);
-	    return ret;
-	}
-    }
-    else
-    {
-	/* need to open db */
-	ret = open_db(&(out_ref->db_p), coll_id, type, create_flag);
 	if (ret < 0)
 	{
 	    gen_mutex_unlock(&cache_mutex);
@@ -367,11 +303,6 @@ void dbpf_open_cache_put(
 	    DBPF_CLOSE(in_ref->fd);
 	    in_ref->fd = -1;
 	}
-	if(in_ref->db_p != NULL)
-	{
-	    in_ref->db_p->close(in_ref->db_p, 0);
-	    in_ref->db_p = NULL;
-	}
     }
     gen_mutex_unlock(&cache_mutex);
     return;
@@ -423,9 +354,6 @@ int dbpf_open_cache_remove(
 	    queue_link);
 	if ((tmp_entry->type == DBPF_OPEN_BSTREAM &&
              (tmp_entry->handle == handle) &&
-             (tmp_entry->coll_id == coll_id)) ||
-            ((tmp_entry->type == DBPF_OPEN_DSPACE_DB ||
-              tmp_entry->type == DBPF_OPEN_KEYVAL_DB) &&
              (tmp_entry->coll_id == coll_id)))
         {
             qlist_del(&tmp_entry->queue_link);
@@ -439,16 +367,10 @@ int dbpf_open_cache_remove(
 	gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
 	    "dbpf_open_cache_remove: unused entry.\n");
 	if (tmp_entry->type == DBPF_OPEN_BSTREAM &&
-            tmp_entry->u.fd > -1)
+            tmp_entry->fd > -1)
 	{
-	    DBPF_CLOSE(tmp_entry->u.fd);
-	    tmp_entry->u.fd = -1;
-	}
-	if (tmp_entry->type != DBPF_OPEN_BSTREAM &&
-            tmp_entry->u.db_p != NULL)
-	{
-	    tmp_entry->u.db_p->close(tmp_entry->u.db_p, 0);
-	    tmp_entry->u.db_p = NULL;
+	    DBPF_CLOSE(tmp_entry->fd);
+	    tmp_entry->fd = -1;
 	}
 	qlist_add(&tmp_entry->queue_link, &free_list);
     }
@@ -507,98 +429,6 @@ static int open_fd(
     return ((*fd < 0) ? -trove_errno_to_trove_error(errno) : 0);
 }
 
-static int open_db(
-    DB **db_pp, 
-    TROVE_coll_id coll_id,
-    enum open_ref_type type,
-    int create_flag)
-{
-    int ret = -TROVE_EINVAL;
-    char filename[PATH_MAX] = {0};
-    DB_ENV *envp = NULL;
-
-    if ((envp = dbpf_getdb_env()) == NULL)
-    {
-        return TROVE_ENOMEM;
-    }
-
-    gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
-                 "dbpf_open_cache open_db: opening db for collection: %llu\n",
-                 llu(coll_id));
-
-    /* special case; ds attrib database */
-    if (type == DBPF_OPEN_DSPACE_DB)
-    {
-	DBPF_GET_DS_ATTRIB_DBNAME(filename, PATH_MAX,
-                                  my_storage_p->name, coll_id);
-    }
-    else
-    {
-        /* normal case; keyval db */
-        DBPF_GET_KEYVAL_DBNAME(filename, PATH_MAX,
-                               my_storage_p->name, coll_id);
-    }
-
-    ret = db_create(db_pp, envp, 0);
-    if (ret != 0)
-    {
-	return -dbpf_db_error_to_trove_error(ret);
-    }
-
-    (*db_pp)->set_errpfx((*db_pp), "pvfs2");
-    (*db_pp)->set_errcall((*db_pp), dbpf_error_report);
-
-    /* DB_RECNUM makes it easier to iterate through every key in chunks */
-    if ((ret = (*db_pp)->set_flags((*db_pp), DB_RECNUM)))
-    {
-	(*db_pp)->err((*db_pp), ret, "%s: set_flags", filename);
-	assert(0);
-    }
-
-    ret = internal_db_open(db_pp, filename, NULL,
-                           DB_UNKNOWN, TROVE_DB_OPEN_FLAGS, 0);
-
-    gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG, " - internal_db_open "
-                 "returned %d\n", ret);
-
-    if ((ret == ENOENT) && (create_flag != 0))
-    {
-	gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG, "About to create "
-                     "new DB file %s ... ", filename);
-
-        ret = internal_db_open(db_pp, filename, NULL, TROVE_DB_TYPE,
-                               TROVE_DB_CREATE_FLAGS, TROVE_DB_MODE);
-
-	gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG, "done\n");
-
-	/* this can easily happen if the server is out of disk space */
-	if (ret)
-	{
-	    (*db_pp)->close(*db_pp, 0);
-	    *db_pp = NULL;
-	    return -dbpf_db_error_to_trove_error(ret);
-	}
-    }
-    else if (ret != 0)
-    {
-	(*db_pp)->close((*db_pp), 0);
-	*db_pp = NULL;
-	return -dbpf_db_error_to_trove_error(ret);
-    }
-
-    return 0;
-}
-
-static int internal_db_open(DB **db, char *name, char *subdb,
-                            DBTYPE type, uint32_t flags, uint32_t mode)
-{
-    return (*db)->open(*db,
-#ifdef HAVE_TXNID_PARAMETER_TO_DB_OPEN
-                       NULL,
-#endif
-                       name, subdb, type, flags, mode);
-}
-
 static void dbpf_open_cache_entries_finalize(struct qlist_head *list)
 {
     struct qlist_head * list_entry;
@@ -606,16 +436,11 @@ static void dbpf_open_cache_entries_finalize(struct qlist_head *list)
     qlist_for_each(list_entry, list)
     {
         entry = qlist_entry(list_entry, struct open_cache_entry, queue_link);
-        if(entry->type == DBPF_OPEN_BSTREAM && entry->u.fd > -1)
+        if(entry->type == DBPF_OPEN_BSTREAM && entry->fd > -1)
         {
-	    DBPF_CLOSE(entry->u.fd);
-	    entry->u.fd = -1;
+	    DBPF_CLOSE(entry->fd);
+	    entry->fd = -1;
 	}
-        else if(entry->u.db_p != NULL)
-        {
-            entry->u.db_p->close(entry->u.db_p, 0);
-            entry->u.db_p = NULL;
-        }
     }
 }
 
@@ -642,16 +467,6 @@ inline static struct open_cache_entry * dbpf_open_cache_find_entry(
                 GOSSIP_DBPF_OPEN_CACHE_DEBUG,
                 "dbpf_open_cache_get: "
                 "found bstream entry in %s.\n", list_name);
-            return tmp_entry;
-        }
-        else if(type == tmp_entry->type &&
-                (type == DBPF_OPEN_DSPACE_DB || type == DBPF_OPEN_KEYVAL_DB) &&
-                (tmp_entry->coll_id == coll_id))
-        {
-            gossip_debug(
-                GOSSIP_DBPF_OPEN_CACHE_DEBUG,
-                "dbpf_open_cache_get: "
-                "found db entry in %s.\n", list_name);
             return tmp_entry;
         }
     }

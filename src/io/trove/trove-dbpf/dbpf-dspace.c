@@ -832,7 +832,7 @@ return_error:
 
 static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
 {
-    int ret = -TROVE_EINVAL, got_db = 0;
+    int ret = -TROVE_EINVAL;
     DBT key, data;
     TROVE_ds_storedattr_s s_attr;
     TROVE_ds_attributes *attr = NULL;
@@ -847,10 +847,6 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
         op_p->coll_p->coll_id, op_p->handle, 0, DBPF_OPEN_BSTREAM, &tmp_ref);
     if (ret < 0)
     {
-        /*
-          FIXME: we can't tell when this error is an actual error or
-          excusable because we haven't created the keyval yet
-        */
     }
     else
     {
