@@ -273,6 +273,7 @@ struct PINT_server_small_io_op
 {
     PVFS_offset offsets[SMALL_IO_MAX_REGIONS];
     PVFS_size sizes[SMALL_IO_MAX_REGIONS];
+    PVFS_size result_bytes;
 };
 
 struct PINT_server_flush_op
