@@ -218,6 +218,7 @@ struct PINT_server_crdirent_op
     PVFS_fs_id fs_id;
     PVFS_handle dirent_handle;  /* holds handle of dirdata dspace that
                                  * we'll write the dirent into */
+    PVFS_size dirent_count;
     int dir_attr_update_required;
 };
 
@@ -226,6 +227,7 @@ struct PINT_server_rmdirent_op
     PVFS_handle dirdata_handle;
     PVFS_handle entry_handle; /* holds handle of dirdata object,
                                * removed entry */
+    PVFS_size dirent_count;
     int dir_attr_update_required;
 };
 
@@ -244,7 +246,7 @@ struct PINT_server_remove_op
     PVFS_handle dirdata_handle;   /* holds dirdata dspace handle in
                                    * the event that we are removing a
                                    * directory */
-    PVFS_ds_attributes dirdata_ds_attr;
+    PVFS_size dirent_count;
 };
 
 struct PINT_server_mgmt_remove_dirent_op
@@ -299,7 +301,7 @@ struct PINT_server_mkdir_op
 struct PINT_server_getattr_op
 {
     PVFS_handle handle;
-    PVFS_handle dirdata_handle;
+    PVFS_size dirent_count;
     PVFS_fs_id fs_id;
     PVFS_ds_attributes dirdata_ds_attr;
     uint32_t attrmask;
