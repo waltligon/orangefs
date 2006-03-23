@@ -18,11 +18,6 @@ struct open_cache_ref
     void* internal; /* pointer to underlying data structure */
 };
 
-enum open_ref_type
-{
-    DBPF_OPEN_BSTREAM   = 1,
-};
-
 void dbpf_open_cache_initialize(void);
 
 void dbpf_open_cache_finalize(void);
@@ -31,7 +26,6 @@ int dbpf_open_cache_get(
     TROVE_coll_id coll_id,
     TROVE_handle handle,
     int create_flag,
-    enum open_ref_type type,
     struct open_cache_ref* out_ref);
 
 void dbpf_open_cache_put(
