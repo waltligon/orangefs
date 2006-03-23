@@ -91,7 +91,11 @@ static int generic_dist(file_object *obj, PVFS_credentials *creds,
     
     if (obj->fs_type == UNIX_FILE)
     {
+#ifndef HAVE_FGETXATTR_EXTRA_ARGS
         if ((ret = fgetxattr(obj->u.ufs.fd, DIST_KEY, buffer, 4096)) < 0)
+#else
+        if ((ret = fgetxattr(obj->u.ufs.fd, DIST_KEY, buffer, 4096, 0, 0)) < 0)
+#endif
         {
             perror("fgetxattr:");
             return -1;
@@ -133,7 +137,11 @@ static int generic_server_location(file_object *obj, PVFS_credentials *creds,
     
     if (obj->fs_type == UNIX_FILE)
     {
-        if ((ret = fgetxattr(obj->u.ufs.fd, DFILE_KEY, buffer, 4096)) < 0)
+#ifndef HAVE_FGETXATTR_EXTRA_ARGS
+        if ((ret = fgetxattr(obj->u.ufs.fd, DIST_KEY, buffer, 4096)) < 0)
+#else
+        if ((ret = fgetxattr(obj->u.ufs.fd, DIST_KEY, buffer, 4096, 0, 0)) < 0)
+#endif
         {
             perror("fgetxattr:");
             return -1;

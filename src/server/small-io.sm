@@ -19,6 +19,7 @@
 #include "pint-request.h"
 
 static int small_io_start_job(PINT_server_op *s_op, job_status_s *js_p);
+static int small_io_check_size(PINT_server_op *s_op, job_status_s *js_p);
 static int small_io_cleanup(PINT_server_op *s_op, job_status_s *js_p);
 
 %%
@@ -26,6 +27,7 @@ static int small_io_cleanup(PINT_server_op *s_op, job_status_s *js_p);
 machine pvfs2_small_io_sm(
     prelude,
     start_job,
+    check_size,
     send_response,
     release,
     cleanup)
@@ -40,6 +42,12 @@ machine pvfs2_small_io_sm(
     state start_job 
     {
         run small_io_start_job;
+        default => check_size;
+    }
+
+    state check_size
+    {
+        run small_io_check_size;
         default => send_response;
     }
 
@@ -177,6 +185,7 @@ static int small_io_start_job(PINT_server_op *s_op, job_status_s *js_p)
             return 1;
         }
         
+        s_op->u.small_io.result_bytes = result.bytes;
         ret = job_trove_bstream_read_list(
             s_op->req->u.small_io.fs_id,
             s_op->req->u.small_io.handle,
@@ -205,6 +214,23 @@ static int small_io_start_job(PINT_server_op *s_op, job_status_s *js_p)
     PINT_free_request_state(file_req_state);
 
     return ret;
+}
+
+static int small_io_check_size(PINT_server_op *s_op, job_status_s *js_p)
+{
+    if(s_op->req->u.small_io.io_type == PVFS_IO_READ)
+    {
+        if(s_op->resp.u.small_io.result_size !=
+           s_op->u.small_io.result_bytes)
+        {
+            /* If we get here assume aio threaded isn't supported and 
+             * so result_size won't have been set correctly.  
+             * Just set to expected value from process_request for now */
+            s_op->resp.u.small_io.result_size = s_op->u.small_io.result_bytes;
+        }
+    }
+
+    return 1;
 }
 
 static int small_io_cleanup(PINT_server_op *s_op, job_status_s *js_p)

@@ -281,7 +281,7 @@ static int dbpf_keyval_write(TROVE_coll_id coll_id,
     q_op_p->op.u.k_write.val = *val_p;
 
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
-
+        
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
                     1, PINT_PERF_ADD);
 
@@ -447,7 +447,7 @@ static int dbpf_keyval_remove(TROVE_coll_id coll_id,
     q_op_p->op.u.k_remove.key = *key_p;
 
     *out_op_id_p = dbpf_queued_op_queue(q_op_p);
-
+       
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
                     1, PINT_PERF_ADD);
 

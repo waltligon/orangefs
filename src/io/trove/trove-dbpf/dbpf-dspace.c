@@ -285,6 +285,9 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
                     1, PINT_PERF_SUB);
 
+    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
+                    1, PINT_PERF_SUB);
+
     *op_p->u.d_create.out_handle_p = new_handle;
     return 1;
 
@@ -376,6 +379,9 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
 
     DBPF_DB_SYNC_IF_NECESSARY(op_p, 
                               op_p->coll_p->ds_db);
+
+    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
+                    1, PINT_PERF_SUB);
 
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
                     1, PINT_PERF_SUB);

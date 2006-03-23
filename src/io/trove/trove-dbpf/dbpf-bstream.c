@@ -74,7 +74,7 @@ extern pthread_cond_t dbpf_op_completed_cond;
 extern dbpf_op_queue_p dbpf_completion_queue_array[TROVE_MAX_CONTEXTS];
 extern gen_mutex_t *dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
 
-static void aio_progress_notification(sigval_t sig)
+static void aio_progress_notification(union sigval sig)
 {
     dbpf_queued_op_t *cur_op = NULL;
     struct dbpf_op *op_p = NULL;

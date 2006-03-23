@@ -152,6 +152,10 @@ sub run_tests()
                        "-d $mountpoint -n $iterations > $datfile",
                        "Test run failed: proc: $proc, meta: $meta, io: $io\n");
 
+                open(WEBINPUT,
+                     "|./perfbase-web-input -o $operation -m $meta -i $io " .
+                     "-f ./experiments/pvfs2-op-input.xml -t $branch > /tmp/perfbase_input_result 2>&1");
+                
                 if($? != 0)
                 {
                     print STDERR "Can't fork perfbase-web-input: $!\n" .
