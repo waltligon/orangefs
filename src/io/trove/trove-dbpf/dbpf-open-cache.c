@@ -83,6 +83,7 @@ void dbpf_open_cache_initialize(void)
 
     for (i = 0; i < OPEN_CACHE_SIZE; i++)
     {
+        prealloc[i].fd = -1;
 	qlist_add(&prealloc[i].queue_link, &free_list);
     }
 
@@ -422,8 +423,9 @@ static int open_fd(
 static void dbpf_open_cache_entries_finalize(struct qlist_head *list)
 {
     struct qlist_head * list_entry;
+    struct qlist_head * scratch;
     struct open_cache_entry * entry; 
-    qlist_for_each(list_entry, list)
+    qlist_for_each_safe(list_entry, scratch, list)
     {
         entry = qlist_entry(list_entry, struct open_cache_entry, queue_link);
         if(entry->fd > -1)
@@ -431,6 +433,7 @@ static void dbpf_open_cache_entries_finalize(struct qlist_head *list)
 	    DBPF_CLOSE(entry->fd);
 	    entry->fd = -1;
 	}
+        qlist_del(&entry->queue_link);
     }
 }
 
