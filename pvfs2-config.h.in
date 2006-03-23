@@ -43,6 +43,9 @@
 /* Define to 1 if you have the `fgetxattr' function. */
 #undef HAVE_FGETXATTR
 
+/* Define if fgetxattr takes position and option arguments */
+#undef HAVE_FGETXATTR_EXTRA_ARGS
+
 /* Define if system provides fgtxattr prototype */
 #undef HAVE_FGETXATTR_PROTOTYPE
 
