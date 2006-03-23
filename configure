@@ -5687,49 +5687,10 @@ if test "${enable_aio_threaded_callbacks+set}" = set; then
   if test "$enableval" = no ; then use_aio_thcb=0 ; fi
 fi;
 
+
 MISC_TROVE_FLAGS=""
 if test $use_aio_thcb = 1 ; then
-    if test "x$host_os" = "xlinux-gnu" ; then
-	echo "$as_me:$LINENO: checking glibc version for working aio callbacks" >&5
-echo $ECHO_N "checking glibc version for working aio callbacks... $ECHO_C" >&6
-			for i in /lib /lib64 /usr/lib /usr/lib64 ; do
-	    libc=`echo $i/libc.so.* | sed 1q`
-	    if test "x$libc" = "x" ; then continue ; fi
-	    if test "x$libc" != "x$i/libc.so.*" ; then break ; fi
-	    libc=
-	done
-	if test "x$libc" != "x" ; then
-	    if test -x $libc ; then
-		vers=`$libc 2> /dev/null | sed 's/.*version \(.*\),.*/\1/; q'`
-		if test "x$vers" = "x"; then
-		    vers=`strings /lib/libc.so.* | grep GLIBC | tail -n 2 | grep -v PRIVATE | cut -b 7-`
-		fi
-		majorminor=`echo $vers | cut -b 1-3`
-		sub=`echo $vers | cut -b 5`
-		if test "x$majorminor" = "x2.3" ; then
-		    if test $sub -gt 1; then
-			MISC_TROVE_FLAGS="-D__PVFS2_TROVE_AIO_THREADED__"
-		    fi
-		fi
-	    else
-		vers=`strings /lib/libc.so.* | grep GLIBC | tail -n 2 | grep -v PRIVATE | cut -b 7-`
-		majorminor=`echo $vers | cut -b 1-3`
-		sub=`echo $vers | cut -b 5`
-		if test "x$majorminor" = "x2.3" ; then
-		    if test $sub -gt 1; then
-			MISC_TROVE_FLAGS="-D__PVFS2_TROVE_AIO_THREADED__"
-		    fi
-		fi
-	    fi
-	fi
-    fi
-    if test "x$MISC_TROVE_FLAGS" = "x" ; then
-	echo "$as_me:$LINENO: result: no" >&5
-echo "${ECHO_T}no" >&6
-    else
-	echo "$as_me:$LINENO: result: yes" >&5
-echo "${ECHO_T}yes" >&6
-    fi
+	MISC_TROVE_FLAGS="-D__PVFS2_TROVE_AIO_THREADED__"
 fi
 
 
