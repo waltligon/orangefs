@@ -117,7 +117,7 @@ int main(int argc, char **argv)
 		  MPI_Allreduce(&time, &maxtime, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
 
 		  if (rank == 0) {
-				printf("%d\t%f\n", i, maxtime);
+				printf("%d\t%d\t%f\n", rank, i, maxtime);
 		  }
 
   		  errcode = MPI_File_close(&fh);

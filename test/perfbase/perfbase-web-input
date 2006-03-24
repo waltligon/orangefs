@@ -81,7 +81,7 @@ INPUTDESC
 ;;
 
 my $hostn=`hostname`;
-$msg .= "cvstag=$cvstag-$cvsdate\nhost=$hostn\n";
+$msg .= "cvsstamp=$cvstag-$cvsdate\nhost=$hostn\n";
 $msg .= "op=$operation\nmeta=$metaservers\nio=$ioservers\n";
 
 while (defined($line = <STDIN>))

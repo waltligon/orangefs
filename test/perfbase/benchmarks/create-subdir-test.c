@@ -166,10 +166,7 @@ int main(int argc, char **argv)
 				return PVFS_get_errno_mapping(pvfs_error);
 		  }
 
-		  if(i % 10 == 9)
-		  {
-				test_util_print_avg_and_dev();
-		  }
+		  test_util_print_timing(rank);
 
 		  pvfs_error = PVFS_sys_remove(test_file, mkdir_resp.ref, &credentials);
 		  if(pvfs_error != 0)
