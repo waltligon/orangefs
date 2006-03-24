@@ -103,7 +103,8 @@ int main(int argc, char **argv)
 
 	 if (rank == 0)
 	 {
-		  printf("\nprocs: %d\n===========\n", nprocs);
+		  printf("\nprocs: %d\nops: %d\n===========\n", nprocs, opt_nfiles);
+		  
 	 }
 
 	 ret = PVFS_util_init_defaults();
@@ -156,10 +157,7 @@ int main(int argc, char **argv)
 				return PVFS_get_errno_mapping(pvfs_error);
 		  }
 
-		  if(i % 10 == 9)
-		  {
-				test_util_print_avg_and_dev();
-		  }
+		  test_util_print_timing(rank);
 
 		  pvfs_error = PVFS_sys_remove(test_file, lookup_resp.ref, &credentials);
 		  if(pvfs_error != 0)
