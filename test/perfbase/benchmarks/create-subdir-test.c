@@ -104,7 +104,7 @@ int main(int argc, char **argv)
 
 	 if (rank == 0)
 	 {
-		  printf("\nprocs: %d\n===========\n", nprocs);
+		  printf("\nprocs: %d\nops: %d\n===========\n", nprocs, opt_nfiles);
 	 }
 
 	 ret = PVFS_util_init_defaults();
