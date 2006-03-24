@@ -83,8 +83,10 @@ static int translate_bstreams_0_0_1(
     char* storage_space, char* coll_id, char* new_name, TROVE_coll_id new_id,
     TROVE_context_id trove_context);
 static int translate_keyval_db_0_0_1(
+    char* storage_space, char* coll_id, 
     char* full_db_path, TROVE_handle handle, char* new_name, TROVE_coll_id 
     new_id, TROVE_context_id trove_context);
+static int check_common_0_0_1(char* key);
 
 /** number of keyval buckets used in DBPF 0.0.1 */
 #define KEYVAL_MAX_NUM_BUCKETS_0_0_1 32
@@ -103,6 +105,16 @@ do {                                                                         \
   __cid, KEYVAL_DIRNAME_0_0_1,                                               \
   llu(DBPF_KEYVAL_GET_BUCKET_0_0_1(__handle, __cid)), llu(__handle));        \
 } while (0)
+
+char* common_key_names_0_0_1[] = 
+{
+    "root_handle",
+    "dir_ent",
+    "datafile_handles",
+    "metafile_dist",
+    "symlink_target",
+    NULL
+};
 
 int main(int argc, char **argv)
 {
@@ -928,7 +940,9 @@ static int translate_keyvals_0_0_1(
                 snprintf(keyval_db, PATH_MAX, "%s/%s/keyvals/%.8d/%s",
                     storage_space, coll_id, i, tmp_ent->d_name);
                 /* translate each keyval db to new format */
-                ret = translate_keyval_db_0_0_1(keyval_db, tmp_handle,
+                ret = translate_keyval_db_0_0_1(
+                    storage_space, coll_id,
+                    keyval_db, tmp_handle,
                     new_name, new_id, trove_context);
                 if(ret < 0)
                 {
@@ -950,6 +964,8 @@ static int translate_keyvals_0_0_1(
  * \return 0 on succes, -1 on failure
  */
 static int translate_keyval_db_0_0_1(
+    char* storage_space,            /**< path to trove storage space */
+    char* coll_id,                  /**< collection id in string format */
     char* full_db_path,             /**< fully resolved path to db file */
     TROVE_handle handle,            /**< handle of the object */
     char* new_name,                 /**< name of new (temporary) collection */
@@ -958,6 +974,8 @@ static int translate_keyval_db_0_0_1(
 {
     int ret = -1;
     DB *dbp;
+    DB *attr_dbp;
+    char attr_db[PATH_MAX];
     DBT key, data;
     DBC *dbc_p = NULL;
     TROVE_op_id op_id;
@@ -965,8 +983,72 @@ static int translate_keyval_db_0_0_1(
     TROVE_ds_state state;
     TROVE_keyval_s t_key;
     TROVE_keyval_s t_val;
+    TROVE_ds_storedattr_s* tmp_attr;
+    PVFS_ds_type obj_type = PVFS_TYPE_NONE;
+    int trove_flag;
 
     if(verbose) printf("VERBOSE Migrating keyvals for handle: %llu\n", llu(handle));
+
+    /* need to read attributes to determine what type of keyval db we
+     * are migrating (to get type right in new collection)
+     */
+    sprintf(attr_db, "%s/%s/dataspace_attributes.db", storage_space, coll_id);
+    ret = db_create(&attr_dbp, NULL, 0);
+    if(ret != 0)
+    {
+        fprintf(stderr, "Error: db_create: %s.\n", db_strerror(ret));
+        return(-1);
+    }
+    
+    /* open dataspace_attributes.db from old collection */
+    ret = attr_dbp->open(attr_dbp,
+#ifdef HAVE_TXNID_PARAMETER_TO_DB_OPEN
+                          NULL,
+#endif
+                          attr_db,
+                          NULL,
+                          DB_UNKNOWN,
+                          0,
+                          0);
+    if(ret != 0)
+    {
+        fprintf(stderr, "Error: dbp->open: %s.\n", db_strerror(ret));
+        return(-1);
+    }
+
+    /* read attributes for the handle in question */
+    memset(&key, 0, sizeof(key));
+    key.data = &handle;
+    key.size = key.ulen = sizeof(PVFS_handle);
+    key.flags |= DB_DBT_USERMEM;
+
+    memset(&data, 0, sizeof(data));
+    data.data = malloc(DEF_DATA_SIZE);
+    if(!data.data)
+    {
+        perror("malloc");    
+        attr_dbp->close(attr_dbp, 0);
+        return(-1);
+    }
+    data.size = data.ulen = DEF_DATA_SIZE;
+    data.flags |= DB_DBT_USERMEM;
+
+    ret = attr_dbp->get(attr_dbp, NULL, &key, &data, 0);
+    if(ret != 0)
+    {
+        /* we found a keyval db that doesn't have a matching attr db entry */
+        fprintf(stderr, "WARNING: handle %llu not found in attr db; skipping.\n",
+            llu(handle));
+        attr_dbp->close(attr_dbp, 0);
+        free(data.data);
+        return(0);
+    }
+
+    tmp_attr = ((TROVE_ds_storedattr_s*)data.data);
+    obj_type = tmp_attr->type;
+
+    free(data.data);
+    attr_dbp->close(attr_dbp, 0);
 
     ret = db_create(&dbp, NULL, 0);
     if(ret != 0)
@@ -975,7 +1057,6 @@ static int translate_keyval_db_0_0_1(
         return(-1);
     }
      
-    /* open dataspace_attributes.db from old collection */
     ret = dbp->open(dbp,
 #ifdef HAVE_TXNID_PARAMETER_TO_DB_OPEN
                           NULL,
@@ -1046,12 +1127,31 @@ static int translate_keyval_db_0_0_1(
             t_val.buffer = data.data;
             t_val.buffer_sz = data.size;
             
+            /* figure out what type flag to use */
+            if(obj_type == PVFS_TYPE_DIRDATA)
+            {
+                /* if the key came from a dirdata object, then we assume that
+                 * it is a directory entry
+                 */
+                trove_flag = TROVE_COMPONENT_NAME_KEY;
+            }
+            else if(check_common_0_0_1((char*)t_key.buffer))
+            {
+                /* if the key is one of the common set from 0.0.1 */
+                trove_flag = TROVE_COMMON_NAME_KEY;
+            }
+            else
+            {
+                /* all other cases */
+                trove_flag = TROVE_XATTR_NAME_KEY;
+            }
+            
             /* write out new keyval pair */
             state = 0;
             ret = trove_keyval_write(
-                new_id, handle, &t_key, &t_val, TROVE_SYNC, 0, NULL,
+                new_id, handle, &t_key, &t_val, (trove_flag|TROVE_SYNC), 0, NULL,
                 trove_context, &op_id);
-            
+
             while (ret == 0)
             {   
                 ret = trove_dspace_test(
@@ -1573,7 +1673,8 @@ static int translate_dirdata_sizes_0_0_1(
  
                 state = 0;
                 ret = trove_keyval_write(
-                    new_id, tmp_handle, &t_key, &t_val, TROVE_SYNC, 0, NULL,
+                    new_id, tmp_handle, &t_key, &t_val,
+                    (TROVE_SYNC|TROVE_COMMON_NAME_KEY), 0, NULL,
                     trove_context, &op_id);
                 
                 while (ret == 0)
@@ -1600,6 +1701,26 @@ static int translate_dirdata_sizes_0_0_1(
     dbc_p->c_close(dbc_p);
     dbp->close(dbp, 0);
 
+    return(0);
+}
+
+/**
+ * checks to see if a given key is one of the "Common" keys in PVFS2
+ *
+ * \return 1 if common, 0 otherwise
+ */
+static int check_common_0_0_1(char* key)
+{
+    int i = 0;
+    
+    while(common_key_names_0_0_1[i] != NULL)
+    {
+        if(strcmp(key, common_key_names_0_0_1[i]) == 0)
+        {
+            return(1);
+        }
+        i++;
+    }
     return(0);
 }
 
