@@ -410,6 +410,19 @@ upgraded, you will only have to restart pvfs2-server with the
 environment variable unset.  You would not have to rebuild pvfs2 to take
 advantage of the fix.
 
+\subsection{PVFS2 write performance slows down dramatically}
+\label{sec:write_slowdown}
+
+Phil Carns noticed that on some kernels, write-heavy workloads can trigger a
+kernel bug.   The symptoms are that the PVFS2 server will only be able to
+deliver a few KB/s, and the CPU utilization will be close to 100\%.  The cause
+appears to be related to ext3's ``reservation'' code (designed to reduce
+fragmentation).  The solution is to either mount the filesystem with the
+'noreservation' option, or upgrade your kernel.  
+
+For more information, including URLs to several other reports of this issue, see Phil's original post:  
+\url{http://www.beowulf-underground.org/pipermail/pvfs2-developers/2006-March/001885.html}
+
 \subsection{I get ``error while loading shared libraries'' when starting PVFS2 programs}
 
 PVFS2 needs several libraries.  If those libraries aren't in the default
