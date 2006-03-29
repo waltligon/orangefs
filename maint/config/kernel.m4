@@ -109,6 +109,7 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		have_aio=no
 	)
 
+	dnl success: kernel does not define. failure: kernel does define 
 	AC_MSG_CHECKING(for touch_atime support in kernel)
 	AC_TRY_COMPILE([
 		#define __KERNEL__
@@ -118,9 +119,9 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 			return;
 		}
 		], [],
+		AC_MSG_RESULT(no),
+		AC_DEFINE(HAVE_TOUCH_ATIME, 1, Define if kernel has touch_atime routine)
 		AC_MSG_RESULT(yes)
-		AC_DEFINE(HAVE_TOUCH_ATIME, 1, Define if kernel has touch_atime routine),
-		AC_MSG_RESULT(no)
 	)
 	if test "x$have_aio" = "xyes" -a "x$enable_kernel_aio" = "xyes"; then
 		AC_MSG_CHECKING(for ki_dtor in kiocb structure of kernel)
