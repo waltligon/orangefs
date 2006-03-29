@@ -733,26 +733,6 @@ AC_SUBST(IB_INCDIR)
 AC_SUBST(IB_LIBDIR)
 
 dnl
-dnl check if fgetxattr takes extra arguments
-AC_MSG_CHECKING([for fgetxattr extra arguments])
-AC_TRY_COMPILE([
-	#include <sys/types.h>
-	#ifdef HAVE_ATTR_XATTR_H
-	#include <attr/xattr.h>
-	#endif
-	#ifdef HAVE_SYS_XATTR_H
-	#include <sys/xattr.h>
-	#endif
-	],
-	[
-	fgetxattr(0, 0, 0, 0, 0, 0);
-	],
-	AC_MSG_RESULT(yes)
-	AC_DEFINE(HAVE_FGETXATTR_EXTRA_ARGS, 1, Define if fgetxattr takes position and option arguments),
-	AC_MSG_RESULT(no)
-)
-
-dnl
 dnl look for sysinfo header
 AC_CHECK_HEADER(sys/sysinfo.h,
        AC_DEFINE(HAVE_SYSINFO, 1, Define if sysinfo.h is present)
@@ -787,6 +767,34 @@ AC_TRY_COMPILE([
 	AC_MSG_RESULT(yes)
 	AC_DEFINE(HAVE_FGETXATTR_PROTOTYPE, 1, Define if system provides fgtxattr prototype)
 )
+
+dnl
+dnl check if fgetxattr takes extra arguments:  old systems that do not have any
+dnl sort of fgetxattr should fall back to our faked version.
+
+AC_MSG_CHECKING([for fgetxattr extra arguments])
+AC_TRY_COMPILE([
+	#include <sys/types.h>
+	#ifdef HAVE_ATTR_XATTR_H
+	#include <attr/xattr.h>
+	#endif
+	#ifdef HAVE_SYS_XATTR_H
+	#include <sys/xattr.h>
+	#endif
+	],
+	[
+	#ifdef HAVE_FGETXATTR_PROTOTYPE
+	fgetxattr(0, 0, 0, 0, 0, 0);
+	#else
+	#  error
+	#endif
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_FGETXATTR_EXTRA_ARGS, 1, Define if fgetxattr takes position and option arguments),
+	AC_MSG_RESULT(no)
+)
+
+
 
 
 dnl check for getmntent(), special test
