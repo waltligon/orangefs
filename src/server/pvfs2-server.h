@@ -247,6 +247,11 @@ struct PINT_server_remove_op
                                    * the event that we are removing a
                                    * directory */
     PVFS_size dirent_count;
+    PVFS_ds_keyval * key_array;
+    PVFS_ds_position pos;
+    int key_count;
+    int index;
+    int remove_keyvals_state;
 };
 
 struct PINT_server_mgmt_remove_dirent_op

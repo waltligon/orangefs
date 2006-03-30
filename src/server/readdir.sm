@@ -14,8 +14,8 @@
 #include "server-config.h"
 #include "pvfs2-server.h"
 #include "pvfs2-attr.h"
-#include "trove.h"
 #include "pvfs2-internal.h"
+#include "trove.h"
 
 enum
 {
@@ -182,7 +182,7 @@ static int readdir_iterate_on_entries(
       - dirent_count dirent structures to hold the results
     */
     kv_array_size = (s_op->req->u.readdir.dirent_count *
-                     sizeof(TROVE_keyval_s));
+                     sizeof(PVFS_ds_keyval));
 
     memory_size = (2 * kv_array_size +
                    s_op->req->u.readdir.dirent_count *
@@ -196,10 +196,10 @@ static int readdir_iterate_on_entries(
     }
 
     /* set up all the pointers into the one big buffer */
-    s_op->key_a = (TROVE_keyval_s *)memory_buffer;
+    s_op->key_a = (PVFS_ds_keyval *)memory_buffer;
     memory_buffer += kv_array_size;
 
-    s_op->val_a = (TROVE_keyval_s *)memory_buffer;
+    s_op->val_a = (PVFS_ds_keyval *)memory_buffer;
     memory_buffer += kv_array_size;
 
     s_op->resp.u.readdir.dirent_array = (PVFS_dirent *)memory_buffer;

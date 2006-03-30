@@ -30,10 +30,6 @@ static int crdirent_write_directory_entry(
     PINT_server_op *s_op, job_status_s *js_p);
 static int crdirent_check_exist_directory_entry(
     PINT_server_op *s_op, job_status_s *js_p);
-static int crdirent_create_dirdata_dspace(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int crdirent_write_dirdata_handle(
-    PINT_server_op *s_op, job_status_s *js_p);
 static int crdirent_increment_dirent_count(
     PINT_server_op *s_op, job_status_s *js_p);
 static int crdirent_get_dirent_count(
@@ -56,8 +52,6 @@ extern PINT_server_trove_keys_s Trove_Common_Keys[];
 nested machine pvfs2_check_entry_not_exist_sm(
     validate,
     read_directory_entry_handle, 
-    create_dirdata_dspace,
-    write_dirdata_handle,
     check_exist_directory_entry,
     set_error_code,
     validation_object_type_failure)
@@ -74,7 +68,7 @@ nested machine pvfs2_check_entry_not_exist_sm(
     {
         run crdirent_read_directory_entry_handle;
         success => check_exist_directory_entry;
-        default => create_dirdata_dspace;
+        default => return;
     }
 
     state check_exist_directory_entry
@@ -92,19 +86,6 @@ nested machine pvfs2_check_entry_not_exist_sm(
     state validation_object_type_failure
     {
         run validation_object_type_failure;
-        default => return;
-    }
-
-    state create_dirdata_dspace
-    {
-        run crdirent_create_dirdata_dspace;
-        success => write_dirdata_handle;
-        default => return;
-    }
-
-    state write_dirdata_handle
-    {
-        run crdirent_write_dirdata_handle;
         default => return;
     }
 }
@@ -314,137 +295,6 @@ static int validation_object_type_failure(
     return 1;
 }
 
-/*
- * Function: crdirent_create_dirdata_dspace
- *
- * Params:   server_op *s_op, 
- *           job_status_s *js_p
- *
- * Pre:      js_p->handle = NULL
- *           js_p->error_code < 0
- *
- * Post:     js_p->handle contains a new handle for a k/v space
- *
- * Returns:  int
- *
- * Synopsis: If we execute this function, this directory does not have
- *           any entries in it.  So we need to create a key val space
- *           for these entries.  This is the first part, and we store
- *           it in part two.
- */
-static int crdirent_create_dirdata_dspace(PINT_server_op *s_op,
-                                          job_status_s *js_p)
-{
-    int ret = -PVFS_ENOMEM;
-    job_id_t i;
-    PVFS_handle_extent_array extent_array;
-    struct server_configuration_s *user_opts = get_server_config_struct();
-
-    PINT_STATE_DEBUG("create_dirdata_dspace");
-
-    gossip_debug(
-        GOSSIP_SERVER_DEBUG, "  creating dspace (coll_id = %d)\n",
-        s_op->u.crdirent.fs_id);
-
-    /* find our meta handle range for this create */
-    ret = PINT_config_get_meta_handle_extent_array(
-        user_opts, s_op->u.crdirent.fs_id, &extent_array);
-    assert(ret == 0);
-    assert(extent_array.extent_count > 0);
-
-    gossip_debug(GOSSIP_SERVER_DEBUG, "  new handle should be in range "
-                 "starting with %llu-%llu\n",
-                 llu(extent_array.extent_array[0].first),
-                 llu(extent_array.extent_array[0].last));
-
-    ret = job_trove_dspace_create(
-        s_op->u.crdirent.fs_id,
-        &extent_array,
-        PVFS_TYPE_DIRDATA,
-        NULL,
-        PINT_config_get_trove_sync_meta(
-            user_opts, s_op->u.crdirent.fs_id),
-        s_op,
-        0,
-        js_p,
-        &i,
-        server_job_context);
-
-    free(extent_array.extent_array);
-    extent_array.extent_array = NULL;
-
-    return ret;
-}
-
-/*
- * Function: crdirent_write_dirdata_handle
- *
- * Params:   server_op *s_op, 
- *           job_status_s *js_p
- *
- * Pre:      js_p->handle is the new directory entry k/v space
- *
- * Post:     js_p->handle is stored in the original k/v space for the
- *           parent handle.
- *
- * Returns:  int
- *
- * Synopsis: We are storing the newly created k/v space for future
- *           directory entries.
- *           
- */
-static int crdirent_write_dirdata_handle(PINT_server_op *s_op,
-                                         job_status_s *js_p)
-{
-    int ret = -PVFS_EINVAL;
-    job_id_t i;
-    struct server_configuration_s *user_opts = get_server_config_struct();
-
-    PINT_STATE_DEBUG("write_dirdata_handle");
-
-    if (js_p->error_code)
-    {
-        return 1;
-    }
-    js_p->error_code = 0;
-
-    /*
-      the last state was create_dirdata_dspace, so handle is in
-      js_p->handle. save it
-    */
-    s_op->u.crdirent.dirent_handle = js_p->handle;
-
-    s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
-    s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
-
-    /* use the crdirent scratch space for the dest handle */
-    s_op->val.buffer = &s_op->u.crdirent.dirent_handle;
-    s_op->val.buffer_sz = sizeof(PVFS_handle);
-
-    gossip_debug(
-        GOSSIP_SERVER_DEBUG, "  writing dirdata handle (%llu) "
-        "into parent directory keyval space (%llu)\n",
-        llu(s_op->u.crdirent.dirent_handle),
-        llu(s_op->u.crdirent.parent_handle));
-
-    ret = job_trove_keyval_write(
-        s_op->u.crdirent.fs_id,
-        s_op->u.crdirent.parent_handle,
-        &s_op->key,
-        &s_op->val,
-        TROVE_COMMON_NAME_KEY |
-        PINT_config_get_trove_sync_meta(
-            user_opts, s_op->u.crdirent.fs_id),
-        NULL,
-        s_op,
-        0,
-        js_p,
-        &i,
-        server_job_context);
-
-    return ret;
-}
-
 static int crdirent_get_dirent_count(PINT_server_op *s_op,
                                      job_status_s *js_p)
 {
@@ -496,7 +346,14 @@ static int crdirent_increment_dirent_count(PINT_server_op *s_op,
                                  js_p,
                                  &i,
                                  server_job_context);
-    
+
+    gossip_debug(GOSSIP_SERVER_DEBUG,
+                 "incrementing dirent_count: fsid: %u, handle: %llu, "
+                 "count: %llu\n",
+                 s_op->req->u.crdirent.fs_id,
+                 s_op->req->u.crdirent.parent_handle,
+                 s_op->u.crdirent.dirent_count);
+     
     return ret;
 }
 
@@ -526,6 +383,8 @@ static int crdirent_write_directory_entry(PINT_server_op *s_op,
         get_server_config_struct();
 
     PINT_STATE_DEBUG("write_directory_entry");
+
+    assert(s_op->u.crdirent.dirent_handle);
 
     js_p->error_code = 0;
 

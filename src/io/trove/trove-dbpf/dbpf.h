@@ -172,6 +172,9 @@ struct dbpf_collection_db_entry
 int PINT_trove_dbpf_keyval_compare(
     DB * dbp, const DBT * a, const DBT * b);
 
+size_t PINT_trove_dbpf_keyval_prefix(
+    DB * dbp, const DBT * a, const DBT * b);
+
 struct dbpf_dspace_create_op
 {
     TROVE_handle_extent_array extent_array;
