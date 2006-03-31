@@ -132,6 +132,23 @@ extern struct TROVE_dspace_ops dbpf_dspace_ops;
 extern struct TROVE_keyval_ops dbpf_keyval_ops;
 extern struct TROVE_mgmt_ops dbpf_mgmt_ops;
 
+typedef int (* PINT_dbpf_keyval_iterate_callback)(
+    DB * db_p, TROVE_handle handle, TROVE_ds_flags flags, TROVE_keyval_s *key);
+
+int PINT_dbpf_keyval_iterate(
+    DB *db_p,
+    TROVE_handle handle,
+    TROVE_ds_flags flags,
+    PINT_dbpf_keyval_pcache *pcache,    
+    TROVE_keyval_s *keys_array,
+    TROVE_keyval_s *values_array,
+    int *count,
+    TROVE_ds_position pos,
+    PINT_dbpf_keyval_iterate_callback callback);
+
+int PINT_dbpf_keyval_remove(
+    DB *db_p, TROVE_handle handle, TROVE_ds_flags flags, TROVE_keyval_s *key);
+
 struct dbpf_storage
 {
     int refct;

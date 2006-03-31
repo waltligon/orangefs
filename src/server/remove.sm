@@ -32,10 +32,9 @@
  * 1) prelude
  * 2) check_object_type
  * 3) verify_object_metadata
- * 4) remove_keyvals
- * 5) remove_dspace
- * 6) final_response
- * 7) cleanup
+ * 4) remove_dspace
+ * 5) final_response
+ * 6) cleanup
  *
  * For a directory that has (or at one time had) entries, the path is:
  * 1) prelude
@@ -44,10 +43,9 @@
  * 4) try_to_read_dirdata_handle
  * 5) remove_dirdata_keyvals
  * 6) remove_dirdata_dspace
- * 7) remove_keyvals
- * 8) remove_dspace
- * 9) final_response
- * 10) cleanup
+ * 7) remove_dspace
+ * 8) final_response
+ * 9) cleanup
  *
  * A directory that never had entries will skip step (5), as there
  * would be no dirdata dspace.
@@ -59,13 +57,6 @@ enum
 {
     STATE_TYPE_DIRECTORY = 1,
     STATE_TYPE_DATAFILE = 2,
-};
-
-enum
-{
-    REMOVE_KEYVALS_GET_MORE_KEYS = 1,
-    REMOVE_KEYVALS_REMOVE_NEXT_KEY = 2,
-    REMOVE_KEYVALS_DONE = 3
 };
 
 static int remove_check_object_type(
@@ -84,34 +75,21 @@ static int remove_get_dirent_count(
     PINT_server_op *s_op, job_status_s *js_p);
 static int remove_check_dirdata_entries(
     PINT_server_op *s_op, job_status_s *js_p);
-static int remove_remove_dirdata_keyvals(
-    PINT_server_op *s_op, job_status_s *js_p);
 static int remove_remove_dirdata_dspace(
     PINT_server_op *s_op, job_status_s *js_p);
 static int remove_setup_work(
     PINT_server_op *s_op, job_status_s *js_p);
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
-/* helper functions */
-
-static int do_remove_keyvals_state(PINT_server_op *s_op,
-                                   job_status_s *js_p,
-                                   PVFS_handle handle);
-
-static int remove_key_array_init(
-    PVFS_ds_keyval **keyval_array);
-
 %%
 
 nested machine pvfs2_remove_work_sm(
     check_object_type,
     verify_object_metadata,
-    remove_keyvals,
     remove_dspace,
     read_dirdata_handle,
     getattr_of_dirdata_handle,
     check_dirdata_entries,
-    remove_dirdata_keyvals,
     remove_dirdata_dspace)
 {
 
@@ -127,7 +105,7 @@ nested machine pvfs2_remove_work_sm(
     {
         run remove_verify_object_metadata;
         STATE_TYPE_DIRECTORY => read_dirdata_handle;
-        success => remove_keyvals;
+        success => remove_dspace;
         default => return;
     }
 
@@ -137,19 +115,11 @@ nested machine pvfs2_remove_work_sm(
         default => return;
     }
 
-    state remove_keyvals
-    {
-        run remove_remove_keyvals;
-        REMOVE_KEYVALS_DONE => remove_dspace;
-        success => remove_keyvals;
-        default => return;
-    }
-
     state read_dirdata_handle
     {
         run remove_read_dirdata_handle;
         success => getattr_of_dirdata_handle;
-        default => remove_keyvals;
+        default => remove_dspace;
     }
 
     state getattr_of_dirdata_handle
@@ -162,24 +132,17 @@ nested machine pvfs2_remove_work_sm(
     state check_dirdata_entries
     {
         run remove_check_dirdata_entries;
-        success => remove_dirdata_keyvals;
+        success => remove_dirdata_dspace;
         default => return;
     }
 
     state remove_dirdata_dspace
     {
         run remove_remove_dirdata_dspace;
-        success => remove_keyvals;
+        success => remove_dspace;
         default => return;
     }
 
-    state remove_dirdata_keyvals
-    {
-        run remove_remove_dirdata_keyvals;
-        REMOVE_KEYVALS_DONE => remove_dirdata_dspace;
-        success => remove_dirdata_keyvals;
-        default => return;
-    }
 }
 
 machine pvfs2_remove_sm(
@@ -289,9 +252,6 @@ static int remove_verify_object_metadata(PINT_server_op *s_op,
             "dirdata object before removing directory itself.\n");
     }
 
-    /* setup position for next state (remove[_dirdata]_keyvals) */
-    s_op->u.remove.pos = PVFS_ITERATE_START;
- 
     return 1;
 }
 
@@ -414,175 +374,7 @@ static int remove_remove_dirdata_dspace(PINT_server_op *s_op,
         &j_id,
         server_job_context);
 
-    /* setup position for next state (get_keyvals) */
-    s_op->u.remove.pos = PVFS_ITERATE_START;
-
     return ret;
-}
-
-static int do_remove_keyvals_state(PINT_server_op *s_op,
-                                   job_status_s *js_p,
-                                   PVFS_handle handle)
-{
-    int ret;
-    job_id_t tmp_id;
-    
-    switch(s_op->u.remove.remove_keyvals_state)
-    {
-        case REMOVE_KEYVALS_GET_MORE_KEYS:
- 
-            s_op->u.remove.remove_keyvals_state = REMOVE_KEYVALS_REMOVE_NEXT_KEY;
-            if(!s_op->u.remove.key_array)
-            {
-                ret = remove_key_array_init(&s_op->u.remove.key_array);
-                if(ret != 0)
-                {
-                    js_p->error_code = ret;
-                    return 1;
-                }
-            }
-            s_op->u.remove.index = 0;
-
-            ret = job_trove_keyval_iterate_keys(
-                s_op->u.remove.fs_id,
-                handle,
-                s_op->u.remove.pos,
-                s_op->u.remove.key_array,
-                PVFS_REMOVE_ITERATE_MAXCOUNT,
-                0, /* allow for all key types */
-                NULL,
-                s_op,
-                0,
-                js_p,
-                &tmp_id,
-                server_job_context);
-            if(ret < 0)
-            {
-                js_p->error_code = ret;
-                return 1;
-            }
-            return 0;
-
-        case REMOVE_KEYVALS_REMOVE_NEXT_KEY:
-
-            if(s_op->u.remove.index == 0)
-            {
-                /* must be first remove after get */
-                s_op->u.remove.key_count = js_p->count;
-                s_op->u.remove.pos = js_p->position;
-            }
-
-            if(s_op->u.remove.key_count == 0)
-            {
-                s_op->u.remove.remove_keyvals_state = REMOVE_KEYVALS_DONE;
-                return 1;
-            }
-
-            if(s_op->u.remove.index < s_op->u.remove.key_count)
-            {
-                gossip_debug(
-                    GOSSIP_SERVER_DEBUG,
-                    "  removing keyval: handle %llu, key: %*s\n",
-                    llu(handle),
-                    s_op->u.remove.key_array[s_op->u.remove.index].read_sz,
-                    (char *)s_op->u.remove.key_array[
-                                    s_op->u.remove.index].buffer);
-
-                s_op->u.remove.key_array[s_op->u.remove.index].buffer_sz = 
-                    s_op->u.remove.key_array[s_op->u.remove.index].read_sz;
-                ret = job_trove_keyval_remove(
-                    s_op->u.remove.fs_id,
-                    handle,
-                    &s_op->u.remove.key_array[s_op->u.remove.index],
-                    TROVE_KEYVAL_TYPES,
-                    NULL,
-                    s_op,
-                    0,
-                    js_p,
-                    &tmp_id,
-                    server_job_context);
-                if(ret < 0)
-                {
-                    js_p->error_code = ret;
-                    return 1;
-                }
-
-                s_op->u.remove.index++;
-            }
-
-            if(s_op->u.remove.index == s_op->u.remove.key_count)
-            {
-                if(s_op->u.remove.pos != PVFS_ITERATE_END)
-                {
-                    s_op->u.remove.remove_keyvals_state = 
-                        REMOVE_KEYVALS_GET_MORE_KEYS;
-                }
-                else
-                {
-                    s_op->u.remove.remove_keyvals_state = REMOVE_KEYVALS_DONE;
-                }
-            }
-                    
-            /* wait for remove to complete */
-            return 0;
-
-        case REMOVE_KEYVALS_DONE:
-            
-            s_op->u.remove.remove_keyvals_state = REMOVE_KEYVALS_GET_MORE_KEYS;
-            js_p->error_code = REMOVE_KEYVALS_DONE;
-            return 1;
-        
-        default:
-            /* should never reach here */
-            gossip_lerr("Program error: remove.sm: invalid state reached\n");
-    }
-
-    /* avoid compiler warning */
-    return 1;
-}
-
-static int remove_remove_keyvals(PINT_server_op *s_op,
-                                 job_status_s *js_p)
-{
-
-    PINT_STATE_DEBUG("remove_remove_keyval");
-
-    if(s_op->attr.objtype == PVFS_TYPE_DATAFILE)
-    {
-        /* skip keyvals (datafiles don't have any) 
-         * and go right to remove_dspace */
-        js_p->error_code = REMOVE_KEYVALS_DONE;
-        return 1;
-    }
-    
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-		 "removing dir_ent keyvals %llu\n",
-		 llu(s_op->u.remove.handle));
-
-    if(js_p->error_code)
-    {
-        return 1;
-    }
-
-    return do_remove_keyvals_state(s_op, js_p, s_op->u.remove.handle);
-}
-
-
-static int remove_remove_dirdata_keyvals(PINT_server_op *s_op,
-                                         job_status_s *js_p)
-{
-    PINT_STATE_DEBUG("remove_remove_dirdata_keyvals");
-
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-		 "removing dir_data keyvals %llu\n",
-		 llu(s_op->u.remove.dirdata_handle));
-
-    if(js_p->error_code)
-    {
-        return 1;
-    }
-
-    return do_remove_keyvals_state(s_op, js_p, s_op->u.remove.dirdata_handle);
 }
 
 /*
@@ -639,42 +431,8 @@ static int remove_setup_work(
 
     s_op->u.remove.handle = s_op->req->u.remove.handle;
     s_op->u.remove.fs_id = s_op->req->u.remove.fs_id;
-    s_op->u.remove.key_count = 0;
-    s_op->u.remove.key_array = NULL;
-    s_op->u.remove.remove_keyvals_state = REMOVE_KEYVALS_GET_MORE_KEYS;
-
     js_p->error_code = 0;
     return 1;
-}
-
-static int remove_key_array_init(
-    PVFS_ds_keyval **keyval_array)
-{
-    PVFS_ds_keyval *array;
-    int i = 0;
-    char * membuffer;
-    
-    membuffer = malloc(
-        (sizeof(PVFS_ds_keyval) + PVFS_NAME_MAX) * 
-        PVFS_REMOVE_ITERATE_MAXCOUNT);
-    if(!membuffer)
-    {
-        return -PVFS_ENOMEM;
-    }
-
-    array = (PVFS_ds_keyval *)membuffer;
-    membuffer += (sizeof(PVFS_ds_keyval) * PVFS_REMOVE_ITERATE_MAXCOUNT);
-
-    for(; i < PVFS_REMOVE_ITERATE_MAXCOUNT; ++i)
-    {
-        array[i].buffer = membuffer;
-        membuffer += PVFS_NAME_MAX;
-        array[i].buffer_sz = PVFS_NAME_MAX;
-        array[i].read_sz = 0;
-    }
-
-    *keyval_array = array;
-    return 0;
 }
 
 

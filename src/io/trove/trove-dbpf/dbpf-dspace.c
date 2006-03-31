@@ -282,12 +282,6 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
                     1, PINT_PERF_SUB);
 
-    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
-                    1, PINT_PERF_SUB);
-
-    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
-                    1, PINT_PERF_SUB);
-
     *op_p->u.d_create.out_handle_p = new_handle;
     return 1;
 
@@ -340,6 +334,7 @@ static int dbpf_dspace_remove(TROVE_coll_id coll_id,
 
 static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
 {
+    int count = 0;
     int ret = -TROVE_EINVAL;
     DBT key;
     TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
@@ -371,20 +366,35 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
     dbpf_attr_cache_remove(ref);
     gen_mutex_unlock(&dbpf_attr_cache_mutex);
 
-    /* remove both bstream and keyval db if they exist.  Not a fatal
+    /* remove bstream if it exists.  Not a fatal
      * error if this fails (may not have ever been created)
      */
-    ret = dbpf_open_cache_remove(
-        op_p->coll_p->coll_id, op_p->handle);
+    ret = dbpf_open_cache_remove(op_p->coll_p->coll_id, op_p->handle);
 
-    DBPF_DB_SYNC_IF_NECESSARY(op_p, 
-                              op_p->coll_p->ds_db);
+    DBPF_DB_SYNC_IF_NECESSARY(op_p, op_p->coll_p->ds_db);
 
-    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
-                    1, PINT_PERF_SUB);
+    /* remove the keyval entries for this handle if any exist.
+     * this way seems a bit messy to me, i.e. we're operating
+     * on keyval databases directly here instead of going through
+     * the trove keyval interfaces.  It does allow us to perform the cleanup
+     * of a handle without having to post more operations though.
+     */
+    ret = PINT_dbpf_keyval_iterate(
+        op_p->coll_p->keyval_db,
+        op_p->handle,
+        TROVE_KEYVAL_TYPES,
+        op_p->coll_p->pcache,
+        NULL,
+        NULL,
+        &count,
+        TROVE_ITERATE_START,
+        PINT_dbpf_keyval_remove);
+    if(ret != 0 && ret != -TROVE_ENOENT)
+    {
+        goto return_error;
+    }
 
-    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
-                    1, PINT_PERF_SUB);
+    DBPF_DB_SYNC_IF_NECESSARY(op_p, op_p->coll_p->keyval_db);
 
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
                     1, PINT_PERF_SUB);
