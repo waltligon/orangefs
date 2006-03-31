@@ -213,7 +213,6 @@ static int small_io_start_job(PINT_server_op *s_op, job_status_s *js_p)
 
     PINT_free_request_state(file_req_state);
 
-    js_p->error_code = 0;
     return ret;
 }
 
