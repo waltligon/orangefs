@@ -53,15 +53,8 @@ enum
     TROVE_ATOMIC = 2,
     TROVE_FORCE_REQUESTED_HANDLE = 4,
     TROVE_NOOVERWRITE = 8, /* keyval_write and keyval_write_list */
-    TROVE_ONLYOVERWRITE = 16, /* keyval_write and keyval_write_list */
-    TROVE_COMMON_NAME_KEY = 32,
-    TROVE_XATTR_NAME_KEY = 64,
-    TROVE_COMPONENT_NAME_KEY = 128
+    TROVE_ONLYOVERWRITE = 16 /* keyval_write and keyval_write_list */
 };
-
-#define TROVE_KEYVAL_TYPES (TROVE_COMMON_NAME_KEY | \
-                            TROVE_XATTR_NAME_KEY | \
-                            TROVE_COMPONENT_NAME_KEY)
 
 /* get/setinfo option flags */
 enum

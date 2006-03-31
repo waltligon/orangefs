@@ -95,7 +95,7 @@ static int mgmt_remove_dirent_get_dirdata_handle_from_parent(
         s_op->req->u.mgmt_remove_dirent.fs_id,
         s_op->req->u.mgmt_remove_dirent.handle,
         &s_op->key, &s_op->val, 
-        TROVE_COMMON_NAME_KEY, NULL, s_op, 0, js_p, &i,
+        0, NULL, s_op, 0, js_p, &i,
         server_job_context);
 
     return ret;
@@ -123,7 +123,6 @@ static int mgmt_remove_dirent(
         s_op->req->u.mgmt_remove_dirent.fs_id,
         s_op->u.mgmt_remove_dirent.dirdata_handle,
         &s_op->key,
-        TROVE_COMPONENT_NAME_KEY |
         PINT_config_get_trove_sync_meta(
             user_opts, s_op->req->u.mgmt_remove_dirent.fs_id),
         NULL,

@@ -985,7 +985,6 @@ static int translate_keyval_db_0_0_1(
     TROVE_keyval_s t_val;
     TROVE_ds_storedattr_s* tmp_attr;
     PVFS_ds_type obj_type = PVFS_TYPE_NONE;
-    int trove_flag;
 
     if(verbose) printf("VERBOSE Migrating keyvals for handle: %llu\n", llu(handle));
 
@@ -1126,30 +1125,11 @@ static int translate_keyval_db_0_0_1(
             t_key.buffer_sz = key.size;
             t_val.buffer = data.data;
             t_val.buffer_sz = data.size;
-            
-            /* figure out what type flag to use */
-            if(obj_type == PVFS_TYPE_DIRDATA)
-            {
-                /* if the key came from a dirdata object, then we assume that
-                 * it is a directory entry
-                 */
-                trove_flag = TROVE_COMPONENT_NAME_KEY;
-            }
-            else if(check_common_0_0_1((char*)t_key.buffer))
-            {
-                /* if the key is one of the common set from 0.0.1 */
-                trove_flag = TROVE_COMMON_NAME_KEY;
-            }
-            else
-            {
-                /* all other cases */
-                trove_flag = TROVE_XATTR_NAME_KEY;
-            }
-            
+           
             /* write out new keyval pair */
             state = 0;
             ret = trove_keyval_write(
-                new_id, handle, &t_key, &t_val, (trove_flag|TROVE_SYNC), 0, NULL,
+                new_id, handle, &t_key, &t_val, TROVE_SYNC, 0, NULL,
                 trove_context, &op_id);
 
             while (ret == 0)
@@ -1674,7 +1654,7 @@ static int translate_dirdata_sizes_0_0_1(
                 state = 0;
                 ret = trove_keyval_write(
                     new_id, tmp_handle, &t_key, &t_val,
-                    (TROVE_SYNC|TROVE_COMMON_NAME_KEY), 0, NULL,
+                    TROVE_SYNC, 0, NULL,
                     trove_context, &op_id);
                 
                 while (ret == 0)

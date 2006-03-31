@@ -65,8 +65,6 @@ static int remove_verify_object_metadata(
     PINT_server_op *s_op, job_status_s *js_p);
 static int remove_cleanup(
     PINT_server_op *s_op, job_status_s *js_p);
-static int remove_remove_keyvals(
-    PINT_server_op *s_op, job_status_s *js_p);
 static int remove_remove_dspace(
     PINT_server_op *s_op, job_status_s *js_p);
 static int remove_read_dirdata_handle(
@@ -280,7 +278,7 @@ static int remove_read_dirdata_handle(PINT_server_op *s_op,
     ret = job_trove_keyval_read(
         s_op->u.remove.fs_id, s_op->u.remove.handle,
         &s_op->key, &s_op->val, 
-        TROVE_COMMON_NAME_KEY, NULL, s_op, 0, js_p,
+        0, NULL, s_op, 0, js_p,
         &j_id, server_job_context);
 
     return ret;
@@ -310,7 +308,7 @@ static int remove_get_dirent_count(
         s_op->u.remove.handle,
         &s_op->key,
         &s_op->val,
-        TROVE_COMMON_NAME_KEY,
+        0,
         NULL,
         s_op,
         0,
@@ -415,11 +413,6 @@ static int remove_cleanup(PINT_server_op *s_op,
 			  job_status_s *js_p)
 {
     PINT_STATE_DEBUG("cleanup");
-
-    if(s_op->u.remove.key_array)
-    {
-        free(s_op->u.remove.key_array);
-    }
 
     return(server_state_machine_complete(s_op));
 }

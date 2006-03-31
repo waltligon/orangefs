@@ -1075,7 +1075,7 @@ static int dbpf_collection_lookup(char *collname,
                            sto_p->name, coll_p->coll_id);
     coll_p->keyval_db = dbpf_db_open(path_name, &ret, 
                                      PINT_trove_dbpf_keyval_compare,
-                                     PINT_trove_dbpf_keyval_prefix);
+                                     NULL);
     if(coll_p->keyval_db == NULL)
     {
         return ret;

@@ -413,7 +413,7 @@ int pvfs2_mkspace(
 
         ret = trove_keyval_write(
             coll_id, new_root_handle, &key, &val, 
-            TROVE_COMMON_NAME_KEY | TROVE_SYNC, 0, NULL,
+            TROVE_SYNC, 0, NULL,
             trove_context, &op_id);
 
         while (ret == 0)
@@ -440,7 +440,7 @@ int pvfs2_mkspace(
 
 	ret = trove_keyval_write(
 	    coll_id, new_root_handle, &key, &val,
-	    TROVE_COMMON_NAME_KEY | TROVE_SYNC, 0, NULL,
+	    TROVE_SYNC, 0, NULL,
 	    trove_context, &op_id);
 	
 	while(ret == 0)
@@ -591,7 +591,7 @@ int pvfs2_mkspace(
 
         ret = trove_keyval_write(
             coll_id, lost_and_found_handle, &key, &val, 
-            TROVE_COMMON_NAME_KEY | TROVE_SYNC,
+            TROVE_SYNC,
             0, NULL, trove_context, &op_id);
 
         while (ret == 0)
@@ -617,7 +617,7 @@ int pvfs2_mkspace(
 
         ret = trove_keyval_write(
             coll_id, lost_and_found_handle, &key, &val, 
-            TROVE_COMMON_NAME_KEY | TROVE_SYNC,
+            TROVE_SYNC,
             0, NULL, trove_context, &op_id);
 
         while (ret == 0)
@@ -649,7 +649,7 @@ int pvfs2_mkspace(
 
         ret = trove_keyval_write(
             coll_id, root_dirdata_handle, &key, &val, 
-            TROVE_COMPONENT_NAME_KEY | TROVE_SYNC, 0,
+            TROVE_SYNC, 0,
             NULL, trove_context, &op_id);
 
         while (ret == 0)

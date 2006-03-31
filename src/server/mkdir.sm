@@ -278,7 +278,6 @@ static int mkdir_write_dirdata_handle(
     ret = job_trove_keyval_write(
         s_op->u.mkdir.fs_id, s_op->resp.u.mkdir.handle,
         &s_op->key, &s_op->val, 
-        TROVE_COMMON_NAME_KEY | 
         PINT_config_get_trove_sync_meta(
             user_opts, s_op->u.mkdir.fs_id),
         NULL, s_op, 0, js_p, &i, server_job_context);
@@ -308,7 +307,6 @@ static int mkdir_init_dirdata_count(PINT_server_op *s_op, job_status_s *js_p)
     ret = job_trove_keyval_write(
         s_op->u.mkdir.fs_id, s_op->resp.u.mkdir.handle,
         &s_op->key, &s_op->val, 
-        TROVE_COMMON_NAME_KEY | 
         PINT_config_get_trove_sync_meta(
             user_opts, s_op->u.mkdir.fs_id),
         NULL, s_op, 0, js_p, &i, server_job_context);

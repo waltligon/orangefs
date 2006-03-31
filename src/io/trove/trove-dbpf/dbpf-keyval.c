@@ -75,15 +75,14 @@ extern struct PINT_perf_counter *PINT_server_pc;
 struct dbpf_keyval_db_entry
 {
     TROVE_handle handle;
-    TROVE_ds_flags type;
     char key[DBPF_MAX_KEY_LENGTH];
 };
 
 #define DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(_size) \
-    (sizeof(TROVE_handle) + sizeof(TROVE_ds_flags) + _size)
+    (sizeof(TROVE_handle) + _size)
 
 #define DBPF_KEYVAL_DB_ENTRY_KEY_SIZE(_size) \
-    (_size - sizeof(TROVE_handle) - sizeof(TROVE_ds_flags))
+    (_size - sizeof(TROVE_handle))
 
 extern gen_mutex_t dbpf_attr_cache_mutex;
 
@@ -101,25 +100,21 @@ static int dbpf_keyval_flush_op_svc(struct dbpf_op *op_p);
 
 static int dbpf_keyval_iterate_get_first_entry(
     TROVE_handle handle, 
-    TROVE_ds_flags flags, 
     DBC * dbc_p);
 
 static int dbpf_keyval_iterate_step_to_position(
     TROVE_handle handle, 
-    TROVE_ds_flags flags, 
     TROVE_ds_position pos,
     DBC * dbc_p);
 
 static int dbpf_keyval_iterate_skip_to_position(
     TROVE_handle handle, 
-    TROVE_ds_flags flags, 
     TROVE_ds_position pos, 
     PINT_dbpf_keyval_pcache *pcache,
     DBC * dbc_p);
 
 static int dbpf_keyval_iterate_cursor_get(
     TROVE_handle handle, 
-    TROVE_ds_flags flags, 
     DBC * dbc_p, 
     TROVE_keyval_s * key, 
     TROVE_keyval_s * data, 
@@ -204,7 +199,6 @@ static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
     memset(&key, 0, sizeof(key));
 
     key_entry.handle = op_p->handle;
-    key_entry.type = op_p->flags & TROVE_KEYVAL_TYPES;
     memcpy(key_entry.key, 
            op_p->u.k_read.key->buffer, 
            op_p->u.k_read.key->buffer_sz);
@@ -334,7 +328,6 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
                  (char *)op_p->u.k_write.key.buffer);
 
     key_entry.handle = op_p->handle;
-    key_entry.type = op_p->flags & TROVE_KEYVAL_TYPES;
 
     assert(op_p->u.k_write.key.buffer_sz <= DBPF_MAX_KEY_LENGTH);
     memcpy(key_entry.key, 
@@ -388,6 +381,14 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
             goto return_error;
         }
     }
+
+    gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
+                 "keyval_db->put(handle= %llu, key= %*s (%d)) size=%d\n",
+                 key_entry.handle, 
+                 op_p->u.k_write.key.buffer_sz,
+                 key_entry.key,
+                 op_p->u.k_write.key.buffer_sz,
+                 key.size);
 
     ret = op_p->coll_p->keyval_db->put(
         op_p->coll_p->keyval_db, NULL, &key, &data, dbflags);
@@ -501,7 +502,6 @@ static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p)
                  (char *)op_p->u.k_remove.key.buffer);
                  
     ret = PINT_dbpf_keyval_remove(op_p->coll_p->keyval_db, op_p->handle,
-                                  op_p->flags,
                                   &op_p->u.k_remove.key);
     if (ret != 0)
     {
@@ -625,7 +625,6 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
 
     ret = PINT_dbpf_keyval_iterate(op_p->coll_p->keyval_db,
                                    op_p->handle,
-                                   op_p->flags,
                                    op_p->coll_p->pcache,
                                    op_p->u.k_iterate.key_array,
                                    op_p->u.k_iterate.val_array,
@@ -758,7 +757,6 @@ static int dbpf_keyval_iterate_keys_op_svc(struct dbpf_op *op_p)
 
     ret = PINT_dbpf_keyval_iterate(op_p->coll_p->keyval_db,
                                    op_p->handle,
-                                   op_p->flags,
                                    op_p->coll_p->pcache,
                                    (count != 0) ?
                                    op_p->u.k_iterate_keys.key_array : NULL,
@@ -856,7 +854,6 @@ static int dbpf_keyval_read_list_op_svc(struct dbpf_op *op_p)
     for(i = 0; i < op_p->u.k_read_list.count; i++)
     {
         key_entry.handle = op_p->handle;
-        key_entry.type = op_p->flags & TROVE_KEYVAL_TYPES;
         memcpy(key_entry.key, 
                op_p->u.k_read_list.key_array[i].buffer,
                op_p->u.k_read_list.key_array[i].buffer_sz);
@@ -957,7 +954,6 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
     int k;
 
     key_entry.handle = op_p->handle;
-    key_entry.type = op_p->flags & TROVE_KEYVAL_TYPES;
 
     /* read each key to see if it is present */
     for (k = 0; k < op_p->u.k_write_list.count; k++)
@@ -1005,6 +1001,14 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
 
         data.data = op_p->u.k_write_list.val_array[k].buffer;
         data.size = op_p->u.k_write_list.val_array[k].buffer_sz;
+
+        gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
+                     "keyval_db->put(handle= %llu, key= %*s (%d)) size=%d\n",
+                     key_entry.handle, 
+                     op_p->u.k_write_list.key_array[k].buffer_sz,
+                     key_entry.key,
+                     op_p->u.k_write_list.key_array[k].buffer_sz,
+                     key.size);
 
         ret = op_p->coll_p->keyval_db->put(
             op_p->coll_p->keyval_db, NULL, &key, &data, 0);
@@ -1118,7 +1122,6 @@ return_error:
 int PINT_dbpf_keyval_iterate(
     DB *db_p,
     TROVE_handle handle,
-    TROVE_ds_flags flags,
     PINT_dbpf_keyval_pcache *pcache,    
     TROVE_keyval_s *keys_array,
     TROVE_keyval_s *values_array,
@@ -1134,6 +1137,9 @@ int PINT_dbpf_keyval_iterate(
     TROVE_keyval_s *key;
     TROVE_keyval_s *val = NULL;
 
+    gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
+                 "Entered: PINT_dpbf_keyval_iterate\n");
+
     skey.buffer = keybuffer;
     skey.buffer_sz = PVFS_NAME_MAX;
     key = &skey;
@@ -1141,6 +1147,9 @@ int PINT_dbpf_keyval_iterate(
     ret = db_p->cursor(db_p, NULL, &dbc_p, 0);
     if (ret != 0)
     {
+        gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
+                     "Exited: PINT_dpbf_keyval_iterate\n");
+
         gossip_lerr("db_p->cursor failed\n");
         *count = 0;
         return -dbpf_db_error_to_trove_error(ret);
@@ -1148,7 +1157,7 @@ int PINT_dbpf_keyval_iterate(
 
     if(pos == TROVE_ITERATE_START)
     {
-        ret = dbpf_keyval_iterate_get_first_entry(handle, flags, dbc_p);
+        ret = dbpf_keyval_iterate_get_first_entry(handle, dbc_p);
         if(ret != 0)
         {
             goto return_error;
@@ -1159,7 +1168,7 @@ int PINT_dbpf_keyval_iterate(
     else
     {
         ret = dbpf_keyval_iterate_skip_to_position(
-            handle, flags, pos, pcache, dbc_p);
+            handle, pos, pcache, dbc_p);
         if(ret != 0 && ret != DBPF_ITERATE_CURRENT_POSITION)
         {
             goto return_error;
@@ -1183,7 +1192,7 @@ int PINT_dbpf_keyval_iterate(
         }
 
         ret = dbpf_keyval_iterate_cursor_get(
-            handle, flags, dbc_p,  key, val, DB_CURRENT);
+            handle, dbc_p,  key, val, DB_CURRENT);
         if(ret != 0)
         {
             goto return_error;
@@ -1192,7 +1201,7 @@ int PINT_dbpf_keyval_iterate(
         if(callback)
         {
             key->buffer_sz = key->read_sz;
-            ret = callback(db_p, handle, flags, key);
+            ret = callback(db_p, handle, key);
             if(ret != 0)
             {
                 goto return_error;
@@ -1219,7 +1228,7 @@ int PINT_dbpf_keyval_iterate(
         }
 
         ret = dbpf_keyval_iterate_cursor_get(
-            handle, flags, dbc_p, key, val, DB_NEXT);
+            handle, dbc_p, key, val, DB_NEXT);
         if(ret != 0)
         {
             goto return_error;
@@ -1228,7 +1237,7 @@ int PINT_dbpf_keyval_iterate(
         if(callback)
         {
             key->buffer_sz = key->read_sz;
-            ret = callback(db_p, handle, flags, key);
+            ret = callback(db_p, handle, key);
             if(ret != 0)
             {
                 goto return_error;
@@ -1246,23 +1255,38 @@ return_error:
         dbc_p->c_close(dbc_p);
     }
 
+    gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
+                 "Exited: PINT_dpbf_keyval_iterate\n");
+
     return ret;
 }
 
 int PINT_dbpf_keyval_remove(
-    DB *db_p, TROVE_handle handle, TROVE_ds_flags flags, TROVE_keyval_s *key)
+    DB *db_p, TROVE_handle handle, TROVE_keyval_s *key)
 {
     int ret;
     struct dbpf_keyval_db_entry key_entry;
     DBT db_key;
 
+    gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
+                 "PINT_dbpf_keyval_remove: handle (%llu), key: (%d) %*s\n",
+                 handle, key->buffer_sz, key->buffer_sz, (char *)key->buffer);
+
     key_entry.handle = handle;
-    key_entry.type = flags & TROVE_KEYVAL_TYPES;
     memcpy(key_entry.key, key->buffer, key->buffer_sz);
 
     memset(&db_key, 0, sizeof(db_key));
     db_key.data = &key_entry;
     db_key.size = DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(key->buffer_sz);
+
+    gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
+                 "keyval_db->del(handle= %llu, key= %*s (%d)) size=%d\n",
+                 key_entry.handle,
+                 key->buffer_sz,
+                 key_entry.key,
+                 key->buffer_sz,
+                 db_key.size);
+
     ret = db_p->del(db_p, NULL, &db_key, 0);
     if(ret != 0)
     {
@@ -1274,7 +1298,7 @@ int PINT_dbpf_keyval_remove(
 }
 
 static int dbpf_keyval_iterate_get_first_entry(
-    TROVE_handle handle, TROVE_ds_flags flags, DBC * dbc_p)
+    TROVE_handle handle, DBC * dbc_p)
 {
     int ret = 0;
     TROVE_keyval_s key;
@@ -1287,7 +1311,7 @@ static int dbpf_keyval_iterate_get_first_entry(
      * This is done by creating a key that has a null component string.
      */
     ret = dbpf_keyval_iterate_cursor_get(
-        handle, flags, dbc_p, &key, NULL, DB_SET_RANGE);
+        handle, dbc_p, &key, NULL, DB_SET_RANGE);
     if(ret != 0)
     {
         return ret;
@@ -1298,7 +1322,6 @@ static int dbpf_keyval_iterate_get_first_entry(
 
 static int dbpf_keyval_iterate_skip_to_position(
     TROVE_handle handle,
-    TROVE_ds_flags flags,
     TROVE_ds_position pos,
     PINT_dbpf_keyval_pcache *pcache,
     DBC * dbc_p)
@@ -1320,11 +1343,11 @@ static int dbpf_keyval_iterate_skip_to_position(
          * to the position
          */
 
-        return dbpf_keyval_iterate_step_to_position(handle, flags, pos, dbc_p);
+        return dbpf_keyval_iterate_step_to_position(handle, pos, dbc_p);
     }
 
     ret = dbpf_keyval_iterate_cursor_get(
-        handle, flags, dbc_p, &key, NULL, DB_SET);
+        handle, dbc_p, &key, NULL, DB_SET);
     if(ret == -TROVE_ENOENT)
     {
         /* cache lookup succeeded but entry is no longer in the DB, so
@@ -1333,7 +1356,7 @@ static int dbpf_keyval_iterate_skip_to_position(
          */
 
         ret = dbpf_keyval_iterate_cursor_get(
-            handle, flags, dbc_p, &key, NULL, DB_SET_RANGE);
+            handle, dbc_p, &key, NULL, DB_SET_RANGE);
         if(ret != 0)
         {
             return ret;
@@ -1347,7 +1370,6 @@ static int dbpf_keyval_iterate_skip_to_position(
 
 static int dbpf_keyval_iterate_step_to_position(
     TROVE_handle handle,
-    TROVE_ds_flags flags,
     TROVE_ds_position pos,
     DBC * dbc_p)
 {
@@ -1357,7 +1379,7 @@ static int dbpf_keyval_iterate_step_to_position(
 
     assert(pos != TROVE_ITERATE_START);
 
-    ret = dbpf_keyval_iterate_get_first_entry(handle, flags, dbc_p);
+    ret = dbpf_keyval_iterate_get_first_entry(handle, dbc_p);
     if(ret != 0)
     {
         return ret;
@@ -1366,7 +1388,7 @@ static int dbpf_keyval_iterate_step_to_position(
     for(i = 0; i < pos; ++i)
     {
         ret = dbpf_keyval_iterate_cursor_get(
-            handle, flags, dbc_p, &key, NULL, DB_NEXT);
+            handle, dbc_p, &key, NULL, DB_NEXT);
         if(ret != 0)
         {
             return ret;
@@ -1378,7 +1400,6 @@ static int dbpf_keyval_iterate_step_to_position(
 
 static int dbpf_keyval_iterate_cursor_get(
     TROVE_handle handle,
-    TROVE_ds_flags flags,
     DBC * dbc_p,
     TROVE_keyval_s * key,
     TROVE_keyval_s * data,
@@ -1391,7 +1412,6 @@ static int dbpf_keyval_iterate_cursor_get(
     int key_sz;
 
     key_entry.handle = handle;
-    key_entry.type = (flags & TROVE_KEYVAL_TYPES);
     memcpy(key_entry.key, key->buffer, key->buffer_sz);
 
     memset(&db_key, 0, sizeof(DBT));
@@ -1450,19 +1470,14 @@ static int dbpf_keyval_iterate_cursor_get(
     if (ret != 0)
     {
         gossip_lerr("Failed to perform cursor get:"
-                    "\n\thandle: %llu\n\ttype: %d\n\tflags: %d\n\tkey: %s\n",
-                    key_entry.handle, key_entry.type, db_flags, key_entry.key);
+                    "\n\thandle: %llu\n\ttype: %d\n\tkey: %s\n",
+                    key_entry.handle, db_flags, key_entry.key);
         return -dbpf_db_error_to_trove_error(ret);
     }
 
     if(key_entry.handle != handle)
     {
             return -TROVE_ENOENT;
-    }
-
-    if(!(flags & key_entry.type))
-    {
-        return -TROVE_ENOENT;
     }
 
     key_sz = (DBPF_KEYVAL_DB_ENTRY_KEY_SIZE(db_key.size) > key->buffer_sz) ?
@@ -1482,7 +1497,6 @@ static int dbpf_keyval_iterate_cursor_get(
 }
 
 static int trove_handle_size = sizeof(TROVE_handle);
-static int trove_dsflags_size = sizeof(TROVE_ds_flags);
 
 size_t PINT_trove_dbpf_keyval_prefix(
     DB * dbp, const DBT * a, const DBT * b)
@@ -1496,11 +1510,6 @@ size_t PINT_trove_dbpf_keyval_prefix(
     if(db_entry_a->handle != db_entry_b->handle)
     {
         return trove_handle_size;
-    }
-
-    if(db_entry_a->type != db_entry_b->type)
-    {
-        return trove_handle_size + trove_dsflags_size;
     }
 
     return (a->size > b->size) ? b->size : a->size;
@@ -1519,11 +1528,6 @@ int PINT_trove_dbpf_keyval_compare(
     if(db_entry_a->handle != db_entry_b->handle)
     {
         return (db_entry_a->handle < db_entry_b->handle) ? -1 : 1;
-    }
-
-    if(!(db_entry_a->type & db_entry_b->type))
-    {
-        return (db_entry_a->type < db_entry_b->type) ? -1 : 1;
     }
 
     if(a->size > b->size)

@@ -382,7 +382,6 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
     ret = PINT_dbpf_keyval_iterate(
         op_p->coll_p->keyval_db,
         op_p->handle,
-        TROVE_KEYVAL_TYPES,
         op_p->coll_p->pcache,
         NULL,
         NULL,
