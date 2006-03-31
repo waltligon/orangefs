@@ -1496,26 +1496,6 @@ static int dbpf_keyval_iterate_cursor_get(
     return 0;
 }
 
-static int trove_handle_size = sizeof(TROVE_handle);
-
-size_t PINT_trove_dbpf_keyval_prefix(
-    DB * dbp, const DBT * a, const DBT * b)
-{
-    const struct dbpf_keyval_db_entry * db_entry_a;
-    const struct dbpf_keyval_db_entry * db_entry_b;
-
-    db_entry_a = (const struct dbpf_keyval_db_entry *) a->data;
-    db_entry_b = (const struct dbpf_keyval_db_entry *) b->data;
-
-    if(db_entry_a->handle != db_entry_b->handle)
-    {
-        return trove_handle_size;
-    }
-
-    return (a->size > b->size) ? b->size : a->size;
-}
-    
-
 int PINT_trove_dbpf_keyval_compare(
     DB * dbp, const DBT * a, const DBT * b)
 {
