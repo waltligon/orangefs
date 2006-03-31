@@ -2259,10 +2259,13 @@ static int io_find_target_datafiles(
         if (total_bytes != 0)
         {
             handle_index_array[(*handle_index_out_count)++] = i;
+
+#ifndef PVFS2_SMALL_IO_OFF
             if(total_bytes <= max_unexp_payload)
             {
                 sio_handle_index_array[(*sio_handle_index_count)++] = i;
             }
+#endif
 
             gossip_debug(GOSSIP_IO_DEBUG, "%s: "
                          "datafile[%d] might have data (out=%d)\n",
