@@ -70,6 +70,12 @@
   <default>100</default>
  </parameter>
 
+ <parameter>
+  <name>iteration</name>
+  <synopsis>Index of operations run so far</synopsis>
+  <datatype>integer</datatype>
+ </parameter>
+
  <!-- results -->
  
  <result>

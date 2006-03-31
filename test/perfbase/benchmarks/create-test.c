@@ -157,6 +157,12 @@ int main(int argc, char **argv)
 		  }
 
 		  test_util_print_timing(rank);
+	 }
+	 
+	 for(i = 0; i < opt_nfiles; ++i)
+	 {
+		  memset(test_file, 0, PATH_MAX);
+		  snprintf(test_file, PATH_MAX, "testfile.%d.%d", rank, i);
 
 		  pvfs_error = PVFS_sys_remove(test_file, lookup_resp.ref, &credentials);
 		  if(pvfs_error != 0)

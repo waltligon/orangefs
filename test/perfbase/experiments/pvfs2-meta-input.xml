@@ -44,6 +44,11 @@
   <skip>1</skip>
 
   <tabular_value>
+   <name>iteration</name>
+   <pos>0</pos>
+  </tabular_value>
+
+  <tabular_value>
    <name>latency</name>
    <pos>2</pos>
   </tabular_value>
