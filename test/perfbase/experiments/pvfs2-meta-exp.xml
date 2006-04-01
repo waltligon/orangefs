@@ -65,14 +65,14 @@
 
  <parameter occurrence="once">
   <name>OP_total</name>
-  <synopsis>Number of operations</synopsis>
+  <synopsis>Total operations per run</synopsis>
   <datatype>integer</datatype>
   <default>100</default>
  </parameter>
 
  <parameter>
   <name>iteration</name>
-  <synopsis>Index of operations run so far</synopsis>
+  <synopsis>Iteration Index</synopsis>
   <datatype>integer</datatype>
  </parameter>
 
