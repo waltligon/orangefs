@@ -307,13 +307,15 @@ sub emit_filesystem
 
 sub emit_server_conf
 {
-    my($target, $node, $storage);
+    my($target, $node, $storage, $logfile);
     $target = $_[0];
     $node = $_[1];
     $storage = $_[2];
+    $logfile = $_[3];
 
     print $target "StorageSpace $storage\n";
     print $target "HostID \"$node\"\n";
+    print $target "LogFile $logfile\n";
 }
 
 sub confirm
@@ -1013,11 +1015,14 @@ for($i = 0; $i <= $#union_bmi; $i++)
     }
     
     my $pstorage = $storage;
+    my $plogfile = $logfile;
     if($union_hosts[$i] =~ /_(p[0-9]+)$/)
     {
         $pstorage .= "-" . $1;
+        $plogfile .= "-" . $1;
     }
-    emit_server_conf($output_target, $union_bmi[$i], $pstorage);
+
+    emit_server_conf($output_target, $union_bmi[$i], $pstorage, $plogfile);
 
     if ($using_stdout == 0)
     {
