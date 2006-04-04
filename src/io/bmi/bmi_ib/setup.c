@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: setup.c,v 1.24 2006-04-04 04:47:11 slang Exp $
+ * $Id: setup.c,v 1.25 2006-04-04 14:50:06 slang Exp $
  */
 #include <fcntl.h>
 #include <unistd.h>
@@ -845,8 +845,7 @@ reinit_mosal(void)
 	return;
     }
     }
-#else
-    {
+#endif
 
     /*
      * Recent thca distros and the 2.6 openib tree do not seem to permit
