@@ -41,13 +41,12 @@ struct PVFS_sys_attr_s
     PVFS_time mtime;
     PVFS_time ctime;
     PVFS_size size;
-#  if __WORDSIZE == 64 || BITS_PER_LONG == 64
-    char *link_target;
-#elif __WORDSIZE == 32 || BITS_PER_LONG == 32
+#if INTPTR_MIN == INT32_MIN
     char *link_target; /* NOTE: caller must free this */
     int32_t __pad2;
-#else
-#error "Unknown/unhandled word size!"
+#else 
+    /* assume 64 bit */
+    char *link_target; /* NOTE: caller must free this */
 #endif
     int32_t dfile_count; /* Changed to int32_t so that size of structure does not change */
     int32_t __pad3;
