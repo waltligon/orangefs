@@ -19,6 +19,7 @@
 #include "dbpf-op-queue.h"
 #include "id-generator.h"
 #include "gossip.h"
+#include "pvfs2-debug.h"
 
 
 /* dbpf_bstream_listio_convert()
@@ -44,7 +45,7 @@ int dbpf_bstream_listio_convert(
 {
     int mct, sct, act = 0;
     int oom = 0, oos = 0;
-    int cur_mem_size = 0;
+    TROVE_size cur_mem_size = 0;
     char *cur_mem_off = NULL;
     TROVE_size cur_stream_size = 0;
     TROVE_offset cur_stream_off = 0;
@@ -162,7 +163,6 @@ int dbpf_bstream_listio_convert(
     return 1;
 }
 
-#if 0
 static void aiocb_print(struct aiocb *ptr)
 {
     static char lio_write[] = "LIO_WRITE";
@@ -178,14 +178,13 @@ static void aiocb_print(struct aiocb *ptr)
     sigev = ((ptr->aio_sigevent.sigev_notify == SIGEV_NONE) ?
              sigev_none : invalid_value);
 
-    gossip_debug(TROVE_DEBUG, "aio_fildes = %d, aio_offset = %d, "
+    gossip_debug(GOSSIP_TROVE_DEBUG, "aio_fildes = %d, aio_offset = %d, "
                  "aio_buf = %x, aio_nbytes = %d, aio_reqprio = %d, "
                  "aio_lio_opcode = %s, aio_sigevent.sigev_notify = %s\n",
                  ptr->aio_fildes, (int)ptr->aio_offset,
                  (unsigned int)ptr->aio_buf, ptr->aio_nbytes,
                  ptr->aio_reqprio, opcode, sigev);
 }
-#endif
 
 /*
  * Local variables:
