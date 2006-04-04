@@ -1287,19 +1287,17 @@ static PVFS_error service_statfs_request(vfs_request_t *vfs_request)
 
         vfs_request->out_downcall.resp.statfs.block_size =
             STATFS_DEFAULT_BLOCKSIZE;
-        vfs_request->out_downcall.resp.statfs.blocks_total = (long)
-            (resp->statfs_buf.bytes_total /
-             vfs_request->out_downcall.resp.statfs.block_size);
-        vfs_request->out_downcall.resp.statfs.blocks_avail = (long)
-            (resp->statfs_buf.bytes_available /
-             vfs_request->out_downcall.resp.statfs.block_size);
+        vfs_request->out_downcall.resp.statfs.blocks_total = (int64_t)
+            (resp->statfs_buf.bytes_total / vfs_request->out_downcall.resp.statfs.block_size);
+        vfs_request->out_downcall.resp.statfs.blocks_avail = (int64_t)
+            (resp->statfs_buf.bytes_available / vfs_request->out_downcall.resp.statfs.block_size);
         /*
           these values really represent handle/inode counts
           rather than an accurate number of files
         */
-        vfs_request->out_downcall.resp.statfs.files_total = (long)
+        vfs_request->out_downcall.resp.statfs.files_total = (int64_t) 
             resp->statfs_buf.handles_total_count;
-        vfs_request->out_downcall.resp.statfs.files_avail = (long)
+        vfs_request->out_downcall.resp.statfs.files_avail = (int64_t)
             resp->statfs_buf.handles_available_count;
     }
 
@@ -1844,6 +1842,9 @@ static inline void package_downcall_members(
 
                 vfs_request->out_downcall.resp.getattr.attributes =
                     vfs_request->response.getattr.attr;
+
+                gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
+                        "object type = %d\n", attr->objtype);
 
                 /*
                   free allocated attr memory if required; to avoid

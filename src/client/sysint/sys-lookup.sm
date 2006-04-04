@@ -448,7 +448,7 @@ PVFS_error PVFS_isys_ref_lookup(
     PVFS_object_ref parent,
     PVFS_credentials *credentials,
     PVFS_sysresp_lookup *resp,
-    int follow_link,
+    int32_t follow_link,
     PVFS_sys_op_id *op_id,
     void *user_ptr)
 {
@@ -505,7 +505,7 @@ PVFS_error PVFS_sys_ref_lookup(
     PVFS_object_ref parent,
     PVFS_credentials *credentials,
     PVFS_sysresp_lookup *resp,
-    int follow_link)
+    int32_t follow_link)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;
@@ -541,7 +541,7 @@ PVFS_error PVFS_sys_lookup(
     PVFS_fs_id fs_id, char *name,
     PVFS_credentials *credentials,
     PVFS_sysresp_lookup *resp,
-    int follow_link)
+    int32_t follow_link)
 {
     PVFS_error ret = -PVFS_EINVAL;
     PVFS_object_ref parent;

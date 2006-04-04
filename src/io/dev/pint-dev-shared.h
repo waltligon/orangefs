@@ -11,12 +11,7 @@
 #ifndef __PINT_DEV_SHARED_H
 #define __PINT_DEV_SHARED_H
 
-/* supported ioctls */
-#define PVFS_DEV_GET_MAGIC          (unsigned int)1
-#define PVFS_DEV_GET_MAX_UPSIZE     (unsigned int)2
-#define PVFS_DEV_GET_MAX_DOWNSIZE   (unsigned int)3
-#define PVFS_DEV_MAP                (unsigned int)4
-#define PVFS_DEV_REMOUNT_ALL        (unsigned int)5
+#include <linux/ioctl.h>  /* needed for constructing the _IO macros */
 
 /* version number for use in communicating between kernel space and user
  * space
@@ -50,11 +45,36 @@
 /* pvfs2-client-core can cache readahead data up to this size in bytes */
 #define PVFS2_MMAP_RACACHE_MAX_SIZE ((loff_t)(8 * (1024 * 1024)))
 
-/* describes memory regions to map in the PVFS_DEV_MAP ioctl */
+/* describes memory regions to map in the PVFS_DEV_MAP ioctl.
+ * NOTE: See devpvfs2-req.c for 32 bit compat structure.
+ * Since this structure has a variable-sized layout that is different
+ * on 32 and 64 bit platforms, we need to normalize to a 64 bit layout
+ * on such systems before servicing ioctl calls from user-space binaries
+ * that may be 32 bit!
+ */
 struct PVFS_dev_map_desc
 {
-    void *ptr;
-    int size;
+    void     *ptr;
+    int32_t  size; /* Changed to an int32_t for fixed size structure */
+};
+
+#define PVFS_DEV_MAGIC 'k'
+
+#define DEV_GET_MAGIC           0x1
+#define DEV_GET_MAX_UPSIZE      0x2
+#define DEV_GET_MAX_DOWNSIZE    0x3
+#define DEV_MAP                 0x4
+#define DEV_REMOUNT_ALL         0x5
+#define DEV_MAX_NR              0x6
+
+/* supported ioctls, codes are with respect to user-space */
+enum {
+PVFS_DEV_GET_MAGIC          = _IOW(PVFS_DEV_MAGIC, DEV_GET_MAGIC, int32_t),
+PVFS_DEV_GET_MAX_UPSIZE     = _IOW(PVFS_DEV_MAGIC, DEV_GET_MAX_UPSIZE, int32_t),
+PVFS_DEV_GET_MAX_DOWNSIZE   = _IOW(PVFS_DEV_MAGIC, DEV_GET_MAX_DOWNSIZE, int32_t),
+PVFS_DEV_MAP                =  _IO(PVFS_DEV_MAGIC, DEV_MAP),
+PVFS_DEV_REMOUNT_ALL        =  _IO(PVFS_DEV_MAGIC, DEV_REMOUNT_ALL),
+PVFS_DEV_MAXNR              =  DEV_MAX_NR,
 };
 
 #endif /* __PINT_DEV_SHARED_H */

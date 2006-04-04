@@ -64,11 +64,32 @@ typedef struct PINT_dist_methods_s
 
 /* Internal representation of a PVFS2 Distribution */
 typedef struct PINT_dist_s {
+#  if __WORDSIZE == 64 || BITS_PER_LONG == 64
 	char *dist_name;
+#elif __WORDSIZE == 32 || BITS_PER_LONG == 32
+	char *dist_name;
+        int32_t __pad1;
+#else
+#error  "Unknown word size!"
+#endif
 	int32_t name_size;
 	int32_t param_size; 
+#  if __WORDSIZE == 64 || BITS_PER_LONG == 64
 	void *params;
+#elif __WORDSIZE == 32 || BITS_PER_LONG == 32
+	void *params;
+        int32_t __pad2;
+#else
+#error  "Unknown word size!"
+#endif
+#  if __WORDSIZE == 64 || BITS_PER_LONG == 64
 	PINT_dist_methods *methods;
+#elif __WORDSIZE == 32 || BITS_PER_LONG == 32
+	PINT_dist_methods *methods;
+        int32_t __pad3;
+#else
+#error  "Unknown word size!"
+#endif
 } PINT_dist;
 
 

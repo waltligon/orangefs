@@ -51,15 +51,23 @@ typedef struct PVFS_vtag_s PVFS_vtag;
  * PVFS_object_attr attributes are what the users and the server deal
  * with.  Trove only deals with *_ds_storedattr objects (trove on disk
  * formats) and *_ds_attributes (trove in memory format).
+ *
+ * Trove version 0.0.1 and version 0.0.2 differ in this aspect, since
+ * many members have been moved, added to make this structure friendlier
+ * for 32 and 64 bit users. Consequently, this means we would require a
+ * migrate utility that will convert from one to the other by reading from
+ * the dspace and writing it out to the new dspace.
  */
 struct PVFS_ds_attributes_s
 {
+    PVFS_ds_type type;
     PVFS_fs_id fs_id;
     PVFS_handle handle;
-    PVFS_ds_type type;
     PVFS_uid uid;
     PVFS_gid gid;
     PVFS_permissions mode;
+    int32_t   __pad1;
+
     PVFS_time ctime;
     PVFS_time mtime;
     PVFS_time atime;
@@ -69,17 +77,19 @@ struct PVFS_ds_attributes_s
     /* non-stored attributes need to be below here */
     PVFS_size b_size; /* bstream size */
     PVFS_size k_size; /* keyval size; # of keys */
-};
+} ;
 typedef struct PVFS_ds_attributes_s PVFS_ds_attributes;
 
 struct PVFS_ds_storedattr_s
 {
+    PVFS_ds_type type;
     PVFS_fs_id fs_id;
     PVFS_handle handle;
-    PVFS_ds_type type;
     PVFS_uid uid;
     PVFS_gid gid;
     PVFS_permissions mode;
+    int32_t __pad1;
+
     PVFS_time ctime;
     PVFS_time mtime;
     PVFS_time atime;

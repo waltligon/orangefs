@@ -16,9 +16,13 @@
 #ifndef __DOWNCALL_H
 #define __DOWNCALL_H
 
+/*
+ * Sanitized the device-client core interaction
+ * for clean 32-64 bit usage
+ */
 typedef struct
 {
-    size_t amt_complete;
+    int64_t amt_complete; 
 } pvfs2_io_response_t;
 
 typedef struct
@@ -59,12 +63,12 @@ typedef struct
 
 typedef struct
 {
-    int dirent_count;
+    int32_t dirent_count;
+    PVFS_ds_position token;
     uint64_t directory_version;
     PVFS_object_ref refn[MAX_DIRENT_COUNT];
     char d_name[MAX_DIRENT_COUNT][PVFS2_NAME_LEN];
-    int d_name_len[MAX_DIRENT_COUNT];
-    PVFS_ds_position token;
+    int32_t d_name_len[MAX_DIRENT_COUNT];
 } pvfs2_readdir_response_t;
 
 /* the rename response is a blank downcall */
@@ -74,11 +78,11 @@ typedef struct
 
 typedef struct
 {
-    long block_size;
-    long blocks_total;
-    long blocks_avail;
-    long files_total;
-    long files_avail;
+    int64_t block_size;
+    int64_t blocks_total;
+    int64_t blocks_avail;
+    int64_t files_total;
+    int64_t files_avail;
 } pvfs2_statfs_response_t;
 
 /* the truncate response is a blank downcall */
@@ -89,8 +93,8 @@ typedef struct
 typedef struct
 {
     PVFS_fs_id fs_id;
+    int32_t id;
     PVFS_handle root_handle;
-    int id;
 } pvfs2_fs_mount_response_t;
 
 /* the umount response is a blank downcall */
@@ -101,7 +105,8 @@ typedef struct
 /* the getxattr response is the attribute value */
 
 typedef struct {
-    size_t val_sz;
+    int32_t val_sz;
+    int32_t __pad1;
     char val[PVFS_MAX_XATTR_VALUELEN];
 } pvfs2_getxattr_response_t;
 
@@ -113,13 +118,13 @@ typedef struct {
 /* the listxattr response is an array of attribute names */
 
 typedef struct {
-    int  returned_count;
+    int32_t  returned_count;
     PVFS_ds_position token;
     char key[PVFS_MAX_XATTR_LISTLEN*PVFS_MAX_XATTR_NAMELEN];
-    int  keylen;
-    int  lengths[PVFS_MAX_XATTR_LISTLEN];
+    int32_t  keylen;
+    int32_t  __pad1;
+    int32_t  lengths[PVFS_MAX_XATTR_LISTLEN];
 } pvfs2_listxattr_response_t;
-
 /* the removexattr response is a blank downcall */
 
 typedef struct {
@@ -154,7 +159,7 @@ typedef struct
 
 typedef struct
 {
-    int type;
+    int32_t type;
     PVFS_error status;
 
     union

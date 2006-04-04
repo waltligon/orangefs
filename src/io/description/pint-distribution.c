@@ -227,8 +227,8 @@ void PINT_dist_decode(PINT_dist *dist, void *buffer)
 		memcpy(dist, buffer, PINT_DIST_PACK_SIZE(d2));
 	}
 	/* convert ints in dist to pointers */
-	dist->dist_name = (char *) dist + (unsigned long) dist->dist_name;
-	dist->params = (void *) ((char *) dist + (unsigned long) dist->params);
+	dist->dist_name = (char *) dist + (int32_t) dist->dist_name;
+	dist->params = (void *) ((char *) dist + (int32_t) dist->params);
 	/* set methods */
 	dist->methods = NULL;
 	if (PINT_dist_lookup(dist)) {

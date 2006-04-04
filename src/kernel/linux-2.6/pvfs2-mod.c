@@ -119,6 +119,14 @@ static int __init pvfs2_init(void)
         op_timeout_secs = 0;
     }
 
+    /* Initialize the ioctl32 subsystem. This could be a noop too */
+    if ((ret = pvfs2_ioctl32_init()) < 0)
+    {
+        pvfs2_error("pvfs2: could not register ioctl32 handlers? %d!\n",
+                ret);
+        return ret;
+    }
+
     /* register pvfs2-req device  */
     pvfs2_dev_major = register_chrdev(0, PVFS2_REQDEVICE_NAME,
                                       &pvfs2_devreq_file_operations);
@@ -126,6 +134,7 @@ static int __init pvfs2_init(void)
     {
 	pvfs2_print("Failed to register /dev/%s (error %d)\n",
 		    PVFS2_REQDEVICE_NAME, pvfs2_dev_major);
+        pvfs2_ioctl32_cleanup();
 	return pvfs2_dev_major;
     }
 
@@ -204,6 +213,8 @@ static void __exit pvfs2_exit(void)
     dev_req_cache_finalize();
     pvfs2_inode_cache_finalize();
     kiocb_cache_finalize();
+    /* cleans up all ioctl32 handlers */
+    pvfs2_ioctl32_cleanup();
 
     if (unregister_chrdev(pvfs2_dev_major, PVFS2_REQDEVICE_NAME) < 0)
     {

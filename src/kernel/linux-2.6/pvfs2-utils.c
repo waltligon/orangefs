@@ -72,7 +72,7 @@ static inline int copy_attributes_to_inode(
         */
         inode->i_blksize = pvfs_bufmap_size_query();
         inode->i_blkbits = PAGE_CACHE_SHIFT;
-        pvfs2_print("attrs->mask = %x (%d, objtype = %d), size = %ld\n", 
+        pvfs2_print("attrs->mask = %x (%d, objtype = %x), size = %ld\n", 
                 attrs->mask, attrs->mask & PVFS_ATTR_SYS_SIZE, 
                 attrs->objtype,
                 (unsigned long) attrs->size);
@@ -224,7 +224,7 @@ static inline int copy_attributes_to_inode(
                 break;
             default:
                 pvfs2_error("pvfs2:copy_attributes_to_inode: got invalid "
-                            "attribute type %d\n", attrs->objtype);
+                            "attribute type %x\n", attrs->objtype);
         }
         pvfs2_print("pvfs2: copy_attributes_to_inode: setting inode->i_mode to %x from %x\n",
                 inode->i_mode, old_mode);

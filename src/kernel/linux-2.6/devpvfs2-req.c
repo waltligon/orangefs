@@ -513,13 +513,31 @@ static int pvfs2_devreq_release(
     return 0;
 }
 
-static int pvfs2_devreq_ioctl(
-    struct inode *inode,
-    struct file *file,
-    unsigned int command,
-    unsigned long arg)
+static inline int check_ioctl_command(unsigned int command)
 {
-    int ret = 0;
+    /* Check for valid ioctl codes */
+    if (_IOC_TYPE(command) != PVFS_DEV_MAGIC) 
+    {
+        pvfs2_error("device ioctl magic numbers don't match! "
+                "did you rebuild pvfs2-client-core/libpvfs2?"
+                "[cmd %x, magic %x != %x]\n",
+                command,
+                _IOC_TYPE(command),
+                PVFS_DEV_MAGIC);
+        return -EINVAL;
+    }
+    /* and valid ioctl commands */
+    if (_IOC_NR(command) >= PVFS_DEV_MAXNR || _IOC_NR(command) <= 0) 
+    {
+        pvfs2_error("Invalid ioctl command number [%d >= %d]\n",
+                _IOC_NR(command), PVFS_DEV_MAXNR);
+        return -ENOIOCTLCMD;
+    }
+    return 0;
+}
+
+static int dispatch_ioctl_command(unsigned int command, unsigned long arg)
+{
     static int32_t magic = PVFS2_DEVREQ_MAGIC;
     static int32_t max_up_size = MAX_ALIGNED_DEV_REQ_UPSIZE;
     static int32_t max_down_size = MAX_ALIGNED_DEV_REQ_DOWNSIZE;
@@ -537,10 +555,13 @@ static int pvfs2_devreq_ioctl(
             return ((put_user(max_down_size, (int32_t __user *)arg) ==
                      -EFAULT) ? -EIO : 0);
         case PVFS_DEV_MAP:
+        {
+            int ret;
             ret = copy_from_user(
                 &user_desc, (struct PVFS_dev_map_desc __user *)arg,
                 sizeof(struct PVFS_dev_map_desc));
             return (ret ? -EIO : pvfs_bufmap_initialize(&user_desc));
+        }
         case PVFS_DEV_REMOUNT_ALL:
         {
             int ret = 0;
@@ -587,10 +608,177 @@ static int pvfs2_devreq_ioctl(
         }
         break;
     default:
-	return -ENOSYS;
+	return -ENOIOCTLCMD;
     }
-    return -ENOSYS;
+    return -ENOIOCTLCMD;
 }
+
+static int pvfs2_devreq_ioctl(
+    struct inode *inode,
+    struct file *file,
+    unsigned int command,
+    unsigned long arg)
+{
+    int ret;
+
+    /* Check for properly constructed commands */
+    if ((ret = check_ioctl_command(command)) < 0)
+    {
+        return ret;
+    }
+    return dispatch_ioctl_command(command, arg);
+}
+
+#ifdef CONFIG_COMPAT
+
+#if defined(HAVE_COMPAT_IOCTL_HANDLER) || defined(HAVE_REGISTER_IOCTL32_CONVERSION)
+
+/*  Compat structure for the PVFS_DEV_MAP ioctl */
+struct PVFS_dev_map_desc32 
+{
+    compat_uptr_t ptr;
+    int32_t      size;
+};
+
+static unsigned long translate_dev_map(
+        unsigned long args, int *error)
+{
+    struct PVFS_dev_map_desc32  __user *p32 = (void __user *) args;
+    /* Depending on the architecture, allocate some space on the user-call-stack based on our expected layout */
+    struct PVFS_dev_map_desc    __user *p   = compat_alloc_user_space(sizeof(*p));
+    u32    addr;
+
+    *error = 0;
+    /* get the ptr from the 32 bit user-space */
+    if (get_user(addr, &p32->ptr))
+        goto err;
+    /* try to put that into a 64-bit layout */
+    if (put_user(compat_ptr(addr), &p->ptr))
+        goto err;
+    /* copy the remaining field */
+    if (copy_in_user(&p->size, &p32->size, sizeof(int32_t)))
+        goto err;
+    return (unsigned long) p;
+err:
+    *error = -EFAULT;
+    return 0;
+}
+
+#endif
+
+#ifdef HAVE_COMPAT_IOCTL_HANDLER
+/*
+ * 32 bit user-space apps' ioctl handlers when kernel modules
+ * is compiled as a 64 bit one
+ */
+static int pvfs2_devreq_compat_ioctl(
+        struct file *filp, unsigned int cmd, unsigned long args)
+{
+    int ret;
+    unsigned long arg = args;
+
+    /* Check for properly constructed commands */
+    if ((ret = check_ioctl_command(cmd)) < 0)
+    {
+        return ret;
+    }
+    if (cmd == PVFS_DEV_MAP)
+    {
+        /* convert the arguments to what we expect internally in kernel space */
+        arg = translate_dev_map(args, &ret);
+        if (ret < 0)
+        {
+            pvfs2_error("Could not translate dev map\n");
+            return ret;
+        }
+    }
+    /* no other ioctl requires translation */
+    return dispatch_ioctl_command(cmd, arg);
+}
+
+#endif
+
+#ifdef HAVE_REGISTER_IOCTL32_CONVERSION
+
+static int pvfs2_translate_dev_map(
+        unsigned int fd,
+        unsigned int cmd,
+        unsigned long arg,
+        struct   file *file)
+{
+    int ret;
+    unsigned long p;
+
+    /* Copy it as the kernel module expects it */
+    p = translate_dev_map(arg, &ret);
+    if (ret < 0)
+    {
+        pvfs2_error("Could not translate dev map structure\n");
+        return ret;
+    }
+    /* p is still a user space address */
+    return sys_ioctl(fd, cmd, p);
+}
+
+static struct ioctl_trans pvfs2_ioctl32_trans[] = {
+    {PVFS_DEV_GET_MAGIC,        NULL},
+    {PVFS_DEV_GET_MAX_UPSIZE,   NULL},
+    {PVFS_DEV_GET_MAX_DOWNSIZE, NULL},
+    {PVFS_DEV_MAP,              pvfs2_translate_dev_map},
+    {PVFS_DEV_REMOUNT_ALL,      NULL},
+    /* Please add stuff above this line and retain the entry below */
+    {0, },
+};
+
+/* Must be called on module load */
+int pvfs2_ioctl32_init(void)
+{
+    int i, error;
+
+    for (i = 0;  pvfs2_ioctl32_trans[i].cmd != 0; i++)
+    {
+        error = register_ioctl32_conversion(
+                    pvfs2_ioctl32_trans[i].cmd, pvfs2_ioctl32_trans[i].handler);
+        if (error) 
+            goto fail;
+        pvfs2_print("Registered ioctl32 command %08x with handler %p\n",
+                (unsigned int) pvfs2_ioctl32_trans[i].cmd, pvfs2_ioctl32_trans[i].handler);
+    }
+    return 0;
+fail:
+    while (--i)
+        unregister_ioctl32_conversion(pvfs2_ioctl32_trans[i].cmd);
+    return error;
+}
+
+/* Must be called on module unload */
+void pvfs2_ioctl32_cleanup(void)
+{
+    int i;
+
+    for (i = 0;  pvfs2_ioctl32_trans[i].cmd != 0; i++)
+    {
+        pvfs2_print("Deregistered ioctl32 command %08x\n",
+               (unsigned int) pvfs2_ioctl32_trans[i].cmd);
+        unregister_ioctl32_conversion(pvfs2_ioctl32_trans[i].cmd);
+    }
+}
+
+#endif /* end HAVE_REGISTER_IOCTL32_CONVERSION */
+
+#else /* !CONFIG_COMPAT */
+
+int pvfs2_ioctl32_init(void)
+{
+    return 0;
+}
+
+void pvfs2_ioctl32_cleanup(void)
+{
+    return;
+}
+
+#endif
 
 static unsigned int pvfs2_devreq_poll(
     struct file *file,
@@ -628,6 +816,11 @@ struct file_operations pvfs2_devreq_file_operations =
     .open = pvfs2_devreq_open,
     .release = pvfs2_devreq_release,
     .ioctl = pvfs2_devreq_ioctl,
+#ifdef CONFIG_COMPAT
+#ifdef HAVE_COMPAT_IOCTL_HANDLER
+    .compat_ioctl = pvfs2_devreq_compat_ioctl,
+#endif
+#endif
     .poll = pvfs2_devreq_poll
 #endif
 };

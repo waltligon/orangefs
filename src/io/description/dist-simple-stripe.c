@@ -196,11 +196,11 @@ static PINT_dist_methods simple_stripe_methods = {
 };
 
 PINT_dist simple_stripe_dist = {
-    PVFS_DIST_SIMPLE_STRIPE_NAME,
-    roundup8(PVFS_DIST_SIMPLE_STRIPE_NAME_SIZE), /* name size */
-    roundup8(sizeof(PVFS_simple_stripe_params)), /* param size */
-    &simple_stripe_params,
-    &simple_stripe_methods
+    .dist_name = PVFS_DIST_SIMPLE_STRIPE_NAME,
+    .name_size = roundup8(PVFS_DIST_SIMPLE_STRIPE_NAME_SIZE), /* name size */
+    .param_size = roundup8(sizeof(PVFS_simple_stripe_params)), /* param size */
+    .params = &simple_stripe_params,
+    .methods = &simple_stripe_methods
 };
 
 

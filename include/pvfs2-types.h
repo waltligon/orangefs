@@ -203,7 +203,7 @@ typedef enum
 /* EITHER a key or a value.  This struct is IDENTICAL */
 /* to a TROVE_keyval_s defined in src/io/trove/trove-types.h */
 /* but is duplicated here to maintain separation between */
-/* the Rrove implementation and PVFS2.  This struct should */
+/* the Trove implementation and PVFS2.  This struct should */
 /* be used everywhere but within Trove. WBL 6/2005*/
 typedef struct PVFS_ds_keyval_s
 {
@@ -286,6 +286,7 @@ typedef struct
 {
     PVFS_handle handle;
     PVFS_fs_id fs_id;
+    int32_t    __pad1;
 } PVFS_object_ref;
 
 /** Credentials (stubbed for future authentication methods). */
@@ -307,20 +308,23 @@ endecode_fields_2(
 #define PVFS_SEGMENT_MAX         PVFS_NAME_MAX
 
 /* max extended attribute name len as imposed by the VFS and exploited for the
- * upcall request types */
+ * upcall request types.
+ * NOTE: Please retain them as multiples of 8 even if you wish to change them
+ * This is *NECESSARY* for supporting 32 bit user-space binaries on a 64-bit kernel.
+ */
 #define PVFS_MAX_XATTR_NAMELEN   256 /* Not the same as XATTR_NAME_MAX defined
                                         by <linux/xattr.h> */
 #define PVFS_MAX_XATTR_VALUELEN  256 /* Not the same as XATTR_SIZE_MAX defined
                                         by <linux/xattr.h> */ 
-#define PVFS_MAX_XATTR_LISTLEN   10    /* Not the same as XATTR_LIST_MAX
+#define PVFS_MAX_XATTR_LISTLEN   8    /* Not the same as XATTR_LIST_MAX
                                           defined by <linux/xattr.h> */
 
 /* This structure is used by the VFS-client interaction alone */
 typedef struct {
     char key[PVFS_MAX_XATTR_NAMELEN];
-    int  key_sz;
+    int32_t  key_sz; /* int32_t for portable, fixed-size structures */
+    int32_t  val_sz;
     char val[PVFS_MAX_XATTR_VALUELEN];
-    int  val_sz;
 } PVFS_keyval_pair;
 
 /** Directory entry contents. */

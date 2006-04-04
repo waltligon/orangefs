@@ -221,6 +221,19 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		 #endif
 		 ] )
 
+	AC_CHECK_HEADERS([linux/ioctl32.h], [], [], 
+		[#define __KERNEL__
+		 #include <linux/ioctl32.h>
+		 ] )
+	AC_CHECK_HEADERS([linux/compat.h], [], [], 
+		[#define __KERNEL__
+		 #include <linux/compat.h>
+		 ] )
+	AC_CHECK_HEADERS([linux/syscalls.h], [], [], 
+		[#define __KERNEL__
+		 #include <linux/syscalls.h>
+		 ] )
+
 	AC_MSG_CHECKING(for generic_permission api in kernel)
 	dnl if this test passes, the kernel does not have it
 	dnl if this test fails, the kernel has it defined with a different
@@ -272,7 +285,7 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 
 	AC_MSG_CHECKING(for second arg type int in address_space_operations releasepage)
 	tmp_cflags=$CFLAGS
-	CFLAGS="$CFLAGS -Werror"
+	CFLAGS="$CFLAGS"
 	AC_TRY_COMPILE([
 	    #define __KERNEL__
 	    #include <linux/fs.h>
@@ -290,7 +303,7 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 
 	AC_MSG_CHECKING(for int return in inode_operations follow_link)
 	tmp_cflags=$CFLAGS
-	CFLAGS="$CFLAGS -Werror"
+	CFLAGS="$CFLAGS"
 	AC_TRY_COMPILE([
 	    #define __KERNEL__
 	    #include <linux/fs.h>
@@ -305,6 +318,37 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	    AC_MSG_RESULT(no)
 	    )
 	CFLAGS=$tmp_cflags
+
+	AC_MSG_CHECKING(for compat_ioctl member in file_operations structure)
+	AC_TRY_COMPILE([
+	    #define __KERNEL__
+	    #include <linux/fs.h>
+		 ], [
+		 struct file_operations filop = {
+				.compat_ioctl = NULL
+		 };
+	    ],
+	    AC_MSG_RESULT(yes)
+		 AC_DEFINE(HAVE_COMPAT_IOCTL_HANDLER, 1, Define if there exists a compat_ioctl member in file_operations),
+	    AC_MSG_RESULT(no)
+	    )
+
+	AC_MSG_CHECKING(for register_ioctl32_conversion kernel exports)
+	dnl if this test passes, the kernel does not have it
+	dnl if this test fails, the kernel has it defined
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/kernel.h>
+		#include <linux/ioctl32.h>
+		int register_ioctl32_conversion(void)
+		{
+			return 0;
+		}
+	], [],
+		AC_MSG_RESULT(no),
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_REGISTER_IOCTL32_CONVERSION, 1, Define if kernel has register_ioctl32_conversion),
+	)
 
 	CFLAGS=$oldcflags
 ])

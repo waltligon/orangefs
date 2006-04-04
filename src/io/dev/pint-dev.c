@@ -84,7 +84,7 @@ int PINT_dev_initialize(
     ret = ioctl(pdev_fd, PVFS_DEV_GET_MAGIC, &pdev_magic);
     if (ret < 0)
     {
-        gossip_err("Error: ioctl() failure.\n");
+        gossip_err("Error: ioctl() PVFS_DEV_GET_MAGIC failure.\n");
         close(pdev_fd);
         return(-(PVFS_ENODEV|PVFS_ERROR_DEV));
     }
@@ -92,7 +92,7 @@ int PINT_dev_initialize(
     ret = ioctl(pdev_fd, PVFS_DEV_GET_MAX_UPSIZE, &pdev_max_upsize);
     if (ret < 0)
     {
-        gossip_err("Error: ioctl() failure.\n");
+        gossip_err("Error: ioctl() PVFS_DEV_GET_MAX_UPSIZE failure.\n");
         close(pdev_fd);
         return(-(PVFS_ENODEV|PVFS_ERROR_DEV));
     }
@@ -100,7 +100,7 @@ int PINT_dev_initialize(
     ret = ioctl(pdev_fd, PVFS_DEV_GET_MAX_DOWNSIZE, &pdev_max_downsize);
     if (ret < 0)
     {
-        gossip_err("Error: ioctl() failure.\n");
+        gossip_err("Error: ioctl() PVFS_DEV_GET_MAX_DOWNSIZE failure.\n");
         close(pdev_fd);
         return(-(PVFS_ENODEV|PVFS_ERROR_DEV));
     }
@@ -134,6 +134,7 @@ int PINT_dev_get_mapped_region(struct PVFS_dev_map_desc *desc, int size)
     int ret = -1;
     int page_count = 0;
     long page_size = sysconf(_SC_PAGE_SIZE);
+    void *ptr = NULL;
 
     /* we would like to use a memaligned region that is a multiple
      * of the system page size
@@ -144,19 +145,20 @@ int PINT_dev_get_mapped_region(struct PVFS_dev_map_desc *desc, int size)
         page_count++;
     }
 
-    desc->ptr = PINT_mem_aligned_alloc(
+    ptr = PINT_mem_aligned_alloc(
         (page_count * page_size), page_size);
-    if (!desc->ptr)
+    if (!ptr)
     {
         return -(PVFS_ENOMEM|PVFS_ERROR_DEV);
     }
+    desc->ptr  = ptr;
     desc->size = (page_count * page_size);
 
     /* ioctl to ask driver to map pages */
     ret = ioctl(pdev_fd, PVFS_DEV_MAP, desc);
     if (ret < 0)
     {
-        free(desc->ptr);
+        free(ptr);
         return -(PVFS_ENOMEM|PVFS_ERROR_DEV);
     }
     return 0;
@@ -170,10 +172,11 @@ int PINT_dev_get_mapped_region(struct PVFS_dev_map_desc *desc, int size)
  */
 void PINT_dev_put_mapped_region(struct PVFS_dev_map_desc *desc)
 {
+    void *ptr = (void *) desc->ptr;
     assert(desc);
-    assert(desc->ptr);
+    assert(ptr);
 
-    PINT_mem_aligned_free(desc->ptr);
+    PINT_mem_aligned_free(ptr);
 }
 
 /* PINT_dev_get_mapped_buffer()
@@ -187,11 +190,11 @@ void *PINT_dev_get_mapped_buffer(
     struct PVFS_dev_map_desc *desc,
     int buffer_index)
 {
-    return ((desc && desc->ptr &&
+    char *ptr = (char *) desc->ptr;
+    return ((desc && ptr &&
              ((buffer_index > -1) &&
               (buffer_index < PVFS2_BUFMAP_DESC_COUNT))) ?
-            ((char *)desc->ptr +
-             (buffer_index * PVFS2_BUFMAP_DEFAULT_DESC_SIZE)) :
+            (ptr + (buffer_index * PVFS2_BUFMAP_DEFAULT_DESC_SIZE)) :
             NULL);
 }
 
@@ -466,6 +469,10 @@ int PINT_dev_remount(void)
     {
         ret = ((ioctl(pdev_fd, PVFS_DEV_REMOUNT_ALL, NULL) < 0) ?
                -PVFS_ERROR_DEV : 0);
+        if (ret)
+        {
+            gossip_err("Error: ioctl PVFS_DEV_REMOUNT_ALL failure\n");
+        }
     }
     return ret;
 }

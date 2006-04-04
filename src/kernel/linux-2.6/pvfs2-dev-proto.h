@@ -36,8 +36,10 @@
 #define PVFS2_VFS_OP_CANCEL            0xFF00EE00
 #define PVFS2_VFS_OP_FSYNC             0xFF00EE01
 
-/* misc constants */
-#define PVFS2_NAME_LEN                 0x000000FF
+/* Misc constants. Please retain them as multiples of 8!
+ * Otherwise 32-64 bit interactions will be messed up :)
+ */
+#define PVFS2_NAME_LEN                 0x00000100
 #define MAX_DIRENT_COUNT               0x00000020
 
 #include "pvfs2.h"
