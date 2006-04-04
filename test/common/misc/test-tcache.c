@@ -45,7 +45,8 @@ int main(int argc, char **argv)
     printf("Initializing cache...\n");
     test_tcache = PINT_tcache_initialize(foo_compare_key_entry,
         foo_hash_key,
-        foo_free_payload);
+        foo_free_payload,
+        -1);
     if(!test_tcache)
     {
         fprintf(stderr, "PINT_tcache_initialize failure.\n");
@@ -263,7 +264,8 @@ int main(int argc, char **argv)
     printf("Initializing cache...\n");
     test_tcache = PINT_tcache_initialize(foo_compare_key_entry,
         foo_hash_key,
-        foo_free_payload);
+        foo_free_payload,
+        -1);
     if(!test_tcache)
     {
         fprintf(stderr, "PINT_tcache_initialize failure.\n");

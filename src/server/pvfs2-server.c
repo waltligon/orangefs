@@ -112,7 +112,18 @@ PINT_server_trove_keys_s Trove_Common_Keys[] =
     {"dir_ent", 8},
     {"datafile_handles", 17},
     {"metafile_dist", 14},
-    {"symlink_target", 15}
+    {"symlink_target", 15},
+    {"dirdata_size", 13}
+};
+
+/* extended attribute name spaces supported in PVFS2 */
+char *PINT_eattr_namespaces[] =
+{
+    "system.",
+    "user.",
+    "trusted.",
+    "security.",
+    NULL
 };
 
 /* extended attribute name spaces supported in PVFS2 */

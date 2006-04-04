@@ -89,7 +89,11 @@ void dbpf_error_report(
 static struct dbpf_storage *dbpf_storage_lookup(
     char *stoname, int *err_p);
 static int dbpf_db_create(char *dbname);
-static DB *dbpf_db_open(char *dbname, int *err_p);
+static DB *dbpf_db_open(char *dbname, int *err_p,
+                        int (*compare_fn) (DB *db,
+                                           const DBT *dbt1,
+                                           const DBT *dbt2));
+
 static int dbpf_mkpath(char *pathname, mode_t mode);
 
 
@@ -559,7 +563,7 @@ static int dbpf_collection_create(char *collname,
 
     DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX,
                                 sto_p->name, new_coll_id);
-    db_p = dbpf_db_open(path_name, &error);
+    db_p = dbpf_db_open(path_name, &error, NULL);
     if (db_p == NULL)
     {
         ret = dbpf_db_create(path_name);
@@ -569,7 +573,7 @@ static int dbpf_collection_create(char *collname,
             return ret;
         }
 
-        db_p = dbpf_db_open(path_name, &error);
+        db_p = dbpf_db_open(path_name, &error, NULL);
         if (db_p == NULL)
         {
             gossip_err("dbpf_db_open failed on attrib db %s\n", path_name);
@@ -619,7 +623,7 @@ static int dbpf_collection_create(char *collname,
     db_p->close(db_p, 0);
 
     DBPF_GET_DS_ATTRIB_DBNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
-    db_p = dbpf_db_open(path_name, &error);
+    db_p = dbpf_db_open(path_name, &error, NULL);
     if (db_p == NULL)
     {
         ret = dbpf_db_create(path_name);
@@ -633,29 +637,26 @@ static int dbpf_collection_create(char *collname,
     {
         db_p->close(db_p, 0);
     }
-    
-    DBPF_GET_KEYVAL_DIRNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
-    ret = mkdir(path_name, 0755);
-    if (ret != 0)
-    {
-        gossip_err("mkdir failed on keyval directory %s\n", path_name);
-        return -trove_errno_to_trove_error(errno);
-    }
 
-    for(i = 0; i < DBPF_KEYVAL_MAX_NUM_BUCKETS; i++)
+    DBPF_GET_KEYVAL_DBNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
+    db_p = dbpf_db_open(path_name, &error, NULL);
+    if (db_p == NULL)
     {
-        snprintf(dir, PATH_MAX, "%s/%.8d", path_name, i);
-        if ((mkdir(dir, 0755) == -1) && (errno != EEXIST))
+        ret = dbpf_db_create(path_name);
+        if (ret != 0)
         {
-            gossip_err("mkdir failed on keyval bucket directory %s\n",
-                       dir);
-            return -trove_errno_to_trove_error(errno);
+            gossip_err("dbpf_db_create failed on %s\n", path_name);
+            return ret;
         }
+    }
+    else
+    {
+        db_p->close(db_p, 0);
     }
 
     DBPF_GET_BSTREAM_DIRNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
     ret = mkdir(path_name, 0755);
-    if (ret != 0)
+    if(ret != 0)
     {
         gossip_err("mkdir failed on bstream directory %s\n", path_name);
         return -trove_errno_to_trove_error(errno);
@@ -737,6 +738,14 @@ static int dbpf_collection_remove(char *collname,
         ret = -trove_errno_to_trove_error(errno);
     }
 
+    DBPF_GET_KEYVAL_DBNAME(path_name, PATH_MAX,
+                           sto_p->name, db_data.coll_id);
+    if(unlink(path_name) != 0)
+    {
+        gossip_err("failure removing keyval db\n");
+        ret = -trove_errno_to_trove_error(errno);
+    }
+
     DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX,
                                 sto_p->name, db_data.coll_id);
     if (unlink(path_name) != 0)
@@ -789,53 +798,6 @@ static int dbpf_collection_remove(char *collname,
     if (rmdir(path_name) != 0)
     {
         gossip_err("failure removing bstream directory %s\n", path_name);
-        ret = -trove_errno_to_trove_error(errno);
-        goto collection_remove_failure;
-    }
-
-    DBPF_GET_KEYVAL_DIRNAME(path_name, PATH_MAX,
-                           sto_p->name, db_data.coll_id);
-    for(i = 0; i < DBPF_KEYVAL_MAX_NUM_BUCKETS; i++)
-    {
-        snprintf(dir, PATH_MAX, "%s/%.8d", path_name, i);
-
-        /* remove all bstream files in this bucket directory */
-        current_dir = opendir(dir);
-        if (current_dir)
-        {
-            while((current_dirent = readdir(current_dir)))
-            {
-                if ((strcmp(current_dirent->d_name, ".") == 0) ||
-                    (strcmp(current_dirent->d_name, "..") == 0))
-                {
-                    continue;
-                }
-                snprintf(tmp_path, PATH_MAX, "%s/%s", dir,
-                         current_dirent->d_name);
-                if (stat(tmp_path, &file_info) < 0)
-                {
-                    gossip_err("error doing stat on bstream entry\n");
-                    ret = -trove_errno_to_trove_error(errno);
-                    closedir(current_dir);
-                    goto collection_remove_failure;
-                }
-                assert(S_ISREG(file_info.st_mode));
-                if (unlink(tmp_path) != 0)
-                {
-                    ret = -trove_errno_to_trove_error(errno);
-                    gossip_err("failure removing keyval entry\n");
-                    closedir(current_dir);
-                    goto collection_remove_failure;
-                }
-            }
-            closedir(current_dir);
-        }
-        rmdir(dir);
-    }
-
-    if (rmdir(path_name) != 0)
-    {
-        gossip_err("failure removing keyval directory %s\n", path_name);
         ret = -trove_errno_to_trove_error(errno);
         goto collection_remove_failure;
     }
@@ -1100,15 +1062,24 @@ static int dbpf_collection_lookup(char *collname,
 
     DBPF_GET_DS_ATTRIB_DBNAME(path_name, PATH_MAX,
                               sto_p->name, coll_p->coll_id);
-    coll_p->ds_db = dbpf_db_open(path_name, &ret);
+    coll_p->ds_db = dbpf_db_open(path_name, &ret, NULL);
     if (coll_p->ds_db == NULL)
+    {
+        return ret;
+    }
+
+    DBPF_GET_KEYVAL_DBNAME(path_name, PATH_MAX,
+                           sto_p->name, coll_p->coll_id);
+    coll_p->keyval_db = dbpf_db_open(path_name, &ret, 
+                                     PINT_trove_dbpf_keyval_compare);
+    if(coll_p->keyval_db == NULL)
     {
         return ret;
     }
 
     DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX,
                                 sto_p->name, coll_p->coll_id);
-    coll_p->coll_attr_db = dbpf_db_open(path_name, &ret);
+    coll_p->coll_attr_db = dbpf_db_open(path_name, &ret, NULL);
     if (coll_p->coll_attr_db == NULL)
     {
         return ret;
@@ -1144,6 +1115,12 @@ static int dbpf_collection_lookup(char *collname,
         gossip_err("This code understands version %s\n",
                    TROVE_DBPF_VERSION_VALUE);
         return -TROVE_EINVAL;
+    }
+
+    coll_p->pcache = PINT_dbpf_keyval_pcache_initialize();
+    if(!coll_p->pcache)
+    {
+        return -TROVE_ENOMEM;
     }
 
     dbpf_collection_register(coll_p);
@@ -1197,7 +1174,7 @@ static struct dbpf_storage *dbpf_storage_lookup(
 
     DBPF_GET_STO_ATTRIB_DBNAME(path_name, PATH_MAX, stoname);
 
-    sto_p->sto_attr_db = dbpf_db_open(path_name, error_p);
+    sto_p->sto_attr_db = dbpf_db_open(path_name, error_p, NULL);
     if (sto_p->sto_attr_db == NULL)
     {
         return NULL;
@@ -1205,7 +1182,7 @@ static struct dbpf_storage *dbpf_storage_lookup(
 
     DBPF_GET_COLLECTIONS_DBNAME(path_name, PATH_MAX, stoname);
 
-    sto_p->coll_db = dbpf_db_open(path_name, error_p);
+    sto_p->coll_db = dbpf_db_open(path_name, error_p, NULL);
     if (sto_p->coll_db == NULL)
     {
         return NULL;
@@ -1338,7 +1315,10 @@ static int dbpf_db_create(char *dbname)
  * Returns NULL on error, passing a trove error type back in the
  * integer pointed to by error_p.
  */
-static DB *dbpf_db_open(char *dbname, int *error_p)
+static DB *dbpf_db_open(char *dbname, int *error_p,
+                        int (*compare_fn) (DB *db, 
+                                           const DBT *dbt1, 
+                                           const DBT *dbt2))
 {
     int ret = -TROVE_EINVAL;
     DB *db_p = NULL;
@@ -1357,6 +1337,11 @@ static DB *dbpf_db_open(char *dbname, int *error_p)
 
     db_p->set_errfile(db_p, stderr);
     db_p->set_errpfx(db_p, "pvfs2-trove-dbpf");
+
+    if(compare_fn)
+    {
+        db_p->set_bt_compare(db_p, compare_fn);
+    }
 
     /* DB_RECNUM makes it easier to iterate through every key in chunks */
     if ((ret = db_p->set_flags(db_p, DB_RECNUM)) != 0)

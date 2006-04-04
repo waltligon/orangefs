@@ -74,6 +74,7 @@ int dbpf_bstream_listio_convert(
 
     while (act < *aiocb_count_p)
     {
+        assert(fd > 0);
 	cur_aiocb_ptr->aio_fildes = fd;
 	cur_aiocb_ptr->aio_offset = cur_stream_off;
 	cur_aiocb_ptr->aio_buf = cur_mem_off;

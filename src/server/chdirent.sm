@@ -258,7 +258,8 @@ static int chdirent_change_directory_entry(PINT_server_op *s_op,
 
     ret = job_trove_keyval_write(
         s_op->req->u.chdirent.fs_id, s_op->u.chdirent.dirdata_handle,
-        &s_op->key, &s_op->val, PINT_config_get_trove_sync_meta(
+        &s_op->key, &s_op->val, 
+        PINT_config_get_trove_sync_meta(
             user_opts, s_op->req->u.crdirent.fs_id),
         NULL, s_op, 0, js_p, &j_id, server_job_context);
 

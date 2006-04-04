@@ -205,5 +205,16 @@ AC_DEFUN([AX_BERKELEY_DB],
     ], AC_MSG_RESULT(yes)
     AC_DEFINE(HAVE_DB_DIRTY_READ, 1, [Define if db library has DB_DIRTY_READ flag]),
     AC_MSG_RESULT(no))
-    CFLAGS="$oldcflags"
+
+    dnl check for DB_BUFFER_SMALL (it is returned by dbp->get in db-4.4 and up)
+    AC_MSG_CHECKING(for DB_BUFFER_SMALL error)
+    AC_TRY_COMPILE([
+    #include <db.h>
+    ], [
+    int res = DB_BUFFER_SMALL;
+    ], AC_MSG_RESULT(yes)
+    AC_DEFINE(HAVE_DB_BUFFER_SMALL, 1, [Define if db library has DB_BUFFER_SMALL error]),
+    AC_MSG_RESULT(no))
+
+    CFLAGS="$oldcflags"    
 ])
