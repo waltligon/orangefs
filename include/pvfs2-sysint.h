@@ -41,15 +41,14 @@ struct PVFS_sys_attr_s
     PVFS_time mtime;
     PVFS_time ctime;
     PVFS_size size;
+    char *link_target; /* NOTE: caller must free this */
 #if INTPTR_MIN == INT32_MIN
-    char *link_target; /* NOTE: caller must free this */
     int32_t __pad2;
-#else 
-    /* assume 64 bit */
-    char *link_target; /* NOTE: caller must free this */
 #endif
     int32_t dfile_count; /* Changed to int32_t so that size of structure does not change */
+#if INTPTR_MIN == INT32_MIN
     int32_t __pad3;
+#endif
     PVFS_size dirent_count;
     PVFS_ds_type objtype;
     uint32_t mask;
