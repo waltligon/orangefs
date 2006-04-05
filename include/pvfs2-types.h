@@ -55,6 +55,10 @@
 #define PVFS2_ALIGN_VAR(_type, _name) _type _name
 #endif
 
+#ifndef offsetof
+#define offsetof(type, field)  ((size_t)(&((type *)0)->field))
+#endif
+
 /* empty stubs to turn off encoding definition generation */
 #include "pvfs2-encode-stubs.h"
 

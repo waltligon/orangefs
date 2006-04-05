@@ -1630,7 +1630,7 @@ static int translate_dirdata_sizes_0_0_1(
                     fprintf(stderr, "WARNING: could not find dirdata object: %s\n", dirdata_db);
                 }
 
-                if(verbose) printf("VERBOSE    size: %lld\n", dirent_count); 
+                if(verbose) printf("VERBOSE    size: %lld\n", lld(dirent_count)); 
 
                 /* write the dirent_count out into new collection */ 
                 memset(&t_key, 0, sizeof(t_key));

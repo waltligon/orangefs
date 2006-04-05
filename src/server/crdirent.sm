@@ -350,8 +350,8 @@ static int crdirent_increment_dirent_count(PINT_server_op *s_op,
                  "incrementing dirent_count: fsid: %u, handle: %llu, "
                  "count: %llu\n",
                  s_op->req->u.crdirent.fs_id,
-                 s_op->req->u.crdirent.parent_handle,
-                 s_op->u.crdirent.dirent_count);
+                 llu(s_op->req->u.crdirent.parent_handle),
+                 llu(s_op->u.crdirent.dirent_count));
      
     return ret;
 }

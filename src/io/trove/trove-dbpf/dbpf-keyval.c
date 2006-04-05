@@ -323,7 +323,7 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
 
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                  "dbpf_keyval_write_op_svc: handle: %llu, key: %*s\n",
-                 op_p->handle,
+                 llu(op_p->handle),
                  op_p->u.k_write.key.buffer_sz,
                  (char *)op_p->u.k_write.key.buffer);
 
@@ -384,7 +384,7 @@ static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
 
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                  "keyval_db->put(handle= %llu, key= %*s (%d)) size=%d\n",
-                 key_entry.handle, 
+                 llu(key_entry.handle), 
                  op_p->u.k_write.key.buffer_sz,
                  key_entry.key,
                  op_p->u.k_write.key.buffer_sz,
@@ -497,7 +497,7 @@ static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p)
 
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                  "dbpf_keyval_remove_op_svc: handle: %llu, key: %*s\n",
-                 op_p->handle,
+                 llu(op_p->handle),
                  op_p->u.k_remove.key.buffer_sz,
                  (char *)op_p->u.k_remove.key.buffer);
                  
@@ -610,7 +610,7 @@ static int dbpf_keyval_iterate_op_svc(struct dbpf_op *op_p)
                   "dbpf_keyval_iterate_op_svc: starting: fsid: %u, "
                   "handle: %llu, pos: %u\n", 
                  op_p->coll_p->coll_id, 
-                 op_p->handle,
+                 llu(op_p->handle),
                  *op_p->u.k_iterate.position_p);
     
     /* if they passed in that they are at the end, return 0.
@@ -1004,7 +1004,7 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
 
         gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                      "keyval_db->put(handle= %llu, key= %*s (%d)) size=%d\n",
-                     key_entry.handle, 
+                     llu(key_entry.handle), 
                      op_p->u.k_write_list.key_array[k].buffer_sz,
                      key_entry.key,
                      op_p->u.k_write_list.key_array[k].buffer_sz,
@@ -1270,7 +1270,7 @@ int PINT_dbpf_keyval_remove(
 
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                  "PINT_dbpf_keyval_remove: handle (%llu), key: (%d) %*s\n",
-                 handle, key->buffer_sz, key->buffer_sz, (char *)key->buffer);
+                 llu(handle), key->buffer_sz, key->buffer_sz, (char *)key->buffer);
 
     key_entry.handle = handle;
     memcpy(key_entry.key, key->buffer, key->buffer_sz);
@@ -1281,7 +1281,7 @@ int PINT_dbpf_keyval_remove(
 
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                  "keyval_db->del(handle= %llu, key= %*s (%d)) size=%d\n",
-                 key_entry.handle,
+                 llu(key_entry.handle),
                  key->buffer_sz,
                  key_entry.key,
                  key->buffer_sz,
@@ -1471,7 +1471,7 @@ static int dbpf_keyval_iterate_cursor_get(
     {
         gossip_lerr("Failed to perform cursor get:"
                     "\n\thandle: %llu\n\ttype: %d\n\tkey: %s\n",
-                    key_entry.handle, db_flags, key_entry.key);
+                    llu(key_entry.handle), db_flags, key_entry.key);
         return -dbpf_db_error_to_trove_error(ret);
     }
 

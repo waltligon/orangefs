@@ -163,6 +163,7 @@ int dbpf_bstream_listio_convert(
     return 1;
 }
 
+#if 0
 static void aiocb_print(struct aiocb *ptr)
 {
     static char lio_write[] = "LIO_WRITE";
@@ -179,12 +180,13 @@ static void aiocb_print(struct aiocb *ptr)
              sigev_none : invalid_value);
 
     gossip_debug(GOSSIP_TROVE_DEBUG, "aio_fildes = %d, aio_offset = %d, "
-                 "aio_buf = %x, aio_nbytes = %d, aio_reqprio = %d, "
+                 "aio_buf = %n, aio_nbytes = %zu, aio_reqprio = %d, "
                  "aio_lio_opcode = %s, aio_sigevent.sigev_notify = %s\n",
                  ptr->aio_fildes, (int)ptr->aio_offset,
-                 (unsigned int)ptr->aio_buf, ptr->aio_nbytes,
+                 ptr->aio_buf, ptr->aio_nbytes,
                  ptr->aio_reqprio, opcode, sigev);
 }
+#endif
 
 /*
  * Local variables:
