@@ -105,16 +105,6 @@ do {                                                                         \
   llu(DBPF_KEYVAL_GET_BUCKET_0_0_1(__handle, __cid)), llu(__handle));        \
 } while (0)
 
-char* common_key_names_0_0_1[] = 
-{
-    "root_handle",
-    "dir_ent",
-    "datafile_handles",
-    "metafile_dist",
-    "symlink_target",
-    NULL
-};
-
 int main(int argc, char **argv)
 {
     int ret = -1;
