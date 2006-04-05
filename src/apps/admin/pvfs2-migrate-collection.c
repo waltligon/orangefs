@@ -86,7 +86,6 @@ static int translate_keyval_db_0_0_1(
     char* storage_space, char* coll_id, 
     char* full_db_path, TROVE_handle handle, char* new_name, TROVE_coll_id 
     new_id, TROVE_context_id trove_context);
-static int check_common_0_0_1(char* key);
 
 /** number of keyval buckets used in DBPF 0.0.1 */
 #define KEYVAL_MAX_NUM_BUCKETS_0_0_1 32
@@ -1681,26 +1680,6 @@ static int translate_dirdata_sizes_0_0_1(
     dbc_p->c_close(dbc_p);
     dbp->close(dbp, 0);
 
-    return(0);
-}
-
-/**
- * checks to see if a given key is one of the "Common" keys in PVFS2
- *
- * \return 1 if common, 0 otherwise
- */
-static int check_common_0_0_1(char* key)
-{
-    int i = 0;
-    
-    while(common_key_names_0_0_1[i] != NULL)
-    {
-        if(strcmp(key, common_key_names_0_0_1[i]) == 0)
-        {
-            return(1);
-        }
-        i++;
-    }
     return(0);
 }
 
