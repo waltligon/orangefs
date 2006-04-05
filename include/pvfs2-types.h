@@ -48,11 +48,11 @@
  * in 64bit case
  */
 #if SIZEOF_VOIDP == 32
-#define ALIGN_VAR(_type, _name) \
+#define PVFS2_ALIGN_VAR(_type, _name) \
     _type _name; \
     int32_t __pad##_name
 #else
-#define ALIGN_VAR(_type, _name) _type _name
+#define PVFS2_ALIGN_VAR(_type, _name) _type _name
 #endif
 
 /* empty stubs to turn off encoding definition generation */

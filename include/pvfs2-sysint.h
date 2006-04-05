@@ -31,13 +31,13 @@ struct PVFS_sys_attr_s
 {
     PVFS_uid owner;
     PVFS_gid group;
-    ALIGN_VAR(PVFS_permissions, perms);
+    PVFS2_ALIGN_VAR(PVFS_permissions, perms);
     PVFS_time atime;
     PVFS_time mtime;
     PVFS_time ctime;
     PVFS_size size;
-    ALIGN_VAR(char *, link_target); /* NOTE: caller must free this */
-    ALIGN_VAR(int32_t, dfile_count); /* Changed to int32_t so that size of structure does not change */
+    PVFS2_ALIGN_VAR(char *, link_target); /* NOTE: caller must free this */
+    PVFS2_ALIGN_VAR(int32_t, dfile_count); /* Changed to int32_t so that size of structure does not change */
     PVFS_size dirent_count;
     PVFS_ds_type objtype;
     uint32_t mask;
