@@ -20,10 +20,6 @@
 #ifndef __PVFS_SYSINT_H
 #define __PVFS_SYSINT_H
 
-#ifndef __KERNEL__
-#include <limits.h>
-#endif
-
 #include "pvfs2-types.h"
 #include "pvfs2-request.h"
 
@@ -35,20 +31,13 @@ struct PVFS_sys_attr_s
 {
     PVFS_uid owner;
     PVFS_gid group;
-    PVFS_permissions perms;
-    int32_t  __pad1;
+    ALIGN_VAR(PVFS_permissions, perms);
     PVFS_time atime;
     PVFS_time mtime;
     PVFS_time ctime;
     PVFS_size size;
-    char *link_target; /* NOTE: caller must free this */
-#if INTPTR_MIN == INT32_MIN
-    int32_t __pad2;
-#endif
-    int32_t dfile_count; /* Changed to int32_t so that size of structure does not change */
-#if INTPTR_MIN == INT32_MIN
-    int32_t __pad3;
-#endif
+    ALIGN_VAR(char *, link_target); /* NOTE: caller must free this */
+    ALIGN_VAR(int32_t, dfile_count); /* Changed to int32_t so that size of structure does not change */
     PVFS_size dirent_count;
     PVFS_ds_type objtype;
     uint32_t mask;

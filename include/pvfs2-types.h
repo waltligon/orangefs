@@ -21,11 +21,38 @@
 #include <stdint.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <limits.h>
 #endif
 
 #ifndef INT32_MAX
 /* definition taken from stdint.h */
 #define INT32_MAX (2147483647)
+#endif
+
+/* figure out the size of a pointer */
+#if defined(__WORDSIZE)
+  #define SIZEOF_VOIDP __WORDSIZE
+#elif defined(BITS_PER_LONG)
+  #define SIZEOF_VOIDP BITS_PER_LONG
+#elif defined(INTPTR_MIN)
+  #if   INTPTR_MIN == INT32_MIN
+    #define SIZEOF_VOIDP 32
+  #elif INTPTR_MIN == INT64_MIN
+    #define SIZEOF_VOIDP 64
+  #endif
+#else
+  #error "Unhandled size of void pointer"
+#endif
+
+/* we need to align some variables in 32bit case to match alignment
+ * in 64bit case
+ */
+#if SIZEOF_VOIDP == 32
+#define ALIGN_VAR(_type, _name) \
+    _type _name; \
+    int32_t __pad##_name
+#else
+#define ALIGN_VAR(_type, _name) _type _name
 #endif
 
 /* empty stubs to turn off encoding definition generation */

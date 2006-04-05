@@ -64,20 +64,11 @@ typedef struct PINT_dist_methods_s
 
 /* Internal representation of a PVFS2 Distribution */
 typedef struct PINT_dist_s {
-	char *dist_name;
-#if INTPTR_MIN == INT32_MIN
-        int32_t __pad1;
-#endif
+	ALIGN_VAR(char *, dist_name);
 	int32_t name_size;
 	int32_t param_size; 
-	void *params;
-#if INTPTR_MIN == INT32_MIN
-        int32_t __pad2;
-#endif
-	PINT_dist_methods *methods;
-#if INTPTR_MIN == INT32_MIN
-        int32_t __pad3;
-#endif
+        ALIGN_VAR(void *, params);
+	ALIGN_VAR(PINT_dist_methods *, methods);
 } PINT_dist;
 
 
