@@ -26,11 +26,13 @@
 
 #include <db.h>
 
+#define __PINT_REQPROTO_ENCODE_FUNCS_C
 #include "pvfs2-config.h"
 #include "pvfs2.h"
 #include "pvfs2-internal.h"
 #include "trove.h"
 #include "mkspace.h"
+#include "pint-distribution.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -86,6 +88,8 @@ static int translate_keyval_db_0_0_1(
     char* storage_space, char* coll_id, 
     char* full_db_path, TROVE_handle handle, char* new_name, TROVE_coll_id 
     new_id, TROVE_context_id trove_context);
+static int translate_dist_0_0_1(
+    PINT_dist * dist);
 
 /** number of keyval buckets used in DBPF 0.0.1 */
 #define KEYVAL_MAX_NUM_BUCKETS_0_0_1 32
@@ -1108,12 +1112,37 @@ static int translate_keyval_db_0_0_1(
         }
         if(ret == 0)
         {
+            int tvalbuf_free = 0;
             memset(&t_key, 0, sizeof(t_key));
             memset(&t_val, 0, sizeof(t_val));
             t_key.buffer = key.data;
             t_key.buffer_sz = key.size;
-            t_val.buffer = data.data;
-            t_val.buffer_sz = data.size;
+            
+            if(!strcmp(t_key.buffer, "metafile_dist"))
+            {
+                PINT_dist *newdist;
+                newdist = t_val.buffer;
+                translate_dist_0_0_1(newdist);
+                
+                t_val.buffer_sz = PINT_DIST_PACK_SIZE(newdist);
+                t_val.buffer = malloc(t_val.buffer_sz);
+                if(!t_val.buffer)
+                {
+                    fprintf(stderr, "Error: trove_keyval_write failure.\n");
+                    free(data.data);
+                    free(key.data);
+                    dbc_p->c_close(dbc_p);
+                    dbp->close(dbp, 0);
+                    return -1; 
+                }
+                tvalbuf_free = 1;
+                PINT_dist_encode(t_val.buffer, newdist);
+            } 
+            else
+            {
+                t_val.buffer = data.data;
+                t_val.buffer_sz = data.size;
+            }
            
             /* write out new keyval pair */
             state = 0;
@@ -1127,6 +1156,13 @@ static int translate_keyval_db_0_0_1(
                     new_id, op_id, trove_context, &count, NULL, NULL,
                     &state, 10);
             }
+            
+            if(tvalbuf_free)
+            {
+                tvalbuf_free = 0;
+                free(t_val.buffer);
+            }
+
             if ((ret < 0) || (ret == 1 && state != 0))
             {
                 fprintf(stderr, "Error: trove_keyval_write failure.\n");
@@ -1671,6 +1707,28 @@ static int translate_dirdata_sizes_0_0_1(
     dbp->close(dbp, 0);
 
     return(0);
+}
+
+/*
+ * convert integers to pointers in dist
+ * with no copy - dist is modified
+ */
+int translate_dist_0_0_1(PINT_dist *dist)
+{
+        if(!dist)
+        {
+            return 0;
+        }
+	/* convert ints in dist to pointers */
+	dist->dist_name = (char *) dist + (int32_t) dist->dist_name;
+	dist->params = (void *) ((char *) dist + (int32_t) dist->params);
+	/* set methods */
+	dist->methods = NULL;
+	if (PINT_dist_lookup(dist)) {
+	    fprintf(stderr, "%s: lookup dist failed\n", __func__);
+            return -1;
+	}
+        return 0;
 }
 
 /* @} */

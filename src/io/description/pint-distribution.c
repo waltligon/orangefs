@@ -7,10 +7,13 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+
+#define __PINT_REQPROTO_ENCODE_FUNCS_C
 #include "pvfs2-types.h"
 #include "pvfs2-debug.h"
 #include "gossip.h"
 #include "pint-distribution.h"
+
 
 
 /* global size of dist table */
@@ -181,60 +184,16 @@ int PINT_dist_lookup(PINT_dist *dist)
 	return -1;
 }
 
-/*
- * If buffer is not null, copy dist into buffer, then convert
- * pointers to integers in buffer, leave dist alone
- * if buffer is null, convert pointers to integers in dist
- * with no copy - dist is modified
- */
+/* pack dist struct for storage */
 void PINT_dist_encode(void *buffer, PINT_dist *dist)
 {
-    PINT_dist* old_dist = dist;
-	
-    if (!dist)
-        return;
-    
-    if (buffer)
-    {
-        memcpy(buffer, dist, PINT_DIST_PACK_SIZE(dist));
-        dist = buffer;
-        /* adjust pointers in new buffer */
-        dist->dist_name = ((char *)dist + ((char *)old_dist->dist_name -
-                                           (char *)old_dist));
-        dist->params =
-            ((char *)dist + ((char *)old_dist->params - (char *)old_dist));
-    }
-    
-    /* convert pointers in dist to ints */
-    dist->dist_name = (void *) (dist->dist_name - (char *) dist);
-    dist->params = (void *) ((char *) dist->params - (char *) dist);
-    dist->methods = NULL;
+    encode_PINT_dist(((char **)&buffer), &dist);
 }
 
-/*
- * If buffer is not null, copy buffer into dist, then convert
- * integers to pointers in dist, leave buffer alone
- * if buffer is null, convert integers to pointers in dist
- * with no copy - dist is modified
- */
-void PINT_dist_decode(PINT_dist *dist, void *buffer)
+/* unpack dist struct after receiving from storage */
+void PINT_dist_decode(PINT_dist **dist, void *buffer)
 {
-	if (!dist)
-		return;
-	if (buffer)
-	{
-		PINT_dist *d2 = (PINT_dist *)buffer;
-		memcpy(dist, buffer, PINT_DIST_PACK_SIZE(d2));
-	}
-	/* convert ints in dist to pointers */
-	dist->dist_name = (char *) (dist + (int32_t)(int64_t)dist->dist_name);
-	dist->params = (void *) (dist + (int32_t)(int64_t)dist->params);
-	/* set methods */
-	dist->methods = NULL;
-	if (PINT_dist_lookup(dist)) {
-	    gossip_err("%s: lookup dist failed\n", __func__);
-	    exit(1);
-	}
+    decode_PINT_dist((char **)(&buffer), dist);
 }
 
 void PINT_dist_dump(PINT_dist *dist)

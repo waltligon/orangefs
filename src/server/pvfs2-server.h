@@ -341,6 +341,8 @@ typedef struct PINT_server_op
     PVFS_ds_keyval *key_a;
     PVFS_ds_keyval *val_a;
 
+    int free_val;
+
     /* attributes structure associated with target of operation; may be 
      * partially filled in by prelude nested state machine (for 
      * permission checking); may be used/modified by later states as well

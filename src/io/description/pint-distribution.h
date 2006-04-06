@@ -64,11 +64,11 @@ typedef struct PINT_dist_methods_s
 
 /* Internal representation of a PVFS2 Distribution */
 typedef struct PINT_dist_s {
-	PVFS2_ALIGN_VAR(char *, dist_name);
+	char * dist_name;
 	int32_t name_size;
 	int32_t param_size; 
-        PVFS2_ALIGN_VAR(void *, params);
-	PVFS2_ALIGN_VAR(PINT_dist_methods *, methods);
+        void * params;
+	PINT_dist_methods * methods;
 } PINT_dist;
 
 
@@ -128,11 +128,11 @@ int PINT_dist_setparams(PINT_dist *dist, const void *buf);
  * that name */
 int PINT_dist_lookup(PINT_dist *dist);
 
-/* pack dist struct for sending over wire */
+/* pack dist struct for storage */
 void PINT_dist_encode(void *buffer, PINT_dist *dist);
 
-/* unpack dist struct after receiving from wire */
-void PINT_dist_decode(PINT_dist *dist, void *buffer);
+/* unpack dist struct after receiving from storage */
+void PINT_dist_decode(PINT_dist **dist, void *buffer);
 
 /* Print dist state to debug system */
 void PINT_dist_dump(PINT_dist *dist);

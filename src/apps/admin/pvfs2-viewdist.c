@@ -202,7 +202,7 @@ int main(int argc, char ** argv)
 {
     struct options* user_opts = NULL;
     file_object src;
-    PINT_dist dist;
+    PINT_dist *dist;
     char *dist_buf = NULL;
     int dist_size;
     int64_t ret;
@@ -252,13 +252,14 @@ int main(int argc, char ** argv)
     }
     /* okay now print out by deserializing the buffer */
     PINT_dist_decode(&dist, dist_buf);
-    printf("dist_name = %s\n", dist.dist_name);
-    if (strcmp(dist.dist_name, PVFS_DIST_SIMPLE_STRIPE_NAME) == 0)
+    printf("dist_name = %s\n", dist->dist_name);
+    if (strcmp(dist->dist_name, PVFS_DIST_SIMPLE_STRIPE_NAME) == 0)
     {
         PVFS_simple_stripe_params params;
-        PINT_dist_getparams(&params, &dist);
+        PINT_dist_getparams(&params, dist);
         printf("strip_size = %ld\n", (unsigned long)(params.strip_size));
     }
+    PINT_dist_free(dist);
     printf("Number of datafiles/servers = %d\n", nservers);
     for (i = 0; i < nservers; i++)
     {

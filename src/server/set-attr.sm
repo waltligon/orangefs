@@ -415,11 +415,18 @@ static int setattr_write_metafile_distribution_if_required(
                  "  metafile distribution size = %d\n",
                  (int)s_op->req->u.setattr.attr.u.meta.dist_size);
 
-    s_op->val.buffer = s_op->req->u.setattr.attr.u.meta.dist;
     s_op->val.buffer_sz = s_op->req->u.setattr.attr.u.meta.dist_size;
 
-    PINT_dist_encode(NULL, s_op->req->u.setattr.attr.u.meta.dist);    
-
+    s_op->val.buffer = malloc(s_op->val.buffer_sz);
+    if(!s_op->val.buffer)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return 1;
+    }
+    s_op->free_val = 1;
+    
+    PINT_dist_encode(s_op->val.buffer, 
+                     s_op->req->u.setattr.attr.u.meta.dist);
     gossip_debug(
         GOSSIP_SERVER_DEBUG, "  writing %s [%llu,%d,"
         "len %d]\n", (char *)s_op->key.buffer,
@@ -498,6 +505,11 @@ static int setattr_write_symlink_target_if_required(
 static int setattr_cleanup(PINT_server_op *s_op, job_status_s *js_p)
 {
     PINT_STATE_DEBUG("setattr_cleanup");
+
+    if(s_op->free_val)
+    {
+        free(s_op->val.buffer);
+    }
     return(server_state_machine_complete(s_op));
 }
 
