@@ -145,7 +145,7 @@ static __inline__ void qlist_splice(struct qlist_head *qlist, struct qlist_head 
  * @member:	the name of the qlist_struct within the struct.
  */
 #define qlist_entry(ptr, type, member) \
-	((type *)((char *)(ptr)-offsetof(type, member)))
+	((type *)((char *)(ptr)-(unsigned long)((&((type *)0)->member))))
 
 /**
  * qlist_for_each	-	iterate over a qlist
