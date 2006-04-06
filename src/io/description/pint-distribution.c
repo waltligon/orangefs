@@ -187,13 +187,15 @@ int PINT_dist_lookup(PINT_dist *dist)
 /* pack dist struct for storage */
 void PINT_dist_encode(void *buffer, PINT_dist *dist)
 {
-    encode_PINT_dist(((char **)&buffer), &dist);
+    char * tmpbuf = (char *)buffer;
+    encode_PINT_dist(&tmpbuf, &dist);
 }
 
 /* unpack dist struct after receiving from storage */
 void PINT_dist_decode(PINT_dist **dist, void *buffer)
 {
-    decode_PINT_dist((char **)(&buffer), dist);
+    char * tmpbuf = (char *)buffer;
+    decode_PINT_dist(&tmpbuf, dist);
 }
 
 void PINT_dist_dump(PINT_dist *dist)

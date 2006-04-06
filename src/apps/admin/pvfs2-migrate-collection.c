@@ -1720,8 +1720,8 @@ int translate_dist_0_0_1(PINT_dist *dist)
             return 0;
         }
 	/* convert ints in dist to pointers */
-	dist->dist_name = (char *) dist + (int32_t) dist->dist_name;
-	dist->params = (void *) ((char *) dist + (int32_t) dist->params);
+	dist->dist_name = (char *) dist + (intptr_t) dist->dist_name;
+	dist->params = (void *) ((char *) dist + (intptr_t) dist->params);
 	/* set methods */
 	dist->methods = NULL;
 	if (PINT_dist_lookup(dist)) {
