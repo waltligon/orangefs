@@ -4,6 +4,7 @@ PVFS2 Release ChangeLog
 
 pvfs2-1.4.1-pre1
 ===============
+- ib: encode data structures to support heterogenous architectures
 - deal with update_atime vanishing from kernel: test for touch_atime and use
   that if available.
 - fix configure-time kernel tests to work better with 2.6.16 kernels

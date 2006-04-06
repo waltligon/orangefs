@@ -5,9 +5,13 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.24 2006-03-21 21:29:24 pw Exp $
+ * $Id: ib.c,v 1.25 2006-04-06 14:39:36 pw Exp $
  */
 #include <stdio.h>  /* just for NULL for id-generator.h */
+#include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+#define __PINT_REQPROTO_ENCODE_FUNCS_C  /* include definitions */
 #include <src/common/id-generator/id-generator.h>
 #include <src/io/bmi/bmi-method-support.h>   /* bmi_method_ops ... */
 #include <src/common/gen-locks/gen-locks.h>  /* gen_mutex_t ... */
@@ -53,8 +57,8 @@ static void post_sr(const buf_head_t *bh, u_int32_t len);
 /* post_rr declared externally */
 static void post_sr_ack(ib_connection_t *c, int his_bufnum);
 static void post_rr_ack(const ib_connection_t *c, const buf_head_t *bh);
-static void post_sr_rdmaw(ib_send_t *sq, msg_header_cts_t *mh_cts);
-
+static void post_sr_rdmaw(ib_send_t *sq, msg_header_cts_t *mh_cts,
+                          void *mh_cts_buf);
 static void encourage_send_waiting_buffer(ib_send_t *sq);
 static void encourage_send_incoming_cts(buf_head_t *bh, u_int32_t byte_len);
 
@@ -154,12 +158,15 @@ check_cq(void)
 		/*
 		 * Some other message: eager send, RTS, CTS, BYE.
 		 */
-		msg_header_common_t *mh_common = bh->buf;
+		msg_header_common_t mh_common;
+		char *ptr = bh->buf;
+
+		decode_msg_header_common_t(&ptr, &mh_common);
 
 		debug(1, "%s: found len %d at %s my bufnum %d type %s",
 		  __func__, byte_len, bh->c->peername, bh->num,
-		  msg_type_name(mh_common->type));
-		if (mh_common->type == MSG_CTS) {
+		  msg_type_name(mh_common.type));
+		if (mh_common.type == MSG_CTS) {
 		    /* incoming CTS messages go to the send engine */
 		    encourage_send_incoming_cts(bh, byte_len);
 		} else {
@@ -236,19 +243,24 @@ encourage_send_waiting_buffer(ib_send_t *sq)
 	/*
 	 * Eager send.
 	 */
-	msg_header_eager_t *mh_eager = bh->buf;
-	mh_eager->type = sq->is_unexpected
+	msg_header_eager_t mh_eager;
+	char *ptr = bh->buf;
+	
+	mh_eager.type = sq->is_unexpected
 	  ? MSG_EAGER_SENDUNEXPECTED : MSG_EAGER_SEND;
-	mh_eager->bmi_tag = sq->bmi_tag;
-	mh_eager->bufnum = bh->num;
+	mh_eager.bmi_tag = sq->bmi_tag;
+	mh_eager.bufnum = bh->num;
 
-	memcpy_from_buflist(&sq->buflist, mh_eager + 1);
+	encode_msg_header_eager_t(&ptr, &mh_eager);
+
+	memcpy_from_buflist(&sq->buflist,
+	                    (msg_header_eager_t *) bh->buf + 1);
 
 	/* get ready to receive the ack */
 	post_rr_ack(sq->c, bh);
 
 	/* send the message */
-	post_sr(bh, (u_int32_t) (sizeof(*mh_eager) + sq->buflist.tot_len));
+	post_sr(bh, (u_int32_t) (sizeof(mh_eager) + sq->buflist.tot_len));
 
 	/* wait for ack saying remote has received and recycled his buf */
 	sq->state = SQ_WAITING_EAGER_ACK;
@@ -260,15 +272,18 @@ encourage_send_waiting_buffer(ib_send_t *sq)
 	 * Request to send, rendez-vous.  Include the mop id in the message
 	 * which will be returned to us in the CTS so we can look it up.
 	 */
-	msg_header_rts_t *mh_rts = bh->buf;
+	msg_header_rts_t mh_rts;
+	char *ptr = bh->buf;
 
-	mh_rts->type = MSG_RTS;
-	mh_rts->bmi_tag = sq->bmi_tag;
-	mh_rts->mop_id = sq->mop->op_id;
-	mh_rts->tot_len = sq->buflist.tot_len;
+	mh_rts.type = MSG_RTS;
+	mh_rts.bmi_tag = sq->bmi_tag;
+	mh_rts.mop_id = sq->mop->op_id;
+	mh_rts.tot_len = sq->buflist.tot_len;
+
+	encode_msg_header_rts_t(&ptr, &mh_rts);
 
 	/* do not expect an ack back from this ever (implicit with CTS) */
-	post_sr(bh, sizeof(*mh_rts));
+	post_sr(bh, sizeof(mh_rts));
 
 #if MEMCACHE_EARLY_REG
 	/* XXX: need to lock against receiver thread?  Could poll return
@@ -289,12 +304,13 @@ encourage_send_waiting_buffer(ib_send_t *sq)
 static void
 encourage_send_incoming_cts(buf_head_t *bh, u_int32_t byte_len)
 {
-    msg_header_cts_t *mh_cts;
+    msg_header_cts_t mh_cts;
     ib_send_t *sq;
     u_int32_t want;
     list_t *l;
+    char *ptr = bh->buf;
 
-    mh_cts = bh->buf;
+    decode_msg_header_cts_t(&ptr, &mh_cts);
 
     /*
      * Look through this CTS message to determine the owning sq.  Works
@@ -304,24 +320,24 @@ encourage_send_incoming_cts(buf_head_t *bh, u_int32_t byte_len)
     qlist_for_each(l, &sendq) {
 	ib_send_t *sqt = (ib_send_t *) l;
 	debug(8, "%s: looking for op_id 0x%llx, consider 0x%llx", __func__,
-	  llu(mh_cts->rts_mop_id), llu(sqt->mop->op_id));
-	if (sqt->mop->op_id == (bmi_op_id_t) mh_cts->rts_mop_id) {
+	  llu(mh_cts.rts_mop_id), llu(sqt->mop->op_id));
+	if (sqt->mop->op_id == (bmi_op_id_t) mh_cts.rts_mop_id) {
 	    sq = sqt;
 	    break;
 	}
     }
     if (!sq)
 	error("%s: mop_id %llx in CTS message not found", __func__,
-	  llu(mh_cts->rts_mop_id));
+	  llu(mh_cts.rts_mop_id));
 
     debug(2, "%s: sq %p %s my bufnum %d his bufnum %d len %u", __func__,
-      sq, sq_state_name(sq->state), bh->num, mh_cts->bufnum, byte_len);
+      sq, sq_state_name(sq->state), bh->num, mh_cts.bufnum, byte_len);
     assert(sq->state == SQ_WAITING_CTS,
       "%s: wrong send state %s", __func__, sq_state_name(sq->state));
 
     /* message; cts content; list of buffers, lengths, and keys */
-    want = sizeof(*mh_cts)
-      + mh_cts->buflist_num * MSG_HEADER_CTS_BUFLIST_ENTRY_SIZE;
+    want = sizeof(mh_cts)
+      + mh_cts.buflist_num * MSG_HEADER_CTS_BUFLIST_ENTRY_SIZE;
     if (bmi_ib_unlikely(byte_len != want))
 	error("%s: wrong message size for CTS, got %u, want %u", __func__,
           byte_len, want);
@@ -330,10 +346,10 @@ encourage_send_incoming_cts(buf_head_t *bh, u_int32_t byte_len)
     qlist_add_tail(&sq->bh->list, &sq->c->eager_send_buf_free);
 
     /* save the bufnum from his cts for later acking */
-    sq->his_bufnum = mh_cts->bufnum;
+    sq->his_bufnum = mh_cts.bufnum;
 
     /* start the big tranfser */
-    post_sr_rdmaw(sq, mh_cts);
+    post_sr_rdmaw(sq, &mh_cts, (msg_header_cts_t *) bh->buf + 1);
 
     /* re-post our recv buf now that we have all the information from CTS,
      * but don't tell him this until the rdma is complete. */
@@ -386,32 +402,39 @@ static void
 encourage_recv_incoming(ib_connection_t *c, buf_head_t *bh, u_int32_t byte_len)
 {
     ib_recv_t *rq;
-    msg_header_common_t *mh_common = bh->buf;
+    msg_header_common_t mh_common;
+    char *ptr = bh->buf;
+
+    decode_msg_header_common_t(&ptr, &mh_common);
 
     debug(4, "%s: incoming msg type %s", __func__,
-          msg_type_name(mh_common->type));
+          msg_type_name(mh_common.type));
 
-    if (mh_common->type == MSG_EAGER_SEND) {
+    if (mh_common.type == MSG_EAGER_SEND) {
 
-	msg_header_eager_t *mh_eager = bh->buf;
+	msg_header_eager_t mh_eager;
+
+	ptr = bh->buf;
+	decode_msg_header_eager_t(&ptr, &mh_eager);
 
 	debug(2, "%s: recv eager my bufnum %d his bufnum %d len %u", __func__,
-	  bh->num, mh_eager->bufnum, byte_len);
+	  bh->num, mh_eager.bufnum, byte_len);
 
-	rq = find_matching_recv(RQ_WAITING_INCOMING, c, mh_eager->bmi_tag);
+	rq = find_matching_recv(RQ_WAITING_INCOMING, c, mh_eager.bmi_tag);
 	if (rq) {
-	    bmi_size_t len = byte_len - sizeof(*mh_eager);
+	    bmi_size_t len = byte_len - sizeof(mh_eager);
 	    if (len > rq->buflist.tot_len)
 		error("%s: EAGER received %lld too small for buffer %lld",
 		  __func__, lld(len), lld(rq->buflist.tot_len));
 
 	    memcpy_to_buflist(&rq->buflist,
-	      (char *) bh->buf + sizeof(*mh_eager), len);
+	                      (msg_header_eager_t *) bh->buf + 1,
+			      len);
 
 	    /* re-post */
 	    post_rr(c, bh);
 	    /* done with buffer, ack to remote */
-	    post_sr_ack(c, mh_eager->bufnum);
+	    post_sr_ack(c, mh_eager.bufnum);
 	    rq->state = RQ_EAGER_WAITING_USER_TEST;
 	    debug(2, "%s: matched rq %p now %s", __func__, rq,
 	      rq_state_name(rq->state));
@@ -428,45 +451,51 @@ encourage_recv_incoming(ib_connection_t *c, buf_head_t *bh, u_int32_t byte_len)
 	} else {
 	    rq = alloc_new_recv(c, bh);
 	    /* return value for when user does post_recv for this one */
-	    rq->bmi_tag = mh_eager->bmi_tag;
+	    rq->bmi_tag = mh_eager.bmi_tag;
 	    rq->state = RQ_EAGER_WAITING_USER_POST;
 	    /* do not repost or ack, keeping bh until user test */
 	    debug(2, "%s: new rq %p now %s", __func__, rq,
 	      rq_state_name(rq->state));
 	}
-	rq->actual_len = byte_len - sizeof(*mh_eager);
+	rq->actual_len = byte_len - sizeof(mh_eager);
 
-    } else if (mh_common->type == MSG_EAGER_SENDUNEXPECTED) {
+    } else if (mh_common.type == MSG_EAGER_SENDUNEXPECTED) {
 
-	msg_header_eager_t *mh_eager = bh->buf;
+	msg_header_eager_t mh_eager;
+
+	ptr = bh->buf;
+	decode_msg_header_eager_t(&ptr, &mh_eager);
 
 	debug(2, "%s: recv eager unexpected my bufnum %d his bufnum %d len %u",
-	  __func__, bh->num, mh_eager->bufnum, byte_len);
+	  __func__, bh->num, mh_eager.bufnum, byte_len);
 
 	rq = alloc_new_recv(c, bh);
 	/* return values for when user does testunexpected for this one */
-	rq->bmi_tag = mh_eager->bmi_tag;
+	rq->bmi_tag = mh_eager.bmi_tag;
 	rq->state = RQ_EAGER_WAITING_USER_TESTUNEXPECTED;
-	rq->actual_len = byte_len - sizeof(*mh_eager);
+	rq->actual_len = byte_len - sizeof(mh_eager);
 	/* do not repost or ack, keeping bh until user test */
 	debug(2, "%s: new rq %p now %s", __func__, rq,
 	  rq_state_name(rq->state));
 
-    } else if (mh_common->type == MSG_RTS) {
+    } else if (mh_common.type == MSG_RTS) {
 	/*
 	 * Sender wants to send a big message, initiates rts/cts protocol.
 	 * Has the user posted a matching receive for it yet?
 	 */
-	msg_header_rts_t *mh_rts = bh->buf;
+	msg_header_rts_t mh_rts;
+
+	ptr = bh->buf;
+	decode_msg_header_rts_t(&ptr, &mh_rts);
 
 	debug(2, "%s: recv RTS my bufnum %d len %u",
 	  __func__, bh->num, byte_len);
 
-	rq = find_matching_recv(RQ_WAITING_INCOMING, c, mh_rts->bmi_tag);
+	rq = find_matching_recv(RQ_WAITING_INCOMING, c, mh_rts.bmi_tag);
 	if (rq) {
-	    if ((int)mh_rts->tot_len > rq->buflist.tot_len) {
+	    if ((int)mh_rts.tot_len > rq->buflist.tot_len) {
 		error("%s: RTS received %llu too small for buffer %llu",
-		  __func__, llu(mh_rts->tot_len), llu(rq->buflist.tot_len));
+		  __func__, llu(mh_rts.tot_len), llu(rq->buflist.tot_len));
 	    }
 	    rq->state = RQ_RTS_WAITING_CTS_BUFFER;
 	    debug(2, "%s: matched rq %p MSG_RTS now %s", __func__, rq,
@@ -474,13 +503,13 @@ encourage_recv_incoming(ib_connection_t *c, buf_head_t *bh, u_int32_t byte_len)
 	} else {
 	    rq = alloc_new_recv(c, bh);
 	    /* return value for when user does post_recv for this one */
-	    rq->bmi_tag = mh_rts->bmi_tag;
+	    rq->bmi_tag = mh_rts.bmi_tag;
 	    rq->state = RQ_RTS_WAITING_USER_POST;
 	    debug(2, "%s: new rq %p MSG_RTS now %s", __func__, rq,
 	      rq_state_name(rq->state));
 	}
-	rq->actual_len = mh_rts->tot_len;
-	rq->rts_mop_id = mh_rts->mop_id;
+	rq->actual_len = mh_rts.tot_len;
+	rq->rts_mop_id = mh_rts.mop_id;
 
 	/* Do not ack his rts, later cts implicitly acks it.
 	 * Done with our buffer though we won't tell him yet. */
@@ -494,7 +523,7 @@ encourage_recv_incoming(ib_connection_t *c, buf_head_t *bh, u_int32_t byte_len)
 	    /* else keep waiting until we can send that cts */
 	}
 
-    } else if (mh_common->type == MSG_BYE) {
+    } else if (mh_common.type == MSG_BYE) {
 	/*
 	 * Other side requests connection close.  Do it.
 	 */
@@ -505,7 +534,7 @@ encourage_recv_incoming(ib_connection_t *c, buf_head_t *bh, u_int32_t byte_len)
 
     } else {
 	error("%s: unknown message header type %d my bufnum %d len %u",
-	      __func__, mh_common->type, bh->num, byte_len);
+	      __func__, mh_common.type, bh->num, byte_len);
     }
 }
 
@@ -541,11 +570,12 @@ static int
 send_cts(ib_recv_t *rq)
 {
     buf_head_t *bh;
-    msg_header_cts_t *mh_cts;
+    msg_header_cts_t mh_cts;
     u_int64_t *bufp;
     u_int32_t *lenp;
     u_int32_t *keyp;
     u_int32_t post_len;
+    char *ptr;
     int i;
 
     debug(2, "%s: rq %p from %s opid 0x%llx len %lld",
@@ -581,24 +611,27 @@ send_cts(ib_recv_t *rq)
 #  endif
 #endif
 
-    mh_cts = bh->buf;
-    mh_cts->type = MSG_CTS;
-    mh_cts->bufnum = bh->num;
-    mh_cts->rts_mop_id = rq->rts_mop_id;
-    mh_cts->buflist_tot_len = rq->buflist.tot_len;
-    mh_cts->buflist_num = rq->buflist.num;
+    mh_cts.type = MSG_CTS;
+    mh_cts.bufnum = bh->num;
+    mh_cts.rts_mop_id = rq->rts_mop_id;
+    mh_cts.buflist_tot_len = rq->buflist.tot_len;
+    mh_cts.buflist_num = rq->buflist.num;
+
+    ptr = bh->buf;
+    encode_msg_header_cts_t(&ptr, &mh_cts);
+
     /* encode all the buflist entries */
-    bufp = (u_int64_t *)(mh_cts + 1);
+    bufp = (u_int64_t *)((msg_header_cts_t *) bh->buf + 1);
     lenp = (u_int32_t *)(bufp + rq->buflist.num);
     keyp = (u_int32_t *)(lenp + rq->buflist.num);
-    post_len = (char *)(keyp + rq->buflist.num) - (char *)mh_cts;
+    post_len = (char *)(keyp + rq->buflist.num) - (char *)bh->buf;
     if (post_len > EAGER_BUF_SIZE)
 	error("%s: too many (%d) recv buflist entries for buf",  __func__,
 	  rq->buflist.num);
     for (i=0; i<rq->buflist.num; i++) {
-	bufp[i] = int64_from_ptr(rq->buflist.buf.recv[i]);
-	lenp[i] = rq->buflist.len[i];
-	keyp[i] = rq->buflist.memcache[i]->memkeys.rkey;
+	bufp[i] = htobmi64(int64_from_ptr(rq->buflist.buf.recv[i]));
+	lenp[i] = htobmi32(rq->buflist.len[i]);
+	keyp[i] = htobmi32(rq->buflist.memcache[i]->memkeys.rkey);
     }
 
     /* expect an ack for this cts; will come after he does the big RDMA write */
@@ -751,17 +784,18 @@ post_rr_ack(const ib_connection_t *c, const buf_head_t *bh)
  * Called only in response to receipt of a CTS on the sender.  RDMA write
  * the big data to the other side.  A bit messy since an RDMA write may
  * not scatter to the receiver, but can gather from the sender, and we may
- * have a non-trivial buflist on both sides.
+ * have a non-trivial buflist on both sides.  The mh_cts variable length
+ * fields must be decoded as we go.
  */
 static void
-post_sr_rdmaw(ib_send_t *sq, msg_header_cts_t *mh_cts)
+post_sr_rdmaw(ib_send_t *sq, msg_header_cts_t *mh_cts, void *mh_cts_buf)
 {
     VAPI_sr_desc_t sr;
     int done;
 
     int send_index = 0, recv_index = 0;    /* working entry in buflist */
     int send_offset = 0;  /* byte offset in working send entry */
-    u_int64_t *recv_bufp = (u_int64_t *)(mh_cts + 1);
+    u_int64_t *recv_bufp = (u_int64_t *) mh_cts_buf;
     u_int32_t *recv_lenp = (u_int32_t *)(recv_bufp + mh_cts->buflist_num);
     u_int32_t *recv_rkey = (u_int32_t *)(recv_lenp + mh_cts->buflist_num);
 
@@ -805,10 +839,10 @@ post_sr_rdmaw(ib_send_t *sq, msg_header_cts_t *mh_cts)
 	 * Driven by recv elements.  Sizes have already been checked
 	 * (hopefully).
 	 */
-	sr.remote_addr = recv_bufp[recv_index];
-	sr.r_key = recv_rkey[recv_index];
+	sr.remote_addr = bmitoh64(recv_bufp[recv_index]);
+	sr.r_key = bmitoh32(recv_rkey[recv_index]);
 	sr.sg_lst_len = 0;
-	recv_bytes_needed = recv_lenp[recv_index];
+	recv_bytes_needed = bmitoh32(recv_lenp[recv_index]);
 	debug(4, "%s: chunk to %s remote addr %llx rkey %x",
 	  __func__, sq->c->peername, llu(sr.remote_addr), sr.r_key);
 	while (recv_bytes_needed > 0) {
@@ -1104,7 +1138,10 @@ generic_post_recv(bmi_op_id_t *id, struct method_addr *remote_map,
     /* handle the two "waiting for a local user post" states */
     if (rq->state == RQ_EAGER_WAITING_USER_POST) {
 
-	msg_header_eager_t *mh_eager = rq->bh->buf;
+	msg_header_eager_t mh_eager;
+	char *ptr = rq->bh->buf;
+
+	decode_msg_header_eager_t(&ptr, &mh_eager);
 
 	debug(2, "%s: rq %p state %s finish eager directly", __func__,
 	  rq, rq_state_name(rq->state));
@@ -1113,13 +1150,14 @@ generic_post_recv(bmi_op_id_t *id, struct method_addr *remote_map,
 	      __func__, lld(rq->actual_len), lld(rq->buflist.tot_len));
 	}
 
-	memcpy_to_buflist(&rq->buflist, (char *) (mh_eager + 1),
+	memcpy_to_buflist(&rq->buflist,
+	                  (msg_header_eager_t *) rq->bh->buf + 1,
 	                  rq->actual_len);
 
 	/* re-post */
 	post_rr(rq->c, rq->bh);
 	/* done with buffer, ack to remote */
-	post_sr_ack(rq->c, mh_eager->bufnum);
+	post_sr_ack(rq->c, mh_eager.bufnum);
 
 	/* now just wait for user to test, never do "immediate completion" */
 	rq->state = RQ_EAGER_WAITING_USER_TEST;
@@ -1424,18 +1462,24 @@ BMI_ib_testunexpected(int incount __unused, int *outcount,
     qlist_for_each(l, &recvq) {
 	ib_recv_t *rq = qlist_upcast(l);
 	if (rq->state == RQ_EAGER_WAITING_USER_TESTUNEXPECTED) {
-	    msg_header_eager_t *mh_eager = rq->bh->buf;
+	    msg_header_eager_t mh_eager;
+	    char *ptr = rq->bh->buf;
+
+	    decode_msg_header_eager_t(&ptr, &mh_eager);
+
 	    debug(2, "%s: found waiting testunexpected", __func__);
 	    ui->error_code = 0;
 	    ui->addr = rq->c->remote_map;  /* hand back permanent method_addr */
 	    ui->buffer = Malloc((unsigned long) rq->actual_len);
 	    ui->size = rq->actual_len;
-	    memcpy(ui->buffer, (char *) (mh_eager + 1), (size_t) ui->size);
+	    memcpy(ui->buffer,
+	           (msg_header_eager_t *) rq->bh->buf + 1,
+	           (size_t) ui->size);
 	    ui->tag = rq->bmi_tag;
 	    /* re-post the buffer in which it was sitting, just unexpecteds */
 	    post_rr(rq->c, rq->bh);
 	    /* freed our eager buffer, ack it */
-	    post_sr_ack(rq->c, mh_eager->bufnum);
+	    post_sr_ack(rq->c, mh_eager.bufnum);
 	    *outcount = 1;
 	    qlist_del(&rq->list);
 	    free(rq);

@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.h,v 1.13 2006-03-21 21:29:24 pw Exp $
+ * $Id: ib.h,v 1.14 2006-04-06 14:39:36 pw Exp $
  */
 #ifndef __ib_h
 #define __ib_h
@@ -258,11 +258,14 @@ typedef struct {
 /*
  * Header structure used for various sends.  Make sure these stay fully 64-bit
  * aligned.  All of eager, rts, and cts messages must start with ->type so
- * we can switch on that first.
+ * we can switch on that first.  All elements in these arrays will be encoded
+ * by the usual le-bytefield encoder used for all wire transfers.
  */
 typedef struct {
     msg_type_t type;
 } msg_header_common_t;
+endecode_fields_1(msg_header_common_t,
+    enum, type);
 
 typedef struct {
     msg_type_t type;
@@ -270,6 +273,10 @@ typedef struct {
     u_int32_t bufnum;  /* sender's bufnum for acknowledgement messages */
     u_int32_t __pad;
 } msg_header_eager_t;
+endecode_fields_3(msg_header_eager_t,
+    enum, type,
+    int32_t, bmi_tag,
+    uint32_t, bufnum);
 
 /*
  * Follows msg_header_t only on MSG_RTS messages.  No bufnum here as
@@ -281,6 +288,11 @@ typedef struct {
     u_int64_t mop_id;  /* handle to ease lookup when CTS is delivered */
     u_int64_t tot_len;
 } msg_header_rts_t;
+endecode_fields_4(msg_header_rts_t,
+    enum, type,
+    int32_t, bmi_tag,
+    uint64_t, mop_id,
+    uint64_t, tot_len);
 
 /*
  * Ditto for MSG_CTS.
@@ -299,6 +311,12 @@ typedef struct {
      */
 } msg_header_cts_t;
 #define MSG_HEADER_CTS_BUFLIST_ENTRY_SIZE (8 + 4 + 4)
+endecode_fields_5(msg_header_cts_t,
+    enum, type,
+    uint32_t, bufnum,
+    uint64_t, rts_mop_id,
+    uint64_t, buflist_tot_len,
+    uint32_t, buflist_num);
 
 /*
  * Internal functions in setup.c used by ib.c.

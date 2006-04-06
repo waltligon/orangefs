@@ -1,5 +1,5 @@
 /*
- * (C) 2003 Pete Wyckoff, Ohio Supercomputer Center <pw@osc.edu>
+ * (C) 2003-6 Pete Wyckoff, Ohio Supercomputer Center <pw@osc.edu>
  *
  * See COPYING in top-level directory.
  *
@@ -189,35 +189,45 @@ static inline void decode_##name(char **pptr, sname *x) { \
 #define endecode_fields_3_struct(name, t1, x1, t2, x2, t3, x3) \
     endecode_fields_3_generic(name, struct name, t1, x1, t2, x2, t3, x3)
 
-#define endecode_fields_4_struct(name, t1, x1, t2, x2, t3, x3, t4, x4) \
-static inline void encode_##name(char **pptr, const struct name *x) { \
+#define endecode_fields_4_generic(name, sname, t1, x1, t2, x2, t3, x3, t4, x4) \
+static inline void encode_##name(char **pptr, const sname *x) { \
     encode_##t1(pptr, &x->x1); \
     encode_##t2(pptr, &x->x2); \
     encode_##t3(pptr, &x->x3); \
     encode_##t4(pptr, &x->x4); \
 } \
-static inline void decode_##name(char **pptr, struct name *x) { \
+static inline void decode_##name(char **pptr, sname *x) { \
     decode_##t1(pptr, &x->x1); \
     decode_##t2(pptr, &x->x2); \
     decode_##t3(pptr, &x->x3); \
     decode_##t4(pptr, &x->x4); \
 }
 
-#define endecode_fields_5_struct(name, t1, x1, t2, x2, t3, x3, t4, x4, t5, x5) \
-static inline void encode_##name(char **pptr, const struct name *x) { \
+#define endecode_fields_4(name, t1, x1, t2, x2, t3, x3, t4, x4) \
+    endecode_fields_4_generic(name, name, t1, x1, t2, x2, t3, x3, t4, x4)
+#define endecode_fields_4_struct(name, t1, x1, t2, x2, t3, x3, t4, x4) \
+    endecode_fields_4_generic(name, struct name, t1, x1, t2, x2, t3, x3, t4, x4)
+
+#define endecode_fields_5_generic(name, sname, t1, x1, t2, x2, t3, x3, t4, x4, t5, x5) \
+static inline void encode_##name(char **pptr, const sname *x) { \
     encode_##t1(pptr, &x->x1); \
     encode_##t2(pptr, &x->x2); \
     encode_##t3(pptr, &x->x3); \
     encode_##t4(pptr, &x->x4); \
     encode_##t5(pptr, &x->x5); \
 } \
-static inline void decode_##name(char **pptr, struct name *x) { \
+static inline void decode_##name(char **pptr, sname *x) { \
     decode_##t1(pptr, &x->x1); \
     decode_##t2(pptr, &x->x2); \
     decode_##t3(pptr, &x->x3); \
     decode_##t4(pptr, &x->x4); \
     decode_##t5(pptr, &x->x5); \
 }
+
+#define endecode_fields_5(name, t1, x1, t2, x2, t3, x3, t4, x4, t5, x5) \
+    endecode_fields_5_generic(name, name, t1, x1, t2, x2, t3, x3, t4, x4, t5, x5)
+#define endecode_fields_5_struct(name, t1, x1, t2, x2, t3, x3, t4, x4, t5, x5) \
+    endecode_fields_5_generic(name, struct name, t1, x1, t2, x2, t3, x3, t4, x4, t5, x5)
 
 #define endecode_fields_7_struct(name,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7) \
 static inline void encode_##name(char **pptr, const struct name *x) { \
@@ -373,13 +383,13 @@ static inline void decode_##name(char **pptr, name *x) { \
 
 /* one field then one array */
 #define endecode_fields_1a_generic(name, sname, t1, x1, tn1, n1, ta1, a1) \
-static inline void encode_##name(char **pptr, const sname *x) { int i; \
+static inline void encode_##name(char **pptr, const sname *x) { typeof(tn1) i; \
     encode_##t1(pptr, &x->x1); \
     encode_##tn1(pptr, &x->n1); \
     for (i=0; i<x->n1; i++) \
 	encode_##ta1(pptr, &(x)->a1[i]); \
 } \
-static inline void decode_##name(char **pptr, sname *x) { int i; \
+static inline void decode_##name(char **pptr, sname *x) { typeof(tn1) i; \
     decode_##t1(pptr, &x->x1); \
     decode_##tn1(pptr, &x->n1); \
     x->a1 = decode_malloc(x->n1 * sizeof(*x->a1)); \
