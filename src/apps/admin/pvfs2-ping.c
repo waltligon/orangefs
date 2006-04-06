@@ -43,7 +43,7 @@ static void print_root_check_error_details(PVFS_error_details * error_details);
 
 int main(int argc, char **argv)
 {
-    int ret = -1;
+    int ret = -1, err = 0;
     int i;
     PVFS_fs_id cur_fs;
     const PVFS_util_tab* tab;
@@ -88,21 +88,26 @@ int main(int argc, char **argv)
 
     for(i=0; i<tab->mntent_count; i++)
     {
+        print_mntent(&tab->mntent_array[i], 1);
+        fflush(stdout);
+        ret = PVFS_sys_fs_add(&tab->mntent_array[i]);
 	printf("   %s: ", tab->mntent_array[i].mnt_dir);
-	ret = PVFS_sys_fs_add(&tab->mntent_array[i]);
 	if(ret < 0)
 	{
 	    printf("FAILURE!\n");
-	    fprintf(stderr, "Failure: could not initialize at "
-                    "least one of the target file systems.\n");
-	    return(-1);
+            err = 1;
 	}
 	else
 	{   
 	    printf("Ok\n");
 	}
     }
-
+    fflush(stdout);
+    if(err)
+    {
+        fprintf(stderr, "\nFailure: could not initialze at "
+                "least one of the target file systems.\n");
+    }
     printf("\n(4) Searching for %s in pvfstab...\n",
            user_opts->fs_path_real);
 
