@@ -107,8 +107,8 @@ int check_smallmem_results(
 	{
 	    if(verbose)
 	    {
-		printf("Invalid result: offset: %llu, size: %d\n",
-		       offsets[i], sizes[i]);
+		printf("Invalid result: offset: %d, size: %d\n",
+		       (int32_t)offsets[i], (int32_t)sizes[i]);
 	    }
 	    return res;
 	}
@@ -143,8 +143,8 @@ int check_results(
 	{
 	    if(verbose)
 	    {
-		printf("Invalid result: offset: %llu, size: %d\n", 
-		       offsets[i], sizes[i]);
+		printf("Invalid result: offset: %u, size: %d\n", 
+		       (int32_t)offsets[i], (int32_t)sizes[i]);
 	    }
 	    return res;
 	}

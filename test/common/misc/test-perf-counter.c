@@ -278,7 +278,7 @@ static void print_counters(struct PINT_perf_counter* pc, int* in_key_count,
     printf("===================\n");
 
     /* print times (column headings) */
-    printf("First start time (ms): %llu\n", start_time_array_ms[0]);
+    printf("First start time (ms): %llu\n", llu(start_time_array_ms[0]));
     printf("%24.24s: ", "Interval size (ms)");
     for(i=0; i<history_size; i++)
     {

@@ -47,7 +47,7 @@ int set_util_path(const char * utility_path) /**< NULL terminated path. MUST end
         print_error("Unable to create pvfs2tab file: "
                     "Specified pvfsEXELocation length (%d bytes) too short.\n"
                     "pvfsEXELocation length needs to be at least %d bytes.\n",
-                    sizeof(pvfsEXELocation), strlen(utility_path));
+                    (int)sizeof(pvfsEXELocation), (int)strlen(utility_path));
         return(TEST_COMMON_FAIL);
     }
 
@@ -114,7 +114,7 @@ int create_pvfs2tab_file(
         print_error("Unable to create pvfs2tab file: "
                     "Specified buffer length (%d bytes) too short.\n"
                     "Buffer length needs to be at least %d bytes.\n",
-                    len, strlen(buffer));
+                    len, (int)strlen(buffer));
         return(TEST_COMMON_FAIL);
     }
    
@@ -267,7 +267,7 @@ int close_file(
     {
         if(use_pvfs2_lib) 
         {
-            printf("\tClosing [%Ld]\n", stFileRef->handle);
+            printf("\tClosing [%lld]\n", lld(stFileRef->handle));
         }
         else
         {
@@ -951,8 +951,8 @@ void print_stats(
         user  = getpwuid(stats.st_uid);
         gid   = getgrgid(stats.st_gid);
       
-        printf("\t st_size    = %Lu\n",      stats.st_size);
-        printf("\t st_ino     = %Lu\n",      stats.st_ino);
+        printf("\t st_size    = %llu\n",     llu(stats.st_size));
+        printf("\t st_ino     = %llu\n",     llu(stats.st_ino));
         printf("\t atime      = %lu (%s)\n", stats.st_atime, a_time);
         printf("\t mtime      = %lu (%s)\n", stats.st_mtime, m_time);
         printf("\t ctime      = %lu (%s)\n", stats.st_ctime, c_time);

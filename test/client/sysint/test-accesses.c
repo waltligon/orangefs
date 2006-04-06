@@ -7,6 +7,18 @@
 #include "pvfs2.h"
 #include "pvfs2-sysint.h"
 
+#if SIZEOF_VOIDP == 32 
+#  define llu(x) (x)
+#  define lld(x) (x)
+#  define SCANF_lld "%lld"
+#elif SIZEOF_VOIDP == 64
+#  define llu(x) (unsigned long long)(x)
+#  define lld(x) (long long)(x)
+#  define SCANF_lld "%ld"
+#else
+#  error Unexpected sizeof(void*)
+#endif
+
 int main(int argc, char * argv[])
 {
     FILE * f;
@@ -106,14 +118,14 @@ int main(int argc, char * argv[])
 	if(ret < 0) goto error;
 
 	printf("Performing Write: offset: %llu, size: %d\n",
-	       offset, size);
+	       llu(offset), size);
 
 	ret = PVFS_sys_io(
 	    create_resp.ref, file_req, offset, membuff, mem_req,
 	    &creds, &io_resp, PVFS_IO_WRITE);
 	if(ret < 0) goto error;
 
-	printf("Write response: size: %llu\n", io_resp.total_completed);
+	printf("Write response: size: %llu\n", llu(io_resp.total_completed));
 	offset += size;
 
 	PVFS_Request_free(&mem_req);

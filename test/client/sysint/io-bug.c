@@ -165,7 +165,7 @@ int main(
     buffer_size = io_size * sizeof(int);
 
     off_array1[0] = 0;
-    off_array1[0] += (unsigned int)io_buffer;
+    off_array1[0] += (intptr_t)io_buffer;
     off_array2[0] = 327552;
     for(i=0; i<17; i++)
     {
