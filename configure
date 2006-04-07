@@ -6952,8 +6952,8 @@ cat >>conftest.$ac_ext <<_ACEOF
 		void stuff()
 		{
 			struct vfsmnount *mnt;
-			/*struct dentry *dentry; */
-			touch_atime(mnt);
+			struct dentry *dentry;
+			touch_atime(mnt, dentry);
 		}
 
 int
