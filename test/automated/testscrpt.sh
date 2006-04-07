@@ -8,8 +8,8 @@
 #   - please don't cheat and run this as root: will not catch permissions bugs
 
 # modify these variables
-export PVFS2_DEST=/sandbox/slang/pvfs2-nightly
-export PVFS2_MOUNTPOINT=/sandbox/slang/nightly-pvfs2mnt
+export PVFS2_DEST=/tmp/pvfs2-nightly
+export PVFS2_MOUNTPOINT=/pvfs2-nightly
 export EXTRA_TESTS=${HOME}/src/benchmarks
 
 # need to make this a command line arugment:
