@@ -8,8 +8,8 @@
 #   - please don't cheat and run this as root: will not catch permissions bugs
 
 # modify these variables
-export PVFS2_DEST=/tmp/pvfs2-nightly
-export PVFS2_MOUNTPOINT=/pvfs2-nightly
+export PVFS2_DEST=/sandbox/slang/pvfs2-nightly
+export PVFS2_MOUNTPOINT=/sandbox/slang/nightly-pvfs2mnt
 export EXTRA_TESTS=${HOME}/src/benchmarks
 
 # need to make this a command line arugment:
@@ -115,7 +115,7 @@ setup_pvfs2() {
 			fs.conf $server_conf
 	done
 
-	echo "tcp://`hostname -s`:3399/pvfs2-fs /pvfs2-nightly pvfs2 defaults 0 0" > ${PVFS2_DEST}/pvfs2tab
+	echo "tcp://`hostname -s`:3399/pvfs2-fs ${PVFS2_MOUNTPOINT} pvfs2 defaults 0 0" > ${PVFS2_DEST}/pvfs2tab
 	# do we need to use our own pvfs2tab file?  If we will mount pvfs2, we
 	# can fall back to /etc/fstab
 	grep -q 'pvfs2-nightly' /etc/fstab
