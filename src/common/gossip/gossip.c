@@ -440,7 +440,7 @@ static int gossip_debug_fp(FILE *fp, char prefix,
             gettimeofday(&tv, 0);
             tp = tv.tv_sec;
             strftime(bptr, 9, "%H:%M:%S", localtime(&tp));
-            sprintf(bptr+8, ".%06ld] ", tv.tv_usec);
+            sprintf(bptr+8, ".%06ld] ", (long)tv.tv_usec);
             bptr += 17;
             bsize -= 17;
             break;

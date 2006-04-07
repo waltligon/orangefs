@@ -11,7 +11,7 @@
 #ifndef __PINT_DEV_SHARED_H
 #define __PINT_DEV_SHARED_H
 
-#include <linux/ioctl.h>  /* needed for constructing the _IO macros */
+#include <sys/ioctl.h>  /* needed for constructing the _IO macros */
 
 /* version number for use in communicating between kernel space and user
  * space
