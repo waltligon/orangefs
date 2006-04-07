@@ -160,11 +160,7 @@ int destroy_pvfs2tab_file(const char * pvfs2tab_name) /**< name of file to delet
         return(TEST_COMMON_FAIL);
     }
 
-    if(unsetenv("PVFS2TAB_FILE"))
-    {
-        print_error("Unable to un-set PVFS2TAB_FILE environment variable.\n");
-        return(TEST_COMMON_FAIL);
-    }
+    unsetenv("PVFS2TAB_FILE");
     return(TEST_COMMON_SUCCESS); 
 }
 
