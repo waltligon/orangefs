@@ -110,6 +110,22 @@ do {                                                                         \
   llu(DBPF_KEYVAL_GET_BUCKET_0_0_1(__handle, __cid)), llu(__handle));        \
 } while (0)
 
+struct PVFS_ds_storedattr_s_0_0_1
+{
+    PVFS_fs_id fs_id;
+    PVFS_handle handle;
+    PVFS_ds_type type;
+    PVFS_uid uid;
+    PVFS_gid gid;
+    PVFS_permissions mode;
+    PVFS_time ctime;
+    PVFS_time mtime;
+    PVFS_time atime;
+    uint32_t dfile_count;
+    uint32_t dist_size;
+};
+typedef struct PVFS_ds_storedattr_s_0_0_1 PVFS_ds_storedattr_0_0_1;
+
 int main(int argc, char **argv)
 {
     int ret = -1;
@@ -741,7 +757,7 @@ static int translate_dspace_attr_0_0_1(
     TROVE_handle_extent_array extent_array;
     TROVE_handle new_handle;
     TROVE_handle* tmp_handle;
-    TROVE_ds_storedattr_s* tmp_attr;
+    PVFS_ds_storedattr_0_0_1* tmp_attr;
     TROVE_ds_attributes new_attr;
 
     sprintf(attr_db, "%s/%s/dataspace_attributes.db", storage_space, coll_id);
@@ -817,10 +833,10 @@ static int translate_dspace_attr_0_0_1(
         if(ret == 0)
         {
             tmp_handle = ((PVFS_handle*)key.data);
-            tmp_attr = ((TROVE_ds_storedattr_s*)data.data);
+            tmp_attr = ((PVFS_ds_storedattr_0_0_1*)data.data);
 
-            if(verbose) printf("VERBOSE Migrating attributes for handle: %llu\n", 
-                llu(*tmp_handle));
+            if(verbose) printf("VERBOSE Migrating attributes for handle: %llu, type: %d\n", 
+                llu(*tmp_handle), (int)tmp_attr->type);
 
             cur_extent.first = cur_extent.last = *tmp_handle;
             extent_array.extent_count = 1;
@@ -852,7 +868,20 @@ static int translate_dspace_attr_0_0_1(
             /* convert out of stored format, disregard k_size and b_size
              * (those will be implicitly set later) 
              */
-            trove_ds_stored_to_attr((*tmp_attr), new_attr, 0, 0);
+            /* NOTE: we cannot memcpy or use trove_ds_stored_to_attr() macro
+             * because the alignment changed after 0.0.1
+             */
+            new_attr.fs_id = tmp_attr->fs_id;
+            new_attr.handle = tmp_attr->handle;
+            new_attr.type = tmp_attr->type;
+            new_attr.uid = tmp_attr->uid;
+            new_attr.gid = tmp_attr->gid;
+            new_attr.mode = tmp_attr->mode;
+            new_attr.ctime = tmp_attr->ctime;
+            new_attr.mtime = tmp_attr->mtime;
+            new_attr.atime = tmp_attr->atime;
+            new_attr.dfile_count = tmp_attr->dfile_count;
+            new_attr.dist_size = tmp_attr->dist_size;
             
             /* write the attributes into the new collection */
             state = 0;
@@ -989,7 +1018,7 @@ static int translate_keyval_db_0_0_1(
     TROVE_ds_state state;
     TROVE_keyval_s t_key;
     TROVE_keyval_s t_val;
-    TROVE_ds_storedattr_s* tmp_attr;
+    PVFS_ds_storedattr_0_0_1* tmp_attr;
     PVFS_ds_type obj_type = PVFS_TYPE_NONE;
 
     if(verbose) printf("VERBOSE Migrating keyvals for handle: %llu\n", llu(handle));
@@ -1049,7 +1078,7 @@ static int translate_keyval_db_0_0_1(
         return(0);
     }
 
-    tmp_attr = ((TROVE_ds_storedattr_s*)data.data);
+    tmp_attr = ((PVFS_ds_storedattr_0_0_1*)data.data);
     obj_type = tmp_attr->type;
 
     free(data.data);
@@ -1468,8 +1497,7 @@ static int translate_dirdata_sizes_0_0_1(
     TROVE_op_id op_id;
     TROVE_handle tmp_handle;
     TROVE_handle tmp_dirdata_handle;
-    TROVE_ds_storedattr_s* tmp_attr;
-    TROVE_ds_attributes new_attr;
+    PVFS_ds_storedattr_0_0_1* tmp_attr;
     DB_BTREE_STAT *k_stat_p = NULL;    
     PVFS_size dirent_count;
     unsigned int coll_id_value;
@@ -1569,12 +1597,9 @@ static int translate_dirdata_sizes_0_0_1(
         if(ret == 0)
         {
             tmp_handle = *((PVFS_handle*)key.data);
-            tmp_attr = ((TROVE_ds_storedattr_s*)data.data);
+            tmp_attr = ((PVFS_ds_storedattr_0_0_1*)data.data);
 
-            /* convert out of stored format */
-            trove_ds_stored_to_attr((*tmp_attr), new_attr, 0, 0);
-
-            if(new_attr.type == PVFS_TYPE_DIRECTORY)
+            if(tmp_attr->type == PVFS_TYPE_DIRECTORY)
             {
                 if(verbose) printf("VERBOSE Migrating dirdata_size for handle: %llu\n", 
                     llu(tmp_handle));
