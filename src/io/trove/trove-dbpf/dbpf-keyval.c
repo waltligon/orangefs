@@ -1377,6 +1377,8 @@ static int dbpf_keyval_iterate_step_to_position(
     int ret;
     TROVE_keyval_s key;
 
+    memset(&key, 0, sizeof(TROVE_keyval_s));
+
     assert(pos != TROVE_ITERATE_START);
 
     ret = dbpf_keyval_iterate_get_first_entry(handle, dbc_p);
@@ -1412,7 +1414,12 @@ static int dbpf_keyval_iterate_cursor_get(
     int key_sz;
 
     key_entry.handle = handle;
-    memcpy(key_entry.key, key->buffer, key->buffer_sz);
+
+    assert(key->buffer_sz >= 0);
+    if(key->buffer_sz != 0)
+    {
+        memcpy(key_entry.key, key->buffer, key->buffer_sz);
+    }
 
     memset(&db_key, 0, sizeof(DBT));
     db_key.data = &key_entry;
