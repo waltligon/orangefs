@@ -1009,8 +1009,6 @@ static int translate_keyval_db_0_0_1(
 {
     int ret = -1;
     DB *dbp;
-    DB *attr_dbp;
-    char attr_db[PATH_MAX];
     DBT key, data;
     DBC *dbc_p = NULL;
     TROVE_op_id op_id;
@@ -1018,71 +1016,8 @@ static int translate_keyval_db_0_0_1(
     TROVE_ds_state state;
     TROVE_keyval_s t_key;
     TROVE_keyval_s t_val;
-    PVFS_ds_storedattr_0_0_1* tmp_attr;
-    PVFS_ds_type obj_type = PVFS_TYPE_NONE;
 
     if(verbose) printf("VERBOSE Migrating keyvals for handle: %llu\n", llu(handle));
-
-    /* need to read attributes to determine what type of keyval db we
-     * are migrating (to get type right in new collection)
-     */
-    sprintf(attr_db, "%s/%s/dataspace_attributes.db", storage_space, coll_id);
-    ret = db_create(&attr_dbp, NULL, 0);
-    if(ret != 0)
-    {
-        fprintf(stderr, "Error: db_create: %s.\n", db_strerror(ret));
-        return(-1);
-    }
-    
-    /* open dataspace_attributes.db from old collection */
-    ret = attr_dbp->open(attr_dbp,
-#ifdef HAVE_TXNID_PARAMETER_TO_DB_OPEN
-                          NULL,
-#endif
-                          attr_db,
-                          NULL,
-                          DB_UNKNOWN,
-                          0,
-                          0);
-    if(ret != 0)
-    {
-        fprintf(stderr, "Error: dbp->open: %s.\n", db_strerror(ret));
-        return(-1);
-    }
-
-    /* read attributes for the handle in question */
-    memset(&key, 0, sizeof(key));
-    key.data = &handle;
-    key.size = key.ulen = sizeof(PVFS_handle);
-    key.flags |= DB_DBT_USERMEM;
-
-    memset(&data, 0, sizeof(data));
-    data.data = malloc(DEF_DATA_SIZE);
-    if(!data.data)
-    {
-        perror("malloc");    
-        attr_dbp->close(attr_dbp, 0);
-        return(-1);
-    }
-    data.size = data.ulen = DEF_DATA_SIZE;
-    data.flags |= DB_DBT_USERMEM;
-
-    ret = attr_dbp->get(attr_dbp, NULL, &key, &data, 0);
-    if(ret != 0)
-    {
-        /* we found a keyval db that doesn't have a matching attr db entry */
-        fprintf(stderr, "WARNING: handle %llu not found in attr db; skipping.\n",
-            llu(handle));
-        attr_dbp->close(attr_dbp, 0);
-        free(data.data);
-        return(0);
-    }
-
-    tmp_attr = ((PVFS_ds_storedattr_0_0_1*)data.data);
-    obj_type = tmp_attr->type;
-
-    free(data.data);
-    attr_dbp->close(attr_dbp, 0);
 
     ret = db_create(&dbp, NULL, 0);
     if(ret != 0)
