@@ -150,10 +150,11 @@ if [ x$PEMM == "x" ] ; then
 fi
 $PEMM $rootdir/make.log > $rootdir/make-extracted.log 2>&1
 
-# this test is the right idea but a bit too picky
 if [ $? != 0 ] ; then
-	echo "Spurious output during make; see $rootdir/make-extracted.log.  Aborting."
-	exit 1
+	# warnings used to be fatal.  We still want no warnings, but we'll flag
+	# that we found some instead of bailing out altogether.
+	echo "Unexpected output during make; see $rootdir/make-extracted.log."
+	touch $rootdir/pvfs-built-with-warnings
 fi
 
 # make install
@@ -197,8 +198,10 @@ if [ $build_tests == "true" ] ; then
 	fi
 	$PEMM $rootdir/make-test.log  > $rootdir/make-test-extracted.log 2>&1
 	if [ $? != 0 ] ; then
-		echo "Spurious output during test make; see $rootdir/make-test-extracted.log.  Aborting."
-		exit 1
+		# same as above.  Indicate that we found something, 
+		# but don't abort
+		echo "Unexpected output during test make; see $rootdir/make-test-extracted.log."
+		touch $rootdir/pvfs2-test-built-with-warnings
 	fi
 	make install > $rootdir/make-test-install.log 2>&1
 	if [ $? != 0 ] ; then
