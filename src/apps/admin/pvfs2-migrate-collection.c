@@ -1349,10 +1349,6 @@ static int confirm_coll_name_not_used(
         if(verbose) printf("VERBOSE removing old temporary collection mapping: %s.\n", coll_name);
         ret = remove_migration_id_mapping(
             storage_space, coll_name);
-        if(ret < 0)
-        {
-
-        }
         return(ret);
     }
 
