@@ -952,7 +952,7 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
     dbpf_attr_cache_elem_t *cache_elem = NULL;
     TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
     int k;
-
+    char tmpdata[PVFS_NAME_MAX];
     key_entry.handle = op_p->handle;
 
     /* read each key to see if it is present */
@@ -966,6 +966,11 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
         key.data = &key_entry;
         key.size = DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(
             op_p->u.k_write_list.key_array[k].buffer_sz);
+        key.flags |= DB_DBT_USERMEM;
+
+        data.data = tmpdata;
+        data.ulen = PVFS_NAME_MAX;
+        data.flags |= DB_DBT_USERMEM;
 
         ret = op_p->coll_p->keyval_db->get(
             op_p->coll_p->keyval_db, NULL, &key, &data, 0);
@@ -999,6 +1004,7 @@ static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
         key.size = DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(
             op_p->u.k_write_list.key_array[k].buffer_sz);
 
+        data.flags = 0;
         data.data = op_p->u.k_write_list.val_array[k].buffer;
         data.size = op_p->u.k_write_list.val_array[k].buffer_sz;
 

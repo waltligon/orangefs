@@ -138,9 +138,9 @@ static int generic_server_location(file_object *obj, PVFS_credentials *creds,
     if (obj->fs_type == UNIX_FILE)
     {
 #ifndef HAVE_FGETXATTR_EXTRA_ARGS
-        if ((ret = fgetxattr(obj->u.ufs.fd, DIST_KEY, buffer, 4096)) < 0)
+        if ((ret = fgetxattr(obj->u.ufs.fd, DFILE_KEY, buffer, 4096)) < 0)
 #else
-        if ((ret = fgetxattr(obj->u.ufs.fd, DIST_KEY, buffer, 4096, 0, 0)) < 0)
+        if ((ret = fgetxattr(obj->u.ufs.fd, DFILE_KEY, buffer, 4096, 0, 0)) < 0)
 #endif
         {
             perror("fgetxattr:");
@@ -337,12 +337,12 @@ static int resolve_filename(file_object *obj, char *filename)
 {
     int ret;
 
-    ret = PVFS_util_resolve(filename, &(obj->u.pvfs2.fs_id), 
+    ret = PVFS_util_resolve(filename, &(obj->u.pvfs2.fs_id),
 	    obj->u.pvfs2.pvfs2_path, PVFS_NAME_MAX);
     if (ret < 0)
     {
 	obj->fs_type = UNIX_FILE;
-	strncpy(obj->u.ufs.path, filename, NAME_MAX);
+        strncpy(obj->u.ufs.path, filename, NAME_MAX);
     } else {
 	obj->fs_type = PVFS2_FILE;
 	strncpy(obj->u.pvfs2.user_path, filename, PVFS_NAME_MAX);

@@ -476,8 +476,11 @@ int pvfs2_inode_setattr(
 
 /* Extended attributes helper functions */
 static char *xattr_non_zero_terminated[] = {
-    "datafile_handles"
+    "system.pvfs2.datafile_handles",
+    "system.pvfs2.metafile_dist"
 };
+
+/* Extended attributes helper functions */
 
 /*
  * this function returns 
