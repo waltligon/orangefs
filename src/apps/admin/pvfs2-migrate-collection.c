@@ -1344,11 +1344,16 @@ static int confirm_coll_name_not_used(
     ret = dbp->get(dbp, NULL, &key, &data, 0);
     if(ret == 0)
     {
-        fprintf(stderr, "Error: a collection named %s already exists.\n",
-            coll_name);
         free(data.data);
         dbp->close(dbp, 0);
-        return(-1);
+        if(verbose) printf("VERBOSE removing old temporary collection mapping: %s.\n", coll_name);
+        ret = remove_migration_id_mapping(
+            storage_space, coll_name);
+        if(ret < 0)
+        {
+
+        }
+        return(ret);
     }
 
     free(data.data);
