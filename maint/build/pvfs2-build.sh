@@ -41,11 +41,9 @@ get_dist() {
 
 }
 
-# get_cvs requires expect
 # pulls from CVS the tag or branch specified by the first argument.  returns
 # nonzero on error.
 get_cvs() {
-#	expect -c "spawn -noecho cvs -Q -d $cvsroot login; send \r;"
 	cvs -Q -d $cvsroot co -r $1 pvfs2 
 	if [ $? -ne 0 ] ; then
 		echo "Pulling PVFS2 from $cvsroot failed."
