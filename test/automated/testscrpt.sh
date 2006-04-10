@@ -105,7 +105,7 @@ setup_pvfs2() {
 		--storage ${PVFS2_DEST}/STORAGE-pvfs2-${CVS_TAG} \
 		--logfile=${PVFS2_DEST}/pvfs2-server.log --quiet
 	rm -rf ${PVFS2_DEST}/STORAGE-pvfs2*
-	failure_logs="${PVFS2_DEST}/pvfs2-server.log $failure_logs"
+	failure_logs="${PVFS2_DEST}/pvfs2-server.log* $failure_logs"
 	for server_conf in server.conf*; do 
 		INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-server \
 			-p `pwd`/pvfs2-server-${server_conf#*_p}.pid \
@@ -151,7 +151,7 @@ buildfail() {
 setupfail() {
 	echo "Failure in setup"
 	dmesg | tail -20 > ${PVFS2_DEST}/dmesg
-	cat ${PVFS2_DEST}/dmesg ${PVFS2_DEST}/pvfs2-server.log | \
+	cat ${PVFS2_DEST}/dmesg ${PVFS2_DEST}/pvfs2-server.log* | \
 		${TINDERSCRIPT}  ${TESTNAME}-${CVS_TAG} test_failed $STARTTIME 
 	exit 1
 }
@@ -261,7 +261,7 @@ fi
 exec 1<&6 6<&-
 exec 2<&7 7<&-
 
-if [ -f $PVFS2_DEST/pvfs2-built-with-warnings -o \ 
+if [ -f $PVFS2_DEST/pvfs2-built-with-warnings -o \
 	-f ${PVFS2_DEST}/pvfs2-test-built-with-warnings ] ; then
 	tinder_report successwarn
 
