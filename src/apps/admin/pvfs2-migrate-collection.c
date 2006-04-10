@@ -33,6 +33,7 @@
 #include "trove.h"
 #include "mkspace.h"
 #include "pint-distribution.h"
+#include "pint-dist-utils.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -435,6 +436,17 @@ static int translate_0_0_1(
         return(-1);
     }
 
+    /* initialize distribution infrastructure */
+    /* NOTE: server config argument is not required here */
+    ret = PINT_dist_initialize(NULL);
+    if (ret < 0)
+    {
+        PVFS_perror("PINT_dist_initialize", ret);
+        if(verbose) printf("VERBOSE Destroying temporary collection.\n");
+        pvfs2_rmspace(storage_space, new_name, new_id, 1, 0);
+        return(-1);
+    }
+
     /* initialize trove and lookup collection */
     ret = trove_initialize(storage_space, 0, &method_name, 0);
     if (ret < 0)
@@ -507,6 +519,7 @@ static int translate_0_0_1(
     /* at this point, we are done with the Trove API */
     trove_close_context(new_id, trove_context);
     trove_finalize();
+    PINT_dist_finalize();
 
     /* convert bstreams */
     ret = translate_bstreams_0_0_1(storage_space, coll_id, new_name,
@@ -1121,8 +1134,17 @@ static int translate_keyval_db_0_0_1(
             if(!strcmp(t_key.buffer, "metafile_dist"))
             {
                 PINT_dist *newdist;
-                newdist = t_val.buffer;
-                translate_dist_0_0_1(newdist);
+                newdist = data.data;
+                
+                ret = translate_dist_0_0_1(newdist);
+                if(ret != 0)
+                {
+                    free(data.data);
+                    free(key.data);
+                    dbc_p->c_close(dbc_p);
+                    dbp->close(dbp, 0);
+                    return(-1);
+                }
                 
                 t_val.buffer_sz = PINT_DIST_PACK_SIZE(newdist);
                 t_val.buffer = malloc(t_val.buffer_sz);
@@ -1136,6 +1158,7 @@ static int translate_keyval_db_0_0_1(
                     return -1; 
                 }
                 tvalbuf_free = 1;
+
                 PINT_dist_encode(t_val.buffer, newdist);
             } 
             else
@@ -1725,7 +1748,7 @@ int translate_dist_0_0_1(PINT_dist *dist)
 	/* set methods */
 	dist->methods = NULL;
 	if (PINT_dist_lookup(dist)) {
-	    fprintf(stderr, "%s: lookup dist failed\n", __func__);
+	    fprintf(stderr, "Error: %s: lookup dist failed\n", __func__);
             return -1;
 	}
         return 0;
