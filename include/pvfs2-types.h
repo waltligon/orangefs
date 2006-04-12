@@ -31,14 +31,14 @@
 
 /* figure out the size of a pointer */
 #if defined(__WORDSIZE)
-  #define SIZEOF_VOIDP __WORDSIZE
+  #define PVFS2_SIZEOF_VOIDP __WORDSIZE
 #elif defined(BITS_PER_LONG)
-  #define SIZEOF_VOIDP BITS_PER_LONG
+  #define PVFS2_SIZEOF_VOIDP BITS_PER_LONG
 #elif defined(INTPTR_MIN)
   #if   INTPTR_MIN == INT32_MIN
-    #define SIZEOF_VOIDP 32
+    #define PVFS2_SIZEOF_VOIDP 32
   #elif INTPTR_MIN == INT64_MIN
-    #define SIZEOF_VOIDP 64
+    #define PVFS2_SIZEOF_VOIDP 64
   #endif
 #else
   #error "Unhandled size of void pointer"
@@ -47,7 +47,7 @@
 /* we need to align some variables in 32bit case to match alignment
  * in 64bit case
  */
-#if SIZEOF_VOIDP == 32
+#if PVFS2_SIZEOF_VOIDP == 32
 #define PVFS2_ALIGN_VAR(_type, _name) \
     _type _name; \
     int32_t __pad##_name

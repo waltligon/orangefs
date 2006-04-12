@@ -84,11 +84,11 @@ int destroy_pvfs2tab_file(const char* pvfs2tab_name);
    fprintf(stderr, "Line     : %d\n", __LINE__);                  \
    fprintf(stderr, "----------------------------------------\n");
 
-#if SIZEOF_VOIDP == 32 
+#if PVFS2_SIZEOF_VOIDP == 32 
 #  define llu(x) (x)
 #  define lld(x) (x)
 #  define SCANF_lld "%lld"
-#elif SIZEOF_VOIDP == 64
+#elif PVFS2_SIZEOF_VOIDP == 64
 #  define llu(x) (unsigned long long)(x)
 #  define lld(x) (long long)(x)
 #  define SCANF_lld "%ld"
