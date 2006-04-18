@@ -1106,7 +1106,7 @@ static PVFS_error service_fs_umount_request(vfs_request_t *vfs_request)
 
         reset_acache_timeout();
 
-        vfs_request->out_downcall.type = PVFS2_VFS_OP_FS_MOUNT;
+        vfs_request->out_downcall.type = PVFS2_VFS_OP_FS_UMOUNT;
         vfs_request->out_downcall.status = 0;
     }
 
