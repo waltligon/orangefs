@@ -1,7 +1,6 @@
 #!/bin/sh  
 #
 # requires: 
-#  expect
 #  cvs (if pulling from CVS
 
 if [ $DEBUG ] ; then
@@ -13,7 +12,7 @@ tarballurl=http://www.mcs.anl.gov/hpio/pvfs2-0.0.6.tar.gz
 cvsroot=:pserver:anonymous@cvs.parl.clemson.edu:/anoncvs 
 # specify extra configure options here; for now we disable karma because
 # of all the gtk warnings
-configureopts="$PVFS2_CONFIGOPTS --disable-karma"
+configureopts="$PVFS2_CONFIGOPTS --enable-strict --disable-karma"
 
 
 #
