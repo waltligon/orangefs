@@ -296,6 +296,19 @@ static void start_delayed_ops_if_any(int dec_first)
             aiocb_ptr_array[i] = &aiocbs[i];
         }
 
+        gossip_debug(GOSSIP_TROVE_DEBUG,
+            "lio_listio called with the following aiocbs:\n");
+        for(i=0; i<aiocb_inuse_count; i++)
+        {
+            gossip_debug(GOSSIP_TROVE_DEBUG,
+                "aiocb_ptr_array[%d]: fd: %d, off: %lld, bytes: %d, buf: %p, type: %d\n",
+                i, 
+                aiocb_ptr_array[i]->aio_fildes,
+                lld(aiocb_ptr_array[i]->aio_offset),
+                (int)aiocb_ptr_array[i]->aio_nbytes,
+                aiocb_ptr_array[i]->aio_buf,
+                (int)aiocb_ptr_array[i]->aio_lio_opcode);
+        }
         ret = lio_listio(LIO_NOWAIT, aiocb_ptr_array, aiocb_inuse_count,
                          &cur_op->op.u.b_rw_list.sigev);
 
@@ -330,6 +343,7 @@ static int issue_or_delay_io_operation(
     int aiocb_inuse_count, struct sigevent *sig, int dec_first)
 {
     int ret = -TROVE_EINVAL, op_delayed = 0;
+    int i;
     assert(cur_op);
 
     gen_mutex_lock(&s_dbpf_io_mutex);
@@ -379,6 +393,18 @@ static int issue_or_delay_io_operation(
 
     if (!op_delayed)
     {
+        gossip_debug(GOSSIP_TROVE_DEBUG,
+            "lio_listio called with the following aiocbs:\n");
+        for(i=0; i<aiocb_inuse_count; i++)
+        {
+            gossip_debug(GOSSIP_TROVE_DEBUG,
+                "aiocb_ptr_array[%d]: fd: %d, off: %lld, bytes: %d, buf: %p, type: %d\n",
+                i, aiocb_ptr_array[i]->aio_fildes,
+                lld(aiocb_ptr_array[i]->aio_offset),
+                (int)aiocb_ptr_array[i]->aio_nbytes,
+                aiocb_ptr_array[i]->aio_buf,
+                (int)aiocb_ptr_array[i]->aio_lio_opcode);
+        }
         ret = lio_listio(LIO_NOWAIT, aiocb_ptr_array,
                          aiocb_inuse_count, sig);
         if (ret != 0)
