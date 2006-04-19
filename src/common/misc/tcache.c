@@ -205,6 +205,7 @@ int PINT_tcache_set_info(
             break;
         case TCACHE_ENABLE_EXPIRATION:
             tcache->expiration_enabled = arg;
+            ret = 0;
             break;
         case TCACHE_NUM_ENTRIES:
             /* this parameter cannot be set */
