@@ -470,7 +470,7 @@ int parse_args(
     }
 
     memset(opts, 0, sizeof(struct setgid_options));
-
+    optind = 0;
     while((ret = getopt_long_only(argc, argv, "", long_opts, &option_index)) != -1)
     {
         switch (ret)
