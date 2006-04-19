@@ -1223,6 +1223,8 @@ int job_flow(flow_descriptor * flow_d,
     *id = jd->job_id;
     flow_pending_count++;
     jd->event_type = PVFS_EVENT_FLOW;
+    gossip_debug(GOSSIP_FLOW_DEBUG, "Job flows in progress (post time): %d\n",
+            flow_pending_count);
 
     return(job_time_mgr_add(jd, timeout_sec));
 }
@@ -4537,6 +4539,8 @@ static void flow_callback(flow_descriptor* flow_d)
     tmp_desc->completed_flag = 1;
 
     flow_pending_count--;
+    gossip_debug(GOSSIP_FLOW_DEBUG, "Job flows in progress (callback time): %d\n",
+            flow_pending_count);
 
 #ifdef __PVFS2_JOB_THREADED__
     /* wake up anyone waiting for completion */

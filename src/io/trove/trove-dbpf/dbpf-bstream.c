@@ -251,6 +251,8 @@ static void start_delayed_ops_if_any(int dec_first)
     {
         s_dbpf_ios_in_progress--;
     }
+    gossip_debug(GOSSIP_TROVE_DEBUG, "DBPF I/O ops in progress: %d\n",
+        s_dbpf_ios_in_progress);
 
     if (s_dbpf_io_ready_queue == NULL)
     {
@@ -369,6 +371,10 @@ static int issue_or_delay_io_operation(
                      "(%d already in progress)\n",
                      cur_op, s_dbpf_ios_in_progress);
     }
+
+    gossip_debug(GOSSIP_TROVE_DEBUG, "DBPF I/O ops in progress: %d\n",
+        s_dbpf_ios_in_progress);
+
     gen_mutex_unlock(&s_dbpf_io_mutex);
 
     if (!op_delayed)

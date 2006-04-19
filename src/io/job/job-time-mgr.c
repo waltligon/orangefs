@@ -15,6 +15,7 @@
 #include "gen-locks.h"
 #include "gossip.h"
 #include "job-time-mgr.h"
+#include "pvfs2-internal.h"
 
 static QLIST_HEAD(bucket_queue);
 static gen_mutex_t bucket_mutex = GEN_MUTEX_INITIALIZER;
@@ -254,8 +255,7 @@ int job_time_mgr_expire(void)
 	    switch(jd->type)
 	    {
 	    case JOB_BMI:
-		gossip_debug(GOSSIP_CANCEL_DEBUG, "%s: cancelling bmi.\n",
-                  __func__);
+		gossip_err("Job time out: cancelling bmi operation, job_id: %llu.\n", llu(jd->job_id));
 		ret = job_bmi_cancel(jd->job_id, jd->context_id);
 		break;
 	    case JOB_FLOW:
@@ -272,14 +272,12 @@ int job_time_mgr_expire(void)
 		else
 		{
 		    /* otherwise kill the flow */
-		    gossip_debug(GOSSIP_CANCEL_DEBUG,
-                                 "%s: cancelling flow.\n", __func__);
+		    gossip_err("Job time out: cancelling flow operation, job_id: %llu.\n", llu(jd->job_id));
 		    ret = job_flow_cancel(jd->job_id, jd->context_id);
 		}
 		break;
 	    case JOB_TROVE:
-		gossip_debug(GOSSIP_CANCEL_DEBUG,
-                             "%s: cancelling trove.\n", __func__);
+		gossip_err("Job time out: cancelling trove operation, job_id: %llu.\n", llu(jd->job_id));
 		ret = job_trove_dspace_cancel(
                     jd->u.trove.fsid, jd->job_id, jd->context_id);
                 break;

@@ -461,6 +461,7 @@ int fp_multiqueue_cancel(flow_descriptor  *flow_d)
 {
     struct fp_private_data *flow_data = PRIVATE_FLOW(flow_d);
 
+    gossip_err("Flow proto cancel called on %p\n", flow_d);
     gen_mutex_lock(flow_data->parent->flow_mutex);
     /*
       if the flow is already marked as complete, then there is nothing
@@ -682,8 +683,8 @@ static void bmi_recv_callback_fn(void *user_ptr,
     void *tmp_user_ptr;
 
     gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-        "flowproto-multiqueue bmi_recv_callback_fn, error code: %d.\n",
-        error_code);
+        "flowproto-multiqueue bmi_recv_callback_fn, error code: %d, flow: %p.\n",
+        error_code, flow_data->parent);
 
     q_item->posted_id = 0;
 
@@ -868,8 +869,8 @@ static void trove_read_callback_fn(void *user_ptr,
     q_item = result_tmp->q_item;
 
     gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-        "flowproto-multiqueue trove_read_callback_fn, error_code: %d.\n",
-        error_code);
+        "flowproto-multiqueue trove_read_callback_fn, error_code: %d, flow: %p.\n",
+        error_code, flow_data->parent);
 
     result_tmp->posted_id = 0;
 
@@ -980,7 +981,8 @@ static int bmi_send_callback_fn(void *user_ptr,
 
     gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
         "flowproto-multiqueue bmi_send_callback_fn, error_code: %d, "
-        "initial_call_flag: %d.\n", error_code, initial_call_flag);
+        "initial_call_flag: %d, flow: %p.\n", error_code, initial_call_flag,
+        flow_data->parent);
 
     if(flow_data->parent->error_code != 0 && initial_call_flag)
     {
@@ -1214,8 +1216,8 @@ static void trove_write_callback_fn(void *user_ptr,
 
     gossip_debug(
         GOSSIP_FLOW_PROTO_DEBUG,
-        "flowproto-multiqueue trove_write_callback_fn, error_code: %d.\n",
-        error_code);
+        "flowproto-multiqueue trove_write_callback_fn, error_code: %d, flow: %p.\n",
+        error_code, flow_data->parent);
 
     result_tmp->posted_id = 0;
 
@@ -1490,8 +1492,8 @@ static void mem_to_bmi_callback_fn(void *user_ptr,
     enum bmi_buffer_type buffer_type = BMI_EXT_ALLOC;
 
     gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-        "flowproto-multiqueue mem_to_bmi_callback_fn, error_code: %d.\n",
-        error_code);
+        "flowproto-multiqueue mem_to_bmi_callback_fn, error_code: %d, flow: %p.\n",
+        error_code, flow_data->parent);
 
     q_item->posted_id = 0;
 
@@ -1673,8 +1675,8 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
     PVFS_size region_size;
 
     gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-        "flowproto-multiqueue bmi_to_mem_callback_fn, error_code: %d.\n",
-        error_code);
+        "flowproto-multiqueue bmi_to_mem_callback_fn, error_code: %d, flow: %p.\n",
+        error_code, flow_data->parent);
 
     q_item->posted_id = 0;
 
@@ -1863,15 +1865,16 @@ static void handle_io_error(
     int ret;
 
     gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, 
-        "flowproto-multiqueue error cleanup path.\n");
+        "flowproto-multiqueue handle_io_error() called for flow %p.\n",
+        flow_data->parent);
 
     /* is this the first error registered for this particular flow? */
     if(flow_data->parent->error_code == 0)
     {
         enum flow_endpoint_type src, dest;
+    
+        gossip_err("Flow proto error cleanup started on %p, error_code: %d\n", flow_data->parent, error_code);
 
-        gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-            "flowproto-multiqueue first failure.\n");
         flow_data->parent->error_code = error_code;
         if(q_item)
         {
@@ -1924,6 +1927,8 @@ static void handle_io_error(
             /* impossible condition */
             assert(0);
         }
+        gossip_err("Flow proto %p canceling a total of %d BMI or Trove operations\n",
+            flow_data->parent, flow_data->cleanup_pending_count);
     }
     else
     {
@@ -1931,11 +1936,15 @@ static void handle_io_error(
         flow_data->cleanup_pending_count--;
     }
     
-    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, "%s: cleanup_pending_count: %d\n",
-        __func__, flow_data->cleanup_pending_count);
+    gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, 
+        "flowproto-multiqueue handle_io_error() pending count: %d\n",
+        flow_data->cleanup_pending_count);
 
     if(flow_data->cleanup_pending_count == 0)
     {
+        gossip_err("Flow proto error cleanup finished %p, error_code: %d\n",
+            flow_data->parent, flow_data->parent->error_code);
+
         /* we are finished, make sure error is marked and state is set */
         assert(flow_data->parent->error_code);
         /* we are in trouble if more than one callback function thinks that
