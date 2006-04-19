@@ -1261,7 +1261,7 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
 }
 
 
-static PVFS_error service_statfs_request(vfs_request_t *vfs_request)
+static PVFS_error post_statfs_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
 
@@ -1269,40 +1269,20 @@ static PVFS_error service_statfs_request(vfs_request_t *vfs_request)
         GOSSIP_CLIENTCORE_DEBUG, "Got a statfs request for fsid %d\n",
         vfs_request->in_upcall.req.statfs.fs_id);
 
-    ret = PVFS_sys_statfs(
+    ret = PVFS_isys_statfs(
         vfs_request->in_upcall.req.statfs.fs_id,
         &vfs_request->in_upcall.credentials,
-        &vfs_request->response.statfs);
+        &vfs_request->response.statfs,
+        &vfs_request->op_id, (void *)vfs_request);
 
     vfs_request->out_downcall.status = ret;
     vfs_request->out_downcall.type = vfs_request->in_upcall.type;
 
     if (ret < 0)
     {
-        PVFS_perror_gossip("Statfs failed", ret);
+        PVFS_perror_gossip("Posting statfs failed", ret);
     }
-    else
-    {
-        PVFS_sysresp_statfs *resp = &vfs_request->response.statfs;
-
-        vfs_request->out_downcall.resp.statfs.block_size =
-            STATFS_DEFAULT_BLOCKSIZE;
-        vfs_request->out_downcall.resp.statfs.blocks_total = (int64_t)
-            (resp->statfs_buf.bytes_total / vfs_request->out_downcall.resp.statfs.block_size);
-        vfs_request->out_downcall.resp.statfs.blocks_avail = (int64_t)
-            (resp->statfs_buf.bytes_available / vfs_request->out_downcall.resp.statfs.block_size);
-        /*
-          these values really represent handle/inode counts
-          rather than an accurate number of files
-        */
-        vfs_request->out_downcall.resp.statfs.files_total = (int64_t) 
-            resp->statfs_buf.handles_total_count;
-        vfs_request->out_downcall.resp.statfs.files_avail = (int64_t)
-            resp->statfs_buf.handles_available_count;
-    }
-
-    write_inlined_device_response(vfs_request);
-    return 0;
+    return ret;
 }
 
 #ifdef USE_MMAP_RA_CACHE
@@ -1894,6 +1874,24 @@ static inline void package_downcall_members(
                 copy_dirents_to_downcall(vfs_request);
             }
             break;
+        case PVFS2_VFS_OP_STATFS:
+            vfs_request->out_downcall.resp.statfs.block_size =
+                STATFS_DEFAULT_BLOCKSIZE;
+            vfs_request->out_downcall.resp.statfs.blocks_total = (int64_t)
+                (vfs_request->response.statfs.statfs_buf.bytes_total /
+                 vfs_request->out_downcall.resp.statfs.block_size);
+            vfs_request->out_downcall.resp.statfs.blocks_avail = (int64_t)
+                (vfs_request->response.statfs.statfs_buf.bytes_available /
+                 vfs_request->out_downcall.resp.statfs.block_size);
+            /*
+              these values really represent handle/inode counts
+              rather than an accurate number of files
+            */
+            vfs_request->out_downcall.resp.statfs.files_total = (int64_t)
+                vfs_request->response.statfs.statfs_buf.handles_total_count;
+            vfs_request->out_downcall.resp.statfs.files_avail = (int64_t)
+                vfs_request->response.statfs.statfs_buf.handles_available_count;
+            break;
         case PVFS2_VFS_OP_RENAME:
             break;
         case PVFS2_VFS_OP_TRUNCATE:
@@ -2241,8 +2239,12 @@ static inline PVFS_error handle_unexp_vfs_request(
             posted_op = 1;
             ret = post_listxattr_request(vfs_request);
             break;
+        case PVFS2_VFS_OP_STATFS:
+            posted_op = 1;
+            ret = post_statfs_request(vfs_request);
+            break;
             /*
-              NOTE: mount, umount and statfs are blocking
+              NOTE: mount, and umount are blocking
               calls that are serviced inline.
             */
         case PVFS2_VFS_OP_FS_MOUNT:
@@ -2250,9 +2252,6 @@ static inline PVFS_error handle_unexp_vfs_request(
             break;
         case PVFS2_VFS_OP_FS_UMOUNT:
             ret = service_fs_umount_request(vfs_request);
-            break;
-        case PVFS2_VFS_OP_STATFS:
-            ret = service_statfs_request(vfs_request);
             break;
         case PVFS2_VFS_OP_PERF_COUNT:
             ret = service_perf_count_request(vfs_request);

@@ -193,7 +193,8 @@ struct PINT_client_op_entry_s PINT_client_sm_sys_table[] =
     {&pvfs2_client_set_eattr_sm},
     {&pvfs2_client_del_eattr_sm},
     {&pvfs2_client_list_eattr_sm},
-    {&pvfs2_client_small_io_sm}
+    {&pvfs2_client_small_io_sm},
+    {&pvfs2_client_statfs_sm}
 };
 
 struct PINT_client_op_entry_s PINT_client_sm_mgmt_table[] =

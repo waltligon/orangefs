@@ -1,8 +1,5 @@
 /* 
- * (C) 2003 Clemson University and The University of Chicago 
- *
- * Changes by Acxiom Corporation to add setgid support
- * Copyright © Acxiom Corporation, 2005.
+ * Copyright © Acxiom Corporation, 2006
  *
  * See COPYING in top-level directory.
  */

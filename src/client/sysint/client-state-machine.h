@@ -288,6 +288,7 @@ struct PINT_client_mgmt_statfs_list_sm
     int count; 
     PVFS_id_gen_t *addr_array;
     PVFS_error_details *details;
+    PVFS_sysresp_statfs* resp; /* ignored by mgmt functions */
 };
 
 struct PINT_client_mgmt_perf_mon_list_sm
@@ -602,6 +603,7 @@ enum
     PVFS_SYS_DELEATTR              = 15,
     PVFS_SYS_LISTEATTR             = 16,
     PVFS_SYS_SMALL_IO              = 17,
+    PVFS_SYS_STATFS                = 18,
     PVFS_MGMT_SETPARAM_LIST        = 70,
     PVFS_MGMT_NOOP                 = 71,
     PVFS_MGMT_STATFS_LIST          = 72,
@@ -759,10 +761,12 @@ extern struct PINT_state_machine_s pvfs2_client_get_eattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_set_eattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_del_eattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_list_eattr_sm;
+extern struct PINT_state_machine_s pvfs2_client_statfs_sm;
 
 /* nested state machines (helpers) */
 extern struct PINT_state_machine_s pvfs2_client_lookup_ncache_sm;
 extern struct PINT_state_machine_s pvfs2_client_remove_helper_sm;
+extern struct PINT_state_machine_s pvfs2_client_mgmt_statfs_list_nested_sm;
 
 #include "state-machine.h"
 

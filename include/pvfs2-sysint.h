@@ -420,6 +420,13 @@ PVFS_error PVFS_sys_flush(
     PVFS_object_ref ref,
     PVFS_credentials *credentials);
 
+PVFS_error PVFS_isys_statfs(
+    PVFS_fs_id fs_id,
+    PVFS_credentials *credentials,
+    PVFS_sysresp_statfs *statfs,
+    PVFS_sys_op_id *op_id,
+    void *user_ptr);
+
 PVFS_error PVFS_sys_statfs(
     PVFS_fs_id fs_id,
     PVFS_credentials *credentials,
