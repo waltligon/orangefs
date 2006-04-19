@@ -135,6 +135,8 @@ typedef struct
     PVFS_ds_keyval  val;
     void *io_kernel_mapped_buf;
 
+    struct PVFS_sys_mntent* mntent; /* used only by mount */
+
     int was_handled_inline;
     int was_cancelled_io;
 
@@ -981,11 +983,9 @@ do {                                                                  \
     ret = 0;                                                          \
 } while(0)
 
-static PVFS_error service_fs_mount_request(vfs_request_t *vfs_request)
+static PVFS_error post_fs_mount_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_ENODEV;
-    struct PVFS_sys_mntent mntent;
-    PVFS_handle root_handle;
     char *ptr = NULL, *ptrcomma = NULL;
     char buf[PATH_MAX] = {0};
 
@@ -994,76 +994,30 @@ static PVFS_error service_fs_mount_request(vfs_request_t *vfs_request)
       mntent entries are not filled in, so add some defaults here
       if they weren't passed in the options.
     */
-    memset(&mntent, 0, sizeof(struct PVFS_sys_mntent));
+    vfs_request->mntent = (struct PVFS_sys_mntent*)malloc(sizeof(struct
+        PVFS_sys_mntent));
+    if(!vfs_request->mntent)
+    {
+        return -PVFS_ENOMEM;
+    }
+    memset(vfs_request->mntent, 0, sizeof(struct PVFS_sys_mntent));
         
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
         "Got an fs mount request for host:\n  %s\n",
         vfs_request->in_upcall.req.fs_mount.pvfs2_config_server);
 
-    generate_upcall_mntent(mntent, vfs_request->in_upcall, 1);
+    generate_upcall_mntent((*vfs_request->mntent), vfs_request->in_upcall, 1);
 
-    ret = PVFS_sys_fs_add(&mntent);
-    if (ret < 0)
+    ret = PVFS_isys_fs_add(vfs_request->mntent, &vfs_request->op_id, (void*)vfs_request);
+
+fail_downcall:
+    if(ret < 0)
     {
-      fail_downcall:
-        gossip_err(
-            "Failed to mount via host %s\n",
-            vfs_request->in_upcall.req.fs_mount.pvfs2_config_server);
-
-        PVFS_perror_gossip("Mount failed", ret);
-
-        vfs_request->out_downcall.type = PVFS2_VFS_OP_FS_MOUNT;
-        vfs_request->out_downcall.status = ret;
-    }
-    else
-    {
-        /*
-          ungracefully ask bmi to drop connections on cancellation so
-          that the server will immediately know that a cancellation
-          occurred
-        */
-        PVFS_BMI_addr_t tmp_addr;
-
-        if (BMI_addr_lookup(&tmp_addr, mntent.the_pvfs_config_server) == 0)
-        {
-            if (BMI_set_info(
-                    tmp_addr, BMI_FORCEFUL_CANCEL_MODE, NULL) == 0)
-            {
-                gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "BMI forceful "
-                             "cancel mode enabled\n");
-            }
-        }
-        reset_acache_timeout();
-
-        /*
-          before sending success response we need to resolve the root
-          handle, given the previously resolved fs_id
-        */
-        ret = PINT_cached_config_get_root_handle(mntent.fs_id, &root_handle);
-        if (ret)
-        {
-            gossip_err("Failed to retrieve root handle for "
-                       "resolved fs_id %d\n", mntent.fs_id);
-            goto fail_downcall;
-        }
-            
-        gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
-                     "FS mount got root handle %llu on fs id %d\n",
-                     llu(root_handle), mntent.fs_id);
-
-        vfs_request->out_downcall.type = PVFS2_VFS_OP_FS_MOUNT;
-        vfs_request->out_downcall.status = 0;
-        vfs_request->out_downcall.resp.fs_mount.fs_id = mntent.fs_id;
-        vfs_request->out_downcall.resp.fs_mount.root_handle =
-            root_handle;
-        vfs_request->out_downcall.resp.fs_mount.id = dynamic_mount_id++;
+        PVFS_perror_gossip("Posting fs_add failed", ret);
     }
 
-    PVFS_util_free_mntent(&mntent);
-
-    write_inlined_device_response(vfs_request);
-    return 0;
+    return ret;
 }
 
 static PVFS_error service_fs_umount_request(vfs_request_t *vfs_request)
@@ -1688,6 +1642,7 @@ static inline void copy_dirents_to_downcall(vfs_request_t *vfs_request)
 static inline void package_downcall_members(
     vfs_request_t *vfs_request, int *error_code)
 {
+    int ret = -PVFS_EINVAL;
     assert(vfs_request);
     assert(error_code);
 
@@ -1891,6 +1846,72 @@ static inline void package_downcall_members(
                 vfs_request->response.statfs.statfs_buf.handles_total_count;
             vfs_request->out_downcall.resp.statfs.files_avail = (int64_t)
                 vfs_request->response.statfs.statfs_buf.handles_available_count;
+            break;
+        case PVFS2_VFS_OP_FS_MOUNT:
+            if (*error_code)
+            {
+                gossip_err(
+                    "Failed to mount via host %s\n",
+                    vfs_request->in_upcall.req.fs_mount.pvfs2_config_server);
+
+                PVFS_perror_gossip("Mount failed", *error_code);
+            }
+            else
+            {
+                PVFS_handle root_handle;
+                /*
+                  ungracefully ask bmi to drop connections on cancellation so
+                  that the server will immediately know that a cancellation
+                  occurred
+                */
+                PVFS_BMI_addr_t tmp_addr;
+
+                if (BMI_addr_lookup(&tmp_addr, 
+                    vfs_request->mntent->the_pvfs_config_server) == 0)
+                {
+                    if (BMI_set_info(
+                            tmp_addr, BMI_FORCEFUL_CANCEL_MODE, NULL) == 0)
+                    {
+                        gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "BMI forceful "
+                                     "cancel mode enabled\n");
+                    }
+                }
+                reset_acache_timeout();
+
+                /*
+                  before sending success response we need to resolve the root
+                  handle, given the previously resolved fs_id
+                */
+                ret = PINT_cached_config_get_root_handle(
+                    vfs_request->mntent->fs_id, &root_handle);
+                if (ret)
+                {
+                    gossip_err("Failed to retrieve root handle for "
+                               "resolved fs_id %d\n", vfs_request->mntent->fs_id);
+                    gossip_err(
+                        "Failed to mount via host %s\n",
+                        vfs_request->in_upcall.req.fs_mount.pvfs2_config_server);
+                    PVFS_perror_gossip("Mount failed", ret);
+                    PVFS_util_free_mntent(vfs_request->mntent);
+                    *error_code = ret;
+                    break;
+                }
+                    
+                gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
+                             "FS mount got root handle %llu on fs id %d\n",
+                             llu(root_handle), vfs_request->mntent->fs_id);
+
+                vfs_request->out_downcall.type = PVFS2_VFS_OP_FS_MOUNT;
+                vfs_request->out_downcall.status = 0;
+                vfs_request->out_downcall.resp.fs_mount.fs_id = 
+                    vfs_request->mntent->fs_id;
+                vfs_request->out_downcall.resp.fs_mount.root_handle =
+                    root_handle;
+                vfs_request->out_downcall.resp.fs_mount.id = dynamic_mount_id++;
+            }
+
+            PVFS_util_free_mntent(vfs_request->mntent);
+
             break;
         case PVFS2_VFS_OP_RENAME:
             break;
@@ -2243,13 +2264,14 @@ static inline PVFS_error handle_unexp_vfs_request(
             posted_op = 1;
             ret = post_statfs_request(vfs_request);
             break;
+        case PVFS2_VFS_OP_FS_MOUNT:
+            posted_op = 1;
+            ret = post_fs_mount_request(vfs_request);
+            break;
             /*
-              NOTE: mount, and umount are blocking
+              NOTE: following operations are blocking
               calls that are serviced inline.
             */
-        case PVFS2_VFS_OP_FS_MOUNT:
-            ret = service_fs_mount_request(vfs_request);
-            break;
         case PVFS2_VFS_OP_FS_UMOUNT:
             ret = service_fs_umount_request(vfs_request);
             break;

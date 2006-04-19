@@ -195,6 +195,10 @@ int PVFS_sys_initialize(
     uint64_t default_debug_mask);
 int PVFS_sys_fs_add(
     struct PVFS_sys_mntent* mntent);
+int PVFS_isys_fs_add(
+    struct PVFS_sys_mntent* mntent,
+    PVFS_sys_op_id *op_id,
+    void *user_ptr);
 int PVFS_sys_fs_remove(
     struct PVFS_sys_mntent* mntent);
 int PVFS_sys_finalize(

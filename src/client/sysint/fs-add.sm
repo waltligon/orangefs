@@ -1,0 +1,315 @@
+/*
+ * (C) 2001 Clemson University and The University of Chicago
+ *
+ * Changes by Acxiom Corporation to add support for nonblocking fs addition
+ * Copyright © Acxiom Corporation, 2006.
+ *
+ * See COPYING in top-level directory.
+ */
+
+/** \file
+ *  \ingroup sysint
+ *
+ *  PVFS2 system interface bootstrapping routine to tell the interface
+ *  about available file systems.
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#ifdef HAVE_MALLOC_H
+#include <malloc.h>
+#endif
+#include <errno.h>
+#include <assert.h>
+#include <string.h>
+#include <unistd.h>
+
+#include "acache.h"
+#include "ncache.h"
+#include "pint-cached-config.h"
+#include "pvfs2-sysint.h"
+#include "pvfs2-util.h"
+#include "pint-sysint-utils.h"
+#include "gen-locks.h"
+#include "pint-servreq.h"
+#include "PINT-reqproto-encode.h"
+#include "dotconf.h"
+#include "trove.h"
+#include "server-config-mgr.h"
+#include "client-state-machine.h"
+
+gen_mutex_t mt_config = GEN_MUTEX_INITIALIZER;
+extern job_context_id pint_client_sm_context;
+
+static int fs_add_parent_cleanup(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+
+%%
+
+machine pvfs2_fs_add_sm(
+    run_nested,
+    parent_cleanup)
+{
+    state run_nested 
+    {
+        jump pvfs2_server_get_config_nested_sm;
+        default => parent_cleanup;
+    }
+
+    state parent_cleanup
+    {
+        run fs_add_parent_cleanup;
+        default => terminate;
+    }
+}
+
+%%
+
+/** Tell the system interface about the location of a PVFS2 file system.
+ *
+ * \return 0 on success, -PVFS_error on failure.
+ */
+PVFS_error PVFS_isys_fs_add(
+    struct PVFS_sys_mntent *mntent,
+    PVFS_sys_op_id *op_id,
+    void* user_ptr)
+{
+    int ret = -PVFS_EINVAL;
+    int i;
+    struct server_configuration_s *new_server_config = NULL;
+    PVFS_BMI_addr_t test_addr;
+    PINT_client_sm *sm_p = NULL;
+    PVFS_credentials creds;
+
+    PVFS_util_gen_credentials(&creds);
+
+    gen_mutex_lock(&mt_config);
+
+    /* Normally the fs_id value has not been resolved yet at this point, and
+     * will be zero.  If it is a non-zero value (and this get_config call
+     * succeeds) then it indicates someone has already added this mntent
+     * instance.  It is ok to add the same _file system_ twice, but not the
+     * same mntent instance.
+     */
+    new_server_config = PINT_server_config_mgr_get_config(mntent->fs_id);
+    if (new_server_config)
+    {
+        PINT_server_config_mgr_put_config(new_server_config);
+        PVFS_perror_gossip("Attempted duplicate mntent addition", ret);
+        gen_mutex_unlock(&mt_config);
+        return -PVFS_EEXIST;
+    }
+
+    /* make sure BMI knows how to handle this method, else fail quietly */
+    for(i = 0; i < mntent->num_pvfs_config_servers; i++)
+    {
+        ret = BMI_addr_lookup(&test_addr, mntent->pvfs_config_servers[i]);
+        if (ret == 0)
+        {
+            break;
+        }
+    }
+
+    if (i == mntent->num_pvfs_config_servers)
+    {
+        gossip_err("%s: Failed to initialize any appropriate "
+                   "BMI methods.\n", __func__);
+        gen_mutex_unlock(&mt_config);
+        return(ret);
+    }
+    mntent->the_pvfs_config_server = mntent->pvfs_config_servers[i];
+
+    sm_p = (PINT_client_sm *)malloc(sizeof(*sm_p));
+    if (sm_p == NULL)
+    {
+        return -PVFS_ENOMEM;
+    }
+    memset(sm_p, 0, sizeof(*sm_p));
+
+    sm_p->u.get_config.mntent = mntent;
+    sm_p->u.get_config.config = 
+        (struct server_configuration_s *)malloc(
+        sizeof(struct server_configuration_s));
+    if (!sm_p->u.get_config.config)
+    {
+        ret = -PVFS_ENOMEM;
+        PVFS_perror_gossip("Failed to allocate configuration object", ret);
+        gen_mutex_unlock(&mt_config);
+        return(ret);
+    }
+    memset(sm_p->u.get_config.config, 0, sizeof(struct server_configuration_s));
+
+    /* NOTE: we set these fields manually here rather than use
+     * PINT_init_msgarray_params(), because we don't yet have a server
+     * configuration file to override default parameters.
+     */
+    sm_p->msgarray_params.job_context = pint_client_sm_context;
+    sm_p->msgarray_params.job_timeout = 30;   /* 30 second job timeout */
+    sm_p->msgarray_params.retry_delay = 2000; /* 2 second retry delay */
+    sm_p->msgarray_params.retry_limit = 5;    /* retry up to 5 times */
+
+    sm_p->msgarray_count = 1;
+    sm_p->msgarray = &(sm_p->msgpair);
+
+    PINT_init_sysint_credentials(sm_p->cred_p, &creds);
+
+    return PINT_client_state_machine_post(
+        sm_p, PVFS_SYS_FS_ADD, op_id, user_ptr);
+}
+
+int PVFS_sys_fs_add(struct PVFS_sys_mntent *mntent)
+{
+    int ret = -PVFS_EINVAL, error = 0;
+    PVFS_sys_op_id op_id;
+
+    ret = PVFS_isys_fs_add(mntent, &op_id, NULL);
+    if (ret)
+    {
+        PVFS_perror_gossip("PVFS_isys_fs_add call", ret);
+        error = ret;
+    }
+    else
+    {
+        ret = PINT_sys_wait(op_id, "fs_add", &error);
+        if (ret)
+        {
+            PVFS_perror_gossip("PVFS_sys_wait call", ret);
+            error = ret;
+        }
+    }
+
+    PINT_sys_release(op_id);
+    return error;
+}
+
+/* PVFS_sys_fs_remove()
+ *
+ * tells the system interface to dynamically "unmount" a mounted file
+ * system by removing the configuration info and reloading the cached
+ * configuration interface
+ *
+ * returns 0 on success, -PVFS_error on failure
+ */
+int PVFS_sys_fs_remove(struct PVFS_sys_mntent *mntent)
+{
+    int ret = -PVFS_EINVAL;
+
+    if (mntent)
+    {
+        gen_mutex_lock(&mt_config);
+        ret = PVFS_util_remove_internal_mntent(mntent);
+        if (ret == 0)
+        {
+            ret = PINT_server_config_mgr_remove_config(mntent->fs_id);
+            if (ret < 0)
+            {
+                PVFS_perror_gossip("PINT_server_config_mgr_remove_config "
+                            "failed", ret);
+            }
+
+            /*
+              reload all handle mappings as well as the interface with
+              the new configuration information
+            */
+            PINT_server_config_mgr_reload_cached_config_interface();
+        }
+        gen_mutex_unlock(&mt_config);
+    }
+    return ret;
+}
+
+static int fs_add_parent_cleanup(
+    PINT_client_sm *sm_p, job_status_s *js_p)
+{
+    int ret = -PVFS_EINVAL;
+
+    if(js_p->error_code != 0)
+    {
+        gen_mutex_unlock(&mt_config);
+        PINT_config_release(sm_p->u.get_config.config);
+        free(sm_p->u.get_config.config);
+        sm_p->error_code  = js_p->error_code;
+        sm_p->op_complete = 1;
+        return(0);
+    }
+
+#ifdef USE_TRUSTED
+    /* once we know about the server configuration, we need to tell BMI */
+    BMI_set_info(0, BMI_TRUSTED_CONNECTION, (void *)sm_p->u.get_config.config);
+    gossip_debug(GOSSIP_SERVER_DEBUG, "Enabling trusted connections!\n");
+#endif
+
+    /*
+      clear out all configuration information about file systems that
+      aren't matching the one being added now.  this ensures no
+      erroneous handle mappings are added next
+    */
+    ret = PINT_config_trim_filesystems_except(
+        sm_p->u.get_config.config, sm_p->u.get_config.mntent->fs_id);
+    if (ret < 0)
+    {
+        PVFS_perror_gossip(
+            "PINT_config_trim_filesystems_except failed", ret);
+        gen_mutex_unlock(&mt_config);
+        PINT_config_release(sm_p->u.get_config.config);
+        free(sm_p->u.get_config.config);
+        sm_p->error_code  = ret;
+        sm_p->op_complete = 1;
+        return(0);
+    }
+
+    /*
+      add the mntent to the internal mount tables; it's okay if it's
+      already there, as the return value will tell us and we can
+      ignore it.  in short, if the mntent was from a pvfstab file, it
+      should already exist in the tables.  in any other case, it needs
+      to be added properly.
+    */
+    ret = PVFS_util_add_dynamic_mntent(sm_p->u.get_config.mntent);
+    if (ret < 0)
+    {
+        PVFS_perror_gossip("PVFS_util_add_mnt failed", ret);
+        gen_mutex_unlock(&mt_config);
+        PINT_config_release(sm_p->u.get_config.config);
+        free(sm_p->u.get_config.config);
+        sm_p->error_code  = ret;
+        sm_p->op_complete = 1;
+        return(0);
+    }
+
+    /* finally, try to add the new config to the server config manager */
+    ret = PINT_server_config_mgr_add_config(
+        sm_p->u.get_config.config, sm_p->u.get_config.mntent->fs_id);
+    if (ret < 0)
+    {
+        PVFS_perror_gossip("PINT_server_config_mgr_add_config failed", ret);
+        gen_mutex_unlock(&mt_config);
+        PINT_config_release(sm_p->u.get_config.config);
+        free(sm_p->u.get_config.config);
+        sm_p->error_code  = ret;
+        sm_p->op_complete = 1;
+        return(0);
+    }
+
+    /*
+      reload all handle mappings as well as the interface with the new
+      configuration information
+    */
+    PINT_server_config_mgr_reload_cached_config_interface();
+
+    gen_mutex_unlock(&mt_config);
+
+    sm_p->error_code  = 0;
+    sm_p->op_complete = 1;
+
+    return 0;
+}
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 expandtab
+ */

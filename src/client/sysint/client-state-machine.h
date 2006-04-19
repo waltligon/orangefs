@@ -337,6 +337,7 @@ struct PINT_client_truncate_sm
 
 struct PINT_server_get_config_sm
 {
+    struct server_configuration_s *config;
     struct PVFS_sys_mntent *mntent;
     char *fs_config_buf;
     char *server_config_buf;
@@ -604,6 +605,7 @@ enum
     PVFS_SYS_LISTEATTR             = 16,
     PVFS_SYS_SMALL_IO              = 17,
     PVFS_SYS_STATFS                = 18,
+    PVFS_SYS_FS_ADD                = 19,
     PVFS_MGMT_SETPARAM_LIST        = 70,
     PVFS_MGMT_NOOP                 = 71,
     PVFS_MGMT_STATFS_LIST          = 72,
@@ -762,11 +764,13 @@ extern struct PINT_state_machine_s pvfs2_client_set_eattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_del_eattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_list_eattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_statfs_sm;
+extern struct PINT_state_machine_s pvfs2_fs_add_sm;
 
 /* nested state machines (helpers) */
 extern struct PINT_state_machine_s pvfs2_client_lookup_ncache_sm;
 extern struct PINT_state_machine_s pvfs2_client_remove_helper_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_statfs_list_nested_sm;
+extern struct PINT_state_machine_s pvfs2_server_get_config_nested_sm;
 
 #include "state-machine.h"
 

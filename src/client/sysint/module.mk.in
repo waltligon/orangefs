@@ -10,8 +10,7 @@ CSRC := \
 	$(DIR)/client-state-machine.c \
 	$(DIR)/mgmt-misc.c \
 	$(DIR)/sys-dist.c \
-	$(DIR)/error-details.c \
-	$(DIR)/fs-add.c
+	$(DIR)/error-details.c
 
 CLIENT_SMCGEN := \
 	$(DIR)/remove.c \
@@ -37,6 +36,7 @@ CLIENT_SMCGEN := \
 	$(DIR)/client-job-timer.c \
 	$(DIR)/perf-count-timer.c \
 	$(DIR)/server-get-config.c \
+	$(DIR)/fs-add.c \
 	$(DIR)/mgmt-noop.c \
 	$(DIR)/mgmt-setparam-list.c \
 	$(DIR)/mgmt-statfs-list.c \
