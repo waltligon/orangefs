@@ -8,6 +8,7 @@
 # distclean      _really_ cleans up; returns to pristine tree
 # docs           builds documentation in docs subdirectory
 # docsclean      cleans up documentation files
+# publish        copy over documents to the PVFS.org web pags
 # admintools     builds admin tools
 # kernapps       builds userland helper programs for kernel driver 
 # statecomp      builds only the statecomp component
@@ -103,7 +104,7 @@ build_static = @build_static@
 #    of a file that has the same name as the target.  Listing them
 #    here keeps make from accidentally doing too much work (see GNU
 #    make manual).
-.PHONY: all clean dist distclean docs docsclean cscope tags codecheck statecomp admintools kernapps
+.PHONY: all clean dist distclean docs docsclean publish cscope tags codecheck statecomp admintools kernapps
 
 ################################################################
 # Find project subdirectories
@@ -635,6 +636,9 @@ codecheck:
 
 # target for building documentation
 docs: $(DOCSPS) $(DOCSPDF) $(DOCSHTML)
+
+publish: docs
+	$(srcdir)/maint/pvfs2-publish-pages `pwd`/doc
 
 # rule for cleaning up documentation
 # latex2html puts all its output in a directory
