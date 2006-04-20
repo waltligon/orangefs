@@ -513,7 +513,7 @@ static int pvfs2_devreq_release(
     return 0;
 }
 
-static inline int check_ioctl_command(unsigned int command)
+static inline long check_ioctl_command(unsigned int command)
 {
     /* Check for valid ioctl codes */
     if (_IOC_TYPE(command) != PVFS_DEV_MAGIC) 
@@ -536,7 +536,7 @@ static inline int check_ioctl_command(unsigned int command)
     return 0;
 }
 
-static int dispatch_ioctl_command(unsigned int command, unsigned long arg)
+static long dispatch_ioctl_command(unsigned int command, unsigned long arg)
 {
     static int32_t magic = PVFS2_DEVREQ_MAGIC;
     static int32_t max_up_size = MAX_ALIGNED_DEV_REQ_UPSIZE;
@@ -619,14 +619,14 @@ static int pvfs2_devreq_ioctl(
     unsigned int command,
     unsigned long arg)
 {
-    int ret;
+    long ret;
 
     /* Check for properly constructed commands */
     if ((ret = check_ioctl_command(command)) < 0)
     {
-        return ret;
+        return (int) ret;
     }
-    return dispatch_ioctl_command(command, arg);
+    return (int) dispatch_ioctl_command(command, arg);
 }
 
 #ifdef CONFIG_COMPAT
@@ -641,7 +641,7 @@ struct PVFS_dev_map_desc32
 };
 
 static unsigned long translate_dev_map(
-        unsigned long args, int *error)
+        unsigned long args, long *error)
 {
     struct PVFS_dev_map_desc32  __user *p32 = (void __user *) args;
     /* Depending on the architecture, allocate some space on the user-call-stack based on our expected layout */
@@ -671,10 +671,10 @@ err:
  * 32 bit user-space apps' ioctl handlers when kernel modules
  * is compiled as a 64 bit one
  */
-static int pvfs2_devreq_compat_ioctl(
+static long pvfs2_devreq_compat_ioctl(
         struct file *filp, unsigned int cmd, unsigned long args)
 {
-    int ret;
+    long ret;
     unsigned long arg = args;
 
     /* Check for properly constructed commands */
@@ -766,7 +766,7 @@ void pvfs2_ioctl32_cleanup(void)
 
 #endif /* end HAVE_REGISTER_IOCTL32_CONVERSION */
 
-#else /* !CONFIG_COMPAT */
+#endif /* CONFIG_COMPAT */
 
 int pvfs2_ioctl32_init(void)
 {
@@ -777,8 +777,6 @@ void pvfs2_ioctl32_cleanup(void)
 {
     return;
 }
-
-#endif
 
 static unsigned int pvfs2_devreq_poll(
     struct file *file,
