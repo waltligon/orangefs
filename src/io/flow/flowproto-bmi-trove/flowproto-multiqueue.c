@@ -612,6 +612,11 @@ int fp_multiqueue_post(flow_descriptor  *flow_d)
                 "flowproto-multiqueue forcing bmi_send_callback_fn.\n");
 
             bmi_send_callback_fn(&(flow_data->prealloc_array[i]), 0, 0, 1);
+            if(flow_data->dest_last_posted)
+            {
+                flow_data->initial_posts = 0;
+                break;
+            }
         }
         if(flow_data->parent->state == FLOW_COMPLETE)
         {
@@ -1022,12 +1027,15 @@ static int bmi_send_callback_fn(void *user_ptr,
 
     /* if this was the last operation, then mark the flow as done */
     gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
-        "(send callback time) ini posts: %d, pending: %d, last: %d\n",
+        "(send callback time) ini posts: %d, pending: %d, last: %d, "
+        "src_list emtpy: %s\n",
         flow_data->initial_posts, flow_data->dest_pending,
-        flow_data->dest_last_posted);
+        flow_data->dest_last_posted,
+        qlist_empty(&flow_data->src_list) ? "yes" : "no");
     if(flow_data->initial_posts == 0 &&
         flow_data->dest_pending == 0 && 
-        flow_data->dest_last_posted)
+        flow_data->dest_last_posted &&
+        qlist_empty(&flow_data->src_list))
     {
         /* we are in trouble if more than one callback function thinks that
          * it can trigger completion
@@ -1141,7 +1149,48 @@ static int bmi_send_callback_fn(void *user_ptr,
 
     if(bytes_processed == 0)
     {        
-        return(0);
+        if(q_item->buffer)
+        {
+            qlist_del(&q_item->list_link);
+        }
+
+        if(flow_data->dest_pending == 0 && qlist_empty(&flow_data->src_list))
+        {
+            /* we know 2 things: 
+             *
+             * 1) all the previously posted trove read and
+             *    bmi send operations have completed.
+             * 2) there aren't any more bytes to process and therefore
+             *    no more trove reads to post.
+             *
+             * based on that we can complete the flow.
+             */
+            gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, 
+                         "zero bytes processed.  no dests pending. "
+                         "setting flow to done\n");
+            assert(q_item->parent->state != FLOW_COMPLETE);
+            q_item->parent->state = FLOW_COMPLETE;
+            return 1;
+        }
+        else
+        {
+            /* no more bytes to process but qitems are still being
+             * worked on, so we can only set that the last qitem
+             * has been posted
+             */
+            gossip_debug(GOSSIP_FLOW_PROTO_DEBUG,
+                         "zero bytes processed, dests pending: %d, "
+                         "src_list empty: %s\n",
+                         flow_data->dest_pending,
+                         qlist_empty(&flow_data->src_list) ? "yes" : "no");
+
+            /* this allows a check in the fp_multiqueue_post function
+             * to prevent further trying to start other qitems from being
+             * posted
+             */
+            flow_data->dest_last_posted = 1;
+            return 0;
+        }
     }
 
     assert(q_item->buffer_used);
