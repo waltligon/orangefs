@@ -154,6 +154,7 @@ struct dbpf_storage
     char *name;
     DB *sto_attr_db;
     DB *coll_db;
+    DB_ENV *sto_env;
 };
 
 struct dbpf_collection
@@ -520,7 +521,9 @@ do {                                                         \
                     ++s_dbpf_metadata_writes, PINT_PERF_SET);\
 } while(0)
 
-extern DB_ENV *dbpf_getdb_env(void);
+extern DB_ENV *dbpf_getdb_env(const char *sto_path);
+extern int db_open(DB *db_p, const char *dbname, int, int);
+extern int db_close(DB *db_p);
 
 #if defined(__cplusplus)
 }

@@ -77,24 +77,34 @@ void dbpf_collection_clear_registered(void)
         if ((ret = free_ptr->coll_attr_db->sync(
                  free_ptr->coll_attr_db, 0)) != 0)
         {
-            return;
+            gossip_err("db_sync(coll_attr_db): %s\n", db_strerror(ret));
         }
 
-        if ((ret = free_ptr->coll_attr_db->close(
-                 free_ptr->coll_attr_db, 0)) != 0)
+        if ((ret = db_close(free_ptr->coll_attr_db)) != 0) 
         {
-            gossip_lerr("dbpf_finalize: %s\n", db_strerror(ret));
+            gossip_lerr("db_close(coll_attr_db): %s\n", db_strerror(ret));
         }
 
         if ((ret = free_ptr->ds_db->sync(free_ptr->ds_db, 0)) != 0)
         {
-            return;
+            gossip_err("db_sync(coll_ds_db): %s\n", db_strerror(ret));
         }
 
-        if ((ret = free_ptr->ds_db->close(free_ptr->ds_db, 0)) != 0)
+        if ((ret = db_close(free_ptr->ds_db)) != 0) 
         {
-            gossip_lerr("dbpf_finalize: %s\n", db_strerror(ret));
+            gossip_lerr("db_close(coll_ds_db): %s\n", db_strerror(ret));
         }
+
+        if ((ret = free_ptr->keyval_db->sync(free_ptr->keyval_db, 0)) != 0)
+        {
+            gossip_err("db_sync(coll_keyval_db): %s\n", db_strerror(ret));
+        }
+
+        if ((ret = db_close(free_ptr->keyval_db)) != 0) 
+        {
+            gossip_lerr("db_close(coll_keyval_db): %s\n", db_strerror(ret));
+        }
+
 
 	free(free_ptr->name);
 

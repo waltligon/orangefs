@@ -47,22 +47,68 @@ char dbpf_method_name[] = "dbpf";
 extern int dbpf_thread_initialize(void);
 
 struct dbpf_storage *my_storage_p = NULL;
+static int db_open_count, db_close_count;
 
-DB_ENV *dbpf_getdb_env(void)
+DB_ENV *dbpf_getdb_env(const char *sto_path)
 {
     static DB_ENV *dbenv = NULL;
+
     if (dbenv == NULL)
     {
         int ret;
+
         ret = db_env_create(&dbenv, 0);
         if (ret != 0)
         {
             gossip_lerr("dbpf_getdb_env: %s\n", db_strerror(ret));
             return NULL;
         }
-        dbenv->flags |= DB_ENV_DBLOCAL;
+        ret = dbenv->open(dbenv, sto_path, DB_INIT_MPOOL | DB_CREATE | DB_THREAD, 0);
+        if (ret != 0) {
+            gossip_lerr("dbpf_getdb_env: %s\n", db_strerror(ret));
+            return NULL;
+        }
     }
+    if (my_storage_p && !my_storage_p->sto_env)
+        my_storage_p->sto_env = dbenv;
     return dbenv;
+}
+
+static int dbpf_putdb_env(const char *sto_path)
+{
+    DB_ENV *dbenv;
+    int ret;
+
+    if (!my_storage_p)
+        return -TROVE_EINVAL;
+
+    if ((dbenv = my_storage_p->sto_env) == NULL)
+        return -TROVE_EINVAL;
+
+    if (db_open_count != db_close_count)
+    {
+        gossip_err("# of db opens (%d) != # of db closes (%d)\n",
+                db_open_count, db_close_count);
+    }
+    ret = my_storage_p->sto_env->close(my_storage_p->sto_env, 0);
+    if (ret != 0) 
+    {
+        gossip_err("dbpf_putdb_env: %s\n", db_strerror(ret));
+        return -dbpf_db_error_to_trove_error(ret);
+    }
+    /* Remove any db env backing log etc. Sadly we cannot make use of the same dbenv for removing stuff */
+    ret = db_env_create(&dbenv, 0);
+    if (ret != 0) 
+    {
+        gossip_err("dbpf_putdb_env: could not create any environment handle: %s\n", db_strerror(ret));
+        return 0;
+    }
+    ret = dbenv->remove(dbenv, sto_path, 0);
+    if (ret != 0) 
+    {
+        gossip_err("dbpf_putdb_env: could not remove environment handle: %s\n", db_strerror(ret));
+    }
+    return 0;
 }
 
 void dbpf_error_report(
@@ -88,8 +134,8 @@ void dbpf_error_report(
 
 static struct dbpf_storage *dbpf_storage_lookup(
     char *stoname, int *err_p);
-static int dbpf_db_create(char *dbname);
-static DB *dbpf_db_open(char *dbname, int *err_p,
+static int dbpf_db_create(const char *sto_path, char *dbname);
+static DB *dbpf_db_open(const char *sto_path, char *dbname, int *err_p,
                         int (*compare_fn) (DB *db,
                                            const DBT *dbt1,
                                            const DBT *dbt2));
@@ -355,7 +401,7 @@ static int dbpf_finalize(void)
         return -dbpf_db_error_to_trove_error(ret);
     }
 
-    ret = my_storage_p->sto_attr_db->close(my_storage_p->sto_attr_db, 0);
+    ret = db_close(my_storage_p->sto_attr_db);
     if (ret)
     {
         gossip_err("dbpf_finalize: %s\n", db_strerror(ret));
@@ -369,13 +415,17 @@ static int dbpf_finalize(void)
         return -dbpf_db_error_to_trove_error(ret);
     }
 
-    ret = my_storage_p->coll_db->close(my_storage_p->coll_db, 0);
+    ret = db_close(my_storage_p->coll_db);
     if (ret)
     {
         gossip_err("dbpf_finalize: %s\n", db_strerror(ret));
         return -dbpf_db_error_to_trove_error(ret);
     }
 
+    if ((ret = dbpf_putdb_env(my_storage_p->name)))
+    {
+        return ret;
+    }
     free(my_storage_p->name);
     free(my_storage_p);
     my_storage_p = NULL;
@@ -406,14 +456,14 @@ static int dbpf_storage_create(char *stoname,
     }
 
     DBPF_GET_STO_ATTRIB_DBNAME(sto_attrib_dbname, PATH_MAX, stoname);
-    ret = dbpf_db_create(sto_attrib_dbname);
+    ret = dbpf_db_create(storage_dirname, sto_attrib_dbname);
     if (ret != 0)
     {
         return ret;
     }
     
     DBPF_GET_COLLECTIONS_DBNAME(collections_dbname, PATH_MAX, stoname);
-    ret = dbpf_db_create(collections_dbname);
+    ret = dbpf_db_create(storage_dirname, collections_dbname);
     if (ret != 0)
     {
 	gossip_lerr("dbpf_storage_create: removing storage attribute database after failed create attempt");
@@ -563,17 +613,17 @@ static int dbpf_collection_create(char *collname,
 
     DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX,
                                 sto_p->name, new_coll_id);
-    db_p = dbpf_db_open(path_name, &error, NULL);
+    db_p = dbpf_db_open(sto_p->name, path_name, &error, NULL);
     if (db_p == NULL)
     {
-        ret = dbpf_db_create(path_name);
+        ret = dbpf_db_create(sto_p->name, path_name);
         if (ret != 0)
         {
             gossip_err("dbpf_db_create failed on attrib db %s\n", path_name);
             return ret;
         }
 
-        db_p = dbpf_db_open(path_name, &error, NULL);
+        db_p = dbpf_db_open(sto_p->name, path_name, &error, NULL);
         if (db_p == NULL)
         {
             gossip_err("dbpf_db_open failed on attrib db %s\n", path_name);
@@ -620,13 +670,13 @@ static int dbpf_collection_create(char *collname,
         return -dbpf_db_error_to_trove_error(ret);
     }
     db_p->sync(db_p, 0);
-    db_p->close(db_p, 0);
+    db_close(db_p);
 
     DBPF_GET_DS_ATTRIB_DBNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
-    db_p = dbpf_db_open(path_name, &error, NULL);
+    db_p = dbpf_db_open(sto_p->name, path_name, &error, NULL);
     if (db_p == NULL)
     {
-        ret = dbpf_db_create(path_name);
+        ret = dbpf_db_create(sto_p->name, path_name);
         if (ret != 0)
         {
             gossip_err("dbpf_db_create failed on %s\n", path_name);
@@ -635,14 +685,14 @@ static int dbpf_collection_create(char *collname,
     }
     else
     {
-        db_p->close(db_p, 0);
+        db_close(db_p);
     }
 
     DBPF_GET_KEYVAL_DBNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
-    db_p = dbpf_db_open(path_name, &error, NULL);
+    db_p = dbpf_db_open(sto_p->name, path_name, &error, NULL);
     if (db_p == NULL)
     {
-        ret = dbpf_db_create(path_name);
+        ret = dbpf_db_create(sto_p->name, path_name);
         if (ret != 0)
         {
             gossip_err("dbpf_db_create failed on %s\n", path_name);
@@ -651,7 +701,7 @@ static int dbpf_collection_create(char *collname,
     }
     else
     {
-        db_p->close(db_p, 0);
+        db_close(db_p);
     }
 
     DBPF_GET_BSTREAM_DIRNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
@@ -1062,7 +1112,7 @@ static int dbpf_collection_lookup(char *collname,
 
     DBPF_GET_DS_ATTRIB_DBNAME(path_name, PATH_MAX,
                               sto_p->name, coll_p->coll_id);
-    coll_p->ds_db = dbpf_db_open(path_name, &ret, NULL);
+    coll_p->ds_db = dbpf_db_open(sto_p->name, path_name, &ret, NULL);
     if (coll_p->ds_db == NULL)
     {
         return ret;
@@ -1070,7 +1120,7 @@ static int dbpf_collection_lookup(char *collname,
 
     DBPF_GET_KEYVAL_DBNAME(path_name, PATH_MAX,
                            sto_p->name, coll_p->coll_id);
-    coll_p->keyval_db = dbpf_db_open(path_name, &ret, 
+    coll_p->keyval_db = dbpf_db_open(sto_p->name, path_name, &ret, 
                                      PINT_trove_dbpf_keyval_compare);
     if(coll_p->keyval_db == NULL)
     {
@@ -1079,7 +1129,7 @@ static int dbpf_collection_lookup(char *collname,
 
     DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX,
                                 sto_p->name, coll_p->coll_id);
-    coll_p->coll_attr_db = dbpf_db_open(path_name, &ret, NULL);
+    coll_p->coll_attr_db = dbpf_db_open(sto_p->name, path_name, &ret, NULL);
     if (coll_p->coll_attr_db == NULL)
     {
         return ret;
@@ -1174,7 +1224,7 @@ static struct dbpf_storage *dbpf_storage_lookup(
 
     DBPF_GET_STO_ATTRIB_DBNAME(path_name, PATH_MAX, stoname);
 
-    sto_p->sto_attr_db = dbpf_db_open(path_name, error_p, NULL);
+    sto_p->sto_attr_db = dbpf_db_open(sto_p->name, path_name, error_p, NULL);
     if (sto_p->sto_attr_db == NULL)
     {
         return NULL;
@@ -1182,7 +1232,7 @@ static struct dbpf_storage *dbpf_storage_lookup(
 
     DBPF_GET_COLLECTIONS_DBNAME(path_name, PATH_MAX, stoname);
 
-    sto_p->coll_db = dbpf_db_open(path_name, error_p, NULL);
+    sto_p->coll_db = dbpf_db_open(sto_p->name, path_name, error_p, NULL);
     if (sto_p->coll_db == NULL)
     {
         return NULL;
@@ -1258,16 +1308,50 @@ static int dbpf_mkpath(char *pathname, mode_t mode)
     return 0;
 }
 
+int db_open(DB *db_p, const char *dbname, int flags, int mode)
+{
+    int ret;
+
+    if ((ret = db_p->open(db_p,
+#ifdef HAVE_TXNID_PARAMETER_TO_DB_OPEN
+                          NULL,
+#endif
+                          dbname,
+                          NULL,
+                          TROVE_DB_TYPE,
+                          flags,
+                          mode)) != 0)
+    {
+        db_p->err(db_p, ret, "%s", dbname);
+        return ret;
+    }
+    db_open_count++;
+    return 0;
+}
+
+int db_close(DB *db_p)
+{
+    int ret;
+
+    if ((ret = db_p->close(db_p, 0)) != 0)
+    {
+        gossip_lerr("db_close: %s\n", db_strerror(ret));
+        return ret;
+    }
+    db_close_count++;
+    return 0;
+}
+
 /* Internal function for creating first instances of the databases for
  * a db plus files storage region.
  */
-static int dbpf_db_create(char *dbname)
+static int dbpf_db_create(const char *sto_path, char *dbname)
 {
     int ret = -TROVE_EINVAL;
     DB *db_p = NULL;
     DB_ENV *envp = NULL;
 
-    if ((envp = dbpf_getdb_env()) == NULL)
+    if ((envp = dbpf_getdb_env(sto_path)) == NULL)
     {
         return TROVE_ENOMEM;
     }
@@ -1281,24 +1365,18 @@ static int dbpf_db_create(char *dbname)
     if ((ret = db_p->set_flags(db_p, DB_RECNUM)) != 0)
     {
         db_p->err(db_p, ret, "%s: set_flags", dbname);
+        db_close(db_p);
         return -dbpf_db_error_to_trove_error(ret);
     }
 
-    if ((ret = db_p->open(db_p,
-#ifdef HAVE_TXNID_PARAMETER_TO_DB_OPEN
-                          NULL,
-#endif
-                          dbname,
-                          NULL,
-                          TROVE_DB_TYPE,
-                          TROVE_DB_CREATE_FLAGS,
-                          TROVE_DB_MODE)) != 0)
+    if ((ret = db_open(db_p, dbname, TROVE_DB_CREATE_FLAGS, TROVE_DB_MODE)) != 0)
     {
         db_p->err(db_p, ret, "%s", dbname);
+        db_close(db_p);
         return -dbpf_db_error_to_trove_error(ret);
     }
-    
-    if ((ret = db_p->close(db_p, 0)) != 0)
+
+    if ((ret = db_close(db_p)) != 0)
     {
         gossip_lerr("dbpf_storage_create: %s\n", db_strerror(ret));
         return -dbpf_db_error_to_trove_error(ret);
@@ -1315,7 +1393,7 @@ static int dbpf_db_create(char *dbname)
  * Returns NULL on error, passing a trove error type back in the
  * integer pointed to by error_p.
  */
-static DB *dbpf_db_open(char *dbname, int *error_p,
+static DB *dbpf_db_open(const char *sto_path, char *dbname, int *error_p,
                         int (*compare_fn) (DB *db, 
                                            const DBT *dbt1, 
                                            const DBT *dbt2))
@@ -1324,7 +1402,7 @@ static DB *dbpf_db_open(char *dbname, int *error_p,
     DB *db_p = NULL;
     DB_ENV *envp = NULL;
 
-    if ((envp = dbpf_getdb_env()) == NULL)
+    if ((envp = dbpf_getdb_env(sto_path)) == NULL)
     {
         *error_p = TROVE_ENOMEM;
         return NULL;
@@ -1348,20 +1426,14 @@ static DB *dbpf_db_open(char *dbname, int *error_p,
     {
         db_p->err(db_p, ret, "%s: set_flags", dbname);
         *error_p = dbpf_db_error_to_trove_error(ret);
+        db_close(db_p);
         return NULL;
     }
 
-    if ((ret = db_p->open(db_p,
-#ifdef HAVE_TXNID_PARAMETER_TO_DB_OPEN
-                          NULL,
-#endif
-                          dbname,
-                          NULL,
-                          TROVE_DB_TYPE,
-                          TROVE_DB_OPEN_FLAGS,
-                          0)) != 0)
+    if ((ret = db_open(db_p, dbname, TROVE_DB_OPEN_FLAGS, 0)) != 0) 
     {
         *error_p = dbpf_db_error_to_trove_error(ret);
+        db_close(db_p);
         return NULL;
     }
     return db_p;
