@@ -49,10 +49,11 @@ extern int dbpf_thread_initialize(void);
 struct dbpf_storage *my_storage_p = NULL;
 static int db_open_count, db_close_count;
 
-DB_ENV *dbpf_getdb_env(const char *sto_path)
+DB_ENV *dbpf_getdb_env(const char *sto_path, int *error)
 {
     static DB_ENV *dbenv = NULL;
 
+    *error = 0;
     if (dbenv == NULL)
     {
         int ret;
@@ -61,11 +62,13 @@ DB_ENV *dbpf_getdb_env(const char *sto_path)
         if (ret != 0)
         {
             gossip_lerr("dbpf_getdb_env: %s\n", db_strerror(ret));
+            *error = ret;
             return NULL;
         }
         ret = dbenv->open(dbenv, sto_path, DB_INIT_MPOOL | DB_CREATE | DB_THREAD, 0);
         if (ret != 0) {
             gossip_lerr("dbpf_getdb_env: %s\n", db_strerror(ret));
+            *error = ret;
             return NULL;
         }
     }
@@ -1199,10 +1202,23 @@ static struct dbpf_storage *dbpf_storage_lookup(
 {
     char path_name[PATH_MAX] = {0};
     struct dbpf_storage *sto_p = NULL;
+    struct stat sbuf;
 
     if (my_storage_p != NULL)
     {
         return my_storage_p;
+    }
+
+    if (stat(stoname, &sbuf) < 0) 
+    {
+        *error_p = -TROVE_ENOENT;
+        return NULL;
+    }
+    if (!S_ISDIR(sbuf.st_mode))
+    {
+        *error_p = -TROVE_EINVAL;
+        gossip_err("%s is not a directory\n", stoname);
+        return NULL;
     }
 
     sto_p = (struct dbpf_storage *)malloc(sizeof(struct dbpf_storage));
@@ -1235,6 +1251,9 @@ static struct dbpf_storage *dbpf_storage_lookup(
     sto_p->coll_db = dbpf_db_open(sto_p->name, path_name, error_p, NULL);
     if (sto_p->coll_db == NULL)
     {
+        db_close(sto_p->sto_attr_db);
+        free(sto_p->name);
+        free(sto_p);
         return NULL;
     }
 
@@ -1312,6 +1331,7 @@ int db_open(DB *db_p, const char *dbname, int flags, int mode)
 {
     int ret;
 
+    db_open_count++;
     if ((ret = db_p->open(db_p,
 #ifdef HAVE_TXNID_PARAMETER_TO_DB_OPEN
                           NULL,
@@ -1325,7 +1345,10 @@ int db_open(DB *db_p, const char *dbname, int flags, int mode)
         db_p->err(db_p, ret, "%s", dbname);
         return ret;
     }
-    db_open_count++;
+#if 0
+    if (my_storage_p) 
+        gossip_err("db_open_count %d db_ref %d\n", db_open_count, my_storage_p->sto_env->db_ref);
+#endif
     return 0;
 }
 
@@ -1333,12 +1356,16 @@ int db_close(DB *db_p)
 {
     int ret;
 
+    db_close_count++;
     if ((ret = db_p->close(db_p, 0)) != 0)
     {
         gossip_lerr("db_close: %s\n", db_strerror(ret));
         return ret;
     }
-    db_close_count++;
+#if 0
+    if (my_storage_p) 
+        gossip_err("db_close_count %d db_ref %d\n", db_close_count, my_storage_p->sto_env->db_ref);
+#endif
     return 0;
 }
 
@@ -1351,9 +1378,9 @@ static int dbpf_db_create(const char *sto_path, char *dbname)
     DB *db_p = NULL;
     DB_ENV *envp = NULL;
 
-    if ((envp = dbpf_getdb_env(sto_path)) == NULL)
+    if ((envp = dbpf_getdb_env(sto_path, &ret)) == NULL)
     {
-        return TROVE_ENOMEM;
+        return -dbpf_db_error_to_trove_error(ret);
     }
     if ((ret = db_create(&db_p, envp, 0)) != 0)
     {
@@ -1402,14 +1429,14 @@ static DB *dbpf_db_open(const char *sto_path, char *dbname, int *error_p,
     DB *db_p = NULL;
     DB_ENV *envp = NULL;
 
-    if ((envp = dbpf_getdb_env(sto_path)) == NULL)
+    if ((envp = dbpf_getdb_env(sto_path, &ret)) == NULL)
     {
-        *error_p = TROVE_ENOMEM;
+        *error_p = -dbpf_db_error_to_trove_error(ret);
         return NULL;
     }
     if ((ret = db_create(&db_p, envp, 0)) != 0)
     {
-        *error_p = dbpf_db_error_to_trove_error(ret);
+        *error_p = -dbpf_db_error_to_trove_error(ret);
         return NULL;
     }
 
@@ -1425,14 +1452,14 @@ static DB *dbpf_db_open(const char *sto_path, char *dbname, int *error_p,
     if ((ret = db_p->set_flags(db_p, DB_RECNUM)) != 0)
     {
         db_p->err(db_p, ret, "%s: set_flags", dbname);
-        *error_p = dbpf_db_error_to_trove_error(ret);
+        *error_p = -dbpf_db_error_to_trove_error(ret);
         db_close(db_p);
         return NULL;
     }
 
     if ((ret = db_open(db_p, dbname, TROVE_DB_OPEN_FLAGS, 0)) != 0) 
     {
-        *error_p = dbpf_db_error_to_trove_error(ret);
+        *error_p = -dbpf_db_error_to_trove_error(ret);
         db_close(db_p);
         return NULL;
     }

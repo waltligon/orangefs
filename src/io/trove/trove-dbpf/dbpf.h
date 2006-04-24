@@ -521,7 +521,7 @@ do {                                                         \
                     ++s_dbpf_metadata_writes, PINT_PERF_SET);\
 } while(0)
 
-extern DB_ENV *dbpf_getdb_env(const char *sto_path);
+extern DB_ENV *dbpf_getdb_env(const char *sto_path, int *err_p);
 extern int db_open(DB *db_p, const char *dbname, int, int);
 extern int db_close(DB *db_p);
 
