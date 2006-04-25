@@ -706,7 +706,7 @@ static int pvfs2_translate_dev_map(
         unsigned long arg,
         struct   file *file)
 {
-    int ret;
+    long ret;
     unsigned long p;
 
     /* Copy it as the kernel module expects it */
@@ -768,6 +768,7 @@ void pvfs2_ioctl32_cleanup(void)
 
 #endif /* CONFIG_COMPAT */
 
+#ifndef HAVE_REGISTER_IOCTL32_CONVERSION
 int pvfs2_ioctl32_init(void)
 {
     return 0;
@@ -777,6 +778,7 @@ void pvfs2_ioctl32_cleanup(void)
 {
     return;
 }
+#endif
 
 static unsigned int pvfs2_devreq_poll(
     struct file *file,
