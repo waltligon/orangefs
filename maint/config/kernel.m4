@@ -80,18 +80,20 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	)
 
 	dnl checking if we have a sendfile callback 
-	AC_MSG_CHECKING(for sendfile callback in struct file_operations in kernel)
-	AC_TRY_COMPILE([
-		#define __KERNEL__
-		#include <linux/fs.h>
-		static struct file_operations fop = {
-		    .sendfile = NULL,
-		};
-	], [],
-		AC_MSG_RESULT(yes)
-		AC_DEFINE(HAVE_SENDFILE_VFS_SUPPORT, 1, Define if struct file_operations in kernel has sendfile callback),
-		AC_MSG_RESULT(no)
-	)
+	if test "x$enable_kernel_sendfile" = "xyes"; then
+		AC_MSG_CHECKING(for sendfile callback in struct file_operations in kernel)
+		AC_TRY_COMPILE([
+			#define __KERNEL__
+			#include <linux/fs.h>
+			static struct file_operations fop = {
+				 .sendfile = NULL,
+			};
+		], [],
+			AC_MSG_RESULT(yes)
+			AC_DEFINE(HAVE_SENDFILE_VFS_SUPPORT, 1, Define if struct file_operations in kernel has sendfile callback),
+			AC_MSG_RESULT(no)
+		)
+	fi
 
 	AC_MSG_CHECKING(for aio support in kernel)
 	dnl if this test passes, the kernel has it

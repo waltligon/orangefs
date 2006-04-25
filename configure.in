@@ -448,6 +448,12 @@ AC_ARG_ENABLE(kernel-aio,
   [ enable_kernel_aio=yes ]
   )
 
+AC_ARG_ENABLE(kernel-sendfile,
+  [  --enable-kernel-sendfile    Forcibly enable kernel sendfile],
+  [ enable_kernel_sendfile=$enableval ],
+  [ enable_kernel_sendfile=no ]
+  )
+
 AX_KERNEL_FEATURES
 
 

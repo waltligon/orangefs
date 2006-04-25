@@ -856,6 +856,7 @@ Optional Features:
   --enable-nptl-workaround Enable workaround for buggy NPTL/Pthread libraries
   --disable-aio-threaded-callbacks  Disable use of AIO threaded callbacks
   --disable-kernel-aio    Forcibly disable kernel aio
+  --enable-kernel-sendfile    Forcibly enable kernel sendfile
   --enable-fast           Disable optional debugging, enable optimizations.
   --enable-strict         Turn on strict debugging with gcc
   --enable-verbose-build  Enables full output during build process
@@ -6556,6 +6557,15 @@ else
 
 fi;
 
+# Check whether --enable-kernel-sendfile or --disable-kernel-sendfile was given.
+if test "${enable_kernel_sendfile+set}" = set; then
+  enableval="$enable_kernel_sendfile"
+   enable_kernel_sendfile=$enableval
+else
+   enable_kernel_sendfile=no
+
+fi;
+
 
 
 	NOSTDINCFLAGS="-nostdinc -isystem `$CC -print-file-name=include`"
@@ -6813,20 +6823,21 @@ echo "${ECHO_T}no" >&6
 fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 
+		if test "x$enable_kernel_sendfile" = "xyes"; then
 		echo "$as_me:$LINENO: checking for sendfile callback in struct file_operations in kernel" >&5
 echo $ECHO_N "checking for sendfile callback in struct file_operations in kernel... $ECHO_C" >&6
-	cat >conftest.$ac_ext <<_ACEOF
+		cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
 cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 
-		#define __KERNEL__
-		#include <linux/fs.h>
-		static struct file_operations fop = {
-		    .sendfile = NULL,
-		};
+			#define __KERNEL__
+			#include <linux/fs.h>
+			static struct file_operations fop = {
+				 .sendfile = NULL,
+			};
 
 int
 main ()
@@ -6874,6 +6885,7 @@ echo "${ECHO_T}no" >&6
 
 fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+	fi
 
 	echo "$as_me:$LINENO: checking for aio support in kernel" >&5
 echo $ECHO_N "checking for aio support in kernel... $ECHO_C" >&6

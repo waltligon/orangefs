@@ -611,7 +611,12 @@ kernel module that uses only exported symbols.
 
 \subsection{Can we run the Apache webserver to serve files off a PVFS2 volume?}
 
-Sure you can! But we recommend that unless the files that are being served are large enough
+Sure you can! However, we recommend that you turn off the EnableSendfile option in
+httpd.conf before starting the web server. Alternatively, you could configure
+PVFS2 with the option \texttt{--enable-kernel-sendfile}. Passing this option
+to configure results in a pvfs2 kernel module that supports the sendfile
+callback.
+But we recommend that unless the files that are being served are large enough
 this may not be a good idea in terms of performance. Apache 2.x+ uses the {\tt sendfile}
 system call that normally stages the file-data through the page-cache. On recent 2.6 kernels,
 this can be averted by providing a {\tt sendfile} callback routine at the file-system.
