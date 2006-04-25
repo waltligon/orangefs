@@ -879,14 +879,6 @@ static int dbpf_keyval_read_list_op_svc(struct dbpf_op *op_p)
             goto return_error;
         }
 
-        key_sz = (DBPF_KEYVAL_DB_ENTRY_KEY_SIZE(key.size) >
-                  op_p->u.k_read_list.key_array[i].buffer_sz) ?
-            op_p->u.k_read_list.key_array[i].buffer_sz :
-            DBPF_KEYVAL_DB_ENTRY_KEY_SIZE(key.size);
-
-        memcpy(op_p->u.k_read_list.key_array[i].buffer,
-               key_entry.key, key_sz);
-        key.size = key_sz;
         op_p->u.k_read_list.val_array[i].read_sz = data.size;
     }
 
