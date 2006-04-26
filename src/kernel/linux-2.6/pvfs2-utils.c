@@ -448,9 +448,9 @@ int pvfs2_inode_setattr(
             (new_op->upcall.req.setattr.refn.fs_id == PVFS_FS_ID_NULL))
         {
             struct super_block *sb = inode->i_sb;
-            new_op->upcall.req.lookup.parent_refn.handle =
+            new_op->upcall.req.setattr.refn.handle =
                 PVFS2_SB(sb)->root_handle;
-            new_op->upcall.req.lookup.parent_refn.fs_id =
+            new_op->upcall.req.setattr.refn.fs_id =
                 PVFS2_SB(sb)->fs_id;
         }
         ret = copy_attributes_from_inode(
