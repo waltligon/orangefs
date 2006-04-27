@@ -27,7 +27,7 @@ enum
    ACACHE_ENABLED = 8,
 };
 
-struct PINT_perf_key acache_keys[] = 
+struct PINT_perf_key acache_keys_array[] = 
 {
    {"ACACHE_NUM_ENTRIES", ACACHE_NUM_ENTRIES, PINT_PERF_PRESERVE},
    {"ACACHE_SOFT_LIMIT", ACACHE_SOFT_LIMIT, PINT_PERF_PRESERVE},
@@ -60,7 +60,7 @@ int main(int argc, char **argv)
     }
 
     printf("Initializing...");
-    pc = PINT_perf_initialize(acache_keys);
+    pc = PINT_perf_initialize(acache_keys_array);
     if(!pc)
     {
         fprintf(stderr, "Error: PINT_perf_initialize() failure.\n");
@@ -289,7 +289,7 @@ static void print_counters(struct PINT_perf_counter* pc, int* in_key_count,
     /* print key names and values */
     for(i=0; i<key_count; i++)
     {
-        printf("%24.24s: ", acache_keys[i].key_name);
+        printf("%24.24s: ", acache_keys_array[i].key_name);
 
         for(j=0; j<history_size; j++)
         {

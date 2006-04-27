@@ -1,0 +1,21 @@
+DIR := posix
+
+MISCSRC += \
+	$(DIR)/crc32c.c \
+	$(DIR)/libcrc32c.c \
+	$(DIR)/sha1.c \
+	$(DIR)/sockio.c
+
+TESTSRC += \
+	$(DIR)/openg.c \
+	$(DIR)/openg-socket.c 
+
+MPIMISCSRC += \
+	$(DIR)/crc32c.c \
+	$(DIR)/libcrc32c.c \
+	$(DIR)/sha1.c \
+	$(DIR)/sockio.c
+
+MPITESTSRC += $(DIR)/openg-mpi.c
+
+MODLDFLAGS_$(DIR) = -lssl -lcrypto
