@@ -72,6 +72,9 @@ struct dentry *pvfs2_lookup(
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *parent = NULL, *found_pvfs2_inode = NULL;
     struct super_block *sb = NULL;
+    struct timeval begin, end;
+
+    do_gettimeofday(&begin);
 
     /*
       in theory we could skip a lookup here (if the intent is to
@@ -224,6 +227,8 @@ struct dentry *pvfs2_lookup(
     }
 
     op_release(new_op);
+    do_gettimeofday(&end);
+    printk(KERN_DEBUG "pvfs2_lookup: took %d usecs\n", diff(&end, &begin));
     return NULL;
 }
 

@@ -8,8 +8,8 @@
 
 extern struct file_system_type pvfs2_fs_type;
 extern struct dentry_operations pvfs2_dentry_operations;
-
-extern kmem_cache_t *pvfs2_inode_cache;
+extern struct address_space_operations pvfs2_address_operations;
+extern struct backing_dev_info pvfs2_backing_dev_info;
 
 extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
@@ -23,6 +23,9 @@ LIST_HEAD(pvfs2_superblocks);
 
 /* used to protect the above superblock list */
 spinlock_t pvfs2_superblocks_lock = SPIN_LOCK_UNLOCKED;
+
+static void pvfs2_sb_get_fs_key(struct super_block *sb, char **ppkey, int *keylen);
+static atomic_t pvfs2_inode_alloc_count, pvfs2_inode_dealloc_count;
 
 static int parse_mount_options(
    char *option_str, struct super_block *sb, int silent)
@@ -164,18 +167,12 @@ static struct inode *pvfs2_alloc_inode(struct super_block *sb)
     struct inode *new_inode = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
 
-    /*
-       this allocator has an associated constructor that fills in the
-       internal vfs inode structure.  this initialization is extremely
-       important and is required since we're allocating the inodes
-       ourselves (rather than letting the system inode allocator
-       initialize them for us); see inode.c/inode_init_once()
-     */
-    pvfs2_inode = kmem_cache_alloc(pvfs2_inode_cache,
-                                   PVFS2_CACHE_ALLOC_FLAGS);
+    pvfs2_inode = pvfs2_inode_alloc();
     if (pvfs2_inode)
     {
         new_inode = &pvfs2_inode->vfs_inode;
+        pvfs2_print("pvfs2_alloc_inode: allocated %p\n", pvfs2_inode);
+        atomic_inc(&pvfs2_inode_alloc_count);
     }
     return new_inode;
 }
@@ -184,11 +181,15 @@ static void pvfs2_destroy_inode(struct inode *inode)
 {
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
 
-    pvfs2_print("pvfs2_destroy_inode: destroying inode %d\n",
-                (int)inode->i_ino);
+    if (pvfs2_inode)
+    {
+        pvfs2_print("pvfs2_destroy_inode: deallocated %p destroying inode %ld\n",
+                    pvfs2_inode, (long)inode->i_ino);
 
-    pvfs2_inode_finalize(pvfs2_inode);
-    kmem_cache_free(pvfs2_inode_cache, pvfs2_inode);
+        atomic_inc(&pvfs2_inode_dealloc_count);
+        pvfs2_inode_finalize(pvfs2_inode);
+        pvfs2_inode_release(pvfs2_inode);
+    }
 }
 
 static void pvfs2_read_inode(
@@ -196,8 +197,8 @@ static void pvfs2_read_inode(
 {
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
 
-    pvfs2_print("pvfs2_read_inode: (inode = %lu | ct = %d)\n",
-                inode->i_ino, (int)atomic_read(&inode->i_count));
+    pvfs2_print("pvfs2_read_inode: %p (inode = %lu | ct = %d)\n",
+                pvfs2_inode, inode->i_ino, (int)atomic_read(&inode->i_count));
 
     /*
       at this point we know the private inode data handle/fs_id can't
@@ -229,9 +230,6 @@ static void pvfs2_read_inode(
 {
     pvfs2_inode_t *pvfs2_inode = NULL;
 
-    pvfs2_print("pvfs2: pvfs2_read_inode called (inode = %lu | "
-                "ct = %d)\n", inode->i_ino,
-                (int)atomic_read(&inode->i_count));
 
     if (inode->u.generic_ip)
     {
@@ -241,14 +239,16 @@ static void pvfs2_read_inode(
     }
 
     /* Here we allocate the PVFS2 specific inode structure */
-    pvfs2_inode = kmem_cache_alloc(pvfs2_inode_cache,
-                                   PVFS2_CACHE_ALLOC_FLAGS);
+    pvfs2_inode = pvfs2_inode_alloc();
     if (pvfs2_inode)
     {
         pvfs2_inode_initialize(pvfs2_inode);
         inode->u.generic_ip = pvfs2_inode;
         pvfs2_inode->vfs_inode = inode;
 
+        pvfs2_print("pvfs2: pvfs2_read_inode: allocated %p (inode = %lu | "
+                "ct = %d)\n", pvfs2_inode, inode->i_ino,
+                (int)atomic_read(&inode->i_count));
         if (pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_ALL) != 0)
         {
             pvfs2_make_bad_inode(inode);
@@ -266,11 +266,11 @@ static void pvfs2_clear_inode(struct inode *inode)
 {
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
 
-    pvfs2_print("pvfs2_clear_inode: destroying inode %d\n",
-                (int)inode->i_ino);
+    pvfs2_print("pvfs2_clear_inode: deallocated %p, destroying inode %ld\n",
+                pvfs2_inode, (long)inode->i_ino);
 
     pvfs2_inode_finalize(pvfs2_inode);
-    kmem_cache_free(pvfs2_inode_cache, pvfs2_inode);
+    pvfs2_inode_release(pvfs2_inode);
     inode->u.generic_ip = NULL;
 }
 
@@ -280,8 +280,9 @@ static void pvfs2_clear_inode(struct inode *inode)
 static void pvfs2_put_inode(
     struct inode *inode)
 {
-    pvfs2_print("pvfs2_put_inode: (%d | ct=%d | nlink=%d)\n",
-                (int)inode->i_ino, (int)atomic_read(&inode->i_count),
+    pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
+    pvfs2_print("pvfs2_put_inode: pvfs2_inode: %p (i_ino %d) = %d (nlink=%d)\n",
+                pvfs2_inode, (int)inode->i_ino, (int)atomic_read(&inode->i_count),
                 (int)inode->i_nlink);
 
     if (atomic_read(&inode->i_count) == 1)
@@ -304,6 +305,46 @@ static void pvfs2_put_inode(
 #endif
     }
 }
+
+#ifdef HAVE_STATFS_LITE_SUPER_OPERATIONS
+static int pvfs2_statfs_lite(
+        struct super_block *sb,
+        struct kstatfs *buf,
+        int statfs_mask)
+{
+    /* 
+     * statfs_mask indicates the fields that we are expected to fill up.
+     * We do not need a network message for the following masks,
+     * STATFS_M_TYPE, STATFS_M_FSID, STATFS_M_NAMELEN, STATFS_M_FRSIZE, STATFS_M_BSIZE.
+     * Everything else use the regular statfs call.
+     */
+    if ((statfs_mask & STATFS_M_BLOCKS)     ||
+            (statfs_mask & STATFS_M_BFREE)  ||
+            (statfs_mask & STATFS_M_BAVAIL) ||
+            (statfs_mask & STATFS_M_FILES)  ||
+            (statfs_mask & STATFS_M_FFREE))
+        return -ENOSYS;
+
+    if (statfs_mask & STATFS_M_TYPE) {
+        buf->f_type = sb->s_magic;
+    }
+    if (statfs_mask & STATFS_M_FSID) {
+        /* stash the fsid as well */
+        memcpy(&buf->f_fsid, &(PVFS2_SB(sb)->fs_id), 
+               sizeof(PVFS2_SB(sb)->fs_id));      
+    }
+    if (statfs_mask & STATFS_M_BSIZE) {
+        buf->f_bsize = sb->s_blocksize;
+    }
+    if (statfs_mask & STATFS_M_NAMELEN) {
+        buf->f_namelen = PVFS2_NAME_LEN;
+    }
+    if (statfs_mask & STATFS_M_FRSIZE) {
+        buf->f_frsize = sb->s_blocksize;
+    }
+    return 0;
+}
+#endif
 
 /*
   NOTE: information filled in here is typically reflected in the
@@ -500,6 +541,221 @@ int pvfs2_remount(
     return ret;
 }
 
+static int fskey_table_size = 11;
+/* hash table for mapping fsids to keys */
+struct qhash_table *fskey_table;
+
+struct fskey_entry {
+    PVFS_fs_id      fsid;
+    char            *fs_key;
+    int             fs_keylen;
+    struct list_head list;
+};
+
+static struct fskey_entry *fskey_entry_ctor(PVFS_fs_id fsid)
+{
+    struct fskey_entry * entry;
+
+    entry = (struct fskey_entry *) kmalloc(sizeof(struct fskey_entry), PVFS2_GFP_FLAGS);
+    if (entry) {
+        entry->fsid = fsid;
+        entry->fs_keylen = PVFS2_MAX_FSKEY_LEN;
+        entry->fs_key = (char *) kmalloc(entry->fs_keylen, PVFS2_GFP_FLAGS);
+        if (!entry->fs_key) {
+            kfree(entry);
+            entry = NULL;
+            goto out;
+        }
+    }
+out:
+    return entry;
+}
+
+static void fskey_entry_dtor(struct fskey_entry * entry)
+{
+    if (entry) {
+        if (entry->fs_key) {
+            kfree(entry->fs_key);
+            entry->fs_key = NULL;
+        }
+        entry->fs_keylen = 0;
+        kfree(entry);
+    }
+    return;
+}
+
+static int fskey_fsid_func(void *key, int table_size)
+{
+    int tmp = 0;
+    PVFS_fs_id *fsid = (PVFS_fs_id *)key;
+    tmp += (int)(*fsid);
+    tmp = (tmp % table_size);
+    return tmp;
+}
+
+static int fskey_fsid_compare(void *key, struct qhash_head *link)
+{
+    PVFS_fs_id *fsid = (PVFS_fs_id *)key;
+    struct fskey_entry *entry = qhash_entry(
+            link, struct fskey_entry, list);
+    return (entry->fsid == *fsid);
+}
+
+int fsid_key_table_initialize(void)
+{
+    fskey_table = qhash_init(fskey_fsid_compare, fskey_fsid_func, fskey_table_size);
+    if (!fskey_table)
+    {
+        pvfs2_error("Failed to initialize fsid/fskey hashtable");
+        return -ENOMEM;
+    }
+    return 0;
+}
+
+void fsid_key_table_finalize(void)
+{
+    int i;
+
+    if (fskey_table == NULL)
+        return;
+    for (i = 0; i < fskey_table_size; i++) {
+        struct qhash_head *hash_link;
+        do {
+            hash_link = qhash_search_and_remove_at_index(
+                    fskey_table, i);
+            if (hash_link)
+            {
+                struct fskey_entry *entry;
+                entry = qhash_entry(hash_link, struct fskey_entry, list);
+                fskey_entry_dtor(entry);
+            }
+        } while (hash_link);
+    }
+    qhash_finalize(fskey_table);
+    fskey_table = NULL;
+    return;
+}
+
+#ifdef HAVE_GET_FS_KEY_SUPER_OPERATIONS
+
+/* Issue an upcall in case we dont have the fsid<->key mappings */
+static int pvfs2_get_fs_key(PVFS_fs_id fsid, char *fs_key, int *fs_keylen)
+{
+    pvfs2_kernel_op_t *new_op = NULL;
+    int ret;
+
+    pvfs2_print("pvfs2: pvfs2_get_fs_key fsid is %d\n", fsid);
+
+    new_op = op_alloc();
+    if (!new_op)
+    {
+        return -ENOMEM;
+    }
+    new_op->upcall.type = PVFS2_VFS_OP_FSKEY;
+    new_op->upcall.req.fs_key.fsid = fsid;
+
+    ret = service_operation(
+        new_op, "pvfs2_get_fs_key", PVFS2_OP_RETRY_COUNT, PVFS2_OP_INTERRUPTIBLE);
+
+    /* copy the keys and key lengths */
+    if (ret == 0)
+    {
+        int copy_fskeylen;
+
+        copy_fskeylen = new_op->downcall.resp.fs_key.fs_keylen > *fs_keylen 
+                        ? *fs_keylen : new_op->downcall.resp.fs_key.fs_keylen;
+        memcpy(fs_key, new_op->downcall.resp.fs_key.fs_key, copy_fskeylen);
+        *fs_keylen = copy_fskeylen;
+    }
+
+    op_release(new_op);
+    return ret;
+}
+
+/*
+ * VFS requests us to fetch a key for a particular superblock/file-system.
+ * We lookup our hash-table to determine if we have cached the keys for the 
+ * file system and if not we issue an upcall to retrieve the key.
+ */
+static void pvfs2_sb_get_fs_key(struct super_block *sb, char **ppkey, int *keylen)
+{
+    struct qhash_head *hash_link;
+    PVFS_fs_id fsid = PVFS2_SB(sb)->fs_id;
+    struct fskey_entry *entry;
+
+    if (fskey_table == NULL) {
+        pvfs2_error("fskey_table not initialized?\n");
+        if (ppkey) {
+            *ppkey = NULL;
+        }
+        if (keylen) {
+            *keylen = 0;
+        }
+        return;
+    }
+    pvfs2_print("Search fskey_table for fsid %d\n", fsid);
+    hash_link = qhash_search(fskey_table, &fsid);
+    if (hash_link)
+    {
+        /* Found an entry in the hash table */
+        entry = qhash_entry(hash_link, struct fskey_entry, list);
+        if (entry->fsid != fsid) {
+            pvfs2_error("pvfs2_sb_get_fs_key: fsid did not match!?\n");
+            if (ppkey) {
+                *ppkey = NULL;
+            }
+            if (keylen) {
+                *keylen = 0;
+            }
+            return;
+        }
+        if (ppkey) {
+            *ppkey = entry->fs_key;
+        }
+        if (keylen) {
+            *keylen = entry->fs_keylen;
+        }
+        pvfs2_print("Cached key for FSID %d - %d\n", fsid, entry->fs_keylen);
+        return;
+    }
+    /* Allocate an entry for this fsid */
+    if ((entry = fskey_entry_ctor(fsid)) == NULL) {
+        if (ppkey) {
+            *ppkey = NULL;
+        }
+        if (keylen) {
+            *keylen = 0;
+        }
+        return;
+    }
+    /* Send an upcall to retrieve the key for this fsid */
+    if (pvfs2_get_fs_key(fsid, entry->fs_key, &entry->fs_keylen) < 0) {
+        fskey_entry_dtor(entry);
+        if (ppkey) {
+            *ppkey = NULL;
+        }
+        if (keylen) {
+            *keylen = 0;
+        }
+        return;
+    }
+    /*
+     * Finally add it to the hash table. NOTE: struct fskey_entry's are freed
+     * only when the fskey_table is finalized at module unload time.
+     */
+    qhash_add(fskey_table, (void *) &(entry->fsid), &(entry->list));
+    if (ppkey) {
+        *ppkey  = entry->fs_key;
+    }
+    if (keylen) {
+        *keylen = entry->fs_keylen;
+    }
+    pvfs2_print("Uncached key for FSID %d - %d\n", entry->fsid, entry->fs_keylen);
+    return;
+}
+
+#endif
+
 struct super_operations pvfs2_s_ops =
 {
 #ifdef PVFS2_LINUX_KERNEL_2_4
@@ -516,7 +772,16 @@ struct super_operations pvfs2_s_ops =
     .read_inode = pvfs2_read_inode,
     .put_inode = pvfs2_put_inode,
     .statfs = pvfs2_statfs,
-    .remount_fs = pvfs2_remount
+    .remount_fs = pvfs2_remount,
+#ifdef HAVE_FIND_INODE_HANDLE_SUPER_OPERATIONS
+    .find_inode_handle = pvfs2_sb_find_inode_handle,
+#endif
+#ifdef HAVE_GET_FS_KEY_SUPER_OPERATIONS
+    .get_fs_key = pvfs2_sb_get_fs_key,
+#endif
+#ifdef HAVE_STATFS_LITE_SUPER_OPERATIONS
+    .statfs_lite = pvfs2_statfs_lite,
+#endif
 #endif
 };
 
@@ -811,6 +1076,8 @@ struct super_block *pvfs2_get_sb(
                 strncpy(PVFS2_SB(sb)->data, data,
                         PVFS2_MAX_MOUNT_OPT_LEN);
             }
+            /* Issue an upcall to pre-fetch the fs key so that subsequent calls would be hits */
+            pvfs2_sb_get_fs_key(sb, NULL, NULL);
 
             /* finally, add this sb to our list of known pvfs2 sb's */
             add_pvfs2_sb(sb);
@@ -839,6 +1106,7 @@ struct super_block *pvfs2_get_sb(
     pvfs2_print("pvfs2_get_sb: returning sb %p\n", sb);
     return sb;
 }
+
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
 
 void pvfs2_kill_sb(
@@ -875,6 +1143,21 @@ void pvfs2_kill_sb(
 #else
         sb->u.generic_sbp = NULL;
 #endif
+        {
+            int count1, count2;
+            count1 = atomic_read(&pvfs2_inode_alloc_count);
+            count2 = atomic_read(&pvfs2_inode_dealloc_count);
+            if (count1 != count2) 
+            {
+                pvfs2_error("pvfs2_kill_sb: (WARNING) number of inode allocs (%d) != number of inode deallocs (%d)\n",
+                        count1, count2);
+            }
+            else
+            {
+                pvfs2_print("pvfs2_kill_sb: (OK) number of inode allocs (%d) = number of inode deallocs (%d)\n",
+                        count1, count2);
+            }
+        }
     }
     else
     {

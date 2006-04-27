@@ -82,6 +82,8 @@ typedef struct filesystem_configuration_s
     int trove_sync_meta;
     int trove_sync_data;
 
+    char *secret_key;
+
 } filesystem_configuration_s;
 
 typedef struct distribution_param_configuration_s
@@ -212,6 +214,12 @@ PINT_llist *PINT_config_get_filesystems(
 int PINT_config_trim_filesystems_except(
     struct server_configuration_s *config_s,
     PVFS_fs_id fs_id);
+
+int PINT_config_get_fs_key(
+    struct server_configuration_s *config,
+    PVFS_fs_id fs_id,
+    char ** key,
+    int * length);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
 int PINT_config_pvfs2_mkspace(

@@ -158,6 +158,7 @@ do {                                                           \
 #define PVFS2_MAX_NUM_OPTIONS          0x00000004
 #define PVFS2_MAX_MOUNT_OPT_LEN        0x00000080
 #define PVFS2_NUM_READDIR_RETRIES      0x0000000A
+#define PVFS2_MAX_FSKEY_LEN            64
 
 #define MAX_DEV_REQ_UPSIZE (2*sizeof(int32_t) +   \
 sizeof(uint64_t) + sizeof(pvfs2_upcall_t))
@@ -398,6 +399,88 @@ typedef struct
     int id;
 } pvfs2_mount_sb_info_t;
 
+/** PVFS2 specific structure that we use for constructing an opaque handle at the time 
+ * an openg() system call that will be used at subsequent openfh system call
+ * We stuff in enough information into this buffer that subsequent
+ * openfh calls don't have to communicate with server. Padding is inserted so that
+ * size of structure is the same and offset is also same on both 32 and 64
+ * bit machines.
+ */
+typedef struct 
+{
+    PVFS_handle handle;
+    PVFS_fs_id  fsid;
+    int32_t     __pad1;
+    PVFS_uid    owner;
+    PVFS_gid    group;
+    PVFS_permissions perms;
+    int32_t     __pad2;
+    PVFS_time   atime;
+    PVFS_time   mtime;
+    PVFS_time   ctime;
+    PVFS_size   size;
+    PVFS_ds_type objtype;
+    uint32_t    mask;
+} pvfs2_opaque_handle_t;
+#ifdef __PINT_PROTO_ENCODE_OPAQUE_HANDLE
+#define encode_int64_t(pptr,x) do { \
+    *(int64_t*) *(pptr) = cpu_to_le64(*(x)); \
+    *(pptr) += 8; \
+} while (0)
+#define decode_int64_t(pptr,x) do { \
+    *(x) = le64_to_cpu(*(int64_t*) *(pptr)); \
+    *(pptr) += 8; \
+} while (0)
+
+#define encode_int32_t(pptr,x) do { \
+    *(int32_t*) *(pptr) = cpu_to_le32(*(x)); \
+    *(pptr) += 4; \
+} while (0)
+#define decode_int32_t(pptr,x) do { \
+    *(x) = le32_to_cpu(*(int32_t*) *(pptr)); \
+    *(pptr) += 4; \
+} while (0)
+
+/* skip 4 bytes */
+#define encode_skip4(pptr,x) do { \
+    *(pptr) += 4; \
+} while (0)
+#define decode_skip4(pptr,x) do { \
+    *(pptr) += 4; \
+} while (0)
+
+#define encode_pvfs2_opaque_handle_t(pptr,x) do {\
+    encode_int64_t(pptr, &(x)->handle);\
+    encode_int32_t(pptr, &(x)->fsid);\
+    encode_skip4(pptr,);\
+    encode_int32_t(pptr, &(x)->owner);\
+    encode_int32_t(pptr, &(x)->group);\
+    encode_int32_t(pptr, &(x)->perms);\
+    encode_skip4(pptr,);\
+    encode_int64_t(pptr, &(x)->atime);\
+    encode_int64_t(pptr, &(x)->mtime);\
+    encode_int64_t(pptr, &(x)->ctime);\
+    encode_int64_t(pptr, &(x)->size);\
+    encode_int32_t(pptr, &(x)->objtype);\
+    encode_int32_t(pptr, &(x)->mask);\
+} while (0)
+#define decode_pvfs2_opaque_handle_t(pptr,x) do {\
+    decode_int64_t(pptr, &(x)->handle);\
+    decode_int32_t(pptr, &(x)->fsid);\
+    decode_skip4(pptr,);\
+    decode_int32_t(pptr, &(x)->owner);\
+    decode_int32_t(pptr, &(x)->group);\
+    decode_int32_t(pptr, &(x)->perms);\
+    decode_skip4(pptr,);\
+    decode_int64_t(pptr, &(x)->atime);\
+    decode_int64_t(pptr, &(x)->mtime);\
+    decode_int64_t(pptr, &(x)->ctime);\
+    decode_int64_t(pptr, &(x)->size);\
+    decode_int32_t(pptr, &(x)->objtype);\
+    decode_int32_t(pptr, &(x)->mask);\
+} while (0)
+#endif
+
 #ifdef HAVE_AIO_VFS_SUPPORT
 
 /** structure that holds the state of any async I/O operation issued 
@@ -448,31 +531,35 @@ static inline pvfs2_sb_info_t *PVFS2_SB(
 /****************************
  * defined in pvfs2-cache.c
  ****************************/
-void op_cache_initialize(
-    void);
-void op_cache_finalize(
-    void);
-pvfs2_kernel_op_t *op_alloc(
-    void);
-void op_release(
-    void *op);
-void dev_req_cache_initialize(
-    void);
-void dev_req_cache_finalize(
-    void);
-void pvfs2_inode_cache_initialize(
-    void);
-void pvfs2_inode_cache_finalize(
-    void);
+int op_cache_initialize(void);
+int op_cache_finalize(void);
+pvfs2_kernel_op_t *op_alloc(void);
+void op_release(pvfs2_kernel_op_t *op);
 
-#ifndef HAVE_AIO_VFS_SUPPORT
-#define kiocb_cache_initialize()
-#define kiocb_cache_finalize()
-#else
-void kiocb_cache_initialize(void);
-void kiocb_cache_finalize(void);
+int dev_req_cache_initialize(void);
+int dev_req_cache_finalize(void);
+void *dev_req_alloc(void);
+void  dev_req_release(void *);
+
+int pvfs2_inode_cache_initialize(void);
+int pvfs2_inode_cache_finalize(void);
+pvfs2_inode_t *pvfs2_inode_alloc(void);
+void pvfs2_inode_release(pvfs2_inode_t *);
+
+#ifdef HAVE_AIO_VFS_SUPPORT
+int kiocb_cache_initialize(void);
+int kiocb_cache_finalize(void);
 pvfs2_kiocb* kiocb_alloc(void);
 void kiocb_release(pvfs2_kiocb *ptr);
+#else
+static inline int kiocb_cache_initialize(void)
+{
+    return 0;
+}
+static inline int kiocb_cache_finalize(void)
+{
+    return 0;
+}
 #endif
 
 /****************************
@@ -494,6 +581,10 @@ struct super_block* pvfs2_get_sb(
     void *data,
     int silent);
 #else
+#ifdef HAVE_FIND_INODE_HANDLE_SUPER_OPERATIONS
+extern struct inode *pvfs2_sb_find_inode_handle(struct super_block *sb, 
+        const struct file_handle *handle);
+#endif
 struct super_block *pvfs2_get_sb(
     struct file_system_type *fst, int flags,
     const char *devname, void *data);
@@ -503,6 +594,9 @@ int pvfs2_remount(
     struct super_block *sb,
     int *flags,
     char *data);
+
+int fsid_key_table_initialize(void);
+void fsid_key_table_finalize(void);
 
 /****************************
  * defined in inode.c
@@ -637,6 +731,10 @@ int pvfs2_cancel_op_in_progress(
 
 PVFS_time pvfs2_convert_time_field(
     void *time_ptr);
+
+#ifdef HAVE_FILL_HANDLE_INODE_OPERATIONS
+int pvfs2_fill_handle(struct inode *inode, struct file_handle *handle);
+#endif
 
 int pvfs2_normalize_to_errno(PVFS_error error_code);
 
@@ -1005,6 +1103,16 @@ static inline ino_t parent_ino(struct dentry *dentry)
 #endif
 
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
+
+static inline unsigned int diff(struct timeval *end, struct timeval *begin)
+{
+    if (end->tv_usec < begin->tv_usec) {
+        end->tv_usec += 1000000; end->tv_sec--;
+    }
+    end->tv_sec  -= begin->tv_sec;
+    end->tv_usec -= begin->tv_usec;
+    return ((end->tv_sec * 1000000) + end->tv_usec);
+}
 
 #endif /* __PVFS2KERNEL_H */
 

@@ -195,6 +195,12 @@ typedef struct
 
 typedef struct
 {
+    PVFS_fs_id fsid;
+    int32_t    __pad1;
+} pvfs2_fs_key_request_t;
+
+typedef struct
+{
     int32_t type;
     int32_t __pad1;
     PVFS_credentials credentials;
@@ -224,6 +230,7 @@ typedef struct
         pvfs2_fsync_request_t fsync;
         pvfs2_param_request_t param;
         pvfs2_perf_count_request_t perf_count;
+        pvfs2_fs_key_request_t fs_key;
     } req;
 } pvfs2_upcall_t;
 

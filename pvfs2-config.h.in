@@ -55,6 +55,13 @@
 /* Define if system provides fgtxattr prototype */
 #undef HAVE_FGETXATTR_PROTOTYPE
 
+/* Define if struct inode_operations in kernel has fill_handle callback */
+#undef HAVE_FILL_HANDLE_INODE_OPERATIONS
+
+/* Define if struct super_operations in kernel has find_inode_handle callback
+   */
+#undef HAVE_FIND_INODE_HANDLE_SUPER_OPERATIONS
+
 /* Define to 1 if you have the <fstab.h> header file. */
 #undef HAVE_FSTAB_H
 
@@ -72,6 +79,9 @@
 
 /* Define to 1 if you have the `getmntent' function. */
 #undef HAVE_GETMNTENT
+
+/* Define if struct super_operations in kernel has get_fs_key callback */
+#undef HAVE_GET_FS_KEY_SUPER_OPERATIONS
 
 /* Define if IB wrap_common.h exists. */
 #undef HAVE_IB_WRAP_COMMON_H
@@ -151,6 +161,9 @@
 
 /* Define if kernel setxattr has const void* argument */
 #undef HAVE_SETXATTR_CONST_ARG
+
+/* Define if struct super_operations in kernel has statfs_lite callback */
+#undef HAVE_STATFS_LITE_SUPER_OPERATIONS
 
 /* Define to 1 if you have the <stdarg.h> header file. */
 #undef HAVE_STDARG_H
@@ -259,6 +272,9 @@
 
 /* Define if mtrace memory leak detection was enabled */
 #undef WITH_MTRACE
+
+/* Define if openssl exists */
+#undef WITH_OPENSSL
 
 /* Define to 1 if your processor stores words with the most significant byte
    first (like Motorola and SPARC, unlike Intel and VAX). */

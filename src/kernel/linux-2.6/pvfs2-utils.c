@@ -4,6 +4,7 @@
  * See COPYING in top-level directory.
  */
 
+#define  __PINT_PROTO_ENCODE_OPAQUE_HANDLE
 #include "pvfs2-kernel.h"
 #include "pvfs2-types.h"
 #include "pint-dev-shared.h"
@@ -11,10 +12,11 @@
 #include "pvfs2-bufmap.h"
 #include "pvfs2-internal.h"
 
-extern kmem_cache_t *pvfs2_inode_cache;
 extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
 extern wait_queue_head_t pvfs2_request_list_waitq;
+extern struct address_space_operations pvfs2_address_operations;
+extern struct backing_dev_info pvfs2_backing_dev_info;
 
 extern struct inode_operations pvfs2_file_inode_operations;
 extern struct file_operations pvfs2_file_operations;
@@ -23,7 +25,6 @@ extern struct inode_operations pvfs2_dir_inode_operations;
 extern struct file_operations pvfs2_dir_operations;
 extern struct dentry_operations pvfs2_dentry_operations;
 extern int debug;
-
 
 int pvfs2_gen_credentials(
     PVFS_credentials *credentials)
@@ -337,6 +338,9 @@ int pvfs2_inode_getattr(struct inode *inode, uint32_t getattr_mask)
     int ret = -EINVAL;
     pvfs2_kernel_op_t *new_op = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
+    struct timeval begin, end;
+
+    do_gettimeofday(&begin);
 
     pvfs2_print("pvfs2_inode_getattr: called on inode %llu\n",
                 llu(pvfs2_ino_to_handle(inode->i_ino)));
@@ -417,6 +421,8 @@ int pvfs2_inode_getattr(struct inode *inode, uint32_t getattr_mask)
 
         op_release(new_op);
     }
+    do_gettimeofday(&end);
+    printk(KERN_DEBUG "pvfs2_inode_getattr: took %d usecs\n", diff(&end, &begin));
     return ret;
 }
 
@@ -1244,6 +1250,353 @@ int pvfs2_truncate_inode(
 
     return ret;
 }
+
+#ifdef HAVE_FIND_INODE_HANDLE_SUPER_OPERATIONS
+
+typedef enum {
+    HANDLE_CHECK_LENGTH = 1,
+    HANDLE_CHECK_MAGIC  = 2,
+    HANDLE_CHECK_FSID   = 4,
+} handle_check_t;
+
+/* Perform simple sanity checks on the obtained handle */
+static inline int perform_handle_checks(const struct file_handle *fhandle,
+        handle_check_t check, void *p)
+{
+    if (!fhandle)
+    {
+        return -EINVAL;
+    }
+    /* okay good. now check if magic_nr matches */
+    if (check & HANDLE_CHECK_LENGTH)
+    {
+        /* Make sure that handle length matches our opaque handle structure */
+        if (fhandle->fh_private_length != sizeof(pvfs2_opaque_handle_t))
+        {
+            pvfs2_print("perform_handle_checks: length mismatch (%d) "
+                    " instead of (%d)\n", fhandle->fh_private_length,
+                    sizeof(pvfs2_opaque_handle_t));
+            return 0;
+        }
+    }
+    if (check & HANDLE_CHECK_MAGIC)
+    {
+        u32 magic;
+
+        get_fh_field(&fhandle->fh_generic, magic, magic);
+
+        if (magic != PVFS2_SUPER_MAGIC)
+        {
+            pvfs2_print("perform_handle_checks: mismatched magic number "
+                    " (%x) instead of (%x)\n",
+                    magic, PVFS2_SUPER_MAGIC);
+            return 0;
+        }
+    }
+    if (check & HANDLE_CHECK_FSID)
+    {
+        pvfs2_sb_info_t *pvfs2_sbp = NULL;
+        struct super_block *sb = (struct super_block *) p;
+        u32 fsid;
+
+        if (!sb)
+            return 0;
+        pvfs2_sbp = PVFS2_SB(sb);
+
+        get_fh_field(&fhandle->fh_generic, fsid, fsid);
+
+        if (fsid != pvfs2_sbp->fs_id)
+        {
+            pvfs2_print("perform_handle_checks: FSID did not match "
+                    " (%d) instead of (%d)\n",
+                    fsid, pvfs2_sbp->fs_id);
+            return 0;
+        }
+        pvfs2_print("perform_handle_checks : fsid = %d\n", fsid);
+    }
+    return 1;
+}
+
+/*
+ * convert an opaque handle to a PVFS_sys_attr structure so that we could
+ * call copy_attributes_to_inode() to initialize the VFS inode structure.
+ */
+static void convert_opaque_handle_to_sys_attr(
+        PVFS_sys_attr *dst, pvfs2_opaque_handle_t *src)
+{
+    dst->owner = src->owner;
+    dst->group = src->group;
+    dst->perms = src->perms;
+    dst->atime = src->atime;
+    dst->mtime = src->mtime;
+    dst->ctime = src->ctime;
+    dst->size  = src->size;
+    dst->link_target = NULL;
+    dst->dfile_count = 0;
+    dst->dirent_count = 0;
+    dst->objtype = src->objtype;
+    dst->mask = src->mask;
+    return;
+}
+
+static inline void do_decode_opaque_handle(pvfs2_opaque_handle_t *h, char *src)
+{
+    char *ptr = src;
+    char **pptr = &ptr;
+
+    memset(h, 0, sizeof(pvfs2_opaque_handle_t));
+    /* Deserialize the buffer */
+    decode_pvfs2_opaque_handle_t(pptr, h);
+    return;
+}
+
+static int get_opaque_handle(struct super_block *sb,
+        const struct file_handle *fhandle,
+        pvfs2_opaque_handle_t *opaque_handle)
+{
+    struct timeval begin, end;
+
+    do_gettimeofday(&begin);
+    /* Make sure that we actually get a valid handle */
+    if (perform_handle_checks(fhandle,
+            HANDLE_CHECK_LENGTH | HANDLE_CHECK_MAGIC 
+            | HANDLE_CHECK_FSID, sb) == 0)
+    {
+        pvfs2_error("get_handle: got invalid handle buffer!? "
+                "Impossible happened\n");
+        return -EINVAL;
+    }
+    do_gettimeofday(&end);
+    printk(KERN_DEBUG "perform_handle_checks: took %d usecs\n", diff(&end, &begin));
+
+    do_gettimeofday(&begin);
+    do_decode_opaque_handle(opaque_handle, (char *) fhandle->fh_private);
+    do_gettimeofday(&end);
+    printk(KERN_DEBUG "do_decode_opaque_handle: took %d usecs\n", diff(&end, &begin));
+    /* make sure that fsid in private buffer also matches */
+    if (opaque_handle->fsid != PVFS2_SB(sb)->fs_id) {
+        pvfs2_error("get_handle: invalid fsid in private buffer "
+                " (%d) instead of (%d)\n",
+                opaque_handle->fsid, PVFS2_SB(sb)->fs_id);
+        return -EINVAL;
+    }
+    pvfs2_print("get_handle: decoded fsid %d handle %lu\n",
+            opaque_handle->fsid, (unsigned long) opaque_handle->handle);
+    return 0;
+}
+
+/*
+ * called by openfh() system call.
+ * Given a handle that ostensibly belongs to this PVFS2 superblock,
+ * we either find an inode
+ * in the icache already matching the given handle or we allocate 
+ * and place a new struct inode in the icache and fill it up based on
+ * the buffer that we obtained from user. Presumably enough checks
+ * at the upper-level (VFS) has been done to make sure that this is
+ * indeed a buffer filled upon a successful openg().
+ * Returns ERR_PTR(-errno) in case of error
+ *         valid pointer to struct inode in case it was a success
+ */
+struct inode *pvfs2_sb_find_inode_handle(struct super_block *sb,
+        const struct file_handle *fhandle)
+{
+    struct inode *inode = NULL;
+    unsigned long inode_number;
+    int err = 0;
+    pvfs2_opaque_handle_t opaque_handle;
+    PVFS_sys_attr attrs;
+    struct timeval t1, t2;
+    struct timeval begin, end;
+
+    do_gettimeofday(&t1);
+    do_gettimeofday(&begin);
+    /* Decode the buffer */
+    err = get_opaque_handle(sb, fhandle, &opaque_handle);
+    if (err)
+        return ERR_PTR(err);
+    do_gettimeofday(&end);
+    printk(KERN_DEBUG "get_opaque_handle: took %d usecs\n", diff(&end, &begin));
+
+    /* and convert the opaque handle structure to the PVFS_sys_attr structure */
+    convert_opaque_handle_to_sys_attr(&attrs, &opaque_handle);
+
+    /* FIXME:
+     * We ought to move to the iget5 model otherwise we are ending 
+     * up truncating handle 
+     */
+    inode_number = (unsigned long) opaque_handle.handle;
+    pvfs2_print("Obtained inode number %lu\n",
+            (unsigned long) inode_number);
+    /* 
+     * NOTE: Locate the inode number in the icache if possible.
+     * If not allocate a new inode that is returned locked and
+     * hashed. Since, we don't issue a getattr/read_inode() callback
+     * the pvfs2 specific inode is almost guaranteed to be
+     * uninitialized or invalid. Therefore, we need to
+     * fill it up based on the information in opaque_handle!
+     * Consequently, this approach should scale well since openfh()
+     * does not require any network messages.
+     */
+    do_gettimeofday(&begin);
+    inode = iget_locked(sb, inode_number);
+    do_gettimeofday(&end);
+    printk(KERN_DEBUG "iget_locked: took %d usecs\n", diff(&end, &begin));
+
+    if (!inode) {
+        pvfs2_error("Could not allocate inode\n");
+        return ERR_PTR(-ENOMEM);
+    }
+    else {
+        if (is_bad_inode(inode)) {
+            iput(inode);
+            pvfs2_error("bad inode obtained from iget_locked\n");
+            return ERR_PTR(-EINVAL);
+        }
+        do_gettimeofday(&begin);
+        /* Initialize and/or verify struct inode as well as pvfs2_inode */
+        if ((err = copy_attributes_to_inode(inode, &attrs, NULL)) < 0) {
+            pvfs2_error("copy_attributes_to_inode failed with err %d\n", err);
+            iput(inode);
+            return ERR_PTR(err);
+        }
+        do_gettimeofday(&end);
+        printk(KERN_DEBUG "copy_attributes_to_inode: took %d usecs\n", diff(&end, &begin));
+
+        do_gettimeofday(&begin);
+        /* this inode was allocated afresh */
+        if (inode->i_state & I_NEW) {
+            pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
+
+            pvfs2_inode_initialize(pvfs2_inode);
+            pvfs2_inode->refn.handle = opaque_handle.handle;
+            pvfs2_inode->refn.fs_id  = opaque_handle.fsid;
+            inode->i_mapping->host   = inode;
+            inode->i_rdev            = 0;
+            inode->i_bdev            = NULL;
+            inode->i_cdev            = NULL;
+            inode->i_mapping->a_ops  = &pvfs2_address_operations;
+#ifndef PVFS2_LINUX_KERNEL_2_4
+            inode->i_mapping->backing_dev_info = &pvfs2_backing_dev_info;
+#endif
+            /* Make sure that we unlock the inode */
+            unlock_new_inode(inode);
+        }
+        do_gettimeofday(&end);
+        printk(KERN_DEBUG "fill_inode (misc.): took %d usecs\n", diff(&end, &begin));
+        do_gettimeofday(&t2);
+        printk(KERN_DEBUG "find_inode_handle: took %d usecs\n", diff(&t2, &t1));
+        return inode;
+    }
+}
+
+#endif
+
+#ifdef HAVE_FILL_HANDLE_INODE_OPERATIONS
+
+/*
+ * dst would be encoded 
+ */
+static int do_encode_opaque_handle(char *dst, struct inode *inode)
+{
+    char *ptr = dst;
+    char **pptr = &ptr;
+    pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
+    pvfs2_opaque_handle_t h;
+
+    /* only metafile allowed */
+    if (!S_ISREG(inode->i_mode)) 
+        return -EINVAL;
+    memset(&h, 0, sizeof(h));
+    h.handle = pvfs2_inode->refn.handle;
+    h.fsid   = pvfs2_inode->refn.fs_id;
+    h.owner  = inode->i_uid;
+    h.group  = inode->i_gid;
+    h.perms  = PVFS2_translate_mode(inode->i_mode);
+    h.mask   |= PVFS_ATTR_SYS_PERM;
+    h.atime  = pvfs2_convert_time_field(&inode->i_atime);
+    h.mtime  = pvfs2_convert_time_field(&inode->i_mtime);
+    h.ctime  = pvfs2_convert_time_field(&inode->i_ctime);
+    h.size   = i_size_read(inode);
+    h.mask   |= PVFS_ATTR_SYS_SIZE;
+    h.objtype = PVFS_TYPE_METAFILE;
+    /* Serialize into the buffer */
+    pvfs2_print("encoded fsid %d handle %lu\n",
+            h.fsid, (unsigned long) h.handle);
+    encode_pvfs2_opaque_handle_t(pptr, &h);
+    return 0;
+}
+
+static void *pvfs2_fh_ctor(void)
+{
+    void *buf;
+
+    buf = kmalloc(sizeof(pvfs2_opaque_handle_t), PVFS2_BUFMAP_GFP_FLAGS);
+    return buf;
+}
+
+static void pvfs2_fh_dtor(void *buf)
+{
+    if (buf)
+        kfree(buf);
+    return;
+}
+
+/*
+ * This routine is called by openg() system call.
+ * Given an inode (which has been looked up previously),
+ * we fill in the attributes of the inode in an opaque buffer
+ * and hand it back to user. 
+ * Note: We need to make it a fixed
+ * endian ordering so that it would work on all homogenous platforms.
+ * Hence the need to encode the handle buffer.
+ */
+int pvfs2_fill_handle(struct inode *inode, struct file_handle *fhandle) 
+{
+    size_t pvfs2_opaque_handle_size = sizeof(pvfs2_opaque_handle_t);
+    struct timeval begin, end;
+
+    if (!inode || !fhandle)
+    {
+        return -EINVAL;
+    }
+    /* querying the size of PVFS2 specific opaque handle buffer */
+    if (fhandle->fh_private_length == 0)
+    {
+        fhandle->fh_private_length = pvfs2_opaque_handle_size;
+        return 0;
+    }
+    else if (fhandle->fh_private_length < pvfs2_opaque_handle_size)
+    {
+        return -ERANGE; /* too small a buffer length */
+    }
+    else
+    {
+        fhandle->fh_private = pvfs2_fh_ctor();
+        if (fhandle->fh_private == NULL)
+        {
+            return -ENOMEM;
+        }
+        do_gettimeofday(&begin);
+        /* encode the opaque handle information */
+        if (do_encode_opaque_handle((char *) fhandle->fh_private, inode) < 0)
+        {
+            pvfs2_fh_dtor(fhandle->fh_private);
+            fhandle->fh_private = NULL;
+            return -EINVAL;
+        }
+        /* Set a destructor function for the fh_private */
+        fhandle->fh_private_dtor = pvfs2_fh_dtor;
+        /* and the length */
+        fhandle->fh_private_length = pvfs2_opaque_handle_size;
+        pvfs2_print("Returning handle length %d\n",
+                pvfs2_opaque_handle_size);
+        do_gettimeofday(&end);
+        pvfs2_print("fill_handle: encode took %d usecs\n", diff(&end, &begin));
+        return 0;
+    }
+}
+
+#endif /* HAVE_FILL_HANDLE_INODE_OPERATIONS */
 
 #ifdef USE_MMAP_RA_CACHE
 int pvfs2_flush_mmap_racache(struct inode *inode)

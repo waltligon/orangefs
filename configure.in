@@ -106,6 +106,10 @@ fi],
     NEED_BERKELEY_DB=yes)
 AC_SUBST(BUILD_SERVER)
 
+AC_ARG_WITH(openssl,
+	    [  --with-openssl=<dir>  Location of installed openssl package (default=/usr)],
+	    [AX_OPENSSL(${withval})])
+
 dnl a mechanism to turn off perf counters
 AC_ARG_ENABLE(perf-counters,
 [  --disable-perf-counters Disables pvfs2-server performance counters],

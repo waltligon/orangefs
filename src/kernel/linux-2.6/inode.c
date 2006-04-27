@@ -411,6 +411,9 @@ struct inode_operations pvfs2_file_inode_operations =
 #if defined(HAVE_GENERIC_GETXATTR) && defined(CONFIG_FS_POSIX_ACL)
     .permission = pvfs2_permission,
 #endif
+#ifdef HAVE_FILL_HANDLE_INODE_OPERATIONS
+    .fill_handle = pvfs2_fill_handle,
+#endif
 #endif
 };
 

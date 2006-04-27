@@ -1239,6 +1239,53 @@ static PVFS_error post_statfs_request(vfs_request_t *vfs_request)
     return ret;
 }
 
+static PVFS_error service_fs_key_request(vfs_request_t *vfs_request)
+{
+    PVFS_error ret = 0;
+    int  key_len;
+    char *key;
+    struct server_configuration_s *sconfig;
+
+    gossip_debug(
+            GOSSIP_CLIENTCORE_DEBUG,
+            "service_fs_key_request called for fsid %d\n",
+            vfs_request->in_upcall.req.fs_key.fsid);
+    /* get a pointer to the server configuration */
+    sconfig = PINT_get_server_config_struct(
+            vfs_request->in_upcall.req.fs_key.fsid);
+    if (sconfig == NULL)
+    {
+        gossip_err("PINT_get_server_config_struct failed:\n");
+        ret = -PVFS_ENOENT;
+        goto out;
+    }
+    /* get a secure shared key for this file system */
+    PINT_config_get_fs_key(
+            sconfig,
+            vfs_request->in_upcall.req.fs_key.fsid, 
+            &key, &key_len);
+    /* drop reference to the server configuration */
+    PINT_put_server_config_struct(sconfig);
+
+    if (key_len < 0 || key == NULL)
+    {
+        gossip_err("PINT_config_get_fs_key failed:\n");
+        ret = -PVFS_EINVAL;
+        goto out;
+    }
+    /* Copy the key length of the FS */
+    vfs_request->out_downcall.resp.fs_key.fs_keylen = 
+        key_len > FS_KEY_BUF_SIZE ? FS_KEY_BUF_SIZE : key_len;
+    /* Copy the secret key of the FS */
+    memcpy(vfs_request->out_downcall.resp.fs_key.fs_key, key,
+            vfs_request->out_downcall.resp.fs_key.fs_keylen); 
+out:
+    vfs_request->out_downcall.status = ret;
+    vfs_request->out_downcall.type = vfs_request->in_upcall.type;
+    write_inlined_device_response(vfs_request);
+    return 0;
+}
+
 #ifdef USE_MMAP_RA_CACHE
 static PVFS_error post_io_readahead_request(vfs_request_t *vfs_request)
 {
@@ -2281,6 +2328,9 @@ static inline PVFS_error handle_unexp_vfs_request(
         case PVFS2_VFS_OP_PARAM:
             ret = service_param_request(vfs_request);
             break;
+        case PVFS2_VFS_OP_FSKEY:
+            ret = service_fs_key_request(vfs_request);
+            break;
             /*
               if the mmap-readahead-cache is enabled and we
               get a cache hit for data, the io call is
@@ -3001,6 +3051,8 @@ static char *get_vfs_op_name_str(int op_type)
         { PVFS2_VFS_OP_CANCEL, "PVFS2_VFS_OP_CANCEL" },
         { PVFS2_VFS_OP_FSYNC,  "PVFS2_VFS_OP_FSYNC" },
         { PVFS2_VFS_OP_PARAM,  "PVFS2_VFS_OP_PARAM" },
+        { PVFS2_VFS_OP_PERF_COUNT, "PVFS2_VFS_OP_PERF_COUNT" },
+        { PVFS2_VFS_OP_FSKEY,  "PVFS2_VFS_OP_FSKEY" },
         { 0, "UNKNOWN" }
     };
 

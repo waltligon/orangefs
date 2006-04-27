@@ -157,6 +157,18 @@ typedef struct
     char buffer[PERF_COUNT_BUF_SIZE];
 } pvfs2_perf_count_response_t;
 
+#define FS_KEY_BUF_SIZE 4096
+typedef struct
+{
+    /* NOTE: 
+    *  See note above on why having such a large buffer size for key is not
+    *  going to affect overall size of the downcall.
+     */
+    int32_t fs_keylen;
+    int32_t __pad1;
+    char    fs_key[FS_KEY_BUF_SIZE];
+} pvfs2_fs_key_response_t;
+
 typedef struct
 {
     int32_t type;
@@ -186,6 +198,7 @@ typedef struct
 /* 	pvfs2_fsync_response_t fsync; */
         pvfs2_param_response_t param;
         pvfs2_perf_count_response_t perf_count;
+        pvfs2_fs_key_response_t fs_key;
     } resp;
 } pvfs2_downcall_t;
 

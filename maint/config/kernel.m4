@@ -95,6 +95,62 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		)
 	fi
 
+	dnl checking if we have a find_inode_handle callback in super_operations 
+	AC_MSG_CHECKING(for find_inode_handle callback in struct super_operations in kernel)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		static struct super_operations sop = {
+		    .find_inode_handle = NULL,
+		};
+	], [],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_FIND_INODE_HANDLE_SUPER_OPERATIONS, 1, Define if struct super_operations in kernel has find_inode_handle callback),
+		AC_MSG_RESULT(no)
+	)
+
+	dnl checking if we have a statfs_lite callback in super_operations 
+	AC_MSG_CHECKING(for statfs_lite callback in struct super_operations in kernel)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		static struct super_operations sop = {
+		    .statfs_lite = NULL,
+		};
+	], [],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_STATFS_LITE_SUPER_OPERATIONS, 1, Define if struct super_operations in kernel has statfs_lite callback),
+		AC_MSG_RESULT(no)
+	)
+
+	dnl checking if we have a fill_handle callback in inode_operations 
+	AC_MSG_CHECKING(for fill_handle callback in struct inode_operations in kernel)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		static struct inode_operations iop = {
+		    .fill_handle = NULL,
+		};
+	], [],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_FILL_HANDLE_INODE_OPERATIONS, 1, Define if struct inode_operations in kernel has fill_handle callback),
+		AC_MSG_RESULT(no)
+	)
+
+	dnl checking if we have a get_fs_key callback in super_operations 
+	AC_MSG_CHECKING(for get_fs_key callback in struct super_operations in kernel)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		static struct super_operations sop = {
+		    .get_fs_key = NULL,
+		};
+	], [],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_GET_FS_KEY_SUPER_OPERATIONS, 1, Define if struct super_operations in kernel has get_fs_key callback),
+		AC_MSG_RESULT(no)
+	)
+
 	AC_MSG_CHECKING(for aio support in kernel)
 	dnl if this test passes, the kernel has it
 	dnl if this test fails, the kernel does not have it
@@ -288,7 +344,7 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 
 	AC_MSG_CHECKING(for second arg type int in address_space_operations releasepage)
 	tmp_cflags=$CFLAGS
-	CFLAGS="$CFLAGS"
+	CFLAGS="$CFLAGS -Werror"
 	AC_TRY_COMPILE([
 	    #define __KERNEL__
 	    #include <linux/fs.h>
@@ -306,7 +362,7 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 
 	AC_MSG_CHECKING(for int return in inode_operations follow_link)
 	tmp_cflags=$CFLAGS
-	CFLAGS="$CFLAGS"
+	CFLAGS="$CFLAGS -Werror"
 	AC_TRY_COMPILE([
 	    #define __KERNEL__
 	    #include <linux/fs.h>
