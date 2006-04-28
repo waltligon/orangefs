@@ -154,7 +154,6 @@ struct dbpf_storage
     char *name;
     DB *sto_attr_db;
     DB *coll_db;
-    DB_ENV *sto_env;
 };
 
 struct dbpf_collection

@@ -19,7 +19,7 @@ DECLARE_ERRNO_MAPPING_AND_FN();
 
 /*
   the pvfs analog to strerror_r that handles PVFS_error codes as well
-  as errno error codes
+  as errno error codes 
 */
 int PVFS_strerror_r(int errnum, char *buf, int n)
 {
