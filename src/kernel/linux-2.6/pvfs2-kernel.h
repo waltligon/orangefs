@@ -927,8 +927,13 @@ do { inode->i_mtime = inode->i_ctime = CURRENT_TIME; } while(0)
 #define get_block_block_type long
 #define pvfs2_lock_inode(inode) do {} while(0)
 #define pvfs2_unlock_inode(inode) do {} while(0)
-#define pvfs2_d_splice_alias(dentry, inode) d_add(dentry, inode)
 #define pvfs2_kernel_readpage block_read_full_page
+
+static inline struct dentry *pvfs2_d_splice_alias(struct dentry *dentry, struct inode *inode)
+{ 
+    d_add(dentry, inode); 
+    return dentry;
+}
 
 /*
   redhat 9 2.4.x kernels have to be treated almost like 2.6.x kernels
@@ -975,10 +980,14 @@ do                                                \
 #define pvfs2_current_signal_lock current->sighand->siglock
 #define pvfs2_current_sigaction current->sighand->action
 #define pvfs2_recalc_sigpending recalc_sigpending
-#define pvfs2_d_splice_alias(dentry, inode) d_splice_alias(inode, dentry)
 #define pvfs2_kernel_readpage mpage_readpage
 #define pvfs2_set_page_reserved(page) do {} while(0)
 #define pvfs2_clear_page_reserved(page) do {} while(0)
+
+static inline struct dentry* pvfs2_d_splice_alias(struct dentry *dentry, struct inode *inode)
+{
+    return d_splice_alias(inode, dentry);
+}
 
 #define fill_default_sys_attrs(sys_attr,type,mode)\
 do                                                \

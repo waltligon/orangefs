@@ -165,6 +165,7 @@ struct dentry *pvfs2_lookup(
                          new_op->downcall.resp.lookup.refn.handle));
 	if (inode && !is_bad_inode(inode))
 	{
+            struct dentry *res;
 	    found_pvfs2_inode = PVFS2_I(inode);
 
 	    /* store the retrieved handle and fs_id */
@@ -173,10 +174,17 @@ struct dentry *pvfs2_lookup(
 	    /* update dentry/inode pair into dcache */
 	    dentry->d_op = &pvfs2_dentry_operations;
 
-            pvfs2_d_splice_alias(dentry, inode);
+            pvfs2_print("calling pvfs2_d_splice_alias\n");
+            res = pvfs2_d_splice_alias(dentry, inode);
 
             pvfs2_print("Lookup success (inode ct = %d)\n",
                         (int)atomic_read(&inode->i_count));
+            op_release(new_op);
+            do_gettimeofday(&end);
+            printk(KERN_DEBUG "pvfs2_lookup: took %d usecs\n", diff(&end, &begin));
+            if (res) 
+                res->d_op = &pvfs2_dentry_operations;
+            return res;
 	}
         else if (inode && is_bad_inode(inode))
         {
