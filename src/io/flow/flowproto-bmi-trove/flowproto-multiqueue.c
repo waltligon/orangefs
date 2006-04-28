@@ -475,6 +475,12 @@ int fp_multiqueue_cancel(flow_descriptor  *flow_d)
                      lld(flow_d->total_transferred));
         assert(flow_d->state == FLOW_TRANSMITTING);
         handle_io_error(-PVFS_ECANCEL, NULL, flow_data);
+        if(flow_data->parent->state == FLOW_COMPLETE)
+        {
+            gen_mutex_unlock(flow_data->parent->flow_mutex);
+            FLOW_CLEANUP(flow_data);
+            return(0);
+        }
     }
     else
     {

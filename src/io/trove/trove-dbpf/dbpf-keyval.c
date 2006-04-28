@@ -847,7 +847,6 @@ static int dbpf_keyval_read_list(TROVE_coll_id coll_id,
 static int dbpf_keyval_read_list_op_svc(struct dbpf_op *op_p)
 {
     int ret = -TROVE_EINVAL, i = 0;
-    int key_sz;
     struct dbpf_keyval_db_entry key_entry;
     DBT key, data;
 
