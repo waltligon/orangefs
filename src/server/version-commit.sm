@@ -1,0 +1,157 @@
+
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+#include <stdio.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/time.h>
+#include <assert.h>
+
+#include "pvfs2-server.h"
+#include "job-time-mgr.h"
+#include "server-config.h"
+
+static int version_commit_schedule(PINT_server_op * s_op, job_status_s * js_p);
+static int version_commit_commit(PINT_server_op *s_op, job_status_s* js_p);
+static int version_commit_release(PINT_server_op * s_op, job_status_s * js_p);
+static int version_commit_cleanup(PINT_server_op * s_op, job_status_s * js_p);
+
+%%
+
+machine pvfs2_version_commit(
+    schedule,
+    commit,
+    release,
+    cleanup)
+{
+    state schedule
+    {
+        run version_commit_schedule;
+        success => commit;
+        default => cleanup;
+    }
+
+    state commit
+    {
+        run version_commit_commit;
+        default => release;
+    }
+
+    state release
+    {
+        run version_commit_release;
+        default => cleanup;
+    }
+
+    state cleanup
+    {
+        run version_commit_cleanup;
+        default => terminate;
+    }
+}
+
+%%
+
+static int version_commit_schedule(PINT_server_op * s_op, job_status_s * js_p)
+{
+    int ret;
+    ret = job_req_sched_post(s_op->req, 0, s_op, 0, js_p,
+                             &(s_op->scheduled_id), server_job_context);
+
+    return ret;
+}
+
+static int version_commit_commit(PINT_server_op * s_op, job_status_s * js_p)
+{
+    int ret;
+    job_id_t tmp_id;
+    PINT_llist * fs_list;
+    filesystem_configuration_s * fs = NULL;
+
+    fs_list = PINT_config_get_filesystems(get_server_config_struct());
+    while(fs_list)
+    {
+        fs = PINT_llist_head(fs_list);
+        if(fs->coll_id == s_op->req->u.version_commit.fs_id)
+        {
+            break;
+        }
+    }
+
+    assert(fs);
+
+    ret = job_trove_bstream_write_list(
+        s_op->req->u.version_commit.fs_id,
+        s_op->req->u.version_commit.handle,
+        (char **)&s_op->u.version_commit.buffer,
+        (TROVE_size *)&s_op->u.version_commit.size,
+        1,
+        s_op->u.version_commit.stream_offsets,
+        s_op->u.version_commit.stream_sizes,
+        s_op->u.version_commit.stream_count,
+        &s_op->u.version_commit.result_size,
+        (fs->trove_sync_data ? TROVE_SYNC : 0),
+        NULL,
+        s_op,
+        0,
+        js_p,
+        &tmp_id,
+        server_job_context);
+    if(ret < 0)
+    {
+        gossip_lerr("version_commit: Failed to post trove bstream write\n");
+        js_p->error_code = ret;
+        return 1;
+    }
+
+    js_p->error_code = 0;
+    return ret;
+}
+
+static int version_commit_release(PINT_server_op * s_op, job_status_s * js_p)
+{
+    int ret;
+    job_id_t tmp_id;
+    ret = job_req_sched_release(
+        s_op->scheduled_id, s_op, 0, js_p, &tmp_id, server_job_context);
+   
+    return ret;
+}
+
+static int version_commit_cleanup(PINT_server_op * s_op, job_status_s * js_p)
+{
+
+    if(s_op->u.version_commit.stream_offsets)
+    {
+        free(s_op->u.version_commit.stream_offsets);
+    }
+
+    if(s_op->u.version_commit.stream_sizes)
+    {
+        free(s_op->u.version_commit.stream_sizes);
+    }
+
+    if(s_op->u.version_commit.buffer)
+    {
+        free(s_op->u.version_commit.buffer);
+    }
+
+    return(server_state_machine_complete(s_op));
+}
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */
+

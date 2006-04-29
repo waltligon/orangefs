@@ -153,7 +153,7 @@ enum
     METAFILE_HANDLES_KEY = 2,
     METAFILE_DIST_KEY    = 3,
     SYMLINK_TARGET_KEY   = 4,
-    DIRDATA_SIZE_KEY     = 5
+    KEYVAL_ARRAY_SIZE    = 5
 };
 
 typedef enum
@@ -207,7 +207,6 @@ struct PINT_server_readdir_op
     uint64_t directory_version;
     PVFS_handle dirent_handle;  /* holds handle of dirdata dspace from
                                    which entries are read */
-    PVFS_size dirdata_size;
 };
 
 struct PINT_server_crdirent_op
@@ -218,7 +217,6 @@ struct PINT_server_crdirent_op
     PVFS_fs_id fs_id;
     PVFS_handle dirent_handle;  /* holds handle of dirdata dspace that
                                  * we'll write the dirent into */
-    PVFS_size dirent_count;
     int dir_attr_update_required;
 };
 
@@ -227,7 +225,6 @@ struct PINT_server_rmdirent_op
     PVFS_handle dirdata_handle;
     PVFS_handle entry_handle; /* holds handle of dirdata object,
                                * removed entry */
-    PVFS_size dirent_count;
     int dir_attr_update_required;
 };
 
@@ -246,12 +243,7 @@ struct PINT_server_remove_op
     PVFS_handle dirdata_handle;   /* holds dirdata dspace handle in
                                    * the event that we are removing a
                                    * directory */
-    PVFS_size dirent_count;
-    PVFS_ds_keyval * key_array;
-    PVFS_ds_position pos;
-    int key_count;
-    int index;
-    int remove_keyvals_state;
+    PVFS_ds_attributes dirdata_ds_attr;
 };
 
 struct PINT_server_mgmt_remove_dirent_op
@@ -281,7 +273,6 @@ struct PINT_server_small_io_op
 {
     PVFS_offset offsets[SMALL_IO_MAX_REGIONS];
     PVFS_size sizes[SMALL_IO_MAX_REGIONS];
-    PVFS_size result_bytes;
 };
 
 struct PINT_server_flush_op
@@ -301,13 +292,12 @@ struct PINT_server_mkdir_op
     PVFS_fs_id fs_id;
     PVFS_handle_extent_array handle_extent_array;
     PVFS_handle dirent_handle;
-    PVFS_size init_dirdata_size;
 };
 
 struct PINT_server_getattr_op
 {
     PVFS_handle handle;
-    PVFS_size dirent_count;
+    PVFS_handle dirdata_handle;
     PVFS_fs_id fs_id;
     PVFS_ds_attributes dirdata_ds_attr;
     uint32_t attrmask;
@@ -318,6 +308,17 @@ struct PINT_server_eattr_op
 {
     void *buffer;
 };
+
+struct PINT_server_version_commit_op
+{
+    char * buffer;
+    TROVE_size size;
+    TROVE_offset * stream_offsets;
+    TROVE_size * stream_sizes;
+    int stream_count;
+    TROVE_size result_size;
+};
+
     
 /* This structure is passed into the void *ptr 
  * within the job interface.  Used to tell us where
@@ -340,8 +341,6 @@ typedef struct PINT_server_op
     PVFS_ds_keyval key, val; 
     PVFS_ds_keyval *key_a;
     PVFS_ds_keyval *val_a;
-
-    int free_val;
 
     /* attributes structure associated with target of operation; may be 
      * partially filled in by prelude nested state machine (for 
@@ -393,6 +392,7 @@ typedef struct PINT_server_op
 	struct PINT_server_mkdir_op mkdir;
         struct PINT_server_mgmt_remove_dirent_op mgmt_remove_dirent;
         struct PINT_server_mgmt_get_dirdata_op mgmt_get_dirdata_handle;
+        struct PINT_server_version_commit_op version_commit;
     } u;
 
 } PINT_server_op;
@@ -483,6 +483,8 @@ extern struct PINT_state_machine_s pvfs2_set_eattr_list_sm;
 extern struct PINT_state_machine_s pvfs2_del_eattr_sm;
 extern struct PINT_state_machine_s pvfs2_list_eattr_sm;
 extern struct PINT_state_machine_s pvfs2_list_eattr_list_sm;
+extern struct PINT_state_machine_s pvfs2_commit_timer_sm;
+extern struct PINT_state_machine_s pvfs2_version_commit_sm;
 
 /* nested state machines */
 extern struct PINT_state_machine_s pvfs2_get_attr_work_sm;

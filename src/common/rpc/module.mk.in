@@ -1,0 +1,4 @@
+DIR := src/common/rpc
+LIBSRC += $(DIR)/rpcutils.c 
+DLMSRC += $(DIR)/rpcutils.c
+VECSRC += $(DIR)/rpcutils.c

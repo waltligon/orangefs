@@ -20,6 +20,10 @@
 #ifndef __PVFS_SYSINT_H
 #define __PVFS_SYSINT_H
 
+#ifndef __KERNEL__
+#include <limits.h>
+#endif
+
 #include "pvfs2-types.h"
 #include "pvfs2-request.h"
 
@@ -31,13 +35,13 @@ struct PVFS_sys_attr_s
 {
     PVFS_uid owner;
     PVFS_gid group;
-    PVFS2_ALIGN_VAR(PVFS_permissions, perms);
+    PVFS_permissions perms;
     PVFS_time atime;
     PVFS_time mtime;
     PVFS_time ctime;
     PVFS_size size;
-    PVFS2_ALIGN_VAR(char *, link_target); /* NOTE: caller must free this */
-    PVFS2_ALIGN_VAR(int32_t, dfile_count); /* Changed to int32_t so that size of structure does not change */
+    char *link_target; /* NOTE: caller must free if valid */
+    int dfile_count;
     PVFS_size dirent_count;
     PVFS_ds_type objtype;
     uint32_t mask;
@@ -48,7 +52,7 @@ typedef struct PVFS_sys_attr_s PVFS_sys_attr;
 struct PVFS_sys_mntent
 {
     char **pvfs_config_servers;	/* addresses of servers with config info */
-    int32_t num_pvfs_config_servers; /* changed to int32_t so that size of structure does not change */
+    int num_pvfs_config_servers;
     char *the_pvfs_config_server; /* first of the entries above that works */
     char *pvfs_fs_name;		/* name of PVFS2 file system */
     enum PVFS_flowproto_type flowproto;	/* flow protocol */
@@ -57,7 +61,7 @@ struct PVFS_sys_mntent
     PVFS_fs_id fs_id;
 
     /* Default number of dfiles mount option value */
-    int32_t default_num_dfiles; /* int32_t for portable, fixed size structure */
+    int default_num_dfiles;
 
     /* the following fields are included for convenience;
      * useful if the file system is "mounted" */
@@ -128,6 +132,13 @@ struct PVFS_sysresp_readlink_s
 };
 typedef struct PVFS_sysresp_readlink_s PVFS_sysresp_readlink;
 
+/* list different implementation techniques for synchronized I/O */
+enum PVFS_synch_method {
+    PVFS_SYNCH_NONE   = 0,
+    PVFS_SYNCH_DLM    = 1,
+    PVFS_SYNCH_VECTOR = 2,
+};
+
 /** Holds results of an I/O operation (total number of bytes read/written). */
 struct PVFS_sysresp_io_s
 {
@@ -142,7 +153,7 @@ struct PVFS_sysresp_readdir_s
 {
     PVFS_ds_position token;
     uint64_t directory_version;
-    int32_t pvfs_dirent_outcount; /* int32_t for portable, fixed size structure */
+    int pvfs_dirent_outcount;
     PVFS_dirent *dirent_array;
 };
 typedef struct PVFS_sysresp_readdir_s PVFS_sysresp_readdir;
@@ -153,7 +164,7 @@ typedef struct PVFS_sysresp_readdir_s PVFS_sysresp_readdir;
 struct PVFS_sysresp_statfs_s
 {
     PVFS_statfs statfs_buf;
-    int32_t server_count; /* int32_t for portable, fixed size structure */
+    int server_count;
 };
 typedef struct PVFS_sysresp_statfs_s PVFS_sysresp_statfs;
 
@@ -195,10 +206,6 @@ int PVFS_sys_initialize(
     uint64_t default_debug_mask);
 int PVFS_sys_fs_add(
     struct PVFS_sys_mntent* mntent);
-int PVFS_isys_fs_add(
-    struct PVFS_sys_mntent* mntent,
-    PVFS_sys_op_id *op_id,
-    void *user_ptr);
 int PVFS_sys_fs_remove(
     struct PVFS_sys_mntent* mntent);
 int PVFS_sys_finalize(
@@ -227,7 +234,7 @@ PVFS_error PVFS_isys_ref_lookup(
     PVFS_object_ref parent_ref,
     PVFS_credentials *credentials,
     PVFS_sysresp_lookup * resp,
-    int32_t follow_link,
+    int follow_link,
     PVFS_sys_op_id *op_id,
     void *user_ptr);
 
@@ -237,14 +244,14 @@ PVFS_error PVFS_sys_ref_lookup(
     PVFS_object_ref parent_ref,
     PVFS_credentials *credentials,
     PVFS_sysresp_lookup * resp,
-    int32_t follow_link);
+    int follow_link);
 
 PVFS_error PVFS_sys_lookup(
     PVFS_fs_id fs_id,
     char *name,
     PVFS_credentials *credentials,
     PVFS_sysresp_lookup * resp,
-    int32_t follow_link);
+    int follow_link);
 
 PVFS_error PVFS_isys_getattr(
     PVFS_object_ref ref,
@@ -291,7 +298,7 @@ PVFS_error PVFS_sys_mkdir(
 PVFS_error PVFS_isys_readdir(
     PVFS_object_ref ref,
     PVFS_ds_position token,
-    int32_t pvfs_dirent_incount,
+    int pvfs_dirent_incount,
     PVFS_credentials *credentials,
     PVFS_sysresp_readdir *resp,
     PVFS_sys_op_id *op_id,
@@ -300,7 +307,7 @@ PVFS_error PVFS_isys_readdir(
 PVFS_error PVFS_sys_readdir(
     PVFS_object_ref ref,
     PVFS_ds_position token,
-    int32_t pvfs_dirent_incount,
+    int pvfs_dirent_incount,
     PVFS_credentials *credentials,
     PVFS_sysresp_readdir *resp);
 
@@ -377,6 +384,7 @@ PVFS_error PVFS_isys_io(
     PVFS_credentials *credentials,
     PVFS_sysresp_io *resp,
     enum PVFS_io_type type,
+    enum PVFS_synch_method synch_method,
     PVFS_sys_op_id *op_id,
     void *user_ptr);
 
@@ -388,13 +396,14 @@ PVFS_error PVFS_sys_io(
     PVFS_Request mem_req,
     PVFS_credentials *credentials,
     PVFS_sysresp_io *resp,
-    enum PVFS_io_type type);
+    enum PVFS_io_type type,
+    enum PVFS_synch_method synch_method);
 
 #define PVFS_sys_read(x1,x2,x3,x4,x5,x6,y) \
-PVFS_sys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_READ)
+PVFS_sys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_READ,PVFS_SYNCH_NONE)
 
 #define PVFS_sys_write(x1,x2,x3,x4,x5,x6,y) \
-PVFS_sys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_WRITE)
+PVFS_sys_io(x1,x2,x3,x4,x5,x6,y,PVFS_IO_WRITE,PVFS_SYNCH_NONE)
 
 PVFS_error PVFS_isys_truncate(
     PVFS_object_ref ref,
@@ -423,13 +432,6 @@ PVFS_error PVFS_isys_flush(
 PVFS_error PVFS_sys_flush(
     PVFS_object_ref ref,
     PVFS_credentials *credentials);
-
-PVFS_error PVFS_isys_statfs(
-    PVFS_fs_id fs_id,
-    PVFS_credentials *credentials,
-    PVFS_sysresp_statfs *statfs,
-    PVFS_sys_op_id *op_id,
-    void *user_ptr);
 
 PVFS_error PVFS_sys_statfs(
     PVFS_fs_id fs_id,

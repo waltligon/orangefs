@@ -1,0 +1,132 @@
+
+/* 
+ * (C) 2001 Clemson University and The University of Chicago 
+ *
+ * See COPYING in top-level directory.
+ */
+#include <stdio.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/time.h>
+
+#include "pvfs2-server.h"
+#include "job-time-mgr.h"
+#include "server-config.h"
+#include "pvfs2-req-proto.h"
+
+static int commit_timer_find_next(PINT_server_op *s_op, job_status_s* js_p);
+static int commit_timer_error(PINT_server_op *s_op, job_status_s* js_p);
+
+%%
+
+machine pvfs2_commit_timer_sm(find_next, error)
+{
+	state find_next 
+	{
+		run commit_timer_find_next;
+		success => find_next;
+		default => error;
+	}
+
+	state error 
+	{
+		run commit_timer_error;
+		default => terminate;
+	}
+}
+
+%%
+
+static int commit_timer_error(PINT_server_op *s_op, job_status_s *js_p)
+{
+    gossip_err("Error: stopping server commit timer.\n");
+
+    return(server_state_machine_complete(s_op));
+}
+
+static int commit_timer_find_next(PINT_server_op *s_op, job_status_s *js_p)
+{
+    int ret;
+    TROVE_coll_id id;
+    TROVE_handle handle;
+    TROVE_offset * stream_offsets;
+    TROVE_size * stream_sizes;
+    int stream_count;
+    char * buffer;
+    TROVE_size size;
+    struct filesystem_configuration_s *cur_fs = NULL;
+    job_id_t tmp_job_id;
+
+    cur_fs = PINT_llist_head(
+            PINT_config_get_filesystems(get_server_config_struct()));
+
+    ret = trove_version_find_commit(
+        cur_fs->coll_id,
+        &id, &handle, &stream_offsets, &stream_sizes,
+        &stream_count, &buffer, &size);
+    if(ret < 0)
+    {
+        gossip_lerr("Server: Commit Timer: trove_version_find_commit failed.\n");
+        js_p->error_code = ret;
+        return 1;
+    }
+
+    if(ret == 1)
+    {
+        /* fake a request struct */
+        PINT_server_op * server_op;
+
+        ret = server_state_machine_alloc_noreq(
+            PVFS_SERV_VERSION_COMMIT, &server_op);
+        if(ret < 0)
+        {
+            js_p->error_code = ret;
+            return 1;
+        }
+         
+        server_op->req = malloc(sizeof(struct PVFS_server_req));
+        if(!server_op->req)
+        {
+            js_p->error_code = -PVFS_ENOMEM;
+            return 1;
+        }
+
+        server_op->req->u.version_commit.handle = handle;
+        server_op->req->u.version_commit.fs_id = id;
+        server_op->u.version_commit.stream_offsets = stream_offsets;
+        server_op->u.version_commit.stream_sizes = stream_sizes;
+        server_op->u.version_commit.stream_count = stream_count;
+        server_op->u.version_commit.buffer = buffer;
+        server_op->u.version_commit.size = size;
+
+        ret = server_state_machine_start_noreq(server_op);
+        if(ret < 0)
+        {
+            free(server_op);
+
+            js_p->error_code = ret;
+            return 1;
+        }
+    }
+
+    return(job_req_sched_post_timer(1000,
+                                    s_op,
+                                    0,
+                                    js_p,
+                                    &tmp_job_id,
+                                    server_job_context));
+}
+
+/*
+ * Local variables:
+ *  mode: c
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ft=c ts=8 sts=4 sw=4 expandtab
+ */
+

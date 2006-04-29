@@ -1,0 +1,11 @@
+DIR := vec
+
+TESTSRC += \
+	$(DIR)/vec-client-example.c
+
+MODCFLAGS_$(DIR) = -I$(pvfs2_srcdir)/test/vec
+
+#LOCALTESTS := $(patsubst %.c,%, $(TESTSRC))
+#$(LOCALTESTS): %: %.o 
+#	$(Q) "  LD		$@"
+#	$(E)$(LD) $< $(LDFLAGS) $(LIBS) -o $@

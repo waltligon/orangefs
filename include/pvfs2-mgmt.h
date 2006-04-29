@@ -122,7 +122,9 @@ endecode_fields_8_struct(
 enum
 {
     PVFS_MGMT_IO_SERVER = 1,
-    PVFS_MGMT_META_SERVER = 2
+    PVFS_MGMT_META_SERVER = 2,
+    PVFS_MGMT_DLM_SERVER = 4,
+    PVFS_MGMT_VEC_SERVER = 8,
 };
 
 
@@ -156,6 +158,12 @@ const char* PVFS_mgmt_map_addr(
     PVFS_credentials *credentials,
     PVFS_BMI_addr_t addr,
     int* server_type);
+
+int PVFS_mgmt_map_synch_ports(
+    PVFS_fs_id fs_id,
+    char *string_server_address,
+    int *dlm_port,
+    int *vec_port);
 
 PVFS_error PVFS_imgmt_setparam_list(
     PVFS_fs_id fs_id,

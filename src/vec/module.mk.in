@@ -1,0 +1,19 @@
+DIR := src/vec/
+LIBSRC += \
+		$(DIR)/vec_prot_client.c $(DIR)/vec_prot_clnt.c \
+		$(DIR)/vec_prot_xdr.c $(DIR)/vec_common.c
+
+VECSRC += \
+		$(DIR)/vec_prot_svc.c $(DIR)/vec_prot_xdr.c\
+		$(DIR)/vec_prot_server.c $(DIR)/vec_prot_aux_svc.c \
+		$(DIR)/vec_grant_version.c $(DIR)/vec_common.c
+
+MODCFLAGS_$(DIR)/vec_prot_xdr.c = -Wno-unused
+MODCFLAGS_$(DIR)/vec_prot_svc.c = -Wno-implicit-function-declaration -Wno-missing-prototypes
+
+GENSRCS := \
+		$(DIR)/vec_prot_clnt.c $(DIR)/vec_prot_xdr.c \
+		$(DIR)/vec_prot.h $(DIR)/vec_prot_svc.c
+
+.SECONDARY: $(GENSRCS)
+

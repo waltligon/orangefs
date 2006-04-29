@@ -20,6 +20,7 @@
 #include "pint-sysint-utils.h"
 #include "server-config.h"
 #include "pvfs2-internal.h"
+#include "pvfs2-synch-client.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -30,6 +31,8 @@ struct options
     char* fs_path_hack;
     char* fs_path_real;
     char* mnt_point;
+    int   ping_dlm;
+    int   ping_vec;
 };
 
 static struct options* parse_args(int argc, char* argv[]);
@@ -38,12 +41,13 @@ static void print_mntent(
     struct PVFS_sys_mntent *entries, int num_entries);
 static int print_config(PVFS_fs_id fsid);
 static int noop_all_servers(PVFS_fs_id fsid);
+static int noop_all_synch_servers(PVFS_fs_id fsid, enum PVFS_synch_method);
 static void print_error_details(PVFS_error_details * error_details);
 static void print_root_check_error_details(PVFS_error_details * error_details);
 
 int main(int argc, char **argv)
 {
-    int ret = -1, err = 0;
+    int ret = -1;
     int i;
     PVFS_fs_id cur_fs;
     const PVFS_util_tab* tab;
@@ -53,6 +57,7 @@ int main(int argc, char **argv)
     PVFS_sysresp_lookup resp_lookup;
     PVFS_error_details * error_details;
     int count;
+    enum PVFS_synch_method synch_method = PVFS_SYNCH_NONE;
 
     /* look at command line arguments */
     user_opts = parse_args(argc, argv);
@@ -88,26 +93,21 @@ int main(int argc, char **argv)
 
     for(i=0; i<tab->mntent_count; i++)
     {
-        print_mntent(&tab->mntent_array[i], 1);
-        fflush(stdout);
-        ret = PVFS_sys_fs_add(&tab->mntent_array[i]);
 	printf("   %s: ", tab->mntent_array[i].mnt_dir);
+	ret = PVFS_sys_fs_add(&tab->mntent_array[i]);
 	if(ret < 0)
 	{
 	    printf("FAILURE!\n");
-            err = 1;
+	    fprintf(stderr, "Failure: could not initialize at "
+                    "least one of the target file systems.\n");
+	    return(-1);
 	}
 	else
 	{   
 	    printf("Ok\n");
 	}
     }
-    fflush(stdout);
-    if(err)
-    {
-        fprintf(stderr, "\nFailure: could not initialze at "
-                "least one of the target file systems.\n");
-    }
+
     printf("\n(4) Searching for %s in pvfstab...\n",
            user_opts->fs_path_real);
 
@@ -144,6 +144,23 @@ int main(int argc, char **argv)
 	fprintf(stderr, "Failure: could not communicate with "
                 "one of the servers.\n");
 	return(-1);
+    }
+
+    if (user_opts->ping_dlm)
+        synch_method |= PVFS_SYNCH_DLM;
+    if (user_opts->ping_vec)
+        synch_method |= PVFS_SYNCH_VECTOR;
+    if (synch_method != PVFS_SYNCH_NONE)
+    {
+        printf("\n(6) Verifying that all synchronization servers are responding...\n");
+        /* send noop to all synchronization servers */
+        ret = noop_all_synch_servers(cur_fs, synch_method);
+        if (ret < 0)
+        {
+            fprintf(stderr, "Failure: could not communicate with "
+                        "one of the synchronization servers.\n");
+            return(-1);
+        }
     }
 
     printf("\n(6) Verifying that fsid %ld is acceptable "
@@ -277,19 +294,21 @@ static int noop_all_servers(PVFS_fs_id fsid)
 
     for (i = 0; i < count; i++)
     {
-	printf("   %s ",
-               PVFS_mgmt_map_addr(fsid, &creds, addr_array[i], &tmp));
-	ret = PVFS_mgmt_noop(fsid, &creds, addr_array[i]);
-	if (ret == 0)
-	{
-	    printf("Ok\n");
-	}
-	else
-	{
-	    printf("FAILURE: PVFS_mgmt_noop failed for server: %s\n",
-                   PVFS_mgmt_map_addr(fsid, &creds, addr_array[i], &tmp));
-	    return ret;
-	}
+        const char *string_server_address = NULL;
+        string_server_address = 
+            PVFS_mgmt_map_addr(fsid, &creds, addr_array[i], &tmp);
+        printf("   %s ", string_server_address);
+        ret = PVFS_mgmt_noop(fsid, &creds, addr_array[i]);
+        if (ret == 0)
+        {
+            printf("Ok\n");
+        }
+        else
+        {
+            printf("FAILURE: PVFS_mgmt_noop failed for server: %s\n",
+                       string_server_address);
+            return ret;
+        }
     }
     free(addr_array);
 
@@ -337,6 +356,80 @@ static int noop_all_servers(PVFS_fs_id fsid)
     return(0);
 }
 
+static int noop_all_synch_servers(PVFS_fs_id fsid, enum PVFS_synch_method method)
+{
+    PVFS_credentials creds;
+    int ret = -1;
+    int count;
+    PVFS_BMI_addr_t* addr_array;
+    int i;
+    int tmp, err = 0;
+ 
+    PVFS_util_gen_credentials(&creds);
+
+    ret = PVFS_mgmt_count_servers(
+        fsid, &creds, PVFS_MGMT_META_SERVER | PVFS_MGMT_IO_SERVER, &count);
+    if (ret < 0)
+    {
+        PVFS_perror("PVFS_mgmt_count_servers()", ret);
+        return ret;
+    }
+    addr_array = (PVFS_BMI_addr_t *) malloc(
+        count * sizeof(PVFS_BMI_addr_t));
+    if (addr_array == NULL)
+    {
+        perror("malloc");
+        return -PVFS_ENOMEM;
+    }
+
+    ret = PVFS_mgmt_get_server_array(
+        fsid, &creds, PVFS_MGMT_META_SERVER | PVFS_MGMT_IO_SERVER, addr_array, &count);
+    if (ret < 0)
+    {
+        PVFS_perror("PVFS_mgmt_get_server_array()", ret);
+        return ret;
+    }
+
+    printf("\n   Synchronization servers:\n");
+    for (i = 0; i < count; i++)
+    {
+        const char *string_server_address = NULL;
+
+        string_server_address = 
+            PVFS_mgmt_map_addr(fsid, &creds, addr_array[i], &tmp);
+
+        printf("   %s ", string_server_address);
+        if (method & PVFS_SYNCH_DLM)
+        {
+            ret = PINT_synch_ping(fsid, string_server_address, PVFS_SYNCH_DLM);
+            if (ret == 0)
+            {
+                printf("lock-server (Ok) ");
+            }
+            else
+            {
+                printf("lock-server (Not Ok) ");
+                err = ret;
+            }
+        }
+        if (method & PVFS_SYNCH_VECTOR)
+        {
+            ret = PINT_synch_ping(fsid, string_server_address, PVFS_SYNCH_VECTOR);
+            if (ret == 0)
+            {
+                printf(" version-server (Ok)");
+            }
+            else
+            {
+                printf(" version-server (Not Ok) ");
+                err = ret;
+            }
+        }
+        printf("\n");
+    }
+    free(addr_array);
+    return (err);
+}
 
 /* print_config()
  *
@@ -461,7 +554,7 @@ static struct options* parse_args(int argc, char* argv[])
     /* getopt stuff */
     extern char* optarg;
     extern int optind, opterr, optopt;
-    char flags[] = "vm:";
+    char flags[] = "vsm:";
     int one_opt = 0;
     int len;
 
@@ -490,6 +583,10 @@ static struct options* parse_args(int argc, char* argv[])
             case('v'):
                 printf("%s\n", PVFS2_VERSION);
                 exit(0);
+            case 's':
+                tmp_opts->ping_dlm = 1;
+                tmp_opts->ping_vec = 1;
+                break;
 	    case('m'):
 		/* taken from pvfs2-statfs.c */
 		len = strlen(optarg)+1;
@@ -644,5 +741,5 @@ static void usage(int argc, char** argv)
  *  c-basic-offset: 4
  * End:
  *
- * vim: ts=8 sts=4 sw=4 expandtab
+ * vim: ts=4 sts=4 sw=4 expandtab
  */

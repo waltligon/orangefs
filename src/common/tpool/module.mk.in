@@ -1,0 +1,4 @@
+DIR := src/common/tpool/
+
+DLMSRC += $(DIR)/tp_proto.c $(DIR)/tp_impl.c $(DIR)/tp_pool.c
+VECSRC += $(DIR)/tp_proto.c $(DIR)/tp_impl.c $(DIR)/tp_pool.c

@@ -832,7 +832,7 @@ static int getattr_set_sys_response(PINT_client_sm *sm_p,
         assert(attr->u.sym.target_path);
 
         sysresp->attr.link_target = strdup(attr->u.sym.target_path);
-        if (!sysresp->attr.link_target)
+        if(!sysresp->attr.link_target)
         {
            js_p->error_code = -PVFS_ENOMEM;
            return 0;

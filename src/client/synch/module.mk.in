@@ -1,0 +1,4 @@
+DIR := src/client/synch
+
+LIBSRC += \
+	$(DIR)/synch-server-mapping.c $(DIR)/pvfs2-synch-client.c $(DIR)/synch-cache.c

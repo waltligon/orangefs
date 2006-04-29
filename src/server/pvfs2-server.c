@@ -58,6 +58,16 @@
 #define SERVER_STORAGE_MODE "non-threaded"
 #endif
 
+#ifdef  USE_DLM
+#define DLM_BINARY_NAME  "dlm_prot_server"
+#define DLM_BINARY_PATH  "src/dlm/dlm_prot_server"
+#endif
+
+#ifdef  USE_VEC
+#define VEC_BINARY_NAME  "vec_prot_server"
+#define VEC_BINARY_PATH  "src/vec/vec_prot_server"
+#endif
+
 #define PVFS2_VERSION_REQUEST 0xFF
 
 /* this controls how many jobs we will test for per job_testcontext()
@@ -102,6 +112,8 @@ typedef struct
     int server_create_storage_space;
     int server_background;
     char *pidfile;
+    char *dlm_path;
+    char *vec_path;
 } options_t;
 
 options_t s_server_options = { 0, 0, 1, NULL };
@@ -112,8 +124,7 @@ PINT_server_trove_keys_s Trove_Common_Keys[] =
     {"dir_ent", 8},
     {"datafile_handles", 17},
     {"metafile_dist", 14},
-    {"symlink_target", 15},
-    {"dirdata_size", 13}
+    {"symlink_target", 15}
 };
 
 /* extended attribute name spaces supported in PVFS2 */
@@ -150,6 +161,7 @@ static int server_post_unexpected_recv(job_status_s * js_p);
 static int server_parse_cmd_line_args(int argc, char **argv);
 static int server_state_machine_start(
     PINT_server_op *s_op, job_status_s *js_p);
+static int verify_path(const char *path);
 #ifdef __PVFS2_SEGV_BACKTRACE__
 static void bt_sighandler(int sig, siginfo_t *info, void *secret);
 #endif
@@ -472,9 +484,6 @@ int main(int argc, char **argv)
         {
             goto server_shutdown;
         }
-        gossip_set_debug_mask(1, GOSSIP_SERVER_DEBUG);
-        gossip_debug(GOSSIP_SERVER_DEBUG, "PVFS2 Server: storage space removed. Exiting.\n");
-        gossip_set_debug_mask(1, debug_mask);
         return(0);
     }
 
@@ -486,9 +495,6 @@ int main(int argc, char **argv)
         {
             goto server_shutdown;
         }
-        gossip_set_debug_mask(1, GOSSIP_SERVER_DEBUG);
-        gossip_debug(GOSSIP_SERVER_DEBUG, "PVFS2 Server: storage space created. Exiting.\n");
-        gossip_set_debug_mask(1, debug_mask);
         return(0);
     }
 
@@ -562,6 +568,20 @@ int main(int argc, char **argv)
         goto server_shutdown;
     }
 
+    ret = server_state_machine_alloc_noreq(
+        PVFS_SERV_COMMIT_TIMER, &(tmp_op));
+    if(ret == 0)
+    {
+        ret = server_state_machine_start_noreq(tmp_op);
+    }
+    if(ret < 0)
+    {
+        PVFS_perror_gossip(
+                "Error: failed to start commit timer state machine\n",
+                ret);
+        goto server_shutdown;
+    }
+    
     /* Initialization complete; process server requests indefinitely. */
     for ( ;; )  
     {
@@ -704,6 +724,8 @@ static void remove_pidfile(void)
  *
  * Handles:
  * - backgrounding, redirecting logging
+ * - starting the dlm daemon if need be..
+ * - starting the version vector daemon if need be..
  * - initializing all the subsystems (BMI, Trove, etc.)
  * - setting up the state table used to map new requests to
  *   state machines
@@ -801,6 +823,118 @@ static int server_initialize(
     return ret;
 }
 
+/* start_auxilliary_servers()
+ *
+ * fires up a DLM and a Version vector server on this node.
+ * We dont stash their pid's since by sending a kill(0,..)
+ * we can terminate all processes within the process group!
+ */
+static int start_auxilliary_servers(void)
+{
+    PINT_llist *cur = NULL;
+
+    /* For every file system that we understand spawn a child process */
+    cur = server_config.file_systems;
+    while (cur)
+    {
+        pid_t new_pid = 0;
+        struct filesystem_configuration_s *cur_fs = NULL;
+        int dlm_port = 0, vec_port = 0;
+        char *binary_path = NULL;
+
+        cur_fs = PINT_llist_head(cur);
+        if (!cur_fs)
+            break;
+        /* obtain the port numbers for this FS */
+        PINT_config_get_synch_port(&server_config, cur_fs, NULL, &dlm_port, &vec_port);
+        gossip_debug(GOSSIP_SERVER_DEBUG, "FSID %d [ DLMport %d, VECport %d]\n", 
+                cur_fs->coll_id, dlm_port, vec_port);
+#ifdef  USE_DLM
+        binary_path = s_server_options.dlm_path 
+            ? s_server_options.dlm_path : DLM_BINARY_PATH;
+        if (verify_path(binary_path))
+        {
+            gossip_err("Error: invalid path to DLM binary %s\n", binary_path);
+            goto spawn_vec;
+        }
+        /* Spawn a child dlm server */
+        new_pid = fork();
+        if (new_pid < 0)
+        {
+            gossip_lerr("error in fork() system call (errno = %x). "
+                        "aborting.\n", errno);
+            return (-PVFS_EINVAL);
+        }
+        else if (new_pid == 0)
+        {
+            char* arg_list[128] = {NULL};
+            char str[16];
+
+            arg_list[0] = DLM_BINARY_NAME;
+            arg_list[1] = "-d";
+            if (dlm_port > 0) {
+                sprintf(str, "-p %d", dlm_port);
+                arg_list[2] = str;
+            }
+            execvp(binary_path, arg_list);
+
+            gossip_lerr("error in exec %s, errno is %d\n",
+                    binary_path, errno);
+            return (-PVFS_EINVAL);
+        }
+        gossip_debug(GOSSIP_SERVER_DEBUG, "FSID %d -> DLM server pid %d\n", cur_fs->coll_id, new_pid);
+#endif
+spawn_vec:
+#ifdef  USE_VEC
+        binary_path = s_server_options.vec_path 
+            ?  s_server_options.vec_path : VEC_BINARY_PATH;
+        if (verify_path(binary_path)) {
+            gossip_err("Error: invalid path to version-server binary %s\n", binary_path);
+            goto skip;
+        }
+        /* Spawn a child version vector server */
+        new_pid = fork();
+        if (new_pid < 0)
+        {
+            gossip_lerr("error in fork() system call (errno = %x). "
+                        "aborting.\n", errno);
+            return (-PVFS_EINVAL);
+        }
+        else if (new_pid == 0)
+        {
+            char* arg_list[128] = {NULL};
+            char str[16];
+
+            arg_list[0] = VEC_BINARY_NAME;
+            arg_list[1] = "-d";
+            if (vec_port > 0) {
+                sprintf(str, "-p %d", vec_port);
+                arg_list[2] = str;
+            }
+            execvp(binary_path, arg_list);
+
+            gossip_lerr("error in exec %s, errno is %d\n",
+                    binary_path, errno);
+            return (-PVFS_EINVAL);
+        }
+        gossip_debug(GOSSIP_SERVER_DEBUG, "FSID %d -> VEC server pid %d\n", cur_fs->coll_id, new_pid);
+#endif
+skip:
+        cur = PINT_llist_next(cur);
+    }
+    return 0;
+}
+
+/* terminate_auxilliary_servers()
+ *
+ * performs cleanup of the auxilliary server daemons
+ * by sending them a specified signal (SIGTERM)
+ */
+static void terminate_auxilliary_servers(void)
+{
+    kill(0, SIGTERM);
+}
+
 /* server_setup_process_environment()
  *
  * performs normal daemon initialization steps
@@ -852,13 +986,16 @@ static int server_setup_process_environment(int background)
             /* exit parent */
             exit(0);
         }
-
+        /* Child is the new session leader */
         new_pid = setsid();
         if (new_pid < 0)
         {
             gossip_lerr("error in setsid() system call.  aborting.\n");
             return(-PVFS_EINVAL);
         }
+    }
+    if (start_auxilliary_servers() < 0) {
+        return (-PVFS_EINVAL);
     }
     if (pid_fd >= 0)
     {
@@ -1462,6 +1599,8 @@ static void server_sig_handler(int sig)
             gossip_err("SIGHUP: pvfs2-server cannot restart; "
                        "shutting down instead.\n");
         }
+        /* terminate any auxilliary servers that were spawned */
+        terminate_auxilliary_servers();
 
         /* ignore further invocations of this signal */
         new_action.sa_handler = SIG_IGN;
@@ -1476,6 +1615,21 @@ static void server_sig_handler(int sig)
     }
 }
 
+static int verify_path(const char *path)
+{
+    int ret = -1;
+    struct stat statbuf;
+    memset(&statbuf, 0 , sizeof(struct stat));
+
+    if (stat(path, &statbuf) == 0)
+    {
+        ret = ((S_ISREG(statbuf.st_mode) &&
+            (statbuf.st_mode & S_IXUSR)) ? 0 : 1);
+    }
+    return ret;
+
+}
+
 static void usage(int argc, char **argv)
 {
     gossip_err("Usage: %s: [OPTIONS] <global_config_file> "
@@ -1487,9 +1641,9 @@ static void usage(int argc, char **argv)
     gossip_err("  -h, --help\t\twill show this message\n");
     gossip_err("  -r, --rmfs\t\twill cause server to "
                "remove file system storage and exit\n");
-    gossip_err("  -v, --version\t\toutput version information "
-               "and exit\n");
     gossip_err("  -p, --pidfile <file>\twrite process id to file\n");
+    gossip_err("  -l, --dlm <path to DLM binary>\tspawn the distributed lock manager on this node\n");
+    gossip_err("  -v, --vec <path to version vector binary>\tspawn the version vector server on this node\n");
 }
 
 static int server_parse_cmd_line_args(int argc, char **argv)
@@ -1502,12 +1656,13 @@ static int server_parse_cmd_line_args(int argc, char **argv)
         {"mkfs",0,0,0},
         {"help",0,0,0},
         {"rmfs",0,0,0},
-        {"version",0,0,0},
         {"pidfile",1,0,0},
+        {"dlm",1,0,0},
+        {"vec",1,0,0},
         {0,0,0,0}
     };
 
-    while ((ret = getopt_long(argc, argv,"dfhrvp:",
+    while ((ret = getopt_long(argc, argv,"dfhrp:l:v:",
                               long_opts, &option_index)) != -1)
     {
         switch (ret)
@@ -1532,20 +1687,19 @@ static int server_parse_cmd_line_args(int argc, char **argv)
                 {
                     goto do_rmfs;
                 }
-                else if (strcmp("version", cur_option) == 0)
-                {
-                    goto do_version;
-                }
                 else if (strcmp("pidfile", cur_option) == 0)
                 {
                     goto do_pidfile;
                 }
+                else if (strcmp("dlm", cur_option) == 0)
+                {
+                    goto do_dlm;
+                }
+                else if (strcmp("vec", cur_option) == 0)
+                {
+                    goto do_vec;
+                }
                 break;
-            case 'v':
-          do_version:
-                printf("%s (mode: %s)\n", PVFS2_VERSION,
-                       SERVER_STORAGE_MODE);
-                return PVFS2_VERSION_REQUEST;
             case 'r':
           do_rmfs:
                 s_server_options.server_remove_storage_space = 1;
@@ -1563,6 +1717,34 @@ static int server_parse_cmd_line_args(int argc, char **argv)
                 if(optarg[0] != '/')
                 {
                     gossip_err("Error: pidfile must be specified with an absolute path.\n");
+                    goto parse_cmd_line_args_failure;
+                }
+                break;
+            case 'l':
+          do_dlm:
+                s_server_options.dlm_path = optarg;
+                if(optarg[0] != '/')
+                {
+                    gossip_err("Error: dlm_path must be specified with an absolute path.\n");
+                    goto parse_cmd_line_args_failure;
+                }
+                if (verify_path(optarg))
+                {
+                    gossip_err("Error: invalid path to DLM binary %s\n", optarg);
+                    goto parse_cmd_line_args_failure;
+                }
+                break;
+            case 'v':
+          do_vec:
+                s_server_options.vec_path = optarg;
+                if(optarg[0] != '/')
+                {
+                    gossip_err("Error: vec_path must be specified with an absolute path.\n");
+                    goto parse_cmd_line_args_failure;
+                }
+                if (verify_path(optarg))
+                {
+                    gossip_err("Error: invalid path to version vector binary %s\n", optarg);
                     goto parse_cmd_line_args_failure;
                 }
                 break;

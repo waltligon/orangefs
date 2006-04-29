@@ -68,15 +68,6 @@ typedef unsigned long sector_t;
 #ifdef HAVE_POSIX_ACL_XATTR_H
 #include <linux/posix_acl_xattr.h>
 #endif
-#ifdef HAVE_LINUX_COMPAT_H
-#include <linux/compat.h>
-#endif
-#ifdef HAVE_LINUX_IOCTL32_H
-#include <linux/ioctl32.h>
-#endif
-#ifdef HAVE_LINUX_SYSCALLS_H
-#include <linux/syscalls.h>
-#endif
 #include <asm/uaccess.h>
 #include <asm/atomic.h>
 #include <linux/uio.h>
@@ -339,7 +330,9 @@ typedef struct
 typedef struct
 {
     PVFS_object_ref refn;
+    PVFS_ds_position readdir_token_adjustment;
     int num_readdir_retries;
+    int last_version_changed; 
     uint64_t directory_version;
     char *link_target;
     /*
@@ -370,6 +363,10 @@ typedef struct
      * requires the file system to honor acl's 
      */
     int acl;
+    /** synch option (is set) to whatever technique we wish to use
+     * to synchronize accesses to datablocks.
+     */
+    enum PVFS_synch_method synch_method;
 } pvfs2_mount_options_t;
 
 /** per superblock private pvfs2 info */
@@ -559,14 +556,6 @@ struct dentry *pvfs2_lookup(
 int pvfs2_permission(struct inode *inode, 
         int mask, struct nameidata *nd);
 #endif
-
-/*****************************
- * defined in devpvfs2-req.c
- ****************************/
-
-int     pvfs2_ioctl32_init(void);
-void    pvfs2_ioctl32_cleanup(void);
-
 
 /****************************
  * defined in pvfs2-utils.c
@@ -782,6 +771,9 @@ do {                                                      \
 
 #define get_acl_flag(inode)                               \
 (PVFS2_SB(inode->i_sb)->mnt_options.acl)
+
+#define get_synch_method(inode)                           \
+(PVFS2_SB(inode->i_sb)->mnt_options.synch_method)
 
 #ifdef USE_MMAP_RA_CACHE
 #define clear_inode_mmap_ra_cache(inode)                  \

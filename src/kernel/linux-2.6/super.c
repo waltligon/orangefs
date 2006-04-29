@@ -24,6 +24,18 @@ LIST_HEAD(pvfs2_superblocks);
 /* used to protect the above superblock list */
 spinlock_t pvfs2_superblocks_lock = SPIN_LOCK_UNLOCKED;
 
+struct synch_mapping {
+    char *synch_method_name;
+    enum PVFS_synch_method synch_method_id; 
+};
+static struct synch_mapping synch_methods[] = {
+    {"none", PVFS_SYNCH_NONE},
+    {"dlm" , PVFS_SYNCH_DLM },
+    {"vec" , PVFS_SYNCH_VECTOR}
+};
+
+static int num_synch_methods = (int) (sizeof(synch_methods) / sizeof(struct synch_mapping));
+
 static int parse_mount_options(
    char *option_str, struct super_block *sb, int silent)
 {
@@ -31,8 +43,8 @@ static int parse_mount_options(
     pvfs2_sb_info_t *pvfs2_sb = NULL;
     int i = 0, j = 0, num_keywords = 0, got_device = 0;
 
-    static char *keywords[] = {"intr", "acl"};
-    static int num_possible_keywords = 2;
+    static char *keywords[] = {"intr", "acl", "synch"};
+    static int num_possible_keywords = 3;
     static char options[PVFS2_MAX_NUM_OPTIONS][PVFS2_MAX_MOUNT_OPT_LEN];
 
     if (!silent)
@@ -64,6 +76,7 @@ static int parse_mount_options(
 
         pvfs2_sb = PVFS2_SB(sb);
         memset(&pvfs2_sb->mnt_options, 0, sizeof(pvfs2_mount_options_t));
+        pvfs2_sb->mnt_options.synch_method = PVFS_SYNCH_NONE;
 
         while(ptr && (*ptr != '\0'))
         {
@@ -118,6 +131,32 @@ static int parse_mount_options(
                         }
                         pvfs2_sb->mnt_options.acl = 1;
                         break;
+                    }
+                    else if (strncmp(options[i], "synch", 5) == 0)
+                    {
+                        ptr = strchr(options[i], '=');
+                        if (!silent)
+                        {
+                            if (ptr)
+                            {
+                                int k;
+                                for (k = 0; k < num_synch_methods; k++)
+                                {
+                                    if (strcmp(ptr + 1, synch_methods[k].synch_method_name) == 0)
+                                    {
+                                        pvfs2_print("pvfs2: mount option "
+                                                    "synch %s specified\n", (ptr + 1));
+                                        pvfs2_sb->mnt_options.synch_method =
+                                            synch_methods[k].synch_method_id;
+                                        /* continue parsing */
+                                        continue;
+                                    }
+                                }
+                            }
+                            /* Parse error */
+                            pvfs2_print("pvfs2: mount option to synch requires a valid "
+                                    "type, e.g. .. -o synch=dlm (OR) -o synch=vec\n");
+                        }
                     }
                 }
             }
@@ -346,8 +385,8 @@ static int pvfs2_statfs(
     {
         pvfs2_print("pvfs2_statfs: got %ld blocks available | "
                     "%ld blocks total\n",
-                    (long) new_op->downcall.resp.statfs.blocks_avail,
-                    (long) new_op->downcall.resp.statfs.blocks_total);
+                    new_op->downcall.resp.statfs.blocks_avail,
+                    new_op->downcall.resp.statfs.blocks_total);
 
         buf->f_type = sb->s_magic;
         /* stash the fsid as well */

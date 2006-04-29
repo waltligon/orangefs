@@ -53,7 +53,7 @@ enum
     TROVE_ATOMIC = 2,
     TROVE_FORCE_REQUESTED_HANDLE = 4,
     TROVE_NOOVERWRITE = 8, /* keyval_write and keyval_write_list */
-    TROVE_ONLYOVERWRITE = 16 /* keyval_write and keyval_write_list */
+    TROVE_ONLYOVERWRITE = 16, /* keyval_write and keyval_write_list */
 };
 
 /* get/setinfo option flags */
@@ -413,6 +413,14 @@ int trove_collection_setinfo(
 			     int option,
 			     void *parameter);
 
+int trove_version_find_commit(TROVE_coll_id coll_id,
+                              TROVE_coll_id *version_fs,
+                              TROVE_handle *handle,
+                              TROVE_offset ** stream_offsets,
+                              TROVE_size ** stream_sizes,
+                              int * stream_count,
+                              char ** membuff,
+                              TROVE_size * memsize);
 #endif
 
 /* @} */

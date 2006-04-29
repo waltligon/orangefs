@@ -33,7 +33,8 @@ GOSSIP_SETATTR_DEBUG | GOSSIP_MKDIR_DEBUG |                       \
 GOSSIP_SETEATTR_DEBUG | GOSSIP_GETEATTR_DEBUG |                   \
 GOSSIP_LISTEATTR_DEBUG |                                          \
 GOSSIP_ACCESS_DEBUG | GOSSIP_ACCESS_DETAIL_DEBUG |                \
-GOSSIP_PERFCOUNTER_DEBUG)
+GOSSIP_PERFCOUNTER_DEBUG | GOSSIP_RPC_DEBUG |                     \
+GOSSIP_DLM_DEBUG | GOSSIP_VEC_DEBUG)
 
 /* map all config keywords to pvfs2 debug masks here */
 static __keyword_mask_t s_keyword_mask_map[] =
@@ -74,7 +75,9 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "access_detail", GOSSIP_ACCESS_DETAIL_DEBUG },
     { "listeattr", GOSSIP_LISTEATTR_DEBUG },
     { "sm", GOSSIP_STATE_MACHINE_DEBUG },
-    { "keyval", GOSSIP_DBPF_KEYVAL_DEBUG },
+    { "rpc", GOSSIP_RPC_DEBUG},
+    { "dlm", GOSSIP_DLM_DEBUG},
+    { "vec", GOSSIP_VEC_DEBUG},
     { "verbose",  (__DEBUG_ALL & ~GOSSIP_PERFCOUNTER_DEBUG)},
     { "none", GOSSIP_NO_DEBUG },
     { "all",  __DEBUG_ALL }

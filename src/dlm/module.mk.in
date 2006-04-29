@@ -1,0 +1,18 @@
+DIR := src/dlm/
+LIBSRC += \
+		$(DIR)/dlm_prot_client.c $(DIR)/dlm_prot_clnt.c \
+		$(DIR)/dlm_prot_xdr.c
+
+DLMSRC += \
+		$(DIR)/dlm_prot_svc.c $(DIR)/dlm_prot_xdr.c\
+		$(DIR)/dlm_prot_server.c $(DIR)/dlm_prot_aux_svc.c
+
+MODCFLAGS_$(DIR)/dlm_prot_xdr.c = -Wno-unused
+MODCFLAGS_$(DIR)/dlm_prot_svc.c = -Wno-implicit-function-declaration -Wno-missing-prototypes
+
+GENSRCS := \
+		$(DIR)/dlm_prot_clnt.c $(DIR)/dlm_prot_xdr.c \
+		$(DIR)/dlm_prot.h $(DIR)/dlm_prot_svc.c
+
+.SECONDARY: $(GENSRCS)
+

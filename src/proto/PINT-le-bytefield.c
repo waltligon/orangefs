@@ -368,6 +368,8 @@ static int lebf_encode_req(
         case PVFS_SERV_WRITE_COMPLETION:
         case PVFS_SERV_PERF_UPDATE:
         case PVFS_SERV_JOB_TIMER:
+        case PVFS_SERV_COMMIT_TIMER:
+        case PVFS_SERV_VERSION_COMMIT:
 	    gossip_err("%s: invalid operation %d\n", __func__, req->op);
 	    ret = -PVFS_ENOSYS;
 	    break;
@@ -449,23 +451,25 @@ static int lebf_encode_resp(
         CASE(PVFS_SERV_GETEATTR, geteattr);
         CASE(PVFS_SERV_LISTEATTR, listeattr);
 
-            case PVFS_SERV_REMOVE:
-            case PVFS_SERV_MGMT_REMOVE_OBJECT:
-            case PVFS_SERV_MGMT_REMOVE_DIRENT:
-            case PVFS_SERV_SETATTR:
-            case PVFS_SERV_SETEATTR:
-            case PVFS_SERV_DELEATTR:
-            case PVFS_SERV_CRDIRENT:
-            case PVFS_SERV_TRUNCATE:
-            case PVFS_SERV_FLUSH:
-            case PVFS_SERV_MGMT_NOOP:
+        case PVFS_SERV_REMOVE:
+        case PVFS_SERV_MGMT_REMOVE_OBJECT:
+        case PVFS_SERV_MGMT_REMOVE_DIRENT:
+        case PVFS_SERV_SETATTR:
+        case PVFS_SERV_SETEATTR:
+        case PVFS_SERV_DELEATTR:
+        case PVFS_SERV_CRDIRENT:
+        case PVFS_SERV_TRUNCATE:
+        case PVFS_SERV_FLUSH:
+        case PVFS_SERV_MGMT_NOOP:
         case PVFS_SERV_PROTO_ERROR:
             /* nothing else */
             break;
 
         case PVFS_SERV_INVALID:
-            case PVFS_SERV_PERF_UPDATE:
-            case PVFS_SERV_JOB_TIMER:
+        case PVFS_SERV_PERF_UPDATE:
+        case PVFS_SERV_JOB_TIMER:
+        case PVFS_SERV_COMMIT_TIMER:
+        case PVFS_SERV_VERSION_COMMIT:
             gossip_err("%s: invalid operation %d\n", __func__, resp->op);
             ret = -PVFS_ENOSYS;
             break;
@@ -560,6 +564,8 @@ static int lebf_decode_req(
         case PVFS_SERV_PERF_UPDATE:
         case PVFS_SERV_JOB_TIMER:
 	case PVFS_SERV_PROTO_ERROR:
+        case PVFS_SERV_COMMIT_TIMER:
+        case PVFS_SERV_VERSION_COMMIT:
 	    gossip_lerr("%s: invalid operation %d.\n", __func__, req->op);
 	    ret = -PVFS_EPROTO;
 	    goto out;
@@ -649,6 +655,8 @@ static int lebf_decode_resp(
 	case PVFS_SERV_INVALID:
         case PVFS_SERV_PERF_UPDATE:
         case PVFS_SERV_JOB_TIMER:
+        case PVFS_SERV_COMMIT_TIMER:
+        case PVFS_SERV_VERSION_COMMIT:
 	    gossip_lerr("%s: invalid operation %d.\n", __func__, resp->op);
 	    ret = -PVFS_EPROTO;
 	    goto out;
@@ -765,6 +773,8 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	    case PVFS_SERV_PERF_UPDATE:
 	    case PVFS_SERV_JOB_TIMER:
 	    case PVFS_SERV_PROTO_ERROR:
+            case PVFS_SERV_COMMIT_TIMER:
+            case PVFS_SERV_VERSION_COMMIT:
 		gossip_lerr("%s: invalid request operation %d.\n",
 		  __func__, req->op);
 		break;
@@ -847,6 +857,8 @@ static void lebf_decode_rel(struct PINT_decoded_msg *msg,
 	    case PVFS_SERV_INVALID:
 	    case PVFS_SERV_PERF_UPDATE:
 	    case PVFS_SERV_JOB_TIMER:
+            case PVFS_SERV_COMMIT_TIMER:
+            case PVFS_SERV_VERSION_COMMIT:
 		gossip_lerr("%s: invalid response operation %d.\n",
 		  __func__, resp->op);
 		break;

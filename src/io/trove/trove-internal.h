@@ -102,6 +102,15 @@ struct TROVE_bstream_ops
 			void *user_ptr,
 			TROVE_context_id context_id,
 			TROVE_op_id *out_op_id_p);
+
+     int (*version_commit)(
+                        TROVE_coll_id * coll_id,
+                        TROVE_handle * handle,
+                        TROVE_offset ** stream_offsets,
+                        TROVE_size ** stream_sizes,
+                        int * stream_count,
+                        char ** membuff,
+                        TROVE_size * memsize);
 };
 
 struct TROVE_keyval_ops

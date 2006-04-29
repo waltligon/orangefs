@@ -21,6 +21,8 @@
 #include "pint-cached-config.h"
 #include "server-config.h"
 #include "client-state-machine.h"
+#include "pvfs2-debug.h"
+#include "gossip.h"
 
 extern int g_admin_mode;
 
@@ -42,6 +44,40 @@ const char *PVFS_mgmt_map_addr(
 
     PINT_put_server_config_struct(server_config);
     return ret;
+}
+
+/* Obtains port numbers of synchronization servers */
+int PVFS_mgmt_map_synch_ports(
+    PVFS_fs_id fs_id,
+    char *string_server_address,
+    int *dlm_port,
+    int *vec_port)
+{
+    struct server_configuration_s *server_config =
+        PINT_get_server_config_struct(fs_id);
+    PINT_llist *cur = NULL;
+    filesystem_configuration_s *cur_fs = NULL;
+
+    *dlm_port = *vec_port = -1;
+    cur = server_config->file_systems;
+    while(cur)
+    {
+        cur_fs = PINT_llist_head(cur);
+        if (!cur_fs)
+        {
+            break;
+        }
+        if (cur_fs->coll_id == fs_id)
+            break;
+        cur = PINT_llist_next(cur);
+    }
+    if (cur_fs)
+    {
+        PINT_config_get_synch_port(server_config, cur_fs, string_server_address, dlm_port, vec_port);
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "FSID %d Server %s [ DLMport %d, VECport %d]\n", fs_id, string_server_address, *dlm_port, *vec_port);
+    }
+    PINT_put_server_config_struct(server_config);
+    return 0;
 }
 
 /** Obtains file system statistics from all servers in a given

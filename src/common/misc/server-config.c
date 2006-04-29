@@ -45,6 +45,10 @@ static DOTCONF_CB(enter_mhranges_context);
 static DOTCONF_CB(exit_mhranges_context);
 static DOTCONF_CB(enter_dhranges_context);
 static DOTCONF_CB(exit_dhranges_context);
+static DOTCONF_CB(enter_dlmservers_context);
+static DOTCONF_CB(exit_dlmservers_context);
+static DOTCONF_CB(enter_vecservers_context);
+static DOTCONF_CB(exit_vecservers_context);
 static DOTCONF_CB(enter_distribution_context);
 static DOTCONF_CB(exit_distribution_context);
 static DOTCONF_CB(get_unexp_req);
@@ -60,6 +64,7 @@ static DOTCONF_CB(get_trusted_portlist);
 static DOTCONF_CB(get_trusted_network);
 #endif
 static DOTCONF_CB(get_range_list);
+static DOTCONF_CB(get_ports);
 static DOTCONF_CB(get_bmi_module_list);
 static DOTCONF_CB(get_flow_module_list);
 static DOTCONF_CB(get_handle_recycle_timeout_seconds);
@@ -77,6 +82,7 @@ static DOTCONF_CB(get_client_job_bmi_timeout);
 static DOTCONF_CB(get_client_job_flow_timeout);
 static DOTCONF_CB(get_client_retry_limit);
 static DOTCONF_CB(get_client_retry_delay);
+static DOTCONF_CB(get_trove_allowed_buffer_size);
 static FUNC_ERRORHANDLER(errorhandler);
 const char *contextchecker(command_t *cmd, unsigned long mask);
 
@@ -109,6 +115,9 @@ static host_alias_s *find_host_alias_ptr_by_alias(
     struct server_configuration_s *config_s,
     char *alias);
 static struct host_handle_mapping_s *get_or_add_handle_mapping(
+    PINT_llist *list,
+    char *alias);
+static struct host_synch_server_mapping_s *get_or_add_synch_mappings(
     PINT_llist *list,
     char *alias);
 static int build_extent_array(
@@ -280,7 +289,30 @@ static const configoption_t options[] =
      */
     {"</DataHandleRanges>",ARG_NONE, exit_dhranges_context,NULL,
         CTX_DATAHANDLERANGES,NULL},
+
+    /* This optional context groups together the DLM servers and their options 
+     * Typically, one would specify Ports for the DLM servers inside this context.
+     */
+    {"<DLMServers>",ARG_NONE, enter_dlmservers_context,NULL,
+        CTX_FILESYSTEM,NULL},
+
+    /* Specifies the end-tag for the DLMServers context.
+     */
+    {"</DLMServers>",ARG_NONE, exit_dlmservers_context,NULL,
+        CTX_DLM_SERVERS,NULL},
     
+    /* This optional context groups together the Version servers and their options 
+     * Typically, one would specify Ports for the Version servers inside this context.
+     */
+    {"<VersionServers>",ARG_NONE, enter_vecservers_context,NULL,
+        CTX_FILESYSTEM,NULL},
+
+    /* Specifies the end-tag for the  context.
+     */
+    {"</VersionServers>",ARG_NONE, exit_vecservers_context,NULL,
+        CTX_VEC_SERVERS,NULL},
+
+
     /* Provides a context for defining the filesystem's default
      * distribution to use and the parameters to be set for that distribution.
      *
@@ -296,6 +328,22 @@ static const configoption_t options[] =
      */
     {"</Distribution>",ARG_NONE, exit_distribution_context,NULL,
         CTX_DISTRIBUTION,NULL},
+
+    /*
+     * This option specifies the ports to be used on a particular pvfs2 server
+     * for the DLM and version vector servers depending on the context in which
+     * it is used. The format is
+     * Port {alias} Port#
+     *
+     * where alias is a pre-defined alias specified in the Aliases section above.
+     * Example:
+     *
+     * <DLMServers>
+     * Port mynode1 3453
+     * </DLMServers>
+     */
+    {"Port",ARG_LIST, get_ports,NULL,
+        CTX_DLM_SERVERS|CTX_VEC_SERVERS,NULL},
 
     /* As logical files are created in pvfs2, the data files and meta files
      * that represent them are given filesystem unique handle values.  The
@@ -557,6 +605,9 @@ static const configoption_t options[] =
      */
     {"TroveSyncData",ARG_STR, get_trove_sync_data, NULL, 
         CTX_STORAGEHINTS,"yes"},
+
+    {"TotalAllowedBufferSize",ARG_INT, get_trove_allowed_buffer_size, NULL,
+        CTX_STORAGEHINTS,"16777216"},
 
     /* Specifies the format of the date/timestamp that events will have
      * in the event log.  Possible values are:
@@ -982,6 +1033,58 @@ DOTCONF_CB(exit_dhranges_context)
     return NULL;
 }
 
+DOTCONF_CB(enter_dlmservers_context)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    config_s->configuration_context = CTX_DLM_SERVERS;
+    return NULL;
+}
+
+DOTCONF_CB(exit_dlmservers_context)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    struct filesystem_configuration_s *fs_conf = NULL;
+
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+    assert(fs_conf);
+
+    if (!fs_conf->dlm_server_list)
+    {
+        return("No valid host<->synch server options added to file system.\n");
+    }
+    config_s->configuration_context = CTX_FILESYSTEM;
+    return NULL;
+}
+
+DOTCONF_CB(enter_vecservers_context)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    config_s->configuration_context = CTX_VEC_SERVERS;
+    return NULL;
+}
+
+DOTCONF_CB(exit_vecservers_context)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    struct filesystem_configuration_s *fs_conf = NULL;
+
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+    assert(fs_conf);
+
+    if (!fs_conf->vec_server_list)
+    {
+        return("No valid host<->vec server options added to file system.\n");
+    }
+    config_s->configuration_context = CTX_FILESYSTEM;
+    return NULL;
+}
+
 DOTCONF_CB(enter_distribution_context)
 {
     struct server_configuration_s *config_s = 
@@ -1334,6 +1437,20 @@ DOTCONF_CB(get_trove_sync_meta)
     return NULL;
 }
 
+DOTCONF_CB(get_trove_allowed_buffer_size)
+{
+    struct filesystem_configuration_s *fs_conf = NULL;
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+    assert(fs_conf);
+
+    fs_conf->trove_allowed_buffer_size = cmd->data.value;
+    return NULL;
+}
+
 DOTCONF_CB(get_trove_sync_data)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
@@ -1468,6 +1585,66 @@ DOTCONF_CB(get_alias_list)
     }
     
     PINT_llist_add_to_tail(config_s->host_aliases,(void *)cur_alias);
+    return NULL;
+}
+
+DOTCONF_CB(get_ports)
+{
+    int is_new_synch_mapping = 0;
+    struct filesystem_configuration_s *fs_conf = NULL;
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    PINT_llist **synch_server_list = NULL;
+
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+    assert(fs_conf);
+
+    synch_server_list = ((config_s->configuration_context ==
+                          CTX_DLM_SERVERS) ?
+                         &fs_conf->dlm_server_list :
+                         &fs_conf->vec_server_list);
+
+    if (*synch_server_list == NULL)
+    {
+        *synch_server_list = PINT_llist_new();
+    }
+    if (*synch_server_list == NULL)
+        return "Error: could not allocate list";
+
+    if (is_valid_alias(config_s->host_aliases, cmd->data.list[0]))
+    {
+        struct host_synch_server_mapping_s *synch_mapping = NULL;
+        char *port_string = cmd->data.list[1], *str = NULL;
+        long port;
+
+        port = strtol(port_string, &str, 10);
+        if (*str != '\0' || port < 0 || port > 65536) 
+        {
+            return "Error: Invalid port number specified in config file";
+        }
+
+        synch_mapping = get_or_add_synch_mappings(*synch_server_list, cmd->data.list[0]);
+        if (!synch_mapping)
+        {
+            return("Error: Alias allocation failed; "
+                       "aborting alias handle range addition!\n");
+        }
+
+        if (!synch_mapping->alias_mapping)
+        {
+            is_new_synch_mapping = 1;
+            synch_mapping->alias_mapping = find_host_alias_ptr_by_alias(config_s, cmd->data.list[0]);
+        }
+
+        assert(synch_mapping->alias_mapping == find_host_alias_ptr_by_alias(config_s, cmd->data.list[0]));
+        synch_mapping->port = (unsigned short) port;
+        if (is_new_synch_mapping)
+        {
+            PINT_llist_add_to_tail(*synch_server_list,
+                              (void *)synch_mapping);
+        }
+    }
     return NULL;
 }
 
@@ -1850,6 +2027,23 @@ static int is_valid_filesystem_configuration(
     return ret;
 }
 
+static void free_host_synch_server_mapping(void *ptr)
+{
+    struct host_synch_server_mapping_s *s_mapping =
+        (struct host_synch_server_mapping_s *)ptr;
+    if (s_mapping)
+    {
+        /*
+          NOTE: s_mapping->alias_mapping is freed by free_host_alias,
+          as the pointer points into the config_s->host_aliases list;
+          it's not copied.
+        */
+        s_mapping->alias_mapping = NULL;
+
+        free(s_mapping);
+    }
+}
+
 static void free_host_handle_mapping(void *ptr)
 {
     struct host_handle_mapping_s *h_mapping =
@@ -1904,6 +2098,10 @@ static void free_filesystem(void *ptr)
         /* free all handle ranges */
         PINT_llist_free(fs->meta_handle_ranges,free_host_handle_mapping);
         PINT_llist_free(fs->data_handle_ranges,free_host_handle_mapping);
+
+        /* free all synch server mappings */
+        PINT_llist_free(fs->dlm_server_list, free_host_synch_server_mapping);
+        PINT_llist_free(fs->vec_server_list, free_host_synch_server_mapping);
 
         /* if the optional hints are used, free them */
         if (fs->attr_cache_keywords)
@@ -2021,6 +2219,80 @@ static void copy_filesystem(
             cur = PINT_llist_next(cur);
         }
 
+        dest_fs->dlm_server_list = PINT_llist_new();
+        dest_fs->vec_server_list = PINT_llist_new();
+
+        assert(dest_fs->dlm_server_list);
+        assert(dest_fs->vec_server_list);
+
+        /* Copy all dlm mappings */
+        cur = src_fs->dlm_server_list;
+        while (cur)
+        {
+            struct host_synch_server_mapping_s *cur_s_mapping = NULL, *new_s_mapping = NULL;
+
+            cur_s_mapping = PINT_llist_head(cur);
+            if (!cur_s_mapping)
+            {
+                break;
+            }
+
+            new_s_mapping = (struct host_synch_server_mapping_s *)
+                malloc(sizeof(struct host_synch_server_mapping_s));
+            assert(new_s_mapping);
+
+            new_s_mapping->alias_mapping = (struct host_alias_s *)
+                malloc(sizeof(struct host_alias_s));
+            assert(new_s_mapping->alias_mapping);
+
+            new_s_mapping->alias_mapping->host_alias =
+                strdup(cur_s_mapping->alias_mapping->host_alias);
+            assert(new_s_mapping->alias_mapping->host_alias);
+
+            new_s_mapping->alias_mapping->bmi_address =
+                strdup(cur_s_mapping->alias_mapping->bmi_address);
+            assert(new_s_mapping->alias_mapping->bmi_address);
+
+            new_s_mapping->port = cur_s_mapping->port;
+            PINT_llist_add_to_tail(
+                dest_fs->dlm_server_list, new_s_mapping);
+
+            cur = PINT_llist_next(cur);
+        }
+        /* Copy all vec mappings */
+        cur = src_fs->vec_server_list;
+        while (cur)
+        {
+            struct host_synch_server_mapping_s *cur_s_mapping = NULL, *new_s_mapping = NULL;
+
+            cur_s_mapping = PINT_llist_head(cur);
+            if (!cur_s_mapping)
+            {
+                break;
+            }
+
+            new_s_mapping = (struct host_synch_server_mapping_s *)
+                malloc(sizeof(struct host_synch_server_mapping_s));
+            assert(new_s_mapping);
+
+            new_s_mapping->alias_mapping = (struct host_alias_s *)
+                malloc(sizeof(struct host_alias_s));
+            assert(new_s_mapping->alias_mapping);
+
+            new_s_mapping->alias_mapping->host_alias =
+                strdup(cur_s_mapping->alias_mapping->host_alias);
+            assert(new_s_mapping->alias_mapping->host_alias);
+
+            new_s_mapping->alias_mapping->bmi_address =
+                strdup(cur_s_mapping->alias_mapping->bmi_address);
+            assert(new_s_mapping->alias_mapping->bmi_address);
+
+            new_s_mapping->port = cur_s_mapping->port;
+            PINT_llist_add_to_tail(
+                dest_fs->vec_server_list, new_s_mapping);
+
+            cur = PINT_llist_next(cur);
+        }
         /* if the optional hints are used, copy them too */
         if (src_fs->attr_cache_keywords)
         {
@@ -2067,6 +2339,45 @@ static host_alias_s *find_host_alias_ptr_by_alias(
                 break;
             }
             cur = PINT_llist_next(cur);
+        }
+    }
+    return ret;
+}
+
+static struct host_synch_server_mapping_s *get_or_add_synch_mappings(
+    PINT_llist *list,
+    char *alias)
+{
+    PINT_llist *cur = list;
+    struct host_synch_server_mapping_s *ret = NULL;
+    struct host_synch_server_mapping_s *handle_mapping = NULL;
+
+    while(cur)
+    {
+        handle_mapping = PINT_llist_head(cur);
+        if (!handle_mapping)
+        {
+            break;
+        }
+        assert(handle_mapping->alias_mapping);
+        assert(handle_mapping->alias_mapping->host_alias);
+
+        if (strcmp(handle_mapping->alias_mapping->host_alias,
+                   alias) == 0)
+        {
+            ret = handle_mapping;
+            break;
+        }
+        cur = PINT_llist_next(cur);
+    }
+
+    if (!ret)
+    {
+        ret = (struct host_synch_server_mapping_s *)
+            malloc(sizeof(struct host_synch_server_mapping_s));
+        if (ret)
+        {
+            memset(ret,0,sizeof(struct host_synch_server_mapping_s));
         }
     }
     return ret;
@@ -2463,6 +2774,84 @@ char *PINT_config_get_merged_handle_range_str(
     }
     return merged_range;
 }
+
+/*
+ * For a given FS, we retrieve either the  DLM or Version vector server's ports
+ * We return -1 in case we dont run any of those servers.
+ */
+static int get_synch_port(
+        struct server_configuration_s *config_s,
+        struct filesystem_configuration_s *fs,
+        char   *server_address,
+        int   dlm_server)
+{
+    char *my_alias = NULL;
+    struct host_synch_server_mapping_s *cur_s_mapping = NULL;
+    int port = -1;
+
+    if (config_s && config_s->host_id && fs) 
+    {
+        /* if server_address was not specified use the host_id */
+        if (server_address == NULL) {
+            my_alias = PINT_config_get_host_alias_ptr(
+                    config_s, config_s->host_id);
+        }
+        else {
+            my_alias = PINT_config_get_host_alias_ptr(
+                    config_s, server_address);
+        }
+        if (my_alias) 
+        {
+            PINT_llist *cur = dlm_server ? fs->dlm_server_list : fs->vec_server_list;
+            while (cur)
+            {
+                cur_s_mapping = PINT_llist_head(cur);
+                if (!cur_s_mapping)
+                    break;
+
+                assert(cur_s_mapping->alias_mapping);
+                assert(cur_s_mapping->alias_mapping->host_alias);
+
+                if (strcmp(cur_s_mapping->alias_mapping->host_alias,
+                           my_alias) == 0)
+                {
+                    port = cur_s_mapping->port;
+                    break;
+                }
+
+                cur = PINT_llist_next(cur);
+            }
+        }
+    }
+    return port;
+}
+
+/*
+ * Function: PINT_config_get_synch_port
+ *
+ * Params:   struct server_configuration_s*,
+ *           struct filesystem_configuration_s *fs
+ *           char   *server_address
+ *
+ * Returns:  *dlm_port, *vec_port on success; set to -1 on failure
+ *
+ * Synopsis: returns the DLM and version vector server ports 
+ *           for the specified filesystem that matches the host specific
+ *           configuration 
+ *           
+ */
+void PINT_config_get_synch_port(
+    struct server_configuration_s *config_s,
+    struct filesystem_configuration_s *fs,
+    char   *server_address,
+    int *dlm_port,
+    int *vec_port)
+{
+    *dlm_port = get_synch_port(config_s, fs, server_address, 1);
+    *vec_port = get_synch_port(config_s, fs, server_address, 0);
+    return;
+}
+
 
 /*
   verify that both config files exist.  if so, cache them in RAM so
@@ -3120,6 +3509,20 @@ int PINT_config_get_trove_sync_data(
     }
     return (fs_conf ? fs_conf->trove_sync_data : TROVE_SYNC);
 }
+
+int PINT_config_get_trove_allowed_buffer_size(
+    struct server_configuration_s *config,
+    PVFS_fs_id fs_id)
+{
+    struct filesystem_configuration_s *fs_conf = NULL;
+
+    if (config)
+    {
+        fs_conf = PINT_config_find_fs_id(config, fs_id);
+    }
+    return (fs_conf ? fs_conf->trove_allowed_buffer_size : (1024*1024*16));
+}
+
 
 #endif
 

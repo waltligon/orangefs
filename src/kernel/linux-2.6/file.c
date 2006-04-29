@@ -136,6 +136,8 @@ ssize_t pvfs2_inode_read(
         new_op->upcall.req.io.async_vfs_io = PVFS_VFS_SYNC_IO; /* synchronous I/O */
         new_op->upcall.req.io.readahead_size = readahead_size;
         new_op->upcall.req.io.io_type = PVFS_IO_READ;
+        /* Pass in the FS mount time option to the upcall */
+        new_op->upcall.req.io.synch_method = get_synch_method(inode);
         new_op->upcall.req.io.refn = pvfs2_inode->refn;
 
         ret = pvfs_bufmap_get(&buffer_index);
@@ -320,6 +322,8 @@ static ssize_t pvfs2_file_write(
         new_op->upcall.type = PVFS2_VFS_OP_FILE_IO;
         new_op->upcall.req.io.async_vfs_io = PVFS_VFS_SYNC_IO; /* synchronous I/O */
         new_op->upcall.req.io.io_type = PVFS_IO_WRITE;
+        /* Synchronization method */
+        new_op->upcall.req.io.synch_method = get_synch_method(inode);
         new_op->upcall.req.io.refn = pvfs2_inode->refn;
 
         pvfs2_print("pvfs2_file_write: writing %d bytes at offset %lu (%lu)\n",
@@ -676,6 +680,7 @@ static ssize_t pvfs2_file_readv(
 
         new_op->upcall.type = PVFS2_VFS_OP_FILE_IO;
         new_op->upcall.req.io.async_vfs_io = PVFS_VFS_SYNC_IO; /* synchronous I/O */
+        new_op->upcall.req.io.synch_method = get_synch_method(inode);
         /* disable read-ahead */
         new_op->upcall.req.io.readahead_size = 0;
         new_op->upcall.req.io.io_type = PVFS_IO_READ;
@@ -926,6 +931,7 @@ static ssize_t pvfs2_file_writev(
         new_op->upcall.type = PVFS2_VFS_OP_FILE_IO;
         new_op->upcall.req.io.async_vfs_io = PVFS_VFS_SYNC_IO; /* synchronous I/O */
         new_op->upcall.req.io.io_type = PVFS_IO_WRITE;
+        new_op->upcall.req.io.synch_method = get_synch_method(inode);
         new_op->upcall.req.io.refn = pvfs2_inode->refn;
 
         ret = pvfs_bufmap_get(&buffer_index);
@@ -1145,9 +1151,7 @@ static ssize_t pvfs2_aio_retry(struct kiocb *iocb)
                     x->buffer, (int) x->bytes_to_be_copied, (int) error);
         if ((x->rw == PVFS_IO_WRITE) && error > 0)
         {
-#ifndef HAVE_TOUCH_ATIME
             struct inode *inode = iocb->ki_filp->f_mapping->host;
-#endif
             struct file *filp = iocb->ki_filp;
             /* update atime if need be */
 #ifdef HAVE_TOUCH_ATIME
@@ -1481,6 +1485,7 @@ pvfs2_file_aio_read(struct kiocb *iocb, char __user *buffer,
                                     : PVFS_VFS_ASYNC_IO;
             new_op->upcall.req.io.readahead_size = 0;
             new_op->upcall.req.io.io_type = PVFS_IO_READ;
+            new_op->upcall.req.io.synch_method = get_synch_method(inode);
             new_op->upcall.req.io.refn = pvfs2_inode->refn;
             error = pvfs_bufmap_get(&buffer_index);
             if (error < 0)
@@ -1728,6 +1733,7 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
                 is_sync_kiocb(iocb) ? PVFS_VFS_SYNC_IO 
                                     : PVFS_VFS_ASYNC_IO;
             new_op->upcall.req.io.io_type = PVFS_IO_WRITE;
+            new_op->upcall.req.io.synch_method = get_synch_method(inode);
             new_op->upcall.req.io.refn = pvfs2_inode->refn;
             error = pvfs_bufmap_get(&buffer_index);
             if (error < 0)

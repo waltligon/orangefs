@@ -1,5 +1,5 @@
 /*
- * (C) 2003-6 Pete Wyckoff, Ohio Supercomputer Center <pw@osc.edu>
+ * (C) 2003 Pete Wyckoff, Ohio Supercomputer Center <pw@osc.edu>
  *
  * See COPYING in top-level directory.
  *
@@ -38,9 +38,7 @@
 #define endecode_fields_2_struct(n,t1,x1,t2,x2)
 #define endecode_fields_3(n,t1,x1,t2,x2,t3,x3)
 #define endecode_fields_3_struct(n,t1,x1,t2,x2,t3,x3)
-#define endecode_fields_4(n,t1,x1,t2,x2,t3,x3,t4,x4)
 #define endecode_fields_4_struct(n,t1,x1,t2,x2,t3,x3,t4,x4)
-#define endecode_fields_5(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5)
 #define endecode_fields_5_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5)
 #define endecode_fields_7_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7)
 #define endecode_fields_8_struct(n,t1,x1,t2,x2,t3,x3,t4,x4,t5,x5,t6,x6,t7,x7,t8,x8)

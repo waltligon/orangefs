@@ -27,6 +27,71 @@
 #include "server-config-mgr.h"
 #include "client-state-machine.h"
 #include "pint-perf-counter.h"
+#include "pvfs2-debug.h"
+
+/* prototypes for data synchronization primitives */
+#include "pvfs2-synch-client.h"  
+/*
+  uncomment for timing of individual operation information to be
+  emitted to the pvfs2-client logging output
+*/
+#define CLIENT_CORE_OP_TIMING
+
+#ifdef CLIENT_CORE_OP_TIMING
+#include "pint-util.h"
+#include "pvfs2-internal.h"
+#endif
+
+typedef struct
+{
+    int is_dev_unexp;
+    pvfs2_upcall_t in_upcall;
+    pvfs2_downcall_t out_downcall;
+
+    job_status_s jstat;
+    struct PINT_dev_unexp_info info;
+
+    PVFS_sys_op_id op_id;
+
+#ifdef USE_MMAP_RA_CACHE
+    void *io_tmp_buf;
+    int readahead_posted;
+    char *io_tmp_small_buf[MMAP_RA_SMALL_BUF_SIZE];
+#endif
+    PVFS_Request file_req;
+    PVFS_Request mem_req;
+    PVFS_ds_keyval  key;/* used only by geteattr, seteattr */
+    PVFS_ds_keyval  val;
+    void *io_kernel_mapped_buf;
+
+    int was_handled_inline;
+    int was_cancelled_io;
+
+    struct qlist_head hash_link;
+
+    union
+    {
+        PVFS_sysresp_lookup lookup;
+        PVFS_sysresp_create create;
+        PVFS_sysresp_symlink symlink;
+        PVFS_sysresp_getattr getattr;
+        PVFS_sysresp_mkdir mkdir;
+        PVFS_sysresp_readdir readdir;
+        PVFS_sysresp_statfs statfs;
+        PVFS_sysresp_io io;
+        PVFS_sysresp_geteattr geteattr;
+        PVFS_sysresp_listeattr listeattr;
+    } response;
+
+#ifdef CLIENT_CORE_OP_TIMING
+    PINT_time_marker start;
+    PINT_time_marker end;
+#endif
+
+} vfs_request_t;
+
+#define REMOUNT_PENDING     0xFFEEFF33
+#define OP_IN_PROGRESS      0xFFEEFF34
 
 #ifdef USE_MMAP_RA_CACHE
 #include "mmap-ra-cache.h"
@@ -42,9 +107,6 @@
 */
 #define MAX_NUM_OPS                 64
 #define MAX_LIST_SIZE      MAX_NUM_OPS
-
-#define REMOUNT_PENDING     0xFFEEFF33
-#define OP_IN_PROGRESS      0xFFEEFF34
 
 /*
   the block size to report in statfs as the blocksize (i.e. the
@@ -66,17 +128,6 @@
   getting core dumps.  this is NOT a supported run mode
 */
 /* #define STANDALONE_RUN_MODE */
-
-/*
-  uncomment for timing of individual operation information to be
-  emitted to the pvfs2-client logging output
-*/
-#define CLIENT_CORE_OP_TIMING
-
-#ifdef CLIENT_CORE_OP_TIMING
-#include "pint-util.h"
-#include "pvfs2-internal.h"
-#endif
 
 #define DEFAULT_LOGFILE "/tmp/pvfs2-client.log"
 
@@ -112,56 +163,6 @@ static int remount_complete = 0;
 
 /* used for generating unique dynamic mount point names */
 static int dynamic_mount_id = 1;
-
-typedef struct
-{
-    int is_dev_unexp;
-    pvfs2_upcall_t in_upcall;
-    pvfs2_downcall_t out_downcall;
-
-    job_status_s jstat;
-    struct PINT_dev_unexp_info info;
-
-    PVFS_sys_op_id op_id;
-
-#ifdef USE_MMAP_RA_CACHE
-    void *io_tmp_buf;
-    int readahead_posted;
-    char *io_tmp_small_buf[MMAP_RA_SMALL_BUF_SIZE];
-#endif
-    PVFS_Request file_req;
-    PVFS_Request mem_req;
-    PVFS_ds_keyval  key;/* used only by geteattr, seteattr */
-    PVFS_ds_keyval  val;
-    void *io_kernel_mapped_buf;
-
-    struct PVFS_sys_mntent* mntent; /* used only by mount */
-
-    int was_handled_inline;
-    int was_cancelled_io;
-
-    struct qlist_head hash_link;
-
-    union
-    {
-        PVFS_sysresp_lookup lookup;
-        PVFS_sysresp_create create;
-        PVFS_sysresp_symlink symlink;
-        PVFS_sysresp_getattr getattr;
-        PVFS_sysresp_mkdir mkdir;
-        PVFS_sysresp_readdir readdir;
-        PVFS_sysresp_statfs statfs;
-        PVFS_sysresp_io io;
-        PVFS_sysresp_geteattr geteattr;
-        PVFS_sysresp_listeattr listeattr;
-    } response;
-
-#ifdef CLIENT_CORE_OP_TIMING
-    PINT_time_marker start;
-    PINT_time_marker end;
-#endif
-
-} vfs_request_t;
 
 static options_t s_opts;
 
@@ -231,10 +232,17 @@ static void client_segfault_handler(int signum)
     abort();
 }
 
+static void client_sigterm_handler(int signum)
+{
+    gossip_err("pvfs2-client-core: caught signal %d\n", signum);
+    PINT_synch_cleanup();
+}
+
 #ifdef STANDALONE_RUN_MODE
 static void client_core_sig_handler(int signum)
 {
     s_client_is_processing = 0;
+    PINT_synch_cleanup();
 }
 #endif
 
@@ -983,9 +991,11 @@ do {                                                                  \
     ret = 0;                                                          \
 } while(0)
 
-static PVFS_error post_fs_mount_request(vfs_request_t *vfs_request)
+static PVFS_error service_fs_mount_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_ENODEV;
+    struct PVFS_sys_mntent mntent;
+    PVFS_handle root_handle;
     char *ptr = NULL, *ptrcomma = NULL;
     char buf[PATH_MAX] = {0};
 
@@ -994,30 +1004,76 @@ static PVFS_error post_fs_mount_request(vfs_request_t *vfs_request)
       mntent entries are not filled in, so add some defaults here
       if they weren't passed in the options.
     */
-    vfs_request->mntent = (struct PVFS_sys_mntent*)malloc(sizeof(struct
-        PVFS_sys_mntent));
-    if(!vfs_request->mntent)
-    {
-        return -PVFS_ENOMEM;
-    }
-    memset(vfs_request->mntent, 0, sizeof(struct PVFS_sys_mntent));
+    memset(&mntent, 0, sizeof(struct PVFS_sys_mntent));
         
     gossip_debug(
         GOSSIP_CLIENTCORE_DEBUG,
         "Got an fs mount request for host:\n  %s\n",
         vfs_request->in_upcall.req.fs_mount.pvfs2_config_server);
 
-    generate_upcall_mntent((*vfs_request->mntent), vfs_request->in_upcall, 1);
+    generate_upcall_mntent(mntent, vfs_request->in_upcall, 1);
 
-    ret = PVFS_isys_fs_add(vfs_request->mntent, &vfs_request->op_id, (void*)vfs_request);
-
-fail_downcall:
-    if(ret < 0)
+    ret = PVFS_sys_fs_add(&mntent);
+    if (ret < 0)
     {
-        PVFS_perror_gossip("Posting fs_add failed", ret);
+      fail_downcall:
+        gossip_err(
+            "Failed to mount via host %s\n",
+            vfs_request->in_upcall.req.fs_mount.pvfs2_config_server);
+
+        PVFS_perror_gossip("Mount failed", ret);
+
+        vfs_request->out_downcall.type = PVFS2_VFS_OP_FS_MOUNT;
+        vfs_request->out_downcall.status = ret;
+    }
+    else
+    {
+        /*
+          ungracefully ask bmi to drop connections on cancellation so
+          that the server will immediately know that a cancellation
+          occurred
+        */
+        PVFS_BMI_addr_t tmp_addr;
+
+        if (BMI_addr_lookup(&tmp_addr, mntent.the_pvfs_config_server) == 0)
+        {
+            if (BMI_set_info(
+                    tmp_addr, BMI_FORCEFUL_CANCEL_MODE, NULL) == 0)
+            {
+                gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "BMI forceful "
+                             "cancel mode enabled\n");
+            }
+        }
+        reset_acache_timeout();
+
+        /*
+          before sending success response we need to resolve the root
+          handle, given the previously resolved fs_id
+        */
+        ret = PINT_cached_config_get_root_handle(mntent.fs_id, &root_handle);
+        if (ret)
+        {
+            gossip_err("Failed to retrieve root handle for "
+                       "resolved fs_id %d\n", mntent.fs_id);
+            goto fail_downcall;
+        }
+            
+        gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
+                     "FS mount got root handle %llu on fs id %d\n",
+                     llu(root_handle), mntent.fs_id);
+
+        vfs_request->out_downcall.type = PVFS2_VFS_OP_FS_MOUNT;
+        vfs_request->out_downcall.status = 0;
+        vfs_request->out_downcall.resp.fs_mount.fs_id = mntent.fs_id;
+        vfs_request->out_downcall.resp.fs_mount.root_handle =
+            root_handle;
+        vfs_request->out_downcall.resp.fs_mount.id = dynamic_mount_id++;
     }
 
-    return ret;
+    PVFS_util_free_mntent(&mntent);
+
+    write_inlined_device_response(vfs_request);
+    return 0;
 }
 
 static PVFS_error service_fs_umount_request(vfs_request_t *vfs_request)
@@ -1060,7 +1116,7 @@ static PVFS_error service_fs_umount_request(vfs_request_t *vfs_request)
 
         reset_acache_timeout();
 
-        vfs_request->out_downcall.type = PVFS2_VFS_OP_FS_UMOUNT;
+        vfs_request->out_downcall.type = PVFS2_VFS_OP_FS_MOUNT;
         vfs_request->out_downcall.status = 0;
     }
 
@@ -1215,7 +1271,7 @@ static PVFS_error service_param_request(vfs_request_t *vfs_request)
 }
 
 
-static PVFS_error post_statfs_request(vfs_request_t *vfs_request)
+static PVFS_error service_statfs_request(vfs_request_t *vfs_request)
 {
     PVFS_error ret = -PVFS_EINVAL;
 
@@ -1223,20 +1279,42 @@ static PVFS_error post_statfs_request(vfs_request_t *vfs_request)
         GOSSIP_CLIENTCORE_DEBUG, "Got a statfs request for fsid %d\n",
         vfs_request->in_upcall.req.statfs.fs_id);
 
-    ret = PVFS_isys_statfs(
+    ret = PVFS_sys_statfs(
         vfs_request->in_upcall.req.statfs.fs_id,
         &vfs_request->in_upcall.credentials,
-        &vfs_request->response.statfs,
-        &vfs_request->op_id, (void *)vfs_request);
+        &vfs_request->response.statfs);
 
     vfs_request->out_downcall.status = ret;
     vfs_request->out_downcall.type = vfs_request->in_upcall.type;
 
     if (ret < 0)
     {
-        PVFS_perror_gossip("Posting statfs failed", ret);
+        PVFS_perror_gossip("Statfs failed", ret);
     }
-    return ret;
+    else
+    {
+        PVFS_sysresp_statfs *resp = &vfs_request->response.statfs;
+
+        vfs_request->out_downcall.resp.statfs.block_size =
+            STATFS_DEFAULT_BLOCKSIZE;
+        vfs_request->out_downcall.resp.statfs.blocks_total = (long)
+            (resp->statfs_buf.bytes_total /
+             vfs_request->out_downcall.resp.statfs.block_size);
+        vfs_request->out_downcall.resp.statfs.blocks_avail = (long)
+            (resp->statfs_buf.bytes_available /
+             vfs_request->out_downcall.resp.statfs.block_size);
+        /*
+          these values really represent handle/inode counts
+          rather than an accurate number of files
+        */
+        vfs_request->out_downcall.resp.statfs.files_total = (long)
+            resp->statfs_buf.handles_total_count;
+        vfs_request->out_downcall.resp.statfs.files_avail = (long)
+            resp->statfs_buf.handles_available_count;
+    }
+
+    write_inlined_device_response(vfs_request);
+    return 0;
 }
 
 #ifdef USE_MMAP_RA_CACHE
@@ -1282,6 +1360,7 @@ static PVFS_error post_io_readahead_request(vfs_request_t *vfs_request)
         &vfs_request->in_upcall.credentials,
         &vfs_request->response.io,
         vfs_request->in_upcall.req.io.io_type,
+        vfs_request->in_upcall.req.io.synch_method,
         &vfs_request->op_id, (void *)vfs_request);
 
     if (ret < 0)
@@ -1416,6 +1495,7 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
         &vfs_request->in_upcall.credentials,
         &vfs_request->response.io,
         vfs_request->in_upcall.req.io.io_type,
+        vfs_request->in_upcall.req.io.synch_method,
         &vfs_request->op_id, (void *)vfs_request);
 
     if (ret < 0)
@@ -1642,7 +1722,6 @@ static inline void copy_dirents_to_downcall(vfs_request_t *vfs_request)
 static inline void package_downcall_members(
     vfs_request_t *vfs_request, int *error_code)
 {
-    int ret = -PVFS_EINVAL;
     assert(vfs_request);
     assert(error_code);
 
@@ -1778,9 +1857,6 @@ static inline void package_downcall_members(
                 vfs_request->out_downcall.resp.getattr.attributes =
                     vfs_request->response.getattr.attr;
 
-                gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
-                        "object type = %d\n", attr->objtype);
-
                 /*
                   free allocated attr memory if required; to avoid
                   copying the embedded link_target string inside the
@@ -1822,96 +1898,12 @@ static inline void package_downcall_members(
         case PVFS2_VFS_OP_READDIR:
             if (*error_code)
             {
-                vfs_request->out_downcall.status = *error_code;
+                vfs_request->out_downcall.resp.readdir.dirent_count = 0;
             }
             else
             {
                 copy_dirents_to_downcall(vfs_request);
             }
-            break;
-        case PVFS2_VFS_OP_STATFS:
-            vfs_request->out_downcall.resp.statfs.block_size =
-                STATFS_DEFAULT_BLOCKSIZE;
-            vfs_request->out_downcall.resp.statfs.blocks_total = (int64_t)
-                (vfs_request->response.statfs.statfs_buf.bytes_total /
-                 vfs_request->out_downcall.resp.statfs.block_size);
-            vfs_request->out_downcall.resp.statfs.blocks_avail = (int64_t)
-                (vfs_request->response.statfs.statfs_buf.bytes_available /
-                 vfs_request->out_downcall.resp.statfs.block_size);
-            /*
-              these values really represent handle/inode counts
-              rather than an accurate number of files
-            */
-            vfs_request->out_downcall.resp.statfs.files_total = (int64_t)
-                vfs_request->response.statfs.statfs_buf.handles_total_count;
-            vfs_request->out_downcall.resp.statfs.files_avail = (int64_t)
-                vfs_request->response.statfs.statfs_buf.handles_available_count;
-            break;
-        case PVFS2_VFS_OP_FS_MOUNT:
-            if (*error_code)
-            {
-                gossip_err(
-                    "Failed to mount via host %s\n",
-                    vfs_request->in_upcall.req.fs_mount.pvfs2_config_server);
-
-                PVFS_perror_gossip("Mount failed", *error_code);
-            }
-            else
-            {
-                PVFS_handle root_handle;
-                /*
-                  ungracefully ask bmi to drop connections on cancellation so
-                  that the server will immediately know that a cancellation
-                  occurred
-                */
-                PVFS_BMI_addr_t tmp_addr;
-
-                if (BMI_addr_lookup(&tmp_addr, 
-                    vfs_request->mntent->the_pvfs_config_server) == 0)
-                {
-                    if (BMI_set_info(
-                            tmp_addr, BMI_FORCEFUL_CANCEL_MODE, NULL) == 0)
-                    {
-                        gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "BMI forceful "
-                                     "cancel mode enabled\n");
-                    }
-                }
-                reset_acache_timeout();
-
-                /*
-                  before sending success response we need to resolve the root
-                  handle, given the previously resolved fs_id
-                */
-                ret = PINT_cached_config_get_root_handle(
-                    vfs_request->mntent->fs_id, &root_handle);
-                if (ret)
-                {
-                    gossip_err("Failed to retrieve root handle for "
-                               "resolved fs_id %d\n", vfs_request->mntent->fs_id);
-                    gossip_err(
-                        "Failed to mount via host %s\n",
-                        vfs_request->in_upcall.req.fs_mount.pvfs2_config_server);
-                    PVFS_perror_gossip("Mount failed", ret);
-                    PVFS_util_free_mntent(vfs_request->mntent);
-                    *error_code = ret;
-                    break;
-                }
-                    
-                gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
-                             "FS mount got root handle %llu on fs id %d\n",
-                             llu(root_handle), vfs_request->mntent->fs_id);
-
-                vfs_request->out_downcall.type = PVFS2_VFS_OP_FS_MOUNT;
-                vfs_request->out_downcall.status = 0;
-                vfs_request->out_downcall.resp.fs_mount.fs_id = 
-                    vfs_request->mntent->fs_id;
-                vfs_request->out_downcall.resp.fs_mount.root_handle =
-                    root_handle;
-                vfs_request->out_downcall.resp.fs_mount.id = dynamic_mount_id++;
-            }
-
-            PVFS_util_free_mntent(vfs_request->mntent);
-
             break;
         case PVFS2_VFS_OP_RENAME:
             break;
@@ -2260,20 +2252,18 @@ static inline PVFS_error handle_unexp_vfs_request(
             posted_op = 1;
             ret = post_listxattr_request(vfs_request);
             break;
-        case PVFS2_VFS_OP_STATFS:
-            posted_op = 1;
-            ret = post_statfs_request(vfs_request);
-            break;
-        case PVFS2_VFS_OP_FS_MOUNT:
-            posted_op = 1;
-            ret = post_fs_mount_request(vfs_request);
-            break;
             /*
-              NOTE: following operations are blocking
+              NOTE: mount, umount and statfs are blocking
               calls that are serviced inline.
             */
+        case PVFS2_VFS_OP_FS_MOUNT:
+            ret = service_fs_mount_request(vfs_request);
+            break;
         case PVFS2_VFS_OP_FS_UMOUNT:
             ret = service_fs_umount_request(vfs_request);
+            break;
+        case PVFS2_VFS_OP_STATFS:
+            ret = service_statfs_request(vfs_request);
             break;
         case PVFS2_VFS_OP_PERF_COUNT:
             ret = service_perf_count_request(vfs_request);
@@ -2565,6 +2555,7 @@ int main(int argc, char **argv)
     /* if pvfs2-client-core segfaults, at least log the occurence so
      * pvfs2-client won't repeatedly respawn pvfs2-client-core */
     signal(SIGSEGV, client_segfault_handler);
+    signal(SIGTERM, client_sigterm_handler);
 
     memset(&s_opts, 0, sizeof(options_t));
     parse_args(argc, argv, &s_opts);
@@ -2708,12 +2699,19 @@ int main(int argc, char **argv)
 	gossip_err("Cannot create remount thread!");
         return -1;
     }
+    if (PINT_synch_init() < 0)
+    {
+        gossip_err("Cannot initialize synchronization sub-system\n");
+        return -1;
+    }
 
     ret = process_vfs_requests();
     if (ret)
     {
 	gossip_err("Failed to process vfs requests!");
     }
+
+    PINT_synch_cleanup();
 
     /* join remount thread; should be long done by now */
     if (remount_complete)

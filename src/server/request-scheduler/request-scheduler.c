@@ -239,6 +239,10 @@ int PINT_req_sched_target_handle(
         *handle = req->u.small_io.handle;
         *fs_id = req->u.small_io.fs_id;
         return (0);
+    case PVFS_SERV_VERSION_COMMIT:
+        *handle = req->u.version_commit.handle;
+        *fs_id = req->u.version_commit.fs_id;
+        return (0);
     case PVFS_SERV_GETATTR:
 	*handle = req->u.getattr.handle;
 	*fs_id = req->u.getattr.fs_id;
@@ -332,6 +336,7 @@ int PINT_req_sched_target_handle(
     case PVFS_SERV_PERF_UPDATE:
     case PVFS_SERV_JOB_TIMER:
     case PVFS_SERV_PROTO_ERROR:
+    case PVFS_SERV_COMMIT_TIMER:
 	/* these should never show up here */
 	return (-EINVAL);
     }
@@ -529,40 +534,7 @@ int PINT_req_sched_post(
 	last_element = qlist_entry((tmp_list->req_list.prev),
 				   struct req_sched_element,
 				   list_link);
-	if (in_request->op == PVFS_SERV_IO &&
-	    next_element->state == REQ_SCHEDULED &&
-	    last_element->state == REQ_SCHEDULED)
-	{
-            /* possible I/O optimization: see if all scheduled ops for this
-             * handle are for I/O.  If so, we can allow another concurrent
-             * I/O request to proceed 
-             */
-            tmp_flag = 0;
-            qlist_for_each(iterator, &tmp_list->req_list)
-            {
-                tmp_element2 = qlist_entry(iterator, struct req_sched_element,
-                    list_link);
-                if(tmp_element2->req_ptr->op != PVFS_SERV_IO)
-                {
-                    tmp_flag = 1;
-                    break;
-                }
-            }
-
-            if(!tmp_flag)
-            {
-                tmp_element->state = REQ_SCHEDULED;
-                ret = 1;
-                gossip_debug(GOSSIP_REQ_SCHED_DEBUG, "REQ SCHED allowing "
-                             "concurrent I/O, handle: %llu\n", llu(handle));
-            }
-            else
-            {
-                tmp_element->state = REQ_QUEUED;
-                ret = 0;
-            }
-	}
-	else if (readonly_flag &&
+	if (readonly_flag &&
 	    next_element->state == REQ_SCHEDULED &&
 	    last_element->state == REQ_SCHEDULED)
         {

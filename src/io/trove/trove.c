@@ -934,3 +934,36 @@ int trove_collection_setinfo(
            parameter);
 }
 
+int trove_version_find_commit(TROVE_coll_id coll_id,
+                              TROVE_coll_id * version_fs,
+                              TROVE_handle *handle,
+                              TROVE_offset ** stream_offsets,
+                              TROVE_size ** stream_sizes,
+                              int * stream_count,
+                              char ** membuff,
+                              TROVE_size * memsize)
+{
+    int method_id;
+
+    method_id = map_coll_id_to_method(coll_id);
+    if (method_id < 0) {
+        return -1; /* NEED STATUS TYPE FOR THIS */
+    }
+    return bstream_method_table[method_id]->version_commit(
+           version_fs,
+           handle,
+           stream_offsets,
+           stream_sizes,
+           stream_count,
+           membuff,
+           memsize);
+}
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 expandtab
+ */

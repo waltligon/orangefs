@@ -72,12 +72,14 @@ enum PVFS_server_op
     PVFS_SERV_SETEATTR = 30,
     PVFS_SERV_DELEATTR = 31,
     PVFS_SERV_LISTEATTR = 32,
-    PVFS_SERV_SMALL_IO = 33
+    PVFS_SERV_SMALL_IO = 33,
+    PVFS_SERV_COMMIT_TIMER = 34,
+    PVFS_SERV_VERSION_COMMIT = 35
     /* IMPORTANT: please remember to modify PVFS_MAX_SERVER_OP define
      * (below) if you add a new operation to this list
      */
 };
-#define PVFS_MAX_SERVER_OP 34
+#define PVFS_MAX_SERVER_OP 36
 
 /*
  * These ops must always work, even if the server is in admin mode.
@@ -1489,6 +1491,14 @@ endecode_fields_1a_struct(
 #define extra_size_PVFS_servresp_listeattr \
     (PVFS_REQ_LIMIT_KEY_LEN * PVFS_REQ_LIMIT_KEYVAL_LIST)
 
+struct PVFS_servreq_version_commit
+{
+    PVFS_fs_id fs_id;
+    PVFS_handle handle;
+};
+/* version commit does not need encoding funcs since its just
+ * used internally
+ */
 
 /* server request *********************************************/
 /* - generic request with union of all op specific structs */
@@ -1526,6 +1536,7 @@ struct PVFS_server_req
         struct PVFS_servreq_deleattr deleattr;
         struct PVFS_servreq_listeattr listeattr;
         struct PVFS_servreq_small_io small_io;
+        struct PVFS_servreq_version_commit version_commit;
     } u;
 };
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C

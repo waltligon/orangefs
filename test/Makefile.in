@@ -81,6 +81,9 @@ INCLUDES := \
     ${pvfs2_srcdir}/src/io/dev \
     ${pvfs2_srcdir}/src/proto \
     ${pvfs2_srcdir}/src/server \
+	 ${pvfs2_srcdir}/src/vec \
+	 ${pvfs2_srcdir}/src/dlm \
+	 ${pvfs2_srcdir}/src/client/synch \
     ${pvfs2_srcdir}/src/server/request-scheduler
 
 #################################################################

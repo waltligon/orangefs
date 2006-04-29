@@ -8,7 +8,6 @@
 # distclean      _really_ cleans up; returns to pristine tree
 # docs           builds documentation in docs subdirectory
 # docsclean      cleans up documentation files
-# publish        copy over documents to the PVFS.org web pags
 # admintools     builds admin tools
 # kernapps       builds userland helper programs for kernel driver 
 # statecomp      builds only the statecomp component
@@ -62,12 +61,16 @@ INSTALL = @INSTALL@
 # TODO: should probably check for bison and flex in configure
 BISON = bison
 FLEX = flex
+RPCGEN = rpcgen
+RPCGENFLAGS = -N -C -M
 BUILD_GM = @BUILD_GM@
 BUILD_IB = @BUILD_IB@
 BUILD_VIS = @BUILD_VIS@
 BUILD_KARMA = @BUILD_KARMA@
 BUILD_EPOLL = @BUILD_EPOLL@
 BUILD_SERVER = @BUILD_SERVER@
+BUILD_DLM  = @BUILD_DLM@
+BUILD_VEC  = @BUILD_VEC@
 NEEDS_LIBRT = @NEEDS_LIBRT@
 TARGET_OS_DARWIN = @TARGET_OS_DARWIN@
 TARGET_OS_LINUX = @TARGET_OS_LINUX@
@@ -104,7 +107,7 @@ build_static = @build_static@
 #    of a file that has the same name as the target.  Listing them
 #    here keeps make from accidentally doing too much work (see GNU
 #    make manual).
-.PHONY: all clean dist distclean docs docsclean publish cscope tags codecheck statecomp admintools kernapps
+.PHONY: all clean dist distclean docs docsclean cscope tags codecheck statecomp admintools kernapps
 
 ################################################################
 # Find project subdirectories
@@ -117,6 +120,11 @@ MODULES := $(shell find . -name "*.mk" | sed -e 's/^.\///;s/module.mk//')
 # List of directories to search for headers.
 INCLUDES := \
     src/client/sysint \
+	 src/client/synch \
+	 src/common/rpc \
+	 src/common/tpool/include \
+	 src/dlm      \
+	 src/vec      \
     src/common/misc \
     src/common/quickhash \
     src/common/quicklist \
@@ -144,10 +152,14 @@ BUILD_LD = @BUILD_CC@
 CFLAGS = @CFLAGS@
 LDFLAGS = @LDFLAGS@
 SERVER_LDFLAGS = @SERVER_LDFLAGS@
+DLM_LDFLAGS = @DLM_LDFLAGS@
+VEC_LDFLAGS = @VEC_LDFLAGS@
 LDSHARED = $(CC) -shared
 PICFLAGS = -fPIC
 LDFLAGS += -Llib 
 SERVER_LDFLAGS += -Llib
+DLM_LDFLAGS  += -L lib -lnsl -lpthread
+VEC_LDFLAGS  += -L lib -lnsl -lpthread
 LIBS += -lpvfs2 @LIBS@ 
 MMAP_RA_CACHE = @MMAP_RA_CACHE@
 TRUSTED_CONNECTIONS = @TRUSTED_CONNECTIONS@
@@ -223,11 +235,11 @@ SERVERCFLAGS = -D__GEN_POSIX_LOCKING__ -D__PVFS2_JOB_THREADED__ \
 # server side flow protocol connecting BMI with NCAC cache
 SERVERCFLAGS += -D__STATIC_FLOWPROTO_BMI_CACHE__
 
-SERVERLIBS = -lpvfs2-server @LIBS@ @DB_LIB@ -lpthread 
-
 ifdef NEEDS_LIBRT 
-	SERVERLIBS += -lrt
+	SERVERLIBS = -lrt
 endif
+
+SERVERLIBS += -lpthread -lpvfs2-server @LIBS@ @DB_LIB@
 
 # you can optionally disable thread safety support in the client
 # though it's not recommended unless *required*.
@@ -279,6 +291,16 @@ ifdef REDHAT_RELEASE
 CFLAGS += @REDHAT_RELEASE@
 endif
 
+# enable DLM flags if need be 
+ifdef BUILD_DLM
+CFLAGS += -DUSE_DLM
+endif
+
+#enable VEC flags if need be
+ifdef BUILD_VEC
+CFLAGS += -DUSE_VEC
+endif
+
 # Add gcc-specific flags if we know it is a gnu compiler.
 ifdef GNUC
 CFLAGS += $(GCC_CFLAGS)
@@ -319,6 +341,10 @@ KERNAPPSRC :=
 MISCSRC := 
 # c files generated from state machines
 SMCGEN :=
+# DLMSRC are sources for the dlm executable
+DLMSRC := 
+# VECSRC are sources for the version vector server executable
+VECSRC := 
 
 ################################################################
 # Top level (default) targets
@@ -330,6 +356,14 @@ ifdef BUILD_SERVER
 SERVER_STUB := src/server/pvfs2-server-stub
 # SERVER is the pvfs2 server
 SERVER := src/server/pvfs2-server
+endif
+
+ifdef BUILD_DLM
+DLMSERVER := src/dlm/dlm_prot_server
+endif
+
+ifdef BUILD_VEC
+VECSERVER := src/vec/vec_prot_server
 endif
 
 # LIBRARIES is a list of the pvfs2 client libraries
@@ -393,6 +427,18 @@ ifdef BUILD_SERVER
     SERVERDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(SERVERSRC)))
 endif
 
+ifdef BUILD_DLM
+    DLMOBJS := $(patsubst %.c,%.o, $(filter %.c,$(DLMSRC)))
+    # SERVERDEPENDS is a list of dependency files for the server
+    DLMDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(DLMSRC)))
+endif
+
+ifdef BUILD_VEC
+    VECOBJS := $(patsubst %.c,%.o, $(filter %.c,$(VECSRC)))
+    # SERVERDEPENDS is a list of dependency files for the server
+    VECDEPENDS := $(patsubst %.c,%.d, $(filter %.c,$(VECSRC)))
+endif
+
 # MISCOBJS is a list of misc. objects not in the above categories
 MISCOBJS := $(patsubst %.c,%.o, $(filter %.c,$(MISCSRC)))
 # MISCDEPENDS is a list of dependency files for misc. objects
@@ -444,19 +490,19 @@ DOCSCRUFT += $(patsubst %.tex,%.toc, $(filter %.tex,$(DOCSRC)))
 #   doesn't matter at all.
 DEPENDS := $(sort $(LIBDEPENDS) $(SERVERDEPENDS) $(MISCDEPENDS) \
     $(ADMINDEPENDS) $(ADMINDEPENDS_SERVER) $(KERNAPPDEPENDS) $(VISDEPENDS) \
-    $(VISMISCDEPENDS) $(KARMADEPENDS) $(STATECOMPDEPS))
+    $(VISMISCDEPENDS) $(KARMADEPENDS) $(STATECOMPDEPS) $(DLMDEPENDS) $(VECDEPENDS)) 
 
 ####################################################################
 # Rules and dependencies
 
 # default rule builds server, library, and applications
-all:: $(SERVER) $(KARMA) $(LIBRARIES) admintools $(VISS) $(KARMA)
+all:: $(SERVER) $(KARMA) $(LIBRARIES) admintools $(VISS) $(KARMA) $(DLMSERVER) $(VECSERVER)
 
 # target for building admin tools
 admintools: $(ADMINTOOLS) $(ADMINTOOLS_SERVER)
 
 # target for building kernel driver userland programs
-kernapps: $(KERNAPPS)
+kernapps: $(KERNAPPS) 
 
 # Build linux-2.6 kernel module if requested.
 # Can't use the actual file target since we don't know how to figure out
@@ -496,20 +542,23 @@ modldflags = $(MODLDFLAGS_$(call canonname,$(1))) \
 # note: this will look better if you use two tabs instead of spaces between
 # SHORT_NAME and the object
 
+$(DLMSERVER): src/dlm/dlm_prot.h $(DLMOBJS)
+	$(Q) "  LD		$@"
+	$(E)$(LD) $(DLMOBJS) -o $@ $(DLM_LDFLAGS) $(LIBS)
+
+$(VECSERVER): src/vec/vec_prot.h $(VECOBJS)
+	$(Q) "  LD		$@"
+	$(E)$(LD) $(VECOBJS) -o $@ $(VEC_LDFLAGS) $(LIBS)
+
 # rule for building the pvfs2 server
 $(SERVER): src/server/pvfs2-server-server.o lib/libpvfs2-server.a 
 	$(Q) "  LD		$@"
 	$(E)$(LD) $^ -o $@ $(SERVER_LDFLAGS) $(SERVERLIBS)
 
-# special rules for admin tool objects which also require server components
-$(ADMINOBJS_SERVER): %.o: %.c
-	$(Q) "  CC		$@"
-	$(E) $(CC) $(SERVERCFLAGS) $(CFLAGS) $(call modcflags,$<) $< -c -o $@
-
 # special rules for admin tools which also require server components
 $(ADMINTOOLS_SERVER): %: %.o
 	$(Q) "  LD		$@"
-	$(E)$(LD) $< $(LDFLAGS) $(SERVER_LDFLAGS) $(SERVERLIBS) -o $@
+	$(E)$(LD) $< $(LDFLAGS) $(SERVERLIBS) -o $@
 
 # rule for building the pvfs2 library
 lib/libpvfs2.a: $(LIBOBJS)
@@ -581,6 +630,23 @@ $(VISS): %: %.o $(VISMISCOBJS) $(LIBRARIES)
 	$(Q) "  CCPIC		$@"
 	$(E)$(CC) $(LIBCFLAGS) $(CFLAGS) $(PICFLAGS) $(call modcflags,$<) $< -c -o $@
 
+# generating C sources from RPC interface definitions
+%_clnt.c: %.x %.h
+	$(Q) "  RPCGEN[C]	$@"
+	$(E)$(RPCGEN) $(RPCGENFLAGS) -l $< > $@
+
+%_xdr.c: %.x %.h
+	$(Q) "  RPCGEN[X]	$@"
+	$(E)$(RPCGEN) $(RPCGENFLAGS) -c $< > $@
+
+%_svc.c: %.x %.h
+	$(Q) "  RPCGEN[S]	$@"
+	$(E)$(RPCGEN) $(RPCGENFLAGS) -m $< > $@
+
+%.h: %.x
+	$(Q) "  RPCGEN[H]	$@"
+	$(E)$(RPCGEN) $(RPCGENFLAGS) -h $< > $@
+
 # bison and yacc
 %.c: %.y
 	$(Q) "  BISON		$@"
@@ -637,9 +703,6 @@ codecheck:
 # target for building documentation
 docs: $(DOCSPS) $(DOCSPDF) $(DOCSHTML)
 
-publish: docs
-	$(srcdir)/maint/pvfs2-publish-pages `pwd`/doc
-
 # rule for cleaning up documentation
 # latex2html puts all its output in a directory
 docsclean: 
@@ -656,12 +719,16 @@ clean::
 		$(KERNAPPOBJS) $(KERNAPPS) \
 		$(VISS) $(VISMISCOBJS) $(VISOBJS) $(VISDEPENDS)\
 		$(VISMISCDEPENDS) $(KARMAOBJS) $(LIBPICOBJS) \
-		$(STATECOMP) $(STATECOMPOBJS) \
+		$(STATECOMP) $(STATECOMPOBJS) $(DLMOBJS) $(DLMDEPENDS) $(VECOBJS) $(VECDEPENDS) \
 		src/server/pvfs2-server-server.o \
-		src/apps/karma/karma 
+		src/apps/karma/karma src/dlm/dlm_prot_server src/vec/vec_prot_server
 ifndef DIST_RELEASE
 	$(E)rm -f $(STATECOMPGEN) 
 endif
+	@find . -name "*prot.h" -exec rm \{\} \;
+	@find . -name "*prot_svc.c" -exec rm \{\} \;
+	@find . -name "*prot_clnt.c" -exec rm \{\} \;
+	@find . -name "*prot_xdr.c" -exec rm \{\} \;
 
 ifneq (,$(LINUX_KERNEL_SRC))
 clean::
@@ -778,7 +845,7 @@ install:: all install_doc
 
 	install -d $(prefix)/lib
 	install -m 755 $(LIBRARIES) $(prefix)/lib
-
+	
 ifdef TARGET_OS_DARWIN
 #       TOC needs to be regenerated in libs after they get moved
 	ranlib $(patsubst %,$(prefix)/%,$(LIBRARIES))
@@ -803,6 +870,12 @@ ifdef BUILD_SERVER
 	install -m 755 $(srcdir)/$(SERVER_STUB) $(prefix)/sbin/pvfs2-server
 	install -m 755 $(SERVER) $(prefix)/sbin/pvfs2-server.bin
     endif
+endif
+ifdef BUILD_DLM
+	install -m 755 $(DLMSERVER) $(prefix)/sbin
+endif
+ifdef BUILD_VEC
+	install -m 755 $(VECSERVER) $(prefix)/sbin
 endif
 
 ifneq (,$(LINUX_KERNEL_SRC))

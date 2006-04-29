@@ -25,7 +25,9 @@ enum
     CTX_DATAHANDLERANGES = (1 << 6),
     CTX_STORAGEHINTS     = (1 << 7),
     CTX_DISTRIBUTION     = (1 << 8),
-    CTX_SECURITY         = (1 << 9)
+    CTX_SECURITY         = (1 << 9),
+    CTX_DLM_SERVERS      = (1 << 10),
+    CTX_VEC_SERVERS      = (1 << 11),
 };
 
 typedef struct phys_server_desc
@@ -55,12 +57,24 @@ typedef struct host_handle_mapping_s
     PVFS_handle_extent_array handle_extent_array;
 } host_handle_mapping_s;
 
+typedef struct host_synch_server_mapping_s
+{
+    struct host_alias_s *alias_mapping;
+    unsigned short       port;
+} host_synch_server_mapping_s;
+
 typedef struct filesystem_configuration_s
 {
     char *file_system_name;
     PVFS_fs_id coll_id;
     PVFS_handle  root_handle;
     int default_num_dfiles;
+
+    /* ptrs are type host_synch_server_mapping_s */
+    PINT_llist *dlm_server_list;
+
+    /* ptrs are type host_synch_server_mapping_s */
+    PINT_llist *vec_server_list;
 
     /* ptrs are type host_handle_mapping_s* */
     PINT_llist *meta_handle_ranges;
@@ -81,6 +95,7 @@ typedef struct filesystem_configuration_s
     int attr_cache_max_num_elems;
     int trove_sync_meta;
     int trove_sync_data;
+    int trove_allowed_buffer_size;
 
 } filesystem_configuration_s;
 
@@ -187,6 +202,13 @@ char *PINT_config_get_merged_handle_range_str(
     struct server_configuration_s *config_s,
     struct filesystem_configuration_s *fs);
 
+void PINT_config_get_synch_port(
+    struct server_configuration_s *config_s,
+    struct filesystem_configuration_s *fs,
+    char *server_address,
+    int *dlm_port,
+    int *vec_port);
+
 int PINT_config_is_valid_configuration(
     struct server_configuration_s *config_s);
 
@@ -222,6 +244,9 @@ int PINT_config_get_trove_sync_meta(
     struct server_configuration_s *config,
     PVFS_fs_id fs_id);
 int PINT_config_get_trove_sync_data(
+    struct server_configuration_s *config,
+    PVFS_fs_id fs_id);
+int PINT_config_get_trove_allowed_buffer_size(
     struct server_configuration_s *config,
     PVFS_fs_id fs_id);
 #endif

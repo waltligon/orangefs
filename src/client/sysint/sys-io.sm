@@ -24,8 +24,15 @@
 #include "PINT-reqproto-encode.h"
 #include "pint-util.h"
 #include "pvfs2-internal.h"
+/* synch functions and prototypes */
+#include "pvfs2-synch-client.h"
+#include "pint-distribution.h"
+#include "pvfs2-dist-basic.h"
+#include "pvfs2-dist-simple-stripe.h"
+#include "pvfs2-dist-varstrip.h"
 
 #define IO_MAX_SEGMENT_NUM 50 
+#define IO_SYNCH_TIMEOUT   5000
 
 extern job_context_id pint_client_sm_context;
 
@@ -55,6 +62,12 @@ static int io_analyze_size_results(
     PINT_client_sm *sm_p, job_status_s *js_p);
 static int io_cleanup(
     PINT_client_sm *sm_p, job_status_s *js_p);
+
+/* Synchronization routines that may block the entire caller for now */
+static int io_pre_synch_region(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static void io_post_synch_region(
+    PINT_client_sm *sm_p);
 
 /* Helper functions local to sys-io.sm. */
 
@@ -152,6 +165,7 @@ static void io_datafile_index_array_destroy(
 machine pvfs2_client_io_sm(
     init,
     io_getattr,
+    io_synch_region,
     io_datafile_setup_msgpairs,
     small_io,
     io_datafile_post_msgpairs,
@@ -171,6 +185,13 @@ machine pvfs2_client_io_sm(
     state io_getattr
     {
         jump pvfs2_client_getattr_sm;
+        success => io_synch_region;
+        default => io_cleanup;
+    }
+
+    state io_synch_region
+    {
+        run io_pre_synch_region; /* for now this function could block */
         success => io_datafile_setup_msgpairs;
         default => io_cleanup;
     }
@@ -247,6 +268,9 @@ machine pvfs2_client_io_sm(
 /** Initiate a read or write operation.
  *
  *  \param type specifies if the operation is a read or write.
+ *  \param synch_method specified if the operation needs to be synchronized
+ *         and if so the method used to synchronize access to the data.
+ *         For now, this applies only to PVFS_Request_contiguous datatypes
  */
 PVFS_error PVFS_isys_io(
     PVFS_object_ref ref,
@@ -257,6 +281,7 @@ PVFS_error PVFS_isys_io(
     PVFS_credentials *credentials,
     PVFS_sysresp_io *resp_p,
     enum PVFS_io_type io_type,
+    enum PVFS_synch_method synch_method,
     PVFS_sys_op_id *op_id,
     void *user_ptr)
 {
@@ -311,6 +336,7 @@ PVFS_error PVFS_isys_io(
     PINT_init_msgarray_params(&sm_p->msgarray_params, ref.fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->u.io.io_type = io_type;
+    sm_p->u.io.synch_method = synch_method;
     sm_p->u.io.file_req = file_req;
     sm_p->u.io.file_req_offset = file_req_offset;
     sm_p->u.io.io_resp_p = resp_p;
@@ -334,6 +360,12 @@ PVFS_error PVFS_isys_io(
 /** Perform a read or write operation.
  *
  *  \param type specifies if the operation is a read or write.
+ *  \param synch_method synchronizes the read/write according to the method
+ *         specified. NOTE: We don't handle anything other than PVFS_Request_
+ *         contiguous as file_req if synch_method is specified.
+ *         This is ok since the only interface that we do care about is the 
+ *         VFS interface users which only make use of PVFS_Request_contiguous
+ *         so far!
  */
 PVFS_error PVFS_sys_io(
     PVFS_object_ref ref,
@@ -343,7 +375,8 @@ PVFS_error PVFS_sys_io(
     PVFS_Request mem_req,
     PVFS_credentials *credentials,
     PVFS_sysresp_io *resp_p,
-    enum PVFS_io_type io_type)
+    enum PVFS_io_type io_type,
+    enum PVFS_synch_method synch_method)
 {
     PVFS_error ret = -PVFS_EINVAL, error = 0;
     PVFS_sys_op_id op_id;
@@ -351,7 +384,7 @@ PVFS_error PVFS_sys_io(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PVFS_sys_io entered\n");
 
     ret = PVFS_isys_io(ref, file_req, file_req_offset, buffer, mem_req,
-                       credentials, resp_p, io_type, &op_id, NULL);
+                       credentials, resp_p, io_type, synch_method, &op_id, NULL);
     if (ret == 1)
         return 0;
     else if (ret < 0)
@@ -410,6 +443,91 @@ static int io_init(PINT_client_sm *sm_p,
             pint_client_sm_context);
     }
     return 1;
+}
+
+/* Kludgey check to see if request is a contiguous request or not */
+static int is_contig(PVFS_Request req)
+{
+    PVFS_size    extent;
+
+    PVFS_Request_extent(req, &extent);
+    if (extent == req->aggregate_size && req->lb == 0)
+    {
+        return 1;
+    }
+    else {
+        return 0;
+    }
+}
+
+static int io_pre_synch_region(PINT_client_sm *sm_p,
+                                job_status_s *js_p)
+{
+    int timeout;
+    int stripe_size = 65536, nservers = 0;
+
+    if (sm_p->op_cancelled)
+    {
+        js_p->error_code = -PVFS_ECANCEL;
+        goto exit;
+    }
+    js_p->error_code = 0;
+    /* if there is no need for any synchronization return quickly */
+    if (sm_p->u.io.synch_method == PVFS_SYNCH_NONE)
+    {
+        goto exit;
+    }
+    /* Assert that file_req is only of type Request_contiguous, since
+       we cannot handle any other types just yet! */
+    if (!is_contig(sm_p->u.io.file_req))
+    {
+        gossip_err("Cannot handle non contiguous file request (yet!)\n");
+        /* operate without synchronization */
+        goto exit;
+    }
+    if (strcmp(sm_p->getattr.attr.u.meta.dist->dist_name, 
+        PVFS_DIST_SIMPLE_STRIPE_NAME) == 0) 
+    {
+        PVFS_simple_stripe_params params;
+        PINT_dist_getparams(&params, sm_p->getattr.attr.u.meta.dist);
+        stripe_size = params.strip_size;
+    }
+    nservers = sm_p->getattr.attr.u.meta.dfile_count;
+    gossip_debug(GOSSIP_IO_DEBUG,
+        "io_pre_synch [fsid %u handle %Ld, mode %d, offset %Ld agg_size %Ld strip_size %d nservers %d]\n",
+        sm_p->object_ref.fs_id, sm_p->object_ref.handle, sm_p->u.io.io_type, 
+        sm_p->u.io.file_req_offset, sm_p->u.io.file_req->aggregate_size,
+        stripe_size, nservers);
+
+    /* call a possibly blocking synchronization routine
+     * if timeout < 0  ==> post a synchronization operation that will prevent this 
+     *                     sm progress, but allows other sm's to progress.
+     * if timeout == 0 ==> invoke a infinite blocking synchronization operation that
+      *                    will prevent any sm from progressing.
+     * if timeout > 0  ==> invoke a finite blocking synchronization operation that 
+     *                     will prevent any sm from progresssing upto timeout mseconds.
+     */
+    timeout = 0; /* blocking for now */
+    js_p->error_code = 
+        PINT_pre_synch(sm_p->u.io.synch_method, /* Synchronization method */
+            &sm_p->object_ref, /* object handle */
+            sm_p->u.io.io_type,       /* Mode */
+            sm_p->u.io.file_req_offset, /* offset */
+            sm_p->u.io.file_req->aggregate_size, /* count */
+            stripe_size, nservers,
+            timeout,
+            &sm_p->u.io.synch_user_ptr);
+exit:
+    return 1;
+}
+
+static void io_post_synch_region(PINT_client_sm *sm_p)
+{
+    if (sm_p->u.io.synch_method == PVFS_SYNCH_NONE)
+        return;
+    /* In case anything needs to be cleaned up do it here */
+    PINT_post_synch(sm_p->u.io.synch_user_ptr, 0);
+    return;
 }
 
 static int io_datafile_setup_msgpairs(PINT_client_sm *sm_p,
@@ -1084,22 +1202,6 @@ static int io_datafile_complete_operations(PINT_client_sm *sm_p,
             cur_ctx->msg_send_has_been_posted = 0;
             cur_ctx->msg_recv_has_been_posted = 0;
         }
-        else
-        {
-            /* if we successfully received an ack.  If the flow has _not_
-             * finished, then we should go ahead and cancel it (the ack is
-             * reporting an error, no point in waiting for flow timeout).  
-             */
-            if(cur_ctx->flow_in_progress != 0)
-            {
-                job_flow_cancel(cur_ctx->flow_job_id,
-                    pint_client_sm_context);
-                /* bump up the retry count to prevent the state machine from
-                 * restarting after this error propigates
-                 */
-                sm_p->u.io.retry_count = sm_p->msgarray_params.retry_limit;
-            }
-        }
     }
 
   check_next_step:
@@ -1136,7 +1238,7 @@ static int io_datafile_complete_operations(PINT_client_sm *sm_p,
         if (!cur_ctx->msg_send_has_been_posted)
             break;
     }
-    if (i < sm_p->u.io.datafile_count && !sm_p->op_cancelled) {
+    if (i < sm_p->u.io.datafile_count) {
         gossip_debug(GOSSIP_IO_DEBUG,
           "*** %s: some msgpairs to repost\n", __func__);
         js_p->error_code = IO_RETRY;
@@ -1188,7 +1290,6 @@ static int io_analyze_results(PINT_client_sm *sm_p,
          * small I/O state machine sets the total_size directly
          */
 
-        ret = 0;
         if(!sm_p->u.io.small_io)
         {
             for(i = 0; i < sm_p->u.io.context_count; i++)
@@ -1209,8 +1310,8 @@ static int io_analyze_results(PINT_client_sm *sm_p,
                     }
                     else
                     {
-                        gossip_debug(GOSSIP_IO_DEBUG, 
-                            "io_check_context_status found error: %d", ret);
+                        PVFS_perror_gossip(
+                            "io_check_context_status found error", ret);
                     }
                     break;
                 }
@@ -1277,15 +1378,10 @@ static int io_analyze_results(PINT_client_sm *sm_p,
         goto analyze_results_exit;
     }
 
-    /* all other errors we should just propigate immediately */
-    if(ret != 0)
-    {
-        js_p->error_code = ret;
-        goto analyze_results_exit;
-    }
-
     gossip_debug(GOSSIP_IO_DEBUG, "total bytes transferred is %lld\n",
                  lld(sm_p->u.io.total_size));
+
+    ret = 0;
 
     if(sm_p->u.io.io_type == PVFS_IO_WRITE)
     {
@@ -1566,6 +1662,9 @@ static int io_cleanup(PINT_client_sm *sm_p,
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "(%p) io state: io_cleanup\n", sm_p);
+
+    /* call any post synchronization cleanup function */
+    io_post_synch_region(sm_p);
 
     io_contexts_destroy(sm_p);
 
@@ -1990,11 +2089,30 @@ static inline int io_check_context_status(
                      cur_ctx->msg.recv_status.error_code, cur_ctx);
         ret = cur_ctx->msg.recv_status.error_code;
     }
+    else if (cur_ctx->flow_status.error_code)
+    {
+        gossip_debug(GOSSIP_IO_DEBUG,
+                     "  error (%d) in flow for context %p\n",
+                     cur_ctx->flow_status.error_code, cur_ctx);
+        PINT_flow_reset(&cur_ctx->flow_desc);
+        ret = cur_ctx->flow_status.error_code;
+    }
+    else if (io_type == PVFS_IO_READ)
+    {
+        gossip_debug(
+            GOSSIP_IO_DEBUG, "  %lld bytes read from context %p\n",
+            lld(cur_ctx->flow_desc.total_transferred), cur_ctx);
+
+        /* size for reads are reported in the flow */
+        *total_size += cur_ctx->flow_desc.total_transferred;
+
+        /*
+          we can't reset the flow here in case we have to do a zero
+          fill adjustment that we haven't detected yet
+        */
+    }
     else if (io_type == PVFS_IO_WRITE)
     {
-        /* we check the write ack status before the flow status so that the
-         * error code that the server reported in the ack takes precedence
-         */
         if (cur_ctx->write_ack.recv_status.error_code)
         {
             gossip_debug(
@@ -2026,9 +2144,6 @@ static inline int io_check_context_status(
                     cur_ctx);
 
                 *total_size += resp->u.write_completion.total_completed;
-                
-                /* pass along the error code from the server as well */
-                ret = resp->status;
 
                 PINT_decode_release(&decoded_resp, PINT_DECODE_RESP);
             }
@@ -2042,38 +2157,7 @@ static inline int io_check_context_status(
                         cur_ctx->write_ack.encoded_resp_p,
                         cur_ctx->write_ack.max_resp_sz, BMI_RECV);
         }
-        else if (cur_ctx->flow_status.error_code)
-        {
-            gossip_debug(GOSSIP_IO_DEBUG,
-                         "  error (%d) in flow for context %p\n",
-                         cur_ctx->flow_status.error_code, cur_ctx);
-            PINT_flow_reset(&cur_ctx->flow_desc);
-            ret = cur_ctx->flow_status.error_code;
-        }
     }
-    else if (cur_ctx->flow_status.error_code)
-    {
-        gossip_debug(GOSSIP_IO_DEBUG,
-                     "  error (%d) in flow for context %p\n",
-                     cur_ctx->flow_status.error_code, cur_ctx);
-        PINT_flow_reset(&cur_ctx->flow_desc);
-        ret = cur_ctx->flow_status.error_code;
-    }
-    else if (io_type == PVFS_IO_READ)
-    {
-        gossip_debug(
-            GOSSIP_IO_DEBUG, "  %lld bytes read from context %p\n",
-            lld(cur_ctx->flow_desc.total_transferred), cur_ctx);
-
-        /* size for reads are reported in the flow */
-        *total_size += cur_ctx->flow_desc.total_transferred;
-
-        /*
-          we can't reset the flow here in case we have to do a zero
-          fill adjustment that we haven't detected yet
-        */
-    }
-
     return ret;
 }
 
@@ -2296,13 +2380,10 @@ static int io_find_target_datafiles(
         if (total_bytes != 0)
         {
             handle_index_array[(*handle_index_out_count)++] = i;
-
-#ifndef PVFS2_SMALL_IO_OFF
             if(total_bytes <= max_unexp_payload)
             {
                 sio_handle_index_array[(*sio_handle_index_count)++] = i;
             }
-#endif
 
             gossip_debug(GOSSIP_IO_DEBUG, "%s: "
                          "datafile[%d] might have data (out=%d)\n",
