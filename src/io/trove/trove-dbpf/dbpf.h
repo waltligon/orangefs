@@ -281,7 +281,8 @@ struct dbpf_bstream_resize_op
  */
 struct bstream_listio_state
 {
-    int mem_ct, stream_ct, cur_mem_size;
+    int mem_ct, stream_ct;
+    TROVE_size cur_mem_size;
     char *cur_mem_off;
     TROVE_size cur_stream_size;
     TROVE_offset cur_stream_off;

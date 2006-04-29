@@ -227,6 +227,7 @@ io/dev/module.mk
 client/sysint/module.mk
 client/mpi-io/module.mk
 client/vfs/module.mk
+vec/module.mk
 proto/module.mk
 server/module.mk
 server/request-scheduler/module.mk

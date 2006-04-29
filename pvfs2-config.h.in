@@ -28,9 +28,6 @@
 /* Define if struct backing_dev_info in kernel has memory_backed */
 #undef HAVE_BDI_MEMORY_BACKED
 
-/* Define if there exists a compat_ioctl member in file_operations */
-#undef HAVE_COMPAT_IOCTL_HANDLER
-
 /* Define if third param (message) to DB error callback function is const */
 #undef HAVE_CONST_THIRD_PARAMETER_TO_DB_ERROR_CALLBACK
 
@@ -48,9 +45,6 @@
 
 /* Define to 1 if you have the `fgetxattr' function. */
 #undef HAVE_FGETXATTR
-
-/* Define if fgetxattr takes position and option arguments */
-#undef HAVE_FGETXATTR_EXTRA_ARGS
 
 /* Define if system provides fgtxattr prototype */
 #undef HAVE_FGETXATTR_PROTOTYPE
@@ -95,20 +89,11 @@
 /* Define to 1 if you have the `efence' library (-lefence). */
 #undef HAVE_LIBEFENCE
 
-/* Define to 1 if you have the <linux/compat.h> header file. */
-#undef HAVE_LINUX_COMPAT_H
-
-/* Define to 1 if you have the <linux/ioctl32.h> header file. */
-#undef HAVE_LINUX_IOCTL32_H
-
 /* Define to 1 if you have the <linux/posix_acl.h> header file. */
 #undef HAVE_LINUX_POSIX_ACL_H
 
 /* Define to 1 if you have the <linux/posix_acl_xattr.h> header file. */
 #undef HAVE_LINUX_POSIX_ACL_XATTR_H
-
-/* Define to 1 if you have the <linux/syscalls.h> header file. */
-#undef HAVE_LINUX_SYSCALLS_H
 
 /* Define to 1 if you have the <linux/xattr_acl.h> header file. */
 #undef HAVE_LINUX_XATTR_ACL_H
@@ -136,9 +121,6 @@
 
 /* Define if sysctl proc handlers have 6th argument */
 #undef HAVE_PROC_HANDLER_SIX_ARG
-
-/* Define if kernel has register_ioctl32_conversion */
-#undef HAVE_REGISTER_IOCTL32_CONVERSION
 
 /* Define to 1 if you have the <SDL/SDL_ttf.h> header file. */
 #undef HAVE_SDL_SDL_TTF_H
