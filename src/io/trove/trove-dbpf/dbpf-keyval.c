@@ -1541,7 +1541,6 @@ struct TROVE_keyval_ops dbpf_keyval_ops =
     dbpf_keyval_write_list,
     dbpf_keyval_flush
 };
-
 /*
  * Local variables:
  *  c-indent-level: 4

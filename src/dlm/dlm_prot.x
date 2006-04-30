@@ -211,7 +211,7 @@ program DLM_MGR {
 		dlm_lockv_resp  DLM_LOCKV(dlm_lockv_req)   = 2;
 		dlm_unlock_resp DLM_UNLOCK(dlm_unlock_req) = 3;
 	} = 1;
-} = 0x20000101; /* Some unique number... that's all */
+} = 0x20000101; /* Some unique program number which is not used internally anyway */
 /*
  * Local variables:
  *  c-indent-level: 3

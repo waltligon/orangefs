@@ -211,7 +211,7 @@ program VEC_MGR {
 		vec_get_resp   VEC_GET(vec_get_req)     = 1;
 		vec_put_resp   VEC_PUT(vec_put_req)     = 2;
 	} = 1;
-} = 0x20000201; /* Some unique number... that's all */
+} = 0x20000201; /* Some unique number which is anyway not used internally */
 
 /*
  * Local variables:
