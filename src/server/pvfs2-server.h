@@ -153,7 +153,8 @@ enum
     METAFILE_HANDLES_KEY = 2,
     METAFILE_DIST_KEY    = 3,
     SYMLINK_TARGET_KEY   = 4,
-    DIRDATA_SIZE_KEY     = 5
+    DIRDATA_SIZE_KEY     = 5,
+    KEYVAL_ARRAY_SIZE    = 6
 };
 
 typedef enum

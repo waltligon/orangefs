@@ -36,7 +36,7 @@ typedef struct PVFS_ds_keyval_s PVFS_ds_keyval;
 
 struct PVFS_vtag_s
 {
-    unsigned long version;
+    uint32_t version;
 };
 typedef struct PVFS_vtag_s PVFS_vtag;
 

@@ -70,7 +70,7 @@ extern "C" {
  PINT_event_timestamp(PVFS_EVENT_API_TROVE, __op, 0, __id,               \
  PVFS_EVENT_FLAG_END)
 
-#define DBPF_GET_STORAGE_DIRNAME(__buf, __path_max, __stoname)          \
+#define DBPF_GET_STORAGE_DIRNAME(__buf, __path_max, __stoname)           \
 do { snprintf(__buf, __path_max, "/%s", __stoname); } while (0)
 
 #define STO_ATTRIB_DBNAME "storage_attributes.db"
@@ -163,6 +163,7 @@ struct dbpf_storage
     char *name;
     DB *sto_attr_db;
     DB *coll_db;
+    DB_ENV *sto_env;
 };
 
 struct dbpf_collection

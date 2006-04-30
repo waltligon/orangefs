@@ -10,7 +10,8 @@ CSRC := \
 	$(DIR)/client-state-machine.c \
 	$(DIR)/mgmt-misc.c \
 	$(DIR)/sys-dist.c \
-	$(DIR)/error-details.c
+	$(DIR)/error-details.c \
+	$(DIR)/statfs.c
 
 CLIENT_SMCGEN := \
 	$(DIR)/remove.c \

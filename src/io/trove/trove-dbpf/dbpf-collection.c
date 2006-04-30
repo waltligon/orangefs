@@ -13,6 +13,7 @@
 #include <assert.h>
 #include <limits.h>
 #include <string.h>
+#include <db.h>
 
 #include "trove.h"
 #include "trove-internal.h"
