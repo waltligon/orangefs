@@ -1202,6 +1202,22 @@ static int io_datafile_complete_operations(PINT_client_sm *sm_p,
             cur_ctx->msg_send_has_been_posted = 0;
             cur_ctx->msg_recv_has_been_posted = 0;
         }
+        else
+        {
+            /* if we successfully received an ack.  If the flow has _not_
+             * finished, then we should go ahead and cancel it (the ack is
+             * reporting an error, no point in waiting for flow timeout).  
+             */
+            if(cur_ctx->flow_in_progress != 0)
+            {
+                job_flow_cancel(cur_ctx->flow_job_id,
+                    pint_client_sm_context);
+                /* bump up the retry count to prevent the state machine from
+                 * restarting after this error propigates
+                 */
+                sm_p->u.io.retry_count = sm_p->msgarray_params.retry_limit;
+            }
+        }
     }
 
   check_next_step:
@@ -1238,7 +1254,7 @@ static int io_datafile_complete_operations(PINT_client_sm *sm_p,
         if (!cur_ctx->msg_send_has_been_posted)
             break;
     }
-    if (i < sm_p->u.io.datafile_count) {
+    if (i < sm_p->u.io.datafile_count && !sm_p->op_cancelled) {
         gossip_debug(GOSSIP_IO_DEBUG,
           "*** %s: some msgpairs to repost\n", __func__);
         js_p->error_code = IO_RETRY;
@@ -1290,6 +1306,7 @@ static int io_analyze_results(PINT_client_sm *sm_p,
          * small I/O state machine sets the total_size directly
          */
 
+        ret = 0;
         if(!sm_p->u.io.small_io)
         {
             for(i = 0; i < sm_p->u.io.context_count; i++)
@@ -1310,8 +1327,8 @@ static int io_analyze_results(PINT_client_sm *sm_p,
                     }
                     else
                     {
-                        PVFS_perror_gossip(
-                            "io_check_context_status found error", ret);
+                        gossip_debug(GOSSIP_IO_DEBUG, 
+                            "io_check_context_status found error: %d", ret);
                     }
                     break;
                 }
@@ -1375,6 +1392,13 @@ static int io_analyze_results(PINT_client_sm *sm_p,
                      "(attempt number %d)\n", sm_p->u.io.retry_count);
 
         js_p->error_code = IO_RETRY;
+        goto analyze_results_exit;
+    }
+
+    /* all other errors we should just propigate immediately */
+    if(ret != 0)
+    {
+        js_p->error_code = ret;
         goto analyze_results_exit;
     }
 
@@ -2089,30 +2113,11 @@ static inline int io_check_context_status(
                      cur_ctx->msg.recv_status.error_code, cur_ctx);
         ret = cur_ctx->msg.recv_status.error_code;
     }
-    else if (cur_ctx->flow_status.error_code)
-    {
-        gossip_debug(GOSSIP_IO_DEBUG,
-                     "  error (%d) in flow for context %p\n",
-                     cur_ctx->flow_status.error_code, cur_ctx);
-        PINT_flow_reset(&cur_ctx->flow_desc);
-        ret = cur_ctx->flow_status.error_code;
-    }
-    else if (io_type == PVFS_IO_READ)
-    {
-        gossip_debug(
-            GOSSIP_IO_DEBUG, "  %lld bytes read from context %p\n",
-            lld(cur_ctx->flow_desc.total_transferred), cur_ctx);
-
-        /* size for reads are reported in the flow */
-        *total_size += cur_ctx->flow_desc.total_transferred;
-
-        /*
-          we can't reset the flow here in case we have to do a zero
-          fill adjustment that we haven't detected yet
-        */
-    }
     else if (io_type == PVFS_IO_WRITE)
     {
+        /* we check the write ack status before the flow status so that the
+         * error code that the server reported in the ack takes precedence
+         */
         if (cur_ctx->write_ack.recv_status.error_code)
         {
             gossip_debug(
@@ -2144,6 +2149,9 @@ static inline int io_check_context_status(
                     cur_ctx);
 
                 *total_size += resp->u.write_completion.total_completed;
+                
+                /* pass along the error code from the server as well */
+                ret = resp->status;
 
                 PINT_decode_release(&decoded_resp, PINT_DECODE_RESP);
             }
@@ -2157,7 +2165,38 @@ static inline int io_check_context_status(
                         cur_ctx->write_ack.encoded_resp_p,
                         cur_ctx->write_ack.max_resp_sz, BMI_RECV);
         }
+        else if (cur_ctx->flow_status.error_code)
+        {
+            gossip_debug(GOSSIP_IO_DEBUG,
+                         "  error (%d) in flow for context %p\n",
+                         cur_ctx->flow_status.error_code, cur_ctx);
+            PINT_flow_reset(&cur_ctx->flow_desc);
+            ret = cur_ctx->flow_status.error_code;
+        }
     }
+    else if (cur_ctx->flow_status.error_code)
+    {
+        gossip_debug(GOSSIP_IO_DEBUG,
+                     "  error (%d) in flow for context %p\n",
+                     cur_ctx->flow_status.error_code, cur_ctx);
+        PINT_flow_reset(&cur_ctx->flow_desc);
+        ret = cur_ctx->flow_status.error_code;
+    }
+    else if (io_type == PVFS_IO_READ)
+    {
+        gossip_debug(
+            GOSSIP_IO_DEBUG, "  %lld bytes read from context %p\n",
+            lld(cur_ctx->flow_desc.total_transferred), cur_ctx);
+
+        /* size for reads are reported in the flow */
+        *total_size += cur_ctx->flow_desc.total_transferred;
+
+        /*
+          we can't reset the flow here in case we have to do a zero
+          fill adjustment that we haven't detected yet
+        */
+    }
+
     return ret;
 }
 
@@ -2380,10 +2419,13 @@ static int io_find_target_datafiles(
         if (total_bytes != 0)
         {
             handle_index_array[(*handle_index_out_count)++] = i;
+
+#ifndef PVFS2_SMALL_IO_OFF
             if(total_bytes <= max_unexp_payload)
             {
                 sio_handle_index_array[(*sio_handle_index_count)++] = i;
             }
+#endif
 
             gossip_debug(GOSSIP_IO_DEBUG, "%s: "
                          "datafile[%d] might have data (out=%d)\n",

@@ -856,6 +856,7 @@ Optional Features:
   --enable-nptl-workaround Enable workaround for buggy NPTL/Pthread libraries
   --disable-aio-threaded-callbacks  Disable use of AIO threaded callbacks
   --disable-kernel-aio    Forcibly disable kernel aio
+  --enable-kernel-sendfile    Forcibly enable kernel sendfile
   --enable-fast           Disable optional debugging, enable optimizations.
   --enable-strict         Turn on strict debugging with gcc
   --enable-verbose-build  Enables full output during build process
@@ -5735,49 +5736,10 @@ if test "${enable_aio_threaded_callbacks+set}" = set; then
   if test "$enableval" = no ; then use_aio_thcb=0 ; fi
 fi;
 
+
 MISC_TROVE_FLAGS=""
 if test $use_aio_thcb = 1 ; then
-    if test "x$host_os" = "xlinux-gnu" ; then
-	echo "$as_me:$LINENO: checking glibc version for working aio callbacks" >&5
-echo $ECHO_N "checking glibc version for working aio callbacks... $ECHO_C" >&6
-			for i in /lib /lib64 /usr/lib /usr/lib64 ; do
-	    libc=`echo $i/libc.so.* | sed 1q`
-	    if test "x$libc" = "x" ; then continue ; fi
-	    if test "x$libc" != "x$i/libc.so.*" ; then break ; fi
-	    libc=
-	done
-	if test "x$libc" != "x" ; then
-	    if test -x $libc ; then
-		vers=`$libc 2> /dev/null | sed 's/.*version \(.*\),.*/\1/; q'`
-		if test "x$vers" = "x"; then
-		    vers=`strings /lib/libc.so.* | grep GLIBC | tail -n 2 | grep -v PRIVATE | cut -b 7-`
-		fi
-		majorminor=`echo $vers | cut -b 1-3`
-		sub=`echo $vers | cut -b 5`
-		if test "x$majorminor" = "x2.3" ; then
-		    if test $sub -gt 1; then
-			MISC_TROVE_FLAGS="-D__PVFS2_TROVE_AIO_THREADED__"
-		    fi
-		fi
-	    else
-		vers=`strings /lib/libc.so.* | grep GLIBC | tail -n 2 | grep -v PRIVATE | cut -b 7-`
-		majorminor=`echo $vers | cut -b 1-3`
-		sub=`echo $vers | cut -b 5`
-		if test "x$majorminor" = "x2.3" ; then
-		    if test $sub -gt 1; then
-			MISC_TROVE_FLAGS="-D__PVFS2_TROVE_AIO_THREADED__"
-		    fi
-		fi
-	    fi
-	fi
-    fi
-    if test "x$MISC_TROVE_FLAGS" = "x" ; then
-	echo "$as_me:$LINENO: result: no" >&5
-echo "${ECHO_T}no" >&6
-    else
-	echo "$as_me:$LINENO: result: yes" >&5
-echo "${ECHO_T}yes" >&6
-    fi
+	MISC_TROVE_FLAGS="-D__PVFS2_TROVE_AIO_THREADED__"
 fi
 
 
@@ -6634,26 +6596,47 @@ elif test -z "${LINUX24_KERNEL_SRC}"  ; then
 fi
 
 
-NOSTDINCFLAGS="-nostdinc -isystem `$CC -print-file-name=include`"
+# Check whether --enable-kernel-aio or --disable-kernel-aio was given.
+if test "${enable_kernel_aio+set}" = set; then
+  enableval="$enable_kernel_aio"
+   enable_kernel_aio=$enableval
+else
+   enable_kernel_aio=yes
 
-CFLAGS="$USR_CFLAGS $NOSTDINCFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default -DKBUILD_STR(s)=#s -DKBUILD_BASENAME=KBUILD_STR(empty)  -DKBUILD_MODNAME=KBUILD_STR(empty)"
+fi;
 
-echo "$as_me:$LINENO: checking for i_size_write in kernel" >&5
+# Check whether --enable-kernel-sendfile or --disable-kernel-sendfile was given.
+if test "${enable_kernel_sendfile+set}" = set; then
+  enableval="$enable_kernel_sendfile"
+   enable_kernel_sendfile=$enableval
+else
+   enable_kernel_sendfile=no
+
+fi;
+
+
+
+	NOSTDINCFLAGS="-nostdinc -isystem `$CC -print-file-name=include`"
+
+	CFLAGS="$USR_CFLAGS $NOSTDINCFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default -DKBUILD_STR(s)=#s -DKBUILD_BASENAME=KBUILD_STR(empty)  -DKBUILD_MODNAME=KBUILD_STR(empty)"
+
+
+	echo "$as_me:$LINENO: checking for i_size_write in kernel" >&5
 echo $ECHO_N "checking for i_size_write in kernel... $ECHO_C" >&6
-cat >conftest.$ac_ext <<_ACEOF
+			cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
 cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 
-	#define __KERNEL__
-        #include <linux/fs.h>
-	void i_size_write(struct inode *inode,
-			loff_t i_size)
-        {
-		return;
-	}
+		#define __KERNEL__
+		#include <linux/fs.h>
+		void i_size_write(struct inode *inode,
+				loff_t i_size)
+		{
+			return;
+		}
 
 int
 main ()
@@ -6701,21 +6684,21 @@ _ACEOF
 fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 
-echo "$as_me:$LINENO: checking for i_size_read in kernel" >&5
+	echo "$as_me:$LINENO: checking for i_size_read in kernel" >&5
 echo $ECHO_N "checking for i_size_read in kernel... $ECHO_C" >&6
-cat >conftest.$ac_ext <<_ACEOF
+			cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
 cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 
-	#define __KERNEL__
-        #include <linux/fs.h>
-	loff_t i_size_read(struct inode *inode)
-        {
-		return 0;
-	}
+		#define __KERNEL__
+		#include <linux/fs.h>
+		loff_t i_size_read(struct inode *inode)
+		{
+			return 0;
+		}
 
 int
 main ()
@@ -6763,21 +6746,21 @@ _ACEOF
 fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 
-echo "$as_me:$LINENO: checking for parent_ino in kernel" >&5
+	echo "$as_me:$LINENO: checking for parent_ino in kernel" >&5
 echo $ECHO_N "checking for parent_ino in kernel... $ECHO_C" >&6
-cat >conftest.$ac_ext <<_ACEOF
+			cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
 cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 
-	#define __KERNEL__
-        #include <linux/fs.h>
-	ino_t parent_ino(struct dentry *dentry)
-        {
-		return (ino_t)0;
-	}
+		#define __KERNEL__
+		#include <linux/fs.h>
+		ino_t parent_ino(struct dentry *dentry)
+		{
+			return (ino_t)0;
+		}
 
 int
 main ()
@@ -6825,21 +6808,21 @@ _ACEOF
 fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 
-echo "$as_me:$LINENO: checking for memory_backed in struct backing_dev_info in kernel" >&5
+			echo "$as_me:$LINENO: checking for memory_backed in struct backing_dev_info in kernel" >&5
 echo $ECHO_N "checking for memory_backed in struct backing_dev_info in kernel... $ECHO_C" >&6
-cat >conftest.$ac_ext <<_ACEOF
+	cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
 cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 
-	#define __KERNEL__
-	#include <linux/mm.h>
-	#include <linux/backing-dev.h>
-	static struct backing_dev_info bdi = {
-	    .memory_backed = 0
-	};
+		#define __KERNEL__
+		#include <linux/mm.h>
+		#include <linux/backing-dev.h>
+		static struct backing_dev_info bdi = {
+		    .memory_backed = 0
+		};
 
 int
 main ()
@@ -6888,20 +6871,21 @@ echo "${ECHO_T}no" >&6
 fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 
-echo "$as_me:$LINENO: checking for sendfile callback in struct file_operations in kernel" >&5
+		if test "x$enable_kernel_sendfile" = "xyes"; then
+		echo "$as_me:$LINENO: checking for sendfile callback in struct file_operations in kernel" >&5
 echo $ECHO_N "checking for sendfile callback in struct file_operations in kernel... $ECHO_C" >&6
-cat >conftest.$ac_ext <<_ACEOF
+		cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
 cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 
-	#define __KERNEL__
-	#include <linux/fs.h>
-	static struct file_operations fop = {
-	    .sendfile = NULL,
-	};
+			#define __KERNEL__
+			#include <linux/fs.h>
+			static struct file_operations fop = {
+				 .sendfile = NULL,
+			};
 
 int
 main ()
@@ -6949,19 +6933,20 @@ echo "${ECHO_T}no" >&6
 
 fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+	fi
 
-echo "$as_me:$LINENO: checking for aio support in kernel" >&5
+	echo "$as_me:$LINENO: checking for aio support in kernel" >&5
 echo $ECHO_N "checking for aio support in kernel... $ECHO_C" >&6
-cat >conftest.$ac_ext <<_ACEOF
+			cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
 cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 
-	#define __KERNEL__
-#include <linux/wait.h>
-        #include <linux/aio.h>
+		#define __KERNEL__
+		#include <linux/wait.h>
+		#include <linux/aio.h>
 		  static struct kiocb iocb;
 
 int
@@ -7001,33 +6986,35 @@ cat >>confdefs.h <<\_ACEOF
 #define HAVE_AIO 1
 _ACEOF
 
-	have_aio=yes
+		have_aio=yes
 else
   echo "$as_me: failed program was:" >&5
 sed 's/^/| /' conftest.$ac_ext >&5
 
 echo "$as_me:$LINENO: result: no" >&5
 echo "${ECHO_T}no" >&6
-	have_aio=no
+		have_aio=no
 
 fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 
-echo "$as_me:$LINENO: checking for touch_atime support in kernel" >&5
+	echo "$as_me:$LINENO: checking for touch_atime support in kernel" >&5
 echo $ECHO_N "checking for touch_atime support in kernel... $ECHO_C" >&6
-cat >conftest.$ac_ext <<_ACEOF
+	cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
 cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 
-	#define __KERNEL__
-	#include <linux/fs.h>
-	void touch_atime(struct vfsmount *mnt, struct dentry *dentry)
-	{
-		return;
-	}
+		#define __KERNEL__
+		#include <linux/fs.h>
+		void stuff()
+		{
+			struct vfsmnount *mnt;
+			struct dentry *dentry;
+			touch_atime(mnt, dentry);
+		}
 
 int
 main ()
@@ -7075,35 +7062,22 @@ echo "${ECHO_T}no" >&6
 
 fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
-
-
-
-
-# Check whether --enable-kernel-aio or --disable-kernel-aio was given.
-if test "${enable_kernel_aio+set}" = set; then
-  enableval="$enable_kernel_aio"
-   enable_kernel_aio=$enableval
-else
-   enable_kernel_aio=yes
-
-fi;
-
-if test "x$have_aio" = "xyes" -a "x$enable_kernel_aio" = "xyes"; then
-	echo "$as_me:$LINENO: checking for ki_dtor in kiocb structure of kernel" >&5
+	if test "x$have_aio" = "xyes" -a "x$enable_kernel_aio" = "xyes"; then
+		echo "$as_me:$LINENO: checking for ki_dtor in kiocb structure of kernel" >&5
 echo $ECHO_N "checking for ki_dtor in kiocb structure of kernel... $ECHO_C" >&6
-			cat >conftest.$ac_ext <<_ACEOF
+								cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
 cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 
-		#define __KERNEL__
-#include <linux/wait.h>
-			  #include <linux/aio.h>
-				  static struct kiocb io_cb = {
+			#define __KERNEL__
+			#include <linux/wait.h>
+			#include <linux/aio.h>
+			static struct kiocb io_cb = {
 					  .ki_dtor = NULL,
-				  };
+			};
 
 int
 main ()
@@ -7151,22 +7125,22 @@ echo "${ECHO_T}no" >&6
 
 fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
-fi
+	fi
 
-echo "$as_me:$LINENO: checking for xattr support in kernel" >&5
+	echo "$as_me:$LINENO: checking for xattr support in kernel" >&5
 echo $ECHO_N "checking for xattr support in kernel... $ECHO_C" >&6
-cat >conftest.$ac_ext <<_ACEOF
+			cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
 cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 
-	#define __KERNEL__
-        #include <linux/fs.h>
-		  static struct inode_operations in_op = {
-			  .getxattr = NULL
-		  };
+		#define __KERNEL__
+		#include <linux/fs.h>
+			  static struct inode_operations in_op = {
+				  .getxattr = NULL
+			  };
 
 int
 main ()
@@ -7205,37 +7179,37 @@ cat >>confdefs.h <<\_ACEOF
 #define HAVE_XATTR 1
 _ACEOF
 
-	have_xattr=yes
+		have_xattr=yes
 else
   echo "$as_me: failed program was:" >&5
 sed 's/^/| /' conftest.$ac_ext >&5
 
 echo "$as_me:$LINENO: result: no" >&5
 echo "${ECHO_T}no" >&6
-	have_xattr=no
+		have_xattr=no
 
 fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 
-if test "x$have_xattr" = "xyes"; then
-      echo "$as_me:$LINENO: checking for const argument to setxattr function" >&5
+	if test "x$have_xattr" = "xyes"; then
+	   	   echo "$as_me:$LINENO: checking for const argument to setxattr function" >&5
 echo $ECHO_N "checking for const argument to setxattr function... $ECHO_C" >&6
-   tmp_cflags=$CFLAGS
-      CFLAGS="$CFLAGS -Werror"
-   cat >conftest.$ac_ext <<_ACEOF
+	   tmp_cflags=$CFLAGS
+	   	   CFLAGS="$CFLAGS -Werror"
+	   cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
 cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 
-   	#define __KERNEL__
-	#include <linux/fs.h>
-	int pvfs2_setxattr(struct dentry *dentry, const char *name,
-	const void *value, size_t size, int flags) { return (0);};
-	static struct inode_operations in_op = {
-		.setxattr = pvfs2_setxattr
-	};
+		#define __KERNEL__
+		#include <linux/fs.h>
+		int pvfs2_setxattr(struct dentry *dentry, const char *name,
+		const void *value, size_t size, int flags) { return (0);};
+		static struct inode_operations in_op = {
+			.setxattr = pvfs2_setxattr
+		};
 
 int
 main ()
@@ -7283,27 +7257,27 @@ echo "${ECHO_T}no" >&6
 
 fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
-	CFLAGS=$tmp_cflags
-fi
+		CFLAGS=$tmp_cflags
+	fi
 
-echo "$as_me:$LINENO: checking for 6th argument to sysctl proc handlers" >&5
+		echo "$as_me:$LINENO: checking for 6th argument to sysctl proc handlers" >&5
 echo $ECHO_N "checking for 6th argument to sysctl proc handlers... $ECHO_C" >&6
-cat >conftest.$ac_ext <<_ACEOF
+		cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
 cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 
-    #define __KERNEL__
-    #include <linux/fs.h>
-    #include <linux/sysctl.h>
+	    #define __KERNEL__
+	    #include <linux/fs.h>
+	    #include <linux/sysctl.h>
 
 int
 main ()
 {
 
-    proc_dointvec_minmax(NULL, 0, NULL, NULL, NULL, NULL);
+	    proc_dointvec_minmax(NULL, 0, NULL, NULL, NULL, NULL);
 
   ;
   return 0;
@@ -7364,10 +7338,10 @@ cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 #define __KERNEL__
-	 #include <linux/fs.h>
-	 #ifdef HAVE_XATTR
-	 #include <linux/xattr.h>
-	 #endif
+		 #include <linux/fs.h>
+		 #ifdef HAVE_XATTR
+		 #include <linux/xattr.h>
+		 #endif
 
 
 #include <$ac_header>
@@ -7431,10 +7405,10 @@ cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 #define __KERNEL__
-	 #include <linux/fs.h>
-	 #ifdef HAVE_XATTR
-	 #include <linux/xattr.h>
-	 #endif
+		 #include <linux/fs.h>
+		 #ifdef HAVE_XATTR
+		 #include <linux/xattr.h>
+		 #endif
 
 
 #include <$ac_header>
@@ -7498,10 +7472,10 @@ cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 #define __KERNEL__
-	 #include <linux/fs.h>
-	 #ifdef HAVE_XATTR
-	 #include <linux/xattr.h>
-	 #endif
+		 #include <linux/fs.h>
+		 #ifdef HAVE_XATTR
+		 #include <linux/xattr.h>
+		 #endif
 
 
 #include <$ac_header>
@@ -7549,22 +7523,212 @@ fi
 done
 
 
-echo "$as_me:$LINENO: checking for generic_permission api in kernel" >&5
+
+for ac_header in linux/ioctl32.h
+do
+as_ac_Header=`echo "ac_cv_header_$ac_header" | $as_tr_sh`
+echo "$as_me:$LINENO: checking for $ac_header" >&5
+echo $ECHO_N "checking for $ac_header... $ECHO_C" >&6
+if eval "test \"\${$as_ac_Header+set}\" = set"; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+#define __KERNEL__
+		 #include <linux/ioctl32.h>
+
+
+#include <$ac_header>
+_ACEOF
+rm -f conftest.$ac_objext
+if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
+  (eval $ac_compile) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"
+			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest.$ac_objext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  eval "$as_ac_Header=yes"
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+eval "$as_ac_Header=no"
+fi
+rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+fi
+echo "$as_me:$LINENO: result: `eval echo '${'$as_ac_Header'}'`" >&5
+echo "${ECHO_T}`eval echo '${'$as_ac_Header'}'`" >&6
+if test `eval echo '${'$as_ac_Header'}'` = yes; then
+  cat >>confdefs.h <<_ACEOF
+#define `echo "HAVE_$ac_header" | $as_tr_cpp` 1
+_ACEOF
+
+fi
+
+done
+
+
+for ac_header in linux/compat.h
+do
+as_ac_Header=`echo "ac_cv_header_$ac_header" | $as_tr_sh`
+echo "$as_me:$LINENO: checking for $ac_header" >&5
+echo $ECHO_N "checking for $ac_header... $ECHO_C" >&6
+if eval "test \"\${$as_ac_Header+set}\" = set"; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+#define __KERNEL__
+		 #include <linux/compat.h>
+
+
+#include <$ac_header>
+_ACEOF
+rm -f conftest.$ac_objext
+if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
+  (eval $ac_compile) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"
+			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest.$ac_objext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  eval "$as_ac_Header=yes"
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+eval "$as_ac_Header=no"
+fi
+rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+fi
+echo "$as_me:$LINENO: result: `eval echo '${'$as_ac_Header'}'`" >&5
+echo "${ECHO_T}`eval echo '${'$as_ac_Header'}'`" >&6
+if test `eval echo '${'$as_ac_Header'}'` = yes; then
+  cat >>confdefs.h <<_ACEOF
+#define `echo "HAVE_$ac_header" | $as_tr_cpp` 1
+_ACEOF
+
+fi
+
+done
+
+
+for ac_header in linux/syscalls.h
+do
+as_ac_Header=`echo "ac_cv_header_$ac_header" | $as_tr_sh`
+echo "$as_me:$LINENO: checking for $ac_header" >&5
+echo $ECHO_N "checking for $ac_header... $ECHO_C" >&6
+if eval "test \"\${$as_ac_Header+set}\" = set"; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+#define __KERNEL__
+		 #include <linux/syscalls.h>
+
+
+#include <$ac_header>
+_ACEOF
+rm -f conftest.$ac_objext
+if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
+  (eval $ac_compile) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"
+			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest.$ac_objext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  eval "$as_ac_Header=yes"
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+eval "$as_ac_Header=no"
+fi
+rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+fi
+echo "$as_me:$LINENO: result: `eval echo '${'$as_ac_Header'}'`" >&5
+echo "${ECHO_T}`eval echo '${'$as_ac_Header'}'`" >&6
+if test `eval echo '${'$as_ac_Header'}'` = yes; then
+  cat >>confdefs.h <<_ACEOF
+#define `echo "HAVE_$ac_header" | $as_tr_cpp` 1
+_ACEOF
+
+fi
+
+done
+
+
+	echo "$as_me:$LINENO: checking for generic_permission api in kernel" >&5
 echo $ECHO_N "checking for generic_permission api in kernel... $ECHO_C" >&6
 
-cat >conftest.$ac_ext <<_ACEOF
+	cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
 cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 
-	#define __KERNEL__
-        #include <linux/fs.h>
-	int generic_permission(struct inode *inode)
-        {
-		return 0;
-	}
+		#define __KERNEL__
+		#include <linux/fs.h>
+		int generic_permission(struct inode *inode)
+		{
+			return 0;
+		}
 
 int
 main ()
@@ -7612,22 +7776,22 @@ _ACEOF
 fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 
-echo "$as_me:$LINENO: checking for generic_getxattr api in kernel" >&5
+	echo "$as_me:$LINENO: checking for generic_getxattr api in kernel" >&5
 echo $ECHO_N "checking for generic_getxattr api in kernel... $ECHO_C" >&6
-cat >conftest.$ac_ext <<_ACEOF
+			cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
 cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 
-	#define __KERNEL__
-        #include <linux/fs.h>
-			#include <linux/xattr.h>
-	int generic_getxattr(struct inode *inode)
-        {
-		return 0;
-	}
+		#define __KERNEL__
+		#include <linux/fs.h>
+				#include <linux/xattr.h>
+		int generic_getxattr(struct inode *inode)
+		{
+			return 0;
+		}
 
 int
 main ()
@@ -7675,24 +7839,24 @@ _ACEOF
 fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 
-echo "$as_me:$LINENO: checking for arg member in read_descriptor_t in kernel" >&5
+	echo "$as_me:$LINENO: checking for arg member in read_descriptor_t in kernel" >&5
 echo $ECHO_N "checking for arg member in read_descriptor_t in kernel... $ECHO_C" >&6
-cat >conftest.$ac_ext <<_ACEOF
+	cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
 cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 
-    #define __KERNEL__
-    #include <linux/fs.h>
+	    #define __KERNEL__
+	    #include <linux/fs.h>
 
 int
 main ()
 {
 
-    read_descriptor_t x;
-    x.arg.data = NULL;
+	    read_descriptor_t x;
+	    x.arg.data = NULL;
 
   ;
   return 0;
@@ -7737,28 +7901,28 @@ echo "${ECHO_T}no" >&6
 fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 
-echo "$as_me:$LINENO: checking for second arg type int in address_space_operations releasepage" >&5
+	echo "$as_me:$LINENO: checking for second arg type int in address_space_operations releasepage" >&5
 echo $ECHO_N "checking for second arg type int in address_space_operations releasepage... $ECHO_C" >&6
-tmp_cflags=$CFLAGS
-CFLAGS="$CFLAGS -Werror"
-cat >conftest.$ac_ext <<_ACEOF
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS"
+	cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
 cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 
-    #define __KERNEL__
-    #include <linux/fs.h>
-    extern int rp(struct page *page, int foo);
+	    #define __KERNEL__
+	    #include <linux/fs.h>
+	    extern int rp(struct page *page, int foo);
 
 int
 main ()
 {
 
-    struct address_space_operations aso = {
-	.releasepage = rp
-    };
+	    struct address_space_operations aso = {
+		.releasepage = rp
+	    };
 
   ;
   return 0;
@@ -7802,30 +7966,30 @@ echo "${ECHO_T}no" >&6
 
 fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
-CFLAGS=$tmp_cflags
+	CFLAGS=$tmp_cflags
 
-echo "$as_me:$LINENO: checking for int return in inode_operations follow_link" >&5
+	echo "$as_me:$LINENO: checking for int return in inode_operations follow_link" >&5
 echo $ECHO_N "checking for int return in inode_operations follow_link... $ECHO_C" >&6
-tmp_cflags=$CFLAGS
-CFLAGS="$CFLAGS -Werror"
-cat >conftest.$ac_ext <<_ACEOF
+	tmp_cflags=$CFLAGS
+	CFLAGS="$CFLAGS"
+	cat >conftest.$ac_ext <<_ACEOF
 /* confdefs.h.  */
 _ACEOF
 cat confdefs.h >>conftest.$ac_ext
 cat >>conftest.$ac_ext <<_ACEOF
 /* end confdefs.h.  */
 
-    #define __KERNEL__
-    #include <linux/fs.h>
-    extern int fl(struct dentry *d, struct nameidata *n);
+	    #define __KERNEL__
+	    #include <linux/fs.h>
+	    extern int fl(struct dentry *d, struct nameidata *n);
 
 int
 main ()
 {
 
-    struct inode_operations io = {
-	.follow_link = fl
-    };
+	    struct inode_operations io = {
+		.follow_link = fl
+	    };
 
   ;
   return 0;
@@ -7869,9 +8033,137 @@ echo "${ECHO_T}no" >&6
 
 fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
-CFLAGS=$tmp_cflags
+	CFLAGS=$tmp_cflags
 
-CFLAGS=$oldcflags
+	echo "$as_me:$LINENO: checking for compat_ioctl member in file_operations structure" >&5
+echo $ECHO_N "checking for compat_ioctl member in file_operations structure... $ECHO_C" >&6
+	cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+	    #define __KERNEL__
+	    #include <linux/fs.h>
+
+int
+main ()
+{
+
+		 struct file_operations filop = {
+				.compat_ioctl = NULL
+		 };
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
+  (eval $ac_compile) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"
+			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest.$ac_objext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6
+
+cat >>confdefs.h <<\_ACEOF
+#define HAVE_COMPAT_IOCTL_HANDLER 1
+_ACEOF
+
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6
+
+fi
+rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+
+	echo "$as_me:$LINENO: checking for register_ioctl32_conversion kernel exports" >&5
+echo $ECHO_N "checking for register_ioctl32_conversion kernel exports... $ECHO_C" >&6
+			cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+		#define __KERNEL__
+		#include <linux/kernel.h>
+		#include <linux/ioctl32.h>
+		int register_ioctl32_conversion(void)
+		{
+			return 0;
+		}
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
+  (eval $ac_compile) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"
+			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest.$ac_objext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6
+
+cat >>confdefs.h <<\_ACEOF
+#define HAVE_REGISTER_IOCTL32_CONVERSION 1
+_ACEOF
+
+fi
+rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+
+	CFLAGS=$oldcflags
+
+
 
 BUILD_ABSOLUTE_TOP=`pwd`
 SRC_RELATIVE_TOP=$srcdir
@@ -10821,6 +11113,72 @@ fi
 
 
 
+echo "$as_me:$LINENO: checking for fgetxattr extra arguments" >&5
+echo $ECHO_N "checking for fgetxattr extra arguments... $ECHO_C" >&6
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+	#include <sys/types.h>
+	#ifdef HAVE_ATTR_XATTR_H
+	#include <attr/xattr.h>
+	#endif
+	#ifdef HAVE_SYS_XATTR_H
+	#include <sys/xattr.h>
+	#endif
+
+int
+main ()
+{
+
+	fgetxattr(0, 0, 0, 0, 0, 0);
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
+  (eval $ac_compile) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"
+			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest.$ac_objext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6
+
+cat >>confdefs.h <<\_ACEOF
+#define HAVE_FGETXATTR_EXTRA_ARGS 1
+_ACEOF
+
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6
+
+fi
+rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+
 if test "${ac_cv_header_sys_sysinfo_h+set}" = set; then
   echo "$as_me:$LINENO: checking for sys/sysinfo.h" >&5
 echo $ECHO_N "checking for sys/sysinfo.h... $ECHO_C" >&6
@@ -11451,6 +11809,79 @@ _ACEOF
 
 fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+
+
+echo "$as_me:$LINENO: checking for fgetxattr extra arguments" >&5
+echo $ECHO_N "checking for fgetxattr extra arguments... $ECHO_C" >&6
+cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+	#include <sys/types.h>
+	#ifdef HAVE_ATTR_XATTR_H
+	#include <attr/xattr.h>
+	#endif
+	#ifdef HAVE_SYS_XATTR_H
+	#include <sys/xattr.h>
+	#endif
+
+int
+main ()
+{
+
+	#ifdef HAVE_FGETXATTR_PROTOTYPE
+	fgetxattr(0, 0, 0, 0, 0, 0);
+	#else
+	#  error
+	#endif
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
+  (eval $ac_compile) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"
+			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest.$ac_objext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6
+
+cat >>confdefs.h <<\_ACEOF
+#define HAVE_FGETXATTR_EXTRA_ARGS 1
+_ACEOF
+
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6
+
+fi
+rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+
+
 
 
 # getmntent is in -lsun on Irix 4, -lseq on Dynix/PTX, -lgen on Unixware.

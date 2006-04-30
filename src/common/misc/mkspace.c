@@ -719,21 +719,18 @@ int pvfs2_rmspace(
 
     if (!remove_collection_only)
     {
+		  /*
+		  * it is a bit weird to do a trove_finaliz() prior to blowing away
+		  * the storage space, but this allows the __db files of the DB env
+		  * to be blown away for the rmdir() to work correctly!
+		  */
+		  trove_finalize();
         ret = trove_storage_remove(storage_space, NULL, &op_id);
         mkspace_print(
             verbose, "PVFS2 Storage Space %s removed %s\n",
             storage_space, (((ret == 1) || (ret == -TROVE_ENOENT)) ?
                             "successfully" : "with errors"));
 
-        /*
-          we should be doing a trove finalize here, but for now we
-          can't because it will fail horribly during the sync/close
-          calls to files that we've just removed.
-     
-          an extra flag to finalize, or a static var in the dbpf-mgmt
-          methods could resolve this.
-        */
-/*         trove_finalize(); */
         trove_is_initialized = 0;
     }
     return ret;

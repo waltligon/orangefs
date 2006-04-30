@@ -153,7 +153,7 @@ enum
     METAFILE_HANDLES_KEY = 2,
     METAFILE_DIST_KEY    = 3,
     SYMLINK_TARGET_KEY   = 4,
-    KEYVAL_ARRAY_SIZE    = 5
+    DIRDATA_SIZE_KEY     = 5
 };
 
 typedef enum
@@ -207,6 +207,7 @@ struct PINT_server_readdir_op
     uint64_t directory_version;
     PVFS_handle dirent_handle;  /* holds handle of dirdata dspace from
                                    which entries are read */
+    PVFS_size dirdata_size;
 };
 
 struct PINT_server_crdirent_op
@@ -217,6 +218,7 @@ struct PINT_server_crdirent_op
     PVFS_fs_id fs_id;
     PVFS_handle dirent_handle;  /* holds handle of dirdata dspace that
                                  * we'll write the dirent into */
+    PVFS_size dirent_count;
     int dir_attr_update_required;
 };
 
@@ -225,6 +227,7 @@ struct PINT_server_rmdirent_op
     PVFS_handle dirdata_handle;
     PVFS_handle entry_handle; /* holds handle of dirdata object,
                                * removed entry */
+    PVFS_size dirent_count;
     int dir_attr_update_required;
 };
 
@@ -243,7 +246,12 @@ struct PINT_server_remove_op
     PVFS_handle dirdata_handle;   /* holds dirdata dspace handle in
                                    * the event that we are removing a
                                    * directory */
-    PVFS_ds_attributes dirdata_ds_attr;
+    PVFS_size dirent_count;
+    PVFS_ds_keyval * key_array;
+    PVFS_ds_position pos;
+    int key_count;
+    int index;
+    int remove_keyvals_state;
 };
 
 struct PINT_server_mgmt_remove_dirent_op
@@ -273,6 +281,7 @@ struct PINT_server_small_io_op
 {
     PVFS_offset offsets[SMALL_IO_MAX_REGIONS];
     PVFS_size sizes[SMALL_IO_MAX_REGIONS];
+    PVFS_size result_bytes;
 };
 
 struct PINT_server_flush_op
@@ -292,12 +301,13 @@ struct PINT_server_mkdir_op
     PVFS_fs_id fs_id;
     PVFS_handle_extent_array handle_extent_array;
     PVFS_handle dirent_handle;
+    PVFS_size init_dirdata_size;
 };
 
 struct PINT_server_getattr_op
 {
     PVFS_handle handle;
-    PVFS_handle dirdata_handle;
+    PVFS_size dirent_count;
     PVFS_fs_id fs_id;
     PVFS_ds_attributes dirdata_ds_attr;
     uint32_t attrmask;
@@ -341,6 +351,8 @@ typedef struct PINT_server_op
     PVFS_ds_keyval key, val; 
     PVFS_ds_keyval *key_a;
     PVFS_ds_keyval *val_a;
+
+    int free_val;
 
     /* attributes structure associated with target of operation; may be 
      * partially filled in by prelude nested state machine (for 

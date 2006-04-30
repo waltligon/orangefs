@@ -34,10 +34,9 @@ struct PVFS_ds_keyval_s
 typedef struct PVFS_ds_keyval_s PVFS_ds_keyval;
 #endif
 
-/* vtag; contents not yet defined */
 struct PVFS_vtag_s
 {
-    /* undefined */
+    unsigned long version;
 };
 typedef struct PVFS_vtag_s PVFS_vtag;
 

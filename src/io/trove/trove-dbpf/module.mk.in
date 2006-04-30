@@ -13,6 +13,7 @@ SERVERSRC += \
 	$(DIR)/dbpf-error.c \
 	$(DIR)/dbpf-mgmt.c \
 	$(DIR)/dbpf-open-cache.c \
+	$(DIR)/dbpf-keyval-pcache.c \
 	$(DIR)/dbpf-version.c \
 	$(DIR)/dbpf-version-buffer.c
 

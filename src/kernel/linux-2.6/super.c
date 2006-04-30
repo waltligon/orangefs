@@ -385,8 +385,8 @@ static int pvfs2_statfs(
     {
         pvfs2_print("pvfs2_statfs: got %ld blocks available | "
                     "%ld blocks total\n",
-                    new_op->downcall.resp.statfs.blocks_avail,
-                    new_op->downcall.resp.statfs.blocks_total);
+                    (long) new_op->downcall.resp.statfs.blocks_avail,
+                    (long) new_op->downcall.resp.statfs.blocks_total);
 
         buf->f_type = sb->s_magic;
         /* stash the fsid as well */

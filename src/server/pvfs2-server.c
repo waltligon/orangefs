@@ -484,6 +484,9 @@ int main(int argc, char **argv)
         {
             goto server_shutdown;
         }
+        gossip_set_debug_mask(1, GOSSIP_SERVER_DEBUG);
+        gossip_debug(GOSSIP_SERVER_DEBUG, "PVFS2 Server: storage space removed. Exiting.\n");
+        gossip_set_debug_mask(1, debug_mask);
         return(0);
     }
 
@@ -495,6 +498,9 @@ int main(int argc, char **argv)
         {
             goto server_shutdown;
         }
+        gossip_set_debug_mask(1, GOSSIP_SERVER_DEBUG);
+        gossip_debug(GOSSIP_SERVER_DEBUG, "PVFS2 Server: storage space created. Exiting.\n");
+        gossip_set_debug_mask(1, debug_mask);
         return(0);
     }
 

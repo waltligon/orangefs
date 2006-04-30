@@ -1151,7 +1151,9 @@ static ssize_t pvfs2_aio_retry(struct kiocb *iocb)
                     x->buffer, (int) x->bytes_to_be_copied, (int) error);
         if ((x->rw == PVFS_IO_WRITE) && error > 0)
         {
+#ifndef HAVE_TOUCH_ATIME
             struct inode *inode = iocb->ki_filp->f_mapping->host;
+#endif
             struct file *filp = iocb->ki_filp;
             /* update atime if need be */
 #ifdef HAVE_TOUCH_ATIME

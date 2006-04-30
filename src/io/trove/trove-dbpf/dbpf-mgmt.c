@@ -48,69 +48,63 @@ extern int dbpf_thread_initialize(void);
 
 struct dbpf_storage *my_storage_p = NULL;
 static int db_open_count, db_close_count;
+static DB_ENV *my_dbenv = NULL;
 
 DB_ENV *dbpf_getdb_env(const char *sto_path, int *error)
 {
-    static DB_ENV *dbenv = NULL;
-
     *error = 0;
-    if (dbenv == NULL)
+    if (my_dbenv == NULL)
     {
         int ret;
 
-        ret = db_env_create(&dbenv, 0);
+        ret = db_env_create(&my_dbenv, 0);
         if (ret != 0)
         {
             gossip_lerr("dbpf_getdb_env: %s\n", db_strerror(ret));
             *error = ret;
             return NULL;
         }
-        ret = dbenv->open(dbenv, sto_path, DB_INIT_MPOOL | DB_CREATE | DB_THREAD, 0);
+        ret = my_dbenv->open(my_dbenv, sto_path, DB_INIT_MPOOL | DB_CREATE | DB_THREAD, 0);
         if (ret != 0) {
-            gossip_lerr("dbpf_getdb_env: %s\n", db_strerror(ret));
+            gossip_lerr("dbpf_getdb_env(%s): %s\n", sto_path, db_strerror(ret));
             *error = ret;
             return NULL;
         }
     }
-    if (my_storage_p && !my_storage_p->sto_env)
-        my_storage_p->sto_env = dbenv;
-    return dbenv;
+    return my_dbenv;
 }
 
 static int dbpf_putdb_env(const char *sto_path)
 {
-    DB_ENV *dbenv;
     int ret;
 
-    if (!my_storage_p)
+    if (!my_storage_p && !my_dbenv) {
         return -TROVE_EINVAL;
-
-    if ((dbenv = my_storage_p->sto_env) == NULL)
-        return -TROVE_EINVAL;
-
+    }
     if (db_open_count != db_close_count)
     {
         gossip_err("# of db opens (%d) != # of db closes (%d)\n",
                 db_open_count, db_close_count);
     }
-    ret = my_storage_p->sto_env->close(my_storage_p->sto_env, 0);
+    ret = my_dbenv->close(my_dbenv, 0);
     if (ret != 0) 
     {
         gossip_err("dbpf_putdb_env: %s\n", db_strerror(ret));
         return -dbpf_db_error_to_trove_error(ret);
     }
     /* Remove any db env backing log etc. Sadly we cannot make use of the same dbenv for removing stuff */
-    ret = db_env_create(&dbenv, 0);
+    ret = db_env_create(&my_dbenv, 0);
     if (ret != 0) 
     {
         gossip_err("dbpf_putdb_env: could not create any environment handle: %s\n", db_strerror(ret));
         return 0;
     }
-    ret = dbenv->remove(dbenv, sto_path, 0);
+    ret = my_dbenv->remove(my_dbenv, sto_path, 0);
     if (ret != 0) 
     {
         gossip_err("dbpf_putdb_env: could not remove environment handle: %s\n", db_strerror(ret));
     }
+    my_dbenv = NULL;
     return 0;
 }
 
@@ -1227,6 +1221,7 @@ static struct dbpf_storage *dbpf_storage_lookup(
         *error_p = -TROVE_ENOMEM;
         return NULL;
     }
+    memset(sto_p, 0, sizeof(struct dbpf_storage));
 
     sto_p->name = strdup(stoname);
     if (sto_p->name == NULL)
@@ -1286,7 +1281,7 @@ static int dbpf_mkpath(char *pathname, mode_t mode)
             nullpos++;
         }
 
-        if (nullpos <= (pos + 1))
+        if (nullpos <= (pos + 1) && nullpos != len)
         {
             /* extra slash or trailing slash; ignore */
             nullpos++;

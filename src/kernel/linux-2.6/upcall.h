@@ -9,21 +9,28 @@
 
 #include "pvfs2-sysint.h"
 
+/* Sanitized this header file to fix
+ * 32-64 bit interaction issues between
+ * client-core and device
+ */
 typedef struct
 {
-    int async_vfs_io;
-    int buf_index;
-    size_t count;
-    loff_t offset;
+    int32_t async_vfs_io;
+    int32_t buf_index;
+    int32_t count;
+    int32_t __pad1;
+    int64_t offset;
     PVFS_object_ref refn;
     enum PVFS_io_type io_type;
+    int32_t readahead_size;
     enum PVFS_synch_method synch_method;
-    loff_t readahead_size;
+    int32_t  __pad2;
 } pvfs2_io_request_t;
 
 typedef struct
 {
-    int sym_follow;
+    int32_t sym_follow;
+    int32_t __pad1;
     PVFS_object_ref parent_refn;
     char d_name[PVFS2_NAME_LEN];
 } pvfs2_lookup_request_t;
@@ -37,16 +44,17 @@ typedef struct
 
 typedef struct
 {
-    char entry_name[PVFS2_NAME_LEN];
     PVFS_object_ref parent_refn;
-    char target[PVFS2_NAME_LEN];
     PVFS_sys_attr attributes;
+    char entry_name[PVFS2_NAME_LEN];
+    char target[PVFS2_NAME_LEN];
 } pvfs2_symlink_request_t;
 
 typedef struct
 {
     PVFS_object_ref refn;
     uint32_t        mask;
+    uint32_t        __pad1;
 } pvfs2_getattr_request_t;
 
 typedef struct
@@ -72,7 +80,7 @@ typedef struct
 {
     PVFS_object_ref refn;
     PVFS_ds_position token;
-    int max_dirent_count;
+    int32_t max_dirent_count;
 } pvfs2_readdir_request_t;
 
 typedef struct
@@ -86,6 +94,7 @@ typedef struct
 typedef struct
 {
     PVFS_fs_id fs_id;
+    int32_t    __pad1;
 } pvfs2_statfs_request_t;
 
 typedef struct
@@ -106,37 +115,40 @@ typedef struct
 
 typedef struct
 {
-    char pvfs2_config_server[PVFS_MAX_SERVER_ADDR_LEN];
-    int id;
+    int32_t id;
     PVFS_fs_id fs_id;
+    char pvfs2_config_server[PVFS_MAX_SERVER_ADDR_LEN];
 } pvfs2_fs_umount_request_t;
 
 typedef struct 
 {
     PVFS_object_ref refn;
+    int32_t key_sz;
+    int32_t __pad1;
     char key[PVFS_MAX_XATTR_NAMELEN];
-    int key_sz;
 } pvfs2_getxattr_request_t;
 
 typedef struct
 {
     PVFS_object_ref refn;
-    int   flags;
     PVFS_keyval_pair keyval;
+    int32_t   flags;
+    int32_t   __pad1;
 } pvfs2_setxattr_request_t;
 
 typedef struct 
 {
     PVFS_object_ref refn;
-    int  requested_count;
+    int32_t  requested_count;
     PVFS_ds_position token;
 } pvfs2_listxattr_request_t;
 
 typedef struct 
 {
     PVFS_object_ref refn;
+    int32_t key_sz;
+    int32_t __pad1;
     char key[PVFS_MAX_XATTR_NAMELEN];
-    int key_sz;
 } pvfs2_removexattr_request_t;
 
 typedef struct
@@ -180,11 +192,13 @@ enum pvfs2_perf_count_request_type
 typedef struct
 {
     enum pvfs2_perf_count_request_type type;
+    int32_t __pad1;
 } pvfs2_perf_count_request_t;
 
 typedef struct
 {
-    int type;
+    int32_t type;
+    int32_t __pad1;
     PVFS_credentials credentials;
 
     union
