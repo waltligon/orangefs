@@ -539,6 +539,7 @@ static int dbpf_collection_create(char *collname,
     DB *db_p = NULL;
     DBT key, data;
     struct stat dirstat;
+    struct stat dbstat;
     char path_name[PATH_MAX] = {0}, dir[PATH_MAX] = {0};
 
     if (my_storage_p == NULL)
@@ -616,8 +617,14 @@ static int dbpf_collection_create(char *collname,
 
     DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX,
                                 sto_p->name, new_coll_id);
-    db_p = dbpf_db_open(sto_p->name, path_name, &error, NULL);
-    if (db_p == NULL)
+
+    ret = stat(path_name, &dbstat);
+    if(ret < 0 && errno != ENOENT)
+    {
+        gossip_err("failed to stat db file: %s\n", path_name);
+        return -trove_errno_to_trove_error(errno);
+    }
+    else if(ret < 0)
     {
         ret = dbpf_db_create(sto_p->name, path_name);
         if (ret != 0)
@@ -625,13 +632,13 @@ static int dbpf_collection_create(char *collname,
             gossip_err("dbpf_db_create failed on attrib db %s\n", path_name);
             return ret;
         }
+    }
 
-        db_p = dbpf_db_open(sto_p->name, path_name, &error, NULL);
-        if (db_p == NULL)
-        {
-            gossip_err("dbpf_db_open failed on attrib db %s\n", path_name);
-            return error;
-        }
+    db_p = dbpf_db_open(sto_p->name, path_name, &error, NULL);
+    if (db_p == NULL)
+    {
+        gossip_err("dbpf_db_open failed on attrib db %s\n", path_name);
+        return error;
     }
 
     /*
@@ -676,8 +683,13 @@ static int dbpf_collection_create(char *collname,
     db_close(db_p);
 
     DBPF_GET_DS_ATTRIB_DBNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
-    db_p = dbpf_db_open(sto_p->name, path_name, &error, NULL);
-    if (db_p == NULL)
+    ret = stat(path_name, &dbstat);
+    if(ret < 0 && errno != ENOENT)
+    {
+        gossip_err("failed to stat ds attrib db: %s\n", path_name);
+        return -trove_errno_to_trove_error(errno);
+    }
+    if(ret < 0)
     {
         ret = dbpf_db_create(sto_p->name, path_name);
         if (ret != 0)
@@ -685,15 +697,16 @@ static int dbpf_collection_create(char *collname,
             gossip_err("dbpf_db_create failed on %s\n", path_name);
             return ret;
         }
-    }
-    else
-    {
-        db_close(db_p);
     }
 
     DBPF_GET_KEYVAL_DBNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
-    db_p = dbpf_db_open(sto_p->name, path_name, &error, NULL);
-    if (db_p == NULL)
+    ret = stat(path_name, &dbstat);
+    if(ret < 0 && errno != ENOENT)
+    {
+        gossip_err("failed to stat keyval db: %s\n", path_name);
+        return -trove_errno_to_trove_error(errno);
+    }
+    if(ret < 0)
     {
         ret = dbpf_db_create(sto_p->name, path_name);
         if (ret != 0)
@@ -701,10 +714,6 @@ static int dbpf_collection_create(char *collname,
             gossip_err("dbpf_db_create failed on %s\n", path_name);
             return ret;
         }
-    }
-    else
-    {
-        db_close(db_p);
     }
 
     DBPF_GET_BSTREAM_DIRNAME(path_name, PATH_MAX, sto_p->name, new_coll_id);
