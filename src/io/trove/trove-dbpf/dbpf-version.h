@@ -36,6 +36,8 @@ int dbpf_version_find_commit(TROVE_coll_id * coll_id,
                              char ** membuff,
                              TROVE_size * memsize);
 
+int dbpf_version_set_allowed_buffer_size(size_t size);
+
 #if defined(__cplusplus)
 }
 #endif

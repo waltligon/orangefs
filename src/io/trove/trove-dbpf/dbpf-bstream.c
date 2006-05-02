@@ -23,6 +23,7 @@
 #include "dbpf.h"
 #include "dbpf-op-queue.h"
 #include "dbpf-bstream.h"
+#include "dbpf-version.h"
 #include "dbpf-attr-cache.h"
 #include "pint-event.h"
 #include "dbpf-open-cache.h"
@@ -867,6 +868,27 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
     int i = 0, aiocb_inuse_count = 0;
     struct aiocb *aiocb_p = NULL, *aiocb_ptr_array[AIOCB_ARRAY_SZ] = {0};
 #endif
+
+    if((flags & TROVE_VERSIONING_ENABLED) &&
+       (!(flags & TROVE_VERSION_COMMIT)))
+    {
+        ret = dbpf_version_add(coll_id, 
+                               handle, 
+                               vtag,
+                               mem_offset_array, 
+                               mem_size_array, 
+                               mem_count,
+                               stream_offset_array, 
+                               stream_size_array, 
+                               stream_count);
+        if(ret < 0)
+        {
+            return ret;
+        }
+
+        /* write buffered so we can return immediate completion */
+        return 1;
+    }
 
     coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL)

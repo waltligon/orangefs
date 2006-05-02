@@ -119,7 +119,7 @@ static QLIST_HEAD(s_id_sync_mode_list);
 static gen_mutex_t id_sync_mode_mutex = GEN_MUTEX_INITIALIZER;
 static TROVE_context_id global_trove_context = -1;
 
-static int get_data_sync_mode(TROVE_coll_id coll_id);
+static int get_trove_flags(TROVE_coll_id coll_id);
 static void bmi_recv_callback_fn(void *user_ptr,
                                  PVFS_size actual_size,
                                  PVFS_error error_code);
@@ -730,7 +730,7 @@ static void bmi_recv_callback_fn(void *user_ptr,
             result_tmp->result.size_array,
             result_tmp->result.segs,
             &q_item->out_size,
-            get_data_sync_mode(q_item->parent->dest.u.trove.coll_id),
+            get_trove_flags(q_item->parent->dest.u.trove.coll_id),
             NULL,
             &result_tmp->trove_callback,
             global_trove_context,
@@ -2092,11 +2092,16 @@ static int cancel_pending_trove(struct qlist_head *list)
 }
 
 #ifdef __PVFS2_TROVE_SUPPORT__
-static int get_data_sync_mode(TROVE_coll_id coll_id)
+#include "server-config.h"
+struct server_configuration_s *get_server_config_struct(void);
+static int get_trove_flags(TROVE_coll_id coll_id)
 {
     int mode = TROVE_SYNC;
     id_sync_mode_t *cur_info = NULL;
     struct qlist_head *tmp_link = NULL;
+    struct server_configuration_s * server_config;
+
+    server_config = get_server_config_struct();
 
     gen_mutex_lock(&id_sync_mode_mutex);
     qlist_for_each(tmp_link, &s_id_sync_mode_list)
@@ -2111,7 +2116,8 @@ static int get_data_sync_mode(TROVE_coll_id coll_id)
     gen_mutex_unlock(&id_sync_mode_mutex);
     gossip_debug(GOSSIP_FLOW_PROTO_DEBUG, "get_data_sync_mode "
                  "returning %d\n", mode);
-    return mode;
+    return (mode | PINT_config_get_trove_versioning_enabled(server_config, 
+                                                            coll_id));
 }
 #endif
 

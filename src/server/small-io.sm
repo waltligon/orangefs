@@ -162,7 +162,9 @@ static int small_io_start_job(PINT_server_op *s_op, job_status_s *js_p)
            s_op->u.small_io.sizes,
            result.segs,
            &s_op->resp.u.small_io.result_size,
-           (fs_config->trove_sync_data ? TROVE_SYNC : 0),
+           (fs_config->trove_sync_data ? TROVE_SYNC : 0) |
+           (fs_config->trove_versioning_enabled ? 
+            (TROVE_VERSIONING_ENABLED | TROVE_VERSION_WRITE) : 0),
            NULL,
            s_op,
            0,

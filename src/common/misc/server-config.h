@@ -61,6 +61,7 @@ typedef struct host_synch_server_mapping_s
 {
     struct host_alias_s *alias_mapping;
     unsigned short       port;
+
 } host_synch_server_mapping_s;
 
 typedef struct filesystem_configuration_s
@@ -95,7 +96,8 @@ typedef struct filesystem_configuration_s
     int attr_cache_max_num_elems;
     int trove_sync_meta;
     int trove_sync_data;
-    int trove_allowed_buffer_size;
+    size_t trove_allowed_buffer_size;
+    int trove_versioning_enabled;
 
 } filesystem_configuration_s;
 
@@ -246,7 +248,10 @@ int PINT_config_get_trove_sync_meta(
 int PINT_config_get_trove_sync_data(
     struct server_configuration_s *config,
     PVFS_fs_id fs_id);
-int PINT_config_get_trove_allowed_buffer_size(
+size_t PINT_config_get_trove_allowed_buffer_size(
+    struct server_configuration_s *config,
+    PVFS_fs_id fs_id);
+int PINT_config_get_trove_versioning_enabled(
     struct server_configuration_s *config,
     PVFS_fs_id fs_id);
 #endif

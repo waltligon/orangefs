@@ -33,6 +33,7 @@
 #include "dbpf-bstream.h"
 #include "dbpf-thread.h"
 #include "dbpf-attr-cache.h"
+#include "dbpf-version.h"
 #include "trove-ledger.h"
 #include "trove-handle-mgmt.h"
 #include "gossip.h"
@@ -234,6 +235,9 @@ static int dbpf_collection_setinfo(TROVE_coll_id coll_id,
             gen_mutex_lock(&dbpf_attr_cache_mutex);
             ret = dbpf_attr_cache_do_initialize();
             gen_mutex_unlock(&dbpf_attr_cache_mutex);
+             break;
+        case TROVE_VERSION_SET_ALLOWED_BUFFER_SIZE:
+             ret = dbpf_version_set_allowed_buffer_size(*((size_t *)parameter));
              break;
     }
     return ret;

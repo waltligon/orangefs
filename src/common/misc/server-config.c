@@ -83,6 +83,8 @@ static DOTCONF_CB(get_client_job_flow_timeout);
 static DOTCONF_CB(get_client_retry_limit);
 static DOTCONF_CB(get_client_retry_delay);
 static DOTCONF_CB(get_trove_allowed_buffer_size);
+static DOTCONF_CB(get_trove_versioning_enabled);
+
 static FUNC_ERRORHANDLER(errorhandler);
 const char *contextchecker(command_t *cmd, unsigned long mask);
 
@@ -608,6 +610,9 @@ static const configoption_t options[] =
 
     {"TotalAllowedBufferSize",ARG_INT, get_trove_allowed_buffer_size, NULL,
         CTX_STORAGEHINTS,"16777216"},
+
+    {"VersioningEnabled", ARG_STR, get_trove_versioning_enabled, NULL,
+        CTX_STORAGEHINTS,"yes"},
 
     /* Specifies the format of the date/timestamp that events will have
      * in the event log.  Possible values are:
@@ -1437,7 +1442,7 @@ DOTCONF_CB(get_trove_sync_meta)
     return NULL;
 }
 
-DOTCONF_CB(get_trove_allowed_buffer_size)
+static DOTCONF_CB(get_trove_allowed_buffer_size)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
     struct server_configuration_s *config_s =
@@ -1448,6 +1453,28 @@ DOTCONF_CB(get_trove_allowed_buffer_size)
     assert(fs_conf);
 
     fs_conf->trove_allowed_buffer_size = cmd->data.value;
+    return NULL;
+}
+
+static DOTCONF_CB(get_trove_versioning_enabled)
+{
+    struct filesystem_configuration_s *fs_conf = NULL;
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+    assert(fs_conf);
+
+    if(!strcmp(cmd->data.str, "yes"))
+    {
+        fs_conf->trove_versioning_enabled = 1;
+    }
+    else
+    {
+        fs_conf->trove_versioning_enabled = 0;
+    }
+
     return NULL;
 }
 
@@ -3510,7 +3537,7 @@ int PINT_config_get_trove_sync_data(
     return (fs_conf ? fs_conf->trove_sync_data : TROVE_SYNC);
 }
 
-int PINT_config_get_trove_allowed_buffer_size(
+size_t PINT_config_get_trove_allowed_buffer_size(
     struct server_configuration_s *config,
     PVFS_fs_id fs_id)
 {
@@ -3523,6 +3550,18 @@ int PINT_config_get_trove_allowed_buffer_size(
     return (fs_conf ? fs_conf->trove_allowed_buffer_size : (1024*1024*16));
 }
 
+int PINT_config_get_trove_versioning_enabled(
+    struct server_configuration_s *config,
+    PVFS_fs_id fs_id)
+{
+    struct filesystem_configuration_s *fs_conf = NULL;
+
+    if(config)
+    {
+        fs_conf = PINT_config_find_fs_id(config, fs_id);
+    }
+    return (fs_conf ? fs_conf->trove_versioning_enabled : 0);
+}
 
 #endif
 

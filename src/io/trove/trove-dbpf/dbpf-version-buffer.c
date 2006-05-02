@@ -17,25 +17,23 @@
 #include <malloc.h>
 #endif
 
-struct server_configuration_s * get_server_config_struct(void);
-
 /* NOTE: none of this code is thread-safe.  Namely, we assume that any
  * of these functions are only called from the dbpf thread.
  */
 
+size_t PINT_dbpf_version_allowed_buffer_size = (1024*1024*16);
 static TROVE_size memory_used = 0;
 
 static int dbpf_version_buffer_is_mem_full(
     TROVE_coll_id coll_id, TROVE_size total)
 {
-    if(total + memory_used > PINT_config_get_trove_allowed_buffer_size(
-           get_server_config_struct(), coll_id))
+    if(total + memory_used > PINT_dbpf_version_allowed_buffer_size)
     {
         return 1;
     }
     return 0;
 }
-        
+
 int dbpf_version_buffer_create(TROVE_coll_id coll_id,
                                TROVE_handle handle,
                                uint32_t version,

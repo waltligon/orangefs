@@ -1206,6 +1206,15 @@ static int server_initialize_subsystems(
                 gossip_lerr("Error setting handle timeout\n");
             }
 
+            ret = trove_collection_setinfo(
+                cur_fs->coll_id, trove_context,
+                TROVE_VERSION_SET_ALLOWED_BUFFER_SIZE,
+                (void *)cur_fs->trove_allowed_buffer_size);
+            if(ret < 0)
+            {
+                gossip_lerr("Error setting allowed buffer size\n");
+            }
+            
             if (cur_fs->attr_cache_keywords &&
                 cur_fs->attr_cache_size &&
                 cur_fs->attr_cache_max_num_elems)

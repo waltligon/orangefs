@@ -96,7 +96,9 @@ static int version_commit_commit(PINT_server_op * s_op, job_status_s * js_p)
         s_op->u.version_commit.stream_sizes,
         s_op->u.version_commit.stream_count,
         &s_op->u.version_commit.result_size,
-        (fs->trove_sync_data ? TROVE_SYNC : 0),
+        (fs->trove_sync_data ? TROVE_SYNC : 0) | 
+        (fs->trove_versioning_enabled ? 
+         (TROVE_VERSIONING_ENABLED | TROVE_VERSION_WRITE) : 0),
         NULL,
         s_op,
         0,

@@ -355,6 +355,14 @@ static int dbpf_version_list_sorted_insert(
     return 0;
 }
 
+extern size_t PINT_dbpf_version_allowed_buffer_size;
+
+int dbpf_version_set_allowed_buffer_size(size_t size)
+{
+    PINT_dbpf_version_allowed_buffer_size = size;
+    return 0;
+}
+
 /*
  * Local variables:
  *  c-indent-level: 4

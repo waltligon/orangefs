@@ -54,6 +54,9 @@ enum
     TROVE_FORCE_REQUESTED_HANDLE = 4,
     TROVE_NOOVERWRITE = 8, /* keyval_write and keyval_write_list */
     TROVE_ONLYOVERWRITE = 16, /* keyval_write and keyval_write_list */
+    TROVE_VERSION_WRITE = 32,
+    TROVE_VERSIONING_ENABLED = 64,
+    TROVE_VERSION_COMMIT = 128
 };
 
 /* get/setinfo option flags */
@@ -64,7 +67,8 @@ enum
     TROVE_COLLECTION_ATTR_CACHE_KEYWORDS,
     TROVE_COLLECTION_ATTR_CACHE_SIZE,
     TROVE_COLLECTION_ATTR_CACHE_MAX_NUM_ELEMS,
-    TROVE_COLLECTION_ATTR_CACHE_INITIALIZE
+    TROVE_COLLECTION_ATTR_CACHE_INITIALIZE,
+    TROVE_VERSION_SET_ALLOWED_BUFFER_SIZE
 };
 
 /** Initializes the Trove layer.  Must be called before any other Trove
