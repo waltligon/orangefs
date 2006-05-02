@@ -853,6 +853,7 @@ struct PVFS_servreq_io
     PVFS_offset file_req_offset;
     /* aggregate size of data to transfer */
     PVFS_size aggregate_size;
+    uint32_t version;
 };
 #ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
 #define encode_PVFS_servreq_io(pptr,x) do { \
@@ -867,6 +868,7 @@ struct PVFS_servreq_io
     encode_PINT_Request(pptr, &(x)->file_req); \
     encode_PVFS_offset(pptr, &(x)->file_req_offset); \
     encode_PVFS_size(pptr, &(x)->aggregate_size); \
+    encode_uint32_t(pptr, &(x)->version); \
 } while (0)
 #define decode_PVFS_servreq_io(pptr,x) do { \
     decode_PVFS_handle(pptr, &(x)->handle); \
@@ -881,6 +883,7 @@ struct PVFS_servreq_io
     PINT_request_decode((x)->file_req); /* unpacks the pointers */ \
     decode_PVFS_offset(pptr, &(x)->file_req_offset); \
     decode_PVFS_size(pptr, &(x)->aggregate_size); \
+    encode_uint32_t(pptr, &(x)->version); \
 } while (0)
 /* could be huge, limit to max ioreq size beyond struct itself */
 #define extra_size_PVFS_servreq_io roundup8(PVFS_REQ_LIMIT_PATH_NAME_BYTES) \
@@ -898,7 +901,8 @@ struct PVFS_servreq_io
                              __io_dist,               \
                              __file_req,              \
                              __file_req_off,          \
-                             __aggregate_size)        \
+                             __aggregate_size,        \
+                             __version)               \
 do {                                                  \
     memset(&(__req), 0, sizeof(__req));               \
     (__req).op                 = PVFS_SERV_IO;        \
@@ -913,6 +917,7 @@ do {                                                  \
     (__req).u.io.file_req        = (__file_req);      \
     (__req).u.io.file_req_offset = (__file_req_off);  \
     (__req).u.io.aggregate_size  = (__aggregate_size);\
+    (__req).u.io.version         = (__version);       \
 } while (0)                             
 
 struct PVFS_servresp_io
@@ -947,6 +952,7 @@ struct PVFS_servreq_small_io
     struct PINT_Request * file_req;
     PVFS_offset file_req_offset;
     PVFS_size aggregate_size;
+    uint32_t version;
 
     /* these are used for writes to map the regions of the memory buffer
      * to the contiguous encoded message.  They don't get encoded.
@@ -970,6 +976,7 @@ struct PVFS_servreq_small_io
     encode_PINT_Request(pptr, &(x)->file_req); \
     encode_PVFS_offset(pptr, &(x)->file_req_offset); \
     encode_PVFS_size(pptr, &(x)->aggregate_size); \
+    encode_uint32_t(pptr, &(x)->version); \
     encode_uint32_t(pptr, &(x)->total_bytes); \
     encode_skip4(pptr,); \
     if ((x)->io_type == PVFS_IO_WRITE) \
@@ -996,6 +1003,7 @@ struct PVFS_servreq_small_io
     PINT_request_decode((x)->file_req); /* unpacks the pointers */ \
     decode_PVFS_offset(pptr, &(x)->file_req_offset); \
     decode_PVFS_size(pptr, &(x)->aggregate_size); \
+    decode_uint32_t(pptr, &(x)->version); \
     decode_uint32_t(pptr, &(x)->total_bytes); \
     decode_skip4(pptr,); \
     if ((x)->io_type == PVFS_IO_WRITE) \
@@ -1024,7 +1032,8 @@ struct PVFS_servreq_small_io
                                    __filereq,                            \
                                    __filereq_offset,                     \
                                    __segments,                           \
-                                   __memreq_size)                        \
+                                   __memreq_size,                        \
+                                   __version)                            \
 do {                                                                     \
     int _sio_i;                                                          \
     (__req).op                                = PVFS_SERV_SMALL_IO;      \
@@ -1039,6 +1048,7 @@ do {                                                                     \
     (__req).u.small_io.file_req_offset        = (__filereq_offset);      \
     (__req).u.small_io.aggregate_size         = (__memreq_size);         \
     (__req).u.small_io.segments               = (__segments);            \
+    (__req).u.small_io.version                = (__version);             \
     (__req).u.small_io.total_bytes            = 0;                       \
     for(_sio_i = 0; _sio_i < (__segments); ++_sio_i)                     \
     {                                                                    \

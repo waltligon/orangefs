@@ -215,6 +215,7 @@ struct PINT_client_io_sm
     PVFS_size * dfile_size_array;
     int small_io;
     void *synch_user_ptr; /* used only by the synch sub-system */
+    uint32_t version;
 };
 
 struct PINT_client_flush_sm

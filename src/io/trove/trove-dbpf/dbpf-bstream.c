@@ -27,6 +27,7 @@
 #include "dbpf-attr-cache.h"
 #include "pint-event.h"
 #include "dbpf-open-cache.h"
+#include "dbpf-version.h"
 
 extern gen_mutex_t dbpf_attr_cache_mutex;
 
@@ -1303,7 +1304,8 @@ struct TROVE_bstream_ops dbpf_bstream_ops =
     dbpf_bstream_validate,
     dbpf_bstream_read_list,
     dbpf_bstream_write_list,
-    dbpf_bstream_flush
+    dbpf_bstream_flush,
+    dbpf_version_find_commit
 };
 
 /*

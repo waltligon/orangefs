@@ -376,6 +376,8 @@ static int dbpf_initialize(char *stoname,
         return -TROVE_ENOMEM;
     }
 
+    dbpf_version_initialize();
+
     dbpf_open_cache_initialize();
 
     return dbpf_thread_initialize();
@@ -389,6 +391,7 @@ static int dbpf_finalize(void)
 
     dbpf_thread_finalize();
     dbpf_open_cache_finalize();
+    dbpf_version_finalize();
     gen_mutex_lock(&dbpf_attr_cache_mutex);
     dbpf_attr_cache_finalize();
     gen_mutex_unlock(&dbpf_attr_cache_mutex);

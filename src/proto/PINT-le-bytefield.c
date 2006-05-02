@@ -83,6 +83,8 @@ static void lebf_initialize(void)
 	    case PVFS_SERV_INVALID:
 	    case PVFS_SERV_PERF_UPDATE:
 	    case PVFS_SERV_JOB_TIMER:
+            case PVFS_SERV_COMMIT_TIMER:
+            case PVFS_SERV_VERSION_COMMIT:
 		/* never used, skip initialization */
 		continue;
 	    case PVFS_SERV_GETCONFIG:

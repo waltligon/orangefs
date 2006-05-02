@@ -124,7 +124,8 @@ PINT_server_trove_keys_s Trove_Common_Keys[] =
     {"dir_ent", 8},
     {"datafile_handles", 17},
     {"metafile_dist", 14},
-    {"symlink_target", 15}
+    {"symlink_target", 15},
+    {"dirdata_size", 13}
 };
 
 /* extended attribute name spaces supported in PVFS2 */
@@ -408,7 +409,21 @@ struct PINT_server_req_params PINT_server_req_table[] =
         "small_io",
         PINT_SERVER_CHECK_NONE,
         PINT_SERVER_ATTRIBS_NOT_REQUIRED,
-        &pvfs2_small_io_sm}
+        &pvfs2_small_io_sm},
+
+    /* 34 */
+    {PVFS_SERV_COMMIT_TIMER,
+        "commit_timer",
+        PINT_SERVER_CHECK_NONE,
+        PINT_SERVER_ATTRIBS_NOT_REQUIRED,
+        &pvfs2_commit_timer_sm},
+
+    /* 35 */
+    {PVFS_SERV_VERSION_COMMIT,
+        "version_commit",
+        PINT_SERVER_CHECK_NONE,
+        PINT_SERVER_ATTRIBS_NOT_REQUIRED,
+        &pvfs2_version_commit_sm}
 };
 
 int main(int argc, char **argv)
@@ -1209,7 +1224,7 @@ static int server_initialize_subsystems(
             ret = trove_collection_setinfo(
                 cur_fs->coll_id, trove_context,
                 TROVE_VERSION_SET_ALLOWED_BUFFER_SIZE,
-                (void *)cur_fs->trove_allowed_buffer_size);
+                (void *)&cur_fs->trove_allowed_buffer_size);
             if(ret < 0)
             {
                 gossip_lerr("Error setting allowed buffer size\n");

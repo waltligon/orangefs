@@ -163,7 +163,7 @@ int dbpf_version_add(TROVE_coll_id coll_id,
 
         keyp->coll_id = coll_id;
         keyp->handle = handle;
-        qlist_add_tail(&dbpf_version_keys, &keyp->link);
+        qlist_add_tail(&keyp->link, &dbpf_version_keys);
 
         newentry = malloc(sizeof(dbpf_version_entry));
         if(!newentry)
@@ -325,10 +325,9 @@ static int dbpf_version_list_sorted_insert(
     struct qlist_head * list, dbpf_version * new_vers)
 {
     struct qlist_head * pos;
-    struct qlist_head * version;
     dbpf_version * vers;
     
-    qlist_for_each(pos, version)
+    qlist_for_each(pos, list)
     {
         vers = qlist_entry(pos, dbpf_version, link);
 
@@ -343,7 +342,7 @@ static int dbpf_version_list_sorted_insert(
         }
     }
     
-    if(pos == version)
+    if(pos == list)
     {
         /* insert at the end */
         new_vers->link.next = pos;

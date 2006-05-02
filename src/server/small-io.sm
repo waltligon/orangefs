@@ -152,6 +152,10 @@ static int small_io_start_job(PINT_server_op *s_op, job_status_s *js_p)
 
     if(s_op->req->u.small_io.io_type == PVFS_IO_WRITE)
     {
+        PVFS_vtag vtag;
+        
+        vtag.version = s_op->req->u.small_io.version;
+
         ret = job_trove_bstream_write_list(
            s_op->req->u.small_io.fs_id,
            s_op->req->u.small_io.handle,
@@ -165,7 +169,7 @@ static int small_io_start_job(PINT_server_op *s_op, job_status_s *js_p)
            (fs_config->trove_sync_data ? TROVE_SYNC : 0) |
            (fs_config->trove_versioning_enabled ? 
             (TROVE_VERSIONING_ENABLED | TROVE_VERSION_WRITE) : 0),
-           NULL,
+           &vtag,
            s_op,
            0,
            js_p,

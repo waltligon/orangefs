@@ -24,7 +24,7 @@ static int version_commit_cleanup(PINT_server_op * s_op, job_status_s * js_p);
 
 %%
 
-machine pvfs2_version_commit(
+machine pvfs2_version_commit_sm(
     schedule,
     commit,
     release,
