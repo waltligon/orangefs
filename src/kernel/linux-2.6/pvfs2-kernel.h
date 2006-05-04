@@ -261,6 +261,13 @@ enum PVFS_async_io_type
 #define PVFS2_XATTR_INDEX_TRUSTED           3
 #define PVFS2_XATTR_INDEX_DEFAULT           4
 
+#ifndef POSIX_ACL_XATTR_ACCESS
+#define POSIX_ACL_XATTR_ACCESS	"system.posix_acl_access"
+#endif
+#ifndef POSIX_ACL_XATTR_DEFAULT
+#define POSIX_ACL_XATTR_DEFAULT	"system.posix_acl_default"
+#endif
+
 #define PVFS2_XATTR_NAME_ACL_ACCESS  POSIX_ACL_XATTR_ACCESS
 #define PVFS2_XATTR_NAME_ACL_DEFAULT POSIX_ACL_XATTR_DEFAULT
 #define PVFS2_XATTR_NAME_TRUSTED_PREFIX "trusted."
