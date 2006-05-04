@@ -12,6 +12,9 @@
 
 #include "pvfs2-kernel.h"
 #include "pvfs2-bufmap.h"
+#ifdef HAVE_LINUX_POSIX_ACL_XATTR_H
+#include <linux/posix_acl_xattr.h>
+#endif
 
 #ifdef HAVE_XATTR
 
@@ -72,12 +75,19 @@ int pvfs2_setxattr(struct dentry *dentry, const char *name,
     if((n = pvfs2_strcmp_prefix(name, PVFS2_XATTR_NAME_TRUSTED_PREFIX)))
     {
         ret = pvfs2_xattr_set_trusted(inode, n, value, size, flags);
+        goto out;
     }
-    else
+    else if ((n = pvfs2_strcmp_prefix(name, PVFS2_XATTR_NAME_ACL_DEFAULT)) ||
+            (n = pvfs2_strcmp_prefix(name, PVFS2_XATTR_NAME_ACL_ACCESS)))
     {
-        ret = pvfs2_xattr_set_default(inode, name, value, size, flags);
+        /* If we don't support acl's dont bother calling setxattr */
+        if (get_acl_flag(inode) == 0) {
+            ret = -EOPNOTSUPP;
+            goto out;
+        }
     }
-
+    ret = pvfs2_xattr_set_default(inode, name, value, size, flags);
+out:
     return ret;
 }
 
@@ -91,12 +101,20 @@ ssize_t pvfs2_getxattr(struct dentry *dentry, const char *name,
     if((n = pvfs2_strcmp_prefix(name, PVFS2_XATTR_NAME_TRUSTED_PREFIX)))
     {
         ret = pvfs2_xattr_get_trusted(inode, n, buffer, size);
+        goto out;
     }
-    else
+    else if ((n = pvfs2_strcmp_prefix(name, PVFS2_XATTR_NAME_ACL_DEFAULT)) ||
+            (n = pvfs2_strcmp_prefix(name, PVFS2_XATTR_NAME_ACL_ACCESS)))
     {
-        ret = pvfs2_xattr_get_default(inode, name, buffer, size);
+        /* If we don't support acl's dont bother calling getxattr */
+        if (get_acl_flag(inode) == 0) {
+            ret = -EOPNOTSUPP;
+            goto out;
+        }
     }
+    ret = pvfs2_xattr_get_default(inode, name, buffer, size);
 
+out:
     return ret;
 }
 
