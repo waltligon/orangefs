@@ -6,10 +6,14 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	dnl 
 	dnl on some systems, there is a /usr/include/linux/xattr_acl.h , so the
 	dnl check for xattr_acl.h down below will always pass, even if it
-	dnl should fail.  this hack will bring in just enough system headers
-	dnl for kernel compilation
+	dnl should fail.  this hack (-nostdinc -isystem ...) will bring in just
+	dnl enough system headers dnl for kernel compilation
 
-	NOSTDINCFLAGS="-nostdinc -isystem `$CC -print-file-name=include`"
+	dnl -Werror can be overkill, but for these kernel feature tests
+	dnl 'implicit function declaration' usually ends up in an undefined
+	dnl symbol somewhere.
+
+	NOSTDINCFLAGS="-Werror-implicit-function-declaration -nostdinc -isystem `$CC -print-file-name=include`"
 
 	CFLAGS="$USR_CFLAGS $NOSTDINCFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default -DKBUILD_STR(s)=#s -DKBUILD_BASENAME=KBUILD_STR(empty)  -DKBUILD_MODNAME=KBUILD_STR(empty)"
 
