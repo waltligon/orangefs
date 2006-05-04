@@ -46,6 +46,8 @@ csrc = \
     pvfs2-bufmap.c \
     symlink.c \
     xattr.c \
+	 xattr-trusted.c \
+	 xattr-default.c \
     waitqueue.c \
     pvfs2-proc.c
 

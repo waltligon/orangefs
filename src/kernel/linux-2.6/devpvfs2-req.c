@@ -768,7 +768,7 @@ void pvfs2_ioctl32_cleanup(void)
 
 #endif /* CONFIG_COMPAT */
 
-#ifndef HAVE_REGISTER_IOCTL32_CONVERSION
+#if (defined(CONFIG_COMPAT) && !defined(HAVE_REGISTER_IOCTL32_CONVERSION)) || !defined(CONFIG_COMPAT)
 int pvfs2_ioctl32_init(void)
 {
     return 0;
