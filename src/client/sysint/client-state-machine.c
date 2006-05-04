@@ -718,7 +718,8 @@ PVFS_error PINT_client_wait_internal(
               "%s: PVFS_i%s_%s calling test()\n",
               __func__, in_class_str, in_op_str);
             */
-            ret = PINT_client_state_machine_test(op_id, out_error);
+            int op_count = 1;
+            ret = PINT_client_state_machine_testsome(&op_id, &op_count, NULL, out_error, 5);
 
         } while (!sm_p->op_complete && (ret == 0));
 
