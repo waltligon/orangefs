@@ -71,6 +71,9 @@
 /* Define if kernel has generic_permission */
 #undef HAVE_GENERIC_PERMISSION
 
+/* Define if struct inode_operations in kernel has getattr_lite callback */
+#undef HAVE_GETATTR_LITE_INODE_OPERATIONS
+
 /* Define if gethostbyaddr function exists */
 #undef HAVE_GETHOSTBYADDR
 

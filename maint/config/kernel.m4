@@ -137,6 +137,20 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		AC_MSG_RESULT(no)
 	)
 
+	dnl checking if we have a getattr_lite callback in inode_operations 
+	AC_MSG_CHECKING(for getattr_lite callback in struct inode_operations in kernel)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		static struct inode_operations iop = {
+		    .getattr_lite = NULL,
+		};
+	], [],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_GETATTR_LITE_INODE_OPERATIONS, 1, Define if struct inode_operations in kernel has getattr_lite callback),
+		AC_MSG_RESULT(no)
+	)
+
 	dnl checking if we have a get_fs_key callback in super_operations 
 	AC_MSG_CHECKING(for get_fs_key callback in struct super_operations in kernel)
 	AC_TRY_COMPILE([
