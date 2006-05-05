@@ -75,10 +75,6 @@ module_param(op_timeout_secs, int, 0);
 /* the assigned character device major number */
 static int pvfs2_dev_major = 0;
 
-/* the pvfs2 memory caches (see pvfs2-cache.c) */
-kmem_cache_t *dev_req_cache = NULL;
-kmem_cache_t *pvfs2_inode_cache = NULL;
-
 /* synchronizes the request device file */
 struct semaphore devreq_semaphore;
 
@@ -119,12 +115,26 @@ static int __init pvfs2_init(void)
         op_timeout_secs = 0;
     }
 
+    /* initialize global book keeping data structures */
+    if ((ret = op_cache_initialize()) < 0) {
+        goto err;
+    }
+    if ((ret = dev_req_cache_initialize()) < 0) {
+        goto cleanup_op;
+    }
+    if ((ret = pvfs2_inode_cache_initialize()) < 0) {
+        goto cleanup_req;
+    }
+    if ((ret = kiocb_cache_initialize()) < 0) {
+        goto cleanup_inode;
+    }
+
     /* Initialize the ioctl32 subsystem. This could be a noop too */
     if ((ret = pvfs2_ioctl32_init()) < 0)
     {
         pvfs2_error("pvfs2: could not register ioctl32 handlers? %d!\n",
                 ret);
-        return ret;
+        goto cleanup_kiocb;
     }
 
     /* register pvfs2-req device  */
@@ -134,8 +144,8 @@ static int __init pvfs2_init(void)
     {
 	pvfs2_print("Failed to register /dev/%s (error %d)\n",
 		    PVFS2_REQDEVICE_NAME, pvfs2_dev_major);
-        pvfs2_ioctl32_cleanup();
-	return pvfs2_dev_major;
+        ret = pvfs2_dev_major;
+        goto cleanup_ioctl;
     }
 
     pvfs2_print("*** /dev/%s character device registered ***\n",
@@ -143,11 +153,6 @@ static int __init pvfs2_init(void)
     pvfs2_print("'mknod /dev/%s c %d 0'.\n", PVFS2_REQDEVICE_NAME,
                 pvfs2_dev_major);
 
-    /* initialize global book keeping data structures */
-    op_cache_initialize();
-    dev_req_cache_initialize();
-    pvfs2_inode_cache_initialize();
-    kiocb_cache_initialize();
     sema_init(&devreq_semaphore, 1);
     sema_init(&request_semaphore, 1);
 
@@ -155,20 +160,34 @@ static int __init pvfs2_init(void)
 	qhash_init(hash_compare, hash_func, hash_table_size);
     if (!htable_ops_in_progress)
     {
-	panic("Failed to initialize op hashtable");
+	pvfs2_error("Failed to initialize op hashtable");
+        ret = -ENOMEM;
+        goto cleanup_device;
     }
+    pvfs2_proc_initialize();
     ret = register_filesystem(&pvfs2_fs_type);
 
     if(ret == 0)
     {
-        ret = pvfs2_proc_initialize();
-    }
-
-    if(ret == 0)
-    {
         printk("pvfs2: module version %s loaded\n", PVFS2_VERSION);
+        return 0;
     }
-    return(ret);
+    pvfs2_proc_finalize();
+    qhash_finalize(htable_ops_in_progress);
+cleanup_device:
+    unregister_chrdev(pvfs2_dev_major, PVFS2_REQDEVICE_NAME);
+cleanup_ioctl:
+    pvfs2_ioctl32_cleanup();
+cleanup_kiocb:
+    kiocb_cache_finalize();
+cleanup_inode:
+    pvfs2_inode_cache_finalize();
+cleanup_req:
+    dev_req_cache_finalize();
+cleanup_op:
+    op_cache_finalize();
+err:
+    return ret;
 }
 
 static void __exit pvfs2_exit(void)
@@ -179,8 +198,17 @@ static void __exit pvfs2_exit(void)
 
     pvfs2_print("pvfs2: pvfs2_exit called\n");
 
+    unregister_filesystem(&pvfs2_fs_type);
     pvfs2_proc_finalize();
-
+    if (unregister_chrdev(pvfs2_dev_major, PVFS2_REQDEVICE_NAME) < 0)
+    {
+	pvfs2_error("Failed to unregister pvfs2 device /dev/%s\n",
+		    PVFS2_REQDEVICE_NAME);
+    }
+    else {
+        pvfs2_print("Unregistered pvfs2 device /dev/%s\n",
+                    PVFS2_REQDEVICE_NAME);
+    }
     /* clear out all pending upcall op requests */
     spin_lock(&pvfs2_request_list_lock);
     while (!list_empty(&pvfs2_request_list))
@@ -207,25 +235,15 @@ static void __exit pvfs2_exit(void)
 	    }
 	} while (hash_link);
     }
-    qhash_finalize(htable_ops_in_progress);
-
-    op_cache_finalize();
-    dev_req_cache_finalize();
-    pvfs2_inode_cache_finalize();
-    kiocb_cache_finalize();
     /* cleans up all ioctl32 handlers */
     pvfs2_ioctl32_cleanup();
+    kiocb_cache_finalize();
+    pvfs2_inode_cache_finalize();
+    dev_req_cache_finalize();
+    op_cache_finalize();
 
-    if (unregister_chrdev(pvfs2_dev_major, PVFS2_REQDEVICE_NAME) < 0)
-    {
-	pvfs2_print("Failed to unregister pvfs2 device /dev/%s\n",
-		    PVFS2_REQDEVICE_NAME);
-    }
-    pvfs2_print("Unregistered pvfs2 device /dev/%s\n",
-                PVFS2_REQDEVICE_NAME);
-
-    unregister_filesystem(&pvfs2_fs_type);
-
+    qhash_finalize(htable_ops_in_progress);
+    
     printk("pvfs2: module version %s unloaded\n", PVFS2_VERSION);
 }
 

@@ -6,28 +6,27 @@
 
 #include "pvfs2-kernel.h"
 
-/* a cache for pvfs2 upcall/downcall operations */
-static kmem_cache_t *op_cache = NULL;
 
 static uint64_t next_tag_value;
 static spinlock_t next_tag_value_lock = SPIN_LOCK_UNLOCKED;
 
+/* a cache for pvfs2 upcall/downcall operations */
+static kmem_cache_t *op_cache = NULL;
 /* a cache for device (/dev/pvfs2-req) communication */
-extern kmem_cache_t *dev_req_cache;
-
+static kmem_cache_t *dev_req_cache = NULL;
 /* a cache for pvfs2-inode objects (i.e. pvfs2 inode private data) */
-extern kmem_cache_t *pvfs2_inode_cache;
+static kmem_cache_t *pvfs2_inode_cache = NULL;
+#ifdef HAVE_AIO_VFS_SUPPORT
+/* a cache for pvfs2_kiocb objects (i.e pvfs2 iocb structures ) */
+static kmem_cache_t *pvfs2_kiocb_cache = NULL;
+#endif
 
 extern int debug;
 extern int pvfs2_gen_credentials(
     PVFS_credentials *credentials);
 
-#ifdef HAVE_AIO_VFS_SUPPORT
-/* a cache for pvfs2_kiocb objects (i.e pvfs2 iocb structures ) */
-static kmem_cache_t *pvfs2_kiocb_cache;
-#endif
 
-void op_cache_initialize(void)
+int op_cache_initialize(void)
 {
     op_cache = kmem_cache_create(
         "pvfs2_op_cache", sizeof(pvfs2_kernel_op_t),
@@ -36,20 +35,24 @@ void op_cache_initialize(void)
     if (!op_cache)
     {
         pvfs2_panic("Cannot create pvfs2_op_cache\n");
+        return -ENOMEM;
     }
 
     /* initialize our atomic tag counter */
     spin_lock(&next_tag_value_lock);
     next_tag_value = 100;
     spin_unlock(&next_tag_value_lock);
+    return 0;
 }
 
-void op_cache_finalize(void)
+int op_cache_finalize(void)
 {
     if (kmem_cache_destroy(op_cache) != 0)
     {
         pvfs2_panic("Failed to destroy pvfs2_op_cache\n");
+        return -EINVAL;
     }
+    return 0;
 }
 
 pvfs2_kernel_op_t *op_alloc(void)
@@ -88,12 +91,17 @@ pvfs2_kernel_op_t *op_alloc(void)
     return new_op;
 }
 
-void op_release(void *op)
+void op_release(pvfs2_kernel_op_t *pvfs2_op)
 {
-    pvfs2_kernel_op_t *pvfs2_op = (pvfs2_kernel_op_t *)op;
-
-    pvfs2_op_initialize(pvfs2_op);
-    kmem_cache_free(op_cache, op);
+    if (pvfs2_op)
+    {
+        pvfs2_op_initialize(pvfs2_op);
+        kmem_cache_free(op_cache, pvfs2_op);
+    }
+    else
+    {
+        pvfs2_panic("NULL pointer in op_release\n");
+    }
 }
 
 static void dev_req_cache_ctor(
@@ -107,11 +115,11 @@ static void dev_req_cache_ctor(
     }
     else
     {
-        pvfs2_error("WARNING!! devreq_ctor called without ctor flag\n");
+        pvfs2_panic("WARNING!! devreq_ctor called without ctor flag\n");
     }
 }
 
-void dev_req_cache_initialize(void)
+int dev_req_cache_initialize(void)
 {
     dev_req_cache = kmem_cache_create(
         "pvfs2_devreqcache", MAX_ALIGNED_DEV_REQ_DOWNSIZE, 0,
@@ -120,15 +128,44 @@ void dev_req_cache_initialize(void)
     if (!dev_req_cache)
     {
         pvfs2_panic("Cannot create pvfs2_dev_req_cache\n");
+        return -ENOMEM;
     }
+    return 0;
 }
 
-void dev_req_cache_finalize(void)
+int dev_req_cache_finalize(void)
 {
     if (kmem_cache_destroy(dev_req_cache) != 0)
     {
         pvfs2_panic("Failed to destroy pvfs2_devreqcache\n");
+        return -EINVAL;
     }
+    return 0;
+}
+
+void *dev_req_alloc(void)
+{
+    void *buffer;
+
+    buffer = kmem_cache_alloc(dev_req_cache, PVFS2_CACHE_ALLOC_FLAGS);
+    if (buffer == NULL)
+    {
+        pvfs2_panic("Failed to allocate from dev_req_cache\n"); 
+    }
+    return buffer;
+}
+
+void dev_req_release(void *buffer)
+{
+    if (buffer)
+    {
+        kmem_cache_free(dev_req_cache, buffer);
+    }
+    else 
+    {
+        pvfs2_panic("NULL pointer passed to dev_req_release\n");
+    }
+    return;
 }
 
 static void pvfs2_inode_cache_ctor(
@@ -160,7 +197,7 @@ static void pvfs2_inode_cache_ctor(
     }
     else
     {
-        pvfs2_error("WARNING!! inode_ctor called without ctor flag\n");
+        pvfs2_panic("WARNING!! inode_ctor called without ctor flag\n");
     }
 }
 
@@ -178,7 +215,7 @@ static void pvfs2_inode_cache_dtor(
     }
 }
 
-void pvfs2_inode_cache_initialize(void)
+int pvfs2_inode_cache_initialize(void)
 {
     pvfs2_inode_cache = kmem_cache_create(
         "pvfs2_inode_cache", sizeof(pvfs2_inode_t), 0,
@@ -188,14 +225,49 @@ void pvfs2_inode_cache_initialize(void)
     if (!pvfs2_inode_cache)
     {
         pvfs2_panic("Cannot create pvfs2_inode_cache\n");
+        return -ENOMEM;
     }
+    return 0;
 }
 
-void pvfs2_inode_cache_finalize(void)
+int pvfs2_inode_cache_finalize(void)
 {
     if (kmem_cache_destroy(pvfs2_inode_cache) != 0)
     {
         pvfs2_panic("Failed to destroy pvfs2_inode_cache\n");
+        return -EINVAL;
+    }
+    return 0;
+}
+
+pvfs2_inode_t* pvfs2_inode_alloc(void)
+{
+    pvfs2_inode_t *pvfs2_inode = NULL;
+    /*
+        this allocator has an associated constructor that fills in the
+        internal vfs inode structure.  this initialization is extremely
+        important and is required since we're allocating the inodes
+        ourselves (rather than letting the system inode allocator
+        initialize them for us); see inode.c/inode_init_once()
+    */
+    pvfs2_inode = kmem_cache_alloc(pvfs2_inode_cache,
+                                   PVFS2_CACHE_ALLOC_FLAGS);
+    if (pvfs2_inode == NULL) 
+    {
+        pvfs2_panic("Failed to allocate pvfs2_inode\n");
+    }
+    return pvfs2_inode;
+}
+
+void pvfs2_inode_release(pvfs2_inode_t *pinode)
+{
+    if (pinode)
+    {
+        kmem_cache_free(pvfs2_inode_cache, pinode);
+    }
+    else
+    {
+        pvfs2_panic("NULL pointer in pvfs2_inode_release\n");
     }
 }
 
@@ -212,12 +284,12 @@ static void kiocb_ctor(
     }
     else
     {
-        pvfs2_error("WARNING!! kiocb_ctor called without ctor flag\n");
+        pvfs2_panic("WARNING!! kiocb_ctor called without ctor flag\n");
     }
 }
 
 
-void kiocb_cache_initialize(void)
+int kiocb_cache_initialize(void)
 {
     pvfs2_kiocb_cache = kmem_cache_create(
         "pvfs2_kiocbcache", sizeof(pvfs2_kiocb), 0,
@@ -226,15 +298,19 @@ void kiocb_cache_initialize(void)
     if (!pvfs2_kiocb_cache)
     {
         pvfs2_panic("Cannot create pvfs2_kiocb_cache!\n");
+        return -ENOMEM;
     }
+    return 0;
 }
 
-void kiocb_cache_finalize(void)
+int kiocb_cache_finalize(void)
 {
     if (kmem_cache_destroy(pvfs2_kiocb_cache) != 0)
     {
         pvfs2_panic("Failed to destroy pvfs2_devreqcache\n");
+        return -EINVAL;
     }
+    return 0;
 }
 
 pvfs2_kiocb* kiocb_alloc(void)

@@ -455,31 +455,35 @@ static inline pvfs2_sb_info_t *PVFS2_SB(
 /****************************
  * defined in pvfs2-cache.c
  ****************************/
-void op_cache_initialize(
-    void);
-void op_cache_finalize(
-    void);
-pvfs2_kernel_op_t *op_alloc(
-    void);
-void op_release(
-    void *op);
-void dev_req_cache_initialize(
-    void);
-void dev_req_cache_finalize(
-    void);
-void pvfs2_inode_cache_initialize(
-    void);
-void pvfs2_inode_cache_finalize(
-    void);
+int op_cache_initialize(void);
+int op_cache_finalize(void);
+pvfs2_kernel_op_t *op_alloc(void);
+void op_release(pvfs2_kernel_op_t *op);
 
-#ifndef HAVE_AIO_VFS_SUPPORT
-#define kiocb_cache_initialize()
-#define kiocb_cache_finalize()
-#else
-void kiocb_cache_initialize(void);
-void kiocb_cache_finalize(void);
+int dev_req_cache_initialize(void);
+int dev_req_cache_finalize(void);
+void *dev_req_alloc(void);
+void  dev_req_release(void *);
+
+int pvfs2_inode_cache_initialize(void);
+int pvfs2_inode_cache_finalize(void);
+pvfs2_inode_t *pvfs2_inode_alloc(void);
+void pvfs2_inode_release(pvfs2_inode_t *);
+
+#ifdef HAVE_AIO_VFS_SUPPORT
+int kiocb_cache_initialize(void);
+int kiocb_cache_finalize(void);
 pvfs2_kiocb* kiocb_alloc(void);
 void kiocb_release(pvfs2_kiocb *ptr);
+#else
+static inline int kiocb_cache_initialize(void)
+{
+    return 0;
+}
+static inline int kiocb_cache_finalize(void)
+{
+    return 0;
+}
 #endif
 
 /****************************

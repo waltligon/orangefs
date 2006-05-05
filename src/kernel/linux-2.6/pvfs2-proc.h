@@ -10,8 +10,8 @@
 #ifndef __PVFS2_PROC_H
 #define __PVFS2_PROC_H
 
-int pvfs2_proc_initialize(void);
-int pvfs2_proc_finalize(void);
+void pvfs2_proc_initialize(void);
+void pvfs2_proc_finalize(void);
 
 #endif /* __PVFS2_PROC_H */
 

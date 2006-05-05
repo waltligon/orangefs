@@ -9,7 +9,6 @@
 extern struct file_system_type pvfs2_fs_type;
 extern struct dentry_operations pvfs2_dentry_operations;
 
-extern kmem_cache_t *pvfs2_inode_cache;
 
 extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
@@ -23,6 +22,8 @@ LIST_HEAD(pvfs2_superblocks);
 
 /* used to protect the above superblock list */
 spinlock_t pvfs2_superblocks_lock = SPIN_LOCK_UNLOCKED;
+
+static atomic_t pvfs2_inode_alloc_count, pvfs2_inode_dealloc_count;
 
 static int parse_mount_options(
    char *option_str, struct super_block *sb, int silent)
@@ -164,18 +165,12 @@ static struct inode *pvfs2_alloc_inode(struct super_block *sb)
     struct inode *new_inode = NULL;
     pvfs2_inode_t *pvfs2_inode = NULL;
 
-    /*
-       this allocator has an associated constructor that fills in the
-       internal vfs inode structure.  this initialization is extremely
-       important and is required since we're allocating the inodes
-       ourselves (rather than letting the system inode allocator
-       initialize them for us); see inode.c/inode_init_once()
-     */
-    pvfs2_inode = kmem_cache_alloc(pvfs2_inode_cache,
-                                   PVFS2_CACHE_ALLOC_FLAGS);
+    pvfs2_inode = pvfs2_inode_alloc();
     if (pvfs2_inode)
     {
         new_inode = &pvfs2_inode->vfs_inode;
+        pvfs2_print("pvfs2_alloc_inode: allocated %p\n", pvfs2_inode);
+        atomic_inc(&pvfs2_inode_alloc_count);
     }
     return new_inode;
 }
@@ -184,11 +179,14 @@ static void pvfs2_destroy_inode(struct inode *inode)
 {
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
 
-    pvfs2_print("pvfs2_destroy_inode: destroying inode %d\n",
-                (int)inode->i_ino);
-
-    pvfs2_inode_finalize(pvfs2_inode);
-    kmem_cache_free(pvfs2_inode_cache, pvfs2_inode);
+    if (pvfs2_inode)
+    {
+        pvfs2_print("pvfs2_destroy_inode: deallocated %p destroying inode %ld\n",
+                    pvfs2_inode, (long)inode->i_ino);
+        atomic_inc(&pvfs2_inode_dealloc_count);
+        pvfs2_inode_finalize(pvfs2_inode);
+        pvfs2_inode_release(pvfs2_inode);
+    }
 }
 
 static void pvfs2_read_inode(
@@ -196,8 +194,8 @@ static void pvfs2_read_inode(
 {
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
 
-    pvfs2_print("pvfs2_read_inode: (inode = %lu | ct = %d)\n",
-                inode->i_ino, (int)atomic_read(&inode->i_count));
+    pvfs2_print("pvfs2_read_inode: %p (inode = %lu | ct = %d)\n",
+                pvfs2_inode, inode->i_ino, (int)atomic_read(&inode->i_count));
 
     /*
       at this point we know the private inode data handle/fs_id can't
@@ -229,10 +227,6 @@ static void pvfs2_read_inode(
 {
     pvfs2_inode_t *pvfs2_inode = NULL;
 
-    pvfs2_print("pvfs2: pvfs2_read_inode called (inode = %lu | "
-                "ct = %d)\n", inode->i_ino,
-                (int)atomic_read(&inode->i_count));
-
     if (inode->u.generic_ip)
     {
         pvfs2_panic("Found an initialized inode in pvfs2_read_inode! "
@@ -241,14 +235,16 @@ static void pvfs2_read_inode(
     }
 
     /* Here we allocate the PVFS2 specific inode structure */
-    pvfs2_inode = kmem_cache_alloc(pvfs2_inode_cache,
-                                   PVFS2_CACHE_ALLOC_FLAGS);
+    pvfs2_inode = pvfs2_inode_alloc();
     if (pvfs2_inode)
     {
         pvfs2_inode_initialize(pvfs2_inode);
         inode->u.generic_ip = pvfs2_inode;
         pvfs2_inode->vfs_inode = inode;
 
+        pvfs2_print("pvfs2: pvfs2_read_inode: allocated %p (inode = %lu | "
+                "ct = %d)\n", pvfs2_inode, inode->i_ino,
+                (int)atomic_read(&inode->i_count));
         if (pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_ALL) != 0)
         {
             pvfs2_make_bad_inode(inode);
@@ -266,11 +262,10 @@ static void pvfs2_clear_inode(struct inode *inode)
 {
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
 
-    pvfs2_print("pvfs2_clear_inode: destroying inode %d\n",
-                (int)inode->i_ino);
-
+    pvfs2_print("pvfs2_clear_inode: deallocated %p, destroying inode %ld\n",
+                pvfs2_inode, (long)inode->i_ino);
     pvfs2_inode_finalize(pvfs2_inode);
-    kmem_cache_free(pvfs2_inode_cache, pvfs2_inode);
+    pvfs2_inode_release(pvfs2_inode);
     inode->u.generic_ip = NULL;
 }
 
@@ -280,9 +275,10 @@ static void pvfs2_clear_inode(struct inode *inode)
 static void pvfs2_put_inode(
     struct inode *inode)
 {
-    pvfs2_print("pvfs2_put_inode: (%d | ct=%d | nlink=%d)\n",
-                (int)inode->i_ino, (int)atomic_read(&inode->i_count),
-                (int)inode->i_nlink);
+    pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
+    pvfs2_print("pvfs2_put_inode: pvfs2_inode: %p (i_ino %d) = %d (nlink=%d)\n",
+                pvfs2_inode, (int)inode->i_ino, (int)atomic_read(&inode->i_count),
+                 (int)inode->i_nlink);
 
     if (atomic_read(&inode->i_count) == 1)
     {
@@ -875,6 +871,21 @@ void pvfs2_kill_sb(
 #else
         sb->u.generic_sbp = NULL;
 #endif
+        {
+            int count1, count2;
+            count1 = atomic_read(&pvfs2_inode_alloc_count);
+            count2 = atomic_read(&pvfs2_inode_dealloc_count);
+            if (count1 != count2) 
+            {
+                pvfs2_error("pvfs2_kill_sb: (WARNING) number of inode allocs (%d) != number of inode deallocs (%d)\n",
+                        count1, count2);
+            }
+            else
+            {
+                pvfs2_print("pvfs2_kill_sb: (OK) number of inode allocs (%d) = number of inode deallocs (%d)\n",
+                        count1, count2);
+            }
+        }
     }
     else
     {

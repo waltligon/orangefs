@@ -11,7 +11,6 @@
 #include "pvfs2-bufmap.h"
 #include "pvfs2-internal.h"
 
-extern kmem_cache_t *pvfs2_inode_cache;
 extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
 extern wait_queue_head_t pvfs2_request_list_waitq;

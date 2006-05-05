@@ -14,7 +14,6 @@
 #include "pvfs2-internal.h"
 
 /* this file implements the /dev/pvfs2-req device node */
-extern kmem_cache_t *dev_req_cache;
 
 extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
@@ -71,7 +70,7 @@ static int pvfs2_devreq_open(
             }
             else
             {
-                pvfs2_panic("PVFS2 Device Error: Cannot obtain reference "
+                pvfs2_error("PVFS2 Device Error: Cannot obtain reference "
                             "for device file\n");
             }
         }
@@ -152,7 +151,7 @@ static ssize_t pvfs2_devreq_read(
         if ((cur_op->op_state == PVFS2_VFS_STATE_INPROGR) ||
             (cur_op->op_state == PVFS2_VFS_STATE_SERVICED))
         {
-            pvfs2_panic("WARNING: Current op already queued...skipping\n");
+            pvfs2_error("WARNING: Current op already queued...skipping\n");
         }
         cur_op->op_state = PVFS2_VFS_STATE_INPROGR;
 
@@ -224,7 +223,7 @@ static ssize_t pvfs2_devreq_writev(
     int32_t proto_ver = 0;
     uint64_t tag = 0;
 
-    buffer = kmem_cache_alloc(dev_req_cache, PVFS2_CACHE_ALLOC_FLAGS);
+    buffer = dev_req_alloc();
     if (!buffer)
     {
 	return -ENOMEM;
@@ -236,14 +235,14 @@ static ssize_t pvfs2_devreq_writev(
 	if (iov[i].iov_len > num_remaining)
 	{
 	    pvfs2_error("writev error: Freeing buffer and returning\n");
-	    kmem_cache_free(dev_req_cache, buffer);
+	    dev_req_release(buffer);
 	    return -EMSGSIZE;
 	}
 	ret = copy_from_user(ptr, iov[i].iov_base, iov[i].iov_len);
         if (ret)
         {
             pvfs2_error("Failed to copy data from user space\n");
-	    kmem_cache_free(dev_req_cache, buffer);
+	    dev_req_release(buffer);
             return -EIO;
         }
 	num_remaining -= iov[i].iov_len;
@@ -267,14 +266,14 @@ static ssize_t pvfs2_devreq_writev(
     if (magic != PVFS2_DEVREQ_MAGIC)
     {
         pvfs2_error("Error: Device magic number does not match.\n");
-        kmem_cache_free(dev_req_cache, buffer);
+        dev_req_release(buffer);
         return -EPROTO;
     }
     if (proto_ver != PVFS_KERNEL_PROTO_VERSION)
     {
         pvfs2_error("Error: Device protocol version numbers do not match.\n");
         pvfs2_error("Please check that your pvfs2 module and pvfs2-client versions are consistent.\n");
-        kmem_cache_free(dev_req_cache, buffer);
+        dev_req_release(buffer);
         return -EPROTO;
     }
 
@@ -458,7 +457,7 @@ static ssize_t pvfs2_devreq_writev(
         /* ignore downcalls that we're not interested in */
 	pvfs2_print("WARNING: No one's waiting for tag %llu\n", llu(tag));
     }
-    kmem_cache_free(dev_req_cache, buffer);
+    dev_req_release(buffer);
 
     return count;
 }
