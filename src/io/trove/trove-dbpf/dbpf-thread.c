@@ -155,8 +155,8 @@ int dbpf_do_one_work_cycle(int *out_count)
             {
                 gossip_err("INVALID OP STATE FOUND %d (op is %p)\n",
                            cur_op->op.state, cur_op);
+                assert(cur_op->op.state == OP_QUEUED);
             }
-            assert(cur_op->op.state == OP_QUEUED);
             cur_op->op.state = OP_IN_SERVICE;
             gen_mutex_unlock(&cur_op->mutex);
         }
@@ -175,7 +175,7 @@ int dbpf_do_one_work_cycle(int *out_count)
         gossip_debug(GOSSIP_TROVE_OP_DEBUG,"***** FINISHED TROVE "
                      "SERVICE ROUTINE (%s) *****\n",
                      dbpf_op_type_to_str(cur_op->op.type));
-        if (ret != 0)
+        if (ret == DBPF_OP_COMPLETE || ret < 0)
         {
             /* operation is done and we are telling the caller;
              * ok to pull off queue now.
@@ -188,8 +188,19 @@ int dbpf_do_one_work_cycle(int *out_count)
             move_op_to_completion_queue(
                 cur_op, ((ret == 1) ? 0 : ret), OP_COMPLETED);
         }
+        else if(ret == DBPF_OP_NEEDS_SYNC)
+        {
+            ret = dbpf_queued_op_sync_coalesce_db_ops(cur_op);
+            pthread_cond_signal(&dbpf_op_completed_cond);
+
+            if(ret < 0)
+            {
+                return ret; /* not sure how to recover from failure here */
+            }
+        }
         else
         {
+
 #ifndef __PVFS2_TROVE_AIO_THREADED__
             /*
               check if trove is telling us to NOT mark this as

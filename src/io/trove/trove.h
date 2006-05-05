@@ -50,10 +50,13 @@ enum
 enum
 {
     TROVE_SYNC = 1,
-    TROVE_ATOMIC = 2,
-    TROVE_FORCE_REQUESTED_HANDLE = 4,
-    TROVE_NOOVERWRITE = 8, /* keyval_write and keyval_write_list */
-    TROVE_ONLYOVERWRITE = 16 /* keyval_write and keyval_write_list */
+    TROVE_ATOMIC = 1 << 1,
+    TROVE_FORCE_REQUESTED_HANDLE = 1 << 2,
+    TROVE_NOOVERWRITE = 1 << 3, /* keyval_write and keyval_write_list */
+    TROVE_ONLYOVERWRITE = 1 << 4, /* keyval_write and keyval_write_list */
+    TROVE_IMMEDIATE_COMPLETION = 1 << 5,
+    TROVE_DSPACE_SYNC_COALESCE = 1 << 6,
+    TROVE_KEYVAL_SYNC_COALESCE = 1 << 7
 };
 
 /* get/setinfo option flags */
@@ -64,7 +67,9 @@ enum
     TROVE_COLLECTION_ATTR_CACHE_KEYWORDS,
     TROVE_COLLECTION_ATTR_CACHE_SIZE,
     TROVE_COLLECTION_ATTR_CACHE_MAX_NUM_ELEMS,
-    TROVE_COLLECTION_ATTR_CACHE_INITIALIZE
+    TROVE_COLLECTION_ATTR_CACHE_INITIALIZE,
+    TROVE_COLLECTION_COALESCING_HIGH_WATERMARK,
+    TROVE_COLLECTION_COALESCING_LOW_WATERMARK
 };
 
 /** Initializes the Trove layer.  Must be called before any other Trove

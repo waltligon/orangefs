@@ -345,7 +345,7 @@ enum dbpf_op_type
     BSTREAM_WRITE_LIST,
     BSTREAM_VALIDATE,
     BSTREAM_FLUSH,
-    KEYVAL_READ,
+    KEYVAL_READ = 8,  /* must change DBPF_OP_IS_BSTREAM also */
     KEYVAL_WRITE,
     KEYVAL_REMOVE_KEY,
     KEYVAL_VALIDATE,
@@ -354,13 +354,28 @@ enum dbpf_op_type
     KEYVAL_READ_LIST,
     KEYVAL_WRITE_LIST,
     KEYVAL_FLUSH,
-    DSPACE_CREATE,
+    DSPACE_CREATE = 17, /* must change DBPF_OP_KEYVAL also */
     DSPACE_REMOVE,
     DSPACE_ITERATE_HANDLES,
     DSPACE_VERIFY,
     DSPACE_GETATTR,
     DSPACE_SETATTR
 };
+
+#define DBPF_OP_IS_BSTREAM(__type) (__type < KEYVAL_READ)
+#define DBPF_OP_IS_KEYVAL(__type) (__type < DSPACE_CREATE)
+#define DBPF_OP_IS_DSPACE(__type) (__type >= DSPACE_CREATE)
+
+#define DBPF_OP_DOES_SYNC(__op)    \
+    (__op == BSTREAM_WRITE_AT   || \
+     __op == BSTREAM_RESIZE     || \
+     __op == BSTREAM_WRITE_LIST || \
+     __op == KEYVAL_WRITE       || \
+     __op == KEYVAL_REMOVE_KEY  || \
+     __op == KEYVAL_WRITE_LIST  || \
+     __op == DSPACE_CREATE      || \
+     __op == DSPACE_REMOVE      || \
+     __op == DSPACE_SETATTR)
 
 /*
   a function useful for debugging that returns a human readable
@@ -377,8 +392,13 @@ enum dbpf_op_state
     OP_COMPLETED,
     OP_DEQUEUED,
     OP_CANCELED,
-    OP_INTERNALLY_DELAYED
+    OP_INTERNALLY_DELAYED,
+    OP_SYNC_QUEUED
 };
+
+#define DBPF_OP_CONTINUE 0
+#define DBPF_OP_COMPLETE 1
+#define DBPF_OP_NEEDS_SYNC 2
 
 /* Used to store parameters for queued operations */
 struct dbpf_op
@@ -486,23 +506,23 @@ do {                                                     \
     }                                                    \
 } while(0)
 
-#define DBPF_DB_SYNC_IF_NECESSARY(dbpf_op_ptr, db_ptr)   \
-do {                                                     \
-    int tmp_ret;                                         \
-    if (dbpf_op_ptr->flags & TROVE_SYNC)                 \
-    {                                                    \
-        if ((tmp_ret = db_ptr->sync(db_ptr, 0)) != 0)    \
-        {                                                \
-            gossip_err("db SYNC failed: %s\n",           \
-                       db_strerror(tmp_ret));            \
-            ret = -dbpf_db_error_to_trove_error(tmp_ret);\
-            goto return_error;                           \
-        }                                                \
-        gossip_debug(                                    \
-          GOSSIP_TROVE_DEBUG, "db SYNC called "          \
-          "servicing op type %s\n",                      \
-          dbpf_op_type_to_str(dbpf_op_ptr->type));       \
-    }                                                    \
+#define DBPF_DB_SYNC_IF_NECESSARY(dbpf_op_ptr, db_ptr, ret)   \
+do {                                                          \
+    int tmp_ret;                                              \
+    ret = 0;                                                  \
+    if (dbpf_op_ptr->flags & TROVE_SYNC)                      \
+    {                                                         \
+        if ((tmp_ret = db_ptr->sync(db_ptr, 0)) != 0)         \
+        {                                                     \
+            gossip_err("db SYNC failed: %s\n",                \
+                       db_strerror(tmp_ret));                 \
+            ret = -dbpf_db_error_to_trove_error(tmp_ret);     \
+        }                                                     \
+        gossip_debug(                                         \
+          GOSSIP_TROVE_DEBUG, "db SYNC called "               \
+          "servicing op type %s\n",                           \
+          dbpf_op_type_to_str(dbpf_op_ptr->type));            \
+    }                                                         \
 } while(0)
 
 
