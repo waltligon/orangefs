@@ -52,25 +52,22 @@ static int db_open_count, db_close_count;
 DB_ENV *dbpf_getdb_env(const char *sto_path, int *error)
 {
     static DB_ENV *dbenv = NULL;
+    int ret;
 
     *error = 0;
-    if (dbenv == NULL)
-    {
-        int ret;
 
-        ret = db_env_create(&dbenv, 0);
-        if (ret != 0)
-        {
-            gossip_lerr("dbpf_getdb_env: %s\n", db_strerror(ret));
-            *error = ret;
-            return NULL;
-        }
-        ret = dbenv->open(dbenv, sto_path, DB_INIT_MPOOL | DB_CREATE | DB_THREAD, 0);
-        if (ret != 0) {
-            gossip_lerr("dbpf_getdb_env: %s\n", db_strerror(ret));
-            *error = ret;
-            return NULL;
-        }
+    ret = db_env_create(&dbenv, 0);
+    if (ret != 0)
+    {
+        gossip_lerr("dbpf_getdb_env: %s\n", db_strerror(ret));
+        *error = ret;
+        return NULL;
+    }
+    ret = dbenv->open(dbenv, sto_path, DB_INIT_MPOOL | DB_CREATE | DB_THREAD, 0);
+    if (ret != 0) {
+        gossip_lerr("dbpf_getdb_env: %s\n", db_strerror(ret));
+        *error = ret;
+        return NULL;
     }
     if (my_storage_p && !my_storage_p->sto_env)
         my_storage_p->sto_env = dbenv;
@@ -1236,6 +1233,7 @@ static struct dbpf_storage *dbpf_storage_lookup(
         *error_p = -TROVE_ENOMEM;
         return NULL;
     }
+    memset(sto_p, 0, sizeof(struct dbpf_storage));
 
     sto_p->name = strdup(stoname);
     if (sto_p->name == NULL)
