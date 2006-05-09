@@ -56,19 +56,23 @@ DB_ENV *dbpf_getdb_env(const char *sto_path, int *error)
 
     *error = 0;
 
-    ret = db_env_create(&dbenv, 0);
-    if (ret != 0)
+    if(dbenv == NULL)
     {
-        gossip_lerr("dbpf_getdb_env: %s\n", db_strerror(ret));
-        *error = ret;
-        return NULL;
+        ret = db_env_create(&dbenv, 0);
+        if (ret != 0)
+        {
+            gossip_lerr("dbpf_getdb_env: %s\n", db_strerror(ret));
+            *error = ret;
+            return NULL;
+        }
+        ret = dbenv->open(dbenv, sto_path, DB_INIT_MPOOL | DB_CREATE | DB_THREAD, 0);
+        if (ret != 0) {
+            gossip_lerr("dbpf_getdb_env: %s\n", db_strerror(ret));
+            *error = ret;
+            return NULL;
+        }
     }
-    ret = dbenv->open(dbenv, sto_path, DB_INIT_MPOOL | DB_CREATE | DB_THREAD, 0);
-    if (ret != 0) {
-        gossip_lerr("dbpf_getdb_env: %s\n", db_strerror(ret));
-        *error = ret;
-        return NULL;
-    }
+
     if (my_storage_p && !my_storage_p->sto_env)
         my_storage_p->sto_env = dbenv;
     return dbenv;
@@ -1206,7 +1210,7 @@ static int dbpf_collection_lookup(char *collname,
 static struct dbpf_storage *dbpf_storage_lookup(
     char *stoname, int *error_p)
 {
-    char path_name[PATH_MAX] = {0};
+    char path_name[PATH_MAX] = {-1};
     struct dbpf_storage *sto_p = NULL;
     struct stat sbuf;
 
