@@ -80,7 +80,9 @@ int dbpf_queue_or_service(
     TROVE_ds_flags flags,
     TROVE_op_id *out_op_id_p);
 
-int dbpf_queued_op_complete(dbpf_queued_op_t * op);
+int dbpf_queued_op_complete(dbpf_queued_op_t * op,
+                            TROVE_ds_state ret,
+                            enum dbpf_op_state state);
 
 int dbpf_queued_op_sync_coalesce_db_ops(
     dbpf_queued_op_t *qop_p);

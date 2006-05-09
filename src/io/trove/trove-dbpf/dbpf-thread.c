@@ -191,8 +191,6 @@ int dbpf_do_one_work_cycle(int *out_count)
         else if(ret == DBPF_OP_NEEDS_SYNC)
         {
             ret = dbpf_queued_op_sync_coalesce_db_ops(cur_op);
-            pthread_cond_signal(&dbpf_op_completed_cond);
-
             if(ret < 0)
             {
                 return ret; /* not sure how to recover from failure here */

@@ -380,7 +380,7 @@ int dbpf_queued_op_sync_coalesce_enqueue(
     }
 
     /* only perform check if operation is either keyval or dspace */
-    if(!DBPF_OP_IS_KEYVAL(qop_p->op.type) ||
+    if(!DBPF_OP_IS_KEYVAL(qop_p->op.type) && 
        !DBPF_OP_IS_DSPACE(qop_p->op.type))
     {
         return 0;
@@ -427,7 +427,7 @@ int dbpf_queued_op_sync_coalesce_dequeue(
     }
 
     /* only perform check if operation is either keyval or dspace */
-    if(!DBPF_OP_IS_KEYVAL(qop_p->op.type) ||
+    if(!DBPF_OP_IS_KEYVAL(qop_p->op.type) &&
        !DBPF_OP_IS_DSPACE(qop_p->op.type))
     {
         return 0;
@@ -464,7 +464,7 @@ int dbpf_queued_op_sync_coalesce_db_ops(
     struct qlist_head * ready_op_link;
     dbpf_queued_op_t *ready_op;
 
-    if(!DBPF_OP_IS_KEYVAL(qop_p->op.type) ||
+    if(!DBPF_OP_IS_KEYVAL(qop_p->op.type) &&
        !DBPF_OP_IS_DSPACE(qop_p->op.type))
     {
         return -TROVE_ENOSYS;
@@ -491,6 +491,13 @@ int dbpf_queued_op_sync_coalesce_db_ops(
                 return ret;
             }
         }
+
+        ret = dbpf_queued_op_complete(qop_p, 0, OP_COMPLETED);
+        if(ret < 0)
+        {
+            return ret;
+        }
+
         return 1;
     }
         
@@ -518,7 +525,7 @@ int dbpf_queued_op_sync_coalesce_db_ops(
                 return ret;
             }
 
-            ret = dbpf_queued_op_complete(qop_p);
+            ret = dbpf_queued_op_complete(qop_p, 0, OP_COMPLETED);
             if(ret < 0)
             {
                 return ret;
@@ -536,7 +543,7 @@ int dbpf_queued_op_sync_coalesce_db_ops(
                    ready_op->op.state == OP_SYNC_QUEUED)
                 {
                     dbpf_queued_op_sync_coalesce_dequeue(ready_op);
-                    ret = dbpf_queued_op_complete(ready_op);
+                    ret = dbpf_queued_op_complete(ready_op, 0, OP_COMPLETED);
                     if(ret < 0)
                     {
                         return ret;
@@ -555,7 +562,7 @@ int dbpf_queued_op_sync_coalesce_db_ops(
                 return ret;
             }
 
-            ret = dbpf_queued_op_complete(qop_p);
+            ret = dbpf_queued_op_complete(qop_p, 0, OP_COMPLETED);
             if(ret < 0)
             {
                 return ret;
@@ -573,7 +580,7 @@ int dbpf_queued_op_sync_coalesce_db_ops(
                    ready_op->op.state == OP_SYNC_QUEUED)
                 {
                     dbpf_queued_op_dequeue(ready_op);
-                    ret = dbpf_queued_op_complete(ready_op);
+                    ret = dbpf_queued_op_complete(ready_op, 0, OP_COMPLETED);
                     if(ret < 0)
                     {
                         return ret;
@@ -604,13 +611,21 @@ int dbpf_queued_op_sync_coalesce_db_ops(
 
 extern dbpf_op_queue_p dbpf_completion_queue_array[TROVE_MAX_CONTEXTS];
 extern gen_mutex_t *dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
+extern pthread_cond_t dbpf_op_completed_cond;
 
-int dbpf_queued_op_complete(dbpf_queued_op_t * qop_p)
+int dbpf_queued_op_complete(dbpf_queued_op_t * qop_p,
+                            TROVE_ds_state ret,
+                            enum dbpf_op_state state)
 {
+    qop_p->state = ret;
     gen_mutex_lock(
 	dbpf_completion_queue_array_mutex[qop_p->op.context_id]);
     dbpf_op_queue_add(dbpf_completion_queue_array[qop_p->op.context_id],
 		      qop_p);
+    gen_mutex_lock(&qop_p->mutex);
+    qop_p->op.state = state;
+    gen_mutex_unlock(&qop_p->mutex);
+    pthread_cond_signal(&dbpf_op_completed_cond);
     gen_mutex_unlock(
 	dbpf_completion_queue_array_mutex[qop_p->op.context_id]);
 

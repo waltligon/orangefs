@@ -1242,6 +1242,7 @@ static struct dbpf_storage *dbpf_storage_lookup(
         *error_p = -TROVE_ENOMEM;
         return NULL;
     }
+    memset(sto_p, 0, sizeof(struct dbpf_storage));
 
     sto_p->name = strdup(stoname);
     if (sto_p->name == NULL)
