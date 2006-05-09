@@ -164,6 +164,21 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		AC_DEFINE(HAVE_GET_FS_KEY_SUPER_OPERATIONS, 1, Define if struct super_operations in kernel has get_fs_key callback),
 		AC_MSG_RESULT(no)
 	)
+	
+	dnl checking if we have a readdirplus callback in file_operations
+	AC_MSG_CHECKING(for readdirplus member in file_operations structure)
+	AC_TRY_COMPILE([
+	    #define __KERNEL__
+	    #include <linux/fs.h>
+		 ], [
+		 struct file_operations filop = {
+				.readdirplus = NULL
+		 };
+	    ],
+	    AC_MSG_RESULT(yes)
+		 AC_DEFINE(HAVE_READDIRPLUS_FILE_OPERATIONS, 1, Define if struct file_operations in kernel has readdirplus callback),
+	    AC_MSG_RESULT(no)
+	    )
 
 	AC_MSG_CHECKING(for aio support in kernel)
 	dnl if this test passes, the kernel has it

@@ -36,6 +36,7 @@
 #define PVFS2_VFS_OP_CANCEL            0xFF00EE00
 #define PVFS2_VFS_OP_FSYNC             0xFF00EE01
 #define PVFS2_VFS_OP_FSKEY             0xFF00EE02
+#define PVFS2_VFS_OP_READDIRPLUS       0xFF00EE03
 
 /* Misc constants. Please retain them as multiples of 8!
  * Otherwise 32-64 bit interactions will be messed up :)

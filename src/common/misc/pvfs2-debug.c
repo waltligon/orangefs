@@ -31,7 +31,7 @@ GOSSIP_PERMISSIONS_DEBUG | GOSSIP_CANCEL_DEBUG |                  \
 GOSSIP_MSGPAIR_DEBUG | GOSSIP_CLIENTCORE_DEBUG |                  \
 GOSSIP_SETATTR_DEBUG | GOSSIP_MKDIR_DEBUG |                       \
 GOSSIP_SETEATTR_DEBUG | GOSSIP_GETEATTR_DEBUG |                   \
-GOSSIP_LISTEATTR_DEBUG |                                          \
+GOSSIP_LISTEATTR_DEBUG | GOSSIP_LISTATTR_DEBUG |                  \
 GOSSIP_ACCESS_DEBUG | GOSSIP_ACCESS_DETAIL_DEBUG |                \
 GOSSIP_PERFCOUNTER_DEBUG)
 
@@ -58,6 +58,7 @@ static __keyword_mask_t s_keyword_mask_map[] =
     { "lookup", GOSSIP_LOOKUP_DEBUG },
     { "remove", GOSSIP_REMOVE_DEBUG },
     { "getattr", GOSSIP_GETATTR_DEBUG },
+    { "listattr", GOSSIP_LISTATTR_DEBUG },
     { "setattr", GOSSIP_SETATTR_DEBUG },
     { "geteattr", GOSSIP_GETEATTR_DEBUG },
     { "seteattr", GOSSIP_SETEATTR_DEBUG },

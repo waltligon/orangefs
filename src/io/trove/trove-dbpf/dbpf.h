@@ -220,6 +220,14 @@ struct dbpf_dspace_getattr_op
     TROVE_ds_attributes_s *attr_p;
 };
 
+struct dbpf_dspace_getattr_list_op
+{
+    int count;
+    TROVE_handle          *handle_array;
+    TROVE_ds_attributes_s *attr_p;
+    TROVE_ds_state        *error_p;
+};
+
 struct dbpf_keyval_read_op
 {
     TROVE_keyval_s *key;
@@ -358,7 +366,8 @@ enum dbpf_op_type
     DSPACE_ITERATE_HANDLES,
     DSPACE_VERIFY,
     DSPACE_GETATTR,
-    DSPACE_SETATTR
+    DSPACE_SETATTR,
+    DSPACE_GETATTR_LIST,
 };
 
 /*
@@ -412,6 +421,7 @@ struct dbpf_op
         struct dbpf_keyval_iterate_keys_op k_iterate_keys;
         struct dbpf_keyval_read_list_op k_read_list;
         struct dbpf_keyval_read_list_op k_write_list;
+        struct dbpf_dspace_getattr_list_op d_getattr_list;
     } u;
 };
 

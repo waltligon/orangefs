@@ -154,6 +154,7 @@ typedef struct
         PVFS_sysresp_io io;
         PVFS_sysresp_geteattr geteattr;
         PVFS_sysresp_listeattr listeattr;
+        PVFS_sysresp_readdirplus readdirplus;
     } response;
 
 #ifdef CLIENT_CORE_OP_TIMING
@@ -643,6 +644,32 @@ static PVFS_error post_readdir_request(vfs_request_t *vfs_request)
     if (ret < 0)
     {
         PVFS_perror_gossip("Posting readdir failed", ret);
+    }
+    return ret;
+}
+
+static PVFS_error post_readdirplus_request(vfs_request_t *vfs_request)
+{
+    PVFS_error ret = -PVFS_EINVAL;
+
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "Got a readdirplus request "
+                 "for %llu,%d (token %d)\n",
+                 llu(vfs_request->in_upcall.req.readdirplus.refn.handle),
+                 vfs_request->in_upcall.req.readdirplus.refn.fs_id,
+                 vfs_request->in_upcall.req.readdirplus.token);
+
+    ret = PVFS_isys_readdirplus(
+        vfs_request->in_upcall.req.readdirplus.refn,
+        vfs_request->in_upcall.req.readdirplus.token,
+        vfs_request->in_upcall.req.readdirplus.max_dirent_count,
+        &vfs_request->in_upcall.credentials,
+        vfs_request->in_upcall.req.readdirplus.mask,
+        &vfs_request->response.readdirplus,
+        &vfs_request->op_id, (void *)vfs_request);
+
+    if (ret < 0)
+    {
+        PVFS_perror_gossip("Posting readdirplus failed", ret);
     }
     return ret;
 }
@@ -1682,6 +1709,64 @@ static inline void copy_dirents_to_downcall(vfs_request_t *vfs_request)
     vfs_request->response.readdir.dirent_array = NULL;
 }
 
+static inline void copy_direntplus_to_downcall(vfs_request_t *vfs_request)
+{
+    int i, len;
+
+    vfs_request->out_downcall.resp.readdirplus.token =
+        vfs_request->response.readdirplus.token;
+    vfs_request->out_downcall.resp.readdirplus.directory_version =
+        vfs_request->response.readdirplus.directory_version;
+
+    len = 0;
+    for(i = 0; i < vfs_request->response.readdirplus.pvfs_dirent_outcount; i++)
+    {
+        vfs_request->out_downcall.resp.readdirplus.refn[i].handle =
+            vfs_request->response.readdirplus.dirent_array[i].handle;
+        vfs_request->out_downcall.resp.readdirplus.refn[i].fs_id =
+            vfs_request->in_upcall.req.readdirplus.refn.fs_id;
+
+        len = strlen(vfs_request->response.readdirplus.dirent_array[i].d_name);
+        vfs_request->out_downcall.resp.readdirplus.d_name_len[i] = len;
+
+        strncpy(&vfs_request->out_downcall.resp.readdirplus.d_name[i][0],
+            vfs_request->response.readdirplus.dirent_array[i].d_name, len);
+
+        /* Copy the stat error */
+        vfs_request->out_downcall.resp.readdirplus.stat_error[i] = 
+            vfs_request->response.readdirplus.stat_err_array[i];
+        /* and the system attributes */
+        if (vfs_request->response.readdirplus.stat_err_array[i] == 0)
+        {
+            PVFS_util_copy_sys_attr(&vfs_request->out_downcall.resp.readdirplus.attributes[i], 
+                                    &vfs_request->response.readdirplus.attr_array[i]);
+        }
+        vfs_request->out_downcall.resp.readdirplus.dirent_count++;
+    }
+
+    if (vfs_request->out_downcall.resp.readdirplus.dirent_count !=
+        vfs_request->response.readdirplus.pvfs_dirent_outcount)
+    {
+        gossip_err("Error! readdir counts don't match! (%d != %d)\n",
+                   vfs_request->out_downcall.resp.readdirplus.dirent_count,
+                   vfs_request->response.readdirplus.pvfs_dirent_outcount);
+    }
+
+    /* free sysresp dirent array */
+    free(vfs_request->response.readdirplus.dirent_array);
+    vfs_request->response.readdirplus.dirent_array = NULL;
+    /* free sysresp stat error array */
+    free(vfs_request->response.readdirplus.stat_err_array);
+    vfs_request->response.readdirplus.stat_err_array = NULL;
+    /* free sysresp attribute array */
+    for (i = 0; i < vfs_request->response.readdirplus.pvfs_dirent_outcount; i++) 
+    {
+        PVFS_util_release_sys_attr(&vfs_request->response.readdirplus.attr_array[i]);
+    }
+    free(vfs_request->response.readdirplus.attr_array);
+    vfs_request->response.readdirplus.attr_array = NULL;
+}
+
 /* 
    this method has the ability to overwrite/scrub the error code
    passed down to the vfs
@@ -1874,6 +1959,16 @@ static inline void package_downcall_members(
             else
             {
                 copy_dirents_to_downcall(vfs_request);
+            }
+            break;
+        case PVFS2_VFS_OP_READDIRPLUS:
+            if (*error_code)
+            {
+                vfs_request->out_downcall.status = *error_code;
+            }
+            else
+            {
+                copy_direntplus_to_downcall(vfs_request);
             }
             break;
         case PVFS2_VFS_OP_STATFS:
@@ -2282,6 +2377,10 @@ static inline PVFS_error handle_unexp_vfs_request(
         case PVFS2_VFS_OP_READDIR:
             posted_op = 1;
             ret = post_readdir_request(vfs_request);
+            break;
+        case PVFS2_VFS_OP_READDIRPLUS:
+            posted_op = 1;
+            ret = post_readdirplus_request(vfs_request);
             break;
         case PVFS2_VFS_OP_RENAME:
             posted_op = 1;
@@ -3036,6 +3135,7 @@ static char *get_vfs_op_name_str(int op_type)
         { PVFS2_VFS_OP_REMOVE, "PVFS2_VFS_OP_REMOVE" },
         { PVFS2_VFS_OP_MKDIR, "PVFS2_VFS_OP_MKDIR" },
         { PVFS2_VFS_OP_READDIR, "PVFS2_VFS_OP_READDIR" },
+        { PVFS2_VFS_OP_READDIRPLUS, "PVFS2_VFS_OP_READDIRPLUS" },
         { PVFS2_VFS_OP_SETATTR, "PVFS2_VFS_OP_SETATTR" },
         { PVFS2_VFS_OP_SYMLINK, "PVFS2_VFS_OP_SYMLINK" },
         { PVFS2_VFS_OP_RENAME, "PVFS2_VFS_OP_RENAME" },

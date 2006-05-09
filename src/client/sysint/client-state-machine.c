@@ -195,7 +195,8 @@ struct PINT_client_op_entry_s PINT_client_sm_sys_table[] =
     {&pvfs2_client_list_eattr_sm},
     {&pvfs2_client_small_io_sm},
     {&pvfs2_client_statfs_sm},
-    {&pvfs2_fs_add_sm}
+    {&pvfs2_fs_add_sm},
+    {&pvfs2_client_readdirplus_sm},
 };
 
 struct PINT_client_op_entry_s PINT_client_sm_mgmt_table[] =
@@ -774,6 +775,7 @@ char *PINT_client_get_name_str(int op_type)
         { PVFS_SYS_SETATTR, "PVFS_SYS_SETATTR" },
         { PVFS_SYS_IO, "PVFS_SYS_IO" },
         { PVFS_SYS_FLUSH, "PVFS_SYS_FLUSH" },
+        { PVFS_SYS_READDIRPLUS, "PVFS_SYS_READDIR_PLUS" },
         { PVFS_MGMT_SETPARAM_LIST, "PVFS_MGMT_SETPARAM_LIST" },
         { PVFS_MGMT_NOOP, "PVFS_MGMT_NOOP" },
         { PVFS_SYS_TRUNCATE, "PVFS_SYS_TRUNCATE" },

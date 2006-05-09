@@ -71,6 +71,19 @@ typedef struct
     int32_t d_name_len[MAX_DIRENT_COUNT];
 } pvfs2_readdir_response_t;
 
+typedef struct
+{
+    int32_t dirent_count;
+    PVFS_ds_position token;
+    uint64_t directory_version;
+    PVFS_object_ref refn[MAX_DIRENT_COUNT];
+    char d_name[MAX_DIRENT_COUNT][PVFS2_NAME_LEN];
+    int32_t d_name_len[MAX_DIRENT_COUNT];
+    PVFS_sys_attr attributes[MAX_DIRENT_COUNT];
+    PVFS_error    stat_error[MAX_DIRENT_COUNT];
+    /* FIXME: What do we do with symlink target's? */
+} pvfs2_readdirplus_response_t;
+
 /* the rename response is a blank downcall */
 typedef struct
 {
@@ -185,6 +198,7 @@ typedef struct
 /*      pvfs2_remove_response_t remove; */
 	pvfs2_mkdir_response_t mkdir;
 	pvfs2_readdir_response_t readdir;
+	pvfs2_readdirplus_response_t readdirplus;
 /*      pvfs2_rename_response_t rename; */
 	pvfs2_statfs_response_t statfs;
 /* 	pvfs2_truncate_response_t truncate; */
