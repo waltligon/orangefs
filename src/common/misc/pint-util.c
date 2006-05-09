@@ -10,7 +10,6 @@
  */
 
 /* This file includes definitions of common internal utility functions */
-
 #include <string.h>
 #include <sys/time.h>
 #include <sys/resource.h>

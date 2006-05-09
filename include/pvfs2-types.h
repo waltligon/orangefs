@@ -11,7 +11,6 @@
  *
  *  Definitions of types used throughout PVFS2.
  */
-
 #ifndef __PVFS2_TYPES_H
 #define __PVFS2_TYPES_H
 

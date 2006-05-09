@@ -9,7 +9,6 @@
  *
  *  PVFS2 system interface routines for reading entries from a directory.
  */
-
 #include <string.h>
 #include <assert.h>
 

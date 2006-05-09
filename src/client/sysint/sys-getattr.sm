@@ -10,7 +10,6 @@
  *  PVFS2 system interface routines for obtaining attributes of an object
  *  (file or directory).
  */
-
 #include <string.h>
 #include <assert.h>
 
