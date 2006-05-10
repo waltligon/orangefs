@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: setup.c,v 1.25 2006-04-04 14:50:06 slang Exp $
+ * $Id: setup.c,v 1.26 2006-05-10 19:44:39 pw Exp $
  */
 #include <fcntl.h>
 #include <unistd.h>
@@ -155,6 +155,8 @@ ib_new_connection(int s, const char *peername, int is_server)
     /* other vars */
     c->remote_map = 0;
     c->cancelled = 0;
+    c->refcnt = 0;
+    c->closed = 0;
 
     /* talk with the peer to get his lid and QP nums */
     if (exchange_connection_data(c, s, is_server) != 0) {
@@ -459,7 +461,8 @@ ib_drain_connection(ib_connection_t *c)
 
 /*
  * At an explicit BYE message, or at finalize time, shut down a connection.
- * If descriptors are posted, hopefully they will be unposted by this.
+ * If descriptors are posted, defer and clean up the connection structures
+ * later.
  */
 void
 ib_close_connection(ib_connection_t *c)
@@ -468,6 +471,11 @@ ib_close_connection(ib_connection_t *c)
     ib_method_addr_t *ibmap;
 
     debug(2, "%s: closing connection to %s", __func__, c->peername);
+    c->closed = 1;
+    if (c->refcnt != 0) {
+	debug(1, "%s: refcnt non-zero %d, delaying free", __func__, c->refcnt);
+	return;
+    }
     ret = VAPI_destroy_qp(nic_handle, c->qp_ack);
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_destroy_qp ack", __func__);

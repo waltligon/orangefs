@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.26 2006-05-10 17:07:55 pw Exp $
+ * $Id: ib.c,v 1.27 2006-05-10 19:44:39 pw Exp $
  */
 #include <stdio.h>  /* just for NULL for id-generator.h */
 #include <stdlib.h>
@@ -386,6 +386,7 @@ alloc_new_recv(ib_connection_t *c, buf_head_t *bh)
     ib_recv_t *rq = Malloc(sizeof(*rq));
     rq->type = BMI_RECV;
     rq->c = c;
+    ++rq->c->refcnt;
     rq->bh = bh;
     rq->mop = 0;  /* until user posts for it */
     qlist_add_tail(&rq->list, &recvq);
@@ -986,6 +987,7 @@ generic_post_send(bmi_op_id_t *id, struct method_addr *remote_map,
 
     sq->bmi_tag = tag;
     sq->c = ibmap->c;
+    ++sq->c->refcnt;
     sq->is_unexpected = is_unexpected;
     qlist_add_tail(&sq->list, &sendq);
 
@@ -1092,12 +1094,9 @@ generic_post_recv(bmi_op_id_t *id, struct method_addr *remote_map,
 	  rq_state_name(rq->state));
     } else {
 	/* alloc and build new recvq structure */
-	rq = Malloc(sizeof(*rq));
-	rq->type = BMI_RECV;
+	rq = alloc_new_recv(c, NULL);
 	rq->state = RQ_WAITING_INCOMING;
 	rq->bmi_tag = tag;
-	rq->c = c;
-	qlist_add_tail(&rq->list, &recvq);
 	debug(2, "%s: new rq %p", __func__, rq);
     }
 
@@ -1224,15 +1223,15 @@ static int
 test_sq(ib_send_t *sq, bmi_op_id_t *outid, bmi_error_code_t *err,
   bmi_size_t *size, void **user_ptr, int complete)
 {
+    ib_connection_t *c;
+
     debug(9, "%s: sq %p outid %p err %p size %p user_ptr %p complete %d",
       __func__, sq, outid, err, size, user_ptr, complete);
 
     if (sq->state == SQ_WAITING_USER_TEST) {
 	if (complete) {
 	    debug(2, "%s: sq %p completed %lld to %s", __func__,
-	      sq, lld(sq->buflist.tot_len),
-	      ((ib_method_addr_t *) sq->c->remote_map->method_data)
-		->hostname);
+	      sq, lld(sq->buflist.tot_len), sq->c->peername);
 	    *outid = sq->mop->op_id;
 	    *err = 0;
 	    *size = sq->buflist.tot_len;
@@ -1240,8 +1239,12 @@ test_sq(ib_send_t *sq, bmi_op_id_t *outid, bmi_error_code_t *err,
 		*user_ptr = sq->mop->user_ptr;
 	    qlist_del(&sq->list);
 	    id_gen_safe_unregister(sq->mop->op_id);
+	    c = sq->c;
 	    free(sq->mop);
 	    free(sq);
+	    --c->refcnt;
+	    if (c->closed)
+		ib_close_connection(c);
 	    return 1;
 	}
     /* this state needs help, push it (ideally would be triggered
@@ -1258,9 +1261,13 @@ test_sq(ib_send_t *sq, bmi_op_id_t *outid, bmi_error_code_t *err,
 	    *user_ptr = sq->mop->user_ptr;
 	qlist_del(&sq->list);
 	id_gen_safe_unregister(sq->mop->op_id);
+	c = sq->c;
 	free(sq->mop);
-	maybe_free_connection(sq->c);
 	free(sq);
+	--c->refcnt;
+	maybe_free_connection(c);
+	if (c->closed)
+	    ib_close_connection(c);
 	return 1;
     } else {
 	debug(9, "%s: sq %p found, not done, state %s", __func__,
@@ -1278,6 +1285,8 @@ static int
 test_rq(ib_recv_t *rq, bmi_op_id_t *outid, bmi_error_code_t *err,
   bmi_size_t *size, void **user_ptr, int complete)
 {
+    ib_connection_t *c;
+
     debug(9, "%s: rq %p outid %p err %p size %p user_ptr %p complete %d",
       __func__, rq, outid, err, size, user_ptr, complete);
 
@@ -1285,9 +1294,7 @@ test_rq(ib_recv_t *rq, bmi_op_id_t *outid, bmi_error_code_t *err,
       || rq->state == RQ_RTS_WAITING_USER_TEST) {
 	if (complete) {
 	    debug(2, "%s: rq %p completed %lld from %s", __func__,
-	      rq, lld(rq->actual_len),
-	      ((ib_method_addr_t *) rq->c->remote_map->method_data)
-		->hostname);
+	      rq, lld(rq->actual_len), rq->c->peername);
 	    *err = 0;
 	    *size = rq->actual_len;
 	    if (rq->mop) {
@@ -1298,7 +1305,11 @@ test_rq(ib_recv_t *rq, bmi_op_id_t *outid, bmi_error_code_t *err,
 		free(rq->mop);
 	    }
 	    qlist_del(&rq->list);
+	    c = rq->c;
 	    free(rq);
+	    --c->refcnt;
+	    if (c->closed)
+		ib_close_connection(c);
 	    return 1;
 	}
     /* this state needs help, push it (ideally would be triggered
@@ -1323,8 +1334,12 @@ test_rq(ib_recv_t *rq, bmi_op_id_t *outid, bmi_error_code_t *err,
 	    free(rq->mop);
 	}
 	qlist_del(&rq->list);
-	maybe_free_connection(rq->c);
+	c = rq->c;
 	free(rq);
+	maybe_free_connection(c);
+	--c->refcnt;
+	if (c->closed)
+	    ib_close_connection(c);
 	return 1;
     } else {
 	debug(9, "%s: rq %p found, not done, state %s", __func__,
@@ -1467,6 +1482,7 @@ BMI_ib_testunexpected(int incount __unused, int *outcount,
 	if (rq->state == RQ_EAGER_WAITING_USER_TESTUNEXPECTED) {
 	    msg_header_eager_t mh_eager;
 	    char *ptr = rq->bh->buf;
+	    ib_connection_t *c;
 
 	    decode_msg_header_eager_t(&ptr, &mh_eager);
 
@@ -1485,7 +1501,11 @@ BMI_ib_testunexpected(int incount __unused, int *outcount,
 	    post_sr_ack(rq->c, mh_eager.bufnum);
 	    *outcount = 1;
 	    qlist_del(&rq->list);
+	    c = rq->c;
 	    free(rq);
+	    --c->refcnt;
+	    if (c->closed)
+		ib_close_connection(c);
 	    goto out;
 	}
     }

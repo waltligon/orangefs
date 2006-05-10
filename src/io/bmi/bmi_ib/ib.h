@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.h,v 1.14 2006-04-06 14:39:36 pw Exp $
+ * $Id: ib.h,v 1.15 2006-05-10 19:44:39 pw Exp $
  */
 #ifndef __ib_h
 #define __ib_h
@@ -64,6 +64,8 @@ typedef struct {
     struct S_buf_head *eager_recv_buf_head_contig;
 
     int cancelled;  /* was any operation cancelled by BMI */
+    int refcnt;  /* sq or rq that need the connection to hang around */
+    int closed;  /* closed, but hanging around waiting for zero refcnt */
 
 } ib_connection_t;
 
