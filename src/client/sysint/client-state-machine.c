@@ -185,7 +185,7 @@ struct PINT_client_op_entry_s PINT_client_sm_sys_table[] =
     {&pvfs2_client_io_sm},
     {&pvfs2_client_flush_sm},
     {&pvfs2_client_truncate_sm},
-    {&pvfs2_client_readdir_sm},
+    {&pvfs2_client_sysint_readdir_sm},
     {&pvfs2_client_setattr_sm},
     {&pvfs2_client_lookup_sm},
     {&pvfs2_client_rename_sm},

@@ -70,7 +70,7 @@ extern "C" {
  PINT_event_timestamp(PVFS_EVENT_API_TROVE, __op, 0, __id,               \
  PVFS_EVENT_FLAG_END)
 
-#define DBPF_GET_STORAGE_DIRNAME(__buf, __path_max, __stoname)           \
+#define DBPF_GET_STORAGE_DIRNAME(__buf, __path_max, __stoname)          \
 do { snprintf(__buf, __path_max, "/%s", __stoname); } while (0)
 
 #define STO_ATTRIB_DBNAME "storage_attributes.db"
@@ -160,9 +160,11 @@ struct dbpf_collection
 {
     int refct;
     char *name;
+    char *path_name;
     DB *coll_attr_db;
     DB *ds_db;
     DB *keyval_db;
+    DB_ENV *coll_env;
     TROVE_coll_id coll_id;
     TROVE_handle root_dir_handle;
     struct dbpf_storage *storage;
@@ -431,6 +433,7 @@ void dbpf_collection_register(
 struct dbpf_collection *dbpf_collection_find_registered(
     TROVE_coll_id coll_id);
 void dbpf_collection_clear_registered(void);
+void dbpf_collection_deregister(struct dbpf_collection *entry);
 
 /* function for mapping db errors to trove errors */
 PVFS_error dbpf_db_error_to_trove_error(int db_error_value);
@@ -530,7 +533,8 @@ do {                                                         \
                     ++s_dbpf_metadata_writes, PINT_PERF_SET);\
 } while(0)
 
-extern DB_ENV *dbpf_getdb_env(const char *sto_path, int *err_p);
+extern DB_ENV *dbpf_getdb_env(const char *path, unsigned int env_flags, int *err_p);
+extern int dbpf_putdb_env(DB_ENV *dbenv, const char *path);
 extern int db_open(DB *db_p, const char *dbname, int, int);
 extern int db_close(DB *db_p);
 

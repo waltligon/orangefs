@@ -36,10 +36,6 @@ enum {
 
 extern job_context_id pint_client_sm_context;
 
-static int readdirplus_init(
-    PINT_client_sm *sm_p, job_status_s *js_p);
-static int readdirplus_msg_setup_msgpair(
-    PINT_client_sm *sm_p, job_status_s *js_p);
 static int readdirplus_fetch_attrs_setup_msgpair(
     PINT_client_sm *sm_p, job_status_s *js_p);
 static int readdirplus_fetch_attrs_comp_fn(void *v_p,
@@ -53,16 +49,10 @@ static int readdirplus_msg_failure(
 static int readdirplus_cleanup(
     PINT_client_sm *sm_p, job_status_s *js_p);
 
-static int readdirplus_msg_comp_fn(
-    void *v_p, struct PVFS_server_resp *resp_p, int index);
-
 %%
 
 machine pvfs2_client_readdirplus_sm(
     init,
-    readdirplus_getattr,
-    readdirplus_msg_setup_msgpair,
-    readdirplus_msg_xfer_msgpair,
     readdirplus_fetch_attrs_setup_msgpair,
     readdirplus_fetch_attrs_xfer_msgpair,
     readdirplus_fetch_sizes_setup_msgpair,
@@ -72,27 +62,7 @@ machine pvfs2_client_readdirplus_sm(
 {
     state init
     {
-        run readdirplus_init;
-        default => readdirplus_getattr;
-    }
-
-    state readdirplus_getattr
-    {
-        jump pvfs2_client_getattr_sm;
-        success => readdirplus_msg_setup_msgpair;
-        default => cleanup;
-    }
-
-    state readdirplus_msg_setup_msgpair
-    {
-        run readdirplus_msg_setup_msgpair;
-        success => readdirplus_msg_xfer_msgpair;
-        default => readdirplus_msg_failure;
-    }
-
-    state readdirplus_msg_xfer_msgpair
-    {
-        jump pvfs2_msgpairarray_sm;
+        jump pvfs2_client_readdir_sm;
         success => readdirplus_fetch_attrs_setup_msgpair;
         default => readdirplus_msg_failure;
     }
@@ -189,8 +159,14 @@ PVFS_error PVFS_isys_readdirplus(
     PINT_init_msgarray_params(&sm_p->msgarray_params, ref.fs_id);
     PINT_init_sysint_credentials(sm_p->cred_p, credentials);
     sm_p->object_ref = ref;
-    sm_p->u.readdirplus.pos_token = token;
-    sm_p->u.readdirplus.dirent_limit = pvfs_dirent_incount;
+    /* point the sm dirent array and outcount to the readdirplus response field */
+    sm_p->readdir.dirent_array = &resp->dirent_array;
+    sm_p->readdir.dirent_outcount = &resp->pvfs_dirent_outcount;
+    sm_p->readdir.token = &resp->token;
+    sm_p->readdir.directory_version = &resp->directory_version;
+
+    sm_p->readdir.pos_token = sm_p->u.readdirplus.pos_token = token;
+    sm_p->readdir.dirent_limit = sm_p->u.readdirplus.dirent_limit = pvfs_dirent_incount;
     /* We store the object attr mask in the sm structure */
     sm_p->u.readdirplus.attrmask = PVFS_util_sys_to_object_attr_mask(attrmask);
     sm_p->u.readdirplus.readdirplus_resp = resp;
@@ -252,149 +228,6 @@ PVFS_error PVFS_sys_readdirplus(
 }
 
 /****************************************************************/
-
-static int readdirplus_init(PINT_client_sm *sm_p,
-                        job_status_s *js_p)
-{
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "readdirplus state: init\n");
-
-    PINT_SM_GETATTR_STATE_FILL(
-        sm_p->getattr,
-        sm_p->object_ref,
-        PVFS_ATTR_DIR_ALL,
-        PVFS_TYPE_DIRECTORY,
-        0);
-    
-    assert(js_p->error_code == 0);
-
-    return 1;
-}
-
-static int readdirplus_msg_setup_msgpair(PINT_client_sm *sm_p,
-                                     job_status_s *js_p)
-{
-    int ret = -PVFS_EINVAL;
-    PINT_sm_msgpair_state *msg_p = NULL;
-
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "readdirplus state: "
-                 "readdirplus_msg_setup_msgpair\n");
-
-    if (js_p->error_code)
-    {
-        return 1;
-    }
-    js_p->error_code = 0;
-
-    gossip_debug(GOSSIP_READDIR_DEBUG," readdirplus: posting readdir req\n");
-
-    gossip_debug(
-        GOSSIP_READDIR_DEBUG, "%llu|%d | token is %d | limit is %d\n",
-        llu(sm_p->object_ref.handle),
-        sm_p->object_ref.fs_id,
-        sm_p->u.readdirplus.pos_token,
-        sm_p->u.readdirplus.dirent_limit);
-
-    PINT_init_msgpair(sm_p, msg_p);
-
-    PINT_SERVREQ_READDIR_FILL(
-        msg_p->req,
-        *sm_p->cred_p,
-        sm_p->object_ref.fs_id,
-        sm_p->object_ref.handle,
-        sm_p->u.readdirplus.pos_token,
-        sm_p->u.readdirplus.dirent_limit);
-
-    msg_p->fs_id = sm_p->object_ref.fs_id;
-    msg_p->handle = sm_p->object_ref.handle;
-    msg_p->retry_flag = PVFS_MSGPAIR_RETRY;
-    msg_p->comp_fn = readdirplus_msg_comp_fn;
-
-    ret = PINT_cached_config_map_to_server(
-        &msg_p->svr_addr, sm_p->object_ref.handle,
-        sm_p->object_ref.fs_id);
-
-    if (ret)
-    {
-        gossip_err("Failed to map meta server address\n");
-        js_p->error_code = ret;
-    }
-    return 1;
-}
-
-static int readdirplus_msg_comp_fn(void *v_p,
-                               struct PVFS_server_resp *resp_p,
-                               int index)
-{
-    PINT_client_sm *sm_p = (PINT_client_sm *) v_p;
-    
-    gossip_debug(GOSSIP_CLIENT_DEBUG, "readdirplus_msg_comp_fn\n");
-
-    assert(resp_p->op == PVFS_SERV_READDIR);
-
-    if (resp_p->status != 0)
-    {
-	return resp_p->status;
-    }
-
-    /* convert servresp_readdir response to a sysresp_readdirplus obj */
-    assert(sm_p->u.readdirplus.readdirplus_resp);
-
-    sm_p->u.readdirplus.readdirplus_resp->token = resp_p->u.readdir.token;
-    sm_p->u.readdirplus.readdirplus_resp->directory_version =
-        resp_p->u.readdir.directory_version;
-    sm_p->u.readdirplus.readdirplus_resp->pvfs_dirent_outcount =
-        resp_p->u.readdir.dirent_count;
-    if (sm_p->u.readdirplus.readdirplus_resp->pvfs_dirent_outcount > 0)
-    {
-        int dirent_array_len =
-            (sizeof(PVFS_dirent) *
-             sm_p->u.readdirplus.readdirplus_resp->pvfs_dirent_outcount);
-        int err_array_len  = 
-            (sizeof(PVFS_error) *
-             sm_p->u.readdirplus.readdirplus_resp->pvfs_dirent_outcount);
-        int attr_array_len =
-            (sizeof(PVFS_sys_attr) *
-             sm_p->u.readdirplus.readdirplus_resp->pvfs_dirent_outcount);
-#if 0
-        int i = 0;
-        PVFS_object_ref tmp_ref;
-#endif
-        /* this dirent_array MUST be freed by caller */
-        sm_p->u.readdirplus.readdirplus_resp->dirent_array =
-            malloc(dirent_array_len);
-        assert(sm_p->u.readdirplus.readdirplus_resp->dirent_array);
-
-        memcpy(sm_p->u.readdirplus.readdirplus_resp->dirent_array,
-               resp_p->u.readdir.dirent_array, dirent_array_len);
-#if 0
-        /* insert all handles into the ncache while we have them */
-        tmp_ref.fs_id = sm_p->object_ref.fs_id;
-        for(i = 0;
-            i < sm_p->u.readdirplus.readdirplus_resp->pvfs_dirent_outcount; i++)
-        {
-            tmp_ref.handle = resp_p->u.readdirplus.dirent_array[i].handle;
-            PINT_ncache_insert(
-                resp_p->u.readdirplus.dirent_array[i].d_name,
-                0 /* PVFS2_LOOKUP_LINK_NO_FOLLOW */, tmp_ref,
-                sm_p->object_ref);
-        }
-#endif
-        /* This stat_err_array MUST be freed by caller */
-        sm_p->u.readdirplus.readdirplus_resp->stat_err_array =
-            (PVFS_error *) calloc(err_array_len, 1);
-        assert(sm_p->u.readdirplus.readdirplus_resp->stat_err_array);
-        sm_p->u.readdirplus.readdirplus_resp->attr_array =
-            (PVFS_sys_attr *) calloc(attr_array_len, 1);
-        assert(sm_p->u.readdirplus.readdirplus_resp->attr_array);
-    }
-
-    gossip_debug(GOSSIP_READDIR_DEBUG, "*** Got %d directory entries "
-                 "[version %lld]\n",
-                 sm_p->u.readdirplus.readdirplus_resp->pvfs_dirent_outcount,
-                 lld(sm_p->u.readdirplus.readdirplus_resp->directory_version));
-
-    return 0;
-}
 
 static int get_handle_index(struct handle_to_index *input_handle_array, int nhandles, PVFS_handle given_handle, int *primary_index, int *secondary_index)
 {
@@ -548,9 +381,31 @@ static int create_partition_handles(PVFS_fs_id fsid, int input_handle_count,
 static int list_of_meta_servers(PINT_client_sm *sm_p)
 {
     PVFS_sysresp_readdirplus *readdirplus_resp = sm_p->u.readdirplus.readdirplus_resp;
-    int i, ret;
+    int i, ret, err_array_len, attr_array_len;
 
     assert(readdirplus_resp);
+    err_array_len = (sizeof(PVFS_error) *
+         readdirplus_resp->pvfs_dirent_outcount);
+    attr_array_len =
+        (sizeof(PVFS_sys_attr) *
+         readdirplus_resp->pvfs_dirent_outcount);
+
+    /* This stat_err_array MUST be freed by caller */
+    readdirplus_resp->stat_err_array =
+        (PVFS_error *) calloc(err_array_len, 1);
+    if (readdirplus_resp->stat_err_array == NULL)
+    {
+        return -PVFS_ENOMEM;
+    }
+    readdirplus_resp->attr_array =
+        (PVFS_sys_attr *) calloc(attr_array_len, 1);
+    if (readdirplus_resp->attr_array == NULL)
+    {
+        free(readdirplus_resp->stat_err_array);
+        readdirplus_resp->stat_err_array = NULL;
+        return -PVFS_ENOMEM;
+    }
+
     sm_p->u.readdirplus.svr_count = 0;
     sm_p->u.readdirplus.server_addresses = NULL;
     sm_p->u.readdirplus.handles = NULL;
@@ -560,18 +415,30 @@ static int list_of_meta_servers(PINT_client_sm *sm_p)
         calloc(sm_p->u.readdirplus.nhandles, sizeof(struct handle_to_index));
     if (sm_p->u.readdirplus.input_handle_array == NULL) 
     {
+        free(readdirplus_resp->attr_array);
+        readdirplus_resp->attr_array = NULL;
+        free(readdirplus_resp->stat_err_array);
+        readdirplus_resp->stat_err_array = NULL;
         return -PVFS_ENOMEM;
     }
     sm_p->u.readdirplus.obj_attr_array = (PVFS_object_attr *)
         calloc(sm_p->u.readdirplus.nhandles, sizeof(PVFS_object_attr));
     if (sm_p->u.readdirplus.obj_attr_array == NULL) 
     {
+        free(readdirplus_resp->attr_array);
+        readdirplus_resp->attr_array = NULL;
+        free(readdirplus_resp->stat_err_array);
+        readdirplus_resp->stat_err_array = NULL;
         return -PVFS_ENOMEM;
     }
     sm_p->u.readdirplus.size_array = (PVFS_size **)
         calloc(sm_p->u.readdirplus.nhandles, sizeof(PVFS_size *));
     if (sm_p->u.readdirplus.size_array == NULL)
     {
+        free(readdirplus_resp->attr_array);
+        readdirplus_resp->attr_array = NULL;
+        free(readdirplus_resp->stat_err_array);
+        readdirplus_resp->stat_err_array = NULL;
         return -PVFS_ENOMEM;
     }
 

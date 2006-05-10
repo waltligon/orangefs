@@ -460,6 +460,16 @@ struct PINT_client_perf_count_timer_sm
     struct PINT_perf_counter *pc;
 };
 
+typedef struct 
+{
+    PVFS_dirent **dirent_array;
+    int32_t      *dirent_outcount;
+    PVFS_ds_position *token;
+    uint64_t         *directory_version;
+    PVFS_ds_position pos_token;     /* input parameter */
+    int32_t      dirent_limit;      /* input parameter */
+} PINT_sm_readdir_state;
+
 typedef struct PINT_client_sm
 {
     /*
@@ -491,6 +501,8 @@ typedef struct PINT_client_sm
 
     /* generic getattr used with getattr sub state machines */
     PINT_sm_getattr_state getattr;
+    /* generic dirent array used by both readdir and readdirplus state machines */
+    PINT_sm_readdir_state readdir;
 
     /* msgpair scratch space used within msgpairarray substatemachine */
     /* if you have only a single msg pair you may point sm_p->msgarray */
@@ -766,6 +778,7 @@ extern struct PINT_state_machine_s pvfs2_client_setattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_io_sm;
 extern struct PINT_state_machine_s pvfs2_client_small_io_sm;
 extern struct PINT_state_machine_s pvfs2_client_flush_sm;
+extern struct PINT_state_machine_s pvfs2_client_sysint_readdir_sm;
 extern struct PINT_state_machine_s pvfs2_client_readdir_sm;
 extern struct PINT_state_machine_s pvfs2_client_readdirplus_sm;
 extern struct PINT_state_machine_s pvfs2_client_lookup_sm;
