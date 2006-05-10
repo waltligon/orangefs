@@ -77,7 +77,19 @@ static int conditional_remove_sm_if_in_completion_list(
     {
         if (s_completion_list[i] == sm_p)
         {
-            s_completion_list[i] = NULL;
+            if(i == (s_completion_list_index - 1))
+            {
+                /* last one, just set to NULL */
+                s_completion_list[i] = NULL;
+            }
+            else
+            {
+                memmove(&s_completion_list[i], 
+                        &s_completion_list[i+1],
+                        (s_completion_list_index - (i + 1)) * 
+                        sizeof(PINT_client_sm *));
+            }
+            --s_completion_list_index;
             found = 1;
             break;
         }
@@ -718,8 +730,7 @@ PVFS_error PINT_client_wait_internal(
               "%s: PVFS_i%s_%s calling test()\n",
               __func__, in_class_str, in_op_str);
             */
-            int op_count = 1;
-            ret = PINT_client_state_machine_testsome(&op_id, &op_count, NULL, out_error, 5);
+            ret = PINT_client_state_machine_test(op_id, out_error);
 
         } while (!sm_p->op_complete && (ret == 0));
 

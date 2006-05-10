@@ -340,7 +340,6 @@ static int setattr_write_metafile_datafile_handles_if_required(
 {
     int ret = 0, dfile_count = 0;
     job_id_t j_id;
-    struct server_configuration_s *user_opts = get_server_config_struct();
 
     PINT_STATE_DEBUG("write_metafile_datafile_handles_if_needed");
 
@@ -376,11 +375,13 @@ static int setattr_write_metafile_datafile_handles_if_required(
         llu(s_op->req->u.setattr.handle), s_op->req->u.setattr.fs_id,
         s_op->val.buffer_sz);
 
+    /* we don't sync here since we're going to do it anyway in
+     * write_metafile_distribution
+     */
     ret = job_trove_keyval_write(
         s_op->req->u.setattr.fs_id, s_op->req->u.setattr.handle,
         &(s_op->key), &(s_op->val),
-        PINT_config_get_trove_sync_meta(
-            user_opts, s_op->req->u.setattr.fs_id),
+        0,
         NULL, s_op, 0, js_p, &j_id, server_job_context);
 
     return ret;

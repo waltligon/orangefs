@@ -248,7 +248,6 @@ static int mkdir_write_dirdata_handle(
 {
     int ret = -PVFS_EINVAL;
     job_id_t i;
-    struct server_configuration_s *user_opts = get_server_config_struct();
 
     PINT_STATE_DEBUG("write_dirdata_handle");
 
@@ -275,11 +274,13 @@ static int mkdir_write_dirdata_handle(
         "into parent dir (%llu)\n", llu(s_op->u.mkdir.dirent_handle),
         llu(s_op->resp.u.mkdir.handle));
 
+    /* we don't sync here since we're going to anyway in the following
+     * operation (setting the dirent count).
+     */
     ret = job_trove_keyval_write(
         s_op->u.mkdir.fs_id, s_op->resp.u.mkdir.handle,
         &s_op->key, &s_op->val, 
-        PINT_config_get_trove_sync_meta(
-            user_opts, s_op->u.mkdir.fs_id),
+        0,
         NULL, s_op, 0, js_p, &i, server_job_context);
 
     return ret;
