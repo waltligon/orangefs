@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: setup.c,v 1.26 2006-05-10 19:44:39 pw Exp $
+ * $Id: setup.c,v 1.27 2006-05-10 21:21:54 pw Exp $
  */
 #include <fcntl.h>
 #include <unistd.h>
@@ -384,7 +384,7 @@ void
 close_connection_drain_qp(VAPI_qp_hndl_t qp)
 {
     int ret;
-    int trips;
+    /* int trips; */
     VAPI_qp_attr_t attr;
     VAPI_qp_attr_mask_t mask;
     VAPI_qp_cap_t cap;
@@ -400,6 +400,7 @@ close_connection_drain_qp(VAPI_qp_hndl_t qp)
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_modify_qp RTS -> SQD", __func__);
 
+#if 0	/* screw the async notification, doesn't work nicely */
     /* wait for the asynch notification */
     async_event_handler_waiting_drain = 1;
     trips = 0;
@@ -414,6 +415,7 @@ close_connection_drain_qp(VAPI_qp_hndl_t qp)
     else
 	async_event_handler_waiting_drain = 0;
 	/* oops, but ignore error and return anyway */
+#endif
 }
 
 /*
