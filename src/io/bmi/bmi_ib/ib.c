@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.25 2006-04-06 14:39:36 pw Exp $
+ * $Id: ib.c,v 1.26 2006-05-10 17:07:55 pw Exp $
  */
 #include <stdio.h>  /* just for NULL for id-generator.h */
 #include <stdlib.h>
@@ -1413,6 +1413,10 @@ BMI_ib_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
 	    up = &user_ptrs[n];
 	n += test_rq(rq, &outids[n], &errs[n], &sizes[n], up, complete);
     }
+
+    /* drop lock before blocking on new connections below */
+    gen_mutex_unlock(&interface_mutex);
+
     *outcount = n;
     if (n > 0) {
 	gettimeofday(&last_action, 0);
@@ -1436,7 +1440,6 @@ BMI_ib_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
 		    gettimeofday(&last_action, 0);
 	}
     }
-    gen_mutex_unlock(&interface_mutex);
     return 0;
 }
 
@@ -1637,7 +1640,10 @@ static const char *
 BMI_ib_rev_lookup(struct method_addr *meth)
 {
     ib_method_addr_t *ibmap = meth->method_data;
-    return ibmap->c->peername;
+    if (!ibmap->c)
+	return "(unconnected)";
+    else
+	return ibmap->c->peername;
 }
 
 /* exported method interface */
