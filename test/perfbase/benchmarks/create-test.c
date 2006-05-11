@@ -167,6 +167,7 @@ int main(int argc, char **argv)
 		  pvfs_error = PVFS_sys_remove(test_file, lookup_resp.ref, &credentials);
 		  if(pvfs_error != 0)
 		  {
+				fprintf(stderr, "Failed to remove: %s\n", test_file);
 				PVFS_perror("PVFS_sys_remove", pvfs_error);
 				return PVFS_get_errno_mapping(pvfs_error);
 		  }
