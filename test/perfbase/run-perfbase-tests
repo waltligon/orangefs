@@ -119,13 +119,6 @@ sub run_tests()
 
     my @mpdprocs_list = split(/\n/, $mpdprocs);
 
-    if($#mpdprocs_list < $procs[$#procs])
-    {
-        print STDERR "Max clients (" . $procs[$#procs] . ") is not possible " .
-            "with only $#mpdprocs_list mpd processes available\n"; 
-        exit 1;
-    }
-
     if(! -d "/tmp/mpi-test-data")
     {
         myexec("mkdir /tmp/mpi-test-data",
