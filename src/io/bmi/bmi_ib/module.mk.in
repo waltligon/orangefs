@@ -5,7 +5,7 @@
 #
 # See COPYING in top-level directory.
 #
-# $Id: module.mk.in,v 1.8 2006-02-22 16:30:54 pw Exp $
+# $Id: module.mk.in,v 1.9 2006-05-11 22:13:34 pw Exp $
 #
 
 # only do any of this if configure decided to use IB
@@ -17,7 +17,6 @@ ifdef BUILD_IB
 DIR := src/io/bmi/bmi_ib
 cfiles := ib.c setup.c util.c mem.c
 src := $(patsubst %,$(DIR)/%,$(cfiles))
-cflags :=
 
 #
 # Export these to the top Makefile to tell it what to build.
@@ -30,6 +29,7 @@ SERVERSRC += $(src)
 # No need to expose the rest of the tree to the mess of IB include
 # dirs and warnings used here.
 #
+cflags :=
 cflags += -I@IB_INCDIR@
 cflags += -fno-common
 cflags += -Wall -W -Wpointer-arith
@@ -46,6 +46,11 @@ cflags += -DMAX_TRACE=0 -DMAX_ERROR=0 -DMAX_DEBUG=0
 # not possible so this always throws a warning:
 #   -Wconversion
 #
+
+#
+# Share files with openib, minor switching on API.
+#
+cflags += -DVAPI
 
 #
 # Tell the toplevel make about the extra cflags.

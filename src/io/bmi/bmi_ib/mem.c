@@ -5,11 +5,16 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: mem.c,v 1.4 2006-03-21 21:00:39 pw Exp $
+ * $Id: mem.c,v 1.5 2006-05-11 22:13:34 pw Exp $
  */
 #include <src/common/gen-locks/gen-locks.h>
-#include "ib.h"
 #include "pvfs2-internal.h"
+#ifdef VAPI
+#include "ib.h"
+#endif
+#ifdef OPENIB
+#include "openib.h"
+#endif
 
 #ifdef __PVFS2_SERVER__
 #  define ENABLE_MEMCACHE 1

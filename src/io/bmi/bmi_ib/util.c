@@ -5,16 +5,21 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: util.c,v 1.5 2006-02-22 16:30:54 pw Exp $
+ * $Id: util.c,v 1.6 2006-05-11 22:13:34 pw Exp $
  */
 #include <stdio.h>
 #include <stdarg.h>
 #include <errno.h>
 #include <unistd.h>
 #include <src/common/gossip/gossip.h>
-#include <vapi_common.h>  /* VAPI_strerror */
 #define __util_c
+
+#ifdef VAPI
+#include <vapi_common.h>  /* VAPI_strerror */
 #include "ib.h"
+#else
+#include "openib.h"
+#endif
 
 /*
  * Utility functions.
@@ -61,6 +66,7 @@ error_xerrno(int errnum, const char *fmt, ...)
     exit(1);
 }
 
+#ifdef VAPI
 void __attribute__((noreturn,format(printf,2,3))) __hidden
 error_verrno(int ecode, const char *fmt, ...)
 {
@@ -73,6 +79,7 @@ error_verrno(int ecode, const char *fmt, ...)
     gossip_err("Error: %s: %s\n", s, VAPI_strerror(ecode));  /* adds a dot */
     exit(1);
 }
+#endif
 
 void __attribute__((format(printf,1,2))) __hidden
 warning(const char *fmt, ...)
@@ -187,8 +194,8 @@ memcpy_to_buflist(ib_buflist_t *buflist, const void *buf, bmi_size_t len)
     const char *cp = buf;
 
     for (i=0; i<buflist->num && len > 0; i++) {
-	size_t bytes = buflist->len[i];
-	if (bytes > (size_t) len)
+	bmi_size_t bytes = buflist->len[i];
+	if (bytes > len)
 	    bytes = len;
 	memcpy(buflist->buf.recv[i], cp, bytes);
 	cp += bytes;
