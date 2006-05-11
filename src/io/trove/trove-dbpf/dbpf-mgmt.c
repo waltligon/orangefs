@@ -243,9 +243,11 @@ static int dbpf_collection_setinfo(TROVE_coll_id coll_id,
             break;
         case TROVE_COLLECTION_COALESCING_HIGH_WATERMARK:
             dbpf_queued_op_set_sync_high_watermark(*(int *)parameter);
+            ret = 0;
             break;
         case TROVE_COLLECTION_COALESCING_LOW_WATERMARK:
             dbpf_queued_op_set_sync_low_watermark(*(int *)parameter);
+            ret = 0;
             break;
     }
     return ret;
