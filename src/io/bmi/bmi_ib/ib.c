@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.27 2006-05-10 19:44:39 pw Exp $
+ * $Id: ib.c,v 1.28 2006-05-12 20:43:23 pw Exp $
  */
 #include <stdio.h>  /* just for NULL for id-generator.h */
 #include <stdlib.h>
@@ -799,6 +799,7 @@ post_sr_rdmaw(ib_send_t *sq, msg_header_cts_t *mh_cts, void *mh_cts_buf)
     u_int64_t *recv_bufp = (u_int64_t *) mh_cts_buf;
     u_int32_t *recv_lenp = (u_int32_t *)(recv_bufp + mh_cts->buflist_num);
     u_int32_t *recv_rkey = (u_int32_t *)(recv_lenp + mh_cts->buflist_num);
+    u_int32_t recv_bytes_needed = 0;
 
     debug(2, "%s: sq %p totlen %d", __func__, sq, (int) sq->buflist.tot_len);
 
@@ -834,19 +835,27 @@ post_sr_rdmaw(ib_send_t *sq, msg_header_cts_t *mh_cts, void *mh_cts_buf)
     done = 0;
     while (!done) {
 	int ret;
-	u_int32_t recv_bytes_needed;
 
-	/*
-	 * Driven by recv elements.  Sizes have already been checked
-	 * (hopefully).
-	 */
-	sr.remote_addr = bmitoh64(recv_bufp[recv_index]);
+	if (recv_bytes_needed == 0) {
+	    /* new one, fresh numbers */
+	    sr.remote_addr = bmitoh64(recv_bufp[recv_index]);
+	    recv_bytes_needed = bmitoh32(recv_lenp[recv_index]);
+	} else {
+	    /* continuing into unfinished remote receive index */
+	    sr.remote_addr +=
+		bmitoh32(recv_lenp[recv_index]) - recv_bytes_needed;
+	}
+
 	sr.r_key = bmitoh32(recv_rkey[recv_index]);
 	sr.sg_lst_len = 0;
-	recv_bytes_needed = bmitoh32(recv_lenp[recv_index]);
+
 	debug(4, "%s: chunk to %s remote addr %llx rkey %x",
 	  __func__, sq->c->peername, llu(sr.remote_addr), sr.r_key);
-	while (recv_bytes_needed > 0) {
+
+	/*
+	 * Driven by recv elements.  Sizes have already been checked.
+	 */
+	while (recv_bytes_needed > 0 && sr.sg_lst_len < sg_max_len) {
 	    /* consume from send buflist to fill this one receive */
 	    u_int32_t send_bytes_offered
 	      = sq->buflist.len[send_index] - send_offset;
@@ -868,10 +877,6 @@ post_sr_rdmaw(ib_send_t *sq, msg_header_cts_t *mh_cts, void *mh_cts_buf)
 	      sg_tmp_array[sr.sg_lst_len].lkey);
 
 	    ++sr.sg_lst_len;
-	    if (sr.sg_lst_len > sg_max_len)
-		error("%s: send buflist len %d bigger than max %d", __func__,
-		  sr.sg_lst_len, sg_max_len);
-
 	    send_offset += this_bytes;
 	    if (send_offset == sq->buflist.len[send_index]) {
 		++send_index;
@@ -885,9 +890,11 @@ post_sr_rdmaw(ib_send_t *sq, msg_header_cts_t *mh_cts, void *mh_cts_buf)
 	}
 
 	/* done with the one we were just working on, is this the last recv? */
-	++recv_index;
-	if (recv_index == (int)mh_cts->buflist_num)
-	    done = 1;
+	if (recv_bytes_needed == 0) {
+	    ++recv_index;
+	    if (recv_index == (int)mh_cts->buflist_num)
+		done = 1;
+	}
 
 	/* either filled the recv or exhausted the send */
 	if (done) {
