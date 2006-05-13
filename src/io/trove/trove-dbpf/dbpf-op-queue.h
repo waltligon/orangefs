@@ -58,6 +58,9 @@ void dbpf_queued_op_put(
 void dbpf_queued_op_dequeue(
     dbpf_queued_op_t *q_op_p);
 
+void dbpf_queued_op_dequeue_nolock(
+    dbpf_queued_op_t *q_op_p);
+
 void dbpf_queued_op_put_and_dequeue(
     dbpf_queued_op_t *q_op_p);
 

@@ -148,8 +148,6 @@ int dbpf_do_one_work_cycle(int *out_count)
         cur_op = dbpf_op_queue_shownext(&dbpf_op_queue);
         if (cur_op)
         {
-            dbpf_op_queue_remove(cur_op);
-
             gen_mutex_lock(&cur_op->mutex);
             if (cur_op->op.state != OP_QUEUED)
             {
@@ -157,6 +155,9 @@ int dbpf_do_one_work_cycle(int *out_count)
                            cur_op->op.state, cur_op);
                 assert(cur_op->op.state == OP_QUEUED);
             }
+
+            dbpf_queued_op_dequeue_nolock(cur_op);
+
             cur_op->op.state = OP_IN_SERVICE;
             gen_mutex_unlock(&cur_op->mutex);
         }
