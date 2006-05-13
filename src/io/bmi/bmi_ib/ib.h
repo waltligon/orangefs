@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.h,v 1.15 2006-05-10 19:44:39 pw Exp $
+ * $Id: ib.h,v 1.16 2006-05-13 19:41:28 pw Exp $
  */
 #ifndef __ib_h
 #define __ib_h
@@ -329,8 +329,6 @@ extern int ib_tcp_client_connect(ib_method_addr_t *ibmap,
   struct method_addr *remote_map);
 extern int ib_tcp_server_check_new_connections(void);
 extern int ib_tcp_server_block_new_connections(int timeout_ms);
-extern void ib_mem_register(memcache_entry_t *c);
-extern void ib_mem_deregister(memcache_entry_t *c);
 
 /*
  * Method functions in setup.c.
@@ -380,48 +378,57 @@ extern int write_full(int fd, const void *buf, size_t count);
 /*
  * Memory allocation and caching internal functions, in mem.c.
  */
-extern void *BMI_ib_memalloc(bmi_size_t size, enum bmi_op_type send_recv);
-extern int BMI_ib_memfree(void *buf, bmi_size_t size,
-  enum bmi_op_type send_recv);
-extern void memcache_register(ib_buflist_t *buflist);
-extern void memcache_deregister(ib_buflist_t *buflist);
-extern void memcache_shutdown(void);
+extern void *memcache_memalloc(void *md, bmi_size_t len, int eager_limit);
+extern int memcache_memfree(void *md, void *buf, bmi_size_t len);
+extern void memcache_register(void *md, ib_buflist_t *buflist);
+extern void memcache_deregister(void *md, ib_buflist_t *buflist);
+extern void *memcache_init(void (*mem_register)(memcache_entry_t *),
+                           void (*mem_deregister)(memcache_entry_t *));
+extern void memcache_shutdown(void *md);
+
+/* 20 8kB buffers allocated to each connection for unexpected messages */
+#define DEFAULT_EAGER_BUF_NUM  (20)
+#define DEFAULT_EAGER_BUF_SIZE (8 << 10)
 
 /*
- * Shared variables, space allocated in ib.c.
+ * State that applies across all users of the device, built at initialization.
  */
-extern VAPI_hca_hndl_t nic_handle;  /* NIC reference */
-extern VAPI_cq_hndl_t nic_cq;  /* single completion queue for all QPs */
-extern int listen_sock;  /* TCP sock on whih to listen for new connections */
-extern list_t connection; /* list of current connections */
-extern list_t sendq;
-extern list_t recvq;
-extern list_t memcache;
+typedef struct {
+    VAPI_hca_hndl_t nic_handle;  /* NIC reference */
+    VAPI_cq_hndl_t nic_cq;  /* single completion queue for all QPs */
+    int listen_sock;  /* TCP sock on whih to listen for new connections */
+    list_t connection; /* list of current connections */
+    list_t sendq;  /* outstanding sent items */
+    list_t recvq;  /* outstanding posted receives (or unexpecteds) */
+    void *memcache;  /* opaque structure that holds memory cache state */
 
-/*
- * Temp array for filling scatter/gather lists to pass to IB functions,
- * allocated once at start to max size defined as reported by the qp.
- */
-extern VAPI_sg_lst_entry_t *sg_tmp_array;
-extern unsigned int sg_max_len;
+    /*
+     * Temp array for filling scatter/gather lists to pass to IB functions,
+     * allocated once at start to max size defined as reported by the qp.
+     */
+    VAPI_sg_lst_entry_t *sg_tmp_array;
+    unsigned int sg_max_len;
 
-/*
- * Maximum number of outstanding work requests in the NIC, same for both
- * SQ and RQ, though we only care about SQ on the QP and ack QP.  Used to
- * decide when to use a SIGNALED completion on a send to avoid WQE buildup.
- */
-extern unsigned int max_outstanding_wr;
-/*
- * Both eager and bounce buffers are the same size, and same number, since
- * there is a symmetry of how many can be in use at the same time.
- * This number limits the number of outstanding entries in the unexpected
- * receive queue, and expected but non-preposted queue, since the data
- * sits in the buffer where it was received until the user posts or tests
- * for it.
- */
-static const int EAGER_BUF_NUM = 20;
-static const unsigned long EAGER_BUF_SIZE = 8 << 10;  /* 8 kB */
-extern bmi_size_t EAGER_BUF_PAYLOAD;
+    /*
+     * Maximum number of outstanding work requests in the NIC, same for both
+     * SQ and RQ, though we only care about SQ on the QP and ack QP.  Used to
+     * decide when to use a SIGNALED completion on a send to avoid WQE buildup.
+     */
+    unsigned int max_outstanding_wr;
+
+    /*
+     * Both eager and bounce buffers are the same size, and same number, since
+     * there is a symmetry of how many can be in use at the same time.
+     * This number limits the number of outstanding entries in the unexpected
+     * receive queue, and expected but non-preposted queue, since the data
+     * sits in the buffer where it was received until the user posts or tests
+     * for it.
+     */
+    int eager_buf_num;
+    unsigned long eager_buf_size;
+    bmi_size_t eager_buf_payload;
+} ib_device_t;
+extern ib_device_t *ib_device;
 
 /*
  * Handle pointer to 64-bit integer conversions.  On 32-bit architectures

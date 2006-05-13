@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: setup.c,v 1.27 2006-05-10 21:21:54 pw Exp $
+ * $Id: setup.c,v 1.28 2006-05-13 19:41:28 pw Exp $
  */
 #include <fcntl.h>
 #include <unistd.h>
@@ -55,6 +55,9 @@ static int exchange_connection_data(ib_connection_t *c, int s, int is_server);
 static void init_connection_modify_qp(VAPI_qp_hndl_t qp,
   VAPI_qp_num_t remote_qp_num, int remote_lid);
 
+static void ib_mem_register(memcache_entry_t *c);
+static void ib_mem_deregister(memcache_entry_t *c);
+
 /*
  * Build new conneciton.
  */
@@ -73,23 +76,23 @@ ib_new_connection(int s, const char *peername, int is_server)
     c->peername = strdup(peername);
 
     /* fill send and recv free lists and buf heads */
-    c->eager_send_buf_contig = Malloc(EAGER_BUF_NUM * EAGER_BUF_SIZE);
-    c->eager_recv_buf_contig = Malloc(EAGER_BUF_NUM * EAGER_BUF_SIZE);
+    c->eager_send_buf_contig = Malloc(ib_device->eager_buf_num * ib_device->eager_buf_size);
+    c->eager_recv_buf_contig = Malloc(ib_device->eager_buf_num * ib_device->eager_buf_size);
     INIT_QLIST_HEAD(&c->eager_send_buf_free);
     INIT_QLIST_HEAD(&c->eager_recv_buf_free);
-    c->eager_send_buf_head_contig = Malloc(EAGER_BUF_NUM
+    c->eager_send_buf_head_contig = Malloc(ib_device->eager_buf_num
       * sizeof(*c->eager_send_buf_head_contig));
-    c->eager_recv_buf_head_contig = Malloc(EAGER_BUF_NUM
+    c->eager_recv_buf_head_contig = Malloc(ib_device->eager_buf_num
       * sizeof(*c->eager_recv_buf_head_contig));
-    for (i=0; i<EAGER_BUF_NUM; i++) {
+    for (i=0; i<ib_device->eager_buf_num; i++) {
 	buf_head_t *ebs = &c->eager_send_buf_head_contig[i];
 	buf_head_t *ebr = &c->eager_recv_buf_head_contig[i];
 	INIT_QLIST_HEAD(&ebs->list);
 	INIT_QLIST_HEAD(&ebr->list);
 	ebs->c = ebr->c = c;
 	ebs->num = ebr->num = i;
-	ebs->buf = (char *) c->eager_send_buf_contig + i * EAGER_BUF_SIZE;
-	ebr->buf = (char *) c->eager_recv_buf_contig + i * EAGER_BUF_SIZE;
+	ebs->buf = (char *) c->eager_send_buf_contig + i * ib_device->eager_buf_size;
+	ebr->buf = (char *) c->eager_recv_buf_contig + i * ib_device->eager_buf_size;
 	qlist_add_tail(&ebs->list, &c->eager_send_buf_free);
 	qlist_add_tail(&ebr->list, &c->eager_recv_buf_free);
     }
@@ -97,10 +100,10 @@ ib_new_connection(int s, const char *peername, int is_server)
     /* register memory region, recv */
     mr.type = VAPI_MR;
     mr.start = int64_from_ptr(c->eager_recv_buf_contig);
-    mr.size = EAGER_BUF_NUM * EAGER_BUF_SIZE;
+    mr.size = ib_device->eager_buf_num * ib_device->eager_buf_size;
     mr.pd_hndl = nic_pd;
     mr.acl = VAPI_EN_LOCAL_WRITE | VAPI_EN_REMOTE_WRITE;
-    ret = VAPI_register_mr(nic_handle, &mr, &c->eager_recv_mr, &mr_out);
+    ret = VAPI_register_mr(ib_device->nic_handle, &mr, &c->eager_recv_mr, &mr_out);
     if (ret < 0)
 	error_verrno(ret, "%s: register_mr eager recv", __func__);
     c->eager_recv_lkey = mr_out.l_key;
@@ -108,10 +111,10 @@ ib_new_connection(int s, const char *peername, int is_server)
     /* register memory region, send */
     mr.type = VAPI_MR;
     mr.start = int64_from_ptr(c->eager_send_buf_contig);
-    mr.size = EAGER_BUF_NUM * EAGER_BUF_SIZE;
+    mr.size = ib_device->eager_buf_num * ib_device->eager_buf_size;
     mr.pd_hndl = nic_pd;
     mr.acl = VAPI_EN_LOCAL_WRITE;
-    ret = VAPI_register_mr(nic_handle, &mr, &c->eager_send_mr, &mr_out);
+    ret = VAPI_register_mr(ib_device->nic_handle, &mr, &c->eager_send_mr, &mr_out);
     if (ret < 0)
 	error_verrno(ret, "%s: register_mr bounce", __func__);
     c->eager_send_lkey = mr_out.l_key;
@@ -124,22 +127,22 @@ ib_new_connection(int s, const char *peername, int is_server)
     qp_init_attr.pd_hndl            = nic_pd;
     qp_init_attr.rdd_hndl           = 0;
     /* wire both send and recv to the same CQ */
-    qp_init_attr.sq_cq_hndl         = nic_cq;
-    qp_init_attr.rq_cq_hndl         = nic_cq;
+    qp_init_attr.sq_cq_hndl         = ib_device->nic_cq;
+    qp_init_attr.rq_cq_hndl         = ib_device->nic_cq;
     /* only generate completion queue entries if requested */
     qp_init_attr.sq_sig_type        = VAPI_SIGNAL_REQ_WR;
     qp_init_attr.rq_sig_type        = VAPI_SIGNAL_REQ_WR;
     qp_init_attr.ts_type            = VAPI_TS_RC;
 
     /* build main qp */
-    ret = VAPI_create_qp(nic_handle, &qp_init_attr, &c->qp, &prop);
+    ret = VAPI_create_qp(ib_device->nic_handle, &qp_init_attr, &c->qp, &prop);
     if (ret < 0)
 	error_verrno(ret, "%s: create QP", __func__);
     c->qp_num = prop.qp_num;
     verify_prop_caps(&prop.cap);
 
     /* and qp ack */
-    ret = VAPI_create_qp(nic_handle, &qp_init_attr, &c->qp_ack, &prop);
+    ret = VAPI_create_qp(ib_device->nic_handle, &qp_init_attr, &c->qp_ack, &prop);
     if (ret < 0)
 	error_verrno(ret, "%s: create QP ack", __func__);
     c->qp_ack_num = prop.qp_num;
@@ -150,7 +153,7 @@ ib_new_connection(int s, const char *peername, int is_server)
     c->num_unsignaled_wr_ack = 0;
 
     /* put it on the list */
-    qlist_add(&c->list, &connection);
+    qlist_add(&c->list, &ib_device->connection);
 
     /* other vars */
     c->remote_map = 0;
@@ -169,7 +172,7 @@ ib_new_connection(int s, const char *peername, int is_server)
     init_connection_modify_qp(c->qp_ack, c->remote_qp_ack_num, c->remote_lid);
 
     /* post initial RRs */
-    for (i=0; i<EAGER_BUF_NUM; i++)
+    for (i=0; i<ib_device->eager_buf_num; i++)
 	post_rr(c, &c->eager_recv_buf_head_contig[i]);
 
     /* final sychronize to ensure nothing happens before RRs are posted */
@@ -217,29 +220,29 @@ ib_new_connection(int s, const char *peername, int is_server)
 static void
 verify_prop_caps(VAPI_qp_cap_t *cap)
 {
-    if (sg_max_len == 0) {
-	sg_max_len = cap->max_sg_size_sq;
-	if (cap->max_sg_size_rq < sg_max_len)
-	    sg_max_len = cap->max_sg_size_rq;
-	sg_tmp_array = Malloc(sg_max_len * sizeof(*sg_tmp_array));
+    if (ib_device->sg_max_len == 0) {
+	ib_device->sg_max_len = cap->max_sg_size_sq;
+	if (cap->max_sg_size_rq < ib_device->sg_max_len)
+	    ib_device->sg_max_len = cap->max_sg_size_rq;
+	ib_device->sg_tmp_array = Malloc(ib_device->sg_max_len * sizeof(*ib_device->sg_tmp_array));
     } else {
-	if (cap->max_sg_size_sq < sg_max_len)
+	if (cap->max_sg_size_sq < ib_device->sg_max_len)
 	    error(
 	      "%s: new connection has smaller send scatter/gather array size,"
-	      " %d vs %d", __func__, cap->max_sg_size_sq, sg_max_len);
-	if (cap->max_sg_size_rq < sg_max_len)
+	      " %d vs %d", __func__, cap->max_sg_size_sq, ib_device->sg_max_len);
+	if (cap->max_sg_size_rq < ib_device->sg_max_len)
 	    error(
 	      "%s: new connection has smaller recv scatter/gather array size,"
-	      " %d vs %d", __func__, cap->max_sg_size_rq, sg_max_len);
+	      " %d vs %d", __func__, cap->max_sg_size_rq, ib_device->sg_max_len);
     }
 
-    if (max_outstanding_wr == 0) {
-	max_outstanding_wr = cap->max_oust_wr_sq;
+    if (ib_device->max_outstanding_wr == 0) {
+	ib_device->max_outstanding_wr = cap->max_oust_wr_sq;
     } else {
-	if (cap->max_oust_wr_sq < max_outstanding_wr)
+	if (cap->max_oust_wr_sq < ib_device->max_outstanding_wr)
 	    error(
 	      "%s: new connection has smaller max_oust_wr_sq size, %d vs %d",
-	      __func__, cap->max_oust_wr_sq, max_outstanding_wr);
+	      __func__, cap->max_oust_wr_sq, ib_device->max_outstanding_wr);
     }
 }
 
@@ -333,7 +336,7 @@ init_connection_modify_qp(VAPI_qp_hndl_t qp, VAPI_qp_num_t remote_qp_num,
     attr.remote_atomic_flags = VAPI_EN_REM_WRITE;
     attr.pkey_ix = 0;
     attr.port = VAPI_PORT;
-    ret = VAPI_modify_qp(nic_handle, qp, &attr, &mask, &cap);
+    ret = VAPI_modify_qp(ib_device->nic_handle, qp, &attr, &mask, &cap);
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_modify_qp RST -> INIT", __func__);
 
@@ -355,7 +358,7 @@ init_connection_modify_qp(VAPI_qp_hndl_t qp, VAPI_qp_num_t remote_qp_num,
     attr.rq_psn = 0;
     attr.dest_qp_num = remote_qp_num;
     attr.min_rnr_timer = IB_RNR_NAK_TIMER_491_52;
-    ret = VAPI_modify_qp(nic_handle, qp, &attr, &mask, &cap);
+    ret = VAPI_modify_qp(ib_device->nic_handle, qp, &attr, &mask, &cap);
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_modify_qp INIT -> RTR", __func__);
 
@@ -375,7 +378,7 @@ init_connection_modify_qp(VAPI_qp_hndl_t qp, VAPI_qp_num_t remote_qp_num,
     attr.timeout = 26;  /* 4.096us * 2^26 = 5 min */
     attr.retry_count = 20;
     attr.rnr_retry = 20;
-    ret = VAPI_modify_qp(nic_handle, qp, &attr, &mask, &cap);
+    ret = VAPI_modify_qp(ib_device->nic_handle, qp, &attr, &mask, &cap);
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_modify_qp RTR -> RTS", __func__);
 }
@@ -396,7 +399,7 @@ close_connection_drain_qp(VAPI_qp_hndl_t qp)
      | QP_ATTR_EN_SQD_ASYN_NOTIF);
     attr.qp_state = VAPI_SQD;
     attr.en_sqd_asyn_notif = 1;
-    ret = VAPI_modify_qp(nic_handle, qp, &attr, &mask, &cap);
+    ret = VAPI_modify_qp(ib_device->nic_handle, qp, &attr, &mask, &cap);
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_modify_qp RTS -> SQD", __func__);
 
@@ -452,7 +455,7 @@ ib_drain_connection(ib_connection_t *c)
 	sr.comp_type = VAPI_UNSIGNALED;  /* == 1 */
 	sr.sg_lst_p = &sg;
 	sr.sg_lst_len = 1;
-	ret = VAPI_post_sr(nic_handle, c->qp, &sr);
+	ret = VAPI_post_sr(ib_device->nic_handle, c->qp, &sr);
 	if (ret < 0)
 	    error_verrno(ret, "%s: VAPI_post_sr", __func__);
     }
@@ -478,16 +481,16 @@ ib_close_connection(ib_connection_t *c)
 	debug(1, "%s: refcnt non-zero %d, delaying free", __func__, c->refcnt);
 	return;
     }
-    ret = VAPI_destroy_qp(nic_handle, c->qp_ack);
+    ret = VAPI_destroy_qp(ib_device->nic_handle, c->qp_ack);
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_destroy_qp ack", __func__);
-    ret = VAPI_destroy_qp(nic_handle, c->qp);
+    ret = VAPI_destroy_qp(ib_device->nic_handle, c->qp);
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_destroy_qp", __func__);
-    ret = VAPI_deregister_mr(nic_handle, c->eager_send_mr);
+    ret = VAPI_deregister_mr(ib_device->nic_handle, c->eager_send_mr);
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_deregister_mr eager send", __func__);
-    ret = VAPI_deregister_mr(nic_handle, c->eager_recv_mr);
+    ret = VAPI_deregister_mr(ib_device->nic_handle, c->eager_recv_mr);
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_deregister_mr eager recv", __func__);
     free(c->eager_send_buf_contig);
@@ -564,7 +567,7 @@ BMI_ib_method_addr_lookup(const char *id)
     /* lookup in known connections, if there are any */
     if (bmi_ib_initialized) {
 	list_t *l;
-	qlist_for_each(l, &connection) {
+	qlist_for_each(l, &ib_device->connection) {
 	    ib_connection_t *c = qlist_upcast(l);
 	    ib_method_addr_t *ibmap = c->remote_map->method_data;
 	    if (ibmap->port == port && !strcmp(ibmap->hostname, hostname)) {
@@ -641,30 +644,30 @@ ib_tcp_server_init_listen_socket(struct method_addr *addr)
     struct sockaddr_in skin;
     ib_method_addr_t *ibc = addr->method_data;
 
-    listen_sock = socket(AF_INET, SOCK_STREAM, 0);
-    if (listen_sock < 0)
+    ib_device->listen_sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (ib_device->listen_sock < 0)
 	error_errno("%s: create tcp socket", __func__);
     flags = 1;
-    if (setsockopt(listen_sock, SOL_SOCKET, SO_REUSEADDR, &flags,
+    if (setsockopt(ib_device->listen_sock, SOL_SOCKET, SO_REUSEADDR, &flags,
       sizeof(flags)) < 0)
 	error_errno("%s: setsockopt REUSEADDR", __func__);
     memset(&skin, 0, sizeof(skin));
     skin.sin_family = AF_INET;
     skin.sin_port = htons(ibc->port);
   retry:
-    if (bind(listen_sock, (struct sockaddr *) &skin, sizeof(skin)) < 0) {
+    if (bind(ib_device->listen_sock, (struct sockaddr *) &skin, sizeof(skin)) < 0) {
 	if (errno == EINTR)
 	    goto retry;
 	else
 	    error_errno("%s: bind tcp socket", __func__);
     }
-    if (listen(listen_sock, 1024) < 0)
+    if (listen(ib_device->listen_sock, 1024) < 0)
 	error_errno("%s: listen tcp socket", __func__);
-    flags = fcntl(listen_sock, F_GETFL);
+    flags = fcntl(ib_device->listen_sock, F_GETFL);
     if (flags < 0)
 	error_errno("%s: fcntl getfl listen sock", __func__);
     flags |= O_NONBLOCK;
-    if (fcntl(listen_sock, F_SETFL, flags) < 0)
+    if (fcntl(ib_device->listen_sock, F_SETFL, flags) < 0)
 	error_errno("%s: fcntl setfl nonblock listen sock", __func__);
 }
 
@@ -680,7 +683,7 @@ ib_tcp_server_check_new_connections(void)
     int s, ret = 0;
 
     len = sizeof(ssin);
-    s = accept(listen_sock, (struct sockaddr *) &ssin, &len);
+    s = accept(ib_device->listen_sock, (struct sockaddr *) &ssin, &len);
     if (s < 0) {
 	if (!(errno == EAGAIN))
 	    error_errno("%s: accept listen sock", __func__);
@@ -725,7 +728,7 @@ ib_tcp_server_block_new_connections(int timeout_ms)
     struct pollfd pfd;
     int ret;
 
-    pfd.fd = listen_sock;
+    pfd.fd = ib_device->listen_sock;
     pfd.events = POLLIN;
     ret = poll(&pfd, 1, timeout_ms);
     if (ret < 0) {
@@ -755,7 +758,7 @@ BMI_ib_get_info(int option, void *param)
 	    /* weird TCP thing, ignore */
 	    break;
 	case BMI_GET_UNEXP_SIZE:
-	    *(int *)param = EAGER_BUF_PAYLOAD;
+	    *(int *)param = ib_device->eager_buf_payload;
 	    break;
 	default:
 	    warning("%s: hint %d not implemented", __func__, option);
@@ -890,6 +893,8 @@ BMI_ib_initialize(struct method_addr *listen_addr, int method_id,
 
     debug(0, "%s: init", __func__);
 
+    ib_device = Malloc(sizeof(*ib_device));
+
     /* check params */
     bmi_ib_method_id = method_id;
     if (!!listen_addr ^ (init_flags & BMI_INIT_SERVER))
@@ -917,25 +922,25 @@ BMI_ib_initialize(struct method_addr *listen_addr, int method_id,
      * all the threads.  Discard const char* for silly mellanox prototype;
      * it really is treated as constant.
      */
-    ret = EVAPI_get_hca_hndl(hca_ids[0], &nic_handle);
+    ret = EVAPI_get_hca_hndl(hca_ids[0], &ib_device->nic_handle);
     if (ret < 0)
 	error("%s: could not get HCA handle", __func__);
 
     /* connect an asynchronous event handler to look for weirdness */
-    ret = EVAPI_set_async_event_handler(nic_handle, async_event_handler, 0,
+    ret = EVAPI_set_async_event_handler(ib_device->nic_handle, async_event_handler, 0,
       &nic_async_event_handler);
     if (ret < 0)
 	error_verrno(ret, "%s: EVAPI_set_async_event_handler", __func__);
 
     /* get my lid */
     /* ignore different-width-prototype warning here, cannot pass u8 */
-    ret = VAPI_query_hca_port_prop(nic_handle, VAPI_PORT, &nic_port_props);
+    ret = VAPI_query_hca_port_prop(ib_device->nic_handle, VAPI_PORT, &nic_port_props);
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_query_hca_port_prop", __func__);
     nic_lid = nic_port_props.lid;
 
     /* build a protection domain */
-    ret = VAPI_alloc_pd(nic_handle, &nic_pd);
+    ret = VAPI_alloc_pd(ib_device->nic_handle, &nic_pd);
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_create_pd", __func__);
     /* ulong in 2.6, uint32 in 2.4 */
@@ -943,7 +948,7 @@ BMI_ib_initialize(struct method_addr *listen_addr, int method_id,
 
     /* see how many cq entries we are allowed to have */
     memset(&hca_cap, 0, sizeof(hca_cap));
-    ret = VAPI_query_hca_cap(nic_handle, &vendor_cap, &hca_cap);
+    ret = VAPI_query_hca_cap(ib_device->nic_handle, &vendor_cap, &hca_cap);
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_query_hca_cap", __func__);
 
@@ -958,9 +963,12 @@ BMI_ib_initialize(struct method_addr *listen_addr, int method_id,
 
     /* build a CQ (ignore actual number returned) */
     debug(0, "%s: asking for %d completion queue entries", __func__, cqe_num);
-    ret = VAPI_create_cq(nic_handle, cqe_num, &nic_cq, &cqe_num_out);
+    ret = VAPI_create_cq(ib_device->nic_handle, cqe_num, &ib_device->nic_cq, &cqe_num_out);
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_create_cq ret %d", __func__, ret);
+
+    /* initialize memcache */
+    ib_device->memcache = memcache_init(ib_mem_register, ib_mem_deregister);
 
     /*
      * Set up tcp socket to listen for connection requests.
@@ -970,22 +978,23 @@ BMI_ib_initialize(struct method_addr *listen_addr, int method_id,
     if (init_flags & BMI_INIT_SERVER)
 	ib_tcp_server_init_listen_socket(listen_addr);
     else
-	listen_sock = -1;
+	ib_device->listen_sock = -1;
 
     /*
      * Initialize data structures.
      */
-    INIT_QLIST_HEAD(&connection);
-    INIT_QLIST_HEAD(&sendq);
-    INIT_QLIST_HEAD(&recvq);
-    INIT_QLIST_HEAD(&memcache);
+    INIT_QLIST_HEAD(&ib_device->connection);
+    INIT_QLIST_HEAD(&ib_device->sendq);
+    INIT_QLIST_HEAD(&ib_device->recvq);
 
-    EAGER_BUF_PAYLOAD = EAGER_BUF_SIZE - sizeof(msg_header_eager_t);
+    ib_device->eager_buf_num  = DEFAULT_EAGER_BUF_NUM;
+    ib_device->eager_buf_size = DEFAULT_EAGER_BUF_SIZE;
+    ib_device->eager_buf_payload = ib_device->eager_buf_size - sizeof(msg_header_eager_t);
 
     /* will be set on first connection */
-    sg_tmp_array = 0;
-    sg_max_len = 0;
-    max_outstanding_wr = 0;
+    ib_device->sg_tmp_array = 0;
+    ib_device->sg_max_len = 0;
+    ib_device->max_outstanding_wr = 0;
 
     bmi_ib_initialized = 1;  /* okay to play with state variables now */
 
@@ -1013,43 +1022,48 @@ BMI_ib_finalize(void)
 
     /* if not server, send BYE to each connection and bring
      * down the QP */
-    if (listen_sock < 0) {
+    if (ib_device->listen_sock < 0) {
 	list_t *l;
-	qlist_for_each(l, &connection) {
+	qlist_for_each(l, &ib_device->connection) {
 	    ib_connection_t *c = qlist_upcast(l);
 	    ib_drain_connection(c);
 	}
     }
 
     /* destroy QPs and other connection structures */
-    while (connection.next != &connection) {
-	ib_connection_t *c = (ib_connection_t *) connection.next;
+    while (ib_device->connection.next != &ib_device->connection) {
+	ib_connection_t *c = (ib_connection_t *) ib_device->connection.next;
 	ib_close_connection(c);
     }
     /* global */
-    if (listen_sock >= 0)
-	close(listen_sock);
-    if (sg_tmp_array)
-	free(sg_tmp_array);
-    ret = VAPI_destroy_cq(nic_handle, nic_cq);
+    if (ib_device->listen_sock >= 0)
+	close(ib_device->listen_sock);
+    if (ib_device->sg_tmp_array)
+	free(ib_device->sg_tmp_array);
+    ret = VAPI_destroy_cq(ib_device->nic_handle, ib_device->nic_cq);
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_destroy_cq", __func__);
-    memcache_shutdown();
-    ret = VAPI_dealloc_pd(nic_handle, nic_pd);
+
+    memcache_shutdown(ib_device->memcache);
+
+    ret = VAPI_dealloc_pd(ib_device->nic_handle, nic_pd);
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_dealloc_pd", __func__);
-    ret = EVAPI_clear_async_event_handler(nic_handle, nic_async_event_handler);
+    ret = EVAPI_clear_async_event_handler(ib_device->nic_handle, nic_async_event_handler);
     if (ret < 0)
 	error_verrno(ret, "%s: EVAPI_clear_async_event_handler", __func__);
-    ret = EVAPI_release_hca_hndl(nic_handle);
+    ret = EVAPI_release_hca_hndl(ib_device->nic_handle);
     if (ret < 0)
 	error_verrno(ret, "%s: EVAPI_release_hca_hndl", __func__);
-    ret = VAPI_close_hca(nic_handle);
+    ret = VAPI_close_hca(ib_device->nic_handle);
     /*
      * Buggy vapi always returns EBUSY, just like for the open
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_close_hca", __func__);
      */
+
+    free(ib_device);
+    ib_device = NULL;
     return 0;
 }
 
@@ -1060,7 +1074,7 @@ BMI_ib_finalize(void)
  * Pain because a s/g list requires lots of little allocations.  Needs
  * wuj's clever discontig allocation stuff.
  */
-void
+static void
 ib_mem_register(memcache_entry_t *c)
 {
     VAPI_mrw_t mrw, mrw_out;
@@ -1072,7 +1086,7 @@ ib_mem_register(memcache_entry_t *c)
     mrw.pd_hndl = nic_pd;
     mrw.start = int64_from_ptr(c->buf);
     mrw.size = c->len;
-    ret = VAPI_register_mr(nic_handle, &mrw, &c->memkeys.mrh, &mrw_out);
+    ret = VAPI_register_mr(ib_device->nic_handle, &mrw, &c->memkeys.mrh, &mrw_out);
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_register_mr", __func__);
     c->memkeys.lkey = mrw_out.l_key;
@@ -1080,12 +1094,12 @@ ib_mem_register(memcache_entry_t *c)
     debug(4, "%s: buf %p len %lld", __func__, c->buf, lld(c->len));
 }
 
-void
+static void
 ib_mem_deregister(memcache_entry_t *c)
 {
     int ret;
     
-    ret = VAPI_deregister_mr(nic_handle, c->memkeys.mrh);
+    ret = VAPI_deregister_mr(ib_device->nic_handle, c->memkeys.mrh);
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_deregister_mr", __func__);
     debug(4, "%s: buf %p len %lld lkey %x rkey %x", __func__,

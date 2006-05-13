@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.28 2006-05-12 20:43:23 pw Exp $
+ * $Id: ib.c,v 1.29 2006-05-13 19:41:28 pw Exp $
  */
 #include <stdio.h>  /* just for NULL for id-generator.h */
 #include <stdlib.h>
@@ -21,17 +21,8 @@
 
 static gen_mutex_t interface_mutex = GEN_MUTEX_INITIALIZER;
 
-/* alloc space for shared variables */
-bmi_size_t EAGER_BUF_PAYLOAD __hidden;
-VAPI_hca_hndl_t nic_handle __hidden;
-VAPI_cq_hndl_t nic_cq __hidden;
-int listen_sock __hidden;
-list_t connection __hidden;
-list_t sendq __hidden;
-list_t recvq __hidden;
-VAPI_sg_lst_entry_t *sg_tmp_array __hidden;
-unsigned int sg_max_len __hidden;
-unsigned int max_outstanding_wr __hidden;
+/* alloc space for the single device structure pointer */
+ib_device_t *ib_device __hidden;
 
 #define MEMCACHE_BOUNCEBUF 0
 #define MEMCACHE_EARLY_REG 1
@@ -80,7 +71,7 @@ check_cq(void)
     int ret = 0;
 
     for (;;) {
-	int vret = VAPI_poll_cq(nic_handle, nic_cq, &desc);
+	int vret = VAPI_poll_cq(ib_device->nic_handle, ib_device->nic_cq, &desc);
 	if (vret < 0) {
 	    if (vret == VAPI_CQ_EMPTY)
 		break;
@@ -190,7 +181,7 @@ check_cq(void)
 	    post_sr_ack(sq->c, sq->his_bufnum);
 
 #if !MEMCACHE_BOUNCEBUF
-	    memcache_deregister(&sq->buflist);
+	    memcache_deregister(ib_device->memcache, &sq->buflist);
 #endif
 	    sq->state = SQ_WAITING_USER_TEST;
 
@@ -239,7 +230,7 @@ encourage_send_waiting_buffer(ib_send_t *sq)
     sq->bh = bh;
     bh->sq = sq;  /* uplink for completion */
 
-    if (sq->buflist.tot_len <= EAGER_BUF_PAYLOAD) {
+    if (sq->buflist.tot_len <= ib_device->eager_buf_payload) {
 	/*
 	 * Eager send.
 	 */
@@ -288,7 +279,7 @@ encourage_send_waiting_buffer(ib_send_t *sq)
 #if MEMCACHE_EARLY_REG
 	/* XXX: need to lock against receiver thread?  Could poll return
 	 * the CTS and start the data send before this completes? */
-	memcache_register(&sq->buflist);
+	memcache_register(ib_device->memcache, &sq->buflist);
 #endif
 
 	sq->state = SQ_WAITING_CTS;
@@ -317,7 +308,7 @@ encourage_send_incoming_cts(buf_head_t *bh, u_int32_t byte_len)
      * using the mop_id which was sent during the RTS, now returned to us.
      */
     sq = 0;
-    qlist_for_each(l, &sendq) {
+    qlist_for_each(l, &ib_device->sendq) {
 	ib_send_t *sqt = (ib_send_t *) l;
 	debug(8, "%s: looking for op_id 0x%llx, consider 0x%llx", __func__,
 	  llu(mh_cts.rts_mop_id), llu(sqt->mop->op_id));
@@ -369,7 +360,7 @@ find_matching_recv(rq_state_t statemask, const ib_connection_t *c,
 {
     list_t *l;
 
-    qlist_for_each(l, &recvq) {
+    qlist_for_each(l, &ib_device->recvq) {
 	ib_recv_t *rq = qlist_upcast(l);
 	if ((rq->state & statemask) && rq->c == c && rq->bmi_tag == bmi_tag)
 	    return rq;
@@ -389,7 +380,7 @@ alloc_new_recv(ib_connection_t *c, buf_head_t *bh)
     ++rq->c->refcnt;
     rq->bh = bh;
     rq->mop = 0;  /* until user posts for it */
-    qlist_add_tail(&rq->list, &recvq);
+    qlist_add_tail(&rq->list, &ib_device->recvq);
     return rq;
 }
 
@@ -442,10 +433,10 @@ encourage_recv_incoming(ib_connection_t *c, buf_head_t *bh, u_int32_t byte_len)
 #if MEMCACHE_EARLY_REG
 	    /* if a big receive was posted but only a small message came
 	     * through, unregister it now */
-	    if (rq->buflist.tot_len > EAGER_BUF_PAYLOAD) {
+	    if (rq->buflist.tot_len > ib_device->eager_buf_payload) {
 		debug(2, "%s: early registration not needed, dereg after eager",
 		  __func__);
-		memcache_deregister(&rq->buflist);
+		memcache_deregister(ib_device->memcache, &rq->buflist);
 	    }
 #endif
 
@@ -555,7 +546,7 @@ encourage_recv_incoming_cts_ack(ib_recv_t *rq)
 #if MEMCACHE_BOUNCEBUF
     memcpy_to_buflist(&rq->buflist, reg_recv_buflist_buf, rq->buflist.tot_len);
 #else
-    memcache_deregister(&rq->buflist);
+    memcache_deregister(ib_device->memcache, &rq->buflist);
 #endif
     rq->state = RQ_RTS_WAITING_USER_TEST;
 
@@ -598,7 +589,7 @@ send_cts(ib_recv_t *rq)
 	reg_recv_buflist.len = &reg_recv_buflist_len;
 	reg_recv_buflist.tot_len = reg_recv_buflist_len;
 	reg_recv_buflist_buf = Malloc(reg_recv_buflist_len);
-	memcache_register(&reg_recv_buflist, BMI_RECV);
+	memcache_register(ib_device->memcache, &reg_recv_buflist);
     }
     if (rq->buflist.tot_len > reg_recv_buflist_len)
 	error("%s: recv prereg buflist too small, need %lld", __func__,
@@ -608,7 +599,7 @@ send_cts(ib_recv_t *rq)
     rq->buflist = reg_recv_buflist;
 #else
 #  if !MEMCACHE_EARLY_REG
-    memcache_register(&rq->buflist, BMI_RECV);
+    memcache_register(ib_device->memcache, &rq->buflist);
 #  endif
 #endif
 
@@ -626,7 +617,7 @@ send_cts(ib_recv_t *rq)
     lenp = (u_int32_t *)(bufp + rq->buflist.num);
     keyp = (u_int32_t *)(lenp + rq->buflist.num);
     post_len = (char *)(keyp + rq->buflist.num) - (char *)bh->buf;
-    if (post_len > EAGER_BUF_SIZE)
+    if (post_len > ib_device->eager_buf_size)
 	error("%s: too many (%d) recv buflist entries for buf",  __func__,
 	  rq->buflist.num);
     for (i=0; i<rq->buflist.num; i++) {
@@ -662,7 +653,7 @@ post_sr(const buf_head_t *bh, u_int32_t len)
     ib_connection_t *c = bh->c;
 
     debug(2, "%s: %s bh %d len %u wr %d/%d", __func__, c->peername, bh->num,
-      len, c->num_unsignaled_wr, max_outstanding_wr);
+      len, c->num_unsignaled_wr, ib_device->max_outstanding_wr);
     sg.addr = int64_from_ptr(bh->buf);
     sg.len = len;
     sg.lkey = c->eager_send_lkey;
@@ -670,14 +661,14 @@ post_sr(const buf_head_t *bh, u_int32_t len)
     memset(&sr, 0, sizeof(sr));
     sr.opcode = VAPI_SEND;
     sr.id = int64_from_ptr(c);  /* for error checking if send fails */
-    if (++c->num_unsignaled_wr + 100 == max_outstanding_wr) {
+    if (++c->num_unsignaled_wr + 100 == ib_device->max_outstanding_wr) {
 	c->num_unsignaled_wr = 0;
 	sr.comp_type = VAPI_SIGNALED;
     } else
 	sr.comp_type = VAPI_UNSIGNALED;  /* == 1 */
     sr.sg_lst_p = &sg;
     sr.sg_lst_len = 1;
-    ret = VAPI_post_sr(nic_handle, c->qp, &sr);
+    ret = VAPI_post_sr(ib_device->nic_handle, c->qp, &sr);
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_post_sr", __func__);
 }
@@ -694,7 +685,7 @@ post_rr(const ib_connection_t *c, buf_head_t *bh)
 
     debug(2, "%s: %s bh %d", __func__, c->peername, bh->num);
     sg.addr = int64_from_ptr(bh->buf);
-    sg.len = EAGER_BUF_SIZE;
+    sg.len = ib_device->eager_buf_size;
     sg.lkey = c->eager_recv_lkey;
 
     memset(&rr, 0, sizeof(rr));
@@ -702,7 +693,7 @@ post_rr(const ib_connection_t *c, buf_head_t *bh)
     rr.id = int64_from_ptr(bh);
     rr.sg_lst_p = &sg;
     rr.sg_lst_len = 1;
-    ret = VAPI_post_rr(nic_handle, c->qp, &rr);
+    ret = VAPI_post_rr(ib_device->nic_handle, c->qp, &rr);
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_post_rr", __func__);
 }
@@ -736,18 +727,18 @@ post_sr_ack(ib_connection_t *c, int his_bufnum)
     int ret;
 
     debug(2, "%s: %s his buf %d wr %d/%d", __func__, c->peername, his_bufnum,
-      c->num_unsignaled_wr_ack, max_outstanding_wr);
+      c->num_unsignaled_wr_ack, ib_device->max_outstanding_wr);
     memset(&sr, 0, sizeof(sr));
     sr.opcode = VAPI_SEND_WITH_IMM;
     sr.id = int64_from_ptr(c);  /* for error checking if send fails */
-    if (++c->num_unsignaled_wr_ack + 100 == max_outstanding_wr) {
+    if (++c->num_unsignaled_wr_ack + 100 == ib_device->max_outstanding_wr) {
 	c->num_unsignaled_wr_ack = 0;
 	sr.comp_type = VAPI_SIGNALED;
     } else
 	sr.comp_type = VAPI_UNSIGNALED;  /* == 1 */
     sr.imm_data = his_bufnum;
     sr.sg_lst_len = 0;
-    ret = VAPI_post_sr(nic_handle, c->qp_ack, &sr);
+    ret = VAPI_post_sr(ib_device->nic_handle, c->qp_ack, &sr);
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_post_sr", __func__);
 }
@@ -776,7 +767,7 @@ post_rr_ack(const ib_connection_t *c, const buf_head_t *bh)
     rr.opcode = VAPI_RECEIVE;
     rr.comp_type = VAPI_SIGNALED;  /* ask to get these, == 0 */
     rr.id = int64_from_ptr(bh);
-    ret = VAPI_post_rr(nic_handle, c->qp_ack, &rr);
+    ret = VAPI_post_rr(ib_device->nic_handle, c->qp_ack, &rr);
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_post_rr", __func__);
 }
@@ -810,7 +801,7 @@ post_sr_rdmaw(ib_send_t *sq, msg_header_cts_t *mh_cts, void *mh_cts_buf)
 	reg_send_buflist.len = &reg_send_buflist_len;
 	reg_send_buflist.tot_len = reg_send_buflist_len;
 	reg_send_buflist_buf = Malloc(reg_send_buflist_len);
-	memcache_register(&reg_send_buflist, BMI_SEND);
+	memcache_register(ib_device->memcache, &reg_send_buflist);
     }
     if (sq->buflist.tot_len > reg_send_buflist_len)
 	error("%s: send prereg buflist too small, need %lld", __func__,
@@ -822,7 +813,7 @@ post_sr_rdmaw(ib_send_t *sq, msg_header_cts_t *mh_cts, void *mh_cts_buf)
 
 #else
 #if !MEMCACHE_EARLY_REG
-    memcache_register(&sq->buflist, BMI_SEND);
+    memcache_register(ib_device->memcache, &sq->buflist);
 #endif
 #endif
 
@@ -830,7 +821,7 @@ post_sr_rdmaw(ib_send_t *sq, msg_header_cts_t *mh_cts, void *mh_cts_buf)
     memset(&sr, 0, sizeof(sr));
     sr.opcode = VAPI_RDMA_WRITE;
     sr.comp_type = VAPI_UNSIGNALED;
-    sr.sg_lst_p = sg_tmp_array;
+    sr.sg_lst_p = ib_device->sg_tmp_array;
 
     done = 0;
     while (!done) {
@@ -855,7 +846,7 @@ post_sr_rdmaw(ib_send_t *sq, msg_header_cts_t *mh_cts, void *mh_cts_buf)
 	/*
 	 * Driven by recv elements.  Sizes have already been checked.
 	 */
-	while (recv_bytes_needed > 0 && sr.sg_lst_len < sg_max_len) {
+	while (recv_bytes_needed > 0 && sr.sg_lst_len < ib_device->sg_max_len) {
 	    /* consume from send buflist to fill this one receive */
 	    u_int32_t send_bytes_offered
 	      = sq->buflist.len[send_index] - send_offset;
@@ -863,18 +854,18 @@ post_sr_rdmaw(ib_send_t *sq, msg_header_cts_t *mh_cts, void *mh_cts_buf)
 	    if (this_bytes > recv_bytes_needed)
 		this_bytes = recv_bytes_needed;
 
-	    sg_tmp_array[sr.sg_lst_len].addr =
+	    ib_device->sg_tmp_array[sr.sg_lst_len].addr =
 	      int64_from_ptr(sq->buflist.buf.send[send_index])
 	      + send_offset;
-	    sg_tmp_array[sr.sg_lst_len].len = this_bytes;
-	    sg_tmp_array[sr.sg_lst_len].lkey =
+	    ib_device->sg_tmp_array[sr.sg_lst_len].len = this_bytes;
+	    ib_device->sg_tmp_array[sr.sg_lst_len].lkey =
 	      sq->buflist.memcache[send_index]->memkeys.lkey;
 
 	    debug(4, "%s: chunk %d local addr %llx len %d lkey %x",
 	      __func__, sr.sg_lst_len,
-	      llu(sg_tmp_array[sr.sg_lst_len].addr),
-	      sg_tmp_array[sr.sg_lst_len].len,
-	      sg_tmp_array[sr.sg_lst_len].lkey);
+	      llu(ib_device->sg_tmp_array[sr.sg_lst_len].addr),
+	      ib_device->sg_tmp_array[sr.sg_lst_len].len,
+	      ib_device->sg_tmp_array[sr.sg_lst_len].lkey);
 
 	    ++sr.sg_lst_len;
 	    send_offset += this_bytes;
@@ -901,7 +892,7 @@ post_sr_rdmaw(ib_send_t *sq, msg_header_cts_t *mh_cts, void *mh_cts_buf)
 	    sr.id = int64_from_ptr(sq);    /* used to match in completion */
 	    sr.comp_type = VAPI_SIGNALED;  /* completion drives the unpin */
 	}
-	ret = VAPI_post_sr(nic_handle, sq->c->qp, &sr);
+	ret = VAPI_post_sr(ib_device->nic_handle, sq->c->qp, &sr);
 	if (ret < 0)
 	    error_verrno(ret, "%s: VAPI_post_sr", __func__);
     }
@@ -986,7 +977,7 @@ generic_post_send(bmi_op_id_t *id, struct method_addr *remote_map,
 	  __func__, lld(total_size), lld(sq->buflist.tot_len));
 
     /* unexpected messages must fit inside an eager message */
-    if (is_unexpected && sq->buflist.tot_len > EAGER_BUF_PAYLOAD) {
+    if (is_unexpected && sq->buflist.tot_len > ib_device->eager_buf_payload) {
 	free(sq);
 	ret = -EINVAL;
 	goto out;
@@ -996,7 +987,7 @@ generic_post_send(bmi_op_id_t *id, struct method_addr *remote_map,
     sq->c = ibmap->c;
     ++sq->c->refcnt;
     sq->is_unexpected = is_unexpected;
-    qlist_add_tail(&sq->list, &sendq);
+    qlist_add_tail(&sq->list, &ib_device->sendq);
 
     /* generate identifier used by caller to test for message later */
     mop = Malloc(sizeof(*mop));
@@ -1176,7 +1167,7 @@ generic_post_recv(bmi_op_id_t *id, struct method_addr *remote_map,
 	/* try to send, or wait for send buffer space */
 	rq->state = RQ_RTS_WAITING_CTS_BUFFER;
 #if MEMCACHE_EARLY_REG
-	memcache_register(&rq->buflist);
+	memcache_register(ib_device->memcache, &rq->buflist);
 #endif
 	sret = send_cts(rq);
 	if (sret == 0)
@@ -1187,8 +1178,8 @@ generic_post_recv(bmi_op_id_t *id, struct method_addr *remote_map,
 #if MEMCACHE_EARLY_REG
     /* but remember that this might not be used if the other side sends
      * less than we posted for receive; that's legal */
-    if (rq->buflist.tot_len > EAGER_BUF_PAYLOAD)
-	memcache_register(&rq->buflist);
+    if (rq->buflist.tot_len > ib_device->eager_buf_payload)
+	memcache_register(ib_device->memcache, &rq->buflist);
 #endif
 
   out:
@@ -1414,7 +1405,7 @@ BMI_ib_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
      * encouraging them as needed due to resource limitations.
      */
     n = 0;
-    for (l=sendq.next; l != &sendq; l=lnext) {
+    for (l=ib_device->sendq.next; l != &ib_device->sendq; l=lnext) {
 	ib_send_t *sq = qlist_upcast(l);
 	lnext = l->next;
 	/* test them all, even if can't reap them, just to encourage */
@@ -1424,7 +1415,7 @@ BMI_ib_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
 	n += test_sq(sq, &outids[n], &errs[n], &sizes[n], up, complete);
     }
 
-    for (l=recvq.next; l != &recvq; l=lnext) {
+    for (l=ib_device->recvq.next; l != &ib_device->recvq; l=lnext) {
 	ib_recv_t *rq = qlist_upcast(l);
 	lnext = l->next;
 
@@ -1448,7 +1439,7 @@ BMI_ib_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
 	 * server, instead of sleeping, watch the accept socket for something
 	 * new.  No way to blockingly poll in standard VAPI.
 	 */
-	if (listen_sock >= 0) {
+	if (ib_device->listen_sock >= 0) {
 	    struct timeval now;
 	    gettimeofday(&now, 0);
 	    now.tv_sec -= last_action.tv_sec;
@@ -1484,7 +1475,7 @@ BMI_ib_testunexpected(int incount __unused, int *outcount,
     num_action = check_cq();
 
     *outcount = 0;
-    qlist_for_each(l, &recvq) {
+    qlist_for_each(l, &ib_device->recvq) {
 	ib_recv_t *rq = qlist_upcast(l);
 	if (rq->state == RQ_EAGER_WAITING_USER_TESTUNEXPECTED) {
 	    msg_header_eager_t mh_eager;
@@ -1583,34 +1574,34 @@ BMI_ib_cancel(bmi_op_id_t id, bmi_context_id context_id __unused)
 
 	c->cancelled = 1;
 	close_connection_drain_qp(c->qp);
-	qlist_for_each(l, &sendq) {
+	qlist_for_each(l, &ib_device->sendq) {
 	    ib_send_t *sq = qlist_upcast(l);
 	    if (sq->c != c) continue;
 #if !MEMCACHE_BOUNCEBUF
 	    if (sq->state == SQ_WAITING_DATA_LOCAL_SEND_COMPLETE)
-		memcache_deregister(&sq->buflist);
+		memcache_deregister(ib_device->memcache, &sq->buflist);
 #  if MEMCACHE_EARLY_REG
 	    /* pin when sending rts, so also must dereg in this state */
 	    if (sq->state == SQ_WAITING_CTS)
-		memcache_deregister(&sq->buflist);
+		memcache_deregister(ib_device->memcache, &sq->buflist);
 #  endif
 #endif
 	    if (sq->state != SQ_WAITING_USER_TEST)
 		sq->state = SQ_CANCELLED;
 	}
-	qlist_for_each(l, &recvq) {
+	qlist_for_each(l, &ib_device->recvq) {
 	    ib_recv_t *rq = qlist_upcast(l);
 	    if (rq->c != c) continue;
 #if !MEMCACHE_BOUNCEBUF
 	    if (rq->state == RQ_RTS_WAITING_DATA)
-		memcache_deregister(&rq->buflist);
+		memcache_deregister(ib_device->memcache, &rq->buflist);
 #  if MEMCACHE_EARLY_REG
 	    /* pin on post, dereg all these */
 	    if (rq->state == RQ_RTS_WAITING_CTS_BUFFER)
-		memcache_deregister(&rq->buflist);
+		memcache_deregister(ib_device->memcache, &rq->buflist);
 	    if (rq->state == RQ_WAITING_INCOMING
-	      && rq->buflist.tot_len > EAGER_BUF_PAYLOAD)
-		memcache_deregister(&rq->buflist);
+	      && rq->buflist.tot_len > ib_device->eager_buf_payload)
+		memcache_deregister(ib_device->memcache, &rq->buflist);
 #  endif
 #endif
 	    if (!(rq->state == RQ_EAGER_WAITING_USER_TEST 
@@ -1634,11 +1625,11 @@ maybe_free_connection(ib_connection_t *c)
 
     if (!c->cancelled)
 	return;
-    qlist_for_each(l, &sendq) {
+    qlist_for_each(l, &ib_device->sendq) {
 	ib_send_t *sq = qlist_upcast(l);
 	if (sq->c == c) return;
     }
-    qlist_for_each(l, &recvq) {
+    qlist_for_each(l, &ib_device->recvq) {
 	ib_recv_t *rq = qlist_upcast(l);
 	if (rq->c == c) return;
     }
@@ -1650,12 +1641,12 @@ static int
 del_bouncebuf_then_BMI_ib_finalize(void)
 {
     if (reg_send_buflist.num > 0) {
-	memcache_deregister(&reg_send_buflist);
+	memcache_deregister(ib_device->memcache, &reg_send_buflist);
 	reg_send_buflist.num = 0;
 	free(reg_send_buflist_buf);
     }
     if (reg_recv_buflist.num > 0) {
-	memcache_deregister(&reg_recv_buflist);
+	memcache_deregister(ib_device->memcache, &reg_recv_buflist);
 	reg_recv_buflist.num = 0;
 	free(reg_recv_buflist_buf);
     }
@@ -1672,6 +1663,20 @@ BMI_ib_rev_lookup(struct method_addr *meth)
     else
 	return ibmap->c->peername;
 }
+
+static void * BMI_ib_memalloc(bmi_size_t len,
+                              enum bmi_op_type send_recv __unused)
+{
+    return memcache_memalloc(ib_device->memcache, len,
+                             ib_device->eager_buf_payload);
+}
+
+static int BMI_ib_memfree(void *buf, bmi_size_t len,
+                          enum bmi_op_type send_recv __unused)
+{
+    return memcache_memfree(ib_device->memcache, buf, len);
+}
+
 
 /* exported method interface */
 struct bmi_method_ops bmi_ib_ops = 
