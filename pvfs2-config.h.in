@@ -73,6 +73,9 @@
 /* Define to 1 if you have the `getmntent' function. */
 #undef HAVE_GETMNTENT
 
+/* Define if strerror_r is GNU-specific */
+#undef HAVE_GNU_STRERROR_R
+
 /* Define if IB wrap_common.h exists. */
 #undef HAVE_IB_WRAP_COMMON_H
 
