@@ -875,6 +875,19 @@ else
    AC_MSG_RESULT(no)
 fi
 
+dnl Which form of strerror?
+AC_MSG_CHECKING([for GNU-style strerror_r])
+AC_TRY_COMPILE(
+    [
+	#include <string.h>
+	extern char *strerror_r();
+    ], [],
+    AC_MSG_RESULT(yes)
+    AC_DEFINE(HAVE_GNU_STRERROR_R, 1, Define if strerror_r is GNU-specific)
+    ,
+    AC_MSG_RESULT(no)
+)
+
 dnl create any missing subdirectories that wouldn't be created
 dnl by AC_OUTPUT below (which won't create intermediate dirs).
 for d in src/apps src/io src/common src/client src/kernel \

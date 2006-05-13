@@ -33,7 +33,7 @@ int PVFS_strerror_r(int errnum, char *buf, int n)
     }
     else
     {
-#ifdef _GNU_SOURCE
+#ifdef HAVE_GNU_STRERROR_R
         char *tmpbuf = strerror_r(tmp, buf, limit);
         if (tmpbuf && (strcmp(tmpbuf, buf)))
         {
