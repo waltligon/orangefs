@@ -668,6 +668,11 @@ void    pvfs2_ioctl32_cleanup(void);
 int pvfs2_gen_credentials(
     PVFS_credentials *credentials);
 
+int copy_attributes_to_inode(
+    struct inode *inode,
+    PVFS_sys_attr *attrs,
+    char *symname);
+
 ssize_t pvfs2_inode_getxattr(
         struct inode *inode, const char* prefix,
         const char *name, void *buffer, size_t size);

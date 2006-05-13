@@ -165,6 +165,11 @@ int PVFS_util_copy_sys_attr(
         dest_attr->objtype = src_attr->objtype;
         dest_attr->mask = src_attr->mask;
 
+        if (src_attr->mask & PVFS_ATTR_SYS_SIZE)
+        {
+            dest_attr->size = src_attr->size;
+        }
+
         if((src_attr->mask & PVFS_ATTR_SYS_LNK_TARGET) &&
             src_attr->link_target)
         {

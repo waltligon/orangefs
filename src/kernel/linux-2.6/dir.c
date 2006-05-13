@@ -11,6 +11,7 @@
  */
 
 #include "pvfs2-kernel.h"
+#include "pvfs2-bufmap.h"
 #include "pvfs2-sysint.h"
 #include "pvfs2-internal.h"
 
@@ -18,6 +19,8 @@ extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
 extern wait_queue_head_t pvfs2_request_list_waitq;
 extern int debug;
+extern struct address_space_operations pvfs2_address_operations;
+extern struct backing_dev_info pvfs2_backing_dev_info;
 
 /* shared file/dir operations defined in file.c */
 extern int pvfs2_file_open(
@@ -231,89 +234,6 @@ static int pvfs2_readdir(
 
 #ifdef HAVE_READDIRPLUS_FILE_OPERATIONS
 
-/* More or less identical to copy_attributes_to_inode().
- * Special version needed since we dont really have a real inode structure
- * and we are faking one
- */
-static void copy_sys_attributes(struct inode *inode, PVFS_sys_attr *attrs, char *symname)
-{
-    int old_mode = 0, perm_mode = 0;
-
-    inode->i_blksize = pvfs_bufmap_size_query();
-    inode->i_blkbits = PAGE_CACHE_SHIFT;
-    if (attrs->objtype == PVFS_TYPE_METAFILE && (attrs->mask & PVFS_ATTR_SYS_SIZE))
-    {
-        loff_t inode_size = 0, rounded_up_size = 0;
-        inode_size = (loff_t)attrs->size;
-        rounded_up_size =
-            (inode_size + (4096 - (inode_size % 4096)));
-        inode->i_bytes = inode_size;
-        inode->i_blocks = (unsigned long) (rounded_up_size/ 512);
-        inode->i_size = inode_size;
-    }
-    else if (attrs->objtype == PVFS_TYPE_SYMLINK &&
-            symname != NULL)
-    {
-        inode->i_size = (loff_t) strlen(symname);
-    }
-    else
-    {
-        inode->i_bytes = PAGE_CACHE_SIZE;
-        inode->i_blocks = (unsigned long) (PAGE_CACHE_SIZE/512);
-        inode->i_size = PAGE_CACHE_SIZE;
-    }
-    inode->i_uid = attrs->owner;
-    inode->i_gid = attrs->group;
-    inode->i_atime.tv_sec = (time_t)attrs->atime;
-    inode->i_mtime.tv_sec = (time_t)attrs->mtime;
-    inode->i_ctime.tv_sec = (time_t)attrs->ctime;
-    inode->i_atime.tv_nsec = 0;
-    inode->i_mtime.tv_nsec = 0;
-    inode->i_ctime.tv_nsec = 0;
-    old_mode = inode->i_mode;
-    inode->i_mode = 0;
-
-    if (attrs->perms & PVFS_O_EXECUTE)
-        perm_mode |= S_IXOTH;
-    if (attrs->perms & PVFS_O_WRITE)
-        perm_mode |= S_IWOTH;
-    if (attrs->perms & PVFS_O_READ)
-        perm_mode |= S_IROTH;
-
-    if (attrs->perms & PVFS_G_EXECUTE)
-        perm_mode |= S_IXGRP;
-    if (attrs->perms & PVFS_G_WRITE)
-        perm_mode |= S_IWGRP;
-    if (attrs->perms & PVFS_G_READ)
-        perm_mode |= S_IRGRP;
-
-    if (attrs->perms & PVFS_U_EXECUTE)
-        perm_mode |= S_IXUSR;
-    if (attrs->perms & PVFS_U_WRITE)
-        perm_mode |= S_IWUSR;
-    if (attrs->perms & PVFS_U_READ)
-        perm_mode |= S_IRUSR;
-
-    if (attrs->perms & PVFS_G_SGID)
-        perm_mode |= S_ISGID;
-
-    inode->i_mode |= perm_mode;
-    switch (attrs->objtype)
-    {
-        case PVFS_TYPE_METAFILE:
-            inode->i_mode |= S_IFREG;
-            break;
-        case PVFS_TYPE_DIRECTORY:
-            inode->i_mode |= S_IFDIR;
-            inode->i_nlink = 1;
-            break;
-        case PVFS_TYPE_SYMLINK:
-            inode->i_mode |= S_IFLNK;
-            break;
-    }
-    return;
-}
-
 /** Read directory entries from an instance of an open directory 
  *  and the associated attributes for every entry in one-shot.
  *
@@ -323,7 +243,7 @@ static void copy_sys_attributes(struct inode *inode, PVFS_sys_attr *attrs, char 
  * \retval 0  when directory has been completely traversed
  * \retval >0 if we don't call filldir for all entries
  *
- * \note If the filldir call-back returns non-zero, then readdir should
+ * \note If the filldirplus call-back returns non-zero, then readdirplus should
  *       assume that it has had enough, and should return as well.
  */
 static int pvfs2_readdirplus(
@@ -371,7 +291,7 @@ static int pvfs2_readdirplus(
             {
                 generic_fillattr(inode, &ks);
                 pvfs2_print("calling filldirplus of . with pos = %d\n", pos);
-                if (filldirplus(dirent, ".", 1, pos, ino, DT_DIR, &ks) < 0)
+                if (filldirplus(direntplus, ".", 1, pos, ino, DT_DIR, &ks) < 0)
                 {
                     break;
                 }
@@ -393,7 +313,7 @@ static int pvfs2_readdirplus(
             {
                 generic_fillattr(inode, &ks);
                 pvfs2_print("calling filldirplus of .. with pos = %d\n", pos);
-                if (filldirplus(dirent, "..", 2, pos, ino, DT_DIR, &ks) < 0)
+                if (filldirplus(direntplus, "..", 2, pos, ino, DT_DIR, &ks) < 0)
                 {
                     break;
                 }
@@ -487,46 +407,100 @@ static int pvfs2_readdirplus(
 
 	    for (i = 0; i < new_op->downcall.resp.readdirplus.dirent_count; i++)
 	    {
-                struct inode dummy_inode;
-                int dt_type;
+                struct inode *filled_inode = NULL;
+                int dt_type, stat_error;
                 void *ptr = NULL;
+                PVFS_sys_attr *attrs = NULL;
+                PVFS_handle handle;
+                PVFS_fs_id fs_id;
 
                 len = new_op->downcall.resp.readdirplus.d_name_len[i];
                 current_entry =
                     &new_op->downcall.resp.readdirplus.d_name[i][0];
-                current_ino =
-                    pvfs2_handle_to_ino(new_op->downcall.resp.readdirplus.refn[i].handle);
+                stat_error = 
+                    new_op->downcall.resp.readdirplus.stat_error[i];
+                handle = 
+                    new_op->downcall.resp.readdirplus.refn[i].handle;
+                fs_id  = 
+                    new_op->downcall.resp.readdirplus.refn[i].fs_id;
+                current_ino = pvfs2_handle_to_ino(handle);
 
-                pvfs2_print("calling filldirplus for %s with len %d, pos %ld\n",
-                        current_entry, len, (unsigned long) pos);
-                if (new_op->downcall.resp.readdirplus.stat_error[i] == 0)
+                if (stat_error == 0)
                 {
-                    /* FIXME: Symlinks won't work right since it is not clear how to pass them through the upcall  */
-                    copy_sys_attributes(&dummy_inode, &new_op->downcall.resp.readdirplus.attr_array[i], NULL);
-                    generic_fillattr(&dummy_inode, &ks);
-                    ptr = &ks;
+                    /* locate inode in the icache, but don't getattr() */
+                    filled_inode = iget_locked(dentry->d_inode->i_sb, current_ino);
+                    if (filled_inode == NULL) {
+                        pvfs2_error("Could not allocate inode\n");
+                        ret = -ENOMEM;
+                        goto err;
+                    }
+                    else if (is_bad_inode(filled_inode)) {
+                        iput(filled_inode);
+                        pvfs2_error("bad inode obtained from iget_locked\n");
+                        ret = -EINVAL;
+                        goto err;
+                    }
+                    else {
+                        attrs = &new_op->downcall.resp.readdirplus.attributes[i];
+                        attrs->mask |= PVFS_ATTR_SYS_SIZE;
+                        if ((ret = copy_attributes_to_inode(filled_inode, attrs, NULL)) < 0) {
+                            pvfs2_error("copy attributes to inode failed with err %d\n", ret);
+                            iput(filled_inode);
+                            goto err;
+                        }
+                        generic_fillattr(filled_inode, &ks);
+                        ptr = &ks;
+                        if (filled_inode->i_state & I_NEW) {
+                            pvfs2_inode_t *filled_pvfs2_inode = PVFS2_I(filled_inode);
+                            pvfs2_inode_initialize(filled_pvfs2_inode);
+                            filled_pvfs2_inode->refn.handle = handle;
+                            filled_pvfs2_inode->refn.fs_id  = fs_id;
+                            filled_inode->i_mapping->host = filled_inode;
+                            filled_inode->i_rdev = 0;
+                            filled_inode->i_bdev = NULL;
+                            filled_inode->i_cdev = NULL;
+                            filled_inode->i_mapping->a_ops = &pvfs2_address_operations;
+#ifndef PVFS2_LINUX_KERNEL_2_4
+                            filled_inode->i_mapping->backing_dev_info = &pvfs2_backing_dev_info;
+#endif
+                            /* Make sure that we unlock the inode */
+                            unlock_new_inode(filled_inode);
+                        }
+                        iput(filled_inode);
+                    }
                 }
                 else {
-                    int err_num = pvfs2_normalize_to_errno(new_op->downcall.resp.readdirplus.stat_error[i]);
+                    int err_num = pvfs2_normalize_to_errno(stat_error);
                     ptr = ERR_PTR(err_num);
                 }
-                if (new_op->downcall.resp.readdirplus.attr_array[i].objtype == PVFS_TYPE_METAFILE) {
+                pvfs2_print("calling filldirplus for %s "
+                        " (%lu) with len %d, pos %ld kstat %p\n", 
+                        current_entry, (unsigned long) handle,
+                        len, (unsigned long) pos, ptr);
+                if (new_op->downcall.resp.readdirplus.attributes[i].objtype 
+                        == PVFS_TYPE_METAFILE) 
+                {
                     dt_type = DT_REG;
                 }
-                else if (new_op->downcall.resp.readdirplus.attr_array[i].objtype == PVFS_TYPE_DIRECTORY) {
+                else if (new_op->downcall.resp.readdirplus.attributes[i].objtype 
+                        == PVFS_TYPE_DIRECTORY) 
+                {
                     dt_type = DT_DIR;
                 }
-                else if (new_op->downcall.resp.readdirplus.attr_array[i].objtype == PVFS_TYPE_SYMLINK) {
+                else if (new_op->downcall.resp.readdirplus.attributes[i].objtype
+                        == PVFS_TYPE_SYMLINK) 
+                {
                     dt_type = DT_LNK;
                 }
-                else {
+                else 
+                {
                     dt_type = DT_UNKNOWN;
                 }
-                if (filldirplus(dirent, current_entry, len, pos,
-                            current_ino, DT_UNKNOWN, ptr) < 0)
+                /* filldirplus has had enough */
+                if (filldirplus(direntplus, current_entry, len, pos,
+                            current_ino, dt_type, ptr) < 0)
                 {
-                  graceful_termination_path:
-
+graceful_termination_path:
                     pvfs2_inode->directory_version = 0;
                     pvfs2_inode->num_readdir_retries =
                         PVFS2_NUM_READDIR_RETRIES;
@@ -546,19 +520,20 @@ static int pvfs2_readdirplus(
             pvfs2_print("Failed to readdirplus (downcall status %d)\n",
                         new_op->downcall.status);
         }
-
+err:
 	op_release(new_op);
 	break;
     }
     pvfs2_print("pvfs2_readdirplus about to update_atime %p\n", dentry->d_inode);
 
+    if (ret == 0)
+    {
 #ifdef HAVE_TOUCH_ATIME
-    touch_atime(file->f_vfsmnt, dentry);
+        touch_atime(file->f_vfsmnt, dentry);
 #else
-    update_atime(dentry->d_inode);
+        update_atime(dentry->d_inode);
 #endif
-
-
+    }
     pvfs2_print("pvfs2_readdirplus returning %d\n",ret);
     return ret;
 }

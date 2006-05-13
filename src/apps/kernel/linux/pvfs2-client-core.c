@@ -1740,6 +1740,11 @@ static inline void copy_direntplus_to_downcall(vfs_request_t *vfs_request)
         {
             PVFS_util_copy_sys_attr(&vfs_request->out_downcall.resp.readdirplus.attributes[i], 
                                     &vfs_request->response.readdirplus.attr_array[i]);
+            gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
+                    "readdirplus: mask %x object type %d size %lu\n", 
+                    vfs_request->response.readdirplus.attr_array[i].mask,
+                    vfs_request->response.readdirplus.attr_array[i].objtype,
+                    (unsigned long) vfs_request->response.readdirplus.attr_array[i].size);
         }
         vfs_request->out_downcall.resp.readdirplus.dirent_count++;
     }

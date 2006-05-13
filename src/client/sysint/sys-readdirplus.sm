@@ -466,9 +466,11 @@ static int readdirplus_fetch_attrs_setup_msgpair(PINT_client_sm *sm_p,
 {
     int i, ret;
 
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "readdirplus state: fetch_attrs_setup\n");
     /* if there are no dirents then return NO_WORK */
     if (sm_p->u.readdirplus.readdirplus_resp->pvfs_dirent_outcount == 0)
     {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "readdirplus: no dirent to read; return\n");
         js_p->error_code = NO_WORK;
         return 1;
     }
@@ -478,7 +480,14 @@ static int readdirplus_fetch_attrs_setup_msgpair(PINT_client_sm *sm_p,
      */
      if ((ret = list_of_meta_servers(sm_p)) < 0) 
      {
+         gossip_err("Could not locate list of attribute servers %d\n", ret);
          js_p->error_code = ret;
+         return 1;
+     }
+     if (sm_p->u.readdirplus.svr_count == 0)
+     {
+         gossip_err("Number of meta servers to contact cannot be 0 %d\n", -PVFS_EINVAL);
+         js_p->error_code = -PVFS_EINVAL;
          return 1;
      }
      sm_p->msgarray_count = sm_p->u.readdirplus.svr_count;
@@ -486,7 +495,9 @@ static int readdirplus_fetch_attrs_setup_msgpair(PINT_client_sm *sm_p,
          calloc(sm_p->msgarray_count, sizeof(PINT_sm_msgpair_state));
      if (sm_p->msgarray == NULL)
      {
+         sm_p->msgarray_count = 0;
          js_p->error_code = -PVFS_ENOMEM;
+         gossip_err("Could not allocate memory %d\n", -PVFS_ENOMEM);
          return 1;
      }
      for (i = 0; i < sm_p->msgarray_count; i++) 
@@ -621,6 +632,9 @@ static int list_of_data_servers(PINT_client_sm *sm_p)
             }
          }
      }
+     /* no meta files */
+     if (nhandles == 0)
+         return 0;
      sm_p->u.readdirplus.nhandles = nhandles;
      sm_p->u.readdirplus.input_handle_array = (struct handle_to_index *)
         calloc(nhandles, sizeof(struct handle_to_index));
@@ -676,6 +690,12 @@ static int readdirplus_fetch_sizes_setup_msgpair(PINT_client_sm *sm_p,
      if ((ret = list_of_data_servers(sm_p)) < 0) 
      {
          js_p->error_code = ret;
+         return 1;
+     }
+     if (sm_p->u.readdirplus.svr_count == 0)
+     {
+         /* no need to contact any server since there are no regular meta files */
+         js_p->error_code = NO_WORK;
          return 1;
      }
      sm_p->msgarray_count = sm_p->u.readdirplus.svr_count;

@@ -8,7 +8,8 @@ MISCSRC += \
 
 TESTSRC += \
 	$(DIR)/openg.c \
-	$(DIR)/openg-socket.c 
+	$(DIR)/openg-socket.c \
+	$(DIR)/getdents.c
 
 MPIMISCSRC += \
 	$(DIR)/crc32c.c \

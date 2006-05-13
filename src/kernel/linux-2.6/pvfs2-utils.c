@@ -43,7 +43,7 @@ int pvfs2_gen_credentials(
 }
 
 /* NOTE: symname is ignored unless the inode is a sym link */
-static inline int copy_attributes_to_inode(
+int copy_attributes_to_inode(
     struct inode *inode,
     PVFS_sys_attr *attrs,
     char *symname)
