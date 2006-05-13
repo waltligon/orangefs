@@ -11281,7 +11281,6 @@ fi
 
 
 
-
 for ac_func in strnlen
 do
 as_ac_var=`echo "ac_cv_func_$ac_func" | $as_tr_sh`
@@ -11379,14 +11378,6 @@ if test `eval echo '${'$as_ac_var'}'` = yes; then
   cat >>confdefs.h <<_ACEOF
 #define `echo "HAVE_$ac_func" | $as_tr_cpp` 1
 _ACEOF
- cat >>confdefs.h <<\_ACEOF
-#define _GNU_SOURCE 1
-_ACEOF
-
-       cat >>confdefs.h <<\_ACEOF
-#define HAVE_STRNLEN 1
-_ACEOF
-
 
 fi
 done

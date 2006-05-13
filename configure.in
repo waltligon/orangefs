@@ -764,15 +764,8 @@ AC_CHECK_HEADER(sys/sysinfo.h,
        AC_DEFINE(HAVE_SYSINFO, 1, Define if sysinfo.h is present)
        )
 
-dnl if we use functions that might not be on every platform, add them here
-dnl the prototypes for some functions are exposed only after defining something
-dnl for example, strnlen needs _GNU_SOURCE defined 
-
-AC_CHECK_FUNCS(strnlen, 
-       AC_DEFINE(_GNU_SOURCE)
-       AC_DEFINE(HAVE_STRNLEN)
-)
-dnl for regular functions, add them to the CHECK_FUNCS
+dnl for regular functions, add another AC_CHECK_FUNCS line
+AC_CHECK_FUNCS(strnlen)
 AC_CHECK_FUNCS(strtoull)
 AC_CHECK_FUNCS(strstr)
 AC_CHECK_FUNCS(fgetxattr)
