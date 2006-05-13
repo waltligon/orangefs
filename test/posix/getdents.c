@@ -15,7 +15,7 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include "list.h"
+#include "quicklist.h"
 #define ERR_MAX 256
 
 static int use_direntplus = 0;
@@ -56,7 +56,7 @@ struct dirent64_plus {
 #define reclen  ROUND_UP(NAME_OFFSET(de) + DIRENT_OFFSET(dirent) + 2)
 #define reclen64  ROUND_UP(NAME_OFFSET(de64) + DIRENT_OFFSET(dirent64) + 2)
 
-static LIST_HEAD(TREE);
+static QLIST_HEAD(TREE);
 
 /* Information about each file in the hierarchy */
 struct files {
@@ -65,7 +65,7 @@ struct files {
 	/* inode number of the file   */
 	int64_t 			  					inode;
 	/* The level field is used to link struct files both in the tree and in the flist */
-	struct list_head 					level; 
+	struct qlist_head 					level; 
 };
 
 static inline struct files* clone_filp(struct files *filp)
@@ -92,8 +92,8 @@ static void dealloc_treelist(void)
 	while (TREE.next != &TREE) {
 		struct files *filp;
 
-		filp = list_entry(TREE.next, struct files, level);
-		list_del(TREE.next);
+		filp = qlist_entry(TREE.next, struct files, level);
+		qlist_del(TREE.next);
 		free(filp);
 	}
 	return;
@@ -102,7 +102,7 @@ static void dealloc_treelist(void)
 /*
  * NOTES: Since we want BREADTH-FIRST TRAVERSAL, we build a link list(queue).
  * If we wanted DEPTH-FIRST TRAVERSAL, then we need to build a stack here, i.e
- * we need to use list_add() function instead of list_add_tail()
+ * we need to use qlist_add() function instead of qlist_add_tail()
  */
 
 static int path_init(const char *path)
@@ -116,7 +116,7 @@ static int path_init(const char *path)
 	}
 	snprintf(filp->name, NAME_MAX + 1, "%s", path);
 	/* add it to the tree of to-be visited nodes */
-	list_add_tail(&filp->level, &TREE);
+	qlist_add_tail(&filp->level, &TREE);
 	return 0;
 }
 
@@ -415,7 +415,7 @@ static int path_walk(struct files *root_filp)
 	ret = 0;
 	memset(&statbuf, 0, sizeof(statbuf));
 	/* Dequeue from the list of to-be-visited nodes */
-	list_del(&root_filp->level);
+	qlist_del(&root_filp->level);
 
 	dir_fd = open(root_filp->name, O_RDONLY | O_NOFOLLOW);
 	
@@ -478,7 +478,7 @@ static int path_walk(struct files *root_filp)
 							}
 							snprintf(filp->name, NAME_MAX + 1, "%s/%s", root_filp->name, next->d_name);
 							/* Add to the tree */
-							list_add_tail(&filp->level, &TREE);
+							qlist_add_tail(&filp->level, &TREE);
 						}
 			}
 			free(p);
@@ -528,7 +528,7 @@ static int path_walk(struct files *root_filp)
 							}
 							snprintf(filp->name, NAME_MAX + 1, "%s/%s", root_filp->name, next->dp_dirent.d_name);
 							/* Add to the tree */
-							list_add_tail(&filp->level, &TREE);
+							qlist_add_tail(&filp->level, &TREE);
 						}
 					}
 			}
@@ -557,7 +557,7 @@ int do_flatten_hierarchy()
 	path_init(path);
 	/* walk the tree */
 	while (TREE.next != &TREE) {
-		filp = (struct files *)list_entry(TREE.next, struct files, level);
+		filp = (struct files *) qlist_entry(TREE.next, struct files, level);
 		/* Visit the node */
 		if (path_walk(filp) < 0) {
 			perror("do_flatten_hierarchy: path_walk:");
