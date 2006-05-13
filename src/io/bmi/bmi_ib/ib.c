@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.29 2006-05-13 19:41:28 pw Exp $
+ * $Id: ib.c,v 1.30 2006-05-13 21:42:02 pw Exp $
  */
 #include <stdio.h>  /* just for NULL for id-generator.h */
 #include <stdlib.h>
@@ -891,6 +891,9 @@ post_sr_rdmaw(ib_send_t *sq, msg_header_cts_t *mh_cts, void *mh_cts_buf)
 	if (done) {
 	    sr.id = int64_from_ptr(sq);    /* used to match in completion */
 	    sr.comp_type = VAPI_SIGNALED;  /* completion drives the unpin */
+	} else {
+	    sr.id = 0;
+	    sr.comp_type = VAPI_UNSIGNALED;
 	}
 	ret = VAPI_post_sr(ib_device->nic_handle, sq->c->qp, &sr);
 	if (ret < 0)
