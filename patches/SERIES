@@ -1,0 +1,7 @@
+Apply the patches to a vanilla 2.6.16 kernel in the following order
+a) posix-extensions-cvs.patch : This implements the sys call stubs for openg/openfh
+and the VFS hooks for file system specific implementations.
+b) posix-statlite.patch : This implements the sys call stubs for the statlite() family of system calls
+and the VFS hooks for file system specific implementations.
+a) posix-direntplus.patch: This implements the sys call stubs for the readdir_plus() family
+of system calls and the corresponding VFS hooks for FS specific implementations.
