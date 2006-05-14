@@ -123,8 +123,8 @@ int create_pvfs2tab_file(
     pvfs2tab = fopen(pvfs2tab_name, "w");
     if (pvfs2tab == NULL)
     {
-        print_error("Could not open pvfs2tab file [%s]: %s\n", 
-                    pvfs2tab_name, strerror_r(errno, buffer, sizeof(buffer)));
+        print_error("Could not open pvfs2tab file [%s]: %s\n",
+                    pvfs2tab_name, strerror(errno));
         return(TEST_COMMON_FAIL);
     }
 
