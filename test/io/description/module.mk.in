@@ -51,11 +51,11 @@ TESTSRC += $(DEBUG_IO_DESC_DIR_SRC)
 
 LOCALTESTS := $(patsubst %.c,%, $(DEBUG_IO_DESC_DIR_SRC))
 $(LOCALTESTS): %: %.o $(DEBUG_IO_DESC_DIR)/debug-main.o
-	$(Q) "  LD     $@"
+	$(Q) "  LD		$@"
 	$(E)$(LD) $< $(DEBUG_IO_DESC_DIR)/debug-main.o $(LDFLAGS) $(LIBS) -o $@
 
 LOCALTESTS := $(patsubst %.c,%, $(TEST_IO_DESC_DIR_SRC))
 $(LOCALTESTS): %: %.o
-	$(Q) "  LD     $@"
+	$(Q) "  LD		$@"
 	$(E)$(LD) $< $(LDFLAGS) $(LIBS) -o $@
 
