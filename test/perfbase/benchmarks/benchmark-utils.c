@@ -1,5 +1,6 @@
 
 #include "benchmark-utils.h"
+#include "pvfs2-internal.h"
 #include <stdlib.h>
 #ifdef HAVE_MALLOC_H
 #include <malloc.h>
@@ -123,9 +124,9 @@ int test_util_get_io_perfs(
 
 	    printf("%d\t%llu\t%lld\t%lld\n",
 		   count,
-		   perf_matrix[i][j].start_time_ms,
-		   perf_matrix[i][j].write,
-		   perf_matrix[i][j].read);
+		   llu(perf_matrix[i][j].start_time_ms),
+		   lld(perf_matrix[i][j].write),
+		   lld(perf_matrix[i][j].read));
 	}
     }
 
@@ -160,9 +161,9 @@ int test_util_get_metadata_perfs(
 
 	    printf("%d\t%llu\t%lld\t%lld\n",
 		   count,
-		   perf_matrix[i][j].start_time_ms,
-		   perf_matrix[i][j].metadata_write,
-		   perf_matrix[i][j].metadata_read);
+		   llu(perf_matrix[i][j].start_time_ms),
+		   lld(perf_matrix[i][j].metadata_write),
+		   lld(perf_matrix[i][j].metadata_read));
 	}
     }
 
@@ -196,7 +197,7 @@ int test_util_get_queue_perfs(
 
 	    printf("%d\t%llu\t%u\t%u\t%u\n",
 		   count,
-		   perf_matrix[i][j].start_time_ms,
+		   llu(perf_matrix[i][j].start_time_ms),
 		   perf_matrix[i][j].dspace_queue,
 		   perf_matrix[i][j].keyval_queue,
 		   perf_matrix[i][j].reqsched);
