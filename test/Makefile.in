@@ -324,7 +324,7 @@ clean::
 	$(E)rm -f $(TESTOBJS) $(MISCOBJS) $(TESTS)\
 		$(DEPENDS) $(CLEANFILES) $(MPIMISCOBJS)\
 		$(MPITESTS) $(MPITESTOBJS) $(MPITESTDEPENDS) $(MPIMISCDEPENDS)\
-		$(MPIIOTESTS)
+		$(MPIIOTESTOBJS) $(MPIIOTESTS)
 
 # some stuff that is cleaned in both distclean and dist targets
 cleaner: clean
