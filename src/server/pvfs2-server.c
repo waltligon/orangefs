@@ -1495,7 +1495,7 @@ static void usage(int argc, char **argv)
 static int server_parse_cmd_line_args(int argc, char **argv)
 {
     int ret = 0, option_index = 0;
-    char *cur_option = NULL;
+    const char *cur_option = NULL;
     static struct option long_opts[] =
     {
         {"foreground",0,0,0},
@@ -1513,7 +1513,7 @@ static int server_parse_cmd_line_args(int argc, char **argv)
         switch (ret)
         {
             case 0:
-                cur_option = (char *)long_opts[option_index].name;
+                cur_option = long_opts[option_index].name;
                 assert(cur_option);
 
                 if (strcmp("foreground", cur_option) == 0)
