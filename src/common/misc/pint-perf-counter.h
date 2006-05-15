@@ -78,9 +78,6 @@ void PINT_perf_finalize(
 void PINT_perf_reset(
     struct PINT_perf_counter* pc);
 
-void PINT_perf_rollover(
-    struct PINT_perf_counter* pc);
-
 void __PINT_perf_count(
     struct PINT_perf_counter* pc,
     int key, 

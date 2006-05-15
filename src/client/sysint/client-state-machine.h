@@ -698,10 +698,6 @@ do {                                                           \
     sm_p->msgarray_count = 1;                                  \
 } while(0)
 
-/* misc helper methods */
-struct server_configuration_s *PINT_get_server_config_struct(
-    PVFS_fs_id fs_id);
-
 /************************************
  * state-machine.h included here
  ************************************/

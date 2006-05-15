@@ -11,9 +11,6 @@
 #include "ncac-job.h"
 #include "pvfs2-internal.h"
 
-extern struct NCAC_dev  NCAC_dev;
-void cache_dump_active_list(void);
-void cache_dump_inactive_list(void);
 static void NCAC_list_add_tail_lock(struct list_head *new, struct list_head *head, NCAC_lock *lock);
 static void NCAC_list_del_lock(struct list_head *entry, NCAC_lock *lock);
 static void NCAC_read_request_from_list_lock(struct list_head *head, NCAC_lock *lock, NCAC_req_t ** ncac_req_ptr);

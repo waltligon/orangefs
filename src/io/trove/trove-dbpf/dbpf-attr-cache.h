@@ -106,10 +106,6 @@ int dbpf_attr_cache_finalize(void);
  * dbpf-attr-cache keyval related methods
  ***********************************************/
 
-/* insert key/data pair into cache element based on specific key */
-int dbpf_attr_cache_elem_set_data_based_on_key(
-    TROVE_object_ref key, char *key_str, void *data, int data_sz);
-
 /*
   given a cached elem and a keyval key, return associated
   data if cached; NULL otherwise
