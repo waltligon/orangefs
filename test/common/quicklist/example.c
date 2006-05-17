@@ -6,6 +6,10 @@
 #include <stdio.h>
 #include "quicklist.h"
 
+void init_list(void);
+int add_item(int data);
+void dump_list(void);
+
 struct foo_struct 
 {
 	int blah;

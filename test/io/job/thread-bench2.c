@@ -12,6 +12,10 @@ pthread_mutex_t mut2 = PTHREAD_MUTEX_INITIALIZER;
 int done = 0;
 int todo = 0;
 
+double wtime(void);
+void* thread1_fn(void* foo);
+void wakeywakey(void);
+
 double wtime(void)
 {
     struct timeval t;
