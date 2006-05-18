@@ -143,7 +143,9 @@ int PINT_request_decode(struct PINT_Request *req);
 void PINT_dump_packed_request(struct PINT_Request *req);
 void PINT_dump_request(struct PINT_Request *req);
 
+#ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
 #include "pint-request-encode.h"
+#endif
 
 /********* macros for accessing key fields in a request *********/
 
