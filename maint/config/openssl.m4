@@ -7,8 +7,8 @@ AC_DEFUN([AX_OPENSSL],
 
     if test "x${opensslpath}" != "x"; then
     	CFLAGS="${CFLAGS} -I${opensslpath}/include"
-        LDFLAGS="$LDFLAGS -L${opensslpath}/lib"
-	SERVER_LDFLAGS="$SERVER_LDFLAGS -L${opensslpath}/lib"
+        LDFLAGS="$LDFLAGS -L${opensslpath}/lib64 -L${opensslpath}/lib"
+	SERVER_LDFLAGS="$SERVER_LDFLAGS -L${opensslpath}/lib64 -L${opensslpath}/lib"
    fi
    LIBS="$LIBS -lcrypt -lssl"
 

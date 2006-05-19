@@ -2,3 +2,4 @@ DIR := common/gossip
 TESTSRC += \
 	$(DIR)/test-gossip.c \
 	$(DIR)/time-gossip.c
+MODLDFLAGS_$(DIR) = -lssl -lcrypto

@@ -595,11 +595,6 @@ static int readdirplus_fetch_attrs_comp_fn(void *v_p,
         free(sm_p->u.readdirplus.input_handle_array);
         sm_p->u.readdirplus.input_handle_array = NULL;
         sm_p->u.readdirplus.nhandles = 0;
-        if (sm_p->msgarray && (sm_p->msgarray != &sm_p->msgpair))
-        {
-            free(sm_p->msgarray);
-            sm_p->msgarray = NULL;
-        }
     }
     return 0;
 }
@@ -679,6 +674,12 @@ static int readdirplus_fetch_sizes_setup_msgpair(PINT_client_sm *sm_p,
                                job_status_s *js_p)
 {
     int i, ret;
+
+    if (sm_p->msgarray && (sm_p->msgarray != &sm_p->msgpair))
+    {
+        free(sm_p->msgarray);
+        sm_p->msgarray = NULL;
+    }
     /* don't need sizes */
     if (!(sm_p->u.readdirplus.attrmask & PVFS_ATTR_META_ALL)
         && !(sm_p->u.readdirplus.attrmask & PVFS_ATTR_DATA_SIZE)) {

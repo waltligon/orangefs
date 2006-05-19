@@ -181,8 +181,8 @@ int main(int argc, char *argv[])
 			exit(1);
 		}
 		end = Wtime();
-		printf("Rank %d openg on %s yielded length %d [Time %g msec]\n",
-				rank, fname, hb.handle_length, msec_diff(&end, &begin));
+		printf("Rank %d openg on %s yielded length %ld [Time %g msec]\n",
+				rank, fname, (unsigned long) hb.handle_length, msec_diff(&end, &begin));
 	}
 
 	/* Broadcast the handle buffer to everyone */

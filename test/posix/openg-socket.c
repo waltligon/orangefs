@@ -223,7 +223,7 @@ int main(int argc, char *argv[])
 		int new_len = 0;
 		wait_for_handle_buffer(ptr, (int *)&new_len);
 		len = new_len;
-		printf("Got length %d\n", len);
+		printf("Got length %ld\n", (unsigned long) len);
 	}
 	/* if I am the client, openg the file and send a packet */
 	else {
@@ -234,8 +234,8 @@ int main(int argc, char *argv[])
 			perror("openg error:");
 			exit(1);
 		}
-		printf("openg on %s yielded %d [Time %g usec]\n",
-					fname, len, usec_diff(&end, &begin));
+		printf("openg on %s yielded %ld [Time %g usec]\n",
+					fname, (unsigned long) len, usec_diff(&end, &begin));
 		send_handle_buffer(server, ptr, len);
 	}
 	/* muck with buffer if need be */

@@ -2933,6 +2933,8 @@ int PINT_config_get_fs_key(
     int * length)
 {
 #ifndef WITH_OPENSSL
+    *key = NULL;
+    *length = 0;
     return -PVFS_ENOSYS;
 #else
     int len, b64len;

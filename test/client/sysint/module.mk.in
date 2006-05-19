@@ -37,3 +37,4 @@ TESTSRC += \
 	$(DIR)/list-eattr.c \
 	$(DIR)/test-accesses.c
 
+MODLDFLAGS_$(DIR) = -lssl -lcrypto

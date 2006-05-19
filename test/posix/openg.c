@@ -135,8 +135,8 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 	end = Wtime();
-	printf("openg on %s yielded length %d [Time %g msec]\n",
-				fname, len, msec_diff(&end, &begin));
+	printf("openg on %s yielded length %ld [Time %g msec]\n",
+				fname, (unsigned long) len, msec_diff(&end, &begin));
 	muck_with_buffer(ptr, len, muck_options);
 	begin = Wtime();
 	fd = openfh(ptr, len);

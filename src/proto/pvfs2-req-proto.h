@@ -142,7 +142,7 @@ typedef struct
 /* max number of key/value pairs to set or get in a list operation */
 #define PVFS_REQ_LIMIT_KEYVAL_LIST 32
 /* max number of handles for which we return attributes */
-#define PVFS_REQ_LIMIT_LISTATTR 32
+#define PVFS_REQ_LIMIT_LISTATTR 64
 
 /* create *********************************************************/
 /* - used to create new metafile and datafile objects */
