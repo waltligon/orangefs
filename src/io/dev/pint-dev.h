@@ -10,6 +10,11 @@
 #include "pvfs2-types.h"
 #include "pint-dev-shared.h"
 
+enum pvfs_bufmap_type {
+    BM_IO = 0,
+    BM_READDIR = 1,
+};
+
 /* describes unexpected messages coming out of the device */
 struct PINT_dev_unexp_info
 {
@@ -29,14 +34,17 @@ int PINT_dev_initialize(
     const char* dev_name,
     int flags);
 
-int PINT_dev_get_mapped_region(
+int PINT_dev_get_mapped_regions(
+    int ndesc,
     struct PVFS_dev_map_desc *desc,
-    int size);
+    int *size);
 
-void PINT_dev_put_mapped_region(
+void PINT_dev_put_mapped_regions(
+    int ndesc,
     struct PVFS_dev_map_desc *desc);
 
 void *PINT_dev_get_mapped_buffer(
+    enum pvfs_bufmap_type bm_type,
     struct PVFS_dev_map_desc *desc,
     int buffer_index);
 

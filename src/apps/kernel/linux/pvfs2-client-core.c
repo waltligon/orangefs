@@ -27,6 +27,7 @@
 #include "server-config-mgr.h"
 #include "client-state-machine.h"
 #include "pint-perf-counter.h"
+#include "pvfs2-encode-stubs.h"
 
 #ifdef USE_MMAP_RA_CACHE
 #include "mmap-ra-cache.h"
@@ -168,7 +169,11 @@ static options_t s_opts;
 
 static job_context_id s_client_dev_context;
 static int s_client_is_processing = 1;
-static struct PVFS_dev_map_desc s_io_desc;
+
+/* We have 2 set of description buffers, one used for staging I/O and one for readdir/readdirplus */
+#define NUM_MAP_DESC 2
+static struct PVFS_dev_map_desc s_io_desc[NUM_MAP_DESC];
+static int s_desc_size[NUM_MAP_DESC] = {PVFS2_BUFMAP_TOTAL_SIZE, PVFS2_READDIR_TOTAL_SIZE};
 
 static struct PINT_perf_counter* acache_pc = NULL;
 
@@ -1474,8 +1479,9 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
             PVFS2_BUFMAP_DESC_COUNT));
 
     /* get a shared kernel/userspace buffer for the I/O transfer */
-    vfs_request->io_kernel_mapped_buf = PINT_dev_get_mapped_buffer(
-        &s_io_desc, vfs_request->in_upcall.req.io.buf_index);
+    vfs_request->io_kernel_mapped_buf = 
+        PINT_dev_get_mapped_buffer(BM_IO, s_io_desc, 
+            vfs_request->in_upcall.req.io.buf_index);
     assert(vfs_request->io_kernel_mapped_buf);
 
     ret = PVFS_Request_contiguous(
@@ -1507,8 +1513,8 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
     vfs_request->out_downcall.resp.io.amt_complete = amt_returned;
 
     /* get a shared kernel/userspace buffer for the I/O transfer */
-    buf = PINT_dev_get_mapped_buffer(
-        &s_io_desc, vfs_request->in_upcall.req.io.buf_index);
+    buf = PINT_dev_get_mapped_buffer(BM_IO, s_io_desc,
+            vfs_request->in_upcall.req.io.buf_index);
     assert(buf);
 
     /* copy cached data into the shared user/kernel space */
@@ -1669,94 +1675,82 @@ PVFS_error write_device_response(
     return ret;
 }
 
-static inline void copy_dirents_to_downcall(vfs_request_t *vfs_request)
+static unsigned long encode_readdir_to_buffer(char *ptr, PVFS_sysresp_readdir *readdir)
 {
-    int i = 0, len = 0;
+    char *buf = ptr;
+    char **pptr = &buf;
+    encode_dirents(pptr, readdir);
+    return ((unsigned long) *pptr - (unsigned long) ptr);
+}
 
-    vfs_request->out_downcall.resp.readdir.token =
-        vfs_request->response.readdir.token;
-    vfs_request->out_downcall.resp.readdir.directory_version =
-        vfs_request->response.readdir.directory_version;
-
-    for(; i < vfs_request->response.readdir.pvfs_dirent_outcount; i++)
+static int copy_dirents_to_downcall(vfs_request_t *vfs_request)
+{
+    int ret = 0;
+    PVFS_sysresp_readdir rd;
+    /* get a buffer for xfer of dirents */
+    vfs_request->io_kernel_mapped_buf = 
+        PINT_dev_get_mapped_buffer(BM_READDIR, s_io_desc, 
+            vfs_request->in_upcall.req.readdir.buf_index);
+    if (vfs_request->io_kernel_mapped_buf == NULL)
     {
-        vfs_request->out_downcall.resp.readdir.refn[i].handle =
-            vfs_request->response.readdir.dirent_array[i].handle;
-        vfs_request->out_downcall.resp.readdir.refn[i].fs_id =
-            vfs_request->in_upcall.req.readdir.refn.fs_id;
-
-        len = strlen(
-            vfs_request->response.readdir.dirent_array[i].d_name);
-        vfs_request->out_downcall.resp.readdir.d_name_len[i] = len;
-
-        strncpy(
-            &vfs_request->out_downcall.resp.readdir.d_name[i][0],
-            vfs_request->response.readdir.dirent_array[i].d_name, len);
-
-        vfs_request->out_downcall.resp.readdir.dirent_count++;
+        ret = -PVFS_EINVAL;
+        goto err;
     }
 
-    if (vfs_request->out_downcall.resp.readdir.dirent_count !=
-        vfs_request->response.readdir.pvfs_dirent_outcount)
+    /* Simply encode the readdir system response into the shared buffer */
+    vfs_request->out_downcall.trailer_size = 
+        encode_readdir_to_buffer(vfs_request->io_kernel_mapped_buf,
+                &vfs_request->response.readdir);
+    if (vfs_request->out_downcall.trailer_size <= 0) 
     {
-        gossip_err("Error! readdir counts don't match! (%d != %d)\n",
-                   vfs_request->out_downcall.resp.readdir.dirent_count,
-                   vfs_request->response.readdir.pvfs_dirent_outcount);
+        gossip_err("copy_dirents_to_downcall: invalid trailer size %ld\n",
+                (unsigned long) vfs_request->out_downcall.trailer_size);
+        ret = -PVFS_EINVAL;
     }
-
+err:
     /* free sysresp dirent array */
     free(vfs_request->response.readdir.dirent_array);
     vfs_request->response.readdir.dirent_array = NULL;
+    return ret;
 }
 
-static inline void copy_direntplus_to_downcall(vfs_request_t *vfs_request)
+static unsigned long encode_readdirplus_to_buffer(char *ptr, PVFS_sysresp_readdirplus *readdirplus)
 {
-    int i, len;
+    char *buf = ptr;
+    char **pptr = &buf;
 
-    vfs_request->out_downcall.resp.readdirplus.token =
-        vfs_request->response.readdirplus.token;
-    vfs_request->out_downcall.resp.readdirplus.directory_version =
-        vfs_request->response.readdirplus.directory_version;
+    /* The above works because both structures share the same member names */
+    encode_dirents(pptr, readdirplus);
+    /* and then we encode the stat part of the response */
+    encode_sys_attr(pptr, readdirplus);
+    return ((unsigned long) *pptr - (unsigned long) ptr);
+}
 
-    len = 0;
-    for(i = 0; i < vfs_request->response.readdirplus.pvfs_dirent_outcount; i++)
+static int copy_direntplus_to_downcall(vfs_request_t *vfs_request)
+{
+    int i, ret = 0;
+    PVFS_sysresp_readdirplus rd;
+    /* get a buffer for xfer of direntplus */
+    vfs_request->io_kernel_mapped_buf = 
+        PINT_dev_get_mapped_buffer(BM_READDIR, s_io_desc, 
+        vfs_request->in_upcall.req.readdirplus.buf_index);
+    if (vfs_request->io_kernel_mapped_buf == NULL)
     {
-        vfs_request->out_downcall.resp.readdirplus.refn[i].handle =
-            vfs_request->response.readdirplus.dirent_array[i].handle;
-        vfs_request->out_downcall.resp.readdirplus.refn[i].fs_id =
-            vfs_request->in_upcall.req.readdirplus.refn.fs_id;
-
-        len = strlen(vfs_request->response.readdirplus.dirent_array[i].d_name);
-        vfs_request->out_downcall.resp.readdirplus.d_name_len[i] = len;
-
-        strncpy(&vfs_request->out_downcall.resp.readdirplus.d_name[i][0],
-            vfs_request->response.readdirplus.dirent_array[i].d_name, len);
-
-        /* Copy the stat error */
-        vfs_request->out_downcall.resp.readdirplus.stat_error[i] = 
-            vfs_request->response.readdirplus.stat_err_array[i];
-        /* and the system attributes */
-        if (vfs_request->response.readdirplus.stat_err_array[i] == 0)
-        {
-            PVFS_util_copy_sys_attr(&vfs_request->out_downcall.resp.readdirplus.attributes[i], 
-                                    &vfs_request->response.readdirplus.attr_array[i]);
-            gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
-                    "readdirplus: mask %x object type %d size %lu\n", 
-                    vfs_request->response.readdirplus.attr_array[i].mask,
-                    vfs_request->response.readdirplus.attr_array[i].objtype,
-                    (unsigned long) vfs_request->response.readdirplus.attr_array[i].size);
-        }
-        vfs_request->out_downcall.resp.readdirplus.dirent_count++;
+        ret = -PVFS_EINVAL;
+        goto err;
     }
 
-    if (vfs_request->out_downcall.resp.readdirplus.dirent_count !=
-        vfs_request->response.readdirplus.pvfs_dirent_outcount)
+    /* Simply encode the readdirplus system response into the shared buffer */
+    vfs_request->out_downcall.trailer_size = 
+        encode_readdirplus_to_buffer(vfs_request->io_kernel_mapped_buf,
+                &vfs_request->response.readdirplus);
+    if (vfs_request->out_downcall.trailer_size <= 0)
     {
-        gossip_err("Error! readdir counts don't match! (%d != %d)\n",
-                   vfs_request->out_downcall.resp.readdirplus.dirent_count,
-                   vfs_request->response.readdirplus.pvfs_dirent_outcount);
+        gossip_err("copy_direntplus_to_downcall: invalid trailed size %ld\n",
+                (unsigned long) vfs_request->out_downcall.trailer_size);
+        ret = -PVFS_EINVAL;
     }
-
+err:
     /* free sysresp dirent array */
     free(vfs_request->response.readdirplus.dirent_array);
     vfs_request->response.readdirplus.dirent_array = NULL;
@@ -1770,6 +1764,7 @@ static inline void copy_direntplus_to_downcall(vfs_request_t *vfs_request)
     }
     free(vfs_request->response.readdirplus.attr_array);
     vfs_request->response.readdirplus.attr_array = NULL;
+    return ret;
 }
 
 /* 
@@ -1963,7 +1958,7 @@ static inline void package_downcall_members(
             }
             else
             {
-                copy_dirents_to_downcall(vfs_request);
+                *error_code = copy_dirents_to_downcall(vfs_request);
             }
             break;
         case PVFS2_VFS_OP_READDIRPLUS:
@@ -1973,7 +1968,7 @@ static inline void package_downcall_members(
             }
             else
             {
-                copy_direntplus_to_downcall(vfs_request);
+                *error_code = copy_direntplus_to_downcall(vfs_request);
             }
             break;
         case PVFS2_VFS_OP_STATFS:
@@ -2089,8 +2084,8 @@ static inline void package_downcall_members(
                       get a shared kernel/userspace buffer for the I/O
                       transfer
                     */
-                    buf = PINT_dev_get_mapped_buffer(
-                        &s_io_desc, vfs_request->in_upcall.req.io.buf_index);
+                    buf = PINT_dev_get_mapped_buffer(BM_IO, s_io_desc, 
+                        vfs_request->in_upcall.req.io.buf_index);
                     assert(buf);
 
                     /* copy cached data into the shared user/kernel space */
@@ -2648,9 +2643,14 @@ static PVFS_error process_vfs_requests(void)
                 {
                     buffer_list[0] = &vfs_request->out_downcall;
                     size_list[0] = sizeof(pvfs2_downcall_t);
-                    total_size = sizeof(pvfs2_downcall_t);
                     list_size = 1;
-
+                    total_size = sizeof(pvfs2_downcall_t);
+                    if (vfs_request->out_downcall.trailer_size > 0) {
+                        buffer_list[1] = vfs_request->io_kernel_mapped_buf;
+                        size_list[1] = vfs_request->out_downcall.trailer_size;
+                        list_size++;
+                        total_size += vfs_request->out_downcall.trailer_size;
+                    }
                     ret = write_device_response(
                         buffer_list,size_list,list_size, total_size,
                         vfs_request->info.tag,
@@ -2836,8 +2836,8 @@ int main(int argc, char **argv)
     }
 
     /* setup a mapped region for I/O transfers */
-    memset(&s_io_desc, 0 , sizeof(struct PVFS_dev_map_desc));
-    ret = PINT_dev_get_mapped_region(&s_io_desc, PVFS2_BUFMAP_TOTAL_SIZE);
+    memset(s_io_desc, 0 , NUM_MAP_DESC * sizeof(struct PVFS_dev_map_desc));
+    ret = PINT_dev_get_mapped_regions(NUM_MAP_DESC, s_io_desc, s_desc_size);
     if (ret < 0)
     {
 	PVFS_perror("PINT_dev_get_mapped_region", ret);
@@ -2896,7 +2896,7 @@ int main(int argc, char **argv)
 #endif
 
     PINT_dev_finalize();
-    PINT_dev_put_mapped_region(&s_io_desc);
+    PINT_dev_put_mapped_regions(NUM_MAP_DESC, s_io_desc);
 
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG,
                  "calling PVFS_sys_finalize()\n");

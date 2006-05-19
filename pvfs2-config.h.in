@@ -86,6 +86,9 @@
 /* Define if struct super_operations in kernel has get_fs_key callback */
 #undef HAVE_GET_FS_KEY_SUPER_OPERATIONS
 
+/* Define if strerror_r is GNU-specific */
+#undef HAVE_GNU_STRERROR_R
+
 /* Define if IB wrap_common.h exists. */
 #undef HAVE_IB_WRAP_COMMON_H
 

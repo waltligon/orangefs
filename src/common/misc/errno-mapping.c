@@ -19,7 +19,7 @@ DECLARE_ERRNO_MAPPING_AND_FN();
 
 /*
   the pvfs analog to strerror_r that handles PVFS_error codes as well
-  as errno error codes 
+  as errno error codes
 */
 int PVFS_strerror_r(int errnum, char *buf, int n)
 {
@@ -33,7 +33,7 @@ int PVFS_strerror_r(int errnum, char *buf, int n)
     }
     else
     {
-#ifdef _GNU_SOURCE
+#ifdef HAVE_GNU_STRERROR_R
         char *tmpbuf = strerror_r(tmp, buf, limit);
         if (tmpbuf && (strcmp(tmpbuf, buf)))
         {

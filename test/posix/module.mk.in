@@ -19,4 +19,5 @@ MPIMISCSRC += \
 
 MPITESTSRC += $(DIR)/openg-mpi.c
 
+MODCFLAGS_$(DIR)/getdents.c = -D_GNU_SOURCE
 MODLDFLAGS_$(DIR) = -lssl -lcrypto

@@ -51,7 +51,7 @@ enum PINT_perf_option
 /** describes a single key to be stored in the perf counter interface */
 struct PINT_perf_key
 {
-    char* key_name;    /**< string name for key */
+    const char* key_name;    /**< string name for key */
     int key;           /**< integer representation of key */
     int flag;          /**< flags that modify behavior of values in this key */
 };
@@ -76,9 +76,6 @@ void PINT_perf_finalize(
     struct PINT_perf_counter* pc);
 
 void PINT_perf_reset(
-    struct PINT_perf_counter* pc);
-
-void PINT_perf_rollover(
     struct PINT_perf_counter* pc);
 
 void __PINT_perf_count(

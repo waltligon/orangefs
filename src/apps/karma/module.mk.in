@@ -22,6 +22,8 @@ MODCFLAGS_$(DIR) := @GTKCFLAGS@
 MODLDFLAGS_$(DIR) := @GTKLIBS@
 
 # gtk-2.0 has many bad prototypes
+ifdef GNUC
 MODCFLAGS_$(DIR) += -Wno-strict-prototypes
+endif
 
 endif  # BUILD_KARMA

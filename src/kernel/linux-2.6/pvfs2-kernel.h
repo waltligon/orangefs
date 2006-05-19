@@ -57,6 +57,7 @@ typedef unsigned long sector_t;
 #include <linux/slab.h>
 #include <linux/types.h>
 #include <linux/fs.h>
+#include <linux/vmalloc.h>
 
 #include "pvfs2-config.h"
 #ifdef HAVE_AIO
@@ -330,6 +331,8 @@ typedef struct
 
     int io_completed;
     wait_queue_head_t io_completion_waitq;
+    void *trailer_buf; /* currently used by readdir and readdirplus to stage the readdir operation */
+    unsigned long trailer_size;
     void *priv;/* used by the async I/O code to stash the pvfs2_kiocb structure */
     atomic_t aio_ref_count; /* used again for the async I/O code for deallocation */
 

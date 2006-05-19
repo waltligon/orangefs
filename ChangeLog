@@ -17,6 +17,9 @@ pvfs2-1.4.1-pre1
 - ib: fix CTS out-of-order problem
 - ib: separate message headers to make math and debugging easier
 - ib: avoid trying to actively connect as a server
+- ib: move static variables into an allocated struct to avoid namespace
+  collisions
+- ib: generalize memcache to be used by multiple consumers, not just VAPI
 
 pvfs2-1.4.0
 - add a simple sendfile callback stub

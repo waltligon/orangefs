@@ -79,6 +79,8 @@ typedef struct
     PVFS_object_ref refn;
     PVFS_ds_position token;
     int32_t max_dirent_count;
+    int32_t buf_index;
+    uint32_t __pad1;
 } pvfs2_readdir_request_t;
 
 typedef struct
@@ -87,7 +89,7 @@ typedef struct
     PVFS_ds_position token;
     int32_t max_dirent_count;
     uint32_t mask;
-    uint32_t __pad1;
+    int32_t  buf_index;
 } pvfs2_readdirplus_request_t;
 
 typedef struct

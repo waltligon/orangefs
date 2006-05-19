@@ -61,27 +61,32 @@ typedef struct
     PVFS_object_ref refn;
 } pvfs2_mkdir_response_t;
 
+/* duplication of some system interface structures so that I don't have to allocate extra memory */
+struct pvfs2_dirent
+{
+    char *d_name;
+    int   d_length;
+    PVFS_handle handle;
+};
+
+/* the readdir response is a blank downcall (i.e. all these fields are obtained from the trailer) */
 typedef struct
 {
-    int32_t dirent_count;
     PVFS_ds_position token;
+    struct pvfs2_dirent *dirent_array;
+    uint32_t pvfs_dirent_outcount;
     uint64_t directory_version;
-    PVFS_object_ref refn[MAX_DIRENT_COUNT];
-    char d_name[MAX_DIRENT_COUNT][PVFS2_NAME_LEN];
-    int32_t d_name_len[MAX_DIRENT_COUNT];
 } pvfs2_readdir_response_t;
 
+/* the readdirplus response is a blank downcall (i.e. all these fields are obtained from the trailer) */
 typedef struct
 {
-    int32_t dirent_count;
     PVFS_ds_position token;
+    struct pvfs2_dirent *dirent_array;
+    uint32_t pvfs_dirent_outcount;
     uint64_t directory_version;
-    PVFS_object_ref refn[MAX_DIRENT_COUNT];
-    char d_name[MAX_DIRENT_COUNT][PVFS2_NAME_LEN];
-    int32_t d_name_len[MAX_DIRENT_COUNT];
-    PVFS_sys_attr attributes[MAX_DIRENT_COUNT];
-    PVFS_error    stat_error[MAX_DIRENT_COUNT];
-    /* FIXME: What do we do with symlink target's? */
+    PVFS_error  *stat_err_array;
+    PVFS_sys_attr *attr_array;
 } pvfs2_readdirplus_response_t;
 
 /* the rename response is a blank downcall */
@@ -162,21 +167,12 @@ typedef struct
 #define PERF_COUNT_BUF_SIZE 4096
 typedef struct
 {
-    /* NOTE: this seems large, but is in fact smaller than the readdir
-     * response structure, so the size of the union is unaffected by this
-     * particular response.  We should probably consider how to get these
-     * downcalls smaller in general so that they don't always span 2 pages
-     */
     char buffer[PERF_COUNT_BUF_SIZE];
 } pvfs2_perf_count_response_t;
 
 #define FS_KEY_BUF_SIZE 4096
 typedef struct
 {
-    /* NOTE: 
-    *  See note above on why having such a large buffer size for key is not
-    *  going to affect overall size of the downcall.
-     */
     int32_t fs_keylen;
     int32_t __pad1;
     char    fs_key[FS_KEY_BUF_SIZE];
@@ -186,6 +182,7 @@ typedef struct
 {
     int32_t type;
     PVFS_error status;
+    PVFS_size  trailer_size;
 
     union
     {
@@ -197,8 +194,8 @@ typedef struct
 /* 	pvfs2_setattr_response_t setattr; */
 /*      pvfs2_remove_response_t remove; */
 	pvfs2_mkdir_response_t mkdir;
-	pvfs2_readdir_response_t readdir;
-	pvfs2_readdirplus_response_t readdirplus;
+/*	pvfs2_readdir_response_t readdir; */
+/*	pvfs2_readdirplus_response_t readdirplus; */
 /*      pvfs2_rename_response_t rename; */
 	pvfs2_statfs_response_t statfs;
 /* 	pvfs2_truncate_response_t truncate; */

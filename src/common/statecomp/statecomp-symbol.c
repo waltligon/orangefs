@@ -15,7 +15,6 @@
 #include <string.h>
 
 #include "statecomp-symbol.h"
-extern int line;
 
 void *emalloc(unsigned int size);
 

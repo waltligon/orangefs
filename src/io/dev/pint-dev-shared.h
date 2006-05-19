@@ -11,6 +11,7 @@
 #ifndef __PINT_DEV_SHARED_H
 #define __PINT_DEV_SHARED_H
 
+
 #ifdef __KERNEL__
 #include <linux/ioctl.h>
 #else
@@ -45,6 +46,12 @@
 /* size of mapped buffer region to use for I/O transfers (in bytes) */
 #define PVFS2_BUFMAP_TOTAL_SIZE \
 (PVFS2_BUFMAP_DESC_COUNT * PVFS2_BUFMAP_DEFAULT_DESC_SIZE)
+
+#define PVFS2_READDIR_DESC_COUNT  5
+#define PVFS2_READDIR_DEFAULT_DESC_SIZE  (128 * 1024)
+#define PVFS2_READDIR_DEFAULT_DESC_SHIFT 17
+#define PVFS2_READDIR_TOTAL_SIZE \
+(PVFS2_READDIR_DESC_COUNT * PVFS2_READDIR_DEFAULT_DESC_SIZE)
 
 /* pvfs2-client-core can cache readahead data up to this size in bytes */
 #define PVFS2_MMAP_RACACHE_MAX_SIZE ((loff_t)(8 * (1024 * 1024)))

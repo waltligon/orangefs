@@ -6,10 +6,14 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	dnl 
 	dnl on some systems, there is a /usr/include/linux/xattr_acl.h , so the
 	dnl check for xattr_acl.h down below will always pass, even if it
-	dnl should fail.  this hack will bring in just enough system headers
-	dnl for kernel compilation
+	dnl should fail.  this hack (-nostdinc -isystem ...) will bring in just
+	dnl enough system headers dnl for kernel compilation
 
-	NOSTDINCFLAGS="-nostdinc -isystem `$CC -print-file-name=include`"
+	dnl -Werror can be overkill, but for these kernel feature tests
+	dnl 'implicit function declaration' usually ends up in an undefined
+	dnl symbol somewhere.
+
+	NOSTDINCFLAGS="-Werror-implicit-function-declaration -nostdinc -isystem `$CC -print-file-name=include`"
 
 	CFLAGS="$USR_CFLAGS $NOSTDINCFLAGS -I$lk_src/include -I$lk_src/include/asm-i386/mach-generic -I$lk_src/include/asm-i386/mach-default -DKBUILD_STR(s)=#s -DKBUILD_BASENAME=KBUILD_STR(empty)  -DKBUILD_MODNAME=KBUILD_STR(empty)"
 
@@ -371,41 +375,37 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	    AC_MSG_RESULT(no)
 	)
 
+	dnl Using -Werror is not an option, because some arches throw lots of
+	dnl warnings that would trigger false negatives.  We know that the
+	dnl change to the releasepage() function signature was accompanied by
+	dnl a similar change to the exported function try_to_release_page(),
+	dnl and that one we can check without using -Werror.  The test fails
+	dnl unless the previous declaration was identical to the one we suggest
+	dnl below.  New kernels use gfp_t, not int.
 	AC_MSG_CHECKING(for second arg type int in address_space_operations releasepage)
-	tmp_cflags=$CFLAGS
-	CFLAGS="$CFLAGS -Werror"
 	AC_TRY_COMPILE([
 	    #define __KERNEL__
-	    #include <linux/fs.h>
-	    extern int rp(struct page *page, int foo);
-	    ], [
-	    struct address_space_operations aso = {
-		.releasepage = rp
-	    };
-	    ],
+	    #include <linux/buffer_head.h>
+	    extern int try_to_release_page(struct page *page, int gfp_mask);
+	    ], [],
 	    AC_MSG_RESULT(yes)
 	    AC_DEFINE(HAVE_INT_ARG2_ADDRESS_SPACE_OPERATIONS_RELEASEPAGE, 1, Define if sceond argument to releasepage in address_space_operations is type int),
 	    AC_MSG_RESULT(no)
-	    )
-	CFLAGS=$tmp_cflags
+	)
 
+	dnl Similar logic for the follow_link member in inode_operations.  New
+	dnl kernels return a void *, not int.
 	AC_MSG_CHECKING(for int return in inode_operations follow_link)
-	tmp_cflags=$CFLAGS
-	CFLAGS="$CFLAGS -Werror"
 	AC_TRY_COMPILE([
 	    #define __KERNEL__
 	    #include <linux/fs.h>
-	    extern int fl(struct dentry *d, struct nameidata *n);
-	    ], [
-	    struct inode_operations io = {
-		.follow_link = fl
-	    };
-	    ],
+	    extern int page_follow_link_light(struct dentry *,
+	                                      struct nameidata *);
+	    ], [],
 	    AC_MSG_RESULT(yes)
 	    AC_DEFINE(HAVE_INT_RETURN_INODE_OPERATIONS_FOLLOW_LINK, 1, Define if return value from follow_link in inode_operations is type int),
 	    AC_MSG_RESULT(no)
-	    )
-	CFLAGS=$tmp_cflags
+	)
 
 	AC_MSG_CHECKING(for compat_ioctl member in file_operations structure)
 	AC_TRY_COMPILE([

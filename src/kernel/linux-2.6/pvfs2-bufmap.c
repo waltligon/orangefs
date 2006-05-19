@@ -20,8 +20,13 @@ static struct page **bufmap_page_array = NULL;
 int buffer_index_array[PVFS2_BUFMAP_DESC_COUNT] = {0};
 static spinlock_t buffer_index_lock = SPIN_LOCK_UNLOCKED;
 
+/* array to track usage of buffer descriptors for readdir/readdirplus */
+int readdir_index_array[PVFS2_READDIR_DESC_COUNT] = {0};
+static spinlock_t readdir_index_lock = SPIN_LOCK_UNLOCKED;
+
 static struct pvfs_bufmap_desc desc_array[PVFS2_BUFMAP_DESC_COUNT];
 static DECLARE_WAIT_QUEUE_HEAD(bufmap_waitq);
+static DECLARE_WAIT_QUEUE_HEAD(readdir_waitq);
 
 /* pvfs_bufmap_initialize()
  *
@@ -194,37 +199,37 @@ void pvfs_bufmap_finalize(void)
     pvfs2_print("pvfs2_bufmap_finalize: exiting normally\n");
 }
 
-/* pvfs_bufmap_get()
- *
- * gets a free mapped buffer descriptor, will sleep until one becomes
- * available if necessary
- *
- * returns 0 on success, -errno on failure
- */
-int pvfs_bufmap_get(int *buffer_index)
+struct slot_args {
+    int         slot_count;
+    int        *slot_array;
+    spinlock_t *slot_lock;
+    wait_queue_head_t *slot_wq;
+};
+
+static int wait_for_a_slot(struct slot_args *slargs, int *buffer_index)
 {
     int ret = -1, i = 0;
     DECLARE_WAITQUEUE(my_wait, current);
 
-    add_wait_queue_exclusive(&bufmap_waitq, &my_wait);
+    add_wait_queue_exclusive(slargs->slot_wq, &my_wait);
 
     while(1)
     {
         set_current_state(TASK_INTERRUPTIBLE);
 
         /* check for available desc */
-        spin_lock(&buffer_index_lock);
-        for(i = 0; i < PVFS2_BUFMAP_DESC_COUNT; i++)
+        spin_lock(slargs->slot_lock);
+        for(i = 0; i < slargs->slot_count; i++)
         {
-            if (buffer_index_array[i] == 0)
+            if (slargs->slot_array[i] == 0)
             {
-                buffer_index_array[i] = 1;
+                slargs->slot_array[i] = 1;
                 *buffer_index = i;
                 ret = 0;
                 break;
             }
         }
-        spin_unlock(&buffer_index_lock);
+        spin_unlock(slargs->slot_lock);
 
         /* if we acquired a buffer, then break out of while */
         if (ret == 0)
@@ -234,25 +239,57 @@ int pvfs_bufmap_get(int *buffer_index)
 
         if (!signal_pending(current))
         {
-            int timeout = MSECS_TO_JIFFIES(
-                1000 * op_timeout_secs);
+            int timeout = MSECS_TO_JIFFIES(1000 * op_timeout_secs);
             if (!schedule_timeout(timeout))
             {
-                pvfs2_print("*** pvfs_bufmap_get timed out\n");
+                pvfs2_print("*** wait_for_a_slot timed out\n");
                 break;
             }
             continue;
         }
 
-        pvfs2_print("pvfs2: bufmap_get() interrupted.\n");
+        pvfs2_print("pvfs2: wait_for_a_slot() interrupted.\n");
         ret = -EINTR;
         break;
     }
 
     set_current_state(TASK_RUNNING);
-    remove_wait_queue(&bufmap_waitq, &my_wait);
+    remove_wait_queue(slargs->slot_wq, &my_wait);
 
     return ret;
+}
+
+static void put_back_slot(struct slot_args *slargs, int buffer_index)
+{
+    if (buffer_index < 0 || buffer_index >= slargs->slot_count)
+    {
+        return;
+    }
+   /* put the desc back on the queue */
+    spin_lock(slargs->slot_lock);
+    slargs->slot_array[buffer_index] = 0;
+    spin_unlock(slargs->slot_lock);
+
+    /* wake up anyone who may be sleeping on the queue */
+    wake_up_interruptible(slargs->slot_wq);
+}
+
+/* pvfs_bufmap_get()
+ *
+ * gets a free mapped buffer descriptor, will sleep until one becomes
+ * available if necessary
+ *
+ * returns 0 on success, -errno on failure
+ */
+int pvfs_bufmap_get(int *buffer_index)
+{
+    struct slot_args slargs;
+
+    slargs.slot_count = PVFS2_BUFMAP_DESC_COUNT;
+    slargs.slot_array = buffer_index_array;
+    slargs.slot_lock  = &buffer_index_lock;
+    slargs.slot_wq    = &bufmap_waitq;
+    return wait_for_a_slot(&slargs, buffer_index);
 }
 
 /* pvfs_bufmap_put()
@@ -263,13 +300,47 @@ int pvfs_bufmap_get(int *buffer_index)
  */
 void pvfs_bufmap_put(int buffer_index)
 {
-    /* put the desc back on the queue */
-    spin_lock(&buffer_index_lock);
-    buffer_index_array[buffer_index] = 0;
-    spin_unlock(&buffer_index_lock);
+    struct slot_args slargs;
 
-    /* wake up anyone who may be sleeping on the queue */
-    wake_up_interruptible(&bufmap_waitq);
+    slargs.slot_count = PVFS2_BUFMAP_DESC_COUNT;
+    slargs.slot_array = buffer_index_array;
+    slargs.slot_lock  = &buffer_index_lock;
+    slargs.slot_wq    = &bufmap_waitq;
+    put_back_slot(&slargs, buffer_index);
+    return;
+}
+
+/* readdir_index_get()
+ *
+ * gets a free descriptor, will sleep until one becomes
+ * available if necessary.
+ * Although the readdir buffers are not mapped into kernel space
+ * we could do that at a later point of time. Regardless, these
+ * indices are used by the client-core.
+ *
+ * returns 0 on success, -errno on failure
+ */
+int readdir_index_get(int *buffer_index)
+{
+    struct slot_args slargs;
+
+    slargs.slot_count = PVFS2_READDIR_DESC_COUNT;
+    slargs.slot_array = readdir_index_array;
+    slargs.slot_lock  = &readdir_index_lock;
+    slargs.slot_wq    = &readdir_waitq;
+    return wait_for_a_slot(&slargs, buffer_index);
+}
+
+void readdir_index_put(int buffer_index)
+{
+    struct slot_args slargs;
+
+    slargs.slot_count = PVFS2_READDIR_DESC_COUNT;
+    slargs.slot_array = readdir_index_array;
+    slargs.slot_lock  = &readdir_index_lock;
+    slargs.slot_wq    = &readdir_waitq;
+    put_back_slot(&slargs, buffer_index);
+    return;
 }
 
 /* pvfs_bufmap_copy_to_user()
@@ -438,7 +509,7 @@ int pvfs_bufmap_copy_iovec_from_user(
     {
         pvfs2_print("pvfs2_bufmap_copy_iovec_from_user: not yet "
                     "initialized; returning\n");
-        return 1;
+        return -EIO;
     }
     /*
      * copy the passed in iovec so that we can change some of its fields
@@ -562,7 +633,7 @@ int pvfs_bufmap_copy_to_user_iovec(
     {
         pvfs2_print("pvfs2_bufmap_copy_to_user_iovec: not yet "
                     "initialized; returning\n");
-        return 1;
+        return -EIO;
     }
     /*
      * copy the passed in iovec so that we can change some of its fields

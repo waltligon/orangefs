@@ -344,8 +344,7 @@ static ssize_t pvfs2_file_write(
         new_op->upcall.req.io.offset = *offset;
 
         /* copy data from application */
-        ret = pvfs_bufmap_copy_from_user(
-            buffer_index, current_buf, each_count);
+        ret = pvfs_bufmap_copy_from_user(buffer_index, current_buf, each_count);
         if(ret < 0)
         {
             pvfs2_print("Failed to copy user buffer.\n");

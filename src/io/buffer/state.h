@@ -13,7 +13,6 @@ int NCAC_extent_first_write_access(NCAC_req_t *req, struct extent *page);
 int NCAC_extent_read_comm_done(struct extent *page);
 int NCAC_extent_write_comm_done(struct extent *page);
 int NCAC_check_ioreq(struct extent *page);
-int NCAC_move_inactive_to_active(struct cache_stack *cache_stack,struct extent *page);
 int NCAC_extent_read_access_recheck(NCAC_req_t *req, struct extent *page,
                         unsigned int offset, unsigned int size);
 int NCAC_extent_write_access_recheck(NCAC_req_t *req, struct extent *page,

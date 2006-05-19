@@ -218,11 +218,19 @@ static ssize_t pvfs2_devreq_writev(
     unsigned long i = 0;
     static int max_downsize = MAX_ALIGNED_DEV_REQ_DOWNSIZE;
     int ret = 0, num_remaining = max_downsize;
+    int notrailer_count = 4; /* number of elements in the iovec without the trailer */
     int payload_size = 0;
     int32_t magic = 0;
     int32_t proto_ver = 0;
     uint64_t tag = 0;
 
+    /* Either there is a trailer or there isn't */
+    if (count != notrailer_count && count != (notrailer_count + 1))
+    {
+        pvfs2_error("Error: Number of iov vectors is (%ld) and notrailer count is %d\n",
+                count, notrailer_count);
+        return -EPROTO;
+    }
     buffer = dev_req_alloc();
     if (!buffer)
     {
@@ -230,7 +238,7 @@ static ssize_t pvfs2_devreq_writev(
     }
     ptr = buffer;
 
-    for (i = 0; i < count; i++)
+    for (i = 0; i < notrailer_count; i++)
     {
 	if (iov[i].iov_len > num_remaining)
 	{
@@ -299,6 +307,52 @@ static ssize_t pvfs2_devreq_writev(
 		pvfs2_print("writev: Ignoring %d bytes\n", payload_size);
 	    }
 
+            /* Do not allocate needlessly if client-core forgets to reset trailer size on op errors */
+            if (op->downcall.status == 0 && op->downcall.trailer_size > 0)
+            {
+                pvfs2_print("writev: trailer size %ld\n", (unsigned long) op->downcall.trailer_size);
+                if (count != (notrailer_count + 1))
+                {
+                    pvfs2_error("Error: trailer size (%ld) is non-zero, no trailer elements though? (%ld)\n",
+                            (unsigned long) op->downcall.trailer_size, count);
+                    dev_req_release(buffer);
+                    put_op(op);
+                    return -EPROTO;
+                }
+                if (iov[notrailer_count].iov_len > op->downcall.trailer_size)
+                {
+                    pvfs2_error("writev error: trailer size (%ld) != iov_len (%ld)\n",
+                            (unsigned long) op->downcall.trailer_size, 
+                            (unsigned long) iov[notrailer_count].iov_len);
+                    dev_req_release(buffer);
+                    put_op(op);
+                    return -EMSGSIZE;
+                }
+                /* Allocate a buffer large enough to hold the trailer bytes */
+                op->trailer_buf = (void *) vmalloc(op->downcall.trailer_size);
+                if (op->trailer_buf != NULL) 
+                {
+                    pvfs2_print("vmalloc: %p\n", op->trailer_buf);
+                    ret = copy_from_user(op->trailer_buf, iov[notrailer_count].iov_base,
+                            iov[notrailer_count].iov_len);
+                    if (ret)
+                    {
+                        pvfs2_error("Failed to copy trailer data from user space\n");
+                        dev_req_release(buffer);
+                        vfree(op->trailer_buf);
+                        pvfs2_print("vfree: %p\n", op->trailer_buf);
+                        op->trailer_buf = NULL;
+                        put_op(op);
+                        return -EIO;
+                    }
+                    op->trailer_size = op->downcall.trailer_size;
+                }
+                else {
+                    /* Change downcall status */
+                    op->downcall.status = -ENOMEM;
+                    pvfs2_error("writev: could not vmalloc for trailer!\n");
+                }
+            }
 
             /*
               if this operation is an I/O operation and if it was
@@ -439,6 +493,7 @@ static ssize_t pvfs2_devreq_writev(
 #endif
             else
             {
+                
                 /* tell the vfs op waiting on a waitqueue that this op is done */
                 spin_lock(&op->lock);
                 op->op_state = PVFS2_VFS_STATE_SERVICED;
@@ -767,7 +822,7 @@ void pvfs2_ioctl32_cleanup(void)
 
 #endif /* CONFIG_COMPAT */
 
-#ifndef HAVE_REGISTER_IOCTL32_CONVERSION
+#if (defined(CONFIG_COMPAT) && !defined(HAVE_REGISTER_IOCTL32_CONVERSION)) || !defined(CONFIG_COMPAT)
 int pvfs2_ioctl32_init(void)
 {
     return 0;

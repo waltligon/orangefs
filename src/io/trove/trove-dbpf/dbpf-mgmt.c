@@ -44,8 +44,6 @@ extern gen_mutex_t dbpf_attr_cache_mutex;
 int dbpf_method_id = -1;
 char dbpf_method_name[] = "dbpf";
 
-extern int dbpf_thread_initialize(void);
-
 struct dbpf_storage *my_storage_p = NULL;
 static int db_open_count, db_close_count;
 

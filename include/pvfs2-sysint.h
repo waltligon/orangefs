@@ -141,9 +141,9 @@ typedef struct PVFS_sysresp_io_s PVFS_sysresp_io;
 struct PVFS_sysresp_readdir_s
 {
     PVFS_ds_position token;
-    uint64_t directory_version;
-    int32_t pvfs_dirent_outcount; /* int32_t for portable, fixed size structure */
     PVFS_dirent *dirent_array;
+    uint32_t pvfs_dirent_outcount; /* uint32_t for portable, fixed size structure */
+    uint64_t directory_version;
 };
 typedef struct PVFS_sysresp_readdir_s PVFS_sysresp_readdir;
 
@@ -154,9 +154,9 @@ typedef struct PVFS_sysresp_readdir_s PVFS_sysresp_readdir;
 struct PVFS_sysresp_readdirplus_s
 {
     PVFS_ds_position token;
-    uint64_t       directory_version;
-    int32_t        pvfs_dirent_outcount; /* int32_t for portable, fixed size structure */
     PVFS_dirent   *dirent_array;
+    uint32_t        pvfs_dirent_outcount; /* uint32_t for portable, fixed size structure */
+    uint64_t       directory_version;
     PVFS_error    *stat_err_array; 
     PVFS_sys_attr *attr_array;
 };

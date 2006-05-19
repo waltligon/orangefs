@@ -77,7 +77,19 @@ static int conditional_remove_sm_if_in_completion_list(
     {
         if (s_completion_list[i] == sm_p)
         {
-            s_completion_list[i] = NULL;
+            if(i == (s_completion_list_index - 1))
+            {
+                /* we're at the end, so just set last sm to null */
+                s_completion_list[i] = NULL;
+            }
+            else
+            {
+                memmove(s_completion_list[i],
+                        s_completion_list[i+1],
+                        (s_completion_list_index - (i + 1)) *
+                        sizeof(PINT_client_sm *));
+            }
+            s_completion_list_index--;
             found = 1;
             break;
         }
