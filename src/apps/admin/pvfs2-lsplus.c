@@ -337,7 +337,6 @@ void print_entry_attr(
         {
             printf("%s\n",buf);
         }
-        free(attr->link_target);
     }
     else
     {
