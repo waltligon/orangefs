@@ -1686,7 +1686,6 @@ static unsigned long encode_readdir_to_buffer(char *ptr, PVFS_sysresp_readdir *r
 static int copy_dirents_to_downcall(vfs_request_t *vfs_request)
 {
     int ret = 0;
-    PVFS_sysresp_readdir rd;
     /* get a buffer for xfer of dirents */
     vfs_request->io_kernel_mapped_buf = 
         PINT_dev_get_mapped_buffer(BM_READDIR, s_io_desc, 
@@ -1729,7 +1728,6 @@ static unsigned long encode_readdirplus_to_buffer(char *ptr, PVFS_sysresp_readdi
 static int copy_direntplus_to_downcall(vfs_request_t *vfs_request)
 {
     int i, ret = 0;
-    PVFS_sysresp_readdirplus rd;
     /* get a buffer for xfer of direntplus */
     vfs_request->io_kernel_mapped_buf = 
         PINT_dev_get_mapped_buffer(BM_READDIR, s_io_desc, 

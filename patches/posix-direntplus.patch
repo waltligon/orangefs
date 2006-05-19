@@ -46,7 +46,7 @@ diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vani
  		.quad ni_syscall
 diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/fs/readdir.c vanilla-new/fs/readdir.c
 --- vanilla/fs/readdir.c	2006-03-19 23:53:29.000000000 -0600
-+++ vanilla-new/fs/readdir.c	2006-05-13 15:06:27.000000000 -0500
++++ vanilla-new/fs/readdir.c	2006-05-18 19:25:06.000000000 -0500
 @@ -43,6 +43,32 @@
  
  EXPORT_SYMBOL(vfs_readdir);
@@ -80,7 +80,7 @@ diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vani
  /*
   * Traditional linux readdir() handling..
   *
-@@ -212,6 +238,110 @@
+@@ -212,6 +238,111 @@
  	return error;
  }
  
@@ -176,10 +176,11 @@ diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vani
 +	error = buf.error;
 +	lastdirent = buf.previous;
 +	if (lastdirent) {
-+		if (put_user(file->f_pos, &lastdirent->dp_dirent.d_off))
-+			error = -EFAULT;
-+		else
-+			error = count - buf.count;
++		typeof(lastdirent->dp_dirent.d_off) d_off = file->f_pos;
++		error = -EFAULT;
++		if (__put_user(d_off, &lastdirent->dp_dirent.d_off))
++			goto out_putf;
++		error = count - buf.count;
 +	}
 +
 +out_putf:
@@ -191,7 +192,7 @@ diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vani
  #define ROUND_UP64(x) (((x)+sizeof(u64)-1) & ~(sizeof(u64)-1))
  
  struct getdents_callback64 {
-@@ -298,3 +428,101 @@
+@@ -298,3 +429,105 @@
  out:
  	return error;
  }
@@ -229,7 +230,11 @@ diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vani
 +	else {
 +		if (__put_user(err, &dirent->dp_stat_err))
 +			goto efault;
++#ifdef __ARCH_WANT_STAT64
 +		if (cp_new_stat64(statp, &dirent->dp_stat))
++#else
++		if (cp_new_stat(statp, &dirent->dp_stat))
++#endif
 +			goto efault;
 +	}
 +	if (__put_user(ino, &dirent->dp_dirent.d_ino))
@@ -332,6 +337,38 @@ diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vani
  {
  	struct stat64_lite tmp;
  
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/include/asm-i386/dirent.h vanilla-new/include/asm-i386/dirent.h
+--- vanilla/include/asm-i386/dirent.h	1969-12-31 18:00:00.000000000 -0600
++++ vanilla-new/include/asm-i386/dirent.h	2006-05-18 19:25:26.000000000 -0500
+@@ -0,0 +1,28 @@
++#ifndef _I386_DIRENT_H
++#define _I386_DIRENT_H
++
++#include <asm/stat.h>
++
++struct dirent_plus {
++	struct stat   dp_stat;
++	int           dp_stat_err;
++	struct dirent dp_dirent;
++};
++
++struct dirent64_plus {
++	struct stat64   dp_stat;
++	int             dp_stat_err;
++	struct dirent64 dp_dirent;
++};
++
++#ifdef __KERNEL__
++
++struct linux_dirent64_plus {
++	struct stat64         dp_stat;
++	int                   dp_stat_err;
++	struct linux_dirent64 dp_dirent;
++};
++
++#endif
++
++#endif
 diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/include/asm-i386/unistd.h vanilla-new/include/asm-i386/unistd.h
 --- vanilla/include/asm-i386/unistd.h	2006-05-09 18:53:48.000000000 -0500
 +++ vanilla-new/include/asm-i386/unistd.h	2006-05-11 14:00:29.000000000 -0500
@@ -384,6 +421,38 @@ diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vani
  
  #ifdef __KERNEL__
  #define __NR__exit __NR_exit
+diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/include/asm-x86_64/dirent.h vanilla-new/include/asm-x86_64/dirent.h
+--- vanilla/include/asm-x86_64/dirent.h	1969-12-31 18:00:00.000000000 -0600
++++ vanilla-new/include/asm-x86_64/dirent.h	2006-05-18 19:25:47.000000000 -0500
+@@ -0,0 +1,28 @@
++#ifndef _ASM_X86_64_DIRENT_H
++#define _ASM_X86_64_DIRENT_H
++
++#include <asm/stat.h>
++
++struct dirent_plus {
++	struct stat   dp_stat;
++	int           dp_stat_err;
++	struct dirent dp_dirent;
++};
++
++struct dirent64_plus {
++	struct stat     dp_stat;
++	int             dp_stat_err;
++	struct dirent64 dp_dirent;
++};
++
++#ifdef __KERNEL__
++
++struct linux_dirent64_plus {
++	struct stat           dp_stat;
++	int                   dp_stat_err;
++	struct linux_dirent64 dp_dirent;
++};
++
++#endif
++
++#endif
 diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/include/asm-x86_64/unistd.h vanilla-new/include/asm-x86_64/unistd.h
 --- vanilla/include/asm-x86_64/unistd.h	2006-05-09 18:53:48.000000000 -0500
 +++ vanilla-new/include/asm-x86_64/unistd.h	2006-05-11 14:04:27.000000000 -0500
@@ -403,52 +472,26 @@ diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vani
  
 diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/include/linux/dirent.h vanilla-new/include/linux/dirent.h
 --- vanilla/include/linux/dirent.h	2006-03-19 23:53:29.000000000 -0600
-+++ vanilla-new/include/linux/dirent.h	2006-05-11 13:29:07.000000000 -0500
-@@ -1,6 +1,8 @@
- #ifndef _LINUX_DIRENT_H
- #define _LINUX_DIRENT_H
++++ vanilla-new/include/linux/dirent.h	2006-05-18 19:29:03.000000000 -0500
+@@ -28,5 +28,6 @@
  
-+#include <linux/stat.h>
-+
- struct dirent {
- 	long		d_ino;
- 	__kernel_off_t	d_off;
-@@ -16,6 +18,18 @@
- 	char		d_name[256];
- };
- 
-+struct dirent_plus {
-+	struct stat   dp_stat;
-+	int           dp_stat_err;
-+	struct dirent dp_dirent;
-+};
-+
-+struct dirent64_plus {
-+	struct stat64   dp_stat;
-+	int             dp_stat_err;
-+	struct dirent64 dp_dirent;
-+};
-+
- #ifdef __KERNEL__
- 
- struct linux_dirent64 {
-@@ -26,6 +40,12 @@
- 	char		d_name[0];
- };
- 
-+struct linux_dirent64_plus {
-+	struct stat64         dp_stat;
-+	int                   dp_stat_err;
-+	struct linux_dirent64 dp_dirent;
-+};
-+
  #endif	/* __KERNEL__ */
  
++#include <asm/dirent.h>
  
+ #endif
 diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vanilla/include/linux/fs.h vanilla-new/include/linux/fs.h
 --- vanilla/include/linux/fs.h	2006-05-09 18:53:48.000000000 -0500
-+++ vanilla-new/include/linux/fs.h	2006-05-13 15:05:24.000000000 -0500
-@@ -951,6 +951,13 @@
++++ vanilla-new/include/linux/fs.h	2006-05-18 19:28:16.000000000 -0500
+@@ -9,6 +9,7 @@
+ #include <linux/config.h>
+ #include <linux/limits.h>
+ #include <linux/ioctl.h>
++#include <linux/unistd.h>
+ 
+ /*
+  * It's silly to have NR_OPEN bigger than NR_FILE, but you can change
+@@ -951,6 +952,13 @@
   */
  typedef int (*filldir_t)(void *, const char *, int, loff_t, ino_t, unsigned);
  
@@ -462,7 +505,7 @@ diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vani
  struct block_device_operations {
  	int (*open) (struct inode *, struct file *);
  	int (*release) (struct inode *, struct file *);
-@@ -1025,6 +1032,7 @@
+@@ -1025,6 +1033,7 @@
  	ssize_t (*write) (struct file *, const char __user *, size_t, loff_t *);
  	ssize_t (*aio_write) (struct kiocb *, const char __user *, size_t, loff_t);
  	int (*readdir) (struct file *, void *, filldir_t);
@@ -470,7 +513,7 @@ diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vani
  	unsigned int (*poll) (struct file *, struct poll_table_struct *);
  	int (*ioctl) (struct inode *, struct file *, unsigned int, unsigned long);
  	long (*unlocked_ioctl) (struct file *, unsigned int, unsigned long);
-@@ -1712,7 +1720,11 @@
+@@ -1712,7 +1721,13 @@
  void inode_set_bytes(struct inode *inode, loff_t bytes);
  
  extern int vfs_readdir(struct file *, filldir_t, void *);
@@ -478,8 +521,10 @@ diff -Naur --exclude-from=/home/vilayann/redhat/BUILD/kernel-2.6.16/exclude vani
 +extern int vfs_readdirplus(struct file *, filldirplus_t, void *);
 +extern int cp_new_stat(struct kstat *stat, struct stat __user *statbuf);
 +extern int cp_new_statlite(struct kstat_lite *stat_lite, struct stat_lite __user *statlitebuf);
++#ifdef __ARCH_WANT_STAT64
 +extern long cp_new_stat64(struct kstat *stat, struct stat64 __user *statbuf);
 +extern long cp_new_stat64_lite(struct kstat_lite *stat_lite, struct stat64_lite __user *statlitebuf);
++#endif
  extern int vfs_stat(char __user *, struct kstat *);
  extern int vfs_statlite(char __user *, struct kstat_lite *);
  extern int vfs_lstat(char __user *, struct kstat *);

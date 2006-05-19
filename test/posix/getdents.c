@@ -242,7 +242,8 @@ static inline void format_size_string(
 
 void print_entry_stat64(
     char *entry_name,
-    struct stat64 *attr)
+    struct stat64 *attr,
+	 const char *link_target)
 {
     char buf[128] = {0}, *formatted_size = NULL;
     char *formatted_owner = NULL, *formatted_group = NULL;
@@ -307,6 +308,7 @@ void print_entry_stat64(
         f_type =  'l';
     }
 
+	 if (link_target == NULL)
     snprintf(buf,128,"%s%c%c%c%c%c%c%c%c%c%c    1 %s %s %s "
              "%.4d-%.2d-%.2d %.2d:%.2d %s",
              inode,
@@ -329,6 +331,30 @@ void print_entry_stat64(
              (time->tm_hour),
              (time->tm_min),
              entry_name);
+	 else 
+		 snprintf(buf,128,"%s%c%c%c%c%c%c%c%c%c%c    1 %s %s %s "
+					 "%.4d-%.2d-%.2d %.2d:%.2d %s -> %s",
+					 inode,
+					 f_type,
+					 ((attr->st_mode & S_IRUSR) ? 'r' : '-'),
+					 ((attr->st_mode & S_IWUSR) ? 'w' : '-'),
+					 ((attr->st_mode & S_IXUSR) ? 'x' : '-'),
+					 ((attr->st_mode & S_IRGRP) ? 'r' : '-'),
+					 ((attr->st_mode & S_IWGRP) ? 'w' : '-'),
+					 group_x_char,
+					 ((attr->st_mode & S_IROTH) ? 'r' : '-'),
+					 ((attr->st_mode & S_IWOTH) ? 'w' : '-'),
+					 ((attr->st_mode & S_IXOTH) ? 'x' : '-'),
+					 formatted_owner,
+					 formatted_group,
+					 formatted_size,
+					 (time->tm_year + 1900),
+					 (time->tm_mon + 1),
+					 time->tm_mday,
+					 (time->tm_hour),
+					 (time->tm_min),
+					 entry_name, link_target);
+
 
     if (formatted_size)
     {
@@ -347,7 +373,7 @@ void print_entry_stat64(
 
 void print_entry_stat(
     char *entry_name,
-    struct stat *attr)
+    struct stat *attr, const char *link_target)
 {
     char buf[128] = {0}, *formatted_size = NULL;
     char *formatted_owner = NULL, *formatted_group = NULL;
@@ -412,6 +438,7 @@ void print_entry_stat(
         f_type =  'l';
     }
 
+	 if (link_target == NULL)
     snprintf(buf,128,"%s%c%c%c%c%c%c%c%c%c%c    1 %s %s %s "
              "%.4d-%.2d-%.2d %.2d:%.2d %s",
              inode,
@@ -434,6 +461,30 @@ void print_entry_stat(
              (time->tm_hour),
              (time->tm_min),
              entry_name);
+	 else
+    snprintf(buf,128,"%s%c%c%c%c%c%c%c%c%c%c    1 %s %s %s "
+             "%.4d-%.2d-%.2d %.2d:%.2d %s -> %s",
+             inode,
+             f_type,
+             ((attr->st_mode & S_IRUSR) ? 'r' : '-'),
+             ((attr->st_mode & S_IWUSR) ? 'w' : '-'),
+             ((attr->st_mode & S_IXUSR) ? 'x' : '-'),
+             ((attr->st_mode & S_IRGRP) ? 'r' : '-'),
+             ((attr->st_mode & S_IWGRP) ? 'w' : '-'),
+             group_x_char,
+             ((attr->st_mode & S_IROTH) ? 'r' : '-'),
+             ((attr->st_mode & S_IWOTH) ? 'w' : '-'),
+             ((attr->st_mode & S_IXOTH) ? 'x' : '-'),
+             formatted_owner,
+             formatted_group,
+             formatted_size,
+             (time->tm_year + 1900),
+             (time->tm_mon + 1),
+             time->tm_mday,
+             (time->tm_hour),
+             (time->tm_min),
+             entry_name, link_target);
+
 
     if (formatted_size)
     {
@@ -452,7 +503,7 @@ void print_entry_stat(
 
 void print_entry_kernel_stat(
     char *entry_name,
-    struct kernel_stat *attr)
+    struct kernel_stat *attr, const char *link_target)
 {
     char buf[128] = {0}, *formatted_size = NULL;
     char *formatted_owner = NULL, *formatted_group = NULL;
@@ -517,6 +568,7 @@ void print_entry_kernel_stat(
         f_type =  'l';
     }
 
+	 if (link_target == NULL)
     snprintf(buf,128,"%s%c%c%c%c%c%c%c%c%c%c    1 %s %s %s "
              "%.4d-%.2d-%.2d %.2d:%.2d %s",
              inode,
@@ -539,6 +591,29 @@ void print_entry_kernel_stat(
              (time->tm_hour),
              (time->tm_min),
              entry_name);
+	 else
+    snprintf(buf,128,"%s%c%c%c%c%c%c%c%c%c%c    1 %s %s %s "
+             "%.4d-%.2d-%.2d %.2d:%.2d %s -> %s",
+             inode,
+             f_type,
+             ((attr->st_mode & S_IRUSR) ? 'r' : '-'),
+             ((attr->st_mode & S_IWUSR) ? 'w' : '-'),
+             ((attr->st_mode & S_IXUSR) ? 'x' : '-'),
+             ((attr->st_mode & S_IRGRP) ? 'r' : '-'),
+             ((attr->st_mode & S_IWGRP) ? 'w' : '-'),
+             group_x_char,
+             ((attr->st_mode & S_IROTH) ? 'r' : '-'),
+             ((attr->st_mode & S_IWOTH) ? 'w' : '-'),
+             ((attr->st_mode & S_IXOTH) ? 'x' : '-'),
+             formatted_owner,
+             formatted_group,
+             formatted_size,
+             (time->tm_year + 1900),
+             (time->tm_mon + 1),
+             time->tm_mday,
+             (time->tm_hour),
+             (time->tm_min),
+             entry_name, link_target);
 
     if (formatted_size)
     {
@@ -570,6 +645,7 @@ static int path_walk(struct files *root_filp)
 	struct stat64 stat64buf;
 	static int invoke_count = 0;
 	int is_dir;
+	char link_target[NAME_MAX], *lnk = NULL;
 
 	invoke_count++;
 	ret = 0;
@@ -619,10 +695,10 @@ static int path_walk(struct files *root_filp)
 			if (invoke_count > 1 && recurse == 0) {
 				ret = 0;
 				if (use_64) {
-					print_entry_stat64(root_filp->name, &stat64buf);
+					print_entry_stat64(root_filp->name, &stat64buf, NULL);
 				}
 				else {
-					print_entry_stat(root_filp->name, &statbuf);
+					print_entry_stat(root_filp->name, &statbuf, NULL);
 				}
 				goto err;
 			}
@@ -790,10 +866,18 @@ static int path_walk(struct files *root_filp)
 					/* As long as it is not . or .. recurse */
 					if (strcmp(next64->dp_dirent.d_name, ".") && strcmp(next64->dp_dirent.d_name, "..")) 
 					{
+						lnk = NULL;
+						if (S_ISLNK(next64->dp_stat.st_mode))
+						{
+							char fname[NAME_MAX];
+							snprintf(fname, NAME_MAX, "%s/%s", root_filp->name, next64->dp_dirent.d_name);
+							readlink(fname, link_target, NAME_MAX);
+							lnk = link_target;
+						}
 #if defined(__i386__) || defined(__i486__) || defined(__i586__) || defined(__i686__)
-						print_entry_stat64(next64->dp_dirent.d_name, &next64->dp_stat);
+						print_entry_stat64(next64->dp_dirent.d_name, &next64->dp_stat, lnk);
 #elif defined (x86_64) || defined (__x86_64__)
-						print_entry_kernel_stat(next64->dp_dirent.d_name, &next64->dp_stat);
+						print_entry_kernel_stat(next64->dp_dirent.d_name, &next64->dp_stat, lnk);
 #endif
 						if (recurse && S_ISDIR(next64->dp_stat.st_mode))
 						{
@@ -815,7 +899,15 @@ static int path_walk(struct files *root_filp)
 					/* As long as it is not . or .. recurse */
 					if (strcmp(next->dp_dirent.d_name, ".") && strcmp(next->dp_dirent.d_name, "..")) 
 					{
-						print_entry_kernel_stat(next->dp_dirent.d_name, &next->dp_stat);
+						lnk = NULL;
+						if (S_ISLNK(next->dp_stat.st_mode))
+						{
+							char fname[NAME_MAX];
+							snprintf(fname, NAME_MAX, "%s/%s", root_filp->name, next->dp_dirent.d_name);
+							readlink(fname, link_target, NAME_MAX);
+							lnk = link_target;
+						}
+						print_entry_kernel_stat(next->dp_dirent.d_name, &next->dp_stat, lnk);
 						if (recurse && S_ISDIR(next->dp_stat.st_mode))
 						{
 							filp = (struct files *)calloc(1, sizeof(struct files));
@@ -839,10 +931,24 @@ static int path_walk(struct files *root_filp)
 	/* or are we looking at a regular file? */
 	else {
 		if (use_direntplus == 0) {
-			if (use_64)
-				print_entry_stat64(root_filp->name, &stat64buf);
-			else
-				print_entry_stat(root_filp->name, &statbuf);
+			if (use_64) {
+				lnk = NULL;
+				if (S_ISLNK(stat64buf.st_mode))
+				{
+					readlink(root_filp->name, link_target, NAME_MAX);
+					lnk = link_target;
+				}
+				print_entry_stat64(root_filp->name, &stat64buf, lnk);
+			}
+			else {
+				lnk = NULL;
+				if (S_ISLNK(statbuf.st_mode))
+				{
+					readlink(root_filp->name, link_target, NAME_MAX);
+					lnk = link_target;
+				}
+				print_entry_stat(root_filp->name, &statbuf, lnk);
+			}
 		}
 	} 
 err:
