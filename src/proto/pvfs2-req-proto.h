@@ -953,7 +953,7 @@ struct PVFS_servreq_small_io
     PVFS_offset offsets[SMALL_IO_MAX_SEGMENTS];
     PVFS_size sizes[SMALL_IO_MAX_SEGMENTS];
 
-    uint32_t total_bytes;
+    PVFS_size total_bytes; /* changed from int32_t */
     void * buffer;
 };
 
@@ -968,7 +968,7 @@ struct PVFS_servreq_small_io
     encode_PINT_Request(pptr, &(x)->file_req); \
     encode_PVFS_offset(pptr, &(x)->file_req_offset); \
     encode_PVFS_size(pptr, &(x)->aggregate_size); \
-    encode_uint32_t(pptr, &(x)->total_bytes); \
+    encode_PVFS_size(pptr, &(x)->total_bytes); \
     encode_skip4(pptr,); \
     if ((x)->io_type == PVFS_IO_WRITE) \
     { \
@@ -994,7 +994,7 @@ struct PVFS_servreq_small_io
     PINT_request_decode((x)->file_req); /* unpacks the pointers */ \
     decode_PVFS_offset(pptr, &(x)->file_req_offset); \
     decode_PVFS_size(pptr, &(x)->aggregate_size); \
-    decode_uint32_t(pptr, &(x)->total_bytes); \
+    decode_PVFS_size(pptr, &(x)->total_bytes); \
     decode_skip4(pptr,); \
     if ((x)->io_type == PVFS_IO_WRITE) \
     { \
