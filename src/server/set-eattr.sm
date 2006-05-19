@@ -102,8 +102,6 @@ static int seteattr_verify_eattribs(
     char reserved_prefix[] = "system.pvfs2.";
     int reserved_prefix_len = strlen("system.pvfs2.");
 
-    PINT_STATE_DEBUG("verify_eattribs");
-
     a_p = &s_op->attr;
 
     js_p->error_code = 0;
@@ -163,8 +161,6 @@ static int seteattr_setobj_eattribs(
     job_id_t j_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
 
-    PINT_STATE_DEBUG("seteattr_setobj_eattribs");
-
     gossip_debug(
         GOSSIP_SETEATTR_DEBUG,
         "  writing keylist [%llu,%d,len %d flags %d]\n",
@@ -180,8 +176,11 @@ static int seteattr_setobj_eattribs(
     {
         trove_flags = TROVE_ONLYOVERWRITE;
     }
-    trove_flags |= PINT_config_get_trove_sync_meta(user_opts, 
-            s_op->req->u.seteattr.fs_id);
+    trove_flags |= 
+        PINT_config_get_trove_sync_meta(
+            user_opts, s_op->req->u.seteattr.fs_id) |
+        PINT_config_get_trove_meta_flags(
+            user_opts, s_op->req->u.seteattr.fs_id);
 
     ret = job_trove_keyval_write_list(
         s_op->req->u.seteattr.fs_id,
@@ -213,7 +212,6 @@ static int seteattr_setobj_eattribs(
  */
 static int seteattr_cleanup(PINT_server_op *s_op, job_status_s *js_p)
 {
-    PINT_STATE_DEBUG("seteattr_cleanup");
     /* do I need to free memory from decoding key and val?*/
     return(server_state_machine_complete(s_op));
 }

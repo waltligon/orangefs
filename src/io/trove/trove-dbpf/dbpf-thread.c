@@ -18,6 +18,7 @@
 #include "dbpf-bstream.h"
 #include "dbpf-op-queue.h"
 
+
 extern struct qlist_head dbpf_op_queue;
 extern gen_mutex_t dbpf_op_queue_mutex;
 extern dbpf_op_queue_p dbpf_completion_queue_array[TROVE_MAX_CONTEXTS];
@@ -172,7 +173,12 @@ int dbpf_do_one_work_cycle(int *out_count)
         gossip_debug(GOSSIP_TROVE_OP_DEBUG,"***** STARTING TROVE "
                      "SERVICE ROUTINE (%s) *****\n",
                      dbpf_op_type_to_str(cur_op->op.type));
+
+        /* we don't need to keep the queue locked while servicing */
+        gen_mutex_unlock(&dbpf_op_queue_mutex);
         ret = cur_op->op.svc_fn(&(cur_op->op));
+        gen_mutex_lock(&dbpf_op_queue_mutex);
+
         gossip_debug(GOSSIP_TROVE_OP_DEBUG,"***** FINISHED TROVE "
                      "SERVICE ROUTINE (%s) *****\n",
                      dbpf_op_type_to_str(cur_op->op.type));

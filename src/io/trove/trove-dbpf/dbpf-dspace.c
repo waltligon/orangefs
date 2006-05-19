@@ -396,6 +396,7 @@ static int dbpf_dspace_remove_op_svc(struct dbpf_op *op_p)
     /* we still do a non-coalesced sync of the keyval db here
      * because we're in a dspace operation
      */
+    DBPF_DB_SYNC_IF_NECESSARY(op_p, op_p->coll_p->keyval_db, ret);
     if(ret < 0)
     {
         goto return_error;

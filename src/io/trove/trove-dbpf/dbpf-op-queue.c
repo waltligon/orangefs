@@ -6,6 +6,9 @@
 
 #include "dbpf-op-queue.h"
 #include "gossip.h"
+#include "pint-perf-counter.h"
+
+extern struct PINT_perf_counter *PINT_server_pc;
 
 /* the queue that stores pending serviceable operations */
 QLIST_HEAD(dbpf_op_queue);
@@ -25,6 +28,13 @@ static QLIST_HEAD(s_dspace_sync_queue);
 
 static int s_high_watermark = 8;
 static int s_low_watermark = 2;
+
+static int dbpf_queued_op_sync_coalesce_op_complete(
+    dbpf_queued_op_t * qop_p);
+
+extern dbpf_op_queue_p dbpf_completion_queue_array[TROVE_MAX_CONTEXTS];
+extern gen_mutex_t *dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
+extern pthread_cond_t dbpf_op_completed_cond;
 
 #ifdef __PVFS2_TROVE_THREADED__
 extern pthread_cond_t dbpf_op_incoming_cond;
@@ -96,6 +106,10 @@ void dbpf_op_queue_cleanup(dbpf_op_queue_p op_queue)
 void dbpf_op_queue_add(dbpf_op_queue_p op_queue,
                        dbpf_queued_op_t *dbpf_op)
 {
+    gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG, 
+                 "op_queue add: %p\n",
+                 dbpf_op);
+
     qlist_add_tail(&dbpf_op->link, op_queue);
 }
 
@@ -111,20 +125,9 @@ int dbpf_op_queue_empty(dbpf_op_queue_p op_queue)
 
 dbpf_queued_op_t *dbpf_op_queue_shownext(dbpf_op_queue_p op_queue)
 {
-    dbpf_queued_op_t *next = NULL;
     while (op_queue->next != op_queue)
     {
-        next = qlist_entry(op_queue->next, dbpf_queued_op_t, link);
-
-        /* skip ops in the queue that just need to be synced */
-        if(next->op.state == OP_SYNC_QUEUED) 
-        {
-            op_queue = op_queue->next;
-        }
-        else
-        {
-            return next;
-        }
+        return qlist_entry(op_queue->next, dbpf_queued_op_t, link);
     }
     return NULL;
 }
@@ -348,21 +351,18 @@ int dbpf_queue_or_service(
 int dbpf_queued_op_sync_coalesce_enqueue(
     dbpf_queued_op_t *qop_p)
 {
+    gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
+                 "[SYNC_COALESCE]: enqueue called\n");
+
     /* only perform check if operation does modifications that require sync */
     if(!DBPF_OP_DOES_SYNC(qop_p->op.type))
     {
         return 0;
     }
 
-    /* only perform check if operation is either keyval or dspace */
-    if(!DBPF_OP_IS_KEYVAL(qop_p->op.type) && 
-       !DBPF_OP_IS_DSPACE(qop_p->op.type))
-    {
-        return 0;
-    }
-
     /* only perform check if operation sync coalesce is enabled */
-    if(qop_p->op.flags == TROVE_KEYVAL_SYNC_COALESCE)
+    if(DBPF_OP_IS_KEYVAL(qop_p->op.type) &&
+       (qop_p->op.flags & TROVE_KEYVAL_SYNC_COALESCE))
     {
         gen_mutex_lock(&s_keyval_sync_mutex);
         s_keyval_sync_counter++;
@@ -372,9 +372,15 @@ int dbpf_queued_op_sync_coalesce_enqueue(
              * to be coalesced when syncing */
             qop_p->stats.coalesce_sync = 1;
         }
+
+        gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
+                     "[SYNC_COALESCE]: enqueue keyval counter: %d\n",
+                     s_keyval_sync_counter);
+
         gen_mutex_unlock(&s_keyval_sync_mutex);
     }
-    else if(qop_p->op.flags == TROVE_DSPACE_SYNC_COALESCE)
+    else if(DBPF_OP_IS_DSPACE(qop_p->op.type) &&
+            (qop_p->op.flags & TROVE_DSPACE_SYNC_COALESCE))
     {
         gen_mutex_lock(&s_dspace_sync_mutex);
         s_dspace_sync_counter++;
@@ -384,6 +390,11 @@ int dbpf_queued_op_sync_coalesce_enqueue(
              * to be coalesced when syncing */
             qop_p->stats.coalesce_sync = 1;
         }
+
+        gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
+                     "[SYNC_COALESCE]: enqueue dspace counter: %d\n",
+                     s_dspace_sync_counter);
+
         gen_mutex_unlock(&s_dspace_sync_mutex);
     }
 
@@ -393,31 +404,39 @@ int dbpf_queued_op_sync_coalesce_enqueue(
 int dbpf_queued_op_sync_coalesce_dequeue(
     dbpf_queued_op_t *qop_p)
 {
+    gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
+                 "[SYNC_COALESCE]: dequeue called\n");
+
     /* only perform check if operation does modifications that require sync */
     if(!DBPF_OP_DOES_SYNC(qop_p->op.type))
     {
         return 0;
     }
 
-    /* only perform check if operation is either keyval or dspace */
-    if(!DBPF_OP_IS_KEYVAL(qop_p->op.type) &&
-       !DBPF_OP_IS_DSPACE(qop_p->op.type))
-    {
-        return 0;
-    }
-
     /* only perform check if operation sync coalesce is enabled */
-    if(qop_p->op.flags == TROVE_KEYVAL_SYNC_COALESCE)
+    if(DBPF_OP_IS_KEYVAL(qop_p->op.type) &&
+       (qop_p->op.flags & TROVE_KEYVAL_SYNC_COALESCE))
     {
         gen_mutex_lock(&s_keyval_sync_mutex);
         s_keyval_sync_counter--;
+
+        gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
+                     "[SYNC_COALESCE]: dequeue keyval counter: %d\n",
+                     s_keyval_sync_counter);
+
         gen_mutex_unlock(&s_keyval_sync_mutex);
     }
     
-    if(qop_p->op.flags == TROVE_DSPACE_SYNC_COALESCE)
+    if(DBPF_OP_IS_DSPACE(qop_p->op.type) &&
+       (qop_p->op.flags & TROVE_DSPACE_SYNC_COALESCE))
     {
         gen_mutex_lock(&s_dspace_sync_mutex);
         s_dspace_sync_counter--;
+
+        gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
+                     "[SYNC_COALESCE]: dequeue dspace counter: %d\n",
+                     s_dspace_sync_counter);
+
         gen_mutex_unlock(&s_dspace_sync_mutex);
     }
 
@@ -432,17 +451,10 @@ int dbpf_queued_op_sync_coalesce_db_ops(
     int * coalesce_counter;
     gen_mutex_t * mutex;
     DB * dbp;
-    struct qlist_head * coalesce_queue;
+    dbpf_op_queue_p coalesce_queue;
 
-    struct qlist_head * ready_op_link;
     dbpf_queued_op_t *ready_op;
-
-    if(!DBPF_OP_IS_KEYVAL(qop_p->op.type) &&
-       !DBPF_OP_IS_DSPACE(qop_p->op.type))
-    {
-        return -TROVE_ENOSYS;
-    }
-    
+   
     if(DBPF_OP_IS_KEYVAL(qop_p->op.type))
     {
         dbp = qop_p->op.coll_p->keyval_db;
@@ -450,6 +462,9 @@ int dbpf_queued_op_sync_coalesce_db_ops(
         coalesce_counter = &s_keyval_coalesce_counter;
         mutex = &s_keyval_sync_mutex;
         coalesce_queue = &s_keyval_sync_queue;
+        gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
+                     "[SYNC_COALESCE]: coalescing keyval ops\n");
+
     }
     else if(DBPF_OP_IS_DSPACE(qop_p->op.type))
     {
@@ -458,10 +473,23 @@ int dbpf_queued_op_sync_coalesce_db_ops(
         coalesce_counter = &s_dspace_coalesce_counter;
         mutex = &s_dspace_sync_mutex;
         coalesce_queue = &s_dspace_sync_queue;
+        gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
+                     "[SYNC_COALESCE]: coalescing dspace ops\n");
+    }
+    else
+    {
+        return -TROVE_ENOSYS;
     }
     
     if(!qop_p->stats.coalesce_sync)
     {
+        gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
+                     "[SYNC_COALESCE]:\toperation synced "
+                     "individually (not coalesced)\n"
+                     "\t\tcoalesced: %d\n\t\tqueued: %d\n",
+                     *coalesce_counter,
+                     sync_counter);
+
         /* do sync right now */
         DBPF_DB_SYNC_IF_NECESSARY((&qop_p->op), dbp, ret);
         if(ret < 0)
@@ -483,6 +511,12 @@ int dbpf_queued_op_sync_coalesce_db_ops(
     if(*coalesce_counter > s_high_watermark ||
        sync_counter < s_low_watermark)
     {
+        gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
+                     "[SYNC_COALESCE]:\thigh or low watermark reached:\n"
+                     "\t\tcoalesced: %d\n\t\tqueued: %d\n",
+                     *coalesce_counter,
+                     sync_counter);
+
         /* sync this operation and signal completion of the others
          * waiting to be synced
          */
@@ -492,41 +526,35 @@ int dbpf_queued_op_sync_coalesce_db_ops(
             return ret;
         }
 
-        ret = dbpf_queued_op_complete(qop_p, 0, OP_COMPLETED);
-        if(ret < 0)
-        {
-            return ret;
-        }
+        dbpf_queued_op_sync_coalesce_op_complete(qop_p);
 
         /* move remaining ops in queue with ready-to-be-synced state
          * to completion queue
          */
-        qlist_for_each(ready_op_link, coalesce_queue)
+        while(!dbpf_op_queue_empty(coalesce_queue))
         {
-            ready_op = qlist_entry(ready_op_link,
-                                   dbpf_queued_op_t,
-                                   link);
-            if(ready_op->op.state == OP_SYNC_QUEUED)
-            {
-                (*coalesce_counter)--;
-                ret = dbpf_queued_op_complete(ready_op, 0, OP_COMPLETED);
-                if(ret < 0)
-                {
-                    return ret;
-                }
-            }
+            ready_op = dbpf_op_queue_shownext(coalesce_queue);
+            dbpf_op_queue_remove(ready_op);
+            dbpf_queued_op_sync_coalesce_op_complete(ready_op);
+            (*coalesce_counter)--;
         }
 
-        /* remove all entries on the coalesce_queue */
-        INIT_QLIST_HEAD(coalesce_queue);
+        pthread_cond_signal(&dbpf_op_completed_cond);
 
         ret = 1;
     }
     else
     {
+        gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
+                     "[SYNC_COALESCE]:\tputting on coalescing queue: (%p)\n"
+                     "\t\tcoalesced: %d\n\t\tqueued: %d\n",
+                     qop_p,
+                     *coalesce_counter,
+                     sync_counter);
+
         /* put back on the queue with SYNC_QUEUED state */
         qop_p->op.state = OP_SYNC_QUEUED;
-        qlist_add_tail(&qop_p->link, coalesce_queue);
+        dbpf_op_queue_add(coalesce_queue, qop_p);
         (*coalesce_counter)++;
         ret = 0;
     }
@@ -535,26 +563,41 @@ int dbpf_queued_op_sync_coalesce_db_ops(
     return ret;
 }
 
-extern dbpf_op_queue_p dbpf_completion_queue_array[TROVE_MAX_CONTEXTS];
-extern gen_mutex_t *dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
-extern pthread_cond_t dbpf_op_completed_cond;
+static int dbpf_queued_op_sync_coalesce_op_complete(
+    dbpf_queued_op_t * qop_p)
+{
+    qop_p->state = 0;
+    gen_mutex_lock(&qop_p->mutex);
+    qop_p->op.state = OP_COMPLETED;
+    gen_mutex_unlock(&qop_p->mutex);
+
+    gen_mutex_lock(
+        dbpf_completion_queue_array_mutex[qop_p->op.context_id]);
+    dbpf_op_queue_add(
+        dbpf_completion_queue_array[qop_p->op.context_id], qop_p);
+    gen_mutex_unlock(
+        dbpf_completion_queue_array_mutex[qop_p->op.context_id]);
+    return 0;
+}
 
 int dbpf_queued_op_complete(dbpf_queued_op_t * qop_p,
                             TROVE_ds_state ret,
                             enum dbpf_op_state state)
 {
     qop_p->state = ret;
+
+    gen_mutex_lock(&qop_p->mutex);
+    qop_p->op.state = state;
+    gen_mutex_unlock(&qop_p->mutex);
+
     gen_mutex_lock(
 	dbpf_completion_queue_array_mutex[qop_p->op.context_id]);
     dbpf_op_queue_add(dbpf_completion_queue_array[qop_p->op.context_id],
 		      qop_p);
-    gen_mutex_lock(&qop_p->mutex);
-    qop_p->op.state = state;
-    gen_mutex_unlock(&qop_p->mutex);
-    pthread_cond_signal(&dbpf_op_completed_cond);
     gen_mutex_unlock(
 	dbpf_completion_queue_array_mutex[qop_p->op.context_id]);
 
+    pthread_cond_signal(&dbpf_op_completed_cond);
     return 0;
 }
 

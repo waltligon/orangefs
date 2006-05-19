@@ -153,8 +153,6 @@ static int rmdirent_verify_parent_metadata_and_read_directory_entry_handle(
     int ret = -PVFS_EINVAL;
     job_id_t i;
 
-    PINT_STATE_DEBUG("verify_parent_metadata_and_"
-                     "read_directory_entry_handle");
     PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "rmdirent entry: %s\n",
         s_op->req->u.rmdirent.entry);
 
@@ -183,7 +181,8 @@ static int rmdirent_verify_parent_metadata_and_read_directory_entry_handle(
         s_op->req->u.rmdirent.parent_handle,
         &s_op->key,
         &s_op->val,
-        0,
+        PINT_config_get_trove_meta_flags(
+            get_server_config_struct(), s_op->req->u.rmdirent.fs_id),
         NULL,
         s_op,
         0,
@@ -206,8 +205,6 @@ static int rmdirent_read_directory_entry(PINT_server_op *s_op,
     int ret = -PVFS_EINVAL;
     job_id_t j_id;
 
-    PINT_STATE_DEBUG("read_directory_entry");
-
     gossip_debug(GOSSIP_SERVER_DEBUG,
 		 "  reading from dirent handle = %llu, name = %s\n",
 		 llu(s_op->u.rmdirent.dirdata_handle),
@@ -228,7 +225,8 @@ static int rmdirent_read_directory_entry(PINT_server_op *s_op,
         s_op->u.rmdirent.dirdata_handle,
         &s_op->key,
         &s_op->val,
-        0,
+        PINT_config_get_trove_meta_flags(
+            get_server_config_struct(), s_op->req->u.rmdirent.fs_id),
         NULL,
         s_op,
         0,
@@ -252,8 +250,6 @@ static int rmdirent_read_directory_entry(PINT_server_op *s_op,
 static int rmdirent_read_directory_entry_failure(PINT_server_op *s_op,
 						 job_status_s *js_p)
 {
-    PINT_STATE_DEBUG("read_directory_entry_failure");
-
     switch (js_p->error_code)
     {
 	case -TROVE_ENOENT:
@@ -281,8 +277,6 @@ static int rmdirent_remove_directory_entry(PINT_server_op *s_op,
     job_id_t j_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
 
-    PINT_STATE_DEBUG("remove_directory_entry");
-
     /* set up key and structure for keyval remove */
     s_op->key.buffer = s_op->req->u.rmdirent.entry;
     s_op->key.buffer_sz = strlen(s_op->req->u.rmdirent.entry) + 1;
@@ -295,6 +289,8 @@ static int rmdirent_remove_directory_entry(PINT_server_op *s_op,
         s_op->req->u.rmdirent.fs_id, s_op->u.rmdirent.dirdata_handle,
         &s_op->key, 
         PINT_config_get_trove_sync_meta(
+            user_opts, s_op->req->u.rmdirent.fs_id) |
+        PINT_config_get_trove_meta_flags(
             user_opts, s_op->req->u.rmdirent.fs_id),
         NULL, s_op, 0, js_p, &j_id, server_job_context);
 
@@ -327,8 +323,6 @@ static int rmdirent_update_directory_attr(
     PVFS_object_attr *dspace_attr = NULL;
     PVFS_ds_attributes *ds_attr = NULL;
     struct server_configuration_s *user_opts = get_server_config_struct();
-
-    PINT_STATE_DEBUG("update_directory_entry");
 
     if (js_p->error_code != UPDATE_DIR_ATTR_REQUIRED)
     {
@@ -373,7 +367,10 @@ static int rmdirent_update_directory_attr(
 
     ret = job_trove_dspace_setattr(
         s_op->req->u.rmdirent.fs_id, s_op->req->u.rmdirent.parent_handle,
-        ds_attr, PINT_config_get_trove_sync_meta(
+        ds_attr, 
+        PINT_config_get_trove_sync_meta(
+            user_opts, s_op->req->u.rmdirent.fs_id) |
+        PINT_config_get_trove_meta_flags(
             user_opts, s_op->req->u.rmdirent.fs_id),
         s_op, 0, js_p, &j_id, server_job_context);
 
@@ -398,8 +395,6 @@ static int rmdirent_update_directory_attr(
 static int rmdirent_remove_directory_entry_failure(PINT_server_op *s_op,
 						   job_status_s *js_p)
 {
-    PINT_STATE_DEBUG("remove_directory_entry_failure");
-
     assert(js_p->error_code != -TROVE_ENOENT);
 	    
     switch (js_p->error_code)
@@ -418,8 +413,6 @@ static int rmdirent_remove_directory_entry_failure(PINT_server_op *s_op,
 static int rmdirent_setup_resp(PINT_server_op *s_op,
                                job_status_s* js_p)
 {
-    PINT_STATE_DEBUG("setup_resp");
-
     /* Set the handle if it was removed */
     if(js_p->error_code == 0)
     {
@@ -448,8 +441,6 @@ static int rmdirent_setup_resp(PINT_server_op *s_op,
 static int rmdirent_cleanup(PINT_server_op *s_op,
                             job_status_s* js_p)
 {
-    PINT_STATE_DEBUG("cleanup");
-
     return(server_state_machine_complete(s_op));
 }
 
@@ -469,7 +460,8 @@ static int rmdirent_get_dirent_count(PINT_server_op *s_op,
         s_op->req->u.rmdirent.parent_handle,
         &s_op->key,
         &s_op->val,
-        0,
+        PINT_config_get_trove_meta_flags(
+            get_server_config_struct(), s_op->req->u.rmdirent.fs_id),
         NULL,
         s_op,
         0,
@@ -497,6 +489,8 @@ static int rmdirent_decrement_dirent_count(PINT_server_op *s_op,
                                  &s_op->key,
                                  &s_op->val,
                                  PINT_config_get_trove_sync_meta(
+                                     user_opts, s_op->req->u.rmdirent.fs_id) |
+                                 PINT_config_get_trove_meta_flags(
                                      user_opts, s_op->req->u.rmdirent.fs_id),
                                  NULL,
                                  s_op,

@@ -45,8 +45,6 @@ static int proto_error_init(PINT_server_op *s_op, job_status_s* js_p)
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
 
-    PINT_STATE_DEBUG("init");
-
     BMI_set_info(s_op->addr, BMI_INC_ADDR_REF, NULL);
 
     s_op->resp.op = PVFS_SERV_PROTO_ERROR;
@@ -94,7 +92,6 @@ static int proto_error_init(PINT_server_op *s_op, job_status_s* js_p)
  */
 static int proto_error_cleanup(PINT_server_op *s_op, job_status_s* js_p)
 {
-    PINT_STATE_DEBUG("cleanup");
     return(server_state_machine_complete(s_op));
 }
 

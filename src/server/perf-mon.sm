@@ -67,8 +67,6 @@ machine pvfs2_perf_mon_sm(prelude, do_work, final_response, cleanup)
  */
 static int perf_mon_cleanup(PINT_server_op *s_op, job_status_s* js_p)
 {
-    PINT_STATE_DEBUG("cleanup");
-
     if(s_op->resp.u.mgmt_perf_mon.perf_array)
 	free(s_op->resp.u.mgmt_perf_mon.perf_array);
 
@@ -86,8 +84,6 @@ static int perf_mon_do_work(PINT_server_op *s_op, job_status_s* js_p)
     int valid_count = 0;
     uint32_t tmp_next_id;
     int ret = -1;
-
-    PINT_STATE_DEBUG("do_work");
 
 #ifdef __PVFS2_DISABLE_PERF_COUNTERS__
     gossip_err("Error: perf_mon request received, but perf counters are disabled.\n");

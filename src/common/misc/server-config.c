@@ -607,7 +607,7 @@ static const configoption_t options[] =
         CTX_STORAGEHINTS, "yes"},
 
     {"ImmediateCompletion", ARG_STR, get_immediate_completion, NULL,
-        CTX_STORAGEHINTS, "yes"},
+        CTX_STORAGEHINTS, "no"},
 
     {"CoalescingHighWatermark", ARG_INT, get_coalescing_high_watermark, NULL,
         CTX_STORAGEHINTS, "8"},
@@ -3191,7 +3191,6 @@ int PINT_config_get_trove_meta_flags(
     
     if(fs_conf)
     {
-        flags |= fs_conf->trove_sync_meta;
         flags |= (fs_conf->immediate_completion ? 
                   TROVE_IMMEDIATE_COMPLETION : 0);
         flags |= fs_conf->metadata_sync_coalesce;

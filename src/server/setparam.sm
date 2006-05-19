@@ -74,8 +74,6 @@ static int setparam_work(PINT_server_op *s_op, job_status_s *js_p)
     struct filesystem_configuration_s *fs_conf;
     char buf[16] = {0};
  
-    PINT_STATE_DEBUG("work");
-
     switch(s_op->req->u.mgmt_setparam.param)
     {
         case PVFS_SERV_PARAM_GOSSIP_MASK:
@@ -103,7 +101,9 @@ static int setparam_work(PINT_server_op *s_op, job_status_s *js_p)
                          s_op->req->u.mgmt_setparam.fs_id);
             ret = job_trove_dspace_verify(
                 s_op->req->u.mgmt_setparam.fs_id, tmp_handle,
-                0, s_op, 0, js_p, &tmp_id, server_job_context);
+                PINT_config_get_trove_meta_flags(
+                    get_server_config_struct(), s_op->req->u.mgmt_setparam.fs_id), 
+                s_op, 0, js_p, &tmp_id, server_job_context);
             return(ret);
         case PVFS_SERV_PARAM_EVENT_ON:
             ret = 0;
@@ -181,8 +181,6 @@ static int setparam_work(PINT_server_op *s_op, job_status_s *js_p)
  */
 static int setparam_cleanup(PINT_server_op *s_op, job_status_s* js_p)
 {
-    PINT_STATE_DEBUG("cleanup");
-
     gossip_debug(GOSSIP_SERVER_DEBUG, " - setparam returning %d\n",
                  js_p->error_code);
     return(server_state_machine_complete(s_op));

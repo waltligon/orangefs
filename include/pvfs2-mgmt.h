@@ -30,7 +30,7 @@ typedef PVFS_id_gen_t PVFS_mgmt_op_id;
 
 /* low level statfs style information for each server */
 /* see PVFS_mgmt_statfs_all() */
-struct PVFS_mgmt_server_stat
+struct PVFS_mgmt_server_stat 
 {
     PVFS_fs_id fs_id;
     PVFS_size bytes_available;

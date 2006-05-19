@@ -363,7 +363,7 @@ enum dbpf_op_type
 };
 
 #define DBPF_OP_IS_BSTREAM(__type) (__type < KEYVAL_READ)
-#define DBPF_OP_IS_KEYVAL(__type) (__type < DSPACE_CREATE)
+#define DBPF_OP_IS_KEYVAL(__type) (__type >= KEYVAL_READ && __type < DSPACE_CREATE)
 #define DBPF_OP_IS_DSPACE(__type) (__type >= DSPACE_CREATE)
 
 #define DBPF_OP_DOES_SYNC(__op)    \
