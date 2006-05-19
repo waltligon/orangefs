@@ -589,3 +589,4 @@ static inline void decode_##name(char **pptr, struct name *x) { int i; \
 }
 
 #endif  /* __SRC_PROTO_ENDECODE_FUNCS_H */
+
