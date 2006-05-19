@@ -1272,9 +1272,9 @@ static inline int perform_handle_checks(const struct file_handle *fhandle,
         /* Make sure that handle length matches our opaque handle structure */
         if (fhandle->fh_private_length != sizeof(pvfs2_opaque_handle_t))
         {
-            pvfs2_print("perform_handle_checks: length mismatch (%d) "
-                    " instead of (%d)\n", fhandle->fh_private_length,
-                    sizeof(pvfs2_opaque_handle_t));
+            pvfs2_print("perform_handle_checks: length mismatch (%ld) "
+                    " instead of (%ld)\n", (unsigned long) fhandle->fh_private_length,
+                    (unsigned long) sizeof(pvfs2_opaque_handle_t));
             return 0;
         }
     }
@@ -1587,8 +1587,8 @@ int pvfs2_fill_handle(struct inode *inode, struct file_handle *fhandle)
         fhandle->fh_private_dtor = pvfs2_fh_dtor;
         /* and the length */
         fhandle->fh_private_length = pvfs2_opaque_handle_size;
-        pvfs2_print("Returning handle length %d\n",
-                pvfs2_opaque_handle_size);
+        pvfs2_print("Returning handle length %ld\n",
+                (unsigned long) pvfs2_opaque_handle_size);
         do_gettimeofday(&end);
         pvfs2_print("fill_handle: encode took %d usecs\n", diff(&end, &begin));
         return 0;
