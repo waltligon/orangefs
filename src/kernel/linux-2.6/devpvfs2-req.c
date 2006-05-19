@@ -639,7 +639,8 @@ struct PVFS_dev_map_desc32
     int32_t      size;
 };
 
-static unsigned long translate_dev_map(
+#ifndef PVFS2_LINUX_KERNEL_2_4
+static unsigned long translate_dev_map26(
         unsigned long args, long *error)
 {
     struct PVFS_dev_map_desc32  __user *p32 = (void __user *) args;
@@ -662,6 +663,28 @@ err:
     *error = -EFAULT;
     return 0;
 }
+#else
+static unsigned long translate_dev_map24(
+        unsigned long args, struct PVFS_dev_map_desc *p, long *error)
+{
+    struct PVFS_dev_map_desc32  __user *p32 = (void __user *) args;
+    u32 addr, size;
+
+    *error = 0;
+    /* get the ptr from the 32 bit user-space */
+    if (get_user(addr, &p32->ptr))
+        goto err;
+    p->ptr = compat_ptr(addr);
+    /* copy the size */
+    if (get_user(size, &p32->size))
+        goto err;
+    p->size = size;
+    return 0;
+err:
+    *error = -EFAULT;
+    return 0;
+}
+#endif
 
 #endif
 
@@ -684,7 +707,7 @@ static long pvfs2_devreq_compat_ioctl(
     if (cmd == PVFS_DEV_MAP)
     {
         /* convert the arguments to what we expect internally in kernel space */
-        arg = translate_dev_map(args, &ret);
+        arg = translate_dev_map26(args, &ret);
         if (ret < 0)
         {
             pvfs2_error("Could not translate dev map\n");
@@ -699,6 +722,8 @@ static long pvfs2_devreq_compat_ioctl(
 
 #ifdef HAVE_REGISTER_IOCTL32_CONVERSION
 
+#ifndef PVFS2_LINUX_KERNEL_2_4
+
 static int pvfs2_translate_dev_map(
         unsigned int fd,
         unsigned int cmd,
@@ -709,7 +734,7 @@ static int pvfs2_translate_dev_map(
     unsigned long p;
 
     /* Copy it as the kernel module expects it */
-    p = translate_dev_map(arg, &ret);
+    p = translate_dev_map26(arg, &ret);
     if (ret < 0)
     {
         pvfs2_error("Could not translate dev map structure\n");
@@ -718,6 +743,34 @@ static int pvfs2_translate_dev_map(
     /* p is still a user space address */
     return sys_ioctl(fd, cmd, p);
 }
+
+#else
+
+static int pvfs2_translate_dev_map(
+        unsigned int fd,
+        unsigned int cmd,
+        unsigned long arg,
+        struct   file *file)
+{
+    long ret;
+    struct PVFS_dev_map_desc p;
+
+    translate_dev_map24(arg, &p, &ret);
+    /* p is a kernel space address */
+    return (ret ? -EIO : pvfs_bufmap_initialize(&p));
+}
+
+#endif
+
+#ifdef PVFS2_LINUX_KERNEL_2_4
+typedef int (*ioctl_fn)(unsigned int fd,
+        unsigned int cmd, unsigned long arg, struct   file *file);
+
+struct ioctl_trans {
+    unsigned int cmd;
+    ioctl_fn     handler;
+};
+#endif
 
 static struct ioctl_trans pvfs2_ioctl32_trans[] = {
     {PVFS_DEV_GET_MAGIC,        NULL},
@@ -754,7 +807,6 @@ fail:
 void pvfs2_ioctl32_cleanup(void)
 {
     int i;
-
     for (i = 0;  pvfs2_ioctl32_trans[i].cmd != 0; i++)
     {
         pvfs2_print("Deregistered ioctl32 command %08x\n",
