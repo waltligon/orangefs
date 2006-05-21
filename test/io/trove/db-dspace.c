@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include "pvfs2-test-config.h"
 #include "pvfs2-types.h"
+#include "pvfs2-internal.h"
 
 struct PVFS_ds_storedattr_s
 {
@@ -26,7 +27,7 @@ struct PVFS_ds_storedattr_s
 
 void do_print_attr(struct PVFS_ds_storedattr_s *attr, PVFS_handle h)
 {
-	printf("Handle %lld\n", h);
+	printf("Handle %lld\n", lld(h));
 	printf("Type %s\n", attr->type == PVFS_TYPE_METAFILE ? "Metafile" :
 							  attr->type == PVFS_TYPE_DATAFILE ? "Datafile" :
 							  attr->type == PVFS_TYPE_DIRECTORY ? "Directory" :
