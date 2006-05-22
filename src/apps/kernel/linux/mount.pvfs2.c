@@ -294,15 +294,12 @@ static int do_mtab(
 
     while ((ment = getmntent(mtab)) != NULL)
     {
-        if (strcmp(myment->mnt_dir, ment->mnt_dir) != 0)
+        if (addmntent(tmp_mtab, ment) == 1)
         {
-            if (addmntent(tmp_mtab, ment) == 1)
-            {
-                fprintf(stderr, "Error: couldn't add entry to" PVFS2_TMP_MTAB "\n");
-                endmntent(mtab);
-                endmntent(tmp_mtab);
-                return -1;
-            }
+            fprintf(stderr, "Error: couldn't add entry to" PVFS2_TMP_MTAB "\n");
+            endmntent(mtab);
+            endmntent(tmp_mtab);
+            return -1;
         }
     }
 
