@@ -28,6 +28,10 @@
 #define INT32_MAX (2147483647)
 #endif
 
+#ifndef offsetof
+#define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
+#endif
+
 /* figure out the size of a pointer */
 #if defined(__WORDSIZE)
   #define PVFS2_SIZEOF_VOIDP __WORDSIZE

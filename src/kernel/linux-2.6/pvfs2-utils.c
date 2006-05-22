@@ -23,7 +23,7 @@ extern struct inode_operations pvfs2_symlink_inode_operations;
 extern struct inode_operations pvfs2_dir_inode_operations;
 extern struct file_operations pvfs2_dir_operations;
 extern struct dentry_operations pvfs2_dentry_operations;
-extern int debug;
+extern int debug, timing;
 
 int pvfs2_gen_credentials(
     PVFS_credentials *credentials)
@@ -339,7 +339,7 @@ int pvfs2_inode_getattr(struct inode *inode, uint32_t getattr_mask)
     pvfs2_inode_t *pvfs2_inode = NULL;
     struct timeval begin, end;
 
-    do_gettimeofday(&begin);
+    if (unlikely(timing)) do_gettimeofday(&begin);
 
     pvfs2_print("pvfs2_inode_getattr: called on inode %llu\n",
                 llu(pvfs2_ino_to_handle(inode->i_ino)));
@@ -420,8 +420,8 @@ int pvfs2_inode_getattr(struct inode *inode, uint32_t getattr_mask)
 
         op_release(new_op);
     }
-    do_gettimeofday(&end);
-    printk(KERN_DEBUG "pvfs2_inode_getattr: took %d usecs\n", diff(&end, &begin));
+    if (unlikely(timing)) do_gettimeofday(&end);
+    pvfs2_timing("pvfs2_inode_getattr: took %d usecs\n", diff(&end, &begin));
     return ret;
 }
 
@@ -1355,7 +1355,7 @@ static int get_opaque_handle(struct super_block *sb,
 {
     struct timeval begin, end;
 
-    do_gettimeofday(&begin);
+    if (unlikely(timing)) do_gettimeofday(&begin);
     /* Make sure that we actually get a valid handle */
     if (perform_handle_checks(fhandle,
             HANDLE_CHECK_LENGTH | HANDLE_CHECK_MAGIC 
@@ -1365,13 +1365,13 @@ static int get_opaque_handle(struct super_block *sb,
                 "Impossible happened\n");
         return -EINVAL;
     }
-    do_gettimeofday(&end);
-    printk(KERN_DEBUG "perform_handle_checks: took %d usecs\n", diff(&end, &begin));
+    if (unlikely(timing)) do_gettimeofday(&end);
+    pvfs2_timing("perform_handle_checks: took %d usecs\n", diff(&end, &begin));
 
-    do_gettimeofday(&begin);
+    if (unlikely(timing)) do_gettimeofday(&begin);
     do_decode_opaque_handle(opaque_handle, (char *) fhandle->fh_private);
-    do_gettimeofday(&end);
-    printk(KERN_DEBUG "do_decode_opaque_handle: took %d usecs\n", diff(&end, &begin));
+    if (unlikely(timing)) do_gettimeofday(&end);
+    pvfs2_timing("do_decode_opaque_handle: took %d usecs\n", diff(&end, &begin));
     /* make sure that fsid in private buffer also matches */
     if (opaque_handle->fsid != PVFS2_SB(sb)->fs_id) {
         pvfs2_error("get_handle: invalid fsid in private buffer "
@@ -1407,14 +1407,14 @@ struct inode *pvfs2_sb_find_inode_handle(struct super_block *sb,
     struct timeval t1, t2;
     struct timeval begin, end;
 
-    do_gettimeofday(&t1);
-    do_gettimeofday(&begin);
+    if (unlikely(timing)) do_gettimeofday(&t1);
+    if (unlikely(timing)) do_gettimeofday(&begin);
     /* Decode the buffer */
     err = get_opaque_handle(sb, fhandle, &opaque_handle);
     if (err)
         return ERR_PTR(err);
-    do_gettimeofday(&end);
-    printk(KERN_DEBUG "get_opaque_handle: took %d usecs\n", diff(&end, &begin));
+    if (unlikely(timing)) do_gettimeofday(&end);
+    pvfs2_timing("get_opaque_handle: took %d usecs\n", diff(&end, &begin));
 
     /* and convert the opaque handle structure to the PVFS_sys_attr structure */
     convert_opaque_handle_to_sys_attr(&attrs, &opaque_handle);
@@ -1436,10 +1436,10 @@ struct inode *pvfs2_sb_find_inode_handle(struct super_block *sb,
      * Consequently, this approach should scale well since openfh()
      * does not require any network messages.
      */
-    do_gettimeofday(&begin);
+    if (unlikely(timing)) do_gettimeofday(&begin);
     inode = iget_locked(sb, inode_number);
-    do_gettimeofday(&end);
-    printk(KERN_DEBUG "iget_locked: took %d usecs\n", diff(&end, &begin));
+    if (unlikely(timing)) do_gettimeofday(&end);
+    pvfs2_timing("iget_locked: took %d usecs\n", diff(&end, &begin));
 
     if (!inode) {
         pvfs2_error("Could not allocate inode\n");
@@ -1451,17 +1451,17 @@ struct inode *pvfs2_sb_find_inode_handle(struct super_block *sb,
             pvfs2_error("bad inode obtained from iget_locked\n");
             return ERR_PTR(-EINVAL);
         }
-        do_gettimeofday(&begin);
+        if (unlikely(timing)) do_gettimeofday(&begin);
         /* Initialize and/or verify struct inode as well as pvfs2_inode */
         if ((err = copy_attributes_to_inode(inode, &attrs, NULL)) < 0) {
             pvfs2_error("copy_attributes_to_inode failed with err %d\n", err);
             iput(inode);
             return ERR_PTR(err);
         }
-        do_gettimeofday(&end);
-        printk(KERN_DEBUG "copy_attributes_to_inode: took %d usecs\n", diff(&end, &begin));
+        if (unlikely(timing)) do_gettimeofday(&end);
+        pvfs2_timing("copy_attributes_to_inode: took %d usecs\n", diff(&end, &begin));
 
-        do_gettimeofday(&begin);
+        if (unlikely(timing)) do_gettimeofday(&begin);
         /* this inode was allocated afresh */
         if (inode->i_state & I_NEW) {
             pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
@@ -1480,10 +1480,10 @@ struct inode *pvfs2_sb_find_inode_handle(struct super_block *sb,
             /* Make sure that we unlock the inode */
             unlock_new_inode(inode);
         }
-        do_gettimeofday(&end);
-        printk(KERN_DEBUG "fill_inode (misc.): took %d usecs\n", diff(&end, &begin));
-        do_gettimeofday(&t2);
-        printk(KERN_DEBUG "find_inode_handle: took %d usecs\n", diff(&t2, &t1));
+        if (unlikely(timing)) do_gettimeofday(&end);
+        pvfs2_timing("fill_inode (misc.): took %d usecs\n", diff(&end, &begin));
+        if (unlikely(timing)) do_gettimeofday(&t2);
+        pvfs2_timing("find_inode_handle: took %d usecs\n", diff(&t2, &t1));
         return inode;
     }
 }
@@ -1575,7 +1575,7 @@ int pvfs2_fill_handle(struct inode *inode, struct file_handle *fhandle)
         {
             return -ENOMEM;
         }
-        do_gettimeofday(&begin);
+        if (unlikely(timing)) do_gettimeofday(&begin);
         /* encode the opaque handle information */
         if (do_encode_opaque_handle((char *) fhandle->fh_private, inode) < 0)
         {
@@ -1589,8 +1589,8 @@ int pvfs2_fill_handle(struct inode *inode, struct file_handle *fhandle)
         fhandle->fh_private_length = pvfs2_opaque_handle_size;
         pvfs2_print("Returning handle length %ld\n",
                 (unsigned long) pvfs2_opaque_handle_size);
-        do_gettimeofday(&end);
-        pvfs2_print("fill_handle: encode took %d usecs\n", diff(&end, &begin));
+        if (unlikely(timing)) do_gettimeofday(&end);
+        pvfs2_timing("fill_handle: encode took %d usecs\n", diff(&end, &begin));
         return 0;
     }
 }

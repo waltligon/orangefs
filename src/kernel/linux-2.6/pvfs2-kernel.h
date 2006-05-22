@@ -134,6 +134,9 @@ do {                                                           \
     pvfs2_error(msg);                                          \
 } while(0)
 #endif
+#define pvfs2_timing(format...) do{                            \
+    if (timing) printk(format);                                \
+} while(0)
 
 /*
   this attempts to disable the annotations used by the 'sparse' kernel

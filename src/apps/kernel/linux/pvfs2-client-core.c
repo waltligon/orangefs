@@ -1675,11 +1675,23 @@ PVFS_error write_device_response(
     return ret;
 }
 
-static unsigned long encode_readdir_to_buffer(char *ptr, PVFS_sysresp_readdir *readdir)
+/* encoding needed by client-core to copy readdir entries to the shared page */
+static long encode_dirents(pvfs2_readdir_response_t *ptr, PVFS_sysresp_readdir *readdir)
 {
-    char *buf = ptr;
+    int i; 
+    char *buf = (char *) ptr;
     char **pptr = &buf;
-    encode_dirents(pptr, readdir);
+
+    ptr->token = readdir->token;
+    ptr->directory_version = readdir->directory_version;
+    ptr->pvfs_dirent_outcount = readdir->pvfs_dirent_outcount;
+    *pptr += offsetof(pvfs2_readdir_response_t, dirent_array);
+    for (i = 0; i < readdir->pvfs_dirent_outcount; i++) 
+    {
+        enc_string(pptr, &readdir->dirent_array[i].d_name);
+        *(int64_t *) *pptr = readdir->dirent_array[i].handle;
+        *pptr += 8;
+    }
     return ((unsigned long) *pptr - (unsigned long) ptr);
 }
 
@@ -1698,12 +1710,12 @@ static int copy_dirents_to_downcall(vfs_request_t *vfs_request)
 
     /* Simply encode the readdir system response into the shared buffer */
     vfs_request->out_downcall.trailer_size = 
-        encode_readdir_to_buffer(vfs_request->io_kernel_mapped_buf,
+        encode_dirents(vfs_request->io_kernel_mapped_buf,
                 &vfs_request->response.readdir);
     if (vfs_request->out_downcall.trailer_size <= 0) 
     {
         gossip_err("copy_dirents_to_downcall: invalid trailer size %ld\n",
-                (unsigned long) vfs_request->out_downcall.trailer_size);
+                (long) vfs_request->out_downcall.trailer_size);
         ret = -PVFS_EINVAL;
     }
 err:
@@ -1713,16 +1725,47 @@ err:
     return ret;
 }
 
-static unsigned long encode_readdirplus_to_buffer(char *ptr, PVFS_sysresp_readdirplus *readdirplus)
+static long encode_sys_attr(char *ptr, PVFS_sysresp_readdirplus *readdirplus) 
 {
     char *buf = ptr;
     char **pptr = &buf;
+    int i;
 
-    /* The above works because both structures share the same member names */
-    encode_dirents(pptr, readdirplus);
-    /* and then we encode the stat part of the response */
-    encode_sys_attr(pptr, readdirplus);
+    memcpy(buf, readdirplus->stat_err_array, sizeof(PVFS_error) * readdirplus->pvfs_dirent_outcount);
+    *pptr += sizeof(PVFS_error) * readdirplus->pvfs_dirent_outcount;
+    if (readdirplus->pvfs_dirent_outcount % 2) 
+    {
+        *pptr += 4;
+    }
+    for (i = 0; i < readdirplus->pvfs_dirent_outcount; i++)
+    {
+        memcpy(*pptr, &readdirplus->attr_array[i], sizeof(PVFS_sys_attr));
+        *pptr += sizeof(PVFS_sys_attr);
+        if (readdirplus->attr_array[i].link_target)
+        {
+            enc_string(pptr, &readdirplus->attr_array[i].link_target);
+        }
+    }
     return ((unsigned long) *pptr - (unsigned long) ptr);
+}
+
+static long encode_readdirplus_to_buffer(char *ptr, PVFS_sysresp_readdirplus *readdirplus)
+{
+    long amt;
+    char *buf = (char *) ptr;
+
+   /* encode the dirent part of the response */
+    amt = encode_dirents((pvfs2_readdir_response_t *) buf, (PVFS_sysresp_readdir *) readdirplus);
+    if (amt < 0)
+        return amt;
+    buf += amt;
+    /* and then we encode the stat part of the response */
+    amt = encode_sys_attr(buf, readdirplus);
+    if (amt < 0)
+        return amt;
+    buf += amt;
+
+    return ((unsigned long) buf - (unsigned long) ptr);
 }
 
 static int copy_direntplus_to_downcall(vfs_request_t *vfs_request)
@@ -1744,8 +1787,8 @@ static int copy_direntplus_to_downcall(vfs_request_t *vfs_request)
                 &vfs_request->response.readdirplus);
     if (vfs_request->out_downcall.trailer_size <= 0)
     {
-        gossip_err("copy_direntplus_to_downcall: invalid trailed size %ld\n",
-                (unsigned long) vfs_request->out_downcall.trailer_size);
+        gossip_err("copy_direntplus_to_downcall: invalid trailer size %ld\n",
+                (long) vfs_request->out_downcall.trailer_size);
         ret = -PVFS_EINVAL;
     }
 err:

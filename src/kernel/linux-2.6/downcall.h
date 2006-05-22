@@ -73,18 +73,22 @@ struct pvfs2_dirent
 typedef struct
 {
     PVFS_ds_position token;
-    struct pvfs2_dirent *dirent_array;
-    uint32_t pvfs_dirent_outcount;
+    uint32_t  __pad1;
     uint64_t directory_version;
+    uint32_t  __pad2;
+    uint32_t pvfs_dirent_outcount;
+    struct pvfs2_dirent *dirent_array;
 } pvfs2_readdir_response_t;
 
-/* the readdirplus response is a blank downcall (i.e. all these fields are obtained from the trailer) */
+/* the readdirplus response is a blank downcall (i.e. all these fields are obtained from the trailer). Do not change the order of the fields. Change it only if readdir_response_t is changing */
 typedef struct
 {
     PVFS_ds_position token;
-    struct pvfs2_dirent *dirent_array;
-    uint32_t pvfs_dirent_outcount;
+    uint32_t  __pad1;
     uint64_t directory_version;
+    uint32_t  __pad2;
+    uint32_t pvfs_dirent_outcount;
+    struct pvfs2_dirent *dirent_array;
     PVFS_error  *stat_err_array;
     PVFS_sys_attr *attr_array;
 } pvfs2_readdirplus_response_t;

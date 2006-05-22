@@ -16,7 +16,7 @@
 extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
 extern wait_queue_head_t pvfs2_request_list_waitq;
-extern int debug;
+extern int debug, timing;
 
 extern struct dentry_operations pvfs2_dentry_operations;
 
@@ -74,7 +74,7 @@ struct dentry *pvfs2_lookup(
     struct super_block *sb = NULL;
     struct timeval begin, end;
 
-    do_gettimeofday(&begin);
+    if (unlikely(timing)) do_gettimeofday(&begin);
 
     /*
       in theory we could skip a lookup here (if the intent is to
@@ -180,8 +180,8 @@ struct dentry *pvfs2_lookup(
             pvfs2_print("Lookup success (inode ct = %d)\n",
                         (int)atomic_read(&inode->i_count));
             op_release(new_op);
-            do_gettimeofday(&end);
-            printk(KERN_DEBUG "pvfs2_lookup: took %d usecs\n", diff(&end, &begin));
+            if (unlikely(timing)) do_gettimeofday(&end);
+            pvfs2_timing("pvfs2_lookup: took %d usecs\n", diff(&end, &begin));
             if (res) 
                 res->d_op = &pvfs2_dentry_operations;
             return res;
@@ -235,8 +235,8 @@ struct dentry *pvfs2_lookup(
     }
 
     op_release(new_op);
-    do_gettimeofday(&end);
-    printk(KERN_DEBUG "pvfs2_lookup: took %d usecs\n", diff(&end, &begin));
+    if (unlikely(timing)) do_gettimeofday(&end);
+    pvfs2_timing("pvfs2_lookup: took %d usecs\n", diff(&end, &begin));
     return NULL;
 }
 

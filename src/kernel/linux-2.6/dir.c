@@ -36,12 +36,30 @@ typedef struct
     void *dents_buf;
 } readdir_handle_t;
 
-static inline long decode_readdir_from_buffer(char *ptr, pvfs2_readdir_response_t *readdir)
+/* decode routine needed by kmod to make sense of the shared page for readdirs */
+static long decode_dirents(char *ptr, pvfs2_readdir_response_t *readdir) 
 {
+    int i;
+    pvfs2_readdir_response_t *rd = (pvfs2_readdir_response_t *) ptr;
     char *buf = ptr;
     char **pptr = &buf;
 
-    decode_dirents(pptr, readdir);
+    readdir->token = rd->token;
+    readdir->directory_version = rd->directory_version;
+    readdir->pvfs_dirent_outcount = rd->pvfs_dirent_outcount;
+    readdir->dirent_array = (struct pvfs2_dirent *) 
+            kmalloc(readdir->pvfs_dirent_outcount * sizeof(struct pvfs2_dirent), GFP_KERNEL);
+    if (readdir->dirent_array == NULL)
+    {
+        return -ENOMEM;
+    }
+    *pptr += offsetof(pvfs2_readdir_response_t, dirent_array);
+    for (i = 0; i < readdir->pvfs_dirent_outcount; i++)
+    {
+        dec_string(pptr, &readdir->dirent_array[i].d_name, &readdir->dirent_array[i].d_length);
+        readdir->dirent_array[i].handle = *(int64_t *) *pptr;
+        *pptr += 8;
+    }
     return ((unsigned long) *pptr - (unsigned long) ptr);
 }
 
@@ -61,7 +79,7 @@ static long readdir_handle_ctor(readdir_handle_t *rhandle, void *buf, int buffer
     }
     rhandle->buffer_index = buffer_index;
     rhandle->dents_buf = buf;
-    if ((ret = decode_readdir_from_buffer(buf, &rhandle->readdir_response)) < 0)
+    if ((ret = decode_dirents(buf, &rhandle->readdir_response)) < 0)
     {
         pvfs2_error("Could not decode readdir from buffer %ld\n", ret);
         readdir_index_put(rhandle->buffer_index);
@@ -338,15 +356,61 @@ typedef struct
     void *dentsplus_buf;
 } readdirplus_handle_t;
 
-static inline long decode_readdirplus_from_buffer(char *ptr, pvfs2_readdirplus_response_t *readdirplus)
+static long decode_sys_attr(char *ptr, pvfs2_readdirplus_response_t *readdirplus) 
 {
-    char *buf = ptr;
+    int i;
+    char *buf = (char *) ptr;
     char **pptr = &buf;
 
-    /* This works because fields have the same member names */
-    decode_dirents(pptr, readdirplus);
-    decode_sys_attr(pptr, readdirplus);
+    readdirplus->stat_err_array = (PVFS_error *) 
+        kmalloc(readdirplus->pvfs_dirent_outcount * sizeof(PVFS_error), GFP_KERNEL);
+    if (readdirplus->stat_err_array == NULL)
+    {
+        return -ENOMEM;
+    }
+    memcpy(readdirplus->stat_err_array, buf, readdirplus->pvfs_dirent_outcount * sizeof(PVFS_error));
+    *pptr += readdirplus->pvfs_dirent_outcount * sizeof(PVFS_error);
+    if (readdirplus->pvfs_dirent_outcount % 2) 
+    {
+        *pptr += 4;
+    }
+    readdirplus->attr_array = (PVFS_sys_attr *) 
+        kmalloc(readdirplus->pvfs_dirent_outcount * sizeof(PVFS_sys_attr), GFP_KERNEL);
+    if (readdirplus->attr_array == NULL)
+    {
+        return -ENOMEM;
+    }
+    for (i = 0; i < readdirplus->pvfs_dirent_outcount; i++)
+    {
+        memcpy(&readdirplus->attr_array[i], *pptr, sizeof(PVFS_sys_attr));
+        *pptr += sizeof(PVFS_sys_attr);
+        if (readdirplus->attr_array[i].objtype == PVFS_TYPE_SYMLINK &&
+                (readdirplus->attr_array[i].mask & PVFS_ATTR_SYS_LNK_TARGET))
+        {
+            int len = 0;
+            dec_string(pptr, &readdirplus->attr_array[i].link_target, &len);
+        }
+        else {
+            readdirplus->attr_array[i].link_target = NULL;
+        }
+    }
     return ((unsigned long) *pptr - (unsigned long) ptr);
+}
+
+static long decode_readdirplus_from_buffer(char *ptr, pvfs2_readdirplus_response_t *readdirplus)
+{
+    char *buf = ptr;
+    long amt;
+
+    amt = decode_dirents(buf, (pvfs2_readdir_response_t *) readdirplus);
+    if (amt < 0)
+        return amt;
+    buf += amt;
+    amt = decode_sys_attr(buf, readdirplus);
+    if (amt < 0)
+        return amt;
+    buf += amt;
+    return ((unsigned long) buf - (unsigned long) ptr);
 }
 
 static long readdirplus_handle_ctor(readdirplus_handle_t *rhandle, void *buf, int buffer_index)

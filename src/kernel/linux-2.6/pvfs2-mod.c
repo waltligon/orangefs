@@ -30,6 +30,7 @@ static int hash_compare(void *key, struct qhash_head *link);
 /* the size of the hash tables for ops in progress */
 static int hash_table_size = 509;
 int debug = 0;
+int timing = 0;
 int op_timeout_secs = PVFS2_DEFAULT_OP_TIMEOUT_SECS;
 
 MODULE_LICENSE("GPL");
@@ -47,6 +48,7 @@ DECLARE_FSTYPE(pvfs2_fs_type, "pvfs2", pvfs2_get_sb, 0);
 
 MODULE_PARM(hash_table_size, "i");
 MODULE_PARM(debug, "i");
+MODULE_PARM(timing, "i");
 MODULE_PARM(op_timeout_secs, "i");
 
 #else /* !PVFS2_LINUX_KERNEL_2_4 */
@@ -68,6 +70,7 @@ struct file_system_type pvfs2_fs_type =
 
 module_param(hash_table_size, int, 0);
 module_param(debug, bool, 0);
+module_param(timing, bool, 0);
 module_param(op_timeout_secs, int, 0);
 
 #endif /* PVFS2_LINUX_KERNEL_2_4 */
