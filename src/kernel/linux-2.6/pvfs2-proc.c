@@ -17,7 +17,7 @@
 #define PVFS2_VERSION "Unknown"
 #endif
 
-extern int debug;
+extern int debug, timing;
 extern int op_timeout_secs;
 extern spinlock_t pvfs2_request_list_lock;
 extern struct list_head pvfs2_request_list;
@@ -247,6 +247,7 @@ static struct pvfs2_param_extra perf_reset_extra = {
     .max = 1,
 };
 static int min_debug[] = {0}, max_debug[] = {1};
+static int min_timing[] = {0}, max_timing[] = {1};
 static int min_op_timeout_secs[] = {0}, max_op_timeout_secs[] = {INT_MAX};
 static ctl_table pvfs2_acache_table[] = {
     /* controls acache timeout */
@@ -291,6 +292,10 @@ static ctl_table pvfs2_table[] = {
     /* subdir for acache control */
     {6, "acache", NULL, 0, 0555, pvfs2_acache_table},
     {7, "perf-counters", NULL, 0, 0555, pvfs2_pc_table},
+    /* controls timing information */
+    {8, "timing", &timing, sizeof(int), 0644, NULL,
+        &proc_dointvec_minmax, &sysctl_intvec,
+        NULL, &min_timing, &max_timing},
     {0}
 };
 static ctl_table fs_table[] = {
