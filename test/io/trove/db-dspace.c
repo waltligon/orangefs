@@ -24,6 +24,7 @@ struct PVFS_ds_storedattr_s
     uint32_t dfile_count;
     uint32_t dist_size;
 };
+void do_print_attr(struct PVFS_ds_storedattr_s *attr, PVFS_handle h);
 
 void do_print_attr(struct PVFS_ds_storedattr_s *attr, PVFS_handle h)
 {
