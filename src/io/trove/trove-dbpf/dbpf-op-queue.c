@@ -319,18 +319,45 @@ int dbpf_queue_or_service(
     TROVE_ds_flags flags,
     TROVE_op_id *out_op_id_p)
 {
+    DB * dbp;
+    int ret;
 
     if(flags & TROVE_IMMEDIATE_COMPLETION)
     {
         *out_op_id_p = 0;
-        return op_p->svc_fn(op_p);
+        ret = op_p->svc_fn(op_p);
+        if(ret < 0)
+        {
+            goto exit;
+        }
+
+        if(DBPF_OP_IS_KEYVAL(op_p->type))
+        {
+            dbp = op_p->coll_p->keyval_db;
+        }
+        else if(DBPF_OP_IS_DSPACE(op_p->type))
+        {
+            dbp = op_p->coll_p->ds_db;
+        }
+
+        DBPF_DB_SYNC_IF_NECESSARY(op_p, dbp, ret);
+        if(ret < 0)
+        {
+            goto exit;
+        }
+
+        ret = 1;
+
     }
     else
     {
         *out_op_id_p = dbpf_queued_op_queue(q_op_p);
+        ret = 0;
     }
 
-    return 0;
+exit:
+
+    return ret;
 }
 
 int dbpf_queued_op_complete(dbpf_queued_op_t * qop_p,

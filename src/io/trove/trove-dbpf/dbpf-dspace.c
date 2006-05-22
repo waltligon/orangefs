@@ -137,7 +137,7 @@ static int dbpf_dspace_create(TROVE_coll_id coll_id,
         return -TROVE_EINVAL;
     }
 
-    DBPF_EVENT_START(PVFS_EVENT_TROVE_DSPACE_CREATE, q_op_p->op.id);
+    DBPF_EVENT_START(PVFS_EVENT_TROVE_DSPACE_CREATE, op_p->id);
 
     /* this array is freed in dbpf-op.c:dbpf_queued_op_free */
     op_p->u.d_create.extent_array.extent_count =
@@ -804,7 +804,7 @@ static int dbpf_dspace_setattr(TROVE_coll_id coll_id,
     }
 
    /* initialize op-specific members */
-    q_op_p->op.u.d_setattr.attr_p = ds_attr_p;
+    op_p->u.d_setattr.attr_p = ds_attr_p;
 
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
                     1, PINT_PERF_ADD);

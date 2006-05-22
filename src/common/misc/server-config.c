@@ -603,7 +603,7 @@ static const configoption_t options[] =
      * (setattr, etc.) should try to coallesce the sync under larger
      * workloads.
      */
-    {"MetaDataSyncCoallesce", ARG_STR, get_metadata_sync_coalesce, NULL,
+    {"MetaDataSyncCoalesce", ARG_STR, get_metadata_sync_coalesce, NULL,
         CTX_STORAGEHINTS, "yes"},
 
     {"ImmediateCompletion", ARG_STR, get_immediate_completion, NULL,
