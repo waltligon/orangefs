@@ -13,7 +13,8 @@ SERVERSRC += \
 	$(DIR)/dbpf-error.c \
 	$(DIR)/dbpf-mgmt.c \
 	$(DIR)/dbpf-open-cache.c \
-	$(DIR)/dbpf-keyval-pcache.c
+	$(DIR)/dbpf-keyval-pcache.c \
+	$(DIR)/dbpf-sync.c
 
 # grab trove-ledger.h from handle-mgmt.
 MODCFLAGS_$(DIR) = -I$(srcdir)/src/io/trove/trove-handle-mgmt

@@ -17,7 +17,7 @@
 #include "dbpf-thread.h"
 #include "dbpf-bstream.h"
 #include "dbpf-op-queue.h"
-
+#include "dbpf-sync.h"
 
 extern struct qlist_head dbpf_op_queue;
 extern gen_mutex_t dbpf_op_queue_mutex;
@@ -197,7 +197,7 @@ int dbpf_do_one_work_cycle(int *out_count)
         }
         else if(ret == DBPF_OP_NEEDS_SYNC)
         {
-            ret = dbpf_queued_op_sync_coalesce_db_ops(cur_op);
+            ret = dbpf_sync_coalesce(cur_op);
             if(ret < 0)
             {
                 return ret; /* not sure how to recover from failure here */
