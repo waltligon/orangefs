@@ -361,13 +361,13 @@ PVFS_error PVFS_sys_io(
     }
     else 
     {
-        ret = PINT_sys_wait(op_id, "io", &error);
+        ret = PVFS_sys_wait(op_id, "io", &error);
         if (ret)
         {
             PVFS_perror_gossip("PVFS_sys_wait call", ret);
             error = ret;
         }
-        PINT_sys_release(op_id);
+        PVFS_sys_release(op_id);
     } 
 
     return error;

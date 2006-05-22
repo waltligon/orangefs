@@ -353,6 +353,20 @@ PVFS_error PVFS_mgmt_get_dirdata_handle(
     PVFS_handle *out_dirdata_handle,
     PVFS_credentials *credentials);
 
+int PVFS_mgmt_wait(
+    PVFS_mgmt_op_id op_id,
+    const char *in_op_str,
+    int *out_error);
+
+int PVFS_mgmt_testsome(
+    PVFS_mgmt_op_id *op_id_array,
+    int *op_count, /* in/out */
+    void **user_ptr_array,
+    int *error_code_array,
+    int timeout_ms);
+
+void PVFS_mgmt_release(PVFS_mgmt_op_id op_id);
+
 #endif /* __PVFS2_MGMT_H */
 
 /* @} */

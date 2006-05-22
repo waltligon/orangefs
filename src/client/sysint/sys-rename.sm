@@ -378,7 +378,7 @@ PVFS_error PVFS_sys_rename(
     }
     else
     {
-        ret = PINT_sys_wait(op_id, "rename", &error);
+        ret = PVFS_sys_wait(op_id, "rename", &error);
         if (ret)
         {
             PVFS_perror_gossip("PVFS_sys_wait call", ret);
@@ -386,7 +386,7 @@ PVFS_error PVFS_sys_rename(
         }
     }
 
-    PINT_sys_release(op_id);
+    PVFS_sys_release(op_id);
     return error;
 }
 

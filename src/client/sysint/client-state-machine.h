@@ -546,19 +546,6 @@ int PINT_client_state_machine_testsome(
     int *error_code_array,
     int timeout_ms);
 
-/* exposed wrapper around the client-state-machine testsome function */
-static inline int PINT_sys_testsome(
-    PVFS_sys_op_id *op_id_array,
-    int *op_count, /* in/out */
-    void **user_ptr_array,
-    int *error_code_array,
-    int timeout_ms)
-{
-    return PINT_client_state_machine_testsome(
-        op_id_array, op_count, user_ptr_array,
-        error_code_array, timeout_ms);
-}
-
 /* exposed wrappers around the id-generator code */
 static inline int PINT_id_gen_safe_register(
     PVFS_sys_op_id *new_id,
@@ -635,18 +622,7 @@ int PINT_client_wait_internal(
     int *out_error,
     const char *in_class_str);
 
-void PINT_sys_release(PVFS_sys_op_id op_id);
-
 /* internal helper macros */
-/** Waits for completion of a system interface function. */
-#define PINT_sys_wait(op_id, in_op_str, out_error)            \
-PINT_client_wait_internal(op_id, in_op_str, out_error, "sys")
-
-#define PINT_mgmt_wait(op_id, in_op_str, out_error)           \
-PINT_client_wait_internal(op_id, in_op_str, out_error, "mgmt")
-
-#define PINT_mgmt_release(op_id) PINT_sys_release(op_id)
-
 #define PINT_init_sysint_credentials(sm_p_cred_p, user_cred_p)\
 do {                                                          \
     if (user_cred_p == NULL)                                  \

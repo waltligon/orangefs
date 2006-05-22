@@ -539,6 +539,22 @@ PVFS_error PVFS_sys_listeattr(
     PVFS_credentials *credentials,
     PVFS_sysresp_listeattr *resp);
 
+/* exported test functions for isys calls */
+
+int PVFS_sys_testsome(
+    PVFS_sys_op_id *op_id_array,
+    int *op_count, /* in/out */
+    void **user_ptr_array,
+    int *error_code_array,
+    int timeout_ms);
+
+int PVFS_sys_wait(
+    PVFS_sys_op_id op_id,
+    const char *in_op_str,
+    int *out_error);
+
+void PVFS_sys_release(PVFS_sys_op_id op_id);
+
 #endif
 
 /* @} */

@@ -251,7 +251,7 @@ PVFS_error PVFS_sys_remove(
     }
     else
     {
-        ret = PINT_sys_wait(op_id, "remove", &error);
+        ret = PVFS_sys_wait(op_id, "remove", &error);
         if (ret)
         {
             PVFS_perror_gossip("PVFS_sys_wait call", ret);
@@ -259,7 +259,7 @@ PVFS_error PVFS_sys_remove(
         }
     }
 
-    PINT_sys_release(op_id);
+    PVFS_sys_release(op_id);
     return error;
 }
 

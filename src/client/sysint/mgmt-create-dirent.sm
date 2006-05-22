@@ -142,7 +142,7 @@ PVFS_error PVFS_mgmt_create_dirent(
     }
     else
     {
-        ret = PINT_mgmt_wait(op_id, "create_dirent", &error);
+        ret = PVFS_mgmt_wait(op_id, "create_dirent", &error);
         if (ret)
         {
             PVFS_perror_gossip("PVFS_mgmt_wait call", ret);
@@ -150,7 +150,7 @@ PVFS_error PVFS_mgmt_create_dirent(
         }
     }
 
-    PINT_mgmt_release(op_id);
+    PVFS_mgmt_release(op_id);
     return error;
 }
 

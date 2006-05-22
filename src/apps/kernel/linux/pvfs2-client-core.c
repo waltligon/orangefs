@@ -2110,7 +2110,7 @@ static inline PVFS_error repost_unexp_vfs_request(
     assert(vfs_request);
 
     PINT_dev_release_unexpected(&vfs_request->info);
-    PINT_sys_release(vfs_request->op_id);
+    PVFS_sys_release(vfs_request->op_id);
 
     memset(vfs_request, 0, sizeof(vfs_request_t));
     vfs_request->is_dev_unexp = 1;
@@ -2425,7 +2425,7 @@ static PVFS_error process_vfs_requests(void)
         memset(vfs_request_array, 0,
                (MAX_NUM_OPS * sizeof(vfs_request_t *)));
 
-        ret = PINT_sys_testsome(
+        ret = PVFS_sys_testsome(
             op_id_array, &op_count, (void **)vfs_request_array,
             error_code_array, PVFS2_CLIENT_DEFAULT_TEST_TIMEOUT_MS);
 
@@ -2731,7 +2731,7 @@ int main(int argc, char **argv)
     for(i = 0; i < MAX_NUM_OPS; i++)
     {
         PINT_dev_release_unexpected(&s_vfs_request_array[i]->info);
-        PINT_sys_release(s_vfs_request_array[i]->op_id);
+        PVFS_sys_release(s_vfs_request_array[i]->op_id);
         free(s_vfs_request_array[i]);
     }
 
