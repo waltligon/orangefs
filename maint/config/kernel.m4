@@ -325,6 +325,10 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		[#define __KERNEL__
 		 #include <linux/syscalls.h>
 		 ] )
+	AC_CHECK_HEADERS([asm/ioctl32.h], [], [], 
+		[#define __KERNEL__
+		 #include <asm/ioctl32.h>
+		 ] )
 
 	AC_MSG_CHECKING(for generic_permission api in kernel)
 	dnl if this test passes, the kernel does not have it

@@ -91,7 +91,9 @@ typedef unsigned long sector_t;
 #include <linux/poll.h>
 #include <linux/rwsem.h>
 #include <asm/unaligned.h>
-
+#ifdef HAVE_ASM_IOCTL32_H
+#include <asm/ioctl32.h>
+#endif
 
 #ifdef HAVE_XATTR
 #include <linux/xattr.h>
