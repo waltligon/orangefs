@@ -70,6 +70,12 @@ int main(int   argc,
      * from the command line and are returned to the application. */
     gtk_init(&argc, &argv);
 
+    if(argc != 1)
+    {
+        fprintf(stderr, "Error: no command line arguments are supported.\n");
+	return(-1);
+    }
+
     /* create a new window */
     main_window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
     gtk_window_set_title(GTK_WINDOW(main_window), "Karma");
