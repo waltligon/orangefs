@@ -1147,7 +1147,7 @@ int PINT_dbpf_keyval_iterate(
         gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                      "Exited: PINT_dpbf_keyval_iterate\n");
 
-        gossip_lerr("db_p->cursor failed\n");
+        gossip_lerr("db_p->cursor failed: db error %s\n", db_strerror(ret));
         *count = 0;
         return -dbpf_db_error_to_trove_error(ret);
     }
@@ -1474,7 +1474,7 @@ static int dbpf_keyval_iterate_cursor_get(
     if (ret != 0)
     {
         gossip_lerr("Failed to perform cursor get:"
-                    "\n\thandle: %llu\n\ttype: %d\n\tkey: %s\n db error: %s\n",
+                    "\n\thandle: %llu\n\ttype: %d\n\tkey: %s\n\tdb error: %s\n",
                     llu(key_entry.handle), db_flags, 
                     key_entry.key, db_strerror(ret));
         return -dbpf_db_error_to_trove_error(ret);
