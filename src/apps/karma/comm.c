@@ -339,6 +339,8 @@ static int gui_comm_stats_collect(
     void)
 {
     int ret;
+    char msgbuf[64];
+    char err_msg[64];
 
 #ifdef FAKE_STATS
     return 0;
@@ -359,15 +361,16 @@ static int gui_comm_stats_collect(
         for (i = 0; i < internal_details->count_used; i++)
         {
             int dummy;
-            char msgbuf[64];
 
+            PVFS_strerror_r(internal_details->error[i].error, err_msg, 64);
             snprintf(msgbuf,
                      64,
-                     "Server %s not responding.",
+                     "Server %s not responding: %s\n",
                      PVFS_mgmt_map_addr(cur_fsid,
                                         &creds,
                                         internal_details->error[i].addr,
-                                        &dummy));
+                                        &dummy),
+                     err_msg);
             gui_message_new(msgbuf);
         }
 
@@ -375,7 +378,14 @@ static int gui_comm_stats_collect(
     }
     else
     {
-        PVFS_perror("PVFS_mgmt_statfs_list", ret);
+
+        PVFS_strerror_r(ret, err_msg, 64);
+        snprintf(msgbuf,
+                 64,
+                 "Error: PVFS_mgmt_statfs_list(): %s\n",
+                 err_msg);
+        gui_message_new(msgbuf);
+
         return -1;
     }
 #endif
@@ -387,6 +397,8 @@ static int gui_comm_perf_collect(
     void)
 {
     int ret;
+    char err_msg[64];
+    char msgbuf[64];
 
 #ifndef FAKE_PERF
     ret = PVFS_mgmt_perf_mon_list(cur_fsid,
@@ -406,15 +418,16 @@ static int gui_comm_perf_collect(
         for (i = 0; i < internal_details->count_used; i++)
         {
             int dummy;
-            char msgbuf[64];
 
+            PVFS_strerror_r(internal_details->error[i].error, err_msg, 64);
             snprintf(msgbuf,
                      64,
-                     "Server %s not responding.",
+                     "Server %s not responding: %s\n",
                      PVFS_mgmt_map_addr(cur_fsid,
                                         &creds,
                                         internal_details->error[i].addr,
-                                        &dummy));
+                                        &dummy),
+                    err_msg);
             gui_message_new(msgbuf);
         }
 
@@ -422,7 +435,13 @@ static int gui_comm_perf_collect(
     }
     else
     {
-        PVFS_perror("PVFS_mgmt_perf_mon_list", ret);
+        PVFS_strerror_r(ret, err_msg, 64);
+        snprintf(msgbuf,
+                 64,
+                 "Error: PVFS_mgmt_perf_mon_list(): %s\n",
+                 err_msg);
+        gui_message_new(msgbuf);
+
         return -1;
     }
 #endif

@@ -114,14 +114,17 @@ int main(
     /* show the window */
     gtk_widget_show_all(main_window);
 
-    status_timer_callback(NULL);
-    traffic_timer_callback(NULL);
+    if(status_timer_callback(NULL) != FALSE)
+    {
+        gtk_timeout_add(5000 /* 5 seconds */ ,
+                        status_timer_callback, NULL);
+    }
 
-    gtk_timeout_add(5000 /* 5 seconds */ ,
-                    status_timer_callback, NULL);
-
-    gtk_timeout_add(1000 /* 1 second */ ,
-                    traffic_timer_callback, NULL);
+    if(traffic_timer_callback(NULL) != FALSE)
+    {
+        gtk_timeout_add(1000 /* 1 second */ ,
+                        traffic_timer_callback, NULL);
+    }
 
     /* handle events */
     gtk_main();
@@ -139,7 +142,9 @@ static gint status_timer_callback(
     ret = gui_comm_stats_retrieve(&svr_stat, &svr_stat_ct);
     if (ret != 0)
     {
-        return -1;
+        gui_message_new("Disabling stats retrieval.  Restart karma to try again.\n");
+        //gtk_timeout_remove(status_timer_tag);
+        return FALSE;
     }
 
     gui_status_data_prepare(svr_stat, svr_stat_ct, &graph_data);
@@ -164,6 +169,11 @@ static gint traffic_timer_callback(
     static struct gui_traffic_graph_data *traffic_graph = NULL;
 
     ret = gui_comm_traffic_retrieve(&raw_traffic_data, &svr_stat_ct);
+    if(ret != 0)
+    {
+        gui_message_new("Disabling traffic retrieval.  Restart karma to try again.\n");
+        return(FALSE);
+    }
 
     /* we are responsible for allocating the traffic graph data storage;
      * this way we only have to do it once.
