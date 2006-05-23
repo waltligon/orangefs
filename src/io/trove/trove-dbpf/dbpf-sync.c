@@ -97,7 +97,11 @@ int dbpf_sync_coalesce(
                      sync_counter);
 
         /* do sync right now */
+        gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
+                     "[SYNC_COALESCE]:\tindividual sync start\n");
         DBPF_DB_SYNC_IF_NECESSARY((&qop_p->op), dbp, ret);
+        gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
+                     "[SYNC_COALESCE]:\tindividual sync stop\n");
         if(ret < 0)
         {
             return ret;
@@ -126,7 +130,11 @@ int dbpf_sync_coalesce(
         /* sync this operation and signal completion of the others
          * waiting to be synced
          */
+        gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
+                     "[SYNC_COALESCE]:\tcoalesce sync start\n");
         DBPF_DB_SYNC_IF_NECESSARY((&qop_p->op),  dbp, ret);
+        gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
+                     "[SYNC_COALESCE]:\tcoalesce sync stop\n");
         if(ret < 0)
         {
             return ret;
