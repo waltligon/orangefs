@@ -24,6 +24,9 @@ static int internal_stat_ct;
 static PVFS_BMI_addr_t *internal_addrs = NULL;
 static int internal_addr_ct;
 
+static int64_t meta_read_prev = 0;
+static int64_t meta_write_prev = 0;
+
 /* performance data structures */
 static struct PVFS_mgmt_perf_stat **internal_perf;
 static uint32_t *internal_perf_ids;
@@ -474,8 +477,10 @@ int gui_comm_traffic_retrieve(struct gui_traffic_raw_data **svr_traffic,
 	/* deal with format in which metadata is returned */
 	if (internal_perf[svr][0].valid_flag)
 	{
-	    raw->meta_write_ops -= internal_perf[svr][0].metadata_write;
-	    raw->meta_read_ops  -= internal_perf[svr][0].metadata_read;
+	    raw->meta_write_ops -= meta_write_prev;
+	    raw->meta_read_ops  -= meta_read_prev;
+	    meta_write_prev += raw->meta_write_ops;
+	    meta_read_prev += raw->meta_read_ops;
 
 	    /* simple, if somewhat inaccurate, handling of overflow */
 	    if (raw->meta_write_ops < 0) raw->meta_write_ops = 0;
