@@ -193,9 +193,28 @@ void gui_status_data_prepare(
     }
     units = gui_units_size(svr_stat[i].ram_total_bytes, &divisor);
 
+    graph_data[GUI_STATUS_MEMORY].count = svr_stat_ct;
+
+#ifdef __KARMA_DISABLE_MEM_USAGE__
+    snprintf(graph_data[GUI_STATUS_MEMORY].title,
+             64, "Physical Memory (%s)", units);
+    graph_data[GUI_STATUS_MEMORY].has_second_val = 0;
+
+    total_free_space = 0.0;
+    for (j = 0; j < svr_stat_ct; j++)
+    {
+        float first =
+            ((float) (svr_stat[j].ram_total_bytes)) / divisor;
+        graph_data[GUI_STATUS_MEMORY].first_val[j] = first;
+        graph_data[GUI_STATUS_MEMORY].bar_color[j] = BAR_GREEN;
+        total_free_space += first;
+    }
+
+    snprintf(graph_data[GUI_STATUS_MEMORY].footer,
+             64, "Total Physical Memory: %.2f%s", total_free_space, units);
+#else
     snprintf(graph_data[GUI_STATUS_MEMORY].title,
              64, "Used/Free Memory (%s)", units);
-    graph_data[GUI_STATUS_MEMORY].count = svr_stat_ct;
     graph_data[GUI_STATUS_MEMORY].has_second_val = 1;
 
     total_free_space = 0.0;
@@ -203,14 +222,13 @@ void gui_status_data_prepare(
     {
         float first, second;
         int bar;
-
         first =
             ((float) (svr_stat[j].ram_total_bytes - svr_stat[j].ram_free_bytes))
             / divisor;
         second = ((float) svr_stat[j].ram_free_bytes) / divisor;
 
-        graph_data[GUI_STATUS_MEMORY].first_val[j] = first;
         graph_data[GUI_STATUS_MEMORY].second_val[j] = second;
+        graph_data[GUI_STATUS_MEMORY].first_val[j] = first;
 
         /* aesthetics: somewhat arbitrary decisions on colors */
         if (second / (first + second) < 0.1)
@@ -227,6 +245,7 @@ void gui_status_data_prepare(
 
     snprintf(graph_data[GUI_STATUS_MEMORY].footer,
              64, "Total Free Memory: %.2f%s", total_free_space, units);
+#endif
 
     /* process cpu information */
     snprintf(graph_data[GUI_STATUS_CPU].title, 64, "<CPU info not supported>");

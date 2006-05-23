@@ -23,7 +23,9 @@ static GtkTreeViewColumn *gui_details_col[GUI_DETAILS_TYPE + 1];
 /* THESE MUST MATCH WITH ENUM IN KARMA.H! */
 static char *gui_details_column_name[] = { "Server Address\n(BMI)",
     "Total RAM",
+#ifndef __KARMA_DISABLE_MEM_USAGE__
     "Available RAM",
+#endif
     "Uptime",
     "Total Handles",
     "Available Handles",
@@ -254,9 +256,11 @@ void gui_details_view_fill(
              gui_details_column_name[GUI_DETAILS_RAM_TOT], rt_units);
     gtk_tree_view_column_set_title(col[GUI_DETAILS_RAM_TOT], titlebuf);
 
+#ifndef __KARMA_DISABLE_MEM_USAGE__
     snprintf(titlebuf, sizeof(titlebuf), "%s\n(%s)",
              gui_details_column_name[GUI_DETAILS_RAM_AVAIL], ra_units);
     gtk_tree_view_column_set_title(col[GUI_DETAILS_RAM_AVAIL], titlebuf);
+#endif
 
     snprintf(titlebuf, sizeof(titlebuf), "%s\n(%s)",
              gui_details_column_name[GUI_DETAILS_UPTIME], up_units);
@@ -337,8 +341,10 @@ static void gui_details_view_insert(
 
     snprintf(fmtbuf[GUI_DETAILS_RAM_TOT], 12, "%.2f",
              (float) s_stat->ram_total_bytes / rt_div);
+#ifndef __KARMA_DISABLE_MEM_USAGE__
     snprintf(fmtbuf[GUI_DETAILS_RAM_AVAIL], 12, "%.2f",
              (float) s_stat->ram_free_bytes / ra_div);
+#endif
     snprintf(fmtbuf[GUI_DETAILS_UPTIME], 12, "%.2f",
              (float) s_stat->uptime_seconds / up_div);
     snprintf(fmtbuf[GUI_DETAILS_HANDLES_TOT], 12, "%.2f",
@@ -375,8 +381,10 @@ static void gui_details_view_insert(
                        s_stat->bmi_address,
                        GUI_DETAILS_RAM_TOT,
                        fmtbuf[GUI_DETAILS_RAM_TOT],
+#ifndef __KARMA_DISABLE_MEM_USAGE__
                        GUI_DETAILS_RAM_AVAIL,
                        fmtbuf[GUI_DETAILS_RAM_AVAIL],
+#endif
                        GUI_DETAILS_UPTIME,
                        fmtbuf[GUI_DETAILS_UPTIME],
                        GUI_DETAILS_HANDLES_TOT,
