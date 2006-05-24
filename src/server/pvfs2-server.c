@@ -716,9 +716,10 @@ static int server_initialize(
 {
     int ret = 0, i = 0; 
     FILE *dummy;
+    uint64_t debug_mask = 0;
     
     assert(server_config.logfile != NULL);
-    dummy = fopen(server_config.logfile, "w");
+    dummy = fopen(server_config.logfile, "a");
     if (dummy == NULL)
     {
         int tmp_errno = errno;
@@ -746,8 +747,11 @@ static int server_initialize(
         /* log starting message again so it appears in log file, not just
          * console
          */
+        gossip_set_debug_mask(1, GOSSIP_SERVER_DEBUG);
         gossip_debug(GOSSIP_SERVER_DEBUG,
            "PVFS2 Server version %s starting.\n", PVFS2_VERSION);
+        debug_mask = PVFS_debug_eventlog_to_mask(server_config.event_logging);
+        gossip_set_debug_mask(1, debug_mask);
     }
 
     /* handle backgrounding, setting up working directory, and so on. */
