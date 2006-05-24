@@ -190,7 +190,7 @@ static int small_io_start_job(PINT_server_op *s_op, job_status_s *js_p)
             s_op->req->u.small_io.fs_id,
             s_op->req->u.small_io.handle,
             (char **)&s_op->resp.u.small_io.buffer,
-            &result.bytes,
+            &s_op->u.small_io.result_bytes,
             1,
             s_op->u.small_io.offsets,
             s_op->u.small_io.sizes,
