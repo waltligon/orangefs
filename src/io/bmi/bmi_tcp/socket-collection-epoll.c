@@ -180,7 +180,9 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
     int tmp_count;
     int i;
     int skip_flag;
+#ifndef __PVFS2_JOB_THREADED__
     struct epoll_event event;
+#endif
 
     /* init the outgoing arguments for safety */
     *outcount = 0;
