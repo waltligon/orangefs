@@ -14,7 +14,7 @@
  * NOTE:  I am making read bits implicit in the implementation.  A poll
  * will always check to see if there is data to be read on a socket.
  */
-
+#include <stdio.h>
 #include <sys/poll.h>
 #include <string.h>
 #include <unistd.h>
@@ -71,6 +71,15 @@ socket_collection_p BMI_socket_collection_init(int new_server_socket)
     {
 	free(tmp_scp->pollfd_array);
 	free(tmp_scp);
+        return NULL;
+    }
+    if (pipe(tmp_scp->pipe_fd) < 0)
+    {
+        perror("pipe failed:");
+        free(tmp_scp->addr_array);
+	free(tmp_scp->pollfd_array);
+	free(tmp_scp);
+        return NULL;
     }
 
     tmp_scp->array_max = POLLFD_ARRAY_START;
@@ -85,6 +94,11 @@ socket_collection_p BMI_socket_collection_init(int new_server_socket)
 	tmp_scp->pollfd_array[0].events = POLLIN;
 	tmp_scp->addr_array[0] = NULL;
 	tmp_scp->array_count++;
+        /* Add the pipe_fd[0] fd to the poll in set always */
+        tmp_scp->pollfd_array[1].fd = tmp_scp->pipe_fd[0];
+        tmp_scp->pollfd_array[1].events = POLLIN;
+        tmp_scp->addr_array[1] = NULL;
+        tmp_scp->array_count++;
     }
 
     return (tmp_scp);
@@ -177,7 +191,12 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
     int tmp_count;
     int i;
     int skip_flag;
+    int pipe_notify = 0;
+    struct timeval start, end;
+    int allowed_poll_time = poll_timeout;
 
+    gettimeofday(&start, NULL);
+do_again:
     /* init the outgoing arguments for safety */
     *outcount = 0;
     memset(maps, 0, (sizeof(method_addr_p) * incount));
@@ -266,7 +285,7 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
     /* actually do the poll() work */
     do
     {
-	ret = poll(scp->pollfd_array, scp->array_count, poll_timeout);
+	ret = poll(scp->pollfd_array, scp->array_count, allowed_poll_time);
     } while(ret < 0 && errno == EINTR);
     old_errno = errno;
 
@@ -292,7 +311,17 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
 	{
 	    break;
 	}
-
+        /* make sure we dont return the pipe fd as being ready */
+        if (scp->pollfd_array[i].fd == scp->pipe_fd[0])
+        {
+            if (scp->pollfd_array[i].revents) {
+                char c;
+                /* drain the pipe */
+                read(scp->pipe_fd[0], &c, 1);
+                pipe_notify = 1;
+            }
+            continue;
+        }
 	/* anything ready on this socket? */
 	if (scp->pollfd_array[i].revents)
 	{
@@ -342,6 +371,20 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
     }
 
     gen_mutex_unlock(&scp->mutex);
+
+    /* Under the following conditions (i.e. all of them must be true) we go back to redoing poll
+     * a) There were no outstanding sockets/fds that had data
+     * b) There was a pipe notification that our socket sets have changed
+     * c) we havent exhausted our allotted time
+     */
+    if (*outcount == 0 && pipe_notify == 1)
+    {
+        gettimeofday(&end, NULL);
+        timersub(&end, &start, &end);
+        allowed_poll_time -= (end.tv_sec * 1000 + end.tv_usec/1000);
+        if (allowed_poll_time > 0)
+            goto do_again;
+    }
 
     return (0);
 }
