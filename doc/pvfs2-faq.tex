@@ -445,6 +445,24 @@ run-time.  There are two ways to teach the system where to find libraries:
 I would suggest the ld.so.conf approach, since that will work for all users on
 your system.
 
+\subsection{PVFS2 performance gets really bad once a day, then gets
+     better again}
+
+Several sites have reported poor PVFS2 performance early in the day that
+eventually goes away until the next day, when the cycle begins again.  Daily
+cron jobs might be the culprit in these cases.  In particular, most Linux
+distributions have a daily cron job (maybe called 'slocate', 'locate' or
+'updatedb') that indexes the entire file system.  Networked file systems such
+as NFS are often excluded from this indexing.  
+
+The exact steps to remove PVFS2 from this indexing process vary among
+distributions.  Generally speaking, there should be a cron script in
+\texttt{/etc/cron.daily} called 'slocate' or 'updatedb'.  That script should
+have a list of excluded file systems (like /var/run and /tmp) and flie types (
+like 'proc' and 'nfs').  Either add 'pvfs2' to the list of file types or add
+the pvfs2 mount point to the list of excluded file systems.   Be sure to do
+this on all machines in your cluster.  
+
 \subsection{Make kmod24 fails with ``structure has no member...'' errors}
 
 On some Redhat and Redhat-derived distributions, ``make kmod24'' might
