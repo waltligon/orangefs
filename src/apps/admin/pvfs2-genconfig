@@ -845,7 +845,7 @@ foreach (split(',', $type)) {
     } elsif ($_ eq "ib") {
         $port{'ib'} = ib_get_port();
     } else {
-        die "Sorry.  At this time, only the tcp,gm, and ib protocols are available\nfor use with this configuration utility.\n";
+        die "Sorry.  At this time, only the tcp, gm and ib protocols are available\nfor use with this configuration utility.\n";
     }
 }
 $bmi_module = join(',', map("bmi_" . $_, split(',', $type)));
