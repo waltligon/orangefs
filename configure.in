@@ -544,17 +544,13 @@ test_for_epoll()
   AC_MSG_RESULT(no))
 }
 
-dnl use epoll() when available, but fall back to poll if not available or
-dnl optionally requested to be disabled
-
+dnl optionally enable use of epoll() on Linux instead of poll()
 AC_ARG_ENABLE(epoll,
 [  --enable-epoll          Enables use of epoll for TCP/IP polling],
-[ if test "x$enableval" = "xno" ; then
-      BUILD_EPOLL=0 
-  else
+[ if test "x$enableval" = "xyes" ; then
       test_for_epoll
   fi
-],test_for_epoll)
+],)
 
 dnl enable resolving addresses all the way to hostnames in bmi reverse lookup
 AC_ARG_ENABLE(rev-hostname,

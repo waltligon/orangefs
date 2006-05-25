@@ -1330,7 +1330,6 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
 
-
 ac_aux_dir=
 for ac_dir in maint/config $srcdir/maint/config; do
   if test -f $ac_dir/install-sh; then
@@ -8373,18 +8372,13 @@ rm -f conftest.err conftest.$ac_objext \
       conftest$ac_exeext conftest.$ac_ext
 }
 
-
 # Check whether --enable-epoll or --disable-epoll was given.
 if test "${enable_epoll+set}" = set; then
   enableval="$enable_epoll"
-   if test "x$enableval" = "xno" ; then
-      BUILD_EPOLL=0
-  else
+   if test "x$enableval" = "xyes" ; then
       test_for_epoll
   fi
 
-else
-  test_for_epoll
 fi;
 
 # Check whether --enable-rev-hostname or --disable-rev-hostname was given.
