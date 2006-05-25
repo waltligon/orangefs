@@ -82,10 +82,9 @@ struct PVFS_mgmt_dspace_info
     PVFS_handle handle;		/* handle this struct refers to */
     PVFS_ds_type type;		/* type of object */
     PVFS_size b_size;		/* size of bstream (if applicable) */
-    PVFS_size k_size;		/* number of keyvals (if applicable) */
     PVFS_handle dirdata_handle; /* directory data handle (if applicable) */
 };
-endecode_fields_8_struct(
+endecode_fields_7_struct(
   PVFS_mgmt_dspace_info,
   PVFS_error, error_code,
   skip4,,
@@ -93,7 +92,6 @@ endecode_fields_8_struct(
   PVFS_ds_type, type,
   skip4,,
   PVFS_size, b_size,
-  PVFS_size, k_size,
   PVFS_handle, dirdata_handle)
 
 /* individual datapoint from event monitoring */

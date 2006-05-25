@@ -44,6 +44,8 @@ extern gen_mutex_t dbpf_attr_cache_mutex;
 int dbpf_method_id = -1;
 char dbpf_method_name[] = "dbpf";
 
+extern int TROVE_db_cache_size_bytes;
+
 struct dbpf_storage *my_storage_p = NULL;
 static int db_open_count, db_close_count;
 
@@ -61,6 +63,7 @@ DB_ENV *dbpf_getdb_env(const char *path, unsigned int env_flags, int *error)
         *error = -EINVAL;
         return NULL;
     }
+
     ret = db_env_create(&dbenv, 0);
     if (ret != 0)
     {
@@ -68,12 +71,61 @@ DB_ENV *dbpf_getdb_env(const char *path, unsigned int env_flags, int *error)
         *error = ret;
         return NULL;
     }
-    ret = dbenv->open(dbenv, path, env_flags, 0);
-    if (ret != 0) {
-        gossip_lerr("dbpf_getdb_env: %s\n", db_strerror(ret));
-        *error = ret;
-        return NULL;
+
+    if(TROVE_db_cache_size_bytes != 0)
+    {
+        gossip_debug(
+            GOSSIP_TROVE_DEBUG, "dbpf using cache size of %d bytes.\n",
+            TROVE_db_cache_size_bytes);
+        ret = dbenv->set_cachesize(dbenv, 0, TROVE_db_cache_size_bytes, 1);
+        if(ret != 0)
+        {
+            gossip_err("Error: failed to set db cache size: %s\n",
+                       db_strerror(ret));
+            *error = ret;
+            return NULL;
+        }
     }
+    else
+    {
+        gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf using default db cache size.\n");
+    }
+
+    if(my_storage_p && (my_storage_p->flags & TROVE_DB_CACHE_MMAP))
+    {
+        /* user wants the standard db cache which uses mmap */
+        ret = dbenv->open(dbenv, path, 
+                             DB_INIT_MPOOL|DB_CREATE|DB_THREAD, 0);
+        if(ret != 0)
+        {
+            gossip_lerr("dbpf_getdb_env(%s): %s\n", path, db_strerror(ret));
+            *error = ret;
+            return NULL;
+        }
+    }
+    else
+    {
+        /* default to using shm style cache */
+
+        ret = dbenv->set_shm_key(dbenv, 646567223);
+        if(ret != 0)
+        {
+            gossip_lerr("dbenv->set_shm_key(%s): %s\n",
+                        path, db_strerror(ret));
+            *error = ret;
+            return NULL;
+        }
+
+        ret = dbenv->open(dbenv, path, 
+                             DB_INIT_MPOOL|DB_CREATE|DB_THREAD|DB_SYSTEM_MEM, 0);
+        if(ret != 0)
+        {
+            gossip_lerr("dbpf_getdb_env(%s): %s\n", path, db_strerror(ret));
+            *error = ret;
+            return NULL;
+        }
+    }
+        
     return dbenv;
 }
 
@@ -127,7 +179,7 @@ void dbpf_error_report(
 #endif
 }
 
-static struct dbpf_storage *dbpf_storage_lookup(char *stoname, int *err_p);
+static struct dbpf_storage *dbpf_storage_lookup(char *stoname, int *err_p, TROVE_ds_flags flags);
 static int dbpf_db_create(const char *sto_path, char *dbname, DB_ENV *envp);
 static DB *dbpf_db_open(const char *sto_path, char *dbname, DB_ENV *envp, int *err_p,
                         int (*compare_fn) (DB *db, const DBT *dbt1, const DBT *dbt2));
@@ -347,7 +399,7 @@ static int dbpf_initialize(char *stoname,
         return ret;
     }
 
-    sto_p = dbpf_storage_lookup(stoname, &ret);
+    sto_p = dbpf_storage_lookup(stoname, &ret, flags);
     if (sto_p == NULL)
     {
         gossip_debug(
@@ -729,6 +781,16 @@ static int dbpf_collection_create(char *collname,
             return -trove_errno_to_trove_error(errno);
         }
     }
+
+    DBPF_GET_STRANDED_BSTREAM_DIRNAME(path_name, PATH_MAX, sto_p->name,
+                                      new_coll_id);
+    ret = mkdir(path_name, 0755);
+    if(ret != 0)
+    {
+        gossip_err("mkdir failed on bstream directory %s\n", path_name);
+        return -trove_errno_to_trove_error(errno);
+    }
+
     return 1;
 }
 
@@ -873,6 +935,50 @@ static int dbpf_collection_remove(char *collname,
     {
         gossip_err("failure removing bstream directory %s\n", path_name);
         ret = -trove_errno_to_trove_error(errno);
+        goto collection_remove_failure;
+    }
+
+    DBPF_GET_STRANDED_BSTREAM_DIRNAME(path_name, PATH_MAX,
+                                      sto_p->name, db_data.coll_id);
+
+    /* remove stranded bstreams directory */
+    current_dir = opendir(path_name);
+    if(current_dir)
+    {
+        while((current_dirent = readdir(current_dir)))
+        {
+            if((strcmp(current_dirent->d_name, ".") == 0) ||
+               (strcmp(current_dirent->d_name, "..") == 0))
+            {
+                continue;
+            }
+            snprintf(tmp_path, PATH_MAX, "%s/%s", path_name,
+                     current_dirent->d_name);
+            if(stat(tmp_path, &file_info) < 0)
+            {
+                gossip_err("error doing stat on bstream entry\n");
+                ret = -trove_errno_to_trove_error(errno);
+                closedir(current_dir);
+                goto collection_remove_failure;
+            }
+            assert(S_ISREG(file_info.st_mode));
+            if(unlink(tmp_path) != 0)
+            {
+                gossip_err("failure removing bstream entry\n");
+                ret = -trove_errno_to_trove_error(errno);
+                closedir(current_dir);
+                goto collection_remove_failure;
+            }
+        }
+        closedir(current_dir);
+    }
+
+    if(rmdir(path_name) != 0)
+    {
+        gossip_err("failure removing bstream directory %s\n", 
+                   path_name);
+        ret = -trove_errno_to_trove_error(errno);
+        goto collection_remove_failure;
     }
 
     DBPF_GET_COLL_DIRNAME(path_name, PATH_MAX,
@@ -1150,7 +1256,7 @@ static int dbpf_collection_lookup(char *collname,
 
     DBPF_GET_DS_ATTRIB_DBNAME(path_name, PATH_MAX,
                               sto_p->name, coll_p->coll_id);
-    coll_p->ds_db = dbpf_db_open(sto_p->name, path_name, coll_p->coll_env, &ret, NULL);
+    coll_p->ds_db = dbpf_db_open(sto_p->name, path_name, coll_p->coll_env, &ret, PINT_trove_dbpf_ds_attr_compare);
     if (coll_p->ds_db == NULL)
     {
         dbpf_putdb_env(coll_p->coll_env, coll_p->path_name);
@@ -1270,7 +1376,7 @@ static int dbpf_collection_lookup(char *collname,
  * structure associated with that collection.
  */
 static struct dbpf_storage *dbpf_storage_lookup(
-    char *stoname, int *error_p)
+    char *stoname, int *error_p, TROVE_ds_flags flags)
 {
     char path_name[PATH_MAX] = {0};
     struct dbpf_storage *sto_p = NULL;
@@ -1309,6 +1415,7 @@ static struct dbpf_storage *dbpf_storage_lookup(
         return NULL;
     }
     sto_p->refct = 0;
+    sto_p->flags = flags;
 
     DBPF_GET_STO_ATTRIB_DBNAME(path_name, PATH_MAX, stoname);
 
@@ -1317,6 +1424,7 @@ static struct dbpf_storage *dbpf_storage_lookup(
     {
         free(sto_p->name);
         free(sto_p);
+        my_storage_p = NULL;
         return NULL;
     }
 
@@ -1328,6 +1436,7 @@ static struct dbpf_storage *dbpf_storage_lookup(
         db_close(sto_p->sto_attr_db);
         free(sto_p->name);
         free(sto_p);
+        my_storage_p = NULL;
         return NULL;
     }
 

@@ -111,6 +111,14 @@ do {                                                                     \
            BSTREAM_DIRNAME);                                             \
 } while (0)
 
+#define STRANDED_BSTREAM_DIRNAME "stranded-bstreams"
+#define DBPF_GET_STRANDED_BSTREAM_DIRNAME(                       \
+        __buf, __path_max, __stoname, __collid)                  \
+    do {                                                         \
+        snprintf(__buf, __path_max, "/%s/%08x/%s",               \
+                 __stoname, __collid, STRANDED_BSTREAM_DIRNAME); \
+    } while(0)
+
 /* arguments are: buf, path_max, stoname, collid, handle */
 #define DBPF_GET_BSTREAM_FILENAME(__b, __pm, __stoname, __cid, __handle)  \
 do {                                                                      \
@@ -118,6 +126,15 @@ do {                                                                      \
            __stoname, __cid, BSTREAM_DIRNAME,                             \
            llu(DBPF_BSTREAM_GET_BUCKET(__handle, __cid)), llu(__handle)); \
 } while (0)
+
+/* arguments are: buf, path_max, stoname, collid, handle */
+#define DBPF_GET_STRANDED_BSTREAM_FILENAME(                  \
+        __b, __pm, __stoname, __cid, __handle)               \
+    do {                                                     \
+        snprintf(__b, __pm, "/%s/%08x/%s/%08llx.bstream",    \
+                 __stoname, __cid, STRANDED_BSTREAM_DIRNAME, \
+                 llu(__handle));                             \
+    } while(0)
 
 /* arguments are: buf, path_max, stoname, collid */
 #define KEYVAL_DBNAME "keyval.db"
@@ -150,6 +167,7 @@ int PINT_dbpf_keyval_remove(
 
 struct dbpf_storage
 {
+    TROVE_ds_flags flags;
     int refct;
     char *name;
     DB *sto_attr_db;
@@ -188,6 +206,8 @@ struct dbpf_collection_db_entry
 #define DBPF_ENTRY_TYPE_COMPONENT  0x02
 
 int PINT_trove_dbpf_keyval_compare(
+    DB * dbp, const DBT * a, const DBT * b);
+int PINT_trove_dbpf_ds_attr_compare(
     DB * dbp, const DBT * a, const DBT * b);
 
 struct dbpf_dspace_create_op

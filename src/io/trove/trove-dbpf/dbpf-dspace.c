@@ -169,6 +169,9 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
     DBT key, data;
     TROVE_extent cur_extent;
     TROVE_object_ref ref = {TROVE_HANDLE_NULL, op_p->coll_p->coll_id};
+    char filename[PATH_MAX + 1];
+
+    memset(filename, 0, PATH_MAX + 1);
 
     cur_extent = op_p->u.d_create.extent_array.extent_array[0];
 
@@ -255,6 +258,37 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
         goto return_error;
     }
     
+    /* check for old bstream files (these should not exist, but it is
+     * possible if the db gets out of sync with the rest of the collection
+     * somehow
+     */
+    DBPF_GET_BSTREAM_FILENAME(filename, PATH_MAX, my_storage_p->name,
+                              op_p->coll_p->coll_id, llu(new_handle));
+    ret = access(filename, F_OK);
+    if(ret == 0)
+    {
+        char new_filename[PATH_MAX+1];
+        memset(new_filename, 0, PATH_MAX+1);
+
+        gossip_err("Warning: found old bstream file %s; "
+                   "moving to stranded-bstreams.\n", 
+                   filename);
+        
+        DBPF_GET_STRANDED_BSTREAM_FILENAME(new_filename, PATH_MAX,
+                                           my_storage_p->name, 
+                                           op_p->coll_p->coll_id,
+                                           llu(new_handle));
+        /* an old file exists.  Move it to the stranded subdirectory */
+        ret = rename(filename, new_filename);
+        if(ret != 0)
+        {
+            ret = -trove_errno_to_trove_error(errno);
+            gossip_err("Error: trove failed to rename stranded bstream: %s\n",
+                       filename);
+            goto return_error;
+        }
+    }
+     
     memset(&data, 0, sizeof(data));
     data.data = &s_attr;
     data.size = sizeof(s_attr);
@@ -268,7 +302,7 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
         goto return_error;
     }
 
-    trove_ds_stored_to_attr(s_attr, attr, 0, 0);
+    trove_ds_stored_to_attr(s_attr, attr, 0);
 
     /* add retrieved ds_attr to dbpf_attr cache here */
     ref.handle = new_handle;
@@ -279,9 +313,7 @@ static int dbpf_dspace_create_op_svc(struct dbpf_op *op_p)
     DBPF_DB_SYNC_IF_NECESSARY(op_p, 
                               op_p->coll_p->ds_db);
 
-    PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
-                    1, PINT_PERF_SUB);
-
+   
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_DSPACE_OPS,
                     1, PINT_PERF_SUB);
 
@@ -862,9 +894,8 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
     DBT key, data;
     TROVE_ds_storedattr_s s_attr;
     TROVE_ds_attributes *attr = NULL;
-    TROVE_size b_size = 0, k_size = 0;
+    TROVE_size b_size = 0;
     struct stat b_stat;
-    DB_BTREE_STAT *k_stat_p = NULL;
     TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
     struct open_cache_ref tmp_ref;
 
@@ -884,28 +915,6 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
             goto return_error;
         }
         b_size = (TROVE_size)b_stat.st_size;
-    }
-
-    ret = op_p->coll_p->ds_db->stat(op_p->coll_p->ds_db,
-#ifdef HAVE_TXNID_PARAMETER_TO_DB_STAT
-                                    (DB_TXN *) NULL,
-#endif
-                                    &k_stat_p,
-#ifdef HAVE_UNKNOWN_PARAMETER_TO_DB_STAT
-                                    NULL,
-#endif
-                                    0);
-    if (ret == 0)
-    {
-        k_size = (TROVE_size) k_stat_p->bt_ndata;
-        free(k_stat_p);
-    }
-    else
-    {
-        gossip_err("Error: unable to stat handle %llu (%llx).\n",
-                   llu(op_p->handle), llu(op_p->handle));
-        ret = -TROVE_EIO;
-        goto return_error;
     }
 
     memset(&key, 0, sizeof(key));
@@ -930,13 +939,13 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
     gossip_debug(
         GOSSIP_TROVE_DEBUG, "ATTRIB: retrieved attributes "
         "from DISK for key %llu\n\tuid = %d, mode = %d, type = %d, "
-        "dfile_count = %d, dist_size = %d\n\tb_size = %lld, k_size = %lld\n",
+        "dfile_count = %d, dist_size = %d\n\tb_size = %lld\n",
         llu(op_p->handle), (int)s_attr.uid, (int)s_attr.mode,
         (int)s_attr.type, (int)s_attr.dfile_count, (int)s_attr.dist_size,
-        llu(b_size), llu(k_size));
+        llu(b_size));
 
     attr = op_p->u.d_getattr.attr_p;
-    trove_ds_stored_to_attr(s_attr, *attr, b_size, k_size);
+    trove_ds_stored_to_attr(s_attr, *attr, b_size);
 
     /* add retrieved ds_attr to dbpf_attr cache here */
     gen_mutex_lock(&dbpf_attr_cache_mutex);
@@ -1480,6 +1489,23 @@ static int dbpf_dspace_testsome(
 
     *inout_count_p = out_count;
     return ((out_count > 0) ? 1 : 0);
+}
+
+int PINT_trove_dbpf_ds_attr_compare(
+    DB * dbp, const DBT * a, const DBT * b)
+{
+    const TROVE_handle * handle_a;
+    const TROVE_handle * handle_b;
+
+    handle_a = (const TROVE_handle *) a->data;
+    handle_b = (const TROVE_handle *) b->data;
+
+    if(*handle_a == *handle_b)
+    {
+        return 0;
+    }
+
+    return (*handle_a < *handle_b) ? -1 : 1;
 }
 
 struct TROVE_dspace_ops dbpf_dspace_ops =

@@ -901,6 +901,7 @@ static int server_initialize_subsystems(
     TROVE_context_id trove_context = -1;
     char buf[16] = {0};
     PVFS_fs_id orig_fsid;
+    PVFS_ds_flags init_flags = 0;
 
     /* Initialize distributions */
     ret = PINT_dist_initialize(0);
@@ -941,8 +942,24 @@ static int server_initialize_subsystems(
 #endif
     *server_status_flag |= SERVER_BMI_INIT;
 
+    ret = trove_collection_setinfo(0, 0, TROVE_DB_CACHE_SIZE_BYTES,
+                                   &server_config.db_cache_size_bytes);
+    /* this should never fail */
+    assert(ret == 0);
+
+    if(server_config.db_cache_type && (!strcmp(server_config.db_cache_type,
+                                               "mmap")))
+    {
+        /* set db cache type to mmap rather than sys */
+        init_flags |= TROVE_DB_CACHE_MMAP;
+    }
+
+    /* Set the buffer size according to configuration file */
+    BMI_set_info(0, BMI_TCP_BUFFER_SEND_SIZE, (void *) server_config.tcp_buffer_size_send);
+    BMI_set_info(0, BMI_TCP_BUFFER_RECEIVE_SIZE, (void *) server_config.tcp_buffer_size_receive);
+
     ret = trove_initialize(server_config.storage_path,
-                           0, &method_name, 0);
+                           init_flags, &method_name, 0);
     if (ret < 0)
     {
         PVFS_perror_gossip("Error: trove_initialize", ret);

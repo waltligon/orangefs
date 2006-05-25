@@ -305,11 +305,10 @@ static int print_dspace(TROVE_coll_id coll_id,
     if (ret != 1) return -1;
 		
     fprintf(stdout,
-	    "\t0x%08llx (dspace_getattr output: type = %s, b_size = %lld, k_size = %lld)\n",
+	    "\t0x%08llx (dspace_getattr output: type = %s, b_size = %lld)\n",
 	    llu(handle),
 	    type_to_string(ds_attr.type),
-	    lld(ds_attr.b_size),
-	    lld(ds_attr.k_size));
+	    lld(ds_attr.b_size));
 
     if (print_keyvals) {
 	ret = print_dspace_keyvals(coll_id, handle,
