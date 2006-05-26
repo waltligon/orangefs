@@ -955,8 +955,10 @@ static int server_initialize_subsystems(
     }
 
     /* Set the buffer size according to configuration file */
-    BMI_set_info(0, BMI_TCP_BUFFER_SEND_SIZE, (void *) server_config.tcp_buffer_size_send);
-    BMI_set_info(0, BMI_TCP_BUFFER_RECEIVE_SIZE, (void *) server_config.tcp_buffer_size_receive);
+    BMI_set_info(0, BMI_TCP_BUFFER_SEND_SIZE, 
+                 (void *)&server_config.tcp_buffer_size_send);
+    BMI_set_info(0, BMI_TCP_BUFFER_RECEIVE_SIZE, 
+                 (void *)&server_config.tcp_buffer_size_receive);
 
     ret = trove_initialize(server_config.storage_path,
                            init_flags, &method_name, 0);

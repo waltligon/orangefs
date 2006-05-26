@@ -650,7 +650,6 @@ int BMI_tcp_memfree(void *buffer,
 int BMI_tcp_set_info(int option,
 		     void *inout_parameter)
 {
-    struct tcp_addr *tcp_addr_data = NULL;
     int ret = -1;
     method_addr_p tmp_addr = NULL;
 
@@ -659,21 +658,23 @@ int BMI_tcp_set_info(int option,
     switch (option)
     {
     case BMI_TCP_BUFFER_SEND_SIZE:
-       tcp_buffer_size_send = (int) inout_parameter;
+       tcp_buffer_size_send = *((int *)inout_parameter);
        ret = 0;
 #ifdef __PVFS2_SERVER__
-       tcp_addr_data = tcp_method_params.listen_addr->method_data;
        /* Set the default socket buffer sizes for the server socket */
-       bmi_set_sock_buffers(tcp_addr_data->socket);
+       bmi_set_sock_buffers(
+           ((struct tcp_addr *)
+            tcp_method_params.listen_addr->method_data)->socket);
 #endif
        break;
     case BMI_TCP_BUFFER_RECEIVE_SIZE:
-       tcp_buffer_size_receive = (int) inout_parameter;
+       tcp_buffer_size_receive = *((int *)inout_parameter);
        ret = 0;
 #ifdef __PVFS2_SERVER__
-       tcp_addr_data = tcp_method_params.listen_addr->method_data;
        /* Set the default socket buffer sizes for the server socket */
-       bmi_set_sock_buffers(tcp_addr_data->socket);
+       bmi_set_sock_buffers(
+           ((struct tcp_addr *)
+            tcp_method_params.listen_addr->method_data)->socket);
 #endif
        break;
     case BMI_FORCEFUL_CANCEL_MODE:

@@ -239,8 +239,10 @@ static int fs_add_parent_cleanup(
     gossip_debug(GOSSIP_SERVER_DEBUG, "Enabling trusted connections!\n");
 #endif
     /* Set the buffer size according to configuration file */
-    BMI_set_info(0, BMI_TCP_BUFFER_SEND_SIZE,    (void *) sm_p->u.get_config.config->tcp_buffer_size_send);
-    BMI_set_info(0, BMI_TCP_BUFFER_RECEIVE_SIZE, (void *) sm_p->u.get_config.config->tcp_buffer_size_receive);
+    BMI_set_info(0, BMI_TCP_BUFFER_SEND_SIZE, 
+                 (void *)&sm_p->u.get_config.config->tcp_buffer_size_send);
+    BMI_set_info(0, BMI_TCP_BUFFER_RECEIVE_SIZE, 
+                 (void *)&sm_p->u.get_config.config->tcp_buffer_size_receive);
 
     /* 
       clear out all configuration information about file systems that
