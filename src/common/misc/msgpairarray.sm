@@ -514,7 +514,7 @@ static int msgpairarray_completion_fn(PARENT_SM *sm_p,
 
         if (msg_p->op_status != 0)
         {
-            PVFS_perror_gossip("msgpair failed, will retry:", msg_p->op_status);
+            PVFS_perror_gossip("msgpair failed, will retry", msg_p->op_status);
                        
             ++need_retry;
             continue;
