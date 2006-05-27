@@ -415,7 +415,7 @@ int BMI_finalize(void)
 int BMI_open_context(bmi_context_id* context_id)
 {
     int context_index;
-    int i,j;
+    int i;
     int ret = 0;
 
     gen_mutex_lock(&context_mutex);
@@ -448,10 +448,12 @@ int BMI_open_context(bmi_context_id* context_id)
               one of them failed; kill this context in the previous
               modules
             */
-	    for(j=(i-1); i>-1; i++)
+            --i;
+            while (i >= 0)
 	    {
 		active_method_table[i]->BMI_meth_close_context(
                     context_index);
+                --i;
 	    }
 	    goto out;
 	}
@@ -1213,7 +1215,6 @@ int BMI_get_info(PVFS_BMI_addr_t addr,
 	    gen_mutex_unlock(&active_method_count_mutex);
 	    return (bmi_errno_to_pvfs(-ENETDOWN));
 	}
-	break;
     case BMI_CHECK_MAXSIZE:
 	gen_mutex_lock(&active_method_count_mutex);
 	for (i = 0; i < active_method_count; i++)
@@ -1267,7 +1268,6 @@ int BMI_get_info(PVFS_BMI_addr_t addr,
 
     default:
 	return (bmi_errno_to_pvfs(-ENOSYS));
-	break;
     }
     return (0);
 }
