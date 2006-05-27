@@ -93,8 +93,7 @@ machine pvfs2_client_remove_sm(
     crdirent_timer,
     crdirent_retry_or_fail,
     crdirent_setup_msgpair,
-    crdirent_xfer_msgpair,
-    crdirent_failure)
+    crdirent_xfer_msgpair)
 {
     state init
     {

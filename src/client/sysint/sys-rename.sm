@@ -88,7 +88,6 @@ machine pvfs2_client_rename_sm(
     rename_getattr_src,
     rename_getattr_src_interpret,
     rename_getattr_dest,
-    rename_getattr_dest_interpret,
     rename_crdirent_setup_msgpair,
     rename_crdirent_xfer_msgpair,
     rename_crdirent_retry_or_fail,
