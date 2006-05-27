@@ -274,7 +274,7 @@ static int list_eattr_comp_fn(
             }
         }
     }
-    return 0;
+    return ret;
 }
 
 /*
