@@ -63,6 +63,7 @@ static ncache *cache = NULL;
 
 static int s_pint_ncache_timeout_ms = PINT_NCACHE_TIMEOUT_MS;
 
+#ifdef ENABLE_NCACHE
 /* compare
  *
  * compares a ncache entry to the search key
@@ -115,6 +116,7 @@ static inline int check_dentry_expiry(struct timeval time_stamp)
     }
     return ret;
 }
+#endif  /* ENABLE_NCACHE */
 
 /* ncache_lookup
  *
