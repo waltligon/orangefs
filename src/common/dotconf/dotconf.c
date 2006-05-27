@@ -495,7 +495,6 @@ char *PINT_dotconf_read_arg(
 	    *cp2++ = *(++cp1);
 	    cp1++;	/* skip the protected one */
 	    continue;
-	    break;
 	default:
 	    break;
 	}
