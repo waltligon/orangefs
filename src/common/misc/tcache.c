@@ -236,7 +236,7 @@ int PINT_tcache_set_info(
             ret = 0;
             break;
         case TCACHE_RECLAIM_PERCENTAGE:
-            if(arg > 100 || arg < 0)
+            if(arg > 100)
             {
                 return(-PVFS_EINVAL);
             }
