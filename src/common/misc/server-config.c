@@ -2830,7 +2830,6 @@ struct filesystem_configuration_s* PINT_config_find_fs_name(
             if (strcmp(cur_fs->file_system_name,fs_name) == 0)
             {
                 return(cur_fs);
-                break;
             }
             cur = PINT_llist_next(cur);
         }
@@ -2865,7 +2864,6 @@ struct filesystem_configuration_s* PINT_config_find_fs_id(
             if (cur_fs->coll_id == fs_id)
             {
                 return(cur_fs);
-                break;
             }
             cur = PINT_llist_next(cur);
         }

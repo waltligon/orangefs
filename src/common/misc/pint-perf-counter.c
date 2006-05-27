@@ -362,7 +362,6 @@ int PINT_perf_set_info(
         default:
             gen_mutex_unlock(pc->mutex);
             return(-PVFS_EINVAL);
-            break;
     }
     
     gen_mutex_unlock(pc->mutex);
@@ -396,7 +395,6 @@ int PINT_perf_get_info(
         default:
             gen_mutex_unlock(pc->mutex);
             return(-PVFS_EINVAL);
-            break;
     }
     
     gen_mutex_unlock(pc->mutex);
