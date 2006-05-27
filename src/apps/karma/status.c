@@ -529,7 +529,7 @@ static gint gui_status_graph_button_press_callback(
     GdkEventButton * event,
     gpointer graph_state_ptr)
 {
-    gint i, width, height, graphwidth, graphoffset, barspace, barheight;
+    gint i, height, barspace, barheight;
     gint topspace = 20;
     struct gui_status_graph_state *g_state;
     struct PVFS_mgmt_server_stat *svr_stat;
@@ -545,10 +545,7 @@ static gint gui_status_graph_button_press_callback(
         return 0;
 
     /* calculate bar placement */
-    width = drawing_area->allocation.width;
     height = drawing_area->allocation.height;
-    graphwidth = (int) (0.8 * (float) width);
-    graphoffset = (width - graphwidth) / 2;
     barspace = (gint) (((float) ((height - topspace) / g_state->nr_bars)) *
                        0.30);
     barheight = ((height - topspace) - g_state->nr_bars * barspace) /
