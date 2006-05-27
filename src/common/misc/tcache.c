@@ -466,8 +466,8 @@ int PINT_tcache_reclaim(
         {
             return(ret);
         }
-        *reclaimed++;
         entries_to_remove--;
+        (*reclaimed)++;
         
         /* break if we hit percentage cap */
         if(entries_to_remove <= 0)
