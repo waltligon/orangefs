@@ -717,7 +717,7 @@ nodep:; @:
 # default rule for generating dependency files
 %.d: %.c
 	$(Q) "  DEP		$@"
-	$(E)$(srcdir)/maint/depend.sh $(call dirname,$*) $(CFLAGS) $(call modcflags,$<) $< > $@
+	$(E)CC=$(CC) $(srcdir)/maint/depend.sh $(call dirname,$*) $(CFLAGS) $(call modcflags,$<) $< > $@
 
 # default rules for building documents in .tex format:
 # TODO: these documentation rules are a big hack!
