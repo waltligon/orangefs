@@ -68,7 +68,7 @@
 #define PVFS_SERVER_TEST_COUNT 64
 
 /* track performance counters for the server */
-struct PINT_perf_key server_keys[] =
+static struct PINT_perf_key server_keys[] =
 {
     {"bytes read", PINT_PERF_READ, 0},
     {"bytes written", PINT_PERF_WRITE, 0},
@@ -103,7 +103,7 @@ typedef struct
     char *pidfile;
 } options_t;
 
-options_t s_server_options = { 0, 0, 1, NULL };
+static options_t s_server_options = { 0, 0, 1, NULL };
 
 PINT_server_trove_keys_s Trove_Common_Keys[] =
 {
