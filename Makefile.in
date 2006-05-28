@@ -172,12 +172,48 @@ CFLAGS += -I $(srcdir)/include -I include -I $(srcdir)
 CFLAGS += $(patsubst %,-I$(srcdir)/%,$(INCLUDES))
   # add package version information
 CFLAGS += -DPVFS2_VERSION="\"@PVFS2_VERSION@\""
-  # special Intel cc options, all warnings, but disable:
-  # remark #279: controlling expression is constant
-  #   shows up in ifdefs such as "do { ... } while (0)" construct
-INTEL_CFLAGS := -Wall -wd279
-  # special gcc options
-GCC_CFLAGS := -Wall -Wstrict-prototypes -pipe
+
+# Intel cc options, enable all warnings, then disable some
+INTEL_CFLAGS := -Wall
+# #279: controlling expression is constant
+# shows up in ifdefs such as "do { ... } while (0)" construct
+INTEL_CFLAGS += -wd279
+# #424: extra ";" ignored e.g. in endecode_fields_2(); usage
+INTEL_CFLAGS += -wd424
+# #1419: external declaration in primary source file; would be good
+# to get rid of these someday
+INTEL_CFLAGS += -wd1419
+# #1419: external definition with no prior declaration; most of these
+# want to be static
+INTEL_CFLAGS += -wd1418
+# #181: argument is incompatible with corresponding format string
+# conversion; investigate someday.
+INTEL_CFLAGS += -wd181
+# #188: enumerated type mixed with another type, like flag |= ENUM_VALUE;
+# bogus compiler warning
+INTEL_CFLAGS += -wd188
+# #869: parameter .. was never referenced, like -Wunused
+INTEL_CFLAGS += -wd869
+# #810: conversion from .. to .. may lose significant bits; investigate
+# but probably harmless
+INTEL_CFLAGS += -wd810
+# #981: operands are evaluated in unspecified order, like printf that
+# uses functions to get some values; unimportant.
+INTEL_CFLAGS += -wd981
+
+# gcc options
+GCC_CFLAGS := -pipe -Wall -Wstrict-prototypes
+# These are quite nice to enable, but will raise some warnings.
+#GCC_CFLAGS += -Wcast-align -Wbad-function-cast
+#GCC_CFLAGS += -Wmissing-prototypes -Wmissing-declarations
+#GCC_CFLAGS += -Wundef -Wpointer-arith
+# These are very noisy.
+#GCC_CFLAGS += -W -Wno-unused -Wno-sign-compare
+#GCC_CFLAGS += -Wcast-qual
+#GCC_CFLAGS += -Wnested-externs
+#GCC_CFLAGS += -Wredundant-decls
+#GCC_CFLAGS += -Wshadow
+#GCC_CFLAGS += -Wwrite-strings
 
 ################################################################
 # Setup component specific flags
