@@ -334,8 +334,6 @@ int PINT_thread_mgr_dev_start(void)
 {
     int ret;
 
-    ret = -1;
-
     gen_mutex_lock(&dev_mutex);
     if(dev_thread_ref_count > 0)
     {
@@ -374,7 +372,7 @@ int PINT_thread_mgr_dev_start(void)
  */
 int PINT_thread_mgr_trove_start(void)
 {
-    int ret = -1;
+    int ret;
 
     gen_mutex_lock(&trove_mutex);
     if(trove_thread_ref_count > 0)
