@@ -239,7 +239,6 @@ static int dbpf_collection_getinfo(TROVE_coll_id coll_id,
 
             return 1;
         }
-        break;
     }
     return ret;
 }
