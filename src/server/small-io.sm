@@ -29,7 +29,6 @@ machine pvfs2_small_io_sm(
     start_job,
     check_size,
     send_response,
-    release,
     cleanup)
 {
     state prelude
