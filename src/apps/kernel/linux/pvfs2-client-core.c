@@ -1728,41 +1728,10 @@ static inline void package_downcall_members(
         case PVFS2_VFS_OP_SYMLINK:
             if (*error_code)
             {
-                /* see comments for create path above */
-                if (*error_code == -PVFS_EEXIST)
-                {
-                    vfs_request->out_downcall.resp.sym.refn =
-                        perform_lookup_on_create_error(
-                            vfs_request->in_upcall.req.sym.parent_refn,
-                            vfs_request->in_upcall.req.sym.entry_name,
-                            &vfs_request->in_upcall.credentials, 0);
-
-                    if (vfs_request->out_downcall.resp.sym.refn.handle ==
-                        PVFS_HANDLE_NULL)
-                    {
-                        gossip_debug(
-                            GOSSIP_CLIENTCORE_DEBUG, "Overwriting error "
-                            "code -PVFS_EEXIST with -PVFS_EACCES "
-                            "(symlink)\n");
-
-                        *error_code = -PVFS_EACCES;
-                    }
-                    else
-                    {
-                        gossip_debug(
-                            GOSSIP_CLIENTCORE_DEBUG, "Overwriting error "
-                            "code -PVFS_EEXIST with 0 (symlink)\n");
-
-                        *error_code = 0;
-                    }
-                }
-                else
-                {
-                    vfs_request->out_downcall.resp.sym.refn.handle =
-                        PVFS_HANDLE_NULL;
-                    vfs_request->out_downcall.resp.sym.refn.fs_id =
-                        PVFS_FS_ID_NULL;
-                }
+                vfs_request->out_downcall.resp.sym.refn.handle =
+                    PVFS_HANDLE_NULL;
+                vfs_request->out_downcall.resp.sym.refn.fs_id =
+                    PVFS_FS_ID_NULL;
             }
             else
             {
