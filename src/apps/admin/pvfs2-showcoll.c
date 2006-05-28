@@ -92,11 +92,9 @@ int main(int argc, char **argv)
 	    fprintf(stderr,
 		    "%s: error: collection iterate failed; aborting!\n",
 		    argv[0]);
-            trove_close_context(coll_id, trove_context);
 	    trove_finalize();
 	    return -1;
 	}
-        trove_close_context(coll_id, trove_context);
 	trove_finalize();
 	return 0;
     }
