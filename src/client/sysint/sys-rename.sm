@@ -893,7 +893,9 @@ static int rename_cleanup(PINT_client_sm *sm_p,
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: cleanup\n");
 
-    sm_p->error_code = js_p->error_code;
+    sm_p->error_code = (sm_p->u.rename.stored_error_code ?
+                        sm_p->u.rename.stored_error_code :
+                        js_p->error_code);
 
     if(sm_p->error_code != 0)
     {
