@@ -629,16 +629,15 @@ void analyze_remaining_handles(PVFS_fs_id cur_fs,
 
     while (handlelist_return_handle(&handle, &server_idx) == 0)
     {
-        int ret;
         PVFS_sysresp_getattr getattr_resp;
         PVFS_object_ref entry_ref;
 
         entry_ref.handle = handle;
         entry_ref.fs_id  = cur_fs;
         /* only remaining handles are dirdata */
-        ret = PVFS_sys_getattr(entry_ref,
-                               PVFS_ATTR_SYS_ALL,
-                               creds, &getattr_resp);
+        PVFS_sys_getattr(entry_ref,
+                         PVFS_ATTR_SYS_ALL,
+                         creds, &getattr_resp);
         if (getattr_resp.attr.objtype != PVFS_TYPE_DIRDATA)
         {
             flag = 0;
