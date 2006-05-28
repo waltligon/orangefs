@@ -336,7 +336,7 @@ int PVFS_Request_resized(PVFS_Request oldreq,
 int PVFS_Address(void *location,
                  PVFS_offset * address)
 {
-    address = location;
+    *address = (char *) location - (char *) PVFS_BOTTOM;
     return PVFS_SUCCESS;
 }
 
