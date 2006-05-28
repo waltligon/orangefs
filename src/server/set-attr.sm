@@ -404,9 +404,6 @@ static int setattr_write_metafile_distribution_if_required(
         return 1;
     }
 
-    /* distribution should take up non-negative space :) */
-    assert(s_op->req->u.setattr.attr.u.meta.dist_size >= 0);
-
     /* set up key and value structure for keyval write */
     s_op->key.buffer = Trove_Common_Keys[METAFILE_DIST_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[METAFILE_DIST_KEY].size;
