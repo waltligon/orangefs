@@ -17,7 +17,6 @@
 
 static int perf_update_do_work(PINT_server_op *s_op, job_status_s* js_p);
 static int perf_update_error(PINT_server_op *s_op, job_status_s* js_p);
-extern struct PINT_perf_counter* PINT_server_pc;
 
 %%
 

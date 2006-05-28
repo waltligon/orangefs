@@ -43,7 +43,6 @@ extern struct qlist_head dbpf_op_queue;
 extern gen_mutex_t dbpf_op_queue_mutex;
 #endif
 extern gen_mutex_t dbpf_attr_cache_mutex;
-extern struct PINT_perf_counter* PINT_server_pc;
 
 int64_t s_dbpf_metadata_writes = 0, s_dbpf_metadata_reads = 0;
 

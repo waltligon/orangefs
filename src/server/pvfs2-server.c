@@ -79,7 +79,6 @@ struct PINT_perf_key server_keys[] =
     {"request scheduler", PINT_PERF_REQSCHED, PINT_PERF_PRESERVE},
     {NULL, 0, 0},
 };
-extern struct PINT_perf_counter* PINT_server_pc;
 
 /* For the switch statement to know what interfaces to shutdown */
 static PINT_server_status_flag server_status_flag;

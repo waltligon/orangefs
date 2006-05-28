@@ -14,8 +14,6 @@
 #include "pvfs2-internal.h"
 #include "pint-perf-counter.h"
 
-extern struct PINT_perf_counter *PINT_server_pc;
-
 /* final-response state machine:
  * This is used as a nested state machine to perform two primary tasks:
  * - release the operation from the request scheduler

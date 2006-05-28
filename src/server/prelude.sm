@@ -17,8 +17,6 @@
 #include "pvfs2-internal.h"
 #include "pint-perf-counter.h"
 
-extern struct PINT_perf_counter *PINT_server_pc;
-
 /* prelude state machine:
  * This is a nested state machine that performs initial setup 
  * steps that are common to many server operations.

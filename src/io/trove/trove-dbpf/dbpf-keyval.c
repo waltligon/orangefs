@@ -38,8 +38,6 @@
 #include "pvfs2-internal.h"
 #include "pint-perf-counter.h"
 
-extern struct PINT_perf_counter *PINT_server_pc;
-
 #define DBPF_MAX_KEY_LENGTH PVFS_NAME_MAX
 
 /**

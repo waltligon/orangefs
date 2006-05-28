@@ -50,8 +50,6 @@ struct result_chain_entry
     struct PINT_thread_mgr_trove_callback trove_callback;
 };
 
-extern struct PINT_perf_counter* PINT_server_pc;
-
 /* fp_queue_item describes an individual buffer being used within the flow */
 struct fp_queue_item
 {

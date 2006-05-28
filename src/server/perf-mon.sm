@@ -17,7 +17,6 @@
 
 static int perf_mon_cleanup(PINT_server_op *s_op, job_status_s* js_p);
 static int perf_mon_do_work(PINT_server_op *s_op, job_status_s* js_p);
-extern struct PINT_perf_counter* PINT_server_pc;
 
 static uint64_t* static_start_time_array_ms = NULL;
 static uint64_t* static_interval_array_ms = NULL;

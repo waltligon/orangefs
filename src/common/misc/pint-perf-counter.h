@@ -69,6 +69,9 @@ struct PINT_perf_counter
     uint64_t* interval_array_ms;          /**< array of interval lengths */
 };
 
+/** server-wide perf counter structure */
+extern struct PINT_perf_counter *PINT_server_pc;
+
 struct PINT_perf_counter* PINT_perf_initialize(
     struct PINT_perf_key* key_array);
 
