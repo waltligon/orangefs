@@ -332,7 +332,7 @@ static void *dev_thread_function(void *ptr)
  */
 int PINT_thread_mgr_dev_start(void)
 {
-    int ret;
+    int ret = 0;
 
     gen_mutex_lock(&dev_mutex);
     if(dev_thread_ref_count > 0)
@@ -341,8 +341,7 @@ int PINT_thread_mgr_dev_start(void)
 	 * reference count and return
 	 */
 	dev_thread_ref_count++;
-	gen_mutex_unlock(&dev_mutex);
-	return(0);
+        goto out;
     }
 
     dev_thread_running = 1;
@@ -350,16 +349,17 @@ int PINT_thread_mgr_dev_start(void)
     ret = pthread_create(&dev_thread_id, NULL, dev_thread_function, NULL);
     if(ret != 0)
     {
-	gen_mutex_unlock(&dev_mutex);
 	dev_thread_running = 0;
 	/* TODO: convert error code */
-	return(-ret);
+        ret = -ret;
+        goto out;
     }
 #endif
     dev_thread_ref_count++;
 
+out:
     gen_mutex_unlock(&dev_mutex);
-    return(0);
+    return ret;
 }
 
 
