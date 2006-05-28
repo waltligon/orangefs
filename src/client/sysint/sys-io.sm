@@ -1153,7 +1153,6 @@ static int io_analyze_results(PINT_client_sm *sm_p,
                               job_status_s *js_p)
 {
     int ret = -PVFS_EINVAL, i = 0;
-    PVFS_size tmp_size = 0;
     PVFS_object_attr *attr;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "(%p) io state: "
@@ -1195,8 +1194,6 @@ static int io_analyze_results(PINT_client_sm *sm_p,
             {
                 PINT_client_io_ctx *cur_ctx = &sm_p->u.io.contexts[i];
                 assert(cur_ctx);
-
-                tmp_size = sm_p->u.io.total_size;
 
                 ret = io_check_context_status(
                     cur_ctx, sm_p->u.io.io_type, &sm_p->u.io.total_size);
