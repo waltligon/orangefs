@@ -1439,7 +1439,7 @@ void PINT_release_pvfstab(void)
     gen_mutex_unlock(&s_stat_tab_mutex);
 }
 
-inline uint32_t PVFS_util_sys_to_object_attr_mask(
+uint32_t PVFS_util_sys_to_object_attr_mask(
     uint32_t sys_attrmask)
 {
 
@@ -1480,7 +1480,7 @@ inline uint32_t PVFS_util_sys_to_object_attr_mask(
     return attrmask;
 }
 
-inline uint32_t PVFS_util_object_to_sys_attr_mask( 
+uint32_t PVFS_util_object_to_sys_attr_mask( 
     uint32_t obj_mask)
 {
     int sys_mask = 0;

@@ -88,10 +88,10 @@ void PVFS_util_make_size_human_readable(
     int max_out_len,
     int use_si_units);
 
-inline uint32_t PVFS_util_sys_to_object_attr_mask(
+uint32_t PVFS_util_sys_to_object_attr_mask(
     uint32_t sys_attrmask);
 
-inline uint32_t PVFS_util_object_to_sys_attr_mask( 
+uint32_t PVFS_util_object_to_sys_attr_mask( 
     uint32_t obj_mask);
 
 static inline int PVFS2_translate_mode(int mode)
