@@ -14,7 +14,7 @@
 /* a private internal type */
 typedef struct 
 {
-    char *keyword;
+    const char *keyword;
     uint64_t mask_val;
 } __keyword_mask_t;
 
@@ -142,7 +142,7 @@ uint64_t PVFS_debug_eventlog_to_mask(const char *event_logging)
   to simply iterate all keywords, position should start at 0
   and be incremented repeatedly until this method returns NULL.
 */
-char *PVFS_debug_get_next_debug_keyword(int position)
+const char *PVFS_debug_get_next_debug_keyword(int position)
 {
     int num_entries = (int)(sizeof(s_keyword_mask_map) /
                             sizeof(__keyword_mask_t));

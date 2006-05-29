@@ -567,7 +567,7 @@ static inline int PINT_id_gen_safe_unregister(
 }
 
 /* debugging method for getting a string macthing the op_type */
-char *PINT_client_get_name_str(int op_type);
+const char *PINT_client_get_name_str(int op_type);
 
 /* used with post call to tell the system what state machine to use
  * when processing a new PINT_client_sm structure.

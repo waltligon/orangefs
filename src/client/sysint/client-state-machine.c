@@ -782,12 +782,12 @@ void PVFS_mgmt_release(PVFS_mgmt_op_id op_id)
     }
 }
 
-char *PINT_client_get_name_str(int op_type)
+const char *PINT_client_get_name_str(int op_type)
 {
     typedef struct
     {
         int type;
-        char *type_str;
+        const char *type_str;
     } __sys_op_info_t;
 
     static __sys_op_info_t op_info[] =

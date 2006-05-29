@@ -1083,7 +1083,7 @@ static PVFS_size PINT_s_si_size_table[NUM_SIZES] =
     SI_GIGABYTE, SI_MEGABYTE, SI_KILOBYTE
 };
 
-static char *PINT_s_str_size_table[NUM_SIZES] =
+static const char *PINT_s_str_size_table[NUM_SIZES] =
 {
     /*"Y", "Z", "E", "P","T", */
     "G", "M", "K"

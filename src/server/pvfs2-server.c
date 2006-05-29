@@ -116,7 +116,7 @@ PINT_server_trove_keys_s Trove_Common_Keys[] =
 };
 
 /* extended attribute name spaces supported in PVFS2 */
-char *PINT_eattr_namespaces[] =
+const char *PINT_eattr_namespaces[] =
 {
     "system.",
     "user.",
