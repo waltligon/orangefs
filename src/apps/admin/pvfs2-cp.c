@@ -19,6 +19,7 @@
 #include <fcntl.h>
 #include <time.h>
 #include <libgen.h>
+#include <getopt.h>
 
 #include "pvfs2.h"
 #include "str-utils.h"
@@ -215,9 +216,6 @@ main_out:
  */
 static struct options* parse_args(int argc, char* argv[])
 {
-    /* getopt stuff */
-    extern char* optarg;
-    extern int optind, opterr, optopt;
     char flags[] = "tvs:n:b:";
     int one_opt = 0;
 

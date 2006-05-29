@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <limits.h>
 #include <assert.h>
+#include <getopt.h>
 
 #include "pvfs2.h"
 #include "pvfs2-mgmt.h"
@@ -934,9 +935,6 @@ static void print_entry(char *name,
  */
 static struct options* parse_args(int argc, char* argv[])
 {
-    /* getopt stuff */
-    extern char* optarg;
-    extern int optind, opterr, optopt;
     char flags[] = "dvkm:f:";
     int one_opt = 0;
     int len = 0;

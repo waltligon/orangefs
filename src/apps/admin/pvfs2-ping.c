@@ -14,6 +14,7 @@
 #include <sys/time.h>
 #include <time.h>
 #include <stdlib.h>
+#include <getopt.h>
 
 #include "pvfs2.h"
 #include "pvfs2-mgmt.h"
@@ -469,9 +470,6 @@ static void print_mntent(struct PVFS_sys_mntent *entries, int num_entries)
  */
 static struct options* parse_args(int argc, char* argv[])
 {
-    /* getopt stuff */
-    extern char* optarg;
-    extern int optind, opterr, optopt;
     char flags[] = "vm:";
     int one_opt = 0;
     int len;

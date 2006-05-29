@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <limits.h>
 #include <assert.h>
+#include <getopt.h>
 
 #include "pvfs2.h"
 #include "pvfs2-mgmt.h"
@@ -1397,10 +1398,6 @@ static void handlelist_print(struct handlelist *hl)
 
 static struct options *parse_args(int argc, char *argv[])
 {
-    /* getopt stuff */
-    extern char *optarg;
-    extern int optind, opterr, optopt;
-
     int one_opt = 0, len = 0, ret = -1;
     struct options *opts = NULL;
 

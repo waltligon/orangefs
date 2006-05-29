@@ -16,6 +16,7 @@
 #include <sys/types.h>
 #include <pwd.h>
 #include <grp.h>
+#include <getopt.h>
 
 #include "pvfs2.h"
 #include "str-utils.h"
@@ -193,9 +194,6 @@ int pvfs2_chown (PVFS_uid owner, PVFS_gid group, char *destfile) {
  */
 static struct options* parse_args(int argc, char* argv[])
 {
-    /* getopt stuff */
-    extern char* optarg;
-    extern int optind, opterr, optopt;
     char flags[] = "v";
     int one_opt = 0;
     int owner = 0;
