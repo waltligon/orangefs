@@ -37,6 +37,27 @@ static void do_print_attr(struct PVFS_ds_storedattr_s *attr, PVFS_handle h)
 	return;
 }
 
+int PINT_trove_dbpf_ds_attr_compare(
+    DB * dbp, const DBT * a, const DBT * b)
+{
+    const PVFS_handle * handle_a;
+    const PVFS_handle * handle_b;
+
+	 if (a->size > b->size)
+		 return 1;
+	 if (a->size < b->size)
+		 return -1;
+    handle_a = (const PVFS_handle *) a->data;
+    handle_b = (const PVFS_handle *) b->data;
+
+    if(*handle_a == *handle_b)
+    {
+        return 0;
+    }
+
+    return (*handle_a < *handle_b) ? -1 : 1;
+}
+
 int main(int argc, char *argv[])
 {
 	DB *db;
@@ -67,6 +88,7 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "db_create: %s\n", db_strerror(ret));
 		exit(1);
 	}
+	db->set_bt_compare(db, &PINT_trove_dbpf_ds_attr_compare);
 	if ((ret = db->set_flags(db, DB_RECNUM)) != 0)
 	{
 		fprintf(stderr, "db->set_flags: %s\n", db_strerror(ret));

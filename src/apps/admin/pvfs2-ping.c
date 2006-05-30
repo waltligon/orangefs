@@ -224,9 +224,12 @@ int main(int argc, char **argv)
 
     PVFS_error_details_free(error_details);
 
-    /* if we hit this point, then everything is ok */
-    printf("   Ok; root handle is owned by exactly one server.\n");
-    printf("\n");
+    if (!err)
+    {
+        /* if we hit this point, then everything is ok */
+        printf("   Ok; root handle is owned by exactly one server.\n");
+        printf("\n");
+    }
 
     PVFS_sys_finalize();
 

@@ -752,8 +752,9 @@ do {                                                      \
     {                                                     \
         wake_up_device_for_return(new_op);                \
     }                                                     \
+    new_op = NULL;                                        \
     pvfs_bufmap_put(buffer_index);                        \
-    *offset = original_offset;                            \
+    buffer_index = -1;                                    \
 } while(0)
 
 #ifdef HAVE_AIO_VFS_SUPPORT

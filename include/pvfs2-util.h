@@ -149,6 +149,31 @@ inline static PVFS_time PVFS_util_mkversion_time(PVFS_time version)
 }
 #endif /* __KERNEL__ */
 
+static inline char *get_object_type(int objtype)
+{
+    static char *obj_types[] =
+    {
+         "NONE", "METAFILE", "DATAFILE",
+         "DIRECTORY", "SYMLINK", "DIRDATA", "UNKNOWN"
+    };
+    switch(objtype)
+    {
+    case PVFS_TYPE_NONE:
+         return obj_types[0];
+    case PVFS_TYPE_METAFILE:
+         return obj_types[1];
+    case PVFS_TYPE_DATAFILE:
+         return obj_types[2];
+    case PVFS_TYPE_DIRECTORY:
+         return obj_types[3];
+    case PVFS_TYPE_SYMLINK:
+         return obj_types[4];
+    case PVFS_TYPE_DIRDATA:
+         return obj_types[5];
+    }
+    return obj_types[6];
+}
+
 #endif /* __PVFS2_UTIL_H */
 
 /*

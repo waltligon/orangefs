@@ -1255,7 +1255,7 @@ static int dbpf_collection_lookup(char *collname,
 
     DBPF_GET_DS_ATTRIB_DBNAME(path_name, PATH_MAX,
                               sto_p->name, coll_p->coll_id);
-    coll_p->ds_db = dbpf_db_open(sto_p->name, path_name, coll_p->coll_env, &ret, PINT_trove_dbpf_ds_attr_compare);
+    coll_p->ds_db = dbpf_db_open(sto_p->name, path_name, coll_p->coll_env, &ret, &PINT_trove_dbpf_ds_attr_compare);
     if (coll_p->ds_db == NULL)
     {
         dbpf_putdb_env(coll_p->coll_env, coll_p->path_name);

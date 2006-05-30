@@ -2079,7 +2079,7 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
     struct tcp_op *tcp_op_data = NULL;
     struct tcp_msg_header bogus_header;
     struct op_list_search_key key;
-    int copy_size = 0;
+    bmi_size_t copy_size = 0;
     bmi_size_t total_copied = 0;
     int i;
 
