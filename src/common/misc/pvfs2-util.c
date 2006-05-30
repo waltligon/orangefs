@@ -266,28 +266,31 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
      */
     for (i = 0; (i < file_count && !targetfile); i++)
     {
-        PINT_fstab_open(mnt_fp, file_list[i]);
-        if (mnt_fp)
+        if(file_list[i])
         {
-            while ((tmp_ent = PINT_fstab_next_entry(mnt_fp)))
+            PINT_fstab_open(mnt_fp, file_list[i]);
+            if (mnt_fp)
             {
-                if(!(PINT_FSTAB_NAME(tmp_ent)) || 
-                   !(strncmp(PINT_FSTAB_NAME(tmp_ent), "#", 1)))
+                while ((tmp_ent = PINT_fstab_next_entry(mnt_fp)))
                 {
-                    /* this entry is a comment */
+                    if(!(PINT_FSTAB_NAME(tmp_ent)) || 
+                       !(strncmp(PINT_FSTAB_NAME(tmp_ent), "#", 1)))
+                    {
+                        /* this entry is a comment */
+                        PINT_fstab_entry_destroy(tmp_ent);
+                        continue;
+                    }
+
+                    if (strcmp(PINT_FSTAB_TYPE(tmp_ent), "pvfs2") == 0)
+                    {
+                        targetfile = file_list[i];
+                        tmp_mntent_count++;
+                    }
+
                     PINT_fstab_entry_destroy(tmp_ent);
-                    continue;
                 }
-
-                if (strcmp(PINT_FSTAB_TYPE(tmp_ent), "pvfs2") == 0)
-                {
-                    targetfile = file_list[i];
-                    tmp_mntent_count++;
-                }
-
-                PINT_fstab_entry_destroy(tmp_ent);
+                PINT_fstab_close(mnt_fp);
             }
-            PINT_fstab_close(mnt_fp);
         }
     }
 
