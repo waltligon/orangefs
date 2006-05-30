@@ -23,7 +23,7 @@
 \begin{document}
 \maketitle
 
-\begin{verbatim}$Id: concepts.tex,v 1.1 2003-01-24 23:29:18 pcarns Exp $\end{verbatim}
+\begin{verbatim}$Id: concepts.tex,v 1.2 2006-05-30 20:26:07 pw Exp $\end{verbatim}
 \section{Introduction}
 
 PVFS2 represents a complete redesign and reimplementation of the
@@ -57,10 +57,10 @@ to the terminology and concepts used in the other pvfs2 documents.
 \end{description}
 
 \item[\em BMI (Buffered Message Interface)] abstracts network communication.  
-   currently BMI supports
-   tcp and GM, but could also support protocols like VIA and Infiniband.
-   ( XXX: since this is a {\em PVFS2} document, more details about BMI
-   internals are best left to the BMI document, no?)
+   Currently BMI supports
+   TCP, Myricom/GM, and InfiniBand using either VAPI or OpenIB APIs.
+   It has been extended to at least two other protocols not included in the
+   distribution.
    
 \item[\em flows] a flow describes the movement of file data from client
    initialization to putting bits on disk.  It encompasses both
