@@ -77,3 +77,7 @@ Bitstream, Inc.
 
 SDL project
 -- pvfs2-config borrows heavily from sdl-config
+
+Kyle Schochenmaier
+-- Ported BMI InfiniBand to OpenIB API
+
