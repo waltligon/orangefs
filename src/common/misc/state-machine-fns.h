@@ -78,8 +78,8 @@ static inline int PINT_state_machine_next(struct PINT_OP_STATE *s,
     int code_val = r->error_code;       /* temp to hold the return code */
     int retval;            /* temp to hold return value of state action */
     union PINT_state_array_values *loc; /* temp pointer into state memory */
-    char * state_name;
-    char * machine_name;
+    const char * state_name;
+    const char * machine_name;
 
     do {
 	/* skip over the current state action to get to the return code list */
@@ -135,10 +135,7 @@ static inline int PINT_state_machine_next(struct PINT_OP_STATE *s,
 	s->current_state += 1; /* skip state flag; now we point to the state
 				* machine */
 
-	/* NOTE: nested_machine is defined as a void * to eliminate a nasty
-	 * cross-structure dependency that I couldn't handle any more.  -- Rob
-	 */
-	s->current_state = ((struct PINT_state_machine_s *) s->current_state->nested_machine)->state_machine;
+	s->current_state = s->current_state->nested_machine->state_machine;
         s->current_state += 2;
     }
 
@@ -170,8 +167,8 @@ static inline int PINT_state_machine_invoke(
     struct PINT_OP_STATE *s, job_status_s *r)
 {
     int retval;
-    char * state_name;
-    char * machine_name;
+    const char * state_name;
+    const char * machine_name;
 
     state_name = PINT_state_machine_current_state_name(s);
     machine_name = PINT_state_machine_current_machine_name(s);
