@@ -620,7 +620,7 @@ static ssize_t do_readv_writev(int type, struct file *file,
                         &seg_count, &seg_array)  /* OUT */ ) < 0)
         {
             pvfs2_error("%s: Failed to split iovecs to satisfy larger "
-                    " than blocksize readv/writev request %d\n", fnstr, ret);
+                    " than blocksize readv/writev request %zd\n", fnstr, ret);
             goto out;
         }
         pvfs2_print("%s: Splitting iovecs from %lu to %lu [max_new %lu]\n", 
@@ -679,8 +679,7 @@ static ssize_t do_readv_writev(int type, struct file *file,
         ret = pvfs_bufmap_get(&buffer_index);
         if (ret < 0)
         {
-            pvfs2_error("%s: pvfs_bufmap_get() "
-                        "failure (%d)\n", fnstr, ret);
+            pvfs2_error("%s: pvfs_bufmap_get() failure (%zd)\n", fnstr, ret);
             goto out;
         }
 
@@ -707,7 +706,7 @@ static ssize_t do_readv_writev(int type, struct file *file,
             if (ret < 0)
             {
                 pvfs2_error("%s: Failed to copy user buffer.  Please make sure "
-                            "that the pvfs2-client is running. %d\n", fnstr, ret);
+                            "that the pvfs2-client is running. %zd\n", fnstr, ret);
                 goto out;
             }
         }
@@ -726,13 +725,13 @@ static ssize_t do_readv_writev(int type, struct file *file,
               */
               if (ret == -EINTR)
               {
-                  pvfs2_print("%s: returning error %d\n", fnstr, ret);
+                  pvfs2_print("%s: returning error %zd\n", fnstr, ret);
               }
               else
               {
                   pvfs2_error(
                         "%s: error on handle %llu, "
-                        "FILE: %s\n  -- returning %d\n",
+                        "FILE: %s\n  -- returning %zd\n",
                         fnstr, llu(pvfs2_ino_to_handle(inode->i_ino)),
                         (file && file->f_dentry && file->f_dentry->d_name.name ?
                          (char *)file->f_dentry->d_name.name : "UNKNOWN"),
