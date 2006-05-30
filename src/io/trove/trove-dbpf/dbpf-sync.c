@@ -60,10 +60,9 @@ void dbpf_sync_context_destroy(int context_index)
 int dbpf_sync_coalesce(
     dbpf_queued_op_t *qop_p)
 {
+    char * optype_string;
     int ret = 0;
     dbpf_sync_context_t * sync_context;
-    int sync_counter;
-    int * coalesce_counter;
     DB * dbp;
 
     dbpf_queued_op_t *ready_op;
@@ -72,15 +71,13 @@ int dbpf_sync_coalesce(
     {
         dbp = qop_p->op.coll_p->keyval_db;
         sync_context = keyval_sync_array[qop_p->op.context_id];
-        gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
-                     "[SYNC_COALESCE]: coalescing keyval ops\n");
+        optype_string = "keyval";
     }
     else if(DBPF_OP_IS_DSPACE(qop_p->op.type))
     {
         dbp = qop_p->op.coll_p->ds_db;
         sync_context = dspace_sync_array[qop_p->op.context_id];
-        gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
-                     "[SYNC_COALESCE]: coalescing dspace ops\n");
+        optype_string = "dspace";
     }
     else
     {
@@ -93,15 +90,17 @@ int dbpf_sync_coalesce(
                      "[SYNC_COALESCE]:\toperation synced "
                      "individually (not coalesced)\n"
                      "\t\tcoalesced: %d\n\t\tqueued: %d\n",
-                     *coalesce_counter,
-                     sync_counter);
+                     sync_context->coalesce_counter,
+                     sync_context->sync_counter);
 
         /* do sync right now */
         gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
-                     "[SYNC_COALESCE]:\tindividual sync start\n");
+                     "[SYNC_COALESCE]:\tindividual %s sync start\n",
+                     optype_string);
         DBPF_DB_SYNC_IF_NECESSARY((&qop_p->op), dbp, ret);
         gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
-                     "[SYNC_COALESCE]:\tindividual sync stop\n");
+                     "[SYNC_COALESCE]:\tindividual %s sync stop\n",
+                     optype_string);
         if(ret < 0)
         {
             return ret;
@@ -118,7 +117,7 @@ int dbpf_sync_coalesce(
         
    gen_mutex_lock(sync_context->mutex);
 
-    if(sync_context->coalesce_counter > s_high_watermark ||
+    if(sync_context->coalesce_counter >= s_high_watermark ||
        sync_context->sync_counter < s_low_watermark)
     {
         gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
@@ -131,10 +130,12 @@ int dbpf_sync_coalesce(
          * waiting to be synced
          */
         gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
-                     "[SYNC_COALESCE]:\tcoalesce sync start\n");
+                     "[SYNC_COALESCE]:\tcoalesce %s sync start: %d\n",
+                     optype_string, sync_context->coalesce_counter);
         DBPF_DB_SYNC_IF_NECESSARY((&qop_p->op),  dbp, ret);
         gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
-                     "[SYNC_COALESCE]:\tcoalesce sync stop\n");
+                     "[SYNC_COALESCE]:\tcoalesce %s sync stop: %d\n",
+                     optype_string, sync_context->coalesce_counter);
         if(ret < 0)
         {
             return ret;
@@ -177,11 +178,8 @@ int dbpf_sync_coalesce(
     else
     {
         gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
-                     "[SYNC_COALESCE]:\tputting on coalescing queue: (%p)\n"
-                     "\t\tcoalesced: %d\n\t\tqueued: %d\n",
-                     qop_p,
-                     sync_context->coalesce_counter,
-                     sync_context->sync_counter);
+                     "[SYNC_COALESCE]:\tcoalescing %s op: %d\n", 
+                     optype_string, sync_context->coalesce_counter);
 
         /* put back on the queue with SYNC_QUEUED state */
         qop_p->op.state = OP_SYNC_QUEUED;
@@ -196,6 +194,7 @@ int dbpf_sync_coalesce(
 
 int dbpf_sync_coalesce_enqueue(dbpf_queued_op_t *qop_p)
 {
+    char * optype_string;
     dbpf_sync_context_t * sync_context;
 
     gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
@@ -212,11 +211,13 @@ int dbpf_sync_coalesce_enqueue(dbpf_queued_op_t *qop_p)
        (qop_p->op.flags & TROVE_KEYVAL_SYNC_COALESCE))
     {
         sync_context = keyval_sync_array[qop_p->op.context_id];
+        optype_string = "keyval";
     }
     else if(DBPF_OP_IS_DSPACE(qop_p->op.type) &&
             (qop_p->op.flags & TROVE_DSPACE_SYNC_COALESCE))
     {
         sync_context = dspace_sync_array[qop_p->op.context_id];
+        optype_string = "dspace";
     }
     else
     {
@@ -233,7 +234,8 @@ int dbpf_sync_coalesce_enqueue(dbpf_queued_op_t *qop_p)
     }
 
     gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
-                 "[SYNC_COALESCE]: enqueue keyval counter: %d\n",
+                 "[SYNC_COALESCE]: enqueue %s counter: %d\n",
+                 optype_string,
                  sync_context->sync_counter);
 
     gen_mutex_unlock(sync_context->mutex);
@@ -244,6 +246,7 @@ int dbpf_sync_coalesce_enqueue(dbpf_queued_op_t *qop_p)
 int dbpf_sync_coalesce_dequeue(
     dbpf_queued_op_t *qop_p)
 {
+    char * optype_string;
     dbpf_sync_context_t * sync_context;
     gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
                  "[SYNC_COALESCE]: dequeue called\n");
@@ -259,11 +262,13 @@ int dbpf_sync_coalesce_dequeue(
        (qop_p->op.flags & TROVE_KEYVAL_SYNC_COALESCE))
     {
         sync_context = keyval_sync_array[qop_p->op.context_id];
+        optype_string = "keyval";
     }
     else if(DBPF_OP_IS_DSPACE(qop_p->op.type) &&
        (qop_p->op.flags & TROVE_DSPACE_SYNC_COALESCE))
     {
         sync_context = dspace_sync_array[qop_p->op.context_id];
+        optype_string = "dspace";
     }
     else
     {
@@ -274,7 +279,8 @@ int dbpf_sync_coalesce_dequeue(
     sync_context->sync_counter--;
 
     gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
-                 "[SYNC_COALESCE]: dequeue keyval counter: %d\n",
+                 "[SYNC_COALESCE]: dequeue %s counter: %d\n",
+                 optype_string,
                  sync_context->sync_counter);
 
     gen_mutex_unlock(sync_context->mutex);

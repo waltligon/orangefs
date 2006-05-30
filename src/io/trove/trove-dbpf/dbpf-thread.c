@@ -88,6 +88,7 @@ void *dbpf_thread_function(void *ptr)
         /* check if we any have ops to service in our work queue */
         gen_mutex_lock(&dbpf_op_queue_mutex);
         op_queued_empty = qlist_empty(&dbpf_op_queue);
+        gen_mutex_unlock(&dbpf_op_queue_mutex);
 
         if (!op_queued_empty)
         {
@@ -118,11 +119,12 @@ void *dbpf_thread_function(void *ptr)
                 wait_time.tv_sec++;
             }
 
+            gen_mutex_lock(&dbpf_op_queue_mutex);
             ret = pthread_cond_timedwait(&dbpf_op_incoming_cond,
                                          &dbpf_op_queue_mutex,
                                          &wait_time);
+            gen_mutex_unlock(&dbpf_op_queue_mutex);
         }
-        gen_mutex_unlock(&dbpf_op_queue_mutex);
     }
 
     gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_thread_function ending\n");
@@ -146,6 +148,7 @@ int dbpf_do_one_work_cycle(int *out_count)
     do
     {
         /* grab next op from queue and mark it as in service */
+        gen_mutex_lock(&dbpf_op_queue_mutex);
         cur_op = dbpf_op_queue_shownext(&dbpf_op_queue);
         if (cur_op)
         {
@@ -162,6 +165,7 @@ int dbpf_do_one_work_cycle(int *out_count)
             cur_op->op.state = OP_IN_SERVICE;
             gen_mutex_unlock(&cur_op->mutex);
         }
+        gen_mutex_unlock(&dbpf_op_queue_mutex);
 
         /* if there's no work to be done, return immediately */
         if (cur_op == NULL)
@@ -174,10 +178,7 @@ int dbpf_do_one_work_cycle(int *out_count)
                      "SERVICE ROUTINE (%s) *****\n",
                      dbpf_op_type_to_str(cur_op->op.type));
 
-        /* we don't need to keep the queue locked while servicing */
-        gen_mutex_unlock(&dbpf_op_queue_mutex);
         ret = cur_op->op.svc_fn(&(cur_op->op));
-        gen_mutex_lock(&dbpf_op_queue_mutex);
 
         gossip_debug(GOSSIP_TROVE_OP_DEBUG,"***** FINISHED TROVE "
                      "SERVICE ROUTINE (%s) *****\n",
@@ -220,7 +221,7 @@ int dbpf_do_one_work_cycle(int *out_count)
             }
 #endif
             assert(cur_op->op.state != OP_COMPLETED);
-            dbpf_queued_op_queue_nolock(cur_op);
+            dbpf_queued_op_queue(cur_op);
         }
 
     } while(--max_num_ops_to_service);
