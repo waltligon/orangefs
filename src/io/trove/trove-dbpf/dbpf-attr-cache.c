@@ -454,7 +454,7 @@ int dbpf_attr_cache_insert(
                 gossip_debug(
                     GOSSIP_DBPF_ATTRCACHE_DEBUG,
                     "dbpf_attr_cache_insert: inserting %llu "
-                    "(b_size is %llu\n", llu(key.handle),
+                    "(b_size is %llu)\n", llu(key.handle),
                     llu(cache_elem->attr.b_size));
             }
             ret = 0;
