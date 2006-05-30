@@ -832,7 +832,9 @@ int BMI_gm_set_info(int option,
         case BMI_TCP_BUFFER_RECEIVE_SIZE:
         case BMI_FORCEFUL_CANCEL_MODE:
         case BMI_DROP_ADDR:
+#ifdef USE_TRUSTED
         case BMI_TRUSTED_CONNECTION:
+#endif
             /* these tcp-specific hints mean nothing to GM */
             return 0;
         default:
