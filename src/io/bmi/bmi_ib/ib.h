@@ -5,14 +5,13 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.h,v 1.16 2006-05-13 19:41:28 pw Exp $
+ * $Id: ib.h,v 1.17 2006-05-30 20:24:57 pw Exp $
  */
 #ifndef __ib_h
 #define __ib_h
 
 #include <src/io/bmi/bmi-types.h>
 #include <src/common/quicklist/quicklist.h>
-#include <vapi.h>
 
 #ifdef __GNUC__
 /* #  define __hidden __attribute__((visibility("hidden"))) */
@@ -25,6 +24,10 @@
 
 typedef struct qlist_head list_t;  /* easier to type */
 
+/* 20 8kB buffers allocated to each connection for unexpected messages */
+#define DEFAULT_EAGER_BUF_NUM  (20)
+#define DEFAULT_EAGER_BUF_SIZE (8 << 10)
+
 struct S_buf_head;
 /*
  * Connection record.  Each machine gets its own set of buffers and
@@ -36,22 +39,6 @@ typedef struct {
     /* connection management */
     struct method_addr *remote_map;
     char *peername;  /* string representation of remote_map */
-
-    /* ib local params */
-    VAPI_qp_hndl_t qp;
-    VAPI_qp_hndl_t qp_ack;
-    VAPI_qp_num_t qp_num;
-    VAPI_qp_num_t qp_ack_num;
-    VAPI_mr_hndl_t eager_send_mr;
-    VAPI_mr_hndl_t eager_recv_mr;
-    VAPI_lkey_t eager_send_lkey;  /* for post_sr */
-    VAPI_lkey_t eager_recv_lkey;  /* for post_rr */
-    unsigned int num_unsignaled_wr;  /* keep track of outstanding WRs */
-    unsigned int num_unsignaled_wr_ack;
-    /* ib remote params */
-    IB_lid_t remote_lid;
-    VAPI_qp_num_t remote_qp_num;
-    VAPI_qp_num_t remote_qp_ack_num;
 
     /* per-connection buffers */
     void *eager_send_buf_contig;    /* bounce bufs, for short sends */
@@ -66,6 +53,8 @@ typedef struct {
     int cancelled;  /* was any operation cancelled by BMI */
     int refcnt;  /* sq or rq that need the connection to hang around */
     int closed;  /* closed, but hanging around waiting for zero refcnt */
+
+    void *priv;
 
 } ib_connection_t;
 
@@ -158,17 +147,6 @@ static name_t msg_type_names[] = {
 #endif  /* __ib_c */
 
 /*
- * Fields for memory registration.  Both lkey and rkey are always valid,
- * even if only being used for a BMI_SEND.  Permissions managed at app level
- * not at mem reg level.
- */
-typedef struct {
-    VAPI_mr_hndl_t mrh;
-    VAPI_lkey_t lkey;
-    VAPI_rkey_t rkey;
-} memkeys_t;
-
-/*
  * Pin and cache explicitly allocated things to avoid registration
  * overheads.  Two sources of entries here:  first, when BMI_memalloc
  * is used to allocate big enough chunks, the malloced regions are
@@ -181,7 +159,13 @@ typedef struct {
     void *buf;
     bmi_size_t len;
     int count;  /* refcount, usage of this entry */
-    memkeys_t memkeys;
+
+    /* IB-specific fields */
+    struct {
+	uint64_t mrh;   /* pointer on openib, 32-bit int on vapi */
+	uint32_t lkey;  /* 32-bit mandated by IB spec */
+	uint32_t rkey;
+    } memkeys;
 } memcache_entry_t;
 
 /*
@@ -321,100 +305,47 @@ endecode_fields_5(msg_header_cts_t,
     uint32_t, buflist_num);
 
 /*
- * Internal functions in setup.c used by ib.c.
+ * Generic work completion from poll_cq() for both vapi and openib.
  */
-extern void ib_close_connection(ib_connection_t *c);
-extern void close_connection_drain_qp(VAPI_qp_hndl_t qp);
-extern int ib_tcp_client_connect(ib_method_addr_t *ibmap,
-  struct method_addr *remote_map);
-extern int ib_tcp_server_check_new_connections(void);
-extern int ib_tcp_server_block_new_connections(int timeout_ms);
+struct bmi_ib_wc {
+    uint64_t id;
+    int status;  /* opaque, but zero means success */
+    uint32_t byte_len;
+    uint32_t imm_data;
+    enum { BMI_IB_OP_SEND, BMI_IB_OP_RECV, BMI_IB_OP_RDMA_WRITE } opcode;
+};
 
 /*
- * Method functions in setup.c.
+ * VAPI or OpenIB functions
  */
-extern int BMI_ib_initialize(struct method_addr *listen_addr, int method_id,
-  int init_flags);
-extern int BMI_ib_finalize(void);
-extern struct method_addr *ib_alloc_method_addr(ib_connection_t *c,
-  const char *hostname, int port);
-extern struct method_addr *BMI_ib_method_addr_lookup(const char *id);
-extern int BMI_ib_get_info(int option, void *param);
-extern int BMI_ib_set_info(int option, void *param);
-
-/*
- * Internal functions in ib.c used by setup.c.
- */
-extern void post_rr(const ib_connection_t *c, buf_head_t *bh);
-
-/*
- * Internal functions in util.c.
- */
-void error(const char *fmt, ...) __attribute__((noreturn,format(printf,1,2)));
-void error_errno(const char *fmt, ...)
-  __attribute__((noreturn,format(printf,1,2)));
-void error_xerrno(int errnum, const char *fmt, ...)
-  __attribute__((noreturn,format(printf,2,3)));
-void error_verrno(int ecode, const char *fmt, ...)
-  __attribute__((noreturn,format(printf,2,3)));
-void warning(const char *fmt, ...) __attribute__((format(printf,1,2)));
-void warning_errno(const char *fmt, ...) __attribute__((format(printf,1,2)));
-void info(const char *fmt, ...) __attribute__((format(printf,1,2)));
-extern void *Malloc(unsigned long n) __attribute__((malloc));
-extern u_int64_t swab64(u_int64_t x);
-extern void *qlist_del_head(struct qlist_head *list);
-extern void *qlist_try_del_head(struct qlist_head *list);
-/* convenient to assign this to the owning type */
-#define qlist_upcast(l) ((void *)(l))
-extern const char *sq_state_name(sq_state_t num);
-extern const char *rq_state_name(rq_state_t num);
-extern const char *msg_type_name(msg_type_t num);
-extern void memcpy_to_buflist(ib_buflist_t *buflist, const void *buf,
-  bmi_size_t len);
-extern void memcpy_from_buflist(ib_buflist_t *buflist, void *buf);
-extern int read_full(int fd, void *buf, size_t num);
-extern int write_full(int fd, const void *buf, size_t count);
-
-/*
- * Memory allocation and caching internal functions, in mem.c.
- */
-extern void *memcache_memalloc(void *md, bmi_size_t len, int eager_limit);
-extern int memcache_memfree(void *md, void *buf, bmi_size_t len);
-extern void memcache_register(void *md, ib_buflist_t *buflist);
-extern void memcache_deregister(void *md, ib_buflist_t *buflist);
-extern void *memcache_init(void (*mem_register)(memcache_entry_t *),
-                           void (*mem_deregister)(memcache_entry_t *));
-extern void memcache_shutdown(void *md);
-
-/* 20 8kB buffers allocated to each connection for unexpected messages */
-#define DEFAULT_EAGER_BUF_NUM  (20)
-#define DEFAULT_EAGER_BUF_SIZE (8 << 10)
+struct ib_device_func {
+    int (*new_connection)(ib_connection_t *c, int sock, int is_server);
+    void (*close_connection)(ib_connection_t *c);
+    void (*drain_qp)(ib_connection_t *c);
+    void (*send_bye)(ib_connection_t *c);
+    int (*ib_initialize)(void);
+    void (*ib_finalize)(void);
+    void (*post_sr)(const buf_head_t *bh, u_int32_t len);
+    void (*post_rr)(const ib_connection_t *c, buf_head_t *bh);
+    void (*post_sr_ack)(ib_connection_t *c, int his_bufnum);
+    void (*post_rr_ack)(const ib_connection_t *c, const buf_head_t *bh);
+    void (*post_sr_rdmaw)(ib_send_t *sq, msg_header_cts_t *mh_cts,
+                          void *mh_cts_buf);
+    int (*check_cq)(struct bmi_ib_wc *wc);
+    const char *(*wc_status_string)(int status);
+    void (*mem_register)(memcache_entry_t *c);
+    void (*mem_deregister)(memcache_entry_t *c);
+};
 
 /*
  * State that applies across all users of the device, built at initialization.
  */
 typedef struct {
-    VAPI_hca_hndl_t nic_handle;  /* NIC reference */
-    VAPI_cq_hndl_t nic_cq;  /* single completion queue for all QPs */
     int listen_sock;  /* TCP sock on whih to listen for new connections */
     list_t connection; /* list of current connections */
     list_t sendq;  /* outstanding sent items */
     list_t recvq;  /* outstanding posted receives (or unexpecteds) */
     void *memcache;  /* opaque structure that holds memory cache state */
-
-    /*
-     * Temp array for filling scatter/gather lists to pass to IB functions,
-     * allocated once at start to max size defined as reported by the qp.
-     */
-    VAPI_sg_lst_entry_t *sg_tmp_array;
-    unsigned int sg_max_len;
-
-    /*
-     * Maximum number of outstanding work requests in the NIC, same for both
-     * SQ and RQ, though we only care about SQ on the QP and ack QP.  Used to
-     * decide when to use a SIGNALED completion on a send to avoid WQE buildup.
-     */
-    unsigned int max_outstanding_wr;
 
     /*
      * Both eager and bounce buffers are the same size, and same number, since
@@ -427,8 +358,45 @@ typedef struct {
     int eager_buf_num;
     unsigned long eager_buf_size;
     bmi_size_t eager_buf_payload;
+
+    void *priv;
+    struct ib_device_func func;
+
 } ib_device_t;
 extern ib_device_t *ib_device;
+
+/*
+ * Internal functions in util.c.
+ */
+void error(const char *fmt, ...) __attribute__((noreturn,format(printf,1,2)));
+void error_errno(const char *fmt, ...)
+  __attribute__((noreturn,format(printf,1,2)));
+void error_xerrno(int errnum, const char *fmt, ...)
+  __attribute__((noreturn,format(printf,2,3)));
+void warning(const char *fmt, ...) __attribute__((format(printf,1,2)));
+void warning_errno(const char *fmt, ...) __attribute__((format(printf,1,2)));
+void info(const char *fmt, ...) __attribute__((format(printf,1,2)));
+void *Malloc(unsigned long n) __attribute__((malloc));
+void *qlist_del_head(struct qlist_head *list);
+void *qlist_try_del_head(struct qlist_head *list);
+const char *sq_state_name(sq_state_t num);
+const char *rq_state_name(rq_state_t num);
+const char *msg_type_name(msg_type_t num);
+void memcpy_to_buflist(ib_buflist_t *buflist, const void *buf, bmi_size_t len);
+void memcpy_from_buflist(ib_buflist_t *buflist, void *buf);
+int read_full(int fd, void *buf, size_t num);
+int write_full(int fd, const void *buf, size_t count);
+
+/*
+ * Memory allocation and caching internal functions, in mem.c.
+ */
+void *memcache_memalloc(void *md, bmi_size_t len, int eager_limit);
+int memcache_memfree(void *md, void *buf, bmi_size_t len);
+void memcache_register(void *md, ib_buflist_t *buflist);
+void memcache_deregister(void *md, ib_buflist_t *buflist);
+void *memcache_init(void (*mem_register)(memcache_entry_t *),
+                    void (*mem_deregister)(memcache_entry_t *));
+void memcache_shutdown(void *md);
 
 /*
  * Handle pointer to 64-bit integer conversions.  On 32-bit architectures
@@ -438,8 +406,8 @@ extern ib_device_t *ib_device;
 #define ptr_from_int64(p) (void *)(unsigned long)(p)
 #define int64_from_ptr(p) (u_int64_t)(unsigned long)(p)
 
-/* handy define */
-#define list_count(list) ((int)(sizeof(list) / sizeof(list[0])))
+/* make cast from list entry to actual item explicit */
+#define qlist_upcast(l) ((void *)(l))
 
 /*
  * Tell the compiler about situations that we truly expect to happen
@@ -452,9 +420,15 @@ extern ib_device_t *ib_device;
 #define bmi_ib_unlikely(x)     __builtin_expect(!!(x), 0)
 
 /*
+ * Memory caching settings, needed both by ib.c and vapi.c or openib.c.
+ */
+#define MEMCACHE_BOUNCEBUF 0
+#define MEMCACHE_EARLY_REG 1
+
+/*
  * Debugging macros.
  */
-#if 0
+#if 1
 #define DEBUG_LEVEL 4
 #define debug(lvl,fmt,args...) \
     do { \
@@ -465,7 +439,7 @@ extern ib_device_t *ib_device;
 #  define debug(lvl,fmt,...) do { } while (0)
 #endif
 
-#if 0
+#if 1
 #define assert(cond,fmt,args...) \
     do { \
 	if (bmi_ib_unlikely(!(cond))) \

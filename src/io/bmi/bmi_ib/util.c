@@ -1,25 +1,21 @@
 /*
  * InfiniBand BMI handy utilities that are not really core functions.
  *
- * Copyright (C) 2003-5 Pete Wyckoff <pw@osc.edu>
+ * Copyright (C) 2003-6 Pete Wyckoff <pw@osc.edu>
  *
  * See COPYING in top-level directory.
  *
- * $Id: util.c,v 1.6 2006-05-11 22:13:34 pw Exp $
+ * $Id: util.c,v 1.7 2006-05-30 20:24:57 pw Exp $
  */
 #include <stdio.h>
+#include <string.h>
 #include <stdarg.h>
 #include <errno.h>
 #include <unistd.h>
 #include <src/common/gossip/gossip.h>
-#define __util_c
 
-#ifdef VAPI
-#include <vapi_common.h>  /* VAPI_strerror */
+#define __util_c
 #include "ib.h"
-#else
-#include "openib.h"
-#endif
 
 /*
  * Utility functions.
@@ -65,21 +61,6 @@ error_xerrno(int errnum, const char *fmt, ...)
     gossip_err("Error: %s: %s.\n", s, strerror(errnum));
     exit(1);
 }
-
-#ifdef VAPI
-void __attribute__((noreturn,format(printf,2,3))) __hidden
-error_verrno(int ecode, const char *fmt, ...)
-{
-    char s[2048];
-    va_list ap;
-
-    va_start(ap, fmt);
-    vsprintf(s, fmt, ap);
-    va_end(ap);
-    gossip_err("Error: %s: %s\n", s, VAPI_strerror(ecode));  /* adds a dot */
-    exit(1);
-}
-#endif
 
 void __attribute__((format(printf,1,2))) __hidden
 warning(const char *fmt, ...)

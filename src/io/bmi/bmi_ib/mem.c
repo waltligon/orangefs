@@ -5,16 +5,11 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: mem.c,v 1.6 2006-05-13 19:41:28 pw Exp $
+ * $Id: mem.c,v 1.7 2006-05-30 20:24:57 pw Exp $
  */
 #include <src/common/gen-locks/gen-locks.h>
 #include "pvfs2-internal.h"
-#ifdef VAPI
 #include "ib.h"
-#endif
-#ifdef OPENIB
-#include "openib.h"
-#endif
 
 #ifdef __PVFS2_SERVER__
 #  define ENABLE_MEMCACHE 1
@@ -22,6 +17,11 @@
 #  define ENABLE_MEMCACHE 1
 #endif
 
+/*
+ * This internal state structure is allocated when the init function
+ * is called.  The device hangs onto it and gives it back to us as
+ * needed.
+ */
 typedef struct {
     list_t list;
     gen_mutex_t mutex;

@@ -2,7 +2,30 @@ Notes on the BMI InfiniBand implementation
 
 Copyright (C) 2003-6 Pete Wyckoff <pw@osc.edu>
 
-$Id: README,v 1.4 2006-03-21 21:29:24 pw Exp $
+$Id: README,v 1.5 2006-05-30 20:24:57 pw Exp $
+
+InifiniBand programming interface
+---------------------------------
+The BMI IB implementation was developed for the API provided by Mellanox, a
+major manufacturer of IB silicon, called VAPI.  In 2006, this code was adapted
+to use the OpenIB (now OpenFabrics) API.  Both versions live in this
+directory, bmi_ib, with the VAPI functions in vapi.c and the OpenIB ones in
+openib.c.  Only the basic operations such as posting descriptors and checking
+for completion are implemented separately for each.
+
+Pete Wyckoff wrote the original PVFS2 BMI support for IB on VAPI in 2003.
+Kyle Schochenmaier ported it to the OpenIB API in 2006, at which point the
+original code was modularized and refactored to support the OpenIB port.
+
+
+Compatibility
+-------------
+Hosts running VAPI can talk to hosts running OpenIB.  Hosts of different
+architectures can communicate as well.  Byte order (endianness) and native
+word lengths are handled by BMI, and in the BMI IB devices too.  A single
+host can use either the VAPI interface or the OpenIB interface, but not
+both at the same time.
+
 
 Connection management
 ---------------------
