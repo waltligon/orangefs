@@ -64,6 +64,7 @@ BISON = bison
 FLEX = flex
 BUILD_GM = @BUILD_GM@
 BUILD_IB = @BUILD_IB@
+BUILD_OPENIB = @BUILD_OPENIB@
 BUILD_VIS = @BUILD_VIS@
 BUILD_KARMA = @BUILD_KARMA@
 BUILD_EPOLL = @BUILD_EPOLL@
@@ -207,11 +208,11 @@ GCC_CFLAGS := -pipe -Wall -Wstrict-prototypes
 #GCC_CFLAGS += -Wcast-align -Wbad-function-cast
 #GCC_CFLAGS += -Wmissing-prototypes -Wmissing-declarations
 #GCC_CFLAGS += -Wundef -Wpointer-arith
+#GCC_CFLAGS += -Wnested-externs
+#GCC_CFLAGS += -Wredundant-decls
 # These are very noisy.
 #GCC_CFLAGS += -W -Wno-unused -Wno-sign-compare
 #GCC_CFLAGS += -Wcast-qual
-#GCC_CFLAGS += -Wnested-externs
-#GCC_CFLAGS += -Wredundant-decls
 #GCC_CFLAGS += -Wshadow
 #GCC_CFLAGS += -Wwrite-strings
 
@@ -298,6 +299,15 @@ ifdef BUILD_IB
 	      -lvapi -lmtl_common -lmosal -lmpga -lpthread -ldl
     LIBS += $(IBLIBS)
     SERVERLIBS += $(IBLIBS)
+endif
+
+ifdef BUILD_OPENIB
+ifndef BUILD_IB
+    CFLAGS += -D__STATIC_METHOD_BMI_IB__
+endif
+    OPENIBLIBS := -L@OPENIB_LIBDIR@ -libverbs
+    LIBS += $(OPENIBLIBS)
+    SERVERLIBS += $(OPENIBLIBS)
 endif
 
 # enable mmap-readahead cache (unless disabled by configure)
