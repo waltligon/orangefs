@@ -3,7 +3,6 @@
  *
  * See COPYING in top-level directory.
  */
-
 #ifndef __PINT_DEV_H
 #define __PINT_DEV_H
 

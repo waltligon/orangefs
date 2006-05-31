@@ -3,7 +3,6 @@
  *
  * See COPYING in top-level directory.
  */
-
 #include <unistd.h>
 #include <stdio.h>
 #include <sys/types.h>
