@@ -734,11 +734,11 @@ static ssize_t do_readv_writev(int type, struct file *file,
               {
                   pvfs2_error(
                         "%s: error on handle %llu, "
-                        "FILE: %s\n  -- returning %d\n",
+                        "FILE: %s\n  -- returning %ld\n",
                         fnstr, llu(pvfs2_ino_to_handle(inode->i_ino)),
                         (file && file->f_dentry && file->f_dentry->d_name.name ?
                          (char *)file->f_dentry->d_name.name : "UNKNOWN"),
-                        ret);
+                        (long) ret);
               }
               goto out;
         }
@@ -1137,7 +1137,7 @@ static ssize_t do_readx_writex(int type, struct file *file,
                         &seg_count_stream, &seg_array_stream) /* OUT */) < 0)
         {
             pvfs2_error("Failed to split iovecs to satisfy larger "
-                    " than blocksize readx request %d\n", ret);
+                    " than blocksize readx request %ld\n", (long) ret);
             goto out;
         }
         pvfs2_print("%s: Splitting xtvecs from %lu to %lu [max_new %lu]\n", 
