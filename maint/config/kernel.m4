@@ -184,6 +184,36 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	    AC_MSG_RESULT(no)
 	    )
 
+	dnl checking if we have a readx callback in file_operations
+	AC_MSG_CHECKING(for readx member in file_operations structure)
+	AC_TRY_COMPILE([
+	    #define __KERNEL__
+	    #include <linux/fs.h>
+		 ], [
+		 struct file_operations filop = {
+				.readx = NULL
+		 };
+	    ],
+	    AC_MSG_RESULT(yes)
+		 AC_DEFINE(HAVE_READX_FILE_OPERATIONS, 1, Define if struct file_operations in kernel has readx callback),
+	    AC_MSG_RESULT(no)
+	    )
+
+	dnl checking if we have a writex callback in file_operations
+	AC_MSG_CHECKING(for writex member in file_operations structure)
+	AC_TRY_COMPILE([
+	    #define __KERNEL__
+	    #include <linux/fs.h>
+		 ], [
+		 struct file_operations filop = {
+				.writex = NULL
+		 };
+	    ],
+	    AC_MSG_RESULT(yes)
+		 AC_DEFINE(HAVE_WRITEX_FILE_OPERATIONS, 1, Define if struct file_operations in kernel has writex callback),
+	    AC_MSG_RESULT(no)
+	    )
+
 	AC_MSG_CHECKING(for aio support in kernel)
 	dnl if this test passes, the kernel has it
 	dnl if this test fails, the kernel does not have it

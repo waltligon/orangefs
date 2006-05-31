@@ -9,7 +9,10 @@ MISCSRC += \
 TESTSRC += \
 	$(DIR)/openg.c \
 	$(DIR)/openg-socket.c \
-	$(DIR)/getdents.c
+	$(DIR)/getdents.c \
+	$(DIR)/readwritex.c \
+	$(DIR)/vecio_test.c \
+	$(DIR)/xio_test.c
 
 MPIMISCSRC += \
 	$(DIR)/crc32c.c \

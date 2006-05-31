@@ -245,7 +245,7 @@ static int pvfs2_readdir(
                 char *current_entry = NULL;
                 long bytes_decoded;
 
-                if ((bytes_decoded = readdir_handle_ctor(&rhandle, new_op->trailer_buf,
+                if ((bytes_decoded = readdir_handle_ctor(&rhandle, new_op->downcall.trailer_buf,
                                 buffer_index)) < 0)
                 {
                     ret = bytes_decoded;
@@ -253,10 +253,10 @@ static int pvfs2_readdir(
                             " into a readdir response %d\n", ret);
                     goto err;
                 }
-                if (bytes_decoded != new_op->trailer_size)
+                if (bytes_decoded != new_op->downcall.trailer_size)
                 {
                     pvfs2_error("pvfs2_readdir: # bytes decoded (%ld) != trailer size (%ld)\n",
-                            bytes_decoded, new_op->trailer_size);
+                            bytes_decoded, (long) new_op->downcall.trailer_size);
                     ret = -EINVAL;
                     goto err;
                 }
@@ -387,8 +387,8 @@ static long decode_sys_attr(char *ptr, pvfs2_readdirplus_response_t *readdirplus
         if (readdirplus->attr_array[i].objtype == PVFS_TYPE_SYMLINK &&
                 (readdirplus->attr_array[i].mask & PVFS_ATTR_SYS_LNK_TARGET))
         {
-            int len = 0;
-            dec_string(pptr, &readdirplus->attr_array[i].link_target, &len);
+            int *plen = NULL;
+            dec_string(pptr, &readdirplus->attr_array[i].link_target, plen);
         }
         else {
             readdirplus->attr_array[i].link_target = NULL;
@@ -630,17 +630,17 @@ static int pvfs2_readdirplus(
 
                 ret = 0;
                 if ((bytes_decoded = readdirplus_handle_ctor(&rhandle,
-                                new_op->trailer_buf, buffer_index)) < 0)
+                                new_op->downcall.trailer_buf, buffer_index)) < 0)
                 {
                     ret = bytes_decoded;
                     pvfs2_error("pvfs2_readdirplus: Could not decode trailer buffer "
                             " into a readdirplus response %d\n", ret);
                     goto err;
                 }
-                if (bytes_decoded != new_op->trailer_size)
+                if (bytes_decoded != new_op->downcall.trailer_size)
                 {
                     pvfs2_error("pvfs2_readdirplus: # bytes decoded (%ld) != trailer size (%ld)\n",
-                            bytes_decoded, new_op->trailer_size);
+                            bytes_decoded, (long) new_op->downcall.trailer_size);
                     ret = -EINVAL;
                     goto err;
                 }

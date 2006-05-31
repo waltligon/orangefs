@@ -27,6 +27,15 @@ typedef struct
 
 typedef struct
 {
+    int32_t buf_index;
+    int32_t count;
+    PVFS_object_ref refn;
+    enum PVFS_io_type io_type;
+    int32_t __pad1;
+} pvfs2_iox_request_t;
+
+typedef struct
+{
     int32_t sym_follow;
     int32_t __pad1;
     PVFS_object_ref parent_refn;
@@ -215,10 +224,14 @@ typedef struct
     int32_t type;
     int32_t __pad1;
     PVFS_credentials credentials;
+    /* currently trailer is used only by readx/writex (iox) */
+    PVFS_size  trailer_size;
+    PVFS2_ALIGN_VAR(char *, trailer_buf);
 
     union
     {
 	pvfs2_io_request_t io;
+        pvfs2_iox_request_t iox;
 	pvfs2_lookup_request_t lookup;
 	pvfs2_create_request_t create;
 	pvfs2_symlink_request_t sym;

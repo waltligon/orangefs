@@ -159,6 +159,9 @@
 /* Define if struct file_operations in kernel has readdirplus callback */
 #undef HAVE_READDIRPLUS_FILE_OPERATIONS
 
+/* Define if struct file_operations in kernel has readx callback */
+#undef HAVE_READX_FILE_OPERATIONS
+
 /* Define if kernel has register_ioctl32_conversion */
 #undef HAVE_REGISTER_IOCTL32_CONVERSION
 
@@ -239,6 +242,9 @@
 
 /* Define if DB stat function takes malloc function ptr */
 #undef HAVE_UNKNOWN_PARAMETER_TO_DB_STAT
+
+/* Define if struct file_operations in kernel has writex callback */
+#undef HAVE_WRITEX_FILE_OPERATIONS
 
 /* Define if kernel has xattr support */
 #undef HAVE_XATTR

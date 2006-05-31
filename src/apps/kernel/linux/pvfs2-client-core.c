@@ -135,6 +135,10 @@ typedef struct
     PVFS_ds_keyval  key;/* used only by geteattr, seteattr */
     PVFS_ds_keyval  val;
     void *io_kernel_mapped_buf;
+    /* The next 3 fields are used only by readx, writex */
+    int32_t  iox_count;
+    int32_t  *iox_sizes;
+    PVFS_size *iox_offsets;
 
     struct PVFS_sys_mntent* mntent; /* used only by mount */
 
@@ -1534,6 +1538,79 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
 #endif /* USE_MMAP_RA_CACHE */
 }
 
+static PVFS_error post_iox_request(vfs_request_t *vfs_request)
+{
+    int32_t i;
+    PVFS_error ret = -PVFS_EINVAL;
+    struct read_write_x *rwx = (struct read_write_x *) vfs_request->in_upcall.trailer_buf;
+
+    if (vfs_request->in_upcall.trailer_size <= 0 || rwx == NULL)
+    {
+        gossip_err("post_iox_request: did not receive any offset-length trailers\n");
+        return ret;
+    }
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "%s: size %ld\n",
+            vfs_request->in_upcall.req.iox.io_type == PVFS_IO_READ ? "readx" : "writex",
+            (unsigned long) vfs_request->in_upcall.req.iox.count);
+    ret = PVFS_Request_contiguous(
+        (int32_t)vfs_request->in_upcall.req.iox.count,
+        PVFS_BYTE, &vfs_request->mem_req);
+    assert(ret == 0);
+
+    assert((vfs_request->in_upcall.req.iox.buf_index > -1) &&
+           (vfs_request->in_upcall.req.iox.buf_index <
+            PVFS2_BUFMAP_DESC_COUNT));
+
+    /* get a shared kernel/userspace buffer for the I/O transfer */
+    vfs_request->io_kernel_mapped_buf = 
+        PINT_dev_get_mapped_buffer(BM_IO, s_io_desc, 
+            vfs_request->in_upcall.req.iox.buf_index);
+    assert(vfs_request->io_kernel_mapped_buf);
+
+    /* trailer is interpreted as struct read_write_x */
+    assert(vfs_request->in_upcall.trailer_size % sizeof(struct read_write_x) == 0);
+    vfs_request->iox_count = vfs_request->in_upcall.trailer_size / sizeof(struct read_write_x);
+    vfs_request->iox_sizes = (int32_t *) malloc(vfs_request->iox_count * sizeof(int32_t));
+    assert(vfs_request->iox_sizes);
+    vfs_request->iox_offsets = (PVFS_size *) malloc(vfs_request->iox_count * sizeof(PVFS_size));
+    assert(vfs_request->iox_offsets);
+    for (i = 0; i < vfs_request->iox_count; i++)
+    {
+        vfs_request->iox_sizes[i] = (int32_t) rwx->len;
+        vfs_request->iox_offsets[i] = rwx->off;
+        rwx++;
+    }
+    /* file request is now a hindexed request type */
+    ret = PVFS_Request_hindexed(vfs_request->iox_count, 
+            vfs_request->iox_sizes, vfs_request->iox_offsets, PVFS_BYTE, 
+            &vfs_request->file_req);
+    assert(ret == 0);
+
+    ret = PVFS_isys_io(
+        vfs_request->in_upcall.req.iox.refn, vfs_request->file_req,
+        0, 
+        vfs_request->io_kernel_mapped_buf, vfs_request->mem_req,
+        &vfs_request->in_upcall.credentials,
+        &vfs_request->response.io,
+        vfs_request->in_upcall.req.iox.io_type,
+        &vfs_request->op_id, (void *)vfs_request);
+
+    if (ret < 0)
+    {
+        PVFS_perror_gossip("Posting file I/O failed", ret);
+        free(vfs_request->iox_sizes);
+        vfs_request->iox_sizes = NULL;
+        free(vfs_request->iox_offsets);
+        vfs_request->iox_offsets = NULL;
+        free(vfs_request->in_upcall.trailer_buf);
+        vfs_request->in_upcall.trailer_buf = NULL;
+        PVFS_Request_free(&vfs_request->mem_req);
+        PVFS_Request_free(&vfs_request->file_req);
+    }
+    return ret;
+}
+
+
 #ifdef USE_MMAP_RA_CACHE
 static PVFS_error service_mmap_ra_flush_request(
     vfs_request_t *vfs_request)
@@ -1699,10 +1776,10 @@ static int copy_dirents_to_downcall(vfs_request_t *vfs_request)
 {
     int ret = 0;
     /* get a buffer for xfer of dirents */
-    vfs_request->io_kernel_mapped_buf = 
+    vfs_request->out_downcall.trailer_buf = 
         PINT_dev_get_mapped_buffer(BM_READDIR, s_io_desc, 
             vfs_request->in_upcall.req.readdir.buf_index);
-    if (vfs_request->io_kernel_mapped_buf == NULL)
+    if (vfs_request->out_downcall.trailer_buf == NULL)
     {
         ret = -PVFS_EINVAL;
         goto err;
@@ -1710,7 +1787,7 @@ static int copy_dirents_to_downcall(vfs_request_t *vfs_request)
 
     /* Simply encode the readdir system response into the shared buffer */
     vfs_request->out_downcall.trailer_size = 
-        encode_dirents(vfs_request->io_kernel_mapped_buf,
+        encode_dirents((pvfs2_readdir_response_t *) vfs_request->out_downcall.trailer_buf,
                 &vfs_request->response.readdir);
     if (vfs_request->out_downcall.trailer_size <= 0) 
     {
@@ -1772,10 +1849,10 @@ static int copy_direntplus_to_downcall(vfs_request_t *vfs_request)
 {
     int i, ret = 0;
     /* get a buffer for xfer of direntplus */
-    vfs_request->io_kernel_mapped_buf = 
+    vfs_request->out_downcall.trailer_buf = 
         PINT_dev_get_mapped_buffer(BM_READDIR, s_io_desc, 
         vfs_request->in_upcall.req.readdirplus.buf_index);
-    if (vfs_request->io_kernel_mapped_buf == NULL)
+    if (vfs_request->out_downcall.trailer_buf == NULL)
     {
         ret = -PVFS_EINVAL;
         goto err;
@@ -1783,7 +1860,7 @@ static int copy_direntplus_to_downcall(vfs_request_t *vfs_request)
 
     /* Simply encode the readdirplus system response into the shared buffer */
     vfs_request->out_downcall.trailer_size = 
-        encode_readdirplus_to_buffer(vfs_request->io_kernel_mapped_buf,
+        encode_readdirplus_to_buffer(vfs_request->out_downcall.trailer_buf,
                 &vfs_request->response.readdirplus);
     if (vfs_request->out_downcall.trailer_size <= 0)
     {
@@ -2193,6 +2270,24 @@ static inline void package_downcall_members(
                 *error_code = -PVFS_EINTR;
             }
             break;
+        case PVFS2_VFS_OP_FILE_IOX:
+            free(vfs_request->iox_sizes);
+            vfs_request->iox_sizes = NULL;
+            free(vfs_request->iox_offsets);
+            vfs_request->iox_offsets = NULL;
+            free(vfs_request->in_upcall.trailer_buf);
+            vfs_request->in_upcall.trailer_buf = NULL;
+            PVFS_Request_free(&vfs_request->mem_req);
+            PVFS_Request_free(&vfs_request->file_req);
+
+            vfs_request->out_downcall.resp.iox.amt_complete =
+                (size_t)vfs_request->response.io.total_completed;
+            /* replace non-errno error code to avoid passing to kernel */
+            if (*error_code == -PVFS_ECANCEL)
+            {
+                *error_code = -PVFS_EINTR;
+            }
+            break;
         case PVFS2_VFS_OP_GETXATTR:
             if (*error_code == 0)
             {
@@ -2480,6 +2575,10 @@ static inline PVFS_error handle_unexp_vfs_request(
             posted_op = 1;
             ret = post_io_request(vfs_request);
             break;
+        case PVFS2_VFS_OP_FILE_IOX:
+            posted_op = 1;
+            ret = post_iox_request(vfs_request);
+            break;
 #ifdef USE_MMAP_RA_CACHE
             /*
               if the mmap-readahead-cache is enabled, cache
@@ -2687,7 +2786,7 @@ static PVFS_error process_vfs_requests(void)
                     list_size = 1;
                     total_size = sizeof(pvfs2_downcall_t);
                     if (vfs_request->out_downcall.trailer_size > 0) {
-                        buffer_list[1] = vfs_request->io_kernel_mapped_buf;
+                        buffer_list[1] = vfs_request->out_downcall.trailer_buf;
                         size_list[1] = vfs_request->out_downcall.trailer_size;
                         list_size++;
                         total_size += vfs_request->out_downcall.trailer_size;
@@ -3199,6 +3298,7 @@ static char *get_vfs_op_name_str(int op_type)
         { PVFS2_VFS_OP_PARAM,  "PVFS2_VFS_OP_PARAM" },
         { PVFS2_VFS_OP_PERF_COUNT, "PVFS2_VFS_OP_PERF_COUNT" },
         { PVFS2_VFS_OP_FSKEY,  "PVFS2_VFS_OP_FSKEY" },
+        { PVFS2_VFS_OP_FILE_IOX, "PVFS2_VFS_OP_FILE_IOX" },
         { 0, "UNKNOWN" }
     };
 

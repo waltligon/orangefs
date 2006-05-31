@@ -268,6 +268,13 @@ enum PVFS_async_io_type
 #define PVFS2_XATTR_INDEX_TRUSTED           3
 #define PVFS2_XATTR_INDEX_DEFAULT           4
 
+#ifndef POSIX_ACL_XATTR_ACCESS
+#define POSIX_ACL_XATTR_ACCESS	"system.posix_acl_access"
+#endif
+#ifndef POSIX_ACL_XATTR_DEFAULT
+#define POSIX_ACL_XATTR_DEFAULT	"system.posix_acl_default"
+#endif
+
 #define PVFS2_XATTR_NAME_ACL_ACCESS  POSIX_ACL_XATTR_ACCESS
 #define PVFS2_XATTR_NAME_ACL_DEFAULT POSIX_ACL_XATTR_DEFAULT
 #define PVFS2_XATTR_NAME_TRUSTED_PREFIX "trusted."
@@ -336,8 +343,19 @@ typedef struct
 
     int io_completed;
     wait_queue_head_t io_completion_waitq;
-    void *trailer_buf; /* currently used by readdir and readdirplus to stage the readdir operation */
-    unsigned long trailer_size;
+
+    /* upcalls requiring variable length trailers require that this struct
+     * be in the request list even after client-core does a read() on the device
+     * to dequeue the upcall 
+     * if op_linger field goes to 0, we dequeue this op off the list.
+     * else we let it stay. What gets passed to the read() is 
+     * a) if op_linger field is = 1, pvfs2_kernel_op_t itself
+     * b) else if = 0, we pass ->upcall.trailer_buf
+     * We expect to have only a single upcall trailer buffer, so we expect callers with trailers
+     * to set this field to 2 and others to set it to 1.
+     */
+    int32_t op_linger, op_linger_tmp;
+    /* VFS aio fields */
     void *priv;/* used by the async I/O code to stash the pvfs2_kiocb structure */
     atomic_t aio_ref_count; /* used again for the async I/O code for deallocation */
 
@@ -542,6 +560,7 @@ static inline pvfs2_sb_info_t *PVFS2_SB(
 int op_cache_initialize(void);
 int op_cache_finalize(void);
 pvfs2_kernel_op_t *op_alloc(void);
+pvfs2_kernel_op_t *op_alloc_trailer(void);
 void op_release(pvfs2_kernel_op_t *op);
 
 int dev_req_cache_initialize(void);
@@ -850,8 +869,9 @@ do {                                                      \
     {                                                     \
         wake_up_device_for_return(new_op);                \
     }                                                     \
+    new_op = NULL;                                        \
     pvfs_bufmap_put(buffer_index);                        \
-    *offset = original_offset;                            \
+    buffer_index = -1;                                    \
 } while(0)
 
 #ifdef HAVE_AIO_VFS_SUPPORT
@@ -870,7 +890,9 @@ do {                                                      \
     {                                                     \
         wake_up_device_for_return(new_op);                \
     }                                                     \
+    new_op = NULL;                                        \
     pvfs_bufmap_put(buffer_index);                        \
+    buffer_index = -1;                                    \
 } while(0)
 
 

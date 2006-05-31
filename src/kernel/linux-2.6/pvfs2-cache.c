@@ -56,7 +56,7 @@ int op_cache_finalize(void)
     return 0;
 }
 
-pvfs2_kernel_op_t *op_alloc(void)
+static pvfs2_kernel_op_t *op_alloc_common(int op_linger)
 {
     pvfs2_kernel_op_t *new_op = NULL;
 
@@ -84,12 +84,23 @@ pvfs2_kernel_op_t *op_alloc(void)
         spin_unlock(&next_tag_value_lock);
 
         pvfs2_gen_credentials(&new_op->upcall.credentials);
+        new_op->op_linger = new_op->op_linger_tmp = op_linger;
     }
     else
     {
-        pvfs2_panic("op_alloc: kmem_cache_alloc failed!\n");
+        pvfs2_panic("op_alloc_common: kmem_cache_alloc failed!\n");
     }
     return new_op;
+}
+
+pvfs2_kernel_op_t *op_alloc()
+{
+    return op_alloc_common(1);
+}
+
+pvfs2_kernel_op_t *op_alloc_trailer()
+{
+    return op_alloc_common(2);
 }
 
 void op_release(pvfs2_kernel_op_t *pvfs2_op)

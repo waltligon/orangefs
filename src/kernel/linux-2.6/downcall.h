@@ -27,6 +27,11 @@ typedef struct
 
 typedef struct
 {
+    int64_t amt_complete; 
+} pvfs2_iox_response_t;
+
+typedef struct
+{
     PVFS_object_ref refn;
 } pvfs2_lookup_response_t;
 
@@ -186,11 +191,14 @@ typedef struct
 {
     int32_t type;
     PVFS_error status;
+    /* currently trailer is used only by readdir and readdirplus */
     PVFS_size  trailer_size;
+    PVFS2_ALIGN_VAR(char *, trailer_buf);
 
     union
     {
 	pvfs2_io_response_t io;
+        pvfs2_iox_response_t iox;
 	pvfs2_lookup_response_t lookup;
 	pvfs2_create_response_t create;
 	pvfs2_symlink_response_t sym;

@@ -25,6 +25,7 @@
 #include "pvfs2-types.h"
 #include "gossip.h"
 #include "pint-dev.h"
+#include "pvfs2-dev-proto.h"
 
 static int setup_dev_entry(
     const char *dev_name);
@@ -254,6 +255,7 @@ int PINT_dev_test_unexpected(
     int32_t *proto_ver = NULL;
     uint64_t *tag = NULL;
     void *buffer = NULL;
+    pvfs2_upcall_t *upc = NULL;
 
     /* prepare to read max upcall size (magic nr and tag included) */
     int read_size = pdev_max_upsize;
@@ -384,6 +386,24 @@ int PINT_dev_test_unexpected(
             ((unsigned long)buffer + 2*sizeof(int32_t) + sizeof(uint64_t));
         info_array[*outcount].tag = *tag;
 
+        upc = (pvfs2_upcall_t *) info_array[*outcount].buffer;
+        /* if there is a trailer, allocate a buffer and issue another read */
+        if (upc->trailer_size > 0)
+        {
+            upc->trailer_buf = malloc(upc->trailer_size);
+            if (upc->trailer_buf == NULL)
+            {
+                ret = -(PVFS_ENOMEM|PVFS_ERROR_DEV);
+                goto dev_test_unexp_error;
+            }
+            ret = read(pdev_fd, upc->trailer_buf, upc->trailer_size);
+            if (ret < 0)
+            {
+                ret = -(PVFS_EIO|PVFS_ERROR_DEV);
+                goto dev_test_unexp_error;
+            }
+        }
+
         (*outcount)++;
 
         /*
@@ -400,6 +420,11 @@ dev_test_unexp_error:
     /* release resources we created up to this point */
     for(i = 0; i < *outcount; i++)
     {
+        upc = (pvfs2_upcall_t *) info_array[i].buffer;
+        if (upc->trailer_buf)
+        {
+            free(upc->trailer_buf);
+        }
         if (buffer)
         {
             free(buffer);
