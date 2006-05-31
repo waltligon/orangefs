@@ -97,17 +97,17 @@ static int fillup_buffer(cm_frame_t *frame, int *nr_segs, struct iovec **wr_iove
     }
 	 for (c = 0; c < frame->cf_valid_count; c++)
 	 {
-			printf("(%d): Writing %p to %p [%d start %d bytes]\n", 
+			printf("(%d): Writing %p to %p [%d start %ld bytes]\n", 
 					c, wr_vector[c].iov_base, 
 					wr_vector[c].iov_base + wr_vector[c].iov_len, 
-					frame->cf_valid_start[c], wr_vector[c].iov_len);
+					frame->cf_valid_start[c], (long) wr_vector[c].iov_len);
 	 }
 	 for (c = 0; c < frame->cf_valid_count; c++)
 	 {
-			printf("(%d): Reading %p to %p [%d start %d bytes]\n", 
+			printf("(%d): Reading %p to %p [%d start %ld bytes]\n", 
 					c, rd_vector[c].iov_base, 
 					rd_vector[c].iov_base + rd_vector[c].iov_len, 
-					frame->cf_valid_start[c], rd_vector[c].iov_len);
+					frame->cf_valid_start[c], (long) rd_vector[c].iov_len);
 	 }
     printf("writev and readv should write %d bytes\n", should_be);
     return should_be;
@@ -159,7 +159,7 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
    offset = rand() % max_offset;
-	printf("Writing at offset %Ld\n", offset);
+	printf("Writing at offset %Ld\n", (long long) offset);
 	fd = open(fname, O_TRUNC | O_RDWR | O_CREAT, 0700);
 	if (fd < 0)
 	{

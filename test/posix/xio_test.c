@@ -211,7 +211,7 @@ int main(int argc, char *argv[])
 	fillup_buffers(&rdptr, nr_segs, 0);
 	wvec = (struct iovec *) malloc(nr_segs * sizeof(struct iovec));
 	rvec = (struct iovec *) malloc(nr_segs * sizeof(struct iovec));
-	printf("Original iovec %d\n", sizeof(off_t));
+	printf("Original iovec %ld\n", (long) sizeof(off_t));
 	for (i = 0; i < nr_segs; i++)
 	{
 		wvec[i].iov_len  = rand() % bufsize + 1;
@@ -220,8 +220,8 @@ int main(int argc, char *argv[])
 		rvec[i].iov_base = (char *) rdptr[i];
 		total += wvec[i].iov_len;
 		mem_total += wvec[i].iov_len;
-		printf("%ld) <%p,%p> WRITE %d bytes\n", i, wvec[i].iov_base, 
-			wvec[i].iov_base + wvec[i].iov_len, wvec[i].iov_len);
+		printf("%ld) <%p,%p> WRITE %ld bytes\n", i, wvec[i].iov_base, 
+			wvec[i].iov_base + wvec[i].iov_len, (long) wvec[i].iov_len);
 	}
 	xtnr_segs = str_ct;
 	xc = (struct xtvec *) malloc(xtnr_segs * sizeof(struct xtvec));
@@ -256,8 +256,8 @@ int main(int argc, char *argv[])
 	total_written = do_writex(wvec, nr_segs, xc, xtnr_segs);
 	for (i = 0; i < nr_segs; i++)
 	{
-		printf("%ld) <%p,%p> READ %d bytes\n", i, rvec[i].iov_base, 
-			rvec[i].iov_base + rvec[i].iov_len, rvec[i].iov_len);
+		printf("%ld) <%p,%p> READ %ld bytes\n", i, rvec[i].iov_base, 
+			rvec[i].iov_base + rvec[i].iov_len, (long) rvec[i].iov_len);
 		mem_total += rvec[i].iov_len;
 	}
 	if (xt_total != mem_total)
