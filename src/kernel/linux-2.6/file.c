@@ -622,7 +622,7 @@ static ssize_t do_readv_writev(int type, struct file *file,
                         &seg_count, &seg_array)  /* OUT */ ) < 0)
         {
             pvfs2_error("%s: Failed to split iovecs to satisfy larger "
-                    " than blocksize readv/writev request %d\n", fnstr, ret);
+                    " than blocksize readv/writev request %ld\n", fnstr, (long) ret);
             goto out;
         }
         pvfs2_print("%s: Splitting iovecs from %lu to %lu [max_new %lu]\n", 
@@ -682,7 +682,7 @@ static ssize_t do_readv_writev(int type, struct file *file,
         if (ret < 0)
         {
             pvfs2_error("%s: pvfs_bufmap_get() "
-                        "failure (%d)\n", fnstr, ret);
+                        "failure (%ld)\n", fnstr, (long) ret);
             goto out;
         }
 
@@ -709,7 +709,7 @@ static ssize_t do_readv_writev(int type, struct file *file,
             if (ret < 0)
             {
                 pvfs2_error("%s: Failed to copy user buffer.  Please make sure "
-                            "that the pvfs2-client is running. %d\n", fnstr, ret);
+                            "that the pvfs2-client is running. %ld\n", fnstr, (long) ret);
                 goto out;
             }
         }
@@ -728,7 +728,7 @@ static ssize_t do_readv_writev(int type, struct file *file,
               */
               if (ret == -EINTR)
               {
-                  pvfs2_print("%s: returning error %d\n", fnstr, ret);
+                  pvfs2_print("%s: returning error %ld\n", fnstr, (long) ret);
               }
               else
               {
@@ -1121,7 +1121,7 @@ static ssize_t do_readx_writex(int type, struct file *file,
                         &seg_count_mem, &seg_array_mem)  /* OUT */ ) < 0)
         {
             pvfs2_error("%s: Failed to split iovecs to satisfy larger "
-                    " than blocksize readx request %d\n", fnstr, ret);
+                    " than blocksize readx request %ld\n", fnstr, (long) ret);
             goto out;
         }
         /* We must free seg_array_mem and iovecptr, xtvecptr and seg_array_stream */
@@ -1202,7 +1202,7 @@ static ssize_t do_readx_writex(int type, struct file *file,
         if (ret < 0)
         {
             pvfs2_error("%s: pvfs_bufmap_get() "
-                        "failure (%d)\n", fnstr, ret);
+                        "failure (%ld)\n", fnstr, (long) ret);
             goto out;
         }
 
@@ -1218,7 +1218,7 @@ static ssize_t do_readx_writex(int type, struct file *file,
                         &new_op->upcall.trailer_size, seg_array_stream[seg], xptr)) < 0)
         {
             pvfs2_error("%s: construct_file_offset_trailer() "
-                    "failure (%d)\n", fnstr, ret);
+                    "failure (%ld)\n", fnstr, (long) ret);
             goto out;
         }
         if (type == IO_WRITEX)
@@ -1235,7 +1235,7 @@ static ssize_t do_readx_writex(int type, struct file *file,
             if (ret < 0)
             {
                 pvfs2_error("%s: failed to copy user buffer. Please make sure "
-                        " that the pvfs2-client is running. %d\n", fnstr, ret);
+                        " that the pvfs2-client is running. %ld\n", fnstr, (long) ret);
                 goto out;
             }
         }
@@ -1254,17 +1254,17 @@ static ssize_t do_readx_writex(int type, struct file *file,
               */
               if (ret == -EINTR)
               {
-                  pvfs2_print("%s: returning error %d\n", fnstr, ret);
+                  pvfs2_print("%s: returning error %ld\n", fnstr, (long) ret);
               }
               else
               {
                   pvfs2_error(
                         "%s: error on handle %llu, "
-                        "FILE: %s\n  -- returning %d\n",
+                        "FILE: %s\n  -- returning %ld\n",
                         fnstr, llu(pvfs2_ino_to_handle(inode->i_ino)),
                         (file && file->f_dentry && file->f_dentry->d_name.name ?
                          (char *)file->f_dentry->d_name.name : "UNKNOWN"),
-                        ret);
+                        (long) ret);
               }
               goto out;
         }
@@ -1284,7 +1284,7 @@ static ssize_t do_readx_writex(int type, struct file *file,
                 if (ret < 0)
                 {
                     pvfs2_error("%s: failed to copy user buffer. Please make sure "
-                            " that the pvfs2-client is running. %d\n", fnstr, ret);
+                            " that the pvfs2-client is running. %ld\n", fnstr, (long) ret);
                     /* put error codes in downcall so that handle_io_error()
                      * preserves it properly */
                     new_op->downcall.status = ret;
