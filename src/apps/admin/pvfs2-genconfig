@@ -131,16 +131,10 @@ sub parse_hostlist
     # we want to split the string into components seperated by comma
     # but we don't want split components that have curly brackets.  For example,
     # we need to be sure that "hosta{1-4,8-12},hostb,hostc{1,2,3}" splits to
-    # hosta{1-4,8-12},
-    # hostb,
+    # hosta{1-4,8-12}
+    # hostb
     # hostc{1,2,3}
     #
-    # We can do that with the following regular expression.  The (? ...)
-    # allows us to execute perl code at that point in the match, and the
-    # $^N contains the content of the last grouped pattern.  So we find
-    # each component hostname before a comma, with an optional {...} suffix,
-    # and push that component onto the @components array
-    
     @components = $inputline =~ /(?:,?[ ]*([^{,]+(?:{[^}]+})?))/g;
     foreach my $comp (@components)
     {
@@ -229,7 +223,7 @@ sub emit_aliases
     foreach my $alias (sort keys %all_endpoints)
     {
         print $target "\tAlias $alias " . 
-        get_bmi_endpoint($all_endpoints{$alias}) . "\n";
+        get_bmi_endpoint($alias) . "\n";
     }
     print $target "</Aliases>\n";
 }
@@ -309,7 +303,7 @@ sub emit_server_conf
     my($target, $node, $storage, $logfile) = @_;
 
     print $target "StorageSpace $storage\n";
-    print $target "HostID \"$node\"\n";
+    print $target "HostID \"" . get_bmi_endpoint($node) . "\"\n";
     print $target "LogFile $logfile\n";
 }
 
@@ -339,7 +333,7 @@ sub specusage
   ports), different storage locations for endpoints on the same node, etc.
 
   Both the -iospec and -metaspec options take strings as arguments.
-  The format of the strings are semi-colon separated endpoints, where 
+  The format of the strings are comma separated endpoints, where 
   each endpoint is formatted as:
                 
     [<proto>://]<host>:<port>[:<storage>][:<logfile>]
@@ -350,9 +344,9 @@ sub specusage
                 
   Examples:
 
-    myhosta:3334;myhostb:{3334-3338}
+    myhosta:3334,myhostb:{3334-3338}
     myhosta:{3334-3338}
-    ib://myhosta:3335:/psto;tcp://myhostb:3334:/psto
+    ib://myhosta:3335:/psto,tcp://myhostb:3334:/psto
 
   Multiple protocols for the same endpoint may also be specified.  The
   format for this type of endpoint is:
@@ -363,10 +357,15 @@ sub specusage
   from the rest of the spec.  While the protocols and ports are different, the
   host for each uri must be the same.  For example:
 
-    --metaspec="[ib://myhosta:3335,gm://myhosta:6]:/psto;tcp://myhostb:3334"
+    --metaspec="[ib://myhosta:3335,gm://myhosta:6]:/psto,tcp://myhostb:3334"
 
   This specifies that one endpoint is at myhosta with the infiniband and myrinet
   protocols enabled, and the other endpoint is at myhostb with tcp enabled.
+
+  Note that the --iospec and --metaspec options cannot be used with enumerated
+  hosts.  Each endpoint must be a single host.  I.e. tcp://myhost{1-4}:3334
+  is not allowed.  This does not preclude multiple endpoints from being
+  on the same host, such as tcp://myhost1:{3334-3338}
 
 THIS
     ;;
@@ -817,7 +816,23 @@ sub get_metanames
 sub get_specs
 {
     my $type = shift;
-    my @endpoints = split(/;/, shift);
+    my $line = shift;
+
+    # we need to split the spec string into individual components that
+    # specify different endpoints.  The endpoints are separated by commas,
+    # but so are the protocols inside square brackets [] and the port ranges
+    # inside curly brackets {}, so its a bit tricky to get what we actually
+    # want.  Hence the long regex.  
+    #
+    # The (?: ...) groups a pattern without
+    # putting the matched text in the result variables ($1, $2, ..).  The
+    # regex tries to match everything that's not a comma, skipping over
+    # the [] and {} bits that may contain commas.  The global flag at the
+    # end allows it to keep matching until no more matches can be made.
+    #
+    my @endpoints =
+        $line =~ /(?:,?[ ]*((?:\[[^\]]+\])|[^\[{,]+(?:{[^}]+})?[^\[{,]*))/g;
+
     foreach my $ep (@endpoints)
     {
         my $stor = undef;
@@ -827,10 +842,12 @@ sub get_specs
         my $portn = undef;
         if($ep =~ /^\[/)
         {
-            # must be an endpoint with multiple protocols
-
-            # match [proto1://host:port1,proto2://host:port2,...]:storage:logfile
-            $ep =~ /\[([^\]]+)\](:[^:]+)?(:[^:]+)?/;
+            # the string must have multiple protocols specified for the same
+            # endpoint.  We want to match on [...]:storage:logfile
+            # and place the stuff between the [] in $1, and optionally
+            # place the matched storage path and logfile in $2 and $3 
+            #
+            $ep =~ /\[([^\]]+)\](?::([^:]+))?(?::([^:]+))?/;
 
             $stor = $2;
             $logf = $3;
@@ -838,7 +855,7 @@ sub get_specs
             if(!defined($1))
             {
                 print STDERR "Invalid spec option format: Missing endpoints\n" .
-                "between brackets.\n\n";
+                             "between brackets.\n\n";
                 exit(1);
             }
 
@@ -868,16 +885,6 @@ sub get_specs
                 $alias_suffix .= "_" . $proto . $portn;
             }
 
-            if(defined($stor))
-            {
-                $stor =~ s/:(.*)$/$1/;
-            }
-
-            if(defined($logf))
-            {
-                $logf =~ s/:(.*)$/$1/;
-            }
-
             my $alias = $hostname . $alias_suffix;
             $all_endpoints{$alias} = {
                 ALIAS => $alias, 
@@ -889,6 +896,18 @@ sub get_specs
         }
         else
         {
+            # I'll probably forget what this does in a day or two, hence the
+            # comment.  The (?: ...) pattern allows for grouping without
+            # putting the matched string in the result variables ($1, $2, ..).
+            # The first (?: ...) pattern optionally looks for the protocol.
+            # There's a subgroup that matches the actual protocol name and puts
+            # it in $1 if it exists.
+            # The grouped pattern following that looks for the hostname, and
+            # the one after that looks for the port, putting the results
+            # in $2 and $3 respectively.  The next two (?: ...) optionally
+            # match the storage and logfile respectively, with subgroups that
+            # put the actual strings into $4 and $5.
+            # 
             $ep =~ /(?:([a-z]+):\/\/)?([^:]+):([^:]+)(?::([^:]+))?(?::([^:]+))?/;
             if(!defined($1))
             {
@@ -978,7 +997,8 @@ sub get_aliases
 
 sub get_bmi_endpoint
 {
-    my $endpoint = shift;
+    my $alias = shift;
+    my $endpoint = $all_endpoints{$alias};
     my @bmi_list = ();
 
     foreach my $proto (keys %{$endpoint->{PORTMAP}})
