@@ -362,7 +362,7 @@ $(MPITESTDEPENDS) $(MPIMISCDEPENDS): %.d: %.c
 # default rule for generating dependency files
 %.d: %.c
 	$(Q) "  DEP		$@"
-	$(E)CC=$(CC) $(pvfs2_srcdir)/maint/depend.sh $(call dirname,$*) $(CFLAGS) $(call modcflags,$<) $< > $@
+	$(E)CC="$(CC)" $(pvfs2_srcdir)/maint/depend.sh $(call dirname,$*) $(CFLAGS) $(call modcflags,$<) $< > $@
 
 install:: 
 	install -d @PVFS2_TOP_PREFIX@/test
