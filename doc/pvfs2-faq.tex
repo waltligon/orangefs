@@ -464,24 +464,6 @@ like 'proc' and 'nfs').  Either add 'pvfs2' to the list of file types or add
 the pvfs2 mount point to the list of excluded file systems.   Be sure to do
 this on all machines in your cluster.  
 
-\subsection{Starting pvfs2-server gives errors like ``Resource temporarily unavailable''}
-\label{sec:sysvipc-as-user}
-
-The Berkely DB library can make use of System V shared memory regions to cache
-data and generally improve performance. On some systems, however, creating
-these shared memory regions for the first time has to be done by a root-owned process. 
-
-If you start \texttt{pvfs2-server} as a non-root user, on some systems you
-might get an error similar to the following: 
-
-\begin{verbatim}
-src/io/trove/trove-dbpf/dbpf-mgmt.c line 123: 
-dbpf_getdb_env: Resource temporarily unavailable
-\end{verbatim}
-
-One solution is to run pvfs2-server as root once.  If you want to run
-pvfs2-server as a regular user, you can then do so.
-
 \subsection{Make kmod24 fails with ``structure has no member...'' errors}
 
 On some Redhat and Redhat-derived distributions, ``make kmod24'' might
