@@ -14,6 +14,7 @@
 #include <sys/time.h>
 #include <time.h>
 #include <stdlib.h>
+#include <getopt.h>
 
 #include "pvfs2.h"
 #include "pvfs2-mgmt.h"
@@ -84,7 +85,7 @@ int main(int argc, char **argv)
     }
 
     printf("\n(3) Initializing each file system found "
-           "in tab file: %s...\n\n", tab->tabfile_name);
+           "in tab file: %s...\n", tab->tabfile_name);
 
     for(i=0; i<tab->mntent_count; i++)
     {
@@ -117,8 +118,12 @@ int main(int argc, char **argv)
     if(ret < 0)
     {
         fprintf(stderr, "Failure: could not find filesystem for %s "
-                "in pvfstab\n", user_opts->fs_path_real);
-	return(-1);
+                "in pvfs2tab %s\n", user_opts->fs_path_real, tab->tabfile_name);
+        for (i = 0; i < tab->mntent_count; i++)
+        {
+            fprintf(stderr, "Entry %d: %s\n", i, tab->mntent_array[i].mnt_dir);
+        }
+        return(-1);
     }
 
     print_mntent(tab->mntent_array, tab->mntent_count);
@@ -140,10 +145,9 @@ int main(int argc, char **argv)
     ret = noop_all_servers(cur_fs);
     if(ret < 0)
     {
-	PVFS_perror("noop_all_servers", ret);
-	fprintf(stderr, "Failure: could not communicate with "
+        fprintf(stderr, "Failure: could not communicate with "
                 "one of the servers.\n");
-	return(-1);
+        err = 1;
     }
 
     printf("\n(6) Verifying that fsid %ld is acceptable "
@@ -177,11 +181,14 @@ int main(int argc, char **argv)
 	PVFS_perror("PVFS_mgmt_setparam_all", ret);
 	fprintf(stderr, "Failure: not all servers accepted fsid %ld\n", 
 	    (long)cur_fs);
-        if(ret == -PVFS_EDETAIL) print_error_details(error_details);
-        PVFS_error_details_free(error_details);
-	return(-1);
+        if (ret == -PVFS_EDETAIL)
+            print_error_details(error_details);
+        err = 1;
     }
-    printf("\n   Ok; all servers understand fs_id %ld\n", (long)cur_fs);
+    else
+    {
+        printf("\n   Ok; all servers understand fs_id %ld\n", (long) cur_fs);
+    }
 
     printf("\n(7) Verifying that root handle is owned by one server...\n");    
 
@@ -212,24 +219,32 @@ int main(int argc, char **argv)
             print_root_check_error_details(error_details);
         }
 
-        PVFS_error_details_free(error_details);
-        return(-1);
+        err = 1;
     }
 
     PVFS_error_details_free(error_details);
 
-    /* if we hit this point, then everything is ok */
-    printf("   Ok; root handle is owned by exactly one server.\n");
-    printf("\n");
+    if (!err)
+    {
+        /* if we hit this point, then everything is ok */
+        printf("   Ok; root handle is owned by exactly one server.\n");
+        printf("\n");
+    }
 
     PVFS_sys_finalize();
 
-    printf("=========================================="
-           "===================\n");
-    printf("\nThe PVFS filesystem at %s appears to be "
-           "correctly configured.\n\n",
-           user_opts->fs_path_real);
-	
+    printf("=============================================================\n");
+    if (err)
+    {
+        printf("\nThe PVFS2 filesystem at %s appears to have "
+               "problems.\n\n", user_opts->fs_path_real);
+    }
+    else
+    {
+        printf("\nThe PVFS2 filesystem at %s appears to be "
+               "correctly configured.\n\n", user_opts->fs_path_real);
+    }
+
     return(ret);
 }
 
@@ -458,9 +473,6 @@ static void print_mntent(struct PVFS_sys_mntent *entries, int num_entries)
  */
 static struct options* parse_args(int argc, char* argv[])
 {
-    /* getopt stuff */
-    extern char* optarg;
-    extern int optind, opterr, optopt;
     char flags[] = "vm:";
     int one_opt = 0;
     int len;

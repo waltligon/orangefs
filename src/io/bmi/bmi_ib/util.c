@@ -1,18 +1,19 @@
 /*
  * InfiniBand BMI handy utilities that are not really core functions.
  *
- * Copyright (C) 2003-5 Pete Wyckoff <pw@osc.edu>
+ * Copyright (C) 2003-6 Pete Wyckoff <pw@osc.edu>
  *
  * See COPYING in top-level directory.
  *
- * $Id: util.c,v 1.5 2006-02-22 16:30:54 pw Exp $
+ * $Id: util.c,v 1.5.6.1 2006-06-01 21:29:27 slang Exp $
  */
 #include <stdio.h>
+#include <string.h>
 #include <stdarg.h>
 #include <errno.h>
 #include <unistd.h>
 #include <src/common/gossip/gossip.h>
-#include <vapi_common.h>  /* VAPI_strerror */
+
 #define __util_c
 #include "ib.h"
 
@@ -58,19 +59,6 @@ error_xerrno(int errnum, const char *fmt, ...)
     vsprintf(s, fmt, ap);
     va_end(ap);
     gossip_err("Error: %s: %s.\n", s, strerror(errnum));
-    exit(1);
-}
-
-void __attribute__((noreturn,format(printf,2,3))) __hidden
-error_verrno(int ecode, const char *fmt, ...)
-{
-    char s[2048];
-    va_list ap;
-
-    va_start(ap, fmt);
-    vsprintf(s, fmt, ap);
-    va_end(ap);
-    gossip_err("Error: %s: %s\n", s, VAPI_strerror(ecode));  /* adds a dot */
     exit(1);
 }
 
@@ -187,8 +175,8 @@ memcpy_to_buflist(ib_buflist_t *buflist, const void *buf, bmi_size_t len)
     const char *cp = buf;
 
     for (i=0; i<buflist->num && len > 0; i++) {
-	size_t bytes = buflist->len[i];
-	if (bytes > (size_t) len)
+	bmi_size_t bytes = buflist->len[i];
+	if (bytes > len)
 	    bytes = len;
 	memcpy(buflist->buf.recv[i], cp, bytes);
 	cp += bytes;

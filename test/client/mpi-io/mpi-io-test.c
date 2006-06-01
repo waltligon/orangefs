@@ -41,6 +41,8 @@ static int     opt_correct   = 0;
 static int     opt_sync      = 0;
 static int     opt_single    = 0;
 static int     opt_verbose   = 0;
+static int     opt_rdonly    = 0;
+static int     opt_wronly    = 0;
 static char    opt_file[256] = "test.out";
 static char    opt_pvfs2tab[256] = "notset";
 static int     opt_pvfstab_set = 0;
@@ -128,7 +130,10 @@ int main(int argc, char **argv)
    if (err != MPI_SUCCESS) {
       handle_error(err, "MPI_File_open");
       goto die_jar_jar_die;
-   }
+   } 
+	
+	nchars = (int) (opt_block/sizeof(char));
+	if (!opt_rdonly) {
 
    /* now repeat the seek and write operations the number of times
     * specified on the command line */
@@ -155,7 +160,6 @@ int main(int argc, char **argv)
       stim = MPI_Wtime();
 
       /* write out the data */
-      nchars = (int) (opt_block/sizeof(char));
 		if (opt_coll) {
 			err = MPI_File_write_all(fh, buf, nchars, MPI_CHAR, &status);
 		}
@@ -179,6 +183,7 @@ int main(int argc, char **argv)
       
       /* we are done with this "write" iteration */
    }
+	} /* ! opt_rdonly */
 
    err = MPI_File_close(&fh);
    if(err){
@@ -196,6 +201,7 @@ int main(int argc, char **argv)
       goto die_jar_jar_die;
    }
 
+	if (!opt_wronly) {
    /* we are going to repeat the read operation the number of iterations
     * specified */
    for (j=0; j < opt_iter; j++) {
@@ -259,6 +265,7 @@ int main(int argc, char **argv)
 
       /* we are done with this read iteration */
    }
+	} /* !opt_wronly */
 
    /* close the file */
    err = MPI_File_close(&fh);
@@ -343,7 +350,7 @@ static int parse_args(int argc, char **argv)
 {
    int c;
    
-   while ((c = getopt(argc, argv, "b:i:f:p:CcyShv")) != EOF) {
+   while ((c = getopt(argc, argv, "b:i:f:p:CcyShvrw")) != EOF) {
       switch (c) {
          case 'b': /* block size */
             opt_block = atoi(optarg);
@@ -373,6 +380,12 @@ static int parse_args(int argc, char **argv)
          case 'v': /* verbose */
             opt_verbose = 1;
             break;
+			case 'r': /* read-only */
+				opt_rdonly = 1;
+				break;
+			case 'w': /* write-only */
+				opt_wronly = 1;
+				break;
          case 'h':
             if (mynod == 0)
                 usage();
@@ -399,6 +412,8 @@ static void usage(void)
     printf(" -f       filename [default: /foo/test.out]\n");
     printf(" -p       path to pvfs2tab file to use [default: notset]\n");
     printf(" -S       all process write to same Single region of file [default: off]\n");
+	 printf(" -r       read-only.  do no writes.  file must already exist\n");
+	 printf(" -w       write-only. do no reads.\n");
     printf(" -v       be more verbose\n");
     printf(" -y       sYnc the file after each write [default: off]\n");
     printf(" -h       print this help\n");

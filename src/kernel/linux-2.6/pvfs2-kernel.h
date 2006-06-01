@@ -90,7 +90,9 @@ typedef unsigned long sector_t;
 #include <linux/poll.h>
 #include <linux/rwsem.h>
 #include <asm/unaligned.h>
-
+#ifdef HAVE_ASM_IOCTL32_H
+#include <asm/ioctl32.h>
+#endif
 
 #ifdef HAVE_XATTR
 #include <linux/xattr.h>
@@ -750,8 +752,9 @@ do {                                                      \
     {                                                     \
         wake_up_device_for_return(new_op);                \
     }                                                     \
+    new_op = NULL;                                        \
     pvfs_bufmap_put(buffer_index);                        \
-    *offset = original_offset;                            \
+    buffer_index = -1;                                    \
 } while(0)
 
 #ifdef HAVE_AIO_VFS_SUPPORT

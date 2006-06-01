@@ -24,6 +24,7 @@
 #include "pts.h"
 #include "pvfs-helper.h"
 #include "pvfs2-util.h"
+#include "pvfs2-internal.h"
 #include "test-mix.h"
 #define SEGMAX 16
 #define BYTEMAX (4*1024*1024)
@@ -107,7 +108,7 @@ static int test_mx(void){
       if(retval >= 0)
       {
          printf("results of PINT_Process_request():\n");
-         printf("%d segments with %lld bytes\n", seg1.segs, seg1.bytes);
+         printf("%d segments with %lld bytes\n", seg1.segs, lld(seg1.bytes));
          for(i=0; i<seg1.segs; i++)
          {
             printf("  segment %d: offset: %d size: %d\n",
@@ -141,7 +142,7 @@ static int test_mx(void){
       if(retval >= 0)
       {
          printf("results of PINT_Process_request():\n");
-         printf("%d segments with %lld bytes\n", seg1.segs, seg1.bytes);
+         printf("%d segments with %lld bytes\n", seg1.segs, lld(seg1.bytes));
          for(i=0; i<seg1.segs; i++)
          {
             printf("  segment %d: offset: %d size: %d\n",
@@ -176,7 +177,7 @@ static int test_mx(void){
       if(retval >= 0)
       {
          printf("results of PINT_Process_request():\n");
-         printf("%d segments with %lld bytes\n", seg1.segs, seg1.bytes);
+         printf("%d segments with %lld bytes\n", seg1.segs, lld(seg1.bytes));
          for(i=0; i<seg1.segs; i++)
          {
             printf("  segment %d: offset: %d size: %d\n",
@@ -211,7 +212,7 @@ static int test_mx(void){
       if(retval >= 0)
       {
          printf("results of PINT_Process_request():\n");
-         printf("%d segments with %lld bytes\n", seg1.segs, seg1.bytes);
+         printf("%d segments with %lld bytes\n", seg1.segs, lld(seg1.bytes));
          for(i=0; i<seg1.segs; i++)
          {
             printf("  segment %d: offset: %d size: %d\n",

@@ -48,6 +48,8 @@ static DOTCONF_CB(exit_dhranges_context);
 static DOTCONF_CB(enter_distribution_context);
 static DOTCONF_CB(exit_distribution_context);
 static DOTCONF_CB(get_unexp_req);
+static DOTCONF_CB(get_tcp_buffer_send);
+static DOTCONF_CB(get_tcp_buffer_receive);
 static DOTCONF_CB(get_perf_update_interval);
 static DOTCONF_CB(get_root_handle);
 static DOTCONF_CB(get_name);
@@ -68,6 +70,8 @@ static DOTCONF_CB(get_attr_cache_size);
 static DOTCONF_CB(get_attr_cache_max_num_elems);
 static DOTCONF_CB(get_trove_sync_meta);
 static DOTCONF_CB(get_trove_sync_data);
+static DOTCONF_CB(get_db_cache_size_bytes);
+static DOTCONF_CB(get_db_cache_type);
 static DOTCONF_CB(get_param);
 static DOTCONF_CB(get_value);
 static DOTCONF_CB(get_default_num_dfiles);
@@ -411,6 +415,15 @@ static const configoption_t options[] =
      {"UnexpectedRequests",ARG_INT, get_unexp_req,NULL,
          CTX_DEFAULTS|CTX_GLOBAL,"50"},
 
+	/*
+	 * TCP socket buffer size.
+	 */
+     {"TCPBufferSend",ARG_INT, get_tcp_buffer_send,NULL,
+         CTX_DEFAULTS|CTX_GLOBAL,"65535"},
+     {"TCPBufferReceive",ARG_INT, get_tcp_buffer_receive,NULL,
+         CTX_DEFAULTS|CTX_GLOBAL,"131071"},
+
+
      /* Specifies the timeout value in seconds for BMI jobs on the server.
       */
      {"ServerJobBMITimeoutSecs",ARG_INT, get_server_job_bmi_timeout,NULL,
@@ -562,6 +575,15 @@ static const configoption_t options[] =
      */
     {"TroveSyncData",ARG_STR, get_trove_sync_data, NULL, 
         CTX_STORAGEHINTS,"yes"},
+
+    {"DBCacheSizeBytes", ARG_INT, get_db_cache_size_bytes, NULL,
+        CTX_STORAGEHINTS,"0"},
+
+    /* cache type for berkeley db environment.  "sys" and "mmap" are valid
+     * value for this option
+     */
+    {"DBCacheType", ARG_STR, get_db_cache_type, NULL,
+        CTX_STORAGEHINTS, "sys"},
 
     /* Specifies the format of the date/timestamp that events will have
      * in the event log.  Possible values are:
@@ -1027,6 +1049,23 @@ DOTCONF_CB(get_unexp_req)
     return NULL;
 }
 
+DOTCONF_CB(get_tcp_buffer_receive)
+{
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+    config_s->tcp_buffer_size_receive = cmd->data.value;
+    return NULL;
+}
+
+DOTCONF_CB(get_tcp_buffer_send)
+{
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+    config_s->tcp_buffer_size_send = cmd->data.value;
+    return NULL;
+}
+
+
 DOTCONF_CB(get_server_job_bmi_timeout)
 {
     struct server_configuration_s *config_s = 
@@ -1376,6 +1415,34 @@ DOTCONF_CB(get_trove_sync_data)
     else
     {
         return("TroveSyncData value must be 'yes' or 'no'.\n");
+    }
+
+    return NULL;
+}
+
+DOTCONF_CB(get_db_cache_size_bytes)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    config_s->db_cache_size_bytes = cmd->data.value;
+    return NULL;
+}
+
+DOTCONF_CB(get_db_cache_type)
+{
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+    
+    if(strcmp(cmd->data.str, "sys") && strcmp(cmd->data.str, "mmap"))
+    {
+        return "Unsupported parameter supplied to DBCacheType option, must "
+               "be either \"sys\" or \"mmap\"\n";
+    }
+
+    config_s->db_cache_type = strdup(cmd->data.str);
+    if(!config_s->db_cache_type)
+    {
+        return "strdup() failure";
     }
 
     return NULL;
@@ -2853,7 +2920,6 @@ struct filesystem_configuration_s* PINT_config_find_fs_name(
             if (strcmp(cur_fs->file_system_name,fs_name) == 0)
             {
                 return(cur_fs);
-                break;
             }
             cur = PINT_llist_next(cur);
         }
@@ -2888,7 +2954,6 @@ struct filesystem_configuration_s* PINT_config_find_fs_id(
             if (cur_fs->coll_id == fs_id)
             {
                 return(cur_fs);
-                break;
             }
             cur = PINT_llist_next(cur);
         }

@@ -11,9 +11,6 @@
 #include "ncac-job.h"
 #include "pvfs2-internal.h"
 
-extern struct NCAC_dev  NCAC_dev;
-void cache_dump_active_list(void);
-void cache_dump_inactive_list(void);
 static void NCAC_list_add_tail_lock(struct list_head *new, struct list_head *head, NCAC_lock *lock);
 static void NCAC_list_del_lock(struct list_head *entry, NCAC_lock *lock);
 static void NCAC_read_request_from_list_lock(struct list_head *head, NCAC_lock *lock, NCAC_req_t ** ncac_req_ptr);
@@ -354,8 +351,11 @@ struct freg_tuple
     PVFS_size   size;
 };
 
-static int comp_pos(const PVFS_offset *num1, const PVFS_offset *num2)
+static int comp_pos(const void *x1, const void *x2)
 {
+    const PVFS_offset *num1 = x1;
+    const PVFS_offset *num2 = x2;
+
     if (*num1 <  *num2) return -1;
     if (*num1 == *num2) return  0;
     if (*num1 >  *num2) return  1;
@@ -446,7 +446,7 @@ static inline int NCAC_rwjob_prepare_list(NCAC_req_t *ncac_req)
      * can present the file regions in an ordered manner, we can
      * eliminate this sorting.
      */
-    qsort(fregions, ncac_req->offcnt, sizeof(struct freg_tuple), (void*)comp_pos);
+    qsort(fregions, ncac_req->offcnt, sizeof(struct freg_tuple), comp_pos);
 
 #if  1
     for (i=0; i<ncac_req->offcnt; i++){

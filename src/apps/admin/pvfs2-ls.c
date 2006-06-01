@@ -55,8 +55,6 @@ struct options
     int num_starts;
 };
 
-static char *process_name = NULL;
-
 static struct options* parse_args(int argc, char* argv[]);
 
 static void usage(int argc, char** argv);
@@ -721,8 +719,6 @@ int main(int argc, char **argv)
     struct options* user_opts = NULL;
     char current_dir[PVFS_NAME_MAX] = {0};
     int found_one = 0;
-
-    process_name = argv[0];
 
     user_opts = parse_args(argc, argv);
     if (!user_opts)

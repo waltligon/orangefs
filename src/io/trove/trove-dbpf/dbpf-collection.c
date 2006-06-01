@@ -64,6 +64,22 @@ struct dbpf_collection *dbpf_collection_find_registered(
     return ptr;
 }
 
+void dbpf_collection_deregister(struct dbpf_collection *entry)
+{
+    struct dbpf_collection *ptr = root_coll_p;
+
+    if (root_coll_p == entry) {
+        root_coll_p = NULL;
+        return;
+    }
+    while (ptr != NULL && ptr->next_p != entry) {
+        ptr = ptr->next_p;
+    }
+    if (ptr) {
+        ptr->next_p = entry->next_p;
+    }
+}
+
 void dbpf_collection_clear_registered(void)
 {
     int ret = -TROVE_EINVAL;
@@ -106,8 +122,9 @@ void dbpf_collection_clear_registered(void)
         }
 
 
+        dbpf_putdb_env(free_ptr->coll_env, free_ptr->path_name);
 	free(free_ptr->name);
-
+        free(free_ptr->path_name);
         PINT_dbpf_keyval_pcache_finalize(free_ptr->pcache);
 
 	free(free_ptr);

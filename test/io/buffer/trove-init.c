@@ -33,6 +33,8 @@ char *method_name;
 TROVE_handle parent_handle;
 char path_to_file[PATH_SIZE] = "/baz";
 
+int trove_init(TROVE_coll_id *coll_id_p, TROVE_handle *handle, TROVE_context_id *context_p);
+
 int path_lookup(TROVE_coll_id coll_id,
                 TROVE_context_id trove_context,
                 char *path, TROVE_handle *out_handle_p);

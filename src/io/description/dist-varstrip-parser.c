@@ -181,7 +181,6 @@ int PINT_dist_strips_parse(
                 PINT_dist_strips_free_mem(strips);
                 *count = 0;
                 return -1;
-                break;
             case 1:
                 /* finished */
                 *count = i;
@@ -195,7 +194,6 @@ int PINT_dist_strips_parse(
                 {
                     return 0;
                 }
-                break;
         }
     }
 }

@@ -36,32 +36,6 @@ enum
     STATE_DIR      = 10
 };
 
-static inline char *get_object_type(int objtype)
-{
-    static char *obj_types[] =
-    {
-        "NONE", "METAFILE", "DATAFILE",
-        "DIRECTORY", "SYMLINK", "DIRDATA", "UNKNOWN"
-    };
-
-    switch(objtype)
-    {
-        case PVFS_TYPE_NONE:
-            return obj_types[0];
-        case PVFS_TYPE_METAFILE:
-            return obj_types[1];
-        case PVFS_TYPE_DATAFILE:
-            return obj_types[2];
-        case PVFS_TYPE_DIRECTORY:
-            return obj_types[3];
-        case PVFS_TYPE_SYMLINK:
-            return obj_types[4];
-        case PVFS_TYPE_DIRDATA:
-            return obj_types[5];
-    }
-    return obj_types[6];
-}
-
 static int getattr_cleanup(
     PINT_server_op *s_op, job_status_s *js_p);
 static int getattr_verify_attribs(
@@ -372,19 +346,14 @@ static int getattr_verify_attribs(
     }
     else
     {
-	gossip_debug(
-            GOSSIP_GETATTR_DEBUG, "  handle %llu refers to something "
-            "unknown -- assuming datafile!\n",
+        /* if we don't understand the object type, then it probably indicates
+         * a bug or some data corruption.  All trove objects should have a
+         * type set.
+         */
+        gossip_err(
+            "Error: got unknown type when verifying attributes for handle %llu.\n", 
             llu(s_op->u.getattr.handle));
-
-        resp_attr->objtype = PVFS_TYPE_DATAFILE;
-        resp_attr->u.data.size = s_op->ds_attr.b_size;
-        resp_attr->mask |= (PVFS_ATTR_COMMON_TYPE | PVFS_ATTR_DATA_ALL);
-
-	gossip_debug(GOSSIP_GETATTR_DEBUG, "  handle %llu now refers to "
-                     "a datafile (size = %lld).\n",
-                     llu(s_op->u.getattr.handle),
-                     lld(resp_attr->u.data.size));
+        js_p->error_code = -PVFS_ENXIO;
     }
     return 1;
 }

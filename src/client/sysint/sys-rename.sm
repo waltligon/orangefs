@@ -88,7 +88,6 @@ machine pvfs2_client_rename_sm(
     rename_getattr_src,
     rename_getattr_src_interpret,
     rename_getattr_dest,
-    rename_getattr_dest_interpret,
     rename_crdirent_setup_msgpair,
     rename_crdirent_xfer_msgpair,
     rename_crdirent_retry_or_fail,
@@ -378,7 +377,7 @@ PVFS_error PVFS_sys_rename(
     }
     else
     {
-        ret = PINT_sys_wait(op_id, "rename", &error);
+        ret = PVFS_sys_wait(op_id, "rename", &error);
         if (ret)
         {
             PVFS_perror_gossip("PVFS_sys_wait call", ret);
@@ -386,7 +385,7 @@ PVFS_error PVFS_sys_rename(
         }
     }
 
-    PINT_sys_release(op_id);
+    PVFS_sys_release(op_id);
     return error;
 }
 
@@ -894,7 +893,9 @@ static int rename_cleanup(PINT_client_sm *sm_p,
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG, "rename state: cleanup\n");
 
-    sm_p->error_code = js_p->error_code;
+    sm_p->error_code = (sm_p->u.rename.stored_error_code ?
+                        sm_p->u.rename.stored_error_code :
+                        js_p->error_code);
 
     if(sm_p->error_code != 0)
     {

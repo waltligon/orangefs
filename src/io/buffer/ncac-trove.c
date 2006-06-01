@@ -252,7 +252,7 @@ int do_read_for_rmw(PVFS_fs_id coll_id, PVFS_handle handle,
     DPRINT("do_read_for_rmw; req=%lld\n", op_id);
 
     *ioreq = op_id;
-    return 0;
+    return ret;
 }
 
 

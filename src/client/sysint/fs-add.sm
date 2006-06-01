@@ -170,7 +170,7 @@ int PVFS_sys_fs_add(struct PVFS_sys_mntent *mntent)
     }
     else
     {
-        ret = PINT_sys_wait(op_id, "fs_add", &error);
+        ret = PVFS_sys_wait(op_id, "fs_add", &error);
         if (ret)
         {
             PVFS_perror_gossip("PVFS_sys_wait call", ret);
@@ -178,7 +178,7 @@ int PVFS_sys_fs_add(struct PVFS_sys_mntent *mntent)
         }
     }
 
-    PINT_sys_release(op_id);
+    PVFS_sys_release(op_id);
     return error;
 }
 
@@ -238,8 +238,13 @@ static int fs_add_parent_cleanup(
     BMI_set_info(0, BMI_TRUSTED_CONNECTION, (void *)sm_p->u.get_config.config);
     gossip_debug(GOSSIP_SERVER_DEBUG, "Enabling trusted connections!\n");
 #endif
+    /* Set the buffer size according to configuration file */
+    BMI_set_info(0, BMI_TCP_BUFFER_SEND_SIZE, 
+                 (void *)&sm_p->u.get_config.config->tcp_buffer_size_send);
+    BMI_set_info(0, BMI_TCP_BUFFER_RECEIVE_SIZE, 
+                 (void *)&sm_p->u.get_config.config->tcp_buffer_size_receive);
 
-    /*
+    /* 
       clear out all configuration information about file systems that
       aren't matching the one being added now.  this ensures no
       erroneous handle mappings are added next

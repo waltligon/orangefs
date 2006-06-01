@@ -43,6 +43,7 @@ static int do_mtab(
 static int parse_args(
     int argc,
     char *argv[],
+    int* flags,
     char **dev,
     char **mntpnt,
     char **kern_options,
@@ -66,7 +67,7 @@ int main(
         return (-1);
     }
 
-    if ((ret = parse_args(argc, argv, &dev, &tmp_mntpnt, &kern_options,
+    if ((ret = parse_args(argc, argv, &flags, &dev, &tmp_mntpnt, &kern_options,
         &orig_options)))
     {
         fprintf(stderr, "Error: could not parse command line arguments.\n");
@@ -138,6 +139,7 @@ int main(
 static int parse_args(
     int argc,
     char *argv[],
+    int *flags,
     char **dev,
     char **mntpnt,
     char **kern_options,
@@ -145,6 +147,8 @@ static int parse_args(
 {
     int opt;
     int opts_set_flag = 0;
+    char mopts[256] = "";
+    char* index;
 
     /* safety */
     *dev = NULL;
@@ -158,6 +162,12 @@ static int parse_args(
         switch (opt)
         {
         case 'o':
+
+            if(strlen(optarg) > 255)
+            {
+                fprintf(stderr, "Error: options string is too long.\n");
+                return(-1);
+            }
             if(opts_set_flag)
             {
                 fprintf(stderr, "Error: please use only one -o argument.\n");
@@ -171,6 +181,20 @@ static int parse_args(
             }
             opts_set_flag = 1;
             strcpy(*orig_options, optarg);
+
+            /* copy into another temporary buffer for strtok */
+            strcpy(mopts, optarg);
+            index = strtok(mopts, ",");
+            while(index != NULL)
+            {
+                /* find out if "ro" was specified and set flag appropriately */
+                if(!strcmp(index, "ro"))
+                {
+                    *flags |= MS_RDONLY;
+                }
+                index = strtok(NULL, ",");
+            }
+
             break;
         default:
             fprintf(stderr, "Error: argument format is incorrect.\n");
@@ -270,15 +294,12 @@ static int do_mtab(
 
     while ((ment = getmntent(mtab)) != NULL)
     {
-        if (strcmp(myment->mnt_dir, ment->mnt_dir) != 0)
+        if (addmntent(tmp_mtab, ment) == 1)
         {
-            if (addmntent(tmp_mtab, ment) == 1)
-            {
-                fprintf(stderr, "Error: couldn't add entry to" PVFS2_TMP_MTAB "\n");
-                endmntent(mtab);
-                endmntent(tmp_mtab);
-                return -1;
-            }
+            fprintf(stderr, "Error: couldn't add entry to" PVFS2_TMP_MTAB "\n");
+            endmntent(mtab);
+            endmntent(tmp_mtab);
+            return -1;
         }
     }
 

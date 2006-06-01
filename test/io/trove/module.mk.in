@@ -19,6 +19,7 @@ LOCALTESTSRC := \
 	$(DIR)/trove-create-stress.c \
 	$(DIR)/trove-key-iterate.c \
 	$(DIR)/db-hack.c \
+	$(DIR)/db-dspace.c \
 	$(DIR)/test-listio-aio-convert.c
 	
 

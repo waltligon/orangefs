@@ -127,7 +127,6 @@ struct fp_private_data
 #define PRIVATE_FLOW(target_flow)\
     ((struct fp_private_data*)(target_flow->flow_protocol_data))
 
-static int fp_bmi_cache_id = -1;
 static bmi_context_id global_bmi_context = -1;
 
 static TROVE_context_id global_trove_context = -1;
@@ -224,8 +223,6 @@ int fp_bmi_cache_initialize(int flowproto_id)
 	return(ret);
     PINT_thread_mgr_bmi_getcontext(&global_bmi_context);
 
-    fp_bmi_cache_id = flowproto_id;
-
     return(0);
 }
 
@@ -263,7 +260,6 @@ int fp_bmi_cache_getinfo(flow_descriptor * flow_d,
 		return(-PVFS_ENOPROTOOPT);
 	default:
 	    return(-PVFS_ENOSYS);
-	    break;
     }
 }
 

@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: openib.c,v 1.1 2006-05-30 20:24:57 pw Exp $
+ * $Id: openib.c,v 1.1.2.1 2006-06-01 21:29:27 slang Exp $
  */
 #include <string.h>
 #include <errno.h>

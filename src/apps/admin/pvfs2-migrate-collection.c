@@ -45,6 +45,8 @@ typedef struct
     int coll_set;
     char storage_space[PATH_MAX];
     int storage_space_set;
+    char new_collection_name[256];
+    int  new_collname_set;
 } options_t;
 
 /** default size of buffers to use for reading old db keys */
@@ -131,8 +133,8 @@ int main(int argc, char **argv)
     int ret = -1;
     options_t opts;
     char version[256];
-    char new_name[] = "pvfs2-migrate-collection-tmp";
-    TROVE_coll_id new_id = 7223;
+    char *new_name = NULL;
+    TROVE_coll_id new_id;
     char subdir[PATH_MAX];
 
     /* make sure that the buffers we intend to use for reading keys and
@@ -154,6 +156,7 @@ int main(int argc, char **argv)
                 argv[0]);
 	return -1;
     }
+    new_name = opts.new_collection_name;
 
     /* make sure that there will not be any collisions in the collection name
      * space 
@@ -227,6 +230,7 @@ static int parse_args(
         {"verbose",0,0,0},
         {"version",0,0,0},
         {"collection",1,0,0},
+        {"new-collection-name",1,0,0},
         {"storage-space",1,0,0},
         {0,0,0,0}
     };
@@ -244,6 +248,12 @@ static int parse_args(
                 {
                     strncpy(opts->coll, optarg, 99);
                     opts->coll_set = 1;
+                    break;
+                }
+                if (strcmp("new-collection-name", cur_option) == 0)
+                {
+                    strncpy(opts->new_collection_name, optarg, 255);
+                    opts->new_collname_set = 1;
                     break;
                 }
                 if (strcmp("storage-space", cur_option) == 0)
@@ -273,7 +283,7 @@ static int parse_args(
 	}
     }
 
-    if (!opts->coll_set || !opts->storage_space_set)
+    if (!opts->coll_set || !opts->storage_space_set || !opts->new_collname_set)
     {
         print_help(argv[0]);
         return(-1);
@@ -297,6 +307,8 @@ static void print_help(
             "location of storage space\n");
     fprintf(stderr,"  --collection=<hex number>: "
             "collection id to be migrated\n");
+    fprintf(stderr, " --new-collection-name=<new collection name>: "
+            " collection name of the migrated collection\n");
     fprintf(stderr, "\n");
     fprintf(stderr,"The following arguments are optional:\n");
     fprintf(stderr,"--------------\n");

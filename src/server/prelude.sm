@@ -17,8 +17,6 @@
 #include "pvfs2-internal.h"
 #include "pint-perf-counter.h"
 
-extern struct PINT_perf_counter *PINT_server_pc;
-
 /* prelude state machine:
  * This is a nested state machine that performs initial setup 
  * steps that are common to many server operations.
@@ -186,6 +184,13 @@ static int prelude_perm_check(
     PVFS_ds_attr_to_object_attr(ds_attr, obj_attr);
     s_op->attr.mask = PVFS_ATTR_COMMON_ALL;
 
+    /* Commenting out the below block for now.  I think this code is
+     * deprecated?  Even if not all of the attributes have been filled in
+     * yet, we should still be able to read them after the object has been
+     * created.  If this change seems stable then we need to also come back
+     * and remove the PINT_SERVER_ATTRIBS_NOT_REQUIRED flag. -Phil 4-13-2006
+     */
+#if 0
     /* the next thing we need to do is interpret the error code from
      * reading the attributes.  Normally it is an error if that step
      * failed, but we have to look for the special case in which we
@@ -197,6 +202,7 @@ static int prelude_perm_check(
     {
         js_p->error_code = 0;
     }
+#endif
 
     /* anything else we treat as a real error */
     if (js_p->error_code)
@@ -241,8 +247,8 @@ static int prelude_perm_check(
             }
             break;
         case PINT_SERVER_CHECK_ATTR:
-            /* a datafile will have a 0 mask value here */
-            if (s_op->attr.mask == 0)
+            /* let datafiles pass through the attr check */
+            if (s_op->attr.objtype == PVFS_TYPE_DATAFILE)
             {
                 js_p->error_code = 0;
             }

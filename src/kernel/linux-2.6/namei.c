@@ -224,7 +224,14 @@ struct dentry *pvfs2_lookup(
     }
 
     op_release(new_op);
-    return NULL;
+    if(ret != -ENOENT)
+    {
+        return ERR_PTR(ret);
+    }
+    else
+    {
+        return NULL;
+    }
 }
 
 /* return 0 on success; non-zero otherwise */

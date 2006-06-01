@@ -82,10 +82,9 @@ struct PVFS_mgmt_dspace_info
     PVFS_handle handle;		/* handle this struct refers to */
     PVFS_ds_type type;		/* type of object */
     PVFS_size b_size;		/* size of bstream (if applicable) */
-    PVFS_size k_size;		/* number of keyvals (if applicable) */
     PVFS_handle dirdata_handle; /* directory data handle (if applicable) */
 };
-endecode_fields_8_struct(
+endecode_fields_7_struct(
   PVFS_mgmt_dspace_info,
   PVFS_error, error_code,
   skip4,,
@@ -93,7 +92,6 @@ endecode_fields_8_struct(
   PVFS_ds_type, type,
   skip4,,
   PVFS_size, b_size,
-  PVFS_size, k_size,
   PVFS_handle, dirdata_handle)
 
 /* individual datapoint from event monitoring */
@@ -352,6 +350,20 @@ PVFS_error PVFS_mgmt_get_dirdata_handle(
     PVFS_object_ref parent_ref,
     PVFS_handle *out_dirdata_handle,
     PVFS_credentials *credentials);
+
+int PVFS_mgmt_wait(
+    PVFS_mgmt_op_id op_id,
+    const char *in_op_str,
+    int *out_error);
+
+int PVFS_mgmt_testsome(
+    PVFS_mgmt_op_id *op_id_array,
+    int *op_count, /* in/out */
+    void **user_ptr_array,
+    int *error_code_array,
+    int timeout_ms);
+
+void PVFS_mgmt_release(PVFS_mgmt_op_id op_id);
 
 #endif /* __PVFS2_MGMT_H */
 

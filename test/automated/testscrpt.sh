@@ -100,8 +100,8 @@ setup_pvfs2() {
 	rm -f fs.conf server.conf*
 	INSTALL-pvfs2-${CVS_TAG}/bin/pvfs2-genconfig fs.conf server.conf \
 		--protocol tcp \
-		--ioports {3396-3399} --metaports {3396-3399}  \
-		--ioservers `hostname -s` --metaservers `hostname -s` \
+		--iospec="`hostname -s`:{3396-3399}" \
+		--metaspec="`hostname -s`:{3396-3399}"  \
 		--storage ${PVFS2_DEST}/STORAGE-pvfs2-${CVS_TAG} \
 		--logfile=${PVFS2_DEST}/pvfs2-server.log --quiet
 	rm -rf ${PVFS2_DEST}/STORAGE-pvfs2*

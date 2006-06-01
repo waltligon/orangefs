@@ -92,11 +92,9 @@ int main(int argc, char **argv)
 	    fprintf(stderr,
 		    "%s: error: collection iterate failed; aborting!\n",
 		    argv[0]);
-            trove_close_context(coll_id, trove_context);
 	    trove_finalize();
 	    return -1;
 	}
-        trove_close_context(coll_id, trove_context);
 	trove_finalize();
 	return 0;
     }
@@ -305,11 +303,10 @@ static int print_dspace(TROVE_coll_id coll_id,
     if (ret != 1) return -1;
 		
     fprintf(stdout,
-	    "\t0x%08llx (dspace_getattr output: type = %s, b_size = %lld, k_size = %lld)\n",
+	    "\t0x%08llx (dspace_getattr output: type = %s, b_size = %lld)\n",
 	    llu(handle),
 	    type_to_string(ds_attr.type),
-	    lld(ds_attr.b_size),
-	    lld(ds_attr.k_size));
+	    lld(ds_attr.b_size));
 
     if (print_keyvals) {
 	ret = print_dspace_keyvals(coll_id, handle,

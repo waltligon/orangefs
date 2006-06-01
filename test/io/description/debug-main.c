@@ -17,6 +17,8 @@
 #include <pint-request.h>
 #include "pvfs2-internal.h"
 
+#include "debug.h"
+
 #define SEGMAX 16
 #define BYTEMAX (4*1024*1024)
 

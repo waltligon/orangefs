@@ -240,6 +240,10 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 		[#define __KERNEL__
 		 #include <linux/syscalls.h>
 		 ] )
+	AC_CHECK_HEADERS([asm/ioctl32.h], [], [], 
+		[#define __KERNEL__
+		 #include <asm/ioctl32.h>
+		 ] )
 
 	AC_MSG_CHECKING(for generic_permission api in kernel)
 	dnl if this test passes, the kernel does not have it
@@ -290,41 +294,37 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	    AC_MSG_RESULT(no)
 	)
 
+	dnl Using -Werror is not an option, because some arches throw lots of
+	dnl warnings that would trigger false negatives.  We know that the
+	dnl change to the releasepage() function signature was accompanied by
+	dnl a similar change to the exported function try_to_release_page(),
+	dnl and that one we can check without using -Werror.  The test fails
+	dnl unless the previous declaration was identical to the one we suggest
+	dnl below.  New kernels use gfp_t, not int.
 	AC_MSG_CHECKING(for second arg type int in address_space_operations releasepage)
-	tmp_cflags=$CFLAGS
-	CFLAGS="$CFLAGS"
 	AC_TRY_COMPILE([
 	    #define __KERNEL__
-	    #include <linux/fs.h>
-	    extern int rp(struct page *page, int foo);
-	    ], [
-	    struct address_space_operations aso = {
-		.releasepage = rp
-	    };
-	    ],
+	    #include <linux/buffer_head.h>
+	    extern int try_to_release_page(struct page *page, int gfp_mask);
+	    ], [],
 	    AC_MSG_RESULT(yes)
 	    AC_DEFINE(HAVE_INT_ARG2_ADDRESS_SPACE_OPERATIONS_RELEASEPAGE, 1, Define if sceond argument to releasepage in address_space_operations is type int),
 	    AC_MSG_RESULT(no)
-	    )
-	CFLAGS=$tmp_cflags
+	)
 
+	dnl Similar logic for the follow_link member in inode_operations.  New
+	dnl kernels return a void *, not int.
 	AC_MSG_CHECKING(for int return in inode_operations follow_link)
-	tmp_cflags=$CFLAGS
-	CFLAGS="$CFLAGS"
 	AC_TRY_COMPILE([
 	    #define __KERNEL__
 	    #include <linux/fs.h>
-	    extern int fl(struct dentry *d, struct nameidata *n);
-	    ], [
-	    struct inode_operations io = {
-		.follow_link = fl
-	    };
-	    ],
+	    extern int page_follow_link_light(struct dentry *,
+	                                      struct nameidata *);
+	    ], [],
 	    AC_MSG_RESULT(yes)
 	    AC_DEFINE(HAVE_INT_RETURN_INODE_OPERATIONS_FOLLOW_LINK, 1, Define if return value from follow_link in inode_operations is type int),
 	    AC_MSG_RESULT(no)
-	    )
-	CFLAGS=$tmp_cflags
+	)
 
 	AC_MSG_CHECKING(for compat_ioctl member in file_operations structure)
 	AC_TRY_COMPILE([

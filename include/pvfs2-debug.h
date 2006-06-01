@@ -79,7 +79,7 @@
 uint64_t PVFS_debug_eventlog_to_mask(
     const char *event_logging);
 
-char *PVFS_debug_get_next_debug_keyword(
+const char *PVFS_debug_get_next_debug_keyword(
     int position);
 
 #endif /* __PVFS2_DEBUG_H */

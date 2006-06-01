@@ -94,7 +94,7 @@ enum PINT_server_req_attrib_flags
 struct PINT_server_req_params
 {
     enum PVFS_server_op op_type;
-    char* string_name;
+    const char* string_name;
     enum PINT_server_req_permissions perm;
     enum PINT_server_req_attrib_flags attrib_flags;
     struct PINT_state_machine_s* sm;
@@ -110,13 +110,13 @@ extern struct PINT_server_req_params PINT_server_req_table[];
  * returns a pointer to a static string (DONT FREE IT) on success,
  * null on failure
  */
-static inline char* PINT_map_server_op_to_string(enum PVFS_server_op op)
+static inline const char* PINT_map_server_op_to_string(enum PVFS_server_op op)
 {
     return (((op < 0) || (op > PVFS_MAX_SERVER_OP)) ? NULL :
             PINT_server_req_table[op].string_name);
 }
 
-extern char*PINT_eattr_namespaces[];
+extern const char *PINT_eattr_namespaces[];
 /* PINT_eattr_is_prefixed()
  *
  * This function will check to see if a given xattr key falls into the set of

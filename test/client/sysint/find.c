@@ -19,6 +19,11 @@
 #define MAX_NUM_DIRENTS    32
 
 
+void print_at_depth(char *name, int depth);
+int is_directory(PVFS_handle handle, PVFS_fs_id fs_id);
+int directory_walk(PVFS_fs_id cur_fs,
+                   char *start_dir, char *base_dir, int depth);
+
 void print_at_depth(char *name, int depth)
 {
     /* we ignore depth for now */

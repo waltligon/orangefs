@@ -79,11 +79,11 @@ int remove_directory_entry(PVFS_object_ref dir_ref,
 struct handlelist {
     int server_ct;
     PVFS_handle **list_array;
-    int *size_array;
-    int *used_array;
+    unsigned long *size_array;
+    unsigned long *used_array;
 };
 
-static struct handlelist *handlelist_initialize(int *handle_counts,
+static struct handlelist *handlelist_initialize(unsigned long *handle_counts,
 						int server_count);
 
 static void handlelist_add_handle(struct handlelist *hl,
@@ -92,7 +92,7 @@ static void handlelist_add_handle(struct handlelist *hl,
 
 static void handlelist_add_handles(struct handlelist *hl,
 				   PVFS_handle *handles,
-				   int handle_count,
+				   unsigned long handle_count,
 				   int server_idx);
 
 static void handlelist_finished_adding_handles(struct handlelist *hl);

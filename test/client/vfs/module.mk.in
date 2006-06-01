@@ -13,6 +13,6 @@ MODCFLAGS_$(TEST_CLIENT_VFS_DIR) = -I$(pvfs2_srcdir)/test/$(TEST_SHARED_DIR)
 
 LOCALTESTS := $(patsubst %.c,%, $(TEST_CLIENT_VFS_SRC))
 $(LOCALTESTS): %: %.o $(TEST_SHARED_OBJ)
-	$(Q) "  LD              $@"
+	$(Q) "  LD		$@"
 	$(E)$(LD) $< $(TEST_SHARED_OBJ) $(LDFLAGS) $(LIBS) -o $@
 

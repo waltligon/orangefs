@@ -130,7 +130,7 @@ describe I/O accesses and physical data distribution.
 The top-level directory holds code for mapping to the various underlying
 implementations and defining common data structures.  Subdirectories hold
 implementations for GM (\texttt{bmi\_gm}), TCP/IP (\texttt{bmi\_tcp}), and
-InfiniBand (\texttt{bmi\_ib}).
+InfiniBand using either the VAPI or OpenIB API (\texttt{bmi\_ib}).
 
 \texttt{buffer} holds the implementation of our internal buffering and caching
 component.  At the time of writing this is not complete and is not enabled.

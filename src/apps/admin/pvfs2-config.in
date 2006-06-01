@@ -52,6 +52,9 @@ while test $# -gt 0; do
 	if [ x"@BUILD_IB@" = x"1" ]; then
 		libflags="$libflags -L@IB_LIBDIR@ -lvapi -lmtl_common -lmosal -lmpga -lpthread -ldl"
 	fi
+	if [ x"@BUILD_OPENIB@" = x"1" ]; then
+		libflags="$libflags -L@OPENIB_LIBDIR@ -libverbs"
+	fi
 
 	echo $libflags
 	;;
@@ -65,6 +68,9 @@ while test $# -gt 0; do
 	fi
 	if [ x"@BUILD_IB@" = x"1" ]; then
 		libflags="$libflags -L@IB_LIBDIR@ -lvapi -lmtl_common -lmosal -lmpga -lpthread -ldl"
+	fi
+	if [ x"@BUILD_OPENIB@" = x"1" ]; then
+		libflags="$libflags -L@OEPNIB_LIBDIR@ -libverbs"
 	fi
 
 	echo $libflags

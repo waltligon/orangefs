@@ -25,31 +25,6 @@
 #include "pvfs2-util.h"
 #include "pint-util.h"
 
-static inline char *get_object_type(int objtype)
-{
-    static char *obj_types[] =
-    {
-         "NONE", "METAFILE", "DATAFILE",
-         "DIRECTORY", "SYMLINK", "DIRDATA", "UNKNOWN"
-    };
-    switch(objtype)
-    {
-    case PVFS_TYPE_NONE:
-         return obj_types[0];
-    case PVFS_TYPE_METAFILE:
-         return obj_types[1];
-    case PVFS_TYPE_DATAFILE:
-         return obj_types[2];
-    case PVFS_TYPE_DIRECTORY:
-         return obj_types[3];
-    case PVFS_TYPE_SYMLINK:
-         return obj_types[4];
-    case PVFS_TYPE_DIRDATA:
-         return obj_types[5];
-    }
-    return obj_types[6];
-}
-
 static int listeattr_setup_resp(
     PINT_server_op *s_op, job_status_s *js_p);
 static int listeattr_list_eattrib(
