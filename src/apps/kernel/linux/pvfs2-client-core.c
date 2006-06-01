@@ -1789,6 +1789,7 @@ static int copy_dirents_to_downcall(vfs_request_t *vfs_request)
     vfs_request->out_downcall.trailer_size = 
         encode_dirents((pvfs2_readdir_response_t *) vfs_request->out_downcall.trailer_buf,
                 &vfs_request->response.readdir);
+
     if (vfs_request->out_downcall.trailer_size <= 0) 
     {
         gossip_err("copy_dirents_to_downcall: invalid trailer size %ld\n",

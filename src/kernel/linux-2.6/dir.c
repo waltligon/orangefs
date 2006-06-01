@@ -132,7 +132,7 @@ static int pvfs2_readdir(
     void *dirent,
     filldir_t filldir)
 {
-    int ret = 0, buffer_index;
+    int ret = 0, buffer_index, token_set = 0;
     PVFS_ds_position pos = 0;
     ino_t ino = 0;
     struct dentry *dentry = file->f_dentry;
@@ -161,6 +161,7 @@ static int pvfs2_readdir(
 	   of the current directory; these always appear
 	 */
         case 0:
+            token_set = 1;
             if (pvfs2_inode->directory_version == 0)
             {
                 ino = dentry->d_inode->i_ino;
@@ -174,6 +175,7 @@ static int pvfs2_readdir(
             pos++;
             /* drop through */
         case 1:
+            token_set = 1;
             if (pvfs2_inode->directory_version == 0)
             {
                 ino = parent_ino(dentry);
@@ -317,6 +319,10 @@ graceful_termination_path:
                     }
                     file->f_pos++;
                     pos++;
+                }
+                /* For the first time around, use the token returned by the readdir response */
+                if (token_set == 1) {
+                    file->f_pos = rhandle.readdir_response.token;
                 }
                 pvfs2_print("pos = %d, file->f_pos is %ld\n", pos, 
                         (unsigned long) file->f_pos);
@@ -494,7 +500,7 @@ static int pvfs2_readdirplus(
     void *direntplus,
     filldirplus_t filldirplus)
 {
-    int ret = 0, buffer_index;
+    int ret = 0, buffer_index, token_set = 0;
     PVFS_ds_position pos = 0;
     ino_t ino = 0;
     struct dentry *dentry = file->f_dentry;
@@ -526,6 +532,7 @@ static int pvfs2_readdirplus(
         case 0:
         {
             struct inode *inode = NULL;
+            token_set = 1;
             if (pvfs2_inode->directory_version == 0)
             {
                 ino = dentry->d_inode->i_ino;
@@ -548,6 +555,7 @@ static int pvfs2_readdirplus(
         case 1:
         {
             struct inode *inode = NULL;
+            token_set = 1;
             if (pvfs2_inode->directory_version == 0)
             {
                 ino = parent_ino(dentry);
@@ -780,6 +788,10 @@ graceful_termination_path:
                     }
                     file->f_pos++;
                     pos++;
+                }
+                /* For the first time around, use the token returned by the readdirplus response */
+                if (token_set == 1) {
+                    file->f_pos = rhandle.readdirplus_response.token;
                 }
                 pvfs2_print("pos = %d, file->f_pos is %ld\n", pos, 
                         (unsigned long) file->f_pos);
