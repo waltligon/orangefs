@@ -37,7 +37,7 @@ static void do_print_attr(struct PVFS_ds_storedattr_s *attr, PVFS_handle h)
 	return;
 }
 
-int PINT_trove_dbpf_ds_attr_compare(
+static int PINT_trove_dbpf_ds_attr_compare(
     DB * dbp, const DBT * a, const DBT * b)
 {
     const PVFS_handle * handle_a;
