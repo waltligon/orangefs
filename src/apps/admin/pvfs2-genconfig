@@ -941,13 +941,21 @@ sub get_specs
                 {
                     my $portmap = {$proto => $i};
                     my $alias = $hostname . "_" . $proto . $i;
-                    $all_endpoints{$alias} = {
-                        ALIAS => $alias, 
-                        TYPE => $type,
-                        HOSTNAME => $hostname,
-                        PORTMAP => $portmap, 
-                        STORAGE => $stor, 
-                        LOGFILE => $logf};
+
+                    if(exists $all_endpoints{$alias})
+                    {
+                        $all_endpoints{$alias}->{TYPE} |= $type;
+                    }
+                    else
+                    {
+                        $all_endpoints{$alias} = {
+                            ALIAS => $alias, 
+                            TYPE => $type,
+                            HOSTNAME => $hostname,
+                            PORTMAP => $portmap, 
+                            STORAGE => $stor, 
+                            LOGFILE => $logf};
+                    }
                 }
             }
         }
