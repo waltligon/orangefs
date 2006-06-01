@@ -118,6 +118,19 @@ DB_ENV *dbpf_getdb_env(const char *path, unsigned int env_flags, int *error)
 
         ret = dbenv->open(dbenv, path, 
                              DB_INIT_MPOOL|DB_CREATE|DB_THREAD|DB_SYSTEM_MEM, 0);
+        /* In some cases (oddly configured systems with pvfs2-server running as
+         * non-root) DB_SYSTEM_MEM, which uses sysV shared memory, can fail
+         * with EAGAIN (resource temporarily unavailable).   berkely DB can use
+         * an mmapped file instead of sysv shm, so we will fall back to that
+         * (by not setting the DB_SYSTEM_MEM flag) in the EAGAIN case.  The
+         * drawback is a file (__db.002) that takes up space in your storage
+         * directory. */
+
+        if (ret == EAGAIN) {
+            ret = dbenv->open(dbenv, path,
+                    DB_INIT_MPOOL|DB_CREATE|DB_THREAD, 0);
+        }
+
         if(ret != 0)
         {
             gossip_lerr("dbpf_getdb_env(%s): %s\n", path, db_strerror(ret));
