@@ -473,18 +473,19 @@ static int split_iovecs(unsigned long max_new_nr_segs,  /* IN */
 repeat:
     for (seg = begin_seg; seg < nr_segs; seg++)
     {
-        if (count + orig_iovec[seg].iov_len <= pvfs_bufmap_size_query())
+        if (tmpnew_nr_segs >= max_new_nr_segs || sizes_count >= max_new_nr_segs)
+        {
+            kfree(sizes);
+            kfree(orig_iovec);
+            kfree(new_iovec);
+            pvfs2_error("split_iovecs: exceeded the index limit (%d)\n", 
+                    tmpnew_nr_segs);
+            return -EINVAL;
+        }
+        if (count + orig_iovec[seg].iov_len < pvfs_bufmap_size_query())
         {
             count += orig_iovec[seg].iov_len;
-            if (tmpnew_nr_segs >= max_new_nr_segs)
-            {
-                kfree(sizes);
-                kfree(orig_iovec);
-                kfree(new_iovec);
-                pvfs2_error("split_iovecs: exceeded the index limit (%d)\n", 
-                        tmpnew_nr_segs);
-                return -EINVAL;
-            }
+            
             memcpy(&new_iovec[tmpnew_nr_segs], &orig_iovec[seg], 
                     sizeof(struct iovec));
             tmpnew_nr_segs++;
@@ -492,28 +493,10 @@ repeat:
         }
         else
         {
-            if (tmpnew_nr_segs >= max_new_nr_segs)
-            {
-                kfree(sizes);
-                kfree(orig_iovec);
-                kfree(new_iovec);
-                pvfs2_error("split_iovecs: exceeded the index limit (%d)\n", 
-                        tmpnew_nr_segs);
-                return -EINVAL;
-            }
             new_iovec[tmpnew_nr_segs].iov_base = orig_iovec[seg].iov_base;
             new_iovec[tmpnew_nr_segs].iov_len = 
                 (pvfs_bufmap_size_query() - count);
             tmpnew_nr_segs++;
-            if (sizes_count >= max_new_nr_segs)
-            {
-                kfree(sizes);
-                kfree(orig_iovec);
-                kfree(new_iovec);
-                pvfs2_error("split_iovecs: exceeded the size limit (%d)\n", 
-                        sizes_count);
-                return -EINVAL;
-            }
             sizes[sizes_count]++;
             sizes_count++;
             begin_seg = seg;
@@ -540,6 +523,35 @@ repeat:
     return 0;
 }
 
+static long estimate_max_iovecs(const struct iovec *curr, unsigned long nr_segs, ssize_t *total_count)
+{
+    unsigned long i;
+    long max_nr_iovecs;
+    ssize_t total, count;
+
+    total = 0;
+    count = 0;
+    max_nr_iovecs = 0;
+    for (i = 0; i < nr_segs; i++) 
+    {
+        const struct iovec *iv = &curr[i];
+        count += iv->iov_len;
+	if (unlikely((ssize_t)(count|iv->iov_len) < 0))
+            return -EINVAL;
+        if (total + iv->iov_len < pvfs_bufmap_size_query())
+        {
+            total += iv->iov_len;
+            max_nr_iovecs++;
+        }
+        else 
+        {
+            total = (total + iv->iov_len - pvfs_bufmap_size_query());
+            max_nr_iovecs += (total / pvfs_bufmap_size_query() + 2);
+        }
+    }
+    *total_count = count;
+    return max_nr_iovecs;
+}
 
 static ssize_t do_readv_writev(int type, struct file *file,
         const struct iovec *iov, unsigned long nr_segs, loff_t *offset)
@@ -551,7 +563,8 @@ static ssize_t do_readv_writev(int type, struct file *file,
     size_t  each_count;
     struct inode *inode = file->f_dentry->d_inode;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
-    unsigned long new_nr_segs = 0, max_new_nr_segs = 0;
+    unsigned long new_nr_segs = 0;
+    long max_new_nr_segs = 0;
     unsigned int  seg_count = 0, *seg_array = NULL;
     struct iovec *iovecptr = NULL, *ptr = NULL;
     pvfs2_kernel_op_t *new_op = NULL;
@@ -563,26 +576,10 @@ static ssize_t do_readv_writev(int type, struct file *file,
     total_count = 0;
     count =  0;
     to_free = 0;
-    /* 
-     * Calculate the total length to read/write by adding up the 
-     * lengths of each io segment 
-     */
-    for (seg = 0; seg < nr_segs; seg++)
+    /* Compute total and max number of segments after split */
+    if ((max_new_nr_segs = estimate_max_iovecs(iov, nr_segs, &count)) < 0)
     {
-	const struct iovec *iv = &iov[seg];
-	count += iv->iov_len;
-	if (unlikely((ssize_t)(count|iv->iov_len) < 0))
-            goto out;
-        if (total_count + iv->iov_len < pvfs_bufmap_size_query())
-        {
-            total_count += iv->iov_len;
-            max_new_nr_segs++;
-        }
-        else {
-            total_count = (total_count + iv->iov_len - 
-                    pvfs_bufmap_size_query());
-            max_new_nr_segs += 2;
-        }
+        return -EINVAL;
     }
     if (type == IO_WRITEV)
     {
