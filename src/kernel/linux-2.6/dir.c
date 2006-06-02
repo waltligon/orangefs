@@ -9,6 +9,7 @@
  *
  *  Linux VFS directory operations.
  */
+
 #include "pvfs2-kernel.h"
 #include "pvfs2-bufmap.h"
 #include "pvfs2-sysint.h"
@@ -146,6 +147,9 @@ static int pvfs2_readdir(
     if (pos == PVFS_READDIR_END)
     {
         pvfs2_print("Skipping to graceful termination path since we are done\n");
+        pvfs2_inode->directory_version = 0;
+        pvfs2_inode->num_readdir_retries =
+            PVFS2_NUM_READDIR_RETRIES;
         return 0;
     }
 
@@ -160,36 +164,36 @@ static int pvfs2_readdir(
 	   if we're just starting, populate the "." and ".." entries
 	   of the current directory; these always appear
 	 */
-        case 0:
-            token_set = 1;
-            if (pvfs2_inode->directory_version == 0)
-            {
-                ino = dentry->d_inode->i_ino;
-                pvfs2_print("calling filldir of . with pos = %d\n", pos);
-                if (filldir(dirent, ".", 1, pos, ino, DT_DIR) < 0)
-                {
-                    break;
-                }
-            }
-            file->f_pos++;
-            pos++;
-            /* drop through */
-        case 1:
-            token_set = 1;
-            if (pvfs2_inode->directory_version == 0)
-            {
-                ino = parent_ino(dentry);
-                pvfs2_print("calling filldir of .. with pos = %d\n", pos);
-                if (filldir(dirent, "..", 2, pos, ino, DT_DIR) < 0)
-                {
-                    break;
-                }
-            }
-            file->f_pos++;
-            pos++;
-            /* drop through */
-        default:
+    case 0:
+        token_set = 1;
+        if (pvfs2_inode->directory_version == 0)
         {
+            ino = dentry->d_inode->i_ino;
+            pvfs2_print("calling filldir of . with pos = %d\n", pos);
+            if (filldir(dirent, ".", 1, pos, ino, DT_DIR) < 0)
+            {
+                break;
+            }
+        }
+        file->f_pos++;
+        pos++;
+    /* drop through */
+    case 1:
+        token_set = 1;
+        if (pvfs2_inode->directory_version == 0)
+        {
+            ino = parent_ino(dentry);
+            pvfs2_print("calling filldir of .. with pos = %d\n", pos);
+            if (filldir(dirent, "..", 2, pos, ino, DT_DIR) < 0)
+            {
+                break;
+            }
+        }
+        file->f_pos++;
+        pos++;
+        /* drop through */
+    default:
+    {
             readdir_handle_t rhandle;
 
             rhandle.buffer_index = -1;
@@ -517,6 +521,9 @@ static int pvfs2_readdirplus(
     if (pos == PVFS_READDIR_END)
     {
         pvfs2_print("Skipping to graceful termination path since we are done\n");
+        pvfs2_inode->directory_version = 0;
+        pvfs2_inode->num_readdir_retries =
+            PVFS2_NUM_READDIR_RETRIES;
         return 0;
     }
 
