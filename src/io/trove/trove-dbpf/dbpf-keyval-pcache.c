@@ -190,6 +190,8 @@ int PINT_dbpf_keyval_pcache_insert(
 {
     struct dbpf_keyval_pcache_entry *entry;
     struct dbpf_keyval_pcache_key key;
+    struct PINT_tcache_entry * tentry;
+    int lookup_status;
     int ret;
     int removed;
     
@@ -199,15 +201,22 @@ int PINT_dbpf_keyval_pcache_insert(
         return -PVFS_ENOMEM;
     }
 
+    key.handle = handle;
+    key.pos = pos;
+
+    gen_mutex_lock(pcache->mutex);
+    if(PINT_tcache_lookup(
+            pcache->tcache, (void *)&key, &tentry, &lookup_status) == 0)
+    {
+        /* remove entry that already exists */
+        PINT_tcache_purge(pcache->tcache, tentry);
+    }
+
     entry->handle = handle;
     entry->pos = pos;
     memcpy(entry->keyname, keyname, length);
     entry->keylen = length;
 
-    key.handle = handle;
-    key.pos = pos;
-
-    gen_mutex_lock(pcache->mutex);
     ret = PINT_tcache_insert_entry(pcache->tcache,
                                    &key,
                                    entry,
