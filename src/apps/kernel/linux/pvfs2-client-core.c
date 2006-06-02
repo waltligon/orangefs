@@ -1580,6 +1580,7 @@ static PVFS_error post_iox_request(vfs_request_t *vfs_request)
         vfs_request->iox_offsets[i] = rwx->off;
         rwx++;
     }
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "iox: iox_count %d\n", vfs_request->iox_count);
     /* file request is now a hindexed request type */
     ret = PVFS_Request_hindexed(vfs_request->iox_count, 
             vfs_request->iox_sizes, vfs_request->iox_offsets, PVFS_BYTE, 
