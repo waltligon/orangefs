@@ -322,7 +322,10 @@ graceful_termination_path:
                 }
                 /* For the first time around, use the token returned by the readdir response */
                 if (token_set == 1) {
-                    file->f_pos = rhandle.readdir_response.token;
+                    if (i == rhandle.readdir_response.pvfs_dirent_outcount)
+                        file->f_pos = rhandle.readdir_response.token;
+                    else 
+                        file->f_pos = i;
                 }
                 pvfs2_print("pos = %d, file->f_pos is %ld\n", pos, 
                         (unsigned long) file->f_pos);
@@ -791,7 +794,10 @@ graceful_termination_path:
                 }
                 /* For the first time around, use the token returned by the readdirplus response */
                 if (token_set == 1) {
-                    file->f_pos = rhandle.readdirplus_response.token;
+                    if (i == rhandle.readdirplus_response.pvfs_dirent_outcount)
+                        file->f_pos = rhandle.readdirplus_response.token;
+                    else
+                        file->f_pos = i;
                 }
                 pvfs2_print("pos = %d, file->f_pos is %ld\n", pos, 
                         (unsigned long) file->f_pos);
