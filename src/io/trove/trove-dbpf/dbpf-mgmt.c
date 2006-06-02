@@ -122,13 +122,24 @@ DB_ENV *dbpf_getdb_env(const char *path, unsigned int env_flags, int *error)
          * non-root) DB_SYSTEM_MEM, which uses sysV shared memory, can fail
          * with EAGAIN (resource temporarily unavailable).   berkely DB can use
          * an mmapped file instead of sysv shm, so we will fall back to that
-         * (by not setting the DB_SYSTEM_MEM flag) in the EAGAIN case.  The
-         * drawback is a file (__db.002) that takes up space in your storage
-         * directory. */
+         * (by calling this routine again after setting TROVE_DB_CACHE_MMAP) in
+         * the EAGAIN case.  The drawback is a file (__db.002) that takes up
+         * space in your storage directory.  We need to call getdb_env again
+         * (instead of just calling dbenv->open immediately) because after
+         * returning an error, even EAGAIN, berkely db requires that you close
+         * and re-create the dbenv before using it again */
 
         if (ret == EAGAIN) {
-            ret = dbenv->open(dbenv, path,
-                    DB_INIT_MPOOL|DB_CREATE|DB_THREAD, 0);
+            assert(my_storage_p != NULL);
+            ret = dbenv->remove(dbenv, path, DB_FORCE);
+            if (ret != 0)
+            {
+                gossip_lerr("dbpf_getdb_env(%s): %s\n", path, db_strerror(ret));
+                *error = ret;
+                return NULL;
+            }
+            my_storage_p->flags |= TROVE_DB_CACHE_MMAP;
+            return dbpf_getdb_env(path, env_flags, error);
         }
 
         if(ret != 0)
