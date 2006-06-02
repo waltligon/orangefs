@@ -64,6 +64,7 @@ DB_ENV *dbpf_getdb_env(const char *path, unsigned int env_flags, int *error)
         return NULL;
     }
 
+retry:
     ret = db_env_create(&dbenv, 0);
     if (ret != 0)
     {
@@ -122,15 +123,15 @@ DB_ENV *dbpf_getdb_env(const char *path, unsigned int env_flags, int *error)
          * non-root) DB_SYSTEM_MEM, which uses sysV shared memory, can fail
          * with EAGAIN (resource temporarily unavailable).   berkely DB can use
          * an mmapped file instead of sysv shm, so we will fall back to that
-         * (by calling this routine again after setting TROVE_DB_CACHE_MMAP) in
+         * (by setting TROVE_DB_CACHE_MMAP and retrying) in
          * the EAGAIN case.  The drawback is a file (__db.002) that takes up
-         * space in your storage directory.  We need to call getdb_env again
-         * (instead of just calling dbenv->open immediately) because after
-         * returning an error, even EAGAIN, berkely db requires that you close
-         * and re-create the dbenv before using it again */
+         * space in your storage directory.  We need to go through the whole
+         * dbenv setup process again (instead of just calling dbenv->open
+         * immediately) because after dbenv->open returns an error, even
+         * EAGAIN, berkely db requires that you close and re-create the dbenv
+         * before using it again */
 
         if (ret == EAGAIN) {
-            assert(my_storage_p != NULL);
             ret = dbenv->remove(dbenv, path, DB_FORCE);
             if (ret != 0)
             {
@@ -138,8 +139,9 @@ DB_ENV *dbpf_getdb_env(const char *path, unsigned int env_flags, int *error)
                 *error = ret;
                 return NULL;
             }
+            assert(my_storage_p != NULL);
             my_storage_p->flags |= TROVE_DB_CACHE_MMAP;
-            return dbpf_getdb_env(path, env_flags, error);
+            goto retry;
         }
 
         if(ret != 0)
