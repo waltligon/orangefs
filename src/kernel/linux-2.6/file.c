@@ -475,18 +475,19 @@ static int split_iovecs(unsigned long max_new_nr_segs,  /* IN */
 repeat:
     for (seg = begin_seg; seg < nr_segs; seg++)
     {
-        if (count + orig_iovec[seg].iov_len <= pvfs_bufmap_size_query())
+        if (tmpnew_nr_segs >= max_new_nr_segs || sizes_count >= max_new_nr_segs)
+        {
+            kfree(sizes);
+            kfree(orig_iovec);
+            kfree(new_iovec);
+            pvfs2_error("split_iovecs: exceeded the index limit (%d)\n", 
+                    tmpnew_nr_segs);
+            return -EINVAL;
+        }
+        if (count + orig_iovec[seg].iov_len < pvfs_bufmap_size_query())
         {
             count += orig_iovec[seg].iov_len;
-            if (tmpnew_nr_segs >= max_new_nr_segs)
-            {
-                kfree(sizes);
-                kfree(orig_iovec);
-                kfree(new_iovec);
-                pvfs2_error("split_iovecs: exceeded the index limit (%d)\n", 
-                        tmpnew_nr_segs);
-                return -EINVAL;
-            }
+            
             memcpy(&new_iovec[tmpnew_nr_segs], &orig_iovec[seg], 
                     sizeof(struct iovec));
             tmpnew_nr_segs++;
@@ -494,28 +495,10 @@ repeat:
         }
         else
         {
-            if (tmpnew_nr_segs >= max_new_nr_segs)
-            {
-                kfree(sizes);
-                kfree(orig_iovec);
-                kfree(new_iovec);
-                pvfs2_error("split_iovecs: exceeded the index limit (%d)\n", 
-                        tmpnew_nr_segs);
-                return -EINVAL;
-            }
             new_iovec[tmpnew_nr_segs].iov_base = orig_iovec[seg].iov_base;
             new_iovec[tmpnew_nr_segs].iov_len = 
                 (pvfs_bufmap_size_query() - count);
             tmpnew_nr_segs++;
-            if (sizes_count >= max_new_nr_segs)
-            {
-                kfree(sizes);
-                kfree(orig_iovec);
-                kfree(new_iovec);
-                pvfs2_error("split_iovecs: exceeded the size limit (%d)\n", 
-                        sizes_count);
-                return -EINVAL;
-            }
             sizes[sizes_count]++;
             sizes_count++;
             begin_seg = seg;
@@ -542,6 +525,35 @@ repeat:
     return 0;
 }
 
+static long estimate_max_iovecs(const struct iovec *curr, unsigned long nr_segs, ssize_t *total_count)
+{
+    unsigned long i;
+    long max_nr_iovecs;
+    ssize_t total, count;
+
+    total = 0;
+    count = 0;
+    max_nr_iovecs = 0;
+    for (i = 0; i < nr_segs; i++) 
+    {
+        const struct iovec *iv = &curr[i];
+        count += iv->iov_len;
+	if (unlikely((ssize_t)(count|iv->iov_len) < 0))
+            return -EINVAL;
+        if (total + iv->iov_len < pvfs_bufmap_size_query())
+        {
+            total += iv->iov_len;
+            max_nr_iovecs++;
+        }
+        else 
+        {
+            total = (total + iv->iov_len - pvfs_bufmap_size_query());
+            max_nr_iovecs += (total / pvfs_bufmap_size_query() + 2);
+        }
+    }
+    *total_count = count;
+    return max_nr_iovecs;
+}
 
 static ssize_t do_readv_writev(int type, struct file *file,
         const struct iovec *iov, unsigned long nr_segs, loff_t *offset)
@@ -553,7 +565,8 @@ static ssize_t do_readv_writev(int type, struct file *file,
     size_t  each_count;
     struct inode *inode = file->f_dentry->d_inode;
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
-    unsigned long new_nr_segs = 0, max_new_nr_segs = 0;
+    unsigned long new_nr_segs = 0;
+    long max_new_nr_segs = 0;
     unsigned int  seg_count = 0, *seg_array = NULL;
     struct iovec *iovecptr = NULL, *ptr = NULL;
     pvfs2_kernel_op_t *new_op = NULL;
@@ -565,26 +578,10 @@ static ssize_t do_readv_writev(int type, struct file *file,
     total_count = 0;
     count =  0;
     to_free = 0;
-    /* 
-     * Calculate the total length to read/write by adding up the 
-     * lengths of each io segment 
-     */
-    for (seg = 0; seg < nr_segs; seg++)
+    /* Compute total and max number of segments after split */
+    if ((max_new_nr_segs = estimate_max_iovecs(iov, nr_segs, &count)) < 0)
     {
-	const struct iovec *iv = &iov[seg];
-	count += iv->iov_len;
-	if (unlikely((ssize_t)(count|iv->iov_len) < 0))
-            goto out;
-        if (total_count + iv->iov_len < pvfs_bufmap_size_query())
-        {
-            total_count += iv->iov_len;
-            max_new_nr_segs++;
-        }
-        else {
-            total_count = (total_count + iv->iov_len - 
-                    pvfs_bufmap_size_query());
-            max_new_nr_segs += (iv->iov_len / pvfs_bufmap_size_query() + 1);
-        }
+        return -EINVAL;
     }
     if (type == IO_WRITEV)
     {
@@ -622,7 +619,7 @@ static ssize_t do_readv_writev(int type, struct file *file,
                         &seg_count, &seg_array)  /* OUT */ ) < 0)
         {
             pvfs2_error("%s: Failed to split iovecs to satisfy larger "
-                    " than blocksize readv/writev request %ld\n", fnstr, (long) ret);
+                    " than blocksize readv/writev request %zd\n", fnstr, ret);
             goto out;
         }
         pvfs2_print("%s: Splitting iovecs from %lu to %lu [max_new %lu]\n", 
@@ -681,8 +678,7 @@ static ssize_t do_readv_writev(int type, struct file *file,
         ret = pvfs_bufmap_get(&buffer_index);
         if (ret < 0)
         {
-            pvfs2_error("%s: pvfs_bufmap_get() "
-                        "failure (%ld)\n", fnstr, (long) ret);
+            pvfs2_error("%s: pvfs_bufmap_get() failure (%zd)\n", fnstr, ret);
             goto out;
         }
 
@@ -709,7 +705,7 @@ static ssize_t do_readv_writev(int type, struct file *file,
             if (ret < 0)
             {
                 pvfs2_error("%s: Failed to copy user buffer.  Please make sure "
-                            "that the pvfs2-client is running. %ld\n", fnstr, (long) ret);
+                            "that the pvfs2-client is running. %zd\n", fnstr, ret);
                 goto out;
             }
         }
@@ -728,17 +724,17 @@ static ssize_t do_readv_writev(int type, struct file *file,
               */
               if (ret == -EINTR)
               {
-                  pvfs2_print("%s: returning error %ld\n", fnstr, (long) ret);
+                  pvfs2_print("%s: returning error %zd\n", fnstr, ret);
               }
               else
               {
                   pvfs2_error(
                         "%s: error on handle %llu, "
-                        "FILE: %s\n  -- returning %ld\n",
+                        "FILE: %s\n  -- returning %zd\n",
                         fnstr, llu(pvfs2_ino_to_handle(inode->i_ino)),
                         (file && file->f_dentry && file->f_dentry->d_name.name ?
                          (char *)file->f_dentry->d_name.name : "UNKNOWN"),
-                        (long) ret);
+                        ret);
               }
               goto out;
         }
@@ -953,18 +949,19 @@ static int split_xtvecs(unsigned long max_new_nr_segs,  /* IN */
 repeat:
     for (seg = begin_seg; seg < nr_segs; seg++)
     {
-        if (count + orig_xtvec[seg].xtv_len <= pvfs_bufmap_size_query())
+        if (tmpnew_nr_segs >= max_new_nr_segs || sizes_count >= max_new_nr_segs)
+        {
+            kfree(sizes);
+            kfree(orig_xtvec);
+            kfree(new_xtvec);
+            pvfs2_error("split_xtvecs: exceeded the index limit (%d)\n", 
+                    tmpnew_nr_segs);
+            return -EINVAL;
+        }
+        if (count + orig_xtvec[seg].xtv_len < pvfs_bufmap_size_query())
         {
             count += orig_xtvec[seg].xtv_len;
-            if (tmpnew_nr_segs >= max_new_nr_segs)
-            {
-                kfree(sizes);
-                kfree(orig_xtvec);
-                kfree(new_xtvec);
-                pvfs2_error("split_xtvecs: exceeded the index limit (%d)\n", 
-                        tmpnew_nr_segs);
-                return -EINVAL;
-            }
+            
             memcpy(&new_xtvec[tmpnew_nr_segs], &orig_xtvec[seg], 
                     sizeof(struct xtvec));
             tmpnew_nr_segs++;
@@ -972,28 +969,10 @@ repeat:
         }
         else
         {
-            if (tmpnew_nr_segs >= max_new_nr_segs)
-            {
-                kfree(sizes);
-                kfree(orig_xtvec);
-                kfree(new_xtvec);
-                pvfs2_error("split_xtvecs: exceeded the index limit (%d)\n", 
-                        tmpnew_nr_segs);
-                return -EINVAL;
-            }
             new_xtvec[tmpnew_nr_segs].xtv_off = orig_xtvec[seg].xtv_off;
             new_xtvec[tmpnew_nr_segs].xtv_len = 
                 (pvfs_bufmap_size_query() - count);
             tmpnew_nr_segs++;
-            if (sizes_count >= max_new_nr_segs)
-            {
-                kfree(sizes);
-                kfree(orig_xtvec);
-                kfree(new_xtvec);
-                pvfs2_error("split_xtvecs: exceeded the size limit (%d)\n", 
-                        sizes_count);
-                return -EINVAL;
-            }
             sizes[sizes_count]++;
             sizes_count++;
             begin_seg = seg;
@@ -1020,6 +999,37 @@ repeat:
     return 0;
 }
 
+static long 
+estimate_max_xtvecs(const struct xtvec *curr, unsigned long nr_segs, ssize_t *total_count)
+{
+    unsigned long i;
+    long max_nr_xtvecs;
+    ssize_t total, count;
+
+    total = 0;
+    count = 0;
+    max_nr_xtvecs = 0;
+    for (i = 0; i < nr_segs; i++) 
+    {
+        const struct xtvec *xv = &curr[i];
+        count += xv->xtv_len;
+	if (unlikely((ssize_t)(count|xv->xtv_len) < 0))
+            return -EINVAL;
+        if (total + xv->xtv_len < pvfs_bufmap_size_query())
+        {
+            total += xv->xtv_len;
+            max_nr_xtvecs++;
+        }
+        else 
+        {
+            total = (total + xv->xtv_len - pvfs_bufmap_size_query());
+            max_nr_xtvecs += (total / pvfs_bufmap_size_query() + 2);
+        }
+    }
+    *total_count = count;
+    return max_nr_xtvecs;
+}
+
 
 static ssize_t do_readx_writex(int type, struct file *file,
         const struct iovec *iov, unsigned long nr_segs,
@@ -1030,7 +1040,7 @@ static ssize_t do_readx_writex(int type, struct file *file,
     unsigned long seg;
     ssize_t total_count, count_mem, count_stream;
     size_t  each_count;
-    unsigned long max_new_nr_segs_mem, max_new_nr_segs_stream;
+    long max_new_nr_segs_mem, max_new_nr_segs_stream;
     unsigned long new_nr_segs_mem = 0, new_nr_segs_stream = 0;
     unsigned int seg_count_mem, *seg_array_mem = NULL;
     unsigned int seg_count_stream, *seg_array_stream = NULL;
@@ -1048,51 +1058,20 @@ static ssize_t do_readx_writex(int type, struct file *file,
 
     /* Calculate the total memory length to read by adding up the length of each io
      * segment */
-    total_count = 0;
     count_mem = 0;
     max_new_nr_segs_mem = 0;
-    for (seg = 0; seg < nr_segs; seg++)
+
+    /* Compute total and max number of segments after split of the memory vector */
+    if ((max_new_nr_segs_mem = estimate_max_iovecs(iov, nr_segs, &count_mem)) < 0)
     {
-	const struct iovec *iv = &iov[seg];
-	count_mem += iv->iov_len;
-	if (unlikely((ssize_t)(count_mem|iv->iov_len) < 0)) {
-            pvfs2_error("invalid iov length\n");
-            goto out;
-        }
-        if (total_count + iv->iov_len < pvfs_bufmap_size_query())
-        {
-            total_count += iv->iov_len;
-            max_new_nr_segs_mem++;
-        }
-        else {
-            total_count = (total_count + iv->iov_len - 
-                    pvfs_bufmap_size_query());
-            max_new_nr_segs_mem += (iv->iov_len / pvfs_bufmap_size_query() + 1);
-        }
+        return -EINVAL;
     }
-    /* Calculate the total stream length to read by adding up the lengths of
-    *  each file segment */
-    total_count = 0;
+    /* Calculate the total stream length to read and max number of segments after split of the stream vector */
     count_stream = 0;
     max_new_nr_segs_stream = 0;
-    for (seg = 0; seg < xtnr_segs; seg++)
+    if ((max_new_nr_segs_stream = estimate_max_xtvecs(xtvec, xtnr_segs, &count_stream)) < 0)
     {
-        const struct xtvec *xv = &xtvec[seg];
-        count_stream += xv->xtv_len;
-	if (unlikely((ssize_t)(count_stream|xv->xtv_len) < 0)) {
-            pvfs2_error("invalid xtv length\n");
-	    return -EINVAL;
-        }
-        if (total_count + xv->xtv_len < pvfs_bufmap_size_query())
-        {
-            total_count += xv->xtv_len;
-            max_new_nr_segs_stream++;
-        }
-        else {
-            total_count = (total_count + xv->xtv_len - 
-                    pvfs_bufmap_size_query());
-            max_new_nr_segs_stream += (xv->xtv_len / pvfs_bufmap_size_query() + 1);
-        }
+        return -EINVAL;
     }
     if (count_mem != count_stream) 
     {
