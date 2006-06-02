@@ -43,7 +43,7 @@ static int pvfs2_readdir(
     void *dirent,
     filldir_t filldir)
 {
-    int ret = 0;
+    int ret = 0, token_set = 0;
     PVFS_ds_position pos = 0;
     ino_t ino = 0;
     struct dentry *dentry = file->f_dentry;
@@ -57,6 +57,9 @@ static int pvfs2_readdir(
     if (pos == PVFS_READDIR_END)
     {
         pvfs2_print("Skipping to graceful termination path since we are done\n");
+        pvfs2_inode->directory_version = 0;
+        pvfs2_inode->num_readdir_retries =
+            PVFS2_NUM_READDIR_RETRIES;
         return 0;
     }
 
@@ -72,6 +75,7 @@ static int pvfs2_readdir(
 	   of the current directory; these always appear
 	 */
     case 0:
+        token_set = 1;
         if (pvfs2_inode->directory_version == 0)
         {
             ino = dentry->d_inode->i_ino;
@@ -83,8 +87,9 @@ static int pvfs2_readdir(
         }
         file->f_pos++;
         pos++;
-	/* drop through */
+    /* drop through */
     case 1:
+        token_set = 1;
         if (pvfs2_inode->directory_version == 0)
         {
             ino = parent_ino(dentry);
@@ -203,7 +208,13 @@ static int pvfs2_readdir(
                 file->f_pos++;
                 pos++;
             }
-            file->f_pos = new_op->downcall.resp.readdir.token;
+            /* for the first time around, use the token teturned by the readdir response */
+            if (token_set == 1) {
+                if (i ==  new_op->downcall.resp.readdir.dirent_count)
+                    file->f_pos = new_op->downcall.resp.readdir.token;
+                else 
+                    file->f_pos = i;
+            }
             pvfs2_print("pos = %d, file->f_pos should have been %ld\n", pos, 
                     (unsigned long) file->f_pos);
 	}
