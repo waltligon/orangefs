@@ -104,7 +104,9 @@ setup_pvfs2() {
 		--metaspec="`hostname -s`:{3396-3399}"  \
 		--storage ${PVFS2_DEST}/STORAGE-pvfs2-${CVS_TAG} \
 		--logfile=${PVFS2_DEST}/pvfs2-server.log --quiet
+	# clean up any artifacts from earlier runs
 	rm -rf ${PVFS2_DEST}/STORAGE-pvfs2*
+	rm -f ${PVFS2_DEST}/pvfs2-server.log* 
 	failure_logs="${PVFS2_DEST}/pvfs2-server.log* $failure_logs"
 	for server_conf in server.conf*; do 
 		INSTALL-pvfs2-${CVS_TAG}/sbin/pvfs2-server \
