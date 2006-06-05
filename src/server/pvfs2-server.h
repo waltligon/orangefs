@@ -397,17 +397,6 @@ typedef struct PINT_server_op
 
 } PINT_server_op;
 
-/* PINT_STATE_DEBUG()
- *
- * macro for consistent printing of state transition information
- * through gossip.  will only work within state machine functions.
- *
- * no return value
- */
-#define PINT_STATE_DEBUG(fn_name)				  \
-    gossip_debug(GOSSIP_SERVER_DEBUG, "(%p) %s state: %s\n", s_op,\
-    PINT_map_server_op_to_string(s_op->op), fn_name);
-
 /* PINT_ACCESS_DEBUG()
  *
  * macro for consistent printing of access records

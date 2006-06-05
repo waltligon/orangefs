@@ -147,17 +147,23 @@ static inline int PINT_state_machine_next(struct PINT_OP_STATE *s,
     state_name = PINT_state_machine_current_state_name(s);
     machine_name = PINT_state_machine_current_machine_name(s);
 
-    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, "[SM Entering]: %s:%s\n",
+    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, 
+                 "[SM Entering]: (%p) %s:%s (status: %d)\n",
+                 s,
                  /* skip pvfs2_ */
                  machine_name,
-                 state_name);
+                 state_name,
+                 (int32_t)r->status_user_tag);
                  
     retval = (s->current_state->state_action)(s,r);
 
-    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, "[SM Exiting]: %s:%s\n",
+    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, 
+                 "[SM Exiting]: (%p) %s:%s (error code: %d)\n",
+                 s,
                  /* skip pvfs2_ */
                  machine_name,
-                 state_name);
+                 state_name,
+                 r->error_code);
 
     /* return to the while loop in pvfs2-server.c */
     return retval;
@@ -173,17 +179,23 @@ static inline int PINT_state_machine_invoke(
     state_name = PINT_state_machine_current_state_name(s);
     machine_name = PINT_state_machine_current_machine_name(s);
 
-    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, "[SM Entering]: %s:%s\n",
+    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, 
+                 "[SM Entering]: (%p) %s:%s (status: %d)\n",
+                 s,
                  /* skip pvfs2_ */
                  machine_name,
-                 state_name);
-                 
+                 state_name,
+                 (int32_t)r->status_user_tag);
+                
     retval = (s->current_state->state_action)(s,r);
 
-    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, "[SM Exiting]: %s:%s\n",
+    gossip_debug(GOSSIP_STATE_MACHINE_DEBUG, 
+                 "[SM Exiting]: (%p) %s:%s (error code: %d)\n",
+                 s,
                  /* skip pvfs2_ */
                  machine_name,
-                 state_name);
+                 state_name,
+                 r->error_code);
     return retval;
 }
 

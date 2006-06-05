@@ -17,6 +17,7 @@
 #include "dbpf-thread.h"
 #include "dbpf-bstream.h"
 #include "dbpf-op-queue.h"
+#include "dbpf-sync.h"
 
 extern struct qlist_head dbpf_op_queue;
 extern gen_mutex_t dbpf_op_queue_mutex;
@@ -74,7 +75,7 @@ int dbpf_thread_finalize(void)
 void *dbpf_thread_function(void *ptr)
 {
 #ifdef __PVFS2_TROVE_THREADED__
-    int out_count = 0, op_queued_empty = 0;
+    int out_count = 0, op_queued_empty = 0, ret = 0;
     struct timeval base;
     struct timespec wait_time;
 
@@ -85,6 +86,7 @@ void *dbpf_thread_function(void *ptr)
         /* check if we any have ops to service in our work queue */
         gen_mutex_lock(&dbpf_op_queue_mutex);
         op_queued_empty = qlist_empty(&dbpf_op_queue);
+        gen_mutex_unlock(&dbpf_op_queue_mutex);
 
         if (!op_queued_empty)
         {
@@ -115,11 +117,12 @@ void *dbpf_thread_function(void *ptr)
                 wait_time.tv_sec++;
             }
 
-            pthread_cond_timedwait(&dbpf_op_incoming_cond,
-                                   &dbpf_op_queue_mutex,
-                                   &wait_time);
+            gen_mutex_lock(&dbpf_op_queue_mutex);
+            ret = pthread_cond_timedwait(&dbpf_op_incoming_cond,
+                                         &dbpf_op_queue_mutex,
+                                         &wait_time);
+            gen_mutex_unlock(&dbpf_op_queue_mutex);
         }
-        gen_mutex_unlock(&dbpf_op_queue_mutex);
     }
 
     gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf_thread_function ending\n");
@@ -143,21 +146,24 @@ int dbpf_do_one_work_cycle(int *out_count)
     do
     {
         /* grab next op from queue and mark it as in service */
+        gen_mutex_lock(&dbpf_op_queue_mutex);
         cur_op = dbpf_op_queue_shownext(&dbpf_op_queue);
         if (cur_op)
         {
-            dbpf_op_queue_remove(cur_op);
-
             gen_mutex_lock(&cur_op->mutex);
             if (cur_op->op.state != OP_QUEUED)
             {
                 gossip_err("INVALID OP STATE FOUND %d (op is %p)\n",
                            cur_op->op.state, cur_op);
+                assert(cur_op->op.state == OP_QUEUED);
             }
-            assert(cur_op->op.state == OP_QUEUED);
+
+            dbpf_queued_op_dequeue_nolock(cur_op);
+
             cur_op->op.state = OP_IN_SERVICE;
             gen_mutex_unlock(&cur_op->mutex);
         }
+        gen_mutex_unlock(&dbpf_op_queue_mutex);
 
         /* if there's no work to be done, return immediately */
         if (cur_op == NULL)
@@ -169,11 +175,13 @@ int dbpf_do_one_work_cycle(int *out_count)
         gossip_debug(GOSSIP_TROVE_OP_DEBUG,"***** STARTING TROVE "
                      "SERVICE ROUTINE (%s) *****\n",
                      dbpf_op_type_to_str(cur_op->op.type));
+
         ret = cur_op->op.svc_fn(&(cur_op->op));
+
         gossip_debug(GOSSIP_TROVE_OP_DEBUG,"***** FINISHED TROVE "
                      "SERVICE ROUTINE (%s) *****\n",
                      dbpf_op_type_to_str(cur_op->op.type));
-        if (ret != 0)
+        if (ret == DBPF_OP_COMPLETE || ret < 0)
         {
             /* operation is done and we are telling the caller;
              * ok to pull off queue now.
@@ -186,8 +194,17 @@ int dbpf_do_one_work_cycle(int *out_count)
             move_op_to_completion_queue(
                 cur_op, ((ret == 1) ? 0 : ret), OP_COMPLETED);
         }
+        else if(ret == DBPF_OP_NEEDS_SYNC)
+        {
+            ret = dbpf_sync_coalesce(cur_op);
+            if(ret < 0)
+            {
+                return ret; /* not sure how to recover from failure here */
+            }
+        }
         else
         {
+
 #ifndef __PVFS2_TROVE_AIO_THREADED__
             /*
               check if trove is telling us to NOT mark this as
@@ -202,7 +219,7 @@ int dbpf_do_one_work_cycle(int *out_count)
             }
 #endif
             assert(cur_op->op.state != OP_COMPLETED);
-            dbpf_queued_op_queue_nolock(cur_op);
+            dbpf_queued_op_queue(cur_op);
         }
 
     } while(--max_num_ops_to_service);

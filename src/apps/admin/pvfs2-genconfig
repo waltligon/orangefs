@@ -287,6 +287,8 @@ sub emit_filesystem
     } else {
         print $target "\t\tTroveSyncMeta no\n";
         print $target "\t\tTroveSyncData no\n";
+        print $target "\t\tCoalescingHighWatermark infinity\n";
+        print $target "\t\tCoalescingLowWatermark 1\n";
     }
 
     print $target "\t\tAttrCacheKeywords datafile_handles,metafile_dist\n";

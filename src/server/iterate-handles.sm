@@ -11,6 +11,7 @@
 #include <fcntl.h>
 
 #include "pvfs2-server.h"
+#include "server-config.h"
 
 static int iterate_handles_cleanup(PINT_server_op *s_op, job_status_s* js_p);
 static int iterate_handles_do_work(PINT_server_op *s_op, job_status_s* js_p);
@@ -60,8 +61,6 @@ machine pvfs2_iterate_handles_sm(prelude, do_work, fill_resp, final_response, cl
  */
 static int iterate_handles_cleanup(PINT_server_op *s_op, job_status_s* js_p)
 {
-    PINT_STATE_DEBUG("cleanup");
-
     if(s_op->resp.u.mgmt_iterate_handles.handle_array)
 	free(s_op->resp.u.mgmt_iterate_handles.handle_array);
 
@@ -76,8 +75,6 @@ static int iterate_handles_cleanup(PINT_server_op *s_op, job_status_s* js_p)
 static int iterate_handles_do_work(PINT_server_op *s_op, job_status_s* js_p)
 {
     job_id_t tmp_id;
-
-    PINT_STATE_DEBUG("do_work");
 
     /* allocate memory to hold handles */
     s_op->resp.u.mgmt_iterate_handles.handle_array
@@ -97,7 +94,8 @@ static int iterate_handles_do_work(PINT_server_op *s_op, job_status_s* js_p)
 	s_op->resp.u.mgmt_iterate_handles.position,
 	s_op->resp.u.mgmt_iterate_handles.handle_array,
 	s_op->req->u.mgmt_iterate_handles.handle_count,
-	0,
+	PINT_config_get_trove_meta_flags(
+            get_server_config_struct(), s_op->req->u.mgmt_iterate_handles.fs_id),
 	NULL,
 	s_op,
 	0,

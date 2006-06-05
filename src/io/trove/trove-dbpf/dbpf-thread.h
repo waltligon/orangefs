@@ -44,7 +44,6 @@ pthread_cond_signal(&dbpf_op_completed_cond);                      \
 gen_mutex_unlock(context_mutex);                                   \
 } while(0)
 
-
 #if defined(__cplusplus)
 }
 #endif

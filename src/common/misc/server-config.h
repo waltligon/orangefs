@@ -81,6 +81,10 @@ typedef struct filesystem_configuration_s
     int attr_cache_max_num_elems;
     int trove_sync_meta;
     int trove_sync_data;
+    int metadata_sync_coalesce;
+    int immediate_completion;
+    int coalescing_high_watermark;
+    int coalescing_low_watermark;
 
 } filesystem_configuration_s;
 
@@ -229,6 +233,9 @@ int PINT_config_get_trove_sync_meta(
     struct server_configuration_s *config,
     PVFS_fs_id fs_id);
 int PINT_config_get_trove_sync_data(
+    struct server_configuration_s *config,
+    PVFS_fs_id fs_id);
+int PINT_config_get_trove_meta_flags(
     struct server_configuration_s *config,
     PVFS_fs_id fs_id);
 #endif

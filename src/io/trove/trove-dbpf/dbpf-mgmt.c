@@ -305,7 +305,15 @@ static int dbpf_collection_setinfo(TROVE_coll_id coll_id,
             gen_mutex_lock(&dbpf_attr_cache_mutex);
             ret = dbpf_attr_cache_do_initialize();
             gen_mutex_unlock(&dbpf_attr_cache_mutex);
-             break;
+            break;
+        case TROVE_COLLECTION_COALESCING_HIGH_WATERMARK:
+            dbpf_queued_op_set_sync_high_watermark(*(int *)parameter);
+            ret = 0;
+            break;
+        case TROVE_COLLECTION_COALESCING_LOW_WATERMARK:
+            dbpf_queued_op_set_sync_low_watermark(*(int *)parameter);
+            ret = 0;
+            break;
     }
     return ret;
 }

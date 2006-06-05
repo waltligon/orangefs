@@ -1142,6 +1142,26 @@ static int server_initialize_subsystems(
                 return ret;
             }
 
+            ret = trove_collection_setinfo(
+                cur_fs->coll_id, trove_context,
+                TROVE_COLLECTION_COALESCING_HIGH_WATERMARK,
+                (void *)&cur_fs->coalescing_high_watermark);
+            if(ret < 0)
+            {
+                gossip_lerr("Error setting coalescing high watermark\n");
+                return ret;
+            }
+
+            ret = trove_collection_setinfo(
+                cur_fs->coll_id, trove_context,
+                TROVE_COLLECTION_COALESCING_LOW_WATERMARK,
+                (void *)&cur_fs->coalescing_low_watermark);
+            if(ret < 0)
+            {
+                gossip_lerr("Error setting coalescing low watermark\n");
+                return ret;
+            }
+
             gossip_debug(GOSSIP_SERVER_DEBUG, "File system %s using "
                          "handles:\n\t%s\n", cur_fs->file_system_name,
                          cur_merged_handle_range);
