@@ -1752,7 +1752,7 @@ DOTCONF_CB(get_coalescing_high_watermark)
 
     if(!strcmp((char *)cmd->data.str, "infinity"))
     {
-        fs_conf->coalescing_high_watermark = INT_MAX;
+        fs_conf->coalescing_high_watermark = -1;
     }
     else
     {

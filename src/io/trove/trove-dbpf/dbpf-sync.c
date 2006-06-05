@@ -130,7 +130,8 @@ int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p)
 
     gen_mutex_lock(sync_context->mutex);
 
-    if(sync_context->coalesce_counter >= s_high_watermark ||
+    if((s_high_watermark >= 0 &&
+       sync_context->coalesce_counter >= s_high_watermark) ||
        sync_context->sync_counter < s_low_watermark)
     {
         gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
