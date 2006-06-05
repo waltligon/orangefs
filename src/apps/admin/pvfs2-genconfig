@@ -568,7 +568,7 @@ sub get_logstamp
     if ($opt_logstamp) {
         $logstamp = $opt_logstamp;
     } else {
-        $logstamp = "usec";
+        $logstamp = "datetime";
     }
     return $logstamp;
 }
