@@ -76,10 +76,14 @@ int gossip_err(
 #ifdef GOSSIP_DISABLE_DEBUG
 #define gossip_debug(mask, format, f...) do {} while(0)
 #define gossip_perf_log(format, f...) do {} while(0)
+#define gossip_debug_enabled(__m) 0
 #else
 extern int gossip_debug_on;
 extern int gossip_facility;
 extern uint64_t gossip_debug_mask;
+
+#define gossip_debug_enabled(__m) \
+    (gossip_debug_on && (gossip_debug_mask & __m))
 
 /* try to avoid function call overhead by checking masks in macro */
 #define gossip_debug(mask, format, f...)                  \
@@ -139,9 +143,12 @@ int gossip_err(
 #ifdef GOSSIP_DISABLE_DEBUG
 #define gossip_debug(__m, __f, f...) __gossip_debug_stub(__m, '?', __f, ##f);
 #define gossip_ldebug(__m, __f, f...) __gossip_debug_stub(__m, '?', __f, ##f);
+#define gossip_debug_enabled(__m) 0
 #else
 #define gossip_debug(__m, __f, f...) __gossip_debug(__m, '?', __f, ##f);
 #define gossip_ldebug(__m, __f, f...) __gossip_debug(__m, '?', __f, ##f);
+#define gossip_debug_enabled(__m) \
+            ((gossip_debug_on != 0) && (__m & gossip_debug_mask))
 #endif /* GOSSIP_DISABLE_DEBUG */
 
 #define gossip_lerr gossip_err

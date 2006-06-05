@@ -161,9 +161,6 @@ static void aio_progress_notification(union sigval sig)
         gossip_debug(GOSSIP_TROVE_DEBUG, "*** starting delayed ops if any "
                      "(state is %d)\n",op_p->u.b_rw_list.list_proc_state);
 
-        gossip_debug(GOSSIP_TROVE_DEBUG, "*** starting delayed ops if any "
-                     "(state is %d)\n",op_p->u.b_rw_list.list_proc_state);
-
         /* this is a macro defined in dbpf-thread.h */
         move_op_to_completion_queue(
             cur_op, ret,
@@ -296,19 +293,27 @@ static void start_delayed_ops_if_any(int dec_first)
             aiocb_ptr_array[i] = &aiocbs[i];
         }
 
-        gossip_debug(GOSSIP_TROVE_DEBUG,
-            "lio_listio called with the following aiocbs:\n");
-        for(i=0; i<aiocb_inuse_count; i++)
+        if(gossip_debug_enabled(GOSSIP_TROVE_DEBUG))
         {
+
             gossip_debug(GOSSIP_TROVE_DEBUG,
-                "aiocb_ptr_array[%d]: fd: %d, off: %lld, bytes: %d, buf: %p, type: %d\n",
-                i, 
-                aiocb_ptr_array[i]->aio_fildes,
-                lld(aiocb_ptr_array[i]->aio_offset),
-                (int)aiocb_ptr_array[i]->aio_nbytes,
-                aiocb_ptr_array[i]->aio_buf,
-                (int)aiocb_ptr_array[i]->aio_lio_opcode);
+                         "lio_listio called with %d following aiocbs:\n", 
+                         aiocb_inuse_count);
+            for(i=0; i<aiocb_inuse_count; i++)
+            {
+                gossip_debug(
+                    GOSSIP_TROVE_DEBUG,
+                    "aiocb_ptr_array[%d]: fd: %d, off: %lld, "
+                    "bytes: %d, buf: %p, type: %d\n",
+                    i, 
+                    aiocb_ptr_array[i]->aio_fildes,
+                    lld(aiocb_ptr_array[i]->aio_offset),
+                    (int)aiocb_ptr_array[i]->aio_nbytes,
+                    aiocb_ptr_array[i]->aio_buf,
+                    (int)aiocb_ptr_array[i]->aio_lio_opcode);
+            }
         }
+
         ret = lio_listio(LIO_NOWAIT, aiocb_ptr_array, aiocb_inuse_count,
                          &cur_op->op.u.b_rw_list.sigev);
 
@@ -393,18 +398,24 @@ static int issue_or_delay_io_operation(
 
     if (!op_delayed)
     {
-        gossip_debug(GOSSIP_TROVE_DEBUG,
-            "lio_listio called with the following aiocbs:\n");
-        for(i=0; i<aiocb_inuse_count; i++)
+        if(gossip_debug_enabled(GOSSIP_TROVE_DEBUG))
         {
+
             gossip_debug(GOSSIP_TROVE_DEBUG,
-                "aiocb_ptr_array[%d]: fd: %d, off: %lld, bytes: %d, buf: %p, type: %d\n",
-                i, aiocb_ptr_array[i]->aio_fildes,
-                lld(aiocb_ptr_array[i]->aio_offset),
-                (int)aiocb_ptr_array[i]->aio_nbytes,
-                aiocb_ptr_array[i]->aio_buf,
-                (int)aiocb_ptr_array[i]->aio_lio_opcode);
+                         "lio_listio called with the following aiocbs:\n");
+            for(i=0; i<aiocb_inuse_count; i++)
+            {
+                gossip_debug(GOSSIP_TROVE_DEBUG,
+                             "aiocb_ptr_array[%d]: fd: %d, "
+                             "off: %lld, bytes: %d, buf: %p, type: %d\n",
+                             i, aiocb_ptr_array[i]->aio_fildes,
+                             lld(aiocb_ptr_array[i]->aio_offset),
+                             (int)aiocb_ptr_array[i]->aio_nbytes,
+                             aiocb_ptr_array[i]->aio_buf,
+                             (int)aiocb_ptr_array[i]->aio_lio_opcode);
+            }
         }
+
         ret = lio_listio(LIO_NOWAIT, aiocb_ptr_array,
                          aiocb_inuse_count, sig);
         if (ret != 0)
@@ -907,6 +918,40 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
 
     DBPF_EVENT_START(event_type, q_op_p->op.id);
 
+    if(gossip_debug_enabled(GOSSIP_TROVE_DEBUG))
+    {
+        PVFS_size count_mem = 0, count_stream = 0;
+        gossip_debug(GOSSIP_TROVE_DEBUG, 
+                     "dbpf_bstream_rw_list: mem_count: %d, stream_count: %d\n",
+                     mem_count,
+                     stream_count);
+        for(i = 0; i < mem_count; ++i)
+        {
+            gossip_debug(
+                GOSSIP_TROVE_DEBUG,
+                "dbpf_bstream_rw_list: mem_offset: %p, mem_size: %Ld\n",
+                mem_offset_array[i], mem_size_array[i]);
+            count_mem += mem_size_array[i];
+        }
+
+        for(i = 0; i < stream_count; ++i)
+        {
+            gossip_debug(GOSSIP_TROVE_DEBUG,
+                         "dbpf_bstream_rw_list: "
+                         "stream_offset: %Ld, stream_size: %Ld\n",
+                         stream_offset_array[i], stream_size_array[i]);
+            count_stream += stream_size_array[i];
+        }
+        
+        if(count_mem != count_stream)
+        {
+            gossip_debug(GOSSIP_TROVE_DEBUG,
+                         "dbpf_bstream_rw_list: "
+                         "mem_count: %Ld != stream_count: %Ld\n",
+                         count_mem, count_stream);
+        }
+    }
+                         
     /* initialize op-specific members */
     q_op_p->op.u.b_rw_list.fd = -1;
     q_op_p->op.u.b_rw_list.opcode = opcode;

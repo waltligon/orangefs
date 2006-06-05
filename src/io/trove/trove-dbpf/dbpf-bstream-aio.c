@@ -169,8 +169,10 @@ int dbpf_bstream_listio_convert(
 	/* haven't processed all of list regions */
 	if (lio_state != NULL)
         {
-	    lio_state->mem_ct = mct;
-	    lio_state->stream_ct = sct;
+            /* if we ran out of streams, increment mem_ct */
+	    lio_state->mem_ct = (!oos) ? mct : ++mct;
+            /* if we ran out of mems, increment stream_ct */
+	    lio_state->stream_ct = (!oom) ? sct : ++sct;
 	    lio_state->cur_mem_size = cur_mem_size;
 	    lio_state->cur_mem_off = cur_mem_off;
 	    lio_state->cur_stream_size = cur_stream_size;
