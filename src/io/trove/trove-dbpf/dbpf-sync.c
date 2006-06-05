@@ -57,13 +57,13 @@ void dbpf_sync_context_destroy(int context_index)
     free(keyval_sync_array[context_index]);
 }
     
-int dbpf_sync_coalesce(
-    dbpf_queued_op_t *qop_p)
+int dbpf_sync_coalesce(dbpf_queued_op_t *qop_p)
 {
     char * optype_string;
     int ret = 0;
     dbpf_sync_context_t * sync_context;
     DB * dbp;
+    int opstate = OP_SYNC_QUEUED;
 
     dbpf_queued_op_t *ready_op;
    
@@ -114,8 +114,21 @@ int dbpf_sync_coalesce(
 
         return 1;
     }
-        
-   gen_mutex_lock(sync_context->mutex);
+
+    if(!(qop_p->op.flags & TROVE_SYNC))
+    {
+        /* if meta sync is disabled, then we can just add the operation
+         * to the completion queue.
+         */
+        ret = dbpf_queued_op_complete(qop_p, 0, OP_COMPLETED);
+        if(ret < 0)
+        {
+            return ret;
+        }
+        opstate = OP_COMPLETED;
+    }
+
+    gen_mutex_lock(sync_context->mutex);
 
     if(sync_context->coalesce_counter >= s_high_watermark ||
        sync_context->sync_counter < s_low_watermark)
@@ -126,53 +139,66 @@ int dbpf_sync_coalesce(
                      sync_context->coalesce_counter,
                      sync_context->sync_counter);
 
-        /* sync this operation and signal completion of the others
-         * waiting to be synced
+        /* sync this operation.  We don't want to use SYNC_IF_NECESSARY
+         * because we may have already completed the operation
+         * (in the case where trove meta sync is disabled).
          */
         gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
                      "[SYNC_COALESCE]:\tcoalesce %s sync start: %d\n",
                      optype_string, sync_context->coalesce_counter);
-        DBPF_DB_SYNC_IF_NECESSARY((&qop_p->op),  dbp, ret);
+        ret = dbp->sync(dbp, 0);
+        if(ret != 0)
+        {
+            gossip_err("db SYNC failed: %s\n",
+                       db_strerror(ret));
+            ret = -dbpf_db_error_to_trove_error(ret);
+            return ret;
+        }
         gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG,
                      "[SYNC_COALESCE]:\tcoalesce %s sync stop: %d\n",
                      optype_string, sync_context->coalesce_counter);
-        if(ret < 0)
-        {
-            return ret;
-        }
 
-        gen_mutex_lock(
-            dbpf_completion_queue_array_mutex[qop_p->op.context_id]);
-        dbpf_op_queue_add(
-            dbpf_completion_queue_array[qop_p->op.context_id], qop_p);
-        gen_mutex_lock(&qop_p->mutex);
-        qop_p->op.state = OP_COMPLETED;
-        gen_mutex_unlock(&qop_p->mutex);
-
-        qop_p->state = 0;
-
-        /* move remaining ops in queue with ready-to-be-synced state
-         * to completion queue
+       /* check if this was already moved to the completion queue
+         * because trove meta sync was disabled
          */
-        while(!dbpf_op_queue_empty(sync_context->sync_queue))
+        if(opstate != OP_COMPLETED)
         {
-            ready_op = dbpf_op_queue_shownext(sync_context->sync_queue);
-            dbpf_op_queue_remove(ready_op);
+            gen_mutex_lock(
+                dbpf_completion_queue_array_mutex[qop_p->op.context_id]);
             dbpf_op_queue_add(
-                dbpf_completion_queue_array[qop_p->op.context_id], ready_op);
-            gen_mutex_lock(&ready_op->mutex);
-            ready_op->op.state = OP_COMPLETED;
-            gen_mutex_unlock(&ready_op->mutex);
-
+                dbpf_completion_queue_array[qop_p->op.context_id], qop_p);
+            gen_mutex_lock(&qop_p->mutex);
+            qop_p->op.state = OP_COMPLETED;
             qop_p->state = 0;
+            gen_mutex_unlock(&qop_p->mutex);
 
-            sync_context->coalesce_counter--;
+
+            /* move remaining ops in queue with ready-to-be-synced state
+             * to completion queue
+             */
+            while(!dbpf_op_queue_empty(sync_context->sync_queue))
+            {
+                ready_op = dbpf_op_queue_shownext(sync_context->sync_queue);
+                dbpf_op_queue_remove(ready_op);
+                dbpf_op_queue_add(
+                    dbpf_completion_queue_array[qop_p->op.context_id], 
+                    ready_op);
+                gen_mutex_lock(&ready_op->mutex);
+                ready_op->op.state = OP_COMPLETED;
+                qop_p->state = 0;
+                gen_mutex_unlock(&ready_op->mutex);
+
+                sync_context->coalesce_counter--;
+            }
+
+            pthread_cond_signal(&dbpf_op_completed_cond);
+            gen_mutex_unlock(
+                dbpf_completion_queue_array_mutex[qop_p->op.context_id]);
         }
-
-        pthread_cond_signal(&dbpf_op_completed_cond);
-        gen_mutex_unlock(
-            dbpf_completion_queue_array_mutex[qop_p->op.context_id]);
-
+        else
+        {
+            sync_context->coalesce_counter = 0;
+        }
         ret = 1;
     }
     else
@@ -181,10 +207,13 @@ int dbpf_sync_coalesce(
                      "[SYNC_COALESCE]:\tcoalescing %s op: %d\n", 
                      optype_string, sync_context->coalesce_counter);
 
-        /* put back on the queue with SYNC_QUEUED state */
-        qop_p->op.state = OP_SYNC_QUEUED;
-        dbpf_op_queue_add(sync_context->sync_queue, qop_p);
         sync_context->coalesce_counter++;
+        if(opstate != OP_COMPLETED)
+        {
+            /* put back on the queue with SYNC_QUEUED state */
+            qop_p->op.state = OP_SYNC_QUEUED;
+            dbpf_op_queue_add(sync_context->sync_queue, qop_p);
+        }
         ret = 0;
     }
 
@@ -206,7 +235,10 @@ int dbpf_sync_coalesce_enqueue(dbpf_queued_op_t *qop_p)
         return 0;
     }
 
-    /* only perform check if operation sync coalesce is enabled */
+    /* only perform check if operation sync coalesce is enabled or if
+     * trove meta sync is disabled, in which case we use the coalescing
+     * code to perform the sync
+     */
     if(DBPF_OP_IS_KEYVAL(qop_p->op.type) &&
        (qop_p->op.flags & TROVE_KEYVAL_SYNC_COALESCE))
     {

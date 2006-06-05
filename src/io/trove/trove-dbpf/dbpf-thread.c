@@ -75,7 +75,7 @@ int dbpf_thread_finalize(void)
 void *dbpf_thread_function(void *ptr)
 {
 #ifdef __PVFS2_TROVE_THREADED__
-    int out_count = 0, op_queued_empty = 0;
+    int out_count = 0, op_queued_empty = 0, ret = 0;
     struct timeval base;
     struct timespec wait_time;
 

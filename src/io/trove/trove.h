@@ -58,7 +58,7 @@ enum
     TROVE_ONLYOVERWRITE          = 1 << 4,
 
     TROVE_DB_CACHE_MMAP          = 1 << 5,
-    TROVE_DB_CACHE_SYS           = 1 << 6
+    TROVE_DB_CACHE_SYS           = 1 << 6,
     TROVE_IMMEDIATE_COMPLETION   = 1 << 7,
     TROVE_DSPACE_SYNC_COALESCE   = 1 << 8,
     TROVE_KEYVAL_SYNC_COALESCE   = 1 << 9

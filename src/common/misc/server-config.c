@@ -631,7 +631,7 @@ static const configoption_t options[] =
     {"ImmediateCompletion", ARG_STR, get_immediate_completion, NULL,
         CTX_STORAGEHINTS, "no"},
 
-    {"CoalescingHighWatermark", ARG_INT, get_coalescing_high_watermark, NULL,
+    {"CoalescingHighWatermark", ARG_STR, get_coalescing_high_watermark, NULL,
         CTX_STORAGEHINTS, "8"},
 
     {"CoalescingLowWatermark", ARG_INT, get_coalescing_low_watermark, NULL,
@@ -1750,7 +1750,14 @@ DOTCONF_CB(get_coalescing_high_watermark)
     fs_conf = (struct filesystem_configuration_s *)
         PINT_llist_head(config_s->file_systems);
 
-    fs_conf->coalescing_high_watermark = cmd->data.value;
+    if(!strcmp((char *)cmd->data.str, "infinity"))
+    {
+        fs_conf->coalescing_high_watermark = INT_MAX;
+    }
+    else
+    {
+        sscanf(cmd->data.str, "%d", &fs_conf->coalescing_high_watermark);
+    }
     return NULL;
 }
 
