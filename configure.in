@@ -541,7 +541,7 @@ test_for_epoll()
   ], CFLAGS="$CFLAGS -D__PVFS2_USE_EPOLL__"
      BUILD_EPOLL=1
      AC_SUBST(BUILD_EPOLL),
-  AC_MSG_ERROR([No suitable epoll library found.]))
+  )
 }
 
 dnl optionally enable use of epoll() on Linux instead of poll()
