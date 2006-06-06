@@ -930,7 +930,7 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
             gossip_debug(
                 GOSSIP_TROVE_DEBUG,
                 "dbpf_bstream_rw_list: mem_offset: %p, mem_size: %Ld\n",
-                mem_offset_array[i], mem_size_array[i]);
+                mem_offset_array[i], lld(mem_size_array[i]));
             count_mem += mem_size_array[i];
         }
 
@@ -939,7 +939,7 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
             gossip_debug(GOSSIP_TROVE_DEBUG,
                          "dbpf_bstream_rw_list: "
                          "stream_offset: %Ld, stream_size: %Ld\n",
-                         stream_offset_array[i], stream_size_array[i]);
+                         lld(stream_offset_array[i]), lld(stream_size_array[i]));
             count_stream += stream_size_array[i];
         }
         
@@ -948,7 +948,7 @@ static inline int dbpf_bstream_rw_list(TROVE_coll_id coll_id,
             gossip_debug(GOSSIP_TROVE_DEBUG,
                          "dbpf_bstream_rw_list: "
                          "mem_count: %Ld != stream_count: %Ld\n",
-                         count_mem, count_stream);
+                         lld(count_mem), lld(count_stream));
         }
     }
                          
