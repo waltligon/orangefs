@@ -77,7 +77,19 @@ static int conditional_remove_sm_if_in_completion_list(
     {
         if (s_completion_list[i] == sm_p)
         {
-            s_completion_list[i] = NULL;
+            if(i == (s_completion_list_index - 1))
+            {
+                /* we're at the end, so just set last sm to null */
+                s_completion_list[i] = NULL;
+            }
+            else
+            {
+                memmove(s_completion_list[i],
+                        s_completion_list[i+1],
+                        (s_completion_list_index - (i + 1)) *
+                        sizeof(PINT_client_sm *));
+            }
+            s_completion_list_index--;
             found = 1;
             break;
         }
@@ -126,7 +138,7 @@ static PVFS_error completion_list_retrieve_completed(
             }
             s_completion_list[i] = NULL;
 
-            PINT_sys_release(sm_p->sys_op_id);
+            PVFS_sys_release(sm_p->sys_op_id);
         }
         else
         {
@@ -736,7 +748,7 @@ PVFS_error PINT_client_wait_internal(
 
 /** Frees resources associated with state machine instance.
  */
-void PINT_sys_release(PVFS_sys_op_id op_id)
+void PVFS_sys_release(PVFS_sys_op_id op_id)
 {
     PINT_client_sm *sm_p = (PINT_client_sm *)id_gen_safe_lookup(op_id);
     if (sm_p)
@@ -753,12 +765,29 @@ void PINT_sys_release(PVFS_sys_op_id op_id)
     }
 }
 
-char *PINT_client_get_name_str(int op_type)
+void PVFS_mgmt_release(PVFS_mgmt_op_id op_id)
+{
+    PINT_client_sm *sm_p = (PINT_client_sm *)id_gen_safe_lookup(op_id);
+    if (sm_p)
+    {
+        PINT_id_gen_safe_unregister(op_id);
+
+        if (sm_p->op && sm_p->cred_p)
+        {
+            PVFS_util_release_credentials(sm_p->cred_p);
+            sm_p->cred_p = NULL;
+        }
+
+        free(sm_p);
+    }
+}
+
+const char *PINT_client_get_name_str(int op_type)
 {
     typedef struct
     {
         int type;
-        char *type_str;
+        const char *type_str;
     } __sys_op_info_t;
 
     static __sys_op_info_t op_info[] =
@@ -808,6 +837,55 @@ char *PINT_client_get_name_str(int op_type)
         }
     }
     return op_info[limit-1].type_str;
+}
+
+/* exposed wrapper around the client-state-machine testsome function */
+int PVFS_sys_testsome(
+    PVFS_sys_op_id *op_id_array,
+    int *op_count, /* in/out */
+    void **user_ptr_array,
+    int *error_code_array,
+    int timeout_ms)
+{
+    return PINT_client_state_machine_testsome(
+        op_id_array, op_count, user_ptr_array,
+        error_code_array, timeout_ms);
+}
+
+int PVFS_sys_wait(
+    PVFS_sys_op_id op_id,
+    const char *in_op_str,
+    int *out_error)
+{
+    return PINT_client_wait_internal(
+        op_id,
+        in_op_str,
+        out_error,
+        "sys");
+}
+
+int PVFS_mgmt_testsome(
+    PVFS_mgmt_op_id *op_id_array,
+    int *op_count, /* in/out */
+    void **user_ptr_array,
+    int *error_code_array,
+    int timeout_ms)
+{
+    return PINT_client_state_machine_testsome(
+        op_id_array, op_count, user_ptr_array,
+        error_code_array, timeout_ms);
+}
+
+int PVFS_mgmt_wait(
+    PVFS_mgmt_op_id op_id,
+    const char *in_op_str,
+    int *out_error)
+{
+    return PINT_client_wait_internal(
+        op_id,
+        in_op_str,
+        out_error,
+        "mgmt");
 }
 
 /*

@@ -212,6 +212,7 @@ AC_DEFUN([AX_BERKELEY_DB],
     #include <db.h>
     ], [
     int res = DB_BUFFER_SMALL;
+    res++;
     ], AC_MSG_RESULT(yes)
     AC_DEFINE(HAVE_DB_BUFFER_SMALL, 1, [Define if db library has DB_BUFFER_SMALL error]),
     AC_MSG_RESULT(no))

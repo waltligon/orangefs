@@ -13,6 +13,7 @@
 #include <sys/time.h>
 #include <time.h>
 #include <stdlib.h>
+#include <getopt.h>
 
 #include "pvfs2.h"
 #include "str-utils.h"
@@ -186,9 +187,6 @@ int pvfs2_chmod (PVFS_permissions perms, char *destfile) {
  */
 static struct options* parse_args(int argc, char* argv[])
 {
-    /* getopt stuff */
-    extern char* optarg;
-    extern int optind, opterr, optopt;
     char flags[] = "v";
     int one_opt = 0;
     int user_perms = 0;

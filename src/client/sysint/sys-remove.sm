@@ -93,8 +93,7 @@ machine pvfs2_client_remove_sm(
     crdirent_timer,
     crdirent_retry_or_fail,
     crdirent_setup_msgpair,
-    crdirent_xfer_msgpair,
-    crdirent_failure)
+    crdirent_xfer_msgpair)
 {
     state init
     {
@@ -251,7 +250,7 @@ PVFS_error PVFS_sys_remove(
     }
     else
     {
-        ret = PINT_sys_wait(op_id, "remove", &error);
+        ret = PVFS_sys_wait(op_id, "remove", &error);
         if (ret)
         {
             PVFS_perror_gossip("PVFS_sys_wait call", ret);
@@ -259,7 +258,7 @@ PVFS_error PVFS_sys_remove(
         }
     }
 
-    PINT_sys_release(op_id);
+    PVFS_sys_release(op_id);
     return error;
 }
 
@@ -507,8 +506,10 @@ static int remove_crdirent_retry_or_fail(PINT_client_sm *sm_p,
 
     sm_p->u.remove.stored_error_code = js_p->error_code;
 
-    PVFS_perror_gossip("Failed to replace directory entry!",
-                       js_p->error_code);
+    gossip_err("Error: failed to replace directory during remove recovery: entry %s for object %llu.\n",
+        sm_p->u.remove.object_name,
+        llu(sm_p->object_ref.handle));
+    PVFS_perror_gossip("crdirent", js_p->error_code);
 
     PRINT_REMOVE_WARNING();
     return 1;
@@ -541,6 +542,9 @@ static int remove_rmdirent_retry_or_fail(PINT_client_sm *sm_p,
 	 * strand objects, or remove non-empty directories, for
 	 * example.
 	 */
+        gossip_err("Warning: Received ENOENT on retry to remove entry %s.\n",
+            sm_p->u.remove.object_name);
+
         PRINT_REMOVE_WARNING();
         js_p->error_code = 0;
         return 1;

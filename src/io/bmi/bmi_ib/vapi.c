@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: vapi.c,v 1.1 2006-05-30 20:24:57 pw Exp $
+ * $Id: vapi.c,v 1.1.8.1 2006-06-07 19:27:15 vilayann Exp $
  */
 #include <stdio.h>
 #include <string.h>

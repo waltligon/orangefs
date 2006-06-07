@@ -162,7 +162,7 @@ PVFS_error PVFS_mgmt_setparam_list(
     }
     else
     {
-        ret = PINT_mgmt_wait(op_id, "setparam_list", &error);
+        ret = PVFS_mgmt_wait(op_id, "setparam_list", &error);
         if (ret)
         {
             PVFS_perror_gossip("PVFS_mgmt_wait call", ret);
@@ -173,7 +173,7 @@ PVFS_error PVFS_mgmt_setparam_list(
     gossip_debug(GOSSIP_CLIENT_DEBUG,
                  "PVFS_mgmt_setparam_list completed\n");
 
-    PINT_mgmt_release(op_id);
+    PVFS_mgmt_release(op_id);
     return error;
 }
 

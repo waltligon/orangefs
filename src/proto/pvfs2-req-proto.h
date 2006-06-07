@@ -961,7 +961,7 @@ struct PVFS_servreq_small_io
     PVFS_offset offsets[SMALL_IO_MAX_SEGMENTS];
     PVFS_size sizes[SMALL_IO_MAX_SEGMENTS];
 
-    uint32_t total_bytes;
+    PVFS_size total_bytes; /* changed from int32_t */
     void * buffer;
 };
 
@@ -978,7 +978,7 @@ struct PVFS_servreq_small_io
     encode_PVFS_size(pptr, &(x)->aggregate_size); \
     encode_uint32_t(pptr, &(x)->version); \
     encode_uint32_t(pptr, &(x)->total_bytes); \
-    encode_skip4(pptr,); \
+    encode_PVFS_size(pptr, &(x)->total_bytes); \
     if ((x)->io_type == PVFS_IO_WRITE) \
     { \
         int i = 0; \
@@ -1005,7 +1005,7 @@ struct PVFS_servreq_small_io
     decode_PVFS_size(pptr, &(x)->aggregate_size); \
     decode_uint32_t(pptr, &(x)->version); \
     decode_uint32_t(pptr, &(x)->total_bytes); \
-    decode_skip4(pptr,); \
+    decode_PVFS_size(pptr, &(x)->total_bytes); \
     if ((x)->io_type == PVFS_IO_WRITE) \
     { \
         /* instead of copying the message we just set the pointer, since \

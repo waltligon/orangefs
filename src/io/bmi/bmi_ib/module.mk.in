@@ -1,36 +1,44 @@
 #
 # Makefile stub for bmi_ib.
 #
-# Copyright (C) 2003-5 Pete Wyckoff <pw@osc.edu>
+# Copyright (C) 2003-6 Pete Wyckoff <pw@osc.edu>
 #
 # See COPYING in top-level directory.
 #
-# $Id: module.mk.in,v 1.8 2006-02-22 16:30:54 pw Exp $
+# $Id: module.mk.in,v 1.8.4.1 2006-06-07 19:27:14 vilayann Exp $
 #
 
-# only do any of this if configure decided to use IB
-ifdef BUILD_IB
+# only do any of this if configure decided to use IB on OpenIB
+ifneq (,$(BUILD_IB)$(BUILD_OPENIB))
 
 #
 # Local definitions.
 #
 DIR := src/io/bmi/bmi_ib
-cfiles := ib.c setup.c util.c mem.c
-src := $(patsubst %,$(DIR)/%,$(cfiles))
-cflags :=
+cfiles := ib.c util.c mem.c
+apis :=
+
+ifdef BUILD_IB
+cfiles += vapi.c
+apis += -DVAPI
+endif
+ifdef BUILD_OPENIB
+cfiles += openib.c
+apis += -DOPENIB
+endif
 
 #
 # Export these to the top Makefile to tell it what to build.
 #
+src := $(patsubst %,$(DIR)/%,$(cfiles))
 LIBSRC    += $(src)
 SERVERSRC += $(src)
 
 #
-# Add extra include paths and warnings just for these IB files.
-# No need to expose the rest of the tree to the mess of IB include
-# dirs and warnings used here.
+# Add extra include paths and warnings just for this directory.
 #
-cflags += -I@IB_INCDIR@
+cflags :=
+ifdef GNUC
 cflags += -fno-common
 cflags += -Wall -W -Wpointer-arith
 cflags += -Wcast-align -Wcast-qual -Wbad-function-cast
@@ -38,18 +46,22 @@ cflags += -Wmissing-prototypes -Wmissing-declarations
 cflags += -Wnested-externs
 cflags += -Wshadow -Wstrict-prototypes -Wredundant-decls
 cflags += -Wundef -Wwrite-strings
-# these are not otherwise defined and cause warnings
-cflags += -DMAX_TRACE=0 -DMAX_ERROR=0 -DMAX_DEBUG=0
+endif
 
 #
-# One prototype in the mellanox includes specifies passing a u8 but that's
-# not possible so this always throws a warning:
-#   -Wconversion
-#
-
-#
-# Tell the toplevel make about the extra cflags.
+# Extra cflags for files in this directory.
 #
 MODCFLAGS_$(DIR) := $(cflags)
 
-endif  # BUILD_IB
+#
+# Each particular IB API needs its headers.
+#
+MODCFLAGS_$(DIR)/vapi.c := -I@IB_INCDIR@
+MODCFLAGS_$(DIR)/openib.c := -I@OPENIB_INCDIR@
+
+#
+# Tell the main driver about the APIs that are available.
+#
+MODCFLAGS_$(DIR)/ib.c := $(apis)
+
+endif  # BUILD_IB or BUILD_OPENIB

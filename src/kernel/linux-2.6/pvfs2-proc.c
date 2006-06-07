@@ -11,6 +11,7 @@
 
 #include <linux/sysctl.h>
 #include <linux/proc_fs.h>
+#include "pvfs2-proc.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -298,10 +299,8 @@ static ctl_table fs_table[] = {
 };
 #endif
 
-int pvfs2_proc_initialize(void)
+void pvfs2_proc_initialize(void)
 {
-    int ret = 0;
-
 #ifdef CONFIG_SYSCTL
     if (!fs_table_header)
     {
@@ -309,13 +308,11 @@ int pvfs2_proc_initialize(void)
     }
 #endif
 
-    return(ret);
+    return;
 }
 
-int pvfs2_proc_finalize(void)
+void pvfs2_proc_finalize(void)
 {
-    int ret = 0;
-
 #ifdef CONFIG_SYSCTL
     if(fs_table_header) 
     {
@@ -323,8 +320,7 @@ int pvfs2_proc_finalize(void)
         fs_table_header = NULL;
     }
 #endif
-
-    return(ret);
+    return;
 }
 
 /*

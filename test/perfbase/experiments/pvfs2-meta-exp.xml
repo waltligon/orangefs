@@ -76,6 +76,12 @@
   <datatype>integer</datatype>
  </parameter>
 
+ <parameter>
+  <name>capacity</name>
+  <synopsis>Number of entries in the file system</synopsis>
+  <datatype>integer</datatype>
+ </parameter>
+
  <!-- results -->
  
  <result>

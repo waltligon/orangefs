@@ -263,7 +263,7 @@ PVFS_error PVFS_sys_symlink(
     }
     else
     {
-        ret = PINT_sys_wait(op_id, "symlink", &error);
+        ret = PVFS_sys_wait(op_id, "symlink", &error);
         if (ret)
         {
             PVFS_perror_gossip("PVFS_sys_wait call", ret);
@@ -271,7 +271,7 @@ PVFS_error PVFS_sys_symlink(
         }
     }
 
-    PINT_sys_release(op_id);
+    PVFS_sys_release(op_id);
     return error;
 }
 
@@ -559,9 +559,6 @@ static int symlink_delete_handle_setup_msgpair(PINT_client_sm *sm_p,
 
     js_p->error_code = 0;
 
-    gossip_debug(GOSSIP_CLIENT_DEBUG, " Preparing to remove "
-                 "metafile handle %llu\n", llu(msg_p->handle));
-
     PINT_init_msgpair(sm_p, msg_p);
 
     PINT_SERVREQ_REMOVE_FILL(
@@ -574,6 +571,9 @@ static int symlink_delete_handle_setup_msgpair(PINT_client_sm *sm_p,
     msg_p->handle = sm_p->u.sym.symlink_handle;
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = symlink_delete_handle_comp_fn;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, " Preparing to remove "
+                 "metafile handle %llu\n", llu(msg_p->handle));
 
     ret = PINT_cached_config_map_to_server(
         &msg_p->svr_addr, sm_p->u.sym.symlink_handle,

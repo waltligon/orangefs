@@ -24,11 +24,13 @@
 #include "dlm_prot.h"
 #include "rpcutils.h"
 
+#if 0
 static void decode_handle(char **synch_handle, PVFS_fs_id *fsid, PVFS_handle *handle)
 {
     decode_PVFS_fs_id(synch_handle, fsid);
     decode_PVFS_handle(synch_handle, handle);
 }
+#endif
 
 /*
  * All these functions must return 1(true).

@@ -2,39 +2,58 @@
  * InfiniBand BMI method.
  *
  * Copyright (C) 2003-6 Pete Wyckoff <pw@osc.edu>
+ * Copyright (C) 2006 Kyle Schochenmaier <kschoche@scl.ameslab.gov>
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.25 2006-04-06 14:39:36 pw Exp $
+ * $Id: ib.c,v 1.25.4.1 2006-06-07 19:27:11 vilayann Exp $
  */
-#include <stdio.h>  /* just for NULL for id-generator.h */
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <sys/types.h>
+#include <arpa/inet.h>   /* inet_ntoa */
+#include <netdb.h>       /* gethostbyname */
+#include <sys/poll.h>
 #define __PINT_REQPROTO_ENCODE_FUNCS_C  /* include definitions */
 #include <src/common/id-generator/id-generator.h>
 #include <src/io/bmi/bmi-method-support.h>   /* bmi_method_ops ... */
+#include <src/io/bmi/bmi-method-callback.h>  /* bmi_method_addr_reg_callback */
 #include <src/common/gen-locks/gen-locks.h>  /* gen_mutex_t ... */
-#include <vapi_common.h>  /* VAPI_cqe_opcode_sym ... */
+#include <src/common/misc/pvfs2-internal.h>
 #include "ib.h"
-#include "pvfs2-internal.h"
 
 static gen_mutex_t interface_mutex = GEN_MUTEX_INITIALIZER;
 
-/* alloc space for shared variables */
-bmi_size_t EAGER_BUF_PAYLOAD __hidden;
-VAPI_hca_hndl_t nic_handle __hidden;
-VAPI_cq_hndl_t nic_cq __hidden;
-int listen_sock __hidden;
-list_t connection __hidden;
-list_t sendq __hidden;
-list_t recvq __hidden;
-VAPI_sg_lst_entry_t *sg_tmp_array __hidden;
-unsigned int sg_max_len __hidden;
-unsigned int max_outstanding_wr __hidden;
+/*
+ * Handle given by upper layer, which must be handed back to create
+ * method_addrs.
+ */
+static int bmi_ib_method_id;
 
-#define MEMCACHE_BOUNCEBUF 0
-#define MEMCACHE_EARLY_REG 1
+/* alloc space for the single device structure pointer; one for
+ * vapi and one for openib */
+ib_device_t *ib_device __hidden = NULL;
+
+/* these all vector through the ib_device */
+#define new_connection ib_device->func.new_connection
+#define close_connection ib_device->func.close_connection
+#define drain_qp ib_device->func.drain_qp
+#define send_bye ib_device->func.send_bye
+#define ib_initialize ib_device->func.ib_initialize
+#define ib_finalize ib_device->func.ib_finalize
+#define post_sr ib_device->func.post_sr
+#define post_rr ib_device->func.post_rr
+#define post_sr_ack ib_device->func.post_sr_ack
+#define post_rr_ack ib_device->func.post_rr_ack
+#define post_sr_rdmaw ib_device->func.post_sr_rdmaw
+#define check_cq ib_device->func.check_cq
+#define wc_status_string ib_device->func.wc_status_string
+#define mem_register ib_device->func.mem_register
+#define mem_deregister ib_device->func.mem_deregister
 
 #if MEMCACHE_EARLY_REG
 #if MEMCACHE_BOUNCEBUF
@@ -53,12 +72,6 @@ static const bmi_size_t reg_recv_buflist_len = 256 * 1024;
 #endif
 
 static int send_cts(ib_recv_t *rq);
-static void post_sr(const buf_head_t *bh, u_int32_t len);
-/* post_rr declared externally */
-static void post_sr_ack(ib_connection_t *c, int his_bufnum);
-static void post_rr_ack(const ib_connection_t *c, const buf_head_t *bh);
-static void post_sr_rdmaw(ib_send_t *sq, msg_header_cts_t *mh_cts,
-                          void *mh_cts_buf);
 static void encourage_send_waiting_buffer(ib_send_t *sq);
 static void encourage_send_incoming_cts(buf_head_t *bh, u_int32_t byte_len);
 
@@ -67,34 +80,57 @@ static void encourage_recv_incoming(ib_connection_t *c, buf_head_t *bh,
 static void encourage_recv_incoming_cts_ack(ib_recv_t *rq);
 static void maybe_free_connection(ib_connection_t *c);
 
+static void ib_close_connection(ib_connection_t *c);
+
+#ifndef __PVFS2_SERVER__
+static int ib_tcp_client_connect(ib_method_addr_t *ibmap,
+                                 struct method_addr *remote_map);
+#endif
+static void ib_tcp_server_init_listen_socket(struct method_addr *addr);
+static int ib_tcp_server_check_new_connections(void);
+static int ib_tcp_server_block_new_connections(int timeout_ms);
+
+/*
+ * Return string form of work completion opcode field.
+ */
+static const char *wc_opcode_string(int opcode)
+{
+    if (opcode == BMI_IB_OP_SEND)
+	return "SEND";
+    else if (opcode == BMI_IB_OP_RECV)
+	return "RECV";
+    else if (opcode == BMI_IB_OP_RDMA_WRITE)
+	return "RDMA WRITE";
+    else
+	return "(UNKNOWN)";
+}
+
 /*
  * Wander through single completion queue, pulling off messages and
  * sticking them on the proper connection queues.  Later you can
  * walk the incomingq looking for things to do to them.  Returns
  * number of new things that arrived.
  */
-static int
-check_cq(void)
+static int ib_check_cq(void)
 {
-    VAPI_wc_desc_t desc;
     int ret = 0;
 
     for (;;) {
-	int vret = VAPI_poll_cq(nic_handle, nic_cq, &desc);
-	if (vret < 0) {
-	    if (vret == VAPI_CQ_EMPTY)
-		break;
-	    error_verrno(vret, "%s: VAPI_poll_cq", __func__);
-	}
+	struct bmi_ib_wc wc;
+	int vret;
+
+	vret = check_cq(&wc);
+	if (vret == 0)
+	    break;  /* empty */
 
 	debug(2, "%s: found something", __func__);
 	++ret;
-	if (desc.status != VAPI_SUCCESS) {
-	    if (desc.opcode == VAPI_CQE_SQ_SEND_DATA) {
-		debug(0, "%s: entry id 0x%llx SQ_SEND_DATA error %s", __func__,
-		  llu(desc.id), VAPI_wc_status_sym(desc.status));
-		if (desc.id) {
-		    ib_connection_t *c = ptr_from_int64(desc.id);
+	if (wc.status != 0) {
+	    if (wc.opcode == BMI_IB_OP_SEND) {
+		debug(0, "%s: entry id 0x%llx SEND error %s", __func__,
+		  llu(wc.id), wc_status_string(wc.status));
+		if (wc.id) {
+		    ib_connection_t *c = ptr_from_int64(wc.id);
 		    if (c->cancelled) {
 			debug(0,
 			  "%s: ignoring send error on cancelled conn to %s",
@@ -103,28 +139,26 @@ check_cq(void)
 		}
 	    } else {
 		error("%s: entry id 0x%llx opcode %s error %s", __func__,
-		  llu(desc.id), VAPI_cqe_opcode_sym(desc.opcode),
-		  VAPI_wc_status_sym(desc.status));
+		  llu(wc.id), wc_opcode_string(wc.opcode),
+		  wc_status_string(wc.status));
 	    }
 	}
 
-	if (desc.opcode == VAPI_CQE_RQ_SEND_DATA) {
+	if (wc.opcode == BMI_IB_OP_RECV) {
 	    /*
 	     * Remote side did a send to us.  Filled one of the receive
 	     * queue descriptors, either message or ack.
 	     */
-	    buf_head_t *bh = ptr_from_int64(desc.id);
-	    u_int32_t byte_len = desc.byte_len;
+	    buf_head_t *bh = ptr_from_int64(wc.id);
+	    u_int32_t byte_len = wc.byte_len;
 
 	    if (byte_len == 0) {
 		/*
 		 * Acknowledgment message on qp_ack.
 		 */
-		int bufnum = desc.imm_data;
+		int bufnum = bmitoh32(wc.imm_data);
 		ib_send_t *sq;
 
-		assert(desc.imm_data_valid, "%s: immediate data is not valid",
-		  __func__);
 		debug(2, "%s: ack message %s my bufnum %d", __func__,
 		      bh->c->peername, bufnum);
 
@@ -175,11 +209,11 @@ check_cq(void)
 		}
 	    }
 
-	} else if (desc.opcode == VAPI_CQE_SQ_RDMA_WRITE) {
+	} else if (wc.opcode == BMI_IB_OP_RDMA_WRITE) {
 
 	    /* completion event for the rdma write we initiated, used
 	     * to signal memory unpin etc. */
-	    ib_send_t *sq = ptr_from_int64(desc.id);
+	    ib_send_t *sq = ptr_from_int64(wc.id);
 
 	    debug(2, "%s: sq %p %s", __func__, sq, sq_state_name(sq->state));
 
@@ -190,25 +224,22 @@ check_cq(void)
 	    post_sr_ack(sq->c, sq->his_bufnum);
 
 #if !MEMCACHE_BOUNCEBUF
-	    memcache_deregister(&sq->buflist);
+	    memcache_deregister(ib_device->memcache, &sq->buflist);
 #endif
 	    sq->state = SQ_WAITING_USER_TEST;
 
 	    debug(2, "%s: sq %p now %s", __func__, sq,
 	      sq_state_name(sq->state));
 
-	} else if (desc.opcode == VAPI_CQE_SQ_SEND_DATA) {
+	} else if (wc.opcode == BMI_IB_OP_SEND) {
 
 	    /* periodic send queue flush, qp or qp_ack */
 	    debug(2, "%s: sr (ack?) to %s send completed", __func__,
-	      ((ib_connection_t *) ptr_from_int64(desc.id))->peername);
+	      ((ib_connection_t *) ptr_from_int64(wc.id))->peername);
 
 	} else {
-	    const char *ops = VAPI_cqe_opcode_sym(desc.opcode);
-	    if (!ops)
-		ops = "(null)";
-	    error("%s: cq entry id 0x%llx opcode %s (%d) unexpected", __func__,
-	      llu(desc.id), ops, desc.opcode);
+	    error("%s: cq entry id 0x%llx opcode %d unexpected", __func__,
+	      llu(wc.id), wc.opcode);
 	}
     }
     return ret;
@@ -239,7 +270,7 @@ encourage_send_waiting_buffer(ib_send_t *sq)
     sq->bh = bh;
     bh->sq = sq;  /* uplink for completion */
 
-    if (sq->buflist.tot_len <= EAGER_BUF_PAYLOAD) {
+    if (sq->buflist.tot_len <= ib_device->eager_buf_payload) {
 	/*
 	 * Eager send.
 	 */
@@ -288,7 +319,7 @@ encourage_send_waiting_buffer(ib_send_t *sq)
 #if MEMCACHE_EARLY_REG
 	/* XXX: need to lock against receiver thread?  Could poll return
 	 * the CTS and start the data send before this completes? */
-	memcache_register(&sq->buflist);
+	memcache_register(ib_device->memcache, &sq->buflist);
 #endif
 
 	sq->state = SQ_WAITING_CTS;
@@ -317,7 +348,7 @@ encourage_send_incoming_cts(buf_head_t *bh, u_int32_t byte_len)
      * using the mop_id which was sent during the RTS, now returned to us.
      */
     sq = 0;
-    qlist_for_each(l, &sendq) {
+    qlist_for_each(l, &ib_device->sendq) {
 	ib_send_t *sqt = (ib_send_t *) l;
 	debug(8, "%s: looking for op_id 0x%llx, consider 0x%llx", __func__,
 	  llu(mh_cts.rts_mop_id), llu(sqt->mop->op_id));
@@ -369,7 +400,7 @@ find_matching_recv(rq_state_t statemask, const ib_connection_t *c,
 {
     list_t *l;
 
-    qlist_for_each(l, &recvq) {
+    qlist_for_each(l, &ib_device->recvq) {
 	ib_recv_t *rq = qlist_upcast(l);
 	if ((rq->state & statemask) && rq->c == c && rq->bmi_tag == bmi_tag)
 	    return rq;
@@ -386,9 +417,10 @@ alloc_new_recv(ib_connection_t *c, buf_head_t *bh)
     ib_recv_t *rq = Malloc(sizeof(*rq));
     rq->type = BMI_RECV;
     rq->c = c;
+    ++rq->c->refcnt;
     rq->bh = bh;
     rq->mop = 0;  /* until user posts for it */
-    qlist_add_tail(&rq->list, &recvq);
+    qlist_add_tail(&rq->list, &ib_device->recvq);
     return rq;
 }
 
@@ -441,10 +473,10 @@ encourage_recv_incoming(ib_connection_t *c, buf_head_t *bh, u_int32_t byte_len)
 #if MEMCACHE_EARLY_REG
 	    /* if a big receive was posted but only a small message came
 	     * through, unregister it now */
-	    if (rq->buflist.tot_len > EAGER_BUF_PAYLOAD) {
+	    if (rq->buflist.tot_len > ib_device->eager_buf_payload) {
 		debug(2, "%s: early registration not needed, dereg after eager",
 		  __func__);
-		memcache_deregister(&rq->buflist);
+		memcache_deregister(ib_device->memcache, &rq->buflist);
 	    }
 #endif
 
@@ -554,7 +586,7 @@ encourage_recv_incoming_cts_ack(ib_recv_t *rq)
 #if MEMCACHE_BOUNCEBUF
     memcpy_to_buflist(&rq->buflist, reg_recv_buflist_buf, rq->buflist.tot_len);
 #else
-    memcache_deregister(&rq->buflist);
+    memcache_deregister(ib_device->memcache, &rq->buflist);
 #endif
     rq->state = RQ_RTS_WAITING_USER_TEST;
 
@@ -597,7 +629,7 @@ send_cts(ib_recv_t *rq)
 	reg_recv_buflist.len = &reg_recv_buflist_len;
 	reg_recv_buflist.tot_len = reg_recv_buflist_len;
 	reg_recv_buflist_buf = Malloc(reg_recv_buflist_len);
-	memcache_register(&reg_recv_buflist, BMI_RECV);
+	memcache_register(ib_device->memcache, &reg_recv_buflist);
     }
     if (rq->buflist.tot_len > reg_recv_buflist_len)
 	error("%s: recv prereg buflist too small, need %lld", __func__,
@@ -607,7 +639,7 @@ send_cts(ib_recv_t *rq)
     rq->buflist = reg_recv_buflist;
 #else
 #  if !MEMCACHE_EARLY_REG
-    memcache_register(&rq->buflist, BMI_RECV);
+    memcache_register(ib_device->memcache, &rq->buflist);
 #  endif
 #endif
 
@@ -625,7 +657,7 @@ send_cts(ib_recv_t *rq)
     lenp = (u_int32_t *)(bufp + rq->buflist.num);
     keyp = (u_int32_t *)(lenp + rq->buflist.num);
     post_len = (char *)(keyp + rq->buflist.num) - (char *)bh->buf;
-    if (post_len > EAGER_BUF_SIZE)
+    if (post_len > ib_device->eager_buf_size)
 	error("%s: too many (%d) recv buflist entries for buf",  __func__,
 	  rq->buflist.num);
     for (i=0; i<rq->buflist.num; i++) {
@@ -644,262 +676,6 @@ send_cts(ib_recv_t *rq)
 #endif
 
     return 0;
-}
-
-/*
- * Simplify VAPI interface to post sends.  Not RDMA, just SEND.
- * Called for an eager send, rts send, or cts send.  Local send
- * completion is ignored, except rarely to clear the queue (see comments
- * at post_sr_ack).
- */
-static void
-post_sr(const buf_head_t *bh, u_int32_t len)
-{
-    VAPI_sg_lst_entry_t sg;
-    VAPI_sr_desc_t sr;
-    int ret;
-    ib_connection_t *c = bh->c;
-
-    debug(2, "%s: %s bh %d len %u wr %d/%d", __func__, c->peername, bh->num,
-      len, c->num_unsignaled_wr, max_outstanding_wr);
-    sg.addr = int64_from_ptr(bh->buf);
-    sg.len = len;
-    sg.lkey = c->eager_send_lkey;
-
-    memset(&sr, 0, sizeof(sr));
-    sr.opcode = VAPI_SEND;
-    sr.id = int64_from_ptr(c);  /* for error checking if send fails */
-    if (++c->num_unsignaled_wr + 100 == max_outstanding_wr) {
-	c->num_unsignaled_wr = 0;
-	sr.comp_type = VAPI_SIGNALED;
-    } else
-	sr.comp_type = VAPI_UNSIGNALED;  /* == 1 */
-    sr.sg_lst_p = &sg;
-    sr.sg_lst_len = 1;
-    ret = VAPI_post_sr(nic_handle, c->qp, &sr);
-    if (ret < 0)
-	error_verrno(ret, "%s: VAPI_post_sr", __func__);
-}
-
-/*
- * Post one of the eager recv bufs for this connection.
- */
-void
-post_rr(const ib_connection_t *c, buf_head_t *bh)
-{
-    VAPI_sg_lst_entry_t sg;
-    VAPI_rr_desc_t rr;
-    int ret;
-
-    debug(2, "%s: %s bh %d", __func__, c->peername, bh->num);
-    sg.addr = int64_from_ptr(bh->buf);
-    sg.len = EAGER_BUF_SIZE;
-    sg.lkey = c->eager_recv_lkey;
-
-    memset(&rr, 0, sizeof(rr));
-    rr.opcode = VAPI_RECEIVE;
-    rr.id = int64_from_ptr(bh);
-    rr.sg_lst_p = &sg;
-    rr.sg_lst_len = 1;
-    ret = VAPI_post_rr(nic_handle, c->qp, &rr);
-    if (ret < 0)
-	error_verrno(ret, "%s: VAPI_post_rr", __func__);
-}
-
-/*
- * Explicitly return a credit.  Immediate data says for which of
- * his buffer numbers does this ack apply.  Buffers will get reposted
- * out of order, although the buffers are always matched pairwise, so we
- * always return _his_ number, not ours.  (Consider this scenario
- *
- *     client                        server
- *        buf 0: send unex eager        buf 0: recv unex eager, no ack
- *        buf 1: send rts                      until app recognizes
- *                                      buf 1: recv rts, ack immediate,
- *                                             repost my buf 1
- *                                      ....
- *                                      app deals with eager, repost
- *                                             my buf 0
- *
- * Now the buffers are posted on the server in a different order.)
- *
- * Don't want to get a local completion from this, but if we don't do
- * so every once in a while, the NIC will fill up apparently.  So we
- * generate one every N - 100, where N =~ 5000, the number asked for
- * at QP build time.
- */
-static void
-post_sr_ack(ib_connection_t *c, int his_bufnum)
-{
-    VAPI_sr_desc_t sr;
-    int ret;
-
-    debug(2, "%s: %s his buf %d wr %d/%d", __func__, c->peername, his_bufnum,
-      c->num_unsignaled_wr_ack, max_outstanding_wr);
-    memset(&sr, 0, sizeof(sr));
-    sr.opcode = VAPI_SEND_WITH_IMM;
-    sr.id = int64_from_ptr(c);  /* for error checking if send fails */
-    if (++c->num_unsignaled_wr_ack + 100 == max_outstanding_wr) {
-	c->num_unsignaled_wr_ack = 0;
-	sr.comp_type = VAPI_SIGNALED;
-    } else
-	sr.comp_type = VAPI_UNSIGNALED;  /* == 1 */
-    sr.imm_data = his_bufnum;
-    sr.sg_lst_len = 0;
-    ret = VAPI_post_sr(nic_handle, c->qp_ack, &sr);
-    if (ret < 0)
-	error_verrno(ret, "%s: VAPI_post_sr", __func__);
-}
-
-/*
- * Put another receive entry on the list for an ack.  These have no
- * data, so require no local buffers.  Just add a descriptor to the
- * NIC list.  We do keep the .id pointing to the bh which is the originator
- * of the eager (or RTS or whatever) send, just as a consistency check
- * that when the ack comes in, it is for the outgoing message we expected.
- *
- * In the future they could be out-of-order, though, so perhaps that will
- * go away.
- *
- * Could prepost a whole load of these and just replenish them without
- * thinking.
- */
-static void
-post_rr_ack(const ib_connection_t *c, const buf_head_t *bh)
-{
-    VAPI_rr_desc_t rr;
-    int ret;
-
-    debug(2, "%s: %s bh %d", __func__, c->peername, bh->num);
-    memset(&rr, 0, sizeof(rr));
-    rr.opcode = VAPI_RECEIVE;
-    rr.comp_type = VAPI_SIGNALED;  /* ask to get these, == 0 */
-    rr.id = int64_from_ptr(bh);
-    ret = VAPI_post_rr(nic_handle, c->qp_ack, &rr);
-    if (ret < 0)
-	error_verrno(ret, "%s: VAPI_post_rr", __func__);
-}
-
-/*
- * Called only in response to receipt of a CTS on the sender.  RDMA write
- * the big data to the other side.  A bit messy since an RDMA write may
- * not scatter to the receiver, but can gather from the sender, and we may
- * have a non-trivial buflist on both sides.  The mh_cts variable length
- * fields must be decoded as we go.
- */
-static void
-post_sr_rdmaw(ib_send_t *sq, msg_header_cts_t *mh_cts, void *mh_cts_buf)
-{
-    VAPI_sr_desc_t sr;
-    int done;
-
-    int send_index = 0, recv_index = 0;    /* working entry in buflist */
-    int send_offset = 0;  /* byte offset in working send entry */
-    u_int64_t *recv_bufp = (u_int64_t *) mh_cts_buf;
-    u_int32_t *recv_lenp = (u_int32_t *)(recv_bufp + mh_cts->buflist_num);
-    u_int32_t *recv_rkey = (u_int32_t *)(recv_lenp + mh_cts->buflist_num);
-
-    debug(2, "%s: sq %p totlen %d", __func__, sq, (int) sq->buflist.tot_len);
-
-#if MEMCACHE_BOUNCEBUF
-    if (reg_send_buflist.num == 0) {
-	reg_send_buflist.num = 1;
-	reg_send_buflist.buf.recv = &reg_send_buflist_buf;
-	reg_send_buflist.len = &reg_send_buflist_len;
-	reg_send_buflist.tot_len = reg_send_buflist_len;
-	reg_send_buflist_buf = Malloc(reg_send_buflist_len);
-	memcache_register(&reg_send_buflist, BMI_SEND);
-    }
-    if (sq->buflist.tot_len > reg_send_buflist_len)
-	error("%s: send prereg buflist too small, need %lld", __func__,
-	  lld(sq->buflist.tot_len));
-    memcpy_from_buflist(&sq->buflist, reg_send_buflist_buf);
-
-    ib_buflist_t save_buflist = sq->buflist;
-    sq->buflist = reg_send_buflist;
-
-#else
-#if !MEMCACHE_EARLY_REG
-    memcache_register(&sq->buflist, BMI_SEND);
-#endif
-#endif
-
-    /* constant things for every send */
-    memset(&sr, 0, sizeof(sr));
-    sr.opcode = VAPI_RDMA_WRITE;
-    sr.comp_type = VAPI_UNSIGNALED;
-    sr.sg_lst_p = sg_tmp_array;
-
-    done = 0;
-    while (!done) {
-	int ret;
-	u_int32_t recv_bytes_needed;
-
-	/*
-	 * Driven by recv elements.  Sizes have already been checked
-	 * (hopefully).
-	 */
-	sr.remote_addr = bmitoh64(recv_bufp[recv_index]);
-	sr.r_key = bmitoh32(recv_rkey[recv_index]);
-	sr.sg_lst_len = 0;
-	recv_bytes_needed = bmitoh32(recv_lenp[recv_index]);
-	debug(4, "%s: chunk to %s remote addr %llx rkey %x",
-	  __func__, sq->c->peername, llu(sr.remote_addr), sr.r_key);
-	while (recv_bytes_needed > 0) {
-	    /* consume from send buflist to fill this one receive */
-	    u_int32_t send_bytes_offered
-	      = sq->buflist.len[send_index] - send_offset;
-	    u_int32_t this_bytes = send_bytes_offered;
-	    if (this_bytes > recv_bytes_needed)
-		this_bytes = recv_bytes_needed;
-
-	    sg_tmp_array[sr.sg_lst_len].addr =
-	      int64_from_ptr(sq->buflist.buf.send[send_index])
-	      + send_offset;
-	    sg_tmp_array[sr.sg_lst_len].len = this_bytes;
-	    sg_tmp_array[sr.sg_lst_len].lkey =
-	      sq->buflist.memcache[send_index]->memkeys.lkey;
-
-	    debug(4, "%s: chunk %d local addr %llx len %d lkey %x",
-	      __func__, sr.sg_lst_len,
-	      llu(sg_tmp_array[sr.sg_lst_len].addr),
-	      sg_tmp_array[sr.sg_lst_len].len,
-	      sg_tmp_array[sr.sg_lst_len].lkey);
-
-	    ++sr.sg_lst_len;
-	    if (sr.sg_lst_len > sg_max_len)
-		error("%s: send buflist len %d bigger than max %d", __func__,
-		  sr.sg_lst_len, sg_max_len);
-
-	    send_offset += this_bytes;
-	    if (send_offset == sq->buflist.len[send_index]) {
-		++send_index;
-		send_offset = 0;
-		if (send_index == sq->buflist.num) {
-		    done = 1;
-		    break;  /* short send */
-		}
-	    }
-	    recv_bytes_needed -= this_bytes;
-	}
-
-	/* done with the one we were just working on, is this the last recv? */
-	++recv_index;
-	if (recv_index == (int)mh_cts->buflist_num)
-	    done = 1;
-
-	/* either filled the recv or exhausted the send */
-	if (done) {
-	    sr.id = int64_from_ptr(sq);    /* used to match in completion */
-	    sr.comp_type = VAPI_SIGNALED;  /* completion drives the unpin */
-	}
-	ret = VAPI_post_sr(nic_handle, sq->c->qp, &sr);
-	if (ret < 0)
-	    error_verrno(ret, "%s: VAPI_post_sr", __func__);
-    }
-#if MEMCACHE_BOUNCEBUF
-    sq->buflist = save_buflist;
-#endif
 }
 
 /*
@@ -978,7 +754,7 @@ generic_post_send(bmi_op_id_t *id, struct method_addr *remote_map,
 	  __func__, lld(total_size), lld(sq->buflist.tot_len));
 
     /* unexpected messages must fit inside an eager message */
-    if (is_unexpected && sq->buflist.tot_len > EAGER_BUF_PAYLOAD) {
+    if (is_unexpected && sq->buflist.tot_len > ib_device->eager_buf_payload) {
 	free(sq);
 	ret = -EINVAL;
 	goto out;
@@ -986,8 +762,9 @@ generic_post_send(bmi_op_id_t *id, struct method_addr *remote_map,
 
     sq->bmi_tag = tag;
     sq->c = ibmap->c;
+    ++sq->c->refcnt;
     sq->is_unexpected = is_unexpected;
-    qlist_add_tail(&sq->list, &sendq);
+    qlist_add_tail(&sq->list, &ib_device->sendq);
 
     /* generate identifier used by caller to test for message later */
     mop = Malloc(sizeof(*mop));
@@ -1082,7 +859,7 @@ generic_post_recv(bmi_op_id_t *id, struct method_addr *remote_map,
     c = ibmap->c;
 
     /* poll interface first to save a few steps below */
-    check_cq();
+    ib_check_cq();
 
     /* check to see if matching recv is in the queue */
     rq = find_matching_recv(
@@ -1092,12 +869,9 @@ generic_post_recv(bmi_op_id_t *id, struct method_addr *remote_map,
 	  rq_state_name(rq->state));
     } else {
 	/* alloc and build new recvq structure */
-	rq = Malloc(sizeof(*rq));
-	rq->type = BMI_RECV;
+	rq = alloc_new_recv(c, NULL);
 	rq->state = RQ_WAITING_INCOMING;
 	rq->bmi_tag = tag;
-	rq->c = c;
-	qlist_add_tail(&rq->list, &recvq);
 	debug(2, "%s: new rq %p", __func__, rq);
     }
 
@@ -1170,7 +944,7 @@ generic_post_recv(bmi_op_id_t *id, struct method_addr *remote_map,
 	/* try to send, or wait for send buffer space */
 	rq->state = RQ_RTS_WAITING_CTS_BUFFER;
 #if MEMCACHE_EARLY_REG
-	memcache_register(&rq->buflist);
+	memcache_register(ib_device->memcache, &rq->buflist);
 #endif
 	sret = send_cts(rq);
 	if (sret == 0)
@@ -1181,8 +955,8 @@ generic_post_recv(bmi_op_id_t *id, struct method_addr *remote_map,
 #if MEMCACHE_EARLY_REG
     /* but remember that this might not be used if the other side sends
      * less than we posted for receive; that's legal */
-    if (rq->buflist.tot_len > EAGER_BUF_PAYLOAD)
-	memcache_register(&rq->buflist);
+    if (rq->buflist.tot_len > ib_device->eager_buf_payload)
+	memcache_register(ib_device->memcache, &rq->buflist);
 #endif
 
   out:
@@ -1224,15 +998,15 @@ static int
 test_sq(ib_send_t *sq, bmi_op_id_t *outid, bmi_error_code_t *err,
   bmi_size_t *size, void **user_ptr, int complete)
 {
+    ib_connection_t *c;
+
     debug(9, "%s: sq %p outid %p err %p size %p user_ptr %p complete %d",
       __func__, sq, outid, err, size, user_ptr, complete);
 
     if (sq->state == SQ_WAITING_USER_TEST) {
 	if (complete) {
 	    debug(2, "%s: sq %p completed %lld to %s", __func__,
-	      sq, lld(sq->buflist.tot_len),
-	      ((ib_method_addr_t *) sq->c->remote_map->method_data)
-		->hostname);
+	      sq, lld(sq->buflist.tot_len), sq->c->peername);
 	    *outid = sq->mop->op_id;
 	    *err = 0;
 	    *size = sq->buflist.tot_len;
@@ -1240,8 +1014,12 @@ test_sq(ib_send_t *sq, bmi_op_id_t *outid, bmi_error_code_t *err,
 		*user_ptr = sq->mop->user_ptr;
 	    qlist_del(&sq->list);
 	    id_gen_safe_unregister(sq->mop->op_id);
+	    c = sq->c;
 	    free(sq->mop);
 	    free(sq);
+	    --c->refcnt;
+	    if (c->closed)
+		ib_close_connection(c);
 	    return 1;
 	}
     /* this state needs help, push it (ideally would be triggered
@@ -1258,9 +1036,13 @@ test_sq(ib_send_t *sq, bmi_op_id_t *outid, bmi_error_code_t *err,
 	    *user_ptr = sq->mop->user_ptr;
 	qlist_del(&sq->list);
 	id_gen_safe_unregister(sq->mop->op_id);
+	c = sq->c;
 	free(sq->mop);
-	maybe_free_connection(sq->c);
 	free(sq);
+	--c->refcnt;
+	maybe_free_connection(c);
+	if (c->closed)
+	    ib_close_connection(c);
 	return 1;
     } else {
 	debug(9, "%s: sq %p found, not done, state %s", __func__,
@@ -1278,6 +1060,8 @@ static int
 test_rq(ib_recv_t *rq, bmi_op_id_t *outid, bmi_error_code_t *err,
   bmi_size_t *size, void **user_ptr, int complete)
 {
+    ib_connection_t *c;
+
     debug(9, "%s: rq %p outid %p err %p size %p user_ptr %p complete %d",
       __func__, rq, outid, err, size, user_ptr, complete);
 
@@ -1285,9 +1069,7 @@ test_rq(ib_recv_t *rq, bmi_op_id_t *outid, bmi_error_code_t *err,
       || rq->state == RQ_RTS_WAITING_USER_TEST) {
 	if (complete) {
 	    debug(2, "%s: rq %p completed %lld from %s", __func__,
-	      rq, lld(rq->actual_len),
-	      ((ib_method_addr_t *) rq->c->remote_map->method_data)
-		->hostname);
+	      rq, lld(rq->actual_len), rq->c->peername);
 	    *err = 0;
 	    *size = rq->actual_len;
 	    if (rq->mop) {
@@ -1298,7 +1080,11 @@ test_rq(ib_recv_t *rq, bmi_op_id_t *outid, bmi_error_code_t *err,
 		free(rq->mop);
 	    }
 	    qlist_del(&rq->list);
+	    c = rq->c;
 	    free(rq);
+	    --c->refcnt;
+	    if (c->closed)
+		ib_close_connection(c);
 	    return 1;
 	}
     /* this state needs help, push it (ideally would be triggered
@@ -1323,8 +1109,12 @@ test_rq(ib_recv_t *rq, bmi_op_id_t *outid, bmi_error_code_t *err,
 	    free(rq->mop);
 	}
 	qlist_del(&rq->list);
-	maybe_free_connection(rq->c);
+	c = rq->c;
 	free(rq);
+	maybe_free_connection(c);
+	--c->refcnt;
+	if (c->closed)
+	    ib_close_connection(c);
 	return 1;
     } else {
 	debug(9, "%s: rq %p found, not done, state %s", __func__,
@@ -1347,7 +1137,7 @@ BMI_ib_test(bmi_op_id_t id, int *outcount, bmi_error_code_t *err,
     int n;
 
     gen_mutex_lock(&interface_mutex);
-    check_cq();
+    ib_check_cq();
 
     mop = id_gen_safe_lookup(id);
     sq = mop->method_data;
@@ -1385,14 +1175,14 @@ BMI_ib_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
     void **up = 0;
 
     gen_mutex_lock(&interface_mutex);
-    check_cq();
+    ib_check_cq();
 
     /*
      * Walk _all_ entries on sq, rq, marking them completed or
      * encouraging them as needed due to resource limitations.
      */
     n = 0;
-    for (l=sendq.next; l != &sendq; l=lnext) {
+    for (l=ib_device->sendq.next; l != &ib_device->sendq; l=lnext) {
 	ib_send_t *sq = qlist_upcast(l);
 	lnext = l->next;
 	/* test them all, even if can't reap them, just to encourage */
@@ -1402,7 +1192,7 @@ BMI_ib_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
 	n += test_sq(sq, &outids[n], &errs[n], &sizes[n], up, complete);
     }
 
-    for (l=recvq.next; l != &recvq; l=lnext) {
+    for (l=ib_device->recvq.next; l != &ib_device->recvq; l=lnext) {
 	ib_recv_t *rq = qlist_upcast(l);
 	lnext = l->next;
 
@@ -1413,6 +1203,10 @@ BMI_ib_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
 	    up = &user_ptrs[n];
 	n += test_rq(rq, &outids[n], &errs[n], &sizes[n], up, complete);
     }
+
+    /* drop lock before blocking on new connections below */
+    gen_mutex_unlock(&interface_mutex);
+
     *outcount = n;
     if (n > 0) {
 	gettimeofday(&last_action, 0);
@@ -1422,7 +1216,7 @@ BMI_ib_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
 	 * server, instead of sleeping, watch the accept socket for something
 	 * new.  No way to blockingly poll in standard VAPI.
 	 */
-	if (listen_sock >= 0) {
+	if (ib_device->listen_sock >= 0) {
 	    struct timeval now;
 	    gettimeofday(&now, 0);
 	    now.tv_sec -= last_action.tv_sec;
@@ -1436,7 +1230,6 @@ BMI_ib_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
 		    gettimeofday(&last_action, 0);
 	}
     }
-    gen_mutex_unlock(&interface_mutex);
     return 0;
 }
 
@@ -1456,14 +1249,15 @@ BMI_ib_testunexpected(int incount __unused, int *outcount,
     gen_mutex_lock(&interface_mutex);
 
     /* Check CQ, then look for the first unexpected message.  */
-    num_action = check_cq();
+    num_action = ib_check_cq();
 
     *outcount = 0;
-    qlist_for_each(l, &recvq) {
+    qlist_for_each(l, &ib_device->recvq) {
 	ib_recv_t *rq = qlist_upcast(l);
 	if (rq->state == RQ_EAGER_WAITING_USER_TESTUNEXPECTED) {
 	    msg_header_eager_t mh_eager;
 	    char *ptr = rq->bh->buf;
+	    ib_connection_t *c;
 
 	    decode_msg_header_eager_t(&ptr, &mh_eager);
 
@@ -1482,7 +1276,11 @@ BMI_ib_testunexpected(int incount __unused, int *outcount,
 	    post_sr_ack(rq->c, mh_eager.bufnum);
 	    *outcount = 1;
 	    qlist_del(&rq->list);
+	    c = rq->c;
 	    free(rq);
+	    --c->refcnt;
+	    if (c->closed)
+		ib_close_connection(c);
 	    goto out;
 	}
     }
@@ -1523,7 +1321,7 @@ BMI_ib_cancel(bmi_op_id_t id, bmi_context_id context_id __unused)
     ib_connection_t *c = 0;
 
     gen_mutex_lock(&interface_mutex);
-    check_cq();
+    ib_check_cq();
     mop = id_gen_safe_lookup(id);
     tsq = mop->method_data;
     if (tsq->type == BMI_SEND) {
@@ -1552,35 +1350,35 @@ BMI_ib_cancel(bmi_op_id_t id, bmi_context_id context_id __unused)
 	list_t *l;
 
 	c->cancelled = 1;
-	close_connection_drain_qp(c->qp);
-	qlist_for_each(l, &sendq) {
+	drain_qp(c);
+	qlist_for_each(l, &ib_device->sendq) {
 	    ib_send_t *sq = qlist_upcast(l);
 	    if (sq->c != c) continue;
 #if !MEMCACHE_BOUNCEBUF
 	    if (sq->state == SQ_WAITING_DATA_LOCAL_SEND_COMPLETE)
-		memcache_deregister(&sq->buflist);
+		memcache_deregister(ib_device->memcache, &sq->buflist);
 #  if MEMCACHE_EARLY_REG
 	    /* pin when sending rts, so also must dereg in this state */
 	    if (sq->state == SQ_WAITING_CTS)
-		memcache_deregister(&sq->buflist);
+		memcache_deregister(ib_device->memcache, &sq->buflist);
 #  endif
 #endif
 	    if (sq->state != SQ_WAITING_USER_TEST)
 		sq->state = SQ_CANCELLED;
 	}
-	qlist_for_each(l, &recvq) {
+	qlist_for_each(l, &ib_device->recvq) {
 	    ib_recv_t *rq = qlist_upcast(l);
 	    if (rq->c != c) continue;
 #if !MEMCACHE_BOUNCEBUF
 	    if (rq->state == RQ_RTS_WAITING_DATA)
-		memcache_deregister(&rq->buflist);
+		memcache_deregister(ib_device->memcache, &rq->buflist);
 #  if MEMCACHE_EARLY_REG
 	    /* pin on post, dereg all these */
 	    if (rq->state == RQ_RTS_WAITING_CTS_BUFFER)
-		memcache_deregister(&rq->buflist);
+		memcache_deregister(ib_device->memcache, &rq->buflist);
 	    if (rq->state == RQ_WAITING_INCOMING
-	      && rq->buflist.tot_len > EAGER_BUF_PAYLOAD)
-		memcache_deregister(&rq->buflist);
+	      && rq->buflist.tot_len > ib_device->eager_buf_payload)
+		memcache_deregister(ib_device->memcache, &rq->buflist);
 #  endif
 #endif
 	    if (!(rq->state == RQ_EAGER_WAITING_USER_TEST 
@@ -1604,52 +1402,524 @@ maybe_free_connection(ib_connection_t *c)
 
     if (!c->cancelled)
 	return;
-    qlist_for_each(l, &sendq) {
+    qlist_for_each(l, &ib_device->sendq) {
 	ib_send_t *sq = qlist_upcast(l);
 	if (sq->c == c) return;
     }
-    qlist_for_each(l, &recvq) {
+    qlist_for_each(l, &ib_device->recvq) {
 	ib_recv_t *rq = qlist_upcast(l);
 	if (rq->c == c) return;
     }
     ib_close_connection(c);
 }
 
-#if MEMCACHE_BOUNCEBUF
-static int
-del_bouncebuf_then_BMI_ib_finalize(void)
-{
-    if (reg_send_buflist.num > 0) {
-	memcache_deregister(&reg_send_buflist);
-	reg_send_buflist.num = 0;
-	free(reg_send_buflist_buf);
-    }
-    if (reg_recv_buflist.num > 0) {
-	memcache_deregister(&reg_recv_buflist);
-	reg_recv_buflist.num = 0;
-	free(reg_recv_buflist_buf);
-    }
-    return BMI_ib_finalize();
-}
-#endif
-
 static const char *
 BMI_ib_rev_lookup(struct method_addr *meth)
 {
     ib_method_addr_t *ibmap = meth->method_data;
-    return ibmap->c->peername;
+    if (!ibmap->c)
+	return "(unconnected)";
+    else
+	return ibmap->c->peername;
 }
 
-/* exported method interface */
+/*
+ * Build and fill an IB-specific method_addr structure.
+ */
+static struct method_addr *ib_alloc_method_addr(ib_connection_t *c,
+                                                const char *hostname, int port)
+{
+    struct method_addr *map;
+    ib_method_addr_t *ibmap;
+
+    map = alloc_method_addr(bmi_ib_method_id, (bmi_size_t) sizeof(*ibmap));
+    ibmap = map->method_data;
+    ibmap->c = c;
+    ibmap->hostname = hostname;
+    ibmap->port = port;
+
+    return map;
+}
+
+/*
+ * Break up a method string like:
+ *   ib://hostname:port/filesystem
+ * into its constituent fields, storing them in an opaque
+ * type, which is then returned.
+ * XXX: I'm assuming that these actually return a _const_ pointer
+ * so that I can hand back an existing map.
+ */
+static struct method_addr *BMI_ib_method_addr_lookup(const char *id)
+{
+    char *s, *hostname, *cp, *cq;
+    int port;
+    struct method_addr *map = 0;
+
+    /* parse hostname */
+    s = string_key("ib", id);  /* allocs a string */
+    if (!s)
+	return 0;
+    cp = strchr(s, ':');
+    if (!cp)
+	error("%s: no ':' found", __func__);
+
+    /* copy to permanent storage */
+    hostname = Malloc((unsigned long) (cp - s + 1));
+    strncpy(hostname, s, (size_t) (cp-s));
+    hostname[cp-s] = '\0';
+
+    /* strip /filesystem  */
+    ++cp;
+    cq = strchr(cp, '/');
+    if (cq)
+	*cq = 0;
+    port = strtoul(cp, &cq, 10);
+    if (cq == cp)
+	error("%s: invalid port number", __func__);
+    if (*cq != '\0')
+	error("%s: extra characters after port number", __func__);
+    free(s);
+
+    /* lookup in known connections, if there are any */
+    gen_mutex_lock(&interface_mutex);
+    if (ib_device) {
+	list_t *l;
+	qlist_for_each(l, &ib_device->connection) {
+	    ib_connection_t *c = qlist_upcast(l);
+	    ib_method_addr_t *ibmap = c->remote_map->method_data;
+	    if (ibmap->port == port && !strcmp(ibmap->hostname, hostname)) {
+	       map = c->remote_map;
+	       break;
+	    }
+	}
+    }
+    gen_mutex_unlock(&interface_mutex);
+
+    if (map)
+	free(hostname);  /* found it */
+    else
+	map = ib_alloc_method_addr(0, hostname, port);  /* alloc new one */
+	/* but don't call method_addr_reg_callback! */
+
+    return map;
+}
+
+static ib_connection_t *ib_new_connection(int sock, const char *peername,
+                                          int is_server)
+{
+    ib_connection_t *c;
+    int i, ret;
+
+    c = Malloc(sizeof(*c));
+    c->peername = strdup(peername);
+
+    /* fill send and recv free lists and buf heads */
+    c->eager_send_buf_contig = Malloc(ib_device->eager_buf_num
+      * ib_device->eager_buf_size);
+    c->eager_recv_buf_contig = Malloc(ib_device->eager_buf_num
+      * ib_device->eager_buf_size);
+    INIT_QLIST_HEAD(&c->eager_send_buf_free);
+    INIT_QLIST_HEAD(&c->eager_recv_buf_free);
+    c->eager_send_buf_head_contig = Malloc(ib_device->eager_buf_num
+      * sizeof(*c->eager_send_buf_head_contig));
+    c->eager_recv_buf_head_contig = Malloc(ib_device->eager_buf_num
+      * sizeof(*c->eager_recv_buf_head_contig));
+    for (i=0; i<ib_device->eager_buf_num; i++) {
+	buf_head_t *ebs = &c->eager_send_buf_head_contig[i];
+	buf_head_t *ebr = &c->eager_recv_buf_head_contig[i];
+	INIT_QLIST_HEAD(&ebs->list);
+	INIT_QLIST_HEAD(&ebr->list);
+	ebs->c = c;
+	ebr->c = c;
+	ebs->num = i;
+	ebr->num = i;
+	ebs->buf = (char *) c->eager_send_buf_contig
+		 + i * ib_device->eager_buf_size;
+	ebr->buf = (char *) c->eager_recv_buf_contig
+		 + i * ib_device->eager_buf_size;
+	qlist_add_tail(&ebs->list, &c->eager_send_buf_free);
+	qlist_add_tail(&ebr->list, &c->eager_recv_buf_free);
+    }
+
+    /* put it on the list */
+    qlist_add(&c->list, &ib_device->connection);
+
+    /* other vars */
+    c->remote_map = 0;
+    c->cancelled = 0;
+    c->refcnt = 0;
+    c->closed = 0;
+
+    ret = new_connection(c, sock, is_server);
+    if (ret) {
+	ib_close_connection(c);
+	c = NULL;
+    }
+
+    return c;
+}
+
+static void ib_close_connection(ib_connection_t *c)
+{
+    ib_method_addr_t *ibmap;
+
+    debug(2, "%s: closing connection to %s", __func__, c->peername);
+    c->closed = 1;
+    if (c->refcnt != 0) {
+	debug(1, "%s: refcnt non-zero %d, delaying free", __func__, c->refcnt);
+	return;
+    }
+
+    close_connection(c);
+
+    free(c->eager_send_buf_contig);
+    free(c->eager_recv_buf_contig);
+    free(c->eager_send_buf_head_contig);
+    free(c->eager_recv_buf_head_contig);
+    /* never free the remote map, for the life of the executable, just
+     * mark it unconnected since BMI will always have this structure. */
+    ibmap = c->remote_map->method_data;
+    ibmap->c = NULL;
+    free(c->peername);
+    qlist_del(&c->list);
+    free(c);
+}
+
+#ifndef __PVFS2_SERVER__
+/*
+ * Blocking connect initiated by a post_sendunexpected{,_list}, or
+ * post_recv*
+ */
+static int ib_tcp_client_connect(ib_method_addr_t *ibmap,
+                                 struct method_addr *remote_map)
+{
+    int s;
+    char peername[2048];
+    struct hostent *hp;
+    struct sockaddr_in skin;
+    
+    s = socket(AF_INET, SOCK_STREAM, 0);
+    if (s < 0) {
+	warning("%s: create tcp socket: %m", __func__);
+	return bmi_errno_to_pvfs(errno);
+    }
+    hp = gethostbyname(ibmap->hostname);
+    if (!hp) {
+	warning("%s: cannot resolve server %s", __func__, ibmap->hostname);
+	return -1;
+    }
+    memset(&skin, 0, sizeof(skin));
+    skin.sin_family = hp->h_addrtype;
+    memcpy(&skin.sin_addr, hp->h_addr_list[0], (size_t) hp->h_length);
+    skin.sin_port = htons(ibmap->port);
+    sprintf(peername, "%s:%d", ibmap->hostname, ibmap->port);
+  retry:
+    if (connect(s, (struct sockaddr *) &skin, sizeof(skin)) < 0) {
+	if (errno == EINTR)
+	    goto retry;
+	else {
+	    warning("%s: connect to server %s: %m", __func__, peername);
+	    return bmi_errno_to_pvfs(errno);
+	}
+    }
+    ibmap->c = ib_new_connection(s, peername, 0);
+    if (!ibmap->c)
+	error("%s: ib_new_connection failed", __func__);
+    ibmap->c->remote_map = remote_map;
+
+    if (close(s) < 0) {
+	warning("%s: close sock: %m", __func__);
+	return bmi_errno_to_pvfs(errno);
+    }
+    return 0;
+}
+#endif
+
+/*
+ * On a server, initialize a socket for listening for new connections.
+ */
+static void ib_tcp_server_init_listen_socket(struct method_addr *addr)
+{
+    int flags;
+    struct sockaddr_in skin;
+    ib_method_addr_t *ibc = addr->method_data;
+
+    ib_device->listen_sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (ib_device->listen_sock < 0)
+	error_errno("%s: create tcp socket", __func__);
+    flags = 1;
+    if (setsockopt(ib_device->listen_sock, SOL_SOCKET, SO_REUSEADDR, &flags,
+      sizeof(flags)) < 0)
+	error_errno("%s: setsockopt REUSEADDR", __func__);
+    memset(&skin, 0, sizeof(skin));
+    skin.sin_family = AF_INET;
+    skin.sin_port = htons(ibc->port);
+  retry:
+    if (bind(ib_device->listen_sock, (struct sockaddr *) &skin, sizeof(skin)) < 0) {
+	if (errno == EINTR)
+	    goto retry;
+	else
+	    error_errno("%s: bind tcp socket", __func__);
+    }
+    if (listen(ib_device->listen_sock, 1024) < 0)
+	error_errno("%s: listen tcp socket", __func__);
+    flags = fcntl(ib_device->listen_sock, F_GETFL);
+    if (flags < 0)
+	error_errno("%s: fcntl getfl listen sock", __func__);
+    flags |= O_NONBLOCK;
+    if (fcntl(ib_device->listen_sock, F_SETFL, flags) < 0)
+	error_errno("%s: fcntl setfl nonblock listen sock", __func__);
+}
+
+/*
+ * Check for new connections.  The listening socket is left nonblocking
+ * so this test can be quick.  Returns >0 if an accept worked.
+ */
+static int ib_tcp_server_check_new_connections(void)
+{
+    struct sockaddr_in ssin;
+    socklen_t len;
+    int s, ret = 0;
+
+    len = sizeof(ssin);
+    s = accept(ib_device->listen_sock, (struct sockaddr *) &ssin, &len);
+    if (s < 0) {
+	if (!(errno == EAGAIN))
+	    error_errno("%s: accept listen sock", __func__);
+    } else {
+	char peername[2048];
+	ib_connection_t *c;
+
+	char *hostname = strdup(inet_ntoa(ssin.sin_addr));
+	int port = ntohs(ssin.sin_port);
+	sprintf(peername, "%s:%d", hostname, port);
+
+	c = ib_new_connection(s, peername, 1);
+	if (!c) {
+	    free(hostname);
+	    close(s);
+	    return 0;
+	}
+
+	c->remote_map = ib_alloc_method_addr(c, hostname, port);
+	/* register this address with the method control layer */
+	ret = bmi_method_addr_reg_callback(c->remote_map);
+	if (ret < 0)
+	    error_xerrno(ret, "%s: bmi_method_addr_reg_callback", __func__);
+
+	debug(2, "%s: accepted new connection %s at server", __func__,
+	  c->peername);
+	if (close(s) < 0)
+	    error_errno("%s: close new sock", __func__);
+	ret = 1;
+    }
+    return ret;
+}
+
+/*
+ * Watch the listen_sock for activity, but do not actually respond to it.  A
+ * later call to testunexpected will pick up the new connection.  Returns >0
+ * if an accept would work on another call (later _unexpected will find it).
+ */
+static int ib_tcp_server_block_new_connections(int timeout_ms)
+{
+    struct pollfd pfd;
+    int ret;
+
+    pfd.fd = ib_device->listen_sock;
+    pfd.events = POLLIN;
+    ret = poll(&pfd, 1, timeout_ms);
+    if (ret < 0) {
+	if (errno == EINTR)  /* these are okay, debugging or whatever */
+	    ret = 0;
+	else
+	    error_errno("%s: poll listen sock", __func__);
+    }
+    return ret;
+}
+
+static void * BMI_ib_memalloc(bmi_size_t len,
+                              enum bmi_op_type send_recv __unused)
+{
+    return memcache_memalloc(ib_device->memcache, len,
+                             ib_device->eager_buf_payload);
+}
+
+static int BMI_ib_memfree(void *buf, bmi_size_t len,
+                          enum bmi_op_type send_recv __unused)
+{
+    return memcache_memfree(ib_device->memcache, buf, len);
+}
+
+/*
+ * Callers sometimes want to know odd pieces of information.  Satisfy
+ * them.
+ */
+static int BMI_ib_get_info(int option, void *param)
+{
+    int ret = 0;
+
+    switch (option) {
+	case BMI_CHECK_MAXSIZE:
+	    /* reality is 2^31, but shrink to avoid negative int */
+	    *(int *)param = (1UL << 31) - 1;
+	    break;
+	case BMI_GET_UNEXP_SIZE:
+	    *(int *)param = ib_device->eager_buf_payload;
+	    break;
+	default:
+	    ret = -ENOSYS;
+    }
+    return ret;
+}
+
+/*
+ * Used to set some optional parameters.  Just ignore.
+ */
+static int BMI_ib_set_info(int option __unused, void *param __unused)
+{
+    /* XXX: should return -ENOSYS, but 0 now until callers handle
+     * that correctly. */
+    return 0;
+}
+
+#ifdef OPENIB
+extern int openib_ib_initialize(void);
+#endif
+#ifdef VAPI
+extern int vapi_ib_initialize(void);
+#endif
+
+/*
+ * Startup, once per application.
+ */
+static int BMI_ib_initialize(struct method_addr *listen_addr, int method_id,
+                             int init_flags)
+{
+    int ret;
+
+    debug(0, "%s: init", __func__);
+
+    gen_mutex_lock(&interface_mutex);
+
+    /* check params */
+    if (!!listen_addr ^ (init_flags & BMI_INIT_SERVER))
+	error("%s: error: BMI_INIT_SERVER requires non-null listen_addr"
+	  " and v.v", __func__);
+
+    bmi_ib_method_id = method_id;
+
+    ib_device = Malloc(sizeof(*ib_device));
+
+    /* try, in order, OpenIB then VAPI; set up function pointers */
+    ret = 1;
+#ifdef OPENIB
+    ret = openib_ib_initialize();
+#endif
+#ifdef VAPI
+    if (ret)
+	ret = vapi_ib_initialize();
+#endif
+    if (ret)
+	return -ENODEV;  /* neither found */
+
+    /* initialize memcache */
+    ib_device->memcache = memcache_init(mem_register, mem_deregister);
+#if 0
+    /*
+     * Need this for correctness.  Could use malloc/free hooks instead, but
+     * they fight with mpich's use, for example.  Consider switching to dreg
+     * kernel module.
+     */
+    mallopt(M_TRIM_THRESHOLD, -1);
+    mallopt(M_MMAP_MAX, 0);
+#endif
+
+    /*
+     * Set up tcp socket to listen for connection requests.
+     * The hostname is currently ignored; the port number is used to bind
+     * the listening TCP socket which accepts new connections.
+     */
+    if (init_flags & BMI_INIT_SERVER)
+	ib_tcp_server_init_listen_socket(listen_addr);
+    else
+	ib_device->listen_sock = -1;
+
+    /*
+     * Initialize data structures.
+     */
+    INIT_QLIST_HEAD(&ib_device->connection);
+    INIT_QLIST_HEAD(&ib_device->sendq);
+    INIT_QLIST_HEAD(&ib_device->recvq);
+
+    ib_device->eager_buf_num  = DEFAULT_EAGER_BUF_NUM;
+    ib_device->eager_buf_size = DEFAULT_EAGER_BUF_SIZE;
+    ib_device->eager_buf_payload = ib_device->eager_buf_size - sizeof(msg_header_eager_t);
+
+    gen_mutex_unlock(&interface_mutex);
+
+    debug(0, "%s: done", __func__);
+    return ret;
+}
+
+/*
+ * Shutdown.
+ */
+static int BMI_ib_finalize(void)
+{
+    gen_mutex_lock(&interface_mutex);
+
+    /* if client, send BYE to each connection and bring down the QP */
+    if (ib_device->listen_sock < 0) {
+	list_t *l;
+	qlist_for_each(l, &ib_device->connection) {
+	    ib_connection_t *c = qlist_upcast(l);
+	    if (c->cancelled)
+		continue;  /* already closed */
+	    /* Send BYE message to servers, transition QP to drain state */
+	    send_bye(c);
+	    drain_qp(c);
+	}
+    }
+    /* if server, stop listening */
+    if (ib_device->listen_sock >= 0)
+	close(ib_device->listen_sock);
+
+    /* destroy QPs and other connection structures */
+    while (ib_device->connection.next != &ib_device->connection) {
+	ib_connection_t *c = (ib_connection_t *) ib_device->connection.next;
+	ib_close_connection(c);
+    }
+
+#if MEMCACHE_BOUNCEBUF
+    if (reg_send_buflist.num > 0) {
+	memcache_deregister(ib_device->memcache, &reg_send_buflist);
+	reg_send_buflist.num = 0;
+	free(reg_send_buflist_buf);
+    }
+    if (reg_recv_buflist.num > 0) {
+	memcache_deregister(ib_device->memcache, &reg_recv_buflist);
+	reg_recv_buflist.num = 0;
+	free(reg_recv_buflist_buf);
+    }
+#endif
+
+    memcache_shutdown(ib_device->memcache);
+
+    ib_finalize();
+
+    free(ib_device);
+    ib_device = NULL;
+
+    gen_mutex_unlock(&interface_mutex);
+    return 0;
+}
+
 struct bmi_method_ops bmi_ib_ops = 
 {
     .method_name = "bmi_ib",
     .BMI_meth_initialize = BMI_ib_initialize,
-#if MEMCACHE_BOUNCEBUF
-    .BMI_meth_finalize = del_bouncebuf_then_BMI_ib_finalize,
-#else
     .BMI_meth_finalize = BMI_ib_finalize,
-#endif
     .BMI_meth_set_info = BMI_ib_set_info,
     .BMI_meth_get_info = BMI_ib_get_info,
     .BMI_meth_memalloc = BMI_ib_memalloc,

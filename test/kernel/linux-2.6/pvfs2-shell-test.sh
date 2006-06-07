@@ -804,7 +804,7 @@ execute_test1()
     # re-fetch has also disappeared in that case
 
     echo "Waiting for 'ls' commands to complete"
-    sleep 30
+    wait
 
     remove_testdir $PVFS2_TESTDIR
 

@@ -362,7 +362,7 @@ static inline void encode_##name(char **pptr, const name *x) { \
     encode_##t9(pptr, &x->x9); \
     encode_##t10(pptr, &x->x10); \
     encode_##t11(pptr, &x->x11); \
-    encode_##t11(pptr, &x->x12); \
+    encode_##t12(pptr, &x->x12); \
 } \
 static inline void decode_##name(char **pptr, name *x) { \
     decode_##t1(pptr, &x->x1); \
@@ -376,7 +376,7 @@ static inline void decode_##name(char **pptr, name *x) { \
     decode_##t9(pptr, &x->x9); \
     decode_##t10(pptr, &x->x10); \
     decode_##t11(pptr, &x->x11); \
-    decode_##t11(pptr, &x->x12); \
+    decode_##t12(pptr, &x->x12); \
 }
 
 /* ones with arrays that are allocated in the decode */

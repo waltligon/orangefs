@@ -87,6 +87,7 @@ int dbpf_bstream_listio_convert(
           determine if we're either out of memory (oom) regions, or
           out of stream (oos) regions
         */
+        /* in many (all?) cases mem_count is 1, so oom will end up being 1 */
         oom = (((mct + 1) < mem_count) ? 0 : 1);
         oos = (((sct + 1) < stream_count) ? 0 : 1);
 
@@ -100,11 +101,19 @@ int dbpf_bstream_listio_convert(
                 cur_mem_size = mem_size_array[++mct];
                 cur_mem_off  = mem_offset_array[mct];
             }
+	    else
+	    {
+		cur_mem_size = 0;
+	    }
             if (!oos)
             {
                 cur_stream_size = stream_size_array[++sct];
                 cur_stream_off  = stream_offset_array[sct];
             }
+	    else 
+	    {
+		cur_stream_size = 0;
+	    }
 	}
 	else if (cur_mem_size < cur_stream_size)
         {
@@ -119,6 +128,10 @@ int dbpf_bstream_listio_convert(
                 cur_mem_size = mem_size_array[++mct];
                 cur_mem_off  = mem_offset_array[mct];
             }
+	    else
+	    {
+		cur_mem_size = 0;
+	    }
 	}
 	else /* cur_mem_size > cur_stream_size */
         {
@@ -133,10 +146,15 @@ int dbpf_bstream_listio_convert(
                 cur_stream_size = stream_size_array[++sct];
                 cur_stream_off  = stream_offset_array[sct];
             }
+	    else
+	    {
+		cur_stream_size = 0;
+	    }
 	}
 	cur_aiocb_ptr = &aiocb_array[++act];
 
-        if (oom || oos)
+        /* process until there are no bytes left in the current piece */
+        if ((oom && cur_mem_size == 0) || (oos && cur_stream_size == 0))
         {
             break;
         }
@@ -151,8 +169,10 @@ int dbpf_bstream_listio_convert(
 	/* haven't processed all of list regions */
 	if (lio_state != NULL)
         {
-	    lio_state->mem_ct = mct;
-	    lio_state->stream_ct = sct;
+            /* if we ran out of streams, increment mem_ct */
+	    lio_state->mem_ct = (!oos) ? mct : ++mct;
+            /* if we ran out of mems, increment stream_ct */
+	    lio_state->stream_ct = (!oom) ? sct : ++sct;
 	    lio_state->cur_mem_size = cur_mem_size;
 	    lio_state->cur_mem_off = cur_mem_off;
 	    lio_state->cur_stream_size = cur_stream_size;

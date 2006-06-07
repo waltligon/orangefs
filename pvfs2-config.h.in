@@ -22,6 +22,9 @@
 /* Define to 1 if you have the <arpa/inet.h> header file. */
 #undef HAVE_ARPA_INET_H
 
+/* Define to 1 if you have the <asm/ioctl32.h> header file. */
+#undef HAVE_ASM_IOCTL32_H
+
 /* Define to 1 if you have the <attr/xattr.h> header file. */
 #undef HAVE_ATTR_XATTR_H
 
@@ -72,6 +75,12 @@
 
 /* Define to 1 if you have the `getmntent' function. */
 #undef HAVE_GETMNTENT
+
+/* Define if strerror_r is GNU-specific */
+#undef HAVE_GNU_STRERROR_R
+
+/* Define if libibverbs has ibv_get_devices */
+#undef HAVE_IBV_GET_DEVICES
 
 /* Define if IB wrap_common.h exists. */
 #undef HAVE_IB_WRAP_COMMON_H

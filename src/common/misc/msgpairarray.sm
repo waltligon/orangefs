@@ -514,7 +514,7 @@ static int msgpairarray_completion_fn(PARENT_SM *sm_p,
 
         if (msg_p->op_status != 0)
         {
-            PVFS_perror_gossip("msgpair failed, will retry:", msg_p->op_status);
+            PVFS_perror_gossip("msgpair failed, will retry", msg_p->op_status);
                        
             ++need_retry;
             continue;
@@ -529,16 +529,15 @@ static int msgpairarray_completion_fn(PARENT_SM *sm_p,
         if (ret != 0)
         {
             PVFS_perror_gossip("msgpairarray decode error", ret);
-            js_p->error_code = ret;
-            return 1;
+            msg_p->op_status = ret;
         }
-
-        assert(resp_p->status <= 0);
-
-        /* if we've made it this far, the server response status is
-         * meaningful, so we save it.
-         */
-        msg_p->op_status = resp_p->status;
+        else
+        {
+            /* if we've made it this far, the server response status is
+             * meaningful, so we save it.
+             */
+            msg_p->op_status = resp_p->status;
+        }
 
         /* NOTE: we call the function associated with each message,
          *       not just the one from the first array element.  so

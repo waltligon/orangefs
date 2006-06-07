@@ -312,12 +312,7 @@ int dbpf_open_cache_remove(
     int ret = -1;
     struct qlist_head* scratch;
     int tmp_error = 0;
-    DB_ENV *envp = NULL;
 
-    if ((envp = dbpf_getdb_env(NULL, &ret)) == NULL)
-    {
-        return -dbpf_db_error_to_trove_error(ret);
-    }
     gossip_debug(GOSSIP_DBPF_OPEN_CACHE_DEBUG,
                  "dbpf_open_cache_remove: called\n");
 

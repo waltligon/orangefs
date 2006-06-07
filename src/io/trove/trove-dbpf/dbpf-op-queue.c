@@ -6,12 +6,20 @@
 
 #include "dbpf-op-queue.h"
 #include "gossip.h"
+#include "pint-perf-counter.h"
+#include "dbpf-sync.h"
+
+extern struct PINT_perf_counter *PINT_server_pc;
 
 /* the queue that stores pending serviceable operations */
 QLIST_HEAD(dbpf_op_queue);
 
 /* lock to be obtained before manipulating dbpf_op_queue */
 gen_mutex_t dbpf_op_queue_mutex = GEN_MUTEX_INITIALIZER;
+
+extern dbpf_op_queue_p dbpf_completion_queue_array[TROVE_MAX_CONTEXTS];
+extern gen_mutex_t *dbpf_completion_queue_array_mutex[TROVE_MAX_CONTEXTS];
+extern pthread_cond_t dbpf_op_completed_cond;
 
 #ifdef __PVFS2_TROVE_THREADED__
 extern pthread_cond_t dbpf_op_incoming_cond;
@@ -83,6 +91,10 @@ void dbpf_op_queue_cleanup(dbpf_op_queue_p op_queue)
 void dbpf_op_queue_add(dbpf_op_queue_p op_queue,
                        dbpf_queued_op_t *dbpf_op)
 {
+    gossip_debug(GOSSIP_DBPF_COALESCE_DEBUG, 
+                 "op_queue add: %p\n",
+                 dbpf_op);
+
     qlist_add_tail(&dbpf_op->link, op_queue);
 }
 
@@ -98,12 +110,11 @@ int dbpf_op_queue_empty(dbpf_op_queue_p op_queue)
 
 dbpf_queued_op_t *dbpf_op_queue_shownext(dbpf_op_queue_p op_queue)
 {
-    dbpf_queued_op_t *next = NULL;
-    if (op_queue->next != op_queue)
+    while (op_queue->next != op_queue)
     {
-        next = qlist_entry(op_queue->next, dbpf_queued_op_t, link);
+        return qlist_entry(op_queue->next, dbpf_queued_op_t, link);
     }
-    return next;
+    return NULL;
 }
 
 /* dbpf_queued_op_try_get()
@@ -204,6 +215,9 @@ TROVE_op_id dbpf_queued_op_queue_nolock(dbpf_queued_op_t *q_op_p)
     gen_mutex_lock(&q_op_p->mutex);
     q_op_p->op.state = OP_QUEUED;
     tmp_id = q_op_p->op.id;
+
+    dbpf_sync_coalesce_enqueue(q_op_p);
+   
     gen_mutex_unlock(&q_op_p->mutex);
 
 #ifdef __PVFS2_TROVE_THREADED__
@@ -231,6 +245,14 @@ void dbpf_queued_op_dequeue(dbpf_queued_op_t *q_op_p)
     gen_mutex_lock(&dbpf_op_queue_mutex);
     gen_mutex_lock(&q_op_p->mutex);
 
+    dbpf_queued_op_dequeue_nolock(q_op_p);
+
+    gen_mutex_unlock(&q_op_p->mutex);
+    gen_mutex_unlock(&dbpf_op_queue_mutex);
+}
+
+void dbpf_queued_op_dequeue_nolock(dbpf_queued_op_t *q_op_p)
+{
     assert(q_op_p->op.state != OP_DEQUEUED);
     assert(q_op_p->op.state != OP_IN_SERVICE);
 
@@ -238,8 +260,125 @@ void dbpf_queued_op_dequeue(dbpf_queued_op_t *q_op_p)
 
     q_op_p->op.state = OP_DEQUEUED;
 
-    gen_mutex_unlock(&dbpf_op_queue_mutex);
-    gen_mutex_unlock(&q_op_p->mutex);
+    dbpf_sync_coalesce_dequeue(q_op_p);
+}
+
+int dbpf_op_init_queued_or_immediate(
+    struct dbpf_op * op_p,
+    dbpf_queued_op_t ** q_op_pp,
+    enum dbpf_op_type op_type,
+    struct dbpf_collection *coll_p,
+    TROVE_handle handle,
+    int (* dbpf_op_svc_fn) (struct dbpf_op *),
+    TROVE_ds_flags flags,
+    TROVE_vtag_s *vtag,
+    void *user_ptr,
+    TROVE_context_id context_id,
+    struct dbpf_op **op_pp)
+{
+    if(flags & TROVE_IMMEDIATE_COMPLETION)
+    {
+        DBPF_OP_INIT(*op_p,
+                     op_type,
+                     OP_QUEUED,
+                     handle,
+                     coll_p,
+                     dbpf_op_svc_fn,
+                     user_ptr,
+                     flags,
+                     context_id,
+                     0);
+        *op_pp = op_p;
+    }
+    else
+    {
+        /* grab a queued op structure */
+        *q_op_pp = dbpf_queued_op_alloc();
+        if (*q_op_pp == NULL)
+        {
+            return -TROVE_ENOMEM;
+        }
+
+        /* initialize all the common members */
+        dbpf_queued_op_init(*q_op_pp,
+                            op_type,
+                            handle,
+                            coll_p,
+                            dbpf_op_svc_fn,
+                            user_ptr,
+                            flags,
+                            context_id);
+        *op_pp = &(*q_op_pp)->op;
+    }
+    return 0;
+}
+
+int dbpf_queue_or_service(
+    struct dbpf_op *op_p,
+    dbpf_queued_op_t *q_op_p,
+    TROVE_ds_flags flags,
+    TROVE_op_id *out_op_id_p)
+{
+    DB * dbp;
+    int ret;
+
+    if(flags & TROVE_IMMEDIATE_COMPLETION)
+    {
+        *out_op_id_p = 0;
+        ret = op_p->svc_fn(op_p);
+        if(ret < 0)
+        {
+            goto exit;
+        }
+
+        if(DBPF_OP_IS_KEYVAL(op_p->type))
+        {
+            dbp = op_p->coll_p->keyval_db;
+        }
+        else if(DBPF_OP_IS_DSPACE(op_p->type))
+        {
+            dbp = op_p->coll_p->ds_db;
+        }
+
+        DBPF_DB_SYNC_IF_NECESSARY(op_p, dbp, ret);
+        if(ret < 0)
+        {
+            goto exit;
+        }
+
+        ret = 1;
+
+    }
+    else
+    {
+        *out_op_id_p = dbpf_queued_op_queue(q_op_p);
+        ret = 0;
+    }
+
+exit:
+
+    return ret;
+}
+
+int dbpf_queued_op_complete(dbpf_queued_op_t * qop_p,
+                            TROVE_ds_state ret,
+                            enum dbpf_op_state state)
+{
+    qop_p->state = ret;
+
+    gen_mutex_lock(&qop_p->mutex);
+    qop_p->op.state = state;
+    gen_mutex_unlock(&qop_p->mutex);
+
+    gen_mutex_lock(
+	dbpf_completion_queue_array_mutex[qop_p->op.context_id]);
+    dbpf_op_queue_add(dbpf_completion_queue_array[qop_p->op.context_id],
+		      qop_p);
+    pthread_cond_signal(&dbpf_op_completed_cond);
+    gen_mutex_unlock(
+	dbpf_completion_queue_array_mutex[qop_p->op.context_id]);
+
+    return 0;
 }
 
 /*

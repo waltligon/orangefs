@@ -495,7 +495,6 @@ char *PINT_dotconf_read_arg(
 	    *cp2++ = *(++cp1);
 	    cp1++;	/* skip the protected one */
 	    continue;
-	    break;
 	default:
 	    break;
 	}
@@ -1518,7 +1517,7 @@ DOTCONF_CB(dotconf_cb_include)
     {
 	/* relative file AND include path is used */
 	int len, inclen;
-	char *sl;
+	const char *sl;
 
 	inclen = strlen(cmd->configfile->includepath);
 	if ((len = (strlen(cmd->data.str) + inclen + 1)) == CFG_MAX_FILENAME)

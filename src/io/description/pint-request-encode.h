@@ -2,24 +2,6 @@
 #ifndef _PINT_REQUEST_ENCODE_H_
 #define _PINT_REQUEST_ENCODE_H_
 
-#ifndef __PINT_REQPROTO_ENCODE_FUNCS_C
-
-inline static
-int encode_PINT_Request(char ** pptr, 
-                        struct PINT_Request ** rp)
-{
-    return 0;
-}
-
-inline static
-int decode_PINT_Request(char ** pptr,
-                        struct PINT_Request ** req)
-{
-    return 0;
-}
-
-#else
-
 /* max depth of a PINT_Request used in anything, just servreq IO now */
 #define PVFS_REQ_LIMIT_PINT_REQUEST_NUM  100
 
@@ -188,5 +170,4 @@ int decode_PINT_Request(char ** pptr,
     return 0;
 }
 
-#endif /* __PINT_REQPROTO_ENCODE_FUNCS_C */
 #endif /* _PINT_REQUEST_ENCODE_H_ */

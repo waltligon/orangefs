@@ -90,7 +90,9 @@ typedef unsigned long sector_t;
 #include <linux/poll.h>
 #include <linux/rwsem.h>
 #include <asm/unaligned.h>
-
+#ifdef HAVE_ASM_IOCTL32_H
+#include <asm/ioctl32.h>
+#endif
 
 #ifdef HAVE_XATTR
 #include <linux/xattr.h>
@@ -260,6 +262,13 @@ enum PVFS_async_io_type
 #define PVFS2_XATTR_INDEX_POSIX_ACL_DEFAULT 2
 #define PVFS2_XATTR_INDEX_TRUSTED           3
 #define PVFS2_XATTR_INDEX_DEFAULT           4
+
+#ifndef POSIX_ACL_XATTR_ACCESS
+#define POSIX_ACL_XATTR_ACCESS	"system.posix_acl_access"
+#endif
+#ifndef POSIX_ACL_XATTR_DEFAULT
+#define POSIX_ACL_XATTR_DEFAULT	"system.posix_acl_default"
+#endif
 
 #define PVFS2_XATTR_NAME_ACL_ACCESS  POSIX_ACL_XATTR_ACCESS
 #define PVFS2_XATTR_NAME_ACL_DEFAULT POSIX_ACL_XATTR_DEFAULT
@@ -452,31 +461,35 @@ static inline pvfs2_sb_info_t *PVFS2_SB(
 /****************************
  * defined in pvfs2-cache.c
  ****************************/
-void op_cache_initialize(
-    void);
-void op_cache_finalize(
-    void);
-pvfs2_kernel_op_t *op_alloc(
-    void);
-void op_release(
-    void *op);
-void dev_req_cache_initialize(
-    void);
-void dev_req_cache_finalize(
-    void);
-void pvfs2_inode_cache_initialize(
-    void);
-void pvfs2_inode_cache_finalize(
-    void);
+int op_cache_initialize(void);
+int op_cache_finalize(void);
+pvfs2_kernel_op_t *op_alloc(void);
+void op_release(pvfs2_kernel_op_t *op);
 
-#ifndef HAVE_AIO_VFS_SUPPORT
-#define kiocb_cache_initialize()
-#define kiocb_cache_finalize()
-#else
-void kiocb_cache_initialize(void);
-void kiocb_cache_finalize(void);
+int dev_req_cache_initialize(void);
+int dev_req_cache_finalize(void);
+void *dev_req_alloc(void);
+void  dev_req_release(void *);
+
+int pvfs2_inode_cache_initialize(void);
+int pvfs2_inode_cache_finalize(void);
+pvfs2_inode_t *pvfs2_inode_alloc(void);
+void pvfs2_inode_release(pvfs2_inode_t *);
+
+#ifdef HAVE_AIO_VFS_SUPPORT
+int kiocb_cache_initialize(void);
+int kiocb_cache_finalize(void);
 pvfs2_kiocb* kiocb_alloc(void);
 void kiocb_release(pvfs2_kiocb *ptr);
+#else
+static inline int kiocb_cache_initialize(void)
+{
+    return 0;
+}
+static inline int kiocb_cache_finalize(void)
+{
+    return 0;
+}
 #endif
 
 /****************************
@@ -743,8 +756,9 @@ do {                                                      \
     {                                                     \
         wake_up_device_for_return(new_op);                \
     }                                                     \
+    new_op = NULL;                                        \
     pvfs_bufmap_put(buffer_index);                        \
-    *offset = original_offset;                            \
+    buffer_index = -1;                                    \
 } while(0)
 
 #ifdef HAVE_AIO_VFS_SUPPORT

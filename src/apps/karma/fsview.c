@@ -1,12 +1,20 @@
+/*
+ * (C) 2001 Clemson University and The University of Chicago
+ *
+ * See COPYING in top-level directory.
+ */
+
 #include <gtk/gtk.h>
 #include <stdio.h>
 
 #include "karma.h"
 
-static void gui_fsview_response(GtkDialog *dialog,
-				gint response_id,
-				gpointer user_data);
-void gui_fsview_popup(void)
+static void gui_fsview_response(
+    GtkDialog * dialog,
+    gint response_id,
+    gpointer user_data);
+void gui_fsview_popup(
+    void)
 {
     GtkWidget *fsview;
     GtkTreeViewColumn *col;
@@ -24,10 +32,7 @@ void gui_fsview_popup(void)
     gtk_tree_view_append_column(GTK_TREE_VIEW(fsview), col);
     renderer = gtk_cell_renderer_text_new();
     gtk_tree_view_column_pack_start(col, renderer, TRUE);
-    gtk_tree_view_column_add_attribute(col,
-				       renderer,
-				       "text",
-				       GUI_FSLIST_MNTPT);
+    gtk_tree_view_column_add_attribute(col, renderer, "text", GUI_FSLIST_MNTPT);
 
     col = gtk_tree_view_column_new();
     gtk_tree_view_column_set_title(col, "Contact Server");
@@ -35,9 +40,7 @@ void gui_fsview_popup(void)
     renderer = gtk_cell_renderer_text_new();
     gtk_tree_view_column_pack_start(col, renderer, TRUE);
     gtk_tree_view_column_add_attribute(col,
-				       renderer,
-				       "text",
-				       GUI_FSLIST_SERVER);
+                                       renderer, "text", GUI_FSLIST_SERVER);
 
     col = gtk_tree_view_column_new();
     gtk_tree_view_column_set_title(col, "File System Name");
@@ -45,22 +48,17 @@ void gui_fsview_popup(void)
     renderer = gtk_cell_renderer_text_new();
     gtk_tree_view_column_pack_start(col, renderer, TRUE);
     gtk_tree_view_column_add_attribute(col,
-				       renderer,
-				       "text",
-				       GUI_FSLIST_FSNAME);
+                                       renderer, "text", GUI_FSLIST_FSNAME);
 
     col = gtk_tree_view_column_new();
     gtk_tree_view_column_set_title(col, "FSID");
     gtk_tree_view_append_column(GTK_TREE_VIEW(fsview), col);
     renderer = gtk_cell_renderer_text_new();
     gtk_tree_view_column_pack_start(col, renderer, TRUE);
-    gtk_tree_view_column_add_attribute(col,
-				       renderer,
-				       "text",
-				       GUI_FSLIST_FSID);
+    gtk_tree_view_column_add_attribute(col, renderer, "text", GUI_FSLIST_FSID);
 
     gtk_tree_view_set_model(GTK_TREE_VIEW(fsview),
-			    GTK_TREE_MODEL(gui_comm_fslist));
+                            GTK_TREE_MODEL(gui_comm_fslist));
 
     /* get a reference to the selection for the view, set so only one
      * thing may be selected.
@@ -70,62 +68,68 @@ void gui_fsview_popup(void)
 
     /* drop the view in a container and go to town */
     dialog = gtk_dialog_new_with_buttons("Select File System",
-					 GTK_WINDOW(main_window),
-					 GTK_DIALOG_DESTROY_WITH_PARENT,
-					 GTK_STOCK_OK,
-					 GTK_RESPONSE_OK,
-					 GTK_STOCK_CANCEL,
-					 GTK_RESPONSE_CANCEL,
-					 NULL);
-    gtk_container_add(GTK_CONTAINER(GTK_DIALOG(dialog)->vbox),
-				    fsview);
+                                         GTK_WINDOW(main_window),
+                                         GTK_DIALOG_DESTROY_WITH_PARENT,
+                                         GTK_STOCK_OK,
+                                         GTK_RESPONSE_OK,
+                                         GTK_STOCK_CANCEL,
+                                         GTK_RESPONSE_CANCEL, NULL);
+    gtk_container_add(GTK_CONTAINER(GTK_DIALOG(dialog)->vbox), fsview);
 
     g_signal_connect(GTK_OBJECT(dialog),
-		     "response",
-		     G_CALLBACK(gui_fsview_response),
-		     fsview);
+                     "response", G_CALLBACK(gui_fsview_response), fsview);
 
     gtk_widget_show_all(dialog);
 
 }
 
-static void gui_fsview_response(GtkDialog *dialog,
-				gint response_id,
-				gpointer fsview)
+static void gui_fsview_response(
+    GtkDialog * dialog,
+    gint response_id,
+    gpointer fsview)
 {
     GtkTreeSelection *selection;
     GtkTreeIter iter;
     GtkTreeModel *model;
 
-    switch (response_id) {
-	case GTK_RESPONSE_OK:
-	    selection = gtk_tree_view_get_selection(GTK_TREE_VIEW((GtkTreeView *) fsview));
+    switch (response_id)
+    {
+    case GTK_RESPONSE_OK:
+        selection =
+            gtk_tree_view_get_selection(GTK_TREE_VIEW((GtkTreeView *) fsview));
 
-	    if (gtk_tree_selection_get_selected(selection,
-						&model /* output */,
-						&iter))
-	    {
-		gchar *server, *fsname;
-		gint fsid;
+        if (gtk_tree_selection_get_selected(selection, &model /* output */ ,
+                                            &iter))
+        {
+            gchar *server, *fsname;
+            gint fsid;
 
-		gtk_tree_model_get(model, &iter,
-				   GUI_FSLIST_SERVER, &server,
-				   GUI_FSLIST_FSNAME, &fsname,
-				   GUI_FSLIST_FSID, &fsid,
-				   -1);
+            gtk_tree_model_get(model, &iter,
+                               GUI_FSLIST_SERVER, &server,
+                               GUI_FSLIST_FSNAME, &fsname,
+                               GUI_FSLIST_FSID, &fsid, -1);
 
-		gui_comm_set_active_fs(server, fsname, fsid);
-		g_free(server);
-		g_free(fsname);
-	    }
+            gui_comm_set_active_fs(server, fsname, fsid);
+            g_free(server);
+            g_free(fsname);
+        }
 
-	    /* fall through to destroy */
-	case GTK_RESPONSE_CANCEL:
-	    gtk_widget_destroy(GTK_WIDGET(dialog));
-	    break;
-	case GTK_RESPONSE_DELETE_EVENT:
-	case GTK_RESPONSE_NONE:
-	    /* GTK_RESPONSE_NONE might indicated destroyed? */
-	    break;
+        /* fall through to destroy */
+    case GTK_RESPONSE_CANCEL:
+        gtk_widget_destroy(GTK_WIDGET(dialog));
+        break;
+    case GTK_RESPONSE_DELETE_EVENT:
+    case GTK_RESPONSE_NONE:
+        /* GTK_RESPONSE_NONE might indicated destroyed? */
+        break;
     }
 }
+
+/*
+ * Local variables:
+ *  c-indent-level: 4
+ *  c-basic-offset: 4
+ * End:
+ *
+ * vim: ts=8 sts=4 sw=4 expandtab
+ */

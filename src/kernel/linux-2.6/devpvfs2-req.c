@@ -14,7 +14,6 @@
 #include "pvfs2-internal.h"
 
 /* this file implements the /dev/pvfs2-req device node */
-extern kmem_cache_t *dev_req_cache;
 
 extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
@@ -71,7 +70,7 @@ static int pvfs2_devreq_open(
             }
             else
             {
-                pvfs2_panic("PVFS2 Device Error: Cannot obtain reference "
+                pvfs2_error("PVFS2 Device Error: Cannot obtain reference "
                             "for device file\n");
             }
         }
@@ -152,7 +151,7 @@ static ssize_t pvfs2_devreq_read(
         if ((cur_op->op_state == PVFS2_VFS_STATE_INPROGR) ||
             (cur_op->op_state == PVFS2_VFS_STATE_SERVICED))
         {
-            pvfs2_panic("WARNING: Current op already queued...skipping\n");
+            pvfs2_error("WARNING: Current op already queued...skipping\n");
         }
         cur_op->op_state = PVFS2_VFS_STATE_INPROGR;
 
@@ -224,7 +223,7 @@ static ssize_t pvfs2_devreq_writev(
     int32_t proto_ver = 0;
     uint64_t tag = 0;
 
-    buffer = kmem_cache_alloc(dev_req_cache, PVFS2_CACHE_ALLOC_FLAGS);
+    buffer = dev_req_alloc();
     if (!buffer)
     {
 	return -ENOMEM;
@@ -236,14 +235,14 @@ static ssize_t pvfs2_devreq_writev(
 	if (iov[i].iov_len > num_remaining)
 	{
 	    pvfs2_error("writev error: Freeing buffer and returning\n");
-	    kmem_cache_free(dev_req_cache, buffer);
+	    dev_req_release(buffer);
 	    return -EMSGSIZE;
 	}
 	ret = copy_from_user(ptr, iov[i].iov_base, iov[i].iov_len);
         if (ret)
         {
             pvfs2_error("Failed to copy data from user space\n");
-	    kmem_cache_free(dev_req_cache, buffer);
+	    dev_req_release(buffer);
             return -EIO;
         }
 	num_remaining -= iov[i].iov_len;
@@ -267,14 +266,14 @@ static ssize_t pvfs2_devreq_writev(
     if (magic != PVFS2_DEVREQ_MAGIC)
     {
         pvfs2_error("Error: Device magic number does not match.\n");
-        kmem_cache_free(dev_req_cache, buffer);
+        dev_req_release(buffer);
         return -EPROTO;
     }
     if (proto_ver != PVFS_KERNEL_PROTO_VERSION)
     {
         pvfs2_error("Error: Device protocol version numbers do not match.\n");
         pvfs2_error("Please check that your pvfs2 module and pvfs2-client versions are consistent.\n");
-        kmem_cache_free(dev_req_cache, buffer);
+        dev_req_release(buffer);
         return -EPROTO;
     }
 
@@ -458,7 +457,7 @@ static ssize_t pvfs2_devreq_writev(
         /* ignore downcalls that we're not interested in */
 	pvfs2_print("WARNING: No one's waiting for tag %llu\n", llu(tag));
     }
-    kmem_cache_free(dev_req_cache, buffer);
+    dev_req_release(buffer);
 
     return count;
 }
@@ -640,7 +639,8 @@ struct PVFS_dev_map_desc32
     int32_t      size;
 };
 
-static unsigned long translate_dev_map(
+#ifndef PVFS2_LINUX_KERNEL_2_4
+static unsigned long translate_dev_map26(
         unsigned long args, long *error)
 {
     struct PVFS_dev_map_desc32  __user *p32 = (void __user *) args;
@@ -663,6 +663,28 @@ err:
     *error = -EFAULT;
     return 0;
 }
+#else
+static unsigned long translate_dev_map24(
+        unsigned long args, struct PVFS_dev_map_desc *p, long *error)
+{
+    struct PVFS_dev_map_desc32  __user *p32 = (void __user *) args;
+    u32 addr, size;
+
+    *error = 0;
+    /* get the ptr from the 32 bit user-space */
+    if (get_user(addr, &p32->ptr))
+        goto err;
+    p->ptr = compat_ptr(addr);
+    /* copy the size */
+    if (get_user(size, &p32->size))
+        goto err;
+    p->size = size;
+    return 0;
+err:
+    *error = -EFAULT;
+    return 0;
+}
+#endif
 
 #endif
 
@@ -685,7 +707,7 @@ static long pvfs2_devreq_compat_ioctl(
     if (cmd == PVFS_DEV_MAP)
     {
         /* convert the arguments to what we expect internally in kernel space */
-        arg = translate_dev_map(args, &ret);
+        arg = translate_dev_map26(args, &ret);
         if (ret < 0)
         {
             pvfs2_error("Could not translate dev map\n");
@@ -700,6 +722,8 @@ static long pvfs2_devreq_compat_ioctl(
 
 #ifdef HAVE_REGISTER_IOCTL32_CONVERSION
 
+#ifndef PVFS2_LINUX_KERNEL_2_4
+
 static int pvfs2_translate_dev_map(
         unsigned int fd,
         unsigned int cmd,
@@ -710,7 +734,7 @@ static int pvfs2_translate_dev_map(
     unsigned long p;
 
     /* Copy it as the kernel module expects it */
-    p = translate_dev_map(arg, &ret);
+    p = translate_dev_map26(arg, &ret);
     if (ret < 0)
     {
         pvfs2_error("Could not translate dev map structure\n");
@@ -719,6 +743,34 @@ static int pvfs2_translate_dev_map(
     /* p is still a user space address */
     return sys_ioctl(fd, cmd, p);
 }
+
+#else
+
+static int pvfs2_translate_dev_map(
+        unsigned int fd,
+        unsigned int cmd,
+        unsigned long arg,
+        struct   file *file)
+{
+    long ret;
+    struct PVFS_dev_map_desc p;
+
+    translate_dev_map24(arg, &p, &ret);
+    /* p is a kernel space address */
+    return (ret ? -EIO : pvfs_bufmap_initialize(&p));
+}
+
+#endif
+
+#ifdef PVFS2_LINUX_KERNEL_2_4
+typedef int (*ioctl_fn)(unsigned int fd,
+        unsigned int cmd, unsigned long arg, struct   file *file);
+
+struct ioctl_trans {
+    unsigned int cmd;
+    ioctl_fn     handler;
+};
+#endif
 
 static struct ioctl_trans pvfs2_ioctl32_trans[] = {
     {PVFS_DEV_GET_MAGIC,        NULL},
@@ -755,7 +807,6 @@ fail:
 void pvfs2_ioctl32_cleanup(void)
 {
     int i;
-
     for (i = 0;  pvfs2_ioctl32_trans[i].cmd != 0; i++)
     {
         pvfs2_print("Deregistered ioctl32 command %08x\n",
@@ -768,7 +819,7 @@ void pvfs2_ioctl32_cleanup(void)
 
 #endif /* CONFIG_COMPAT */
 
-#ifndef HAVE_REGISTER_IOCTL32_CONVERSION
+#if (defined(CONFIG_COMPAT) && !defined(HAVE_REGISTER_IOCTL32_CONVERSION)) || !defined(CONFIG_COMPAT)
 int pvfs2_ioctl32_init(void)
 {
     return 0;

@@ -78,18 +78,17 @@
 #define PVFS_SERVER_TEST_COUNT 64
 
 /* track performance counters for the server */
-struct PINT_perf_key server_keys[] =
+static struct PINT_perf_key server_keys[] =
 {
     {"bytes read", PINT_PERF_READ, 0},
     {"bytes written", PINT_PERF_WRITE, 0},
-    {"metadata reads", PINT_PERF_METADATA_READ, 0},
-    {"metadata writes", PINT_PERF_METADATA_WRITE, 0},
+    {"metadata reads", PINT_PERF_METADATA_READ, PINT_PERF_PRESERVE},
+    {"metadata writes", PINT_PERF_METADATA_WRITE, PINT_PERF_PRESERVE},
     {"metadata dspace ops", PINT_PERF_METADATA_DSPACE_OPS, PINT_PERF_PRESERVE},
     {"metadata keyval ops", PINT_PERF_METADATA_KEYVAL_OPS, PINT_PERF_PRESERVE},
     {"request scheduler", PINT_PERF_REQSCHED, PINT_PERF_PRESERVE},
     {NULL, 0, 0},
 };
-extern struct PINT_perf_counter* PINT_server_pc;
 
 /* For the switch statement to know what interfaces to shutdown */
 static PINT_server_status_flag server_status_flag;
@@ -116,7 +115,7 @@ typedef struct
     char *vec_path;
 } options_t;
 
-options_t s_server_options = { 0, 0, 1, NULL };
+static options_t s_server_options = { 0, 0, 1, NULL };
 
 PINT_server_trove_keys_s Trove_Common_Keys[] =
 {
@@ -129,7 +128,7 @@ PINT_server_trove_keys_s Trove_Common_Keys[] =
 };
 
 /* extended attribute name spaces supported in PVFS2 */
-char *PINT_eattr_namespaces[] =
+const char *PINT_eattr_namespaces[] =
 {
     "system.",
     "user.",
@@ -759,9 +758,10 @@ static int server_initialize(
 {
     int ret = 0, i = 0; 
     FILE *dummy;
+    uint64_t debug_mask = 0;
     
     assert(server_config.logfile != NULL);
-    dummy = fopen(server_config.logfile, "w");
+    dummy = fopen(server_config.logfile, "a");
     if (dummy == NULL)
     {
         int tmp_errno = errno;
@@ -789,8 +789,11 @@ static int server_initialize(
         /* log starting message again so it appears in log file, not just
          * console
          */
+        gossip_set_debug_mask(1, GOSSIP_SERVER_DEBUG);
         gossip_debug(GOSSIP_SERVER_DEBUG,
            "PVFS2 Server version %s starting.\n", PVFS2_VERSION);
+        debug_mask = PVFS_debug_eventlog_to_mask(server_config.event_logging);
+        gossip_set_debug_mask(1, debug_mask);
     }
 
     /* handle backgrounding, setting up working directory, and so on. */
@@ -1055,6 +1058,7 @@ static int server_initialize_subsystems(
     TROVE_context_id trove_context = -1;
     char buf[16] = {0};
     PVFS_fs_id orig_fsid;
+    PVFS_ds_flags init_flags = 0;
 
     /* Initialize distributions */
     ret = PINT_dist_initialize(0);
@@ -1095,8 +1099,26 @@ static int server_initialize_subsystems(
 #endif
     *server_status_flag |= SERVER_BMI_INIT;
 
+    ret = trove_collection_setinfo(0, 0, TROVE_DB_CACHE_SIZE_BYTES,
+                                   &server_config.db_cache_size_bytes);
+    /* this should never fail */
+    assert(ret == 0);
+
+    if(server_config.db_cache_type && (!strcmp(server_config.db_cache_type,
+                                               "mmap")))
+    {
+        /* set db cache type to mmap rather than sys */
+        init_flags |= TROVE_DB_CACHE_MMAP;
+    }
+
+    /* Set the buffer size according to configuration file */
+    BMI_set_info(0, BMI_TCP_BUFFER_SEND_SIZE, 
+                 (void *)&server_config.tcp_buffer_size_send);
+    BMI_set_info(0, BMI_TCP_BUFFER_RECEIVE_SIZE, 
+                 (void *)&server_config.tcp_buffer_size_receive);
+
     ret = trove_initialize(server_config.storage_path,
-                           0, &method_name, 0);
+                           init_flags, &method_name, 0);
     if (ret < 0)
     {
         PVFS_perror_gossip("Error: trove_initialize", ret);
@@ -1284,6 +1306,26 @@ static int server_initialize_subsystems(
                             "filesystem %s\n",
                             cur_merged_handle_range,
                             cur_fs->file_system_name);
+                return ret;
+            }
+
+            ret = trove_collection_setinfo(
+                cur_fs->coll_id, trove_context,
+                TROVE_COLLECTION_COALESCING_HIGH_WATERMARK,
+                (void *)&cur_fs->coalescing_high_watermark);
+            if(ret < 0)
+            {
+                gossip_lerr("Error setting coalescing high watermark\n");
+                return ret;
+            }
+
+            ret = trove_collection_setinfo(
+                cur_fs->coll_id, trove_context,
+                TROVE_COLLECTION_COALESCING_LOW_WATERMARK,
+                (void *)&cur_fs->coalescing_low_watermark);
+            if(ret < 0)
+            {
+                gossip_lerr("Error setting coalescing low watermark\n");
                 return ret;
             }
 
@@ -1679,7 +1721,7 @@ static void usage(int argc, char **argv)
 static int server_parse_cmd_line_args(int argc, char **argv)
 {
     int ret = 0, option_index = 0;
-    char *cur_option = NULL;
+    const char *cur_option = NULL;
     static struct option long_opts[] =
     {
         {"foreground",0,0,0},
@@ -1698,7 +1740,7 @@ static int server_parse_cmd_line_args(int argc, char **argv)
         switch (ret)
         {
             case 0:
-                cur_option = (char *)long_opts[option_index].name;
+                cur_option = long_opts[option_index].name;
                 assert(cur_option);
 
                 if (strcmp("foreground", cur_option) == 0)

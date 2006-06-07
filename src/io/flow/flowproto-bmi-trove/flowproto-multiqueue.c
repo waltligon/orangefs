@@ -50,8 +50,6 @@ struct result_chain_entry
     struct PINT_thread_mgr_trove_callback trove_callback;
 };
 
-extern struct PINT_perf_counter* PINT_server_pc;
-
 /* fp_queue_item describes an individual buffer being used within the flow */
 struct fp_queue_item
 {
@@ -94,7 +92,6 @@ struct fp_private_data
 #define PRIVATE_FLOW(target_flow)\
     ((struct fp_private_data*)(target_flow->flow_protocol_data))
 
-static int fp_multiqueue_id = -1;
 static bmi_context_id global_bmi_context = -1;
 static void cleanup_buffers(
     struct fp_private_data *flow_data);
@@ -226,9 +223,9 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
  * ways, depending on if the function is triggered from an external thread
  * or in a direct invocation
  */
-static inline void mem_to_bmi_callback_wrapper(void *user_ptr,
-                                               PVFS_size actual_size,
-                                               PVFS_error error_code)
+static void mem_to_bmi_callback_wrapper(void *user_ptr,
+                                        PVFS_size actual_size,
+                                        PVFS_error error_code)
 {
     struct fp_private_data *flow_data = 
         PRIVATE_FLOW(((struct fp_queue_item*)user_ptr)->parent);
@@ -245,9 +242,9 @@ static inline void mem_to_bmi_callback_wrapper(void *user_ptr,
     }
 }
 
-static inline void bmi_to_mem_callback_wrapper(void *user_ptr,
-                                               PVFS_size actual_size,
-                                               PVFS_error error_code)
+static void bmi_to_mem_callback_wrapper(void *user_ptr,
+                                        PVFS_size actual_size,
+                                        PVFS_error error_code)
 {
     struct fp_private_data *flow_data = 
         PRIVATE_FLOW(((struct fp_queue_item*)user_ptr)->parent);
@@ -323,8 +320,6 @@ int fp_multiqueue_initialize(int flowproto_id)
     PINT_thread_mgr_trove_getcontext(&global_trove_context);
 #endif
 
-    fp_multiqueue_id = flowproto_id;
-
     return(0);
 }
 
@@ -380,7 +375,6 @@ int fp_multiqueue_getinfo(flow_descriptor *flow_d,
                 return(-PVFS_ENOPROTOOPT);
         default:
             return(-PVFS_ENOSYS);
-            break;
     }
 }
 
@@ -1883,7 +1877,7 @@ static void bmi_to_mem_callback_fn(void *user_ptr,
         segs,
         total_size,
         &tmp_actual_size,
-        BMI_EXT_ALLOC,
+        buffer_type,
         q_item->parent->tag,
         &q_item->bmi_callback,
         global_bmi_context);

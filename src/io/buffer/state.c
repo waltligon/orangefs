@@ -10,7 +10,7 @@
 
 /* this file contains state transition of an extent */
 
-int NCAC_move_inactive_to_active(struct cache_stack *cache_stack,struct extent *page);
+static int NCAC_move_inactive_to_active(struct cache_stack *cache_stack,struct extent *page);
 int  data_sync_inode(struct inode *inode);
 
 /* NCAC_extent_read_access(): when a cached extent is accessed by a read
@@ -327,7 +327,7 @@ void list_set_clean_page(struct extent *page)
 }
 
 
-int NCAC_move_inactive_to_active(struct cache_stack *cache_stack,struct extent *page)
+static int NCAC_move_inactive_to_active(struct cache_stack *cache_stack,struct extent *page)
 {
     del_page_from_inactive_list(cache_stack, page);
     add_page_to_active_list(cache_stack, page);

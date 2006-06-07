@@ -266,28 +266,31 @@ const PVFS_util_tab *PVFS_util_parse_pvfstab(
      */
     for (i = 0; (i < file_count && !targetfile); i++)
     {
-        PINT_fstab_open(mnt_fp, file_list[i]);
-        if (mnt_fp)
+        if(file_list[i])
         {
-            while ((tmp_ent = PINT_fstab_next_entry(mnt_fp)))
+            PINT_fstab_open(mnt_fp, file_list[i]);
+            if (mnt_fp)
             {
-                if(!(PINT_FSTAB_NAME(tmp_ent)) || 
-                   !(strncmp(PINT_FSTAB_NAME(tmp_ent), "#", 1)))
+                while ((tmp_ent = PINT_fstab_next_entry(mnt_fp)))
                 {
-                    /* this entry is a comment */
+                    if(!(PINT_FSTAB_NAME(tmp_ent)) || 
+                       !(strncmp(PINT_FSTAB_NAME(tmp_ent), "#", 1)))
+                    {
+                        /* this entry is a comment */
+                        PINT_fstab_entry_destroy(tmp_ent);
+                        continue;
+                    }
+
+                    if (strcmp(PINT_FSTAB_TYPE(tmp_ent), "pvfs2") == 0)
+                    {
+                        targetfile = file_list[i];
+                        tmp_mntent_count++;
+                    }
+
                     PINT_fstab_entry_destroy(tmp_ent);
-                    continue;
                 }
-
-                if (strcmp(PINT_FSTAB_TYPE(tmp_ent), "pvfs2") == 0)
-                {
-                    targetfile = file_list[i];
-                    tmp_mntent_count++;
-                }
-
-                PINT_fstab_entry_destroy(tmp_ent);
+                PINT_fstab_close(mnt_fp);
             }
-            PINT_fstab_close(mnt_fp);
         }
     }
 
@@ -1083,7 +1086,7 @@ static PVFS_size PINT_s_si_size_table[NUM_SIZES] =
     SI_GIGABYTE, SI_MEGABYTE, SI_KILOBYTE
 };
 
-static char *PINT_s_str_size_table[NUM_SIZES] =
+static const char *PINT_s_str_size_table[NUM_SIZES] =
 {
     /*"Y", "Z", "E", "P","T", */
     "G", "M", "K"
@@ -1439,7 +1442,7 @@ void PINT_release_pvfstab(void)
     gen_mutex_unlock(&s_stat_tab_mutex);
 }
 
-inline uint32_t PVFS_util_sys_to_object_attr_mask(
+uint32_t PVFS_util_sys_to_object_attr_mask(
     uint32_t sys_attrmask)
 {
 
@@ -1480,7 +1483,7 @@ inline uint32_t PVFS_util_sys_to_object_attr_mask(
     return attrmask;
 }
 
-inline uint32_t PVFS_util_object_to_sys_attr_mask( 
+uint32_t PVFS_util_object_to_sys_attr_mask( 
     uint32_t obj_mask)
 {
     int sys_mask = 0;

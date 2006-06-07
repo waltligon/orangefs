@@ -75,7 +75,6 @@ struct PVFS_ds_attributes_s
 
     /* non-stored attributes need to be below here */
     PVFS_size b_size; /* bstream size */
-    PVFS_size k_size; /* keyval size; # of keys */
 } ;
 typedef struct PVFS_ds_attributes_s PVFS_ds_attributes;
 
@@ -102,11 +101,10 @@ do {						        \
     (__to) = * ((PVFS_ds_storedattr *) &(__from));	\
 } while (0)
 
-#define PVFS_ds_stored_to_attr(__from, __to, __b_size, __k_size)\
+#define PVFS_ds_stored_to_attr(__from, __to, __b_size)\
 do {                                                            \
     memcpy(&__to, &__from, sizeof(PVFS_ds_storedattr));         \
     (__to).b_size = (__b_size);                                 \
-    (__to).k_size = (__k_size);                                 \
 } while (0)
 
 #define PVFS_ds_attr_to_object_attr(__dsa, __oa)           \

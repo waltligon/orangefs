@@ -73,8 +73,6 @@ static int mgmt_remove_dirent_get_dirdata_handle_from_parent(
     int ret = -PVFS_EINVAL;
     job_id_t i;
 
-    PINT_STATE_DEBUG("mgmt_remove_dirent_get_dirdata_handle_from_parent");
-
     s_op->key.buffer = Trove_Common_Keys[DIR_ENT_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[DIR_ENT_KEY].size;
 
@@ -95,7 +93,9 @@ static int mgmt_remove_dirent_get_dirdata_handle_from_parent(
         s_op->req->u.mgmt_remove_dirent.fs_id,
         s_op->req->u.mgmt_remove_dirent.handle,
         &s_op->key, &s_op->val, 
-        0, NULL, s_op, 0, js_p, &i,
+        PINT_config_get_trove_meta_flags(
+            get_server_config_struct(), s_op->req->u.mgmt_remove_dirent.fs_id), 
+        NULL, s_op, 0, js_p, &i,
         server_job_context);
 
     return ret;
@@ -107,8 +107,6 @@ static int mgmt_remove_dirent(
     int ret = -PVFS_EINVAL;
     job_id_t j_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
-
-    PINT_STATE_DEBUG("mgmt_remove_dirent");
 
     s_op->key.buffer = s_op->req->u.mgmt_remove_dirent.entry;
     s_op->key.buffer_sz = strlen(
@@ -124,6 +122,8 @@ static int mgmt_remove_dirent(
         s_op->u.mgmt_remove_dirent.dirdata_handle,
         &s_op->key,
         PINT_config_get_trove_sync_meta(
+            user_opts, s_op->req->u.mgmt_remove_dirent.fs_id) |
+        PINT_config_get_trove_meta_flags(
             user_opts, s_op->req->u.mgmt_remove_dirent.fs_id),
         NULL,
         s_op,
@@ -138,7 +138,6 @@ static int mgmt_remove_dirent(
 static int mgmt_remove_dirent_cleanup(
     PINT_server_op *s_op, job_status_s *js_p)
 {
-    PINT_STATE_DEBUG("mgmt_remove_dirent_cleanup");
     return(server_state_machine_complete(s_op));
 }
 

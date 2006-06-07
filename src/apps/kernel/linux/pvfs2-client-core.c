@@ -1740,41 +1740,10 @@ static inline void package_downcall_members(
         case PVFS2_VFS_OP_SYMLINK:
             if (*error_code)
             {
-                /* see comments for create path above */
-                if (*error_code == -PVFS_EEXIST)
-                {
-                    vfs_request->out_downcall.resp.sym.refn =
-                        perform_lookup_on_create_error(
-                            vfs_request->in_upcall.req.sym.parent_refn,
-                            vfs_request->in_upcall.req.sym.entry_name,
-                            &vfs_request->in_upcall.credentials, 0);
-
-                    if (vfs_request->out_downcall.resp.sym.refn.handle ==
-                        PVFS_HANDLE_NULL)
-                    {
-                        gossip_debug(
-                            GOSSIP_CLIENTCORE_DEBUG, "Overwriting error "
-                            "code -PVFS_EEXIST with -PVFS_EACCES "
-                            "(symlink)\n");
-
-                        *error_code = -PVFS_EACCES;
-                    }
-                    else
-                    {
-                        gossip_debug(
-                            GOSSIP_CLIENTCORE_DEBUG, "Overwriting error "
-                            "code -PVFS_EEXIST with 0 (symlink)\n");
-
-                        *error_code = 0;
-                    }
-                }
-                else
-                {
-                    vfs_request->out_downcall.resp.sym.refn.handle =
-                        PVFS_HANDLE_NULL;
-                    vfs_request->out_downcall.resp.sym.refn.fs_id =
-                        PVFS_FS_ID_NULL;
-                }
+                vfs_request->out_downcall.resp.sym.refn.handle =
+                    PVFS_HANDLE_NULL;
+                vfs_request->out_downcall.resp.sym.refn.fs_id =
+                    PVFS_FS_ID_NULL;
             }
             else
             {
@@ -2122,7 +2091,7 @@ static inline PVFS_error repost_unexp_vfs_request(
     assert(vfs_request);
 
     PINT_dev_release_unexpected(&vfs_request->info);
-    PINT_sys_release(vfs_request->op_id);
+    PVFS_sys_release(vfs_request->op_id);
 
     memset(vfs_request, 0, sizeof(vfs_request_t));
     vfs_request->is_dev_unexp = 1;
@@ -2437,7 +2406,7 @@ static PVFS_error process_vfs_requests(void)
         memset(vfs_request_array, 0,
                (MAX_NUM_OPS * sizeof(vfs_request_t *)));
 
-        ret = PINT_sys_testsome(
+        ret = PVFS_sys_testsome(
             op_id_array, &op_count, (void **)vfs_request_array,
             error_code_array, PVFS2_CLIENT_DEFAULT_TEST_TIMEOUT_MS);
 
@@ -2752,7 +2721,7 @@ int main(int argc, char **argv)
     for(i = 0; i < MAX_NUM_OPS; i++)
     {
         PINT_dev_release_unexpected(&s_vfs_request_array[i]->info);
-        PINT_sys_release(s_vfs_request_array[i]->op_id);
+        PVFS_sys_release(s_vfs_request_array[i]->op_id);
         free(s_vfs_request_array[i]);
     }
 

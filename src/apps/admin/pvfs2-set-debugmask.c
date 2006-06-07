@@ -226,7 +226,7 @@ static struct options *parse_args(int argc, char **argv)
 static void usage(int argc, char **argv)
 {
     int i = 0;
-    char *mask = NULL;
+    const char *mask = NULL;
 
     fprintf(stderr, "Usage: %s [OPTION] <mask_list>\n\n",
             argv[0]);

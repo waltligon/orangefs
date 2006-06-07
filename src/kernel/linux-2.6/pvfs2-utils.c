@@ -11,7 +11,6 @@
 #include "pvfs2-bufmap.h"
 #include "pvfs2-internal.h"
 
-extern kmem_cache_t *pvfs2_inode_cache;
 extern struct list_head pvfs2_request_list;
 extern spinlock_t pvfs2_request_list_lock;
 extern wait_queue_head_t pvfs2_request_list_waitq;
@@ -256,6 +255,7 @@ static inline int copy_attributes_from_inode(
     struct iattr *iattr)
 {
     int ret = -1;
+    umode_t tmp_mode;
 
     if (inode && attrs)
     {
@@ -296,28 +296,39 @@ static inline int copy_attributes_from_inode(
 
         if (iattr && (iattr->ia_valid & ATTR_MODE))
         {
-            pvfs2_print("[1] converting attr mode %d\n", iattr->ia_mode);
-            if((iattr->ia_mode & (S_ISUID|S_ISVTX)) != 0)
-            {
-                pvfs2_print("User attempted to set setuid or sticky bit; "
-                    "returning EINVAL.\n");
-                return(-EINVAL);
-            }
-            convert_attribute_mode_to_pvfs_sys_attr(
-                iattr->ia_mode, attrs);
+            tmp_mode = iattr->ia_mode;
         }
         else
         {
-            pvfs2_print("[2] converting attr mode %d\n", inode->i_mode); 
-            if((inode->i_mode & (S_ISUID|S_ISVTX)) != 0)
+            tmp_mode = inode->i_mode;
+        }
+
+        if (tmp_mode & (S_ISVTX))
+        {
+            if(inode->i_ino == PVFS2_SB(inode->i_sb)->root_handle)
             {
-                pvfs2_print("User attempted to set setuid or sticky bit; "
-                    "returning EINVAL.\n");
+                /* allow sticky bit to be set on root (since it shows up that
+                 * way by default anyhow), but don't show it to
+                 * the server
+                 */
+                tmp_mode -= S_ISVTX;
+            }
+            else
+            {
+                pvfs2_print("User attempted to set sticky bit on non-root "
+                    "directory; returning EINVAL.\n");
                 return(-EINVAL);
             }
-            convert_attribute_mode_to_pvfs_sys_attr(
-                inode->i_mode, attrs);
         }
+        if (tmp_mode & (S_ISUID))
+        {
+            pvfs2_print("User attempted to set setuid bit; "
+                "returning EINVAL.\n");
+            return(-EINVAL);
+        }
+
+        convert_attribute_mode_to_pvfs_sys_attr(
+            tmp_mode, attrs);
 
         /* we carefully selected which bits to set in attrs->mask above, so
          * don't undo all that work by setting attrs->mask to

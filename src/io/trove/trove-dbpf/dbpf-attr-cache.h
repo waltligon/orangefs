@@ -82,13 +82,6 @@ int dbpf_attr_cache_ds_attr_update_cached_data_bsize(
     TROVE_object_ref key, PVFS_size b_size);
 
 /*
-  do an atomic update of the attr's k_size in the cache
-  for this key
-*/
-int dbpf_attr_cache_ds_attr_update_cached_data_ksize(
-    TROVE_object_ref key, PVFS_size k_size);
-
-/*
   do an atomic copy of the cached attributes into the provided
   target_ds_attr object based on the specified key
 */
@@ -105,10 +98,6 @@ int dbpf_attr_cache_finalize(void);
 /***********************************************
  * dbpf-attr-cache keyval related methods
  ***********************************************/
-
-/* insert key/data pair into cache element based on specific key */
-int dbpf_attr_cache_elem_set_data_based_on_key(
-    TROVE_object_ref key, char *key_str, void *data, int data_sz);
 
 /*
   given a cached elem and a keyval key, return associated

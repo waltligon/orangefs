@@ -826,14 +826,20 @@ int BMI_gm_memfree(void *buffer,
 int BMI_gm_set_info(int option,
 		    void *inout_parameter)
 {
-#ifndef USE_TRUSTED
-    return (bmi_gm_errno_to_pvfs(-ENOSYS));
-#else
-
-    if (option == BMI_TRUSTED_CONNECTION)
-        return 0;
-    return (bmi_gm_errno_to_pvfs(-ENOSYS));
+    switch(option)
+    {
+        case BMI_TCP_BUFFER_SEND_SIZE:
+        case BMI_TCP_BUFFER_RECEIVE_SIZE:
+        case BMI_FORCEFUL_CANCEL_MODE:
+        case BMI_DROP_ADDR:
+#ifdef USE_TRUSTED
+        case BMI_TRUSTED_CONNECTION:
 #endif
+            /* these tcp-specific hints mean nothing to GM */
+            return 0;
+        default:
+            return (bmi_gm_errno_to_pvfs(-ENOSYS));
+    }
 }
 
 /* BMI_gm_get_info()

@@ -49,14 +49,22 @@ enum
 /* TROVE operation flags */
 enum
 {
-    TROVE_SYNC = 1,
-    TROVE_ATOMIC = 2,
-    TROVE_FORCE_REQUESTED_HANDLE = 4,
-    TROVE_NOOVERWRITE = 8, /* keyval_write and keyval_write_list */
-    TROVE_ONLYOVERWRITE = 16, /* keyval_write and keyval_write_list */
-    TROVE_VERSION_WRITE = 32,
-    TROVE_VERSIONING_ENABLED = 64,
-    TROVE_VERSION_COMMIT = 128
+    TROVE_SYNC                   = 1,
+    TROVE_ATOMIC                 = 1 << 1,
+    TROVE_FORCE_REQUESTED_HANDLE = 1 << 2,
+
+    /* keyval_write and keyval_write_list */
+    TROVE_NOOVERWRITE            = 1 << 3, 
+    TROVE_ONLYOVERWRITE          = 1 << 4,
+
+    TROVE_DB_CACHE_MMAP          = 1 << 5,
+    TROVE_DB_CACHE_SYS           = 1 << 6,
+    TROVE_IMMEDIATE_COMPLETION   = 1 << 7,
+    TROVE_DSPACE_SYNC_COALESCE   = 1 << 8,
+    TROVE_KEYVAL_SYNC_COALESCE   = 1 << 9,
+    TROVE_VERSION_WRITE          = 1 << 10,
+    TROVE_VERSIONING_ENABLED     = 1 << 11,
+    TROVE_VERSION_COMMIT         = 1 << 12,
 };
 
 /* get/setinfo option flags */
@@ -68,7 +76,10 @@ enum
     TROVE_COLLECTION_ATTR_CACHE_SIZE,
     TROVE_COLLECTION_ATTR_CACHE_MAX_NUM_ELEMS,
     TROVE_COLLECTION_ATTR_CACHE_INITIALIZE,
-    TROVE_VERSION_SET_ALLOWED_BUFFER_SIZE
+    TROVE_DB_CACHE_SIZE_BYTES,
+    TROVE_COLLECTION_COALESCING_HIGH_WATERMARK,
+    TROVE_COLLECTION_COALESCING_LOW_WATERMARK,
+    TROVE_VERSION_SET_ALLOWED_BUFFER_SIZE,
 };
 
 /** Initializes the Trove layer.  Must be called before any other Trove

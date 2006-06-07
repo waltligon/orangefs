@@ -109,8 +109,6 @@ static int setattr_verify_attribs(
 {
     PVFS_object_attr *a_p = NULL, *req_a_p = NULL;
 
-    PINT_STATE_DEBUG("verify_attribs");
-
     a_p = &s_op->attr;
     req_a_p = &s_op->req->u.setattr.attr;
 
@@ -262,8 +260,6 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s *js_p)
     PVFS_ds_attributes *ds_attr = NULL;
     struct server_configuration_s *user_opts = get_server_config_struct();
 
-    PINT_STATE_DEBUG("setobj_attribs");
-
     dspace_a_p = &s_op->attr;
     a_p = &s_op->req->u.setattr.attr;
 
@@ -328,7 +324,10 @@ static int setattr_setobj_attribs(PINT_server_op *s_op, job_status_s *js_p)
 
     ret = job_trove_dspace_setattr(
         s_op->req->u.setattr.fs_id, s_op->req->u.setattr.handle,
-        ds_attr, PINT_config_get_trove_sync_meta(
+        ds_attr, 
+        PINT_config_get_trove_sync_meta(
+            user_opts, s_op->req->u.setattr.fs_id) |
+        PINT_config_get_trove_meta_flags(
             user_opts, s_op->req->u.setattr.fs_id),
         s_op, 0, js_p, &j_id, server_job_context);
 
@@ -340,9 +339,6 @@ static int setattr_write_metafile_datafile_handles_if_required(
 {
     int ret = 0, dfile_count = 0;
     job_id_t j_id;
-    struct server_configuration_s *user_opts = get_server_config_struct();
-
-    PINT_STATE_DEBUG("write_metafile_datafile_handles_if_needed");
 
     gossip_debug(GOSSIP_SETATTR_DEBUG,
                  " request has dfile_count of %d | dspace has %d\n",
@@ -376,11 +372,14 @@ static int setattr_write_metafile_datafile_handles_if_required(
         llu(s_op->req->u.setattr.handle), s_op->req->u.setattr.fs_id,
         s_op->val.buffer_sz);
 
+    /* we don't sync here since we're going to do it anyway in
+     * write_metafile_distribution
+     */
     ret = job_trove_keyval_write(
         s_op->req->u.setattr.fs_id, s_op->req->u.setattr.handle,
         &(s_op->key), &(s_op->val),
-        PINT_config_get_trove_sync_meta(
-            user_opts, s_op->req->u.setattr.fs_id),
+        PINT_config_get_trove_meta_flags(
+            get_server_config_struct(), s_op->req->u.setattr.fs_id),
         NULL, s_op, 0, js_p, &j_id, server_job_context);
 
     return ret;
@@ -393,8 +392,6 @@ static int setattr_write_metafile_distribution_if_required(
     job_id_t j_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
 
-    PINT_STATE_DEBUG("write_metafile_distribution_if_required");
-
     /* if we don't need to fill in the distribution, skip it */
     if (!(s_op->req->u.setattr.attr.mask & PVFS_ATTR_META_DIST))
     {
@@ -403,9 +400,6 @@ static int setattr_write_metafile_distribution_if_required(
         js_p->error_code = 0;
         return 1;
     }
-
-    /* distribution should take up non-negative space :) */
-    assert(s_op->req->u.setattr.attr.u.meta.dist_size >= 0);
 
     /* set up key and value structure for keyval write */
     s_op->key.buffer = Trove_Common_Keys[METAFILE_DIST_KEY].key;
@@ -437,6 +431,8 @@ static int setattr_write_metafile_distribution_if_required(
         s_op->req->u.setattr.fs_id, s_op->req->u.setattr.handle,
         &(s_op->key), &(s_op->val),
         PINT_config_get_trove_sync_meta(
+            user_opts, s_op->req->u.setattr.fs_id) |
+        PINT_config_get_trove_meta_flags(
             user_opts, s_op->req->u.setattr.fs_id),
         NULL, s_op, 0, js_p, &j_id, server_job_context);
 
@@ -449,8 +445,6 @@ static int setattr_write_symlink_target_if_required(
     int ret = 0;
     job_id_t j_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
-
-    PINT_STATE_DEBUG("write_symlink_target_if_required");
 
     /* if we don't need to fill in the symlink target, skip it */
     if (!(s_op->req->u.setattr.attr.mask & PVFS_ATTR_SYMLNK_TARGET))
@@ -485,6 +479,8 @@ static int setattr_write_symlink_target_if_required(
         s_op->req->u.setattr.fs_id, s_op->req->u.setattr.handle,
         &(s_op->key), &(s_op->val),
         PINT_config_get_trove_sync_meta(
+            user_opts, s_op->req->u.setattr.fs_id) |
+        PINT_config_get_trove_meta_flags(
             user_opts, s_op->req->u.setattr.fs_id),
         NULL, s_op, 0, js_p, &j_id, server_job_context);
 
@@ -504,8 +500,6 @@ static int setattr_write_symlink_target_if_required(
  */
 static int setattr_cleanup(PINT_server_op *s_op, job_status_s *js_p)
 {
-    PINT_STATE_DEBUG("setattr_cleanup");
-
     if(s_op->free_val)
     {
         free(s_op->val.buffer);

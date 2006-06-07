@@ -241,14 +241,16 @@ int PINT_flow_initialize(
 int PINT_flow_finalize(void)
 {
     int i = 0;
-    int ret = -1;
+    int ret = 0, tret;
 
     gen_mutex_lock(&interface_mutex);
 
     /* shut down each active protocol */
     for (i = 0; i < active_flowproto_count; i++)
     {
-	ret = active_flowproto_table[i]->flowproto_finalize();
+	tret = active_flowproto_table[i]->flowproto_finalize();
+        if (tret)
+            ret = tret;
     }
 
     free(active_flowproto_table);
@@ -258,7 +260,7 @@ int PINT_flow_finalize(void)
     flow_ref_cleanup(flow_mapping);
 
     gen_mutex_unlock(&interface_mutex);
-    return (0);
+    return ret;
 }
 
 /* PINT_flow_alloc()
@@ -459,7 +461,7 @@ int PINT_flow_setinfo(flow_descriptor *flow_d,
 		      int option,
 		      void *parameter)
 {
-    int ret = -ENOSYS, i = 0;
+    int ret, tret, i;
 
     gen_mutex_lock(&interface_mutex);
     if (flow_d)
@@ -470,15 +472,18 @@ int PINT_flow_setinfo(flow_descriptor *flow_d,
     }
     else
     {
+        ret = -ENOSYS;  /* success if any flowproto could handle it */
         for(i = 0; i < active_flowproto_count; i++)
         {
-            ret = active_flowproto_table[i]->flowproto_setinfo(
+            tret = active_flowproto_table[i]->flowproto_setinfo(
                 flow_d, option, parameter);
+            if (tret == 0)
+                ret = 0;
         }
     }
     gen_mutex_unlock(&interface_mutex);
 
-    return -ENOSYS;
+    return ret;
 }
 
 
