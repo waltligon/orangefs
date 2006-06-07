@@ -17,6 +17,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <libgen.h>
+#include <getopt.h>
 
 #define __PINT_REQPROTO_ENCODE_FUNCS_C
 #include "pvfs2.h"
@@ -281,9 +282,6 @@ main_out:
  */
 static struct options* parse_args(int argc, char* argv[])
 {
-    /* getopt stuff */
-    extern char* optarg;
-    extern int optind, opterr, optopt;
     char flags[] = "vf:";
     int one_opt = 0;
 

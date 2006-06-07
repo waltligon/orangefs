@@ -55,7 +55,7 @@ int PVFS_strerror_r(int errnum, char *buf, int n)
  * prints a warning if the error code is not in a pvfs2 format and
  * assumes errno
  */
-void PVFS_perror(char *text, int retcode)
+void PVFS_perror(const char *text, int retcode)
 {
     if (IS_PVFS_NON_ERRNO_ERROR(-retcode))
     {
@@ -85,7 +85,7 @@ void PVFS_perror(char *text, int retcode)
  * same as PVFS_perror, except that the output is routed through
  * gossip rather than stderr
  */
-void PVFS_perror_gossip(char *text, int retcode)
+void PVFS_perror_gossip(const char *text, int retcode)
 {
     if (IS_PVFS_NON_ERRNO_ERROR(-retcode))
     {

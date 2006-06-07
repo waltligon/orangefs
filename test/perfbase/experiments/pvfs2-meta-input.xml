@@ -39,6 +39,11 @@
   <match>ops: </match>
  </named_location>
 
+ <named_location>
+  <name>capacity</name>
+  <match>dbsize: </match>
+ </named_location>
+
  <tabular_location columns="3">
   <match>====</match>
   <skip>1</skip>

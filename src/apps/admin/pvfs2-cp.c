@@ -19,6 +19,7 @@
 #include <fcntl.h>
 #include <time.h>
 #include <libgen.h>
+#include <getopt.h>
 
 #include "pvfs2.h"
 #include "str-utils.h"
@@ -37,7 +38,7 @@ struct options
 };
 
 enum object_type { 
-    UNIX_FILE, 
+    UNIX_FILE = 1,
     PVFS2_FILE 
 };
 
@@ -215,9 +216,6 @@ main_out:
  */
 static struct options* parse_args(int argc, char* argv[])
 {
-    /* getopt stuff */
-    extern char* optarg;
-    extern int optind, opterr, optopt;
     char flags[] = "tvs:n:b:";
     int one_opt = 0;
 
@@ -647,7 +645,7 @@ static int generic_cleanup(file_object *src, file_object *dest,
                            PVFS_credentials *credentials)
 {
     /* preserve permissions doing a pvfs2 => unix copy */
-    if ((src->fs_type != UNIX_FILE) &&
+    if ((src->fs_type == PVFS2_FILE) &&
         ((dest->fs_type == UNIX_FILE) && (dest->u.ufs.fd != -1)))
     {
         fchmod(dest->u.ufs.fd,
@@ -662,7 +660,7 @@ static int generic_cleanup(file_object *src, file_object *dest,
     }
 
     /* preserve permissions doing a pvfs2 => pvfs2 copy */
-    if ((src->fs_type != UNIX_FILE) && (dest->fs_type != UNIX_FILE))
+    if ((src->fs_type == PVFS2_FILE) && (dest->fs_type == PVFS2_FILE))
     {
         PVFS_sys_setattr(dest->u.pvfs2.ref, src->u.pvfs2.attr, credentials);
     }

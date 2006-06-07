@@ -281,6 +281,8 @@ static int tcp_enable_trusted(struct tcp_addr *tcp_addr_data);
 static int tcp_allow_trusted(struct sockaddr_in *peer_sockaddr);
 #endif
 
+static void bmi_set_sock_buffers(int socket);
+
 /* exported method interface */
 struct bmi_method_ops bmi_tcp_ops = {
     BMI_tcp_method_name,
@@ -368,6 +370,14 @@ enum
  * in all cancellation cases
  */
 static int forceful_cancel_mode = 0;
+
+/*
+  Socket buffer sizes, currently these default values will be used 
+  for the clients... (TODO)
+ */
+static int tcp_buffer_size_receive = 0;
+static int tcp_buffer_size_send = 0;
+
 
 /*************************************************************************
  * Visible Interface 
@@ -640,7 +650,6 @@ int BMI_tcp_memfree(void *buffer,
 int BMI_tcp_set_info(int option,
 		     void *inout_parameter)
 {
-
     int ret = -1;
     method_addr_p tmp_addr = NULL;
 
@@ -648,7 +657,26 @@ int BMI_tcp_set_info(int option,
 
     switch (option)
     {
-
+    case BMI_TCP_BUFFER_SEND_SIZE:
+       tcp_buffer_size_send = *((int *)inout_parameter);
+       ret = 0;
+#ifdef __PVFS2_SERVER__
+       /* Set the default socket buffer sizes for the server socket */
+       bmi_set_sock_buffers(
+           ((struct tcp_addr *)
+            tcp_method_params.listen_addr->method_data)->socket);
+#endif
+       break;
+    case BMI_TCP_BUFFER_RECEIVE_SIZE:
+       tcp_buffer_size_receive = *((int *)inout_parameter);
+       ret = 0;
+#ifdef __PVFS2_SERVER__
+       /* Set the default socket buffer sizes for the server socket */
+       bmi_set_sock_buffers(
+           ((struct tcp_addr *)
+            tcp_method_params.listen_addr->method_data)->socket);
+#endif
+       break;
     case BMI_FORCEFUL_CANCEL_MODE:
 	forceful_cancel_mode = 1;
 	ret = 0;
@@ -1801,6 +1829,8 @@ static int tcp_sock_init(method_addr_p my_method_addr)
 	 * see if the socket is usable yet. */
 	return (0);
     }
+    
+    bmi_set_sock_buffers(tcp_addr_data->socket);
 
     /* at this point there is no socket.  try to build it */
     if (tcp_addr_data->port < 1)
@@ -1835,6 +1865,8 @@ static int tcp_sock_init(method_addr_p my_method_addr)
 	close(tcp_addr_data->socket);
 	return (bmi_tcp_errno_to_pvfs(-tmp_errno));
     }
+
+       bmi_set_sock_buffers(tcp_addr_data->socket);
 
     if (tcp_addr_data->hostname)
     {
@@ -2047,7 +2079,7 @@ static int tcp_post_recv_generic(bmi_op_id_t * id,
     struct tcp_op *tcp_op_data = NULL;
     struct tcp_msg_header bogus_header;
     struct op_list_search_key key;
-    int copy_size = 0;
+    bmi_size_t copy_size = 0;
     bmi_size_t total_copied = 0;
     int i;
 
@@ -3581,6 +3613,20 @@ static int payload_progress(int s, void *const *buffer_list, const bmi_size_t*
     }
 
     return(ret);
+}
+
+static void bmi_set_sock_buffers(int socket){
+	//Set socket buffer sizes:
+	gossip_debug(GOSSIP_BMI_DEBUG_TCP, "Default socket buffers send:%d receive:%d\n",
+		GET_SENDBUFSIZE(socket), GET_RECVBUFSIZE(socket));
+	gossip_debug(GOSSIP_BMI_DEBUG_TCP, "Setting socket buffer size for send:%d receive:%d \n",
+		tcp_buffer_size_send, tcp_buffer_size_receive);
+    if( tcp_buffer_size_receive != 0)
+         SET_RECVBUFSIZE(socket,tcp_buffer_size_receive);
+    if( tcp_buffer_size_send != 0)
+         SET_SENDBUFSIZE(socket,tcp_buffer_size_send);
+	gossip_debug(GOSSIP_BMI_DEBUG_TCP, "Reread socket buffers send:%d receive:%d\n",
+		GET_SENDBUFSIZE(socket), GET_RECVBUFSIZE(socket));
 }
 
 /*

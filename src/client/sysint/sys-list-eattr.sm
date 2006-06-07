@@ -120,7 +120,7 @@ PVFS_error PVFS_sys_listeattr(
     }
     else
     {
-        ret = PINT_sys_wait(op_id, "listeattr", &error);
+        ret = PVFS_sys_wait(op_id, "listeattr", &error);
         if (ret)
         {
              PVFS_perror_gossip("PVFS_sys_wait call", ret);
@@ -128,7 +128,7 @@ PVFS_error PVFS_sys_listeattr(
         }
     }
 
-    PINT_sys_release(op_id);
+    PVFS_sys_release(op_id);
     return error;
 }
 
@@ -274,7 +274,7 @@ static int list_eattr_comp_fn(
             }
         }
     }
-    return 0;
+    return ret;
 }
 
 /*

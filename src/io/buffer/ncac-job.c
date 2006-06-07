@@ -316,12 +316,6 @@ static inline void increase_read_reference(struct extent *extent)
     return;
 }
 
-static inline void increase_write_reference(struct extent *extent)
-{
-    extent->reads ++;
-    return;
-}
-
 static inline int add_extent_to_cache(struct extent * extent,
             unsigned long index, NCAC_req_t *ncac_req, int policy)
 {

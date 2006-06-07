@@ -17,6 +17,19 @@
 
 #define MAX_NUM_DIRENTS    32
 
+void print_entry_attr( 
+		char *entry_name, 
+		PVFS_sys_attr *attr);
+
+void print_entry(
+    char *entry_name,
+    PVFS_handle handle,
+    PVFS_fs_id fs_id);
+
+int do_list(
+    PVFS_fs_id fs_id,
+    char *start_dir);
+
 void print_entry_attr(
     char *entry_name,
     PVFS_sys_attr *attr)

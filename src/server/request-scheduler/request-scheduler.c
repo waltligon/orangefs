@@ -1052,11 +1052,9 @@ int PINT_req_sched_test(
     }
     else
     {
+        /* should not hit this point */
 	return (-EINVAL);
     }
-
-    /* should not hit this point */
-    return (-ENOSYS);
 }
 
 /** Tests for completion of one or more of a set of scheduler operations.

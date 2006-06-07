@@ -199,7 +199,7 @@ PVFS_error PVFS_sys_readdir(
     }
     else
     {
-        ret = PINT_sys_wait(op_id, "readdir", &error);
+        ret = PVFS_sys_wait(op_id, "readdir", &error);
         if (ret)
         {
             PVFS_perror_gossip("PVFS_sys_wait call", ret);
@@ -207,7 +207,7 @@ PVFS_error PVFS_sys_readdir(
         }
     }
 
-    PINT_sys_release(op_id);
+    PVFS_sys_release(op_id);
     return error;
 }
 

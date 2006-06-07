@@ -10,6 +10,7 @@
 #include "dbpf-op-queue.h"
 #include "gossip.h"
 #include "dbpf-context.h"
+#include "dbpf-sync.h"
 
 static gen_mutex_t dbpf_context_mutex = GEN_MUTEX_INITIALIZER;
 dbpf_op_queue_p dbpf_completion_queue_array[TROVE_MAX_CONTEXTS] = {NULL};
@@ -20,6 +21,7 @@ int dbpf_open_context(
     TROVE_context_id *context_id)
 {
     int context_index = 0;
+    int ret = 0;
 
     assert(context_id);
 
@@ -55,6 +57,14 @@ int dbpf_open_context(
 
     *context_id = context_index;
     gen_mutex_unlock(&dbpf_context_mutex);
+
+    ret = dbpf_sync_context_init(context_index);
+    if(ret < 0)
+    {
+	return ret;
+    }
+
+
     return 0;
 }
 
@@ -77,6 +87,8 @@ int dbpf_close_context(
     dbpf_completion_queue_array[context_id] = NULL;
 
     gen_mutex_unlock(&dbpf_context_mutex);
+
+    dbpf_sync_context_destroy(context_id);
     return 0;
 }
 

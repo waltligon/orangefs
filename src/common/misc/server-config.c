@@ -52,6 +52,8 @@ static DOTCONF_CB(exit_dhranges_context);
 static DOTCONF_CB(enter_distribution_context);
 static DOTCONF_CB(exit_distribution_context);
 static DOTCONF_CB(get_unexp_req);
+static DOTCONF_CB(get_tcp_buffer_send);
+static DOTCONF_CB(get_tcp_buffer_receive);
 static DOTCONF_CB(get_perf_update_interval);
 static DOTCONF_CB(get_root_handle);
 static DOTCONF_CB(get_name);
@@ -72,17 +74,22 @@ static DOTCONF_CB(get_attr_cache_size);
 static DOTCONF_CB(get_attr_cache_max_num_elems);
 static DOTCONF_CB(get_trove_sync_meta);
 static DOTCONF_CB(get_trove_sync_data);
+static DOTCONF_CB(get_db_cache_size_bytes);
+static DOTCONF_CB(get_db_cache_type);
 static DOTCONF_CB(get_param);
 static DOTCONF_CB(get_value);
 static DOTCONF_CB(get_default_num_dfiles);
+static DOTCONF_CB(get_metadata_sync_coalesce);
+static DOTCONF_CB(get_immediate_completion);
 static DOTCONF_CB(get_server_job_bmi_timeout);
 static DOTCONF_CB(get_server_job_flow_timeout);
 static DOTCONF_CB(get_client_job_bmi_timeout);
 static DOTCONF_CB(get_client_job_flow_timeout);
 static DOTCONF_CB(get_client_retry_limit);
 static DOTCONF_CB(get_client_retry_delay);
-
 static DOTCONF_CB(get_secret_key);
+static DOTCONF_CB(get_coalescing_high_watermark);
+static DOTCONF_CB(get_coalescing_low_watermark);
 
 static FUNC_ERRORHANDLER(errorhandler);
 const char *contextchecker(command_t *cmd, unsigned long mask);
@@ -413,6 +420,15 @@ static const configoption_t options[] =
      {"UnexpectedRequests",ARG_INT, get_unexp_req,NULL,
          CTX_DEFAULTS|CTX_GLOBAL,"50"},
 
+	/*
+	 * TCP socket buffer size.
+	 */
+     {"TCPBufferSend",ARG_INT, get_tcp_buffer_send,NULL,
+         CTX_DEFAULTS|CTX_GLOBAL,"65535"},
+     {"TCPBufferReceive",ARG_INT, get_tcp_buffer_receive,NULL,
+         CTX_DEFAULTS|CTX_GLOBAL,"131071"},
+
+
      /* Specifies the timeout value in seconds for BMI jobs on the server.
       */
      {"ServerJobBMITimeoutSecs",ARG_INT, get_server_job_bmi_timeout,NULL,
@@ -565,6 +581,15 @@ static const configoption_t options[] =
     {"TroveSyncData",ARG_STR, get_trove_sync_data, NULL, 
         CTX_STORAGEHINTS,"yes"},
 
+    {"DBCacheSizeBytes", ARG_INT, get_db_cache_size_bytes, NULL,
+        CTX_STORAGEHINTS,"0"},
+
+    /* cache type for berkeley db environment.  "sys" and "mmap" are valid
+     * value for this option
+     */
+    {"DBCacheType", ARG_STR, get_db_cache_type, NULL,
+        CTX_STORAGEHINTS, "sys"},
+
     /* Specifies the format of the date/timestamp that events will have
      * in the event log.  Possible values are:
      *
@@ -606,6 +631,22 @@ static const configoption_t options[] =
      */
     {"SecretKey",ARG_STR, get_secret_key,NULL,CTX_FILESYSTEM,NULL},
 
+
+    /* This option specified that MetaData operations that have to sync
+     * (setattr, etc.) should try to coallesce the sync under larger
+     * workloads.
+     */
+    {"MetaDataSyncCoalesce", ARG_STR, get_metadata_sync_coalesce, NULL,
+        CTX_STORAGEHINTS, "yes"},
+
+    {"ImmediateCompletion", ARG_STR, get_immediate_completion, NULL,
+        CTX_STORAGEHINTS, "no"},
+
+    {"CoalescingHighWatermark", ARG_STR, get_coalescing_high_watermark, NULL,
+        CTX_STORAGEHINTS, "8"},
+
+    {"CoalescingLowWatermark", ARG_INT, get_coalescing_low_watermark, NULL,
+        CTX_STORAGEHINTS, "2"},
 
     LAST_OPTION
 };
@@ -1019,6 +1060,23 @@ DOTCONF_CB(get_unexp_req)
     return NULL;
 }
 
+DOTCONF_CB(get_tcp_buffer_receive)
+{
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+    config_s->tcp_buffer_size_receive = cmd->data.value;
+    return NULL;
+}
+
+DOTCONF_CB(get_tcp_buffer_send)
+{
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+    config_s->tcp_buffer_size_send = cmd->data.value;
+    return NULL;
+}
+
+
 DOTCONF_CB(get_server_job_bmi_timeout)
 {
     struct server_configuration_s *config_s = 
@@ -1373,6 +1431,34 @@ DOTCONF_CB(get_trove_sync_data)
     return NULL;
 }
 
+DOTCONF_CB(get_db_cache_size_bytes)
+{
+    struct server_configuration_s *config_s = 
+        (struct server_configuration_s *)cmd->context;
+    config_s->db_cache_size_bytes = cmd->data.value;
+    return NULL;
+}
+
+DOTCONF_CB(get_db_cache_type)
+{
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+    
+    if(strcmp(cmd->data.str, "sys") && strcmp(cmd->data.str, "mmap"))
+    {
+        return "Unsupported parameter supplied to DBCacheType option, must "
+               "be either \"sys\" or \"mmap\"\n";
+    }
+
+    config_s->db_cache_type = strdup(cmd->data.str);
+    if(!config_s->db_cache_type)
+    {
+        return "strdup() failure";
+    }
+
+    return NULL;
+}
+
 DOTCONF_CB(get_root_handle)
 {
     struct filesystem_configuration_s *fs_conf = NULL;
@@ -1633,6 +1719,82 @@ DOTCONF_CB(get_secret_key)
         PINT_llist_head(config_s->file_systems);
 
     fs_conf->secret_key = strdup(cmd->data.str);
+    return NULL;
+}
+
+DOTCONF_CB(get_metadata_sync_coalesce)
+{
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+    struct filesystem_configuration_s *fs_conf = NULL;
+
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+
+    if(!strcmp((char *)cmd->data.str, "yes"))
+    {
+        fs_conf->metadata_sync_coalesce = 
+            (TROVE_DSPACE_SYNC_COALESCE | TROVE_KEYVAL_SYNC_COALESCE);
+    }
+    else
+    {
+        fs_conf->metadata_sync_coalesce = 0;
+    }
+
+    return NULL;
+}
+
+DOTCONF_CB(get_immediate_completion)
+{
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+    struct filesystem_configuration_s *fs_conf = NULL;
+
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+
+    if(!strcmp((char *)cmd->data.str, "yes"))
+    {
+        fs_conf->immediate_completion = 1;
+    }
+    else
+    {
+        fs_conf->immediate_completion = 0;
+    }
+
+    return NULL;
+}
+
+DOTCONF_CB(get_coalescing_high_watermark)
+{
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+    struct filesystem_configuration_s *fs_conf = NULL;
+
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+
+    if(!strcmp((char *)cmd->data.str, "infinity"))
+    {
+        fs_conf->coalescing_high_watermark = -1;
+    }
+    else
+    {
+        sscanf(cmd->data.str, "%d", &fs_conf->coalescing_high_watermark);
+    }
+    return NULL;
+}
+
+DOTCONF_CB(get_coalescing_low_watermark)
+{
+    struct server_configuration_s *config_s =
+        (struct server_configuration_s *)cmd->context;
+    struct filesystem_configuration_s *fs_conf = NULL;
+
+    fs_conf = (struct filesystem_configuration_s *)
+        PINT_llist_head(config_s->file_systems);
+
+    fs_conf->coalescing_low_watermark = cmd->data.value;
     return NULL;
 }
 
@@ -2799,7 +2961,6 @@ struct filesystem_configuration_s* PINT_config_find_fs_name(
             if (strcmp(cur_fs->file_system_name,fs_name) == 0)
             {
                 return(cur_fs);
-                break;
             }
             cur = PINT_llist_next(cur);
         }
@@ -2834,7 +2995,6 @@ struct filesystem_configuration_s* PINT_config_find_fs_id(
             if (cur_fs->coll_id == fs_id)
             {
                 return(cur_fs);
-                break;
             }
             cur = PINT_llist_next(cur);
         }
@@ -3182,6 +3342,28 @@ int PINT_config_pvfs2_rmspace(
         }
     }
     return ret;
+}
+
+int PINT_config_get_trove_meta_flags(
+    struct server_configuration_s *config,
+    PVFS_fs_id fs_id)
+{
+    int flags = 0;
+    struct filesystem_configuration_s *fs_conf = NULL;
+
+    if(config)
+    {
+        fs_conf = PINT_config_find_fs_id(config, fs_id);
+    }
+    
+    if(fs_conf)
+    {
+        flags |= (fs_conf->immediate_completion ? 
+                  TROVE_IMMEDIATE_COMPLETION : 0);
+        flags |= fs_conf->metadata_sync_coalesce;
+    }
+
+    return flags;
 }
 
 /*

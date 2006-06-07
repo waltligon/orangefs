@@ -6,6 +6,7 @@ dnl You may need to use autoheader as well if changing any DEFINEs
 
 dnl sanity checks, output header, location of scripts used here
 AC_INIT(include/pvfs2-types.h)
+AC_PREREQ(2.59)
 AC_CONFIG_AUX_DIR(maint/config)
 
 dnl
@@ -138,7 +139,8 @@ AC_SUBST(MMAP_RA_CACHE)
 
 dnl See if the --enable-trusted-connections  option was given to configure
 AC_ARG_ENABLE(trusted-connections,
-[  --enable-trusted-connections  Enable connects only from trusted hosts/ports (experimental, off by default) ],
+[  --enable-trusted-connections  Enable connects only from trusted hosts/ports
+                                (experimental, off by default) ],
 [if test "x$enableval" = "xyes"; then
 TRUSTED_CONNECTIONS="-DUSE_TRUSTED"
 fi],
@@ -531,20 +533,28 @@ test_for_epoll()
 	int fd;
 	fd = epoll_create(1);
 	close(fd);
-  ], AC_MSG_RESULT(yes)
-     CFLAGS="$CFLAGS -D__PVFS2_USE_EPOLL__"
+  ], CFLAGS="$CFLAGS -D__PVFS2_USE_EPOLL__"
      BUILD_EPOLL=1
      AC_SUBST(BUILD_EPOLL),
-  AC_MSG_RESULT(no))
+  )
 }
 
 dnl optionally enable use of epoll() on Linux instead of poll()
+dnl optionally disable use of epoll() on Linux instead of poll()
 AC_ARG_ENABLE(epoll,
-[  --enable-epoll          Enables use of epoll for TCP/IP polling],
-[ if test "x$enableval" = "xyes" ; then
-      test_for_epoll
-  fi
-],)
+[  --enable-epoll          Enable use of epoll for TCP/IP polling 
+                          (epoll is enabled by default, this option
+			  ensures no checking is done for x-compiling)
+  --disable-epoll         Disable epoll, use poll instead],
+[
+   if test "x$enableval" = "xyes"; then
+   	BUILD_EPOLL=1
+	AC_SUBST(BUILD_EPOLL)
+   fi
+],
+[
+  test_for_epoll
+])
 
 dnl enable resolving addresses all the way to hostnames in bmi reverse lookup
 AC_ARG_ENABLE(rev-hostname,
@@ -725,7 +735,7 @@ if test -n "$IB_INCDIR$IB_LIBDIR" ; then
     AC_CHECK_HEADER(vapi.h,, AC_MSG_ERROR([Header vapi.h not found.]))
     dnl Run test is not possible on a machine that does not have an IB NIC,
     dnl and link test is hard because we need so many little libraries.   Bail
-    dnl and just check for existance; full library list is in Makefile.in.
+    dnl and just check for existence; full library list is in Makefile.in.
     if test ! -f $IB_LIBDIR/libvapi.so ; then
 	if test ! -f $IB_LIBDIR/libvapi.a ; then
 	    AC_MSG_ERROR([Infiniband library libvapi.so not found.])
@@ -741,6 +751,84 @@ fi
 AC_SUBST(BUILD_IB)
 AC_SUBST(IB_INCDIR)
 AC_SUBST(IB_LIBDIR)
+
+dnl Configure options for OpenIB install path.
+dnl --with-openib=<dir> is shorthand for
+dnl    --with-openib-includes=<dir>/include
+dnl    --with-openib-libs=<dir>/lib  (or lib64 if that exists)
+openib_home=
+AC_ARG_WITH(openib,
+[  --with-openib=<dir>     Location of the OpenIB install (default no OpenIB)],
+    if test -z "$withval" -o "$withval" = yes ; then
+	AC_MSG_ERROR([Option --with-openib requires the path to your OpenIB tree.])
+    elif test "$withval" != no ; then
+	openib_home="$withval"
+    fi
+)
+AC_ARG_WITH(openib-includes,
+[  --with-openib-includes=<dir>  Location of the OpenIB includes],
+    if test -z "$withval" -o "$withval" = yes ; then
+	AC_MSG_ERROR([Option --with-openib-includes requires path to OpenIB headers.])
+    elif test "$withval" != no ; then
+	OPENIB_INCDIR="$withval"
+    fi
+)
+AC_ARG_WITH(openib-libs,
+[  --with-openib-libs=<dir>  Location of the OpenIB libraries],
+    if test -z "$withval" -o "$withval" = yes ; then
+	AC_MSG_ERROR([Option --with-openib-libs requires path to OpenIB libraries.])
+    elif test "$withval" != no ; then
+	OPENIB_LIBDIR="$withval"
+    fi
+)
+dnl If supplied the incls and libs explicitly, use them, else populate them
+dnl using guesses from the --with-openib dir.
+if test -n "$openib_home" ; then
+    if test -z "$OPENIB_INCDIR"; then
+	OPENIB_INCDIR=$openib_home/include
+    fi
+    if test -z "$OPENIB_LIBDIR"; then
+	OPENIB_LIBDIR=$openib_home/lib64
+	if test ! -d "$OPENIB_LIBDIR" ; then
+	    OPENIB_LIBDIR=$openib_home/lib
+	fi
+    fi
+fi
+dnl If anything OpenIB-ish was set, go look for header.
+if test -n "$OPENIB_INCDIR$OPENIB_LIBDIR" ; then
+    CPPFLAGS="$CPPFLAGS -I$OPENIB_INCDIR"
+    AC_CHECK_HEADER(infiniband/verbs.h,,
+	AC_MSG_ERROR([Header infiniband/verbs.h not found.]))
+    dnl Run test is not possible on a machine that does not have an IB NIC.
+    dnl Link test would work, but just check for existence.
+    if test ! -f $OPENIB_LIBDIR/libibverbs.so ; then
+	if test ! -f $OPENIB_LIBDIR/libibverbs.a ; then
+	    AC_MSG_ERROR([OpenIB library libibverbs.so not found.])
+	fi
+    fi
+    BUILD_OPENIB=1
+    CPPFLAGS="$CPPFLAGS_OLD"
+fi
+AC_SUBST(BUILD_OPENIB)
+AC_SUBST(OPENIB_INCDIR)
+AC_SUBST(OPENIB_LIBDIR)
+
+if test -n "$BUILD_OPENIB" ; then
+    dnl Check for which version of the ibverbs library, device opening is
+    dnl different.  This format is the older one; newer is ibv_get_device_list.
+    save_ldflags="$LDFLAGS"
+    LDFLAGS="-L$OPENIB_LIBDIR -libverbs"
+    AC_MSG_CHECKING(for ibv_get_devices)
+    AC_TRY_LINK([], [
+	ibv_get_devices();
+	],
+	AC_MSG_RESULT(yes)
+	AC_DEFINE(HAVE_IBV_GET_DEVICES, 1,
+	          Define if libibverbs has ibv_get_devices),
+	AC_MSG_RESULT(no)
+    )
+    LDFLAGS="$save_ldflags"
+fi
 
 dnl
 dnl check if fgetxattr takes extra arguments

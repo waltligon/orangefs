@@ -38,8 +38,6 @@
 #include "pvfs2-internal.h"
 #include "pint-perf-counter.h"
 
-extern struct PINT_perf_counter *PINT_server_pc;
-
 #define DBPF_MAX_KEY_LENGTH PVFS_NAME_MAX
 
 /**
@@ -130,7 +128,10 @@ static int dbpf_keyval_read(TROVE_coll_id coll_id,
                             TROVE_context_id context_id,
                             TROVE_op_id *out_op_id_p)
 {
+    int ret;
     dbpf_queued_op_t *q_op_p = NULL;
+    struct dbpf_op op;
+    struct dbpf_op *op_p;
     struct dbpf_collection *coll_p = NULL;
     dbpf_attr_cache_elem_t *cache_elem = NULL;
     TROVE_object_ref ref = {handle, coll_id};
@@ -163,30 +164,27 @@ static int dbpf_keyval_read(TROVE_coll_id coll_id,
         return -TROVE_EINVAL;
     }
 
-    /* grab a queued op structure */
-    q_op_p = dbpf_queued_op_alloc();
-    if (q_op_p == NULL)
+    ret = dbpf_op_init_queued_or_immediate(
+        &op, &q_op_p,
+        KEYVAL_READ,
+        coll_p,
+        handle,
+        dbpf_keyval_read_op_svc,
+        flags,
+        NULL,
+        user_ptr,
+        context_id,
+        &op_p);
+    if(ret < 0)
     {
-        return -TROVE_ENOMEM;
+        return ret;
     }
 
-    /* initialize all the common members */
-    dbpf_queued_op_init(q_op_p,
-                        KEYVAL_READ,
-                        handle,
-                        coll_p,
-                        dbpf_keyval_read_op_svc,
-                        user_ptr,
-                        flags,
-                        context_id);
-
     /* initialize the op-specific members */
-    q_op_p->op.u.k_read.key = key_p;
-    q_op_p->op.u.k_read.val = val_p;
+    op_p->u.k_read.key = key_p;
+    op_p->u.k_read.val = val_p;
 
-    *out_op_id_p = dbpf_queued_op_queue(q_op_p);
-
-    return 0;
+    return dbpf_queue_or_service(op_p, q_op_p, flags, out_op_id_p);
 }
 
 static int dbpf_keyval_read_op_svc(struct dbpf_op *op_p)
@@ -277,39 +275,41 @@ static int dbpf_keyval_write(TROVE_coll_id coll_id,
                              TROVE_op_id *out_op_id_p)
 {
     dbpf_queued_op_t *q_op_p = NULL;
+    struct dbpf_op op;
+    struct dbpf_op *op_p;
     struct dbpf_collection *coll_p = NULL;
+    int ret;
 
     coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL)
     {
         return -TROVE_EINVAL;
     }
-    q_op_p = dbpf_queued_op_alloc();
-    if (q_op_p == NULL)
+
+    ret = dbpf_op_init_queued_or_immediate(
+        &op, &q_op_p,
+        KEYVAL_WRITE,
+        coll_p,
+        handle,
+        dbpf_keyval_write_op_svc,
+        flags,
+        NULL,
+        user_ptr,
+        context_id,
+        &op_p);
+    if(ret < 0)
     {
-        return -TROVE_ENOMEM;
+        return ret;
     }
 
-    /* initialize all the common members */
-    dbpf_queued_op_init(q_op_p,
-                        KEYVAL_WRITE,
-                        handle,
-                        coll_p,
-                        dbpf_keyval_write_op_svc,
-                        user_ptr,
-                        flags,
-                        context_id);
+   /* initialize the op-specific members */
+    op_p->u.k_write.key = *key_p;
+    op_p->u.k_write.val = *val_p;
 
-    /* initialize the op-specific members */
-    q_op_p->op.u.k_write.key = *key_p;
-    q_op_p->op.u.k_write.val = *val_p;
-
-    *out_op_id_p = dbpf_queued_op_queue(q_op_p);
-        
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
                     1, PINT_PERF_ADD);
 
-    return 0;
+    return dbpf_queue_or_service(op_p, q_op_p, flags, out_op_id_p);
 }
 
 static int dbpf_keyval_write_op_svc(struct dbpf_op *op_p)
@@ -435,13 +435,10 @@ or if there is no associated cache_elem for this key
 
     gen_mutex_unlock(&dbpf_attr_cache_mutex);
 
-    DBPF_DB_SYNC_IF_NECESSARY(op_p, 
-                              op_p->coll_p->keyval_db);
-
+    ret = DBPF_OP_NEEDS_SYNC;
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
                     1, PINT_PERF_SUB);
 
-    return 1;
 
 return_error:
     return ret;
@@ -457,38 +454,40 @@ static int dbpf_keyval_remove(TROVE_coll_id coll_id,
                               TROVE_op_id *out_op_id_p)
 {
     dbpf_queued_op_t *q_op_p = NULL;
+    struct dbpf_op op;
+    struct dbpf_op *op_p;
     struct dbpf_collection *coll_p = NULL;
+    int ret;
 
     coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL)
     {
         return -TROVE_EINVAL;
     }
-    q_op_p = dbpf_queued_op_alloc();
-    if (q_op_p == NULL)
+
+    ret = dbpf_op_init_queued_or_immediate(
+        &op, &q_op_p,
+        KEYVAL_REMOVE_KEY,
+        coll_p,
+        handle,
+        dbpf_keyval_remove_op_svc,
+        flags,
+        NULL,
+        user_ptr,
+        context_id,
+        &op_p);
+    if(ret < 0)
     {
-        return -TROVE_ENOMEM;
+        return ret;
     }
 
-    /* initialize common members */
-    dbpf_queued_op_init(q_op_p,
-                        KEYVAL_REMOVE_KEY,
-                        handle,
-                        coll_p,
-                        dbpf_keyval_remove_op_svc,
-                        user_ptr,
-                        flags,
-                        context_id);
-
     /* initialize op-specific members */
-    q_op_p->op.u.k_remove.key = *key_p;
-
-    *out_op_id_p = dbpf_queued_op_queue(q_op_p);
+    op_p->u.k_remove.key = *key_p;
       
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
                     1, PINT_PERF_ADD);
 
-    return 0;
+    return dbpf_queue_or_service(op_p, q_op_p, flags, out_op_id_p);
 }
 
 static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p)
@@ -508,13 +507,9 @@ static int dbpf_keyval_remove_op_svc(struct dbpf_op *op_p)
         goto return_error;
     }
 
-    DBPF_DB_SYNC_IF_NECESSARY(op_p, 
-                              op_p->coll_p->keyval_db);
-
+    ret = DBPF_OP_NEEDS_SYNC;
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
                     1, PINT_PERF_SUB);
-
-    return 1;
 
 return_error:
     return ret;
@@ -544,38 +539,40 @@ static int dbpf_keyval_iterate(TROVE_coll_id coll_id,
                                TROVE_op_id *out_op_id_p)
 {
     dbpf_queued_op_t *q_op_p = NULL;
+    struct dbpf_op op;
+    struct dbpf_op *op_p;
     struct dbpf_collection *coll_p = NULL;
+    int ret;
 
     coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL)
     {
         return -TROVE_EINVAL;
     }
-    q_op_p = dbpf_queued_op_alloc();
-    if (q_op_p == NULL)
+
+    ret = dbpf_op_init_queued_or_immediate(
+        &op, &q_op_p,
+        KEYVAL_ITERATE,
+        coll_p,
+        handle,
+        dbpf_keyval_iterate_op_svc,
+        flags,
+        NULL,
+        user_ptr,
+        context_id,
+        &op_p);
+    if(ret < 0)
     {
-        return -TROVE_ENOMEM;
+        return ret;
     }
 
-    /* initialize all the common members */
-    dbpf_queued_op_init(q_op_p,
-                        KEYVAL_ITERATE,
-                        handle,
-                        coll_p,
-                        dbpf_keyval_iterate_op_svc,
-                        user_ptr,
-                        flags,
-                        context_id);
+     /* initialize op-specific members */
+    op_p->u.k_iterate.key_array = key_array;
+    op_p->u.k_iterate.val_array = val_array;
+    op_p->u.k_iterate.position_p = position_p;
+    op_p->u.k_iterate.count_p = inout_count_p;
 
-    /* initialize op-specific members */
-    q_op_p->op.u.k_iterate.key_array = key_array;
-    q_op_p->op.u.k_iterate.val_array = val_array;
-    q_op_p->op.u.k_iterate.position_p = position_p;
-    q_op_p->op.u.k_iterate.count_p = inout_count_p;
-
-    *out_op_id_p = dbpf_queued_op_queue(q_op_p);
-
-    return 0;
+    return dbpf_queue_or_service(op_p, q_op_p, flags, out_op_id_p);
 }
 
 /* dbpf_keyval_iterate_op_svc()
@@ -686,37 +683,39 @@ static int dbpf_keyval_iterate_keys(TROVE_coll_id coll_id,
                                     TROVE_op_id *out_op_id_p)
 {
     dbpf_queued_op_t *q_op_p = NULL;
+    struct dbpf_op op;
+    struct dbpf_op *op_p;
     struct dbpf_collection *coll_p = NULL;
+    int ret;
 
     coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL)
     {
         return -TROVE_EINVAL;
     }
-    q_op_p = dbpf_queued_op_alloc();
-    if (q_op_p == NULL)
+
+    ret = dbpf_op_init_queued_or_immediate(
+        &op, &q_op_p,
+        KEYVAL_ITERATE_KEYS,
+        coll_p,
+        handle,
+        dbpf_keyval_iterate_keys_op_svc,
+        flags,
+        NULL,
+        user_ptr,
+        context_id,
+        &op_p);
+    if(ret < 0)
     {
-        return -TROVE_ENOMEM;
+        return ret;
     }
 
-    /* initialize all the common members */
-    dbpf_queued_op_init(q_op_p,
-                        KEYVAL_ITERATE_KEYS,
-                        handle,
-                        coll_p,
-                        dbpf_keyval_iterate_keys_op_svc,
-                        user_ptr,
-                        flags,
-                        context_id);
+ /* initialize op-specific members */
+    op_p->u.k_iterate_keys.key_array = key_array;
+    op_p->u.k_iterate_keys.position_p = position_p;
+    op_p->u.k_iterate_keys.count_p = inout_count_p;
 
-    /* initialize op-specific members */
-    q_op_p->op.u.k_iterate_keys.key_array = key_array;
-    q_op_p->op.u.k_iterate_keys.position_p = position_p;
-    q_op_p->op.u.k_iterate_keys.count_p = inout_count_p;
-
-    *out_op_id_p = dbpf_queued_op_queue(q_op_p);
-
-    return 0;
+    return dbpf_queue_or_service(op_p, q_op_p, flags, out_op_id_p);
 }
 
 /* dbpf_keyval_iterate_keys_op_svc()
@@ -811,37 +810,39 @@ static int dbpf_keyval_read_list(TROVE_coll_id coll_id,
                                  TROVE_op_id *out_op_id_p)
 {
     dbpf_queued_op_t *q_op_p = NULL;
+    struct dbpf_op op;
+    struct dbpf_op *op_p;
     struct dbpf_collection *coll_p = NULL;
+    int ret;
 
     coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL)
     {
         return -TROVE_EINVAL;
     }
-    q_op_p = dbpf_queued_op_alloc();
-    if (q_op_p == NULL)
+
+    ret = dbpf_op_init_queued_or_immediate(
+        &op, &q_op_p,
+        KEYVAL_READ_LIST,
+        coll_p,
+        handle,
+        dbpf_keyval_read_list_op_svc,
+        flags,
+        NULL,
+        user_ptr,
+        context_id,
+        &op_p);
+    if(ret < 0)
     {
-        return -TROVE_ENOMEM;
+        return ret;
     }
 
-    /* initialize all the common members */
-    dbpf_queued_op_init(q_op_p,
-                        KEYVAL_READ_LIST,
-                        handle,
-                        coll_p,
-                        dbpf_keyval_read_list_op_svc,
-                        user_ptr,
-                        flags,
-                        context_id);
-
     /* initialize the op-specific members */
-    q_op_p->op.u.k_read_list.key_array = key_array;
-    q_op_p->op.u.k_read_list.val_array = val_array;
-    q_op_p->op.u.k_read_list.count = count;
+    op_p->u.k_read_list.key_array = key_array;
+    op_p->u.k_read_list.val_array = val_array;
+    op_p->u.k_read_list.count = count;
 
-    *out_op_id_p = dbpf_queued_op_queue(q_op_p);
-
-    return 0;
+    return dbpf_queue_or_service(op_p, q_op_p, flags, out_op_id_p);
 }
 
 static int dbpf_keyval_read_list_op_svc(struct dbpf_op *op_p)
@@ -899,40 +900,42 @@ static int dbpf_keyval_write_list(TROVE_coll_id coll_id,
                                   TROVE_op_id *out_op_id_p)
 {
     dbpf_queued_op_t *q_op_p = NULL;
+    struct dbpf_op op;
+    struct dbpf_op *op_p;
     struct dbpf_collection *coll_p = NULL;
+    int ret;
 
     coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL)
     {
         return -TROVE_EINVAL;
     }
-    q_op_p = dbpf_queued_op_alloc();
-    if (q_op_p == NULL)
+
+    ret = dbpf_op_init_queued_or_immediate(
+        &op, &q_op_p,
+        KEYVAL_WRITE_LIST,
+        coll_p,
+        handle,
+        dbpf_keyval_write_list_op_svc,
+        flags,
+        NULL,
+        user_ptr,
+        context_id,
+        &op_p);
+    if(ret < 0)
     {
-        return -TROVE_ENOMEM;
+        return ret;
     }
 
-    /* initialize all the common members */
-    dbpf_queued_op_init(q_op_p,
-                        KEYVAL_WRITE_LIST,
-                        handle,
-                        coll_p,
-                        dbpf_keyval_write_list_op_svc,
-                        user_ptr,
-                        flags,
-                        context_id);
-
-    /* initialize the op-specific members */
-    q_op_p->op.u.k_write_list.key_array = key_array;
-    q_op_p->op.u.k_write_list.val_array = val_array;
-    q_op_p->op.u.k_write_list.count = count;
-
-    *out_op_id_p = dbpf_queued_op_queue(q_op_p);
+   /* initialize the op-specific members */
+    op_p->u.k_write_list.key_array = key_array;
+    op_p->u.k_write_list.val_array = val_array;
+    op_p->u.k_write_list.count = count;
 
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
                     1, PINT_PERF_ADD);
 
-    return 0;
+    return dbpf_queue_or_service(op_p, q_op_p, flags, out_op_id_p);
 }
 
 static int dbpf_keyval_write_list_op_svc(struct dbpf_op *op_p)
@@ -1052,12 +1055,9 @@ or if there is no associated cache_elem for this key
         gen_mutex_unlock(&dbpf_attr_cache_mutex);
     }
 
-    DBPF_DB_SYNC_IF_NECESSARY(op_p, 
-                              op_p->coll_p->keyval_db);
-
+    ret = DBPF_OP_NEEDS_SYNC;
     PINT_perf_count(PINT_server_pc, PINT_PERF_METADATA_KEYVAL_OPS,
                     1, PINT_PERF_SUB);
-    return 1;
 
 return_error:
     return ret;
@@ -1071,32 +1071,34 @@ static int dbpf_keyval_flush(TROVE_coll_id coll_id,
                              TROVE_op_id *out_op_id_p)
 {
     dbpf_queued_op_t *q_op_p = NULL;
+    struct dbpf_op op;
+    struct dbpf_op *op_p;
     struct dbpf_collection *coll_p = NULL;
+    int ret;
 
     coll_p = dbpf_collection_find_registered(coll_id);
     if (coll_p == NULL)
     {
         return -TROVE_EINVAL;
     }
-    q_op_p = dbpf_queued_op_alloc();
-    if (q_op_p == NULL)
+    
+    ret = dbpf_op_init_queued_or_immediate(
+        &op, &q_op_p,
+        KEYVAL_FLUSH,
+        coll_p,
+        handle,
+        dbpf_keyval_flush_op_svc,
+        flags,
+        NULL,
+        user_ptr,
+        context_id,
+        &op_p);
+    if(ret < 0)
     {
-        return -TROVE_ENOMEM;
+        return ret;
     }
 
-    /* initialize all the common members */
-    dbpf_queued_op_init(q_op_p,
-                        KEYVAL_FLUSH,
-                        handle,
-                        coll_p,
-                        dbpf_keyval_flush_op_svc,
-                        user_ptr,
-                        flags,
-                        context_id);
-
-    *out_op_id_p = dbpf_queued_op_queue(q_op_p);
-
-    return 0;
+    return dbpf_queue_or_service(op_p, q_op_p, flags, out_op_id_p);
 }
 
 static int dbpf_keyval_flush_op_svc(struct dbpf_op *op_p)
@@ -1147,7 +1149,7 @@ int PINT_dbpf_keyval_iterate(
         gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                      "Exited: PINT_dpbf_keyval_iterate\n");
 
-        gossip_lerr("db_p->cursor failed\n");
+        gossip_lerr("db_p->cursor failed: db error %s\n", db_strerror(ret));
         *count = 0;
         return -dbpf_db_error_to_trove_error(ret);
     }
@@ -1474,8 +1476,9 @@ static int dbpf_keyval_iterate_cursor_get(
     if (ret != 0)
     {
         gossip_lerr("Failed to perform cursor get:"
-                    "\n\thandle: %llu\n\ttype: %d\n\tkey: %s\n",
-                    llu(key_entry.handle), db_flags, key_entry.key);
+                    "\n\thandle: %llu\n\ttype: %d\n\tkey: %s\n\tdb error: %s\n",
+                    llu(key_entry.handle), db_flags, 
+                    key_entry.key, db_strerror(ret));
         return -dbpf_db_error_to_trove_error(ret);
     }
 

@@ -29,6 +29,8 @@ extern struct TROVE_mgmt_ops    *mgmt_method_table[];
 
 struct PINT_perf_counter* PINT_server_pc = NULL;
 
+int TROVE_db_cache_size_bytes = 0;
+
 /** Initiate reading from a contiguous region in a bstream into a
  *  contiguous region in memory.
  */
@@ -953,6 +955,12 @@ int trove_collection_setinfo(
     void* parameter)
 {
     int method_id;
+
+    if(option == TROVE_DB_CACHE_SIZE_BYTES)
+    {
+	TROVE_db_cache_size_bytes = *((int *)parameter);
+	return 0;
+    }
 
     method_id = map_coll_id_to_method(coll_id);
     if (method_id < 0) {

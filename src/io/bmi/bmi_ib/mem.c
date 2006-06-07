@@ -5,11 +5,11 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: mem.c,v 1.4 2006-03-21 21:00:39 pw Exp $
+ * $Id: mem.c,v 1.4.2.1 2006-06-07 03:20:47 slang Exp $
  */
 #include <src/common/gen-locks/gen-locks.h>
-#include "ib.h"
 #include "pvfs2-internal.h"
+#include "ib.h"
 
 #ifdef __PVFS2_SERVER__
 #  define ENABLE_MEMCACHE 1
@@ -17,15 +17,24 @@
 #  define ENABLE_MEMCACHE 1
 #endif
 
-list_t memcache __hidden;
-static gen_mutex_t memcache_mutex = GEN_MUTEX_INITIALIZER;
+/*
+ * This internal state structure is allocated when the init function
+ * is called.  The device hangs onto it and gives it back to us as
+ * needed.
+ */
+typedef struct {
+    list_t list;
+    gen_mutex_t mutex;
+    void (*mem_register)(memcache_entry_t *c);
+    void (*mem_deregister)(memcache_entry_t *c);
+} memcache_device_t;
 
 #if ENABLE_MEMCACHE
 /*
  * Create and link a new memcache entry.  Assumes lock already held.
  */
 static memcache_entry_t *
-memcache_add(void *buf, bmi_size_t len)
+memcache_add(memcache_device_t *memcache_device, void *buf, bmi_size_t len)
 {
     memcache_entry_t *c;
 
@@ -34,7 +43,7 @@ memcache_add(void *buf, bmi_size_t len)
 	c->buf = buf;
 	c->len = len;
 	c->count = 0;
-	qlist_add_tail(&c->list, &memcache);
+	qlist_add_tail(&c->list, &memcache_device->list);
     }
     return c;
 }
@@ -47,13 +56,13 @@ memcache_add(void *buf, bmi_size_t len)
  *   3. prefer tightest bounds among matching refcnt
  */
 static memcache_entry_t *
-memcache_lookup_cover(const void *const buf, bmi_size_t len)
+memcache_lookup_cover(memcache_device_t *memcache_device, const void *const buf, bmi_size_t len)
 {
     list_t *l;
     const char *end = (const char *) buf + len;
     memcache_entry_t *cbest = 0;
 
-    qlist_for_each(l, &memcache) {
+    qlist_for_each(l, &memcache_device->list) {
 	memcache_entry_t *c = qlist_entry(l, memcache_entry_t, list);
 	if (!(c->buf <= buf && end <= (const char *)c->buf + c->len))
 	    continue;
@@ -78,11 +87,11 @@ memcache_lookup_cover(const void *const buf, bmi_size_t len)
  * of the same entry.  Used only for BMI_ib_memfree.
  */
 static memcache_entry_t *
-memcache_lookup_exact(const void *const buf, bmi_size_t len)
+memcache_lookup_exact(memcache_device_t *memcache_device, const void *const buf, bmi_size_t len)
 {
     list_t *l;
 
-    qlist_for_each(l, &memcache) {
+    qlist_for_each(l, &memcache_device->list) {
 	memcache_entry_t *c = qlist_entry(l, memcache_entry_t, list);
 	if (c->buf == buf && c->len == len)
 	    return c;
@@ -96,32 +105,34 @@ memcache_lookup_exact(const void *const buf, bmi_size_t len)
  * it now to save time later in the actual send or recv routine.
  */
 void *
-BMI_ib_memalloc(bmi_size_t len, enum bmi_op_type send_recv __unused)
+memcache_memalloc(void *md, bmi_size_t len, int eager_limit)
 {
+    memcache_device_t *memcache_device = md;
     void *buf;
 
     buf = malloc(len);
 #if ENABLE_MEMCACHE
     if (bmi_ib_unlikely(!buf))
 	goto out;
-    if (len > EAGER_BUF_PAYLOAD) {
+    if (len > eager_limit) {
 	memcache_entry_t *c;
 
-	gen_mutex_lock(&memcache_mutex);
-	c = memcache_lookup_cover(buf, len);  /* could be recycled buffer */
+	gen_mutex_lock(&memcache_device->mutex);
+	/* could be recycled buffer */
+	c = memcache_lookup_cover(memcache_device, buf, len);
 	if (c)
 	    ++c->count;
 	else {
-	    c = memcache_add(buf, len);
+	    c = memcache_add(memcache_device, buf, len);
 	    if (bmi_ib_unlikely(!c)) {
 		free(buf);
 		buf = 0;
 	    } else {
-		ib_mem_register(c);
+		(memcache_device->mem_register)(c);
 		++c->count;
 	    }
 	}
-	gen_mutex_unlock(&memcache_mutex);
+	gen_mutex_unlock(&memcache_device->mutex);
     }
   out:
 #endif  /* ENABLE_MEMCACHE */
@@ -129,24 +140,24 @@ BMI_ib_memalloc(bmi_size_t len, enum bmi_op_type send_recv __unused)
 }
 
 int
-BMI_ib_memfree(void *buf, bmi_size_t len __unused,
-  enum bmi_op_type send_recv __unused)
+memcache_memfree(void *md, void *buf, bmi_size_t len)
 {
+    memcache_device_t *memcache_device = md;
 #if ENABLE_MEMCACHE
     memcache_entry_t *c;
     /* okay if not found, just not cached */
 
-    gen_mutex_lock(&memcache_mutex);
-    c = memcache_lookup_exact(buf, len);
+    gen_mutex_lock(&memcache_device->mutex);
+    c = memcache_lookup_exact(memcache_device, buf, len);
     if (c) {
 	debug(6, "%s: found %p len %lld", __func__, c->buf, lld(c->len));
 	assert(c->count == 1, "%s: buf %p len %lld count = %d, expected 1",
 	  __func__, c->buf, lld(c->len), c->count);
-	ib_mem_deregister(c);
+	(memcache_device->mem_deregister)(c);
 	qlist_del(&c->list);
 	free(c);
     }
-    gen_mutex_unlock(&memcache_mutex);
+    gen_mutex_unlock(&memcache_device->mutex);
 #endif
     free(buf);
     return 0;
@@ -157,16 +168,18 @@ BMI_ib_memfree(void *buf, bmi_size_t len __unused,
  * and looks up each entry in the memcache, adding it if not yet pinned.
  */
 void
-memcache_register(ib_buflist_t *buflist)
+memcache_register(void *md, ib_buflist_t *buflist)
 {
     int i;
+    memcache_device_t *memcache_device = md;
 
     buflist->memcache = Malloc(buflist->num * sizeof(*buflist->memcache));
-    gen_mutex_lock(&memcache_mutex);
+    gen_mutex_lock(&memcache_device->mutex);
     for (i=0; i<buflist->num; i++) {
 #if ENABLE_MEMCACHE
 	memcache_entry_t *c;
-	c = memcache_lookup_cover(buflist->buf.send[i], buflist->len[i]);
+	c = memcache_lookup_cover(memcache_device, buflist->buf.send[i],
+	                          buflist->len[i]);
 	if (c) {
 	    ++c->count;
 	    debug(2, "%s: hit [%d] %p len %lld (via %p len %lld) refcnt now %d",
@@ -175,11 +188,12 @@ memcache_register(ib_buflist_t *buflist)
 	} else {
 	    debug(2, "%s: miss [%d] %p len %lld", __func__, i,
 	      buflist->buf.send[i], lld(buflist->len[i]));
-	    c = memcache_add(buflist->buf.recv[i], buflist->len[i]);
+	    c = memcache_add(memcache_device, buflist->buf.recv[i],
+	                     buflist->len[i]);
 	    if (!c)
 		error("%s: no memory for cache entry", __func__);
 	    c->count = 1;
-	    ib_mem_register(c);
+	    (memcache_device->mem_register)(c);
 	}
 	buflist->memcache[i] = c;
 #else
@@ -187,19 +201,20 @@ memcache_register(ib_buflist_t *buflist)
 	cp->buf = buflist->buf.recv[i];
 	cp->len = buflist->len[i];
 	cp->type = type;
-	ib_mem_register(cp);
+	(memcache_device->mem_register)(cp);
 	buflist->memcache[i] = cp;
 #endif
     }
-    gen_mutex_unlock(&memcache_mutex);
+    gen_mutex_unlock(&memcache_device->mutex);
 }
 
 void
-memcache_deregister(ib_buflist_t *buflist)
+memcache_deregister(void *md, ib_buflist_t *buflist)
 {
     int i;
+    memcache_device_t *memcache_device = md;
 
-    gen_mutex_lock(&memcache_mutex);
+    gen_mutex_lock(&memcache_device->mutex);
     for (i=0; i<buflist->num; i++) {
 #if ENABLE_MEMCACHE
 	memcache_entry_t *c = buflist->memcache[i];
@@ -208,29 +223,46 @@ memcache_deregister(ib_buflist_t *buflist)
 	  buflist->buf.send[i], lld(buflist->len[i]), c->count);
 	/* let garbage collection do ib_mem_deregister(c) for refcnt==0 */
 #else
-	ib_mem_deregister(buflist->memcache[i]);
+	(memcache_device->mem_deregister)(buflist->memcache[i]);
 	free(buflist->memcache[i]);
 #endif
     }
     free(buflist->memcache);
-    gen_mutex_unlock(&memcache_mutex);
+    gen_mutex_unlock(&memcache_device->mutex);
+}
+
+/*
+ * Initialize.
+ */
+void *memcache_init(void (*mem_register)(memcache_entry_t *),
+                    void (*mem_deregister)(memcache_entry_t *))
+{
+    memcache_device_t *memcache_device;
+
+    memcache_device = Malloc(sizeof(*memcache_device));
+    INIT_QLIST_HEAD(&memcache_device->list);
+    gen_mutex_init(&memcache_device->mutex);
+    memcache_device->mem_register = mem_register;
+    memcache_device->mem_deregister = mem_deregister;
+    return memcache_device;
 }
 
 /*
  * Remove all mappings in preparation for closing the pd.
  */
-void
-memcache_shutdown(void)
+void memcache_shutdown(void *md)
 {
     list_t *l, *lp;
+    memcache_device_t *memcache_device = md;
 
-    gen_mutex_lock(&memcache_mutex);
-    qlist_for_each_safe(l, lp, &memcache) {
+    gen_mutex_lock(&memcache_device->mutex);
+    qlist_for_each_safe(l, lp, &memcache_device->list) {
 	memcache_entry_t *c = qlist_entry(l, memcache_entry_t, list);
-	ib_mem_deregister(c);
+	(memcache_device->mem_deregister)(c);
 	qlist_del(&c->list);
 	free(c);
     }
-    gen_mutex_unlock(&memcache_mutex);
+    gen_mutex_unlock(&memcache_device->mutex);
+    free(memcache_device);
 }
 

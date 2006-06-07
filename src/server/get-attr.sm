@@ -36,32 +36,6 @@ enum
     STATE_DIR      = 10
 };
 
-static inline char *get_object_type(int objtype)
-{
-    static char *obj_types[] =
-    {
-        "NONE", "METAFILE", "DATAFILE",
-        "DIRECTORY", "SYMLINK", "DIRDATA", "UNKNOWN"
-    };
-
-    switch(objtype)
-    {
-        case PVFS_TYPE_NONE:
-            return obj_types[0];
-        case PVFS_TYPE_METAFILE:
-            return obj_types[1];
-        case PVFS_TYPE_DATAFILE:
-            return obj_types[2];
-        case PVFS_TYPE_DIRECTORY:
-            return obj_types[3];
-        case PVFS_TYPE_SYMLINK:
-            return obj_types[4];
-        case PVFS_TYPE_DIRDATA:
-            return obj_types[5];
-    }
-    return obj_types[6];
-}
-
 static int getattr_cleanup(
     PINT_server_op *s_op, job_status_s *js_p);
 static int getattr_verify_attribs(
@@ -192,8 +166,6 @@ static int getattr_verify_attribs(
     PINT_server_op *s_op, job_status_s *js_p)
 {
     PVFS_object_attr *resp_attr = NULL;
-
-    PINT_STATE_DEBUG("verify_attribs");
 
     js_p->error_code = 0;
 
@@ -374,19 +346,14 @@ static int getattr_verify_attribs(
     }
     else
     {
-	gossip_debug(
-            GOSSIP_GETATTR_DEBUG, "  handle %llu refers to something "
-            "unknown -- assuming datafile!\n",
+        /* if we don't understand the object type, then it probably indicates
+         * a bug or some data corruption.  All trove objects should have a
+         * type set.
+         */
+        gossip_err(
+            "Error: got unknown type when verifying attributes for handle %llu.\n", 
             llu(s_op->u.getattr.handle));
-
-        resp_attr->objtype = PVFS_TYPE_DATAFILE;
-        resp_attr->u.data.size = s_op->ds_attr.b_size;
-        resp_attr->mask |= (PVFS_ATTR_COMMON_TYPE | PVFS_ATTR_DATA_ALL);
-
-	gossip_debug(GOSSIP_GETATTR_DEBUG, "  handle %llu now refers to "
-                     "a datafile (size = %lld).\n",
-                     llu(s_op->u.getattr.handle),
-                     lld(resp_attr->u.data.size));
+        js_p->error_code = -PVFS_ENXIO;
     }
     return 1;
 }
@@ -396,8 +363,6 @@ static int getattr_read_symlink_target(
 {
     int ret;
     job_id_t i;
-
-    PINT_STATE_DEBUG("read_symlink_target");
 
     /* if we don't need to fill in the symlink target, skip it */
     if (!(s_op->u.getattr.attrmask & PVFS_ATTR_SYMLNK_TARGET))
@@ -431,7 +396,9 @@ static int getattr_read_symlink_target(
     ret = job_trove_keyval_read(
         s_op->u.getattr.fs_id, s_op->u.getattr.handle,
         &(s_op->key), &(s_op->val), 
-        0, NULL, s_op, 0, js_p,
+        PINT_config_get_trove_meta_flags(
+            get_server_config_struct(), s_op->u.getattr.fs_id), 
+        NULL, s_op, 0, js_p,
         &i, server_job_context);
 
     return ret;
@@ -444,8 +411,6 @@ static int getattr_read_metafile_datafile_handles_if_required(
     int ret = -PVFS_EINVAL;
     int dfile_count = 0;
     job_id_t i;
-
-    PINT_STATE_DEBUG("read_metafile_datafile_handles_if_required");
 
     assert(s_op->attr.objtype == PVFS_TYPE_METAFILE);
 
@@ -522,7 +487,9 @@ static int getattr_read_metafile_datafile_handles_if_required(
     ret = job_trove_keyval_read(
         s_op->u.getattr.fs_id, s_op->u.getattr.handle,
         &s_op->key, &s_op->val, 
-        0, NULL, s_op, 0, js_p,
+        PINT_config_get_trove_meta_flags(
+            get_server_config_struct(), s_op->u.getattr.fs_id), 
+        NULL, s_op, 0, js_p,
         &i, server_job_context);
 
     return ret;
@@ -533,8 +500,6 @@ static int getattr_read_metafile_distribution_if_required(
 {
     int ret = -PVFS_EINVAL;
     job_id_t i;
-
-    PINT_STATE_DEBUG("read_metafile_distribution_if_required");
 
     assert(s_op->attr.objtype == PVFS_TYPE_METAFILE);
 
@@ -582,7 +547,10 @@ static int getattr_read_metafile_distribution_if_required(
     ret = job_trove_keyval_read(
         s_op->u.getattr.fs_id, s_op->u.getattr.handle,
         &(s_op->key), &(s_op->val), 
-        0, NULL,
+        PINT_config_get_trove_meta_flags(
+            get_server_config_struct(),
+            s_op->u.getattr.fs_id), 
+        NULL,
         s_op, 0, js_p, &i, server_job_context);
 
     return ret;
@@ -591,8 +559,6 @@ static int getattr_read_metafile_distribution_if_required(
 static int getattr_setup_resp(PINT_server_op *s_op, job_status_s *js_p)
 {
     PVFS_object_attr *resp_attr = &s_op->resp.u.getattr.attr;
-
-    PINT_STATE_DEBUG("setup_resp");
 
     gossip_debug(
         GOSSIP_GETATTR_DEBUG,
@@ -690,8 +656,6 @@ static int getattr_setup_resp(PINT_server_op *s_op, job_status_s *js_p)
 
 static int getattr_cleanup(PINT_server_op *s_op, job_status_s *js_p)
 {
-    PINT_STATE_DEBUG("getattr_cleanup");
-
     PINT_free_object_attr(&s_op->resp.u.getattr.attr);
     return(server_state_machine_complete(s_op));
 }
@@ -713,8 +677,6 @@ static int getattr_get_dirent_count(
     int ret;
     job_id_t tmp_id;
 
-    PINT_STATE_DEBUG("get_dirent_count");
-
     s_op->key.buffer = Trove_Common_Keys[DIRDATA_SIZE_KEY].key;
     s_op->key.buffer_sz = Trove_Common_Keys[DIRDATA_SIZE_KEY].size;
     s_op->val.buffer = &s_op->u.getattr.dirent_count;
@@ -725,7 +687,8 @@ static int getattr_get_dirent_count(
         s_op->u.getattr.handle,
         &s_op->key,
         &s_op->val,
-        0,
+        PINT_config_get_trove_meta_flags(
+            get_server_config_struct(), s_op->u.getattr.fs_id),
         NULL,
         s_op,
         0,
@@ -739,8 +702,6 @@ static int getattr_get_dirent_count(
 static int getattr_interpret_dirent_count(
     PINT_server_op *s_op, job_status_s *js_p)
 {
-    PINT_STATE_DEBUG("interpret_dirent_count");
-
     s_op->resp.u.getattr.attr.u.dir.dirent_count =
         s_op->u.getattr.dirent_count;
 

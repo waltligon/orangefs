@@ -78,7 +78,7 @@ socket_collection_p BMI_socket_collection_init(int new_server_socket)
         event.data.ptr = NULL;
         ret = epoll_ctl(tmp_scp->epfd, EPOLL_CTL_ADD, new_server_socket,
             &event);
-        if(ret < 0)
+        if(ret < 0 && errno != EEXIST)
         {
             gossip_err("Error: epoll_ctl() failure: %s.\n", strerror(errno));
 #if 0
@@ -180,7 +180,9 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
     int tmp_count;
     int i;
     int skip_flag;
+#ifndef __PVFS2_JOB_THREADED__
     struct epoll_event event;
+#endif
 
     /* init the outgoing arguments for safety */
     *outcount = 0;
@@ -189,6 +191,7 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
 
     gen_mutex_lock(&scp->mutex);
 
+#ifndef __PVFS2_JOB_THREADED__
     gen_mutex_lock(&scp->queue_mutex);
 
     /* look for addresses slated for removal */
@@ -205,7 +208,7 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
             ret = epoll_ctl(scp->epfd, EPOLL_CTL_DEL, tcp_addr_data->socket,
                 &event);
 
-            if(ret < 0)
+            if(ret < 0 && errno != ENOENT)
             {
                 /* TODO: error handling */
                 gossip_lerr("Error: epoll_ctl() failure: %s\n",
@@ -233,7 +236,7 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
             ret = epoll_ctl(scp->epfd, EPOLL_CTL_MOD, tcp_addr_data->socket,
                 &event);
 
-            if(ret < 0)
+            if(ret < 0 && errno != ENOENT)
             {
                 /* TODO: error handling */
                 gossip_lerr("Error: epoll_ctl() failure: %s\n",
@@ -252,7 +255,7 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
                 event.events |= EPOLLOUT;
             ret = epoll_ctl(scp->epfd, EPOLL_CTL_ADD, tcp_addr_data->socket,
                 &event);
-            if(ret < 0)
+            if(ret < 0 && errno != EEXIST)
             {
                 /* TODO: error handling */
                 gossip_lerr("Error: epoll_ctl() failure: %s\n",
@@ -262,8 +265,9 @@ int BMI_socket_collection_testglobal(socket_collection_p scp,
 	}
     }
     gen_mutex_unlock(&scp->queue_mutex);
+#endif
 
-    /* actually do the poll() work */
+    /* actually do the epoll_wait() here */
     do
     {
         tmp_count = incount;

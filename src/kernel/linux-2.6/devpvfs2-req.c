@@ -307,14 +307,14 @@ static ssize_t pvfs2_devreq_writev(
 	if (iov[i].iov_len > num_remaining)
 	{
 	    pvfs2_error("writev error: Freeing buffer and returning\n");
-            dev_req_release(buffer);
+	    dev_req_release(buffer);
 	    return -EMSGSIZE;
 	}
 	ret = copy_from_user(ptr, iov[i].iov_base, iov[i].iov_len);
         if (ret)
         {
             pvfs2_error("Failed to copy data from user space\n");
-            dev_req_release(buffer);
+	    dev_req_release(buffer);
             return -EIO;
         }
 	num_remaining -= iov[i].iov_len;

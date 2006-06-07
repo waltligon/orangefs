@@ -147,7 +147,7 @@ int main(int argc, char **argv)
                 coll_id, op_id, trove_context, &count, NULL, NULL, &state,
                 TROVE_DEFAULT_TEST_TIMEOUT);
 
-	    printf("%s/%s (handle = %llu, uid = %d, gid = %d, perm = %o, type = %d, b_size = %d, k_size = %d)\n",
+	    printf("%s/%s (handle = %llu, uid = %d, gid = %d, perm = %o, type = %d, b_size = %d)\n",
 		   path_name,
 		   (char *) key[i].buffer,
 		   llu(*(TROVE_handle *) val[i].buffer),
@@ -155,8 +155,7 @@ int main(int argc, char **argv)
 		   (int) ds_attr.gid,
 		   ds_attr.mode,
 		   ds_attr.type,
-		   (int) ds_attr.b_size,
-		   (int) ds_attr.k_size);
+		   (int) ds_attr.b_size);
 	    
 
 	}

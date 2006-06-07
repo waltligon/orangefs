@@ -230,7 +230,6 @@ static void pvfs2_read_inode(
 {
     pvfs2_inode_t *pvfs2_inode = NULL;
 
-
     if (inode->u.generic_ip)
     {
         pvfs2_panic("Found an initialized inode in pvfs2_read_inode! "

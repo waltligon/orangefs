@@ -17,6 +17,7 @@
 #include <sys/time.h>
 #include <time.h>
 #include <stdlib.h>
+#include <getopt.h>
 
 #include "pvfs2.h"
 #include "pvfs2-mgmt.h"
@@ -112,9 +113,6 @@ int main(int argc, char **argv)
  */
 static struct options* parse_args(int argc, char* argv[])
 {
-    /* getopt stuff */
-    extern char* optarg;
-    extern int optind, opterr, optopt;
     char flags[] = "vm:M:D:";
     int one_opt = 0;
     int len = 0;
@@ -186,8 +184,8 @@ static struct options* parse_args(int argc, char* argv[])
 
     if(tmp_opts->meta_sync_set != 1 || tmp_opts->data_sync_set != 1)
     {
-	usage(argc, argv);
-	exit(EXIT_FAILURE);
+        usage(argc, argv);
+        exit(EXIT_FAILURE);
     }
 
     if(!tmp_opts->mnt_point_set)
@@ -205,7 +203,8 @@ static struct options* parse_args(int argc, char* argv[])
 static void usage(int argc, char** argv)
 {
     fprintf(stderr, "\n");
-    fprintf(stderr, "Usage  : %s -m <fs_mount_point> -D [0|1] -M [0|1]\n",
+    fprintf(stderr, "Usage  : %s -m <fs_mount_point> "
+                    "-D [0|1] -M [0|1] -T [NUM]\n",
 	argv[0]);
     fprintf(stderr, "  -D   always implicitly sync file data (0=off, 1=on)\n");
     fprintf(stderr, "  -M   always implicitly sync metadata  (0=off, 1=on)\n");

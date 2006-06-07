@@ -295,6 +295,7 @@ static int remove_object_remove_setup_msgpair(PINT_client_sm *sm_p,
 static int remove_datafile_remove_failure(PINT_client_sm *sm_p,
 					  job_status_s *js_p)
 {
+    gossip_err("Error: failed removing one or more datafiles associated with the meta handle %llu\n", llu(sm_p->object_ref.handle));
     HANDLE_REMOVE_ERROR("datafile_remove_failure");
     return 1;
 }
@@ -315,6 +316,7 @@ static int remove_object_remove_failure(PINT_client_sm *sm_p,
     }
     else
     {
+        gossip_err("Error: failed removing handle %llu\n", llu(sm_p->object_ref.handle));
         HANDLE_REMOVE_ERROR("object_remove_failure");
     }
     return 1;

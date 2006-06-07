@@ -20,6 +20,8 @@ pvfs2-1.4.1-pre1
 - ib: move static variables into an allocated struct to avoid namespace
   collisions
 - ib: generalize memcache to be used by multiple consumers, not just VAPI
+- ib: generalize bmi_ib to work with multiple verbs interfaces.  Add support
+  for OpenIB.
 
 pvfs2-1.4.0
 - add a simple sendfile callback stub

@@ -81,6 +81,10 @@ typedef struct filesystem_configuration_s
     int attr_cache_max_num_elems;
     int trove_sync_meta;
     int trove_sync_data;
+    int metadata_sync_coalesce;
+    int immediate_completion;
+    int coalescing_high_watermark;
+    int coalescing_low_watermark;
 
     char *secret_key;
 
@@ -125,6 +129,10 @@ typedef struct server_configuration_s
     char *event_logging;
     char *bmi_modules;              /* BMI modules                      */
     char *flow_modules;             /* Flow modules                     */
+
+    int tcp_buffer_size_receive;    /* Size of TCP receive buffer, is set
+                                       later with setsockopt */
+    int tcp_buffer_size_send;       /* Size of TCP send buffer */
 #ifdef USE_TRUSTED
     int           ports_enabled;    /* Should we enable trusted port connections at all? */
     unsigned long allowed_ports[2]; /* {Min, Max} value of ports from which connections will be allowed */
@@ -138,6 +146,9 @@ typedef struct server_configuration_s
     PINT_llist *file_systems;       /* ptrs are type
                                        filesystem_configuration_s       */
     distribution_configuration default_dist_config;  /* distribution conf */
+    int db_cache_size_bytes;        /* cache size to use in berkeley db
+                                       if zero, use defaults */
+    char * db_cache_type;
 
 } server_configuration_s;
 
@@ -230,6 +241,9 @@ int PINT_config_get_trove_sync_meta(
     struct server_configuration_s *config,
     PVFS_fs_id fs_id);
 int PINT_config_get_trove_sync_data(
+    struct server_configuration_s *config,
+    PVFS_fs_id fs_id);
+int PINT_config_get_trove_meta_flags(
     struct server_configuration_s *config,
     PVFS_fs_id fs_id);
 #endif

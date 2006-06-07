@@ -92,6 +92,9 @@
 /* Define if strerror_r is GNU-specific */
 #undef HAVE_GNU_STRERROR_R
 
+/* Define if libibverbs has ibv_get_devices */
+#undef HAVE_IBV_GET_DEVICES
+
 /* Define if IB wrap_common.h exists. */
 #undef HAVE_IB_WRAP_COMMON_H
 

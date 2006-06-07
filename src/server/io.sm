@@ -114,8 +114,6 @@ static int io_send_ack(PINT_server_op *s_op, job_status_s *js_p)
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
         
-    PINT_STATE_DEBUG("send_ack");
-
     /* this is where we report the file size to the client before
      * starting the I/O transfer, or else report an error if we
      * failed to get the size, or failed for permission reasons
@@ -165,8 +163,6 @@ static int io_start_flow(PINT_server_op *s_op, job_status_s *js_p)
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
         
-    PINT_STATE_DEBUG("start_flow");
-
     s_op->u.io.flow_d = PINT_flow_alloc();
     if (!s_op->u.io.flow_d)
     {
@@ -267,8 +263,6 @@ static int io_release(PINT_server_op *s_op, job_status_s *js_p)
     int ret = 0;
     job_id_t i;
 
-    PINT_STATE_DEBUG("release");
-
     /*
       tell the scheduler that we are done with this operation (if it
       was scheduled in the first place)
@@ -296,8 +290,6 @@ static int io_release(PINT_server_op *s_op, job_status_s *js_p)
 static int io_cleanup(PINT_server_op *s_op, job_status_s *js_p)
 {
     char status_string[64] = {0};
-
-    PINT_STATE_DEBUG("cleanup");
 
     PVFS_strerror_r(s_op->resp.status, status_string, 64);
     PINT_ACCESS_DEBUG(s_op, GOSSIP_ACCESS_DEBUG, "finish (%s)\n", status_string);
@@ -350,8 +342,6 @@ static int io_send_completion_ack(
     job_id_t tmp_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
         
-    PINT_STATE_DEBUG("send_completion_ack");
-
     /* we only send this trailing ack if we are working on a write
      * operation; otherwise just cut out early
      */

@@ -225,27 +225,6 @@ int dbpf_attr_cache_ds_attr_update_cached_data(
     return ret;
 }
 
-int dbpf_attr_cache_ds_attr_update_cached_data_ksize(
-    TROVE_object_ref key, PVFS_size k_size)
-{
-    int ret = -1;
-    dbpf_attr_cache_elem_t *cache_elem = NULL;
-
-    cache_elem = dbpf_attr_cache_elem_lookup(key);
-    if (cache_elem)
-    {
-        if (cache_elem)
-        {
-            cache_elem->attr.k_size = k_size;
-            gossip_debug(GOSSIP_DBPF_ATTRCACHE_DEBUG, "Updating "
-                         "cached k_size for key %llu\n",
-                         llu(key.handle));
-            ret = 0;
-        }
-    }
-    return ret;
-}
-
 int dbpf_attr_cache_ds_attr_update_cached_data_bsize(
     TROVE_object_ref key, PVFS_size b_size)
 {
@@ -475,8 +454,7 @@ int dbpf_attr_cache_insert(
                 gossip_debug(
                     GOSSIP_DBPF_ATTRCACHE_DEBUG,
                     "dbpf_attr_cache_insert: inserting %llu "
-                    "(k_size is %llu | b_size is %llu)\n", llu(key.handle),
-                    llu(cache_elem->attr.k_size),
+                    "(b_size is %llu)\n", llu(key.handle),
                     llu(cache_elem->attr.b_size));
             }
             ret = 0;
