@@ -36,32 +36,6 @@ enum
     MORE_WORK = 1,
 };
 
-static inline char *get_object_type(int objtype)
-{
-    static char *obj_types[] =
-    {
-        "NONE", "METAFILE", "DATAFILE",
-        "DIRECTORY", "SYMLINK", "DIRDATA", "UNKNOWN"
-    };
-
-    switch(objtype)
-    {
-        case PVFS_TYPE_NONE:
-            return obj_types[0];
-        case PVFS_TYPE_METAFILE:
-            return obj_types[1];
-        case PVFS_TYPE_DATAFILE:
-            return obj_types[2];
-        case PVFS_TYPE_DIRECTORY:
-            return obj_types[3];
-        case PVFS_TYPE_SYMLINK:
-            return obj_types[4];
-        case PVFS_TYPE_DIRDATA:
-            return obj_types[5];
-    }
-    return obj_types[6];
-}
-
 static int listattr_cleanup(
     PINT_server_op *s_op, job_status_s *js_p);
 static int listattr_verify_attribs(
@@ -197,8 +171,6 @@ static int listattr_verify_attribs(
     PVFS_ds_attributes *ds_attr = NULL;
     int *resp_error = NULL, *ds_error = NULL;
     PVFS_handle *handle = NULL;
-
-    PINT_STATE_DEBUG("verify_attribs");
 
     js_p->error_code = 0;
 
@@ -412,7 +384,6 @@ static int listattr_read_symlink_target(
     resp_attr = &s_op->resp.u.listattr.attr[s_op->u.listattr.handle_index];
     handle    = &s_op->u.listattr.handles[s_op->u.listattr.handle_index];
 
-    PINT_STATE_DEBUG("read_symlink_target");
 
     js_p->error_code = 0;
     /* if we don't need to fill in the symlink target, skip it */
@@ -462,7 +433,6 @@ static int listattr_read_metafile_datafile_handles_if_required(
     PVFS_object_attr *resp_attr = NULL;
     PVFS_handle *handle = NULL;
 
-    PINT_STATE_DEBUG("read_metafile_datafile_handles_if_required");
 
     resp_attr = &s_op->resp.u.listattr.attr[s_op->u.listattr.handle_index];
     handle    = &s_op->u.listattr.handles[s_op->u.listattr.handle_index];
@@ -555,7 +525,6 @@ static int listattr_read_metafile_distribution_if_required(
     PVFS_object_attr *resp_attr = NULL;
     PVFS_handle *handle = NULL;
 
-    PINT_STATE_DEBUG("read_metafile_distribution_if_required");
     resp_attr = &s_op->resp.u.listattr.attr[s_op->u.listattr.handle_index];
     handle    = &s_op->u.listattr.handles[s_op->u.listattr.handle_index];
 
@@ -622,7 +591,6 @@ static int listattr_setup_resp(PINT_server_op *s_op, job_status_s *js_p)
     resp_attr = &s_op->resp.u.listattr.attr[s_op->u.listattr.handle_index++];
     s_op->u.listattr.nhandles--;
 
-    PINT_STATE_DEBUG("setup_resp");
 
     gossip_debug(
         GOSSIP_LISTATTR_DEBUG,
@@ -742,7 +710,6 @@ static int listattr_setup_resp(PINT_server_op *s_op, job_status_s *js_p)
 static int listattr_cleanup(PINT_server_op *s_op, job_status_s *js_p)
 {
     int i;
-    PINT_STATE_DEBUG("listattr_cleanup");
 
     if (s_op->u.listattr.attr_a)
     {
@@ -824,7 +791,6 @@ static int listattr_get_dirent_count(
     job_id_t tmp_id;
     PVFS_handle *handle = NULL;
 
-    PINT_STATE_DEBUG("get_dirent_count");
     handle    = &s_op->u.listattr.handles[s_op->u.listattr.handle_index];
 
     js_p->error_code = 0;
@@ -853,7 +819,6 @@ static int listattr_interpret_dirent_count(
     PINT_server_op *s_op, job_status_s *js_p)
 {
     PVFS_object_attr *resp_attr = NULL;
-    PINT_STATE_DEBUG("interpret_dirent_count");
 
     resp_attr = &s_op->resp.u.listattr.attr[s_op->u.listattr.handle_index];
     resp_attr->u.dir.dirent_count = s_op->u.listattr.dirent_count;

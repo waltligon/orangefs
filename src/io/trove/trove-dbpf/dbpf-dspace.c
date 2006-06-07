@@ -1147,7 +1147,7 @@ static int dbpf_dspace_getattr_list_op_svc(struct dbpf_op *op_p)
             llu(b_size), llu(k_size));
 
         attr = &op_p->u.d_getattr_list.attr_p[i];
-        trove_ds_stored_to_attr(s_attr, *attr, b_size, k_size);
+        trove_ds_stored_to_attr(s_attr, *attr, b_size);
 
         /* add retrieved ds_attr to dbpf_attr cache here */
         gen_mutex_lock(&dbpf_attr_cache_mutex);
