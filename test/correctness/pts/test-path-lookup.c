@@ -36,7 +36,7 @@ static int build_nested_path(
     PVFS_sysresp_mkdir mkdir_resp;
     PVFS_sysresp_symlink symlink_resp;
     char PATH_LOOKUP_BASE_DIR[64] = {0};
-    PVFS_object_ref root_refn, parent_refn, base_refn;
+    PVFS_object_ref root_refn = {0,0}, parent_refn = {0,0}, base_refn = {0,0};
     PVFS_object_ref *newdir_refns = NULL;
     PVFS_object_ref *lookup_refns = NULL;
     PVFS_object_ref *rsymlink_refns = NULL;
