@@ -1159,17 +1159,6 @@ static ssize_t do_readx_writex(int type, struct file *file,
                 (long) xtvecptr[seg].xtv_len);
     }
 #endif
-    for (seg = 0; seg < seg_count_stream; seg++)
-    {
-        if (seg_array_stream[seg] > 100) {
-            ret = -EINVAL;
-            pvfs2_error("%s: Error! Too many stream segments (%d) [max. stream vector: 100]\n",
-                    fnstr, seg_array_stream[seg]);
-            pvfs2_error("This limit can be raised by changing PVFS_REQ_LIMIT_PINT_REQUEST_NUM "
-                    " in src/io/description/pint-request-encode.h\n");
-            goto out;
-        }
-    }
     seg = 0;
     ptr = iovecptr;
     xptr = xtvecptr;

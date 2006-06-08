@@ -43,6 +43,7 @@
 */
 #define MAX_NUM_OPS                 64
 #define MAX_LIST_SIZE      MAX_NUM_OPS
+#define IOX_HINDEXED_COUNT          64
 
 #define REMOUNT_PENDING     0xFFEEFF33
 #define OP_IN_PROGRESS      0xFFEEFF34
@@ -123,7 +124,10 @@ typedef struct
     job_status_s jstat;
     struct PINT_dev_unexp_info info;
 
+    /* iox requests may post multiple operations at one shot */
+    int num_ops, num_incomplete_ops;
     PVFS_sys_op_id op_id;
+    PVFS_sys_op_id *op_ids;
 
 #ifdef USE_MMAP_RA_CACHE
     void *io_tmp_buf;
@@ -135,10 +139,12 @@ typedef struct
     PVFS_ds_keyval  key;/* used only by geteattr, seteattr */
     PVFS_ds_keyval  val;
     void *io_kernel_mapped_buf;
-    /* The next 3 fields are used only by readx, writex */
+    /* The next few fields are used only by readx, writex */
     int32_t  iox_count;
     int32_t  *iox_sizes;
     PVFS_size *iox_offsets;
+    PVFS_Request *file_req_a;
+    PVFS_Request *mem_req_a;
 
     struct PVFS_sys_mntent* mntent; /* used only by mount */
 
@@ -160,6 +166,7 @@ typedef struct
         PVFS_sysresp_geteattr geteattr;
         PVFS_sysresp_listeattr listeattr;
         PVFS_sysresp_readdirplus readdirplus;
+        PVFS_sysresp_io *iox;
     } response;
 
 #ifdef CLIENT_CORE_OP_TIMING
@@ -1540,75 +1547,185 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
 
 static PVFS_error post_iox_request(vfs_request_t *vfs_request)
 {
-    int32_t i;
+    int32_t i, num_ops_posted, iox_count, iox_index;
+    int32_t *mem_sizes = NULL;
     PVFS_error ret = -PVFS_EINVAL;
     struct read_write_x *rwx = (struct read_write_x *) vfs_request->in_upcall.trailer_buf;
 
     if (vfs_request->in_upcall.trailer_size <= 0 || rwx == NULL)
     {
         gossip_err("post_iox_request: did not receive any offset-length trailers\n");
-        return ret;
+        goto out;
     }
     gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "%s: size %ld\n",
             vfs_request->in_upcall.req.iox.io_type == PVFS_IO_READ ? "readx" : "writex",
             (unsigned long) vfs_request->in_upcall.req.iox.count);
-    ret = PVFS_Request_contiguous(
-        (int32_t)vfs_request->in_upcall.req.iox.count,
-        PVFS_BYTE, &vfs_request->mem_req);
-    assert(ret == 0);
 
-    assert((vfs_request->in_upcall.req.iox.buf_index > -1) &&
-           (vfs_request->in_upcall.req.iox.buf_index <
-            PVFS2_BUFMAP_DESC_COUNT));
+    if ((vfs_request->in_upcall.req.iox.buf_index < 0) ||
+           (vfs_request->in_upcall.req.iox.buf_index >= PVFS2_BUFMAP_DESC_COUNT))
+    {
+        gossip_err("post_iox_request: invalid buffer index %d\n",
+                vfs_request->in_upcall.req.iox.buf_index);
+        goto out;
+    }
 
     /* get a shared kernel/userspace buffer for the I/O transfer */
     vfs_request->io_kernel_mapped_buf = 
         PINT_dev_get_mapped_buffer(BM_IO, s_io_desc, 
             vfs_request->in_upcall.req.iox.buf_index);
-    assert(vfs_request->io_kernel_mapped_buf);
+    if (vfs_request->io_kernel_mapped_buf == NULL)
+    {
+        gossip_err("post_iox_request: PINT_dev_get_mapped_buffer failed\n");
+        goto out;
+    }
 
     /* trailer is interpreted as struct read_write_x */
-    assert(vfs_request->in_upcall.trailer_size % sizeof(struct read_write_x) == 0);
+    if (vfs_request->in_upcall.trailer_size % sizeof(struct read_write_x) != 0)
+    {
+        gossip_err("post_iox_request: trailer size (%Ld) is not a multiple of read_write_x structure (%ld)\n",
+            lld(vfs_request->in_upcall.trailer_size),
+            (long) sizeof(struct read_write_x));
+        goto out;
+    }
     vfs_request->iox_count = vfs_request->in_upcall.trailer_size / sizeof(struct read_write_x);
-    vfs_request->iox_sizes = (int32_t *) malloc(vfs_request->iox_count * sizeof(int32_t));
-    assert(vfs_request->iox_sizes);
-    vfs_request->iox_offsets = (PVFS_size *) malloc(vfs_request->iox_count * sizeof(PVFS_size));
-    assert(vfs_request->iox_offsets);
+    /* We will split this in units of IOX_HINDEXED_COUNT */
+    num_ops_posted = (vfs_request->iox_count / IOX_HINDEXED_COUNT);
+    if (vfs_request->iox_count % IOX_HINDEXED_COUNT != 0)
+        num_ops_posted++;
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "iox: iox_count %d, num_ops_posted %d\n",
+            vfs_request->iox_count, num_ops_posted);
+    vfs_request->num_ops = vfs_request->num_incomplete_ops = num_ops_posted;
+    ret = -PVFS_ENOMEM;
+    mem_sizes = (int32_t *) calloc(num_ops_posted, sizeof(int32_t));
+    if (mem_sizes == NULL)
+    {
+        gossip_err("post_iox_request: mem_sizes allocation failed\n");
+        goto out;
+    }
+    vfs_request->iox_sizes = (int32_t *) calloc(vfs_request->iox_count, sizeof(int32_t));
+    if (vfs_request->iox_sizes == NULL)
+    {
+        gossip_err("post_iox_request: iox_sizes allocation failed\n");
+        goto out;
+    }
+    vfs_request->iox_offsets = (PVFS_size *) calloc(vfs_request->iox_count, sizeof(PVFS_size));
+    if (vfs_request->iox_offsets == NULL)
+    {
+        gossip_err("post_iox_request: iox_offsets allocation failed\n");
+        goto err_sizes;
+    }
     for (i = 0; i < vfs_request->iox_count; i++)
     {
         vfs_request->iox_sizes[i] = (int32_t) rwx->len;
         vfs_request->iox_offsets[i] = rwx->off;
+        mem_sizes[i/IOX_HINDEXED_COUNT] += (int32_t) rwx->len;
         rwx++;
     }
-    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "iox: iox_count %d\n", vfs_request->iox_count);
-    /* file request is now a hindexed request type */
-    ret = PVFS_Request_hindexed(vfs_request->iox_count, 
-            vfs_request->iox_sizes, vfs_request->iox_offsets, PVFS_BYTE, 
-            &vfs_request->file_req);
-    assert(ret == 0);
-
-    ret = PVFS_isys_io(
-        vfs_request->in_upcall.req.iox.refn, vfs_request->file_req,
-        0, 
-        vfs_request->io_kernel_mapped_buf, vfs_request->mem_req,
-        &vfs_request->in_upcall.credentials,
-        &vfs_request->response.io,
-        vfs_request->in_upcall.req.iox.io_type,
-        &vfs_request->op_id, (void *)vfs_request);
-
-    if (ret < 0)
+    vfs_request->op_ids = (PVFS_sys_op_id *) malloc(num_ops_posted * sizeof(PVFS_sys_op_id));
+    if (vfs_request->op_ids == NULL)
     {
-        PVFS_perror_gossip("Posting file I/O failed", ret);
-        free(vfs_request->iox_sizes);
-        vfs_request->iox_sizes = NULL;
-        free(vfs_request->iox_offsets);
-        vfs_request->iox_offsets = NULL;
+        gossip_err("post_iox_request: op_ids allocation failed\n");
+        goto err_offsets;
+    }
+    vfs_request->file_req_a = (PVFS_Request *) malloc(num_ops_posted * sizeof(PVFS_Request));
+    if (vfs_request->file_req_a == NULL)
+    {
+        gossip_err("post_iox_request: file_req_a allocation failed\n");
+        goto err_opids;
+    }
+    vfs_request->mem_req_a  = (PVFS_Request *) malloc(num_ops_posted * sizeof(PVFS_Request));
+    if (vfs_request->mem_req_a == NULL)
+    {
+        gossip_err("post_iox_request: mem_req_a allocation failed\n");
+        goto err_filereq;
+    }
+    vfs_request->response.iox = (PVFS_sysresp_io *) malloc(num_ops_posted * sizeof(PVFS_sysresp_io)); 
+    if (vfs_request->response.iox == NULL)
+    {
+        gossip_err("post_iox_request: iox response allocation failed\n");
+        goto err_memreq;
+    }
+    iox_index = 0;
+    iox_count = vfs_request->iox_count;
+    ret = 0;
+    for (i = 0; i < num_ops_posted; i++)
+    {
+        int32_t iox_stage;
+
+        assert(iox_count >= 0);
+        assert(iox_index >= 0 && iox_index < vfs_request->iox_count);
+        iox_stage = PVFS_util_min(IOX_HINDEXED_COUNT, iox_count);
+        /* Construct a mem request type for this portion */
+        ret = PVFS_Request_contiguous(mem_sizes[i], PVFS_BYTE,
+                &vfs_request->mem_req_a[i]);
+        if (ret != 0)
+        {
+            gossip_err("post_iox_request: request_contiguous failed mem_sizes[%d] = %d\n",
+                    i, mem_sizes[i]);
+            break;
+        }
+        /* file request is now a hindexed request type */
+        ret = PVFS_Request_hindexed(iox_stage, 
+                &vfs_request->iox_sizes[iox_index],
+                &vfs_request->iox_offsets[iox_index],
+                PVFS_BYTE, 
+                &vfs_request->file_req_a[i]);
+        if (ret != 0)
+        {
+            gossip_err("post_iox_request: request_hindexed failed\n");
+            break;
+        }
+        /* post the I/O */
+        ret = PVFS_isys_io(
+            vfs_request->in_upcall.req.iox.refn, vfs_request->file_req_a[i],
+            0, 
+            vfs_request->io_kernel_mapped_buf, vfs_request->mem_req_a[i],
+            &vfs_request->in_upcall.credentials,
+            &vfs_request->response.iox[i],
+            vfs_request->in_upcall.req.iox.io_type,
+            &vfs_request->op_ids[i],
+            (void *)vfs_request);
+
+        if (ret < 0)
+        {
+            PVFS_perror_gossip("Posting file I/O failed", ret);
+            break;
+        }
+        iox_count -= iox_stage;
+        iox_index += iox_stage;
+    }
+    if (i != num_ops_posted)
+    {
+        int j;
+        for (j = 0; j < i; j++)
+        {
+            /* cancel previously posted I/O's */
+            PINT_client_io_cancel(vfs_request->op_ids[j]);
+            PVFS_Request_free(&vfs_request->mem_req_a[j]);
+            PVFS_Request_free(&vfs_request->file_req_a[j]);
+        }
         free(vfs_request->in_upcall.trailer_buf);
         vfs_request->in_upcall.trailer_buf = NULL;
-        PVFS_Request_free(&vfs_request->mem_req);
-        PVFS_Request_free(&vfs_request->file_req);
+        goto err_iox;
     }
+    vfs_request->op_id = vfs_request->op_ids[0];
+    ret = 0;
+out:
+    free(mem_sizes);
     return ret;
+err_iox:
+    free(vfs_request->response.iox);
+err_memreq:
+    free(vfs_request->mem_req_a);
+err_filereq:
+    free(vfs_request->file_req_a);
+err_opids:
+    free(vfs_request->op_ids);
+err_offsets:
+    free(vfs_request->iox_offsets);
+err_sizes:
+    free(vfs_request->iox_sizes);
+    goto out;
 }
 
 
@@ -2242,23 +2359,36 @@ static inline void package_downcall_members(
             }
             break;
         case PVFS2_VFS_OP_FILE_IOX:
-            free(vfs_request->iox_sizes);
-            vfs_request->iox_sizes = NULL;
+        {
+            int j;
+
+            vfs_request->out_downcall.resp.iox.amt_complete = 0;
+            for (j = 0; j < vfs_request->num_ops; j++)
+            {
+                vfs_request->out_downcall.resp.iox.amt_complete +=
+                    vfs_request->response.iox[j].total_completed;
+            }
+            free(vfs_request->response.iox);
+            for (j = 0; j < vfs_request->num_ops; j++)
+            {
+                PVFS_Request_free(&vfs_request->mem_req_a[j]);
+                PVFS_Request_free(&vfs_request->file_req_a[j]);
+            }
+            free(vfs_request->mem_req_a);
+            free(vfs_request->file_req_a);
+            free(vfs_request->op_ids);
             free(vfs_request->iox_offsets);
-            vfs_request->iox_offsets = NULL;
+            free(vfs_request->iox_sizes);
             free(vfs_request->in_upcall.trailer_buf);
             vfs_request->in_upcall.trailer_buf = NULL;
-            PVFS_Request_free(&vfs_request->mem_req);
-            PVFS_Request_free(&vfs_request->file_req);
-
-            vfs_request->out_downcall.resp.iox.amt_complete =
-                (size_t)vfs_request->response.io.total_completed;
+            
             /* replace non-errno error code to avoid passing to kernel */
             if (*error_code == -PVFS_ECANCEL)
             {
                 *error_code = -PVFS_EINTR;
             }
             break;
+        }
         case PVFS2_VFS_OP_GETXATTR:
             if (*error_code == 0)
             {
@@ -2451,6 +2581,9 @@ static inline PVFS_error handle_unexp_vfs_request(
     PINT_time_mark(&vfs_request->start);
 #endif
 
+    vfs_request->num_ops = 1;
+    vfs_request->num_incomplete_ops = 1;
+    vfs_request->op_ids  = NULL;
     switch(vfs_request->in_upcall.type)
     {
         case PVFS2_VFS_OP_LOOKUP:
@@ -2694,9 +2827,27 @@ static PVFS_error process_vfs_requests(void)
             vfs_request = vfs_request_array[i];
             assert(vfs_request);
 /*             assert(vfs_request->op_id == op_id_array[i]); */
-            if (vfs_request->op_id != op_id_array[i])
+            if (vfs_request->num_ops == 1 &&
+                    vfs_request->op_id != op_id_array[i])
             {
+                gossip_err("op_id %Ld != completed op id %Ld\n",
+                        lld(vfs_request->op_id), lld(op_id_array[i]));
                 continue;
+            }
+            else if (vfs_request->num_ops > 1)
+            {
+                int j;
+                /* assert that completed op is one that we posted earlier */
+                for (j = 0; j < vfs_request->num_ops; j++) {
+                    if (op_id_array[i] == vfs_request->op_ids[j])
+                        break;
+                }
+                if (j == vfs_request->num_ops)
+                {
+                    gossip_err("completed op id (%Ld) is weird\n",
+                            lld(op_id_array[i]));
+                    continue;
+                }
             }
 
             /* check if this is a new dev unexp request */
@@ -2715,6 +2866,10 @@ static PVFS_error process_vfs_requests(void)
             }
             else
             {
+                vfs_request->num_incomplete_ops--;
+                /* if operation is not complete, we gotta continue */
+                if (vfs_request->num_incomplete_ops != 0)
+                    continue;
                 log_operation_timing(vfs_request);
 
                 gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "PINT_sys_testsome"
