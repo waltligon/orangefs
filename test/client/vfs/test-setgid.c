@@ -464,7 +464,6 @@ int parse_args(
 
     if(ret != TEST_COMMON_SUCCESS)
     {
-        print_error("Unable to process arguments\n");
         usage();
         return(-1);
     }

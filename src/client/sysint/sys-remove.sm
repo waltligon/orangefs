@@ -355,7 +355,7 @@ static int remove_crdirent_setup_msgpair(PINT_client_sm *sm_p,
                  sm_p->parent_ref.fs_id);
 
     msg_p->fs_id = sm_p->parent_ref.fs_id;
-    msg_p->handle = sm_p->object_ref.handle;
+    msg_p->handle = sm_p->parent_ref.handle;
     msg_p->retry_flag = PVFS_MSGPAIR_NO_RETRY;
     msg_p->comp_fn = remove_crdirent_comp_fn;
 
@@ -546,7 +546,7 @@ static int remove_rmdirent_retry_or_fail(PINT_client_sm *sm_p,
             sm_p->u.remove.object_name);
 
         PRINT_REMOVE_WARNING();
-        js_p->error_code = 0;
+        js_p->error_code = -PVFS_ENOENT;
         return 1;
     }
 

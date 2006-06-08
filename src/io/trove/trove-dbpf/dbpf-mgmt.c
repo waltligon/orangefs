@@ -45,6 +45,7 @@ int dbpf_method_id = -1;
 char dbpf_method_name[] = "dbpf";
 
 extern int TROVE_db_cache_size_bytes;
+extern int TROVE_shm_key_hint;
 
 struct dbpf_storage *my_storage_p = NULL;
 static int db_open_count, db_close_count;
@@ -63,12 +64,22 @@ DB_ENV *dbpf_getdb_env(const char *path, unsigned int env_flags, int *error)
         *error = -EINVAL;
         return NULL;
     }
+  
+    /* we start by making sure any old environment remnants are cleaned up */
+    ret = db_env_create(&dbenv, 0);
+    if (ret != 0) 
+    {
+        gossip_err("dbpf_putdb_env: could not create any environment handle: %s\n", db_strerror(ret));
+        return 0;
+    }
+    /* don't check return code here; we don't care if it fails */
+    dbenv->remove(dbenv, path, DB_FORCE);
 
 retry:
     ret = db_env_create(&dbenv, 0);
     if (ret != 0)
     {
-        gossip_lerr("dbpf_getdb_env: %s\n", db_strerror(ret));
+        gossip_err("dbpf_getdb_env: %s\n", db_strerror(ret));
         *error = ret;
         return NULL;
     }
@@ -99,7 +110,7 @@ retry:
                              DB_INIT_MPOOL|DB_CREATE|DB_THREAD, 0);
         if(ret != 0)
         {
-            gossip_lerr("dbpf_getdb_env(%s): %s\n", path, db_strerror(ret));
+            gossip_err("dbpf_getdb_env(%s): %s\n", path, db_strerror(ret));
             *error = ret;
             return NULL;
         }
@@ -107,11 +118,12 @@ retry:
     else
     {
         /* default to using shm style cache */
-
-        ret = dbenv->set_shm_key(dbenv, 646567223);
+        gossip_debug(GOSSIP_TROVE_DEBUG, "dbpf using shm key: %d\n",
+            (646567223+TROVE_shm_key_hint));
+        ret = dbenv->set_shm_key(dbenv, (646567223+TROVE_shm_key_hint));
         if(ret != 0)
         {
-            gossip_lerr("dbenv->set_shm_key(%s): %s\n",
+            gossip_err("dbenv->set_shm_key(%s): %s\n",
                         path, db_strerror(ret));
             *error = ret;
             return NULL;
@@ -144,9 +156,18 @@ retry:
             goto retry;
         }
 
+        if(ret == DB_RUNRECOVERY)
+        {
+            gossip_err("dbpf_getdb_env(): DB_RUNRECOVERY on environment open.\n");
+            gossip_err(
+            "\n\n"
+            "    Please make sure that you have not chosen a DBCacheSizeBytes\n"
+            "    configuration file value that is too large for your machine.\n\n"); 
+        }
+
         if(ret != 0)
         {
-            gossip_lerr("dbpf_getdb_env(%s): %s\n", path, db_strerror(ret));
+            gossip_err("dbpf_getdb_env(%s): %s\n", path, db_strerror(ret));
             *error = ret;
             return NULL;
         }

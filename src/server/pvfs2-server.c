@@ -107,12 +107,12 @@ static options_t s_server_options = { 0, 0, 1, NULL };
 
 PINT_server_trove_keys_s Trove_Common_Keys[] =
 {
-    {"root_handle", 12},
-    {"dir_ent", 8},
-    {"datafile_handles", 17},
-    {"metafile_dist", 14},
-    {"symlink_target", 15},
-    {"dirdata_size", 13}
+    {"rh", 2}, /* root handle */
+    {"de", 2}, /* directory entry */
+    {"dh", 2}, /* datafile handles */
+    {"md", 2}, /* metafile dist */
+    {"st", 2}, /* symlink target */
+    {"ds", 2} /* dirdata size */
 };
 
 /* extended attribute name spaces supported in PVFS2 */
@@ -155,6 +155,7 @@ static void bt_sighandler(int sig, siginfo_t *info, void *secret);
 static int create_pidfile(char *pidfile);
 static void write_pidfile(int fd);
 static void remove_pidfile(void);
+static int parse_port_from_host_id(char* host_id);
 
 /* table of incoming request types and associated parameters */
 struct PINT_server_req_params PINT_server_req_table[] =
@@ -901,6 +902,7 @@ static int server_initialize_subsystems(
     char buf[16] = {0};
     PVFS_fs_id orig_fsid;
     PVFS_ds_flags init_flags = 0;
+    int port_num = 0;
 
     /* Initialize distributions */
     ret = PINT_dist_initialize(0);
@@ -945,6 +947,16 @@ static int server_initialize_subsystems(
                                    &server_config.db_cache_size_bytes);
     /* this should never fail */
     assert(ret == 0);
+
+    /* parse port number and allow trove to use it to help differentiate
+     * shmem regions if needed
+     */
+    port_num = parse_port_from_host_id(server_config.host_id);
+    if(port_num > 0)
+    {
+        ret = trove_collection_setinfo(0, 0, TROVE_SHM_KEY_HINT, &port_num);
+        assert(ret == 0);
+    }
 
     if(server_config.db_cache_type && (!strcmp(server_config.db_cache_type,
                                                "mmap")))
@@ -1848,6 +1860,37 @@ int server_state_machine_complete(PINT_server_op *s_op)
 struct server_configuration_s *get_server_config_struct(void)
 {
     return &server_config;
+}
+
+/* parse_port_from_host_id()
+ *
+ * attempts to parse the port number from a BMI address.  Returns port number
+ * on success, -1 on failure
+ */
+static int parse_port_from_host_id(char* host_id)
+{
+    int ret = -1;
+    int port_num;
+    char* port_index;
+    char* colon_index;
+
+    /* see if we have a <proto>://<hostname>:<port> format */
+    port_index = rindex(host_id, ':');
+    colon_index = index(host_id, ':');
+    /* if so, parse the port number */
+    if(port_index && (port_index != colon_index))
+    {
+        port_index++;
+        ret = sscanf(port_index, "%d", &port_num);
+    }
+
+    /* report error if we don't find a valid port number in the string */
+    if(ret != 1)
+    {
+        return(-1);
+    }
+    
+    return(port_num);
 }
 
 /*
