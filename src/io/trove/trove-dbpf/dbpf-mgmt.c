@@ -176,7 +176,7 @@ int dbpf_putdb_env(DB_ENV *dbenv, const char *path)
         gossip_err("dbpf_putdb_env: could not create any environment handle: %s\n", db_strerror(ret));
         return 0;
     }
-    ret = dbenv->remove(dbenv, path, 0);
+    ret = dbenv->remove(dbenv, path, DB_FORCE);
     if (ret != 0) 
     {
         gossip_err("dbpf_putdb_env: could not remove environment handle: %s\n", db_strerror(ret));
@@ -1287,39 +1287,11 @@ static int dbpf_collection_lookup(char *collname,
         return -dbpf_db_error_to_trove_error(ret);
     }
 
-    DBPF_GET_DS_ATTRIB_DBNAME(path_name, PATH_MAX,
-                              sto_p->name, coll_p->coll_id);
-    coll_p->ds_db = dbpf_db_open(sto_p->name, path_name, coll_p->coll_env, &ret, &PINT_trove_dbpf_ds_attr_compare);
-    if (coll_p->ds_db == NULL)
-    {
-        dbpf_putdb_env(coll_p->coll_env, coll_p->path_name);
-        free(coll_p->path_name);
-        free(coll_p->name);
-        free(coll_p);
-        return ret;
-    }
-
-    DBPF_GET_KEYVAL_DBNAME(path_name, PATH_MAX,
-                           sto_p->name, coll_p->coll_id);
-    coll_p->keyval_db = dbpf_db_open(sto_p->name, path_name, coll_p->coll_env, &ret, 
-                                     PINT_trove_dbpf_keyval_compare);
-    if(coll_p->keyval_db == NULL)
-    {
-        db_close(coll_p->ds_db);
-        dbpf_putdb_env(coll_p->coll_env, coll_p->path_name);
-        free(coll_p->path_name);
-        free(coll_p->name);
-        free(coll_p);
-        return ret;
-    }
-
     DBPF_GET_COLL_ATTRIB_DBNAME(path_name, PATH_MAX,
                                 sto_p->name, coll_p->coll_id);
     coll_p->coll_attr_db = dbpf_db_open(sto_p->name, path_name, coll_p->coll_env, &ret, NULL);
     if (coll_p->coll_attr_db == NULL)
     {
-        db_close(coll_p->keyval_db);
-        db_close(coll_p->ds_db);
         dbpf_putdb_env(coll_p->coll_env, coll_p->path_name);
         free(coll_p->path_name);
         free(coll_p->name);
@@ -1344,8 +1316,6 @@ static int dbpf_collection_lookup(char *collname,
         gossip_err("Failed to retrieve collection version: %s\n",
                    db_strerror(ret));
         db_close(coll_p->coll_attr_db);
-        db_close(coll_p->keyval_db);
-        db_close(coll_p->ds_db);
         dbpf_putdb_env(coll_p->coll_env, coll_p->path_name);
         free(coll_p->path_name);
         free(coll_p->name);
@@ -1359,8 +1329,6 @@ static int dbpf_collection_lookup(char *collname,
     if (strcmp(trove_dbpf_version, TROVE_DBPF_VERSION_VALUE) != 0)
     {
         db_close(coll_p->coll_attr_db);
-        db_close(coll_p->keyval_db);
-        db_close(coll_p->ds_db);
         dbpf_putdb_env(coll_p->coll_env, coll_p->path_name);
         free(coll_p->path_name);
         free(coll_p->name);
@@ -1371,6 +1339,34 @@ static int dbpf_collection_lookup(char *collname,
         gossip_err("This code understands version %s\n",
                    TROVE_DBPF_VERSION_VALUE);
         return -TROVE_EINVAL;
+    }
+
+    DBPF_GET_DS_ATTRIB_DBNAME(path_name, PATH_MAX,
+                              sto_p->name, coll_p->coll_id);
+    coll_p->ds_db = dbpf_db_open(sto_p->name, path_name, coll_p->coll_env, &ret, &PINT_trove_dbpf_ds_attr_compare);
+    if (coll_p->ds_db == NULL)
+    {
+        db_close(coll_p->coll_attr_db);
+        dbpf_putdb_env(coll_p->coll_env, coll_p->path_name);
+        free(coll_p->path_name);
+        free(coll_p->name);
+        free(coll_p);
+        return ret;
+    }
+
+    DBPF_GET_KEYVAL_DBNAME(path_name, PATH_MAX,
+                           sto_p->name, coll_p->coll_id);
+    coll_p->keyval_db = dbpf_db_open(sto_p->name, path_name, coll_p->coll_env, &ret, 
+                                     PINT_trove_dbpf_keyval_compare);
+    if(coll_p->keyval_db == NULL)
+    {
+        db_close(coll_p->coll_attr_db);
+        db_close(coll_p->ds_db);
+        dbpf_putdb_env(coll_p->coll_env, coll_p->path_name);
+        free(coll_p->path_name);
+        free(coll_p->name);
+        free(coll_p);
+        return ret;
     }
 
     coll_p->pcache = PINT_dbpf_keyval_pcache_initialize();
