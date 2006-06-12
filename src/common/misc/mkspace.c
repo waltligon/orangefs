@@ -24,9 +24,9 @@
 #include "pvfs2-util.h"
 #include "pvfs2-internal.h"
 
-static char *dir_ent_string = "dir_ent";
+static char *dir_ent_string = "de";
 static char *dirdata_size_string = "dirdata_size";
-static char *root_handle_string = "root_handle";
+static char *root_handle_string = "rh";
 static char *lost_and_found_string = "lost+found";
 
 static TROVE_handle s_used_handles[4] =
