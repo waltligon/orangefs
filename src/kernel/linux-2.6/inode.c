@@ -240,14 +240,23 @@ static int pvfs2_readpages(
     return mpage_readpages(mapping, pages, nr_pages, pvfs2_get_block);
 }
 
+#ifdef HAVE_INT_RETURN_ADDRESS_SPACE_OPERATIONS_INVALIDATEPAGE
 static int pvfs2_invalidatepage(struct page *page, unsigned long offset)
+#else
+static void pvfs2_invalidatepage(struct page *page, unsigned long offset)
+#endif
 {
     pvfs2_print("pvfs2_invalidatepage called on page %p "
                 "(offset is %lu)\n", page, offset);
 
     ClearPageUptodate(page);
     ClearPageMappedToDisk(page);
+#ifdef HAVE_INT_RETURN_ADDRESS_SPACE_OPERATIONS_INVALIDATEPAGE
     return 0;
+#else
+    return;
+#endif
+
 }
 
 #ifdef HAVE_INT_ARG2_ADDRESS_SPACE_OPERATIONS_RELEASEPAGE
