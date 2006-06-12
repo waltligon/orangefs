@@ -107,12 +107,12 @@ static options_t s_server_options = { 0, 0, 1, NULL };
 
 PINT_server_trove_keys_s Trove_Common_Keys[] =
 {
-    {"rh", 2}, /* root handle */
-    {"de", 2}, /* directory entry */
-    {"dh", 2}, /* datafile handles */
-    {"md", 2}, /* metafile dist */
-    {"st", 2}, /* symlink target */
-    {"ds", 2} /* dirdata size */
+    {"rh", 3}, /* root handle */
+    {"de", 3}, /* directory entry */
+    {"dh", 3}, /* datafile handles */
+    {"md", 3}, /* metafile dist */
+    {"st", 3}, /* symlink target */
+    {"ds", 3} /* dirdata size */
 };
 
 /* extended attribute name spaces supported in PVFS2 */
