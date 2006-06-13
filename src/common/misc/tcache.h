@@ -31,10 +31,12 @@
  * payload.
  * .
  * Terminology:
- * - PURGE: Process of removing and delete a single entry from the CACHE
+ * - DELETE: Process of removing a specific entry at the request of the caller
+ * - PURGE: Process of removing an entry because there is not enough room in
+ *   the cache (see RECLAIM)
  * - EXPIRED: CACHE entry that is older than CACHE_TIMEOUT_MSECS and is
  *   still in the CACHE
- * - RECLAIM: Process of removing up to CACHE_RECLAIM_PERCENTAGE
+ * - RECLAIM: Process of purging up to CACHE_RECLAIM_PERCENTAGE
  *   entries from the CACHE that are EXPIRED
  * - REFRESH: Process of updating an existing entry in cache with a
  *   new CACHE_TIMEOUT_MSECS
@@ -150,7 +152,7 @@ int PINT_tcache_insert_entry(
     struct PINT_tcache* tcache,
     void* key,
     void* payload,
-    int* removed);
+    int* purged);
 
 int PINT_tcache_lookup(
     struct PINT_tcache* tcache,
@@ -162,7 +164,7 @@ int PINT_tcache_reclaim(
     struct PINT_tcache* tcache,
     int* reclaimed);
 
-int PINT_tcache_purge(
+int PINT_tcache_delete(
     struct PINT_tcache* tcache,
     struct PINT_tcache_entry* entry);
 

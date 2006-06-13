@@ -30,6 +30,8 @@
  *
  * Notes:
  * - See tcache for policy documentation
+ * - Note that the acache never explicitly deletes an entry.  Instead, it
+ *   will invalidate an entry but leave it in the cache.
  * .
  *
  * Operations that may retrieve items from acache:
@@ -56,7 +58,7 @@
  * - symlink
  * .
  *
- * Operations that may purge items from the cache:
+ * Operations that may invalidate items in the cache:
  * - remove
  * - rename
  * - io (size only)
@@ -91,7 +93,8 @@ enum
    PERF_ACACHE_UPDATES = 5,
    PERF_ACACHE_PURGES = 6,
    PERF_ACACHE_REPLACEMENTS = 7,
-   PERF_ACACHE_ENABLED = 8,
+   PERF_ACACHE_DELETIONS = 8,
+   PERF_ACACHE_ENABLED = 9,
 };
 
 /** acache performance counter keys */
