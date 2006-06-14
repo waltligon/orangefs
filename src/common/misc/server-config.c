@@ -540,7 +540,9 @@ static const configoption_t options[] =
      * AttrCacheKeywords dh,md,de,st
      */
     {"AttrCacheKeywords",ARG_LIST, get_attr_cache_keywords_list,NULL,
-        CTX_STORAGEHINTS, "dh,md,de,st"},
+        CTX_STORAGEHINTS, 
+        DATAFILE_HANDLES_KEYSTR","METAFILE_DIST_KEYSTR","
+        DIRECTORY_ENTRY_KEYSTR","SYMLINK_TARGET_KEYSTR},
     
     /* The attribute cache in the TROVE layer mentioned in the documentation
      * for the AttrCacheKeywords option is managed as a hashtable.  The
@@ -1324,6 +1326,29 @@ DOTCONF_CB(get_attr_cache_keywords_list)
         strncat(ptr, cmd->data.list[i], 512 - len);
         len += strlen(cmd->data.list[i]);
     }
+
+    /* check for old keyval strings */
+    if(strstr(fs_conf->attr_cache_keywords, "dir_ent"))
+    {
+        strncat(ptr, "de,", 512 - len);
+        len += 3;
+    }
+    if(strstr(fs_conf->attr_cache_keywords, "datafile_handles"))
+    {
+        strncat(ptr, "dh,", 512 - len);
+        len += 3;
+    }
+    if(strstr(fs_conf->attr_cache_keywords, "metafile_dist"))
+    {
+        strncat(ptr, "md,", 512 - len);
+        len += 3;
+    }
+    if(strstr(fs_conf->attr_cache_keywords, "symlink_target"))
+    {
+        strncat(ptr, "st,", 512 - len);
+        len += 3;
+    }
+
     fs_conf->attr_cache_keywords = strdup(buf);
     return NULL;
 }
