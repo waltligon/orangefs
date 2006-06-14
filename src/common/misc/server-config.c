@@ -1328,22 +1328,22 @@ DOTCONF_CB(get_attr_cache_keywords_list)
     }
 
     /* check for old keyval strings */
-    if(strstr(fs_conf->attr_cache_keywords, "dir_ent"))
+    if(strstr(buf, "dir_ent"))
     {
         strncat(ptr, "de,", 512 - len);
         len += 3;
     }
-    if(strstr(fs_conf->attr_cache_keywords, "datafile_handles"))
+    if(strstr(buf, "datafile_handles"))
     {
         strncat(ptr, "dh,", 512 - len);
         len += 3;
     }
-    if(strstr(fs_conf->attr_cache_keywords, "metafile_dist"))
+    if(strstr(buf, "metafile_dist"))
     {
         strncat(ptr, "md,", 512 - len);
         len += 3;
     }
-    if(strstr(fs_conf->attr_cache_keywords, "symlink_target"))
+    if(strstr(buf, "symlink_target"))
     {
         strncat(ptr, "st,", 512 - len);
         len += 3;
