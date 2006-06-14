@@ -61,7 +61,9 @@ enum
     TROVE_DB_CACHE_SYS           = 1 << 6,
     TROVE_IMMEDIATE_COMPLETION   = 1 << 7,
     TROVE_DSPACE_SYNC_COALESCE   = 1 << 8,
-    TROVE_KEYVAL_SYNC_COALESCE   = 1 << 9
+    TROVE_KEYVAL_SYNC_COALESCE   = 1 << 9,
+
+    TROVE_KEYVAL_HANDLE_COUNT    = 1 << 10
 };
 
 /* get/setinfo option flags */
@@ -75,7 +77,8 @@ enum
     TROVE_COLLECTION_ATTR_CACHE_INITIALIZE,
     TROVE_DB_CACHE_SIZE_BYTES,
     TROVE_COLLECTION_COALESCING_HIGH_WATERMARK,
-    TROVE_COLLECTION_COALESCING_LOW_WATERMARK
+    TROVE_COLLECTION_COALESCING_LOW_WATERMARK,
+    TROVE_SHM_KEY_HINT
 };
 
 /** Initializes the Trove layer.  Must be called before any other Trove
@@ -239,6 +242,7 @@ int trove_keyval_remove(
 			TROVE_coll_id coll_id,
 			TROVE_handle handle,
 			TROVE_keyval_s *key_p,
+                        TROVE_keyval_s *val_p,
 			TROVE_ds_flags flags,
 			TROVE_vtag_s *vtag,
 			void *user_ptr,
@@ -309,6 +313,14 @@ int trove_keyval_flush(TROVE_coll_id coll_id,
 			void *user_ptr,
 			TROVE_context_id context_id,
 			TROVE_op_id *out_op_id_p);
+
+int trove_keyval_get_handle_info(TROVE_coll_id coll_id,
+                                 TROVE_handle handle,
+                                 TROVE_ds_flags flags,
+                                 TROVE_keyval_handle_info *info,
+                                 void * user_ptr,
+                                 TROVE_context_id context_id,
+                                 TROVE_op_id *out_op_id_p);
 
 int trove_dspace_create(TROVE_coll_id coll_id,
 			TROVE_handle_extent_array *handle_extent_array,

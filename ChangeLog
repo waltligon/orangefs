@@ -2,8 +2,52 @@
 PVFS2 Release ChangeLog
 -----------------------
 
-pvfs2-1.4.1-pre1
+pvfs2-1.5.0
 ===============
+- trove dbpf keyval changes:  The dbpf keyval implementation has been
+  changed from using individual DB objects for each handle, to one
+  DB object for all keyval entries.  This affects the storage format,
+  and requires the pvfs2-migrate-collection tool to be run on storage
+  spaces created previous to this release.
+- sync coalescing: A new syncing feature has been added to the trove layer that
+  provides better performance with metadata in high-load cases.  New options
+  were added to the server config: TroveSyncCoalesce, CoalescingHighWatermark,
+  CoalescingLowWatermark.
+- added stranded bstream checking and handling.  This is useful for correctly
+  reusing handles in failure cases.
+- consolidate I/O paths through the VFS for read,write and readv,writev.
+- added testsome, wait, and release functions to external interfaces
+- fixes to karma and performance monitoring.
+- better error handling on server and client and kernel module
+- fixes to ownership flags on root directory.  Allow chmod to work.
+- fixes for small io and non-contiguous io.
+- fixes to sys-io state machine to prevent deadlock on the server caused by
+  concurrent writes from the same client.
+- replaced keyval strings with shorter versions to save space in the keyval
+  database.
+- cleanups to the kernel module: cleanup cache subsystem structures and
+  functions.  Better error checking on to make module reloading more robust.
+- fixes for fsck and fs-dump.
+- better xattr support for 2.4 kernels
+- added support for berkeley db environments with the pvfs2 bdbs, and using
+  shared memory for db cache instead of mmapped file.
+- better support for 64bit (esp. ppc64) platforms and 32/64 bit mixed env.
+- better support for darwin (OS X)
+- added configure options: --disable-aio-callbacks,  No check for aio callback
+  support is done any longer. --enable-kernel-sendfile to configure for users 
+  that want sendfile system call support, it is now disabled by default.
+  Epoll is now the default if its available, otherwise poll is used,
+  --enable-epoll and --disable-epoll now force without checking.
+- pvfs2-genconfig now supports --iospec and --metaspec options.  Also fixed
+  some hostname sorting and range spec bugs.
+- pvfs2-client: added --logstamp.  nonblocking statfs and mount support.
+- handle allocation wasn't resulting in a uniform distribution.  Now we
+  pick a server at random and then select the remaining handles in a
+  round-robin fashion
+- pvfs2-ping does better per-server error reporting and keeps track of errors
+  better
+- pvfs2-viewdist now fails gracefully on old systems without xattrs.  Also
+  prints out handle number and filename for each datafile
 - ib: encode data structures to support heterogenous architectures
 - deal with update_atime vanishing from kernel: test for touch_atime and use
   that if available.

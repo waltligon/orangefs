@@ -236,6 +236,10 @@ modcflags = $(MODCFLAGS_$(call canonname,$(1))) \
             $(MODCFLAGS_$(patsubst $(srcdir)/%,%,$(1))) \
 	    -I$(call dirname,$(1))
 
+modldflags = $(MODLDFLAGS_$(call canonname,$(1))) \
+            $(MODLDFLAGS_$(patsubst $(srcdir)/%,%,$(1))) \
+	    -L$(call dirname,$(1))
+
 
 # target for building the test program executables
 tests: $(TESTS)
@@ -283,18 +287,18 @@ endif
 # rule for building MPI executables from object files
 $(MPITESTS): %: %.o $(MPIMISCOBJS) $(LIBRARIES)
 	$(Q) "  MPILD		$@"
-	$(E)$(MPICC) $^ $(LDFLAGS) $(LIBS) -lm -o $@
+	$(E)$(MPICC) $^ $(LDFLAGS) $(call modldflags,$<) $(LIBS) -lm -o $@
 
 # rule for building MPI-IO executables from object files
 # note: add a $(MPIMISCOBJS) prereq if we build multi-object tests someday
 $(MPIIOTESTS): %: %.o $(LIBRARIES)
 	$(Q) "  MPILD		$@"
-	$(E)$(MPICC) $^ $(LDFLAGS) $(LIBS) -lm -o $@
+	$(E)$(MPICC) $^ $(LDFLAGS) $(call modldflags,$<) $(LIBS) -lm -o $@
 
 # default rule for building executables from object files
 %: %.o $(LIBRARIES)
 	$(Q) "  LD		$@"
-	$(E)$(LD) $(LDFLAGS) $< $(LIBS) -o $@
+	$(E)$(LD) $(LDFLAGS) $(call modldflags,$<) $< $(LIBS) -o $@
 
 # default rule for building objects 
 %.o: %.c

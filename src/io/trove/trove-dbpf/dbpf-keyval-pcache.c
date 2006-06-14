@@ -209,7 +209,7 @@ int PINT_dbpf_keyval_pcache_insert(
             pcache->tcache, (void *)&key, &tentry, &lookup_status) == 0)
     {
         /* remove entry that already exists */
-        PINT_tcache_purge(pcache->tcache, tentry);
+        PINT_tcache_delete(pcache->tcache, tentry);
     }
 
     entry->handle = handle;

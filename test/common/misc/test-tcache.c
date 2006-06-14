@@ -200,10 +200,10 @@ int main(int argc, char **argv)
 
     /* try destroying an entry */
     printf("Destroying an entry...\n");
-    ret = PINT_tcache_purge(test_tcache, test_entry);
+    ret = PINT_tcache_delete(test_tcache, test_entry);
     if(ret < 0)
     {
-        PVFS_perror("PINT_tcache_purge", ret);
+        PVFS_perror("PINT_tcache_delete", ret);
         return(-1);
     }
     printf("Done.\n");

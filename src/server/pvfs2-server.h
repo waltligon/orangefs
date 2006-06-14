@@ -152,8 +152,7 @@ enum
     DIR_ENT_KEY          = 1,
     METAFILE_HANDLES_KEY = 2,
     METAFILE_DIST_KEY    = 3,
-    SYMLINK_TARGET_KEY   = 4,
-    DIRDATA_SIZE_KEY     = 5
+    SYMLINK_TARGET_KEY   = 4
 };
 
 typedef enum
@@ -252,6 +251,7 @@ struct PINT_server_remove_op
     int key_count;
     int index;
     int remove_keyvals_state;
+    PVFS_ds_keyval_handle_info keyval_handle_info;
 };
 
 struct PINT_server_mgmt_remove_dirent_op
@@ -311,6 +311,7 @@ struct PINT_server_getattr_op
     PVFS_fs_id fs_id;
     PVFS_ds_attributes dirdata_ds_attr;
     uint32_t attrmask;
+    PVFS_ds_keyval_handle_info keyval_handle_info;
 };
 
 /* this is used in both set_eattr, get_eattr and list_eattr */

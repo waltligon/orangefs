@@ -266,7 +266,7 @@ int main(int argc, char **argv)
 	memset(buffer2, 0, BUF_SIZE);
 
 	/* remove the key/val entry */
-	ret = job_trove_keyval_remove(coll_id, file_handle, &key,
+	ret = job_trove_keyval_remove(coll_id, file_handle, &key, NULL,
 		0, NULL, NULL, 0, &job_stat, &foo_id, context);
 	if(ret < 0)
 	{

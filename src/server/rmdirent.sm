@@ -29,18 +29,10 @@ static int rmdirent_check_for_req_dir_update(
     PINT_server_op *s_op, job_status_s *js_p);
 static int rmdirent_update_directory_attr(
     PINT_server_op *s_op, job_status_s *js_p);
-static int rmdirent_read_directory_entry(
-    PINT_server_op *s_op, job_status_s* js_p);
-static int rmdirent_read_directory_entry_failure(
-    PINT_server_op *s_op, job_status_s* js_p);
 static int rmdirent_remove_directory_entry_failure(
     PINT_server_op *s_op, job_status_s* js_p);
 static int rmdirent_setup_resp(
     PINT_server_op *s_op, job_status_s* js_p);
-static int rmdirent_decrement_dirent_count(
-    PINT_server_op *s_op, job_status_s *js_p);
-static int rmdirent_get_dirent_count(
-    PINT_server_op *s_op, job_status_s *js_p);
 
 extern PINT_server_trove_keys_s Trove_Common_Keys[];
 
@@ -52,8 +44,6 @@ machine pvfs2_rmdirent_sm(
     read_directory_entry,
     read_directory_entry_failure,
     remove_directory_entry,
-    get_dirent_count,
-    decrement_dirent_count,
     remove_directory_entry_failure,
     check_for_req_dir_update,
     update_directory_attr,
@@ -71,40 +61,15 @@ machine pvfs2_rmdirent_sm(
     state verify_parent_metadata_and_read_directory_entry_handle
     {
         run rmdirent_verify_parent_metadata_and_read_directory_entry_handle;
-        success => read_directory_entry;
-        default => setup_resp;
-    }
-
-    state read_directory_entry
-    {
-        run rmdirent_read_directory_entry;
         success => remove_directory_entry;
-        default => read_directory_entry_failure;
-    }
-
-    state read_directory_entry_failure
-    {
-        run rmdirent_read_directory_entry_failure;
         default => setup_resp;
     }
 
     state remove_directory_entry
     {
         run rmdirent_remove_directory_entry;
-        success => get_dirent_count;
+        success => check_for_req_dir_update;
         default => remove_directory_entry_failure;
-    }
-
-    state get_dirent_count
-    {
-        run rmdirent_get_dirent_count;
-        default => decrement_dirent_count;
-    }
-
-    state decrement_dirent_count
-    {
-        run rmdirent_decrement_dirent_count;
-        default => check_for_req_dir_update;
     }
 
     state remove_directory_entry_failure
@@ -193,76 +158,6 @@ static int rmdirent_verify_parent_metadata_and_read_directory_entry_handle(
     return ret;
 }
 
-/* Function: rmdirent_read_directory_entry
- *
- * Synopsis: In order to return the handle of the removed entry (which
- * is part of the rmdirent response), we must read the directory entry
- * prior to removing it.
- */
-static int rmdirent_read_directory_entry(PINT_server_op *s_op,
-					 job_status_s* js_p)
-{
-    int ret = -PVFS_EINVAL;
-    job_id_t j_id;
-
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-		 "  reading from dirent handle = %llu, name = %s\n",
-		 llu(s_op->u.rmdirent.dirdata_handle),
-		 s_op->req->u.rmdirent.entry);
-
-    /* initialize keyval prior to read call
-     *
-     * We will read the handle into the rmdirent scratch space
-     * (s_op->u.rmdirent.entry_handle).
-     */
-    s_op->key.buffer = s_op->req->u.rmdirent.entry;
-    s_op->key.buffer_sz = strlen(s_op->req->u.rmdirent.entry) + 1;
-    s_op->val.buffer = &s_op->u.rmdirent.entry_handle;
-    s_op->val.buffer_sz = sizeof(PVFS_handle);
-
-    ret = job_trove_keyval_read(
-        s_op->req->u.rmdirent.fs_id,
-        s_op->u.rmdirent.dirdata_handle,
-        &s_op->key,
-        &s_op->val,
-        PINT_config_get_trove_meta_flags(
-            get_server_config_struct(), s_op->req->u.rmdirent.fs_id),
-        NULL,
-        s_op,
-        0,
-        js_p,
-        &j_id,
-        server_job_context);
-
-    return ret;
-}
-
-/* Function: rmdirent_read_directory_entry_failure
- *
- * The purpose of this state is simply to parse the error value from a
- * failed direntry read operation (trove_keyval_read), convert it into
- * an error to return to the user if possible, and print an error if
- * something unexpected has occurred.
- *
- * This state always returns 1, and it allows another function to
- * handle actually returning the error value.
- */
-static int rmdirent_read_directory_entry_failure(PINT_server_op *s_op,
-						 job_status_s *js_p)
-{
-    switch (js_p->error_code)
-    {
-	case -TROVE_ENOENT:
-	    js_p->error_code = -PVFS_ENOENT;
-	    break;
-	default:
-	    gossip_err("rmdirent_read_directory_entry_failure: "
-                       "unexpected error %d\n", js_p->error_code);
-	    break;
-    }
-    return 1;
-}
-
 /*
  * Function: rmdirent_remove_directory_entry
  *
@@ -276,22 +171,39 @@ static int rmdirent_remove_directory_entry(PINT_server_op *s_op,
     int ret = -PVFS_EINVAL;
     job_id_t j_id;
     struct server_configuration_s *user_opts = get_server_config_struct();
+    TROVE_ds_flags flags;
 
     /* set up key and structure for keyval remove */
     s_op->key.buffer = s_op->req->u.rmdirent.entry;
     s_op->key.buffer_sz = strlen(s_op->req->u.rmdirent.entry) + 1;
 
+    s_op->val.buffer = &s_op->u.rmdirent.entry_handle;
+    s_op->val.buffer_sz = sizeof(PVFS_handle);
+
     gossip_debug(GOSSIP_SERVER_DEBUG, "  removing entry %s from dirdata "
                  "object (handle = %llu)\n", s_op->req->u.rmdirent.entry,
                  llu(s_op->u.rmdirent.dirdata_handle));
 
+    /* get the flags from the config file, such as immediate completion
+     * or sync coalescing.
+     */
+    flags = PINT_config_get_trove_meta_flags(
+        user_opts, s_op->req->u.rmdirent.fs_id);
+
+    /* get the sync flag from the config file */
+    flags |= PINT_config_get_trove_sync_meta(
+        user_opts, s_op->req->u.rmdirent.fs_id);
+
+    /* Also keep track of the keyval entries removed on this handle.  Because
+     * we're doing a remove, this should decrement the count.
+     */
+    flags |= TROVE_KEYVAL_HANDLE_COUNT;
+
     ret = job_trove_keyval_remove(
         s_op->req->u.rmdirent.fs_id, s_op->u.rmdirent.dirdata_handle,
         &s_op->key, 
-        PINT_config_get_trove_sync_meta(
-            user_opts, s_op->req->u.rmdirent.fs_id) |
-        PINT_config_get_trove_meta_flags(
-            user_opts, s_op->req->u.rmdirent.fs_id),
+        &s_op->val,
+        flags,
         NULL, s_op, 0, js_p, &j_id, server_job_context);
 
     if (s_op->req->u.rmdirent.parent_atime ||
@@ -443,73 +355,6 @@ static int rmdirent_cleanup(PINT_server_op *s_op,
 {
     return(server_state_machine_complete(s_op));
 }
-
-static int rmdirent_get_dirent_count(PINT_server_op *s_op,
-                                     job_status_s *js_p)
-{
-    int ret = -PVFS_EINVAL;
-    job_id_t i;
-
-    s_op->key.buffer = Trove_Common_Keys[DIRDATA_SIZE_KEY].key;
-    s_op->key.buffer_sz = Trove_Common_Keys[DIRDATA_SIZE_KEY].size;
-    s_op->val.buffer = &s_op->u.rmdirent.dirent_count;
-    s_op->val.buffer_sz = sizeof(PVFS_size);
-
-    ret = job_trove_keyval_read(
-        s_op->req->u.rmdirent.fs_id,
-        s_op->req->u.rmdirent.parent_handle,
-        &s_op->key,
-        &s_op->val,
-        PINT_config_get_trove_meta_flags(
-            get_server_config_struct(), s_op->req->u.rmdirent.fs_id),
-        NULL,
-        s_op,
-        0,
-        js_p,
-        &i,
-        server_job_context);
-
-    return ret;
-}
-
-static int rmdirent_decrement_dirent_count(PINT_server_op *s_op,
-                                           job_status_s *js_p)
-{
-    struct server_configuration_s *user_opts = get_server_config_struct();
-    int ret;
-    job_id_t i;
-
-    s_op->u.rmdirent.dirent_count--;
-    assert(s_op->u.rmdirent.dirent_count >= 0);
-
-    /* s_op->key should still point to Trove_Common_Keys[DIRDATA_SIZE] */
-
-    ret = job_trove_keyval_write(s_op->req->u.rmdirent.fs_id,
-                                 s_op->req->u.rmdirent.parent_handle,
-                                 &s_op->key,
-                                 &s_op->val,
-                                 PINT_config_get_trove_sync_meta(
-                                     user_opts, s_op->req->u.rmdirent.fs_id) |
-                                 PINT_config_get_trove_meta_flags(
-                                     user_opts, s_op->req->u.rmdirent.fs_id),
-                                 NULL,
-                                 s_op,
-                                 0,
-                                 js_p,
-                                 &i,
-                                 server_job_context);
-    
-
-    gossip_debug(GOSSIP_SERVER_DEBUG,
-                 "decrementing dirent_count: fsid: %u, handle: %llu, "
-                 "count: %llu\n",
-                 s_op->req->u.rmdirent.fs_id,
-                 llu(s_op->req->u.rmdirent.parent_handle),
-                 llu(s_op->u.rmdirent.dirent_count));
-                 
-    return ret;
-}
-
 
 /*
  * Local variables:

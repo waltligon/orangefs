@@ -644,6 +644,18 @@ kernels. However, on older 2.4 kernels the {\tt sendfile} system call streams th
 the page-cache and thus there is a real possibility of the data being served stale.
 Therefore users of the {\tt sendfile} system call are warned to be wary of this detail.
 
+\subsection{Trove-dbpf metadata format version mismatch!}
+
+In PVFS2-1.5.0 or newer the format of the metadata storage has change from
+previous versions (1.4.0 or earlier).  This affects users that have created
+file systems with the earlier versions of pvfs2, and wish to upgrade to the
+most recent version.  We've provided a migration tool that must be run
+(a one-time only procedure) to convert the file system from the old format
+to the new one.  The migration tool can be used as follows:
+\begin{verbatim}
+$PVFS2_INSTALL/bin/pvfs2-migrate-collection -all fs.conf server.conf-<hostname>
+\end{verbatim}
+
 %
 % PERFORMANCE
 %

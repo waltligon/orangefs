@@ -123,8 +123,7 @@ nested machine pvfs2_remove_work_sm(
     state getattr_of_dirdata_handle
     {
         run remove_get_dirent_count;
-        success => check_dirdata_entries;
-        default => return;
+        default => check_dirdata_entries;
     }
 
     state check_dirdata_entries
@@ -292,19 +291,13 @@ static int remove_get_dirent_count(
     }
     js_p->error_code = 0;
 
-    s_op->key.buffer = Trove_Common_Keys[DIRDATA_SIZE_KEY].key;
-    s_op->key.buffer_sz = Trove_Common_Keys[DIRDATA_SIZE_KEY].size;
-    s_op->val.buffer = &s_op->u.remove.dirent_count;
-    s_op->val.buffer_sz = sizeof(PVFS_size);
-
-    ret = job_trove_keyval_read(
+    ret = job_trove_keyval_get_handle_info(
         s_op->u.remove.fs_id,
         s_op->u.remove.handle,
-        &s_op->key,
-        &s_op->val,
+        TROVE_KEYVAL_HANDLE_COUNT |
         PINT_config_get_trove_meta_flags(
             get_server_config_struct(), s_op->u.remove.fs_id),
-        NULL,
+        &s_op->u.remove.keyval_handle_info,
         s_op,
         0,
         js_p,
@@ -319,7 +312,7 @@ static int remove_check_dirdata_entries(
 {
     if (js_p->error_code == 0)
     {
-        if (s_op->u.remove.dirent_count > 0)
+        if (s_op->u.remove.keyval_handle_info.count > 0)
         {
             gossip_debug(GOSSIP_SERVER_DEBUG, 
                          " detected non-empty "
@@ -330,6 +323,12 @@ static int remove_check_dirdata_entries(
                          llu(s_op->u.remove.dirent_count));
             js_p->error_code = -PVFS_ENOTEMPTY;
         }
+    }
+    else if(js_p->error_code == -TROVE_ENOENT)
+    {
+        /* no entries because count is 0 */
+        js_p->error_code = 0;
+        s_op->u.remove.keyval_handle_info.count = 0;
     }
 
     /* setup position for next state (remove[_dirdata]_keyvals) */

@@ -1366,10 +1366,10 @@ ac_configure="$SHELL $ac_aux_dir/configure" # This should be Cygnus configure.
 
 CONFIGURE_TIME=`date -u +"%Y-%m-%d-%H%M%S"`
 PVFS2_MAJOR=1
-PVFS2_MINOR=4
-PVFS2_SUB=1
-#PVFS2_PRE=""
-PVFS2_PRE="pre1-$CONFIGURE_TIME"
+PVFS2_MINOR=5
+PVFS2_SUB=0
+PVFS2_PRE=""
+#PVFS2_PRE="pre1-$CONFIGURE_TIME"
 
 PVFS2_VERSION=$PVFS2_MAJOR.$PVFS2_MINOR.$PVFS2_SUB$PVFS2_PRE
 
@@ -7993,6 +7993,74 @@ echo "${ECHO_T}no" >&6
 fi
 rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
 
+						tmp_cflags=${CFLAGS}
+	CFLAGS="${CFLAGS} -Werror"
+	echo "$as_me:$LINENO: checking for older int return in invalidatepage" >&5
+echo $ECHO_N "checking for older int return in invalidatepage... $ECHO_C" >&6
+	cat >conftest.$ac_ext <<_ACEOF
+/* confdefs.h.  */
+_ACEOF
+cat confdefs.h >>conftest.$ac_ext
+cat >>conftest.$ac_ext <<_ACEOF
+/* end confdefs.h.  */
+
+		#define __KERNEL__
+		#include <linux/fs.h>
+		static int cfg_invalidate_page(struct page * page, unsigned long offset) {
+			return 0;
+		}
+		struct address_space_operations aso =
+		{
+		    .invalidatepage = cfg_invalidate_page,
+		};
+
+int
+main ()
+{
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext
+if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
+  (eval $ac_compile) 2>conftest.er1
+  ac_status=$?
+  grep -v '^ *+' conftest.er1 >conftest.err
+  rm -f conftest.er1
+  cat conftest.err >&5
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+	 { ac_try='test -z "$ac_c_werror_flag"			 || test ! -s conftest.err'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; } &&
+	 { ac_try='test -s conftest.$ac_objext'
+  { (eval echo "$as_me:$LINENO: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:$LINENO: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  echo "$as_me:$LINENO: result: yes" >&5
+echo "${ECHO_T}yes" >&6
+
+cat >>confdefs.h <<\_ACEOF
+#define HAVE_INT_RETURN_ADDRESS_SPACE_OPERATIONS_INVALIDATEPAGE 1
+_ACEOF
+
+else
+  echo "$as_me: failed program was:" >&5
+sed 's/^/| /' conftest.$ac_ext >&5
+
+echo "$as_me:$LINENO: result: NO" >&5
+echo "${ECHO_T}NO" >&6
+
+fi
+rm -f conftest.err conftest.$ac_objext conftest.$ac_ext
+	CFLAGS=$tmp_cflags
+
 	echo "$as_me:$LINENO: checking for compat_ioctl member in file_operations structure" >&5
 echo $ECHO_N "checking for compat_ioctl member in file_operations structure... $ECHO_C" >&6
 	cat >conftest.$ac_ext <<_ACEOF
@@ -8371,9 +8439,6 @@ else
   echo "$as_me: failed program was:" >&5
 sed 's/^/| /' conftest.$ac_ext >&5
 
-{ { echo "$as_me:$LINENO: error: No suitable epoll library found." >&5
-echo "$as_me: error: No suitable epoll library found." >&2;}
-   { (exit 1); exit 1; }; }
 fi
 rm -f conftest.err conftest.$ac_objext \
       conftest$ac_exeext conftest.$ac_ext

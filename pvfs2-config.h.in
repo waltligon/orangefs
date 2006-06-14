@@ -92,6 +92,9 @@
    type int */
 #undef HAVE_INT_ARG2_ADDRESS_SPACE_OPERATIONS_RELEASEPAGE
 
+/* Define if return type of invalidatepage should be int */
+#undef HAVE_INT_RETURN_ADDRESS_SPACE_OPERATIONS_INVALIDATEPAGE
+
 /* Define if return value from follow_link in inode_operations is type int */
 #undef HAVE_INT_RETURN_INODE_OPERATIONS_FOLLOW_LINK
 

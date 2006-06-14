@@ -22,7 +22,7 @@ extern "C" {
 #define TROVE_DBPF_VERSION_KEY                       "trove-dbpf-version"
 #define TROVE_DBPF_VERSION_VALUE                                  "0.1.2"
 #define LAST_HANDLE_STRING                                  "last_handle"
-#define ROOT_HANDLE_STRING                                  "root_handle"
+#define ROOT_HANDLE_STRING                                  ROOT_HANDLE_KEYSTR
 
 #ifdef HAVE_DB_DIRTY_READ
 #define TROVE_DB_DIRTY_READ DB_DIRTY_READ
@@ -150,7 +150,7 @@ extern struct TROVE_keyval_ops dbpf_keyval_ops;
 extern struct TROVE_mgmt_ops dbpf_mgmt_ops;
 
 typedef int (* PINT_dbpf_keyval_iterate_callback)(
-    DB * db_p, TROVE_handle handle, TROVE_keyval_s *key);
+    DB * db_p, TROVE_handle handle, TROVE_keyval_s *key, TROVE_keyval_s *val);
 
 int PINT_dbpf_keyval_iterate(
     DB *db_p,
@@ -163,7 +163,7 @@ int PINT_dbpf_keyval_iterate(
     PINT_dbpf_keyval_iterate_callback callback);
 
 int PINT_dbpf_keyval_remove(
-    DB *db_p, TROVE_handle handle, TROVE_keyval_s *key);
+    DB *db_p, TROVE_handle handle, TROVE_keyval_s *key, TROVE_keyval_s *val);
 
 struct dbpf_storage
 {
@@ -356,6 +356,12 @@ struct dbpf_bstream_rw_list_op
 #endif
 };
 
+struct dbpf_keyval_get_handle_info_op
+{
+    TROVE_keyval_handle_info *info;
+};
+
+
 /* List of operation types that might be queued */
 enum dbpf_op_type
 {
@@ -375,7 +381,8 @@ enum dbpf_op_type
     KEYVAL_READ_LIST,
     KEYVAL_WRITE_LIST,
     KEYVAL_FLUSH,
-    DSPACE_CREATE = 17, /* must change DBPF_OP_KEYVAL also */
+    KEYVAL_GET_HANDLE_INFO,
+    DSPACE_CREATE = 18, /* must change DBPF_OP_KEYVAL also */
     DSPACE_REMOVE,
     DSPACE_ITERATE_HANDLES,
     DSPACE_VERIFY,
@@ -454,6 +461,7 @@ struct dbpf_op
         struct dbpf_keyval_iterate_keys_op k_iterate_keys;
         struct dbpf_keyval_read_list_op k_read_list;
         struct dbpf_keyval_read_list_op k_write_list;
+        struct dbpf_keyval_get_handle_info_op k_get_handle_info;
     } u;
 };
 

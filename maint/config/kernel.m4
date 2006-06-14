@@ -326,6 +326,31 @@ AC_DEFUN([AX_KERNEL_FEATURES],
 	    AC_MSG_RESULT(no)
 	)
 
+	dnl more 2.6 api changes.  return type for the invalidatepage
+	dnl address_space_operation is 'void' in new kernels but 'int' in old
+	dnl I had to turn on -Werror for this test because i'm not sure how
+	dnl else to make dnl "initialization from incompatible pointer type"
+	dnl fail.  
+	tmp_cflags=${CFLAGS}
+	CFLAGS="${CFLAGS} -Werror"
+	AC_MSG_CHECKING(for older int return in invalidatepage)
+	AC_TRY_COMPILE([
+		#define __KERNEL__
+		#include <linux/fs.h>
+		static int cfg_invalidate_page(struct page * page, unsigned long offset) {
+			return 0;
+		}
+		struct address_space_operations aso = 
+		{
+		    .invalidatepage = cfg_invalidate_page,
+		};
+		], [],
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_INT_RETURN_ADDRESS_SPACE_OPERATIONS_INVALIDATEPAGE, 1, Define if return type of invalidatepage should be int),
+		AC_MSG_RESULT(NO)
+		)
+	CFLAGS=$tmp_cflags
+
 	AC_MSG_CHECKING(for compat_ioctl member in file_operations structure)
 	AC_TRY_COMPILE([
 	    #define __KERNEL__

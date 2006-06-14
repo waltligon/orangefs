@@ -240,6 +240,11 @@ typedef struct PVFS_ds_keyval_s
                            /* only valid after a read */
 } PVFS_ds_keyval;
 
+typedef struct
+{
+    uint32_t count;
+} PVFS_ds_keyval_handle_info;
+
 /* attribute masks used by system interface callers */
 #define PVFS_ATTR_SYS_SIZE                  (1 << 20)
 #define PVFS_ATTR_SYS_LNK_TARGET            (1 << 24)
