@@ -37,4 +37,13 @@
 #  error Unexpected sizeof(long int)
 #endif
 
+/* key string definition macros.  These are used by the server and
+ * by the client (in the case of xattrs with viewdist, etc).
+ */
+#define ROOT_HANDLE_KEYSTR      "rh"
+#define DIRECTORY_ENTRY_KEYSTR  "de"
+#define DATAFILE_HANDLES_KEYSTR "dh"
+#define METAFILE_DIST_KEYSTR    "md"
+#define SYMLINK_TARGET_KEYSTR   "st"
+
 #endif /* PVFS2_INTERNAL_H */

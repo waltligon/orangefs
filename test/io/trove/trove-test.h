@@ -1,7 +1,7 @@
 #ifndef __TROVE_TEST_H
 #define __TROVE_TEST_H
 
-#define ROOT_HANDLE_STRING "root_handle"
+#include "pvfs2-internal.h"
 
 enum {
     SSPACE_SIZE = 64,
@@ -32,7 +32,7 @@ static inline int path_lookup(
     char dir[PATH_SIZE];
     TROVE_context_id context_id = 0; /* FIXME: Hacked for now */
 
-    char root_handle_string[] = ROOT_HANDLE_STRING;
+    char root_handle_string[] = ROOT_HANDLE_KEYSTR;
 
     /* get root handle */
     key.buffer = root_handle_string;

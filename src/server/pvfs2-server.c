@@ -105,14 +105,17 @@ typedef struct
 
 static options_t s_server_options = { 0, 0, 1, NULL };
 
+/* each of the elements in this array consists of a string and its length.
+ * we're able to use sizeof here because sizeof an inlined string ("") gives
+ * the length of the string with the null terminator
+ */
 PINT_server_trove_keys_s Trove_Common_Keys[] =
 {
-    {"rh", 3}, /* root handle */
-    {"de", 3}, /* directory entry */
-    {"dh", 3}, /* datafile handles */
-    {"md", 3}, /* metafile dist */
-    {"st", 3}, /* symlink target */
-    {"ds", 3} /* dirdata size */
+    {ROOT_HANDLE_KEYSTR, sizeof(ROOT_HANDLE_KEYSTR)},
+    {DIRECTORY_ENTRY_KEYSTR, sizeof(DIRECTORY_ENTRY_KEYSTR)},
+    {DATAFILE_HANDLES_KEYSTR, sizeof(DATAFILE_HANDLES_KEYSTR)},
+    {METAFILE_DIST_KEYSTR, sizeof(METAFILE_DIST_KEYSTR)},
+    {SYMLINK_TARGET_KEYSTR, sizeof(SYMLINK_TARGET_KEYSTR)}
 };
 
 /* extended attribute name spaces supported in PVFS2 */

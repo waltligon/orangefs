@@ -84,9 +84,6 @@ static int translate_dspace_attr_0_0_1(
 static int translate_keyvals_0_0_1(
     char* old_coll_path, TROVE_coll_id coll_id, char* coll_name,
     TROVE_context_id trove_context);
-static int translate_dirdata_sizes_0_0_1(
-    char* storage_space, char* old_coll_path, TROVE_coll_id coll_id, 
-    char* coll_name, TROVE_context_id trove_context);
 static int translate_bstreams_0_0_1(
     char* storage_space, char* old_coll_path, 
     TROVE_coll_id coll_id, char* coll_name,
@@ -97,6 +94,7 @@ static int translate_keyval_db_0_0_1(
     TROVE_context_id trove_context);
 static int translate_dist_0_0_1(
     PINT_dist * dist);
+static int translate_keyval_key_0_0_1(TROVE_keyval_s * keyval, DBT * db_key);
 
 /** number of keyval buckets used in DBPF 0.0.1 */
 #define KEYVAL_MAX_NUM_BUCKETS_0_0_1 32
@@ -740,17 +738,6 @@ static int translate_0_0_1(
         return(-1);
     }
 
-    /* convert dirent_count for each directory */
-    ret = translate_dirdata_sizes_0_0_1(
-        storage_space, old_coll_path, coll_id, coll_name, trove_context);
-    if(ret < 0)
-    {
-        fprintf(stderr, "Error: failed to migrate dirdata sizes.\n");
-        if(verbose) printf("VERBOSE Destroying temporary collection.\n");
-        pvfs2_rmspace(storage_space, coll_name, coll_id, 1, 0);
-        return(-1);
-    }
-
     /* at this point, we are done with the Trove API */
     trove_close_context(coll_id, trove_context);
     trove_finalize();
@@ -1256,6 +1243,41 @@ static int translate_keyvals_0_0_1(
     return(0);
 }
 
+static int translate_keyval_key_0_0_1(TROVE_keyval_s * keyval, DBT * db_key)
+{
+    if(!strcmp(db_key->data, "root_handle"))
+    {
+        keyval->buffer = ROOT_HANDLE_KEYSTR;
+        keyval->buffer_sz = sizeof(ROOT_HANDLE_KEYSTR);
+    }
+    else if(!strcmp(db_key->data, "dir_ent"))
+    {
+        keyval->buffer = DIRECTORY_ENTRY_KEYSTR;
+        keyval->buffer_sz = sizeof(DIRECTORY_ENTRY_KEYSTR);
+    }
+    else if(!strcmp(db_key->data, "datafile_handles"))
+    {
+        keyval->buffer = DATAFILE_HANDLES_KEYSTR;
+        keyval->buffer_sz = sizeof(DATAFILE_HANDLES_KEYSTR);
+    }
+    else if(!strcmp(db_key->data, "metafile_dist"))
+    {
+        keyval->buffer = METAFILE_DIST_KEYSTR;
+        keyval->buffer_sz = sizeof(METAFILE_DIST_KEYSTR);
+    }
+    else if(!strcmp(db_key->data, "symlink_target"))
+    {
+        keyval->buffer = SYMLINK_TARGET_KEYSTR;
+        keyval->buffer_sz = sizeof(SYMLINK_TARGET_KEYSTR);
+    }
+    else
+    {
+        return -1;
+    }
+
+    return 0;
+}
+
 /**
  * Migrates a single keyval db from a 0.0.1 DBPF collection
  * \return 0 on succes, -1 on failure
@@ -1351,12 +1373,18 @@ static int translate_keyval_db_0_0_1(
         if(ret == 0)
         {
             int tvalbuf_free = 0;
+            PVFS_ds_flags trove_flags = TROVE_SYNC;
             memset(&t_key, 0, sizeof(t_key));
             memset(&t_val, 0, sizeof(t_val));
-            t_key.buffer = key.data;
-            t_key.buffer_sz = key.size;
+            if(translate_keyval_key_0_0_1(&t_key, &key) < 0)
+            {
+                /* assume its a component name of a directory entry */
+                t_key.buffer = key.data;
+                t_key.buffer_sz = key.size;
+                trove_flags |= TROVE_KEYVAL_HANDLE_COUNT;
+            }
             
-            if(!strcmp(t_key.buffer, "metafile_dist"))
+            if(!strcmp(t_key.buffer, "md")) /* metafile_dist */
             {
                 PINT_dist *newdist;
                 newdist = data.data;
@@ -1395,7 +1423,7 @@ static int translate_keyval_db_0_0_1(
             /* write out new keyval pair */
             state = 0;
             ret = trove_keyval_write(
-                coll_id, handle, &t_key, &t_val, TROVE_SYNC, 0, NULL,
+                coll_id, handle, &t_key, &t_val, trove_flags, 0, NULL,
                 trove_context, &op_id);
 
             while (ret == 0)
@@ -1486,291 +1514,6 @@ static int translate_bstreams_0_0_1(
         }
         closedir(tmp_dir);
     }
-
-    return(0);
-}
-
-/**
- * iterate through all of the directories in the old collection and find out
- * how many entries they had in the dirdata object.  Write that value into
- * the new collection (new versions of trove store this explicitly in a db
- * key)
- * \return 0 on success -1 on failure
- */
-static int translate_dirdata_sizes_0_0_1(
-    char* storage_space,
-    char* old_coll_path, 
-    TROVE_coll_id coll_id, 
-    char* coll_name,
-    TROVE_context_id trove_context)
-{
-    int ret = -1;
-    char attr_db[PATH_MAX];
-    char dir_db[PATH_MAX];
-    char dirdata_db[PATH_MAX];
-    DB *dbp;
-    DB *dir_dbp;
-    DB *dirdata_dbp;
-    DBT key, data;
-    DBT keyB, dataB;
-    DBC *dbc_p = NULL;
-    TROVE_op_id op_id;
-    TROVE_handle tmp_handle;
-    TROVE_handle tmp_dirdata_handle;
-    PVFS_ds_storedattr_0_0_1* tmp_attr;
-    DB_BTREE_STAT *k_stat_p = NULL;    
-    PVFS_size dirent_count;
-    TROVE_ds_state state;
-    TROVE_keyval_s t_key;
-    TROVE_keyval_s t_val;
-    int count = 0;
-    
-    sprintf(attr_db, "%s/dataspace_attributes.db", old_coll_path);
-    ret = db_create(&dbp, NULL, 0);
-    if(ret != 0)
-    {
-        fprintf(stderr, "Error: db_create: %s.\n", db_strerror(ret));
-        return(-1);
-    }
-    
-    /* open dataspace_attributes.db from old collection */
-    ret = dbp->open(dbp,
-#ifdef HAVE_TXNID_PARAMETER_TO_DB_OPEN
-                    NULL,
-#endif
-                    attr_db,
-                    NULL,
-                    DB_UNKNOWN,
-                    0,
-                    0);
-    if(ret != 0)
-    {
-        fprintf(stderr, "Error: dbp->open: %s.\n", db_strerror(ret));
-        return(-1);
-    }
-
-    ret = dbp->cursor(dbp, NULL, &dbc_p, 0);
-    if (ret != 0)
-    {
-        fprintf(stderr, "Error: dbp->cursor: %s.\n", db_strerror(ret));
-        dbp->close(dbp, 0);
-        return(-1);
-    }
-
-    memset(&key, 0, sizeof(key));
-    key.data = malloc(DEF_KEY_SIZE);
-    if(!key.data)
-    {
-        perror("malloc");    
-        dbc_p->c_close(dbc_p);
-        dbp->close(dbp, 0);
-        return(-1);
-    }
-    key.size = key.ulen = DEF_KEY_SIZE;
-    key.flags |= DB_DBT_USERMEM;
-
-    memset(&data, 0, sizeof(data));
-    data.data = malloc(DEF_DATA_SIZE);
-    if(!data.data)
-    {
-        perror("malloc");    
-        free(key.data);
-        dbc_p->c_close(dbc_p);
-        dbp->close(dbp, 0);
-        return(-1);
-    }
-    data.size = data.ulen = DEF_DATA_SIZE;
-    data.flags |= DB_DBT_USERMEM;
-
-    memset(&keyB, 0, sizeof(keyB));
-    keyB.size = keyB.ulen = 0;
-    keyB.flags |= DB_DBT_USERMEM;
-
-    memset(&dataB, 0, sizeof(dataB));
-    dataB.size = dataB.ulen = 0;
-    dataB.flags |= DB_DBT_USERMEM;
-
-    do
-    {
-        /* iterate through handles in the old collection */
-        key.size = key.ulen = DEF_KEY_SIZE;
-        ret = dbc_p->c_get(dbc_p, &key, &data, DB_NEXT);
-        if (ret != DB_NOTFOUND && ret != 0)
-        {
-            fprintf(stderr, "Error: dbc_p->c_get: %s.\n", db_strerror(ret));
-            free(data.data);
-            free(key.data);
-            dbc_p->c_close(dbc_p);
-            dbp->close(dbp, 0);
-            return(-1);
-        }
-        if(ret == 0)
-        {
-            tmp_handle = *((PVFS_handle*)key.data);
-            tmp_attr = ((PVFS_ds_storedattr_0_0_1*)data.data);
-
-            if(tmp_attr->type == PVFS_TYPE_DIRECTORY)
-            {
-                if(verbose) printf("VERBOSE Migrating dirdata_size for handle: %llu\n", 
-                    llu(tmp_handle));
-                
-                /* find the keyval db for the directory */
-                DBPF_GET_KEYVAL_DBNAME_0_0_1(dir_db, (PATH_MAX-1), 
-                    old_coll_path, coll_id, tmp_handle);
-                
-                ret = db_create(&dir_dbp, NULL, 0);
-                if(ret != 0)
-                {
-                    fprintf(stderr, "Error: db_create: %s.\n", 
-                            db_strerror(ret));
-                    free(data.data);
-                    free(key.data);
-                    dbc_p->c_close(dbc_p);
-                    dbp->close(dbp, 0);
-                    return(-1);
-                }
-                
-                ret = dir_dbp->open(dir_dbp,
-#ifdef HAVE_TXNID_PARAMETER_TO_DB_OPEN
-                                    NULL,
-#endif
-                                    dir_db,
-                                    NULL,
-                                    DB_UNKNOWN,
-                                    0,
-                                    0);
-                if(ret != 0)
-                {
-                    fprintf(stderr, "Error: dir_dbp->open: %s.\n", 
-                            db_strerror(ret));
-                    free(data.data);
-                    free(key.data);
-                    dbc_p->c_close(dbc_p);
-                    dbp->close(dbp, 0);
-                    return(-1);
-                }
-                    
-                /* read out the dirdata handle */
-                keyB.data = "dir_ent";
-                keyB.size = strlen("dir_ent") + 1;
-                dataB.data = &tmp_dirdata_handle;
-                dataB.size = dataB.ulen = sizeof(PVFS_handle);
-                ret = dir_dbp->get(dir_dbp, NULL, &keyB, &dataB, 0);
-                if(ret != 0)
-                {
-                    fprintf(stderr, "Error: dir_dbp->get: %s\n", 
-                            db_strerror(ret));
-                    free(data.data);
-                    free(key.data);
-                    dbc_p->c_close(dbc_p);
-                    dbp->close(dbp, 0);
-                    dir_dbp->close(dbp, 0);
-                    return(-1);
-                }
-
-                dir_dbp->close(dir_dbp, 0);
-                
-                /* find the dirdata db for the directory */
-                DBPF_GET_KEYVAL_DBNAME_0_0_1(dirdata_db, (PATH_MAX-1), 
-                    old_coll_path, coll_id, tmp_dirdata_handle);
-                
-                ret = db_create(&dirdata_dbp, NULL, 0);
-                if(ret != 0)
-                {
-                    fprintf(stderr, "Error: db_create: %s.\n", 
-                            db_strerror(ret));
-                    free(data.data);
-                    free(key.data);
-                    dbc_p->c_close(dbc_p);
-                    dbp->close(dbp, 0);
-                    return(-1);
-                }
-                
-                dirent_count = 0;
-                ret = dirdata_dbp->open(dirdata_dbp,
-#ifdef HAVE_TXNID_PARAMETER_TO_DB_OPEN
-                                        NULL,
-#endif
-                                        dirdata_db,
-                                        NULL,
-                                        DB_UNKNOWN,
-                                        0,
-                                        0);
-                if(ret == 0)
-                {
-                    /* found out how many keys were in the dirdata db */
-                    ret = dirdata_dbp->stat(dirdata_dbp,
-#ifdef HAVE_TXNID_PARAMETER_TO_DB_STAT
-                                            (DB_TXN *) NULL,
-#endif
-                                            &k_stat_p,
-#ifdef HAVE_UNKNOWN_PARAMETER_TO_DB_STAT
-                                            NULL,
-#endif
-                                            0);
-                    if(ret != 0)
-                    {
-                        fprintf(stderr, "Error: dirdata_dbp->stat: %s.\n", 
-                                db_strerror(ret));
-                        free(data.data);
-                        free(key.data);
-                        dbc_p->c_close(dbc_p);
-                        dbp->close(dbp, 0);
-                        dirdata_dbp->close(dbp, 0);
-                        return(-1);
-                    }
-                    dirent_count = (PVFS_size) k_stat_p->bt_ndata;
-                    free(k_stat_p);
-
-                    dirdata_dbp->close(dirdata_dbp, 0);
-                }
-                else
-                {
-                    fprintf(stderr, 
-                            "WARNING: could not find dirdata object: %s\n", 
-                            dirdata_db);
-                }
-
-                if(verbose) 
-                    printf("VERBOSE    size: %lld\n", lld(dirent_count)); 
-
-                /* write the dirent_count out into new collection */ 
-                memset(&t_key, 0, sizeof(t_key));
-                memset(&t_val, 0, sizeof(t_val));
-                t_key.buffer = "dirdata_size";
-                t_key.buffer_sz = 13;
-                t_val.buffer = &dirent_count;
-                t_val.buffer_sz = sizeof(PVFS_size);
- 
-                state = 0;
-                ret = trove_keyval_write(
-                    coll_id, tmp_handle, &t_key, &t_val,
-                    TROVE_SYNC, 0, NULL,
-                    trove_context, &op_id);
-                
-                while (ret == 0)
-                {   
-                    ret = trove_dspace_test(
-                        coll_id, op_id, trove_context, &count, NULL, NULL,
-                        &state, 10);
-                }
-                if ((ret < 0) || (ret == 1 && state != 0))
-                {
-                    fprintf(stderr, "Error: trove_keyval_write failure.\n");
-                    free(data.data);
-                    free(key.data);
-                    dbc_p->c_close(dbc_p);
-                    dbp->close(dbp, 0);
-                    return -1; 
-                }
-            }
-        } 
-     }while(ret != DB_NOTFOUND);
-
-    free(data.data);
-    free(key.data);
-    dbc_p->c_close(dbc_p);
-    dbp->close(dbp, 0);
 
     return(0);
 }

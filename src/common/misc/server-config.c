@@ -521,27 +521,26 @@ static const configoption_t options[] =
      * object types that should get cached in the attribute cache.  
      * The possible values for this option are:
      *
-     * datafile_handles - This will cache the array of datafile handles for
-     *                    each logical file in this filesystem
+     * dh - (datafile handles) This will cache the array of datafile handles for
+     *      each logical file in this filesystem
      * 
-     * metafile_dist - This will cache (for each logical file)
-     *                 the file distribution information used to create/manage
-     *                 the datafiles.  
+     * md - (metafile distribution) This will cache (for each logical file)
+     *      the file distribution information used to create/manage
+     *      the datafiles.  
      *
-     * dir_ent - This will cache the handles of the directory entries in this
-     *           filesystem
+     * de - (directory entries) This will cache the handles of 
+     *      the directory entries in this filesystem
      *
-     * symlink_target - This will cache the target path for the symbolic links
-     *                  in this filesystem
+     * st - (symlink target) This will cache the target path 
+     *      for the symbolic links in this filesystem
      *
      * The format of this option is a comma-separated list of one or more
      * of the above values.  For example:
      *
-     * AttrCacheKeywords datafile_handles,metafile_dist,dir_ent
+     * AttrCacheKeywords dh,md,de,st
      */
     {"AttrCacheKeywords",ARG_LIST, get_attr_cache_keywords_list,NULL,
-        CTX_STORAGEHINTS,
-        "datafile_handles,metafile_dist,dir_ent,symlink_target,"},
+        CTX_STORAGEHINTS, "dh,md,de,st"},
     
     /* The attribute cache in the TROVE layer mentioned in the documentation
      * for the AttrCacheKeywords option is managed as a hashtable.  The

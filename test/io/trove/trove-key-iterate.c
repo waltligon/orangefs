@@ -18,6 +18,7 @@
 
 #include <trove.h>
 #include "trove-test.h"
+#include "pvfs2-internal.h"
 
 char storage_space[SSPACE_SIZE] = "/tmp/trove-test-space";
 char file_system[FS_SIZE] = "fs-foo";
@@ -41,7 +42,7 @@ static inline int file_lookup(
     char dir[PATH_SIZE];
     TROVE_context_id context_id = 0; /* FIXME: Hacked for now */
 
-    char root_handle_string[] = ROOT_HANDLE_STRING;
+    char root_handle_string[] = ROOT_HANDLE_KEYSTR;
 
     /* get root handle */
     key.buffer = root_handle_string;

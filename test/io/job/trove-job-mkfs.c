@@ -13,6 +13,7 @@
 #include "trove-test.h"
 #include "job.h"
 #include "job-help.h"
+#include "pvfs2-internal.h"
 
 char storage_space[SSPACE_SIZE] = "/tmp/trove-test-space";
 char file_system[FS_SIZE] = "fs-foo";
@@ -33,7 +34,7 @@ int main(int argc, char **argv)
     TROVE_extent cur_extent;
     TROVE_handle_extent_array extent_array;
 
-    char root_handle_string[] = ROOT_HANDLE_STRING;
+    char root_handle_string[] = ROOT_HANDLE_KEYSTR;
 
     ret = parse_args(argc, argv);
     if (ret < 0) {

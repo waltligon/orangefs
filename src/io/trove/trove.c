@@ -355,6 +355,7 @@ int trove_keyval_remove(
     TROVE_coll_id coll_id,
     TROVE_handle handle,
     TROVE_keyval_s* key_p,
+    TROVE_keyval_s* val_p,
     TROVE_ds_flags flags,
     TROVE_vtag_s* vtag,
     void* user_ptr,
@@ -371,6 +372,7 @@ int trove_keyval_remove(
            coll_id,
            handle,
            key_p,
+	   val_p,
            flags,
            vtag,
            user_ptr,
@@ -581,6 +583,30 @@ int trove_keyval_flush(
            user_ptr,
            context_id,
            out_op_id_p);
+}
+
+int trove_keyval_get_handle_info(TROVE_coll_id coll_id,
+				 TROVE_handle handle,
+				 TROVE_ds_flags flags,
+				 TROVE_keyval_handle_info *info,
+				 void * user_ptr,
+				 TROVE_context_id context_id,
+				 TROVE_op_id *out_op_id_p)
+{
+    int method_id;
+
+    method_id = map_coll_id_to_method(coll_id);
+    if (method_id < 0) {
+        return -1; /* NEED STATUS TYPE FOR THIS */
+    }
+    return keyval_method_table[method_id]->keyval_get_handle_info(
+	coll_id,
+	handle,
+	flags,
+	info,
+	user_ptr,
+	context_id,
+	out_op_id_p);
 }
 
 /** Initiate creation of a new data space.

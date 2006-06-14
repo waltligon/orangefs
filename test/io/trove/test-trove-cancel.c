@@ -15,8 +15,7 @@
 
 #include "gossip.h"
 #include "trove.h"
-
-#define ROOT_HANDLE_STRING "root_handle"
+#include "pvfs2-internal.h"
 
 int path_lookup(TROVE_coll_id coll_id,
                 TROVE_context_id trove_context,
@@ -328,7 +327,7 @@ int path_lookup(TROVE_coll_id coll_id,
     TROVE_op_id op_id;
     TROVE_handle handle;
 
-    char root_handle_string[] = ROOT_HANDLE_STRING;
+    char root_handle_string[] = ROOT_HANDLE_KEYSTR;
 
     key.buffer = root_handle_string;
     key.buffer_sz = strlen(root_handle_string) + 1;

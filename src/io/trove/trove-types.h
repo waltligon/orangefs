@@ -37,6 +37,7 @@ typedef PVFS_ds_type               TROVE_ds_type;
 typedef PVFS_vtag                  TROVE_vtag_s;
 typedef PVFS_ds_flags              TROVE_ds_flags;
 typedef PVFS_ds_keyval             TROVE_keyval_s;
+typedef PVFS_ds_keyval_handle_info TROVE_keyval_handle_info;
 typedef PVFS_ds_position           TROVE_ds_position;
 typedef PVFS_ds_attributes         TROVE_ds_attributes_s;
 typedef PVFS_ds_attributes         TROVE_ds_attributes;
