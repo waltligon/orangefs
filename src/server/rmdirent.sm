@@ -307,18 +307,16 @@ static int rmdirent_update_directory_attr(
 static int rmdirent_remove_directory_entry_failure(PINT_server_op *s_op,
 						   job_status_s *js_p)
 {
-    assert(js_p->error_code != -TROVE_ENOENT);
-	    
     switch (js_p->error_code)
     {
 	case -TROVE_ENOENT:
 	    js_p->error_code = -PVFS_ENOENT;
 	    break;
 	default:
+            gossip_lerr("unexpected error %d\n", js_p->error_code);
 	    break;
     }
 
-    gossip_lerr("unexpected error %d\n", js_p->error_code);
     return 1;
 }
 

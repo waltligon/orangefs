@@ -1330,7 +1330,6 @@ int PINT_dbpf_keyval_remove(
         ret = db_p->get(db_p, NULL, &db_key, &db_val, 0);
         if(ret != 0)
         {
-            db_p->err(db_p, ret, "DB->get");
             ret = -dbpf_db_error_to_trove_error(ret);
         }
         val->read_sz = db_val.size;
@@ -1339,7 +1338,6 @@ int PINT_dbpf_keyval_remove(
     ret = db_p->del(db_p, NULL, &db_key, 0);
     if(ret != 0)
     {
-        db_p->err(db_p, ret, "DB->del");
         ret = -dbpf_db_error_to_trove_error(ret);
     }
 
