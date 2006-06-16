@@ -1,0 +1,247 @@
+PVFS2:
+
+Weikuan Yu, Shuang Liang, Dhabaleswar K. Panda. "PVFS2 over Quadrics: Design,
+    Implementation and Performance Evaluation". Ohio State University Tecnhical
+    Report OSU-CISRC-12/04-TR6.  Date Unknown
+
+W. Yu and D. K. Panda, Benefits of Quadrics Scatter/Gather to PVFS2
+    Noncontiguous I/O, International Workshop on Storage Network Architecture
+    and Parallel I/Os (SNAPI) 2005, Saint Louis, Missouri, USA.  Sept. 2005.
+
+W. Yu, S. Liang, and D. K. Panda, High Performance Support of Parallel Virtual
+    File System (PVFS2) over Quadrics, Int'l Conference on Supercomputing (ICS
+    '05), Cambridge, MA, USA. June 2005.
+
+Dean Hildebrand and Peter Honeyman, "Exporting Storage Systems in a Scalable
+    Manner with pNFS," February 2005. [22nd IEEE - 13th NASA Goddard (MSST2005)
+    Conference on Mass Storage Systems and Technologies, Monterey, California,
+    (April 2005).]
+
+/* this one makes only a brief reference to pvfs2.  */
+Dean Hildebrand and Peter Honeyman, "Scaling NFSv4 with Parallel File Systems,"
+    March 2005. [Cluster Computing and Grid (CCGrid05), Cardiff, United
+    Kingdom, (May 2005).]
+
+The Impact of File Systems on MPI-IO Scalability. Rob Latham, Robert Ross,
+   Rajeev Thakur; EuroPVM/MPI, Budapest, Hungary. 2004.
+
+A. Ching, A. Choudhary, W. Liao, R. Ross, and W. Gropp, "Efficient Structured
+    Access in Parallel File Systems," Proceedings of the 2003 IEEE
+    International Conference on Cluster Computing, December, 2003. 
+
+BMI: a network abstraction layer for parallel I/O Philip H. Carns, Walter B.
+    Ligon III, Robert Ross and Pete Wyckoff Workshop on Communication
+    Architecture for Clusters, Proceedings of IPDPS '05, Denver, CO, April 2005
+
+P. H. Carns, ``Achieving Scalability in Parallel File Systems'', Clemson
+    University Doctoral Dissertation, May 2005.
+
+Design and Implementation of the System Interface for PVFS2
+    Harish Ramachandran,  Technical report PARL-2002-008. Masters Thesis,
+    December 2002.
+
+Using Grid Computing and PVFS2 Technologies for Construction of an e-Learning
+    Environment.  Chao-Tung Yang, Hsin-Chuan Ho, Chien-Tung Pan. July 2005.
+    Proceedings of the Fifth IEEE International Conference on Advanced Learning
+    Technologies (ICALT'05) - Volume 00 ICALT '05, Kaohsiung, Taiwan.
+
+"Benchmarking Parallel I/O Performance for Computational Fluid Dynamics
+    Applications". Parimala D. Pakalapati, Thomas Hauser.  43rd AIAA Aerospace
+    Sciences Meeting and Exhibit, 10 - 13 Jan 2005, Reno, Nevada.  
+
+"Shared Parallel Filesystems in Heterogeneous Linux Multi-Cluster
+    Environments". Jason Cope, Michael Oberg, Henry M. Tufo, and Matthew
+    Woitaszek. Computational Science Center, Linux Cluster Institute (LCI)
+    Conference, Chapel Hill, North Carolina.  2005
+
+Hipolito Vasquez Lucas and Thomas Ludwig.  "Hint Controlled Distribution with
+    Parallel File Systems".  European PVM/MPI Users' Group Meeting, Sorrento,
+    Italy, September 2005.  Pages 110-118.  ISBN 3-540-29009-5, ISSN 0302-9743.
+    Springer, Berlin, September 2005.
+
+Thomas Ludwig.  "Research Trends in High Performance Parallel Input/Output for
+   Cluster Environments".  Proceedings of the 4th International Scientific and
+   Practical Conference on Programming UkrPROG´2004.  Pages 274-281.  ISSN
+   1727-4907.  National Academy of Sciences of Ukraine, Kiev, Ukraine, 2004.
+
+"A High Performance Gigabit Ethernet Messaging Method for PVFS" C. Kling, L.
+    Schneidenbach, and B. Schnor (Germany). Proceedings of the  Parallel and
+    Distributed Computing and Systems, Phoenix, AZ. 2005
+ 
+"Exploring Clustered Parallel File Systems and Object Storage". Michael Ewan.
+    Intel Software Network Report. Publication Date Unknown.
+    http://www.intel.com/cd/ids/developer/asmo-na/eng/238284.htm
+
+"High Performance Computing Environments Without the Fuss: The Bootable Cluster
+    CD", Sarah M. Diesburg, Paul A. Gray, David Joiner. 19th IEEE International
+    Parallel and Distributed Processing Symposium (IPDPS'05) - Workshop 13.
+    Denver, CO, USA, April 2005
+
+"Design and Implementation of HTSFS: High throughput & Scalable File System",
+    Wenguo WEI, Shoubin DONG,  Ling ZHANG. Second International Workshop on
+    Operating Systems, Programming Environments and Management Tools for
+    High-Performance Computing on Clusters (COSET-2), Cambridge, MA, USA. 2005
+
+"An Efficient Network API for in-Kernel Applications in Clusters." Brice
+    Goglin, Olivier Glück, Pascale Vicat-Blanc Primet.  Laboratoire de
+    l'Informatique du Parallélisme, ENS Lyon.  Tech report RR2005-18, April
+    2005
+
+/* just a brief mention */
+Discovering new dynamics of core-collapse supernova shock waves. 
+John M. Blondin. Journal of Physics: Conference Series 16, pp 370-379. 2005
+
+MPI-IO and file system optimizations:
+
+Implementing MPI-IO Shared File Pointers without File System Support Robert
+    Latham, Robert Ross, Rajeev Thakur, Brian Toonen; EuroPVM/MPI 2005
+
+Implementing Byte-Range Locks Using MPI One-Sided Communication. Rajeev Thakur,
+    Robert Ross, Robert Latham. EuroPVM/MPI 2005
+
+Implementing MPI-IO Atomic Mode Without File System Support. Robert Ross,
+    Robert Latham, William Gropp, Rajeev Thakur, Brian Toonen; CCGrid 2005 
+
+
+PVFS1:
+
+Nagavijayalakshmi Vydyanathan, Gaurav Khanna, Tahsin Kurc, Umit Catalyurek,
+    Pete Wyckoff, Joel Saltz and P. Sadayappa. "Use of PVFS for Efficient
+    Execution of Jobs iwth Pipeline-Shared I/O". Proceedings of the 5th
+    IEEE/ACM International Workshop on Grid Computing (Grid 2004). Pittsburg,
+    PA, November 2004
+
+Unifier: unifying cache management and communication buffer management for PVFS
+    over InfiniBand Jiesheng Wu, Pete Wyckoff, D. K. Panda and Rob Ross
+    Proceedings of CCGrid '04, Chicago, IL, April 2004
+
+"Supporting efficient noncontiguous access in PVFS over InfiniBand
+    Jiesheng Wu, Pete Wyckoff and D. K. Panda Proceedings of Cluster '03, Hong
+    Kong, China, December 2003
+
+Jiesheng Wu, Pete Wyckoff and Dhabaleswar Panda "PVFS over InfiniBand: design
+    and performance evaluation" Proceedings of ICPP '03, Kaohsiung, Taiwan,
+    October 2003
+
+A. Sivasubramaniam, M. Vilayannur, P. H. Carns, R. B. Ross, R. Thakur, ``On the
+    Performance of the POSIX I/O Interface to PVFS'', Proceedings of the 12th
+    Euromicro Conference on Parallel, Distributed and Network based Processing,
+    A Coruna, Spain, February 2004.
+
+/* this one does mention a bit of pvfs2k */
+"A Parallel Out-of-Core Computing System Using PVFS for Linux Clusters". Jianqi
+    Tang.  Binxing Fang. Mingzeng Hu Hongli Zhang.  International Workshop on
+    Storage Network Architecture and Parallel I/Os (SNAPI), Saint Louis
+    Missouri, 2005
+
+ARTICLES:
+P. H. Carns, N. Miller, R. Latham, R. B. Ross, P. H. Carns, ``Improving Cluster
+    Performance with PVFS2'', ClusterWorld Magazine, April 2004.
+
+R. Latham, N. Miller, R. B. Ross, P. H. Carns, ``A Next-Generation Parallel
+    File System for Linux Clusters'', LinuxWorld Magazine, January 2004.
+
+Julian Kunkel, Thomas Ludwig and Hipolito Vasquez.  "Weit verteilt -
+    Dateisystem für parallele Systeme: PVFS, Version 2" .  iX - Magazin für
+    professionelle Informationstechnik.  Number 6, pages 110-113.  Heise
+    Verlag, June 2004.
+
+/* all the pvfs1 references from parl.clemson.edu/pvfs/papers.html */
+
+Avery Ching, Alok Choudhary, Wei-keng Liao, Robert Ross, and William Gropp,
+    "Noncontiguous I/O through PVFS," Proceedings of 2002 IEEE International
+    Conference on Cluster Computing, September, 2002.
+
+Ligon, III, W.B., and Ross, R. B., "Server-Side Scheduling in Cluster Parallel
+    I/O Systems," Calculateurs Parallèles Journal Special Issue on Parallel I/O
+    for Cluster Computing, accepted for publication October, 2001.
+
+Ligon, III, W.B., and Ross, R. B., "PVFS: Parallel Virtual File System,"
+    Beowulf Cluster Computing with Linux, Thomas Sterling, editor, pages
+    391-430, MIT Press, November, 2001.
+
+P. H. Carns, W. B. Ligon III, R. B. Ross, and R. Thakur, ``PVFS: A Parallel
+    File System For Linux Clusters'', Proceedings of the 4th Annual Linux
+    Showcase and Conference, Atlanta, GA, October 2000, pp. 317-327 (Best Paper
+    Award)
+
+R. B. Ross, "Providing Parallel I/O on Linux Clusters" 
+    Second Annual Linux Storage Management Workshop, Miami, FL, October 2000.
+
+W. B. Ligon III and R. B. Ross, ``An Overview of the Parallel Virtual File
+    System'', Proceedings of the 1999 Extreme Linux Workshop, June, 1999.
+
+M. M. Cettei, W. B. Ligon III, and R. B. Ross, ``Support for Parallel Out of
+    Core Applications on Beowulf Workstations'', Proceedings of the 1998 IEEE
+    Aerospace Conference, March, 1998.
+
+W. B. Ligon III and R. B. Ross, ``Implementation and Performance of a Parallel
+    File System for High Performance Distributed Applications,'',
+    Proceedings of the Fifth IEEE International Symposium on High Performance
+    Distributed Computing, August, 1996.
+
+John Enok Vollestad, "A High Performance Cluster File System Using SCI" (Full
+    Thesis and PVFS relevant excerpt), Master's Thesis, Department of
+    Informatics, University of Oslo, 2002.
+
+Monica Kashyap, Jenwei Hsieh, Christopher Stanton, and Rizwan Ali, "The
+    Parallel Virtual File System for High-Performance Computing Clusters," Dell
+    Scalable Systems Group article, November, 2002.
+
+Murali Vilayannur, Anand Sivasubramaniam, Mahmut Kandemir, Rajeev Thakur, and
+    Robert Ross, "Discretionary caching for I/O on clusters," under review
+
+Murali Vilayannur, Mahmut Kandemir, Anand Sivasubramaniam, "Kernel-level
+    caching for Optimizing I/O by exploiting inter-application data sharing,"
+    Proceedings of 2002 IEEE International Conference on Cluster Computing,
+    September, 2002.
+
+J. Li, W.-K. Liao, A. Choudhary, and V. Taylor, "I/O Analysis and Optimization
+    for an AMR Cosmology Application," Proceedings of 2002 IEEE International
+    Conference on Cluster Computing, September, 2002.
+
+Kumaran Rajaram, "Principal Design Criteria Influencing the Performance of a
+    Portable, High Performance Parallel I/O Implementation" (Mississippi State
+    University Library entry), Master's Thesis, Mississipi State University,
+    May, 2002.
+
+Juan Touriño, Jacobo Barro, Ramón Doallo, and Víctor M. Gulías, "Performance
+    analysis of MPI-I/O primitives on a PC cluster" (ACM Portal), Proceedings
+    of the 2002 ACM symposium on applied computing, 2002.
+
+Apon, A.W.; Wolinski, P.D.; Amerson, G.M. "Sensitivity of cluster file system
+    access to I/O server selection", Cluster Computing and the Grid 2nd
+    IEEE/ACM International Symposium CCGRID2002, 2002 Page(s): 183-192.
+
+Troy Baer "Parallel I/O Experiences on an SGI 750 Cluster", Cray User
+    Group Summit, 2002.
+
+Forrest Hartman, "Scalable I/O on Clusters, Part 1", Linux Magazine, July 2002.
+
+Forrest Hartman, "Scalable I/O on Clusters, Part 2", Linux Magazine, August
+    2002.
+
+Sharad Garg and Jens Mache, "Performance Evaluation of Parallel File Systems
+    for PC Clusters and ASCI Red" (IEEE Abstract) 3rd IEEE International
+    Conference on Cluster Computing, October 2001.
+
+J. Mache, J. Bower-Cooley, J. Guchereau, P. Thomas, and M. Wilkinson, "How to
+    achieve 1 GByte/sec I/O throughput with commodity IDE disks" (html),
+    Proceedings of SC2001 - 14th ACM/ IEEE Conference on High-Performance
+    Networking and Computing (refereed poster exhibit), 2001
+
+Nguyen, V.A. and Pierre, S. "Scalability of computer clusters" Canadian
+    Conference on Electrical and Computer Engineering, 2001.
+
+Seung-Ho Park, Si-Yong Park, Gwang Moon Kim, and Ki Dong Chung, "Design and
+    implementation of the parallel multimedia file system based on message
+    distribution" (ACM Portal), Proceedings of the eighth ACM international
+    conference on Multimedia, 2000.
+
+Ibrahim F. Haddad, ``PVFS: A Parallel Virtual File System for Linux Clusters''
+    Linux Journal , Volume 2000 , Issue 80 (November 2000).
+
+Hakan Taki and Gil Utard, "MPI-IO on a Parallel File System for Cluster of
+    Workstations" (IEEE Abstract), Proceedings of the 1st IEEE Computer Society
+    International Workshop on Cluster Computing, December 1999.
+

@@ -1,0 +1,42 @@
+#!/bin/sh
+
+. functions
+
+##
+## entry point for script
+##
+
+IOR=${CLUSTER_DIR}/IOR
+
+(cd ${EXTRA_TESTS}/IOR-2.8.6 && make mpiio && cp src/C/IOR ${IOR} )
+
+if [ $? -eq 1 ] ; then
+	exit 1
+fi
+
+# like the other mpiio tests we can only do multi processor tests if there's a
+# pav config file we can use
+# If we have to we can fall back to single processor, and still do something
+# reasonable. 
+
+if [ -f $PAV_CONFIG ] ; then 
+	# write out a pbs script
+	pbs_script=${CLUSTER_DIR}/ior.sh
+	make_pbs_script ${IOR} -a MPIIO -i 3 -o pvfs2:\${MOUNTPOINT}/iortest > $pbs_script
+
+	# submit it
+	job_id=$(qsub -N ior $pbs_script | cut -d . -f1)
+
+	# wait patently for it to complete
+	block_until_done $job_id
+
+	# need to get results into per-test log files
+	cat ior.o$job_id
+
+	# need to know if we failed or not
+	egrep -q '(Abort:|Assertion.*failed|Actual file size)' ior.o$job_id
+	if [ $? -eq 0 ] ; then
+		exit 1
+	fi
+	grep -q 'Max Read' ior.o$job_id
+fi
