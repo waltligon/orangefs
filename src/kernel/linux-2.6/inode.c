@@ -350,7 +350,7 @@ int pvfs2_revalidate(struct dentry *dentry)
      * A revalidate expects that all fields of the inode would be refreshed
      * So we have no choice but to refresh all attributes.
      */
-    ret = pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_ALL);
+    ret = pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_ALL_NOHINT);
     if (ret)
     {
         /* assume an I/O error and flag inode as bad */
@@ -376,7 +376,7 @@ int pvfs2_getattr(
      * of the inode would be refreshed. So again, we dont have too much of a choice
      * but refresh all the attributes.
      */
-    ret = pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_ALL);
+    ret = pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_ALL_NOHINT);
     if (ret == 0)
     {
         generic_fillattr(inode, kstat);

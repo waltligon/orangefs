@@ -32,7 +32,8 @@ extern job_context_id pint_client_sm_context;
 
 enum
 {
-    MKDIR_RETRY = 180
+    MKDIR_RETRY = 180,
+    MKDIR_SKIP_EATTR = 181
 };
 
 static int mkdir_init(
@@ -44,6 +45,10 @@ static int mkdir_msg_failure(
 static int mkdir_crdirent_setup_msgpair(
     PINT_client_sm *sm_p, job_status_s *js_p);
 static int mkdir_crdirent_failure(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int mkdir_seteattr_setup_msgpair(
+    PINT_client_sm *sm_p, job_status_s *js_p);
+static int mkdir_seteattr_failure(
     PINT_client_sm *sm_p, job_status_s *js_p);
 static int mkdir_delete_handle_setup_msgpair(
     PINT_client_sm *sm_p, job_status_s *js_p);
@@ -68,6 +73,9 @@ machine pvfs2_client_mkdir_sm(
     mkdir_msg_setup_msgpair,
     mkdir_msg_xfer_msgpair,
     mkdir_msg_failure,
+    mkdir_seteattr_setup_msgpair,
+    mkdir_seteattr_xfer_msgpair,
+    mkdir_seteattr_failure,
     mkdir_crdirent_setup_msgpair,
     mkdir_crdirent_xfer_msgpair,
     mkdir_crdirent_failure,
@@ -105,7 +113,7 @@ machine pvfs2_client_mkdir_sm(
     state mkdir_msg_xfer_msgpair
     {
         jump pvfs2_msgpairarray_sm;
-        success => mkdir_crdirent_setup_msgpair;
+        success => mkdir_seteattr_setup_msgpair;
         default => mkdir_msg_failure;
     }
 
@@ -113,6 +121,27 @@ machine pvfs2_client_mkdir_sm(
     {
         run mkdir_msg_failure;
         default => cleanup;
+    }
+
+    state mkdir_seteattr_setup_msgpair
+    {
+        run mkdir_seteattr_setup_msgpair;
+        MKDIR_SKIP_EATTR => mkdir_crdirent_setup_msgpair;
+        success => mkdir_seteattr_xfer_msgpair;
+        default => mkdir_seteattr_failure;
+    }
+
+    state mkdir_seteattr_xfer_msgpair
+    {
+        jump pvfs2_msgpairarray_sm;
+        success => mkdir_crdirent_setup_msgpair;
+        default => mkdir_seteattr_failure;
+    }
+
+    state mkdir_seteattr_failure
+    {
+        run mkdir_seteattr_failure;
+        default => delete_handle_setup_msgpair;
     }
 
     state mkdir_crdirent_setup_msgpair
@@ -277,7 +306,7 @@ static int mkdir_init(PINT_client_sm *sm_p,
     PINT_SM_GETATTR_STATE_FILL(
         sm_p->getattr,
         sm_p->object_ref,
-        PVFS_ATTR_COMMON_ALL, 
+        (PVFS_ATTR_COMMON_ALL|PVFS_ATTR_DIR_HINT), 
         PVFS_TYPE_DIRECTORY,
         0);
 
@@ -498,6 +527,20 @@ static int mkdir_cleanup(PINT_client_sm *sm_p,
 {
     gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: cleanup\n");
 
+    if(sm_p->u.mkdir.val_array)
+    {
+        if((sm_p->getattr.attr.mask & PVFS_ATTR_DIR_HINT) &&
+            (sm_p->getattr.attr.u.dir.hint.dfile_count > 0))
+        {
+            free(sm_p->u.mkdir.val_array[0].buffer);
+        }
+        free(sm_p->u.mkdir.val_array);
+    }
+    if(sm_p->u.mkdir.key_array)
+    {
+        free(sm_p->u.mkdir.key_array);
+    }
+
     PVFS_util_release_sys_attr(&sm_p->u.mkdir.sys_attr);
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
@@ -570,6 +613,152 @@ static int mkdir_parent_getattr_inspect(
     }
 
     return(1);
+}
+
+static int mkdir_seteattr_setup_msgpair(
+    PINT_client_sm *sm_p, job_status_s *js_p)
+{
+    int eattr_count = 0;
+    int cur_index = 0;
+    PINT_sm_msgpair_state *msg_p = NULL;
+    int ret = -PVFS_EINVAL;
+
+    /* NOTE: any memory allocated here will be free'd in the cleanup function */
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: seteattr_setup_msgpair\n");
+    
+    /* don't set any hint attributes if the parent doesn't have them */
+    if(!(sm_p->getattr.attr.mask & PVFS_ATTR_DIR_HINT))
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: skipping seteattr\n");
+        js_p->error_code = MKDIR_SKIP_EATTR;
+        return(1);
+    }
+
+    /* count how many hints we acquired */
+    if(sm_p->getattr.attr.u.dir.hint.dfile_count > 0)
+        eattr_count++;
+    if(sm_p->getattr.attr.u.dir.hint.dist_name != NULL)
+        eattr_count++;
+    if(sm_p->getattr.attr.u.dir.hint.dist_params != NULL)
+        eattr_count++;
+
+    if(eattr_count == 0)
+    {
+        /* nothing to inherit */
+        js_p->error_code = MKDIR_SKIP_EATTR;
+        return(1);
+    }
+
+    sm_p->u.mkdir.key_array = (PVFS_ds_keyval*)calloc(eattr_count,
+        sizeof(PVFS_ds_keyval));
+    if(!sm_p->u.mkdir.key_array)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return(1);
+    }
+
+    sm_p->u.mkdir.val_array = (PVFS_ds_keyval*)calloc(eattr_count,
+        sizeof(PVFS_ds_keyval));
+    if(!sm_p->u.mkdir.val_array)
+    {
+        js_p->error_code = -PVFS_ENOMEM;
+        return(1);
+    }
+
+    if(sm_p->getattr.attr.u.dir.hint.dfile_count > 0)
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir: setting num_dfiles\n");
+        sm_p->u.mkdir.key_array[cur_index].buffer = "user.pvfs2.num_dfiles";
+        sm_p->u.mkdir.key_array[cur_index].buffer_sz = 
+            strlen("user.pvfs2.num_dfiles") + 1;
+
+        sm_p->u.mkdir.val_array[cur_index].buffer = calloc(1, 16);
+        if(!sm_p->u.mkdir.val_array[cur_index].buffer)
+        {
+            js_p->error_code = -PVFS_ENOMEM;
+            return(1);
+        }
+        snprintf((char*)sm_p->u.mkdir.val_array[cur_index].buffer,
+            16, "%d", sm_p->getattr.attr.u.dir.hint.dfile_count);
+        sm_p->u.mkdir.val_array[cur_index].buffer_sz = 
+            strlen((char*)sm_p->u.mkdir.val_array[cur_index].buffer) + 1;
+
+        cur_index++;
+    }
+    if(sm_p->getattr.attr.u.dir.hint.dist_name != NULL)
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir: setting dist_name\n");
+        sm_p->u.mkdir.key_array[cur_index].buffer = "user.pvfs2.dist_name";
+        sm_p->u.mkdir.key_array[cur_index].buffer_sz = 
+            strlen("user.pvfs2.dist_name") + 1;
+        sm_p->u.mkdir.val_array[cur_index].buffer =
+            sm_p->getattr.attr.u.dir.hint.dist_name;
+        sm_p->u.mkdir.val_array[cur_index].buffer_sz =
+            sm_p->getattr.attr.u.dir.hint.dist_name_len;
+
+        cur_index++;
+    }
+    if(sm_p->getattr.attr.u.dir.hint.dist_params != NULL)
+    {
+        gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir: setting dist_params\n");
+        sm_p->u.mkdir.key_array[cur_index].buffer = "user.pvfs2.dist_params";
+        sm_p->u.mkdir.key_array[cur_index].buffer_sz = 
+            strlen("user.pvfs2.dist_params") + 1;
+
+        sm_p->u.mkdir.val_array[cur_index].buffer = 
+            sm_p->getattr.attr.u.dir.hint.dist_params;
+        sm_p->u.mkdir.val_array[cur_index].buffer_sz = 
+            sm_p->getattr.attr.u.dir.hint.dist_params_len;
+
+        cur_index++;
+    }
+
+    PINT_init_msgpair(sm_p, msg_p);
+
+    PINT_SERVREQ_SETEATTR_FILL(
+            sm_p->msgpair.req,
+            (*sm_p->cred_p),
+            sm_p->object_ref.fs_id,
+            sm_p->u.mkdir.metafile_handle,
+            0,
+            eattr_count,
+            sm_p->u.mkdir.key_array,
+            sm_p->u.mkdir.val_array
+            );
+
+    sm_p->msgarray = &(sm_p->msgpair);
+    sm_p->msgarray_count = 1;
+    sm_p->msgpair.fs_id = sm_p->object_ref.fs_id;
+    sm_p->msgpair.handle = sm_p->u.mkdir.metafile_handle;
+    sm_p->msgpair.retry_flag = PVFS_MSGPAIR_RETRY;
+    /* NOTE: no comp_fn needed. */
+
+    ret = PINT_cached_config_map_to_server(
+            &sm_p->msgpair.svr_addr,
+            sm_p->msgpair.handle,
+            sm_p->msgpair.fs_id);
+    if (ret)
+    {
+        gossip_err("Failed to map meta server address\n");
+        js_p->error_code = ret;
+    }
+    else
+    {
+        js_p->error_code = 0;
+    }
+    return(1);
+}
+
+static int mkdir_seteattr_failure(
+    PINT_client_sm *sm_p, job_status_s *js_p)
+{
+    sm_p->u.mkdir.stored_error_code = js_p->error_code;
+
+    gossip_debug(GOSSIP_CLIENT_DEBUG, "mkdir state: mkdir_seteattr_failure\n");
+
+    PVFS_perror_gossip("mkdir seteattr failed", js_p->error_code);
+    return 1;
 }
 
 /*

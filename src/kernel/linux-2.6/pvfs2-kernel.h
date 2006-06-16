@@ -930,7 +930,7 @@ static inline int pvfs2_internal_revalidate(
          * The dentry revalidating function expects that all fields of the inode
          * would be refreshed, so we dont have much of a choice here too.
          */
-        ret = ((pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_ALL) == 0) ? 1 : 0);
+        ret = ((pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_ALL_NOHINT) == 0) ? 1 : 0);
 #if 0
 /* Calling make_bad_inode() here results in a bad reference count on the
  * inode.  It therefore gets cached until the module is unloaded, when we get 

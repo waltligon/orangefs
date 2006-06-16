@@ -307,11 +307,12 @@ struct PINT_server_mkdir_op
 struct PINT_server_getattr_op
 {
     PVFS_handle handle;
-    PVFS_size dirent_count;
     PVFS_fs_id fs_id;
     PVFS_ds_attributes dirdata_ds_attr;
     uint32_t attrmask;
+    PVFS_error* err_array;
     PVFS_ds_keyval_handle_info keyval_handle_info;
+    PVFS_handle dirent_handle;
 };
 
 /* this is used in both set_eattr, get_eattr and list_eattr */

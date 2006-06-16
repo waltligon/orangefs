@@ -726,15 +726,24 @@ static PVFS_error post_getxattr_request(vfs_request_t *vfs_request)
     {
         return -PVFS_ENOMEM;
     }
+    vfs_request->response.geteattr.err_array = 
+        (PVFS_error *) malloc(sizeof(PVFS_error));
+    if(vfs_request->response.geteattr.err_array == NULL)
+    {
+        free(vfs_request->response.geteattr.val_array);
+        return -PVFS_ENOMEM;
+    }
     vfs_request->response.geteattr.val_array[0].buffer = 
         (void *) malloc(PVFS_REQ_LIMIT_VAL_LEN);
     if (vfs_request->response.geteattr.val_array[0].buffer == NULL)
     {
         free(vfs_request->response.geteattr.val_array);
+        free(vfs_request->response.geteattr.err_array);
         return -PVFS_ENOMEM;
     }
     vfs_request->response.geteattr.val_array[0].buffer_sz = 
         PVFS_REQ_LIMIT_VAL_LEN;
+
     /* Remember to free these up */
     ret = PVFS_isys_geteattr_list(
         vfs_request->in_upcall.req.getxattr.refn,
@@ -2007,6 +2016,8 @@ static inline void package_downcall_members(
             vfs_request->response.geteattr.val_array[0].buffer = NULL;
             free(vfs_request->response.geteattr.val_array);
             vfs_request->response.geteattr.val_array = NULL;
+            free(vfs_request->response.geteattr.err_array);
+            vfs_request->response.geteattr.err_array = NULL;
             break;
         case PVFS2_VFS_OP_SETXATTR:
             break;

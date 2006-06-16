@@ -108,6 +108,8 @@ typedef struct
 #define PVFS_REQ_LIMIT_SEGMENT_BYTES      PVFS_SEGMENT_MAX
 /* max total size of I/O request descriptions */
 #define PVFS_REQ_LIMIT_IOREQ_BYTES        8192
+/* maximum size of distribution name used for the hints */
+#define PVFS_REQ_LIMIT_DIST_NAME          128
 /* max count of segments allowed per path lookup (note that this governs 
  * the number of handles and attributes returned in lookup_path responses)
  */
@@ -1349,14 +1351,17 @@ struct PVFS_servresp_geteattr
 {
     int32_t nkey;           /* number of values returned */
     PVFS_ds_keyval *val;    /* array of values returned */
+    PVFS_error *err;        /* array of error codes */
 };
-endecode_fields_1a_struct(
+endecode_fields_1aa_struct(
     PVFS_servresp_geteattr,
     skip4,,
     int32_t, nkey,
-    PVFS_ds_keyval, val)
+    PVFS_ds_keyval, val,
+    PVFS_error, err);
 #define extra_size_PVFS_servresp_geteattr \
-    (PVFS_REQ_LIMIT_VAL_LEN * PVFS_REQ_LIMIT_KEYVAL_LIST)
+    (PVFS_REQ_LIMIT_VAL_LEN * PVFS_REQ_LIMIT_KEYVAL_LIST + \
+    PVFS_REQ_LIMIT_KEYVAL_LIST * sizeof(PVFS_error))
 
 /* seteattr ****************************************************/
 /* - sets list of extended attributes */

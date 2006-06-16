@@ -60,6 +60,8 @@ size_t strnlen(const char *s, size_t limit);
 char *strstr(const char *haystack, const char *needle);
 #endif
 
+int PINT_split_keyvals(char *string, int *nkey, 
+        char ***pkey, char ***pval);
 #endif
 /*
  * Local variables:

@@ -1808,6 +1808,7 @@ int job_trove_keyval_read_list(PVFS_fs_id coll_id,
                                PVFS_handle handle,
                                PVFS_ds_keyval * key_array,
                                PVFS_ds_keyval * val_array,
+                               PVFS_error * err_array,
                                int count,
                                PVFS_ds_flags flags,
                                PVFS_vtag * vtag,
@@ -1843,8 +1844,8 @@ int job_trove_keyval_read_list(PVFS_fs_id coll_id,
     JOB_EVENT_START(PVFS_EVENT_TROVE_KEYVAL_READ_LIST, jd->job_id);
 
 #ifdef __PVFS2_TROVE_SUPPORT__
-    ret = trove_keyval_read_list(coll_id, handle, key_array,
-                                 val_array, count, flags, jd->u.trove.vtag, 
+    ret = trove_keyval_read_list(coll_id, handle, key_array, val_array, 
+                                 err_array, count, flags, jd->u.trove.vtag, 
                                  user_ptr_internal,
                                  global_trove_context, &(jd->u.trove.id));
 #else

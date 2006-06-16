@@ -406,7 +406,7 @@ static int generic_open(file_object *obj, PVFS_credentials *credentials)
         ref.fs_id = resp_lookup.ref.fs_id;
 
         memset(&resp_getattr, 0, sizeof(PVFS_sysresp_getattr));
-        ret = PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL,
+        ret = PVFS_sys_getattr(ref, PVFS_ATTR_SYS_ALL_NOHINT,
                                credentials, &resp_getattr);
         if (ret)
         {

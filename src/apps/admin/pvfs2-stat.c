@@ -225,7 +225,7 @@ static int do_stat(const char             * pszFile,
    ref.fs_id  = fs_id;
    
    ret = PVFS_sys_getattr(ref, 
-                          PVFS_ATTR_SYS_ALL,
+                          PVFS_ATTR_SYS_ALL_NOHINT,
                           (PVFS_credentials *) credentials, 
                           &getattr_response);
 

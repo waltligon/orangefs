@@ -759,6 +759,52 @@ If you're looking for a quick suggestion for a local file system type
 to use, we suggest ext3 with ``journal data writeback'' option as a
 reasonable choice.
 
+\subsection{Is there any way to tune particular directories for different
+workloads?}
+
+Yes.  This can be done by using extended attributes to set directory
+hints.  Three hints are currently supported, and they allow you to specify
+the distribution, distribution parameters, and number of datafiles to
+stripe across.  They will not change the characteristics of existing
+files, but they will take effect for any newly created files within the
+directory.  These hints will also be inherited by any new
+subdirectories.
+
+\subsubsection{Distribution}
+
+The distribution can be set as follows:
+
+\begin{verbatim}
+prompt# setfattr -n "user.pvfs2.dist_name" -v "basic_dist" /mnt/pvfs2/directory
+\end{verbatim}
+
+Supported distribution names can be found by looking in the pvfs2-dist-*
+header files.
+
+\subsubsection{Distribution parameters}
+
+Some distributions allow you to set parameters that impact how the
+distribution behaves.  These parameters can be set as follows:
+
+\begin{verbatim}
+prompt# setfattr -n "user.pvfs2.dist_params" -v "strip_size:4096" /mnt/pvfs2/directory
+\end{verbatim}
+
+You can specify more than one "parameter:value" pair by seperating them with
+commas.
+
+\subsubsection{Number of datafiles}
+
+You can also specify the number of datafiles to stripe across: 
+
+\begin{verbatim}
+prompt# setfattr -n "user.pvfs2.num_dfiles" -v "1" /mnt/pvfs2/directory
+\end{verbatim}
+
+PVFS2 defaults to striping files across each server in the file system.
+However, you may find that for small files it is advantages to limit each
+file to only a subset of servers (or even just one).
+
 \subsection{My app still runs more slowly than I would like.  What can I do?}
 \label{sec:tuning}
 
