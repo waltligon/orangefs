@@ -2456,6 +2456,8 @@ io_find_offset(
                                    &rfdata, &result, PINT_SERVER);
         if(res < 0)
         {
+            PINT_free_request_state(filereq_state);
+            PINT_free_request_state(memreq_state);
             return res;
         }
 
@@ -2476,6 +2478,9 @@ io_find_offset(
     } while(!PINT_REQUEST_DONE(filereq_state) && result.segs);
 
     *total_return_offset = total_offset;
+
+    PINT_free_request_state(filereq_state);
+    PINT_free_request_state(memreq_state);
     return 0;
 }
 
