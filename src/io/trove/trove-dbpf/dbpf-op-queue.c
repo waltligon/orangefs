@@ -9,8 +9,6 @@
 #include "pint-perf-counter.h"
 #include "dbpf-sync.h"
 
-extern struct PINT_perf_counter *PINT_server_pc;
-
 /* the queue that stores pending serviceable operations */
 QLIST_HEAD(dbpf_op_queue);
 
