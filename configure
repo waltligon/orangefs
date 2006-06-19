@@ -8449,7 +8449,8 @@ if test "${enable_epoll+set}" = set; then
   enableval="$enable_epoll"
 
    if test "x$enableval" = "xyes"; then
-   	BUILD_EPOLL=1
+        CFLAGS="$CFLAGS -D__PVFS2_USE_EPOLL__"
+        BUILD_EPOLL=1
 
    fi
 

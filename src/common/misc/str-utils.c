@@ -680,6 +680,134 @@ char *strstr(const char *haystack, const char *needle)
 #endif
 
 /*
+ * PINT_split_keyvals()
+ *
+ * Splits a given string into a number of key:val strings.
+ *
+ * Parameters:
+ * The given string must be comma separated, and each
+ * segment within the comma regions must be of of
+ * the form key:val.
+ * Return the number of such keyval pairs and a 
+ * pointer to a double dimensional array of keys and values.
+ * In case of errors, a -ve PVFS error is returned.
+ *
+ * Example inputs and return values:
+ *
+ * NULL - return -PVFS_EINVAL
+ * ab:23 - return nkey as 1, pkey <"ab">, pval <"23">
+ * ab:23,bc:34 - returns nkey as 2, pkey <"ab", "bc">, pval<"23", "34">
+ *
+ */
+int PINT_split_keyvals(char *string, int *nkey, 
+        char ***pkey, char ***pval)
+{
+    char **key, **val, *ptr, *params;
+    int nparams = 0, i;
+
+    if (string == NULL || nkey == NULL 
+            || pkey == NULL || pval == NULL)
+    {
+      return -PVFS_EINVAL;
+    }
+    params = strdup(string);
+    if (params == NULL)
+    {
+      return -PVFS_ENOMEM;
+    }
+    ptr = params;
+    while (ptr)
+    {
+        if (*ptr != ',' || *ptr != '\0')
+                 nparams++;
+        ptr++;
+        ptr = strchr(ptr, ',');
+    }
+    if (nparams == 0)
+    {
+      free(params);
+      return -PVFS_EINVAL;
+    }
+    ptr = params;
+    key = (char **) calloc(nparams, sizeof(char *));
+    val = (char **) calloc(nparams, sizeof(char *));
+    if (key == NULL || val ==  NULL)
+    {
+      free(key);
+      free(val);
+      free(params);
+      return -PVFS_ENOMEM;
+    }
+    for (i = 0; i < nparams; i++)
+    {
+        char *ptr2;
+        if (i > 0 && ptr)
+        {
+            *ptr = '\0';
+            ptr++;
+        }
+        else if (ptr == NULL)
+        {
+            break;
+        }
+        ptr2 = strchr(ptr, ':');
+        if (ptr2 == NULL)
+        {
+            break;
+        }
+        key[i] = ptr;
+        ptr = strchr(ptr, ',');
+        if (ptr != NULL && ptr < ptr2)
+        {
+            break;
+        }
+        *ptr2 = '\0';
+        val[i] = ptr2 + 1;
+    }
+    if (i != nparams)
+    {
+      free(key);
+      free(val);
+      free(params);
+      return -PVFS_EINVAL;
+    }
+    else
+    {
+      for (i = 0; i < nparams; i++)
+      {
+          char *ptr1, *ptr2;
+          ptr1 = strdup(key[i]);
+          ptr2 = strdup(val[i]);
+          if (ptr1 == NULL || ptr2 == NULL)
+              break;
+          if (strchr(ptr1, ':') || strchr(ptr2, ':'))
+              break;
+          key[i] = ptr1;
+          val[i] = ptr2;
+      }
+      if (i != nparams)
+      {
+          int j;
+          for (j = 0; j < i; j++)
+          {
+              if (key[j]) free(key[j]);
+              if (val[j]) free(val[j]);
+          }
+          free(key);
+          free(val);
+          free(params);
+          return -PVFS_EINVAL;
+      }
+      free(params);
+      *nkey = nparams;
+      *pkey = key;
+      *pval = val;
+      return 0;
+    }
+}
+
+
+/*
  * Local variables:
  *  c-indent-level: 4
  *  c-basic-offset: 4

@@ -836,6 +836,7 @@ static int dbpf_keyval_read_list(TROVE_coll_id coll_id,
                                  TROVE_handle handle,
                                  TROVE_keyval_s *key_array,
                                  TROVE_keyval_s *val_array,
+                                 TROVE_ds_state *err_array,
                                  int count,
                                  TROVE_ds_flags flags,
                                  TROVE_vtag_s *vtag,
@@ -874,6 +875,7 @@ static int dbpf_keyval_read_list(TROVE_coll_id coll_id,
     /* initialize the op-specific members */
     op_p->u.k_read_list.key_array = key_array;
     op_p->u.k_read_list.val_array = val_array;
+    op_p->u.k_read_list.err_array = err_array;
     op_p->u.k_read_list.count = count;
 
     return dbpf_queue_or_service(op_p, q_op_p, flags, out_op_id_p);
@@ -884,6 +886,7 @@ static int dbpf_keyval_read_list_op_svc(struct dbpf_op *op_p)
     int ret = -TROVE_EINVAL, i = 0;
     struct dbpf_keyval_db_entry key_entry;
     DBT key, data;
+    int success_count = 0;
 
     for(i = 0; i < op_p->u.k_read_list.count; i++)
     {
@@ -909,17 +912,28 @@ static int dbpf_keyval_read_list_op_svc(struct dbpf_op *op_p)
         {
             op_p->coll_p->keyval_db->err(
                 op_p->coll_p->keyval_db, ret, "DB->get");
-            ret = -dbpf_db_error_to_trove_error(ret);
-            goto return_error;
+            op_p->u.k_read_list.err_array[i] = 
+                -dbpf_db_error_to_trove_error(ret);
+            op_p->u.k_read_list.val_array[i].read_sz = 0;
         }
-
-        op_p->u.k_read_list.val_array[i].read_sz = data.size;
+        else
+        {
+            success_count++;
+            op_p->u.k_read_list.err_array[i] = 0;
+            op_p->u.k_read_list.val_array[i].read_sz = data.size;
+        }
     }
 
-    return 1;
-
-return_error:
-    return ret;
+    if(success_count)
+    {
+        /* return success if we read at least one of the requested keys */
+        return 1;
+    }
+    else
+    {
+        /* if everything failed, then return first error code */
+        return(op_p->u.k_read_list.err_array[0]);
+    }
 }
 
 static int dbpf_keyval_write_list(TROVE_coll_id coll_id,
@@ -1330,7 +1344,6 @@ int PINT_dbpf_keyval_remove(
         ret = db_p->get(db_p, NULL, &db_key, &db_val, 0);
         if(ret != 0)
         {
-            db_p->err(db_p, ret, "DB->get");
             ret = -dbpf_db_error_to_trove_error(ret);
         }
         val->read_sz = db_val.size;
@@ -1339,7 +1352,6 @@ int PINT_dbpf_keyval_remove(
     ret = db_p->del(db_p, NULL, &db_key, 0);
     if(ret != 0)
     {
-        db_p->err(db_p, ret, "DB->del");
         ret = -dbpf_db_error_to_trove_error(ret);
     }
 
@@ -1610,13 +1622,14 @@ static int dbpf_keyval_get_handle_info_op_svc(struct dbpf_op * op_p)
     int ret = -TROVE_EINVAL;
     struct dbpf_keyval_db_entry key_entry;
 
+    memset(&key_entry, 0, sizeof(key_entry));
     key_entry.handle = op_p->handle;
     memset(&key, 0, sizeof(key));
     memset(&data, 0, sizeof(data));
     key.data = &key_entry;
     key.size = DBPF_KEYVAL_DB_ENTRY_TOTAL_SIZE(0);
     key.flags = DB_DBT_USERMEM;
-    data.data = &op_p->u.k_get_handle_info.info;
+    data.data = op_p->u.k_get_handle_info.info;
     data.ulen = sizeof(TROVE_keyval_handle_info);
     data.flags = DB_DBT_USERMEM;
 
@@ -1627,7 +1640,7 @@ static int dbpf_keyval_get_handle_info_op_svc(struct dbpf_op * op_p)
         return -dbpf_db_error_to_trove_error(ret);
     }
 
-    return 0;
+    return 1;
 }    
 
 /**

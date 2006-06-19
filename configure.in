@@ -553,8 +553,9 @@ AC_ARG_ENABLE(epoll,
   --disable-epoll         Disable epoll, use poll instead],
 [
    if test "x$enableval" = "xyes"; then
-   	BUILD_EPOLL=1
-	AC_SUBST(BUILD_EPOLL)
+        CFLAGS="$CFLAGS -D__PVFS2_USE_EPOLL__"
+        BUILD_EPOLL=1
+        AC_SUBST(BUILD_EPOLL)
    fi
 ],
 [

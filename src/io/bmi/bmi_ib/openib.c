@@ -6,10 +6,11 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: openib.c,v 1.1 2006-05-30 20:24:57 pw Exp $
+ * $Id: openib.c,v 1.1.4.1 2006-06-19 15:57:37 slang Exp $
  */
 #include <string.h>
 #include <errno.h>
+#include <fcntl.h>
 #define __PINT_REQPROTO_ENCODE_FUNCS_C  /* include definitions */
 #include <src/io/bmi/bmi-byteswap.h>  /* bmitoh64 */
 #include <src/common/misc/pvfs2-internal.h>  /* llu */
@@ -813,6 +814,32 @@ static const char *openib_port_state_string(enum ibv_port_state state)
     }
     return s;
 }
+
+static const char *async_event_type_string(enum ibv_event_type event_type)
+{
+    const char *s = "(UNKNOWN)";
+
+    switch (event_type) {
+	CASE(IBV_EVENT_CQ_ERR);
+	CASE(IBV_EVENT_QP_FATAL);
+	CASE(IBV_EVENT_QP_REQ_ERR);
+	CASE(IBV_EVENT_QP_ACCESS_ERR);
+	CASE(IBV_EVENT_COMM_EST);
+	CASE(IBV_EVENT_SQ_DRAINED);
+	CASE(IBV_EVENT_PATH_MIG);
+	CASE(IBV_EVENT_PATH_MIG_ERR);
+	CASE(IBV_EVENT_DEVICE_FATAL);
+	CASE(IBV_EVENT_PORT_ACTIVE);
+	CASE(IBV_EVENT_PORT_ERR);
+	CASE(IBV_EVENT_LID_CHANGE);
+	CASE(IBV_EVENT_PKEY_CHANGE);
+	CASE(IBV_EVENT_SM_CHANGE);
+	CASE(IBV_EVENT_SRQ_ERR);
+	CASE(IBV_EVENT_SRQ_LIMIT_REACHED);
+	CASE(IBV_EVENT_QP_LAST_WQE_REACHED);
+    }
+    return s;
+}
 #undef CASE
 
 /*
@@ -891,14 +918,30 @@ static struct ibv_device *get_nic_handle(void)
     return nic_handle;
 }
 
+static int openib_check_async_events(void)
+{
+    struct openib_device_priv *od = ib_device->priv;
+    int ret;
+    struct ibv_async_event ev;
+
+    ret = ibv_get_async_event(od->ctx, &ev);
+    if (ret < 0) {
+	if (errno == EAGAIN)
+	    return 0;
+	error_errno("%s: ibv_get_async_event", __func__);
+    }
+    warning("%s: %s", __func__, async_event_type_string(ev.event_type));
+    ibv_ack_async_event(&ev);
+    return 1;
+}
+
 
 /*
  * Startup, once per application.
- * XXX: Watch for async events someday.
  */
 int openib_ib_initialize(void)
 {
-    int ret = 0;
+    int flags, ret = 0;
     struct ibv_device *nic_handle;
     struct ibv_context *ctx;
     int cqe_num; /* local variables, mainly for debug */
@@ -940,6 +983,7 @@ int openib_ib_initialize(void)
     ib_device->func.wc_status_string = openib_wc_status_string;
     ib_device->func.mem_register = openib_mem_register;
     ib_device->func.mem_deregister = openib_mem_deregister;
+    ib_device->func.check_async_events = openib_check_async_events;
 
     od->ctx = ctx;
     od->nic_port = IBV_PORT;  /* maybe let this be configurable */
@@ -979,10 +1023,16 @@ int openib_ib_initialize(void)
     if (!od->channel)
 	error("%s: ibv_create_comp_channel failed", __func__);
 
-
     od->nic_cq = ibv_create_cq(od->ctx, cqe_num, NULL, od->channel, 0);
     if (!od->nic_cq)
 	error("%s: ibv_create_cq failed", __func__);
+
+    /* use non-blocking IO on the async fd */
+    flags = fcntl(ctx->async_fd, F_GETFL);
+    if (flags < 0)
+	error_errno("%s: get async fd flags", __func__);
+    if (fcntl(ctx->async_fd, F_SETFL, flags | O_NONBLOCK) < 0)
+	error_errno("%s: set async fd nonblocking", __func__);
 
     /* will be set on first connection */
     od->sg_tmp_array = 0;

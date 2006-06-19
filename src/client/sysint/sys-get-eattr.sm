@@ -139,7 +139,9 @@ PVFS_error PVFS_sys_geteattr(
         PVFS_ds_keyval *val_p)
 {
     PVFS_sysresp_geteattr resp_p;
+    PVFS_error tmp_err;
     resp_p.val_array = val_p;
+    resp_p.err_array = &tmp_err;
     return PVFS_sys_geteattr_list(ref, credentials, 1, key_p, &resp_p);
 }
 
@@ -263,22 +265,27 @@ static int get_eattr_comp_fn(
             /* out the actual read_sz in its place */
             sm_p->u.geteattr.resp_p->val_array[k].read_sz =
                     resp_p->u.geteattr.val[k].buffer_sz;
+            sm_p->u.geteattr.resp_p->err_array[k] =
+                    resp_p->u.geteattr.err[k];
             /* check for too big a return message */
-            if (sm_p->u.geteattr.resp_p->val_array[k].read_sz <=
-                    sm_p->u.geteattr.resp_p->val_array[k].buffer_sz)
+            if(resp_p->u.geteattr.err[k] == 0)
             {
-                gossip_debug(GOSSIP_GETEATTR_DEBUG,"copying\n");
-                memcpy(sm_p->u.geteattr.resp_p->val_array[k].buffer,
-                        resp_p->u.geteattr.val[k].buffer,
-                        sm_p->u.geteattr.resp_p->val_array[k].read_sz);
-            }
-            else /* oops, error! returned too much data */
-            {
-                gossip_debug(GOSSIP_GETEATTR_DEBUG,"clearing on error\n");
-                memset(sm_p->u.geteattr.resp_p->val_array[k].buffer,0,
-                        sm_p->u.geteattr.resp_p->val_array[k].buffer_sz);
-                /* record an error, but keep going */
-                ret = -PVFS_EMSGSIZE;
+                if (sm_p->u.geteattr.resp_p->val_array[k].read_sz <=
+                        sm_p->u.geteattr.resp_p->val_array[k].buffer_sz)
+                {
+                    gossip_debug(GOSSIP_GETEATTR_DEBUG,"copying\n");
+                    memcpy(sm_p->u.geteattr.resp_p->val_array[k].buffer,
+                            resp_p->u.geteattr.val[k].buffer,
+                            sm_p->u.geteattr.resp_p->val_array[k].read_sz);
+                }
+                else /* oops, error! returned too much data */
+                {
+                    gossip_debug(GOSSIP_GETEATTR_DEBUG,"clearing on error\n");
+                    memset(sm_p->u.geteattr.resp_p->val_array[k].buffer,0,
+                            sm_p->u.geteattr.resp_p->val_array[k].buffer_sz);
+                    /* record an error, but keep going */
+                    ret = -PVFS_EMSGSIZE;
+                }
             }
         }
     }

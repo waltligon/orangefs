@@ -253,6 +253,7 @@ struct dbpf_keyval_read_list_op
 {
     TROVE_keyval_s *key_array;
     TROVE_keyval_s *val_array;
+    TROVE_ds_state *err_array;
     int count; /* TODO: MAKE INOUT? */
 };
 

@@ -213,7 +213,7 @@ static void pvfs2_read_inode(
        called after a successful dentry lookup if the inode is not
        present in the inode cache already.  so this is our chance.
     */
-    if (pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_ALL) != 0)
+    if (pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_ALL_NOHINT) != 0)
     {
         /* assume an I/O error and mark the inode as bad */
         pvfs2_make_bad_inode(inode);
@@ -245,7 +245,7 @@ static void pvfs2_read_inode(
         pvfs2_print("pvfs2: pvfs2_read_inode: allocated %p (inode = %lu | "
                 "ct = %d)\n", pvfs2_inode, inode->i_ino,
                 (int)atomic_read(&inode->i_count));
-        if (pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_ALL) != 0)
+        if (pvfs2_inode_getattr(inode, PVFS_ATTR_SYS_ALL_NOHINT) != 0)
         {
             pvfs2_make_bad_inode(inode);
         }

@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.31 2006-05-30 20:24:57 pw Exp $
+ * $Id: ib.c,v 1.31.2.1 2006-06-19 15:57:37 slang Exp $
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -54,6 +54,7 @@ ib_device_t *ib_device __hidden = NULL;
 #define wc_status_string ib_device->func.wc_status_string
 #define mem_register ib_device->func.mem_register
 #define mem_deregister ib_device->func.mem_deregister
+#define check_async_events ib_device->func.check_async_events
 
 #if MEMCACHE_EARLY_REG
 #if MEMCACHE_BOUNCEBUF
@@ -1208,6 +1209,11 @@ BMI_ib_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
     gen_mutex_unlock(&interface_mutex);
 
     *outcount = n;
+#if 0
+    /* possible spinless hack */
+    if (n == 0 && max_idle_time > 0 && ib_device->listen_sock >= 0) 
+	ib_tcp_server_block_new_connections(1);  /* 1 ms only */
+#else
     if (n > 0) {
 	gettimeofday(&last_action, 0);
     } else if (max_idle_time > 0) {
@@ -1225,11 +1231,17 @@ BMI_ib_testcontext(int incount, bmi_op_id_t *outids, int *outcount,
 		if (now.tv_usec < 0)
 		    --now.tv_sec;
 	    }
-	    if (now.tv_sec > 0)  /* spin for 1 sec following any activity */
+	    if (now.tv_sec > 0) {  /* spin for 1 sec following any activity */
 		if (ib_tcp_server_block_new_connections(max_idle_time))
 		    gettimeofday(&last_action, 0);
+	    } else {
+		/* totally helps on Lee's old 2.4.21 machine, but may cause
+		 * big delays on modern kernels; do not make default */
+		/* sched_yield(); */
+	    }
 	}
     }
+#endif
     return 0;
 }
 
@@ -1285,7 +1297,12 @@ BMI_ib_testunexpected(int incount __unused, int *outcount,
 	}
     }
 
+    /* check for new incoming connections */
     num_action += ib_tcp_server_check_new_connections();
+
+    /* look for async events on the IB port */
+    num_action += check_async_events();
+
     if (num_action)
 	gettimeofday(&last_action, 0);
 

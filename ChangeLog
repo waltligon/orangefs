@@ -38,6 +38,10 @@ pvfs2-1.5.0
   that want sendfile system call support, it is now disabled by default.
   Epoll is now the default if its available, otherwise poll is used,
   --enable-epoll and --disable-epoll now force without checking.
+- Performance improvements for bmi_tcp: allow socket buffer size and tcp
+  window size to be changed dynamically.  Use a pipe file descriptor
+  for poll to prevent stalls.  Reorganize epoll to add and remove epoll
+  watches.
 - pvfs2-genconfig now supports --iospec and --metaspec options.  Also fixed
   some hostname sorting and range spec bugs.
 - pvfs2-client: added --logstamp.  nonblocking statfs and mount support.

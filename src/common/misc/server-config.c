@@ -26,6 +26,8 @@
 #include "pvfs2-server.h"
 #include "pvfs2-internal.h"
 
+static const char * replace_old_keystring(const char * oldkey);
+
 static DOTCONF_CB(get_pvfs_server_id);
 static DOTCONF_CB(get_logstamp);
 static DOTCONF_CB(get_storage_space);
@@ -1295,11 +1297,36 @@ DOTCONF_CB(get_handle_recycle_timeout_seconds)
     return NULL;
 }
 
+static const char * replace_old_keystring(const char * oldkey)
+{
+    /* check for old keyval strings */
+    if(!strcmp(oldkey, "dir_ent"))
+    {
+        return "de";
+    }
+    else if(!strcmp(oldkey, "datafile_handles"))
+    {
+        return "dh";
+    }
+    else if(!strcmp(oldkey, "metafile_dist"))
+    {
+        return "md";
+    }
+    else if(!strcmp(oldkey, "symlink_target"))
+    {
+        return "st";
+    }
+
+    return oldkey;
+}
+
+
 DOTCONF_CB(get_attr_cache_keywords_list)
 {
     int i = 0, len = 0;
     char buf[512] = {0};
     char *ptr = buf;
+    const char * rtok;
     struct filesystem_configuration_s *fs_conf = NULL;
 
     struct server_configuration_s *config_s = 
@@ -1311,44 +1338,52 @@ DOTCONF_CB(get_attr_cache_keywords_list)
 
     if (fs_conf->attr_cache_keywords != NULL)
     {
-        len = strlen(fs_conf->attr_cache_keywords);
-        strncpy(ptr,fs_conf->attr_cache_keywords,len);
-        ptr += (len * sizeof(char));
-        if (*(ptr-1) != ',')
+        char ** tokens;
+        int token_count, j;
+        
+        token_count = PINT_split_string_list(
+            &tokens, fs_conf->attr_cache_keywords);
+
+        for(j = 0; j < token_count; ++j)
         {
-            *ptr = ',';
-            ptr++;
+            rtok = replace_old_keystring(tokens[j]);
+            if(!strstr(buf, rtok))
+            {
+                len = strlen(rtok);
+                strncat(ptr, rtok, len);
+                strncat(ptr, ",", 1);
+                ptr += len + 1;
+            }
         }
+                       
+        PINT_free_string_list(tokens, token_count);
         free(fs_conf->attr_cache_keywords);
     }
+
     for(i = 0; i < cmd->arg_count; i++)
     {
-        strncat(ptr, cmd->data.list[i], 512 - len);
-        len += strlen(cmd->data.list[i]);
+        char ** tokens;
+        int token_count, j;
+        
+        token_count = PINT_split_string_list(
+            &tokens, cmd->data.list[i]);
+
+        for(j = 0; j < token_count; ++j)
+        {
+            rtok = replace_old_keystring(tokens[j]);
+            if(!strstr(buf, rtok))
+            {
+                len = strlen(rtok);
+                strncat(ptr, rtok, len);
+                strncat(ptr, ",", 1);
+                ptr += len + 1;
+            }
+        }
+
+        PINT_free_string_list(tokens, token_count);
     }
 
-    /* check for old keyval strings */
-    if(strstr(buf, "dir_ent"))
-    {
-        strncat(ptr, "de,", 512 - len);
-        len += 3;
-    }
-    if(strstr(buf, "datafile_handles"))
-    {
-        strncat(ptr, "dh,", 512 - len);
-        len += 3;
-    }
-    if(strstr(buf, "metafile_dist"))
-    {
-        strncat(ptr, "md,", 512 - len);
-        len += 3;
-    }
-    if(strstr(buf, "symlink_target"))
-    {
-        strncat(ptr, "st,", 512 - len);
-        len += 3;
-    }
-
+    *ptr = '\0';
     fs_conf->attr_cache_keywords = strdup(buf);
     return NULL;
 }

@@ -484,11 +484,15 @@ int pvfs2_inode_setattr(
     return ret;
 }
 
+/* metafile distribution */
+#define DIST_KEY "system.pvfs2." METAFILE_DIST_KEYSTR
+/* datafile handles */
+#define DFILE_KEY "system.pvfs2." DATAFILE_HANDLES_KEYSTR
 
 /* Extended attributes helper functions */
 static char *xattr_non_zero_terminated[] = {
-    "system.pvfs2.datafile_handles",
-    "system.pvfs2.metafile_dist"
+    DFILE_KEY,
+    DIST_KEY
 };
 
 /* Extended attributes helper functions */

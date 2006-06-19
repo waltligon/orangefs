@@ -44,7 +44,9 @@
 
 /* internal attribute masks for directory objects */
 #define PVFS_ATTR_DIR_DIRENT_COUNT         (1 << 19)
-#define PVFS_ATTR_DIR_ALL PVFS_ATTR_DIR_DIRENT_COUNT
+#define PVFS_ATTR_DIR_HINT                  (1 << 20)
+#define PVFS_ATTR_DIR_ALL \
+(PVFS_ATTR_DIR_DIRENT_COUNT | PVFS_ATTR_DIR_HINT)
 
 /* attributes specific to metadata objects */
 struct PVFS_metafile_attr_s
@@ -90,13 +92,49 @@ struct PVFS_datafile_attr_s
 typedef struct PVFS_datafile_attr_s PVFS_datafile_attr;
 endecode_fields_1(PVFS_datafile_attr, PVFS_size, size)
 
+/* extended hint attributes for a directory object */
+struct PVFS_directory_hint_s
+{
+    uint32_t  dist_name_len;
+    /* what is the distribution name? */
+    char     *dist_name;
+    /* what are the distribution parameters? */
+    uint32_t  dist_params_len;
+    char     *dist_params;
+    /* how many dfiles ought to be used */
+    uint32_t dfile_count;
+};
+typedef struct PVFS_directory_hint_s PVFS_directory_hint;
+
+#ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
+endecode_fields_7(PVFS_directory_hint,
+        uint32_t, dist_name_len,
+        skip4,,
+        string, dist_name,
+        uint32_t, dist_params_len,
+        skip4,,
+        string, dist_params,
+        uint32_t, dfile_count)
+#endif
+
 /* attributes specific to directory objects */
 struct PVFS_directory_attr_s
 {
     PVFS_size dirent_count;
+    PVFS_directory_hint hint;
 };
 typedef struct PVFS_directory_attr_s PVFS_directory_attr;
-endecode_fields_1(PVFS_directory_attr, PVFS_size, dirent_count)
+
+#ifdef __PINT_REQPROTO_ENCODE_FUNCS_C
+#define encode_PVFS_directory_attr(pptr, x) do { \
+    encode_PVFS_size(pptr, &(x)->dirent_count);\
+    encode_PVFS_directory_hint(pptr, &(x)->hint);\
+} while(0)
+#define decode_PVFS_directory_attr(pptr, x) do { \
+    decode_PVFS_size(pptr, &(x)->dirent_count);\
+    decode_PVFS_directory_hint(pptr, &(x)->hint);\
+} while(0)
+#endif
 
 /* attributes specific to symlinks */
 struct PVFS_symlink_attr_s
@@ -151,7 +189,7 @@ typedef struct PVFS_object_attr PVFS_object_attr;
 	encode_PVFS_datafile_attr(pptr, &(x)->u.data); \
     if ((x)->mask & PVFS_ATTR_SYMLNK_TARGET) \
 	encode_PVFS_symlink_attr(pptr, &(x)->u.sym); \
-    if ((x)->mask & PVFS_ATTR_DIR_DIRENT_COUNT) \
+    if (((x)->mask & PVFS_ATTR_DIR_DIRENT_COUNT) || ((x)->mask & PVFS_ATTR_DIR_HINT)) \
 	encode_PVFS_directory_attr(pptr, &(x)->u.dir); \
 } while (0)
 #define decode_PVFS_object_attr(pptr,x) do { \
@@ -172,18 +210,26 @@ typedef struct PVFS_object_attr PVFS_object_attr;
 	decode_PVFS_datafile_attr(pptr, &(x)->u.data); \
     if ((x)->mask & PVFS_ATTR_SYMLNK_TARGET) \
 	decode_PVFS_symlink_attr(pptr, &(x)->u.sym); \
-    if ((x)->mask & PVFS_ATTR_DIR_DIRENT_COUNT) \
+    if (((x)->mask & PVFS_ATTR_DIR_DIRENT_COUNT) || ((x)->mask & PVFS_ATTR_DIR_HINT)) \
 	decode_PVFS_directory_attr(pptr, &(x)->u.dir); \
 } while (0)
 #endif
-/* attr buffer needs room for larger of symlink path or meta fields: an attrib
- * structure can never hold information for both a symlink and a metafile  */
+/* attr buffer needs room for larger of symlink path, meta fields or dir hints: an attrib
+ * structure can never hold information for not more than a symlink or a metafile or a dir object */
+#define extra_size_PVFS_object_attr_dir  (PVFS_REQ_LIMIT_DIST_BYTES + \
+  PVFS_REQ_LIMIT_DIST_NAME + roundup8(sizeof(PVFS_directory_attr)))
+
 #define extra_size_PVFS_object_attr_meta (PVFS_REQ_LIMIT_DIST_BYTES + \
   PVFS_REQ_LIMIT_DFILE_COUNT * sizeof(PVFS_handle))
+
 #define extra_size_PVFS_object_attr_symlink (PVFS_REQ_LIMIT_PATH_NAME_BYTES)
-#define extra_size_PVFS_object_attr ((extra_size_PVFS_object_attr_meta > \
- extra_size_PVFS_object_attr_symlink) ? extra_size_PVFS_object_attr_meta : \
- extra_size_PVFS_object_attr_symlink)
+
+#ifndef max3
+#define max3(a, b, c) (a) < (b) ? (b) < (c) ? (c) : (b) : (a) < (c) ? (c) : (a)
+#endif
+
+#define extra_size_PVFS_object_attr \
+        max3(extra_size_PVFS_object_attr_meta, extra_size_PVFS_object_attr_symlink, extra_size_PVFS_object_attr_dir)
 
 #endif /* __PVFS2_ATTR_H */
 
