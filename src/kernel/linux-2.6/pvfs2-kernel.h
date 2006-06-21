@@ -364,6 +364,8 @@ typedef struct
 #endif
     sector_t last_failed_block_index_read;
     int error_code;
+    /* All allocated pvfs2_inode_t objects are chained to a list */
+    struct list_head list;
 } pvfs2_inode_t;
 
 /** mount options.  only accepted mount options are listed.

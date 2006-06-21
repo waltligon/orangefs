@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.31.2.1 2006-06-19 15:57:37 slang Exp $
+ * $Id: ib.c,v 1.31.2.2 2006-06-21 20:08:21 slang Exp $
  */
 #include <stdio.h>
 #include <stdlib.h>

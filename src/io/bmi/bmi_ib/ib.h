@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.h,v 1.17.2.1 2006-06-19 15:57:37 slang Exp $
+ * $Id: ib.h,v 1.17.2.2 2006-06-21 20:08:21 slang Exp $
  */
 #ifndef __ib_h
 #define __ib_h
