@@ -902,7 +902,7 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
     DBT key, data;
     TROVE_ds_storedattr_s s_attr;
     TROVE_ds_attributes *attr = NULL;
-    TROVE_size b_size = 0;
+    TROVE_size b_size;
     struct stat b_stat;
     TROVE_object_ref ref = {op_p->handle, op_p->coll_p->coll_id};
     struct open_cache_ref tmp_ref;
@@ -912,6 +912,7 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
         op_p->coll_p->coll_id, op_p->handle, 0, &tmp_ref);
     if (ret < 0)
     {
+        b_size = 0;
     }
     else
     {
@@ -940,7 +941,7 @@ static int dbpf_dspace_getattr_op_svc(struct dbpf_op *op_p)
     if (ret != 0)
     {
         op_p->coll_p->ds_db->err(op_p->coll_p->ds_db, ret, "DB->get");
-        ret = -TROVE_EIO;
+        ret = -dbpf_db_error_to_trove_error(ret);
         goto return_error;
     }
 
