@@ -690,9 +690,7 @@ access a PVFS2 file, performance will suffer.
 
 Setting both (or either of) the \texttt{TroveSyncMeta} and
 \texttt{TroveSyncData} options to \texttt{no} in the config file can
-improve performance in some situations.  By default these values are
-both set to \texttt{yes}, which means that server will issue a sync
-call after each metadata or data update, respectively.  If you set the
+improve performance in some situations.  If you set the
 value to no and the server is terminated unexpectedly, you will likely
 lose data (or access to it).  Also, PVFS2 has a transparent server
 side attribute cache (enabled by default), which can speed up
@@ -723,7 +721,8 @@ do for other file systems.
 Also, if the \texttt{TroveSyncMeta} and \texttt{TroveSyncData} options
 are set to \texttt{no} in your PVFS2 configuration file, the server
 will sync data to disk only when a flush or close operation is called.
-This option is set to \texttt{yes} by default, to limit the amount of
+The \texttt{TroveSyncMeta} option is set to \texttt{yes} by default, 
+to limit the amount of
 data that could be lost if a server is terminated unexpectedly.  With
 this option enabled, it is somewhat analogous to mounting your NFS
 volume with the \texttt{sync} flag, forcing it to sync data after each
