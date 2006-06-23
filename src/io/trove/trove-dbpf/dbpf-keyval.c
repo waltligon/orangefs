@@ -1468,8 +1468,6 @@ static int dbpf_keyval_iterate_step_to_position(
     int ret;
     TROVE_keyval_s key;
 
-    memset(&key, 0, sizeof(TROVE_keyval_s));
-
     assert(pos != TROVE_ITERATE_START);
 
     ret = dbpf_keyval_iterate_get_first_entry(handle, dbc_p);
@@ -1480,6 +1478,8 @@ static int dbpf_keyval_iterate_step_to_position(
 
     for(i = 0; i < pos; ++i)
     {
+        memset(&key, 0, sizeof(TROVE_keyval_s));
+
         ret = dbpf_keyval_iterate_cursor_get(
             handle, dbc_p, &key, NULL, DB_NEXT);
         if(ret != 0)
@@ -1491,6 +1491,25 @@ static int dbpf_keyval_iterate_step_to_position(
     return 0;
 }
 
+/**
+ * dbpf_keyval_iterate_cursor_get is part of a set of iterate functions
+ * that abstact the DB functions so to allow us to iterate over directory
+ * entries and xattrs easily.  This function takes the handle and fills in
+ * the key and value to get in the iteration step.  The iterate step can
+ * be to set with the db_flags parameter to the initial iterate position 
+ * (DB_SET_RANGE), get the next position (DB_NEXT), or even get the current 
+ * position (DB_CURRENT).
+ *
+ * The key parameter is filled in up to the space available specified in
+ * buffer_sz.  The read_sz value is set to the amount filled in.
+ * Finally, if the buffer_sz is less than the size of the available key
+ * length, buffer_sz is set to the size of the available key.  Note that
+ * buffer_sz may end up being more than it was set to when key was passed
+ * in, this is useful for the SET_RANGE flag when checking for the null
+ * keyval string (handle info item) which must be skipped over.
+ *
+ * The data parameter can be null, in which case only the key is filled in.
+ */
 static int dbpf_keyval_iterate_cursor_get(
     TROVE_handle handle,
     DBC * dbc_p,
