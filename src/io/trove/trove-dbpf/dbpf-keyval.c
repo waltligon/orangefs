@@ -1713,9 +1713,6 @@ static int dbpf_keyval_handle_info_ops(struct dbpf_op * op_p,
             return -dbpf_db_error_to_trove_error(ret);
         }
        
-            /* debug check that we don't have an invalid count somehow */
-            assert(info.count != 0);
-            
         if(action == DBPF_KEYVAL_HANDLE_COUNT_INCREMENT)
         {
             gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
@@ -1727,7 +1724,7 @@ static int dbpf_keyval_handle_info_ops(struct dbpf_op * op_p,
         else if(action == DBPF_KEYVAL_HANDLE_COUNT_DECREMENT)
         {
             /* debug check that we don't have an invalid count somehow */
-            assert(info.count != 0);
+            assert(info.count > 0);
             
             gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                          "[DBPF KEYVAL]: handle_info "
