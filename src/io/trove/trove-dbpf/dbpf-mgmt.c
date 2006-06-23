@@ -52,6 +52,9 @@ static int db_open_count, db_close_count;
 
 #define COLL_ENV_FLAGS (DB_INIT_MPOOL | DB_CREATE | DB_THREAD)
 
+static void dbpf_db_error_callback(
+    const DB_ENV *dbenv, const char *errpfx, const char * msg);
+
 DB_ENV *dbpf_getdb_env(const char *path, unsigned int env_flags, int *error)
 {
     int ret;
@@ -84,6 +87,9 @@ retry:
         return NULL;
     }
 
+    /* set the error callback for all databases opened with this environment */
+    dbenv->set_errcall(dbenv, dbpf_db_error_callback);
+
     if(TROVE_db_cache_size_bytes != 0)
     {
         gossip_debug(
@@ -107,7 +113,7 @@ retry:
     {
         /* user wants the standard db cache which uses mmap */
         ret = dbenv->open(dbenv, path, 
-                             DB_INIT_MPOOL|DB_CREATE|DB_THREAD, 0);
+                          DB_INIT_MPOOL|DB_CREATE|DB_THREAD, 0);
         if(ret != 0)
         {
             gossip_err("dbpf_getdb_env(%s): %s\n", path, db_strerror(ret));
@@ -1640,8 +1646,9 @@ static int dbpf_db_create(const char *sto_path, char *dbname, DB_ENV *envp)
  * Returns NULL on error, passing a trove error type back in the
  * integer pointed to by error_p.
  */
-static DB *dbpf_db_open(const char *sto_path, char *dbname, DB_ENV *envp, int *error_p,
-                        int (*compare_fn) (DB *db, const DBT *dbt1, const DBT *dbt2))
+static DB *dbpf_db_open(
+    const char *sto_path, char *dbname, DB_ENV *envp, int *error_p,
+    int (*compare_fn) (DB *db, const DBT *dbt1, const DBT *dbt2))
 {
     int ret = -TROVE_EINVAL;
     DB *db_p = NULL;
@@ -1652,8 +1659,7 @@ static DB *dbpf_db_open(const char *sto_path, char *dbname, DB_ENV *envp, int *e
         return NULL;
     }
 
-    db_p->set_errfile(db_p, stderr);
-    db_p->set_errpfx(db_p, "pvfs2-trove-dbpf");
+    db_p->set_errpfx(db_p, "TROVE:DBPF:Berkeley DB");
 
     if(compare_fn)
     {
@@ -1676,6 +1682,12 @@ static DB *dbpf_db_open(const char *sto_path, char *dbname, DB_ENV *envp, int *e
         return NULL;
     }
     return db_p;
+}
+
+static void dbpf_db_error_callback(
+    const DB_ENV *dbenv, const char *errpfx, const char *msg)
+{
+    gossip_err("%s: %s\n", errpfx, msg);
 }
 
 /* dbpf_mgmt_ops

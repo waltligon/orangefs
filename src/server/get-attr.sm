@@ -633,11 +633,10 @@ static int getattr_setup_resp(PINT_server_op *s_op, job_status_s *js_p)
         GOSSIP_GETATTR_DEBUG,
         "- RETURNING retrieved attrs: [owner = %d, group = %d\n\t"
         "perms = %o, type = %d, atime = %llu, mtime = %llu\n\t"
-        "ctime = %llu, dfile_count = %d, dist_size = %d]\n",
+        "ctime = %llu, dist_size = %d]\n",
         resp_attr->owner, resp_attr->group, resp_attr->perms,
         resp_attr->objtype, llu(resp_attr->atime),
         llu(resp_attr->mtime), llu(resp_attr->ctime),
-        (int)resp_attr->u.meta.dfile_count,
         (int)resp_attr->u.meta.dist_size);
 
     if (resp_attr->objtype == PVFS_TYPE_METAFILE)
@@ -655,6 +654,7 @@ static int getattr_setup_resp(PINT_server_op *s_op, job_status_s *js_p)
 
         if (resp_attr->mask & PVFS_ATTR_META_DIST)
         {
+            assert(s_op->val.buffer);
             PINT_dist_decode(&resp_attr->u.meta.dist, s_op->val.buffer);
             free(s_op->val.buffer);
 
@@ -712,9 +712,11 @@ static int getattr_setup_resp(PINT_server_op *s_op, job_status_s *js_p)
             (resp_attr->mask & PVFS_ATTR_DIR_HINT))
     {
         gossip_debug(GOSSIP_GETATTR_DEBUG, " server returning "
+            "dirent_count = %llu "
             "dfile_count = %d "
             "dist_name_len    = %d "
             "dist_params_len  = %d\n",
+            llu(resp_attr->u.dir.dirent_count),
             resp_attr->u.dir.hint.dfile_count,
             resp_attr->u.dir.hint.dist_name_len,
             resp_attr->u.dir.hint.dist_params_len);
@@ -863,8 +865,7 @@ static int getattr_get_dir_hint(
    
     if (!(s_op->u.getattr.attrmask & PVFS_ATTR_DIR_HINT))
     {
-        /* the caller didn't really want the dirent count; skip to get
-         * directory hints
+        /* the caller didn't really want the dir hints; skip
          */
         js_p->error_code = STATE_DONE;
         return(1);
@@ -1021,7 +1022,7 @@ static int getattr_interpret_dir_hint(
 
         s_op->resp.u.getattr.attr.u.dir.hint.dfile_count = dfile_count;
 
-        gossip_debug(GOSSIP_SERVER_DEBUG, "getattr: dfile_count: %d\n",
+        gossip_debug(GOSSIP_SERVER_DEBUG, "getattr: dir hint dfile_count: %d\n",
             s_op->resp.u.getattr.attr.u.dir.hint.dfile_count);
 
         js_p->error_code = 0;

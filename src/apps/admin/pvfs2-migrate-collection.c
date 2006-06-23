@@ -1382,6 +1382,7 @@ static int translate_keyval_db_0_0_1(
                 t_key.buffer = key.data;
                 t_key.buffer_sz = key.size;
                 trove_flags |= TROVE_KEYVAL_HANDLE_COUNT;
+                trove_flags |= TROVE_NOOVERWRITE;
             }
             
             if(!strcmp(t_key.buffer, "md")) /* metafile_dist */

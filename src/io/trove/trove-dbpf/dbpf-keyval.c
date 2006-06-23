@@ -43,23 +43,44 @@
 /**
  * The keyval database contains attributes for pvfs2 handles
  * (files, directories, symlinks, etc.) that are not considered
- * common attributes.  The following table lists all the currently
- * stored keyvals, based on their handle type:
+ * common attributes.  Each key in the keyval database consists of a
+ * handle and a string.  The handles can be of different types, and the strings
+ * vary based on the type of handle and the data to be stored (the value for that
+ * key).  The following table lists all the currently stored keyvals, 
+ * based on their handle type:
  *
- * <table>
- * <th><td>Handle Type</td><td>Key Class</td><td>Key</td><td>Value</td><td>Description</td></th>
- * <tr><td>meta-file</td><td>COMMON</td><td>metafile_handles</td><td>Datafile Array</td><td>Holds the list of datafile handles that exist for this metafile</td></tr>
- * <tr><td>meta-file</td><td>COMMON</td><td>metafile_dist</td><td>Distribution</td><td>Holds the distribution type</td></tr>
- * <tr><td>symlink</td><td>COMMON</td><td>symlink_target</td><td>Target Handle</td><td>Holds the file handle that this symlink points to</td></tr>
- * <tr><td>directory</td><td>COMMON</td><td>dir_ent</td><td>Entries Handle</td><td>Holds the handle that manages the directory entries for this directory</td></tr>
- * <tr><td>directory</td><td>COMMON</td><td>dirdata_size</td><td>Size</td><td>Holds the number of entries in the directory</td></tr>
- * <tr><td>dir-ent</td><td>COMPONENT</td><td>&lt;component name&gt;</td><td>Entry Handle</td><td>Holds the directory entry (with name &lt;component name &gt;) handle</td></tr>
- * <tr><td>ALL</td><td>XATTR</td><td>&lt;extended attribute name&gt;</td><td>&lt;extended attribute content&gt;</td><td>Holds the extended attribute that can be defined for any handle type (commonly files and directories).</td></tr>
- * </table>
+ * Handle Type   Key Class   Key                       Value    
+ * ================================================================
+ * 
+ * meta-file     COMMON      "mh"                      Datafile Array
+ * meta-file     COMMON      "md"                      Distribution
+ * symlink       COMMON      "st"                      Target Handle
+ * directory     COMMON      "de"                      Entries Handle
+ * dir-ent       COMPONENT   <component name>          Entry Handle
+ * ALL           XATTR       <extended attribute name> <extended attribute content>
+ *
+ * The descriptions for the common keys are:
+ *
+ * md:  (m)etafile (d)istribution - stores the distribution type
+ * mh:  stores the (d)atafile (h)andles that exist for this metafile
+ * st:  stores the (s)ymlink (t)arget path that the symlink references
+ * de:  stores the handle that manages the (d)irectory (e)ntries for this directory
+ *
+ * The <component name> strings are the actual object names 
+ * (files, directories, etc) in the directory.  They map to the handles for those 
+ * objects.
+ *
+ * There is also now a special 'null' keyval that has a handle and the null
+ * string as its key.  This acts as handle info for a particular handle.  This
+ * is useful for dir-ent handles, where the number of entries on that handle
+ * must be counted.  The null keyval is accessed internally, based on flags
+ * passed in through the API.
  */
 
-/* Structure for key in the keyval DB */
-/* The keys in the keyval database are now stored as the following
+/**
+ * Structure for key in the keyval DB:
+ *
+ * The keys in the keyval database are now stored as the following
  * struct (dbpf_keyval_db_entry).  The size of key field (the common
  * name or component name of the key) is not explicitly specified in the
  * struct, instead it is calculated from the DBT->size field of the
@@ -910,8 +931,6 @@ static int dbpf_keyval_read_list_op_svc(struct dbpf_op *op_p)
             op_p->coll_p->keyval_db, NULL, &key, &data, 0);
         if (ret != 0)
         {
-            op_p->coll_p->keyval_db->err(
-                op_p->coll_p->keyval_db, ret, "DB->get");
             op_p->u.k_read_list.err_array[i] = 
                 -dbpf_db_error_to_trove_error(ret);
             op_p->u.k_read_list.val_array[i].read_sz = 0;
@@ -1281,6 +1300,10 @@ int PINT_dbpf_keyval_iterate(
             goto return_error;
         }
 
+        gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "iterate key: %*s, val: %llu\n", 
+                     key->read_sz, (char *)key->buffer, 
+                     (val ? *(PVFS_handle *)val->buffer : 0));
+
         if(callback)
         {
             key->buffer_sz = key->read_sz;
@@ -1560,8 +1583,10 @@ static int dbpf_keyval_iterate_cursor_get(
         key->buffer_sz : DBPF_KEYVAL_DB_ENTRY_KEY_SIZE(db_key.size);
 
     memcpy(key->buffer, key_entry.key, key_sz);
+    key->buffer_sz = DBPF_KEYVAL_DB_ENTRY_KEY_SIZE(db_key.size);
 
     key->read_sz = key_sz;
+    key->buffer_sz = DBPF_KEYVAL_DB_ENTRY_KEY_SIZE(db_key.size);
     
     if(data)
     {
@@ -1640,6 +1665,10 @@ static int dbpf_keyval_get_handle_info_op_svc(struct dbpf_op * op_p)
         return -dbpf_db_error_to_trove_error(ret);
     }
 
+    gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
+                 "[DBPF KEYVAL]: handle_info get: handle: %llu, count: %d\n",
+                 op_p->handle, op_p->u.k_get_handle_info.info->count); 
+
     return 1;
 }    
 
@@ -1684,16 +1713,33 @@ static int dbpf_keyval_handle_info_ops(struct dbpf_op * op_p,
             return -dbpf_db_error_to_trove_error(ret);
         }
        
+            /* debug check that we don't have an invalid count somehow */
+            assert(info.count != 0);
+            
         if(action == DBPF_KEYVAL_HANDLE_COUNT_INCREMENT)
         {
+            gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
+                         "[DBPF KEYVAL]: handle_info "
+                         "count increment: handle: %llu, value: %d\n",
+                         llu(op_p->handle), info.count);
             info.count++;
         }
         else if(action == DBPF_KEYVAL_HANDLE_COUNT_DECREMENT)
         {
+            /* debug check that we don't have an invalid count somehow */
+            assert(info.count != 0);
+            
+            gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
+                         "[DBPF KEYVAL]: handle_info "
+                         "count decrement: handle: %llu, value: %d\n",
+                         llu(op_p->handle), info.count);
             info.count--;
 
             if(info.count == 0)
             {
+                gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
+                             "[DBPF KEYVAL]: handle_info "
+                             "count decremented to zero, removing keyval\n");
                 /* special case if we get down to zero remove this
                  * keyval as well
                  */
