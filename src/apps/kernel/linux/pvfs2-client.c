@@ -19,6 +19,7 @@
 
 #include "pvfs2-types.h"
 #include "acache.h"
+#include "gossip.h"
 
 #ifndef PVFS2_VERSION
 #define PVFS2_VERSION "Unknown"
@@ -188,11 +189,10 @@ static int monitor_pvfs2_client(options_t *opts)
 
             if (WIFEXITED(ret))
             {
-                if (opts->verbose)
-                {
-                    printf("Child process with pid %d exited with "
-                           "value %d\n", core_pid, (int)WEXITSTATUS(ret));
-                }
+                gossip_enable_file(opts->logfile, "a");
+                gossip_err("pvfs2-client-core with pid %d exited with "
+                       "value %d\n", core_pid, (int)WEXITSTATUS(ret));
+                gossip_disable();
 
                 if (WEXITSTATUS(ret) == (unsigned char)-PVFS_EDEVINIT)
                 {

@@ -7,11 +7,6 @@
 #include "pvfs2-kernel.h"
 #include "pvfs2-bufmap.h"
 
-extern struct list_head pvfs2_request_list;
-extern spinlock_t pvfs2_request_list_lock;
-extern struct dentry_operations pvfs2_dentry_operations;
-extern int debug;
-
 static int pvfs2_readlink(
     struct dentry *dentry, char __user *buffer, int buflen)
 {

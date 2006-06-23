@@ -6,17 +6,6 @@
 
 #include "pvfs2-kernel.h"
 
-extern struct file_system_type pvfs2_fs_type;
-extern struct dentry_operations pvfs2_dentry_operations;
-
-
-extern struct list_head pvfs2_request_list;
-extern spinlock_t pvfs2_request_list_lock;
-extern wait_queue_head_t pvfs2_request_list_waitq;
-
-extern void pvfs2_kill_sb(struct super_block *sb);
-extern int debug;
-
 /* list for storing pvfs2 specific superblocks in use */
 LIST_HEAD(pvfs2_superblocks);
 
@@ -322,12 +311,11 @@ static int pvfs2_statfs(
     pvfs2_print("pvfs2_statfs: called on sb %p (fs_id is %d)\n",
                 sb, (int)(PVFS2_SB(sb)->fs_id));
 
-    new_op = op_alloc();
+    new_op = op_alloc(PVFS2_VFS_OP_STATFS);
     if (!new_op)
     {
         return ret;
     }
-    new_op->upcall.type = PVFS2_VFS_OP_STATFS;
     new_op->upcall.req.statfs.fs_id = PVFS2_SB(sb)->fs_id;
 
     if(PVFS2_SB(sb)->mnt_options.intr)
@@ -336,7 +324,7 @@ static int pvfs2_statfs(
     }
 
     ret = service_operation(
-        new_op, "pvfs2_statfs", PVFS2_OP_RETRY_COUNT, flags);
+        new_op, "pvfs2_statfs",  flags);
 
     if (new_op->downcall.status > -1)
     {
@@ -456,12 +444,11 @@ int pvfs2_remount(
 #endif
         }
 
-        new_op = op_alloc();
+        new_op = op_alloc(PVFS2_VFS_OP_FS_MOUNT);
         if (!new_op)
         {
             return -ENOMEM;
         }
-        new_op->upcall.type = PVFS2_VFS_OP_FS_MOUNT;
         strncpy(new_op->upcall.req.fs_mount.pvfs2_config_server,
                 PVFS2_SB(sb)->devname, PVFS_MAX_SERVER_ADDR_LEN);
 
@@ -472,7 +459,7 @@ int pvfs2_remount(
          * request_semaphore to prevent other operations from bypassing this
          * one
          */
-        ret = service_operation(new_op, "pvfs2_remount", 0, 
+        ret = service_operation(new_op, "pvfs2_remount", 
             (PVFS2_OP_PRIORITY|PVFS2_OP_NO_SEMAPHORE));
 
         pvfs2_print("pvfs2_remount: mount got return value of %d\n", ret);
@@ -489,6 +476,7 @@ int pvfs2_remount(
             {
                 strncpy(PVFS2_SB(sb)->data, data, PVFS2_MAX_MOUNT_OPT_LEN);
             }
+            PVFS2_SB(sb)->mount_pending = 0;
         }
 
         op_release(new_op);
@@ -559,13 +547,12 @@ struct super_block* pvfs2_get_sb(
         dev_name = PVFS2_SB(sb)->devname;
     }
 
-    new_op = op_alloc();
+    new_op = op_alloc(PVFS2_VFS_OP_FS_MOUNT);
     if (!new_op)
     {
         ret = -ENOMEM;
         goto error_exit;
     }
-    new_op->upcall.type = PVFS2_VFS_OP_FS_MOUNT;
     strncpy(new_op->upcall.req.fs_mount.pvfs2_config_server,
             dev_name, PVFS_MAX_SERVER_ADDR_LEN);
 
@@ -751,19 +738,18 @@ struct super_block *pvfs2_get_sb(
 
     if (devname)
     {
-        new_op = op_alloc();
+        new_op = op_alloc(PVFS2_VFS_OP_FS_MOUNT);
         if (!new_op)
         {
             return ERR_PTR(-ENOMEM);
         }
-        new_op->upcall.type = PVFS2_VFS_OP_FS_MOUNT;
         strncpy(new_op->upcall.req.fs_mount.pvfs2_config_server,
                 devname, PVFS_MAX_SERVER_ADDR_LEN);
 
         pvfs2_print("Attempting PVFS2 Mount via host %s\n",
                     new_op->upcall.req.fs_mount.pvfs2_config_server);
 
-        ret = service_operation(new_op, "pvfs2_get_sb", 0, 0);
+        ret = service_operation(new_op, "pvfs2_get_sb", 0);
 
         pvfs2_print("pvfs2_get_sb: mount got return value of %d\n", ret);
         if (ret)
@@ -808,6 +794,8 @@ struct super_block *pvfs2_get_sb(
                         PVFS2_MAX_MOUNT_OPT_LEN);
             }
 
+            /* mount_pending must be cleared */
+            PVFS2_SB(sb)->mount_pending = 0;
             /* finally, add this sb to our list of known pvfs2 sb's */
             add_pvfs2_sb(sb);
         }

@@ -31,8 +31,6 @@
 #endif
 #include "bmi-byteswap.h"
 
-extern int debug;
-
 /*
  * Encoding and Decoding the extended attributes so that we can
  * retrieve it properly on any architecture.

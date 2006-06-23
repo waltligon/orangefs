@@ -14,19 +14,6 @@
 #include "pvfs2-sysint.h"
 #include "pvfs2-internal.h"
 
-extern struct list_head pvfs2_request_list;
-extern spinlock_t pvfs2_request_list_lock;
-extern wait_queue_head_t pvfs2_request_list_waitq;
-extern int debug;
-
-/* shared file/dir operations defined in file.c */
-extern int pvfs2_file_open(
-    struct inode *inode,
-    struct file *file);
-extern int pvfs2_file_release(
-    struct inode *inode,
-    struct file *file);
-
 /** Read directory entries from an instance of an open directory.
  *
  * \param filldir callback function called for each entry read.
@@ -104,12 +91,11 @@ static int pvfs2_readdir(
 	/* drop through */
     default:
 	/* handle the normal cases here */
-	new_op = op_alloc();
+	new_op = op_alloc(PVFS2_VFS_OP_READDIR);
 	if (!new_op)
 	{
 	    return -ENOMEM;
 	}
-	new_op->upcall.type = PVFS2_VFS_OP_READDIR;
 
 	if (pvfs2_inode && pvfs2_inode->refn.handle &&
             pvfs2_inode->refn.fs_id)
@@ -134,7 +120,7 @@ static int pvfs2_readdir(
             (pos == 2 ? PVFS_READDIR_START : pos);
 
         ret = service_operation(
-            new_op, "pvfs2_readdir", PVFS2_OP_RETRY_COUNT,
+            new_op, "pvfs2_readdir", 
             get_interruptible_flag(dentry->d_inode));
 
 	pvfs2_print("Readdir downcall status is %d (dirent_count "

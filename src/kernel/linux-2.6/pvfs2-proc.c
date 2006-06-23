@@ -17,12 +17,6 @@
 #define PVFS2_VERSION "Unknown"
 #endif
 
-extern int debug;
-extern int op_timeout_secs;
-extern spinlock_t pvfs2_request_list_lock;
-extern struct list_head pvfs2_request_list;
-extern wait_queue_head_t pvfs2_request_list_waitq;
-
 #ifdef CONFIG_SYSCTL
 #include <linux/sysctl.h>
 /* extra parameters provided to pvfs2 param proc handlers */
@@ -67,7 +61,7 @@ static int pvfs2_param_proc_handler(
     tmp_ctl.extra2 = &extra->max;
 
     /* build an op structure to send request to pvfs2-client */
-    new_op = op_alloc();
+    new_op = op_alloc(PVFS2_VFS_OP_PARAM);
     if (!new_op)
     {
         return -ENOMEM;
@@ -96,11 +90,10 @@ static int pvfs2_param_proc_handler(
         new_op->upcall.req.param.type = PVFS2_PARAM_REQUEST_GET;
     }
 
-    new_op->upcall.type = PVFS2_VFS_OP_PARAM;
     new_op->upcall.req.param.op = extra->op;
 
     /* perform operation (get or set) */
-    ret = service_operation(new_op, "pvfs2_param", PVFS2_OP_RETRY_COUNT, 
+    ret = service_operation(new_op, "pvfs2_param",  
         PVFS2_OP_INTERRUPTIBLE);
     
     if(ret == 0 && !write)
@@ -155,17 +148,16 @@ static int pvfs2_acache_pc_proc_handler(
     }
 
     /* build an op structure to send request to pvfs2-client */
-    new_op = op_alloc();
+    new_op = op_alloc(PVFS2_VFS_OP_PERF_COUNT);
     if (!new_op)
     {
         return -ENOMEM;
     }
     new_op->upcall.req.perf_count.type = *pc_type;
-    new_op->upcall.type = PVFS2_VFS_OP_PERF_COUNT;
 
     /* retrieve performance counters */
     ret = service_operation(new_op, "pvfs2_perf_count",
-        PVFS2_OP_RETRY_COUNT, PVFS2_OP_INTERRUPTIBLE);
+         PVFS2_OP_INTERRUPTIBLE);
 
     if(ret == 0)
     {

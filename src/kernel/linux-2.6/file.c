@@ -24,21 +24,12 @@ enum {
     IO_WRITEV = 1,
 };
 
-extern struct list_head pvfs2_request_list;
-extern spinlock_t pvfs2_request_list_lock;
-extern wait_queue_head_t pvfs2_request_list_waitq;
-extern int debug;
-extern int op_timeout_secs;
-
-extern struct address_space_operations pvfs2_address_operations;
-extern struct backing_dev_info pvfs2_backing_dev_info;
-
 #ifdef PVFS2_LINUX_KERNEL_2_4
 static int pvfs2_precheck_file_write(struct file *file, struct inode *inode,
     size_t *count, loff_t *ppos);
 #endif
 
-#define wake_up_device_for_return(op)             \
+#define wake_up_daemon_for_return(op)             \
 do {                                              \
   spin_lock(&op->lock);                           \
   op->io_completed = 1;                           \
@@ -208,14 +199,13 @@ static ssize_t do_read_write(struct rw_options *rw)
     {
         size_t each_count, amt_complete;
 
-        new_op = op_alloc();
+        new_op = op_alloc(PVFS2_VFS_OP_FILE_IO);
         if (!new_op)
         {
             ret = -ENOMEM;
             goto out;
         }
 
-        new_op->upcall.type = PVFS2_VFS_OP_FILE_IO;
         new_op->upcall.req.io.async_vfs_io = PVFS_VFS_SYNC_IO; /* synchronous I/O */
         new_op->upcall.req.io.readahead_size = readahead_size;
         new_op->upcall.req.io.io_type = 
@@ -229,6 +219,7 @@ static ssize_t do_read_write(struct rw_options *rw)
                         "failure (%ld)\n", (long) ret);
             goto out;
         }
+        pvfs2_print("GET op %p -> buffer_index %d\n", new_op, buffer_index);
         /* how much to transfer in this loop iteration */
         each_count = (((count - total_count) > pvfs_bufmap_size_query()) ?
                       pvfs_bufmap_size_query() : (count - total_count));
@@ -247,7 +238,7 @@ static ssize_t do_read_write(struct rw_options *rw)
             }
         }
         ret = service_operation(
-            new_op, fnstr, PVFS2_OP_RETRY_COUNT,
+            new_op, fnstr, 
             get_interruptible_flag(inode));
 
         if (ret < 0)
@@ -311,10 +302,10 @@ static ssize_t do_read_write(struct rw_options *rw)
         /*
           tell the device file owner waiting on I/O that this read has
           completed and it can return now.  in this exact case, on
-          wakeup the device will free the op, so we *cannot* touch it
+          wakeup the daemon will free the op, so we *cannot* touch it
           after this.
         */
-        wake_up_device_for_return(new_op);
+        wake_up_daemon_for_return(new_op);
         new_op = NULL;
         pvfs_bufmap_put(buffer_index);
         buffer_index = -1;
@@ -330,10 +321,12 @@ static ssize_t do_read_write(struct rw_options *rw)
         ret = total_count;
     }
 out:
+    if (buffer_index >= 0) {
+        pvfs_bufmap_put(buffer_index);
+        pvfs2_print("PUT buffer_index %d\n", buffer_index);
+    }
     if (new_op) 
         op_release(new_op);
-    if (buffer_index >= 0) 
-        pvfs_bufmap_put(buffer_index);
     if (ret > 0 && file != NULL && inode != NULL)
     {
 #ifdef HAVE_TOUCH_ATIME
@@ -658,13 +651,12 @@ static ssize_t do_readv_writev(int type, struct file *file,
     seg = 0;
     while (total_count < count)
     {
-        new_op = op_alloc();
+        new_op = op_alloc(PVFS2_VFS_OP_FILE_IO);
         if (!new_op)
         {
             ret = -ENOMEM;
             goto out;
         }
-        new_op->upcall.type = PVFS2_VFS_OP_FILE_IO;
         new_op->upcall.req.io.async_vfs_io = PVFS_VFS_SYNC_IO; /* synchronous I/O */
         /* disable read-ahead */
         new_op->upcall.req.io.readahead_size = 0;
@@ -679,6 +671,7 @@ static ssize_t do_readv_writev(int type, struct file *file,
             pvfs2_error("%s: pvfs_bufmap_get() failure (%zd)\n", fnstr, ret);
             goto out;
         }
+        pvfs2_print("GET op %p -> buffer_index %d\n", new_op, buffer_index);
 
         /* how much to transfer in this loop iteration */
         each_count = (((count - total_count) > pvfs_bufmap_size_query()) ?
@@ -708,7 +701,7 @@ static ssize_t do_readv_writev(int type, struct file *file,
             }
         }
         ret = service_operation(new_op, fnstr,
-            PVFS2_OP_RETRY_COUNT, get_interruptible_flag(inode));
+             get_interruptible_flag(inode));
 
         if (ret < 0)
         {
@@ -776,10 +769,10 @@ static ssize_t do_readv_writev(int type, struct file *file,
         /*
           tell the device file owner waiting on I/O that this read has
           completed and it can return now.  in this exact case, on
-          wakeup the device will free the op, so we *cannot* touch it
+          wakeup the daemon will free the op, so we *cannot* touch it
           after this.
         */
-        wake_up_device_for_return(new_op);
+        wake_up_daemon_for_return(new_op);
         new_op = NULL;
         pvfs_bufmap_put(buffer_index);
         buffer_index = -1;
@@ -797,10 +790,12 @@ static ssize_t do_readv_writev(int type, struct file *file,
         ret = total_count;
     }
 out:
+    if (buffer_index >= 0) {
+        pvfs_bufmap_put(buffer_index);
+        pvfs2_print("PUT buffer_index %d\n", buffer_index);
+    }
     if (new_op)
         op_release(new_op);
-    if (buffer_index >= 0)
-        pvfs_bufmap_put(buffer_index);
     if (to_free) 
     {
         kfree(iovecptr);
@@ -911,8 +906,7 @@ static ssize_t pvfs2_aio_retry(struct kiocb *iocb)
     /* lock up the op */
     spin_lock(&op->lock);
     /* check the state of the op */
-    if (op->op_state == PVFS2_VFS_STATE_WAITING 
-            || op->op_state == PVFS2_VFS_STATE_INPROGR)
+    if (op_state_waiting(op) || op_state_in_progress(op))
     {
         spin_unlock(&op->lock);
         return -EIOCBQUEUED;
@@ -1076,14 +1070,14 @@ pvfs2_aio_cancel(struct kiocb *iocb, struct io_event *event)
         } while (0);
 
         /* We need to fill up event->res and event->res2 if at all */
-        if (op->op_state == PVFS2_VFS_STATE_SERVICED)
+        if (op_state_serviced(op))
         {
             op->priv = NULL;
             spin_unlock(&op->lock);
             event->res = x->bytes_copied;
             event->res2 = 0;
         }
-        else if (op->op_state == PVFS2_VFS_STATE_INPROGR)
+        else if (op_state_in_progress(op))
         {
             op->priv = NULL;
             spin_unlock(&op->lock);
@@ -1258,7 +1252,7 @@ pvfs2_file_aio_read(struct kiocb *iocb, char __user *buffer,
             char __user *current_buf = buffer;
             pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
             
-            new_op = op_alloc();
+            new_op = op_alloc(PVFS2_VFS_OP_FILE_IO);
             if (!new_op)
             {
                 error = -ENOMEM;
@@ -1266,7 +1260,6 @@ pvfs2_file_aio_read(struct kiocb *iocb, char __user *buffer,
             }
             /* Increase ref count */
             get_op(new_op);
-            new_op->upcall.type = PVFS2_VFS_OP_FILE_IO;
             /* (A)synchronous I/O */
             new_op->upcall.req.io.async_vfs_io = 
                 is_sync_kiocb(iocb) ? PVFS_VFS_SYNC_IO 
@@ -1324,7 +1317,7 @@ pvfs2_file_aio_read(struct kiocb *iocb, char __user *buffer,
                  * Stage the operation!
                  */
                 ret = service_operation(
-                        new_op, "pvfs2_file_aio_read", PVFS2_OP_RETRY_COUNT, 
+                        new_op, "pvfs2_file_aio_read",  
                         get_interruptible_flag(inode));
                 if (ret < 0)
                 {
@@ -1367,7 +1360,7 @@ pvfs2_file_aio_read(struct kiocb *iocb, char __user *buffer,
                     goto out_error;
                 }
                 error = new_op->downcall.resp.io.amt_complete;
-                wake_up_device_for_return(new_op);
+                wake_up_daemon_for_return(new_op);
                 pvfs_bufmap_put(buffer_index);
                 pvfs2_print("pvfs2_file_aio_read: pvfs_bufmap_put %d\n",
                         buffer_index);
@@ -1399,7 +1392,8 @@ pvfs2_file_aio_read(struct kiocb *iocb, char __user *buffer,
                  * but don't wait for it to be serviced. 
                  * Return immediately 
                  */
-                service_async_vfs_op(new_op);
+                service_operation(new_op, "pvfs2_file_aio_read", 
+                        PVFS2_OP_ASYNC);
                 pvfs2_print("pvfs2_file_aio_read: queued "
                         " read operation [%ld for %d]\n",
                             (unsigned long) offset, (int) count);
@@ -1506,7 +1500,7 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
             char __user *current_buf = (char *) buffer;
             pvfs2_inode_t *pvfs2_inode = PVFS2_I(inode);
             
-            new_op = op_alloc();
+            new_op = op_alloc(PVFS2_VFS_OP_FILE_IO);
             if (!new_op)
             {
                 error = -ENOMEM;
@@ -1514,7 +1508,6 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
             }
             /* Increase ref count */
             get_op(new_op);
-            new_op->upcall.type = PVFS2_VFS_OP_FILE_IO;
             /* (A)synchronous I/O */
             new_op->upcall.req.io.async_vfs_io = 
                 is_sync_kiocb(iocb) ? PVFS_VFS_SYNC_IO 
@@ -1592,7 +1585,7 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
                  * Stage the operation!
                  */
                 ret = service_operation(
-                        new_op, "pvfs2_file_aio_write", PVFS2_OP_RETRY_COUNT, 
+                        new_op, "pvfs2_file_aio_write",  
                         get_interruptible_flag(inode));
                 if (ret < 0)
                 {
@@ -1624,7 +1617,7 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
                     goto out_error;
                 }
                 error = new_op->downcall.resp.io.amt_complete;
-                wake_up_device_for_return(new_op);
+                wake_up_daemon_for_return(new_op);
                 pvfs_bufmap_put(buffer_index);
                 pvfs2_print("pvfs2_file_aio_read: pvfs_bufmap_put %d\n",
                         (int) buffer_index);
@@ -1664,7 +1657,8 @@ pvfs2_file_aio_write(struct kiocb *iocb, const char __user *buffer,
                  * but don't wait for it to be serviced. 
                  * Return immediately 
                  */
-                service_async_vfs_op(new_op);
+                service_operation(new_op, "pvfs2_file_aio_write", 
+                        PVFS2_OP_ASYNC);
                 pvfs2_print("pvfs2_file_aio_write: queued "
                         " write operation [%ld for %d]\n",
                             (unsigned long) offset, (int) count);
@@ -1787,16 +1781,15 @@ int pvfs2_fsync(
     pvfs2_inode_t *pvfs2_inode = PVFS2_I(file->f_dentry->d_inode);
     pvfs2_kernel_op_t *new_op = NULL;
 
-    new_op = op_alloc();
+    new_op = op_alloc(PVFS2_VFS_OP_FSYNC);
     if (!new_op)
     {
         return -ENOMEM;
     }
-    new_op->upcall.type = PVFS2_VFS_OP_FSYNC;
     new_op->upcall.req.fsync.refn = pvfs2_inode->refn;
 
-    ret = service_operation(new_op, "pvfs2_fsync", 0,
-                      get_interruptible_flag(file->f_dentry->d_inode));
+    ret = service_operation(new_op, "pvfs2_fsync", 
+            get_interruptible_flag(file->f_dentry->d_inode));
 
     pvfs2_print("pvfs2_fsync got return value of %d\n",ret);
 

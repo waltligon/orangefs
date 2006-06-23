@@ -1395,10 +1395,11 @@ static PVFS_error post_io_request(vfs_request_t *vfs_request)
     }
 #endif /* USE_MMAP_RA_CACHE */
 
-    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "%s: off %ld size %ld\n",
+    gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "posted %s: off %ld size %ld tag: %Ld\n",
             vfs_request->in_upcall.req.io.io_type == PVFS_IO_READ ? "read" : "write",
             (unsigned long) vfs_request->in_upcall.req.io.offset,
-            (unsigned long) vfs_request->in_upcall.req.io.count);
+            (unsigned long) vfs_request->in_upcall.req.io.count,
+            lld(vfs_request->info.tag));
     ret = PVFS_Request_contiguous(
         (int32_t)vfs_request->in_upcall.req.io.count,
         PVFS_BYTE, &vfs_request->mem_req);
@@ -1962,6 +1963,7 @@ static inline void package_downcall_members(
 
                 vfs_request->out_downcall.resp.io.amt_complete =
                     (size_t)vfs_request->response.io.total_completed;
+                gossip_debug(GOSSIP_CLIENTCORE_DEBUG, "completed I/O on tag %Ld\n", lld(vfs_request->info.tag));
 #endif
             }
 #ifdef USE_MMAP_RA_CACHE
@@ -2149,7 +2151,7 @@ static inline PVFS_error handle_unexp_vfs_request(
     {
         gossip_debug(
             GOSSIP_CLIENTCORE_DEBUG, "Got an upcall operation of "
-            "type %x before mounting.  ignoring.\n",
+            "type %x before mounting. ignoring.\n",
             vfs_request->in_upcall.type);
         /*
           if we don't have any mount information yet, just discard the
@@ -2166,11 +2168,12 @@ static inline PVFS_error handle_unexp_vfs_request(
       make sure the operation is not currently in progress.  if it is,
       ignore it -- this can happen if the vfs issues a retry request
       on an operation that's taking a long time to complete.
+      Can this happen any more?
     */
     if (is_op_in_progress(vfs_request))
     {
-        gossip_debug(GOSSIP_CLIENTCORE_DEBUG, " Ignoring upcall of type "
-                     "%x that's already in progress (tag=%lld)\n",
+        gossip_debug(GOSSIP_CLIENTCORE_DEBUG, " WARNING: Client-core obtained duplicate upcall of type "
+                     "%x that's already in progress (tag=%lld)?\n",
                      vfs_request->in_upcall.type,
                      lld(vfs_request->info.tag));
 

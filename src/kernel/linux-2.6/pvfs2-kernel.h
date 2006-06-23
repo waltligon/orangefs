@@ -126,7 +126,8 @@ do {                                                           \
 } while(0)
 #else
 #define pvfs2_print(format...) do{                             \
-    if(debug) printk(format);                                  \
+    if(debug)                                                  \
+        printk(format);                                        \
 }while(0)
 #define pvfs2_panic(msg)                                       \
 do {                                                           \
@@ -146,16 +147,16 @@ do {                                                           \
 #endif
 
 #ifdef PVFS2_KERNEL_DEBUG
-#define PVFS2_DEFAULT_OP_TIMEOUT_SECS       30
+#define PVFS2_DEFAULT_OP_TIMEOUT_SECS       10
 #else
-#define PVFS2_DEFAULT_OP_TIMEOUT_SECS       60
+#define PVFS2_DEFAULT_OP_TIMEOUT_SECS       20
 #endif
 
 #define PVFS2_REQDEVICE_NAME          "pvfs2-req"
 
 #define PVFS2_DEVREQ_MAGIC             0x20030529
 #define PVFS2_LINK_MAX                 0x000000FF
-#define PVFS2_OP_RETRY_COUNT           0x00000005
+#define PVFS2_PURGE_RETRY_COUNT        0x00000005
 #define PVFS2_SEEK_END                 0x00000002
 #define PVFS2_MAX_NUM_OPTIONS          0x00000004
 #define PVFS2_MAX_MOUNT_OPT_LEN        0x00000080
@@ -200,11 +201,26 @@ sizeof(uint64_t) + sizeof(pvfs2_downcall_t))
  * waiting  - op is on request_list (upward bound)
  * inprogr  - op is in progress (waiting for downcall)
  * serviced - op has matching downcall; ok
+ * purged   - op has to start a timer since client-core
+              exited uncleanly before servicing op
  ************************************/
-#define PVFS2_VFS_STATE_UNKNOWN        0x00FF0000
-#define PVFS2_VFS_STATE_WAITING        0x00FF0001
-#define PVFS2_VFS_STATE_INPROGR        0x00FF0002
-#define PVFS2_VFS_STATE_SERVICED       0x00FF0003
+enum pvfs2_vfs_op_states {
+    OP_VFS_STATE_UNKNOWN = 0,
+    OP_VFS_STATE_WAITING = 1,
+    OP_VFS_STATE_INPROGR = 2,
+    OP_VFS_STATE_SERVICED = 4,
+    OP_VFS_STATE_PURGED  = 8,
+};
+
+#define set_op_state_waiting(op)     ((op)->op_state = OP_VFS_STATE_WAITING)
+#define set_op_state_inprogress(op)  ((op)->op_state = OP_VFS_STATE_INPROGR)
+#define set_op_state_serviced(op)    ((op)->op_state = OP_VFS_STATE_SERVICED)
+#define set_op_state_purged(op)      ((op)->op_state |= OP_VFS_STATE_PURGED)
+
+#define op_state_waiting(op)     ((op)->op_state & OP_VFS_STATE_WAITING)
+#define op_state_in_progress(op) ((op)->op_state & OP_VFS_STATE_INPROGR)
+#define op_state_serviced(op)    ((op)->op_state & OP_VFS_STATE_SERVICED)
+#define op_state_purged(op)      ((op)->op_state & OP_VFS_STATE_PURGED)
 
 /* Defines for incrementing aio_ref_count */
 #ifndef HAVE_AIO_VFS_SUPPORT
@@ -215,12 +231,12 @@ sizeof(uint64_t) + sizeof(pvfs2_downcall_t))
 #define get_op(op) \
     do {\
         atomic_inc(&(op)->aio_ref_count);\
-        pvfs2_print("Alloced OP (%p:%ld)\n", op, (unsigned long)(op)->tag);\
+        pvfs2_print("(get) Alloced OP (%p:%ld)\n", op, (unsigned long)(op)->tag);\
     } while(0)
 #define put_op(op) \
     do {\
         if (atomic_sub_and_test(1, &(op)->aio_ref_count) == 1) {\
-            pvfs2_print("Releasing OP (%p:%ld)\n", op, (unsigned long)(op)->tag);\
+            pvfs2_print("(put) Releasing OP (%p:%ld)\n", op, (unsigned long)(op)->tag);\
             op_release(op);\
         }\
     } while(0)
@@ -327,7 +343,7 @@ int pvfs2_xattr_get_default(struct inode *inode,
  ************************************/
 typedef struct
 {
-    int op_state;
+    enum pvfs2_vfs_op_states op_state;
     uint64_t tag;
 
     pvfs2_upcall_t upcall;
@@ -340,6 +356,8 @@ typedef struct
     wait_queue_head_t io_completion_waitq;
     void *priv;/* used by the async I/O code to stash the pvfs2_kiocb structure */
     atomic_t aio_ref_count; /* used again for the async I/O code for deallocation */
+
+    int attempts;
 
     struct list_head list;
 } pvfs2_kernel_op_t;
@@ -393,7 +411,7 @@ typedef struct
     char data[PVFS2_MAX_MOUNT_OPT_LEN];
     char devname[PVFS_MAX_SERVER_ADDR_LEN];
     struct super_block *sb;
-
+    int    mount_pending;
     struct list_head list;
 } pvfs2_sb_info_t;
 
@@ -461,7 +479,8 @@ static inline pvfs2_sb_info_t *PVFS2_SB(
  ****************************/
 int op_cache_initialize(void);
 int op_cache_finalize(void);
-pvfs2_kernel_op_t *op_alloc(void);
+char *get_opname_string(pvfs2_kernel_op_t *new_op);
+pvfs2_kernel_op_t *op_alloc(int32_t type);
 void op_release(pvfs2_kernel_op_t *op);
 
 int dev_req_cache_initialize(void);
@@ -491,6 +510,11 @@ static inline int kiocb_cache_finalize(void)
 #endif
 
 /****************************
+ * defined in pvfs2-mod.c
+ ****************************/
+void purge_inprogress_ops(void);
+
+/****************************
  * defined in waitqueue.c
  ****************************/
 int wait_for_matching_downcall(
@@ -499,6 +523,7 @@ int wait_for_cancellation_downcall(
     pvfs2_kernel_op_t * op);
 void clean_up_interrupted_operation(
     pvfs2_kernel_op_t * op);
+void purge_waiting_ops(void);
 
 /****************************
  * defined in super.c
@@ -514,6 +539,7 @@ struct super_block *pvfs2_get_sb(
     const char *devname, void *data);
 #endif
 
+void pvfs2_kill_sb(struct super_block *sb);
 int pvfs2_remount(
     struct super_block *sb,
     int *flags,
@@ -562,18 +588,28 @@ int pvfs2_removexattr(struct dentry *dentry, const char *name);
  * defined in namei.c
  ****************************/
 #ifdef PVFS2_LINUX_KERNEL_2_4
-struct dentry *pvfs2_lookup(
-    struct inode *dir,
-    struct dentry *dentry);
 int pvfs2_permission(struct inode *, int);
 #else
-struct dentry *pvfs2_lookup(
-    struct inode *dir,
-    struct dentry *dentry,
-    struct nameidata *nd);
 int pvfs2_permission(struct inode *inode, 
         int mask, struct nameidata *nd);
 #endif
+
+/*****************************
+ * defined in file.c (shared file/dir operations)
+ ****************************/
+int pvfs2_file_open(
+    struct inode *inode,
+    struct file *file);
+int pvfs2_file_release(
+    struct inode *inode,
+    struct file *file);
+ssize_t pvfs2_inode_read(
+    struct inode *inode,
+    char *buf,
+    size_t count,
+    loff_t *offset,
+    int copy_to_user,
+    loff_t readahead_size);
 
 /*****************************
  * defined in devpvfs2-req.c
@@ -581,13 +617,15 @@ int pvfs2_permission(struct inode *inode,
 
 int     pvfs2_ioctl32_init(void);
 void    pvfs2_ioctl32_cleanup(void);
-
+int     is_daemon_in_service(void);
+int     fs_mount_pending(PVFS_fs_id fsid);
 
 /****************************
  * defined in pvfs2-utils.c
  ****************************/
 int pvfs2_gen_credentials(
     PVFS_credentials *credentials);
+PVFS_fs_id fsid_of_op(pvfs2_kernel_op_t *op);
 
 ssize_t pvfs2_inode_getxattr(
         struct inode *inode, const char* prefix,
@@ -655,15 +693,35 @@ PVFS_time pvfs2_convert_time_field(
 
 int pvfs2_normalize_to_errno(PVFS_error error_code);
 
+extern struct semaphore devreq_semaphore;
+extern struct semaphore request_semaphore;
+extern int debug;
+extern int op_timeout_secs;
+extern struct list_head pvfs2_superblocks;
+extern spinlock_t pvfs2_superblocks_lock;
+extern struct list_head pvfs2_request_list;
+extern spinlock_t pvfs2_request_list_lock;
+extern wait_queue_head_t pvfs2_request_list_waitq;
+extern struct qhash_table *htable_ops_in_progress;
+
+extern struct file_system_type pvfs2_fs_type;
+extern struct address_space_operations pvfs2_address_operations;
+extern struct backing_dev_info pvfs2_backing_dev_info;
+extern struct inode_operations pvfs2_file_inode_operations;
+extern struct file_operations pvfs2_file_operations;
+extern struct inode_operations pvfs2_symlink_inode_operations;
+extern struct inode_operations pvfs2_dir_inode_operations;
+extern struct file_operations pvfs2_dir_operations;
+extern struct dentry_operations pvfs2_dentry_operations;
+extern struct file_operations pvfs2_devreq_file_operations;
+
 /************************************
  * misc convenience macros
  ************************************/
-extern struct semaphore request_semaphore;
-
 #define add_op_to_request_list(op)                           \
 do {                                                         \
     spin_lock(&op->lock);                                    \
-    op->op_state = PVFS2_VFS_STATE_WAITING;                  \
+    set_op_state_waiting(op);                                \
                                                              \
     spin_lock(&pvfs2_request_list_lock);                     \
     list_add_tail(&op->list, &pvfs2_request_list);           \
@@ -676,7 +734,7 @@ do {                                                         \
 #define add_priority_op_to_request_list(op)                  \
 do {                                                         \
     spin_lock(&op->lock);                                    \
-    op->op_state = PVFS2_VFS_STATE_WAITING;                  \
+    set_op_state_waiting(op);                                \
                                                              \
     spin_lock(&pvfs2_request_list_lock);                     \
     list_add(&op->list, &pvfs2_request_list);                \
@@ -708,13 +766,14 @@ do {                                                         \
                             &(op->tag));                     \
 } while(0)
 
-#define PVFS2_OP_INTERRUPTIBLE 1  /**< service_operation() is interruptible */
-#define PVFS2_OP_PRIORITY 2       /**< service_operation() is high priority */
-#define PVFS2_OP_CANCELLATION 4   /**< this is a cancellation */
-#define PVFS2_OP_NO_SEMAPHORE 8   /**< don't acquire semaphore */
+#define PVFS2_OP_INTERRUPTIBLE 1   /**< service_operation() is interruptible */
+#define PVFS2_OP_PRIORITY      2   /**< service_operation() is high priority */
+#define PVFS2_OP_CANCELLATION  4   /**< this is a cancellation */
+#define PVFS2_OP_NO_SEMAPHORE  8   /**< don't acquire semaphore */
+#define PVFS2_OP_ASYNC         16  /* Queue it, but don't wait */
 
 int service_operation(pvfs2_kernel_op_t* op, const char* op_name, 
-    int num_retries, int flags);
+    int flags);
 
 /** handles two possible error cases, depending on context.
  *
@@ -729,7 +788,7 @@ int service_operation(pvfs2_kernel_op_t* op, const char* op_name,
  *
  *  FIXME: POSSIBLE OPTIMIZATION:
  *  However, if we timed out or if we got a signal AND our upcall was never
- *  picked off the queue (i.e. we were in PVFS2_VFS_STATE_WAITING), then we don't
+ *  picked off the queue (i.e. we were in OP_VFS_STATE_WAITING), then we don't
  *  need to send a cancellation upcall. The way we can handle this is set error_exit
  *  to 2 in such cases and 1 whenever cancellation has to be sent and have handle_error
  *  take care of this situation as well..
@@ -745,14 +804,14 @@ int service_operation(pvfs2_kernel_op_t* op, const char* op_name,
  */
 #define handle_io_error()                                 \
 do {                                                      \
-    if(new_op->op_state != PVFS2_VFS_STATE_SERVICED)      \
+    if(!op_state_serviced(new_op))                        \
     {                                                     \
         pvfs2_cancel_op_in_progress(new_op->tag);         \
         op_release(new_op);                               \
     }                                                     \
     else                                                  \
     {                                                     \
-        wake_up_device_for_return(new_op);                \
+        wake_up_daemon_for_return(new_op);                \
     }                                                     \
     new_op = NULL;                                        \
     pvfs_bufmap_put(buffer_index);                        \
@@ -766,29 +825,16 @@ do {                                                      \
  */
 #define handle_sync_aio_error()                           \
 do {                                                      \
-    if(new_op->op_state != PVFS2_VFS_STATE_SERVICED)      \
+    if(!op_state_serviced(new_op))                        \
     {                                                     \
         pvfs2_cancel_op_in_progress(new_op->tag);         \
         op_release(new_op);                               \
     }                                                     \
     else                                                  \
     {                                                     \
-        wake_up_device_for_return(new_op);                \
+        wake_up_daemon_for_return(new_op);                \
     }                                                     \
     pvfs_bufmap_put(buffer_index);                        \
-} while(0)
-
-
-/** All this function does is that it tries to issue the operation and return
- * by queuing it up in the device queue.
- *  \note used in pvfs_file_aio_read/pvfs_file_aio_write functions
- *  alone
- */
-#define service_async_vfs_op(op)                          \
-do {                                                      \
-    down(&request_semaphore);                             \
-    add_op_to_request_list(op);                           \
-    up(&request_semaphore);                               \
 } while(0)
 
 #endif

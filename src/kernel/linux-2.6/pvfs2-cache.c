@@ -25,11 +25,6 @@ static kmem_cache_t *pvfs2_inode_cache = NULL;
 static kmem_cache_t *pvfs2_kiocb_cache = NULL;
 #endif
 
-extern int debug;
-extern int pvfs2_gen_credentials(
-    PVFS_credentials *credentials);
-
-
 int op_cache_initialize(void)
 {
     op_cache = kmem_cache_create(
@@ -59,7 +54,62 @@ int op_cache_finalize(void)
     return 0;
 }
 
-pvfs2_kernel_op_t *op_alloc(void)
+char *get_opname_string(pvfs2_kernel_op_t *new_op)
+{
+    if (new_op)
+    {
+        int32_t type = new_op->upcall.type;
+        if (type == PVFS2_VFS_OP_FILE_IO)
+            return "OP_FILE_IO";
+        else if (type == PVFS2_VFS_OP_LOOKUP)
+            return "OP_LOOKUP";
+        else if (type == PVFS2_VFS_OP_CREATE)
+            return "OP_CREATE";
+        else if (type == PVFS2_VFS_OP_GETATTR)
+            return "OP_GETATTR";
+        else if (type == PVFS2_VFS_OP_REMOVE)
+            return "OP_REMOVE";
+        else if (type == PVFS2_VFS_OP_MKDIR)
+            return "OP_MKDIR";
+        else if (type == PVFS2_VFS_OP_READDIR)
+            return "OP_READDIR";
+        else if (type == PVFS2_VFS_OP_SETATTR)
+            return "OP_SETATTR";
+        else if (type == PVFS2_VFS_OP_SYMLINK)
+            return "OP_SYMLINK";
+        else if (type == PVFS2_VFS_OP_RENAME)
+            return "OP_RENAME";
+        else if (type == PVFS2_VFS_OP_STATFS)
+            return "OP_STATFS";
+        else if (type == PVFS2_VFS_OP_TRUNCATE)
+            return "OP_TRUNCATE";
+        else if (type == PVFS2_VFS_OP_MMAP_RA_FLUSH)
+            return "OP_MMAP_RA_FLUSH";
+        else if (type == PVFS2_VFS_OP_FS_MOUNT)
+            return "OP_FS_MOUNT";
+        else if (type == PVFS2_VFS_OP_FS_UMOUNT)
+            return "OP_FS_UMOUNT";
+        else if (type == PVFS2_VFS_OP_GETXATTR)
+            return "OP_GETXATTR";
+        else if (type == PVFS2_VFS_OP_SETXATTR)
+            return "OP_SETXATTR";
+        else if (type == PVFS2_VFS_OP_LISTXATTR)
+            return "OP_LISTXATTR";
+        else if (type == PVFS2_VFS_OP_REMOVEXATTR)
+            return "OP_REMOVEXATTR";
+        else if (type == PVFS2_VFS_OP_PARAM)
+            return "OP_PARAM";
+        else if (type == PVFS2_VFS_OP_PERF_COUNT)
+            return "OP_PERF_COUNT";
+        else if (type == PVFS2_VFS_OP_CANCEL)
+            return "OP_CANCEL";
+        else if (type == PVFS2_VFS_OP_FSYNC)
+            return "OP_FSYNC";
+    }
+    return "OP_INVALID";
+}
+
+pvfs2_kernel_op_t *op_alloc(int32_t type)
 {
     pvfs2_kernel_op_t *new_op = NULL;
 
@@ -85,6 +135,9 @@ pvfs2_kernel_op_t *op_alloc(void)
             next_tag_value = 100;
         }
         spin_unlock(&next_tag_value_lock);
+        new_op->upcall.type = type;
+        new_op->attempts = 0;
+        pvfs2_print("Alloced OP (%p: %ld %s)\n", new_op, (unsigned long) new_op->tag, get_opname_string(new_op));
 
         pvfs2_gen_credentials(&new_op->upcall.credentials);
     }
@@ -99,6 +152,7 @@ void op_release(pvfs2_kernel_op_t *pvfs2_op)
 {
     if (pvfs2_op)
     {
+        pvfs2_print("Releasing OP (%p: %ld)\n", pvfs2_op, (unsigned long) pvfs2_op->tag);
         pvfs2_op_initialize(pvfs2_op);
         kmem_cache_free(op_cache, pvfs2_op);
     }
