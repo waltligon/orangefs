@@ -1685,7 +1685,14 @@ static DB *dbpf_db_open(
 }
 
 static void dbpf_db_error_callback(
-    const DB_ENV *dbenv, const char *errpfx, const char *msg)
+#ifdef HAVE_DBENV_PARAMETER_TO_DB_ERROR_CALLBACK
+    const DB_ENV *dbenv, 
+#endif
+    const char *errpfx, 
+#ifdef HAVE_CONST_THIRD_PARAMETER_TO_DB_ERROR_CALLBACK
+    const 
+#endif
+    char *msg)
 {
     gossip_err("%s: %s\n", errpfx, msg);
 }
