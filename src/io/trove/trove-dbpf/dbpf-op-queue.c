@@ -317,11 +317,11 @@ int dbpf_queue_or_service(
     TROVE_ds_flags flags,
     TROVE_op_id *out_op_id_p)
 {
-    DB * dbp;
     int ret;
 
     if(flags & TROVE_IMMEDIATE_COMPLETION)
     {
+        DB * dbp;
         *out_op_id_p = 0;
         ret = op_p->svc_fn(op_p);
         if(ret < 0)

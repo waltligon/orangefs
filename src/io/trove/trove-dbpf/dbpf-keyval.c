@@ -1302,7 +1302,7 @@ int PINT_dbpf_keyval_iterate(
 
         gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG, "iterate key: %*s, val: %llu\n", 
                      key->read_sz, (char *)key->buffer, 
-                     (val ? *(PVFS_handle *)val->buffer : 0));
+                     (val ? llu(*(PVFS_handle *)val->buffer) : 0));
 
         if(callback)
         {
@@ -1685,7 +1685,7 @@ static int dbpf_keyval_get_handle_info_op_svc(struct dbpf_op * op_p)
 
     gossip_debug(GOSSIP_DBPF_KEYVAL_DEBUG,
                  "[DBPF KEYVAL]: handle_info get: handle: %llu, count: %d\n",
-                 op_p->handle, op_p->u.k_get_handle_info.info->count); 
+                 llu(op_p->handle), op_p->u.k_get_handle_info.info->count); 
 
     return 1;
 }    
