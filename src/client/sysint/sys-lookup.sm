@@ -1068,7 +1068,7 @@ static int lookup_segment_lookup_comp_fn(
     gossip_debug(GOSSIP_CLIENT_DEBUG, "lookup_segment_lookup_comp_fn\n");
 
     assert(resp_p->op == PVFS_SERV_LOOKUP_PATH);
-
+    
     if (resp_p->status != 0)
     {
         return resp_p->status;
@@ -1078,6 +1078,8 @@ static int lookup_segment_lookup_comp_fn(
 
     gossip_debug(GOSSIP_LOOKUP_DEBUG, "- Resolved %d segments\n",
                  resp_p->u.lookup_path.handle_count);
+
+    memset(&last_resolved_refn, 0, sizeof(PVFS_object_ref));
 
     /*
       at this point we have 1 or more resolved handles so we're going

@@ -319,7 +319,8 @@ int dbpf_queue_or_service(
 {
     int ret;
 
-    if(flags & TROVE_IMMEDIATE_COMPLETION)
+    if(flags & TROVE_IMMEDIATE_COMPLETION &&
+       (DBPF_OP_IS_KEYVAL(op_p->type) || DBPF_OP_IS_DSPACE(op_p->type)))
     {
         DB * dbp;
         *out_op_id_p = 0;
@@ -333,7 +334,7 @@ int dbpf_queue_or_service(
         {
             dbp = op_p->coll_p->keyval_db;
         }
-        else if(DBPF_OP_IS_DSPACE(op_p->type))
+        else
         {
             dbp = op_p->coll_p->ds_db;
         }
