@@ -181,6 +181,8 @@ int main(
     }
 #endif
     /* print out results */
+
+
     if (world_rank == 0)
     {
 	bench_args_dump(&opts);
@@ -188,30 +190,37 @@ int main(
 	printf
 	    ("all times measure round trip in seconds unless otherwise noted\n");
 	printf("\"ave\" field is computed as (total time)/iterations\n");
-	printf("%d\t%f\t%f\t(size,total,ave)", mpi_recv_bufs.size,
-	       mpi_time, (mpi_time / ITERATIONS));
-	printf(" mpi client\n");
     }
-    else
+
+    /* enforce output ordering */
+    fflush(stdout);
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    if (world_rank != 0)
     {
+	printf("%d\t%f\t%f\t(size,total,ave)", bmi_recv_bufs.size,
+	       bmi_time, (bmi_time / ITERATIONS));
+	printf(" bmi server\n");
+
 	printf("%d\t%f\t%f\t(size,total,ave)", mpi_recv_bufs.size,
 	       mpi_time, (mpi_time / ITERATIONS));
 	printf(" mpi server\n");
     }
+
+    /* enforce output ordering */
+    fflush(stdout);
+    MPI_Barrier(MPI_COMM_WORLD);
+
     if (world_rank == 0)
     {
 	printf("%d\t%f\t%f\t(size,total,ave)", bmi_recv_bufs.size,
 	       bmi_time, (bmi_time / ITERATIONS));
 	printf(" bmi client\n");
-    }
-    else
-    {
-	printf("%d\t%f\t%f\t(size,total,ave)", bmi_recv_bufs.size,
-	       bmi_time, (bmi_time / ITERATIONS));
-	printf(" bmi server\n");
-    }
 
-
+	printf("%d\t%f\t%f\t(size,total,ave)", mpi_recv_bufs.size,
+	       mpi_time, (mpi_time / ITERATIONS));
+	printf(" mpi client\n");
+    }
     /* free buffers */
     free_buffers(&mpi_send_bufs);
     free_buffers(&mpi_recv_bufs);
@@ -437,7 +446,7 @@ static int mpi_server(
 	{
 	    ret = MPI_Test(&request, &flag, &status);
 	} while (ret == MPI_SUCCESS && flag == 0);
-	if (ret != MPI_SUCCESS || status.MPI_ERROR != MPI_SUCCESS)
+	if (ret != MPI_SUCCESS)
 	{
 	    fprintf(stderr, "MPI_Test() failure.\n");
 	    return (-1);
@@ -530,7 +539,7 @@ static int mpi_client(
 	{
 	    ret = MPI_Test(&request, &flag, &status);
 	} while (ret == MPI_SUCCESS && flag == 0);
-	if (ret != MPI_SUCCESS || status.MPI_ERROR != MPI_SUCCESS)
+	if (ret != MPI_SUCCESS)
 	{
 	    fprintf(stderr, "MPI_Test() failure.\n");
 	    return (-1);

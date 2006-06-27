@@ -303,13 +303,18 @@ int main(
     MPI_Allreduce(&sq_bmi_time, &sumsq_bmi_time, 1, MPI_DOUBLE, MPI_SUM, comm);
     MPI_Allreduce(&sq_mpi_time, &sumsq_mpi_time, 1, MPI_DOUBLE, MPI_SUM, comm);
 
+    /* do this first to get nice output ordering */
+    if (world_rank == 0) {
+	bench_args_dump(&opts);
+        fflush(stdout);
+    }
+    MPI_Barrier(MPI_COMM_WORLD);
+
     /* exactly one "client" and one "server" compute and print
      * statistics
      */
     if (world_rank == 0)
     {
-	bench_args_dump(&opts);
-
 	total_data_xfer = opts.num_servers * num_clients * num_messages *
 	    opts.message_len;
 	if (opts.num_servers > 1)
@@ -340,6 +345,10 @@ int main(
 	     opts.message_len, opts.num_servers, min_mpi_time, max_mpi_time,
 	     ave_mpi_time, stddev_mpi_time, agg_mpi_bw / (1024 * 1024));
     }
+
+    /* enforce output ordering */
+    fflush(stdout);
+    MPI_Barrier(MPI_COMM_WORLD);
 
     if (world_rank == opts.num_servers)
     {
