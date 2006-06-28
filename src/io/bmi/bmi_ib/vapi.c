@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: vapi.c,v 1.2 2006-06-16 19:23:53 pw Exp $
+ * $Id: vapi.c,v 1.3 2006-06-28 17:40:48 pw Exp $
  */
 #include <stdio.h>
 #include <string.h>
@@ -62,6 +62,10 @@ struct vapi_device_priv {
     /* async events */
     EVAPI_async_handler_hndl_t nic_async_event_handler;
     int async_event_pipe[2];
+
+    /* completion channel events */
+    EVAPI_compl_handler_hndl_t nic_cq_event_handler;
+    int cq_event_pipe[2];
 };
 
 /*
@@ -759,6 +763,21 @@ static int vapi_check_cq(struct bmi_ib_wc *wc)
     return 1;
 }
 
+static int vapi_prepare_cq_block(void)
+{
+    struct vapi_device_priv *vd = ib_device->priv;
+    int ret;
+
+    /* ask for the next notfication */
+    ret = VAPI_req_comp_notif(vd->nic_handle, vd->nic_cq, VAPI_NEXT_COMP);
+    if (ret < 0)
+	error_verrno(ret, "%s: VAPI_req_comp_notif", __func__);
+
+    /* return the fd that can be fed to poll() */
+    return vd->cq_event_pipe[0];
+}
+
+
 /*
  * Return string form of work completion status field.
  */
@@ -855,6 +874,23 @@ async_event_handler(VAPI_hca_hndl_t nic_handle_in __attribute__((unused)),
     ret = write(vd->async_event_pipe[1], e, sizeof(*e));
     if (ret != sizeof(*e))
 	error_errno("%s: write async event pipe", __func__);
+}
+
+/*
+ * To deal with blocking completion events.  Just write down a pipe
+ * that something is ready to go; signaling to poll that an event is
+ * ready.
+ */
+static void cq_event_handler(VAPI_hca_hndl_t hca __attribute__((unused)),
+                             VAPI_cq_hndl_t cq __attribute__((unused)),
+		             void *private_data __attribute__((unused)))
+{
+    struct vapi_device_priv *vd = ib_device->priv;
+    int i = 0, ret;
+
+    ret = write(vd->cq_event_pipe[1], &i, sizeof(i));
+    if (ret != sizeof(i))
+	error_errno("%s: write cq event pipe", __func__);
 }
 
 #ifdef HAVE_IB_WRAP_COMMON_H
@@ -1001,6 +1037,7 @@ int vapi_ib_initialize(void)
     ib_device->func.post_rr_ack = vapi_post_rr_ack;
     ib_device->func.post_sr_rdmaw = vapi_post_sr_rdmaw;
     ib_device->func.check_cq = vapi_check_cq;
+    ib_device->func.prepare_cq_block = vapi_prepare_cq_block;
     ib_device->func.wc_status_string = vapi_wc_status_string;
     ib_device->func.mem_register = vapi_mem_register;
     ib_device->func.mem_deregister = vapi_mem_deregister;
@@ -1062,6 +1099,22 @@ int vapi_ib_initialize(void)
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_create_cq ret %d", __func__, ret);
 
+    /* create completion "channel" */
+    ret = pipe(vd->cq_event_pipe);
+    if (ret < 0)
+	error_errno("%s: pipe", __func__);
+    flags = fcntl(vd->cq_event_pipe[0], F_GETFL);
+    if (flags < 0)
+	error_errno("%s: get cq pipe flags", __func__);
+    if (fcntl(vd->cq_event_pipe[0], F_SETFL, flags | O_NONBLOCK) < 0)
+	error_errno("%s: set cq pipe nonblocking", __func__);
+
+    /* register handler for the cq */
+    ret = EVAPI_set_comp_eventh(vd->nic_handle, vd->nic_cq, cq_event_handler,
+                                NULL, &vd->nic_cq_event_handler);
+    if (ret < 0)
+	error_verrno(ret, "%s: EVAPI_set_comp_eventh", __func__);
+
     /* build a pipe to queue up async events, and set it to non-blocking
      * on the receive side */
     ret = pipe(vd->async_event_pipe);
@@ -1091,6 +1144,13 @@ static void vapi_ib_finalize(void)
 
     if (vd->sg_tmp_array)
 	free(vd->sg_tmp_array);
+    ret = EVAPI_clear_comp_eventh(vd->nic_handle, vd->nic_cq_event_handler);
+    if (ret < 0)
+	error_verrno(ret, "%s: EVAPI_clear_comp_eventh", __func__);
+
+    close(vd->cq_event_pipe[0]);
+    close(vd->cq_event_pipe[1]);
+
     ret = VAPI_destroy_cq(vd->nic_handle, vd->nic_cq);
     if (ret < 0)
 	error_verrno(ret, "%s: VAPI_destroy_cq", __func__);
@@ -1103,6 +1163,10 @@ static void vapi_ib_finalize(void)
     if (ret < 0)
 	error_verrno(ret, "%s: EVAPI_clear_async_event_handler", __func__);
     ret = EVAPI_release_hca_hndl(vd->nic_handle);
+
+    close(vd->async_event_pipe[0]);
+    close(vd->async_event_pipe[1]);
+
     if (ret < 0)
 	error_verrno(ret, "%s: EVAPI_release_hca_hndl", __func__);
     ret = VAPI_close_hca(vd->nic_handle);
@@ -1112,6 +1176,7 @@ static void vapi_ib_finalize(void)
 	error_verrno(ret, "%s: VAPI_close_hca", __func__);
      */
 
-    free(ib_device->priv);
+    free(vd);
+    ib_device->priv = NULL;
 }
 

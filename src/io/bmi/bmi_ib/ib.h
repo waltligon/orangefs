@@ -5,7 +5,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.h,v 1.18 2006-06-16 19:23:53 pw Exp $
+ * $Id: ib.h,v 1.19 2006-06-28 17:40:48 pw Exp $
  */
 #ifndef __ib_h
 #define __ib_h
@@ -331,6 +331,7 @@ struct ib_device_func {
     void (*post_rr_ack)(const ib_connection_t *c, const buf_head_t *bh);
     void (*post_sr_rdmaw)(ib_send_t *sq, msg_header_cts_t *mh_cts,
                           void *mh_cts_buf);
+    int (*prepare_cq_block)(void);
     int (*check_cq)(struct bmi_ib_wc *wc);
     const char *(*wc_status_string)(int status);
     void (*mem_register)(memcache_entry_t *c);
@@ -430,7 +431,7 @@ void memcache_shutdown(void *md);
  * Debugging macros.
  */
 #if 1
-#define DEBUG_LEVEL 4
+#define DEBUG_LEVEL 2
 #define debug(lvl,fmt,args...) \
     do { \
 	if (lvl <= DEBUG_LEVEL) \
