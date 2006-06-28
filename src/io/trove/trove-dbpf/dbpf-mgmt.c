@@ -53,7 +53,14 @@ static int db_open_count, db_close_count;
 #define COLL_ENV_FLAGS (DB_INIT_MPOOL | DB_CREATE | DB_THREAD)
 
 static void dbpf_db_error_callback(
-    const DB_ENV *dbenv, const char *errpfx, const char * msg);
+#ifdef HAVE_DBENV_PARAMETER_TO_DB_ERROR_CALLBACK
+    const DB_ENV *dbenv, 
+#endif
+    const char *errpfx, 
+#ifdef HAVE_CONST_THIRD_PARAMETER_TO_DB_ERROR_CALLBACK
+    const 
+#endif
+    char * msg);
 
 DB_ENV *dbpf_getdb_env(const char *path, unsigned int env_flags, int *error)
 {
@@ -209,27 +216,6 @@ int dbpf_putdb_env(DB_ENV *dbenv, const char *path)
         gossip_err("dbpf_putdb_env: could not remove environment handle: %s\n", db_strerror(ret));
     }
     return 0;
-}
-
-void dbpf_error_report(
-#ifdef HAVE_DBENV_PARAMETER_TO_DB_ERROR_CALLBACK
-		       const DB_ENV *dbenv,
-#endif
-		       const char *errpfx,
-#ifdef HAVE_CONST_THIRD_PARAMETER_TO_DB_ERROR_CALLBACK
-		       const
-#endif
-		       char *msg)
-{
-#ifdef BERKDB_ERROR_REPORTING
-    char buf[512] = {0};
-
-    if (errpfx && msg)
-    {
-        snprintf(buf, 512, "%s: %s\n", errpfx, msg);
-        gossip_err(buf);
-    }
-#endif
 }
 
 static struct dbpf_storage *dbpf_storage_lookup(char *stoname, int *err_p, TROVE_ds_flags flags);
