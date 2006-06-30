@@ -6,7 +6,7 @@
  *
  * See COPYING in top-level directory.
  *
- * $Id: ib.c,v 1.33 2006-06-28 17:40:48 pw Exp $
+ * $Id: ib.c,v 1.34 2006-06-30 18:11:46 pw Exp $
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -73,22 +73,17 @@ static const bmi_size_t reg_send_buflist_len = 256 * 1024;
 static const bmi_size_t reg_recv_buflist_len = 256 * 1024;
 #endif
 
-static int send_cts(ib_recv_t *rq);
-static void encourage_send_waiting_buffer(ib_send_t *sq);
 static void encourage_send_incoming_cts(buf_head_t *bh, u_int32_t byte_len);
-
 static void encourage_recv_incoming(ib_connection_t *c, buf_head_t *bh,
-  u_int32_t byte_len);
+                                    u_int32_t byte_len);
 static void encourage_recv_incoming_cts_ack(ib_recv_t *rq);
+static int send_cts(ib_recv_t *rq);
 static void maybe_free_connection(ib_connection_t *c);
-
 static void ib_close_connection(ib_connection_t *c);
-
 #ifndef __PVFS2_SERVER__
 static int ib_tcp_client_connect(ib_method_addr_t *ibmap,
                                  struct method_addr *remote_map);
 #endif
-static void ib_tcp_server_init_listen_socket(struct method_addr *addr);
 static int ib_tcp_server_check_new_connections(void);
 static int ib_block_for_activity(int timeout_ms);
 
@@ -1159,12 +1154,6 @@ BMI_ib_test(bmi_op_id_t id, int *outcount, bmi_error_code_t *err,
 }
 
 /*
- * Used by the test functions to block if not much is going on
- * since the timeouts at the BMI job layer are too coarse.
- */
-static struct timeval last_action = { 0, 0 };
-
-/*
  * Test just the particular list of op ids, returning the list of indices
  * that completed.
  */
@@ -1207,6 +1196,12 @@ static int BMI_ib_testsome(int incount, bmi_op_id_t *ids, int *outcount,
     *outcount = n;
     return 0;
 }
+
+/*
+ * Used by the test functions to block if not much is going on
+ * since the timeouts at the BMI job layer are too coarse.
+ */
+static struct timeval last_action = { 0, 0 };
 
 /*
  * Test for multiple completions matching a particular user context.
@@ -1982,7 +1977,7 @@ static int BMI_ib_finalize(void)
     return 0;
 }
 
-struct bmi_method_ops bmi_ib_ops = 
+const struct bmi_method_ops bmi_ib_ops = 
 {
     .method_name = "bmi_ib",
     .BMI_meth_initialize = BMI_ib_initialize,
