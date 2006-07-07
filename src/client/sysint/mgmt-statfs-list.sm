@@ -249,7 +249,9 @@ static int mgmt_statfs_list_cleanup(PINT_client_sm *sm_p,
         sm_p->msgarray = NULL;
     }
 
-    js_p->error_code = error;
+    sm_p->error_code  = error;
+    PINT_SET_OP_COMPLETE;
+
     return 1;
 }
 

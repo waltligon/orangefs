@@ -21,6 +21,13 @@
 #define SM_JUMP   6
 #define SM_TERMINATE 7
 
+/* these define things like stack size and so forth for the common
+ * state machine code.
+ */
+
+#define PINT_STATE_STACK_SIZE                  8
+#define PINT_FRAME_STACK_SIZE                  8
+
 /*
  * Local variables:
  *  c-indent-level: 4

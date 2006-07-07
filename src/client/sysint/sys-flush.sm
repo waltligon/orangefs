@@ -266,7 +266,7 @@ static int flush_cleanup(PINT_client_sm *sm_p,
         sm_p->msgarray = NULL;
     }
 
-    sm_p->op_complete = 1;
+    PINT_SET_OP_COMPLETE;
     return 0;
 }
 

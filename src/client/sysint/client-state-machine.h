@@ -26,15 +26,12 @@
 #include "id-generator.h"
 #include "msgpairarray.h"
 #include "pint-sysint-utils.h"
-#include "pint-perf-counter.h"
 
 /* skip everything except #includes if __SM_CHECK_DEP is already defined; this
  * allows us to get the dependencies right for msgpairarray.sm which relies
  * on conflicting headers for dependency information
  */
 #ifndef __SM_CHECK_DEP
-
-#define PINT_STATE_STACK_SIZE 3
 
 #define MAX_LOOKUP_SEGMENTS PVFS_REQ_LIMIT_PATH_SEGMENT_COUNT
 #define MAX_LOOKUP_CONTEXTS PVFS_REQ_LIMIT_MAX_SYMLINK_RESOLUTION_COUNT
@@ -95,8 +92,6 @@ struct PINT_client_mkdir_sm
     PVFS_sysresp_mkdir *mkdir_resp; /* in/out parameter */
     PVFS_sys_attr sys_attr;         /* input parameter  */
 
-    PVFS_ds_keyval *key_array;
-    PVFS_ds_keyval *val_array;
     int retry_count;
     int stored_error_code;
     PVFS_handle metafile_handle;
@@ -139,6 +134,9 @@ struct PINT_client_mgmt_get_dirdata_handle_sm
 {
     PVFS_handle *dirdata_handle;
 };
+
+typedef struct
+{
 
 typedef struct
 {
@@ -441,6 +439,10 @@ struct PINT_client_perf_count_timer_sm
 
 typedef struct PINT_client_sm
 {
+    /* this code removed and corresponding fields added to the generic
+     * state machine code in the PINT_smcb struct
+     */
+#if 0
     /*
       internal state machine values; the stack is used for tracking
       movement through nested state machines
@@ -457,6 +459,11 @@ typedef struct PINT_client_sm
 
     /* indicates when the operation has been cancelled */
     int op_cancelled;
+
+    /* used internally by client-state-machine.c */
+    PVFS_sys_op_id sys_op_id;
+    void *user_ptr;
+#endif
 
     /* stores the final operation error code on operation exit */
     PVFS_error error_code;
@@ -486,10 +493,6 @@ typedef struct PINT_client_sm
 
     PVFS_object_ref object_ref;
     PVFS_object_ref parent_ref;
-
-    /* used internally by client-state-machine.c */
-    PVFS_sys_op_id sys_op_id;
-    void *user_ptr;
 
     PVFS_credentials *cred_p;
     union
@@ -679,7 +682,9 @@ do {                                                           \
 /************************************
  * state-machine.h included here
  ************************************/
+#if 0
 #define PINT_OP_STATE       PINT_client_sm
+#endif
 
 /* This macro allows the generic state-machine-fns.h locate function
  * to access the appropriate sm struct based on the client operation index
@@ -710,17 +715,14 @@ extern struct PINT_state_machine_s pvfs2_client_mkdir_sm;
 extern struct PINT_state_machine_s pvfs2_client_symlink_sm;
 extern struct PINT_state_machine_s pvfs2_client_sysint_getattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_getattr_sm;
-extern struct PINT_state_machine_s pvfs2_client_datafile_getattr_sizes_sm;
 extern struct PINT_state_machine_s pvfs2_client_setattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_io_sm;
-extern struct PINT_state_machine_s pvfs2_client_small_io_sm;
 extern struct PINT_state_machine_s pvfs2_client_flush_sm;
 extern struct PINT_state_machine_s pvfs2_client_readdir_sm;
 extern struct PINT_state_machine_s pvfs2_client_lookup_sm;
 extern struct PINT_state_machine_s pvfs2_client_rename_sm;
 extern struct PINT_state_machine_s pvfs2_client_truncate_sm;
 extern struct PINT_state_machine_s pvfs2_client_job_timer_sm;
-extern struct PINT_state_machine_s pvfs2_client_perf_count_timer_sm;
 extern struct PINT_state_machine_s pvfs2_server_get_config_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_setparam_list_sm;
 extern struct PINT_state_machine_s pvfs2_client_mgmt_statfs_list_sm;
@@ -736,15 +738,11 @@ extern struct PINT_state_machine_s pvfs2_client_mgmt_get_dirdata_handle_sm;
 extern struct PINT_state_machine_s pvfs2_client_get_eattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_set_eattr_sm;
 extern struct PINT_state_machine_s pvfs2_client_del_eattr_sm;
-extern struct PINT_state_machine_s pvfs2_client_list_eattr_sm;
-extern struct PINT_state_machine_s pvfs2_client_statfs_sm;
-extern struct PINT_state_machine_s pvfs2_fs_add_sm;
+
 
 /* nested state machines (helpers) */
 extern struct PINT_state_machine_s pvfs2_client_lookup_ncache_sm;
 extern struct PINT_state_machine_s pvfs2_client_remove_helper_sm;
-extern struct PINT_state_machine_s pvfs2_client_mgmt_statfs_list_nested_sm;
-extern struct PINT_state_machine_s pvfs2_server_get_config_nested_sm;
 
 #include "state-machine.h"
 

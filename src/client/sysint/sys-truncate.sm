@@ -284,7 +284,7 @@ static int truncate_cleanup(PINT_client_sm *sm_p,
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
 
-    sm_p->op_complete = 1;
+    PINT_SET_OP_COMPLETE;
     return 0;
 }
 

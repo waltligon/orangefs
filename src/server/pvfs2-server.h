@@ -39,8 +39,6 @@
 #ifndef __SM_CHECK_DEP
 extern job_context_id server_job_context;
 
-/* size of stack for nested state machines */
-#define PINT_STATE_STACK_SIZE                  8
 #define PVFS2_SERVER_DEFAULT_TIMEOUT_MS      100
 #define BMI_UNEXPECTED_OP                    999
 
@@ -331,9 +329,12 @@ typedef struct PINT_server_op
     /* the following fields are used in state machine processing to keep
      * track of the current state
      */
+
+    /* removed to PINT_state_frame - WBL
     int stackptr;
     union PINT_state_array_values *current_state; 
     union PINT_state_array_values *state_stack[PINT_STATE_STACK_SIZE]; 
+    */
 
     /* holds id from request scheduler so we can release it later */
     job_id_t scheduled_id; 
@@ -496,7 +497,9 @@ int server_state_machine_start_noreq(
     PINT_server_op *new_op);
 
 /* INCLUDE STATE-MACHINE.H DOWN HERE */
+#if 0
 #define PINT_OP_STATE       PINT_server_op
+#endif
 #define PINT_OP_STATE_GET_MACHINE(_op) \
     ((_op <= PVFS_MAX_SERVER_OP) ? (PINT_server_req_table[_op].sm) : NULL)
 

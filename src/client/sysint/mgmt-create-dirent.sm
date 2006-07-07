@@ -235,7 +235,7 @@ static int mgmt_create_dirent_cleanup(
 
     sm_p->error_code = js_p->error_code;
 
-    sm_p->op_complete = 1;
+    PINT_SET_OP_COMPLETE;
     return 0;
 }
 

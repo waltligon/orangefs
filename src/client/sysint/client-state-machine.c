@@ -36,7 +36,7 @@ static int got_context = 0;
   (and possible completing operations in the test() call
 */
 static int s_completion_list_index = 0;
-static PINT_client_sm *s_completion_list[MAX_RETURNED_JOBS] = {NULL};
+static PINT_smcb *s_completion_list[MAX_RETURNED_JOBS] = {NULL};
 static gen_mutex_t s_completion_list_mutex = GEN_MUTEX_INITIALIZER;
 
 #define CLIENT_SM_INIT_ONCE()                                        \
@@ -52,11 +52,11 @@ do {                                                                 \
 #define CLIENT_SM_ASSERT_INITIALIZED()  \
 do { assert(got_context); } while(0)
 
-static PVFS_error add_sm_to_completion_list(PINT_client_sm *sm_p)
+static PVFS_error add_sm_to_completion_list(PINT_smcb *smcb)
 {
     gen_mutex_lock(&s_completion_list_mutex);
     assert(s_completion_list_index < MAX_RETURNED_JOBS);
-    s_completion_list[s_completion_list_index++] = sm_p;
+    s_completion_list[s_completion_list_index++] = smcb;
     gen_mutex_unlock(&s_completion_list_mutex);
     return 0;
 }
@@ -67,15 +67,14 @@ static PVFS_error add_sm_to_completion_list(PINT_client_sm *sm_p)
   if the sm was added to the completion list, it MUST be removed
   before returning from test()
 */
-static int conditional_remove_sm_if_in_completion_list(
-    PINT_client_sm *sm_p)
+static int conditional_remove_sm_if_in_completion_list(PINT_smcb *smcb)
 {
     int found = 0, i = 0;
 
     gen_mutex_lock(&s_completion_list_mutex);
     for(i = 0; i < s_completion_list_index; i++)
     {
-        if (s_completion_list[i] == sm_p)
+        if (s_completion_list[i] == smcb)
         {
             if(i == (s_completion_list_index - 1))
             {
@@ -106,8 +105,8 @@ static PVFS_error completion_list_retrieve_completed(
     int *out_count)
 {
     int i = 0, new_list_index = 0;
-    PINT_client_sm *sm_p = NULL;
-    PINT_client_sm *tmp_completion_list[MAX_RETURNED_JOBS] = {NULL};
+    PINT_smcb *smcb = NULL;
+    PINT_smcb *tmp_completion_list[MAX_RETURNED_JOBS] = {NULL};
 
     assert(op_id_array);
     assert(error_code_array);
@@ -124,25 +123,25 @@ static PVFS_error completion_list_retrieve_completed(
             continue;
         }
 
-        sm_p = s_completion_list[i];
-        assert(sm_p);
+        smcb = s_completion_list[i];
+        assert(smcb);
 
         if (i < limit)
         {
-            op_id_array[i] = sm_p->sys_op_id;
-            error_code_array[i] = sm_p->error_code;
+            op_id_array[i] = smcb->sys_op_id;
+            error_code_array[i] = smcb->error_code;
 
             if (user_ptr_array)
             {
-                user_ptr_array[i] = (void *)sm_p->user_ptr;
+                user_ptr_array[i] = (void *)smcb->user_ptr;
             }
             s_completion_list[i] = NULL;
 
-            PVFS_sys_release(sm_p->sys_op_id);
+            PINT_sys_release(smcb->sys_op_id);
         }
         else
         {
-            tmp_completion_list[new_list_index++] = sm_p;
+            tmp_completion_list[new_list_index++] = smcb;
         }
     }
     *out_count = i;
@@ -150,14 +149,15 @@ static PVFS_error completion_list_retrieve_completed(
     /* clean up and adjust the list and it's book keeping */
     s_completion_list_index = new_list_index;
     memcpy(s_completion_list, tmp_completion_list,
-           (MAX_RETURNED_JOBS * sizeof(PINT_client_sm *)));
+           (MAX_RETURNED_JOBS * sizeof(smcb *)));
     
     gen_mutex_unlock(&s_completion_list_mutex);
     return 0;
 }
 
-static inline int cancelled_io_jobs_are_pending(PINT_client_sm *sm_p)
+static inline int cancelled_io_jobs_are_pending(PINT_smcb *smcb)
 {
+    PINT_sm_client *sm_p = smcb->frame_stack[smcb->framebaseptr];
     /*
       NOTE: if the I/O cancellation has properly completed, the
       cancelled contextual jobs within that I/O operation will be
@@ -181,7 +181,7 @@ static inline int cancelled_io_jobs_are_pending(PINT_client_sm *sm_p)
         GOSSIP_IO_DEBUG, "(%p) cancelled_io_jobs_are_pending: %d "
         "remaining (op %s)\n", sm_p,
         sm_p->u.io.total_cancellations_remaining,
-        (sm_p->op_complete ? "complete" : "NOT complete"));
+        (smcb->op_complete ? "complete" : "NOT complete"));
 
     return (sm_p->u.io.total_cancellations_remaining != 0);
 }
@@ -255,7 +255,7 @@ struct PINT_client_op_entry_s PINT_client_sm_mgmt_table[] =
  *  actively serviced.
  */
 PVFS_error PINT_client_state_machine_post(
-    PINT_client_sm *sm_p,
+    PINT_smcb *smcb,
     int pvfs_sys_op,
     PVFS_sys_op_id *op_id,
     void *user_ptr /* in */)
@@ -270,7 +270,7 @@ PVFS_error PINT_client_state_machine_post(
 
     CLIENT_SM_INIT_ONCE();
 
-    if (!sm_p)
+    if (!smcb)
     {
         return ret;
     }
@@ -278,19 +278,19 @@ PVFS_error PINT_client_state_machine_post(
     memset(&js, 0, sizeof(js));
 
     /* save operation type; mark operation as unfinished */
-    sm_p->user_ptr = user_ptr;
-    sm_p->op = pvfs_sys_op;
-    sm_p->op_complete = 0;
+    smcb->user_ptr = user_ptr;
+    smcb->op = pvfs_sys_op;
+    smcb->op_complete = 0;
 
-    if(sm_p->op == PVFS_DEV_UNEXPECTED)
+    if(smcb->op == PVFS_DEV_UNEXPECTED)
     {
         gossip_err("FAILURE: You should be using PINT_sys_dev_unexp for "
                    "posting this type of operation!\n");
         return ret;
     }
 
-    sm_p->current_state = PINT_state_machine_locate(sm_p);
-    if(!sm_p->current_state)
+    smcb->current_state = PINT_state_machine_locate(smcb);
+    if(!smcb->current_state)
     {
        gossip_lerr("ERROR: Unrecognized sysint operation!\n");
        return  ret;
@@ -298,27 +298,28 @@ PVFS_error PINT_client_state_machine_post(
 
     if (op_id)
     {
-        ret = PINT_id_gen_safe_register(op_id, (void *)sm_p);
-        sm_p->sys_op_id = *op_id;
+        ret = PINT_id_gen_safe_register(op_id, (void *)smcb);
+        smcb->sys_op_id = *op_id;
     }
 
     /*
       start state machine and continue advancing while we're getting
       immediate completions
     */
-    ret = PINT_state_machine_invoke(sm_p, &js);
+    ret = smcb->current_state->state_action(smcb,
+            smcb->frame_stack[smcb->framebaseptr], &js);
     while(ret == 1)
     {
-        ret = PINT_state_machine_next(sm_p, &js);
+        ret = PINT_state_machine_next(smcb, &js);
     }
 
-    if (sm_p->op_complete)
+    if (smcb->op_complete)
     {
         gossip_debug(
             GOSSIP_CLIENT_DEBUG, "Posted %s (immediate completion)\n",
             PINT_client_get_name_str(pvfs_sys_op));
 
-        ret = add_sm_to_completion_list(sm_p);
+        ret = add_sm_to_completion_list(smcb);
         assert(ret == 0);
     }
     else
@@ -338,7 +339,7 @@ PVFS_error PINT_sys_dev_unexp(
 {
     PVFS_error ret = -PVFS_EINVAL;
     job_id_t id;
-    PINT_client_sm *sm_p = NULL;
+    PINT_smcb *smcb = NULL;
 
     CLIENT_SM_INIT_ONCE();
 
@@ -348,29 +349,27 @@ PVFS_error PINT_sys_dev_unexp(
         return -PVFS_EINVAL;
     }
 
-    sm_p = (PINT_client_sm *)malloc(sizeof(PINT_client_sm));
-    if (!sm_p)
+    PINT_smcb_alloc(&smcb, PVFS_DEV_UNEXPECTED);
+    if (!smcb)
     {
         return -PVFS_ENOMEM;
     }
-    memset(sm_p, 0, sizeof(PINT_client_sm));
-    sm_p->user_ptr = user_ptr;
-    sm_p->op = PVFS_DEV_UNEXPECTED;
-    sm_p->op_complete = 0;
-    sm_p->cred_p = NULL;
+    smcb->user_ptr = user_ptr;
+    smcb->op_complete = 0;
+    smcb->frame_stack[smcb->framebaseptr]->cred_p = NULL;
 
     memset(jstat, 0, sizeof(job_status_s));
-    ret = job_dev_unexp(info, (void *)sm_p, 0, jstat, &id,
+    ret = job_dev_unexp(info, (void *)smcb, 0, jstat, &id,
                         JOB_NO_IMMED_COMPLETE, pint_client_sm_context);
     if (ret)
     {
         PVFS_perror_gossip("PINT_sys_dev_unexp failed", ret);
-        free(sm_p);
+        PINT_smcb_free(&smcb);
     }
     else
     {
-        ret = PINT_id_gen_safe_register(op_id, (void *)sm_p);
-        sm_p->sys_op_id = *op_id;
+        ret = PINT_id_gen_safe_register(op_id, (void *)smcb);
+        smcb->sys_op_id = *op_id;
     }
     return ret;
 }
@@ -383,11 +382,18 @@ PVFS_error PINT_client_io_cancel(PVFS_sys_op_id id)
 {
     int i = 0;
     PVFS_error ret = -PVFS_EINVAL;
-    PINT_client_sm *sm_p = NULL;
+    PINT_smcb *smcb = NULL;
+    PINT_sm_client *sm_p = NULL;
 
     gossip_debug(GOSSIP_CLIENT_DEBUG, "PINT_client_io_cancel called\n");
 
-    sm_p = PINT_id_gen_safe_lookup(id);
+    smcb = PINT_id_gen_safe_lookup(id);
+    if (!smcb)
+    {
+	/* if we can't find it, it may have already completed */
+        return 0;
+    }
+    sm_p = smcb->frame_stack[smcb->framebaseptr];
     if (!sm_p)
     {
 	/* if we can't find it, it may have already completed */
@@ -395,9 +401,9 @@ PVFS_error PINT_client_io_cancel(PVFS_sys_op_id id)
     }
 
     /* we can't cancel any arbitrary operation */
-    assert(sm_p->op == PVFS_SYS_IO);
+    assert(smcb->op == PVFS_SYS_IO);
 
-    if (sm_p->op_complete)
+    if (smcb->op_complete)
     {
 	/* op already completed; nothing to cancel. */
         return 0;
@@ -407,7 +413,7 @@ PVFS_error PINT_client_io_cancel(PVFS_sys_op_id id)
     /* first, set a flag informing the sys_io state machine that the
      * operation has been cancelled so it doesn't post any new jobs 
      */
-    sm_p->op_cancelled = 1;
+    smcb->op_cancelled = 1;
 
     /*
       don't return an error if nothing is cancelled, because
@@ -501,7 +507,7 @@ PVFS_error PINT_client_state_machine_test(
 {
     int i = 0, job_count = 0;
     PVFS_error ret = -PVFS_EINVAL;
-    PINT_client_sm *sm_p, *tmp_sm_p = NULL;
+    PINT_smcb *smcb, *tmp_smcb = NULL;
     job_id_t job_id_array[MAX_RETURNED_JOBS];
     job_status_s job_status_array[MAX_RETURNED_JOBS];
     void *client_sm_p_array[MAX_RETURNED_JOBS] = {NULL};
@@ -520,16 +526,16 @@ PVFS_error PINT_client_state_machine_test(
         return ret;
     }
 
-    sm_p = PINT_id_gen_safe_lookup(op_id);
-    if (!sm_p)
+    smcb = PINT_id_gen_safe_lookup(op_id);
+    if (!smcb)
     {
         return ret;
     }
 
-    if (sm_p->op_complete)
+    if (smcb->op_complete)
     {
-        *error_code = sm_p->error_code;
-        conditional_remove_sm_if_in_completion_list(sm_p);
+        *error_code = smcb->frame_stack[smcb->framebaseptr]->error_code;
+        conditional_remove_sm_if_in_completion_list(smcb);
         return 0;
     }
 
@@ -544,20 +550,20 @@ PVFS_error PINT_client_state_machine_test(
     /* do as much as we can on every job that has completed */
     for(i = 0; i < job_count; i++)
     {
-	tmp_sm_p = (PINT_client_sm *)client_sm_p_array[i];
-        assert(tmp_sm_p);
+	tmp_smcb = (PINT_smcb *)client_sm_p_array[i];
+        assert(tmp_smcb);
 
-        if (tmp_sm_p->op == PVFS_DEV_UNEXPECTED)
+        if (tmp_smcb->op == PVFS_DEV_UNEXPECTED)
         {
-            tmp_sm_p->op_complete = 1;
+            tmp_smcb->op_complete = 1;
         }
 
-        if (!tmp_sm_p->op_complete)
+        if (!tmp_smcb->op_complete)
         {
             do
             {
                 ret = PINT_state_machine_next(
-                    tmp_sm_p, &job_status_array[i]);
+                    tmp_smcb, &job_status_array[i]);
 
             } while (ret == 1);
 
@@ -565,8 +571,8 @@ PVFS_error PINT_client_state_machine_test(
         }
 
         /* make sure we don't return internally cancelled I/O jobs */
-        if ((tmp_sm_p->op == PVFS_SYS_IO) && (tmp_sm_p->op_cancelled) &&
-            (cancelled_io_jobs_are_pending(tmp_sm_p)))
+        if ((tmp_smcb->op == PVFS_SYS_IO) && (tmp_smcb->op_cancelled) &&
+            (cancelled_io_jobs_are_pending(tmp_smcb)))
         {
             continue;
         }
@@ -576,17 +582,17 @@ PVFS_error PINT_client_state_machine_test(
           being tested here, we add it to our local completion list so
           that later calls to the sysint test/testsome can find it
         */
-        if ((tmp_sm_p != sm_p) && (tmp_sm_p->op_complete == 1))
+        if ((tmp_smcb != smcb) && (tmp_smcb->op_complete == 1))
         {
-            ret = add_sm_to_completion_list(tmp_sm_p);
+            ret = add_sm_to_completion_list(tmp_smcb);
             assert(ret == 0);
         }
     }
 
-    if (sm_p->op_complete)
+    if (smcb->op_complete)
     {
-        *error_code = sm_p->error_code;
-        conditional_remove_sm_if_in_completion_list(sm_p);
+        *error_code = smcb->frame_stack[smcb->framebaseptr]->error_code;
+        conditional_remove_sm_if_in_completion_list(smcb);
     }
     return 0;
 }
@@ -605,7 +611,7 @@ PVFS_error PINT_client_state_machine_testsome(
 {
     PVFS_error ret = -PVFS_EINVAL;
     int i = 0, limit = 0, job_count = 0;
-    PINT_client_sm *sm_p = NULL;
+    PINT_smcb *smcb = NULL;
     job_id_t job_id_array[MAX_RETURNED_JOBS];
     job_status_s job_status_array[MAX_RETURNED_JOBS];
     void *client_sm_p_array[MAX_RETURNED_JOBS] = {NULL};
@@ -652,25 +658,25 @@ PVFS_error PINT_client_state_machine_testsome(
     /* do as much as we can on every job that has completed */
     for(i = 0; i < job_count; i++)
     {
-	sm_p = (PINT_client_sm *)client_sm_p_array[i];
-        assert(sm_p);
+	smcb = (PINT_smcb *)client_sm_p_array[i];
+        assert(smcb);
 
         /*
           note that dev unexp messages found here are treated as
           complete since if we see them at all in here, they're ready
           to be passed back to the caller
         */
-        if (sm_p->op == PVFS_DEV_UNEXPECTED)
+        if (smcb->op == PVFS_DEV_UNEXPECTED)
         {
-            sm_p->op_complete = 1;
+            smcb->op_complete = 1;
         }
 
-        if (!sm_p->op_complete)
+        if (!smcb->op_complete)
         {
             do
             {
                 ret = PINT_state_machine_next(
-                    sm_p, &job_status_array[i]);
+                    smcb, &job_status_array[i]);
 
             } while (ret == 1);
 
@@ -682,8 +688,8 @@ PVFS_error PINT_client_state_machine_testsome(
         }
 
         /* make sure we don't return internally cancelled I/O jobs */
-        if ((sm_p->op == PVFS_SYS_IO) && (sm_p->op_cancelled) &&
-            (cancelled_io_jobs_are_pending(sm_p)))
+        if ((smcb->op == PVFS_SYS_IO) && (smcb->op_cancelled) &&
+            (cancelled_io_jobs_are_pending(smcb)))
         {
             continue;
         }
@@ -694,9 +700,9 @@ PVFS_error PINT_client_state_machine_testsome(
           grab all completed operations when we're finished
           (i.e. outside of this loop).
         */
-        if (sm_p->op_complete)
+        if (smcb->op_complete)
         {
-            ret = add_sm_to_completion_list(sm_p);
+            ret = add_sm_to_completion_list(smcb);
             assert(ret == 0);
         }
     }
@@ -716,12 +722,12 @@ PVFS_error PINT_client_wait_internal(
     const char *in_class_str)
 {
     PVFS_error ret = -PVFS_EINVAL;
-    PINT_client_sm *sm_p = NULL;
+    PINT_smcb *smcb = NULL;
 
     if (in_op_str && out_error && in_class_str)
     {
-        sm_p = (PINT_client_sm *)id_gen_safe_lookup(op_id);
-        assert(sm_p);
+        smcb = (PINT_smcb *)id_gen_safe_lookup(op_id);
+        assert(smcb);
 
         do
         {
@@ -732,7 +738,7 @@ PVFS_error PINT_client_wait_internal(
             */
             ret = PINT_client_state_machine_test(op_id, out_error);
 
-        } while (!sm_p->op_complete && (ret == 0));
+        } while (!smcb->op_complete && (ret == 0));
 
         if (ret)
         {
@@ -740,7 +746,7 @@ PVFS_error PINT_client_wait_internal(
         }
         else
         {
-            *out_error = sm_p->error_code;
+            *out_error = smcb->error_code;
         }
     }
     return ret;
@@ -750,18 +756,20 @@ PVFS_error PINT_client_wait_internal(
  */
 void PVFS_sys_release(PVFS_sys_op_id op_id)
 {
-    PINT_client_sm *sm_p = (PINT_client_sm *)id_gen_safe_lookup(op_id);
-    if (sm_p)
+    PINT_smcb *smcb = (PINT_client_sm *)id_gen_safe_lookup(op_id);
+    PVFS_credentials *cred_p =
+            smcb->frame_stack[smcb->framebaseptr]->cred_p;
+    if (smcb)
     {
         PINT_id_gen_safe_unregister(op_id);
 
-        if (sm_p->op && sm_p->cred_p)
+        if (smcb->op && cred_p)
         {
-            PVFS_util_release_credentials(sm_p->cred_p);
-            sm_p->cred_p = NULL;
+            PVFS_util_release_credentials(cred_p);
+            smcb->frame_stack[smcb->framebaseptr]->cred_p = NULL;
         }
 
-        free(sm_p);
+        PINT_smcb_free(&smcb);
     }
 }
 

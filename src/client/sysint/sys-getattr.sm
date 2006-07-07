@@ -813,7 +813,7 @@ static int getattr_set_sys_response(PINT_client_sm *sm_p,
 
     if(js_p->error_code != 0)
     {
-        sm_p->op_complete = 1;
+        PINT_SET_OP_COMPLETE;
         return 0;
     }
 
@@ -936,7 +936,7 @@ static int getattr_set_sys_response(PINT_client_sm *sm_p,
     }
 
     PINT_SM_GETATTR_STATE_CLEAR(sm_p->getattr);
-    sm_p->op_complete = 1;
+    PINT_SET_OP_COMPLETE;
     return 0;
 }
 
