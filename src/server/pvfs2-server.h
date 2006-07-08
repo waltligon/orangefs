@@ -499,12 +499,14 @@ int server_state_machine_start_noreq(
 /* INCLUDE STATE-MACHINE.H DOWN HERE */
 #if 0
 #define PINT_OP_STATE       PINT_server_op
-#endif
 #define PINT_OP_STATE_GET_MACHINE(_op) \
     ((_op <= PVFS_MAX_SERVER_OP) ? (PINT_server_req_table[_op].sm) : NULL)
+#endif
 
 #include "state-machine.h"
 #include "pvfs2-internal.h"
+
+struct PINT_stage_machine_s *server_op_state_get_machine(int);
 
 #endif /* __SM_CHECK_DEP */ 
 #endif /* __PVFS_SERVER_H */

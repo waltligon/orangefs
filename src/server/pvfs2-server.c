@@ -1655,7 +1655,7 @@ static int server_post_unexpected_recv(job_status_s *js_p)
 
     if (js_p)
     {
-        PINT_smcb_alloc(&smcb, BMI_UNEXPECTED_OP);
+        PINT_smcb_alloc(&smcb, BMI_UNEXPECTED_OP, server_op_state_get_machine);
 
         /*
           TODO: Consider the optimization of enabling immediate
@@ -1735,7 +1735,7 @@ static int server_state_machine_start(
     }
 
     s_op->resp.op = smcb->op;
-    return ((smcb->current_state->state_action))(smcb,s_op,js_p);
+    return PINT_state_machine_invoke(smcb, js_p);
 }
 
 /* server_state_machine_alloc_noreq()
@@ -1753,7 +1753,7 @@ int server_state_machine_alloc_noreq(
 
     if (new_op)
     {
-        PINT_smcb_alloc(new_op, op);
+        PINT_smcb_alloc(new_op, op, server_op_state_get_machine);
 
         /* find the state machine for this op type */
         (*new_op)->current_state = PINT_state_machine_locate(*new_op);
@@ -1792,7 +1792,7 @@ int server_state_machine_start_noreq(PINT_smcb *smcb)
     if (new_op)
     {
         /* execute first state */
-        ret = smcb->current_state->state_action(smcb, new_op, &tmp_status);
+        ret = PINT_state_machine_invoke(smcb, &tmp_status);
         if (ret < 0)
         {
             gossip_lerr("Error: failed to start state machine.\n");
@@ -1886,6 +1886,21 @@ static int parse_port_from_host_id(char* host_id)
     }
     
     return(port_num);
+}
+
+/* server_op_get_machine()
+ * 
+ * looks up the state machine for the op * given and returns it, or
+ * NULL of the op is out of range.
+ * pointer to this function set in the control block of server state
+ * machines.
+ */
+struct PINT_state_machine_s *server_op_state_get_machine(int op)
+{
+    if (op <= PVFS_MAX_SERVER_OP)
+        return PINT_server_req_table[op].sm;
+    else
+        return NULL;
 }
 
 /*
