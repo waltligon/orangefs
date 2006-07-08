@@ -61,6 +61,8 @@ struct PINT_smcb
     union PINT_state_array_values *current_state;
     union PINT_state_array_values *state_stack[PINT_STATE_STACK_SIZE];
     union PINT_OP_STATE *frame_stack[PINT_FRAME_STACK_SIZE];
+    /* usage specific routinet to look up SM from OP */
+    struct PINT_state_machine_s *(*op_get_state_machine)(int);
     /* state machine context and control variables */
     int op; /* this field externally indicates type of state machine */
     PVFS_id_gen_t op_id; /* unique ID for this operation */
