@@ -684,7 +684,6 @@ do {                                                           \
  ************************************/
 #if 0
 #define PINT_OP_STATE       PINT_client_sm
-#endif
 
 /* This macro allows the generic state-machine-fns.h locate function
  * to access the appropriate sm struct based on the client operation index
@@ -699,6 +698,7 @@ do {                                                           \
       ((_op == PVFS_SERVER_GET_CONFIG) ? (&pvfs2_server_get_config_sm) : \
        ((_op == PVFS_CLIENT_JOB_TIMER) ? (&pvfs2_client_job_timer_sm) : \
         ((_op == PVFS_CLIENT_PERF_COUNT_TIMER) ? (&pvfs2_client_perf_count_timer_sm) : NULL)))))
+#endif
 
 struct PINT_client_op_entry_s
 {
@@ -745,6 +745,9 @@ extern struct PINT_state_machine_s pvfs2_client_lookup_ncache_sm;
 extern struct PINT_state_machine_s pvfs2_client_remove_helper_sm;
 
 #include "state-machine.h"
+
+/* method for lookup up SM from OP */
+struct PINT_state_machine_s *client_op_state_get_machine(int);
 
 #endif /* __SM_CHECK_DEP */
 #endif /* __PVFS2_CLIENT_STATE_MACHINE_H */

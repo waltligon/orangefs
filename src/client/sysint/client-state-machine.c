@@ -225,6 +225,43 @@ struct PINT_client_op_entry_s PINT_client_sm_mgmt_table[] =
     {&pvfs2_client_mgmt_get_dirdata_handle_sm}
 };
 
+
+/* This function allows the generic state-machine-fns.c locate function
+ * to access the appropriate sm struct based on the client operation index
+ * from the above enum.  Because the enum starts management operations at
+ * 70, the management table was separated out from the sys table and the
+ * necessary checks and subtractions are made in this macro.
+ * Pointer to this func is put in SM control block for client SMs.
+ */
+/* NOTE; appears to be a latent bug that does not catch op values
+ * between largest sys op and lowest mgmt op - need to check on this
+ * WBL
+ */
+struct PINT_state_machine_s *client_op_state_get_machine(int op)
+{
+    switch (op)
+    {
+    /* special cases first */
+    case PVFS_SERVER_GET_CONFIG :
+        return &pvfs2_server_get_config_sm;
+    case PVFS_CLIENT_JOB_TIMER :
+        return &pvfs2_client_job_timer;
+    case PVFS_CLIENT_PERF_COUNT_TIMER :
+        return &pvfs2_client_perf_count_timer;
+    default:
+        /* now check range for sys functions */
+        if (op <= PVFS_OP_SYS_MAXVAL)
+            return PINT_client_sm_sys_table[op-1].sm;
+        else
+            /* now checjk range for mgmt functions */
+            if (op <= PVFS_OP_MGMT_MAXVAL)
+                return PINT_client_sm_mgmt_table[op-PVFS_OP_SYS_MAXVAL-1].sm;
+            else
+                /* otherwise its out of range */
+                return NULL;
+    }
+}
+
 /*
   NOTE: important usage notes regarding post(), test(), and testsome()
 
@@ -306,8 +343,7 @@ PVFS_error PINT_client_state_machine_post(
       start state machine and continue advancing while we're getting
       immediate completions
     */
-    ret = smcb->current_state->state_action(smcb,
-            smcb->frame_stack[smcb->framebaseptr], &js);
+    ret = PINT_state_machine_invoke(smcb, &js);
     while(ret == 1)
     {
         ret = PINT_state_machine_next(smcb, &js);
@@ -349,7 +385,7 @@ PVFS_error PINT_sys_dev_unexp(
         return -PVFS_EINVAL;
     }
 
-    PINT_smcb_alloc(&smcb, PVFS_DEV_UNEXPECTED);
+    PINT_smcb_alloc(&smcb, PVFS_DEV_UNEXPECTED, client_op_state_get_machine);
     if (!smcb)
     {
         return -PVFS_ENOMEM;
